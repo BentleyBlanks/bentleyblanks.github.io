@@ -24,7 +24,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815y";
+} from "./Data_Game.mjs?v=20260815z";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -72,7 +72,7 @@ import {
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815y";
+} from "./Script_Rules.mjs?v=20260815z";
 import {
   FindLocation,
   FindLocationAt,
@@ -83,20 +83,20 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815v";
+} from "./Data_World.mjs?v=20260815z";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815v";
+} from "./Script_World.mjs?v=20260815z";
 
 const dom = Object.fromEntries([
   "loadingScreen", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
   "hungerBar", "hungerValue", "anxietyBar", "anxietyValue", "soundButton", "soundButtonIcon", "helpButton", "studioMonogram",
   "studioNameHud", "startupDebtValue", "locationValue", "locationRoute", "projectTitle", "missionText", "moduleStrip", "interactionPrompt", "interactionTitle", "interactionDetail",
-  "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "toastStack", "setupScreen",
+  "mobileControls", "moveLeftButton", "moveRightButton", "jumpButton", "interactButton", "settlementButton", "settlementMonthValue", "toastStack", "setupScreen",
   "travelCurtain",
   "ceremonyIntro", "ceremonyStartButton", "skipCeremonyButton", "ceremonyCaption", "ceremonyCaptionText",
   "foundingNamePanel", "studioNameInput", "studioNameSuggestions", "nameConfirmButton", "setupError",
@@ -633,11 +633,15 @@ function BuildHumanActor(color = 0x8d7cff, owner = false) {
   group.add(shadow);
   const backLeg = BuildPivotedBoxLimb({ color: 0x24283a, upperLength: .38, lowerLength: .38, width: .22, depth: .28, shoeColor: 0x11131c });
   const frontLeg = BuildPivotedBoxLimb({ color: 0x292e42, upperLength: .38, lowerLength: .38, width: .22, depth: .3, shoeColor: 0x11131c });
-  backLeg.position.set(-.19, .86, -.08);
-  frontLeg.position.set(.19, .86, .08);
+  backLeg.scale.set(.72, 1.14, .9);
+  frontLeg.scale.set(1.18, .91, 1.08);
+  backLeg.position.set(-.19, .88, -.08);
+  frontLeg.position.set(.19, .84, .08);
   group.add(backLeg, frontLeg);
   const torso = Box(.76, .88, .42, color);
   torso.position.y = 1.3;
+  torso.scale.set(1.08, .94, .82);
+  torso.rotation.z = -.025;
   group.add(torso);
   const collar = Box(.34, .12, .45, owner ? 0xeee8ff : 0xdad5e5, { castShadow: false });
   collar.position.set(0, 1.66, .015);
@@ -647,31 +651,61 @@ function BuildHumanActor(color = 0x8d7cff, owner = false) {
     new THREE.MeshStandardMaterial({ color: owner ? 0xe2ad86 : 0xd9a985, roughness: .88 }),
   );
   head.position.set(0, 2.02, 0);
+  head.scale.set(1.24, .88, .8);
   head.castShadow = true;
   group.add(head);
   const hair = new THREE.Mesh(
     new THREE.SphereGeometry(.325, 14, 9, 0, Math.PI * 2, 0, Math.PI * .48),
     new THREE.MeshStandardMaterial({ color: owner ? 0x11121a : 0x24212a, roughness: .96 }),
   );
-  hair.position.set(0, 2.13, 0);
+  hair.position.set(-.025, 2.13, 0);
+  hair.scale.set(1.27, .86, .82);
+  hair.rotation.z = -.1;
   group.add(hair);
   const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x171620, toneMapped: false });
-  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(.026, 8, 6), eyeMaterial);
-  const rightEye = leftEye.clone();
-  leftEye.position.set(-.105, 2.05, .292);
-  rightEye.position.set(.105, 2.05, .292);
+  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(.044, 8, 6), eyeMaterial);
+  const rightEye = new THREE.Mesh(new THREE.SphereGeometry(.019, 8, 6), eyeMaterial);
+  leftEye.position.set(-.13, 2.06, .286);
+  rightEye.position.set(.12, 2.035, .286);
   const nose = new THREE.Mesh(
-    new THREE.SphereGeometry(.038, 8, 6),
+    new THREE.SphereGeometry(.05, 8, 6),
     new THREE.MeshStandardMaterial({ color: owner ? 0xd99f79 : 0xcf9877, roughness: .95 }),
   );
-  nose.scale.set(.7, .82, 1);
-  nose.position.set(0, 1.985, .31);
-  group.add(leftEye, rightEye, nose);
+  nose.scale.set(.62, .72, 2.6);
+  nose.position.set(.015, 1.985, .37);
+  const ear = Sphere(.105, owner ? 0xd79c77 : 0xcf9675, { roughness: .96, segments: 10, rings: 7 });
+  ear.scale.set(.72, 1.2, .48);
+  ear.position.set(-.385, 2.0, -.015);
+  const mouth = Box(.17, .024, .025, 0x713c45, { castShadow: false, roughness: .9 });
+  mouth.position.set(.035, 1.89, .287);
+  mouth.rotation.z = -.1;
+  const eyebrow = Box(.18, .025, .018, 0x28212a, { castShadow: false });
+  eyebrow.position.set(-.1, 2.135, .285);
+  eyebrow.rotation.z = .16;
+  group.add(leftEye, rightEye, nose, ear, mouth, eyebrow);
+  const badge = Box(.18, .22, .025, owner ? 0xffd166 : 0xe4d7ba, { surface: "paper", castShadow: false });
+  badge.position.set(.2, 1.36, .225);
+  badge.rotation.z = .08;
+  const badgeClip = Box(.035, .16, .018, 0x5c526f, { castShadow: false });
+  badgeClip.position.set(.15, 1.55, .225);
+  badgeClip.rotation.z = -.24;
+  group.add(badge, badgeClip);
   const backArm = BuildPivotedBoxLimb({ color, upperLength: .34, lowerLength: .34, width: .17, depth: .22, handColor: owner ? 0xe2ad86 : 0xd9a985 });
   const frontArm = BuildPivotedBoxLimb({ color, upperLength: .34, lowerLength: .34, width: .17, depth: .24, handColor: owner ? 0xe2ad86 : 0xd9a985 });
   backArm.position.set(-.46, 1.62, -.12);
   frontArm.position.set(.46, 1.62, .12);
+  backArm.scale.set(.72, 1.18, .9);
+  frontArm.scale.set(1.15, .84, 1.08);
   group.add(backArm, frontArm);
+  if (owner) {
+    const overdueSlip = Box(.12, .58, .018, 0xf1e7cf, { surface: "paper", castShadow: false });
+    overdueSlip.position.set(-.47, 1.23, .18);
+    overdueSlip.rotation.z = -.23;
+    const redLine = Box(.09, .025, .02, 0xb2474d, { castShadow: false });
+    redLine.position.set(-.4, 1.43, .195);
+    redLine.rotation.z = -.23;
+    group.add(overdueSlip, redLine);
+  }
   group.userData.parts = {
     torso, head, leftLeg: backLeg, rightLeg: frontLeg,
     leftKnee: backLeg.userData.joint, rightKnee: frontLeg.userData.joint,
@@ -679,10 +713,11 @@ function BuildHumanActor(color = 0x8d7cff, owner = false) {
     leftElbow: backArm.userData.joint, rightElbow: frontArm.userData.joint,
     shadow,
   };
+  group.userData.visualStyle = "absurd-paper-doll-v2";
   return group;
 }
 
-function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
+function BuildFlatHumanActor(color = 0x8d7cff, owner = false, variant = "default") {
   const group = new THREE.Group();
   const material = (fill) => new THREE.MeshBasicMaterial({ color: fill, toneMapped: false, side: THREE.DoubleSide });
   const rectangle = (width, height, fill, z = 0) => {
@@ -721,27 +756,33 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
     pivot.userData.joint = joint;
     return pivot;
   };
-  const leftLeg = limb({ upperLength: .39, lowerLength: .4, width: .22, fill: 0x22283b, z: .01, shoe: true });
-  const rightLeg = limb({ upperLength: .39, lowerLength: .4, width: .22, fill: 0x2b3148, z: .07, shoe: true });
-  leftLeg.position.set(-.17, .91, .01);
-  rightLeg.position.set(.17, .91, .07);
+  const leftLeg = limb({ upperLength: .46, lowerLength: .44, width: .15, fill: 0x22283b, z: .01, shoe: true });
+  const rightLeg = limb({ upperLength: .34, lowerLength: .36, width: .29, fill: 0x2b3148, z: .07, shoe: true });
+  leftLeg.position.set(-.16, .96, .01);
+  rightLeg.position.set(.19, .82, .07);
   group.add(leftLeg, rightLeg);
   if (owner) {
-    const bag = rectangle(.48, .58, 0x27243a, .025);
-    bag.position.set(-.32, 1.25, .025);
-    bag.rotation.z = -.08;
+    const bag = rectangle(.56, .68, 0x27243a, .025);
+    bag.position.set(-.34, 1.22, .025);
+    bag.rotation.z = -.13;
     const strap = rectangle(.055, .98, 0x4d466f, .026);
     strap.position.set(-.08, 1.43, .026);
     strap.rotation.z = -.38;
-    group.add(bag, strap);
+    const receiptA = rectangle(.1, .46, 0xefe5cc, .028);
+    receiptA.position.set(-.48, 1.05, .028);
+    receiptA.rotation.z = -.31;
+    const receiptB = rectangle(.08, .34, 0xffd7d9, .029);
+    receiptB.position.set(-.25, 1.02, .029);
+    receiptB.rotation.z = .2;
+    group.add(bag, strap, receiptA, receiptB);
   }
   const torsoShape = new THREE.Shape();
-  torsoShape.moveTo(-.34, -.43);
-  torsoShape.lineTo(-.43, .27);
-  torsoShape.lineTo(-.25, .45);
-  torsoShape.lineTo(.25, .45);
-  torsoShape.lineTo(.43, .27);
-  torsoShape.lineTo(.34, -.43);
+  torsoShape.moveTo(-.27, -.46);
+  torsoShape.lineTo(-.49, .16);
+  torsoShape.lineTo(-.2, .49);
+  torsoShape.lineTo(.34, .4);
+  torsoShape.lineTo(.49, .08);
+  torsoShape.lineTo(.25, -.46);
   torsoShape.closePath();
   const torso = new THREE.Mesh(new THREE.ShapeGeometry(torsoShape), material(color));
   torso.position.set(0, 1.35, .04);
@@ -750,12 +791,17 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
     new THREE.Vector2(-.15, .12), new THREE.Vector2(0, -.08), new THREE.Vector2(.15, .12),
   ])), material(owner ? 0xf0ecff : 0xd9d6e7));
   shirt.position.set(0, 1.66, .045);
+  shirt.rotation.z = -.08;
   group.add(shirt);
   const head = new THREE.Mesh(new THREE.CircleGeometry(.31, 20), material(owner ? 0xe2ad86 : 0xd9a985));
-  head.position.set(0, 2.02, .05);
+  head.position.set(.035, 2.02, .05);
+  head.scale.set(1.28, .82, 1);
+  head.rotation.z = -.055;
   group.add(head);
   const hair = new THREE.Mesh(new THREE.CircleGeometry(.32, 20, 0, Math.PI), material(owner ? 0x11121a : 0x24212a));
-  hair.position.set(0, 2.11, .06);
+  hair.position.set(-.015, 2.105, .06);
+  hair.scale.set(1.32, .84, 1);
+  hair.rotation.z = -.16;
   group.add(hair);
   let thinningHair = null;
   let scalpShine = null;
@@ -775,20 +821,84 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
       new THREE.MeshBasicMaterial({ color: 0xffead7, transparent: true, opacity: .72, depthWrite: false, toneMapped: false }),
     );
     scalpShine.scale.set(.58, 1, 1);
-    scalpShine.position.set(.095, 2.14, .071);
+    scalpShine.position.set(.13, 2.14, .071);
     group.add(scalpShine);
     thinningHair.visible = false;
     scalpShine.visible = false;
   }
-  const ear = new THREE.Mesh(new THREE.CircleGeometry(.065, 10), material(owner ? 0xd79c77 : 0xcf9675));
-  ear.position.set(-.29, 2.01, .055);
-  const eye = new THREE.Mesh(new THREE.CircleGeometry(.025, 8), material(0x161722));
-  eye.position.set(.12, 2.05, .065);
-  group.add(ear, eye);
-  const leftArm = limb({ upperLength: .35, lowerLength: .35, width: .17, fill: color, z: .025, hand: true });
-  const rightArm = limb({ upperLength: .35, lowerLength: .35, width: .17, fill: color, z: .075, hand: true });
-  leftArm.position.set(-.4, 1.62, .025);
-  rightArm.position.set(.4, 1.62, .075);
+  const ear = new THREE.Mesh(new THREE.CircleGeometry(.09, 10), material(owner ? 0xd79c77 : 0xcf9675));
+  ear.scale.set(.72, 1.35, 1);
+  ear.position.set(-.36, 1.995, .055);
+  const leftEyeWhite = new THREE.Mesh(new THREE.CircleGeometry(.071, 12), material(0xf4efe4));
+  const rightEyeWhite = new THREE.Mesh(new THREE.CircleGeometry(.038, 10), material(0xf4efe4));
+  leftEyeWhite.scale.y = 1.18;
+  leftEyeWhite.position.set(-.105, 2.065, .064);
+  rightEyeWhite.position.set(.155, 2.035, .064);
+  const leftPupil = new THREE.Mesh(new THREE.CircleGeometry(.027, 8), material(0x161722));
+  const rightPupil = new THREE.Mesh(new THREE.CircleGeometry(.014, 8), material(0x161722));
+  leftPupil.position.set(-.087, 2.05, .067);
+  rightPupil.position.set(.165, 2.03, .067);
+  const noseShape = new THREE.Shape();
+  noseShape.moveTo(-.025, .08);
+  noseShape.lineTo(.16, -.01);
+  noseShape.lineTo(-.025, -.06);
+  noseShape.closePath();
+  const nose = new THREE.Mesh(new THREE.ShapeGeometry(noseShape), material(owner ? 0xd79c77 : 0xcf9675));
+  nose.position.set(.18, 1.985, .069);
+  const mouth = rectangle(.17, .022, 0x763943, .069);
+  mouth.position.set(.055, 1.885, .069);
+  mouth.rotation.z = -.12;
+  const eyebrow = rectangle(.18, .024, 0x24212a, .069);
+  eyebrow.position.set(-.095, 2.155, .069);
+  eyebrow.rotation.z = .18;
+  const cheek = new THREE.Mesh(new THREE.CircleGeometry(.045, 10), material(0xd88484));
+  cheek.position.set(-.18, 1.94, .067);
+  cheek.scale.y = .55;
+  group.add(ear, leftEyeWhite, rightEyeWhite, leftPupil, rightPupil, nose, mouth, eyebrow, cheek);
+  const badge = rectangle(.18, .22, owner ? 0xffd166 : 0xe7d9bc, .071);
+  badge.position.set(.2, 1.37, .071);
+  badge.rotation.z = .1;
+  const badgeClip = rectangle(.03, .17, 0x4e4667, .072);
+  badgeClip.position.set(.15, 1.55, .072);
+  badgeClip.rotation.z = -.22;
+  group.add(badge, badgeClip);
+  const variantSeed = [...`${variant}:${color}`].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 3;
+  if (variantSeed === 0) {
+    const visorLeft = new THREE.Mesh(new THREE.RingGeometry(.078, .096, 14), material(0x282133));
+    const visorRight = new THREE.Mesh(new THREE.RingGeometry(.05, .064, 12), material(0x282133));
+    visorLeft.position.set(-.105, 2.065, .071);
+    visorRight.position.set(.155, 2.035, .071);
+    const visorBridge = rectangle(.13, .025, 0x282133, .071);
+    visorBridge.position.set(.025, 2.05, .071);
+    visorBridge.rotation.z = -.08;
+    group.add(visorLeft, visorRight, visorBridge);
+  } else if (variantSeed === 1) {
+    const cape = rectangle(.54, .74, 0x514567, .018);
+    cape.position.set(-.17, 1.31, .018);
+    cape.rotation.z = .18;
+    const stickyA = rectangle(.17, .14, 0xffd166, .073);
+    stickyA.position.set(-.23, 1.42, .073);
+    stickyA.rotation.z = -.13;
+    const stickyB = rectangle(.13, .11, 0xff6eae, .074);
+    stickyB.position.set(-.05, 1.2, .074);
+    stickyB.rotation.z = .17;
+    group.add(cape, stickyA, stickyB);
+  } else {
+    const cableA = rectangle(.035, .5, 0x343042, .02);
+    cableA.position.set(-.43, 1.12, .02);
+    cableA.rotation.z = -.42;
+    const cableB = rectangle(.035, .38, 0x343042, .02);
+    cableB.position.set(-.56, .73, .02);
+    cableB.rotation.z = .25;
+    const plug = rectangle(.18, .12, 0x343042, .021);
+    plug.position.set(-.51, .48, .021);
+    plug.rotation.z = .25;
+    group.add(cableA, cableB, plug);
+  }
+  const leftArm = limb({ upperLength: .44, lowerLength: .41, width: .12, fill: color, z: .025, hand: true });
+  const rightArm = limb({ upperLength: .29, lowerLength: .32, width: .22, fill: color, z: .075, hand: true });
+  leftArm.position.set(-.42, 1.68, .025);
+  rightArm.position.set(.43, 1.56, .075);
   group.add(leftArm, rightArm);
   group.userData.flat = true;
   group.userData.parts = {
@@ -799,6 +909,7 @@ function BuildFlatHumanActor(color = 0x8d7cff, owner = false) {
     shadow,
   };
   group.userData.motion = { phase: 0, blend: 0, landing: 0, wasGrounded: true, stepIndex: -1 };
+  group.userData.visualStyle = "absurd-paper-doll-v2";
   return group;
 }
 
@@ -849,9 +960,36 @@ function BuildFlatAiActor(color = 0x66b8ff) {
   face.position.set(0, 1.25, .07);
   const stand = Box(.11, .7, .02, color, { castShadow: false });
   stand.position.set(0, .55, .01);
-  group.add(glow, body, face, stand);
+  const leftEye = FlatDisc(.035, 0xf5f3ff, { z: .09, segments: 10 });
+  leftEye.scale.y = 1.55;
+  leftEye.position.set(-.11, 1.27, .09);
+  const rightEye = FlatDisc(.018, 0xf5f3ff, { z: .09, segments: 8 });
+  rightEye.position.set(.1, 1.23, .09);
+  const mouth = FlatPanel(.12, .018, 0x66f4d0, { z: .09, rotation: -.12 });
+  mouth.position.set(.02, 1.17, .09);
+  const antenna = FlatPanel(.035, .38, color, { z: .045, rotation: -.28 });
+  antenna.position.set(-.06, 1.83, .045);
+  const antennaTip = FlatDisc(.09, 0xffd166, { z: .05, segments: 5 });
+  antennaTip.position.set(-.115, 2.02, .05);
+  const leftFin = FlatPanel(.32, .12, color, { z: .025, rotation: .42 });
+  leftFin.position.set(-.48, 1.38, .025);
+  const rightFin = FlatPanel(.24, .18, 0xff6eae, { z: .025, rotation: -.35 });
+  rightFin.position.set(.45, 1.11, .025);
+  const brokenOrbit = new THREE.Mesh(
+    new THREE.RingGeometry(.62, .66, 28, 1, .28, Math.PI * 1.55),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .58, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  brokenOrbit.scale.y = .42;
+  brokenOrbit.position.set(0, 1.28, -.005);
+  brokenOrbit.rotation.z = -.18;
+  const cord = FlatPanel(.035, .52, 0x242736, { z: .005, rotation: .17 });
+  cord.position.set(.12, .45, .005);
+  const plug = FlatPanel(.19, .12, 0x242736, { z: .006, rotation: .17 });
+  plug.position.set(.17, .18, .006);
+  group.add(glow, brokenOrbit, body, leftFin, rightFin, face, leftEye, rightEye, mouth, antenna, antennaTip, stand, cord, plug);
   group.userData.flat = true;
   group.userData.parts = { ring: glow, body };
+  group.userData.visualStyle = "absurd-orbit-assistant-v2";
   return group;
 }
 
@@ -1360,6 +1498,101 @@ function AddTuftedPanel(group, x, y, width, height, color) {
   }
 }
 
+function AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent) {
+  const sigil = new THREE.Group();
+  const motifX = index % 2 ? -5.05 : 5.05;
+  const ink = new THREE.Color(accent).multiplyScalar(.42).getHex();
+  const paper = new THREE.Color(paleAccent).lerp(new THREE.Color(0xf6ead0), .46).getHex();
+  const Eye = (x, y, radius = .16, pupilScale = 1) => {
+    AddSceneDisc(sigil, radius, x, y, paper, { z: -.07, segments: 18, scaleY: .78 });
+    AddSceneRing(sigil, radius * .46, radius * .61, x, y, ink, { z: -.055, segments: 16 });
+    const pupil = AddSceneDisc(sigil, radius * .23 * pupilScale, x + radius * .08, y - radius * .025, 0x17151b, { z: -.04, segments: 10 });
+    pupil.scale.y = 1.35;
+  };
+  AddSceneDisc(sigil, .88, 0, 0, accent, { z: -.18, opacity: .08, segments: 32, scaleY: .82 });
+
+  if (location.id === "home") {
+    AddScenePanel(sigil, 1.18, .78, 0, 0, 0x27233c, { z: -.12, rotation: -.06 });
+    AddScenePanel(sigil, .98, .56, -.02, .01, 0x8d7cff, { z: -.1, opacity: .5, rotation: -.06 });
+    Eye(.02, .02, .24, 1.2);
+    AddScenePanel(sigil, .05, .5, -.25, .64, ink, { z: -.08, rotation: -.42 });
+    AddScenePanel(sigil, .05, .46, .27, .62, ink, { z: -.08, rotation: .5 });
+    for (let key = 0; key < 5; key += 1) AddScenePanel(sigil, .12, .055, -.34 + key * .17, -.52, key % 2 ? paper : accent, { z: -.06, rotation: (key - 2) * .04 });
+  } else if (location.id === "diner") {
+    const egg = AddSceneDisc(sigil, .68, 0, .02, paper, { z: -.13, segments: 28, scaleY: .72 });
+    egg.rotation.z = -.18;
+    AddSceneDisc(sigil, .29, .1, .01, 0xffbf45, { z: -.09, segments: 22, scaleY: .86 });
+    Eye(.09, .03, .13, .8);
+    for (let ray = 0; ray < 8; ray += 1) {
+      const angle = ray / 8 * Math.PI * 2;
+      AddScenePanel(sigil, .55, .035, Math.cos(angle) * .78, Math.sin(angle) * .56, ray % 2 ? 0x7b3e2a : ink, { z: -.1, rotation: angle });
+    }
+  } else if (location.id === "market") {
+    for (let bar = 0; bar < 11; bar += 1) {
+      const height = .52 + ((bar * 7) % 5) * .11;
+      AddScenePanel(sigil, bar % 3 ? .06 : .11, height, -.52 + bar * .105, .02, bar % 4 ? ink : accent, { z: -.1, rotation: (bar % 2 ? 1 : -1) * .025 });
+      AddScenePanel(sigil, .025, .22, -.52 + bar * .105, -.48 - (bar % 2) * .05, ink, { z: -.09, rotation: bar % 2 ? -.35 : .35 });
+    }
+    Eye(-.38, .28, .14, 1.3);
+    Eye(.4, .21, .08, .8);
+    AddScenePanel(sigil, .72, .04, .03, -.29, 0xffd166, { z: -.08, rotation: -.06 });
+  } else if (location.id === "talent") {
+    AddScenePanel(sigil, 1.05, 1.24, 0, 0, paper, { z: -.13, rotation: .11 });
+    AddScenePanel(sigil, .86, .045, .03, .38, accent, { z: -.1, rotation: .11 });
+    Eye(-.19, .12, .12, 1.1);
+    Eye(.22, .07, .06, .75);
+    AddScenePanel(sigil, .46, .035, .03, -.17, ink, { z: -.08, rotation: .18 });
+    AddScenePanel(sigil, .18, .48, .13, -.51, 0xff6eae, { z: -.09, rotation: -.17 });
+    for (let pin = 0; pin < 4; pin += 1) AddSceneDisc(sigil, .035, -.42 + pin * .28, -.42 + (pin % 2) * .08, pin % 2 ? accent : 0xffd166, { z: -.07, segments: 8 });
+  } else if (location.id === "bank") {
+    AddSceneRing(sigil, .45, .67, 0, 0, 0xb99556, { z: -.12, segments: 30 });
+    AddSceneRing(sigil, .22, .3, 0, 0, accent, { z: -.09, segments: 22 });
+    Eye(0, 0, .17, 1.25);
+    for (let spoke = 0; spoke < 10; spoke += 1) {
+      const angle = spoke / 10 * Math.PI * 2;
+      AddScenePanel(sigil, .43, .035, Math.cos(angle) * .78, Math.sin(angle) * .62, spoke % 2 ? 0xb99556 : paleAccent, { z: -.11, rotation: angle });
+    }
+  } else if (location.id === "hotel") {
+    AddSceneDisc(sigil, .65, 0, -.02, 0xc5a367, { z: -.13, segments: 24, scaleY: .65 });
+    AddScenePanel(sigil, 1.42, .13, 0, -.24, 0x7d293d, { z: -.1, rotation: -.03 });
+    AddSceneDisc(sigil, .11, 0, .49, 0xc5a367, { z: -.1, segments: 16 });
+    Eye(.04, -.03, .16, 1.1);
+    for (let spark = 0; spark < 5; spark += 1) AddSceneDisc(sigil, .035 + spark * .006, -.55 + spark * .28, .52 + (spark % 2) * .1, spark % 2 ? accent : paper, { z: -.08, segments: 5 });
+  } else if (location.id === "footbath") {
+    const sole = AddSceneDisc(sigil, .48, -.05, -.12, 0x79aaa3, { z: -.12, segments: 24, scaleY: 1.42 });
+    sole.rotation.z = -.16;
+    for (let toe = 0; toe < 5; toe += 1) AddSceneDisc(sigil, .12 - toe * .012, -.34 + toe * .18, .58 - Math.abs(toe - 2) * .055, toe % 2 ? paleAccent : accent, { z: -.1, segments: 14 });
+    Eye(-.12, -.02, .13, .9);
+    AddSceneRing(sigil, .12, .16, .44, -.45, paper, { z: -.08, segments: 18, thetaLength: Math.PI * 1.55 });
+  } else if (location.id === "footbathCity") {
+    const bubbles = [[-.4,.22,.3],[.1,.08,.42],[.45,.44,.2],[-.18,-.38,.18]];
+    bubbles.forEach(([x, y, radius], bubbleIndex) => {
+      AddSceneRing(sigil, radius * .72, radius, x, y, bubbleIndex % 2 ? accent : paleAccent, { z: -.11 + bubbleIndex * .008, opacity: .8, segments: 24 });
+    });
+    Eye(.08, .09, .18, 1.25);
+    AddScenePanel(sigil, .54, .04, .09, -.26, ink, { z: -.07, rotation: .12 });
+  } else {
+    AddScenePanel(sigil, .09, 1.2, 0, -.12, 0xc29a62, { z: -.12 });
+    AddScenePanel(sigil, 1.08, .09, 0, .28, 0xc29a62, { z: -.11, rotation: -.08 });
+    AddScenePanel(sigil, .72, .62, 0, -.15, 0x641f3f, { z: -.13, rotation: .04 });
+    AddSceneRing(sigil, .14, .25, -.27, .28, 0x17151b, { z: -.07, segments: 18 });
+    AddSceneRing(sigil, .1, .2, .27, .25, 0x17151b, { z: -.07, segments: 18 });
+    AddScenePanel(sigil, .22, .055, 0, .27, 0x17151b, { z: -.06, rotation: -.05 });
+    AddScenePanel(sigil, .46, .035, .02, -.12, paleAccent, { z: -.07, rotation: .1 });
+  }
+
+  for (let screw = 0; screw < 5; screw += 1) {
+    const angle = screw / 5 * Math.PI * 2 + index * .37;
+    AddSceneDisc(sigil, .025 + (screw % 2) * .012, Math.cos(angle) * .9, Math.sin(angle) * .7, screw % 2 ? accent : paper, { z: -.045, segments: 6 });
+  }
+  sigil.position.set(center + motifX, 3.48, 0);
+  sigil.rotation.z = index % 2 ? -.035 : .035;
+  sigil.userData.baseRotation = sigil.rotation.z;
+  sigil.userData.baseScale = .96 + (index % 3) * .025;
+  group.add(sigil);
+  return sigil;
+}
+
 function BuildLocationEnvironment(location, index) {
   const group = new THREE.Group();
   const start = location.startX;
@@ -1532,13 +1765,14 @@ function BuildLocationEnvironment(location, index) {
     Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
 
+  const sigil = AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
   const practicalColors = { home: 0xffd6ad, diner: 0xffc77f, market: 0xdfffee, talent: 0xdbeaff, bank: 0xffe0c6, hotel: 0xffc47d, footbath: 0xc8fff4, footbathCity: 0xe0cfff, maleModelClub: 0xffc6e4 };
   const roomLight = new THREE.PointLight(practicalColors[location.id] || accent, 1.55, 9.2, 2.05);
   roomLight.position.set(center, 3.8, 3.1);
   roomLight.castShadow = false;
   worldPracticalLights.push(roomLight);
   group.add(roomLight);
-  locationVisuals.set(location.id, { group, halo, ceilingBar, roomLight, accent: new THREE.Color(accent), phase: index * 1.37 });
+  locationVisuals.set(location.id, { group, halo, ceilingBar, sigil, roomLight, accent: new THREE.Color(accent), phase: index * 1.37 });
   roomGroup.add(group);
 }
 
@@ -1957,7 +2191,7 @@ function RebuildStaffActors() {
   state.team.forEach((member, index) => {
     const staff = FindStaff(member.id);
     const color = HexColor(staff.color);
-    const actor = staff.kind === "ai" ? BuildFlatAiActor(color) : BuildFlatHumanActor(color, false);
+    const actor = staff.kind === "ai" ? BuildFlatAiActor(color) : BuildFlatHumanActor(color, false, staff.id);
     actor.scale.setScalar(.72);
     actor.position.set(3.75 + index * 1.02, .02, .12);
     actor.userData.baseY = actor.position.y;
@@ -2222,6 +2456,11 @@ function Animate() {
       const pulse = active ? Math.sin(time * 1.6 + visual.phase) * .04 : 0;
       visual.halo.material.opacity += (((active ? .072 : .026) + pulse * .12) - visual.halo.material.opacity) * (1 - Math.exp(-delta * 4));
       visual.ceilingBar.material.opacity += ((active ? .66 + pulse : .2) - visual.ceilingBar.material.opacity) * (1 - Math.exp(-delta * 5));
+      if (visual.sigil) {
+        const sigilScale = visual.sigil.userData.baseScale + (active ? Math.sin(time * 1.9 + visual.phase) * .025 : 0);
+        visual.sigil.scale.setScalar(sigilScale);
+        visual.sigil.rotation.z = visual.sigil.userData.baseRotation + Math.sin(time * .72 + visual.phase) * (active ? .022 : .006);
+      }
       if (visual.roomLight) visual.roomLight.intensity += ((active ? 2.45 + pulse * 2 : .72) - visual.roomLight.intensity) * (1 - Math.exp(-delta * 3.8));
     });
   }
@@ -2319,7 +2558,7 @@ function GetGuidedMission(project, gameType, tensions, anxietyState) {
     return `本月还剩 ${energyLeft} 格精力。继续开发，先把四项基础做起来。`;
   }
   if (project.age === 0) {
-    return "本月精力已经用完。关掉电脑，走到墙上月历前结算第一个月。";
+    return "本月精力已经用完。点右下角“下一回合”结算第一个月。";
   }
   if (project.age < 2) {
     return `继续开发第 ${project.age + 1} 个月；做满两个月后，电脑才会出现“提交商店”。`;
@@ -2340,6 +2579,10 @@ function RenderHud() {
   dom.studioNameHud.textContent = studioName;
   dom.studioMonogram.textContent = studioName === "尚未成立" ? "未" : Array.from(studioName)[0] || "创";
   dom.monthValue.textContent = `M${String(state.month).padStart(2, "0")}`;
+  const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
+  dom.settlementMonthValue.textContent = `进入 ${nextMonthLabel}`;
+  dom.settlementButton.setAttribute("aria-label", `下一回合，进入 ${nextMonthLabel}`);
+  dom.settlementButton.disabled = state.status !== "playing" || !project;
   ApplyOwnerHairStage();
   dom.cashValue.textContent = FormatMoney(state.cash);
   const startupLoan = state.startupLoan;
@@ -2703,7 +2946,7 @@ function OpenHomeComputerSheet() {
     : "本月精力已经用完";
   const objectiveDetail = energyLeft > 0
     ? `还剩 ${energyLeft} 格。每点一次开发，就会投入 1 格精力并立刻推进对应模块。`
-    : "关掉电脑，走到墙上月历前核对账单并进入下个月。";
+    : "关掉电脑，点右下角“下一回合”核账并进入下个月。";
   OpenPanel("DEVELOPMENT DESK", `开发电脑 · 《${EscapeHtml(state.project.name)}》`, `
     <div class="computerDeskScene">
       <div class="computerDeskMat" aria-hidden="true"></div>
@@ -2739,7 +2982,7 @@ function OpenHomeComputerSheet() {
 
             ${canRelease ? `<section class="computerReleaseCallout"><div><span>${state.project.isReleased ? "新版本可以提交" : "已达到商店提交条件"}</span><strong>${state.project.isReleased ? `v${state.project.version + 1}.0` : "首发版本"} · 预估 ${evaluation.rating.toFixed(1)} 分</strong></div><button data-computer-release type="button">${state.project.isReleased ? "检查并发布更新" : "检查并提交商店"} →</button></section>` : ""}
 
-            <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>项目方向在墙上白板；宣发用桌边手机；招聘必须出门去人才市场；月结在墙上月历。</span></div>
+            <div class="computerLocationHint"><b>这台电脑只负责开发${canRelease ? "与发布" : ""}</b><span>方向在白板；宣发用手机；招聘去人才市场；月结点右下角“下一回合”。</span></div>
           </div>
         </div>
         <div class="computerControlDeck" aria-hidden="true">
@@ -2765,7 +3008,7 @@ function OpenHomeComputerSheet() {
       const left = Math.max(0, 3 - state.ownerWorkCount);
       ShowToast(left > 0
         ? `已把 1 格精力投入${MODULE_META[moduleKey].label}，本月还剩 ${left} 格。`
-        : "本月 3 格精力已经用完。下一步：去墙上月历结算。", left > 0 ? "good" : "warning");
+        : "本月 3 格精力已经用完。点右下角“下一回合”。", left > 0 ? "good" : "warning");
       OpenHomeComputerSheet();
     };
   }, { mode: "computer" });
@@ -3407,7 +3650,7 @@ function OpenMarketPhoneSheet() {
     OpenPanel("MARKETING PHONE", "宣发手机 · 现在还没有可宣传的内容", `
       <div class="marketPhone phoneLockedIntro">
         <div class="phoneStatusBar"><span>M${String(state.month).padStart(2, "0")} · 09:41</span><b>宣发中心</b><span>5G ▰</span></div>
-        <div class="resultHero"><b>先开发</b><p>游戏连第一版都没有，市场口径和付费投放暂时不展示。先把电脑里的 3 格精力用完，再去月历结算第一个月。</p></div>
+        <div class="resultHero"><b>先开发</b><p>先把电脑里的 3 格精力用完，再点右下角“下一回合”。</p></div>
         <div class="note good">首月结束后，这里会开放市场风向、宣传口径与付费投放。</div>
       </div>`);
     return;
@@ -3620,7 +3863,7 @@ function OpenMonthSheet() {
   const nextMonthLabel = `M${String(state.month + 1).padStart(2, "0")}`;
   const openActions = GetMonthCloseActions();
   const hasOpenActions = openActions.length > 0;
-  OpenPanel("WALL CALENDAR", `墙上月历 · ${currentMonthLabel} 月结`, `
+  OpenPanel("NEXT TURN", `${currentMonthLabel} 月末结算`, `
     <div class="monthCloseRitual">
       <section class="monthCloseLedger" aria-label="${currentMonthLabel} 结束，进入 ${nextMonthLabel}">
         <div class="monthCloseLeaf"><small>本月封账</small><strong>${currentMonthLabel}</strong><span>→ ${nextMonthLabel}</span></div>
@@ -3686,7 +3929,7 @@ function OpenHelpSheet() {
       <div class="note"><b>项目方向</b>：墙上白板。</div>
       <div class="note"><b>宣发</b>：桌边手机，首月结束后开放。</div>
       <div class="note"><b>招聘与设备</b>：出门去人才市场。</div>
-      <div class="note"><b>结束本月</b>：墙上月历。</div>
+      <div class="note"><b>结束本月</b>：右下角“下一回合”；墙上月历也可。</div>
       <div class="note"><b>股票与贷款</b>：出门去银行；小超市只卖 ${FormatMoney(SCRATCH_OPTION.stake)} 的刮刮乐。</div>
       <div class="note danger">M08 前还清 ¥82,000；累计游戏收入达到 100 亿元，你将成为成功的游戏制作人。</div>
     </div>
@@ -4136,6 +4379,11 @@ function BindControls() {
     event.preventDefault();
     PlayTouchFeedback(12);
     TriggerInteraction();
+  });
+  dom.settlementButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    PlayTouchFeedback(12);
+    OpenMonthSheet();
   });
   dom.modalBackdrop.addEventListener("click", ClosePanel);
   dom.sheetCloseButton.addEventListener("click", ClosePanel);

@@ -75,9 +75,10 @@ assert.match(html, /<title>甲方是我<\/title>/, "the browser title should use
 assert.match(html, /<h1><span>甲方是我<\/span><\/h1>/, "the title screen should lead with the game name only");
 assert.doesNotMatch(`${html}\n${css}`, /进入\s*2\.5D|2\.5D\s+FOUNDING|灯会亮/, "the title screen should use normal player-facing language");
 assert.doesNotMatch(html, /id="phoneButton"/, "market decisions must not be available from a global HUD shortcut");
-assert.doesNotMatch(html, /id="settlementButton"/, "monthly close must stay on the physical wall calendar");
+assert.match(html, /id="settlementButton"[^>]*>[\s\S]*?下一回合/, "the primary next-turn action must stay visible in the global bottom-right HUD");
+assert.match(script, /dom\.settlementButton\.addEventListener\("click"[\s\S]*?OpenMonthSheet\(\)/, "the global next-turn button must open the same confirmation sheet as the wall calendar");
 assert.doesNotMatch(script, /event\.code === "KeyM"|dom\.phoneButton/, "market decisions must not gain a global shortcut");
-assert.doesNotMatch(script, /event\.code === "KeyN"|dom\.settlementButton/, "monthly close must not gain a global shortcut");
+assert.doesNotMatch(script, /event\.code === "KeyN"/, "monthly close must not gain an undocumented keyboard shortcut");
 assert.match(html, /id="foundingNamePanel"[\s\S]*01 \/ 04/);
 assert.match(html, /id="founderProfilePanel"[\s\S]*02 \/ 04/);
 assert.match(html, /id="contractPageCounter">03 \/ 04/);
@@ -89,5 +90,8 @@ assert.doesNotMatch(script, /确认开局/, "contract signing must not be labele
 assert.match(html, /id="quickRestartButton"[\s\S]*沿用上局设定[\s\S]*快速重开/, "the ending must offer a one-click restart with the previous setup");
 assert.match(html, /id="restartButton"[\s\S]*重新设定/, "the ending must retain a route back through full setup");
 assert.match(script, /function QuickRestart\(\)[\s\S]*RestartProject\(state\)[\s\S]*BeginWorld\(result\.state\)/, "quick restart must enter a fresh run without reopening the naming book");
+assert.match(script, /visualStyle = "absurd-paper-doll-v2"/, "human actors must keep the deliberately absurd asymmetric silhouette");
+assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
+assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
 
 console.log("StudioSurvival interface separation contract test passed");
