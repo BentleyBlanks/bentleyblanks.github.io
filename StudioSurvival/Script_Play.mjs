@@ -23,7 +23,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815bc";
+} from "./Data_Game.mjs?v=20260815bd";
 import {
   AdvanceMonth,
   BuyScratchTicket,
@@ -464,7 +464,7 @@ const sceneToneByLocation = new Map([
 ]);
 const sceneToneTarget = new THREE.Color(0x090c17);
 const surfaceTextureCache = new Map();
-const ART_CACHE_VERSION = "20260815bc";
+const ART_CACHE_VERSION = "20260815bd";
 const ArtTexturePaths = Object.freeze({
   founderFull: `./Assets/Texture_CharacterFounderFullWalkSheet.png?v=${ART_CACHE_VERSION}`,
   founderThinning: `./Assets/Texture_CharacterFounderThinningWalkSheet.png?v=${ART_CACHE_VERSION}`,
@@ -4051,12 +4051,13 @@ function OpenInvestmentSheet(staffId) {
 function OpenEquipmentSheet() {
   const count = state.workstations || 0;
   const nextCost = WORKSTATION_COSTS[count];
-  const freeSeats = Math.max(0, count - state.team.length);
+  const seatedStudents = state.team.filter((member) => FindStaff(member.id)?.kind === "student").length;
+  const freeSeats = Math.max(0, count - seatedStudents);
   OpenPanel("设备", "工位", `
-    <p class="panelIntro">每人 1 工位</p>
+    <p class="panelIntro">学生每人 1 工位 · AI 云端免工位</p>
     <div class="metricGrid">
       <div class="metricTile"><span>已购工位</span><strong>${count}/4</strong></div>
-      <div class="metricTile"><span>已被占用</span><strong>${state.team.length}</strong></div>
+      <div class="metricTile"><span>已被占用</span><strong>${seatedStudents}</strong></div>
       <div class="metricTile"><span>空工位</span><strong>${freeSeats}</strong></div>
     </div>
     <div class="workstationPreview">${WORKSTATION_COSTS.map((cost, index) => `<div class="${index < count ? "owned" : index === count ? "next" : ""}"><span>${index < count ? "✓" : index + 1}</span><strong>工位 ${index + 1}</strong><small>${index < count ? "已购" : FormatMoney(cost)}</small></div>`).join("")}</div>
@@ -4102,7 +4103,7 @@ function TalentStatWidth(value) {
 function OpenTalentSheet() {
   const costs = ForecastMonthlyCosts(state);
   const seats = state.workstations || 0;
-  const occupied = state.team.length;
+  const occupied = state.team.filter((member) => FindStaff(member.id)?.kind === "student").length;
   const freeSeats = Math.max(0, seats - occupied);
   const RenderTalentFlyer = (staff) => {
     const member = state.team.find((item) => item.id === staff.id);
@@ -4119,14 +4120,15 @@ function OpenTalentSheet() {
       </div>`;
     }).join("");
     const priceNote = hired ? ` · ${EscapeHtml(plan.name)}` : "";
+    const hireLocked = staff.kind === "student" && occupied >= seats;
     const actions = hired
       ? `<button type="button" class="miniButton" data-staff-action="talk" data-staff-id="${staff.id}">聊聊</button><button type="button" class="miniButton" data-staff-action="pay" data-staff-id="${staff.id}">调待遇</button><button type="button" class="dangerButton" data-staff-action="fire" data-staff-id="${staff.id}">${staff.kind === "ai" ? "退订" : "开除"}</button>`
-      : `<button type="button" class="flyerHireButton ${staff.kind === "ai" ? "ai" : ""}" data-staff-action="hire" data-staff-id="${staff.id}" ${occupied >= seats ? "disabled" : ""}>${occupied >= seats ? "无工位" : staff.kind === "ai" ? "开始月租" : "发 Offer"}</button>`;
+      : `<button type="button" class="flyerHireButton ${staff.kind === "ai" ? "ai" : ""}" data-staff-action="hire" data-staff-id="${staff.id}" ${hireLocked ? "disabled" : ""}>${hireLocked ? "无工位" : staff.kind === "ai" ? "开始月租" : "发 Offer"}</button>`;
     return `<article class="talentFlyer ${hired ? "hired" : ""}" data-kind="${staff.kind}" style="--staffColor:${staff.color}">
       <div class="flyerHead">
         <span class="avatarBox">${TalentAvatarHtml(staff.id)}${hired ? `<span class="flyerStamp">${staff.kind === "ai" ? "租用中" : "已入职"}</span>` : ""}</span>
         <div class="flyerIdentity">
-          <span class="talentKindBadge ${staff.kind}">${staff.kind === "ai" ? "AI · 月租" : "大学生 · 月薪"}</span>
+          <span class="talentKindBadge ${staff.kind}">${staff.kind === "ai" ? "AI · 月租 · 免工位" : "大学生 · 月薪"}</span>
           <h3>${EscapeHtml(staff.name)}</h3>
           <p>${EscapeHtml(staff.role)}</p>
         </div>
@@ -4141,14 +4143,14 @@ function OpenTalentSheet() {
   };
   OpenPanel("招聘公告栏", "人才市场", `
     <div class="talentBoardBar">
-      <div class="talentBoardStat"><span>占用工位</span><strong>${occupied}<small> / ${seats}</small></strong></div>
+      <div class="talentBoardStat"><span>学生工位</span><strong>${occupied}<small> / ${seats}</small></strong></div>
       <div class="talentBoardStat"><span>空工位</span><strong>${freeSeats}</strong></div>
       <div class="talentBoardStat"><span>每月人力</span><strong>${FormatMoney(costs.studentWages + costs.aiRent)}</strong></div>
-      <button type="button" class="talentEquipmentButton" data-equipment><span>工位设备</span><strong>每人 1 工位</strong></button>
+      <button type="button" class="talentEquipmentButton" data-equipment><span>工位设备</span><strong>学生 1 人 1 工位</strong></button>
     </div>
-    <div class="sectionHeading"><strong>大学生</strong><span>按月发薪</span></div>
+    <div class="sectionHeading"><strong>大学生</strong><span>按月发薪 · 1 人 1 工位</span></div>
     <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "student").map(RenderTalentFlyer).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>AI</strong><span>按月收租</span></div>
+    <div class="panelSection sectionHeading"><strong>AI</strong><span>按月收租 · 免工位</span></div>
     <div class="talentBoardGrid">${STAFF_CATALOG.filter((staff) => staff.kind === "ai").map(RenderTalentFlyer).join("")}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
       if (event.target.closest("[data-equipment]")) return OpenEquipmentSheet();
@@ -4387,7 +4389,7 @@ function OpenWorkstationSheet(interaction) {
       <div class="metricTile"><span>技术债 · 范围债</span><strong>${Math.round(state.project.technicalDebt)} / ${Math.round(state.project.scopeDebt)}</strong></div>
     </div>
     <div class="panelSection choiceFooter"><span>本月 ${state.ownerWorkCount}/${ownerEnergyLimit}</span><button class="primaryButton" data-owner-work type="button" ${state.ownerWorkCount >= ownerEnergyLimit ? "disabled" : ""}>干 1 次</button></div>
-    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "在家里的额外工位上，月结时产出" : "目前只有老板的背影"}</span></div>
+    <div class="panelSection sectionHeading"><strong>擅长这个模块的成员</strong><span>${workers.length ? "月结时产出 · 学生坐工位，AI 在云端" : "目前只有老板的背影"}</span></div>
     <div class="chipRow">${workers.length ? workers.map(({ staff }) => `<button class="miniButton" data-worker-id="${staff.id}" type="button">跟 ${EscapeHtml(staff.name)} 聊</button>`).join("") : `<span class="chip">没有人手。关掉电脑，从门口出发去人才市场招聘。</span>`}</div>
     ${relatedTensions.length ? `<div class="noteList">${relatedTensions.map((tension) => `<div class="note ${tension.severity === "critical" ? "danger" : ""}"><b>${EscapeHtml(tension.title)}</b><br>${EscapeHtml(tension.description)}</div>`).join("")}</div>` : `<div class="noteList"><div class="note good">当前没有明显跨模块互殴，像暴风雨前的 stand-up。</div></div>`}`, () => {
     dom.sheetBody.onclick = (event) => {
