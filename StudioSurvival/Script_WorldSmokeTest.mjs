@@ -40,6 +40,7 @@ const requiredInteractionIds = [
   "equipmentCounter",
   "talentCounter",
   "talentExit",
+  "bankStockCounter",
   "bankCounter",
   "bankExit",
   "hotelRestaurant",

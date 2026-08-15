@@ -11,6 +11,14 @@ const contractDecisionPage = html.match(/<article class="contractPage contractDe
 const sealKeyupSource = script.match(/dom\.sealButton\.addEventListener\("keyup"[^]*?\n  \}\);/)?.[0] || "";
 const monthMontageTag = html.match(/<[^>]*\bid="monthMontage"[^>]*>/)?.[0] || "";
 const monthMontageCss = css.match(/\.monthMontage\s*\{[^}]*\}/s)?.[0] || "";
+const bankSource = script.slice(
+  script.indexOf("function OpenBankSheet"),
+  script.indexOf("function OutcomeOdds"),
+);
+const stockWindowSource = script.slice(
+  script.indexOf("function OpenStockSheet"),
+  script.indexOf("function OpenDirectiveSheet"),
+);
 
 assert.match(html, /viewport-fit=cover/, "the page must preserve phone safe-area insets");
 assert.match(html, /id="mobileControls"/, "the touch-control region needs a stable DOM hook");
@@ -19,9 +27,9 @@ assert.match(html, /id="moveLeftButton"[^>]+aria-pressed="false"/, "left movemen
 assert.match(html, /id="moveRightButton"[^>]+aria-pressed="false"/, "right movement needs an accessible held state");
 assert.match(html, /id="jumpButton"[^>]+aria-pressed="false"/, "jump needs visible press feedback");
 assert.match(html, /id="interactButton"[^>]+disabled/, "interaction should begin disabled until a target is nearby");
-assert.match(html, /Style_Play\.css\?v=20260815am/, "UI changes must bypass the Pages cache");
+assert.match(html, /Style_Play\.css\?v=20260815ao/, "UI changes must bypass the Pages cache");
 assert.match(html, /Script_Play\.mjs\?v=20260815ao/, "gameplay changes must bypass the Pages cache");
-assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!am)/, "the stylesheet cache-bust must stay unified");
+assert.doesNotMatch(html, /Style_Play\.css\?v=20260815(?!ao)/, "the stylesheet cache-bust must stay unified");
 assert.doesNotMatch(html, /Script_Play\.mjs\?v=20260815(?!ao)/, "the gameplay cache-bust must stay unified");
 assert.match(html, /class="hudConsole identityConsole sceneConsole" aria-label="当前场景">[\s\S]*?id="locationValue"/, "the top-left console must show the current scene name");
 assert.match(html, /class="missionHeading"><span>项目<\/span><b id="studioNameHud">/, "the project sheet must own the company name");
@@ -79,6 +87,10 @@ assert.doesNotMatch(css, /\.contractChoiceGroup \.compactRail\s*\{[^}]*grid-temp
 assert.match(css, /\.stockPickGrid\s*\{/, "the bank stock picker needs a responsive two-choice layout");
 assert.match(css, /\.stockMonthReport\s*\{/, "the next-turn result needs a dedicated stock chart report");
 assert.match(css, /\.stockQuickAmounts button,[\s\S]*min-height:\s*44px/, "stock amount shortcuts must remain full touch targets");
+assert.match(css, /\.modalLayer\.bankMode \.worldPanel/, "the lending counter needs a dedicated physical ledger surface");
+assert.match(css, /\.modalLayer\.stockWindowMode \.worldPanel/, "the separate stock counter needs a dedicated terminal surface");
+assert.match(css, /\.collateralLoanCard button\s*\{[^}]*min-height:44px;/s, "collateral redemption must retain a full touch target");
+assert.match(css, /@media \(max-height:540px\) and \(orientation:landscape\)[\s\S]*?\.modalLayer\.stockWindowMode \.sheetBody\s*\{\s*overflow-x:hidden;[\s\S]*?\.modalLayer\.stockWindowMode \.marketCommit span\s*\{\s*display:none;/s, "short stock windows must drop helper copy before introducing horizontal scrolling");
 assert.match(css, /\.founderSkillControls button\s*\{[^}]*min-height:\s*44px;/s, "founder skill steppers must remain full touch targets");
 assert.doesNotMatch(css, /\.founderSkillPresets/, "founder setup must stay focused on the three editable abilities");
 assert.match(css, /\.endingActions button\s*\{[^}]*min-height:\s*48px;/s, "restart choices must remain full touch targets");
@@ -119,7 +131,12 @@ assert.match(script, /const sceneName = FindLocation\(interaction\.locationId\)\
 assert.doesNotMatch(script, /studioMonogram/, "scene identity must not fall back to a company monogram icon");
 assert.match(script, /OpenPanel\("地图", "去哪？"[\s\S]*\{ mode: "travelMap" \}/, "the exit interaction must open the compact map presentation");
 assert.doesNotMatch(setupChoiceScript, /project\.pitch|project\.trend|gameType\.description|gameType\.warning/, "project choices must stay label-only");
-assert.match(script, /function OpenBankSheet[\s\S]*?data-open-stock/, "stock trading must enter through the physical bank interaction");
+assert.doesNotMatch(bankSource, /data-open-stock|data-stock-form|GetStockAccountAccess/, "the lending counter must not contain stock trading");
+assert.doesNotMatch(bankSource, /开发电脑|asset\.fatal/, "the visible pledge list must not offer the development computer");
+assert.match(bankSource, /data-redeem-collateral/, "the lending counter must expose collateral redemption");
+assert.match(script, /case "stockWindow": return OpenStockSheet\(\)/, "stock trading must enter through its own physical bank window");
+assert.match(stockWindowSource, /data-stock-unlock[\s\S]*data-stock-form/, "account opening and buy orders must both live in the stock window flow");
+assert.match(stockWindowSource, /\{ mode: "stockWindow" \}/, "the stock flow must keep its distinct terminal presentation");
 assert.doesNotMatch(script, /function OpenHomeComputerSheet|function OpenWorkstationSheet/, "the decorative computer must not retain a modal interaction");
 assert.match(script, /function OpenScratchSheet\(/, "the supermarket counter must have its own scratch-card screen");
 assert.match(script, /function StockSettlementReport\(/, "the next turn must render the monthly stock trend and return");

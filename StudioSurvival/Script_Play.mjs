@@ -51,6 +51,7 @@ import {
   PerformOwnerTask,
   PivotProject,
   PurchaseWorkstation,
+  RedeemCollateral,
   RepayStartupLoan,
   ReleaseBuild,
   RestartProject,
@@ -60,14 +61,13 @@ import {
   SetStaffInvestmentLevel,
   StartProject,
   STARTUP_LOAN_TERMS,
-  STOCK_ACCOUNT_UNLOCK_CASH,
   TakeLoan,
   TalkToStaff,
   ValidateState,
   VisitRelaxationVenue,
   WORKSTATION_COSTS,
   UnlockStockAccount,
-} from "./Script_Rules.mjs?v=20260815am";
+} from "./Script_Rules.mjs?v=20260815ao";
 import {
   FindLocation,
   FindLocationAt,
@@ -78,14 +78,14 @@ import {
   MovingHazards as WorldHazards,
   InteractionPoints as WorldInteractions,
   Platforms as WorldPlatforms,
-} from "./Data_World.mjs?v=20260815al";
+} from "./Data_World.mjs?v=20260815ao";
 import {
   CreateWorldState,
   NearestInteraction,
   ResetWorldMonth,
   TickWorld,
   TravelWorld,
-} from "./Script_World.mjs?v=20260815am";
+} from "./Script_World.mjs?v=20260815ao";
 
 const dom = Object.fromEntries([
   "loadingScreen", "gameRoot", "sceneCanvas", "sceneVignette", "monthValue", "cashValue", "revenueValue", "goalBar",
@@ -1300,7 +1300,8 @@ const FacilityLooks = {
   scratch: ["刮刮乐柜台", "本月限刮一张", 0xff6eae],
   equipmentShop: ["设备柜台", "先买电脑再招人", 0x66b8ff],
   talentMarket: ["人才市场", "工资 / AI 月租", 0x9d8cff],
-  bank: ["银行", "启动贷 M08 到期", 0xff6eae],
+  stockWindow: ["股票窗口", "开户 / 买入 / 持仓", 0x66b8ff],
+  bank: ["贷款柜台", "还款 / 抵押 / 赎回", 0xc9a45d],
   hotel: ["大酒店", "吃顿像人的饭", 0xffb45f],
   regularFootbath: ["普通足浴店", "焦虑 -8 · 本月限一次", 0x72e0d1],
   footbathCity: ["洗脚城", "焦虑 -20 · 验资开放", 0xc69cff],
@@ -1533,6 +1534,19 @@ function BuildFacility(interaction) {
     Place(group, Box(.42, .34, .025, color, { emissive: color, emissiveIntensity: .82, roughness: .15, castShadow: false }), .66, 1.38, .19);
     const lamp = Sphere(.09, 0xffd166, { emissive: 0xffb33f, emissiveIntensity: 1.4, castShadow: false });
     Place(group, lamp, .88, 1.83, .05);
+  } else if (kind === "stockWindow") {
+    Place(group, Box(2.45, .92, .94, 0x263b46, { surface: "wood", roughness: .65 }), 0, .46, -.04);
+    Place(group, Box(2.58, .12, 1.02, 0x8b9da2, { surface: "metal", metalness: .5, roughness: .32 }), 0, .97, 0);
+    Place(group, Box(2.1, 1.12, .08, 0x182329, { surface: "metal", metalness: .36, roughness: .42 }), 0, 1.66, -.01);
+    Place(group, Box(1.82, .72, .025, 0x101a20, { emissive: 0x101a20, emissiveIntensity: .22, castShadow: false }), 0, 1.68, .05);
+    for (let bar = 0; bar < 8; bar += 1) {
+      const barHeight = .12 + ((bar * 5) % 4) * .09;
+      const barColor = bar % 3 === 0 ? 0xe46a73 : 0x72d9a2;
+      Place(group, Box(.13, barHeight, .022, barColor, { emissive: barColor, emissiveIntensity: .72, castShadow: false }), -.67 + bar * .19, 1.46 + barHeight * .5, .075);
+    }
+    Place(group, Box(1.42, .035, .022, 0x66b8ff, { emissive: 0x66b8ff, emissiveIntensity: .72, castShadow: false }), 0, 1.91, .075, -.04);
+    Place(group, Box(.46, .38, .18, 0x242b31, { surface: "metal", metalness: .42 }), .76, 1.2, .23);
+    Place(group, Box(.34, .2, .02, 0x72d9a2, { emissive: 0x72d9a2, emissiveIntensity: .68, castShadow: false }), .76, 1.24, .335);
   } else if (kind === "bank") {
     Place(group, Box(2.65, 1.0, 1.02, 0x5b3b38, { surface: "wood", roughness: .65 }), 0, .5, -.04);
     Place(group, Box(2.75, .13, 1.12, 0xc2a578, { surface: "stone", roughness: .5 }), 0, 1.04, 0);
@@ -1973,14 +1987,6 @@ function AddAbsurdLocationSigil(group, location, index, center, accent, paleAcce
     AddScenePanel(sigil, .46, .035, .03, -.17, ink, { z: -.08, rotation: .18 });
     AddScenePanel(sigil, .18, .48, .13, -.51, 0xff6eae, { z: -.09, rotation: -.17 });
     for (let pin = 0; pin < 4; pin += 1) AddSceneDisc(sigil, .035, -.42 + pin * .28, -.42 + (pin % 2) * .08, pin % 2 ? accent : 0xffd166, { z: -.07, segments: 8 });
-  } else if (location.id === "bank") {
-    AddSceneRing(sigil, .45, .67, 0, 0, 0xb99556, { z: -.12, segments: 30 });
-    AddSceneRing(sigil, .22, .3, 0, 0, accent, { z: -.09, segments: 22 });
-    Eye(0, 0, .17, 1.25);
-    for (let spoke = 0; spoke < 10; spoke += 1) {
-      const angle = spoke / 10 * Math.PI * 2;
-      AddScenePanel(sigil, .43, .035, Math.cos(angle) * .78, Math.sin(angle) * .62, spoke % 2 ? 0xb99556 : paleAccent, { z: -.11, rotation: angle });
-    }
   } else if (location.id === "hotel") {
     AddSceneDisc(sigil, .65, 0, -.02, 0xc5a367, { z: -.13, segments: 24, scaleY: .65 });
     AddScenePanel(sigil, 1.42, .13, 0, -.24, 0x7d293d, { z: -.1, rotation: -.03 });
@@ -2104,25 +2110,55 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     }
     AddFluorescent(group, center, 4.93, 0xdceeff, 2.4);
   } else if (location.id === "bank") {
-    Place(group, Box(9.08, 3.78, .12, 0x9c9388, { surface: "stone", roughness: .65, castShadow: false }), center, 2.9, -.13);
-    [start + .95, start + 3.0, start + 7.0, start + 9.05].forEach((x, columnIndex) => {
-      Place(group, Cylinder(.24, .28, 3.82, columnIndex % 2 ? 0x8a817a : 0xaba299, 22, { surface: "stone", roughness: .62 }), x, 2.69, -.02);
-      Place(group, Box(.72, .18, .42, 0xb69c69, { surface: "stone", roughness: .48 }), x, 4.64, -.01);
-      Place(group, Box(.72, .16, .42, 0xb69c69, { surface: "stone", roughness: .48 }), x, .78, -.01);
-    });
-    const vaultX = start + 8.02;
-    const vault = Cylinder(1.22, 1.22, .28, 0x30353a, 36, { surface: "metal", metalness: .68, roughness: .31 });
+    const stockZoneX = start + 3.35;
+    const loanZoneX = start + 8.1;
+    const vaultX = start + 11.75;
+    Place(group, Box(12.15, 3.78, .12, 0xa39b8e, { surface: "stone", roughness: .68, castShadow: false }), start + 6.55, 2.9, -.13);
+    AddFramedPanel(group, stockZoneX, 3.28, 4.6, 2.87, 0x22343c, 0x75868b, { surface: "metal", frameSurface: "metal", frameMetalness: .62, frameWidth: .075, z: -.01 });
+    for (let row = 0; row < 3; row += 1) {
+      const rowY = 3.82 - row * .54;
+      Place(group, Box(3.82, .035, .02, 0x557079, { emissive: 0x557079, emissiveIntensity: .28, castShadow: false }), stockZoneX, rowY, .075);
+      for (let cell = 0; cell < 6; cell += 1) {
+        const positive = (row + cell) % 3 !== 0;
+        Place(group, Box(.31 + (cell % 2) * .08, .08, .02, positive ? 0x72d9a2 : 0xe46a73, {
+          emissive: positive ? 0x72d9a2 : 0xe46a73, emissiveIntensity: .62, castShadow: false,
+        }), stockZoneX - 1.62 + cell * .65, rowY + .2, .085);
+      }
+    }
+    const chartPoints = [[-1.7, -.36], [-1.17, -.12], [-.64, -.28], [-.12, .14], [.42, .05], [.96, .42], [1.55, .28]];
+    for (let pointIndex = 0; pointIndex < chartPoints.length - 1; pointIndex += 1) {
+      const [x1, y1] = chartPoints[pointIndex];
+      const [x2, y2] = chartPoints[pointIndex + 1];
+      const width = Math.hypot(x2 - x1, y2 - y1);
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      Place(group, Box(width, .045, .024, 0x66b8ff, { emissive: 0x66b8ff, emissiveIntensity: .9, castShadow: false }), stockZoneX + (x1 + x2) * .5, 2.52 + (y1 + y2) * .5, .1, angle);
+    }
+
+    AddFramedPanel(group, loanZoneX, 3.28, 4.18, 2.87, 0xb8afa0, 0x826b43, { surface: "stone", frameSurface: "wood", frameMetalness: .08, frameWidth: .09, z: -.01 });
+    for (let row = 0; row < 3; row += 1) {
+      for (let column = 0; column < 5; column += 1) {
+        const drawerX = loanZoneX - 1.48 + column * .74;
+        const drawerY = 2.54 + row * .55;
+        Place(group, Box(.61, .4, .035, (row + column) % 2 ? 0x8f877a : 0x9d9486, { surface: "metal", metalness: .14, roughness: .63, castShadow: false }), drawerX, drawerY, .08);
+        Place(group, Box(.18, .025, .018, 0xc9a45d, { surface: "metal", metalness: .72, castShadow: false }), drawerX, drawerY, .105);
+      }
+    }
+    Place(group, Box(.12, 3.82, .26, 0x786644, { surface: "metal", metalness: .48, roughness: .34 }), start + 5.72, 2.9, .01);
+
+    const vault = Cylinder(1.02, 1.02, .26, 0x343b3e, 36, { surface: "metal", metalness: .64, roughness: .34 });
     vault.rotation.x = Math.PI / 2;
     Place(group, vault, vaultX, 2.78, .02);
-    Place(group, Torus(1.03, .095, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .2);
-    Place(group, Torus(.48, .055, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .25);
-    for (let spoke = 0; spoke < 8; spoke += 1) Place(group, Box(.76, .045, .06, 0xb59556, { surface: "metal", metalness: .84, roughness: .2 }), vaultX, 2.78, .28, spoke * Math.PI / 4);
-    Place(group, Sphere(.13, 0xd2b46e, { surface: "metal", metalness: .9, roughness: .16 }), vaultX, 2.78, .32);
-    AddQueuePost(group, start + 2.9, start + 4.2);
-    AddQueuePost(group, start + 4.2, start + 5.5);
-    AddQueuePost(group, start + 5.5, null);
-    AddWallClock(group, start + 1.85, 3.72, 0xb59556, .44);
-    Place(group, Box(6.7, .04, 1.2, 0x58616a, { surface: "stone", roughness: .66 }), center - .45, .055, .72);
+    Place(group, Torus(.84, .08, 0xa98b50, { surface: "metal", metalness: .8, roughness: .22 }), vaultX, 2.78, .19);
+    Place(group, Torus(.36, .045, 0xa98b50, { surface: "metal", metalness: .8, roughness: .22 }), vaultX, 2.78, .24);
+    for (let spoke = 0; spoke < 6; spoke += 1) Place(group, Box(.56, .04, .055, 0xa98b50, { surface: "metal", metalness: .8, roughness: .22 }), vaultX, 2.78, .27, spoke * Math.PI / 3);
+    Place(group, Sphere(.11, 0xc9a45d, { surface: "metal", metalness: .88, roughness: .18 }), vaultX, 2.78, .3);
+
+    AddQueuePost(group, loanZoneX - 1.25, loanZoneX + 1.25, 0xa98b50);
+    AddQueuePost(group, loanZoneX + 1.25, null, 0xa98b50);
+    AddFluorescent(group, stockZoneX, 4.93, 0xc8f4ee, 2.25);
+    AddFluorescent(group, loanZoneX, 4.93, 0xffe3b3, 2.25);
+    Place(group, Box(4.0, .045, 1.2, 0x29434a, { surface: "stone", roughness: .68 }), stockZoneX, .055, .72);
+    Place(group, Box(4.0, .045, 1.2, 0x5b5145, { surface: "stone", roughness: .68 }), loanZoneX, .055, .72);
   } else if (location.id === "hotel") {
     Place(group, Box(9.06, 1.72, .15, 0x503728, { surface: "wood", roughness: .66, castShadow: false }), center, 1.65, -.12);
     AddTuftedPanel(group, center, 3.55, 3.3, 2.16, 0x702a3b);
@@ -2207,7 +2243,7 @@ function BuildLocationEnvironment(location, index, sceneGroup) {
     Place(group, Box(8.36, .05, 1.28, isLuxury ? 0x6a2741 : isCity ? 0x56446d : 0x456d68, { surface: "fabric", roughness: .98 }), center, .06, .76);
   }
 
-  const sigil = AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
+  const sigil = location.id === "bank" ? null : AddAbsurdLocationSigil(group, location, index, center, accent, paleAccent);
   const practicalColors = { home: 0xffd6ad, diner: 0xffc77f, market: 0xdfffee, talent: 0xdbeaff, bank: 0xffe0c6, hotel: 0xffc47d, footbath: 0xc8fff4, footbathCity: 0xe0cfff, maleModelClub: 0xffc6e4 };
   const roomLight = new THREE.PointLight(practicalColors[location.id] || accent, 1.55, 9.2, 2.05);
   roomLight.position.set(center, 3.8, 3.1);
@@ -2232,7 +2268,7 @@ function BuildRoom() {
     diner: { wall: 0x8f6a58, surface: "plaster", floor: 0x5a4540, floorSurface: "tile" },
     market: { wall: 0x718d80, surface: "tile", floor: 0x465d55, floorSurface: "linoleum" },
     talent: { wall: 0x72869d, surface: "plaster", floor: 0x40536a, floorSurface: "linoleum" },
-    bank: { wall: 0x8d8289, surface: "stone", floor: 0x514d50, floorSurface: "stone" },
+    bank: { wall: 0xa39b8e, surface: "stone", floor: 0x454b4e, floorSurface: "stone" },
     hotel: { wall: 0x806553, surface: "fabric", floor: 0x5e3b3b, floorSurface: "fabric" },
     footbath: { wall: 0x66817d, surface: "tile", floor: 0x405c59, floorSurface: "tile" },
     footbathCity: { wall: 0x685c77, surface: "stone", floor: 0x493f58, floorSurface: "stone" },
@@ -3234,6 +3270,8 @@ function OpenPanel(kicker, title, html, onReady = null, options = {}) {
   dom.modalLayer.classList.toggle("computerMode", panelOptions.mode === "computer");
   dom.modalLayer.classList.toggle("whiteboardMode", panelOptions.mode === "whiteboard");
   dom.modalLayer.classList.toggle("travelMapMode", panelOptions.mode === "travelMap");
+  dom.modalLayer.classList.toggle("bankMode", panelOptions.mode === "bank");
+  dom.modalLayer.classList.toggle("stockWindowMode", panelOptions.mode === "stockWindow");
   dom.sheetKicker.textContent = kicker;
   dom.sheetTitle.textContent = title;
   dom.sheetBody.innerHTML = html;
@@ -3253,6 +3291,8 @@ function ClosePanel() {
   dom.modalLayer.classList.remove("computerMode");
   dom.modalLayer.classList.remove("whiteboardMode");
   dom.modalLayer.classList.remove("travelMapMode");
+  dom.modalLayer.classList.remove("bankMode");
+  dom.modalLayer.classList.remove("stockWindowMode");
   dom.sheetBody.onclick = null;
   dom.sheetBody.onchange = null;
 }
@@ -3487,39 +3527,37 @@ function OpenBankSheet() {
   const costs = ForecastMonthlyCosts(state);
   const activeLoans = state.loans.filter((loan) => loan.status === "active");
   const startupLoan = state.startupLoan;
-  const stockAccess = GetStockAccountAccess(state);
-  const stockOption = STOCK_OPTIONS.find((option) => option.id === state.stockPosition?.optionId);
+  const pledgeOptions = COLLATERAL_OPTIONS.filter((asset) => asset.id !== "computer");
   const monthsLeft = startupLoan?.status === "active" ? Math.max(0, startupLoan.dueMonth - state.month + 1) : 0;
-  OpenPanel("贷款", "银行", `
-    <p class="panelIntro">到期清零 · 抵押电脑即结束</p>
+  OpenPanel("贷款", "贷款柜台", `
     <section class="startupLoanCard ${startupLoan?.status || "pending"}">
       <div><span>启动贷 · 身家担保</span><strong>${startupLoan?.status === "repaid" ? "已清" : `欠 ${FormatMoney(startupLoan?.remaining || 0)}`}</strong><small>${startupLoan?.status === "active" ? `M${String(startupLoan.dueMonth).padStart(2, "0")} · 剩 ${monthsLeft} 月` : startupLoan?.status === "repaid" ? "已还清" : "未生效"}</small></div>
       <div class="loanDeadline"><b>${startupLoan?.status === "repaid" ? "✓" : `M${String(startupLoan?.dueMonth || 0).padStart(2, "0")}`}</b></div>
     </section>
     ${startupLoan?.status === "active" ? `<div class="loanPaymentRow"><button data-startup-payment="10000" type="button" ${state.cash < 10000 ? "disabled" : ""}>先还 ¥10,000</button><button data-startup-payment="30000" type="button" ${state.cash < 30000 ? "disabled" : ""}>先还 ¥30,000</button><button data-startup-payment="full" type="button" ${state.cash < startupLoan.remaining ? "disabled" : ""}>一次结清 ${FormatMoney(startupLoan.remaining)}</button></div>` : ""}
-    <div class="panelSection sectionHeading"><strong>证券柜台</strong><span>股票只在银行办理</span></div>
-    <div class="worldGrid singleChoiceGrid">
-      <button class="worldChoice ${state.stockPosition ? "selected" : ""}" data-open-stock type="button" ${stockAccess.unlocked ? "" : "disabled"}>
-        <div class="choiceTop"><strong>↗ ${state.stockPosition ? `${EscapeHtml(stockOption?.symbol || "股票")} 持仓中` : "股票账户"}</strong><span>${state.stockPosition ? `本金 ${FormatMoney(state.stockPosition.stake)}` : stockAccess.permanentlyUnlocked ? "已开户" : stockAccess.unlocked ? "可以开户" : `现金满 ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 开放`}</span></div>
-        <p>${state.stockPosition ? `M${String(state.stockPosition.openedMonth + 1).padStart(2, "0")} 收盘结算` : "选择股票与金额；次月显示走势和盈亏。不计入游戏收入。"}</p>
-      </button>
-    </div>
     <div class="metricGrid">
-      <div class="metricTile"><span>下月总成本</span><strong>${FormatMoney(costs.total)}</strong></div>
-      <div class="metricTile"><span>现有贷款月供</span><strong>${FormatMoney(costs.loanPayments)}</strong></div>
-      <div class="metricTile"><span>现金缺口</span><strong>${FormatMoney(Math.max(0, costs.total - state.cash))}</strong></div>
+      <div class="metricTile"><span>下月成本</span><strong>${FormatMoney(costs.total)}</strong></div>
+      <div class="metricTile"><span>月供</span><strong>${FormatMoney(costs.loanPayments)}</strong></div>
+      <div class="metricTile"><span>缺口</span><strong>${FormatMoney(Math.max(0, costs.total - state.cash))}</strong></div>
     </div>
-    <div class="panelSection worldGrid">${COLLATERAL_OPTIONS.map((asset) => {
+    <div class="panelSection sectionHeading"><strong>抵押借款</strong><span>${pledgeOptions.filter((asset) => state.assets[asset.id] === "free").length} 件可用</span></div>
+    <div class="panelSection worldGrid">${pledgeOptions.map((asset) => {
       const assetState = state.assets[asset.id];
-      return `<button class="worldChoice ${asset.fatal ? "danger" : ""}" data-collateral-id="${asset.id}" type="button" ${assetState !== "free" ? "disabled" : ""}>
+      return `<button class="worldChoice" data-collateral-id="${asset.id}" type="button" ${assetState !== "free" ? "disabled" : ""}>
         <div class="choiceTop"><strong>${asset.icon} ${EscapeHtml(asset.name)}</strong><span>${assetState === "free" ? `到账 ${FormatMoney(asset.principal)}` : EscapeHtml(assetState === "pledged" ? "已抵押" : "已没收")}</span></div>
         <p>${EscapeHtml(asset.consequence)}</p><div class="choiceFooter"><span>${asset.term} 个月</span><b>月供 ${FormatMoney(asset.monthlyPayment)}</b></div>
       </button>`;
     }).join("")}</div>
-    <div class="panelSection sectionHeading"><strong>抵押贷</strong><span>${activeLoans.length} 笔</span></div>
-    <div class="noteList">${activeLoans.length ? activeLoans.map((loan) => { const asset = FindCollateral(loan.collateralId); return `<div class="note">${EscapeHtml(asset.name)} · ${loan.remaining} 期 · ${FormatMoney(loan.monthlyPayment)}/月</div>`; }).join("") : `<div class="note good">无</div>`}</div>`, () => {
+    <div class="panelSection sectionHeading"><strong>赎回抵押物</strong><span>${activeLoans.length} 件</span></div>
+    <div class="collateralLoanList">${activeLoans.length ? activeLoans.map((loan) => {
+      const asset = FindCollateral(loan.collateralId);
+      const redemptionCost = Math.max(0, Math.round(loan.monthlyPayment * loan.remaining));
+      return `<article class="collateralLoanCard">
+        <div><strong>${asset.icon} ${EscapeHtml(asset.name)}</strong><small>${loan.remaining} 期 · ${FormatMoney(loan.monthlyPayment)}/月</small></div>
+        <button data-redeem-collateral="${asset.id}" type="button" ${state.cash < redemptionCost ? "disabled" : ""}>赎回 ${FormatMoney(redemptionCost)}</button>
+      </article>`;
+    }).join("") : `<div class="note good">无抵押物</div>`}</div>`, () => {
     dom.sheetBody.onclick = (event) => {
-      if (event.target.closest("[data-open-stock]")) return OpenStockSheet();
       const startupPayment = event.target.closest("[data-startup-payment]");
       if (startupPayment) {
         const value = startupPayment.dataset.startupPayment === "full" ? "full" : Number(startupPayment.dataset.startupPayment);
@@ -3527,15 +3565,18 @@ function OpenBankSheet() {
         if (ApplyInteractiveResult(result, { tone: result?.repaid ? "good" : "normal" })) OpenBankSheet();
         return;
       }
+      const redemptionButton = event.target.closest("[data-redeem-collateral]");
+      if (redemptionButton) {
+        const result = RedeemCollateral(state, redemptionButton.dataset.redeemCollateral);
+        if (ApplyInteractiveResult(result, { tone: "good" })) OpenBankSheet();
+        return;
+      }
       const button = event.target.closest("[data-collateral-id]");
       if (!button) return;
-      const asset = FindCollateral(button.dataset.collateralId);
-      if (asset?.fatal && !window.confirm("抵押电脑 = 结束本局。确定？")) return;
       const result = TakeLoan(state, button.dataset.collateralId);
-      if (!ApplyInteractiveResult(result, { tone: "warning", deferEnding: true })) return;
-      if (result.fatal) RenderEnding(); else OpenBankSheet();
+      if (ApplyInteractiveResult(result, { tone: "warning" })) OpenBankSheet();
     };
-  });
+  }, { mode: "bank" });
 }
 
 function OutcomeOdds(option) {
@@ -3930,28 +3971,41 @@ function StockProfitTotal() {
 
 function OpenStockSheet() {
   const access = GetStockAccountAccess(state);
-  if (!access.unlocked) {
-    ShowToast(`现金 ≥ ${FormatMoney(STOCK_ACCOUNT_UNLOCK_CASH)} 解锁炒股。`, "warning");
-    PlayTone("warning");
-    return;
-  }
   if (!access.permanentlyUnlocked) {
-    const unlock = UnlockStockAccount(state);
-    if (!ApplyInteractiveResult(unlock, { tone: "good" })) return;
+    const progress = Clamp(state.cash / access.minimumCash, 0, 1);
+    OpenPanel("证券", "股票窗口", `
+      <div class="stockWindowShell">
+        <section class="stockAccountGate">
+          <span>开户门槛</span>
+          <strong>${FormatMoney(state.cash)} / ${FormatMoney(access.minimumCash)}</strong>
+          <div class="stockAccessTrack"><i style="width:${(progress * 100).toFixed(1)}%"></i></div>
+          <small>${access.unlocked ? "已达标" : `还差 ${FormatMoney(access.shortfall)}`}</small>
+          <button class="primaryButton" data-stock-unlock type="button" ${access.unlocked ? "" : "disabled"}>${access.unlocked ? "开户" : "未达标"}</button>
+        </section>
+      </div>`, () => {
+      dom.sheetBody.onclick = (event) => {
+        if (!event.target.closest("[data-stock-unlock]")) return;
+        const unlock = UnlockStockAccount(state);
+        if (ApplyInteractiveResult(unlock, { tone: "good" })) OpenStockSheet();
+      };
+    }, { mode: "stockWindow" });
+    return;
   }
 
   const position = state.stockPosition;
   if (position) {
     const option = STOCK_OPTIONS.find((candidate) => candidate.id === position.optionId);
     const stockProfit = StockProfitTotal();
-    OpenPanel("STOCK POSITION", "股票持仓", `
-      <section class="stockPositionCard" style="--stockColor:${option?.color || "#66b8ff"}">
-        <span>M${String(position.openedMonth).padStart(2, "0")} 持仓中</span>
-        <strong>${EscapeHtml(option?.symbol || "STOCK")} · ${EscapeHtml(option?.name || position.optionId)}</strong>
-        <div><b>${FormatMoney(position.stake)}</b><small>M${String(position.openedMonth + 1).padStart(2, "0")} 收盘</small></div>
-      </section>
-      <div class="panelSection sectionHeading"><strong>股票历史</strong><span>累计 ${stockProfit >= 0 ? "赚" : "亏"} ${FormatMoney(Math.abs(stockProfit))}</span></div>
-      <div class="logList">${StockHistoryHtml()}</div>`);
+    OpenPanel("证券", "股票窗口", `
+      <div class="stockWindowShell">
+        <section class="stockPositionCard" style="--stockColor:${option?.color || "#66b8ff"}">
+          <span>M${String(position.openedMonth).padStart(2, "0")} 持仓中</span>
+          <strong>${EscapeHtml(option?.symbol || "STOCK")} · ${EscapeHtml(option?.name || position.optionId)}</strong>
+          <div><b>${FormatMoney(position.stake)}</b><small>M${String(position.openedMonth + 1).padStart(2, "0")} 收盘</small></div>
+        </section>
+        <div class="panelSection sectionHeading"><strong>股票历史</strong><span>累计 ${stockProfit >= 0 ? "赚" : "亏"} ${FormatMoney(Math.abs(stockProfit))}</span></div>
+        <div class="logList">${StockHistoryHtml()}</div>
+      </div>`, null, { mode: "stockWindow" });
     return;
   }
 
@@ -3960,22 +4014,24 @@ function OpenStockSheet() {
   const canBuy = maximumBuy >= minimumBuy;
   const defaultStake = canBuy ? Math.min(20000, maximumBuy) : 0;
   const quickAmounts = [5000, 10000, 30000, 50000];
-  OpenPanel("STOCK ACCOUNT", "炒股 · 选股票与金额", `
-    <form class="stockOrderForm" data-stock-form>
-      <div class="stockPickGrid">${STOCK_OPTIONS.map((option, index) => `
-        <label class="stockPick" style="--stockColor:${option.color}">
-          <input type="radio" name="stockOption" value="${option.id}" ${index === 0 ? "checked" : ""}>
-          <span><em>${EscapeHtml(option.symbol)}</em><strong>${option.icon} ${EscapeHtml(option.name)}</strong><small>${EscapeHtml(option.risk)}</small></span>
-        </label>`).join("")}</div>
-      <section class="stockAmountPanel">
-        <div><span>买入金额</span><strong>可用 ${FormatMoney(state.cash)}</strong></div>
-        <label class="stockAmountInput"><span>¥</span><input name="stockAmount" type="number" inputmode="numeric" min="${minimumBuy}" max="${Math.max(minimumBuy, maximumBuy)}" step="1000" value="${defaultStake}" aria-label="股票买入金额" ${canBuy ? "" : "disabled"}></label>
-        <div class="stockQuickAmounts">${quickAmounts.map((amount) => `<button data-stock-amount="${amount}" type="button" ${amount > state.cash ? "disabled" : ""}>${FormatGoalMoney(amount)}</button>`).join("")}</div>
-        <div class="marketCommit"><span>${canBuy ? "¥1,000 取整 · 每月 1 只 · 不计游戏收入" : `最低 ${FormatMoney(minimumBuy)} · 账户仍已解锁`}</span><button class="primaryButton" data-stock-buy type="button" ${canBuy ? "" : "disabled"}>买入 · 次月结算</button></div>
-      </section>
-    </form>
-    <div class="panelSection sectionHeading"><strong>股票历史</strong><span>最近 6 次</span></div>
-    <div class="logList">${StockHistoryHtml()}</div>`, () => {
+  OpenPanel("证券", "股票窗口", `
+    <div class="stockWindowShell">
+      <form class="stockOrderForm" data-stock-form>
+        <div class="stockPickGrid">${STOCK_OPTIONS.map((option, index) => `
+          <label class="stockPick" style="--stockColor:${option.color}">
+            <input type="radio" name="stockOption" value="${option.id}" ${index === 0 ? "checked" : ""}>
+            <span><em>${EscapeHtml(option.symbol)}</em><strong>${option.icon} ${EscapeHtml(option.name)}</strong><small>${EscapeHtml(option.risk)}</small></span>
+          </label>`).join("")}</div>
+        <section class="stockAmountPanel">
+          <div><span>买入金额</span><strong>可用 ${FormatMoney(state.cash)}</strong></div>
+          <label class="stockAmountInput"><span>¥</span><input name="stockAmount" type="number" inputmode="numeric" min="${minimumBuy}" max="${Math.max(minimumBuy, maximumBuy)}" step="1000" value="${defaultStake}" aria-label="股票买入金额" ${canBuy ? "" : "disabled"}></label>
+          <div class="stockQuickAmounts">${quickAmounts.map((amount) => `<button data-stock-amount="${amount}" type="button" ${amount > state.cash ? "disabled" : ""}>${FormatGoalMoney(amount)}</button>`).join("")}</div>
+          <div class="marketCommit"><span>${canBuy ? "¥1,000 取整 · 每月 1 只 · 不计游戏收入" : `最低 ${FormatMoney(minimumBuy)}`}</span><button class="primaryButton" data-stock-buy type="button" ${canBuy ? "" : "disabled"}>买入 · 次月结算</button></div>
+        </section>
+      </form>
+      <div class="panelSection sectionHeading"><strong>股票历史</strong><span>最近 6 次</span></div>
+      <div class="logList">${StockHistoryHtml()}</div>
+    </div>`, () => {
     const form = dom.sheetBody.querySelector("[data-stock-form]");
     const amountInput = form?.querySelector('[name="stockAmount"]');
     dom.sheetBody.onclick = (event) => {
@@ -3992,7 +4048,7 @@ function OpenStockSheet() {
       ShowResult("ORDER PLACED", `${result.option.symbol} 已买入`, `
         <div class="resultHero"><b>${FormatGoalMoney(result.stake)}</b><p>M${String(state.month + 1).padStart(2, "0")} 显示 22 日走势、返还与盈亏。</p></div>`);
     };
-  });
+  }, { mode: "stockWindow" });
 }
 
 function OpenDirectiveSheet() {
@@ -4628,6 +4684,7 @@ function TriggerInteraction() {
     case "regularFootbath": return OpenRelaxationSheet("regularFootbath");
     case "footbathCity": return OpenRelaxationSheet("footbathCity");
     case "maleModelClub": return OpenRelaxationSheet("maleModelClub");
+    case "stockWindow": return OpenStockSheet();
     case "bank": return OpenBankSheet();
     case "lotteryMachine": return OpenScratchSheet();
     case "equipmentShop": return OpenEquipmentSheet();

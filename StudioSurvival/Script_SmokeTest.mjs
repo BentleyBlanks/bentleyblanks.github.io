@@ -40,6 +40,7 @@ import {
   PivotProject,
   PerformOwnerTask,
   PurchaseWorkstation,
+  RedeemCollateral,
   RepayStartupLoan,
   RestartProject,
   STARTUP_LOAN_TERMS,
@@ -591,6 +592,31 @@ function HasRecordedId(collection, id) {
   state.cash = 0;
   state = AdvanceMonth(state).state;
   assert.equal(state.assets.drawingTablet, "seized", "an unaffordable collateral loan must seize its asset");
+}
+
+{
+  const pledged = TakeLoan(Begin(), "home").state;
+  const activeLoan = pledged.loans.find((loan) => loan.collateralId === "home" && loan.status === "active");
+  const redemptionCost = activeLoan.monthlyPayment * activeLoan.remaining;
+  const insufficientState = structuredClone(pledged);
+  insufficientState.cash = redemptionCost - 1;
+  const blocked = RedeemCollateral(insufficientState, "home");
+  assert.equal(blocked.ok, false, "collateral redemption must be blocked when cash is short");
+  assert.equal(blocked.cost, redemptionCost);
+  assert.deepEqual(blocked.state, insufficientState, "a blocked redemption must not mutate the pledged asset or loan");
+
+  const fundedState = structuredClone(pledged);
+  fundedState.cash = redemptionCost + 5000;
+  const costsBefore = fundedState.totalCosts;
+  const redeemed = RedeemCollateral(fundedState, "home");
+  const repaidLoan = redeemed.state.loans.find((loan) => loan.collateralId === "home");
+  assert.equal(redeemed.ok, true, "a funded player must be able to redeem collateral early");
+  assert.equal(redeemed.cost, redemptionCost);
+  assert.equal(redeemed.state.cash, 5000, "redemption must deduct every remaining installment");
+  assert.equal(redeemed.state.totalCosts, costsBefore + redemptionCost);
+  assert.equal(redeemed.state.assets.home, "free");
+  assert.equal(repaidLoan.status, "repaid");
+  assert.equal(repaidLoan.remaining, 0);
 }
 
 {

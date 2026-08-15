@@ -2309,6 +2309,26 @@ export function RepayStartupLoan(currentState, requestedAmount) {
   return { state, ok: true, payment, repaid: false, message: `已还 ¥${payment.toLocaleString("zh-CN")}` };
 }
 
+export function RedeemCollateral(currentState, collateralId) {
+  const state = Clone(currentState);
+  const collateral = FindCollateral(collateralId);
+  const loan = state.loans.find((item) => item.collateralId === collateralId && item.status === "active");
+  if (state.status !== "playing" || !collateral || !loan || state.assets[collateralId] !== "pledged") {
+    return { state, ok: false, message: "当前没有这笔抵押。" };
+  }
+  const cost = RoundMoney(Math.max(0, loan.monthlyPayment * loan.remaining));
+  if (state.cash < cost) return { state, ok: false, cost, message: `赎回还差 ¥${Math.ceil(cost - state.cash).toLocaleString("zh-CN")}。` };
+  state.cash -= cost;
+  state.totalCosts += cost;
+  state.assets[collateralId] = "free";
+  loan.remaining = 0;
+  loan.status = "repaid";
+  loan.redeemedMonth = state.month;
+  state.anxiety = Math.max(0, state.anxiety - 3);
+  PushLog(state, `提前结清 ¥${cost.toLocaleString("zh-CN")}，赎回 ${collateral.name}。`, "good");
+  return { state, ok: true, collateral, cost, message: `${collateral.name} 已赎回` };
+}
+
 export function TakeLoan(currentState, collateralId) {
   const state = Clone(currentState);
   const collateral = FindCollateral(collateralId);

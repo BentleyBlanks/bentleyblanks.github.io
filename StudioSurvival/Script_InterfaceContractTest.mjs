@@ -32,15 +32,40 @@ assert.deepEqual(
   "the project board, calendar, recruitment, and equipment need distinct physical entry points",
 );
 
+assert.deepEqual(
+  ["bankStockCounter", "bankCounter"].map((id) => {
+    const point = ById(id);
+    return [point.id, point.locationId, point.kind, point.action];
+  }),
+  [
+    ["bankStockCounter", "bank", "stockWindow", "stock"],
+    ["bankCounter", "bank", "bank", "finance"],
+  ],
+  "stock trading and lending need two different physical bank counters",
+);
+
 const triggerBlock = script.match(/function TriggerInteraction\(\)[\s\S]*?function StartFoundingCeremony/)?.[0] || "";
 assert.match(triggerBlock, /case "planningBoard": return OpenDirectiveSheet\(\)/);
 assert.match(triggerBlock, /case "homeCalendar": return OpenMonthSheet\(\)/);
 assert.match(triggerBlock, /case "talentMarket": return OpenTalentSheet\(\)/);
 assert.match(triggerBlock, /case "exit": return OpenTravelSheet\(\)/);
+assert.match(triggerBlock, /case "stockWindow": return OpenStockSheet\(\)/);
+assert.match(triggerBlock, /case "bank": return OpenBankSheet\(\)/);
 assert.doesNotMatch(triggerBlock, /homeComputer|OpenHomeComputerSheet/, "the decorative computer must never receive an interaction route");
 assert.doesNotMatch(triggerBlock, /marketingPhone|OpenMarketPhoneSheet/, "the redundant physical phone must be removed");
 
-const staffBlock = script.match(/function OpenStaffSheet[\s\S]*?function OpenBankSheet/)?.[0] || "";
+const bankBlock = FunctionBlock("OpenBankSheet");
+const stockWindowBlock = FunctionBlock("OpenStockSheet");
+assert.doesNotMatch(bankBlock, /data-open-stock|GetStockAccountAccess|STOCK_OPTIONS/, "the loan counter must not contain stock services");
+assert.doesNotMatch(bankBlock, /asset\.fatal|开发电脑/, "the loan counter must not offer the development computer as collateral");
+assert.match(bankBlock, /COLLATERAL_OPTIONS\.filter\(\(asset\) => asset\.id !== "computer"\)/, "the visible pledge list must explicitly exclude the development computer");
+assert.match(bankBlock, /data-redeem-collateral[\s\S]*RedeemCollateral/, "the loan counter must expose collateral redemption");
+assert.match(bankBlock, /\{ mode: "bank" \}/, "the loan counter needs its own ledger-like surface");
+assert.match(stockWindowBlock, /data-stock-unlock/, "the stock window must show the account-opening gate");
+assert.match(stockWindowBlock, /data-stock-form/, "the stock window must own buy orders");
+assert.match(stockWindowBlock, /\{ mode: "stockWindow" \}/, "the stock window needs its own market-terminal surface");
+
+const staffBlock = FunctionBlock("OpenStaffSheet");
 assert.doesNotMatch(staffBlock, /data-customize|OpenCustomizationSheet\(staffId\)/, "staff chat must not duplicate the project-direction button");
 
 const directiveBlock = script.match(/function OpenDirectiveSheet[\s\S]*?function RevenueChart/)?.[0] || "";
@@ -172,7 +197,6 @@ assert.doesNotMatch(ownerHairBlock, /(?:thinningHair|scalpShine)\.visible\s*=\s*
 assert.doesNotMatch(rules, /GetOwnerHair(?:Stage|Amount)\(state\.month\)/, "monthly settlement must not drive the founder's hair");
 assert.doesNotMatch(`${script}\n${rules}`, /GetOwnerHairStage|OWNER_HAIR_STAGES|ApplyOwnerHairStage|hairStage|连续做游戏满一年|发际线正式进入抢先体验|彻底秃/, "the retired month-driven hair stages and messages must stay removed");
 assert.match(script, /visualStyle = "absurd-orbit-assistant-v2"/, "AI actors must keep their broken-orbit visual identity");
-assert.match(script, /function AddAbsurdLocationSigil\(/, "each room must retain its location-specific abstract sigil details");
 const maleModelDancerBlock = script.match(/function BuildMaleModelDancer[\s\S]*?function ApplyOwnerHairAmount/)?.[0] || "";
 const maleModelRoomBlock = script.match(/const dancerSpecs = \[[\s\S]*?maleModelDancers\.push\(dancer\);[\s\S]*?\}\);/)?.[0] || "";
 assert.match(maleModelDancerBlock, /torsoShape[\s\S]*necklace[\s\S]*sunglasses/, "male models need a distinct shirtless stage silhouette");
@@ -180,6 +204,12 @@ assert.match(maleModelDancerBlock, /visualStyle = "twisting-male-model-v1"/, "ma
 assert.equal([...maleModelRoomBlock.matchAll(/\{ offset:/g)].length, 4, "the male-model club needs several visible performers");
 assert.match(maleModelRoomBlock, /maleModelDancers\.push\(dancer\)/, "club performers must join the animation roster");
 assert.match(script, /maleModelDancers\.forEach[\s\S]*parts\.hips\.rotation\.z[\s\S]*parts\.torso\.rotation\.y[\s\S]*parts\.leftArm\.rotation\.z/, "club performers must keep twisting hips, shoulders, and arms");
+const sigilBlock = script.match(/function AddAbsurdLocationSigil[\s\S]*?function BuildLocationEnvironment/)?.[0] || "";
+const bankEnvironmentBlock = script.match(/function BuildLocationEnvironment[\s\S]*?function BuildRoom/)?.[0] || "";
+assert.match(script, /function AddAbsurdLocationSigil\(/, "non-bank rooms may retain location-specific abstract details");
+assert.doesNotMatch(sigilBlock, /location\.id === "bank"/, "the meaningless eye-like wall sigil must be deleted from the bank");
+assert.match(script, /const sigil = location\.id === "bank" \? null : AddAbsurdLocationSigil/, "the bank must never instantiate a generic abstract sigil");
+assert.match(bankEnvironmentBlock, /const stockZoneX[\s\S]*const loanZoneX[\s\S]*const vaultX/, "the bank environment must visually separate stock, lending, and vault zones");
 
 const homeWindowCycleSeconds = Number(script.match(/const HOME_WINDOW_DAY_NIGHT_SECONDS = (\d+);/)?.[1]);
 const homeWindowBuilderBlock = script.match(/function BuildHomeWindowDayNight[\s\S]*?function UpdateHomeWindowDayNight/)?.[0] || "";

@@ -3669,6 +3669,62 @@ body {
   .computerTurbo { display:none; }
 }
 
+/* The two bank counters have separate tactile surfaces: paper ledgers and a market terminal. */
+.modalLayer.bankMode .modalBackdrop { background:radial-gradient(ellipse at 50% 30%,rgba(201,164,93,.18),transparent 52%),repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0 1px,transparent 1px 22px),rgba(12,14,15,.93); backdrop-filter:blur(5px) saturate(.72); }
+.modalLayer.bankMode .worldPanel { width:min(880px,95vw); max-height:94vh; border:2px solid #8d7750; border-bottom-color:#332a1c; color:#f3ead8; background:linear-gradient(145deg,#514a3e,#292a28 58%,#1c2020); box-shadow:inset 0 0 0 2px #b5a27c,inset 0 0 0 5px #302b22,8px 11px 0 #0b0d0c,0 30px 74px rgba(0,0,0,.7); }
+.modalLayer.bankMode .worldPanel > header { border-bottom-color:#211b12; background:linear-gradient(180deg,#71634b,#3d352a); }
+.modalLayer.bankMode .worldPanel > header span { color:#f0cf87; }
+.modalLayer.bankMode .worldPanel h2 { color:#fff8e9; }
+.modalLayer.bankMode .sheetBody { max-height:calc(94vh - 64px); border-color:#17130d; background:repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 4px),#202321; }
+.modalLayer.bankMode .sectionHeading { border-color:#17130d; background:#151713; box-shadow:inset 5px 0 #b59455,inset 0 2px 4px #000; }
+.modalLayer.bankMode .metricTile,
+.modalLayer.bankMode .worldChoice,
+.modalLayer.bankMode .startupLoanCard { border-color:#5e574a; background:linear-gradient(145deg,rgba(201,164,93,.09),transparent 42%),#292c29; }
+.modalLayer.bankMode .choiceTop span,
+.modalLayer.bankMode .choiceFooter { color:#d9c7a1; }
+.modalLayer.bankMode button.worldChoice:hover { border-color:#b59455; background:linear-gradient(145deg,rgba(201,164,93,.16),transparent 44%),#31352f; }
+.modalLayer.bankMode .loanPaymentRow button { min-height:44px; border-color:#6f5c38; color:#fff4dd; background:linear-gradient(180deg,#7d6944,#4b3e29); }
+
+.collateralLoanList { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:7px; }
+.collateralLoanCard { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; padding:9px 10px; border:1px solid #4d5158; border-left:5px solid #b99556; border-radius:5px; background:linear-gradient(145deg,rgba(185,149,86,.12),transparent 44%),#23272d; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -3px rgba(0,0,0,.34),0 3px 4px rgba(0,0,0,.34); }
+.collateralLoanCard > div { min-width:0; display:grid; gap:3px; }
+.collateralLoanCard strong { overflow:hidden; color:#f0e5cc; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.collateralLoanCard small { color:#aaa8a3; font-size:7px; }
+.collateralLoanCard button { min-height:44px; padding:7px 10px; border:1px solid #695a37; border-radius:5px; color:#fff8e8; background:linear-gradient(180deg,#bc9554,#87682f); font-size:8px; font-weight:900; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.28),inset 0 -3px rgba(74,52,18,.4),0 3px 4px rgba(0,0,0,.36); }
+.collateralLoanCard button:active:not(:disabled) { transform:translateY(2px); box-shadow:inset 0 2px 4px rgba(50,34,13,.42),0 1px 1px rgba(0,0,0,.38); }
+.collateralLoanCard button:disabled { opacity:.36; cursor:not-allowed; filter:saturate(.5); }
+
+.modalLayer.stockWindowMode .modalBackdrop { background:radial-gradient(ellipse at 50% 35%,rgba(80,170,164,.16),transparent 56%),repeating-linear-gradient(0deg,rgba(109,227,176,.012) 0 1px,transparent 1px 4px),rgba(5,10,12,.94); backdrop-filter:blur(5px) saturate(.82); }
+.modalLayer.stockWindowMode .worldPanel { width:min(880px,95vw); max-height:94vh; border-color:#56666a; background:linear-gradient(145deg,#334148,#1a252b 58%,#11191e); box-shadow:inset 0 0 0 2px #849397,inset 0 0 0 5px #202b30,9px 12px 0 #080d0f,0 32px 76px rgba(0,0,0,.7); }
+.modalLayer.stockWindowMode .worldPanel > header { border-bottom-color:#121d21; background:linear-gradient(180deg,#4d5e62,#27353a); }
+.modalLayer.stockWindowMode .worldPanel > header span { color:#8be2bd; }
+.modalLayer.stockWindowMode .worldPanel h2 { color:#effff8; }
+.modalLayer.stockWindowMode .sheetBody { max-height:calc(94vh - 64px); border-color:#060b0d; background:repeating-linear-gradient(0deg,rgba(109,227,176,.018) 0 1px,transparent 1px 4px),#0b1216; }
+.stockWindowShell { display:grid; gap:10px; }
+.stockAccountGate { width:min(520px,100%); display:grid; justify-self:center; gap:9px; padding:18px; border:1px solid #43635d; border-left:6px solid #72d9a2; border-radius:6px; background:linear-gradient(135deg,rgba(114,217,162,.12),transparent 52%),#172226; box-shadow:inset 0 1px rgba(255,255,255,.1),0 8px 18px rgba(0,0,0,.3); }
+.stockAccountGate > span { color:#8be2bd; font-size:8px; font-weight:950; letter-spacing:.12em; }
+.stockAccountGate > strong { color:#f2fff9; font:950 21px/1.1 "Courier New",monospace; }
+.stockAccountGate > small { color:#9eaaa6; font-size:8px; }
+.stockAccountGate .primaryButton { min-height:44px; }
+.stockAccessTrack { height:9px; overflow:hidden; border:1px solid #040809; border-radius:2px; background:#11191c; box-shadow:inset 0 2px 4px #000; }
+.stockAccessTrack i { display:block; height:100%; background:repeating-linear-gradient(90deg,#72d9a2 0 12px,#4aa87d 12px 15px); box-shadow:0 0 8px rgba(114,217,162,.42); }
+
+@media (max-height:540px) and (orientation:landscape) {
+  .modalLayer.bankMode .worldPanel,
+  .modalLayer.stockWindowMode .worldPanel { width:min(920px,98vw); max-height:96vh; }
+  .modalLayer.bankMode .sheetBody,
+  .modalLayer.stockWindowMode .sheetBody { max-height:calc(96vh - 54px); padding:8px 10px; }
+  .modalLayer.stockWindowMode .sheetBody { overflow-x:hidden; }
+  .stockWindowShell { gap:6px; }
+  .stockPick > span { min-height:82px; padding:8px; }
+  .stockAmountPanel { padding:8px; }
+  .modalLayer.stockWindowMode .marketCommit span { display:none; }
+  .modalLayer.stockWindowMode .marketCommit .primaryButton { width:100%; flex:1 1 auto; }
+  .stockAccountGate { gap:6px; padding:11px 13px; }
+  .stockAccountGate > strong { font-size:17px; }
+  .collateralLoanCard { padding:6px 8px; }
+}
+
 /* Touch targets stay usable across the four-page founding book. */
 .founderSkillControls button,
 .founderBookNav .bookBackButton,
