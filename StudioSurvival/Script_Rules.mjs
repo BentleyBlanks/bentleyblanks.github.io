@@ -32,7 +32,7 @@ import {
   STAFF_CATALOG,
   STOCK_OPTIONS,
   STUDENT_PAY_LEVELS,
-} from "./Data_Game.mjs?v=20260815aw";
+} from "./Data_Game.mjs?v=20260815be";
 
 export const SAVE_KEY = "studio_survival_v1";
 export const RULES_VERSION = 9;
@@ -1659,16 +1659,23 @@ export function HireStaff(currentState, staffId) {
   const staff = FindStaff(staffId);
   if (!staff) return { state, ok: false, message: "人才不存在，可能已被别的创业者画饼带走。" };
   if (state.status !== "playing") return { state, ok: false, message: "请先立项。" };
-  if (state.team.some((member) => member.id === staffId)) return { state, ok: false, message: `${staff.name} 已经在工位上了。` };
-  if (state.team.length >= WORKSTATION_COSTS.length) return { state, ok: false, message: "家里已经塞满四张额外工位。再来一个人只能坐冰箱。" };
-  if (state.team.length >= (state.workstations || 0)) {
-    return { state, ok: false, message: state.workstations > 0 ? "没有空工位。先去人才市场设备柜台再买一套电脑桌椅。" : "家里只有老板自己的电脑。第一次招聘前，先在人才市场买第一套工位。" };
+  if (state.team.some((member) => member.id === staffId)) {
+    return { state, ok: false, message: staff.kind === "ai" ? `${staff.name} 已经在计费了。` : `${staff.name} 已经在工位上了。` };
+  }
+  if (staff.kind === "student") {
+    const studentCount = state.team.filter((member) => FindStaff(member.id)?.kind === "student").length;
+    if (studentCount >= WORKSTATION_COSTS.length) {
+      return { state, ok: false, message: "四套学生工位已经坐满。再收简历只能挂墙上。" };
+    }
+    if (studentCount >= (state.workstations || 0)) {
+      return { state, ok: false, message: state.workstations > 0 ? "没有空工位。先去人才市场设备柜台再买一套电脑桌椅。" : "家里只有老板自己的电脑。第一次招学生前，先在人才市场买第一套工位。" };
+    }
   }
   state.team.push({ id: staffId, morale: 70, stress: 18, drift: 12, boost: 0, months: 0, investmentLevel: 0 });
   PushLog(
     state,
     staff.kind === "ai"
-      ? `租用 ${staff.name}，每月 ¥${staff.monthlyCost.toLocaleString("zh-CN")}，取消订阅时不保证代码还能看懂。`
+      ? `租用 ${staff.name}，每月 ¥${staff.monthlyCost.toLocaleString("zh-CN")}。它在云端运行，不占工位；取消订阅时不保证代码还能看懂。`
       : `雇用 ${staff.name}，月薪 ¥${staff.monthlyCost.toLocaleString("zh-CN")}。对方礼貌地接受了创业风险。`,
     "good",
   );
@@ -1679,7 +1686,7 @@ export function PurchaseWorkstation(currentState) {
   const state = Clone(currentState);
   if (state.status !== "playing") return { state, ok: false, message: "公司还没成立，设备发票暂时没有抬头。" };
   const currentCount = Math.max(0, Math.floor(state.workstations || 0));
-  if (currentCount >= WORKSTATION_COSTS.length) return { state, ok: false, message: "四套额外工位已经把家塞满了。" };
+  if (currentCount >= WORKSTATION_COSTS.length) return { state, ok: false, message: "四套学生工位已经把家塞满了。" };
   const cost = WORKSTATION_COSTS[currentCount];
   if (state.cash < cost) return { state, ok: false, message: `第 ${currentCount + 1} 套工位要 ¥${cost.toLocaleString("zh-CN")}，现金不够。` };
   state.cash -= cost;
@@ -1687,7 +1694,7 @@ export function PurchaseWorkstation(currentState) {
   state.workstations = currentCount + 1;
   state.equipmentSpent = (state.equipmentSpent || 0) + cost;
   state.anxiety = Clamp(state.anxiety + 1, 0, 100);
-  PushLog(state, `购入第 ${state.workstations} 套员工工位：电脑、显示器、桌椅共 ¥${cost.toLocaleString("zh-CN")}。家又小了一点。`, "warning");
+  PushLog(state, `购入第 ${state.workstations} 套学生工位：电脑、显示器、桌椅共 ¥${cost.toLocaleString("zh-CN")}。家又小了一点。`, "warning");
   return { state, ok: true, cost, workstations: state.workstations, message: `第 ${state.workstations} 套工位已搬回家` };
 }
 

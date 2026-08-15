@@ -4230,7 +4230,7 @@ body {
 .avatar-taoRan .trFace { left: 1.5px; top: 1.5px; width: 7px; height: 9px; border-radius: 1px; background: #fffdf4; box-shadow: inset 0 0 0 .5px rgba(90, 70, 30, .35); }
 .avatar-taoRan .trFps { left: 8px; top: 36px; padding: 2px 4px; border-radius: 3px; background: #14301f; color: #6fffb0; font: 950 8px/1 "Courier New", monospace; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); animation: talentFpsPing 2s ease-in-out infinite; }
 
-/* 梦笔 4.2 · 生成美术 AI：悬浮显示器、画笔尾巴与像素星尘。 */
+/* 显存诗人 · 生成美术 AI：悬浮显示器、画笔尾巴与像素星尘。 */
 .avatar-dreamBrush .dbBody { left: 17px; top: 28px; width: 46px; height: 34px; border: 2px solid #8a6a4a; border-radius: 5px; background: linear-gradient(180deg, #f2e6cf, #d9c9a8 70%, #cdbb96); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), 0 2px 4px rgba(0, 0, 0, .3); }
 .avatar-dreamBrush .dbScreen { left: 3px; top: 3px; width: 36px; height: 24px; border-radius: 3px; background: radial-gradient(circle at 50% 38%, rgba(255, 157, 201, .9) 0 18%, #5a2a4a 62%, #331c2e); box-shadow: inset 0 0 8px rgba(255, 120, 190, .5), inset 0 0 2px #2a1224; }
 .avatar-dreamBrush .dbEye { top: 12px; width: 5px; height: 6px; border-radius: 50%; background: #fff2f8; box-shadow: 0 0 3px rgba(255, 255, 255, .8); animation: talentBlink 3.2s ease-in-out infinite; }
@@ -4250,7 +4250,7 @@ body {
 .avatar-dreamBrush .dbSpark.s2 { left: 70px; top: 26px; animation-delay: .8s; }
 .avatar-dreamBrush .dbSpark.s3 { left: 10px; top: 58px; animation-delay: 1.5s; }
 
-/* 范围鲸 · 脑暴策划 AI：打领带的鲸鱼，头顶冒点子气泡。 */
+/* 无限猴子 · 脑暴策划 AI：鲸鱼吉祥物、领带与点子气泡。 */
 .avatar-scopeWhale .swTail { left: 6px; top: 35px; width: 16px; height: 20px; transform-origin: 12px 10px; animation: talentTailWag 2.6s ease-in-out infinite; }
 .avatar-scopeWhale .swFin { width: 11px; height: 8px; background: #f0be54; }
 .avatar-scopeWhale .swFin.top { left: 2px; top: 2px; border-radius: 70% 0 60% 0; }
@@ -4264,7 +4264,7 @@ body {
 .avatar-scopeWhale .swDot.d1 { left: 41px; top: 24px; }
 .avatar-scopeWhale .swDot.d2 { left: 46px; top: 18px; animation-delay: .5s; }
 
-/* 结对熊猫 · 编码 AI：黑眼圈眨眼，终端光标一闪一闪。 */
+/* 堆栈先知 · 编码 AI：熊猫吉祥物眨眼，终端光标一闪一闪。 */
 .avatar-pairPanda .ppHead { left: 17px; top: 24px; width: 50px; height: 44px; border-radius: 50%; background: #f4f1ea; box-shadow: inset -7px -6px 0 rgba(0, 0, 0, .07), 0 2px 3px rgba(0, 0, 0, .25); }
 .avatar-pairPanda .ppEar { top: 19px; width: 14px; height: 14px; border-radius: 50%; background: #23262e; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .35); }
 .avatar-pairPanda .ppEar.left { left: 21px; }
@@ -4667,8 +4667,8 @@ body {
   z-index:3;
   left:50%;
   top:56%;
-  width:min(1040px,89vw);
-  height:min(570px,68vh);
+  width:min(1040px,89vw,calc(68vh * 1040 / 570));
+  aspect-ratio:1040/570;
   transform:translate(-50%,-50%);
 }
 .montageWorkScene,
@@ -4783,7 +4783,7 @@ body {
   .whiteboardSectionHeading { margin-top:5px; margin-bottom:4px; }
   .monthMontageHeader { min-height:62px; padding:4px 11px; }
   .montageDate { min-width:138px; }.montageDate b { font-size:44px; }.montageDate small { font-size:7px; }
-  .monthMontageStage { top:56%; width:min(840px,88vw); height:min(350px,69vh); }
+  .monthMontageStage { top:56%; width:min(840px,88vw,calc(69vh * 1040 / 570)); }
   .montageHomeComputerArt { width:45%; bottom:-4%; }
   .montageWorkOwner { left:30%; width:clamp(132px,18%,170px); }
   .montageHomeShelfArt,.montageHomeBoardArt { width:16%; }
@@ -4793,7 +4793,7 @@ body {
 @media (max-height: 410px) and (orientation: landscape) {
   .monthMontageHeader { min-height:52px; padding:2px 9px; }
   .monthMontageHeader > span { font-size:7px; }.montageDate { min-width:120px; }.montageDate b { font-size:36px; }.montageDate i { font-size:8px; }
-  .monthMontageStage { top:57%; width:min(760px,88vw); height:min(270px,68vh); }
+  .monthMontageStage { top:57%; width:min(760px,88vw,calc(68vh * 1040 / 570)); }
   .montageHomeComputerArt { width:41%; bottom:-7%; }
   .montageWorkOwner { left:31%; bottom:5%; width:118px; }
   .montageHomeShelfArt,.montageHomeBoardArt { width:14%; }

@@ -265,6 +265,7 @@ assert.match(monthMontageBlock, /dataset\.ownerArt = GetFounderArtStage\(ownerHa
 assert.match(html, /id="montageDate"[^>]*>[\s\S]*?id="montageDayValue"/, "the day must occupy the montage header's central date display");
 assert.match(css, /\.montageDate\s*\{[^}]*justify-self:center;[^}]*justify-content:center;/s, "the enlarged montage date must be centered rather than left or right aligned");
 assert.match(css, /\.montageDate b\s*\{[^}]*clamp\(46px,7vw,82px\)/s, "the montage day number must remain the strongest header element");
+assert.match(css, /\.monthMontageStage\s*\{[^}]*width:min\(1040px,89vw,calc\(68vh \* 1040 \/ 570\)\);[^}]*aspect-ratio:1040\/570;/s, "the montage stage must preserve its authored 1040:570 ratio when either viewport axis constrains it");
 assert.equal([...html.matchAll(/class="montageOwner\s+montage(?:Work|Transit|Food|Relax)Owner"/g)].length, 4, "each montage scene must contain the generated playable protagonist");
 assert.match(html, /montageOwnerArt full[\s\S]*montageOwnerArt thinning[\s\S]*montageOwnerArt bald/, "the montage must preserve all three live founder art stages");
 assert.match(css, /Texture_CharacterFounderFullWalkSheet\.png[\s\S]*Texture_CharacterFounderThinningWalkSheet\.png[\s\S]*Texture_CharacterFounderBaldWalkSheet\.png/, "the montage must directly reuse the playable founder sprite sheets");
