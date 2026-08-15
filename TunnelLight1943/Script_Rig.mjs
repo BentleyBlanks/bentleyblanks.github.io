@@ -480,15 +480,34 @@ export const TRACKS = {
       { t: 0.0, hipY: -0.02, hipX: 0.02, torso: 12, head: -14, armF: -46, foreF: -30, armB: -34, foreB: -26, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -4 },
       // 蹲到她的高度，两手兜到她腋下
       { t: 0.35, hipY: -0.30, hipX: 0.06, torso: 32, head: -26, armF: -76, foreF: -6, armB: -70, foreB: -4, thighB: -54, shinB: 60, footB: -6, thighF: -42, shinF: 48, footF: -8 },
-      // 发力起身，她离地
-      { t: 0.7, hipY: -0.14, hipX: 0.0, torso: -2, head: 2, armF: -96, foreF: 26, armB: -104, foreB: 26, thighB: -30, shinB: 34, thighF: -20, shinF: 22 },
-      // 站直兜稳（＝childArms 的静止帧）
-      { t: 1.1, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -96, foreF: 38, armB: -104, foreB: 38, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+      // 发力起身，她离地（胳膊往兜的角度收：肘落回体侧、前臂折上来）
+      { t: 0.7, hipY: -0.14, hipX: 0.0, torso: -2, head: 2, armF: -52, foreF: -48, armB: -62, foreB: -72, thighB: -30, shinB: 34, thighF: -20, shinF: 22 },
+      // 站直兜稳（**＝childArms 的静止帧，两处必须一模一样**：末帧对不上，
+      // 轨道一到期人就当帧弹一下——2026-08-15 把 childArms 从"平端两臂"
+      // 改成"肘吊下来兜住"时，这两个键也得跟着改）
+      { t: 1.1, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
     ],
   },
-  // ⑧ 坐到窖沿把妹妹放上梯子（单次 3.0s，玩家操作②）。字幕点了两件事：
-  // "先坐到窖沿"和"妹妹抓着他的衣襟不肯松手"——老版这两件事合起来是一个
-  // FlashPose("kneel", 3.0)，也就是一张跪姿定格挂三秒。
+  // ⑦b 往上颠一下把她托稳（单次 1.4s，玩家操作②：腾出一只手扒梯子之前）。
+  // 抱着人要腾手，现实里就是先屈膝一沉、再往上一送，把人颠高半寸卡在臂弯里。
+  // 起止两帧都是 childArms 的静止帧，接过去不跳。
+  hoistChild: {
+    dur: 1.4, loop: false,
+    keys: [
+      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103 },
+      // 屈膝一沉（劲是从腿上来的，不是从胳膊上来的）
+      { t: 0.35, hipY: -0.10, hipX: -0.01, torso: -2, head: 1, armF: -30, foreF: -66, armB: -42, foreB: -96, thighB: -18, shinB: 24, thighF: -14, shinF: 20 },
+      // 往上一送：她被颠高，两条胳膊跟着收紧
+      { t: 0.7, hipY: 0.04, hipX: -0.04, torso: -10, head: 5, armF: -44, foreF: -84, armB: -56, foreB: -112, thighB: -4, shinB: 6, thighF: 2, shinF: 4 },
+      // 卡稳，换手扒住横档那一下由 climbing+childArms 那支接着演
+      { t: 1.4, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103 },
+    ],
+  },
+  // ⑧ 坐到窖沿把妹妹放上梯子（单次 3.0s）。**2026-08-15 起没人用了**：
+  // 用户定「要抱着下地道」，她整段都在他怀里，不再有"放上梯子"这回事
+  // （那一步换成了 hoistChild）。轨道留着——同视频序章那批遗产，要清另说。
+  // 字幕点了两件事："先坐到窖沿"和"妹妹抓着他的衣襟不肯松手"——老版这两件事
+  // 合起来是一个 FlashPose("kneel", 3.0)，也就是一张跪姿定格挂三秒。
   lowerChild: {
     dur: 3.0, loop: false,
     keys: [
@@ -1964,6 +1983,24 @@ export function PoseRig(rig, s, dt) {
     target.armB = -40 * DEG; target.foreB = -48 * DEG;
     target.thighB = -96 * DEG; target.shinB = 88 * DEG; target.footB = 10 * DEG;
     target.thighF = -90 * DEG; target.shinF = 82 * DEG; target.footF = 8 * DEG;
+  } else if (s.climbing && s.childArms) {
+    // **抱着孩子下梯子**（序·那天：抱着妹妹下窖）。双手交替上够那一套在这儿
+    // 不成立——一条胳膊正兜着人。所以：远侧那只手扒横档（一格一格换手，
+    // 幅度比空手小得多），近侧那只**保持兜的角度不动**，孩子就一直在怀里；
+    // 腿照常蹬阶，身子比空手更贴梯子（怀里有分量，不敢往后仰）。
+    // 缺了这一支，抱着下窖那一段会退回"两只手都在爬"，怀里的人成了挂件。
+    target.hipY = 0; target.hipX = -0.02;
+    target.torso = -2 * DEG;
+    target.head = 4 * DEG;
+    target.armB = Lerp(-142, -118, (swing + 1) / 2) * DEG;   // 扒横档的那只
+    target.foreB = -30 * DEG;
+    target.armF = -35 * DEG;                                  // 兜着她的那只：不动
+    target.foreF = -73 * DEG;
+    target.thighB = Lerp(-10, -40, (swing2 + 1) / 2) * DEG;
+    target.shinB = 40 * DEG;
+    target.thighF = Lerp(-40, -10, (swing2 + 1) / 2) * DEG;
+    target.shinF = 40 * DEG;
+    target.footB = 10 * DEG; target.footF = 10 * DEG;
   } else if (s.climbing) {
     // 爬梯：双手交替上够，腿蹬阶
     target.hipY = 0; target.hipX = 0;
@@ -2127,12 +2164,20 @@ export function PoseRig(rig, s, dt) {
     target.thighF = (c ? swing * 20 : 3) * DEG;
     target.shinF = (c ? Math.max(0, -swing) * 36 : 2) * DEG;
     target.footF = (c ? -swing * 8 - 4 : -3) * DEG;
-    // 两条胳膊都不摆——它们正兜着人。近侧托屁股（世界角 −58），
-    // 远侧扶后背略高一点（−66），错开一档才不叠成一条
-    target.armF = (-96 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
-    target.foreF = (38 - (c ? Math.sin(p) * 2 : 0)) * DEG;
-    target.armB = (-104 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
-    target.foreB = (38 - (c ? Math.sin(p) * 2 : 0)) * DEG;
+    // 两条胳膊都不摆——它们正兜着人。**肘要吊在体侧，不许平端出去**：
+    // 老版给的是上臂 −96/−104（＝把**肘**抬到水平以上、整条胳膊直挺挺伸向身前），
+    // 实测手落在身前 0.61m、离地 0.52m，而她的身子中心只在身前 0.26m——
+    // 他在她身外 0.35m 的空气里认真兜着，她浮在旁边（2026-08-15 用户报「完全不对」）。
+    //
+    // 按落点反算（柱子体型 0.80：肩高 0.82m，上臂＝前臂＝0.196m）：
+    // · 近侧那只托屁股 —— 手要停在身前 0.30m、离地 0.70m ⇒ 肩→手 0.316m，
+    //   肘弯 72°，上臂 −35°（几乎垂着、略朝前），前臂 −73°（折上去横兜）；
+    // · 远侧那只搂后腰 —— 手停在身前 0.24m、离地 0.86m ⇒ 上臂 −48°、前臂 −103°。
+    // 两条错开十几度，侧视里才不叠成一条。
+    target.armF = (-35 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
+    target.foreF = (-73 - (c ? Math.sin(p) * 2 : 0)) * DEG;
+    target.armB = (-48 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
+    target.foreB = (-103 - (c ? Math.sin(p) * 2 : 0)) * DEG;
   } else if (s.carry) {
     // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
     // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。

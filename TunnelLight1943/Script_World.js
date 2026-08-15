@@ -31,6 +31,16 @@ import {
 // 躺着的姿势：整具骨架转 90°（见 UpdateOne 里那段与 Rig 的 sleep）。
 // 新加一支"躺"的姿势时登记到这儿，别在别处另写一套旋转。
 const LIE_POSES = { sleep: true };
+
+// 谁画在谁前面：**同一排的人绝不许共用一个绘制序号**（见 UpdateOne 里那段注释——
+// 共用就是两具骨架的贴图互相穿插，读出来是"两个人在打架"）。这张表是唯一真相：
+//   4 = 玩家（镜头跟着的人，永远压在乡亲之前）
+//   5 = 被玩家抱在怀里的孩子（她贴在他胸前，必须画在他之后）
+//   0..3 = 其余的人，按 id 稳定分槽（同一个人每一帧都落在同一槽里，不会闪）
+// 数字只是**整数偏移**不是深度带：z 一动 CheckBandZ 就记一条深度违规。
+const DRAW_NUDGE_PLAYER = 4;
+const DRAW_NUDGE_HELD = 5;
+const ActorDrawNudge = (id) => Math.floor(ART.Hash(String(id)) * 4) % 4;
 const LIE_LEN = 0.90;        // 一个人躺下有多长（身长，骨架单位）
 const LIE_RISE = 0.15;       // 躺着垫起多高（半个身厚，免得半边陷进地里）
 
@@ -2278,11 +2288,23 @@ export function CreateWorld(canvasEl) {
     // 绘制顺序是 SetPlayOrder 钉死的，所以档位一变就得重新钉一次——
     // 不重钉的话后排的人会画在前排之前，两个人叠成一个。
     const dz = extra.rankDz || 0;
-    if (s.rankDz !== dz) {
+    // 两个人挤在同一处时，谁在前必须**钉死**（2026-08-15 用户报「柱子还会和娘有
+    // ZFighting」）。病根不是深度缓冲——这层全是不写深度的半透明贴图——而是
+    // 同一排的人 z 与绘制序号一模一样，于是两具骨架的**各块贴图按摄像机距离
+    // 互相穿插**（骨头各有各的局部 z）：他的胳膊一会儿在她前面、一会儿在她后面，
+    // 镜头一动就翻，读出来就是两个人打架。
+    // 治法是给每个人一个稳定且互不相同的**整数**绘制序号偏移。不动 z——
+    // CheckBandZ 只认规范表上的那几档，挪 z 会当场记一条深度违规（那张单子必须为空）。
+    const nudge = extra.drawNudge || 0;
+    if (s.rankDz !== dz || s.drawNudge !== nudge) {
       s.rankDz = dz;
-      SetPlayOrder(s.rig.group, ACTOR_Z + dz);
-      if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow");
-      if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry");
+      s.drawNudge = nudge;
+      // **走 SetPlayOrder 不走 FixOrder**：骨架是一整组网格，而 FixOrder 只钉
+      // 传进去的那一个对象、不往下遍历——钉在 group 上等于没钉，各骨头照旧
+      // 被 ApplyDepthOrder 按自己的局部 z 派号（第一版就是这么"改了等于没改"）
+      SetPlayOrder(s.rig.group, ACTOR_Z + dz, "actor", nudge);
+      if (s.shadow) SetPlayOrder(s.shadow, ACTOR_SHADOW_Z + dz, "actorShadow", nudge);
+      if (s.carryMesh) SetPlayOrder(s.carryMesh, CARRY_Z + dz, "carry", nudge);
     }
     // 位置压回地平面：演员脚下这条线必须与行走线道具（井台/磨盘/车）是同一条。
     // 后一排（rankDz 是负的）是**有意**站在更靠后的地面上，PlaceZ 会原样放行——
@@ -2556,6 +2578,7 @@ export function CreateWorld(canvasEl) {
         // 怀里抱着个孩子：不是姿势是**走姿**（腿照走、两臂兜住她、后仰配重）。
         // 挂在这儿而不是 pose 上，是因为 pose 会把走路整个顶掉
         childArms: !!p.childArms,
+        drawNudge: DRAW_NUDGE_PLAYER,
         aimHand: CrankAimLocal(state, p, boyScale),
         track: p.track?.name, trackT: p.track?.t,
         // 自己提着灯也照样有影子——灯在身前，影子就甩在身后
@@ -2642,6 +2665,8 @@ export function CreateWorld(canvasEl) {
           lift: a.lift || 0, poseK: PoseProgress(a), climbing: !!a.climbing,
           // 队列里的第几排：横版里"并排"只能靠深度演（见 RankDz 的注释）
           rankDz: RankDz(a.rank || 0),
+          // 谁压着谁：被抱在怀里的那个画在玩家之后，其余按 id 稳定分槽
+          drawNudge: a.heldByPlayer ? DRAW_NUDGE_HELD : ActorDrawNudge(a.id),
           ...(sisterScale ? { bodyScale: sisterScale } : {}),
           light: NearestLight(a.x, LevelYOf(a.level)),
         });

@@ -155,9 +155,13 @@ export function SetLayerOrder(obj, layerKey, z, tag = layerKey) {
   obj.traverse((o) => { if (o.isMesh) { o.renderOrder = order; o.userData.fixedOrder = order; } });
 }
 
-export function SetPlayOrder(obj, z, tag = "SetPlayOrder") {
+// nudge 是**同一深度带内**的整数错位：两个人站在一处时谁画在前面必须钉死，
+// 否则两具骨架的贴图按摄像机距离互相穿插（各骨头有各自的局部 z），镜头一动
+// 前后就翻——读出来是"两个人在打架"。**不许改 z 去错位**：CheckBandZ 只认
+// 规范表上那几档，挪 z 会当场记一条深度违规（那张单子必须为空）。
+export function SetPlayOrder(obj, z, tag = "SetPlayOrder", nudge = 0) {
   CheckBandZ(tag, z);
-  const order = DepthOrder("play", z);
+  const order = DepthOrder("play", z) + nudge;
   // 同时写进 userData：BuildEnvironment 重建后 ApplyDepthOrder 重跑派发时，
   // 不至于改按 position.z 重新猜（动态物的 position.z 与深度带曾经不一致，
   // 「桶忽前忽后」就是这么来的）。对骨架尤其致命：骨头各自的**局部** z 全是

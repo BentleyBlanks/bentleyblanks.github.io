@@ -40,6 +40,11 @@ export function ChapterC1(K) {
     AddGroundItem, Cue, FindActor, FlashPose, FlashTrack, GiveItem, RewindBeat, SetDin,
     StartMicroCine, StopDin, UNDER_Y, V,
   } = K;
+  // 抱在怀里的孩子坐得多高（米）。**这个数是量出来的**：柱子走 childArms 那档
+  // 走姿时，托着的那只手落在离地 0.82m（`world.LimbTipsOf('player').handF`），
+  // 而妹妹按 heldChild 坐着时胯离她自己脚底 0.40m —— 两个数一减就是她该垫多高。
+  // 手心与她的胯差一寸都能看出来：差多了是"托着空气"，差少了是"陷进他胳膊里"。
+  const SEAT_LIFT = 0.42;
   return [
     {
       // ── 序 · 那天（第八稿独立成场；镜头调度沿用 2026-08-13 那版重做） ──
@@ -300,18 +305,30 @@ export function ChapterC1(K) {
         // 老版只在按下那一帧闪 0.8 秒 shelter，之后柱子甩着两条空胳膊走路，
         // 妹妹浮在他胸口跟着飘
         const sis = FindActor(state, "sister");
-        if (b.carrying && sis && b.stepIndex === 1) {
+        // 抱起来之后**一路抱到窖底**（2026-08-15 用户报「没有抱着下地道的设计，
+        // 妹妹直接瞬移到了地道下面」）：老版在走到窖口那一步就 carrying=false，
+        // 顺手把她 `level="under"; x=30.7` ——一句话把人挪下去一层又挪开 1.4 米，
+        // 那正是玩家看到的瞬移。现在她整段都钉在他怀里，连下梯子也是，
+        // **一帧都没有"她自己出现在别处"**。
+        if (b.carrying && sis) {
           sis.cineTarget = null;
-          // **身前 0.26m**：childArms 的手心落在身前 0.29m，而老版写的是
-          // `- heading * 0.16`＝**背后** 0.16m——他在身前认真兜着空气，
-          // 她笔直站着浮在他背后跟着飘（差了 0.45m ≈ 58 像素）
-          sis.x = state.player.x + state.player.heading * 0.26;
-          sis.heading = state.player.heading;
-          sis.lift = 0.42;
+          sis.following = false;
+          // 贴着他：身前 0.20m。老版 0.26m 在实拍里两人之间留着一道缝——
+          // 抱孩子是**贴在胸口**，有缝就读成"她浮在他前面"
+          sis.x = state.player.x + state.player.heading * 0.20;
+          // **脸朝着他**（不是跟他同向）：她两条胳膊是搂着他脖子的，
+          // 同向的话那两只手就搂在空气里
+          sis.heading = -state.player.heading;
+          // 跟着他换层、跟着他下梯子：lift 叠在他的 lift 上，所以他一级一级往下，
+          // 她就在怀里一级一级跟着下去
+          sis.level = state.player.level;
+          sis.lift = (state.player.lift || 0) + SEAT_LIFT;
           // leanIn 是**站姿**（腿几乎直）：被抱着的孩子腿要折起来搭在他小臂上
           sis.pose = "heldChild";
+          // 她画在他之后（贴在他胸前那一侧）——见 World 的 DRAW_NUDGE_HELD
+          sis.heldByPlayer = true;
           state.player.childArms = true;
-        }
+        } else if (sis) sis.heldByPlayer = false;
         // 拦门那段过场演完，娘自己跑回窖口接着掀板（轨道在走位期间要撤掉，
         // 否则她指着手平移过去）
         const mm = FindActor(state, "mother");
@@ -352,21 +369,21 @@ export function ChapterC1(K) {
             // 蹲下去→兜到腋下→起身：有过程的动作不许只摆一个造型
             FlashTrack(state, "scoopChild", 1.1);
           } },
-        // ② 抱到窖口：先坐到窖沿，把妹妹放上梯子。她抓着衣襟不肯松手
+        // ② 抱到窖口：她一直在他怀里——**不放下、不换手、不挪位置**。
+        // 老版这一步 `carrying=false` 之后顺手把她挪到 under/x=30.7，
+        // 于是玩家还站在窖口上头，她已经在窖底站着了（用户报的瞬移）
         { type: "goto", zone: { x: 29.3, w: 1.8 },
           effect: (state) => {
-            state.beat.carrying = false;
-            const sis = FindActor(state, "sister");
-            if (sis) { sis.lift = 0; sis.level = "under"; sis.x = 30.7; sis.heading = 1; sis.pose = "leanIn"; sis.cineTarget = null; }
             StartMicroCine(state, [
-              { act: "柱子先坐到窖沿，把妹妹放上梯子。妹妹抓着他的衣襟不肯松手。", d: 3.4,
+              { act: "柱子把她往上托了托，腾出一只手扒住梯子横档。", d: 3.4,
                 cam: { kind: "free", from: [30.62, 0.86, 2.90], to: [30.55, 0.84, 2.70], at: [29.78, 0.46], atTo: [29.80, 0.42],
                   fg: [{ art: "vat", u: -0.72, v: -0.44, z: 1.40, w: 0.55, h: 0.55 }] },
                 on: (s) => {
-                  // 坐下去→往下送→她不撒手→一根根掰开（老版：跪姿定格挂 3 秒）
-                  FlashTrack(s, "lowerChild", 3.0);
-                  Cue(s, "clothLift", { gain: 0.4, rate: 0.9, delay: 1.9 });
-                  Cue(s, "ladder", { gain: 0.4, rate: 1.1, delay: 0.8 });
+                  // 往上颠一下把她托稳（抱着人腾手之前都得先这么一下），
+                  // 不再是"把她放上梯子"——她不下来
+                  FlashTrack(s, "hoistChild", 1.4);
+                  Cue(s, "clothLift", { gain: 0.4, rate: 0.9, delay: 0.5 });
+                  Cue(s, "ladder", { gain: 0.4, rate: 1.1, delay: 1.2 });
                 } },
             ]);
           } },
@@ -376,8 +393,17 @@ export function ChapterC1(K) {
             // 旗标落在 effect 里（跳幕只跑 effect）：lidShut 一落，
             // 渲染层的盖板合上、板缝光条亮起来
             state.flags.lidShut = true;
+            // 到窖底了才松手。**放下 ≠ 瞬移**：她落在他脚边（他这会儿站的地方），
+            // 不是被搬到窖底另一头去——老版写死 x=30.9，玩家在 29 点几的地方
+            // 松开手，她却出现在两米开外
+            state.beat.carrying = false;
             const sis = FindActor(state, "sister");
-            if (sis) { sis.following = false; sis.level = "under"; sis.x = 30.9; sis.heading = 1; sis.pose = "leanIn"; sis.lift = 0; }
+            if (sis) {
+              sis.heldByPlayer = false; sis.following = false;
+              sis.level = "under"; sis.lift = 0;
+              sis.x = (state.player.x || 30.9) + 0.35;
+              sis.heading = -1; sis.pose = "leanIn";
+            }
             StartMicroCine(state, [
               { act: "娘跪在窖口，一只手压着翻板。外面的脚步已经到了院门口。", d: 3.2,
                 cam: { kind: "free", from: [30.98, 0.54, 3.02], to: [30.92, 0.52, 2.86], at: [29.95, 0.54], atTo: [29.95, 0.52],
