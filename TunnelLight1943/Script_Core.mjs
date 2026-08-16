@@ -37,11 +37,14 @@ const PROMPT_ACTS = { E: "interact", F: "throw", C: "crouch", W: "up", S: "down"
 
 // 把 `按住 E · 接绳` 拆成 { act:"interact", hold:true, text:"接绳" }。
 // 认不出前缀的当成没有按键的状态行（"跟上娘""手里拿着桶"），HUD 走另一条样式。
+// `dir`：四动词里那半个方向（「按住 E ＋ ↑ · 掀开翻板」）。键名不进正文——
+// 前缀里认出来，HUD 翻成第二枚键帽（键盘是箭头键，触屏是摇杆方向）。
+const PROMPT_DIRS = { "↑": "up", "↓": "down", "←": "left", "→": "right" };
 export function SplitPrompt(raw) {
   if (!raw) return null;
-  const m = /^(按住\s*)?([EFCWS])\s*·\s*([\s\S]+)$/.exec(raw);
-  if (!m) return { act: null, hold: false, text: raw };
-  return { act: PROMPT_ACTS[m[2]], hold: !!m[1], text: m[3] };
+  const m = /^(按住\s*)?([EFCWS])(?:\s*[＋+]\s*([↑↓←→]))?\s*·\s*([\s\S]+)$/.exec(raw);
+  if (!m) return { act: null, hold: false, dir: null, text: raw };
+  return { act: PROMPT_ACTS[m[2]], hold: !!m[1], dir: PROMPT_DIRS[m[3]] || null, text: m[4] };
 }
 
 // ---------------------------------------------------------------------------
@@ -1545,6 +1548,80 @@ function StepLightHazard(state, def, dt) {
 // 每攒满一"下"，物体答一声话（cue + 姿势）——做功要听得见、看得着。
 // ---------------------------------------------------------------------------
 const STROKE_LEN = 0.30;      // 一下拽/顶的行程（归一化拖动量，≈1/3 屏高）
+// 四个动词的键位（2026-08-16 用户定，照《勇敢的心》）：全部长在 E 上。
+// **提示文案里必须写清按什么**——「罚玩家之前先让他看懂」那条的第 2 款。
+const STROKE_KEYS = {
+  up: "按住 E ＋ ↑", down: "按住 E ＋ ↓",
+  left: "按住 E ＋ ←", right: "按住 E ＋ →",
+  circle: "按住 E",     // 绕圈那一档没有方向，光按住 E 是合法后备
+};
+export function StrokePrompt(text, stroke) {
+  const keys = STROKE_KEYS[stroke || "down"];
+  if (!text) return keys;
+  // 键位**一律由这儿说了算**：剧本里写的旧前缀（「按住 E · 顶上撑木」）连同
+  // 已经写了方向的，都换成这一步真正要的那一半。数据里只留动词最省心
+  const m = /^(?:按住\s*)?E(?:\s*[＋+]\s*[↑↓←→])?\s*·\s*([\s\S]+)$/.exec(text);
+  return `${keys} · ${m ? m[1] : text}`;
+}
+// ---------------------------------------------------------------------------
+// 「按住 E ＋ 方向」＝ 一根虚拟指尖（2026-08-16 四动词）
+//
+// 拟物那几套玩法（掀苫子、扒烧土、掰红薯干、撕布、缝三针）的手感全长在
+// **一只手在那件东西上怎么走**里：有分量、跟不上会脱手、卡口要往回让一寸。
+// 新口径要求全部输入收进 E ＋ 方向，可**手感不该跟着一起砍掉**——所以这儿
+// 不给它们各写一条键盘分支，而是把方向键翻译成一只手：手自己落在该攥的地方
+// （anchor），按住的每一帧朝那个方向匀速挪。底下那套判定一个字都不用改。
+//
+// 谁在用：case heaveMat / scoopAsh / unwrapJar / split / tear / sew。
+// 指尖玩家照旧真的用手拖（pointerWorld / pointerCard），两条路并行。
+// ---------------------------------------------------------------------------
+// 按住 E 的时候方向键归"做功"的那几档活（走位与爬梯让位，见 MovePlayer）：
+// 笔画做功、以及全部由虚拟指尖驱动的拟物玩法
+const WORK_ACTIONS = new Set([
+  "holdAt", "heaveAt", "plankAt", "scoopAt", "unwrapAt", "splitAt", "tearAt", "sewAt",
+]);
+
+function VirtualHand(state, input, dt, anchor, opts) {
+  if (!anchor) { if (state.vhand?.key === opts.key) state.vhand = null; return null; }
+  const dirs = opts.dirs || {};
+  const climb = input.climb || 0, moveX = input.moveX || 0;
+  let v = null;
+  if (input.interactHeld) {
+    if (climb < 0) v = dirs.up;
+    else if (climb > 0) v = dirs.down;
+    else if (moveX < 0) v = dirs.left;
+    else if (moveX > 0) v = dirs.right;
+  }
+  if (!v) {
+    // 松手（或方向不对）：手离开，那一路的"撒手"分支照旧接管
+    if (state.vhand?.key === opts.key) state.vhand = null;
+    return null;
+  }
+  const speed = opts.speed || 0.55;
+  const h = state.vhand;
+  // `regrab`＝这会儿并没攥着（一把扒完自己松了手、脱手了、或还没上手）：
+  // 手退回该攥的地方重新按下去。一把一把干的活（扒土、撕布、掰）就是这么
+  // 一下接一下的——真人也是松开再按，只不过按住方向键的时候由它替你按
+  if (!h || h.key !== opts.key || (opts.regrab && h.idle > 0.12)) {
+    // 落手那一帧＝按下那一帧：攥住判定要的 ptrPressed 在这儿立
+    state.vhand = { key: opts.key, x: anchor.x, y: anchor.y, a: opts.orbit?.a0 ?? 0, idle: 0 };
+    state.ptrPressed = true;
+    return { x: anchor.x, y: anchor.y };
+  }
+  // 松着手的时间（连着两帧没攥住才算真松了，免得判定那一帧的空档就重按）
+  h.idle = opts.regrab ? (h.idle || 0) + dt : 0;
+  // 绕圈那一路（解泥封/缠绳）：方向键推的是**转角**，手自己贴着圈走——
+  // 一个方向键说不了"绕圈"，可这活儿现实里就是绕的，所以把它翻译过来
+  if (opts.orbit) {
+    const o = opts.orbit;
+    h.a += (o.dir || -1) * (o.rate || 2.2) * dt;
+    return { x: o.cx + Math.cos(h.a) * o.r, y: o.cy + Math.sin(h.a) * o.r };
+  }
+  h.x += v[0] * speed * dt;
+  h.y += v[1] * speed * dt;
+  return { x: h.x, y: h.y };
+}
+
 function StrokeWork(state, mem, input, dt, opts) {
   const hold = opts.hold;
   const kind = opts.stroke || "down";
@@ -1571,14 +1648,26 @@ function StrokeWork(state, mem, input, dt, opts) {
       } else mem.prevA = null;
     } else mem.prevA = null;
   } else {
-    // 竖向笔画：只认对的方向（铲子不往上抡，撑木不往下砸）
-    const dir = kind === "up" ? -1 : 1;
-    const pull = input.pullHeld ? Math.max(0, (input.pull || 0) * dir) : 0;
-    gain = pull / (STROKE_LEN * strokesN) * hold;
+    // 笔画：只认对的方向（铲子不往上抡，撑木不往下砸，撕布不往回缠）。
+    // 竖的（up/down）与横的（left/right）共用一套账，差别只在读哪根轴。
+    const horiz = kind === "left" || kind === "right";
+    const dir = (kind === "up" || kind === "left") ? -1 : 1;
+    // 指尖：只有竖向有位移量通道（横向那根 dragX 是把看不见的 slider，
+    // 2026-08-07 用户明令拆掉的，别加回来）。手机上横着做功走摇杆＋互动钮，
+    // 与键盘同一条路
+    if (!horiz) {
+      const pull = input.pullHeld ? Math.max(0, (input.pull || 0) * dir) : 0;
+      gain = pull / (STROKE_LEN * strokesN) * hold;
+    }
+    // **键盘／摇杆：按住 E ＋ 往做功的方向推**（2026-08-16 起全作只有这四个
+    // 输入）。以前是光按住 E 就涨——那等于"长按一个按钮"，方向白写；
+    // 现在方向不对不涨，与「手势要贴着做功的方向」那条对齐
+    const axis = horiz ? (input.moveX || 0) : (input.climb || 0);
+    if (input.interactHeld && Math.sign(axis) === dir) gain += dt * 0.85;
   }
 
-  // 键盘后备走同一个账本：手感稍慢，但一样能干完
-  if (input.interactHeld) gain += dt * 0.85;
+  // 绕圈那一档还留着光按住 E 的后备（辘轳/缠绳是费力气的活，不是指尖功夫）
+  if (kind === "circle" && input.interactHeld) gain += dt * 0.85;
 
   // 攒满一"下"：物体答话。键盘与手势共用节拍，Cue 不会重复也不会漏
   if (gain > 0) {
@@ -1617,14 +1706,21 @@ export function SearchSpotNow(state, st) {
   const lvl = p.level || "surface";
   const left = (st.spots || []).filter((s) => !S.done[s.key]);
   if (!left.length) return { spot: null, sub: null, near: null, left };
-  // 同时站在两处的判定区里（挨得近的时候会有）：取近的那处
+  // 同时站在两处的判定区里（挨得近的时候会有）：**手上正干着的那处优先**，
+  // 其余取近的那处。不认这条的话，掀席子掀到一半人被那件东西自己拽过半米
+  //（mat 的 standX 跟着外沿走），脚一跨进隔壁食槽的判定区，这一处当场换人——
+  // 屏幕上是席子掀到一半停住、提示换成了"扫槽底"（2026-08-16 实测）
   let best = null, bestD = Infinity;
   for (const s of left) {
     const sub = s.steps[S.sub[s.key] || 0];
     const z = sub?.zone;
     if (!z || (z.level || "surface") !== lvl) continue;
     const d = Math.abs(p.x - z.x);
-    if (d <= z.w / 2 && d < bestD) { bestD = d; best = { spot: s, sub }; }
+    if (d > z.w / 2) continue;
+    const busy = (S.sub[s.key] || 0) > 0 || state.forage?.[s.key]?.started
+      || state.forage?.[s.key]?.grab || (state.forage?.[s.key]?.done || 0) > 0;
+    const rank = busy ? d - 100 : d;      // 干着的那处排在最前
+    if (rank < bestD) { bestD = rank; best = { spot: s, sub }; }
   }
   if (best) return { ...best, near: best.spot, left };
   let near = left[0], nd = Infinity;
@@ -1930,7 +2026,8 @@ function StepChain(state, def, input, dt) {
         //    ……」，全场别的长按都写「按住 E · ……」——玩家连该按什么都不知道，
         //    先挨了一巴掌。要再做这类偷渡门，两件事一起做：把门画出来，
         //    并且照旧把输入写进 prompt。
-        state.prompt = st.prompt;          // 百分比不进文案，promptFill 画成进度环
+        // 百分比不进文案，promptFill 画成进度环；键位由 StrokePrompt 兜底补上
+        state.prompt = StrokePrompt(st.prompt, st.stroke);
         state.promptFill = b.holdP / st.hold;
         // 动词姿势（规范：每个玩法动词必须配角色动画，不许「人站着不动、
         // 字幕替他做」）。步骤上写 pose，进度就直接驱动它——倒土那三下以前
@@ -1995,8 +2092,11 @@ function StepChain(state, def, input, dt) {
       }
       if (!InZone(p.x, lvl, st.zone)) { f.grab = false; return; }
       const edge = ForageMatEdge(f.x, gy, f.ang, part);
-      const pw = input.pointerWorld;
-      const held = !!input.pointerHeld && !!pw;
+      // 按住 E ＋ ↑ ＝ 手落在外沿上往上掀（分量、撕草、坠回全走原来那条路）
+      const vh = VirtualHand(state, input, dt, edge,
+        { key: `mat:${part}`, dirs: { up: [-0.18, 1] }, speed: 0.62, regrab: !f.grab });
+      const pw = vh || input.pointerWorld;
+      const held = !!vh || (!!input.pointerHeld && !!pw);
       // ① 按下那一帧手必须落在苫子外沿上，画面别处拖一律无效
       if (held && state.ptrPressed && !f.grab
         && Math.hypot(pw.x - edge.x, pw.y - edge.y) < L.grabR) {
@@ -2068,8 +2168,11 @@ function StepChain(state, def, input, dt) {
       const end = ForagePlankEnd(f.x0, gy, f.dx);
       const east = end.x;
       f.tilt = end.tilt;
-      const pw = input.pointerWorld;
-      const held = !!input.pointerHeld && !!pw;
+      // 按住 E ＋ → 往外推；卡在焦椽茬上那一下按 E ＋ ← 往回让一寸
+      const vh = VirtualHand(state, input, dt, { x: east, y: end.y },
+        { key: "plank", dirs: { right: [1, 0], left: [-1, 0] }, speed: 0.55, regrab: !f.grab });
+      const pw = vh || input.pointerWorld;
+      const held = !!vh || (!!input.pointerHeld && !!input.pointerWorld);
       if (held && state.ptrPressed && !f.grab
         && Math.abs(pw.x - east) < L.grabR && Math.abs(pw.y - end.y) < 0.42) {
         f.grab = true; f.started = true;
@@ -2155,8 +2258,14 @@ function StepChain(state, def, input, dt) {
       const mound = { x: f.x, y: gy + L.top * (1 - 0.55 * f.k) * 0.55 };
       const phased = L.wipes !== undefined;
       const sh = phased ? { x: f.jarX, y: gy + L.shoulderY } : null;   // 坛肩
-      const pw = input.pointerWorld;
-      const held = !!input.pointerHeld && !!pw;
+      // 按住 E ＋ ↓＝一把一把往怀里扒（方向就是 u：朝自己斜下）；
+      // 钉住之后换 E ＋ ←/→ 顺着坛肩横着抹——"换个方向"这条谜面照旧成立
+      const vh = VirtualHand(state, input, dt, f.pinned || f.caught ? sh || mound : mound, {
+        key: `ash:${part}`, speed: 0.5, regrab: !f.grab,
+        dirs: { down: [u.x, u.y], left: [-1, 0.05], right: [1, 0.05] },
+      });
+      const pw = vh || input.pointerWorld;
+      const held = !!vh || (!!input.pointerHeld && !!input.pointerWorld);
       // 攥得住的地方：土堆本身；钉住之后坛肩那一圈也算（它就埋在堆顶底下，
       // 两块地方叠着——所以**这一把是什么不看按在哪儿，看手往哪儿走**）
       if (held && state.ptrPressed && !f.grab
@@ -2308,10 +2417,17 @@ function StepChain(state, def, input, dt) {
       }
       p.heading = -1;
 
-      const pc = input.pointerCard;
-      const held = !!input.pointerHeld && !!pc;
-      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
       const c = L.neck;
+      // 按住 E ＋ ↑：手贴着罐口那一圈逆时针褪泥；褪完再往上掀油布角
+      const vh = VirtualHand(state, input, dt,
+        w.phase === "unwind" ? { x: c.x + c.r * 0.92, y: c.y } : w.corner,
+        w.phase === "unwind"
+          ? { key: "wrap:unwind", dirs: { up: [0, -1] }, orbit: { cx: c.x, cy: c.y, r: c.r * 0.92, a0: 0, dir: -1, rate: 2.0 } }
+          : { key: "wrap:peel", dirs: { up: [0, -1] }, speed: 0.34, regrab: !w.grab });
+      const pc = input.pointerCard;
+      const ptr = !!input.pointerHeld && !!pc;
+      const held = !!vh || ptr;
+      const hand = vh || (ptr ? { x: pc.u, y: pc.v / L.aspect } : null);
 
       if (w.phase === "unwind") {
         const d = hand ? Math.hypot(hand.x - c.x, hand.y - c.y) : 0;
@@ -2432,9 +2548,22 @@ function StepChain(state, def, input, dt) {
         p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.8 * dt);
       }
       p.heading = -1;
+      // 掰：按住 E ＋ ← 或 → ——**从你使劲那头断开**（捏点由方向定：往左掰
+      // 就掐在偏左那点，一长一短的长短跟着变，"掰哪儿断哪儿"这条手感留住了）。
+      // 分进两只碗那一段：E ＋ ← 搁左边那只，E ＋ → 搁右边那只
+      const splitAnchor = w.phase === "break"
+        ? { x: L.strip.cx + ((input.moveX || 0) < 0 ? -1 : 1) * L.strip.len * 0.17, y: L.strip.cy }
+        : (w.pieces && w.held < 0 ? (w.pieces.find((pe) => !pe.bowl) || null) : null);
+      const vhSplit = VirtualHand(state, input, dt, splitAnchor, {
+        key: `split:${w.phase}`, speed: 0.42, regrab: w.phase === "break" ? !w.grab : w.held < 0,
+        dirs: w.phase === "break"
+          ? { left: [-0.15, 1], right: [0.15, 1] }        // 掰＝往下压（卡上 y 朝下）
+          : { left: [-1, -0.35], right: [1, -0.35] },     // 分＝把那截送进碗里
+      });
       const pc = input.pointerCard;
-      const held = !!input.pointerHeld && !!pc;
-      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
+      const ptr = !!input.pointerHeld && !!pc;
+      const held = !!vhSplit || ptr;
+      const hand = vhSplit || (ptr ? { x: pc.u, y: pc.v / L.aspect } : null);
 
       if (w.phase === "break") {
         const x0 = L.strip.cx - L.strip.len / 2;
@@ -2604,9 +2733,13 @@ function StepChain(state, def, input, dt) {
         p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.8 * dt);
       }
       p.heading = -1;
+      // 撕：按住 E ＋ ← 横着往回拽（三把：绷紧 → 裂口 → 一路拽到头）
+      const vh = VirtualHand(state, input, dt, w.corner,
+        { key: "tear", dirs: { left: [-1, 0] }, speed: 0.30, regrab: !w.grab });
       const pc = input.pointerCard;
-      const held = !!input.pointerHeld && !!pc;
-      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
+      const ptr = !!input.pointerHeld && !!pc;
+      const held = !!vh || ptr;
+      const hand = vh || (ptr ? { x: pc.u, y: pc.v / L.aspect } : null);
 
       // ① 按下那一帧手必须落在布角上
       if (held && state.ptrPressed && !w.grab) {
@@ -2722,10 +2855,22 @@ function StepChain(state, def, input, dt) {
         p.x += Math.sign(standX - p.x) * Math.min(Math.abs(standX - p.x), 1.6 * dt);
       }
       p.heading = -1;
-      const pc = input.pointerCard;
-      const held = !!input.pointerHeld && !!pc;
-      const hand = held ? { x: pc.u, y: pc.v / L.aspect } : null;
       const stz = L.stitches[Math.min(w.n, L.stitches.length - 1)];
+      // 缝三针＝按住 E ＋ ↑／↓／↑：**按哪个方向针就往哪儿走**。这一针该往
+      // 上还是往下由版面上的落点说了算（送针 send / 拉线 pull），所以方向表
+      // 是照"针到落点"现算的——玩家按对了方向，针就顺着走
+      const aim = w.phase === "aim" ? stz.send : stz.pull;
+      const av = { x: aim.x - w.needle.x, y: aim.y - w.needle.y };
+      const alen = Math.hypot(av.x, av.y) || 1;
+      const unit = [av.x / alen, av.y / alen];
+      // 卡坐标 y 朝下：往上走＝ y 减
+      const sewDirs = av.y < 0 ? { up: unit } : { down: unit };
+      const vh = VirtualHand(state, input, dt, w.needle,
+        { key: `sew:${w.n}:${w.phase}`, dirs: sewDirs, speed: 0.30, regrab: !w.grab });
+      const pc = input.pointerCard;
+      const ptr = !!input.pointerHeld && !!pc;
+      const held = !!vh || ptr;
+      const hand = vh || (ptr ? { x: pc.u, y: pc.v / L.aspect } : null);
 
       if (held && state.ptrPressed && !w.grab
         && Math.hypot(hand.x - w.needle.x, hand.y - w.needle.y) < L.grabR) {
@@ -3131,8 +3276,8 @@ function StepChain(state, def, input, dt) {
       // 画框以人为主、支撑位为辅（六四开）：只对着中点的话，人被挤到画框边上，
       // 而这一拍要看的正是他把板举上去这件事
       state.closeUp = { x: p.x * 0.62 + z.x * 0.38, y: UNDER_Y + 0.40, hw: 1.9 };
-      state.prompt = z.ok ? (st.prompt || "把木板顶上去 · 往上使劲")
-        : (st.wrongPrompt || st.prompt || "把木板顶上去 · 往上使劲");
+      state.prompt = StrokePrompt(z.ok ? (st.prompt || "把木板顶上去")
+        : (st.wrongPrompt || st.prompt || "把木板顶上去"), "up");
       state.promptFill = b.holdP / need;
       const g = StrokeWork(state, b.strokeMem || (b.strokeMem = {}), input, dt, {
         hold: need, stroke: "up", at: { x: z.x, y: 0.55, baseY: UNDER_Y },
@@ -3246,7 +3391,9 @@ function StepChain(state, def, input, dt) {
       // 特写：桶一挂上辘轳，镜头就推到井口——摇转盘这套手上功夫不在大全景里做。
       // 景别按"看得见他使劲"倒推：2.2m 半宽下柱子占了小半个画高
       state.closeUp = { x: cx - 0.25, y: SURFACE_Y + 0.66, hw: st.closeHw ?? 2.2 };
-      const climb = input.climb || 0;
+      // 四动词（2026-08-16）：摇辘轳＝**按住 E ＋ ↓/↑**。光按方向键不算——
+      // 全作的做功输入都长在 E 上，井台不该是唯一的例外
+      const climb = input.interactHeld ? (input.climb || 0) : 0;
       // 辘轳的木轴一圈一圈地叫：手在摇才响，摇得快叫得密
       const Creak = (rate) => {
         w.creakT = (w.creakT ?? 0) + dt;
@@ -3318,9 +3465,24 @@ function StepChain(state, def, input, dt) {
           w.swayV += 1.6;
           Cue(state, "bucketKnock", { gain: 0.8, rate: 1.1 - w.knocks * 0.16 });
         }
-        state.prompt = "S · 放绳下去";
+        state.prompt = "按住 E ＋ ↓ · 放绳下去";
         state.promptFill = w.depth;
-        if (w.depth >= 1) {
+        if (w.depth >= 1 && st.simple) {
+          // 第九稿：井台压成两道手（放桶 / 摇上来）。空桶落到水面先横着漂
+          // 一下、松一下让它扣过去吃水——这一下留在**画面**里演，不再单开
+          // 一道「墩桶」的玩法（Notion 第九稿：修井绳＋辘轳绕圈＋墩桶下线）
+          w.phase = "raise";
+          w.filled = true;
+          w.giveOut = false;
+          w.slipT = WINCH_GRACE;
+          w.prevA = null;
+          w.tiredShown = false;
+          w.swayV += 1.1;
+          Cue(state, "bucketBob", { gain: 0.9 });
+          Cue(state, "waterSplash", { gain: 0.9, delay: 0.55 });
+          state.toast = { text: "桶口一斜，咕咚一声吃满了水——沉得手腕一坠。", t: 3.0 };
+          st.onFilled?.(state);
+        } else if (w.depth >= 1) {
           w.phase = "dunk";
           w.prevA = null;
           w.swayV += 1.1;
@@ -3438,8 +3600,19 @@ function StepChain(state, def, input, dt) {
             }
           }
         }
-        state.prompt = "W · 摇上来";
+        state.prompt = "按住 E ＋ ↑ · 摇上来";
         state.promptFill = 1 - w.depth;
+        if (w.depth <= 0 && st.simple) {
+          // 第九稿：拽到井沿那一道也下线——摇上来就是摇上来了，剩下的一步
+          // 由收尾的微过场演（「柱子抓住桶梁，把满桶提到地面。他掂了一下重量。」）
+          Cue(state, "crank", { gain: 0.6 });
+          Cue(state, "waterDrip", { gain: 0.5, delay: 0.3 });
+          if (st.gives) GiveItem(state, st.gives);
+          state.closeUp = null;
+          state.winchLock = false;
+          finish();
+          return;
+        }
         if (w.depth <= 0) {
           w.phase = "land";
           w.prevA = null;
@@ -5469,6 +5642,20 @@ function MovePlayer(state, input, dt) {
   const env = CHAPTERS[state.chapterIndex].scene;
   const p = state.player;
 
+  // **按住 E 做功的那一帧，方向键归做功，不归走路、也不当爬梯**
+  // （2026-08-16 四动词：E＋方向 是唯一的做功输入）。不锁的话两件事同时发生：
+  // 掀翻板按 E＋↑ 正站在窖口上，人当场顺着梯子爬上去；掰红薯干按 E＋←
+  // 一下就走出判定区，功白攒。判据与驱动器用的是同一个（GetBeatTarget 报
+  // holdAt ＋ 走进它的 reach），两边不一致的话中间那条缝里既不做功也不走路。
+  if (input?.interactHeld && !state.microCine) {
+    const t = GetBeatTarget(state);
+    if (t && WORK_ACTIONS.has(t.action) && (t.level || "surface") === (p.level || "surface")
+      && Math.abs(p.x - t.x) <= (t.reach || 1.35)) {
+      input = { ...input, moveX: 0, climb: 0 };
+      state.workLock = true;
+    } else state.workLock = false;
+  } else state.workLock = false;
+
   // 娘按住你。以前屏幕下方写着"娘按住你"，画面上谁也没按住谁，玩家随时能走开——
   // 用户的第一句话就是「哪里按住了？」。现在它是真的：她的手落在你肩上（pose
   // "press"），你被按成蹲姿、这一下走不动，也真的因此没被照见。
@@ -6320,7 +6507,9 @@ function StepObserve(state, def, dt) {
 
 function StepHold(state, def, input, dt) {
   if (!ZoneReached(state, def.zone)) return;
-  state.prompt = def.holdPrompt || `按住 E · ${def.objective}`;
+  state.prompt = def.sustain
+    ? (def.holdPrompt || `按住 E · ${def.objective}`)
+    : StrokePrompt(def.holdPrompt || def.objective, def.stroke);
   state.promptFill = state.beat.holdProgress / def.holdTime;
   // sustain=保持一个状态（贴着听、按住不动）——量的是时间本身，长按是诚实的。
   // 其余都是对物体做功：走拟物笔画（def.stroke，c7 撬地沿是往上扳）
@@ -6435,8 +6624,8 @@ function StepDigSeq(state, def, input, dt) {
       state.prompt = "！头顶有动静——停下，别出声";
       c.progress = Math.max(0, c.progress - dt * 0.3);
     } else {
-      // 清土是一铲一铲挖出来的：往下拽一下=挖一铲（键盘按住 E 是后备）
-      state.prompt = "按住 E · 清土";
+      // 清土是一铲一铲挖出来的：一铲＝按住 E 往下推一把
+      state.prompt = StrokePrompt("清土", "down");
       state.promptFill = c.progress / def.holdTime;
       const g = StrokeWork(state, state.beat.strokeMem || (state.beat.strokeMem = {}), input, dt, {
         hold: def.holdTime, stroke: "down",
@@ -7117,7 +7306,12 @@ export function GetBeatTarget(state) {
       const s = def.spots[state.beat.spotIndex];
       return s ? { action: "crouchAt", x: s.x, level: s.level || "surface" } : null;
     }
-    case "hold": return { action: "holdAt", x: def.zone.x, level: def.zone.level || "surface" };
+    // stroke＝这一下往哪个方向使劲（驱动器照它按方向键；sustain 那档只按 E）
+    case "hold": return {
+      action: "holdAt", x: def.zone.x, level: def.zone.level || "surface",
+      reach: def.zone.w ? def.zone.w / 2 : undefined,
+      stroke: def.sustain ? null : (def.stroke || "down"),
+    };
     // 自动通关只要一直按住就行——反正按住也留不住她
     case "doomedHold": return { action: "holdAt", x: state.player.x, level: state.player.level };
     case "mapBoard": return { action: "interactAt", x: def.zone.x, level: def.zone.level || "surface" };
@@ -7147,7 +7341,7 @@ export function GetBeatTarget(state) {
         if (p.item?.id === "beam") return { action: "interactAt", x: TF[key].x, level: "under" };
         return { action: "interactAt", x: def.shore[key].beamX, level: "under" };
       }
-      return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true };
+      return { action: "holdAt", x: TF[key].x, level: "under", pauseOnQuake: true, stroke: "down" };
     }
     case "plane": {
       // 自动通关：站到工位上，按住 E 一趟一趟地推（到头了掉头拖回来）
@@ -7182,6 +7376,8 @@ export function GetBeatTarget(state) {
         // wait = 打盹门关着（匀稠的）：这会儿动手会被她看见，驱动器得把手停住
         case "use": return { action: st.hold ? "holdAt" : "interactAt", x: st.zone.x,
           level: st.zone.level || "surface", reach: st.zone.w / 2,
+          // 四动词：做功那一档要往方向上使劲，托稳/按住（steady）只按 E
+          stroke: (!st.hold || st.steady) ? null : (st.stroke || "down"),
           wait: st.gate ? !st.gate(state) : false };
         // 扶门是"费力气"的活，留了按住 E 的后备（CLAUDE.md 第 5 条），驱动器走它
         case "holdDoor": return { action: "holdAt", x: st.zone.x, level: st.zone.level || "surface" };
@@ -7397,7 +7593,7 @@ export function GetBeatTarget(state) {
           // CLAUDE.md 第 5 条），所以驱动器从"按一下"改成"按住"——
           // 忘了改这一处，自动通关会站在支撑位前面按一辈子 E
           const z = (st.zones || []).find((zz) => zz.ok && !state.flags[zz.flag]);
-          return z ? { action: "holdAt", x: z.x, level: st.level || "under" } : null;
+          return z ? { action: "holdAt", x: z.x, level: st.level || "under", stroke: "up" } : null;
         }
         case "winch": {
           const w = state.beat.winch;

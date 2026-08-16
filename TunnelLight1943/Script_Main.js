@@ -733,9 +733,25 @@ const TOUCH_GLYPH = {
     + '<path d="M12 8.2v7.2M12 15.4l-3-3M12 15.4l3-3"/></svg>',
 };
 
+// 四动词的那半个方向（E ＋ ↑/↓/←/→）：键盘给箭头键帽，触屏给摇杆里的一支箭。
+// 上下沿用爬梯那两枚盘子里的箭（同一件事：摇杆往那边推），左右照抄旋 90°
+const DIR_GLYPH = {
+  up: TOUCH_GLYPH.up, down: TOUCH_GLYPH.down,
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M15.8 12H8.6M8.6 12l3-3M8.6 12l3 3"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M8.2 12h7.2M15.4 12l-3-3M15.4 12l-3 3"/></svg>',
+};
+const DIR_KEY = { up: "↑", down: "↓", left: "←", right: "→" };
+
 function KeyChipHtml(act) {
   if (!act) return "";
   return inputMode === "touch" ? (TOUCH_GLYPH[act] || "") : (KEY_GLYPH[act] || "");
+}
+
+function DirChipHtml(dir) {
+  if (!dir) return "";
+  return inputMode === "touch" ? (DIR_GLYPH[dir] || "") : (DIR_KEY[dir] || "");
 }
 
 let itemTagShown = "";             // 手里那格的指纹（物件 + 当前输入设备）
@@ -799,11 +815,15 @@ function SyncActPrompt(state, pr, fill) {
   const el = ui.actPrompt;
   if (!el) return;
   if (!pr) { el.hidden = true; actShown = ""; return; }
-  const fp = `${inputMode}|${pr.act}|${pr.text}`;
+  const fp = `${inputMode}|${pr.act}|${pr.dir || ""}|${pr.text}`;
   if (fp !== actShown) {
     actShown = fp;
     el.hidden = false;
-    el.querySelector(".pKey").innerHTML = KeyChipHtml(pr.act);
+    // 做功那一档是两枚键帽：E ＋ 方向。涟漪与进度环只长在 E 那枚上
+    //（CSS 的 `.pKey:not(.pDir)`），方向那枚是"还要往哪推"的说明
+    const dir = DirChipHtml(pr.dir);
+    el.querySelector(".pKeys").innerHTML = `<i class="pKey">${KeyChipHtml(pr.act)}</i>`
+      + (dir ? `<i class="pPlus">＋</i><i class="pKey pDir">${dir}</i>` : "");
     el.querySelector(".pVerb").textContent = pr.text;
     actBox = { w: el.offsetWidth || actBox.w, h: el.offsetHeight || actBox.h };
   }

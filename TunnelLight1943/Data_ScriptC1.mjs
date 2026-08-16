@@ -449,8 +449,13 @@ export function ChapterC1(K) {
         }
       },
       steps: [
-        // ① 抱起妹妹：她两条胳膊立刻搂住脖子（此后 tick 把她贴在怀里）
-        { type: "use", zone: { x: 30.9, w: 2.4 }, prompt: "E · 抱起妹妹",
+        // ① 抱起妹妹：她两条胳膊立刻搂住脖子（此后 tick 把她贴在怀里）。
+        // **四动词的第一课**（2026-08-16）：抱起来＝按住 E ＋ ↑ 把人兜起来。
+        // 这一下往后要用五次（抱坛子、抱她够石笔、摇水、掀草苫、缝第一针），
+        // 玩家学的是"往上使劲"，不是"按一下就有"
+        // 使劲那 0.9 秒弯着腰（真正兜起来那一下是 effect 里的 scoopChild 轨道）
+        { type: "use", zone: { x: 30.9, w: 2.4 }, hold: 0.9, stroke: "up", gestureY: 0.62,
+          pose: "bow", prompt: "抱起妹妹",
           note: "妹妹两条胳膊立刻搂住他的脖子。",
           effect: (state) => {
             state.beat.carrying = true;
@@ -673,8 +678,14 @@ export function ChapterC1(K) {
       // 章目标落在收尾：天黑前，给妹妹弄一顿热饭。
       // 头一句还在合着盖板的窖底（接 c1_hide 的黑），所以这一拍从 dark 起，
       // 「三天后」那一句才翻回拂晓（lightOverride = "dawn"）
-      kind: "cinematic", id: "c1_open", timeOfDay: "dark",
-      lines: [
+      //
+      // **2026-08-16 改成 chain(1)**（Notion 第九稿的第 4 拍）：整场戏一个字没动，
+      // 只把最后那下「替她把脚盖好」从演出改成玩家自己做——**「往下」这个动词
+      // 第一次出现，是件温柔的事**。往后它要重用四次（刨灰堆、画正字、放桶下井、
+      // 倒水进缸），先在安全的地方学会，再在要命的地方用。
+      kind: "chain", id: "c1_open", timeOfDay: "dark",
+      objective: "给妹妹盖上", hint: "她一只脚露在外面",
+      onStart: (state) => StartMicroCine(state, [
         // 序的收尾：柱子仍然搂着妹妹。板缝里的光从直的变成斜的（beamSlant
         // 已由 c1_hide 落下），又一点点暗下去
         { act: "柱子仍然搂着妹妹。板缝里的光从直的变成斜的，又一点点暗下去。", d: 4.2,
@@ -814,34 +825,41 @@ export function ChapterC1(K) {
             state.player.x = 33.2;
             state.player.heading = -1;
           } },
-        // 他蹲下去，替她把脚盖好
-        // 分镜图 04 正格：炕在画左（她侧躺着），柱子跪在炕沿外侧替她掖被，
-        // 人占画高四成出头。炕沿在画框下沿压一道
-        { act: "柱子替她把脚盖好。", d: 2.8,
-          // 分镜 04：炕在画左（她侧躺着），柱子跪在炕沿外侧替她掖被。
-          // **照站姿身高配机距会松一档**（跪着的柱子实测只有 0.59m）；注视点
-          // 还要压到炕面高度，不然上半屏一片空墙、两人的小腿又被下黑边切掉
-          cam: CINE(31.48, 0.40, 3.60, [
-            { art: "kangEdge", u: -0.34, v: -0.86, z: 2.27, w: 1.30, h: 0.26, dim: 1.86 },
-            { art: "doorJamb", u: 0.86, v: 0, z: 2.27, w: 0.50, h: 1.00, dim: 1.94, flip: true },
-          ]),
-          on: (state) => {
-            state.beat.indoorScene = true;
-            state.player.x = 32.2;
-            state.player.heading = -1;
+      ]),
+      steps: [
+        // 玩家自己蹲下去替她把脚盖好——**全作「往下」的第一课**。
+        // 分镜 04 正格：炕在画左（她侧躺着），柱子跪在炕沿外侧掖被
+        { type: "use", zone: { x: 31.9, w: 2.4 }, hold: 1.1, stroke: "down", gestureY: 0.45,
+          pose: "bow", prompt: "给她盖上",
+          effect: (state) => {
             FlashTrack(state, "tuckQuilt", 2.4);
-            Cue(state, "clothLift", { gain: 0.5, delay: 1.1 });
-          } },
-        // 镜头停在她的手腕上：去年的褂子短了一截，袖口遮不住手腕。
-        // ——章末那一针一针，就是缝给这截手腕的
-        { act: "去年的褂子已经短了一截，袖口遮不住手腕。", d: 3.8,
-          cam: WRIST_CAM,
-          on: (state) => { state.beat.indoorScene = true; } },
-        { stage: "第三天。还是没人来叫。", d: 3.2,
-          cam: WRIST_CAM,
-          on: (state) => {
-            // 章目标（八稿）：这一天全部的事，都归到这一句底下
-            state.toast = { text: "章目标：天黑前，给妹妹弄一顿热饭。", t: 5.5 };
+            Cue(state, "clothLift", { gain: 0.5, delay: 0.2 });
+            StartMicroCine(state, [
+              // 分镜 04：炕在画左，柱子跪在炕沿外侧替她掖被。
+              // **照站姿身高配机距会松一档**（跪着的柱子实测只有 0.59m）；注视点
+              // 还要压到炕面高度，不然上半屏一片空墙、两人的小腿又被下黑边切掉
+              { act: "柱子替她把脚盖好。", d: 2.4,
+                cam: CINE(31.48, 0.40, 3.60, [
+                  { art: "kangEdge", u: -0.34, v: -0.86, z: 2.27, w: 1.30, h: 0.26, dim: 1.86 },
+                  { art: "doorJamb", u: 0.86, v: 0, z: 2.27, w: 0.50, h: 1.00, dim: 1.94, flip: true },
+                ]),
+                on: (s) => {
+                  s.beat.indoorScene = true;
+                  s.player.x = 32.2;
+                  s.player.heading = -1;
+                } },
+              // 镜头停在她的手腕上：去年的褂子短了一截，袖口遮不住手腕。
+              // ——章末那一针一针，就是缝给这截手腕的
+              { act: "去年的褂子已经短了一截，袖口遮不住手腕。", d: 3.8,
+                cam: WRIST_CAM,
+                on: (s) => { s.beat.indoorScene = true; } },
+              { stage: "第三天。还是没人来叫。", d: 3.2,
+                cam: WRIST_CAM,
+                on: (s) => {
+                  // 章目标（八稿）：这一天全部的事，都归到这一句底下
+                  s.toast = { text: "章目标：天黑前，给妹妹弄一顿热饭。", t: 5.5 };
+                } },
+            ]);
           } },
       ],
     },
@@ -861,6 +879,12 @@ export function ChapterC1(K) {
       objective: "棚里翻翻，看有没有能下锅的",
       hint: "西头那间棚。能翻的有三处：翻倒的食槽、压着苇席的那堆、墙根一片发白的烧土",
       // 三处的坐标（World 照这三个数把三件东西画出来）。**先翻哪处玩家自己挑**
+      //
+      // 2026-08-16（第九稿）：Notion 那版写的是"压成一条五步直链"，**没照做**——
+      // 8-15 用户刚为「找东西不能排成一条直线」退回过一次（CLAUDE.md 有整节）。
+      // 这一场因此只换**输入**：三处的动作全部改由「按住 E ＋ 方向」驱动
+      // （掀席 E＋↑ / 扫槽底·刨灰堆 E＋↓ / 顺着坛肩抹 E＋←→ / 抠泥封 E＋↑），
+      // 拟物的分量、脱手、卡口一条没动。要真收成直链，把这一步换掉即可。
       forage: { trough: 11.6, reed: 9.7, ash: 7.4 },
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）；序里的人早收干净了
@@ -927,9 +951,9 @@ export function ChapterC1(K) {
           } },
                 // 扎回袋口：拧紧、绕绳、压回砖下。这一下不靠旁白解释：饿着的人
                 // 把一袋**能吃的**谷种原样扎回去——留种是明年的命，道理由手做出来
-                { type: "use", zone: { x: 9.7, w: 2.2 }, hold: 1.6, stroke: "circle", gestureY: 0.55,
+                { type: "use", zone: { x: 9.7, w: 2.2 }, hold: 1.6, stroke: "right", gestureY: 0.55,
           pose: "twistTie", cue: "clothFold",
-          prompt: "拧紧袋口 · 绕绳扎回去",
+          prompt: "拧紧袋口",
           effect: (state) => {
             state.flags.seedKept = true;
             StartMicroCine(state, [
@@ -989,12 +1013,15 @@ export function ChapterC1(K) {
               ],
             },
           ] },
+        // ⑥ 抱起坛子｜按住 E ＋ ↑——**「抱起来」的第二次**（第一次是逃命那天
+        // 抱起妹妹）。同一个动作，这回抱的是吃的。
         // worldDrawn：坛子由 DrawAshMound 画（挖到哪儿露哪儿），不许再预摆一份
         // 地面道具——那份从进拍第一帧就蹲在灰堆顶上，把"埋着"整个剧透掉
-        { type: "pickup", x: 7.4, item: { id: "driedYams", label: "红薯干" }, prompt: "E · 抱起坛子",
-          worldDrawn: true,
+        { type: "use", zone: { x: 7.4, w: 2.2 }, hold: 0.8, stroke: "up", gestureY: 0.5,
+          pose: "bow", prompt: "抱起坛子",
           note: "坛子夹在胳膊底下，往回走。",
           effect: (state) => {
+            GiveItem(state, { id: "driedYams", label: "红薯干" });
             // 坛子抱走了：堆上只剩那个刨开的坑
             const a = state.forage?.ash;
             if (a) { a.jar = false; a.open = false; a.taken = true; }
@@ -1149,7 +1176,8 @@ export function ChapterC1(K) {
         ]);
       },
       steps: [
-        { type: "use", zone: { x: 34.1, w: 2.6 }, prompt: "E · 抱起妹妹",
+        { type: "use", zone: { x: 34.1, w: 2.6 }, hold: 0.9, stroke: "up", gestureY: 0.62,
+          pose: "bow", prompt: "抱起妹妹",
           effect: (state) => {
             // 旗标在 effect 里落：跳幕结算只跑 effect、不跑台词行的 on()，
             // 落在 on() 里的话跳过这一拍正字就永远缺今天这道
@@ -1382,26 +1410,14 @@ export function ChapterC1(K) {
         }
       },
       steps: [
-        { type: "use", zone: V.well, needs: "bucket", consume: false, prompt: "E · 搁桶查井绳",
-          note: "刚抓住井绳，绳上一段磨细的麻纤维就翘了起来。桶梁上拴着一截短麻绳——正好使。",
-          effect: (state) => {
-            // 结算空手跑到这儿也得搁一只真桶
-            AddGroundItem(state, state.player.item
-              || { id: "bucket", label: "挂着布兜的空桶", big: true }, 60.2, "surface");
-            state.player.item = null;
-            state.flags.bucketAt = 60.2;
-          } },
-        { type: "use", zone: V.well, prompt: "E · 折回磨损处",
-          effect: (state) => { Cue(state, "crank", { gain: 0.7 }); } },
-        // 接绳活卡：短绳穿过绳圈、绕回磨损处、向两侧拉紧——麻结勒死
-        { type: "knot", zone: V.well, knotY: 1.18,
-          note: "短绳穿过绳圈，绕回磨损处，两头一拽——麻结勒死，又能吃上劲了。",
-          effect: (state) => { state.flags.wellRopeFixed = true; } },
-        { type: "pickupGround", flagX: "bucketAt", item: { id: "bucket", label: "挂着布兜的空桶", big: true },
-          prompt: "E · 拎回桶" },
-        { type: "winch", zone: V.well, needs: "bucket",
+        // 第九稿：**修井绳（查绳／折回／接绳活卡）整段下线**，井台压成两道手——
+        // 挂上桶（E）→ 放桶下去（按住 E ＋ ↓）→ 摇上来（按住 E ＋ ↑）。
+        // 「绳磨细了、拿短麻绳接一截」这条叙事没丢，改由挂桶那一句手记带过
+        { type: "winch", zone: V.well, needs: "bucket", simple: true,
+          hookPrompt: "E · 把桶挂上井绳",
+          missPrompt: "手里缺一只桶——撂在半道上了吧",
           gives: { id: "fullBucket", label: "一桶水", big: true },
-          note: "水打上来了。桶沿一路往下滴。",
+          note: "井绳有一段磨细了——柱子把桶梁上那截短麻绳绕上去压住，才敢挂桶。",
           onFilled: (state) => { state.flags.waterFilled = true; },
           effect: (state) => {
             const sis = FindActor(state, "sister");
@@ -1833,7 +1849,8 @@ export function ChapterC1(K) {
       steps: [
         { type: "pickupGround", flagX: "bucketAt", item: { id: "fullBucket", label: "一桶水", big: true },
           prompt: "E · 拎起桶" },
-        { type: "use", zone: { x: 43.4, w: 2.6 }, needs: "fullBucket", prompt: "E · 倒进缸里",
+        { type: "use", zone: { x: 43.4, w: 2.6 }, needs: "fullBucket", hold: 1.4, stroke: "down",
+          gestureY: 0.75, pose: "pourBasket", cue: "waterSplash", prompt: "把水倒进缸里",
           effect: (state) => {
             state.player.item = null;
             state.flags.vatFilled = true;
@@ -2006,7 +2023,7 @@ export function ChapterC1(K) {
         // 拨完她就醒了：按住两只碗把柱子的碗推回来，「哥，你也吃。」——这一下
         // 现在是**必然发生的转折**（引出步骤②那句谎），不再是撞见了才演、
         // 演完还要重来。
-        { type: "use", zone: { x: 32.9, w: 2.4 }, hold: 1.8, stroke: "down", gestureY: 0.6,
+        { type: "use", zone: { x: 32.9, w: 2.4 }, hold: 1.8, stroke: "right", gestureY: 0.6,
           pose: "bow", cue: "waterDrip",
           prompt: "按住 E · 把稠的拨过去",
           effect: (state) => {
@@ -2189,7 +2206,8 @@ export function ChapterC1(K) {
         // 掀草苫：底下是一块对折的布。蓝底白花，整块没下过剪子。
         // 碎布放上去——两块布的花纹接在一起。贴脸一下。抱着走向梯子——
         // 一只手从黑暗里抓住他的手腕
-        { type: "use", zone: { x: 27.6, w: 2.2, level: "under" }, prompt: "E · 掀开草苫",
+        { type: "use", zone: { x: 27.6, w: 2.2, level: "under" }, hold: 1.3, stroke: "up",
+          gestureY: 0.5, pose: "bow", prompt: "掀开草苫",
           effect: (state) => {
             // 旗标落 effect；carry 是画面，只在微过场行里挂/收——落在 effect 里
             // 的话跳幕结算会把一块"整布"永远糊在手上（二轮视觉审查的悬空蓝板）
@@ -2425,7 +2443,8 @@ export function ChapterC1(K) {
             state.flags.lidShut = true;
             Cue(state, "doorCreak", { gain: 0.5, rate: 0.8 });
           } },
-        { type: "use", zone: { x: 43.4, w: 2.6 }, prompt: "E · 舀半瓢水",
+        { type: "use", zone: { x: 43.4, w: 2.6 }, hold: 1.1, stroke: "up", gestureY: 0.7,
+          pose: "bow", cue: "waterDrip", prompt: "舀半瓢水",
           effect: (state) => {
             GiveItem(state, { id: "ladleWater", label: "半瓢水" });
             // 水线随着瓢抬起而下降（渲染层照着这张小账演 1.6s）
@@ -2494,7 +2513,7 @@ export function ChapterC1(K) {
         // ① 喂水：把瓢托在他嘴边，保持稳定（长按托稳；中途他呛一下）
         { type: "use", zone: { x: 28.0, w: 2.2, level: "under" }, hold: 3.4, steady: true,
           pose: "ladleSteady", needs: "ladleWater", consume: false,
-          prompt: "按住 · 把瓢托稳",
+          prompt: "按住 E · 把瓢托稳",
           steadyCues: [
             [0.5, "waterDrip", 0.4, 1.0],       // 一只手扶住瓢沿
             [1.2, "waterSplash", 0.25, 1.3],    // 水响。喝得很急
@@ -2545,14 +2564,14 @@ export function ChapterC1(K) {
             ]);
           } },
         // ③ 包扎一：布条从伤员肩下穿过，绕到背后，再拉回胸前——第一圈很松
-        { type: "use", zone: { x: 27.9, w: 2.2, level: "under" }, hold: 1.7, stroke: "circle", gestureY: 0.55,
+        { type: "use", zone: { x: 27.9, w: 2.2, level: "under" }, hold: 1.7, stroke: "right", gestureY: 0.55,
           pose: "bandageWrap", cue: "clothLift",
-          prompt: "布条穿过肩下 · 绕背后拉回",
+          prompt: "布条绕过肩",
           note: "第一圈很松。暗色继续向外扩。" },
         // ④ 包扎二：拉紧布条，再绕第二圈，末端压进缠好的布层
-        { type: "use", zone: { x: 27.9, w: 2.2, level: "under" }, hold: 1.9, stroke: "circle", gestureY: 0.55,
+        { type: "use", zone: { x: 27.9, w: 2.2, level: "under" }, hold: 1.9, stroke: "right", gestureY: 0.55,
           pose: "bandageWrap", cue: "clothLift",
-          prompt: "拉紧 · 再绕第二圈 · 末端压进布层",
+          prompt: "拉紧，再绕一圈",
           effect: (state) => {
             state.flags.manBound = true;
             const w = FindActor(state, "wounded");
@@ -2570,7 +2589,7 @@ export function ChapterC1(K) {
         // ⑤ 按住他：一只手压住肩膀，另一只手托住后颈。长按——挣动渐松
         { type: "use", zone: { x: 27.9, w: 2.2, level: "under" }, hold: 5.0, steady: true,
           pose: "pinDown",
-          prompt: "按住 · 别让他挣",
+          prompt: "按住 E · 别让他挣",
           steadyCues: [
             [0.8, "sobBreath", 0.45, 0.75],
             [2.2, "sobBreath", 0.35, 0.7],

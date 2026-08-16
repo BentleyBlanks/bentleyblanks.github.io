@@ -317,6 +317,12 @@ function InputOf(tok) {
     case "c": return { crouch: true };
     case "adv": return { advance: true };
     case ".": return {};
+    // 四动词（2026-08-16）：做功＝按住 E ＋ 一个方向。一个 token 一件事，
+    // 按住 E 与方向键分成两个 token 就永远凑不到同一帧上
+    case "Ew": return { interactHeld: true, climb: -1 };
+    case "Es": return { interactHeld: true, climb: 1 };
+    case "Ea": return { interactHeld: true, moveX: -1 };
+    case "Ed": return { interactHeld: true, moveX: 1 };
     default: return null;
   }
 }
@@ -375,7 +381,7 @@ async function CmdState(o) {
     for (const raw of String(o.input).split(/[,;]/)) {
       const [tok, mul] = raw.trim().split("*");
       const inp = InputOf(tok);
-      if (!inp) { console.log(`看不懂的输入 token：${tok}（d a s w e E c . adv）`); return; }
+      if (!inp) { console.log(`看不懂的输入 token：${tok}（d a s w e E Ew Es Ea Ed c . adv）`); return; }
       const n = Math.max(1, Number(mul || 1));
       step(inp, n);
       if (o.trace) trace.push(`${raw}: x=${state.player.x.toFixed(2)} step=${state.beat?.stepIndex} prompt=${JSON.stringify(state.prompt)}`);

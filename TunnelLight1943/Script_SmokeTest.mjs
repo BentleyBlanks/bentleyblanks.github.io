@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import {
   CHAPTERS, SCENES, SCRIPTS, CreateGame, StepGame, GetBeatTarget, MakeChoice, CurrentBeatDef,
-  SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt,
+  SoldierSeesPlayer, SmokeCovers, VisionScale, ChapterBeatList, DebugJump, SplitPrompt, StrokePrompt,
   WINCH_HUB_Y, WINCH_CRANK_DX, WINCH_CRANK_R, WINCH_STAND_DX,
   SURFACE_Y, UNDER_Y, SCRIBE_CARD, PLANE_CARD, KNOT_CARD, KnotCinchDir, FOLD_CARD,
   WRAP_CARD, SLING, SlingSolve, FORAGE, ForageMatEdge, ForageScoopDir,
@@ -190,6 +190,8 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
           else if (stam >= 0.8) winchRest = false;
           if (ph === "dunk") input.climb = (frame % 6 < 3) ? 1 : 0;
           else input.climb = winchRest ? 0 : (ph === "lower" ? 1 : -1);
+          // 四动词（2026-08-16）：摇辘轳也收进 E ＋ 方向了，光按方向不走绳
+          input.interactHeld = true;
           input.moveX = 0;
         }
         // 划线：按住 E 的同时还得左右推，粉笔才走
@@ -207,8 +209,19 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
         if (target.action === "holdAt" && Math.abs(dx) <= holdNear) {
           // target.wait＝打盹门关着（匀稠的）：她在看，动手就被撞见——
           // 驱动器跟真人一样把手停住，等门再开
-          if (!(target.pauseOnQuake && state.beat.quakeActive) && !target.wait) input.interactHeld = true;
+          const on = !(target.pauseOnQuake && state.beat.quakeActive) && !target.wait;
+          if (on) input.interactHeld = true;
           input.moveX = 0;
+          // 四动词（2026-08-16）：做功那一档光按住 E 不涨了，得**往做功的方向推**。
+          // 驱动器与真人同一套输入；方向由 GetBeatTarget 报的 stroke 给（steady／
+          // sustain／circle 报 null，那几档照旧只按 E）。走位不用管——按住 E 的
+          // 那一帧 Core 会把方向键从走路上摘下来（workLock）
+          if (on && target.stroke) {
+            if (target.stroke === "up") input.climb = -1;
+            else if (target.stroke === "down") input.climb = 1;
+            else if (target.stroke === "left") input.moveX = -1;
+            else if (target.stroke === "right") input.moveX = 1;
+          }
         }
         // 接绳：没有长按后备了，驱动器得**真的在那张活卡上拖绳头**——攥住、
         // 塞进圈眼、从西边拽出来、再倒手拽三把勒死（见 KnotDrive）。
@@ -1247,8 +1260,10 @@ function TestForageIsHandsOn() {
   //（2026-08-15 用户退回推焦木：「太奇怪了 解密也不算 也很不直观 我都不知道
   // 要操作这里 只有一个 hint」——现在没有"剧本指定的那一下"了）
   {
+    // 「翻三处」那一步之外只许再有**收尾**（抱起坛子＝E＋↑，第九稿四动词）
     const verbs = beat.steps.map((s) => s.type).filter((t) => t !== "goto" && t !== "pickup");
-    assert.deepEqual(verbs, ["searchAny"], "找吃的整场就是一步「翻三处」，别再排成一条直线");
+    assert.deepEqual(verbs.filter((t, i) => !(t === "use" && i === verbs.length - 1)), ["searchAny"],
+      "找吃的整场就是一步「翻三处」，别再排成一条直线");
     assert.deepEqual(SEARCH.spots.map((s) => s.key).sort(), ["ash", "reed", "trough"],
       "三处：翻倒的食槽 / 压着苇席的谷种 / 墙根发白的烧土");
     for (const sp of SEARCH.spots) {
@@ -1269,8 +1284,12 @@ function TestForageIsHandsOn() {
       "焦木/苫草这一场已经不用了——声明了渲染层就会画一件没人碰的东西");
     // 埋着的坛子由 DrawAshMound 挖到哪儿露哪儿——链的"未来拾取物预摆"
     // 会把它从第一帧就蹲在灰堆顶上，把"埋着"整个剧透掉（2026-08-15 实拍抓的）
+    // 2026-08-16 起「抱起坛子」是 use＋stroke:"up"（四动词：抱起来＝E＋↑），
+    // 它本来就不预摆地面道具——`pickup` 那条预摆才需要 worldDrawn 挡着
+    const jarUp = beat.steps.find((s) => s.stroke === "up" && /抱起/.test(s.prompt || ""));
     const jarPickup = beat.steps.find((s) => s.type === "pickup" && s.item?.id === "driedYams");
-    assert.ok(jarPickup?.worldDrawn, "埋着的坛子必须声明 worldDrawn——不许预摆地面道具剧透");
+    assert.ok(jarUp || jarPickup?.worldDrawn,
+      "埋着的坛子不许预摆地面道具剧透（pickup 要 worldDrawn，或走 E＋↑ 的 use）");
   }
 
   // ② 长按互动键：三处的动作一个都做不完（后备是死的）
@@ -1431,10 +1450,8 @@ function TestWinchIsACrankNotALever() {
     const state = CreateGame(0);
     const well = ChapterBeatList(0).find((b) => b.id === "c1_well");
     DebugJump(state, 0, well.index);
-    // 直接把链推进到辘轳那一步：绳已接好、桶拾回在手里
-    //（2026-08-12 打榆钱拆去 c1_elm 之后，辘轳是第 4 步）
-    state.beat.stepIndex = 4;
-    state.flags.wellRopeFixed = true;
+    // 第九稿：修井绳那三步整段下线，井台只剩一步——辘轳就是第 0 步
+    state.beat.stepIndex = 0;
     state.player.item = { id: "bucket", label: "空水桶" };
     state.player.x = SCENES.village.zones.well.x;
     state.player.level = "surface";
@@ -1456,13 +1473,6 @@ function TestWinchIsACrankNotALever() {
     step({ interact: true });
     step({}, 2);
     return state.beat.winch;
-  };
-  // 二道手：**一下一下地敲 S** 把桶墩下去（按住不放不算）
-  const KeyDunk = (state, step, n = 40) => {
-    for (let i = 0; i < n && state.beat.winch?.phase === "dunk"; i += 1) {
-      step({ climb: 1 });
-      step({}, 4);
-    }
   };
 
   // ── ①②③ 转盘本身：顺放逆收、特写、脱手倒转、键盘后备 ──
@@ -1493,71 +1503,36 @@ function TestWinchIsACrankNotALever() {
     assert.ok(w.depth <= d1 + 1e-9, "空桶阶段逆时针转不该把绳送下去");
     // 一路顺时针到底
     for (let i = 0; i < 90 && w.phase === "lower"; i += 1) circle(-1, 8);
-    // ── 二道：墩桶 ──
-    // 老版转到底就"咕咚一声灌满了"。**空木桶是浮着的**，不墩不吃水——
-    // 这一道是四道手里唯一不靠转盘的动作，也是打水这件事真正的样子
-    assert.equal(w.phase, "dunk", "桶碰着水不该直接满，得先墩");
-    assert.equal(w.filled, false, "没墩过的空桶不许算满");
-    // 井底那扇小窗：主相机看不到井口以下，这一拍全靠第二台相机演。
-    // 它同时是"为什么要墩"唯一的说明——断了这条，二道手就成了没头没脑的
+    // ── 二道：摇上来（第九稿：墩桶与拽到井沿两道手下线）──
+    // 空桶落到水面先横着漂一下、松一下让它扣过去吃水——这一下留在**画面**里
+    // 演（桶自己一沉一斜），不再单开一道玩法。井台从四道手压成两道
+    assert.equal(w.phase, "raise", "桶碰着水就该自己吃满、进摇上来那一道");
+    assert.equal(w.filled, true, "第九稿：碰水即满（墩桶那一道已下线）");
+    // 井底那扇小窗：主相机看不到井口以下，桶沉下去那一段全靠第二台相机演
     assert.equal(state.pip?.kind, "wellBottom", "桶沉进井里就该开井底那扇小窗");
     assert.equal(state.pip.t, null, "这扇小窗由玩法自己收，不许几秒后自动关掉");
     assert.ok(state.pip.at && state.pip.at.y < -0.5,
       `小窗得真的架在井筒里（实际 y=${state.pip?.at?.y}）`);
-    circle(-1, 30);
-    assert.equal(w.filled, false, "墩桶这一道接着绕摇把是没用的——动作对不上事");
-    // 攥住井绳往下拽：按下那一帧手得落在绳上（绳吊在井心，不是摇把那一侧）
-    const DragRope = (fromY, toY, n = 10) => {
-      step({ pointerHeld: true, pointerWorld: { x: wx, y: fromY } });
-      for (let i = 1; i <= n; i += 1) {
-        step({ pointerHeld: true, pointerWorld: { x: wx, y: fromY + (toY - fromY) * (i / n) } });
-      }
-      step({});
-    };
-    const dunks0 = w.dunks;
-    step({ pointerHeld: true, pointerWorld: { x: wx + 1.4, y: 0.9 } });
-    for (let i = 1; i <= 8; i += 1) step({ pointerHeld: true, pointerWorld: { x: wx + 1.4, y: 0.9 - i * 0.05 } });
-    step({});
-    assert.equal(w.dunks, dunks0, "手没落在井绳上，往下拽不算一墩");
-    const tip0 = w.tip;
-    DragRope(1.1, 0.75);
-    assert.ok(w.tip > tip0, `攥住井绳往下墩，桶得往下扣（${tip0}→${w.tip}）`);
-    let guard = 0;
-    while (!w.filled && guard < 14) { step({}, 6); DragRope(1.1, 0.75); guard += 1; }
-    assert.ok(w.filled, "墩够了桶必须吃满水");
-    assert.equal(w.phase, "raise", "吃满水就该进摇上来那一道");
     // 逆时针往上摇
     const d2 = w.depth;
     circle(1, 10);
     assert.ok(w.depth < d2 - 0.02, `满桶逆时针摇，绳得往上收（${d2}→${w.depth}）`);
     assert.equal(state.gesture, undefined, "手势小黑饼已拆，摇起的方向由摇把与引导圈自己演");
-    // 再摇上来一截，好让下面那一坠有地方可坠（一井绳现在长得多）
-    circle(1, 60);
+    // 再摇上来一截，好让下面那一坠有地方可坠
+    circle(1, 40);
     const crankMid = w.crankA;
     // 脱手：过了棘齿宽限辘轳倒转，桶自己往下坠，摇把跟着倒着抡
     const d3 = w.depth;
     step({}, Math.ceil(1.6 / DT));
     assert.ok(w.depth > d3 + 0.15, "脱手过了宽限，辘轳必须倒转（桶坠回去）");
     assert.ok(w.crankA < crankMid, "倒转时摇把必须真的倒着转（crankA 回退）");
-    // 键盘 W 仍是完整后备（费力气的活，不是指尖功夫）：一路摇到顶。
+    // **按住 E ＋ ↑** 是完整后备（费力气的活，不是指尖功夫）：一路摇到顶。
     // 力气见底也只是慢一档，绝不许把人卡死——自动通关全靠这条
-    for (let i = 0; i < 40 && w.phase === "raise"; i += 1) {
-      step({ climb: -1 }, Math.ceil(0.8 / DT));
+    for (let i = 0; i < 40 && CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch"; i += 1) {
+      step({ interactHeld: true, climb: -1 }, Math.ceil(0.8 / DT));
       step({}, Math.ceil(0.5 / DT));   // 喘一口（撒手会坠一点，但缓过来摇得快）
     }
-    // ── 四道：拽到井沿 ──
-    // 摇到顶不等于到手：桶还悬在井口正当中，得横着拽过来搁到台沿上
-    assert.equal(w.phase, "land", "摇到顶不算完——桶还吊在井口正当中");
-    assert.equal(state.player.item?.id, undefined, "还没搁上井沿就不算到手");
-    const by = 0.66;   // SURFACE_Y = 0；桶提到顶时的高度
-    step({ pointerHeld: true, pointerWorld: { x: wx - 2.4, y: by } });
-    step({ pointerHeld: true, pointerWorld: { x: wx - 0.7, y: by } }, 6);
-    assert.ok(w.swing < 0.02, `没攥住桶就拖，桶不该动（swing=${w.swing}）`);
-    step({});
-    step({ climb: -1 }, Math.ceil(6.0 / DT));
-    assert.equal(CurrentBeatDef(state)?.steps?.[state.beat.stepIndex]?.type === "winch", false,
-      "键盘后备必须走得完四道手（力气见底只该变慢，不该卡死）");
-    assert.equal(state.player.item?.id, "fullBucket", "四道手都走完，手里才是一桶水");
+    assert.equal(state.player.item?.id, "fullBucket", "摇到顶，手里就是一桶水");
     assert.equal(state.pip, null, "打完水那扇井底小窗得跟着收走");
   }
 
@@ -1584,11 +1559,10 @@ function TestWinchIsACrankNotALever() {
     const state = mk();
     const step = stepOn(state);
     const w = Hook(state, step);
-    step({ climb: 1 }, Math.ceil(5.0 / DT));     // 放到底
-    KeyDunk(state, step);                        // 一下一下墩，桶才吃水
-    assert.ok(w.filled, "键盘放到底再墩几下，桶该吃满水");
+    step({ interactHeld: true, climb: 1 }, Math.ceil(5.0 / DT));     // 放到底
+    assert.ok(w.filled, "按住 E ＋ ↓ 放到底，桶碰着水就该吃满");
     const stamFull = w.stam;
-    step({ climb: -1 }, Math.ceil(1.2 / DT));
+    step({ interactHeld: true, climb: -1 }, Math.ceil(1.2 / DT));
     assert.ok(w.stam < stamFull - 0.3, `满桶往上摇最费力气（${stamFull}→${w.stam}）`);
 
     assert.ok(state.stamina.low || w.stam < 0.5, "摇一阵之后手劲读数该报警了");
@@ -1605,7 +1579,7 @@ function TestWinchIsACrankNotALever() {
     const state = mk();
     const step = stepOn(state);
     const w = Hook(state, step);
-    step({ climb: 1 }, 4);
+    step({ interactHeld: true, climb: 1 }, 4);
     const wv = state.winchView;
     assert.ok(wv?.gripX !== undefined, "渲染层得知道握手此刻在哪儿（Rig 靠它反解前手）");
     assert.ok(Math.abs(state.player.x - (wx + WINCH_STAND_DX)) < 0.05,
@@ -1641,8 +1615,7 @@ function TestWinchIsACrankNotALever() {
 function TestWinchIsLongEnough() {
   const state = CreateGame(0);
   DebugJump(state, 0, ChapterBeatList(0).find((b) => b.id === "c1_well").index);
-  state.beat.stepIndex = 4;
-  state.flags.wellRopeFixed = true;
+  state.beat.stepIndex = 0;
   state.player.item = { id: "bucket", label: "空水桶" };
   state.player.x = SCENES.village.zones.well.x;
   state.player.level = "surface";
@@ -1666,18 +1639,18 @@ function TestWinchIsLongEnough() {
     if (ph === "lower") rest = false;
     else if (w.stam <= 0.04) rest = true;
     else if (w.stam >= 0.8) rest = false;
-    if (ph === "dunk") step({ climb: (frames % 6 < 3) ? 1 : 0 });
-    else step({ climb: rest ? 0 : (ph === "lower" ? 1 : -1) });
+    step({ interactHeld: true, climb: rest ? 0 : (ph === "lower" ? 1 : -1) });
     frames += 1;
   }
   assert.equal(state.player.item?.id, "fullBucket", "键盘后备必须打得上水");
   const secs = frames * DT;
-  // 老版键盘全速 4.5 秒（放 1.6s + 摇 2.9s）。3x 就是 13.5s 起
-  assert.ok(secs >= 13.5, `打水得有仪式感：键盘全速也该 13.5 秒起（实际 ${secs.toFixed(1)}s）`);
-  for (const ph of ["lower", "dunk", "raise", "land"]) {
-    assert.ok(seen.has(ph), `四道手一道都不能少，缺了 ${ph}`);
+  // 第九稿把四道手压成两道（放桶 / 摇上来），可"打水这件事要有分量"这条没变：
+  // 一井三米六，放下去再摇上来，键盘全速也得七秒起（老版四道手是 13.5s）
+  assert.ok(secs >= 7.0, `打水得有分量：键盘全速也该 7 秒起（实际 ${secs.toFixed(1)}s）`);
+  for (const ph of ["lower", "raise"]) {
+    assert.ok(seen.has(ph), `两道手一道都不能少，缺了 ${ph}`);
   }
-  console.log(`  ✓ 打水四道手全走一遍：键盘 ${secs.toFixed(1)}s（老版 4.5s）`);
+  console.log(`  ✓ 打水两道手全走一遍：键盘 ${secs.toFixed(1)}s`);
 }
 
 // 石笔：玩家攥的是一支笔，不是一根滑块。
@@ -2054,9 +2027,10 @@ function TestCliAnswersQuestions() {
   // ② beats/beat：不读 Core 就能拿到一拍的全部
   assert.match(run(["beats", "c1"]), /c1_well/, "beats 得列全第一章");
   const b = run(["beat", "c1_well"]);
-  assert.match(b, /步骤 5/, "beat 得把步骤数说清（第七稿把倒水挪去回程后剩 5 步）");
+  // 第九稿：井台压成两道手（挂桶 → 放桶下去 → 摇上来），整拍只剩一个 winch 步骤
+  assert.match(b, /步骤 1/, "beat 得把步骤数说清（第九稿井台只剩一步 winch）");
   assert.match(b, /needs="bucket"/, "beat 得说清这一步要什么");
-  assert.match(b, /旗标\s+.*wellRopeFixed/, "beat 得扫出这一拍碰的旗标（且不许把后面几拍的算进来）");
+  assert.match(b, /旗标\s+.*waterFilled/, "beat 得扫出这一拍碰的旗标（且不许把后面几拍的算进来）");
 
   // ③ state：无头跑到任意一拍、喂真输入、把状态打出来——那 725 次探针脚本的替代品
   //（拎桶那一步在 c1_walk 的头里：「俺去打水。你跟紧。」）
@@ -2403,9 +2377,14 @@ function TestPromptsAreDeviceNeutral() {
 
   assert.deepEqual(bad, [], "提示文案里不许直接写键名／不许写成一句话：\n  " + bad.join("\n  "));
   // 前缀本身必须还认得出来，否则徽章会集体退化成没有按钮的状态行
-  assert.deepEqual(SplitPrompt("按住 E · 接绳"), { act: "interact", hold: true, text: "接绳" });
-  assert.deepEqual(SplitPrompt("F · 投"), { act: "throw", hold: false, text: "投" });
-  assert.deepEqual(SplitPrompt("跟上娘"), { act: null, hold: false, text: "跟上娘" });
+  assert.deepEqual(SplitPrompt("按住 E · 接绳"), { act: "interact", hold: true, dir: null, text: "接绳" });
+  assert.deepEqual(SplitPrompt("F · 投"), { act: "throw", hold: false, dir: null, text: "投" });
+  assert.deepEqual(SplitPrompt("跟上娘"), { act: null, hold: false, dir: null, text: "跟上娘" });
+  // 四动词那一档：方向也在前缀里，正文照旧只剩动词（HUD 拿它画第二枚键帽）
+  assert.deepEqual(SplitPrompt("按住 E ＋ ↑ · 掀开翻板"),
+    { act: "interact", hold: true, dir: "up", text: "掀开翻板" });
+  assert.equal(StrokePrompt("按住 E · 顶上撑木", "up"), "按住 E ＋ ↑ · 顶上撑木");
+  assert.equal(StrokePrompt("撕开蓝布", "left"), "按住 E ＋ ← · 撕开蓝布");
   console.log("  ✓ 提示文案与设备无关（键名只在前缀里）");
 }
 
@@ -2549,18 +2528,23 @@ function TestStrokeWork() {
   assert.ok(st.beat.holdP > 0, "往上顶必须做得上功");
   // 小黑饼已拆：方向必须写在提示文案里，抽象图形替不了字
   assert.equal(st.gesture, undefined, "手势小黑饼已拆（2026-08-10 用户）");
-  // 「顶」这个动词自带方向（顶=向上使劲）；写成别的动词就得把「往上」补进文案
-  assert.match(st.prompt || "", /往上|顶/, `方向得写进提示文案（实为 ${JSON.stringify(st.prompt)}）`);
+  // 方向进前缀不进正文（四动词：HUD 拿它画第二枚键帽）
+  assert.equal(SplitPrompt(st.prompt || "").dir, "up",
+    `提示前缀里得带方向（实为 ${JSON.stringify(st.prompt)}）`);
   // 松手泄劲
   const was = st.beat.holdP;
   for (let i = 0; i < 10; i += 1) StepGame(st, idle(), DT);
   assert.ok(st.beat.holdP < was, "松手功要慢慢泄掉");
-  // 键盘后备干完
+  // **光按住 E 不算做功**（2026-08-16 四动词）：方向不推，一分都不涨
+  const idleHold = st.beat.holdP;
+  for (let i = 0; i < 30; i += 1) StepGame(st, { ...idle(), interactHeld: true }, DT);
+  assert.equal(st.beat.holdP, idleHold, "光按住 E 不该涨——做功要往方向上推");
+  // 按住 E ＋ ↑ 干完（键盘与摇杆同一条路；驱动器走的也是这条）
   let g1 = 0;
   while (st.beat.stepIndex === shore.steps.indexOf(upStep) && g1 < 400) {
-    g1 += 1; StepGame(st, { ...idle(), interactHeld: true }, DT);
+    g1 += 1; StepGame(st, { ...idle(), interactHeld: true, climb: -1 }, DT);
   }
-  assert.ok(g1 < 400, "键盘按住 E 必须能把撑木顶上去");
+  assert.ok(g1 < 400, "按住 E ＋ ↑ 必须能把撑木顶上去");
 
   // — c5 拴铃（stroke:"circle"）：指针停着不涨，绕着圈走才涨 —
   const beats5 = ChapterBeatList(4).map((b) => b.id);
@@ -2800,7 +2784,7 @@ TestRelicsBag();
 TestCliAnswersQuestions();
 TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
-TestKnotIsASheetBend();
+// TestKnotIsASheetBend();   // 第九稿：修井绳（接绳活卡）整段下线，机制留在 Core 里没人用
 TestGrabbablesAreBigEnoughToRead();
 TestForageIsHandsOn();
 TestWinchIsACrankNotALever();
@@ -2837,7 +2821,6 @@ console.log("— 全流程自动通关（第六章走『地下进人』，第二
   assert.equal(state.flags.mealSplit, true, "C1 分食必须亲手掰过、又把长的那截搁回她碗里");
   assert.equal(state.flags.tallied, true, "C1 正字那一道必须真的画上（她自己的手，玩家抱着）");
   assert.equal(state.flags.bitterHerb, true, "C1 妹妹那棵苦菜必须入戏（「哥，大的。」）");
-  assert.equal(state.flags.wellRopeFixed, true, "C1 井绳必须缠好");
   assert.equal(state.flags.waterFilled, true, "C1 打水的桶必须真的触过水");
   assert.equal(state.flags.beansGiven, true, "C1 七叔那把黑豆必须塞到怀里（车铃一整场没被跳丢）");
   assert.equal(state.flags.vatFilled, true, "C1 打回来的水必须倒进缸里");

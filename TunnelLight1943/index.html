@@ -141,7 +141,8 @@
     <!-- 交互徽章（勇敢的心式）：一枚按钮 + 一个短动词，浮在柱子头顶上。
          按钮的脸由当前输入设备决定——键盘是键帽，手指是右下角那几个钮的
          同一套线描图形。文案里一个键名都不写。 -->
-    <div id="actPrompt" hidden><i class="pKey"></i><b class="pVerb"></b></div>
+    <!-- 做功那一档是两枚键帽（E ＋ 方向），所以键位单独包一行 -->
+    <div id="actPrompt" hidden><span class="pKeys"><i class="pKey"></i></span><b class="pVerb"></b></div>
     <!-- 底部那条只剩没有按键的状态行（"跟上娘""！探杆就在头顶"） -->
     <div id="prompt" hidden></div>
     <!-- 后果小窗（勇敢的心式画中画）：玩家的操作在画面外起了作用，角落里开一扇

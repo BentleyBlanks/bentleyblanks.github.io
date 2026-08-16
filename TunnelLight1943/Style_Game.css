@@ -165,8 +165,17 @@ body {
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
 #actPrompt .pKey svg circle.solid { fill: currentColor; stroke: none; }
+/* 做功那一档两枚键帽并排：E ＋ 方向（2026-08-16 四动词） */
+#actPrompt .pKeys { display: flex; align-items: center; gap: 4px; }
+#actPrompt .pPlus {
+  font-size: 13px; font-style: normal; color: #d9c393; line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+/* 方向那枚小一号：主角是 E，它只说"还要往哪推" */
+#actPrompt .pKey.pDir { width: 29px; height: 29px; font-size: 15px; }
+#actPrompt .pKey.pDir svg { width: 17px; height: 17px; }
 /* 招手的一圈涟漪：把眼睛引过去，但不动徽章本身——缩放静止的字会糊 */
-#actPrompt .pKey::before {
+#actPrompt .pKey:not(.pDir)::before {
   content: ""; position: absolute; inset: 0; border-radius: 50%;
   border: 1.5px solid rgba(242, 207, 114, 0.7);
   animation: actPing 2.1s ease-out infinite;
@@ -176,8 +185,8 @@ body {
   70%, 100% { transform: scale(1.75); opacity: 0; }
 }
 /* 长按：徽章外面套一圈进度环。百分比不写成字——环走到头就是走到头 */
-#actPrompt.hold .pKey::before { animation: none; opacity: 0; }
-#actPrompt.hold .pKey::after {
+#actPrompt.hold .pKey:not(.pDir)::before { animation: none; opacity: 0; }
+#actPrompt.hold .pKey:not(.pDir)::after {
   content: ""; position: absolute; inset: -6px; border-radius: 50%;
   background: conic-gradient(#f2cf72 calc(var(--fill) * 1%), rgba(240, 222, 180, 0.18) 0);
   -webkit-mask: radial-gradient(circle, transparent 0 62%, #000 64%);
