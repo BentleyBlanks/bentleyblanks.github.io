@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>牛马指挥官 · Crunch Overlord</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=2" />
+  <link rel="stylesheet" href="./Style_Game.css?v=3" />
 </head>
 <body>
   <div id="stage">
@@ -49,15 +49,21 @@
     <nav id="commandBar" class="hidden">
       <div class="cmd-row">
         <span class="cmd-tag">压榨</span>
-        <button id="pieButton" type="button"><b>画大饼 [Q]</b><small>全员提速8秒 · 饼凉全员掉士气</small></button>
+        <button id="pieButton" type="button"><b>画大饼 [Q]</b><small>全员提速8秒 · 饼凉掉士气</small></button>
         <button id="bossCodeButton" type="button"><b>亲自写代码 [W]</b><small>进度+10 · 掉头发 · 送BUG</small></button>
-        <button id="footbathButton" type="button"><b>报销足浴 [E]</b><small>¥1,999 · 选中的牛马士气+35</small></button>
-        <button id="releaseButton" type="button"><b>发售！[R]</b><small>进度满可按 · BUG越多评分越低</small></button>
+        <button id="releaseButton" type="button"><b>发售！[R]</b><small>进度满可按 · BUG扣评分</small></button>
       </div>
       <div class="cmd-row">
-        <span class="cmd-tag">老板的生活</span>
-        <button id="spaButton" type="button"><b>老板去足疗 [A]</b><small>¥888 · 头发+18 · 离岗牛马摸鱼</small></button>
-        <button id="clubButton" type="button"><b>高端会所 [S]</b><small>¥8,888 · 可能拉到投资 · 全员看到朋友圈</small></button>
+        <span class="cmd-tag">安抚</span>
+        <button id="footbathButton" type="button"><b>报销足浴 [E]</b><small>¥1,999 · 选中的牛马 +35</small></button>
+        <button id="milkTeaButton" type="button"><b>请奶茶 [T]</b><small>¥888 · 全员 +12 · 液体股权</small></button>
+        <button id="awardButton" type="button"><b>发奖状 [F]</b><small>免费 · 越发越贬值</small></button>
+        <button id="teambuildButton" type="button"><b>强制团建 [G]</b><small>¥6,666 · 全员离岗回来大补</small></button>
+      </div>
+      <div class="cmd-row">
+        <span class="cmd-tag">堕落</span>
+        <button id="spaButton" type="button"><b>老板去足疗 [A]</b><small>¥888 · 头发+18 · 牛马摸鱼</small></button>
+        <button id="clubButton" type="button"><b>高端会所 [S]</b><small>¥8,888 · 可能拉到投资</small></button>
         <button id="stockButton" type="button"><b>杀入股市 [D]</b><small>¥20,000 · 纯赌 · 老板离岗</small></button>
       </div>
     </nav>
@@ -68,6 +74,7 @@
       <ul class="howto">
         <li><b>点牛马 → 点目标</b>：修红色 BUG，或冲进度</li>
         <li><b>直接点黄色需求瘤</b>：老板亲自砍需求，策划会哭</li>
+        <li><b>安抚有一整排</b>：足浴、奶茶、奖状（免费但会贬值）、强制团建</li>
         <li><b>老板也有生活</b>：足疗生发、会所拉投资、股市搏一搏</li>
         <li><b>但是</b>：老板一出门，牛马集体摸鱼（效率减半、士气回升）</li>
         <li><b>目标</b>：流水 ¥500,000 · 别破产 · 别把人全逼走</li>
@@ -88,6 +95,11 @@
     <div class="rotate-card">📱↻<br />横屏体验更佳<br /><span>老板的格局必须是宽的</span></div>
   </div>
 
-  <script type="module" src="./Script_Game.mjs?v=2"></script>
+  <div id="bossCursor" class="hidden" aria-hidden="true">
+    <span class="cur-hand">🫵</span>
+    <span class="cur-tag">指挥</span>
+  </div>
+
+  <script type="module" src="./Script_Game.mjs?v=3"></script>
 </body>
 </html>

@@ -28,6 +28,14 @@ import {
   BOSS_ACTIVITIES,
   STOCK_STAKE,
   CLUB_INVEST_GAIN,
+  MilkTea,
+  GiveAward,
+  TeamBuild,
+  AwardValue,
+  MILK_TEA_COST,
+  MILK_TEA_MORALE,
+  TEAMBUILD_COST,
+  AWARD_BASE_MORALE,
 } from "./Script_Rules.mjs";
 
 const failures = [];
@@ -292,6 +300,67 @@ Check("高端会所：投资结果二选一，行程计数正确", () => {
   assert.equal(state.boss.phase, "office");
   assert.equal(state.stats.clubTrips, 1);
   assert.ok([0, CLUB_INVEST_GAIN].includes(state.stats.investGained));
+});
+
+Check("请奶茶：扣钱、全员士气涨、冷却挡连点", () => {
+  const state = NewGame(61);
+  const moraleBefore = state.workers.map((worker) => worker.morale);
+  const cashBefore = state.cash;
+  const result = MilkTea(state);
+  assert.ok(result.ok);
+  assert.equal(state.cash, cashBefore - MILK_TEA_COST);
+  assert.equal(state.stats.milkTeas, 1);
+  state.workers.forEach((worker, index) => {
+    assert.ok(worker.morale > moraleBefore[index], `${worker.id} 士气应上涨`);
+    assert.ok(worker.morale <= moraleBefore[index] + MILK_TEA_MORALE + 0.01);
+  });
+  const again = MilkTea(state);
+  assert.equal(again.ok, false, "冷却中不许连点奶茶");
+});
+
+Check("发奖状：第一张涨士气，发多了穿帮变负", () => {
+  const state = NewGame(67);
+  const worker = state.workers[0];
+  worker.morale = 50;
+  assert.equal(AwardValue(state), AWARD_BASE_MORALE);
+  const first = GiveAward(state, worker.id);
+  assert.ok(first.ok);
+  assert.ok(worker.morale > 50, `第一张应涨士气，实际 ${worker.morale}`);
+  state.awardCooldown = 0;
+  GiveAward(state, worker.id);
+  state.awardCooldown = 0;
+  GiveAward(state, worker.id);
+  state.awardCooldown = 0;
+  const before = worker.morale;
+  const fourth = GiveAward(state, worker.id);
+  assert.ok(fourth.ok);
+  assert.ok(worker.morale < before, `第四张应穿帮掉士气，${before} → ${worker.morale}`);
+  assert.ok(AwardValue(state) < 0);
+});
+
+Check("强制团建：扣钱、全员离岗、进度停、回来多数涨一人嫌", () => {
+  const state = NewGame(71);
+  const control = NewGame(71);
+  const cashBefore = state.cash;
+  const result = TeamBuild(state);
+  assert.ok(result.ok);
+  assert.equal(state.cash, cashBefore - TEAMBUILD_COST);
+  assert.equal(state.stats.teambuilds, 1);
+  Simulate(state, 8);
+  const gone = state.workers.filter((worker) => worker.state === "teambuild" || worker.mission?.then === "teambuild");
+  assert.ok(gone.length >= 3, `多数人应已出门团建，实际 ${gone.length}`);
+  Simulate(control, 8);
+  assert.ok(
+    state.project.progress < control.project.progress,
+    `团建局进度 ${state.project.progress} 应低于对照 ${control.project.progress}`,
+  );
+  Simulate(state, 20);
+  const back = state.workers.filter((worker) => worker.state === "desk" || worker.state === "moving");
+  assert.ok(back.length >= 3, "团建结束后多数人应回工位");
+  const boosted = state.workers.filter((worker) => worker.morale > 72).length;
+  const hurt = state.workers.filter((worker) => worker.morale < 72).length;
+  assert.ok(boosted >= 2, `至少两人该真香，实际 ${boosted}`);
+  assert.ok(hurt >= 1, "总有一个人讨厌团建");
 });
 
 Check("发售弹幕：三条喷子如约而至", () => {

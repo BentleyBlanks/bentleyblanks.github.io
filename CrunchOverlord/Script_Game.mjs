@@ -1,19 +1,21 @@
 // 牛马指挥官 · 表现层。规则全在 Script_Rules.mjs，这里只负责画、响、收输入。
 import {
-  WORLD, BOSS_HOME, BOSS_ACTIVITIES, MONTH_SECONDS, REVENUE_GOAL, FOOTBATH_COST,
+  WORLD, BOSS_HOME, BOSS_ACTIVITIES, REVENUE_GOAL, FOOTBATH_COST,
+  MILK_TEA_COST, TEAMBUILD_COST, AwardValue,
   CreateState, StartGame, Tick, DrainEvents, AssignWorker, SlashScope, PaintPie,
-  BossCode, Footbath, BossGoOut, Release, FindWorkerDef, ActiveWorkers,
-  GetSpeedMultiplier, BossAway, WORKER_DEFS,
-} from "./Script_Rules.mjs?v=2";
+  BossCode, Footbath, MilkTea, GiveAward, TeamBuild, BossGoOut, Release,
+  FindWorkerDef, ActiveWorkers, GetSpeedMultiplier, BossAway, WORKER_DEFS,
+} from "./Script_Rules.mjs?v=3";
 
 const dom = {};
 [
   "stage", "gameCanvas", "hud", "hudMonth", "hudCash", "hudGoalText", "hudGoalFill",
   "hudProjectName", "hudProjectFill", "hudHair", "hudSpeed", "bossBanner", "selectionHint",
   "toastStack", "commandBar", "pieButton", "bossCodeButton", "footbathButton", "releaseButton",
-  "spaButton", "clubButton", "stockButton", "titleScreen", "startButton", "endScreen",
+  "spaButton", "clubButton", "stockButton", "milkTeaButton", "awardButton", "teambuildButton",
+  "titleScreen", "startButton", "endScreen",
   "endTitle", "endReason", "endStats", "restartButton", "tutorialTip", "tutorialText",
-  "tutorialSkip", "rotateHint",
+  "tutorialSkip", "rotateHint", "bossCursor",
 ].forEach((id) => { dom[id] = document.getElementById(id); });
 
 const ctx = dom.gameCanvas.getContext("2d");
@@ -26,7 +28,7 @@ const TUTORIAL_STEPS = [
   { id: "select", text: "这四位是你的牛马。点一头试试——他们巴不得被老板注意。" },
   { id: "assign", text: "选中了就点红色 BUG 把他扔过去（他掉一点士气，你获得全部快乐）。点中间的游戏则是冲进度。" },
   { id: "slash", text: "黄色的瘤是策划偷加的需求。不用派人——直接点它，老板亲自砍。后果：策划心碎，其他人偷着乐。" },
-  { id: "release", text: "进度环满了就点【发售】。BUG 留着会扣评分。穷了去炒股，秃了去足疗——注意：老板一出门，牛马就摸鱼。" },
+  { id: "release", text: "进度环满了就点【发售】。士气掉了请奶茶、发奖状或报销足浴；奖状发多了会穿帮。老板出门，牛马摸鱼。" },
 ];
 
 const view = {
@@ -296,9 +298,25 @@ function UpdatePointer(event) {
   view.mouseY = ((event.clientY - rect.top) / rect.height) * WORLD.height;
 }
 
+function ShowBossCursor(on) {
+  if (!dom.bossCursor) return;
+  dom.bossCursor.classList.toggle("hidden", !on);
+}
+
+function MoveBossCursor(clientX, clientY) {
+  if (!dom.bossCursor) return;
+  // 跟鼠标同步走 CSS transform，不进 rAF，所以拖起来不再慢半拍。
+  dom.bossCursor.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
+}
+
 dom.gameCanvas.addEventListener("pointermove", (event) => {
   UpdatePointer(event);
-  view.mouseInside = event.pointerType === "mouse";
+  const mouse = event.pointerType === "mouse";
+  view.mouseInside = mouse;
+  if (mouse && state.status === "playing") {
+    ShowBossCursor(true);
+    MoveBossCursor(event.clientX, event.clientY);
+  }
 });
 dom.gameCanvas.addEventListener("pointerdown", (event) => {
   EnsureAudio();
@@ -306,7 +324,10 @@ dom.gameCanvas.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "mouse" && event.button === 2) { view.selectedWorkerId = null; return; }
   if (event.pointerType !== "mouse" || event.button === 0) HandleClick();
 });
-dom.gameCanvas.addEventListener("pointerleave", () => { view.mouseInside = false; });
+dom.gameCanvas.addEventListener("pointerleave", () => {
+  view.mouseInside = false;
+  ShowBossCursor(false);
+});
 dom.gameCanvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
 window.addEventListener("keydown", (event) => {
@@ -319,7 +340,12 @@ window.addEventListener("keydown", (event) => {
     else if (HandleCommand(Footbath(state, view.selectedWorkerId))) view.selectedWorkerId = null;
   } else if (key === "r") {
     if (HandleCommand(Release(state), { toast: false })) MarkTutorial("release");
-  } else if (key === "a") HandleCommand(BossGoOut(state, "spa"));
+  } else if (key === "t") HandleCommand(MilkTea(state));
+  else if (key === "f") {
+    if (!view.selectedWorkerId) ShowToast("先点一头牛马，再发奖状。", "normal");
+    else HandleCommand(GiveAward(state, view.selectedWorkerId));
+  } else if (key === "g") HandleCommand(TeamBuild(state));
+  else if (key === "a") HandleCommand(BossGoOut(state, "spa"));
   else if (key === "s") HandleCommand(BossGoOut(state, "club"));
   else if (key === "d") HandleCommand(BossGoOut(state, "stock"));
   else if (["1", "2", "3", "4"].includes(key)) {
@@ -339,6 +365,13 @@ dom.releaseButton.addEventListener("click", () => {
   EnsureAudio();
   if (HandleCommand(Release(state), { toast: false })) MarkTutorial("release");
 });
+dom.milkTeaButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(MilkTea(state)); });
+dom.awardButton.addEventListener("click", () => {
+  EnsureAudio();
+  if (!view.selectedWorkerId) { ShowToast("先点一头牛马，再发奖状。", "normal"); return; }
+  HandleCommand(GiveAward(state, view.selectedWorkerId));
+});
+dom.teambuildButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(TeamBuild(state)); });
 dom.spaButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "spa")); });
 dom.clubButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "club")); });
 dom.stockButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "stock")); });
@@ -347,6 +380,8 @@ dom.tutorialSkip.addEventListener("click", () => FinishTutorial("行，老板天
 dom.startButton.addEventListener("click", () => {
   EnsureAudio();
   StartGame(state);
+  view.hudAt = 0;
+  SyncHud();
   dom.titleScreen.classList.add("hidden");
   dom.endScreen.classList.add("hidden");
   dom.hud.classList.remove("hidden");
@@ -355,6 +390,8 @@ dom.startButton.addEventListener("click", () => {
 dom.restartButton.addEventListener("click", () => {
   EnsureAudio();
   StartGame(state);
+  view.hudAt = 0;
+  SyncHud();
   view.selectedWorkerId = null;
   view.floaters = [];
   view.confetti = [];
@@ -383,7 +420,16 @@ function SyncHud() {
   dom.pieButton.querySelector("b").textContent = state.pie.cooldown > 0 ? `画大饼 (${Math.ceil(state.pie.cooldown)}s)` : "画大饼 [Q]";
   dom.bossCodeButton.disabled = away || state.bossCodeCooldown > 0 || state.hair <= 0;
   dom.bossCodeButton.querySelector("b").textContent = state.hair <= 0 ? "秃了，写不动" : state.bossCodeCooldown > 0 ? `亲自写代码 (${Math.ceil(state.bossCodeCooldown)}s)` : "亲自写代码 [W]";
+  const teaming = state.workers.some((worker) => worker.state === "teambuild" || worker.mission?.then === "teambuild");
+  const awardNow = AwardValue(state);
   dom.footbathButton.disabled = away || state.cash < FOOTBATH_COST;
+  dom.milkTeaButton.disabled = away || state.cash < MILK_TEA_COST || state.milkTeaCooldown > 0;
+  dom.milkTeaButton.querySelector("b").textContent = state.milkTeaCooldown > 0 ? `请奶茶 (${Math.ceil(state.milkTeaCooldown)}s)` : "请奶茶 [T]";
+  dom.awardButton.disabled = away || state.awardCooldown > 0;
+  dom.awardButton.querySelector("b").textContent = state.awardCooldown > 0
+    ? `发奖状 (${Math.ceil(state.awardCooldown)}s)`
+    : awardNow > 0 ? `发奖状 [F]  +${awardNow}` : `发奖状 [F]  ${awardNow}`;
+  dom.teambuildButton.disabled = away || teaming || state.cash < TEAMBUILD_COST;
   dom.releaseButton.disabled = away || state.project.progress < state.project.need;
   dom.releaseButton.classList.toggle("ready", !away && state.project.progress >= state.project.need);
   dom.spaButton.disabled = away || state.cash < BOSS_ACTIVITIES.spa.cost;
@@ -392,7 +438,7 @@ function SyncHud() {
 
   if (view.selectedWorkerId) {
     const def = FindWorkerDef(view.selectedWorkerId);
-    dom.selectionHint.textContent = `已选中 ${def.roleLabel} ${def.name} —— 点 BUG 派活 / 点游戏冲进度 / [E] 报销足浴`;
+    dom.selectionHint.textContent = `已选中 ${def.roleLabel} ${def.name} —— 点 BUG 派活 / 点游戏冲进度 / [E] 足浴 / [F] 奖状`;
     dom.selectionHint.classList.remove("hidden");
   } else {
     dom.selectionHint.classList.add("hidden");
@@ -401,6 +447,7 @@ function SyncHud() {
 }
 
 function ShowEndScreen() {
+  ShowBossCursor(false);
   dom.hud.classList.add("hidden");
   dom.commandBar.classList.add("hidden");
   dom.tutorialTip.classList.add("hidden");
@@ -418,7 +465,7 @@ function ShowEndScreen() {
   const lines = [
     `存活 ${stats.monthsSurvived} 个月 · 发售 ${stats.releases} 款游戏`,
     `砍需求 ${stats.slashes} 次 · 画饼 ${stats.pies} 张 · 亲自写代码 ${stats.bossCodes} 次（剩余头发 ${Math.round(state.hair)}%）`,
-    `修复 BUG ${stats.bugsFixed} 个 · 报销足浴 ${stats.footbaths} 次 · 气走 ${stats.quits} 头牛马`,
+    `修复 BUG ${stats.bugsFixed} 个 · 足浴 ${stats.footbaths} · 奶茶 ${stats.milkTeas} · 奖状 ${stats.awards} · 团建 ${stats.teambuilds} · 气走 ${stats.quits} 头`,
     `老板足疗 ${stats.spaTrips} 次 · 高端会所 ${stats.clubTrips} 次${stats.investGained ? `（拉到投资 ${FormatMoney(stats.investGained)}）` : ""}`,
     `炒股 ${stats.stockPlays} 次 · 股市净收益 ${FormatMoney(stats.stockNet)}`,
   ];
@@ -528,7 +575,7 @@ function DrawBackground(time) {
   ctx.fillStyle = "#9d92bd";
   ctx.font = "12px 'Microsoft YaHei', sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText("足疗·会所·股市·离职", 1276, 444);
+  ctx.fillText("足疗·团建·会所·股市·离职", 1276, 444);
   ctx.fillText("↑ 全走同一扇门", 1276, 660);
   ctx.textAlign = "left";
 
@@ -755,6 +802,7 @@ function DrawWorker(worker, time) {
   const stateLabel = worker.state === "working" ? "修锣中" :
     worker.state === "sprint" ? "冲刺中" :
     worker.state === "soaking" ? "泡脚中" :
+    worker.state === "teambuild" ? "团建中" :
     worker.state === "quitWalking" ? "去意已决" :
     slacking ? "带薪呼吸" : "";
   ctx.fillText(`${def.name}${stateLabel ? " · " + stateLabel : ""}`, x, worker.y + 42);
@@ -1016,28 +1064,6 @@ function DrawTutorialMarker(time) {
   ctx.fill();
 }
 
-function DrawCursor() {
-  if (!view.mouseInside || state.status !== "playing") return;
-  const x = view.mouseX;
-  const y = view.mouseY;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(-0.5);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#241a05";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(-7, -4, 22, 13, 5);
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(9, -7, 13, 8, 4);
-  ctx.fill(); ctx.stroke();
-  ctx.restore();
-  ctx.fillStyle = "rgba(255, 209, 102, 0.9)";
-  ctx.font = "bold 11px 'Microsoft YaHei', sans-serif";
-  ctx.fillText("指挥", x + 16, y + 22);
-}
-
 /* ============================ 主渲染 ============================ */
 function Render(time, dt) {
   ctx.setTransform(renderK, 0, 0, renderK, 0, 0);
@@ -1064,7 +1090,6 @@ function Render(time, dt) {
   DrawConfetti(dt);
   DrawDanmaku(dt);
   DrawReleaseCard(dt);
-  DrawCursor();
   ctx.restore();
 }
 
@@ -1078,7 +1103,10 @@ function Frame(now) {
   if (state.status === "playing") {
     Tick(state, dt);
     ConsumeEvents();
-    SyncHud();
+    if (now - (view.hudAt || 0) > 80) {
+      view.hudAt = now;
+      SyncHud();
+    }
     ended = false;
   } else if ((state.status === "won" || state.status === "lost") && !ended) {
     ended = true;
@@ -1097,7 +1125,7 @@ function FitStage() {
   dom.stage.classList.toggle("compact", scale < 0.72);
 
   const dpr = window.devicePixelRatio || 1;
-  renderK = Math.min(2.6, Math.max(1, scale * dpr));
+  renderK = Math.min(2, Math.max(1, scale * dpr));
   dom.gameCanvas.width = Math.round(WORLD.width * renderK);
   dom.gameCanvas.height = Math.round(WORLD.height * renderK);
 

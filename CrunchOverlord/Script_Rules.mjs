@@ -1,6 +1,6 @@
 // 《牛马指挥官》纯逻辑模块。禁止 window / document / Math.random()。
-// 上帝视角：玩家是老板，指挥四头牛马做游戏；老板本人会出门足疗/会所/炒股，
-// 人一走，牛马就摸鱼。一切随机走 Rand(state)，同种子同操作逐字节一致。
+// 上帝视角：玩家是老板，指挥四头牛马做游戏。安抚有足浴/奶茶/奖状/团建；
+// 老板本人会出门足疗/会所/炒股，人一走牛马就摸鱼。随机走 Rand(state)。
 
 export const WORLD = Object.freeze({
   width: 1280,
@@ -33,6 +33,17 @@ export const SLACK_PROGRESS_MULT = 0.55;
 export const SLACK_MORALE_REGEN = 0.8;
 export const STOCK_STAKE = 20000;
 export const CLUB_INVEST_GAIN = 66666;
+export const MILK_TEA_COST = 888;
+export const MILK_TEA_MORALE = 12;
+export const MILK_TEA_COOLDOWN = 14;
+export const AWARD_COOLDOWN = 10;
+export const AWARD_BASE_MORALE = 18;
+export const AWARD_DECAY = 7;
+export const AWARD_MIN = -12;
+export const TEAMBUILD_COST = 6666;
+export const TEAMBUILD_SECONDS = 7;
+export const TEAMBUILD_MORALE = 26;
+export const TEAMBUILD_VICTIM_MORALE = -10;
 
 export const BOSS_ACTIVITIES = Object.freeze({
   spa: {
@@ -119,6 +130,9 @@ export const BOSS_LINES = Object.freeze({
   pie: ["干完这票，人人都是合伙人！", "上市了给你们一人一层楼！", "这不是加班，这是财富自由预科班！", "明年今天，纳斯达克见！"],
   bossCode: ["让开！我当年用记事本写过引擎！", "看好了，这叫老板的肌肉记忆！", "报错就是编译器嫉妒我！"],
   footbath: ["去，把脚洗了，公司报销！", "泡完回来给我拿出上市公司的精神面貌！"],
+  milkTea: ["全员奶茶！三分糖，甜多了你们会忘记工资！", "喝！喝完这杯还有三杯需求！", "这不是奶茶，这是液体股权！"],
+  award: ["这张奖状，含金量比工资高！", "裱起来！挂工位上！让别人卷死！", "公司穷得只剩荣誉了，都给你！"],
+  teambuild: ["全体收拾东西，团建！这是命令也是福利！", "不许带电脑！但把工作都记在脑子里！", "去团建！费用我出，快乐你们自己找！"],
   back: ["都给我回工位！！", "我听见 Switch 的声音了！！", "刚才谁在点外卖？！"],
 });
 
@@ -128,6 +142,51 @@ export const BOSS_CODE_ROASTS = [
   "变量名叫 aaa2，我看到它的时候它已经在生产环境了。",
   "老板的注释写着：别问，问就是能跑。",
   "刚才那次提交把周五也删了。",
+];
+
+// 奶茶到货时牛马的反应
+export const MILK_TEA_LINES = [
+  "谢谢老板！这杯奶茶值三行代码。",
+  "珍珠是加班的形状，但我不管，真香。",
+  "喝完这杯，再干半小时，说好了啊。",
+  "老板请奶茶，事出反常必有需求。",
+];
+
+// 收到奖状（还没穿帮时）
+export const AWARD_LINES = [
+  "谢谢老板！我先假装很感动。",
+  "裱是不会裱的，垫泡面倒是正好。",
+  "妈，我出息了，是纸做的那种。",
+];
+
+// 奖状发多了，牛马看穿了一切
+export const AWARD_JADED_LINES = [
+  "又是奖状？奖状能交房租吗？！",
+  "第 N 张了，我工位快贴成灵堂了。",
+  "把打印机墨钱折现给我都比这强。",
+  "下次能不能直接发钱，纸我家有。",
+];
+
+// 团建出发时
+export const TEAMBUILD_GO_LINES = [
+  "团建？周末团建等于上六天班！",
+  "只要不在工位，哪儿都是天堂。",
+  "我赌五毛，到了还是聊需求。",
+  "记得拍照发朋友圈，配文：感恩公司。",
+];
+
+// 团建回来（多数人真香）
+export const TEAMBUILD_BACK_LINES = [
+  "烤肉不错，明天继续为烤肉打工。",
+  "唱了三小时，嗓子哑了，心情好了。",
+  "团建一日游，感觉自己又能卷三个月。",
+];
+
+// 团建受害者（就是讨厌团建）
+export const TEAMBUILD_HATE_LINES = [
+  "果然，团建就是换个地方开会。",
+  "全程在玩『真心话大冒险之你对公司的建议』。",
+  "我的周末！还我周末！",
 ];
 
 // 老板不在时的摸鱼台词
@@ -238,6 +297,9 @@ export function CreateState(seed = 20260816) {
     hair: 100,
     pie: { timer: 0, cooldown: 0 },
     bossCodeCooldown: 0,
+    milkTeaCooldown: 0,
+    awardCooldown: 0,
+    awardsGiven: 0,
     spawnTimer: 3.5,
     ambientTimer: 6,
     slackTimer: 0,
@@ -266,10 +328,11 @@ export function CreateState(seed = 20260816) {
       tx: def.desk.x,
       ty: def.desk.y,
       morale: 72,
-      state: "desk", // desk | moving | working | sprint | soaking | quitWalking | gone
+      state: "desk", // desk | moving | working | sprint | soaking | teambuild | quitWalking | gone
       mission: null,
       sprintTimer: 0,
       soakTimer: 0,
+      teambuildGrump: false,
       targetTumorId: null,
     })),
     tumors: [],
@@ -280,6 +343,9 @@ export function CreateState(seed = 20260816) {
       footbaths: 0,
       bugsFixed: 0,
       scopesNegotiated: 0,
+      milkTeas: 0,
+      awards: 0,
+      teambuilds: 0,
       quits: 0,
       releases: 0,
       monthsSurvived: 0,
@@ -444,6 +510,7 @@ export function AssignWorker(state, workerId, target) {
   if (!worker) return { ok: false, message: "查无此牛马。" };
   if (worker.state === "gone" || worker.state === "quitWalking") return { ok: false, message: "这位已经不吃这套了，人都走了。" };
   if (worker.state === "soaking") return { ok: false, message: "人在足浴店，命令传不进按摩房。" };
+  if (worker.state === "teambuild" || worker.mission?.then === "teambuild") return { ok: false, message: "人在团建 KTV，麦克风声音比你大。" };
   const def = FindWorkerDef(worker.id);
   if (target === "core") {
     worker.mission = { type: "core" };
@@ -541,6 +608,7 @@ export function Footbath(state, workerId) {
   if (!worker) return { ok: false, message: "先选中一头牛马再报销。" };
   if (worker.state === "gone" || worker.state === "quitWalking") return { ok: false, message: "人都走了，足浴留不住离职的心。" };
   if (worker.state === "soaking" || worker.mission?.then === "footbath") return { ok: false, message: "这位已经泡上了。" };
+  if (worker.state === "teambuild" || worker.mission?.then === "teambuild") return { ok: false, message: "人在团建，脚已经在别处泡着了。" };
   if (state.cash < FOOTBATH_COST) return { ok: false, message: `现金不足 ¥${FOOTBATH_COST.toLocaleString("zh-CN")}，老板的关怀是要钱的。` };
   state.cash -= FOOTBATH_COST;
   state.stats.footbaths += 1;
@@ -553,6 +621,92 @@ export function Footbath(state, workerId) {
   Emit(state, { kind: "sfx", id: "cashOut" });
   const def = FindWorkerDef(worker.id);
   return { ok: true, message: `${def.name} 拿着报销单出门了。` };
+}
+
+// 当前这张奖状值多少士气：越发越不值钱，发多了直接伤人
+export function AwardValue(state) {
+  return Math.max(AWARD_MIN, AWARD_BASE_MORALE - state.awardsGiven * AWARD_DECAY);
+}
+
+export function MilkTea(state) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  if (state.milkTeaCooldown > 0) return { ok: false, message: "奶茶店说骑手还在路上，别催了。" };
+  if (state.cash < MILK_TEA_COST) return { ok: false, message: `现金不足 ¥${MILK_TEA_COST.toLocaleString("zh-CN")}，连奶茶都请不起了？` };
+  const targets = state.workers.filter((worker) =>
+    worker.state !== "gone" && worker.state !== "quitWalking" && worker.state !== "soaking" && worker.state !== "teambuild");
+  if (!targets.length) return { ok: false, message: "办公室没人在，奶茶送给谁喝？" };
+  state.cash -= MILK_TEA_COST;
+  state.milkTeaCooldown = MILK_TEA_COOLDOWN;
+  state.stats.milkTeas += 1;
+  BossSay(state, "milkTea");
+  targets.forEach((worker) => {
+    ChangeMorale(state, worker, MILK_TEA_MORALE);
+    Emit(state, { kind: "effect", x: worker.x, y: worker.y - 58, text: `+${MILK_TEA_MORALE} 🧋`, color: "#8df0b0" });
+  });
+  const drinker = Pick(state, targets);
+  if (drinker) WorkerQuote(state, drinker, MILK_TEA_LINES);
+  Emit(state, { kind: "sfx", id: "cashOut" });
+  Emit(state, { kind: "toast", tone: "good", text: `奶茶到了：现金 -¥${MILK_TEA_COST.toLocaleString("zh-CN")}，全员士气 +${MILK_TEA_MORALE}。液体股权，实惠。` });
+  return { ok: true, message: "奶茶已送达。" };
+}
+
+export function GiveAward(state, workerId) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  const worker = FindWorker(state, workerId);
+  if (!worker) return { ok: false, message: "先选中一头牛马，再颁发荣誉。" };
+  if (worker.state === "gone" || worker.state === "quitWalking") return { ok: false, message: "人都走了，奖状只能寄到前东家。" };
+  if (worker.state === "soaking" || worker.state === "teambuild") return { ok: false, message: "人不在工位，荣誉无处安放。" };
+  if (state.awardCooldown > 0) return { ok: false, message: "打印机还在吐上一张奖状。" };
+  const value = AwardValue(state);
+  state.awardsGiven += 1;
+  state.awardCooldown = AWARD_COOLDOWN;
+  state.stats.awards += 1;
+  const def = FindWorkerDef(worker.id);
+  BossSay(state, "award");
+  ChangeMorale(state, worker, value);
+  Emit(state, { kind: "effect", x: worker.x, y: worker.y - 58, text: `士气 ${value >= 0 ? "+" : ""}${value} 🏆`, color: value >= 0 ? "#ffd166" : "#ff8a94" });
+  Emit(state, { kind: "sfx", id: value >= 0 ? "pie" : "payday" });
+  if (worker.state !== "gone" && worker.state !== "quitWalking") {
+    WorkerQuote(state, worker, value > 0 ? AWARD_LINES : AWARD_JADED_LINES);
+  }
+  if (value <= 0) {
+    Emit(state, { kind: "toast", tone: "danger", text: `第 ${state.awardsGiven} 张『优秀员工』：${def.name} 已经看穿了一切。零成本安抚宣告破产。` });
+    return { ok: true, message: "奖状发多了，穿帮了。" };
+  }
+  Emit(state, { kind: "toast", tone: "good", text: `『优秀员工』颁给 ${def.name}：士气 +${value}。成本：一张 A4 纸。注意——每发一张，下一张就更不值钱。` });
+  return { ok: true, message: "荣誉已送达。" };
+}
+
+export function TeamBuild(state) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  if (state.workers.some((worker) => worker.state === "teambuild" || worker.mission?.then === "teambuild")) {
+    return { ok: false, message: "上一场团建还没散场，KTV 的麦还没抢完。" };
+  }
+  if (state.cash < TEAMBUILD_COST) return { ok: false, message: `现金不足 ¥${TEAMBUILD_COST.toLocaleString("zh-CN")}，团建团不起。` };
+  const targets = state.workers.filter((worker) =>
+    worker.state !== "gone" && worker.state !== "quitWalking" && worker.state !== "soaking" && worker.mission?.then !== "footbath");
+  if (!targets.length) return { ok: false, message: "一个能拉去团建的人都没有。" };
+  state.cash -= TEAMBUILD_COST;
+  state.stats.teambuilds += 1;
+  const grump = Pick(state, targets);
+  targets.forEach((worker) => {
+    worker.mission = { type: "door", then: "teambuild" };
+    worker.state = "moving";
+    worker.tx = WORLD.doorX;
+    worker.ty = WORLD.doorY;
+    worker.targetTumorId = null;
+    worker.sprintTimer = 0;
+    worker.teambuildGrump = worker === grump;
+  });
+  BossSay(state, "teambuild");
+  const talker = Pick(state, targets);
+  if (talker) WorkerQuote(state, talker, TEAMBUILD_GO_LINES);
+  Emit(state, { kind: "sfx", id: "cashOut" });
+  Emit(state, { kind: "toast", tone: "warning", text: `强制团建：现金 -¥${TEAMBUILD_COST.toLocaleString("zh-CN")}，全员离岗 ${TEAMBUILD_SECONDS} 秒（进度停摆），回来大补士气。总有一个人讨厌团建。` });
+  return { ok: true, message: "全员团建去了。" };
 }
 
 export function BossGoOut(state, activityId) {
@@ -745,6 +899,25 @@ function TickWorker(state, worker, dt, speedMultiplier) {
     return;
   }
 
+  if (worker.state === "teambuild") {
+    worker.soakTimer -= dt;
+    if (worker.soakTimer <= 0) {
+      const grump = worker.teambuildGrump;
+      worker.teambuildGrump = false;
+      const delta = grump ? TEAMBUILD_VICTIM_MORALE : TEAMBUILD_MORALE;
+      ChangeMorale(state, worker, delta);
+      worker.x = WORLD.doorX;
+      worker.y = WORLD.doorY;
+      if (worker.state !== "gone" && worker.state !== "quitWalking") {
+        SetDesk(state, worker);
+        WorkerQuote(state, worker, grump ? TEAMBUILD_HATE_LINES : TEAMBUILD_BACK_LINES);
+      }
+      Emit(state, { kind: "effect", x: worker.x - 60, y: worker.y - 40, text: `士气 ${delta >= 0 ? "+" : ""}${delta}`, color: delta >= 0 ? "#8df0b0" : "#ff8a94" });
+      Emit(state, { kind: "sfx", id: "return" });
+    }
+    return;
+  }
+
   if (worker.state === "moving" || worker.state === "quitWalking") {
     const speed = 170 * (0.55 + worker.morale / 220) * dt;
     const dx = worker.tx - worker.x;
@@ -766,6 +939,12 @@ function TickWorker(state, worker, dt, speedMultiplier) {
     if (mission?.type === "door" && mission.then === "footbath") {
       worker.state = "soaking";
       worker.soakTimer = FOOTBATH_SOAK_SECONDS;
+      worker.mission = null;
+      return;
+    }
+    if (mission?.type === "door" && mission.then === "teambuild") {
+      worker.state = "teambuild";
+      worker.soakTimer = TEAMBUILD_SECONDS;
       worker.mission = null;
       return;
     }
@@ -838,6 +1017,8 @@ export function Tick(state, dt) {
   }
   if (state.pie.cooldown > 0) state.pie.cooldown -= dt;
   if (state.bossCodeCooldown > 0) state.bossCodeCooldown -= dt;
+  if (state.milkTeaCooldown > 0) state.milkTeaCooldown -= dt;
+  if (state.awardCooldown > 0) state.awardCooldown -= dt;
 
   state.monthTimer += dt;
   if (state.monthTimer >= MONTH_SECONDS) {
