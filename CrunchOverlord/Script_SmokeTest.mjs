@@ -36,6 +36,14 @@ import {
   MILK_TEA_MORALE,
   TEAMBUILD_COST,
   AWARD_BASE_MORALE,
+  HIRE_COST,
+  HIRE_ORDER,
+  RegisterCompany,
+  HireNext,
+  SkipSetup,
+  GetSetupCard,
+  AdvanceSetup,
+  MarkSetupSelect,
 } from "./Script_Rules.mjs";
 
 const failures = [];
@@ -56,6 +64,7 @@ function Simulate(state, seconds, step = 0.1) {
 function NewGame(seed = 42) {
   const state = CreateState(seed);
   StartGame(state);
+  SkipSetup(state);
   DrainEvents(state);
   return state;
 }
@@ -65,10 +74,75 @@ console.log("CrunchOverlord smoke test");
 Check("开局契约：现金/目标/四头牛马/进度归零", () => {
   const state = NewGame();
   assert.equal(state.status, "playing");
-  assert.equal(state.cash, START_CASH);
+  assert.equal(state.cash, START_CASH - 4 * HIRE_COST);
+  assert.ok(state.companyName);
   assert.equal(state.revenueGoal, REVENUE_GOAL);
   assert.equal(ActiveWorkers(state).length, 4);
   assert.equal(state.project.progress, 0);
+});
+
+Check("开业筹备：注册公司后进入招聘", () => {
+  const state = CreateState(8);
+  StartGame(state);
+  assert.equal(state.status, "setup");
+  assert.equal(ActiveWorkers(state).length, 0);
+  const card = GetSetupCard(state);
+  assert.equal(card.action, "register");
+  const result = RegisterCompany(state);
+  assert.ok(result.ok);
+  assert.ok(state.companyName);
+  assert.equal(state.setup.step, "hire");
+  assert.equal(GetSetupCard(state).action, "hire");
+});
+
+Check("开业筹备：招满四人扣预付、人从门口走进来", () => {
+  const state = CreateState(8);
+  StartGame(state);
+  RegisterCompany(state);
+  const cashBefore = state.cash;
+  HIRE_ORDER.forEach((id, index) => {
+    const result = HireNext(state);
+    assert.ok(result.ok, `${id} 应能入职`);
+    const worker = state.workers.find((item) => item.id === id);
+    assert.equal(worker.hired, true);
+    assert.equal(worker.state, "moving");
+    assert.equal(state.setup.hireIndex, index + 1);
+  });
+  assert.equal(state.cash, cashBefore - 4 * HIRE_COST);
+  assert.equal(state.setup.step, "teachSelect");
+  assert.equal(state.setup.allowOrders, true);
+});
+
+Check("开业筹备：跳过会坐满工位并开工", () => {
+  const state = CreateState(8);
+  StartGame(state);
+  const result = AdvanceSetup(state, "skip");
+  assert.ok(result.ok);
+  assert.equal(state.status, "playing");
+  assert.equal(ActiveWorkers(state).length, 4);
+  state.workers.forEach((worker) => {
+    assert.equal(worker.state, "desk");
+    assert.equal(worker.hired, true);
+  });
+});
+
+Check("开业教学：点人出缺陷单，派人后出便签，撕掉开工", () => {
+  const state = CreateState(11);
+  StartGame(state);
+  RegisterCompany(state);
+  while (state.setup.step === "hire") HireNext(state);
+  assert.equal(state.setup.step, "teachSelect");
+  const pick = MarkSetupSelect(state);
+  assert.ok(pick.ok);
+  const bug = state.tumors.find((ticket) => ticket.kind === "bug");
+  assert.ok(bug, "点人后应贴出缺陷单");
+  const assign = AssignWorker(state, "chenChonggou", bug.id);
+  assert.ok(assign.ok);
+  const note = state.tumors.find((ticket) => ticket.kind === "scope");
+  assert.ok(note, "派人后应贴出加塞便签");
+  const slash = SlashScope(state, note.id);
+  assert.ok(slash.ok);
+  assert.equal(state.status, "playing");
 });
 
 Check("坐在工位就有进度，月薪照扣", () => {
@@ -89,13 +163,13 @@ Check("确定性：同种子同操作逐字节一致", () => {
   assert.equal(JSON.stringify(a), JSON.stringify(b));
 });
 
-Check("需求瘤会长出来并拖慢效率，砍掉后策划掉士气", () => {
+Check("加塞便签会长出来并拖慢效率，撕掉后策划掉士气", () => {
   const state = NewGame(3);
   Simulate(state, 40);
-  assert.ok(state.tumors.length > 0, "40 秒内应长出至少一个瘤");
+  assert.ok(state.tumors.length > 0, "40 秒内应贴出至少一张工单");
   const scope = state.tumors.find((tumor) => tumor.kind === "scope");
-  if (!scope) return; // 该种子没长需求瘤就不测砍
-  assert.ok(GetSpeedMultiplier(state) < 1, "有需求瘤时效率应低于 100%");
+  if (!scope) return;
+  assert.ok(GetSpeedMultiplier(state) < 1, "有加塞便签时效率应低于 100%");
   const designer = state.workers.find((worker) => worker.id === "zhaoDagang");
   const before = designer.morale;
   const result = SlashScope(state, scope.id);
@@ -232,7 +306,7 @@ Check("完整循环压测：机器人打满 90 秒不崩、账目有界", () => 
   });
 });
 
-Check("教学序列：前两个瘤固定先 BUG 后需求", () => {
+Check("教学序列：前两张工单固定先缺陷单后加塞便签", () => {
   const state = NewGame(59);
   const kinds = [];
   for (let t = 0; t < 45 && kinds.length < 2; t += 0.1) {
@@ -241,8 +315,8 @@ Check("教学序列：前两个瘤固定先 BUG 后需求", () => {
       if (event.kind === "spawn") kinds.push(event.tumorKind);
     });
   }
-  assert.equal(kinds[0], "bug", `第一个瘤应是 BUG，实际 ${kinds[0]}`);
-  assert.equal(kinds[1], "scope", `第二个瘤应是需求，实际 ${kinds[1]}`);
+  assert.equal(kinds[0], "bug", `第一张应是缺陷单，实际 ${kinds[0]}`);
+  assert.equal(kinds[1], "scope", `第二张应是加塞便签，实际 ${kinds[1]}`);
 });
 
 Check("老板去足疗：扣钱、离岗期间命令全拒、回来头发+18", () => {

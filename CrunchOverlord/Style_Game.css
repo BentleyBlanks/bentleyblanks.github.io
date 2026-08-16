@@ -25,39 +25,10 @@ html, body {
   inset: 0;
   width: 1280px;
   height: 720px;
-  cursor: none;
+  cursor: default;
   background: #241f2e;
   border-radius: 10px;
   touch-action: none;
-}
-
-/* 指针走 DOM，不跟游戏帧。画在 canvas 上永远慢一帧，重场景里拖起来像浆糊。 */
-#bossCursor {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 80;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  will-change: transform;
-  transform: translate3d(-80px, -80px, 0);
-}
-#bossCursor.hidden { display: none !important; }
-#bossCursor .cur-hand {
-  font-size: 28px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 0 #241a05);
-}
-#bossCursor .cur-tag {
-  margin: -2px 0 0 18px;
-  color: #ffd166;
-  font-size: 11px;
-  font-weight: 900;
-  text-shadow: 0 2px 0 #241a05;
-  letter-spacing: 1px;
 }
 
 .hidden { display: none !important; }
@@ -164,6 +135,61 @@ html, body {
 .toast.leaving { animation: toastOut 0.3s ease-in forwards; }
 @keyframes toastIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes toastOut { to { transform: translateX(60px); opacity: 0; } }
+
+/* ---------- 开业筹备卡 ---------- */
+#setupCard {
+  position: absolute;
+  left: 50%;
+  bottom: 168px;
+  transform: translateX(-50%);
+  width: min(640px, 90%);
+  background: rgba(20, 16, 30, 0.94);
+  border: 2px solid #ffd166;
+  border-radius: 12px;
+  padding: 16px 18px 14px;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+#setupCard h2 {
+  color: #ffd166;
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+#setupCard p {
+  color: #e8e2f5;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.setup-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+#setupAction, #setupSkip {
+  font-family: inherit;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 800;
+}
+#setupAction {
+  background: #ffd166;
+  color: #241a05;
+  border: 2px solid #241a05;
+}
+#setupSkip {
+  background: none;
+  color: #c9b075;
+  border: 1px solid #9d8347;
+}
+#setupCard.teach {
+  left: 16px;
+  right: auto;
+  top: 86px;
+  bottom: auto;
+  transform: none;
+  width: 360px;
+  padding: 10px 12px 10px;
+}
+#setupCard.teach h2 { font-size: 17px; margin-bottom: 4px; }
+#setupCard.teach p { font-size: 13px; line-height: 1.5; }
+#setupSkip:hover { color: #ffe9b3; border-color: #ffd166; }
 
 /* ---------- 新手引导 ---------- */
 #tutorialTip {

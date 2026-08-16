@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>牛马指挥官 · Crunch Overlord</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=3" />
+  <link rel="stylesheet" href="./Style_Game.css?v=4" />
 </head>
 <body>
   <div id="stage">
@@ -41,9 +41,18 @@
     <div id="selectionHint" class="hidden"></div>
     <div id="toastStack"></div>
 
+    <div id="setupCard" class="hidden">
+      <h2 id="setupTitle"></h2>
+      <p id="setupBody"></p>
+      <div class="setup-actions">
+        <button id="setupAction" type="button"></button>
+        <button id="setupSkip" type="button">跳过开业，直接压榨</button>
+      </div>
+    </div>
+
     <div id="tutorialTip" class="hidden">
       <span id="tutorialText"></span>
-      <button id="tutorialSkip" type="button">跳过引导</button>
+      <button id="tutorialSkip" type="button">知道了</button>
     </div>
 
     <nav id="commandBar" class="hidden">
@@ -72,14 +81,14 @@
       <h1>牛马指挥官</h1>
       <p class="subtitle">CRUNCH OVERLORD · 你不用做游戏，你只需要让别人做游戏</p>
       <ul class="howto">
-        <li><b>点牛马 → 点目标</b>：修红色 BUG，或冲进度</li>
-        <li><b>直接点黄色需求瘤</b>：老板亲自砍需求，策划会哭</li>
-        <li><b>安抚有一整排</b>：足浴、奶茶、奖状（免费但会贬值）、强制团建</li>
-        <li><b>老板也有生活</b>：足疗生发、会所拉投资、股市搏一搏</li>
-        <li><b>但是</b>：老板一出门，牛马集体摸鱼（效率减半、士气回升）</li>
+        <li><b>先开公司，再招四个人</b>：空桌子坐满才算开工</li>
+        <li><b>点牛马 → 点目标</b>：红色缺陷单派人修，点游戏冲进度</li>
+        <li><b>黄色加塞便签直接点掉</b>：老板亲自撕，策划会哭</li>
+        <li><b>安抚</b>：足浴、奶茶、奖状（越发越贬值）、强制团建</li>
+        <li><b>老板出门</b>：足疗 / 会所 / 股市 —— 人一走，牛马摸鱼</li>
         <li><b>目标</b>：流水 ¥500,000 · 别破产 · 别把人全逼走</li>
       </ul>
-      <button id="startButton" type="button">上任 CEO</button>
+      <button id="startButton" type="button">去注册公司</button>
       <p class="tiny">手机请横屏 · 老板的视野必须是宽的</p>
     </div>
 
@@ -95,11 +104,6 @@
     <div class="rotate-card">📱↻<br />横屏体验更佳<br /><span>老板的格局必须是宽的</span></div>
   </div>
 
-  <div id="bossCursor" class="hidden" aria-hidden="true">
-    <span class="cur-hand">🫵</span>
-    <span class="cur-tag">指挥</span>
-  </div>
-
-  <script type="module" src="./Script_Game.mjs?v=3"></script>
+  <script type="module" src="./Script_Game.mjs?v=4"></script>
 </body>
 </html>

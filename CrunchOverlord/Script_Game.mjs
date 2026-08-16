@@ -4,8 +4,9 @@ import {
   MILK_TEA_COST, TEAMBUILD_COST, AwardValue,
   CreateState, StartGame, Tick, DrainEvents, AssignWorker, SlashScope, PaintPie,
   BossCode, Footbath, MilkTea, GiveAward, TeamBuild, BossGoOut, Release,
+  AdvanceSetup, GetSetupCard, MarkSetupSelect,
   FindWorkerDef, ActiveWorkers, GetSpeedMultiplier, BossAway, WORKER_DEFS,
-} from "./Script_Rules.mjs?v=3";
+} from "./Script_Rules.mjs?v=4";
 
 const dom = {};
 [
@@ -15,19 +16,23 @@ const dom = {};
   "spaButton", "clubButton", "stockButton", "milkTeaButton", "awardButton", "teambuildButton",
   "titleScreen", "startButton", "endScreen",
   "endTitle", "endReason", "endStats", "restartButton", "tutorialTip", "tutorialText",
-  "tutorialSkip", "rotateHint", "bossCursor",
+  "tutorialSkip", "rotateHint", "setupCard", "setupTitle", "setupBody", "setupAction", "setupSkip",
 ].forEach((id) => { dom[id] = document.getElementById(id); });
 
-const ctx = dom.gameCanvas.getContext("2d");
+const ctx = dom.gameCanvas.getContext("2d", { alpha: false, desynchronized: true });
 let renderK = 1;
+const bgCanvas = document.createElement("canvas");
+const bgCtx = bgCanvas.getContext("2d", { alpha: false });
+let bgReady = false;
+let canvasRect = { left: 0, top: 0, width: WORLD.width, height: WORLD.height };
 
 const state = CreateState((Date.now() % 100000) | 1);
 
 const TUTORIAL_KEY = "crunchoverlord_tutorial_v1";
 const TUTORIAL_STEPS = [
   { id: "select", text: "这四位是你的牛马。点一头试试——他们巴不得被老板注意。" },
-  { id: "assign", text: "选中了就点红色 BUG 把他扔过去（他掉一点士气，你获得全部快乐）。点中间的游戏则是冲进度。" },
-  { id: "slash", text: "黄色的瘤是策划偷加的需求。不用派人——直接点它，老板亲自砍。后果：策划心碎，其他人偷着乐。" },
+  { id: "assign", text: "选中了就点红色缺陷单把他扔过去。点中间的游戏则是冲进度。" },
+  { id: "slash", text: "黄色便签是策划偷加的需求。直接点掉，老板亲自撕。策划心碎，其他人偷着乐。" },
   { id: "release", text: "进度环满了就点【发售】。士气掉了请奶茶、发奖状或报销足浴；奖状发多了会穿帮。老板出门，牛马摸鱼。" },
 ];
 
@@ -196,9 +201,31 @@ function SyncTutorial() {
 }
 
 /* ============================ 事件消费 ============================ */
+function SyncSetupCard() {
+  const card = GetSetupCard(state);
+  if (!card) {
+    dom.setupCard.classList.add("hidden");
+    dom.commandBar.classList.toggle("hidden", state.status !== "playing");
+    return;
+  }
+  dom.setupCard.classList.remove("hidden");
+  dom.setupCard.classList.toggle("teach", !card.action);
+  dom.commandBar.classList.add("hidden");
+  dom.setupTitle.textContent = card.title;
+  dom.setupBody.textContent = card.body;
+  if (card.action) {
+    dom.setupAction.classList.remove("hidden");
+    dom.setupAction.textContent = card.actionLabel;
+  } else {
+    dom.setupAction.classList.add("hidden");
+  }
+  dom.setupSkip.classList.toggle("hidden", !card.skip);
+}
+
 function ConsumeEvents() {
   DrainEvents(state).forEach((event) => {
     switch (event.kind) {
+      case "setup": SyncSetupCard(); break;
       case "boss": ShowBanner(event.text); break;
       case "quote": {
         const def = FindWorkerDef(event.workerId);
@@ -244,6 +271,7 @@ function HitTest(x, y) {
 }
 
 function HandleCommand(result, options = {}) {
+  ConsumeEvents();
   if (!result.ok) {
     ShowToast(result.message, "warning");
     return false;
@@ -253,13 +281,17 @@ function HandleCommand(result, options = {}) {
 }
 
 function HandleClick() {
-  if (state.status !== "playing") return;
+  if (state.status !== "playing" && state.status !== "setup") return;
   const hit = HitTest(view.mouseX, view.mouseY);
   if (!hit) { view.selectedWorkerId = null; return; }
 
   if (hit.type === "worker") {
     view.selectedWorkerId = hit.id;
     MarkTutorial("select");
+    if (state.status === "setup") {
+      MarkSetupSelect(state);
+      ConsumeEvents();
+    }
     PlaySfx("order");
     return;
   }
@@ -275,7 +307,7 @@ function HandleClick() {
     if (hit.kind === "scope") {
       if (HandleCommand(SlashScope(state, hit.id))) MarkTutorial("slash");
     } else {
-      ShowToast("BUG 要牛马修：先点一头牛马，再点这个 BUG。", "warning");
+      ShowToast("缺陷单要牛马修：先点一头牛马，再点这张单。", "warning");
     }
     return;
   }
@@ -293,44 +325,42 @@ function HandleClick() {
 }
 
 function UpdatePointer(event) {
-  const rect = dom.gameCanvas.getBoundingClientRect();
+  const rect = canvasRect;
+  if (!rect.width) return;
   view.mouseX = ((event.clientX - rect.left) / rect.width) * WORLD.width;
   view.mouseY = ((event.clientY - rect.top) / rect.height) * WORLD.height;
 }
 
-function ShowBossCursor(on) {
-  if (!dom.bossCursor) return;
-  dom.bossCursor.classList.toggle("hidden", !on);
-}
-
-function MoveBossCursor(clientX, clientY) {
-  if (!dom.bossCursor) return;
-  // 跟鼠标同步走 CSS transform，不进 rAF，所以拖起来不再慢半拍。
-  dom.bossCursor.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
-}
-
 dom.gameCanvas.addEventListener("pointermove", (event) => {
   UpdatePointer(event);
-  const mouse = event.pointerType === "mouse";
-  view.mouseInside = mouse;
-  if (mouse && state.status === "playing") {
-    ShowBossCursor(true);
-    MoveBossCursor(event.clientX, event.clientY);
-  }
-});
+  view.mouseInside = event.pointerType === "mouse";
+}, { passive: true });
 dom.gameCanvas.addEventListener("pointerdown", (event) => {
   EnsureAudio();
   UpdatePointer(event);
   if (event.pointerType === "mouse" && event.button === 2) { view.selectedWorkerId = null; return; }
   if (event.pointerType !== "mouse" || event.button === 0) HandleClick();
 });
-dom.gameCanvas.addEventListener("pointerleave", () => {
-  view.mouseInside = false;
-  ShowBossCursor(false);
-});
+dom.gameCanvas.addEventListener("pointerleave", () => { view.mouseInside = false; });
 dom.gameCanvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
 window.addEventListener("keydown", (event) => {
+  if (state.status === "setup") {
+    const key = event.key.toLowerCase();
+    if (key === "enter" || key === " ") {
+      const card = GetSetupCard(state);
+      if (card?.action) HandleCommand(AdvanceSetup(state, card.action));
+    } else if (key === "escape") HandleCommand(AdvanceSetup(state, "skip"));
+    else if (["1", "2", "3", "4"].includes(key)) {
+      const worker = state.workers[Number(key) - 1];
+      if (worker && worker.state !== "gone") {
+        view.selectedWorkerId = worker.id;
+        MarkSetupSelect(state);
+        PlaySfx("order");
+      }
+    }
+    return;
+  }
   if (state.status !== "playing") return;
   const key = event.key.toLowerCase();
   if (key === "q") HandleCommand(PaintPie(state));
@@ -376,30 +406,41 @@ dom.spaButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(Bos
 dom.clubButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "club")); });
 dom.stockButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "stock")); });
 dom.tutorialSkip.addEventListener("click", () => FinishTutorial("行，老板天生就会。"));
+dom.setupAction.addEventListener("click", () => {
+  EnsureAudio();
+  const card = GetSetupCard(state);
+  if (card?.action) HandleCommand(AdvanceSetup(state, card.action));
+});
+dom.setupSkip.addEventListener("click", () => {
+  EnsureAudio();
+  HandleCommand(AdvanceSetup(state, "skip"));
+});
+
+function EnterOffice() {
+  view.hudAt = 0;
+  view.selectedWorkerId = null;
+  view.tutorial.active = false;
+  dom.tutorialTip.classList.add("hidden");
+  SyncHud();
+  SyncSetupCard();
+  dom.titleScreen.classList.add("hidden");
+  dom.endScreen.classList.add("hidden");
+  dom.hud.classList.remove("hidden");
+}
 
 dom.startButton.addEventListener("click", () => {
   EnsureAudio();
   StartGame(state);
-  view.hudAt = 0;
-  SyncHud();
-  dom.titleScreen.classList.add("hidden");
-  dom.endScreen.classList.add("hidden");
-  dom.hud.classList.remove("hidden");
-  dom.commandBar.classList.remove("hidden");
+  EnterOffice();
 });
 dom.restartButton.addEventListener("click", () => {
   EnsureAudio();
   StartGame(state);
-  view.hudAt = 0;
-  SyncHud();
-  view.selectedWorkerId = null;
   view.floaters = [];
   view.confetti = [];
   view.danmaku = [];
   view.releaseCard = null;
-  dom.endScreen.classList.add("hidden");
-  dom.hud.classList.remove("hidden");
-  dom.commandBar.classList.remove("hidden");
+  EnterOffice();
 });
 
 /* ============================ HUD 同步 ============================ */
@@ -438,7 +479,7 @@ function SyncHud() {
 
   if (view.selectedWorkerId) {
     const def = FindWorkerDef(view.selectedWorkerId);
-    dom.selectionHint.textContent = `已选中 ${def.roleLabel} ${def.name} —— 点 BUG 派活 / 点游戏冲进度 / [E] 足浴 / [F] 奖状`;
+    dom.selectionHint.textContent = `已选中 ${def.roleLabel} ${def.name} —— 点红色缺陷单派人修 / 点游戏冲进度 / 黄色便签直接撕`;
     dom.selectionHint.classList.remove("hidden");
   } else {
     dom.selectionHint.classList.add("hidden");
@@ -447,9 +488,9 @@ function SyncHud() {
 }
 
 function ShowEndScreen() {
-  ShowBossCursor(false);
   dom.hud.classList.add("hidden");
   dom.commandBar.classList.add("hidden");
+  dom.setupCard.classList.add("hidden");
   dom.tutorialTip.classList.add("hidden");
   dom.endScreen.classList.remove("hidden");
   const stats = state.stats;
@@ -463,7 +504,7 @@ function ShowEndScreen() {
     dom.endReason.textContent = state.loseReason;
   }
   const lines = [
-    `存活 ${stats.monthsSurvived} 个月 · 发售 ${stats.releases} 款游戏`,
+    `${state.companyName || "无名公司"} · 招聘 ${stats.hired} 人 · 存活 ${stats.monthsSurvived} 个月 · 发售 ${stats.releases} 款游戏`,
     `砍需求 ${stats.slashes} 次 · 画饼 ${stats.pies} 张 · 亲自写代码 ${stats.bossCodes} 次（剩余头发 ${Math.round(state.hair)}%）`,
     `修复 BUG ${stats.bugsFixed} 个 · 足浴 ${stats.footbaths} · 奶茶 ${stats.milkTeas} · 奖状 ${stats.awards} · 团建 ${stats.teambuilds} · 气走 ${stats.quits} 头`,
     `老板足疗 ${stats.spaTrips} 次 · 高端会所 ${stats.clubTrips} 次${stats.investGained ? `（拉到投资 ${FormatMoney(stats.investGained)}）` : ""}`,
@@ -475,174 +516,175 @@ function ShowEndScreen() {
 /* ============================ 场景绘制 ============================ */
 const WALL_BASE = 132;
 
-function DrawBackground(time) {
-  // 墙
-  const wallGradient = ctx.createLinearGradient(0, 0, 0, WALL_BASE);
+function PaintPlant(g, x, y) {
+  g.fillStyle = "#7a4a33";
+  g.fillRect(x - 13, y - 16, 26, 20);
+  g.fillStyle = "#3f7a4d";
+  for (let i = 0; i < 5; i++) {
+    const angle = -Math.PI / 2 + (i - 2) * 0.45;
+    g.beginPath();
+    g.ellipse(x + Math.cos(angle) * 14, y - 22 + Math.sin(angle) * 10, 7, 17, angle + Math.PI / 2, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+function PaintDesk(g, deskX, deskY, color, seed) {
+  g.fillStyle = "rgba(0,0,0,0.24)";
+  g.beginPath();
+  g.ellipse(deskX, deskY + 32, 66, 14, 0, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#241f33";
+  g.fillRect(deskX - 14, deskY + 18, 28, 10);
+  g.fillRect(deskX - 3, deskY + 26, 6, 8);
+  g.fillStyle = "#4d4166";
+  g.fillRect(deskX - 62, deskY - 14, 124, 30);
+  g.fillStyle = "#5d4f7c";
+  g.fillRect(deskX - 62, deskY - 14, 124, 7);
+  g.fillStyle = "#171226";
+  g.fillRect(deskX - 26, deskY - 46, 52, 34);
+  g.fillStyle = "rgba(110, 190, 255, 0.42)";
+  g.fillRect(deskX - 22, deskY - 42, 44, 26);
+  g.fillStyle = "rgba(255,255,255,0.35)";
+  for (let i = 0; i < 3; i++) g.fillRect(deskX - 18, deskY - 38 + i * 7, 22 + ((seed + i) % 3) * 5, 2);
+  g.fillStyle = "#332b47";
+  g.fillRect(deskX - 18, deskY - 8, 36, 8);
+  g.fillStyle = color;
+  g.fillRect(deskX + 38, deskY - 10, 12, 12);
+  g.fillStyle = "rgba(255,255,255,0.5)";
+  g.fillRect(deskX + 50, deskY - 7, 4, 6);
+}
+
+function BakeBackground() {
+  bgCanvas.width = WORLD.width;
+  bgCanvas.height = WORLD.height;
+  const g = bgCtx;
+  const wallGradient = g.createLinearGradient(0, 0, 0, WALL_BASE);
   wallGradient.addColorStop(0, "#332b47");
   wallGradient.addColorStop(1, "#2b2440");
-  ctx.fillStyle = wallGradient;
-  ctx.fillRect(0, 0, WORLD.width, WALL_BASE);
-  ctx.fillStyle = "#1d1830";
-  ctx.fillRect(0, WALL_BASE - 6, WORLD.width, 6);
+  g.fillStyle = wallGradient;
+  g.fillRect(0, 0, WORLD.width, WALL_BASE);
+  g.fillStyle = "#1d1830";
+  g.fillRect(0, WALL_BASE - 6, WORLD.width, 6);
 
-  // 地板（木板条）
-  const floorGradient = ctx.createLinearGradient(0, WALL_BASE, 0, WORLD.height);
+  const floorGradient = g.createLinearGradient(0, WALL_BASE, 0, WORLD.height);
   floorGradient.addColorStop(0, "#2e2740");
   floorGradient.addColorStop(1, "#221c31");
-  ctx.fillStyle = floorGradient;
-  ctx.fillRect(0, WALL_BASE, WORLD.width, WORLD.height - WALL_BASE);
-  ctx.strokeStyle = "rgba(255,255,255,0.028)";
-  ctx.lineWidth = 1;
+  g.fillStyle = floorGradient;
+  g.fillRect(0, WALL_BASE, WORLD.width, WORLD.height - WALL_BASE);
+  g.strokeStyle = "rgba(255,255,255,0.028)";
+  g.lineWidth = 1;
   for (let y = WALL_BASE + 34; y < WORLD.height; y += 42) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD.width, y); ctx.stroke();
+    g.beginPath(); g.moveTo(0, y); g.lineTo(WORLD.width, y); g.stroke();
     const offset = ((y / 42) % 2) * 110;
     for (let x = offset; x < WORLD.width; x += 220) {
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 42); ctx.stroke();
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 42); g.stroke();
     }
   }
 
-  // 夜景窗户
-  ctx.fillStyle = "#171226";
-  ctx.fillRect(944, 14, 250, 104);
-  const skyGradient = ctx.createLinearGradient(0, 18, 0, 114);
+  g.fillStyle = "#171226";
+  g.fillRect(944, 14, 250, 104);
+  const skyGradient = g.createLinearGradient(0, 18, 0, 114);
   skyGradient.addColorStop(0, "#101b33");
   skyGradient.addColorStop(1, "#1c2b4d");
-  ctx.fillStyle = skyGradient;
-  ctx.fillRect(950, 20, 238, 92);
-  ctx.fillStyle = "#f4ecc9";
-  ctx.beginPath(); ctx.arc(1150, 44, 13, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#1c2b4d";
-  ctx.beginPath(); ctx.arc(1156, 40, 11, 0, Math.PI * 2); ctx.fill();
-  // 远处写字楼灯光（永远有人在加班）
+  g.fillStyle = skyGradient;
+  g.fillRect(950, 20, 238, 92);
+  g.fillStyle = "#f4ecc9";
+  g.beginPath(); g.arc(1150, 44, 13, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "#1c2b4d";
+  g.beginPath(); g.arc(1156, 40, 11, 0, Math.PI * 2); g.fill();
   for (let i = 0; i < 3; i++) {
     const bx = 962 + i * 78;
-    ctx.fillStyle = "#0c1424";
-    ctx.fillRect(bx, 58 + (i % 2) * 8, 52, 54);
+    g.fillStyle = "#0c1424";
+    g.fillRect(bx, 58 + (i % 2) * 8, 52, 54);
     for (let wy = 0; wy < 4; wy++) {
       for (let wx = 0; wx < 4; wx++) {
-        const lit = Math.sin(time * 0.7 + i * 5 + wx * 3 + wy * 7) > 0.15;
-        ctx.fillStyle = lit ? "rgba(255,214,140,0.85)" : "rgba(70,86,120,0.4)";
-        ctx.fillRect(bx + 6 + wx * 11, 64 + (i % 2) * 8 + wy * 11, 6, 6);
+        const lit = ((i * 17 + wx * 5 + wy * 9) % 7) > 2;
+        g.fillStyle = lit ? "rgba(255,214,140,0.85)" : "rgba(70,86,120,0.4)";
+        g.fillRect(bx + 6 + wx * 11, 64 + (i % 2) * 8 + wy * 11, 6, 6);
       }
     }
   }
-  ctx.strokeStyle = "#4a3f66";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(950, 20, 238, 92);
-  ctx.beginPath(); ctx.moveTo(1069, 20); ctx.lineTo(1069, 112); ctx.stroke();
+  g.strokeStyle = "#4a3f66";
+  g.lineWidth = 4;
+  g.strokeRect(950, 20, 238, 92);
+  g.beginPath(); g.moveTo(1069, 20); g.lineTo(1069, 112); g.stroke();
 
-  // 挂钟（走得比工资快）
-  ctx.fillStyle = "#efe9dc";
-  ctx.beginPath(); ctx.arc(96, 66, 24, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "#4a3f66"; ctx.lineWidth = 4; ctx.stroke();
-  ctx.strokeStyle = "#3a3450"; ctx.lineWidth = 3;
+  g.fillStyle = "#efe9dc";
+  g.beginPath(); g.arc(96, 66, 24, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = "#4a3f66"; g.lineWidth = 4; g.stroke();
+
+  g.fillStyle = "#3d3357";
+  g.fillRect(150, 34, 214, 74);
+  g.strokeStyle = "#6a5a96"; g.lineWidth = 3; g.strokeRect(150, 34, 214, 74);
+  g.fillStyle = "#ffd166";
+  g.font = "bold 16px 'Microsoft YaHei', sans-serif";
+  g.textAlign = "center";
+  g.fillText("KPI 光荣榜", 257, 60);
+  g.fillStyle = "#9d92bd";
+  g.font = "13px 'Microsoft YaHei', sans-serif";
+  g.fillText("本月全勤：空缺", 257, 84);
+
+  g.fillStyle = "#8a2f3d";
+  g.fillRect(478, 96, 324, 36);
+  g.strokeStyle = "#5c1d28"; g.lineWidth = 3; g.strokeRect(478, 96, 324, 36);
+  g.fillStyle = "#ffe9b3";
+  g.font = "bold 19px 'Microsoft YaHei', sans-serif";
+  g.fillText("今天不努力，明天陪老板努力", 640, 121);
+
+  g.fillStyle = "#1a1526";
+  g.fillRect(1218, 452, 62, 176);
+  g.strokeStyle = "#4a3f66"; g.lineWidth = 3;
+  g.strokeRect(1218, 452, 62, 176);
+  g.fillStyle = "#3d3357";
+  g.fillRect(1226, 462, 46, 158);
+  g.fillStyle = "#ffd166";
+  g.beginPath(); g.arc(1234, 546, 4, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "#9d92bd";
+  g.font = "12px 'Microsoft YaHei', sans-serif";
+  g.textAlign = "right";
+  g.fillText("足疗·团建·会所·股市·离职", 1276, 444);
+  g.fillText("↑ 全走同一扇门", 1276, 660);
+
+  PaintPlant(g, 46, 668);
+  PaintPlant(g, 1190, 300);
+  g.fillStyle = "#3a3450";
+  g.fillRect(1128, 596, 34, 62);
+  g.fillStyle = "#6fb6d9";
+  g.fillRect(1132, 574, 26, 26);
+  g.fillStyle = "rgba(255,255,255,0.25)";
+  g.fillRect(1136, 578, 8, 18);
+
+  g.fillStyle = "rgba(122, 92, 255, 0.07)";
+  g.beginPath();
+  g.ellipse(WORLD.coreX, WORLD.coreY + 24, 220, 120, 0, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = "rgba(122, 92, 255, 0.14)";
+  g.lineWidth = 2;
+  g.stroke();
+  WORKER_DEFS.forEach((def, index) => PaintDesk(g, def.desk.x, def.desk.y, def.color, index));
+  bgReady = true;
+}
+
+function DrawClockHands() {
   const minuteAngle = state.time * 0.6;
+  ctx.strokeStyle = "#3a3450";
+  ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(96, 66);
   ctx.lineTo(96 + Math.sin(minuteAngle) * 16, 66 - Math.cos(minuteAngle) * 16); ctx.stroke();
   ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(96, 66);
   ctx.lineTo(96 + Math.sin(minuteAngle / 12) * 10, 66 - Math.cos(minuteAngle / 12) * 10); ctx.stroke();
+}
 
-  // KPI 光荣榜
+function DrawCompanyPlaque() {
+  if (!state.companyName) return;
   ctx.fillStyle = "#3d3357";
-  ctx.fillRect(150, 34, 214, 74);
-  ctx.strokeStyle = "#6a5a96"; ctx.lineWidth = 3; ctx.strokeRect(150, 34, 214, 74);
-  ctx.fillStyle = "#ffd166";
-  ctx.font = "bold 16px 'Microsoft YaHei', sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("KPI 光荣榜", 257, 60);
-  ctx.fillStyle = "#9d92bd";
-  ctx.font = "13px 'Microsoft YaHei', sans-serif";
-  ctx.fillText("本月全勤：空缺", 257, 84);
-
-  // 中央标语（挂在 HUD 之下、老板高台之上）
-  ctx.fillStyle = "#8a2f3d";
-  ctx.fillRect(478, 96, 324, 36);
-  ctx.strokeStyle = "#5c1d28"; ctx.lineWidth = 3; ctx.strokeRect(478, 96, 324, 36);
-  ctx.fillStyle = "#ffe9b3";
-  ctx.font = "bold 19px 'Microsoft YaHei', sans-serif";
-  ctx.fillText("今天不努力，明天陪老板努力", 640, 121);
-
-  // 大门（所有堕落与离职的必经之路）
-  ctx.fillStyle = "#1a1526";
-  ctx.fillRect(1218, 452, 62, 176);
-  ctx.strokeStyle = "#4a3f66"; ctx.lineWidth = 3;
-  ctx.strokeRect(1218, 452, 62, 176);
-  ctx.fillStyle = "#3d3357";
-  ctx.fillRect(1226, 462, 46, 158);
-  ctx.fillStyle = "#ffd166";
-  ctx.beginPath(); ctx.arc(1234, 546, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#9d92bd";
+  ctx.fillRect(158, 88, 198, 16);
+  ctx.fillStyle = "#efe9fb";
   ctx.font = "12px 'Microsoft YaHei', sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText("足疗·团建·会所·股市·离职", 1276, 444);
-  ctx.fillText("↑ 全走同一扇门", 1276, 660);
+  ctx.textAlign = "center";
+  ctx.fillText(state.companyName, 257, 100);
   ctx.textAlign = "left";
-
-  // 绿植（唯一还在长的东西）
-  DrawPlant(46, 668);
-  DrawPlant(1190, 300);
-
-  // 饮水机
-  ctx.fillStyle = "#3a3450";
-  ctx.fillRect(1128, 596, 34, 62);
-  ctx.fillStyle = "#6fb6d9";
-  ctx.fillRect(1132, 574, 26, 26);
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(1136, 578, 8, 18);
-
-  // 核心区地毯
-  ctx.fillStyle = "rgba(122, 92, 255, 0.07)";
-  ctx.beginPath();
-  ctx.ellipse(WORLD.coreX, WORLD.coreY + 24, 220, 120, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(122, 92, 255, 0.14)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.textAlign = "left";
-}
-
-function DrawPlant(x, y) {
-  ctx.fillStyle = "#7a4a33";
-  ctx.fillRect(x - 13, y - 16, 26, 20);
-  ctx.fillStyle = "#3f7a4d";
-  for (let i = 0; i < 5; i++) {
-    const angle = -Math.PI / 2 + (i - 2) * 0.45;
-    ctx.beginPath();
-    ctx.ellipse(x + Math.cos(angle) * 14, y - 22 + Math.sin(angle) * 10, 7, 17, angle + Math.PI / 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function DrawDesk(deskX, deskY, color, time, seed) {
-  ctx.fillStyle = "rgba(0,0,0,0.24)";
-  ctx.beginPath();
-  ctx.ellipse(deskX, deskY + 32, 66, 14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // 椅子
-  ctx.fillStyle = "#241f33";
-  ctx.fillRect(deskX - 14, deskY + 18, 28, 10);
-  ctx.fillRect(deskX - 3, deskY + 26, 6, 8);
-  // 桌板
-  ctx.fillStyle = "#4d4166";
-  ctx.fillRect(deskX - 62, deskY - 14, 124, 30);
-  ctx.fillStyle = "#5d4f7c";
-  ctx.fillRect(deskX - 62, deskY - 14, 124, 7);
-  // 显示器（闪烁的忙碌）
-  ctx.fillStyle = "#171226";
-  ctx.fillRect(deskX - 26, deskY - 46, 52, 34);
-  const flicker = 0.72 + 0.18 * Math.sin(time * 6.5 + seed * 3.1);
-  ctx.fillStyle = `rgba(110, 190, 255, ${flicker * 0.6})`;
-  ctx.fillRect(deskX - 22, deskY - 42, 44, 26);
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  for (let i = 0; i < 3; i++) ctx.fillRect(deskX - 18, deskY - 38 + i * 7, 22 + ((seed + i) % 3) * 5, 2);
-  // 键盘 + 马克杯
-  ctx.fillStyle = "#332b47";
-  ctx.fillRect(deskX - 18, deskY - 8, 36, 8);
-  ctx.fillStyle = color;
-  ctx.fillRect(deskX + 38, deskY - 10, 12, 12);
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillRect(deskX + 50, deskY - 7, 4, 6);
 }
 
 function DrawCore(time) {
@@ -676,53 +718,57 @@ function DrawCore(time) {
   ctx.textAlign = "left";
 }
 
-function DrawTumor(tumor, time) {
-  const radius = TumorRadius(tumor);
-  const wiggle = Math.sin(time * 4 + tumor.x * 0.05) * 2.4;
+function DrawTicket(tumor) {
   const isScope = tumor.kind === "scope";
-  const hovering = Dist(view.mouseX, view.mouseY, tumor.x, tumor.y) < radius + 10;
+  const w = isScope ? 54 : 60;
+  const h = isScope ? 50 : 42;
+  const rot = (((tumor.id.charCodeAt(1) || 1) * 13 + (tumor.id.charCodeAt(2) || 3)) % 7 - 3) * 0.035;
+  const hovering = Dist(view.mouseX, view.mouseY, tumor.x, tumor.y) < TumorRadius(tumor) + 10;
 
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(tumor.x, tumor.y + radius * 0.75, radius * 0.9, radius * 0.32, 0, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.save();
+  ctx.translate(tumor.x, tumor.y);
+  ctx.rotate(rot);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillRect(-w / 2 + 3, -h / 2 + 4, w, h);
+  ctx.fillStyle = isScope ? "#f2d36a" : "#f4ddd8";
+  ctx.fillRect(-w / 2, -h / 2, w, h);
   ctx.fillStyle = isScope ? "#c99413" : "#b0263a";
-  ctx.beginPath();
-  ctx.ellipse(tumor.x, tumor.y + wiggle * 0.3, radius, radius * 0.86, wiggle * 0.02, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = isScope ? "#ffd166" : "#ff5d73";
-  ctx.beginPath();
-  ctx.ellipse(tumor.x - radius * 0.22, tumor.y - radius * 0.24 + wiggle * 0.3, radius * 0.62, radius * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#241a05";
+  ctx.fillRect(-w / 2, -h / 2, w, 13);
+  ctx.fillStyle = isScope ? "#3a2a08" : "#fff8f6";
+  ctx.font = "bold 11px 'Microsoft YaHei', sans-serif";
   ctx.textAlign = "center";
-  ctx.font = `bold ${Math.max(11, radius * 0.5)}px 'Microsoft YaHei', sans-serif`;
-  ctx.fillText(isScope ? "需求++" : "BUG", tumor.x, tumor.y + 4 + wiggle * 0.3);
+  ctx.fillText(isScope ? "加塞便签" : "缺陷单", 0, -h / 2 + 10);
+  ctx.fillStyle = isScope ? "rgba(80,50,10,0.32)" : "rgba(90,24,24,0.32)";
+  for (let i = 0; i < 3; i++) ctx.fillRect(-w / 2 + 8, -h / 2 + 20 + i * 7, w - 22 - i * 5, 2);
   if (tumor.bossMade) {
-    ctx.font = "10px 'Microsoft YaHei', sans-serif";
-    ctx.fillStyle = "#3d2a08";
-    ctx.fillText("老板亲笔", tumor.x, tumor.y + 16 + wiggle * 0.3);
+    ctx.strokeStyle = "#8a2f3d";
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(w / 2 - 28, 4, 22, 12);
+    ctx.fillStyle = "#8a2f3d";
+    ctx.font = "9px 'Microsoft YaHei', sans-serif";
+    ctx.fillText("亲笔", w / 2 - 17, 13);
   }
-
   const hpRatio = tumor.hp / tumor.maxHp;
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(tumor.x - 20, tumor.y - radius - 12, 40, 5);
-  ctx.fillStyle = isScope ? "#ffd166" : "#ff5d73";
-  ctx.fillRect(tumor.x - 20, tumor.y - radius - 12, 40 * hpRatio, 5);
-
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(-20, h / 2 + 3, 40, 4);
+  ctx.fillStyle = isScope ? "#c99413" : "#b0263a";
+  ctx.fillRect(-20, h / 2 + 3, 40 * hpRatio, 4);
   if (hovering) {
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.arc(tumor.x, tumor.y, radius + 8, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = "12px 'Microsoft YaHei', sans-serif";
+    ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+  }
+  ctx.restore();
+
+  if (hovering) {
     ctx.fillStyle = "#fff";
-    ctx.fillText(isScope ? (view.selectedWorkerId ? "点击派人谈判" : "点击直接砍掉") : (view.selectedWorkerId ? "点击派人修" : "先选牛马再点我"), tumor.x, tumor.y - radius - 20);
+    ctx.font = "12px 'Microsoft YaHei', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      isScope ? "点击直接撕掉" : (view.selectedWorkerId ? "点击派人修" : "先选牛马再点这张单"),
+      tumor.x,
+      tumor.y - h / 2 - 14,
+    );
   }
   ctx.textAlign = "left";
 }
@@ -1066,18 +1112,18 @@ function DrawTutorialMarker(time) {
 
 /* ============================ 主渲染 ============================ */
 function Render(time, dt) {
-  ctx.setTransform(renderK, 0, 0, renderK, 0, 0);
-  ctx.clearRect(0, 0, WORLD.width, WORLD.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(bgCanvas, 0, 0);
   ctx.save();
   if (view.shake > 0) {
     view.shake = Math.max(0, view.shake - dt * 1.8);
     ctx.translate((Math.random() - 0.5) * view.shake * 16, (Math.random() - 0.5) * view.shake * 16);
   }
 
-  DrawBackground(time);
-  WORKER_DEFS.forEach((def, index) => DrawDesk(def.desk.x, def.desk.y, def.color, time, index));
+  DrawClockHands();
+  DrawCompanyPlaque();
   DrawCore(time);
-  state.tumors.forEach((tumor) => DrawTumor(tumor, time));
+  state.tumors.forEach((tumor) => DrawTicket(tumor));
   state.workers.forEach((worker) => DrawWorker(worker, time));
   DrawBoss(time);
   if (view.bossPoint) {
@@ -1100,7 +1146,7 @@ function Frame(now) {
   view.lastFrame = now;
   const time = now / 1000;
 
-  if (state.status === "playing") {
+  if (state.status === "playing" || state.status === "setup") {
     Tick(state, dt);
     ConsumeEvents();
     if (now - (view.hudAt || 0) > 80) {
@@ -1124,10 +1170,13 @@ function FitStage() {
   dom.stage.style.transform = `translate(-50%, -50%) scale(${scale})`;
   dom.stage.classList.toggle("compact", scale < 0.72);
 
-  const dpr = window.devicePixelRatio || 1;
-  renderK = Math.min(2, Math.max(1, scale * dpr));
-  dom.gameCanvas.width = Math.round(WORLD.width * renderK);
-  dom.gameCanvas.height = Math.round(WORLD.height * renderK);
+  renderK = 1;
+  if (dom.gameCanvas.width !== WORLD.width || dom.gameCanvas.height !== WORLD.height) {
+    dom.gameCanvas.width = WORLD.width;
+    dom.gameCanvas.height = WORLD.height;
+  }
+  canvasRect = dom.gameCanvas.getBoundingClientRect();
+  if (!bgReady) BakeBackground();
 
   const portrait = window.innerHeight > window.innerWidth && window.innerWidth < 820;
   dom.rotateHint.classList.toggle("hidden", !portrait);

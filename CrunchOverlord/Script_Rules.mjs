@@ -44,6 +44,15 @@ export const TEAMBUILD_COST = 6666;
 export const TEAMBUILD_SECONDS = 7;
 export const TEAMBUILD_MORALE = 26;
 export const TEAMBUILD_VICTIM_MORALE = -10;
+export const HIRE_COST = 2000;
+export const HIRE_ORDER = Object.freeze(["linKeke", "zhaoDagang", "chenChonggou", "taoShengdian"]);
+export const COMPANY_NAMES = [
+  "福报互娱",
+  "梦想加一像素",
+  "纳斯达克预备役",
+  "周一就上市科技",
+  "工位即战场文化",
+];
 
 export const BOSS_ACTIVITIES = Object.freeze({
   spa: {
@@ -215,7 +224,8 @@ export const WORKER_DEFS = [
       "老板说要『高级感』，我加了个渐变，他说对，就是这个。",
       "甲方眼里的五彩斑斓的黑，我今天做出来了。",
     ],
-    assignedLines: ["美术修 BUG？行吧，BUG 也要好看。", "收到，我给崩溃界面加个渐变。", "去了去了，画笔换扳手。"],
+    hireLine: "美术报道。先说好，修缺陷单要加钱。",
+    assignedLines: ["美术修缺陷单？行吧，崩溃也要好看。", "收到，我给报错界面加个渐变。", "去了去了，画笔换扳手。"],
     fixedLines: ["修好了，顺手加了描边。", "好了。别问我怎么修的，问就是艺术。"],
     footbathLines: ["脚是新的了，灵感也是。", "泡完想给主角加第三层轮廓光。"],
     quitLine: "我去接商单了，时薪是这里三倍。",
@@ -235,7 +245,8 @@ export const WORKER_DEFS = [
       "这不叫抄袭，这叫行业最佳实践对齐。",
       "我在文档里埋了个彩蛋：离职申请模板。",
     ],
-    assignedLines: ["策划修 BUG？我去把它改成特性。", "这个 BUG 逻辑自洽，我先给它写个背景故事。"],
+    hireLine: "策划来了。文档我已经写了八十页，游戏可以慢慢做。",
+    assignedLines: ["策划修缺陷单？我去把它改成特性。", "这张单逻辑自洽，我先给它写个背景故事。"],
     fixedLines: ["搞定，顺便把它写进了世界观。", "修完了，文档更新到第 48 页。"],
     slashLines: ["那是我写了三周的文档！！", "你砍的不是需求，是我的青春！", "行，砍吧，反正简历上我会写做完了。", "下次评审我要带律师来！"],
     footbathLines: ["泡的时候想到七个新系统，放心，只提一个。"],
@@ -256,7 +267,8 @@ export const WORKER_DEFS = [
       "这段代码是祖传的，动了要上香。",
       "重构完成度 99%，剩下 1% 是全部。",
     ],
-    assignedLines: ["收到，这个 BUG 我认识，是我写的。", "去了。修不好我就重构，重构不好我就转行。"],
+    hireLine: "客户端到了。本机是好的，出了问题先重启。",
+    assignedLines: ["收到，这张缺陷单我认识，是我写的。", "去了。修不好我就重构，重构不好我就转行。"],
     fixedLines: ["修好了，又欠了点技术债，先记账上。", "好了。提交信息我写的是『奇迹』。"],
     footbathLines: ["泡完突然看懂了自己上周写的代码。"],
     quitLine: "劳动仲裁见。",
@@ -276,6 +288,7 @@ export const WORKER_DEFS = [
       "内存泄漏不可怕，可怕的是它比我先转正。",
       "刚优化完启动速度，现在闪退得特别快。",
     ],
+    hireLine: "性能到岗。先把帧率从『能煎蛋』救回『能点』。",
     assignedLines: ["性能问题交给我，画面问题交给命。", "收到，先关特效，再关美术的门。"],
     fixedLines: ["帧率回来了，特效没了。", "优化完成。现在它流畅地展示着没内容。"],
     footbathLines: ["泡脚水温 42 度，比我们的服务器凉快。"],
@@ -286,8 +299,10 @@ export const WORKER_DEFS = [
 export function CreateState(seed = 20260816) {
   return {
     seed,
-    status: "title", // title | playing | won | lost
+    status: "title", // title | setup | playing | won | lost
     loseReason: "",
+    companyName: "",
+    setup: { step: "register", hireIndex: 0, allowOrders: false },
     time: 0,
     month: 1,
     monthTimer: 0,
@@ -304,7 +319,7 @@ export function CreateState(seed = 20260816) {
     ambientTimer: 6,
     slackTimer: 0,
     tumorSerial: 1,
-    teachQueue: ["bug", "scope"], // 前两个瘤固定顺序，配合新手引导
+    teachQueue: ["bug", "scope"], // 前两张工单固定：缺陷单 → 加塞便签
     boss: {
       x: BOSS_HOME.x,
       y: BOSS_HOME.y,
@@ -323,12 +338,13 @@ export function CreateState(seed = 20260816) {
     },
     workers: WORKER_DEFS.map((def) => ({
       id: def.id,
-      x: def.desk.x,
-      y: def.desk.y,
-      tx: def.desk.x,
-      ty: def.desk.y,
+      x: WORLD.doorX,
+      y: WORLD.doorY,
+      tx: WORLD.doorX,
+      ty: WORLD.doorY,
       morale: 72,
-      state: "desk", // desk | moving | working | sprint | soaking | teambuild | quitWalking | gone
+      hired: false,
+      state: "gone", // gone | desk | moving | working | sprint | soaking | teambuild | quitWalking
       mission: null,
       sprintTimer: 0,
       soakTimer: 0,
@@ -337,6 +353,8 @@ export function CreateState(seed = 20260816) {
     })),
     tumors: [],
     stats: {
+      founded: 0,
+      hired: 0,
       slashes: 0,
       pies: 0,
       bossCodes: 0,
@@ -406,8 +424,12 @@ export function GetSpeedMultiplier(state) {
   return multiplier;
 }
 
-function RequireBoss(state) {
-  if (state.status !== "playing") return "游戏未开始。";
+function RequireBoss(state, allowSetup = false) {
+  if (state.status === "setup") {
+    if (!allowSetup || !state.setup.allowOrders) return "先把公司注册完、人招齐。工位上还没人听你喊。";
+  } else if (state.status !== "playing") {
+    return "游戏未开始。";
+  }
   if (BossAway(state)) {
     const activity = BOSS_ACTIVITIES[state.boss.activity];
     return activity ? activity.blockedLine : "老板不在工位，命令没有签发人。";
@@ -462,7 +484,7 @@ function SetDesk(state, worker) {
 
 function SpawnTumor(state, forcedKind = null, bossMade = false) {
   if (state.tumors.length >= MAX_TUMORS) {
-    Emit(state, { kind: "toast", tone: "warning", text: "需求池已满，新的想法溢出到了梦里。" });
+    Emit(state, { kind: "toast", tone: "warning", text: "墙上贴不下了。先清掉几张工单。" });
     return null;
   }
   let kind = forcedKind;
@@ -477,14 +499,14 @@ function SpawnTumor(state, forcedKind = null, bossMade = false) {
     y: WORLD.coreY + Math.sin(angle) * radius * 0.72,
     hp: kind === "scope" ? 40 : bossMade ? 36 : 30,
     maxHp: kind === "scope" ? 40 : bossMade ? 36 : 30,
-    label: bossMade ? "老板亲笔BUG" : kind === "scope" ? "需求++" : "BUG",
+    label: bossMade ? "老板亲笔" : kind === "scope" ? "加塞便签" : "缺陷单",
     bossMade,
   };
   state.tumors.push(tumor);
   if (kind === "scope" && !bossMade) {
     const designer = FindWorker(state, "zhaoDagang");
     if (designer && designer.state !== "gone" && designer.state !== "quitWalking" && Rand(state) < 0.7) {
-      Emit(state, { kind: "quote", workerId: designer.id, x: designer.x, y: designer.y - 46, text: "我趁老板不注意加了个小需求！" });
+      Emit(state, { kind: "quote", workerId: designer.id, x: designer.x, y: designer.y - 46, text: "我趁你不注意又贴了一张便签！" });
     }
   }
   Emit(state, { kind: "spawn", tumorId: tumor.id, tumorKind: kind });
@@ -497,14 +519,171 @@ export function StartGame(state) {
   const seed = state.seed;
   const fresh = CreateState(seed);
   Object.keys(fresh).forEach((key) => { state[key] = fresh[key]; });
+  state.status = "setup";
+  state.setup = { step: "register", hireIndex: 0, allowOrders: false };
+  state.spawnTimer = 999;
+  Emit(state, { kind: "toast", tone: "good", text: `口袋里 ¥${START_CASH.toLocaleString("zh-CN")}。先注册公司，再招四头牛马。` });
+  Emit(state, { kind: "boss", text: "空房间，四张空桌子。伟大的互娱帝国，从工商局开始。" });
+  Emit(state, { kind: "setup" });
+  return { ok: true, message: "开业筹备" };
+}
+
+function SeatWorker(state, worker) {
+  const def = FindWorkerDef(worker.id);
+  worker.hired = true;
+  worker.state = "desk";
+  worker.mission = null;
+  worker.x = def.desk.x;
+  worker.y = def.desk.y;
+  worker.tx = def.desk.x;
+  worker.ty = def.desk.y;
+}
+
+export function RegisterCompany(state) {
+  if (state.status !== "setup" || state.setup.step !== "register") {
+    return { ok: false, message: "执照已经下来了。" };
+  }
+  state.companyName = Pick(state, COMPANY_NAMES);
+  state.setup.step = "hire";
+  state.setup.hireIndex = 0;
+  state.stats.founded = 1;
+  Emit(state, { kind: "boss", text: `${state.companyName} 成立了！章是我盖的，责任是你们的。` });
+  Emit(state, { kind: "toast", tone: "good", text: `营业执照：${state.companyName}。下一步：把四张空桌子坐满。` });
+  Emit(state, { kind: "sfx", id: "cashIn" });
+  Emit(state, { kind: "setup" });
+  return { ok: true, message: state.companyName };
+}
+
+export function HireNext(state) {
+  if (state.status !== "setup" || state.setup.step !== "hire") {
+    return { ok: false, message: "现在不是招聘会。" };
+  }
+  const workerId = HIRE_ORDER[state.setup.hireIndex];
+  const worker = FindWorker(state, workerId);
+  const def = FindWorkerDef(workerId);
+  if (!worker || !def) return { ok: false, message: "候选人跑了。" };
+  if (state.cash < HIRE_COST) return { ok: false, message: `现金不足 ¥${HIRE_COST.toLocaleString("zh-CN")}，连 offer 都打不起。` };
+  state.cash -= HIRE_COST;
+  state.stats.hired += 1;
+  worker.hired = true;
+  worker.morale = 72;
+  worker.state = "moving";
+  worker.mission = { type: "desk" };
+  worker.x = WORLD.doorX;
+  worker.y = WORLD.doorY;
+  worker.tx = def.desk.x;
+  worker.ty = def.desk.y;
+  state.setup.hireIndex += 1;
+  Emit(state, { kind: "quote", workerId: worker.id, x: worker.x, y: worker.y - 46, text: def.hireLine });
+  Emit(state, { kind: "sfx", id: "order" });
+  if (state.setup.hireIndex >= HIRE_ORDER.length) {
+    state.setup.step = "teachSelect";
+    state.setup.allowOrders = true;
+    Emit(state, { kind: "boss", text: "人齐了。点一头牛马——他们巴不得被老板注意。" });
+    Emit(state, { kind: "toast", tone: "good", text: "编制满员。先点人，再点事。这是你在这间屋子里唯一要学的。" });
+  } else {
+    Emit(state, { kind: "boss", text: `${def.roleLabel} ${def.name} 入职。预付 ¥${HIRE_COST.toLocaleString("zh-CN")}，剩下的用福报补。` });
+  }
+  Emit(state, { kind: "setup" });
+  return { ok: true, message: `${def.name} 入职` };
+}
+
+export function MarkSetupSelect(state) {
+  if (state.status !== "setup" || state.setup.step !== "teachSelect") return { ok: false };
+  state.setup.step = "teachAssign";
+  if (!state.tumors.some((ticket) => ticket.kind === "bug")) SpawnTumor(state, "bug");
+  Emit(state, { kind: "boss", text: "选中了。红色那张是缺陷单——点它，把人扔过去修。" });
+  Emit(state, { kind: "setup" });
+  return { ok: true };
+}
+
+function BeginCrunch(state) {
   state.status = "playing";
-  Emit(state, { kind: "toast", tone: "good", text: `启动资金 ¥${START_CASH.toLocaleString("zh-CN")}。目标流水 ¥${REVENUE_GOAL.toLocaleString("zh-CN")}（100 亿进度 0.005%）。` });
-  Emit(state, { kind: "boss", text: "都醒醒！从今天起，这间屋子里只有一个想法：我的想法！" });
-  return { ok: true, message: "开始压榨" };
+  state.setup.step = "done";
+  state.setup.allowOrders = true;
+  state.spawnTimer = 4;
+  Emit(state, { kind: "boss", text: "你会了。进度环满了就发售。底下三排：压榨、安抚、堕落。" });
+  Emit(state, { kind: "toast", tone: "good", text: `${state.companyName} 正式开工。目标流水 ¥${REVENUE_GOAL.toLocaleString("zh-CN")}。别把人逼走，也别把自己炒破产。` });
+  Emit(state, { kind: "setup" });
+}
+
+export function SkipSetup(state) {
+  if (state.status === "playing") return { ok: false, message: "已经在压榨中。" };
+  if (state.status !== "setup") StartGame(state);
+  if (!state.companyName) state.companyName = Pick(state, COMPANY_NAMES);
+  state.stats.founded = 1;
+  HIRE_ORDER.forEach((id) => {
+    const worker = FindWorker(state, id);
+    if (!worker.hired) {
+      if (state.cash >= HIRE_COST) state.cash -= HIRE_COST;
+      state.stats.hired += 1;
+    }
+    SeatWorker(state, worker);
+  });
+  state.setup.hireIndex = HIRE_ORDER.length;
+  BeginCrunch(state);
+  return { ok: true, message: "跳过开业" };
+}
+
+export function GetSetupCard(state) {
+  if (state.status !== "setup") return null;
+  const step = state.setup.step;
+  if (step === "register") {
+    return {
+      title: "注册公司",
+      body: "四张空桌子，启动资金还在口袋里。先去工商局盖个章——没有执照，牛马连五险都交不上。",
+      action: "register",
+      actionLabel: "去工商局盖章",
+      skip: true,
+    };
+  }
+  if (step === "hire") {
+    const def = FindWorkerDef(HIRE_ORDER[state.setup.hireIndex]);
+    const left = HIRE_ORDER.length - state.setup.hireIndex;
+    return {
+      title: `招聘${def.roleLabel} · 还差 ${left} 人`,
+      body: `${def.name}（${def.roleLabel}）在门口等 offer。预付 ¥${HIRE_COST.toLocaleString("zh-CN")}。招齐四个人，这间屋子才算公司。`,
+      action: "hire",
+      actionLabel: `录用 ${def.name} · ¥${HIRE_COST.toLocaleString("zh-CN")}`,
+      skip: true,
+    };
+  }
+  if (step === "teachSelect") {
+    return {
+      title: "点一头牛马",
+      body: "编制满了。用鼠标点其中一个人——选中后才会听你的。数字键 1–4 也能点名。",
+      action: null,
+      skip: true,
+    };
+  }
+  if (step === "teachAssign") {
+    return {
+      title: "派人修缺陷单",
+      body: "红色卡片是测试开的缺陷单，不是什么活物。选中人之后再点那张单，他会走过去修。点中间的游戏则是冲进度。",
+      action: null,
+      skip: true,
+    };
+  }
+  if (step === "teachSlash") {
+    return {
+      title: "把加塞便签撕掉",
+      body: "黄色便签是策划偷加的需求。不用派人——直接点它，老板亲自撕。策划会心碎，其他人偷着乐。",
+      action: null,
+      skip: true,
+    };
+  }
+  return null;
+}
+
+export function AdvanceSetup(state, action) {
+  if (action === "register") return RegisterCompany(state);
+  if (action === "hire") return HireNext(state);
+  if (action === "skip") return SkipSetup(state);
+  return { ok: false, message: "没有这一步。" };
 }
 
 export function AssignWorker(state, workerId, target) {
-  const guard = RequireBoss(state);
+  const guard = RequireBoss(state, true);
   if (guard) return { ok: false, message: guard };
   const worker = FindWorker(state, workerId);
   if (!worker) return { ok: false, message: "查无此牛马。" };
@@ -534,17 +713,23 @@ export function AssignWorker(state, workerId, target) {
   WorkerQuote(state, worker, def.assignedLines);
   Emit(state, { kind: "point", x: tumor.x, y: tumor.y });
   Emit(state, { kind: "sfx", id: "order" });
+  if (state.status === "setup" && state.setup.step === "teachAssign") {
+    state.setup.step = "teachSlash";
+    if (!state.tumors.some((ticket) => ticket.kind === "scope")) SpawnTumor(state, "scope");
+    Emit(state, { kind: "boss", text: "人走了。黄色那张是加塞便签——直接点掉，不用派人。" });
+    Emit(state, { kind: "setup" });
+  }
   return { ok: true, message: `${def.name} 领命。` };
 }
 
 export function SlashScope(state, tumorId) {
-  const guard = RequireBoss(state);
+  const guard = RequireBoss(state, true);
   if (guard) return { ok: false, message: guard };
   const index = state.tumors.findIndex((tumor) => tumor.id === tumorId);
   if (index < 0) return { ok: false, message: "已经没了，你砍了个寂寞。" };
   const tumor = state.tumors[index];
   if (tumor.kind !== "scope") {
-    return { ok: false, message: "BUG 是技术问题，老板的威严砍不动，得派牛马修。" };
+    return { ok: false, message: "缺陷单是技术问题，老板的威严撕不动，得派牛马修。" };
   }
   state.tumors.splice(index, 1);
   state.stats.slashes += 1;
@@ -562,7 +747,8 @@ export function SlashScope(state, tumorId) {
   });
   Emit(state, { kind: "slash", x: tumor.x, y: tumor.y });
   Emit(state, { kind: "sfx", id: "slash" });
-  return { ok: true, message: "咔嚓。世界清净了一点。" };
+  if (state.status === "setup" && state.setup.step === "teachSlash") BeginCrunch(state);
+  return { ok: true, message: "撕掉了。墙上清净了一点。" };
 }
 
 export function PaintPie(state) {
@@ -1004,6 +1190,13 @@ function TickWorker(state, worker, dt, speedMultiplier) {
 }
 
 export function Tick(state, dt) {
+  if (state.status === "setup") {
+    state.time += dt;
+    TickBoss(state, dt);
+    const speedMultiplier = GetSpeedMultiplier(state);
+    state.workers.forEach((worker) => TickWorker(state, worker, dt, speedMultiplier));
+    return;
+  }
   if (state.status !== "playing") return;
   state.time += dt;
 
