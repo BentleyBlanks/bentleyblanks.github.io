@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>牛马指挥官 · Crunch Overlord</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=4" />
+  <link rel="stylesheet" href="./Style_Game.css?v=5" />
 </head>
 <body>
   <div id="stage">
@@ -19,8 +19,12 @@
         <span class="hud-label">现金</span>
         <span class="hud-value" id="hudCash">¥88,888</span>
       </div>
+      <div class="hud-cell">
+        <span class="hud-label">分成</span>
+        <span class="hud-value" id="hudRoyalty">+¥0/秒</span>
+      </div>
       <div class="hud-cell hud-wide">
-        <span class="hud-label">流水目标 <span id="hudGoalText"></span></span>
+        <span class="hud-label">百亿目标 <span id="hudGoalText"></span></span>
         <div class="hud-bar"><i id="hudGoalFill"></i></div>
       </div>
       <div class="hud-cell hud-wide">
@@ -28,11 +32,11 @@
         <div class="hud-bar"><i id="hudProjectFill"></i></div>
       </div>
       <div class="hud-cell">
-        <span class="hud-label">老板头发</span>
-        <span class="hud-value" id="hudHair">100%</span>
+        <span class="hud-label">编制</span>
+        <span class="hud-value" id="hudStaff">4/4</span>
       </div>
       <div class="hud-cell">
-        <span class="hud-label">全员效率</span>
+        <span class="hud-label">效率</span>
         <span class="hud-value" id="hudSpeed">100%</span>
       </div>
     </header>
@@ -75,7 +79,27 @@
         <button id="clubButton" type="button"><b>高端会所 [S]</b><small>¥8,888 · 可能拉到投资</small></button>
         <button id="stockButton" type="button"><b>杀入股市 [D]</b><small>¥20,000 · 纯赌 · 老板离岗</small></button>
       </div>
+      <div class="cmd-row">
+        <span class="cmd-tag">扩张</span>
+        <button id="hireButton" type="button"><b>再招一个 [H]</b><small>编制扩容 · 越招越贵</small></button>
+        <button id="aiButton" type="button"><b>AI月租 [Y]</b><small>补全 / 生图 / 大模型 / 算力</small></button>
+        <button id="upgradeButton" type="button"><b>基建 [U]</b><small>椅子 · 渠道 · 海外</small></button>
+        <button id="expandButton" type="button"><b>扩张办公室 [N]</b><small>作坊 → 工作室 → 帝国</small></button>
+      </div>
     </nav>
+
+    <div id="empireShop" class="hidden">
+      <header>
+        <h2 id="shopTitle">帝国商店</h2>
+        <div class="shop-tabs">
+          <button id="shopTabAi" type="button" class="on">AI月租</button>
+          <button id="shopTabUp" type="button">基建</button>
+        </div>
+        <button id="shopClose" type="button">收起</button>
+      </header>
+      <p id="shopHint"></p>
+      <div id="shopList"></div>
+    </div>
 
     <div id="titleScreen">
       <h1>牛马指挥官</h1>
@@ -86,7 +110,9 @@
         <li><b>黄色加塞便签直接点掉</b>：老板亲自撕，策划会哭</li>
         <li><b>安抚</b>：足浴、奶茶、奖状（越发越贬值）、强制团建</li>
         <li><b>老板出门</b>：足疗 / 会所 / 股市 —— 人一走，牛马摸鱼</li>
-        <li><b>目标</b>：流水 ¥500,000 · 别破产 · 别把人全逼走</li>
+        <li><b>越做越赚</b>：每发一款，目录分成变厚，下一款乘数更高</li>
+        <li><b>包 AI 月租</b>：补全、生图、大模型、算力包——提效，也吃现金流</li>
+        <li><b>目标</b>：做到 <b>100亿</b> 老板 · 别破产 · 别把人全逼走</li>
       </ul>
       <button id="startButton" type="button">去注册公司</button>
       <p class="tiny">手机请横屏 · 老板的视野必须是宽的</p>
@@ -104,6 +130,6 @@
     <div class="rotate-card">📱↻<br />横屏体验更佳<br /><span>老板的格局必须是宽的</span></div>
   </div>
 
-  <script type="module" src="./Script_Game.mjs?v=4"></script>
+  <script type="module" src="./Script_Game.mjs?v=5"></script>
 </body>
 </html>

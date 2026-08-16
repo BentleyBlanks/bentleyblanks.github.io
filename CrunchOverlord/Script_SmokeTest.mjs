@@ -44,6 +44,15 @@ import {
   GetSetupCard,
   AdvanceSetup,
   MarkSetupSelect,
+  HireExtra,
+  ToggleAi,
+  BuyUpgrade,
+  ExpandStudio,
+  GetShipBreakdown,
+  GetRoyaltyPerMonth,
+  GetAiBurn,
+  NextHireCost,
+  StaffCount,
 } from "./Script_Rules.mjs";
 
 const failures = [];
@@ -435,6 +444,99 @@ Check("强制团建：扣钱、全员离岗、进度停、回来多数涨一人�
   const hurt = state.workers.filter((worker) => worker.morale < 72).length;
   assert.ok(boosted >= 2, `至少两人该真香，实际 ${boosted}`);
   assert.ok(hurt >= 1, "总有一个人讨厌团建");
+});
+
+Check("五十万只是里程碑，不是胜利", () => {
+  const state = NewGame(101);
+  state.revenue = 480000;
+  state.project.progress = state.project.need;
+  const result = Release(state);
+  assert.ok(result.ok);
+  assert.ok(state.revenue >= 500000);
+  assert.equal(state.status, "playing", "五十万不该通关");
+  assert.ok(state.empire.milestoneIndex >= 1, "应记下五十万里程碑");
+});
+
+Check("第二款比第一款赚：目录乘数", () => {
+  const state = NewGame(103);
+  state.project.progress = state.project.need;
+  const first = Release(state);
+  state.project.progress = state.project.need;
+  const second = Release(state);
+  assert.ok(second.revenue > first.revenue, `第二款 ${second.revenue} 应高于第一款 ${first.revenue}`);
+  assert.ok(state.empire.catalog > 0);
+  assert.ok(GetRoyaltyPerMonth(state) > 0);
+});
+
+Check("AI 月租：提速、开通扣首月、发薪再扣", () => {
+  const state = NewGame(107);
+  const before = GetSpeedMultiplier(state);
+  const cashBefore = state.cash;
+  const buy = ToggleAi(state, "copilot");
+  assert.ok(buy.ok);
+  assert.equal(state.cash, cashBefore - 2000);
+  assert.ok(GetSpeedMultiplier(state) > before, "开通补全后应更快");
+  assert.equal(GetAiBurn(state), 2000);
+  Simulate(state, MONTH_SECONDS + 0.2);
+  assert.ok(state.stats.aiSpend >= 4000, `首月+发薪应记下月租，实际 ${state.stats.aiSpend}`);
+});
+
+Check("再招一个：扣递增预付、编制+1", () => {
+  const state = NewGame(109);
+  state.empire.tier = 1;
+  state.cash = 20000;
+  const cost = NextHireCost(state);
+  const hire = HireExtra(state);
+  assert.ok(hire.ok);
+  assert.equal(StaffCount(state), 5);
+  assert.equal(state.stats.extrasHired, 1);
+  assert.ok(state.workers.some((worker) => worker.id === "extra1"));
+  assert.equal(state.cash, 20000 - cost);
+});
+
+Check("扩张办公室：卡流水和现金", () => {
+  const state = NewGame(113);
+  const early = ExpandStudio(state);
+  assert.equal(early.ok, false, "没流水不该扩");
+  state.revenue = 500000;
+  state.cash = 1000;
+  const poor = ExpandStudio(state);
+  assert.equal(poor.ok, false, "没钱不该扩");
+  state.cash = 300000;
+  const ok = ExpandStudio(state);
+  assert.ok(ok.ok);
+  assert.equal(state.empire.tier, 1);
+  assert.equal(state.stats.expands, 1);
+});
+
+Check("基建一次买死", () => {
+  const state = NewGame(127);
+  state.cash = 20000;
+  const buy = BuyUpgrade(state, "chairs");
+  assert.ok(buy.ok);
+  const again = BuyUpgrade(state, "chairs");
+  assert.equal(again.ok, false);
+  assert.ok(GetSpeedMultiplier(state) > 1);
+});
+
+Check("发售乘数栈写得出来", () => {
+  const state = NewGame(131);
+  const stack = GetShipBreakdown(state, 1);
+  assert.ok(stack.revenue > 0);
+  assert.equal(stack.studioMult, 1);
+  assert.equal(stack.catalogMult, 1);
+});
+
+Check("惊喜事件同种子可复现", () => {
+  const a = NewGame(137);
+  const b = NewGame(137);
+  Simulate(a, 40);
+  Simulate(b, 40);
+  DrainEvents(a);
+  DrainEvents(b);
+  assert.equal(a.empire.nextShipMult, b.empire.nextShipMult);
+  assert.equal(a.empire.fame, b.empire.fame);
+  assert.equal(Math.round(a.cash), Math.round(b.cash));
 });
 
 Check("发售弹幕：三条喷子如约而至", () => {

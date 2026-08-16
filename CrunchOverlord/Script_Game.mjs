@@ -1,19 +1,22 @@
 // 牛马指挥官 · 表现层。规则全在 Script_Rules.mjs，这里只负责画、响、收输入。
 import {
   WORLD, BOSS_HOME, BOSS_ACTIVITIES, REVENUE_GOAL, FOOTBATH_COST,
-  MILK_TEA_COST, TEAMBUILD_COST, AwardValue,
+  MILK_TEA_COST, TEAMBUILD_COST, AwardValue, FormatMoney,
   CreateState, StartGame, Tick, DrainEvents, AssignWorker, SlashScope, PaintPie,
   BossCode, Footbath, MilkTea, GiveAward, TeamBuild, BossGoOut, Release,
   AdvanceSetup, GetSetupCard, MarkSetupSelect,
+  HireExtra, ToggleAi, BuyUpgrade, ExpandStudio, GetEmpireView,
   FindWorkerDef, ActiveWorkers, GetSpeedMultiplier, BossAway, WORKER_DEFS,
-} from "./Script_Rules.mjs?v=4";
+} from "./Script_Rules.mjs?v=5";
 
 const dom = {};
 [
-  "stage", "gameCanvas", "hud", "hudMonth", "hudCash", "hudGoalText", "hudGoalFill",
-  "hudProjectName", "hudProjectFill", "hudHair", "hudSpeed", "bossBanner", "selectionHint",
+  "stage", "gameCanvas", "hud", "hudMonth", "hudCash", "hudRoyalty", "hudGoalText", "hudGoalFill",
+  "hudProjectName", "hudProjectFill", "hudStaff", "hudSpeed", "bossBanner", "selectionHint",
   "toastStack", "commandBar", "pieButton", "bossCodeButton", "footbathButton", "releaseButton",
   "spaButton", "clubButton", "stockButton", "milkTeaButton", "awardButton", "teambuildButton",
+  "hireButton", "aiButton", "upgradeButton", "expandButton",
+  "empireShop", "shopTitle", "shopHint", "shopList", "shopTabAi", "shopTabUp", "shopClose",
   "titleScreen", "startButton", "endScreen",
   "endTitle", "endReason", "endStats", "restartButton", "tutorialTip", "tutorialText",
   "tutorialSkip", "rotateHint", "setupCard", "setupTitle", "setupBody", "setupAction", "setupSkip",
@@ -98,11 +101,8 @@ function PlaySfx(id) {
 }
 
 /* ============================ 小工具 ============================ */
-function FormatMoney(value) {
-  const sign = value < 0 ? "-" : "";
-  return `${sign}¥${Math.abs(Math.round(value)).toLocaleString("zh-CN")}`;
-}
 function Dist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+let shopTab = "ai";
 function TumorRadius(tumor) { return 20 + (tumor.hp / tumor.maxHp) * 14; }
 
 function AddFloater(x, y, text, color = "#fff", life = 2.4, size = 15) {
@@ -208,6 +208,7 @@ function SyncSetupCard() {
     dom.commandBar.classList.toggle("hidden", state.status !== "playing");
     return;
   }
+  CloseShop();
   dom.setupCard.classList.remove("hidden");
   dom.setupCard.classList.toggle("teach", !card.action);
   dom.commandBar.classList.add("hidden");
@@ -228,7 +229,7 @@ function ConsumeEvents() {
       case "setup": SyncSetupCard(); break;
       case "boss": ShowBanner(event.text); break;
       case "quote": {
-        const def = FindWorkerDef(event.workerId);
+        const def = FindWorkerDef(event.workerId, state);
         AddFloater(event.x, event.y, `${def ? def.name : "?"}：${event.text}`, def ? def.color : "#fff", 3.4);
         break;
       }
@@ -378,10 +379,18 @@ window.addEventListener("keydown", (event) => {
   else if (key === "a") HandleCommand(BossGoOut(state, "spa"));
   else if (key === "s") HandleCommand(BossGoOut(state, "club"));
   else if (key === "d") HandleCommand(BossGoOut(state, "stock"));
-  else if (["1", "2", "3", "4"].includes(key)) {
-    const worker = state.workers[Number(key) - 1];
-    if (worker && worker.state !== "gone") { view.selectedWorkerId = worker.id; MarkTutorial("select"); }
-  } else if (key === "escape") view.selectedWorkerId = null;
+  else if (key === "h") HandleCommand(HireExtra(state));
+  else if (key === "y") OpenShop("ai");
+  else if (key === "u") OpenShop("up");
+  else if (key === "n") HandleCommand(ExpandStudio(state));
+  else if (key === "b") ToggleShop();
+  else if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)) {
+    const worker = ActiveWorkers(state)[Number(key) - 1];
+    if (worker) { view.selectedWorkerId = worker.id; MarkTutorial("select"); }
+  } else if (key === "escape") {
+    if (!dom.empireShop.classList.contains("hidden")) CloseShop();
+    else view.selectedWorkerId = null;
+  }
 });
 
 dom.pieButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(PaintPie(state)); });
@@ -405,6 +414,23 @@ dom.teambuildButton.addEventListener("click", () => { EnsureAudio(); HandleComma
 dom.spaButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "spa")); });
 dom.clubButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "club")); });
 dom.stockButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(BossGoOut(state, "stock")); });
+dom.hireButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(HireExtra(state)); });
+dom.aiButton.addEventListener("click", () => { EnsureAudio(); OpenShop("ai"); });
+dom.upgradeButton.addEventListener("click", () => { EnsureAudio(); OpenShop("up"); });
+dom.expandButton.addEventListener("click", () => { EnsureAudio(); HandleCommand(ExpandStudio(state)); });
+dom.shopTabAi.addEventListener("click", () => OpenShop("ai"));
+dom.shopTabUp.addEventListener("click", () => OpenShop("up"));
+dom.shopClose.addEventListener("click", () => CloseShop());
+dom.shopList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-buy]");
+  if (!button) return;
+  EnsureAudio();
+  const id = button.getAttribute("data-buy");
+  const kind = button.getAttribute("data-kind");
+  if (kind === "ai") HandleCommand(ToggleAi(state, id));
+  else HandleCommand(BuyUpgrade(state, id));
+  RenderShop();
+});
 dom.tutorialSkip.addEventListener("click", () => FinishTutorial("行，老板天生就会。"));
 dom.setupAction.addEventListener("click", () => {
   EnsureAudio();
@@ -445,15 +471,17 @@ dom.restartButton.addEventListener("click", () => {
 
 /* ============================ HUD 同步 ============================ */
 function SyncHud() {
+  const empire = GetEmpireView(state);
   dom.hudMonth.textContent = `M${String(state.month).padStart(2, "0")}`;
   dom.hudCash.textContent = FormatMoney(state.cash);
   dom.hudCash.style.color = state.cash < 20000 ? "#ff5d73" : "#f5efff";
+  dom.hudRoyalty.textContent = `+${FormatMoney(empire.royaltyPerSec)}/秒`;
+  dom.hudRoyalty.style.color = empire.royaltyPerSec > 0 ? "#43d9ad" : "#9d92bd";
   dom.hudGoalText.textContent = `${FormatMoney(state.revenue)} / ${FormatMoney(REVENUE_GOAL)}`;
   dom.hudGoalFill.style.width = `${Math.min(100, (state.revenue / REVENUE_GOAL) * 100)}%`;
   dom.hudProjectName.textContent = `${state.project.name} 进度 ${Math.floor(state.project.progress)}/${state.project.need}`;
   dom.hudProjectFill.style.width = `${(state.project.progress / state.project.need) * 100}%`;
-  dom.hudHair.textContent = `${Math.round(state.hair)}%`;
-  dom.hudHair.style.color = state.hair < 30 ? "#ff5d73" : "#f5efff";
+  dom.hudStaff.textContent = empire.ghostStaff ? `${empire.staff}(${empire.ghostStaff}远程)` : `${empire.staff}/${empire.staffCap}`;
   dom.hudSpeed.textContent = `${Math.round(GetSpeedMultiplier(state) * 100)}%`;
 
   const away = BossAway(state);
@@ -476,9 +504,18 @@ function SyncHud() {
   dom.spaButton.disabled = away || state.cash < BOSS_ACTIVITIES.spa.cost;
   dom.clubButton.disabled = away || state.cash < BOSS_ACTIVITIES.club.cost;
   dom.stockButton.disabled = away || state.cash < BOSS_ACTIVITIES.stock.cost;
+  dom.hireButton.disabled = away || !empire.canHire;
+  dom.hireButton.querySelector("small").textContent = empire.hireLocked
+    ? "编制满了 · 先扩张"
+    : `${FormatMoney(empire.nextHireCost)} · ${empire.staff}/${empire.staffCap}`;
+  dom.expandButton.disabled = away || !empire.nextExpand || !empire.nextExpand.can;
+  dom.expandButton.querySelector("small").textContent = empire.nextExpand
+    ? `${empire.nextExpand.name} · ${FormatMoney(empire.nextExpand.cost)}`
+    : "已经是帝国";
+  if (!dom.empireShop.classList.contains("hidden")) RenderShop();
 
   if (view.selectedWorkerId) {
-    const def = FindWorkerDef(view.selectedWorkerId);
+    const def = FindWorkerDef(view.selectedWorkerId, state);
     dom.selectionHint.textContent = `已选中 ${def.roleLabel} ${def.name} —— 点红色缺陷单派人修 / 点游戏冲进度 / 黄色便签直接撕`;
     dom.selectionHint.classList.remove("hidden");
   } else {
@@ -487,17 +524,51 @@ function SyncHud() {
   SyncTutorial();
 }
 
+function OpenShop(tab) {
+  shopTab = tab || shopTab;
+  dom.empireShop.classList.remove("hidden");
+  RenderShop();
+}
+function CloseShop() {
+  dom.empireShop.classList.add("hidden");
+}
+function ToggleShop() {
+  if (dom.empireShop.classList.contains("hidden")) OpenShop(shopTab);
+  else CloseShop();
+}
+function RenderShop() {
+  const empire = GetEmpireView(state);
+  dom.shopTabAi.classList.toggle("on", shopTab === "ai");
+  dom.shopTabUp.classList.toggle("on", shopTab === "up");
+  if (shopTab === "ai") {
+    dom.shopTitle.textContent = "AI 月租";
+    dom.shopHint.textContent = `当前月租 ${FormatMoney(empire.aiBurn)} · 发薪日从口袋里扣。开通先付一个月。`;
+    dom.shopList.innerHTML = empire.ais.map((plan) => {
+      const label = plan.on ? "退订" : plan.locked ? "未解锁" : FormatMoney(plan.cost);
+      return `<div class="shop-row${plan.locked ? " locked" : ""}"><b>${plan.name}</b><button type="button" data-kind="ai" data-buy="${plan.id}" class="${plan.on ? "on" : ""}" ${plan.locked ? "disabled" : ""}>${label}</button><small>${plan.desc}</small></div>`;
+    }).join("");
+  } else {
+    dom.shopTitle.textContent = "基建";
+    dom.shopHint.textContent = `${empire.tierName} · 热度 ×${empire.fame.toFixed(1)} · 目录 ${FormatMoney(empire.catalog)}`;
+    dom.shopList.innerHTML = empire.upgrades.map((item) => {
+      const label = item.owned ? "已装" : item.locked ? "未解锁" : FormatMoney(item.cost);
+      return `<div class="shop-row${item.locked ? " locked" : ""}"><b>${item.name}</b><button type="button" data-kind="up" data-buy="${item.id}" ${item.owned || item.locked ? "disabled" : ""}>${label}</button><small>${item.desc}</small></div>`;
+    }).join("");
+  }
+}
+
 function ShowEndScreen() {
   dom.hud.classList.add("hidden");
   dom.commandBar.classList.add("hidden");
+  dom.empireShop.classList.add("hidden");
   dom.setupCard.classList.add("hidden");
   dom.tutorialTip.classList.add("hidden");
   dom.endScreen.classList.remove("hidden");
   const stats = state.stats;
   if (state.status === "won") {
-    dom.endTitle.textContent = "小目标达成！";
+    dom.endTitle.textContent = "百亿老板！";
     dom.endTitle.style.color = "#ffd166";
-    dom.endReason.textContent = `流水破 ${FormatMoney(REVENUE_GOAL)}。你在年会上说：“成绩是大家的。”台下的牛马在心里翻译：“钱是老板的。”`;
+    dom.endReason.textContent = `累计流水破 ${FormatMoney(REVENUE_GOAL)}。你在年会上说：“成绩是大家的。”台下的牛马在心里翻译：“钱是老板的。”`;
   } else {
     dom.endTitle.textContent = "公司没了";
     dom.endTitle.style.color = "#ff5d73";
@@ -509,6 +580,7 @@ function ShowEndScreen() {
     `修复 BUG ${stats.bugsFixed} 个 · 足浴 ${stats.footbaths} · 奶茶 ${stats.milkTeas} · 奖状 ${stats.awards} · 团建 ${stats.teambuilds} · 气走 ${stats.quits} 头`,
     `老板足疗 ${stats.spaTrips} 次 · 高端会所 ${stats.clubTrips} 次${stats.investGained ? `（拉到投资 ${FormatMoney(stats.investGained)}）` : ""}`,
     `炒股 ${stats.stockPlays} 次 · 股市净收益 ${FormatMoney(stats.stockNet)}`,
+    `扩张 ${stats.expands} 次 · 编外招聘 ${stats.extrasHired} · AI 月租花掉 ${FormatMoney(stats.aiSpend)} · 分成进账 ${FormatMoney(stats.royalties)}`,
   ];
   dom.endStats.innerHTML = lines.map((line) => `<div>${line}</div>`).join("");
 }
@@ -774,7 +846,8 @@ function DrawTicket(tumor) {
 }
 
 function DrawWorker(worker, time) {
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
+  if (!def) return;
   if (worker.state === "gone") return;
   const selected = view.selectedWorkerId === worker.id;
   const walking = worker.state === "moving" || worker.state === "quitWalking";
@@ -1067,21 +1140,26 @@ function DrawReleaseCard(dt) {
   const alpha = Math.min(1, card.t / 0.5, (5.2 - card.t) / 0.3);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = "rgba(16, 13, 24, 0.92)";
-  ctx.beginPath(); ctx.roundRect(WORLD.coreX - 250, 210, 500, 158, 14); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(WORLD.coreX - 280, 188, 560, 196, 14); ctx.fill();
   ctx.strokeStyle = "#7a5cff"; ctx.lineWidth = 3; ctx.stroke();
   ctx.textAlign = "center";
   ctx.fillStyle = "#efe9fb";
   ctx.font = "bold 25px 'Microsoft YaHei', sans-serif";
-  ctx.fillText(`${card.name} 已发售！`, WORLD.coreX, 252);
+  ctx.fillText(`${card.name} 已发售！`, WORLD.coreX, 230);
   ctx.fillStyle = "#ffd166";
   ctx.font = "29px sans-serif";
-  ctx.fillText("★".repeat(card.stars) + "☆".repeat(5 - card.stars), WORLD.coreX, 291);
+  ctx.fillText("★".repeat(card.stars) + "☆".repeat(5 - card.stars), WORLD.coreX, 268);
   ctx.fillStyle = "#b3a7d6";
   ctx.font = "15px 'Microsoft YaHei', sans-serif";
-  ctx.fillText(card.review, WORLD.coreX, 320);
+  ctx.fillText(card.review, WORLD.coreX, 296);
   ctx.fillStyle = "#43d9ad";
-  ctx.font = "bold 19px 'Microsoft YaHei', sans-serif";
-  ctx.fillText(`+${FormatMoney(card.revenue)}${card.bugsShipped ? `（带着 ${card.bugsShipped} 个 BUG 上线）` : ""}`, WORLD.coreX, 350);
+  ctx.font = "bold 18px 'Microsoft YaHei', sans-serif";
+  ctx.fillText(`+${FormatMoney(card.revenue)}${card.bugsShipped ? `（带着 ${card.bugsShipped} 个 BUG 上线）` : ""}`, WORLD.coreX, 326);
+  if (card.stack) {
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "12px 'Microsoft YaHei', sans-serif";
+    ctx.fillText(card.stack, WORLD.coreX, 354);
+  }
   ctx.globalAlpha = 1;
   ctx.textAlign = "left";
 }

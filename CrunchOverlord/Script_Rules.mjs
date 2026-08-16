@@ -1,6 +1,18 @@
 // 《牛马指挥官》纯逻辑模块。禁止 window / document / Math.random()。
-// 上帝视角：玩家是老板，指挥四头牛马做游戏。安抚有足浴/奶茶/奖状/团建；
-// 老板本人会出门足疗/会所/炒股，人一走牛马就摸鱼。随机走 Rand(state)。
+// 上帝视角：玩家是老板，指挥牛马做游戏。安抚有足浴/奶茶/奖状/团建；
+// 老板出门牛马摸鱼。帝国层：目录分成、工作室扩张、AI 月租、基建。随机走 Rand(state)。
+
+import {
+  STUDIO_TIERS,
+  MILESTONES,
+  AI_PLANS,
+  UPGRADES,
+  EXTRA_DESKS,
+  EXTRA_ROLES,
+  EXTRA_IDLE,
+} from "./Data_Empire.mjs";
+
+export { STUDIO_TIERS, MILESTONES, AI_PLANS, UPGRADES };
 
 export const WORLD = Object.freeze({
   width: 1280,
@@ -16,7 +28,10 @@ export const BOSS_HOME = Object.freeze({ x: 640, y: 178 });
 export const MONTH_SECONDS = 20;
 export const WORKER_SALARY = 5500;
 export const START_CASH = 88888;
-export const REVENUE_GOAL = 500000;
+export const REVENUE_GOAL = 10000000000;
+export const VISIBLE_STAFF_CAP = 16;
+export const CATALOG_PER_SHIP = 0.28;
+export const ROYALTY_RATE = 0.055;
 export const FOOTBATH_COST = 1999;
 export const PIE_DURATION = 8;
 export const PIE_COOLDOWN = 26;
@@ -352,6 +367,20 @@ export function CreateState(seed = 20260816) {
       targetTumorId: null,
     })),
     tumors: [],
+    extraDefs: {},
+    empire: {
+      tier: 0,
+      catalog: 0,
+      fame: 1,
+      extraHired: 0,
+      ghostStaff: 0,
+      ai: {},
+      upgrades: {},
+      nextShipMult: 1,
+      surpriseTimer: 22,
+      freezeTimer: 0,
+      milestoneIndex: 0,
+    },
     stats: {
       founded: 0,
       hired: 0,
@@ -372,6 +401,11 @@ export function CreateState(seed = 20260816) {
       stockPlays: 0,
       stockNet: 0,
       investGained: 0,
+      royalties: 0,
+      aiSpend: 0,
+      extrasHired: 0,
+      expands: 0,
+      virals: 0,
     },
     events: [],
   };
@@ -400,8 +434,24 @@ export function DrainEvents(state) {
   return events;
 }
 
-export function FindWorkerDef(workerId) {
-  return WORKER_DEFS.find((def) => def.id === workerId) || null;
+export function FormatMoney(value) {
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1e8) {
+    const yi = abs / 1e8;
+    const digits = yi >= 100 ? 0 : yi >= 10 ? 1 : 2;
+    return `${sign}¥${yi.toFixed(digits)}亿`;
+  }
+  if (abs >= 1e4) {
+    const wan = abs / 1e4;
+    const digits = wan >= 100 ? 0 : 1;
+    return `${sign}¥${wan.toFixed(digits)}万`;
+  }
+  return `${sign}¥${Math.round(abs).toLocaleString("zh-CN")}`;
+}
+
+export function FindWorkerDef(workerId, state) {
+  return WORKER_DEFS.find((def) => def.id === workerId) || state?.extraDefs?.[workerId] || null;
 }
 
 function FindWorker(state, workerId) {
@@ -417,11 +467,267 @@ export function BossAway(state) {
 }
 
 export function GetSpeedMultiplier(state) {
+  if (state.empire.freezeTimer > 0) return 0;
   const scopeCount = state.tumors.filter((tumor) => tumor.kind === "scope").length;
   let multiplier = Math.max(0.3, Math.pow(0.85, scopeCount));
   if (state.pie.timer > 0) multiplier *= PIE_SPEED_MULT;
   if (BossAway(state)) multiplier *= SLACK_PROGRESS_MULT;
+  multiplier *= ProductOf(SubscribedPlans(state), "speed");
+  multiplier *= ProductOf(OwnedUpgrades(state), "speed");
   return multiplier;
+}
+
+function SubscribedPlans(state) {
+  return AI_PLANS.filter((plan) => state.empire.ai[plan.id]);
+}
+
+function OwnedUpgrades(state) {
+  return UPGRADES.filter((item) => state.empire.upgrades[item.id]);
+}
+
+function ProductOf(list, key) {
+  return list.reduce((total, item) => total * (item[key] || 1), 1);
+}
+
+export function StaffCount(state) {
+  return ActiveWorkers(state).length + state.empire.ghostStaff;
+}
+
+export function StudioOf(state) {
+  return STUDIO_TIERS[state.empire.tier] || STUDIO_TIERS[0];
+}
+
+export function NextHireCost(state) {
+  return Math.round(HIRE_COST * Math.pow(1.35, state.empire.extraHired));
+}
+
+export function GetAiBurn(state) {
+  return SubscribedPlans(state).reduce((total, plan) => total + plan.cost, 0);
+}
+
+export function GetRoyaltyPerMonth(state) {
+  const studio = StudioOf(state);
+  const upgradeRoyalty = ProductOf(OwnedUpgrades(state), "royalty");
+  return Math.round(state.empire.catalog * ROYALTY_RATE * studio.royaltyMult * upgradeRoyalty);
+}
+
+export function GetRoyaltyPerSecond(state) {
+  return GetRoyaltyPerMonth(state) / MONTH_SECONDS;
+}
+
+export function GetShipBreakdown(state, quality) {
+  const project = state.project;
+  const studio = StudioOf(state);
+  const base = Math.round(((40000 + project.scale * 18000) * quality) / 100) * 100;
+  const catalogMult = 1 + state.stats.releases * CATALOG_PER_SHIP;
+  const studioMult = studio.shipMult;
+  const aiShip = ProductOf(SubscribedPlans(state), "ship");
+  const upShip = ProductOf(OwnedUpgrades(state), "ship");
+  const fame = state.empire.fame;
+  const viral = state.empire.nextShipMult;
+  const revenue = Math.max(100, Math.round((base * catalogMult * studioMult * aiShip * upShip * fame * viral) / 100) * 100);
+  return { base, catalogMult, studioMult, aiShip, upShip, fame, viral, quality, revenue };
+}
+
+function FormatShipStack(breakdown) {
+  return `基础 ${FormatMoney(breakdown.base)} × 目录 ${breakdown.catalogMult.toFixed(1)} × 工作室 ${breakdown.studioMult} × AI ${breakdown.aiShip.toFixed(1)} × 基建 ${breakdown.upShip.toFixed(1)} × 热度 ${breakdown.fame.toFixed(1)} × 爆款 ${breakdown.viral.toFixed(1)} = ${FormatMoney(breakdown.revenue)}`;
+}
+
+function TumorCap(state) {
+  return Clamp(4 + Math.floor(StaffCount(state) / 3), 4, 12);
+}
+
+function OffsetDesk(state, desk) {
+  let x = desk.x;
+  let y = desk.y;
+  const taken = state.workers.filter((worker) => worker.state !== "gone");
+  for (let n = 0; n < 6; n += 1) {
+    const clash = taken.some((worker) => Math.hypot(worker.tx - x, worker.ty - y) < 28 || Math.hypot(worker.x - x, worker.y - y) < 28);
+    if (!clash) return { x, y };
+    x = desk.x + (n + 1) * 36;
+    y = desk.y + ((n % 2) * 18 - 9);
+  }
+  return { x, y };
+}
+
+function MakeExtraDef(state) {
+  const n = state.empire.extraHired;
+  const role = EXTRA_ROLES[(n - 1) % EXTRA_ROLES.length];
+  const name = `${role.namePool[(n - 1) % role.namePool.length]}${n > 4 ? `·${n}` : ""}`;
+  const id = `extra${n}`;
+  const def = {
+    id,
+    name,
+    role: role.role,
+    roleLabel: role.roleLabel,
+    roleGlyph: role.roleGlyph,
+    color: role.color,
+    desk: OffsetDesk(state, EXTRA_DESKS[(n - 1) % EXTRA_DESKS.length]),
+    idleLines: EXTRA_IDLE,
+    hireLine: "工位在哪？我自己找。",
+    assignedLines: ["收到，编制内的命也是命。", "去了。这单我背。"],
+    fixedLines: ["修好了。下一张呢。", "好了。别问加班费。"],
+    footbathLines: ["值了。还能再卷一轮。"],
+    quitLine: "编制是假的，离职是真的。",
+  };
+  state.extraDefs[id] = def;
+  return def;
+}
+
+function CheckMilestones(state) {
+  while (state.empire.milestoneIndex < MILESTONES.length) {
+    const milestone = MILESTONES[state.empire.milestoneIndex];
+    if (state.revenue < milestone.at) break;
+    state.empire.milestoneIndex += 1;
+    if (milestone.at >= REVENUE_GOAL) break;
+    Emit(state, { kind: "toast", tone: "good", text: `${milestone.title} ${milestone.text}` });
+    Emit(state, { kind: "sfx", id: "cashIn" });
+  }
+}
+
+export function GetEmpireView(state) {
+  const studio = StudioOf(state);
+  const next = STUDIO_TIERS[state.empire.tier + 1] || null;
+  const staff = StaffCount(state);
+  const hireCost = NextHireCost(state);
+  const canHireMore = studio.id >= 4 || staff < studio.hireCap;
+  return {
+    tier: studio.id,
+    tierName: studio.name,
+    staff,
+    staffCap: studio.hireCap,
+    ghostStaff: state.empire.ghostStaff,
+    fame: state.empire.fame,
+    catalog: state.empire.catalog,
+    royaltyPerMonth: GetRoyaltyPerMonth(state),
+    royaltyPerSec: GetRoyaltyPerSecond(state),
+    aiBurn: GetAiBurn(state),
+    nextHireCost: hireCost,
+    canHire: canHireMore && state.cash >= hireCost && state.status === "playing",
+    hireLocked: !canHireMore,
+    nextExpand: next
+      ? {
+        name: next.unlock ? studio.unlock : next.name,
+        cost: studio.expandCost,
+        needLifetime: next.needLifetime,
+        can: state.cash >= studio.expandCost && state.revenue >= next.needLifetime,
+      }
+      : null,
+    ais: AI_PLANS.map((plan) => ({
+      ...plan,
+      on: Boolean(state.empire.ai[plan.id]),
+      locked: studio.id < plan.needTier,
+    })),
+    upgrades: UPGRADES.map((item) => ({
+      ...item,
+      owned: Boolean(state.empire.upgrades[item.id]),
+      locked: studio.id < item.needTier,
+    })),
+  };
+}
+
+export function HireExtra(state) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  const studio = StudioOf(state);
+  const staff = StaffCount(state);
+  if (studio.id < 4 && staff >= studio.hireCap) {
+    return { ok: false, message: `编制满了（${staff}/${studio.hireCap}）。先扩张办公室。` };
+  }
+  const cost = NextHireCost(state);
+  if (state.cash < cost) return { ok: false, message: `现金不足 ${FormatMoney(cost)}，这人连入职体检都做不起。` };
+  state.cash -= cost;
+  state.empire.extraHired += 1;
+  state.stats.extrasHired += 1;
+  state.stats.hired += 1;
+  const visible = ActiveWorkers(state).length;
+  if (visible < VISIBLE_STAFF_CAP && visible < studio.hireCap) {
+    const def = MakeExtraDef(state);
+    state.workers.push({
+      id: def.id,
+      x: WORLD.doorX,
+      y: WORLD.doorY,
+      tx: def.desk.x,
+      ty: def.desk.y,
+      morale: 72,
+      hired: true,
+      state: "moving",
+      mission: { type: "desk" },
+      sprintTimer: 0,
+      soakTimer: 0,
+      teambuildGrump: false,
+      targetTumorId: null,
+    });
+    Emit(state, { kind: "quote", workerId: def.id, x: WORLD.doorX, y: WORLD.doorY - 46, text: def.hireLine });
+    Emit(state, { kind: "toast", tone: "good", text: `${def.roleLabel} ${def.name} 入职。预付 ${FormatMoney(cost)}。工位自己找。` });
+  } else {
+    state.empire.ghostStaff += 1;
+    Emit(state, { kind: "toast", tone: "good", text: `远程编制 +1。人不来工位，进度照样涨。预付 ${FormatMoney(cost)}。` });
+  }
+  Emit(state, { kind: "sfx", id: "order" });
+  return { ok: true, message: "招到人了。" };
+}
+
+export function ToggleAi(state, planId) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  const plan = AI_PLANS.find((item) => item.id === planId);
+  if (!plan) return { ok: false, message: "没有这个套餐。" };
+  if (StudioOf(state).id < plan.needTier) {
+    return { ok: false, message: `${plan.name} 要等公司再大一档。销售说这叫成长型定价。` };
+  }
+  if (state.empire.ai[plan.id]) {
+    delete state.empire.ai[plan.id];
+    Emit(state, { kind: "toast", tone: "warning", text: `已退订 ${plan.name}。牛马重新手写。` });
+    return { ok: true, message: `退订 ${plan.name}` };
+  }
+  if (state.cash < plan.cost) return { ok: false, message: `开通 ${plan.name} 要先付一个月 ${FormatMoney(plan.cost)}。` };
+  state.cash -= plan.cost;
+  state.stats.aiSpend += plan.cost;
+  state.empire.ai[plan.id] = true;
+  if (plan.id === "cursor") {
+    state.project.need = Math.max(80, Math.round(state.project.need * 0.92));
+  }
+  Emit(state, { kind: "toast", tone: "good", text: `开通 ${plan.name}。本月 ${FormatMoney(plan.cost)}。${plan.desc}` });
+  Emit(state, { kind: "sfx", id: "cashIn" });
+  return { ok: true, message: `开通 ${plan.name}` };
+}
+
+export function BuyUpgrade(state, upgradeId) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  const item = UPGRADES.find((entry) => entry.id === upgradeId);
+  if (!item) return { ok: false, message: "没有这项基建。" };
+  if (state.empire.upgrades[item.id]) return { ok: false, message: "已经装过了，再买就是重复建设。" };
+  if (StudioOf(state).id < item.needTier) return { ok: false, message: `${item.name} 要等办公室再大一点才装得下。` };
+  if (state.cash < item.cost) return { ok: false, message: `现金不足 ${FormatMoney(item.cost)}。` };
+  state.cash -= item.cost;
+  state.empire.upgrades[item.id] = true;
+  Emit(state, { kind: "toast", tone: "good", text: `购入 ${item.name}。${item.desc}` });
+  Emit(state, { kind: "sfx", id: "cashIn" });
+  return { ok: true, message: `购入 ${item.name}` };
+}
+
+export function ExpandStudio(state) {
+  const guard = RequireBoss(state);
+  if (guard) return { ok: false, message: guard };
+  const studio = StudioOf(state);
+  const next = STUDIO_TIERS[state.empire.tier + 1];
+  if (!next) return { ok: false, message: "已经是互娱帝国。再扩就是税务局的事了。" };
+  if (state.revenue < next.needLifetime) {
+    return { ok: false, message: `累计流水还没到 ${FormatMoney(next.needLifetime)}，银行不批装修贷。` };
+  }
+  if (state.cash < studio.expandCost) {
+    return { ok: false, message: `扩张要 ${FormatMoney(studio.expandCost)}。先发几款把口袋填上。` };
+  }
+  state.cash -= studio.expandCost;
+  state.empire.tier += 1;
+  state.stats.expands += 1;
+  const now = StudioOf(state);
+  Emit(state, { kind: "toast", tone: "good", text: `办公室升级为「${now.name}」。编制 ${now.hireCap}，发售 ×${now.shipMult}。` });
+  Emit(state, { kind: "boss", text: `${now.name} 揭牌了。工位多了，福报也多了。` });
+  Emit(state, { kind: "sfx", id: "win" });
+  return { ok: true, message: now.name };
 }
 
 function RequireBoss(state, allowSetup = false) {
@@ -450,7 +756,7 @@ function ChangeMorale(state, worker, delta) {
   if (worker.state === "gone" || worker.state === "quitWalking") return;
   worker.morale = Clamp(worker.morale + delta, 0, 100);
   if (worker.morale > 0) return;
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   worker.state = "quitWalking";
   worker.mission = { type: "door", then: "quit" };
   worker.tx = WORLD.doorX;
@@ -460,7 +766,7 @@ function ChangeMorale(state, worker, delta) {
   Emit(state, { kind: "quote", workerId: worker.id, x: worker.x, y: worker.y - 46, text: def.quitLine });
   Emit(state, { kind: "toast", tone: "danger", text: `${def.name} 情绪归零，已离职。工位上只剩一杯凉咖啡。` });
   Emit(state, { kind: "sfx", id: "quit" });
-  if (ActiveWorkers(state).length === 0) {
+  if (StaffCount(state) === 0) {
     Lose(state, "最后一头牛马已离职。你对着空工位喊了一句『复工』，没有回音。");
   }
 }
@@ -474,7 +780,7 @@ function Lose(state, reason) {
 }
 
 function SetDesk(state, worker) {
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   worker.mission = { type: "desk" };
   worker.state = "moving";
   worker.tx = def.desk.x;
@@ -483,7 +789,7 @@ function SetDesk(state, worker) {
 }
 
 function SpawnTumor(state, forcedKind = null, bossMade = false) {
-  if (state.tumors.length >= MAX_TUMORS) {
+  if (state.tumors.length >= TumorCap(state)) {
     Emit(state, { kind: "toast", tone: "warning", text: "墙上贴不下了。先清掉几张工单。" });
     return null;
   }
@@ -529,7 +835,7 @@ export function StartGame(state) {
 }
 
 function SeatWorker(state, worker) {
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   worker.hired = true;
   worker.state = "desk";
   worker.mission = null;
@@ -560,7 +866,7 @@ export function HireNext(state) {
   }
   const workerId = HIRE_ORDER[state.setup.hireIndex];
   const worker = FindWorker(state, workerId);
-  const def = FindWorkerDef(workerId);
+  const def = FindWorkerDef(workerId, state);
   if (!worker || !def) return { ok: false, message: "候选人跑了。" };
   if (state.cash < HIRE_COST) return { ok: false, message: `现金不足 ¥${HIRE_COST.toLocaleString("zh-CN")}，连 offer 都打不起。` };
   state.cash -= HIRE_COST;
@@ -602,8 +908,8 @@ function BeginCrunch(state) {
   state.setup.step = "done";
   state.setup.allowOrders = true;
   state.spawnTimer = 4;
-  Emit(state, { kind: "boss", text: "你会了。进度环满了就发售。底下三排：压榨、安抚、堕落。" });
-  Emit(state, { kind: "toast", tone: "good", text: `${state.companyName} 正式开工。目标流水 ¥${REVENUE_GOAL.toLocaleString("zh-CN")}。别把人逼走，也别把自己炒破产。` });
+  Emit(state, { kind: "boss", text: "你会了。进度环满了就发售。底下四排：压榨、安抚、堕落、扩张。" });
+  Emit(state, { kind: "toast", tone: "good", text: `${state.companyName} 正式开工。目标 ${FormatMoney(REVENUE_GOAL)}。发一款，目录就厚一寸。` });
   Emit(state, { kind: "setup" });
 }
 
@@ -638,7 +944,7 @@ export function GetSetupCard(state) {
     };
   }
   if (step === "hire") {
-    const def = FindWorkerDef(HIRE_ORDER[state.setup.hireIndex]);
+    const def = FindWorkerDef(HIRE_ORDER[state.setup.hireIndex], state);
     const left = HIRE_ORDER.length - state.setup.hireIndex;
     return {
       title: `招聘${def.roleLabel} · 还差 ${left} 人`,
@@ -690,7 +996,7 @@ export function AssignWorker(state, workerId, target) {
   if (worker.state === "gone" || worker.state === "quitWalking") return { ok: false, message: "这位已经不吃这套了，人都走了。" };
   if (worker.state === "soaking") return { ok: false, message: "人在足浴店，命令传不进按摩房。" };
   if (worker.state === "teambuild" || worker.mission?.then === "teambuild") return { ok: false, message: "人在团建 KTV，麦克风声音比你大。" };
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   if (target === "core") {
     worker.mission = { type: "core" };
     worker.state = "moving";
@@ -737,7 +1043,7 @@ export function SlashScope(state, tumorId) {
   Emit(state, { kind: "point", x: tumor.x, y: tumor.y });
   const designer = FindWorker(state, "zhaoDagang");
   if (designer && designer.state !== "gone" && designer.state !== "quitWalking") {
-    const def = FindWorkerDef(designer.id);
+    const def = FindWorkerDef(designer.id, state);
     WorkerQuote(state, designer, def.slashLines);
     ChangeMorale(state, designer, -7);
     Emit(state, { kind: "effect", x: designer.x, y: designer.y - 64, text: "策划士气 -7", color: "#ff8a94" });
@@ -772,7 +1078,8 @@ export function BossCode(state) {
   if (state.hair <= 0) return { ok: false, message: "没有头发可以掉了。要么去足疗养一养，要么认命。" };
   state.bossCodeCooldown = BOSS_CODE_COOLDOWN;
   state.hair = Clamp(state.hair - BOSS_CODE_HAIR_COST, 0, 100);
-  state.project.progress = Math.min(state.project.need, state.project.progress + BOSS_CODE_PROGRESS);
+  const gain = BOSS_CODE_PROGRESS + (state.empire.ai.copilot ? 6 : 0);
+  state.project.progress = Math.min(state.project.need, state.project.progress + gain);
   state.stats.bossCodes += 1;
   BossSay(state, "bossCode");
   SpawnTumor(state, "bug", true);
@@ -783,7 +1090,7 @@ export function BossCode(state) {
   }
   Emit(state, { kind: "bossCode" });
   Emit(state, { kind: "sfx", id: "bossCode" });
-  Emit(state, { kind: "toast", tone: "warning", text: `老板亲自写代码：进度 +${BOSS_CODE_PROGRESS}，头发 -${BOSS_CODE_HAIR_COST}%，随赠 BUG 若干。` });
+  Emit(state, { kind: "toast", tone: "warning", text: `老板亲自写代码：进度 +${gain}，头发 -${BOSS_CODE_HAIR_COST}%，随赠 BUG 若干。` });
   return { ok: true, message: "代码已提交，责任已模糊。" };
 }
 
@@ -805,7 +1112,7 @@ export function Footbath(state, workerId) {
   worker.targetTumorId = null;
   BossSay(state, "footbath");
   Emit(state, { kind: "sfx", id: "cashOut" });
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   return { ok: true, message: `${def.name} 拿着报销单出门了。` };
 }
 
@@ -849,7 +1156,7 @@ export function GiveAward(state, workerId) {
   state.awardsGiven += 1;
   state.awardCooldown = AWARD_COOLDOWN;
   state.stats.awards += 1;
-  const def = FindWorkerDef(worker.id);
+  const def = FindWorkerDef(worker.id, state);
   BossSay(state, "award");
   ChangeMorale(state, worker, value);
   Emit(state, { kind: "effect", x: worker.x, y: worker.y - 58, text: `士气 ${value >= 0 ? "+" : ""}${value} 🏆`, color: value >= 0 ? "#ffd166" : "#ff8a94" });
@@ -978,39 +1285,116 @@ export function Release(state) {
   const averageMorale = active.length
     ? active.reduce((total, worker) => total + worker.morale, 0) / active.length
     : 20;
-  const quality = Clamp((1 - bugCount * 0.12) * (0.7 + averageMorale / 250), 0.2, 1.2);
-  const tier = REVIEW_TIERS.find((candidate) => quality >= candidate.minQuality) || REVIEW_TIERS.at(-1);
-  const revenue = Math.round(((30000 + project.scale * 25000) * quality) / 100) * 100;
+  const aiQuality = SubscribedPlans(state).reduce((total, plan) => total + (plan.quality || 0), 0);
+  const upQuality = OwnedUpgrades(state).reduce((total, item) => total + (item.quality || 0), 0);
+  const quality = Clamp((1 - bugCount * 0.12) * (0.7 + averageMorale / 250) + (aiQuality + upQuality) / 100, 0.2, 1.35);
+  const review = REVIEW_TIERS.find((candidate) => quality >= candidate.minQuality) || REVIEW_TIERS.at(-1);
+  const breakdown = GetShipBreakdown(state, quality);
+  const revenue = breakdown.revenue;
   state.cash += revenue;
   state.revenue += revenue;
+  state.empire.catalog += revenue * CATALOG_PER_SHIP;
+  state.empire.fame = Clamp(state.empire.fame + 0.04, 1, 20);
+  state.empire.nextShipMult = 1;
   state.stats.releases += 1;
   const releasedName = project.name;
-  const pool = DANMAKU_BY_STARS[tier.stars];
+  const pool = DANMAKU_BY_STARS[review.stars];
   const danmaku = [Pick(state, pool), Pick(state, pool), Pick(state, pool)];
   Emit(state, {
     kind: "release",
     name: releasedName,
-    stars: tier.stars,
-    review: tier.line,
+    stars: review.stars,
+    review: review.line,
     revenue,
+    stack: FormatShipStack(breakdown),
     bugsShipped: bugCount,
     danmaku,
   });
   Emit(state, { kind: "sfx", id: "cashIn" });
+  CheckMilestones(state);
   if (state.revenue >= state.revenueGoal) {
     state.status = "won";
     state.stats.monthsSurvived = state.month;
     Emit(state, { kind: "sfx", id: "win" });
-    return { ok: true, message: "小目标达成。", revenue, stars: tier.stars };
+    return { ok: true, message: "百亿老板。", revenue, stars: review.stars, breakdown };
   }
   project.nameIndex = (project.nameIndex + 1) % PROJECT_NAMES.length;
   project.name = PROJECT_NAMES[project.nameIndex];
   project.scale += 1;
-  project.need += 45;
+  const needGrow = state.empire.ai.cursor ? 38 : 45;
+  project.need += needGrow;
   project.progress = 0;
   state.tumors = [];
-  Emit(state, { kind: "toast", tone: "good", text: `${releasedName} 已发售：${"★".repeat(tier.stars)}${"☆".repeat(5 - tier.stars)}，进账 ¥${revenue.toLocaleString("zh-CN")}。下一款：${project.name}。` });
-  return { ok: true, message: "已发售。", revenue, stars: tier.stars };
+  Emit(state, { kind: "toast", tone: "good", text: `${releasedName} 已发售：${"★".repeat(review.stars)}${"☆".repeat(5 - review.stars)}。${FormatShipStack(breakdown)}。目录 +${FormatMoney(revenue * CATALOG_PER_SHIP)}。下一款：${project.name}。` });
+  return { ok: true, message: "已发售。", revenue, stars: review.stars, breakdown };
+}
+
+function RollSurprise(state) {
+  const roll = Rand(state);
+  const plans = SubscribedPlans(state);
+  const autoFix = plans.reduce((total, plan) => total + (plan.autoFix || 0), 0);
+  const hallucination = plans.reduce((total, plan) => total + (plan.hallucination || 0), 0);
+  const fameChance = plans.reduce((total, plan) => total + (plan.fame || 0), 0);
+
+  if (roll < 0.16) {
+    const boom = 3 + Rand(state) * 2;
+    state.empire.nextShipMult *= boom;
+    state.stats.virals += 1;
+    Emit(state, { kind: "toast", tone: "good", text: `热搜了。下一款发售 ×${boom.toFixed(1)}。别问是谁买的热搜。` });
+    Emit(state, { kind: "sfx", id: "cashIn" });
+    return;
+  }
+  if (roll < 0.28 && autoFix > 0) {
+    const bug = state.tumors.find((tumor) => tumor.kind === "bug");
+    if (bug) {
+      state.tumors = state.tumors.filter((tumor) => tumor.id !== bug.id);
+      state.stats.bugsFixed += 1;
+      Emit(state, { kind: "fixed", x: bug.x, y: bug.y, tumorKind: "bug" });
+      Emit(state, { kind: "toast", tone: "good", text: "月租 AI 自动撕掉一张缺陷单。它没要你 review。" });
+      return;
+    }
+  }
+  if (roll < 0.4 && hallucination > 0) {
+    SpawnTumor(state, "bug", true);
+    Emit(state, { kind: "toast", tone: "warning", text: "大模型幻觉：墙上多了一张老板亲笔缺陷单。谁也没写过这句需求。" });
+    return;
+  }
+  if (roll < 0.5) {
+    const gift = Math.round((12000 + StudioOf(state).id * 48000) * (0.7 + Rand(state) * 0.8));
+    state.cash += gift;
+    state.stats.investGained += gift;
+    Emit(state, { kind: "toast", tone: "good", text: `投资人路过工位，随手打了 ${FormatMoney(gift)}。他说这叫看好赛道。` });
+    Emit(state, { kind: "sfx", id: "cashIn" });
+    return;
+  }
+  if (roll < 0.6) {
+    state.empire.freezeTimer = 3.6 + Rand(state) * 1.4;
+    Emit(state, { kind: "toast", tone: "warning", text: "版号卡住了。进度冻住几秒。策划开始写情况说明。" });
+    return;
+  }
+  if (roll < 0.72 && state.empire.catalog > 0) {
+    const spike = Math.round(GetRoyaltyPerMonth(state) * (0.35 + Rand(state) * 0.7));
+    state.cash += spike;
+    state.revenue += spike;
+    state.stats.royalties += spike;
+    Emit(state, { kind: "toast", tone: "good", text: `长尾分成到账 ${FormatMoney(spike)}。有人半夜又打开了你的旧作。` });
+    CheckMilestones(state);
+    return;
+  }
+  if (roll < 0.82) {
+    state.workers.forEach((worker) => ChangeMorale(state, worker, 6));
+    Emit(state, { kind: "toast", tone: "good", text: "加班餐到了。士气小补。发票回头让财务想办法。" });
+    return;
+  }
+  if (roll < 0.9) {
+    state.empire.nextShipMult *= 0.7;
+    Emit(state, { kind: "toast", tone: "warning", text: "竞品抄了你的核心玩法。下一款发售打七折。律师还在电梯里。" });
+    return;
+  }
+  if (fameChance > 0 || roll >= 0.9) {
+    state.empire.fame = Clamp(state.empire.fame + 0.18, 1, 20);
+    Emit(state, { kind: "toast", tone: "good", text: `热度涨到 ×${state.empire.fame.toFixed(1)}。有人在饭局上提起了你们。` });
+  }
 }
 
 function TickBoss(state, dt) {
@@ -1068,8 +1452,8 @@ function TickBoss(state, dt) {
 }
 
 function TickWorker(state, worker, dt, speedMultiplier) {
-  const def = FindWorkerDef(worker.id);
-  if (worker.state === "gone") return;
+  const def = FindWorkerDef(worker.id, state);
+  if (!def || worker.state === "gone") return;
 
   if (worker.state === "soaking") {
     worker.soakTimer -= dt;
@@ -1213,20 +1597,56 @@ export function Tick(state, dt) {
   if (state.milkTeaCooldown > 0) state.milkTeaCooldown -= dt;
   if (state.awardCooldown > 0) state.awardCooldown -= dt;
 
+  if (state.empire.freezeTimer > 0) state.empire.freezeTimer = Math.max(0, state.empire.freezeTimer - dt);
+
+  const royaltyTick = GetRoyaltyPerSecond(state) * dt;
+  if (royaltyTick > 0) {
+    state.cash += royaltyTick;
+    state.revenue += royaltyTick;
+    state.stats.royalties += royaltyTick;
+  }
+
   state.monthTimer += dt;
   if (state.monthTimer >= MONTH_SECONDS) {
     state.monthTimer -= MONTH_SECONDS;
     state.month += 1;
-    const payroll = ActiveWorkers(state).length * WORKER_SALARY;
-    state.cash -= payroll;
-    Emit(state, { kind: "toast", tone: payroll > 0 ? "warning" : "normal", text: `M${String(state.month).padStart(2, "0")} 发薪日：现金 -¥${payroll.toLocaleString("zh-CN")}。梦想余额同步减少。` });
+    const payroll = ActiveWorkers(state).length * WORKER_SALARY + Math.round(state.empire.ghostStaff * WORKER_SALARY * 0.7);
+    const aiBurn = GetAiBurn(state);
+    const royalty = GetRoyaltyPerMonth(state);
+    state.cash -= payroll + aiBurn;
+    state.stats.aiSpend += aiBurn;
+    const mood = payroll + aiBurn > royalty ? "warning" : "good";
+    Emit(state, {
+      kind: "toast",
+      tone: mood,
+      text: `M${String(state.month).padStart(2, "0")} 发薪：工资 -${FormatMoney(payroll)}${aiBurn ? ` · AI月租 -${FormatMoney(aiBurn)}` : ""}。分成已按秒进账 ${FormatMoney(royalty)}/月。`,
+    });
     Emit(state, { kind: "sfx", id: "payday" });
-    state.workers.forEach((worker) => ChangeMorale(state, worker, -4));
+    const moraleHit = state.empire.upgrades.coffee ? -2 : -4;
+    state.workers.forEach((worker) => ChangeMorale(state, worker, moraleHit));
+    CheckMilestones(state);
     if (state.status !== "playing") return;
     if (state.cash < 0) {
       Lose(state, "现金归负。牛马们抱走了显示器抵工资，最后关灯的是电表。");
       return;
     }
+    if (state.revenue >= state.revenueGoal) {
+      state.status = "won";
+      state.stats.monthsSurvived = state.month;
+      Emit(state, { kind: "sfx", id: "win" });
+      return;
+    }
+  }
+
+  state.empire.surpriseTimer -= dt;
+  if (state.empire.surpriseTimer <= 0) {
+    RollSurprise(state);
+    state.empire.surpriseTimer = 12 + Rand(state) * 10;
+  }
+
+  const passive = SubscribedPlans(state).reduce((total, plan) => total + (plan.passive || 0), 0) + state.empire.ghostStaff * 0.55;
+  if (passive > 0 && state.empire.freezeTimer <= 0) {
+    state.project.progress = Math.min(state.project.need, state.project.progress + passive * GetSpeedMultiplier(state) * dt);
   }
 
   state.spawnTimer -= dt;
@@ -1241,7 +1661,7 @@ export function Tick(state, dt) {
     const candidates = ActiveWorkers(state).filter((worker) => worker.state === "desk");
     if (candidates.length && !BossAway(state)) {
       const worker = Pick(state, candidates);
-      WorkerQuote(state, worker, FindWorkerDef(worker.id).idleLines);
+      WorkerQuote(state, worker, FindWorkerDef(worker.id, state).idleLines);
     }
     state.ambientTimer = 7 + Rand(state) * 5;
   }
