@@ -4751,14 +4751,6 @@ export function StartChapter(state, index) {
     state.flags.vatFilled = true;       // 第一章打满的那缸水——舀水支线舀的就是它
     state.flags.lidShut = false;
     state.flags.coughChoice = null;
-    // 窖角草苫旁那块**撕剩的蓝花布**（wholeClothRest 认 manFound，撕过之后
-    // clothTorn 重烘成半块）：人第八天夜里叫人背走了，布留在原地——
-    // c2_open 头两行拍的那一格空草苫上剩下的就是它。跟上面几面旗同一个道理：
-    // 第一章的结果在第二章是**开场既成事实**，从章节菜单直接进来也得对
-    //（这两面旗只许在这儿立成 true，别改成 false：manFound 同时是"玩家真做过
-    // 这件事"的记录，通关断言盯着）
-    state.flags.manFound = true;
-    state.flags.clothTorn = true;
   }
   if (index <= 4) { state.flags.quiltPlugged = false; state.flags.trapBuilt = false; }
   if (index === 4) { state.flags.dogFed2 = false; state.flags.bellBuilt = false; }
