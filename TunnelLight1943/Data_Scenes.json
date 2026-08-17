@@ -38,7 +38,7 @@
           "name": "七叔家窖口"
         }
       ],
-      "_propsNote": "interior 的那间是柱子家：门开在正面墙的东次间（门心 x=34.08，东墙角 35.0），刻身高线的门框就是它。门框那件道具连着门垛一起画，所以立面淡出时门仍然长在墙上",
+      "_propsNote": "interior 的那间是柱子家：门开在正面墙的东次间（门心 x=34.08，东墙角 35.0），刻身高线的门框就是它。门框那件道具连着门垛一起画，所以立面淡出时门仍然长在墙上。**band 是逐件的深度带覆盖**（2026-08-17 用户：「路上的桌子椅子坛坛罐罐什么的 应该有一些是在路的下方 显得错落有致」）：不写＝按 Data_PropArt 那一类的默认（多半是 walk，全站在同一条地平线上，一条街读出来像摆在一根尺子上）；写了就把这一件挪到自己的纵深上——obstacle(+38px) 是「撂在路当中」、clutter(+69px) 是「堆在镜头这一侧的路肩上」。选件只挑**纯布景**：会做活的（工作台/水缸/柴堆里的绳/投布巾的石子堆）一律留在 walk，前景带会把它们画到人前面去，做活那几镜就被自己的道具挡住了。clutter 还有 1.2m 的硬上限（Data_DepthSpec）",
       "props": [
         {
           "id": "oldDoors",
@@ -75,6 +75,7 @@
         },
         {
           "id": "cartShafts",
+          "band": "obstacle",
           "kind": "cartShafts",
           "x": 15.6,
           "name": "空车辕",
@@ -101,6 +102,7 @@
         },
         {
           "id": "spinWheel",
+          "band": "obstacle",
           "kind": "spinWheelBroken",
           "x": 24.9,
           "name": "踩碎的纺车",
@@ -158,6 +160,7 @@
         },
         {
           "id": "yardStool",
+          "band": "obstacle",
           "kind": "stool",
           "x": 35.9,
           "name": "院里的小板凳"
@@ -296,6 +299,7 @@
         },
         {
           "id": "pigpen",
+          "band": "obstacle",
           "kind": "pigpen",
           "x": 44.9,
           "name": "猪圈",
@@ -303,12 +307,13 @@
         },
         {
           "id": "dirtPigpen",
+          "band": "obstacle",
           "kind": "freshDirt",
           "x": 44.9,
           "w": 3.1,
           "showFlag": "dirtPigpen",
           "name": "猪圈里垫的新土",
-          "note": "倒完那一筐才出现（c1_dig）。土真的落到了地上，这一层是它的去处"
+          "note": "倒完那一筐才出现（c1_dig）。土真的落到了地上，这一层是它的去处。band 跟着猪圈走——新土是倒**在圈里**的，圈挪到 obstacle 带、土还留在 walk 上的话，两样东西差 38px，土就摊在圈墙后头了"
         },
         {
           "id": "dirtRoad",
@@ -443,6 +448,7 @@
         },
         {
           "id": "henYardA",
+          "band": "clutter",
           "kind": "hen",
           "x": 65.7,
           "hideFlag": "raidStarted",
@@ -450,6 +456,7 @@
         },
         {
           "id": "henCoop",
+          "band": "obstacle",
           "kind": "henCoop",
           "x": 66.6,
           "name": "刘家的鸡窝"
@@ -463,6 +470,7 @@
         },
         {
           "id": "woodpile",
+          "band": "obstacle",
           "kind": "woodpile",
           "x": 70,
           "name": "木料堆"
@@ -477,6 +485,7 @@
         },
         {
           "id": "millstone",
+          "band": "obstacle",
           "kind": "millstone",
           "x": 76,
           "name": "磨盘"
@@ -570,6 +579,7 @@
         },
         {
           "id": "yardDog",
+          "band": "clutter",
           "kind": "emptyKennel",
           "x": 138,
           "name": "王家的狗",
@@ -647,6 +657,7 @@
         },
         {
           "id": "dungHome",
+          "band": "clutter",
           "kind": "dungHeap",
           "x": 38.2
         },
@@ -659,6 +670,7 @@
         },
         {
           "id": "dungPen",
+          "band": "clutter",
           "kind": "dungHeap",
           "x": 45.6
         },
@@ -674,6 +686,7 @@
         },
         {
           "id": "stalksE",
+          "band": "obstacle",
           "kind": "woodpile",
           "x": 133.5
         }
