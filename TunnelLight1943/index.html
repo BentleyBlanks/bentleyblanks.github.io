@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=128">
+  <link rel="stylesheet" href="./Style_Game.css?v=129">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,32 +33,34 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=128",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=128",
+        "three": "./vendor/three/build/three.module.js?v=129",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=129",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=128",
-        "./Script_World.js": "./Script_World.js?v=128",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=128",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=128",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=128",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=128",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=128",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=128",
-        "./Script_Audio.js": "./Script_Audio.js?v=128",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=128",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=128",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=128",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=128",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=128",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=129",
+        "./Script_World.js": "./Script_World.js?v=129",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=129",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=129",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=129",
+        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=129",
+        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=129",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=129",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=129",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=129",
+        "./Script_Audio.js": "./Script_Audio.js?v=129",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=129",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=129",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=129",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=129",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=129",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=128",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=128",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=128",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=128",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=128",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=128",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=128",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=128"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=129",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=129",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=129",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=129",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=129",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=129",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=129",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=129"
       }
     }
   </script>
@@ -128,6 +130,8 @@
       <button id="btnQuit" class="panelRow" type="button">回到标题<small>进度已存</small></button>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+      <!-- 动画工作台：全屏预览骨架的每一条轨道/姿势/步态，按名字点名重做（F4 / ?anim=名字） -->
+      <button id="btnAnim" type="button">调试 · 动画工作台<small>F4</small></button>
     </section>
     <!-- 包袱条（勇敢的心式收藏品栏）：右缘一条纸底竖条，一格一件老物件。
          收到新东西时整条滑进来亮一下那格（peek），平时按 B 或点包袱钮打开。
@@ -254,6 +258,32 @@
     <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
   </section>
 
+  <!-- 动画工作台（2026-08-17）：骨架里的每一条轨道 / 姿势 / 步态按名字列出来，自己一块
+       画布上循环播、拖时间轴、逐帧走、换人、叠关键帧影子、量手脚离地；右栏摊开这条动画
+       的一切（源码行、时长、帧、驱动、用在哪几拍）。为的是动画退回能按名字点名
+       （「scoopChild 第 3→4 帧太快」），不再靠描述画面/贴截图。骨架在这儿，内容
+       Script_AnimLab.mjs 现填；入口在设置面板里 / F4 / ?anim=名字。 -->
+  <section id="animPanel" hidden aria-label="动画工作台">
+    <header>
+      <b>调试 · 动画工作台</b>
+      <input id="animSearch" type="search" placeholder="搜：名字 / 说明 / 节拍 id / 谁在用（/ 聚焦）" autocomplete="off" spellcheck="false">
+      <span id="animStatus"></span>
+      <button id="animClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div id="animBody">
+      <nav id="animList" aria-label="动画清单"></nav>
+      <div id="animStage">
+        <div id="animView">
+          <canvas id="animCanvas" aria-label="动画预览"></canvas>
+          <canvas id="animOverlay" aria-hidden="true"></canvas>
+          <div id="animViewTag"></div>
+        </div>
+        <div id="animTransport"></div>
+      </div>
+      <aside id="animInfo"></aside>
+    </div>
+  </section>
+
   <!-- 主菜单（2026-08-17 重做，用户：「这开始菜单还弄个两层是干什么？」）：
        一列竖着的条目，市面上的叙事游戏都是这个形。老版把「从第一章开始 ／
        跳到任意一幕」两颗钮、八枚章节牌、一张键盘对照表全摊在标题页上——
@@ -332,6 +362,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=128"></script>
+<script type="module" src="./Script_Main.js?v=129"></script>
 </body>
 </html>
