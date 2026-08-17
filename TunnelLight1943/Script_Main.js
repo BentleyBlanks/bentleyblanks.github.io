@@ -1561,21 +1561,35 @@ function PaintArt() {
   const P = 480, ik = 3.2;                    // PART_PPM / INK_K，跟 Script_Rig 一个数
   const sc = 0.46 * zoom;                     // 只是摆到画布上，线宽仍按 ik 给
   const [coat, coatDark] = ART.RIG_COLOR(c.kind);
+  // box = [宽m, 高m, 枢轴u, 枢轴v]，跟 Script_Rig 的 Bake 调用一个数
   const parts = [
-    ["躯干 DrawTorsoPart", (x, y) => ART.DrawTorsoPart(g, x, y, 0.29 * P * sc, 0.52 * P * sc, c.kind, "abt" + c.kind, ik * sc)],
-    ["上臂 DrawLimb", (x, y) => ART.DrawLimb(g, x, y, 0.25 * P * sc, 0.115 * P * sc, 0.092 * P * sc, coat, "aba" + c.kind, { k: ik * sc })],
-    ["前臂＋手", (x, y) => {
+    ["躯干 DrawTorsoPart", c.kind === "officer" ? [0.418, 0.60, 0.653, 0.88] : [0.29, 0.60, 0.5, 0.88],
+      (x, y) => ART.DrawTorsoPart(g, x, y, 0.29 * P * sc, 0.52 * P * sc, c.kind, "abt" + c.kind, ik * sc)],
+    ["上臂 DrawLimb", [0.115, 0.25, 0.5, 0],
+      (x, y) => ART.DrawLimb(g, x, y, 0.25 * P * sc, 0.115 * P * sc, 0.092 * P * sc, coat, "aba" + c.kind, { k: ik * sc })],
+    ["前臂＋手", [0.15, 0.38, 0.5, 0], (x, y) => {
       ART.DrawLimb(g, x, y, 0.24 * P * sc, 0.092 * P * sc, 0.074 * P * sc, coat, "abf" + c.kind, { k: ik * sc });
       ART.DrawHandPart(g, x, y + 0.24 * P * sc, 0.044 * P * sc, ART.PAL.skin, "abh" + c.kind, { k: ik * sc, lw: 3 });
     }],
-    ["大腿 DrawLimb", (x, y) => ART.DrawLimb(g, x, y, 0.31 * P * sc, 0.145 * P * sc, 0.112 * P * sc, coatDark, "abg" + c.kind, { k: ik * sc })],
-    ["小腿 DrawShinPart", (x, y) => ART.DrawShinPart(g, x, y, 0.31 * P * sc, 0.112 * P * sc, 0.086 * P * sc, c.kind, "abs" + c.kind, { k: ik * sc })],
-    ["脚 DrawFootPart", (x, y) => ART.DrawFootPart(g, x, y, 0.19 * P * sc, 0.09 * P * sc, ART.RIG_LEG(c.kind).footF, "abo" + c.kind, ik * sc)],
+    ["大腿 DrawLimb", [0.145, 0.31, 0.5, 0],
+      (x, y) => ART.DrawLimb(g, x, y, 0.31 * P * sc, 0.145 * P * sc, 0.112 * P * sc, coatDark, "abg" + c.kind, { k: ik * sc })],
+    ["小腿 DrawShinPart", [0.12, 0.31, 0.5, 0],
+      (x, y) => ART.DrawShinPart(g, x, y, 0.31 * P * sc, 0.112 * P * sc, 0.086 * P * sc, c.kind, "abs" + c.kind, { k: ik * sc })],
+    ["脚 DrawFootPart", [0.31, 0.15, 0.22, 0],
+      (x, y) => ART.DrawFootPart(g, x, y, 0.19 * P * sc, 0.09 * P * sc, ART.RIG_LEG(c.kind).footF, "abo" + c.kind, ik * sc)],
   ];
   let px2 = hr * 3.5;
   const topY = H * 0.38;
-  for (const [label, draw] of parts) {
+  const pad = 10 * ik * sc;                   // 同 BakePart：留给墨线抖动的边
+  for (const [label, box, draw] of parts) {
+    const [bw, bh, pu, pv] = box;
+    g.save();
+    g.beginPath();
+    g.rect(px2 - pu * bw * P * sc - pad, topY - pv * bh * P * sc - pad,
+      bw * P * sc + pad * 2, bh * P * sc + pad * 2);
+    g.clip();
     draw(px2, topY);
+    g.restore();
     Label(g, px2, topY + 0.36 * P * sc + 26, label, dark);
     px2 += 92 * zoom;
   }

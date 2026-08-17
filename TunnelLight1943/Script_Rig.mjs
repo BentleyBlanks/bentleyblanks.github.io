@@ -103,10 +103,20 @@ function BuildParts(kind, haze = null) {
   const Bake = (wM, hM, pu, pv, fn) => BakePart(wM, hM, pu, pv, fn, haze);
   const LONG_COAT = kind === "family" || kind === "sister";   // 大襟褂过胯
   const parts = {
-    torso: () => Bake(BONE.torsoW, BONE.torso + (LONG_COAT ? 0.16 : 0.08), 0.5,
-      // 枢轴（胯）在画布下沿往上留出下摆的位置
-      LONG_COAT ? 0.72 : 0.88,
-      (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K)),
+    // 军官胯后那把刀鞘斜指后下方，画到 −0.92 个躯干宽——比画布左沿还出去 0.42 个
+    // 宽度，**在游戏里就被裁掉了**：刀尖成了一条齐刷刷切在大襟外的短杠（2026-08-17
+    // 美术样式浏览器一放大就抓着了）。同帽垂/长发那条老账：**装备探出躯干，就得给
+    // 画布留出那一截**，别指望它自己缩回来
+    torso: () => {
+      const sabre = !!ART.UNIFORM[kind]?.sabre;
+      const wM = BONE.torsoW * (sabre ? 1.44 : 1);
+      return Bake(wM, BONE.torso + (LONG_COAT ? 0.16 : 0.08),
+        // 多出来的宽全留在身后（枢轴＝胯，按新画布折算）
+        sabre ? 0.94 / 1.44 : 0.5,
+        // 枢轴（胯）在画布下沿往上留出下摆的位置
+        LONG_COAT ? 0.72 : 0.88,
+        (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K));
+    },
     // 戴帽垂的（日军）得给脑后那片布留出画布：它垂过后颈，比头本身低一截。
     // 枢轴（脖根）在画布里的高度不变，只在下面多加一段——不然布会被裁平
     head: () => {

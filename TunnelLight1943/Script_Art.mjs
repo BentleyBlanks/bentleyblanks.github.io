@@ -1223,16 +1223,24 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     InkFill(ctx, Spline([P(-1.06, -1.26), P(-0.90, -1.74), P(-0.30, -2.04), P(0.36, -2.00),
       P(0.82, -1.72), P(0.98, -1.42), P(0.92, -1.10), P(-1.00, -0.98)], 4),
     id + "cap", "#5f5a30", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    InkFill(ctx, [P(0.84, -1.50), P(1.58, -1.36), P(1.52, -1.18), P(0.86, -1.30)],
-      id + "brim", "#4a461f", { amp: 0.6 * k, lw: lw * 0.85 });
+    // 帽檐（同军官那笔的账）：老版是一条 0.74r 长、几乎水平的平行四边形，放大看
+    // 是从帽子上支出去的一根棍。战斗帽的檐**短、带弧、往前下方压**——它的活是
+    // 盖住眼睛（日军的帽檐压得比谁都低，那张冷脸就是这么来的），不是往前伸
+    // 檐要**够大**才描得起一圈墨线：0.48r 那一版（第一次改完）在真线宽下被墨线
+    // 填成一个疙瘩——同「五官小、线细」那条的反面，**小形体配全圈墨线＝一坨**。
+    // 现在跟军官的帽檐一个量级，往前下方压，盖住眼线
+    InkFill(ctx, Spline([
+      P(0.88, -1.46), P(1.24, -1.42), P(1.52, -1.24),
+      P(1.44, -1.08), P(1.10, -1.14), P(0.90, -1.28),
+    ], 4), id + "brim", "#4a461f", { amp: 0.5 * k, lw: lw * 0.7 });
   } else if (kind === "officer") {
     // **卫生胡（方块胡）**：太君脸就靠这一撮认。横在人中上，鼻底与唇缝之间
     ctx.save();
     clipFace();
     InkFill(ctx, [
-      P(F.brow - 0.36, -0.58), P(F.brow + 0.02, -0.61),
-      P(F.brow - 0.01, -0.45), P(F.brow - 0.38, -0.42),
-    ], id + "stache", "#1e160f", { amp: 0.35 * k, lw: 1.1 * k });
+      P(F.brow - 0.33, -0.59), P(F.brow - 0.19, -0.63), P(F.brow - 0.06, -0.61),
+      P(F.brow - 0.08, -0.48), P(F.brow - 0.20, -0.50), P(F.brow - 0.32, -0.47),
+    ], id + "stache", "#241b12", { amp: 0.35 * k, lw: 1.1 * k });
     ctx.restore();
     // 大盖帽（九八式軍帽）重做（2026-08-17 用户："太君这个不太像"）。
     // 老版是一只圆头的碗＋一根平板帽檐，读出来是钢盔。真东西的四件：
@@ -1249,8 +1257,10 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     // 帽顶与帽墙之间那道硬棱
     InkLine(ctx, px - r * 1.14, py - r * 1.50, px + r * 1.16, py - r * 1.58,
       id + "welt", { lw: 1.3 * k, color: "rgba(18,20,12,0.6)", amp: 0.3 * k });
-    // 帽墙：立着的一圈，绯红（1938 年式定色；按 sRGB 老账压两档）
-    InkFill(ctx, [P(-1.14, -1.50), P(1.16, -1.58), P(1.14, -1.20), P(-1.10, -1.12)],
+    // 帽墙：立着的一圈，绯红（1938 年式定色；按 sRGB 老账压两档）。
+    // **下沿停在眉弓上头**（−1.26，见「帽子戴在眉上，不是眼上」）：老版给到 −1.12，
+    // 正压在眼线（−1.14）上，整顶帽子扣在眼睛上、眼镜只好退到腮帮子上去
+    InkFill(ctx, [P(-1.14, -1.50), P(1.16, -1.58), P(1.14, -1.30), P(-1.10, -1.24)],
       id + "band", "#5a2418", { amp: 0.35 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.2)" });
     // 帽墙正面一粒星徽（哑金，别亮）
     ctx.save();
@@ -1265,16 +1275,18 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
-    // 帽檐：黑漆皮，往前下方斜切、带弧
+    // 帽檐：黑漆皮，从帽墙下沿往前下方斜切、带弧。**探出去半个脸宽就够**——
+    // 老版给到 2.02r（比整颗头还宽），放大看是一张鸭嘴；而它真正的活是**盖住眼线**
+    // （−1.14），所以要的是往下压，不是往前伸
     InkFill(ctx, Spline([
-      P(0.94, -1.34), P(1.62, -1.30), P(2.02, -1.10),
-      P(1.94, -0.94), P(1.44, -1.00), P(0.96, -1.10),
+      P(0.92, -1.36), P(1.30, -1.32), P(1.54, -1.18),
+      P(1.46, -1.04), P(1.16, -1.06), P(0.94, -1.14),
     ], 4), id + "visor", "#1b1e14", { amp: 0.3 * k, lw: lw * 0.85, shade: null });
     // 漆皮的高光：上沿一条
-    InkLine(ctx, px + r * 1.02, py - r * 1.30, px + r * 1.90, py - r * 1.10,
+    InkLine(ctx, px + r * 1.00, py - r * 1.32, px + r * 1.44, py - r * 1.19,
       id + "gloss", { lw: 1.2 * k, color: "rgba(196,200,180,0.42)", amp: 0.2 * k });
     // 颏带：帽墙底下一条细带，压在帽檐根上
-    InkLine(ctx, px - r * 1.06, py - r * 1.16, px + r * 1.06, py - r * 1.22,
+    InkLine(ctx, px - r * 1.06, py - r * 1.28, px + r * 1.02, py - r * 1.34,
       id + "chin", { lw: 1.6 * k, color: "#20180f", amp: 0.25 * k });
     // 圆片眼镜：太君脸的第二个记号。镜片罩在被帽檐压暗的眼位上，
     // 镜腿往后勾到耳朵——**只描圈不填色**，填了就成了墨镜
@@ -1282,21 +1294,37 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ctx.strokeStyle = "rgba(28,24,16,0.85)";
     ctx.lineWidth = 1.3 * k;
     ctx.lineCap = "round";
-    const gx2 = px + r * (F.brow - 0.20), gy2 = py - r * 0.96;
+    // **镜片钉在眼线上**：眼线＝颅顶到颏的一半，这颗头上是 −1.14r。老版写 −0.96，
+    // 差出去的 0.18r 在 55px 的头上就是十个像素——镜片整个落到腮帮子上，
+    // 一颗孤零零的圈读出来是单片眼镜
+    const gx2 = px + r * (F.brow - 0.22), gy2 = py - r * 1.13;
     ctx.beginPath();
-    ctx.ellipse(gx2, gy2, r * 0.20, r * 0.17, 0, 0, Math.PI * 2);
+    ctx.ellipse(gx2, gy2, r * 0.19, r * 0.165, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.beginPath();                                     // 鼻梁上那道
-    ctx.moveTo(gx2 + r * 0.20, gy2 - r * 0.03);
-    ctx.lineTo(gx2 + r * 0.30, gy2 - r * 0.05);
+    ctx.moveTo(gx2 + r * 0.19, gy2 + r * 0.01);
+    ctx.lineTo(gx2 + r * 0.29, gy2 - r * 0.01);
     ctx.stroke();
-    ctx.beginPath();                                     // 镜腿勾到耳后
-    ctx.moveTo(gx2 - r * 0.20, gy2 - r * 0.03);
-    ctx.quadraticCurveTo(px - r * 0.20, py - r * 1.02, px - r * 0.44, py - r * 0.96);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(214,226,232,0.16)";            // 镜片一点反光，不遮眼
+    // 镜腿：**平着往后勾到耳朵上头**，不许从镜片朝斜上方支出去——老版的控制点
+    // 给在 −1.02（比镜心还高），那条线从镜片翻过帽墙横到脑后，实拍是一根天线
     ctx.beginPath();
-    ctx.ellipse(gx2, gy2, r * 0.19, r * 0.16, 0, 0, Math.PI * 2);
+    ctx.moveTo(gx2 - r * 0.19, gy2 + r * 0.01);
+    ctx.quadraticCurveTo(px + r * 0.02, py - r * 1.06, px - r * 0.32, py - r * 0.97);
+    ctx.stroke();
+    // 眼：镜片后头一道很窄的缝（面无表情、凶）。**它不是"眼窝上的阴影"**——
+    // 遮它的是真压在那儿的帽檐与这片玻璃，一道缝只是让人知道底下有只眼睛
+    ctx.save();
+    clipFace();
+    ctx.strokeStyle = "rgba(24,20,14,0.82)";
+    ctx.lineWidth = 1.5 * k;
+    ctx.beginPath();
+    ctx.moveTo(gx2 - r * 0.10, gy2 + r * 0.015);
+    ctx.lineTo(gx2 + r * 0.11, gy2 - r * 0.005);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = "rgba(206,220,228,0.20)";            // 一片很淡的玻璃，压在眼上
+    ctx.beginPath();
+    ctx.ellipse(gx2, gy2, r * 0.18, r * 0.155, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   } else if (kind === "puppet") {
