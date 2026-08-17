@@ -8,7 +8,11 @@ import {
   PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn,
 } from "./Script_Core.mjs";
 import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
+// 美术样式浏览器要按名字调很多支笔，整个模块拿进来（它本来就已经在模块图里）
+import * as ART from "./Script_Art.mjs";
+import { BONE as RIG_BONE } from "./Script_Rig.mjs";
 import { CreateWorld } from "./Script_World.js";
+import { CreateAnimLab } from "./Script_AnimLab.mjs";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
@@ -109,12 +113,19 @@ for (const id of [
   "noticeOverlay", "noticeSheet", "noticeClose",
   "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose", "btnCine",
+  "btnAnim", "animPanel",
+  "btnArt", "artBrowser", "artList", "artCanvas", "artMeta", "artClose", "artZoom", "artDark",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
 ]) ui[id] = document.getElementById(id);
 
 const params = new URLSearchParams(location.search);
 const fastCinematic = params.get("fast") === "1";
+
+// 动画工作台（调试用，全屏）：自己一台渲染器，不碰世界；开着的时候世界停住、
+// 键盘全归它（见 MenuKey 顶上那一条）。渲染器懒建——没打开过就不占 WebGL 上下文
+const animLab = ui.animPanel ? CreateAnimLab({ root: ui.animPanel }) : null;
+const AnimLabOpen = () => !!animLab && animLab.IsOpen();
 
 // ---------------------------------------------------------------------------
 // 进度与存档（2026-08-17 加，用户：「哪有一个线性游戏能跳关的 还没有存档？」）
@@ -219,6 +230,7 @@ window.addEventListener("keydown", (e) => {
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
+  if (k === "f4") { animLab?.Toggle(); e.preventDefault(); return; }
   // Esc ＝ 暂停：呼出设置面板（世界当帧停住）。市面上的游戏都在这颗键上。
   if (k === "escape") { OpenSettings(true); e.preventDefault(); return; }
   if (k === "1" || k === "2") {
@@ -227,7 +239,13 @@ window.addEventListener("keydown", (e) => {
   }
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
-window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
+// M 开关声音——但打字的时候（工作台的搜索框）敲到 m 不算
+window.addEventListener("keydown", (e) => {
+  if (AnimLabOpen()) return;
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.key.toLowerCase() === "m") ToggleSound();
+});
 
 const DEBUG_KEYS = ["`", "f2", "～", "·", "f3"];   // f3 ＝ 过场时间轴
 // 菜单开着时键盘归菜单：Esc 收一层、↑↓ 在条目间挪、回车/空格按下去。
@@ -235,6 +253,11 @@ const DEBUG_KEYS = ["`", "f2", "～", "·", "f3"];   // f3 ＝ 过场时间轴
 // **一层一层地收**（确认框 > 操作说明 > 设置 > 标题页）：Esc 收掉最上面那一张，
 // 不是一把全关——同一颗键收两层东西，玩家会以为自己按错了。
 function MenuKey(e, k) {
+  // 动画工作台是最上面那一层：开着时键盘整个归它（空格播放、←→ 逐帧、Esc 关）
+  if (AnimLabOpen()) {
+    if (k === "f4") { animLab.Close(); e.preventDefault(); return true; }
+    return animLab.Key(e, k) !== false;
+  }
   if (!ui.confirmOverlay.hidden) {
     if (k === "escape") { CloseConfirm(); e.preventDefault(); }
     return true;
@@ -253,7 +276,7 @@ function MenuKey(e, k) {
       e.preventDefault();
       return true;
     }
-    if (DEBUG_KEYS.includes(k)) return false;   // 标题页上也能开调试面板（选关就在那儿）
+    if (DEBUG_KEYS.includes(k) || k === "f4") return false;   // 标题页上也能开调试面板（选关就在那儿）/ 动画工作台
     return true;    // 回车/空格交给按钮的默认行为，别被玩法那几行吃掉
   }
   return false;
@@ -488,8 +511,6 @@ let frozen = false;
 // 发飘（?fast=1 那条 ×5 只在过场里用，过场没有物理）
 let playSpeed = 1;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
-// 过场分级的当前档（0=一个字节都不动）。见 UpdateCamera 末尾与 World.SetCineGrade
-let gradeNow = 0;
 
 function ActorAt(state, id) {
   if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
@@ -715,17 +736,10 @@ function UpdateCamera(state, dt) {
     world.SetCineFore((def?.fg && state.phase === "playing") ? def.fg : null, null, 16 / 9, "play:" + (def?.id || ""));
     world.SetSplitShot(null);
   }
-  // 过场分级：过场满档，玩法段只有节拍显式声明 `grade` 才给（序章那三拍）。
-  // 换挡走 6/s 的吸附——硬切会在跳幕/暂停这些不走 iris 的地方"啪"地跳一下
-  {
-    const def2 = state.phase === "playing" ? CurrentBeatDef(state) : null;
-    const want = state.phase !== "playing" ? 0
-      : inCinematic ? 1
-        : (def2?.grade ?? 0);
-    gradeNow += (want - gradeNow) * Math.min(1, dt * 6);
-    if (Math.abs(want - gradeNow) < 0.01) gradeNow = want;
-    world.SetCineGrade(gradeNow);
-  }
+  // 分级不再按拍换挡（2026-08-17 用户：「统一游戏过场的内外」）：World 那一遍
+  // 后期一直开着、过场与玩法同一条曲线，所以这儿一个字都不用管。原来这里有
+  // 一段 6/s 的吸附，负责在"过场满档 ↔ 玩法不分级"之间过渡——接缝没了，
+  // 过渡也就没了。要拨强度去 World.SetCineGrade，那是全局的。
   // 做功那几拍的活卡（划线 / 刨料 / 接绳 / 叠衣裳）：铺满画框、每帧重画，玩家
   // 的手就按在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、
   // ApplyCamera 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
@@ -1477,6 +1491,172 @@ ui.btnDebug?.addEventListener("click", () => {
   ToggleDebug(true);
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
+// 动画工作台的入口也收在设置里（同调试面板：开发工具不常驻画面）
+ui.btnAnim?.addEventListener("click", () => {
+  CloseSettings();
+  ToggleDebug(false);
+  animLab?.Open();
+});
+
+// ── 人物美术样式浏览器（2026-08-17 用户要的）────────────────────────────
+// 做的人用的东西，不是玩家 UI，所以入口藏在设置面板里（同调试面板）。
+// 两条设计前提：
+//   ① **画的必须是游戏里真用的那几支笔**（`ART.DrawHeadPart` / `DrawLimb` /
+//      `DrawTorsoPart` / `DrawFootPart` / `DrawHandPart` / `DrawCharacter`），
+//      不许另画一套示意图——不然"看的"和"跑的"是两回事，改完还得进游戏碰运气。
+//   ② **墨线粗细必须按游戏的比例给**：骨头贴图是 PART_PPM=480、INK_K=3.2，
+//      也就是 k = 3.2·r/(headR·480)。拿 k=1 预览会看着秀气、进游戏全糊——
+//      脸改了八稿，五稿是栽在这上头（见 CLAUDE.md「脸」那一节第 1 条）。
+// 右边那块「名目」把 kind / 中文名 / 画笔分支 / 文件位置一起列出来，就是为了
+// 跟 AI 说话时一句话定位（"改 officer 的 crown"）。
+const ART_SHEET = [
+  { kind: "player", name: "柱子", role: "主角（半大孩子）", hair: "短发刘海",
+    where: "HeadHair（short）", note: "第一章体型 0.75、头 ×1.34（HEAD_K）、身子 ×0.88、脸长 ×0.76。颅大脸短身子细" },
+  { kind: "sister", name: "妹妹", role: "被护送者", hair: "短发刘海＋头顶抓髻＋红头绳",
+    where: "HeadHair（child）", note: "一二章体型 0.60、头 ×1.52、身子 ×0.80、脸长 ×0.66。头顶那枚心情气泡主要给她" },
+  { kind: "family", name: "娘", role: "主角的母亲", hair: "长发刘海＋项后一道布绳",
+    where: "HeadHair（long）", note: "体型 0.90。蓝底白花的短褂是全章的暗线" },
+  { kind: "father", name: "爹", role: "主角的父亲（木匠）", hair: "长发刘海",
+    where: "HeadHair（long）", note: "体型 1.00" },
+  { kind: "villager", name: "乡亲", role: "村里人（共用一套）", hair: "盘头巾（羊肚手巾）",
+    where: "HeadScarf", note: "体型 0.95。全村共用一张贴图——要逐人不同得按 id 分缓存" },
+  { kind: "militia", name: "民兵", role: "区小队 / 民兵", hair: "白毛巾",
+    where: "DrawHeadPart 的 militia 分支", note: "体型 0.98" },
+  { kind: "puppet", name: "伪军", role: "本乡人，不做丑角", hair: "黑大盖帽＋白帽墙＋漆皮檐",
+    where: "DrawHeadPart 的 puppet 分支（crown/band/visor）",
+    note: "体型 0.97。一身黑号衣＋褐皮斜带＋白裹腿＋黑布鞋；跟军官同是大盖帽，分开靠白帽墙与白裹腿这两道亮" },
+  { kind: "soldier", name: "日军兵", role: "扫荡的兵", hair: "战斗帽＋帽垂",
+    where: "DrawHeadPart 的 soldier 分支 + DrawCapFlap", note: "体型 0.99。帽垂是侧视认日军最硬的标志" },
+  { kind: "officer", name: "军官（太君）", role: "带队的军官", hair: "大盖帽＋绯红帽墙＋星徽＋圆片眼镜＋卫生胡",
+    where: "DrawHeadPart 的 officer 分支（crown/band/visor/stache）", note: "体型 0.98" },
+];
+let artPick = 0;
+
+function BuildArtList() {
+  if (!ui.artList || ui.artList.childElementCount) return;
+  ART_SHEET.forEach((c, i) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<b>${c.name}</b><small>${c.kind}</small>`;
+    b.addEventListener("click", () => { artPick = i; PaintArt(); });
+    li.appendChild(b);
+    ui.artList.appendChild(li);
+  });
+}
+
+function PaintArt() {
+  const cv = ui.artCanvas;
+  if (!cv) return;
+  const c = ART_SHEET[artPick];
+  [...ui.artList.children].forEach((li, i) => li.firstChild.classList.toggle("on", i === artPick));
+  // 画布按面板实际大小重设（高分屏也要清楚）
+  const box = cv.parentElement.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(520, Math.round(box.width - 24)), H = Math.max(320, Math.round(box.height - 150));
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  cv.style.width = `${W}px`;
+  cv.style.height = `${H}px`;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const dark = !!ui.artDark?.checked;
+  g.fillStyle = dark ? "#241f18" : "#cfc7b2";
+  g.fillRect(0, 0, W, H);
+  const zoom = (Number(ui.artZoom?.value) || 150) / 100;
+
+  // ① 头：**按游戏的线宽比例**给 k（见上头第 ② 条）
+  const hr = 74 * zoom;
+  const hk = 3.2 * hr / (RIG_BONE.headR * 480);
+  g.save();
+  g.translate(hr * 1.6, H * 0.66);
+  ART.DrawHeadPart(g, 0, 0, hr, c.kind, "ab" + c.kind, hk);
+  g.restore();
+  Label(g, hr * 1.6, H * 0.66 + hr * 0.62, "头 DrawHeadPart", dark);
+
+  // ② 零件一排：躯干 / 上臂 / 前臂＋手 / 大腿 / 小腿 / 脚——就是骨架烘的那几张
+  const P = 480, ik = 3.2;                    // PART_PPM / INK_K，跟 Script_Rig 一个数
+  const sc = 0.46 * zoom;                     // 只是摆到画布上，线宽仍按 ik 给
+  const [coat, coatDark] = ART.RIG_COLOR(c.kind);
+  // box = [宽m, 高m, 枢轴u, 枢轴v]，跟 Script_Rig 的 Bake 调用一个数
+  const parts = [
+    ["躯干 DrawTorsoPart", c.kind === "officer" ? [0.418, 0.60, 0.653, 0.88] : [0.29, 0.60, 0.5, 0.88],
+      (x, y) => ART.DrawTorsoPart(g, x, y, 0.29 * P * sc, 0.52 * P * sc, c.kind, "abt" + c.kind, ik * sc)],
+    ["上臂 DrawLimb", [0.115, 0.25, 0.5, 0],
+      (x, y) => ART.DrawLimb(g, x, y, 0.25 * P * sc, 0.115 * P * sc, 0.092 * P * sc, coat, "aba" + c.kind, { k: ik * sc })],
+    ["前臂＋手", [0.15, 0.38, 0.5, 0], (x, y) => {
+      ART.DrawLimb(g, x, y, 0.24 * P * sc, 0.092 * P * sc, 0.074 * P * sc, coat, "abf" + c.kind, { k: ik * sc });
+      ART.DrawHandPart(g, x, y + 0.24 * P * sc, 0.044 * P * sc, ART.PAL.skin, "abh" + c.kind, { k: ik * sc, lw: 3 });
+    }],
+    ["大腿 DrawLimb", [0.145, 0.31, 0.5, 0],
+      (x, y) => ART.DrawLimb(g, x, y, 0.31 * P * sc, 0.145 * P * sc, 0.112 * P * sc, coatDark, "abg" + c.kind, { k: ik * sc })],
+    ["小腿 DrawShinPart", [0.12, 0.31, 0.5, 0],
+      (x, y) => ART.DrawShinPart(g, x, y, 0.31 * P * sc, 0.112 * P * sc, 0.086 * P * sc, c.kind, "abs" + c.kind, { k: ik * sc })],
+    ["脚 DrawFootPart", [0.31, 0.15, 0.22, 0],
+      (x, y) => ART.DrawFootPart(g, x, y, 0.19 * P * sc, 0.09 * P * sc, ART.RIG_LEG(c.kind).footF, "abo" + c.kind, ik * sc)],
+  ];
+  let px2 = hr * 3.5;
+  const topY = H * 0.38;
+  const pad = 10 * ik * sc;                   // 同 BakePart：留给墨线抖动的边
+  for (const [label, box, draw] of parts) {
+    const [bw, bh, pu, pv] = box;
+    g.save();
+    g.beginPath();
+    g.rect(px2 - pu * bw * P * sc - pad, topY - pv * bh * P * sc - pad,
+      bw * P * sc + pad * 2, bh * P * sc + pad * 2);
+    g.clip();
+    draw(px2, topY);
+    g.restore();
+    Label(g, px2, topY + 0.36 * P * sc + 26, label, dark);
+    px2 += 92 * zoom;
+  }
+
+  // ③ 整身的平贴图（HUD 牌面与背景乡亲用的那一张）：跟骨架不是同一支笔，
+  // 所以并排放着看——两处得对得上，不然"牌上是甲、路上是乙"
+  g.save();
+  g.translate(W - 92 * zoom, H * 0.74);
+  ART.DrawCharacter(g, { x: 0, y: 0, S: 2.6 * zoom, kind: c.kind, id: "abc" + c.kind, facing: 1 });
+  g.restore();
+  Label(g, W - 92 * zoom, H * 0.80, "整身 DrawCharacter", dark);
+
+  ui.artMeta.innerHTML = `
+    <div class="artRow"><span>kind</span><div><code>${c.kind}</code> · <b>${c.name}</b></div></div>
+    <div class="artRow"><span>角色</span><div>${c.role}</div></div>
+    <div class="artRow"><span>头饰</span><div>${c.hair}</div></div>
+    <div class="artRow"><span>画笔</span><div><code>${c.where}</code></div></div>
+    <div class="artRow"><span>文件</span><div><code>Script_Art.mjs</code> · 骨架装配 <code>Script_Rig.mjs</code></div></div>
+    <div class="artRow"><span>备注</span><div>${c.note}</div></div>`;
+}
+
+function Label(g, x, y, text, dark) {
+  g.save();
+  g.font = "13px system-ui, sans-serif";
+  g.textAlign = "center";
+  g.fillStyle = dark ? "rgba(226,216,192,0.72)" : "rgba(52,42,30,0.72)";
+  g.fillText(text, x, y);
+  g.restore();
+}
+
+function OpenArt(open) {
+  if (!ui.artBrowser) return;
+  ui.artBrowser.hidden = !open;
+  if (open) {
+    CloseSettings();
+    BuildArtList();
+    PaintArt();
+    ui.artClose?.focus({ preventScroll: true });
+  }
+}
+ui.btnArt?.addEventListener("click", () => OpenArt(true));
+ui.artClose?.addEventListener("click", () => OpenArt(false));
+ui.artZoom?.addEventListener("input", PaintArt);
+ui.artDark?.addEventListener("change", PaintArt);
+// 点面板外面也收（同告示阅读层的老规矩）
+ui.artBrowser?.addEventListener("pointerdown", (e) => {
+  if (e.target === ui.artBrowser) OpenArt(false);
+});
+
+
 
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);
@@ -1737,7 +1917,9 @@ let lastSaveKey = "";
 // 暂停：菜单类面板开着的时候世界停住。**包袱与告示不在此列**——那两样是
 // Core 自己的闸（state.bagOpen / noticeOpen），它们还要靠 StepGame 收 E 键关掉。
 function MenuFrozen() {
-  return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden;
+  // 两块全屏工作台（动画工作台 / 人物美术样式）也算菜单：开着的时候世界停住
+  return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden
+    || AnimLabOpen() || !(ui.artBrowser?.hidden ?? true);
 }
 
 function Frame(now) {
@@ -1823,8 +2005,13 @@ function RunFrame(now, dt) {
     soundtrack.Step(state, dt);
     SyncDebugPanel();
   }
-  world.Render();
-  world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
+  // 动画工作台开着：它铺满整屏，主画面不用画（省一整帧 GPU），改画它那块
+  if (AnimLabOpen()) animLab.Step(dt);
+  else {
+    // 后果小窗一起交给 Render：全局分级要连它一块儿过，不然那块角落是全屏
+    // 唯一没走后期的地方（见 World 的 Render 注释）
+    world.Render(pipRect);
+  }
   interactEdge = false;
   advanceEdge = false;
   tapEdge = false;
@@ -1876,6 +2063,11 @@ if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
   if (beatParam >= 1) JumpToBeat(chapterParam - 1, beatParam - 1);
 }
 if (params.get("debug") === "1") ToggleDebug(true);
+// ?anim=1 打开动画工作台；?anim=scoopChild 直接选中那一条
+if (params.get("anim") !== null && animLab) {
+  const want = params.get("anim");
+  animLab.Open(want && want !== "1" ? want : undefined);
+}
 
 // 过场时间轴（底栏，Unity Timeline 式）。它不改剧本，只把"演到哪儿"变成能指着
 // 说的东西：拖到哪一格游戏就推到哪一格并冻住，「复制定位」给出的
@@ -1913,6 +2105,8 @@ window.TunnelLight = {
   },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
+  // 动画工作台：Open(name?) / Close / Select / Seek / Play / SetKind / LimbTips / Ref / Entries
+  AnimLab: animLab,
   // 征夫告示那张纸这一档排出来的字号／列数（CSS 像素）。给渲染健康测试用：
   // 字小到认不出是这张纸唯一验得了对错的事
   NoticeMetrics: () => { PaintNoticeSheet(); return noticeMetrics; },
