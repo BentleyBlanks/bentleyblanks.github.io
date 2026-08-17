@@ -92,7 +92,7 @@ for (const id of [
   "btnControls", "btnTitleSettings",
   "controlsScreen", "controlsClose", "btnHelp", "btnQuit",
   "confirmOverlay", "confirmTitle", "confirmText", "confirmYes", "confirmNo",
-  "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
+  "prompt", "toast", "crouchTag", "itemTag", "itemName",
   "objectiveTab", "objectiveTabIcon", "objectiveTabText", "objectiveTabHint",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
   "detectionVignette", "fadeOverlay", "irisOverlay", "slitMatte",
@@ -798,7 +798,6 @@ let toastShown = null;
 let choiceBuilt = false;
 let fadeLevel = 1;
 let lastObjective = undefined;
-let objectiveT = 0;
 
 function HideChoice() {
   ui.choiceOverlay.hidden = true;
@@ -939,18 +938,22 @@ function SyncActPrompt(state, pr, fill) {
 }
 
 // ---------------------------------------------------------------------------
-// 角上那枚「下一件事」（勇敢的心式）
+// 角上那枚「下一件事」（勇敢的心式）——目标 HUD **只有这一处**
 //
-// 中间那条目标只在变化时闪 6.5 秒，闪完玩家再想问"我这会儿到底要干嘛"就没处查
-// 了；可常驻一行字又会把画面读成任务列表。所以常驻的只有**一枚图**——画框边那张
-// 提示牌的同一支画笔、同一套推导（Core.BeatHintIcon → Art.DrawHudBadge），角上
-// 认得的图走到框边还是同一张。字要看的时候才给：鼠标悬停（CSS 管）/ 点一下。
-// 换了图只顶一下，不展开字——那会儿中间的目标条正把全文说着，两处同时说同一句
-// 就是重复。
+// 2026-08-17 用户：「把水带回家这种小任务和左上角的任务目标 icon 这块功能还是
+// 有点重合的 合并一下吧 简化一点」。老版是两件东西说同一句话：屏幕正中一条目标
+// 在换目标时闪 6.5 秒，左上角一枚图常驻、悬停/点开才给字——玩家在换目标那一刻
+// 同时看见两处"把水带回家"。现在中间那条整个撤了，角上这枚牌把它的活接过来：
+// **换了目标，牌自己张开把字说一遍（同样几秒）再收回图**；之后想再看，悬停
+// （CSS 管）/ 点一下。图与画框边那张提示牌同一支画笔、同一套推导
+// （Core.BeatHintIcon → Art.DrawHudBadge），角上认得的图走到框边还是同一张。
+// 目标在过场里换的（牌那会儿藏着），等牌再露面时补说——不然那句就没人说过。
 // ---------------------------------------------------------------------------
 let objIconFp = "";
 let objTextFp = "";
-let objTabT = 0;          // 点开之后自己收回去的倒计时（悬停那条归 CSS，不进这儿）
+let objTabT = 0;          // 张开之后自己收回去的倒计时（悬停那条归 CSS，不进这儿）
+let objFresh = false;     // 目标刚换过、字还没给玩家看过（牌藏着的时候先欠着）
+const OBJ_TAB_HOLD = 6.5; // 张开多久：换目标自动张的、点一下张的，一个数
 
 function PaintObjectiveIcon(icon) {
   const cv = ui.objectiveTabIcon;
@@ -970,12 +973,16 @@ function SetObjTabOpen(open) {
   if (!el) return;
   el.classList.toggle("open", open);
   el.setAttribute("aria-expanded", open ? "true" : "false");
-  objTabT = open ? 7 : 0;
+  objTabT = open ? OBJ_TAB_HOLD : 0;
 }
 
 function SyncObjectiveTab(state, inCinematic, objective, dt) {
   const el = ui.objectiveTab;
   if (!el) return;
+  if (objective !== lastObjective) {
+    lastObjective = objective;
+    objFresh = !!objective;   // 藏着的时候先欠着，露面那一帧再说
+  }
   const show = state.phase === "playing" && !inCinematic && !!objective;
   if (!show) {
     if (!el.hidden) { el.hidden = true; SetObjTabOpen(false); }
@@ -1005,6 +1012,9 @@ function SyncObjectiveTab(state, inCinematic, objective, dt) {
     el.classList.toggle("noHint", !hint);
     el.setAttribute("aria-label", hint ? `${objective}。${hint}` : objective);
   }
+
+  // 换了目标：牌自己张开把字说一遍（老版这句是屏幕正中那条目标条说的）
+  if (objFresh) { objFresh = false; SetObjTabOpen(true); }
 
   if (objTabT > 0) {
     objTabT -= dt;
@@ -1055,19 +1065,8 @@ function SyncHud(state, dt, shotFade) {
     ui.caption.hidden = true;
   }
 
-  // 目标：只在变化时露一小会儿（勇敢的心式克制 HUD），之后画面自己说话
-  const objective = GetObjective(state);
-  if (objective !== lastObjective) {
-    lastObjective = objective;
-    objectiveT = objective ? 6.5 : 0;
-    ui.objectiveText.textContent = objective || "";
-    ui.hintText.textContent = (objective && GetHint(state)) || "";
-  }
-  if (objectiveT > 0) objectiveT -= dt;
-  const objVisible = objectiveT > 0 && !inCinematic;
-  ui.objectiveText.parentElement.style.opacity = objVisible ? 1 : 0;
-  // 那一闪过去之后，「下一件事」仍旧挂在左上角那枚牌上
-  SyncObjectiveTab(state, inCinematic, objective, dt);
+  // 目标：只有左上角那一枚牌（换目标时它自己张开说一遍，之后画面自己说话）
+  SyncObjectiveTab(state, inCinematic, GetObjective(state), dt);
 
   // 节拍自己的提示优先；没有的时候，把"这儿能上下"这件事说出来。
   // 带按键的走头顶那枚徽章，没按键的状态行（"跟上娘""！探杆就在头顶"）
