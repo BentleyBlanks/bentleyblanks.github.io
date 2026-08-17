@@ -2116,10 +2116,10 @@ export function CreateWorld(canvasEl) {
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
-    // 街面：只管镜头跟前那七米，贴图密度是大地面的三十倍（大地面一张贴图要摊
-    // 410 米宽，横着只有 3.4 像素/米——车辙画出来是两米四宽的一条色带）。
+    // 街面：只管镜头跟前那七米，给出"街比田沉一档"这个调子（撒点已整批删掉，
+    // 见 Script_WorldPaint 那一节：地面抢戏比地面单调糟得多）。
     // 地下场景不用：那儿的"地"是地道底
-    if (!sceneDef.underOnly) AddRoadPlane(layers.play, L, ch.light, ch.scene + "road");
+    if (!sceneDef.underOnly) AddRoadPlane(layers.play, L, ch.light);
     // 第八章：院子一带留下焦土
     if (state.flags.ruined) {
       for (const bx of [30, 62, 92]) {
