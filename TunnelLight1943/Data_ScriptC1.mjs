@@ -128,6 +128,32 @@ export function ChapterC1(K) {
     // 前景压左缘，**不许压画框下沿**——她整条胳膊就躺在下沿那一带
     fg: [{ art: "doorJamb", u: -0.88, v: 0, z: 0.80, w: 0.20, h: 0.42, dim: 2.02 }],
   };
+  // ── 「三天后」翻过去之后，**世界**该是什么样（2026-08-17）────────────────
+  // 娘已经不在了、翻板重新敞着、板缝那几条光收起来、天亮回来、两个孩子回到地面。
+  //
+  // **这几样是状态，不是画面**，所以必须有一条跳幕也走得到的路。老版整段只写在
+  // c1_open 那条微过场的行内 `on()` 里，而**跳幕结算一行微过场都不播**（旗标要
+  // 落在 effect / settle 里，on() 只管画面——CLAUDE.md 那条老规矩）。后果是：
+  // 从序章任意一幕往后跳，**娘就一直跪在窖口守着翻板**（c1_thatday 最后一句把她
+  // 摆在 29.95 起 hatchGuard，而收她的三处——c1_hide 的 tick、c1_open 的微过场、
+  // c1_forage 的 onStart——跳幕一处都跑不到），一路守到 §8 兄妹俩做饭；
+  // 同一笔账里 `lidShut` 也赖着不走，屋里那块盖板一直合着往窖里打光。
+  // 2026-08-17 用户报的就是这个（「为什么最后的兄妹两个做饭会有娘的戏份」）。
+  //
+  // 走位（谁站在哪儿、镜头、字卡）**不写在这里**：跳幕的落点归 SettleDest，
+  // 微过场那一头照旧自己摆。这里只留"翻过这一页之后，世界跟原来不一样了"的那几笔。
+  const DayThreeWorld = (state) => {
+    state.flags.lidShut = false;      // 翻板重新敞着
+    state.beamSlant = 0;              // 板缝那几条光收起来
+    state.lightOverride = "dawn";     // 天亮回来
+    // 娘没有回来。窖口那尊 hatchGuard 从这一刻起不该再出现在任何一幕里
+    const m = FindActor(state, "mother");
+    if (m) { m.visible = false; m.cineTarget = null; m.track = null; m.pose = null; }
+    // 两个孩子回到地面（妹妹的落点与姿势由演出那一头给）
+    const sis = FindActor(state, "sister");
+    if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; }
+    state.player.level = "surface";
+  };
   return [
     {
       // ── 序 · 那天（第八稿独立成场；镜头调度沿用 2026-08-13 那版重做） ──
@@ -428,8 +454,8 @@ export function ChapterC1(K) {
       // 到了窖底她只探进半张脸：「搂紧她。」「不叫你们，别上来。」翻板合上——
       // 最后消失在板缝里的，是她那截蓝底白花的袖子。
       kind: "chain", id: "c1_descend", timeOfDay: "day", indoorScene: true, bgm: null,
-      // 序这三拍是一段连着的戏，分级也不许中途换脸（玩法段默认不分级）
-      grade: 0.82,
+      // （原来这儿有个 grade: 0.82：序这三拍夹在过场中间，得自己补一档分级才不会
+      //   中途换脸。2026-08-17 分级改成全局常开之后，节拍级的分级整个没了意义。）
       objective: "带妹妹下窖", hint: "娘掀着翻板等着你们",
       onStart: (state) => {
         state.player.cineWalk = null;
@@ -680,7 +706,7 @@ export function ChapterC1(K) {
       // 粮袋割破；靴子踩上翻板，灰从板缝落下来；屋外一声喊，靴子离开。
       // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
       // 「打进来的光」要有黑给它打进来才成立。
-      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null, grade: 0.82,
+      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null,
       zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 15, sustain: true,
       // 按住的十五秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
       // holdPose 留着当兜底口径
@@ -791,6 +817,10 @@ export function ChapterC1(K) {
       // 倒水进缸），先在安全的地方学会，再在要命的地方用。
       kind: "chain", id: "c1_open", timeOfDay: "dark",
       objective: "给妹妹盖上", hint: "她一只脚露在外面",
+      // **这一拍是全章唯一一处"时间翻页"，而它整个长在微过场里**——跳幕直落
+      // 后面的任何一幕都不会播它，所以那几笔状态得在这儿再交一次
+      // （同一个函数，不抄第二份；说明见文件顶上的 DayThreeWorld）
+      settle: DayThreeWorld,
       onStart: (state) => StartMicroCine(state, [
         // 序的收尾：柱子仍然搂着妹妹。板缝里的光从直的变成斜的（beamSlant
         // 已由 c1_hide 落下），又一点点暗下去
@@ -831,15 +861,12 @@ export function ChapterC1(K) {
         { act: "", d: 2.2, cam: { kind: "dark" },
           on: (state) => {
             state.titleCard = { num: "", title: "三天后", t: 0, dur: 2.0 };
-            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来
-            state.flags.lidShut = false;
-            state.beamSlant = 0;
-            state.lightOverride = "dawn";
-            const m = FindActor(state, "mother");
-            if (m) { m.visible = false; m.cineTarget = null; }
+            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来。
+            // **状态那几笔走 DayThreeWorld**（这一拍的 `settle` 调的是同一个函数，
+            // 跳幕直落后面才不会把娘落在窖口）；这儿只补演出要的走位
+            DayThreeWorld(state);
             const sis = FindActor(state, "sister");
-            if (sis) { sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
-            state.player.level = "surface";
+            if (sis) { sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.2;
           } },
         // 黑屏一声肚子叫——不是大人的，是小孩那种咕噜噜的空响
@@ -990,9 +1017,12 @@ export function ChapterC1(K) {
       //
       // 2026-08-16（第九稿）：Notion 那版写的是"压成一条五步直链"，**没照做**——
       // 8-15 用户刚为「找东西不能排成一条直线」退回过一次（CLAUDE.md 有整节）。
-      // 这一场因此只换**输入**：三处的动作全部改由「按住 E ＋ 方向」驱动
-      // （掀席 E＋↑ / 扫槽底·刨灰堆 E＋↓ / 顺着坛肩抹 E＋←→ / 抠泥封 E＋↑），
-      // 拟物的分量、脱手、卡口一条没动。要真收成直链，把这一步换掉即可。
+      // 这一场因此只换**输入**：三处的动作全部由「按住 E ＋ 方向」驱动
+      // （掀席 E＋↑ / 扫槽底·刨灰堆 E＋↓ / 钉住之后顺着坛肩抹 E＋↔ / 抠泥封＋揭碗片
+      // E＋↑）。**2026-08-17 第二轮**：不再是"虚拟指尖替你拖"，而是直读方向键、
+      // 每一步都亮键帽（Core 各 case 里的 StrokePrompt），指针拖拽整个下线；
+      // 分量留在时间里（硬土慢一倍、席子有角速度上限、松手坠回）。
+      // 要真收成直链，把这一步换掉即可。
       forage: { trough: 11.6, reed: 9.7, ash: 7.4 },
       onStart: (state) => {
         // 妹妹还在铺盖上睡（立面合着自然看不见她）；序里的人早收干净了
@@ -1090,7 +1120,7 @@ export function ChapterC1(K) {
                 { type: "scoopAsh", zone: { x: 7.4, w: 2.2 },
           note: "扒开周围的土——一个小口坛。坛口糊着泥，上面压着半块碗底。",
           effect: (state) => { state.flags.jarDug = true; } },
-                // 抠开泥封、揭碗片（活卡）。碗片底下垫着一圈碎布——蓝底白花。
+                // 抠开泥封、揭碗片（活卡，按住 E＋↑ 一路到底）。碗片底下垫着一圈碎布——蓝底白花。
                 // 画面短暂切回娘跪在窖口的手臂（序里那半张脸的机位），再切回坛子
                 { type: "unwrapJar", zone: { x: 7.4, w: 2.2 },
           effect: (state) => {
@@ -1138,14 +1168,15 @@ export function ChapterC1(K) {
       ],
     },
     {
-      // 第二场（玩法）：分食（第七稿改成玩家的手）。三下：
-      //   ① **掰**——泡软的红薯干，捏住哪儿就从哪儿断，你掰出一长一短；
-      //   ② **分**——两截、两只碗，随你放；
-      //   （她醒了。不管长的那截在谁碗里，她都伸手把长的推到你这边来。）
-      //   ③ **换回去**——把它捞出来，水沥了沥，搁回她碗里。按下去那一下，
-      //      就是这句：「吃你的。」
+      // 第二场（玩法）：分食。三下（2026-08-17 照 Notion 关卡设计第 6 拍收成四动词，
+      // 用户点名「分红薯」不该是复杂交互；老版三段全在卡上捏着拖，第三段连键盘都走不通）：
+      //   ① **掰｜按住 E＋← 或 →**——从你使劲那头断开，一长一短（掰哪儿断哪儿留住了）；
+      //   ② **分进两只碗｜E**——一按，长的那截搁进她碗里，短的留给自己（卡上动画）；
+      //   （她醒了。看看两只碗，伸手把长的推到你这边来，低头不看你。）
+      //   ③ **放回她碗里｜E**——一按，捞出来、提在半空沥两滴、搁回她碗里（卡上动画）。
+      //      按下去那一下，就是这句：「吃你的。」
       // 红薯干泡软了才 0.12m，玩法景别里不到 1% 画宽——同石笔/接绳，
-      // 长在铺满画框的活卡上（SPLIT_CARD → Art.DrawSplitCard）。
+      // 长在铺满画框的活卡上（SPLIT_CARD → Art.DrawSplitCard），卡只当画面用。
       // 这一版的善意谎不靠旁白点破，全长在推来推去那几下手上。
       kind: "chain", id: "c1_meal", timeOfDay: "day",
       objective: "分红薯干", hint: "泡软了。掰开，分进两只碗",
@@ -1168,7 +1199,7 @@ export function ChapterC1(K) {
                 } },
             ]);
           } },
-        // ①② 掰 + 分（活卡）
+        // ①② 掰（按住 E＋↔）＋ 分进两只碗（E，卡上动画）
         { type: "split", zone: { x: 34.6, w: 2.6 },
           effect: (state) => {
             StartMicroCine(state, [
@@ -1209,7 +1240,7 @@ export function ChapterC1(K) {
                 cam: CINE(34.0, 0.44, 2.90, [FG.kangLow(1.82, 1.2, 0.22)]) },
             ]);
           } },
-        // ③ 换回去（活卡第二段）：捞出来，提在半空沥两滴，放回她碗里
+        // ③ 放回她碗里（E，卡上动画）：捞出来，提在半空沥两滴，搁回她碗里
         { type: "split", phase: "swap", zone: { x: 34.6, w: 2.6 },
           effect: (state) => {
             state.flags.mealSplit = true;
@@ -2660,8 +2691,8 @@ export function ChapterC1(K) {
                 cam: CINE(27.9, UNDER_Y + 0.5 - 0.26, 2.3, [FG.strawLow(1.12, 1.0, 0.24)]) },
             ]);
           } },
-        // ② 撕开蓝布（活卡）：抓住布的一角，沿横向拖动——
-        // 第一下绷紧、第二下裂口、继续拉，一条长布分离下来
+        // ② 撕开蓝布（活卡，按住 E＋←，三把）：第一把绷紧、第二把裂口、
+        // 第三把顺着裂口一路撕到头，一条长布分离下来
         { type: "tear", zone: { x: 27.9, w: 2.4, level: "under" },
           effect: (state) => {
             state.flags.clothTorn = true;

@@ -25,7 +25,8 @@ import { LadderHolds } from "./Data_Ladder.mjs";
 // 无状态的画笔/烘焙/绘制序工具（2026-08-15 从 CreateWorld 闭包抽出）——见该文件头
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
-  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
+  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, GROUND_PLANE_DIP,
+  LAYER_ORDER,
   MakeCanvas, MakeCastShadow, MakeFlatShadow, MakeShaftMouth, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
 } from "./Script_WorldPaint.mjs";
@@ -1310,6 +1311,53 @@ export function CreateWorld(canvasEl) {
 
     // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
     const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+      // ── 断口的那条边：土层的上沿、耕作层、墨线、草茬四处共用它 ──────────
+      // **这一撮东西横跨"看得见"与"看不见"的那条线，所以先把线找出来**
+      //（2026-08-17 用户：「道路上的绿草被砍断了一半一样 有点显示bug」）。
+      // 那条线是 `AddGroundPlane`——全场唯一不透明又写深度的几何，躺在
+      // SURFACE_Y−GROUND_PLANE_DIP 上、纵深一直铺到 z=2.5，**压在这张 z=2.2 的
+      // 剖面前面**：从地表机位看，剖面上低于那条线的内容一律被它切掉，而它躺着，
+      // 所以切口是一条**笔直的横线**（实测 1600×900 上落在 y≈889）。
+      // 老版这一片有三处各自往线上探：`DrawEarthStrata` 的头一层土**自带 ±7px
+      // 的上沿起伏**（画笔内部的事，这儿压根没声明）、墨线与耕作层按 `gy+Wob`
+      // 起伏 ±4px、草茬则长在后者上。于是路面上头露出来的是：一条横贯全场的
+      // 土色板带 ＋ 一道暗杠（墨线）＋ 一道亮杠（耕作层），而草茬**从最粗的
+      // 根部被平着切断**，只剩腰上那一截悬在半空——一排草看着像被谁横着铲过一遍。
+      // 两条治法：
+      //   · **断口整条沉到那条线以下**（起伏一点没少，只是不许再翻上来），而且
+      //     土层的上沿**剪在这条边底下**——画笔自己那 ±7px 从此说不上话。断口是
+      //     给地道那一侧看的；地表这边路面是连着铺过来的，本来就不该有断口。
+      //   · **草茬与土坷垃扎在路面那条线上**（`rootY`，根埋进去一丝）。地面就在
+      //     那儿，草是从地里长出来的——根最粗的那一头正好落在线上、往上收尖，
+      //     于是切口不再切在任何一笔的半腰上。
+      const gy = toPy(SURFACE_Y);
+      const cutY = toPy(SURFACE_Y - GROUND_PLANE_DIP);
+      // 三支正弦：十米一起、三米一伏、再加一档一米二的糙（原来这一档在
+      // DrawEarthStrata 里自己走，收进来之后整条边只有一处真相）
+      const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
+        + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5
+        + Math.sin(px * 0.105 + ART.Hash(sceneKey + "tw3") * 5) * 0.9;
+      const WOB_AMP = 5.0;          // 三支正弦的幅度之和
+      const INK_HALF = 1.9;         // 墨线半宽（lineWidth 3）再留一点余量
+      const sink = Math.max(0, cutY + INK_HALF + WOB_AMP - gy);
+      const Edge = (px) => gy + sink + Wob(px);
+      const rootY = cutY + 1;       // 草根/土坷垃：路面线底下一丝
+      // 沿着那条边走一遍（剪土层、填耕作层、描墨线共用）
+      const WalkEdge = () => {
+        ctx.moveTo(0, Edge(0));
+        for (let px = 0; px <= wPx; px += 12) ctx.lineTo(px, Edge(px));
+        ctx.lineTo(wPx, Edge(wPx));
+      };
+
+      ctx.save();
+      // 土层剪在断口那条边底下（`clip` 之前必须现走一遍路径——当前路径不进
+      // save/restore，这是本仓库的老账）
+      ctx.beginPath();
+      ctx.moveTo(0, hPx);
+      WalkEdge();
+      ctx.lineTo(wPx, hPx);
+      ctx.closePath();
+      ctx.clip();
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
       // 土体整体压暗：参考里的地下几乎是纯黑，细节只留在洞沿一圈
       ctx.save();
@@ -1321,17 +1369,16 @@ export function CreateWorld(canvasEl) {
       ctx.fillStyle = dk;
       ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
       ctx.restore();
+      ctx.restore();
 
       // —— 地平线那一刀：这是**地表被切开的断口**，不是两张贴图的接缝
       //（2026-08-11 用户：「地道口那里为什么有一条分割线一样的，上面下面
       // 有点土一样的颜色」）。老版上沿就是 fillRect 的直边：上头是地表的土色、
       // 下头是剖面的土色，两块平色贴着一条razor直线，读出来只能是"贴图裁齐了"。
       // 断口该有三样东西：翻耕过的表土比生土浅一档、一条起伏的墨线、
-      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）
+      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）。
+      // 这三样都钉在上头那条 `Edge`／`rootY` 上——为什么，见那一段的账
       {
-        const gy = toPy(SURFACE_Y);
-        const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
-          + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5;
         const night = CHAPTERS[state.chapterIndex].light === "night"
           || CHAPTERS[state.chapterIndex].light === "dark";
         // ① 耕作层：常年翻的那 30 公分，比底下的生土松、浅。
@@ -1339,32 +1386,30 @@ export function CreateWorld(canvasEl) {
         const tilth = 0.34 * PPM;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 14) ctx.lineTo(px, gy + Wob(px));
-        ctx.lineTo(wPx, gy + tilth);
-        ctx.lineTo(0, gy + tilth);
+        WalkEdge();
+        ctx.lineTo(wPx, gy + sink + tilth);
+        ctx.lineTo(0, gy + sink + tilth);
         ctx.closePath();
-        const til = ctx.createLinearGradient(0, gy, 0, gy + tilth);
+        const til = ctx.createLinearGradient(0, gy + sink, 0, gy + sink + tilth);
         til.addColorStop(0, night ? "rgba(104,86,60,0.5)" : "rgba(154,128,88,0.46)");
         til.addColorStop(1, night ? "rgba(104,86,60,0)" : "rgba(154,128,88,0)");
         ctx.fillStyle = til;
         ctx.fill();
         // ② 断口的墨线：跟着起伏走，不是一条直边
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 20) ctx.lineTo(px, gy + Wob(px));
+        WalkEdge();
         ctx.strokeStyle = "rgba(36,26,16,0.62)";
         ctx.lineWidth = 3;
         ctx.stroke();
-        // ③ 草茬与翻出来的土坷垃：长在沿上，把那条直线彻底啃断。
-        //    竖井口那一圈自己有碎土（见下面 shaftGeom 那段），这儿让开它
+        // ③ 草茬与翻出来的土坷垃：**扎在路面那条线上**（`rootY`，不是断口的沿），
+        //    从地表看就是路沿上冒出来的一撮草。竖井口那一圈自己有碎土
+        //    （见下面 shaftGeom 那段），这儿让开它
         const nearShaft = (wx) => shaftGeom.some((g) => Math.abs(wx - g.wx) < SHAFT_R + 0.3);
         const grass = night ? ART.PAL.grassNight : ART.PAL.grass;
         for (let px = 0; px <= wPx; px += 17) {
           const wx = x0 + px / PPM;
           if (nearShaft(wx)) continue;
           const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
-          const base = gy + Wob(px);
           if (r > 0.42) {
             // 一片草是**尖的**：根粗梢细、还得往一边披。老版是三根等宽的直线段，
             // 这块贴图在画面上要放大四五倍——上屏读出来是一排绿色小方块
@@ -1376,19 +1421,23 @@ export function CreateWorld(canvasEl) {
               const lean = (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 1.5;
               const wRoot = 1.5 + ART.Hash(sceneKey + "tw" + px + b) * 0.9;
               ctx.beginPath();
-              ctx.moveTo(bx - wRoot / 2, base + 1);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, base - hgt * 0.55,
-                bx + lean * hgt, base - hgt);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, base - hgt * 0.45,
-                bx + wRoot / 2, base + 1);
+              ctx.moveTo(bx - wRoot / 2, rootY + 1);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, rootY - hgt * 0.55,
+                bx + lean * hgt, rootY - hgt);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, rootY - hgt * 0.45,
+                bx + wRoot / 2, rootY + 1);
               ctx.closePath();
               ctx.fill();
             }
           } else if (r < 0.14) {
-            // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
+            // 翻出来的土坷垃：压在线上，一半在线上一半在线下。
+            // **大小与埋深都要差得开**——`r` 被 0.14 那道门夹住，拿它算尺寸就是
+            // 一串一样大的坷垃，露在路面上的又都是同样厚的一片，读出来是花纹不是土
+            const cr = 2.6 + ART.Hash(sceneKey + "cw" + px) * 4.4;
+            const cy = rootY + cr * (0.18 + ART.Hash(sceneKey + "cd" + px) * 0.8);
             ctx.fillStyle = night ? "rgba(78,64,44,0.9)" : "rgba(112,90,60,0.9)";
             ctx.beginPath();
-            ctx.ellipse(px, base + 1, 2.6 + r * 12, 2 + r * 8, 0, 0, Math.PI * 2);
+            ctx.ellipse(px, cy, cr, cr * 0.68, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1569,21 +1618,32 @@ export function CreateWorld(canvasEl) {
       // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
       for (const g of shaftGeom) {
         const stopY = g.yBot - 0.42 * PPM;
+        // 洞沿从**路面那条线**底下起描：`g.yTop` 在地表线上头 10cm（井口啃掉地面
+        // 一线），那一截落在路面以上，屏幕上就是窖口两边各悬一道斜的黑杠、
+        // 底边还被路面齐刷刷切平（同上头 Edge/rootY 那段账）
+        const inkTop = Math.max(g.yTop, cutY + 3.5);
         for (const side of [-1, 1]) {
           ctx.beginPath();
-          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
-          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.moveTo(g.x + side * g.half(inkTop), inkTop);
+          for (let y = inkTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
           ctx.strokeStyle = "rgba(24,17,10,0.62)";
           ctx.lineWidth = 5.5;
           ctx.stroke();
         }
-        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        // 井口一圈翻出来的碎土：把地面那条直边啃断。
+        // **一半埋在路面里**（`rootY`，跟草茬、土坷垃同一条线）：老版按井口的
+        // `g.yTop`（＝地表线往上 10cm）摆，而地面平面把路面以下全切掉了——
+        // 于是这九块土整个浮在路面上头，实拍就是窖口跟前悬着一串深色圆饼
+        //（同上头 Edge/rootY 那段账，2026-08-17 用户报的"显示bug"里就有它）
+        // 九块**等距**排开的土，各自只露出同样厚的一片，就是一排花纹——
+        // 所以埋深与落点都得错开（同「等距的横杠是梯子不是炭裂」那条老账）
         for (let i = 0; i < 9; i += 1) {
           const t = i / 8;
-          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32
+            + (ART.Hash(g.id + "cx" + i) - 0.5) * 9;
           const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
           ctx.beginPath();
-          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.arc(px, rootY + r * (0.14 + ART.Hash(g.id + "cy" + i) * 0.82), r, 0, Math.PI * 2);
           ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
           ctx.fill();
         }
@@ -2321,6 +2381,17 @@ export function CreateWorld(canvasEl) {
     if (extra.climbing) s.phase += movedY * 4.5;
     else if (isMoving) s.phase += moved * 3.4 / bsPh;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
+    // 梯子上停没停（2026-08-17 可停可掉头）：停了 settle 升到 1，Rig 把半空的手脚
+    // 收到档上；一动就掉回 0。升得慢一点（0.3s 落稳），掉得快（一动就接着爬）
+    // 停没停读 Core 的竖向速度（extra.climb.still），不读画出来的位移——实拍冻帧时
+    // 位移也是 0，按位移判会把正爬着的一格拍成"停稳了"
+    {
+      const still = extra.climbing && !!extra.climb?.still;
+      const tgt = still ? 1 : 0;
+      const rate = still ? 5 : 12;
+      s.climbSettle = (s.climbSettle || 0) + (tgt - (s.climbSettle || 0)) * Math.min(1, (dt || 0.016) * rate);
+      if (!extra.climbing) s.climbSettle = 0;
+    }
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
@@ -2344,7 +2415,8 @@ export function CreateWorld(canvasEl) {
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       // 爬梯：这架梯子的落点表 + 方向 + **画出来的脚线**（不是 Core 的，两者差一个缓动）
-      climb: extra.climb ? { holds: extra.climb.holds, dir: extra.climb.dir, base: y, bs: bsRig } : null,
+      // + settle（0 在爬 … 1 停稳）：停下来那一刻手脚要落到档上，不许悬在半空
+      climb: extra.climb ? { holds: extra.climb.holds, dir: extra.climb.dir, base: y, bs: bsRig, settle: s.climbSettle || 0 } : null,
       poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
       childArms: extra.childArms,
       track: extra.track, trackT: extra.trackT,
@@ -2588,8 +2660,8 @@ export function CreateWorld(canvasEl) {
     const def = CurrentBeatDef(state);
     const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
     // 爬梯：人在哪架梯子上（离得最近的竖井口）→ 那架梯子的落点表 + 往上/往下。
-    // Core 一按下就把 level 翻成目的层，所以方向直接读目的层
-    const climbDir = p.level === "under" ? -1 : 1;
+    // 方向读 Core 的 p.climb.dir（最近一次爬的方向：停下来姿势不变，掉头才换）
+    const climbDir = p.climb?.dir ?? (p.level === "under" ? -1 : 1);
     const ClimbSpecAt = (x) => {
       let best = null, bd = 1.5;
       for (const sh of sceneDef.shafts || []) {
@@ -2599,7 +2671,8 @@ export function CreateWorld(canvasEl) {
       if (!best) return null;
       let holds = ladderHoldsCache.get(best.id);
       if (!holds) { holds = LadderHolds(SURFACE_Y, UNDER_Y, best.id); ladderHoldsCache.set(best.id, holds); }
-      return { holds, dir: climbDir };
+      // still：松手停在梯子上（Core 的竖向速度归零）——跟着爬的妹妹与他同停同走
+      return { holds, dir: climbDir, still: !p.climb || Math.abs(p.climb.v || 0) < 0.02 };
     };
 
     // ① 先把这一帧的光源点清出来：影子朝哪边拖、谁挡谁的光，都要先知道灯在哪
@@ -3476,7 +3549,14 @@ export function CreateWorld(canvasEl) {
             new THREE.PlaneGeometry(0.44, 0.41),
             new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
           );
-          FixOrder(m, LAYER_ORDER.fx + 340);
+          // **排在过场框景之后**（2026-08-17 用户：「这张图里的顶部是什么鬼东西」）。
+          // 老版排在 fx+340＝7340，而过场那几块框景板在 cine＝8450：序章「抱她。」
+          // 那一镜房梁横在她头顶，**气泡的身子被梁挡住、只剩底下那个尖露出来**，
+          // 屏幕上是画框顶上挂着一枚认不出的白色小楔子。
+          // 这枚气泡不是屋里的东西，是**漫画式的状态提示**（照《勇敢的心》），
+          // 所以它不该被一块贴在镜头跟前的板子吃掉——排到框景之后去。
+          // 仍然压在昼夜罩（ORDER_DARK 8500）之前：夜里/窖里它该跟着一起暗。
+          FixOrder(m, LAYER_ORDER.cine + 40);
           layers.fx.add(m);
           moodMeshes.set(key, m);
         }
@@ -5712,33 +5792,71 @@ export function CreateWorld(canvasEl) {
   }
 
   // =========================================================================
-  // 过场分级（2026-08-14）：整幅画再走一遍全屏后期。
+  // 全局分级：整幅画再走一遍全屏后期。**全作只有这一张脸，过场与玩法共用。**
   //
-  // 为什么非做不可：这套画的贴图全是 CanvasTexture，没声明 colorSpace，上屏被
-  // 当线性值提亮一大截（CLAUDE.md 里"配色一律往下压两档"那条说的就是它）。
-  // 单张贴图能靠压色号救回来，**整幅画的调子救不回来**——序章实拍出来是一屏
-  // 米黄压米黄，最暗的地方也有 0.55 的明度，画面里根本没有黑。而参考的那几张
-  // 勇敢的心过场，黑是构图的一部分：墨线、暗角、逆光的门洞。
+  // 2026-08-14 立这一遍后期的理由还成立：这套画的贴图全是 CanvasTexture、没声明
+  // colorSpace，上屏被当线性值提亮一大截（CLAUDE.md 里"配色一律往下压两档"那条
+  // 说的就是它），单张贴图能靠压色号救回来、**整幅画的调子救不回来**。
   //
-  // 所以分级不是"加个滤镜"，是把这套渲染欠的那两档还回来，并且**只在过场还**
-  //（玩法段的辨识度靠亮，压黑会让人找不着路）。四件事：
-  //   ① 以 0.46 为轴提对比——轴要低于中灰，才吃得住这套偏亮的底；
+  // 但它当时**只在过场开**（"玩法段的辨识度靠亮"），于是同一间屋、同一个人，
+  // 镜头一切进过场就换了一张脸：实拍量过，过场那一格的四角比玩法段暗六成、
+  // 中灰段的对比多出一倍，墨线整个压成纯黑。2026-08-17 用户退回：「游戏过场的
+  // 后处理调色调的比较强，和实机差的比较多，我需要你统一游戏过场的内外」。
+  //
+  // **治法不是把过场那档调小一点，是让它一直开着。** 只要这遍后期有开关，
+  // 开关两边就必然是两张脸——调得再近也只是把接缝做窄。现在 `cineGrade` 恒为 1、
+  // 每一帧都过这遍后期（连小窗一起，见 Render 的 pipRect），过场与玩法在像素上
+  // 是同一条曲线。
+  //
+  // -------------------------------------------------------------------------
+  // **这遍后期九成的效果不是曲线，是那道 ^2.2**（2026-08-17 逐像素量出来的，
+  // 之前三轮调参全在调噪声）。原理：离屏靶声明了 `SRGBColorSpace`，所以世界渲
+  // 进去时照常编码一次，硬件**采样时又解码一次**拿到线性值；而这块四边形是裸
+  // ShaderMaterial，three 不会给它补输出编码——写出去多少就显示多少。一解一不编，
+  // 等于全屏乘了一道 gamma 2.2。实测传递曲线（老过场档，画面正中晕影为 0）：
+  //     0.394 → 0.081   0.667 → 0.377   0.828 → 0.700
+  // 逐点等于 `src^2.2` 再过那条对比曲线，误差 0.001。对比给 0.70 还是 0.28，
+  // 在这道 gamma 面前几乎看不出来。
+  //
+  // 而这道 gamma **正是 CanvasTexture 那笔老账的反函数**（CLAUDE.md「配色一律
+  // 往下压两档」说的就是它：贴图没声明 colorSpace，上屏被当线性值提亮一档）。
+  // 所以过场比玩法"调色重"从来不是加了滤镜，是**过场把这套渲染欠的那一档还了、
+  // 玩法段没还**。知道这一条，两件事才定得下来：
+  //   · 统一只能往"两边都还"走。往"两边都不还"走的话，全作的黑就没了——
+  //     墨线、逆光门洞、框景板全靠这一档压下去，画笔那边的色号是照着它配的
+  //     （`ForeMix` 注解里那句"看着黑得离谱才是对的"）；重配等于重画一遍全作。
+  //   · 但**整档全还上去，玩法段就太沉**（实测均值 0.752→0.570、p5 0.433→0.141）。
+  //     所以还多少要能拨：`uGamma` 就是这个把手，它是显示值上的指数——
+  //     1.0＝一点不还（＝老玩法段那张washed 的脸），2.2＝全还（＝老过场那档）。
+  //     现在取 **1.55**，两头之间，玩法段还看得清路、过场也还有黑。
+  // -------------------------------------------------------------------------
+  //
+  // 曲线本身跟着轻下来（它现在玩法段也要扛）：
+  //   ① 对比只提一点点（S 曲线 0.28，老的过场档是 0.70）；
   //   ② 略去一点饱和（手绘水彩上屏容易过艳）；
-  //   ③ 重晕影——参考图四角全是压下去的；
+  //   ③ 晕影只剩一层很软的（四角 10% 上下，老的是 63%）——它的活是收边，
+  //      不是给过场盖戳；
   //   ④ 一层很细的颗粒（纸纹），把大片平色的"塑料感"打散。
-  // 强度由 `SetCineGrade(k)` 给，0＝一个字节都不动（玩法段照旧原样）。
+  // 要再往"电影感"上加，加在**只有过场才有的东西**上（黑边、DOF、框景板 fg、
+  // 运镜），别再往这条曲线上加——它一动就是两边一起动。
   //
   // **分离色调已整个拆掉（2026-08-15 用户退回：「过场动画的后处理变色太严重了，
   // 只需要一些 dof、边缘的效果，但不能用大范围的偏色」）。** 原来暗部乘
   // (0.88,0.95,1.14)、亮部乘 (1.06,1.00,0.88)：暗处红蓝差 26 个点推向冷青灰、
   // 亮处红蓝差 18 个点推向纸黄，两头方向还相反——整幅画从暗到亮一路在换色相，
-  // 这就是"变色"。**从此这一遍后期只许动明度，不许动色相**：对比、晕影、颗粒
-  // 都是各通道等量的，`uSat` 只往灰里收（收到 0 就是彩色转黑白，那一档用户
-  // 明说可以）。要再加风格化，加在明度或饱和上，别再引入通道差。
+  // 这就是"变色"。**这遍后期只许动明度，不许动色相**：对比、晕影、颗粒都是
+  // 各通道等量的，`uSat` 只往灰里收（收到 0 就是彩色转黑白，那一档用户明说
+  // 可以）。要再加风格化，加在明度或饱和上，别再引入通道差。
   // =========================================================================
-  let cineGrade = 0;
+  // 强度：1＝这条曲线全给，0＝整遍后期跳过（连离屏靶都不建）。**默认 1 且没人
+  // 再去拨它**——留着这个把手是为了"某一拍要转黑白/要淡出分级"时有处可下手，
+  // 拨的时候记住：拨了就等于在那一拍上又开了一条接缝。
+  let cineGrade = 1;
   // 饱和：1＝原样，0＝全黑白。等量作用于三个通道，不产生色相偏移。
-  let cineSat = 0.90;
+  let cineSat = 0.94;
+  // 还多少档回来（显示值上的指数，见上面那段）。1.0＝老玩法段那张脸，
+  // 2.2＝老过场那档全压。改这个数就是改全作的调子，改之前先拿实拍量一遍。
+  const GRADE_GAMMA = 1.55;
   function SetCineGrade(k, sat) {
     cineGrade = Math.max(0, Math.min(1, k || 0));
     if (sat !== undefined) cineSat = Math.max(0, Math.min(1, sat));
@@ -5749,7 +5867,8 @@ export function CreateWorld(canvasEl) {
     uniforms: {
       uTex: { value: null },
       uK: { value: 1 },
-      uSat: { value: 0.90 },
+      uSat: { value: 0.94 },
+      uGamma: { value: 1.55 },
       uPx: { value: new THREE.Vector2(1600, 900) },
       uSeed: { value: 0 },
     },
@@ -5761,11 +5880,22 @@ export function CreateWorld(canvasEl) {
       uniform sampler2D uTex;
       uniform float uK;
       uniform float uSat;
+      uniform float uGamma;
       uniform vec2 uPx;
       uniform float uSeed;
       varying vec2 vUv;
       void main() {
-        vec3 src = clamp(texture2D(uTex, vUv).rgb, 0.0, 1.0);
+        // ⓪ **先把采样值还原成"屏幕上那个数"，别在线性值上调曲线。**
+        //    离屏靶是 sRGB 格式，硬件采样时解过一次码；而这块四边形写出去不再
+        //    编码。所以 lin ＝ 不分级时该显示的那个值的 2.2 次方——先开 1/2.2
+        //    次方回到显示值，下面那几步（对比轴 0.46、黑位、晕影量）说的才是
+        //    屏幕上的数；随后按 uGamma 重新压下去，那一步才是"还债"（见上面
+        //    那段长注解）。两步合起来就是 pow(显示值, uGamma)。
+        //    （这几行是 JS 模板字符串里的 GLSL：**注释里一个反引号都不许有**，
+        //    一个就把模板提前收了口，整份 World 当场 SyntaxError。）
+        vec3 lin = clamp(texture2D(uTex, vUv).rgb, 0.0, 1.0);
+        vec3 shown = pow(lin, vec3(1.0 / 2.2));
+        vec3 src = pow(shown, vec3(uGamma));
         const vec3 W = vec3(0.299, 0.587, 0.114);
         // ① 对比走 S 曲线，**不走直线**。直线 (c-0.46)*1.4+0.40 在白天那几拍很漂亮，
         //    可它把 0.12 以下一律压成 0——序章收尾那间黑窖整幅变成纯黑，
@@ -5774,23 +5904,30 @@ export function CreateWorld(canvasEl) {
         //    逐通道跑会把本来就偏暖的色拉得更开——实测高光的红蓝差比玩法段
         //    多出 15 个点，那也是一种"变色"，只不过来自对比而非色调。
         //    按比例缩只动明暗，色相与饱和比例一个字节都不动。
+        //    **强度 0.28**：这条曲线现在玩法段也走（见上面那段），老的 0.70 是
+        //    "只在过场还那两档"的量，铺到玩法段上就是把整条村街压进阴天里。
         float l0 = dot(src, W);
-        float lc = mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.70);
+        float lc = mix(l0, l0 * l0 * (3.0 - 2.0 * l0), 0.28);
         vec3 c = src * (lc / max(l0, 0.02));
-        c = clamp(c, 0.0, 1.0) * 0.97 + 0.012;      // 抬一点黑位（等量加，中性）
+        c = clamp(c, 0.0, 1.0) * 0.985 + 0.006;     // 抬一点黑位（等量加，中性）
         // ② 收饱和。这是**唯一**允许动颜色的一步，而它只往灰里走（uSat=0 就是
         //    黑白）——不许再回到"暗部推冷、亮部推暖"那种通道差，那是变色
         //    （2026-08-15 用户退回，见上面那段）。
         float l = dot(c, W);
         c = mix(vec3(l), c, uSat);
-        // ③ 晕影（横向略松，免得宽屏上两侧压成两条黑边）
+        // ③ 晕影（横向略松，免得宽屏上两侧压成两条黑边）。**起点推到 0.44、量收到
+        //    0.20**：四角落在九成上下，读起来只是"边上收了一下"。老的
+        //    smoothstep(0.26,0.88)×0.74 在四角只剩三成七、画框正下方也去掉三成五
+        //    ——那是过场专用的盖戳，玩法段边上正是找路要看的地方。
         vec2 d = vUv - 0.5;
         float r = length(vec2(d.x * 0.94, d.y * 1.12));
-        c *= 1.0 - smoothstep(0.26, 0.88, r) * 0.74;
-        // ④ 纸纹颗粒
+        c *= 1.0 - smoothstep(0.44, 1.06, r) * 0.20;
+        // ④ 纸纹颗粒（同理减半：一直开着的颗粒比只在过场闪一下的更容易被看出来）
         float n = fract(sin(dot(vUv * uPx + uSeed, vec2(12.9898, 78.233))) * 43758.5453);
-        c += (n - 0.5) * 0.028;
-        gl_FragColor = vec4(mix(src, clamp(c, 0.0, 1.0), uK), 1.0);
+        c += (n - 0.5) * 0.013;
+        // uK 往回混的是 shown（＝这遍后期一个字节都不动时屏幕上那张脸），
+        // 不是 src（那已经压过 uGamma 了）——混错了 uK=0 就不是恒等
+        gl_FragColor = vec4(mix(shown, clamp(c, 0.0, 1.0), uK), 1.0);
       }
     `,
   };
@@ -5908,19 +6045,24 @@ export function CreateWorld(canvasEl) {
     camera.updateProjectionMatrix();
   }
 
-  function Render() {
+  // pipRect：后果小窗那块剪裁区（可为 null）。**它必须画在分级之内**——分级
+  // 现在一直开着，小窗要是照老样子等 Render 完了再补一遍，那块角落就是全屏
+  // 唯一没过后期的地方，明度差着一档，读出来是"贴了张别的游戏的截图"。
+  function Render(pipRect) {
     // 分级要把整幅画先渲进离屏靶。**setRenderTarget 会重置视口与剪裁区**，
-    // 所以它必须排在分屏那几下 setScissor/setViewport 之前
+    // 所以它必须排在分屏／小窗那几下 setScissor/setViewport 之前
     const grading = cineGrade > 0.004 && rendererCssW > 0 && EnsureGrade();
     if (grading) renderer.setRenderTarget(gradeRT);
     if (splitShot) RenderSplit();
     else RenderMain();
+    if (pipRect) RenderPip(pipRect);
     if (grading) {
       renderer.setRenderTarget(null);
       const u = gradeQuad.material.uniforms;
       u.uTex.value = gradeRT.texture;
       u.uK.value = cineGrade;
       u.uSat.value = cineSat;
+      u.uGamma.value = GRADE_GAMMA;
       u.uPx.value.set(gradeW, gradeH);
       // 颗粒每帧换一次种子会满屏爬虫，隔几帧换一次就够（也让无头实拍可复现）
       gradeSeed = (gradeSeed + 1) % 4;

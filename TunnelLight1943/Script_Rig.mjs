@@ -163,7 +163,7 @@ function BuildParts(kind, haze = null) {
       }),
     thighB: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * LK * P, 0.112 * LK * P, coatDark, kind + "thb", { k: INK_K })),
-    // 小腿与脚按兵种取（绑腿 / 马靴 / 土布裤脚 + 布鞋）：原来这四个颜色是
+    // 小腿与脚按兵种取（绑腿 / 马靴 / 白裹腿 + 黑布鞋 / 土布裤脚）：原来这四个颜色是
     // 全场写死的农民褐，日军穿着一双农民的腿——「看不出是日军」有一半在这儿
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * LK * P, 0.086 * LK * P,
@@ -1469,7 +1469,7 @@ export function LegIK(tx, ty) {
 function ClimbPose(target, s) {
   const c = s.climb;
   const bs = c.bs || 1;
-  const plan = PlanClimb({ holds: c.holds, base: c.base, dir: c.dir, bs, oneHand: !!s.childArms });
+  const plan = PlanClimb({ holds: c.holds, base: c.base, dir: c.dir, bs, oneHand: !!s.childArms, settle: c.settle || 0 });
   const L = (wy) => (wy - c.base) / bs;          // 世界 y → 骨架局部 y
   const X = (wx) => wx / bs;                      // 身前米 → 骨架局部 x
   target.hipX = X(plan.hip.x);

@@ -43,6 +43,235 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const Esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const Fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : (+v).toFixed(d);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 工作台与人物美术样式浏览器共用的那一层：时间模型（一条动画怎么随时间走）、
+// 从索引搭清单、取索引（一次 fetch 两处用）、把骨架摆到位。**这里的常数与走法
+// 照抄 World.UpdateOne**——两块预览看到的必须是游戏里那条动画，不是另一套。
+// ═══════════════════════════════════════════════════════════════════════════
+
+// cycle = 时间轴一圈多长；env = { scale 体型, params { speed, strain, moving } }
+export function EntryCycle(e, env) {
+  const scale = env?.scale || 1, params = env?.params || {};
+  if (e.type === "track") return e.dur;
+  if (e.type === "pose") return e.progress ? PROGRESS_CYCLE : 2 * Math.PI / BREATH_RATE;
+  const L = e.loco;
+  const sp = params.speed ?? L.speed ?? 1;
+  if (L.cycle === "walk") {
+    const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
+    return 2 * Math.PI / (sp * (WALK_RATE / scale + gait * RUN_EXTRA));
+  }
+  if (L.cycle === "climb") return 2 * Math.PI / (sp * CLIMB_RATE);
+  if (L.cycle === "idle") return 2 * Math.PI / IDLE_RATE;
+  return 2 * Math.PI / BREATH_RATE;
+}
+// 时间可以无界增长的（循环轨道、呼吸、步态、往复的进度）；单次轨道不是
+export const IsCyclic = (e) => !(e.type === "track" && !e.loop);
+// 进度姿势 0→1→0 往复：一趟 PROGRESS_CYCLE
+export const ProgressAt = (tt) => { const u = ((tt % PROGRESS_CYCLE) + PROGRESS_CYCLE) % PROGRESS_CYCLE / (PROGRESS_CYCLE / 2); return u <= 1 ? u : 2 - u; };
+
+// 喂给 PoseRig 的合成状态——字段名与 World.UpdateOne 那一处逐字相同
+export function EntryState(e, tt, env) {
+  const scale = env?.scale || 1, params = env?.params || {};
+  if (e.type === "track") return { track: e.name, trackT: tt, phase: 0, breath: tt * BREATH_RATE, moving: false };
+  if (e.type === "pose") {
+    const s = { pose: e.name, breath: tt * BREATH_RATE, phase: tt * IDLE_RATE, moving: !!params.moving, poseStrain: params.strain || 0 };
+    if (e.progress) s.poseK = ProgressAt(tt);
+    return s;
+  }
+  const L = e.loco;
+  const s = { ...L.state, breath: tt * BREATH_RATE };
+  const sp = params.speed ?? L.speed ?? 1;
+  if (L.cycle === "walk") {
+    const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
+    s.gait = gait;
+    s.phase = tt * sp * (WALK_RATE / scale + gait * RUN_EXTRA);
+  } else if (L.cycle === "climb") s.phase = tt * sp * CLIMB_RATE;
+  else s.phase = tt * IDLE_RATE;
+  return s;
+}
+
+// 把一具骨架摆到位：体型、朝向、躺姿整具转 90°（同 World.UpdateOne）
+export function PlaceRigGroup(group, s, { scale = 1, heading = 1, lieSet = null } = {}) {
+  const lie = (s.pose && lieSet && lieSet.includes(s.pose)) ? (heading >= 0 ? 1 : -1) : 0;
+  group.rotation.z = lie * Math.PI / 2;
+  group.position.set(lie * LIE_LEN * 0.5 * scale, lie ? LIE_RISE * scale : 0, 0);
+  group.scale.set((heading >= 0 ? 1 : -1) * scale, scale, 1);
+}
+
+// 同游戏：一具骨架的骨头共用一个绘制序号，先后由各自的局部 z（都是 0）→
+// 创建顺序决定——这就是 CreateRig 里挂载顺序的意义
+export function SetRigOrder(group, order, opacity = 1) {
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    o.renderOrder = order;
+    if (o.material) { o.material.opacity = opacity; o.material.transparent = true; }
+  });
+}
+
+// 从索引搭清单：轨道（运行时 TRACKS 是真相，索引补行号/说明/用法）/ 姿势 / 步态
+export function BuildAnimEntries(idx) {
+  const out = [];
+  for (const [name, def] of Object.entries(TRACKS)) {
+    const sc = idx?.tracks?.[name] || {};
+    const keys = def.keys.map((k, i) => ({ t: k.t, values: k, note: sc.keys?.[i]?.note || "", line: sc.keys?.[i]?.line || null }));
+    const joints = RIG_FIELDS.filter((f) => def.keys.some((k) => k[f] !== undefined));
+    out.push({
+      id: "track:" + name, type: "track", name, label: name, dur: def.dur, loop: !!def.loop, keys, joints,
+      line: sc.line || null, comment: sc.comment || "", usages: sc.usages || [], notes: sc.notes || [], warnings: sc.warnings || [],
+      kindGuess: DominantKind(sc.usages),
+    });
+  }
+  // 索引里有、运行时没有的轨道（不该发生——扫描器与 Rig 不同步时报出来）
+  for (const name of Object.keys(idx?.tracks || {})) if (!TRACKS[name]) out.push({ id: "track:" + name, type: "track", name, label: name, dur: idx.tracks[name].dur ?? 0, loop: !!idx.tracks[name].loop, keys: [], joints: [], line: idx.tracks[name].line, comment: idx.tracks[name].comment, usages: idx.tracks[name].usages || [], notes: [], warnings: ["源码里有、运行时 TRACKS 里没有——索引与 Rig 不同步"], missing: true });
+  for (const [name, p] of Object.entries(idx?.poses || {})) {
+    out.push({
+      id: "pose:" + name, type: "pose", name, label: name, ...p,
+      usages: p.usages || [], notes: p.notes || [], warnings: p.warnings || [], kindGuess: DominantKind(p.usages),
+    });
+  }
+  for (const L of (idx?.locomotion || LOCOMOTION)) {
+    out.push({ id: "loco:" + L.id, type: "loco", name: L.id, label: L.label, loco: L, cond: L.cond, line: L.line || null, comment: L.comment || "", inputs: L.inputs || [], usages: [], notes: L.note ? [L.note] : [], warnings: L.warnings || [] });
+  }
+  return out;
+}
+
+// 索引：现扫源码（fetch 同目录的 .mjs / .js）。**一次 fetch，工作台与美术浏览器共用**
+let indexPromise = null;
+export function EnsureAnimIndex() {
+  if (indexPromise) return indexPromise;
+  indexPromise = (async () => {
+    const files = ["Script_Rig.mjs", "Script_World.js", "Script_Core.mjs", "Data_ScriptC1.mjs", "Data_ScriptC2.mjs", "Data_ScriptC3.mjs",
+      "Data_ScriptC4.mjs", "Data_ScriptC5.mjs", "Data_ScriptC6.mjs", "Data_ScriptC7.mjs", "Data_ScriptC8.mjs"];
+    const texts = {};
+    await Promise.all(files.map(async (f) => {
+      try {
+        const r = await fetch(new URL("./" + f, import.meta.url), { cache: "no-cache" });
+        texts[f] = r.ok ? await r.text() : null;
+      } catch { texts[f] = null; }
+    }));
+    let idx = null;
+    try { idx = ScanAnimIndex((f) => texts[f] ?? null); } catch (err) { console.warn("动画索引扫描失败，只列运行时能拿到的", err); }
+    if (!idx || !texts["Script_Rig.mjs"]) {
+      // 离线兜底：姿势名从 PoseRig 的源码文本里抠（Function.prototype.toString 保留注释与分支）
+      const src = PoseRig.toString();
+      const poses = {};
+      for (const m of src.matchAll(/s\.pose === "([A-Za-z0-9]+)"/g)) poses[m[1]] ||= { name: m[1], line: null, comment: "", inputs: [], usages: [], notes: ["离线兜底：源码没取到，行号/说明/用法缺"], warnings: [] };
+      idx = { tracks: {}, poses, locomotion: LOCOMOTION, sets: { LIE_POSES: ["sleep"], CALM_BREATH: [], NO_HIP: [], POSE_PROGRESS: [] }, usages: {}, counts: { tracks: Object.keys(TRACKS).length, poses: Object.keys(poses).length, locomotion: LOCOMOTION.length }, offline: true };
+    }
+    const entries = BuildAnimEntries(idx);
+    return { index: idx, entries, byId: new Map(entries.map((e) => [e.id, e])) };
+  })();
+  return indexPromise;
+}
+// 某种人用得上的动作：步态全给（谁都会走）；轨道/姿势按剧本里谁在用挑
+export function EntriesForKind(entries, kind) {
+  const mine = entries.filter((e) => e.type !== "loco" && e.kindGuess === kind);
+  return {
+    loco: entries.filter((e) => e.type === "loco"),
+    tracks: mine.filter((e) => e.type === "track"),
+    poses: mine.filter((e) => e.type === "pose"),
+  };
+}
+
+/**
+ * 小舞台：一块画布、一具骨架、一条动画循环播——给人物美术样式浏览器（和别的
+ * 想"看一眼这个人动起来"的地方）用。渲染器懒建；背景透明，底色归宿主。
+ *   SetKind(kind, scale) / SetEntry(entry) / SetHeading(±1) / Playing(v?) / Step(dt) / Resize()
+ */
+export function CreateRigStage({ canvas, viewH: fixedViewH = null, groundAt = 0.16, lieSet = null } = {}) {
+  let renderer = null, scene = null, camera = null;
+  let cssW = 1, cssH = 1, dpr = 1;
+  const rigs = new Map();
+  let live = null, kind = null, scale = 1, heading = 1;
+  let entry = null, t = 0, playing = true;
+  const params = { speed: null, strain: 0, moving: false };
+  const env = () => ({ scale, params });
+  // 画框按人的个头给（整身要大）：1.72m 的骨架 × 体型，头顶上留一拃、脚下留 groundAt；
+  // 传了 viewH 就钉死不跟人变
+  const ViewH = () => fixedViewH || Math.max(1.2, 1.72 * scale * 1.32 + 0.12);
+
+  function Ensure() {
+    if (renderer) return true;
+    if (!canvas) return false;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.setClearColor(0x000000, 0);
+    scene = new THREE.Scene();
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -20, 20);
+    camera.position.set(0, 0, 10);
+    camera.lookAt(0, 0, 0);
+    if (typeof ResizeObserver === "function") new ResizeObserver(Resize).observe(canvas);
+    Resize(true);
+    return true;
+  }
+  function Resize(force) {
+    if (!renderer) return;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.max(2, r.width), h = Math.max(2, r.height);
+    if (!force && Math.abs(w - cssW) < 0.5 && Math.abs(h - cssH) < 0.5) return;
+    cssW = w; cssH = h;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(w, h, false);
+    Frame();
+  }
+  function Frame() {
+    if (!camera) return;
+    const viewH = ViewH();
+    const aspect = cssW / cssH;
+    camera.top = viewH * (1 - groundAt); camera.bottom = -viewH * groundAt;
+    camera.left = -viewH * aspect / 2; camera.right = viewH * aspect / 2;
+    camera.updateProjectionMatrix();
+  }
+  function Use(k) {
+    if (live && live.kind === k) return;
+    if (live) scene.remove(live.rig.group);
+    let r = rigs.get(k);
+    if (!r) { const rig = CreateRig(k); SetRigOrder(rig.group, 10); r = { kind: k, rig }; rigs.set(k, r); }
+    live = r;
+    scene.add(live.rig.group);
+    // 冲掉上一条动画的残留：常态站姿打底
+    PoseRig(live.rig, { phase: 0, breath: 0 }, 1);
+  }
+  function Apply(blendDt) {
+    if (!live || !entry) return;
+    const s = EntryState(entry, t, env());
+    PoseRig(live.rig, s, blendDt);
+    PlaceRigGroup(live.rig.group, s, { scale, heading, lieSet });
+  }
+  return {
+    SetKind(k, sc) {
+      kind = k; if (sc) scale = sc;
+      if (Ensure()) { Use(k); Frame(); if (entry) Apply(1); }
+    },
+    SetEntry(e, opts = {}) {
+      entry = e; t = 0; playing = opts.playing ?? true;
+      params.speed = opts.speed ?? null; params.strain = 0; params.moving = false;
+      if (Ensure() && kind) { Use(kind); PoseRig(live.rig, { phase: 0, breath: 0 }, 1); Apply(1); }
+    },
+    SetHeading(h) { heading = h >= 0 ? 1 : -1; if (live && entry) Apply(1); },
+    Flip() { heading = -heading; if (live && entry) Apply(1); return heading; },
+    Playing(v) { if (v !== undefined) playing = !!v; return playing; },
+    Time() { return t; },
+    Cycle() { return entry ? EntryCycle(entry, env()) : 0; },
+    Step(dt) {
+      if (!Ensure() || !entry || !live) return;
+      if (playing) {
+        const cycle = EntryCycle(entry, env());
+        t += dt;
+        if (!IsCyclic(entry) && t >= cycle) t = t % cycle;   // 单次轨道播完再来一遍
+        Apply(Math.max(1e-4, dt));
+      }
+      Resize();
+      renderer.render(scene, camera);
+    },
+    Resize: () => Resize(true),
+    Current: () => ({ kind, scale, heading, entry: entry && entry.id, t, playing }),
+    LimbTips: () => (live ? LimbTips(live.rig) : null),
+  };
+}
+
 /**
  * root：#animPanel（骨架在 index.html，这里只往里填）。
  * 返回 { Open(name?), Close(), Toggle(), IsOpen(), Step(dt), Key(e,k), Select(name), Current(), Ready() }
@@ -133,15 +362,7 @@ export function CreateAnimLab({ root }) {
     }
     return r;
   }
-  function SetOrder(group, order, opacity = 1) {
-    // 同游戏：一具骨架的骨头共用一个绘制序号，先后由各自的局部 z（都是 0）→
-    // 创建顺序决定——这就是 CreateRig 里挂载顺序的意义
-    group.traverse((o) => {
-      if (!o.isMesh) return;
-      o.renderOrder = order;
-      if (o.material) { o.material.opacity = opacity; o.material.transparent = true; }
-    });
-  }
+  const SetOrder = SetRigOrder;
   function UseKind(kind) {
     if (live && live.kind === kind) return;
     if (live) { scene.remove(live.rig.group); for (const g of live.ghosts) scene.remove(g.group); }
@@ -151,52 +372,12 @@ export function CreateAnimLab({ root }) {
     trails = null;
     RebuildGhosts();
   }
-  function PlaceRig(group, s) {
-    const bs = preset.scale;
-    const lie = (s.pose && index?.sets?.LIE_POSES?.includes(s.pose)) ? (heading >= 0 ? 1 : -1) : 0;
-    group.rotation.z = lie * Math.PI / 2;
-    group.position.set(lie * LIE_LEN * 0.5 * bs, lie ? LIE_RISE * bs : 0, 0);
-    group.scale.set((heading >= 0 ? 1 : -1) * bs, bs, 1);
-  }
+  const PlaceRig = (group, s) => PlaceRigGroup(group, s, { scale: preset.scale, heading, lieSet: index?.sets?.LIE_POSES || null });
 
-  // ── 时间模型：这条动画怎么随时间走 ───────────────────────────────────────
-  // cycle = 时间轴一圈多长；cyclic = 时间可以无界增长（循环轨道、呼吸、步态、往复的进度）
-  function CycleOf(e) {
-    if (e.type === "track") return e.dur;
-    if (e.type === "pose") return e.progress ? PROGRESS_CYCLE : 2 * Math.PI / BREATH_RATE;
-    const L = e.loco;
-    const sp = params.speed ?? L.speed ?? 1;
-    if (L.cycle === "walk") {
-      const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
-      return 2 * Math.PI / (sp * (WALK_RATE / preset.scale + gait * RUN_EXTRA));
-    }
-    if (L.cycle === "climb") return 2 * Math.PI / (sp * CLIMB_RATE);
-    if (L.cycle === "idle") return 2 * Math.PI / IDLE_RATE;
-    return 2 * Math.PI / BREATH_RATE;
-  }
-  const IsCyclic = (e) => !(e.type === "track" && !e.loop);
-  // 进度姿势 0→1→0 往复：一趟 PROGRESS_CYCLE
-  const ProgressAt = (tt) => { const u = ((tt % PROGRESS_CYCLE) + PROGRESS_CYCLE) % PROGRESS_CYCLE / (PROGRESS_CYCLE / 2); return u <= 1 ? u : 2 - u; };
-
-  // 喂给 PoseRig 的合成状态——字段名与 World.UpdateOne 那一处逐字相同
-  function StateFor(e, tt) {
-    if (e.type === "track") return { track: e.name, trackT: tt, phase: 0, breath: tt * BREATH_RATE, moving: false };
-    if (e.type === "pose") {
-      const s = { pose: e.name, breath: tt * BREATH_RATE, phase: tt * IDLE_RATE, moving: !!params.moving, poseStrain: params.strain };
-      if (e.progress) s.poseK = ProgressAt(tt);
-      return s;
-    }
-    const L = e.loco;
-    const s = { ...L.state, breath: tt * BREATH_RATE };
-    const sp = params.speed ?? L.speed ?? 1;
-    if (L.cycle === "walk") {
-      const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
-      s.gait = gait;
-      s.phase = tt * sp * (WALK_RATE / preset.scale + gait * RUN_EXTRA);
-    } else if (L.cycle === "climb") s.phase = tt * sp * CLIMB_RATE;
-    else s.phase = tt * IDLE_RATE;
-    return s;
-  }
+  // ── 时间模型：这条动画怎么随时间走（共用那一层，见文件顶上）──────────────
+  const Env = () => ({ scale: preset.scale, params });
+  const CycleOf = (e) => EntryCycle(e, Env());
+  const StateFor = (e, tt) => EntryState(e, tt, Env());
   // 摆姿势。blendDt=1 ＝ 一步到位（拖时间轴/采样用）；播放时给真 dt 才是游戏里
   // 那个 dt*26 / 1−e^(−14dt) 的混合手感——"顺不顺"有一半在混合上
   function Pose(rig, s, blendDt) { PoseRig(rig, s, blendDt); }
@@ -244,32 +425,6 @@ export function CreateAnimLab({ root }) {
   }
 
   // ── 清单 ────────────────────────────────────────────────────────────────
-  function BuildEntries(idx) {
-    const out = [];
-    // 轨道：运行时 TRACKS 是真相，索引补行号/说明/用法
-    for (const [name, def] of Object.entries(TRACKS)) {
-      const sc = idx?.tracks?.[name] || {};
-      const keys = def.keys.map((k, i) => ({ t: k.t, values: k, note: sc.keys?.[i]?.note || "", line: sc.keys?.[i]?.line || null }));
-      const joints = RIG_FIELDS.filter((f) => def.keys.some((k) => k[f] !== undefined));
-      out.push({
-        id: "track:" + name, type: "track", name, label: name, dur: def.dur, loop: !!def.loop, keys, joints,
-        line: sc.line || null, comment: sc.comment || "", usages: sc.usages || [], notes: sc.notes || [], warnings: sc.warnings || [],
-        kindGuess: DominantKind(sc.usages),
-      });
-    }
-    // 索引里有、运行时没有的轨道（不该发生——扫描器与 Rig 不同步时报出来）
-    for (const name of Object.keys(idx?.tracks || {})) if (!TRACKS[name]) out.push({ id: "track:" + name, type: "track", name, label: name, dur: idx.tracks[name].dur ?? 0, loop: !!idx.tracks[name].loop, keys: [], joints: [], line: idx.tracks[name].line, comment: idx.tracks[name].comment, usages: idx.tracks[name].usages || [], notes: [], warnings: ["源码里有、运行时 TRACKS 里没有——索引与 Rig 不同步"], missing: true });
-    for (const [name, p] of Object.entries(idx?.poses || {})) {
-      out.push({
-        id: "pose:" + name, type: "pose", name, label: name, ...p,
-        usages: p.usages || [], notes: p.notes || [], warnings: p.warnings || [], kindGuess: DominantKind(p.usages),
-      });
-    }
-    for (const L of (idx?.locomotion || LOCOMOTION)) {
-      out.push({ id: "loco:" + L.id, type: "loco", name: L.id, label: L.label, loco: L, cond: L.cond, line: L.line || null, comment: L.comment || "", inputs: L.inputs || [], usages: [], notes: L.note ? [L.note] : [], warnings: L.warnings || [] });
-    }
-    return out;
-  }
   function Haystack(e) {
     const bits = [e.name, e.label, e.type, e.comment || "", (e.usages || []).map((u) => `${u.beat || ""} ${u.fn || ""} ${u.subject || ""} ${u.kindGuess ? KIND_LABEL[u.kindGuess] : ""}`).join(" "),
       e.kindGuess ? KIND_LABEL[e.kindGuess] || e.kindGuess : "", e.type === "loco" ? "步态 状态" : e.type === "track" ? "轨道 关键帧" : "姿势 pose"];
@@ -731,27 +886,10 @@ export function CreateAnimLab({ root }) {
   // ── 索引：现扫源码（fetch 同目录的 .mjs / .js）─────────────────────────
   async function LoadIndex() {
     ui.status.textContent = "扫描源码…";
-    const files = ["Script_Rig.mjs", "Script_World.js", "Script_Core.mjs", "Data_ScriptC1.mjs", "Data_ScriptC2.mjs", "Data_ScriptC3.mjs",
-      "Data_ScriptC4.mjs", "Data_ScriptC5.mjs", "Data_ScriptC6.mjs", "Data_ScriptC7.mjs", "Data_ScriptC8.mjs"];
-    const texts = {};
-    await Promise.all(files.map(async (f) => {
-      try {
-        const r = await fetch(new URL("./" + f, import.meta.url), { cache: "no-cache" });
-        texts[f] = r.ok ? await r.text() : null;
-      } catch { texts[f] = null; }
-    }));
-    let idx = null;
-    try { idx = ScanAnimIndex((f) => texts[f] ?? null); } catch (err) { console.warn("动画索引扫描失败，只列运行时能拿到的", err); }
-    if (!idx || !texts["Script_Rig.mjs"]) {
-      // 离线兜底：姿势名从 PoseRig 的源码文本里抠（Function.prototype.toString 保留注释与分支）
-      const src = PoseRig.toString();
-      const poses = {};
-      for (const m of src.matchAll(/s\.pose === "([A-Za-z0-9]+)"/g)) poses[m[1]] ||= { name: m[1], line: null, comment: "", inputs: [], usages: [], notes: ["离线兜底：源码没取到，行号/说明/用法缺"], warnings: [] };
-      idx = { tracks: {}, poses, locomotion: LOCOMOTION, sets: { LIE_POSES: ["sleep"], CALM_BREATH: [], NO_HIP: [], POSE_PROGRESS: [] }, usages: {}, counts: { tracks: Object.keys(TRACKS).length, poses: Object.keys(poses).length, locomotion: LOCOMOTION.length }, offline: true };
-    }
-    index = idx;
-    entries = BuildEntries(idx);
-    byId = new Map(entries.map((e) => [e.id, e]));
+    const got = await EnsureAnimIndex();
+    index = got.index;
+    entries = got.entries;
+    byId = got.byId;
     ready = true;
     RenderList();
     if (index.offline) ui.status.textContent = "离线：源码没取到，只有运行时能拿到的信息";

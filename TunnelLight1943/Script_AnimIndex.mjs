@@ -63,10 +63,11 @@ export const LOCOMOTION = [
   { id: "carryMove", label: "扛·走", cond: "s.carry", state: { carry: true, moving: true }, cycle: "walk", speed: 1.3 },
 ];
 
-// 工作台里能挑的人：骨架种类 + 体型（World 里柱子第一章 0.80、妹妹一二章 0.60，
-// 都不是 BODY_SCALE 表上的默认值——预览得按戏里的尺寸看）
+// 工作台里能挑的人：骨架种类 + 体型（World 里柱子一二章 0.75、妹妹一二章 0.60，
+// 都不是 BODY_SCALE 表上的默认值——预览得按戏里的尺寸看；同一种人的第一条
+// 就是"戏里现在的样子"，DefaultPreset 取的是它）
 export const KIND_PRESETS = [
-  { key: "player@0.80", kind: "player", scale: 0.80, label: "柱子 · 第一章（0.80）" },
+  { key: "player@0.75", kind: "player", scale: 0.75, label: "柱子 · 一二章（0.75）" },
   { key: "player@0.93", kind: "player", scale: 0.93, label: "柱子 · 抽条后（0.93）" },
   { key: "sister@0.60", kind: "sister", scale: 0.60, label: "妹妹 · 一二章（0.60）" },
   { key: "sister@0.68", kind: "sister", scale: 0.68, label: "妹妹 · 后续（0.68）" },
@@ -78,6 +79,7 @@ export const KIND_PRESETS = [
   { key: "officer@0.98", kind: "officer", scale: 0.98, label: "军官（officer 0.98）" },
   { key: "puppet@0.97", kind: "puppet", scale: 0.97, label: "伪军（puppet 0.97）" },
 ];
+export const DefaultPreset = (kind) => KIND_PRESETS.find((p) => p.kind === kind) || null;
 
 // 用法那一行里"是谁在做"（sis.track = … / FlashTrack(state, "x", d, m)）→ 骨架种类。
 // 只是猜：剧本里的局部变量名习惯很稳（sis / m / father / k），够用；猜不出就 null

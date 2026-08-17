@@ -715,12 +715,17 @@ async function CmdShot(o) {
         if (held.length) {
           await page.evaluate(async (want) => {
             const tl = window.TunnelLight;
+            tl.Freeze(false);
             const t0 = tl.state.time;
             const cap = Date.now() + want * 6000 + 4000;
             await new Promise((res) => {
               const poll = () => ((tl.state.time - t0 >= want) || Date.now() > cap ? res() : setTimeout(poll, 60));
               poll();
             });
+            // 走满就**冻帧**（2026-08-17 爬梯实拍查出来的）：截图要一两秒，那会儿键还按着、
+            // rAF 还在跑，游戏又往前走两三秒——`dur=0.7` 拍到的是第三秒。冻住游戏钟，
+            // 渲染照跑（下面 Settle 推的就是渲染侧），画面停在 dur 那一格
+            tl.Freeze(true);
           }, slice);
         } else if (slice > 0.01) {
           await page.evaluate((n) => window.TunnelLight.StepFrames(n, {}), Math.max(1, Math.round(slice * 30)));
@@ -764,7 +769,10 @@ async function CmdShot(o) {
         const s = await page.evaluate((wantProbe) => {
           const st = window.TunnelLight.state;
           const out = { x: +st.player.x.toFixed(2), pose: st.player.pose, prompt: st.prompt, step: st.beat?.stepIndex, line: st.beat?.lineIndex,
-            lineT: st.beat?.lineT === undefined ? undefined : +st.beat.lineT.toFixed(1), micro: !!st.microCine };
+            lineT: st.beat?.lineT === undefined ? undefined : +st.beat.lineT.toFixed(1), micro: !!st.microCine,
+            // 梯子上：报到哪一档了（世界 y）——爬梯是自己按住爬的，截图上看不出走了多远
+            climb: st.player.climb ? `${st.player.climb.phase}@${st.player.climb.y.toFixed(2)}` : undefined,
+            time: +(st.time || 0).toFixed(2) };
           if (wantProbe) {
             // 只报两件**有明确对错**的（好不好看得自己看图，这里不掺和）：
             // 深度带用错了没有、人的手脚有没有悬空/陷地
@@ -774,7 +782,7 @@ async function CmdShot(o) {
           return out;
         }, !!o.probe);
         files.push(file);
-        console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step}${s.line !== undefined ? ` line=${s.line} lineT=${s.lineT}` : ""}${s.micro ? " micro!" : ""} prompt=${JSON.stringify(s.prompt)}`);
+        console.log(`  ${path.basename(file)}  x=${s.x} pose=${s.pose} step=${s.step}${s.line !== undefined ? ` line=${s.line} lineT=${s.lineT}` : ""}${s.micro ? " micro!" : ""}${s.climb ? ` 梯:${s.climb}` : ""} t=${s.time} prompt=${JSON.stringify(s.prompt)}`);
         if (o.probe) {
           console.log(`      深度告警 ${s.depth.length ? s.depth.join(" / ") : "无"}`);
           if (s.limbs) console.log(`      手脚离地 ${Object.entries(s.limbs).map(([k, v]) => `${k}=${v}`).join(" ")}`);
@@ -809,6 +817,7 @@ const MENU_PAGES = {
   pause: ["游戏里的暂停（设置面板）", null],
   debug: ["调试面板（选关就在这儿）", null],
   anim: ["动画工作台（--anim 名字 选中哪条，--at 秒 钉到第几秒，--kind sister@0.60 换人，--ghosts 叠影，--flip 翻朝向）", null],
+  art: ["人物美术样式（--who sister 选人，--anim loco:run 右栏骨架跑哪条）", null],
 };
 async function CmdMenu(o) {
   const want = (o._.length ? o._ : Object.keys(MENU_PAGES)).filter((k) => {
@@ -843,6 +852,16 @@ async function CmdMenu(o) {
       if (key === "controls") await page.click("#btnControls");
       if (key === "settings") await page.click("#btnTitleSettings");
       if (key === "debug") await page.evaluate(() => window.TunnelLight.ToggleDebug(true));
+      if (key === "art") {
+        await page.evaluate(async ({ who, anim }) => {
+          const tl = window.TunnelLight, ab = tl.ArtBrowser;
+          ab.Open(true);
+          if (who) ab.Pick(who);
+          for (let i = 0; i < 200 && !ab.Ready(); i += 1) await new Promise((r) => setTimeout(r, 50));
+          if (anim) await ab.Anim(anim);
+          tl.Tick(12, 1 / 30);            // 无头下 rAF 几乎不走，骨架要靠 Tick 推几帧才摆到位
+        }, { who: o.who ? String(o.who) : null, anim: o.anim ? String(o.anim) : null });
+      }
       if (key === "anim") {
         // 工作台自己 fetch 源码建索引，等它 Ready 再选；无头下 rAF 几乎不走，
         // 帧要靠 Tick 推，钉到 --at 那一秒再拍
@@ -866,7 +885,8 @@ async function CmdMenu(o) {
         await page.click("#btnSettings");
       }
       await page.waitForTimeout(220);
-      const suffix = key === "anim" && o.anim ? `_${String(o.anim).replace(/[^A-Za-z0-9_]/g, "")}` : "";
+      const suffix = (key === "anim" && o.anim) ? `_${String(o.anim).replace(/[^A-Za-z0-9_]/g, "")}`
+        : (key === "art" && o.who) ? `_${String(o.who).replace(/[^A-Za-z0-9_]/g, "")}` : "";
       const file = path.join(outDir, `menu_${key}${suffix}.png`);
       await page.screenshot({ path: file });
       console.log(`  ${path.basename(file)}  ${label}`);
@@ -939,6 +959,7 @@ const HELP = `《地道里的光》命令行工作台
       title 标题页 / continue 有存档的标题页 / confirm 覆盖确认 / controls 操作说明
       settings 标题页上的设置 / pause 游戏里的暂停 / debug 调试面板（选关）
       anim 动画工作台（--anim scoopChild 选中哪条，--at 0.55 钉到第几秒，--kind sister@0.60 --ghosts --flip）
+      art 人物美术样式（--who sister 选人，--anim loco:run 右栏那具骨架跑哪条）
       不给页名就全拍一遍。菜单是玩家的第一屏，改完必须看图——测试绿着也可能很难看
   anims [片段]            骨架里全部动作的清单：轨道 / 姿势 / 步态 → 名字·时长·行号·谁在用
   anim <名字>             一条动作的全部：说明 / 关键帧表 / 驱动 / 用在哪几拍 / 一行引用

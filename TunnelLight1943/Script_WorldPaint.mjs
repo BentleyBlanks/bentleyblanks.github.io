@@ -472,6 +472,13 @@ export function AddGroundBand(group, xFrom, xTo, groundY, light, id, depthM = 3.
   group.add(mesh);
 }
 
+// 大地面躺得比地表线低这么一点点（米）。**这是全场唯一一块不透明、还写深度的
+// 几何**，所以它是一把刀：凡是竖着的贴图，低于这条线的那一截会被它齐刷刷切掉，
+// 而且切口是一条**笔直的横线**（平面躺着，边在屏幕上就是水平的）。
+// 谁要在地平线附近画东西，先问自己"这一笔在这条线的上头还是下头"——
+// 剖面断口那撮草就是这么被砍成两半的（见 Script_World.js 的 TURF 那一段）。
+export const GROUND_PLANE_DIP = 0.02;
+
 // 真正的水平地面：其余元素都是竖直广告牌，只有这块是躺平的几何。
 // 相机在 y≈2.7 平视，于是它自然向地平线收敛 —— 垄沟与车辙的收敛线
 // 就是 2.5D 纵深最强的读法，是此前一直缺的那一块。
@@ -619,7 +626,7 @@ export function AddGroundPlane(group, length, light, id) {
     new THREE.MeshBasicMaterial({ map: tex, transparent: false, depthWrite: true }),
   );
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(length / 2, SURFACE_Y - 0.02, (nearZ + farZ) / 2);
+  mesh.position.set(length / 2, SURFACE_Y - GROUND_PLANE_DIP, (nearZ + farZ) / 2);
   FixOrder(mesh, LAYER_ORDER.play - 40);   // 地面躺在整个玩法层之下
   group.add(mesh);
   return mesh;

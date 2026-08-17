@@ -58,7 +58,15 @@ export const PAL = {
   // 军官：将校呢比士兵的土黄卡其深一档、偏墨绿——审问那一拍是 6m 的近景，
   // 光靠帽子分不开，衣服的色阶才是三米外就读得出的那一档
   officer: "#333827", officerDark: "#20241a",
-  puppet: "#8d8464", puppetDark: "#6d6549",
+  // 伪军：**黑制服**（2026-08-17 用户拿一张「民国伪军演出服」的照片定的：黑上衣、
+  // 黑马裤、黑大盖帽配白帽墙、褐皮斜带、**白裹腿**、黑布鞋）。原来是一身灰土黄
+  // （`#8d8464`），跟村民、日军挤在同一个土色系里。
+  // 这是全场最深的一件衣服——但**不许比墨线还深**（`IN.ink` 是 #2b1f16，明度 34）。
+  // 这套画法的形全靠那圈墨线；填色比墨线还暗的话，轮廓就成了一道**比衣服还亮**的
+  // 边，放大看是一块黑布外头套着一圈光晕（第一版给到 #1c1b17 正是这样）。
+  // 所以"黑"的下限就钉在墨线上头一点点：明度 41，比军官那身墨绿呢（52）再深一档，
+  // 色相收成中性暖灰——同样是深色，一个偏绿一个不偏，三米外也分得开。
+  puppet: "#2a2925", puppetDark: "#1c1b18",
   villager: "#9a8d78", villagerDark: "#7a705c",
   skin: "#d8ab7c", skinDark: "#b98a5c",
   // 光
@@ -672,11 +680,21 @@ export function DrawCharacter(ctx, spec) {
       [footX - 3.4 * S, -footLift],
       [kneeX - 3.2 * S, hipY * 0.42],
     ], sid, color, { amp: 0.7 * S, lw, line: IN.ink });
+    // 伪军的白裹腿：膝下那一截罩白（画在腿之后、鞋之前）。这张平贴图是画框边
+    // 那枚提示牌用的，牌上只有二十来个像素高——认出"伪军"就靠这截白 + 白帽墙。
+    // **墨线只描到 0.4 档**：这条白才 0.18 个身高，照常规线宽描一圈就被自己的
+    // 墨线填成一坨黑（同「小形体配全圈墨线＝一坨」那条），白等于没画
+    if (kind === "puppet") {
+      InkFill(ctx, [
+        [kneeX - 3.3 * S, hipY * 0.42], [kneeX + 3.3 * S, hipY * 0.42],
+        [footX + 3.6 * S, -footLift], [footX - 3.4 * S, -footLift],
+      ], sid + "legging", "#c4bda6", { amp: 0.5 * S, lw: lw * 0.4, line: IN.ink });
+    }
     // 鞋
     InkFill(ctx, [
       [footX - 4.4 * S, -footLift], [footX + 5.4 * S, -footLift],
       [footX + 5.0 * S, -footLift + 3.4 * S], [footX - 4.6 * S, -footLift + 3.4 * S],
-    ], sid + "shoe", "#4d3a28", { amp: 0.5 * S, lw: lw * 0.8 });
+    ], sid + "shoe", kind === "puppet" ? "#26221c" : "#4d3a28", { amp: 0.5 * S, lw: lw * 0.8 });
   };
   Leg(swing2, coatDark, id + "legB");
 
@@ -779,9 +797,23 @@ export function DrawCharacter(ctx, spec) {
     // 于是抡枪托那一下胳膊在挥、枪还老老实实背在背上。现在它跟锯、锄头一样
     // 是真握在手里、跟着前臂转的物件（DrawCarry 的 "步枪" + World 的 alongArm）。
   } else if (kind === "puppet") {
+    // 黑大盖帽 + 白帽墙 + 漆皮檐（同骨架那一路）：帽体跟号衣同是黑的，
+    // 所以这枚牌上认出他靠的是帽墙那一条白，不是帽子的形。
+    // **帽墙一笔墨线都不描**：这条白只有 2.6 个 S 高，而这张平贴图的墨线是
+    // 2.1·S ——描一圈就把白整个填掉（第一版渲出来是一顶纯黑的帽子）。
+    // 它上下本来就压在帽体与檐之间，两条黑边已经把它框住了
     InkFill(ctx, [
-      [-6.6 * S, headY - 4.6 * S], [0, headY - 8.4 * S], [7.0 * S, headY - 4.4 * S], [-6.2 * S, headY - 3.0 * S],
-    ], id + "hat", "#3a352c", { amp: 0.6 * S, lw: lw * 0.9 });
+      [-6.6 * S, headY - 5.4 * S], [-1.0 * S, headY - 8.8 * S],
+      [5.6 * S, headY - 8.2 * S], [7.2 * S, headY - 5.2 * S],
+    ], id + "crown", "#26241e", { amp: 0.6 * S, lw: lw * 0.9 });
+    InkFill(ctx, [
+      [-6.6 * S, headY - 5.6 * S], [7.3 * S, headY - 5.2 * S],
+      [7.1 * S, headY - 2.6 * S], [-6.4 * S, headY - 3.0 * S],
+    ], id + "band", "#c4bda6", { amp: 0.4 * S, lw: 0, line: null });
+    InkFill(ctx, [
+      [5.0 * S, headY - 3.4 * S], [11.0 * S, headY - 2.6 * S],
+      [10.6 * S, headY - 1.0 * S], [5.0 * S, headY - 1.6 * S],
+    ], id + "visor", "#17150f", { amp: 0.4 * S, lw: lw * 0.7 });
   } else if (kind === "militia") {
     // 白毛巾（华北民兵的标志）
     InkFill(ctx, [
@@ -842,14 +874,35 @@ export const RIG_COLOR = (kind) => (kind === "father"
 //   日军  战斗帽 + **帽垂**（脑后垂布。侧视里最硬的一个标志，中国观众一眼认得）
 //         立领 + 武装带 + 前腰两个弹药盒、**绑腿** + 短军靴
 //   军官  大盖帽（硬檐）+ 深墨绿将校呢 + **马靴**（不打绑腿）+ 胯后挑一柄军刀
-//   伪军  软布帽（既不是战斗帽也不是大盖帽）、**没有帽垂**、胯后一只挎包，
-//         裤脚布鞋跟村民一样——剪影**卡在日军与村民中间**，这是他的人物设定，
-//         不是偷懒（同 TunnelBell：他是本乡人，不做丑角）
+//   伪军  **一身黑**：黑大盖帽（**白帽墙**）+ 黑制服 + 褐皮斜带与腰带 +
+//         **白裹腿** + 黑布鞋，胯后一只挎包
+//
+// 伪军这一身是 2026-08-17 用户拿一张「民国伪军演出服」的照片定的（原话：
+// 「伪军应该是我图里这幅装扮」）。照片里的东西按侧视认得出的顺序排：
+//   ① **白帽墙**——黑帽体上一圈白，是整个人最靠上的那点亮；
+//   ② **白裹腿**——膝下到脚面一截白，是整个人最靠下的那点亮；
+//   ③ 褐皮**斜带 + 腰带**，两条中间调压在黑衣服上（黑上叠黑等于没画）；
+//   ④ 黑布鞋（跟村民同款的鞋，只是黑的）。
+// 换掉的是原来那身灰土布 + 软布帽：它跟村民、日军挤在同一个土黄色系里，
+// 三个人的剪影只差一顶帽子。
+//
+// **它跟军官都戴大盖帽，靠什么分开？** 靠明度不靠形状：
+// 军官是绯红帽墙 + 深墨绿呢子 + 马靴，通身没有一处亮的；伪军的白帽墙与白裹腿
+// 是画面上一头一尾两道白——三十米外先读到的就是这两道，绝不会认错。
+// 「他是本乡人，不做丑角」这条人物设定没变：**脸不走 `hard` 那一路**
+//（没有卫生胡、没有帽檐下那片死板的冷阴影），穿的是号衣，长的还是乡下人的脸。
 // ---------------------------------------------------------------------------
 export const UNIFORM = {
   soldier: { capFlap: true, puttee: true, pouches: true, collar: true },
   officer: { ridingBoot: true, sabre: true, collar: true, sam: true },
-  puppet: { satchel: true },
+  puppet: {
+    satchel: true, collar: true, sam: true, legging: true, pocket: true, peakCap: true,
+    collarC: "#242219",      // 立领跟号衣同色（黑），只靠领章那一小片白分出来
+    tab: "#b9b29a",          // 领章：白布（日军那两块是绯红的）
+    strap: "#6b4f2e",        // 皮件：褐皮。**黑衣服上不许用墨色皮带**，叠上去等于没画
+    belt: "#6b4f2e",
+    satStrap: "#514526",     // 挎包是帆布带子，比皮件暗一档
+  },
 };
 
 // 小腿与脚：原来全场写死一副农民的土布裤脚 + 黑布鞋，当兵的也穿着它——
@@ -857,13 +910,16 @@ export const UNIFORM = {
 const LEG = {
   soldier: { shinB: "#7b7346", shinF: "#8c8353", footB: "#332c1c", footF: "#3d3524" },
   officer: { shinB: "#2c2b1f", shinF: "#363426", footB: "#221f16", footF: "#2b2820" },
-  puppet: { shinB: "#6a5a44", shinF: "#7b6a50", footB: "#3a2f22", footF: "#463829" },
+  // 伪军：**白裹腿 + 黑布鞋**。白裹腿是这一身最靠下的那点亮，跟白帽墙一头一尾
+  // 把他从一片土黄的村街里拎出来。别给到纯白——民兵那条羊肚手巾（#ddd6c2）
+  // 才是全场最白的一样东西，裹腿压它一档，两个人的"白"才有主次
+  puppet: { shinB: "#ada693", shinF: "#c4bda6", footB: "#211d18", footF: "#2b2620" },
 };
 export function RIG_LEG(kind) {
   return LEG[kind] || { shinB: "#6b5540", shinF: "#7d6349", footB: "#43331f", footF: "#4d3a28" };
 }
 
-// 小腿：农民是土布裤脚，日军是绑腿（一圈圈缠到膝下），军官是马靴
+// 小腿：农民是土布裤脚，日军是绑腿（一圈圈缠到膝下），军官是马靴，伪军是白裹腿
 export function DrawShinPart(ctx, px, py, len, w0, w1, kind, id, { k = 1, back = false } = {}) {
   const leg = RIG_LEG(kind);
   DrawLimb(ctx, px, py, len, w0, w1, back ? leg.shinB : leg.shinF, id, { k });
@@ -875,6 +931,18 @@ export function DrawShinPart(ctx, px, py, len, w0, w1, kind, id, { k = 1, back =
       // 缠的方向是斜的：一圈压着一圈往上走，平行横线看着像穿了条袜子
       InkLine(ctx, px - w * 0.54, py + len * t, px + w * 0.54, py + len * (t - 0.055),
         id + "wrap" + i, { lw: 2.1 * k, color: "rgba(40,32,18,0.40)", amp: 0.7 * k });
+    }
+  } else if (u?.legging) {
+    // 白裹腿（伪军）：跟日军的绑腿是同一个动作，只是布是白的，所以缠痕要**压暗**
+    // 才看得见（日军那几道是深线压在浅卡其上，同一个道理反过来）。
+    // 顶口那一道是**马裤扎进裹腿**的界线——没有它，白的那一截读成一双长筒袜
+    InkLine(ctx, px - w0 * 0.62, py + len * 0.045, px + w0 * 0.62, py + len * 0.005,
+      id + "legTop", { lw: 3.2 * k, color: "rgba(22,20,16,0.62)", amp: 0.6 * k });
+    for (let i = 0; i < 5; i += 1) {
+      const t = 0.14 + i * 0.18;
+      const w = w0 + (w1 - w0) * t;
+      InkLine(ctx, px - w * 0.54, py + len * t, px + w * 0.54, py + len * (t - 0.05),
+        id + "wrap" + i, { lw: 1.9 * k, color: "rgba(96,88,70,0.42)", amp: 0.7 * k });
     }
   } else if (u?.ridingBoot) {
     // 靴口那道折边：马靴与绑腿的分界就靠它（军官不打绑腿）
@@ -889,23 +957,28 @@ function DrawUniformKit(ctx, px, py, w, h, kind, id, k) {
   const u = UNIFORM[kind];
   if (!u) return;
   const ink = (a) => `rgba(28,22,12,${a})`;
+  // 皮件的色号可以按兵种覆盖：日军那副墨色的皮带压在土黄卡其上读得清清楚楚，
+  // 同一副压在伪军那身**黑**制服上就是黑叠黑（照片里那两条褐皮才是他身上
+  // 唯一的中间调）。默认仍是老那副
+  const strapC = u.strap || ink(0.55);
+  const beltC = u.belt || "#3d3020";
   if (u.collar) {
     // 立领：军装竖着的那圈硬领，配一小片领章（农民的对襟褂没有领子）
     InkFill(ctx, [
       [px - w * 0.26, py - h * 1.02], [px + w * 0.22, py - h * 1.02],
       [px + w * 0.26, py - h * 0.86], [px - w * 0.28, py - h * 0.86],
-    ], id + "collar", "#4e4a2b", { amp: 1 * k, lw: 3 * k });
+    ], id + "collar", u.collarC || "#4e4a2b", { amp: 1 * k, lw: 3 * k });
     InkFill(ctx, [
       [px + w * 0.04, py - h * 1.00], [px + w * 0.24, py - h * 0.98],
       [px + w * 0.24, py - h * 0.90], [px + w * 0.04, py - h * 0.90],
-    ], id + "tab", "#8f3b2e", { amp: 0.6 * k, lw: 2 * k });
+    ], id + "tab", u.tab || "#8f3b2e", { amp: 0.6 * k, lw: 2 * k });
   }
   if (u.pouches || u.sam) {
     // 武装带：比农民那根布腰带宽一倍、深一档，还有个铜扣
     InkFill(ctx, [
       [px - w * 0.40, py - h * 0.30], [px + w * 0.38, py - h * 0.32],
       [px + w * 0.38, py - h * 0.18], [px - w * 0.40, py - h * 0.16],
-    ], id + "belt", "#3d3020", { amp: 0.9 * k, lw: 2.6 * k });
+    ], id + "belt", beltC, { amp: 0.9 * k, lw: 2.6 * k });
     InkFill(ctx, [
       [px + w * 0.24, py - h * 0.31], [px + w * 0.38, py - h * 0.32],
       [px + w * 0.38, py - h * 0.19], [px + w * 0.24, py - h * 0.18],
@@ -921,9 +994,20 @@ function DrawUniformKit(ctx, px, py, w, h, kind, id, k) {
       id + "strap", { lw: 3.4 * k, color: ink(0.55), amp: 1.2 * k });
   }
   if (u.sam) {
-    // 军官是斜挎的武装带（Sam Browne），肩上那条从右肩斜到左胯
+    // 斜挎的武装带（Sam Browne），肩上那条从右肩斜到左胯
     InkLine(ctx, px + w * 0.26, py - h * 0.30, px - w * 0.16, py - h * 0.94,
-      id + "sam", { lw: 3.6 * k, color: ink(0.6), amp: 1.1 * k });
+      id + "sam", { lw: 3.6 * k, color: u.strap || ink(0.6), amp: 1.1 * k });
+  }
+  if (u.pocket) {
+    // 胸前那两只带盖的贴袋（照片里的黑号衣，左右各一只；侧视只露得出近镜头这一只）。
+    // 一片盖 + 底下一道袋口就够——袋身四条边全描出来，在这块 139px 宽的贴图上
+    // 会跟大襟、皮带挤成一堆横杠
+    InkFill(ctx, [
+      [px + w * 0.10, py - h * 0.80], [px + w * 0.36, py - h * 0.82],
+      [px + w * 0.36, py - h * 0.72], [px + w * 0.10, py - h * 0.70],
+    ], id + "pkFlap", "#282620", { amp: 0.6 * k, lw: 2 * k });
+    InkLine(ctx, px + w * 0.12, py - h * 0.58, px + w * 0.36, py - h * 0.60,
+      id + "pkBot", { lw: 1.8 * k, color: "rgba(120,112,94,0.35)", amp: 0.7 * k });
   }
   if (u.sabre) {
     // 胯后挑着的军刀：刀鞘斜指后下方。侧视里它是军官唯一一个"带兵器"的记号
@@ -938,8 +1022,10 @@ function DrawUniformKit(ctx, px, py, w, h, kind, id, k) {
       [px - w * 0.62, py - h * 0.34], [px - w * 0.28, py - h * 0.32],
       [px - w * 0.26, py - h * 0.02], [px - w * 0.64, py - h * 0.04],
     ], id + "satchel", "#5d5442", { amp: 1 * k, lw: 2.6 * k, shade: "rgba(0,0,0,0.18)" });
+    // 挎包带比武装带**细一档、暗一档**：两条斜带在胸口交出一个 X，一样粗的话
+    // 读出来是两条武装带（那是日军的样式），主次分开才知道哪条是皮带、哪条是包带
     InkLine(ctx, px - w * 0.44, py - h * 0.34, px + w * 0.06, py - h * 0.94,
-      id + "satStrap", { lw: 3 * k, color: ink(0.5), amp: 1.2 * k });
+      id + "satStrap", { lw: 2.3 * k, color: u.satStrap || strapC, amp: 1.2 * k });
   }
 }
 
@@ -1391,9 +1477,48 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ctx.fill();
     ctx.restore();
   } else if (kind === "puppet") {
-    InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
-      P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),
-    id + "hat", "#3a352c", { amp: 0.7 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
+    // 黑大盖帽 + **白帽墙**（2026-08-17 用户拿一张民国伪军号衣的照片定的那一身）。
+    // 形制跟军官那顶同款——都是大盖帽，所以照他那几段来（帽顶／硬棱／帽墙／
+    // 漆皮檐／颏带）；**分开靠明度不靠形状**：军官通身没有一处亮的（绯红帽墙 +
+    // 深墨绿呢子），伪军这一圈白是整个人最靠上的那点亮，配上膝下的白裹腿，
+    // 一头一尾两道白，三十米外先读到的就是这两道。
+    // 高度全按眼线给（同「头上任何东西的高度都按眼线算」那条老账）：眼线 −1.14r，
+    // 帽墙下沿停在 −1.22 以上（眉弓之上），檐往**下压**盖住眼线，不往前伸。
+    // 帽顶（平顶、前高后低，探出头形一截）
+    InkFill(ctx, [
+      P(-1.14, -1.44), P(-1.08, -2.04), P(-0.50, -2.28),
+      P(0.54, -2.32), P(1.08, -2.08), P(1.16, -1.52),
+    ], id + "crown", "#26241e", { amp: 0.4 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.16)", shadeAt: 0.45 });
+    // 帽顶与帽墙之间那道硬棱
+    InkLine(ctx, px - r * 1.12, py - r * 1.50, px + r * 1.14, py - r * 1.58,
+      id + "welt", { lw: 1.3 * k, color: "rgba(12,11,8,0.7)", amp: 0.3 * k });
+    // 白帽墙：立着的一圈。**别给到纯白**——民兵那条羊肚手巾（#ddd6c2）才是全场
+    // 最白的一样东西，这一圈压它一档，两处白才有主次
+    InkFill(ctx, [P(-1.12, -1.50), P(1.14, -1.58), P(1.12, -1.28), P(-1.08, -1.22)],
+      id + "band", "#c6bfa8", { amp: 0.35 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.14)" });
+    // 帽墙正面一枚小帽徽：白底上一粒深的，点到为止（那么小的一片描不起花纹，
+    // 同「小形体配全圈墨线＝一坨」那条）
+    ctx.save();
+    ctx.fillStyle = "#3a352a";
+    ctx.beginPath();
+    ctx.ellipse(px + r * 0.62, py - r * 1.40, r * 0.085, r * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // 颏带：一条横过白帽墙的细带（**画在帽檐之前**，让檐压住它的前半截——
+    // 真东西就是这么扣的；画在檐之后的话，黑带压在黑檐上等于没画）
+    InkLine(ctx, px - r * 1.04, py - r * 1.24, px + r * 1.06, py - r * 1.30,
+      id + "chinStrap", { lw: 1.7 * k, color: "#20180f", amp: 0.25 * k });
+    // 帽檐：黑漆皮。它的活是**盖住眼线**（−1.14），所以后缘要一直扫到脑门上
+    // （x 0.44 ＝ 眼位 0.58 的后头）——只在脸前头挑出一小片的话，眉眼那一带
+    // 就是一片**空白的腮**：这颗头上眼睛本来就不画，靠的是"真有东西压在那儿"，
+    // 檐收在脸外面等于谁也没遮（同「眼睛让头发／帽檐遮住，不画」那条：遮，不是空）
+    InkFill(ctx, Spline([
+      P(0.44, -1.28), P(1.02, -1.30), P(1.34, -1.26), P(1.52, -1.14),
+      P(1.38, -1.01), P(1.00, -1.05), P(0.48, -1.11),
+    ], 4), id + "visor", "#17150f", { amp: 0.3 * k, lw: lw * 0.85, shade: null });
+    // 漆皮的高光：上沿一条
+    InkLine(ctx, px + r * 0.70, py - r * 1.28, px + r * 1.42, py - r * 1.17,
+      id + "gloss", { lw: 1.2 * k, color: "rgba(196,200,180,0.38)", amp: 0.2 * k });
   } else if (kind === "militia") {
     InkFill(ctx, Spline([P(-1.08, -1.12), P(-0.94, -1.66), P(-0.34, -1.98), P(0.32, -1.96),
       P(0.90, -1.68), P(1.04, -1.34), P(0.94, -1.02), P(-0.98, -0.90)], 4),
@@ -1763,9 +1888,20 @@ export function DrawShoulder(ctx, x, y, S, kind, id) {
       [R * 1.08, -R * 0.80], [-R * 1.14, -R * 0.72],
     ], id + "cap", "#1e1811", { amp: 1.8 * S, lw: 0, line: null });
   } else if (kind === "puppet") {
+    // 黑大盖帽 + 白帽墙（同 DrawHeadPart 的 puppet 分支）：这块头像上认出他
+    // 就靠帽墙那一条白——帽体跟他的黑号衣同色，不分出来的话整个头是一坨
     InkFill(ctx, [
-      [-R * 1.12, -R * 0.92], [R * 0.04, -R * 2.02], [R * 1.08, -R * 0.96], [-R * 1.14, -R * 0.70],
-    ], id + "hat", "#241f18", { amp: 2.0 * S, lw: 0, line: null });
+      [-R * 1.12, -R * 1.10], [-R * 1.02, -R * 1.86], [R * 0.06, -R * 2.10],
+      [R * 1.00, -R * 1.90], [R * 1.10, -R * 1.16],
+    ], id + "crown", "#1e1c17", { amp: 2.0 * S, lw: 0, line: null });
+    InkFill(ctx, [
+      [-R * 1.10, -R * 1.16], [R * 1.10, -R * 1.22], [R * 1.08, -R * 0.90], [-R * 1.12, -R * 0.84],
+    // 这一层是**压暗的前景剪影**，帽墙只压到"比帽体亮两档"为止：
+    // 给到骨架那边的白（#c6bfa8），画框边上会亮出一条比主体还抢眼的杠
+    ], id + "band", "#8e8873", { amp: 1.6 * S, lw: 0, line: null });
+    InkFill(ctx, [
+      [R * 0.86, -R * 0.98], [R * 1.62, -R * 0.86], [R * 1.56, -R * 0.60], [R * 0.88, -R * 0.72],
+    ], id + "visor", "#141310", { amp: 1.4 * S, lw: 0, line: null });
   } else if (kind === "militia") {
     // 白毛巾：贴着颅顶缠一圈，前低后高，脑后垂下一角
     InkFill(ctx, [
@@ -5880,8 +6016,10 @@ export function DrawFoldCard(ctx, W, H, view, L, t) {
 //
 // 第七稿的封法：**坛口糊着一圈干泥，泥上盖半块碗底**（豁口碗的底，圈足朝上），
 // 碗片底下垫着一圈蓝底白花的碎布——暗线的第二面。两段动作：
-//   unwind＝抠泥（顺着一个方向一段一段啃，泥真的一块一块掉）；
-//   peel＝揭碗片（捏住边往左下揭，底下的碎布垫圈和红薯干露出来）。
+//   unwind＝抠泥（按住 E＋↑，指头顺着圈一段一段啃，泥真的一块一块掉）；
+//   peel＝揭碗片（同一个键继续，碗片往左下揭起，底下的碎布垫圈和红薯干露出来）。
+// 输入 2026-08-17 起只有按住 E＋↑（Core 的 unwrapJar），卡只管画：进度、指头的角度
+//（view.a＝Core 的 WrapEdgeAngle）、碗片揭起多少全从 view 里来。
 // 画的顺序＝封坛那天的先后（画笔通病第 1 条）：先有坛、再垫布、再扣碗底、
 // 最后糊泥——所以泥压在碗片边上、碗片压在布上、布压在坛口上。
 // 玩家抠掉一段，就真少画一段。
@@ -6210,7 +6348,7 @@ export function DrawWrapCard(ctx, W, H, view, L, t) {
   // 内沿咬住碗片（0.62cr），外沿盖过口沿垂下来（最厚 1.24cr），两条沿都是
   // 手抹出来的起伏（"四边笔直＝没有手"，光滑圆弧也一样）。抠的进度长在泥上：
   // 外沿一层层往里退，本圈啃过的那一段先薄一档——绕到哪儿一眼看得见。
-  const GAP = 0.42;                        // 起手位那个豁口（tip 处，本来就缺一块）
+  const GAP = L.gap ?? 0.42;               // 起手位那个豁口（tip 处，本来就缺一块）——与 Core 的 WrapEdgeAngle 同一个数
   if (laps < L.laps) {
     const eaten = lapK * (Math.PI * 2 - GAP);
     // **泥是骑在缝上的一道箍，不是一块盖布。** 碗片外沿 1.00cr、口沿 1.06cr，
@@ -11238,7 +11376,10 @@ export function DrawInsertCard(ctx, W, H, kind) {
 //           九八式立领 + 红领章、斜挎武装带（Sam Browne）、白手套、
 //           军刀立在斗里手扶着刀柄——马靴被斗沿挡住，不必画
 //   驾驶兵  战斗帽 + **帽垂**（正面看是垂在两颊边的两片布）、土黄军装、胸前交叉背带
-//   伪军    软布帽（没有帽垂）、灰土布军装、胯上挎包、布鞋——本乡人的脸，不做丑角
+//   伪军    **一身黑号衣**：黑大盖帽 + **白帽墙**、黑制服、褐皮斜带、**白裹腿**、
+//           黑布鞋，胯上一只挎包——本乡人的脸，不做丑角（2026-08-17 换的那一身，
+//           见 UNIFORM 那一节；开道的两个大脸就是 seg0 的起手画面，这身白帽墙 +
+//           白裹腿要一眼读得出来）
 //   队列    摩托背后雾里两排日军剪影，肩上一排刺刀尖——"大部队"三个字全靠这排尖
 // ---------------------------------------------------------------------------
 export function DrawRaidMotoCard(ctx, W, H, seg, t) {
@@ -11249,7 +11390,10 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
   // 卡内配色：整卡就是"阴下来"的那一刻，比村里的日常配色再冷再沉一档
   const RC = {
     ground: "#4e4636", wall: "#544d3c", wallDark: "#423c2f",
-    puppetCoat: "#5d5744", puppetTrouser: "#4a443a", puppetCap: "#36322a",
+    // 伪军那一身黑号衣：帽体/上衣/马裤全是黑的，认得出他靠三样中间调——
+    // 白帽墙、白裹腿、褐皮带（黑上叠黑等于没画）
+    puppetCoat: "#2b2924", puppetTrouser: "#252319", puppetCap: "#242219",
+    puppetBand: "#c0b99f", puppetLegging: "#bdb69e", puppetStrap: "#6b4f2e",
     jpCoat: "#4c482c", jpDark: "#34321f",
     moto: "#514729", motoDark: "#383120", tire: "#22221e",
     officerCoat: "#2b2f1f", officerDark: "#1d2016",
@@ -11334,33 +11478,55 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
     const shoulderY = gyS - hgt * 0.78 * S;
     const headC = gyS - hgt * 0.88 * S;
     const wS = 30 * hu * S;                     // 半肩宽 px
-    // 腿（正面两条，走路小幅错开）
+    // 腿（正面两条，走路小幅错开）：黑马裤到膝下，膝下是**白裹腿**——
+    // 这一截白是他最靠下的那点亮，跟白帽墙一头一尾把他从土黄的村街里拎出来
     const step = walk ? Math.sin(walk) * 7 * hu : 0;
+    const legTop = gyS - hgt * 0.42 * S;
     for (const s of [-1, 1]) {
+      const footC = px + s * (11 + 1.5) * hu * S + s * step * S * 0.3;
+      const kneeY = legTop + (gyS - 2.5 * S - legTop) * 0.50;
+      const kneeC = px + s * 11 * hu * S + (footC - px - s * 11 * hu * S) * 0.50;
+      // 马裤：胯上宽、到膝收进去（照片里那条裤子就是这个形）
       InkFill(ctx, [
-        [px + s * 11 * hu * S - 6 * hu * S, gyS - hgt * 0.42 * S],
-        [px + s * 11 * hu * S + 6 * hu * S, gyS - hgt * 0.42 * S],
-        [px + s * (11 + 1.5) * hu * S + 5 * hu * S + s * step * S * 0.3, gyS - 3 * S],
-        [px + s * (11 + 1.5) * hu * S - 6 * hu * S + s * step * S * 0.3, gyS - 2 * S],
+        [px + s * 11 * hu * S - 6.6 * hu * S, legTop],
+        [px + s * 11 * hu * S + 6.6 * hu * S, legTop],
+        [kneeC + 4.4 * hu * S, kneeY], [kneeC - 4.6 * hu * S, kneeY],
       ], id + "leg" + s, RC.puppetTrouser, { amp: 1.6 * S, lw: 2.6 * S });
-      // 布鞋
+      // 白裹腿：膝下到脚面，比马裤窄一档
+      InkFill(ctx, [
+        [kneeC - 4.4 * hu * S, kneeY - 1 * S], [kneeC + 4.2 * hu * S, kneeY - 1 * S],
+        [footC + 4.0 * hu * S, gyS - 3 * S], [footC - 4.4 * hu * S, gyS - 2 * S],
+      ], id + "legging" + s, RC.puppetLegging, { amp: 1.2 * S, lw: 2.2 * S, shade: "rgba(0,0,0,0.14)" });
+      // 黑布鞋
       InkFill(ctx, [
         [px + s * 12 * hu * S - 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
         [px + s * 12 * hu * S + 7 * hu * S + s * step * S * 0.3, gyS - 5 * S],
         [px + s * 12 * hu * S + 8 * hu * S + s * step * S * 0.3, gyS],
         [px + s * 12 * hu * S - 8 * hu * S + s * step * S * 0.3, gyS],
-      ], id + "shoe" + s, "#2e2721", { amp: 1 * S, lw: 2 * S });
+      ], id + "shoe" + s, "#231f1a", { amp: 1 * S, lw: 2 * S });
     }
-    // 躯干：灰土布军装，正面对襟一道扣线
+    // 躯干：黑号衣，正面对襟一道扣线
     InkFill(ctx, [
       [px - wS, shoulderY], [px + wS, shoulderY],
       [px + wS * 0.92, gyS - hgt * 0.40 * S], [px - wS * 0.92, gyS - hgt * 0.40 * S],
     ], id + "coat", RC.puppetCoat, { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.18)" });
     InkLine(ctx, px, shoulderY + 4 * S, px, gyS - hgt * 0.42 * S, id + "btn",
-      { lw: 1.8 * S, color: "rgba(30,24,16,0.55)", amp: 1 * S });
-    // 挎包带（斜挂）——伪军在本作的记号
+      { lw: 1.8 * S, color: "rgba(120,112,94,0.35)", amp: 1 * S });
+    // 胸前两只带盖的贴袋（正面看得见两只）
+    for (const s of [-1, 1]) {
+      InkFill(ctx, [
+        [px + s * wS * 0.30 - wS * 0.20, shoulderY + 12 * hu * S],
+        [px + s * wS * 0.30 + wS * 0.20, shoulderY + 12 * hu * S],
+        [px + s * wS * 0.30 + wS * 0.20, shoulderY + 18 * hu * S],
+        [px + s * wS * 0.30 - wS * 0.20, shoulderY + 18 * hu * S],
+      ], id + "pk" + s, "#2b2822", { amp: 1 * S, lw: 1.8 * S });
+    }
+    // 褐皮腰带 + 斜挎的皮带（挎包在胯后，正面只看得见这两条）——**黑衣服上
+    // 不许用墨色皮带**，叠上去等于没画
+    InkLine(ctx, px - wS * 0.96, gyS - hgt * 0.44 * S, px + wS * 0.96, gyS - hgt * 0.44 * S,
+      id + "belt", { lw: 4 * hu * S, color: RC.puppetStrap, amp: 0.8 * S });
     InkLine(ctx, px - wS * 0.6, shoulderY + 2 * S, px + wS * 0.72, gyS - hgt * 0.44 * S,
-      id + "sat", { lw: 3 * hu * S, color: "rgba(30,24,16,0.5)", amp: 1.2 * S });
+      id + "sat", { lw: 3.4 * hu * S, color: RC.puppetStrap, amp: 1.2 * S });
     // 两臂垂在身侧（走路小幅摆）
     for (const s of [-1, 1]) {
       const sw = walk ? Math.sin(walk + (s > 0 ? Math.PI : 0)) * 5 * hu : 0;
@@ -11375,12 +11541,26 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
       [px + hr * S, headC + hr * 0.7 * S], [px + hr * 0.4 * S, headC + hr * 1.06 * S],
       [px - hr * 0.4 * S, headC + hr * 1.06 * S],
     ], id + "face", RC.skin, { amp: 1.2 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.12)" });
-    // 软布帽（没有帽垂）：一顶塌塌的圆帽
+    // 黑大盖帽 + **白帽墙** + 漆皮檐（正面：帽顶是撑开的一个饼，帽墙是立着的
+    // 一圈白，檐横在眉上压出那片影）
     InkFill(ctx, [
-      [px - hr * 1.12 * S, headC - hr * 0.44 * S], [px - hr * 0.7 * S, headC - hr * 1.2 * S],
-      [px + hr * 0.7 * S, headC - hr * 1.24 * S], [px + hr * 1.12 * S, headC - hr * 0.4 * S],
-      [px + hr * 0.9 * S, headC - hr * 0.2 * S], [px - hr * 0.9 * S, headC - hr * 0.22 * S],
-    ], id + "cap", RC.puppetCap, { amp: 1.6 * S, lw: 2.6 * S });
+      [px - hr * 1.20 * S, headC - hr * 0.86 * S], [px - hr * 0.92 * S, headC - hr * 1.46 * S],
+      [px + hr * 0.92 * S, headC - hr * 1.50 * S], [px + hr * 1.20 * S, headC - hr * 0.82 * S],
+    ], id + "crown", RC.puppetCap, { amp: 1.6 * S, lw: 2.6 * S, shade: "rgba(0,0,0,0.2)" });
+    InkFill(ctx, [
+      [px - hr * 1.20 * S, headC - hr * 0.88 * S], [px + hr * 1.20 * S, headC - hr * 0.84 * S],
+      [px + hr * 1.14 * S, headC - hr * 0.46 * S], [px - hr * 1.14 * S, headC - hr * 0.50 * S],
+    ], id + "band", RC.puppetBand, { amp: 1.2 * S, lw: 2.2 * S, shade: "rgba(0,0,0,0.14)" });
+    // 帽徽：白帽墙正中一粒深的
+    ctx.fillStyle = "#332e26";
+    ctx.beginPath();
+    ctx.ellipse(px, headC - hr * 0.68 * S, hr * 0.15 * S, hr * 0.19 * S, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 漆皮檐：横在眉上，两头略往下弯
+    InkFill(ctx, [
+      [px - hr * 1.16 * S, headC - hr * 0.50 * S], [px + hr * 1.16 * S, headC - hr * 0.46 * S],
+      [px + hr * 1.02 * S, headC - hr * 0.24 * S], [px - hr * 1.02 * S, headC - hr * 0.28 * S],
+    ], id + "visor", "#17150f", { amp: 1 * S, lw: 2 * S });
     // 帽影里的眉眼：两道短墨 + 抿住的嘴
     ctx.fillStyle = "rgba(20,16,10,0.6)";
     ctx.fillRect(px - hr * 0.72 * S, headC - hr * 0.28 * S, hr * 1.44 * S, hr * 0.34 * S);
@@ -11704,9 +11884,18 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
     const hgt = 182;
     const walk = (t < 1.6 || turn > 0.6) ? t * 7.5 : 0;
     const step = walk ? Math.sin(walk) * 8 : 0;
-    // 腿（侧视两条）——比伪军的灰土布再深一档：他站在近景，浅了就发飘
-    InkLine(ctx, px - step * S * 0.4, gyS - hgt * 0.44 * S, px - (13 + step) * S, gyS - 2 * S, "rmChLegB", { lw: 8 * S, color: "#3a352c", amp: 1.2 * S });
-    InkLine(ctx, px + step * S * 0.4, gyS - hgt * 0.44 * S, px + (6 + step) * S, gyS - 2 * S, "rmChLegF", { lw: 8.6 * S, color: "#443e33", amp: 1.2 * S });
+    // 腿（侧视两条）：黑马裤到膝、膝下白裹腿、脚上黑布鞋。**分两截画**，
+    // 一根从胯到脚的通线读不出裹腿那一截
+    const hipYc = gyS - hgt * 0.44 * S;
+    const ChiefLeg = (idc, hx0, fx0, lw0, dark, white) => {
+      const mx = (hx0 + fx0) / 2, my = (hipYc + gyS - 2 * S) / 2;
+      InkLine(ctx, hx0, hipYc, mx, my, idc + "Th", { lw: lw0, color: dark, amp: 1.2 * S });
+      InkLine(ctx, mx, my, fx0, gyS - 4 * S, idc + "Sh", { lw: lw0 * 0.86, color: white, amp: 1 * S });
+      InkFill(ctx, [[fx0 - 6 * S, gyS - 5 * S], [fx0 + 7 * S, gyS - 5 * S],
+        [fx0 + 8 * S, gyS], [fx0 - 6.5 * S, gyS]], idc + "Sho", "#231f1a", { amp: 0.9 * S, lw: 2 * S });
+    };
+    ChiefLeg("rmChLegB", px - step * S * 0.4, px - (13 + step) * S, 8 * S, "#201e18", "#a8a189");
+    ChiefLeg("rmChLegF", px + step * S * 0.4, px + (6 + step) * S, 8.6 * S, "#26241d", "#bfb8a0");
     // 躯干：凑过去时朝左折
     const bend = lean * 0.34 - turn * 0.2;
     const sx = px - Math.sin(bend) * hgt * 0.36 * S;
@@ -11714,37 +11903,52 @@ export function DrawRaidMotoCard(ctx, W, H, seg, t) {
     InkFill(ctx, [
       [px - 15 * S, gyS - hgt * 0.42 * S], [sx - 16 * S, sy], [sx + 14 * S, sy + 6 * S],
       [px + 17 * S, gyS - hgt * 0.42 * S],
-    ], "rmChBody", "#4a4436", { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.24)" });
+    ], "rmChBody", "#2b2924", { amp: 1.8 * S, lw: 2.8 * S, shade: "rgba(0,0,0,0.24)" });
+    // 斜挎的褐皮带：黑号衣上唯一的中间调，不给它整个人就是一块剪影
+    InkLine(ctx, sx + 12 * S, sy + 6 * S, px - 10 * S, gyS - hgt * 0.44 * S,
+      "rmChSam", { lw: 4 * S, color: RC.puppetStrap, amp: 1 * S });
+    InkLine(ctx, px - 15 * S, gyS - hgt * 0.44 * S, px + 17 * S, gyS - hgt * 0.44 * S,
+      "rmChBelt", { lw: 4.4 * S, color: RC.puppetStrap, amp: 0.8 * S });
     // 挎包
-    InkFill(ctx, Rect(px + 6 * S, gyS - hgt * 0.40 * S, 14 * S, 17 * S), "rmChSat", "#3f382c", { amp: 1.2 * S, lw: 2 * S });
-    // 头（侧脸朝左）＋软帽；回身时翻朝右
+    InkFill(ctx, Rect(px + 6 * S, gyS - hgt * 0.40 * S, 14 * S, 17 * S), "rmChSat", "#4d4536", { amp: 1.2 * S, lw: 2 * S });
+    // 头（侧脸朝左）＋大盖帽；回身时翻朝右
     const hx = sx + (turn > 0.5 ? 8 : -4) * S, hy = sy - 20 * S + lean * 6 * S;
     const fdir = turn > 0.5 ? 1 : -1;
     InkFill(ctx, [
       [hx - fdir * 14 * S, hy + 12 * S], [hx - fdir * 13 * S, hy - 10 * S], [hx, hy - 14 * S],
       [hx + fdir * 13 * S, hy - 8 * S], [hx + fdir * 15 * S, hy + 4 * S], [hx + fdir * 10 * S, hy + 13 * S],
     ], "rmChHead", RC.skin, { amp: 1.2 * S, lw: 2.6 * S });
+    // 大盖帽：黑帽体 + 白帽墙 + 漆皮檐。他是近景里唯一一个侧脸的伪军，
+    // 白帽墙那一条就是"这也是个伪军"的全部说明
     InkFill(ctx, [
-      [hx - fdir * 16 * S, hy - 6 * S], [hx - fdir * 10 * S, hy - 17 * S], [hx + fdir * 10 * S, hy - 17 * S],
-      [hx + fdir * 15 * S, hy - 4 * S], [hx + fdir * 10 * S, hy - 1 * S], [hx - fdir * 12 * S, hy - 1 * S],
+      [hx - fdir * 16 * S, hy - 8 * S], [hx - fdir * 11 * S, hy - 19 * S], [hx + fdir * 11 * S, hy - 19 * S],
+      [hx + fdir * 15 * S, hy - 7 * S],
     ], "rmChCap", RC.puppetCap, { amp: 1.4 * S, lw: 2.2 * S });
+    InkFill(ctx, [
+      [hx - fdir * 16 * S, hy - 8 * S], [hx + fdir * 15 * S, hy - 7 * S],
+      [hx + fdir * 14 * S, hy - 1.5 * S], [hx - fdir * 14 * S, hy - 2 * S],
+    ], "rmChBand", RC.puppetBand, { amp: 1.2 * S, lw: 2 * S });
+    InkFill(ctx, [
+      [hx + fdir * 12 * S, hy - 3 * S], [hx + fdir * 23 * S, hy - 1 * S],
+      [hx + fdir * 22 * S, hy + 3 * S], [hx + fdir * 12 * S, hy + 1 * S],
+    ], "rmChVisor", "#17150f", { amp: 1 * S, lw: 1.8 * S });
     ctx.fillStyle = IN.ink;
-    ctx.fillRect(hx + fdir * 6 * S - 2 * S, hy + 1 * S, 4.4 * S, 2.4 * S);   // 眼
+    ctx.fillRect(hx + fdir * 6 * S - 2 * S, hy + 2.4 * S, 4.4 * S, 2.4 * S);   // 眼（檐底下）
     // 胳膊：凑着说话时一只手拢在嘴边；回身时手朝村里一指
     if (turn > 0.4) {
       const k = Sm((t - 4.0) / 0.5);
       InkLine(ctx, sx, sy + 8 * S, sx - 30 * S * (1 - k) - 4 * S, sy + 30 * S - 44 * S * k, "rmChPoint",
-        { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+        { lw: 8 * S, color: "#2b2924", amp: 1.2 * S });
     } else if (lean > 0.3) {
       // 拢在嘴边的那只手——"交头接耳"的画面记号
-      InkLine(ctx, sx + 6 * S, sy + 10 * S, hx - 10 * S, hy + 8 * S, "rmChCup", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+      InkLine(ctx, sx + 6 * S, sy + 10 * S, hx - 10 * S, hy + 8 * S, "rmChCup", { lw: 8 * S, color: "#2b2924", amp: 1.2 * S });
       ctx.beginPath();
       ctx.ellipse(hx - 12 * S, hy + 7 * S, 5.4 * S, 4.4 * S, -0.5, 0, Math.PI * 2);
       ctx.fillStyle = RC.skinDark;
       ctx.fill();
       ctx.strokeStyle = IN.ink; ctx.lineWidth = 1.6 * S; ctx.stroke();
     } else {
-      InkLine(ctx, sx, sy + 8 * S, px - 6 * S + step * S * 0.5, gyS - hgt * 0.42 * S, "rmChArm", { lw: 8 * S, color: "#4a4436", amp: 1.2 * S });
+      InkLine(ctx, sx, sy + 8 * S, px - 6 * S + step * S * 0.5, gyS - hgt * 0.42 * S, "rmChArm", { lw: 8 * S, color: "#2b2924", amp: 1.2 * S });
     }
   };
 
@@ -12069,8 +12273,8 @@ export function DrawMotherJacketCard(ctx, W, H, seg, t) {
 
 // ---------------------------------------------------------------------------
 // 回程·两个骑车的（c1_riders，三段）。参照 DrawRaidMotoCard 的构图：
-// S=H/420、地平线、村口土路、冷罩+角晕+颗粒。侧视——两个伪军（软布帽、
-// 无帽垂、胯后挎包、土布裤脚布鞋，见 UNIFORM）骑自行车。
+// S=H/420、地平线、村口土路、冷罩+角晕+颗粒。侧视——两个伪军（黑大盖帽 +
+// 白帽墙、黑号衣、白裹腿、黑布鞋、胯后挎包，见 UNIFORM）骑自行车。
 //   seg 0  从右（北）骑进画面：前车捏闸停住、一只脚点地；后车跟着停
 //   seg 1  支着腿不下车，朝村里（画面左）望；远景左侧两三间塌了房顶的房
 //   seg 2  调头骑远（往右出画）。车铃那一声是音效的事，画面不管
@@ -12085,10 +12289,12 @@ export function DrawVillageRidersCard(ctx, W, H, seg, t) {
   const PX = (u) => W / 2 + u * S;
   const RC = {
     ground: "#57503c", road: "#6b6148", rut: "#4a4434",
-    // 裤腿提亮两档到土布色（首轮退回：裤腿/脚跟车、地几乎同明度，
-    // 人腿糊进车架里）；远侧那条腿仍暗一档，前后才分得开
-    coat: "#5d5744", trouser: "#7d7258", trouserFar: "#57503f",
-    cap: "#36322a", shoe: "#2e2721",
+    // 换成黑号衣（2026-08-17）之后，"裤腿别糊进车架里"这条老账反过来解：
+    // 老版靠**提亮裤腿**跟深色的车架分开，现在裤腿跟车架一样深——分开靠的是
+    // 膝下那截**白裹腿**（车架上没有任何一处是亮的）。远侧那条仍暗一档
+    coat: "#2b2924", trouser: "#252319", trouserFar: "#1d1c16",
+    legging: "#bdb69e", leggingFar: "#9c9682",
+    cap: "#242219", band: "#c0b99f", strap: "#6b4f2e", shoe: "#231f1a",
     skin: "#bb9066", bike: "#232a30", bikeDark: "#1c2126",
   };
 
@@ -12217,13 +12423,15 @@ export function DrawVillageRidersCard(ctx, W, H, seg, t) {
     const hipX = seatX - 1 * K, hipY = seatY - 2 * K;
     const shoY = hipY - 26 * K + shrug * -3.5 * K;
     const shoX = hipX - 14 * K;
-    const Leg = (px2, py2, col, lw2, ground2) => {
+    // 大腿是黑马裤、小腿是**白裹腿**，所以两节各给各的色（膝正好是那道分界，
+    // 这套两节腿的画法本来就在膝上断开，不用另加一笔）
+    const Leg = (px2, py2, col, legCol, lw2, ground2) => {
       // 两节腿：髋→膝→踏板（膝盖角度随踏板走）；ground2=这只脚点地撑着
       const tx2 = ground2 ? fx + 6 * K : px2;
       const ty2 = ground2 ? -1 * K : py2;
       const mx2 = (hipX + tx2) / 2 - 7 * K, my2 = (hipY + ty2) / 2 - 3 * K;
       InkLine(ctx, hipX, hipY, mx2, my2, id2 + "thigh" + col, { lw: lw2, color: col, amp: 0.6 * K });
-      InkLine(ctx, mx2, my2, tx2, ty2, id2 + "shin" + col, { lw: lw2 * 0.85, color: col, amp: 0.6 * K });
+      InkLine(ctx, mx2, my2, tx2, ty2, id2 + "shin" + col, { lw: lw2 * 0.85, color: legCol, amp: 0.6 * K });
       // 布鞋踩在踏板/地上
       InkFill(ctx, [[tx2 - 4.5 * K, ty2 - 2.4 * K], [tx2 + 4 * K, ty2 - 2.6 * K],
         [tx2 + 5 * K, ty2 + 0.6 * K], [tx2 - 4 * K, ty2 + 0.8 * K]],
@@ -12234,34 +12442,45 @@ export function DrawVillageRidersCard(ctx, W, H, seg, t) {
           id2 + "shoeTop" + col, { lw: 1.1 * K, color: "rgba(196,182,148,0.7)", amp: 0.3 * K });
       }
     };
-    Leg(pBx, pBy, RC.trouserFar, 6 * K, false);
+    Leg(pBx, pBy, RC.trouserFar, RC.leggingFar, 6 * K, false);
     // 躯干：微微前倾压着车把
     InkFill(ctx, [
       [hipX - 8 * K, hipY + 4 * K], [hipX + 8 * K, hipY + 2 * K],
       [shoX + 10 * K, shoY], [shoX - 8 * K, shoY + 3 * K],
     ], id2 + "torso", RC.coat, { amp: 1.6 * K, lw: 2.6 * K, shade: "rgba(0,0,0,0.2)" });
+    // 斜挎的褐皮带：黑号衣上唯一的中间调
+    InkLine(ctx, hipX + 5 * K, hipY + 2 * K, shoX + 2 * K, shoY + 2 * K, id2 + "sam",
+      { lw: 2.4 * K, color: RC.strap, amp: 0.5 * K });
     // 近侧腿（压在车架上）：footDown 时伸直点地
-    Leg(pAx, pAy, RC.trouser, 7 * K, footDown > 0.5);
-    // 裤脚扎口那一道（土布裤脚——伪军穿的是村民的腿）：裤腿提亮之后
-    // 这道改压深，亮边叠亮裤只会糊掉
-    InkLine(ctx, hipX - 2 * K, hipY + 14 * K, hipX + 3 * K, hipY + 15 * K, id2 + "cuff",
-      { lw: 2 * K, color: "rgba(58,50,36,0.55)", amp: 0.4 * K });
+    Leg(pAx, pAy, RC.trouser, RC.legging, 7 * K, footDown > 0.5);
+    // 裹腿顶口那一道（马裤扎进裹腿的界线）：**压在白的那截上**才看得见——
+    // 换成黑号衣之后，老版那道深线画在深裤腿上等于没画
+    InkLine(ctx, hipX - 8 * K, hipY + 15 * K, hipX - 1 * K, hipY + 16 * K, id2 + "cuff",
+      { lw: 2 * K, color: "rgba(40,36,26,0.6)", amp: 0.4 * K });
     // 两臂伸向车把
     InkLine(ctx, shoX + 2 * K, shoY + 4 * K, headX - 8 * K, headY - 5 * K, id2 + "armF",
       { lw: 5.5 * K, color: RC.coat, amp: 0.8 * K });
-    // 头：软布帽、没有帽垂。lookBack>0 时扭头朝后（跟后车说话）
+    // 头：黑大盖帽 + 白帽墙 + 漆皮檐。lookBack>0 时扭头朝后（跟后车说话）
     const hx = shoX + lookBack * 10 * K, hy = shoY - 11 * K;
     const fdir2 = 1 - lookBack * 2;       // 1=朝前（车头方向），-1=扭向后
     InkFill(ctx, [
       [hx - fdir2 * 8 * K, hy + 7 * K], [hx - fdir2 * 7.5 * K, hy - 5 * K], [hx, hy - 8 * K],
       [hx + fdir2 * 7.5 * K, hy - 4.6 * K], [hx + fdir2 * 8.6 * K, hy + 2 * K], [hx + fdir2 * 5.6 * K, hy + 7.6 * K],
     ], id2 + "head", RC.skin, { amp: 0.9 * K, lw: 2 * K });
-    InkFill(ctx, [
-      [hx - fdir2 * 9.2 * K, hy - 3.4 * K], [hx - fdir2 * 6 * K, hy - 9.6 * K], [hx + fdir2 * 6 * K, hy - 9.8 * K],
-      [hx + fdir2 * 8.6 * K, hy - 2.4 * K], [hx + fdir2 * 5.6 * K, hy - 0.6 * K], [hx - fdir2 * 7 * K, hy - 0.6 * K],
+    InkFill(ctx, [                                        // 帽顶（平顶、比头宽）
+      [hx - fdir2 * 9.6 * K, hy - 4.6 * K], [hx - fdir2 * 6.4 * K, hy - 11.0 * K],
+      [hx + fdir2 * 6.4 * K, hy - 11.2 * K], [hx + fdir2 * 9.0 * K, hy - 4.4 * K],
     ], id2 + "cap", RC.cap, { amp: 1 * K, lw: 1.8 * K });
+    InkFill(ctx, [                                        // 白帽墙
+      [hx - fdir2 * 9.6 * K, hy - 4.8 * K], [hx + fdir2 * 9.0 * K, hy - 4.4 * K],
+      [hx + fdir2 * 8.4 * K, hy - 1.4 * K], [hx - fdir2 * 9.0 * K, hy - 1.8 * K],
+    ], id2 + "band", RC.band, { amp: 0.8 * K, lw: 1.5 * K });
+    InkFill(ctx, [                                        // 漆皮檐
+      [hx + fdir2 * 7.0 * K, hy - 2.4 * K], [hx + fdir2 * 14.4 * K, hy - 1.0 * K],
+      [hx + fdir2 * 13.8 * K, hy + 1.4 * K], [hx + fdir2 * 7.2 * K, hy + 0.4 * K],
+    ], id2 + "visor", "#17150f", { amp: 0.7 * K, lw: 1.4 * K });
     ctx.fillStyle = IN.ink;
-    ctx.fillRect(hx + fdir2 * 3 * K - 1.4 * K, hy - 0.2 * K, 2.8 * K, 1.6 * K);   // 眼
+    ctx.fillRect(hx + fdir2 * 3 * K - 1.4 * K, hy + 1.6 * K, 2.8 * K, 1.6 * K);   // 眼（檐底下）
     ctx.restore();
   };
 
@@ -15649,29 +15868,94 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
     // 房梁：横在画框上沿的一根梁，底下垂着椽子头与苇箔的茬。
     // **梁身要占大半张画布**——第一版 0.62 配上长短不一的长齿，梁身整个被推出
     // 画框，屏幕上只剩一排黑方块，读成城墙垛口（实拍抓的）
+    // 大梁：一根**斧子砍出来的树干**横在画框顶上。
+    //
+    // 2026-08-17 重做（用户：「这张图里的顶部是什么鬼东西 这个鬼东西出现了好多次」）。
+    // 老版＝一块平板 ＋ 四条等距的直横线 ＋ **九个等距同宽、各描一圈墨线的方齿** ＋
+    // 一条通长的细亮线，实拍读出来是**一排铆钉**（或胶片的齿孔）钉在一块黑板上。
+    // 三处病根，全是本文件里记过的老账：
+    //   ① **椽子头压根不该长在这儿。** 椽子头是**檐口**的东西（屋顶挑出墙外那一截
+    //      锯断的杆头）；屋里一根梁的**底下**不会挂着一排木桩。梁上头才是檩和椽，
+    //      而且朝屋里走——在这个框景里它们全在画框外。所以：**齿整排删掉。**
+    //   ② **等距 ＋ 同宽 ＋ 各描一圈墨线 ＝ 一排零件**（同 strawEdge 那把梳子、
+    //      同「等距的横杠是梯子不是炭裂」、同「小形体配全圈墨线＝一坨」）。
+    //   ③ **梁底不许是一条直线。** 树干不直；更要紧的是这条边正好贴着过场的黑边，
+    //      一条平行的直边跟黑边并成一条，整块板就读成"画面上多了一道 UI"——
+    //      用户看见的正是这个。现在底沿是一条**起伏带下垂**的线。
+    // 认出"这是一根圆木"靠的不是轮廓，是**底面的一条柱面高光**（同 DrawLimb 那条：
+    // 屋里的光从底下打上来，贴着底沿最亮、往上很快收掉）。一条通长等宽的细亮线
+    // 是根电线，一条**渐变的宽带**才是圆的。
     case "beam": {
       const hb = H * 0.74;
-      InkFill(ctx, [[0, 0], [W, 0], [W, hb], [W * 0.5, hb * 1.06], [0, hb * 0.96]], id, C("body"),
+      // 底沿：起伏 ＋ 中间下垂（梁受力会塌一点，树干本身也不直）
+      const N = 7;
+      const edge = [];
+      for (let i = 0; i <= N; i += 1) {
+        const t = i / N;
+        const sag = Math.sin(t * Math.PI) * H * 0.05;              // 中间垂下去
+        edge.push([W * t, hb + sag + Sym(id + "e", i, H * 0.022)]);
+      }
+      InkFill(ctx, [[0, 0], [W, 0]].concat(edge.slice().reverse()), id, C("body"),
         { amp: H * 0.012, line: C("deep"), lw: Math.max(2, H * 0.016) });
+      const EdgeY = (x) => {                                        // 底沿在某个 x 上的高度
+        const t = Math.max(0, Math.min(0.999, x / W)) * N;
+        const i = Math.floor(t), f = t - i;
+        return edge[i][1] + (edge[Math.min(N, i + 1)][1] - edge[i][1]) * f;
+      };
       ctx.save();
-      ctx.globalAlpha = 0.45;
-      for (let i = 1; i <= 4; i += 1) {
-        const y = hb * (0.2 + i * 0.17);
-        InkLine(ctx, W * 0.02, y, W * 0.98, y + Sym(id + "g", i, H * 0.02), id + i,
-          { amp: H * 0.008, lw: Math.max(1, H * 0.008), color: C("dark") });
-      }
+      ctx.beginPath();                                              // 往下的笔都剪在梁里
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W, 0);
+      for (let i = N; i >= 0; i -= 1) ctx.lineTo(edge[i][0], edge[i][1]);
+      ctx.closePath();
+      ctx.clip();
+      // 斧痕：**长短不一、略斜、还得断几道**。等距的通长直线是压型钢板
+      ctx.globalAlpha = 0.42;
+      const FACET = [[0.02, 0.44, 0.30], [0.30, 0.96, 0.52], [0.10, 0.62, 0.70], [0.58, 0.99, 0.24]];
+      FACET.forEach(([x0, x1, ky], i) => {
+        const y0 = hb * ky + Sym(id + "f", i, H * 0.03);
+        InkLine(ctx, W * x0, y0, W * x1, y0 + Sym(id + "fs", i, H * 0.05), id + "f" + i,
+          { amp: H * 0.01, lw: Math.max(1, H * 0.009), color: i % 2 ? C("dark") : C("deep") });
+      });
+      // 两个节子：树干上砍掉枝丫留下的疤（一圈深、心里更深）
+      ctx.globalAlpha = 0.55;
+      [[0.22, 0.42], [0.71, 0.30]].forEach(([kx, ky], i) => {
+        const cx2 = W * kx, cy2 = hb * ky, rr = H * (0.052 + Rnd(id + "k", i) * 0.03);
+        ctx.fillStyle = C("deep");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr, rr * 0.74, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = C("dark");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr * 0.5, rr * 0.36, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // 底面的柱面高光：贴着底沿最亮、往上很快收掉——"圆木"就是这一笔给的。
+      // **必须一笔铺完。** 第一版沿着底沿分成 26 段各画一条渐变、还逐段抖了 alpha，
+      // 段与段之间的接缝在图上是一排竖刻度——**刚删掉的那排铆钉换个地方又长出来了**。
+      // 分段画连续的东西，接缝本身就成了内容（同灰堆「一团东西只许有一条外轮廓」）。
+      ctx.globalAlpha = 1;
+      const band = H * 0.16;
+      const yLo = Math.min(...edge.map((e) => e[1]));
+      const yHi = Math.max(...edge.map((e) => e[1]));
+      ctx.save();
+      ctx.beginPath();                                              // 只留底沿往上 band 这一条
+      ctx.moveTo(0, edge[0][1] - band);
+      for (let i = 1; i <= N; i += 1) ctx.lineTo(edge[i][0], edge[i][1] - band);
+      ctx.lineTo(W, H * 2);
+      ctx.lineTo(0, H * 2);
+      ctx.closePath();
+      ctx.clip();
+      const gr = ctx.createLinearGradient(0, yLo - band, 0, yHi);
+      gr.addColorStop(0, "rgba(0,0,0,0)");
+      gr.addColorStop(0.40, "rgba(0,0,0,0)");
+      gr.addColorStop(1, C("rim"));
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, yLo - band, W, yHi - yLo + band + 2);
+      // **不再往上叠一层"光不匀"的暗**：那一层压在高光带上，图上就是梁底多一条
+      // 更暗的横带（实拍抓的），而屋里的光本来就是一大片漫射，沿梁长匀着才对。
       ctx.restore();
-      // 椽子头：一排短齿，长短不一
-      for (let i = 0; i < 9; i += 1) {
-        const x = W * (0.04 + i * 0.108);
-        const len = (H - hb) * (0.28 + Rnd(id + "r", i) * 0.46);
-        InkFill(ctx, Rect(x, hb * 0.98, W * 0.052, len), id + "r" + i, C("dark"),
-          { amp: W * 0.006, line: C("deep"), lw: Math.max(1, W * 0.006) });
-      }
-      // 梁底那条亮边：屋里的光从底下打上来，这一条就是"梁"与"一块黑板"的分界
-      ctx.save();
-      ctx.globalAlpha = 0.40;
-      InkLine(ctx, 0, hb * 0.97, W, hb * 1.01, id + "rim", { amp: H * 0.006, lw: Math.max(2, H * 0.018), color: C("rim") });
       ctx.restore();
       break;
     }
