@@ -24,7 +24,7 @@ import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
   AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
-  MakeCanvas, MakeCastShadow, MakeFlatShadow, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
+  MakeCanvas, MakeCastShadow, MakeFlatShadow, MakeShaftMouth, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
 } from "./Script_WorldPaint.mjs";
 
@@ -1840,9 +1840,24 @@ export function CreateWorld(canvasEl) {
       if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
       const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
-          // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
-          ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
+          // 梯脚落在地道那一层的地面上（ay 就是 UNDER_Y）。**第三个参数是地表
+          // 那条地平线**——梯头高出地面多少、洞口开在哪一行都按它算，
+          // 摆位一改这支笔自己跟着走（老版写死 0.32*PPM，跟地平线没有关系）
+          ART.DrawShaft(ctx, ax, ay - (SURFACE_Y - UNDER_Y) * PPM, ay - 1, shaft.id);
         }, 0, 2);
+      // 地上那个洞：**一块躺平的几何**，排在地面之上、梯子之下。
+      // 梯子那张立牌上也画着洞口的黑，可立牌是竖的——俯角一看就压成一条暗带，
+      // 「掀开盖」那一镜因此读不出"这儿有个口子"（2026-08-17 实拍抓的）。
+      // 躺平的这块反过来：俯角是个椭圆口子，平视自己收成一条缝
+      // 纵深给到 0.86m（比洞该有的深）：玩法与过场都是**接近平视**的机位，
+      // 躺平的面在 16° 俯角下要乘个 sin16°＝只剩两成三——按真尺寸给，屏幕上
+      // 就是一条 0.15m 的缝，白画。这一块的尺寸是按"上屏读得出"定的，不是按
+      // 世界里的真尺寸定的（同「小东西要画大一档」那本账）
+      const mouth = MakeShaftMouth(1.34, 0.86, shaft.id + "mouth");
+      mouth.position.set(shaft.x, SURFACE_Y + 0.006, PlaceZ(BAND.loose));
+      FixOrder(mouth, DepthOrder("play", BAND.loose) - 1);
+      group.add(mouth);
+
       // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
       // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
       // 位置照旧压在地平面上（原来这里写的是裸 z=0.45，梯子因此比洞口高半拃）
