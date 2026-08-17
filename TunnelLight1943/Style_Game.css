@@ -564,7 +564,12 @@ body.touchDevice #touchControls.gone { display: none; }
    渐变不能过渡，所以做成两块各自淡入淡出 */
 #titleScreen::before, #titleScreen::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
+  /* 两块压暗必须垫在字**底下**：::after 默认画在所有子元素之后，等于把左边那片暗
+     盖在菜单和题名上（用户 2026-08-18 报「继续 新游戏这些文字被黑边盖上去变暗了」，
+     窄窗口下整列字都灰了）。压暗归 0 层、字归 1 层 */
+  z-index: 0;
 }
+#titleScreen > * { z-index: 1; }
 #titleScreen::before {
   background: linear-gradient(180deg, rgba(10, 8, 6, 0.30), rgba(10, 8, 6, 0) 24%, rgba(10, 8, 6, 0) 74%, rgba(10, 8, 6, 0.46));
 }
@@ -650,8 +655,8 @@ body.titleUp #hud > :not(#settingsPanel) { visibility: hidden; }
   display: flex; align-items: baseline; gap: 14px;
   height: clamp(38px, 5.4vh, 50px); padding: 0 16px 0 10.4vw;
   cursor: pointer; font-family: inherit; text-align: left; white-space: nowrap;
-  background: transparent; border: none; color: #d0c6b1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 8px rgba(0, 0, 0, 0.35);
+  background: transparent; border: none; color: #c2b8a4;   /* 没选中的是灰的（勇敢的心那种），选中的才白 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   transition: color 0.16s, background-color 0.16s;
 }
 #titleMenu button[hidden] { display: none; }
