@@ -9250,29 +9250,131 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
     id + "jar", "#6b5540", { amp: 1.2, lw: 2 });
 }
 
-export function DrawShaft(ctx, x, topY, botY, id) {
-  // 井口木沿 + 一架看得清的木梯。
-  //
-  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
-  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
-  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
-  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
-  //
-  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
-  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
-    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
-  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
-  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
-  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
-  const railTop = topY + 3;
-  for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
-      { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+/**
+ * 窖口/竖井：**地面上那个洞** ＋ 一架从洞里伸上来的木梯。
+ *
+ * **这里不画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条当井筒，
+ * 可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的矩形套在一起，
+ * 看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁归 World 的
+ * AddUnderground 管，这支笔只负责"这儿有个口子、人从这儿上下"。
+ *
+ * **梯子只露出一截的时候也得认得出是梯子**（2026-08-17 用户看序章掀盖那一镜退回：
+ * 「特别是梯子那里 完全认不出是梯子」）。这是这支笔最难的一条：4.2 米长的梯子，
+ * 地表机位只看得见地平线以上那两三拃——余下 95% 被地面挡着（实拍把梯子藏掉验过，
+ * 底下确实是地面在挡，不是绘制序错）。老版露在外头的三样东西是：一根 1 米宽的
+ * "井口木沿"横木 ＋ 两根 0.22m 的短竖杆 ＋ 一道缩在两杆之间的横档——**从俯角看
+ * 就是一条长凳**（那一镜里它 570px/米、横着占掉半个画框，实拍量的）。
+ *
+ * 四条治法，缺一条就还是长凳：
+ *  ① **那根横木整个删掉。** 一根横杆架在两条腿上，正是长凳的骨架；而窖口该有的
+ *     记号本来就是"洞"和"盖板"，不是又一根横木。
+ *  ② **两根梯梃各自高出地面一截，而且不一样高**（0.40／0.32 米，斧子砍的斜口）。
+ *     一样高就又连成一条横线；差着一截才读成"两根杆子插在洞里"。
+ *  ③ **横档两头探出梯梃。** 这是任何裁切下最强的"梯子"信号——缩在两梃之间是格子，
+ *     探出去才是"穿过去别住的横档"。间距也不许匀（自家伐的树，谁量着凿）。
+ *  ④ **给它一个洞。** 老版地表压根没有洞：地面是连着的，梯子直接从平地里长出来。
+ *     洞口的黑与近侧翻上来的土坯一起画在这张贴图上（它排在 loose 带、压在地面
+ *     之上），于是洞里还看得见两道横档——"梯子是往下去的"这件事才有得读。
+ *
+ * `floorY` 是**地平线**在画布上的行（不是贴图顶）：梯头高出地面多少、洞开在哪儿
+ * 全按它算，所以摆位一改这支笔不用跟着改。
+ */
+export function DrawShaft(ctx, x, floorY, botY, id) {
+  const PX = 48;                                   // 1 米 = 48 画布像素（道具贴图的标尺）
+  const railDx = 12;                               // 两梃相距 0.5m
+  // 梯头高出地面**一拃多，不是一臂**：给到 0.40m 那一版，顶上那截光杆比头一道
+  // 横档还长，两根一起读成一对犄角。0.26/0.19 是"扶得着、又不抢戏"的那一档
+  const proudL = 0.26 * PX, proudR = 0.19 * PX;    // 左高右低：一样高就又连成一条横线
+  const railTop = floorY - proudL;
+
+  // ---- ④ 洞 ----------------------------------------------------------------
+  // 黑口子：上沿是洞的近侧土沿（略拱起），往下三四寸化进黑里。**画在最底下**，
+  // 梯子压在它上头，洞里那两道横档才看得见。
+  // 深度只给 0.24m：盖板合上时那块 0.20m 的板正好压住它，剩下的一线读成板底的影
+  const mHalf = 0.58 * PX, mDeep = 0.30 * PX;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x - mHalf, floorY + 1.5);
+  ctx.quadraticCurveTo(x, floorY - 3.4, x + mHalf, floorY + 1.5);
+  ctx.lineTo(x + mHalf, floorY + mDeep);
+  ctx.lineTo(x - mHalf, floorY + mDeep);
+  ctx.closePath();
+  const mouth = ctx.createLinearGradient(0, floorY - 3, 0, floorY + mDeep);
+  mouth.addColorStop(0, "#191308");
+  mouth.addColorStop(0.5, "#0c0905");
+  mouth.addColorStop(1, "rgba(8,6,4,0)");
+  ctx.fillStyle = mouth;
+  ctx.fill();
+  ctx.restore();
+  // 洞沿那道墨线：只描上沿（下沿在黑里，描了就把洞封成一个方框）
+  ctx.beginPath();
+  ctx.moveTo(x - mHalf, floorY + 1.5);
+  ctx.quadraticCurveTo(x, floorY - 3.4, x + mHalf, floorY + 1.5);
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 2.0;
+  ctx.lineCap = "round";
+  ctx.stroke();
+  // 洞沿翻上来的土：一疙瘩一疙瘩，**不许有长直边**。
+  // 第一版在这儿砌了四块规规矩矩的土坯，两头各探出一条横杠——那正好又搭出
+  // 长凳的两条扶手（同 ① 那笔账：这一带凡是横平的长条都会被读成家具）
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i += 1) {
+      const r = 3.4 + Rnd(id + "cr" + side, i) * 2.6;
+      const cx = x + side * (mHalf - 2 - i * (r * 1.5) - Rnd(id + "cx" + side, i) * 2);
+      const cy = floorY - 0.6 - Rnd(id + "cy" + side, i) * 2.4;
+      InkFill(ctx, Spline([
+        [cx - r, cy + r * 0.55], [cx - r * 0.66, cy - r * 0.5],
+        [cx + r * 0.5, cy - r * 0.62], [cx + r, cy + r * 0.5],
+      ], 4), id + "clod" + side + i, i % 2 ? "#7d6540" : "#8b7149",
+      { amp: 0.7, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
+    }
   }
-  // 横档：亮一档、暗一档，看着有厚度
-  for (let y = railTop + 11; y < botY - 3; y += 15) {
-    InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
-      { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
+
+  // ---- ②③ 梯子 -------------------------------------------------------------
+  // 两根梯梃：自家伐的树杆，所以**有点弯、上细下粗**，不是两条画出来的直边
+  for (const dx of [-railDx, railDx]) {
+    const top = dx < 0 ? railTop : floorY - proudR;
+    const wTop = 2.7, wBot = 3.2;                  // 半宽：梢细根粗（收细过头就成了两根针）
+    const bow = (dx < 0 ? 1 : -1) * 1.5;           // 各自朝外弯一点点
+    const mid = (top + botY) / 2;
+    // **杆头要有一条顶边，不能只有两个角。** 前两版把左右两个上角直接连起来交给
+    // 闭合样条，插值当场在那两点之间拱出一个尖——两根梯梃一起读成一对犄角。
+    // 现在顶上多给两个点（略鼓的顶面），而且整条轮廓不走样条：杆子本来就该是
+    // 直的，手感交给 InkFill 自己的抖
+    InkFill(ctx, [
+      [x + dx - wTop, top + 2.0], [x + dx - wBot + bow, mid], [x + dx - wBot, botY],
+      [x + dx + wBot, botY], [x + dx + wBot + bow, mid], [x + dx + wTop, top + 2.0],
+      [x + dx + wTop * 0.62, top], [x + dx - wTop * 0.62, top],
+    ], id + "rail" + dx, "#9c7a4c", { amp: 0.55, lw: 1.8, shade: "rgba(0,0,0,0.22)" });
+    // 锯断的断面：顶上一小片受光的白茬（压在轮廓里，别探出去）
+    InkFill(ctx, [
+      [x + dx - wTop * 0.6, top + 1.9], [x + dx - wTop * 0.42, top + 0.5],
+      [x + dx + wTop * 0.42, top + 0.5], [x + dx + wTop * 0.6, top + 1.9],
+    ], id + "cut" + dx, "#c4a678", { amp: 0.3, lw: 1.0 });
+  }
+  // 横档：**两头探出梯梃**，间距不匀。第一道就在地面上头一点（那是伸手扶的那道），
+  // 往下一道道进洞里。
+  // **档与档之间的空必须比档本身宽得多**——第一版档给到 4.6px 高、还各自描一圈
+  // 墨线，一根根挤成实心的一条，读出来是根柱子不是梯子
+  const rungs = [];
+  for (let y = railTop + 8; y < botY - 4; y += 15.4 + (Rnd(id + "rs", rungs.length) - 0.5) * 5) {
+    rungs.push(y);
+  }
+  for (let i = 0; i < rungs.length; i += 1) {
+    const y = rungs[i];
+    const out = 3.4 + Rnd(id + "ro", i) * 1.6;     // 探出去多少，两头各不相同
+    InkFill(ctx, Rect(x - railDx - out, y, (railDx + out) * 2, 3.2), id + "r" + i, "#c2a06a",
+      { amp: 0.5, lw: 1.2, shade: "rgba(0,0,0,0.24)" });
+    // 绑扎：隔几道缠一道麻绳（榫头松了就缠，农家梯子都这样）。
+    // 两道斜线就够——缠成一个方块会在梃上鼓出一串疙瘩
+    if (i % 4 === 2) {
+      for (const dx of [-railDx, railDx]) {
+        for (const k of [0, 1]) {
+          InkLine(ctx, x + dx - 3.6, y - 0.8 + k * 2.4, x + dx + 3.6, y + 2.2 + k * 2.4,
+            id + "lz" + i + dx + k, { lw: 1.2, color: "#5b4526", amp: 0.35 });
+        }
+      }
+    }
   }
   // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
   InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
@@ -14365,19 +14467,38 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
       ctx.restore();
       break;
     }
-    // 草苫/柴草的一角：底下一排乱茬，茬尖长短不一
+    // 草苫/柴草的一角：底下一排乱茬，茬尖长短不一。
+    // **柴火是横七竖八堆的，不是插在土里的**：老版 46 根几乎等距、几乎竖直、
+    // 长短只差三成的细线，出来是一把梳子（2026-08-17 序章掀盖那一镜实拍抓的）。
+    // 三条改法——歪得开（±50°）、长得差得开（三成到满格）、**得有几根横着压在
+    // 上头**（柴堆的轮廓是交叉出来的，不是一排竖线的顶端连成的）
     case "strawEdge": {
       InkFill(ctx, [[0, H * 0.56], [W, H * 0.50], [W, H], [0, H]], id, C("dark"),
         { amp: W * 0.01, line: null, lw: 0 });
-      ctx.strokeStyle = C("body");
       ctx.lineCap = "round";
-      for (let i = 0; i < 46; i += 1) {
-        const x = W * (i / 45) + Sym(id + "x", i, W * 0.012);
-        const top = H * (0.52 - Rnd(id + "h", i) * 0.30);
+      for (let i = 0; i < 38; i += 1) {
+        // 成簇：三四根挤在一处，簇与簇之间留得出缝
+        const x = W * ((Math.floor(i / 3) + Rnd(id + "c", i) * 0.9) / 13);
+        const len = H * (0.16 + Rnd(id + "h", i) ** 1.6 * 0.62);
+        const lean = (Rnd(id + "a", i) - 0.5) * 1.7;         // ±50°
+        ctx.strokeStyle = Rnd(id + "s", i) > 0.7 ? C("rim") : C("body");
+        ctx.globalAlpha = Rnd(id + "s", i) > 0.7 ? 0.5 : 1;
         ctx.beginPath();
-        ctx.lineWidth = Math.max(1.2, W * (0.004 + Rnd(id + "w", i) * 0.006));
-        ctx.moveTo(x, H * 0.62);
-        ctx.lineTo(x + Sym(id + "t", i, W * 0.03), top);
+        ctx.lineWidth = Math.max(1.2, W * (0.004 + Rnd(id + "w", i) * 0.009));
+        ctx.moveTo(x, H * (0.60 + Rnd(id + "b", i) * 0.24));
+        ctx.lineTo(x + Math.sin(lean) * len, H * 0.60 - Math.cos(lean) * len);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // 横压在堆上的那几根：轮廓靠它们咬缺，才不是一排竖线的顶端
+      for (let i = 0; i < 5; i += 1) {
+        const y = H * (0.56 + Rnd(id + "ly", i) * 0.30);
+        const x0 = W * Rnd(id + "lx", i) * 0.7;
+        ctx.strokeStyle = C("body");
+        ctx.beginPath();
+        ctx.lineWidth = Math.max(1.6, W * 0.010);
+        ctx.moveTo(x0, y);
+        ctx.quadraticCurveTo(x0 + W * 0.16, y - H * 0.05, x0 + W * (0.22 + Rnd(id + "ll", i) * 0.20), y + H * 0.03);
         ctx.stroke();
       }
       break;
