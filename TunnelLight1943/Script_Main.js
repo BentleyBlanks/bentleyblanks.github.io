@@ -8,6 +8,9 @@ import {
   PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn,
 } from "./Script_Core.mjs";
 import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
+// 美术样式浏览器要按名字调很多支笔，整个模块拿进来（它本来就已经在模块图里）
+import * as ART from "./Script_Art.mjs";
+import { BONE as RIG_BONE } from "./Script_Rig.mjs";
 import { CreateWorld } from "./Script_World.js";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
@@ -106,6 +109,7 @@ for (const id of [
   "noticeOverlay", "noticeSheet", "noticeClose",
   "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
+  "btnArt", "artBrowser", "artList", "artCanvas", "artMeta", "artClose", "artZoom", "artDark",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
 ]) ui[id] = document.getElementById(id);
@@ -1468,6 +1472,151 @@ ui.btnDebug?.addEventListener("click", () => {
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
 
+// ── 人物美术样式浏览器（2026-08-17 用户要的）────────────────────────────
+// 做的人用的东西，不是玩家 UI，所以入口藏在设置面板里（同调试面板）。
+// 两条设计前提：
+//   ① **画的必须是游戏里真用的那几支笔**（`ART.DrawHeadPart` / `DrawLimb` /
+//      `DrawTorsoPart` / `DrawFootPart` / `DrawHandPart` / `DrawCharacter`），
+//      不许另画一套示意图——不然"看的"和"跑的"是两回事，改完还得进游戏碰运气。
+//   ② **墨线粗细必须按游戏的比例给**：骨头贴图是 PART_PPM=480、INK_K=3.2，
+//      也就是 k = 3.2·r/(headR·480)。拿 k=1 预览会看着秀气、进游戏全糊——
+//      脸改了八稿，五稿是栽在这上头（见 CLAUDE.md「脸」那一节第 1 条）。
+// 右边那块「名目」把 kind / 中文名 / 画笔分支 / 文件位置一起列出来，就是为了
+// 跟 AI 说话时一句话定位（"改 officer 的 crown"）。
+const ART_SHEET = [
+  { kind: "player", name: "柱子", role: "主角（半大孩子）", hair: "短发刘海",
+    where: "HeadHair（short）", note: "体型 0.93。第一章还是个孩子，颅大鼻矮" },
+  { kind: "sister", name: "妹妹", role: "被护送者", hair: "短发刘海＋头顶抓髻＋红头绳",
+    where: "HeadHair（child）", note: "体型 0.66。眼大鼻小颏圆；头顶那枚心情气泡主要给她" },
+  { kind: "family", name: "娘", role: "主角的母亲", hair: "长发刘海＋项后一道布绳",
+    where: "HeadHair（long）", note: "体型 0.90。蓝底白花的短褂是全章的暗线" },
+  { kind: "father", name: "爹", role: "主角的父亲（木匠）", hair: "长发刘海",
+    where: "HeadHair（long）", note: "体型 1.00" },
+  { kind: "villager", name: "乡亲", role: "村里人（共用一套）", hair: "盘头巾（羊肚手巾）",
+    where: "HeadScarf", note: "体型 0.95。全村共用一张贴图——要逐人不同得按 id 分缓存" },
+  { kind: "militia", name: "民兵", role: "区小队 / 民兵", hair: "白毛巾",
+    where: "DrawHeadPart 的 militia 分支", note: "体型 0.98" },
+  { kind: "puppet", name: "伪军", role: "本乡人，不做丑角", hair: "软布帽（没有帽垂）",
+    where: "DrawHeadPart 的 puppet 分支", note: "体型 0.97。故意卡在日军与村民中间" },
+  { kind: "soldier", name: "日军兵", role: "扫荡的兵", hair: "战斗帽＋帽垂",
+    where: "DrawHeadPart 的 soldier 分支 + DrawCapFlap", note: "体型 0.99。帽垂是侧视认日军最硬的标志" },
+  { kind: "officer", name: "军官（太君）", role: "带队的军官", hair: "大盖帽＋绯红帽墙＋星徽＋圆片眼镜＋卫生胡",
+    where: "DrawHeadPart 的 officer 分支（crown/band/visor/stache）", note: "体型 0.98" },
+];
+let artPick = 0;
+
+function BuildArtList() {
+  if (!ui.artList || ui.artList.childElementCount) return;
+  ART_SHEET.forEach((c, i) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<b>${c.name}</b><small>${c.kind}</small>`;
+    b.addEventListener("click", () => { artPick = i; PaintArt(); });
+    li.appendChild(b);
+    ui.artList.appendChild(li);
+  });
+}
+
+function PaintArt() {
+  const cv = ui.artCanvas;
+  if (!cv) return;
+  const c = ART_SHEET[artPick];
+  [...ui.artList.children].forEach((li, i) => li.firstChild.classList.toggle("on", i === artPick));
+  // 画布按面板实际大小重设（高分屏也要清楚）
+  const box = cv.parentElement.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(520, Math.round(box.width - 24)), H = Math.max(320, Math.round(box.height - 150));
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  cv.style.width = `${W}px`;
+  cv.style.height = `${H}px`;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const dark = !!ui.artDark?.checked;
+  g.fillStyle = dark ? "#241f18" : "#cfc7b2";
+  g.fillRect(0, 0, W, H);
+  const zoom = (Number(ui.artZoom?.value) || 150) / 100;
+
+  // ① 头：**按游戏的线宽比例**给 k（见上头第 ② 条）
+  const hr = 74 * zoom;
+  const hk = 3.2 * hr / (RIG_BONE.headR * 480);
+  g.save();
+  g.translate(hr * 1.6, H * 0.66);
+  ART.DrawHeadPart(g, 0, 0, hr, c.kind, "ab" + c.kind, hk);
+  g.restore();
+  Label(g, hr * 1.6, H * 0.66 + hr * 0.62, "头 DrawHeadPart", dark);
+
+  // ② 零件一排：躯干 / 上臂 / 前臂＋手 / 大腿 / 小腿 / 脚——就是骨架烘的那几张
+  const P = 480, ik = 3.2;                    // PART_PPM / INK_K，跟 Script_Rig 一个数
+  const sc = 0.46 * zoom;                     // 只是摆到画布上，线宽仍按 ik 给
+  const [coat, coatDark] = ART.RIG_COLOR(c.kind);
+  const parts = [
+    ["躯干 DrawTorsoPart", (x, y) => ART.DrawTorsoPart(g, x, y, 0.29 * P * sc, 0.52 * P * sc, c.kind, "abt" + c.kind, ik * sc)],
+    ["上臂 DrawLimb", (x, y) => ART.DrawLimb(g, x, y, 0.25 * P * sc, 0.115 * P * sc, 0.092 * P * sc, coat, "aba" + c.kind, { k: ik * sc })],
+    ["前臂＋手", (x, y) => {
+      ART.DrawLimb(g, x, y, 0.24 * P * sc, 0.092 * P * sc, 0.074 * P * sc, coat, "abf" + c.kind, { k: ik * sc });
+      ART.DrawHandPart(g, x, y + 0.24 * P * sc, 0.044 * P * sc, ART.PAL.skin, "abh" + c.kind, { k: ik * sc, lw: 3 });
+    }],
+    ["大腿 DrawLimb", (x, y) => ART.DrawLimb(g, x, y, 0.31 * P * sc, 0.145 * P * sc, 0.112 * P * sc, coatDark, "abg" + c.kind, { k: ik * sc })],
+    ["小腿 DrawShinPart", (x, y) => ART.DrawShinPart(g, x, y, 0.31 * P * sc, 0.112 * P * sc, 0.086 * P * sc, c.kind, "abs" + c.kind, { k: ik * sc })],
+    ["脚 DrawFootPart", (x, y) => ART.DrawFootPart(g, x, y, 0.19 * P * sc, 0.09 * P * sc, ART.RIG_LEG(c.kind).footF, "abo" + c.kind, ik * sc)],
+  ];
+  let px2 = hr * 3.5;
+  const topY = H * 0.38;
+  for (const [label, draw] of parts) {
+    draw(px2, topY);
+    Label(g, px2, topY + 0.36 * P * sc + 26, label, dark);
+    px2 += 92 * zoom;
+  }
+
+  // ③ 整身的平贴图（HUD 牌面与背景乡亲用的那一张）：跟骨架不是同一支笔，
+  // 所以并排放着看——两处得对得上，不然"牌上是甲、路上是乙"
+  g.save();
+  g.translate(W - 92 * zoom, H * 0.74);
+  ART.DrawCharacter(g, { x: 0, y: 0, S: 2.6 * zoom, kind: c.kind, id: "abc" + c.kind, facing: 1 });
+  g.restore();
+  Label(g, W - 92 * zoom, H * 0.80, "整身 DrawCharacter", dark);
+
+  ui.artMeta.innerHTML = `
+    <div class="artRow"><span>kind</span><div><code>${c.kind}</code> · <b>${c.name}</b></div></div>
+    <div class="artRow"><span>角色</span><div>${c.role}</div></div>
+    <div class="artRow"><span>头饰</span><div>${c.hair}</div></div>
+    <div class="artRow"><span>画笔</span><div><code>${c.where}</code></div></div>
+    <div class="artRow"><span>文件</span><div><code>Script_Art.mjs</code> · 骨架装配 <code>Script_Rig.mjs</code></div></div>
+    <div class="artRow"><span>备注</span><div>${c.note}</div></div>`;
+}
+
+function Label(g, x, y, text, dark) {
+  g.save();
+  g.font = "13px system-ui, sans-serif";
+  g.textAlign = "center";
+  g.fillStyle = dark ? "rgba(226,216,192,0.72)" : "rgba(52,42,30,0.72)";
+  g.fillText(text, x, y);
+  g.restore();
+}
+
+function OpenArt(open) {
+  if (!ui.artBrowser) return;
+  ui.artBrowser.hidden = !open;
+  if (open) {
+    CloseSettings();
+    BuildArtList();
+    PaintArt();
+    ui.artClose?.focus({ preventScroll: true });
+  }
+}
+ui.btnArt?.addEventListener("click", () => OpenArt(true));
+ui.artClose?.addEventListener("click", () => OpenArt(false));
+ui.artZoom?.addEventListener("input", PaintArt);
+ui.artDark?.addEventListener("change", PaintArt);
+// 点面板外面也收（同告示阅读层的老规矩）
+ui.artBrowser?.addEventListener("pointerdown", (e) => {
+  if (e.target === ui.artBrowser) OpenArt(false);
+});
+
+
+
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);
   // 包袱跨章跨会话：把存过的收藏灌回来
@@ -1727,7 +1876,8 @@ let lastSaveKey = "";
 // 暂停：菜单类面板开着的时候世界停住。**包袱与告示不在此列**——那两样是
 // Core 自己的闸（state.bagOpen / noticeOpen），它们还要靠 StepGame 收 E 键关掉。
 function MenuFrozen() {
-  return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden;
+  return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden
+    || !(ui.artBrowser?.hidden ?? true);
 }
 
 function Frame(now) {

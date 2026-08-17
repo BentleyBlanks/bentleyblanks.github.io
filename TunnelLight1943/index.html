@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=128">
+  <link rel="stylesheet" href="./Style_Game.css?v=129">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,32 +33,32 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=128",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=128",
+        "three": "./vendor/three/build/three.module.js?v=129",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=129",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=128",
-        "./Script_World.js": "./Script_World.js?v=128",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=128",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=128",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=128",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=128",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=128",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=128",
-        "./Script_Audio.js": "./Script_Audio.js?v=128",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=128",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=128",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=128",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=128",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=128",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=129",
+        "./Script_World.js": "./Script_World.js?v=129",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=129",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=129",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=129",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=129",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=129",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=129",
+        "./Script_Audio.js": "./Script_Audio.js?v=129",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=129",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=129",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=129",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=129",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=129",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=128",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=128",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=128",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=128",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=128",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=128",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=128",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=128"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=129",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=129",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=129",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=129",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=129",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=129",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=129",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=129"
       }
     }
   </script>
@@ -128,6 +128,28 @@
       <button id="btnQuit" class="panelRow" type="button">回到标题<small>进度已存</small></button>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+      <button id="btnArt" type="button">人物美术样式<small>预览 · 名目</small></button>
+    </section>
+    <!-- 人物美术样式浏览器（2026-08-17 用户要的）：全屏，左边一列角色、右边一张
+         预览。预览里画的是**游戏里真用的那几支笔**（DrawHeadPart / DrawCharacter /
+         DrawLimb 一族），不是另画一套示意图——不然看的和跑的两回事。
+         右下角那块「名目」把 kind、中文名、画笔函数、文件位置一起列出来，
+         就是为了跟 AI 说话时一句话定位（"改 officer 的 crown"）。
+         入口在设置面板里，不是玩家 UI。 -->
+    <section id="artBrowser" hidden aria-label="人物美术样式">
+      <header>
+        <h3>人物美术样式</h3>
+        <label class="artScale">大小 <input id="artZoom" type="range" min="60" max="240" step="10" value="150"></label>
+        <label class="artBg">底色 <input id="artDark" type="checkbox"></label>
+        <button id="artClose" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="artBody">
+        <nav><ul id="artList"></ul></nav>
+        <div class="artStage">
+          <canvas id="artCanvas" width="1200" height="620"></canvas>
+          <div id="artMeta"></div>
+        </div>
+      </div>
     </section>
     <!-- 包袱条（勇敢的心式收藏品栏）：右缘一条纸底竖条，一格一件老物件。
          收到新东西时整条滑进来亮一下那格（peek），平时按 B 或点包袱钮打开。
@@ -332,6 +354,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=128"></script>
+<script type="module" src="./Script_Main.js?v=129"></script>
 </body>
 </html>

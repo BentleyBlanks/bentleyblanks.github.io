@@ -714,6 +714,36 @@ WALL_T/HOUSE_D`）：
   node TunnelLight1943/Script_Cli.mjs shot "c1_walk@out=tmp" --eval "(async()=>{const A=await import('./Script_Art.mjs');const K=['player','sister','family','father','villager','militia','puppet','soldier','officer'];const r=62,W=285,H=310;const c=document.createElement('canvas');c.width=W*K.length;c.height=H;const g=c.getContext('2d');g.fillStyle='#9a9a9a';g.fillRect(0,0,c.width,c.height);K.forEach((k,i)=>{g.save();g.translate(i*W+W*0.4,H*0.84);A.DrawHeadPart(g,0,0,r,k,'q'+k,1.6);g.restore();});fetch('/__shot?name=allheads',{method:'POST',body:c.toDataURL('image/jpeg',0.96)});return 'ok';})()"
   ```
 
+### 人物美术样式浏览器（2026-08-17 用户要的：「方便我后续和 ai 对话时快速定位」）
+
+设置 → **人物美术样式**（`#btnArt`，同调试面板一路，做的人用的东西不进玩家 HUD）。
+全屏两栏：左边九种角色，右边把这一种的**头 / 六块骨头零件 / 整身平贴图**并排渲出来，
+底下一块「名目」列 `kind` · 中文名 · 角色 · 头饰 · 画笔分支 · 文件 · 备注。开着的时候
+世界停住（`MenuFrozen` 也认它）。**上头那条 `--eval` 九连渲仍然留着**——它不用开页面、
+能进无头实拍，两条路各有各的用处。
+
+四条实装账：
+
+1. **画的必须是游戏真用的那几支笔**（`DrawHeadPart` / `DrawTorsoPart` / `DrawLimb` /
+   `DrawShinPart` / `DrawFootPart` / `DrawHandPart` / `DrawCharacter`），不许另画一套
+   示意图。不然"看的"和"跑的"是两回事，改完还得进游戏碰运气——而这个浏览器存在的
+   全部理由就是不用再碰运气。
+2. **墨线粗细按游戏的比例给**：`k = 3.2·r/(BONE.headR·480)`（INK_K 3.2、PART_PPM 480）。
+   拿 `k=1` 预览会看着秀气、进游戏全糊——脸那五稿就是栽在这上头（「脸」那一节第 1 条），
+   这个面板等于把那条规矩钉成了代码。
+3. **零件是从枢轴往下长的**（`DrawLimb` 的 len 朝下、`DrawTorsoPart` 朝上）：摆位与标签
+   的 y 要按这个来。第一版把 `topY` 给到画布上五分之一处，躯干直接顶出画外；标签压在
+   0.20 处又正落在小腿当中。
+4. **`.artRow` 是两列 grid，值必须裹在一个元素里**。三个子节点的话第三个掉到下一行去
+   （实拍：`kind` 一行、`· 娘` 又一行）。
+
+**太君同时重做了一轮**（用户：「太君这个不太像 重做一下」）。老版的大盖帽是一个圆顶
+加一条黑边，读出来是顶棉帽。认出"太君"靠的是五样东西一起在：**平而宽的帽顶**（大盖帽
+的顶是撑开的一个饼，不是贴着颅骨的弧）、**绯红帽墙**（那一圈是唯一的彩色）、**帽墙上
+一枚五角星徽**、**乌黑发亮的硬檐**（斜压下来、上头一道高光——它才是"帽子"的重量所在）、
+以及**圆片眼镜**（一圈细钢丝、一根鼻梁、一条腿挂到耳朵上，镜片里给一丝很淡的反光）。
+卫生胡照旧 `clipFace()` 剪在脸里（老版一半探在轮廓外头）。
+
 ## 阅读层那张纸是**程序化画的**（2026-08-15 用户定：「界面里只有一张纸，程序化的在纸上写上文字内容」）
 
 征夫告示的阅读层不再是「左边一张外部成图 + 右边现代排版的转录」，而是

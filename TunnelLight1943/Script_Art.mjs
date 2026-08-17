@@ -1231,17 +1231,71 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       P(F.brow - 0.01, -0.45), P(F.brow - 0.38, -0.42),
     ], id + "stache", "#1e160f", { amp: 0.35 * k, lw: 1.1 * k });
     ctx.restore();
-    InkFill(ctx, Spline([P(-1.10, -1.42), P(-1.00, -1.94), P(-0.58, -2.26), P(0.32, -2.32),
-      P(0.82, -1.98), P(1.00, -1.56), P(1.04, -1.22), P(-1.02, -1.08)], 4),
-    id + "cap", "#4a4f34", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    InkFill(ctx, [P(-1.02, -1.30), P(1.04, -1.36), P(1.04, -1.14), P(-1.00, -1.08)],
-      id + "band", "#4e2018", { amp: 0.5 * k, lw: lw * 0.7 });
+    // 大盖帽（九八式軍帽）重做（2026-08-17 用户："太君这个不太像"）。
+    // 老版是一只圆头的碗＋一根平板帽檐，读出来是钢盔。真东西的四件：
+    //   ① **帽顶是平的、而且比头宽**——前高后低往前压，帽顶与帽墙之间一道硬棱；
+    //   ② **帽墙**（绯红）是一圈立着的硬边，不是一条描在碗上的线；
+    //   ③ **帽檐是黑漆皮的**，往前下方斜切、带弧，上沿一道高光；
+    //   ④ **颏带**：帽墙下横一条细带（压在帽檐根上）。
+    // 再加两样"太君脸"的记号：圆片眼镜（正好套在被帽檐压暗的眼位上）＋卫生胡。
+    // 帽顶（平顶、前高后低，往前探出头形一截）
+    InkFill(ctx, [
+      P(-1.16, -1.44), P(-1.10, -2.06), P(-0.52, -2.30),
+      P(0.56, -2.34), P(1.10, -2.10), P(1.18, -1.52),
+    ], id + "crown", "#4d5238", { amp: 0.4 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.16)", shadeAt: 0.45 });
+    // 帽顶与帽墙之间那道硬棱
+    InkLine(ctx, px - r * 1.14, py - r * 1.50, px + r * 1.16, py - r * 1.58,
+      id + "welt", { lw: 1.3 * k, color: "rgba(18,20,12,0.6)", amp: 0.3 * k });
+    // 帽墙：立着的一圈，绯红（1938 年式定色；按 sRGB 老账压两档）
+    InkFill(ctx, [P(-1.14, -1.50), P(1.16, -1.58), P(1.14, -1.20), P(-1.10, -1.12)],
+      id + "band", "#5a2418", { amp: 0.35 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.2)" });
+    // 帽墙正面一粒星徽（哑金，别亮）
+    ctx.save();
+    ctx.fillStyle = "#8f7f3c";
     ctx.beginPath();
-    ctx.arc(px + r * 0.72, py - r * 1.23, r * 0.085, 0, Math.PI * 2);
-    ctx.fillStyle = "#8a7a3a";
+    for (let i = 0; i < 10; i += 1) {                     // 五角星，不是一个圆点
+      const a2 = -Math.PI / 2 + i * Math.PI / 5;
+      const q = i % 2 ? r * 0.045 : r * 0.10;
+      const sx = px + r * 0.80 + Math.cos(a2) * q, sy = py - r * 1.37 + Math.sin(a2) * q;
+      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.closePath();
     ctx.fill();
-    InkFill(ctx, [P(0.86, -1.28), P(1.88, -1.16), P(1.84, -0.94), P(0.86, -1.08)],
-      id + "visor", "#232616", { amp: 0.5 * k, lw: lw * 0.8 });
+    ctx.restore();
+    // 帽檐：黑漆皮，往前下方斜切、带弧
+    InkFill(ctx, Spline([
+      P(0.94, -1.34), P(1.62, -1.30), P(2.02, -1.10),
+      P(1.94, -0.94), P(1.44, -1.00), P(0.96, -1.10),
+    ], 4), id + "visor", "#1b1e14", { amp: 0.3 * k, lw: lw * 0.85, shade: null });
+    // 漆皮的高光：上沿一条
+    InkLine(ctx, px + r * 1.02, py - r * 1.30, px + r * 1.90, py - r * 1.10,
+      id + "gloss", { lw: 1.2 * k, color: "rgba(196,200,180,0.42)", amp: 0.2 * k });
+    // 颏带：帽墙底下一条细带，压在帽檐根上
+    InkLine(ctx, px - r * 1.06, py - r * 1.16, px + r * 1.06, py - r * 1.22,
+      id + "chin", { lw: 1.6 * k, color: "#20180f", amp: 0.25 * k });
+    // 圆片眼镜：太君脸的第二个记号。镜片罩在被帽檐压暗的眼位上，
+    // 镜腿往后勾到耳朵——**只描圈不填色**，填了就成了墨镜
+    ctx.save();
+    ctx.strokeStyle = "rgba(28,24,16,0.85)";
+    ctx.lineWidth = 1.3 * k;
+    ctx.lineCap = "round";
+    const gx2 = px + r * (F.brow - 0.20), gy2 = py - r * 0.96;
+    ctx.beginPath();
+    ctx.ellipse(gx2, gy2, r * 0.20, r * 0.17, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();                                     // 鼻梁上那道
+    ctx.moveTo(gx2 + r * 0.20, gy2 - r * 0.03);
+    ctx.lineTo(gx2 + r * 0.30, gy2 - r * 0.05);
+    ctx.stroke();
+    ctx.beginPath();                                     // 镜腿勾到耳后
+    ctx.moveTo(gx2 - r * 0.20, gy2 - r * 0.03);
+    ctx.quadraticCurveTo(px - r * 0.20, py - r * 1.02, px - r * 0.44, py - r * 0.96);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(214,226,232,0.16)";            // 镜片一点反光，不遮眼
+    ctx.beginPath();
+    ctx.ellipse(gx2, gy2, r * 0.19, r * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   } else if (kind === "puppet") {
     InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
       P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),

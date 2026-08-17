@@ -1242,3 +1242,61 @@ body.paused #gameCanvas { filter: brightness(0.52) saturate(0.72); }
     overflow-y: auto;
   }
 }
+
+/* ── 人物美术样式浏览器（做的人用的，不是玩家 UI；入口在设置面板里）──────
+   全屏两栏：左边一列角色、右边一张预览＋一块「名目」。名目那块的用处是
+   跟 AI 说话时一句话定位（"改 officer 的 crown"），所以 kind 与画笔名要
+   能一眼抄走——用等宽字。 */
+#artBrowser {
+  position: fixed; inset: 0; z-index: 34;
+  display: flex; flex-direction: column;
+  background: rgba(16, 13, 10, 0.92);
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+           max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+#artBrowser[hidden] { display: none; }
+#artBrowser > header {
+  display: flex; align-items: center; gap: 16px;
+  color: #e8dcbe; font-weight: 700; letter-spacing: .04em;
+  padding: 6px 10px 10px;
+}
+#artBrowser h3 { margin: 0; font-size: 17px; }
+#artBrowser header label { font-size: 12px; font-weight: 400; opacity: .8; display: flex; align-items: center; gap: 6px; }
+#artBrowser #artZoom { width: 110px; }
+#artClose {
+  margin-left: auto; width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(232, 220, 190, 0.4); background: rgba(0,0,0,.25);
+  color: #e8dcbe; font-size: 20px; line-height: 1; cursor: pointer;
+}
+#artClose:hover { background: rgba(232, 220, 190, 0.16); }
+.artBody { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.artBody nav { width: 168px; flex: 0 0 auto; overflow: auto; }
+.artBody nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.artBody nav button {
+  width: 100%; text-align: left; padding: 8px 10px; cursor: pointer;
+  border: 1px solid rgba(232, 220, 190, 0.18); border-radius: 6px;
+  background: rgba(232, 220, 190, 0.06); color: #e2d6b8;
+  display: grid; gap: 2px; font: inherit;
+}
+.artBody nav button small { opacity: .6; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+.artBody nav button.on { background: rgba(232, 220, 190, 0.22); border-color: rgba(232, 220, 190, 0.55); }
+.artStage {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px;
+  background: rgba(232, 220, 190, 0.05); border-radius: 8px; padding: 12px;
+}
+#artCanvas { flex: 1; min-height: 0; border-radius: 6px; align-self: stretch; }
+#artMeta { color: #e2d6b8; font-size: 12.5px; display: grid; gap: 3px; }
+#artMeta .artRow { display: grid; grid-template-columns: 84px 1fr; gap: 10px; }
+#artMeta .artRow span { opacity: .55; }
+#artMeta code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  background: rgba(0,0,0,.28); padding: 1px 5px; border-radius: 3px;
+}
+/* 窄屏（手机横屏）把左栏压成一条横排的胶囊 */
+@media (max-width: 720px), (max-height: 460px) {
+  .artBody { flex-direction: column; }
+  .artBody nav { width: auto; }
+  .artBody nav ul { grid-auto-flow: column; grid-auto-columns: max-content; overflow: auto; }
+  #artMeta { font-size: 11.5px; }
+  #artMeta .artRow { grid-template-columns: 68px 1fr; }
+}
