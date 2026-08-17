@@ -127,6 +127,9 @@ const INDEX_SOURCES = [
   ]],
   ["Data_DepthSpec.mjs", [[/^\s*([a-zA-Z][a-zA-Z0-9]*):\s*-?[\d.]+,/, (m) => [[m[1], "深度带/尺度常量"]]]]],
   ["CLAUDE.md", [[/^#{2,4} (.+)$/, (m) => [[m[1], "项目规范章节"]]]]],
+  // 2026-08-18 起规范按系统拆成分册（docs/*.md），CLAUDE.md 只留硬规矩与路由表
+  ...["Cli", "Script", "Depth", "Art", "Rig", "Camera", "Interaction", "Ui"].map((k) =>
+    [`docs/${k}.md`, [[/^#{2,4} (.+)$/, (m) => [[m[1], `规范分册章节（${k}）`]]]]]),
   ["Data_StoryC1.md", [
     [/^#{1,3} (.+)$/, (m) => [[m[1], "剧情文档章节"]]],
     [/^([①-⑮]) (?:§\d+ )?\*{0,2}([^（(*]+)/, (m) => [[m[2].trim(), "c1 场次（剧情文档）"]]],
@@ -972,7 +975,8 @@ const HELP = `《地道里的光》命令行工作台
       （网页里播：设置 → 调试 · 动画工作台，或 index.html?anim=<名字>；同一份索引）
   doctor                  分支/上游/未提交/缓存戳/端口
 
-要问游戏状态先跑这个，别再现写一次性探针脚本。`;
+要问游戏状态先跑这个，别再现写一次性探针脚本。
+用法细则与坑（--eval 是表达式、pre → eval → hold → 冻帧 → 截图 的先后、Settle 推渲染侧）见 docs/Cli.md。`;
 
 const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, menu: CmdMenu, anims: CmdAnims, anim: CmdAnim, doctor: CmdDoctor };
 const fn = TABLE[cmd];
