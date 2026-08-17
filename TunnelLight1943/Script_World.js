@@ -2920,7 +2920,8 @@ export function CreateWorld(canvasEl) {
     //（划线那一拍它正好压在石笔上）
     // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
     const closeUp = viewW < 5.0 || liveCardOn;
-    const want = inCine || closeUp || otsHiddenId === "player" ? 0
+    // 标题页背后那台戏（state.tableau）里也不要它：画面上就两个人，谁是谁不用认
+    const want = inCine || closeUp || otsHiddenId === "player" || state.tableau ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
     ps.tagMesh.visible = ps.tagAlpha > 0.02;
@@ -2951,7 +2952,8 @@ export function CreateWorld(canvasEl) {
     // 不停的白星挂在戏正中（c2 出洞那一镜的鞋底、捂嘴那拍的边区票都赶上过）
     // 只会把眼睛从戏上拽走
     {
-      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine;
+      // 标题页背后那台戏（state.tableau）里也不闪：捡不了，只会在菜单旁边眨眼
+      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine && !state.tableau;
       let glowAt = null;
       for (const [id, rec] of relicMeshes) {
         const got = state.relicsGot?.has(id);
@@ -5101,8 +5103,9 @@ export function CreateWorld(canvasEl) {
     // 指路的标记在特写里没有意义——你已经站在它跟前了
     // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
     // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
+    // 标题页背后那台戏（state.tableau）没有目标可指——那不是一局
     const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
-      && !state.microCine && !liveCardOn && viewW >= 5.0;
+      && !state.microCine && !liveCardOn && !state.tableau && viewW >= 5.0;
     // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
     // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
     // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。

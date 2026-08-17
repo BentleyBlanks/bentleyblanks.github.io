@@ -38,6 +38,10 @@ page.on("console", (message) => {
 
 try {
   await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
+  // 第一屏是「按任意键」：按一下把菜单叫出来，再点「新游戏」
+  await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(900);
   await page.click("#startButton");
   // —— 序 · 那天必须是**静的**（2026-08-14）——
   //
