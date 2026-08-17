@@ -243,13 +243,32 @@ float SolidAt(vec2 w) {
   return texture2D(uMask, uv).r;
 }
 
-float BlockedAt(vec2 p) {
+// 人体挡光：**一整条线段一次解析算完，不许在步进里逐点去问**
+//（2026-08-17 用户报「日军走过时地下的灯光效果有锯齿」）。
+// 老版是在沿光轴的步进里每一步调一次 BlockedAt，而步长
+// stepLen = max(dist/22, 0.12) 是按**每个片元自己的 dist** 算的：采样格子的
+// 相位每往下挪一行就变一点，于是"这一路上撞没撞到人"成了 dist 的锯齿函数。
+// 踩在板缝上的那个兵尤其致命——他的脚只跟光轴顶端那 16 厘米重叠，能不能被
+// 采到全看余数落在哪，那道光当场被切成一节一节的横杠（实拍 solON/solOFF 对照，
+// 兵一走横杠还跟着往下爬）。
+// 挡光的本来就是几个轴对齐的方盒，线段到盒子的距离直接算得出来：连续、没有
+// 格子、也比 22 次纹理取样便宜。
+//   p0  线段起点（着色点 / 亮斑落点）
+//   dir 单位方向（朝光源那头）
+//   len 线段长度（到光源为止）
+float BlockedSeg(vec2 p0, vec2 dir, float len) {
   float hit = 0.0;
   for (int i = 0; i < ${MAX_BLOCKERS}; i++) {
     if (i >= uBlockerCount) break;
     vec4 b = uBlockers[i];
-    vec2 q = abs(p - b.xy) - b.zw;
-    hit = max(hit, 1.0 - smoothstep(-0.05, 0.08, max(q.x, q.y)));
+    // 线段上离盒心最近的那一点（超出两端就夹回端点）
+    float tc = clamp(dot(b.xy - p0, dir), 0.0, len);
+    vec2 q = abs(p0 + dir * tc - b.xy) - b.zw;
+    float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+    // 半影给得**很省**：光源是一条几毫米的板缝，近乎点光源，影子本来就该是硬的。
+    // 这点软只为两件事——抗锯齿，以及"方盒子只是人的粗胚"。越远的遮挡物越软
+    float soft = 0.05 + 0.03 * tc;
+    hit = max(hit, 1.0 - smoothstep(-soft, soft, sd));
   }
   return hit;
 }
@@ -340,7 +359,9 @@ void main() {
   if (direct + pool + bounce < 0.0025) discard;
 
   // ── 挡住没有：土层挡死，人挡一截。**这一条只管空气里那段光柱**：
-  // 从着色点顺着光轴往回走，问"这一路上有没有东西"
+  // 从着色点顺着光轴往回走，问"这一路上有没有东西"。
+  // 土层还是步进（掩码是一张贴图，只能采样；但它不动，采样格子再粗也不会闪）；
+  // **人体那一路走解析式**（BlockedSeg，见上）——挂在这条步进上就是那道锯齿
   float lit = 1.0;
   if (direct > 0.002) {
     const int STEPS = 22;
@@ -349,10 +370,10 @@ void main() {
     for (int i = 1; i <= STEPS; i++) {
       float t = float(i) * stepLen;
       if (t >= dist) break;
-      vec2 p = vWorld - uDir * t;
-      if (SolidAt(p) > 0.5) { lit = 0.0; break; }
-      lit = min(lit, 1.0 - BlockedAt(p) * 0.94);
+      if (SolidAt(vWorld - uDir * t) > 0.5) { lit = 0.0; break; }
     }
+    // 人挡光不挡死：半影里还留一点点，才不像贴了张黑纸
+    lit = min(lit, 1.0 - BlockedSeg(vWorld, -uDir, dist) * 0.94);
   }
   float selfSolid = SolidAt(vWorld);
   // 着色点自己就在土里：一点点受光感，不然洞壁没有被照到的样子
@@ -367,10 +388,11 @@ void main() {
     float L2 = length(poolSrc - uOrigin);
     poolLit = 1.0;
     for (int i = 1; i <= 16; i++) {
-      vec2 p = poolSrc - uDir * (L2 * float(i) / 17.0);
-      if (SolidAt(p) > 0.5) { poolLit = 0.0; break; }
-      poolLit = min(poolLit, 1.0 - BlockedAt(p) * 0.94);
+      if (SolidAt(poolSrc - uDir * (L2 * float(i) / 17.0)) > 0.5) { poolLit = 0.0; break; }
     }
+    // 人挡在光轴上时这摊亮斑跟着灭——但要**灭得像影子挪过去**，不是整摊一起
+    // 跳闸：poolSrc 全屏只有三个点，逐点采样的话兵一跨进那格，整摊光当场消失
+    poolLit = min(poolLit, 1.0 - BlockedSeg(poolSrc, -uDir, L2) * 0.94);
   }
 
   // 间接光自己的遮挡：从这一点连到亮斑，中间隔着土就照不到。
@@ -384,13 +406,15 @@ void main() {
       vec2 dn = dd / L;
       float acc = 0.0;
       for (int i = 1; i <= 8; i++) {
-        vec2 p = vWorld + dn * (L * float(i) / 9.0);
-        acc += SolidAt(p) + BlockedAt(p) * 0.45;
+        acc += SolidAt(vWorld + dn * (L * float(i) / 9.0));
       }
       // **软透射**，不是"撞到土就归零"。掩码只有 6 像素/米、而且是一堆
       // 轴对齐的方盒子：一撞就断的话，窖底会浮出一个边缘刀切的亮方块
       //（第一版实拍抓到的就是这个）。按吃到的实心量指数衰减，边界自己糊开
       bLit = exp(-acc * 0.62);
+      // 挡在中间的人也吃掉一截，但**只吃一截**：间接光的源是地上那一大摊，
+      // 一个人挡不干净它。同样走解析式，不然人一动这层也跟着起横杠
+      bLit *= mix(1.0, 0.33, BlockedSeg(vWorld, dn, L));
     }
     // 打在土墙上的间接光**要留下来**——照亮四壁正是它的活；
     // 只把埋在土里的那部分收掉一档
