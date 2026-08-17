@@ -118,10 +118,9 @@ def main():
     rscore = S[:, [RSHO, RELB, RWRI, RHIP, RKNE, RANK]].mean()
     frontLeft = lscore >= rscore
     print(f"face={'right' if face > 0 else 'left'}  front side={'LEFT' if frontLeft else 'RIGHT'} (score L {lscore:.2f} R {rscore:.2f})")
-    F = dict(sho=LSHO, elb=LELB, wri=LWRI, hip=LHIP, kne=LKNE, ank=LANK, toe=LBTOE, heel=LHEEL, hand=LHAND0) if frontLeft \
-        else dict(sho=RSHO, elb=RELB, wri=RWRI, hip=RHIP, kne=RKNE, ank=RANK, toe=RBTOE, heel=RHEEL, hand=RHAND0)
-    B = dict(sho=RSHO, elb=RELB, wri=RWRI, hip=RHIP, kne=RKNE, ank=RANK, toe=RBTOE, heel=RHEEL, hand=RHAND0) if frontLeft \
-        else dict(sho=LSHO, elb=LELB, wri=LWRI, hip=LHIP, kne=LKNE, ank=LANK, toe=LBTOE, heel=LHEEL, hand=LHAND0)
+    L = dict(sho=LSHO, elb=LELB, wri=LWRI, hip=LHIP, kne=LKNE, ank=LANK, toe=LBTOE, heel=LHEEL, hand=LHAND0, ear=LEAR, eye=LEYE)
+    Rr = dict(sho=RSHO, elb=RELB, wri=RWRI, hip=RHIP, kne=RKNE, ank=RANK, toe=RBTOE, heel=RHEEL, hand=RHAND0, ear=REAR, eye=REYE)
+    F, B = (L, Rr) if frontLeft else (Rr, L)
 
     def vec(p, q, f):
         dx = (q[0] - p[0]) * face          # 前为正
@@ -141,13 +140,17 @@ def main():
         k = Ks[f]
         hipm = (k[LHIP] + k[RHIP]) / 2
         shom = (k[LSHO] + k[RSHO]) / 2
-        earm = (k[LEAR] + k[REAR]) / 2
         r = {}
         tx, ty = vec(hipm, shom, f)
         r["torso"] = ang_up(tx, ty)
         r["chest"] = 0.0
-        hx, hy = vec(shom, earm, f)
-        r["head"] = wrap(ang_up(hx, hy) - r["torso"])
+        # 头的朝向用**耳→眼**这条轴（脸朝哪儿），不用肩→耳（耳朵在极端仰头时飘）：
+        # 平视＝水平朝前＝0，仰头为负、低头为正（Rig 的 head 正＝往下点），再减去躯干
+        ear = k[F["ear"]] if S[f, F["ear"]] > 0.3 else k[B["ear"]]
+        eye = k[F["eye"]] if S[f, F["eye"]] > 0.3 else k[B["eye"]]
+        ex_, ey_ = vec(ear, eye, f)
+        tilt = math.atan2(ey_, max(1e-6, abs(ex_))) * DEG        # 眼在耳之上＝仰
+        r["head"] = wrap(-tilt - r["torso"])
         r["neck"] = 0.0
         for tag, side in (("F", F), ("B", B)):
             thx, thy = vec(k[side["hip"]], k[side["kne"]], f)
@@ -198,7 +201,7 @@ def main():
         lines.append("      { " + ", ".join(parts) + " },")
     dur = keys[-1]["_t"] - t0 + 1 / a.fps
     js = (f"  // —— 视频转骨骼（Script_MocapTrack.py，{os.path.basename(a.video)}，{a.fps:g}fps 抽稀）——\n"
-          f"  {a.name}: {{\n    dur: {dur:.2f}, loop: false,\n    keys: [\n" + "\n".join(lines) + "\n    ],\n  }},\n")
+          f"  {a.name}: {{\n    dur: {dur:.2f}, loop: false,\n    keys: [\n" + "\n".join(lines) + "\n    ],\n  },\n")
     with open(os.path.join(a.out, a.name + ".track.mjs"), "w", encoding="utf-8") as fh:
         fh.write(js)
     with open(os.path.join(a.out, a.name + ".csv"), "w", encoding="utf-8") as fh:
