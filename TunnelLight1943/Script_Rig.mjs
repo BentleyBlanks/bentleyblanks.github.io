@@ -501,11 +501,13 @@ export const TRACKS = {
     dur: 1.45, loop: false,
     keys: [
       // 蹲到她的高度、两手兜在她腋下（＝ scoopReach 走满进度那一格，接过去不跳）
-      { t: 0.0, hipY: -0.24, hipX: 0.07, torso: 38, head: -22, armF: -51, foreF: -89, armB: -44, foreB: -95, thighB: -76, shinB: 84, footB: -6, thighF: -52, shinF: 60, footF: -8 },
+      // 每一格的两条腿都按闭合式配（hipY = 0.31·cosθ + 0.31·cos(θ+小腿) − 0.62），
+      // 两条投影必须一样长，否则错开的那一档就是一只脚陷进地里／悬在半空
+      { t: 0.0, hipY: -0.24, hipX: 0.07, torso: 38, head: -22, armF: -51, foreF: -89, armB: -44, foreB: -95, thighB: -76, shinB: 84, footB: -6, thighF: -60, shinF: 103, footF: -8 },
       // 预备：再沉一寸，两只手在她腋下扣死（这一格是"使劲"的证据）
-      { t: 0.20, hipY: -0.29, hipX: 0.09, torso: 42, head: -18, armF: -56, foreF: -84, armB: -49, foreB: -90, thighB: -86, shinB: 94, thighF: -62, shinF: 70 },
+      { t: 0.20, hipY: -0.29, hipX: 0.09, torso: 42, head: -18, armF: -56, foreF: -84, armB: -49, foreB: -90, thighB: -86, shinB: 94, thighF: -70, shinF: 114 },
       // 蹬腿起身：她离地。胯先上来、腰跟着直、肘往体侧落（开始改兜的角度）
-      { t: 0.55, hipY: -0.106, hipX: 0.02, torso: 8, head: -6, armF: -20, foreF: -74, armB: -34, foreB: -110, thighB: -48, shinB: 56, footB: -4, thighF: -30, shinF: 36, footF: -6 },
+      { t: 0.55, hipY: -0.106, hipX: 0.02, torso: 8, head: -6, armF: -20, foreF: -74, armB: -34, foreB: -110, thighB: -48, shinB: 56, footB: -4, thighF: -34, shinF: 68, footF: -6 },
       // 分量压上来：上身往后仰过一点点配重，同时胯往上一送把她坐稳
       { t: 0.85, hipY: 0.02, hipX: -0.05, torso: -11, head: 6, armF: 8, foreF: -74, armB: -16, foreB: -133, thighB: -2, shinB: 3, thighF: 4, shinF: 2 },
       // 回落（很小的一次回坐，重量真的落在身上了）
@@ -1665,9 +1667,13 @@ export function PoseRig(rig, s, dt) {
     target.armF = L(-22, -51); target.foreF = L(-24, -89);
     target.armB = L(-14, -44); target.foreB = L(-20, -95);
     // 蹲的闭合式：hipY = 0.31·cos(大腿) + 0.31·cos(大腿+小腿) − 0.62
-    // （−76/+84 ⇒ −0.238）。前腿往前迈半步、屈得少一档，别蹲成一对平行的棍子
+    // （−76/+84 ⇒ −0.238）。**两条腿都要按这条闭合式配**，只是角度错开——
+    // 前腿第一版给了 −52/+60，投影 0.498 比后腿的 0.382 长了 12cm，
+    // 实拍量出来那只脚陷进地里 2.3cm（`--probe` 的 footF=−0.023）。
+    // −60/+103 的投影也是 0.382：膝往前顶得少一点、小腿往后斜得多一点，
+    // 两只脚都落在地面上，侧视里还错得开
     target.thighB = L(-8, -76); target.shinB = L(10, 84); target.footB = L(-4, -6);
-    target.thighF = L(6, -52); target.shinF = L(6, 60); target.footF = L(-4, -8);
+    target.thighF = L(6, -60); target.shinF = L(6, 103); target.footF = L(-4, -8);
   } else if (s.pose === "heldUp") {
     // 被托在半空的孩子（与 liftChild 成对）。老版她用的是 `mark`——那是
     // **站在地上**伸手比划的姿势，两条腿笔直踩着空气，人就这么浮在门框前。
