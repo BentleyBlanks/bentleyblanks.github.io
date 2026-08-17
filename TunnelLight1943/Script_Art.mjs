@@ -1268,76 +1268,6 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
 }
 
 /**
- * 包在头上的一块布：男的羊肚手巾（本白）、女的头巾（靛蓝一档）。
- * **下沿压到眉弓下沿**，眼睛就在它底下的阴影里（同 HeadHair 的刘海那一路）。
- * 脑后系一个结、垂一小截巾角；娘的纂从巾底下露出来——那是"一眼认出是谁"的一笔。
- */
-function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
-  const woman = kind === "family";
-  const cloth = woman ? "#4a5464" : "#d8d0bb";
-  const fold = woman ? "rgba(22,28,38,0.34)" : "rgba(96,88,70,0.30)";
-  const P = (x, y) => [px + r * x, py + r * y];
-  const edge = -1.06;                                   // 布的下沿：眉弓下沿
-  // 娘的纂：先画（布压住它的上半，露出底下那一团）
-  if (woman) {
-    InkFill(ctx, Spline([P(-0.98, -1.00), P(-1.30, -1.06), P(-1.50, -0.82), P(-1.42, -0.52),
-      P(-1.12, -0.44), P(-0.92, -0.64)], 4),
-    id + "bun", "#2a1f18", { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.24)" });
-  }
-  // 布身：从额前包过颅顶、落到项后
-  InkFill(ctx, Spline([
-    P(F.brow - 0.10, edge),                             // 前下角（压在眼线上）
-    P(F.brow + 0.02, -1.30),
-    P(F.brow - 0.18, -1.58),
-    P(0.30, -1.90),
-    P(-0.22, F.crown - 0.12),                           // 颅顶
-    P(-0.76, -1.82),
-    P(F.back - 0.12, -1.28),
-    P(-1.04, -0.88),
-    P(-0.90, -0.62),                                    // 项后（布收进去）
-    P(-0.70, -0.70),
-    P(-0.64, -0.96),
-    P(-0.50, -1.10),
-    P(-0.16, edge - 0.05),                              // 下沿往前压
-    P(0.22, edge - 0.01),
-    P(0.52, edge - 0.02),
-  ], 6), id + "scarf", cloth, { amp: 0.34 * k, lw: lw * 0.75, shade: "rgba(0,0,0,0.16)", shadeAt: 0.5 });
-  // 布的两道褶：顺着头形走，一块布才不是一顶瓜皮帽
-  ctx.save();
-  ctx.strokeStyle = fold;
-  ctx.lineWidth = 1.1 * k;
-  ctx.lineCap = "round";
-  for (let i = 0; i < 2; i += 1) {
-    const t = 0.3 + i * 0.34;
-    ctx.beginPath();
-    ctx.moveTo(px + r * (F.brow - 0.22 - t * 0.5), py + r * (edge - 0.08));
-    ctx.quadraticCurveTo(px + r * (-0.10 - t * 0.4), py + r * (F.crown + 0.34 + t * 0.3),
-      px + r * (F.back + 0.10 - t * 0.1), py + r * (-1.20 + t * 0.34));
-    ctx.stroke();
-  }
-  ctx.restore();
-  // 脑后的结＋垂下来的一小截巾角
-  InkFill(ctx, Spline([P(-0.98, -1.02), P(-1.22, -1.10), P(-1.26, -0.86), P(-1.04, -0.80)], 4),
-    id + "knot", cloth, { amp: 0.4 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.18)" });
-  InkFill(ctx, [P(-1.16, -0.94), P(-1.54, -0.46), P(-1.24, -0.32), P(-1.02, -0.76)],
-    id + "tail", cloth, { amp: 0.7 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.14)" });
-  // 布底下那片阴影：眼睛在这儿
-  EyeShade(ctx, px, py, r, F, edge + 0.01, 0.38, 0.30);
-  // 前额露出来的一两绺头发（布不是戴在光头上）
-  ctx.save();
-  ctx.fillStyle = "#2e2119";
-  for (let i = 0; i < 2; i += 1) {
-    const bx = px + r * (0.16 + i * 0.34);
-    ctx.beginPath();
-    ctx.moveTo(bx - r * 0.08, py + r * (edge - 0.02));
-    ctx.quadraticCurveTo(bx, py + r * (edge + 0.09), bx + r * 0.07, py + r * (edge - 0.02));
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-/**
  * 头发/帽檐底下那片阴影——**眼睛就"藏"在这儿**（《勇敢的心》的做法）。
  * y = 遮挡物的下沿（单位 r），阴影从那儿往下化开 depth。
  * 越深越冷：日军给 0.52，自家人给 0.34（还能看出是张脸，只是眼在暗处）。
@@ -1366,6 +1296,130 @@ function EyeShade(ctx, px, py, r, F, y, alpha = 0.34, depth = 0.30) {
     ctx.fillStyle = rg;
     ctx.beginPath();
     ctx.ellipse(px + r * dx, ey, r * w * 1.7, r * w * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * 头上盘的那块布（2026-08-17 用户拿一张华北老乡的照片退回第一版：
+ * 「你做的这什么玩意儿」——第一版是一整块光板扣在头上，读出来是顶浴帽/摩托头盔）。
+ *
+ * 照片里那东西的三个特征，缺一个就不是它：
+ *   ① **一圈圈缠上去的**：看得见三四道叠着的箍，每一道都有自己的下沿与影子。
+ *      一整块光板没有"缠"这个动作，所以怎么调都是帽子。
+ *   ② **比脑袋高**：盘起来的布顶比颅顶还高出半个头，侧影是上宽下窄的一坨，
+ *      而且**不规整**（每一道箍粗细不同、还错着位）。
+ *   ③ **末端散着**：最后一圈的布头不塞进去，散成几绺从顶前支出来。
+ * 下沿仍旧压在眉弓上——眼睛在它底下的阴影里（同刘海那一路）。
+ * 男的裹本白的羊肚手巾，女的（娘）包一块靛蓝的、盘得低而紧，纂从巾底下露出来。
+ */
+function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
+  const woman = kind === "family";
+  const cloth = woman ? "#59637a" : "#ddd6c1";
+  const clothDim = woman ? "#414a5e" : "#bfb69f";
+  const seam = woman ? "rgba(20,26,38,0.42)" : "rgba(104,94,74,0.42)";
+  const P = (x, y) => [px + r * x, py + r * y];
+  const edge = -1.06;                        // 布的下沿：眉弓下沿
+  const coils = woman ? 2 : 3;               // 看得见几道缠痕
+  const top = woman ? -1.86 : -2.26;         // 布顶：男的盘得高，比颅顶还高一截
+  const backW = woman ? -1.06 : -1.18;       // 后缘最宽处
+  // 娘的纂：先画（布压住它的上半，露出底下那一团）
+  if (woman) {
+    InkFill(ctx, Spline([P(-0.98, -0.98), P(-1.28, -1.04), P(-1.46, -0.80), P(-1.38, -0.52),
+      P(-1.10, -0.44), P(-0.92, -0.62)], 4),
+    id + "bun", "#2a1f18", { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.24)" });
+  }
+  // —— 布是**一整坨**，缠痕画在里头。第一版把每一道箍各画成一个描了边的圈，
+  // 出来是一摞盘子（用户："你做的这什么玩意儿"）——同灰堆那条老账：
+  // 一团东西只许有一条外轮廓，层次靠里头的缝去说
+  const mass = Spline([
+    P(F.brow - 0.10, edge),                  // 额前（下沿压在眉弓上）
+    P(F.brow + 0.07, -1.34),                 // 前缘略往外鼓
+    P(F.brow + 0.01, -1.74),
+    P(0.60, top + 0.20),
+    P(0.06, top),                            // 顶
+    P(-0.52, top + 0.06),
+    P(-1.00, top + 0.32),
+    P(backW, -1.52),                         // 后缘最宽
+    P(backW + 0.04, -1.14),
+    P(-0.96, -0.94),                         // 后下角（落到项上）
+    P(-0.50, -1.02),
+    P(-0.16, edge - 0.05),                   // 下沿往前压（带一点起伏）
+    P(0.06, edge + 0.02),
+    P(0.30, edge - 0.03),
+  ], 6);
+  InkFill(ctx, mass, id + "cloth", cloth,
+    { amp: 0.34 * k, lw: lw * 0.78, shade: "rgba(0,0,0,0.14)", shadeAt: 0.52 });
+  // 缠痕：一道道从后缘绕到前缘的弧。每道给"暗缝＋上面一条亮脊"——
+  // 那才是一圈布压着一圈布，而不是画了几条横线
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mass[0][0], mass[0][1]);
+  for (const q of mass.slice(1)) ctx.lineTo(q[0], q[1]);
+  ctx.closePath();
+  ctx.clip();
+  ctx.lineCap = "round";
+  for (let i = 0; i < coils; i += 1) {
+    const cy = edge - (i + 1) * (edge - top) / (coils + 1) + Sym(id + "cy", i, 0.03);
+    const sag = 0.10 + Hash(id + "cs" + i) * 0.06;
+    const seamPath = (dy) => {
+      ctx.beginPath();
+      ctx.moveTo(px + r * (backW + 0.10), py + r * (cy + dy - 0.04));
+      ctx.quadraticCurveTo(px + r * (-0.20), py + r * (cy + dy + sag),
+        px + r * (F.brow + 0.04), py + r * (cy + dy - 0.02));
+      ctx.stroke();
+    };
+    ctx.strokeStyle = seam;                  // 暗缝
+    ctx.lineWidth = 1.6 * k;
+    seamPath(0);
+    ctx.strokeStyle = woman ? "rgba(150,164,190,0.34)" : "rgba(252,246,228,0.42)";
+    ctx.lineWidth = 1.8 * k;                 // 缝上头那条亮脊
+    seamPath(-0.055);
+  }
+  // 一道斜着压过去的：布是绕上去的，不是一圈圈平着摞的
+  ctx.strokeStyle = seam;
+  ctx.lineWidth = 1.3 * k;
+  ctx.beginPath();
+  ctx.moveTo(px + r * (backW + 0.16), py + r * (edge - 0.30));
+  ctx.quadraticCurveTo(px + r * 0.10, py + r * (top + 0.52), px + r * (F.brow + 0.02), py + r * (top + 0.40));
+  ctx.stroke();
+  ctx.restore();
+  // —— 散着的布头：最后一圈没塞进去，几绺从顶前支出来（照片里最跳的一笔）
+  ctx.save();
+  for (let i = 0; i < (woman ? 2 : 3); i += 1) {
+    const t = i / Math.max(1, (woman ? 1 : 2));
+    const bx = 0.04 + t * 0.44;
+    const by = top + 0.14 + t * 0.14;
+    const up = 0.15 + Hash(id + "tp" + i) * 0.13;
+    const sw = 0.13 + Hash(id + "tw" + i) * 0.06;
+    // 一绺布头：根宽梢尖、往外倒。四个方点连出来是三面小旗（上一版实拍）
+    const lean2 = 0.10 + t * 0.22;
+    InkFill(ctx, Spline([
+      P(bx - sw, by + 0.03),
+      P(bx - sw * 0.5 + lean2 * 0.35, by - up * 0.55),
+      P(bx + lean2 - sw * 0.34, by - up),            // 梢（是片布角，不是针尖）
+      P(bx + lean2 + sw * 0.40, by - up * 0.92),
+      P(bx + sw * 0.7 + lean2 * 0.3, by - up * 0.48),
+      P(bx + sw, by + 0.03),
+    ], 4), id + "tip" + i, i % 2 ? cloth : clothDim,
+    { amp: 0.26 * k, lw: lw * 0.6, shade: "rgba(0,0,0,0.1)" });
+  }
+  ctx.restore();
+  // 脑后垂下来的一小截巾角
+  InkFill(ctx, [P(-1.06, -0.98), P(-1.44, -0.50), P(-1.16, -0.34), P(-0.96, -0.78)],
+    id + "tail", clothDim, { amp: 0.7 * k, lw: lw * 0.66, shade: "rgba(0,0,0,0.14)" });
+  // 布底下那片阴影：眼睛在这儿
+  EyeShade(ctx, px, py, r, F, edge + 0.01, 0.38, 0.30);
+  // 额前露出来的一两绺头发（布不是裹在光头上）
+  ctx.save();
+  ctx.fillStyle = "#2e2119";
+  for (let i = 0; i < 2; i += 1) {
+    const bx = px + r * (0.18 + i * 0.32);
+    ctx.beginPath();
+    ctx.moveTo(bx - r * 0.08, py + r * (edge - 0.02));
+    ctx.quadraticCurveTo(bx, py + r * (edge + 0.09), bx + r * 0.07, py + r * (edge - 0.02));
+    ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
