@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=149">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
-       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
+       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v=149 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
        新 Main 不再发 dragX、旧 Core 只认 dragX，于是刨子怎么拖都不动；而旧 Core
        写的 dragTrack 又没有元素接（新 index.html 已删），连那根轨道都不出来。
@@ -25,7 +25,7 @@
        这一张表里（连同上面的 Style_Game.css 与下面的 Script_Main.js 一起改），
        谁 import 谁都拿到同一个带戳的 URL，模块实例仍然只有一份。
        **新增模块必须登记在这里**，否则它又会独自留在缓存里；源码里则一律不许
-       再自己写 ?v=（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
+       再自己写 ?v=149（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
        TestModuleGraphIsCacheBusted 盯着。 -->
   <!-- three.js 收进仓库 vendor（同 TunnelBell1942 的做法）：不再吃 CDN——
        jsdelivr 在部分网络（国内、离线、代理环境）连不上时整个模块图会挂，
