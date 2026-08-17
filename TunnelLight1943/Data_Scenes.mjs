@@ -97,6 +97,26 @@ for (const [key, scene] of Object.entries(SCENES)) {
   for (const c of scene.covers || []) {
     if (!COVER_ART[c.kind]) throw new Error(`场景 ${key} 的掩体 ${c.id} 用了没登记的 kind "${c.kind}"（补进 Data_PropArt.json 的 covers）`);
   }
+  // 门与门框必须是同一个门（2026-08-17）：立面按 house.door 开洞，门框那件道具
+  // 按自己的 x 画木头，两处一旦对不上，画面上就是"墙上一个洞、旁边立着一副框"
+  // ——正是这一轮被退回的样子。差一寸都不许，所以这里抛而不是告警。
+  for (const p of scene.props || []) {
+    if (p.kind !== "house" || p.door === undefined) continue;
+    const half = p.w / 2;
+    if (p.door < p.x - half || p.door > p.x + half) {
+      throw new Error(`场景 ${key} 的 ${p.id} 门心 x=${p.door} 落在屋子足迹 [${p.x - half}, ${p.x + half}] 之外`);
+    }
+    const frame = (scene.props || []).find((q) => q.kind === "doorframe" && Math.abs(q.x - p.door) < 0.02);
+    if (!frame) {
+      throw new Error(`场景 ${key} 的 ${p.id} 声明门心在 x=${p.door}，那儿却没有 doorframe 道具`
+        + "——立面上会留一个空洞（门框是另一张贴图，它俩必须同坐标）");
+    }
+    const corner = p.x + half - frame.x;
+    if (Math.abs((frame.corner ?? 0) - corner) > 0.02) {
+      throw new Error(`场景 ${key} 的门框 corner=${frame.corner} 与实际的墙角距离 ${corner.toFixed(2)}m 对不上`
+        + "——corner 是伪透视的灭点基准，错了门垛的墙角就跟立面的山墙分家");
+    }
+  }
   // 收藏品：id 全局唯一、注解非空、落点在走行范围里——摆出界的收藏品永远
   // 走不到，等于静默丢了一件（包袱条会永远缺一格）
   for (const r of scene.relics || []) {

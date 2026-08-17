@@ -922,8 +922,12 @@ export function CreateWorld(canvasEl) {
         if (V2 && p.interior && !(ruined && p.burnable)) {
           mk((ctx, ax, ay) => ART.DrawHomeInterior(ctx, ax, ay, W, H, p.id, { night }),
             { z: BAND[V2.innerBand] });
-          homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
-            { z: BAND[V2.facadeBand] });
+          // doorAt：门心在立面上的位置（px，相对屋子中心）。**由场景数据给**，
+          // 因为门框那件道具要严丝合缝地嵌进这个洞里——两处各写一份迟早对不上
+          // （Data_Scenes 加载期校验两者相等）
+          homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id,
+            { burnt: false, night, door: true, doorAt: p.door !== undefined ? (p.door - p.x) * PPM : null }),
+          { z: BAND[V2.facadeBand] });
           // 东西两头的山墙内侧。后墙那片按透视只占到画框的一小截，过场又把
           // 第四堵墙整个撤掉——越过后墙的边就是野地和炮楼。屋子那两头本来就有
           // 一道墙，这里把它接上（画法与三条约束见 Art.DrawRoomWing）。
@@ -952,14 +956,19 @@ export function CreateWorld(canvasEl) {
           // 屋里，不能一挨着东墙就没影
           // mid/half 是**屋子的足迹**（山墙到山墙），跟 HouseSpan 那段街不是一回事：
           // 山墙内侧该不该画拿它当闸，见 UpdateProps
-          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM, mid: p.x, half: p.w / 2 };
+          homeRange = { ...HouseSpan(p), door: p.door ?? (p.x + p.w / 2 - 25 / PPM), mid: p.x, half: p.w / 2 };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night, slogan: p.slogan }));
         break;
       }
       case "doorframe": {
-        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, carveState));
+        // 门框连着门垛一起画（2026-08-17）：w/h 是那块墙的尺寸，corner 是门心到
+        // 东墙角有多远——灭点按它算，所以这件道具与立面共用同一个假想机位
+        const DW = p.w * PPM, DH = p.h * PPM;
+        const opt = { night, burnt: ruined, corner: p.corner };
+        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, DW, DH, p.id,
+          { ...opt, ...carveState }));
         // 两道刻痕分别由 flags.marked / flags.carved 把门，划完才长出来
         carveRebuild = (marks) => {
           const c = mesh.material.map.image;
@@ -970,7 +979,7 @@ export function CreateWorld(canvasEl) {
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, c.width, c.height);
           ctx.restore();
-          ART.DrawDoorframe(ctx, S.ax, S.ay, p.id, marks);
+          ART.DrawDoorframe(ctx, S.ax, S.ay, DW, DH, p.id, { ...opt, ...marks });
           mesh.material.map.needsUpdate = true;
         };
         break;
