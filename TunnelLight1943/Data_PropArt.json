@@ -23,9 +23,10 @@
       "band": "building",
       "ss": "prop",
       "shadow": 0.42,
+      "_padNote": "w 的 pad 从 90 加到 130：东山墙是真的转过去的一面（伪透视），从墙角往东铺出 46px——45px 的余量装不下，山墙会被画布裁掉半截",
       "sprite": {
         "w": {
-          "pad": 90,
+          "pad": 130,
           "per": "w"
         },
         "h": {
@@ -71,12 +72,18 @@
       "band": "walk",
       "ss": "closeup",
       "sprite": {
-        "w": 120,
-        "h": 130,
+        "w": {
+          "pad": 60,
+          "per": "w"
+        },
+        "h": {
+          "pad": 40,
+          "per": "h"
+        },
         "anchor": "center",
         "baseline": 10
       },
-      "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档"
+      "note": "两道刻痕分别由 flags.marked / flags.carved 把门，carveRebuild 就地重绘这张贴图。划线那一拍镜头推到 1.9m，它占半个画面——所以走 closeup 档。2026-08-17 起门框连着门垛（洞两边那块墙）一起画，画布因此按场景数据的 w/h 长（门心在正中，东边还得装得下到墙角那 0.92m）"
     },
     "doorLeaf": {
       "art": "DrawDoorLeaf",
