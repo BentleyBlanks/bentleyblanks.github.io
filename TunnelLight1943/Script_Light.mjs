@@ -224,13 +224,15 @@ uniform vec2 uMaskSize;
 uniform vec2 uOrigin;      // 板缝所在（窖口中心，地表高度）
 uniform vec2 uDir;         // 光的方向（朝下，斜的时候往东偏）
 uniform vec4 uShafts[${MAX_SHAFTS}];   // x=缝相对窖口的横向偏移 y=缝口半宽 z=每米张开 w=亮度
+uniform vec4 uShaftEx[${MAX_SHAFTS}];  // x=每米偏多少（各缝不平行）y=噪声相位 z=落地亮斑 w=间接光
 uniform int uCount;
 uniform float uLen;        // 打得多远
 uniform float uFloorY;     // 落到哪儿（窖底）
 uniform float uIntensity;
 uniform float uDust;
 uniform float uTime;
-uniform vec3 uColor;
+uniform vec3 uColor;       // 直射：外头的天光
+uniform vec3 uBounceColor; // 反射回来的：在土地上滚过一道，暖得多也脏得多
 uniform int uBlockerCount;
 uniform vec4 uBlockers[${MAX_BLOCKERS}];
 varying vec2 vWorld;
@@ -260,55 +262,140 @@ void main() {
   vec2 perp = vec2(uDir.y, -uDir.x);
   vec2 rel = vWorld - uOrigin;
   float tAxis = dot(rel, uDir);
-  if (tAxis < -0.15 || tAxis > uLen) discard;
+  // 间接光要泼到光柱以外去，所以纵向范围比光柱本身多留一段
+  if (tAxis < -0.35 || tAxis > uLen + 2.0) discard;
 
-  // ── 先算 SDF：光柱外的片元一律不参与后面的步进 ──
-  float core = 0.0;      // 光柱里的浓度
-  float pool = 0.0;      // 落点那摊亮斑
+  float core = 0.0;      // 亮芯：里头那根细亮线
+  float glow = 0.0;      // 芯子外那一圈散射（"光柱"的形其实全在这一层上）
+  float pool = 0.0;      // 落地那摊亮斑
+  float bounce = 0.0;    // 间接光：亮斑当面光源往窖里泼的那一层
+  vec2 bounceSrc = vWorld;
+  vec2 poolSrc = vWorld;
+  float bestPool = 0.0;
   for (int i = 0; i < ${MAX_SHAFTS}; i++) {
     if (i >= uCount) break;
     vec4 s = uShafts[i];
+    vec4 e = uShaftEx[i];
     vec2 o = uOrigin + perp * s.x;
     vec2 d = vWorld - o;
     float t = dot(d, uDir);
-    if (t < 0.0) continue;
-    float lat = dot(d, perp);
-    float hw = s.y + s.z * t;
-    // 有符号距离：<0 在光柱里。柔边按半宽走（尺度不变），但**不许糊过头**——
-    // 柔边一宽，三条缝就并成一根胖柱子，读出来是"一团光晕"不是"几条光"
-    float sd = abs(lat) - hw;
-    float k = 1.0 - smoothstep(-hw * 0.55, hw * 0.12, sd);
-    // 越往下越淡（空气里散掉了）。指数压到 0.85：1.5 那档打到窖底只剩一成，
-    // 光在半空就没了，落地那摊亮斑跟上面接不上
-    float fade = pow(max(0.0, 1.0 - t / uLen), 0.85);
-    core += k * fade * s.w;
+    // 每条缝自己歪一点点（板是三块拼的，缝也就不会互相平行）——
+    // 三根一模一样、一样粗、一样亮、还严格平行的柱子，人眼当场读成三根管子
+    float lat = dot(d, perp) - e.x * t;
 
-    // 落在窖底的那摊：光轴撞地的位置，横着摊开一块椭圆
-    float tf = (uFloorY - o.y) / uDir.y;
-    if (tf > 0.0) {
-      vec2 hit = o + uDir * tf;
-      float hwf = s.y + s.z * tf;
-      vec2 q = (vWorld - hit) / vec2(hwf * 1.5, hwf * 0.42);
-      pool += (1.0 - smoothstep(0.4, 1.0, length(q))) * s.w * 0.55;
+    // ── 落地那摊 + 它反射出来的间接光（光柱外的片元也要算）──
+    if (uDir.y < -0.001) {
+      float tf = (uFloorY - o.y) / uDir.y;
+      if (tf > 0.0) {
+        vec2 hit = o + uDir * tf + perp * (e.x * tf);
+        float hwf = max(s.y + s.z * tf, 0.02);
+        // 亮斑：一个很亮的芯 + 一圈拖得很开的裙边（硬边缘＝贴了张纸）
+        vec2 q = (vWorld - hit) / vec2(hwf * 3.2, hwf * 1.1);
+        float r2 = dot(q, q);
+        // **不许漏到窖底以下**：掩码把地面往下 0.2m 也算成空气（走廊那条
+        // air 矩形从 UNDER_Y−0.2 起），不夹住的话地面底下会亮出一个跟洞室
+        // 一样宽的方块——边缘是刀切的，实拍第一眼就是"地上贴了张亮纸"
+        float onFloor = smoothstep(uFloorY - 0.26, uFloorY - 0.04, vWorld.y);
+        // 0.30 是**不许过曝**定的：三条缝的亮斑在窖底本来就叠在一处，而亮度按
+        // 外头的天光给（窖里亮不亮不影响它），c2 那间没压暗的窖里一叠就是一摊死白
+        float pw = (exp(-r2 * 1.7) + 0.34 * exp(-r2 * 0.20)) * s.w * e.z * 0.30 * onFloor;
+        if (pw > bestPool) { bestPool = pw; poolSrc = hit; }
+        pool += pw;
+        // **间接光**（2026-08-17 用户："也没有什么间接光照出来"）：
+        // 直射打在地上以后不会就此消失——那摊亮斑本身是一盏很软的面光源，
+        // 把窖底、身上和四壁的下半截整个提起来一档。老版一点都没有，
+        // 于是光"落地即止"，四周还是死黑，读出来就是几根发光的棍子插在黑屋里。
+        vec2 bq = (vWorld - hit - vec2(0.0, 0.18)) / vec2(1.0, 0.80);
+        float b2 = dot(bq, bq);
+        // 从地上反上来的光**主要照下半截**：越往上越弱，窖顶该留着黑
+        float up = mix(1.0, 0.30, clamp((vWorld.y - uFloorY) / 1.9, 0.0, 1.0));
+        float w = exp(-b2 * 0.26) * s.w * e.w * 0.165 * up * onFloor;
+        if (w > bounce) bounceSrc = hit + vec2(0.0, 0.05);
+        bounce += w;
+      }
+    }
+
+    if (t < -0.05 || t > uLen) continue;
+    float hw = max(s.y + s.z * t, 0.004);
+    // 亮芯**要按张开量变淡**（能量守恒）：一条宽度不变、亮度也不变的光带，
+    // 不管柔边给得多软，读出来都是一根圆筒。张多宽就淡多少，它才是个楔形
+    float sd = lat / hw;
+    float k = exp(-sd * sd * 2.4) * (s.y / hw);
+    // 外圈的散射**张得比芯子快得多**：一条真的光柱是"一根亮线裹在一团雾里"，
+    // 越往下雾越开、越淡。老版只有芯子这一层，所以边缘是刀切的
+    // 外圈**只张 2.2 倍**：张得太开三条就并成一团，画面上又剩"一根胖柱子"
+    float gw = hw * (1.0 + 2.2 * t / uLen);
+    float sg = lat / gw;
+    // 指数取 0.55 不是 1.0：严格按 1/宽 收的话，外圈那层张到三倍就只剩三分之一，
+    // 张开的那截自己先没了；而它正是"光柱"读出来的那个形
+    glow += exp(-sg * sg * 0.85) * pow(s.y / gw, 0.55) * 0.17 * s.w * exp(-t * 0.24);
+    // 沿程的浓淡：空气不是均质的，尘也不是均匀铺的。**这一条是"不像塑料棒"
+    // 的正主**——一根亮度沿程不变的光带，形状再对也是发光体不是被照亮的空气
+    float rip = 0.78 + 0.22 * sin(t * 4.7 + e.y) * cos(t * 2.3 - e.y * 1.6 + uTime * 0.22);
+    // 芯子要压得过外圈那层雾：三条缝各自的那根亮线读不出来的话，画面上还是
+    // 一团光晕——"板缝里漏下来几条光"这句话就没在画面上成立
+    core += k * exp(-t * 0.20) * rip * s.w * 1.55;
+  }
+  float direct = core + glow;
+  if (direct + pool + bounce < 0.0025) discard;
+
+  // ── 挡住没有：土层挡死，人挡一截。**这一条只管空气里那段光柱**：
+  // 从着色点顺着光轴往回走，问"这一路上有没有东西"
+  float lit = 1.0;
+  if (direct > 0.002) {
+    const int STEPS = 22;
+    float dist = max(tAxis, 0.02);
+    float stepLen = max(dist / float(STEPS), 0.12);
+    for (int i = 1; i <= STEPS; i++) {
+      float t = float(i) * stepLen;
+      if (t >= dist) break;
+      vec2 p = vWorld - uDir * t;
+      if (SolidAt(p) > 0.5) { lit = 0.0; break; }
+      lit = min(lit, 1.0 - BlockedAt(p) * 0.94);
     }
   }
-  float amt = core + pool;
-  if (amt < 0.004) discard;
-
-  // ── 挡住没有：土层挡死，人挡一截 ──
-  const int STEPS = 22;
-  float dist = max(tAxis, 0.02);
-  float stepLen = max(dist / float(STEPS), 0.12);
-  float lit = 1.0;
-  for (int i = 1; i <= STEPS; i++) {
-    float t = float(i) * stepLen;
-    if (t >= dist) break;
-    vec2 p = vWorld - uDir * t;
-    if (SolidAt(p) > 0.5) { lit = 0.0; break; }
-    lit = min(lit, 1.0 - BlockedAt(p) * 0.94);
-  }
+  float selfSolid = SolidAt(vWorld);
   // 着色点自己就在土里：一点点受光感，不然洞壁没有被照到的样子
-  lit *= mix(1.0, 0.25, SolidAt(vWorld));
+  float directLit = lit * mix(1.0, 0.25, selfSolid);
+
+  // 落地那摊亮斑的遮挡要**在光轴上算一次**，不许逐片元竖着回溯。
+  // 它是地上的一块光，不是空气里的一段：拿裙边上每个像素各自往上打一条射线，
+  // 等于给这摊光做了一次竖直可见性测试——于是它被洞室那个 6 像素/米的方盒子
+  // 齐刷刷切掉两边，画面上是一块**边缘刀切的亮方块**（这一版实拍抓的）。
+  float poolLit = 0.0;
+  if (pool > 0.002) {
+    float L2 = length(poolSrc - uOrigin);
+    poolLit = 1.0;
+    for (int i = 1; i <= 16; i++) {
+      vec2 p = poolSrc - uDir * (L2 * float(i) / 17.0);
+      if (SolidAt(p) > 0.5) { poolLit = 0.0; break; }
+      poolLit = min(poolLit, 1.0 - BlockedAt(p) * 0.94);
+    }
+  }
+
+  // 间接光自己的遮挡：从这一点连到亮斑，中间隔着土就照不到。
+  // 走八步就够——间接光本来就软，边界糊一点反倒对
+  float bLit = 0.0;
+  if (bounce > 0.0012) {
+    vec2 dd = bounceSrc - vWorld;
+    float L = length(dd);
+    bLit = 1.0;
+    if (L > 0.05) {
+      vec2 dn = dd / L;
+      float acc = 0.0;
+      for (int i = 1; i <= 8; i++) {
+        vec2 p = vWorld + dn * (L * float(i) / 9.0);
+        acc += SolidAt(p) + BlockedAt(p) * 0.45;
+      }
+      // **软透射**，不是"撞到土就归零"。掩码只有 6 像素/米、而且是一堆
+      // 轴对齐的方盒子：一撞就断的话，窖底会浮出一个边缘刀切的亮方块
+      //（第一版实拍抓到的就是这个）。按吃到的实心量指数衰减，边界自己糊开
+      bLit = exp(-acc * 0.62);
+    }
+    // 打在土墙上的间接光**要留下来**——照亮四壁正是它的活；
+    // 只把埋在土里的那部分收掉一档
+    bLit *= mix(1.0, 0.62, selfSolid);
+  }
 
   // ── 浮尘：光柱里才看得见的那些小颗粒，慢慢往下飘 ──
   float dust = 0.0;
@@ -320,17 +407,28 @@ void main() {
     dust = smoothstep(0.30, 0.02, d) * step(0.86, rnd) * uDust * core;
   }
 
-  float v = (amt * lit + dust) * uIntensity;
-  gl_FragColor = vec4(uColor * v, v);
+  float dv = (direct * directLit + pool * poolLit + dust) * uIntensity;
+  float bv = bounce * bLit * uIntensity;
+  // **不许再走 vec4(color*v, v) ＋ AdditiveBlending**：那一档的混合是
+  // src.rgb × src.a + dst，于是屏幕上拿到的是 color·v²——很淡的那几层
+  // （外圈散射、间接光、亮斑的裙边）被平方一压全没了，只剩下最亮的芯子，
+  // 也就正好剩下"三根发光的棍子"。现在走 One/One 的真加法，写多少加多少。
+  gl_FragColor = vec4(uColor * dv + uBounceColor * bv, 1.0);
 }
 `;
 
 /**
  * 造一束"打进来的光"。所有几何参数都按世界米给，摆位由 SetShafts 决定。
  */
-export function CreateLightShafts(occluder, { color = 0xe8dcb6, span = 12, height = 6 } = {}) {
+export function CreateLightShafts(occluder, {
+  color = 0xe8dcb6, bounceColor = 0xc7a173, span = 12, height = 6,
+} = {}) {
   const shafts = [];
-  for (let i = 0; i < MAX_SHAFTS; i += 1) shafts.push(new THREE.Vector4(0, 0, 0, 0));
+  const shaftEx = [];
+  for (let i = 0; i < MAX_SHAFTS; i += 1) {
+    shafts.push(new THREE.Vector4(0, 0, 0, 0));
+    shaftEx.push(new THREE.Vector4(0, 0, 0, 0));
+  }
   const blockers = [];
   for (let i = 0; i < MAX_BLOCKERS; i += 1) blockers.push(new THREE.Vector4(0, 0, 0, 0));
   const mat = new THREE.ShaderMaterial({
@@ -341,6 +439,7 @@ export function CreateLightShafts(occluder, { color = 0xe8dcb6, span = 12, heigh
       uOrigin: { value: new THREE.Vector2() },
       uDir: { value: new THREE.Vector2(0, -1) },
       uShafts: { value: shafts },
+      uShaftEx: { value: shaftEx },
       uCount: { value: 0 },
       uLen: { value: height },
       uFloorY: { value: -3.6 },
@@ -348,13 +447,19 @@ export function CreateLightShafts(occluder, { color = 0xe8dcb6, span = 12, heigh
       uDust: { value: 1 },
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(color) },
+      uBounceColor: { value: new THREE.Color(bounceColor) },
       uBlockerCount: { value: 0 },
       uBlockers: { value: blockers },
     },
     vertexShader: VERT,
     fragmentShader: SHAFT_FRAG,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    // 真加法（One/One）。THREE.AdditiveBlending 是 SrcAlpha/One，
+    // 而这个着色器把浓度同时写进 rgb 与 a，乘起来就成了 v² —— 见片元末尾那段
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneFactor,
+    blendEquation: THREE.AddEquation,
     depthWrite: false,
     depthTest: false,
   });
@@ -369,12 +474,17 @@ export function CreateLightShafts(occluder, { color = 0xe8dcb6, span = 12, heigh
     const len = Math.hypot(slant, 1);
     mat.uniforms.uDir.value.set(slant / len, -1 / len);
   };
-  // list: [{off, half, spread, gain}]
+  // list: [{off, half, spread, gain, tilt, seed, pool, bounce}]
+  //   tilt   每米往边上偏多少（各条缝不平行——三根严格平行的等宽柱子＝三根管子）
+  //   seed   沿程浓淡噪声的相位（每条各走各的）
+  //   pool   落地那摊亮斑的增益
+  //   bounce 这摊亮斑往窖里泼的间接光增益
   mesh.userData.SetShafts = (list) => {
     const n = Math.min(list.length, MAX_SHAFTS);
     for (let i = 0; i < n; i += 1) {
       const s = list[i];
       shafts[i].set(s.off, s.half, s.spread, s.gain);
+      shaftEx[i].set(s.tilt || 0, s.seed || 0, s.pool ?? 1, s.bounce ?? 1);
     }
     mat.uniforms.uCount.value = n;
   };

@@ -167,6 +167,9 @@ function PoseProgress(o) {
     // 扎回袋口（绕圈）、喂水与按住伤员（长按的行程）——2026-08-13 新增。
     // **漏登记＝冻在第一帧**，这是 CLAUDE.md 点名的老坑
     || o.pose === "twistTie" || o.pose === "bandageWrap"
+    // 蹲下去够妹妹（序·抱起妹妹那 0.9 秒）——2026-08-17 新增。漏登记就是
+    // 冻在第一帧，也就是上一版那个"对着空气鞠躬"的观感
+    || o.pose === "scoopReach"
     || o.pose === "ladleSteady" || o.pose === "pinDown") return o.poseU;
   return o.poseK;
 }
@@ -1817,13 +1820,19 @@ export function CreateWorld(canvasEl) {
         hatchBeamMesh.userData.SetOrigin(g.wx, SURFACE_Y + 0.08, 0.62);
         hatchBeamMesh.userData.SetFloor(UNDER_Y + 0.05);
         // 三条缝：宽窄不一（板是三块拼的，缝也就不匀）。
-        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽。
-        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起——
-        // 画面上是一根胖柱子，不是"板缝里漏下来几条光"
+        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽——
+        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起，
+        // 画面上是一根胖柱子。光柱看着"张开"靠的不是芯子变宽，是**外圈那层
+        // 散射**（着色器里 gw 那一层，随行程张 3.4 倍），芯子照旧很细。
+        //
+        // 2026-08-17 用户："三柱圆筒形的光也很奇怪"。三根一样粗、一样亮、
+        // 严格平行、亮度还沿程不变的光带，人眼当场读成三根发光的管子。
+        // 治法是**让它们不一样**：宽窄、亮度、歪的方向、沿程浓淡的相位各走各的，
+        // 中间那条是主光（缝最窄最亮、几乎直下），两边两条各歪各的、暗一档。
         hatchBeamMesh.userData.SetShafts([
-          { off: -0.37, half: 0.022, spread: 0.020, gain: 0.90 },
-          { off: -0.02, half: 0.017, spread: 0.016, gain: 1.15 },
-          { off: 0.33, half: 0.029, spread: 0.025, gain: 0.75 },
+          { off: -0.37, half: 0.034, spread: 0.024, gain: 0.66, tilt: -0.030, seed: 0.0, pool: 0.9, bounce: 0.55 },
+          { off: -0.02, half: 0.024, spread: 0.017, gain: 1.05, tilt: 0.008, seed: 2.1, pool: 1.15, bounce: 0.85 },
+          { off: 0.33, half: 0.044, spread: 0.030, gain: 0.46, tilt: 0.042, seed: 4.3, pool: 0.75, bounce: 0.45 },
         ]);
         hatchBeamMesh.userData.SetIntensity(0);
         // **必须走 FixOrder**：光柱要排在压暗罩（ORDER_DARK）**之后**——

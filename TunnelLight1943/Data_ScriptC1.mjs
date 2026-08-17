@@ -41,10 +41,17 @@ export function ChapterC1(K) {
     StartMicroCine, StopDin, UNDER_Y, V,
   } = K;
   // 抱在怀里的孩子坐得多高（米）。**这个数是量出来的**：柱子走 childArms 那档
-  // 走姿时，托着的那只手落在离地 0.82m（`world.LimbTipsOf('player').handF`），
-  // 而妹妹按 heldChild 坐着时胯离她自己脚底 0.40m —— 两个数一减就是她该垫多高。
+  // 走姿时，托着的那只手落在离地 0.645m（`world.LimbTipsOf('player').handF`），
+  // 而妹妹按 heldChild 坐着时胯离她自己脚底 0.43m —— 两个数一减就是她该垫多高。
   // 手心与她的胯差一寸都能看出来：差多了是"托着空气"，差少了是"陷进他胳膊里"。
-  const SEAT_LIFT = 0.42;
+  //
+  // 2026-08-17 从 0.42 降到 0.28（用户："抱起妹妹的动画太蠢了"）。0.42 那版把她
+  // 坐在他**胸口**上：实拍量出来她的头顶 1.258m、他的头顶 1.159m——被抱的孩子
+  // 比抱她的人还高一头，读出来是"举着"不是"抱着"。抱孩子是**坐在胯上**，
+  // 头顶落在对方下巴那一线。
+  const SEAT_LIFT = 0.28;
+  // 兜起来那条轨道多长（scoopChild / scoopedUp 同长；tick 按它换算坐高的行程）
+  const SCOOP_DUR = 1.45;
   // 那截手腕的机位——**全章出现三次**（§1 袖口遮不住 / §14 蓝花袖口盖住 /
   // 章末同框），三次必须是同一格，所以只写一份。2026-08-16 照分镜图收紧：
   // 原来是 `insert dist 1.9`＝画宽 3.8m，一屏摆下整间屋，"镜头停在她的手腕上"
@@ -416,20 +423,56 @@ export function ChapterC1(K) {
         // 顺手把她 `level="under"; x=30.7` ——一句话把人挪下去一层又挪开 1.4 米，
         // 那正是玩家看到的瞬移。现在她整段都钉在他怀里，连下梯子也是，
         // **一帧都没有"她自己出现在别处"**。
+        // 还没抱起来、他正按着 E 使劲的那 0.9 秒：**先转过身去看着她**，
+        // 她也转过来把两只手举起来（2026-08-17 用户："抱起妹妹的动画太蠢了"
+        // ——实拍里他冲着**背对她的那一边**弯腰，两条胳膊平端着够空气，
+        // 而她在他身后一动不动，然后当帧瞬移进他怀里）。
+        // Core 的通用长按只会把人转向**判定区中心**，而她就站在区中心上、
+        // 判定区宽 2.4m，玩家从东边进来时区心在他身后 —— 转出来正好背对她。
+        if (!b.carrying && sis && b.stepIndex === 0) {
+          const dx = sis.x - state.player.x;
+          if ((b.holdP || 0) > 0) {
+            state.player.heading = dx >= 0 ? 1 : -1;
+            sis.heading = dx >= 0 ? -1 : 1;         // 她也转过来对着他
+            sis.following = false;
+            // 她自己挪到**一臂之内、但不许贴上来**（0.50m）。走过去这一下也是
+            // "她知道要被抱了"的表演，比瞬移强得多。
+            // 0.50 这个数是 scoopReach 的落点反算出来的：再近就没有胳膊的事了
+            // ——贴到 0.34m 时他的肩到她的腋下只剩 9 厘米，比一条上臂还短。
+            const want = state.player.x + state.player.heading * 0.50;
+            sis.x += Math.max(-1.6 * dt, Math.min(1.6 * dt, want - sis.x));
+            // 举起两只手等着（末帧＝scoopedUp 的首帧，扣上腋下接过去不跳）
+            if (sis.track?.name !== "armsUpWait") sis.track = { name: "armsUpWait", t: 0 };
+          } else if (sis.track?.name === "armsUpWait") sis.track = null;
+        }
         if (b.carrying && sis) {
           sis.cineTarget = null;
           sis.following = false;
-          // 贴着他：身前 0.20m。老版 0.26m 在实拍里两人之间留着一道缝——
-          // 抱孩子是**贴在胸口**，有缝就读成"她浮在他前面"
-          sis.x = state.player.x + state.player.heading * 0.20;
+          // 兜起来那 1.45 秒是**成对轨道**（scoopChild / scoopedUp）在演，
+          // 位置与坐高得跟着那条曲线走，不能当帧到位：上一版一进 carrying 就
+          // 把 x 挪到怀里、lift 直接给满，实拍量到他才蹲到一半（scoopChild
+          // t=0.48）她已经坐在 0.42m 的半空中了。
+          const scoop = state.player.track?.name === "scoopChild"
+            ? Math.max(0, Math.min(1, state.player.track.t / SCOOP_DUR)) : 1;
+          // 她离地是在 0.55/1.45 ≈ 0.38 那一格（腋下被扣住之后才起来）
+          const rise = Math.max(0, Math.min(1, (scoop - 0.30) / 0.55));
+          const ease = rise * rise * (3 - 2 * rise);
+          // 贴着他：身前 0.16m。老版 0.20m 在实拍里两人之间还留着一道缝——
+          // 抱孩子是**贴在胸口**，有缝就读成"她浮在他前面"。
+          // 从"站在 0.50m 外让他够"滑到"贴在胸口"，走的是**离地那条曲线**
+          // （不是另给一个时间常数）：她横着挪进来与竖着升起来是同一个动作
+          const hug = state.player.x + state.player.heading * 0.16;
+          const from = b.scoopFromX ?? hug;
+          sis.x = scoop >= 1 ? hug : hug + (from - hug) * (1 - ease);
           // **脸朝着他**（不是跟他同向）：她两条胳膊是搂着他脖子的，
           // 同向的话那两只手就搂在空气里
           sis.heading = -state.player.heading;
           // 跟着他换层、跟着他下梯子：lift 叠在他的 lift 上，所以他一级一级往下，
           // 她就在怀里一级一级跟着下去
           sis.level = state.player.level;
-          sis.lift = (state.player.lift || 0) + SEAT_LIFT;
-          // leanIn 是**站姿**（腿几乎直）：被抱着的孩子腿要折起来搭在他小臂上
+          sis.lift = (state.player.lift || 0) + SEAT_LIFT * ease;
+          // leanIn 是**站姿**（腿几乎直）：被抱着的孩子腿要折起来盘在他身上。
+          // 兜起来那一段走 scoopedUp 轨道，轨道到期才落到这个静止姿势上
           sis.pose = "heldChild";
           // 她画在他之后（贴在他胸前那一侧）——见 World 的 DRAW_NUDGE_HELD
           sis.heldByPlayer = true;
@@ -468,17 +511,29 @@ export function ChapterC1(K) {
         // **四动词的第一课**（2026-08-16）：抱起来＝按住 E ＋ ↑ 把人兜起来。
         // 这一下往后要用五次（抱坛子、抱她够石笔、摇水、掀草苫、缝第一针），
         // 玩家学的是"往上使劲"，不是"按一下就有"
-        // 使劲那 0.9 秒弯着腰（真正兜起来那一下是 effect 里的 scoopChild 轨道）
+        // 使劲那 0.9 秒**按进度蹲下去够她**（scoopReach：站着→屈膝→两手探到
+        // 她腋下扣住，走满那一格正好是 scoopChild 的第一帧）。原来这儿借的是
+        // `bow`＝弯腰拾东西：不吃进度、0.9 秒一格不动，而且两条胳膊平端着
+        // 直指身前——实拍就是"对着空气鞠了个躬"
         { type: "use", zone: { x: 30.9, w: 2.4 }, hold: 0.9, stroke: "up", gestureY: 0.62,
-          pose: "bow", prompt: "抱起妹妹",
+          pose: "scoopReach", prompt: "抱起妹妹",
           note: "妹妹两条胳膊立刻搂住他的脖子。",
           effect: (state) => {
             state.beat.carrying = true;
             const sis = FindActor(state, "sister");
-            if (sis) { sis.following = false; sis.pose = "leanIn"; }
             Cue(state, "clothLift", { gain: 0.5 });
             // 蹲下去→兜到腋下→起身：有过程的动作不许只摆一个造型
-            FlashTrack(state, "scoopChild", 1.1);
+            FlashTrack(state, "scoopChild", SCOOP_DUR);
+            // **成对轨道**：抱的人在动、被抱的人一动不动＝抱了个假人。
+            // 她这一边是"够他 → 被扣住腋下踮起来 → 离地（腿还垂着）→ 腿收上来
+            // 盘住、脸埋进肩窝"，与他的发力同拍（见 Rig 的 scoopedUp）
+            if (sis) {
+              sis.following = false;
+              sis.pose = "heldChild";
+              // 她这会儿站在哪儿——兜起来那一段横着滑进怀里的起点（见 tick）
+              state.beat.scoopFromX = sis.x;
+              FlashTrack(state, "scoopedUp", SCOOP_DUR, sis);
+            }
           } },
         // ② 抱到窖口：她一直在他怀里——**不放下、不换手、不挪位置**。
         // 老版这一步 `carrying=false` 之后顺手把她挪到 under/x=30.7，
@@ -1211,8 +1266,8 @@ export function ChapterC1(K) {
                   s.player.x = 34.05; s.player.heading = -1;
                   // 蹲下→兜住→站起来托住（老版当帧弹进 shelter，而 shelter 是
                   // 蹲着围住她的姿势，托不起一个悬在 0.52m 的孩子）
-                  FlashTrack(s, "scoopChild", 1.1);
-                  // 轨道跑完（1.1s）自动收回，落到这个姿势上继续托着
+                  FlashTrack(s, "scoopChild", SCOOP_DUR);
+                  // 轨道跑完自动收回，落到这个姿势上继续托着
                   s.player.pose = "liftChild";
                 } },
               { act: "石笔是一截磨秃了的滑石。爹划线用的——木匠家里，比锥子还常使的东西。他把它塞进她手里。", d: 4.4,
