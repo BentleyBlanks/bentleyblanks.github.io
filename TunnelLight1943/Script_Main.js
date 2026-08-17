@@ -505,7 +505,7 @@ const PLAY_HW = {
 // 比它还近的镜头一律原样过，别把脸和卡面挤出画框。
 const HW_TIGHTEN = 0.71;
 const HW_CLOSE = 3.8;
-const HW_WIDE_MAX = 8.5;   // 「退一档」的封顶（本作没有全景，见 CLAUDE.md 镜头规范）
+const HW_WIDE_MAX = 8.5;   // 「退一档」的封顶（本作没有全景，见 docs/Camera.md 镜头规范）
 function TightenHw(d) {
   return d <= HW_CLOSE ? d : Math.max(HW_CLOSE, d * HW_TIGHTEN);
 }

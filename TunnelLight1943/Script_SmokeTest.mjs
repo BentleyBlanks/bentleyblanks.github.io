@@ -410,7 +410,7 @@ function TestClimbPlanLocksToRungs() {
   const near = (list, y, tol) => list.some((v) => Math.abs(v - y) < tol);
   for (const bs of [0.60, 0.80, 0.93]) {
     for (const dir of [-1, 1]) {
-      for (const oneHand of [false, true]) {
+      for (const oneHand of (bs >= 0.75 ? [false, true] : [false])) {   // 抱着孩子爬的只有柱子
         const span = SURFACE_Y - UNDER_Y;
         let prev = null;
         const holdsSeen = { fF: new Set(), fB: new Set(), hB: new Set() };
@@ -427,7 +427,11 @@ function TestClimbPlanLocksToRungs() {
               holdsSeen["f" + name].add(f.hold);
             }
             const leg = Math.hypot(f.x - p.hip.x, f.y - ANKLE_UP * bs - p.hip.y);
-            assert.ok(leg <= 0.62 * bs + 0.02, `${tag}：胯到脚 ${name} ${leg.toFixed(3)} 超过腿长`);
+            // 小身量并档步里后脚在上一档时膝盖要顶到胯，规划宁可让下面那条腿差几厘米（见 KNEE_ROOM）
+            assert.ok(leg <= 0.62 * bs + (bs < 0.75 ? 0.07 : 0.02), `${tag}：胯到脚 ${name} ${leg.toFixed(3)} 超过腿长`);
+            // **抬着的脚不许顶到胯**（2026-08-18 用户："像青蛙一样 / 反关节的脚"）：脚一到胯的高度，
+            // 大腿就翻过水平线、膝盖翻到背后去
+            assert.ok(f.y - ANKLE_UP * bs <= p.hip.y - 0.10 * bs, `${tag}：脚 ${name} 抬到胯上头去了（脚 ${(f.y - ANKLE_UP * bs).toFixed(2)} 胯 ${p.hip.y.toFixed(2)}）`);
           }
           const shoulderY = p.hip.y + 0.447 * bs;
           for (const [name, h] of Object.entries(p.hands)) {

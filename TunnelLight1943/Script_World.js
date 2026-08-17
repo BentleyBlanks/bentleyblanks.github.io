@@ -464,6 +464,9 @@ export function CreateWorld(canvasEl) {
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
+  // 脚后跟扬起的土（见 UpdateOne 末尾 / EmitFootDust / StepFootDust）：一池贴图，
+  // 每个人每一步蹬离地那一格往身后掀一小团。池子里的网格标 persist，挺过环境重建
+  const footDust = { pool: [], tex: null, geo: null };
   // 一阵看得见的风：逐帧重画的尘土流线与草屑画布（state.wind 活着才画）
   let windMesh = null, windCanvas = null, windCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
@@ -563,6 +566,9 @@ export function CreateWorld(canvasEl) {
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
+    // 脚下的土是 persist 的，网格还在；换场景/跳幕时把还没散的几团直接掐掉，
+    // 免得旧场景的土浮在新场景里
+    for (const d of footDust.pool) { d.t = d.life; d.mesh.visible = false; }
     windMesh = null; windCanvas = null; windCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
     doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
@@ -1833,6 +1839,18 @@ export function CreateWorld(canvasEl) {
         ctx.globalAlpha = 1;
         ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
         ctx.restore();
+        // **下沿要化开，不许齐齐切断**（2026-08-18 用户报的那块"硬边淡板"）。
+        // 井壁只画到走廊洞顶为止、指望走廊自己的后壁接手，可两张贴图的调子
+        // 对不齐——于是井筒底下横着一条贯穿的直边，读出来是"贴图裁齐了"，
+        // 正是这一带最扎眼的那道硬边。让最后 0.5m 淡成透明，接缝自己没了
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        const fade = ctx.createLinearGradient(0, hp - Math.min(hp * 0.5, 0.5 * PPM), 0, hp);
+        fade.addColorStop(0, "rgba(0,0,0,0)");
+        fade.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, 0, wp, hp);
+        ctx.restore();
       });
       PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
       FixOrder(wall, SHAFT_WALL_ORDER);   // 位置在剖面这一刀上，前后关系另排
@@ -2349,6 +2367,109 @@ export function CreateWorld(canvasEl) {
   }
 
 
+  // ── 脚后跟扬起的土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里都有
+  //    对应的烟雾特效」，照《勇敢的心》：每一步蹬离地那一格，鞋底往身后掀一小团
+  //    干土，跟着人的方向往后飘、越散越淡）──
+  //
+  // 三条：
+  // ① **一步一团，钉在蹬离地那一格**——不是按时间匀速冒烟。步态里前腿在相位 π/2
+  //    摆到最后头（thighF 最大＝蹬离地），后腿在 3π/2；相位一跨过去就从那只脚的
+  //    位置（LimbTips，画出来的脚，不是 x±0.3 估的）掀一团。所有步态（走/跑/猫腰/
+  //    提桶/扛/抱孩子/推车）共用同一条 swing 约定，所以一个判据全管。
+  // ② **走是一小团、跑是两三团**：土的多少与飘的距离都跟 gait 走（跑起来鞋底刨得
+  //    深）；猫腰潜行只有半团（放轻脚步这件事要在地上读得出来）。
+  // ③ **画在人与影子之前、obstacle 带之后**（FixOrder = 携带物那一档 + 2）：土是悬在
+  //    地面上头的，得压过脚下的影子；人/影子在同一带内是按 nudge 一个整数一个整数
+  //    排死的，中间插不进去，所以排到演员簇的上沿——它只在鞋后跟那一小块出现、
+  //    一冒出来就往后飘，盖不住人；而塌墙那一档（obstacle 6259）仍在它之上，人跑到
+  //    墙后小腿被挡，脚下的土也一起被挡。地道里颜色压暗一档（夯土地，光又弱）。
+  //    位置 z 与那个人相同（同一条地平线，队列后排跟着退、也排在前排之后）。
+  const FOOT_DUST_MAX = 96;   // 一队兵跑起来一人十几团在天上，池子给足
+  function EnsureFootDust() {
+    if (footDust.tex) return;
+    footDust.tex = [0, 1, 2, 3].map((v) => {
+      const c = MakeCanvas(96, 96);
+      ART.DrawFootDust(c.getContext("2d"), 48, 50, "footDust" + v);
+      return CanvasTexture(c);
+    });
+    footDust.geo = new THREE.PlaneGeometry(1, 1);
+  }
+  function TakeFootDust() {
+    let slot = null;
+    for (const d of footDust.pool) if (d.t >= d.life) { slot = d; break; }
+    if (!slot) {
+      if (footDust.pool.length < FOOT_DUST_MAX) {
+        const mesh = new THREE.Mesh(footDust.geo,
+          new THREE.MeshBasicMaterial({ map: footDust.tex[0], transparent: true, depthWrite: false }));
+        mesh.userData.persist = true;   // 见 ClearGroup：池子跨场景复用
+        mesh.visible = false;
+        layers.play.add(mesh);
+        slot = { mesh, t: 0, life: 1, x: 0, y: 0, vx: 0, vy: 0, s0: 0.1, s1: 0.2, a0: 0.5 };
+        footDust.pool.push(slot);
+      } else {
+        // 池子满了就顶掉最老的那团（它本来也快散了）
+        slot = footDust.pool[0];
+        for (const d of footDust.pool) if (d.t / d.life > slot.t / slot.life) slot = d;
+      }
+    }
+    return slot;
+  }
+  function EmitFootDust(x, ground, z, order, heading, gait, soft, bs, under) {
+    EnsureFootDust();
+    const dir = heading >= 0 ? 1 : -1;
+    const n = soft ? 1 : 1 + (gait > 0.3 ? 1 : 0) + (gait > 0.75 ? 1 : 0);
+    for (let i = 0; i < n; i += 1) {
+      const d = TakeFootDust();
+      const r = Math.random;
+      d.t = 0;
+      d.life = (soft ? 0.40 : 0.58 + 0.24 * gait) * (0.85 + r() * 0.3);
+      // 起点：脚后跟往后一点、贴着地；后几团再靠后一些（是一趟掀出去的，不是一坨）
+      d.x = x - dir * (0.03 + i * 0.09 + r() * 0.05);
+      d.y = ground + 0.02 + r() * 0.03;
+      d.z = z;
+      // 往身后飘、微微上扬，飘不远（干土掀起来一尺就落）；跑起来掀得更远更高
+      d.vx = -dir * (0.28 + 0.6 * gait + r() * 0.2) * (soft ? 0.5 : 1);
+      d.vy = (0.10 + 0.18 * gait + r() * 0.08) * (soft ? 0.5 : 1);
+      // 大小按体型走（妹妹的脚小，掀的土也小）。走：一拳大→巴掌大；跑：再大一圈
+      const base = (soft ? 0.09 : 0.14 + 0.06 * gait) * bs * (0.85 + r() * 0.3);
+      d.s0 = base;
+      d.s1 = base * (2.6 + 0.9 * gait);
+      d.a0 = (soft ? 0.45 : 0.72 + 0.16 * gait) * (under ? 0.7 : 1) * (i ? 0.85 : 1);
+      d.flip = r() < 0.5 ? -1 : 1;
+      const m = d.mesh;
+      m.material.map = footDust.tex[Math.floor(r() * footDust.tex.length)];
+      // 地道里是夯土地、光又弱：土色压暗一档，别在黑地里冒白烟
+      if (under) m.material.color.setRGB(0.62, 0.58, 0.52); else m.material.color.setRGB(1, 1, 1);
+      FixOrder(m, order);
+      m.visible = true;
+      m.position.set(d.x, d.y, d.z);
+      m.scale.set(d.flip * d.s0, d.s0, 1);
+      m.material.opacity = d.a0;
+    }
+  }
+  function StepFootDust(dt) {
+    if (!(dt > 0)) return;
+    const step = Math.min(dt, 0.05);
+    for (const d of footDust.pool) {
+      if (d.t >= d.life) continue;
+      d.t += step;
+      const k = Math.min(1, d.t / d.life);
+      if (k >= 1) { d.mesh.visible = false; continue; }
+      // 速度很快就衰掉：土掀出去一下就悬住、慢慢散，不是一路飞
+      d.vx *= Math.max(0, 1 - 4.5 * step);
+      d.vy *= Math.max(0, 1 - 3.0 * step);
+      d.x += d.vx * step;
+      d.y += d.vy * step;
+      // 先胀后停：大小按 1−(1−k)² 走，透明度按 (1−k)^1.4 收
+      const g = 1 - (1 - k) * (1 - k);
+      const sz = d.s0 + (d.s1 - d.s0) * g;
+      // 团心随大小抬一点（贴图底边始终贴着地，土是从地上鼓起来的，不是浮在半空）
+      d.mesh.position.set(d.x, d.y + sz * 0.3, d.z);
+      d.mesh.scale.set(d.flip * sz, sz * 0.8, 1);
+      d.mesh.material.opacity = d.a0 * Math.pow(1 - k, 1.4);
+    }
+  }
+
   // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
@@ -2496,6 +2617,32 @@ export function CreateWorld(canvasEl) {
         s.castShadow.material.opacity = near * far * (lit.i ?? 1);
       } else {
         s.castShadow.visible = false;
+      }
+    }
+    // 脚后跟的土：只在真的在**用腿走**的时候（轨道/爬梯/挖土/一次性姿势/爬行/
+    // 离地/躺着都不算——推车例外，那一支腿照走）。跳幕/换层那种一帧挪出去几米的
+    // 不算步子（相位一下跳过大半圈，speed 也离谱），也不掀
+    {
+      const prevPh = s.dustPhase;
+      s.dustPhase = s.phase;
+      const walking = isMoving && !extra.climbing && !extra.track && !extra.digging
+        && (!extra.pose || extra.pose === "push") && extra.posture !== "crawl"
+        && !lie && lift < 0.06 && speed < 7 && s.mesh.visible !== false;
+      // moved < 1.5：一帧挪一米半以上只能是跳幕/换层，不是步子（掉帧时一帧跨过大半
+      // 个步态周期是正常的——无头实拍就常掉到几帧一秒——所以按位移判，不按相位差判）
+      if (walking && prevPh !== undefined && s.phase > prevPh && moved < 1.5) {
+        const TAU = Math.PI * 2;
+        const crossed = (a) => Math.floor((s.phase - a) / TAU) > Math.floor((prevPh - a) / TAU);
+        const front = crossed(Math.PI / 2), back = crossed(Math.PI * 1.5);
+        if (front || back) {
+          const tips = LimbTips(s.rig);
+          const soft = crouch || extra.posture === "stoop";
+          // 绘制序：压过这个人的身子/影子（6252+nudge），**但要在 obstacle 带（+0.95）
+          // 之下**——人跑到塌墙后头时小腿被墙挡住，脚下的土也得一起被挡
+          const order = DepthOrder("play", CARRY_Z + dz) + 2;
+          if (front) EmitFootDust(tips.footF.x, ground, PlaceZ(ACTOR_Z + dz), order, heading, gait, soft, bs, level === "under");
+          if (back) EmitFootDust(tips.footB.x, ground, PlaceZ(ACTOR_Z + dz), order, heading, gait, soft, bs, level === "under");
+        }
       }
     }
     return { x, y, isMoving };
@@ -2870,6 +3017,8 @@ export function CreateWorld(canvasEl) {
     for (const [id, m] of mountMeshes) {
       if (!seen.has(id)) { layers.play.remove(m); mountMeshes.delete(id); }
     }
+    // 这一帧所有人脚下掀起来的土往后飘、散掉（UpdateOne 里按步子发的）
+    StepFootDust(dt);
 
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
@@ -6194,8 +6343,20 @@ export function CreateWorld(canvasEl) {
       t: +f.trackT.toFixed(2), phase: +f.phase.toFixed(2), layer: f.layerKey,
     })),
     get __fluid() { return fluid; },
+    // 脚下还没散的土（调试/断言用）：位置、年龄、大小、透明度
+    __footDust: () => footDust.pool.filter((d) => d.t < d.life)
+      .map((d) => ({ x: +d.x.toFixed(2), y: +d.y.toFixed(2), k: +(d.t / d.life).toFixed(2), a: +d.mesh.material.opacity.toFixed(2), s: +d.mesh.scale.y.toFixed(3) })),
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
+    // 窖口那束"打进来的光"的全部可调量（uniform 对象本身，拿到就能改）。
+    // 打光是**看着调**的活：一次实拍 25 秒，改一个数重编译一次就别干活了。
+    // 配 shot --eval 用：`tl.world.__shaftLight().uWash.value.set(...)`。
+    // 顺带把掩码的画布交出来——"光上那条直边是不是掩码的方盒子"只能翻掩码
+    __shaftLight: () => (hatchBeamMesh ? {
+      ...hatchBeamMesh.userData.uniforms,
+      __mesh: hatchBeamMesh,
+      __occluder: occluder,
+    } : null),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
