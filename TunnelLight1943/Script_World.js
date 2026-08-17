@@ -452,6 +452,9 @@ export function CreateWorld(canvasEl) {
   const groundItemMeshes = new Map();
   let bubbleMeshes = [];
   const bubbleTex = new Map();
+  // 心情气泡（自家人的表情全在这儿，脸上一笔不画——见 Art.DrawMoodBubble）
+  const moodMeshes = new Map();
+  const moodTex = new Map();
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
@@ -3367,6 +3370,79 @@ export function CreateWorld(canvasEl) {
         m.material.opacity = 0.8 + Math.sin(time * 5.2) * 0.12;
         m.position.set(bx, (by ?? SURFACE_Y + 2.1) + Math.sin(time * 2.6) * 0.05, 0.62);
       });
+    }
+
+    // 心情气泡：自家人不画脸，表情全靠头顶这一枚（用户 2026-08-17：「妹妹在害怕
+    // 有很多种表达啊…就像勇敢的心的那种，像对话框一样的状态显示」）。
+    // **谁有心情谁挂**：`a.mood` 由剧本拨；没拨的从轨道推一个默认
+    //（tremble/pulledClose 一族＝怕），所以老剧本不改也有。
+    // 活卡与告示那两档模态盖着屏幕时收掉——那会儿玩家在看别的东西
+    {
+      const MoodOf = (a, isPlayer) => {
+        if (a.mood === null) return null;
+        if (a.mood) return a.mood;
+        // **玩家不吃推导出来的心情**：他搂着妹妹那一拍两个人都是 shelter，
+        // 两枚气泡叠在一处（实拍抓的）。这套是给"看着的那个人"用的——
+        // 玩家自己的情绪由他手上正在做的事说。真要给他挂，剧本里明写 mood
+        if (isPlayer) return null;
+        const tn = a.track?.name || "";
+        if (/tremble|pulledClose|heldChild/.test(tn)) return "afraid";
+        if (a.pose === "shelter" || a.pose === "leanIn") return "afraid";
+        return null;
+      };
+      const hideAll = !!(state.liveCardOn || state.noticeOpen || state.bagOpen);
+      const live = new Set();
+      const folks = [state.player, ...(state.actors || [])];
+      for (const a of folks) {
+        if (!a || a.visible === false || hideAll) continue;
+        const isPlayer = a === state.player;
+        const mood = MoodOf(a, isPlayer);
+        if (!mood) continue;
+        const key = a.id || "player";
+        live.add(key);
+        let m = moodMeshes.get(key);
+        if (!m) {
+          // **尺寸按人给，不按贴图给**：64/PPM ＝ 1.33m，在 2.4m 宽的过场画框里
+          // 是半幅画（第一版实拍就是这样）。一枚气泡该跟这个人的脑袋差不多大——
+          // 头径 2·headR·体型 ≈ 0.21m，气泡给两个头宽
+          m = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.44, 0.41),
+            new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
+          );
+          FixOrder(m, LAYER_ORDER.fx + 340);
+          layers.fx.add(m);
+          moodMeshes.set(key, m);
+        }
+        if (!moodTex.has(mood)) {
+          const c = MakeCanvas(64 * HINT_SS, 60 * HINT_SS);
+          const g = c.getContext("2d");
+          g.scale(HINT_SS, HINT_SS);
+          ART.DrawMoodBubble(g, 32, 56, mood, "mood" + mood);
+          moodTex.set(mood, CanvasTexture(c));
+        }
+        if (m.material.map !== moodTex.get(mood)) {
+          m.material.map = moodTex.get(mood);
+          m.material.needsUpdate = true;
+        }
+        // 挂在这个人的头顶上：身高按体型折算（妹妹比柱子矮一头多）
+        const scale = a.bodyScale ?? BODY_SCALE[a.kind] ?? BODY_SCALE[a.id] ?? 0.95;
+        const ground = (a.level === "under" ? UNDER_Y : SURFACE_Y) + (a.liftNow || 0);
+        m.visible = true;
+        m.material.opacity = 0.96;
+        m.scale.set(scale, scale, 1);
+        // **贴着这个人真的头顶**，不是贴着"站直了该有多高"：她这会儿蹲成一团，
+        // 按站姿算的话气泡飘在她头上一米、还被过场的黑边切掉一半（实拍抓的）。
+        // 骨架每帧都在，直接量（LimbTips 的 head 是世界坐标）
+        const sp = actorSprites.get(key);
+        const hd = sp?.rig ? LimbTips(sp.rig).head : null;
+        // 横向也认头的位置：她蹲着往前倾，头在 a.x 后头两三寸，按 a.x 摆尾巴
+        // 就指在她身子外头了
+        m.position.set((hd ? hd.x : a.x) + 0.10 * scale,
+          (hd ? hd.y : ground + 1.37 * scale) + 0.30 * scale + Math.sin(time * 2.2 + a.x) * 0.02, 0.7);
+      }
+      for (const [key, m] of moodMeshes) {
+        if (!live.has(key)) m.visible = false;
+      }
     }
 
     // 投掷弧线预览：点列由 Core 用**和真石子同一套**弹道物理跑出来，预览即所得。
