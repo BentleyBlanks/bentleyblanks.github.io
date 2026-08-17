@@ -88,7 +88,10 @@ for (const evt of ["pointerdown", "keydown", "touchstart"]) {
 
 const ui = {};
 for (const id of [
-  "titleScreen", "startButton", "titleJump", "chapterList",
+  "titleScreen", "titleMenu", "startButton", "startNote", "btnContinue", "continueWhere",
+  "btnControls", "btnTitleSettings",
+  "controlsScreen", "controlsClose", "btnHelp", "btnQuit",
+  "confirmOverlay", "confirmTitle", "confirmText", "confirmYes", "confirmNo",
   "objectiveText", "hintText", "prompt", "toast", "crouchTag", "itemTag", "itemName",
   "objectiveTab", "objectiveTabIcon", "objectiveTabText", "objectiveTabHint",
   "cineBars", "caption", "capSpeaker", "capText", "captionScrim",
@@ -111,19 +114,67 @@ const params = new URLSearchParams(location.search);
 const fastCinematic = params.get("fast") === "1";
 
 // ---------------------------------------------------------------------------
-// 进度
+// 进度与存档（2026-08-17 加，用户：「哪有一个线性游戏能跳关的 还没有存档？」）
+//
+// **一个自动存档位，按幕存**：每进一幕就把「哪一章 · 哪一幕」写下来，
+// 标题页上的「继续」照它落回去。恢复走 Core.DebugJump——它把前面每一幕按脚本
+// 结算一遍（人物入场、工事、分支都补上），所以存档不必记世界里的每一根骨头，
+// 剧本改了也不会成为废档。三条细则：
+// ① **认 id 不认序号**：往章里插一拍，老档的序号就指到别人家去了；id 是稳定的。
+// ② **旗标另存一份**：结算跑的是脚本的默认分支，而玩家自己做过的抉择在
+//    `state.flags` 里；跳完把存下来的**合并**回去（不整份替换——新版本加的键
+//    要保留默认值）。
+// ③ 关系到进度的另外两样各有各的存法，别在这儿重复：老物件在包袱那份
+//    （BAG_KEY），声音与三路音量在 SOUND_KEY / VOL_KEY。这里只管"打到哪儿了"。
+//
+// 老的 `TunnelLight1943.unlocked`（解锁到第几章）连同标题页上那排章节牌一起
+// 撤了——线性剧情不给跳关，选关退回调试面板（设置 → 调试）。
 // ---------------------------------------------------------------------------
-const STORE_KEY = "TunnelLight1943.unlocked";
-// 开放到第几章为止。已经打到第五章的老存档也照这个数收口——
-// 否则换成试玩版之后，那些人的标题页上还挂着能点进去的第二到第八章。
+const SAVE_KEY = "tunnelLight1943.save.v1";
+// 开放到第几章为止。Core 手里还是完整的八章，外壳在这儿收口。
 const LAST_OPEN = Math.min(CHAPTERS.length, PLAYABLE_CHAPTERS) - 1;
-function GetUnlocked() {
-  const v = parseInt(localStorage.getItem(STORE_KEY) || "0", 10);
-  return Number.isFinite(v) ? Math.max(0, Math.min(LAST_OPEN, v)) : 0;
+
+/** 读存档并**校准到当前剧本**（章号夹住、幕按 id 找回来）。没有就返回 null。 */
+function LoadSave() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch { return null; }
+  if (!raw || typeof raw !== "object") return null;
+  const chapter = Math.max(0, Math.min(LAST_OPEN, Number(raw.chapter) || 0));
+  const beats = ChapterBeatList(chapter);
+  if (!beats.length) return null;
+  let beat = beats.findIndex((b) => b.id === raw.beatId);
+  if (beat < 0) beat = Math.max(0, Math.min(beats.length - 1, Number(raw.beat) || 0));
+  return {
+    chapter, beat,
+    label: beats[beat].label || "",
+    flags: (raw.flags && typeof raw.flags === "object") ? raw.flags : null,
+    at: Number(raw.at) || 0,
+  };
 }
-function Unlock(index) {
-  const capped = Math.min(index, LAST_OPEN);
-  if (capped > GetUnlocked()) localStorage.setItem(STORE_KEY, String(capped));
+/** 把眼下这一幕存下来。每进一幕调一次（见 RunFrame 的 saveKey）。 */
+function WriteSave() {
+  if (!state) return;
+  const def = CurrentBeatDef(state);
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1, game: GAME_VERSION,
+      chapter: state.chapterIndex,
+      beat: state.beatIndex,
+      beatId: def?.id || null,
+      flags: state.flags,
+      at: Date.now(),
+    }));
+  } catch (ignored) { /* 隐私模式下写不进去：不存就是了，别把游戏搞崩 */ }
+}
+function ClearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (ignored) { /* 同上 */ }
+}
+// 存档那行小注：「第一章 · 第 7 幕 · 分了那半块」。幕名是从剧本现挖的
+// （目标或第一句台词），长了截断——菜单上一行字，不是剧情梗概。
+function SaveLine(save) {
+  const ch = CHAPTERS[save.chapter];
+  const label = save.label.length > 12 ? save.label.slice(0, 12) + "…" : save.label;
+  return `${ch.num} · 第 ${save.beat + 1} 幕${label ? " · " + label : ""}`;
 }
 // 打完最后一个开放章：Core 那边照常进 chapterEnd（它手里还是完整的八章），
 // 外壳在这儿把它接住——不给"下一章"的牌子，也不让 advance 传下去，
@@ -150,6 +201,10 @@ window.addEventListener("keydown", (e) => {
   if (e.repeat) return;
   inputMode = "key";
   const k = e.key.toLowerCase();
+  // 菜单开着的时候键盘归菜单（见 MenuKey）。**这一条必须在最前面**：底下那句
+  // 「空格/回车 → advance + preventDefault」会把回车的默认行为一起吃掉，而按钮
+  // 正是靠 keydown 上的默认行为激活的——不拦住，标题页上选中一条按回车没反应。
+  if (MenuKey(e, k)) return;
   keys.add(k);
   if (k === "e") { interactEdge = true; advanceEdge = true; }
   // F 曾经专职投掷。投掷改成了「攥住石子往后拽」，没有按键路径了——键留着推台词，
@@ -158,6 +213,8 @@ window.addEventListener("keydown", (e) => {
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
+  // Esc ＝ 暂停：呼出设置面板（世界当帧停住）。市面上的游戏都在这颗键上。
+  if (k === "escape") { OpenSettings(true); e.preventDefault(); return; }
   if (k === "1" || k === "2") {
     const def = state && CurrentBeatDef(state);
     if (def?.kind === "choice") { MakeChoice(state, def.options[k === "1" ? 0 : 1].key); HideChoice(); }
@@ -165,6 +222,43 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
+
+const DEBUG_KEYS = ["`", "f2", "～", "·"];
+// 菜单开着时键盘归菜单：Esc 收一层、↑↓ 在条目间挪、回车/空格按下去。
+// 返回 true ＝ 这一下归菜单，玩法那段键盘分支整段跳过。
+// **一层一层地收**（确认框 > 操作说明 > 设置 > 标题页）：Esc 收掉最上面那一张，
+// 不是一把全关——同一颗键收两层东西，玩家会以为自己按错了。
+function MenuKey(e, k) {
+  if (!ui.confirmOverlay.hidden) {
+    if (k === "escape") { CloseConfirm(); e.preventDefault(); }
+    return true;
+  }
+  if (!ui.controlsScreen.hidden) {
+    if (k === "escape") { OpenControls(false); e.preventDefault(); }
+    return true;
+  }
+  if (SettingsOpen()) {
+    if (k === "escape") { CloseSettings(); e.preventDefault(); return true; }
+    return false;   // 面板开着照旧能按 M 关声音、` 开调试
+  }
+  if (!ui.titleScreen.hidden) {
+    if (k === "arrowdown" || k === "arrowup") {
+      MoveTitleFocus(k === "arrowdown" ? 1 : -1);
+      e.preventDefault();
+      return true;
+    }
+    if (DEBUG_KEYS.includes(k)) return false;   // 标题页上也能开调试面板（选关就在那儿）
+    return true;    // 回车/空格交给按钮的默认行为，别被玩法那几行吃掉
+  }
+  return false;
+}
+function MoveTitleFocus(step) {
+  const items = [...ui.titleMenu.querySelectorAll("button")].filter((b) => !b.hidden);
+  if (!items.length) return;
+  const at = items.indexOf(document.activeElement);
+  const next = at < 0 ? (step > 0 ? 0 : items.length - 1) : (at + step + items.length) % items.length;
+  items[next].focus({ preventScroll: true });
+}
 // 沉浸式手势的唯一入口：手按在画面上的**位置**（世界坐标 / 特写卡坐标），
 // 加上竖向拖动量与点按。所有上手的玩法都从这几样里取——
 // 转辘轳/打结靠 world 绕圈、勒紧靠 dy；
@@ -1088,7 +1182,6 @@ function SyncHud(state, dt, shotFade) {
     ui.cardTitle.textContent = ch.title;
     ui.cardYear.textContent = ch.year;
     ui.cardContinue.textContent = "点击继续";
-    Unlock(state.chapterIndex + (showNext ? 1 : 0));
   } else ui.chapterCard.hidden = true;
 
   if (def?.kind === "choice") {
@@ -1151,25 +1244,111 @@ function SyncHud(state, dt, shotFade) {
 }
 
 // ---------------------------------------------------------------------------
-// 标题
+// 标题：一列条目（继续 / 新游戏 / 操作说明 / 设置）
+//
+// 「继续」有存档才出现——灰着的按钮是在说"这儿本该有东西"，可头一回进来的人
+// 没什么可继续的。主位（灯色那一块）跟着走：有档在「继续」上，没档在「新游戏」上，
+// 玩家一眼看得出该按哪一条。
 // ---------------------------------------------------------------------------
 function BuildTitle() {
-  const unlocked = GetUnlocked();
-  ui.chapterList.innerHTML = "";
-  CHAPTERS.forEach((ch, i) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    // 没做完的章跟"还没解锁的章"是两回事：后者写「？？？」是在说"接着打就有"，
-    // 挂在永远打不开的东西上就成了骗人。这些直接写明还没做。
-    const coming = i > LAST_OPEN;
-    btn.disabled = coming || i > unlocked;
-    btn.classList.toggle("coming", coming);
-    const label = coming ? "尚未开放" : (i <= unlocked ? ch.title : "？？？");
-    btn.innerHTML = `<small>${ch.num}</small><b>${label}</b>`;
-    if (!coming) btn.addEventListener("click", () => StartGame(i));
-    ui.chapterList.appendChild(btn);
-  });
+  const save = LoadSave();
+  ui.btnContinue.hidden = !save;
+  if (save) ui.continueWhere.textContent = SaveLine(save);
+  // 「新游戏」在有档时要把代价写在脸上（点下去会盖掉进度），不能等按了才说
+  ui.startNote.textContent = save ? "从头再来一遍" : "从序 · 那天开始";
+  ui.btnContinue.classList.toggle("primary", !!save);
+  ui.startButton.classList.toggle("primary", !save);
 }
+
+// 主位那条上给个焦点：键盘直接回车就走得了（手柄/键盘玩家的老习惯）
+function FocusTitleMenu() {
+  const first = [...ui.titleMenu.querySelectorAll("button")].find((b) => !b.hidden);
+  first?.focus({ preventScroll: true });
+}
+
+function ShowTitle() {
+  ui.titleScreen.hidden = false;
+  BuildTitle();
+  FocusTitleMenu();
+}
+
+// ── 三个入口 ────────────────────────────────────────────────────
+function ContinueGame() {
+  const save = LoadSave();
+  if (!save) { StartGame(0); return; }
+  StartGame(save.chapter);
+  JumpToBeat(save.chapter, save.beat);
+  // 存下来的旗标**合并**回去：结算只跑得出脚本的默认分支，玩家自己选过的那些
+  // （route/deduced/notesSeen…）在这儿才补得回来
+  if (save.flags) Object.assign(state.flags, save.flags);
+  fadeLevel = 1;          // 从黑里亮起来，别硬切
+}
+function NewGame() {
+  ClearSave();
+  StartGame(0);
+}
+// 新游戏是唯一会抹掉进度的按钮，所以有档时先问一句
+ui.startButton.addEventListener("click", () => {
+  const save = LoadSave();
+  if (!save) { NewGame(); return; }
+  AskConfirm({
+    title: "开始新游戏？",
+    text: `当前进度（${SaveLine(save)}）会被盖掉。`,
+    yes: "从头开始",
+    onYes: NewGame,
+  });
+});
+ui.btnContinue.addEventListener("click", ContinueGame);
+ui.btnControls.addEventListener("click", () => OpenControls(true));
+ui.btnTitleSettings.addEventListener("click", () => OpenSettings(true));
+
+// ── 操作说明 ────────────────────────────────────────────────────
+// 标题页与游戏里（设置面板）共用这一页：一处内容，两个入口。
+function OpenControls(open) {
+  ui.controlsScreen.hidden = !open;
+  if (open) {
+    CloseSettings();
+    ui.controlsClose.focus({ preventScroll: true });
+  } else if (!ui.titleScreen.hidden) FocusTitleMenu();
+}
+ui.controlsClose.addEventListener("click", () => OpenControls(false));
+ui.btnHelp?.addEventListener("click", () => OpenControls(true));
+// 点纸外面也收（同告示阅读层的老规矩）
+ui.controlsScreen.addEventListener("pointerdown", (e) => {
+  if (e.target === ui.controlsScreen) OpenControls(false);
+});
+
+// ── 确认框 ──────────────────────────────────────────────────────
+let confirmAction = null;
+function AskConfirm({ title, text, yes, onYes }) {
+  confirmAction = onYes;
+  ui.confirmTitle.textContent = title;
+  ui.confirmText.textContent = text;
+  ui.confirmYes.textContent = yes;
+  ui.confirmOverlay.hidden = false;
+  ui.confirmNo.focus({ preventScroll: true });   // 默认落在"取消"上：误触不该毁存档
+}
+function CloseConfirm() {
+  confirmAction = null;
+  ui.confirmOverlay.hidden = true;
+  if (!ui.titleScreen.hidden) FocusTitleMenu();
+}
+ui.confirmYes.addEventListener("click", () => { const f = confirmAction; CloseConfirm(); f?.(); });
+ui.confirmNo.addEventListener("click", CloseConfirm);
+
+// ── 回到标题 ────────────────────────────────────────────────────
+// 收工前把这一幕钉住（正常玩每进一幕都存过，这一下是给"玩到一半就走"兜底）
+function ReturnToTitle() {
+  WriteSave();
+  soundtrack.StopBgm();
+  audio.StopVoice();
+  CloseSettings();
+  ToggleDebug(false);
+  ui.endScreen.hidden = true;
+  state = null;
+  ShowTitle();
+}
+ui.btnQuit?.addEventListener("click", ReturnToTitle);
 
 // ---------------------------------------------------------------------------
 // 调试面板：跳到任意一章的任意一幕
@@ -1229,7 +1408,6 @@ function JumpToBeat(chapterIndex, beatIndex) {
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   HideChoice();
-  Unlock(chapterIndex);
   camSnap = true;
   framing = { key: "", prog: 0, baseHw: 7.2 };
   fadeLevel = 0;
@@ -1271,24 +1449,21 @@ function ToggleDebug(force) {
   }
 }
 
-// 入口在设置面板里，点开调试就把设置收起来——两张面板都压在右上角，别叠着
+// 选关的唯一入口（2026-08-17 起）：设置 → 调试。标题页上的「设置」也走这张面板，
+// 所以在标题页上一样点得进来——线性剧情不给玩家跳关，做的人照旧一步到位。
+// 点开调试就把设置收起来——两张面板都压在右上角，别叠着。
 ui.btnDebug?.addEventListener("click", () => {
-  if (ui.settingsPanel) {
-    ui.settingsPanel.hidden = true;
-    ui.btnSettings?.setAttribute("aria-expanded", "false");
-  }
+  CloseSettings();
   ToggleDebug(true);
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
-// 标题页上的第二条路：直接开跳幕面板选章节/选幕。**面板要压在标题页上头**
-// （z-index 见 Style_Game.css：debugPanel 61 > titleScreen），不然点开了看不见
-ui.titleJump?.addEventListener("click", () => ToggleDebug(true));
 
 function StartGame(chapterIndex) {
   state = CreateGame(chapterIndex);
   // 包袱跨章跨会话：把存过的收藏灌回来
   state.relicsGot = new Set(LoadBag());
   RebuildBagStrip();
+  lastSaveKey = "";        // 新一局：头一幕也要落盘（不清的话它跟上一局同号，白等一幕）
   ui.titleScreen.hidden = true;
   ui.endScreen.hidden = true;
   camSnap = true;
@@ -1349,18 +1524,26 @@ OnVolumeInput("sfx", ui.volSfx, ui.volSfxOut);
 OnVolumeInput("music", ui.volMusic, ui.volMusicOut);
 SyncVolumeUi();
 
+// 这张面板在游戏里**就是暂停菜单**：开着的时候世界停住（见 RunFrame 的
+// MenuFrozen），所以「操作说明」「回到标题」两条也住在这儿。不停的话，玩家
+// 在车铃那一拍点开设置就等于站在伪军跟前发呆——那一拍是全章唯一会失败的。
+// 标题页上点「设置」走同一张面板，只是要压过标题页（.overTitle）。
+function OpenSettings(open) {
+  if (!ui.settingsPanel) return;
+  ui.settingsPanel.hidden = !open;
+  ui.settingsPanel.classList.toggle("overTitle", open && !ui.titleScreen.hidden);
+  ui.btnSettings?.setAttribute("aria-expanded", open ? "true" : "false");
+  if (!open && !ui.titleScreen.hidden) FocusTitleMenu();
+}
+function CloseSettings() { OpenSettings(false); }
+function SettingsOpen() { return ui.settingsPanel && !ui.settingsPanel.hidden; }
 if (ui.btnSettings) {
-  ui.btnSettings.addEventListener("click", () => {
-    const open = ui.settingsPanel.hidden;
-    ui.settingsPanel.hidden = !open;
-    ui.btnSettings.setAttribute("aria-expanded", open ? "true" : "false");
-  });
+  ui.btnSettings.addEventListener("click", () => OpenSettings(!SettingsOpen()));
   // 点面板以外的地方就收起来
   document.addEventListener("pointerdown", (e) => {
-    if (ui.settingsPanel.hidden) return;
+    if (!SettingsOpen()) return;
     if (ui.settingsPanel.contains(e.target) || ui.btnSettings.contains(e.target)) return;
-    ui.settingsPanel.hidden = true;
-    ui.btnSettings.setAttribute("aria-expanded", "false");
+    CloseSettings();
   });
 }
 
@@ -1463,7 +1646,8 @@ document.addEventListener("pointerdown", (e) => {
 });
 window.addEventListener("keydown", (e) => {
   if (e.key === "b" || e.key === "B") {
-    if (state && state.phase === "playing") OpenBag(!state.bagOpen);
+    // 菜单开着时不叠第二张面板（设置面板已经把世界停住了）
+    if (state && state.phase === "playing" && !MenuFrozen()) OpenBag(!state.bagOpen);
   }
 });
 
@@ -1472,7 +1656,6 @@ ui.btnSkipCine?.addEventListener("click", () => {
   if (state && SkipPrologue(state)) audio.StopVoice();
 });
 
-ui.startButton.addEventListener("click", () => StartGame(0));
 
 // ---------------------------------------------------------------------------
 // 征夫告示阅读层：一张程序化画出来的纸（画笔在 Art.DrawNoticeSheet）
@@ -1522,19 +1705,20 @@ document.fonts?.ready?.then(() => { noticePainted = ""; if (state?.noticeOpen) P
 window.addEventListener("resize", () => { if (state?.noticeOpen) PaintNoticeSheet(); });
 ui.noticeClose?.addEventListener("click", () => { if (state) state.noticeOpen = false; });
 
-ui.endRestart.addEventListener("click", () => {
-  soundtrack.StopBgm();
-  ui.endScreen.hidden = true;
-  ui.titleScreen.hidden = false;
-  state = null;
-  BuildTitle();
-});
+ui.endRestart.addEventListener("click", ReturnToTitle);
 
 // ---------------------------------------------------------------------------
 // 主循环
 // ---------------------------------------------------------------------------
 let state = null;
 let lastT = performance.now();
+// 上一次存下来的是哪一幕（换幕才写盘，见 RunFrame）
+let lastSaveKey = "";
+// 暂停：菜单类面板开着的时候世界停住。**包袱与告示不在此列**——那两样是
+// Core 自己的闸（state.bagOpen / noticeOpen），它们还要靠 StepGame 收 E 键关掉。
+function MenuFrozen() {
+  return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden;
+}
 
 function Frame(now) {
   requestAnimationFrame(Frame);
@@ -1547,6 +1731,9 @@ function Frame(now) {
 // 驱动它——浏览器面板不显示时 rAF 整个停摆，只调 StepGame 是看不到镜头
 // 和 HUD 的（它们只在这里更新），验证会变成自欺欺人。
 function RunFrame(now, dt) {
+  // 暂停得让人看得出来：压暗画布（CSS 的 body.paused）。不压的话画面照旧鲜亮，
+  // 读起来是"游戏还在跑，只是弹了个面板"。每帧同步，省得漏掉某个开合的路口。
+  document.body.classList.toggle("paused", !!state && MenuFrozen());
   if (state) {
     const move = state.phase === "playing" ? ReadInput() : { moveX: 0, climb: 0 };
     const def = CurrentBeatDef(state);
@@ -1565,7 +1752,8 @@ function RunFrame(now, dt) {
     // 截图要的是"某一拍第几秒"那一格，可镜头缓动、立面淡出、光照换挡都得真的
     // 渲染几帧才追得上——不冻帧的话，等渲染追上的那半秒里游戏又往前走了，
     // 截出来的根本不是那一格（妹妹睡姿那次为此白跑了十几轮）。
-    if (!frozen) StepGame(state, {
+    // 暂停（设置/操作说明/确认框开着）走的是同一条路：世界停住、画面照渲。
+    if (!frozen && !MenuFrozen()) StepGame(state, {
       moveX: move.moveX, climb: move.climb,
       crouch: crouchToggle,
       interact: interactEdge,
@@ -1587,6 +1775,14 @@ function RunFrame(now, dt) {
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
       framing = { key: "", prog: 0, baseHw: 7.2 };
+    }
+    // 自动存档：**换幕就存**。幕是这作品天然的检查点（每一幕自带一条目标，
+    // 前序又能按脚本结算回来），所以存档不必自己再造一套检查点。
+    // 调试跳幕落地的那一幕也照存——跳过去以后玩的就是那儿，两套规矩反而费解。
+    const saveKey = `${state.chapterIndex}/${state.beatIndex}`;
+    if (saveKey !== lastSaveKey) {
+      lastSaveKey = saveKey;
+      WriteSave();
     }
 
     world.BuildEnvironment(state);
@@ -1641,7 +1837,7 @@ if (window.visualViewport) {
 }
 SetupTouch();
 Resize();
-BuildTitle();
+ShowTitle();
 
 const chapterParam = parseInt(params.get("chapter") || "0", 10);
 const beatParam = parseInt(params.get("beat") || "0", 10);

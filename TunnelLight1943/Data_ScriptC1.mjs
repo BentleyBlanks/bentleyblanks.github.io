@@ -202,7 +202,7 @@ export function ChapterC1(K) {
             const sis = FindActor(state, "sister");
             // 0.62m：0.52 那一版她整颗头缩在他那条搂过来的胳膊背后，画面上
             // 只剩一截粉衣裳（同「两个人要看得见是两个人」量出来的那条线）
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.68; sis.heading = -1; sis.pose = null; sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.45; }
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.68; sis.heading = -1; sis.pose = null; sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.45; sis.mood = "afraid"; }
             state.player.x = 30.90;
             state.player.heading = 1;
             state.player.pose = "shelter";      // 哥哥搂着她——分镜图上这一下是有的
@@ -1113,7 +1113,7 @@ export function ChapterC1(K) {
       objective: "分红薯干", hint: "泡软了。掰开，分进两只碗",
       onStart: (state) => {
         const sis = FindActor(state, "sister");
-        if (sis) { sis.visible = true; sis.level = "surface"; sis.following = false; sis.cineTarget = null; sis.pose = "sleep"; sis.x = 31.15; sis.heading = -1; }
+        if (sis) { sis.visible = true; sis.level = "surface"; sis.following = false; sis.cineTarget = null; sis.pose = "sleep"; sis.x = 31.15; sis.heading = -1; sis.mood = "sleepy"; }
         state.player.level = "surface";
       },
       steps: [
