@@ -27,6 +27,19 @@ export const BODY_SCALE = {
   family: 0.90, villager: 0.95, player: 0.93, sister: 0.66,
 };
 
+// **头相对身子的倍数**（2026-08-17 用户：「主角柱子的设计完全不像一个小男孩
+// 看着倒像是一个成年男人」）。病根是 BODY_SCALE 这一张表**只会等比缩放**：柱子在
+// 第一章按 0.80 缩，身高 1.10m 是对的，可**比例还是成年人的**——量出来头顶到脚
+// 是头高的 7.8 倍，正是成年男子的数（小孩该在 6 倍上下，越小越少）。
+// 等比缩小的大人还是大人，只是小一号。
+//
+// **只放大 head 那个 group**，别的一个数不改：关节位置、骨长、够不着够得着、
+// 落地贴合、爬梯落点表全在 BODY_SCALE 与 BONE 上，动它们要重调几十个手调过的
+// 姿势（蹲/跪/爬的 hipY 是按 `0.31cos+0.31cos−0.62` 那条恒等式配的）。
+// 头是躯干的子节点、又是这条链的末端，放大它谁都不受影响；`LimbTips` 走
+// matrixWorld，报的头顶高度自己就跟上了。
+export const HEAD_K = { player: 1.34, sister: 1.52 };
+
 // 骨长（米），按 1.72m 身高排布
 export const BONE = {
   hipY: 0.62,
@@ -102,6 +115,9 @@ function BuildParts(kind, haze = null) {
   // 这一套零件统一带上该层的雾量
   const Bake = (wM, hM, pu, pv, fn) => BakePart(wM, hM, pu, pv, fn, haze);
   const LONG_COAT = kind === "family" || kind === "sister";   // 大襟褂过胯
+  // 孩子的身子是竹竿：胳膊腿细、肩窄、没有成年人的胸廓（同 HEAD_K 那一轮）。
+  // **只改画出来的粗细，骨长一个字不动**——长度决定关节位置、够不着够得着与落地。
+  const LK = kind === "sister" ? 0.80 : kind === "player" ? 0.88 : 1;
   const parts = {
     // 军官胯后那把刀鞘斜指后下方，画到 −0.92 个躯干宽——比画布左沿还出去 0.42 个
     // 宽度，**在游戏里就被裁掉了**：刀尖成了一条齐刷刷切在大襟外的短杠（2026-08-17
@@ -115,7 +131,7 @@ function BuildParts(kind, haze = null) {
         sabre ? 0.94 / 1.44 : 0.5,
         // 枢轴（胯）在画布下沿往上留出下摆的位置
         LONG_COAT ? 0.72 : 0.88,
-        (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * P, BONE.torso * P, kind, kind + "torso", INK_K));
+        (ctx, px, py) => ART.DrawTorsoPart(ctx, px, py, BONE.torsoW * LK * P, BONE.torso * P, kind, kind + "torso", INK_K));
     },
     // 戴帽垂的（日军）得给脑后那片布留出画布：它垂过后颈，比头本身低一截。
     // 枢轴（脖根）在画布里的高度不变，只在下面多加一段——不然布会被裁平
@@ -128,40 +144,40 @@ function BuildParts(kind, haze = null) {
         (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K));
     },
     upperArmB: () => Bake(0.115, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coatDark, kind + "uab", { k: INK_K })),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * LK * P, 0.092 * LK * P, coatDark, kind + "uab", { k: INK_K })),
     foreArmB: () => Bake(0.15, BONE.foreArm + 0.14, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coatDark, kind + "fab", { k: INK_K });
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * LK * P, 0.074 * LK * P, coatDark, kind + "fab", { k: INK_K });
         // 手：远侧那只压一档色。老版两只手都是 ctx.arc 的圆片——袖口上顶着
         // 两粒肉色扣子（2026-08-17 用户："关节都做的方块太丑了"）
-        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.042 * P, ART.PAL.skinDark,
+        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.042 * LK * P, ART.PAL.skinDark,
           kind + "hb", { k: INK_K, lw: 2.4 });
       }),
     upperArmF: () => Bake(0.115, BONE.upperArm, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coat, kind + "uaf", { k: INK_K })),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * LK * P, 0.092 * LK * P, coat, kind + "uaf", { k: INK_K })),
     foreArmF: () => Bake(0.15, BONE.foreArm + 0.14, 0.5, 0,
       (ctx, px, py) => {
-        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coat, kind + "faf", { k: INK_K });
-        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.044 * P, ART.PAL.skin,
+        ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * LK * P, 0.074 * LK * P, coat, kind + "faf", { k: INK_K });
+        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.044 * LK * P, ART.PAL.skin,
           kind + "hf", { k: INK_K, lw: 3 });
       }),
     thighB: () => Bake(0.145, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * LK * P, 0.112 * LK * P, coatDark, kind + "thb", { k: INK_K })),
     // 小腿与脚按兵种取（绑腿 / 马靴 / 白裹腿 + 黑布鞋 / 土布裤脚）：原来这四个颜色是
     // 全场写死的农民褐，日军穿着一双农民的腿——「看不出是日军」有一半在这儿
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
+      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * LK * P, 0.086 * LK * P,
         kind, kind + "shb", { k: INK_K, back: true })),
     footB: () => Bake(BONE.foot + 0.12, 0.15, 0.22, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * LK * P, BONE.sole * P,
         ART.RIG_LEG(kind).footB, kind + "ftb", INK_K)),
     thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
-      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coat, kind + "thf", { k: INK_K })),
+      (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * LK * P, 0.112 * LK * P, coat, kind + "thf", { k: INK_K })),
     shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
-      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
+      (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * LK * P, 0.086 * LK * P,
         kind, kind + "shf", { k: INK_K })),
     footF: () => Bake(BONE.foot + 0.12, 0.15, 0.22, 0,
-      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
+      (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * LK * P, BONE.sole * P,
         ART.RIG_LEG(kind).footF, kind + "ftf", INK_K)),
   };
   const built = {};
@@ -212,6 +228,8 @@ export function CreateRig(kind, haze = null) {
   torso.add(mk("torso", 5));
   const head = new THREE.Group();
   head.position.y = BONE.torso;
+  const hk = HEAD_K[kind] || 1;      // 小孩的头大（见 HEAD_K）；枢轴在脖根，所以往上长
+  if (hk !== 1) head.scale.set(hk, hk, 1);
   head.add(mk("head", 6));
   torso.add(head);
 

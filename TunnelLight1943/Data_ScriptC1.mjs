@@ -128,6 +128,32 @@ export function ChapterC1(K) {
     // 前景压左缘，**不许压画框下沿**——她整条胳膊就躺在下沿那一带
     fg: [{ art: "doorJamb", u: -0.88, v: 0, z: 0.80, w: 0.20, h: 0.42, dim: 2.02 }],
   };
+  // ── 「三天后」翻过去之后，**世界**该是什么样（2026-08-17）────────────────
+  // 娘已经不在了、翻板重新敞着、板缝那几条光收起来、天亮回来、两个孩子回到地面。
+  //
+  // **这几样是状态，不是画面**，所以必须有一条跳幕也走得到的路。老版整段只写在
+  // c1_open 那条微过场的行内 `on()` 里，而**跳幕结算一行微过场都不播**（旗标要
+  // 落在 effect / settle 里，on() 只管画面——CLAUDE.md 那条老规矩）。后果是：
+  // 从序章任意一幕往后跳，**娘就一直跪在窖口守着翻板**（c1_thatday 最后一句把她
+  // 摆在 29.95 起 hatchGuard，而收她的三处——c1_hide 的 tick、c1_open 的微过场、
+  // c1_forage 的 onStart——跳幕一处都跑不到），一路守到 §8 兄妹俩做饭；
+  // 同一笔账里 `lidShut` 也赖着不走，屋里那块盖板一直合着往窖里打光。
+  // 2026-08-17 用户报的就是这个（「为什么最后的兄妹两个做饭会有娘的戏份」）。
+  //
+  // 走位（谁站在哪儿、镜头、字卡）**不写在这里**：跳幕的落点归 SettleDest，
+  // 微过场那一头照旧自己摆。这里只留"翻过这一页之后，世界跟原来不一样了"的那几笔。
+  const DayThreeWorld = (state) => {
+    state.flags.lidShut = false;      // 翻板重新敞着
+    state.beamSlant = 0;              // 板缝那几条光收起来
+    state.lightOverride = "dawn";     // 天亮回来
+    // 娘没有回来。窖口那尊 hatchGuard 从这一刻起不该再出现在任何一幕里
+    const m = FindActor(state, "mother");
+    if (m) { m.visible = false; m.cineTarget = null; m.track = null; m.pose = null; }
+    // 两个孩子回到地面（妹妹的落点与姿势由演出那一头给）
+    const sis = FindActor(state, "sister");
+    if (sis) { sis.visible = true; sis.level = "surface"; sis.cineTarget = null; }
+    state.player.level = "surface";
+  };
   return [
     {
       // ── 序 · 那天（第八稿独立成场；镜头调度沿用 2026-08-13 那版重做） ──
@@ -428,8 +454,8 @@ export function ChapterC1(K) {
       // 到了窖底她只探进半张脸：「搂紧她。」「不叫你们，别上来。」翻板合上——
       // 最后消失在板缝里的，是她那截蓝底白花的袖子。
       kind: "chain", id: "c1_descend", timeOfDay: "day", indoorScene: true, bgm: null,
-      // 序这三拍是一段连着的戏，分级也不许中途换脸（玩法段默认不分级）
-      grade: 0.82,
+      // （原来这儿有个 grade: 0.82：序这三拍夹在过场中间，得自己补一档分级才不会
+      //   中途换脸。2026-08-17 分级改成全局常开之后，节拍级的分级整个没了意义。）
       objective: "带妹妹下窖", hint: "娘掀着翻板等着你们",
       onStart: (state) => {
         state.player.cineWalk = null;
@@ -680,7 +706,7 @@ export function ChapterC1(K) {
       // 粮袋割破；靴子踩上翻板，灰从板缝落下来；屋外一声喊，靴子离开。
       // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
       // 「打进来的光」要有黑给它打进来才成立。
-      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null, grade: 0.82,
+      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null,
       zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 15, sustain: true,
       // 按住的十五秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
       // holdPose 留着当兜底口径
@@ -791,6 +817,10 @@ export function ChapterC1(K) {
       // 倒水进缸），先在安全的地方学会，再在要命的地方用。
       kind: "chain", id: "c1_open", timeOfDay: "dark",
       objective: "给妹妹盖上", hint: "她一只脚露在外面",
+      // **这一拍是全章唯一一处"时间翻页"，而它整个长在微过场里**——跳幕直落
+      // 后面的任何一幕都不会播它，所以那几笔状态得在这儿再交一次
+      // （同一个函数，不抄第二份；说明见文件顶上的 DayThreeWorld）
+      settle: DayThreeWorld,
       onStart: (state) => StartMicroCine(state, [
         // 序的收尾：柱子仍然搂着妹妹。板缝里的光从直的变成斜的（beamSlant
         // 已由 c1_hide 落下），又一点点暗下去
@@ -831,15 +861,12 @@ export function ChapterC1(K) {
         { act: "", d: 2.2, cam: { kind: "dark" },
           on: (state) => {
             state.titleCard = { num: "", title: "三天后", t: 0, dur: 2.0 };
-            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来
-            state.flags.lidShut = false;
-            state.beamSlant = 0;
-            state.lightOverride = "dawn";
-            const m = FindActor(state, "mother");
-            if (m) { m.visible = false; m.cineTarget = null; }
+            // 时间翻页：兄妹回到地面，翻板重新敞着，光条收起，天亮回来。
+            // **状态那几笔走 DayThreeWorld**（这一拍的 `settle` 调的是同一个函数，
+            // 跳幕直落后面才不会把娘落在窖口）；这儿只补演出要的走位
+            DayThreeWorld(state);
             const sis = FindActor(state, "sister");
-            if (sis) { sis.level = "surface"; sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
-            state.player.level = "surface";
+            if (sis) { sis.x = 30.75; sis.heading = -1; sis.pose = "sleep"; }
             state.player.x = 33.2;
           } },
         // 黑屏一声肚子叫——不是大人的，是小孩那种咕噜噜的空响

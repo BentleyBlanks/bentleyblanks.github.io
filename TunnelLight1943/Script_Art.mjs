@@ -723,6 +723,17 @@ export function DrawCharacter(ctx, spec) {
 
   // 头 + 脖子
   InkLine(ctx, 0, shoulderY + 1 * S, 0, headY + 3 * S, id + "neck", { lw: lw * 2.4, color: PAL.skinDark, amp: 0.2 });
+  // **孩子的头相对身子要大**（2026-08-17，跟骨架那边的 HEAD_K 是同一件事）。
+  // 这支笔是给 HUD 牌面与背景乡亲用的平贴图，跟骨架**不是同一支**——牌上是个
+  // 成年人、路上是个孩子，玩家会以为是两个人（同「牌上是甲、路上是乙」那条）。
+  // 连头饰一起套在这个变换里，不然帽子/头发会跟脸错开。
+  const chHK = kind === "sister" ? 1.46 : kind === "player" ? 1.30 : 1;
+  ctx.save();
+  if (chHK !== 1) {
+    ctx.translate(0, headY);
+    ctx.scale(chHK, chHK);
+    ctx.translate(0, -headY);
+  }
   InkFill(ctx, [
     [-5.6 * S, headY - 1 * S], [-2 * S, headY - 6.4 * S], [3.4 * S, headY - 6.6 * S],
     [6.2 * S, headY - 2.6 * S], [5.8 * S, headY + 3.4 * S], [-4.6 * S, headY + 3.6 * S],
@@ -809,9 +820,15 @@ export function DrawCharacter(ctx, spec) {
       [-5.6 * S, headY - 5.2 * S], [1.2 * S, headY - 8.2 * S], [6.6 * S, headY - 4.4 * S], [-5.2 * S, headY - 2.8 * S],
     ], id + "hair", "#33251b", { amp: 0.6 * S, lw: lw * 0.85 });
   }
+  ctx.restore();                       // 收掉孩子那一档的头部放大
 
   ctx.restore();
-  return { handX: x + hand.handX * facing, handY: y - bob + hand.handY, headTop: y - bodyH * 0.98 };
+  // 头顶要跟着放大后的头走（HUD 牌面按它裁圆、演员头顶的标按它摆）
+  return {
+    handX: x + hand.handX * facing,
+    handY: y - bob + hand.handY,
+    headTop: y - bodyH * 0.98 - (chHK - 1) * 6.6 * S,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1194,18 +1211,39 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   const woman = kind === "family";
   const hard = kind === "soldier" || kind === "officer";
   // 比例（单位 r）：brow＝眉弓那条前缘、nose＝鼻尖、chin＝颏、jaw＝下颌角
+  // 孩子那两档一并改宽窄（2026-08-17 同一轮）：光把脸压短会得到一张**又短又宽的
+  // 板子**——下颌还是成人的宽度。小孩是**颅大而圆、下半张脸又窄又收**：
+  // 颅顶更高、后脑更鼓（back 更负）、脸的前缘往里收（brow/nose 更小）、
+  // 颏窄而回收（chin 小）、下颌角几乎没有肉（jaw 更小）
   const F = child
-    ? { crown: -2.00, back: -0.94, brow: 0.72, nose: 0.88, noseY: -0.80, chin: 0.70, jaw: -0.56, eyeK: 1.16 }
+    ? { crown: -2.10, back: -1.06, brow: 0.64, nose: 0.78, noseY: -0.80, chin: 0.56, jaw: -0.44, eyeK: 1.16 }
     : young
-      ? { crown: -1.96, back: -0.96, brow: 0.76, nose: 0.94, noseY: -0.82, chin: 0.76, jaw: -0.60, eyeK: 1.06 }
+      ? { crown: -2.03, back: -1.02, brow: 0.70, nose: 0.85, noseY: -0.82, chin: 0.65, jaw: -0.51, eyeK: 1.06 }
       : woman
         ? { crown: -1.96, back: -0.96, brow: 0.78, nose: 0.96, noseY: -0.82, chin: 0.78, jaw: -0.60, eyeK: 1.02 }
         : { crown: -1.94, back: -0.94, brow: 0.80, nose: 1.00, noseY: -0.84, chin: 0.82, jaw: hard ? -0.68 : -0.62, eyeK: 1 };
-  const P = (x, y) => [px + r * x, py + r * y];
+  // **小孩不是缩小的大人：颅大、脸短。**（2026-08-17 用户：「主角柱子的设计完全不像
+  // 一个小男孩 看着倒像是一个成年男人」）
+  // 老版九种角色的**脸长一模一样**——颏的 y 写死在 −0.34，比例表里那个 `chin` 是
+  // 颏的**横**坐标，管的是下巴往前收多少，跟年纪没关系。于是柱子和他爹只差
+  // crown −1.96 / −1.94（3%）与鼻尖 0.94 / 1.00，再把体型整体缩到 0.80——
+  // **等比缩小的大人还是大人**，实测头高只占身高的 1/7.8（成年人正是这个数）。
+  //
+  // 真正的差别在**眉弓以下那一段**：婴儿的眼线在头高六成处、成人在五成处，也就是
+  // 说小孩的脸（眉弓到颏）短得多，颅骨那一半几乎不变。所以这一版**只压眉弓以下**：
+  // 颅顶、后脑、额头一个点没动，眼线以下整段乘 FK。五官、耳朵、下颌的暗、头发的
+  // 下缘全都跟着走（都过 CY），不用逐点去挪。
+  const FK = child ? 0.66 : young ? 0.76 : 1;   // 成人 1＝恒等，老图一个像素不变
+  const BROW_Y = -1.26;
+  const CY = (y) => (y > BROW_Y ? BROW_Y + (y - BROW_Y) * FK : y);
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
+  const PY = (y) => py + r * CY(y);             // 直接用 ctx 画的那几笔走这个
   const skin = hard ? "#d0a074" : PAL.skin;
 
-  // 脖子：斜的（胸锁乳突肌从耳后斜到锁骨）。竖直两条边是根柱子
-  InkFill(ctx, [P(-0.34, 0.16), P(-0.26, -0.46), P(0.32, -0.50), P(0.46, 0.16)],
+  // 脖子：斜的（胸锁乳突肌从耳后斜到锁骨）。竖直两条边是根柱子。
+  // 小孩的脖子又短又细——短由 CY 管，细在这儿（成人 NK=1，老图不变）
+  const NK = child ? 0.80 : young ? 0.88 : 1;
+  InkFill(ctx, [P(-0.34 * NK, 0.16), P(-0.26 * NK, -0.46), P(0.32 * NK, -0.50), P(0.46 * NK, 0.16)],
     id + "neck", PAL.skinDark, { amp: 0.6 * k, lw: 0, line: null });
 
   // ① 脸：一条软线，鼻子就在线上。**点少、间距匀、嘴那一段一笔不留**——
@@ -1246,10 +1284,10 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.globalAlpha = hard ? 0.24 : 0.18;
   ctx.fillStyle = hard ? "#6d4526" : "#8a5a34";
   ctx.beginPath();
-  ctx.moveTo(px + r * (F.chin - 0.06), py - r * 0.24);
-  ctx.quadraticCurveTo(px + r * 0.26, py + r * 0.04, px - r * 0.40, py - r * 0.10);
-  ctx.lineTo(px - r * 0.36, py + r * 0.24);
-  ctx.lineTo(px + r * (F.chin - 0.02), py + r * 0.24);
+  ctx.moveTo(px + r * (F.chin - 0.06), PY(-0.24));
+  ctx.quadraticCurveTo(px + r * 0.26, PY(0.04), px - r * 0.40, PY(-0.10));
+  ctx.lineTo(px - r * 0.36, PY(0.24));
+  ctx.lineTo(px + r * (F.chin - 0.02), PY(0.24));
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -1267,7 +1305,7 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.lineJoin = "round";
   // 嘴：一小截唇缝。自家人略弯，日军一条平直线（面无表情）
   const mw = r * (child ? 0.11 : 0.13);
-  const mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
+  const mcx = px + r * (F.brow - 0.17), my = PY(-0.40);
   ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(108,56,46,0.7)";
   ctx.lineWidth = (hard ? 1.3 : 1.1) * k;
   ctx.beginPath();
@@ -1278,14 +1316,14 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   // 一粒鼻孔，点到为止
   ctx.fillStyle = "rgba(96,58,34,0.42)";
   ctx.beginPath();
-  ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
+  ctx.ellipse(px + r * (F.brow - 0.04), PY(F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
   // 耳：颧弓后头、眼线到鼻底那一段（规范位置 0.50H~0.72H）。一小片软肉＋
   // 耳轮后上那半道折。**不许描一整圈**——两条同心的边就是一枚靶心
   ctx.save();
-  const eax = px - r * 0.40, eay = py - r * 0.80;
+  const eax = px - r * 0.40, eay = PY(-0.80);
   ctx.beginPath();
   ctx.moveTo(eax + r * 0.10, eay - r * 0.20);
   ctx.quadraticCurveTo(eax - r * 0.13, eay - r * 0.24, eax - r * 0.12, eay + r * 0.02);
@@ -1466,10 +1504,10 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     // **大人包头巾**（2026-08-17 用户："村里人和主角团 部分可以包头巾来遮住眼睛"）。
     // 1943 年冀中的庄稼人男的裹条羊肚手巾、女的包块头巾，本来就是常态；
     // 顺手把"遮眼"这件事分成两路——孩子留刘海、大人包头巾，一屋子人不再一个样
-    HeadScarf(ctx, px, py, r, kind, id, k, lw, F);
+    HeadScarf(ctx, px, py, r, kind, id, k, lw, F, CY);
   } else {
     // 孩子（柱子/妹妹）：头发贴着颅骨长、刘海压到眼线上，见 HeadHair
-    HeadHair(ctx, px, py, r, kind, id, k, lw, F);
+    HeadHair(ctx, px, py, r, kind, id, k, lw, F, CY);
   }
 }
 
@@ -1490,12 +1528,12 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
  * 下沿仍旧压在眉弓上——眼睛在它底下的阴影里（同刘海那一路）。
  * 男的裹本白的羊肚手巾，女的（娘）包一块靛蓝的、盘得低而紧，纂从巾底下露出来。
  */
-function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
+function HeadScarf(ctx, px, py, r, kind, id, k, lw, F, CY = (y) => y) {
   const woman = kind === "family";
   const cloth = woman ? "#59637a" : "#ddd6c1";
   const clothDim = woman ? "#414a5e" : "#bfb69f";
   const seam = woman ? "rgba(20,26,38,0.42)" : "rgba(104,94,74,0.42)";
-  const P = (x, y) => [px + r * x, py + r * y];
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
   const edge = -1.06;                        // 布的下沿：眉弓下沿
   const coils = woman ? 2 : 3;               // 看得见几道缠痕
   const top = woman ? -1.86 : -2.26;         // 布顶：男的盘得高，比颅顶还高一截
@@ -1604,14 +1642,17 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
  * 头发：**贴着颅骨长的一层**，外沿＝颅骨轮廓往外 0.1r，内沿＝发际线
  *（额→鬓角→耳前→绕到耳后→项）。样条走，没有折角、没有横过颅顶的灰道子。
  */
-function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
+function HeadHair(ctx, px, py, r, kind, id, k, lw, F, CY = (y) => y) {
   const child = kind === "sister";
   // **长发**：娘（部分女士）与爹（少部分男士）不裹布，刘海照旧压到眼线上，
   // 发身一路落到肩——一屋子人于是有三种剪影：短发刘海（孩子）、长发（这两位）、
   // 盘头巾／毛巾（乡亲、民兵）
   const long = kind === "family" || kind === "father";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
-  const P = (x, y) => [px + r * x, py + r * y];
+  // CY＝脸长压缩（见 DrawHeadPart）：**头发的下缘必须跟脸走**，不然孩子那两档
+  // 刘海会浮在脸外头、前缘跟脸的前缘错出一个台阶（实拍抓的那个豁口）
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
+  const PY = (y) => py + r * CY(y);
   // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
   // 外沿＝颅骨往外一层，内沿＝**刘海的下缘**，从耳前一路往前压到眉弓前缘；
   // 耳朵在它底下、后头，所以露得出来
@@ -1648,9 +1689,9 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     const dp = r * (0.04 + Hash(id + "fr" + i) * 0.09);   // 每一绺长短差得开
     const hw2 = r * (0.09 + Hash(id + "fw" + i) * 0.04);
     ctx.beginPath();                                       // 圆头的一绺，不是尖齿
-    ctx.moveTo(bx - hw2, py + r * (fringe - 0.03));
-    ctx.quadraticCurveTo(bx - hw2 * 0.6, py + r * fringe + dp, bx, py + r * fringe + dp);
-    ctx.quadraticCurveTo(bx + hw2 * 0.6, py + r * fringe + dp * 0.86, bx + hw2, py + r * (fringe - 0.03));
+    ctx.moveTo(bx - hw2, PY(fringe - 0.03));
+    ctx.quadraticCurveTo(bx - hw2 * 0.6, PY(fringe) + dp, bx, PY(fringe) + dp);
+    ctx.quadraticCurveTo(bx + hw2 * 0.6, PY(fringe) + dp * 0.86, bx + hw2, PY(fringe - 0.03));
     ctx.closePath();
     ctx.fill();
   }
@@ -15572,29 +15613,94 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
     // 房梁：横在画框上沿的一根梁，底下垂着椽子头与苇箔的茬。
     // **梁身要占大半张画布**——第一版 0.62 配上长短不一的长齿，梁身整个被推出
     // 画框，屏幕上只剩一排黑方块，读成城墙垛口（实拍抓的）
+    // 大梁：一根**斧子砍出来的树干**横在画框顶上。
+    //
+    // 2026-08-17 重做（用户：「这张图里的顶部是什么鬼东西 这个鬼东西出现了好多次」）。
+    // 老版＝一块平板 ＋ 四条等距的直横线 ＋ **九个等距同宽、各描一圈墨线的方齿** ＋
+    // 一条通长的细亮线，实拍读出来是**一排铆钉**（或胶片的齿孔）钉在一块黑板上。
+    // 三处病根，全是本文件里记过的老账：
+    //   ① **椽子头压根不该长在这儿。** 椽子头是**檐口**的东西（屋顶挑出墙外那一截
+    //      锯断的杆头）；屋里一根梁的**底下**不会挂着一排木桩。梁上头才是檩和椽，
+    //      而且朝屋里走——在这个框景里它们全在画框外。所以：**齿整排删掉。**
+    //   ② **等距 ＋ 同宽 ＋ 各描一圈墨线 ＝ 一排零件**（同 strawEdge 那把梳子、
+    //      同「等距的横杠是梯子不是炭裂」、同「小形体配全圈墨线＝一坨」）。
+    //   ③ **梁底不许是一条直线。** 树干不直；更要紧的是这条边正好贴着过场的黑边，
+    //      一条平行的直边跟黑边并成一条，整块板就读成"画面上多了一道 UI"——
+    //      用户看见的正是这个。现在底沿是一条**起伏带下垂**的线。
+    // 认出"这是一根圆木"靠的不是轮廓，是**底面的一条柱面高光**（同 DrawLimb 那条：
+    // 屋里的光从底下打上来，贴着底沿最亮、往上很快收掉）。一条通长等宽的细亮线
+    // 是根电线，一条**渐变的宽带**才是圆的。
     case "beam": {
       const hb = H * 0.74;
-      InkFill(ctx, [[0, 0], [W, 0], [W, hb], [W * 0.5, hb * 1.06], [0, hb * 0.96]], id, C("body"),
+      // 底沿：起伏 ＋ 中间下垂（梁受力会塌一点，树干本身也不直）
+      const N = 7;
+      const edge = [];
+      for (let i = 0; i <= N; i += 1) {
+        const t = i / N;
+        const sag = Math.sin(t * Math.PI) * H * 0.05;              // 中间垂下去
+        edge.push([W * t, hb + sag + Sym(id + "e", i, H * 0.022)]);
+      }
+      InkFill(ctx, [[0, 0], [W, 0]].concat(edge.slice().reverse()), id, C("body"),
         { amp: H * 0.012, line: C("deep"), lw: Math.max(2, H * 0.016) });
+      const EdgeY = (x) => {                                        // 底沿在某个 x 上的高度
+        const t = Math.max(0, Math.min(0.999, x / W)) * N;
+        const i = Math.floor(t), f = t - i;
+        return edge[i][1] + (edge[Math.min(N, i + 1)][1] - edge[i][1]) * f;
+      };
       ctx.save();
-      ctx.globalAlpha = 0.45;
-      for (let i = 1; i <= 4; i += 1) {
-        const y = hb * (0.2 + i * 0.17);
-        InkLine(ctx, W * 0.02, y, W * 0.98, y + Sym(id + "g", i, H * 0.02), id + i,
-          { amp: H * 0.008, lw: Math.max(1, H * 0.008), color: C("dark") });
-      }
+      ctx.beginPath();                                              // 往下的笔都剪在梁里
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W, 0);
+      for (let i = N; i >= 0; i -= 1) ctx.lineTo(edge[i][0], edge[i][1]);
+      ctx.closePath();
+      ctx.clip();
+      // 斧痕：**长短不一、略斜、还得断几道**。等距的通长直线是压型钢板
+      ctx.globalAlpha = 0.42;
+      const FACET = [[0.02, 0.44, 0.30], [0.30, 0.96, 0.52], [0.10, 0.62, 0.70], [0.58, 0.99, 0.24]];
+      FACET.forEach(([x0, x1, ky], i) => {
+        const y0 = hb * ky + Sym(id + "f", i, H * 0.03);
+        InkLine(ctx, W * x0, y0, W * x1, y0 + Sym(id + "fs", i, H * 0.05), id + "f" + i,
+          { amp: H * 0.01, lw: Math.max(1, H * 0.009), color: i % 2 ? C("dark") : C("deep") });
+      });
+      // 两个节子：树干上砍掉枝丫留下的疤（一圈深、心里更深）
+      ctx.globalAlpha = 0.55;
+      [[0.22, 0.42], [0.71, 0.30]].forEach(([kx, ky], i) => {
+        const cx2 = W * kx, cy2 = hb * ky, rr = H * (0.052 + Rnd(id + "k", i) * 0.03);
+        ctx.fillStyle = C("deep");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr, rr * 0.74, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = C("dark");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr * 0.5, rr * 0.36, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // 底面的柱面高光：贴着底沿最亮、往上很快收掉——"圆木"就是这一笔给的。
+      // **必须一笔铺完。** 第一版沿着底沿分成 26 段各画一条渐变、还逐段抖了 alpha，
+      // 段与段之间的接缝在图上是一排竖刻度——**刚删掉的那排铆钉换个地方又长出来了**。
+      // 分段画连续的东西，接缝本身就成了内容（同灰堆「一团东西只许有一条外轮廓」）。
+      ctx.globalAlpha = 1;
+      const band = H * 0.16;
+      const yLo = Math.min(...edge.map((e) => e[1]));
+      const yHi = Math.max(...edge.map((e) => e[1]));
+      ctx.save();
+      ctx.beginPath();                                              // 只留底沿往上 band 这一条
+      ctx.moveTo(0, edge[0][1] - band);
+      for (let i = 1; i <= N; i += 1) ctx.lineTo(edge[i][0], edge[i][1] - band);
+      ctx.lineTo(W, H * 2);
+      ctx.lineTo(0, H * 2);
+      ctx.closePath();
+      ctx.clip();
+      const gr = ctx.createLinearGradient(0, yLo - band, 0, yHi);
+      gr.addColorStop(0, "rgba(0,0,0,0)");
+      gr.addColorStop(0.40, "rgba(0,0,0,0)");
+      gr.addColorStop(1, C("rim"));
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, yLo - band, W, yHi - yLo + band + 2);
+      // **不再往上叠一层"光不匀"的暗**：那一层压在高光带上，图上就是梁底多一条
+      // 更暗的横带（实拍抓的），而屋里的光本来就是一大片漫射，沿梁长匀着才对。
       ctx.restore();
-      // 椽子头：一排短齿，长短不一
-      for (let i = 0; i < 9; i += 1) {
-        const x = W * (0.04 + i * 0.108);
-        const len = (H - hb) * (0.28 + Rnd(id + "r", i) * 0.46);
-        InkFill(ctx, Rect(x, hb * 0.98, W * 0.052, len), id + "r" + i, C("dark"),
-          { amp: W * 0.006, line: C("deep"), lw: Math.max(1, W * 0.006) });
-      }
-      // 梁底那条亮边：屋里的光从底下打上来，这一条就是"梁"与"一块黑板"的分界
-      ctx.save();
-      ctx.globalAlpha = 0.40;
-      InkLine(ctx, 0, hb * 0.97, W, hb * 1.01, id + "rim", { amp: H * 0.006, lw: Math.max(2, H * 0.018), color: C("rim") });
       ctx.restore();
       break;
     }
