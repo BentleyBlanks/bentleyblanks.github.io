@@ -12,6 +12,7 @@ import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
 import * as ART from "./Script_Art.mjs";
 import { BONE as RIG_BONE } from "./Script_Rig.mjs";
 import { CreateWorld } from "./Script_World.js";
+import { CreateAnimLab } from "./Script_AnimLab.mjs";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
@@ -112,6 +113,7 @@ for (const id of [
   "noticeOverlay", "noticeSheet", "noticeClose",
   "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose", "btnCine",
+  "btnAnim", "animPanel",
   "btnArt", "artBrowser", "artList", "artCanvas", "artMeta", "artClose", "artZoom", "artDark",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
@@ -119,6 +121,11 @@ for (const id of [
 
 const params = new URLSearchParams(location.search);
 const fastCinematic = params.get("fast") === "1";
+
+// 动画工作台（调试用，全屏）：自己一台渲染器，不碰世界；开着的时候世界停住、
+// 键盘全归它（见 MenuKey 顶上那一条）。渲染器懒建——没打开过就不占 WebGL 上下文
+const animLab = ui.animPanel ? CreateAnimLab({ root: ui.animPanel }) : null;
+const AnimLabOpen = () => !!animLab && animLab.IsOpen();
 
 // ---------------------------------------------------------------------------
 // 进度与存档（2026-08-17 加，用户：「哪有一个线性游戏能跳关的 还没有存档？」）
@@ -223,6 +230,7 @@ window.addEventListener("keydown", (e) => {
   if (k === " " || k === "enter") { advanceEdge = true; e.preventDefault(); }
   if (k === "c" || k === "control") crouchToggle = !crouchToggle;
   if (k === "`" || k === "f2" || k === "～" || k === "·") { ToggleDebug(); e.preventDefault(); return; }
+  if (k === "f4") { animLab?.Toggle(); e.preventDefault(); return; }
   // Esc ＝ 暂停：呼出设置面板（世界当帧停住）。市面上的游戏都在这颗键上。
   if (k === "escape") { OpenSettings(true); e.preventDefault(); return; }
   if (k === "1" || k === "2") {
@@ -231,7 +239,13 @@ window.addEventListener("keydown", (e) => {
   }
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
-window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
+// M 开关声音——但打字的时候（工作台的搜索框）敲到 m 不算
+window.addEventListener("keydown", (e) => {
+  if (AnimLabOpen()) return;
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.key.toLowerCase() === "m") ToggleSound();
+});
 
 const DEBUG_KEYS = ["`", "f2", "～", "·", "f3"];   // f3 ＝ 过场时间轴
 // 菜单开着时键盘归菜单：Esc 收一层、↑↓ 在条目间挪、回车/空格按下去。
@@ -239,6 +253,11 @@ const DEBUG_KEYS = ["`", "f2", "～", "·", "f3"];   // f3 ＝ 过场时间轴
 // **一层一层地收**（确认框 > 操作说明 > 设置 > 标题页）：Esc 收掉最上面那一张，
 // 不是一把全关——同一颗键收两层东西，玩家会以为自己按错了。
 function MenuKey(e, k) {
+  // 动画工作台是最上面那一层：开着时键盘整个归它（空格播放、←→ 逐帧、Esc 关）
+  if (AnimLabOpen()) {
+    if (k === "f4") { animLab.Close(); e.preventDefault(); return true; }
+    return animLab.Key(e, k) !== false;
+  }
   if (!ui.confirmOverlay.hidden) {
     if (k === "escape") { CloseConfirm(); e.preventDefault(); }
     return true;
@@ -257,7 +276,7 @@ function MenuKey(e, k) {
       e.preventDefault();
       return true;
     }
-    if (DEBUG_KEYS.includes(k)) return false;   // 标题页上也能开调试面板（选关就在那儿）
+    if (DEBUG_KEYS.includes(k) || k === "f4") return false;   // 标题页上也能开调试面板（选关就在那儿）/ 动画工作台
     return true;    // 回车/空格交给按钮的默认行为，别被玩法那几行吃掉
   }
   return false;
@@ -1481,6 +1500,12 @@ ui.btnDebug?.addEventListener("click", () => {
   ToggleDebug(true);
 });
 ui.debugClose?.addEventListener("click", () => ToggleDebug(false));
+// 动画工作台的入口也收在设置里（同调试面板：开发工具不常驻画面）
+ui.btnAnim?.addEventListener("click", () => {
+  CloseSettings();
+  ToggleDebug(false);
+  animLab?.Open();
+});
 
 // ── 人物美术样式浏览器（2026-08-17 用户要的）────────────────────────────
 // 做的人用的东西，不是玩家 UI，所以入口藏在设置面板里（同调试面板）。
@@ -1900,8 +1925,9 @@ let lastSaveKey = "";
 // 暂停：菜单类面板开着的时候世界停住。**包袱与告示不在此列**——那两样是
 // Core 自己的闸（state.bagOpen / noticeOpen），它们还要靠 StepGame 收 E 键关掉。
 function MenuFrozen() {
+  // 两块全屏工作台（动画工作台 / 人物美术样式）也算菜单：开着的时候世界停住
   return SettingsOpen() || !ui.controlsScreen.hidden || !ui.confirmOverlay.hidden
-    || !(ui.artBrowser?.hidden ?? true);
+    || AnimLabOpen() || !(ui.artBrowser?.hidden ?? true);
 }
 
 function Frame(now) {
@@ -1987,8 +2013,12 @@ function RunFrame(now, dt) {
     soundtrack.Step(state, dt);
     SyncDebugPanel();
   }
-  world.Render();
-  world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
+  // 动画工作台开着：它铺满整屏，主画面不用画（省一整帧 GPU），改画它那块
+  if (AnimLabOpen()) animLab.Step(dt);
+  else {
+    world.Render();
+    world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
+  }
   interactEdge = false;
   advanceEdge = false;
   tapEdge = false;
@@ -2040,6 +2070,11 @@ if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
   if (beatParam >= 1) JumpToBeat(chapterParam - 1, beatParam - 1);
 }
 if (params.get("debug") === "1") ToggleDebug(true);
+// ?anim=1 打开动画工作台；?anim=scoopChild 直接选中那一条
+if (params.get("anim") !== null && animLab) {
+  const want = params.get("anim");
+  animLab.Open(want && want !== "1" ? want : undefined);
+}
 
 // 过场时间轴（底栏，Unity Timeline 式）。它不改剧本，只把"演到哪儿"变成能指着
 // 说的东西：拖到哪一格游戏就推到哪一格并冻住，「复制定位」给出的
@@ -2077,6 +2112,8 @@ window.TunnelLight = {
   },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
+  // 动画工作台：Open(name?) / Close / Select / Seek / Play / SetKind / LimbTips / Ref / Entries
+  AnimLab: animLab,
   // 征夫告示那张纸这一档排出来的字号／列数（CSS 像素）。给渲染健康测试用：
   // 字小到认不出是这张纸唯一验得了对错的事
   NoticeMetrics: () => { PaintNoticeSheet(); return noticeMetrics; },

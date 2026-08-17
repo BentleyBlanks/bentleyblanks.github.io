@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=132">
+  <link rel="stylesheet" href="./Style_Game.css?v=133">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,35 +33,37 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=132",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=132",
+        "three": "./vendor/three/build/three.module.js?v=133",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=133",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=132",
-        "./Script_World.js": "./Script_World.js?v=132",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=132",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=132",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=132",
-        "./Script_Climb.mjs": "./Script_Climb.mjs?v=132",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=132",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=132",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=132",
-        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=132",
-        "./Script_Audio.js": "./Script_Audio.js?v=132",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=132",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=132",
-        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=132",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=132",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=132",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=132",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=133",
+        "./Script_World.js": "./Script_World.js?v=133",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=133",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=133",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=133",
+        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=133",
+        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=133",
+        "./Script_Climb.mjs": "./Script_Climb.mjs?v=133",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=133",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=133",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=133",
+        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=133",
+        "./Script_Audio.js": "./Script_Audio.js?v=133",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=133",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=133",
+        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=133",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=133",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=133",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=133",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=132",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=132",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=132",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=132",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=132",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=132",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=132",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=132"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=133",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=133",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=133",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=133",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=133",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=133",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=133",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=133"
       }
     }
   </script>
@@ -135,6 +137,8 @@
       <!-- 过场时间轴：底栏 Unity Timeline 式面板，拖到过场的某一格、复制
            `c1_xx@line=N,at=T` 定位串粘给 agent（见 Script_CineTimeline.js） -->
       <button id="btnCine" type="button">调试 · 过场时间轴<small>F3</small></button>
+      <!-- 动画工作台：全屏预览骨架的每一条轨道/姿势/步态，按名字点名重做（F4 / ?anim=名字） -->
+      <button id="btnAnim" type="button">调试 · 动画工作台<small>F4</small></button>
     </section>
     <!-- 人物美术样式浏览器（2026-08-17 用户要的）：全屏，左边一列角色、右边一张
          预览。预览里画的是**游戏里真用的那几支笔**（DrawHeadPart / DrawCharacter /
@@ -285,6 +289,32 @@
   <!-- 过场时间轴（调试）：内容全由 Script_CineTimeline.js 现搭。F3 / ?cine=1 / 设置里那颗钮 -->
   <section id="cinePanel" hidden aria-label="过场时间轴"></section>
 
+  <!-- 动画工作台（2026-08-17）：骨架里的每一条轨道 / 姿势 / 步态按名字列出来，自己一块
+       画布上循环播、拖时间轴、逐帧走、换人、叠关键帧影子、量手脚离地；右栏摊开这条动画
+       的一切（源码行、时长、帧、驱动、用在哪几拍）。为的是动画退回能按名字点名
+       （「scoopChild 第 3→4 帧太快」），不再靠描述画面/贴截图。骨架在这儿，内容
+       Script_AnimLab.mjs 现填；入口在设置面板里 / F4 / ?anim=名字。 -->
+  <section id="animPanel" hidden aria-label="动画工作台">
+    <header>
+      <b>调试 · 动画工作台</b>
+      <input id="animSearch" type="search" placeholder="搜：名字 / 说明 / 节拍 id / 谁在用（/ 聚焦）" autocomplete="off" spellcheck="false">
+      <span id="animStatus"></span>
+      <button id="animClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div id="animBody">
+      <nav id="animList" aria-label="动画清单"></nav>
+      <div id="animStage">
+        <div id="animView">
+          <canvas id="animCanvas" aria-label="动画预览"></canvas>
+          <canvas id="animOverlay" aria-hidden="true"></canvas>
+          <div id="animViewTag"></div>
+        </div>
+        <div id="animTransport"></div>
+      </div>
+      <aside id="animInfo"></aside>
+    </div>
+  </section>
+
   <!-- 主菜单（2026-08-17 重做，用户：「这开始菜单还弄个两层是干什么？」）：
        一列竖着的条目，市面上的叙事游戏都是这个形。老版把「从第一章开始 ／
        跳到任意一幕」两颗钮、八枚章节牌、一张键盘对照表全摊在标题页上——
@@ -363,6 +393,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=132"></script>
+<script type="module" src="./Script_Main.js?v=133"></script>
 </body>
 </html>

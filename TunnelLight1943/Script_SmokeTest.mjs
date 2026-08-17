@@ -2836,6 +2836,79 @@ function TestPoseNamesExist() {
   console.log(`  ✓ 剧本用到的 ${used.size} 个姿势名 Rig 全都接得住（共 ${handled.size} 支）`);
 }
 
+// 动画索引 / 动画工作台（2026-08-17）：动画退回要**按名字点名**，所以索引必须把
+// Rig 里的每一条轨道、每一支姿势、每一支步态分支都扫出来，且带行号与用法；
+// 工作台的骨架（DOM id / 入口 / import map）在，CLI 的 anims/anim 答得上话。
+// 索引是纯正则扫源码——Rig 的写法一变（缩进、`dur:` 的格式、if 链的形状）它就会
+// 悄悄少扫一片，这里拿 Rig 自己的正则数一遍来对账。
+async function TestAnimIndexIsComplete() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const read = (f) => { try { return fs.readFileSync(path.join(here, f), "utf8"); } catch { return null; } };
+  const { ScanAnimIndex, LOCOMOTION, FormatRef, KIND_PRESETS } = await import("./Script_AnimIndex.mjs");
+  const idx = ScanAnimIndex(read);
+  const rig = read("Script_Rig.mjs");
+
+  // ① 轨道：TRACKS 块里每一个二级键都得在，dur/loop/keys 读得出
+  const trackBlock = rig.slice(rig.indexOf("export const TRACKS = {"), rig.indexOf("\n};", rig.indexOf("export const TRACKS = {")));
+  const trackNames = [...trackBlock.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9]*): \{\s*$/gm)].map((m) => m[1]);
+  assert.ok(trackNames.length >= 40, `Rig 里该有几十条轨道，正则只数出 ${trackNames.length}`);
+  for (const n of trackNames) {
+    const t = idx.tracks[n];
+    assert.ok(t, `索引漏掉了轨道 ${n}`);
+    assert.ok(t.dur > 0 && typeof t.loop === "boolean", `轨道 ${n} 的 dur/loop 没读出来`);
+    assert.ok(t.keys.length >= 2, `轨道 ${n} 只读出 ${t.keys.length} 帧`);
+    assert.ok(t.keys.every((k) => typeof k.t === "number"), `轨道 ${n} 有关键帧没读到 t`);
+    assert.ok(t.line > 0, `轨道 ${n} 没有行号`);
+    assert.deepEqual(t.warnings, [], `轨道 ${n}：${t.warnings.join("；")}`);
+  }
+  // 多行写的关键帧也得整个读进来（malletTap 首帧写了三行、14 个字段）
+  assert.ok(Object.keys(idx.tracks.malletTap.keys[0].values).length >= 14, "malletTap 首帧跨三行，字段必须读全");
+  assert.match(idx.tracks.scoopChild.keys[1].note, /预备/, "关键帧行尾的注释要挂到那一帧上");
+
+  // ② 姿势：PoseRig 里每个 s.pose === "x" 都得在，且带行号、说明
+  const poseNames = new Set([...rig.matchAll(/s\.pose === "([A-Za-z0-9]+)"/g)].map((m) => m[1]));
+  for (const n of poseNames) {
+    assert.ok(idx.poses[n], `索引漏掉了姿势 ${n}`);
+    assert.ok(idx.poses[n].line > 0, `姿势 ${n} 没有行号`);
+  }
+  assert.equal(idx.poses.planePush.progress, true, "planePush 读 s.poseK，得标成进度驱动");
+  assert.equal(idx.poses.planePush.registeredProgress, true, "planePush 在 World.PoseProgress 里登记着");
+  assert.equal(idx.poses.shelter.calmBreath, true, "shelter 在 CALM_BREATH 白名单里");
+  assert.equal(idx.poses.sleep.lie, true, "sleep 是 LIE_POSES");
+  assert.ok(idx.poses.crank.inputs.some((i) => i.key === "aimHand"), "crank 的输入里得有 aimHand");
+
+  // ③ 步态：LOCOMOTION 表上每一条都得对上 Rig 里的分支（条件文字逐字相同）
+  for (const L of idx.locomotion) assert.ok(L.line > 0, `步态 ${L.id}：${L.warnings.join("；") || "没对上分支"}`);
+  assert.equal(idx.locomotion.length, LOCOMOTION.length);
+  assert.ok(KIND_PRESETS.length >= 9, "换人预设要覆盖九种骨架");
+
+  // ④ 用法：谁在哪一行挂了哪个名字——带 文件:行、节拍 id、是谁
+  const su = idx.usages.scoopedUp || [];
+  assert.ok(su.some((u) => u.file === "Data_ScriptC1.mjs" && u.beat === "c1_descend" && u.kind === "FlashTrack" && u.kindGuess === "sister"),
+    `scoopedUp 的用法要扫出 c1_descend 里 FlashTrack(…, sis)：${JSON.stringify(su)}`);
+  const sh = idx.usages.shelter || [];
+  assert.ok(sh.some((u) => u.kind === "holdPose" && u.beat === "c1_bell"), "shelter 的 holdPose 用法要认成 holdPose（同一行还有 holdTrack）");
+  const ref = FormatRef({ type: "track", ...idx.tracks.scoopChild });
+  assert.match(ref, /^轨道 scoopChild · Script_Rig\.mjs:\d+ · 1\.45s 单次 · \d+ 帧 · 用于 c1_descend/, `引用行格式：${ref}`);
+
+  // ⑤ 壳：入口在设置面板里、面板骨架在、模块登进 import map（版本戳那条另有测试盯）
+  const html = read("index.html");
+  for (const id of ["btnAnim", "animPanel", "animSearch", "animList", "animView", "animCanvas", "animOverlay", "animTransport", "animInfo", "animClose", "animStatus"]) {
+    assert.ok(html.includes(`id="${id}"`), `index.html 缺 #${id}`);
+  }
+  assert.ok(/import \{ CreateAnimLab \} from "\.\/Script_AnimLab\.mjs"/.test(read("Script_Main.js")), "Main 得接上动画工作台");
+  assert.ok(/AnimLab: animLab/.test(read("Script_Main.js")), "TunnelLight.AnimLab 钩子要暴露给实拍/测试");
+
+  // ⑥ CLI：anims / anim 答得上话
+  const cli = path.join(here, "Script_Cli.mjs");
+  const run = (args) => execFileSync(process.execPath, [cli, ...args], { encoding: "utf8", timeout: 60000 });
+  assert.match(run(["anims", "scoop"]), /轨道 scoopChild\s+1\.45s 单次 6帧\s+Script_Rig\.mjs:\d+/, "anims 得列出 scoopChild 及其时长/帧数/行号");
+  const one = run(["anim", "scoopChild"]);
+  assert.match(one, /关键帧|#\s+t/, "anim 得打出关键帧表");
+  assert.match(one, /Data_ScriptC1\.mjs:\d+\s+c1_descend/, "anim 得说清用在哪一拍");
+  console.log(`  ✓ 动画索引：${trackNames.length} 轨道 / ${poseNames.size} 姿势 / ${idx.locomotion.length} 步态全扫到；用法带 文件:行 + 节拍 + 谁；工作台入口/骨架/CLI 齐`);
+}
+
 // 原 TestSlingThrow / TestElmSetupIsMotivated 随打榆钱一场退役（2026-08-13
 // 八稿：村里的榆树全秃了，c1_elm 整拍删除）。投石机制（SlingSolve / 拽弓 /
 // 无按键后备）仍在链外自由投掷里活着（潜行段的石子引开），throwHit 链步
@@ -2872,6 +2945,7 @@ TestEdgeHintIconTellsWhatsNext();
 TestInstrumentalBgmManifest();
 TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
+await TestAnimIndexIsComplete();
 
 console.log("— 全流程自动通关（第六章走『地下进人』，第二章走『舀水』）—");
 {

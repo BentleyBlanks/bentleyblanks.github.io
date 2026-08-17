@@ -176,6 +176,74 @@ function CmdWhere(o) {
 }
 
 // ---------------------------------------------------------------------------
+// anims / anim：骨架里有哪些动作、各叫什么名、在哪一行、谁在用。
+// 与浏览器里的动画工作台（设置 → 调试 · 动画工作台 / F4 / ?anim=名字）同一份索引
+// （Script_AnimIndex 纯正则扫源码）——工作台负责"看"，这里负责在对话/终端里"点名"。
+//   anims             全部清单（轨道 / 姿势 / 步态）
+//   anims scoop       名字/说明/节拍里带 scoop 的
+//   anim scoopChild   一条的全部：说明、关键帧表、驱动、用在哪几拍、一行引用
+// ---------------------------------------------------------------------------
+async function AnimIndex() {
+  const { ScanAnimIndex } = await import("./Script_AnimIndex.mjs");
+  return ScanAnimIndex((f) => { try { return fs.readFileSync(path.join(DIR, f), "utf8"); } catch { return null; } });
+}
+async function CmdAnims(o) {
+  const { FormatRef, KIND_LABEL, DominantKind } = await import("./Script_AnimIndex.mjs");
+  const idx = await AnimIndex();
+  const q = (o._[0] || "").toLowerCase();
+  const rows = [];
+  for (const t of Object.values(idx.tracks)) rows.push({ type: "轨道", name: t.name, line: t.line, meta: `${t.dur?.toFixed(2)}s ${t.loop ? "循环" : "单次"} ${t.keys.length}帧`, e: t, hay: `${t.name} ${t.comment} ${t.usages.map((u) => u.beat || u.fn || "").join(" ")}` });
+  for (const p of Object.values(idx.poses)) rows.push({ type: "姿势", name: p.name, line: p.line, meta: p.progress ? "进度驱动" : p.calmBreath ? "静态·呼吸" : "静态", e: p, hay: `${p.name} ${p.comment} ${p.usages.map((u) => u.beat || u.fn || "").join(" ")}` });
+  for (const L of idx.locomotion) rows.push({ type: "步态", name: L.id, line: L.line, meta: L.label, e: L, hay: `${L.id} ${L.label} ${L.comment}` });
+  const hit = rows.filter((r) => !q || r.hay.toLowerCase().includes(q));
+  if (o.json) { console.log(JSON.stringify(hit.map((r) => ({ type: r.type, name: r.name, line: r.line, meta: r.meta, ref: FormatRef({ type: r.type === "轨道" ? "track" : r.type === "姿势" ? "pose" : "loco", ...r.e }) })), null, 1)); return; }
+  if (!hit.length) { console.log(`没找到「${o._[0]}」。索引里有 ${rows.length} 条：${idx.counts.tracks} 轨道 / ${idx.counts.poses} 姿势 / ${idx.counts.locomotion} 步态`); return; }
+  for (const r of hit) {
+    const us = (r.e.usages || []).filter((u) => u.kind !== "check" && u.kind !== "ref");
+    const beats = [...new Set(us.map((u) => u.beat || u.fn).filter(Boolean))];
+    const who = DominantKind(r.e.usages);
+    const where = r.type === "步态" ? "" : beats.length ? `用于 ${beats.slice(0, 3).join("/")}${beats.length > 3 ? `…共${beats.length}` : ""}` : "（无引用）";
+    console.log(`  ${r.type} ${r.name.padEnd(18)} ${String(r.meta).padEnd(16)} Script_Rig.mjs:${String(r.line ?? "?").padEnd(5)} ${who ? (KIND_LABEL[who] || who).padEnd(4) : "    "} ${where}`);
+  }
+  console.log(`\n${hit.length} 条（${idx.counts.tracks} 轨道 / ${idx.counts.poses} 姿势 / ${idx.counts.locomotion} 步态）。看一条：anim <名字>；网页里播：设置 → 调试 · 动画工作台（F4）或 ?anim=<名字>`);
+}
+async function CmdAnim(o) {
+  const { FormatRef, KIND_LABEL, RIG_FIELDS } = await import("./Script_AnimIndex.mjs");
+  const name = o._[0];
+  if (!name) { console.log("用法：anim <名字>   例：anim scoopChild / anim shelter / anim walk"); return; }
+  const idx = await AnimIndex();
+  const t = idx.tracks[name], p = idx.poses[name], L = idx.locomotion.find((x) => x.id === name);
+  const e = t ? { type: "track", ...t } : p ? { type: "pose", ...p } : L ? { type: "loco", ...L } : null;
+  if (!e) { console.log(`没有叫「${name}」的轨道/姿势/步态。试试 anims ${name.slice(0, 4)}`); process.exitCode = 1; return; }
+  if (o.json) { console.log(JSON.stringify(e, null, 1)); return; }
+  console.log(FormatRef(e));
+  console.log(`源码  TunnelLight1943/Script_Rig.mjs:${e.line ?? "?"}`);
+  if (e.type === "track") {
+    console.log(`时长  ${e.dur}s ${e.loop ? "循环" : "单次"} · ${e.keys.length} 帧 · 关节 ${e.joints.length === RIG_FIELDS.length ? "全部 14" : e.joints.join(",")}`);
+    const cols = e.joints;
+    console.log(`\n  #   t     ${cols.map((c) => c.padStart(6)).join("")}  备注`);
+    e.keys.forEach((k, i) => {
+      console.log(`  ${String(i + 1).padStart(2)}  ${k.t.toFixed(2).padStart(4)}  ${cols.map((c) => (k.values[c] === undefined ? "·" : String(k.values[c])).padStart(6)).join("")}  ${k.note}`);
+    });
+  } else if (e.type === "pose") {
+    console.log(`类型  ${e.progress ? `进度驱动 · 来源 ${e.progressSource}` : e.calmBreath ? "静态·有呼吸（CALM_BREATH）" + (e.noHip ? "·不动胯" : "") : "静态"}${e.lie ? " · 躺姿（LIE_POSES 整具转 90°）" : ""}${e.usesIK ? " · AimFrontHand 反解" : ""}${e.customBlend ? " · 自定义混合" : ""}`);
+    if (e.inputs.length) console.log(`输入  ${e.inputs.map((i) => `${i.key}（${i.label}）`).join("；")}`);
+  } else {
+    console.log(`分支  ${e.cond} · ${e.label}`);
+    if (e.inputs?.length) console.log(`输入  ${e.inputs.map((i) => i.key).join(" ")}`);
+  }
+  for (const w of e.warnings || []) console.log(`⚠  ${w}`);
+  for (const n of e.notes || []) console.log(`·  ${n}`);
+  if (e.note) console.log(`·  ${e.note}`);
+  if (e.comment) console.log(`\n说明\n${e.comment.split("\n").map((l) => "  " + l).join("\n")}`);
+  const us = (e.usages || []);
+  const real = us.filter((u) => u.kind !== "check" && u.kind !== "ref");
+  console.log(`\n用在哪  ${real.length} 处${us.length - real.length ? `（另 ${us.length - real.length} 处只是判断）` : ""}`);
+  for (const u of real) console.log(`  ${(u.file + ":" + u.line).padEnd(26)} ${(u.beat || u.fn || "").padEnd(16)} ${u.kind.padEnd(10)} ${u.subject ? u.subject + (u.kindGuess ? "＝" + (KIND_LABEL[u.kindGuess] || u.kindGuess) : "") : ""}\n      ${u.text}`);
+  console.log(`\n网页里播：node TunnelLight1943/Script_Cli.mjs menu anim --anim ${name}   或打开 index.html?anim=${name}`);
+}
+
+// ---------------------------------------------------------------------------
 // beats / beat：不 import three 也能拿到剧本——Script_Core 只依赖 Data_Scenes
 // ---------------------------------------------------------------------------
 async function Core() { return import("./Script_Core.mjs"); }
@@ -740,6 +808,7 @@ const MENU_PAGES = {
   settings: ["标题页上的设置面板", null],
   pause: ["游戏里的暂停（设置面板）", null],
   debug: ["调试面板（选关就在这儿）", null],
+  anim: ["动画工作台（--anim 名字 选中哪条，--at 秒 钉到第几秒，--kind sister@0.60 换人，--ghosts 叠影，--flip 翻朝向）", null],
 };
 async function CmdMenu(o) {
   const want = (o._.length ? o._ : Object.keys(MENU_PAGES)).filter((k) => {
@@ -774,13 +843,31 @@ async function CmdMenu(o) {
       if (key === "controls") await page.click("#btnControls");
       if (key === "settings") await page.click("#btnTitleSettings");
       if (key === "debug") await page.evaluate(() => window.TunnelLight.ToggleDebug(true));
+      if (key === "anim") {
+        // 工作台自己 fetch 源码建索引，等它 Ready 再选；无头下 rAF 几乎不走，
+        // 帧要靠 Tick 推，钉到 --at 那一秒再拍
+        await page.evaluate(async (want) => {
+          const lab = window.TunnelLight.AnimLab;
+          await lab.Open(want || undefined);
+        }, o.anim ? String(o.anim) : null);
+        await page.waitForFunction(() => window.TunnelLight.AnimLab.Ready() && !!window.TunnelLight.AnimLab.Current(), { timeout: 30000 });
+        await page.evaluate(({ at, kind, ghosts, flip }) => {
+          const tl = window.TunnelLight, lab = tl.AnimLab;
+          if (kind) lab.SetKind(kind);
+          lab.SetOptions({ ghosts: !!ghosts, ...(flip ? { heading: -1 } : {}) });
+          tl.Tick(2, 1 / 30);
+          if (at !== null) lab.Seek(at); else lab.Play(false);
+          tl.Tick(2, 1 / 30);
+        }, { at: o.at !== undefined ? Number(o.at) : null, kind: o.kind ? String(o.kind) : null, ghosts: !!o.ghosts, flip: !!o.flip });
+      }
       if (key === "pause") {
         await page.evaluate(() => window.TunnelLight.JumpToBeat(0, 12));
         await page.waitForFunction(() => (window.TunnelLight.iris ?? 1) > 0.995, { timeout: 8000 }).catch(() => {});
         await page.click("#btnSettings");
       }
       await page.waitForTimeout(220);
-      const file = path.join(outDir, `menu_${key}.png`);
+      const suffix = key === "anim" && o.anim ? `_${String(o.anim).replace(/[^A-Za-z0-9_]/g, "")}` : "";
+      const file = path.join(outDir, `menu_${key}${suffix}.png`);
       await page.screenshot({ path: file });
       console.log(`  ${path.basename(file)}  ${label}`);
     }
@@ -851,12 +938,16 @@ const HELP = `《地道里的光》命令行工作台
   menu [页 ...]           拍菜单类界面 → _shots/menu_*.png（--w --h 换画框）
       title 标题页 / continue 有存档的标题页 / confirm 覆盖确认 / controls 操作说明
       settings 标题页上的设置 / pause 游戏里的暂停 / debug 调试面板（选关）
+      anim 动画工作台（--anim scoopChild 选中哪条，--at 0.55 钉到第几秒，--kind sister@0.60 --ghosts --flip）
       不给页名就全拍一遍。菜单是玩家的第一屏，改完必须看图——测试绿着也可能很难看
+  anims [片段]            骨架里全部动作的清单：轨道 / 姿势 / 步态 → 名字·时长·行号·谁在用
+  anim <名字>             一条动作的全部：说明 / 关键帧表 / 驱动 / 用在哪几拍 / 一行引用
+      （网页里播：设置 → 调试 · 动画工作台，或 index.html?anim=<名字>；同一份索引）
   doctor                  分支/上游/未提交/缓存戳/端口
 
 要问游戏状态先跑这个，别再现写一次性探针脚本。`;
 
-const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, menu: CmdMenu, doctor: CmdDoctor };
+const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, menu: CmdMenu, anims: CmdAnims, anim: CmdAnim, doctor: CmdDoctor };
 const fn = TABLE[cmd];
 if (!fn) { console.log(HELP); process.exit(cmd ? 1 : 0); }
 await fn(Opts(rest));
