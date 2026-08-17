@@ -3476,7 +3476,14 @@ export function CreateWorld(canvasEl) {
             new THREE.PlaneGeometry(0.44, 0.41),
             new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
           );
-          FixOrder(m, LAYER_ORDER.fx + 340);
+          // **排在过场框景之后**（2026-08-17 用户：「这张图里的顶部是什么鬼东西」）。
+          // 老版排在 fx+340＝7340，而过场那几块框景板在 cine＝8450：序章「抱她。」
+          // 那一镜房梁横在她头顶，**气泡的身子被梁挡住、只剩底下那个尖露出来**，
+          // 屏幕上是画框顶上挂着一枚认不出的白色小楔子。
+          // 这枚气泡不是屋里的东西，是**漫画式的状态提示**（照《勇敢的心》），
+          // 所以它不该被一块贴在镜头跟前的板子吃掉——排到框景之后去。
+          // 仍然压在昼夜罩（ORDER_DARK 8500）之前：夜里/窖里它该跟着一起暗。
+          FixOrder(m, LAYER_ORDER.cine + 40);
           layers.fx.add(m);
           moodMeshes.set(key, m);
         }
