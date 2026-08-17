@@ -5583,6 +5583,15 @@ function MovePlayer(state, input, dt) {
       state.workLock = true;
     } else state.workLock = false;
   } else state.workLock = false;
+  // **活卡铺在画框上的那几拍，方向键全归卡，脚不走**（2026-08-17 四动词第二轮）。
+  // 掰红薯干断了那一瞬手还按着 E＋→，下一步是按 E 分碗（不再是做功），上面那把
+  // 锁一松人当场顺着 → 走出判定区、卡从眼前消失（实拍抓的）。卡是整幅画面，
+  // 人钉在卡跟前；卡收了脚才还给玩家。cards 在这一帧末尾才清，MovePlayer 读到的
+  // 是上一帧立的那张——正好
+  if (LiveCardOn(state) && !state.microCine) {
+    input = { ...input, moveX: 0, climb: 0 };
+    state.workLock = true;
+  }
 
   // 娘按住你。以前屏幕下方写着"娘按住你"，画面上谁也没按住谁，玩家随时能走开——
   // 用户的第一句话就是「哪里按住了？」。现在它是真的：她的手落在你肩上（pose
