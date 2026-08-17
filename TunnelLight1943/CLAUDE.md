@@ -434,6 +434,21 @@ npm run scene:tunnelLight1943
 - **手走 `DrawHandPart`，不是 `ctx.arc`。** 侧视的手只要三样：略扁的掌、翘起来的
   拇指、指根一道分缝。圆片放在袖口上读出来是两粒扣子。
 - **脚走 `DrawFootPart` 的鞋型**：后跟、脚背、圆鞋头、压深的鞋底，`boot:true` 抬高后帮。
+- **脸是微微转过来的四分之三，不是纯侧脸**（2026-08-17 用户拿《勇敢的心》的图定：
+  「你是纯侧脸，我要你大概转一点点角度」）。纯侧脸只看得见一只眼、脸是一条剪影线
+  ——认得出是个人，但没有"脸"。转过来这一下在侧视骨架里靠三件事做，**不改骨架、
+  不加朝向，翻面照旧只翻 x**：
+  · **脸的轮廓里不含鼻子**。转过来之后脸的前缘是**远侧那半张脸的颊线**（比例表里
+    的 `cheek`），鼻子是压在它上头、探出去的一块——所以鼻子**单独画、只描外沿**
+    （描成闭合圈会在脸当中横一条线）。纯侧脸那一版鼻子长在轮廓上，脸前缘就只能是
+    鼻梁，两只眼根本摆不下。
+  · **两只眼两道眉**：原来那只退到脸中间，新出来的贴着鼻根、窄一档（透视压缩）、
+    低一点点；鼻梁顺手啃掉它的前缘。`cheek` 与 `nose` 的差就是"转了多少"。
+  · **嘴横过来一截**：从远侧嘴角画到近侧，略带弧。
+  · 配套：**帽子/头巾的前缘一律停在眉毛之上**（≈ −1.25r）。老版兵帽的檐、军官帽的
+    檐、羊肚手巾都横在眼睛上，实拍整张脸只剩下巴；军官那撮**卫生胡**也是这么丢的
+    ——它原来贴在纯侧脸的前缘上，一半探在轮廓外头（用户："日军的胡子呢"）。
+    改完拿下面那条 `--eval` 把**九种角色**一次全渲出来对一遍，别只看眼前这一个。
 - **`DrawHeadPart`：头是个蛋，不是多边形**（第三稿才立住，前两稿都被退回——
   「人物脸部太抽象了」→「长得都不像人类了」）。第二稿照"真侧脸的十几个特征点"
   逐点连线，眉弓、鼻尖、下巴各探出一截，一条脸线锯齿一样折上折下，实拍是**巫婆
@@ -457,6 +472,12 @@ npm run scene:tunnelLight1943
 - **看零件本身长什么样，别只看整幅画**：`shot --eval` 里把那块骨头的 canvas
   `toDataURL` POST 到 `/__shot?name=xxx`（dev server 那个回写口），几秒就能拿到一张
   放大三倍的贴图——脸上那几笔到底糊成什么样，在整幅画上是看不出来的。
+  **改完脸/帽子，九种角色要一次全看**（用户 2026-08-17：「所有的人物都要生成好」）
+  ——场景里当时站着谁是碰运气，漏看的那种下一轮才炸出来。一条命令全渲：
+
+  ```bash
+  node TunnelLight1943/Script_Cli.mjs shot "c1_walk@out=tmp" --eval "(async()=>{const A=await import('./Script_Art.mjs');const K=['player','sister','family','father','villager','militia','puppet','soldier','officer'];const r=62,W=285,H=310;const c=document.createElement('canvas');c.width=W*K.length;c.height=H;const g=c.getContext('2d');g.fillStyle='#9a9a9a';g.fillRect(0,0,c.width,c.height);K.forEach((k,i)=>{g.save();g.translate(i*W+W*0.4,H*0.84);A.DrawHeadPart(g,0,0,r,k,'q'+k,1.6);g.restore();});fetch('/__shot?name=allheads',{method:'POST',body:c.toDataURL('image/jpeg',0.96)});return 'ok';})()"
+  ```
 
 ## 阅读层那张纸是**程序化画的**（2026-08-15 用户定：「界面里只有一张纸，程序化的在纸上写上文字内容」）
 
