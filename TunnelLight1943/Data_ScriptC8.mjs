@@ -12,9 +12,11 @@ export function ChapterC8(K) {
       kind: "cinematic", id: "c8_open",
       lines: [
         { stage: "一个月后。", d: 1.6, cam: { kind: "dark" } },
-        { stage: "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "wide", x: 90 } },
-        { stage: "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。", d: 4.8, cam: { kind: "wide", x: 130, pan: 5 } },
-        { stage: "柱子带着妹妹，回了一趟梁家村。", d: 3.4, cam: { kind: "wide", x: 100, pan: -8 } },
+        // 三个机位都收进剪短后的村界（2026-08-18，village.length 190→120）：
+        // 原来是 90/130/100，后两个落在已经删掉的那片空场上
+        { stage: "沙河庄的地道重新修整。被发现的口子封死了，新口挖在另一片庄稼地旁。", d: 4.6, cam: { kind: "wide", x: 86 } },
+        { stage: "乡亲们把废弃的旧口填平。那块地方，正是当年柱子第一次找到妹妹的地方。", d: 4.8, cam: { kind: "wide", x: 104, pan: 5 } },
+        { stage: "柱子带着妹妹，回了一趟梁家村。", d: 3.4, cam: { kind: "wide", x: 96, pan: -8 } },
       ],
       onDone: (state) => { SetupRuinedVillage(state); },
     },

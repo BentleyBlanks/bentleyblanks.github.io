@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE, RELICS_ON } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf, GaitToeOff } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
@@ -46,6 +46,74 @@ const DRAW_NUDGE_HELD = 5;
 const ActorDrawNudge = (id) => Math.floor(ART.Hash(String(id)) * 4) % 4;
 const LIE_LEN = 0.90;        // 一个人躺下有多长（身长，骨架单位）
 const LIE_RISE = 0.15;       // 躺着垫起多高（半个身厚，免得半边陷进地里）
+
+// ── 尘土（2026-08-18 重做，用户："地上掉下来的尘土特效太挫了"）──────────────
+// 两朵土共用一套"粒子表 + 柔边尘团贴图"的写法，粒子表是**常量**（种子固定，
+// 无头实拍能复现，也不用每次事件重新分配）。画法上的三条硬账写在各自的用处上：
+//  · 扬起来的土（DUST_PUFF，翻越落地/刨土）——见 UpdateProps 里那一段；
+//  · 板缝里筛下来的灰（SLAT_DUST，靴子踩在窖口翻板上）——见 UpdateProps 末尾。
+// `k` 是空气阻力系数：位移走 (v/k)(1−e^{−kt})，匀速那条线画出来是烟不是土。
+const DUST_PUFF = (() => {
+  const grains = [];
+  for (let i = 0; i < 42; i += 1) {
+    const h1 = ART.Hash("puffA" + i), h2 = ART.Hash("puffB" + i), h3 = ART.Hash("puffC" + i);
+    const skirt = i < 24;                       // 前二十四粒是贴地摊出去的裙边
+    // **一朵土是一团，不是二十几个点**：整朵才半米多，粒与粒必须叠得上。
+    // 首轮把初速给到 300px/s（＝一秒摊出三米），红染诊断下是几枚巨大的淡斑
+    // 各奔东西——画面上什么都读不出来。尺度按实物给：拍一下土，土花摊开
+    // 半米、扬起半米，就这么大。
+    grains.push({
+      dir: i % 2 ? 1 : -1,
+      vx: (skirt ? 92 : 30) * (0.5 + h1 * 1.0),   // 画布像素/秒（48px = 1m）
+      vy: (skirt ? 20 : 88) * (0.45 + h2 * 1.05),
+      x0: (i % 2 ? 1 : -1) * (0.5 + h2 * 4),
+      y0: -(skirt ? 1 : 3) - h3 * 6,
+      // **粒要够大够多**：一朵土是一团实的，不是撒开的几个点——首版四十粒
+      // 加起来只盖住画布的 7%，屏幕上就是一层看不见的薄雾
+      r0: (skirt ? 10 : 8) + h3 * 8,
+      grow: (skirt ? 22 : 32) * (0.6 + h1 * 0.85),
+      t0: (skirt ? 0.0 : 0.04) + h3 * (skirt ? 0.05 : 0.12),
+      fall: skirt ? 6 : (14 + h1 * 20),          // 尾巴上的重力：重的几粒自己落回来
+      a: (skirt ? 0.52 : 0.40) * (0.72 + h1 * 0.55),
+      // 亮的那一档只留四分之一（同那阵风里的 `bright`）：多了就成一团烟
+      tint: h2 < 0.26 ? 1 : 0,
+    });
+  }
+  return { w: 140, h: 90, gy: 74, life: 0.92, k: 3.4, grains };
+})();
+// 板缝里筛下来的灰：三条缝各一股，每股一串粒子按相位错开地往下走。
+// 缝的横向偏移与 Script_World 里那三束光（SetShafts 的 off）是同一组数——
+// **灰要落在光里**，那才叫"板缝里落下来的"；两处对不上就成了两件事。
+const SLAT_SLITS = [-0.37, -0.02, 0.33];
+// 两拨灰：**震下来的那一蓬**（靴子落板的当下，密、大、只走上面一米多就散了）
+// ＋ **跟着筛下来的那一股**（细、慢、一路落到窖底）。只有后者的话，
+// 上屏是"三条缝在漏沙"；只有前者的话，那一下就没有余韵。
+const SLAT_DUST = (() => {
+  const grains = [];
+  for (let i = 0; i < 96; i += 1) {
+    const h1 = ART.Hash("slatA" + i), h2 = ART.Hash("slatB" + i), h3 = ART.Hash("slatC" + i);
+    const burst = i < 30;
+    grains.push({
+      slit: i % SLAT_SLITS.length,
+      // 一股灰不是同时落下来的：起手一阵密的，后面越来越稀（t0 走 h² 拉长尾巴）
+      t0: burst ? h1 * 0.14 : 0.06 + h1 * h1 * 1.25,
+      vy: burst ? (0.30 + h2 * 0.55) : (0.45 + h2 * 1.05),  // 米/秒；细灰落得慢，这是它区别于砂砾的地方
+      // 震下来的那一蓬在头一米就散光（reach 是它自己的行程），筛下来的能到窖底
+      reach: burst ? (0.75 + h3 * 0.85) : 1,
+      drift: (h3 - 0.5) * (burst ? 0.55 : 0.26),  // 边落边被空气推偏
+      sway: (burst ? 0.030 : 0.014) + h1 * 0.030, // 飘（横向小幅摆）
+      swayF: 2.2 + h2 * 3.4,
+      x0: (h3 - 0.5) * (burst ? 0.12 : 0.05),     // 缝本身就有几厘米宽
+      r0: (burst ? 2.6 : 2.0) + h2 * (burst ? 4.6 : 4.2),   // 画布像素
+      grow: burst ? (7 + h1 * 11) : (3.5 + h1 * 5.5),
+      // 加色下别给太满：那几粒是**光里的灰**，给到 0.5 以上就成了发光的珠子
+      a: (burst ? 0.34 : 0.30) + h3 * 0.30,
+      // 这一路走加色（灰是靠反光才看得见的），所以偏亮的那一档给多些
+      tint: h1 < 0.3 ? 0 : 1,
+    });
+  }
+  return { halfW: 0.95, life: 2.2, grains };
+})();
 
 const PROP_SS = SS.prop;     // 道具/遮蔽物的贴图超采样倍率（特写不糊）
 const DETAIL_SS = SS.detail; // 塌方堆、油灯这类会被特写到的小件
@@ -278,9 +346,15 @@ export function CreateWorld(canvasEl) {
   const LAYER_COMP = {};
   for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
   // 假景深：离玩法层越远，烘焙时越糊
-  const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
+  // hills 是**最近的一条背景带**，地平线那条线归它交代——糊到 2.2 就没有线了，
+  // 收到 1.5（2026-08-18）
+  const LAYER_BLUR = { ridge: 2.4, hills: 1.5, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
   // 空气透视：越远越向雾色靠拢——在烘焙时染进贴图，见 BakeSprite 的 haze 参数
-  const LAYER_FADE = { ridge: 0.62, hills: 0.48, farTown: 0.34, midTrees: 0.20, nearTrees: 0.09, play: 0, fore: 0.26 };
+  // 2026-08-18 整体收一档（用户："一点层次没有…根本不像远景层"）：老版 .62/.48/.34
+  // 把三条远带全推到离雾色只剩三四成，加上地平线那条暖雾罩子，上屏彼此差不到
+  // 十级灰——**读出来是一团雾，不是三层地**。空气透视要的是"一档比一档淡"，
+  // 不是"全都淡到看不见"。
+  const LAYER_FADE = { ridge: 0.50, hills: 0.34, farTown: 0.13, midTrees: 0.09, nearTrees: 0.05, play: 0, fore: 0.26 };
   let hazeColor = "#e2d8bc";
   const HazeFor = (key) => (LAYER_FADE[key] ? { color: hazeColor, amount: LAYER_FADE[key] } : null);
   // **空气透视只许用染色，不许用半透明。** haze 是 source-atop 染在精灵自己
@@ -473,6 +547,35 @@ export function CreateWorld(canvasEl) {
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
+  // 一枚柔边尘团：烘一次，之后每一粒都只是把它缩放着 drawImage 上去。
+  // **尘土没有轮廓线**——老版拿 `arc()+fill` 画硬边实心圆，五枚褐饼在地上滑，
+  // 这是"太挫"的头一条根。两个色号错开，一朵土里才有深浅
+  const dustDots = [];
+  function DustDot(i) {
+    if (dustDots[i]) return dustDots[i];
+    const R = 32, c = MakeCanvas(R * 2, R * 2);
+    const g = c.getContext("2d");
+    // **土的主色比地面暗**（照抄那阵风里已经验证过的一套：土雾 168,140,96、
+    // 流线 #7a6238，只有四分之一是亮的 #e8d5a8）。老版给 202,184,146 —— 跟白天的
+    // 夯土路面几乎同色，实拍量出画布 20% 有墨、屏幕上一点看不出；后来试过反过来
+    // 给亮色，一样看不出，因为墙和地本来就亮。**扬起来的土是挡在东西前面的一团，
+    // 它该压暗身后的东西**；亮的那一档只留少数，当它的受光边。
+    // 还要再暗一档：全屏分级（GRADE_GAMMA 1.55）把中间调整体往上提，
+    // 半透明的褐色压在米黄的夯土上，提完就跟地面同色了——实拍下把这一团
+    // 染成纯绿看得清清楚楚、换回土色就什么都没有，差的全在明度上。
+    const rgb = i ? "236,220,178" : "118,94,62";
+    // 芯子要**厚**：首版 0.38 半径处就掉到 0.44，四十粒叠起来的总遮盖还不到 2%，
+    // 屏幕上等于没有（实拍把整块画布填实才确认渲染这一路是通的）
+    const gr = g.createRadialGradient(R, R, 0, R, R, R);
+    gr.addColorStop(0, `rgba(${rgb},0.95)`);
+    gr.addColorStop(0.50, `rgba(${rgb},0.62)`);
+    gr.addColorStop(0.80, `rgba(${rgb},0.18)`);
+    gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, R * 2, R * 2);
+    dustDots[i] = c;
+    return c;
+  }
   // 脚后跟扬起的土（见 UpdateOne 末尾 / EmitFootDust / StepFootDust）：一池贴图，
   // 每个人每一步蹬离地那一格往身后掀一小团。池子里的网格标 persist，挺过环境重建
   const footDust = { pool: [], tex: null, geo: null };
@@ -497,8 +600,11 @@ export function CreateWorld(canvasEl) {
   let louMesh = null;
   // 做饭那一拍的灶火与热气（state.stoveFire）
   let stoveFireMesh = null, stoveFireT = 0;
-  // 靴子踩上翻板那一段：板缝里落下来的灰（state.slatDust）
-  let slatDustMesh = null;
+  // 靴子踩上翻板那一段：板缝里落下来的灰（state.slatDust）。
+  // hatchShaftX ＝ 窖口那道竖井的世界 x（建场时从 shaftGeom 抄来）——
+  // 灰要落在打进来的那三束光里，所以两处共用同一个原点，别再写死 29.5
+  let slatDustMesh = null, slatDustCanvas = null, slatDustCtx = null;
+  let hatchShaftX = 29;
   // 舀水那一下的水圈（state.vatScoop）
   let vatScoopMesh = null;
   // 窖角那一垛草苫（§9「草苫下面忽然动了一下」：state.matStir 一立就真晃 1.2 秒）。
@@ -575,6 +681,8 @@ export function CreateWorld(canvasEl) {
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
+    // 板缝落灰也是懒创建的：漏在这张单子外头，换过一次场就再也画不出来
+    slatDustMesh = null; slatDustCanvas = null; slatDustCtx = null;
     // 脚下的土是 persist 的，网格还在；换场景/跳幕时把还没散的几团直接掐掉，
     // 免得旧场景的土浮在新场景里
     for (const d of footDust.pool) { d.t = d.life; d.mesh.visible = false; }
@@ -741,6 +849,21 @@ export function CreateWorld(canvasEl) {
           ctx.globalCompositeOperation = "destination-out";
           ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
           ctx.globalCompositeOperation = "source-over";
+        }
+        // 村边那几棵树（2026-08-18）。冀中的村子远看**永远是一团树里露出几个屋角**——
+        // 房子四周种着杨柳挡风沙。缺了它，远村就是几块立在空地上的板子，
+        // 也没有任何东西打破那条平直的屋顶线（用户："一点层次没有…不像远景层"）
+        const treeC = Darken(color, 0.86);
+        for (let t = 0; t < 4; t += 1) {
+          const th = ART.Hash(id + "vt" + x + t);
+          if (th < 0.28) continue;
+          const tx = ax - W / 2 - 40 + (W + 80) * ART.Hash(id + "vx" + x + t);
+          const r = 13 + th * 12;
+          ctx.fillStyle = treeC;
+          ctx.beginPath();
+          ctx.ellipse(tx, ay - r * 1.15, r * 0.9, r * 1.05, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(tx - 2, ay - r * 1.1, 4, r * 1.1);
         }
       }, LAYER_BLUR.farTown, 1, HazeSolid("farTown", opacity));
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
@@ -1077,7 +1200,8 @@ export function CreateWorld(canvasEl) {
       }
       case "ridge": mk((ctx, ax, ay) => ART.DrawRidge(ctx, ax, ay, (p.w || 3) * PPM, p.id)); break;
       case "fallenWood": mk((ctx, ax, ay) => ART.DrawFallenWood(ctx, ax, ay, p.id)); break;
-      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id, { big: p.big, stripped: !!p.stripped, night, bare: ruined || !!p.bare })); break;
+      case "tree": mk((ctx, ax, ay) => ART.DrawTree(ctx, ax, ay, p.id,
+        { big: p.big, stripped: !!p.stripped, night, bare: ruined || !!p.bare, picked: !!p.picked })); break;
       case "lamppost": mk((ctx, ax, ay) => ART.DrawLamppost(ctx, ax, ay, p.id, { lit: night })); break;
       case "ditch": mk((ctx, ax, ay) => ART.DrawDitch(ctx, ax, ay, p.w * PPM, p.id)); break;
       case "crops": mk((ctx, ax, ay) => ART.DrawCrops(ctx, ax, ay, p.w * PPM, p.id, { night, veggie: !!p.veggie })); break;
@@ -1919,6 +2043,7 @@ export function CreateWorld(canvasEl) {
         });
         // 板缝在盖板那一层（地表），光往窖里打
         hatchBeamMesh.userData.SetOrigin(g.wx, SURFACE_Y + 0.08, 0.62);
+        hatchShaftX = g.wx;   // 灰也从这三条缝里筛下来，跟光同一个原点
         hatchBeamMesh.userData.SetFloor(UNDER_Y + 0.05);
         // 三条缝：宽窄不一（板是三块拼的，缝也就不匀）。
         // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽——
@@ -1930,10 +2055,12 @@ export function CreateWorld(canvasEl) {
         // 严格平行、亮度还沿程不变的光带，人眼当场读成三根发光的管子。
         // 治法是**让它们不一样**：宽窄、亮度、歪的方向、沿程浓淡的相位各走各的，
         // 中间那条是主光（缝最窄最亮、几乎直下），两边两条各歪各的、暗一档。
+        // 缝的横向偏移取 `SLAT_SLITS`——**板缝里筛下来的灰走的是同一组数**
+        // （靴子踩上翻板那一段），两处各写一套的话，灰就落在光旁边而不是光里
         hatchBeamMesh.userData.SetShafts([
-          { off: -0.37, half: 0.034, spread: 0.024, gain: 0.66, tilt: -0.030, seed: 0.0, pool: 0.9, bounce: 0.55 },
-          { off: -0.02, half: 0.024, spread: 0.017, gain: 1.05, tilt: 0.008, seed: 2.1, pool: 1.15, bounce: 0.85 },
-          { off: 0.33, half: 0.044, spread: 0.030, gain: 0.46, tilt: 0.042, seed: 4.3, pool: 0.75, bounce: 0.45 },
+          { off: SLAT_SLITS[0], half: 0.034, spread: 0.024, gain: 0.66, tilt: -0.030, seed: 0.0, pool: 0.9, bounce: 0.55 },
+          { off: SLAT_SLITS[1], half: 0.024, spread: 0.017, gain: 1.05, tilt: 0.008, seed: 2.1, pool: 1.15, bounce: 0.85 },
+          { off: SLAT_SLITS[2], half: 0.044, spread: 0.030, gain: 0.46, tilt: 0.042, seed: 4.3, pool: 0.75, bounce: 0.45 },
         ]);
         hatchBeamMesh.userData.SetIntensity(0);
         // **必须走 FixOrder**：光柱要排在压暗罩（ORDER_DARK）**之后**——
@@ -2141,10 +2268,12 @@ export function CreateWorld(canvasEl) {
     }
     // 地平线暖雾：把天和地缝起来，也是纵深的一部分
     {
+      // 这层暖雾是"把天和地缝起来"，不是"把地擦掉"：0.55 那一版罩在三条远带上，
+      // 地平线整个化进天里（2026-08-18 用户退回）。收到 0.34 并让它更贴地
       const hazeColor = {
-        day: "rgba(214,190,148,0.55)", dawn: "rgba(226,186,142,0.6)",
-        night: "rgba(58,68,96,0.5)", tunnel: "rgba(52,44,32,0.5)", dark: "rgba(30,26,22,0.5)",
-      }[ch.light] || "rgba(214,190,148,0.5)";
+        day: "rgba(214,190,148,0.34)", dawn: "rgba(226,186,142,0.38)",
+        night: "rgba(58,68,96,0.34)", tunnel: "rgba(52,44,32,0.34)", dark: "rgba(30,26,22,0.34)",
+      }[ch.light] || "rgba(214,190,148,0.32)";
       const wPx = Math.ceil((L + 160) * PPM * 0.2);
       const hPx = 200;
       const haze = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
@@ -2160,19 +2289,30 @@ export function CreateWorld(canvasEl) {
     }
 
     // 远景分层（越远越糊越淡：假景深）
+    // **值阶必须一档比一档沉**（2026-08-18 用户："一点层次没有"）。各层的雾量
+    // 不同（LAYER_FADE ridge .62 / hills .48 / farTown .34+），所以源色相近＝上屏
+    // 层次乱套：老版算下来 ridge 上屏 (201,191,163)、hills (180,166,132)、
+    // farTown (187,172,146)——**farTown 比它后头的 hills 还亮**，最近的一层反而
+    // 最淡，纵深当场倒过来。现在按"上屏值"倒推源色，三档拉开各差十几级。
     const pal = {
-      day: { ridge: "#a1957a", hill: "#8a7850", town: "#96836a" },
-      dawn: { ridge: "#968a79", hill: "#7c7364", town: "#8a7e6f" },
-      night: { ridge: "#2a3244", hill: "#212938", town: "#39415a" },
-      tunnel: { ridge: "#2a2a30", hill: "#232227", town: "#33313a" },
-      dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
-    }[ch.light] || { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" };
+      // town 要**狠压**：贴图上屏被整体提亮（源 109 → 屏 173，见 Art.Dim 那条），
+      // 再让 0.2 的雾一兑，远村就跟它后头的 hills 一个亮度，最近的一层反而不沉。
+      // 按"屏幕目标值"倒推：天 241 / ridge 219 / hills 203 / **远村 175**
+      day: { ridge: "#a1957a", hill: "#82704a", town: "#4e4230" },
+      dawn: { ridge: "#968a79", hill: "#746b5c", town: "#645a4c" },
+      night: { ridge: "#2a3244", hill: "#1c2333", town: "#2a3049" },
+      tunnel: { ridge: "#2a2a30", hill: "#1f1e23", town: "#2a2830" },
+      dark: { ridge: "#1c1c22", hill: "#141419", town: "#1c1b22" },
+    }[ch.light] || { ridge: "#b6ab90", hill: "#96845f", town: "#82705a" };
 
-    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
+    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）。
+    // 最远那条只给稀疏的一排（远了本来就并成一线），近的那条密一档并带地平线的边
     AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
-      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, haze: 0.5, rows: 26, hazeTint: hazeColor });
+      // base/lift 一起挪：地平线的高度不变（lift+base/48），但带子加厚到 52px，
+      // 下缘那 42px 的淡出才有肉可淡——只有 30px 的话整条带子都在淡出区里
+      { amp: 6, base: 52, blur: LAYER_BLUR.ridge, lift: 1.15, haze: 0.42, rows: 20, hazeTint: hazeColor });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
-      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, haze: 0.3, rows: 34, hazeTint: hazeColor });
+      { amp: 4, base: 40, blur: LAYER_BLUR.hills, lift: 0.24, haze: 0.24, rows: 30, hazeTint: hazeColor, edge: 0.55 });
     // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
     AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
 
@@ -2208,11 +2348,33 @@ export function CreateWorld(canvasEl) {
           // 越远的带子块越碎、垄沟越细（近处那条才看得出一垄一垄）
           strips: depth >= 8 ? 26 : depth >= 7 ? 22 : 18, furrow: depth <= 6,
         });
-        ctx.strokeStyle = "rgba(43,31,22,0.5)";
-        ctx.lineWidth = 2.4;
+        // 这条是**田块退到那一档的沿**（下一档地平线）。老版是 ±2.5px 的抖，
+        // 200 米横过去等于一条尺子画的直线——三四条平行直线摞起来，就是用户说的
+        // "一点层次没有"。改成**低频大起伏**（一个坡长三四十米、落差三四十厘米），
+        // 再随机啃几个缺口；墨色**越远越淡**（空气透视：远处的沿本来就看不清）。
+        const edgeA = { hills: 0.16, farTown: 0.24, midTrees: 0.34, nearTrees: 0.46 }[key] ?? 0.3;
+        const ph = ART.Hash(key + "eph") * 9;
+        const EdgeY = (px) => 4 + Math.sin(px * 0.0016 + ph) * 11
+          + Math.sin(px * 0.0051 + ph * 2.1) * 5 + (ART.Hash(key + "e" + Math.round(px / 60)) - 0.5) * 4;
+        // 沿上头那一线要透出后面的层——不然这块地的上沿又是一条硬边
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
         ctx.beginPath();
-        ctx.moveTo(0, 4);
-        for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
+        ctx.moveTo(0, -2);
+        for (let px = 0; px <= wPx; px += 26) ctx.lineTo(px, EdgeY(px));
+        ctx.lineTo(wPx, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = `rgba(43,31,22,${edgeA})`;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let px = 0; px <= wPx; px += 26) {
+          const y = EdgeY(px);
+          // 缺口：一条从头连到尾的沿，比没有沿还假
+          if (ART.Hash(key + "gap" + Math.round(px / 130)) < 0.22) { ctx.moveTo(px, y); continue; }
+          if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+        }
         ctx.stroke();
         // 雾量只取该层本来的空气透视值：这点带压带的半透明原本混的是同为
         // 土色的下一条带，不是天——照 HazeSolid 折算会把整块地洗成天色，
@@ -2227,7 +2389,7 @@ export function CreateWorld(canvasEl) {
         ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown,
           // 站在村街上，身后就是全村的房——村庄场景的远景要密一档、实一档，
           // 不然中景一空整个画面只剩天和地两条色带
-          opacity: 0.78 });
+          opacity: 0.9 });
     }
     if (ch.scene !== "tunnelFort") {
       const dense = ch.scene === "village" || ch.scene === "tunnelVillage";
@@ -2278,8 +2440,9 @@ export function CreateWorld(canvasEl) {
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
 
     // 收藏品（scene.relics）：小件、贴地、半掩在现有物件脚下。loose 序号——
-    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧
-    for (const r of sceneDef.relics || []) {
+    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧。
+    // **整套 2026-08-18 下线**（Core 的 `RELICS_ON`，一处开关；数据与画笔都留着）
+    for (const r of RELICS_ON ? sceneDef.relics || [] : []) {
       const m = BakeSprite(64, 60, 32, 52, (ctx, ax, ay) => ART.DrawRelic(ctx, ax, ay, r.art, r.id, { dim: true }), 0, DETAIL_SS);
       PlaceSprite(m, r.x, r.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
       SetPlayOrder(m, BAND.loose, "relic");
@@ -2290,8 +2453,11 @@ export function CreateWorld(canvasEl) {
 
     // 前景草丛（scene.fore）：layers.fore 是掠过镜头的那一层（z=+3.4，微糊、
     // 特写与地下机位自动隐藏）。它的地平线比行走线低一截——草从画框下沿探
-    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头
-    for (const f of sceneDef.fore || []) {
+    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头。
+    // **跟着收藏品一起下线**（`RELICS_ON`）：这几丛草的活就是半遮老物件，
+    // 没有老物件的话它只剩"挡在人前面的一片草"——留着就是白挡（同 2026-08-10
+    // 把 fore 层内容整个删掉那一轮的账：这层在它该干活的机位上只改动 0.25% 的像素）
+    for (const f of RELICS_ON ? sceneDef.fore || [] : []) {
       const m = BakeSprite(120, 110, 60, 104,
         (ctx, ax, ay) => ART.DrawForeTuft(ctx, ax, ay, "ft" + f.x, f.art), 1.1, 2, HazeFor("fore"));
       // fore 组整层按 (D_REF-z)/D_REF 预缩过，作者坐标要除回去——不除的话
@@ -4039,37 +4205,59 @@ export function CreateWorld(canvasEl) {
       } else if (windMesh) windMesh.visible = false;
     }
 
-    // 翻越落地扬起的干土：半秒就散，但没有它落地就是"啪"一声没有画面
+    // 翻越落地／刨土扬起来的那一朵干土（2026-08-18 重做，用户："地上掉下来的
+    // 尘土特效太挫了"）。老版是五枚**硬边实心圆**，各自匀速往外滑、匀速往上飘，
+    // 半秒后一起消失——上屏读出来是五个褐色的饼在地上溜。
+    // 干土扬起来的样子由三件事定，一件都不能少：
+    //  ① **贴地的裙边先出去**：脚底板/手掌把土往两边推，这一层几乎不升高、
+    //     摊得最快、也最先散。没有它就只有一朵蘑菇云，看不出土是被"拍"出来的。
+    //  ② **升起来的那一朵要减速**：土一离地就只剩空气托着，初速一秒内掉光。
+    //     所以位移走 (v/k)(1−e^{−kt}) 而不是 v·t——匀速的那条线是"烟"，不是"土"。
+    //     尾巴上再给一点重力，最重的几粒会自己落回地面。
+    //  ③ **边是软的、粒有大小**：每一粒是一张柔边尘团贴图（DustDot），
+    //     不是 fill 出来的圆；十八粒的大小/初速/起始时刻各不相同。
     {
       const vd = state.vaultDust;
-      if (vd && vd.t < 0.62) {
+      const D = DUST_PUFF;
+      if (vd && vd.t < D.life) {
         if (!dustMesh) {
-          dustCanvas = MakeCanvas(160, 90);
+          dustCanvas = MakeCanvas(D.w, D.h);
           dustCtx = dustCanvas.getContext("2d");
           dustMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(160 / PPM, 90 / PPM),
+            new THREE.PlaneGeometry(D.w / PPM, D.h / PPM),
             new THREE.MeshBasicMaterial({ map: CanvasTexture(dustCanvas), transparent: true, depthWrite: false }),
           );
           FixOrder(dustMesh, LAYER_ORDER.fx + 250);
           layers.fx.add(dustMesh);
         }
         const c = dustCtx;
-        c.clearRect(0, 0, 160, 90);
+        c.clearRect(0, 0, D.w, D.h);
         const t = vd.t;
-        c.globalAlpha = Math.max(0, 1 - t / 0.62) * 0.55;
-        for (let i = 0; i < 5; i += 1) {
-          const dir = i % 2 ? 1 : -1;
-          const px = 80 + dir * (6 + t * (46 + i * 12));
-          const py = 78 - t * (14 + i * 5);
-          c.beginPath();
-          c.arc(px, py, 5 + t * (13 + i * 2), 0, Math.PI * 2);
-          c.fillStyle = i % 2 ? "rgba(196,178,140,0.75)" : "rgba(172,152,116,0.65)";
-          c.fill();
+        const fade = Math.max(0, 1 - t / D.life);
+        for (const p of D.grains) {
+          const pt = t - p.t0;
+          if (pt <= 0) continue;
+          const damp = (1 - Math.exp(-pt * D.k)) / D.k;     // 初速衰减后的位移积分
+          const px = D.w / 2 + p.x0 + p.dir * p.vx * damp;
+          const py = D.gy + p.y0 - p.vy * damp + pt * pt * p.fall;
+          const r = p.r0 + p.grow * damp;
+          // 起手 0.08 秒淡入（土是被拍出来的，不是凭空出现的），整朵按 fade² 散
+          c.globalAlpha = Math.min(0.95, p.a * fade * fade * Math.min(1, pt * 12));
+          if (c.globalAlpha < 0.004) continue;
+          c.drawImage(DustDot(p.tint), px - r, py - r, r * 2, r * 2);
         }
+        c.globalAlpha = 1;
         dustMesh.material.map.needsUpdate = true;
         dustMesh.visible = true;
-        // 顶撑木也用它（顶实那一下洞顶簌簌落土），所以这团土得认得出自己在哪一层
-        dustMesh.position.set(vd.x, (vd.level === "under" ? UNDER_Y : SURFACE_Y) + 0.42, 0.52);
+        // 顶撑木也用它（顶实那一下洞顶簌簌落土），所以这团土得认得出自己在哪一层。
+        // 画布上那条地面线是 D.gy，把它对到该层的地平线上：画布第 py 行的世界高度
+        // ＝ 中心 +(h/2−py)/PPM，要 py=gy 落在地平线上，中心就得抬 (gy−h/2)/PPM。
+        // **这个符号写反过一次**，整团土沉到地下一米半，画面上什么都没有
+        dustMesh.position.set(
+          vd.x,
+          (vd.level === "under" ? UNDER_Y : SURFACE_Y) + (D.gy - D.h / 2) / PPM,
+          0.52,
+        );
       } else if (dustMesh) dustMesh.visible = false;
     }
 
@@ -4376,20 +4564,67 @@ export function CreateWorld(canvasEl) {
       stoveFireMesh.visible = false;
     }
 
-    // ── 靴子踩上翻板那一段：板缝里落下来的灰（state.slatDust，2.2s 自灭）──
+    // ── 靴子踩上翻板那一段：板缝里筛下来的灰（state.slatDust，2.2s 自灭）──
+    // 2026-08-18 重做（同「地上掉下来的尘土特效太挫了」那一条）。老版是**一张
+    // 烘死的贴图**：三根笔直的细杆加七个点，整块从 UNDER_Y+2.1 平移到 −1.1m
+    // 再淡出——三根棍子一起往下滑，既不像灰，也不在光里（它钉在 x=29.5，
+    // 而三束光在 29−0.37/−0.02/+0.33）。
+    // 现在逐帧画：**三条缝各一股**，每股四十来粒各自的起落。四条账：
+    //  ① **细灰落得慢**（0.4~1.4 m/s）——落得快的是砂砾。3.6 米的井筒要落两秒多，
+    //     所以这一下才有"簌簌"的时间感；平移那一版 1.6 秒走完 1.1 米，读成一块布。
+    //  ② **不是同时落下来的**：靴子踩下去是一阵密的，之后越来越稀（t0 走 h²）。
+    //  ③ **边落边飘**：横向一个慢摆 + 一点定向的偏移，才不是三条直线。
+    //  ④ **画布跨整条井筒**（地表到窖底），灰落到窖底那条线上就该没了——
+    //     贴图从中间往下平移的老写法，等于灰穿过地面继续往下走。
     if (state.slatDust) {
+      const S = SLAT_DUST;
+      const H = SURFACE_Y - UNDER_Y;                       // 井筒全高（3.6m）
+      const wPx = Math.ceil(S.halfW * 2 * PPM * 2), hPx = Math.ceil(H * PPM * 2);
       if (!slatDustMesh) {
-        slatDustMesh = BakeSprite(46, 60, 23, 56,
-          (ctx, ax, ay) => ART.DrawSlatDust(ctx, ax, ay, "slatDust"), 0, DETAIL_SS);
-        SetPlayOrder(slatDustMesh, BAND.loose, "slatDust");
-        layers.play.add(slatDustMesh);
+        slatDustCanvas = MakeCanvas(wPx, hPx);
+        slatDustCtx = slatDustCanvas.getContext("2d");
+        slatDustMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(S.halfW * 2, H),
+          new THREE.MeshBasicMaterial({
+            map: CanvasTexture(slatDustCanvas), transparent: true, depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        );
+        // **灰是靠反光才看得见的**：一间黑窖里，落在光柱外头的灰本来就该看不见，
+        // 落进光里的那几粒反倒是全画面最亮的东西。所以这一层走加色、
+        // 并且要排在压暗罩（ORDER_DARK 8500）**之后**——排在前头会被罩子一起压掉，
+        // 那正是首轮实拍里"什么都没有"的原因。紧贴着三束光（ORDER_GLOW−1）画。
+        FixOrder(slatDustMesh, ORDER_GLOW + 1);
+        slatDustMesh.userData.dofKeep = true;
+        layers.fx.add(slatDustMesh);
       }
-      const k = Math.min(1, (state.slatDust.t || 0) / 1.6);
+      const t = state.slatDust.t || 0;
+      const c = slatDustCtx;
+      const pxM = wPx / (S.halfW * 2);                     // 画布像素/米（横向，纵向同）
+      c.clearRect(0, 0, wPx, hPx);
+      for (const p of S.grains) {
+        const pt = t - p.t0;
+        if (pt <= 0) continue;
+        const drop = pt * p.vy;                            // 落了多少米
+        const span = H * p.reach;                          // 这一粒能走多远（震下来的那一蓬只走一米多）
+        if (drop > span) continue;                          // 走完自己的行程就散了
+        const wx = SLAT_SLITS[p.slit] + p.x0
+          + p.drift * drop + Math.sin(pt * p.swayF + p.slit * 2.1) * p.sway;
+        const px = wPx / 2 + wx * pxM;
+        const py = drop * pxM;
+        const k = drop / span;
+        const r = p.r0 + p.grow * k;
+        // 一粒灰自己的一生：出缝时最实，越落越散；整股再随节拍的 2.2 秒收尾
+        c.globalAlpha = p.a * (1 - k) * (1 - k) * Math.min(1, pt * 9) * Math.max(0, 1 - t / S.life);
+        if (c.globalAlpha < 0.004) continue;
+        c.drawImage(DustDot(p.tint), px - r, py - r, r * 2, r * 2);
+      }
+      c.globalAlpha = 1;
+      slatDustMesh.material.map.needsUpdate = true;
+      slatDustMesh.material.opacity = 1;
       slatDustMesh.visible = true;
-      slatDustMesh.material.opacity = 0.85 * (1 - k * 0.8);
-      slatDustMesh.material.transparent = true;
-      // 从翻板底面（洞口）往下落
-      slatDustMesh.position.set(29.5, UNDER_Y + 2.1 - k * 1.1, PlaceZ(BAND.loose));
+      // 画布顶边贴着地表、底边贴着窖底，整块不动——动的是里头的灰
+      slatDustMesh.position.set(hatchShaftX, (SURFACE_Y + UNDER_Y) / 2, PlaceZ(BAND.loose));
     } else if (slatDustMesh) {
       slatDustMesh.visible = false;
     }

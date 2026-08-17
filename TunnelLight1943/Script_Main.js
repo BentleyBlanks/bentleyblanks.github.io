@@ -5,7 +5,7 @@ import {
   CurrentBeatDef, MakeChoice, GetObjective, GetHint, SplitPrompt, BeatHintIcon,
   ChapterBeatList, DebugJump, SkipPrologue, PROLOGUE_CLIPS, SCRIBE_CARD, PLANE_CARD,
   KNOT_CARD, FOLD_CARD, WRAP_CARD, SPLIT_CARD, TEAR_CARD, SEW_CARD,
-  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn,
+  PLAYABLE_CHAPTERS, ZHENGFU_NOTICE, AllRelics, LiveCardOn, RELICS_ON,
 } from "./Script_Core.mjs";
 import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
 // 美术样式浏览器要按名字调很多支笔，整个模块拿进来（它本来就已经在模块图里）
@@ -1966,6 +1966,12 @@ if (ui.btnSettings) {
 // ── 包袱（收藏品）──────────────────────────────────────────────
 // 跨章、跨会话持久：localStorage 存 id 列表；StartGame 每次灌回 state。
 // Core 只管拾取与冻结，条与卡全在这儿。
+//
+// **2026-08-18 用户定：整套下线**（「把现在的道具收集功能都干掉 暂时不要这个玩法」）。
+// 关着的时候这儿要干净到玩家看不出它存在过：右上角那枚包袱钮不出（HTML 里就带
+// `hidden`）、纸带不建、peek 不响、B 键不认。**尤其是 peek**：它是"收到新东西"的通知，
+// 通知一个不存在的玩法比留着玩法更糟（同「按了没反应的键比没有更糟」那条老账）。
+// 存过的档（BAG_KEY）一个字不删——恢复只翻 Core 的 `RELICS_ON`，玩家收过的还在。
 const BAG_KEY = "tunnelLight1943.bag.v1";
 function LoadBag() {
   try { return JSON.parse(localStorage.getItem(BAG_KEY) || "[]"); } catch { return []; }
@@ -1987,7 +1993,7 @@ function PaintBagSlot(canvas, relic, got) {
   DrawRelic(ctx, w / 2, w * 0.82, relic.art, "bag" + relic.id, { sil: !got, k: 1.35 });
 }
 function RebuildBagStrip(freshId = null) {
-  if (!ui.bagStrip) return;
+  if (!RELICS_ON || !ui.bagStrip) return;
   ui.bagStrip.textContent = "";
   const got = state?.relicsGot || new Set();
   for (const r of BAG_ALL) {
@@ -2019,7 +2025,7 @@ function SelectBagSlot(id) {
   RebuildBagStrip();
 }
 function OpenBag(open) {
-  if (!ui.bagPanel) return;
+  if (!RELICS_ON || !ui.bagPanel) return;
   if (open) {
     clearTimeout(bagPeekTimer);
     RebuildBagStrip();
@@ -2040,7 +2046,7 @@ function OpenBag(open) {
 }
 // 收到新东西：条自己滑进来亮一下那格，几秒后退场（不冻结世界）
 function PeekBag(freshId) {
-  if (!ui.bagPanel || !ui.bagPanel.hidden) return;
+  if (!RELICS_ON || !ui.bagPanel || !ui.bagPanel.hidden) return;
   RebuildBagStrip(freshId);
   ui.bagNote.hidden = true;
   ui.bagPanel.hidden = false;
@@ -2054,6 +2060,8 @@ function PeekBag(freshId) {
 }
 // 开合看的是 bagOpen 不是面板可见性：拾取后的"探头"（peek）也可见但没打开，
 // 那时点按钮该是**打开**，按可见性判断会反手把它关了
+// 关着就整枚不出：HTML 里那枚钮自带 hidden，只有开着才亮出来
+if (RELICS_ON && ui.btnBag) ui.btnBag.hidden = false;
 ui.btnBag?.addEventListener("click", () => OpenBag(!state?.bagOpen));
 document.addEventListener("pointerdown", (e) => {
   if (!ui.bagPanel || ui.bagPanel.hidden || !state?.bagOpen) return;
@@ -2063,7 +2071,7 @@ document.addEventListener("pointerdown", (e) => {
 window.addEventListener("keydown", (e) => {
   if (e.key === "b" || e.key === "B") {
     // 菜单开着时不叠第二张面板（设置面板已经把世界停住了）
-    if (state && state.phase === "playing" && !MenuFrozen() && !state.tableau) OpenBag(!state.bagOpen);
+    if (RELICS_ON && state && state.phase === "playing" && !MenuFrozen() && !state.tableau) OpenBag(!state.bagOpen);
   }
 });
 
@@ -2161,7 +2169,7 @@ function RunFrame(now, dt) {
     const stepDt = (fastCinematic && !soundOn && def?.kind === "cinematic") ? dt * 5 : dt;
     const prevChapter = state.chapterIndex;
     // 收藏品拾取：Core 出一张卡（带递增 seq），这儿存档 + 让包袱条探头
-    if (state.relicCard && state.relicCard.seq !== bagLastCardSeq) {
+    if (RELICS_ON && state.relicCard && state.relicCard.seq !== bagLastCardSeq) {
       bagLastCardSeq = state.relicCard.seq;
       SaveBag();
       PeekBag(state.relicCard.id);
