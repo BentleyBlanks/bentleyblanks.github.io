@@ -61,8 +61,77 @@ const bad = await page.evaluate(async () => {
   return out;
 });
 
+if (bad.length) {
+  await browser.close(); server.close();
+  console.error("✗ 跳幕失败：", bad.join(" | ")); process.exit(1);
+}
+console.log("✓ 八章全部分幕跳转落点正确");
+
+// ---------------------------------------------------------------------------
+// 存档：玩到一半 → 关掉页面 → 回来点「继续」，得回到同一幕
+//
+// 存档骑在跳幕上（`Core.DebugJump` 按脚本结算前序），所以它跟这个文件同住。
+// 三件事各验一遍，缺哪件玩家都会丢进度：
+// ① 换幕真的落盘（不落盘＝关了就没）；
+// ② 幕**认 id 不认序号**（往章里插一拍，老档不许指到别人家去）；
+// ③ 旗标合并回来（结算只跑得出脚本的默认分支，玩家自己选的在旗标里）。
+// ---------------------------------------------------------------------------
+const savePage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+await savePage.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
+await savePage.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+const saved = await savePage.evaluate(() => {
+  window.TunnelLight.JumpToBeat(0, 6);
+  window.TunnelLight.state.flags.route = "tunnel";   // "玩家自己做过的抉择"
+  window.TunnelLight.Tick(2);                        // 换幕那一帧才写盘
+  const raw = JSON.parse(localStorage.getItem("tunnelLight1943.save.v1") || "null");
+  return { raw, beat: window.TunnelLight.state.beatIndex };
+});
+if (!saved.raw || saved.raw.chapter !== 0 || saved.raw.beat !== 6 || !saved.raw.beatId
+  || saved.raw.flags?.route !== "tunnel") {
+  await browser.close(); server.close();
+  console.error("✗ 换幕没落盘或存档不全：", JSON.stringify(saved.raw));
+  process.exit(1);
+}
+// 回来一趟：标题页上「继续」得出现，点下去回到同一幕、旗标还在
+await savePage.reload({ waitUntil: "load", timeout: 60000 });
+await savePage.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+const shownWhere = await savePage.textContent("#continueWhere");
+if (await savePage.isHidden("#btnContinue")) {
+  await browser.close(); server.close();
+  console.error("✗ 有存档却不出「继续」"); process.exit(1);
+}
+await savePage.click("#btnContinue");
+await savePage.waitForTimeout(300);
+const back = await savePage.evaluate(() => {
+  const st = window.TunnelLight.state;
+  return { ch: st.chapterIndex, beat: st.beatIndex, route: st.flags.route, phase: st.phase,
+    titleHidden: document.getElementById("titleScreen").hidden };
+});
+if (back.ch !== 0 || back.beat !== 6 || back.route !== "tunnel" || !back.titleHidden) {
+  await browser.close(); server.close();
+  console.error("✗ 继续没回到存档那一幕：", JSON.stringify(back)); process.exit(1);
+}
+
+// 暂停：设置面板 ＝ 游戏里的暂停菜单，开着的时候游戏钟必须真的停住。
+// （车铃那一拍是全章唯一会失败的：不停的话，点开设置就等于站在伪军跟前发呆。）
+const paused = await savePage.evaluate(() => {
+  const tl = window.TunnelLight;
+  document.getElementById("btnSettings").click();
+  const t0 = tl.state.time;
+  tl.Tick(20);
+  const held = tl.state.time - t0;
+  const dim = document.body.classList.contains("paused");
+  document.getElementById("btnSettings").click();      // 收起来，游戏该走了
+  tl.Tick(20);
+  return { held, ran: tl.state.time - t0, dim };
+});
 await browser.close();
 server.close();
-if (bad.length) { console.error("✗ 跳幕失败：", bad.join(" | ")); process.exit(1); }
+if (paused.held > 0.0001 || paused.ran <= 0.0001 || !paused.dim) {
+  console.error(`✗ 设置面板没把游戏停住：开着走了 ${paused.held.toFixed(3)}s`
+    + `、收起来之后走了 ${paused.ran.toFixed(3)}s、压暗=${paused.dim}`);
+  process.exit(1);
+}
 if (errors.length) { console.error("✗ 页面异常：", errors.slice(0, 5).join(" | ")); process.exit(1); }
-console.log("✓ 八章全部分幕跳转落点正确");
+console.log(`✓ 存档：换幕落盘 → 刷新 → 继续，回到 ${shownWhere.trim()}（旗标也带回来了）`);
+console.log(`✓ 暂停：设置面板开着游戏钟不走（收起来又走了 ${paused.ran.toFixed(2)}s）`);
