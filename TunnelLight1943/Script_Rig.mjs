@@ -305,6 +305,24 @@ export const TRACKS = {
       { t: 1.7, hipY: -0.07, hipX: 0.02, torso: 8, head: -34, armF: -44, foreF: -12 },
     ],
   },
+  // 举着手等着被抱起来（循环 2.2s）。**不是 reachJump**——那一支是在树底下
+  // 蹦着够布巾（hipY 冲到 +0.15，人真的离地）；等人抱的孩子是**站着**把两只手
+  // 举到他胸前，仰着脸，脚跟一颠一颠地催。2026-08-17 新增：上一版这 0.9 秒里
+  // 她一格没动，玩家按着 E 使劲，画面上像在跟一根木桩较劲。
+  // **末帧＝scoopedUp 的第一帧**，扣上腋下那一下接过去不跳。
+  armsUpWait: {
+    dur: 2.2, loop: true,
+    keys: [
+      { t: 0.0, hipY: -0.02, hipX: 0.03, torso: 10, head: -26, armF: -96, foreF: -48, armB: -88, foreB: -44, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+      // 踮一下脚，手再往上举一截（催他）
+      { t: 0.42, hipY: 0.03, hipX: 0.04, torso: 7, head: -31, armF: -108, foreF: -42, armB: -99, foreB: -38, thighB: -5, shinB: 7, footB: -13, thighF: 4, shinF: 4, footF: -13 },
+      { t: 0.80, hipY: -0.03, hipX: 0.03, torso: 12, head: -24, armF: -92, foreF: -50, armB: -85, foreB: -46, thighB: -10, shinB: 13, footB: -4, thighF: 7, shinF: 7, footF: -4 },
+      // 换一只脚倒重心，胳膊酸了往下落一点点
+      { t: 1.25, hipY: -0.04, hipX: 0.01, torso: 9, head: -28, armF: -87, foreF: -53, armB: -94, foreB: -41, thighB: -4, shinB: 6, thighF: -6, shinF: 9 },
+      { t: 1.68, hipY: 0.01, hipX: 0.04, torso: 8, head: -32, armF: -103, foreF: -44, armB: -95, foreB: -40, thighB: -7, shinB: 9, footB: -10, thighF: 5, shinF: 5, footF: -10 },
+      { t: 2.2, hipY: -0.02, hipX: 0.03, torso: 10, head: -26, armF: -96, foreF: -48, armB: -88, foreB: -44, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+    ],
+  },
   // 欢呼（循环）：布巾打下来了，妹妹拍着手原地小跳——两下轻跳、一下拍手定住。
   // 幅度照孩子来：蹦得高、胳膊抡得开，跟大人的克制拉开
   cheerHop: {
@@ -415,7 +433,7 @@ export const TRACKS = {
       // 顿住，喘一口
       { t: 1.5, hipY: -0.33, hipX: -0.02, torso: 34, head: -34, armF: -30, foreF: -34, armB: -18, foreB: -30 },
       // 在衣襟上蹭一把汗（手收到胸腹前，肘折死）
-      { t: 2.0, hipY: -0.31, hipX: 0.00, torso: 30, head: -32, armF: -66, foreF: 74, armB: -20, foreB: -30 },
+      { t: 2.0, hipY: -0.31, hipX: 0.00, torso: 30, head: -32, armF: -66, foreF: -74, armB: -20, foreB: -30 },
       // 再探下去，两只手都攥住铁环
       { t: 2.5, hipY: -0.42, hipX: 0.06, torso: 60, head: -48, armF: -32, foreF: -20, armB: -28, foreB: -18, thighB: -88, shinB: 96, thighF: -76, shinF: 88 },
       // 发力：腰一节节直起来，重心后压（板从这儿开始转）
@@ -452,11 +470,11 @@ export const TRACKS = {
     keys: [
       // 两只小手蜷在胸口（＝上一行 leanIn 的落点，切过来不跳）：肘朝前折死，
       // 前臂折回来，手落在自己胸前——这套数是 leanIn 验过的，照抄别改
-      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 8, head: -10, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+      { t: 0.0, hipY: -0.02, hipX: 0.0, torso: 8, head: -10, armF: -24, foreF: -104, armB: -20, foreB: -98, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
       // 被拽得一趔趄：重心往娘那边倒，一只手被拉开
-      { t: 0.45, hipY: -0.04, hipX: 0.07, torso: 16, head: -18, armF: -52, foreF: 60, armB: -66, foreB: 118, thighB: -16, shinB: 20, thighF: 12, shinF: 10 },
+      { t: 0.45, hipY: -0.04, hipX: 0.07, torso: 16, head: -18, armF: -30, foreF: -88, armB: -26, foreB: -92, thighB: -16, shinB: 20, thighF: 12, shinF: 10 },
       // 撞进怀里、埋头（leanIn 的落点：整个人往对方那边倒，两只小手蜷在胸口）
-      { t: 0.95, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
+      { t: 0.95, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -24, foreF: -104, armB: -20, foreB: -98, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
       // 被摸的时候一颤一颤（幅度小、频率高——「你能数出来她抖了多少下」）
       { t: 1.6, torso: 29, head: -37 },
       { t: 2.2, torso: 25, head: -41 },
@@ -466,21 +484,61 @@ export const TRACKS = {
       { t: 5.2, torso: 26, head: -40 },
     ],
   },
-  // ⑦ 蹲下去把妹妹抱起来（单次 1.1s，玩家操作①）。老版是 FlashPose("shelter",
-  // 0.8)——只有"抱住了"这个造型，没有"怎么抱起来的"：人当帧从站姿弹进搂抱姿，
-  // 0.8 秒后又弹回走路。末帧刻意对齐 childArms 的静止帧，接过去不跳。
+  // ⑦ 蹲下去把妹妹抱起来（单次 1.45s，玩家操作①）。
+  //
+  // 2026-08-17 重排（用户："抱起妹妹的动画太蠢了…不流畅"）。上一版四个键
+  // 1.1 秒，三段都被 smoothstep 各自缓入缓出，读出来是"蹲、停、抬、停、站、停"。
+  // 换了插值（见 SampleTrack）之后还得**把动作本身排出来**，缺的是三件事：
+  //   · **起手不许是站姿**：这一拍前面 0.9 秒玩家一直按着（scoopReach 已经蹲下去
+  //     把手伸到她腋下了），轨道第一帧要**接着那个蹲**往下走，不能从站姿重来一遍
+  //     ——老版就是这么当帧弹回去、再蹲第二次的。
+  //   · **预备动作**：抬人之前先往下再沉一寸（0.18s 那格）。没有这一沉，
+  //     "使劲"就只是位置在变。
+  //   · **劲从腿上来**：胯先起、腰后起、两条胳膊最后才收紧兜住——一起动就是
+  //     "整个人平移上去"。收尾给一次很小的回坐（0.85 的仰过头 → 1.15 的回落），
+  //     怀里那点分量才落到身上。
   scoopChild: {
-    dur: 1.1, loop: false,
+    dur: 1.45, loop: false,
     keys: [
-      { t: 0.0, hipY: -0.02, hipX: 0.02, torso: 12, head: -14, armF: -46, foreF: -30, armB: -34, foreB: -26, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -4 },
-      // 蹲到她的高度，两手兜到她腋下
-      { t: 0.35, hipY: -0.30, hipX: 0.06, torso: 32, head: -26, armF: -76, foreF: -6, armB: -70, foreB: -4, thighB: -54, shinB: 60, footB: -6, thighF: -42, shinF: 48, footF: -8 },
-      // 发力起身，她离地（胳膊往兜的角度收：肘落回体侧、前臂折上来）
-      { t: 0.7, hipY: -0.14, hipX: 0.0, torso: -2, head: 2, armF: -52, foreF: -48, armB: -62, foreB: -72, thighB: -30, shinB: 34, thighF: -20, shinF: 22 },
+      // 蹲到她的高度、两手兜在她腋下（＝ scoopReach 走满进度那一格，接过去不跳）
+      // 每一格的两条腿都按闭合式配（hipY = 0.31·cosθ + 0.31·cos(θ+小腿) − 0.62），
+      // 两条投影必须一样长，否则错开的那一档就是一只脚陷进地里／悬在半空
+      { t: 0.0, hipY: -0.24, hipX: 0.07, torso: 38, head: -22, armF: -51, foreF: -89, armB: -44, foreB: -95, thighB: -76, shinB: 84, footB: -6, thighF: -60, shinF: 103, footF: -8 },
+      // 预备：再沉一寸，两只手在她腋下扣死（这一格是"使劲"的证据）
+      { t: 0.20, hipY: -0.29, hipX: 0.09, torso: 42, head: -18, armF: -56, foreF: -84, armB: -49, foreB: -90, thighB: -86, shinB: 94, thighF: -70, shinF: 114 },
+      // 蹬腿起身：她离地。胯先上来、腰跟着直、肘往体侧落（开始改兜的角度）
+      { t: 0.55, hipY: -0.106, hipX: 0.02, torso: 8, head: -6, armF: -20, foreF: -74, armB: -34, foreB: -110, thighB: -48, shinB: 56, footB: -4, thighF: -34, shinF: 68, footF: -6 },
+      // 分量压上来：上身往后仰过一点点配重，同时胯往上一送把她坐稳
+      { t: 0.85, hipY: 0.02, hipX: -0.05, torso: -11, head: 6, armF: 8, foreF: -74, armB: -16, foreB: -133, thighB: -2, shinB: 3, thighF: 4, shinF: 2 },
+      // 回落（很小的一次回坐，重量真的落在身上了）
+      { t: 1.15, hipY: -0.02, hipX: -0.02, torso: -4, head: 2, armF: 2, foreF: -67, armB: -22, foreB: -125 },
       // 站直兜稳（**＝childArms 的静止帧，两处必须一模一样**：末帧对不上，
-      // 轨道一到期人就当帧弹一下——2026-08-15 把 childArms 从"平端两臂"
-      // 改成"肘吊下来兜住"时，这两个键也得跟着改）
-      { t: 1.1, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+      // 轨道一到期人就当帧弹一下）
+      { t: 1.45, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: 4, foreF: -69, armB: -20, foreB: -128, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+    ],
+  },
+  // ⑦-对 妹妹这一边（成对轨道，与 scoopChild 同长）。接触戏的老规矩：
+  // **抱的人在动、被抱的人一动不动＝抱了个假人**。老版她连轨道都没有——
+  // 一到 carrying 就当帧换成 heldChild、位置从原地瞬移到他怀里、lift 直接给满，
+  // 也就是"他还蹲着，她已经坐在半空中了"（实拍量到 t=0.48 时她 lift 已经 0.42）。
+  //
+  // 她这一边的四件事：伸手够他 → 被兜住、踮起来 → 离地（腿先垂着才有分量）→
+  // 腿收上来盘住、脸埋进他肩窝。**腿要晚于人离地**：一起收就是"自己跳上去的"。
+  scoopedUp: {
+    dur: 1.45, loop: false,
+    keys: [
+      // 站着仰头，两只手已经举到他胸前（＝他按住那 0.9 秒里她做的事）
+      { t: 0.0, hipY: -0.02, hipX: 0.03, torso: 10, head: -26, armF: -96, foreF: -48, armB: -88, foreB: -44, thighB: -8, shinB: 10, footB: -4, thighF: 6, shinF: 6, footF: -4 },
+      // 被扣住腋下：踮起脚、身子被提得往上抻一点
+      { t: 0.18, hipY: 0.03, hipX: 0.05, torso: 14, head: -30, armF: -104, foreF: -54, armB: -96, foreB: -50, thighB: -4, shinB: 6, footB: -14, thighF: 3, shinF: 4, footF: -14 },
+      // 离地：腿这会儿还是垂着的（分量全挂在腋下），手开始往他脖子上够
+      { t: 0.55, hipY: -0.04, hipX: 0.06, torso: 6, head: -22, armF: -112, foreF: -60, armB: -104, foreB: -58, thighB: -14, shinB: 20, footB: -6, thighF: -8, shinF: 14, footF: -8 },
+      // 坐上臂弯：腿这才收起来盘住他，胳膊搂死脖子（这一格略过一点，像被颠了一下）
+      { t: 0.85, hipY: -0.05, hipX: 0.07, torso: 22, head: -32, armF: -108, foreF: -66, armB: -101, foreB: -70, thighB: -56, shinB: 60, footB: -6, thighF: -68, shinF: 68, footF: -6 },
+      // 回摆（她自己晃回来一下）
+      { t: 1.15, hipY: -0.04, hipX: 0.05, torso: 13, head: -23, armF: -103, foreF: -72, armB: -96, foreB: -76 },
+      // 稳住（**＝heldChild 的静止帧**，轨道一到期接过去不跳）
+      { t: 1.45, hipY: -0.04, hipX: 0.05, torso: 16, head: -26, armF: -105, foreF: -70, armB: -98, foreB: -74, thighB: -52, shinB: 56, footB: -5, thighF: -64, shinF: 62, footF: -6 },
     ],
   },
   // ⑦b 往上颠一下把她托稳（单次 1.4s，玩家操作②：腾出一只手扒梯子之前）。
@@ -489,13 +547,13 @@ export const TRACKS = {
   hoistChild: {
     dur: 1.4, loop: false,
     keys: [
-      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103 },
+      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: 4, foreF: -69, armB: -20, foreB: -128 },
       // 屈膝一沉（劲是从腿上来的，不是从胳膊上来的）
-      { t: 0.35, hipY: -0.10, hipX: -0.01, torso: -2, head: 1, armF: -30, foreF: -66, armB: -42, foreB: -96, thighB: -18, shinB: 24, thighF: -14, shinF: 20 },
+      { t: 0.35, hipY: -0.10, hipX: -0.01, torso: -2, head: 1, armF: 9, foreF: -62, armB: -14, foreB: -120, thighB: -18, shinB: 24, thighF: -14, shinF: 20 },
       // 往上一送：她被颠高，两条胳膊跟着收紧
-      { t: 0.7, hipY: 0.04, hipX: -0.04, torso: -10, head: 5, armF: -44, foreF: -84, armB: -56, foreB: -112, thighB: -4, shinB: 6, thighF: 2, shinF: 4 },
+      { t: 0.7, hipY: 0.04, hipX: -0.04, torso: -10, head: 5, armF: -4, foreF: -80, armB: -28, foreB: -137, thighB: -4, shinB: 6, thighF: 2, shinF: 4 },
       // 卡稳，换手扒住横档那一下由 climbing+childArms 那支接着演
-      { t: 1.4, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -35, foreF: -73, armB: -48, foreB: -103 },
+      { t: 1.4, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: 4, foreF: -69, armB: -20, foreB: -128 },
     ],
   },
   // ⑧ 坐到窖沿把妹妹放上梯子（单次 3.0s）。**2026-08-15 起没人用了**：
@@ -506,9 +564,9 @@ export const TRACKS = {
   lowerChild: {
     dur: 3.0, loop: false,
     keys: [
-      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -96, foreF: 38, armB: -104, foreB: 38, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
+      { t: 0.0, hipY: 0.0, hipX: -0.03, torso: -6, head: 3, armF: -96, foreF: -38, armB: -104, foreB: -38, thighB: -3, shinB: 4, footB: -3, thighF: 3, shinF: 2, footF: -3 },
       // 坐到窖沿（这一帧起下半身钉死，剩下的全长在腰和胳膊上）
-      { t: 0.55, hipY: -0.40, hipX: -0.06, torso: 14, head: -10, armF: -88, foreF: 30, armB: -96, foreB: 30, thighB: -84, shinB: 92, footB: -6, thighF: -76, shinF: 84, footF: -8 },
+      { t: 0.55, hipY: -0.40, hipX: -0.06, torso: 14, head: -10, armF: -88, foreF: -30, armB: -96, foreB: -30, thighB: -84, shinB: 92, footB: -6, thighF: -76, shinF: 84, footF: -8 },
       // 弯下腰把她往下送
       { t: 1.2, hipY: -0.40, hipX: -0.04, torso: 42, head: -34, armF: -52, foreF: -6, armB: -60, foreB: -4 },
       // 松开一只手——她还抓着衣襟，手停在半空
@@ -538,11 +596,11 @@ export const TRACKS = {
       // smoothstep 插不出「一点点退出去」，袖子就是"闪没了"
       { t: 1.05, torso: 37, head: -15, armF: -32, foreF: -8 },
       // 抽回来——袖子从缝里退出去的那一下
-      { t: 1.2, torso: 34, head: -18, armF: -46, foreF: 26, armB: -22, foreB: -20 },
+      { t: 1.2, torso: 34, head: -18, armF: -46, foreF: -26, armB: -22, foreB: -20 },
       // 伏在板上听外面的脚步（肩背微微起伏）
-      { t: 2.0, torso: 40, head: -12, armF: -34, foreF: 10, armB: -18, foreB: -22 },
-      { t: 3.0, torso: 36, head: -16, armF: -36, foreF: 12 },
-      { t: 4.0, torso: 40, head: -12, armF: -34, foreF: 10 },
+      { t: 2.0, torso: 40, head: -12, armF: -34, foreF: -10, armB: -18, foreB: -22 },
+      { t: 3.0, torso: 36, head: -16, armF: -36, foreF: -12 },
+      { t: 4.0, torso: 40, head: -12, armF: -34, foreF: -10 },
     ],
   },
   // ── §1 冷灶那一场（柱子的四件事，2026-08-13）─────────────────────────
@@ -558,8 +616,8 @@ export const TRACKS = {
       { t: 0.7, torso: 40, head: -24, armF: -52, foreF: -26, armB: -18, foreB: -16 },   // 探手进锅
       { t: 1.3, torso: 44, head: -26, armF: -44, foreF: -36 },                          // 摸一圈
       { t: 1.7, torso: 43, head: -25, armF: -56, foreF: -22 },
-      { t: 2.2, torso: 34, head: -30, armF: -70, foreF: 34 },                           // 手抽出来，捻捻手指
-      { t: 2.7, torso: 30, head: -28, armF: -66, foreF: 44 },
+      { t: 2.2, torso: 34, head: -30, armF: -70, foreF: -34 },                           // 手抽出来，捻捻手指
+      { t: 2.7, torso: 30, head: -28, armF: -66, foreF: -44 },
       { t: 3.2, torso: 27, head: -14, armF: -22, foreF: -16 },
     ],
   },
@@ -573,7 +631,7 @@ export const TRACKS = {
       { t: 1.6, torso: 30, head: -14, armF: -40, foreF: -44, armB: -36, foreB: -40 },   // 挪到一边放下
       { t: 2.2, torso: 48, head: -30, armF: -30, foreF: -22, armB: -20, foreB: -16 },   // 探头看瓮底
       { t: 2.8, torso: 46, head: -28, armF: -50, foreF: -30 },                          // 手伸进去捻一撮
-      { t: 3.4, torso: 34, head: -26, armF: -66, foreF: 30 },
+      { t: 3.4, torso: 34, head: -26, armF: -66, foreF: -30 },
     ],
   },
   // 瓢探下去刮缸底，小半瓢——抿一口，剩下的倒进锅里（5.2s）
@@ -586,8 +644,8 @@ export const TRACKS = {
       { t: 1.7, torso: 49, head: -31, armF: -36, foreF: -32 },                          // 刮着缸底转半圈
       { t: 2.2, torso: 50, head: -32, armF: -26, foreF: -42 },
       { t: 2.9, torso: 32, head: -24, armF: -64, foreF: -24 },                          // 提上来
-      { t: 3.6, torso: 18, head: -30, armF: -82, foreF: 52 },                           // 凑到瓢沿抿一口
-      { t: 4.1, torso: 16, head: -34, armF: -86, foreF: 58 },
+      { t: 3.6, torso: 18, head: -30, armF: -82, foreF: -52 },                           // 凑到瓢沿抿一口
+      { t: 4.1, torso: 16, head: -34, armF: -86, foreF: -58 },
       { t: 4.7, torso: 36, head: -22, armF: -54, foreF: -14 },                          // 剩下的倒进锅里
       { t: 5.2, torso: 40, head: -20, armF: -46, foreF: -6 },
     ],
@@ -630,7 +688,7 @@ export const TRACKS = {
   tallyCount: {
     dur: 7.2, loop: false,
     keys: [
-      { t: 0.0, hipY: 0.0, hipX: 0.02, torso: 8, head: -22, armF: -132, foreF: -22, armB: -46, foreB: 96, thighB: -18, shinB: 46, footB: -14, thighF: -34, shinF: 58, footF: -16 },
+      { t: 0.0, hipY: 0.0, hipX: 0.02, torso: 8, head: -22, armF: -132, foreF: -22, armB: -52, foreB: -34, thighB: -18, shinB: 46, footB: -14, thighF: -34, shinF: 58, footF: -16 },
       // 吹石粉：脸凑过去，撅起来吹一口（头的世界角压到 +6 ＝ 真的朝着门框吹）
       { t: 0.5, torso: 14, head: -8, armF: -126, foreF: -28 },
       { t: 0.9, torso: 16, head: -4, armF: -124, foreF: -30 },
@@ -690,19 +748,19 @@ export const TRACKS = {
   tearHerb: {
     dur: 1.4, loop: true,
     keys: [
-      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
-      { t: 0.35, torso: 30, head: -28, armF: -80, foreF: -18, armB: -48, foreB: 4 },     // 一撕
-      { t: 0.7, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14 },
-      { t: 1.05, torso: 31, head: -29, armF: -82, foreF: -16, armB: -46, foreB: 2 },     // 再撕
-      { t: 1.4, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: 14 },
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: -14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.35, torso: 30, head: -28, armF: -80, foreF: -18, armB: -48, foreB: -4 },     // 一撕
+      { t: 0.7, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: -14 },
+      { t: 1.05, torso: 31, head: -29, armF: -82, foreF: -16, armB: -46, foreB: -2 },     // 再撕
+      { t: 1.4, torso: 28, head: -26, armF: -70, foreF: -28, armB: -58, foreB: -14 },
     ],
   },
   // 蹲下吹气（单次 3.6s）：伏到灶口 → 一口一口吹 → 直起来
   blowFire: {
     dur: 3.6, loop: false,
     keys: [
-      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -30, foreF: 18, armB: -26, foreB: 14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
-      { t: 0.9, hipY: -0.36, hipX: 0.08, torso: 48, head: -40, armF: -30, foreF: 18 },   // 伏到灶口（两手撑膝）
+      { t: 0.0, hipY: -0.36, hipX: 0.02, torso: 26, head: -12, armF: -30, foreF: -18, armB: -26, foreB: -14, thighB: -38, shinB: 128, footB: 12, thighF: -44, shinF: 136, footF: 14 },
+      { t: 0.9, hipY: -0.36, hipX: 0.08, torso: 48, head: -40, armF: -30, foreF: -18 },   // 伏到灶口（两手撑膝）
       { t: 1.5, torso: 52, head: -44 },                                                  // 吹第一口
       { t: 1.9, torso: 49, head: -41 },
       { t: 2.4, torso: 53, head: -45 },                                                  // 第二口
@@ -799,7 +857,7 @@ export const TRACKS = {
   heldTremble: {
     dur: 0.46, loop: true,
     keys: [
-      { t: 0.0, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -70, foreF: 128, armB: -64, foreB: 120, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
+      { t: 0.0, hipY: -0.05, hipX: 0.10, torso: 26, head: -40, armF: -24, foreF: -104, armB: -20, foreB: -98, thighB: -10, shinB: 12, footB: -4, thighF: 8, shinF: 6, footF: -6 },
       { t: 0.12, hipY: -0.062, torso: 29, head: -37 },
       { t: 0.24, hipY: -0.048, torso: 25, head: -41 },
       { t: 0.35, hipY: -0.058, torso: 28, head: -38 },
@@ -904,7 +962,7 @@ export const TRACKS = {
     keys: [
       { t: 0.0, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armB: -66, foreB: -74, armF: -30, foreF: -20, thighB: -6, shinB: 8, footB: -4, thighF: 4, shinF: 4, footF: -4 },
       { t: 0.5, hipY: -0.04, hipX: 0.03, torso: 14, head: -10, armF: -52, foreF: -46 },   // 手伸进笸箩抓食
-      { t: 0.85, hipY: 0.0, hipX: 0.0, torso: 4, head: -4, armF: 26, foreF: 8 },          // 扬出去（最快的一下）
+      { t: 0.85, hipY: 0.0, hipX: 0.0, torso: 4, head: -4, armF: 26, foreF: -8 },          // 扬出去（最快的一下）
       { t: 1.25, hipY: -0.01, hipX: 0.01, torso: 7, head: -7, armF: 10, foreF: -6 },      // 收手，看鸡抢
       { t: 2.8, hipY: -0.02, hipX: 0.02, torso: 10, head: -8, armF: -30, foreF: -20 },
     ],
@@ -966,14 +1024,14 @@ export const TRACKS = {
     keys: [
       // t=0 与 t=0.85 必须是同一格：knockT 归零那一帧才接得上，不然每敲一下闪一下
       { t: 0.00, hipY: -0.31, hipX: 0.05, torso: 52, head: -40,
-        armB: -42, foreB: 26, armF: 73, foreF: -120,
+        armB: -42, foreB: -26, armF: 73, foreF: -120,
         thighB: -8, shinB: 96, footB: 16, thighF: -74, shinF: 80, footF: -4 },
       { t: 0.22, torso: 50, head: -38, armF: 40, foreF: -40 },       // 提槌
       // 举起来是**往自己身后举**（前臂世界角 −135°），不是往门那边举：
       // 爹跪在轴的西边、脸朝东，槌子要是甩向东，整条胳膊就横到扶门的柱子身上，
       // 画面上读成"这把槌子是柱子的"（实拍逮到的）
-      { t: 0.58, torso: 46, head: -34, armF: -10, foreF: 145 },      // 举到最高（慢）
-      { t: 0.74, torso: 45, head: -33, armF: -12, foreF: 150 },      // 顿住蓄一下
+      { t: 0.58, torso: 46, head: -34, armF: -10, foreF: -145 },      // 举到最高（慢）
+      { t: 0.74, torso: 45, head: -33, armF: -12, foreF: -150 },      // 顿住蓄一下
       { t: 0.85, torso: 52, head: -40, armF: 73, foreF: -120 },      // 砸下：0.11s，全程最快
     ],
   },
@@ -1199,29 +1257,111 @@ export const TRACKS = {
 };
 
 const TRACK_JOINTS = ["torso", "head", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "armF", "foreF"];
+const TRACK_FIELDS = ["hipY", "hipX", ...TRACK_JOINTS];
 
-// 采样：找到 t 两侧的关键帧，缺省关节先向前找最近一次显式赋值
+// ── 关键帧之间怎么插（2026-08-17 重写；用户："抱起妹妹的动画…不流畅"）──
+//
+// 老版是**每一段各自 smoothstep**：缓入缓出是对每两帧之间说的，于是**每一个
+// 关键帧上速度都归零**。一条 4 帧的轨道读出来就是三下互不相干的推拉——
+// 蹲下去、停；兜起来、停；站直、停。关键帧写得越密越像卡顿，而"写密一点让它
+// 顺一点"正是所有人的第一反应，等于往病根上加料。
+//
+// 现在走**分段三次 Hermite**，切线由前后两段的割线定（Catmull-Rom），
+// 并按 Fritsch–Carlson 夹住不许过冲：
+//   · 速度只在**真正的折返点**（局部极值：蹲到最低、抡到最高）上归零——
+//     那儿本来就该停一下；一路往同一个方向走的几帧连成一条连贯的运动。
+//   · **不过冲**是硬要求：这套姿势的角度全是按几何量出来的（手要落在她胯上、
+//     膝要着地），普通 Catmull-Rom 在快慢段交界处会冲过关键帧十几度，
+//     那就是手插进人体里。夹住之后曲线永远停在相邻两帧的值域内。
+//   · 直轨（loop:false）两端各镜像一格 ⇒ 端点切线自然归零＝整条轨道缓入缓出，
+//     接进/接出常态姿势时不会甩一下。
+//   · 循环轨绕回去取邻居，所以**跨过末帧那一下也不再顿**（走姿、守窖口那种
+//     一直在循环的轨道，老版每转一圈都要停一次）。
+function TrackSeq(tr) {
+  if (tr._seq) return tr._seq;
+  const keys = tr.keys;
+  const n = keys.length;
+  // 稀疏语义照旧：某个关节这一帧没写就沿用上一次显式赋的值；开头没写的往后借。
+  // 摊成稠密表只是为了不用每帧再逐关节往回扫。
+  const dense = {};
+  for (const joint of TRACK_FIELDS) {
+    const col = new Array(n);
+    let last;
+    for (let k = 0; k < n; k += 1) {
+      if (keys[k][joint] !== undefined) last = keys[k][joint];
+      col[k] = last;
+    }
+    let first = 0;
+    while (first < n && col[first] === undefined) first += 1;
+    const fill = first < n ? col[first] : 0;
+    for (let k = 0; k < first; k += 1) col[k] = fill;
+    dense[joint] = col;
+  }
+  // 采样用的帧序：两端各补一格虚拟帧，切线算到端点也不用分支。
+  // 循环轨的虚拟帧绕到另一头去（末帧 t==dur 且＝首帧的那种"闭合"轨道要跳过
+  // 那格重复帧，否则绕回去取到的是同一个姿势，切线又成了 0）。
+  const seq = keys.map((k, idx) => ({ t: k.t, i: idx }));
+  if (tr.loop) {
+    const closed = Math.abs(keys[n - 1].t - tr.dur) < 1e-3;
+    const pre = closed ? Math.max(0, n - 2) : n - 1;
+    const post = closed ? Math.min(n - 1, 1) : 0;
+    seq.unshift({ t: keys[pre].t - tr.dur, i: pre });
+    seq.push({ t: keys[post].t + tr.dur, i: post });
+    seq.push({ t: keys[Math.min(n - 1, post + 1)].t + tr.dur, i: Math.min(n - 1, post + 1) });
+  } else {
+    const h0 = n > 1 ? keys[1].t - keys[0].t : 1;
+    const h1 = n > 1 ? keys[n - 1].t - keys[n - 2].t : 1;
+    seq.unshift({ t: keys[0].t - Math.max(1e-3, h0), i: 0 });          // 镜像＝端点速度 0
+    seq.push({ t: keys[n - 1].t + Math.max(1e-3, h1), i: n - 1 });
+    seq.push({ t: keys[n - 1].t + 2 * Math.max(1e-3, h1), i: n - 1 });
+  }
+  tr._seq = { seq, dense };
+  return tr._seq;
+}
+
 function SampleTrack(name, time) {
   const tr = TRACKS[name];
   if (!tr) return null;
-  const t = tr.loop ? time % tr.dur : Math.min(time, tr.dur - 1e-4);
   const keys = tr.keys;
+  const n = keys.length;
+  const { seq, dense } = TrackSeq(tr);
+  const t = tr.loop
+    ? ((time % tr.dur) + tr.dur) % tr.dur
+    : Math.min(Math.max(time, 0), tr.dur - 1e-4);
   let i = 0;
-  while (i < keys.length - 1 && keys[i + 1].t <= t) i += 1;
-  const a = keys[i];
-  const b = keys[Math.min(i + 1, keys.length - 1)];
-  const span = Math.max(1e-4, b.t - a.t);
-  let u = Math.max(0, Math.min(1, (t - a.t) / span));
-  u = u * u * (3 - 2 * u);           // smoothstep：缓入缓出
-  const ValAt = (ki, joint) => {
-    for (let k = ki; k >= 0; k -= 1) if (keys[k][joint] !== undefined) return keys[k][joint];
-    for (let k = ki + 1; k < keys.length; k += 1) if (keys[k][joint] !== undefined) return keys[k][joint];
-    return 0;
-  };
+  while (i < n - 1 && keys[i + 1].t <= t) i += 1;
+  // seq 前面补了一格，所以 keys[i] 是 seq[i+1]；这一段是 seq[q]→seq[q+1]
+  const q = i + 1;
+  const t0 = seq[q].t, t1 = seq[q + 1].t;
+  const h = Math.max(1e-4, t1 - t0);
+  const u = Math.max(0, Math.min(1, (t - t0) / h));
+  // Hermite 基
+  const u2 = u * u, u3 = u2 * u;
+  const b0 = 2 * u3 - 3 * u2 + 1;
+  const b1 = u3 - 2 * u2 + u;
+  const b2 = -2 * u3 + 3 * u2;
+  const b3 = u3 - u2;
+  const hPrev = seq[q].t - seq[q - 1].t;
+  const hNext = seq[q + 2].t - seq[q + 1].t;
   const out = {};
-  for (const joint of ["hipY", "hipX"]) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u);
-  for (const joint of TRACK_JOINTS) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u) * DEG;
+  for (const joint of TRACK_FIELDS) {
+    const col = dense[joint];
+    const vP = col[seq[q - 1].i], v0 = col[seq[q].i], v1 = col[seq[q + 1].i], vN = col[seq[q + 2].i];
+    const d = (v1 - v0) / h;
+    const dP = hPrev > 1e-6 ? (v0 - vP) / hPrev : d;
+    const dN = hNext > 1e-6 ? (vN - v1) / hNext : d;
+    // 折返点上切线归零，其余取两段割线的均值并夹住（Fritsch–Carlson）
+    const m0 = dP * d <= 0 ? 0 : ClampSlope((dP + d) / 2, dP, d);
+    const m1 = d * dN <= 0 ? 0 : ClampSlope((d + dN) / 2, d, dN);
+    const v = b0 * v0 + b1 * h * m0 + b2 * v1 + b3 * h * m1;
+    out[joint] = joint === "hipY" || joint === "hipX" ? v : v * DEG;
+  }
   return out;
+}
+
+function ClampSlope(m, a, b) {
+  const lim = 3 * Math.min(Math.abs(a), Math.abs(b));
+  return Math.abs(m) > lim ? Math.sign(m) * lim : m;
 }
 
 
@@ -1251,6 +1391,11 @@ function AimFrontHand(target, aim, both = false) {
   const solve = (px, py) => {
     const tx = px - (target.hipX + sx), ty = py - (rootY + sy);
     const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
+    // **先挑解剖上对的那一组**（fore ≤ 0 ＝肘往前屈）：两组解的手落在同一点，
+    // 差别只是肘往哪边翻，所以挑对的那组不会动手的位置。老版只按"肘朝下"挑，
+    // 一半的机位下挑出来的是反关节的那一组
+    const ok1 = a1.fore <= 0, ok2 = a2.fore <= 0;
+    if (ok1 !== ok2) return ok1 ? a1 : a2;
     return elbowY(a1) <= elbowY(a2) ? a1 : a2;
   };
   const f = solve(aim.x, aim.y);
@@ -1264,7 +1409,9 @@ function AimFrontHand(target, aim, both = false) {
 export function PoseRig(rig, s, dt) {
   const j = rig.joints;
   const p = s.phase || 0;
-  const blend = Math.min(1, (dt || 0.016) * 12);   // 姿态之间连续过渡，不会跳
+  // 姿态之间的过渡：**真正的指数平滑**。老版是 dt*12 的线性近似——掉帧那几帧
+  // 一步跨过去（>1 被夹住＝硬切），高帧率下又比设计的慢。1−e^(−λt) 与帧率无关
+  const blend = 1 - Math.exp(-14 * (dt || 0.016));
   const t = rig.pose || (rig.pose = {
     hipY: 0, hipX: 0, torso: 0, head: 0,
     thighB: 0, shinB: 0, footB: 0, thighF: 0, shinF: 0, footF: 0,
@@ -1388,8 +1535,8 @@ export function PoseRig(rig, s, dt) {
     // 不是"蜷在胸口"。肘要折死（foreF 正值＝小臂折回来），手才落到自己胸前
     target.hipY = -0.05; target.hipX = 0.10;
     target.torso = 26 * DEG; target.head = -40 * DEG;
-    target.armB = -64 * DEG; target.foreB = 120 * DEG;
-    target.armF = -70 * DEG; target.foreF = 128 * DEG;
+    target.armB = -20 * DEG; target.foreB = -98 * DEG;
+    target.armF = -24 * DEG; target.foreF = -104 * DEG;
     target.thighB = -10 * DEG; target.shinB = 12 * DEG; target.footB = -4 * DEG;
     target.thighF = 8 * DEG; target.shinF = 6 * DEG; target.footF = -6 * DEG;
   } else if (s.pose === "mark") {
@@ -1431,8 +1578,8 @@ export function PoseRig(rig, s, dt) {
     const k = Math.max(0, Math.min(1, s.poseK ?? 0));
     target.hipY = -0.36; target.hipX = 0.04;
     target.torso = (46 + 3 * k) * DEG; target.head = -16 * DEG;
-    target.armF = (-60 - 6 * k) * DEG; target.foreF = (36 + 4 * k) * DEG;   // 压住肩（世界角 ≈ −24）
-    target.armB = 10 * DEG; target.foreB = 30 * DEG;                        // 另一只手托后颈（正值＝往身后够）
+    target.armF = (-60 - 6 * k) * DEG; target.foreF = (-36 + 4 * k) * DEG;   // 压住肩（世界角 ≈ −24）
+    target.armB = 12 * DEG; target.foreB = -18 * DEG;                        // 另一只手托后颈（正值＝往身后够）
     target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
     target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
   } else if (s.pose === "ladleSteady") {
@@ -1442,8 +1589,8 @@ export function PoseRig(rig, s, dt) {
     const k = Math.max(0, Math.min(1, s.poseK ?? 0));
     target.hipY = -0.36; target.hipX = 0.03;
     target.torso = (40 + 4 * k) * DEG; target.head = -18 * DEG;
-    target.armF = -48 * DEG; target.foreF = (31 - 4 * k) * DEG;
-    target.armB = -30 * DEG; target.foreB = 22 * DEG;
+    target.armF = -48 * DEG; target.foreF = (-31 - 4 * k) * DEG;
+    target.armB = -30 * DEG; target.foreB = -22 * DEG;
     target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
     target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
   } else if (s.pose === "twistTie") {
@@ -1467,25 +1614,68 @@ export function PoseRig(rig, s, dt) {
     const a = (s.poseK ?? 0) * Math.PI * 4;
     target.hipY = -0.36; target.hipX = 0.05;
     target.torso = 44 * DEG; target.head = -20 * DEG;
-    target.armF = (-52 + 16 * Math.sin(a)) * DEG; target.foreF = (26 + 18 * Math.cos(a)) * DEG;
-    target.armB = (-40 + 16 * Math.sin(a + Math.PI)) * DEG; target.foreB = (20 + 18 * Math.cos(a + Math.PI)) * DEG;
+    target.armF = (-52 + 16 * Math.sin(a)) * DEG; target.foreF = (-26 + 18 * Math.cos(a)) * DEG;
+    target.armB = (-40 + 16 * Math.sin(a + Math.PI)) * DEG; target.foreB = (-20 + 18 * Math.cos(a + Math.PI)) * DEG;
     target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
     target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
   } else if (s.pose === "heldChild") {
     // 被抱在怀里的孩子（与 childArms 走姿成对）。老版给的是 leanIn——那是
     // **站姿**（hipY −0.05、大腿 −10°、小腿 12°，腿几乎是直的），于是被抱起来
-    // 的妹妹笔直地垂着两条腿浮在他身前。真被抱着的孩子：腿折起来搭在他小臂上，
-    // 两只手往上够、搂住他的脖子（他的脖根在 0.98m，她坐在 0.82m ⇒ 手往上
-    // 够 0.16m ⇒ 前臂世界角落在 −140 上下）。
+    // 的妹妹笔直地垂着两条腿浮在他身前。真被抱着的孩子：腿折起来盘住他，
+    // 两只手往上够、搂住他的脖子。
+    //
+    // 2026-08-17 按新的坐高重算（用户："抱起妹妹的动画太蠢了"）。上一版她坐在
+    // 0.82m 上：**头顶比他还高 0.1m**（实拍量的：她 head 1.258 / 他 1.159），
+    // 读出来是"举着一个人"不是"抱着一个孩子"。抱孩子是**坐在胯上**——
+    // 她的胯落在 0.70m（他的胯 0.57、肩 0.93），头顶就正好在他下巴那一线。
+    // 落点反算（她体型 0.61：肩高 0.97m，上臂 0.153/前臂 0.146）：
+    // 手要够到他的脖根（她身前 0.16m、比她自己的肩高 0.185m）⇒ 弦长 0.245m、
+    // 世界角 −139°，拆成上臂 −105°、前臂 −70°。
     const br = Math.sin(s.breath || 0);
-    target.hipY = -0.05; target.hipX = 0.06;
-    target.torso = (10 + br * 1.4) * DEG; target.head = (-22 - br * 1.6) * DEG;
-    // 两条胳膊往上够着搂脖子：肘吊在体侧，前臂折上去（错开 6° 免得叠成一条）
-    target.armF = -46 * DEG; target.foreF = -94 * DEG;
-    target.armB = -40 * DEG; target.foreB = -100 * DEG;
-    // 腿折起来（大腿收到身前、小腿垂下去），一前一后错开
-    target.thighF = -70 * DEG; target.shinF = 80 * DEG; target.footF = -6 * DEG;
-    target.thighB = -62 * DEG; target.shinB = 72 * DEG; target.footB = -4 * DEG;
+    target.hipY = -0.04; target.hipX = 0.05;
+    // 整个人往他那边贴（torso 正值＝朝她自己的正前方折，而她正对着他）
+    target.torso = (16 + br * 1.4) * DEG; target.head = (-26 - br * 1.6) * DEG;
+    // 两条胳膊往上够着搂脖子（错开 7° 免得侧视里叠成一条）
+    target.armF = -105 * DEG; target.foreF = -70 * DEG;
+    target.armB = -98 * DEG; target.foreB = -74 * DEG;
+    // 腿盘住他：大腿收到身前偏上（膝头顶在他腰上），小腿垂下去贴着他
+    target.thighF = -64 * DEG; target.shinF = 62 * DEG; target.footF = -6 * DEG;
+    target.thighB = -52 * DEG; target.shinB = 56 * DEG; target.footB = -5 * DEG;
+  } else if (s.pose === "scoopReach") {
+    // 蹲下去够她（进度驱动，poseU 0→1；玩家按住 E ＋ ↑ 的那 0.9 秒）。
+    // 老版这一步借的是 `bow`——**弯腰拾东西**：两条胳膊平端着直指身前，
+    // 而且 bow 不吃进度，0.9 秒里一格不动。实拍读出来是"他冲着空气鞠了个躬，
+    // 然后妹妹瞬移到他怀里"。
+    // 这一支是**有行程的**：站着 → 屈膝下蹲、腰跟着折 → 两只手探到她腋下扣住。
+    // 走满进度那一格 = scoopChild 的第一帧，松手接回站姿也是连着的。
+    //
+    // **落点是量出来的，别照感觉写**（第一版就栽了：胳膊的世界角给到 −82°，
+    // 两条手臂平端着直指身前，正是 CLAUDE.md 点名的那个"闲着的人不会平端双手"）：
+    // 半蹲 hipY −0.24 ⇒ 胯 0.376m，腰折 38° ⇒ 肩落在（身前 0.22m, 0.658m）；
+    // 妹妹站在身前 0.50m，腋下 0.68m ⇒ 肩→手 0.28m、世界角 −94.5°，
+    // 拆成上臂 −51°、前臂 −89°（肘吊在身前下方、前臂折上来从她腋下兜进去）。
+    // 她**必须站在 0.50m 外**这一条同样要紧：贴到 0.34m 时肩到腋下只剩 9 厘米，
+    // 比一条上臂还短，胳膊怎么摆都是一团折起来的东西。
+    //
+    // 进度到骨架这一层统一叫 poseK（World 的 PoseProgress 按姿势名从
+    // vaultK/poseU/poseK 里挑一个塞进来）——直接读 s.poseU 是拿不到的
+    const k = Math.max(0, Math.min(1, s.poseK ?? 0));
+    const e = k * k * (3 - 2 * k);
+    const L = (a, b) => (a + (b - a) * e) * DEG;
+    target.hipY = -0.02 + (-0.24 - -0.02) * e;
+    target.hipX = 0.02 + (0.07 - 0.02) * e;
+    target.torso = L(10, 38); target.head = L(-12, -22);
+    // 手一路往下探：肘先离开体侧，前臂再折上来从腋下兜进去
+    target.armF = L(-22, -51); target.foreF = L(-24, -89);
+    target.armB = L(-14, -44); target.foreB = L(-20, -95);
+    // 蹲的闭合式：hipY = 0.31·cos(大腿) + 0.31·cos(大腿+小腿) − 0.62
+    // （−76/+84 ⇒ −0.238）。**两条腿都要按这条闭合式配**，只是角度错开——
+    // 前腿第一版给了 −52/+60，投影 0.498 比后腿的 0.382 长了 12cm，
+    // 实拍量出来那只脚陷进地里 2.3cm（`--probe` 的 footF=−0.023）。
+    // −60/+103 的投影也是 0.382：膝往前顶得少一点、小腿往后斜得多一点，
+    // 两只脚都落在地面上，侧视里还错得开
+    target.thighB = L(-8, -76); target.shinB = L(10, 84); target.footB = L(-4, -6);
+    target.thighF = L(6, -60); target.shinF = L(6, 103); target.footF = L(-4, -8);
   } else if (s.pose === "heldUp") {
     // 被托在半空的孩子（与 liftChild 成对）。老版她用的是 `mark`——那是
     // **站在地上**伸手比划的姿势，两条腿笔直踩着空气，人就这么浮在门框前。
@@ -1495,7 +1685,7 @@ export function PoseRig(rig, s, dt) {
     target.hipY = 0; target.hipX = 0.02;
     target.torso = (8 + br * 1.5) * DEG; target.head = -22 * DEG;
     target.armF = -150 * DEG; target.foreF = -14 * DEG;   // 够门框（同 mark 那只手）
-    target.armB = -46 * DEG; target.foreB = 96 * DEG;     // 扒着他的肩
+    target.armB = -52 * DEG; target.foreB = -34 * DEG;     // 扒着他的肩
     // 两条腿垂着、膝盖松松地屈——错开一前一后，不然侧视里只剩一条
     target.thighB = -18 * DEG; target.shinB = 46 * DEG; target.footB = -14 * DEG;
     target.thighF = -34 * DEG; target.shinF = 58 * DEG; target.footF = -16 * DEG;
@@ -1584,7 +1774,7 @@ export function PoseRig(rig, s, dt) {
     target.head = -50 * DEG;              // 顺着自己的手往上看
     target.armF = -118 * DEG;             // 负角向前：抬到前上方 28°，从脑袋侧上方指出去
     target.foreF = -6 * DEG;              // 胳膊几乎伸直，指出去
-    target.armB = -2 * DEG; target.foreB = 14 * DEG;   // 另一只顺着重力垂着
+    target.armB = -2 * DEG; target.foreB = -14 * DEG;   // 另一只顺着重力垂着
     target.thighB = -36 * DEG; target.shinB = 46 * DEG; target.footB = -12 * DEG;
     target.thighF = -24 * DEG; target.shinF = 34 * DEG; target.footF = -12 * DEG;
   } else if (s.pose === "planePush") {
@@ -1695,8 +1885,8 @@ export function PoseRig(rig, s, dt) {
     target.thighB = -38 * DEG; target.shinB = 128 * DEG; target.footB = 12 * DEG;
     target.thighF = -44 * DEG; target.shinF = 136 * DEG; target.footF = 14 * DEG;
     // 起手抱在胸前（肘折死、世界角 −16°），按下去的过程里胳膊伸开往下压
-    target.armF = (-74 + 46 * k) * DEG; target.foreF = (58 - 76 * k) * DEG;
-    target.armB = (-66 + 40 * k) * DEG; target.foreB = (52 - 68 * k) * DEG;
+    target.armF = (-74 + 46 * k) * DEG; target.foreF = (-58 - 76 * k) * DEG;
+    target.armB = (-66 + 40 * k) * DEG; target.foreB = (-52 - 68 * k) * DEG;
   } else if (s.pose === "heaveMat") {
     // 掀苫草（找吃的第一道手）：**姿势由掀到哪个角直接驱动**（poseK 0→1＝
     // 苫子从平铺到过重心），不是播一段循环。起手蹲着弓腰、两手探到脚前的地面
@@ -1916,8 +2106,8 @@ export function PoseRig(rig, s, dt) {
     target.head = (-30 - 18 * k) * DEG;       // 眼睛跟着板往上看
     // 行程全长在**小臂**上（前臂从折在胸前一路推直）——这就是"往上顶"的读法。
     // k=1 时手心停在 0.885（体型 0.80 折世界 0.71m），正好抵住洞顶那条线
-    target.armF = (-95 - 5 * k) * DEG + push; target.foreF = (95 - 115 * k) * DEG;
-    target.armB = (-88 - 6 * k) * DEG + push; target.foreB = (92 - 114 * k) * DEG;
+    target.armF = (-95 - 5 * k) * DEG + push; target.foreF = (-95 - 115 * k) * DEG;
+    target.armB = (-88 - 6 * k) * DEG + push; target.foreB = (-92 - 114 * k) * DEG;
     // 双膝跪在地上、小腿折向身后（爬行段里没有别的姿势可选）
     target.thighB = -8 * DEG; target.shinB = 96 * DEG; target.footB = 16 * DEG;
     target.thighF = -6 * DEG; target.shinF = 92 * DEG; target.footF = 14 * DEG;
@@ -1989,8 +2179,10 @@ export function PoseRig(rig, s, dt) {
     target.head = 4 * DEG;
     target.armB = Lerp(-142, -118, (swing + 1) / 2) * DEG;   // 扒横档的那只
     target.foreB = -30 * DEG;
-    target.armF = -35 * DEG;                                  // 兜着她的那只：不动
-    target.foreF = -73 * DEG;
+    // 兜着她的那只：**一格不许动**，角度照抄 childArms 的静止帧
+    // （改了那儿就得改这儿——她在怀里的位置由这只手定）
+    target.armF = 4 * DEG;
+    target.foreF = -69 * DEG;
     target.thighB = Lerp(-10, -40, (swing2 + 1) / 2) * DEG;
     target.shinB = 40 * DEG;
     target.thighF = Lerp(-40, -10, (swing2 + 1) / 2) * DEG;
@@ -2041,9 +2233,9 @@ export function PoseRig(rig, s, dt) {
     // 撑地那一侧接近伸直，往前够的那一侧抬起来——手离地是应该的，
     // 那是"正在往前挪"，不是飞
     target.armB = (-14 + (c ? swing * 22 : 0)) * DEG;
-    target.foreB = (6 + (c ? Math.max(0, -swing) * 14 : 0)) * DEG;
+    target.foreB = (-6 + (c ? Math.max(0, -swing) * 14 : 0)) * DEG;
     target.armF = (-14 + (c ? swing2 * 22 : 0)) * DEG;
-    target.foreF = (6 + (c ? Math.max(0, -swing2) * 14 : 0)) * DEG;
+    target.foreF = (-6 + (c ? Math.max(0, -swing2) * 14 : 0)) * DEG;
     // 腿：大腿几乎垂直（膝盖跪在地上），小腿连着脚往后铺在地面上拖着走。
     // 大腿与小腿由同一个 swing 驱动、方向相反，小腿的世界角就始终贴着地面
     target.thighB = (-6 + (c ? swing2 * 16 : 0)) * DEG;
@@ -2147,32 +2339,44 @@ export function PoseRig(rig, s, dt) {
     // **步幅收掉一档**（抱着人迈不开步，也不敢颠）。
     const c = s.moving ? 1 : 0;
     const br = Math.sin(s.breath || 0);
+    // 抱着人站着**不是一尊像**（2026-08-17 用户："太蠢了"）。老版站住时这一支
+    // 除了 ±1.2° 的呼吸全是死值，实拍隔半秒两张图像素相同。抱孩子的人一直在
+    // 微微地倒重心、隔一会儿往上颠一下把她换个位置——两条错开周期的慢摆
+    // （呼吸 1×、倒重心 0.37×、颠一下 0.19× 且只在波峰附近发力）就够了。
+    const sway = Math.sin((s.breath || 0) * 0.37);
+    const shift = Math.sin((s.breath || 0) * 0.19);
+    const jog = Math.max(0, shift - 0.72) * 3.6;       // 隔十几秒往上托一下
     // 起伏比空手小得多：颠孩子的人会自己把步子放软
-    target.hipY = c ? Math.abs(Math.sin(p)) * 0.018 : br * 0.010;
-    target.hipX = -0.03;
-    target.torso = (c ? -7 : -6 + br * 1.0) * DEG;      // 后仰配重
-    target.head = (c ? 4 : 3 - br * 1.2) * DEG;
-    // 腿：步幅 30→20、小腿折度 52→36
-    target.thighB = (c ? swing2 * 20 : -3) * DEG;
-    target.shinB = (c ? Math.max(0, -swing2) * 36 : 4) * DEG;
+    target.hipY = c ? Math.abs(Math.sin(p)) * 0.018 : br * 0.010 + jog * 0.030;
+    target.hipX = -0.03 + (c ? 0 : sway * 0.012);
+    target.torso = (c ? -7 : -6 + br * 1.0 - sway * 1.6 - jog * 2.4) * DEG;   // 后仰配重
+    target.head = (c ? 4 : 3 - br * 1.2 + sway * 1.1) * DEG;
+    // 腿：步幅 30→20、小腿折度 52→36。站住时两条腿一前一后错开倒重心，
+    // 别让抱着人的姿势又退回"两根平行的棍子"
+    target.thighB = (c ? swing2 * 20 : -3 - sway * 2.6) * DEG;
+    target.shinB = (c ? Math.max(0, -swing2) * 36 : 4 + sway * 2.0) * DEG;
     target.footB = (c ? -swing2 * 8 - 4 : -3) * DEG;
-    target.thighF = (c ? swing * 20 : 3) * DEG;
-    target.shinF = (c ? Math.max(0, -swing) * 36 : 2) * DEG;
+    target.thighF = (c ? swing * 20 : 3 + sway * 2.6) * DEG;
+    target.shinF = (c ? Math.max(0, -swing) * 36 : 2 - sway * 1.4) * DEG;
     target.footF = (c ? -swing * 8 - 4 : -3) * DEG;
     // 两条胳膊都不摆——它们正兜着人。**肘要吊在体侧，不许平端出去**：
     // 老版给的是上臂 −96/−104（＝把**肘**抬到水平以上、整条胳膊直挺挺伸向身前），
     // 实测手落在身前 0.61m、离地 0.52m，而她的身子中心只在身前 0.26m——
     // 他在她身外 0.35m 的空气里认真兜着，她浮在旁边（2026-08-15 用户报「完全不对」）。
     //
-    // 按落点反算（柱子体型 0.80：肩高 0.82m，上臂＝前臂＝0.196m）：
-    // · 近侧那只托屁股 —— 手要停在身前 0.30m、离地 0.70m ⇒ 肩→手 0.316m，
-    //   肘弯 72°，上臂 −35°（几乎垂着、略朝前），前臂 −73°（折上去横兜）；
-    // · 远侧那只搂后腰 —— 手停在身前 0.24m、离地 0.86m ⇒ 上臂 −48°、前臂 −103°。
-    // 两条错开十几度，侧视里才不叠成一条。
-    target.armF = (-35 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
-    target.foreF = (-73 - (c ? Math.sin(p) * 2 : 0)) * DEG;
-    target.armB = (-48 + (c ? Math.sin(p) * 2 : br * 1.2)) * DEG;
-    target.foreB = (-103 - (c ? Math.sin(p) * 2 : 0)) * DEG;
+    // 2026-08-17 又降了一档：上一版把她坐到 0.82m（＝他自己的胸口），实拍她的
+    // 头顶比他还高，两条胳膊在她胯那一线横着抱——那是**举**不是**抱**。
+    // 抱孩子是坐在胯上。按新落点反算（柱子体型 0.80：肩高 0.93m、胯 0.57m，
+    // 上臂 0.20/前臂 0.192m）：
+    // · 近侧那只托屁股 —— 手停在身前 0.16m、离地 0.645m（＝她坐的那一面）
+    //   ⇒ 肩→手 0.323m、上臂 +4°（几乎垂直吊着）、前臂 −69°（折上来横兜）；
+    // · 远侧那只搂后背 —— 手停在身前 0.17m、离地 0.90m ⇒ 上臂 −20°、前臂 −128°
+    //   （肘吊在腰侧、前臂折上去绕过她的背）。
+    // 两条错开二十几度，侧视里才不叠成一条。
+    target.armF = (4 + (c ? Math.sin(p) * 2 : br * 1.2 + sway * 1.8) - jog * 7) * DEG;
+    target.foreF = (-69 - (c ? Math.sin(p) * 2 : 0) - jog * 5) * DEG;
+    target.armB = (-20 + (c ? Math.sin(p) * 2 : br * 1.2 - sway * 1.5) - jog * 6) * DEG;
+    target.foreB = (-128 - (c ? Math.sin(p) * 2 : 0) - jog * 5) * DEG;
   } else if (s.carry) {
     // 扛：东西搁在肩上，近侧手臂上抬扶住（肘朝外），另一只手自然垂着摆动；
     // 肩担了重量，躯干朝反侧微倾配重，脖子略偏。
@@ -2307,6 +2511,17 @@ function SoleLift(t) {
 function ApplyPose(rig, t, target, blend) {
   const j = rig.joints;
   for (const k of Object.keys(target)) t[k] = Lerp(t[k], target[k], blend);
+
+  // —— 关节的解剖闸（2026-08-17 用户："人物还是有很多反关节的设置"）。
+  // **膝只能往后屈（shin ≥ 0）、肘只能往前屈（fore ≤ 0）**：这两个角都是相对
+  // 上一节的局部角，0 是伸直，正值把小腿往身后送、把小臂往身后翻。
+  // 病根是一条**写错的注释**——"foreF 正值＝小臂折回来"——被照抄了 51 处，
+  // 于是全场的胳膊在肘上反着弯。那 51 处已经把号翻过来了，这道闸是防再犯：
+  // 谁写反了，画面上顶多是伸直，绝不会再翻过去。
+  t.shinB = Math.max(0, Math.min(150 * DEG, t.shinB));
+  t.shinF = Math.max(0, Math.min(150 * DEG, t.shinF));
+  t.foreB = Math.max(-155 * DEG, Math.min(0, t.foreB));
+  t.foreF = Math.max(-155 * DEG, Math.min(0, t.foreF));
 
   j.root.position.set(t.hipX, BONE.hipY + BONE.sole * SoleLift(t) + t.hipY, 0);
   j.torso.rotation.z = -t.torso;

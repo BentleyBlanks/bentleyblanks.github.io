@@ -5005,6 +5005,12 @@ function EnterBeat(state) {
     else EnterBeat(state);
     return;
   }
+  // 心情气泡（头顶那枚）**每拍清一次**：`a.mood` 是这一拍的话，赖着不走的话
+  // 一枚"饿"会跟着妹妹跟到第八章。要挂就在这一拍的 onStart / 行内 on() 里拨；
+  // 不拨的由 World 从轨道推一个默认（tremble 一族＝怕）。写 `mood: null` 是
+  // "这一拍明确不要气泡"
+  for (const a of state.actors || []) a.mood = undefined;
+  if (state.player) state.player.mood = undefined;
   state.beat = {
     t: 0, lineIndex: 0, lineT: 0, lineFired: -1,
     itemStates: def.kind === "collect" ? def.items.map((p) => ({ x: p.x, carried: false, delivered: false })) : null,

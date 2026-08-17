@@ -256,19 +256,31 @@ export function AddBandEdge(group, xFrom, xTo, z, light, id) {
 //     里是 2.4 米宽的一条色带，读出来就是"横过整幅画的两道条纹"。
 //
 // 所以路面另起一块几何：**只管街面这 7 米纵深**，贴图沿路方向按 64 米一循环
-// 平铺，密度回到 96 像素/米（跟道具同一把尺）。两条关键：
+// 平铺，密度回到 96 像素/米（跟道具同一把尺）。关键的一条：
 //
-//   ① **纵向 UV 按屏幕均分，不按世界均分**。地面在画面上是随纵深收缩的：
-//      深度 z 处离视平线 camY/(camD−z)。让贴图每一行对应等量的**屏幕**行，
-//      于是贴图上画一个圆，上屏就是一枚按透视压扁的印子——远的自己小、
-//      近的自己大，一个折算都不用手写。
-//   ② **撒点在世界坐标里撒**（沿路 x、纵深 z 各自均匀），尺寸按各自那一档
-//      纵深换算：横着 96px/米是常数，纵深方向一米占多少行由 RowsPerM 给。
-//      不这么做，路上的东西就只能全挤在一条线上——那正是被退回的样子。
+//   **纵向 UV 按屏幕均分，不按世界均分**。地面在画面上是随纵深收缩的：
+//   深度 z 处离视平线 camY/(camD−z)。让贴图每一行对应等量的**屏幕**行，
+//   于是贴图上画一条软边，上屏就是一条按透视压扁的带子——远的自己窄、
+//   近的自己宽，一个折算都不用手写。
 //
 // 色号一律比直觉深两档：CanvasTexture 没声明 sRGB，上屏被整体提亮（全作老账）。
-// 老版路面细节给的是 0.10~0.16 的 alpha，提亮之后等于没画，那也是"看不出来是
-// 什么"的一半原因。
+//
+// **这块几何上只许有调子，不许有碎点**（2026-08-17 用户看序章过场退回：「地面的
+// 纹理太丑了 太喧宾夺主了 会抢掉视觉重点」）。上一版按"材质靠形不靠颜色"往路上
+// 撒了蹄印、土坷垃、料礓石子、旱裂的泥皮、糠秕、粪蛋、草茬——每一样单看都对，
+// 合到一起是一条**明暗对比比人还强**的花带子。两笔账一起记下：
+//
+//   ① **过场机位比玩法近一倍**：2.8m 半宽下一枚四厘米的石子上屏十几个像素，
+//      而这些点铺满画面下三分之一——眼睛先看见地，后看见人。地面是背景，
+//      **背景的活是让人立得住，不是自己好看**。
+//   ② **这块几何横贯全场、屋里屋外一视同仁**（x0=−60..length+60），所以那些
+//      车辙、蹄印、粪蛋是**画在自家屋里的夯土地面上**的——序章整场戏都在屋里，
+//      用户看到的正是这个。画得对不够，还得问它铺到了哪儿。
+//
+// 现在这张贴图只剩三样**大面积软渐变**：路面底色、两道路肩、两条碾道。要交代
+// "这是条常年碾压的村道"，一档比田沉的调子就够了。**别再往这儿加离散的记号**
+// （点、线、圈、草）——真要在路上摆东西，摆成道具（`Data_Scenes.json` 里挂
+// `band`），那是一件一件摆得住、也删得掉的东西。
 // ---------------------------------------------------------------------------
 export const ROAD_VIEW = {
   camY: 1.85, camD: 9.3,   // 默认玩法机位（PLAY_HW 4.45）——这是把尺子，不是真相机
@@ -280,55 +292,31 @@ export const ROAD_VIEW = {
 };
 const OffOf = (z) => ROAD_VIEW.camY / (ROAD_VIEW.camD - z);
 const OFF_FAR = OffOf(ROAD_VIEW.farZ), OFF_NEAR = OffOf(ROAD_VIEW.nearZ);
-const ROAD_PX_M = PPM * ROAD_VIEW.ss;                       // 横着：一米几像素
 // 贴图第几行 ↔ 那一行落在哪个纵深（行 0 = 远端）
 const RoadRow = (z) => ROAD_VIEW.hPx * (OffOf(z) - OFF_FAR) / (OFF_NEAR - OFF_FAR);
-// 纵深方向一米占多少行（近处多、远处少——这就是透视压缩）
-const RoadRowsPerM = (z) => (ROAD_VIEW.hPx / (OFF_NEAR - OFF_FAR))
-  * ROAD_VIEW.camY / ((ROAD_VIEW.camD - z) ** 2);
+// 横向 96px/米（ROAD_PX_M）与"纵深一米占多少行"（RoadRowsPerM）这两把尺子随撒点
+// 一起删了——只画软渐变的话，用得着的只有 RoadRow。要往回加细节先把它们找回来
 
+// 只剩三档色：路面底色、路肩、碾道。**碎点那一族色号已整批删掉**——留着就会有人
+// 顺手再撒回去（尤其是 grit/chaff/clodLit 那几个高亮的，它们正是抢眼的正主）
 const ROAD_PAL = {
   // 路要比地里的生土**沉一档**：常年碾压的土板结、发暗、带一层灰。老版路面跟
   // 田同色，于是"街"这件东西在画面上根本不存在——两边一样亮，只剩一条空地
   day: {
-    face: ["#93794a", "#77602f"], track: "rgba(50,36,18,0.40)",
-    rut: "rgba(26,17,7,0.78)", lip: "rgba(224,202,154,0.60)", rim: "rgba(12,8,3,0.34)",
-    crack: "rgba(48,32,14,0.55)", hoof: "rgba(32,21,9,0.58)",
-    clod: "#574323", clodLit: "rgba(220,198,152,0.78)",
-    grit: ["rgba(210,194,158,0.82)", "rgba(66,50,28,0.7)"],
-    chaff: "rgba(216,198,138,0.72)", dung: "rgba(40,29,13,0.75)",
-    grass: ["#48591f", "#63652c"], dust: "rgba(226,206,160,0.30)",
-    shoulder: "rgba(66,56,28,0.34)",
+    face: ["#93794a", "#77602f"],
+    track: "rgba(50,36,18,0.26)", shoulder: "rgba(66,56,28,0.30)",
   },
   dawn: {
-    face: ["#7d6d52", "#63543c"], track: "rgba(42,33,21,0.38)",
-    rut: "rgba(23,18,11,0.74)", lip: "rgba(202,188,156,0.52)", rim: "rgba(10,8,5,0.3)",
-    crack: "rgba(41,32,19,0.5)", hoof: "rgba(28,22,13,0.54)",
-    clod: "#4a3e2a", clodLit: "rgba(196,180,146,0.7)",
-    grit: ["rgba(188,176,146,0.72)", "rgba(58,48,32,0.64)"],
-    chaff: "rgba(192,176,130,0.64)", dung: "rgba(35,28,17,0.7)",
-    grass: ["#3a4527", "#525232"], dust: "rgba(202,190,160,0.24)",
-    shoulder: "rgba(58,50,32,0.3)",
+    face: ["#7d6d52", "#63543c"],
+    track: "rgba(42,33,21,0.24)", shoulder: "rgba(58,50,32,0.26)",
   },
   night: {
-    face: ["#333b49", "#222833"], track: "rgba(12,15,22,0.42)",
-    rut: "rgba(5,7,11,0.76)", lip: "rgba(134,148,172,0.44)", rim: "rgba(0,0,0,0.34)",
-    crack: "rgba(9,12,18,0.52)", hoof: "rgba(7,9,14,0.56)",
-    clod: "#1e2532", clodLit: "rgba(132,148,174,0.56)",
-    grit: ["rgba(142,156,178,0.6)", "rgba(22,28,38,0.64)"],
-    chaff: "rgba(140,146,150,0.44)", dung: "rgba(9,12,18,0.7)",
-    grass: ["#1e2726", "#2a302e"], dust: "rgba(130,148,174,0.18)",
-    shoulder: "rgba(13,17,24,0.34)",
+    face: ["#333b49", "#222833"],
+    track: "rgba(12,15,22,0.28)", shoulder: "rgba(13,17,24,0.30)",
   },
   tunnel: {
-    face: ["#2e251b", "#201a12"], track: "rgba(15,12,8,0.4)",
-    rut: "rgba(7,6,4,0.7)", lip: "rgba(104,92,72,0.38)", rim: "rgba(0,0,0,0.3)",
-    crack: "rgba(14,11,8,0.48)", hoof: "rgba(10,8,6,0.52)",
-    clod: "#1f1a11", clodLit: "rgba(112,100,78,0.54)",
-    grit: ["rgba(118,106,82,0.56)", "rgba(24,20,14,0.6)"],
-    chaff: "rgba(120,108,76,0.44)", dung: "rgba(12,10,7,0.64)",
-    grass: ["#1c1e13", "#242618"], dust: "rgba(108,96,74,0.16)",
-    shoulder: "rgba(16,13,9,0.3)",
+    face: ["#2e251b", "#201a12"],
+    track: "rgba(15,12,8,0.26)", shoulder: "rgba(16,13,9,0.26)",
   },
 };
 ROAD_PAL.dusk = ROAD_PAL.dawn;
@@ -336,22 +324,20 @@ ROAD_PAL.dark = ROAD_PAL.tunnel;
 
 /**
  * 一节村道的贴图（沿路方向可平铺）。W×H 像素 = tileM 米 × farZ..nearZ 那一片。
- * 画法全在世界坐标里想：一颗石子多大、一道辙多宽、一撮草在哪条没被碾着的缝里。
+ * **通篇只有三道软渐变**，一个离散的记号都没有——为什么，见本节开头那段账。
  */
-function PaintRoadTile(ctx, W, H, id, light) {
+function PaintRoadTile(ctx, W, H, light) {
   const P = ROAD_PAL[light] || ROAD_PAL.day;
-  const H1 = ART.Hash;
-  const spanM = W / ROAD_PX_M;
   const { farZ, nearZ } = ROAD_VIEW;
 
-  // 底：路面比田里的生土沉一档（常年碾压），远端再压一点当空气透视
+  // ① 底：路面比田里的生土沉一档（常年碾压），远端再压一点当空气透视
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, P.face[0]);
   g.addColorStop(1, P.face[1]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // 两道路肩：街跟院子/墙根交界的那一条，土色发灰、草多、车碾不着
+  // ② 两道路肩：街跟院子/墙根交界的那一条，土色发灰、车碾不着
   for (const [z0, z1, dir] of [[farZ, farZ + 1.15, 1], [nearZ - 1.0, nearZ, -1]]) {
     const y0 = RoadRow(z0), y1 = RoadRow(z1);
     const sg = ctx.createLinearGradient(0, dir > 0 ? y0 : y1, 0, dir > 0 ? y1 : y0);
@@ -361,7 +347,8 @@ function PaintRoadTile(ctx, W, H, id, light) {
     ctx.fillRect(0, Math.min(y0, y1), W, Math.abs(y1 - y0));
   }
 
-  // ① 碾道：车轮常年压的那两条比路心沉一档。先铺面，细节才有得压
+  // ③ 碾道：车轮常年压的那两条比路心沉一档。**两条软渐变，没有边**——一给它
+  // 硬边（老版那三道 lip/rut/rim 描线）就成了横贯全画的两道条纹，近景尤其扎眼
   for (const [z0, z1] of [[-1.95, -0.05], [0.34, 2.25]]) {
     const y0 = RoadRow(z0), y1 = RoadRow(z1);
     const tg = ctx.createLinearGradient(0, y0, 0, y1);
@@ -372,184 +359,6 @@ function PaintRoadTile(ctx, W, H, id, light) {
     ctx.fillStyle = tg;
     ctx.fillRect(0, y0, W, y1 - y0);
   }
-
-  // ② 车辙：**沿路走，所以在画面上是横的**——可一道辙不是一条线，是一条槽：
-  // 槽心一道暗、挤到近侧的土棱受光亮一线、远侧的沿口带一点暗。宽窄按各自
-  // 那一档纵深折算（远的细近的粗），而且走一段浅一段（车轮跳过去了）
-  const RUTS = [
-    { z: -1.62, w: 0.18, a: 0.9 },   // 大车（轴距 1.36m）
-    { z: -0.26, w: 0.18, a: 1.0 },
-    { z: 0.92, w: 0.11, a: 0.8 },    // 独轮车——冀中的路一半是它碾出来的
-    { z: 1.95, w: 0.19, a: 0.9 },
-  ];
-  for (const R of RUTS) {
-    const th = Math.max(2.2, R.w * RoadRowsPerM(R.z));
-    const base = RoadRow(R.z);
-    const wander = (px) => Math.sin(px * 0.0016 + H1(id + "wd" + R.z) * 6) * th * 1.5
-      + Math.sin(px * 0.0061) * th * 0.55;
-    const step = Math.max(6, 0.24 * ROAD_PX_M);
-    const stroke = (dy, color, lw) => {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lw;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      let on = false;
-      for (let px = 0; px <= W; px += step) {
-        const live = H1(id + "rt" + R.z + Math.floor(px / (step * 8))) > 0.14;
-        const yy = base + dy + wander(px) + (H1(id + "rj" + R.z + px) - 0.5) * th * 0.45;
-        if (live && !on) { ctx.moveTo(px, yy); on = true; } else if (live) ctx.lineTo(px, yy);
-        else on = false;
-      }
-      ctx.stroke();
-    };
-    ctx.save();
-    ctx.globalAlpha = R.a;
-    stroke(th * 0.62, P.lip, th * 0.5);      // 挤到近侧的土棱（受光）
-    stroke(0, P.rut, th);                     // 槽心
-    stroke(-th * 0.68, P.rim, th * 0.45);     // 远侧的沿口
-    ctx.restore();
-  }
-
-  // ③ 撒点：世界坐标里均匀撒，尺寸按那一档纵深折算。
-  // 贴图沿路平铺，所以贴着两边的东西要在对面再画一份，缝上才连得起来
-  const scatter = (perM2, seed, zFrom, zTo, draw) => {
-    const n = Math.round(perM2 * spanM * (zTo - zFrom));
-    for (let i = 0; i < n; i += 1) {
-      const z = zFrom + H1(id + seed + "z" + i) * (zTo - zFrom);
-      const px = H1(id + seed + "x" + i) * W;
-      const py = RoadRow(z);
-      draw(px, py, z, i);
-      if (px < 90) draw(px + W, py, z, i);
-      else if (px > W - 90) draw(px - W, py, z, i);
-    }
-  };
-  // 一件东西：横着 wM 米、顺路 dM 米，在贴图上占多少像素。
-  // **竖着有个下限**：这一片贴图纵向只有 1.7 行/屏幕像素，一枚物理上没错的
-  // 三厘米石子在这儿只有半行高——上屏被各向异性过滤抹成一片均匀的灰，
-  // 那正是"近处这一段还是空的"的来历。手绘画风本来就该把小东西画大一档。
-  const RX = (wM) => wM * ROAD_PX_M;
-  const RY = (dM, z) => Math.max(2.6, dM * RoadRowsPerM(z));
-
-  // 蹄印与脚印：路是被走出来的。牲口顺着辙走，人踩在辙外头
-  scatter(0.5, "hoof", farZ + 0.9, nearZ - 0.4, (px, py, z, i) => {
-    const w = RX(0.075), h = RY(0.17, z) * 0.5;
-    ctx.fillStyle = P.hoof;
-    ctx.beginPath();
-    ctx.ellipse(px, py, w, h, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = P.lip;
-    ctx.beginPath();
-    ctx.ellipse(px, py + h * 1.05, w * 0.85, h * 0.45, 0, 0, Math.PI * 2);
-    ctx.fill();
-    void i;
-  });
-
-  // 土坷垃：黏土碾不碎，路上永远躺着一层。一块给一个受光顶和一线接地影，
-  // 不然就是一颗颗色点
-  scatter(1.3, "clod", farZ + 0.5, nearZ, (px, py, z, i) => {
-    const r = RX(0.045 + H1(id + "cr" + i) * 0.065);
-    const ry = RY(0.09 + H1(id + "cr" + i) * 0.12, z) * 0.6;
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    ctx.beginPath();
-    ctx.ellipse(px + r * 0.35, py + ry * 0.7, r * 1.05, ry * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = P.clod;
-    ctx.beginPath();
-    ctx.ellipse(px, py, r, ry, H1(id + "ca" + i) * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = P.clodLit;
-    ctx.beginPath();
-    ctx.ellipse(px - r * 0.26, py - ry * 0.3, r * 0.44, ry * 0.36, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // 碾碎的料礓石子：一层细碎的明暗点，路面的"沙"就是它
-  scatter(4.5, "grit", farZ + 0.4, nearZ, (px, py, z, i) => {
-    const r = RX(0.019 + H1(id + "gr" + i) * 0.032);
-    ctx.fillStyle = P.grit[i % 2];
-    ctx.beginPath();
-    ctx.ellipse(px, py, r, RY(0.05, z) * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // 旱裂的泥皮：一板一板——泥板的缝是**闭合的多边形**，不是横七竖八的乱线
-  scatter(0.4, "plate", farZ + 0.6, nearZ, (px, py, z, i) => {
-    const r = 0.12 + H1(id + "pr" + i) * 0.2;
-    ctx.strokeStyle = P.crack;
-    ctx.lineWidth = Math.max(1.4, RX(r) * 0.07);
-    ctx.beginPath();
-    for (let k = 0; k <= 5; k += 1) {
-      const a = (k / 5) * Math.PI * 2 + H1(id + "pa" + i) * 3;
-      const q = 0.6 + H1(id + "pq" + i + k) * 0.62;
-      const X = px + Math.cos(a) * RX(r * q), Y = py + Math.sin(a) * RY(r * q, z);
-      if (k === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  });
-
-  // 糠秕与麦秸碎：碾道、场院、门口那一层细碎亮屑——"农村"与"空地"的分界
-  scatter(2.4, "chaff", farZ + 0.3, nearZ, (px, py, z, i) => {
-    ctx.strokeStyle = P.chaff;
-    ctx.lineWidth = Math.max(1.5, RX(0.015));
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(px + RX(0.03 + H1(id + "cl" + i) * 0.075) * (i % 2 ? 1 : -1),
-      py + (H1(id + "cd" + i) - 0.5) * RY(0.09, z));
-    ctx.stroke();
-  });
-
-  // 粪蛋：牲口过路留下的，三五颗一撮。**撒在整条路上**，不再只贴着上沿
-  scatter(0.07, "dung", farZ + 0.8, nearZ - 0.3, (px, py, z, i) => {
-    ctx.fillStyle = P.dung;
-    for (let k = 0; k < 4; k += 1) {
-      const r = RX(0.038 + H1(id + "dr" + i + k) * 0.026);
-      ctx.beginPath();
-      ctx.ellipse(px + (H1(id + "dx" + i + k) - 0.5) * RX(0.28),
-        py + (H1(id + "dy" + i + k) - 0.5) * RY(0.24, z), r, Math.max(2.6, r * 0.7), 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  });
-
-  // 草茬：只长在**没被碾着的那几条**（两条路肩、辙与辙之间的埂），一丛几片
-  // 带尖的叶子。老版是三根 1.5px 的直线画在贴图第 7 行——放大上屏，
-  // 读出来是一排绿方块
-  const GRASS = [[farZ, farZ + 1.2, 1.5], [-0.02, 0.28, 0.7], [2.4, nearZ, 1.2]];
-  for (let b = 0; b < GRASS.length; b += 1) {
-    const [z0, z1, dens] = GRASS[b];
-    const n = Math.round(dens * spanM * (z1 - z0));
-    for (let i = 0; i < n; i += 1) {
-      const z = z0 + H1(id + "gz" + b + i) * (z1 - z0);
-      const px = H1(id + "gx" + b + i) * W, py = RoadRow(z);
-      // 草是立着的：高度按**竖直方向**的透视给（跟横着一个尺度），
-      // 不按纵深压缩——压了就成了趴在地上的一摊苔
-      const hgt = RX(0.06 + H1(id + "gh" + b + i) * 0.09);
-      const tuft = (X) => {
-        ctx.fillStyle = P.grass[i % 2];
-        for (let k = 0; k < 4; k += 1) {
-          const lean = (k - 1.5) * 0.36 + (H1(id + "gl" + b + i + k) - 0.5) * 0.5;
-          const tipX = X + lean * hgt, tipY = py - hgt * (0.6 + H1(id + "gt" + b + i + k) * 0.5);
-          ctx.beginPath();
-          ctx.moveTo(X - hgt * 0.09, py);
-          ctx.quadraticCurveTo(X + lean * hgt * 0.35, py - hgt * 0.5, tipX, tipY);
-          ctx.quadraticCurveTo(X + lean * hgt * 0.2, py - hgt * 0.42, X + hgt * 0.09, py);
-          ctx.closePath();
-          ctx.fill();
-        }
-      };
-      tuft(px);
-      if (px < 90) tuft(px + W); else if (px > W - 90) tuft(px - W);
-    }
-  }
-
-  // 浮土：一片片被风吹薄的亮，把上面那些点连成"一条路"
-  ctx.fillStyle = P.dust;
-  scatter(0.12, "dust", farZ + 0.4, nearZ, (px, py, z, i) => {
-    ctx.beginPath();
-    ctx.ellipse(px, py, RX(0.3 + H1(id + "ur" + i) * 0.7), RY(0.24, z), 0, 0, Math.PI * 2);
-    ctx.fill();
-  });
 }
 
 /**
@@ -557,12 +366,12 @@ function PaintRoadTile(ctx, W, H, id, light) {
  * 它压在 AddGroundPlane（那张管到 72 米外的大地面）之上、一切立牌之下；
  * 两头用 alpha 化开，不留横贯全画的硬边。
  */
-export function AddRoadPlane(group, length, light, id) {
+export function AddRoadPlane(group, length, light) {
   const { farZ, nearZ, tileM, ss, hPx } = ROAD_VIEW;
   const W = Math.round(tileM * PPM * ss);
   const canvas = MakeCanvas(W, hPx);
   const ctx = canvas.getContext("2d");
-  PaintRoadTile(ctx, W, hPx, id, light);
+  PaintRoadTile(ctx, W, hPx, light);
   // 两头化开：远端交给田、近端交给画框外的土，中间才是路。
   // **一遍走完整张画布**——`destination-in` 是会连 fillRect 以外的像素一起吃掉的
   // （改这段时栽过一次：分两段淡入淡出，第二段把第一段的成果整个抹成透明，
@@ -581,9 +390,11 @@ export function AddRoadPlane(group, length, light, id) {
   const tex = CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   // 这一片是**斜着看**的：纵深方向一个屏幕像素要吃掉近两行贴图，横着却还富余。
-  // 各向异性给到 4（CanvasTexture 的默认）就只能靠降 mip 去补，近处那一截当场
-  // 糊成一片均匀的土色——路面的细节全是这么丢的
+  // 各向异性给到 4（CanvasTexture 的默认）就只能靠降 mip 去补，几道渐变的过渡带
+  // 会跟着一起糊出台阶
   tex.anisotropy = 16;
+  // **横贯全场，屋里屋外一视同仁**——所以这张贴图上不许有"只属于街"的东西
+  // （车辙的描线、蹄印、粪蛋）：那些会一并画到自家屋里的夯土地面上
   const x0 = -60, x1 = length + 60;
   const N = 24;
   const pos = [], uv = [], idx = [];
@@ -920,6 +731,50 @@ export function MakeFlatShadow(lengthM, widthM, strength) {
   );
   mesh.rotation.x = -Math.PI / 2;
   FixOrder(mesh, LAYER_ORDER.play - 20);  // 投影压在地面上、在所有立面之下
+  return mesh;
+}
+
+/**
+ * 窖口/竖井口那个**躺在地上的黑洞**（2026-08-17 加。用户：「地道口掀开盖这个镜头
+ * 太丑了 特别是梯子那里 完全认不出是梯子」）。
+ *
+ * 病根之一是：**地表上压根没有洞**。梯子那张贴图是竖着的立牌，从上往下看时，
+ * 画在它上头的洞口只是地平线上一条被压扁的暗带——俯角越大压得越扁。所以洞得
+ * 自己是一块**躺平的几何**（同「贴地光池」那条），俯角一看就是个椭圆的口子，
+ * 平视时自己收成一条缝（那也是对的：平视本来就看不进地上的洞）。
+ *
+ * 排在地面之上、梯子之下：梯子从洞里探上来，两根梯梃压在黑上，"往下去"才成立。
+ */
+export function MakeShaftMouth(wM, dM, id) {
+  const wPx = 256, hPx = 160;
+  const canvas = MakeCanvas(wPx, hPx);
+  const ctx = canvas.getContext("2d");
+  // 口子本身：中间实黑，四边化开成翻上来的土。**不许有干净的边**——
+  // 一圈利落的椭圆读出来是"地上摆着个黑盘子"，不是"地被掏了个洞"
+  const g = ctx.createRadialGradient(wPx * 0.5, hPx * 0.5, 0, wPx * 0.5, hPx * 0.5, hPx * 0.62);
+  g.addColorStop(0, "rgba(6,5,3,0.96)");
+  g.addColorStop(0.52, "rgba(9,7,4,0.92)");
+  g.addColorStop(0.78, "rgba(26,19,11,0.55)");
+  g.addColorStop(1, "rgba(40,30,18,0)");
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i += 1) {
+    const a = (i / 40) * Math.PI * 2;
+    const r = 0.80 + ART.Hash(id + "m" + i) * 0.18;      // 边缘啃得不匀
+    const px = wPx * 0.5 + Math.cos(a) * wPx * 0.5 * r;
+    const py = hPx * 0.5 + Math.sin(a) * hPx * 0.5 * r;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, wPx, hPx);
+  ctx.restore();
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(wM, dM),
+    new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
   return mesh;
 }
 

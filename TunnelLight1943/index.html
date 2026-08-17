@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=123">
+  <link rel="stylesheet" href="./Style_Game.css?v=127">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,32 +33,32 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=123",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=123",
+        "three": "./vendor/three/build/three.module.js?v=127",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=127",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=123",
-        "./Script_World.js": "./Script_World.js?v=123",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=123",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=123",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=123",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=123",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=123",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=123",
-        "./Script_Audio.js": "./Script_Audio.js?v=123",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=123",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=123",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=123",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=123",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=123",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=127",
+        "./Script_World.js": "./Script_World.js?v=127",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=127",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=127",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=127",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=127",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=127",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=127",
+        "./Script_Audio.js": "./Script_Audio.js?v=127",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=127",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=127",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=127",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=127",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=127",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=123",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=123",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=123",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=123",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=123",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=123",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=123",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=123"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=127",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=127",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=127",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=127",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=127",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=127",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=127",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=127"
       }
     }
   </script>
@@ -68,14 +68,12 @@
   <canvas id="gameCanvas" aria-label="地道里的光 三维白盒场景"></canvas>
 
   <div id="hud" aria-hidden="false">
-    <section id="objectivePanel">
-      <b id="objectiveText"></b>
-      <span id="hintText"></span>
-    </section>
-    <!-- 角上那枚「下一件事」：常驻的只有一枚图，字要看的时候才给（勇敢的心式）。
+    <!-- 角上那枚「下一件事」——目标 HUD 只有这一处（2026-08-17 用户：「把水带回家
+         这种小任务和左上角的任务目标 icon 这块功能还是有点重合的 合并一下吧」；
+         屏幕正中那条 #objectivePanel 已撤）。常驻的只有一枚图，换了目标它自己张开
+         把字说几秒再收回去；之后鼠标悬停 / 点一下（手机）再看。
          图与画框边那张提示牌同源（Core.BeatHintIcon → Art.DrawHudBadge），
-         所以角上认得的图走到框边还是同一张，玩家只用学一套。
-         鼠标悬停 / 点一下（手机）展开这一拍的目标与那句提示。 -->
+         所以角上认得的图走到框边还是同一张，玩家只用学一套。 -->
     <button id="objectiveTab" type="button" hidden aria-expanded="false">
       <canvas id="objectiveTabIcon" aria-hidden="true"></canvas>
       <span id="objectiveTabBody"><span class="clip"><span id="objectiveTabCard">
@@ -122,6 +120,12 @@
         <a href="https://www.scottbuckley.com.au/library/with-these-hands/" target="_blank" rel="noopener">With These Hands</a>
         · <a href="https://www.scottbuckley.com.au/library/the-long-dark/" target="_blank" rel="noopener">The Long Dark</a>
         — Scott Buckley（CC BY 4.0）</p>
+      <hr>
+      <!-- 游戏里这张面板就是暂停菜单（开着的时候世界停住，见 Main 的 menuFrozen）：
+           所以「操作说明」「回到标题」两条要在这儿，不能只挂在标题页上——
+           玩到一半想查怎么按、想收工，总不能先把游戏关了 -->
+      <button id="btnHelp" class="panelRow" type="button">操作说明<small>四个动作</small></button>
+      <button id="btnQuit" class="panelRow" type="button">回到标题<small>进度已存</small></button>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
     </section>
@@ -177,7 +181,7 @@
       <span id="cardContinue">按 E 继续</span>
     </section>
 
-    <!-- 戏里的章名字样（八稿：章名出现在序的末尾、章末的「序章结束」）——
+    <!-- 戏里的章名字样（八稿：章名出现在序的末尾、章末的「第一章结束」）——
          不是章节卡：不挡操作、自己淡入淡出，由 state.titleCard 驱动 -->
     <section id="sceneTitle" aria-hidden="true" hidden>
       <small id="sceneTitleNum"></small>
@@ -250,31 +254,84 @@
     <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
   </section>
 
+  <!-- 主菜单（2026-08-17 重做，用户：「这开始菜单还弄个两层是干什么？」）：
+       一列竖着的条目，市面上的叙事游戏都是这个形。老版把「从第一章开始 ／
+       跳到任意一幕」两颗钮、八枚章节牌、一张键盘对照表全摊在标题页上——
+       三摞东西各说各的；而**选章节**在一个线性剧情游戏里本来就不该给玩家
+       （跳关＝把故事拆了），键盘对照表也该在「操作说明」里。现在：
+       继续（有存档才出，主位）／新游戏／操作说明／设置，选关退回调试面板。 -->
   <section id="titleScreen">
     <div class="titleInner">
       <p class="eyebrow">WHITEBOX PROTOTYPE · 1942–1943 华北敌后</p>
       <h1><span>地道里的光</span></h1>
       <p class="thesis">一个只想保护母亲和妹妹的普通青年，在一次次失去之后，被迫学会保护更多人。</p>
-      <div class="titleActions">
-        <button id="startButton" type="button">从第一章开始</button>
-        <button id="titleJump" type="button">跳到任意一幕</button>
-      </div>
-      <div id="chapterList" aria-label="章节选择"></div>
-      <dl id="controlsNote">
-        <div><dt>A / D</dt><dd>左右移动（手机：左下摇杆横推）</dd></div>
-        <div><dt>W / S</dt><dd>在梯口 / 地道口上下（手机：摇杆竖推）</dd></div>
-        <div><dt>E</dt><dd>互动：拾取 / 使用 / 交谈 / 按住施工、推车；手里有东西随时可放下（手机：右下大圆钮）</dd></div>
-        <div><dt>鼠标</dt><dd>直接上手：摇辘轳转盘、绕圈打结、攥笔划线、点按抡锤（键盘同样能做）</dd></div>
-        <div><dt>F</dt><dd>投掷，先捡石子（手机：手里有能扔的东西才冒出来的那个钮）</dd></div>
-        <div><dt>C</dt><dd>蹲低，躲在草垛断墙后能避开视线（手机：右下蹲人钮）</dd></div>
-        <div><dt>1 / 2</dt><dd>做出抉择（手机：直接点那张牌）</dd></div>
-        <div><dt>M</dt><dd>开关声音（旁白 / 音效 / 配乐）</dd></div>
-      </dl>
+      <nav id="titleMenu" aria-label="主菜单">
+        <!-- 「继续」没存档时整枚不出：灰着的按钮是在说"这儿本该有东西"，
+             可第一次进来的人没什么可继续的 -->
+        <button id="btnContinue" type="button" hidden>
+          <b>继续</b><small id="continueWhere"></small>
+        </button>
+        <button id="startButton" type="button">
+          <b>新游戏</b><small id="startNote">从序 · 那天开始</small>
+        </button>
+        <button id="btnControls" type="button"><b>操作说明</b><small>走动 · 四个动作</small></button>
+        <button id="btnTitleSettings" type="button"><b>设置</b><small>声音 · 音量</small></button>
+      </nav>
       <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
       <p class="contentNote">本作依据抗战史实创作，包含日军针对平民的战争暴行场景（不含血腥特写）。</p>
     </div>
   </section>
+
+  <!-- 操作说明：标题页与游戏里（设置面板）共用这一页。
+       **内容按 2026-08-16 的四动词口径重写过**：全作只剩 E ／ 长按 E ／
+       E＋方向；投掷那颗 F 键早就撤了（"留一颗按了没反应的键比没有更糟"），
+       可老对照表上还挂着它，而按住 E ＋方向这套一个字都没写。 -->
+  <section id="controlsScreen" hidden aria-label="操作说明">
+    <div class="sheet">
+      <header>
+        <b>操作说明</b>
+        <button id="controlsClose" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="body">
+        <h4>走动</h4>
+        <dl>
+          <div><dt>A / D</dt><dd>左右走<i>手机：左下摇杆横推</i></dd></div>
+          <div><dt>W / S</dt><dd>在梯口、地道口上下<i>手机：摇杆竖推</i></dd></div>
+          <div><dt>C</dt><dd>蹲下。躲在草垛、断墙背面能避开视线<i>手机：右下蹲人钮</i></dd></div>
+        </dl>
+        <h4>做事 —— 全作只有四个动作，都长在 E 上</h4>
+        <dl>
+          <div><dt>E</dt><dd>一下的事：拾、说、递、点火<i>手机：右下大圆钮</i></dd></div>
+          <div><dt>按住 E</dt><dd>保持住：搂紧、托稳、按住 —— 松手就塌</dd></div>
+          <div><dt>E ＋ ← →</dt><dd>横着使劲：推、掰、拨、撕、缠</dd></div>
+          <div><dt>E ＋ ↑ ↓</dt><dd>竖着使劲：抱起、掀、刨、舀、缝、摇辘轳</dd></div>
+          <div><dt>拖动</dt><dd>有几样活是直接上手的：攥住画面里那件东西本身拖——摇辘轳、攥笔划线、撕布、拽石子<i>手机：手指按上去直接拖</i></dd></div>
+        </dl>
+        <h4>其它</h4>
+        <dl>
+          <div><dt>空格 / 回车</dt><dd>把话说下去</dd></div>
+          <div><dt>1 / 2</dt><dd>做出抉择<i>手机：直接点那张牌</i></dd></div>
+          <div><dt>B</dt><dd>打开包袱，看捡到的老物件</dd></div>
+          <div><dt>M</dt><dd>开关声音（旁白 / 音效 / 配乐）</dd></div>
+          <div><dt>Esc</dt><dd>设置。开着的时候游戏停住<i>手机：右上角那三道滑轨</i></dd></div>
+        </dl>
+        <p class="foot">进度按幕自动保存，回标题页点「继续」接着走。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 覆盖存档前问一句：新游戏是唯一会抹掉进度的按钮 -->
+  <section id="confirmOverlay" hidden aria-label="确认">
+    <div class="sheet">
+      <h3 id="confirmTitle">开始新游戏？</h3>
+      <p id="confirmText"></p>
+      <div class="row">
+        <button id="confirmNo" type="button">取消</button>
+        <button id="confirmYes" type="button">从头开始</button>
+      </div>
+    </div>
+  </section>
 </main>
-<script type="module" src="./Script_Main.js?v=123"></script>
+<script type="module" src="./Script_Main.js?v=127"></script>
 </body>
 </html>

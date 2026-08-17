@@ -724,6 +724,74 @@ async function CmdShot(o) {
 }
 
 // ---------------------------------------------------------------------------
+// menu：拍菜单类界面（标题 / 操作说明 / 设置 / 确认框 / 调试 / 暂停）。
+//
+// `shot` 是拍**戏**的，它一上来就 StartGame，看不到标题页；而菜单是玩家看到的
+// 第一屏，改完只能靠眼睛验（"两层菜单"这种毛病，测试是绿的、图上一看就知道）。
+// 各态怎么摆好，比"临时写个 playwright 脚本"稳：存档态要先写 localStorage 再刷新，
+// 确认框要有存档才弹得出来——这几步每次都要重推一遍，固化在这儿。
+// ---------------------------------------------------------------------------
+const MENU_PAGES = {
+  // key: [说明, 到这一态要做什么（在页面里跑）]
+  title: ["标题页（没有存档）", null],
+  continue: ["标题页（有存档）", "save"],
+  confirm: ["新游戏覆盖确认框", "save"],
+  controls: ["操作说明", null],
+  settings: ["标题页上的设置面板", null],
+  pause: ["游戏里的暂停（设置面板）", null],
+  debug: ["调试面板（选关就在这儿）", null],
+};
+async function CmdMenu(o) {
+  const want = (o._.length ? o._ : Object.keys(MENU_PAGES)).filter((k) => {
+    if (MENU_PAGES[k]) return true;
+    console.log(`没有叫「${k}」的界面。有：${Object.keys(MENU_PAGES).join(" / ")}`);
+    return false;
+  });
+  if (!want.length) return;
+  const { LaunchBrowser } = await import("../PrairieFire1937/Script_BrowserTestKit.mjs");
+  const { ServeRoot } = await import("./Script_DevServer.mjs");
+  const outDir = path.join(DIR, "_shots");
+  fs.mkdirSync(outDir, { recursive: true });
+  const server = await ServeRoot(ROOT, 0);
+  const port = server.address().port;
+  const browser = await LaunchBrowser();
+  const page = await browser.newPage({ viewport: { width: Number(o.w || 1600), height: Number(o.h || 900) } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
+  // 存档态：先把一份档写进 localStorage 再刷新——BuildTitle 是在 load 时跑的
+  const SEED = { v: 1, chapter: 0, beat: 12, beatId: "c1_return", flags: {}, at: 0 };
+  try {
+    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html`, { waitUntil: "load", timeout: 60000 });
+    await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+    for (const key of want) {
+      const [label, prep] = MENU_PAGES[key];
+      await page.evaluate(() => localStorage.removeItem("tunnelLight1943.save.v1"));
+      if (prep === "save") await page.evaluate((seed) => localStorage.setItem("tunnelLight1943.save.v1", JSON.stringify(seed)), SEED);
+      await page.reload({ waitUntil: "load", timeout: 60000 });
+      await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+      if (key === "confirm") await page.click("#startButton");
+      if (key === "controls") await page.click("#btnControls");
+      if (key === "settings") await page.click("#btnTitleSettings");
+      if (key === "debug") await page.evaluate(() => window.TunnelLight.ToggleDebug(true));
+      if (key === "pause") {
+        await page.evaluate(() => window.TunnelLight.JumpToBeat(0, 12));
+        await page.waitForFunction(() => (window.TunnelLight.iris ?? 1) > 0.995, { timeout: 8000 }).catch(() => {});
+        await page.click("#btnSettings");
+      }
+      await page.waitForTimeout(220);
+      const file = path.join(outDir, `menu_${key}.png`);
+      await page.screenshot({ path: file });
+      console.log(`  ${path.basename(file)}  ${label}`);
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  if (errors.length) { console.error("页面异常：", errors.slice(0, 4).join(" | ")); process.exitCode = 1; }
+}
+
+// ---------------------------------------------------------------------------
 // doctor：开工前一条命令说清"我在哪、有没有踩别人、戳对不对"。
 // 端口撞车在日志里出现过 10 次（并行会话各起一个 dev server 抢 8148）。
 // ---------------------------------------------------------------------------
@@ -780,11 +848,15 @@ const HELP = `《地道里的光》命令行工作台
       --pre 走 state 那套输入语言（开拍前的前置操作）；--hold 是拍摄期间真按住的键
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
       转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
+  menu [页 ...]           拍菜单类界面 → _shots/menu_*.png（--w --h 换画框）
+      title 标题页 / continue 有存档的标题页 / confirm 覆盖确认 / controls 操作说明
+      settings 标题页上的设置 / pause 游戏里的暂停 / debug 调试面板（选关）
+      不给页名就全拍一遍。菜单是玩家的第一屏，改完必须看图——测试绿着也可能很难看
   doctor                  分支/上游/未提交/缓存戳/端口
 
 要问游戏状态先跑这个，别再现写一次性探针脚本。`;
 
-const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, doctor: CmdDoctor };
+const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, menu: CmdMenu, doctor: CmdDoctor };
 const fn = TABLE[cmd];
 if (!fn) { console.log(HELP); process.exit(cmd ? 1 : 0); }
 await fn(Opts(rest));

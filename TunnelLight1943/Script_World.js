@@ -24,7 +24,7 @@ import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
   AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
-  MakeCanvas, MakeCastShadow, MakeFlatShadow, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
+  MakeCanvas, MakeCastShadow, MakeFlatShadow, MakeShaftMouth, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
 } from "./Script_WorldPaint.mjs";
 
@@ -167,6 +167,9 @@ function PoseProgress(o) {
     // 扎回袋口（绕圈）、喂水与按住伤员（长按的行程）——2026-08-13 新增。
     // **漏登记＝冻在第一帧**，这是 CLAUDE.md 点名的老坑
     || o.pose === "twistTie" || o.pose === "bandageWrap"
+    // 蹲下去够妹妹（序·抱起妹妹那 0.9 秒）——2026-08-17 新增。漏登记就是
+    // 冻在第一帧，也就是上一版那个"对着空气鞠躬"的观感
+    || o.pose === "scoopReach"
     || o.pose === "ladleSteady" || o.pose === "pinDown") return o.poseU;
   return o.poseK;
 }
@@ -452,6 +455,9 @@ export function CreateWorld(canvasEl) {
   const groundItemMeshes = new Map();
   let bubbleMeshes = [];
   const bubbleTex = new Map();
+  // 心情气泡（自家人的表情全在这儿，脸上一笔不画——见 Art.DrawMoodBubble）
+  const moodMeshes = new Map();
+  const moodTex = new Map();
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
@@ -916,8 +922,12 @@ export function CreateWorld(canvasEl) {
         if (V2 && p.interior && !(ruined && p.burnable)) {
           mk((ctx, ax, ay) => ART.DrawHomeInterior(ctx, ax, ay, W, H, p.id, { night }),
             { z: BAND[V2.innerBand] });
-          homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: false, night, door: true }),
-            { z: BAND[V2.facadeBand] });
+          // doorAt：门心在立面上的位置（px，相对屋子中心）。**由场景数据给**，
+          // 因为门框那件道具要严丝合缝地嵌进这个洞里——两处各写一份迟早对不上
+          // （Data_Scenes 加载期校验两者相等）
+          homeFacade = mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id,
+            { burnt: false, night, door: true, doorAt: p.door !== undefined ? (p.door - p.x) * PPM : null }),
+          { z: BAND[V2.facadeBand] });
           // 东西两头的山墙内侧。后墙那片按透视只占到画框的一小截，过场又把
           // 第四堵墙整个撤掉——越过后墙的边就是野地和炮楼。屋子那两头本来就有
           // 一道墙，这里把它接上（画法与三条约束见 Art.DrawRoomWing）。
@@ -946,14 +956,19 @@ export function CreateWorld(canvasEl) {
           // 屋里，不能一挨着东墙就没影
           // mid/half 是**屋子的足迹**（山墙到山墙），跟 HouseSpan 那段街不是一回事：
           // 山墙内侧该不该画拿它当闸，见 UpdateProps
-          homeRange = { ...HouseSpan(p), door: p.x + p.w / 2 - 25 / PPM, mid: p.x, half: p.w / 2 };
+          homeRange = { ...HouseSpan(p), door: p.door ?? (p.x + p.w / 2 - 25 / PPM), mid: p.x, half: p.w / 2 };
           break;
         }
         mk((ctx, ax, ay) => ART.DrawHouse(ctx, ax, ay, W, H, p.id, { burnt: ruined && p.burnable, night, slogan: p.slogan }));
         break;
       }
       case "doorframe": {
-        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, p.id, carveState));
+        // 门框连着门垛一起画（2026-08-17）：w/h 是那块墙的尺寸，corner 是门心到
+        // 东墙角有多远——灭点按它算，所以这件道具与立面共用同一个假想机位
+        const DW = p.w * PPM, DH = p.h * PPM;
+        const opt = { night, burnt: ruined, corner: p.corner };
+        const mesh = mk((ctx, ax, ay) => ART.DrawDoorframe(ctx, ax, ay, DW, DH, p.id,
+          { ...opt, ...carveState }));
         // 两道刻痕分别由 flags.marked / flags.carved 把门，划完才长出来
         carveRebuild = (marks) => {
           const c = mesh.material.map.image;
@@ -964,7 +979,7 @@ export function CreateWorld(canvasEl) {
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, c.width, c.height);
           ctx.restore();
-          ART.DrawDoorframe(ctx, S.ax, S.ay, p.id, marks);
+          ART.DrawDoorframe(ctx, S.ax, S.ay, DW, DH, p.id, { ...opt, ...marks });
           mesh.material.map.needsUpdate = true;
         };
         break;
@@ -1817,13 +1832,19 @@ export function CreateWorld(canvasEl) {
         hatchBeamMesh.userData.SetOrigin(g.wx, SURFACE_Y + 0.08, 0.62);
         hatchBeamMesh.userData.SetFloor(UNDER_Y + 0.05);
         // 三条缝：宽窄不一（板是三块拼的，缝也就不匀）。
-        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽。
-        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起——
-        // 画面上是一根胖柱子，不是"板缝里漏下来几条光"
+        // **张开要给得很省**：一条缝才几毫米，打到三米六外也就一拃宽——
+        // 首轮给到 0.055/米，三条到窖底各自胖成半米、彼此叠在一起，
+        // 画面上是一根胖柱子。光柱看着"张开"靠的不是芯子变宽，是**外圈那层
+        // 散射**（着色器里 gw 那一层，随行程张 3.4 倍），芯子照旧很细。
+        //
+        // 2026-08-17 用户："三柱圆筒形的光也很奇怪"。三根一样粗、一样亮、
+        // 严格平行、亮度还沿程不变的光带，人眼当场读成三根发光的管子。
+        // 治法是**让它们不一样**：宽窄、亮度、歪的方向、沿程浓淡的相位各走各的，
+        // 中间那条是主光（缝最窄最亮、几乎直下），两边两条各歪各的、暗一档。
         hatchBeamMesh.userData.SetShafts([
-          { off: -0.37, half: 0.022, spread: 0.020, gain: 0.90 },
-          { off: -0.02, half: 0.017, spread: 0.016, gain: 1.15 },
-          { off: 0.33, half: 0.029, spread: 0.025, gain: 0.75 },
+          { off: -0.37, half: 0.034, spread: 0.024, gain: 0.66, tilt: -0.030, seed: 0.0, pool: 0.9, bounce: 0.55 },
+          { off: -0.02, half: 0.024, spread: 0.017, gain: 1.05, tilt: 0.008, seed: 2.1, pool: 1.15, bounce: 0.85 },
+          { off: 0.33, half: 0.044, spread: 0.030, gain: 0.46, tilt: 0.042, seed: 4.3, pool: 0.75, bounce: 0.45 },
         ]);
         hatchBeamMesh.userData.SetIntensity(0);
         // **必须走 FixOrder**：光柱要排在压暗罩（ORDER_DARK）**之后**——
@@ -1840,9 +1861,24 @@ export function CreateWorld(canvasEl) {
       if (shaft.builtFlag && !state.flags[shaft.builtFlag]) continue;
       const sh = BakeSprite(90, Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), 45,
         Math.ceil((SURFACE_Y - UNDER_Y + 0.6) * PPM), (ctx, ax, ay) => {
-          // 梯脚落在地道地面上（ay 就是地平线），梯头露出井口一点
-          ART.DrawShaft(ctx, ax, 0.32 * PPM, ay - 1, shaft.id);
+          // 梯脚落在地道那一层的地面上（ay 就是 UNDER_Y）。**第三个参数是地表
+          // 那条地平线**——梯头高出地面多少、洞口开在哪一行都按它算，
+          // 摆位一改这支笔自己跟着走（老版写死 0.32*PPM，跟地平线没有关系）
+          ART.DrawShaft(ctx, ax, ay - (SURFACE_Y - UNDER_Y) * PPM, ay - 1, shaft.id);
         }, 0, 2);
+      // 地上那个洞：**一块躺平的几何**，排在地面之上、梯子之下。
+      // 梯子那张立牌上也画着洞口的黑，可立牌是竖的——俯角一看就压成一条暗带，
+      // 「掀开盖」那一镜因此读不出"这儿有个口子"（2026-08-17 实拍抓的）。
+      // 躺平的这块反过来：俯角是个椭圆口子，平视自己收成一条缝
+      // 纵深给到 0.86m（比洞该有的深）：玩法与过场都是**接近平视**的机位，
+      // 躺平的面在 16° 俯角下要乘个 sin16°＝只剩两成三——按真尺寸给，屏幕上
+      // 就是一条 0.15m 的缝，白画。这一块的尺寸是按"上屏读得出"定的，不是按
+      // 世界里的真尺寸定的（同「小东西要画大一档」那本账）
+      const mouth = MakeShaftMouth(1.34, 0.86, shaft.id + "mouth");
+      mouth.position.set(shaft.x, SURFACE_Y + 0.006, PlaceZ(BAND.loose));
+      FixOrder(mouth, DepthOrder("play", BAND.loose) - 1);
+      group.add(mouth);
+
       // 梯子必须看得见——它是玩家判断"这儿能上下"的唯一依据。绘制序号排在
       // loose 带（行走线道具之前、演员之后），免得被洞口、磨盘这些中景件压掉；
       // 位置照旧压在地平面上（原来这里写的是裸 z=0.45，梯子因此比洞口高半拃）
@@ -2116,10 +2152,10 @@ export function CreateWorld(canvasEl) {
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
-    // 街面：只管镜头跟前那七米，贴图密度是大地面的三十倍（大地面一张贴图要摊
-    // 410 米宽，横着只有 3.4 像素/米——车辙画出来是两米四宽的一条色带）。
+    // 街面：只管镜头跟前那七米，给出"街比田沉一档"这个调子（撒点已整批删掉，
+    // 见 Script_WorldPaint 那一节：地面抢戏比地面单调糟得多）。
     // 地下场景不用：那儿的"地"是地道底
-    if (!sceneDef.underOnly) AddRoadPlane(layers.play, L, ch.light, ch.scene + "road");
+    if (!sceneDef.underOnly) AddRoadPlane(layers.play, L, ch.light);
     // 第八章：院子一带留下焦土
     if (state.flags.ruined) {
       for (const bx of [30, 62, 92]) {
@@ -3367,6 +3403,79 @@ export function CreateWorld(canvasEl) {
         m.material.opacity = 0.8 + Math.sin(time * 5.2) * 0.12;
         m.position.set(bx, (by ?? SURFACE_Y + 2.1) + Math.sin(time * 2.6) * 0.05, 0.62);
       });
+    }
+
+    // 心情气泡：自家人不画脸，表情全靠头顶这一枚（用户 2026-08-17：「妹妹在害怕
+    // 有很多种表达啊…就像勇敢的心的那种，像对话框一样的状态显示」）。
+    // **谁有心情谁挂**：`a.mood` 由剧本拨；没拨的从轨道推一个默认
+    //（tremble/pulledClose 一族＝怕），所以老剧本不改也有。
+    // 活卡与告示那两档模态盖着屏幕时收掉——那会儿玩家在看别的东西
+    {
+      const MoodOf = (a, isPlayer) => {
+        if (a.mood === null) return null;
+        if (a.mood) return a.mood;
+        // **玩家不吃推导出来的心情**：他搂着妹妹那一拍两个人都是 shelter，
+        // 两枚气泡叠在一处（实拍抓的）。这套是给"看着的那个人"用的——
+        // 玩家自己的情绪由他手上正在做的事说。真要给他挂，剧本里明写 mood
+        if (isPlayer) return null;
+        const tn = a.track?.name || "";
+        if (/tremble|pulledClose|heldChild/.test(tn)) return "afraid";
+        if (a.pose === "shelter" || a.pose === "leanIn") return "afraid";
+        return null;
+      };
+      const hideAll = !!(state.liveCardOn || state.noticeOpen || state.bagOpen);
+      const live = new Set();
+      const folks = [state.player, ...(state.actors || [])];
+      for (const a of folks) {
+        if (!a || a.visible === false || hideAll) continue;
+        const isPlayer = a === state.player;
+        const mood = MoodOf(a, isPlayer);
+        if (!mood) continue;
+        const key = a.id || "player";
+        live.add(key);
+        let m = moodMeshes.get(key);
+        if (!m) {
+          // **尺寸按人给，不按贴图给**：64/PPM ＝ 1.33m，在 2.4m 宽的过场画框里
+          // 是半幅画（第一版实拍就是这样）。一枚气泡该跟这个人的脑袋差不多大——
+          // 头径 2·headR·体型 ≈ 0.21m，气泡给两个头宽
+          m = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.44, 0.41),
+            new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }),
+          );
+          FixOrder(m, LAYER_ORDER.fx + 340);
+          layers.fx.add(m);
+          moodMeshes.set(key, m);
+        }
+        if (!moodTex.has(mood)) {
+          const c = MakeCanvas(64 * HINT_SS, 60 * HINT_SS);
+          const g = c.getContext("2d");
+          g.scale(HINT_SS, HINT_SS);
+          ART.DrawMoodBubble(g, 32, 56, mood, "mood" + mood);
+          moodTex.set(mood, CanvasTexture(c));
+        }
+        if (m.material.map !== moodTex.get(mood)) {
+          m.material.map = moodTex.get(mood);
+          m.material.needsUpdate = true;
+        }
+        // 挂在这个人的头顶上：身高按体型折算（妹妹比柱子矮一头多）
+        const scale = a.bodyScale ?? BODY_SCALE[a.kind] ?? BODY_SCALE[a.id] ?? 0.95;
+        const ground = (a.level === "under" ? UNDER_Y : SURFACE_Y) + (a.liftNow || 0);
+        m.visible = true;
+        m.material.opacity = 0.96;
+        m.scale.set(scale, scale, 1);
+        // **贴着这个人真的头顶**，不是贴着"站直了该有多高"：她这会儿蹲成一团，
+        // 按站姿算的话气泡飘在她头上一米、还被过场的黑边切掉一半（实拍抓的）。
+        // 骨架每帧都在，直接量（LimbTips 的 head 是世界坐标）
+        const sp = actorSprites.get(key);
+        const hd = sp?.rig ? LimbTips(sp.rig).head : null;
+        // 横向也认头的位置：她蹲着往前倾，头在 a.x 后头两三寸，按 a.x 摆尾巴
+        // 就指在她身子外头了
+        m.position.set((hd ? hd.x : a.x) + 0.10 * scale,
+          (hd ? hd.y : ground + 1.37 * scale) + 0.30 * scale + Math.sin(time * 2.2 + a.x) * 0.02, 0.7);
+      }
+      for (const [key, m] of moodMeshes) {
+        if (!live.has(key)) m.visible = false;
+      }
     }
 
     // 投掷弧线预览：点列由 Core 用**和真石子同一套**弹道物理跑出来，预览即所得。

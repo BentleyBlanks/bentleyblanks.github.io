@@ -954,7 +954,35 @@ export function DrawLimb(ctx, px, py, len, w0, w1, color, id,
     const a = Math.PI + (i / 4) * Math.PI;
     pts.push([px + Math.cos(a) * r0, py + Math.sin(a) * r0 * capTop]);
   }
-  InkFill(ctx, pts, id, color, { amp: 0.9 * k, lw: lw * k, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
+  InkFill(ctx, pts, id, color, { amp: 0.9 * k, lw: lw * k, shade: null });
+  // —— 精致度那两笔（2026-08-17 用户："给人物的关节、部件设计优化一下…精致度"）。
+  // 老版的暗部是 InkFill 的 `shade`：一块压在右下角的方块，肢体因此读成一片剪纸。
+  // 一条胳膊是个**圆柱**：暗在背光那一侧、沿着长边一路走；亮边贴着受光那一侧。
+  ctx.save();
+  ctx.beginPath();
+  const wob = (t) => rAt(t);
+  ctx.moveTo(px + wob(0), py);
+  for (let i = 1; i <= 8; i += 1) ctx.lineTo(px + wob(i / 8), py + len * (i / 8));
+  ctx.lineTo(px + Math.cos(Math.PI * 0.5) * r1, py + len + r1 * capBot);
+  for (let i = 8; i >= 0; i -= 1) ctx.lineTo(px - wob(i / 8), py + len * (i / 8));
+  ctx.closePath();
+  ctx.clip();
+  const gx = ctx.createLinearGradient(px - r0, 0, px + r0, 0);
+  gx.addColorStop(0, "rgba(0,0,0,0.22)");        // 背光那一侧（身后）
+  gx.addColorStop(0.42, "rgba(0,0,0,0.03)");
+  gx.addColorStop(0.82, "rgba(255,246,226,0.10)");   // 受光那一侧（身前）
+  gx.addColorStop(1, "rgba(0,0,0,0.10)");        // 边上再收一点，才是圆的
+  ctx.fillStyle = gx;
+  ctx.fillRect(px - r0 * 1.4, py - r0, r0 * 2.8, len + r1 * 2);
+  // 关节处的一道衣褶：肘/膝一弯，布就在那儿堆一道。**只给一道**，多了成花纹
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = Math.max(1, 1.1 * k);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(px - r1 * 0.82, py + len * 0.80);
+  ctx.quadraticCurveTo(px, py + len * 0.86, px + r1 * 0.82, py + len * 0.78);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
@@ -1137,69 +1165,26 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.fill();
   ctx.restore();
 
-  // ④ 五官。**近侧那只眼是主角、远侧只给一小记**——两只画一样大就并成一副墨镜
-  //（前几稿实拍都是这样）。转过来那一点角度，一记就够
+  // ④ 五官：**耳、鼻、嘴、颏都画，眼睛让头发／帽檐挡住不画**
+  //（2026-08-17 用户定：「耳朵怎么没有 画出来啊；每个人物的眼睛都可以假装被头发/
+  // 帽子遮住而不画（参考勇敢的心的做法）」）。
+  // 上一版是把脸整个留空——读出来是一张面具。《勇敢的心》的做法是**遮**不是**空**：
+  // 刘海／帽檐压到眼线上，底下垫一片阴影，眼睛"在阴影里"——观众自己会补上那双眼，
+  // 而且永远不会出现一整章不变的死表情。耳朵反而必须画：它是这颗头唯一的横向
+  // 参照，少了它脸和后脑连成一块饼。
   ctx.save();
   clipFace();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  const nx = px + r * (F.brow - 0.56), ny = py - r * 1.02;   // 眼线 0.50H
-  const fx = px + r * (F.brow - 0.22), fy = py - r * 1.00;   // 远侧那只：整只都得在脸里
-  const browTone = hard ? "rgba(28,20,14,0.92)" : child ? "rgba(78,54,36,0.62)" : "rgba(58,40,26,0.72)";
-  // 眼窝：一小片贴着眉的暗，眼睛才是坐进去的
-  ctx.globalAlpha = hard ? 0.28 : 0.16;
-  ctx.fillStyle = "#6b4326";
-  ctx.beginPath();
-  ctx.ellipse(nx + r * 0.06, ny - r * 0.05, r * 0.30, r * 0.14, -0.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  // 眉：自家人略弯；日军**低而直、往鼻侧压**
-  ctx.strokeStyle = browTone;
-  ctx.lineWidth = (hard ? 1.5 : 1.1) * k;
-  ctx.beginPath();
-  if (hard) {
-    ctx.moveTo(nx - r * 0.22, ny - r * 0.28);
-    ctx.lineTo(nx + r * 0.26, ny - r * 0.36);
-  } else {
-    ctx.moveTo(nx - r * 0.22, ny - r * 0.30);
-    ctx.quadraticCurveTo(nx + r * 0.04, ny - r * 0.40, nx + r * 0.26, ny - r * 0.32);
-  }
-  ctx.stroke();
-  // 眼：杏仁形。日军收成一道缝
-  const eyeH = r * (hard ? 0.055 : 0.100) * F.eyeK, eyeW = r * 0.145 * F.eyeK;
-  ctx.beginPath();
-  ctx.moveTo(nx - eyeW, ny + eyeH * 0.2);
-  ctx.quadraticCurveTo(nx - eyeW * 0.2, ny - eyeH * 1.25, nx + eyeW, ny - eyeH * 0.15);
-  ctx.quadraticCurveTo(nx + eyeW * 0.1, ny + eyeH * 0.95, nx - eyeW, ny + eyeH * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = IN.ink;
-  ctx.fill();
-  // 远侧那只：窄一档（透视压缩），贴着鼻根。跟近侧那只之间留得出鼻梁
-  const fH = eyeH * 0.86, fW = eyeW * 0.60;
-  ctx.beginPath();
-  ctx.moveTo(fx - fW, fy + fH * 0.2);
-  ctx.quadraticCurveTo(fx - fW * 0.2, fy - fH * 1.25, fx + fW, fy - fH * 0.15);
-  ctx.quadraticCurveTo(fx + fW * 0.1, fy + fH * 0.95, fx - fW, fy + fH * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = IN.ink;
-  ctx.fill();
-  // 远侧那道眉
-  ctx.strokeStyle = browTone;
-  ctx.lineWidth = (hard ? 1.2 : 0.9) * k;
-  ctx.beginPath();
-  ctx.moveTo(fx - r * 0.08, fy - r * (hard ? 0.26 : 0.28));
-  ctx.quadraticCurveTo(fx + r * 0.02, fy - r * (hard ? 0.31 : 0.34), fx + r * 0.11, fy - r * (hard ? 0.27 : 0.29));
-  ctx.stroke();
-  // 唇缝：**短**（一张脸上的嘴只有四分之一个头宽），位置在鼻底下 0.2r。
-  // 自家人略弯，日军一条平直线——面无表情
+  // 嘴：一小截唇缝。自家人略弯，日军一条平直线（面无表情）
   const mw = r * (child ? 0.11 : 0.13);
   const mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
-  ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(112,58,46,0.72)";
+  ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(108,56,46,0.7)";
   ctx.lineWidth = (hard ? 1.3 : 1.1) * k;
   ctx.beginPath();
   ctx.moveTo(mcx - mw, my + r * 0.01);
   if (hard) ctx.lineTo(mcx + mw, my - r * 0.01);
-  else ctx.quadraticCurveTo(mcx, my + r * 0.045, mcx + mw, my - r * 0.015);
+  else ctx.quadraticCurveTo(mcx, my + r * 0.04, mcx + mw, my - r * 0.015);
   ctx.stroke();
   // 一粒鼻孔，点到为止
   ctx.fillStyle = "rgba(96,58,34,0.42)";
@@ -1208,17 +1193,24 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.fill();
   ctx.restore();
 
-  // 耳：颧弓后头、眼线高度。一小片软肉，**不许有内环**
+  // 耳：颧弓后头、眼线到鼻底那一段（规范位置 0.50H~0.72H）。一小片软肉＋
+  // 耳轮后上那半道折。**不许描一整圈**——两条同心的边就是一枚靶心
   ctx.save();
+  const eax = px - r * 0.40, eay = py - r * 0.80;
   ctx.beginPath();
-  ctx.moveTo(px - r * 0.40, py - r * 1.00);
-  ctx.quadraticCurveTo(px - r * 0.60, py - r * 0.96, px - r * 0.58, py - r * 0.74);
-  ctx.quadraticCurveTo(px - r * 0.56, py - r * 0.56, px - r * 0.42, py - r * 0.60);
+  ctx.moveTo(eax + r * 0.10, eay - r * 0.20);
+  ctx.quadraticCurveTo(eax - r * 0.13, eay - r * 0.24, eax - r * 0.12, eay + r * 0.02);
+  ctx.quadraticCurveTo(eax - r * 0.11, eay + r * 0.22, eax + r * 0.03, eay + r * 0.24);
+  ctx.quadraticCurveTo(eax + r * 0.11, eay + r * 0.14, eax + r * 0.10, eay - r * 0.20);
   ctx.closePath();
-  ctx.fillStyle = hard ? "#bf9068" : "#cd9a66";
+  ctx.fillStyle = hard ? "#c2946b" : "#d09d69";
   ctx.fill();
-  ctx.strokeStyle = "rgba(106,68,42,0.45)";
-  ctx.lineWidth = 0.7 * k;
+  ctx.strokeStyle = "rgba(104,66,42,0.55)";
+  ctx.lineWidth = 1.1 * k;
+  ctx.stroke();
+  ctx.beginPath();                       // 耳轮：只描后上那半道
+  ctx.moveTo(eax + r * 0.04, eay - r * 0.14);
+  ctx.quadraticCurveTo(eax - r * 0.07, eay - r * 0.16, eax - r * 0.065, eay + r * 0.06);
   ctx.stroke();
   ctx.restore();
 
@@ -1226,11 +1218,11 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   if (kind === "soldier") {
     DrawCapFlap(ctx, px, py, r, id, k);
     InkFill(ctx, Spline([P(-1.06, -1.26), P(-0.90, -1.74), P(-0.30, -2.04), P(0.36, -2.00),
-      P(0.82, -1.78), P(0.98, -1.56), P(0.92, -1.38), P(-1.00, -1.12)], 4),
+      P(0.82, -1.72), P(0.98, -1.42), P(0.92, -1.10), P(-1.00, -0.98)], 4),
     id + "cap", "#5f5a30", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
     InkFill(ctx, [P(0.84, -1.50), P(1.58, -1.36), P(1.52, -1.18), P(0.86, -1.30)],
       id + "brim", "#4a461f", { amp: 0.6 * k, lw: lw * 0.85 });
-    HardBrowShadow(ctx, px, py, r, F, -1.32);
+    EyeShade(ctx, px, py, r, F, -1.06, 0.5, 0.32);
   } else if (kind === "officer") {
     // **卫生胡（方块胡）**：太君脸就靠这一撮认。横在人中上，鼻底与唇缝之间
     ctx.save();
@@ -1241,46 +1233,141 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ], id + "stache", "#1e160f", { amp: 0.35 * k, lw: 1.1 * k });
     ctx.restore();
     InkFill(ctx, Spline([P(-1.10, -1.42), P(-1.00, -1.94), P(-0.58, -2.26), P(0.32, -2.32),
-      P(0.82, -2.04), P(1.00, -1.70), P(1.04, -1.42), P(-1.02, -1.26)], 4),
+      P(0.82, -1.98), P(1.00, -1.56), P(1.04, -1.22), P(-1.02, -1.08)], 4),
     id + "cap", "#4a4f34", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    InkFill(ctx, [P(-1.02, -1.44), P(1.04, -1.50), P(1.04, -1.32), P(-1.00, -1.26)],
+    InkFill(ctx, [P(-1.02, -1.30), P(1.04, -1.36), P(1.04, -1.14), P(-1.00, -1.08)],
       id + "band", "#4e2018", { amp: 0.5 * k, lw: lw * 0.7 });
     ctx.beginPath();
-    ctx.arc(px + r * 0.72, py - r * 1.39, r * 0.085, 0, Math.PI * 2);
+    ctx.arc(px + r * 0.72, py - r * 1.23, r * 0.085, 0, Math.PI * 2);
     ctx.fillStyle = "#8a7a3a";
     ctx.fill();
-    InkFill(ctx, [P(0.86, -1.42), P(1.88, -1.30), P(1.84, -1.08), P(0.86, -1.22)],
+    InkFill(ctx, [P(0.86, -1.28), P(1.88, -1.16), P(1.84, -0.94), P(0.86, -1.08)],
       id + "visor", "#232616", { amp: 0.5 * k, lw: lw * 0.8 });
-    HardBrowShadow(ctx, px, py, r, F, -1.36);
+    EyeShade(ctx, px, py, r, F, -1.04, 0.54, 0.32);
   } else if (kind === "puppet") {
     InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
-      P(0.86, -1.76), P(1.00, -1.48), P(0.90, -1.32), P(-0.96, -1.02)], 4),
+      P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),
     id + "hat", "#3a352c", { amp: 0.7 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
+    EyeShade(ctx, px, py, r, F, -1.00, 0.38, 0.28);
   } else if (kind === "militia") {
     InkFill(ctx, Spline([P(-1.08, -1.12), P(-0.94, -1.66), P(-0.34, -1.98), P(0.32, -1.96),
-      P(0.90, -1.74), P(1.04, -1.46), P(0.94, -1.30), P(-0.98, -0.98)], 4),
+      P(0.90, -1.68), P(1.04, -1.34), P(0.94, -1.02), P(-0.98, -0.90)], 4),
     id + "towel", "#ddd6c2", { amp: 0.8 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.08)" });
+    EyeShade(ctx, px, py, r, F, -0.98, 0.34, 0.26);
     InkFill(ctx, [P(-1.00, -1.08), P(-1.56, -0.58), P(-1.18, -0.42), P(-0.94, -0.84)],
       id + "tail", "#ccc4ae", { amp: 0.9 * k, lw: lw * 0.8 });
+  } else if (kind === "father" || kind === "villager" || kind === "family") {
+    // **大人包头巾**（2026-08-17 用户："村里人和主角团 部分可以包头巾来遮住眼睛"）。
+    // 1943 年冀中的庄稼人男的裹条羊肚手巾、女的包块头巾，本来就是常态；
+    // 顺手把"遮眼"这件事分成两路——孩子留刘海、大人包头巾，一屋子人不再一个样
+    HeadScarf(ctx, px, py, r, kind, id, k, lw, F);
   } else {
+    // 孩子（柱子/妹妹）：头发贴着颅骨长、刘海压到眼线上，见 HeadHair
     HeadHair(ctx, px, py, r, kind, id, k, lw, F);
   }
 }
 
-/** 帽檐底下压的一片阴影：眼睛沉进去，脸就冷了（日军与军官专用） */
-function HardBrowShadow(ctx, px, py, r, F, y) {
+/**
+ * 包在头上的一块布：男的羊肚手巾（本白）、女的头巾（靛蓝一档）。
+ * **下沿压到眉弓下沿**，眼睛就在它底下的阴影里（同 HeadHair 的刘海那一路）。
+ * 脑后系一个结、垂一小截巾角；娘的纂从巾底下露出来——那是"一眼认出是谁"的一笔。
+ */
+function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
+  const woman = kind === "family";
+  const cloth = woman ? "#4a5464" : "#d8d0bb";
+  const fold = woman ? "rgba(22,28,38,0.34)" : "rgba(96,88,70,0.30)";
+  const P = (x, y) => [px + r * x, py + r * y];
+  const edge = -1.06;                                   // 布的下沿：眉弓下沿
+  // 娘的纂：先画（布压住它的上半，露出底下那一团）
+  if (woman) {
+    InkFill(ctx, Spline([P(-0.98, -1.00), P(-1.30, -1.06), P(-1.50, -0.82), P(-1.42, -0.52),
+      P(-1.12, -0.44), P(-0.92, -0.64)], 4),
+    id + "bun", "#2a1f18", { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.24)" });
+  }
+  // 布身：从额前包过颅顶、落到项后
+  InkFill(ctx, Spline([
+    P(F.brow - 0.10, edge),                             // 前下角（压在眼线上）
+    P(F.brow + 0.02, -1.30),
+    P(F.brow - 0.18, -1.58),
+    P(0.30, -1.90),
+    P(-0.22, F.crown - 0.12),                           // 颅顶
+    P(-0.76, -1.82),
+    P(F.back - 0.12, -1.28),
+    P(-1.04, -0.88),
+    P(-0.90, -0.62),                                    // 项后（布收进去）
+    P(-0.70, -0.70),
+    P(-0.64, -0.96),
+    P(-0.50, -1.10),
+    P(-0.16, edge - 0.05),                              // 下沿往前压
+    P(0.22, edge - 0.01),
+    P(0.52, edge - 0.02),
+  ], 6), id + "scarf", cloth, { amp: 0.34 * k, lw: lw * 0.75, shade: "rgba(0,0,0,0.16)", shadeAt: 0.5 });
+  // 布的两道褶：顺着头形走，一块布才不是一顶瓜皮帽
   ctx.save();
-  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + 0.44));
-  g.addColorStop(0, "rgba(18,14,10,0.46)");
-  g.addColorStop(1, "rgba(18,14,10,0)");
+  ctx.strokeStyle = fold;
+  ctx.lineWidth = 1.1 * k;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 2; i += 1) {
+    const t = 0.3 + i * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(px + r * (F.brow - 0.22 - t * 0.5), py + r * (edge - 0.08));
+    ctx.quadraticCurveTo(px + r * (-0.10 - t * 0.4), py + r * (F.crown + 0.34 + t * 0.3),
+      px + r * (F.back + 0.10 - t * 0.1), py + r * (-1.20 + t * 0.34));
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 脑后的结＋垂下来的一小截巾角
+  InkFill(ctx, Spline([P(-0.98, -1.02), P(-1.22, -1.10), P(-1.26, -0.86), P(-1.04, -0.80)], 4),
+    id + "knot", cloth, { amp: 0.4 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.18)" });
+  InkFill(ctx, [P(-1.16, -0.94), P(-1.54, -0.46), P(-1.24, -0.32), P(-1.02, -0.76)],
+    id + "tail", cloth, { amp: 0.7 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.14)" });
+  // 布底下那片阴影：眼睛在这儿
+  EyeShade(ctx, px, py, r, F, edge + 0.01, 0.38, 0.30);
+  // 前额露出来的一两绺头发（布不是戴在光头上）
+  ctx.save();
+  ctx.fillStyle = "#2e2119";
+  for (let i = 0; i < 2; i += 1) {
+    const bx = px + r * (0.16 + i * 0.34);
+    ctx.beginPath();
+    ctx.moveTo(bx - r * 0.08, py + r * (edge - 0.02));
+    ctx.quadraticCurveTo(bx, py + r * (edge + 0.09), bx + r * 0.07, py + r * (edge - 0.02));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * 头发/帽檐底下那片阴影——**眼睛就"藏"在这儿**（《勇敢的心》的做法）。
+ * y = 遮挡物的下沿（单位 r），阴影从那儿往下化开 depth。
+ * 越深越冷：日军给 0.52，自家人给 0.34（还能看出是张脸，只是眼在暗处）。
+ */
+function EyeShade(ctx, px, py, r, F, y, alpha = 0.34, depth = 0.30) {
+  ctx.save();
+  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + depth));
+  g.addColorStop(0, `rgba(20,15,10,${alpha})`);
+  g.addColorStop(0.5, `rgba(20,15,10,${alpha * 0.7})`);
+  g.addColorStop(1, "rgba(20,15,10,0)");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(px - r * 0.58, py + r * y);
-  ctx.lineTo(px + r * (F.brow - 0.02), py + r * (y + 0.06));
-  ctx.lineTo(px + r * (F.brow - 0.10), py + r * (y + 0.46));
-  ctx.lineTo(px - r * 0.56, py + r * (y + 0.42));
+  ctx.moveTo(px - r * 0.62, py + r * (y - 0.02));
+  ctx.lineTo(px + r * (F.brow + 0.02), py + r * (y + 0.02));
+  ctx.lineTo(px + r * (F.brow - 0.06), py + r * (y + depth + 0.02));
+  ctx.lineTo(px - r * 0.60, py + r * (y + depth - 0.02));
   ctx.closePath();
   ctx.fill();
+  // 阴影里埋两团很虚的暗：**不是眼睛**，是让眼睛"在那儿"的暗示。
+  // 观众会自己把它读成一双眼，而且永远不会有死表情（这就是遮眼这一招的划算处）
+  const ey = py + r * (y + depth * 0.42);
+  for (const [dx, w] of [[F.brow - 0.52, 0.15], [F.brow - 0.18, 0.11]]) {
+    const rg = ctx.createRadialGradient(px + r * dx, ey, 0, px + r * dx, ey, r * w * 1.7);
+    rg.addColorStop(0, `rgba(14,10,7,${alpha * 0.85})`);
+    rg.addColorStop(1, "rgba(14,10,7,0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.ellipse(px + r * dx, ey, r * w * 1.7, r * w * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1292,20 +1379,45 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
   const child = kind === "sister";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
   const P = (x, y) => [px + r * x, py + r * y];
+  // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
+  // 外沿＝颅骨往外一层，内沿＝**刘海的下缘**，从耳前一路往前压到眉弓前缘；
+  // 耳朵在它底下、后头，所以露得出来
+  const fringe = child ? -1.00 : -1.06;
   InkFill(ctx, Spline([
-    P(F.brow - 0.16, child ? -1.42 : -1.56),   // 发际线（孩子的刘海压低一点）
-    P(0.36, -1.86),
+    P(F.brow - 0.12, fringe),                  // 刘海前下角（停在眉弓下沿，让开鼻梁）
+    P(F.brow + 0.02, -1.26),                   // 沿眉弓往上（外沿）
+    P(F.brow - 0.16, -1.54),
+    P(0.32, -1.86),
     P(-0.20, F.crown - 0.10),                  // 颅顶外一层
-    P(-0.72, -1.80),
+    P(-0.74, -1.80),
     P(F.back - 0.10, -1.26),
     P(-1.02, -0.78),
     P(-0.84, -0.46),                           // 项（发脚）
     P(-0.66, -0.56),
-    P(-0.62, -0.88),                           // 耳后
-    P(-0.46, -1.14),                           // 绕过耳上
-    P(-0.08, -1.34),                           // 鬓角
-    P(0.28, -1.50),                            // 太阳穴
-  ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.2)", shadeAt: 0.5 });
+    P(-0.62, -0.92),                           // 耳后（让开耳朵）
+    P(-0.50, -1.08),                           // 绕过耳上
+    P(-0.18, fringe - 0.06),                   // ← 刘海下缘往前压
+    P(0.22, fringe - 0.02),
+    P(0.50, fringe - 0.01),
+  ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.18)", shadeAt: 0.5 });
+  // 刘海底下那片阴影：眼睛在这儿
+  EyeShade(ctx, px, py, r, F, fringe + 0.01, child ? 0.32 : 0.40, 0.30);
+  // 两三根散下来的发丝，压在阴影上——刘海不是一块板
+  ctx.save();
+  ctx.fillStyle = tone;
+  for (let i = 0; i < 4; i += 1) {
+    const t = i / 3;
+    const bx = px + r * (-0.06 + t * 0.80);
+    const dp = r * (0.04 + Hash(id + "fr" + i) * 0.09);   // 每一绺长短差得开
+    const hw2 = r * (0.09 + Hash(id + "fw" + i) * 0.04);
+    ctx.beginPath();                                       // 圆头的一绺，不是尖齿
+    ctx.moveTo(bx - hw2, py + r * (fringe - 0.03));
+    ctx.quadraticCurveTo(bx - hw2 * 0.6, py + r * fringe + dp, bx, py + r * fringe + dp);
+    ctx.quadraticCurveTo(bx + hw2 * 0.6, py + r * fringe + dp * 0.86, bx + hw2, py + r * (fringe - 0.03));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   if (child) {
     // 妹妹：头顶偏后一只小抓髻（**扎进头发里**，别浮在头顶上）＋一根红头绳，
     // 颈后一小绺散下来的
@@ -2037,6 +2149,189 @@ export function DrawCarry(ctx, x, y, S, facing, label) {
 }
 
 // ---------------------------------------------------------------------------
+// 伪透视：房子是个盒子，不是一张贴在天上的卡片
+// （2026-08-17 用户退回门框：「门框的设计还是太抽象了 门框就应该在家里啊
+//   你这个都不符合其他场景样式的透视效果，要么你把房子的四个面都做出来
+//   伪造一下透视 然后再画一个贴合的门框还差不多」）
+//
+// 病根不在门框那三根木头，在**整栋房子只有一面**：一张正对镜头的平墙，
+// 到头是一条竖直的裁边；门是墙上一个黑洞、洞没有厚度。于是那副门框无处可
+// 依附——立在院子里就成了一座牌坊。
+//
+// 治法是把假想机位钉死，把**转过去的那几面**画进同一张贴图里：
+//   ① 山墙（东头那一面）从墙角往里收；
+//   ② 门洞与窗洞有 40cm 的洞壁（墙有多厚，洞口就有多厚）；
+//   ③ 门槛看得见顶面（视平线 1.85m，门槛在脚底下）。
+// 这不是"画得斜一点"，是**真透视、假机位**：假想机位钉在每栋房子东墙外
+// EYE_OFF 米处，深度 d 上的一点按 D/(D+d) 朝灭点收——所以山墙的上下沿会朝
+// 视平线收拢，洞壁的两条边也会。代价是镜头横移时这几面不跟着变；换来的是
+// 「房子有体积、门开在墙上」，那才是画面上真读得出来的事。
+//
+// 灭点一律在**东边**（假想机位在房子东侧），全街统一：一条街上每栋房子各朝
+// 一个方向收，比全平还乱。
+// ---------------------------------------------------------------------------
+export const PX_M = 48;        // 贴图像素 / 米（与 Data_Scenes 的 PPM 同一把尺）
+export const EYE_M = 1.85;     // 玩法机位的视平线（Data_DepthSpec 的老账）
+export const CAM_D = 9.3;      // 玩法机距
+// 假想机位在东墙外多远。山墙那一面的**上屏宽度 = EYE_OFF × 进深/(机距+进深)**，
+// 2.15 米折算出来是 0.75m ≈ 36px：够读出"这是个盒子"，又不至于在正墙旁边再摆
+// 一整块板（首轮给 2.6 ＝0.91m，实拍下山墙跟正墙争画面）
+export const EYE_OFF = 2.15;
+export const WALL_T = 0.40;    // 土坯墙厚（洞壁就是这么厚）
+export const HOUSE_D = 5.0;    // 屋子进深：山墙那面往里铺多远
+
+/** 前平面上的一点（画布 px）按深度 d（米，往里为正）朝灭点收 */
+export function Recede(px, py, d, vpx, vpy) {
+  const k = CAM_D / (CAM_D + d);
+  return [vpx + (px - vpx) * k, vpy + (py - vpy) * k];
+}
+/** 视平线在画布上的 y（groundY 是这张贴图里的地平线） */
+export function EyeY(groundY) { return groundY - EYE_M * PX_M; }
+/** 灭点的 x：假想机位钉在东墙外 EYE_OFF 米 */
+export function VanishX(eastEdgePx) { return eastEdgePx + EYE_OFF * PX_M; }
+
+// 门洞的尺寸（px）。**按人给，不按房子给**：这套骨架里大人实高 1.37m，
+// 门净高 1.55m 正好是"进门不必低头、可也高不出多少"。全作只有这一副门框，
+// 立面上的洞、门框那件道具、烧过之后剩下的那副，三处共用这一张表。
+export const DOOR = {
+  openW: 32,     // 净宽 0.66m
+  openH: 74,     // 净高 1.55m
+  jamb: 8,       // 立柱见方 0.17m（刻痕就刻在西边这根的正面上）
+  lintel: 9,     // 门楣 0.19m
+  sill: 7,       // 门槛 0.15m
+};
+/** 门框外沿的半宽 / 全高（立面上的洞按这个开，门框那件道具照这个画） */
+export const DOOR_HALF = DOOR.openW / 2 + DOOR.jamb;
+export const DOOR_TOP = DOOR.openH + DOOR.lintel;
+
+/**
+ * 洞壁：墙有厚度，洞口就有一圈往里收的侧壁。
+ * 灭点在东边，所以看得见的是**西边那根立柱的内侧面**（站在门左边就看得见
+ * 右边的门垛内壁，反过来也一样）——东侧那面背着镜头，一丝都不该画。
+ * 底下那道是门槛的顶面（视平线在它上头，看得见顶）。
+ * @param x0,x1 洞口在画布上的左右沿；yTop 洞顶；groundY 地平线
+ */
+function DoorReveal(ctx, x0, x1, yTop, groundY, id, { vpx, vpy, night = false, depth = WALL_T } = {}) {
+  const [fx0, fy0] = Recede(x0, yTop, depth, vpx, vpy);
+  const [fx1] = Recede(x1, yTop, depth, vpx, vpy);
+  const [, fyb] = Recede(x0, groundY, depth, vpx, vpy);
+  // 洞里那片暗：**不是死黑**——门后头是屋子，暗到什么程度由后面那层贴图说
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, yTop, x1 - x0, groundY - yTop);
+  ctx.clip();
+  const inner = ctx.createLinearGradient(0, yTop, 0, groundY);
+  inner.addColorStop(0, night ? "rgba(14,12,10,0.86)" : "rgba(22,18,14,0.80)");
+  inner.addColorStop(1, night ? "rgba(14,12,10,0.66)" : "rgba(26,21,16,0.52)");
+  ctx.fillStyle = inner;
+  ctx.fillRect(x0, yTop, x1 - x0, groundY - yTop);
+  // 西侧洞壁：擦进来的光只舔得着这一面，所以它是洞口唯一亮的地方
+  InkFill(ctx, [[x0, yTop], [fx0, fy0], [fx0, fyb], [x0, groundY]], id + "revW",
+    night ? "#4e4133" : "#8a7757", { amp: 0.7, lw: 1.2, line: "rgba(40,30,20,0.5)" });
+  const lit = ctx.createLinearGradient(x0, 0, fx0, 0);
+  lit.addColorStop(0, night ? "rgba(190,170,130,0.10)" : "rgba(238,214,160,0.22)");
+  lit.addColorStop(1, "rgba(40,30,20,0.28)");
+  ctx.fillStyle = lit;
+  ctx.fillRect(x0, yTop, fx0 - x0 + 0.6, groundY - yTop);
+  // 门楣底面：门头几乎顶在视平线上，所以它只剩薄薄一条——有这一条，
+  // 洞口才是"穿过一堵墙"，没有就是墙上贴了张黑纸
+  InkFill(ctx, [[x0, yTop], [x1, yTop], [fx1, fy0], [fx0, fy0]], id + "revT",
+    "rgba(28,22,16,0.92)", { amp: 0.5, lw: 0, line: null });
+  ctx.restore();
+  return { fx0, fx1, fy0 };
+}
+
+/**
+ * 门槛：一条横在洞口底下的木/石坎。视平线在它上头 1.7 米，所以**顶面看得见**
+ * ——那一小条正是"这道坎有厚度"的全部证据。
+ */
+function DoorSill(ctx, x0, x1, groundY, id, { vpx, vpy, night = false } = {}) {
+  const h = DOOR.sill;
+  const [bx0, by0] = Recede(x0 - 2, groundY - h, WALL_T, vpx, vpy);
+  const [bx1, by1] = Recede(x1 + 2, groundY - h, WALL_T, vpx, vpy);
+  // 顶面（往里收的那一片）
+  InkFill(ctx, [[x0 - 2, groundY - h], [x1 + 2, groundY - h], [bx1, by1], [bx0, by0]],
+    id + "sillTop", night ? "#584c3c" : "#8c7f68", { amp: 0.6, lw: 1.2, line: "rgba(40,32,22,0.45)" });
+  // 正面（踢脚那一条，磨得发亮）
+  InkFill(ctx, Rect(x0 - 2, groundY - h, x1 - x0 + 4, h), id + "sill",
+    night ? "#463c30" : "#6b6152", { amp: 0.9, lw: 1.5, shade: "rgba(0,0,0,0.20)" });
+  InkLine(ctx, x0, groundY - h + 1.4, x1, groundY - h + 1.2, id + "sillWear",
+    { lw: 1.2, color: night ? "rgba(150,140,120,0.20)" : "rgba(226,206,166,0.34)", amp: 0.5 });
+}
+
+/**
+ * 东山墙：从墙角往里收的那一面。**全画面唯一的大块暗部**——一排土房之所以
+ * 有分量，靠的是这种整面的阴影，不是细节多（老版拿一道渐变假装它，读出来
+ * 还是一张卡片的边）。
+ * @param ex 墙角（东墙）在画布上的 x；top 墙头；groundY 地平线
+ */
+function EastGable(ctx, ex, top, groundY, id, {
+  vpx, vpy, night = false, burnt = false, depth = HOUSE_D,
+} = {}) {
+  const [fxT, fyT] = Recede(ex, top, depth, vpx, vpy);
+  const [fxB, fyB] = Recede(ex, groundY, depth, vpx, vpy);
+  // 比正墙**暗两档**：太阳在西，这一面整天背着光。跟正墙同一个明度的话，
+  // 转过去的那一下就读不出来，只剩"旁边又贴了一块板"
+  const face = burnt ? "#453f38" : (night ? "#2d261e" : "#635740");
+  InkFill(ctx, [[ex, top], [fxT, fyT], [fxB, fyB], [ex, groundY]], id + "gable", face,
+    { amp: 1.6, lw: 2.2 });
+  ctx.save();
+  WobblyPath(ctx, [[ex, top], [fxT, fyT], [fxB, fyB], [ex, groundY]], id + "gable", 1.6, true);
+  ctx.clip();
+  // 越往里越暗（墙角那儿还擦得着一点光，深处什么也没有）
+  const deep = ctx.createLinearGradient(ex, 0, fxT, 0);
+  deep.addColorStop(0, "rgba(30,22,14,0.06)");
+  deep.addColorStop(1, "rgba(24,18,12,0.42)");
+  ctx.fillStyle = deep;
+  ctx.fillRect(Math.min(ex, fxT) - 2, top - 4, Math.abs(fxT - ex) + 4, groundY - top + 8);
+  // 抹泥的横茬：**跟着透视一起收**，不然这一面读回一块贴在旁边的平板
+  for (let i = 0; i < 4; i += 1) {
+    const t = 0.16 + i * 0.21 + Sym(id + "gr", i, 0.05);
+    const y = top + (groundY - top) * t;
+    const [rx, ry] = Recede(ex, y, depth * (0.35 + Rnd(id + "gr2", i) * 0.6), vpx, vpy);
+    InkLine(ctx, ex + 1, y, rx, ry, id + "gtr" + i,
+      { lw: 2.0 + Rnd(id + "gr3", i) * 3, amp: 1.4,
+        color: i % 2 ? "rgba(52,40,26,0.10)" : "rgba(214,196,158,0.07)" });
+  }
+  // 墙根：往里那一头也得落在地上
+  const foot = ctx.createLinearGradient(0, groundY, 0, groundY - (groundY - fyB) * 1.5);
+  foot.addColorStop(0, "rgba(40,30,20,0.40)");
+  foot.addColorStop(1, "rgba(40,30,20,0)");
+  ctx.fillStyle = foot;
+  ctx.fillRect(ex - 2, fyB - 4, fxT - ex + 6, groundY - fyB + 8);
+  // 碱脚也转过去：墙根那两皮旧砖顺着地面斜进去。**这一条比墙面上任何花纹
+  // 都管用**——它是唯一一处"地面在往里走"的证据
+  if (!burnt) {
+    for (let i = 0; i < 7; i += 1) {
+      const t0 = i / 7, t1 = (i + 0.82) / 7;
+      const ax0 = ex + (fxB - ex) * t0, ay0 = groundY + (fyB - groundY) * t0;
+      const ax1 = ex + (fxB - ex) * t1, ay1 = groundY + (fyB - groundY) * t1;
+      const bh = 7 * (1 - t0 * 0.4);
+      InkFill(ctx, [[ax0, ay0], [ax1, ay1], [ax1, ay1 - bh], [ax0, ay0 - bh]],
+        id + "gpl" + i, i % 2 ? PAL.brickPlinth : PAL.brickPlinthAlt,
+        { amp: 0.7, lw: 1.0, line: "rgba(38,32,26,0.45)" });
+    }
+  }
+  ctx.restore();
+  // 墙角那条竖线：两面之间的那道棱，比别处都硬
+  InkLine(ctx, ex, top + 1, ex + Sym(id + "cn", 0, 1.2), groundY, id + "corner",
+    { lw: 2.0, color: "rgba(34,25,16,0.62)", amp: 0.8 });
+  return { fxT, fyT, fxB, fyB };
+}
+
+/**
+ * 山墙上头那条檐：屋顶挑出墙面的那一截转过去之后是**斜下去的一条**。
+ * 单独一支笔，因为它必须画在屋顶之后——屋顶自己的东缘要压在山墙面之前，
+ * 顺序反了，墙就长到屋顶上头去了。
+ */
+function GableEave(ctx, ex, top, id, { vpx, vpy, night = false, burnt = false, depth = HOUSE_D, rise = 6 } = {}) {
+  const [fx, fy] = Recede(ex, top, depth, vpx, vpy);
+  const [fxU, fyU] = Recede(ex, top - rise, depth, vpx, vpy);
+  InkFill(ctx, [[ex, top - rise], [fxU, fyU], [fx, fy], [ex, top]], id + "gEave",
+    burnt ? "#3b352d" : (night ? "#2b2419" : "#4b4230"), { amp: 1.2, lw: 1.8 });
+}
+
+// ---------------------------------------------------------------------------
 // 建筑与道具
 // ---------------------------------------------------------------------------
 // 可进入的屋子的内里（剖面）：土墙面、炕、灶台、水缸、房梁。
@@ -2249,8 +2544,11 @@ export function DrawRoomWing(ctx, x, groundY, w, h, id,
 }
 
 export function DrawHouse(ctx, x, groundY, w, h, id,
-  { burnt = false, night = false, door = false, slogan = null } = {}) {
+  { burnt = false, night = false, door = false, slogan = null, doorAt = null } = {}) {
   const W = w, H = h;
+  // 伪透视的两个数：灭点钉在东墙外（见上面「房子是个盒子」那一节）
+  const vpx = VanishX(x + W / 2);
+  const vpy = EyeY(groundY);
   if (burnt) {
     // 烧过的土坯房：**土坯不燃，火只吃木头和草**——所以四堵墙基本还立着、
     // 屋顶整个没了。老版画的"一堵墙立着其余塌成瓦砾"是砖石建筑的垮法。
@@ -2261,6 +2559,9 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
       id, "#6b6154", { amp: 2.2, lw: 2.4, shade: "rgba(0,0,0,0.22)" });
     WeatherAdobe(ctx, x - W / 2, top, W, groundY - top, id + "bw",
       { course: 12, gullies: 7, cracks: 4, patches: 1, seam: 0.20 });
+    // 东山墙：烧塌的也是一栋房子，四堵墙还立着——只有这一面转过去，
+    // 才看得出"里头是空的"。没有它，残墙就是院子里立着的一块灰板
+    EastGable(ctx, x + W / 2, top + 3, groundY, id + "bg", { vpx, vpy, night, burnt: true });
     // 门窗洞：烧空之后是这堵墙上最黑的两块，洞口正上方一道火舌形的熏黑
     const holes = [[x - W * 0.22, 40, 74], [x + W * 0.16, 46, 38]];
     for (let i = 0; i < holes.length; i += 1) {
@@ -2338,21 +2639,11 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
   ctx.fillRect(x - W / 2, groundY - H, W, H * 0.26);
   ctx.restore();
 
-  // ⑥.2 背光的山墙面。太阳在西（SUN.dx=+0.85），东头那道山墙整片在阴影里——
-  // **这是全画面唯一的大块暗部**。没有它，一排土房就是一排贴在天上的浅色卡片：
-  // 照片里的村子之所以"有分量"，靠的就是这种整面的阴影，不是细节多。
-  {
-    const sw2 = Math.min(16, W * 0.09);
-    ctx.save();
-    const side = ctx.createLinearGradient(x + W / 2 - sw2, 0, x + W / 2, 0);
-    side.addColorStop(0, "rgba(44,33,21,0.10)");
-    side.addColorStop(1, "rgba(44,33,21,0.52)");
-    ctx.fillStyle = side;
-    ctx.fillRect(x + W / 2 - sw2, groundY - H, sw2, H);
-    ctx.restore();
-    InkLine(ctx, x + W / 2 - sw2, groundY - H + 2, x + W / 2 - sw2 + Sym(id + "sd", 0, 2), groundY,
-      id + "sideEdge", { lw: 1.4, color: "rgba(38,28,18,0.4)", amp: 1.2 });
-  }
+  // ⑥.2 东山墙：**真的转过去的一面**，不是画在正墙上的一道渐变（2026-08-17
+  // 用户退回门框那一轮换掉的）。太阳在西，所以这一面整片在阴影里——
+  // 全画面唯一的大块暗部。老版拿一道 16px 的渐变假装它，正墙到头还是一条
+  // 竖直的裁边：房子仍然是一张卡片，门框也就无墙可依。
+  EastGable(ctx, x + W / 2, groundY - H + 2, groundY, id + "eg", { vpx, vpy, night });
 
   // ⑥.5 墙根的溅泥带：雨从檐口砸下来把泥溅上墙，加上常年堆在根上的柴土——
   //      **照片里土墙最暗的一条就在这儿**。只有泛碱的浅色，墙就还是一张平板
@@ -2469,68 +2760,106 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
   ctx.fillRect(x - rw / 2 + 4, eaveY + 2, rw - 8, 4);
   ctx.restore();
 
-  // ⑨ 门：**按米写死**，不跟着 H 缩放（房子一矮门就压成一米五的洞）
-  const SILL = 7;                       // 门槛 0.15m：土屋的门下必有这一条
+  // ⑧.5 山墙上头的檐：必须画在屋顶之后（屋顶自己的东缘要压在山墙面之前，
+  //      顺序反了墙就长到屋顶上头去了）
+  GableEave(ctx, x + W / 2, eaveY + 2, id + "eg", { vpx, vpy, night, rise: rh + 3 });
+
+  // ⑨ 门：**一个有厚度的洞**，不是墙上一块黑色（2026-08-17 改）。
+  // 尺寸按人给不按房子给（DOOR 表），三处共用：这儿开的洞、门框那件道具、
+  // 烧过之后剩下的那副。
   if (door) {
-    // 可进入的家：门洞敞着（人从这儿进去，立面淡出让位给屋里）
-    const dw2 = 41, dh2 = 84;           // 0.85m × 1.75m，成年人进门要低头
-    const dx2 = x + W / 2 - dw2 - 10;
-    InkFill(ctx, Rect(dx2, groundY - dh2, dw2, dh2), id + "doorway", "#1c1712", { amp: 1.6, lw: 2.4 });
+    // 可进入的家：**立面只负责把洞开出来**，门框那三根木头由 doorframe 那件
+    // 道具画（它得能单独留在画面上——第八章「门框还在」全指着它，而且刻痕
+    // 要能就地重绘）。两张贴图同在行走线这个平面上（facade 带的位置 z 也是
+    // 0），所以洞开成门框外沿那么大，木头就正好嵌在洞里，严丝合缝。
+    // 洞口比门框外沿**小 1.5px**：两张贴图的手绘抖动不可能逐点对齐，让墙
+    // 压住框一线，才不会在接缝上漏出一条透光的白缝。
+    const dcx = x + (doorAt ?? (W / 2 - DOOR_HALF - 22));
+    const hx0 = dcx - DOOR_HALF + 1.5, hx1 = dcx + DOOR_HALF - 1.5;
+    const hyT = groundY - DOOR_TOP + 1.5;
     ctx.save();
-    ctx.globalAlpha = night ? 0.12 : 0.20;
-    ctx.fillStyle = "#8a6f4c";
-    ctx.fillRect(dx2 + 4, groundY - dh2 * 0.62, dw2 - 8, dh2 * 0.62);
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "#000";
+    WobblyPath(ctx, Rect(hx0, hyT, hx1 - hx0, groundY - hyT), id + "cut", 0.8, true);
+    ctx.fill();
     ctx.restore();
-    InkFill(ctx, Rect(dx2 - 3, groundY - SILL, dw2 + 6, SILL), id + "sill", "#635a4b", { amp: 1.2, lw: 1.6 });
+    // 洞沿：墙被掏开的地方要有一道墨线，不然是"贴图破了"
+    WobblyPath(ctx, Rect(hx0, hyT, hx1 - hx0, groundY - hyT + 4), id + "cut", 0.8, true);
+    ctx.strokeStyle = "rgba(40,30,20,0.55)";
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+    // 洞口上方那块墙常年被门里冒出来的炊烟熏着
+    ctx.save();
+    const soot = ctx.createLinearGradient(0, hyT, 0, hyT - 26);
+    soot.addColorStop(0, "rgba(34,26,18,0.34)");
+    soot.addColorStop(1, "rgba(34,26,18,0)");
+    ctx.fillStyle = soot;
+    ctx.fillRect(hx0 - 4, hyT - 26, hx1 - hx0 + 8, 26);
+    ctx.restore();
   } else {
-    // 邻家：3~5 块厚板拼的板门，板缝开裂能透光，下沿泡烂发毛，不用合页
-    const dw = 29, dh = 82;
-    const dx3 = x - W * 0.28;
-    InkFill(ctx, Rect(dx3, groundY - dh, dw, dh), id + "doorHole", "#1c1712", { amp: 1.4, lw: 2.0 });
-    InkFill(ctx, [[dx3 + 1, groundY - dh + 1], [dx3 + dw - 1, groundY - dh + 2],
-      [dx3 + dw - 2, groundY - 3], [dx3 + 2, groundY - 2]], id + "door", PAL.woodOld,
-    { amp: 1.6, lw: 2.0, shade: "rgba(0,0,0,0.24)" });
+    // 邻家：穷家的门洞连门框料都没有，泥墙自己就是洞壁；板门**钉在洞的里口**，
+    // 所以门扇之外还看得见一圈墙的厚度。3~5 块厚板拼的，板缝开裂能透光，
+    // 下沿泡烂发毛，不用合页
+    const dcx = x - W * 0.28 + 14;
+    const hx0 = dcx - DOOR.openW / 2, hx1 = dcx + DOOR.openW / 2;
+    const rev = DoorReveal(ctx, hx0, hx1, groundY - DOOR.openH, groundY,
+      id + "nd", { vpx, vpy, night });
+    // 门扇：钉在洞的**里口**，所以整扇都在洞壁之后、跟着洞口一起往里收
+    const dx3 = rev.fx0 + 1, dw = rev.fx1 - rev.fx0 - 2;
+    const dTop = rev.fy0 + 2;
+    InkFill(ctx, [[dx3, dTop], [dx3 + dw, dTop + 1], [dx3 + dw, groundY - 3], [dx3, groundY - 2]],
+      id + "door", night ? "#4a4034" : PAL.woodOld,
+      { amp: 1.6, lw: 2.0, shade: "rgba(0,0,0,0.30)" });
     for (let i = 1; i < 4; i += 1) {
-      InkLine(ctx, dx3 + (dw * i) / 4, groundY - dh + 3, dx3 + (dw * i) / 4 + Sym(id + "pk", i, 1.2), groundY - 4,
+      InkLine(ctx, dx3 + (dw * i) / 4, dTop + 3, dx3 + (dw * i) / 4 + Sym(id + "pk", i, 1.2), groundY - 5,
         id + "plank" + i, { lw: 1.3, color: "rgba(30,24,17,0.55)", amp: 1.0 });
     }
     // 下沿泡烂：贴地参差朽茬，更深发黑
-    InkFill(ctx, [[dx3 + 2, groundY - 8], [dx3 + dw - 2, groundY - 6],
-      [dx3 + dw - 2, groundY - 2], [dx3 + 2, groundY - 2]], id + "rotBase", PAL.woodOldDark,
+    InkFill(ctx, [[dx3 + 2, groundY - 9], [dx3 + dw - 2, groundY - 7],
+      [dx3 + dw - 2, groundY - 3], [dx3 + 2, groundY - 3]], id + "rotBase", PAL.woodOldDark,
     { amp: 2.2, lw: 1.2 });
-    InkFill(ctx, Rect(dx3 - 3, groundY - 5, dw + 6, 5), id + "sill2", "#635a4b", { amp: 1.0, lw: 1.4 });
+    DoorSill(ctx, hx0, hx1, groundY, id + "nd", { vpx, vpy, night });
   }
 
   // ⑩ 窗：木棂糊纸，按米写死，下沿在炕沿高（坐在炕上正好平视出去）
   const ww = 50, wh = 41, wy0 = groundY - 41 - wh;
   const wx0 = x + W * 0.06;
-  // 窗洞的厚度：外围一圈抹泥凹口 + 上沿一道投影
-  InkFill(ctx, Rect(wx0 - 2, wy0 - 2, ww + 4, wh + 4), id + "winFrame", "#5c4a30", { amp: 1.4, lw: 1.6 });
-  InkFill(ctx, Rect(wx0, wy0, ww, wh), id + "winPaper",
-    night ? "#a87f37" : "#8d8368", { amp: 0.9, lw: 0, line: null });
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#2b2118";
-  ctx.fillRect(wx0, wy0, ww, 4);
-  ctx.restore();
+  // 窗洞的厚度：跟门洞同一套算法——窗纸糊在**里口**，所以西边那道洞壁
+  // 露出来一条（灭点在东，看得见的永远是西侧那一面）。老版只在外围描一圈
+  // 深色边，那是"墙上贴了张纸"，不是"墙上掏了个洞"
+  const [pwx, pwy] = Recede(wx0, wy0, WALL_T, vpx, vpy);
+  const [pwx1] = Recede(wx0 + ww, wy0, WALL_T, vpx, vpy);
+  const [, pwyb] = Recede(wx0, wy0 + wh, WALL_T, vpx, vpy);
+  const pw = pwx1 - pwx, ph = pwyb - pwy;      // 里口那张窗纸的方框
+  {
+    InkFill(ctx, Rect(wx0 - 2, wy0 - 2, ww + 4, wh + 4), id + "winFrame", "#5c4a30", { amp: 1.4, lw: 1.6 });
+    // 洞壁：西侧一片（受光）＋上沿一条（背光）
+    InkFill(ctx, [[wx0, wy0], [pwx, pwy], [pwx, pwyb], [wx0, wy0 + wh]], id + "winRevW",
+      night ? "#4a3f31" : "#93805f", { amp: 0.6, lw: 1.0, line: "rgba(45,34,22,0.45)" });
+    InkFill(ctx, [[wx0, wy0], [wx0 + ww, wy0], [pwx1, pwy], [pwx, pwy]], id + "winRevT",
+      "rgba(38,29,20,0.66)", { amp: 0.5, lw: 0, line: null });
+    // 窗纸：糊在里口那一层，跟着洞口一起往里收
+    InkFill(ctx, Rect(pwx, pwy, pw, ph), id + "winPaper",
+      night ? "#a87f37" : "#8d8368", { amp: 0.9, lw: 0, line: null });
+  }
   // 直棂窗：只有竖棂，间距粗细都不匀（精确等分是像样人家）
   {
-    let mx = wx0 + 5;
+    let mx = pwx + 4;
     let k = 0;
-    while (mx < wx0 + ww - 3) {
-      InkLine(ctx, mx, wy0 + 1, mx + Sym(id + "mv", k, 1.0), wy0 + wh - 1,
+    while (mx < pwx + pw - 3) {
+      InkLine(ctx, mx, pwy + 1, mx + Sym(id + "mv", k, 1.0), pwy + ph - 1,
         id + "mull" + k, { lw: 0.9 + Rnd(id + "mw", k) * 0.5, color: "#5c4a30", amp: 0.7 });
-      mx += 7 + Rnd(id + "mg", k) * 8;
+      mx += 6 + Rnd(id + "mg", k) * 7;
       k += 1;
     }
-    InkLine(ctx, wx0 + 1, wy0 + wh * 0.55, wx0 + ww - 1, wy0 + wh * 0.55 + 1,
+    InkLine(ctx, pwx + 1, pwy + ph * 0.55, pwx + pw - 1, pwy + ph * 0.55 + 1,
       id + "mullH", { lw: 1.2, color: "#4a3a25", amp: 0.7 });
   }
   // 破洞：撕裂形，一角卷起来的纸
   for (let i = 0; i < 2; i += 1) {
-    const hx2 = wx0 + 5 + Rnd(id + "tc", i) * (ww - 20);
-    const hy2 = wy0 + 4 + Rnd(id + "tr", i) * (wh - 16);
-    const hs = 7 + Rnd(id + "ts", i) * 6;
+    const hx2 = pwx + 4 + Rnd(id + "tc", i) * (pw - 18);
+    const hy2 = pwy + 4 + Rnd(id + "tr", i) * (ph - 15);
+    const hs = 6 + Rnd(id + "ts", i) * 5;
     InkFill(ctx, [[hx2, hy2], [hx2 + hs, hy2 - 2], [hx2 + hs + 2, hy2 + hs * 0.7],
       [hx2 + hs * 0.4, hy2 + hs], [hx2 - 1, hy2 + hs * 0.5]],
     id + "torn" + i, "#241d15", { amp: 1.6, lw: 1.2 });
@@ -2552,14 +2881,240 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
   }
 }
 
-export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = false, tally = 0 } = {}) {
-  const H = 74, W = 40;
-  InkFill(ctx, Rect(x - W / 2, groundY - H, 8, H), id + "l", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
-  InkFill(ctx, Rect(x + W / 2 - 8, groundY - H, 8, H), id + "r", PAL.wood, { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
-  InkFill(ctx, Rect(x - W / 2 - 4, groundY - H - 9, W + 8, 10), id + "t", PAL.woodDark, { amp: 1.1, lw: 2.4 });
+/**
+ * 门框——**连着门垛一起画**（2026-08-17 重做）。
+ *
+ * 用户退回的原话：「门框的设计还是太抽象了 门框就应该在家里啊 你这个都不符合
+ * 其他场景样式的透视效果，要么你把房子的四个面都做出来 伪造一下透视 然后再画
+ * 一个贴合的门框还差不多」。老版是**两根柱子加一根横梁**，四条边全是直的、
+ * 没有厚度，而且孤零零立在院子里——立面一淡出（屋里的戏、过场撤第四堵墙），
+ * 它周围一堵墙都没有，读出来就是一座牌坊。
+ *
+ * 治法不是把这三根木头画细致，是**给它一堵墙**：
+ *   · 门垛（洞两边那块墙）跟着门框一起画，西边化开、东边收在墙角上——
+ *     立面淡出时它照旧在，门框于是永远长在墙上，不是立在空地上；
+ *   · 洞有厚度：门框料是**一圈套在墙洞里的框**，所以西侧那根立柱看得见内侧面
+ *     （灭点在东，见「房子是个盒子」那一节），门楣看得见底面，门槛看得见顶面；
+ *   · 尺寸与立面上那个洞共用同一张 DOOR 表，两张贴图同在行走线这个平面上，
+ *     木头正好嵌在墙洞里。
+ *
+ * 刻痕（marked/carved/tally）画在**西立柱的正面**上，世界坐标一寸没动：
+ * 立柱的西沿＝门心 −0.50m，跟剧本里的 markX0/markX1（33.55~33.78）对得上。
+ *
+ * @param w,h 门垛的画布尺寸（px，来自 Data_Scenes 的 w/h）
+ * @param corner 门心到东墙角有多远（米，来自 Data_Scenes；灭点按它算，
+ *   所以这件道具与立面用的是同一个灭点）
+ */
+export function DrawDoorframe(ctx, x, groundY, w, h, id,
+  { marked = false, carved = false, tally = 0, night = false, burnt = false, corner = 0.92 } = {}) {
+  const H = DOOR.openH, W = DOOR.openW + DOOR.jamb * 2;
+  const ex = x + corner * PX_M;          // 东墙角
+  const wx = ex - w;                     // 门垛西沿（那儿墙化开，交给立面接着说）
+  // 烧过的墙**要矮一截**：泥平顶没了以后墙头被雨啃塌，跟残墙一般高才叫废墟
+  //（照原高画，门垛比整栋残房还高，读出来是"院里立着一座塔"）
+  const ph = burnt ? h * 0.80 : h;
+  const wallTopY = groundY - ph;
+  const vpx = VanishX(ex), vpy = EyeY(groundY);
+  const c0 = x - DOOR.openW / 2, c1 = x + DOOR.openW / 2;   // 净空左右沿
+  const yTop = groundY - H;                                  // 门头
+  const JX = c0 - DOOR.jamb;                                 // 西立柱的西沿（刻痕在这根上）
+
+  // ① 门垛：这块墙跟房子的立面是同一堵，所以泥、坯缝、碱脚全照 DrawHouse 那套
+  const crest = RaggedTop(wx, ex, wallTopY, id + "pTop",
+    burnt ? { sag: 7, n: 11 } : { sag: 2.5, n: 7 });
+  InkFill(ctx, crest.concat([[ex, groundY], [wx, groundY]]), id + "pier",
+    burnt ? "#6b6154" : (night ? "#4b4235" : PAL.adobe),
+    { amp: 2.0, lw: 2.4, shade: "rgba(74,56,42,0.18)", shadeAt: 0.66 });
+  WeatherAdobe(ctx, wx, wallTopY, ex - wx, ph, id + "pwa",
+    burnt ? { course: 11, gullies: 5, cracks: 4, patches: 1, seam: 0.2 } : { course: 13 });
+  // 檐下那道压暗 + 墙根的溅泥（跟立面同款，两张贴图接缝处才看不出来）
+  ctx.save();
+  const pe = ctx.createLinearGradient(0, wallTopY, 0, wallTopY + ph * 0.26);
+  pe.addColorStop(0, `rgba(40,30,20,${burnt ? 0.30 : 0.62})`);
+  pe.addColorStop(1, "rgba(40,30,20,0)");
+  ctx.fillStyle = pe;
+  ctx.fillRect(wx, wallTopY, ex - wx, ph * 0.26);
+  const pf = ctx.createLinearGradient(0, groundY - ph * 0.20, 0, groundY);
+  pf.addColorStop(0, "rgba(58,44,28,0)");
+  pf.addColorStop(1, "rgba(48,36,22,0.42)");
+  ctx.fillStyle = pf;
+  ctx.fillRect(wx, groundY - ph * 0.20, ex - wx, ph * 0.20);
+  ctx.restore();
+  // 碱脚从化开那一段之后才起（起在渐隐里，最西头那块砖会被擦掉半截，
+  // 读出来是地上躺着一块孤零零的砖）
+  BrickPlinth(ctx, wx + 32, ex - wx - 34, groundY, id + "ppl", { rows: 2, cover: 0.5 });
+  // 檐口：一道压在墙头上的暗边。立面在的时候被屋顶盖着看不见，第四堵墙一撤，
+  // 全靠它，墙头才不是一条生切口
+  ctx.save();
+  ctx.globalAlpha = burnt ? 0.18 : 0.34;
+  ctx.fillStyle = "#2b2118";
+  ctx.fillRect(wx, wallTopY + 1, ex - wx, 4);
+  ctx.restore();
+  // 烧过的门垛：火是从屋里舔出来的，所以**门洞上方那一片最黑**，越往两边越淡。
+  // 只压暗、不描边——烟熏没有轮廓（同「灰靠没有边」那条）
+  if (burnt) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(wx, wallTopY - 4, ex - wx, ph + 4);
+    ctx.clip();
+    const sm = ctx.createRadialGradient(x, groundY - H, 4, x, groundY - H, Math.max(46, w * 0.62));
+    sm.addColorStop(0, "rgba(24,20,17,0.46)");
+    sm.addColorStop(0.55, "rgba(26,22,18,0.24)");
+    sm.addColorStop(1, "rgba(26,22,18,0)");
+    ctx.fillStyle = sm;
+    ctx.fillRect(wx, wallTopY - 4, ex - wx, ph + 4);
+    // 火舌从洞口舔上墙：一叠很淡的小团，越往上越散（同灯窝那条熏黑的做法）
+    ctx.fillStyle = "rgba(20,17,14,1)";
+    ctx.globalAlpha = 0.05;
+    for (let i = 0; i < 26; i += 1) {
+      const t = Rnd(id + "sm", i);
+      const r = 3.4 + (1 - t) * 5 + Rnd(id + "smr", i) * 3;
+      ctx.beginPath();
+      ctx.ellipse(x + Sym(id + "smx", i, 4 + t * 16), groundY - H - 2 - t * 40, r, r * 0.82, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // 东墙角：墙到这儿**转过去**。转多少与立面那张贴图算的是同一笔（同一个灭点、
+  // 同一个进深），只画贴着墙角的一截、往里化开——再往里是山墙内侧那张贴图
+  // （过场撤第四堵墙那一档）的地盘，两张画满就打架了。
+  // 有这一截，立面淡出时墙角才是"转过去了"，不是"切在这儿"
+  {
+    const seen = 20;                     // 只画墙角这 20px
+    const [gx, gy] = Recede(ex, wallTopY, HOUSE_D, vpx, vpy);
+    const [gbx, gby] = Recede(ex, groundY, HOUSE_D, vpx, vpy);
+    const kx = Math.min(seen / Math.max(1, gx - ex), 1);
+    const qx = ex + (gx - ex) * kx, qy = wallTopY + (gy - wallTopY) * kx;
+    const qbx = ex + (gbx - ex) * kx, qby = groundY + (gby - groundY) * kx;
+    ctx.save();
+    InkFill(ctx, [[ex, wallTopY], [qx, qy], [qbx, qby], [ex, groundY]], id + "pierGable",
+      burnt ? "#453f38" : (night ? "#2d261e" : "#635740"), { amp: 1.4, lw: 1.8 });
+    // 往里那一头化开：它是"还没画完的墙"，不是一块断板
+    ctx.globalCompositeOperation = "destination-out";
+    const gf = ctx.createLinearGradient(ex + seen * 0.45, 0, ex + seen + 3, 0);
+    gf.addColorStop(0, "rgba(0,0,0,0)");
+    gf.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = gf;
+    ctx.fillRect(ex + seen * 0.45, wallTopY - 10, seen + 8, ph + 20);
+    ctx.restore();
+  }
+  ctx.save();
+  const cg = ctx.createLinearGradient(ex - 14, 0, ex, 0);
+  cg.addColorStop(0, "rgba(44,33,21,0)");
+  cg.addColorStop(1, "rgba(44,33,21,0.42)");
+  ctx.fillStyle = cg;
+  ctx.fillRect(ex - 14, wallTopY, 14, ph);
+  ctx.restore();
+  InkLine(ctx, ex, wallTopY + 2, ex + Sym(id + "cn", 0, 1.0), groundY, id + "pierCorner",
+    { lw: 2.0, color: "rgba(34,25,16,0.6)", amp: 0.8 });
+  // 西沿**化开**：第四堵墙撤掉的时候，墙不该有一条切口——它是"没画的那一截"，
+  // 不是"断在这儿"。渐隐的一段正好落在立面半隐的那 0.30 上，两张贴图接得住
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  const fade = ctx.createLinearGradient(wx, 0, wx + 30, 0);
+  fade.addColorStop(0, "rgba(0,0,0,1)");
+  fade.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = fade;
+  ctx.fillRect(wx - 4, wallTopY - 8, 34, ph + 12);
+  ctx.restore();
+
+  // ② 门洞：**有厚度的洞**。先把往里收的那一层（洞底）铺暗，再补三面洞壁
+  const [fx0, fy0] = Recede(c0, yTop, WALL_T, vpx, vpy);
+  const [fx1, fy1] = Recede(c1, yTop, WALL_T, vpx, vpy);
+  // 只算西侧那条：东立柱的内侧面背着镜头（灭点在东），一丝都不该画
+  const [fb0, fyb0] = Recede(c0, groundY, WALL_T, vpx, vpy);
+  ctx.save();
+  WobblyPath(ctx, [[c0, yTop], [c1, yTop], [c1, groundY], [c0, groundY]], id + "hole", 0.8, true);
+  ctx.clip();
+  // 洞里不是死黑：门后头是屋子，后面那层贴图要透一点出来
+  const inner = ctx.createLinearGradient(0, yTop, 0, groundY);
+  inner.addColorStop(0, night ? "rgba(12,10,8,0.88)" : "rgba(20,16,12,0.82)");
+  inner.addColorStop(1, night ? "rgba(12,10,8,0.70)" : "rgba(24,19,14,0.56)");
+  ctx.fillStyle = inner;
+  ctx.fillRect(c0 - 2, yTop - 2, c1 - c0 + 4, groundY - yTop + 4);
+  ctx.restore();
+  // 西立柱的内侧面：擦进来的光只舔得着这一面——门洞里唯一亮的地方
+  InkFill(ctx, [[c0, yTop], [fx0, fy0], [fb0, fyb0], [c0, groundY]], id + "revW",
+    burnt ? "#3d332a" : (night ? "#4a3c2a" : "#93724a"), { amp: 0.6, lw: 1.0, line: "rgba(45,32,18,0.5)" });
+  ctx.save();
+  const lit = ctx.createLinearGradient(c0, 0, fx0, 0);
+  lit.addColorStop(0, night ? "rgba(190,170,130,0.10)" : "rgba(238,214,160,0.20)");
+  lit.addColorStop(1, "rgba(40,28,16,0.34)");
+  ctx.fillStyle = lit;
+  WobblyPath(ctx, [[c0, yTop], [fx0, fy0], [fb0, fyb0], [c0, groundY]], id + "revW", 0.6, true);
+  ctx.clip();
+  ctx.fillRect(c0 - 1, yTop - 1, fx0 - c0 + 2, groundY - yTop + 2);
+  ctx.restore();
+  // 门楣底面：门头几乎顶在视平线上，所以只剩薄薄一条。有这一条，洞口才是
+  // "穿过一堵墙"；没有就是墙上贴了张黑纸
+  InkFill(ctx, [[c0, yTop], [c1, yTop], [fx1, fy1], [fx0, fy0]], id + "revT",
+    "rgba(30,23,16,0.94)", { amp: 0.5, lw: 0, line: null });
+
+  // ③ 门框料：一圈套在墙洞里的框（立柱两根 + 门楣一根 + 门槛一道）
+  const woodA = burnt ? "#4a4038" : PAL.wood;
+  const woodB = burnt ? "#37302a" : PAL.woodDark;
+  InkFill(ctx, Rect(JX, yTop, DOOR.jamb, H), id + "l", woodA,
+    { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
+  InkFill(ctx, Rect(c1, yTop, DOOR.jamb, H), id + "r", woodA,
+    { amp: 1.1, lw: 2.4, shade: "rgba(0,0,0,0.15)" });
+  InkFill(ctx, Rect(JX - 4, yTop - DOOR.lintel, W + 8, DOOR.lintel + 1), id + "t", woodB,
+    { amp: 1.1, lw: 2.4 });
+  // 门槛：脚下那道坎。视平线在它上头一米七，所以**顶面看得见**——
+  // 那一小条正是"这道坎有厚度"的全部证据
+  {
+    const s0 = JX + 1, s1 = c1 + DOOR.jamb - 1, sy = groundY - DOOR.sill;
+    const [tx0, ty0] = Recede(s0, sy, WALL_T, vpx, vpy);
+    const [tx1, ty1] = Recede(s1, sy, WALL_T, vpx, vpy);
+    InkFill(ctx, [[s0, sy], [s1, sy], [tx1, ty1], [tx0, ty0]], id + "sillTop",
+      burnt ? "#4e463c" : (night ? "#584c3c" : "#8c7f68"),
+      { amp: 0.6, lw: 1.2, line: "rgba(40,32,22,0.45)" });
+    InkFill(ctx, Rect(s0, sy, s1 - s0, DOOR.sill), id + "sill",
+      burnt ? "#413a33" : (night ? "#463c30" : "#6b6152"),
+      { amp: 0.9, lw: 1.6, shade: "rgba(0,0,0,0.20)" });
+    InkLine(ctx, s0 + 2, sy + 1.6, s1 - 2, sy + 1.4, id + "sillWear",
+      { lw: 1.2, color: night ? "rgba(150,140,120,0.20)" : "rgba(226,206,166,0.34)", amp: 0.5 });
+  }
+  // 烧过的门框。**立柱只有 8px 宽，不许铺龟裂的鳞**——CLAUDE.md 那条老账：
+  // 格子跟形体一样宽，实拍读出来是挂着的铁链（首轮就是这样，一副门框成了
+  // 铁栅栏）。细长件改用**横着的裂口**：一道道炸开的横缝 + 缝里的炭灰，
+  // 外加烧得最狠的下半截压暗
+  if (burnt) {
+    const Char = (bx, by, bw, bh, tag) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bx, by, bw, bh);
+      ctx.clip();
+      const n = Math.max(3, Math.round(bh / 13));
+      for (let i = 0; i < n; i += 1) {
+        // **不许排成等距的横杠**——那是梯子不是炭裂。位置要跳、长短要差得开，
+        // 还得缺几道（首轮实拍：一副门框读成了铁栅栏）
+        if (Rnd(tag + "k", i) < 0.34) continue;
+        const cy = by + (i + 0.5) * (bh / n) + Sym(tag + "y", i, 6.5);
+        const x0 = bx + Rnd(tag + "a", i) * bw * 0.5;
+        const x1 = Math.min(bx + bw, x0 + bw * (0.35 + Rnd(tag + "b", i) * 0.6));
+        InkLine(ctx, x0, cy, x1, cy + Sym(tag + "s", i, 1.2), tag + i,
+          { lw: 0.8 + Rnd(tag + "w", i) * 1.3, color: "rgba(14,11,9,0.62)", amp: 0.5 });
+        // 缝里的炭灰：**很淡**，它只是让裂口有个亮边
+        if (Rnd(tag + "l", i) > 0.45) {
+          InkLine(ctx, x0 + 0.6, cy + 1.3, x1 - 0.6, cy + 1.3, tag + "ash" + i,
+            { lw: 0.6, color: "rgba(160,150,134,0.15)", amp: 0.4 });
+        }
+      }
+      // 底下烧得最狠
+      const g = ctx.createLinearGradient(0, by + bh, 0, by + bh * 0.35);
+      g.addColorStop(0, "rgba(12,10,8,0.55)");
+      g.addColorStop(1, "rgba(12,10,8,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.restore();
+    };
+    Char(JX, yTop, DOOR.jamb, H, id + "chL");
+    Char(c1, yTop, DOOR.jamb, H, id + "chR");
+    Char(JX - 4, yTop - DOOR.lintel, W + 8, DOOR.lintel + 1, id + "chT");
+  }
   // 木纹
   for (let i = 0; i < 3; i += 1) {
-    InkLine(ctx, x - W / 2 + 2, groundY - H + 12 + i * 20, x - W / 2 + 2, groundY - H + 28 + i * 20,
+    InkLine(ctx, JX + 2, yTop + 12 + i * 20, JX + 2, yTop + 28 + i * 20,
       id + "g" + i, { lw: 0.9, color: "rgba(90,60,35,0.55)", amp: 1.6 });
   }
   // 爹刻的那道线：高度必须跟划线玩法的 markY 对上（1.28m×48ppm≈61px），
@@ -2575,9 +3130,9 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   // 正字模式下（tally>0，剧本新生一二章）这道旧凹槽要收掉：它没了下文
   //（量身那场戏已不存在），挂在道道正上方就会被玩家数进正字里
   if (!tally) {
-    InkLine(ctx, x - W / 2 + 0.5, groundY - 57, x - W / 2 + 8, groundY - 57,
+    InkLine(ctx, JX + 0.5, groundY - 57, JX + 8, groundY - 57,
       id + "markOld", { lw: 2.6, color: "#2e2115", amp: 0.4 });
-    InkLine(ctx, x - W / 2 + 1, groundY - 55.2, x - W / 2 + 7.4, groundY - 55.2,
+    InkLine(ctx, JX + 1, groundY - 55.2, JX + 7.4, groundY - 55.2,
       id + "markOldLip", { lw: 1.1, color: "rgba(238,222,180,0.6)", amp: 0.3 });
   }
   // 齐膝那些石笔道道再往上——**两道凿子刻的深痕**（第七稿：爹给她量身高刻的，
@@ -2593,7 +3148,7 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
     [68, 1.5, 5.4, 2.0, 0.55, "Y1"],
     [62, 2.4, 4.5, 1.7, 0.40, "Y2"],
   ]) {
-    const mx0 = x - W / 2 + x0off, mx1 = mx0 + ln;
+    const mx0 = JX + x0off, mx1 = mx0 + ln;
     // 凿槽本体：窄槽一道
     InkLine(ctx, mx0, groundY - dy2, mx1, groundY - dy2 + 0.5, id + "chis" + tag,
       { lw: gw, color: "#241809", amp: 0.4 });
@@ -2609,11 +3164,11 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
       { lw: 0.9, color: "#241809", amp: 0.3 });
   }
   if (marked) {
-    InkLine(ctx, x - W / 2 + 1, groundY - 61, x - W / 2 + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
+    InkLine(ctx, JX + 1, groundY - 61, JX + 8, groundY - 61, id + "mark1", { lw: 1.8, color: "#f0e0b0", amp: 0.4 });
   }
   if (carved) {
     // 第八章给妹妹刻的：矮一头（1.08m）
-    InkLine(ctx, x - W / 2 + 1, groundY - 52, x - W / 2 + 8, groundY - 52, id + "mark2", { lw: 1.8, color: "#fff0c8", amp: 0.4 });
+    InkLine(ctx, JX + 1, groundY - 52, JX + 8, groundY - 52, id + "mark2", { lw: 1.8, color: "#fff0c8", amp: 0.4 });
   }
   // 妹妹的正字（剧本新生第一章）：爹娘走后一天一道，五道一个"正"。
   // 画在左立柱孩子够得着的高度（第一个字的中横 = 0.98m，与划线玩法的 markY
@@ -2622,7 +3177,7 @@ export function DrawDoorframe(ctx, x, groundY, id, { marked = false, carved = fa
   if (tally > 0) {
     // 道道收在柱面里侧（探到柱边就读成缠在柱子上的布条），笔画要细——
     // 特写下 1.7px 的白线已经是一根白鞋带了
-    const jx0 = x - W / 2 + 1.8, jx1 = x - W / 2 + 6.9;
+    const jx0 = JX + 1.8, jx1 = JX + 6.9;
     const cxm = (jx0 + jx1) / 2;
     // 每一道都是「暗底线 + 亮痕」两笔：石笔的白痕淡，单画在浅木色上就是隐形
     //（c2 开场那一镜实拍过一版，一道都看不见）。暗线垫底，亮痕才立得住
@@ -8775,6 +9330,129 @@ export function DrawMouse(ctx, x, y, id) {
 // 全部图标共用同一套手绘语汇——纸面底、墨线框、图形不写字。
 // icon: plank 木料 | rope 断绳 | q 疑问 | stone 石子
 // ---------------------------------------------------------------------------
+/**
+ * 头顶那枚**心情气泡**（2026-08-17 用户定：「妹妹在害怕有很多种表达啊，你可以在
+ * 她头上加个 hud+icon 显示一下，就像勇敢的心的那种，像对话框一样的状态显示」）。
+ *
+ * 这枚气泡是**自家人表情的唯一去处**：那颗头只有 55px 半径，五官挤进去必糊，
+ * 而且糊出来是一整章不变的死表情（所以脸整个不画了，见 DrawHeadPart ④）。
+ * 一个 icon 能演十种情绪，还能跟着剧情换——这才是"有很多种表达"。
+ *
+ * 画法照漫画气泡：圆角的一块纸、左下角一条指向人的小尾巴、里头一张最简的脸
+ *（两只眼＋一张嘴），外加一个记号（汗珠 / 呵气 / 泪 / Z）。
+ * 纸色比画面亮一档但不刺眼；墨线跟全场同一支笔。
+ */
+export const MOOD_KINDS = ["afraid", "cold", "hungry", "hurt", "sleepy", "sad", "calm"];
+
+export function DrawMoodBubble(ctx, x, y, mood, id) {
+  const w = 40, h = 34;                 // 气泡本身（画布另留出尾巴与记号的地方）
+  const top = y - h - 7;
+  // 纸：圆角一块，左下探出一条尾巴指着头顶
+  InkFill(ctx, [
+    [x - w / 2, top + 5], [x - w / 2 + 5, top], [x + w / 2 - 5, top], [x + w / 2, top + 5],
+    [x + w / 2, top + h - 5], [x + w / 2 - 5, top + h], [x - 2, top + h],
+    [x - 7, y - 1], [x - 9, top + h], [x - w / 2 + 5, top + h], [x - w / 2, top + h - 5],
+  ], id + "paper", "rgba(242,231,201,0.96)", { amp: 0.9, lw: 2.4 });
+  const cx = x, cy = top + h * 0.47;
+  const ink = IN.ink;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const line = (x0, y0, x1, y1, lwPx = 2.2, col = ink) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lwPx;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  };
+  const dot = (dx, rr = 2.6) => {
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.ellipse(cx + dx, cy - 3.4, rr, rr * 1.15, 0, 0, Math.PI * 2); ctx.fill();
+  };
+  const arc = (x0, y0, rr, a0, a1, lwPx = 2.2) => {
+    ctx.strokeStyle = ink; ctx.lineWidth = lwPx;
+    ctx.beginPath(); ctx.arc(x0, y0, rr, a0, a1); ctx.stroke();
+  };
+  switch (mood) {
+    case "afraid":
+      // 睁大的两只眼＋张着的小嘴＋一颗汗珠：一眼就是"怕"
+      dot(-5.4, 3.1); dot(5.4, 3.1);
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 5.2, 3.0, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(120,160,186,0.9)";
+      ctx.beginPath();
+      ctx.moveTo(cx + 12, cy - 9);
+      ctx.quadraticCurveTo(cx + 15.5, cy - 4.5, cx + 12, cy - 2.6);
+      ctx.quadraticCurveTo(cx + 8.6, cy - 4.6, cx + 12, cy - 9);
+      ctx.fill();
+      break;
+    case "cold":
+      // 挤紧的两只眼（><）＋抖的嘴＋两道呵气
+      line(cx - 8.4, cy - 6, cx - 3.4, cy - 3.2); line(cx - 8.4, cy - 0.6, cx - 3.4, cy - 3.2);
+      line(cx + 8.4, cy - 6, cx + 3.4, cy - 3.2); line(cx + 8.4, cy - 0.6, cx + 3.4, cy - 3.2);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy + 5.6);
+      ctx.quadraticCurveTo(cx - 2, cy + 3.4, cx, cy + 5.6);
+      ctx.quadraticCurveTo(cx + 2, cy + 7.8, cx + 5, cy + 5.6);
+      ctx.stroke();
+      arc(cx + 12, cy + 2, 4.2, -1.9, 0.5, 1.6);
+      arc(cx + 14, cy + 7, 3.0, -1.9, 0.5, 1.4);
+      break;
+    case "hungry":
+      // 半闭的眼＋一条平嘴＋一只空碗
+      line(cx - 8, cy - 3.6, cx - 3, cy - 3.6); line(cx + 3, cy - 3.6, cx + 8, cy - 3.6);
+      line(cx - 3.4, cy + 5, cx + 3.4, cy + 5, 2.0);
+      ctx.strokeStyle = "#8a6a45"; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx + 8.4, cy + 7.6);
+      ctx.quadraticCurveTo(cx + 12.6, cy + 12.6, cx + 16.8, cy + 7.6);
+      ctx.stroke();
+      break;
+    case "hurt":
+      // 挤成一条缝的眼＋咬住的牙
+      line(cx - 8.4, cy - 4.6, cx - 3.2, cy - 2.6); line(cx + 8.4, cy - 4.6, cx + 3.2, cy - 2.6);
+      InkFill(ctx, [[cx - 4.6, cy + 3], [cx + 4.6, cy + 3], [cx + 4.6, cy + 7], [cx - 4.6, cy + 7]],
+        id + "teeth", "rgba(250,244,226,0.95)", { amp: 0.4, lw: 1.6 });
+      line(cx - 1.4, cy + 3, cx - 1.4, cy + 7, 1.2); line(cx + 1.8, cy + 3, cx + 1.8, cy + 7, 1.2);
+      break;
+    case "sleepy":
+      // 闭上的眼＋一个 Z
+      arc(cx - 5.6, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      arc(cx + 5.6, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      line(cx - 2.6, cy + 5.4, cx + 2.6, cy + 5.4, 1.8);
+      line(cx + 8.6, cy - 8.6, cx + 14.4, cy - 8.6, 2.0);
+      line(cx + 14.4, cy - 8.6, cx + 8.6, cy - 2.8, 2.0);
+      line(cx + 8.6, cy - 2.8, cx + 14.4, cy - 2.8, 2.0);
+      break;
+    case "sad":
+      // 垂下的眼＋往下弯的嘴＋一颗泪
+      arc(cx - 5.4, cy - 1.6, 3.4, 3.5, 6.1, 2.0);
+      arc(cx + 5.4, cy - 1.6, 3.4, 3.5, 6.1, 2.0);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy + 6.6);
+      ctx.quadraticCurveTo(cx, cy + 3.4, cx + 4, cy + 6.6);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(120,160,186,0.92)";
+      ctx.beginPath();
+      ctx.moveTo(cx - 7.6, cy + 1);
+      ctx.quadraticCurveTo(cx - 4.6, cy + 5.6, cx - 7.6, cy + 7.4);
+      ctx.quadraticCurveTo(cx - 10.6, cy + 5.6, cx - 7.6, cy + 1);
+      ctx.fill();
+      break;
+    default:            // calm：闭着眼、嘴角略松——"这会儿没事了"
+      arc(cx - 5.4, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      arc(cx + 5.4, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 3.6, cy + 4.4);
+      ctx.quadraticCurveTo(cx, cy + 7.2, cx + 3.6, cy + 4.4);
+      ctx.stroke();
+      break;
+  }
+  ctx.restore();
+}
+
 export function DrawIconBubble(ctx, x, y, icon, id) {
   // 气泡：圆角方带一个小尾巴
   const w = 34, h = 28;
@@ -9126,29 +9804,131 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
     id + "jar", "#6b5540", { amp: 1.2, lw: 2 });
 }
 
-export function DrawShaft(ctx, x, topY, botY, id) {
-  // 井口木沿 + 一架看得清的木梯。
-  //
-  // **这里不再画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条
-  // 当井筒，可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的
-  // 矩形套在一起，看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁
-  // 现在都归 World 的 AddUnderground 管，这支笔只负责"人怎么上下"。
-  //
-  // 井口木沿：地面上认路的记号——两根压在土里的横木，中间是黑口子
-  InkFill(ctx, Rect(x - 24, topY + 1, 48, 6.5), id + "lip", "#8a6b45",
-    { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
-  InkFill(ctx, Rect(x - 27, topY - 4.5, 12, 6), id + "lipL", "#7a5c3c", { amp: 0.8, lw: 1.8 });
-  InkFill(ctx, Rect(x + 15, topY - 4.5, 12, 6), id + "lipR", "#7a5c3c", { amp: 0.8, lw: 1.8 });
-  // 梯子：两根立杆从井口一路扎到井底（老版停在离地 0.3m 处，末端悬空）
-  const railTop = topY + 3;
-  for (const dx of [-12, 12]) {
-    InkFill(ctx, Rect(x + dx - 2.6, railTop, 5.2, botY - railTop), id + "rail" + dx, "#9c7a4c",
-      { amp: 0.7, lw: 1.8, shade: "rgba(0,0,0,0.2)" });
+/**
+ * 窖口/竖井：**地面上那个洞** ＋ 一架从洞里伸上来的木梯。
+ *
+ * **这里不画"井筒"本身**：以前拿 PAL.tunnelAir 铺一根 34px 宽的浅色竖条当井筒，
+ * 可掏在土里的洞是 1.7m 宽、梯子是 0.5m 宽——三个宽度不一样的矩形套在一起，
+ * 看着就是贴图破了（用户原话：像 bug）。井筒的形状与内壁归 World 的
+ * AddUnderground 管，这支笔只负责"这儿有个口子、人从这儿上下"。
+ *
+ * **梯子只露出一截的时候也得认得出是梯子**（2026-08-17 用户看序章掀盖那一镜退回：
+ * 「特别是梯子那里 完全认不出是梯子」）。这是这支笔最难的一条：4.2 米长的梯子，
+ * 地表机位只看得见地平线以上那两三拃——余下 95% 被地面挡着（实拍把梯子藏掉验过，
+ * 底下确实是地面在挡，不是绘制序错）。老版露在外头的三样东西是：一根 1 米宽的
+ * "井口木沿"横木 ＋ 两根 0.22m 的短竖杆 ＋ 一道缩在两杆之间的横档——**从俯角看
+ * 就是一条长凳**（那一镜里它 570px/米、横着占掉半个画框，实拍量的）。
+ *
+ * 四条治法，缺一条就还是长凳：
+ *  ① **那根横木整个删掉。** 一根横杆架在两条腿上，正是长凳的骨架；而窖口该有的
+ *     记号本来就是"洞"和"盖板"，不是又一根横木。
+ *  ② **两根梯梃各自高出地面一截，而且不一样高**（0.40／0.32 米，斧子砍的斜口）。
+ *     一样高就又连成一条横线；差着一截才读成"两根杆子插在洞里"。
+ *  ③ **横档两头探出梯梃。** 这是任何裁切下最强的"梯子"信号——缩在两梃之间是格子，
+ *     探出去才是"穿过去别住的横档"。间距也不许匀（自家伐的树，谁量着凿）。
+ *  ④ **给它一个洞。** 老版地表压根没有洞：地面是连着的，梯子直接从平地里长出来。
+ *     洞口的黑与近侧翻上来的土坯一起画在这张贴图上（它排在 loose 带、压在地面
+ *     之上），于是洞里还看得见两道横档——"梯子是往下去的"这件事才有得读。
+ *
+ * `floorY` 是**地平线**在画布上的行（不是贴图顶）：梯头高出地面多少、洞开在哪儿
+ * 全按它算，所以摆位一改这支笔不用跟着改。
+ */
+export function DrawShaft(ctx, x, floorY, botY, id) {
+  const PX = 48;                                   // 1 米 = 48 画布像素（道具贴图的标尺）
+  const railDx = 12;                               // 两梃相距 0.5m
+  // 梯头高出地面**一拃多，不是一臂**：给到 0.40m 那一版，顶上那截光杆比头一道
+  // 横档还长，两根一起读成一对犄角。0.26/0.19 是"扶得着、又不抢戏"的那一档
+  const proudL = 0.26 * PX, proudR = 0.19 * PX;    // 左高右低：一样高就又连成一条横线
+  const railTop = floorY - proudL;
+
+  // ---- ④ 洞 ----------------------------------------------------------------
+  // 黑口子：上沿是洞的近侧土沿（略拱起），往下三四寸化进黑里。**画在最底下**，
+  // 梯子压在它上头，洞里那两道横档才看得见。
+  // 深度只给 0.24m：盖板合上时那块 0.20m 的板正好压住它，剩下的一线读成板底的影
+  const mHalf = 0.58 * PX, mDeep = 0.30 * PX;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x - mHalf, floorY + 1.5);
+  ctx.quadraticCurveTo(x, floorY - 3.4, x + mHalf, floorY + 1.5);
+  ctx.lineTo(x + mHalf, floorY + mDeep);
+  ctx.lineTo(x - mHalf, floorY + mDeep);
+  ctx.closePath();
+  const mouth = ctx.createLinearGradient(0, floorY - 3, 0, floorY + mDeep);
+  mouth.addColorStop(0, "#191308");
+  mouth.addColorStop(0.5, "#0c0905");
+  mouth.addColorStop(1, "rgba(8,6,4,0)");
+  ctx.fillStyle = mouth;
+  ctx.fill();
+  ctx.restore();
+  // 洞沿那道墨线：只描上沿（下沿在黑里，描了就把洞封成一个方框）
+  ctx.beginPath();
+  ctx.moveTo(x - mHalf, floorY + 1.5);
+  ctx.quadraticCurveTo(x, floorY - 3.4, x + mHalf, floorY + 1.5);
+  ctx.strokeStyle = IN.ink;
+  ctx.lineWidth = 2.0;
+  ctx.lineCap = "round";
+  ctx.stroke();
+  // 洞沿翻上来的土：一疙瘩一疙瘩，**不许有长直边**。
+  // 第一版在这儿砌了四块规规矩矩的土坯，两头各探出一条横杠——那正好又搭出
+  // 长凳的两条扶手（同 ① 那笔账：这一带凡是横平的长条都会被读成家具）
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i += 1) {
+      const r = 3.4 + Rnd(id + "cr" + side, i) * 2.6;
+      const cx = x + side * (mHalf - 2 - i * (r * 1.5) - Rnd(id + "cx" + side, i) * 2);
+      const cy = floorY - 0.6 - Rnd(id + "cy" + side, i) * 2.4;
+      InkFill(ctx, Spline([
+        [cx - r, cy + r * 0.55], [cx - r * 0.66, cy - r * 0.5],
+        [cx + r * 0.5, cy - r * 0.62], [cx + r, cy + r * 0.5],
+      ], 4), id + "clod" + side + i, i % 2 ? "#7d6540" : "#8b7149",
+      { amp: 0.7, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
+    }
   }
-  // 横档：亮一档、暗一档，看着有厚度
-  for (let y = railTop + 11; y < botY - 3; y += 15) {
-    InkFill(ctx, Rect(x - 13, y, 26, 5.2), id + "r" + Math.round(y), "#c2a06a",
-      { amp: 0.6, lw: 1.6, shade: "rgba(0,0,0,0.26)" });
+
+  // ---- ②③ 梯子 -------------------------------------------------------------
+  // 两根梯梃：自家伐的树杆，所以**有点弯、上细下粗**，不是两条画出来的直边
+  for (const dx of [-railDx, railDx]) {
+    const top = dx < 0 ? railTop : floorY - proudR;
+    const wTop = 2.7, wBot = 3.2;                  // 半宽：梢细根粗（收细过头就成了两根针）
+    const bow = (dx < 0 ? 1 : -1) * 1.5;           // 各自朝外弯一点点
+    const mid = (top + botY) / 2;
+    // **杆头要有一条顶边，不能只有两个角。** 前两版把左右两个上角直接连起来交给
+    // 闭合样条，插值当场在那两点之间拱出一个尖——两根梯梃一起读成一对犄角。
+    // 现在顶上多给两个点（略鼓的顶面），而且整条轮廓不走样条：杆子本来就该是
+    // 直的，手感交给 InkFill 自己的抖
+    InkFill(ctx, [
+      [x + dx - wTop, top + 2.0], [x + dx - wBot + bow, mid], [x + dx - wBot, botY],
+      [x + dx + wBot, botY], [x + dx + wBot + bow, mid], [x + dx + wTop, top + 2.0],
+      [x + dx + wTop * 0.62, top], [x + dx - wTop * 0.62, top],
+    ], id + "rail" + dx, "#9c7a4c", { amp: 0.55, lw: 1.8, shade: "rgba(0,0,0,0.22)" });
+    // 锯断的断面：顶上一小片受光的白茬（压在轮廓里，别探出去）
+    InkFill(ctx, [
+      [x + dx - wTop * 0.6, top + 1.9], [x + dx - wTop * 0.42, top + 0.5],
+      [x + dx + wTop * 0.42, top + 0.5], [x + dx + wTop * 0.6, top + 1.9],
+    ], id + "cut" + dx, "#c4a678", { amp: 0.3, lw: 1.0 });
+  }
+  // 横档：**两头探出梯梃**，间距不匀。第一道就在地面上头一点（那是伸手扶的那道），
+  // 往下一道道进洞里。
+  // **档与档之间的空必须比档本身宽得多**——第一版档给到 4.6px 高、还各自描一圈
+  // 墨线，一根根挤成实心的一条，读出来是根柱子不是梯子
+  const rungs = [];
+  for (let y = railTop + 8; y < botY - 4; y += 15.4 + (Rnd(id + "rs", rungs.length) - 0.5) * 5) {
+    rungs.push(y);
+  }
+  for (let i = 0; i < rungs.length; i += 1) {
+    const y = rungs[i];
+    const out = 3.4 + Rnd(id + "ro", i) * 1.6;     // 探出去多少，两头各不相同
+    InkFill(ctx, Rect(x - railDx - out, y, (railDx + out) * 2, 3.2), id + "r" + i, "#c2a06a",
+      { amp: 0.5, lw: 1.2, shade: "rgba(0,0,0,0.24)" });
+    // 绑扎：隔几道缠一道麻绳（榫头松了就缠，农家梯子都这样）。
+    // 两道斜线就够——缠成一个方块会在梃上鼓出一串疙瘩
+    if (i % 4 === 2) {
+      for (const dx of [-railDx, railDx]) {
+        for (const k of [0, 1]) {
+          InkLine(ctx, x + dx - 3.6, y - 0.8 + k * 2.4, x + dx + 3.6, y + 2.2 + k * 2.4,
+            id + "lz" + i + dx + k, { lw: 1.2, color: "#5b4526", amp: 0.35 });
+        }
+      }
+    }
   }
   // 梯脚踩在井底的两块垫石：没有它，梯子看着像浮在土上
   InkFill(ctx, Rect(x - 17, botY - 4, 34, 5), id + "foot", "#5c4830", { amp: 1.1, lw: 1.8 });
@@ -14513,19 +15293,38 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
       ctx.restore();
       break;
     }
-    // 草苫/柴草的一角：底下一排乱茬，茬尖长短不一
+    // 草苫/柴草的一角：底下一排乱茬，茬尖长短不一。
+    // **柴火是横七竖八堆的，不是插在土里的**：老版 46 根几乎等距、几乎竖直、
+    // 长短只差三成的细线，出来是一把梳子（2026-08-17 序章掀盖那一镜实拍抓的）。
+    // 三条改法——歪得开（±50°）、长得差得开（三成到满格）、**得有几根横着压在
+    // 上头**（柴堆的轮廓是交叉出来的，不是一排竖线的顶端连成的）
     case "strawEdge": {
       InkFill(ctx, [[0, H * 0.56], [W, H * 0.50], [W, H], [0, H]], id, C("dark"),
         { amp: W * 0.01, line: null, lw: 0 });
-      ctx.strokeStyle = C("body");
       ctx.lineCap = "round";
-      for (let i = 0; i < 46; i += 1) {
-        const x = W * (i / 45) + Sym(id + "x", i, W * 0.012);
-        const top = H * (0.52 - Rnd(id + "h", i) * 0.30);
+      for (let i = 0; i < 38; i += 1) {
+        // 成簇：三四根挤在一处，簇与簇之间留得出缝
+        const x = W * ((Math.floor(i / 3) + Rnd(id + "c", i) * 0.9) / 13);
+        const len = H * (0.16 + Rnd(id + "h", i) ** 1.6 * 0.62);
+        const lean = (Rnd(id + "a", i) - 0.5) * 1.7;         // ±50°
+        ctx.strokeStyle = Rnd(id + "s", i) > 0.7 ? C("rim") : C("body");
+        ctx.globalAlpha = Rnd(id + "s", i) > 0.7 ? 0.5 : 1;
         ctx.beginPath();
-        ctx.lineWidth = Math.max(1.2, W * (0.004 + Rnd(id + "w", i) * 0.006));
-        ctx.moveTo(x, H * 0.62);
-        ctx.lineTo(x + Sym(id + "t", i, W * 0.03), top);
+        ctx.lineWidth = Math.max(1.2, W * (0.004 + Rnd(id + "w", i) * 0.009));
+        ctx.moveTo(x, H * (0.60 + Rnd(id + "b", i) * 0.24));
+        ctx.lineTo(x + Math.sin(lean) * len, H * 0.60 - Math.cos(lean) * len);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // 横压在堆上的那几根：轮廓靠它们咬缺，才不是一排竖线的顶端
+      for (let i = 0; i < 5; i += 1) {
+        const y = H * (0.56 + Rnd(id + "ly", i) * 0.30);
+        const x0 = W * Rnd(id + "lx", i) * 0.7;
+        ctx.strokeStyle = C("body");
+        ctx.beginPath();
+        ctx.lineWidth = Math.max(1.6, W * 0.010);
+        ctx.moveTo(x0, y);
+        ctx.quadraticCurveTo(x0 + W * 0.16, y - H * 0.05, x0 + W * (0.22 + Rnd(id + "ll", i) * 0.20), y + H * 0.03);
         ctx.stroke();
       }
       break;
