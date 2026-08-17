@@ -11,6 +11,7 @@
 
 import * as THREE from "three";
 import * as ART from "./Script_Art.mjs";
+import { PlanClimb } from "./Script_Climb.mjs";
 
 // 零件贴图密度（像素/米）。150 是给中景定的：镜头推到 4.1m 画宽（刨料那一拍）时
 // 画面密度到 ~900px/米，150 的贴图要放大六倍，人就糊成一团。480 之后放大不到两倍。
@@ -1381,29 +1382,96 @@ function ClampSlope(m, a, b) {
  * 两组解里挑**肘朝下**的那一组（肘翘到肩膀上头读成"吊在把手上"）。
  * both=true 时后手也搭上去（两手抓同一件东西，稍稍错开一点，别叠成一条）。
  */
-function AimFrontHand(target, aim, both = false) {
-  if (!aim) return;
+/** 把手送到骨架局部坐标 (px, py)：两组解里挑解剖上对的那组（fore ≤ 0），再挑肘低的 */
+function SolveArm(target, px, py) {
   // 肩点＝躯干局部 (0, sh) 跟着躯干转过来的位置（同 ApplyPose 里那段）
   const sh = BONE.torso * 0.86;
   const sx = Math.sin(target.torso) * sh, sy = Math.cos(target.torso) * sh;
   const rootY = BONE.hipY + BONE.sole * SoleLift(target) + target.hipY;
   const elbowY = (k) => -BONE.upperArm * Math.cos(k.arm);
-  const solve = (px, py) => {
-    const tx = px - (target.hipX + sx), ty = py - (rootY + sy);
-    const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
-    // **先挑解剖上对的那一组**（fore ≤ 0 ＝肘往前屈）：两组解的手落在同一点，
-    // 差别只是肘往哪边翻，所以挑对的那组不会动手的位置。老版只按"肘朝下"挑，
-    // 一半的机位下挑出来的是反关节的那一组
-    const ok1 = a1.fore <= 0, ok2 = a2.fore <= 0;
-    if (ok1 !== ok2) return ok1 ? a1 : a2;
-    return elbowY(a1) <= elbowY(a2) ? a1 : a2;
-  };
-  const f = solve(aim.x, aim.y);
+  const tx = px - (target.hipX + sx), ty = py - (rootY + sy);
+  const a1 = ArmIK(tx, ty, 1), a2 = ArmIK(tx, ty, -1);
+  // **先挑解剖上对的那一组**（fore ≤ 0 ＝肘往前屈）：两组解的手落在同一点，
+  // 差别只是肘往哪边翻，所以挑对的那组不会动手的位置。老版只按"肘朝下"挑，
+  // 一半的机位下挑出来的是反关节的那一组
+  const ok1 = a1.fore <= 0, ok2 = a2.fore <= 0;
+  if (ok1 !== ok2) return ok1 ? a1 : a2;
+  return elbowY(a1) <= elbowY(a2) ? a1 : a2;
+}
+
+function AimFrontHand(target, aim, both = false) {
+  if (!aim) return;
+  const f = SolveArm(target, aim.x, aim.y);
   target.armF = f.arm; target.foreF = f.fore;
   if (both) {
-    const b = solve(aim.x - 0.09, aim.y + 0.05);
+    const b = SolveArm(target, aim.x - 0.09, aim.y + 0.05);
     target.armB = b.arm; target.foreB = b.fore;
   }
+}
+
+/**
+ * 把脚（踝）送到相对胯的 (tx, ty)：膝只能往后屈（shin ≥ 0）。够不着就伸直去够。
+ * 角度语义与胳膊同（0 朝下、正角向后），所以两骨反解是同一条式子换骨长。
+ */
+export function LegIK(tx, ty) {
+  const a1 = ArmIK(tx, ty, 1, BONE.thigh, BONE.shin), a2 = ArmIK(tx, ty, -1, BONE.thigh, BONE.shin);
+  const ok1 = a1.fore >= 0, ok2 = a2.fore >= 0;
+  if (ok1 !== ok2) return ok1 ? { thigh: a1.arm, shin: a1.fore } : { thigh: a2.arm, shin: a2.fore };
+  // 两组都合法/都不合法：取膝盖朝前的那组（膝点 x 大）
+  const kneeX = (k) => -BONE.thigh * Math.sin(k.arm);
+  const p = kneeX(a1) >= kneeX(a2) ? a1 : a2;
+  return { thigh: p.arm, shin: p.fore };
+}
+
+/**
+ * 爬梯（2026-08-17 重做）：**手脚钉在真横档上**，不是甩两条正弦。
+ *
+ * s.climb = { holds, dir, base, bs }（World 给：这架梯子的落点表、爬的方向、
+ * 演员脚线的世界 y、体型）。Script_Climb.PlanClimb 算出四肢各自该在哪道横档、
+ * 胯多高；这儿只做两件事：世界米 → 骨架局部（÷体型、减脚线），再两骨反解。
+ * 一只手兜着孩子（childArms）时近侧手不动，只有远侧手扒——PlanClimb 的 oneHand。
+ *
+ * 胯的高度是 PlanClimb 定的（跟着最低那只脚沉、够梯头时蹲下去），所以这儿
+ * 反过来从"根该在哪"推 hipY：ApplyPose 把根摆在 hipY+sole·SoleLift+t.hipY，而
+ * SoleLift 又看膝盖高低——先按膝盖屈着算一遍、再按算出来的膝盖修一遍就够准。
+ */
+function ClimbPose(target, s) {
+  const c = s.climb;
+  const bs = c.bs || 1;
+  const plan = PlanClimb({ holds: c.holds, base: c.base, dir: c.dir, bs, oneHand: !!s.childArms });
+  const L = (wy) => (wy - c.base) / bs;          // 世界 y → 骨架局部 y
+  const X = (wx) => wx / bs;                      // 身前米 → 骨架局部 x
+  target.hipX = X(plan.hip.x);
+  // 身子贴着梯子略前倾（挂在梯子上的人不会挺直腰板坐着——那读成坐在椅子上）；
+  // 怀里有人就直一点，前倾会把她顶出去
+  target.torso = (s.childArms ? 4 : 9) * DEG;
+  // 往下爬看脚底下、往上爬看洞口（头是相对躯干的角，加起来是世界角）
+  target.head = (plan.look > 0 ? 10 : -22) * DEG;
+  const rootWant = L(plan.hip.y);
+  const footWorld = (pt) => (pt.air > 0.05 ? 10 * pt.air : -7) * DEG;   // 落稳时脚尖略翘，抬起时脚尖下垂
+  let sole = 1;
+  for (let it = 0; it < 2; it += 1) {
+    target.hipY = rootWant - BONE.hipY - BONE.sole * sole;
+    const rootY = BONE.hipY + BONE.sole * sole + target.hipY;    // ＝ rootWant
+    const legF = LegIK(X(plan.feet.F.x) - target.hipX, L(plan.feet.F.y) - rootY);
+    const legB = LegIK(X(plan.feet.B.x) - target.hipX, L(plan.feet.B.y) - rootY);
+    target.thighF = legF.thigh; target.shinF = legF.shin;
+    target.thighB = legB.thigh; target.shinB = legB.shin;
+    target.footF = footWorld(plan.feet.F) - (legF.thigh + legF.shin);
+    target.footB = footWorld(plan.feet.B) - (legB.thigh + legB.shin);
+    sole = SoleLift(target);
+  }
+  if (plan.hands.F) {
+    const f = SolveArm(target, X(plan.hands.F.x), L(plan.hands.F.y));
+    target.armF = f.arm; target.foreF = f.fore;
+  } else {
+    // 兜着她的那只：**一格不许动**，角度照抄 childArms 的静止帧
+    // （改了那儿就得改这儿——她在怀里的位置由这只手定）
+    target.armF = 4 * DEG;
+    target.foreF = -69 * DEG;
+  }
+  const b = SolveArm(target, X(plan.hands.B.x), L(plan.hands.B.y));
+  target.armB = b.arm; target.foreB = b.fore;
 }
 
 export function PoseRig(rig, s, dt) {
@@ -1430,6 +1498,18 @@ export function PoseRig(rig, s, dt) {
     ApplyPose(rig, t, target, Math.min(1, (dt || 0.016) * 26));
     return;
   }
+
+  // ── 爬梯：手脚钉在真横档上（见 ClimbPose / Script_Climb）──
+  // 目标本身是按位置连续算出来的，**不能再叠指数平滑**：14/s 的平滑在 2m/s 的
+  // 竖向速度下要落后 0.14m——手就从横档上滑下来了，那正是"像平移"的另一半。
+  // 只在上梯子那 0.2 秒里从站姿缓过去，之后逐帧钉死
+  if (s.climbing && s.climb) {
+    rig.climbAge = (rig.climbAge || 0) + (dt || 0.016);
+    ClimbPose(target, s);
+    ApplyPose(rig, t, target, Math.max(blend, Math.min(1, rig.climbAge / 0.22)));
+    return;
+  }
+  rig.climbAge = 0;
 
   // ── 一次性戏剧姿势 ──
   // 跪、挨砸、扑上去、被架走、把人搂进肩膀……这些是过场里最重的几拍，
@@ -2485,8 +2565,7 @@ const KNEE_CLEAR = 0.13;       // 高过这儿体重全在脚上
  * 够不着就把距离夹到臂长（胳膊伸直去够），永远给得出一组角度——手到不了
  * 是**摆位的错**，不该让反解在这儿抛。
  */
-export function ArmIK(tx, ty, elbow = 1) {
-  const La = BONE.upperArm, Lf = BONE.foreArm;
+export function ArmIK(tx, ty, elbow = 1, La = BONE.upperArm, Lf = BONE.foreArm) {
   const raw = Math.hypot(tx, ty);
   const d = Math.max(Math.abs(La - Lf) + 1e-3, Math.min(La + Lf - 1e-3, raw));
   const phi = Math.atan2(-tx, -ty);
@@ -2497,7 +2576,13 @@ export function ArmIK(tx, ty, elbow = 1) {
   // 手按夹过的 d 摆（够不着时就是伸直的那一点），不是按原始目标
   const hx = -d * Math.sin(phi), hy = -d * Math.cos(phi);
   const fore = Math.atan2(-(hx - ex), -(hy - ey));
-  return { arm, fore: fore - arm };
+  // **肘的相对角要折回 (−π, π]**（2026-08-17 爬梯查出来的）：手举过头顶时大臂
+  // 世界角在 −90° 以外，前臂世界角减大臂角会跑出 ±180°——同一个肘弯，算出来
+  // 是 +240° 而不是 −120°。不折的话 SolveArm 判它"反关节"、ApplyPose 又把它夹到
+  // 0，两条胳膊当场绷成两根直棍指着横档（实拍就是这样）。摇辘轳/够地上的东西
+  // 从没撞上，是因为那些手都在肩膀以下
+  const Wrap = (v) => { while (v > Math.PI) v -= 2 * Math.PI; while (v <= -Math.PI) v += 2 * Math.PI; return v; };
+  return { arm: Wrap(arm), fore: Wrap(fore - arm) };
 }
 
 function SoleLift(t) {

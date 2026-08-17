@@ -8,6 +8,7 @@
 // Data_PropArt.json，加载与校验在 Data_Scenes.mjs（配错在加载时就抛）。
 import { SCENES } from "./Data_Scenes.mjs";
 import { VaultLiftFor, VAULT_MAX_TOP } from "./Data_DepthSpec.mjs";
+import { LADDER } from "./Data_Ladder.mjs";
 // 剧本按章拆在 Data_ScriptC1..C8.mjs（2026-08-15）——组装在本文件末尾（SCRIPT_KIT）。
 import { ChapterC1 } from "./Data_ScriptC1.mjs";
 import { ChapterC2 } from "./Data_ScriptC2.mjs";
@@ -279,9 +280,12 @@ const DOOR_KEY = 0.42;       // 键盘后备：按住 E 把门扶正的角速度
 // 底下，玩家一整拍都没看见自己在修什么（用户 2026-08-10）
 const DOOR_CAM = { y: 0.72, hw: 2.45 };
 
-const CLIMB_DOWN = 1.5;
-const CLIMB_UP = 2.0;
-const LADDER_RUNG = 0.34;    // 横档间距：每挪过一档响一声，声音跟着人走
+// 时长按"一档一档爬"给（2026-08-17 爬梯重做）：3.6 米十一道横档，下去 2.4 秒是
+// 每档 0.22 秒——每只脚隔一档跨一步、四肢轮着动还看得清；老版 1.5 秒每档 0.14 秒，
+// 手脚再怎么钉在横档上也是一团糊。上来费劲，慢一档。
+const CLIMB_DOWN = 2.4;
+const CLIMB_UP = 3.0;
+const LADDER_RUNG = LADDER.pitch;   // 横档间距：每挪过一档响一声，声音跟着人走（与画笔/骨架同一张表）
 
 // 层数当帧就翻（碰撞/视线/玩法一律按目的层算，不留半层的中间态），
 // 渲染高度另走 p.lift 从原来那层缓过去。两件事分开，玩法才不会出现"半层人"。
@@ -5555,9 +5559,11 @@ export function StepGame(state, input, dt) {
   // 前身是院墙角那枚孤零零的顶针（用户 2026-08-10 退回：「铜顶针是什么鬼」）——
   // 现在每件都是查过史料的实物，收进包袱给一段注解；顶针并进了「军鞋底」那件。
   // 不抢任务提示（!state.prompt）、潜行中不出；收走就从场上消失（World 切 visible）。
+  // 梯子上也不出：层数一按下就翻成目的层，梯子底下那只笸箩会在人还挂在半空时就亮
+  // 「收进包袱」（2026-08-17 爬梯实拍抓的），按 E 还真能隔着两米把它收走
   {
     const relics = SCENES[CHAPTERS[state.chapterIndex].scene].relics;
-    if (relics && !state.prompt && !state.microCine && !state.stealthActive) {
+    if (relics && !state.prompt && !state.microCine && !state.stealthActive && !(state.player.climbT > 0)) {
       for (const r of relics) {
         if (state.relicsGot.has(r.id)) continue;
         if ((r.level || "surface") !== state.player.level) continue;
