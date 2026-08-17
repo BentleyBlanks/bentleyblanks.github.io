@@ -376,6 +376,15 @@ export function CreateWorld(canvasEl) {
     return m;
   }
 
+  // 挡光的剪影层（2026-08-18 用户："你角色过去怎么遮挡的形状是个方块而不是
+  // 角色的边缘啊"）。演员每帧**单独渲进一张小离屏靶**，光柱着色器沿光线采它的
+  // alpha——头发、袖子、抱在怀里的孩子，什么形状挡出来就是什么形状。
+  // three 的 layers 是位掩码：骨架同时留在 0 层（照常上屏）和这一层（掩码那一遍）
+  const BLOCK_LAYER = 3;
+  const MarkBlocker = (obj) => obj.traverse((o) => o.layers.enable(BLOCK_LAYER));
+  let blockRT = null, blockW = 0, blockH = 0;
+  const blockVP = new THREE.Matrix4();
+
   const actorSprites = new Map();
   // 这一帧场上所有会挡光的人体，交给每盏灯做遮挡查询（见 Script_Light 的 uBlockers）。
   // 只取躯干那一柱，不是整个人的包围盒——太宽的话人自己就先被自己的影子吃掉了。
@@ -2344,6 +2353,10 @@ export function CreateWorld(canvasEl) {
       rig.group.userData.persist = true;   // 见 ClearGroup：骨架资源是全场共享的
       layers.play.add(rig.group);
       SetPlayOrder(rig.group, ACTOR_Z);
+      // 挡光要照**真剪影**（见 BLOCK_LAYER）：把骨架每块骨头都登进那一层，
+      // 每帧单独渲一遍拿它的 alpha。**只登骨架**——脚下那团影子和灯打的长影子
+      // 登进去的话，人会被自己的影子挡掉光
+      MarkBlocker(rig.group);
       const shadow = MakeFlatShadow(1.9, 1.15, 0.30);
       shadow.userData.persist = true;
       layers.play.add(shadow);
@@ -6280,7 +6293,47 @@ export function CreateWorld(canvasEl) {
   // pipRect：后果小窗那块剪裁区（可为 null）。**它必须画在分级之内**——分级
   // 现在一直开着，小窗要是照老样子等 Render 完了再补一遍，那块角落就是全屏
   // 唯一没过后期的地方，明度差着一档，读出来是"贴了张别的游戏的截图"。
+  // 挡光的剪影靶：把演员单独渲一遍，光柱着色器沿光线采它的 alpha
+  //（2026-08-18 用户："遮挡的形状是个方块而不是角色的边缘"）。
+  // **必须排在所有正式渲染之前**——它要动 camera.layers 和清屏色，
+  // 夹在分级/DOF 中间会把那两遍的状态带跑。
+  // 分辨率给画布的三分之一就够：影子要的是轮廓，不是细节
+  function RenderBlockMask() {
+    if (!hatchBeamMesh || !hatchBeamMesh.visible) return;
+    const cw = renderer.domElement.width, ch = renderer.domElement.height;
+    if (!cw || !ch) return;
+    const w = Math.max(64, Math.round(cw / 3)), h = Math.max(64, Math.round(ch / 3));
+    if (!blockRT || blockW !== w || blockH !== h) {
+      blockRT?.dispose();
+      blockRT = new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        depthBuffer: false,
+        stencilBuffer: false,
+      });
+      blockW = w; blockH = h;
+    }
+    const prevTarget = renderer.getRenderTarget();
+    const prevMask = camera.layers.mask;
+    const prevClear = new THREE.Color();
+    renderer.getClearColor(prevClear);
+    const prevAlpha = renderer.getClearAlpha();
+    camera.layers.set(BLOCK_LAYER);
+    renderer.setRenderTarget(blockRT);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, false, false);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(prevTarget);
+    renderer.setClearColor(prevClear, prevAlpha);
+    camera.layers.mask = prevMask;
+    // 世界 → 靶上的 uv 用的是**这一遍的相机**，所以后面无论谁（主相机／长焦
+    // DOF 相机／小窗相机）来画光柱，采样都对得上
+    blockVP.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    hatchBeamMesh.userData.SetBlockMask(blockRT.texture, blockVP, ACTOR_Z);
+  }
+
   function Render(pipRect) {
+    RenderBlockMask();
     // 分级要把整幅画先渲进离屏靶。**setRenderTarget 会重置视口与剪裁区**，
     // 所以它必须排在分屏／小窗那几下 setScissor/setViewport 之前
     const grading = cineGrade > 0.004 && rendererCssW > 0 && EnsureGrade();
