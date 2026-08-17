@@ -346,9 +346,15 @@ export function CreateWorld(canvasEl) {
   const LAYER_COMP = {};
   for (const k of Object.keys(LAYER_Z)) LAYER_COMP[k] = (D_REF - LAYER_Z[k]) / D_REF;
   // 假景深：离玩法层越远，烘焙时越糊
-  const LAYER_BLUR = { ridge: 3.2, hills: 2.2, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
+  // hills 是**最近的一条背景带**，地平线那条线归它交代——糊到 2.2 就没有线了，
+  // 收到 1.5（2026-08-18）
+  const LAYER_BLUR = { ridge: 2.4, hills: 1.5, farTown: 1.3, midTrees: 0.7, nearTrees: 0.25, fore: 1.6 };
   // 空气透视：越远越向雾色靠拢——在烘焙时染进贴图，见 BakeSprite 的 haze 参数
-  const LAYER_FADE = { ridge: 0.62, hills: 0.48, farTown: 0.34, midTrees: 0.20, nearTrees: 0.09, play: 0, fore: 0.26 };
+  // 2026-08-18 整体收一档（用户："一点层次没有…根本不像远景层"）：老版 .62/.48/.34
+  // 把三条远带全推到离雾色只剩三四成，加上地平线那条暖雾罩子，上屏彼此差不到
+  // 十级灰——**读出来是一团雾，不是三层地**。空气透视要的是"一档比一档淡"，
+  // 不是"全都淡到看不见"。
+  const LAYER_FADE = { ridge: 0.50, hills: 0.34, farTown: 0.13, midTrees: 0.09, nearTrees: 0.05, play: 0, fore: 0.26 };
   let hazeColor = "#e2d8bc";
   const HazeFor = (key) => (LAYER_FADE[key] ? { color: hazeColor, amount: LAYER_FADE[key] } : null);
   // **空气透视只许用染色，不许用半透明。** haze 是 source-atop 染在精灵自己
@@ -843,6 +849,21 @@ export function CreateWorld(canvasEl) {
           ctx.globalCompositeOperation = "destination-out";
           ctx.fillRect(ax - W * 0.1, ay - H - 30, W * 0.5, H * 0.55);
           ctx.globalCompositeOperation = "source-over";
+        }
+        // 村边那几棵树（2026-08-18）。冀中的村子远看**永远是一团树里露出几个屋角**——
+        // 房子四周种着杨柳挡风沙。缺了它，远村就是几块立在空地上的板子，
+        // 也没有任何东西打破那条平直的屋顶线（用户："一点层次没有…不像远景层"）
+        const treeC = Darken(color, 0.86);
+        for (let t = 0; t < 4; t += 1) {
+          const th = ART.Hash(id + "vt" + x + t);
+          if (th < 0.28) continue;
+          const tx = ax - W / 2 - 40 + (W + 80) * ART.Hash(id + "vx" + x + t);
+          const r = 13 + th * 12;
+          ctx.fillStyle = treeC;
+          ctx.beginPath();
+          ctx.ellipse(tx, ay - r * 1.15, r * 0.9, r * 1.05, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(tx - 2, ay - r * 1.1, 4, r * 1.1);
         }
       }, LAYER_BLUR.farTown, 1, HazeSolid("farTown", opacity));
       PlaceSprite(mesh, x, SURFACE_Y - 0.2, 0);
@@ -2247,10 +2268,12 @@ export function CreateWorld(canvasEl) {
     }
     // 地平线暖雾：把天和地缝起来，也是纵深的一部分
     {
+      // 这层暖雾是"把天和地缝起来"，不是"把地擦掉"：0.55 那一版罩在三条远带上，
+      // 地平线整个化进天里（2026-08-18 用户退回）。收到 0.34 并让它更贴地
       const hazeColor = {
-        day: "rgba(214,190,148,0.55)", dawn: "rgba(226,186,142,0.6)",
-        night: "rgba(58,68,96,0.5)", tunnel: "rgba(52,44,32,0.5)", dark: "rgba(30,26,22,0.5)",
-      }[ch.light] || "rgba(214,190,148,0.5)";
+        day: "rgba(214,190,148,0.34)", dawn: "rgba(226,186,142,0.38)",
+        night: "rgba(58,68,96,0.34)", tunnel: "rgba(52,44,32,0.34)", dark: "rgba(30,26,22,0.34)",
+      }[ch.light] || "rgba(214,190,148,0.32)";
       const wPx = Math.ceil((L + 160) * PPM * 0.2);
       const hPx = 200;
       const haze = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
@@ -2266,19 +2289,30 @@ export function CreateWorld(canvasEl) {
     }
 
     // 远景分层（越远越糊越淡：假景深）
+    // **值阶必须一档比一档沉**（2026-08-18 用户："一点层次没有"）。各层的雾量
+    // 不同（LAYER_FADE ridge .62 / hills .48 / farTown .34+），所以源色相近＝上屏
+    // 层次乱套：老版算下来 ridge 上屏 (201,191,163)、hills (180,166,132)、
+    // farTown (187,172,146)——**farTown 比它后头的 hills 还亮**，最近的一层反而
+    // 最淡，纵深当场倒过来。现在按"上屏值"倒推源色，三档拉开各差十几级。
     const pal = {
-      day: { ridge: "#a1957a", hill: "#8a7850", town: "#96836a" },
-      dawn: { ridge: "#968a79", hill: "#7c7364", town: "#8a7e6f" },
-      night: { ridge: "#2a3244", hill: "#212938", town: "#39415a" },
-      tunnel: { ridge: "#2a2a30", hill: "#232227", town: "#33313a" },
-      dark: { ridge: "#1c1c22", hill: "#17171c", town: "#24232a" },
-    }[ch.light] || { ridge: "#b6ab90", hill: "#a08e6a", town: "#a8967a" };
+      // town 要**狠压**：贴图上屏被整体提亮（源 109 → 屏 173，见 Art.Dim 那条），
+      // 再让 0.2 的雾一兑，远村就跟它后头的 hills 一个亮度，最近的一层反而不沉。
+      // 按"屏幕目标值"倒推：天 241 / ridge 219 / hills 203 / **远村 175**
+      day: { ridge: "#a1957a", hill: "#82704a", town: "#4e4230" },
+      dawn: { ridge: "#968a79", hill: "#746b5c", town: "#645a4c" },
+      night: { ridge: "#2a3244", hill: "#1c2333", town: "#2a3049" },
+      tunnel: { ridge: "#2a2a30", hill: "#1f1e23", town: "#2a2830" },
+      dark: { ridge: "#1c1c22", hill: "#141419", town: "#1c1b22" },
+    }[ch.light] || { ridge: "#b6ab90", hill: "#96845f", town: "#82705a" };
 
-    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）
+    // 平原：起伏压到几个像素，纵深交给雾、树行与远村的剪影（见 AddRidgeBand）。
+    // 最远那条只给稀疏的一排（远了本来就并成一线），近的那条密一档并带地平线的边
     AddRidgeBand(layers.ridge, L, pal.ridge, ch.scene + "ridge",
-      { amp: 6, base: 30, blur: LAYER_BLUR.ridge, lift: 1.6, haze: 0.5, rows: 26, hazeTint: hazeColor });
+      // base/lift 一起挪：地平线的高度不变（lift+base/48），但带子加厚到 52px，
+      // 下缘那 42px 的淡出才有肉可淡——只有 30px 的话整条带子都在淡出区里
+      { amp: 6, base: 52, blur: LAYER_BLUR.ridge, lift: 1.15, haze: 0.42, rows: 20, hazeTint: hazeColor });
     AddRidgeBand(layers.hills, L, pal.hill, ch.scene + "hill",
-      { amp: 4, base: 18, blur: LAYER_BLUR.hills, lift: 0.7, haze: 0.3, rows: 34, hazeTint: hazeColor });
+      { amp: 4, base: 40, blur: LAYER_BLUR.hills, lift: 0.24, haze: 0.24, rows: 30, hazeTint: hazeColor, edge: 0.55 });
     // 地平线上的炮楼：每隔几里一座，站在村里往哪边看都能看见
     AddHorizonForts(sceneDef.horizonForts, pal.hill, night, state.flags.ruined);
 
@@ -2314,11 +2348,33 @@ export function CreateWorld(canvasEl) {
           // 越远的带子块越碎、垄沟越细（近处那条才看得出一垄一垄）
           strips: depth >= 8 ? 26 : depth >= 7 ? 22 : 18, furrow: depth <= 6,
         });
-        ctx.strokeStyle = "rgba(43,31,22,0.5)";
-        ctx.lineWidth = 2.4;
+        // 这条是**田块退到那一档的沿**（下一档地平线）。老版是 ±2.5px 的抖，
+        // 200 米横过去等于一条尺子画的直线——三四条平行直线摞起来，就是用户说的
+        // "一点层次没有"。改成**低频大起伏**（一个坡长三四十米、落差三四十厘米），
+        // 再随机啃几个缺口；墨色**越远越淡**（空气透视：远处的沿本来就看不清）。
+        const edgeA = { hills: 0.16, farTown: 0.24, midTrees: 0.34, nearTrees: 0.46 }[key] ?? 0.3;
+        const ph = ART.Hash(key + "eph") * 9;
+        const EdgeY = (px) => 4 + Math.sin(px * 0.0016 + ph) * 11
+          + Math.sin(px * 0.0051 + ph * 2.1) * 5 + (ART.Hash(key + "e" + Math.round(px / 60)) - 0.5) * 4;
+        // 沿上头那一线要透出后面的层——不然这块地的上沿又是一条硬边
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
         ctx.beginPath();
-        ctx.moveTo(0, 4);
-        for (let px = 0; px <= wPx; px += 44) ctx.lineTo(px, 4 + (ART.Hash(key + px) - 0.5) * 5);
+        ctx.moveTo(0, -2);
+        for (let px = 0; px <= wPx; px += 26) ctx.lineTo(px, EdgeY(px));
+        ctx.lineTo(wPx, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = `rgba(43,31,22,${edgeA})`;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let px = 0; px <= wPx; px += 26) {
+          const y = EdgeY(px);
+          // 缺口：一条从头连到尾的沿，比没有沿还假
+          if (ART.Hash(key + "gap" + Math.round(px / 130)) < 0.22) { ctx.moveTo(px, y); continue; }
+          if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+        }
         ctx.stroke();
         // 雾量只取该层本来的空气透视值：这点带压带的半透明原本混的是同为
         // 土色的下一条带，不是天——照 HazeSolid 折算会把整块地洗成天色，
@@ -2333,7 +2389,7 @@ export function CreateWorld(canvasEl) {
         ch.scene + "town", { ruined: state.flags.ruined, objScale: 1 / LAYER_COMP.farTown,
           // 站在村街上，身后就是全村的房——村庄场景的远景要密一档、实一档，
           // 不然中景一空整个画面只剩天和地两条色带
-          opacity: 0.78 });
+          opacity: 0.9 });
     }
     if (ch.scene !== "tunnelFort") {
       const dense = ch.scene === "village" || ch.scene === "tunnelVillage";
