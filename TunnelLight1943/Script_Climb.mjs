@@ -28,7 +28,9 @@ const HIP_STAND = 0.66;     // 扒在梯上胯离脚线多高（未乘体型）�
                             // 用户说「像青蛙」
 const HIP_SMALL = 0.56;     // 并档步的小身量：两只脚常在同一档上，胯钉在腿长上会一档一顿
 const HIP_CARRY = 0.66;     // 抱着孩子爬：腿几乎直着——她坐在他胯上（SEAT_LIFT 按脚线算），他一蹲她就骑到脸上
-const LEG_STAND = 0.60;     // 胯离最低那只脚最多多远（腿 0.62 伸直前留一丝）
+const LEG_STAND = 0.61;     // 胯离最低那只脚最多多远（腿 0.62 伸直前留一丝）
+const KNEE_ROOM = 0.12;     // 抬着的那只脚至少在胯下多少（未乘体型）：再高大腿翻过水平线、膝盖顶到胸口，
+                            // 反解只能把大腿翻到背后去（实拍就是「反关节的脚」）
 const HAND_REF = 1.16;      // 手的参考高度（相对脚线，未乘体型）：肩上半拳（肩在 0.66+0.447）。低了两只手
                             // 折在脸前像捂脸；再高胳膊就绷直
 const HAND_REF_SMALL = 0.68; // 并档步的手参考高度：两只手一先一后，隔着一档的那半个周期里高的那只要
@@ -205,6 +207,12 @@ export function PlanClimb(o) {
     const vert = Math.sqrt(Math.max(0.01, (ARM_REACH * bs) ** 2 - (h.x - (-0.04 * bs)) ** 2));
     hipY = Math.min(hipY, h.y - SHOULDER_UP * bs + vert);
   }
+
+  // 抬着的那只脚不许顶到胯：两脚在相邻两档上时上面那只离胯只有「腿长 − 一档」，档给高了
+  // 或者胯被下面那只脚拽得太低，大腿就翻过水平线。宁可下面那条腿/胳膊伸直了差一两厘米
+  // 够不到（反解夹住，手脚悬在档上一线），也不让膝盖翻上去——所以放在最后压轴
+  const highFoot = Math.max(footF.y, footB.y) - ANKLE_UP * bs;
+  hipY = Math.max(hipY, highFoot + KNEE_ROOM * bs);
 
   return {
     hip: { x: -0.04 * bs, y: hipY },
