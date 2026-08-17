@@ -707,8 +707,13 @@ export function ChapterC1(K) {
       // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
       // 「打进来的光」要有黑给它打进来才成立。
       kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null,
-      zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 15, sustain: true,
-      // 按住的十五秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
+      // **九秒，不是十五秒**（2026-08-18 用户："搂着她这么长时间也不知道在干嘛"）。
+      // 这一拍画面上一样东西都没有——戏全在头顶那场翻箱倒柜的声音里，
+      // 玩家能做的只有按住不放。十五秒对一段"看不见的戏"太长了：屋里那七下
+      // 动静（踹门→碗碎→拖箱→割粮袋→踩上翻板→喊→离开）本来就只占前十二秒，
+      // 后面三秒纯粹是在等表走完。整条时刻表照 0.6 压缩，一下没少，只是不拖。
+      zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 9, sustain: true,
+      // 按住的这九秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
       // holdPose 留着当兜底口径
       holdPose: "shelter", holdTrack: "hugTight",
       holdPrompt: "按住 E · 搂紧她",
@@ -733,10 +738,12 @@ export function ChapterC1(K) {
         state.player.x = 31.45;
         state.player.heading = -1;
         state.lid = null;                    // 板已经合上了
-        // 头顶那阵动静从最近处开始，整整 15 秒一路退远——「声音过去了」
+        // 头顶那阵动静从最近处开始，整整九秒一路退远——「声音过去了」
         // 是这一拍要玩家**听出来**的东西，所以它是一条连着走的曲线，
-        // 不是一张定时表
-        SetDin(state, 1.0, 0, 0.08);
+        // 不是一张定时表。**by 是每秒的量，跟着 holdTime 一起改**：
+        // 十五秒那一版给 0.08（0.08×15=1.2 够走到 0），照搬到九秒就只退了七成，
+        // 收尾那句「声音过去了」会落在还听得见脚步的时候
+        SetDin(state, 1.0, 0, 0.13);
       },
       tick: (state, dt) => {
         const b = state.beat;
@@ -749,21 +756,23 @@ export function ChapterC1(K) {
         // 头顶那场翻箱倒柜只在按住时往前走：松手，脚步停住听你们（八稿）
         if (holding) b.hideT = (b.hideT || 0) + dt;
         // 快过去的时候来一阵风，把最后那点声音扫走
-        if (!b.gusted && (b.hideT || 0) > 12.4) { b.gusted = true; Cue(state, "windGust", { gain: 0.4, rate: 0.9 }); }
+        if (!b.gusted && (b.hideT || 0) > 7.8) { b.gusted = true; Cue(state, "windGust", { gain: 0.4, rate: 0.9 }); }
         // 屋里那几下是有先后的（踹门→碗碎→拖箱→割粮袋→踩上翻板→喊→离开）：
-        // 这条时刻表压在 SetDin 那条退远的曲线上头，一遍，不循环
+        // 这条时刻表压在 SetDin 那条退远的曲线上头，一遍，不循环。
+        // 秒数是 15 秒那一版整体 ×0.6 压过来的（见上面 holdTime 那条）——
+        // **一下都没删**，只是不再拖
         const CUES = [
-          [2.4, "knock", 0.9, 0.7],       // 前门被一脚踹开
-          [2.9, "doorCreak", 0.7, 0.6],
-          [3.8, "step", 0.7, 0.8],        // 靴子踩进屋里
-          [4.8, "stoneLand", 0.6, 1.5],   // 碗摔碎
-          [5.8, "doorCreak", 0.5, 0.5],   // 木箱被拖开
-          [6.9, "clothLift", 0.55, 0.6],  // 粮袋被割破，谷粒落了一地
-          [7.4, "flutter", 0.4, 0.7],
-          [8.6, "step", 0.65, 0.7],       // 靴子踩上菜窖翻板
-          [9.3, "doorCreak", 0.35, 0.55],
-          [11.6, "shout", 0.4, 0.9],      // 屋外有人喊了一声
-          [12.2, "step", 0.5, 0.85],      // 靴子离开翻板
+          [1.5, "knock", 0.9, 0.7],       // 前门被一脚踹开
+          [1.9, "doorCreak", 0.7, 0.6],
+          [2.4, "step", 0.7, 0.8],        // 靴子踩进屋里
+          [3.0, "stoneLand", 0.6, 1.5],   // 碗摔碎
+          [3.6, "doorCreak", 0.5, 0.5],   // 木箱被拖开
+          [4.2, "clothLift", 0.55, 0.6],  // 粮袋被割破，谷粒落了一地
+          [4.6, "flutter", 0.4, 0.7],
+          [5.3, "step", 0.65, 0.7],       // 靴子踩上菜窖翻板
+          [5.8, "doorCreak", 0.35, 0.55],
+          [7.1, "shout", 0.4, 0.9],       // 屋外有人喊了一声
+          [7.6, "step", 0.5, 0.85],       // 靴子离开翻板
         ];
         b.hideFired = b.hideFired || new Set();
         for (let i = 0; i < CUES.length; i += 1) {
@@ -773,9 +782,11 @@ export function ChapterC1(K) {
             Cue(state, name, { gain, rate });
           }
         }
-        // 靴子踩上翻板那一段：灰从板缝里落下来
-        if ((b.hideT || 0) > 8.6 && (b.hideT || 0) < 12.2) {
-          b.dustT = (b.dustT || 0) + dt;
+        // 靴子踩上翻板那一段：灰从板缝里筛下来（渲染在 Script_World 的 SLAT_DUST，
+        // 三条缝各一股，落在打进来的那三束光里）。**这是整拍唯一一样看得见的东西**，
+        // 头一下要跟着 5.3 秒那声踩板同帧，所以起手先来一蓬
+        if ((b.hideT || 0) > 5.3 && (b.hideT || 0) < 7.6) {
+          b.dustT = (b.dustT ?? 1.1) + dt;
           if (b.dustT > 1.1) { b.dustT = 0; state.slatDust = { t: 0 }; }
         }
         // 妹妹在怀里抖：按住抖得轻；松手那阵抖从怀里传出去，呼吸立刻变响
@@ -787,7 +798,7 @@ export function ChapterC1(K) {
         } else b.sobT = 0;
         // 心跳：越到后头越沉（同 c2_hush）
         b.heartT = (b.heartT || 0) + dt;
-        const beatEvery = 1.2 - 0.35 * (b.holdProgress / 15);
+        const beatEvery = 1.2 - 0.35 * (b.holdProgress / 9);   // 分母＝holdTime
         if (b.heartT > beatEvery) {
           b.heartT = 0;
           Cue(state, "heartbeat", { gain: 0.3 + 0.18 * (b.holdProgress / 15) });
