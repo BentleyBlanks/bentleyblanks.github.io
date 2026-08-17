@@ -425,41 +425,47 @@ export function AddRoadPlane(group, length, light) {
 }
 export function AddGroundBand(group, xFrom, xTo, groundY, light, id, depthM = 3.2) {
   const wPx = Math.ceil((xTo - xFrom) * PPM);
-  const hPx = Math.round(depthM * PPM);
+  // 地平线以上留的头顶（像素）。老版只留 6px（0.125m），而路肩那撮草的梢画到
+  // 1.5−5＝−3.5 行去了——**画出画布＝顶上被裁**：每一撮草都在同一高度被平着切成
+  // 一条直边，默认景别 22px 就看得出，特写里是一排"砍了一半的草"（2026-08-18
+  // 用户报的）。草最高探到 RISE−9.5 行，留 14 行富余
+  const RISE = 14;
+  const hPx = Math.round(depthM * PPM) + RISE - 6;
   const colors = light === "day" ? ART.PAL.earthDay
     : light === "dawn" || light === "dusk" ? ART.PAL.earthDawn
       : light === "night" ? ART.PAL.earthNight : ["#5a4a34", "#3d3123"];
   const grassColor = light === "night" ? ART.PAL.grassNight : ART.PAL.grass;
-  const mesh = BakeSprite(wPx, hPx, 0, 6, (ctx) => {
-    const grad = ctx.createLinearGradient(0, 0, 0, hPx);
+  const mesh = BakeSprite(wPx, hPx, 0, RISE, (ctx) => {
+    const grad = ctx.createLinearGradient(0, RISE, 0, hPx);
     grad.addColorStop(0, colors[0]);
     grad.addColorStop(1, colors[1]);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 6, wPx, hPx - 6);
+    ctx.fillRect(0, RISE, wPx, hPx - RISE);
     // 地表线（手绘起伏）
     ctx.beginPath();
-    ctx.moveTo(0, 6);
+    ctx.moveTo(0, RISE);
     for (let px = 0; px <= wPx; px += 40) {
-      ctx.lineTo(px, 6 + (ART.Hash(id + px) - 0.5) * 4);
+      ctx.lineTo(px, RISE + (ART.Hash(id + px) - 0.5) * 4);
     }
     ctx.strokeStyle = ART.IN.ink;
     ctx.lineWidth = 2.6;
     ctx.stroke();
-    ART.Speckle(ctx, 0, 8, wPx, hPx - 10, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
+    ART.Speckle(ctx, 0, RISE + 2, wPx, hPx - RISE - 4, id + "sp", { count: Math.round(wPx / 26), alpha: 0.12, size: 2 });
     // **这条带子上画路面是白费**（2026-08-17 实拍量的）：它整条被 AddGroundPlane
     // 的深度写入挡在后头，地平线底下只露出七八个像素。老版把车辙/石子/糠秕/粪蛋
     // 全画在这儿的第 6~40 行，屏幕上就只剩"路的上沿一道条纹"——路面归 AddRoadPlane
     // 那块真躺着的几何管，这儿只管断口这一线。
-    // 路肩上剩的那点青：贴着断口一线，草是从路边长起来的，不长在车辙里
+    // 路肩上剩的那点青：贴着断口一线，草是从路边长起来的，不长在车辙里。
+    // **叶梢的高度以 RISE 为准往上算**（画布上头留够了才画得下整片叶子）
     ctx.strokeStyle = grassColor;
     for (let i = 0; i < wPx / 46; i += 1) {
       const gx = ART.Hash(id + "g" + i) * wPx;
       for (let b = 0; b < 3; b += 1) {
         ctx.lineWidth = 1.1 + ART.Hash(id + "gw" + i + b) * 0.9;
         ctx.beginPath();
-        ctx.moveTo(gx + b * 2.5, 6.5);
-        ctx.quadraticCurveTo(gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 4, 3,
-          gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 9, 1.5 - ART.Hash(id + "h" + i + b) * 5);
+        ctx.moveTo(gx + b * 2.5, RISE + 0.5);
+        ctx.quadraticCurveTo(gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 4, RISE - 3,
+          gx + b * 2.5 + (ART.Hash(id + i + b) - 0.5) * 9, RISE - 4.5 - ART.Hash(id + "h" + i + b) * 5);
         ctx.stroke();
       }
     }

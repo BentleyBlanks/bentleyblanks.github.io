@@ -14,9 +14,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=147">
+  <link rel="stylesheet" href="./Style_Game.css?v=151">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
-       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
+       事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v=151 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
        新 Main 不再发 dragX、旧 Core 只认 dragX，于是刨子怎么拖都不动；而旧 Core
        写的 dragTrack 又没有元素接（新 index.html 已删），连那根轨道都不出来。
@@ -25,7 +25,7 @@
        这一张表里（连同上面的 Style_Game.css 与下面的 Script_Main.js 一起改），
        谁 import 谁都拿到同一个带戳的 URL，模块实例仍然只有一份。
        **新增模块必须登记在这里**，否则它又会独自留在缓存里；源码里则一律不许
-       再自己写 ?v=（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
+       再自己写 ?v=151（同一模块两个 URL＝加载两份）。两条都由 SmokeTest 的
        TestModuleGraphIsCacheBusted 盯着。 -->
   <!-- three.js 收进仓库 vendor（同 TunnelBell1942 的做法）：不再吃 CDN——
        jsdelivr 在部分网络（国内、离线、代理环境）连不上时整个模块图会挂，
@@ -33,37 +33,37 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=147",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=147",
+        "three": "./vendor/three/build/three.module.js?v=151",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=151",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=147",
-        "./Script_World.js": "./Script_World.js?v=147",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=147",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=147",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=147",
-        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=147",
-        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=147",
-        "./Script_Climb.mjs": "./Script_Climb.mjs?v=147",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=147",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=147",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=147",
-        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=147",
-        "./Script_Audio.js": "./Script_Audio.js?v=147",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=147",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=147",
-        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=147",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=147",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=147",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=147",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=151",
+        "./Script_World.js": "./Script_World.js?v=151",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=151",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=151",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=151",
+        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=151",
+        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=151",
+        "./Script_Climb.mjs": "./Script_Climb.mjs?v=151",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=151",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=151",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=151",
+        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=151",
+        "./Script_Audio.js": "./Script_Audio.js?v=151",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=151",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=151",
+        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=151",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=151",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=151",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=151",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=147",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=147",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=147",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=147",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=147",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=147",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=147",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=147"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=151",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=151",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=151",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=151",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=151",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=151",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=151",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=151"
       }
     }
   </script>
@@ -418,6 +418,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=147"></script>
+<script type="module" src="./Script_Main.js?v=151"></script>
 </body>
 </html>

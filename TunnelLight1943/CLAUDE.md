@@ -94,7 +94,7 @@ node TunnelLight1943/Script_Cli.mjs
 ### 画笔与人物美术（`docs/Art.md`）
 - 画的顺序跟事情发生的顺序一致；四边笔直＝没有手；**不许在有内容的画布上用 `destination-out`**（唯一例外：立面门洞）。
 - 材质靠形不靠颜色（`ClothFold`/`CharScale`/`DrawAshHeap` 三支通用笔）；一团东西只许一条外轮廓；手绘画布上不许出现完美几何形；横躺圆柱不画端面椭圆；细长件不铺龟裂鳞。
-- **全作是平视立面，一件东西都不许自带透视**（圆交给明暗不交给形，上下沿是直线；唯一例外是房子）；**贴地的东西一丝不许压到地平线以下**（底边压在 `groundY`，往下探的只有 `NEAR_Z` 一族与 `MakeShaftMouth`）。
+- **朝上的那一面一律画出来，压扁多少由机位算（`TopRy`/`TopFace`，夸张系数 `TOP_STYLE`），别在画笔里手写 ry**——一屏里只有两件有透视比全都没有还别扭；用户点名「有点透视」的那件就是他要的样子。**贴地的东西一丝不许压到地平线以下**（底圆最低点落在 `groundY`，往下探的只有 `NEAR_Z` 一族与 `MakeShaftMouth`）。
 - CanvasTexture 没声明 sRGB 会提亮，**配色一律往下压、必须页内实拍看**，别信色值。
 - 骨架零件两头是圆的；小孩不是缩小的大人（`FK/CY`、`HEAD_K`、`LK`、`boyScale` 四层，腿长故意不动）；`footF` 必须等于 `BONE.sole × 体型`。
 - 自家人不画脸，表情走 `DrawMoodBubble`；日军/军官走 `hard` 一路；眼睛由头发/帽檐**真的遮住**，眼窝不抹阴影；耳朵必须画。
@@ -112,7 +112,7 @@ node TunnelLight1943/Script_Cli.mjs
 - 闲着的手顺重力吊、肘要折、左右不同角；低头别低成干呕（头的世界角判据）；三人一排同朝向＝复制人。
 - 躺着的姿势不掰关节，整具骨架转 90°（`LIE_POSES`），角度在躺下之后反算。
 - 进度驱动的姿势必须登进 `PoseProgress`，Rig 里读 `s.poseK`；`??` 会被 0 吃掉。
-- 触地量 `world.PlayerLimbTips()`／`LimbTipsOf`；接触戏先站到一臂之内、受方轨道从负 t 起、落点按实物量（`TestContactStagingIsCloseEnough`）。
+- 触地量 `world.PlayerLimbTips()`／`LimbTipsOf`；接触戏先站到一臂之内、受方轨道从负 t 起、落点按实物量（无测试守着，用 `LimbTipsOf` 量间距）。
 - 爬的东西全走 `Data_Ladder.LadderHolds` 落点表 + `Script_Climb.PlanClimb`（`TestClimbPlanLocksToRungs`）；换层不许瞬移，`lift` 自己走完；抱着的人跟着换层。
 - 抱人：肘吊下来、坐在胯上（`SEAT_LIFT`）、`childArms` 静止帧与 `scoopChild` 末帧只许一处真相。
 
