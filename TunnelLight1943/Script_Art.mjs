@@ -12604,6 +12604,277 @@ export function DrawMendedSleeveCard(ctx, W, H, seg, t) {
   Speckle(ctx, 0, 0, W, H, "msGrain", { count: Math.round(W / 7), alpha: 0.05, size: 2.2 });
 }
 
+// ---------------------------------------------------------------------------
+// 序 · 刺刀一帧（2026-08-17 用户重排的分镜，镜 02，0.5s，硬切进硬切出）：
+// 「全静。硬切一帧：日军枪上挑着襁褓。正面剪影——战斗帽带帽垂，刺刀尖挑着
+//   布包，襁褓一角蓝底白花垂下来；嘴裂成一道白牙，头微歪，在笑。切出。」
+//
+// 为什么是插卡：全作是侧视骨架，**正脸给不出来**，而这一帧要的正是正脸——
+// 那道白牙。画法是**剪影**：整个人是逆着白晃晃的日头的一块黑，认得出他是日军
+// 靠的只有轮廓（战斗帽的圆顶＋两片垂到肩上的帽垂＋斜挑上去的长枪）；画面里
+// 只有两样东西不是黑的——那道白牙，和襁褓垂下来的那一角**蓝底白花**：全章的
+// 暗线第一次出现，就在这一帧里。
+// 三条画法的账（同族插卡的老账，这里再记一遍）：
+//   ① 过场上下各压一条黑边，可见画高只剩 77%——脸和布包都要压在 0.16H~0.84H 里；
+//   ② CanvasTexture 上屏提亮两档：剪影要**真黑**得给到 #0a0806 上下，背景想读成
+//      白晃晃的日头，源色 #7a7266 就够了；
+//   ③ 蓝布上的白花跟整布卡（wholeCloth）**同一簇画法**——四瓣一簇的米白，
+//      观众在窖里再见到那块布时，认的就是这簇花。
+// t 只用来让垂下来的那一角布极轻地晃一下；其余全是定格。
+// ---------------------------------------------------------------------------
+export function DrawBayonetCard(ctx, W, H, seg, t) {
+  const S = H / 420;
+  const X = (u) => W * u, Y = (v) => H * v;
+  // ── 背景：白晃晃的日头，亮心落在脸与布包之间，四角沉下去 ──
+  // 亮心给到很亮（源色 #b4ab9b 上屏≈0.86）：这一帧是硬切进黑里的一闪，
+  // 天不白，人就不是剪影，只是一团黑压在灰上（第一版实拍就是这样）
+  const bg = ctx.createRadialGradient(X(0.55), Y(0.36), H * 0.05, X(0.50), Y(0.45), H * 0.98);
+  bg.addColorStop(0, "#b4ab9b");
+  bg.addColorStop(0.5, "#8e8677");
+  bg.addColorStop(1, "#46403a");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  // 日头里的浮尘：一层很淡的颗粒，白得不平
+  Speckle(ctx, 0, 0, W, H, "byDust", { count: Math.round(W / 4), alpha: 0.05, size: 2.6 * S, color: "#d8d0c0" });
+
+  const INK = "#0a0806";               // 剪影的黑（上屏≈0.2）
+  const INK2 = "#110d0a";              // 压在前面的那层（胳膊/帽垂），差一丝好分层
+  const LINE = "rgba(4,3,2,0.9)";
+  const F = { amp: 1.6 * S, lw: 2.2 * S, line: LINE };
+
+  // ── 枪：托在他右手里、从身前斜挑向画右上，枪的上大半截**亮在天上**——
+  //    剪影里黑压黑什么都读不出，枪得离开身子才是一杆枪。三八式带刺刀一米七 ──
+  const B0 = [X(0.400), Y(0.97)], B1 = [X(0.790), Y(0.245)];   // 托底 → 刀尖
+  const dx = B1[0] - B0[0], dy = B1[1] - B0[1];
+  const L = Math.hypot(dx, dy);
+  const ux = dx / L, uy = dy / L;      // 沿枪
+  const nx = -uy, ny = ux;             // 垂直于枪（指向画右上方的法线）
+  const Along = (s, o = 0) => [B0[0] + ux * s + nx * o, B0[1] + uy * s + ny * o];
+  const bladeLen = L * 0.235;          // 刺刀那一截
+  const gunLen = L - bladeLen;
+
+  // ── 躯干（先画：枪与胳膊都压在它前头）──
+  // 肩很宽、领子立着、腰上一道武装带的凹。这一层只有轮廓在说话，所以肩线要硬
+  const cx = X(0.405);
+  const shY = Y(0.545);                // 肩线
+  const torso = [
+    [cx - X(0.150), shY + 4 * S], [cx - X(0.118), shY - 10 * S], [cx - X(0.052), shY - 26 * S],
+    [cx - X(0.030), shY - 46 * S],    // 领口（脖子）
+    [cx + X(0.030), shY - 46 * S],
+    [cx + X(0.052), shY - 26 * S], [cx + X(0.118), shY - 10 * S], [cx + X(0.150), shY + 4 * S],
+    [cx + X(0.140), Y(0.80)], [cx + X(0.128), Y(1.02)],
+    [cx - X(0.128), Y(1.02)], [cx - X(0.140), Y(0.80)],
+  ];
+  InkFill(ctx, torso, "byTorso", INK, F);
+  // 立领：脖子那一截比肩略窄，领口的两个尖
+  InkFill(ctx, [
+    [cx - X(0.036), shY - 62 * S], [cx + X(0.036), shY - 62 * S],
+    [cx + X(0.044), shY - 30 * S], [cx - X(0.044), shY - 30 * S],
+  ], "byNeck", INK, F);
+
+  // ── 枪身：托板一头宽、握把处收窄、机匣与护木一段厚、枪管一段细；刺刀最后画
+  //    （要压在布包上头）。三八式在剪影里就是这四段粗细，别画成一根棍 ──
+  const stockW = 9 * S, barrelW = 4.4 * S;
+  const GUN = "#171310";               // 枪比身子亮一丝：压在胸前那一截才分得开
+  // 护木一直包到枪口跟前（三八式的木头几乎到头），光杆的枪管只剩最后一小段
+  const gunPoly = [
+    Along(0, -18 * S), Along(gunLen * 0.05, -16 * S),                 // 托板（顶部有一点托梳）
+    Along(gunLen * 0.22, -7 * S),                                     // 握把最窄
+    Along(gunLen * 0.27, -stockW * 1.2), Along(gunLen * 0.86, -stockW * 1.05),   // 机匣＋护木
+    Along(gunLen * 0.86, -barrelW), Along(gunLen, -barrelW * 0.9),    // 枪管
+    Along(gunLen, barrelW * 0.9), Along(gunLen * 0.86, barrelW),
+    Along(gunLen * 0.86, stockW * 0.95), Along(gunLen * 0.27, stockW * 1.05),
+    Along(gunLen * 0.22, 7 * S), Along(gunLen * 0.05, 14 * S), Along(0, 18 * S),
+  ];
+  InkFill(ctx, gunPoly, "byGun", GUN, { ...F, amp: 1.0 * S });
+  // 机匣上的三样小东西：表尺（上沿一小块）、拉机柄（右侧一个疙瘩）、准星（枪口一小尖）
+  InkFill(ctx, [Along(gunLen * 0.42, -stockW * 1.2), Along(gunLen * 0.47, -stockW * 1.2),
+    Along(gunLen * 0.47, -stockW * 1.9), Along(gunLen * 0.42, -stockW * 1.9)], "bySight", GUN, { ...F, amp: 0.5 * S });
+  {
+    const [kx, ky] = Along(gunLen * 0.36, stockW * 1.9);
+    InkFill(ctx, Spline([[kx - 5 * S, ky - 5 * S], [kx + 6 * S, ky - 4 * S], [kx + 6 * S, ky + 6 * S], [kx - 5 * S, ky + 5 * S]], 4),
+      "byBolt", GUN, { ...F, amp: 0.5 * S });
+  }
+  InkFill(ctx, [Along(gunLen - 14 * S, -barrelW), Along(gunLen - 8 * S, -barrelW * 2.4), Along(gunLen - 4 * S, -barrelW)],
+    "byFrontSight", GUN, { ...F, amp: 0.4 * S });
+  // 扳机护圈：握把底下一个小弧
+  {
+    const [tx, ty] = Along(gunLen * 0.245, 9 * S);
+    ctx.save();
+    ctx.strokeStyle = GUN; ctx.lineWidth = 3.2 * S; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(tx, ty, 8 * S, Math.atan2(uy, ux) - 0.2, Math.atan2(uy, ux) + Math.PI + 0.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── 胳膊：右手（画左）攥托、扣扳机；左手（画右）伸过来握着枪的前段 ──
+  const Arm = (sx, sy, ex, ey, id, w) => {
+    const ax = ex - sx, ay = ey - sy, al = Math.hypot(ax, ay) || 1;
+    const px = -ay / al * w, py = ax / al * w;
+    InkFill(ctx, [[sx - px, sy - py], [ex - px * 0.7, ey - py * 0.7], [ex + px * 0.7, ey + py * 0.7], [sx + px, sy + py]],
+      id, INK2, { ...F, amp: 1.2 * S });
+  };
+  const gripR = Along(gunLen * 0.25, stockW * 0.2);      // 扳机手（右手横过胸前）
+  const gripL = Along(gunLen * 0.60, 0);                 // 前托手（左手伸到身外）
+  Arm(cx - X(0.118), shY + 6 * S, gripR[0] - 4 * S, gripR[1] + 4 * S, "byArmR", 15 * S);
+  Arm(cx + X(0.118), shY + 6 * S, gripL[0] - 4 * S, gripL[1] + 6 * S, "byArmL", 14 * S);
+  // 拳头：两团攥着枪的黑
+  for (const [gx, gy, id] of [[gripR[0], gripR[1] + 4 * S, "byFistR"], [gripL[0], gripL[1] + 6 * S, "byFistL"]]) {
+    InkFill(ctx, Spline([
+      [gx - 13 * S, gy - 6 * S], [gx + 2 * S, gy - 13 * S], [gx + 14 * S, gy - 4 * S],
+      [gx + 11 * S, gy + 11 * S], [gx - 6 * S, gy + 13 * S], [gx - 15 * S, gy + 5 * S],
+    ], 4), id, INK2, { ...F, amp: 0.8 * S });
+  }
+
+  // ── 头：微歪（朝布包那一侧）。战斗帽的圆顶 + 短檐 + 两片垂到肩上的帽垂 ──
+  const hx = cx, hy = Y(0.385);
+  const r = H * 0.086;                 // 头半径（脸宽≈1.7r，读得出那道牙）
+  const tilt = 0.14;                   // 头往画右歪 8°
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(tilt);
+  // 帽垂：从帽墙两侧垂下来，越往下越开，压在肩上——正面认日军的第一眼
+  for (const sd of [-1, 1]) {
+    InkFill(ctx, [
+      [sd * r * 0.62, -r * 0.42], [sd * r * 1.02, -r * 0.30],
+      [sd * r * 1.30, r * 0.62], [sd * r * 1.34, r * 1.36],
+      [sd * r * 0.60, r * 1.30], [sd * r * 0.62, r * 0.40],
+    ], "byFlap" + sd, INK2, { ...F, amp: 1.8 * S });
+  }
+  // 脸：一颗蛋，下巴略尖；脖子从下巴接到领口
+  InkFill(ctx, Spline([
+    [0, -r * 0.98], [r * 0.72, -r * 0.62], [r * 0.86, r * 0.10], [r * 0.52, r * 0.86],
+    [0, r * 1.06], [-r * 0.52, r * 0.86], [-r * 0.86, r * 0.10], [-r * 0.72, -r * 0.62],
+  ], 5), "byFace", INK, F);
+  InkFill(ctx, [[-r * 0.34, r * 0.90], [r * 0.34, r * 0.90], [r * 0.40, r * 1.62], [-r * 0.40, r * 1.62]],
+    "byNeck2", INK, F);
+  // 战斗帽：圆顶盖在眉上，帽檐短短一片探在额前，帽墙一圈
+  InkFill(ctx, Spline([
+    [0, -r * 1.34], [r * 0.70, -r * 1.16], [r * 0.98, -r * 0.62], [r * 0.90, -r * 0.34],
+    [0, -r * 0.30], [-r * 0.90, -r * 0.34], [-r * 0.98, -r * 0.62], [-r * 0.70, -r * 1.16],
+  ], 5), "byCap", INK, F);
+  // 帽檐：短短一片探在额前——正面看是眉上一道比脸宽的横沿，剪影里就靠它认帽子
+  InkFill(ctx, [
+    [-r * 1.06, -r * 0.42], [r * 1.06, -r * 0.42], [r * 1.14, -r * 0.24], [r * 0.90, -r * 0.16],
+    [-r * 0.90, -r * 0.16], [-r * 1.14, -r * 0.24],
+  ], "byBrim", INK, F);
+  // 那道白牙：嘴裂开，两角吊上去——整张脸里唯一亮的东西
+  {
+    const mw = r * 0.70, my = r * 0.46;
+    ctx.beginPath();
+    ctx.moveTo(-mw, my - r * 0.10);
+    ctx.quadraticCurveTo(0, my + r * 0.16, mw, my - r * 0.10);      // 下唇线
+    ctx.quadraticCurveTo(0, my - r * 0.02, -mw, my - r * 0.10);     // 上唇线
+    ctx.closePath();
+    ctx.fillStyle = "#cfc6b2";
+    ctx.fill();
+    // 牙缝：细细的黑线把这一道白切成一排
+    ctx.strokeStyle = "rgba(10,8,6,0.85)";
+    ctx.lineWidth = 1.5 * S;
+    for (let i = -4; i <= 4; i += 1) {
+      const tx = i * mw * 0.20;
+      const k = 1 - (Math.abs(i) / 5) ** 2;
+      ctx.beginPath();
+      ctx.moveTo(tx, my - r * 0.10 + r * 0.03 * k);
+      ctx.lineTo(tx, my - r * 0.10 + r * 0.16 * k);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // ── 刺刀：先画整截钢（包挂上来之后尖还露在外头），整幅画里唯一的一线冷光 ──
+  const bw = 5.2 * S;
+  const DrawBlade = (s0, s1) => {
+    InkFill(ctx, [Along(s0, -bw), Along(s1 - 6 * S, -bw * 0.4), Along(s1, 0), Along(s1 - 6 * S, bw * 0.4), Along(s0, bw)],
+      "byBlade" + s0.toFixed(0), "#6a665c", { amp: 0.5 * S, lw: 1.6 * S, line: "rgba(6,5,4,0.9)" });
+    // 刃口的一线亮
+    const [ax, ay] = Along(s0, -bw * 0.55), [bx2, by2] = Along(s1 - 4 * S, -bw * 0.15);
+    ctx.save();
+    ctx.strokeStyle = "rgba(226,222,208,0.85)";
+    ctx.lineWidth = 1.4 * S;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke();
+    ctx.restore();
+  };
+  DrawBlade(gunLen, L);
+  // 枪口箍：管与刀交界那一小段
+  InkFill(ctx, [Along(gunLen - 8 * S, -barrelW * 1.1), Along(gunLen + 8 * S, -barrelW * 1.1),
+    Along(gunLen + 8 * S, barrelW * 1.1), Along(gunLen - 8 * S, barrelW * 1.1)], "byMuzzle", INK, { ...F, amp: 0.6 * S });
+
+  // ── 布包（襁褓）：**挂在刀尖底下**——刀从裹布里勾过去，包整个吊下来，
+  //    尖从包顶露出一截。吊着的东西读得出重量：上头收成一把、往下坠成一团、
+  //    最底下那一角布散开垂在光里（蓝底白花——全章那块布头一回露面）──
+  const hook = Along(L - bladeLen * 0.30, 0);              // 刀勾住布的那一点
+  const sway = Math.sin(t * 2.6) * 1.6 * S;
+  const bx0 = hook[0] + 6 * S, by0 = hook[1] + 4 * S;      // 包顶（拧成一把的布）
+  const bundle = Spline([
+    [bx0 - 9 * S, by0 - 4 * S], [bx0 + 11 * S, by0 - 2 * S],          // 拧在刀上的那一把
+    [bx0 + 30 * S, by0 + 26 * S], [bx0 + 40 * S, by0 + 66 * S],       // 右肩鼓出来（头那一头）
+    [bx0 + 34 * S, by0 + 108 * S], [bx0 + 12 * S + sway, by0 + 134 * S],  // 底：圆的
+    [bx0 - 20 * S + sway, by0 + 128 * S], [bx0 - 34 * S, by0 + 96 * S],
+    [bx0 - 36 * S, by0 + 54 * S], [bx0 - 24 * S, by0 + 18 * S],
+  ], 5);
+  // 垂下来的那一角：从包底左侧散开、垂到更低的地方，末端在风里略摆
+  const cTop = [[bx0 - 34 * S, by0 + 96 * S], [bx0 + 6 * S + sway * 0.4, by0 + 132 * S]];
+  const cTip = [bx0 - 26 * S + sway * 1.4, by0 + 222 * S];
+  const cornerPts = [
+    cTop[0], cTop[1],
+    [bx0 + 6 * S + sway, by0 + 182 * S], cTip,
+    [bx0 - 54 * S + sway * 0.8, by0 + 170 * S],
+  ];
+  // 蓝布：靠外的那条边被日头打亮，根上沉在包身的影子里
+  const cg = ctx.createLinearGradient(cTop[0][0], cTop[0][1], cTip[0], cTip[1]);
+  cg.addColorStop(0, "#1c2c48");
+  cg.addColorStop(1, "#3d5c8a");
+  InkFill(ctx, cornerPts, "byCorner", cg, { amp: 2.0 * S, lw: 2.4 * S, line: "rgba(6,8,14,0.9)", shade: "rgba(0,0,0,0.22)", shadeAt: 0.62 });
+  // 布上的小白花：跟整布卡同一簇画法（四瓣一簇的米白）
+  ctx.save();
+  ctx.beginPath();
+  WobblyPath(ctx, cornerPts, "byCorner", 2.0 * S, true);
+  ctx.clip();
+  ctx.fillStyle = "rgba(206,212,222,0.78)";
+  // 撒在那一角布的三角形里（重心坐标）：一张摊开的格子再各抖一点——
+  // 纯随机撒 9 朵有一半会挤成一团（第一版实拍就是三朵叠在一处）
+  const BLOOM_UV = [[0.22, 0.14], [0.58, 0.16], [0.30, 0.42], [0.60, 0.34], [0.14, 0.62], [0.40, 0.56], [0.24, 0.84], [0.72, 0.10], [0.46, 0.30]];
+  for (let i = 0; i < BLOOM_UV.length; i += 1) {
+    const ku = BLOOM_UV[i][0] + (Hash("byBloomX" + i) - 0.5) * 0.08;
+    const kv = BLOOM_UV[i][1] + (Hash("byBloomY" + i) - 0.5) * 0.08;
+    const bx = cTop[0][0] + (cTop[1][0] - cTop[0][0]) * ku + (cTip[0] - cTop[0][0]) * kv;
+    const by = cTop[0][1] + (cTop[1][1] - cTop[0][1]) * ku + (cTip[1] - cTop[0][1]) * kv;
+    for (let p2 = 0; p2 < 4; p2 += 1) {
+      const pa = (p2 / 4) * Math.PI * 2 + Hash("byBloomP" + i) * 2;
+      ctx.beginPath();
+      ctx.ellipse(bx + Math.cos(pa) * 3.2 * S, by + Math.sin(pa) * 2.4 * S, 1.9 * S, 1.4 * S, pa, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+  // 包身压在布角的根上（布是从包底下散出来的）
+  InkFill(ctx, bundle, "byBundle", INK, { ...F, amp: 2.2 * S, shade: "rgba(0,0,0,0.25)", shadeAt: 0.5 });
+  // 裹布勒出的两道褶：黑上更黑的一线，读得出是"裹着的"不是一只口袋
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,0,0,0.85)";
+  ctx.lineWidth = 2.4 * S;
+  for (let i = 0; i < 2; i += 1) {
+    const fy = by0 + 44 * S + i * 40 * S;
+    ctx.beginPath();
+    ctx.moveTo(bx0 - 30 * S, fy);
+    ctx.quadraticCurveTo(bx0 + 4 * S, fy + 14 * S, bx0 + 34 * S, fy - 4 * S);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 刀尖再压回来：从包顶露出来的那一截
+  DrawBlade(L - bladeLen * 0.30, L);
+
+  // ── 角晕 + 纸纹：这一帧是硬切进来的一张画，四角收黑让它读成"一帧" ──
+  const v = ctx.createRadialGradient(X(0.5), Y(0.46), H * 0.30, X(0.5), Y(0.5), H * 0.98);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(6,5,4,0.62)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  Speckle(ctx, 0, 0, W, H, "byGrain", { count: Math.round(W / 6), alpha: 0.06, size: 2.2 });
+}
+
 // 过场活动插卡的登记表：World.SetInsertCard 见到这里的名字就走每帧重画那条路。
 // 新加一张卡＝这里登记 + 剧本行 cam: { kind: "insertCard", card: 名字, seg: n }
 export const INSERT_LIVE = {
@@ -12613,6 +12884,7 @@ export const INSERT_LIVE = {
   wholeCloth: DrawWholeClothCard,
   strangerFace: DrawStrangerFaceCard,
   mendedSleeve: DrawMendedSleeveCard,
+  bayonet: DrawBayonetCard,
 };
 
 // ---------------------------------------------------------------------------

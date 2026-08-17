@@ -967,6 +967,85 @@ function Build(ac, options) {
       }
       NoiseHit(t + 0.12, { level: 0.012 * k, attack: 0.09, decay: 0.34, freq: 320, sweep: 130, q: 3, pan });
     },
+    // ── 序章开场那四秒黑屏里的两声（2026-08-17 刺刀一帧版）：婴儿啼哭，接着是
+    //    女人的叫声，无词，一声枪响全都停了。两样都是人嗓——锯齿过两个共振峰，
+    //    音高一路抖着走。**没有烘出来的样本**：music-3.0 拟音听不懂人嗓（试过，
+    //    吐回来的是鼓点，见 Script_SfxBake 末尾那条），所以这两样合成就是正主。
+    // 婴儿啼哭：一声约一秒半的高哭——起得急、掉下去、末了抽一口气。
+    // 基频 400~550Hz 上下（婴儿的哭就是这么高），第一共振峰压在 1kHz 上
+    babyCry(t, k, pan, r) {
+      if (Full()) return;
+      const dur = 1.35;
+      const f0 = 430 * r;
+      const o = ac.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(f0 * 0.86, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.22, t + 0.28);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.05, t + 0.75);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.78, t + dur);
+      // 哭腔的那点颤（detune 走音分）
+      const vib = ac.createOscillator();
+      vib.type = "sine";
+      vib.frequency.value = 6.5 + Rand(-0.8, 0.8);
+      const vibAmt = ac.createGain();
+      vibAmt.gain.value = 28;
+      vib.connect(vibAmt); vibAmt.connect(o.detune);
+      const f1 = ac.createBiquadFilter();
+      f1.type = "bandpass"; f1.frequency.value = 1050 * r; f1.Q.value = 1.6;
+      const f2 = ac.createBiquadFilter();
+      f2.type = "bandpass"; f2.frequency.value = 2700 * r; f2.Q.value = 2.4;
+      const g1 = ac.createGain(); g1.gain.value = 1;
+      const g2 = ac.createGain(); g2.gain.value = 0.55;
+      const g = ac.createGain();
+      // 包络：起 60ms、稳住、末尾三分之一秒塌下去
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.09 * k), t + 0.06);
+      g.gain.setValueAtTime(Math.max(0.0002, 0.09 * k), t + dur - 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(f1); o.connect(f2); f1.connect(g1); f2.connect(g2); g1.connect(g); g2.connect(g);
+      const tail = Out(g, sfxBus, pan);
+      o.start(t); vib.start(t);
+      // 哭完抽的那一口气
+      NoiseHit(t + dur + 0.05, { level: 0.035 * k, attack: 0.05, decay: 0.16, type: "highpass", freq: 1400, q: 0.8, pan });
+      Spawn([o, vib, vibAmt, f1, f2, g1, g2, g, ...tail], [o, vib], t + dur + 0.1);
+    },
+    // 女人的叫声：无词，一声约一秒二——从胸口冲上去、在顶上破一下、掉下来。
+    // 基频 600~900Hz，比婴儿低一档却更亮（第二共振峰更重），末尾带气声
+    womanScream(t, k, pan, r) {
+      if (Full()) return;
+      const dur = 1.2;
+      const f0 = 640 * r;
+      const o = ac.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(f0 * 0.72, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.30, t + 0.22);
+      o.frequency.setValueAtTime(f0 * 1.30, t + 0.55);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.92, t + dur);
+      const vib = ac.createOscillator();
+      vib.type = "sine";
+      vib.frequency.value = 5.2 + Rand(-0.6, 0.6);
+      const vibAmt = ac.createGain();
+      vibAmt.gain.setValueAtTime(8, t);
+      vibAmt.gain.linearRampToValueAtTime(40, t + 0.5);   // 破音：越到顶上抖得越厉害
+      vib.connect(vibAmt); vibAmt.connect(o.detune);
+      const f1 = ac.createBiquadFilter();
+      f1.type = "bandpass"; f1.frequency.value = 1300 * r; f1.Q.value = 1.4;
+      const f2 = ac.createBiquadFilter();
+      f2.type = "bandpass"; f2.frequency.value = 3100 * r; f2.Q.value = 2.0;
+      const g1 = ac.createGain(); g1.gain.value = 0.9;
+      const g2 = ac.createGain(); g2.gain.value = 0.7;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.10 * k), t + 0.09);
+      g.gain.setValueAtTime(Math.max(0.0002, 0.10 * k), t + dur - 0.30);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(f1); o.connect(f2); f1.connect(g1); f2.connect(g2); g1.connect(g); g2.connect(g);
+      const tail = Out(g, sfxBus, pan);
+      o.start(t); vib.start(t);
+      // 嗓子里的气声：整声垫着一层，末尾剩下的只有它
+      NoiseHit(t + 0.05, { level: 0.030 * k, attack: 0.08, decay: dur - 0.1, type: "bandpass", freq: 2400 * r, q: 1.2, pan });
+      Spawn([o, vib, vibAmt, f1, f2, g1, g2, g, ...tail], [o, vib], t + dur + 0.1);
+    },
     // 憋着的哭：压低的两下抽气——不是哭声，是不许自己哭出声的呼吸
     sobBreath(t, k, pan) {
       NoiseHit(t, { level: 0.05 * k, attack: 0.09, decay: 0.16, freq: 700, sweep: 380, q: 2.4, pan });
