@@ -15133,37 +15133,84 @@ export function DrawSlatDust(ctx, ax, ay, id) {
   ctx.restore();
 }
 
-// 脚后跟蹬起来的一小团干土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里
-// 都有对应的烟雾特效」，照《勇敢的心》）。World 的 footDust 池子按 id 烘几张变体，
-// 逐帧只动位置/大小/透明度，这儿只画一团。
-// 画法：三五个圆叠成一团、**横着比竖着宽**（土是从鞋底往后掀出去的，不是往上冒
-// 的烟）；每个圆心实、边虚；**不描墨线**——这是"扬起来的灰"，一描线就成了一朵
-// 云的图标。两个色调错着来（亮的土面、暗的土里），一团里才有厚薄。
-// 画布以 (ax, ay) 为团心，半径不超过 40px。
+// 脚后跟蹬起来的一小摊干土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里
+// 都有对应的烟雾特效」→ 第二轮「应该是泥土灰尘起来了 不是烟雾 颜色质感不对」，
+// 照《勇敢的心》）。World 的 footDust 池子按 id 烘几张变体，逐帧只动位置/大小/
+// 透明度，这儿只画一摊。
+//
+// **是土不是烟**，四条：
+// ① **颜色就是脚下那条路的土色**，只比路面暗一档、灰一档（扬起来的是路面的灰，
+//    在空气里背着光）——不许往白里走，一白就是蒸汽（首版正是这么被退回的）。
+// ② **扁、毛边、底平**：从鞋底往后掀出去的一摊，横着比竖着宽一倍，下沿平贴着地、
+//    上沿是碎的；边缘用抖动的多边形，**不用径向渐变**（软圆＝烟）。
+// ③ **里头夹砂粒**：几粒深的（土渣）、两三粒亮的（沙），撒在摊子里和摊子沿外
+//    一点——颗粒感是"土"跟"雾"的分界。
+// ④ **不描墨线**：这是灰，不是一件东西。
+// 画布以 (ax, ay) 为摊心，半宽 ≤40px、半高 ≤22px。
 export function DrawFootDust(ctx, ax, ay, id) {
   ctx.save();
-  const n = 4 + Math.floor(Hash(id + "n") * 2);
-  for (let i = 0; i < n; i += 1) {
-    const a = (i / n) * Math.PI * 2 + Hash(id + "a" + i) * 1.3;
-    const rr = 5 + Hash(id + "d" + i) * 9;
-    const cx = ax + Math.cos(a) * rr * 1.35, cy = ay + Math.sin(a) * rr * 0.6;
-    const r = 13 + Hash(id + "r" + i) * 9;
-    // **芯子比路面亮、裙边比路面暗**：路面本来就是浅褐的，同色的一团贴上去等于
-    // 没画（首版就是这么隐形的）；只往亮里走又只差两三档，还是糊在地里。亮芯
-    // 加一圈很淡的暗边，土面/夯土/夜路上都读得出一团的轮廓——不描墨线，只是
-    // 边上暗一点
-    const light = Hash(id + "l" + i) < 0.7 ? "246,240,224" : "228,216,190";
-    const dark = "150,132,100";
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(${light},1)`);
-    g.addColorStop(0.52, `rgba(${light},0.86)`);
-    g.addColorStop(0.8, `rgba(${dark},0.40)`);
-    g.addColorStop(1, `rgba(${dark},0)`);
-    ctx.fillStyle = g;
+  // 摊子：三四块扁的、彼此叠着的碎多边形；每块 10 个顶点绕一圈、半径抖着来
+  const Blob = (cx, cy, rx, ry, seed, color) => {
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    const n = 10;
+    for (let k = 0; k < n; k += 1) {
+      const a = (k / n) * Math.PI * 2;
+      // 上半圈抖得狠（碎的上沿），下半圈几乎不抖（贴地的平底）
+      const up = Math.sin(a) < 0 ? 1 : 0.25;
+      const w = 1 + (Hash(seed + "v" + k) - 0.5) * 0.7 * up;
+      const px = cx + Math.cos(a) * rx * w, py = cy + Math.sin(a) * ry * w;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  const n = 3 + Math.floor(Hash(id + "n") * 2);
+  for (let i = 0; i < n; i += 1) {
+    const cx = ax + (Hash(id + "x" + i) - 0.5) * 34;
+    const cy = ay + 2 - Hash(id + "y" + i) * 8;
+    const rx = 12 + Hash(id + "rx" + i) * 10, ry = 6 + Hash(id + "ry" + i) * 5;
+    // 底下那块最沉（背光的土），叠在上头的略浅（沾着光的灰）
+    const t = i / Math.max(1, n - 1);
+    const c = t < 0.5 ? "146,122,82" : "176,154,110";
+    Blob(cx, cy, rx, ry, id + "b" + i, `rgba(${c},${0.50 + t * 0.14})`);
+  }
+  // 摊心再压一块更实的（有厚度的那一撮），别整摊一样薄
+  Blob(ax + (Hash(id + "cx") - 0.5) * 8, ay - 1, 12, 5.5, id + "core", "rgba(136,112,74,0.62)");
+  // 砂粒：深的是土渣、亮的是沙。**撒在摊子外沿也要有**——飞出去的那几粒才说明
+  // 这是被鞋底蹬起来的，不是原地冒出来的
+  for (let i = 0; i < 9; i += 1) {
+    const a = Hash(id + "ga" + i) * Math.PI * 2;
+    const d = 6 + Hash(id + "gd" + i) * 30;
+    const px = ax + Math.cos(a) * d, py = ay - Math.abs(Math.sin(a)) * d * 0.55 + 2;
+    const r = 0.7 + Hash(id + "gr" + i) * 1.1;
+    ctx.fillStyle = i % 3 === 2 ? "rgba(214,198,160,0.9)" : "rgba(84,66,42,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(px, py, r * 1.3, r, a, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+// 脚后跟蹬飞的一粒土渣（World 的 footDust 池子里 kind="grit" 那些：真往后飞、
+// 受重力落回地面）。一粒黑黢黢的小土块，带一角亮面——不是圆点
+export function DrawFootGrit(ctx, ax, ay, id) {
+  ctx.save();
+  ctx.fillStyle = "#3a2c1c";
+  ctx.beginPath();
+  const n = 6;
+  for (let k = 0; k < n; k += 1) {
+    const a = (k / n) * Math.PI * 2;
+    const r = 5.5 * (0.7 + Hash(id + "r" + k) * 0.6);
+    const px = ax + Math.cos(a) * r * 1.2, py = ay + Math.sin(a) * r * 0.9;
+    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(150,124,84,0.75)";
+  ctx.beginPath();
+  ctx.ellipse(ax - 1.4, ay - 1.6, 2.2, 1.3, -0.5, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 

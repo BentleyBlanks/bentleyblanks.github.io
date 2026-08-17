@@ -2364,20 +2364,31 @@ export function CreateWorld(canvasEl) {
   //    摆到最后头（thighF 最大＝蹬离地），后腿在 3π/2；相位一跨过去就从那只脚的
   //    位置（LimbTips，画出来的脚，不是 x±0.3 估的）掀一团。所有步态（走/跑/猫腰/
   //    提桶/扛/抱孩子/推车）共用同一条 swing 约定，所以一个判据全管。
-  // ② **走是一小团、跑是两三团**：土的多少与飘的距离都跟 gait 走（跑起来鞋底刨得
-  //    深）；猫腰潜行只有半团（放轻脚步这件事要在地上读得出来）。
+  // ② **走是一摊两三粒、跑是两摊四五粒**：土的多少与掀出去的距离都跟 gait 走（跑
+  //    起来鞋底刨得深）；猫腰潜行只有半摊一粒（放轻脚步这件事要在地上读得出来）。
   // ③ **画在人与影子之前、obstacle 带之后**（FixOrder = 携带物那一档 + 2）：土是悬在
   //    地面上头的，得压过脚下的影子；人/影子在同一带内是按 nudge 一个整数一个整数
   //    排死的，中间插不进去，所以排到演员簇的上沿——它只在鞋后跟那一小块出现、
   //    一冒出来就往后飘，盖不住人；而塌墙那一档（obstacle 6259）仍在它之上，人跑到
   //    墙后小腿被挡，脚下的土也一起被挡。地道里颜色压暗一档（夯土地，光又弱）。
   //    位置 z 与那个人相同（同一条地平线，队列后排跟着退、也排在前排之后）。
-  const FOOT_DUST_MAX = 96;   // 一队兵跑起来一人十几团在天上，池子给足
+  // ④ **是土不是烟**（2026-08-18 第二轮，用户：「应该是泥土灰尘起来了 不是烟雾
+  //    颜色质感不对」）。两样东西一起发：一摊**贴地的浮土**（土色、扁、毛边、夹砂粒，
+  //    见 Art.DrawFootDust——它横着散、几乎不往上升、半秒就没）＋ 几粒**土渣**
+  //    （kind="grit"：真往后上方蹬飞、受重力落回地面就没）。首版是几个亮芯软圆往上飘，
+  //    读出来是蒸汽——软圆渐变＋往上升＋比地亮，三样凑齐就是烟。
+  const FOOT_DUST_MAX = 160;   // 一队兵跑起来一人十几团加几十粒渣，池子给足
+  const GRIT_G = 9.0;          // 土渣的重力（m/s²）
   function EnsureFootDust() {
     if (footDust.tex) return;
     footDust.tex = [0, 1, 2, 3].map((v) => {
-      const c = MakeCanvas(96, 96);
-      ART.DrawFootDust(c.getContext("2d"), 48, 50, "footDust" + v);
+      const c = MakeCanvas(112, 64);
+      ART.DrawFootDust(c.getContext("2d"), 56, 40, "footDust" + v);
+      return CanvasTexture(c);
+    });
+    footDust.gritTex = [0, 1, 2].map((v) => {
+      const c = MakeCanvas(20, 20);
+      ART.DrawFootGrit(c.getContext("2d"), 10, 10, "footGrit" + v);
       return CanvasTexture(c);
     });
     footDust.geo = new THREE.PlaneGeometry(1, 1);
@@ -2405,33 +2416,68 @@ export function CreateWorld(canvasEl) {
   function EmitFootDust(x, ground, z, order, heading, gait, soft, bs, under) {
     EnsureFootDust();
     const dir = heading >= 0 ? 1 : -1;
-    const n = soft ? 1 : 1 + (gait > 0.3 ? 1 : 0) + (gait > 0.75 ? 1 : 0);
+    const r = Math.random;
+    // 地道里是夯土地、光又弱：土色整体压暗一档，别在黑地里冒白灰
+    const tint = under ? 0.6 : 1;
+    // —— 浮土：一摊（跑起来两摊，第二摊靠后一点、薄一点）——
+    const n = soft ? 1 : 1 + (gait > 0.45 ? 1 : 0);
     for (let i = 0; i < n; i += 1) {
       const d = TakeFootDust();
-      const r = Math.random;
+      d.kind = "cloud";
       d.t = 0;
-      d.life = (soft ? 0.40 : 0.58 + 0.24 * gait) * (0.85 + r() * 0.3);
-      // 起点：脚后跟往后一点、贴着地；后几团再靠后一些（是一趟掀出去的，不是一坨）
-      d.x = x - dir * (0.03 + i * 0.09 + r() * 0.05);
-      d.y = ground + 0.02 + r() * 0.03;
+      d.life = (soft ? 0.34 : 0.42 + 0.16 * gait) * (0.85 + r() * 0.3);
+      // 起点：鞋后跟往后一点、贴着地
+      d.x = x - dir * (0.04 + i * 0.12 + r() * 0.05);
+      d.y = ground + 0.005;
       d.z = z;
-      // 往身后飘、微微上扬，飘不远（干土掀起来一尺就落）；跑起来掀得更远更高
-      d.vx = -dir * (0.28 + 0.6 * gait + r() * 0.2) * (soft ? 0.5 : 1);
-      d.vy = (0.10 + 0.18 * gait + r() * 0.08) * (soft ? 0.5 : 1);
-      // 大小按体型走（妹妹的脚小，掀的土也小）。走：一拳大→巴掌大；跑：再大一圈
-      const base = (soft ? 0.09 : 0.14 + 0.06 * gait) * bs * (0.85 + r() * 0.3);
+      d.ground = ground;
+      // 往身后**横着**散、几乎不往上升——土是重的，掀起来一拃就趴回地上；
+      // 只有跑起来才略微腾起一点
+      d.vx = -dir * (0.35 + 0.7 * gait + r() * 0.2) * (soft ? 0.5 : 1);
+      d.vy = (0.05 + 0.10 * gait + r() * 0.04) * (soft ? 0.5 : 1);
+      // 大小按体型走（妹妹的脚小，掀的土也小）。宽：一拳→一尺；跑：再宽一圈
+      const base = (soft ? 0.14 : 0.22 + 0.08 * gait) * bs * (0.85 + r() * 0.3);
       d.s0 = base;
-      d.s1 = base * (2.6 + 0.9 * gait);
-      d.a0 = (soft ? 0.45 : 0.72 + 0.16 * gait) * (under ? 0.7 : 1) * (i ? 0.85 : 1);
+      d.s1 = base * (2.2 + 0.7 * gait);
+      d.a0 = (soft ? 0.6 : 0.88 + 0.12 * gait) * (i ? 0.75 : 1);
       d.flip = r() < 0.5 ? -1 : 1;
       const m = d.mesh;
       m.material.map = footDust.tex[Math.floor(r() * footDust.tex.length)];
-      // 地道里是夯土地、光又弱：土色压暗一档，别在黑地里冒白烟
-      if (under) m.material.color.setRGB(0.62, 0.58, 0.52); else m.material.color.setRGB(1, 1, 1);
+      m.material.color.setScalar(tint);
+      FixOrder(m, order);
+      m.visible = true;
+      m.rotation.z = 0;                    // 这一格上回可能是粒转着的土渣
+      m.position.set(d.x, d.y, d.z);
+      m.scale.set(d.flip * d.s0, d.s0 * 0.57, 1);
+      m.material.opacity = d.a0;
+    }
+    // —— 土渣：几粒真被鞋底蹬飞的，往后上方抛出去、落回地面就没 ——
+    const g = soft ? 1 : 2 + Math.floor(gait * 2.4 + r() * 1.5);
+    for (let i = 0; i < g; i += 1) {
+      const d = TakeFootDust();
+      d.kind = "grit";
+      d.t = 0;
+      d.life = 0.9;                       // 兜底；实际以落地为准
+      d.x = x - dir * (0.02 + r() * 0.06);
+      d.y = ground + 0.03 + r() * 0.04;
+      d.z = z;
+      d.ground = ground;
+      // 抛物线：后向 0.6~1.6 m/s、上向 0.5~1.3 m/s（跑起来更狠），落点在身后一两步
+      d.vx = -dir * (0.6 + 0.6 * gait + r() * 0.5) * (soft ? 0.5 : 1);
+      d.vy = (0.5 + 0.5 * gait + r() * 0.35) * (soft ? 0.6 : 1);
+      d.spin = (r() - 0.5) * 12;
+      const sz = (0.022 + r() * 0.02) * bs;
+      d.s0 = sz; d.s1 = sz;
+      d.a0 = 0.95;
+      d.flip = 1;
+      const m = d.mesh;
+      m.material.map = footDust.gritTex[Math.floor(r() * footDust.gritTex.length)];
+      m.material.color.setScalar(tint);
       FixOrder(m, order);
       m.visible = true;
       m.position.set(d.x, d.y, d.z);
-      m.scale.set(d.flip * d.s0, d.s0, 1);
+      m.rotation.z = r() * Math.PI * 2;
+      m.scale.set(sz, sz, 1);
       m.material.opacity = d.a0;
     }
   }
@@ -2443,18 +2489,29 @@ export function CreateWorld(canvasEl) {
       d.t += step;
       const k = Math.min(1, d.t / d.life);
       if (k >= 1) { d.mesh.visible = false; continue; }
-      // 速度很快就衰掉：土掀出去一下就悬住、慢慢散，不是一路飞
-      d.vx *= Math.max(0, 1 - 4.5 * step);
-      d.vy *= Math.max(0, 1 - 3.0 * step);
+      if (d.kind === "grit") {
+        // 一粒土渣：抛物线，碰到地面就没了（不弹、不留）
+        d.vy -= GRIT_G * step;
+        d.x += d.vx * step;
+        d.y += d.vy * step;
+        if (d.y <= d.ground + 0.004 && d.vy < 0) { d.t = d.life; d.mesh.visible = false; continue; }
+        d.mesh.position.set(d.x, d.y, d.z);
+        d.mesh.rotation.z += d.spin * step;
+        continue;
+      }
+      // 浮土：横着散得快、竖着几乎不动；很快就衰掉——土掀出去一下就趴住、散掉，不是一路飞
+      d.vx *= Math.max(0, 1 - 5.0 * step);
+      d.vy *= Math.max(0, 1 - 4.0 * step);
       d.x += d.vx * step;
       d.y += d.vy * step;
-      // 先胀后停：大小按 1−(1−k)² 走，透明度按 (1−k)^1.4 收
+      // 先胀后停：宽按 1−(1−k)² 长，透明度按 (1−k)^1.2 收（土散得比烟干脆）
       const g = 1 - (1 - k) * (1 - k);
       const sz = d.s0 + (d.s1 - d.s0) * g;
-      // 团心随大小抬一点（贴图底边始终贴着地，土是从地上鼓起来的，不是浮在半空）
-      d.mesh.position.set(d.x, d.y + sz * 0.3, d.z);
-      d.mesh.scale.set(d.flip * sz, sz * 0.8, 1);
-      d.mesh.material.opacity = d.a0 * Math.pow(1 - k, 1.4);
+      // 摊子的底边贴着地：贴图里摊心在下方 3/5 处，网格中心抬 0.28×高
+      const h = sz * 0.57;
+      d.mesh.position.set(d.x, d.y + h * 0.28, d.z);
+      d.mesh.scale.set(d.flip * sz, h, 1);
+      d.mesh.material.opacity = d.a0 * Math.pow(1 - k, 1.2);
     }
   }
 
