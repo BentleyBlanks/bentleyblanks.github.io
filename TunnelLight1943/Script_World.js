@@ -20,6 +20,8 @@ import {
 // 物体的坐标/尺寸来自 Data_Scenes.json，贴图与深度带来自 Data_PropArt.json；
 // 这里只负责"照着数据把它烘出来放好"，不再自己写死尺寸与 z
 import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
+// 梯子的横档在哪：画笔、爬梯骨架、每档一响三处共用这一张表（见该文件头）
+import { LadderHolds } from "./Data_Ladder.mjs";
 // 无状态的画笔/烘焙/绘制序工具（2026-08-15 从 CreateWorld 闭包抽出）——见该文件头
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
@@ -1864,7 +1866,9 @@ export function CreateWorld(canvasEl) {
           // 梯脚落在地道那一层的地面上（ay 就是 UNDER_Y）。**第三个参数是地表
           // 那条地平线**——梯头高出地面多少、洞口开在哪一行都按它算，
           // 摆位一改这支笔自己跟着走（老版写死 0.32*PPM，跟地平线没有关系）
-          ART.DrawShaft(ctx, ax, ay - (SURFACE_Y - UNDER_Y) * PPM, ay - 1, shaft.id);
+          // 横档照 LadderHolds 那张表画——爬梯的骨架把手脚放上去时用的是同一份
+          ART.DrawShaft(ctx, ax, ay - (SURFACE_Y - UNDER_Y) * PPM, ay - 1, shaft.id,
+            LadderHolds(SURFACE_Y, UNDER_Y, shaft.id));
         }, 0, 2);
       // 地上那个洞：**一块躺平的几何**，排在地面之上、梯子之下。
       // 梯子那张立牌上也画着洞口的黑，可立牌是竖的——俯角一看就压成一条暗带，
@@ -2295,7 +2299,10 @@ export function CreateWorld(canvasEl) {
     // 翻越那条本来就是逐帧算好的弧线（每帧变化很小），缓动不会把它糊掉；
     // 阈值兜住"换层/跳幕"那种一米以上的大跳，让它照旧瞬时到位。
     const liftWant = extra.lift || 0;
-    if (s.liftNow === undefined || Math.abs(liftWant - s.liftNow) > 1.0) s.liftNow = liftWant;
+    // **爬梯不缓**：Core 的 lift 本来就是逐帧连续的，6/s 的追赶在 2m/s 的竖向速度下
+    // 落后 0.3m——人到了井底还在往下溜半秒，而且手脚照 Core 的高度找横档、身子却画在
+    // 别处（2026-08-17 爬梯重做时量出来的）
+    if (s.liftNow === undefined || Math.abs(liftWant - s.liftNow) > 1.0 || extra.climbing) s.liftNow = liftWant;
     else s.liftNow += (liftWant - s.liftNow) * Math.min(1, (dt || 0.016) * 6);
     const lift = s.liftNow;
     const y = ground + lift;
@@ -2331,10 +2338,13 @@ export function CreateWorld(canvasEl) {
     const gait = Math.max(0, Math.min(1, (speed - 1.5) / 1.7));
     // 跑起来步频也要跟上（同一段路迈的步子更少、每步更大）
     if (isMoving && !extra.climbing) s.phase += moved * gait * 0.7;
+    const bsRig = extra.bodyScale || s.bodyScale || 1;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, gait,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
+      // 爬梯：这架梯子的落点表 + 方向 + **画出来的脚线**（不是 Core 的，两者差一个缓动）
+      climb: extra.climb ? { holds: extra.climb.holds, dir: extra.climb.dir, base: y, bs: bsRig } : null,
       poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
       childArms: extra.childArms,
       track: extra.track, trackT: extra.trackT,
@@ -2567,6 +2577,7 @@ export function CreateWorld(canvasEl) {
     };
   }
 
+  const ladderHoldsCache = new Map();     // 竖井 id → LadderHolds（每架梯子算一次）
   function UpdateActors(state, time, dt) {
     const ch = CHAPTERS[state.chapterIndex];
     const sceneDef = SCENES[ch.scene];
@@ -2576,6 +2587,20 @@ export function CreateWorld(canvasEl) {
     const ps = EnsureActorSprite("player", "player");
     const def = CurrentBeatDef(state);
     const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
+    // 爬梯：人在哪架梯子上（离得最近的竖井口）→ 那架梯子的落点表 + 往上/往下。
+    // Core 一按下就把 level 翻成目的层，所以方向直接读目的层
+    const climbDir = p.level === "under" ? -1 : 1;
+    const ClimbSpecAt = (x) => {
+      let best = null, bd = 1.5;
+      for (const sh of sceneDef.shafts || []) {
+        const d = Math.abs(sh.x - x);
+        if (d < bd) { bd = d; best = sh; }
+      }
+      if (!best) return null;
+      let holds = ladderHoldsCache.get(best.id);
+      if (!holds) { holds = LadderHolds(SURFACE_Y, UNDER_Y, best.id); ladderHoldsCache.set(best.id, holds); }
+      return { holds, dir: climbDir };
+    };
 
     // ① 先把这一帧的光源点清出来：影子朝哪边拖、谁挡谁的光，都要先知道灯在哪
     lightSources.length = 0;
@@ -2624,6 +2649,8 @@ export function CreateWorld(canvasEl) {
     UpdateOne(ps, p.x, p.level, p.heading, p.crouch, dt, held,
       {
         climbing: p.climbT > 0, digging, bodyScale: boyScale, posture: p.posture, pose: p.pose,
+        // 梯子上：手脚要钉在这架梯子的横档上（Rig 的 ClimbPose）
+        climb: p.climbT > 0 ? ClimbSpecAt(p.x) : null,
         // 翻越：抬升与动作进度都由 Core 算，渲染层只负责把人抬起来、把姿势推到那一格
         // poseK = 0..1 的动作进度，Rig 里所有被进度驱动的姿势共用这一个参数：
         // 翻越取 vaultK、刨料/顶撑木取 poseU、投石取 poseK（拉弓量），见 PoseProgress
@@ -2719,6 +2746,7 @@ export function CreateWorld(canvasEl) {
           // 跟着走的人翻的是同一垛柴：抬升与动作进度都按位置连续算（Core/StepFollowers）
           // 下地道也一样：玩家在梯子上她就也在梯子上（a.climbing）
           lift: a.lift || 0, poseK: PoseProgress(a), climbing: !!a.climbing,
+          climb: a.climbing ? ClimbSpecAt(a.x) : null,
           // 队列里的第几排：横版里"并排"只能靠深度演（见 RankDz 的注释）
           rankDz: RankDz(a.rank || 0),
           // 谁压着谁：被抱在怀里的那个画在玩家之后，其余按 id 稳定分槽
@@ -6031,6 +6059,16 @@ export function CreateWorld(canvasEl) {
       const out = {};
       for (const k of Object.keys(tips)) out[k] = { x: +tips[k].x.toFixed(3), y: +tips[k].y.toFixed(3) };
       return out;
+    },
+    // 骨架当前的关节角（度）与肩/肘点（世界米）：排两骨反解那类姿势（爬梯、摇辘轳）
+    // 时看数字比看图快——图上"胳膊直着伸出去"分不清是目标给错了还是解挑错了
+    __rigPose: (id) => {
+      const s = actorSprites.get(id);
+      if (!s?.rig?.pose) return null;
+      const deg = {};
+      for (const [k, v] of Object.entries(s.rig.pose)) deg[k] = +(k === "hipX" || k === "hipY" ? v : v * 180 / Math.PI).toFixed(2);
+      const e = ElbowPoint(s.rig), sh = ShoulderPoint(s.rig);
+      return { pose: deg, elbowF: { x: +e.x.toFixed(3), y: +e.y.toFixed(3) }, shoulder: { x: +sh.x.toFixed(3), y: +sh.y.toFixed(3) } };
     },
     PlayerLimbTips: () => {
       const ps = actorSprites.get("player");

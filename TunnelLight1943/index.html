@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=129">
+  <link rel="stylesheet" href="./Style_Game.css?v=131">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,34 +33,37 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=129",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=129",
+        "three": "./vendor/three/build/three.module.js?v=131",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=131",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=129",
-        "./Script_World.js": "./Script_World.js?v=129",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=129",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=129",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=129",
-        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=129",
-        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=129",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=129",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=129",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=129",
-        "./Script_Audio.js": "./Script_Audio.js?v=129",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=129",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=129",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=129",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=129",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=129",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=131",
+        "./Script_World.js": "./Script_World.js?v=131",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=131",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=131",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=131",
+        "./Script_AnimLab.mjs": "./Script_AnimLab.mjs?v=131",
+        "./Script_AnimIndex.mjs": "./Script_AnimIndex.mjs?v=131",
+        "./Script_Climb.mjs": "./Script_Climb.mjs?v=131",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=131",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=131",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=131",
+        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=131",
+        "./Script_Audio.js": "./Script_Audio.js?v=131",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=131",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=131",
+        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=131",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=131",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=131",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=131",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=129",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=129",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=129",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=129",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=129",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=129",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=129",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=129"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=131",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=131",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=131",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=131",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=131",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=131",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=131",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=131"
       }
     }
   </script>
@@ -130,6 +133,9 @@
       <button id="btnQuit" class="panelRow" type="button">回到标题<small>进度已存</small></button>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+      <!-- 过场时间轴：底栏 Unity Timeline 式面板，拖到过场的某一格、复制
+           `c1_xx@line=N,at=T` 定位串粘给 agent（见 Script_CineTimeline.js） -->
+      <button id="btnCine" type="button">调试 · 过场时间轴<small>F3</small></button>
       <!-- 动画工作台：全屏预览骨架的每一条轨道/姿势/步态，按名字点名重做（F4 / ?anim=名字） -->
       <button id="btnAnim" type="button">调试 · 动画工作台<small>F4</small></button>
     </section>
@@ -258,6 +264,9 @@
     <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
   </section>
 
+  <!-- 过场时间轴（调试）：内容全由 Script_CineTimeline.js 现搭。F3 / ?cine=1 / 设置里那颗钮 -->
+  <section id="cinePanel" hidden aria-label="过场时间轴"></section>
+
   <!-- 动画工作台（2026-08-17）：骨架里的每一条轨道 / 姿势 / 步态按名字列出来，自己一块
        画布上循环播、拖时间轴、逐帧走、换人、叠关键帧影子、量手脚离地；右栏摊开这条动画
        的一切（源码行、时长、帧、驱动、用在哪几拍）。为的是动画退回能按名字点名
@@ -362,6 +371,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=129"></script>
+<script type="module" src="./Script_Main.js?v=131"></script>
 </body>
 </html>

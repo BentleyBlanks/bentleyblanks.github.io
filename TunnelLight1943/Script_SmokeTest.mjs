@@ -22,6 +22,8 @@ import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
 import { VaultLiftFor, VAULT_MAX_TOP, VAULT_MIN_TOP, BAND, ACTOR_Z, PlaceZ, RankDz } from "./Data_DepthSpec.mjs";
 import { LightPath, MoodAt, DipAt, LIGHT_MOOD, LIGHT_DIP } from "./Data_DayCycle.mjs";
+import { LADDER, LadderHolds } from "./Data_Ladder.mjs";
+import { PlanClimb } from "./Script_Climb.mjs";
 
 const DT = 1 / 30;
 
@@ -410,6 +412,74 @@ function TestTunnelNotDugYet() {
   console.log("  ✓ 挖通之前地道不通：自家窖 →", g.wall, "掌子面 →", g.face, "通了 →", v.walk.under[1]);
 }
 
+// 爬梯的手脚是**钉在真横档上**的（2026-08-17 用户退回「爬楼梯怎么和楼梯一点关联
+// 没有 就像是个平移一样」）。这条盯四件事，三种体型、上下两个方向都过一遍：
+// ① 落稳的脚一定踩在落点表里的某一道横档/地面上，落稳的手一定扒在某一道横档上；
+// ② 逐帧连续——手脚胯没有一帧跳一档（跳一档就是"瞬移"）；
+// ③ 胯离最低那只脚不超过腿长（腿不许拉断）、手离肩不超过臂长（胳膊不许拉断）；
+// ④ 真的一档一档换过：整趟下来每只脚/手换过的落点数与横档数一个量级。
+function TestClimbPlanLocksToRungs() {
+  const holds = LadderHolds(SURFACE_Y, UNDER_Y, "cellarHatch");
+  assert.ok(holds.rungs.length >= 10, "3.6 米的井该有十来道横档");
+  for (let i = 1; i < holds.rungs.length; i += 1) {
+    const gap = holds.rungs[i - 1] - holds.rungs[i];
+    assert.ok(Math.abs(gap - LADDER.pitch) <= LADDER.jitter * 2 + 1e-9, `横档间距 ${gap.toFixed(3)} 偏离 pitch`);
+  }
+  const ANKLE_UP = 0.085;
+  const near = (list, y, tol) => list.some((v) => Math.abs(v - y) < tol);
+  for (const bs of [0.60, 0.80, 0.93]) {
+    for (const dir of [-1, 1]) {
+      for (const oneHand of [false, true]) {
+        const span = SURFACE_Y - UNDER_Y;
+        let prev = null;
+        const holdsSeen = { fF: new Set(), fB: new Set(), hB: new Set() };
+        const N = 600;
+        for (let i = 0; i <= N; i += 1) {
+          const k = i / N;
+          const e = k * k * (3 - 2 * k);
+          const base = dir < 0 ? SURFACE_Y - span * e : UNDER_Y + span * e;
+          const p = PlanClimb({ holds, base, dir, bs, oneHand });
+          const tag = `bs=${bs} dir=${dir} oneHand=${oneHand} k=${k.toFixed(2)}`;
+          for (const [name, f] of Object.entries(p.feet)) {
+            if (f.air < 0.02) {
+              assert.ok(near(holds.feet, f.y - ANKLE_UP * bs, 1e-3), `${tag}：脚 ${name} 落稳了却不在任何一道横档上（y=${f.y.toFixed(3)}）`);
+              holdsSeen["f" + name].add(f.hold);
+            }
+            const leg = Math.hypot(f.x - p.hip.x, f.y - ANKLE_UP * bs - p.hip.y);
+            assert.ok(leg <= 0.62 * bs + 0.02, `${tag}：胯到脚 ${name} ${leg.toFixed(3)} 超过腿长`);
+          }
+          const shoulderY = p.hip.y + 0.447 * bs;
+          for (const [name, h] of Object.entries(p.hands)) {
+            if (h.air < 0.02) {
+              assert.ok(near(holds.hands, h.y, 1e-3), `${tag}：手 ${name} 扒稳了却不在任何一道横档上（y=${h.y.toFixed(3)}）`);
+              if (name === "B") holdsSeen.hB.add(h.hold);
+            }
+            // 手的相位钉在脚上，高度只能按整档挑（见 PlanClimb 里 corr 那段），
+            // 妹妹那种 0.6 的小身量胳膊才 0.29m，最高那一档要绷直再差几厘米——
+            // 反解伸直了去够，手离横档几厘米，屏幕上一个像素；大人一厘米都不许差
+            const slack = bs < 0.75 ? 0.05 : 0.02;
+            const arm = Math.hypot(h.x - p.hip.x, h.y - shoulderY);
+            assert.ok(arm <= 0.49 * bs + slack, `${tag}：肩到手 ${name} ${arm.toFixed(3)} 超过臂长`);
+          }
+          const now = { hip: p.hip.y, fF: p.feet.F.y, fB: p.feet.B.y, hB: p.hands.B.y, hF: p.hands.F?.y ?? 0 };
+          if (prev) {
+            for (const key of Object.keys(now)) {
+              assert.ok(Math.abs(now[key] - prev[key]) < 0.09, `${tag}：${key} 一帧跳了 ${(now[key] - prev[key]).toFixed(3)}m`);
+            }
+          }
+          prev = now;
+        }
+        const nF = holds.feet.length;
+        assert.ok(holdsSeen.fF.size >= nF / 2 - 1 && holdsSeen.fB.size >= nF / 2 - 1,
+          `bs=${bs} dir=${dir}：整趟只换了 ${holdsSeen.fF.size}/${holdsSeen.fB.size} 次脚——不是一档一档爬的`);
+        assert.ok(holdsSeen.hB.size >= holds.hands.length / 2 - 2,
+          `bs=${bs} dir=${dir} oneHand=${oneHand}：手只换了 ${holdsSeen.hB.size} 次`);
+      }
+    }
+  }
+  console.log("  ✓ 爬梯规划：手脚钉在真横档上 / 逐帧连续 / 腿臂不拉断 / 一档一档换");
+}
+
 function TestClimb() {
   const state = CreateGame(0); // 第一章村庄有地窖口
   // 推进到第一个可玩 beat（开场是 cinematic，期间不处理移动输入）
@@ -429,7 +499,8 @@ function TestClimb() {
   assert.equal(state.player.level, "under", "在地窖口按 S 应下到地下");
   // 爬梯锁定时间过后，W 上来
   let guard = 0;
-  while (state.player.climbT > 0 && (guard += 1) < 100) {
+  // 下井 0.45+2.4+0.5 秒（2026-08-17 爬梯放慢到一档一档看得清）——上限留够
+  while (state.player.climbT > 0 && (guard += 1) < 300) {
     StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
   }
   StepGame(state, { moveX: 0, climb: -1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
@@ -2498,6 +2569,7 @@ TestSingleChapterEntry();
 TestVision();
 TestCoverIsDirectional();
 TestClimb();
+TestClimbPlanLocksToRungs();
 TestTunnelNotDugYet();
 TestSmokeFront();
 TestDetectionReset();
