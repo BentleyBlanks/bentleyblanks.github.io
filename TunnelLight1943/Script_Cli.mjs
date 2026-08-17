@@ -550,8 +550,9 @@ async function CmdShot(o) {
         if (!inp) throw new Error(`看不懂的 --pre token：${tok}`);
         return [inp, Math.max(1, Number(mul || 1))];
       });
-      await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps, flags, line, at }) => {
+      await page.evaluate(({ c, b, x, level, actor, keepCine, stepIndex, pre: steps, flags, line, at, hold }) => {
         const tl = window.TunnelLight;
+        tl.Freeze(false);                          // 上一拍可能冻着（钉格那条路），先解开
         tl.JumpToBeat(c, b);                       // 吃章号，跨章不用重开页面
         tl.StepFrames(1, {});
         if (!keepCine) for (let i = 0; i < 900 && tl.state.microCine; i += 1) tl.StepFrames(1, { advance: true });
@@ -572,11 +573,17 @@ async function CmdShot(o) {
         // @line=9,at=2.6：钉到"第 9 句台词的第 2.6 秒"。别再拿 --dur 猜——
         // dur 是从整拍开头算的，改一句台词的时长后面全错位；而且推完之后要等
         // 渲染追上（镜头缓动/立面淡出/光照换挡），那半秒里游戏又往前走了
-        if (line !== undefined) tl.SeekLine(line, at || 0);
+        if (line !== undefined) {
+          tl.SeekLine(line, at || 0);
+          // 钉到格就**当场冻帧**：下面还要等圆形黑幕拉开（真墙钟几百毫秒），
+          // 那会儿页面自己的 rAF 还在推游戏钟——半秒长的一格（序章刺刀那一帧）
+          // 等到拍的时候早就翻过去了。冻帧只停游戏钟，黑幕照旧会拉开
+          if (!hold) tl.Freeze(true);
+        }
       }, { c: job.ci, b: job.bi, x: jo.x === undefined ? undefined : Number(jo.x), level: jo.level || null,
         actor: jo.actor || null, keepCine: jo.cine === "keep",
         stepIndex: jo.step === undefined ? undefined : Number(jo.step), pre, flags: job.flags,
-        line: jo.line === undefined ? undefined : Number(jo.line), at: Number(jo.at || 0) });
+        line: jo.line === undefined ? undefined : Number(jo.line), at: Number(jo.at || 0), hold: !!jo.hold });
 
       // 等转场的圆形黑幕拉开再拍——死等固定秒数会拍到一个圆洞（等待时间随
       // 机器快慢变，猜不准）。iris 是 Script_Main 挂出来的调试钩子

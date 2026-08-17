@@ -459,7 +459,9 @@ function HintShot(state, hint) {
     case "insertCard":
       // 专画的一张细节插画铺满画框；机位停在原地不动。
       // seg：活动插卡（每帧重画）的段号，动画按 (seg, 本行时间) 走
-      return { ...BaseShot(state), card: hint.card, cardSeg: hint.seg ?? 0 };
+      // cut：**硬切**——罩子当帧掀开/盖回，不走 6.5/s 的吸附（序章那 0.5s 的
+      // 刺刀一帧走吸附的话，从头到尾都蒙着一层灰）
+      return { ...BaseShot(state), card: hint.card, cardSeg: hint.seg ?? 0, cut: !!hint.cut };
     case "insertVideo":
       // 序章：一行旁白一段过场短片铺满画框。card 是兜底——片子没缓冲好就先上手绘卡
       return { ...BaseShot(state), card: hint.card, video: hint.clip };
@@ -484,7 +486,8 @@ function HintShot(state, hint) {
       // 黑就是黑：`1` 不是 0.94。老版留那 6% 不是为了"有点透"，是因为
       // #fadeOverlay 排在字幕**上面**——压到 1 就把台词一起盖掉了。现在
       // 罩子的 z-index 沉到字幕之下（Style_Game.css），黑得到底，字照旧在上头。
-      return { ...BaseShot(state), fade: 1 };
+      // cut：从亮到黑**当帧盖上**（接在硬切一帧后头的那句黑）
+      return { ...BaseShot(state), fade: 1, cut: !!hint.cut };
     case "free": {
       // 过场自由相机（勇敢的心式运镜，仅 cinematic 行）：from→to 机位、
       // at→atTo 注视点按本行时长插值（smoothstep），roll 单位是度。
@@ -657,6 +660,9 @@ function UpdateCamera(state, dt) {
     view = world.ApplyCamera(cam.x, cam.y, cam.hw);
   }
   world.UpdateAtmosphere(state, view.viewW, view.viewH, cam.x, cam.y, view.dist, dt);
+  // 行上标了 `cut` 的镜（硬切一帧那种）：换到这一行的当帧，罩子直接跳到目标值。
+  // 认的是 hint 对象本身（＝剧本里那一行的 cam），同一行里不会反复触发
+  if (shot.cut && state.camHint !== fadeCutHint) { fadeCutHint = state.camHint; fadeSnap = true; }
   return shot.fade || 0;
 }
 
@@ -703,6 +709,8 @@ function StepIris(state, dt) {
 let toastShown = null;
 let choiceBuilt = false;
 let fadeLevel = 1;
+let fadeSnap = false;        // 硬切：下一次 SyncHud 把罩子直接钉到目标值
+let fadeCutHint = null;      // 上一次触发硬切的那一行的 cam（防同一行反复触发）
 let lastObjective = undefined;
 let objectiveT = 0;
 
@@ -1064,7 +1072,7 @@ function SyncHud(state, dt, shotFade) {
   ui.detectionVignette.style.opacity = (state.stealthActive && state.detection.level > 0.03 && !inCinematic)
     ? Math.min(0.85, state.detection.level) : 0;
 
-  // 戏里的章名字样（八稿：序末的「第一章 · 蓝底白花」、章末的「第一章结束」）
+  // 戏里的章名字样（八稿：序末的「序章 · 蓝底白花」、章末的「序章结束」）
   // ——不是章节卡，不挡操作；淡入淡出交给 CSS 的过渡
   if (state.titleCard) {
     ui.sceneTitle.hidden = false;
@@ -1129,8 +1137,9 @@ function SyncHud(state, dt, shotFade) {
   if (showEnd && endScreenMode !== (demoEnd ? "demo" : "full")) {
     endScreenMode = demoEnd ? "demo" : "full";
     if (ui.endTitle) {
+      // 章号从 CHAPTERS 取（序章／第一章……），别再按下标数——c1 现在是「序章」
       ui.endTitle.textContent = demoEnd
-        ? `第${"一二三四五六七八"[LAST_OPEN] || "一"}章完` : "门框上的两道刻痕，留在了身后";
+        ? `${CHAPTERS[LAST_OPEN]?.num || "第一章"}完` : "门框上的两道刻痕，留在了身后";
     }
     if (ui.endText) {
       ui.endText.textContent = demoEnd
@@ -1145,6 +1154,8 @@ function SyncHud(state, dt, shotFade) {
   // 慢吞吞、亮回来更慢（一句台词都念完了画面还挂着一层灰）。提速到 6.5/s
   // （≈0.45 秒走完），并且贴近终点就吸住——不吸住的话"全黑"永远差着最后
   // 那几个千分点，屏幕上是深灰不是黑。
+  // 硬切（行上标 `cut`）：不吸附，当帧钉到目标——刺刀那一帧要"啪"地亮、"啪"地黑
+  if (fadeSnap) { fadeLevel = targetFade; fadeSnap = false; }
   fadeLevel += (targetFade - fadeLevel) * Math.min(1, dt * 6.5);
   if (Math.abs(targetFade - fadeLevel) < 0.01) fadeLevel = targetFade;
   ui.fadeOverlay.style.opacity = Math.max(fadeLevel, dipLevel).toFixed(3);

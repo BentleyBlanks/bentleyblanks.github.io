@@ -56,9 +56,13 @@ export function SplitPrompt(raw) {
 // 半袋烟的工夫=换岗的空当，学会看的那一课；最后一盏灯=熄灯后攥在手里的那盏；
 // 东口的铃=改造的回报；没套的骡车=推理的破绽本身。
 // （一二章 2026-08-11 按 Notion「剧本新生」重写；三章起仍是旧线，待逐章翻新）
+// **章号（2026-08-17 用户重排分镜定的）**：序·那天与原第一章合并为「序章」，原
+// 《第二章 · 梳篦》顺位为「第一章」；第三章及以后 Notion 上还挂着旧章号（尚未顺移，
+// 翻新时一并处理），这儿也照旧。序末的章名卡与章末字样跟这张表同口径
+//（Data_ScriptC1 的 titleCard：「序章 · 蓝底白花」「序章结束」）。
 export const CHAPTERS = [
-  { id: "c1", num: "第一章", title: "蓝底白花", year: "1943 · 春 · 华北敌后 · 梁家村", scene: "village", light: "day" },
-  { id: "c2", num: "第二章", title: "地洞里的眼睛", year: "1943 · 谷雨后 · 梁家村", scene: "village", light: "day" },
+  { id: "c1", num: "序章", title: "蓝底白花", year: "1943 · 春 · 华北敌后 · 梁家村", scene: "village", light: "day" },
+  { id: "c2", num: "第一章", title: "地洞里的眼睛", year: "1943 · 谷雨后 · 梁家村", scene: "village", light: "day" },
   { id: "c3", num: "第三章", title: "半袋烟的工夫", year: "1943 · 据点外的庄稼地", scene: "fields", light: "night" },
   { id: "c4", num: "第四章", title: "最后一盏灯", year: "1943 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
   { id: "c5", num: "第五章", title: "东口的铃", year: "1943 · 夏 · 沙河庄地道", scene: "tunnelVillage", light: "tunnel" },
@@ -5299,7 +5303,7 @@ function StepDin(state, dt) {
 // 剧本里的斜体（〔镜〕〔演〕〔音〕）一律是 `act`，它只管这一行演什么、占多久，
 // 不进文本层。第一章（含序）28 拍已按 Notion 剧本逐行分好：164 行 `act`，
 // 真旁白只有两句（「没人来叫。」「第三天。还是没人来叫。」）。屏幕上的字卡
-// （章名／三天后／第一章结束）走 `state.titleCard`，也不是旁白。
+// （章名／三天后／序章结束）走 `state.titleCard`，也不是旁白。
 // c2 起还是老样子（描述仍写在 `stage` 里），翻新时照第一章的口径改。
 function StepCinematic(state, input, dt) {
   const lines = state.beatLines;
