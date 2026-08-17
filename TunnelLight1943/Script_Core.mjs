@@ -144,6 +144,18 @@ export const CART_REACH = 2.6;   // 手边有车 = 推着它（翻越判定用�
 // 下次换别的路子（一拍固定机位的插入镜、或者过场里交代），别再默认开自动摇镜。
 export const CAM_CELLAR_PEEK = false;
 
+// 收藏品（老物件 + 包袱）总开关。2026-08-18 用户定：「把现在的道具收集功能都干掉
+// 暂时不要这个玩法」——整套下线，一处开关。关着的时候：
+//   · Core 不出「E · 收进包袱」、不发 `state.relicCard`（StepGame 里那一段）；
+//   · World 不摆老物件的贴图、不亮引导的那颗星、也不摆专门为它挡在镜头前的前景草
+//     （`scene.fore` 那几丛的活就是半遮收藏品，没了收藏品它就只是挡在人前面的草）；
+//   · Main 不出右上角那枚包袱钮、不建纸带、不响 peek、B 键不认。
+// **数据与画笔一个字都没删**（`Data_Scenes.json` 的 `relics`/`fore`、`Art.DrawRelic`、
+// Main 的 BAG_KEY 存档都在），要恢复就把这一行改成 true——玩家收过的东西还在档里。
+// 恢复之前先想一遍它当初为什么在：勇敢的心式的"路边不起眼的角落"，靠前景草的视差
+// 半遮半露。这两样（收藏品、疑兵草）是一件事，别只开一半。
+export const RELICS_ON = false;
+
 export function PushingCart(state) {
   return !!state.cart && Math.abs(state.player.x - state.cart.x) < CART_REACH;
 }
@@ -5529,7 +5541,11 @@ export function StepGame(state, input, dt) {
   // 不抢任务提示（!state.prompt）、潜行中不出；收走就从场上消失（World 切 visible）。
   // 梯子上也不出：层数一按下就翻成目的层，梯子底下那只笸箩会在人还挂在半空时就亮
   // 「收进包袱」（2026-08-17 爬梯实拍抓的），按 E 还真能隔着两米把它收走
-  {
+  // **2026-08-18 用户定：整套下线**（「把现在的道具收集功能都干掉 暂时不要这个玩法」）。
+  // 开关只有 `RELICS_ON` 这一处（本文件顶上）：关着的时候不出拾取提示、不发包袱卡，
+  // World 不摆老物件也不亮那颗星，Main 不出包袱钮与纸带。数据（`scene.relics`）、
+  // 画笔（`Art.DrawRelic`）、存档（Main 的 BAG_KEY）一个字没删——真要恢复就翻这个布尔
+  if (RELICS_ON) {
     const relics = SCENES[CHAPTERS[state.chapterIndex].scene].relics;
     if (relics && !state.prompt && !state.microCine && !state.stealthActive && !(state.player.climbT > 0)) {
       for (const r of relics) {

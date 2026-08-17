@@ -16,7 +16,7 @@ import {
   WRAP_CARD, SLING, SlingSolve, FORAGE, ForageMatEdge, ForageScoopDir,
   TEAR_CARD, SEW_CARD, SPLIT_CARD, LIVE_CARD_FIELDS, LiveCardOn,
   EdgeHint, BeatHintIcon, RAID_FORMATION, HouseSpan, IndoorOpen, PushingCart, CAM_CELLAR_PEEK, COVER_PAD,
-  UnderSegments, AllRelics,
+  UnderSegments, AllRelics, RELICS_ON,
 } from "./Script_Core.mjs";
 import { CHAPTER_BGM } from "./Data_BgmConfig.mjs";
 import { AUDIO_BUS_BASE, AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
@@ -1979,6 +1979,11 @@ function TestInstrumentalBgmManifest() {
   console.log("  ✓ 八章纯器乐 BGM 清单 / 文件 / 淘汰规则");
 }
 
+// 收藏品（老物件 + 包袱）2026-08-18 整套下线（Core 的 `RELICS_ON`，用户：「把现在的
+// 道具收集功能都干掉 暂时不要这个玩法」）。所以这条测试分两半：
+//   · **数据与画笔照旧逐条体检**——一个字都没删，将来翻开关就得能用；烂在抽屉里也是烂；
+//   · **玩法按开关验**：关着就必须真关着（不出提示、不发卡），开着就照老样子走通。
+// 这样恢复的时候不用回来改测试，翻一个布尔两条路都是绿的。
 function TestRelicsBag() {
   const all = AllRelics();
   assert.ok(all.length >= 9, `收藏品至少 9 件，现在 ${all.length}`);
@@ -2001,7 +2006,7 @@ function TestRelicsBag() {
   }
   assert.ok(decoys >= 3, "前景草全长在收藏品跟前——那就成了藏宝标记，要掺疑兵位");
 
-  // 无头拾取：跳到第一章玩法拍，走到鸡窝那件跟前按 E
+  // 无头走位：跳到第一章玩法拍，走到鸡窝那件（newsSheet）跟前按 E
   const st = CreateGame(0);
   DebugJump(st, 0, ChapterBeatList(0).find((b) => b.id === "c1_well").index);
   const idle = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
@@ -2010,19 +2015,28 @@ function TestRelicsBag() {
   st.player.level = "surface";
   st.player.cineWalk = null;
   StepGame(st, idle, DT);
-  assert.equal(st.prompt, "E · 收进包袱", `站到收藏品跟前该出拾取提示，实际 ${JSON.stringify(st.prompt)}`);
-  StepGame(st, { ...idle, interact: true }, DT);
-  assert.ok(st.relicsGot.has("newsSheet"), "按 E 没收进包袱");
-  assert.ok(st.relicCard && st.relicCard.id === "newsSheet", "拾取后要出包袱卡（Main 靠它存档+滑条）");
-  StepGame(st, idle, DT);
-  assert.notEqual(st.prompt, "E · 收进包袱", "收走了还出提示");
-  // 包袱开着世界要冻住
+  if (RELICS_ON) {
+    assert.equal(st.prompt, "E · 收进包袱", `站到收藏品跟前该出拾取提示，实际 ${JSON.stringify(st.prompt)}`);
+    StepGame(st, { ...idle, interact: true }, DT);
+    assert.ok(st.relicsGot.has("newsSheet"), "按 E 没收进包袱");
+    assert.ok(st.relicCard && st.relicCard.id === "newsSheet", "拾取后要出包袱卡（Main 靠它存档+滑条）");
+    StepGame(st, idle, DT);
+    assert.notEqual(st.prompt, "E · 收进包袱", "收走了还出提示");
+  } else {
+    // 关着＝**一点痕迹都不许有**：不出提示（那句提示会顶掉这一拍真正的任务提示）、
+    // 按 E 也收不走、更不许发包袱卡（Main 拿它弹 peek，弹出来就是通知一个不存在的玩法）
+    assert.notEqual(st.prompt, "E · 收进包袱", "收藏品已下线，还在出「收进包袱」的提示");
+    StepGame(st, { ...idle, interact: true }, DT);
+    assert.ok(!st.relicsGot.has("newsSheet"), "收藏品已下线，按 E 还能收走");
+    assert.ok(!st.relicCard, "收藏品已下线，还在发包袱卡");
+  }
+  // 包袱开着世界要冻住（机制留着——恢复那天这一条还得管用）
   st.bagOpen = true;
   const beforeX = st.player.x;
   StepGame(st, { ...idle, moveX: 1 }, DT);
   assert.equal(st.player.x, beforeX, "包袱开着人还能走——世界没冻住");
   st.bagOpen = false;
-  console.log(`  ✓ 收藏品：${all.length} 件老物件 / 注解齐 / 画法齐 / 疑兵草 ${decoys} 处 / 无头拾取通`);
+  console.log(`  ✓ 收藏品${RELICS_ON ? "" : "（已下线）"}：${all.length} 件老物件 / 注解齐 / 画法齐 / 疑兵草 ${decoys} 处 / ${RELICS_ON ? "无头拾取通" : "场上不出提示不发卡"}`);
 }
 
 function TestCliAnswersQuestions() {

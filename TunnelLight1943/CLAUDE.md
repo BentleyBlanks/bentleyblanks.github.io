@@ -133,7 +133,7 @@ node TunnelLight1943/Script_Cli.mjs
 - 翻越尺度只在 `Data_DepthSpec`（`VAULT_*`），抬升算绝对米数；曲线是带平台的梯形不是正弦。
 - 藏身处＝前景里一件挡得住人的实体（`clutter` 带掩体），不是阴影；高度必须实拍量；判定区＝那件东西的足迹。
 - 潜行四条：藏＝站到掩体背光面 / 危险先看得见再生效 / 动得越猛越显眼 / 每道关口两条出路。
-- 收藏品每件要真有史实出处、注解成掌故；开合判断看 `bagOpen`；疑兵草丛必须掺。
+- **收藏品（老物件/包袱）2026-08-18 整套下线**：总开关 `Core.RELICS_ON=false`，数据与画笔都留着（细则与恢复方式见分册）。别顺手打开、也别顺手删。
 
 ### UI（`docs/Ui.md`）
 - 标题页只有一列条目、版式照《勇敢的心》（活场景打底＝`state.tableau` 那台戏，不存档不走 StepGame；按任意键→红条菜单）；选关只在调试面板；一个自动存档位按幕存、认 id 不认序号；设置面板即暂停（`MenuFrozen`）；改完必看 `menu` 实拍。
@@ -174,6 +174,13 @@ npm run test:tunnelLight1943:browser    # 浏览器：逐章渲染健康 + 跳�
 node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
 node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提交/缓存戳/端口
 ```
+
+**worktree 里跑测试要在 worktree 根目录跑**（2026-08-18 白跑了一整轮）：`npm run` 会把
+cwd 换到装着 package.json 的**主仓库**，于是 `npm run test:tunnelLight1943` 测的是主仓库那份
+签出，跟你改的这份没关系——全绿也说明不了任何事。worktree 里直接 `node` 调脚本：
+`node TunnelLight1943/Script_SmokeTest.mjs`（＋ `Script_SceneAudit.mjs --quiet` /
+`Script_RenderHealthTest.mjs` / `Script_DebugJumpTest.mjs` / `Script_BgmTest.mjs`），
+node_modules 靠模块解析往上走就能找到主仓库那份。
 
 改完某一拍，最快的自检是把它单独跑一遍再看一眼：
 

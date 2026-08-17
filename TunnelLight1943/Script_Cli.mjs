@@ -295,7 +295,7 @@ async function CmdAnim(o) {
   console.log(FormatRef(e));
   console.log(`源码  TunnelLight1943/Script_Rig.mjs:${e.line ?? "?"}`);
   if (e.type === "track") {
-    console.log(`时长  ${e.dur}s ${e.loop ? "循环" : "单次"} · ${e.keys.length} 帧 · 关节 ${e.joints.length === RIG_FIELDS.length ? "全部 14" : e.joints.join(",")}`);
+    console.log(`时长  ${e.dur}s ${e.loop ? "循环" : "单次"} · ${e.keys.length} 帧 · 关节 ${e.joints.length === RIG_FIELDS.length ? `全部 ${RIG_FIELDS.length}` : e.joints.join(",")}`);
     const cols = e.joints;
     console.log(`\n  #   t     ${cols.map((c) => c.padStart(6)).join("")}  备注`);
     e.keys.forEach((k, i) => {

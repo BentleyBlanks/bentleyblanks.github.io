@@ -7,7 +7,7 @@
 // 视差：正交投影下由渲染层每帧按 parallax 系数手动偏移各层容器。
 
 import * as THREE from "three";
-import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
+import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE, RELICS_ON } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
 import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf, GaitToeOff } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
@@ -2440,8 +2440,9 @@ export function CreateWorld(canvasEl) {
     for (const c of sceneDef.covers) AddCover(layers.play, c, ch.light, state.flags.ruined);
 
     // 收藏品（scene.relics）：小件、贴地、半掩在现有物件脚下。loose 序号——
-    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧
-    for (const r of sceneDef.relics || []) {
+    // 压在行走线道具之前、演员之后；真正的"藏"靠 fore 前景草挡在镜头侧。
+    // **整套 2026-08-18 下线**（Core 的 `RELICS_ON`，一处开关；数据与画笔都留着）
+    for (const r of RELICS_ON ? sceneDef.relics || [] : []) {
       const m = BakeSprite(64, 60, 32, 52, (ctx, ax, ay) => ART.DrawRelic(ctx, ax, ay, r.art, r.id, { dim: true }), 0, DETAIL_SS);
       PlaceSprite(m, r.x, r.level === "under" ? UNDER_Y : SURFACE_Y, PlaceZ(BAND.loose));
       SetPlayOrder(m, BAND.loose, "relic");
@@ -2452,8 +2453,11 @@ export function CreateWorld(canvasEl) {
 
     // 前景草丛（scene.fore）：layers.fore 是掠过镜头的那一层（z=+3.4，微糊、
     // 特写与地下机位自动隐藏）。它的地平线比行走线低一截——草从画框下沿探
-    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头
-    for (const f of sceneDef.fore || []) {
+    // 上来，正好把行走线上的小东西挡个六七成，走动的视差会让东西从草后露头。
+    // **跟着收藏品一起下线**（`RELICS_ON`）：这几丛草的活就是半遮老物件，
+    // 没有老物件的话它只剩"挡在人前面的一片草"——留着就是白挡（同 2026-08-10
+    // 把 fore 层内容整个删掉那一轮的账：这层在它该干活的机位上只改动 0.25% 的像素）
+    for (const f of RELICS_ON ? sceneDef.fore || [] : []) {
       const m = BakeSprite(120, 110, 60, 104,
         (ctx, ax, ay) => ART.DrawForeTuft(ctx, ax, ay, "ft" + f.x, f.art), 1.1, 2, HazeFor("fore"));
       // fore 组整层按 (D_REF-z)/D_REF 预缩过，作者坐标要除回去——不除的话
