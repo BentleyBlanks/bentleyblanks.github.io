@@ -104,7 +104,11 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
       const scene = SCENES[CHAPTERS[state.chapterIndex].scene];
       const targetLevel = target.level || "surface";
 
-      if (p.level !== targetLevel && p.climbT <= 0) {
+      if (p.climb) {
+        // 梯子上是自己爬的（2026-08-17：可停可掉头）——按住往目的层那头推，松手就停在
+        // 半路。level 一按下就翻成目的层，所以"往目的层推"＝往 level 那头推
+        input.climb = p.level === "under" ? 1 : -1;
+      } else if (p.level !== targetLevel) {
         // 找可用爬梯口，走过去按 W/S
         const shafts = scene.shafts.filter((s) => !s.builtFlag || state.flags[s.builtFlag]);
         // 下窖要挑**通向目标那一段**的井口。地道没挖通之前自家窖和七叔家窖
@@ -432,9 +436,9 @@ function TestClimbPlanLocksToRungs() {
               if (name === "B") holdsSeen.hB.add(h.hold);
             }
             // 手的相位钉在脚上，高度只能按整档挑（见 PlanClimb 里 corr 那段），
-            // 妹妹那种 0.6 的小身量胳膊才 0.29m，最高那一档要绷直再差几厘米——
-            // 反解伸直了去够，手离横档几厘米，屏幕上一个像素；大人一厘米都不许差
-            const slack = bs < 0.75 ? 0.05 : 0.02;
+            // 够到最高那一档时胳膊绷直还差三四厘米——反解伸直了去够，手离横档几厘米，
+            // 屏幕上一两个像素；再宽就是真的够不着了
+            const slack = 0.05;
             const arm = Math.hypot(h.x - p.hip.x, h.y - shoulderY);
             assert.ok(arm <= 0.49 * bs + slack, `${tag}：肩到手 ${name} ${arm.toFixed(3)} 超过臂长`);
           }
@@ -471,17 +475,22 @@ function TestClimb() {
   // 开场那一拍给玩家挂了走位（c1_door 的过场），不清掉的话人会被一路拖离
   // 梯口，等爬梯锁定走完就够不着梯子了——这条验的是梯子，不是过场
   state.player.cineWalk = null;
-  // S 下地窖
-  StepGame(state, { moveX: 0, climb: 1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
+  // S 下地窖：**按住**——梯子上是自己爬的（2026-08-17 可停可掉头），松手就停在半路
+  const HOLD_S = { moveX: 0, climb: 1, crouch: false, interact: false, interactHeld: false, advance: false };
+  const HOLD_W = { moveX: 0, climb: -1, crouch: false, interact: false, interactHeld: false, advance: false };
+  StepGame(state, HOLD_S, DT);
   assert.equal(state.player.level, "under", "在地窖口按 S 应下到地下");
-  // 爬梯锁定时间过后，W 上来
   let guard = 0;
-  // 下井 0.45+2.4+0.5 秒（2026-08-17 爬梯放慢到一档一档看得清）——上限留够
-  while (state.player.climbT > 0 && (guard += 1) < 300) {
-    StepGame(state, { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
-  }
-  StepGame(state, { moveX: 0, climb: -1, crouch: false, interact: false, interactHeld: false, advance: false }, DT);
+  // 下井 0.45 + 3.6/1.35 + 0.5 秒——上限留够
+  while (state.player.climb && (guard += 1) < 300) StepGame(state, HOLD_S, DT);
+  assert.ok(!state.player.climb, "按住 S 三百帧之内必须爬到底、盖上板");
+  assert.equal(state.player.level, "under");
+  // W 上来
+  StepGame(state, HOLD_W, DT);
   assert.equal(state.player.level, "surface", "在梯口按 W 应回到地表");
+  guard = 0;
+  while (state.player.climb && (guard += 1) < 400) StepGame(state, HOLD_W, DT);
+  assert.ok(!state.player.climb, "按住 W 四百帧之内必须爬到顶、盖上板");
 
   // 人不许瞬移：层数当帧就翻（碰撞按目的层算），但**渲染高度得一格一格挪下去**。
   // 老版本 `p.level="under"; p.climbT=0.55` 就翻了个层数，渲染层照 level 取地平线，
@@ -499,16 +508,17 @@ function TestClimb() {
     s2.player.x = sc2.shafts[0].x;
     s2.player.level = "surface";
     const idle2 = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false };
-    StepGame(s2, { ...idle2, climb: 1 }, DT);
+    const holdS = { ...idle2, climb: 1 }, holdW = { ...idle2, climb: -1 };
+    StepGame(s2, holdS, DT);
     assert.equal(s2.player.level, "under", "层数当帧就翻");
     const RenderY = () => (s2.player.level === "under" ? UNDER_Y : SURFACE_Y) + (s2.player.lift || 0);
     assert.ok(Math.abs(RenderY() - SURFACE_Y) < 0.35,
       `刚下梯子那一下人还得在井口（现在渲染在 ${RenderY().toFixed(2)}，井口 ${SURFACE_Y}）`);
-    assert.ok(s2.player.climbT > 1.0, "3.6 米的井不该 0.55 秒就下完——那是瞬移的时长");
+    assert.ok(s2.player.climb, "按下 S 之后人在梯子上");
     const ys = [RenderY()];
     let g2 = 0;
-    while (s2.player.climbT > 0 && (g2 += 1) < 400) {
-      StepGame(s2, idle2, DT);
+    while (s2.player.climb && (g2 += 1) < 400) {
+      StepGame(s2, holdS, DT);
       ys.push(RenderY());
     }
     // 一路只降不升，且真的走完了整口井
@@ -517,8 +527,34 @@ function TestClimb() {
     }
     assert.ok(ys.filter((y, i) => i > 0 && y < ys[i - 1] - 1e-6).length > 20,
       "中间得有几十帧真的在往下挪，不是跳一下就到底");
+    assert.ok(ys.length > 60, `3.6 米的井按住 S 至少两秒（现在 ${ys.length} 帧）——那才是一档一档爬的速度`);
     assert.ok(Math.abs(RenderY() - UNDER_Y) < 1e-6, "落地之后渲染高度要正好归到地道地平线");
     assert.equal(s2.player.lift, 0, "落地要把抬升清干净，不然后面的姿势全跟着飘");
+
+    // **半路停下、掉头**（2026-08-17 用户："可以支持在半路停下的，就像勇敢的心那样"）：
+    // 从井底按住 W 爬一秒，松手——人停在梯子上不动；再按 S 掉头往下、又按 W 接着上到顶
+    StepGame(s2, holdW, DT);
+    assert.equal(s2.player.level, "surface", "井底按 W 层数当帧翻回地表");
+    for (let i = 0; i < 30; i += 1) StepGame(s2, holdW, DT);
+    const midY = RenderY();
+    assert.ok(midY > UNDER_Y + 0.3 && midY < SURFACE_Y - 0.3, `爬了一秒该在井中间（现在 ${midY.toFixed(2)}）`);
+    for (let i = 0; i < 30; i += 1) StepGame(s2, idle2, DT);
+    assert.ok(Math.abs(RenderY() - midY) < 0.05, `松手就得停在那一档上（停前 ${midY.toFixed(2)} 停后 ${RenderY().toFixed(2)}）`);
+    assert.ok(s2.player.climb, "停着的时候人还在梯子上");
+    for (let i = 0; i < 12; i += 1) StepGame(s2, holdS, DT);
+    assert.ok(RenderY() < midY - 0.15, "按 S 能掉头往下");
+    let g3 = 0;
+    while (s2.player.climb && (g3 += 1) < 500) StepGame(s2, holdW, DT);
+    assert.ok(!s2.player.climb && s2.player.level === "surface" && Math.abs(RenderY() - SURFACE_Y) < 1e-6,
+      "接着按 W 得能爬到顶、出梯子");
+    // 掉头爬回原来那头出去：层数要翻回来
+    StepGame(s2, holdS, DT);
+    assert.equal(s2.player.level, "under");
+    for (let i = 0; i < 40; i += 1) StepGame(s2, holdS, DT);
+    let g4 = 0;
+    while (s2.player.climb && (g4 += 1) < 300) StepGame(s2, holdW, DT);
+    assert.equal(s2.player.level, "surface", "下了一半又爬回井口出去，层数得翻回地表");
+    assert.equal(s2.player.lift, 0);
   }
 
   // 镜头不许自己动（用户 2026-08-10：「目前我看不需要这个自动摇动镜头的功能，
@@ -643,7 +679,9 @@ function TestStealthEscapable() {
       const input = { moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, throw: false, advance: false };
       if (target && target.x !== undefined) {
         const targetLevel = target.level || "surface";
-        if (state.player.level !== targetLevel && state.player.climbT <= 0) {
+        if (state.player.climb) {
+          input.climb = state.player.level === "under" ? 1 : -1;     // 梯子上按住往目的层推
+        } else if (state.player.level !== targetLevel) {
           // 笨玩家也会爬梯子：目标在另一层就先奔梯口。
           // 井口要挑**通向目标那一段**的（与主驱动器同一条规矩）：防兵洞
           // 没挖开之前自家窖和七叔家窖是两个腔，就近下错口就是死胡同
