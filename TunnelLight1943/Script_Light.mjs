@@ -214,6 +214,28 @@ export function CreateOccludedLight(occluder, { radius = 5, color = 0xffc878, in
 //
 // 与灯不同，这里的遮挡步进只做**一次**（所有光柱共用一个源点方向），
 // 而且**先算 SDF、光柱外的片元当场 discard**——不然满屏都在跑步进。
+//
+// ── 2026-08-18 第三轮：照《勇敢的心》重排能量（用户贴了那一幕的截图，
+//    「参考一下勇敢的心怎么做的，然后做好」）──
+// 把那张图逐块读一遍，能看见"光"的地方**没有一处是空气**：洞口那一圈过曝的白、
+// 梯子一节节发亮的横档、井壁上一大片软亮斑、梁在墙上投的斜影、地上一摊。
+// 空气里那点雾很弱，而且只在洞口下面一小截——**它是配角，不是主角**。
+// 我们前两版正好反过来：能量全堆在 core 那几根细亮线上，一路 3.6 米不怎么衰减，
+// 而梯子、井壁、后墙一点没被照亮。于是画面上是"黑屋里插着几根发光的棍子"，
+// 不是"有光从上头打进来"。
+//
+// 现在的分层（从主到次）：
+//   ① **面光 wash**——从窖口往下张开的一个喇叭，照到什么什么就亮：梯子、井壁、
+//      后墙、地面、蹲在底下的人。**这一层才是光**，它占七成能量。
+//      （2D 剖面里"空气"其实就是后墙，所以给空气加色 ＝ 把墙照亮，正是要的。）
+//   ② **洞口那一团过曝的白**——参考图里最亮的就是洞口本身，亮到没有细节。
+//   ③ **细光柱 cone**——三条缝各一条，很弱，而且**沿程衰减快**（一米开外就没了）。
+//      留着它是因为板缝的故事在这儿：三块板拼的，缝宽窄不一。
+//   ④ 地上那摊 ⑤ 间接光——照旧。
+// 配套两条：· 遮挡一律走**软透射**（`exp(-Σsolid·k)`），不再"撞到就归零 break"——
+//   面光铺满全屏，硬阈值会把 6 像素/米那些方盒子的直边全画出来；
+//   · 四个可调量做成 uniform（`uWash`/`uHead`），配 `world.__shaftLight()`
+//   在浏览器里现调现看，别再改一次数值重编译一次。
 export const MAX_SHAFTS = 4;
 
 const SHAFT_FRAG = `
@@ -233,6 +255,13 @@ uniform float uDust;
 uniform float uTime;
 uniform vec3 uColor;       // 直射：外头的天光
 uniform vec3 uBounceColor; // 反射回来的：在土地上滚过一道，暖得多也脏得多
+// 四个"看着调"的量（world.__shaftLight() 拿得到，浏览器里现调现看）
+uniform vec4 uWash;        // x=面光强度 y=洞口处半宽 z=每米张开 w=沿程衰减
+uniform vec3 uHead;        // x=洞口过曝 y=细光柱强度 z=细光柱沿程衰减
+uniform sampler2D uBlockTex;  // 演员剪影靶（宿主每帧单渲一遍，见 MaskAt）
+uniform mat4 uBlockVP;        // 渲那张靶用的相机矩阵：世界 → 靶上的 uv
+uniform float uBlockZ;        // 演员所在的那一档 z（投影要用）
+uniform float uBlockOn;       // 靶备好没有；没有就退回方盒子
 uniform int uBlockerCount;
 uniform vec4 uBlockers[${MAX_BLOCKERS}];
 varying vec2 vWorld;
@@ -277,17 +306,67 @@ float Hash21(vec2 p) {
   return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
 }
 
+// 人体挡光**照真剪影**（2026-08-18 用户："你角色过去怎么遮挡的形状是个方块
+// 而不是角色的边缘啊"）。方盒子那一版（BlockedSeg，留在下面当兜底）的形状是
+// 半宽 0.20m 的躯干柱，所以人一进光柱，画面上断掉的是一个方块。
+// 现在宿主每帧把演员**单独渲进一张小离屏靶**（Script_World 的 BLOCK_LAYER），
+// 这儿沿光线采它的 alpha——头发、袖子、抱在怀里的孩子，什么形状挡出来就是
+// 什么形状。累加而不是 min/break：随深度连续，不会再起横杠。
+// **要多走一米**：光源是地表那条板缝，踩在板上的人身子整个在原点上头，
+// 只走到原点就一根头发也采不到（方盒子那版靠"线段到盒的距离"才蒙对）
+float MaskAt(vec2 w) {
+  vec4 c = uBlockVP * vec4(w, uBlockZ, 1.0);
+  vec2 uv = (c.xy / c.w) * 0.5 + 0.5;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
+  return texture2D(uBlockTex, uv).a;
+}
+
+// 软透射：从 p 沿 dir 走 len 米，问这一路吃了多少土。
+// **一律走这条，不许再用"撞到实心就归零 break"**——面光铺满整间窖，硬阈值
+// 会把掩码那些 6 像素/米的轴对齐方盒子的直边整条画在墙上（实拍抓到过两回）。
+// 而且它是个连续的和，不是 min/break，所以也不会随片元深度起横杠。
+float Transmit(vec2 p, vec2 dir, float len, float k) {
+  float acc = 0.0;
+  for (int i = 1; i <= 12; i++) acc += SolidAt(p + dir * (len * float(i) / 13.0));
+  return exp(-acc * k);
+}
+
+// 挡多少：有剪影靶就照剪影，没有（还没渲出第一帧）退回方盒子
+float Blocked(vec2 p0, vec2 dir, float len) {
+  if (uBlockOn < 0.5) return BlockedSeg(p0, dir, len);
+  float total = len + 1.0;
+  float acc = 0.0;
+  for (int i = 1; i <= 14; i++) acc += MaskAt(p0 + dir * (total * float(i) / 15.0));
+  return 1.0 - exp(-acc * 0.62);
+}
+
 void main() {
   vec2 perp = vec2(uDir.y, -uDir.x);
   vec2 rel = vWorld - uOrigin;
   float tAxis = dot(rel, uDir);
   // 间接光要泼到光柱以外去，所以纵向范围比光柱本身多留一段
   if (tAxis < -0.35 || tAxis > uLen + 2.0) discard;
+  float td = max(tAxis, 0.0);
 
-  float core = 0.0;      // 亮芯：里头那根细亮线
-  float glow = 0.0;      // 芯子外那一圈散射（"光柱"的形其实全在这一层上）
-  float pool = 0.0;      // 落地那摊亮斑
-  float bounce = 0.0;    // 间接光：亮斑当面光源往窖里泼的那一层
+  // ── ① 面光：从窖口往下张开的一个喇叭。**这一层才是"光"**，占七成能量。
+  // 它照到什么什么就亮——梯子、井壁、后墙、地面、蹲在底下的人。
+  // 剖面画法里"空气"其实就是后墙，所以给空气加色 ＝ 把墙照亮，正是要的那件事。
+  // 形状是**以洞口为心的衰减**，不是一条等宽的带子：洞口最亮，走远了迅速就没。
+  // 头一版按"等宽带 + 指数衰减"给，参数怎么扫都是一根柱子——因为横向高斯的
+  // 拖尾把光泼得满屋都是，而纵向又掉得太慢。
+  // 横向随深度张开（uWash.z），纵向走 1/(1+(d/d0)²) 这条平方反比样的曲线
+  float hwW = uWash.y + uWash.z * td;
+  float sw = dot(rel, perp) / hwW;
+  float dd = td / max(uWash.w, 0.01);
+  float wash = exp(-sw * sw * 1.55) / (1.0 + dd * dd) * uWash.x;
+
+  // ── ② 洞口那一团过曝的白：参考图里最亮的就是洞口本身，亮到没有细节 ──
+  vec2 mq = rel / vec2(0.46, 0.30);
+  float mouth = exp(-dot(mq, mq) * 1.1) * uHead.x;
+
+  float cone = 0.0;      // ③ 空气里那点雾：三条缝各一条，很弱、而且掉得快
+  float pool = 0.0;      // ④ 落地那摊亮斑
+  float bounce = 0.0;    // ⑤ 间接光：亮斑当面光源往窖里泼的那一层
   vec2 bounceSrc = vWorld;
   vec2 poolSrc = vWorld;
   float bestPool = 0.0;
@@ -336,48 +415,25 @@ void main() {
 
     if (t < -0.05 || t > uLen) continue;
     float hw = max(s.y + s.z * t, 0.004);
-    // 亮芯**要按张开量变淡**（能量守恒）：一条宽度不变、亮度也不变的光带，
-    // 不管柔边给得多软，读出来都是一根圆筒。张多宽就淡多少，它才是个楔形
     float sd = lat / hw;
-    float k = exp(-sd * sd * 2.4) * (s.y / hw);
-    // 外圈的散射**张得比芯子快得多**：一条真的光柱是"一根亮线裹在一团雾里"，
-    // 越往下雾越开、越淡。老版只有芯子这一层，所以边缘是刀切的
-    // 外圈**只张 2.2 倍**：张得太开三条就并成一团，画面上又剩"一根胖柱子"
-    float gw = hw * (1.0 + 2.2 * t / uLen);
-    float sg = lat / gw;
-    // 指数取 0.55 不是 1.0：严格按 1/宽 收的话，外圈那层张到三倍就只剩三分之一，
-    // 张开的那截自己先没了；而它正是"光柱"读出来的那个形
-    glow += exp(-sg * sg * 0.85) * pow(s.y / gw, 0.55) * 0.17 * s.w * exp(-t * 0.24);
-    // 沿程的浓淡：空气不是均质的，尘也不是均匀铺的。**这一条是"不像塑料棒"
-    // 的正主**——一根亮度沿程不变的光带，形状再对也是发光体不是被照亮的空气
+    // 沿程的浓淡：空气不是均质的，尘也不是均匀铺的
     float rip = 0.78 + 0.22 * sin(t * 4.7 + e.y) * cos(t * 2.3 - e.y * 1.6 + uTime * 0.22);
-    // 芯子要压得过外圈那层雾：三条缝各自的那根亮线读不出来的话，画面上还是
-    // 一团光晕——"板缝里漏下来几条光"这句话就没在画面上成立
-    core += k * exp(-t * 0.20) * rip * s.w * 1.55;
+    // **掉得快**是这一层不再像塑料棒的关键（uHead.z）：参考图里洞口下面一小截
+    // 有雾，再往下就只剩"东西被照亮"了。老版一路 3.6 米几乎不衰减（exp(-t*0.20)
+    // 到窖底还剩一半），所以三条一直亮到地，读出来就是三根发光的棍子
+    cone += exp(-sd * sd * 2.2) * (s.y / hw) * rip * s.w * exp(-t * uHead.z) * uHead.y;
   }
-  float direct = core + glow;
-  if (direct + pool + bounce < 0.0025) discard;
+  float air = wash + mouth + cone;
+  if (air + pool + bounce < 0.0025) discard;
 
-  // ── 挡住没有：土层挡死，人挡一截。**这一条只管空气里那段光柱**：
-  // 从着色点顺着光轴往回走，问"这一路上有没有东西"。
-  // 土层还是步进（掩码是一张贴图，只能采样；但它不动，采样格子再粗也不会闪）；
-  // **人体那一路走解析式**（BlockedSeg，见上）——挂在这条步进上就是那道锯齿
-  float lit = 1.0;
-  if (direct > 0.002) {
-    const int STEPS = 22;
-    float dist = max(tAxis, 0.02);
-    float stepLen = max(dist / float(STEPS), 0.12);
-    for (int i = 1; i <= STEPS; i++) {
-      float t = float(i) * stepLen;
-      if (t >= dist) break;
-      if (SolidAt(vWorld - uDir * t) > 0.5) { lit = 0.0; break; }
-    }
-    // 人挡光不挡死：半影里还留一点点，才不像贴了张黑纸
-    lit = min(lit, 1.0 - BlockedSeg(vWorld, -uDir, dist) * 0.94);
-  }
+  // ── 挡住没有：土层与人。两条都**必须软**——面光铺满整间窖，
+  // 硬阈值会把掩码那些方盒子的直边整条画在墙上
+  float dist = max(tAxis, 0.03);
   float selfSolid = SolidAt(vWorld);
-  // 着色点自己就在土里：一点点受光感，不然洞壁没有被照到的样子
-  float directLit = lit * mix(1.0, 0.25, selfSolid);
+  // 着色点自己就在土里：留一点点受光感，不然洞壁没有被照到的样子
+  float airLit = Transmit(vWorld, -uDir, dist, 1.45)
+    * (1.0 - Blocked(vWorld, -uDir, dist) * 0.94)
+    * mix(1.0, 0.30, selfSolid);
 
   // 落地那摊亮斑的遮挡要**在光轴上算一次**，不许逐片元竖着回溯。
   // 它是地上的一块光，不是空气里的一段：拿裙边上每个像素各自往上打一条射线，
@@ -386,13 +442,10 @@ void main() {
   float poolLit = 0.0;
   if (pool > 0.002) {
     float L2 = length(poolSrc - uOrigin);
-    poolLit = 1.0;
-    for (int i = 1; i <= 16; i++) {
-      if (SolidAt(poolSrc - uDir * (L2 * float(i) / 17.0)) > 0.5) { poolLit = 0.0; break; }
-    }
     // 人挡在光轴上时这摊亮斑跟着灭——但要**灭得像影子挪过去**，不是整摊一起
     // 跳闸：poolSrc 全屏只有三个点，逐点采样的话兵一跨进那格，整摊光当场消失
-    poolLit = min(poolLit, 1.0 - BlockedSeg(poolSrc, -uDir, L2) * 0.94);
+    poolLit = Transmit(poolSrc, -uDir, L2, 1.45)
+      * (1.0 - Blocked(poolSrc, -uDir, L2) * 0.94);
   }
 
   // 间接光自己的遮挡：从这一点连到亮斑，中间隔着土就照不到。
@@ -414,7 +467,7 @@ void main() {
       bLit = exp(-acc * 0.62);
       // 挡在中间的人也吃掉一截，但**只吃一截**：间接光的源是地上那一大摊，
       // 一个人挡不干净它。同样走解析式，不然人一动这层也跟着起横杠
-      bLit *= mix(1.0, 0.33, BlockedSeg(vWorld, dn, L));
+      bLit *= mix(1.0, 0.33, Blocked(vWorld, dn, L));
     }
     // 打在土墙上的间接光**要留下来**——照亮四壁正是它的活；
     // 只把埋在土里的那部分收掉一档
@@ -423,16 +476,22 @@ void main() {
 
   // ── 浮尘：光柱里才看得见的那些小颗粒，慢慢往下飘 ──
   float dust = 0.0;
-  if (uDust > 0.0 && core > 0.02) {
+  if (uDust > 0.0 && cone > 0.02) {
     vec2 cell = vec2(vWorld.x * 7.0, vWorld.y * 7.0 - uTime * 0.35);
     vec2 id = floor(cell);
     float rnd = Hash21(id);
     float d = length(fract(cell) - vec2(0.35 + 0.3 * rnd, 0.5));
-    dust = smoothstep(0.30, 0.02, d) * step(0.86, rnd) * uDust * core;
+    dust = smoothstep(0.30, 0.02, d) * step(0.86, rnd) * uDust * cone;
   }
 
-  float dv = (direct * directLit + pool * poolLit + dust) * uIntensity;
-  float bv = bounce * bLit * uIntensity;
+  // **窖底以下一点光都不许有**：那底下是剖面近侧那条黑土，而光柱排在
+  // ORDER_GLOW 上、画在它之后，泼过去就是"地上贴了张亮纸"（用户 2026-08-18
+  // 报的那块硬边淡板，一半是这个）。掩码指望不上——它把地面往下 0.2m 也
+  // 算成空气（走廊那条 air 矩形从 UNDER_Y−0.2 起），这一刀只能自己夹
+  float aboveFloor = smoothstep(uFloorY - 0.30, uFloorY - 0.08, vWorld.y);
+
+  float dv = (air * airLit + pool * poolLit + dust) * uIntensity * aboveFloor;
+  float bv = bounce * bLit * uIntensity * aboveFloor;
   // **不许再走 vec4(color*v, v) ＋ AdditiveBlending**：那一档的混合是
   // src.rgb × src.a + dst，于是屏幕上拿到的是 color·v²——很淡的那几层
   // （外圈散射、间接光、亮斑的裙边）被平方一压全没了，只剩下最亮的芯子，
@@ -472,6 +531,15 @@ export function CreateLightShafts(occluder, {
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(color) },
       uBounceColor: { value: new THREE.Color(bounceColor) },
+      // 参考《勇敢的心》配的一组：**面光是主角**，细光柱只剩一小截、
+      // 1.05/米 的衰减让它一米开外就散了；洞口过曝到 1.8。
+      // uWash.w=1.15m 是"掉到一半"的距离——窖底 3.6m 处只剩不到一成
+      uWash: { value: new THREE.Vector4(0.38, 0.26, 0.72, 0.80) },
+      uHead: { value: new THREE.Vector3(0.85, 0.30, 1.20) },
+      uBlockTex: { value: null },
+      uBlockVP: { value: new THREE.Matrix4() },
+      uBlockZ: { value: 0.6 },
+      uBlockOn: { value: 0 },
       uBlockerCount: { value: 0 },
       uBlockers: { value: blockers },
     },
@@ -513,6 +581,13 @@ export function CreateLightShafts(occluder, {
     mat.uniforms.uCount.value = n;
   };
   mesh.userData.SetIntensity = (v) => { mat.uniforms.uIntensity.value = v; };
+  // 演员剪影靶（宿主每帧渲一张）：挡光从此照真轮廓，不再是方盒子
+  mesh.userData.SetBlockMask = (tex, vp, z) => {
+    mat.uniforms.uBlockTex.value = tex;
+    if (tex) mat.uniforms.uBlockVP.value.copy(vp);
+    mat.uniforms.uBlockZ.value = z;
+    mat.uniforms.uBlockOn.value = tex ? 1 : 0;
+  };
   mesh.userData.SetFloor = (y) => { mat.uniforms.uFloorY.value = y; };
   mesh.userData.SetDust = (v) => { mat.uniforms.uDust.value = v; };
   mesh.userData.SetTime = (t) => { mat.uniforms.uTime.value = t; };

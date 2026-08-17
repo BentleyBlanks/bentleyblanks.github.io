@@ -127,6 +127,9 @@ const INDEX_SOURCES = [
   ]],
   ["Data_DepthSpec.mjs", [[/^\s*([a-zA-Z][a-zA-Z0-9]*):\s*-?[\d.]+,/, (m) => [[m[1], "深度带/尺度常量"]]]]],
   ["CLAUDE.md", [[/^#{2,4} (.+)$/, (m) => [[m[1], "项目规范章节"]]]]],
+  // 2026-08-18 起规范按系统拆成分册（docs/*.md），CLAUDE.md 只留硬规矩与路由表
+  ...["Cli", "Script", "Depth", "Art", "Rig", "Camera", "Interaction", "Ui"].map((k) =>
+    [`docs/${k}.md`, [[/^#{2,4} (.+)$/, (m) => [[m[1], `规范分册章节（${k}）`]]]]]),
   ["Data_StoryC1.md", [
     [/^#{1,3} (.+)$/, (m) => [[m[1], "剧情文档章节"]]],
     [/^([①-⑮]) (?:§\d+ )?\*{0,2}([^（(*]+)/, (m) => [[m[2].trim(), "c1 场次（剧情文档）"]]],
@@ -187,7 +190,80 @@ async function AnimIndex() {
   const { ScanAnimIndex } = await import("./Script_AnimIndex.mjs");
   return ScanAnimIndex((f) => { try { return fs.readFileSync(path.join(DIR, f), "utf8"); } catch { return null; } });
 }
+// anims --contact [片段]：**真骨架、逐帧量脚**（2026-08-18 用户："非常多的动作，脚都是会
+// 在 Y 轴漂移的"）。起一个真浏览器，开动画工作台，把每条动作播一圈，每帧读 Rig.RigContact
+// ——两只鞋底、两个膝头里最低的点离地多高。地面吸附之后钉在地上的该恒为 0；报出来的是：
+// ① 没贴地的（离地状态：被抱着/骑着/跳/躺/爬梯）——鞋底到底多高，看合不合理；
+// ② 吸附把胯挪了多少（shift）：|shift| 大说明这支姿势原来腿没闭合，手的落点也跟着挪了
+//    那么多，要回头看手；③ 手离地（爬/跪着撑地的姿势手该在地上）。
+async function CmdAnimContact(o) {
+  const q = (o._[0] || "").toLowerCase();
+  const { LaunchBrowser } = await import("../PrairieFire1937/Script_BrowserTestKit.mjs");
+  const { ServeRoot } = await import("./Script_DevServer.mjs");
+  const server = await ServeRoot(ROOT, 0);
+  const port = server.address().port;
+  const browser = await LaunchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html`, { waitUntil: "load", timeout: 60000 });
+    await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+    await page.evaluate(async () => { await window.TunnelLight.AnimLab.Open(); });
+    await page.waitForFunction(() => window.TunnelLight.AnimLab.Ready(), { timeout: 60000 });
+    const rows = await page.evaluate(async ({ q, samples }) => {
+      const tl = window.TunnelLight, lab = tl.AnimLab;
+      const out = [];
+      for (const e of lab.Entries()) {
+        if (q && !e.name.toLowerCase().includes(q) && !e.id.toLowerCase().includes(q)) continue;
+        lab.Select(e.id);
+        lab.SetOptions({ exact: true });
+        const cyc = lab.Cycle ? lab.Cycle() : 0;
+        const cycle = cyc || 1;
+        const acc = { lowMin: Infinity, lowMax: -Infinity, soleF: Infinity, soleB: Infinity, kneeF: Infinity, kneeB: Infinity, shiftMin: Infinity, shiftMax: -Infinity, handMin: Infinity, ground: 1, air: 0 };
+        for (let i = 0; i < samples; i += 1) {
+          lab.Seek(cycle * (i + 0.5) / samples);
+          tl.Tick(1, 1 / 30);
+          const c = lab.Contact(); const lt = lab.LimbTips();
+          if (!c) continue;
+          acc.lowMin = Math.min(acc.lowMin, c.lowest); acc.lowMax = Math.max(acc.lowMax, c.lowest);
+          acc.soleF = Math.min(acc.soleF, c.soleF); acc.soleB = Math.min(acc.soleB, c.soleB);
+          acc.kneeF = Math.min(acc.kneeF, c.kneeF); acc.kneeB = Math.min(acc.kneeB, c.kneeB);
+          acc.shiftMin = Math.min(acc.shiftMin, c.shift); acc.shiftMax = Math.max(acc.shiftMax, c.shift);
+          acc.handMin = Math.min(acc.handMin, lt.handF.y, lt.handB.y);
+          acc.ground = Math.min(acc.ground, c.groundW); acc.air = Math.max(acc.air, c.airY);
+          // 脚尖扎地：脚的世界角在 30°~150° 之间且鞋底那只是最低点
+          for (const leg of ["F", "B"]) {
+            const phi = ((c["phi" + leg] % 360) + 360) % 360;
+            if (phi > 55 && phi < 150 && Math.abs(c["sole" + leg] - c.lowest) < 0.004) acc["toe" + leg] = Math.max(acc["toe" + leg] || 0, phi);
+          }
+        }
+        out.push({ id: e.id, type: e.type, name: e.name, kind: lab.Current().kind, cycle, ...acc });
+      }
+      return out;
+    }, { q, samples: Number(o.samples || 24) });
+    const f = (v) => (v === Infinity || v === -Infinity || v === undefined ? "  –  " : (v >= 0 ? "+" : "") + v.toFixed(3));
+    console.log(`  ${"类型".padEnd(4)} ${"名字".padEnd(16)} ${"人".padEnd(8)} 最低点(min..max)      鞋底F/B(min)     膝F/B(min)      手(min)  吸附挪胯(min..max)  备注`);
+    let bad = 0;
+    for (const r of rows) {
+      const notes = [];
+      if (r.ground < 1) notes.push(r.ground === 0 ? "离地状态（不贴地）" : `贴地权重 ${r.ground.toFixed(2)}`);
+      if (r.ground >= 1 && (r.lowMin < -0.006 || r.lowMax > r.air + 0.006)) { notes.push("⚠ 最低点没钉在地上"); bad += 1; }
+      if (Math.abs(r.shiftMin) > 0.03 || Math.abs(r.shiftMax) > 0.03) notes.push(`⚠ 原来腿没闭合，吸附挪胯 ${f(r.shiftMin)}..${f(r.shiftMax)}`);
+      if (r.air > 0.001) notes.push(`腾空 ${f(r.air)}`);
+      if (r.toeF || r.toeB) notes.push(`⚠ 脚尖扎地撑着（${r.toeF ? "前脚 Φ" + r.toeF.toFixed(0) + "° " : ""}${r.toeB ? "后脚 Φ" + r.toeB.toFixed(0) + "°" : ""}）：脚的角度填错了`);
+      console.log(`  ${(r.type === "track" ? "轨道" : r.type === "pose" ? "姿势" : "步态").padEnd(4)} ${r.name.padEnd(16)} ${String(r.kind).padEnd(8)} ${f(r.lowMin)}..${f(r.lowMax)}   ${f(r.soleF)}/${f(r.soleB)}   ${f(r.kneeF)}/${f(r.kneeB)}   ${f(r.handMin)}   ${f(r.shiftMin)}..${f(r.shiftMax)}   ${notes.join("；")}`);
+    }
+    console.log(`\n${rows.length} 条（每条 ${Number(o.samples || 24)} 帧）；最低点没钉住的 ${bad} 条。数字＝世界米（乘过体型），负＝陷地。`);
+    if (o.json) console.log(JSON.stringify(rows));
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  if (errors.length) { console.error("页面异常：", errors.slice(0, 4).join(" | ")); process.exitCode = 1; }
+}
 async function CmdAnims(o) {
+  if (o.contact) return CmdAnimContact(o);
   const { FormatRef, KIND_LABEL, DominantKind } = await import("./Script_AnimIndex.mjs");
   const idx = await AnimIndex();
   const q = (o._[0] || "").toLowerCase();
@@ -541,7 +617,11 @@ async function CmdState(o) {
 const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step",
   // line/at：钉到"第几句台词的第几秒"；zoom：截图之后再裁一张近景（认不认得出
   // 那件东西，只能靠近看）。三个都是 2026-08-12 睡姿那次白跑十几轮换来的
-  "line", "at", "zoom"]);
+  "line", "at", "zoom",
+  // live：按住键拍**走动中**的那一格——不冻帧、不 Settle。冻帧之后位移归零，
+  // 走路是按位移判的，Settle 那三秒里人就站定了、脚下的土也散了（2026-08-18
+  // 拍脚后跟的土时撞上的）：走/跑姿势与随步子发出来的东西只能这么拍
+  "live"]);
 
 // "c2_digout@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
@@ -712,8 +792,9 @@ async function CmdShot(o) {
         // 真按着键的拍必须让 rAF 真跑（StepFrames 喂的是空输入，会把按住的键
         // 冲掉），就盯着 state.time 等游戏钟走满，墙钟慢多少都不怕
         const slice = dur / phases;
+        const live = !!jo.live && held.length > 0;
         if (held.length) {
-          await page.evaluate(async (want) => {
+          await page.evaluate(async ({ want, live: lv }) => {
             const tl = window.TunnelLight;
             tl.Freeze(false);
             const t0 = tl.state.time;
@@ -724,9 +805,10 @@ async function CmdShot(o) {
             });
             // 走满就**冻帧**（2026-08-17 爬梯实拍查出来的）：截图要一两秒，那会儿键还按着、
             // rAF 还在跑，游戏又往前走两三秒——`dur=0.7` 拍到的是第三秒。冻住游戏钟，
-            // 渲染照跑（下面 Settle 推的就是渲染侧），画面停在 dur 那一格
-            tl.Freeze(true);
-          }, slice);
+            // 渲染照跑（下面 Settle 推的就是渲染侧），画面停在 dur 那一格。
+            // `live` 例外：要拍的就是走动中那一格，冻了人就站定了（见 SHOT_KEYS）
+            if (!lv) tl.Freeze(true);
+          }, { want: slice, live });
         } else if (slice > 0.01) {
           await page.evaluate((n) => window.TunnelLight.StepFrames(n, {}), Math.max(1, Math.round(slice * 30)));
           await page.waitForTimeout(420);   // 等镜头缓动与下一次真合成追上推完的状态
@@ -736,7 +818,7 @@ async function CmdShot(o) {
         // 几乎不跑（实测按住键推 12 秒，游戏钟只走了 0.58 秒）。光靠上面那
         // 420ms 的干等追不上，拍到的会是"过渡刚开始"那一格——序章那间该黑的
         // 窖因此一直拍成亮的。至少推够一次换挡（LIGHT_FADE 2.6s）
-        await page.evaluate((n) => window.TunnelLight.Settle?.(n), Math.max(90, Math.round(dur * 30)));
+        if (!live) await page.evaluate((n) => window.TunnelLight.Settle?.(n), Math.max(90, Math.round(dur * 30)));
         const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
         await page.screenshot({ path: file, clip });
         // @zoom=sister / @zoom=player / @zoom=31.15[:0.6]：顺手再裁一张近景。
@@ -809,8 +891,9 @@ async function CmdShot(o) {
 // ---------------------------------------------------------------------------
 const MENU_PAGES = {
   // key: [说明, 到这一态要做什么（在页面里跑）]
-  title: ["标题页（没有存档）", null],
-  continue: ["标题页（有存档）", "save"],
+  splash: ["标题页第一屏（按任意键）", null],
+  title: ["标题页菜单（没有存档）", null],
+  continue: ["标题页菜单（有存档）", "save"],
   confirm: ["新游戏覆盖确认框", "save"],
   controls: ["操作说明", null],
   settings: ["标题页上的设置面板", null],
@@ -848,6 +931,23 @@ async function CmdMenu(o) {
       if (prep === "save") await page.evaluate((seed) => localStorage.setItem("tunnelLight1943.save.v1", JSON.stringify(seed)), SEED);
       await page.reload({ waitUntil: "load", timeout: 60000 });
       await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+      // 标题页背后是活的场景，靠 rAF 渲染；无头下 rAF 几乎不走，先 Tick 几帧把戏
+      // 搭出来（世界首帧要烘贴图，多推几下）。第一屏是「按任意键」，除了拍它本身，
+      // 其余各态都得先按一下把菜单叫出来（真按键，走的是玩家那条路）
+      await page.evaluate(() => window.TunnelLight.Tick(6, 1 / 30));
+      if (key !== "splash") {
+        await page.keyboard.press("Space");
+        await page.waitForTimeout(900);          // 题名飞到左上角 + 菜单从左边出来
+      }
+      await page.evaluate(() => window.TunnelLight.Tick(30, 1 / 30));
+      // --keys ArrowDown,Enter：真按几颗键再拍（拍"键盘选到第三条"这类态；
+      // 也是验"回车真的按得下去"的唯一办法——那走的是按钮的默认行为，JS 里看不见）
+      if (o.keys) {
+        for (const k of String(o.keys).split(",").map((s) => s.trim()).filter(Boolean)) {
+          await page.keyboard.press(k);
+          await page.waitForTimeout(120);
+        }
+      }
       if (key === "confirm") await page.click("#startButton");
       if (key === "controls") await page.click("#btnControls");
       if (key === "settings") await page.click("#btnTitleSettings");
@@ -885,6 +985,16 @@ async function CmdMenu(o) {
         await page.click("#btnSettings");
       }
       await page.waitForTimeout(220);
+      // --eval：截图前在页面里跑一段（同 shot 的 --eval：一个表达式，带 tl/state/world），
+      // 问"这块的计算样式是什么 / 焦点在哪"这类截图看不出的事
+      if (o.eval) {
+        const r = await page.evaluate(async (src) => {
+          const tl = window.TunnelLight;
+          try { return { ok: await new Function("tl", "state", "world", `return (${src});`)(tl, tl.state, tl.world) }; }
+          catch (e) { return { err: String(e) }; }
+        }, String(o.eval));
+        console.log(`  eval[${key}] ${r.err ? r.err : JSON.stringify(r.ok)}`);
+      }
       const suffix = (key === "anim" && o.anim) ? `_${String(o.anim).replace(/[^A-Za-z0-9_]/g, "")}`
         : (key === "art" && o.who) ? `_${String(o.who).replace(/[^A-Za-z0-9_]/g, "")}` : "";
       const file = path.join(outDir, `menu_${key}${suffix}.png`);
@@ -956,17 +1066,19 @@ const HELP = `《地道里的光》命令行工作台
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
       转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
   menu [页 ...]           拍菜单类界面 → _shots/menu_*.png（--w --h 换画框）
-      title 标题页 / continue 有存档的标题页 / confirm 覆盖确认 / controls 操作说明
+      splash 标题第一屏（按任意键）/ title 标题菜单 / continue 有存档的标题菜单 / confirm 覆盖确认 / controls 操作说明
       settings 标题页上的设置 / pause 游戏里的暂停 / debug 调试面板（选关）
       anim 动画工作台（--anim scoopChild 选中哪条，--at 0.55 钉到第几秒，--kind sister@0.60 --ghosts --flip）
       art 人物美术样式（--who sister 选人，--anim loco:run 右栏那具骨架跑哪条）
       不给页名就全拍一遍。菜单是玩家的第一屏，改完必须看图——测试绿着也可能很难看
   anims [片段]            骨架里全部动作的清单：轨道 / 姿势 / 步态 → 名字·时长·行号·谁在用
+  anims --contact [片段]  真骨架逐帧量脚（起浏览器）：鞋底/膝头最低点离地、吸附挪了多少胯、脚尖扎地没有
   anim <名字>             一条动作的全部：说明 / 关键帧表 / 驱动 / 用在哪几拍 / 一行引用
       （网页里播：设置 → 调试 · 动画工作台，或 index.html?anim=<名字>；同一份索引）
   doctor                  分支/上游/未提交/缓存戳/端口
 
-要问游戏状态先跑这个，别再现写一次性探针脚本。`;
+要问游戏状态先跑这个，别再现写一次性探针脚本。
+用法细则与坑（--eval 是表达式、pre → eval → hold → 冻帧 → 截图 的先后、Settle 推渲染侧）见 docs/Cli.md。`;
 
 const TABLE = { where: CmdWhere, beats: CmdBeats, beat: CmdBeat, state: CmdState, shot: CmdShot, menu: CmdMenu, anims: CmdAnims, anim: CmdAnim, doctor: CmdDoctor };
 const fn = TABLE[cmd];

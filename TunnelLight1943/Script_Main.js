@@ -97,7 +97,7 @@ for (const evt of ["pointerdown", "keydown", "touchstart"]) {
 const ui = {};
 for (const id of [
   "titleScreen", "titleMenu", "startButton", "startNote", "btnContinue", "continueWhere",
-  "btnControls", "btnTitleSettings",
+  "btnControls", "btnTitleSettings", "titleLogo", "pressAny", "titleVersion",
   "controlsScreen", "controlsClose", "btnHelp", "btnQuit",
   "confirmOverlay", "confirmTitle", "confirmText", "confirmYes", "confirmNo",
   "prompt", "toast", "crouchTag", "itemTag", "itemName",
@@ -169,7 +169,8 @@ function LoadSave() {
 }
 /** 把眼下这一幕存下来。每进一幕调一次（见 RunFrame 的 saveKey）。 */
 function WriteSave() {
-  if (!state) return;
+  // 标题页背后那台戏（state.tableau）不是进度：存了它，「继续」会把人送到村街上
+  if (!state || state.tableau) return;
   const def = CurrentBeatDef(state);
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
@@ -275,12 +276,15 @@ function MenuKey(e, k) {
     return false;   // 面板开着照旧能按 M 关声音、` 开调试
   }
   if (!ui.titleScreen.hidden) {
+    if (DEBUG_KEYS.includes(k) || k === "f4") return false;   // 标题页上也能开调试面板（选关就在那儿）/ 动画工作台
+    // 「按任意键」那一屏：随便哪颗键都把菜单叫出来（勇敢的心式）。这一下本身
+    // 不许再落到别处——菜单是这一下之后才有的，回车不能顺手把「继续」也按了
+    if (TitleSplashUp()) { DismissSplash(); e.preventDefault(); return true; }
     if (k === "arrowdown" || k === "arrowup") {
       MoveTitleFocus(k === "arrowdown" ? 1 : -1);
       e.preventDefault();
       return true;
     }
-    if (DEBUG_KEYS.includes(k) || k === "f4") return false;   // 标题页上也能开调试面板（选关就在那儿）/ 动画工作台
     return true;    // 回车/空格交给按钮的默认行为，别被玩法那几行吃掉
   }
   return false;
@@ -501,7 +505,7 @@ const PLAY_HW = {
 // 比它还近的镜头一律原样过，别把脸和卡面挤出画框。
 const HW_TIGHTEN = 0.71;
 const HW_CLOSE = 3.8;
-const HW_WIDE_MAX = 8.5;   // 「退一档」的封顶（本作没有全景，见 CLAUDE.md 镜头规范）
+const HW_WIDE_MAX = 8.5;   // 「退一档」的封顶（本作没有全景，见 docs/Camera.md 镜头规范）
 function TightenHw(d) {
   return d <= HW_CLOSE ? d : Math.max(HW_CLOSE, d * HW_TIGHTEN);
 }
@@ -730,8 +734,10 @@ function UpdateCamera(state, dt) {
     // 不在大全景下做），优先于节拍级的 def.cam；步骤一结束它就没了，镜头拉回。
     const def = state.phase === "playing" ? CurrentBeatDef(state) : null;
     const cu = state.phase === "playing" ? state.closeUp : null;
-    shot = cu ? HintShot(state, { kind: "shot", x: cu.x, y: cu.y, dist: cu.hw })
-      : def?.cam ? HintShot(state, def.cam) : BaseShot(state);
+    // 标题页背后那台戏：钉死一个机位（见 MountTableau），不跟人、不认节拍的 cam
+    shot = state.tableau ? TableauShot(state)
+      : cu ? HintShot(state, { kind: "shot", x: cu.x, y: cu.y, dist: cu.hw })
+        : def?.cam ? HintShot(state, def.cam) : BaseShot(state);
     if (framing.key !== "") { framing = { key: "", prog: 0, baseHw: shot.hw }; camSnap = true; } // 交给 iris 遮
     world.SetOverShoulder(state, null);
     world.SetInsertCard(null, null, 0);
@@ -1290,11 +1296,17 @@ function SyncHud(state, dt, shotFade) {
 }
 
 // ---------------------------------------------------------------------------
-// 标题：一列条目（继续 / 新游戏 / 操作说明 / 设置）
+// 标题（2026-08-18 照《勇敢的心》重排）：一台戏 + 两态
 //
-// 「继续」有存档才出现——灰着的按钮是在说"这儿本该有东西"，可头一回进来的人
-// 没什么可继续的。主位（灯色那一块）跟着走：有档在「继续」上，没档在「新游戏」上，
-// 玩家一眼看得出该按哪一条。
+// · 背后是**活的场景**（MountTableau）：借游戏自己的世界，把柱子与妹妹摆在村街上，
+//   游戏钟冻住、HUD 整层藏起（body.titleUp）——勇敢的心的标题页就是主角与狗站在
+//   废墟前，菜单压在戏上。这份 state 挂 `tableau: true`，不存档、不走 StepGame、
+//   不指路（World 的目标标 / 画框边牌见它就不画）；开局／继续／跳幕一律换新 state。
+// · `.splash`「按任意键」→ `.menu`：题名 FLIP 到左上角，菜单从左边贴框出来。
+//   开机走 splash（这一下也正好把浏览器的音频解锁了）；从游戏回来直接 menu。
+// · 「继续」有存档才出现——灰着的按钮是在说"这儿本该有东西"，可头一回进来的人
+//   没什么可继续的。选中（那块红条，.sel）永远有且只有一条：有档落在「继续」上，
+//   没档在「新游戏」上；键盘 ↑↓ 与鼠标悬停都挪它，回车／点击按下去。
 // ---------------------------------------------------------------------------
 function BuildTitle() {
   const save = LoadSave();
@@ -1302,20 +1314,121 @@ function BuildTitle() {
   if (save) ui.continueWhere.textContent = SaveLine(save);
   // 「新游戏」在有档时要把代价写在脸上（点下去会盖掉进度），不能等按了才说
   ui.startNote.textContent = save ? "从头再来一遍" : "从序 · 那天开始";
-  ui.btnContinue.classList.toggle("primary", !!save);
-  ui.startButton.classList.toggle("primary", !save);
+  if (ui.titleVersion) ui.titleVersion.textContent = `白盒 v${GAME_VERSION}${BUILD_STAMP ? " · " + BUILD_STAMP : ""}`;
+  if (ui.pressAny) ui.pressAny.firstElementChild.textContent = inputMode === "touch" ? "轻触屏幕" : "按任意键";
 }
+// 缓存戳（index.html import map 盖上的 ?v=）当构建号用：右上角那串小字
+const BUILD_STAMP = (() => { try { return new URL(import.meta.url).searchParams.get("v") || ""; } catch { return ""; } })();
 
-// 主位那条上给个焦点：键盘直接回车就走得了（手柄/键盘玩家的老习惯）
+// 选中那条：红条只有一块，跟着焦点走（键盘）；鼠标悬停也把焦点挪过去，
+// 于是两种输入看到的是同一块红。永远不清——勇敢的心的菜单从来不会一条都不选
+function SelectTitleItem(btn) {
+  for (const b of ui.titleMenu.querySelectorAll("button")) b.classList.toggle("sel", b === btn);
+}
+ui.titleMenu.addEventListener("focusin", (e) => {
+  const b = e.target.closest("button");
+  if (b) SelectTitleItem(b);
+});
+ui.titleMenu.addEventListener("pointerover", (e) => {
+  if (MenuFrozen()) return;      // 设置／操作说明／确认框压在上头时，别把焦点从它们手里抢走
+  const b = e.target.closest("button");
+  if (b && !b.hidden && document.activeElement !== b) b.focus({ preventScroll: true });
+});
+
+// 焦点回菜单：落在**选中的那条**上（从设置／操作说明退回来，红条得还在你离开时
+// 那一条上——勇敢的心是这样，市面上的菜单都是这样）；还没选过就落主位第一条
+//（键盘直接回车就走得了，手柄/键盘玩家的老习惯）
 function FocusTitleMenu() {
-  const first = [...ui.titleMenu.querySelectorAll("button")].find((b) => !b.hidden);
-  first?.focus({ preventScroll: true });
+  const items = [...ui.titleMenu.querySelectorAll("button")].filter((b) => !b.hidden);
+  const cur = items.find((b) => b.classList.contains("sel")) || items[0];
+  cur?.focus({ preventScroll: true });
+  if (cur) SelectTitleItem(cur);
 }
 
-function ShowTitle() {
+function TitleSplashUp() { return !ui.titleScreen.hidden && ui.titleScreen.classList.contains("splash"); }
+function SetTitleStage(stage) {
+  ui.titleScreen.classList.toggle("splash", stage === "splash");
+  ui.titleScreen.classList.toggle("menu", stage === "menu");
+}
+// splash → menu：题名从画面正中飞到左上角。FLIP：先把版式切到终态、量出前后两个框，
+// 用 transform 把它按回原处再放手过渡——末了不留 transform，字落在真实字号上不糊
+function DismissSplash() {
+  if (!TitleSplashUp()) return false;
+  const logo = ui.titleLogo;
+  const before = logo?.getBoundingClientRect();
+  SetTitleStage("menu");
+  if (logo && before && before.width > 0) {
+    const after = logo.getBoundingClientRect();
+    const s = before.width / Math.max(1, after.width);
+    logo.style.transition = "none";
+    logo.style.transformOrigin = "0 0";
+    logo.style.transform = `translate(${(before.left - after.left).toFixed(1)}px, ${(before.top - after.top).toFixed(1)}px) scale(${s.toFixed(4)})`;
+    logo.getBoundingClientRect();                       // 让上面那一格真的落下去
+    logo.style.transition = "transform 0.7s cubic-bezier(0.22, 0.8, 0.28, 1)";
+    logo.style.transform = "";
+    logo.addEventListener("transitionend", () => { logo.style.transition = ""; }, { once: true });
+  }
+  // 焦点晚一点再给：叫出菜单的那一下（键盘）不能顺手把「继续」也按了
+  setTimeout(() => { if (!ui.titleScreen.hidden) FocusTitleMenu(); }, 90);
+  return true;
+}
+// 鼠标／手指点在 splash 上也算「任意键」
+ui.titleScreen.addEventListener("pointerdown", () => { if (TitleSplashUp()) DismissSplash(); });
+
+function ShowTitle({ splash = false } = {}) {
   ui.titleScreen.hidden = false;
+  document.body.classList.add("titleUp");
+  MountTableau();
   BuildTitle();
-  FocusTitleMenu();
+  SelectTitleItem(null);      // 新进标题页：红条回主位（有档「继续」，没档「新游戏」）
+  SetTitleStage(splash ? "splash" : "menu");
+  if (ui.titleLogo) { ui.titleLogo.style.transform = ""; ui.titleLogo.style.transition = ""; }
+  if (!splash) FocusTitleMenu();
+  else document.activeElement?.blur?.();
+}
+function HideTitle() {
+  ui.titleScreen.hidden = true;
+  document.body.classList.remove("titleUp");
+}
+
+// ── 标题页背后那台戏 ──────────────────────────────────────────────
+// 村街上、井台西边那一段：身后是土屋、两棵枯树、草垛，地平线上一座炮楼；
+// 柱子与妹妹并肩站在当中，比玩法机位退一小档（勇敢的心的标题：主角与狗站在
+// 废墟前，人不大、景要全）。位置往右让一点——菜单占着左边三成画框。
+const TABLEAU = {
+  chapter: 0, beat: "c1_return",
+  x: 52.9,        // 柱子（枯树与草垛之间的平地上；东边 53.8 起是垫路的那堆新土，两个人都别站上去）
+  sisterDx: 0.8,  // 妹妹站在他右手边、草垛跟前，脸朝他
+  camDx: -0.55,   // 机位偏左 ⇒ 两个人落在画框六成处（左边三成是菜单）
+  hw: 5.15,       // 玩法 4.45 退一小档；封顶 HW_WIDE_MAX（本作没有全景）
+};
+function MountTableau() {
+  const beats = ChapterBeatList(TABLEAU.chapter);
+  const bi = Math.max(0, beats.findIndex((b) => b.id === TABLEAU.beat));
+  state = CreateGame(TABLEAU.chapter);
+  state.relicsGot = new Set(LoadBag());
+  DebugJump(state, TABLEAU.chapter, bi);
+  state.tableau = true;
+  state.bgmOverride = null;        // 标题静着：序 · 那天要从「没有音乐」开场，别在门口先响一首
+  const p = state.player;
+  p.x = TABLEAU.x; p.level = "surface"; p.heading = 1; p.crouch = false; p.cineWalk = null; p.pose = null;
+  const sis = state.actors.find((a) => a.id === "sister");
+  if (sis) {
+    sis.x = TABLEAU.x + TABLEAU.sisterDx; sis.level = "surface"; sis.heading = -1;
+    sis.visible = true; sis.following = false; sis.cineTarget = null; sis.pose = null;
+    // 结算到这一拍时她还带着上一场留下的抬升（坐炕上 lift 0.52）——不清掉就浮在
+    // 半空里，跟哥哥不在一条地平线上（用户 2026-08-18 报的）。爬梯/抬升一律归零
+    sis.lift = 0; sis.climbing = null; sis.climbT = 0; sis.heldByPlayer = false;
+  }
+  RebuildBagStrip();
+  lastSaveKey = "";
+  camSnap = true;
+  framing = { key: "", prog: 0, baseHw: TABLEAU.hw };
+  fadeLevel = 0; dipLevel = 0;
+  irisLevel = 1; irisClosing = false; lastBeatKind = "play";
+}
+function TableauShot(state) {
+  return { x: state.player.x + TABLEAU.camDx, y: SURFACE_Y + 1.85, hw: Math.min(TABLEAU.hw, HW_WIDE_MAX) };
 }
 
 // ── 三个入口 ────────────────────────────────────────────────────
@@ -1449,9 +1562,10 @@ function SyncDebugNow() {
 }
 
 function JumpToBeat(chapterIndex, beatIndex) {
-  if (!state) StartGame(chapterIndex);
+  // 标题页背后那台戏不是一局：从它跳幕＝开一局新的再跳
+  if (!state || state.tableau) StartGame(chapterIndex);
   DebugJump(state, chapterIndex, beatIndex);
-  ui.titleScreen.hidden = true;
+  HideTitle();
   ui.endScreen.hidden = true;
   HideChoice();
   camSnap = true;
@@ -1766,7 +1880,7 @@ function StartGame(chapterIndex) {
   state.relicsGot = new Set(LoadBag());
   RebuildBagStrip();
   lastSaveKey = "";        // 新一局：头一幕也要落盘（不清的话它跟上一局同号，白等一幕）
-  ui.titleScreen.hidden = true;
+  HideTitle();
   ui.endScreen.hidden = true;
   camSnap = true;
   framing = { key: "", prog: 0, baseHw: 7.2 };
@@ -1949,7 +2063,7 @@ document.addEventListener("pointerdown", (e) => {
 window.addEventListener("keydown", (e) => {
   if (e.key === "b" || e.key === "B") {
     // 菜单开着时不叠第二张面板（设置面板已经把世界停住了）
-    if (state && state.phase === "playing" && !MenuFrozen()) OpenBag(!state.bagOpen);
+    if (state && state.phase === "playing" && !MenuFrozen() && !state.tableau) OpenBag(!state.bagOpen);
   }
 });
 
@@ -2057,7 +2171,8 @@ function RunFrame(now, dt) {
     // 渲染几帧才追得上——不冻帧的话，等渲染追上的那半秒里游戏又往前走了，
     // 截出来的根本不是那一格（妹妹睡姿那次为此白跑了十几轮）。
     // 暂停（设置/操作说明/确认框开着）走的是同一条路：世界停住、画面照渲。
-    if (!frozen && !MenuFrozen()) {
+    // 标题页背后那台戏（state.tableau）也是：人站着、镜头钉着，只有渲染侧在呼吸。
+    if (!frozen && !MenuFrozen() && !state.tableau) {
       const input = {
         moveX: move.moveX, climb: move.climb,
         crouch: crouchToggle,
@@ -2091,7 +2206,7 @@ function RunFrame(now, dt) {
     // 前序又能按脚本结算回来），所以存档不必自己再造一套检查点。
     // 调试跳幕落地的那一幕也照存——跳过去以后玩的就是那儿，两套规矩反而费解。
     const saveKey = `${state.chapterIndex}/${state.beatIndex}`;
-    if (saveKey !== lastSaveKey) {
+    if (saveKey !== lastSaveKey && !state.tableau) {   // 标题背后那台戏不是进度
       lastSaveKey = saveKey;
       WriteSave();
     }
@@ -2157,7 +2272,8 @@ if (window.visualViewport) {
 }
 SetupTouch();
 Resize();
-ShowTitle();
+// 开机走「按任意键」那一屏（这一下也顺手把音频解锁了）；从游戏回来直接落到菜单
+ShowTitle({ splash: true });
 
 const chapterParam = parseInt(params.get("chapter") || "0", 10);
 const beatParam = parseInt(params.get("beat") || "0", 10);
@@ -2209,6 +2325,9 @@ window.TunnelLight = {
   },
   JumpToBeat: (chapterIndex, beatIndex) => JumpToBeat(chapterIndex, beatIndex),
   ToggleDebug: (v) => ToggleDebug(v),
+  // 标题页：「按任意键」那一屏 → 菜单（测试与 CLI 要点菜单前先过这一下）
+  DismissSplash: () => DismissSplash(),
+  TitleSplashUp: () => TitleSplashUp(),
   // 动画工作台：Open(name?) / Close / Select / Seek / Play / SetKind / LimbTips / Ref / Entries
   AnimLab: animLab,
   // 人物美术样式浏览器：Open(v) / Pick(kind|序号) / Anim(id) / Stage（右栏那具骨架的小舞台）

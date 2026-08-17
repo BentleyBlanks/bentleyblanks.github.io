@@ -16,19 +16,17 @@
 // 索引（名字/行号/说明/用法）来自 Script_AnimIndex 现扫源码（fetch 同目录的 .mjs），
 // 轨道的 dur/loop/keys 以运行时 TRACKS 为准。
 import * as THREE from "three";
-import { CreateRig, PoseRig, TRACKS, LimbTips } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, TRACKS, LimbTips, WalkCadence, GaitOf, RigContact } from "./Script_Rig.mjs";
 import {
   ScanAnimIndex, LOCOMOTION, KIND_PRESETS, KIND_LABEL, RIG_FIELDS, RIG_FIELD_LABEL,
   FormatRef, DominantKind,
 } from "./Script_AnimIndex.mjs";
 
-// 相位的走法：World.UpdateOne 的那几个常数，一个数都不许改（改了预览就不是游戏）
+// 相位的走法：World.UpdateOne 的那几个常数，一个数都不许改（改了预览就不是游戏）。
+// 走路的步频与走↔跑由 Rig.WalkCadence / GaitOf 给（2026-08-18 起按自然步频，不按位移数步）
 const BREATH_RATE = 1.4;      // s.idleT += dt*1.4
 const IDLE_RATE = 2.2;        // 原地动作 phase += dt*2.2
-const WALK_RATE = 3.4;        // 走路 phase += 位移*3.4/体型
-const RUN_EXTRA = 0.7;        // 跑起来再 += 位移*gait*0.7
 const CLIMB_RATE = 4.5;       // 爬梯 phase += 竖向位移*4.5
-const GAIT_LO = 1.5, GAIT_SPAN = 1.7;   // gait = (speed-1.5)/1.7
 const LIE_LEN = 0.90, LIE_RISE = 0.15;  // 同 World：躺姿整具转 90° 后的挪与垫
 const FRAME = 1 / 30;
 const PROGRESS_CYCLE = 4.0;   // 进度姿势 0→1→0 往复一趟的演示时长
@@ -56,10 +54,7 @@ export function EntryCycle(e, env) {
   if (e.type === "pose") return e.progress ? PROGRESS_CYCLE : 2 * Math.PI / BREATH_RATE;
   const L = e.loco;
   const sp = params.speed ?? L.speed ?? 1;
-  if (L.cycle === "walk") {
-    const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
-    return 2 * Math.PI / (sp * (WALK_RATE / scale + gait * RUN_EXTRA));
-  }
+  if (L.cycle === "walk") return 2 / WalkCadence(sp, scale);          // 一圈 = 两步
   if (L.cycle === "climb") return 2 * Math.PI / (sp * CLIMB_RATE);
   if (L.cycle === "idle") return 2 * Math.PI / IDLE_RATE;
   return 2 * Math.PI / BREATH_RATE;
@@ -76,15 +71,15 @@ export function EntryState(e, tt, env) {
   if (e.type === "pose") {
     const s = { pose: e.name, breath: tt * BREATH_RATE, phase: tt * IDLE_RATE, moving: !!params.moving, poseStrain: params.strain || 0 };
     if (e.progress) s.poseK = ProgressAt(tt);
+    if (e.lie) s.ground = 0;                       // 躺着的：World 也不贴地（整具转 90°）
     return s;
   }
   const L = e.loco;
   const s = { ...L.state, breath: tt * BREATH_RATE };
   const sp = params.speed ?? L.speed ?? 1;
   if (L.cycle === "walk") {
-    const gait = clamp01((sp - GAIT_LO) / GAIT_SPAN);
-    s.gait = gait;
-    s.phase = tt * sp * (WALK_RATE / scale + gait * RUN_EXTRA);
+    s.gait = GaitOf(sp, scale);
+    s.phase = tt * WalkCadence(sp, scale) * Math.PI;   // 一步 = π
   } else if (L.cycle === "climb") s.phase = tt * sp * CLIMB_RATE;
   else s.phase = tt * IDLE_RATE;
   return s;
@@ -649,7 +644,7 @@ export function CreateAnimLab({ root }) {
     const sp = tp.animParams.querySelector("#animSpeedMs");
     if (sp) {
       const out = tp.animParams.querySelector("#animSpeedOut");
-      const show = () => { const v = params.speed ?? cur.loco.speed; const g = cur.loco.cycle === "walk" ? ` gait ${Fmt(clamp01((v - GAIT_LO) / GAIT_SPAN))}` : ""; out.textContent = `${Fmt(v)} m/s${g} · 一圈 ${Fmt(CycleOf(cur))}s`; };
+      const show = () => { const v = params.speed ?? cur.loco.speed; const g = cur.loco.cycle === "walk" ? ` gait ${Fmt(GaitOf(v, preset.scale))} · ${Fmt(WalkCadence(v, preset.scale), 1)} 步/秒` : ""; out.textContent = `${Fmt(v)} m/s${g} · 一圈 ${Fmt(CycleOf(cur))}s`; };
       sp.addEventListener("input", () => { params.speed = parseFloat(sp.value); show(); RenderTicks(); BuildTrails(); });
       show();
     }
@@ -679,7 +674,7 @@ export function CreateAnimLab({ root }) {
       facts.push(["源码行数", `${e.lines} 行`]);
     } else {
       facts.push(["分支", `<code>${Esc(e.loco.cond)}</code>`]);
-      facts.push(["相位", e.loco.cycle === "walk" ? "步频按位移：phase += 位移×3.4/体型（+位移×gait×0.7）" : e.loco.cycle === "climb" ? "爬梯：phase += 竖向位移×4.5" : e.loco.cycle === "idle" ? "原地：phase += dt×2.2" : "只有呼吸：idleT += dt×1.4"]);
+      facts.push(["相位", e.loco.cycle === "walk" ? "步频按 Rig.WalkCadence：速度÷体型 → 步/秒（快走 2、冲刺封顶 3.5，小孩 ÷√体型），一步 = π；走多远与迈几步脱钩" : e.loco.cycle === "climb" ? "爬梯：phase += 竖向位移×4.5" : e.loco.cycle === "idle" ? "原地：phase += dt×2.2" : "只有呼吸：idleT += dt×1.4"]);
       if (e.inputs?.length) facts.push(["输入", e.inputs.map((i) => `<i class="chip" title="${Esc(i.label)}">${Esc(i.key)}</i>`).join("")]);
     }
     const who = e.kindGuess ? `${KIND_LABEL[e.kindGuess] || e.kindGuess}` : (e.type === "loco" ? "任何人" : "（剧本里没引用）");
@@ -785,13 +780,25 @@ export function CreateAnimLab({ root }) {
       for (let i = 0; i < ang.length; i += 2) rows.push(ang[i] + "   " + (ang[i + 1] || ""));
       const g = (v) => (v >= 0 ? "+" : "") + Fmt(v, 3);
       rows.push("");
-      rows.push(`手 前${g(lt.handF.y)} 后${g(lt.handB.y)}   膝 前${g(lt.kneeF.y)} 后${g(lt.kneeB.y)}`);
-      rows.push(`脚 前${g(lt.footF.y)} 后${g(lt.footB.y)}   头顶 ${g(lt.head.y)}m`);
-      rows.push(`（正＝悬空 负＝陷地；站姿脚 ≈ +0.078×体型 才踩在鞋底上）`);
+      const ct = ContactWorld();
+      rows.push(`手 前${g(lt.handF.y)} 后${g(lt.handB.y)}   头顶 ${g(lt.head.y)}m`);
+      if (ct) {
+        rows.push(`鞋底 前${g(ct.soleF)} 后${g(ct.soleB)}   膝头 前${g(ct.kneeF)} 后${g(ct.kneeB)}`);
+        rows.push(`最低点 ${g(ct.lowest)}${ct.groundW < 1 ? `（贴地权重 ${Fmt(ct.groundW)}${ct.groundW === 0 ? "：离地状态，胯高信手填的 hipY" : ""}）` : "＝钉在地平线上"}${ct.airY ? ` 腾空 +${Fmt(ct.airY * preset.scale, 3)}` : ""}`);
+      }
+      rows.push(`（正＝悬空 负＝陷地；鞋底/膝头里最低那个该 = 0，除非真离地）`);
       inf.live.textContent = rows.join("\n");
     }
   }
-  const TIP_STYLE = { handF: ["#f0c060", "前手"], handB: ["#9a7a3a", "后手"], footF: ["#7fd08a", "前脚"], footB: ["#4a8a52", "后脚"], kneeF: ["#7fc8e8", "前膝"], kneeB: ["#3f7a92", "后膝"], head: ["#e8e8e8", "头顶"] };
+  const TIP_STYLE = { handF: ["#f0c060", "前手"], handB: ["#9a7a3a", "后手"], footF: ["#7fd08a", "前鞋底"], footB: ["#4a8a52", "后鞋底"], kneeF: ["#7fc8e8", "前膝"], kneeB: ["#3f7a92", "后膝"], head: ["#e8e8e8", "头顶"] };
+  // 鞋底/膝头离地（世界米）：RigContact 给的是骨架局部、未缩放的数，乘体型；躺着的不算
+  function ContactWorld() {
+    if (!live) return null;
+    const c = RigContact(live.rig);
+    if (!c) return null;
+    const bs = preset.scale;
+    return { soleF: c.soleF * bs, soleB: c.soleB * bs, kneeF: c.kneeF * bs, kneeB: c.kneeB * bs, lowest: c.lowest * bs, groundW: c.groundW, airY: c.airY * bs, shift: c.shift * bs, rootY: c.rootY * bs, phiF: c.phiF, phiB: c.phiB };
+  }
   function DrawOverlay() {
     const c = ui.overlay.getContext("2d");
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -842,9 +849,13 @@ export function CreateAnimLab({ root }) {
     // 量具：手脚离地
     if (showMeasure) {
       const lt = LimbTips(live.rig);
+      const ct = ContactWorld();
       const placed = [];
       for (const [k, [col, name]] of Object.entries(TIP_STYLE)) {
-        const v = lt[k]; if (!v) continue;
+        let v = lt[k]; if (!v) continue;
+        // 脚：量鞋底最低点，不量踝（踝本来就在鞋底上头一拃）；膝：量膝头球
+        if (ct && (k === "footF" || k === "footB")) v = { x: v.x, y: ct[k === "footF" ? "soleF" : "soleB"] };
+        if (ct && (k === "kneeF" || k === "kneeB")) v = { x: v.x, y: ct[k] };
         const p = ToScreen(v.x, v.y);
         c.strokeStyle = col; c.lineWidth = 1.5;
         c.beginPath(); c.arc(p.x, p.y, 4, 0, Math.PI * 2); c.stroke();
@@ -956,7 +967,7 @@ export function CreateAnimLab({ root }) {
     Entries: () => entries.map((e) => ({ id: e.id, type: e.type, name: e.name })),
     Index: () => index,
     // 给测试/实拍：把时间钉到某处并同步画面
-    Seek: (v) => SeekTo(v), Play: (v) => TogglePlay(v),
+    Seek: (v) => SeekTo(v), Play: (v) => TogglePlay(v), Cycle: () => (cur ? CycleOf(cur) : 0),
     SetKind: (key) => { const p = KIND_PRESETS.find((x) => x.key === key || x.kind === key); if (p) SetPreset(p); return !!p; },
     // 开关几样显示（实拍用）：{ ghosts, trails, measure, exact, heading, zoom }
     SetOptions: (o = {}) => {
@@ -968,6 +979,8 @@ export function CreateAnimLab({ root }) {
       if (o.zoom !== undefined) { viewH = Number(o.zoom) || viewH; if (tp.animZoom) tp.animZoom.value = String(viewH); }
     },
     LimbTips: () => { if (!live) return null; const lt = LimbTips(live.rig); const o = {}; for (const k of Object.keys(lt)) o[k] = { x: +lt[k].x.toFixed(3), y: +lt[k].y.toFixed(3) }; return o; },
+    // 鞋底/膝头离地（世界米，负 = 陷地）+ 贴地权重：审计"脚有没有钉在地上"用这个
+    Contact: () => { const c = ContactWorld(); if (!c) return null; const o = {}; for (const k of Object.keys(c)) o[k] = +(+c[k]).toFixed(3); return o; },
     Ref: () => (cur ? FormatRef(cur) : ""),
   };
 }

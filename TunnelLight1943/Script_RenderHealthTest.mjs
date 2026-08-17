@@ -438,6 +438,11 @@ for (const size of TITLE_SIZES) {
   const tp = await browser.newPage({ viewport: { width: size.w, height: size.h } });
   await tp.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
   await tp.waitForFunction(() => document.querySelectorAll("#titleMenu button").length > 0, { timeout: 60000 });
+  // 第一屏是「按任意键」（2026-08-18 照勇敢的心重排）：真按一下把菜单叫出来，
+  // 再等题名飞完、菜单从左边落定，量到的才是玩家点得着的位置
+  await tp.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+  await tp.keyboard.press("Space");
+  await tp.waitForTimeout(900);
   const r = await tp.evaluate(() => {
     const t = document.getElementById("titleScreen");
     const items = [...document.querySelectorAll("#titleMenu button")].filter((b) => !b.hidden);

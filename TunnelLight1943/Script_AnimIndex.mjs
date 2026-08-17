@@ -32,8 +32,9 @@ export const RIG_FIELD_LABEL = {
 
 // 步态/状态那几支：PoseRig 的 if 链上按状态字段分的分支。cond 要跟源码里的
 // 条件**逐字**相同（索引靠它对上行号）；state 是工作台喂给 PoseRig 的合成状态；
-// 相位怎么走照抄 World.UpdateOne：走路 phase += 位移*3.4/体型(+位移*gait*0.7)，
-// 爬梯 += 竖向位移*4.5，原地动作 += dt*2.2，呼吸 idleT += dt*1.4。
+// 相位怎么走照抄 World.UpdateOne：走路 phase += dt·Rig.WalkCadence(速度,体型)·π
+// （一步 = π；2026-08-18 起按自然步频，不按位移数步），爬梯 += 竖向位移*4.5，
+// 原地动作 += dt*2.2，呼吸 idleT += dt*1.4。
 export const LOCOMOTION = [
   { id: "stand", label: "站立（呼吸）", cond: "else", state: {}, cycle: "breath",
     note: "常态。所有一次性戏剧姿势收回之后落到这儿。" },
