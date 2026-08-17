@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf, GaitToeOff } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
@@ -25,7 +25,8 @@ import { LadderHolds } from "./Data_Ladder.mjs";
 // 无状态的画笔/烘焙/绘制序工具（2026-08-15 从 CreateWorld 闭包抽出）——见该文件头
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
-  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
+  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, GROUND_PLANE_DIP,
+  LAYER_ORDER,
   MakeCanvas, MakeCastShadow, MakeFlatShadow, MakeShaftMouth, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
 } from "./Script_WorldPaint.mjs";
@@ -463,6 +464,9 @@ export function CreateWorld(canvasEl) {
   let throwAimLine = null;
   let critterMesh = null, critterCanvas = null, critterCtx = null;
   let dustMesh = null, dustCanvas = null, dustCtx = null;
+  // 脚后跟扬起的土（见 UpdateOne 末尾 / EmitFootDust / StepFootDust）：一池贴图，
+  // 每个人每一步蹬离地那一格往身后掀一小团。池子里的网格标 persist，挺过环境重建
+  const footDust = { pool: [], tex: null, geo: null };
   // 一阵看得见的风：逐帧重画的尘土流线与草屑画布（state.wind 活着才画）
   let windMesh = null, windCanvas = null, windCtx = null;
   // 刨料那一拍：台面上的料、骑在手上的刨子、飘落的刨花、地上的刨花堆
@@ -562,6 +566,9 @@ export function CreateWorld(canvasEl) {
     throwAimLine = null;
     critterMesh = null; critterCanvas = null; critterCtx = null;
     dustMesh = null; dustCanvas = null; dustCtx = null;
+    // 脚下的土是 persist 的，网格还在；换场景/跳幕时把还没散的几团直接掐掉，
+    // 免得旧场景的土浮在新场景里
+    for (const d of footDust.pool) { d.t = d.life; d.mesh.visible = false; }
     windMesh = null; windCanvas = null; windCtx = null;
     planeBoardMesh = null; planeBoardCanvas = null; planeBoardCtx = null;
     doorLeafPivot = null; doorLeafMesh = null; doorLeafLoose = null;
@@ -1310,6 +1317,53 @@ export function CreateWorld(canvasEl) {
 
     // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
     const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+      // ── 断口的那条边：土层的上沿、耕作层、墨线、草茬四处共用它 ──────────
+      // **这一撮东西横跨"看得见"与"看不见"的那条线，所以先把线找出来**
+      //（2026-08-17 用户：「道路上的绿草被砍断了一半一样 有点显示bug」）。
+      // 那条线是 `AddGroundPlane`——全场唯一不透明又写深度的几何，躺在
+      // SURFACE_Y−GROUND_PLANE_DIP 上、纵深一直铺到 z=2.5，**压在这张 z=2.2 的
+      // 剖面前面**：从地表机位看，剖面上低于那条线的内容一律被它切掉，而它躺着，
+      // 所以切口是一条**笔直的横线**（实测 1600×900 上落在 y≈889）。
+      // 老版这一片有三处各自往线上探：`DrawEarthStrata` 的头一层土**自带 ±7px
+      // 的上沿起伏**（画笔内部的事，这儿压根没声明）、墨线与耕作层按 `gy+Wob`
+      // 起伏 ±4px、草茬则长在后者上。于是路面上头露出来的是：一条横贯全场的
+      // 土色板带 ＋ 一道暗杠（墨线）＋ 一道亮杠（耕作层），而草茬**从最粗的
+      // 根部被平着切断**，只剩腰上那一截悬在半空——一排草看着像被谁横着铲过一遍。
+      // 两条治法：
+      //   · **断口整条沉到那条线以下**（起伏一点没少，只是不许再翻上来），而且
+      //     土层的上沿**剪在这条边底下**——画笔自己那 ±7px 从此说不上话。断口是
+      //     给地道那一侧看的；地表这边路面是连着铺过来的，本来就不该有断口。
+      //   · **草茬与土坷垃扎在路面那条线上**（`rootY`，根埋进去一丝）。地面就在
+      //     那儿，草是从地里长出来的——根最粗的那一头正好落在线上、往上收尖，
+      //     于是切口不再切在任何一笔的半腰上。
+      const gy = toPy(SURFACE_Y);
+      const cutY = toPy(SURFACE_Y - GROUND_PLANE_DIP);
+      // 三支正弦：十米一起、三米一伏、再加一档一米二的糙（原来这一档在
+      // DrawEarthStrata 里自己走，收进来之后整条边只有一处真相）
+      const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
+        + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5
+        + Math.sin(px * 0.105 + ART.Hash(sceneKey + "tw3") * 5) * 0.9;
+      const WOB_AMP = 5.0;          // 三支正弦的幅度之和
+      const INK_HALF = 1.9;         // 墨线半宽（lineWidth 3）再留一点余量
+      const sink = Math.max(0, cutY + INK_HALF + WOB_AMP - gy);
+      const Edge = (px) => gy + sink + Wob(px);
+      const rootY = cutY + 1;       // 草根/土坷垃：路面线底下一丝
+      // 沿着那条边走一遍（剪土层、填耕作层、描墨线共用）
+      const WalkEdge = () => {
+        ctx.moveTo(0, Edge(0));
+        for (let px = 0; px <= wPx; px += 12) ctx.lineTo(px, Edge(px));
+        ctx.lineTo(wPx, Edge(wPx));
+      };
+
+      ctx.save();
+      // 土层剪在断口那条边底下（`clip` 之前必须现走一遍路径——当前路径不进
+      // save/restore，这是本仓库的老账）
+      ctx.beginPath();
+      ctx.moveTo(0, hPx);
+      WalkEdge();
+      ctx.lineTo(wPx, hPx);
+      ctx.closePath();
+      ctx.clip();
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
       // 土体整体压暗：参考里的地下几乎是纯黑，细节只留在洞沿一圈
       ctx.save();
@@ -1321,17 +1375,16 @@ export function CreateWorld(canvasEl) {
       ctx.fillStyle = dk;
       ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
       ctx.restore();
+      ctx.restore();
 
       // —— 地平线那一刀：这是**地表被切开的断口**，不是两张贴图的接缝
       //（2026-08-11 用户：「地道口那里为什么有一条分割线一样的，上面下面
       // 有点土一样的颜色」）。老版上沿就是 fillRect 的直边：上头是地表的土色、
       // 下头是剖面的土色，两块平色贴着一条razor直线，读出来只能是"贴图裁齐了"。
       // 断口该有三样东西：翻耕过的表土比生土浅一档、一条起伏的墨线、
-      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）
+      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）。
+      // 这三样都钉在上头那条 `Edge`／`rootY` 上——为什么，见那一段的账
       {
-        const gy = toPy(SURFACE_Y);
-        const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
-          + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5;
         const night = CHAPTERS[state.chapterIndex].light === "night"
           || CHAPTERS[state.chapterIndex].light === "dark";
         // ① 耕作层：常年翻的那 30 公分，比底下的生土松、浅。
@@ -1339,32 +1392,30 @@ export function CreateWorld(canvasEl) {
         const tilth = 0.34 * PPM;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 14) ctx.lineTo(px, gy + Wob(px));
-        ctx.lineTo(wPx, gy + tilth);
-        ctx.lineTo(0, gy + tilth);
+        WalkEdge();
+        ctx.lineTo(wPx, gy + sink + tilth);
+        ctx.lineTo(0, gy + sink + tilth);
         ctx.closePath();
-        const til = ctx.createLinearGradient(0, gy, 0, gy + tilth);
+        const til = ctx.createLinearGradient(0, gy + sink, 0, gy + sink + tilth);
         til.addColorStop(0, night ? "rgba(104,86,60,0.5)" : "rgba(154,128,88,0.46)");
         til.addColorStop(1, night ? "rgba(104,86,60,0)" : "rgba(154,128,88,0)");
         ctx.fillStyle = til;
         ctx.fill();
         // ② 断口的墨线：跟着起伏走，不是一条直边
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 20) ctx.lineTo(px, gy + Wob(px));
+        WalkEdge();
         ctx.strokeStyle = "rgba(36,26,16,0.62)";
         ctx.lineWidth = 3;
         ctx.stroke();
-        // ③ 草茬与翻出来的土坷垃：长在沿上，把那条直线彻底啃断。
-        //    竖井口那一圈自己有碎土（见下面 shaftGeom 那段），这儿让开它
+        // ③ 草茬与翻出来的土坷垃：**扎在路面那条线上**（`rootY`，不是断口的沿），
+        //    从地表看就是路沿上冒出来的一撮草。竖井口那一圈自己有碎土
+        //    （见下面 shaftGeom 那段），这儿让开它
         const nearShaft = (wx) => shaftGeom.some((g) => Math.abs(wx - g.wx) < SHAFT_R + 0.3);
         const grass = night ? ART.PAL.grassNight : ART.PAL.grass;
         for (let px = 0; px <= wPx; px += 17) {
           const wx = x0 + px / PPM;
           if (nearShaft(wx)) continue;
           const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
-          const base = gy + Wob(px);
           if (r > 0.42) {
             // 一片草是**尖的**：根粗梢细、还得往一边披。老版是三根等宽的直线段，
             // 这块贴图在画面上要放大四五倍——上屏读出来是一排绿色小方块
@@ -1376,19 +1427,23 @@ export function CreateWorld(canvasEl) {
               const lean = (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 1.5;
               const wRoot = 1.5 + ART.Hash(sceneKey + "tw" + px + b) * 0.9;
               ctx.beginPath();
-              ctx.moveTo(bx - wRoot / 2, base + 1);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, base - hgt * 0.55,
-                bx + lean * hgt, base - hgt);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, base - hgt * 0.45,
-                bx + wRoot / 2, base + 1);
+              ctx.moveTo(bx - wRoot / 2, rootY + 1);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, rootY - hgt * 0.55,
+                bx + lean * hgt, rootY - hgt);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, rootY - hgt * 0.45,
+                bx + wRoot / 2, rootY + 1);
               ctx.closePath();
               ctx.fill();
             }
           } else if (r < 0.14) {
-            // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
+            // 翻出来的土坷垃：压在线上，一半在线上一半在线下。
+            // **大小与埋深都要差得开**——`r` 被 0.14 那道门夹住，拿它算尺寸就是
+            // 一串一样大的坷垃，露在路面上的又都是同样厚的一片，读出来是花纹不是土
+            const cr = 2.6 + ART.Hash(sceneKey + "cw" + px) * 4.4;
+            const cy = rootY + cr * (0.18 + ART.Hash(sceneKey + "cd" + px) * 0.8);
             ctx.fillStyle = night ? "rgba(78,64,44,0.9)" : "rgba(112,90,60,0.9)";
             ctx.beginPath();
-            ctx.ellipse(px, base + 1, 2.6 + r * 12, 2 + r * 8, 0, 0, Math.PI * 2);
+            ctx.ellipse(px, cy, cr, cr * 0.68, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1569,21 +1624,32 @@ export function CreateWorld(canvasEl) {
       // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
       for (const g of shaftGeom) {
         const stopY = g.yBot - 0.42 * PPM;
+        // 洞沿从**路面那条线**底下起描：`g.yTop` 在地表线上头 10cm（井口啃掉地面
+        // 一线），那一截落在路面以上，屏幕上就是窖口两边各悬一道斜的黑杠、
+        // 底边还被路面齐刷刷切平（同上头 Edge/rootY 那段账）
+        const inkTop = Math.max(g.yTop, cutY + 3.5);
         for (const side of [-1, 1]) {
           ctx.beginPath();
-          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
-          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.moveTo(g.x + side * g.half(inkTop), inkTop);
+          for (let y = inkTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
           ctx.strokeStyle = "rgba(24,17,10,0.62)";
           ctx.lineWidth = 5.5;
           ctx.stroke();
         }
-        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        // 井口一圈翻出来的碎土：把地面那条直边啃断。
+        // **一半埋在路面里**（`rootY`，跟草茬、土坷垃同一条线）：老版按井口的
+        // `g.yTop`（＝地表线往上 10cm）摆，而地面平面把路面以下全切掉了——
+        // 于是这九块土整个浮在路面上头，实拍就是窖口跟前悬着一串深色圆饼
+        //（同上头 Edge/rootY 那段账，2026-08-17 用户报的"显示bug"里就有它）
+        // 九块**等距**排开的土，各自只露出同样厚的一片，就是一排花纹——
+        // 所以埋深与落点都得错开（同「等距的横杠是梯子不是炭裂」那条老账）
         for (let i = 0; i < 9; i += 1) {
           const t = i / 8;
-          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32
+            + (ART.Hash(g.id + "cx" + i) - 0.5) * 9;
           const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
           ctx.beginPath();
-          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.arc(px, rootY + r * (0.14 + ART.Hash(g.id + "cy" + i) * 0.82), r, 0, Math.PI * 2);
           ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
           ctx.fill();
         }
@@ -1772,6 +1838,18 @@ export function CreateWorld(canvasEl) {
         }
         ctx.globalAlpha = 1;
         ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
+        ctx.restore();
+        // **下沿要化开，不许齐齐切断**（2026-08-18 用户报的那块"硬边淡板"）。
+        // 井壁只画到走廊洞顶为止、指望走廊自己的后壁接手，可两张贴图的调子
+        // 对不齐——于是井筒底下横着一条贯穿的直边，读出来是"贴图裁齐了"，
+        // 正是这一带最扎眼的那道硬边。让最后 0.5m 淡成透明，接缝自己没了
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        const fade = ctx.createLinearGradient(0, hp - Math.min(hp * 0.5, 0.5 * PPM), 0, hp);
+        fade.addColorStop(0, "rgba(0,0,0,0)");
+        fade.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, 0, wp, hp);
         ctx.restore();
       });
       PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
@@ -2289,6 +2367,110 @@ export function CreateWorld(canvasEl) {
   }
 
 
+  // ── 脚后跟扬起的土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里都有
+  //    对应的烟雾特效」，照《勇敢的心》：每一步蹬离地那一格，鞋底往身后掀一小团
+  //    干土，跟着人的方向往后飘、越散越淡）──
+  //
+  // 三条：
+  // ① **一步一团，钉在蹬离地那一格**——不是按时间匀速冒烟。蹬离地是哪一格由步态给
+  //    （Rig.GaitToeOff：前腿在 duty·2π、后腿再错半圈，duty 随走↔跑 0.60→0.42）；
+  //    相位一跨过去就从那只脚的位置（LimbTips，画出来的脚，不是 x±0.3 估的）掀一团。
+  //    所有步态（走/跑/猫腰/提桶/扛/抱孩子/推车）都走 GaitLegs 同一套着地/摆动约定，
+  //    所以一个判据全管。
+  // ② **走是一小团、跑是两三团**：土的多少与飘的距离都跟 gait 走（跑起来鞋底刨得
+  //    深）；猫腰潜行只有半团（放轻脚步这件事要在地上读得出来）。
+  // ③ **画在人与影子之前、obstacle 带之后**（FixOrder = 携带物那一档 + 2）：土是悬在
+  //    地面上头的，得压过脚下的影子；人/影子在同一带内是按 nudge 一个整数一个整数
+  //    排死的，中间插不进去，所以排到演员簇的上沿——它只在鞋后跟那一小块出现、
+  //    一冒出来就往后飘，盖不住人；而塌墙那一档（obstacle 6259）仍在它之上，人跑到
+  //    墙后小腿被挡，脚下的土也一起被挡。地道里颜色压暗一档（夯土地，光又弱）。
+  //    位置 z 与那个人相同（同一条地平线，队列后排跟着退、也排在前排之后）。
+  const FOOT_DUST_MAX = 96;   // 一队兵跑起来一人十几团在天上，池子给足
+  function EnsureFootDust() {
+    if (footDust.tex) return;
+    footDust.tex = [0, 1, 2, 3].map((v) => {
+      const c = MakeCanvas(96, 96);
+      ART.DrawFootDust(c.getContext("2d"), 48, 50, "footDust" + v);
+      return CanvasTexture(c);
+    });
+    footDust.geo = new THREE.PlaneGeometry(1, 1);
+  }
+  function TakeFootDust() {
+    let slot = null;
+    for (const d of footDust.pool) if (d.t >= d.life) { slot = d; break; }
+    if (!slot) {
+      if (footDust.pool.length < FOOT_DUST_MAX) {
+        const mesh = new THREE.Mesh(footDust.geo,
+          new THREE.MeshBasicMaterial({ map: footDust.tex[0], transparent: true, depthWrite: false }));
+        mesh.userData.persist = true;   // 见 ClearGroup：池子跨场景复用
+        mesh.visible = false;
+        layers.play.add(mesh);
+        slot = { mesh, t: 0, life: 1, x: 0, y: 0, vx: 0, vy: 0, s0: 0.1, s1: 0.2, a0: 0.5 };
+        footDust.pool.push(slot);
+      } else {
+        // 池子满了就顶掉最老的那团（它本来也快散了）
+        slot = footDust.pool[0];
+        for (const d of footDust.pool) if (d.t / d.life > slot.t / slot.life) slot = d;
+      }
+    }
+    return slot;
+  }
+  function EmitFootDust(x, ground, z, order, heading, gait, soft, bs, under) {
+    EnsureFootDust();
+    const dir = heading >= 0 ? 1 : -1;
+    const n = soft ? 1 : 1 + (gait > 0.3 ? 1 : 0) + (gait > 0.75 ? 1 : 0);
+    for (let i = 0; i < n; i += 1) {
+      const d = TakeFootDust();
+      const r = Math.random;
+      d.t = 0;
+      d.life = (soft ? 0.40 : 0.58 + 0.24 * gait) * (0.85 + r() * 0.3);
+      // 起点：脚后跟往后一点、贴着地；后几团再靠后一些（是一趟掀出去的，不是一坨）
+      d.x = x - dir * (0.03 + i * 0.09 + r() * 0.05);
+      d.y = ground + 0.02 + r() * 0.03;
+      d.z = z;
+      // 往身后飘、微微上扬，飘不远（干土掀起来一尺就落）；跑起来掀得更远更高
+      d.vx = -dir * (0.28 + 0.6 * gait + r() * 0.2) * (soft ? 0.5 : 1);
+      d.vy = (0.10 + 0.18 * gait + r() * 0.08) * (soft ? 0.5 : 1);
+      // 大小按体型走（妹妹的脚小，掀的土也小）。走：一拳大→巴掌大；跑：再大一圈
+      const base = (soft ? 0.09 : 0.14 + 0.06 * gait) * bs * (0.85 + r() * 0.3);
+      d.s0 = base;
+      d.s1 = base * (2.6 + 0.9 * gait);
+      d.a0 = (soft ? 0.45 : 0.72 + 0.16 * gait) * (under ? 0.7 : 1) * (i ? 0.85 : 1);
+      d.flip = r() < 0.5 ? -1 : 1;
+      const m = d.mesh;
+      m.material.map = footDust.tex[Math.floor(r() * footDust.tex.length)];
+      // 地道里是夯土地、光又弱：土色压暗一档，别在黑地里冒白烟
+      if (under) m.material.color.setRGB(0.62, 0.58, 0.52); else m.material.color.setRGB(1, 1, 1);
+      FixOrder(m, order);
+      m.visible = true;
+      m.position.set(d.x, d.y, d.z);
+      m.scale.set(d.flip * d.s0, d.s0, 1);
+      m.material.opacity = d.a0;
+    }
+  }
+  function StepFootDust(dt) {
+    if (!(dt > 0)) return;
+    const step = Math.min(dt, 0.05);
+    for (const d of footDust.pool) {
+      if (d.t >= d.life) continue;
+      d.t += step;
+      const k = Math.min(1, d.t / d.life);
+      if (k >= 1) { d.mesh.visible = false; continue; }
+      // 速度很快就衰掉：土掀出去一下就悬住、慢慢散，不是一路飞
+      d.vx *= Math.max(0, 1 - 4.5 * step);
+      d.vy *= Math.max(0, 1 - 3.0 * step);
+      d.x += d.vx * step;
+      d.y += d.vy * step;
+      // 先胀后停：大小按 1−(1−k)² 走，透明度按 (1−k)^1.4 收
+      const g = 1 - (1 - k) * (1 - k);
+      const sz = d.s0 + (d.s1 - d.s0) * g;
+      // 团心随大小抬一点（贴图底边始终贴着地，土是从地上鼓起来的，不是浮在半空）
+      d.mesh.position.set(d.x, d.y + sz * 0.3, d.z);
+      d.mesh.scale.set(d.flip * sz, sz * 0.8, 1);
+      d.mesh.material.opacity = d.a0 * Math.pow(1 - k, 1.4);
+    }
+  }
+
   // held 收的是**标签**不是布尔：扛在肩上还是提在手里，姿势与挂点都得看它是什么
   function UpdateOne(s, x, level, heading, crouch, dt, held = null, extra = {}) {
     const ground = level === "under" ? UNDER_Y : SURFACE_Y;
@@ -2439,6 +2621,35 @@ export function CreateWorld(canvasEl) {
         s.castShadow.material.opacity = near * far * (lit.i ?? 1);
       } else {
         s.castShadow.visible = false;
+      }
+    }
+    // 脚后跟的土：只在真的在**用腿走**的时候（轨道/爬梯/挖土/一次性姿势/爬行/
+    // 离地/躺着都不算——推车例外，那一支腿照走）。跳幕/换层那种一帧挪出去几米的
+    // 不算步子（相位一下跳过大半圈，speed 也离谱），也不掀
+    {
+      const prevPh = s.dustPhase;
+      s.dustPhase = s.phase;
+      const walking = isMoving && !extra.climbing && !extra.track && !extra.digging
+        && (!extra.pose || extra.pose === "push") && extra.posture !== "crawl"
+        && !lie && lift < 0.06 && speedNow < 7 && s.mesh.visible !== false;
+      // moved < 1.5：一帧挪一米半以上只能是跳幕/换层，不是步子（掉帧时一帧跨过大半
+      // 个步态周期是正常的——无头实拍就常掉到几帧一秒——所以按位移判，不按相位差判）
+      if (walking && prevPh !== undefined && s.phase > prevPh && moved < 1.5) {
+        const TAU = Math.PI * 2;
+        const crossed = (a) => Math.floor((s.phase - a) / TAU) > Math.floor((prevPh - a) / TAU);
+        // 蹬离地那一格由步态给（2026-08-18 步态重写：着地段占周期 0.60→0.42，前腿在
+        // duty·2π 蹬离、后腿再错半圈——不再是老正弦的 π/2 与 3π/2）
+        const toe = GaitToeOff(gait);
+        const front = crossed(toe.F), back = crossed(toe.B);
+        if (front || back) {
+          const tips = LimbTips(s.rig);
+          const soft = crouch || extra.posture === "stoop";
+          // 绘制序：压过这个人的身子/影子（6252+nudge），**但要在 obstacle 带（+0.95）
+          // 之下**——人跑到塌墙后头时小腿被墙挡住，脚下的土也得一起被挡
+          const order = DepthOrder("play", CARRY_Z + dz) + 2;
+          if (front) EmitFootDust(tips.footF.x, ground, PlaceZ(ACTOR_Z + dz), order, heading, gait, soft, bs, level === "under");
+          if (back) EmitFootDust(tips.footB.x, ground, PlaceZ(ACTOR_Z + dz), order, heading, gait, soft, bs, level === "under");
+        }
       }
     }
     return { x, y, isMoving };
@@ -2813,6 +3024,8 @@ export function CreateWorld(canvasEl) {
     for (const [id, m] of mountMeshes) {
       if (!seen.has(id)) { layers.play.remove(m); mountMeshes.delete(id); }
     }
+    // 这一帧所有人脚下掀起来的土往后飘、散掉（UpdateOne 里按步子发的）
+    StepFootDust(dt);
 
     for (const [id, s] of actorSprites) {
       if (id !== "player" && !seen.has(id)) {
@@ -2863,7 +3076,8 @@ export function CreateWorld(canvasEl) {
     //（划线那一拍它正好压在石笔上）
     // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
     const closeUp = viewW < 5.0 || liveCardOn;
-    const want = inCine || closeUp || otsHiddenId === "player" ? 0
+    // 标题页背后那台戏（state.tableau）里也不要它：画面上就两个人，谁是谁不用认
+    const want = inCine || closeUp || otsHiddenId === "player" || state.tableau ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
     ps.tagMesh.visible = ps.tagAlpha > 0.02;
@@ -2894,7 +3108,8 @@ export function CreateWorld(canvasEl) {
     // 不停的白星挂在戏正中（c2 出洞那一镜的鞋底、捂嘴那拍的边区票都赶上过）
     // 只会把眼睛从戏上拽走
     {
-      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine;
+      // 标题页背后那台戏（state.tableau）里也不闪：捡不了，只会在菜单旁边眨眼
+      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine && !state.tableau;
       let glowAt = null;
       for (const [id, rec] of relicMeshes) {
         const got = state.relicsGot?.has(id);
@@ -5044,8 +5259,9 @@ export function CreateWorld(canvasEl) {
     // 指路的标记在特写里没有意义——你已经站在它跟前了
     // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
     // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
+    // 标题页背后那台戏（state.tableau）没有目标可指——那不是一局
     const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
-      && !state.microCine && !liveCardOn && viewW >= 5.0;
+      && !state.microCine && !liveCardOn && !state.tableau && viewW >= 5.0;
     // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
     // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
     // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
@@ -5535,7 +5751,9 @@ export function CreateWorld(canvasEl) {
   // **摆位按画框给，落地是世界坐标**（`fg: [{ art, u, v, z, w, h, flip, dim }]`）：
   //   · z＝这块板离行走线多近（米，越大越贴镜头）；
   //   · u/v＝板心在**它自己那个深度上的画框**里的位置，−1..1（u=−1 贴左缘、
-  //     v=−1 贴下缘）；w/h 仍是真实米数。
+  //     v=−1 贴下缘）；w/h 仍是真实米数；
+  //   · **吊在上沿的板（房梁）写 `vLow` 不写 `v`**＝梁底落在画框哪儿，板心与
+  //     "探出上边框多少"由渲染侧按当时的画高反算（见下面 ForeV 那段账）。
   // 为什么不直接写世界坐标：贴镜头 0.8m 的那个平面上，整个画框才三四十厘米宽——
   // 写世界 x 等于要作者心算一遍透视，第一版五块板有四块落在画框外（实拍才看见）。
   // u/v **只在换行那一下按当时的机位折算一次**，之后板子钉死在世界里：所以镜头
@@ -5543,6 +5761,19 @@ export function CreateWorld(canvasEl) {
   // 老写法（直接给 x/y）仍然认——真要钉在某件实物上时用它。
   // -------------------------------------------------------------------------
   let cineForeKey = "";
+  // 板心的 v 由 `vLow` 反算：**吊在画框上沿的板（房梁）要按"梁底落在哪儿"给，
+  // 不能按"板心落在哪儿"给**（2026-08-18 用户："这个多次在我泥坛子这里的遮挡物
+  // 是什么？修掉"）。同一块 0.28m 的梁，贴镜头 1.2m 时占掉四成画高、退到 1.9m 只
+  // 占两成——写死的 v 意味着作者要为每一镜心算一遍透视，而写错的代价是**整根梁
+  // 横在画面当中**：泥坛子那五镜的梁底落在 v=−0.08（画面正中），跪着的柱子整个
+  // 被盖住，只从梁底下露出一只脚。给 `vLow` 之后，梁底钉在指定的那条线上、梁身
+  // 一路探出上边框，不论机距远近都只啃掉画框顶上那一条。
+  // 顺带一条闸：**梁顶必须探进上黑边**（≥0.88）——留在画框里就是一根悬空的横杠，
+  // 底下一条边、顶上又一条边，读出来是"画面上多了一道 UI"（同 beam 画笔里那条账）。
+  const ForeV = (f, hv) => {
+    if (f.vLow === undefined) return f.v || 0;
+    return Math.max(f.vLow + hv / 2, 0.88 - hv / 2);
+  };
   function ForePlace(f, cam, aspect) {
     const z = f.z ?? 2.2;
     if (f.x !== undefined) return { x: f.x, y: f.y ?? 0, z };
@@ -5554,7 +5785,8 @@ export function CreateWorld(canvasEl) {
     const dz = Math.max(0.05, cam.pz - z);
     const fh = 2 * dz * Math.tan((CAM_FOV * Math.PI / 180) / 2);
     const fw = fh * aspect;
-    return { x: cx + (f.u || 0) * fw / 2, y: cy + (f.v || 0) * fh / 2, z };
+    const v = ForeV(f, 2 * (f.h ?? 2.4) / fh);
+    return { x: cx + (f.u || 0) * fw / 2, y: cy + v * fh / 2, z };
   }
   // shotKey＝这一镜的构图指纹（Main 算的那个）。**折算只在换镜头那一下做一次**，
   // 拿机位当指纹的话每帧都会重摆——板子就粘在镜头上了，视差当场没了
@@ -6134,8 +6366,20 @@ export function CreateWorld(canvasEl) {
       t: +f.trackT.toFixed(2), phase: +f.phase.toFixed(2), layer: f.layerKey,
     })),
     get __fluid() { return fluid; },
+    // 脚下还没散的土（调试/断言用）：位置、年龄、大小、透明度
+    __footDust: () => footDust.pool.filter((d) => d.t < d.life)
+      .map((d) => ({ x: +d.x.toFixed(2), y: +d.y.toFixed(2), k: +(d.t / d.life).toFixed(2), a: +d.mesh.material.opacity.toFixed(2), s: +d.mesh.scale.y.toFixed(3) })),
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
+    // 窖口那束"打进来的光"的全部可调量（uniform 对象本身，拿到就能改）。
+    // 打光是**看着调**的活：一次实拍 25 秒，改一个数重编译一次就别干活了。
+    // 配 shot --eval 用：`tl.world.__shaftLight().uWash.value.set(...)`。
+    // 顺带把掩码的画布交出来——"光上那条直边是不是掩码的方盒子"只能翻掩码
+    __shaftLight: () => (hatchBeamMesh ? {
+      ...hatchBeamMesh.userData.uniforms,
+      __mesh: hatchBeamMesh,
+      __occluder: occluder,
+    } : null),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的

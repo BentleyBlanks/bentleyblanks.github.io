@@ -450,6 +450,55 @@ export function Dim(hex, k) {
   return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
+// ---------------------------------------------------------------------------
+// 台面透视（2026-08-18 用户定：「我要的就是透视」）
+//
+// 全街的道具原来都是纯侧立面：一张工作台 = 一个矩形、一只缸口 = 一条直线。井和碾
+// 按真物件画出台面之后，反倒成了画面里唯一两件"有厚度"的东西，别的一比就是纸片。
+// 所以**朝上的那一面一律要画出来**，压扁多少由机位算，不靠手感。
+//
+// 平视机位（视平线 EYE 1.85m、机距 DIST 9.3m，见 Data_DepthSpec）下，高 h 处
+// 一块半深 r 的水平面，画面上前后铺开的**半高**：
+//     ry = F·(EYE − h)·r / (DIST² − r²)，   F = DIST × 48 px/米
+// 也就是：**越矮、越深，台面摊得越开；越高越贴视平线，台面自己收成一条线。**
+// STYLE 是统一的夸张系数——真值在这个尺度上偏薄（一张 0.54m 高的工作台只有
+// 1.7 画布像素），乘 1.5 之后上屏 9~10 像素，正好读得出"这是个台面"。
+// **全作只许从这一个口子取数**，各画笔别再手写 ry：手写的必然彼此不一致，
+// 而一屏里两件东西各按各的角度铺台面，比全都没有透视还别扭。
+export const CAM_EYE_M = 1.85, CAM_DIST_M = 9.3, ART_PPM = 48, TOP_STYLE = 1.5;
+export function TopRy(halfDepthPx, hPx) {
+  const r = Math.abs(halfDepthPx) / ART_PPM;
+  const h = Math.max(0, hPx) / ART_PPM;
+  const ry = (CAM_DIST_M * ART_PPM) * Math.max(0, CAM_EYE_M - h) * r
+    / (CAM_DIST_M * CAM_DIST_M - r * r);
+  return Math.max(0.9, ry * TOP_STYLE);
+}
+
+/**
+ * 画一个朝上的台面。**手绘的形，不是 ctx.ellipse**（几何图形那条见「凭空冒出来的
+ * 椭圆」）。椭圆/矩形两种：圆的东西（缸口、井台、碾盘）给 round，方的（工作台、
+ * 凳面、灶台）给方角——方台面的后沿要略收一点，才不是一块平贴上去的板。
+ *
+ * **前沿钉在 topY 上**：台面整个长在物件的前上沿之上，所以加了台面不会往下长，
+ * 也就不会伸到地平线以下去被路面吃掉。
+ */
+export function TopFace(ctx, cx, halfW, topY, ry, id, fill, { round = false, inset = 1.6, lw = 2.0, line = IN.ink } = {}) {
+  const pts = [];
+  if (round) {
+    const n = 18;
+    for (let i = 0; i < n; i += 1) {
+      const a = (i / n) * Math.PI * 2;
+      const k = 0.96 + Rnd(id + "tf", i) * 0.07;
+      pts.push([cx + Math.cos(a) * halfW * k, topY - ry + Math.sin(a) * ry * k]);
+    }
+  } else {
+    pts.push([cx - halfW, topY], [cx + halfW, topY],
+      [cx + halfW - inset, topY - 2 * ry], [cx - halfW + inset, topY - 2 * ry]);
+  }
+  InkFill(ctx, pts, id + "tf", fill, { amp: 0.5, lw, line });
+  return pts;
+}
+
 /**
  * 起伏的墙头。**全文件禁止再把 Rect() 直接当墙用**——土坯是一块块垒的、
  * 年年抹泥年年掉，没有一条直线；一条从头齐到尾的墙头是本作最出戏的一处。
@@ -474,8 +523,18 @@ export function RaggedTop(x0, x1, y, id, { sag = 5, n = 9, tiltR = 0 } = {}) {
  */
 export function WeatherAdobe(ctx, x0, y0, w, h, id, {
   course = 13, alkali = 0.26, gullies = 5, cracks = 3, patches = 3,
-  render = PAL.adobeRender, fresh = PAL.adobeDark, seam = 0.26,
+  body = null, render = null, fresh = null, seam = 0.26,
 } = {}) {
+  // 抹泥／补泥的颜色**跟着坯身走**（2026-08-17 用户：「图四两个椭圆形是什么玩意儿」）。
+  // 老版把这两个色写死成 PAL.adobeRender / adobeDark ——那两个数是照**背景墙**的
+  // 坯身 #8e7f61 定的（"亮不超过 12%" / "暗一档"）。可前景那堵院墙的坯身压到了
+  // #453922（近处的东西必须比背景实），于是同样的两个色打上去就不是"暗一档"，
+  // 是**比墙亮一倍**——两块补泥当场变成墙上凭空浮着的两枚浅色椭圆。
+  // 传了 body 就按它现算，没传的照旧（背景墙那一族的数没变）。
+  // 1.13／0.85 是从老的两个数**除**出来的（#9d8f72÷#8e7f61≈1.13、#7d6c50÷≈0.85），
+  // 所以背景那一族的墙换算前后一模一样，变的只有坯身不是 #8e7f61 的那几件
+  const rend = render || (body ? Dim(body, 1.13) : PAL.adobeRender);
+  const frsh = fresh || (body ? Dim(body, 0.85) : PAL.adobeDark);
   // ① 还没掉的抹泥（先铺，坯缝压在它上面才有"底下露出来"的关系）
   ctx.save();
   for (let i = 0; i < patches; i += 1) {
@@ -487,7 +546,7 @@ export function WeatherAdobe(ctx, x0, y0, w, h, id, {
     InkFill(ctx, [
       [px, py + Sym(id + "e" + i, 0, 3)], [px + pw, py + Sym(id + "e" + i, 1, 3)],
       [px + pw + Sym(id + "e" + i, 2, 3), py + ph], [px + Sym(id + "e" + i, 3, 3), py + ph],
-    ], id + "rend" + i, render, { amp: 2.6, lw: 0, line: null });
+    ], id + "rend" + i, rend, { amp: 2.6, lw: 0, line: null });
   }
   ctx.restore();
 
@@ -516,18 +575,33 @@ export function WeatherAdobe(ctx, x0, y0, w, h, id, {
   }
   ctx.restore();
 
-  // ③ 补过的新泥：比坯身暗一档，抹子拖出来的圆弧边
+  // ③ 补过的新泥：一块**抹子糊上去、边缘化开**的泥，不是一枚椭圆。
+  // 老版是 `ctx.ellipse` 一笔实心正椭圆 + 0.42 的硬边——手绘的墙上凭空贴两枚
+  // 几何形，越近越假（用户 2026-08-17 就是指着这两枚问的）。三条一起改：
+  // 轮廓抖开、**边缘用径向渐变化掉**（抹泥跟坯身之间没有一条线）、浓度减半。
   for (let i = 0; i < 2; i += 1) {
     const fw = w * (0.10 + Rnd(id + "fx", i) * 0.14);
-    const fx = x0 + Rnd(id + "fx2", i) * (w - fw);
-    const fy = y0 + h * (0.30 + Rnd(id + "fx3", i) * 0.42);
+    const fh = fw * (0.34 + Rnd(id + "fx4", i) * 0.24);
+    const cx = x0 + Rnd(id + "fx2", i) * (w - fw) + fw / 2;
+    const cy = y0 + h * (0.30 + Rnd(id + "fx3", i) * 0.42);
+    const tilt = Sym(id + "fx5", i, 0.4);
+    const pts = [];
+    for (let k = 0; k < 11; k += 1) {
+      const a = (k / 11) * Math.PI * 2 + tilt;
+      const r = 0.66 + Rnd(id + "fb" + i, k) * 0.46;      // 轮廓不匀：抹子拖出来的
+      pts.push([cx + Math.cos(a) * fw * 0.5 * r, cy + Math.sin(a) * fh * r]);
+    }
     ctx.save();
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = fresh;
-    ctx.beginPath();
-    ctx.ellipse(fx + fw / 2, fy, fw / 2, fw * (0.30 + Rnd(id + "fx4", i) * 0.2),
-      Sym(id + "fx5", i, 0.4), 0, Math.PI * 2);
-    ctx.fill();
+    WobblyPath(ctx, pts, id + "fb" + i, 1.6, true);
+    ctx.clip();
+    ctx.translate(cx, cy);
+    ctx.scale(fw * 0.62, fh * 1.15);
+    const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    fg.addColorStop(0, Tint(frsh, 0.30));
+    fg.addColorStop(0.55, Tint(frsh, 0.22));
+    fg.addColorStop(1, Tint(frsh, 0));
+    ctx.fillStyle = fg;
+    ctx.fillRect(-1.2, -1.2, 2.4, 2.4);
     ctx.restore();
   }
 
@@ -2859,7 +2933,7 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
     InkFill(ctx, [...crest, [x + W / 2, groundY], [x - W / 2, groundY]],
       id, "#6b6154", { amp: 2.2, lw: 2.4, shade: "rgba(0,0,0,0.22)" });
     WeatherAdobe(ctx, x - W / 2, top, W, groundY - top, id + "bw",
-      { course: 12, gullies: 7, cracks: 4, patches: 1, seam: 0.20 });
+      { course: 12, gullies: 7, cracks: 4, patches: 1, seam: 0.20, body: "#6b6154" });
     // 东山墙：烧塌的也是一栋房子，四堵墙还立着——只有这一面转过去，
     // 才看得出"里头是空的"。没有它，残墙就是院子里立着的一块灰板
     EastGable(ctx, x + W / 2, top + 3, groundY, id + "bg", { vpx, vpy, night, burnt: true });
@@ -2929,7 +3003,7 @@ export function DrawHouse(ctx, x, groundY, w, h, id,
   Speckle(ctx, x - W / 2, groundY - H, W, H, id + "sp", { count: 54, alpha: 0.13, size: 2.2 });
 
   // ②③④⑤ 抹泥 / 坯缝 / 补丁 / 泛碱 / 雨沟 / 裂缝（全街共用一套）
-  WeatherAdobe(ctx, x - W / 2, groundY - H, W, H, id + "wa", { course: 13 });
+  WeatherAdobe(ctx, x - W / 2, groundY - H, W, H, id + "wa", { course: 13, body: ADOBE });
 
   // ⑥ 檐下压暗，墙才有厚度
   ctx.save();
@@ -3226,8 +3300,10 @@ export function DrawDoorframe(ctx, x, groundY, w, h, id,
   InkFill(ctx, crest.concat([[ex, groundY], [wx, groundY]]), id + "pier",
     burnt ? "#6b6154" : (night ? "#4b4235" : PAL.adobe),
     { amp: 2.0, lw: 2.4, shade: "rgba(74,56,42,0.18)", shadeAt: 0.66 });
-  WeatherAdobe(ctx, wx, wallTopY, ex - wx, ph, id + "pwa",
-    burnt ? { course: 11, gullies: 5, cracks: 4, patches: 1, seam: 0.2 } : { course: 13 });
+  WeatherAdobe(ctx, wx, wallTopY, ex - wx, ph, id + "pwa", {
+    body: burnt ? "#6b6154" : (night ? "#4b4235" : PAL.adobe),
+    ...(burnt ? { course: 11, gullies: 5, cracks: 4, patches: 1, seam: 0.2 } : { course: 13 }),
+  });
   // 檐下那道压暗 + 墙根的溅泥（跟立面同款，两张贴图接缝处才看不出来）
   ctx.save();
   const pe = ctx.createLinearGradient(0, wallTopY, 0, wallTopY + ph * 0.26);
@@ -4099,14 +4175,37 @@ export function DrawHaystack(ctx, x, groundY, w, id, { night = false, raided = f
   }
 }
 
-// 水井。**辘轳轴心钉死在 groundY-69px（=WINCH_HUB_Y 1.43m×48）**——摇辘轳那一拍，
+// 水井。**辘轳轴心钉死在 groundY-45px（=WINCH_HUB_Y 0.9375m×48）**——摇辘轳那一拍，
 // Core 按这个高度算摇把的轴心，World 把会转的摇把贴在同一点上。改这张画的高度，
 // 就要同步改 Core 的 WINCH_HUB_Y，否则玩家的手落在轴心外面，转不动。
 //
 // 上一版是「一个灰梯形 + 一座牌坊」：井台只有 22px 高、没有砌石、没有辘轳鼓，
-// 脚下也没有一点湿泥，于是它既不像井，又像被路截了一半。这一版按真物件重排：
+// 脚下也没有一点湿泥，于是它既不像井，又像被路截了一半。那之后按真物件重排过一轮：
 // 圆井台（正面砌石 + 椭圆台面 + 黑井口）、两根埋进土里的立柱、柱间一只辘轳鼓、
 // 鼓上缠绳、绳垂进井口，脚下压一圈常年泼出来的湿地。
+//
+// **2026-08-17 再修一轮**（用户：「图三的井就很奇怪，扁扁的，也不对」）。
+// 那一版实拍下来是「一只带栅栏的灰箱子」，四条账：
+//  ① **宽了**。井台 0.73m 高（这个高度是 Core 的约束③钉死的：井台沿 0.73 + 辘轳鼓
+//     半径 0.14 = 轴心 0.87 的下限，再高鼓就压在井口上放不出绳）却有 1.04m 粗，
+//     高宽比 0.70——横过来的东西读作"矮"。收到半径 0.44m（高宽比 0.83）之后它才
+//     立得起来，而井台本来就该比辘轳架窄：架子的两根柱子是**砸在井台外头的土里**的。
+//  ② **圆柱得有圆柱的线**。老版正面是一个直上直下的梯形＋一排笔直的横线：那是
+//     一堵砖墙的画法。镜头在井台上头（视平线 1.85m > 台面 0.73m），所以圆柱身上
+//     每一圈砌石在画面上都是**中间往下坠的弧**，连脚下那条落地线也是弧。改成弧
+//     之后不用加一笔明暗，它自己就圆了。
+//  ③ **井口要是个洞，不是一块黑贴纸**。老版井口＝一个 3.6px 的扁黑椭圆，糊在台面上。
+//     现在台面是一圈**有厚度的石沿**（外椭圆减内椭圆），洞口里侧还能看见后壁那道
+//     被天光扫亮的月牙，再往下才黑透——"往下去"这件事得在洞口里交代一次。
+//  ④ **辘轳架的柱头要高过轴**。老版柱子到 HUB−5 就没了，辘轳鼓比柱头还高——
+//     于是"架子"读不出来，只剩一只横在井台上的滚筒（那两枚端面椭圆就是用户在
+//     另一张图里问的"两个椭圆形"的同款）。真辘轳是轴卡在柱头下的凹口里、柱头
+//     还要探出一截；两根柱子不等高、东边那根再加一道斜撑砸进土里，
+//     井上头才有一个认得出的剪影。**横杆一根都不许加**（同梯子那条：
+//     这一带凡是横平的长条都会被读成家具）。
+// 摇把的歇息角。**必须＝ Core 的 `WINCH_REST_A`**：静的这只（本画笔）与
+// World 那只会转的是同一根摇把，角度对不上，一进摇辘轳那一拍它就跳一下
+export const WELL_REST_A = -0.6;
 export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, crank = true, rope = true } = {}) {
   // 石头是**暖灰**，不是白瓷：上一版调到 #a8a094，画出来整口井比黄土路还亮，
   // 成了画面里最跳的一块。井是背景，不该抢主角的明度。
@@ -4115,56 +4214,87 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   // 石头要**发土**，不是发灰：村里的井台是就地捡的料礓石垒的，年年泼水糊泥，
   // 颜色跟脚下的土路是一路的。上一版调成中性灰，上屏读出来像一圈水泥管
   //（用户 2026-08-09："井也太现代了"）
-  const stone = night ? "#3f3b33" : "#655a48";
-  const stoneLit = night ? "#4f4a41" : "#7a6d57";
-  const stoneDark = night ? "#2a2722" : "#453c2e";
+  const stone = night ? "#3b382f" : "#5d5240";
+  const stoneLit = night ? "#4a453c" : "#70654e";
+  const stoneDark = night ? "#27251f" : "#3f3729";
   const wood = night ? "#6a4c30" : PAL.wood;
   const woodDark = night ? "#4c3722" : PAL.woodDark;
-  // 井台要**高而窄**（0.73m 高、0.5m 半径）：矮而宽 + 一圈大椭圆台面，
-  // 画出来是一只洗脸盆，不是一口井
-  const CURB = 35;        // 井台高（px）：0.73m，蹲下去打水刚好搭得上手
-  const RX = 25;          // 井台半径
+  // 井台要**高而窄**：0.73m 高、0.44m 半径（高宽比 0.83）。矮而宽 + 一圈大椭圆
+  // 台面，画出来是一只洗脸盆，不是一口井
+  const CURB = 35;        // 井台高（px）：0.73m，蹲下去打水刚好搭得上手。**Core 的
+  //                         约束③钉死了它**（井台沿 + 鼓半径 = 轴心下限），别往上调
+  const RX = 21;          // 井台半径：0.44m
+  const RY = 4.6;         // 台面椭圆的短半轴：俯角浅，压扁一档才不像一只盆
+  const RYB = 5.4;        // 落地那一圈的短半轴（离视平线更远，比台面张一点）
   // 辘轳轴心（px，48px/米）。**这个数由"够不着"倒推**：老版 69px（1.43m）比
   // 第一章那个孩子的头顶（1.13m）还高 30 厘米，摇把画的那个圈他一辈子也够不着，
   // 画面上就是"人在旁边空划拉、辘轳自己在转"。45px = 0.9375m，与 Core 的
   // WINCH_HUB_Y 一个数——改这儿必须同时改那儿（还有 WINCH_CRANK_DX/_R）。
   // 这一档同时也是**放得下绳**的下限：井台沿 35px + 鼓半径 6.8px ≈ 42px。
   const HUB = groundY - 45;
+  const POST = 24;        // 立柱离井心多远：**砸在井台外头的土里**（RX 21 < 24），
+  //                         所以井台可以细，架子照旧跨得开；摇把轴销 −21px 正好落在
+  //                         鼓端面（−18）与西柱（−24）当中的空档里
+  // 圆柱上一条水平圆周在画面上的样子：中间往下坠 k×短半轴。u∈[−1,1] 是横向位置
+  const sag = (u, k) => k * Math.sqrt(Math.max(0, 1 - u * u));
+  const arcPts = (yAt, k, n = 14, from = -1, to = 1) => {
+    const pts = [];
+    for (let i = 0; i <= n; i += 1) {
+      const u = from + ((to - from) * i) / n;
+      pts.push([x + u * RX, yAt + sag(u, k)]);
+    }
+    return pts;
+  };
 
-  // 常年泼出来的那一圈湿地：井脚有水痕，才不像一块摆在路当中的石头
+  // 常年泼出来的那一圈湿地：井脚有水痕，才不像一块摆在路当中的石头。
+  // **整片提到地平线以上**（见下面落地弧那条注）：线以下归路面，画下去等于没画
   ctx.save();
   ctx.globalAlpha = night ? 0.26 : 0.20;
   ctx.fillStyle = "#4a3a24";
   ctx.beginPath();
-  ctx.ellipse(x + 2, groundY - 1, RX * 1.75, 9.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 2, groundY - 8, RX * 2.0, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = night ? 0.16 : 0.12;
   ctx.beginPath();
-  ctx.ellipse(x - RX * 1.1, groundY + 1, 13, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - RX * 1.3, groundY - 4, 13, 4, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // 辘轳架：两根埋进土里的立柱，上头开口卡住轴。**先画柱子再画井台**——
-  // 柱子立在井台后侧，反过来画就成了两根挡在井前面的门框
+  // 辘轳架：两根砸进土里的立柱，**柱头探过轴心一截**、开口卡住轴。
+  // **先画柱子再画井台**——柱子立在井台后侧，反过来画就成了两根挡在井前面的门框。
+  // 两根**不等高**（同梯子那条：一样高就连成一条横线，横线＝家具）
+  const postTop = { "-1": HUB - 13, 1: HUB - 18 };
   for (const s of [-1, 1]) {
-    const px = x + s * (RX - 1);
+    const px = x + s * POST;
+    const ty = postTop[s];
     InkFill(ctx, [
-      [px - 3.2 - s * 0.6, groundY - 2], [px - 2.8, HUB - 5], [px + 2.8, HUB - 5], [px + 3.2 + s * 0.6, groundY - 2],
+      [px - 3.4 - s * 0.7, groundY - 2], [px - 3.0, ty + 2], [px, ty - 1.4], [px + 3.0, ty + 2],
+      [px + 3.4 + s * 0.7, groundY - 2],
     ], id + "post" + s, s < 0 ? wood : woodDark, { amp: 0.9, lw: 2.2, shade: "rgba(0,0,0,0.22)" });
-    // 卡轴的凹口
-    InkLine(ctx, px - 3, HUB - 3, px + 3, HUB - 3, id + "notch" + s, { lw: 2, color: "rgba(30,22,14,0.7)" });
+    // 卡轴的凹口：一个朝上的 U 形口，轴就坐在里头
+    InkFill(ctx, [[px - 3.2, HUB - 4.6], [px - 1.7, HUB + 1.2], [px + 1.7, HUB + 1.2], [px + 3.2, HUB - 4.6]],
+      id + "notch" + s, night ? "rgba(20,14,8,0.72)" : "rgba(38,27,16,0.60)",
+      { amp: 0.5, lw: 1.4, line: "rgba(30,22,14,0.62)" });
   }
+  // 东柱的斜撑：一根砸进土里的戗木。井上头有个三角形，剪影才认得出是辘轳架
+  InkLine(ctx, x + POST + 2, HUB - 4, x + POST + 15, groundY - 2, id + "brace",
+    { lw: 4.4, color: IN.ink, amp: 0.5 });
+  InkLine(ctx, x + POST + 2, HUB - 4, x + POST + 15, groundY - 2, id + "brace2",
+    { lw: 2.6, color: woodDark, amp: 0.5 });
 
-  // 井台正面（圆台的前半），砌石一层三块、上下错缝
-  const curbPts = [
-    [x - RX, groundY - 2], [x - RX + 1.5, groundY - CURB],
-    [x + RX - 1.5, groundY - CURB], [x + RX, groundY - 2],
-  ];
-  InkFill(ctx, curbPts, id + "curb", stone, { amp: 0.8, lw: 2.6 });
+  // 井台正面（圆柱的前半）：上下两条边都是**中间往下坠的弧**，不是两条直线——
+  // 这一条比任何明暗都管用，圆是从线上读出来的。
+  // **落地那条弧的最低点正好落在地平线上**（2026-08-18 用户："下沿还是被路给遮住了，
+  // 完全可以放上来啊，不用被遮住啊"）：底圆的前沿本来该画到地平线**以下** RYB 像素
+  // （前沿离镜头更近、地平线更低），可线以下由路面盖着，1 画布像素在玩法机位上是
+  // 3.75 屏幕像素——那条弧上屏就是被啃掉整整 20 像素，**一遮住就不透视了**。
+  // 所以整只桶的底往上挪 RYB：读出来分毫不差，还把整条下沿留在画面里。
+  const curbPts = arcPts(groundY - CURB, RY).concat(arcPts(groundY - RYB, RYB).reverse());
+  InkFill(ctx, curbPts, id + "curb", stone, { amp: 0.7, lw: 2.6 });
   // 圆的东西要有圆的明暗：左受光、右背光、根部压暗。
   // 只在右半边糊一块死黑（InkFill 的 shade）读出来是一张对折的纸
   ctx.save();
-  WobblyPath(ctx, curbPts, id + "curb", 0.8, true);
+  WobblyPath(ctx, curbPts, id + "curb", 0.7, true);
   ctx.clip();
   const cyl = ctx.createLinearGradient(x - RX, 0, x + RX, 0);
   cyl.addColorStop(0, "rgba(255,245,220,0.15)");
@@ -4175,93 +4305,139 @@ export function DrawWell(ctx, x, groundY, id, { night = false, broken = false, c
   ctx.fillRect(x - RX - 2, groundY - CURB - 2, RX * 2 + 4, CURB + 4);
   const foot = ctx.createLinearGradient(0, groundY - 13, 0, groundY);
   foot.addColorStop(0, "rgba(0,0,0,0)");
-  foot.addColorStop(1, "rgba(30,20,10,0.32)");
+  foot.addColorStop(1, "rgba(30,20,10,0.34)");
   ctx.fillStyle = foot;
-  ctx.fillRect(x - RX - 2, groundY - 13, RX * 2 + 4, 15);
-  ctx.restore();
+  ctx.fillRect(x - RX - 2, groundY - 13, RX * 2 + 4, 14);
+  // 砌石：每一层也是一条弧。一层里码几块**不一样大**的石头——整齐的三块一层是
+  // 砌出来的，村里的井台是垒出来的
   const ROWS = 3;
-  const rh = (CURB - 4) / ROWS;
+  const rh = (CURB - RYB - 3) / ROWS;
   for (let r = 0; r < ROWS; r += 1) {
-    const ry = groundY - 3 - r * rh;
-    if (r > 0) InkLine(ctx, x - RX + 2, ry, x + RX - 2, ry, id + "j" + r, { lw: 2.2, color: stoneDark, amp: 1.2 });
-    // 一层里码几块**不一样大**的石头：整齐的三块一层是砌出来的，
-    // 村里的井台是垒出来的
+    const ry = groundY - RYB - 2 - r * rh;
+    const k = RY + (RYB - RY) * (r / ROWS);
+    if (r > 0) {
+      const pts = arcPts(ry, k, 10, -0.94, 0.94);
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const p of pts) ctx.lineTo(p[0] + Sym(id + "jw" + r, p[0], 0.8), p[1]);
+      ctx.strokeStyle = stoneDark;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+    }
     const n = 3;
     for (let c = 0; c < n; c += 1) {
-      const jx = x - RX + ((c + 0.5 + (r % 2) * 0.5) / n) * RX * 2
-        + (Rnd(id + "jw", r * 3 + c) - 0.5) * 7;
-      if (jx > x - RX + 4 && jx < x + RX - 4) {
-        InkLine(ctx, jx, ry - 1.5, jx, ry - rh + 1.5, id + "v" + r + c, { lw: 2, color: stoneDark, amp: 1.6 });
-      }
+      const u = -1 + ((c + 0.5 + (r % 2) * 0.5) / n) * 2 + (Rnd(id + "jw", r * 3 + c) - 0.5) * 0.3;
+      if (u <= -0.82 || u >= 0.82) continue;
+      const jx = x + u * RX;
+      InkLine(ctx, jx, ry + sag(u, k) - 1.5, jx, ry - rh + sag(u, k) + 1.5,
+        id + "v" + r + c, { lw: 2, color: stoneDark, amp: 1.6 });
     }
   }
-  Speckle(ctx, x - RX, groundY - CURB, RX * 2, CURB, id + "sp", { count: 24, alpha: 0.12, size: 2 });
+  ctx.restore();
+  Speckle(ctx, x - RX, groundY - CURB, RX * 2, CURB, id + "sp", { count: 20, alpha: 0.12, size: 2 });
 
-  // 台面：一圈磨光的石沿
+  // 台面：一圈**有厚度**的磨光石沿（外椭圆 − 井口），不是一块盖板
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(x, groundY - CURB, RX, 6.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, groundY - CURB, RX, RY, 0, 0, Math.PI * 2);
   ctx.fillStyle = stoneLit;
   ctx.fill();
   ctx.strokeStyle = IN.ink;
   ctx.lineWidth = 2.6;
   ctx.stroke();
   ctx.restore();
-  // 井口：黑，永远看不到底。口不能开太大——满面的黑会读成一口锅
+  // 井口：黑，永远看不到底。**里侧要看得见后壁**——洞口里那道被天光扫亮的月牙，
+  // 是"往下去"唯一的证据；缺了它就是台面上贴了一张黑纸
+  const MX = RX - 7, MY = RY - 1.4;
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(x, groundY - CURB + 0.8, RX - 11, 3.6, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, groundY - CURB + 0.7, MX, MY, 0, 0, Math.PI * 2);
   ctx.fillStyle = night ? "#0e0c0a" : "#1b1611";
   ctx.fill();
+  ctx.save();
+  ctx.clip();
+  const inner = ctx.createLinearGradient(0, groundY - CURB - MY, 0, groundY - CURB + MY);
+  inner.addColorStop(0, night ? "rgba(96,104,116,0.42)" : "rgba(150,138,112,0.46)");
+  inner.addColorStop(0.55, "rgba(40,33,24,0.12)");
+  inner.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = inner;
+  ctx.fillRect(x - MX - 2, groundY - CURB - MY - 2, MX * 2 + 4, MY * 2 + 4);
+  ctx.restore();
   ctx.strokeStyle = "rgba(20,15,10,0.85)";
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
   // 井绳在石沿上磨出来的槽：一口用了几十年的井该有的痕
   for (let i = 0; i < 2; i += 1) {
-    InkLine(ctx, x - 5 + i * 10, groundY - CURB - 3.5, x - 5 + i * 10, groundY - CURB + 2,
+    InkLine(ctx, x - 4 + i * 8, groundY - CURB - 2.6, x - 4 + i * 8, groundY - CURB + 2.4,
       id + "wear" + i, { lw: 1.5, color: "rgba(60,50,40,0.45)", amp: 0.4 });
   }
-
-  // 辘轳鼓：一段圆木。两头各一枚端面椭圆才读得出"圆"，两道铁箍箍住，
-  // 中段缠着井绳（绳圈只缠中间那一段——缠满全长就成了一架木琴）
-  const DR = 6.8, DL = 18;
-  InkFill(ctx, [
-    [x - DL, HUB - DR], [x + DL, HUB - DR], [x + DL, HUB + DR], [x - DL, HUB + DR],
-  ], id + "drum", wood, { amp: 0.6, lw: 2.4, shade: "rgba(0,0,0,0.24)" });
+  // 井台跟前那两块踩得发亮的踏脚石：打水的人年年站在这儿。**摆在井台足迹外头**——
+  // 压在台底那条弧下面就成了两条腿，整口井读作"一只架起来的筐"（首轮实拍抓的）
   for (const s of [-1, 1]) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(x + s * DL, HUB, 3.2, DR, 0, 0, Math.PI * 2);
-    ctx.fillStyle = s > 0 ? wood : woodDark;
-    ctx.fill();
-    ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-    InkLine(ctx, x + s * 12, HUB - DR, x + s * 12, HUB + DR, id + "hoop" + s,
+    const sx = x + s * (RX + 11) + Sym(id + "fs", s, 3);
+    InkFill(ctx, [[sx - 9, groundY], [sx - 7, groundY - 3.4], [sx + 8, groundY - 3.8], [sx + 10, groundY - 0.4]],
+      id + "step" + s, night ? "#453f36" : "#6d6455", { amp: 0.9, lw: 1.4 });
+  }
+
+  // 辘轳鼓：一段圆木，两道铁箍箍住，中段缠着井绳（绳圈只缠中间那一段——
+  // 缠满全长就成了一架木琴）。
+  // **两头不许画成端面大椭圆**（2026-08-17）：轴是横着的、跟画面平行，端面在这个
+  // 机位上是**立着看过去的**，只该收成一条略鼓的边。老版一头糊一枚 3.2px 宽的
+  // 椭圆，读出来是"一根横杆上套了两只垫圈"——正是用户在别的图里问的那种
+  // 凭空冒出来的椭圆。轴心略高于中线，所以上沿看得见一线鼓面。
+  const DR = 6.8, DL = 18, DE = 1.7;
+  const drumPts = [];
+  for (let i = 0; i <= 8; i += 1) {                       // 右端头（鼓出去一点点）
+    const a = -Math.PI / 2 + (Math.PI * i) / 8;
+    drumPts.push([x + DL + Math.cos(a) * DE, HUB + Math.sin(a) * DR]);
+  }
+  for (let i = 0; i <= 8; i += 1) {                       // 左端头
+    const a = Math.PI / 2 + (Math.PI * i) / 8;
+    drumPts.push([x - DL + Math.cos(a) * DE, HUB + Math.sin(a) * DR]);
+  }
+  InkFill(ctx, drumPts, id + "drum", wood, { amp: 0.5, lw: 2.4, shade: "rgba(0,0,0,0.24)" });
+  // 圆木的上沿受光、下沿压暗——一根横木靠这两笔才不是一块板
+  ctx.save();
+  WobblyPath(ctx, drumPts, id + "drum", 0.5, true);
+  ctx.clip();
+  const dg = ctx.createLinearGradient(0, HUB - DR, 0, HUB + DR);
+  dg.addColorStop(0, "rgba(255,244,215,0.16)");
+  dg.addColorStop(0.42, "rgba(255,244,215,0.02)");
+  dg.addColorStop(1, "rgba(0,0,0,0.26)");
+  ctx.fillStyle = dg;
+  ctx.fillRect(x - DL - 4, HUB - DR - 2, DL * 2 + 8, DR * 2 + 4);
+  ctx.restore();
+  for (const s of [-1, 1]) {
+    InkLine(ctx, x + s * 12.5, HUB - DR + 0.6, x + s * 12.5, HUB + DR - 0.6, id + "hoop" + s,
       { lw: 1.8, color: night ? "#33302c" : "#4c463c", amp: 0.3 });
   }
   ctx.save();
-  ctx.globalAlpha = 0.8;
-  for (let i = 0; i < 5; i += 1) {
-    InkLine(ctx, x - 7 + i * 3.4, HUB - DR + 0.8, x - 7 + i * 3.4, HUB + DR - 0.8, id + "coil" + i,
-      { lw: 1.7, color: "#8a7350", amp: 0.3 });
+  ctx.globalAlpha = 0.7;
+  for (let i = 0; i < 4; i += 1) {
+    InkLine(ctx, x - 5.4 + i * 3.6, HUB - DR + 1.2, x - 5.4 + i * 3.6, HUB + DR - 1.2, id + "coil" + i,
+      { lw: 1.5, color: "#8a7350", amp: 0.3 });
   }
   ctx.restore();
 
   // 摇把：轴销 + 一段柄臂 + 一节握手，钉在**西端面**上——摇的人站在井台西侧，
   // 摇把长在他够得着的那一头（老版钉在东端，人在西边够不着）。柄长 5.8px＝
   // Core 的 WINCH_CRANK_R 0.12m；轴销偏移 −21px ＝ WINCH_CRANK_DX −0.44m。
-  // 摇辘轳那一拍由 World 换上会转的那只，这里就不画了（两只摇把会叉在同一根轴上）
+  // 摇辘轳那一拍由 World 换上会转的那只，这里就不画了（两只摇把会叉在同一根轴上）。
+  // **柄臂朝西南斜出去那一版画错了**（2026-08-17）：柄一甩就压在西边那根立柱上，
+  // 两样木头糊成一坨；而且 World 的活摇把歇在 `WINCH_REST_A −0.6`（柄指向
+  // **东南**），静的这只跟它反着，一进那一拍摇把当场跳一下。现在两只同一个角度。
   if (crank) {
-    const px = x - DL - 3;          // 轴销 −21px ≈ WINCH_CRANK_DX
-    InkLine(ctx, px, HUB, px - 4.5, HUB + 3.6, id + "arm", { lw: 5.2, color: IN.ink, amp: 0.2 });
-    InkLine(ctx, px, HUB, px - 4.5, HUB + 3.6, id + "arm2", { lw: 3.2, color: woodDark, amp: 0.2 });
-    InkLine(ctx, px - 4.5, HUB + 0.6, px - 4.5, HUB + 8, id + "grip0", { lw: 6.4, color: IN.ink, amp: 0.2 });
-    InkLine(ctx, px - 4.5, HUB + 0.6, px - 4.5, HUB + 8, id + "grip", { lw: 4.2, color: wood, amp: 0.2 });
+    const px = x - 21;              // 轴销 ＝ WINCH_CRANK_DX（−0.44m）
+    const R = 5.8;                  // ＝ WINCH_CRANK_R 0.12m
+    const gx = px + Math.cos(WELL_REST_A) * R;
+    const gy = HUB - Math.sin(WELL_REST_A) * R;      // 画布 y 朝下，所以取负
+    InkLine(ctx, px, HUB, gx, gy, id + "arm", { lw: 5.2, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, px, HUB, gx, gy, id + "arm2", { lw: 3.2, color: woodDark, amp: 0.2 });
+    InkLine(ctx, gx, gy - 3.4, gx, gy + 3.4, id + "grip0", { lw: 6.4, color: IN.ink, amp: 0.2 });
+    InkLine(ctx, gx, gy - 3.0, gx, gy + 3.0, id + "grip", { lw: 4.2, color: wood, amp: 0.2 });
     ctx.beginPath();
-    ctx.arc(px, HUB, 2.6, 0, Math.PI * 2);
+    ctx.arc(px, HUB, 1.9, 0, Math.PI * 2);
     ctx.fillStyle = night ? "#3a3a3c" : "#5c5a56";
     ctx.fill();
   }
@@ -4396,40 +4572,173 @@ export function DrawWellShaft(ctx, x, topY, waterY, botY, id, { night = false } 
   ctx.restore();
 }
 
-// 碾盘：石头**要发土不要发灰**（跟井台一个规矩）。台面是手錾出来的多边形，
-// 不是 ctx.ellipse 的完美圆；磨齿是四组平行的剔沟，不是六根从圆心均分的
-// 放射线——那是齿轮不是磨齿。旁边压一根碾棍。
+// 石碾。石头**要发土不要发灰**（跟井台一个规矩）。
+//
+// **2026-08-17 整件重做**（用户：「图五也不知道是个什么，扁扁的根本不对，修」）。
+// 老版只有一块 0.31m 厚的圆饼＋一圈放射剔沟＋一根斜靠的棍子，实拍下来是"路当中
+// 摊了一张灰煎饼"——它既不是磨也不是碾，而且**贴着地**，玩家从它身上走过去。
+// 病根是画了个**俯视的盘面**：这一档机位（视平线 1.85m）看 0.3m 高的东西几乎是
+// 平视，盘面本来就该收成一条边，可老版把整张盘面摊开来画，于是只剩下"扁"。
+//
+// 一盘真石碾是**四件摞起来的**，缺一件就认不出（全高 0.95m，够到柱子的胸口）：
+//   ① 碾台：底下垫的一圈干垒料礓石，把碾盘架到齐胯高——**它才是"不扁"的由来**；
+//   ② 碾盘：台上那块厚圆石，看过去是一条**带厚度的边**（上沿一道弧、下沿一道弧），
+//      不是一张摊开的圆面；
+//   ③ 碾磙子：**横躺在盘上的那段大石滚**——整件东西唯一的、认得出的剪影，
+//      比什么剔沟都管用；
+//   ④ 碾框＋碾棍：套着磙子的木框，一根碾棍从框上探出来（推碾的人扶的就是它）。
+// 中心那根碾管芯（立轴）把磙子拴在盘心上，所以磙子是绕着盘心转的，不是滚走的。
 export function DrawMillstone(ctx, x, groundY, id) {
-  InkFill(ctx, [[x - 30, groundY], [x - 27, groundY - 15], [x + 27, groundY - 15], [x + 30, groundY]],
-    id, "#6b6252", { amp: 1.6, lw: 2.6, shade: "rgba(0,0,0,0.20)" });
-  // 台面：16 点手錾多边形，边缘啃出两个缺口
-  const rim = [];
-  for (let i = 0; i < 16; i += 1) {
-    const a = (i / 16) * Math.PI * 2;
-    const chip = (i === 3 || i === 11) ? 0.86 : 1;
-    rim.push([x + Math.cos(a) * 27 * chip * (0.97 + Rnd(id + "rm", i) * 0.06),
-      groundY - 15 + Math.sin(a) * 6.5 * chip]);
-  }
-  InkFill(ctx, rim, id + "top", "#7a7061", { amp: 1.0, lw: 2.2, shade: "rgba(0,0,0,0.14)" });
-  // 磨眼
-  ctx.beginPath();
-  ctx.ellipse(x, groundY - 16, 5, 2.2, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "#3a3229";
-  ctx.fill();
-  // 磨齿：四组平行剔沟，组间转 30~40°
-  for (let g = 0; g < 4; g += 1) {
-    const a = g * 0.62 + 0.2;
-    const nx = Math.cos(a), ny = Math.sin(a) * 0.24;
-    for (let k = -2; k <= 2; k += 1) {
-      const ox = -ny * k * 5.5, oy = nx * k * 1.5;
-      InkLine(ctx, x + ox - nx * 20, groundY - 15.5 + oy - ny * 20,
-        x + ox + nx * 20, groundY - 15.5 + oy + ny * 20, id + "t" + g + k,
-        { lw: 0.9, color: "rgba(58,50,40,0.5)", amp: 0.5 });
+  const stone = "#564c3b";
+  const stoneLit = "#635840";
+  const stoneDark = "#3a3326";
+  const BASE = 23;              // 碾台高（px，48px/米）＝0.48m。比"看着够"多留 6px：
+  //                               碾台的底圆前沿要整条提到地平线以上（见下），
+  //                               提上来的那一截得从台高里补回去
+  const DISC = 11;              // 碾盘厚 0.23m
+  const RX = 32;                // 碾盘半径 0.67m（直径 1.33m，小村的碾就这么大）
+  const RY = 5.0;               // 盘面椭圆的短半轴：俯角浅，压扁一档
+  const discY = groundY - BASE; // 碾盘底面
+  const topY = discY - DISC;    // 盘面
+  const sag = (u, k) => k * Math.sqrt(Math.max(0, 1 - u * u));
+  const arcPts = (yAt, k, rx, n = 14) => {
+    const pts = [];
+    for (let i = 0; i <= n; i += 1) {
+      const u = -1 + (2 * i) / n;
+      pts.push([x + u * rx, yAt + sag(u, k)]);
     }
+    return pts;
+  };
+
+  // ① 碾台：干垒的料礓石，比碾盘收一圈（盘子探出来才有"摞上去"的关系）。
+  // **落地那条弧的最低点正好落在地平线上**（2026-08-18 用户："下沿还是被路给遮住了"）：
+  // 底圆前沿本该画到线下 RY×1.25，可线以下由路面盖着，一遮住就不透视了——整只
+  // 台子的底往上挪同样多，读出来分毫不差，下沿整条留在画面里
+  const bR = RX - 10;
+  const BRY = RY * 1.25;
+  const basePts = arcPts(discY + 1, RY * 0.9, bR).concat(arcPts(groundY - BRY, BRY, bR).reverse());
+  InkFill(ctx, basePts, id + "base", stoneDark, { amp: 1.4, lw: 2.2, shade: "rgba(0,0,0,0.24)" });
+  ctx.save();
+  WobblyPath(ctx, basePts, id + "base", 1.4, true);
+  ctx.clip();
+  for (let r = 0; r < 2; r += 1) {
+    const ry = groundY - BRY - 2 - r * 7;
+    const pts = arcPts(ry, RY * 1.1, bR * 0.94, 8);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (const p of pts) ctx.lineTo(p[0], p[1]);
+    ctx.strokeStyle = "rgba(30,25,18,0.45)";
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
   }
-  // 碾棍斜靠在盘沿上
-  InkLine(ctx, x + 24, groundY - 2, x + 4, groundY - 26, id + "stick",
-    { lw: 3, color: PAL.woodOld, amp: 1.0 });
+  ctx.restore();
+
+  // ② 碾盘：一块厚圆石。**剪影的上沿是盘面的"后"缘，不是前缘**——盘面是看得见的
+  // （镜头在它上头），所以整块石头最高的一点在后半圈。首轮把前缘当剪影上沿、
+  // 再绕盘面描一整圈墨线，读出来是**一只敞口的木盆**（实拍抓的），碾磙子还像
+  // 泡在盆里。现在墨线只描剪影，盘面与侧壁之间的那条前缘用一道软线分。
+  const discPts = arcPts(topY, -RY, RX).concat(arcPts(discY, RY * 1.1, RX).reverse());
+  InkFill(ctx, discPts, id + "disc", stone, { amp: 1.0, lw: 2.6, shade: "rgba(0,0,0,0.18)" });
+  ctx.save();
+  WobblyPath(ctx, discPts, id + "disc", 1.0, true);
+  ctx.clip();
+  const dg = ctx.createLinearGradient(x - RX, 0, x + RX, 0);
+  dg.addColorStop(0, "rgba(255,244,215,0.13)");
+  dg.addColorStop(0.4, "rgba(255,244,215,0.02)");
+  dg.addColorStop(1, "rgba(0,0,0,0.24)");
+  ctx.fillStyle = dg;
+  ctx.fillRect(x - RX - 2, topY - RY - 2, RX * 2 + 4, DISC + RY * 3 + 6);
+  // 盘面：一整块平石头，比侧壁亮**半档**（再亮就成了一汪水）
+  ctx.beginPath();
+  ctx.ellipse(x, topY, RX, RY, 0, 0, Math.PI * 2);
+  ctx.fillStyle = stoneLit;
+  ctx.fill();
+  // 磨了几十年的碾道：**一道磨亮的细环**压在盘面正中那一圈，不是一个洞
+  ctx.beginPath();
+  ctx.ellipse(x, topY, RX * 0.72, RY * 0.72, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(226,214,184,0.15)";
+  ctx.lineWidth = 3.6;
+  ctx.stroke();
+  for (const k of [0.55, 0.9]) {
+    ctx.beginPath();
+    ctx.ellipse(x, topY, RX * k, RY * k, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(58,50,40,0.22)";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+  ctx.restore();
+  // 盘面与侧壁的转折：只是一道软线，不是一圈墨——它不是盆沿
+  const lip = arcPts(topY, RY, RX, 12);
+  ctx.beginPath();
+  ctx.moveTo(lip[0][0], lip[0][1]);
+  for (const p of lip) ctx.lineTo(p[0], p[1]);
+  ctx.strokeStyle = "rgba(52,44,34,0.42)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  // 磨得凹下去的碾道（一圈亮痕），加两处啃掉的缺口——手錾出来的石头没有正圆
+  for (let i = 0; i < 2; i += 1) {
+    const a = 0.7 + i * 2.3;
+    InkLine(ctx, x + Math.cos(a) * RX * 0.98, topY + Math.sin(a) * RY * 0.98,
+      x + Math.cos(a) * RX * 0.86, topY + Math.sin(a) * RY * 0.86 + 2.2,
+      id + "chip" + i, { lw: 1.6, color: stoneDark, amp: 0.8 });
+  }
+  Speckle(ctx, x - RX, topY, RX * 2, DISC + RY, id + "sp", { count: 18, alpha: 0.1, size: 2 });
+
+  // ③ 碾磙子：横躺在盘上的大石滚，**压在盘的东半边**（轴指着盘心，所以在东西两侧
+  // 时它跟画面平行，正是看得最清楚的那个位置）。**这一件才是"这是个碾"的答案**——
+  // 端面同辘轳鼓那条：轴跟画面平行，端头只该略鼓一线，不许糊一枚大椭圆
+  // **磙子是个锥台不是圆柱**：外头那端粗、里头那端细，它才走得出一个圆
+  //（两端一样粗的滚子只能走直线——真碾磙都是这么凿的）。这一档收细也顺手
+  // 把它从"一只方木箱"里救出来
+  const MR = 11, ML = 14, ME = 2.9, MCX = x + 13, MK = 0.78;
+  const my = topY - MR + RY * 0.45;      // 磙子坐在盘面上（略偏前一点，压住那条前缘）
+  const rollPts = [];
+  for (let i = 0; i <= 8; i += 1) {
+    const a = -Math.PI / 2 + (Math.PI * i) / 8;
+    rollPts.push([MCX + ML + Math.cos(a) * ME, my + Math.sin(a) * MR]);
+  }
+  const myL = my + MR * (1 - MK);        // 细端的中心：两端**底面对齐**（都坐在盘上）
+  for (let i = 0; i <= 8; i += 1) {
+    const a = Math.PI / 2 + (Math.PI * i) / 8;
+    rollPts.push([MCX - ML + Math.cos(a) * ME * MK, myL + Math.sin(a) * MR * MK]);
+  }
+  InkFill(ctx, rollPts, id + "roll", stone, { amp: 0.8, lw: 2.6 });
+  ctx.save();
+  WobblyPath(ctx, rollPts, id + "roll", 0.8, true);
+  ctx.clip();
+  const rg = ctx.createLinearGradient(0, my - MR, 0, my + MR);
+  rg.addColorStop(0, "rgba(255,244,215,0.16)");
+  rg.addColorStop(0.44, "rgba(255,244,215,0.02)");
+  rg.addColorStop(1, "rgba(0,0,0,0.28)");
+  ctx.fillStyle = rg;
+  ctx.fillRect(MCX - ML - 4, my - MR - 2, ML * 2 + 8, MR * 2 + 4);
+  ctx.restore();
+  // 磙面上一圈圈凿出来的棱（顺着轴向，不是放射的——放射线是齿轮不是碾）；
+  // 棱也跟着锥面收
+  for (let i = 0; i < 4; i += 1) {
+    const t = (i + 0.6) / 4.6;
+    const rx0 = MCX - ML + t * ML * 2;
+    const rr = MR * (MK + (1 - MK) * t);
+    const cy = myL + (my - myL) * t;
+    InkLine(ctx, rx0, cy - rr + 2.2, rx0, cy + rr - 2.2, id + "rib" + i,
+      { lw: 1.3, color: "rgba(46,39,30,0.45)", amp: 0.4 });
+  }
+
+  // ④ 碾管芯（盘心那根立轴）＋ 碾框 ＋ 碾棍。框套着磙子、一头拴在立轴上，
+  // 所以磙子是**绕着盘心转圈**的，不是滚走的
+  const pinTop = myL - MR * MK - 3;
+  InkLine(ctx, x, topY - 1, x, pinTop, id + "pin",
+    { lw: 3.4, color: PAL.woodOldDark, amp: 0.5 });
+  InkLine(ctx, x, pinTop + 1.5, MCX + ML + 1, my - MR + 2.5, id + "frame",
+    { lw: 3.0, color: PAL.woodOld, amp: 0.6 });
+  InkLine(ctx, x + 3, myL + MR * MK - 2, MCX + ML + 1, my + MR - 2.5, id + "frame2",
+    { lw: 2.4, color: PAL.woodOldDark, amp: 0.6 });
+  // 碾棍：从框上斜探出来，推碾的人扶的就是它。**探得要够长**——缩在框里
+  // 就只是一根短木头，探出去才是"人推着它转圈"的把手
+  InkLine(ctx, MCX + ML - 2, my - 3, MCX + ML + 21, my + 11, id + "stick0",
+    { lw: 4.4, color: IN.ink, amp: 0.6 });
+  InkLine(ctx, MCX + ML - 2, my - 3, MCX + ML + 21, my + 11, id + "stick",
+    { lw: 2.8, color: PAL.woodOld, amp: 0.6 });
 }
 
 // 村街上的土坯墙段。**墙头绝不许是一条水平线**，夯土层理也不是每 11px
@@ -4439,7 +4748,10 @@ export function DrawWall(ctx, x, groundY, w, h, id, { burnt = false } = {}) {
     { sag: 4.5, n: 9, tiltR: Sym(id + "tl", 0, 5) });
   InkFill(ctx, top.concat([[x + w / 2, groundY], [x - w / 2, groundY]]), id,
     burnt ? PAL.burnt : "#8e7f61", { amp: 1.8, lw: 2.4, shade: "rgba(74,56,42,0.22)" });
-  if (!burnt) WeatherAdobe(ctx, x - w / 2, groundY - h, w, h, id + "wa", { course: 12, gullies: 4, cracks: 2 });
+  if (!burnt) {
+    WeatherAdobe(ctx, x - w / 2, groundY - h, w, h, id + "wa",
+      { course: 12, gullies: 4, cracks: 2, body: "#8e7f61" });
+  }
   Speckle(ctx, x - w / 2, groundY - h, w, h, id + "sp", { count: 16, alpha: 0.12 });
   // 墙根：塌下来的碎土坯壅在脚下，两头淌开——没有这一堆，断墙就是一块
   // 悬着的白纸板；断墙的"断"也正是从墙根的碎处读出来的
@@ -4608,7 +4920,7 @@ export function DrawYardWall(ctx, x, groundY, w, id, { gate = true, slogan = nul
     InkFill(ctx, top.concat([[x1, groundY], [x0, groundY]]), id + "w" + x0, "#8f7d5d",
       { amp: 1.8, lw: 2.2, shade: "rgba(74,56,42,0.20)" });
     WeatherAdobe(ctx, x0, groundY - H, x1 - x0, H, id + "wa" + x0,
-      { course: 12, gullies: 3, cracks: 2, patches: 2 });
+      { course: 12, gullies: 3, cracks: 2, patches: 2, body: "#8f7d5d" });
     // 墙头苫的谷草。
     // 2026-08-10 用户退回：「这个顶上我都不知道是什么玩意儿 一块块的」。
     // 老画法是**每 5px 描一个 6px 宽、5~12px 高的独立四边形**，每块自带墨线，
@@ -4753,7 +5065,7 @@ export function DrawYardWallLow(ctx, x, groundY, w, h, id, { pier = true, slogan
   // 前景件是全画面离镜头最近的东西，纹理得比背景狠一档；但**大补丁只留一块**
   //（两块以上在这个尺度下就是墙上贴了两张白纸）
   WeatherAdobe(ctx, x0, groundY - h, (xp + 2) - x0, h, id + "rwa",
-    { course: 10, gullies: 4, cracks: 3, patches: 1, seam: 0.34 });
+    { course: 10, gullies: 4, cracks: 3, patches: 1, seam: 0.34, body: "#453922" });
   Speckle(ctx, x0, groundY - h, (xp + 2) - x0, h, id + "sp", { count: 26, alpha: 0.13 });
 
   // ② 门垛（东头拔高一点：拐角靠高低差读，不靠另糊一块暗板）
@@ -4763,7 +5075,7 @@ export function DrawYardWallLow(ctx, x, groundY, w, h, id, { pier = true, slogan
     InkFill(ctx, pierTop.concat([[x1, groundY], [xp, groundY]]), id + "pier",
       "#3c311b", { amp: 1.7, lw: 2.4, shade: "rgba(16,11,5,0.44)", shadeAt: 0.40 });
     WeatherAdobe(ctx, xp, groundY - pierH, pierW, pierH, id + "pwa",
-      { course: 10, gullies: 2, cracks: 2, patches: 0, seam: 0.34 });
+      { course: 10, gullies: 2, cracks: 2, patches: 0, seam: 0.34, body: "#3c311b" });
     InkLine(ctx, xp + Sym(id + "cn", 0, 1.2), groundY - h + 2, xp + Sym(id + "cn", 1, 1.2), groundY,
       id + "corner", { lw: 2.0, color: IN.inkSoft, amp: 0.7 });
   }
@@ -6693,29 +7005,38 @@ export function DrawWoodpile(ctx, x, groundY, id) {
     }
     InkLine(ctx, bx - 8, groundY - bh * 0.66, bx + 8, groundY - bh * 0.68, id + "tie" + b,
       { lw: 1.8, color: "#6d5a3a", amp: 0.8 });
+    // 捆口：一捆秫秸立着，朝上的是**一圈切口**（透视）。没有它，捆子是一块纸板
+    TopFace(ctx, bx, 6.5, groundY - bh - 3, TopRy(6.5, bh + 3), id + "cut" + b,
+      Dim(PAL.stalk, 1.12), { round: true, lw: 1.5, line: IN.inkSoft });
+    for (let k = 0; k < 4; k += 1) {
+      InkLine(ctx, bx - 4 + k * 2.6, groundY - bh - 4.4, bx - 3.4 + k * 2.6, groundY - bh - 1.6,
+        id + "cs" + b + k, { lw: 0.8, color: "rgba(74,60,32,0.5)", amp: 0.4 });
+    }
   }
-  // ② 三四根真柴：弯的、带杈的、粗细不一
+  // ② 三四根真柴：弯的、带杈的、粗细不一。
+  //
+  // **2026-08-17 重画**（用户指着画面问：「图四两个椭圆形是什么玩意儿」）。老版
+  // 注释写的是"弯的、带杈的"，代码画的却是四枚**端面**——`ctx.ellipse` 一枚实心
+  // 椭圆＋一圈偏心年轮。侧视里柴是**横躺着**的，看得见的是杆身不是锯口；四枚圆盘
+  // 各带一圈同心环，散在垛脚下，读出来就是"地上摆着两只盘子"（而且这一族的东西
+  // 一挪到前景带就被放大，两枚盘子当场跳到画面最显眼的位置）。
+  // 规矩同辘轳鼓、碾磙那两条：**轴跟画面平行的圆柱，端头只能是一线，不许糊椭圆。**
   for (let i = 0; i < 4; i += 1) {
-    const px = x - 24 + Rnd(id + "lx", i) * 46;
-    const py = groundY - 5 - Rnd(id + "ly", i) * 12;
-    const r = 5 + Rnd(id + "lr", i) * 4;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(Sym(id + "lrot", i, 0.3));
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r, r * (0.6 + Rnd(id + "sq", i) * 0.35), 0, 0, Math.PI * 2);
-    ctx.fillStyle = ["#8f6740", "#7d5632", "#6b4d2e", "#96754a"][i % 4];
-    ctx.fill();
-    ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-    // 年轮偏心
-    ctx.beginPath();
-    ctx.ellipse(r * 0.3, -r * 0.2, r * 0.4, r * 0.28, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(58,38,20,0.6)";
-    ctx.lineWidth = 1.1;
-    ctx.stroke();
-    ctx.restore();
+    const px = x - 24 + Rnd(id + "lx", i) * 40;
+    const py = groundY - 3 - Rnd(id + "ly", i) * 9;
+    const len = 13 + Rnd(id + "ll", i) * 15;
+    const a = Sym(id + "lrot", i, 0.42);                  // 躺着，只是略歪
+    const w0 = 3.4 + Rnd(id + "lr", i) * 2.4;
+    const dx = Math.cos(a) * len, dy = Math.sin(a) * len;
+    const col = ["#8f6740", "#7d5632", "#6b4d2e", "#96754a"][i % 4];
+    Limb(ctx, px, py, px + dx, py + dy, w0, w0 * 0.62, id + "log" + i, col,
+      { bow: Sym(id + "lb", i, 2.6), lw: 1.8, shade: "rgba(0,0,0,0.16)" });
+    // 带个杈：从中段斜出去一小截。有杈才是拾回来的柴，没杈是锯好的板材
+    if (i % 2 === 0) {
+      Limb(ctx, px + dx * 0.55, py + dy * 0.55,
+        px + dx * 0.55 + Math.cos(a + 0.8) * len * 0.4, py + dy * 0.55 + Math.sin(a + 0.8) * len * 0.4,
+        w0 * 0.55, w0 * 0.3, id + "fork" + i, col, { bow: 1.2, lw: 1.4 });
+    }
   }
   // ③ 滚出去的两根
   for (let i = 0; i < 2; i += 1) {
@@ -6755,6 +7076,9 @@ export function DrawDoorLeaf(ctx, x, groundY, id) {
 }
 
 export function DrawBench(ctx, x, groundY, id) {
+  // 台面：朝上的那一面（透视量由 TopRy 按机位算，半深 12px＝台子 0.5m 进深）。
+  // 没有它，工作台就是一块立着的板——爹在上头拉锯的东西得有个"面"
+  TopFace(ctx, x, 26, groundY - 26, TopRy(12, 26), id + "topf", Dim(PAL.wood, 1.14), { inset: 2.6, lw: 2.3 });
   InkFill(ctx, Rect(x - 26, groundY - 26, 52, 8), id, PAL.wood, { amp: 1, lw: 2.3, shade: "rgba(0,0,0,0.14)" });
   InkFill(ctx, Rect(x - 22, groundY - 18, 6, 18), id + "l1", PAL.woodDark, { amp: 0.8, lw: 2 });
   InkFill(ctx, Rect(x + 16, groundY - 18, 6, 18), id + "l2", PAL.woodDark, { amp: 0.8, lw: 2 });
@@ -6864,6 +7188,8 @@ export function DrawShavingPile(ctx, x, groundY, n, id) {
 }
 
 export function DrawStool(ctx, x, groundY, id) {
+  // 凳面（透视）：矮东西的台面摊得最开，一只小板凳的面比工作台还显眼
+  TopFace(ctx, x, 11, groundY - 15, TopRy(9, 15), id + "topf", "#a88250", { inset: 1.4, lw: 1.9 });
   InkFill(ctx, Rect(x - 11, groundY - 15, 22, 5), id, "#96723f", { amp: 0.8, lw: 2 });
   InkFill(ctx, Rect(x - 9, groundY - 10, 4, 10), id + "a", "#7a5433", { amp: 0.7, lw: 1.8 });
   InkFill(ctx, Rect(x + 5, groundY - 10, 4, 10), id + "b", "#7a5433", { amp: 0.7, lw: 1.8 });
@@ -7444,11 +7770,14 @@ export function DrawVat(ctx, x, groundY, id, { filled = true } = {}) {
   InkFill(ctx, [[x - 12, groundY], [x - 15, groundY - 18], [x - 10, groundY - 30], [x + 10, groundY - 30],
     [x + 15, groundY - 18], [x + 12, groundY]],
     id + "body", "#6e5b44", { amp: 1.2, lw: 2.2, shade: "rgba(0,0,0,0.26)" });
-  // 口沿。水面只在真有水的时候画（「见了底」的缸口亮着一条水色，
-  // 空缸就读成满缸——视觉审查退回过）；空缸口里是一圈往下看不到底的暗影
-  InkLine(ctx, x - 10, groundY - 30, x + 10, groundY - 30, id + "rim", { lw: 2.4, color: IN.ink });
-  if (filled) InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "water", "#4d6a78", { amp: 0.5, lw: 1 });
-  else InkFill(ctx, Rect(x - 8, groundY - 29, 16, 3), id + "dry", "#241c12", { amp: 0.5, lw: 1 });
+  // 缸口：**一圈有透视的口沿**（2026-08-18 起全街统一，见 TopFace 的注）。老版是
+  // 一条横直线加一小块矩形水面——缸是圆的，口当然是个（压扁的）圈。
+  // 水面只在真有水的时候画（「见了底」的缸口亮着一条水色，空缸就读成满缸——
+  // 视觉审查退回过）；空缸口里是一圈往下看不到底的暗影
+  const vry = TopRy(10, 30);
+  TopFace(ctx, x, 10, groundY - 30, vry, id + "rim", "#7d6950", { round: true, lw: 2.4 });
+  TopFace(ctx, x, 7.2, groundY - 30 - vry * 0.28, vry * 0.72, id + (filled ? "water" : "dry"),
+    filled ? "#4d6a78" : "#241c12", { round: true, lw: 1.3, line: "rgba(30,22,14,0.7)" });
 }
 
 // 地窖里的红薯堆：过冬的口粮码在窖底，上面搭半领草苫
@@ -8545,6 +8874,9 @@ export function DrawStove(ctx, x, groundY, id) {
   ctx.beginPath(); ctx.ellipse(x - 12, groundY - 8, 4.6, 3, 0.3, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.ellipse(x + 14, groundY - 18, 3.6, 2.4, -0.4, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
+  // 灶台面（透视）：灶顶是块平的，画出来才不是一堵小土墙。铁锅坐在它上头，
+  // 所以先铺面、后坐锅
+  TopFace(ctx, x, 21, groundY - 27, TopRy(11, 27), id + "topf", "#9c866a", { inset: 2.2, lw: 2.0 });
   // 灶口：黑洞，口沿熏黑，底下一撮冷灰（发灰白，不发红——冷灶的全部）
   InkFill(ctx, [[x - 8, groundY - 2], [x - 7, groundY - 12], [x, groundY - 15], [x + 7, groundY - 12], [x + 8, groundY - 2]],
     id + "mouth", "#1c1712", { amp: 1.0, lw: 1.8 });
@@ -14421,6 +14753,9 @@ export function DrawDungHeap(ctx, x, groundY, id, { street = false } = {}) {
   }
   InkFill(ctx, top.concat([[x + W / 2 + 3, groundY], [x - W / 2 - 3, groundY]]), id,
     "#6b5f46", { amp: street ? 2.2 : 1.2, lw: 1.8, shade: "rgba(48,38,24,0.26)" });
+  // 顶面（透视）：拍得四棱见线的粪堆，朝上那一面看得最清楚
+  TopFace(ctx, x, W / 2 - 2, groundY - H, TopRy(W * 0.34, H), id + "topf",
+    "#7b6e52", { inset: 2.6, lw: 1.6, line: IN.inkSoft });
   // 一锹一锹拍出来的棱：自家那堆四棱见线
   if (!street) {
     for (let i = 1; i < 4; i += 1) {
@@ -14428,12 +14763,14 @@ export function DrawDungHeap(ctx, x, groundY, id, { street = false } = {}) {
         id + "edge" + i, { lw: 1.1, color: "rgba(52,42,28,0.42)", amp: 0.9 });
     }
   } else {
-    // 顶上撒的一层草木灰
+    // 顶上撒的一层草木灰。**照 TopRy 摊开**：这堆才半米高，顶面在这个机位上是
+    // 全街摊得最开的几个之一
     ctx.save();
     ctx.globalAlpha = 0.34;
     ctx.fillStyle = "#a8a08c";
+    const ary = TopRy(W * 0.3, H);
     ctx.beginPath();
-    ctx.ellipse(x, groundY - H + 1, W * 0.4, 3.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, groundY - H + 1 - ary, W * 0.4, ary, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -14935,6 +15272,40 @@ export function DrawSlatDust(ctx, ax, ay, id) {
     ctx.beginPath();
     ctx.arc(ax + Sym(id + "px", i, 9), ay - 10 - Hash(id + "py" + i) * 38,
       0.8 + Hash(id + "pr" + i) * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 脚后跟蹬起来的一小团干土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里
+// 都有对应的烟雾特效」，照《勇敢的心》）。World 的 footDust 池子按 id 烘几张变体，
+// 逐帧只动位置/大小/透明度，这儿只画一团。
+// 画法：三五个圆叠成一团、**横着比竖着宽**（土是从鞋底往后掀出去的，不是往上冒
+// 的烟）；每个圆心实、边虚；**不描墨线**——这是"扬起来的灰"，一描线就成了一朵
+// 云的图标。两个色调错着来（亮的土面、暗的土里），一团里才有厚薄。
+// 画布以 (ax, ay) 为团心，半径不超过 40px。
+export function DrawFootDust(ctx, ax, ay, id) {
+  ctx.save();
+  const n = 4 + Math.floor(Hash(id + "n") * 2);
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2 + Hash(id + "a" + i) * 1.3;
+    const rr = 5 + Hash(id + "d" + i) * 9;
+    const cx = ax + Math.cos(a) * rr * 1.35, cy = ay + Math.sin(a) * rr * 0.6;
+    const r = 13 + Hash(id + "r" + i) * 9;
+    // **芯子比路面亮、裙边比路面暗**：路面本来就是浅褐的，同色的一团贴上去等于
+    // 没画（首版就是这么隐形的）；只往亮里走又只差两三档，还是糊在地里。亮芯
+    // 加一圈很淡的暗边，土面/夯土/夜路上都读得出一团的轮廓——不描墨线，只是
+    // 边上暗一点
+    const light = Hash(id + "l" + i) < 0.7 ? "246,240,224" : "228,216,190";
+    const dark = "150,132,100";
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(${light},1)`);
+    g.addColorStop(0.52, `rgba(${light},0.86)`);
+    g.addColorStop(0.8, `rgba(${dark},0.40)`);
+    g.addColorStop(1, `rgba(${dark},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

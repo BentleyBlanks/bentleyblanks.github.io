@@ -1645,6 +1645,14 @@ function GaitLegs(target, p, g, o = {}) {
   // 交给上面摆胳膊用：同侧腿在前，胳膊就该在后（xF/xB 归一到 ±1）
   return { air: target.airY, xF: xs.F / a, xB: xs.B / a, hip: H };
 }
+// 哪一格是蹬离地（脚后跟的土从这儿掀）：前腿在相位 duty·2π，后腿再错半圈。
+// duty 随走↔跑变（0.60→0.42）；提着/抱着/蹲着挪的 duty 略不同（0.62/0.64），差个几度，
+// 土照样落在蹬地那一下附近
+export function GaitToeOff(g) {
+  const duty = Lerp(0.60, 0.42, Math.max(0, Math.min(1, g || 0)));
+  const TAU = Math.PI * 2;
+  return { F: duty * TAU, B: ((duty + 0.5) % 1) * TAU };
+}
 // 走路/跑步的胳膊：与同侧腿反着摆；跑起来抡得大、肘折死
 function GaitArms(target, gait, g, o = {}) {
   const amp = o.amp ?? Lerp(24, 46, g);
