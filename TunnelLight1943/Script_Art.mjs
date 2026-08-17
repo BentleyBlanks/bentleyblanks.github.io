@@ -1222,7 +1222,6 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     id + "cap", "#5f5a30", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
     InkFill(ctx, [P(0.84, -1.50), P(1.58, -1.36), P(1.52, -1.18), P(0.86, -1.30)],
       id + "brim", "#4a461f", { amp: 0.6 * k, lw: lw * 0.85 });
-    EyeShade(ctx, px, py, r, F, -1.06, 0.5, 0.32);
   } else if (kind === "officer") {
     // **卫生胡（方块胡）**：太君脸就靠这一撮认。横在人中上，鼻底与唇缝之间
     ctx.save();
@@ -1243,20 +1242,17 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ctx.fill();
     InkFill(ctx, [P(0.86, -1.28), P(1.88, -1.16), P(1.84, -0.94), P(0.86, -1.08)],
       id + "visor", "#232616", { amp: 0.5 * k, lw: lw * 0.8 });
-    EyeShade(ctx, px, py, r, F, -1.04, 0.54, 0.32);
   } else if (kind === "puppet") {
     InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
       P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),
     id + "hat", "#3a352c", { amp: 0.7 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    EyeShade(ctx, px, py, r, F, -1.00, 0.38, 0.28);
   } else if (kind === "militia") {
     InkFill(ctx, Spline([P(-1.08, -1.12), P(-0.94, -1.66), P(-0.34, -1.98), P(0.32, -1.96),
       P(0.90, -1.68), P(1.04, -1.34), P(0.94, -1.02), P(-0.98, -0.90)], 4),
     id + "towel", "#ddd6c2", { amp: 0.8 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.08)" });
-    EyeShade(ctx, px, py, r, F, -0.98, 0.34, 0.26);
     InkFill(ctx, [P(-1.00, -1.08), P(-1.56, -0.58), P(-1.18, -0.42), P(-0.94, -0.84)],
       id + "tail", "#ccc4ae", { amp: 0.9 * k, lw: lw * 0.8 });
-  } else if (kind === "father" || kind === "villager" || kind === "family") {
+  } else if (kind === "villager") {
     // **大人包头巾**（2026-08-17 用户："村里人和主角团 部分可以包头巾来遮住眼睛"）。
     // 1943 年冀中的庄稼人男的裹条羊肚手巾、女的包块头巾，本来就是常态；
     // 顺手把"遮眼"这件事分成两路——孩子留刘海、大人包头巾，一屋子人不再一个样
@@ -1267,39 +1263,9 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   }
 }
 
-/**
- * 头发/帽檐底下那片阴影——**眼睛就"藏"在这儿**（《勇敢的心》的做法）。
- * y = 遮挡物的下沿（单位 r），阴影从那儿往下化开 depth。
- * 越深越冷：日军给 0.52，自家人给 0.34（还能看出是张脸，只是眼在暗处）。
- */
-function EyeShade(ctx, px, py, r, F, y, alpha = 0.34, depth = 0.30) {
-  ctx.save();
-  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + depth));
-  g.addColorStop(0, `rgba(20,15,10,${alpha})`);
-  g.addColorStop(0.5, `rgba(20,15,10,${alpha * 0.7})`);
-  g.addColorStop(1, "rgba(20,15,10,0)");
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(px - r * 0.62, py + r * (y - 0.02));
-  ctx.lineTo(px + r * (F.brow + 0.02), py + r * (y + 0.02));
-  ctx.lineTo(px + r * (F.brow - 0.06), py + r * (y + depth + 0.02));
-  ctx.lineTo(px - r * 0.60, py + r * (y + depth - 0.02));
-  ctx.closePath();
-  ctx.fill();
-  // 阴影里埋两团很虚的暗：**不是眼睛**，是让眼睛"在那儿"的暗示。
-  // 观众会自己把它读成一双眼，而且永远不会有死表情（这就是遮眼这一招的划算处）
-  const ey = py + r * (y + depth * 0.42);
-  for (const [dx, w] of [[F.brow - 0.52, 0.15], [F.brow - 0.18, 0.11]]) {
-    const rg = ctx.createRadialGradient(px + r * dx, ey, 0, px + r * dx, ey, r * w * 1.7);
-    rg.addColorStop(0, `rgba(14,10,7,${alpha * 0.85})`);
-    rg.addColorStop(1, "rgba(14,10,7,0)");
-    ctx.fillStyle = rg;
-    ctx.beginPath();
-    ctx.ellipse(px + r * dx, ey, r * w * 1.7, r * w * 1.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
+// 眼睛底下那圈渐变的阴影已整个删掉（2026-08-17 用户："你这眼部还有一圈阴影是啥
+// 玩意儿啊，干掉，丑得一逼跟个僵尸一样"）。**遮眼靠的是遮挡物真的压在那儿**，
+// 不是在眼窝上抹一层暗——抹了就是黑眼圈。别再加回来。
 
 /**
  * 头上盘的那块布（2026-08-17 用户拿一张华北老乡的照片退回第一版：
@@ -1410,7 +1376,6 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
   InkFill(ctx, [P(-1.06, -0.98), P(-1.44, -0.50), P(-1.16, -0.34), P(-0.96, -0.78)],
     id + "tail", clothDim, { amp: 0.7 * k, lw: lw * 0.66, shade: "rgba(0,0,0,0.14)" });
   // 布底下那片阴影：眼睛在这儿
-  EyeShade(ctx, px, py, r, F, edge + 0.01, 0.38, 0.30);
   // 额前露出来的一两绺头发（布不是裹在光头上）
   ctx.save();
   ctx.fillStyle = "#2e2119";
@@ -1431,6 +1396,10 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
  */
 function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
   const child = kind === "sister";
+  // **长发**：娘（部分女士）与爹（少部分男士）不裹布，刘海照旧压到眼线上，
+  // 发身一路落到肩——一屋子人于是有三种剪影：短发刘海（孩子）、长发（这两位）、
+  // 盘头巾／毛巾（乡亲、民兵）
+  const long = kind === "family" || kind === "father";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
   const P = (x, y) => [px + r * x, py + r * y];
   // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
@@ -1448,6 +1417,11 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     P(-1.02, -0.78),
     P(-0.84, -0.46),                           // 项（发脚）
     P(-0.66, -0.56),
+    ...(long
+      // 长发：从项后一路垂到肩，发梢参差（女的更长更齐，男的短一档更乱）
+      ? [P(-1.06, -0.46), P(-1.16, 0.16), P(-1.00, 0.62), P(-0.78, 0.70),
+        P(-0.68, 0.34), P(-0.62, -0.22), P(-0.58, -0.56)]
+      : []),
     P(-0.62, -0.92),                           // 耳后（让开耳朵）
     P(-0.50, -1.08),                           // 绕过耳上
     P(-0.18, fringe - 0.06),                   // ← 刘海下缘往前压
@@ -1455,7 +1429,6 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     P(0.50, fringe - 0.01),
   ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.18)", shadeAt: 0.5 });
   // 刘海底下那片阴影：眼睛在这儿
-  EyeShade(ctx, px, py, r, F, fringe + 0.01, child ? 0.32 : 0.40, 0.30);
   // 两三根散下来的发丝，压在阴影上——刘海不是一块板
   ctx.save();
   ctx.fillStyle = tone;
@@ -1491,7 +1464,19 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
       P(-0.78, -0.10), P(-0.74, -0.38)], 4),
     id + "wisp", tone, { amp: 0.36 * k, lw: lw * 0.7 });
   } else if (kind === "family") {
-    // 娘：抿到脑后挽成一个纂，横插一根簪。侧视里这是"一眼认出是谁"最省的一笔
+    // 娘：长发在项后拿一根布绳松松系一道（挽成纂就看不出是长发了），
+    // 侧视里这一道横绳就是"一眼认出是谁"最省的一笔
+    ctx.save();
+    ctx.strokeStyle = "rgba(184,164,116,0.9)";
+    ctx.lineWidth = 1.6 * k;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px - r * 1.10, py - r * 0.18);
+    ctx.quadraticCurveTo(px - r * 0.86, py - r * 0.06, px - r * 0.64, py - r * 0.22);
+    ctx.stroke();
+    ctx.restore();
+  } else if (kind === "__oldFamilyBun") {
+    // （旧的纂画法：长发之后不用了，留着当参照）
     InkFill(ctx, Spline([P(-0.98, -1.08), P(-1.32, -1.16), P(-1.54, -0.90), P(-1.46, -0.58),
       P(-1.14, -0.48), P(-0.92, -0.70)], 4),
     id + "bun", tone, { amp: 0.36 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.24)" });
