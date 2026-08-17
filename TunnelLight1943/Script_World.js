@@ -1839,6 +1839,18 @@ export function CreateWorld(canvasEl) {
         ctx.globalAlpha = 1;
         ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
         ctx.restore();
+        // **下沿要化开，不许齐齐切断**（2026-08-18 用户报的那块"硬边淡板"）。
+        // 井壁只画到走廊洞顶为止、指望走廊自己的后壁接手，可两张贴图的调子
+        // 对不齐——于是井筒底下横着一条贯穿的直边，读出来是"贴图裁齐了"，
+        // 正是这一带最扎眼的那道硬边。让最后 0.5m 淡成透明，接缝自己没了
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        const fade = ctx.createLinearGradient(0, hp - Math.min(hp * 0.5, 0.5 * PPM), 0, hp);
+        fade.addColorStop(0, "rgba(0,0,0,0)");
+        fade.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, 0, wp, hp);
+        ctx.restore();
       });
       PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
       FixOrder(wall, SHAFT_WALL_ORDER);   // 位置在剖面这一刀上，前后关系另排
@@ -6333,6 +6345,15 @@ export function CreateWorld(canvasEl) {
       .map((d) => ({ x: +d.x.toFixed(2), y: +d.y.toFixed(2), k: +(d.t / d.life).toFixed(2), a: +d.mesh.material.opacity.toFixed(2), s: +d.mesh.scale.y.toFixed(3) })),
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
+    // 窖口那束"打进来的光"的全部可调量（uniform 对象本身，拿到就能改）。
+    // 打光是**看着调**的活：一次实拍 25 秒，改一个数重编译一次就别干活了。
+    // 配 shot --eval 用：`tl.world.__shaftLight().uWash.value.set(...)`。
+    // 顺带把掩码的画布交出来——"光上那条直边是不是掩码的方盒子"只能翻掩码
+    __shaftLight: () => (hatchBeamMesh ? {
+      ...hatchBeamMesh.userData.uniforms,
+      __mesh: hatchBeamMesh,
+      __occluder: occluder,
+    } : null),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
