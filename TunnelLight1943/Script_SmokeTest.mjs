@@ -2896,7 +2896,10 @@ async function TestAnimIndexIsComplete() {
   for (const id of ["btnAnim", "animPanel", "animSearch", "animList", "animView", "animCanvas", "animOverlay", "animTransport", "animInfo", "animClose", "animStatus"]) {
     assert.ok(html.includes(`id="${id}"`), `index.html 缺 #${id}`);
   }
-  assert.ok(/import \{ CreateAnimLab \} from "\.\/Script_AnimLab\.mjs"/.test(read("Script_Main.js")), "Main 得接上动画工作台");
+  assert.ok(/import \{[^}]*\bCreateAnimLab\b[^}]*\} from "\.\/Script_AnimLab\.mjs"/.test(read("Script_Main.js")), "Main 得接上动画工作台");
+  // 人物美术样式浏览器的右栏借的是同一层小舞台：换人/换动作的壳得在
+  assert.ok(/CreateRigStage\(\{ canvas: ui\.artRigCanvas/.test(read("Script_Main.js")), "人物美术样式浏览器要接上 CreateRigStage（整身·骨架实时）");
+  for (const id of ["artRigCanvas", "artAnim", "artPlay", "artFlip", "artToLab", "artRigNote"]) assert.ok(html.includes(`id="${id}"`), `index.html 缺 #${id}`);
   assert.ok(/AnimLab: animLab/.test(read("Script_Main.js")), "TunnelLight.AnimLab 钩子要暴露给实拍/测试");
 
   // ⑥ CLI：anims / anim 答得上话
