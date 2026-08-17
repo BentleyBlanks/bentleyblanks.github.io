@@ -25,7 +25,8 @@ import { LadderHolds } from "./Data_Ladder.mjs";
 // 无状态的画笔/烘焙/绘制序工具（2026-08-15 从 CreateWorld 闭包抽出）——见该文件头
 import {
   AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
-  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
+  AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, GROUND_PLANE_DIP,
+  LAYER_ORDER,
   MakeCanvas, MakeCastShadow, MakeFlatShadow, MakeShaftMouth, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
 } from "./Script_WorldPaint.mjs";
@@ -1310,6 +1311,53 @@ export function CreateWorld(canvasEl) {
 
     // —— 1) 近侧土层剖面：把地道那一块真正掏成透明，才看得进去
     const face = BakeSprite(wPx, hPx, 0, toPy(SURFACE_Y), (ctx) => {
+      // ── 断口的那条边：土层的上沿、耕作层、墨线、草茬四处共用它 ──────────
+      // **这一撮东西横跨"看得见"与"看不见"的那条线，所以先把线找出来**
+      //（2026-08-17 用户：「道路上的绿草被砍断了一半一样 有点显示bug」）。
+      // 那条线是 `AddGroundPlane`——全场唯一不透明又写深度的几何，躺在
+      // SURFACE_Y−GROUND_PLANE_DIP 上、纵深一直铺到 z=2.5，**压在这张 z=2.2 的
+      // 剖面前面**：从地表机位看，剖面上低于那条线的内容一律被它切掉，而它躺着，
+      // 所以切口是一条**笔直的横线**（实测 1600×900 上落在 y≈889）。
+      // 老版这一片有三处各自往线上探：`DrawEarthStrata` 的头一层土**自带 ±7px
+      // 的上沿起伏**（画笔内部的事，这儿压根没声明）、墨线与耕作层按 `gy+Wob`
+      // 起伏 ±4px、草茬则长在后者上。于是路面上头露出来的是：一条横贯全场的
+      // 土色板带 ＋ 一道暗杠（墨线）＋ 一道亮杠（耕作层），而草茬**从最粗的
+      // 根部被平着切断**，只剩腰上那一截悬在半空——一排草看着像被谁横着铲过一遍。
+      // 两条治法：
+      //   · **断口整条沉到那条线以下**（起伏一点没少，只是不许再翻上来），而且
+      //     土层的上沿**剪在这条边底下**——画笔自己那 ±7px 从此说不上话。断口是
+      //     给地道那一侧看的；地表这边路面是连着铺过来的，本来就不该有断口。
+      //   · **草茬与土坷垃扎在路面那条线上**（`rootY`，根埋进去一丝）。地面就在
+      //     那儿，草是从地里长出来的——根最粗的那一头正好落在线上、往上收尖，
+      //     于是切口不再切在任何一笔的半腰上。
+      const gy = toPy(SURFACE_Y);
+      const cutY = toPy(SURFACE_Y - GROUND_PLANE_DIP);
+      // 三支正弦：十米一起、三米一伏、再加一档一米二的糙（原来这一档在
+      // DrawEarthStrata 里自己走，收进来之后整条边只有一处真相）
+      const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
+        + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5
+        + Math.sin(px * 0.105 + ART.Hash(sceneKey + "tw3") * 5) * 0.9;
+      const WOB_AMP = 5.0;          // 三支正弦的幅度之和
+      const INK_HALF = 1.9;         // 墨线半宽（lineWidth 3）再留一点余量
+      const sink = Math.max(0, cutY + INK_HALF + WOB_AMP - gy);
+      const Edge = (px) => gy + sink + Wob(px);
+      const rootY = cutY + 1;       // 草根/土坷垃：路面线底下一丝
+      // 沿着那条边走一遍（剪土层、填耕作层、描墨线共用）
+      const WalkEdge = () => {
+        ctx.moveTo(0, Edge(0));
+        for (let px = 0; px <= wPx; px += 12) ctx.lineTo(px, Edge(px));
+        ctx.lineTo(wPx, Edge(wPx));
+      };
+
+      ctx.save();
+      // 土层剪在断口那条边底下（`clip` 之前必须现走一遍路径——当前路径不进
+      // save/restore，这是本仓库的老账）
+      ctx.beginPath();
+      ctx.moveTo(0, hPx);
+      WalkEdge();
+      ctx.lineTo(wPx, hPx);
+      ctx.closePath();
+      ctx.clip();
       ART.DrawEarthStrata(ctx, 0, wPx, toPy(SURFACE_Y), hPx, sceneKey + "earth");
       // 土体整体压暗：参考里的地下几乎是纯黑，细节只留在洞沿一圈
       ctx.save();
@@ -1321,17 +1369,16 @@ export function CreateWorld(canvasEl) {
       ctx.fillStyle = dk;
       ctx.fillRect(0, toPy(SURFACE_Y), wPx, hPx);
       ctx.restore();
+      ctx.restore();
 
       // —— 地平线那一刀：这是**地表被切开的断口**，不是两张贴图的接缝
       //（2026-08-11 用户：「地道口那里为什么有一条分割线一样的，上面下面
       // 有点土一样的颜色」）。老版上沿就是 fillRect 的直边：上头是地表的土色、
       // 下头是剖面的土色，两块平色贴着一条razor直线，读出来只能是"贴图裁齐了"。
       // 断口该有三样东西：翻耕过的表土比生土浅一档、一条起伏的墨线、
-      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）
+      // 以及长在沿上的草茬（往上探出画布，所以上头留了 TURF_RISE 那一指）。
+      // 这三样都钉在上头那条 `Edge`／`rootY` 上——为什么，见那一段的账
       {
-        const gy = toPy(SURFACE_Y);
-        const Wob = (px) => Math.sin(px * 0.013 + ART.Hash(sceneKey + "tw") * 9) * 2.6
-          + Math.sin(px * 0.041 + ART.Hash(sceneKey + "tw2") * 6) * 1.5;
         const night = CHAPTERS[state.chapterIndex].light === "night"
           || CHAPTERS[state.chapterIndex].light === "dark";
         // ① 耕作层：常年翻的那 30 公分，比底下的生土松、浅。
@@ -1339,32 +1386,30 @@ export function CreateWorld(canvasEl) {
         const tilth = 0.34 * PPM;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 14) ctx.lineTo(px, gy + Wob(px));
-        ctx.lineTo(wPx, gy + tilth);
-        ctx.lineTo(0, gy + tilth);
+        WalkEdge();
+        ctx.lineTo(wPx, gy + sink + tilth);
+        ctx.lineTo(0, gy + sink + tilth);
         ctx.closePath();
-        const til = ctx.createLinearGradient(0, gy, 0, gy + tilth);
+        const til = ctx.createLinearGradient(0, gy + sink, 0, gy + sink + tilth);
         til.addColorStop(0, night ? "rgba(104,86,60,0.5)" : "rgba(154,128,88,0.46)");
         til.addColorStop(1, night ? "rgba(104,86,60,0)" : "rgba(154,128,88,0)");
         ctx.fillStyle = til;
         ctx.fill();
         // ② 断口的墨线：跟着起伏走，不是一条直边
         ctx.beginPath();
-        ctx.moveTo(0, gy + Wob(0));
-        for (let px = 0; px <= wPx; px += 20) ctx.lineTo(px, gy + Wob(px));
+        WalkEdge();
         ctx.strokeStyle = "rgba(36,26,16,0.62)";
         ctx.lineWidth = 3;
         ctx.stroke();
-        // ③ 草茬与翻出来的土坷垃：长在沿上，把那条直线彻底啃断。
-        //    竖井口那一圈自己有碎土（见下面 shaftGeom 那段），这儿让开它
+        // ③ 草茬与翻出来的土坷垃：**扎在路面那条线上**（`rootY`，不是断口的沿），
+        //    从地表看就是路沿上冒出来的一撮草。竖井口那一圈自己有碎土
+        //    （见下面 shaftGeom 那段），这儿让开它
         const nearShaft = (wx) => shaftGeom.some((g) => Math.abs(wx - g.wx) < SHAFT_R + 0.3);
         const grass = night ? ART.PAL.grassNight : ART.PAL.grass;
         for (let px = 0; px <= wPx; px += 17) {
           const wx = x0 + px / PPM;
           if (nearShaft(wx)) continue;
           const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
-          const base = gy + Wob(px);
           if (r > 0.42) {
             // 一片草是**尖的**：根粗梢细、还得往一边披。老版是三根等宽的直线段，
             // 这块贴图在画面上要放大四五倍——上屏读出来是一排绿色小方块
@@ -1376,19 +1421,23 @@ export function CreateWorld(canvasEl) {
               const lean = (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 1.5;
               const wRoot = 1.5 + ART.Hash(sceneKey + "tw" + px + b) * 0.9;
               ctx.beginPath();
-              ctx.moveTo(bx - wRoot / 2, base + 1);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, base - hgt * 0.55,
-                bx + lean * hgt, base - hgt);
-              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, base - hgt * 0.45,
-                bx + wRoot / 2, base + 1);
+              ctx.moveTo(bx - wRoot / 2, rootY + 1);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, rootY - hgt * 0.55,
+                bx + lean * hgt, rootY - hgt);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, rootY - hgt * 0.45,
+                bx + wRoot / 2, rootY + 1);
               ctx.closePath();
               ctx.fill();
             }
           } else if (r < 0.14) {
-            // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
+            // 翻出来的土坷垃：压在线上，一半在线上一半在线下。
+            // **大小与埋深都要差得开**——`r` 被 0.14 那道门夹住，拿它算尺寸就是
+            // 一串一样大的坷垃，露在路面上的又都是同样厚的一片，读出来是花纹不是土
+            const cr = 2.6 + ART.Hash(sceneKey + "cw" + px) * 4.4;
+            const cy = rootY + cr * (0.18 + ART.Hash(sceneKey + "cd" + px) * 0.8);
             ctx.fillStyle = night ? "rgba(78,64,44,0.9)" : "rgba(112,90,60,0.9)";
             ctx.beginPath();
-            ctx.ellipse(px, base + 1, 2.6 + r * 12, 2 + r * 8, 0, 0, Math.PI * 2);
+            ctx.ellipse(px, cy, cr, cr * 0.68, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1569,21 +1618,32 @@ export function CreateWorld(canvasEl) {
       // 描到喇叭口就收（再往下就横在洞顶上了），并在井口啃一圈碎土
       for (const g of shaftGeom) {
         const stopY = g.yBot - 0.42 * PPM;
+        // 洞沿从**路面那条线**底下起描：`g.yTop` 在地表线上头 10cm（井口啃掉地面
+        // 一线），那一截落在路面以上，屏幕上就是窖口两边各悬一道斜的黑杠、
+        // 底边还被路面齐刷刷切平（同上头 Edge/rootY 那段账）
+        const inkTop = Math.max(g.yTop, cutY + 3.5);
         for (const side of [-1, 1]) {
           ctx.beginPath();
-          ctx.moveTo(g.x + side * g.half(g.yTop), g.yTop);
-          for (let y = g.yTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
+          ctx.moveTo(g.x + side * g.half(inkTop), inkTop);
+          for (let y = inkTop; y <= stopY; y += 5) ctx.lineTo(g.x + side * g.half(y), y);
           ctx.strokeStyle = "rgba(24,17,10,0.62)";
           ctx.lineWidth = 5.5;
           ctx.stroke();
         }
-        // 井口一圈翻出来的碎土：把地面那条直边啃断
+        // 井口一圈翻出来的碎土：把地面那条直边啃断。
+        // **一半埋在路面里**（`rootY`，跟草茬、土坷垃同一条线）：老版按井口的
+        // `g.yTop`（＝地表线往上 10cm）摆，而地面平面把路面以下全切掉了——
+        // 于是这九块土整个浮在路面上头，实拍就是窖口跟前悬着一串深色圆饼
+        //（同上头 Edge/rootY 那段账，2026-08-17 用户报的"显示bug"里就有它）
+        // 九块**等距**排开的土，各自只露出同样厚的一片，就是一排花纹——
+        // 所以埋深与落点都得错开（同「等距的横杠是梯子不是炭裂」那条老账）
         for (let i = 0; i < 9; i += 1) {
           const t = i / 8;
-          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32;
+          const px = g.x - g.half(g.yTop) * 1.16 + t * g.half(g.yTop) * 2.32
+            + (ART.Hash(g.id + "cx" + i) - 0.5) * 9;
           const r = (3.4 + ART.Hash(g.id + "cr" + i) * 5.2);
           ctx.beginPath();
-          ctx.arc(px, g.yTop + (ART.Hash(g.id + "cy" + i) - 0.35) * 7, r, 0, Math.PI * 2);
+          ctx.arc(px, rootY + r * (0.14 + ART.Hash(g.id + "cy" + i) * 0.82), r, 0, Math.PI * 2);
           ctx.fillStyle = i % 2 ? "rgba(58,44,28,0.85)" : "rgba(78,60,38,0.8)";
           ctx.fill();
         }
