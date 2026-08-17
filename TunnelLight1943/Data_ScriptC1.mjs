@@ -428,8 +428,8 @@ export function ChapterC1(K) {
       // 到了窖底她只探进半张脸：「搂紧她。」「不叫你们，别上来。」翻板合上——
       // 最后消失在板缝里的，是她那截蓝底白花的袖子。
       kind: "chain", id: "c1_descend", timeOfDay: "day", indoorScene: true, bgm: null,
-      // 序这三拍是一段连着的戏，分级也不许中途换脸（玩法段默认不分级）
-      grade: 0.82,
+      // （原来这儿有个 grade: 0.82：序这三拍夹在过场中间，得自己补一档分级才不会
+      //   中途换脸。2026-08-17 分级改成全局常开之后，节拍级的分级整个没了意义。）
       objective: "带妹妹下窖", hint: "娘掀着翻板等着你们",
       onStart: (state) => {
         state.player.cineWalk = null;
@@ -680,7 +680,7 @@ export function ChapterC1(K) {
       // 粮袋割破；靴子踩上翻板，灰从板缝落下来；屋外一声喊，靴子离开。
       // 光照走 dark 档（罩子 0.52、土黑）：盖板合上的窖底就该是黑的，
       // 「打进来的光」要有黑给它打进来才成立。
-      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null, grade: 0.82,
+      kind: "hold", id: "c1_hide", timeOfDay: "dark", indoorScene: true, bgm: null,
       zone: { x: 31.0, w: 3.2, level: "under" }, holdTime: 15, sustain: true,
       // 按住的十五秒走循环轨道（呼吸＋每轮收紧一下），松手当帧撤掉；
       // holdPose 留着当兜底口径

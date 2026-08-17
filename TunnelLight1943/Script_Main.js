@@ -511,8 +511,6 @@ let frozen = false;
 // 发飘（?fast=1 那条 ×5 只在过场里用，过场没有物理）
 let playSpeed = 1;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
-// 过场分级的当前档（0=一个字节都不动）。见 UpdateCamera 末尾与 World.SetCineGrade
-let gradeNow = 0;
 
 function ActorAt(state, id) {
   if (id === "player") return { x: state.player.x, level: state.player.level, heading: state.player.heading };
@@ -738,17 +736,10 @@ function UpdateCamera(state, dt) {
     world.SetCineFore((def?.fg && state.phase === "playing") ? def.fg : null, null, 16 / 9, "play:" + (def?.id || ""));
     world.SetSplitShot(null);
   }
-  // 过场分级：过场满档，玩法段只有节拍显式声明 `grade` 才给（序章那三拍）。
-  // 换挡走 6/s 的吸附——硬切会在跳幕/暂停这些不走 iris 的地方"啪"地跳一下
-  {
-    const def2 = state.phase === "playing" ? CurrentBeatDef(state) : null;
-    const want = state.phase !== "playing" ? 0
-      : inCinematic ? 1
-        : (def2?.grade ?? 0);
-    gradeNow += (want - gradeNow) * Math.min(1, dt * 6);
-    if (Math.abs(want - gradeNow) < 0.01) gradeNow = want;
-    world.SetCineGrade(gradeNow);
-  }
+  // 分级不再按拍换挡（2026-08-17 用户：「统一游戏过场的内外」）：World 那一遍
+  // 后期一直开着、过场与玩法同一条曲线，所以这儿一个字都不用管。原来这里有
+  // 一段 6/s 的吸附，负责在"过场满档 ↔ 玩法不分级"之间过渡——接缝没了，
+  // 过渡也就没了。要拨强度去 World.SetCineGrade，那是全局的。
   // 做功那几拍的活卡（划线 / 刨料 / 接绳 / 叠衣裳）：铺满画框、每帧重画，玩家
   // 的手就按在上面。必须排在 SetInsertCard 之后（不然当帧就被它关掉）、
   // ApplyCamera 之前（PlaceInsertCard 要给它摆位，并顺手算出屏幕↔卡面的换算比）。
@@ -2016,8 +2007,9 @@ function RunFrame(now, dt) {
   // 动画工作台开着：它铺满整屏，主画面不用画（省一整帧 GPU），改画它那块
   if (AnimLabOpen()) animLab.Step(dt);
   else {
-    world.Render();
-    world.RenderPip(pipRect);   // 后果小窗：主画面之后补一遍角落的剪裁区
+    // 后果小窗一起交给 Render：全局分级要连它一块儿过，不然那块角落是全屏
+    // 唯一没走后期的地方（见 World 的 Render 注释）
+    world.Render(pipRect);
   }
   interactEdge = false;
   advanceEdge = false;
