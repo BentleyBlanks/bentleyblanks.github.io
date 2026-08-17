@@ -1137,90 +1137,91 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.fill();
   ctx.restore();
 
-  // ④ 五官。**近侧那只眼是主角、远侧只给一小记**——两只画一样大就并成一副墨镜
-  //（前几稿实拍都是这样）。转过来那一点角度，一记就够
-  ctx.save();
-  clipFace();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  const nx = px + r * (F.brow - 0.56), ny = py - r * 1.02;   // 眼线 0.50H
-  const fx = px + r * (F.brow - 0.22), fy = py - r * 1.00;   // 远侧那只：整只都得在脸里
-  const browTone = hard ? "rgba(28,20,14,0.92)" : child ? "rgba(78,54,36,0.62)" : "rgba(58,40,26,0.72)";
-  // 眼窝：一小片贴着眉的暗，眼睛才是坐进去的
-  ctx.globalAlpha = hard ? 0.28 : 0.16;
-  ctx.fillStyle = "#6b4326";
-  ctx.beginPath();
-  ctx.ellipse(nx + r * 0.06, ny - r * 0.05, r * 0.30, r * 0.14, -0.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  // 眉：自家人略弯；日军**低而直、往鼻侧压**
-  ctx.strokeStyle = browTone;
-  ctx.lineWidth = (hard ? 1.5 : 1.1) * k;
-  ctx.beginPath();
+  // ④ 五官。**自家人（中国人这一路）一张脸都不画**（2026-08-17 用户定：
+  // 「主角一家索兴别画脸了，丑就算了，还没有表情还不如没有」）。
+  // 这颗头只有 55px 半径，眉眼鼻嘴挤进去必糊；而糊出来的那张脸是**死的**——
+  // 一整章都是同一个表情，比不画更糟。情绪改由**头顶那枚气泡**说
+  // （`Art.DrawMoodBubble`，参考《勇敢的心》的漫画气泡），一个 icon 顶十张脸。
+  // 剩下的读法全交给剪影：鼻子给朝向、发型给身份、衣色给人。
+  //
+  // **日军与军官例外**：他们要的正是"面无表情"（用户："日军应该面无表情，凶一点
+  // 变态一点"）——那张冷脸本身就是内容，所以只有 hard 这一路画五官。
   if (hard) {
+    ctx.save();
+    clipFace();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const nx = px + r * (F.brow - 0.56), ny = py - r * 1.02;   // 眼线 0.50H
+    const fx = px + r * (F.brow - 0.22), fy = py - r * 1.00;   // 远侧那只：整只都得在脸里
+    // 眼窝：一小片贴着眉的暗，眼睛才是坐进去的
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = "#6b4326";
+    ctx.beginPath();
+    ctx.ellipse(nx + r * 0.06, ny - r * 0.05, r * 0.30, r * 0.14, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // 眉：低而直、往鼻侧压——凶就在这一下
+    ctx.strokeStyle = "rgba(28,20,14,0.92)";
+    ctx.lineWidth = 1.5 * k;
+    ctx.beginPath();
     ctx.moveTo(nx - r * 0.22, ny - r * 0.28);
     ctx.lineTo(nx + r * 0.26, ny - r * 0.36);
-  } else {
-    ctx.moveTo(nx - r * 0.22, ny - r * 0.30);
-    ctx.quadraticCurveTo(nx + r * 0.04, ny - r * 0.40, nx + r * 0.26, ny - r * 0.32);
+    ctx.stroke();
+    ctx.lineWidth = 1.2 * k;
+    ctx.beginPath();
+    ctx.moveTo(fx - r * 0.08, fy - r * 0.26);
+    ctx.quadraticCurveTo(fx + r * 0.02, fy - r * 0.31, fx + r * 0.11, fy - r * 0.27);
+    ctx.stroke();
+    // 眼：收成一道缝，瞳一粒钉在中间
+    const eyeH = r * 0.055, eyeW = r * 0.145;
+    const slit = (cx, cy, w, h) => {
+      ctx.beginPath();
+      ctx.moveTo(cx - w, cy + h * 0.2);
+      ctx.quadraticCurveTo(cx - w * 0.2, cy - h * 1.25, cx + w, cy - h * 0.15);
+      ctx.quadraticCurveTo(cx + w * 0.1, cy + h * 0.95, cx - w, cy + h * 0.2);
+      ctx.closePath();
+      ctx.fillStyle = IN.ink;
+      ctx.fill();
+    };
+    slit(nx, ny, eyeW, eyeH);
+    slit(fx, fy, eyeW * 0.6, eyeH * 0.86);
+    // 鼻梁：两只眼之间那一道，不留就并成一副墨镜
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = "#7a4a28";
+    ctx.lineWidth = 1.0 * k;
+    ctx.beginPath();
+    ctx.moveTo(px + r * (F.brow - 0.26), py - r * 1.14);
+    ctx.quadraticCurveTo(px + r * (F.brow - 0.24), py - r * 0.98, px + r * (F.brow - 0.28), py - r * 0.86);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // 唇缝：**一条平直线**——面无表情
+    const mw = r * 0.13, mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
+    ctx.strokeStyle = "rgba(58,34,28,0.9)";
+    ctx.lineWidth = 1.3 * k;
+    ctx.beginPath();
+    ctx.moveTo(mcx - mw, my + r * 0.01);
+    ctx.lineTo(mcx + mw, my - r * 0.01);
+    ctx.stroke();
+    // 一粒鼻孔
+    ctx.fillStyle = "rgba(96,58,34,0.42)";
+    ctx.beginPath();
+    ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // 耳：颧弓后头、眼线高度。一小片软肉，**不许有内环**
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(px - r * 0.40, py - r * 1.00);
+    ctx.quadraticCurveTo(px - r * 0.60, py - r * 0.96, px - r * 0.58, py - r * 0.74);
+    ctx.quadraticCurveTo(px - r * 0.56, py - r * 0.56, px - r * 0.42, py - r * 0.60);
+    ctx.closePath();
+    ctx.fillStyle = "#bf9068";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(106,68,42,0.45)";
+    ctx.lineWidth = 0.7 * k;
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.stroke();
-  // 眼：杏仁形。日军收成一道缝
-  const eyeH = r * (hard ? 0.055 : 0.100) * F.eyeK, eyeW = r * 0.145 * F.eyeK;
-  ctx.beginPath();
-  ctx.moveTo(nx - eyeW, ny + eyeH * 0.2);
-  ctx.quadraticCurveTo(nx - eyeW * 0.2, ny - eyeH * 1.25, nx + eyeW, ny - eyeH * 0.15);
-  ctx.quadraticCurveTo(nx + eyeW * 0.1, ny + eyeH * 0.95, nx - eyeW, ny + eyeH * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = IN.ink;
-  ctx.fill();
-  // 远侧那只：窄一档（透视压缩），贴着鼻根。跟近侧那只之间留得出鼻梁
-  const fH = eyeH * 0.86, fW = eyeW * 0.60;
-  ctx.beginPath();
-  ctx.moveTo(fx - fW, fy + fH * 0.2);
-  ctx.quadraticCurveTo(fx - fW * 0.2, fy - fH * 1.25, fx + fW, fy - fH * 0.15);
-  ctx.quadraticCurveTo(fx + fW * 0.1, fy + fH * 0.95, fx - fW, fy + fH * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = IN.ink;
-  ctx.fill();
-  // 远侧那道眉
-  ctx.strokeStyle = browTone;
-  ctx.lineWidth = (hard ? 1.2 : 0.9) * k;
-  ctx.beginPath();
-  ctx.moveTo(fx - r * 0.08, fy - r * (hard ? 0.26 : 0.28));
-  ctx.quadraticCurveTo(fx + r * 0.02, fy - r * (hard ? 0.31 : 0.34), fx + r * 0.11, fy - r * (hard ? 0.27 : 0.29));
-  ctx.stroke();
-  // 唇缝：**短**（一张脸上的嘴只有四分之一个头宽），位置在鼻底下 0.2r。
-  // 自家人略弯，日军一条平直线——面无表情
-  const mw = r * (child ? 0.11 : 0.13);
-  const mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
-  ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(112,58,46,0.72)";
-  ctx.lineWidth = (hard ? 1.3 : 1.1) * k;
-  ctx.beginPath();
-  ctx.moveTo(mcx - mw, my + r * 0.01);
-  if (hard) ctx.lineTo(mcx + mw, my - r * 0.01);
-  else ctx.quadraticCurveTo(mcx, my + r * 0.045, mcx + mw, my - r * 0.015);
-  ctx.stroke();
-  // 一粒鼻孔，点到为止
-  ctx.fillStyle = "rgba(96,58,34,0.42)";
-  ctx.beginPath();
-  ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // 耳：颧弓后头、眼线高度。一小片软肉，**不许有内环**
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(px - r * 0.40, py - r * 1.00);
-  ctx.quadraticCurveTo(px - r * 0.60, py - r * 0.96, px - r * 0.58, py - r * 0.74);
-  ctx.quadraticCurveTo(px - r * 0.56, py - r * 0.56, px - r * 0.42, py - r * 0.60);
-  ctx.closePath();
-  ctx.fillStyle = hard ? "#bf9068" : "#cd9a66";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(106,68,42,0.45)";
-  ctx.lineWidth = 0.7 * k;
-  ctx.stroke();
-  ctx.restore();
 
   // ⑤ 头饰：最后画（帽子压住颅顶与鬓角；军官的卫生胡也在这一段，压在唇缝上）
   if (kind === "soldier") {
@@ -8775,6 +8776,129 @@ export function DrawMouse(ctx, x, y, id) {
 // 全部图标共用同一套手绘语汇——纸面底、墨线框、图形不写字。
 // icon: plank 木料 | rope 断绳 | q 疑问 | stone 石子
 // ---------------------------------------------------------------------------
+/**
+ * 头顶那枚**心情气泡**（2026-08-17 用户定：「妹妹在害怕有很多种表达啊，你可以在
+ * 她头上加个 hud+icon 显示一下，就像勇敢的心的那种，像对话框一样的状态显示」）。
+ *
+ * 这枚气泡是**自家人表情的唯一去处**：那颗头只有 55px 半径，五官挤进去必糊，
+ * 而且糊出来是一整章不变的死表情（所以脸整个不画了，见 DrawHeadPart ④）。
+ * 一个 icon 能演十种情绪，还能跟着剧情换——这才是"有很多种表达"。
+ *
+ * 画法照漫画气泡：圆角的一块纸、左下角一条指向人的小尾巴、里头一张最简的脸
+ *（两只眼＋一张嘴），外加一个记号（汗珠 / 呵气 / 泪 / Z）。
+ * 纸色比画面亮一档但不刺眼；墨线跟全场同一支笔。
+ */
+export const MOOD_KINDS = ["afraid", "cold", "hungry", "hurt", "sleepy", "sad", "calm"];
+
+export function DrawMoodBubble(ctx, x, y, mood, id) {
+  const w = 40, h = 34;                 // 气泡本身（画布另留出尾巴与记号的地方）
+  const top = y - h - 7;
+  // 纸：圆角一块，左下探出一条尾巴指着头顶
+  InkFill(ctx, [
+    [x - w / 2, top + 5], [x - w / 2 + 5, top], [x + w / 2 - 5, top], [x + w / 2, top + 5],
+    [x + w / 2, top + h - 5], [x + w / 2 - 5, top + h], [x - 2, top + h],
+    [x - 7, y - 1], [x - 9, top + h], [x - w / 2 + 5, top + h], [x - w / 2, top + h - 5],
+  ], id + "paper", "rgba(242,231,201,0.96)", { amp: 0.9, lw: 2.4 });
+  const cx = x, cy = top + h * 0.47;
+  const ink = IN.ink;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const line = (x0, y0, x1, y1, lwPx = 2.2, col = ink) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lwPx;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  };
+  const dot = (dx, rr = 2.6) => {
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.ellipse(cx + dx, cy - 3.4, rr, rr * 1.15, 0, 0, Math.PI * 2); ctx.fill();
+  };
+  const arc = (x0, y0, rr, a0, a1, lwPx = 2.2) => {
+    ctx.strokeStyle = ink; ctx.lineWidth = lwPx;
+    ctx.beginPath(); ctx.arc(x0, y0, rr, a0, a1); ctx.stroke();
+  };
+  switch (mood) {
+    case "afraid":
+      // 睁大的两只眼＋张着的小嘴＋一颗汗珠：一眼就是"怕"
+      dot(-5.4, 3.1); dot(5.4, 3.1);
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 5.2, 3.0, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(120,160,186,0.9)";
+      ctx.beginPath();
+      ctx.moveTo(cx + 12, cy - 9);
+      ctx.quadraticCurveTo(cx + 15.5, cy - 4.5, cx + 12, cy - 2.6);
+      ctx.quadraticCurveTo(cx + 8.6, cy - 4.6, cx + 12, cy - 9);
+      ctx.fill();
+      break;
+    case "cold":
+      // 挤紧的两只眼（><）＋抖的嘴＋两道呵气
+      line(cx - 8.4, cy - 6, cx - 3.4, cy - 3.2); line(cx - 8.4, cy - 0.6, cx - 3.4, cy - 3.2);
+      line(cx + 8.4, cy - 6, cx + 3.4, cy - 3.2); line(cx + 8.4, cy - 0.6, cx + 3.4, cy - 3.2);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy + 5.6);
+      ctx.quadraticCurveTo(cx - 2, cy + 3.4, cx, cy + 5.6);
+      ctx.quadraticCurveTo(cx + 2, cy + 7.8, cx + 5, cy + 5.6);
+      ctx.stroke();
+      arc(cx + 12, cy + 2, 4.2, -1.9, 0.5, 1.6);
+      arc(cx + 14, cy + 7, 3.0, -1.9, 0.5, 1.4);
+      break;
+    case "hungry":
+      // 半闭的眼＋一条平嘴＋一只空碗
+      line(cx - 8, cy - 3.6, cx - 3, cy - 3.6); line(cx + 3, cy - 3.6, cx + 8, cy - 3.6);
+      line(cx - 3.4, cy + 5, cx + 3.4, cy + 5, 2.0);
+      ctx.strokeStyle = "#8a6a45"; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx + 8.4, cy + 7.6);
+      ctx.quadraticCurveTo(cx + 12.6, cy + 12.6, cx + 16.8, cy + 7.6);
+      ctx.stroke();
+      break;
+    case "hurt":
+      // 挤成一条缝的眼＋咬住的牙
+      line(cx - 8.4, cy - 4.6, cx - 3.2, cy - 2.6); line(cx + 8.4, cy - 4.6, cx + 3.2, cy - 2.6);
+      InkFill(ctx, [[cx - 4.6, cy + 3], [cx + 4.6, cy + 3], [cx + 4.6, cy + 7], [cx - 4.6, cy + 7]],
+        id + "teeth", "rgba(250,244,226,0.95)", { amp: 0.4, lw: 1.6 });
+      line(cx - 1.4, cy + 3, cx - 1.4, cy + 7, 1.2); line(cx + 1.8, cy + 3, cx + 1.8, cy + 7, 1.2);
+      break;
+    case "sleepy":
+      // 闭上的眼＋一个 Z
+      arc(cx - 5.6, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      arc(cx + 5.6, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      line(cx - 2.6, cy + 5.4, cx + 2.6, cy + 5.4, 1.8);
+      line(cx + 8.6, cy - 8.6, cx + 14.4, cy - 8.6, 2.0);
+      line(cx + 14.4, cy - 8.6, cx + 8.6, cy - 2.8, 2.0);
+      line(cx + 8.6, cy - 2.8, cx + 14.4, cy - 2.8, 2.0);
+      break;
+    case "sad":
+      // 垂下的眼＋往下弯的嘴＋一颗泪
+      arc(cx - 5.4, cy - 1.6, 3.4, 3.5, 6.1, 2.0);
+      arc(cx + 5.4, cy - 1.6, 3.4, 3.5, 6.1, 2.0);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy + 6.6);
+      ctx.quadraticCurveTo(cx, cy + 3.4, cx + 4, cy + 6.6);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(120,160,186,0.92)";
+      ctx.beginPath();
+      ctx.moveTo(cx - 7.6, cy + 1);
+      ctx.quadraticCurveTo(cx - 4.6, cy + 5.6, cx - 7.6, cy + 7.4);
+      ctx.quadraticCurveTo(cx - 10.6, cy + 5.6, cx - 7.6, cy + 1);
+      ctx.fill();
+      break;
+    default:            // calm：闭着眼、嘴角略松——"这会儿没事了"
+      arc(cx - 5.4, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      arc(cx + 5.4, cy - 5.4, 3.4, 0.25, 2.9, 2.0);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(cx - 3.6, cy + 4.4);
+      ctx.quadraticCurveTo(cx, cy + 7.2, cx + 3.6, cy + 4.4);
+      ctx.stroke();
+      break;
+  }
+  ctx.restore();
+}
+
 export function DrawIconBubble(ctx, x, y, icon, id) {
   // 气泡：圆角方带一个小尾巴
   const w = 34, h = 28;
