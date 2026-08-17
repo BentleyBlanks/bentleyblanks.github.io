@@ -22,15 +22,20 @@
 // 后续别的梯子/楼梯照抄：换一张落点表（feet/hands 两列世界 y）就是另一架梯子。
 // 楼梯只有 feet 没有 hands（hands 传空表就不扒）。
 
-const HIP_STAND = 0.48;     // 扒在梯上胯离脚线多高（未乘体型）：屈膝挂着，不是站直（站直 0.62）
+const HIP_STAND = 0.66;     // 扒在梯上胯离脚线多高（未乘体型）。**故意给得比腿长（0.62）还高**：胯真正的
+                            // 高度由 LEG_STAND 从最低那只脚往上量，这个数只是上限——于是撑着的那条腿几乎
+                            // 一直是直的，只在够下一档那一下沉一寸。0.48 那版两条腿都折着、膝盖朝外支，
+                            // 用户说「像青蛙」
+const HIP_SMALL = 0.56;     // 并档步的小身量：两只脚常在同一档上，胯钉在腿长上会一档一顿
 const HIP_CARRY = 0.66;     // 抱着孩子爬：腿几乎直着——她坐在他胯上（SEAT_LIFT 按脚线算），他一蹲她就骑到脸上
-const LEG_STAND = 0.615;    // 胯离最低那只脚最多多远（腿 0.62 伸直前留一丝）
-const HAND_REF = 0.98;      // 手的参考高度（相对脚线，未乘体型）：肩上半拳——再高胳膊就绷直、肘翻到脑后
+const LEG_STAND = 0.60;     // 胯离最低那只脚最多多远（腿 0.62 伸直前留一丝）
+const HAND_REF = 1.16;      // 手的参考高度（相对脚线，未乘体型）：肩上半拳（肩在 0.66+0.447）。低了两只手
+                            // 折在脸前像捂脸；再高胳膊就绷直
 const HAND_REF_SMALL = 0.68; // 并档步的手参考高度：两只手一先一后，隔着一档的那半个周期里高的那只要
                             // 够到参考上方一档——小身量的胳膊只有 0.29m，参考得压到肩下一拳才两头都够得着
 const FOOT_X = 0.06;        // 踩着的脚（踝）在身前多少（未乘体型）——脚掌前半搭在档上
 const HAND_X = 0.17;        // 扒着的手在身前多少（未乘体型）——胸前一拃
-const FOOT_LIFT_X = -0.11;  // 换脚时脚往身后收多少（抬膝）
+const FOOT_LIFT_X = -0.05;  // 换脚时脚往身后收多少（抬膝）：收多了膝盖朝外支成青蛙腿
 const HAND_LIFT_X = -0.07;  // 换手时手往身前收多少
 const ANKLE_UP = 0.085;     // 踝在档上方多少（鞋帮 0.09 减去鞋底压进档的一线）
 const ANKLE_BACK = -0.07;   // 踝在踩点之后多少（脚掌前半在档上，踝在后）
@@ -71,11 +76,14 @@ export function YAt(list, i) {
  * 一条肢体的周期：q 是它自己的相位（落点表号数），每 stride 号一个周期；
  * 周期开头 [0, w) 那一段在空中从 to−stride 挪到 to，其余时候扒在 to 上。
  */
-function LimbCycle(q, par, stride, w) {
+function LimbCycle(q, par, stride, w, settle = 0) {
   const c = Math.floor((q - par) / stride);
   const to = par + c * stride;
   const fr = (q - to) / stride;
-  const k = fr < w ? fr / w : 1;
+  let k = fr < w ? fr / w : 1;
+  // 停下来（settle→1）：半空里的肢体就近落到档上——刚抬起来的收回去、过了一半的
+  // 落到下一档。位置的连续性由 settle 自己的渐变保证，再动起来它又掉回 0
+  if (settle > 0 && k < 1) k = k < 0.5 ? k * (1 - settle) : k + (1 - k) * settle;
   return { from: to - stride, to, k };
 }
 
@@ -106,12 +114,13 @@ function ShiftFor(w, stride, landRel, sgn, pitch) {
  *   dir    −1 往下 / +1 往上
  *   bs     体型（BODY_SCALE）
  *   oneHand 一只手兜着孩子：只剩后手扒
+ *   settle 0 在爬 … 1 停稳了（World 按有没有在挪给）：半空的手脚就近落到档上
  * @returns {{hip:{x,y}, feet:{F,B}, hands:{F,B}|{B}, look:number, stride:number}}
  *   x 是身前为正的世界米（未除体型）；**y 一律是世界 y**（不是相对 base）。
  *   Rig 拿到之后换算成骨架局部坐标：local = (world − base) / bs
  */
 export function PlanClimb(o) {
-  const { holds, base, dir, bs = 1, oneHand = false } = o;
+  const { holds, base, dir, bs = 1, oneHand = false, settle = 0 } = o;
   const down = dir < 0;
   const sgn = down ? -1 : 1;
   const feetList = down ? holds.feet : [...holds.feet].reverse();
@@ -123,19 +132,21 @@ export function PlanClimb(o) {
   // 跨档步 / 并档步：半大孩子（0.80）也跨得动，只有妹妹那种矮一头多的才并档
   const big = bs >= 0.75;
   const strideF = big ? 2 : 1;
-  const wF = big ? 0.36 : 0.40;
+  // 空中那一段占周期几成。**这个数越小，扒着的那只脚跟着身子挪的距离越长**（=stride·pitch·(1−w)），
+  // 抬到最后膝盖就顶到胯——0.28 那版实拍是青蛙腿；0.42 一步只挪 0.46m，膝盖最高到胯下一拳
+  const wF = big ? 0.42 : 0.40;
   // 落稳那一刻脚在哪：往下是**伸直了够下去**（脚线下 0.19·bs），往上是**跨上去**
   // （膝抬到脚线上 0.29·bs）；两只脚扒稳时的范围就夹在这两个数之间
   const sweepF = pitch * strideF * (1 - wF);
   // 抱着人够不了那么远（腿直着，胯没有余量往下沉）
-  const reachF = (oneHand ? -0.10 : -0.20) * bs;
+  const reachF = (oneHand ? -0.08 : -0.16) * bs;
   const landF = down ? reachF : (reachF + sweepF);
   const shiftF = ShiftFor(wF, strideF, landF, sgn, pitch);
   const qF = IndexOf(feetList, base) + shiftF;
 
-  const cF = LimbCycle(qF, 0, strideF, wF);
+  const cF = LimbCycle(qF, 0, strideF, wF, settle);
   // 并档步：后脚**跟着前脚去同一档**（落后半个周期），不是错开一档
-  const cB = big ? LimbCycle(qF, 1, strideF, wF) : LimbCycle(qF - 0.5, 0, 1, wF);
+  const cB = big ? LimbCycle(qF, 1, strideF, wF, settle) : LimbCycle(qF - 0.5, 0, 1, wF, settle);
   const footF = LimbPoint(feetList, cF, FOOT_X * bs, FOOT_LIFT_X * bs);
   const footB = LimbPoint(feetList, cB, FOOT_X * bs, FOOT_LIFT_X * bs);
   // 踝不是踩点：脚掌前半搭在档上，踝在后上方
@@ -147,11 +158,12 @@ export function PlanClimb(o) {
   // 跳一下。（这一条最初写成 min(0.5·bs, 脚 + 腿) 忘了脚是世界坐标——上限从来
   // 没生效，胯整段钉在最低那只脚上，一半时间是停的，画面读成一顿一顿地掉）
   const lowFoot = Math.min(footF.y, footB.y) - ANKLE_UP * bs;
-  let hipY = SoftMin(base + (oneHand ? HIP_CARRY : HIP_STAND) * bs, lowFoot + LEG_STAND * bs, 0.03);
+  const hipStand = oneHand ? HIP_CARRY : big ? HIP_STAND : HIP_SMALL;
+  let hipY = SoftMin(base + hipStand * bs, lowFoot + LEG_STAND * bs, 0.03);
 
   // 手：自己按参考高度找档，跟脚各走各的表；换手窗口错开半档（前脚→前手→后脚→后手）
   const strideH = oneHand ? 1 : (big ? 2 : 1);
-  const wH = oneHand ? 0.42 : (big ? 0.36 : 0.40);
+  const wH = oneHand ? 0.40 : (big ? 0.42 : 0.40);
   const sweepH = pitch * strideH * (1 - wH);
   // 往下：胸口接住（比参考低）、伸直了松；往上：够到头顶抓、拉到胸口松
   const landH = down ? -0.5 * sweepH : 0.5 * sweepH;
@@ -164,20 +176,26 @@ export function PlanClimb(o) {
   // 最多偏出半档：大人的胳膊够得住；妹妹那种 0.6 的小身量胳膊才 0.29m，半档就是
   // 一臂——并档步**不钉相位**，手就按参考高度找档，谁先谁后由几何定（同一张表算
   // 出来的，相位关系是稳的，不会跳）
+  // 两种错法都成立：错半档（脚→手→脚→手）或对齐（对角的手脚一起动，也是真人的爬法）——
+  // 挑修正量小的那个，手的平均高度就只偏参考 ±¼ 档，胳膊够得着
   const wrap = (v) => v - Math.round(v);
   const yMid = (holds.top + holds.bot) * 0.5;
-  const corr = big ? wrap((IndexOf(feetList, yMid) + shiftF + 0.5)
-    - (IndexOf(handList, yMid + handRef) + shiftH)) : 0;
+  let corr = 0;
+  if (big) {
+    const c1 = wrap((IndexOf(feetList, yMid) + shiftF + 0.5) - (IndexOf(handList, yMid + handRef) + shiftH));
+    const c2 = wrap(c1 + 0.5);
+    corr = Math.abs(c2) < Math.abs(c1) ? c2 : c1;
+  }
   const qH = qHraw + corr;
   const hands = {};
   if (!oneHand) {
-    const hF = LimbCycle(qH, 0, strideH, wH);
-    const hB = big ? LimbCycle(qH, 1, strideH, wH) : LimbCycle(qH - 0.5, 0, 1, wH);
+    const hF = LimbCycle(qH, 0, strideH, wH, settle);
+    const hB = big ? LimbCycle(qH, 1, strideH, wH, settle) : LimbCycle(qH - 0.5, 0, 1, wH, settle);
     hands.F = LimbPoint(handList, hF, HAND_X * bs, HAND_LIFT_X * bs);
     hands.B = LimbPoint(handList, hB, HAND_X * bs, HAND_LIFT_X * bs);
     hands.B.x -= 0.03 * bs;                       // 后手略靠里，别跟前手叠成一只
   } else {
-    hands.B = LimbPoint(handList, LimbCycle(qH, 0, 1, wH), HAND_X * bs, HAND_LIFT_X * bs);
+    hands.B = LimbPoint(handList, LimbCycle(qH, 0, 1, wH, settle), HAND_X * bs, HAND_LIFT_X * bs);
   }
 
   // 手也得够得着：井口那几档手还扒在梯头上、人却站直了往下够，胳膊要伸到 0.6m——
