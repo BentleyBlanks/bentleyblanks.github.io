@@ -175,6 +175,13 @@ node TunnelLight1943/Script_DepthAudit.mjs   # 落地体检（悬空/陷地）
 node TunnelLight1943/Script_Cli.mjs doctor   # 开工前：分支/落后/未提交/缓存戳/端口
 ```
 
+**worktree 里跑测试要在 worktree 根目录跑**（2026-08-18 白跑了一整轮）：`npm run` 会把
+cwd 换到装着 package.json 的**主仓库**，于是 `npm run test:tunnelLight1943` 测的是主仓库那份
+签出，跟你改的这份没关系——全绿也说明不了任何事。worktree 里直接 `node` 调脚本：
+`node TunnelLight1943/Script_SmokeTest.mjs`（＋ `Script_SceneAudit.mjs --quiet` /
+`Script_RenderHealthTest.mjs` / `Script_DebugJumpTest.mjs` / `Script_BgmTest.mjs`），
+node_modules 靠模块解析往上走就能找到主仓库那份。
+
 改完某一拍，最快的自检是把它单独跑一遍再看一眼：
 
 ```bash
