@@ -196,11 +196,6 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
           input.interactHeld = true;
           input.moveX = 0;
         }
-        // 划线：按住 E 的同时还得左右推，粉笔才走
-        if (target.action === "scribeAt" && Math.abs(dx) <= 1.6) {
-          input.interactHeld = true;
-          input.moveX = 1;
-        }
         // 刨料：驱动器只按键盘（CLAUDE.md 铁律），按住 E 就行——方向由节拍自己判。
         // 走位也由节拍接管（爹让开后柱子自动上前），驱动器不用管站位
         // 受伤版刨木（c1_repair）：手抖那口气没喘完就得松手，驱动器照着 rest 松
@@ -239,32 +234,14 @@ function AutoPlay(state, routeChoice, { maxChapterSeconds = 900, log = false, ch
           input.moveX = 0;
           FoldDrive(state, input, target, tick);
         }
-        // 找吃的那四道手：一个长按后备都没有（2026-08-12 用户退回「居然是长按
-        // 一个按钮」），所以驱动器只能**真的去拖那三样东西 / 那张卡**——攥住、
-        // 往该去的方向一点点挪，跟真人同一套输入。走位容差比别处紧
-        // （0.45）：这几步的站位是节拍自己钉的，走过头会掉出判定区。
-        if ((target.action === "heaveAt" || target.action === "plankAt" || target.action === "scoopAt")
-          && Math.abs(dx) <= 0.45) {
+        // 找吃的三处、抠泥封、掰红薯干、撕布、划线（2026-08-17 四动词第二轮）：
+        // 全部走上面那条 holdAt＋stroke / interactAt 的通用路，驱动器不再各配
+        // 一条拖拽路——真人也没有那条路了。
+        // 缝三针**保留原样**（用户同日：「缝针的这个交互保留」）：驱动器还是抓着卡上
+        // 那根针，照 GetBeatTarget 交出来的 seq 一段一段拖
+        if (target.action === "sewAt" && Math.abs(dx) <= near && target.card) {
           input.moveX = 0;
-          ForageDrive(state, input, target, tick);
-        }
-        if (target.action === "unwrapAt" && Math.abs(dx) <= 0.45 && target.card) {
-          input.moveX = 0;
-          WrapDrive(state, input, target, tick);
-        }
-        // 掰红薯干（分食）：同接绳/叠衣裳，没有长按后备，驱动器真的在卡上
-        // 捏住那截、掰断、分进碗、再把长的捞出来沥两滴搁回去
-        if (target.action === "splitAt" && Math.abs(dx) <= near && target.card) {
-          input.moveX = 0;
-          SplitDrive(state, input, target, tick);
-        }
-        // 撕布 / 缝三针（八稿）：同上，没有长按后备——驱动器抓着卡上的
-        // 布角/针，照 GetBeatTarget 交出来的 seq 一段一段拖
-        if ((target.action === "tearAt" || target.action === "sewAt")
-          && Math.abs(dx) <= near && target.card) {
-          input.moveX = 0;
-          CardSeqDrive(state, input, target, tick,
-            target.action === "tearAt" ? state.tearCard : state.sewCard);
+          CardSeqDrive(state, input, target, tick, state.sewCard);
         }
       }
     }
@@ -1019,50 +996,6 @@ function FoldDrive(state, input, target, tick) {
   Put(fc.tip.x + (vx / d) * step, fc.tip.y + (vy / d) * step);
 }
 
-/** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒紧到了几成 */
-// 找吃的那三样在世界里的东西（苫子/门板/土堆）：攥住 → 往 target.to 挪。
-// 两个点都是 Core 每帧现算的（GetBeatTarget），驱动器不自己推几何。
-function ForageDrive(state, input, target, tick) {
-  const Put = (pt) => { input.pointerHeld = true; input.pointerWorld = { x: pt.x, y: pt.y }; };
-  // 同一个动作词可能对应两件东西（苫草/苇席、灰堆/食槽）：Core 在 target.part
-  // 里说清这一步拖的是哪件，驱动器不自己猜
-  const f = target.part ? state.forage?.[target.part]
-    : target.action === "heaveAt" ? state.forage?.mat
-      : target.action === "plankAt" ? state.forage?.plank : state.forage?.ash;
-  if (!f) return;
-  if (!f.grab) {
-    // 松一帧 → 按一帧：这一下必须按在那件东西上才攥得住（state.ptrPressed）
-    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerWorld = null; return; }
-    Put(target.grab);
-    return;
-  }
-  // 攥住了：手只许比那件东西领先一点点——领先过头，苫子会撕、板子会顶住，
-  // 那两条规矩这里不许绕开
-  Put(target.to);
-}
-
-// 掰红薯干那张活卡（分食）：GetBeatTarget 每帧把「捏哪儿、拖到哪儿」算成
-// seq[0] 交出来（from 是活的：捏点/那截红薯干此刻在哪儿），驱动器照着拖。
-// 没攥住时同 KnotDrive 的节拍：先松一帧再按下去（攥住只认按下那一帧）
-function SplitDrive(state, input, target, tick) {
-  const A = target.aspect || 16 / 9;
-  const Put = (x, y) => { input.pointerHeld = true; input.pointerCard = { u: x, v: y * A }; };
-  const sc = state.splitCard;
-  const seq = target.seq || [];
-  if (!seq.length) return;
-  const leg = seq[0];
-  if (!sc || !sc.grab) {
-    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerCard = null; return; }
-    Put(leg.from.x, leg.from.y);
-    return;
-  }
-  const vx = leg.to.x - leg.from.x, vy = leg.to.y - leg.from.y;
-  const d = Math.hypot(vx, vy) || 1;
-  if (leg.hold && d < 0.02) { Put(leg.to.x, leg.to.y); return; }   // 提在半空沥水：手停住
-  const step = Math.min(d, target.reachStep);
-  Put(leg.from.x + (vx / d) * step, leg.from.y + (vy / d) * step);
-}
-
 // 撕布 / 缝三针（八稿）：通用的「抓着卡上那个点、照 seq[0] 拖」驱动——
 // 卡的 view 里必须有 grab 和一个可抓的当前点（seq[0].from 就是它）。
 // 没攥住时同 KnotDrive 的节拍：先松一帧再按下去（攥住只认按下那一帧）
@@ -1081,27 +1014,6 @@ function CardSeqDrive(state, input, target, tick, card) {
   const d = Math.hypot(vx, vy) || 1;
   const step = Math.min(d, target.reachStep);
   Put(leg.from.x + (vx / d) * step, leg.from.y + (vy / d) * step);
-}
-
-// 解扎口那张活卡：先顺着一个方向把泥圈抠完，再捏住碗片揭开
-function WrapDrive(state, input, target, tick) {
-  const A = target.aspect || 16 / 9;
-  const Put = (x, y) => { input.pointerHeld = true; input.pointerCard = { u: x, v: y * A }; };
-  const wc = state.wrapCard;
-  const c = target.neck;
-  if (!wc) { Put(c.x + target.ring, c.y); return; }
-  if (wc.phase !== "peel") {
-    const a = (wc.a === null || wc.a === undefined) ? -0.5 : wc.a + target.spin;
-    Put(c.x + Math.cos(a) * target.ring, c.y + Math.sin(a) * target.ring * 0.9);
-    return;
-  }
-  const cor = wc.corner;
-  if (!wc.grab) {
-    if (tick % 2 === 0) { input.pointerHeld = false; input.pointerCard = null; return; }
-    Put(cor.x, cor.y);
-    return;
-  }
-  Put(cor.x + target.peel.x * target.reachStep, cor.y + target.peel.y * target.reachStep);
 }
 
 /** 把整条接绳做完（链式测试与自动通关驱动共用同一条路），返回勒了几把 */
@@ -1299,7 +1211,12 @@ function TestGrabbablesAreBigEnoughToRead() {
   console.log(`  ✓ 能上手的大件都认得出（最小 ${Math.min(...items.map(([, m]) => m * PX)).toFixed(0)}px ≥ ${MIN_PX}px）`);
 }
 
-function TestForageIsHandsOn() {
+// 找吃的三处 ＋ 抠泥封（2026-08-17 四动词第二轮）：全部只认「按住 E ＋ 方向」——
+// 光按住 E 不涨、方向反了不涨、松手该塌的塌（苇席坠回、碗片压回）、该留的留
+// （抠掉的泥、扒下去的土）。分量在时间里：硬土那一把比浮灰慢一倍多，第三把
+// 拽到半道钉住、动词当场换成"顺着坛肩抹"。指针那条老路（pointerWorld /
+// pointerCard）这几件东西一概不读了。
+function TestForageIsFourVerbs() {
   const beat = SCRIPTS.c1.find((b) => b.id === "c1_forage");
   const SEARCH = beat.steps.find((s) => s.type === "searchAny");
   const SEARCH_I = beat.steps.indexOf(SEARCH);
@@ -1315,7 +1232,6 @@ function TestForageIsHandsOn() {
     state.player.x = Spot(key).steps[sub].zone.x + 0.55;   // 判定区半宽 1.1，别站到区外
     return state;
   };
-  // 这一处走到第几小步了 / 翻完没有
   const Sub = (state, key) => state.beat.search.sub[key] || 0;
   const Done = (state, key) => !!state.beat.search.done[key];
   const step = (state, input = {}, n = 1) => {
@@ -1326,12 +1242,15 @@ function TestForageIsHandsOn() {
       }, DT);
     }
   };
-  const world = (x, y) => ({ pointerHeld: true, pointerWorld: { x, y: SURFACE_Y + y } });
+  const E_UP = { interactHeld: true, climb: -1 };
+  const E_DOWN = { interactHeld: true, climb: 1 };
+  const E_RIGHT = { interactHeld: true, moveX: 1 };
+  const E_ONLY = { interactHeld: true, interact: true };
+  const frames = (s) => Math.ceil(s / DT);
   // ① 这一场只有一件事：**在棚里翻东西吃**，三处各摆各的、顺序随玩家
   //（2026-08-15 用户退回推焦木：「太奇怪了 解密也不算 也很不直观 我都不知道
   // 要操作这里 只有一个 hint」——现在没有"剧本指定的那一下"了）
   {
-    // 「翻三处」那一步之外只许再有**收尾**（抱起坛子＝E＋↑，第九稿四动词）
     const verbs = beat.steps.map((s) => s.type).filter((t) => t !== "goto" && t !== "pickup");
     assert.deepEqual(verbs.filter((t, i) => !(t === "use" && i === verbs.length - 1)), ["searchAny"],
       "找吃的整场就是一步「翻三处」，别再排成一条直线");
@@ -1353,37 +1272,49 @@ function TestForageIsHandsOn() {
     }
     assert.ok(beat.forage.plank === undefined && beat.forage.mat === undefined,
       "焦木/苫草这一场已经不用了——声明了渲染层就会画一件没人碰的东西");
-    // 埋着的坛子由 DrawAshMound 挖到哪儿露哪儿——链的"未来拾取物预摆"
-    // 会把它从第一帧就蹲在灰堆顶上，把"埋着"整个剧透掉（2026-08-15 实拍抓的）
-    // 2026-08-16 起「抱起坛子」是 use＋stroke:"up"（四动词：抱起来＝E＋↑），
-    // 它本来就不预摆地面道具——`pickup` 那条预摆才需要 worldDrawn 挡着
     const jarUp = beat.steps.find((s) => s.stroke === "up" && /抱起/.test(s.prompt || ""));
     const jarPickup = beat.steps.find((s) => s.type === "pickup" && s.item?.id === "driedYams");
     assert.ok(jarUp || jarPickup?.worldDrawn,
       "埋着的坛子不许预摆地面道具剧透（pickup 要 worldDrawn，或走 E＋↑ 的 use）");
   }
 
-  // ② 长按互动键：三处的动作一个都做不完（后备是死的）
+  // ② 光按住 E（不推方向）：三处一处都做不完；指针拖拽那条老路也死了
   for (const key of ["trough", "reed", "ash"]) {
     const state = Setup(key);
     step(state, {}, 2);
     const before = Sub(state, key);
-    step(state, { interactHeld: true, interact: true }, Math.ceil(8.0 / DT));
-    assert.equal(Sub(state, key), before, `长按 E 居然把「${key}」做完了——这条后备必须是死的`);
-    assert.ok(!state.promptFill, `「${key}」不该再画长按进度环`);
+    step(state, E_ONLY, frames(8));
+    assert.equal(Sub(state, key), before, `光按住 E 居然把「${key}」做完了——做功要往方向上推`);
+    step(state, { pointerHeld: true, pointerWorld: { x: beat.forage[key], y: 0.3 } }, frames(4));
+    assert.equal(Sub(state, key), before, `「${key}」不该再认指针拖拽`);
     assert.ok(!state.dragTrack, "做功那一拍画面上不许有可拖的 HUD 轨道");
+    // 键帽提示：E ＋ 一个方向（老版没有提示，玩家只看见一张要用手拖的卡/一件东西）
+    step(state, {}, 1);
+    const pr = SplitPrompt(state.prompt || "");
+    assert.equal(pr.act, "interact", `「${key}」站到跟前要给键帽提示（实为 ${JSON.stringify(state.prompt)}）`);
+    assert.ok(pr.hold && pr.dir, `「${key}」的提示得是「按住 E ＋ 方向」（实为 ${JSON.stringify(state.prompt)}）`);
   }
 
-  // ③ 按下那一帧手不落在苇席外沿上：攥不住，怎么甩都不动
+  // ③ 苇席：按住 E＋↑ 抬起来（有分量：一秒只抬 lift 那么多）、松手坠回、
+  //    一直按住过了重心自己翻过去；按 ↓ 不动
   {
     const state = Setup("reed");
     step(state, {}, 2);
     const f = state.forage.reed;
-    const a0 = f.ang;
-    step(state, world(beat.forage.reed + 3.6, 1.4), 2);
-    for (let i = 0; i < 60; i += 1) step(state, world(beat.forage.reed + 3.6, 1.4 + i * 0.01));
-    assert.ok(!f.grab, "手没落在席子外沿上就按下去，不该攥得住");
-    assert.ok(Math.abs(f.ang - a0) < 0.02, "在别处按下再甩，席子一动都不该动（这正是「不是 slider」）");
+    const L = FORAGE.reed;
+    step(state, E_DOWN, frames(1));
+    assert.ok(Math.abs(f.ang - L.restA) < 1e-6, "按住 E＋↓ 席子一动都不该动（方向要对）");
+    step(state, E_UP, frames(0.5));
+    assert.ok(f.ang > L.restA + 0.3 && f.ang < L.restA + L.lift * 0.5 + 0.05,
+      `半秒只该抬 ${(L.lift * 0.5).toFixed(2)}rad（实为 ${(f.ang - L.restA).toFixed(2)}）——席子有分量`);
+    assert.equal(SplitPrompt(state.prompt).dir, "up", "掀席子的键帽是 E ＋ ↑");
+    const lifted = f.ang;
+    step(state, {}, frames(1.2));
+    assert.ok(f.ang < lifted - 0.2, "松手席子要自己坠回去");
+    step(state, E_UP, frames(4));
+    assert.ok(f.done, "一直按住 E＋↑，席子过了重心自己翻过去");
+    for (let i = 0; i < 6 && Sub(state, "reed") === 0; i += 1) step(state, {});
+    assert.equal(Sub(state, "reed"), 1, "席子翻过去，这一小步才算完");
   }
 
   // ④ 没进任何一处时，画框边那张牌得指向最近的一处
@@ -1398,76 +1329,54 @@ function TestForageIsHandsOn() {
     assert.ok(BeatHintIcon(state), "牌面要有图——空着等于没提示");
   }
 
-  // ⑥ 扒土：一下一下的——按住不放拖到底，只算一下
+  // ⑤ 食槽：按住 E＋↓ 一把一把扫，三把才完（松手这一把作废）
   {
-    const state = Setup("ash");
+    const state = Setup("trough");
     step(state, {}, 2);
-    const L = FORAGE.ash;
-    const u = ForageScoopDir(1);
-    const m = { x: beat.forage.ash, y: 0.5 * L.top * 0.55 };
-    step(state, world(m.x, m.y), 2);
-    assert.ok(state.forage.ash.grab, "手落在土堆上要抓得住");
-    for (let i = 1; i <= 60; i += 1) {
-      const d = Math.min(i * 0.02, L.keepR * 0.9);
-      step(state, world(m.x + u.x * d, m.y + u.y * d));
-    }
-    assert.equal(state.forage.ash.done, 1, "按住不放一路拖到底，只能算一下——扒是一把一把的");
-    // 划横的不算扒（那是抹，不是往怀里扒）
-    const before = state.forage.ash.done;
+    const f = state.forage.trough;
+    const L = FORAGE.trough;
+    step(state, E_DOWN, frames(L.strokeS[0] * 0.6));
+    assert.equal(f.done, 0, "一把没扫满不算一下");
     step(state, {}, 2);
-    step(state, world(m.x, m.y), 2);
-    for (let i = 1; i <= 40; i += 1) step(state, world(m.x, m.y - i * 0.01));
-    assert.equal(state.forage.ash.done, before, "手往下抹不算扒——方向不对就不涨");
+    assert.equal(f.acc, 0, "扫到半道松手，这一把作废");
+    step(state, E_DOWN, frames(L.strokeS[0] * 1.2));
+    assert.equal(f.done, 1, "扫满一把算一下");
+    step(state, E_DOWN, frames(L.strokeS[0] * 2.4));
+    assert.ok(f.done >= L.strokes, `三把要扫完（done=${f.done}）`);
+    for (let i = 0; i < 6 && Sub(state, "trough") === 0; i += 1) step(state, {});
+    assert.equal(Sub(state, "trough"), 1, "槽底扫完这一小步才算完");
   }
 
-  // ⑥b 灰堆的三层手感（2026-08-15 重做，用户退回「既没有代入感也不好玩也没有
-  // 解密感」）：第三把拽到半道**手钉住**（指甲碰上坛肩，一个字不上屏）；
-  // 钉住之后往怀里拽只攒归因不涨进度；出路是换方向——顺着坛肩横着抹三把，
-  // 抹哪儿露哪儿
+  // ⑥ 灰堆的三层手感（2026-08-15 重做）：浮灰快、硬土慢，第三把拽到半道**手钉住**
+  //   （指甲碰上坛肩，一个字不上屏）；钉住之后往怀里拽只有闷响，动词换成
+  //   「顺着坛肩抹开」（键帽换成 ↔），横着抹三把，抹哪儿露哪儿
   {
     const state = Setup("ash");
     step(state, {}, 2);
     const L = FORAGE.ash;
-    const u = ForageScoopDir(1);
     const f = state.forage.ash;
-    const m = () => ({ x: beat.forage.ash, y: L.top * (1 - 0.55 * f.k) * 0.55 });
-    // 一把：松手→按在堆上→顺着扒的方向拽满，再多攥一会（钉住的话会自己滑脱）
-    const pull = () => {
-      step(state, {}, 2);
-      const p0 = m();
-      step(state, world(p0.x, p0.y), 2);
-      for (let i = 1; i <= 44; i += 1) {
-        const d = Math.min(i * 0.02, L.keepR * 0.9);
-        step(state, world(p0.x + u.x * d, p0.y + u.y * d));
-      }
-      step(state, world(p0.x + u.x * L.keepR * 0.9, p0.y + u.y * L.keepR * 0.9),
-        Math.ceil((L.pinHold + 0.25) / DT));
-    };
-    pull(); pull();
+    let n1 = 0;
+    while (f.done < 1 && n1 < 400) { n1 += 1; step(state, E_DOWN); }
+    let n2 = 0;
+    while (f.done < 2 && n2 < 400) { n2 += 1; step(state, E_DOWN); }
     assert.equal(f.done, 2, "头两把是真扒：浮灰一把、硬土一把");
+    assert.ok(n2 > n1 * 1.8, `硬土那一把要比浮灰慢一倍多（浮灰 ${n1} 帧、硬土 ${n2} 帧）——分量在阻力里`);
     assert.ok(!f.caught, "还没碰着坛肩");
-    pull();
+    assert.equal(SplitPrompt(state.prompt).dir, "down", "扒的键帽是 E ＋ ↓");
+    step(state, E_DOWN, frames(L.strokeS[2] * L.catchAt + 0.1));
     assert.ok(f.caught, "第三把拽到半道要碰上坛肩——手钉住");
     assert.equal(f.done, 2, "钉住的那一把不算扒——它永远拉不完");
     assert.ok(!state.toast, "发现由手说：钉住那一下不许弹字（老版的 toast 是退回原因）");
     assert.equal(Sub(state, "ash"), 0, "光钉住这一步不算完");
-    // 再犟一把：还是拽不动，归因提示才出来（拽两把才说，一把不说）
-    pull();
-    assert.ok(f.tug >= 2, `拽了又拽要记在归因账上（tug=${f.tug}）`);
+    assert.equal(SplitPrompt(state.prompt).dir, "horiz", "钉住了动词就换：键帽变成 E ＋ ↔（顺着坛肩抹）");
+    // 再犟：还是往怀里拽——只有闷响，坛肩一分不露
+    step(state, E_DOWN, frames(1.6));
     assert.equal(f.clear, 0, "往怀里拽把坛肩拽不出来——这个方向已经死了");
-    assert.ok((state.prompt || "").includes("顺着"), "拽了两把都没动静，要说清该换的方向");
-    // 顺着坛肩抹：竖着按不算（那是往下按，不是顺着抹）
-    const sh = { x: f.jarX, y: L.shoulderY };
-    step(state, {}, 2);
-    step(state, world(sh.x, sh.y), 2);
-    for (let i = 1; i <= 30; i += 1) step(state, world(sh.x, sh.y - i * 0.008));
-    assert.equal(f.wipesDone, 0, "在坛肩上竖着按不算抹——方向在这儿是有意义的");
+    assert.ok(f.tug >= 1, `拽了又拽要记在归因账上（tug=${f.tug}）`);
     // 横着抹三把，一把露一段
     for (let w = 0; w < 3; w += 1) {
-      step(state, {}, 2);
-      step(state, world(sh.x, sh.y), 2);
       const dir = w % 2 === 0 ? 1 : -1;
-      for (let i = 1; i <= 24; i += 1) step(state, world(sh.x + dir * Math.min(i * 0.012, 0.3), sh.y));
+      step(state, { interactHeld: true, moveX: dir }, frames(L.wipeS * 1.05));
       assert.equal(f.wipesDone, w + 1, `顺着肩抹一把要露一段（第 ${w + 1} 把）`);
     }
     assert.ok(f.jar && f.clear >= 1, "三把抹完，坛肩整个出来");
@@ -1475,39 +1384,39 @@ function TestForageIsHandsOn() {
     assert.equal(Sub(state, "ash"), 1, "坛肩出来了这一小步才算完");
   }
 
-  // ⑦ 解扎口：转反了是往紧里缠，进度不涨
+  // ⑦ 抠泥封：按住 E＋↑ 三箍一段一段掉，同一个键继续把碗片揭开；
+  //    按 ↓ 不涨；松手泥不长回去、碗片却压回去
   {
     const state = Setup("ash", 1);
     step(state, {}, 3);
-    assert.ok(state.wrapCard, "站到罐跟前就该亮出那张扎口活卡");
-    assert.ok(!state.prompt, "活卡这一拍不留按键提示（招呼长在绳头上）");
+    assert.ok(state.wrapCard, "站到罐跟前就该亮出那张活卡");
     assert.ok(!state.closeUp, "有活卡就不该再推世界里的特写");
     const L = WRAP_CARD;
-    const card = (x, y) => ({ pointerHeld: true, pointerCard: { u: x, v: y * L.aspect } });
-    const at = (a) => card(L.neck.x + Math.cos(a) * L.neck.r * 1.35,
-      L.neck.y + Math.sin(a) * L.neck.r * 1.35);
-    // 顺时针（卡坐标里角度递增）＝往紧里缠
-    for (let i = 0; i < 60; i += 1) step(state, at(-0.5 + i * 0.24));
-    assert.equal(state.wrapCard.laps, 0, "往紧里缠居然把绳褪下来了——方向必须是有意义的");
-    assert.ok(state.beat.wrap.wrongTold, "转反了要说清楚该往哪边转");
-    // 逆时针：一道一道褪
-    for (let i = 0; i < 400 && state.wrapCard?.phase !== "peel"; i += 1) {
-      step(state, at(state.beat.wrap.a - 0.22));
-    }
-    assert.equal(state.wrapCard?.phase, "peel", `三道绳褪完才轮到掀布（laps=${state.beat.wrap.laps}）`);
-    // 掀布：捏住布角往外拖
-    const t = GetBeatTarget(state);
-    assert.equal(t.action, "unwrapAt", "扎口那一步的驱动目标是拖卡上的东西，不是长按");
-    for (let i = 0; i < 400 && !Done(state, "ash"); i += 1) {
-      const inp = {};
-      WrapDrive(state, inp, GetBeatTarget(state), i);
-      step(state, inp);
-    }
-    assert.ok(Done(state, "ash"), "布掀开了，烧土这一处就该算翻完");
+    const pr = SplitPrompt(state.prompt || "");
+    assert.equal(pr.dir, "up", `抠泥封的键帽是 E ＋ ↑（实为 ${JSON.stringify(state.prompt)}）`);
+    step(state, E_DOWN, frames(1));
+    assert.equal(state.wrapCard.laps, 0, "按 E＋↓ 泥一块都不该掉——方向要对");
+    step(state, E_UP, frames(L.unwindS / L.laps + 0.05));
+    assert.equal(state.wrapCard.laps, 1, "按住 E＋↑ 一段时间，第一箍泥掉了");
+    const k1 = state.beat.wrap.k;
+    step(state, {}, frames(1));
+    assert.ok(Math.abs(state.beat.wrap.k - k1) < 1e-6, "松手泥不长回去（掉了就是掉了）");
+    let nUp = 0;
+    while (state.wrapCard?.phase === "unwind" && nUp < frames(L.unwindS + 1)) { nUp += 1; step(state, E_UP); }
+    assert.equal(state.wrapCard?.phase, "peel", `三箍抠完才轮到揭碗片（laps=${state.beat.wrap.laps}）`);
+    assert.ok(nUp * DT > L.unwindS * 0.5, `三箍有三箍的分量（剩下两箍花了 ${(nUp * DT).toFixed(1)}s）`);
+    assert.equal(SplitPrompt(state.prompt).dir, "up", "揭碗片还是同一个键：E ＋ ↑");
+    step(state, E_UP, frames(L.peelS * 0.5));
+    assert.ok(state.wrapCard.open > 0.3 && state.wrapCard.open < 0.7, "碗片揭到一半");
+    const half = state.wrapCard.open;
+    step(state, {}, frames(0.4));
+    assert.ok(state.wrapCard.open < half, "松手碗片自己压回去（有分量）");
+    step(state, E_UP, frames(L.peelS + 0.3));
+    assert.ok(Done(state, "ash"), "碗片揭开了，烧土这一处就该算翻完");
     assert.equal(state.wrapCard, null, "做完了活卡要收走");
   }
-  console.log("  ✓ 找吃的＝翻三处（食槽/苇席/烧土，顺序随玩家） / 长按无效 / 攥不住不动"
-    + " / 一把一把 / 三层手感·钉住不上屏·顺肩抹三把才出坛 / 方向有意义 / 没进哪一处时牌指路");
+  console.log("  ✓ 找吃的＝翻三处（食槽/苇席/烧土，顺序随玩家） / 只认 E＋方向 / 光按住 E 与指针都不涨"
+    + " / 席子有分量会坠回 / 三层手感·钉住不上屏·换 ↔ 抹三把才出坛 / 抠泥三箍＋揭碗片同一个 E＋↑");
 }
 
 // 辘轳是个转盘，不是一根拉杆：鼠标绕**摇把轴销**转圈才走绳——顺时针放、
@@ -1724,15 +1633,15 @@ function TestWinchIsLongEnough() {
   console.log(`  ✓ 打水两道手全走一遍：键盘 ${secs.toFixed(1)}s`);
 }
 
-// 石笔：玩家攥的是一支笔，不是一根滑块。
+// 石笔：按住 E ＋ → 笔才走，三趟才成一道（2026-08-17 四动词第二轮）。
 //
-// 这一拍长在一张铺满画框的手绘特写卡上（state.scribeCard），手落在**卡面**
-// 的哪儿说了算（pointerCard，u 沿卡宽 / v 沿卡高的归一化坐标）。世界坐标那条
-// 老路子已经废了——世界里那支笔只有十来个像素，按不着。五条硬规矩各验一遍。
-function TestChalkIsAPencilNotASlider() {
-  // 攥石笔划线的拟物交互一头一尾各一次：第一章量身（c1_carve，爹的手按着、
-  // 玩家攥笔）与第八章给妹妹刻痕（c8_carve）。机制细则在 c8 上验（selfMark 那
-  // 版旗标齐全）；c1 那道由整章自动通关盯 flags.marked 兜底
+// 这一拍长在一张铺满画框的手绘特写卡上（state.scribeCard）。老版攥的是卡上那支笔
+//（pointerCard）外加一条光按住 E＋左右的后备、不给键帽提示——用户点名的「非按 E
+// 的复杂交互」之一。现在四条：光按住 E 不走、按 ← 不走、按住 E＋→ 笔有摩擦地往前
+// 蹭、一趟到头笔抬起来退回去再蹭，三趟印子一趟比一趟深。
+function TestChalkIsThreePasses() {
+  // 一头一尾各一次：序章画正字（c1_draw）与第八章给妹妹刻痕（c8_carve）。
+  // 机制细则在 c8 上验（selfMark 那版旗标齐全）；c1 那道由整章自动通关兜底
   const carve = ChapterBeatList(7).find((b) => b.id === "c8_carve");
   const mk = () => {
     const state = CreateGame(7);
@@ -1750,77 +1659,58 @@ function TestChalkIsAPencilNotASlider() {
     }
   };
   const L = SCRIBE_CARD;
-  // 笔尖在起点时，拳心（该按的那一点）落在这儿
-  const GRIP = { u: L.u0 + L.gripDU, v: L.v + L.gripDV };
+  const E_RIGHT = { interactHeld: true, moveX: 1 };
 
-  // ① 手没落在笔上就按下去拖：笔不动（这正是"不是 slider"的意思）
-  {
-    const s = mk();
-    step(s, {}, 2);
-    for (let i = 0; i < 40; i += 1) {
-      // 从画框左边一路拖到右边，全程避开那支笔
-      step(s, { pointerHeld: true, pointerCard: { u: 0.06 + i * 0.02, v: L.v + 0.34 } });
-    }
-    assert.equal(s.beat.drawn, 0, "手没抓着笔，怎么拖都不该划出印子");
-    assert.ok(!s.dragTrack, "划线这一拍绝不许有拖动轨道（slider）");
-  }
-
-  // ② 攥住笔再拉：印子跟着出来，且笔有摩擦——拉不过 SCRIBE_CARD.speed
-  {
-    const s = mk();
-    step(s, {}, 2);
-    step(s, { pointerHeld: true, pointerCard: { ...GRIP } });   // 落在拳心上=攥住
-    assert.ok(s.beat.grabbed, "手落在笔身上按下去，必须攥得住");
-    // 手瞬间甩到另一头：笔只能一寸一寸蹭过去，一帧绝不会到底
-    step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } });
-    assert.ok(s.beat.drawn > 0, "攥住往前拉，必须留下印子");
-    assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
-    // 玩家要做的事，画面上事先不能已经做完了：第二道刻痕此刻必须还没有
-    assert.ok(!s.flags.carved, "没划完之前，门框上不该已经有第二道刻痕");
-    // 一直拉到底
-    step(s, { pointerHeld: true, pointerCard: { u: L.u1 + 0.1, v: GRIP.v } }, 240);
-    assert.notEqual(CurrentBeatDef(s)?.id, "c8_carve", "拉满一道线，这一拍必须过");
-    assert.equal(s.flags.carved, true, "划完了，第二道刻痕才长在门框上");
-    assert.equal(s.scribeCard, null, "划完了，那张卡必须收走");
-  }
-
-  // ③ 手飘离刻线：笔脱手，印子当场停住
-  {
-    const s = mk();
-    step(s, {}, 2);
-    step(s, { pointerHeld: true, pointerCard: { ...GRIP } });
-    step(s, { pointerHeld: true, pointerCard: { u: GRIP.u + 0.08, v: GRIP.v } }, 4);
-    const drawnBefore = s.beat.drawn;
-    assert.ok(drawnBefore > 0, "先得划出一点");
-    step(s, { pointerHeld: true, pointerCard: { u: L.u1, v: GRIP.v + L.slipV + 0.08 } }, 30);
-    assert.equal(s.beat.grabbed, false, "手抬离刻线太远，笔必须脱手");
-    assert.equal(s.beat.drawn, drawnBefore, "脱手之后印子不该再长");
-  }
-
-  // ④ 键盘后备仍在（自动通关测试与无鼠标的玩家都靠它）
-  {
-    const s = mk();
-    step(s, {}, 2);
-    step(s, { interactHeld: true, moveX: 1 }, 200);
-    assert.notEqual(CurrentBeatDef(s)?.id, "c8_carve", "按住 E 往右推必须也能划完");
-  }
-
-  // ⑤ 这一拍不许出现任何 HUD 轨道：**用户反复要过的就是这一条**——
-  // 画面里有一根可拖的条，玩家就永远去拖那根条，"攥住一支笔"当场作废。
+  // ① 光按住 E、按 ←、在卡上拖指针：笔都不走（这正是"不是 slider"的意思）
   {
     const s = mk();
     step(s, {}, 2);
     assert.ok(s.scribeCard, "站定就该亮出那张特写卡");
-    let moved = 0;
-    for (let i = 0; i < 60 && CurrentBeatDef(s)?.id === "c8_carve"; i += 1) {
-      step(s, { pointerHeld: true, pointerCard: { u: GRIP.u + i * 0.006, v: GRIP.v } });
-      assert.ok(!s.dragTrack, "划线这一拍绝不许有拖动轨道（slider）");
-      moved = Math.max(moved, s.scribeCard?.head || 0);
+    step(s, { interactHeld: true }, 40);
+    step(s, { interactHeld: true, moveX: -1 }, 40);
+    for (let i = 0; i < 40; i += 1) {
+      step(s, { pointerHeld: true, pointerCard: { u: 0.06 + i * 0.02, v: L.v } });
     }
-    assert.ok(moved > 0, "卡上那支笔得真的跟着手走");
+    assert.equal(s.beat.drawn, 0, "光按住 E / 按 ← / 拖指针，都不该划出印子");
+    assert.ok(!s.dragTrack, "划线这一拍绝不许有拖动轨道（slider）");
+    const pr = SplitPrompt(s.prompt || "");
+    assert.equal(pr.dir, "right", `划线的键帽是 E ＋ →（实为 ${JSON.stringify(s.prompt)}）`);
+  }
+
+  // ② 按住 E＋→：印子跟着出来，且笔有摩擦——一趟按 def.speed 走，一帧绝不到底
+  {
+    const s = mk();
+    step(s, {}, 2);
+    step(s, E_RIGHT, 1);
+    assert.ok(s.beat.drawn > 0, "按住 E＋→ 必须留下印子");
+    assert.ok(s.beat.drawn < 0.2, `笔有摩擦，一帧不该窜到 ${s.beat.drawn}`);
+    // 玩家要做的事，画面上事先不能已经做完了：第二道刻痕此刻必须还没有
+    assert.ok(!s.flags.carved, "没划完之前，门框上不该已经有第二道刻痕");
+    // 第一趟到头：笔抬起来退回去，印子只是浅白的一道
+    while (s.beat.pass === 0) step(s, E_RIGHT);
+    assert.equal(s.beat.pass, 1, "一趟到头算一趟");
+    assert.ok(s.beat.press.every((v) => v <= L.passPress[0] + 1e-6), "第一趟只留浅白印");
+    assert.ok(s.beat.lift > 0, "一趟到头笔要抬起来退回起点");
+    assert.equal(CurrentBeatDef(s)?.id, "c8_carve", "一趟不算完，得三趟");
+    // 一直按到底：三趟
+    step(s, E_RIGHT, 600);
+    assert.notEqual(CurrentBeatDef(s)?.id, "c8_carve", "三趟蹭完，这一拍必须过");
+    assert.equal(s.flags.carved, true, "划完了，第二道刻痕才长在门框上");
+    assert.equal(s.scribeCard, null, "划完了，那张卡必须收走");
+  }
+
+  // ③ 松手笔停住，印子不长也不退（石笔留下的是痕，不是可增可减的进度）
+  {
+    const s = mk();
+    step(s, {}, 2);
+    step(s, E_RIGHT, 8);
+    const drawnBefore = s.beat.drawn;
+    assert.ok(drawnBefore > 0, "先得划出一点");
+    step(s, {}, 30);
+    assert.equal(s.beat.drawn, drawnBefore, "松手之后印子不该再长，也不该退");
     assert.ok(!s.dragTrack, "划完之后也不许留下一根轨道");
   }
-  console.log("  ✓ 石笔：长在特写卡上 / 抓不住就划不动 / 有摩擦 / 会脱手 / 无 slider / 键盘后备可用");
+  console.log("  ✓ 石笔：长在特写卡上 / 只认 E＋→ / 有摩擦 / 三趟一趟比一趟深 / 无 slider");
 }
 
 // 昼夜过渡得是**一条连续的曲线**，不是进拍即换（用户 2026-08-09：
@@ -2245,18 +2135,24 @@ function TestLiveCardGrabPointsSitOnTheThing() {
   console.log("  ✓ 活卡的抓取点长在实物上；活卡名单只有 LIVE_CARD_FIELDS 一份");
 }
 
-// 撕布：手落在布上就得有回音。**"按了没反应"比难更劝退**——玩家不会怀疑
-// 自己按错了地方，只会认定这玩法是坏的（同"留一颗按了没反应的键比从来没有
-// 更糟"那一条）。三样一起验：开场那句话、按空的窝、揪住角真的能拽动。
-function TestTearClothAnswersTheHand() {
+// 撕布：三把全是按住 E ＋ ←（2026-08-17 四动词第二轮）——第一把只绷紧、第二把
+// 裂口、第三把一路撕到头。前两把拽到头布弹回去缓一口，按住不放也是一把一把的。
+// 光按住 E、按 → 都不动。**"按了没反应"比难更劝退**，所以卡一摆上来就说清、
+// 每换一把都有一句话（同打水那几道手）。
+function TestTearIsThreePulls() {
   const state = CreateGame(0);
   const rescue = ChapterBeatList(0).find((b) => b.id === "c1_rescue");
   DebugJump(state, 0, rescue.index);
-  const L = TEAR_CARD, A = L.aspect;
-  const Step = (inp = {}) => StepGame(state, {
-    moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...inp,
-  }, DT);
-  const At = (x, y) => ({ pointerHeld: true, pointerCard: { u: x, v: y * A } });
+  const L = TEAR_CARD;
+  const Step = (inp = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...inp,
+      }, DT);
+    }
+  };
+  const frames = (s) => Math.ceil(s / DT);
+  const E_LEFT = { interactHeld: true, moveX: -1 };
   Step();
   for (let i = 0; i < 900 && state.microCine; i += 1) Step({ advance: true });
   state.beat.stepIndex = 2;                // 撕布那一步（喂水/摸血跳过）
@@ -2265,33 +2161,113 @@ function TestTearClothAnswersTheHand() {
   state.player.x = zone.x;
   state.player.level = zone.level;
   state.player.cineWalk = null;
-  for (let i = 0; i < 8; i += 1) Step();   // 站定、把卡摆上来
+  Step({}, 8);                             // 站定、把卡摆上来
   assert.ok(state.tearCard, "撕布那一步必须把活卡摆上来");
   assert.equal(state.climbHint, "", "活卡亮着时脚底下那句「W · 上梯子」必须收掉");
-  assert.ok(/角/.test(state.toast?.text || ""), "卡一摆上来就得说清这一下要揪哪儿");
+  assert.ok(/撕|角/.test(state.toast?.text || ""), "卡一摆上来就得说清这一下要干嘛");
+  const pr = SplitPrompt(state.prompt || "");
+  assert.equal(pr.dir, "left", `撕布的键帽是 E ＋ ←（实为 ${JSON.stringify(state.prompt)}）`);
+  assert.ok(pr.hold, "撕是按住做功，不是点一下");
 
-  // ① 按在布正中（玩家最自然的一下）：抓不住是对的，但**必须有回音**
-  const mid = { x: (L.cloth.x0 + L.cloth.x1) / 2, y: L.cloth.y + L.cloth.h * 0.5 };
-  Step();                                   // 先松一帧，ptrPressed 才认得出按下
-  Step(At(mid.x, mid.y));
-  assert.equal(state.tearCard.grab, false, "按在布面上不该攥住（攥的是那个角）");
-  assert.ok(state.tearCard.press, "按在布面上必须按出一个窝——这一下原来什么都不发生");
-  assert.ok(/角/.test(state.toast?.text || ""), "按空了要说清该往哪儿落手");
+  // ① 光按住 E、按 →、拖指针：布一动不动
+  Step({ interactHeld: true }, frames(1));
+  Step({ interactHeld: true, moveX: 1 }, frames(1));
+  Step({ pointerHeld: true, pointerCard: { u: L.corner.x - 0.05, v: L.corner.y * L.aspect } }, frames(1));
+  assert.equal(state.tearCard.pulls, 0, "光按住 E / 按 → / 拖指针，布都不该被拽动");
+  assert.ok(state.tearCard.pull < 1e-6, "方向不对布角一寸都不该挪");
 
-  // ② 揪住那个角横着拽：三把之内必须真的撕开
-  for (let pass = 0; pass < 8 && state.tearCard; pass += 1) {
-    const c = { ...state.tearCard.corner };
-    Step();                                 // 松一帧再按（一把一把地拽）
-    Step(At(c.x, c.y));
-    assert.ok(state.tearCard?.grab || !state.tearCard,
-      `第 ${pass + 1} 把没攥住布角——抓取半径 ${L.grabR} 覆不住画面上那个角`);
-    // 手比布快就脱手，所以一寸一寸挪（同驱动器）
-    for (let i = 0; i < 40 && state.tearCard?.grab; i += 1) {
-      Step(At(state.tearCard.corner.x - L.speed * DT * 0.9, c.y));
+  // ② 第一把：拽紧到头——布只绷紧，弹回去
+  Step(E_LEFT, frames(L.tautS * 0.5));
+  assert.ok(state.tearCard.pull > 0 && state.tearCard.pull < L.tautLen, "拽到一半布角跟着挪了一截");
+  assert.ok(state.tearCard.corner.x < L.corner.x, "布角要真的往回挪（画面上看得见）");
+  Step(E_LEFT, frames(L.tautS * 0.6));
+  assert.equal(state.tearCard.pulls, 1, "第一把拽到头：布只被拉紧");
+  assert.ok(/绷紧|没撕动/.test(state.toast?.text || ""), "第一把要说清：绷紧了，没撕动");
+  Step({}, frames(0.5));
+  assert.ok(state.tearCard.pull < 0.02, "撒手绷紧的布要弹回去");
+
+  // ③ 一直按住：第二把裂口、第三把撕到头（缓一口的那几眼不算，可按住不放也走得完）
+  let n = 0;
+  while (state.tearCard && n < 900) { n += 1; Step(E_LEFT); }
+  assert.equal(state.flags.clothTorn, true, "按住 E＋← 三把之内必须撕下来");
+  assert.ok(n * DT > L.tautS + L.recoilS + L.tearS - 0.2,
+    `三把有三把的分量（实际 ${(n * DT).toFixed(1)}s）——不是一根越拽越长的条`);
+  console.log("  ✓ 撕布：只认 E＋← / 第一把绷紧弹回 / 第二把裂口 / 第三把撕到头 / 每把都有话");
+}
+
+// 分红薯干（2026-08-17 四动词第二轮，照 Notion 关卡设计第 6 拍）：掰＝按住 E＋←/→
+//（从你使劲那头断开，一长一短）、分进两只碗＝E（长的搁进她碗里）、她推回来之后
+// 放回她碗里＝E（捞出来沥两滴再搁）。老版三段全是在卡上捏着拖，第三段连键盘都
+// 走不通——用户点名的「非按 E 的复杂交互」之一。
+function TestSplitIsBreakThenTwoPresses() {
+  const state = CreateGame(0);
+  const meal = ChapterBeatList(0).find((b) => b.id === "c1_meal");
+  DebugJump(state, 0, meal.index);
+  const L = SPLIT_CARD;
+  const beat = SCRIPTS.c1.find((b) => b.id === "c1_meal");
+  const splitI = beat.steps.findIndex((s) => s.type === "split");
+  const Step = (inp = {}, n = 1) => {
+    for (let i = 0; i < n; i += 1) {
+      StepGame(state, {
+        moveX: 0, climb: 0, crouch: false, interact: false, interactHeld: false, advance: false, ...inp,
+      }, DT);
     }
-  }
-  assert.equal(state.flags.clothTorn, true, "揪着角一把一把拽，三把之内必须撕下来");
-  console.log("  ✓ 撕布：按在布上有回音、揪住角拽得动（不再「拖什么都没反应」）");
+  };
+  const frames = (s) => Math.ceil(s / DT);
+  const Skip = () => { for (let i = 0; i < 900 && state.microCine; i += 1) Step({ advance: true }); };
+  Step();
+  Skip();
+  state.beat.stepIndex = splitI;
+  const zone = beat.steps[splitI].zone;
+  state.player.x = zone.x + 0.35;
+  state.player.level = "surface";
+  state.player.cineWalk = null;
+  Step({}, 6);
+  assert.ok(state.splitCard, "分食那一步必须把活卡摆上来");
+  assert.equal(state.splitCard.phase, "break", "先掰");
+  const pr = SplitPrompt(state.prompt || "");
+  assert.equal(pr.dir, "horiz", `掰的键帽是 E ＋ ↔（左右都行；实为 ${JSON.stringify(state.prompt)}）`);
+
+  // ① 光按住 E、按 ↑、拖指针：条不弯
+  Step({ interactHeld: true }, frames(0.6));
+  Step({ interactHeld: true, climb: -1 }, frames(0.6));
+  Step({ pointerHeld: true, pointerCard: { u: L.strip.cx, v: L.strip.cy * L.aspect } }, frames(0.6));
+  assert.equal(state.splitCard.bend, 0, "光按住 E / 按 ↑ / 拖指针，条一点都不该弯");
+  // ② 按住 E＋→ 掰：弯到一半松手它直回来；掰到底断成两截——按右掐在偏右那点，右短左长
+  Step({ interactHeld: true, moveX: 1 }, frames(L.bendS * 0.5));
+  assert.ok(state.splitCard.bend > 0.3 * L.bendNeed && state.splitCard.bend < L.bendNeed, "掰到一半条弯着");
+  assert.ok(state.splitCard.grabU > 0.5, "按 → 捏点在偏右那头（从你使劲那头断开）");
+  Step({}, frames(0.6));
+  assert.ok(state.splitCard.bend < 0.02, "松手条自己直回来");
+  Step({ interactHeld: true, moveX: 1 }, frames(L.bendS + 0.2));
+  assert.equal(state.splitCard.phase, "sort", "掰到底：断成两截");
+  const pcs = state.splitCard.pieces;
+  assert.equal(pcs.length, 2, "两截");
+  assert.ok(pcs[0].len > pcs[1].len, "按 → 掰出来左长右短（一长一短是这场戏的题眼）");
+  assert.equal(SplitPrompt(state.prompt || "").act, "interact", "分进两只碗＝按一下 E");
+  assert.ok(!SplitPrompt(state.prompt || "").hold, "分进两只碗不是长按");
+  // ③ 按 E：卡上一截一截搁进碗——长的进她碗（西），短的进他碗（东）
+  Step({ interact: true });
+  Step({}, frames(L.sortS * 0.5));
+  assert.ok(state.splitCard.held >= 0, "搬的时候手里捏着那截（画面上看得见在搬）");
+  Step({}, frames(L.sortS * 2 + 0.3));
+  assert.ok(state.microCine, "分完两只碗接过场：她醒了、把长的推过来");
+  assert.equal(state.beat.stepIndex, splitI + 1, "分完两只碗这一步才过");
+  const longWasLeft = pcs[0].len > pcs[1].len;
+  assert.ok(longWasLeft, "长的那截该搁进她碗里（西边那只）");
+  Skip();
+  // ④ 换回去：按 E，捞出来沥两滴再搁回她碗——一按到底，中间是卡上动画
+  state.player.x = zone.x + 0.35;
+  Step({}, 4);
+  assert.equal(state.splitCard?.phase, "swap", "她推回来之后是「放回她碗里」那一段");
+  assert.equal(SplitPrompt(state.prompt || "").act, "interact", "放回她碗里＝按一下 E");
+  Step({ interact: true });
+  Step({}, frames(L.swapS[0] + L.swapS[1] * 0.6));
+  assert.ok(state.splitCard && state.splitCard.drips >= 1, "提在半空要沥水（滴出来才算沥过）");
+  Step({}, frames(L.swapS[1] + L.swapS[2] + 0.4));
+  assert.equal(state.flags.mealSplit, true, "搁回她碗里，这一场就成了（「吃你的。」）");
+  assert.equal(state.splitCard, null, "做完了活卡要收走");
+  console.log("  ✓ 分红薯干：掰＝E＋↔（掰哪儿断哪儿·松手直回）/ 分进两只碗＝E（长的给她）/ 放回她碗＝E（沥两滴）");
 }
 
 function TestLiveCardsKeepTheWorldBehind() {
@@ -2931,13 +2907,14 @@ TestGestureBlobStaysDead();
 TestHoeingIsARealSwing();
 // TestKnotIsASheetBend();   // 第九稿：修井绳（接绳活卡）整段下线，机制留在 Core 里没人用
 TestGrabbablesAreBigEnoughToRead();
-TestForageIsHandsOn();
+TestForageIsFourVerbs();
 TestWinchIsACrankNotALever();
 TestWinchIsLongEnough();
-TestChalkIsAPencilNotASlider();
+TestChalkIsThreePasses();
 TestLiveCardsKeepTheWorldBehind();
 TestLiveCardGrabPointsSitOnTheThing();
-TestTearClothAnswersTheHand();
+TestTearIsThreePulls();
+TestSplitIsBreakThenTwoPresses();
 TestMalletTapDoesNotSlide();
 TestDayNightIsContinuous();
 TestEdgeHintPointsOffscreenTargets();
