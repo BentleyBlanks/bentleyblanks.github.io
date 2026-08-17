@@ -2,6 +2,9 @@
 // 目标：钢笔勾线 + 水彩填色的插画感（参考《勇敢的心》的 UbiArt 手绘质感），
 // 而不是几何色块。所有形体用带抖动的贝塞尔路径绘制，抖动由 id 决定 —— 逐帧稳定，不闪。
 
+// 梯子横档的落点表：画笔与爬梯骨架、Core 的一档一响共用一份（见 Data_Ladder 头注）
+import { LadderHolds } from "./Data_Ladder.mjs";
+
 // ---------------------------------------------------------------------------
 // 调色：暖土黄的纸面基调 + 墨线
 // ---------------------------------------------------------------------------
@@ -9924,9 +9927,10 @@ export function DrawChamberVault(ctx, x, w, topY, botY, id) {
  *     之上），于是洞里还看得见两道横档——"梯子是往下去的"这件事才有得读。
  *
  * `floorY` 是**地平线**在画布上的行（不是贴图顶）：梯头高出地面多少、洞开在哪儿
- * 全按它算，所以摆位一改这支笔不用跟着改。
+ * 全按它算，所以摆位一改这支笔不用跟着改。`holds` 是 Data_Ladder.LadderHolds 算好的
+ * 落点表（World 传进来，跟爬梯骨架用的是同一份）；不传就按 id 现算一份一样的。
  */
-export function DrawShaft(ctx, x, floorY, botY, id) {
+export function DrawShaft(ctx, x, floorY, botY, id, holds = null) {
   const PX = 48;                                   // 1 米 = 48 画布像素（道具贴图的标尺）
   const railDx = 12;                               // 两梃相距 0.5m
   // 梯头高出地面**一拃多，不是一臂**：给到 0.40m 那一版，顶上那截光杆比头一道
@@ -10003,10 +10007,11 @@ export function DrawShaft(ctx, x, floorY, botY, id) {
   // 往下一道道进洞里。
   // **档与档之间的空必须比档本身宽得多**——第一版档给到 4.6px 高、还各自描一圈
   // 墨线，一根根挤成实心的一条，读出来是根柱子不是梯子
-  const rungs = [];
-  for (let y = railTop + 8; y < botY - 4; y += 15.4 + (Rnd(id + "rs", rungs.length) - 0.5) * 5) {
-    rungs.push(y);
-  }
+  // **横档在哪儿不在这儿定**：Data_Ladder.LadderHolds 算一次，画笔照它画、爬梯的
+  // 骨架照它把手脚放上去、Core 照它一档一响（2026-08-17 爬梯重做：三处各画各的
+  // 梯子，手脚永远落不到横档上，人就像贴着梯子平移）。世界 y → 画布行：
+  // 地平线在 floorY，1 米 = PX 行
+  const rungs = (holds || LadderHolds(0, -(botY - floorY) / PX, id)).rungs.map((wy) => floorY - wy * PX);
   for (let i = 0; i < rungs.length; i += 1) {
     const y = rungs[i];
     const out = 3.4 + Rnd(id + "ro", i) * 1.6;     // 探出去多少，两头各不相同

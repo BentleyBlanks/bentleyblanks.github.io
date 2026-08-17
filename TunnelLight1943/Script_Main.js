@@ -16,6 +16,9 @@ import { CreateWorld } from "./Script_World.js";
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
 import { AUDIO_DEFAULT_LEVELS } from "./Data_AudioMix.mjs";
+// 过场时间轴（调试面板，F3 / ?cine=1 / 设置→过场时间轴）：拖播放头定位过场的
+// 某一格、把 `c1_xx@line=N,at=T` 定位串复制出来粘给 agent。见该文件头注。
+import { CreateCineTimeline } from "./Script_CineTimeline.js";
 
 const canvas = document.getElementById("gameCanvas");
 const world = CreateWorld(canvas);
@@ -108,7 +111,7 @@ for (const id of [
   "endTitle", "endText",
   "noticeOverlay", "noticeSheet", "noticeClose",
   "btnBag", "bagBadge", "bagPanel", "bagStrip", "bagNote", "bagNoteName", "bagNoteText", "bagNoteCount",
-  "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose",
+  "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose", "btnCine",
   "btnArt", "artBrowser", "artList", "artCanvas", "artMeta", "artClose", "artZoom", "artDark",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
@@ -209,6 +212,9 @@ window.addEventListener("keydown", (e) => {
   // 「空格/回车 → advance + preventDefault」会把回车的默认行为一起吃掉，而按钮
   // 正是靠 keydown 上的默认行为激活的——不拦住，标题页上选中一条按回车没反应。
   if (MenuKey(e, k)) return;
+  // 过场时间轴：F3 开合；开着时空格/←→/[ ]/Home/End 归它（备注框里打字它自己拦）
+  if (k === "f3") { cineTimeline.Toggle(); e.preventDefault(); return; }
+  if (cineTimeline.OnKey(e, k)) return;
   keys.add(k);
   if (k === "e") { interactEdge = true; advanceEdge = true; }
   // F 曾经专职投掷。投掷改成了「攥住石子往后拽」，没有按键路径了——键留着推台词，
@@ -227,7 +233,7 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "m") ToggleSound(); });
 
-const DEBUG_KEYS = ["`", "f2", "～", "·"];
+const DEBUG_KEYS = ["`", "f2", "～", "·", "f3"];   // f3 ＝ 过场时间轴
 // 菜单开着时键盘归菜单：Esc 收一层、↑↓ 在条目间挪、回车/空格按下去。
 // 返回 true ＝ 这一下归菜单，玩法那段键盘分支整段跳过。
 // **一层一层地收**（确认框 > 操作说明 > 设置 > 标题页）：Esc 收掉最上面那一张，
@@ -481,6 +487,10 @@ const cam = { x: 60, y: 2.0, hw: 7.2 };
 let camSnap = true;
 // 冻帧开关：只给实拍/调试用（TunnelLight.Freeze）。见 RunFrame 里那段注释
 let frozen = false;
+// 播放倍速：只给过场时间轴用（慢放看动画、快放找位置）。1 以外只在面板开着时有；
+// 关面板归 1。>2 倍拆成子步喂 StepGame——一帧 0.2s 的 dt 会让绳/门这些积分的东西
+// 发飘（?fast=1 那条 ×5 只在过场里用，过场没有物理）
+let playSpeed = 1;
 let framing = { key: "", prog: 0, baseHw: 7.2 };
 // 过场分级的当前档（0=一个字节都不动）。见 UpdateCamera 末尾与 World.SetCineGrade
 let gradeNow = 0;
@@ -1913,24 +1923,31 @@ function RunFrame(now, dt) {
     // 渲染几帧才追得上——不冻帧的话，等渲染追上的那半秒里游戏又往前走了，
     // 截出来的根本不是那一格（妹妹睡姿那次为此白跑了十几轮）。
     // 暂停（设置/操作说明/确认框开着）走的是同一条路：世界停住、画面照渲。
-    if (!frozen && !MenuFrozen()) StepGame(state, {
-      moveX: move.moveX, climb: move.climb,
-      crouch: crouchToggle,
-      interact: interactEdge,
-      interactHeld: keys.has("e") || touch.act,
-      // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
-      // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
-      // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
-      // 就是根看不见的 slider（刨料曾用它，已改成攥住刨子本身），别加回来。
-      pull: gest.active ? gest.dy : 0,
-      pullHeld: gest.active,
-      pointerHeld: gest.active,
-      pointerWorld: gest.world,
-      pointerCard: gest.card,
-      tap: tapEdge,
-      // 试玩收尾那块牌子上点一下不能把人送进第二章（见 DemoEnd）
-      advance: advanceEdge && !DemoEnd(state),
-    }, stepDt);
+    if (!frozen && !MenuFrozen()) {
+      const input = {
+        moveX: move.moveX, climb: move.climb,
+        crouch: crouchToggle,
+        interact: interactEdge,
+        interactHeld: keys.has("e") || touch.act,
+        // 沉浸式手势：pull=本帧竖向拖动（+下 −上，归一化），
+        // pointerWorld=指尖的世界坐标，pointerCard=指尖落在特写卡上的位置。
+        // 这里没有 dragX 那样的"横向位移量"通道——位移量拖哪儿都涨，本质上
+        // 就是根看不见的 slider（刨料曾用它，已改成攥住刨子本身），别加回来。
+        pull: gest.active ? gest.dy : 0,
+        pullHeld: gest.active,
+        pointerHeld: gest.active,
+        pointerWorld: gest.world,
+        pointerCard: gest.card,
+        tap: tapEdge,
+        // 试玩收尾那块牌子上点一下不能把人送进第二章（见 DemoEnd）
+        advance: advanceEdge && !DemoEnd(state),
+      };
+      // 倍速（过场时间轴）：拆成子步，一次性的按键只喂第一步
+      const sub = playSpeed > 2 ? Math.ceil(playSpeed / 2) : 1;
+      for (let i = 0; i < sub; i += 1) {
+        StepGame(state, i === 0 ? input : { ...input, interact: false, tap: false, advance: false }, stepDt * playSpeed / sub);
+      }
+    }
     gest.dy = 0;
     if (state.chapterIndex !== prevChapter) {
       camSnap = true; crouchToggle = false; irisLevel = 0; irisClosing = false;
@@ -1951,6 +1968,8 @@ function RunFrame(now, dt) {
     const shotFade = UpdateCamera(state, dt);
     StepIris(state, dt);
     SyncHud(state, dt, shotFade);
+    // 过场时间轴要在 soundtrack.Step 之前看一眼 cues（它每帧把队列清空）
+    cineTimeline.Frame();
     soundtrack.Step(state, dt);
     SyncDebugPanel();
   }
@@ -2008,6 +2027,25 @@ if (chapterParam >= 1 && chapterParam <= CHAPTERS.length) {
 }
 if (params.get("debug") === "1") ToggleDebug(true);
 
+// 过场时间轴（底栏，Unity Timeline 式）。它不改剧本，只把"演到哪儿"变成能指着
+// 说的东西：拖到哪一格游戏就推到哪一格并冻住，「复制定位」给出的
+// `c1_xx@line=N,at=T` 正是 shot 子命令吃的那一串。
+const cineTimeline = CreateCineTimeline({
+  getState: () => state,
+  JumpToBeat,
+  Freeze: (v) => { frozen = !!v; },
+  IsFrozen: () => frozen,
+  MenuFrozen,
+  SetSpeed: (k) => { playSpeed = Math.max(0.1, Math.min(8, Number(k) || 1)); },
+  GetSpeed: () => playSpeed,
+  Settle: (n) => window.TunnelLight.Settle(n),
+  world,
+  canvas,
+  getCam: () => cam,
+});
+ui.btnCine?.addEventListener("click", () => { CloseSettings(); cineTimeline.Toggle(true); });
+if (params.get("cine") === "1") cineTimeline.Toggle(true);
+
 requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(Frame); });
 
 // 测试挂钩
@@ -2035,6 +2073,15 @@ window.TunnelLight = {
   // 冻帧：游戏钟停住、渲染照跑。实拍要"某一拍第几秒"那一格时，先把游戏推到位
   // （StepFrames），再 Freeze(true) 让镜头/立面/光照渲染追上来，然后截图。
   Freeze: (v = true) => { frozen = !!v; return frozen; },
+  // 过场时间轴（F3 那张面板）的钩子：开合 / 定位串 / 复制给 agent 的那段文本
+  CineTimeline: {
+    Toggle: (v) => cineTimeline.Toggle(v),
+    IsOpen: () => cineTimeline.IsOpen(),
+    Seek: (line, at) => cineTimeline.Seek(line, at),
+    SeekTime: (t) => cineTimeline.SeekTime(t),
+    Locator: () => cineTimeline.Locator(),
+    SetSpeed: (k) => { playSpeed = Math.max(0.1, Math.min(8, Number(k) || 1)); return playSpeed; },
+  },
   // 把游戏推到"第 line 句台词的第 at 秒"。实拍最常要的就是这个，别再拿 --dur
   // 一秒一秒地猜（猜出来的还随机器快慢漂）。返回真正落在哪儿。
   // 微过场（chain 步骤 effect 里起的那种）同样认这把尺子：微过场在跑的时候
