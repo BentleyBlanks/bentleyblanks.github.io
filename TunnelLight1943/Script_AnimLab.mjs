@@ -668,7 +668,7 @@ export function CreateAnimLab({ root }) {
       facts.push(["时长", `<b>${Fmt(e.dur)} s</b>（${Math.round(e.dur / FRAME)} 帧 @30fps）`]);
       facts.push(["循环", e.loop ? "是（trackT 无界，按 dur 取模；跨末帧也用 Hermite 接）" : "否（单次；FlashTrack 的 until 到点收回常态）"]);
       facts.push(["关键帧", `<b>${e.keys.length}</b> 帧 · 间隔 ${e.keys.slice(1).map((k, i) => Fmt(k.t - e.keys[i].t)).join(" / ")} s`]);
-      facts.push(["关节", e.joints.length === RIG_FIELDS.length ? "全部 14 个字段" : `${e.joints.length}/14：${e.joints.map((j) => `<i class="chip">${j}</i>`).join("")}`]);
+      facts.push(["关节", e.joints.length === RIG_FIELDS.length ? `全部 ${RIG_FIELDS.length} 个字段` : `${e.joints.length}/${RIG_FIELDS.length}：${e.joints.map((j) => `<i class="chip">${j}</i>`).join("")}`]);
       facts.push(["插值", "分段三次 Hermite（Catmull-Rom 切线 + Fritsch–Carlson 夹住不过冲）；折返点上速度归零"]);
     } else if (e.type === "pose") {
       facts.push(["类型", e.progress ? `<b>进度驱动</b> · 来源 ${Esc(e.progressSource || "poseK")}` : e.calmBreath ? "静态 · <b>有呼吸</b>（CALM_BREATH）" + (e.noHip ? " · 不动胯（NO_HIP）" : "") : "静态"]);
