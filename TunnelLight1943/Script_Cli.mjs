@@ -187,7 +187,80 @@ async function AnimIndex() {
   const { ScanAnimIndex } = await import("./Script_AnimIndex.mjs");
   return ScanAnimIndex((f) => { try { return fs.readFileSync(path.join(DIR, f), "utf8"); } catch { return null; } });
 }
+// anims --contact [片段]：**真骨架、逐帧量脚**（2026-08-18 用户："非常多的动作，脚都是会
+// 在 Y 轴漂移的"）。起一个真浏览器，开动画工作台，把每条动作播一圈，每帧读 Rig.RigContact
+// ——两只鞋底、两个膝头里最低的点离地多高。地面吸附之后钉在地上的该恒为 0；报出来的是：
+// ① 没贴地的（离地状态：被抱着/骑着/跳/躺/爬梯）——鞋底到底多高，看合不合理；
+// ② 吸附把胯挪了多少（shift）：|shift| 大说明这支姿势原来腿没闭合，手的落点也跟着挪了
+//    那么多，要回头看手；③ 手离地（爬/跪着撑地的姿势手该在地上）。
+async function CmdAnimContact(o) {
+  const q = (o._[0] || "").toLowerCase();
+  const { LaunchBrowser } = await import("../PrairieFire1937/Script_BrowserTestKit.mjs");
+  const { ServeRoot } = await import("./Script_DevServer.mjs");
+  const server = await ServeRoot(ROOT, 0);
+  const port = server.address().port;
+  const browser = await LaunchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/TunnelLight1943/index.html`, { waitUntil: "load", timeout: 60000 });
+    await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+    await page.evaluate(async () => { await window.TunnelLight.AnimLab.Open(); });
+    await page.waitForFunction(() => window.TunnelLight.AnimLab.Ready(), { timeout: 60000 });
+    const rows = await page.evaluate(async ({ q, samples }) => {
+      const tl = window.TunnelLight, lab = tl.AnimLab;
+      const out = [];
+      for (const e of lab.Entries()) {
+        if (q && !e.name.toLowerCase().includes(q) && !e.id.toLowerCase().includes(q)) continue;
+        lab.Select(e.id);
+        lab.SetOptions({ exact: true });
+        const cyc = lab.Cycle ? lab.Cycle() : 0;
+        const cycle = cyc || 1;
+        const acc = { lowMin: Infinity, lowMax: -Infinity, soleF: Infinity, soleB: Infinity, kneeF: Infinity, kneeB: Infinity, shiftMin: Infinity, shiftMax: -Infinity, handMin: Infinity, ground: 1, air: 0 };
+        for (let i = 0; i < samples; i += 1) {
+          lab.Seek(cycle * (i + 0.5) / samples);
+          tl.Tick(1, 1 / 30);
+          const c = lab.Contact(); const lt = lab.LimbTips();
+          if (!c) continue;
+          acc.lowMin = Math.min(acc.lowMin, c.lowest); acc.lowMax = Math.max(acc.lowMax, c.lowest);
+          acc.soleF = Math.min(acc.soleF, c.soleF); acc.soleB = Math.min(acc.soleB, c.soleB);
+          acc.kneeF = Math.min(acc.kneeF, c.kneeF); acc.kneeB = Math.min(acc.kneeB, c.kneeB);
+          acc.shiftMin = Math.min(acc.shiftMin, c.shift); acc.shiftMax = Math.max(acc.shiftMax, c.shift);
+          acc.handMin = Math.min(acc.handMin, lt.handF.y, lt.handB.y);
+          acc.ground = Math.min(acc.ground, c.groundW); acc.air = Math.max(acc.air, c.airY);
+          // 脚尖扎地：脚的世界角在 30°~150° 之间且鞋底那只是最低点
+          for (const leg of ["F", "B"]) {
+            const phi = ((c["phi" + leg] % 360) + 360) % 360;
+            if (phi > 55 && phi < 150 && Math.abs(c["sole" + leg] - c.lowest) < 0.004) acc["toe" + leg] = Math.max(acc["toe" + leg] || 0, phi);
+          }
+        }
+        out.push({ id: e.id, type: e.type, name: e.name, kind: lab.Current().kind, cycle, ...acc });
+      }
+      return out;
+    }, { q, samples: Number(o.samples || 24) });
+    const f = (v) => (v === Infinity || v === -Infinity || v === undefined ? "  –  " : (v >= 0 ? "+" : "") + v.toFixed(3));
+    console.log(`  ${"类型".padEnd(4)} ${"名字".padEnd(16)} ${"人".padEnd(8)} 最低点(min..max)      鞋底F/B(min)     膝F/B(min)      手(min)  吸附挪胯(min..max)  备注`);
+    let bad = 0;
+    for (const r of rows) {
+      const notes = [];
+      if (r.ground < 1) notes.push(r.ground === 0 ? "离地状态（不贴地）" : `贴地权重 ${r.ground.toFixed(2)}`);
+      if (r.ground >= 1 && (r.lowMin < -0.006 || r.lowMax > r.air + 0.006)) { notes.push("⚠ 最低点没钉在地上"); bad += 1; }
+      if (Math.abs(r.shiftMin) > 0.03 || Math.abs(r.shiftMax) > 0.03) notes.push(`⚠ 原来腿没闭合，吸附挪胯 ${f(r.shiftMin)}..${f(r.shiftMax)}`);
+      if (r.air > 0.001) notes.push(`腾空 ${f(r.air)}`);
+      if (r.toeF || r.toeB) notes.push(`⚠ 脚尖扎地撑着（${r.toeF ? "前脚 Φ" + r.toeF.toFixed(0) + "° " : ""}${r.toeB ? "后脚 Φ" + r.toeB.toFixed(0) + "°" : ""}）：脚的角度填错了`);
+      console.log(`  ${(r.type === "track" ? "轨道" : r.type === "pose" ? "姿势" : "步态").padEnd(4)} ${r.name.padEnd(16)} ${String(r.kind).padEnd(8)} ${f(r.lowMin)}..${f(r.lowMax)}   ${f(r.soleF)}/${f(r.soleB)}   ${f(r.kneeF)}/${f(r.kneeB)}   ${f(r.handMin)}   ${f(r.shiftMin)}..${f(r.shiftMax)}   ${notes.join("；")}`);
+    }
+    console.log(`\n${rows.length} 条（每条 ${Number(o.samples || 24)} 帧）；最低点没钉住的 ${bad} 条。数字＝世界米（乘过体型），负＝陷地。`);
+    if (o.json) console.log(JSON.stringify(rows));
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  if (errors.length) { console.error("页面异常：", errors.slice(0, 4).join(" | ")); process.exitCode = 1; }
+}
 async function CmdAnims(o) {
+  if (o.contact) return CmdAnimContact(o);
   const { FormatRef, KIND_LABEL, DominantKind } = await import("./Script_AnimIndex.mjs");
   const idx = await AnimIndex();
   const q = (o._[0] || "").toLowerCase();
@@ -962,6 +1035,7 @@ const HELP = `《地道里的光》命令行工作台
       art 人物美术样式（--who sister 选人，--anim loco:run 右栏那具骨架跑哪条）
       不给页名就全拍一遍。菜单是玩家的第一屏，改完必须看图——测试绿着也可能很难看
   anims [片段]            骨架里全部动作的清单：轨道 / 姿势 / 步态 → 名字·时长·行号·谁在用
+  anims --contact [片段]  真骨架逐帧量脚（起浏览器）：鞋底/膝头最低点离地、吸附挪了多少胯、脚尖扎地没有
   anim <名字>             一条动作的全部：说明 / 关键帧表 / 驱动 / 用在哪几拍 / 一行引用
       （网页里播：设置 → 调试 · 动画工作台，或 index.html?anim=<名字>；同一份索引）
   doctor                  分支/上游/未提交/缓存戳/端口

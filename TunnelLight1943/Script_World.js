@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
@@ -841,9 +841,9 @@ export function CreateWorld(canvasEl) {
         f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
         f.heading = f.fleeDir;
         f.rig.group.position.x = f.x;
-        f.phase += FOLK_FLEE_SPEED * dt * 3.4 / (f.scale || 1);
+        f.phase += dt * WalkCadence(FOLK_FLEE_SPEED, f.scale || 1) * Math.PI;
         f.idleT += dt * 1.4;
-        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
+        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true, gait: GaitOf(FOLK_FLEE_SPEED, f.scale || 1) }, dt);
         f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
         if (f.carryMesh) SyncCarry(f, null, f.heading);   // 家伙已经撂下了
         continue;
@@ -858,11 +858,11 @@ export function CreateWorld(canvasEl) {
         f.rig.group.position.x = f.x;
       }
       const moving = moved > 1e-4;
-      f.phase += moving ? moved * 3.4 / (f.scale || 1) : dt * 2.2;
+      f.phase += moving ? dt * WalkCadence(dt > 0 ? moved / dt : 0, f.scale || 1) * Math.PI : dt * 2.2;
       f.idleT += dt * 1.4;
       if (f.track) f.trackT += dt;
       PoseRig(f.rig, {
-        phase: f.phase, breath: f.idleT, moving,
+        phase: f.phase, breath: f.idleT, moving, gait: GaitOf(dt > 0 ? moved / dt : 0, f.scale || 1),
         carry: f.shoulder, track: f.track, trackT: f.trackT,
       }, dt);
       f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
@@ -2315,11 +2315,14 @@ export function CreateWorld(canvasEl) {
     // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
     // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
     // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
-    // 步频要按**体型**折算：妹妹比柱子矮一头多，可她的步频原来和他一模一样，
-    // 于是她像踩着风火轮飘着跟，而不是小孩迈小碎步追（去井台那一路占屏最久）
+    // 步频（2026-08-18 重做，用户："主角的步频也太快了"）：不再按位移一步一步数
+    // （4.2m/s 的柱子一秒 7 步），改按 Rig.WalkCadence 那条自然曲线走——速度按体型
+    // 折算，快走 2 步/秒、冲刺封顶 3.5，小孩再高一档；一步 = 相位 π。走多远与迈几步
+    // 从此脱钩，差的那部分脚会打滑，那是"步频对"和"脚不滑"之间的取舍（见 Rig 注释）
     const bsPh = extra.bodyScale || s.bodyScale || 1;
+    const speedNow = dt > 0 ? moved / dt : 0;
     if (extra.climbing) s.phase += movedY * 4.5;
-    else if (isMoving) s.phase += moved * 3.4 / bsPh;
+    else if (isMoving) s.phase += dt * WalkCadence(speedNow, bsPh) * Math.PI;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     // 梯子上停没停（2026-08-17 可停可掉头）：停了 settle 升到 1，Rig 把半空的手脚
     // 收到档上；一动就掉回 0。升得慢一点（0.3s 落稳），掉得快（一动就接着爬）
@@ -2345,13 +2348,13 @@ export function CreateWorld(canvasEl) {
      // 都还是那副散步的架势——序章里娘"冲进来"是 3.4m/s 的冲刺，画面上只是
     // 一个人快速平移过去（用户说的"生硬"有一半在这儿）。gait 0..1 按实测速度
     // 给（1.5m/s 起、3.2m/s 满），Rig 拿它加大步幅、把躯干压前、手臂抡开。
-    const speed = dt > 0 ? moved / dt : 0;
-    const gait = Math.max(0, Math.min(1, (speed - 1.5) / 1.7));
-    // 跑起来步频也要跟上（同一段路迈的步子更少、每步更大）
-    if (isMoving && !extra.climbing) s.phase += moved * gait * 0.7;
+    // 走还是跑也按体型折算（1.1m 的孩子 2m/s 已经是在跑）
+    const gait = GaitOf(speedNow, bsPh);
     const bsRig = extra.bodyScale || s.bodyScale || 1;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, gait,
+      // 脚要不要钉在地上（Rig 的地面吸附）：抱起来/骑着/翻越的 lift、躺着的不钉
+      lift, ground: LIE_POSES[extra.pose] ? 0 : 1,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       // 爬梯：这架梯子的落点表 + 方向 + **画出来的脚线**（不是 Core 的，两者差一个缓动）
@@ -6146,6 +6149,12 @@ export function CreateWorld(canvasEl) {
       const tips = LimbTips(s.rig);
       const out = {};
       for (const k of Object.keys(tips)) out[k] = { x: +tips[k].x.toFixed(3), y: +tips[k].y.toFixed(3) };
+      // 鞋底/膝头离脚线多高（世界米；负 = 陷地）——脚钉没钉在地上看这几个，不看踝
+      const c = RigContact(s.rig);
+      if (c && s.ground !== undefined) {
+        const bs = Math.abs(s.mesh.scale.y) || 1;
+        for (const k of ["soleF", "soleB", "kneeF", "kneeB", "lowest"]) out[k] = +(c[k] * bs + (s.liftNow || 0)).toFixed(3);
+      }
       return out;
     },
     // 骨架当前的关节角（度）与肩/肘点（世界米）：排两骨反解那类姿势（爬梯、摇辘轳）
@@ -6165,6 +6174,12 @@ export function CreateWorld(canvasEl) {
       const tips = LimbTips(ps.rig);
       const out = {};
       for (const k of Object.keys(tips)) out[k] = +(tips[k].y - ground).toFixed(3);
+      // 鞋底/膝头（见 LimbTipsOf）：站着 soleF/soleB ≈ 0.000 才叫踩在地上
+      const c = RigContact(ps.rig);
+      if (c) {
+        const bs = Math.abs(ps.mesh.scale.y) || 1;
+        for (const k of ["soleF", "soleB", "kneeF", "kneeB", "lowest"]) out[k] = +(c[k] * bs + (ps.liftNow || 0)).toFixed(3);
+      }
       return out;
     },
     get viewSize() { return { w: viewW, h: viewH }; },

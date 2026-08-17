@@ -2926,6 +2926,41 @@ async function TestAnimIndexIsComplete() {
   console.log(`  ✓ 动画索引：${trackNames.length} 轨道 / ${poseNames.size} 姿势 / ${idx.locomotion.length} 步态全扫到；用法带 文件:行 + 节拍 + 谁；工作台入口/骨架/CLI 齐`);
 }
 
+// 步频与贴地（2026-08-18 用户："主角的步频也太快了 完全不像是正常的跑步" /
+// "非常多的动作，脚都是会在 Y 轴漂移的"）。两条机制的契约：
+// ① 步频走 Rig.WalkCadence 那条曲线（大人快走 2 步/秒上下、冲刺封顶 3.5，小孩高一档），
+//    World 不许再按位移一步一步数（老版柱子 4.2m/s 一秒 7 步）；
+// ② 胯高由 ApplyPose 的地面吸附按腿的几何算，脚/膝里最低的点钉在地平线上——
+//    Rig 里得有这套件（FootDepth/LowestContact/GroundWeight/RigContact），World 要把
+//    lift/ground 喂给 PoseRig（抱起来/骑着/翻越/躺着才离地）。
+function TestGaitCadenceAndGroundSnap() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
+  const world = fs.readFileSync(path.join(here, "Script_World.js"), "utf8");
+  // Rig 拖不动 three，把两支纯函数的源码抠出来现算
+  const grab = (name) => {
+    const m = new RegExp(`export function ${name}\\(([^)]*)\\) \\{([\\s\\S]*?)\\n\\}`).exec(rig);
+    assert.ok(m, `Rig 里得有 ${name}`);
+    return new Function(...m[1].split(",").map((a) => a.trim().split("=")[0].trim()), m[2].replace(/const bs = Math\.max/, "const bs = Math.max"));
+  };
+  const Cadence = grab("WalkCadence"), Gait = grab("GaitOf");
+  const c = (v, bs) => Cadence(v, bs);
+  assert.ok(c(1.4, 1) > 1.7 && c(1.4, 1) < 2.2, `大人快走该在 2 步/秒上下，实为 ${c(1.4, 1).toFixed(2)}`);
+  assert.ok(c(3.4, 1) >= 3.0 && c(3.4, 1) <= 3.6, `大人冲刺该在 3~3.5 步/秒，实为 ${c(3.4, 1).toFixed(2)}`);
+  assert.ok(c(4.2, 0.75) >= 3.6 && c(4.2, 0.75) <= 4.3, `柱子 4.2m/s 该在 4 步/秒上下（老版 7），实为 ${c(4.2, 0.75).toFixed(2)}`);
+  assert.ok(c(2.5, 0.60) <= 4.8, `妹妹小跑不许超过 4.8 步/秒，实为 ${c(2.5, 0.60).toFixed(2)}`);
+  assert.ok(c(0.5, 1) < c(1.4, 1) && c(1.4, 1) < c(3.4, 1), "步频随速度单调");
+  assert.ok(Gait(4.2, 0.75) === 1 && Gait(1.0, 1) === 0, "走↔跑按体型折算的速度分档");
+  assert.ok(!/s\.phase \+= moved \* 3\.4/.test(world), "World 不许再按位移数步（3.4 弧度/米那套）");
+  assert.ok(/WalkCadence\(/.test(world) && /GaitOf\(/.test(world), "World 得用 Rig.WalkCadence / GaitOf");
+  for (const fn of ["FootDepth", "LowestContact", "GroundWeight", "RigContact", "GaitLegs"]) assert.ok(new RegExp(`function ${fn}\\(`).test(rig), `Rig 缺 ${fn}`);
+  assert.ok(/LowestContact\(t\)/.test(rig.slice(rig.indexOf("function ApplyPose("))), "ApplyPose 得按最低接触点定胯高（地面吸附）");
+  assert.ok(/lift, ground: LIE_POSES\[extra\.pose\] \? 0 : 1/.test(world), "World 得把 lift/ground 喂给 PoseRig（离地才不贴地）");
+  // 跪着的脚要跟着小腿铺平（鞋面贴地），不许再是脚尖扎进地里那套 12°/14°
+  assert.ok(!/shinB: 128, footB: 12,/.test(rig) && !/shinB = 128 \* DEG; target\.footB = 12 \* DEG/.test(rig), "跪姿的脚角度不许退回脚尖扎地的 12°");
+  console.log(`  ✓ 步频与贴地：大人快走 ${c(1.4, 1).toFixed(2)}/s · 冲刺 ${c(3.4, 1).toFixed(2)}/s · 柱子跑 ${c(4.2, 0.75).toFixed(2)}/s；胯高按腿的几何吸附到地平线`);
+}
+
 // 原 TestSlingThrow / TestElmSetupIsMotivated 随打榆钱一场退役（2026-08-13
 // 八稿：村里的榆树全秃了，c1_elm 整拍删除）。投石机制（SlingSolve / 拽弓 /
 // 无按键后备）仍在链外自由投掷里活着（潜行段的石子引开），throwHit 链步
@@ -2964,6 +2999,7 @@ TestInstrumentalBgmManifest();
 TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 await TestAnimIndexIsComplete();
+TestGaitCadenceAndGroundSnap();
 
 console.log("— 全流程自动通关（第六章走『地下进人』，第二章走『舀水』）—");
 {
