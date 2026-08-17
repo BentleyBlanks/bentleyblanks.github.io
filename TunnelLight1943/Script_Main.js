@@ -1511,9 +1511,9 @@ ui.btnAnim?.addEventListener("click", () => {
 // 跟 AI 说话时一句话定位（"改 officer 的 crown"）。
 const ART_SHEET = [
   { kind: "player", name: "柱子", role: "主角（半大孩子）", hair: "短发刘海",
-    where: "HeadHair（short）", note: "体型 0.93。第一章还是个孩子，颅大鼻矮" },
+    where: "HeadHair（short）", note: "第一章体型 0.75、头 ×1.34（HEAD_K）、身子 ×0.88、脸长 ×0.76。颅大脸短身子细" },
   { kind: "sister", name: "妹妹", role: "被护送者", hair: "短发刘海＋头顶抓髻＋红头绳",
-    where: "HeadHair（child）", note: "体型 0.66。眼大鼻小颏圆；头顶那枚心情气泡主要给她" },
+    where: "HeadHair（child）", note: "一二章体型 0.60、头 ×1.52、身子 ×0.80、脸长 ×0.66。头顶那枚心情气泡主要给她" },
   { kind: "family", name: "娘", role: "主角的母亲", hair: "长发刘海＋项后一道布绳",
     where: "HeadHair（long）", note: "体型 0.90。蓝底白花的短褂是全章的暗线" },
   { kind: "father", name: "爹", role: "主角的父亲（木匠）", hair: "长发刘海",

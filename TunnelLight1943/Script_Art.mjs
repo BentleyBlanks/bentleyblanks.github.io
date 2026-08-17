@@ -705,6 +705,17 @@ export function DrawCharacter(ctx, spec) {
 
   // 头 + 脖子
   InkLine(ctx, 0, shoulderY + 1 * S, 0, headY + 3 * S, id + "neck", { lw: lw * 2.4, color: PAL.skinDark, amp: 0.2 });
+  // **孩子的头相对身子要大**（2026-08-17，跟骨架那边的 HEAD_K 是同一件事）。
+  // 这支笔是给 HUD 牌面与背景乡亲用的平贴图，跟骨架**不是同一支**——牌上是个
+  // 成年人、路上是个孩子，玩家会以为是两个人（同「牌上是甲、路上是乙」那条）。
+  // 连头饰一起套在这个变换里，不然帽子/头发会跟脸错开。
+  const chHK = kind === "sister" ? 1.46 : kind === "player" ? 1.30 : 1;
+  ctx.save();
+  if (chHK !== 1) {
+    ctx.translate(0, headY);
+    ctx.scale(chHK, chHK);
+    ctx.translate(0, -headY);
+  }
   InkFill(ctx, [
     [-5.6 * S, headY - 1 * S], [-2 * S, headY - 6.4 * S], [3.4 * S, headY - 6.6 * S],
     [6.2 * S, headY - 2.6 * S], [5.8 * S, headY + 3.4 * S], [-4.6 * S, headY + 3.6 * S],
@@ -777,9 +788,15 @@ export function DrawCharacter(ctx, spec) {
       [-5.6 * S, headY - 5.2 * S], [1.2 * S, headY - 8.2 * S], [6.6 * S, headY - 4.4 * S], [-5.2 * S, headY - 2.8 * S],
     ], id + "hair", "#33251b", { amp: 0.6 * S, lw: lw * 0.85 });
   }
+  ctx.restore();                       // 收掉孩子那一档的头部放大
 
   ctx.restore();
-  return { handX: x + hand.handX * facing, handY: y - bob + hand.handY, headTop: y - bodyH * 0.98 };
+  // 头顶要跟着放大后的头走（HUD 牌面按它裁圆、演员头顶的标按它摆）
+  return {
+    handX: x + hand.handX * facing,
+    handY: y - bob + hand.handY,
+    headTop: y - bodyH * 0.98 - (chHK - 1) * 6.6 * S,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1108,18 +1125,39 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   const woman = kind === "family";
   const hard = kind === "soldier" || kind === "officer";
   // 比例（单位 r）：brow＝眉弓那条前缘、nose＝鼻尖、chin＝颏、jaw＝下颌角
+  // 孩子那两档一并改宽窄（2026-08-17 同一轮）：光把脸压短会得到一张**又短又宽的
+  // 板子**——下颌还是成人的宽度。小孩是**颅大而圆、下半张脸又窄又收**：
+  // 颅顶更高、后脑更鼓（back 更负）、脸的前缘往里收（brow/nose 更小）、
+  // 颏窄而回收（chin 小）、下颌角几乎没有肉（jaw 更小）
   const F = child
-    ? { crown: -2.00, back: -0.94, brow: 0.72, nose: 0.88, noseY: -0.80, chin: 0.70, jaw: -0.56, eyeK: 1.16 }
+    ? { crown: -2.10, back: -1.06, brow: 0.64, nose: 0.78, noseY: -0.80, chin: 0.56, jaw: -0.44, eyeK: 1.16 }
     : young
-      ? { crown: -1.96, back: -0.96, brow: 0.76, nose: 0.94, noseY: -0.82, chin: 0.76, jaw: -0.60, eyeK: 1.06 }
+      ? { crown: -2.03, back: -1.02, brow: 0.70, nose: 0.85, noseY: -0.82, chin: 0.65, jaw: -0.51, eyeK: 1.06 }
       : woman
         ? { crown: -1.96, back: -0.96, brow: 0.78, nose: 0.96, noseY: -0.82, chin: 0.78, jaw: -0.60, eyeK: 1.02 }
         : { crown: -1.94, back: -0.94, brow: 0.80, nose: 1.00, noseY: -0.84, chin: 0.82, jaw: hard ? -0.68 : -0.62, eyeK: 1 };
-  const P = (x, y) => [px + r * x, py + r * y];
+  // **小孩不是缩小的大人：颅大、脸短。**（2026-08-17 用户：「主角柱子的设计完全不像
+  // 一个小男孩 看着倒像是一个成年男人」）
+  // 老版九种角色的**脸长一模一样**——颏的 y 写死在 −0.34，比例表里那个 `chin` 是
+  // 颏的**横**坐标，管的是下巴往前收多少，跟年纪没关系。于是柱子和他爹只差
+  // crown −1.96 / −1.94（3%）与鼻尖 0.94 / 1.00，再把体型整体缩到 0.80——
+  // **等比缩小的大人还是大人**，实测头高只占身高的 1/7.8（成年人正是这个数）。
+  //
+  // 真正的差别在**眉弓以下那一段**：婴儿的眼线在头高六成处、成人在五成处，也就是
+  // 说小孩的脸（眉弓到颏）短得多，颅骨那一半几乎不变。所以这一版**只压眉弓以下**：
+  // 颅顶、后脑、额头一个点没动，眼线以下整段乘 FK。五官、耳朵、下颌的暗、头发的
+  // 下缘全都跟着走（都过 CY），不用逐点去挪。
+  const FK = child ? 0.66 : young ? 0.76 : 1;   // 成人 1＝恒等，老图一个像素不变
+  const BROW_Y = -1.26;
+  const CY = (y) => (y > BROW_Y ? BROW_Y + (y - BROW_Y) * FK : y);
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
+  const PY = (y) => py + r * CY(y);             // 直接用 ctx 画的那几笔走这个
   const skin = hard ? "#d0a074" : PAL.skin;
 
-  // 脖子：斜的（胸锁乳突肌从耳后斜到锁骨）。竖直两条边是根柱子
-  InkFill(ctx, [P(-0.34, 0.16), P(-0.26, -0.46), P(0.32, -0.50), P(0.46, 0.16)],
+  // 脖子：斜的（胸锁乳突肌从耳后斜到锁骨）。竖直两条边是根柱子。
+  // 小孩的脖子又短又细——短由 CY 管，细在这儿（成人 NK=1，老图不变）
+  const NK = child ? 0.80 : young ? 0.88 : 1;
+  InkFill(ctx, [P(-0.34 * NK, 0.16), P(-0.26 * NK, -0.46), P(0.32 * NK, -0.50), P(0.46 * NK, 0.16)],
     id + "neck", PAL.skinDark, { amp: 0.6 * k, lw: 0, line: null });
 
   // ① 脸：一条软线，鼻子就在线上。**点少、间距匀、嘴那一段一笔不留**——
@@ -1160,10 +1198,10 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.globalAlpha = hard ? 0.24 : 0.18;
   ctx.fillStyle = hard ? "#6d4526" : "#8a5a34";
   ctx.beginPath();
-  ctx.moveTo(px + r * (F.chin - 0.06), py - r * 0.24);
-  ctx.quadraticCurveTo(px + r * 0.26, py + r * 0.04, px - r * 0.40, py - r * 0.10);
-  ctx.lineTo(px - r * 0.36, py + r * 0.24);
-  ctx.lineTo(px + r * (F.chin - 0.02), py + r * 0.24);
+  ctx.moveTo(px + r * (F.chin - 0.06), PY(-0.24));
+  ctx.quadraticCurveTo(px + r * 0.26, PY(0.04), px - r * 0.40, PY(-0.10));
+  ctx.lineTo(px - r * 0.36, PY(0.24));
+  ctx.lineTo(px + r * (F.chin - 0.02), PY(0.24));
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -1181,7 +1219,7 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.lineJoin = "round";
   // 嘴：一小截唇缝。自家人略弯，日军一条平直线（面无表情）
   const mw = r * (child ? 0.11 : 0.13);
-  const mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
+  const mcx = px + r * (F.brow - 0.17), my = PY(-0.40);
   ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(108,56,46,0.7)";
   ctx.lineWidth = (hard ? 1.3 : 1.1) * k;
   ctx.beginPath();
@@ -1192,14 +1230,14 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   // 一粒鼻孔，点到为止
   ctx.fillStyle = "rgba(96,58,34,0.42)";
   ctx.beginPath();
-  ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
+  ctx.ellipse(px + r * (F.brow - 0.04), PY(F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
   // 耳：颧弓后头、眼线到鼻底那一段（规范位置 0.50H~0.72H）。一小片软肉＋
   // 耳轮后上那半道折。**不许描一整圈**——两条同心的边就是一枚靶心
   ctx.save();
-  const eax = px - r * 0.40, eay = py - r * 0.80;
+  const eax = px - r * 0.40, eay = PY(-0.80);
   ctx.beginPath();
   ctx.moveTo(eax + r * 0.10, eay - r * 0.20);
   ctx.quadraticCurveTo(eax - r * 0.13, eay - r * 0.24, eax - r * 0.12, eay + r * 0.02);
@@ -1341,10 +1379,10 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     // **大人包头巾**（2026-08-17 用户："村里人和主角团 部分可以包头巾来遮住眼睛"）。
     // 1943 年冀中的庄稼人男的裹条羊肚手巾、女的包块头巾，本来就是常态；
     // 顺手把"遮眼"这件事分成两路——孩子留刘海、大人包头巾，一屋子人不再一个样
-    HeadScarf(ctx, px, py, r, kind, id, k, lw, F);
+    HeadScarf(ctx, px, py, r, kind, id, k, lw, F, CY);
   } else {
     // 孩子（柱子/妹妹）：头发贴着颅骨长、刘海压到眼线上，见 HeadHair
-    HeadHair(ctx, px, py, r, kind, id, k, lw, F);
+    HeadHair(ctx, px, py, r, kind, id, k, lw, F, CY);
   }
 }
 
@@ -1365,12 +1403,12 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
  * 下沿仍旧压在眉弓上——眼睛在它底下的阴影里（同刘海那一路）。
  * 男的裹本白的羊肚手巾，女的（娘）包一块靛蓝的、盘得低而紧，纂从巾底下露出来。
  */
-function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
+function HeadScarf(ctx, px, py, r, kind, id, k, lw, F, CY = (y) => y) {
   const woman = kind === "family";
   const cloth = woman ? "#59637a" : "#ddd6c1";
   const clothDim = woman ? "#414a5e" : "#bfb69f";
   const seam = woman ? "rgba(20,26,38,0.42)" : "rgba(104,94,74,0.42)";
-  const P = (x, y) => [px + r * x, py + r * y];
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
   const edge = -1.06;                        // 布的下沿：眉弓下沿
   const coils = woman ? 2 : 3;               // 看得见几道缠痕
   const top = woman ? -1.86 : -2.26;         // 布顶：男的盘得高，比颅顶还高一截
@@ -1479,14 +1517,17 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
  * 头发：**贴着颅骨长的一层**，外沿＝颅骨轮廓往外 0.1r，内沿＝发际线
  *（额→鬓角→耳前→绕到耳后→项）。样条走，没有折角、没有横过颅顶的灰道子。
  */
-function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
+function HeadHair(ctx, px, py, r, kind, id, k, lw, F, CY = (y) => y) {
   const child = kind === "sister";
   // **长发**：娘（部分女士）与爹（少部分男士）不裹布，刘海照旧压到眼线上，
   // 发身一路落到肩——一屋子人于是有三种剪影：短发刘海（孩子）、长发（这两位）、
   // 盘头巾／毛巾（乡亲、民兵）
   const long = kind === "family" || kind === "father";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
-  const P = (x, y) => [px + r * x, py + r * y];
+  // CY＝脸长压缩（见 DrawHeadPart）：**头发的下缘必须跟脸走**，不然孩子那两档
+  // 刘海会浮在脸外头、前缘跟脸的前缘错出一个台阶（实拍抓的那个豁口）
+  const P = (x, y) => [px + r * x, py + r * CY(y)];
+  const PY = (y) => py + r * CY(y);
   // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
   // 外沿＝颅骨往外一层，内沿＝**刘海的下缘**，从耳前一路往前压到眉弓前缘；
   // 耳朵在它底下、后头，所以露得出来
@@ -1523,9 +1564,9 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     const dp = r * (0.04 + Hash(id + "fr" + i) * 0.09);   // 每一绺长短差得开
     const hw2 = r * (0.09 + Hash(id + "fw" + i) * 0.04);
     ctx.beginPath();                                       // 圆头的一绺，不是尖齿
-    ctx.moveTo(bx - hw2, py + r * (fringe - 0.03));
-    ctx.quadraticCurveTo(bx - hw2 * 0.6, py + r * fringe + dp, bx, py + r * fringe + dp);
-    ctx.quadraticCurveTo(bx + hw2 * 0.6, py + r * fringe + dp * 0.86, bx + hw2, py + r * (fringe - 0.03));
+    ctx.moveTo(bx - hw2, PY(fringe - 0.03));
+    ctx.quadraticCurveTo(bx - hw2 * 0.6, PY(fringe) + dp, bx, PY(fringe) + dp);
+    ctx.quadraticCurveTo(bx + hw2 * 0.6, PY(fringe) + dp * 0.86, bx + hw2, PY(fringe - 0.03));
     ctx.closePath();
     ctx.fill();
   }

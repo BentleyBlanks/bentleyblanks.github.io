@@ -2636,8 +2636,14 @@ export function CreateWorld(canvasEl) {
       && ((def?.kind === "digSeq" && state.beat.digIndex !== undefined)
         || def?.kind === "buildSpots" || def?.kind === "hold" || def?.kind === "chain")
       && (state.promptFill || 0) > 0.001);
-    // 柱子在第一章还是个半大孩子，第二章起抽条；妹妹一直矮一头多
-    const boyScale = state.chapterIndex === 0 ? 0.80 : 0.93;
+    // 柱子在第一章还是个半大孩子，后面才抽条；妹妹一直矮一头多。
+    // 两处 2026-08-17 改的（用户：「柱子完全不像一个小男孩 看着倒像是一个成年男人」）：
+    // ① **0.80 太高了**：配上 HEAD_K 之后头顶 1.234m，而他娘只有 1.314m——**儿子有他娘
+    //    九成四那么高**，站一块儿就是两个大人。0.75 之后是八成八，一眼分得出大小。
+    //    比例那一半（颅大脸短、身子细）在 Script_Rig 的 HEAD_K / LK 与 Art 的 FK 上。
+    // ② **第二章不许再跳到 0.93**：一二章只隔几天，原来的写法让他在换章那一刻长高
+    //    15 公分（妹妹那一路本来就是 `<= 1`，他这一路漏了）。抽条留给第三章往后。
+    const boyScale = state.chapterIndex <= 1 ? 0.75 : 0.93;
     PushBlocker(p.x, p.level, p.crouch, boyScale);
     for (const a of state.actors) {
       if (a.visible === false) continue;
