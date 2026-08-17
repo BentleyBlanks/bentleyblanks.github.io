@@ -734,6 +734,50 @@ export function MakeFlatShadow(lengthM, widthM, strength) {
   return mesh;
 }
 
+/**
+ * 窖口/竖井口那个**躺在地上的黑洞**（2026-08-17 加。用户：「地道口掀开盖这个镜头
+ * 太丑了 特别是梯子那里 完全认不出是梯子」）。
+ *
+ * 病根之一是：**地表上压根没有洞**。梯子那张贴图是竖着的立牌，从上往下看时，
+ * 画在它上头的洞口只是地平线上一条被压扁的暗带——俯角越大压得越扁。所以洞得
+ * 自己是一块**躺平的几何**（同「贴地光池」那条），俯角一看就是个椭圆的口子，
+ * 平视时自己收成一条缝（那也是对的：平视本来就看不进地上的洞）。
+ *
+ * 排在地面之上、梯子之下：梯子从洞里探上来，两根梯梃压在黑上，"往下去"才成立。
+ */
+export function MakeShaftMouth(wM, dM, id) {
+  const wPx = 256, hPx = 160;
+  const canvas = MakeCanvas(wPx, hPx);
+  const ctx = canvas.getContext("2d");
+  // 口子本身：中间实黑，四边化开成翻上来的土。**不许有干净的边**——
+  // 一圈利落的椭圆读出来是"地上摆着个黑盘子"，不是"地被掏了个洞"
+  const g = ctx.createRadialGradient(wPx * 0.5, hPx * 0.5, 0, wPx * 0.5, hPx * 0.5, hPx * 0.62);
+  g.addColorStop(0, "rgba(6,5,3,0.96)");
+  g.addColorStop(0.52, "rgba(9,7,4,0.92)");
+  g.addColorStop(0.78, "rgba(26,19,11,0.55)");
+  g.addColorStop(1, "rgba(40,30,18,0)");
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i += 1) {
+    const a = (i / 40) * Math.PI * 2;
+    const r = 0.80 + ART.Hash(id + "m" + i) * 0.18;      // 边缘啃得不匀
+    const px = wPx * 0.5 + Math.cos(a) * wPx * 0.5 * r;
+    const py = hPx * 0.5 + Math.sin(a) * hPx * 0.5 * r;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, wPx, hPx);
+  ctx.restore();
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(wM, dM),
+    new THREE.MeshBasicMaterial({ map: CanvasTexture(canvas), transparent: true, depthWrite: false }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
 // 灯打出来的影子：从脚下往背光方向拖一条，近端浓、远端散开。
 // 贴图的 u=0 一端是脚下，靠 scale.x 的正负决定往哪边拖。
 export function MakeCastShadow(strength) {

@@ -416,16 +416,18 @@ for (const size of TOUCH_SIZES) {
 }
 
 // ---------------------------------------------------------------------------
-// 标题页：四档画高都点得着（章节选择）
+// 标题页 + 操作说明：四档画高都点得着
 //
 // 2026-08-14 用户报「移动端横屏过来以及 pc 端不能选择章节了」。病根是一句
 // `#titleScreen { display:flex; align-items:center }` 配 `overflow-y:auto`：
 // **flex 的居中会把超出的那一半顶到容器上方**，而 scrollTop 的下限是 0——
 // 上半截既画不出来也滚不到。实测 1280×620 的桌面窗口 h1 落在 y=−44、
-// 667×375 的横屏手机「从第一章开始」落在 y=−75，两处都按不着；机器再矮一档，
-// 被顶出去的就轮到章节列表了。
+// 667×375 的横屏手机「从第一章开始」落在 y=−75，两处都按不着。
 // 这条按**能不能点着**验：滚到顶时不许有东西在 y<0（上方没有够不着的内容），
-// 滚到底时最后一枚章节牌必须整个在画框里。
+// 滚到底时最后一条菜单必须整个在画框里。
+// 2026-08-17 菜单重做（继续/新游戏/操作说明/设置，章节牌整排撤了）之后，
+// 那张键盘对照表搬进了「操作说明」页——同一类"够不着"的账它也得记一笔：
+// 纸封在画框里、正文自己滚，关闭键任何一档都按得着。
 const TITLE_SIZES = [
   { name: "iPhoneSE 横屏", w: 667, h: 375 },
   { name: "iPhone14 横屏", w: 844, h: 390 },
@@ -435,39 +437,61 @@ const TITLE_SIZES = [
 for (const size of TITLE_SIZES) {
   const tp = await browser.newPage({ viewport: { width: size.w, height: size.h } });
   await tp.goto(`http://127.0.0.1:${port}/TunnelLight1943/`, { waitUntil: "load", timeout: 60000 });
-  await tp.waitForFunction(() => document.getElementById("chapterList")?.children.length > 0, { timeout: 60000 });
+  await tp.waitForFunction(() => document.querySelectorAll("#titleMenu button").length > 0, { timeout: 60000 });
   const r = await tp.evaluate(() => {
     const t = document.getElementById("titleScreen");
-    const l = document.getElementById("chapterList");
-    const s2 = document.getElementById("startButton");
+    const items = [...document.querySelectorAll("#titleMenu button")].filter((b) => !b.hidden);
     t.scrollTop = 0;
-    const top = Math.min(s2.getBoundingClientRect().top,
-      ...[...l.children].map((b) => b.getBoundingClientRect().top));
+    const top = Math.min(...items.map((b) => b.getBoundingClientRect().top));
     t.scrollTop = t.scrollHeight;
-    const last = l.children[l.children.length - 1].getBoundingClientRect();
-    const n = l.children.length;
+    const last = items[items.length - 1].getBoundingClientRect();
     t.scrollTop = 0;
     // 收黑罩（#fadeOverlay）CSS 默认全黑、开机没有游戏循环去降它——标题页的
     // z-index 必须压过它，否则玩家一打开是纯黑（2026-08-14 线上就是这么黑的；
     // 罩子 pointer-events:none，按钮盲点得着，所以光测"点得着"抓不住）。
     const zOf = (el) => { const z = parseInt(getComputedStyle(el).zIndex, 10); return Number.isFinite(z) ? z : -1; };
-    return { top, lastBottom: last.bottom, vh: window.innerHeight, n,
+    return { top, lastBottom: last.bottom, vh: window.innerHeight, n: items.length,
       titleZ: zOf(t), fadeZ: zOf(document.getElementById("fadeOverlay")) };
   });
-  await tp.close();
   if (r.titleZ <= r.fadeZ) {
     failed += 1;
     console.error(`✗ ${size.name} 标题页被收黑罩盖死：#titleScreen z=${r.titleZ} ≤ #fadeOverlay z=${r.fadeZ}`
       + `——开机就是纯黑，玩家什么都看不见`);
   }
-  // 0.5px 的余量给亚像素布局
-  if (r.top < -0.5 || r.lastBottom > r.vh + 0.5 || r.n < 8) {
+  // 0.5px 的余量给亚像素布局。菜单至少三条（新游戏 / 操作说明 / 设置；
+  // 「继续」要有存档才出，全新的浏览器上没有）
+  if (r.top < -0.5 || r.lastBottom > r.vh + 0.5 || r.n < 3) {
     failed += 1;
     console.error(`✗ ${size.name} 标题页够不着：滚到顶时最上沿在 y=${r.top.toFixed(0)}`
-      + `（<0 ＝ 被 flex 居中顶出去了，滚不回来）、滚到底时末章下沿 ${r.lastBottom.toFixed(0)} / 画高 ${r.vh}`
-      + `、章节 ${r.n} 枚——玩家点不着「开始」或「选章节」`);
+      + `（<0 ＝ 被 flex 居中顶出去了，滚不回来）、滚到底时末条下沿 ${r.lastBottom.toFixed(0)} / 画高 ${r.vh}`
+      + `、菜单 ${r.n} 条——玩家点不着菜单`);
   } else {
-    console.log(`✓ ${size.name} 标题页开始键与 ${r.n} 枚章节牌都点得着`);
+    console.log(`✓ ${size.name} 标题页 ${r.n} 条菜单都点得着`);
+  }
+
+  // 操作说明：整张纸必须封在画框里（正文自己滚），关闭键要真的按得着——
+  // 那张对照表比标题页长得多，第一个撑破画框的就是它
+  await tp.click("#btnControls");
+  const c = await tp.evaluate(() => {
+    const sheet = document.querySelector("#controlsScreen .sheet");
+    const body = document.querySelector("#controlsScreen .body");
+    const close = document.getElementById("controlsClose");
+    const sr = sheet.getBoundingClientRect(), cr = close.getBoundingClientRect();
+    const hit = document.elementFromPoint(cr.left + cr.width / 2, cr.top + cr.height / 2);
+    return {
+      top: sr.top, bottom: sr.bottom, vh: window.innerHeight,
+      scrolls: body.scrollHeight > body.clientHeight,
+      closeOk: !!close.contains(hit) || close === hit,
+      rows: document.querySelectorAll("#controlsScreen dl div").length,
+    };
+  });
+  await tp.close();
+  if (c.top < -0.5 || c.bottom > c.vh + 0.5 || !c.closeOk || c.rows < 10) {
+    failed += 1;
+    console.error(`✗ ${size.name} 操作说明够不着：纸 ${c.top.toFixed(0)}~${c.bottom.toFixed(0)} / 画高 ${c.vh}`
+      + `、关闭键${c.closeOk ? "" : "被盖住"}、条目 ${c.rows} 行`);
+  } else {
+    console.log(`✓ ${size.name} 操作说明 ${c.rows} 行封在画框里（正文${c.scrolls ? "自己滚" : "一屏装得下"}）`);
   }
 }
 
