@@ -541,7 +541,11 @@ async function CmdState(o) {
 const SHOT_KEYS = new Set(["x", "level", "hold", "dur", "phases", "pre", "actor", "cine", "out", "clip", "ui", "step",
   // line/at：钉到"第几句台词的第几秒"；zoom：截图之后再裁一张近景（认不认得出
   // 那件东西，只能靠近看）。三个都是 2026-08-12 睡姿那次白跑十几轮换来的
-  "line", "at", "zoom"]);
+  "line", "at", "zoom",
+  // live：按住键拍**走动中**的那一格——不冻帧、不 Settle。冻帧之后位移归零，
+  // 走路是按位移判的，Settle 那三秒里人就站定了、脚下的土也散了（2026-08-18
+  // 拍脚后跟的土时撞上的）：走/跑姿势与随步子发出来的东西只能这么拍
+  "live"]);
 
 // "c2_digout@x=44,level=under,digStarted=1" → { id, opts:{x,level}, flags:{digStarted:true} }
 function ParseShotSpec(spec, base) {
@@ -712,8 +716,9 @@ async function CmdShot(o) {
         // 真按着键的拍必须让 rAF 真跑（StepFrames 喂的是空输入，会把按住的键
         // 冲掉），就盯着 state.time 等游戏钟走满，墙钟慢多少都不怕
         const slice = dur / phases;
+        const live = !!jo.live && held.length > 0;
         if (held.length) {
-          await page.evaluate(async (want) => {
+          await page.evaluate(async ({ want, live: lv }) => {
             const tl = window.TunnelLight;
             tl.Freeze(false);
             const t0 = tl.state.time;
@@ -724,9 +729,10 @@ async function CmdShot(o) {
             });
             // 走满就**冻帧**（2026-08-17 爬梯实拍查出来的）：截图要一两秒，那会儿键还按着、
             // rAF 还在跑，游戏又往前走两三秒——`dur=0.7` 拍到的是第三秒。冻住游戏钟，
-            // 渲染照跑（下面 Settle 推的就是渲染侧），画面停在 dur 那一格
-            tl.Freeze(true);
-          }, slice);
+            // 渲染照跑（下面 Settle 推的就是渲染侧），画面停在 dur 那一格。
+            // `live` 例外：要拍的就是走动中那一格，冻了人就站定了（见 SHOT_KEYS）
+            if (!lv) tl.Freeze(true);
+          }, { want: slice, live });
         } else if (slice > 0.01) {
           await page.evaluate((n) => window.TunnelLight.StepFrames(n, {}), Math.max(1, Math.round(slice * 30)));
           await page.waitForTimeout(420);   // 等镜头缓动与下一次真合成追上推完的状态
@@ -736,7 +742,7 @@ async function CmdShot(o) {
         // 几乎不跑（实测按住键推 12 秒，游戏钟只走了 0.58 秒）。光靠上面那
         // 420ms 的干等追不上，拍到的会是"过渡刚开始"那一格——序章那间该黑的
         // 窖因此一直拍成亮的。至少推够一次换挡（LIGHT_FADE 2.6s）
-        await page.evaluate((n) => window.TunnelLight.Settle?.(n), Math.max(90, Math.round(dur * 30)));
+        if (!live) await page.evaluate((n) => window.TunnelLight.Settle?.(n), Math.max(90, Math.round(dur * 30)));
         const file = path.join(outDir, phases > 1 ? `cli_${tag}_${i}.png` : `cli_${tag}.png`);
         await page.screenshot({ path: file, clip });
         // @zoom=sister / @zoom=player / @zoom=31.15[:0.6]：顺手再裁一张近景。

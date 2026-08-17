@@ -15193,6 +15193,40 @@ export function DrawSlatDust(ctx, ax, ay, id) {
   ctx.restore();
 }
 
+// 脚后跟蹬起来的一小团干土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里
+// 都有对应的烟雾特效」，照《勇敢的心》）。World 的 footDust 池子按 id 烘几张变体，
+// 逐帧只动位置/大小/透明度，这儿只画一团。
+// 画法：三五个圆叠成一团、**横着比竖着宽**（土是从鞋底往后掀出去的，不是往上冒
+// 的烟）；每个圆心实、边虚；**不描墨线**——这是"扬起来的灰"，一描线就成了一朵
+// 云的图标。两个色调错着来（亮的土面、暗的土里），一团里才有厚薄。
+// 画布以 (ax, ay) 为团心，半径不超过 40px。
+export function DrawFootDust(ctx, ax, ay, id) {
+  ctx.save();
+  const n = 4 + Math.floor(Hash(id + "n") * 2);
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2 + Hash(id + "a" + i) * 1.3;
+    const rr = 5 + Hash(id + "d" + i) * 9;
+    const cx = ax + Math.cos(a) * rr * 1.35, cy = ay + Math.sin(a) * rr * 0.6;
+    const r = 13 + Hash(id + "r" + i) * 9;
+    // **芯子比路面亮、裙边比路面暗**：路面本来就是浅褐的，同色的一团贴上去等于
+    // 没画（首版就是这么隐形的）；只往亮里走又只差两三档，还是糊在地里。亮芯
+    // 加一圈很淡的暗边，土面/夯土/夜路上都读得出一团的轮廓——不描墨线，只是
+    // 边上暗一点
+    const light = Hash(id + "l" + i) < 0.7 ? "246,240,224" : "228,216,190";
+    const dark = "150,132,100";
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, `rgba(${light},1)`);
+    g.addColorStop(0.52, `rgba(${light},0.86)`);
+    g.addColorStop(0.8, `rgba(${dark},0.40)`);
+    g.addColorStop(1, `rgba(${dark},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // 舀水那一下：缸口的水圈（随瓢抬起往下沉）＋两道回滴
 export function DrawScoopRing(ctx, ax, ay, id) {
   ctx.save();
