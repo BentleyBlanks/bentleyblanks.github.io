@@ -713,8 +713,17 @@ export const Darken = (hex, k) => {
 export function AddParallaxTrees(group, xFrom, xTo, night, id, { blur = 0, scale = 0.72, opacity = 0.85, step = 19, hazeOpt = null } = {}) {
   for (let x = xFrom; x < xTo; x += step + ART.Hash(id + x) * 16) {
     const wPx = 150, hPx = 200;
+    // **背景那排树也得是 1943 年春的树**（2026-08-18 用户："华北 大家都没东西吃
+    // 远处的树咋可能还有叶子呢"）。前景那几棵早就画成秃榆+剥皮了，可这一层
+    // 一直是满冠的绿球，一整排排在村子后头——画面上说的是"年景不错"。
+    // 现在按位置定死地分三种：**六成薅过的**（低枝空、只剩高处几簇稀叶）、
+    // 三成全秃（榆树连皮都刮了，那是死透的）、一成还算完整（够不着的高树/
+    // 不能吃的树总还有——全秃一片就成了冬天，而这会儿是谷雨）。
+    const kind = ART.Hash(id + "picked" + x);
+    const bare = kind < 0.30;
+    const picked = !bare && kind < 0.90;
     const mesh = BakeSprite(wPx, hPx, wPx / 2, hPx - 4, (ctx, ax, ay) => {
-      ART.DrawTree(ctx, ax, ay, id + x, { big: false, night });
+      ART.DrawTree(ctx, ax, ay, id + x, { big: false, night, bare, picked });
     }, blur, 1, hazeOpt);
     PlaceSprite(mesh, x, SURFACE_Y - 0.1, 0);
     if (scale !== 1) ScaleKeepGround(mesh, scale);
