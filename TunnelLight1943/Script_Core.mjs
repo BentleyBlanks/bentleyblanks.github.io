@@ -7772,9 +7772,6 @@ function SettleBeat(state, def) {
       break;
     // 跳过一条链，就等于这条链上每一步都做过了：旗标要落、口信要入账
     // （第六章的推理要用），手里那格清空——东西都已经用出去了。
-    case "linger":
-      def.settle?.(state);
-      break;
     case "chain":
       for (const st of def.steps || []) {
         if (st.noteAdd) state.flags.notesSeen.push(st.noteAdd);
@@ -7801,6 +7798,19 @@ function SettleBeat(state, def) {
     default:
       break;
   }
+  // **`settle`：跳幕直落后面时，这一拍该在世界上留下什么**（2026-08-17 加，
+  // 原来只有 `linger` 那一档认，现在每一种 kind 都认）。
+  //
+  // 为什么非要多这一个钩子：结算能跑到的只有 `steps[].effect` 与 cinematic 行的
+  // `on()`。**微过场（StartMicroCine）的行一次都不跑**——effect 起了它，
+  // 结算却不会播，行内 `on()` 里写的东西整段作废。可有些戏的**状态**恰恰只写在
+  // 那儿：序章「三天后」那一页翻过去（娘走了、翻板重新敞着、天亮回来）就全在
+  // c1_open 的微过场里，于是跳到 §3 以后的任何一幕，娘都还跪在窖口守着翻板，
+  // 一路守到兄妹俩做饭（用户 2026-08-17 报的）。
+  // 口径与 effect 同款：**只写状态，别写画面**（走位交给 SettleDest，镜头/字卡
+  // 本来就不该在跳幕里出现）；同一件事让 on() 与 settle 调用同一个函数，
+  // 别抄两份——两份迟早会分家。
+  def.settle?.(state);
 }
 
 /**
