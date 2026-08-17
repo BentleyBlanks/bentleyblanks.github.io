@@ -1225,7 +1225,6 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     id + "cap", "#5f5a30", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
     InkFill(ctx, [P(0.84, -1.50), P(1.58, -1.36), P(1.52, -1.18), P(0.86, -1.30)],
       id + "brim", "#4a461f", { amp: 0.6 * k, lw: lw * 0.85 });
-    EyeShade(ctx, px, py, r, F, -1.06, 0.5, 0.32);
   } else if (kind === "officer") {
     // **卫生胡（方块胡）**：太君脸就靠这一撮认。横在人中上，鼻底与唇缝之间
     ctx.save();
@@ -1246,20 +1245,17 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ctx.fill();
     InkFill(ctx, [P(0.86, -1.28), P(1.88, -1.16), P(1.84, -0.94), P(0.86, -1.08)],
       id + "visor", "#232616", { amp: 0.5 * k, lw: lw * 0.8 });
-    EyeShade(ctx, px, py, r, F, -1.04, 0.54, 0.32);
   } else if (kind === "puppet") {
     InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
       P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),
     id + "hat", "#3a352c", { amp: 0.7 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    EyeShade(ctx, px, py, r, F, -1.00, 0.38, 0.28);
   } else if (kind === "militia") {
     InkFill(ctx, Spline([P(-1.08, -1.12), P(-0.94, -1.66), P(-0.34, -1.98), P(0.32, -1.96),
       P(0.90, -1.68), P(1.04, -1.34), P(0.94, -1.02), P(-0.98, -0.90)], 4),
     id + "towel", "#ddd6c2", { amp: 0.8 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.08)" });
-    EyeShade(ctx, px, py, r, F, -0.98, 0.34, 0.26);
     InkFill(ctx, [P(-1.00, -1.08), P(-1.56, -0.58), P(-1.18, -0.42), P(-0.94, -0.84)],
       id + "tail", "#ccc4ae", { amp: 0.9 * k, lw: lw * 0.8 });
-  } else if (kind === "father" || kind === "villager" || kind === "family") {
+  } else if (kind === "villager") {
     // **大人包头巾**（2026-08-17 用户："村里人和主角团 部分可以包头巾来遮住眼睛"）。
     // 1943 年冀中的庄稼人男的裹条羊肚手巾、女的包块头巾，本来就是常态；
     // 顺手把"遮眼"这件事分成两路——孩子留刘海、大人包头巾，一屋子人不再一个样
@@ -1270,39 +1266,9 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   }
 }
 
-/**
- * 头发/帽檐底下那片阴影——**眼睛就"藏"在这儿**（《勇敢的心》的做法）。
- * y = 遮挡物的下沿（单位 r），阴影从那儿往下化开 depth。
- * 越深越冷：日军给 0.52，自家人给 0.34（还能看出是张脸，只是眼在暗处）。
- */
-function EyeShade(ctx, px, py, r, F, y, alpha = 0.34, depth = 0.30) {
-  ctx.save();
-  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + depth));
-  g.addColorStop(0, `rgba(20,15,10,${alpha})`);
-  g.addColorStop(0.5, `rgba(20,15,10,${alpha * 0.7})`);
-  g.addColorStop(1, "rgba(20,15,10,0)");
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(px - r * 0.62, py + r * (y - 0.02));
-  ctx.lineTo(px + r * (F.brow + 0.02), py + r * (y + 0.02));
-  ctx.lineTo(px + r * (F.brow - 0.06), py + r * (y + depth + 0.02));
-  ctx.lineTo(px - r * 0.60, py + r * (y + depth - 0.02));
-  ctx.closePath();
-  ctx.fill();
-  // 阴影里埋两团很虚的暗：**不是眼睛**，是让眼睛"在那儿"的暗示。
-  // 观众会自己把它读成一双眼，而且永远不会有死表情（这就是遮眼这一招的划算处）
-  const ey = py + r * (y + depth * 0.42);
-  for (const [dx, w] of [[F.brow - 0.52, 0.15], [F.brow - 0.18, 0.11]]) {
-    const rg = ctx.createRadialGradient(px + r * dx, ey, 0, px + r * dx, ey, r * w * 1.7);
-    rg.addColorStop(0, `rgba(14,10,7,${alpha * 0.85})`);
-    rg.addColorStop(1, "rgba(14,10,7,0)");
-    ctx.fillStyle = rg;
-    ctx.beginPath();
-    ctx.ellipse(px + r * dx, ey, r * w * 1.7, r * w * 1.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
+// 眼睛底下那圈渐变的阴影已整个删掉（2026-08-17 用户："你这眼部还有一圈阴影是啥
+// 玩意儿啊，干掉，丑得一逼跟个僵尸一样"）。**遮眼靠的是遮挡物真的压在那儿**，
+// 不是在眼窝上抹一层暗——抹了就是黑眼圈。别再加回来。
 
 /**
  * 头上盘的那块布（2026-08-17 用户拿一张华北老乡的照片退回第一版：
@@ -1413,7 +1379,6 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
   InkFill(ctx, [P(-1.06, -0.98), P(-1.44, -0.50), P(-1.16, -0.34), P(-0.96, -0.78)],
     id + "tail", clothDim, { amp: 0.7 * k, lw: lw * 0.66, shade: "rgba(0,0,0,0.14)" });
   // 布底下那片阴影：眼睛在这儿
-  EyeShade(ctx, px, py, r, F, edge + 0.01, 0.38, 0.30);
   // 额前露出来的一两绺头发（布不是裹在光头上）
   ctx.save();
   ctx.fillStyle = "#2e2119";
@@ -1434,6 +1399,10 @@ function HeadScarf(ctx, px, py, r, kind, id, k, lw, F) {
  */
 function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
   const child = kind === "sister";
+  // **长发**：娘（部分女士）与爹（少部分男士）不裹布，刘海照旧压到眼线上，
+  // 发身一路落到肩——一屋子人于是有三种剪影：短发刘海（孩子）、长发（这两位）、
+  // 盘头巾／毛巾（乡亲、民兵）
+  const long = kind === "family" || kind === "father";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
   const P = (x, y) => [px + r * x, py + r * y];
   // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
@@ -1451,6 +1420,11 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     P(-1.02, -0.78),
     P(-0.84, -0.46),                           // 项（发脚）
     P(-0.66, -0.56),
+    ...(long
+      // 长发：从项后一路垂到肩，发梢参差（女的更长更齐，男的短一档更乱）
+      ? [P(-1.06, -0.46), P(-1.16, 0.16), P(-1.00, 0.62), P(-0.78, 0.70),
+        P(-0.68, 0.34), P(-0.62, -0.22), P(-0.58, -0.56)]
+      : []),
     P(-0.62, -0.92),                           // 耳后（让开耳朵）
     P(-0.50, -1.08),                           // 绕过耳上
     P(-0.18, fringe - 0.06),                   // ← 刘海下缘往前压
@@ -1458,7 +1432,6 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
     P(0.50, fringe - 0.01),
   ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.18)", shadeAt: 0.5 });
   // 刘海底下那片阴影：眼睛在这儿
-  EyeShade(ctx, px, py, r, F, fringe + 0.01, child ? 0.32 : 0.40, 0.30);
   // 两三根散下来的发丝，压在阴影上——刘海不是一块板
   ctx.save();
   ctx.fillStyle = tone;
@@ -1494,7 +1467,19 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
       P(-0.78, -0.10), P(-0.74, -0.38)], 4),
     id + "wisp", tone, { amp: 0.36 * k, lw: lw * 0.7 });
   } else if (kind === "family") {
-    // 娘：抿到脑后挽成一个纂，横插一根簪。侧视里这是"一眼认出是谁"最省的一笔
+    // 娘：长发在项后拿一根布绳松松系一道（挽成纂就看不出是长发了），
+    // 侧视里这一道横绳就是"一眼认出是谁"最省的一笔
+    ctx.save();
+    ctx.strokeStyle = "rgba(184,164,116,0.9)";
+    ctx.lineWidth = 1.6 * k;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px - r * 1.10, py - r * 0.18);
+    ctx.quadraticCurveTo(px - r * 0.86, py - r * 0.06, px - r * 0.64, py - r * 0.22);
+    ctx.stroke();
+    ctx.restore();
+  } else if (kind === "__oldFamilyBun") {
+    // （旧的纂画法：长发之后不用了，留着当参照）
     InkFill(ctx, Spline([P(-0.98, -1.08), P(-1.32, -1.16), P(-1.54, -0.90), P(-1.46, -0.58),
       P(-1.14, -0.48), P(-0.92, -0.70)], 4),
     id + "bun", tone, { amp: 0.36 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.24)" });
@@ -12806,69 +12791,121 @@ export function DrawBayonetCard(ctx, W, H, seg, t) {
   InkFill(ctx, [Along(gunLen - 8 * S, -barrelW * 1.1), Along(gunLen + 8 * S, -barrelW * 1.1),
     Along(gunLen + 8 * S, barrelW * 1.1), Along(gunLen - 8 * S, barrelW * 1.1)], "byMuzzle", INK, { ...F, amp: 0.6 * S });
 
-  // ── 布包（襁褓）：**挂在刀尖底下**——刀从裹布里勾过去，包整个吊下来，
-  //    尖从包顶露出一截。吊着的东西读得出重量：上头收成一把、往下坠成一团、
-  //    最底下那一角布散开垂在光里（蓝底白花——全章那块布头一回露面）──
-  const hook = Along(L - bladeLen * 0.30, 0);              // 刀勾住布的那一点
+  // ── 襁褓：**吊在刀上的一个裹着的孩子**（2026-08-17 用户拿两张图退回第一版：
+  //    一张是背上背着孩子的老照片（金文的「保」字就是那个形），一张是今天的
+  //    襁褓照——第一版画成一只口袋，什么都不像）。照那两张图来：
+  //    · **头露在外头**：一颗圆脑袋在最上头，几缕胎发；
+  //    · **身子裹成一个茧**：肩最宽、往脚那头收窄、底是圆的，一层布从肩上斜着
+  //      掖过胸前（那道斜的包边就是"裹着的"这两个字），下摆再折回来一道；
+  //    · 裹的就是那块**蓝底白花**——整个茧是布，只是背着光，色沉在影子里；
+  //      散开垂下来的那一角在光里，花才亮；
+  //    · 刀从后背的裹布里勾过去：布在刀上拧成一小把，尖从脑袋上头露出来。
+  //    比例按真孩子：头 0.135m、连头带茧 0.6m 上下——比第一版那只口袋小一圈 ──
+  const hook = Along(L - bladeLen * 0.48, 0);              // 刀勾住裹布的那一点
   const sway = Math.sin(t * 2.6) * 1.6 * S;
-  const bx0 = hook[0] + 6 * S, by0 = hook[1] + 4 * S;      // 包顶（拧成一把的布）
-  const bundle = Spline([
-    [bx0 - 9 * S, by0 - 4 * S], [bx0 + 11 * S, by0 - 2 * S],          // 拧在刀上的那一把
-    [bx0 + 30 * S, by0 + 26 * S], [bx0 + 40 * S, by0 + 66 * S],       // 右肩鼓出来（头那一头）
-    [bx0 + 34 * S, by0 + 108 * S], [bx0 + 12 * S + sway, by0 + 134 * S],  // 底：圆的
-    [bx0 - 20 * S + sway, by0 + 128 * S], [bx0 - 34 * S, by0 + 96 * S],
-    [bx0 - 36 * S, by0 + 54 * S], [bx0 - 24 * S, by0 + 18 * S],
+  // 头心：钩点就在脑袋的左上沿——布是从后背勾住的，刀从脑袋后头穿上去
+  const cx2 = hook[0] + 10 * S, cy2 = hook[1] + 18 * S;
+  const hr = 20 * S;                                       // 头半径
+  const B = (x, y) => [cx2 + x * S, cy2 + y * S];          // 以头心为原点的局部坐标（单位 S）
+  // 茧：领口在下巴底下 22，肩最宽 ±36，脚那头 ±22，底圆；下半截随风略摆
+  const cocoon = Spline([
+    B(-30, 24), B(0, 20), B(30, 24), B(37, 56), B(35, 96),
+    B(28 + sway * 0.6, 136), B(12 + sway, 160), B(-10 + sway, 160), B(-26 + sway * 0.6, 138),
+    B(-36, 98), B(-38, 56),
   ], 5);
-  // 垂下来的那一角：从包底左侧散开、垂到更低的地方，末端在风里略摆
-  const cTop = [[bx0 - 34 * S, by0 + 96 * S], [bx0 + 6 * S + sway * 0.4, by0 + 132 * S]];
-  const cTip = [bx0 - 26 * S + sway * 1.4, by0 + 222 * S];
+  // 垂下来的那一角：从茧的左下摆散开、垂到更低的地方，末端在风里略摆
+  const cTop = [B(-30 + sway * 0.4, 128), B(-4 + sway * 0.8, 160)];
+  const cTip = B(-24 + sway * 1.6, 220);
   const cornerPts = [
     cTop[0], cTop[1],
-    [bx0 + 6 * S + sway, by0 + 182 * S], cTip,
-    [bx0 - 54 * S + sway * 0.8, by0 + 170 * S],
+    B(0 + sway * 1.2, 188), cTip,
+    B(-46 + sway * 0.9, 182),
   ];
-  // 蓝布：靠外的那条边被日头打亮，根上沉在包身的影子里
+  // 蓝布（那一角在光里）：靠外的那条边被日头打亮，根上沉在茧的影子里
   const cg = ctx.createLinearGradient(cTop[0][0], cTop[0][1], cTip[0], cTip[1]);
   cg.addColorStop(0, "#1c2c48");
   cg.addColorStop(1, "#3d5c8a");
   InkFill(ctx, cornerPts, "byCorner", cg, { amp: 2.0 * S, lw: 2.4 * S, line: "rgba(6,8,14,0.9)", shade: "rgba(0,0,0,0.22)", shadeAt: 0.62 });
-  // 布上的小白花：跟整布卡同一簇画法（四瓣一簇的米白）
+  // 四瓣一簇的米白小花：跟整布卡（wholeCloth）同一簇画法
+  const Bloom = (bx, by, alpha, i) => {
+    ctx.fillStyle = `rgba(206,212,222,${alpha})`;
+    for (let p2 = 0; p2 < 4; p2 += 1) {
+      const pa = (p2 / 4) * Math.PI * 2 + Hash("byBloomP" + i) * 2;
+      ctx.beginPath();
+      ctx.ellipse(bx + Math.cos(pa) * 3.0 * S, by + Math.sin(pa) * 2.2 * S, 1.8 * S, 1.3 * S, pa, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  // 那一角上的花：撒在三角形里（重心坐标）——一张摊开的格子再各抖一点，
+  // 纯随机撒有一半会挤成一团（第一版实拍就是三朵叠在一处）
   ctx.save();
   ctx.beginPath();
   WobblyPath(ctx, cornerPts, "byCorner", 2.0 * S, true);
   ctx.clip();
-  ctx.fillStyle = "rgba(206,212,222,0.78)";
-  // 撒在那一角布的三角形里（重心坐标）：一张摊开的格子再各抖一点——
-  // 纯随机撒 9 朵有一半会挤成一团（第一版实拍就是三朵叠在一处）
   const BLOOM_UV = [[0.22, 0.14], [0.58, 0.16], [0.30, 0.42], [0.60, 0.34], [0.14, 0.62], [0.40, 0.56], [0.24, 0.84], [0.72, 0.10], [0.46, 0.30]];
   for (let i = 0; i < BLOOM_UV.length; i += 1) {
     const ku = BLOOM_UV[i][0] + (Hash("byBloomX" + i) - 0.5) * 0.08;
     const kv = BLOOM_UV[i][1] + (Hash("byBloomY" + i) - 0.5) * 0.08;
-    const bx = cTop[0][0] + (cTop[1][0] - cTop[0][0]) * ku + (cTip[0] - cTop[0][0]) * kv;
-    const by = cTop[0][1] + (cTop[1][1] - cTop[0][1]) * ku + (cTip[1] - cTop[0][1]) * kv;
-    for (let p2 = 0; p2 < 4; p2 += 1) {
-      const pa = (p2 / 4) * Math.PI * 2 + Hash("byBloomP" + i) * 2;
-      ctx.beginPath();
-      ctx.ellipse(bx + Math.cos(pa) * 3.2 * S, by + Math.sin(pa) * 2.4 * S, 1.9 * S, 1.4 * S, pa, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    Bloom(cTop[0][0] + (cTop[1][0] - cTop[0][0]) * ku + (cTip[0] - cTop[0][0]) * kv,
+      cTop[0][1] + (cTop[1][1] - cTop[0][1]) * ku + (cTip[1] - cTop[0][1]) * kv, 0.78, i);
   }
   ctx.restore();
-  // 包身压在布角的根上（布是从包底下散出来的）
-  InkFill(ctx, bundle, "byBundle", INK, { ...F, amp: 2.2 * S, shade: "rgba(0,0,0,0.25)", shadeAt: 0.5 });
-  // 裹布勒出的两道褶：黑上更黑的一线，读得出是"裹着的"不是一只口袋
+
+  // 茧身：背着光的蓝布——比那一角暗两档，但要跟兵的黑分得开
+  const cocoonFill = ctx.createLinearGradient(cx2, cy2 + 20 * S, cx2, cy2 + 160 * S);
+  cocoonFill.addColorStop(0, "#152239");
+  cocoonFill.addColorStop(1, "#203352");
+  InkFill(ctx, cocoon, "byCocoon", cocoonFill, { ...F, amp: 1.8 * S, shade: "rgba(0,0,0,0.28)", shadeAt: 0.55 });
   ctx.save();
-  ctx.strokeStyle = "rgba(0,0,0,0.85)";
-  ctx.lineWidth = 2.4 * S;
-  for (let i = 0; i < 2; i += 1) {
-    const fy = by0 + 44 * S + i * 40 * S;
-    ctx.beginPath();
-    ctx.moveTo(bx0 - 30 * S, fy);
-    ctx.quadraticCurveTo(bx0 + 4 * S, fy + 14 * S, bx0 + 34 * S, fy - 4 * S);
-    ctx.stroke();
+  ctx.beginPath();
+  WobblyPath(ctx, cocoon, "byCocoon", 1.8 * S, true);
+  ctx.clip();
+  // 布上的花（在影子里只剩淡淡一层）
+  const COC_UV = [[-22, 44], [12, 40], [-6, 66], [24, 74], [-26, 84], [4, 96], [26, 108], [-14, 116], [10, 132], [-22, 140], [-2, 150], [20, 138]];
+  for (let i = 0; i < COC_UV.length; i += 1) {
+    const [ux2, uy2] = COC_UV[i];
+    const [bx, by] = B(ux2 + (Hash("byCocX" + i) - 0.5) * 6 + sway * (uy2 / 160), uy2 + (Hash("byCocY" + i) - 0.5) * 6);
+    Bloom(bx, by, 0.30, 20 + i);
   }
+  // 裹布的两道边：从左肩斜掖到右胯的那一道，下摆再折回来一道——
+  // 每道边上一线亮的包边、边底下压一道影，"裹着"全靠这两笔
+  const Fold = (p0, pc, p1) => {
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(0,0,0,0.42)"; ctx.lineWidth = 6 * S;
+    ctx.beginPath(); ctx.moveTo(p0[0], p0[1] + 3 * S); ctx.quadraticCurveTo(pc[0], pc[1] + 3 * S, p1[0], p1[1] + 3 * S); ctx.stroke();
+    ctx.strokeStyle = "rgba(150,165,190,0.55)"; ctx.lineWidth = 2.0 * S;
+    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(pc[0], pc[1], p1[0], p1[1]); ctx.stroke();
+  };
+  Fold(B(-38, 52), B(-4, 100), B(30 + sway * 0.4, 130));            // 斜掖过胸前
+  Fold(B(30 + sway * 0.4, 130), B(6 + sway * 0.8, 152), B(-24 + sway * 0.6, 142));   // 下摆折回来
+  Fold(B(-32, 24), B(0, 40), B(32, 24));                              // 领口那道弯
   ctx.restore();
-  // 刀尖再压回来：从包顶露出来的那一截
+  // 刀上拧着的那一小把裹布：后背的布被刀背勾住、拧成一把——画在脑袋后头
+  InkFill(ctx, Spline([
+    [hook[0] - 12 * S, hook[1] - 6 * S], [hook[0] + 8 * S, hook[1] - 10 * S], [hook[0] + 16 * S, hook[1] + 4 * S],
+    [hook[0] + 6 * S, hook[1] + 16 * S], [hook[0] - 12 * S, hook[1] + 10 * S],
+  ], 4), "byHookCloth", "#182640", { ...F, amp: 1.2 * S });
+  // 脖颈：一小截黑，接在下巴底下
+  InkFill(ctx, [B(-9, 14), B(9, 14), B(11, 26), B(-11, 26)], "byBabyNeck", INK, { ...F, amp: 0.8 * S });
+  // 头：一颗圆脑袋（孩子的头大而圆，下巴几乎没有），逆着光是黑的
+  InkFill(ctx, Spline([
+    B(0, -20), B(15, -14), B(20, 0), B(15, 14), B(0, 20), B(-15, 14), B(-20, 0), B(-15, -14),
+  ], 5), "byBabyHead", INK, { ...F, amp: 1.2 * S });
+  // 几缕胎发，从头顶翘出来
+  ctx.save();
+  ctx.strokeStyle = INK; ctx.lineWidth = 1.8 * S; ctx.lineCap = "round";
+  for (let i = 0; i < 5; i += 1) {
+    const a = -Math.PI * (0.32 + i * 0.09);
+    const [x0, y0] = B(Math.cos(a) * 19, Math.sin(a) * 19);
+    const [x1, y1] = B(Math.cos(a - 0.35) * 26, Math.sin(a - 0.35) * 26);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+  // 逆光的一线边：头顶与茧的左肩各一道亮边——圆的东西背着光就该有这一线
+  ctx.strokeStyle = "rgba(196,188,172,0.55)"; ctx.lineWidth = 2.0 * S;
+  ctx.beginPath(); ctx.arc(cx2, cy2, hr - 1.2 * S, Math.PI * 1.05, Math.PI * 1.62); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(...B(-33, 30)); ctx.quadraticCurveTo(...B(-40, 60), ...B(-37, 92)); ctx.stroke();
+  ctx.restore();
+  // 刀尖再压回来：从脑袋上头露出来的那一截
   DrawBlade(L - bladeLen * 0.30, L);
 
   // ── 角晕 + 纸纹：这一帧是硬切进来的一张画，四角收黑让它读成"一帧" ──

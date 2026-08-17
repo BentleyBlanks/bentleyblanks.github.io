@@ -110,7 +110,10 @@ function BuildParts(kind, haze = null) {
     // 戴帽垂的（日军）得给脑后那片布留出画布：它垂过后颈，比头本身低一截。
     // 枢轴（脖根）在画布里的高度不变，只在下面多加一段——不然布会被裁平
     head: () => {
-      const hM = ART.UNIFORM[kind]?.capFlap ? 0.54 : 0.46;
+      // 帽垂（日军）往脑后垂过后颈，长发（娘/爹）落到肩——两种都得在枢轴**底下**
+      // 多留一段画布，不然发梢会被裁成一个小揪儿（2026-08-17 实拍抓的）
+      const longHair = kind === "family" || kind === "father";
+      const hM = ART.UNIFORM[kind]?.capFlap ? 0.54 : longHair ? 0.64 : 0.46;
       return Bake(0.46, hM, 0.42, 0.46 / hM,
         (ctx, px, py) => ART.DrawHeadPart(ctx, px, py, BONE.headR * P, kind, kind + "head", INK_K));
     },

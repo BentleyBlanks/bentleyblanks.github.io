@@ -231,12 +231,60 @@ function LineHeld(line, t) {
   if (t > d + VOICE_WAIT_CAP) return false;
   return !!(VOICE_BUSY && VOICE_BUSY());
 }
-function LineDuration(line) {
+export function LineDuration(line) {
   if (!VOICE_DUR) return line.d;
   const text = line.say || line.stage;
   if (!text) return line.d;
   const v = VOICE_DUR.get(VoiceLineId(line.say ? (line.who || "") : "", text));
   return v ? Math.max(line.d, v + 0.35) : line.d;
+}
+
+// ---------------------------------------------------------------------------
+// 过场的一把尺子（2026-08-17 加，给 Script_CineTimeline 的时间轴面板与 CLI 共用）
+//
+// 过场里"现在演到哪儿"只有一个说法：**第几句、句内第几秒**——`shot` 子命令的
+// `@line=N,at=T` 认的就是它。时间轴上的秒数是从它折算出来的（每句起点＝前面
+// 各句时长之和，时长走 LineDuration：开着声音时被配音撑长的那份也算进去），
+// 反过来拖播放头也是先换算回 (line, at) 再推游戏。两边共用这一处，免得
+// 面板上一套、命令行一套，对不上号。
+// ---------------------------------------------------------------------------
+/** 各句的起点与时长：{ rows:[{start,d}], total } */
+export function CineTimeTable(lines) {
+  const rows = [];
+  let acc = 0;
+  for (const l of lines || []) {
+    const d = Math.max(0, LineDuration(l) || 0);
+    rows.push({ start: acc, d });
+    acc += d;
+  }
+  return { rows, total: acc };
+}
+
+/** 眼下演到哪儿：{ id, chapter, beatIndex, kind, line, lineT, micro, lines }。
+ *  微过场在跑时以它为准（同 TunnelLight.SeekLine 的口径）；不在过场里 line 为 null。 */
+export function CineLocator(state) {
+  if (!state) return null;
+  const def = CurrentBeatDef(state);
+  const base = {
+    id: def?.id || null, chapter: state.chapterIndex, beatIndex: state.beatIndex,
+    kind: def?.kind || state.phase, phase: state.phase,
+  };
+  if (state.microCine) {
+    const mc = state.microCine;
+    return { ...base, micro: true, line: mc.i ?? 0, lineT: mc.t || 0, lines: mc.lines };
+  }
+  if (def?.kind === "cinematic" && state.beat) {
+    return { ...base, micro: false, line: state.beat.lineIndex, lineT: state.beat.lineT || 0, lines: state.beatLines || def.lines || [] };
+  }
+  return { ...base, micro: false, line: null, lineT: 0, lines: [] };
+}
+
+/** `c1_thatday@line=5,at=1.20`——shot 子命令吃的定位串；不在过场里就只有拍名 */
+export function CineLocatorString(state) {
+  const L = CineLocator(state);
+  if (!L || !L.id) return "";
+  if (L.line === null) return L.id;
+  return `${L.id}@line=${L.line},at=${(L.lineT || 0).toFixed(2)}`;
 }
 
 // ---------------------------------------------------------------------------

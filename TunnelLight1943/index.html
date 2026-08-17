@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=127">
+  <link rel="stylesheet" href="./Style_Game.css?v=130">
   <!-- 版本戳必须盖到**整张模块图**上，不能只盖入口。
        事故（2026-08-07，手机上报「刨子推不动」）：Script_Main.js 带 ?v= 拿到了新版，
        它 import 的 Script_Core.mjs 是裸 URL，手机上照旧吃缓存里的旧版——新壳配旧芯：
@@ -33,34 +33,35 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three/build/three.module.js?v=127",
-        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=127",
+        "three": "./vendor/three/build/three.module.js?v=130",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=130",
 
-        "./Script_Core.mjs": "./Script_Core.mjs?v=127",
-        "./Script_World.js": "./Script_World.js?v=127",
-        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=127",
-        "./Script_Art.mjs": "./Script_Art.mjs?v=127",
-        "./Script_Rig.mjs": "./Script_Rig.mjs?v=127",
-        "./Script_Climb.mjs": "./Script_Climb.mjs?v=127",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=127",
-        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=127",
-        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=127",
-        "./Script_Audio.js": "./Script_Audio.js?v=127",
-        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=127",
-        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=127",
-        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=127",
-        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=127",
-        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=127",
-        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=127",
+        "./Script_Core.mjs": "./Script_Core.mjs?v=130",
+        "./Script_World.js": "./Script_World.js?v=130",
+        "./Script_WorldPaint.mjs": "./Script_WorldPaint.mjs?v=130",
+        "./Script_Art.mjs": "./Script_Art.mjs?v=130",
+        "./Script_Rig.mjs": "./Script_Rig.mjs?v=130",
+        "./Script_Climb.mjs": "./Script_Climb.mjs?v=130",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=130",
+        "./Script_Fluid.mjs": "./Script_Fluid.mjs?v=130",
+        "./Script_Soundtrack.js": "./Script_Soundtrack.js?v=130",
+        "./Script_CineTimeline.js": "./Script_CineTimeline.js?v=130",
+        "./Script_Audio.js": "./Script_Audio.js?v=130",
+        "./Data_Scenes.mjs": "./Data_Scenes.mjs?v=130",
+        "./Data_DepthSpec.mjs": "./Data_DepthSpec.mjs?v=130",
+        "./Data_Ladder.mjs": "./Data_Ladder.mjs?v=130",
+        "./Data_DayCycle.mjs": "./Data_DayCycle.mjs?v=130",
+        "./Data_BgmConfig.mjs": "./Data_BgmConfig.mjs?v=130",
+        "./Data_AudioMix.mjs": "./Data_AudioMix.mjs?v=130",
 
-        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=127",
-        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=127",
-        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=127",
-        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=127",
-        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=127",
-        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=127",
-        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=127",
-        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=127"
+        "./Data_ScriptC1.mjs": "./Data_ScriptC1.mjs?v=130",
+        "./Data_ScriptC2.mjs": "./Data_ScriptC2.mjs?v=130",
+        "./Data_ScriptC3.mjs": "./Data_ScriptC3.mjs?v=130",
+        "./Data_ScriptC4.mjs": "./Data_ScriptC4.mjs?v=130",
+        "./Data_ScriptC5.mjs": "./Data_ScriptC5.mjs?v=130",
+        "./Data_ScriptC6.mjs": "./Data_ScriptC6.mjs?v=130",
+        "./Data_ScriptC7.mjs": "./Data_ScriptC7.mjs?v=130",
+        "./Data_ScriptC8.mjs": "./Data_ScriptC8.mjs?v=130"
       }
     }
   </script>
@@ -130,6 +131,9 @@
       <button id="btnQuit" class="panelRow" type="button">回到标题<small>进度已存</small></button>
       <hr>
       <button id="btnDebug" type="button">调试 · 跳到第 N 幕<small>` 或 F2</small></button>
+      <!-- 过场时间轴：底栏 Unity Timeline 式面板，拖到过场的某一格、复制
+           `c1_xx@line=N,at=T` 定位串粘给 agent（见 Script_CineTimeline.js） -->
+      <button id="btnCine" type="button">调试 · 过场时间轴<small>F3</small></button>
     </section>
     <!-- 包袱条（勇敢的心式收藏品栏）：右缘一条纸底竖条，一格一件老物件。
          收到新东西时整条滑进来亮一下那格（peek），平时按 B 或点包袱钮打开。
@@ -256,6 +260,9 @@
     <footer>前序剧情按脚本结算（人物入场 / 工事 / 分支都补上），不逐帧重跑</footer>
   </section>
 
+  <!-- 过场时间轴（调试）：内容全由 Script_CineTimeline.js 现搭。F3 / ?cine=1 / 设置里那颗钮 -->
+  <section id="cinePanel" hidden aria-label="过场时间轴"></section>
+
   <!-- 主菜单（2026-08-17 重做，用户：「这开始菜单还弄个两层是干什么？」）：
        一列竖着的条目，市面上的叙事游戏都是这个形。老版把「从第一章开始 ／
        跳到任意一幕」两颗钮、八枚章节牌、一张键盘对照表全摊在标题页上——
@@ -334,6 +341,6 @@
     </div>
   </section>
 </main>
-<script type="module" src="./Script_Main.js?v=127"></script>
+<script type="module" src="./Script_Main.js?v=130"></script>
 </body>
 </html>

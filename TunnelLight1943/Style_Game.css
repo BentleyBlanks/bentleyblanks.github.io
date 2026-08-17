@@ -1004,9 +1004,10 @@ body.touchDevice #touchControls.gone { display: none; }
 #gameCanvas { transition: filter 0.18s ease; }
 body.paused #gameCanvas { filter: brightness(0.52) saturate(0.72); }
 
-#btnDebug {
+#btnDebug, #btnCine {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   width: 100%;
+  margin-top: 6px;
   padding: 7px 10px;
   border: 1px solid rgba(150, 180, 210, 0.28);
   border-radius: 5px;
@@ -1018,8 +1019,8 @@ body.paused #gameCanvas { filter: brightness(0.52) saturate(0.72); }
   pointer-events: auto;
   transition: color 0.2s, border-color 0.2s;
 }
-#btnDebug small { font-size: 9.5px; letter-spacing: 0.12em; color: rgba(150, 180, 210, 0.5); }
-#btnDebug:hover { color: rgba(190, 220, 245, 0.95); border-color: rgba(150, 180, 210, 0.6); }
+#btnDebug small, #btnCine small { font-size: 9.5px; letter-spacing: 0.12em; color: rgba(150, 180, 210, 0.5); }
+#btnDebug:hover, #btnCine:hover { color: rgba(190, 220, 245, 0.95); border-color: rgba(150, 180, 210, 0.6); }
 
 #debugPanel {
   position: absolute;
@@ -1242,3 +1243,222 @@ body.paused #gameCanvas { filter: brightness(0.52) saturate(0.72); }
     overflow-y: auto;
   }
 }
+
+/* ── 过场时间轴（调试，Script_CineTimeline.js）────────────────────────
+   底栏 Unity Timeline 式：左边轨道名、中间可横向滚的轨道区、右边检视器。
+   配色沿用调试面板那套冷灰蓝，压在 HUD 之上（z 61 同 #debugPanel）。
+   面板自己接指针；游戏画布在它上头那片照旧能点。 */
+#cinePanel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 61;
+  height: min(300px, 46vh);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(150, 180, 210, 0.32);
+  background: rgba(10, 14, 19, 0.94);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  color: #c3d3e0;
+  font: 11px/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  pointer-events: auto;
+  user-select: none;
+  --ct-ruler: 22px;
+  --ct-lane: 26px;
+}
+#cinePanel[hidden] { display: none; }
+#cinePanel.min { height: auto !important; }
+.ctGrip { flex: none; height: 5px; margin-top: -3px; cursor: ns-resize; }
+.ctGrip:hover { background: rgba(150, 200, 235, 0.35); }
+#cinePanel.min .ctGrip { display: none; }
+#cinePanel.min .ctBody { display: none; }
+body.cineOpen #debugPanel { max-height: calc(54vh - 24px); }
+/* 面板开着时字幕/状态行/字幕渐暗底往上让开（--cine-h 由面板按实际高度写） */
+body.cineOpen #caption { bottom: calc(var(--cine-h, 0px) + 18px); }
+body.cineOpen #captionScrim { bottom: var(--cine-h, 0px); height: 30vh; }
+body.cineOpen #prompt { bottom: calc(var(--cine-h, 0px) + 24px); }
+body.cineOpen #cineBars .barBottom { bottom: var(--cine-h, 0px); }
+
+.ctBar {
+  flex: none;
+  display: flex; align-items: center; gap: 6px; row-gap: 4px;
+  flex-wrap: wrap;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(150, 180, 210, 0.18);
+  white-space: nowrap;
+}
+.ctTitle { letter-spacing: 0.06em; color: #9fc6e4; margin-right: 4px; flex: none; }
+.ctSel {
+  flex: none;
+  max-width: 260px;
+  padding: 3px 5px;
+  border: 1px solid rgba(150, 180, 210, 0.28);
+  border-radius: 3px;
+  background: rgba(20, 26, 34, 0.9);
+  color: #dbe7f0;
+  font: inherit;
+}
+.ctSel option.dim { color: #7a8d9c; }
+.ctBeat { max-width: 300px; }
+.ctSpeed { width: 58px; }
+.ctTransport { flex: none; display: inline-flex; gap: 2px; margin: 0 4px; }
+.ctBtn {
+  flex: none;
+  min-width: 26px; height: 24px;
+  padding: 0 7px;
+  border: 1px solid rgba(150, 180, 210, 0.24);
+  border-radius: 3px;
+  background: rgba(120, 150, 175, 0.1);
+  color: #b9cfe0;
+  font: inherit; line-height: 1;
+  cursor: pointer;
+}
+.ctBtn:hover { background: rgba(120, 160, 190, 0.22); border-color: rgba(150, 180, 210, 0.5); }
+.ctBtn.on, .ctBtn[aria-pressed="true"] { background: rgba(110, 165, 210, 0.36); border-color: rgba(150, 200, 235, 0.7); color: #eef6fc; }
+.ctPlay { min-width: 34px; font-weight: 700; }
+.ctCopy { color: #ffe08a; border-color: rgba(255, 224, 138, 0.4); }
+.ctCopy:hover { background: rgba(255, 224, 138, 0.14); }
+.ctTime { flex: none; color: #dbe7f0; font-variant-numeric: tabular-nums; margin: 0 4px; }
+.ctLoc {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 3px;
+  background: rgba(255, 224, 138, 0.1);
+  color: #ffe08a;
+  cursor: copy;
+  font: inherit;
+}
+.ctNote {
+  flex: 1 1 120px; min-width: 90px; max-width: 320px;
+  padding: 3px 6px;
+  border: 1px solid rgba(150, 180, 210, 0.24);
+  border-radius: 3px;
+  background: rgba(20, 26, 34, 0.9);
+  color: #dbe7f0;
+  font: inherit;
+}
+.ctNote::placeholder { color: #6a7f8f; }
+.ctZoom { flex: none; display: inline-flex; gap: 2px; }
+.ctStatus { flex: 1 1 auto; min-width: 40px; color: #8fb3cc; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.ctMin, .ctClose { min-width: 24px; padding: 0; }
+
+.ctBody { flex: 1; display: flex; min-height: 0; }
+.ctTracks { flex: 1; display: flex; min-width: 0; }
+.ctHead {
+  flex: none; width: 64px;
+  border-right: 1px solid rgba(150, 180, 210, 0.18);
+  background: rgba(14, 19, 26, 0.9);
+}
+.ctHeadRow {
+  height: var(--ct-lane);
+  display: flex; align-items: center;
+  padding: 0 8px;
+  color: #8fa9bd;
+  border-bottom: 1px solid rgba(150, 180, 210, 0.08);
+}
+.ctHeadRuler { height: var(--ct-ruler); color: #5f7686; font-size: 10px; }
+.ctScroll { flex: 1; overflow: auto; position: relative; }
+.ctScroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.ctScroll::-webkit-scrollbar-thumb { background: rgba(150, 180, 210, 0.25); border-radius: 4px; }
+.ctInner { position: relative; min-width: 100%; height: calc(var(--ct-ruler) + 6 * var(--ct-lane)); }
+.ctRuler {
+  position: relative; height: var(--ct-ruler);
+  border-bottom: 1px solid rgba(150, 180, 210, 0.2);
+  background: rgba(20, 26, 34, 0.7);
+  cursor: ew-resize;
+}
+.ctTick { position: absolute; bottom: 0; width: 1px; height: 5px; background: rgba(150, 180, 210, 0.35); }
+.ctTick.major { height: 9px; background: rgba(150, 180, 210, 0.6); }
+.ctTick.minor { height: 3px; }
+.ctTick b { position: absolute; left: 3px; bottom: 6px; font-weight: 400; font-size: 9.5px; color: #7f97aa; white-space: nowrap; }
+.ctLane {
+  position: relative; height: var(--ct-lane);
+  border-bottom: 1px solid rgba(150, 180, 210, 0.08);
+  cursor: ew-resize;
+}
+.ctLane[data-lane="lines"] { background: rgba(255, 255, 255, 0.015); }
+.ctLane[data-lane="lines"].microPrimary { background: rgba(200, 160, 90, 0.08); }
+.ctLane[data-lane="cue"] { background: rgba(255, 255, 255, 0.015); }
+.ctClip {
+  position: absolute; top: 3px; height: calc(var(--ct-lane) - 6px);
+  box-sizing: border-box;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
+  line-height: calc(var(--ct-lane) - 8px);
+  font-size: 10.5px;
+  color: #e6eef5;
+  background: rgba(120, 150, 175, 0.25);
+}
+.ctClip span { pointer-events: none; }
+.ctClip.say { background: rgba(86, 140, 200, 0.42); border-color: rgba(140, 190, 240, 0.5); }
+.ctClip.stage { background: rgba(196, 150, 70, 0.42); border-color: rgba(230, 190, 110, 0.55); }
+.ctClip.act { background: rgba(120, 130, 140, 0.22); border-color: rgba(160, 175, 190, 0.3); color: #aebccb; }
+.ctClip.blank { background: transparent; border-style: dashed; color: #6f8595; }
+.ctClip.now { outline: 2px solid #ffe08a; outline-offset: -1px; color: #fff; }
+.ctClip.cam { background: rgba(90, 120, 150, 0.22); border-color: rgba(140, 170, 200, 0.3); color: #cfe0ee; }
+.ctClip.cam.k-close { background: rgba(120, 100, 200, 0.36); }
+.ctClip.cam.k-ots { background: rgba(160, 90, 190, 0.36); }
+.ctClip.cam.k-shot, .ctClip.cam.k-wide, .ctClip.cam.k-insert { background: rgba(70, 150, 140, 0.34); }
+.ctClip.cam.k-free { background: rgba(70, 130, 200, 0.4); }
+.ctClip.cam.k-split { background: rgba(60, 160, 200, 0.4); }
+.ctClip.cam.k-dark { background: rgba(0, 0, 0, 0.75); border-color: rgba(120, 120, 120, 0.5); color: #9aa; }
+.ctClip.cam.k-insertCard, .ctClip.cam.k-insertVideo { background: rgba(200, 120, 70, 0.4); }
+.ctClip.cam.cut { border-left: 3px solid #ff5f5f; }
+.ctClip.micro { background: rgba(200, 160, 90, 0.3); border-color: rgba(230, 200, 140, 0.45); }
+.ctMark {
+  position: absolute; top: 6px;
+  width: 12px; height: 12px;
+  transform: translateX(-6px) rotate(45deg);
+  border-radius: 2px;
+  background: #79c0ff;
+  cursor: pointer;
+}
+.ctMark.on { background: #7be0a0; }
+.ctMark.fg {
+  transform: none; border-radius: 3px;
+  height: calc(var(--ct-lane) - 12px);
+  background: rgba(230, 200, 140, 0.35);
+  border: 1px solid rgba(230, 200, 140, 0.6);
+  color: #ffe6b0; font-size: 9.5px; line-height: 12px; padding-left: 4px;
+  box-sizing: border-box;
+}
+.ctMark.fg b { font-weight: 600; }
+.ctMark.cue { background: #ff9f5a; width: 8px; height: 8px; top: 9px; transform: translateX(-4px) rotate(45deg); }
+.ctPlayhead {
+  position: absolute; top: 0; bottom: 0; width: 1px;
+  background: #ff5f5f;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 6px rgba(255, 95, 95, 0.6);
+}
+.ctPlayhead.off { opacity: 0.35; }
+.ctPlayheadCap {
+  position: absolute; top: 0; left: -6px;
+  border: 6px solid transparent; border-top: 9px solid #ff5f5f; border-bottom: 0;
+}
+.ctInspect {
+  flex: none; width: 300px;
+  padding: 8px 10px;
+  border-left: 1px solid rgba(150, 180, 210, 0.18);
+  overflow-y: auto;
+  user-select: text;
+}
+.ctInspect h4 { margin: 0 0 6px; font-size: 12px; color: #9fc6e4; font-weight: 600; letter-spacing: 0.04em; }
+.ctRow { display: grid; grid-template-columns: 58px 1fr; gap: 6px; padding: 2px 0; align-items: baseline; }
+.ctRow b { color: #5f7686; font-weight: 500; }
+.ctRow span { color: #d5e1eb; word-break: break-all; }
+.ctRow.hi span { color: #ffe08a; }
+.ctRow.dim span { color: #7f97aa; }
+.ctRow.flags span { color: #7f97aa; font-size: 10px; }
+.ctActors { margin: 6px 0; padding: 4px 0; border-top: 1px dashed rgba(150, 180, 210, 0.15); border-bottom: 1px dashed rgba(150, 180, 210, 0.15); }
+.ctProg { height: 4px; margin: 2px 0 6px; background: rgba(150, 180, 210, 0.15); border-radius: 2px; overflow: hidden; }
+.ctProg i { display: block; height: 100%; background: #ffe08a; }
+.ctText { margin: 4px 0 8px; padding: 6px 8px; border-radius: 3px; background: rgba(86, 140, 200, 0.18); color: #eef4f8; font-size: 11.5px; line-height: 1.5; }
+.ctText.stage { background: rgba(196, 150, 70, 0.2); }
+.ctText.act { background: rgba(120, 130, 140, 0.16); color: #aebccb; }
+.ctEmpty { color: #7f97aa; }
+.ctPre { white-space: pre-wrap; font: inherit; color: #ffe08a; margin: 0 0 8px; }
+@media (max-width: 1100px) { .ctInspect { width: 240px; } }
+@media (max-width: 820px) { .ctInspect { display: none; } #cinePanel { height: min(240px, 50vh); } }
