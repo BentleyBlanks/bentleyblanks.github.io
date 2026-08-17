@@ -298,9 +298,10 @@ export function CineLocatorString(state) {
 const VAULT_DUR = 0.62;      // 齐胯高的墙一撑就过，拖长了就成了慢动作
 const VAULT_DUR_BIG = 1.05;
 
-// 上下梯子。井有 3.6 米深（SURFACE_Y→UNDER_Y），按人爬梯子的真速度给时长：
-// 下去顺着重力快些，上来是费力气的活。**这段时间里人是在梯子上的**，
-// 高度由 p.lift 插值（见 MovePlayer 里的爬梯分支），不是换个层数就完事。
+// 上下梯子。井有 3.6 米深（SURFACE_Y→UNDER_Y）。**梯子上是自己爬的**（2026-08-17
+// 用户："可以支持在半路停下的，就像勇敢的心那样"）：按住 S 往下、W 往上，松手就停在
+// 那一档上，中途可以掉头。速度按人爬梯子的真速度给：下去顺着重力快些，上来是费力气
+// 的活。高度由 p.lift 插值（见 MovePlayer 里的爬梯分支），不是换个层数就完事。
 // 扶稳门扇（第一场"修门"）。下门轴跳出臼窝，整扇吊在上轴上自己往外坠；
 // 玩家的手真的按在门板上，把它顶回门框正位，爹才使得上劲礅轴。
 // 数值都按一扇 1.83m 高、0.83m 宽的木门给。
@@ -329,35 +330,36 @@ const DOOR_KEY = 0.42;       // 键盘后备：按住 E 把门扶正的角速度
 // 底下，玩家一整拍都没看见自己在修什么（用户 2026-08-10）
 const DOOR_CAM = { y: 0.72, hw: 2.45 };
 
-// 时长按"一档一档爬"给（2026-08-17 爬梯重做）：3.6 米十一道横档，下去 2.4 秒是
-// 每档 0.22 秒——每只脚隔一档跨一步、四肢轮着动还看得清；老版 1.5 秒每档 0.14 秒，
-// 手脚再怎么钉在横档上也是一团糊。上来费劲，慢一档。
-const CLIMB_DOWN = 2.4;
-const CLIMB_UP = 3.0;
+// 速度按"一档一档爬"给（2026-08-17 爬梯重做）：0.40m 一档，下 1.35m/s ＝每档 0.3 秒，
+// 每只脚隔一档跨一步、四肢轮着动还看得清；上来费劲，慢一档。老版是定时 1.5 秒滑到底，
+// 每档 0.14 秒，手脚再怎么钉在横档上也是一团糊。
+const CLIMB_SPEED_DOWN = 1.35;
+const CLIMB_SPEED_UP = 1.10;
+const CLIMB_ACCEL = 14;             // 松手/按下的加减速（1/s）：停得干脆，又不是一格一格顿
 const LADDER_RUNG = LADDER.pitch;   // 横档间距：每挪过一档响一声，声音跟着人走（与画笔/骨架同一张表）
 
-// 层数当帧就翻（碰撞/视线/玩法一律按目的层算，不留半层的中间态），
+// 层数**一按下就翻成目的层**（碰撞/视线/玩法一律按目的层算，不留半层的中间态），
 // 渲染高度另走 p.lift 从原来那层缓过去。两件事分开，玩法才不会出现"半层人"。
+// 中途掉头爬回原来那头出去的，出去那一刻再翻回来。
 // 窖口上有盖板：一块抹了泥灰做旧的旧门板（正是 c1_plane 刨出来的那块）。
-// 上下地道不是"人从地面沉下去"，是**掀开盖板 → 爬 → 把盖板拉回来盖上**。
-// 三段共用一个计时器（`p.climbT`）：
-//   掀盖 LID_OPEN → 爬 travelDur → 盖回 LID_SHUT
-// 分三段而不是三个状态机，是因为「落地归零」那套断言盯的是 lift 的单调性——
-// 掀盖那段 lift 停在起点、盖回那段停在终点，只降不升仍然成立。
+// 上下地道不是"人从地面沉下去"，是**掀开盖板 → 爬 → 把盖板拉回来盖上**：
+//   p.climb = { id, y（脚线的世界 y）, v（竖向速度）, dir（最近一次爬的方向 ±1）,
+//              phase: "open" | "ride" | "shut", t（open/shut 的计时）, fromTop, rung }
+// `p.climbT` 只是给老读者留的旗（Main 的镜头、World 的 climbing、CLI）：在梯子上＝1。
 const LID_OPEN = 0.45;       // 掀开：土封的边先崩开，板子立起来
 const LID_SHUT = 0.50;       // 盖回：从底下伸手够着拉，比掀开慢一点
 
-function StartClimb(state, toLevel, dur, shaftId) {
+function StartClimb(state, toLevel, shaftId) {
   const p = state.player;
   const fromY = p.level === "under" ? UNDER_Y : SURFACE_Y;
   const destY = toLevel === "under" ? UNDER_Y : SURFACE_Y;
   p.level = toLevel;
-  p.travelDur = dur;
-  p.climbDur = LID_OPEN + dur + LID_SHUT;
-  p.climbT = p.climbDur;
-  p.climbFrom = fromY;
+  p.climb = {
+    id: shaftId || null, y: fromY, v: 0, dir: destY < fromY ? -1 : 1,
+    phase: "open", t: LID_OPEN, fromTop: fromY > destY, rung: 0,
+  };
+  p.climbT = 1;
   p.lift = fromY - destY;
-  p.rung = 0;
   p.moving = false;
   p.crouch = false;           // 梯子上不猫腰：进地道那一下的弓背等落地再说
   p.pose = null;              // 手上的活到梯子这儿一律让位给爬的姿势
@@ -367,6 +369,50 @@ function StartClimb(state, toLevel, dur, shaftId) {
   // 盖板归渲染层读：id 说是哪个窖口，open 是 0..1 的掀开量
   state.lid = { id: shaftId || null, open: 0 };
   Cue(state, "dig", { gain: 0.34 });        // 土封的边崩开，先是一下刮土
+}
+
+/** 梯子上的一帧：掀盖 → 自己爬（可停可掉头）→ 到头盖回。返回 true = 这一帧人在梯子上 */
+function StepClimb(state, input, dt) {
+  const p = state.player;
+  const c = p.climb;
+  if (!c) return false;
+  const groundOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
+  if (c.phase === "open") {
+    c.t = Math.max(0, c.t - dt);
+    if (state.lid) state.lid.open = 1 - c.t / LID_OPEN;
+    if (c.t <= 0) c.phase = "ride";
+  } else if (c.phase === "ride") {
+    // 竖推：S(+1) 往下、W(−1) 往上；松手停在这一档，可以掉头
+    const push = Math.abs(input.climb || 0) > 0.05 ? Math.sign(input.climb) : 0;
+    const want = push > 0 ? -CLIMB_SPEED_DOWN : push < 0 ? CLIMB_SPEED_UP : 0;
+    c.v += (want - c.v) * Math.min(1, dt * CLIMB_ACCEL);
+    if (Math.abs(c.v) < 0.02 && !push) c.v = 0;
+    if (push) c.dir = push > 0 ? -1 : 1;
+    const y0 = c.y;
+    c.y = Math.max(UNDER_Y, Math.min(SURFACE_Y, c.y + c.v * dt));
+    // 一档一档地响：按真正挪过的档发，不是定时循环——快慢都对得上，停下就不响
+    const rung = Math.floor((SURFACE_Y - c.y) / LADDER_RUNG + 1e-6);
+    if (rung !== c.rung && Math.abs(c.y - y0) > 1e-6) { c.rung = rung; Cue(state, "ladder", { gain: 0.42 }); }
+    // 到头了（还在往那头推）：出梯子、把盖板拉回来。到哪头就是哪一层
+    const atTop = c.y >= SURFACE_Y - 1e-6, atBot = c.y <= UNDER_Y + 1e-6;
+    if ((atTop && push < 0) || (atBot && push > 0)) {
+      p.level = atTop ? "surface" : "under";
+      c.phase = "shut"; c.t = LID_SHUT; c.v = 0;
+    }
+  } else {
+    c.t = Math.max(0, c.t - dt);
+    if (state.lid) state.lid.open = c.t / LID_SHUT;
+    // 板子落回洞口那一下闷响（只发一次）
+    if (!c.shutCued && c.t <= LID_SHUT * 0.04) { c.shutCued = true; Cue(state, "drop", { gain: 0.55 }); }
+    if (c.t <= 0) {
+      p.climb = null; p.climbT = 0; p.lift = 0; state.lid = null;
+      return true;
+    }
+  }
+  p.lift = c.y - groundOf(p.level);
+  p.climbT = 1;
+  p.moving = false;
+  return true;
 }
 
 // 翻越的抬升曲线：人真的离地，不是换个姿势平移过去。
@@ -4626,7 +4672,7 @@ export function CreateGame(chapterIndex = 0) {
     beatIndex: 0,
     time: 0,
     cardTimer: 0,
-    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, vaultT: 0, vaultK: 0, lift: 0, cineWalk: null },
+    player: { x: 0, level: "surface", heading: 1, crouch: false, carry: null, item: null, lamp: false, hidden: false, climbT: 0, climb: null, vaultT: 0, vaultK: 0, lift: 0, cineWalk: null },
     actors: [],
     cart: null,
     // 自由放下的落地道具：{uid, id, label, big?, throwable?, x, level}
@@ -4747,6 +4793,7 @@ export function StartChapter(state, index) {
   state.player.lamp = false;
   state.player.crouch = false;
   state.player.climbT = 0;
+  state.player.climb = null;
   state.player.cineWalk = null;
   state.player.level = "surface";
   state.cart = null;
@@ -5277,7 +5324,7 @@ export function StepGame(state, input, dt) {
   // 过场里自己开合的窖盖（娘掀翻板那一下）。爬梯时这块板由 MovePlayer 逐帧
   // 改写，不走这儿——这儿只认剧本立起来的那种带 to 的：一句 on() 立上去，
   // 剩下的自己转过去，过场不用逐帧脚本
-  if (state.lid && state.lid.to !== undefined && !state.player.climbDur) {
+  if (state.lid && state.lid.to !== undefined && !state.player.climb) {
     const l = state.lid;
     // delay：板子等人先使上劲再动（娘掀翻板那一下——她要够两次才攥住铁环，
     // 板在第二次攥住之后才该起来）。没有它的话，on() 一立板就转，
@@ -5617,50 +5664,17 @@ function MovePlayer(state, input, dt) {
     }
   }
 
-  // 上下梯子：**人真的在梯子上挪**，不是换个层数。
-  //
-  // 上一版是 `p.level = "under"; p.climbT = 0.55`——层数当帧就翻了，渲染层照
-  // `level` 取地平线，人当场瞬移到井底，然后在井底原地摆 0.55 秒爬梯姿势。
-  // 玩家看见的就是"瞬移 + 没有攀爬动作"。
-  //
-  // 现在：层数照旧当帧翻（碰撞/视线/玩法都按目的层算，不留中间态），但渲染的
-  // 高度由 p.lift 从原来那层缓到目的层——World 的 UpdateOne 本来就画 ground+lift
-  // （翻越用的是同一条路）。3.6 米的井，下去 1.5 秒、上来 2.0 秒（上梯子费劲），
-  // 每挪过一档横档响一声，手上才有"在爬"的实感。
-  if (p.climbT > 0) {
-    p.climbT = Math.max(0, p.climbT - dt);
-    const destY = p.level === "under" ? UNDER_Y : SURFACE_Y;
-    const travel = p.travelDur || Math.max(0.1, p.climbDur - LID_OPEN - LID_SHUT);
-    const gone2 = p.climbDur - p.climbT;                       // 已经走了多久 0 → climbDur
-    // 三段：掀盖（人还在口上）→ 爬（lift 走完全程）→ 盖回（人已到位，伸手拉回来）
-    let travelK;                                               // 0 → 1
-    let lidOpen;                                               // 0 → 1 → 0
-    if (gone2 < LID_OPEN) {
-      travelK = 0;
-      lidOpen = gone2 / LID_OPEN;
-    } else if (gone2 < LID_OPEN + travel) {
-      travelK = (gone2 - LID_OPEN) / travel;
-      lidOpen = 1;
-    } else {
-      travelK = 1;
-      lidOpen = Math.max(0, 1 - (gone2 - LID_OPEN - travel) / LID_SHUT);
-      // 板子落回洞口那一下闷响（只发一次）
-      if (!p.lidShut && lidOpen <= 0.02) { p.lidShut = true; Cue(state, "drop", { gain: 0.55 }); }
-    }
-    const e = 1 - travelK * travelK * (3 - 2 * travelK);        // 1 → 0，起步收势各缓一点
-    p.lift = (p.climbFrom - destY) * e;
-    if (state.lid) state.lid.open = lidOpen;
-    // 一档一档地响：按真正挪过的距离发，不是定时循环——快慢都对得上
-    const gone = Math.abs(p.climbFrom - destY) * (1 - e);
-    const rung = Math.floor(gone / LADDER_RUNG);
-    if (rung !== p.rung) { p.rung = rung; Cue(state, "ladder", { gain: 0.42 }); }
-    if (p.climbT <= 0) { p.lift = 0; p.climbDur = 0; p.lidShut = false; state.lid = null; }
-    p.moving = false;
+  // 上下梯子：**人真的在梯子上挪、而且是自己爬**（StepClimb）。层数一按下就翻
+  //（碰撞/视线/玩法按目的层算），渲染的高度由 p.lift 从原来那层缓到目的层——World
+  // 的 UpdateOne 本来就画 ground+lift（翻越用的是同一条路）。按住 S/W 走、松手停、
+  // 中途可掉头；每挪过一档横档响一声。**按住 E 做功的那一帧竖推归做功**（顶上那段
+  // 已经把 input.climb 清掉了），所以在梯子上是不会误触做功的。
+  if (StepClimb(state, input, dt)) {
     state.climbHint = "";
     state.vaultHint = "";
     state.cellarPeek = 0;    // 爬梯自己带镜头（BaseShot 读 lift），别再叠探头
     state.steadyCam = false;
-    return;                                                    // 爬梯中锁操作
+    return;                                                    // 爬梯中锁横向走位
   }
   // 翻越进行中：撑上顶沿 → 收腿荡过去 → 落地缓冲，全程锁操作。
   // 横向用 smoothstep（起手几乎不动，手在撑；过顶沿最快；落地收住），
@@ -5818,9 +5832,9 @@ function MovePlayer(state, input, dt) {
         }
         // 据点地道没有做地表：真让他爬上去会掉进一个空场景，提示全消失
         if (!scene.walk.surface) break;
-        p.x = shaft.x; StartClimb(state, "surface", CLIMB_UP, shaft.id);
+        p.x = shaft.x; StartClimb(state, "surface", shaft.id);
       } else if (input.climb > 0 && p.level === "surface" && scene.walk.under) {
-        p.x = shaft.x; StartClimb(state, "under", CLIMB_DOWN, shaft.id);
+        p.x = shaft.x; StartClimb(state, "under", shaft.id);
       }
       break;
     }
@@ -5868,16 +5882,17 @@ function StepFollowers(state, dt) {
     // 玩家在梯子上的时候，跟着走的人也得在梯子上——层数是跟着翻的，
     // 高度不跟就成了"你一格一格爬，妹妹在井底等你"。她慢半拍（落后一档多），
     // 一前一后下同一架梯子；等你落地她也就到了。
-    if (p.climbT > 0) {
-      const destY = p.level === "under" ? UNDER_Y : SURFACE_Y;
-      const span = p.climbFrom - destY;                     // 下井为正，上井为负
+    if (p.climb) {
       a.x = p.x;
       a.heading = p.heading;
       a.climbing = true;
       a.crouch = false;
-      // 夹在两头之间：不许爬出井口，也不许穿到井底以下
-      const lag = Math.sign(span) * 0.55;
-      a.lift = span > 0 ? Math.min(span, p.lift + lag) : Math.max(span, p.lift + lag);
+      // 她待在**进梯子那一头**的那一侧（从上头下来她就一直在他上头，反过来在他下头），
+      // 玩家停她也停、掉头她也跟着回；夹在两头之间：不许爬出井口，也不许穿到井底以下
+      const her = p.climb.fromTop
+        ? Math.min(SURFACE_Y, p.climb.y + 0.55)
+        : Math.max(UNDER_Y, p.climb.y - 0.55);
+      a.lift = her - (p.level === "under" ? UNDER_Y : SURFACE_Y);
       continue;
     }
     a.climbing = false;

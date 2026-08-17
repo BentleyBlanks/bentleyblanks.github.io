@@ -1469,7 +1469,7 @@ export function LegIK(tx, ty) {
 function ClimbPose(target, s) {
   const c = s.climb;
   const bs = c.bs || 1;
-  const plan = PlanClimb({ holds: c.holds, base: c.base, dir: c.dir, bs, oneHand: !!s.childArms });
+  const plan = PlanClimb({ holds: c.holds, base: c.base, dir: c.dir, bs, oneHand: !!s.childArms, settle: c.settle || 0 });
   const L = (wy) => (wy - c.base) / bs;          // 世界 y → 骨架局部 y
   const X = (wx) => wx / bs;                      // 身前米 → 骨架局部 x
   target.hipX = X(plan.hip.x);

@@ -2381,6 +2381,17 @@ export function CreateWorld(canvasEl) {
     if (extra.climbing) s.phase += movedY * 4.5;
     else if (isMoving) s.phase += moved * 3.4 / bsPh;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
+    // 梯子上停没停（2026-08-17 可停可掉头）：停了 settle 升到 1，Rig 把半空的手脚
+    // 收到档上；一动就掉回 0。升得慢一点（0.3s 落稳），掉得快（一动就接着爬）
+    // 停没停读 Core 的竖向速度（extra.climb.still），不读画出来的位移——实拍冻帧时
+    // 位移也是 0，按位移判会把正爬着的一格拍成"停稳了"
+    {
+      const still = extra.climbing && !!extra.climb?.still;
+      const tgt = still ? 1 : 0;
+      const rate = still ? 5 : 12;
+      s.climbSettle = (s.climbSettle || 0) + (tgt - (s.climbSettle || 0)) * Math.min(1, (dt || 0.016) * rate);
+      if (!extra.climbing) s.climbSettle = 0;
+    }
     s.idleT += dt * 1.4;
 
     const holding = IsHandHeld(held);
@@ -2404,7 +2415,8 @@ export function CreateWorld(canvasEl) {
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       // 爬梯：这架梯子的落点表 + 方向 + **画出来的脚线**（不是 Core 的，两者差一个缓动）
-      climb: extra.climb ? { holds: extra.climb.holds, dir: extra.climb.dir, base: y, bs: bsRig } : null,
+      // + settle（0 在爬 … 1 停稳）：停下来那一刻手脚要落到档上，不许悬在半空
+      climb: extra.climb ? { holds: extra.climb.holds, dir: extra.climb.dir, base: y, bs: bsRig, settle: s.climbSettle || 0 } : null,
       poseK: extra.poseK, poseStrain: extra.poseStrain, aimHand: extra.aimHand,
       childArms: extra.childArms,
       track: extra.track, trackT: extra.trackT,
@@ -2648,8 +2660,8 @@ export function CreateWorld(canvasEl) {
     const def = CurrentBeatDef(state);
     const LevelYOf = (lv) => (lv === "under" ? UNDER_Y : SURFACE_Y);
     // 爬梯：人在哪架梯子上（离得最近的竖井口）→ 那架梯子的落点表 + 往上/往下。
-    // Core 一按下就把 level 翻成目的层，所以方向直接读目的层
-    const climbDir = p.level === "under" ? -1 : 1;
+    // 方向读 Core 的 p.climb.dir（最近一次爬的方向：停下来姿势不变，掉头才换）
+    const climbDir = p.climb?.dir ?? (p.level === "under" ? -1 : 1);
     const ClimbSpecAt = (x) => {
       let best = null, bd = 1.5;
       for (const sh of sceneDef.shafts || []) {
@@ -2659,7 +2671,8 @@ export function CreateWorld(canvasEl) {
       if (!best) return null;
       let holds = ladderHoldsCache.get(best.id);
       if (!holds) { holds = LadderHolds(SURFACE_Y, UNDER_Y, best.id); ladderHoldsCache.set(best.id, holds); }
-      return { holds, dir: climbDir };
+      // still：松手停在梯子上（Core 的竖向速度归零）——跟着爬的妹妹与他同停同走
+      return { holds, dir: climbDir, still: !p.climb || Math.abs(p.climb.v || 0) < 0.02 };
     };
 
     // ① 先把这一帧的光源点清出来：影子朝哪边拖、谁挡谁的光，都要先知道灯在哪
