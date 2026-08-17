@@ -112,7 +112,7 @@ node TunnelLight1943/Script_Cli.mjs
 - 闲着的手顺重力吊、肘要折、左右不同角；低头别低成干呕（头的世界角判据）；三人一排同朝向＝复制人。
 - 躺着的姿势不掰关节，整具骨架转 90°（`LIE_POSES`），角度在躺下之后反算。
 - 进度驱动的姿势必须登进 `PoseProgress`，Rig 里读 `s.poseK`；`??` 会被 0 吃掉。
-- 触地量 `world.PlayerLimbTips()`／`LimbTipsOf`；接触戏先站到一臂之内、受方轨道从负 t 起、落点按实物量（`TestContactStagingIsCloseEnough`）。
+- 触地量 `world.PlayerLimbTips()`／`LimbTipsOf`；接触戏先站到一臂之内、受方轨道从负 t 起、落点按实物量（无测试守着，用 `LimbTipsOf` 量间距）。
 - 爬的东西全走 `Data_Ladder.LadderHolds` 落点表 + `Script_Climb.PlanClimb`（`TestClimbPlanLocksToRungs`）；换层不许瞬移，`lift` 自己走完；抱着的人跟着换层。
 - 抱人：肘吊下来、坐在胯上（`SEAT_LIFT`）、`childArms` 静止帧与 `scoopChild` 末帧只许一处真相。
 
