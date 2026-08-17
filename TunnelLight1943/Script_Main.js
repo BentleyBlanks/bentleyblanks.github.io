@@ -12,7 +12,8 @@ import { DrawRelic, DrawHudBadge, DrawNoticeSheet } from "./Script_Art.mjs";
 import * as ART from "./Script_Art.mjs";
 import { BONE as RIG_BONE } from "./Script_Rig.mjs";
 import { CreateWorld } from "./Script_World.js";
-import { CreateAnimLab } from "./Script_AnimLab.mjs";
+import { CreateAnimLab, CreateRigStage, EnsureAnimIndex, EntriesForKind } from "./Script_AnimLab.mjs";
+import { DefaultPreset, FormatRef } from "./Script_AnimIndex.mjs";
 // 版本戳一律不写在这儿：全部由 index.html 的 import map 一张表盖上去
 //（只盖入口、漏掉依赖，手机上就会新壳配旧芯——见那张表上的事故说明）
 import { CreateSoundtrack } from "./Script_Soundtrack.js";
@@ -115,6 +116,7 @@ for (const id of [
   "btnDebug", "debugPanel", "debugChapters", "debugBeats", "debugNow", "debugClose", "btnCine",
   "btnAnim", "animPanel",
   "btnArt", "artBrowser", "artList", "artCanvas", "artMeta", "artClose", "artZoom", "artDark",
+  "artRigCanvas", "artAnim", "artPlay", "artFlip", "artToLab", "artRigNote",
   "stick", "stickBase", "stickKnob", "btnSkipCine",
   "actPrompt", "itemThrow", "pipFrame", "pipView", "staminaBar",
 ]) ui[id] = document.getElementById(id);
@@ -258,6 +260,8 @@ function MenuKey(e, k) {
     if (k === "f4") { animLab.Close(); e.preventDefault(); return true; }
     return animLab.Key(e, k) !== false;
   }
+  // 人物美术样式浏览器（全屏）也是一层：Esc 关、空格/←→/↑↓/H 归它
+  if (ui.artBrowser && !ui.artBrowser.hidden) return ArtKey(e, k);
   if (!ui.confirmOverlay.hidden) {
     if (k === "escape") { CloseConfirm(); e.preventDefault(); }
     return true;
@@ -866,8 +870,11 @@ const DIR_GLYPH = {
     + '<path d="M15.8 12H8.6M8.6 12l3-3M8.6 12l3 3"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
     + '<path d="M8.2 12h7.2M15.4 12l-3-3M15.4 12l-3 3"/></svg>',
+  // 左右都行（掰红薯干、顺着坛肩来回抹）：盘子里一支双头箭
+  horiz: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M7.4 12h9.2M9.6 9.6L7.2 12l2.4 2.4M14.4 9.6l2.4 2.4-2.4 2.4"/></svg>',
 };
-const DIR_KEY = { up: "↑", down: "↓", left: "←", right: "→" };
+const DIR_KEY = { up: "↑", down: "↓", left: "←", right: "→", horiz: "↔" };
 
 function KeyChipHtml(act) {
   if (!act) return "";
@@ -960,6 +967,13 @@ function SyncActPrompt(state, pr, fill) {
   // 位置一律取整像素落位——半个像素上的字就是"HUD 有点糊"的老根。
   const vs = world.viewSize;
   const cw = canvas.clientWidth, chh = canvas.clientHeight;
+  // 活卡铺满画框那几拍（抠泥封/掰红薯干/撕布/划线）看不见柱子——键帽钉在卡的
+  // 下沿正中，别按他头顶的位置漂到卡上不知哪个角去
+  if (LiveCardOn(state) && cw && chh) {
+    el.style.left = Math.round(cw / 2 - actBox.w / 2) + "px";
+    el.style.top = Math.round(chh * 0.80 - actBox.h / 2) + "px";
+    return;
+  }
   if (!vs?.w || !cw || !chh) { el.style.left = "50%"; el.style.top = "70%"; return; }
   const p = state.player;
   const headY = LevelY(p.level) + (p.crouch ? 1.55 : 2.15);
@@ -1171,11 +1185,9 @@ function SyncHud(state, dt, shotFade) {
   // 已连元素和 CSS 一起拆掉，别加回来。
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
-    // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
-    // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    // 名单走 Core 的 LiveCardOn（唯一一份）——这儿原先手抄了五张，撕布/缝针/
-    // 分食三张没跟上，手机上摇杆就一直压在卡的左下角截胡手指
-    ui.touchControls.classList.toggle("gone", LiveCardOn(state) && state.phase === "playing");
+    // 活卡那几拍摇杆与互动钮**留着**（2026-08-17 四动词第二轮）：抠泥封/掰红薯干/
+    // 撕布/划线如今全靠「互动钮 ＋ 摇杆方向」，收走就没法玩了。老版收走是因为
+    // 卡面要用手拖；只剩缝三针那张还认手拖，它两条路都通，摇杆照旧留着
   }
 
   if (state.toast !== toastShown) {
@@ -1550,14 +1562,12 @@ function PaintArt() {
   if (!cv) return;
   const c = ART_SHEET[artPick];
   [...ui.artList.children].forEach((li, i) => li.firstChild.classList.toggle("on", i === artPick));
-  // 画布按面板实际大小重设（高分屏也要清楚）
+  // 画布按自己那格的实际大小重设（高分屏也要清楚）
   const box = cv.parentElement.getBoundingClientRect();
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = Math.max(520, Math.round(box.width - 24)), H = Math.max(320, Math.round(box.height - 150));
+  const W = Math.max(360, Math.round(box.width)), H = Math.max(260, Math.round(box.height));
   cv.width = W * dpr;
   cv.height = H * dpr;
-  cv.style.width = `${W}px`;
-  cv.style.height = `${H}px`;
   const g = cv.getContext("2d");
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const dark = !!ui.artDark?.checked;
@@ -1565,16 +1575,7 @@ function PaintArt() {
   g.fillRect(0, 0, W, H);
   const zoom = (Number(ui.artZoom?.value) || 150) / 100;
 
-  // ① 头：**按游戏的线宽比例**给 k（见上头第 ② 条）
-  const hr = 74 * zoom;
-  const hk = 3.2 * hr / (RIG_BONE.headR * 480);
-  g.save();
-  g.translate(hr * 1.6, H * 0.66);
-  ART.DrawHeadPart(g, 0, 0, hr, c.kind, "ab" + c.kind, hk);
-  g.restore();
-  Label(g, hr * 1.6, H * 0.66 + hr * 0.62, "头 DrawHeadPart", dark);
-
-  // ② 零件一排：躯干 / 上臂 / 前臂＋手 / 大腿 / 小腿 / 脚——就是骨架烘的那几张
+  // ① 零件一排（上半）：躯干 / 上臂 / 前臂＋手 / 大腿 / 小腿 / 脚——就是骨架烘的那几张
   const P = 480, ik = 3.2;                    // PART_PPM / INK_K，跟 Script_Rig 一个数
   const sc = 0.46 * zoom;                     // 只是摆到画布上，线宽仍按 ik 给
   const [coat, coatDark] = ART.RIG_COLOR(c.kind);
@@ -1595,8 +1596,9 @@ function PaintArt() {
     ["脚 DrawFootPart", [0.31, 0.15, 0.22, 0],
       (x, y) => ART.DrawFootPart(g, x, y, 0.19 * P * sc, 0.09 * P * sc, ART.RIG_LEG(c.kind).footF, "abo" + c.kind, ik * sc)],
   ];
-  let px2 = hr * 3.5;
-  const topY = H * 0.38;
+  const stepX = Math.max(60 * zoom, Math.min(92 * zoom, (W - 40) / parts.length));
+  let px2 = 30 + 0.2 * P * sc;
+  const topY = Math.min(H * 0.40, 0.88 * 0.60 * P * sc + 12);   // 躯干枢轴在 0.88 高处，顶上得留得下它
   const pad = 10 * ik * sc;                   // 同 BakePart：留给墨线抖动的边
   for (const [label, box, draw] of parts) {
     const [bw, bh, pu, pv] = box;
@@ -1608,16 +1610,34 @@ function PaintArt() {
     draw(px2, topY);
     g.restore();
     Label(g, px2, topY + 0.36 * P * sc + 26, label, dark);
-    px2 += 92 * zoom;
+    px2 += stepX;
   }
 
-  // ③ 整身的平贴图（HUD 牌面与背景乡亲用的那一张）：跟骨架不是同一支笔，
-  // 所以并排放着看——两处得对得上，不然"牌上是甲、路上是乙"
+  // ② 头（下半左）：**按游戏的线宽比例**给 k（见上头第 ② 条）
+  const rowY = topY + 0.36 * P * sc + 44;     // 零件那一排的下沿
+  // 发髻/大盖帽往上长到 2.5 个头半径，帽垂/长发往下也过下巴——按这个高度给它留地方，
+  // 别顶到零件那一排的标签
+  const hr = Math.max(20, Math.min(74 * zoom, (H - rowY) * 0.27));   // 面板还没量出高度时也不许给负半径
+  const hk = 3.2 * hr / (RIG_BONE.headR * 480);
+  const headX = 30 + hr * 1.3, headY = rowY + hr * 2.55 + 4;
   g.save();
-  g.translate(W - 92 * zoom, H * 0.74);
-  ART.DrawCharacter(g, { x: 0, y: 0, S: 2.6 * zoom, kind: c.kind, id: "abc" + c.kind, facing: 1 });
+  g.translate(headX, headY);
+  ART.DrawHeadPart(g, 0, 0, hr, c.kind, "ab" + c.kind, hk);
   g.restore();
-  Label(g, W - 92 * zoom, H * 0.80, "整身 DrawCharacter", dark);
+  Label(g, headX, Math.min(H - 8, headY + hr * 1.25 + 12), "头 DrawHeadPart", dark);
+
+  // ③ 整身的平贴图（HUD 牌面与背景乡亲用的那一张，下半右）：跟骨架不是同一支笔，
+  // 所以放在同一张纸上看——两处得对得上，不然"牌上是甲、路上是乙"。
+  // 骨架那具真整身在右栏（artRig）里动着，这里只管平贴图那一版
+  const flatH = Math.max(90, (H - rowY) * 0.86);       // 立姿总高（像素）；DrawCharacter 的 H = 62·S
+  const flatS = flatH / 62;
+  const flatX = Math.max(headX + hr * 1.6 + flatH * 0.35, W * 0.62);
+  g.save();
+  g.translate(flatX, rowY + (H - rowY) * 0.94);
+  // DrawCharacter 收的是 spec.scale（老版传的 S 根本没人读，所以整身一直是 62px 的小人）
+  ART.DrawCharacter(g, { x: 0, y: 0, scale: flatS, kind: c.kind, id: "abc" + c.kind, facing: 1 });
+  g.restore();
+  Label(g, flatX, Math.min(H - 8, rowY + (H - rowY) * 0.94 + 16), "整身 DrawCharacter（平贴图：牌面 / 背景乡亲）", dark);
 
   ui.artMeta.innerHTML = `
     <div class="artRow"><span>kind</span><div><code>${c.kind}</code> · <b>${c.name}</b></div></div>
@@ -1626,6 +1646,88 @@ function PaintArt() {
     <div class="artRow"><span>画笔</span><div><code>${c.where}</code></div></div>
     <div class="artRow"><span>文件</span><div><code>Script_Art.mjs</code> · 骨架装配 <code>Script_Rig.mjs</code></div></div>
     <div class="artRow"><span>备注</span><div>${c.note}</div></div>`;
+  SyncArtRig();
+}
+
+// ── 整身·骨架实时（右栏）：CreateRig 那具真骨架按这个人在戏里的体型跑他自己的动作
+// （2026-08-17 用户：「整身的样子有点小，而且不能预览动作」）。舞台与动画工作台共用
+// 一层（Script_AnimLab.CreateRigStage / EnsureAnimIndex），所以看到的就是游戏里那条动画；
+// 步态谁都会走所以全给，轨道/姿势按剧本里谁在用挑。想逐帧看：「工作台 ▸」带着这条过去。
+const artStage = ui.artRigCanvas ? CreateRigStage({ canvas: ui.artRigCanvas, groundAt: 0.14 }) : null;   // 画框按人的个头给
+let artAnimId = "loco:walk";       // 换人时尽量沿用同一条（走路谁都有）
+let artRigSync = 0, artRigKind = null;
+async function SyncArtRig() {
+  if (!artStage || !ui.artAnim) return;
+  const c = ART_SHEET[artPick];
+  const preset = DefaultPreset(c.kind);
+  artStage.SetKind(c.kind, preset ? preset.scale : 1);
+  if (artRigKind === c.kind && ui.artAnim.options.length) return;   // 只是改了大小/底色：清单不用重搭
+  artRigKind = c.kind;
+  const seq = ++artRigSync;
+  ui.artRigNote.textContent = "扫描动作清单…";
+  const { entries, byId, index } = await EnsureAnimIndex();
+  if (seq !== artRigSync) return;                    // 期间又换了人
+  const mine = EntriesForKind(entries, c.kind);
+  const groups = [["步态", mine.loco], [`轨道 · 剧本里 ${c.name} 用到的`, mine.tracks], [`姿势 · 剧本里 ${c.name} 用到的`, mine.poses]];
+  ui.artAnim.innerHTML = groups.filter(([, list]) => list.length).map(([title, list]) =>
+    `<optgroup label="${EscapeHtml(title)}（${list.length}）">${list.map((e) => {
+      const meta = e.type === "track" ? `${e.dur.toFixed(2)}s ${e.loop ? "循环" : "单次"}` : e.type === "pose" ? (e.progress ? "进度" : "静态") : "";
+      return `<option value="${EscapeHtml(e.id)}">${EscapeHtml(e.label)}${meta ? " · " + meta : ""}</option>`;
+    }).join("")}</optgroup>`).join("");
+  if (!byId.has(artAnimId) || ![...mine.loco, ...mine.tracks, ...mine.poses].some((e) => e.id === artAnimId)) artAnimId = "loco:walk";
+  ui.artAnim.value = artAnimId;
+  const entry = byId.get(artAnimId);
+  if (entry) artStage.SetEntry(entry);
+  artStage.Playing(true);
+  SyncArtRigNote(entry, index);
+}
+function SyncArtRigNote(entry, index) {
+  if (!ui.artRigNote) return;
+  const c = ART_SHEET[artPick];
+  const preset = DefaultPreset(c.kind);
+  const cyc = artStage ? artStage.Cycle() : 0;
+  ui.artRigNote.textContent = entry
+    ? `${FormatRef(entry)}\n体型 ${preset ? preset.scale : 1}（戏里现在的尺寸）· 一圈 ${cyc.toFixed(2)}s · ${index?.offline ? "离线：清单只有运行时的" : "空格 播放/暂停 · ←→ 换动作 · ↑↓ 换人 · H 翻朝向"}`
+    : "";
+  if (ui.artPlay) ui.artPlay.textContent = artStage && artStage.Playing() ? "❚❚" : "▶";
+}
+function ArtAnimStep(dir) {
+  const opts = ui.artAnim ? [...ui.artAnim.options] : [];
+  if (!opts.length) return;
+  const at = Math.max(0, opts.findIndex((o) => o.value === artAnimId));
+  const next = opts[(at + dir + opts.length) % opts.length];
+  ui.artAnim.value = next.value;
+  ui.artAnim.dispatchEvent(new Event("change"));
+}
+ui.artAnim?.addEventListener("change", async () => {
+  if (!ui.artAnim.value) return;
+  artAnimId = ui.artAnim.value;
+  const { byId, index } = await EnsureAnimIndex();
+  const entry = byId.get(artAnimId);
+  if (entry && artStage) { artStage.SetEntry(entry); artStage.Playing(true); }
+  SyncArtRigNote(entry, index);
+});
+ui.artPlay?.addEventListener("click", () => { if (artStage) { artStage.Playing(!artStage.Playing()); ui.artPlay.textContent = artStage.Playing() ? "❚❚" : "▶"; } });
+ui.artFlip?.addEventListener("click", () => artStage?.Flip());
+ui.artToLab?.addEventListener("click", async () => {
+  if (!animLab) return;
+  const c = ART_SHEET[artPick];
+  const preset = DefaultPreset(c.kind);
+  OpenArt(false);
+  await animLab.Open(artAnimId);
+  if (preset) animLab.SetKind(preset.key);
+});
+// 面板开着时键盘归它：Esc 关、空格播放/暂停、←→ 换动作、↑↓ 换人、H 翻朝向
+function ArtKey(e, k) {
+  const tag = e.target && e.target.tagName;
+  if (tag === "SELECT" || tag === "INPUT") { if (k === "escape") { e.target.blur(); return true; } return true; }
+  if (k === "escape") { OpenArt(false); e.preventDefault(); return true; }
+  if (k === " ") { ui.artPlay?.click(); e.preventDefault(); return true; }
+  if (k === "arrowright") { ArtAnimStep(1); e.preventDefault(); return true; }
+  if (k === "arrowleft") { ArtAnimStep(-1); e.preventDefault(); return true; }
+  if (k === "arrowdown" || k === "arrowup") { artPick = (artPick + (k === "arrowdown" ? 1 : -1) + ART_SHEET.length) % ART_SHEET.length; PaintArt(); e.preventDefault(); return true; }
+  if (k === "h") { artStage?.Flip(); return true; }
+  return true;
 }
 
 function Label(g, x, y, text, dark) {
@@ -2011,6 +2113,8 @@ function RunFrame(now, dt) {
     // 后果小窗一起交给 Render：全局分级要连它一块儿过，不然那块角落是全屏
     // 唯一没走后期的地方（见 World 的 Render 注释）
     world.Render(pipRect);
+    // 人物美术样式浏览器开着：右栏那具骨架要动
+    if (artStage && ui.artBrowser && !ui.artBrowser.hidden) artStage.Step(dt);
   }
   interactEdge = false;
   advanceEdge = false;
@@ -2107,6 +2211,31 @@ window.TunnelLight = {
   ToggleDebug: (v) => ToggleDebug(v),
   // 动画工作台：Open(name?) / Close / Select / Seek / Play / SetKind / LimbTips / Ref / Entries
   AnimLab: animLab,
+  // 人物美术样式浏览器：Open(v) / Pick(kind|序号) / Anim(id) / Stage（右栏那具骨架的小舞台）
+  ArtBrowser: {
+    Open: (v = true) => OpenArt(v),
+    Pick: (who) => {
+      const i = typeof who === "number" ? who : ART_SHEET.findIndex((c) => c.kind === who || c.name === who);
+      if (i < 0) return false;
+      artPick = i; PaintArt(); return true;
+    },
+    // 任何一条动作都能塞给任何人看（不是这个人的就挂到「其他」组里）
+    Anim: async (id) => {
+      const { byId } = await EnsureAnimIndex();
+      if (!ui.artAnim || !byId.has(id)) return false;
+      if (![...ui.artAnim.options].some((o) => o.value === id)) {
+        let og = ui.artAnim.querySelector('optgroup[data-other]');
+        if (!og) { og = document.createElement("optgroup"); og.label = "其他（不是这个人的）"; og.dataset.other = "1"; ui.artAnim.appendChild(og); }
+        const e = byId.get(id);
+        const opt = document.createElement("option"); opt.value = id; opt.textContent = e.label; og.appendChild(opt);
+      }
+      ui.artAnim.value = id;
+      ui.artAnim.dispatchEvent(new Event("change"));
+      return true;
+    },
+    Stage: artStage,
+    Ready: () => !!(ui.artAnim && ui.artAnim.options.length),
+  },
   // 征夫告示那张纸这一档排出来的字号／列数（CSS 像素）。给渲染健康测试用：
   // 字小到认不出是这张纸唯一验得了对错的事
   NoticeMetrics: () => { PaintNoticeSheet(); return noticeMetrics; },
