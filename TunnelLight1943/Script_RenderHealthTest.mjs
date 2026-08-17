@@ -369,16 +369,27 @@ for (const size of TOUCH_SIZES) {
     const Sweep = () => ["stick", "btnAct", "btnCrouch"].map(Free).filter((r) => r.bad > 0);
     const out = {};
     out.玩法 = Sweep();
+    // 包袱那两态（探头 / 打开）：收藏品玩法 2026-08-18 下线之后**在实机里出不来了**
+    // （Core 的 RELICS_ON 关着 ⇒ 钮带 hidden、纸带不建、peek 不响）。这两条断言留着
+    // 但按开关走——开关一翻回来它们自己复活；靠"把 DOM 掰开"硬测等于测一个玩家
+    // 碰不到的状态，反而会在纸带真的下线时报假红
     const bp = document.getElementById("bagPanel");
-    bp.hidden = false; bp.classList.add("show");        // 探头（只 show 不 open）
-    await new Promise((r) => setTimeout(r, 380));
-    out.包袱探头 = Sweep();
-    bp.classList.remove("show"); bp.hidden = true;
-    document.getElementById("btnBag").click();          // 真打开
-    await new Promise((r) => setTimeout(r, 380));
-    out.包袱打开 = Sweep();
-    document.getElementById("btnBag").click();          // 关回去，别影响下面那段
-    await new Promise((r) => setTimeout(r, 380));
+    const bagOn = !document.getElementById("btnBag").hidden;
+    if (bagOn) {
+      bp.hidden = false; bp.classList.add("show");      // 探头（只 show 不 open）
+      await new Promise((r) => setTimeout(r, 380));
+      out.包袱探头 = Sweep();
+      bp.classList.remove("show"); bp.hidden = true;
+      document.getElementById("btnBag").click();        // 真打开
+      await new Promise((r) => setTimeout(r, 380));
+      out.包袱打开 = Sweep();
+      document.getElementById("btnBag").click();        // 关回去，别影响下面那段
+      await new Promise((r) => setTimeout(r, 380));
+    } else {
+      // 关着的话反过来验一条：纸带绝不许自己冒出来占着拇指那一排
+      out.包袱已下线 = (!bp.hidden || bp.classList.contains("show"))
+        ? [{ id: "bagPanel", bad: 1, total: 1, thief: "收藏品已下线，纸带还露着" }] : [];
+    }
 
     // 角上那枚「下一件事」：它自己也是个按得着的钮，同样不许被谁盖住；
     // 而左上角还住着跳过序章那颗钮（现在没有 prologue 拍，但机制留着），
