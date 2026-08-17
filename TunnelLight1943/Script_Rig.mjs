@@ -115,26 +115,21 @@ function BuildParts(kind, haze = null) {
     },
     upperArmB: () => Bake(0.115, BONE.upperArm, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coatDark, kind + "uab", { k: INK_K })),
-    foreArmB: () => Bake(0.105, BONE.foreArm + 0.05, 0.5, 0,
+    foreArmB: () => Bake(0.15, BONE.foreArm + 0.14, 0.5, 0,
       (ctx, px, py) => {
         ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coatDark, kind + "fab", { k: INK_K });
-        ctx.beginPath();
-        ctx.arc(px, py + BONE.foreArm * P, 0.045 * P, 0, Math.PI * 2);
-        ctx.fillStyle = ART.PAL.skinDark;
-        ctx.fill();
+        // 手：远侧那只压一档色。老版两只手都是 ctx.arc 的圆片——袖口上顶着
+        // 两粒肉色扣子（2026-08-17 用户："关节都做的方块太丑了"）
+        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.042 * P, ART.PAL.skinDark,
+          kind + "hb", { k: INK_K, lw: 2.4 });
       }),
     upperArmF: () => Bake(0.115, BONE.upperArm, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.upperArm * P, 0.115 * P, 0.092 * P, coat, kind + "uaf", { k: INK_K })),
-    foreArmF: () => Bake(0.105, BONE.foreArm + 0.05, 0.5, 0,
+    foreArmF: () => Bake(0.15, BONE.foreArm + 0.14, 0.5, 0,
       (ctx, px, py) => {
         ART.DrawLimb(ctx, px, py, BONE.foreArm * P, 0.092 * P, 0.074 * P, coat, kind + "faf", { k: INK_K });
-        ctx.beginPath();
-        ctx.arc(px, py + BONE.foreArm * P, 0.047 * P, 0, Math.PI * 2);
-        ctx.fillStyle = ART.PAL.skin;
-        ctx.fill();
-        ctx.strokeStyle = ART.IN.ink;
-        ctx.lineWidth = 3 * INK_K;
-        ctx.stroke();
+        ART.DrawHandPart(ctx, px, py + BONE.foreArm * P, 0.044 * P, ART.PAL.skin,
+          kind + "hf", { k: INK_K, lw: 3 });
       }),
     thighB: () => Bake(0.145, BONE.thigh, 0.5, 0,
       (ctx, px, py) => ART.DrawLimb(ctx, px, py, BONE.thigh * P, 0.145 * P, 0.112 * P, coatDark, kind + "thb", { k: INK_K })),
@@ -143,7 +138,7 @@ function BuildParts(kind, haze = null) {
     shinB: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
         kind, kind + "shb", { k: INK_K, back: true })),
-    footB: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
+    footB: () => Bake(BONE.foot + 0.12, 0.15, 0.22, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
         ART.RIG_LEG(kind).footB, kind + "ftb", INK_K)),
     thighF: () => Bake(0.145, BONE.thigh, 0.5, 0,
@@ -151,7 +146,7 @@ function BuildParts(kind, haze = null) {
     shinF: () => Bake(0.12, BONE.shin, 0.5, 0,
       (ctx, px, py) => ART.DrawShinPart(ctx, px, py, BONE.shin * P, 0.112 * P, 0.086 * P,
         kind, kind + "shf", { k: INK_K })),
-    footF: () => Bake(BONE.foot + 0.05, 0.10, 0.16, 0,
+    footF: () => Bake(BONE.foot + 0.12, 0.15, 0.22, 0,
       (ctx, px, py) => ART.DrawFootPart(ctx, px, py, BONE.foot * P, BONE.sole * P,
         ART.RIG_LEG(kind).footF, kind + "ftf", INK_K)),
   };

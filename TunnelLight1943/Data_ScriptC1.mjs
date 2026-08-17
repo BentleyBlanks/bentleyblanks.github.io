@@ -165,9 +165,13 @@ export function ChapterC1(K) {
         { act: "画面从黑暗里显出来。屋门关着，门闩没有插——外面每一声撞击，门板就轻轻震一下。柱子搂着妹妹缩在屋角，她两只手捂着耳朵。", d: 4.2,
           cam: {
             kind: "free",
-            // 贴着两个孩子拍：分镜图里他们占了大半个画高，机距给到 1.9m
-            from: [31.72, 0.72, 2.00], to: [31.68, 0.71, 1.88],
-            at: [31.20, 0.52], atTo: [31.20, 0.51],
+            // 贴着两个孩子拍：分镜图里他们占了大半个画高。
+            // **机距 1.9m 那一版把哥哥的天灵盖切在画框外**（2026-08-17 用户：
+            // "室内镜头动画有遮挡和穿插"）——16:9 的画高只有机距的 0.56 倍，
+            // 1.9m 机距＝画高 1.07m，而他站直了 1.27m。退到 2.4m、注视点抬到
+            // 0.62：画高 1.35m，两颗脑袋都在框里，构图仍是"贴着他们拍"
+            from: [31.76, 0.80, 2.46], to: [31.72, 0.79, 2.30],
+            at: [31.22, 0.62], atTo: [31.22, 0.61],
             fg: [
               // 画左那扇门：占掉 44% 画宽，门缝落在它靠里那一侧
               // w 是**实拍量出来的**：画笔改成铺满整张画布之后，同一个 w 比原来
@@ -189,7 +193,9 @@ export function ChapterC1(K) {
             // 0.52m ＝ 两颗脑袋分得开、又读得出"搂着"（同「两个人要看得见是
             // 两个人」量出来的 0.59 上下）
             const sis = FindActor(state, "sister");
-            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.42; sis.heading = -1; sis.pose = null; sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.7; }
+            // 0.62m：0.52 那一版她整颗头缩在他那条搂过来的胳膊背后，画面上
+            // 只剩一截粉衣裳（同「两个人要看得见是两个人」量出来的那条线）
+            if (sis) { sis.visible = true; sis.level = "surface"; sis.x = 31.68; sis.heading = -1; sis.pose = null; sis.track = { name: "tremble", t: 0, ambient: true }; sis.trembleK = 0.45; }
             state.player.x = 30.90;
             state.player.heading = 1;
             state.player.pose = "shelter";      // 哥哥搂着她——分镜图上这一下是有的
@@ -248,6 +254,15 @@ export function ChapterC1(K) {
             // hipX+躯干折，头会前移小 0.2m）——挤到 0.31/0.44m 时实拍出来
             // 两颗脑袋叠在一处、孩子整个被大襟长摆吞掉，画面上只剩一个蹲着的娘
             if (sis) { sis.pose = null; sis.cineTarget = null; sis.x = 30.86; sis.heading = 1; sis.track = { name: "pulledClose", t: 0 }; }
+            // **柱子得让开妹妹那个点**（2026-08-17 用户："室内镜头动画有遮挡和
+            // 穿插"）。上一镜把他钉在 30.90，这一镜又把妹妹拉到 30.86——两个人
+            // 差 4 厘米站在同一处，他整个盖在她身上：分镜要的"妹妹的头埋在娘的
+            // 臂弯里"一格都看不见，画面上只剩两具互相穿插的贴图。
+            // 挪到 32.0：跟娘（31.45）隔开半米多，正好在画右缘露半个身子，
+            // 也接得上下一镜他站在 32.45。
+            state.player.x = 32.00;
+            state.player.heading = -1;          // 转过来看着她们
+            state.player.pose = null;
             Cue(state, "clothLift", { gain: 0.6, delay: 2.6 });
           } },
         // 她抬头找柱子。气还没有喘匀——所以这两句挂的是会喘的循环轨道，

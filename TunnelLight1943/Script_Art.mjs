@@ -903,18 +903,94 @@ function DrawCapFlap(ctx, px, py, r, id, k) {
   ], id + "flap", "#494327", { amp: 1 * k, lw: 3.2 * k, shade: "rgba(0,0,0,0.22)", shadeAt: 0.5 });
 }
 
-// 锥形肢体：从枢轴向下延伸 len，上宽 w0 下宽 w1
-export function DrawLimb(ctx, px, py, len, w0, w1, color, id, { lw = 4, k = 1 } = {}) {
-  InkFill(ctx, [
-    [px - w0 / 2, py], [px + w0 / 2, py],
-    [px + w1 / 2, py + len], [px - w1 / 2, py + len],
-  ], id, color, { amp: 1.6 * k, lw: lw * k, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
+/**
+ * 一节肢体：从枢轴往下 len，上宽 w0、下宽 w1。
+ *
+ * 老版是一只**直角梯形**（四个点、两条笔直的斜边、两个方角）。四条边一直，
+ * 关节处就是两块板拼在一起的硬角——上臂一块、前臂一块、当中一个折角，
+ * 读出来是"用图钉别起来的纸片人"（2026-08-17 用户："关节都做的方块太丑了"）。
+ *
+ * 现在是**两头圆的锥体**，三件事一起给：
+ *   ① 侧边中段略鼓（肌肉/衣褶），不是一条从头直到尾的斜线；
+ *   ② **远端一个整圆帽**——它就是肘/膝/腕那颗关节球。前臂画在上臂之后，
+ *      它的近端帽正好盖住上臂的远端帽，两节于是连成一条连续的胳膊；
+ *   ③ **近端一个浅帽**，往上探进躯干/上一节里，接缝藏在里头。
+ * 圆帽都在 BakePart 那 10·INK_K 的留边之内，不会被画布裁掉。
+ */
+export function DrawLimb(ctx, px, py, len, w0, w1, color, id,
+  { lw = 3.1, k = 1, bow = 0.07, capTop = 0.5, capBot = 1.0 } = {}) {
+  const r0 = w0 / 2, r1 = w1 / 2;
+  const pts = [];
+  const N = 6;
+  const rAt = (t) => (r0 + (r1 - r0) * t) * (1 + bow * Math.sin(t * Math.PI));
+  // 前缘往下
+  for (let i = 0; i <= N; i += 1) pts.push([px + rAt(i / N), py + len * (i / N)]);
+  // 远端的关节球
+  for (let i = 1; i < 6; i += 1) {
+    const a = (i / 6) * Math.PI;
+    pts.push([px + Math.cos(a) * r1, py + len + Math.sin(a) * r1 * capBot]);
+  }
+  // 后缘往上
+  for (let i = N; i >= 0; i -= 1) pts.push([px - rAt(i / N), py + len * (i / N)]);
+  // 近端的浅帽（探进上一节里）
+  for (let i = 1; i < 4; i += 1) {
+    const a = Math.PI + (i / 4) * Math.PI;
+    pts.push([px + Math.cos(a) * r0, py + Math.sin(a) * r0 * capTop]);
+  }
+  InkFill(ctx, pts, id, color, { amp: 0.9 * k, lw: lw * k, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
 }
 
-export function DrawFootPart(ctx, px, py, len, h, color, id, k = 1) {
+/**
+ * 手：老版是 `ctx.arc` 一个圆片，袖口上顶着一颗肉色的球（实拍看就是两粒扣子）。
+ * 侧视的手要读得出来只需要三样：**一个略扁的掌**、**一根翘起来的拇指**、
+ * 以及**指根那一道分缝**。r ≈ 掌的半宽；手顺着前臂往下（+y），拇指朝身前（+x）。
+ */
+export function DrawHandPart(ctx, px, py, r, color, id, { k = 1, lw = 3, fist = 0 } = {}) {
+  const grip = Math.max(0, Math.min(1, fist));
+  const L = r * (2.0 - grip * 0.55);          // 攥起来的手更短更圆
   InkFill(ctx, [
-    [px - h * 0.5, py], [px + len, py], [px + len - 2 * k, py + h], [px - h * 0.6, py + h],
-  ], id, color, { amp: 1.2 * k, lw: 3.6 * k, shade: "rgba(0,0,0,0.2)" });
+    [px - r * 0.86, py - r * 0.30],           // 腕后
+    [px - r * 0.96, py + L * 0.42],           // 小指侧
+    [px - r * 0.62, py + L * 0.92],
+    [px + r * 0.12, py + L],                  // 指尖（并拢的四指）
+    [px + r * 0.78, py + L * 0.80],
+    [px + r * 0.98, py + L * 0.34],           // 虎口下沿
+    [px + r * 1.24, py + L * 0.12],           // 拇指尖
+    [px + r * 1.02, py - r * 0.16],           // 拇指根
+    [px + r * 0.70, py - r * 0.34],           // 腕前
+  ], id, color, { amp: 0.7 * k, lw: lw * k, shade: "rgba(0,0,0,0.18)", shadeAt: 0.5 });
+  // 指根那一道分缝 + 虎口：两笔就把"这是手"说清楚了
+  InkLine(ctx, px - r * 0.62, py + L * 0.62, px + r * 0.72, py + L * 0.52,
+    id + "knuck", { lw: 1.1 * k, color: "rgba(60,42,28,0.45)", amp: 0.5 * k });
+  InkLine(ctx, px + r * 0.72, py + L * 0.28, px + r * 0.96, py + L * 0.10,
+    id + "web", { lw: 1.1 * k, color: "rgba(60,42,28,0.4)", amp: 0.4 * k });
+}
+
+/**
+ * 脚：布鞋/军靴的侧影。老版是一只平行四边形——脚后跟、脚背、鞋头一个都没有，
+ * 读出来是钉在腿底下的一块木片。现在按真鞋的四段走：后跟（略往后探）、
+ * 脚背（往上鼓）、鞋头（圆的、微微上翘）、鞋底（一条压深的边）。
+ * len = 脚长，h = 鞋帮高；枢轴在踝（脚跟上方）。
+ */
+export function DrawFootPart(ctx, px, py, len, h, color, id, k = 1, { boot = false } = {}) {
+  const heel = boot ? 0.86 : 0.66;
+  InkFill(ctx, [
+    [px - h * heel, py - h * (boot ? 0.5 : 0.12)],   // 后帮（靴子高一截）
+    [px - h * (heel + 0.12), py + h * 0.66],         // 后跟
+    [px - h * 0.34, py + h * 1.02],                  // 跟底
+    [px + len * 0.52, py + h * 1.06],                // 鞋底中段
+    [px + len * 0.90, py + h * 0.92],
+    [px + len * 1.02, py + h * 0.52],                // 鞋头（圆、微翘）
+    [px + len * 0.88, py + h * 0.14],
+    [px + len * 0.44, py - h * 0.10],                // 脚背最高处
+    [px + h * 0.10, py - h * (boot ? 0.5 : 0.14)],   // 踝前
+  ], id, color, { amp: 0.8 * k, lw: 3.2 * k, shade: "rgba(0,0,0,0.2)" });
+  // 鞋底：压深的一条，脚才"踩"在地上而不是浮着
+  InkLine(ctx, px - h * 0.30, py + h * 0.9, px + len * 0.92, py + h * 0.78,
+    id + "sole", { lw: 2.4 * k, color: "rgba(24,18,10,0.55)", amp: 0.5 * k });
+  // 鞋口（布鞋那道白边 / 靴筒的折口）
+  InkLine(ctx, px + h * 0.08, py - h * 0.04, px + len * 0.44, py + h * 0.02,
+    id + "cuff", { lw: 1.6 * k, color: boot ? "rgba(20,16,10,0.5)" : "rgba(214,200,170,0.4)", amp: 0.5 * k });
 }
 
 // 躯干：枢轴在胯（底边中点），短褂下摆略散
@@ -928,8 +1004,11 @@ export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
   const hem = longCoat ? 0.10 : 0.02;                        // 下摆探出胯多少（按 h 比例）
   const flare = longCoat ? 0.46 : 0.40;                      // 下摆散开的程度
   InkFill(ctx, [
-    [px - w * 0.30, py - h],                 // 后肩
-    [px + w * 0.24, py - h],                 // 前肩（略收，肩不是方的）
+    [px - w * 0.30, py - h * 0.94],          // 后肩
+    [px - w * 0.16, py - h * 1.03],          // 肩头（**圆的**：一条平顶就是块板子）
+    [px + w * 0.06, py - h * 1.04],
+    [px + w * 0.24, py - h * 0.96],          // 前肩（略收，肩不是方的）
+    [px + w * 0.38, py - h * 0.82],          // 肩到胸的斜面
     [px + w * 0.44, py - h * 0.66],          // 胸最厚处
     [px + w * 0.30, py - h * 0.26],          // 腰掐进去
     [px + w * flare, py + h * hem],          // 下摆（前）
@@ -954,34 +1033,118 @@ export function DrawTorsoPart(ctx, px, py, w, h, kind, id, k = 1) {
   DrawUniformKit(ctx, px, py, w, h, kind, id, k);
 }
 
-// 头：枢轴在脖根（底边中点）
+// 头：枢轴在脖根（底边中点）。
+//
+// 老版的头是一只七边形：后脑一刀、天灵盖一刀、脸一刀——**没有额头、没有眉弓、
+// 没有鼻根的凹、没有唇、没有颏、没有下颌角、也没有耳朵**，五官只剩一粒黑点当眼、
+// 一道短线当嘴。侧脸认不认得出来，全在外轮廓那一串起伏上（这条账 2026-08-14 画
+// strangerFace 插卡时就记过，可骨架这边一直没跟上），所以放大看就是"一块抽象的
+// 米色补丁"（2026-08-17 用户："人物脸部太抽象了"）。
+//
+// 现在整条脸线按真侧脸走：颅顶 → 额 → 眉弓 → **鼻根的凹** → 鼻尖 → 人中 →
+// 上唇 → 唇缝 → 下唇 → **颏唇沟** → 下巴 → 下颌线 → 下颌角 → 后脑。
+// 加上耳朵、眼窝、眉、颧骨与下颌的暗——这几笔才是"一张脸"。
+// 一律用 r（headR）度量，改体型自动跟着走。
 export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   const lw = 4.2 * k;
-  // 脖子
-  InkFill(ctx, Rect(px - r * 0.26, py - r * 0.34, r * 0.52, r * 0.4), id + "neck", PAL.skinDark,
-    { amp: 1 * k, lw: 0, line: null });
-  // 头（侧脸：后脑圆、下巴收）
+  const child = kind === "sister" || kind === "player";   // 孩子：颅大、颏小、鼻矮
+  const brow = child ? 0.94 : 1.02;                        // 眉弓探出多少
+  const nose = child ? 1.06 : 1.20;                        // 鼻尖探出多少
+  const chin = child ? 0.78 : 0.88;
+  // 脖子：**有斜度**（胸锁乳突肌从耳后斜到锁骨），竖直的两条边是根柱子
   InkFill(ctx, [
-    [px - r * 0.92, py - r * 0.30], [px - r * 0.86, py - r * 1.30],
-    [px - r * 0.10, py - r * 1.72], [px + r * 0.72, py - r * 1.36],
-    [px + r * 1.00, py - r * 0.62], [px + r * 0.86, py - r * 0.06],
-    [px - r * 0.62, py - r * 0.02],
-  ], id + "skull", PAL.skin, { amp: 1.4 * k, lw, shade: "rgba(0,0,0,0.10)", shadeAt: 0.6 });
-  // 鼻梁
+    [px - r * 0.34, py + r * 0.06], [px - r * 0.26, py - r * 0.40],
+    [px + r * 0.30, py - r * 0.44], [px + r * 0.40, py + r * 0.06],
+  ], id + "neck", PAL.skinDark, { amp: 0.7 * k, lw: 0, line: null });
+  InkFill(ctx, [
+    // —— 后脑与颅顶
+    [px - r * 0.94, py - r * 0.66],
+    [px - r * 1.00, py - r * 1.18],
+    [px - r * 0.72, py - r * 1.60],
+    [px - r * 0.14, py - r * 1.78],
+    [px + r * 0.40, py - r * 1.66],
+    // —— 额头（往前下方倾，不是一条平顶）
+    [px + r * 0.72, py - r * 1.38],
+    [px + r * brow, py - r * 1.08],          // 眉弓
+    [px + r * (brow - 0.10), py - r * 0.94], // 鼻根的凹：这一下最要紧
+    [px + r * nose, py - r * 0.62],          // 鼻尖
+    [px + r * (nose - 0.46), py - r * 0.46], // 鼻底＋人中
+    [px + r * (nose - 0.32), py - r * 0.30], // 唇（并成一个很浅的鼓包）
+    [px + r * (nose - 0.44), py - r * 0.17], // 颏唇沟（浅——深了会被墨线填死）
+    [px + r * chin, py - r * 0.02],          // 下巴
+    // —— 下颌线收回耳下
+    [px + r * 0.40, py + r * 0.14],
+    [px - r * 0.28, py + r * 0.06],
+    [px - r * 0.70, py - r * 0.22],
+  ], id + "skull", PAL.skin, { amp: 0.55 * k, lw: lw * 0.55, shade: "rgba(0,0,0,0.08)", shadeAt: 0.62 });
+  // 颧骨与下颌的暗：一张脸的体积就靠这一块
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = "#7a4c2c";
   ctx.beginPath();
-  ctx.moveTo(px + r * 0.94, py - r * 0.78);
-  ctx.quadraticCurveTo(px + r * 1.22, py - r * 0.56, px + r * 0.90, py - r * 0.36);
-  ctx.strokeStyle = IN.inkSoft;
-  ctx.lineWidth = lw * 0.7;
+  ctx.ellipse(px + r * 0.26, py - r * 0.42, r * 0.32, r * 0.20, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 耳：侧视里耳朵在颧弓后头、眼线高度上。少了它，脸和后脑连成一块饼。
+  // **不许描一整圈**——两条同心的边就是一枚靶心（前两版实拍都是这样）。
+  // 耳廓是个上宽下收的水滴，只在后上沿描半道耳轮，底下留个耳垂
+  ctx.save();
+  const ex = px - r * 0.34, ey = py - r * 0.82;
+  ctx.beginPath();
+  ctx.moveTo(ex + r * 0.06, ey - r * 0.11);
+  ctx.quadraticCurveTo(ex - r * 0.09, ey - r * 0.15, ex - r * 0.08, ey + r * 0.03);
+  ctx.quadraticCurveTo(ex - r * 0.07, ey + r * 0.15, ex + r * 0.02, ey + r * 0.17);
+  ctx.quadraticCurveTo(ex + r * 0.07, ey + r * 0.12, ex + r * 0.06, ey - r * 0.11);
+  ctx.closePath();
+  ctx.fillStyle = "#c99a66";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(118,80,50,0.38)";
+  ctx.lineWidth = 0.9 * k;
   ctx.stroke();
-  // 眼
+  ctx.beginPath();                      // 耳轮：只描后上那半道
+  ctx.moveTo(ex + r * 0.03, ey - r * 0.08);
+  ctx.quadraticCurveTo(ex - r * 0.05, ey - r * 0.10, ex - r * 0.05, ey + r * 0.06);
+  ctx.stroke();
+  ctx.restore();
+
+  // 五官一律走**不抖的细线**：InkLine 那点抖动在一颗 110px 的头上会把眉、
+  // 眼、鼻底、唇缝糊成一团黑斑（第一版实拍就是"脸上按了几个黑手印"）
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const stroke = (color, lwPx, path) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lwPx * k;
+    ctx.beginPath();
+    path();
+    ctx.stroke();
+  };
+  const eyeX = px + r * (brow - 0.42);        // 眼窝比眉弓退一档，别挤在鼻根上
+  // 眉：顺着眉弓往后下方收
+  stroke("rgba(62,44,28,0.62)", 1.2, () => {
+    ctx.moveTo(eyeX - r * 0.20, py - r * 1.10);
+    ctx.quadraticCurveTo(eyeX + r * 0.10, py - r * 1.16, eyeX + r * 0.26, py - r * 1.10);
+  });
+  // 上睑：一道短实线，鼻侧那头略往下（侧视的眼是个尖三角）
+  stroke("rgba(34,23,16,0.9)", 1.6, () => {
+    ctx.moveTo(eyeX - r * 0.16, py - r * 0.94);
+    ctx.quadraticCurveTo(eyeX + r * 0.04, py - r * 1.00, eyeX + r * 0.22, py - r * 0.92);
+  });
   ctx.fillStyle = IN.ink;
   ctx.beginPath();
-  ctx.ellipse(px + r * 0.50, py - r * 0.86, r * 0.10, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.ellipse(eyeX + r * 0.06, py - r * 0.88, r * 0.075, r * 0.10, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 嘴（一道短线）
-  InkLine(ctx, px + r * 0.62, py - r * 0.36, px + r * 0.86, py - r * 0.34, id + "mouth",
-    { lw: 2.2 * k, color: IN.inkSoft, amp: 0.6 * k });
+  // 鼻翼：鼻子底下一小道，把鼻子从脸上分出来
+  stroke("rgba(108,66,38,0.5)", 1.2, () => {
+    ctx.moveTo(px + r * (nose - 0.40), py - r * 0.56);
+    ctx.quadraticCurveTo(px + r * (nose - 0.22), py - r * 0.50, px + r * (nose - 0.12), py - r * 0.56);
+  });
+  // 嘴：唇缝那一道（唇形已经在轮廓上了，这儿只压缝）
+  stroke("rgba(104,58,48,0.62)", 1.3, () => {
+    ctx.moveTo(px + r * (nose - 0.66), py - r * 0.32);
+    ctx.quadraticCurveTo(px + r * (nose - 0.50), py - r * 0.29, px + r * (nose - 0.34), py - r * 0.31);
+  });
+  ctx.restore();
 
   // 头饰
   if (kind === "soldier") {
@@ -1038,38 +1201,64 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
       [px - r * 1.02, py - r * 0.80], [px - r * 1.66, py - r * 0.16],
       [px - r * 1.20, py - r * 0.02], [px - r * 0.92, py - r * 0.48],
     ], id + "tail", "#ccc4ae", { amp: 1.4, lw: lw * 0.8 });
-  } else if (kind === "sister") {
-    InkFill(ctx, [
-      [px - r * 0.90, py - r * 1.26], [px + r * 0.18, py - r * 1.90],
-      [px + r * 1.02, py - r * 1.04], [px - r * 0.86, py - r * 0.68],
-    ], id + "hair", "#3a2a1f", { amp: 1.5, lw: lw * 0.85 });
-    for (let i = 0; i < 3; i += 1) {
-      ctx.beginPath();
-      ctx.arc(px - r * 1.14 - i * r * 0.06, py - r * 0.36 + i * r * 0.5, r * 0.34, 0, Math.PI * 2);
-      ctx.fillStyle = "#3a2a1f";
-      ctx.fill();
-      ctx.strokeStyle = IN.ink;
-      ctx.lineWidth = lw * 0.6;
-      ctx.stroke();
-    }
-  } else if (kind === "family") {
-    // 娘：抿到脑后挽成一个髻。侧视里这是"一眼认出是谁"最省的一笔
-    InkFill(ctx, [
-      [px - r * 0.96, py - r * 1.16], [px + r * 0.10, py - r * 1.86],
-      [px + r * 1.00, py - r * 1.04], [px - r * 0.92, py - r * 0.58],
-    ], id + "hair", "#2f2219", { amp: 1.5 * k, lw: lw * 0.85 });
-    ctx.beginPath();
-    ctx.arc(px - r * 1.12, py - r * 0.86, r * 0.40, 0, Math.PI * 2);
-    ctx.fillStyle = "#2f2219";
-    ctx.fill();
-    ctx.strokeStyle = IN.ink;
-    ctx.lineWidth = lw * 0.7;
-    ctx.stroke();
   } else {
+    // 不戴帽子的（柱子/妹妹/娘/爹/乡亲）：头发贴着颅骨长，见 HeadHair
+    HeadHair(ctx, px, py, r, kind, id, k, lw);
+  }
+}
+
+/**
+ * 头发。老版是**一块四边形拍在颅顶上**——四条直边、一个尖角，放大看就是顶
+ * 折纸帽子；妹妹脑后那三个等大的圆更是一条毛毛虫。
+ * 现在头发是**贴着颅骨长的一层**：从发际线起、盖过颅顶、沿枕骨落到颈后，
+ * 下缘是碎的（不是一条直边），再按人各给一个记号（妹妹的抓髻、娘的纂）。
+ */
+function HeadHair(ctx, px, py, r, kind, id, k, lw) {
+  const tone = kind === "family" ? "#2b1f17" : kind === "sister" ? "#33241a" : "#2e2119";
+  // 一层贴着颅骨的发：发际线在额上，往后包住整个后脑
+  const cap = [
+    [px + r * 0.64, py - r * 1.46],          // 发际线（额角）——不许压到眉上
+    [px + r * 0.26, py - r * 1.76],
+    [px - r * 0.26, py - r * 1.92],          // 颅顶（比骨头高出一层发的厚度）
+    [px - r * 0.78, py - r * 1.72],
+    [px - r * 1.10, py - r * 1.26],          // 枕骨
+    [px - r * 1.12, py - r * 0.82],
+    [px - r * 0.98, py - r * (kind === "sister" ? 0.42 : 0.54)],   // 颈后（碎发）
+    [px - r * 0.80, py - r * 0.64],
+    [px - r * 0.86, py - r * 0.94],
+    [px - r * 0.74, py - r * 1.28],          // 内缘沿着颅骨回去
+    [px - r * 0.12, py - r * 1.62],
+    [px + r * 0.50, py - r * 1.38],
+  ];
+  InkFill(ctx, cap, id + "hair", tone, { amp: 1.0 * k, lw: lw * 0.8, shade: "rgba(0,0,0,0.2)", shadeAt: 0.5 });
+  // 发丝：三两道顺着头形走的浅线，头发才不是一块黑板
+  for (let i = 0; i < 3; i += 1) {
+    const t = 0.25 + i * 0.24;
+    InkLine(ctx, px + r * (0.44 - t * 1.3), py - r * (1.52 + Math.sin(t * 3) * 0.16),
+      px - r * (0.5 + t * 0.5), py - r * (1.1 - t * 0.3),
+      id + "strand" + i, { lw: 1.2 * k, color: "rgba(150,124,96,0.28)", amp: 0.8 * k });
+  }
+  if (kind === "sister") {
+    // 妹妹：脑后一只抓髻＋一小绺散下来的。三个等大的圆叠成一串是毛毛虫，
+    // 一只**上大下收**的髻才读得出"扎起来了"
     InkFill(ctx, [
-      [px - r * 0.94, py - r * 1.20], [px + r * 0.10, py - r * 1.84],
-      [px + r * 1.00, py - r * 1.02], [px - r * 0.90, py - r * 0.62],
-    ], id + "hair", "#33251b", { amp: 1.5 * k, lw: lw * 0.85 });
+      [px - r * 1.06, py - r * 1.00], [px - r * 1.52, py - r * 0.92],
+      [px - r * 1.72, py - r * 0.52], [px - r * 1.54, py - r * 0.14],
+      [px - r * 1.14, py - r * 0.10], [px - r * 0.96, py - r * 0.52],
+    ], id + "bun", tone, { amp: 1.0 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.24)" });
+    InkLine(ctx, px - r * 1.10, py - r * 0.86, px - r * 1.56, py - r * 0.46,
+      id + "tie", { lw: 1.6 * k, color: "rgba(176,110,116,0.7)", amp: 0.5 * k });
+    InkLine(ctx, px - r * 1.02, py - r * 0.44, px - r * 1.24, py + r * 0.16,
+      id + "wisp", { lw: 1.6 * k, color: tone, amp: 1.2 * k });
+  } else if (kind === "family") {
+    // 娘：抿到脑后挽成一个纂，插一根簪。侧视里这是"一眼认出是谁"最省的一笔
+    InkFill(ctx, [
+      [px - r * 1.04, py - r * 1.06], [px - r * 1.46, py - r * 1.02],
+      [px - r * 1.66, py - r * 0.70], [px - r * 1.50, py - r * 0.36],
+      [px - r * 1.10, py - r * 0.34], [px - r * 0.96, py - r * 0.70],
+    ], id + "bun", tone, { amp: 0.9 * k, lw: lw * 0.7, shade: "rgba(0,0,0,0.26)" });
+    InkLine(ctx, px - r * 1.62, py - r * 0.92, px - r * 1.04, py - r * 0.46,
+      id + "pin", { lw: 1.8 * k, color: "rgba(178,158,110,0.8)", amp: 0.4 * k });
   }
 }
 
