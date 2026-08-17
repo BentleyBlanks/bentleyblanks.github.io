@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { SCENES, CHAPTERS, SURFACE_Y, UNDER_Y, CurrentBeatDef, GetBeatTarget, EdgeHint, SmokeCovers, TunnelPosture, UnderSegments, POSTURE_HEAD, VISION_RANGE, VisionScale, COVER_PAD, WINCH_HUB_Y, WINCH_LAND_X, WINCH_CRANK_R, WINCH_REST_A, WELL_MOUTH_Y, WELL_WATER_Y, WELL_BOTTOM_Y, HouseSpan, IndoorOpen, FORAGE } from "./Script_Core.mjs";
 import * as ART from "./Script_Art.mjs";
-import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, BODY_SCALE } from "./Script_Rig.mjs";
+import { CreateRig, PoseRig, HandPoint, ElbowPoint, ShoulderPoint, LimbTips, RigContact, BODY_SCALE, WalkCadence, GaitOf, GaitToeOff } from "./Script_Rig.mjs";
 import { BuildOccluder, CreateOccludedLight, CreateLightShafts, SceneOccluders } from "./Script_Light.mjs";
 import { CreateTunnelFluid } from "./Script_Fluid.mjs";
 import { MoodAt, DipAt, LIGHT_FADE, MixHex } from "./Data_DayCycle.mjs";
@@ -848,9 +848,9 @@ export function CreateWorld(canvasEl) {
         f.x += f.fleeDir * FOLK_FLEE_SPEED * dt;
         f.heading = f.fleeDir;
         f.rig.group.position.x = f.x;
-        f.phase += FOLK_FLEE_SPEED * dt * 3.4 / (f.scale || 1);
+        f.phase += dt * WalkCadence(FOLK_FLEE_SPEED, f.scale || 1) * Math.PI;
         f.idleT += dt * 1.4;
-        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true }, dt);
+        PoseRig(f.rig, { phase: f.phase, breath: f.idleT, moving: true, gait: GaitOf(FOLK_FLEE_SPEED, f.scale || 1) }, dt);
         f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
         if (f.carryMesh) SyncCarry(f, null, f.heading);   // 家伙已经撂下了
         continue;
@@ -865,11 +865,11 @@ export function CreateWorld(canvasEl) {
         f.rig.group.position.x = f.x;
       }
       const moving = moved > 1e-4;
-      f.phase += moving ? moved * 3.4 / (f.scale || 1) : dt * 2.2;
+      f.phase += moving ? dt * WalkCadence(dt > 0 ? moved / dt : 0, f.scale || 1) * Math.PI : dt * 2.2;
       f.idleT += dt * 1.4;
       if (f.track) f.trackT += dt;
       PoseRig(f.rig, {
-        phase: f.phase, breath: f.idleT, moving,
+        phase: f.phase, breath: f.idleT, moving, gait: GaitOf(dt > 0 ? moved / dt : 0, f.scale || 1),
         carry: f.shoulder, track: f.track, trackT: f.trackT,
       }, dt);
       f.rig.group.scale.set((f.heading >= 0 ? 1 : -1) * f.scale, f.scale, 1);
@@ -1839,6 +1839,18 @@ export function CreateWorld(canvasEl) {
         ctx.globalAlpha = 1;
         ART.Speckle(ctx, 0, 0, wp, hp, g.id + "sp", { count: Math.round(hp / 6), alpha: 0.2, size: 3, color: "#0d0906" });
         ctx.restore();
+        // **下沿要化开，不许齐齐切断**（2026-08-18 用户报的那块"硬边淡板"）。
+        // 井壁只画到走廊洞顶为止、指望走廊自己的后壁接手，可两张贴图的调子
+        // 对不齐——于是井筒底下横着一条贯穿的直边，读出来是"贴图裁齐了"，
+        // 正是这一带最扎眼的那道硬边。让最后 0.5m 淡成透明，接缝自己没了
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        const fade = ctx.createLinearGradient(0, hp - Math.min(hp * 0.5, 0.5 * PPM), 0, hp);
+        fade.addColorStop(0, "rgba(0,0,0,0)");
+        fade.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, 0, wp, hp);
+        ctx.restore();
       });
       PlaceSprite(wall, g.wx, wallBotY, NEAR_Z);
       FixOrder(wall, SHAFT_WALL_ORDER);   // 位置在剖面这一刀上，前后关系另排
@@ -2360,10 +2372,11 @@ export function CreateWorld(canvasEl) {
   //    干土，跟着人的方向往后飘、越散越淡）──
   //
   // 三条：
-  // ① **一步一团，钉在蹬离地那一格**——不是按时间匀速冒烟。步态里前腿在相位 π/2
-  //    摆到最后头（thighF 最大＝蹬离地），后腿在 3π/2；相位一跨过去就从那只脚的
-  //    位置（LimbTips，画出来的脚，不是 x±0.3 估的）掀一团。所有步态（走/跑/猫腰/
-  //    提桶/扛/抱孩子/推车）共用同一条 swing 约定，所以一个判据全管。
+  // ① **一步一团，钉在蹬离地那一格**——不是按时间匀速冒烟。蹬离地是哪一格由步态给
+  //    （Rig.GaitToeOff：前腿在 duty·2π、后腿再错半圈，duty 随走↔跑 0.60→0.42）；
+  //    相位一跨过去就从那只脚的位置（LimbTips，画出来的脚，不是 x±0.3 估的）掀一团。
+  //    所有步态（走/跑/猫腰/提桶/扛/抱孩子/推车）都走 GaitLegs 同一套着地/摆动约定，
+  //    所以一个判据全管。
   // ② **走是一小团、跑是两三团**：土的多少与飘的距离都跟 gait 走（跑起来鞋底刨得
   //    深）；猫腰潜行只有半团（放轻脚步这件事要在地上读得出来）。
   // ③ **画在人与影子之前、obstacle 带之后**（FixOrder = 携带物那一档 + 2）：土是悬在
@@ -2484,11 +2497,14 @@ export function CreateWorld(canvasEl) {
     // 爬梯的倒手频率跟着**竖着挪过的距离**走，和走路跟着横向位移是一个道理。
     // 之前它落在下面那条"原地动作"的定速相位上：2.2/秒，下一趟井（1.5 秒）
     // 才够半个循环——手只抬了一下，看着像挂在梯子上不动。
-    // 步频要按**体型**折算：妹妹比柱子矮一头多，可她的步频原来和他一模一样，
-    // 于是她像踩着风火轮飘着跟，而不是小孩迈小碎步追（去井台那一路占屏最久）
+    // 步频（2026-08-18 重做，用户："主角的步频也太快了"）：不再按位移一步一步数
+    // （4.2m/s 的柱子一秒 7 步），改按 Rig.WalkCadence 那条自然曲线走——速度按体型
+    // 折算，快走 2 步/秒、冲刺封顶 3.5，小孩再高一档；一步 = 相位 π。走多远与迈几步
+    // 从此脱钩，差的那部分脚会打滑，那是"步频对"和"脚不滑"之间的取舍（见 Rig 注释）
     const bsPh = extra.bodyScale || s.bodyScale || 1;
+    const speedNow = dt > 0 ? moved / dt : 0;
     if (extra.climbing) s.phase += movedY * 4.5;
-    else if (isMoving) s.phase += moved * 3.4 / bsPh;
+    else if (isMoving) s.phase += dt * WalkCadence(speedNow, bsPh) * Math.PI;
     else s.phase += dt * 2.2;      // 挖土这类原地动作也要有相位
     // 梯子上停没停（2026-08-17 可停可掉头）：停了 settle 升到 1，Rig 把半空的手脚
     // 收到档上；一动就掉回 0。升得慢一点（0.3s 落稳），掉得快（一动就接着爬）
@@ -2514,13 +2530,13 @@ export function CreateWorld(canvasEl) {
      // 都还是那副散步的架势——序章里娘"冲进来"是 3.4m/s 的冲刺，画面上只是
     // 一个人快速平移过去（用户说的"生硬"有一半在这儿）。gait 0..1 按实测速度
     // 给（1.5m/s 起、3.2m/s 满），Rig 拿它加大步幅、把躯干压前、手臂抡开。
-    const speed = dt > 0 ? moved / dt : 0;
-    const gait = Math.max(0, Math.min(1, (speed - 1.5) / 1.7));
-    // 跑起来步频也要跟上（同一段路迈的步子更少、每步更大）
-    if (isMoving && !extra.climbing) s.phase += moved * gait * 0.7;
+    // 走还是跑也按体型折算（1.1m 的孩子 2m/s 已经是在跑）
+    const gait = GaitOf(speedNow, bsPh);
     const bsRig = extra.bodyScale || s.bodyScale || 1;
     PoseRig(s.rig, {
       phase: s.phase, breath: s.idleT, moving: isMoving, crouch, gait,
+      // 脚要不要钉在地上（Rig 的地面吸附）：抱起来/骑着/翻越的 lift、躺着的不钉
+      lift, ground: LIE_POSES[extra.pose] ? 0 : 1,
       carry: !!held && !holding, hold: holding, holdW: holding ? HoldWeight(held) : 0,
       climbing: extra.climbing, digging: extra.digging, posture: extra.posture, pose: extra.pose,
       // 爬梯：这架梯子的落点表 + 方向 + **画出来的脚线**（不是 Core 的，两者差一个缓动）
@@ -2615,13 +2631,16 @@ export function CreateWorld(canvasEl) {
       s.dustPhase = s.phase;
       const walking = isMoving && !extra.climbing && !extra.track && !extra.digging
         && (!extra.pose || extra.pose === "push") && extra.posture !== "crawl"
-        && !lie && lift < 0.06 && speed < 7 && s.mesh.visible !== false;
+        && !lie && lift < 0.06 && speedNow < 7 && s.mesh.visible !== false;
       // moved < 1.5：一帧挪一米半以上只能是跳幕/换层，不是步子（掉帧时一帧跨过大半
       // 个步态周期是正常的——无头实拍就常掉到几帧一秒——所以按位移判，不按相位差判）
       if (walking && prevPh !== undefined && s.phase > prevPh && moved < 1.5) {
         const TAU = Math.PI * 2;
         const crossed = (a) => Math.floor((s.phase - a) / TAU) > Math.floor((prevPh - a) / TAU);
-        const front = crossed(Math.PI / 2), back = crossed(Math.PI * 1.5);
+        // 蹬离地那一格由步态给（2026-08-18 步态重写：着地段占周期 0.60→0.42，前腿在
+        // duty·2π 蹬离、后腿再错半圈——不再是老正弦的 π/2 与 3π/2）
+        const toe = GaitToeOff(gait);
+        const front = crossed(toe.F), back = crossed(toe.B);
         if (front || back) {
           const tips = LimbTips(s.rig);
           const soft = crouch || extra.posture === "stoop";
@@ -3057,7 +3076,8 @@ export function CreateWorld(canvasEl) {
     //（划线那一拍它正好压在石笔上）
     // 同上：活卡在时这枚标也退场（它会跟着背景一起被糊开）
     const closeUp = viewW < 5.0 || liveCardOn;
-    const want = inCine || closeUp || otsHiddenId === "player" ? 0
+    // 标题页背后那台戏（state.tableau）里也不要它：画面上就两个人，谁是谁不用认
+    const want = inCine || closeUp || otsHiddenId === "player" || state.tableau ? 0
       : (tagT < 3.2 ? 1 : (tagLevel > 2.5 ? 0.85 : 0.24));
     ps.tagAlpha = (ps.tagAlpha ?? 0) + (want - (ps.tagAlpha ?? 0)) * Math.min(1, dt * 4);
     ps.tagMesh.visible = ps.tagAlpha > 0.02;
@@ -3088,7 +3108,8 @@ export function CreateWorld(canvasEl) {
     // 不停的白星挂在戏正中（c2 出洞那一镜的鞋底、捂嘴那拍的边区票都赶上过）
     // 只会把眼睛从戏上拽走
     {
-      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine;
+      // 标题页背后那台戏（state.tableau）里也不闪：捡不了，只会在菜单旁边眨眼
+      const glowOk = def?.kind !== "cinematic" && def?.kind !== "hold" && !state.microCine && !state.tableau;
       let glowAt = null;
       for (const [id, rec] of relicMeshes) {
         const got = state.relicsGot?.has(id);
@@ -5238,8 +5259,9 @@ export function CreateWorld(canvasEl) {
     // 指路的标记在特写里没有意义——你已经站在它跟前了
     // 活卡那几拍（刨料/划线/接绳）世界只是背后那层散焦的景——指路的标、
     // 画框边缘的牌都不该出现在里头（糊成一团的黄三角比不画还糟）
+    // 标题页背后那台戏（state.tableau）没有目标可指——那不是一局
     const canPoint = target && target.x !== undefined && def?.kind !== "cinematic"
-      && !state.microCine && !liveCardOn && viewW >= 5.0;
+      && !state.microCine && !liveCardOn && !state.tableau && viewW >= 5.0;
     // 目标出了画框：世界里那枚小人字标交给画框边缘的 HUD 接手（见 UpdateEdgeHud）。
     // 该不该指、指哪边、牌面画什么由 Core.EdgeHint 判（跨层的先指梯口）。
     // camera/viewW 是上一帧镜头的（UpdateProps 先于 ApplyCamera 跑），差一帧看不出来。
@@ -5729,7 +5751,9 @@ export function CreateWorld(canvasEl) {
   // **摆位按画框给，落地是世界坐标**（`fg: [{ art, u, v, z, w, h, flip, dim }]`）：
   //   · z＝这块板离行走线多近（米，越大越贴镜头）；
   //   · u/v＝板心在**它自己那个深度上的画框**里的位置，−1..1（u=−1 贴左缘、
-  //     v=−1 贴下缘）；w/h 仍是真实米数。
+  //     v=−1 贴下缘）；w/h 仍是真实米数；
+  //   · **吊在上沿的板（房梁）写 `vLow` 不写 `v`**＝梁底落在画框哪儿，板心与
+  //     "探出上边框多少"由渲染侧按当时的画高反算（见下面 ForeV 那段账）。
   // 为什么不直接写世界坐标：贴镜头 0.8m 的那个平面上，整个画框才三四十厘米宽——
   // 写世界 x 等于要作者心算一遍透视，第一版五块板有四块落在画框外（实拍才看见）。
   // u/v **只在换行那一下按当时的机位折算一次**，之后板子钉死在世界里：所以镜头
@@ -5737,6 +5761,19 @@ export function CreateWorld(canvasEl) {
   // 老写法（直接给 x/y）仍然认——真要钉在某件实物上时用它。
   // -------------------------------------------------------------------------
   let cineForeKey = "";
+  // 板心的 v 由 `vLow` 反算：**吊在画框上沿的板（房梁）要按"梁底落在哪儿"给，
+  // 不能按"板心落在哪儿"给**（2026-08-18 用户："这个多次在我泥坛子这里的遮挡物
+  // 是什么？修掉"）。同一块 0.28m 的梁，贴镜头 1.2m 时占掉四成画高、退到 1.9m 只
+  // 占两成——写死的 v 意味着作者要为每一镜心算一遍透视，而写错的代价是**整根梁
+  // 横在画面当中**：泥坛子那五镜的梁底落在 v=−0.08（画面正中），跪着的柱子整个
+  // 被盖住，只从梁底下露出一只脚。给 `vLow` 之后，梁底钉在指定的那条线上、梁身
+  // 一路探出上边框，不论机距远近都只啃掉画框顶上那一条。
+  // 顺带一条闸：**梁顶必须探进上黑边**（≥0.88）——留在画框里就是一根悬空的横杠，
+  // 底下一条边、顶上又一条边，读出来是"画面上多了一道 UI"（同 beam 画笔里那条账）。
+  const ForeV = (f, hv) => {
+    if (f.vLow === undefined) return f.v || 0;
+    return Math.max(f.vLow + hv / 2, 0.88 - hv / 2);
+  };
   function ForePlace(f, cam, aspect) {
     const z = f.z ?? 2.2;
     if (f.x !== undefined) return { x: f.x, y: f.y ?? 0, z };
@@ -5748,7 +5785,8 @@ export function CreateWorld(canvasEl) {
     const dz = Math.max(0.05, cam.pz - z);
     const fh = 2 * dz * Math.tan((CAM_FOV * Math.PI / 180) / 2);
     const fw = fh * aspect;
-    return { x: cx + (f.u || 0) * fw / 2, y: cy + (f.v || 0) * fh / 2, z };
+    const v = ForeV(f, 2 * (f.h ?? 2.4) / fh);
+    return { x: cx + (f.u || 0) * fw / 2, y: cy + v * fh / 2, z };
   }
   // shotKey＝这一镜的构图指纹（Main 算的那个）。**折算只在换镜头那一下做一次**，
   // 拿机位当指纹的话每帧都会重摆——板子就粘在镜头上了，视差当场没了
@@ -6333,6 +6371,15 @@ export function CreateWorld(canvasEl) {
       .map((d) => ({ x: +d.x.toFixed(2), y: +d.y.toFixed(2), k: +(d.t / d.life).toFixed(2), a: +d.mesh.material.opacity.toFixed(2), s: +d.mesh.scale.y.toFixed(3) })),
     // 供 Script_DepthAudit.mjs 做落地体检；DepthViolations = 深度规范校验的告警单
     debugLayers: () => ({ layers, SURFACE_Y, UNDER_Y, THREE, camera }),
+    // 窖口那束"打进来的光"的全部可调量（uniform 对象本身，拿到就能改）。
+    // 打光是**看着调**的活：一次实拍 25 秒，改一个数重编译一次就别干活了。
+    // 配 shot --eval 用：`tl.world.__shaftLight().uWash.value.set(...)`。
+    // 顺带把掩码的画布交出来——"光上那条直边是不是掩码的方盒子"只能翻掩码
+    __shaftLight: () => (hatchBeamMesh ? {
+      ...hatchBeamMesh.userData.uniforms,
+      __mesh: hatchBeamMesh,
+      __occluder: occluder,
+    } : null),
     DepthViolations,
     // 主角四肢末端离地多高（米，正=悬空/负=陷进地里）。姿势"像不像"靠眼睛，
     // "手脚有没有落在地上"是可以量的——爬行那一拍就是这么修出来的
@@ -6346,6 +6393,12 @@ export function CreateWorld(canvasEl) {
       const tips = LimbTips(s.rig);
       const out = {};
       for (const k of Object.keys(tips)) out[k] = { x: +tips[k].x.toFixed(3), y: +tips[k].y.toFixed(3) };
+      // 鞋底/膝头离脚线多高（世界米；负 = 陷地）——脚钉没钉在地上看这几个，不看踝
+      const c = RigContact(s.rig);
+      if (c && s.ground !== undefined) {
+        const bs = Math.abs(s.mesh.scale.y) || 1;
+        for (const k of ["soleF", "soleB", "kneeF", "kneeB", "lowest"]) out[k] = +(c[k] * bs + (s.liftNow || 0)).toFixed(3);
+      }
       return out;
     },
     // 骨架当前的关节角（度）与肩/肘点（世界米）：排两骨反解那类姿势（爬梯、摇辘轳）
@@ -6365,6 +6418,12 @@ export function CreateWorld(canvasEl) {
       const tips = LimbTips(ps.rig);
       const out = {};
       for (const k of Object.keys(tips)) out[k] = +(tips[k].y - ground).toFixed(3);
+      // 鞋底/膝头（见 LimbTipsOf）：站着 soleF/soleB ≈ 0.000 才叫踩在地上
+      const c = RigContact(ps.rig);
+      if (c) {
+        const bs = Math.abs(ps.mesh.scale.y) || 1;
+        for (const k of ["soleF", "soleB", "kneeF", "kneeB", "lowest"]) out[k] = +(c[k] * bs + (ps.liftNow || 0)).toFixed(3);
+      }
       return out;
     },
     get viewSize() { return { w: viewW, h: viewH }; },
