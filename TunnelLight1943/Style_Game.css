@@ -540,95 +540,194 @@ body.touchDevice #touchControls.gone { display: none; }
 #noticeClose:hover { border-color: var(--lamp); color: var(--lamp); }
 
 
-/* 标题 */
-/* **不许用 align-items: center 居中一个会滚动的东西**（2026-08-14 用户报
-   「移动端横屏过来以及 pc 端不能选择章节了」）。flex 的居中会把超出的那一半
-   顶到容器**上方**去，而 scrollTop 的下限是 0——上半截既画不出来也滚不到：
-   实测 667×375（横屏 iPhone SE）：整页 718px 塞进 375px 的画框，**滚到底时
-   最后一枚章节牌的下沿在 y=−50**——整列章节全在画框上边，怎么划都够不着，
-   「从第一章开始」也在 y=−80。桌面窗口一矮（1280×620）同样先吃掉标题。
-   正确写法是 **flex-start + 子项 margin:auto**：有富余时照样居中，
-   不够时从顶上开始排，超出的部分老老实实进滚动条。
-   守这条的是 RenderHealthTest 的「标题页四档画高都点得着」。 */
+/* 标题（2026-08-18 照《勇敢的心》重排，见 index.html 那段注释）
+   整页是**压在活场景上的一层字**：背景透明，底下是 Script_Main 摆的那台戏
+   （村街、柱子与妹妹）。所有东西按画框的百分比钉位置（勇敢的心的版式就是
+   "题名左上、菜单贴左边、版本右上、按键提示左下"），不再是一列居中的流式排版，
+   所以 2026-08-14 那条「flex 居中会把超出的顶到上方」的账在这儿不成立了——
+   短画高（横屏手机）靠下面的 @media 把字缩小，整页永远一屏装下。
+   守它的仍是 RenderHealthTest 的「标题页四档画高都点得着」。 */
+:root { --menuBar: #5c110d; }   /* 选中那条的暗红（勇敢的心的那块红条） */
 #titleScreen {
-  position: absolute; inset: 0; overflow-y: auto;
+  position: absolute; inset: 0; overflow: hidden;
   /* 必须压过收黑罩（#fadeOverlay 26）：那层罩子 CSS 默认全黑，开机没有游戏循环
-     去把它降下来，标题页没编号就整个被它盖死——玩家一打开是纯黑，按钮还
-     盲点得着（罩子 pointer-events:none，所以"点得着"的测试全绿）。
-     上限是调试面板（61），它要能盖住标题页。 */
+     去把它降下来，标题页没编号就整个被它盖死。上限是调试面板（61）。
+     （现在 HUD 整层在标题页底下藏着——见下面 body.titleUp——罩子本身也在里头。） */
   z-index: 33;
-  display: flex; align-items: flex-start; justify-content: center;
-  background:
-    radial-gradient(ellipse 60% 45% at 50% 38%, rgba(232, 193, 90, 0.13), transparent 70%),
-    #070605;
+  background: transparent;
+  /* 开机／回标题：从黑里亮起来。场景要先建几帧才有画，这一秒黑正好把它盖住 */
+  animation: titleIn 1.1s ease-out both;
 }
-.titleInner { width: min(760px, 92vw); margin: auto; padding: 48px 0; text-align: center; }
-.eyebrow { font-size: 12px; letter-spacing: 0.4em; color: var(--dim); }
-#titleScreen h1 { margin: 18px 0 14px; }
+@keyframes titleIn { from { background-color: #070605; } to { background-color: rgba(7, 6, 5, 0); } }
+/* 两层压暗：上下各压一条（电影感，也给题名和底边的字垫底）；
+   菜单态再从左边压一片（勇敢的心菜单那一列底下有一块半透明的暗）——
+   渐变不能过渡，所以做成两块各自淡入淡出 */
+#titleScreen::before, #titleScreen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  /* 两块压暗必须垫在字**底下**：::after 默认画在所有子元素之后，等于把左边那片暗
+     盖在菜单和题名上（用户 2026-08-18 报「继续 新游戏这些文字被黑边盖上去变暗了」，
+     窄窗口下整列字都灰了）。压暗归 0 层、字归 1 层 */
+  z-index: 0;
+}
+#titleScreen > * { z-index: 1; }
+#titleScreen::before {
+  background: linear-gradient(180deg, rgba(10, 8, 6, 0.30), rgba(10, 8, 6, 0) 24%, rgba(10, 8, 6, 0) 74%, rgba(10, 8, 6, 0.46));
+}
+#titleScreen::after {
+  background: linear-gradient(90deg, rgba(12, 9, 7, 0.76), rgba(12, 9, 7, 0.60) 22%, rgba(12, 9, 7, 0.24) 40%, rgba(12, 9, 7, 0) 52%);
+  opacity: 0; transition: opacity 0.6s;
+}
+#titleScreen.menu::after { opacity: 1; }
+/* 标题页在上时 HUD 整层藏起（活场景是借游戏的渲染画的，HUD 会跟着一起长出来）。
+   设置面板除外——标题页上的「设置」走的就是它（.overTitle） */
+body.titleUp #hud > :not(#settingsPanel) { visibility: hidden; }
+
+/* ── 题名：一个块，两个位置。splash 居中大字，menu 缩到左上角。
+   字号全部乘同一个 --k，FLIP 时整块等比缩，末了落在真实字号上（不留 transform，
+   字才不糊）。颜色：splash 里题名压在亮天上，用墨色（勇敢的心 splash 的题名是
+   深蓝＋暗红压在天上）；menu 里左边压了一片暗，翻成纸色（勇敢的心 menu 态的题名
+   是白的）。 */
+.titleLogo {
+  --k: 1;
+  --logoSize: clamp(46px, 7.4vw, 104px);
+  position: absolute; top: 11%; left: 0; right: 0;
+  width: max-content; max-width: 96vw; margin: 0 auto;
+  text-align: center; z-index: 2;
+  will-change: transform;
+}
+#titleScreen.menu .titleLogo { --k: 0.46; left: 6vw; right: auto; top: 12.5%; margin: 0; text-align: left; }
+#titleScreen h1 { margin: 0; line-height: 1.15; }
 #titleScreen h1 span {
-  font-size: clamp(44px, 8vw, 68px); letter-spacing: 0.22em; font-weight: 700;
-  color: var(--paper);
-  text-shadow: 0 0 34px rgba(232, 193, 90, 0.35);
+  display: inline-block;
+  font-size: calc(var(--k) * var(--logoSize)); letter-spacing: 0.2em; margin-right: -0.2em;
+  font-weight: 700; color: #211a15;
+  text-shadow: 0 1px 0 rgba(255, 250, 240, 0.35), 0 0 22px rgba(255, 246, 226, 0.45);
+  transition: color 0.6s 0.1s, text-shadow 0.6s 0.1s;
 }
+#titleScreen .subtitle {
+  margin-top: 0.42em; white-space: nowrap;
+  font-size: calc(var(--k) * var(--logoSize) * 0.2); letter-spacing: 0.34em; margin-right: -0.34em;
+  font-weight: 500; color: rgba(33, 26, 21, 0.86);
+  transition: color 0.6s 0.1s;
+}
+#titleScreen.menu h1 span { color: #f1e8d6; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 0 18px rgba(0, 0, 0, 0.35); }
+#titleScreen.menu .subtitle { color: rgba(241, 232, 214, 0.78); }
+
+/* 题名下那句题旨：只在 splash 上，菜单出来它就让开（勇敢的心的菜单态只剩题名） */
 /* text-wrap: balance —— 不然末行只剩一个「人。」吊在那儿（实拍抓的） */
-.thesis { max-width: 520px; margin: 0 auto; font-size: 15px; line-height: 2; color: #b3a78e; text-wrap: balance; }
-/* 主菜单：一列条目，一条一行。左边一根竖标记跟着焦点走（键盘 ↑↓ 也能选），
-   条目本身是"一行字 + 一行小注"——小注说清这一条会发生什么，
-   于是标题页上不必再摆第二摞按钮去解释第一摞。 */
+.thesis {
+  position: absolute; left: 0; right: 0; top: 30.5%;
+  max-width: 560px; margin: 0 auto; padding: 0 16px; text-align: center;
+  font-size: clamp(12px, 1.05vw, 15.5px); line-height: 1.9; letter-spacing: 0.06em;
+  color: rgba(38, 30, 24, 0.8); text-wrap: balance;
+  transition: opacity 0.35s, visibility 0s;
+}
+#titleScreen.menu .thesis { opacity: 0; visibility: hidden; transition: opacity 0.35s, visibility 0s 0.35s; }
+
+/* 「按任意键」：底边正中，慢慢地一明一暗 */
+.pressAny {
+  position: absolute; left: 0; right: 0; bottom: 9.5%; text-align: center;
+  font-size: clamp(15px, 1.5vw, 22px); letter-spacing: 0.32em; margin-right: -0.32em;
+  color: #f0e7d4; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+  animation: pressPulse 2.4s ease-in-out infinite;
+  transition: opacity 0.3s, visibility 0s;
+}
+@keyframes pressPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+#titleScreen.menu .pressAny { opacity: 0; visibility: hidden; animation: none; transition: opacity 0.3s, visibility 0s 0.3s; }
+
+/* ── 菜单：贴着左画框边的一列。条目之间一根细线（往右淡出）；选中的那条整条
+   压一块暗红、字翻白（勇敢的心的红条）；小注跟在同一行里。 */
 #titleMenu {
-  display: flex; flex-direction: column; align-items: stretch;
-  gap: 2px; width: min(360px, 78vw); margin: 30px auto 26px;
+  position: absolute; left: 0; top: 41%;
+  width: clamp(280px, 31vw, 600px);
+  display: flex; flex-direction: column;
+  /* 整列底下再垫一块半透明的暗（勇敢的心那一列底下有）：条目压在土墙、树干上
+     也读得出来。往右淡出，别切出一条竖直的硬边 */
+  background: linear-gradient(90deg, rgba(10, 8, 6, 0.58), rgba(10, 8, 6, 0.40) 70%, rgba(10, 8, 6, 0));
+  opacity: 0; visibility: hidden; transform: translateX(-32px);
+}
+#titleScreen.menu #titleMenu {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.45s 0.18s, transform 0.6s 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), visibility 0s;
 }
 #titleMenu button {
   position: relative;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  padding: 11px 16px 11px 20px;
-  cursor: pointer; font-family: inherit; text-align: left;
-  background: transparent; border: none; border-left: 2px solid transparent;
-  color: var(--paper);
-  transition: border-color 0.18s, background 0.18s, color 0.18s;
+  display: flex; align-items: baseline; gap: 14px;
+  height: clamp(38px, 5.4vh, 50px); padding: 0 16px 0 10.4vw;
+  cursor: pointer; font-family: inherit; text-align: left; white-space: nowrap;
+  background: transparent; border: none; color: #c2b8a4;   /* 没选中的是灰的（勇敢的心那种），选中的才白 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: color 0.16s, background-color 0.16s;
 }
 #titleMenu button[hidden] { display: none; }
-#titleMenu button b { font-size: 16px; font-weight: 600; letter-spacing: 0.22em; }
-#titleMenu button small {
-  font-size: 11.5px; letter-spacing: 0.08em; color: var(--dim); line-height: 1.5;
+#titleMenu button::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(232, 222, 200, 0.34), rgba(232, 222, 200, 0.34) 58%, rgba(232, 222, 200, 0));
 }
-#titleMenu button:hover,
-#titleMenu button:focus-visible {
-  outline: none;
-  border-left-color: var(--lamp);
-  background: rgba(232, 193, 90, 0.07);
+#titleMenu button b { font-size: clamp(15px, 1.35vw, 21px); font-weight: 600; letter-spacing: 0.2em; }
+#titleMenu button small { font-size: clamp(10px, 0.82vw, 12.5px); letter-spacing: 0.08em; color: rgba(210, 200, 180, 0.72); }
+#titleMenu button small:empty { display: none; }
+#titleMenu button:focus { outline: none; }
+/* 选中＝那块红条。选中态由 Script_Main 的 .sel 管（焦点／悬停都落到它上），
+   永远有且只有一条——键盘和鼠标看到的是同一块红 */
+#titleMenu button.sel {
+  color: #f4ecdc;
+  background: linear-gradient(90deg, var(--menuBar), var(--menuBar) 84%, rgba(92, 17, 13, 0.4));
 }
-#titleMenu button:hover b,
-#titleMenu button:focus-visible b { color: var(--lamp); }
-/* 主位那一条（有存档时是「继续」，没有时是「新游戏」）：灯色的一小块，
-   一眼看出该按哪个——市面上的菜单都靠这个把第一步指出来 */
-#titleMenu button.primary { background: rgba(232, 193, 90, 0.1); border-left-color: rgba(232, 193, 90, 0.55); }
-#titleMenu button.primary b { color: var(--lamp); }
-.titleFoot { font-size: 12.5px; letter-spacing: 0.14em; color: #776d5b; }
+#titleMenu button.sel small { color: rgba(244, 236, 220, 0.72); }
+#titleMenu button.sel::after { background: none; }
 
-/* 历史战争暴力内容提示（关卡设计文档要求）：小字，不抢标题 */
+/* 左下：按键提示（勇敢的心：「Space 验证」）。触屏设备没有键盘，不出 */
+.titleKeys {
+  position: absolute; left: 3.2vw; bottom: 5.5vh;
+  display: flex; align-items: center; gap: 22px;
+  font-size: 13px; letter-spacing: 0.14em; color: #dcd2bb;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.4s 0.3s;
+}
+.titleKeys kbd {
+  display: inline-block; min-width: 32px; margin-right: 8px; padding: 3px 9px;
+  border-radius: 5px; text-align: center;
+  font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; line-height: 1.3;
+  color: #2a221b; background: linear-gradient(#f5eede, #d8cfba);
+  box-shadow: 0 2px 0 #978d78, 0 3px 6px rgba(0, 0, 0, 0.45);
+  text-shadow: none;
+}
+body.touchDevice .titleKeys { display: none; }
+/* 右上：版本号（勇敢的心右上角那串小字） */
+.titleVersion {
+  position: absolute; right: 3.2vw; top: 5.5vh;
+  font-size: 12.5px; letter-spacing: 0.12em; color: rgba(240, 232, 215, 0.62);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.4s 0.3s;
+}
+#titleScreen.splash .titleKeys, #titleScreen.splash .titleVersion { opacity: 0; visibility: hidden; }
+
+/* 历史战争暴力内容提示（关卡设计文档要求）：底边一行小字（勇敢的心 splash 底边
+   的版权行的位置），菜单出来就让开 */
 #titleScreen .contentNote {
-  margin-top: 10px;
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  color: rgba(196, 178, 138, 0.52);
+  position: absolute; left: 0; right: 0; bottom: 3.6%; padding: 0 12px; text-align: center;
+  font-size: 11.5px; letter-spacing: 0.06em; color: rgba(236, 226, 206, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.3s, visibility 0s;
 }
+#titleScreen.menu .contentNote { opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0s 0.3s; }
 
-/* 横屏手机（画高 ≤560）：整页收进一屏，别让人为了点最后一条先滚一段。
-   判据用**画高**不用画宽——横屏手机是"宽而矮"，max-width 那条根本不命中
-   （844×390 的机器画宽比 iPad 竖屏还大）。同「拇指落点」那一节的老规矩。 */
+/* 横屏手机（画高 ≤560）：整页收进一屏。判据用**画高**不用画宽——横屏手机是
+   "宽而矮"，max-width 那条根本不命中（844×390 的机器画宽比 iPad 竖屏还大）。 */
 @media (max-height: 560px) {
-  .titleInner { padding: 16px 0; }
-  #titleScreen h1 { margin: 6px 0 8px; }
-  #titleScreen h1 span { font-size: clamp(26px, 5vw, 34px); letter-spacing: 0.16em; }
-  .eyebrow { font-size: 10px; letter-spacing: 0.26em; }
-  .thesis { font-size: 12.5px; line-height: 1.7; max-width: 460px; }
-  #titleMenu { margin: 12px auto 10px; }
-  #titleMenu button { padding: 7px 14px 7px 18px; gap: 1px; }
-  #titleMenu button b { font-size: 14px; letter-spacing: 0.16em; }
-  #titleMenu button small { font-size: 10.5px; }
-  .titleFoot, #titleScreen .contentNote { font-size: 10.5px; }
+  .titleLogo { --logoSize: clamp(30px, 6vw, 54px); top: 9%; }
+  #titleScreen.menu .titleLogo { --k: 0.5; top: 9%; }
+  .thesis { top: 33%; font-size: 12px; line-height: 1.7; max-width: 460px; }
+  .pressAny { bottom: 15%; font-size: 14px; }
+  #titleMenu { top: 36%; }
+  #titleMenu button { height: 32px; padding-left: 9vw; gap: 10px; }
+  #titleMenu button b { font-size: 13.5px; letter-spacing: 0.16em; }
+  #titleMenu button small { font-size: 10px; }
+  .titleKeys { font-size: 11px; bottom: 4vh; gap: 14px; }
+  .titleKeys kbd { font-size: 10.5px; padding: 2px 7px; min-width: 26px; }
+  .titleVersion { font-size: 11px; top: 4vh; }
+  #titleScreen .contentNote { font-size: 10px; }
 }
 
 /* 操作说明 / 确认框：两张压在最上头的纸。

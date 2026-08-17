@@ -95,6 +95,9 @@ if (!saved.raw || saved.raw.chapter !== 0 || saved.raw.beat !== 6 || !saved.raw.
 // 回来一趟：标题页上「继续」得出现，点下去回到同一幕、旗标还在
 await savePage.reload({ waitUntil: "load", timeout: 60000 });
 await savePage.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+// 第一屏是「按任意键」：按一下把菜单叫出来（真按键，走玩家那条路）
+await savePage.keyboard.press("Space");
+await savePage.waitForTimeout(900);
 const shownWhere = await savePage.textContent("#continueWhere");
 if (await savePage.isHidden("#btnContinue")) {
   await browser.close(); server.close();

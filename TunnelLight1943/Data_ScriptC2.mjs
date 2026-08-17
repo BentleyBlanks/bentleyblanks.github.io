@@ -140,7 +140,7 @@ export function ChapterC2(K) {
       // 第二场（玩法）：捂住妹妹的嘴。sustain 长按——量的是时间本身，
       // 长按在这儿是诚实的（CLAUDE.md 拟物交互第 2 条）。
       // 恐惧全部走声音：脚步、踹门、翻缸、远处的哭喊，一段一段从头顶碾过去。
-      kind: "hold", id: "c2_hush", timeOfDay: "day", noDetect: true,
+      kind: "hold", id: "c2_hush", timeOfDay: "tunnel", noDetect: true,
       zone: { x: 31.6, w: 3.4, level: "under" }, holdTime: 10, sustain: true,
       holdPose: "shelter",
       holdPrompt: "按住 E · 捂住妹妹的嘴",
@@ -227,7 +227,7 @@ export function ChapterC2(K) {
     },
     {
       // 过场：伤员的咳压不住了。抉择的由头先演出来，再让玩家拿主意。
-      kind: "cinematic", id: "c2_worse", timeOfDay: "day", noDetect: true,
+      kind: "cinematic", id: "c2_worse", timeOfDay: "tunnel", noDetect: true,
       lines: [
         { stage: "田大爷胸口拉风箱似的响。他把咳压在嗓子眼里，压一下，抖一下。", d: 4.4,
           cam: { kind: "insert", x: 30.4, y: UNDER_Y + 0.75, dist: 2.6 },
@@ -272,7 +272,7 @@ export function ChapterC2(K) {
       // 两边都是真代价：上去，是拿自己冒险；忍着，是拿别人的罪受换安稳。
       // 选哪边都不会导致暴露（窖口是梳篦扫荡自己翻出来的）：
       // 护送对象与伤员永不成为失败原因，这是全作铁律。
-      kind: "choice", id: "c2_cough", timeOfDay: "day", flagKey: "coughChoice", noDetect: true,
+      kind: "choice", id: "c2_cough", timeOfDay: "tunnel", flagKey: "coughChoice", noDetect: true,
       prompt: "水早见了底。是冒险上去舀水，还是让他咬着布忍？",
       options: [
         { key: "water", label: "上去舀水", detail: "扫荡队还在街上。贴着墙根到院里水缸，舀半瓢就回来。" },
@@ -348,7 +348,7 @@ export function ChapterC2(K) {
     {
       // 抉择分支 B（过场）：让他忍着。没有解法的那一边也要给分量——
       // 咬布、憋咳、谁也不看谁。
-      kind: "cinematic", id: "c2_endure", timeOfDay: "day", noDetect: true,
+      kind: "cinematic", id: "c2_endure", timeOfDay: "tunnel", noDetect: true,
       when: (state) => state.flags.coughChoice !== "water",
       debugForce: (state) => { state.flags.coughChoice = "endure"; },
       lines: [
@@ -393,7 +393,7 @@ export function ChapterC2(K) {
     {
       // 第四场：敌人发现窖口。千钧一发——柱子退到窖底最里头，
       // 脚跟碾着的那块土是松的。
-      kind: "cinematic", id: "c2_found", timeOfDay: "day", noDetect: true,
+      kind: "cinematic", id: "c2_found", timeOfDay: "tunnel", noDetect: true,
       lines: [
         { stage: "头顶的脚步，忽然停在了屋当间。", d: 3.0,
           cam: { kind: "shot", x: 30, y: UNDER_Y + 1.2, dist: 5.5 },
@@ -441,7 +441,7 @@ export function ChapterC2(K) {
       // 第五场（玩法）：挖。两轮笔画把 underDig 的两面旗都落了——
       // 松土塌出一个黑口子，是早年祖先挖的旧防兵洞。
       // 头顶的砸声一轮紧过一轮（只是声音，没有倒计时，也没有失败）。
-      kind: "chain", id: "c2_digout", timeOfDay: "day", noDetect: true,
+      kind: "chain", id: "c2_digout", timeOfDay: "tunnel", noDetect: true,
       objective: "墙角的土是松的——挖！", hint: "一下接一下，别停",
       onStart: (state) => {
         state.player.cineWalk = null;
@@ -498,7 +498,7 @@ export function ChapterC2(K) {
     {
       // 第六场（玩法）：顺着窄道爬出去。净高只够爬（tight 段接管姿态），
       // 妹妹镜像跟着；乡亲们在后头。身后是盖板碎裂的响声——只有声音。
-      kind: "escort", id: "c2_crawl", timeOfDay: "day", noDetect: true,
+      kind: "escort", id: "c2_crawl", timeOfDay: "tunnel", noDetect: true,
       follower: "sister", dest: { x: 51.8, w: 2.8, level: "under" },
       objective: "带妹妹顺着窄道爬出去", hint: "洞矮，得爬；她跟得上你",
       onEnter: (state) => {

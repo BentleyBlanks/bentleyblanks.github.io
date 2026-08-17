@@ -1,7 +1,7 @@
 // 《地道里的光》—— 世界画笔与绘制序工具（2026-08-15 从 Script_World.js 的
 // CreateWorld 闭包里抽出来的**无状态**那一层）：
 //   · 绘制序小工具：LAYER_ORDER / DepthOrder / FixOrder / SetLayerOrder / SetPlayOrder
-//     （规矩见 CLAUDE.md「Z 轴深度规范」——带号是绘制顺序，不是位置）
+//     （规矩见 docs/Depth.md「Z 轴深度规范」——带号是绘制顺序，不是位置）
 //   · 烘焙工具：MakeCanvas / CanvasTexture / BakeSprite / PlaceSprite(Flip) / ScaleKeepGround
 //   · 地形带/背景/影子画笔：AddStrip / AddBandEdge / AddGroundBand / AddGroundPlane /
 //     AddRidgeBand / AddParallaxTrees / MakeFlatShadow / MakeCastShadow / AddGroundShadow / AddCover
