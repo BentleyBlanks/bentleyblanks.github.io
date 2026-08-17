@@ -152,6 +152,20 @@ node TunnelLight1943/Script_Cli.mjs
 | `menu [页 ...]` | 拍**菜单类界面**（`title` / `continue` 有存档 / `confirm` / `controls` / `settings` / `pause` / `debug`）→ `_shots/menu_*.png`。`shot` 一上来就 StartGame，看不到标题页；各态怎么摆（存档要先写 localStorage 再刷新、确认框要有档才弹得出来）都固化在这儿 |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |
 
+**页面里还有一张过场时间轴（2026-08-17 加，`Script_CineTimeline.js`）**：F3 /
+`?cine=1` / 设置 → 「调试 · 过场时间轴」。底栏 Unity Timeline 式：台词／镜头／
+on()／框景／音效／微过场六条轨，拖播放头游戏就推到那一格并冻住（渲染照跑），
+右侧检视器给这一格的句、镜头参数、台上每个人的位置/姿势/轨道。**用户与 agent
+对过场说事，以它的「复制定位」为准**——复制出来的第一行就是 `shot` 吃的那一串
+`c1_thatday@line=5,at=1.20`（后面几行是台上状态与备注），agent 拿它
+`node Script_Cli.mjs shot "…"` 拍到的就是用户看到的同一格；「拍这一格」在本地
+DevServer 上直接落 `_shots/cine_*.jpg`（定位＋路径一起进剪贴板）。时间的口径只有
+Core 的 `CineTimeTable / CineLocator` 一处（面板与 CLI 共用），别另立一套秒数。
+它**不改剧本**——改台词仍去 `Data_ScriptC*.mjs`。键：空格 播放/暂停、← → 逐帧
+（Shift ×10）、[ ] 上一句/下一句、Home/End；倍速 0.25~4×；`⟲句` 循环当前句。
+往回拖＝重跳这一拍再推（几毫秒），链里起的微过场只能往前推（它回不去）。
+钩子：`TunnelLight.CineTimeline.{Toggle,Seek,SeekTime,Locator,SetSpeed}`。
+
 **这是硬规矩，因为代价量过**：翻 12 天会话记录，改这个游戏的 token 七成花在
 「定位」上（Read/Grep 打在源码上 ≈149 万），另有 ≈40 万花在**现写一次性探针**
 （234 个 scratchpad 脚本 + 319 次 `node -e`）——而跑测试只占 ≈23 万。7000 行的
