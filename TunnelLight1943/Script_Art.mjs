@@ -15396,29 +15396,94 @@ export function DrawCineFore(ctx, W, H, kind, dim = 1) {
     // 房梁：横在画框上沿的一根梁，底下垂着椽子头与苇箔的茬。
     // **梁身要占大半张画布**——第一版 0.62 配上长短不一的长齿，梁身整个被推出
     // 画框，屏幕上只剩一排黑方块，读成城墙垛口（实拍抓的）
+    // 大梁：一根**斧子砍出来的树干**横在画框顶上。
+    //
+    // 2026-08-17 重做（用户：「这张图里的顶部是什么鬼东西 这个鬼东西出现了好多次」）。
+    // 老版＝一块平板 ＋ 四条等距的直横线 ＋ **九个等距同宽、各描一圈墨线的方齿** ＋
+    // 一条通长的细亮线，实拍读出来是**一排铆钉**（或胶片的齿孔）钉在一块黑板上。
+    // 三处病根，全是本文件里记过的老账：
+    //   ① **椽子头压根不该长在这儿。** 椽子头是**檐口**的东西（屋顶挑出墙外那一截
+    //      锯断的杆头）；屋里一根梁的**底下**不会挂着一排木桩。梁上头才是檩和椽，
+    //      而且朝屋里走——在这个框景里它们全在画框外。所以：**齿整排删掉。**
+    //   ② **等距 ＋ 同宽 ＋ 各描一圈墨线 ＝ 一排零件**（同 strawEdge 那把梳子、
+    //      同「等距的横杠是梯子不是炭裂」、同「小形体配全圈墨线＝一坨」）。
+    //   ③ **梁底不许是一条直线。** 树干不直；更要紧的是这条边正好贴着过场的黑边，
+    //      一条平行的直边跟黑边并成一条，整块板就读成"画面上多了一道 UI"——
+    //      用户看见的正是这个。现在底沿是一条**起伏带下垂**的线。
+    // 认出"这是一根圆木"靠的不是轮廓，是**底面的一条柱面高光**（同 DrawLimb 那条：
+    // 屋里的光从底下打上来，贴着底沿最亮、往上很快收掉）。一条通长等宽的细亮线
+    // 是根电线，一条**渐变的宽带**才是圆的。
     case "beam": {
       const hb = H * 0.74;
-      InkFill(ctx, [[0, 0], [W, 0], [W, hb], [W * 0.5, hb * 1.06], [0, hb * 0.96]], id, C("body"),
+      // 底沿：起伏 ＋ 中间下垂（梁受力会塌一点，树干本身也不直）
+      const N = 7;
+      const edge = [];
+      for (let i = 0; i <= N; i += 1) {
+        const t = i / N;
+        const sag = Math.sin(t * Math.PI) * H * 0.05;              // 中间垂下去
+        edge.push([W * t, hb + sag + Sym(id + "e", i, H * 0.022)]);
+      }
+      InkFill(ctx, [[0, 0], [W, 0]].concat(edge.slice().reverse()), id, C("body"),
         { amp: H * 0.012, line: C("deep"), lw: Math.max(2, H * 0.016) });
+      const EdgeY = (x) => {                                        // 底沿在某个 x 上的高度
+        const t = Math.max(0, Math.min(0.999, x / W)) * N;
+        const i = Math.floor(t), f = t - i;
+        return edge[i][1] + (edge[Math.min(N, i + 1)][1] - edge[i][1]) * f;
+      };
       ctx.save();
-      ctx.globalAlpha = 0.45;
-      for (let i = 1; i <= 4; i += 1) {
-        const y = hb * (0.2 + i * 0.17);
-        InkLine(ctx, W * 0.02, y, W * 0.98, y + Sym(id + "g", i, H * 0.02), id + i,
-          { amp: H * 0.008, lw: Math.max(1, H * 0.008), color: C("dark") });
-      }
+      ctx.beginPath();                                              // 往下的笔都剪在梁里
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W, 0);
+      for (let i = N; i >= 0; i -= 1) ctx.lineTo(edge[i][0], edge[i][1]);
+      ctx.closePath();
+      ctx.clip();
+      // 斧痕：**长短不一、略斜、还得断几道**。等距的通长直线是压型钢板
+      ctx.globalAlpha = 0.42;
+      const FACET = [[0.02, 0.44, 0.30], [0.30, 0.96, 0.52], [0.10, 0.62, 0.70], [0.58, 0.99, 0.24]];
+      FACET.forEach(([x0, x1, ky], i) => {
+        const y0 = hb * ky + Sym(id + "f", i, H * 0.03);
+        InkLine(ctx, W * x0, y0, W * x1, y0 + Sym(id + "fs", i, H * 0.05), id + "f" + i,
+          { amp: H * 0.01, lw: Math.max(1, H * 0.009), color: i % 2 ? C("dark") : C("deep") });
+      });
+      // 两个节子：树干上砍掉枝丫留下的疤（一圈深、心里更深）
+      ctx.globalAlpha = 0.55;
+      [[0.22, 0.42], [0.71, 0.30]].forEach(([kx, ky], i) => {
+        const cx2 = W * kx, cy2 = hb * ky, rr = H * (0.052 + Rnd(id + "k", i) * 0.03);
+        ctx.fillStyle = C("deep");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr, rr * 0.74, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = C("dark");
+        ctx.beginPath();
+        ctx.ellipse(cx2, cy2, rr * 0.5, rr * 0.36, 0.2 - i * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // 底面的柱面高光：贴着底沿最亮、往上很快收掉——"圆木"就是这一笔给的。
+      // **必须一笔铺完。** 第一版沿着底沿分成 26 段各画一条渐变、还逐段抖了 alpha，
+      // 段与段之间的接缝在图上是一排竖刻度——**刚删掉的那排铆钉换个地方又长出来了**。
+      // 分段画连续的东西，接缝本身就成了内容（同灰堆「一团东西只许有一条外轮廓」）。
+      ctx.globalAlpha = 1;
+      const band = H * 0.16;
+      const yLo = Math.min(...edge.map((e) => e[1]));
+      const yHi = Math.max(...edge.map((e) => e[1]));
+      ctx.save();
+      ctx.beginPath();                                              // 只留底沿往上 band 这一条
+      ctx.moveTo(0, edge[0][1] - band);
+      for (let i = 1; i <= N; i += 1) ctx.lineTo(edge[i][0], edge[i][1] - band);
+      ctx.lineTo(W, H * 2);
+      ctx.lineTo(0, H * 2);
+      ctx.closePath();
+      ctx.clip();
+      const gr = ctx.createLinearGradient(0, yLo - band, 0, yHi);
+      gr.addColorStop(0, "rgba(0,0,0,0)");
+      gr.addColorStop(0.40, "rgba(0,0,0,0)");
+      gr.addColorStop(1, C("rim"));
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, yLo - band, W, yHi - yLo + band + 2);
+      // **不再往上叠一层"光不匀"的暗**：那一层压在高光带上，图上就是梁底多一条
+      // 更暗的横带（实拍抓的），而屋里的光本来就是一大片漫射，沿梁长匀着才对。
       ctx.restore();
-      // 椽子头：一排短齿，长短不一
-      for (let i = 0; i < 9; i += 1) {
-        const x = W * (0.04 + i * 0.108);
-        const len = (H - hb) * (0.28 + Rnd(id + "r", i) * 0.46);
-        InkFill(ctx, Rect(x, hb * 0.98, W * 0.052, len), id + "r" + i, C("dark"),
-          { amp: W * 0.006, line: C("deep"), lw: Math.max(1, W * 0.006) });
-      }
-      // 梁底那条亮边：屋里的光从底下打上来，这一条就是"梁"与"一块黑板"的分界
-      ctx.save();
-      ctx.globalAlpha = 0.40;
-      InkLine(ctx, 0, hb * 0.97, W, hb * 1.01, id + "rim", { amp: H * 0.006, lw: Math.max(2, H * 0.018), color: C("rim") });
       ctx.restore();
       break;
     }
