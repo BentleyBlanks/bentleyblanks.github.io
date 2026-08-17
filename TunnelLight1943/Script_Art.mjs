@@ -169,6 +169,224 @@ export function Hatch(ctx, x, y, w, h, id, { spacing = 5, alpha = 0.16, angle = 
 }
 
 // 颗粒点（土层/草垛的质感）
+// ---------------------------------------------------------------------------
+// 材质三件套（2026-08-17 用户："很多东西根本就不像，例如布料 焦木 灰 泥土"）
+//
+// 这三支是**材质**的通用笔，不是某一件东西的画法。共同的病根是老版把材质当
+// 颜色画：布是一块多边形加两根直线、焦木是一根深色的线、灰是一个描了墨边的
+// 半圆。可这三样东西之所以认得出来，靠的都不是颜色：
+//   · 布靠**褶**——一道褶是从受力点拉出来的谷，谷心暗、旁边一条被绷亮的脊，
+//     两头散掉；
+//   · 焦木靠**龟裂**——烧过的木头表面炸成一格一格的鳞，缝里是灰白的；
+//   · 灰靠**没有边**——它是倒着堆起来的粉，轮廓一描墨线就成了石头。
+// ---------------------------------------------------------------------------
+
+/** 一道布褶：谷心一条暗、背光侧一条被绷亮的脊，两头自己散掉。bow = 褶弯多少 */
+export function ClothFold(ctx, x0, y0, x1, y1, w,
+  { dark = "rgba(18,14,10,0.34)", lit = "rgba(255,246,224,0.26)", bow = 0 } = {}) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L, ny = dx / L;
+  const cx = (x0 + x1) / 2 + nx * bow, cy = (y0 + y1) / 2 + ny * bow;
+  const band = (off, width, color) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.24, color);
+    g.addColorStop(0.76, color);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x0 + nx * off, y0 + ny * off);
+    ctx.quadraticCurveTo(cx + nx * off, cy + ny * off, x1 + nx * off, y1 + ny * off);
+    ctx.stroke();
+  };
+  ctx.save();
+  band(w * 0.78, w * 0.6, lit);
+  band(0, w, dark);
+  ctx.restore();
+}
+
+/**
+ * 烧焦的木面：**龟裂**。烧过的木头表面炸成一格一格发亮的黑鳞，缝里露出灰白的
+ * 炭灰——这一格一格的网就是"焦"这个字唯一读得出来的地方。
+ * 在已经填好底色的形状里调（调用处自己 clip），沿 (x0..x1, y0..y1) 铺网。
+ */
+export function CharScale(ctx, x0, y0, x1, y1, id, { cell = 7, fissure = "rgba(150,140,124,0.34)", plate = "rgba(10,8,6,0.5)" } = {}) {
+  // 一格鳞至少要能塞进这块面里两三格。**格子跟形体一样宽就成了链条**
+  //（第一版把它铺在五像素粗的椽子上，实拍读出来是三条挂着的铁链）
+  const span = Math.min(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  if (span < 4) return;
+  cell = Math.min(cell, span * 0.55);
+  ctx.save();
+  const cols = Math.max(1, Math.round((x1 - x0) / cell));
+  const rows = Math.max(1, Math.round((y1 - y0) / cell));
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const px = x0 + (c + 0.5) * (x1 - x0) / cols + Sym(id + "cx", r * 40 + c, cell * 0.22);
+      const py = y0 + (r + 0.5) * (y1 - y0) / rows + Sym(id + "cy", r * 40 + c, cell * 0.2);
+      const w = cell * (0.34 + Rnd(id + "cw", r * 40 + c) * 0.16);
+      const h = cell * (0.3 + Rnd(id + "ch", r * 40 + c) * 0.16);
+      ctx.fillStyle = plate;
+      ctx.beginPath();
+      ctx.moveTo(px - w, py + Sym(id + "a", r * 40 + c, 0.8));
+      ctx.lineTo(px + Sym(id + "b", r * 40 + c, 1.2), py - h);
+      ctx.lineTo(px + w, py + Sym(id + "c", r * 40 + c, 0.8));
+      ctx.lineTo(px + Sym(id + "d", r * 40 + c, 1.2), py + h);
+      ctx.closePath();
+      ctx.fill();
+      // 裂缝里透出的炭灰：只给鳞的上沿一线，全描一圈就成了瓷砖
+      ctx.strokeStyle = fissure;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(px - w, py);
+      ctx.lineTo(px + Sym(id + "b", r * 40 + c, 1.2), py - h);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * 一堆草木灰。**不描外轮廓**——灰是倒出来堆着的粉，一描边就成了石头
+ * （老版正是这么画的：一个 InkFill 的半圆，实拍读出来是路边一块灰石头）。
+ * 它靠三样东西成立：крест上那一档发白的浮灰、底下越堆越沉的暗、
+ * 以及埋在里头没烧透的**炭块与秫秸茬**——那才是"这是烧剩下的东西"。
+ * 画在 (ax,ay)：ay 是接地线，hw/h 是半幅与高。
+ */
+export function DrawAshHeap(ctx, ax, ay, hw, h, id, { night = false, scoops = 0 } = {}) {
+  const pale = night ? "#4b4d55" : "#787267";
+  const mid = night ? "#33363d" : "#524d44";
+  const deep = night ? "#1e2128" : "#332f29";
+  // ① 摊在四周的一层浮灰：堆的脚是化开的，没有边
+  ctx.save();
+  const apron = ctx.createRadialGradient(ax, ay - 1, hw * 0.2, ax, ay - 1, hw * 1.5);
+  apron.addColorStop(0, night ? "rgba(48,52,60,0.5)" : "rgba(104,98,88,0.46)");
+  apron.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = apron;
+  ctx.beginPath();
+  ctx.ellipse(ax, ay - 1, hw * 1.5, Math.max(4, h * 0.34), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // ② 堆身：**低而阔、还塌了一边**。灰是倒出来自己摊平的，堆不成一个圆包——
+  // 第一版给的是对称的半圆，实拍读出来是路边一块灰石头。所以顶上给两个高低
+  // 不一样的包、中间塌下去一道，边沿带细齿
+  const pts = [];
+  const N = 26;
+  const skew = Hash(id + "sk") * 0.5 + 0.25;
+  for (let i = 0; i <= N; i += 1) {
+    const t = i / N;
+    const lobe = Math.exp(0 - ((t - skew) / 0.26) ** 2) * h
+      + Math.exp(0 - ((t - (skew + 0.34)) / 0.20) ** 2) * h * 0.72;
+    const bump = lobe * (1 - 0.12 * Math.sin(t * 12.7 + Hash(id + "w") * 6))
+      + Math.sin(t * 23.3) * h * 0.05;
+    pts.push([ax - hw + hw * 2 * t, ay - Math.max(0.6, bump * Math.sin(t * Math.PI) ** 0.28)]);
+  }
+  const bodyPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(ax - hw * 1.06, ay + 1);
+    for (const [px, py] of pts) ctx.lineTo(px, py);
+    ctx.lineTo(ax + hw * 1.06, ay + 1);
+    ctx.closePath();
+  };
+  const body = ctx.createLinearGradient(0, ay - h, 0, ay + 1);
+  body.addColorStop(0, pale);
+  body.addColorStop(0.45, mid);
+  body.addColorStop(1, deep);
+  // **边要虚**。灰没有轮廓——只要给它一条干净利落的边，人眼当场把它读成石头
+  //（2026-08-17 实拍连着两轮都是"路边一块灰石头"）。所以堆身是**糊着填**的，
+  // 硬的东西（炭块、秸秆茬）再压在上头，虚实的对比反过来说明这是粉
+  ctx.save();
+  ctx.filter = `blur(${Math.max(1.2, hw * 0.07)}px)`;
+  bodyPath();
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.filter = "none";
+  ctx.restore();
+  ctx.save();
+  bodyPath();
+  ctx.clip();
+  // 面上的粉：细密的亮点，一层一层往下稀
+  Speckle(ctx, ax - hw, ay - h, hw * 2, h, id + "dust",
+    { count: Math.round(hw * 1.6), alpha: night ? 0.16 : 0.26, size: 1.5, color: pale });
+  Speckle(ctx, ax - hw, ay - h * 0.55, hw * 2, h * 0.6, id + "dk",
+    { count: Math.round(hw * 0.5), alpha: 0.16, size: 1.4, color: deep });
+  // 扒过的坑：一道月牙暗，坑沿一线亮
+  for (let s = 0; s < scoops; s += 1) {
+    const sx = ax + (Hash(id + "sx" + s) - 0.5) * hw * 1.2;
+    const sy = ay - h * (0.25 + Hash(id + "sy" + s) * 0.4);
+    const sr = hw * (0.2 + Hash(id + "sr" + s) * 0.14);
+    ctx.fillStyle = "rgba(0,0,0,0.26)";
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, sr, sr * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = night ? "rgba(92,98,108,0.4)" : "rgba(146,140,128,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + sr * 0.42, sr * 0.9, sr * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // ③ 没烧透的炭块：**有棱有角**（灰是粉、炭是块，这一对比就是"烧剩下的"），
+  // 半埋在灰里，向光的一棱带一线灰白
+  const nC = Math.max(2, Math.round(hw / 13));
+  for (let i = 0; i < nC; i += 1) {
+    const t = 0.1 + Hash(id + "cx" + i) * 0.8;
+    const cx = ax - hw + hw * 2 * t;
+    const cy = ay - 1 - Hash(id + "cy" + i) * h * 0.62;
+    const r = 1.3 + Hash(id + "cr" + i) * 1.9;
+    const spin = Hash(id + "ca" + i) * 3;
+    const poly = [];
+    for (let a = 0; a < 5; a += 1) {
+      const ang = (a / 5) * Math.PI * 2 + spin;
+      const q = r * (0.66 + Hash(id + "cq" + i + a) * 0.6);
+      poly.push([cx + Math.cos(ang) * q, cy + Math.sin(ang) * q * 0.78]);
+    }
+    ctx.save();
+    ctx.fillStyle = night ? "#1b1e25" : "#2a231a";
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (const p of poly.slice(1)) ctx.lineTo(p[0], p[1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = night ? "rgba(96,102,112,0.45)" : "rgba(140,132,118,0.45)";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    ctx.lineTo(poly[1][0], poly[1][1]);
+    ctx.lineTo(poly[2][0], poly[2][1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // ④ 烧了一半的秫秸茬：从灰里斜插出来几根，梢上一点白
+  for (let i = 0; i < Math.max(4, Math.round(hw / 5)); i += 1) {
+    const t = 0.14 + Hash(id + "sk" + i) * 0.72;
+    const sx = ax - hw + hw * 2 * t;
+    const sy = ay - 1 - Hash(id + "sy2" + i) * h * 0.4;
+    const len = 6 + Hash(id + "sl" + i) * h * 1.05;
+    const lean = (Hash(id + "sa" + i) - 0.5) * 2.4;
+    ctx.save();
+    ctx.strokeStyle = night ? "#14161c" : "#221c14";
+    ctx.lineWidth = 1.5 + Hash(id + "sw" + i) * 0.9;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(sx + lean * len * 0.3, sy - len * 0.6, sx + lean * len, sy - len);
+    ctx.stroke();
+    ctx.fillStyle = night ? "rgba(104,110,120,0.7)" : "rgba(154,146,132,0.7)";
+    ctx.beginPath();
+    ctx.ellipse(sx + lean * len, sy - len, 1.3, 1.0, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // ⑤ 接地那一线：只有这儿有暗，堆的上沿一笔墨都不许有
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(ax, ay + 0.5, hw * 1.1, 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function Speckle(ctx, x, y, w, h, id, { count = 24, color = IN.ink, alpha = 0.18, size = 1.6 } = {}) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -5968,16 +6186,55 @@ export function DrawHangLantern(ctx, x, groundY, id, { lit = true } = {}) {
 }
 
 // 刮上树杈的花布头巾：一角勾在杈上，其余的随风搭下来
+// 挂在树杈上的一片破布。**布是靠褶认出来的**（2026-08-17 用户："布料…根本就
+// 不像"）：挂着的布只有一个受力点，所有褶都从那一点辐射下来、越往下越散；
+// 下摆被自重拉成一条软弧，边上还挂着抽出来的经纬线头。老版是一块六边形加两根
+// 直线当印花——那是一片贴纸。
 export function DrawCloth(ctx, x, y, id) {
-  InkFill(ctx, [[x - 2, y - 14], [x + 5, y - 10], [x + 9, y + 2], [x + 3, y + 14], [x - 6, y + 10], [x - 8, y - 2]],
-    id + "body", "#c9a9a0", { amp: 1.8, lw: 1.8, shade: "rgba(0,0,0,0.14)" });
-  // 印花条
-  InkLine(ctx, x - 5, y - 4, x + 6, y - 1, id + "st1", { lw: 1.2, color: "rgba(150,80,70,0.6)", amp: 1.6 });
-  InkLine(ctx, x - 4, y + 4, x + 5, y + 7, id + "st2", { lw: 1.2, color: "rgba(150,80,70,0.45)", amp: 1.6 });
+  const top = y - 15, bot = y + 15;
+  // 布身：上头收在挂点、下头张开的一片，下摆是软弧
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x - 1, top);
+  ctx.quadraticCurveTo(x - 8, y - 4, x - 7.5, bot - 5);
+  ctx.quadraticCurveTo(x - 2, bot + 2.5, x + 4, bot - 2);
+  ctx.quadraticCurveTo(x + 9.5, bot - 6, x + 8, y - 3);
+  ctx.quadraticCurveTo(x + 5, y - 11, x + 1.5, top);
+  ctx.closePath();
+  ctx.fillStyle = "#b8968c";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(74,54,44,0.6)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.clip();
+  // 四道褶，全从挂点辐射下来：越往下越散、越浅
+  for (let i = 0; i < 4; i += 1) {
+    const spread = (i - 1.5) * 4.4;
+    ClothFold(ctx, x + spread * 0.14, top + 2, x + spread, bot - 3.5, 2.4 - Math.abs(i - 1.5) * 0.4,
+      { bow: spread * 0.3, dark: "rgba(84,52,44,0.34)", lit: "rgba(255,236,224,0.30)" });
+  }
+  // 洗白的花：一两点，不是横条
+  ctx.fillStyle = "rgba(232,216,204,0.5)";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(x - 4 + i * 4.4, y - 4 + (i % 2) * 7, 1.5, 1.2, Hash(id + "f" + i) * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // 下摆抽出来的线头：布破了才会有，这一笔比整片布都说明问题
+  ctx.save();
+  ctx.strokeStyle = "rgba(150,120,110,0.75)";
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 5; i += 1) {
+    const fx = x - 6 + i * 3.2;
+    ctx.beginPath();
+    ctx.moveTo(fx, bot - 5 + Sym(id + "fy", i, 1.6));
+    ctx.lineTo(fx + Sym(id + "fx", i, 2.4), bot + 1 + Hash(id + "fl" + i) * 4);
+    ctx.stroke();
+  }
+  ctx.restore();
   // 勾在树杈上的那一角
-  InkLine(ctx, x - 2, y - 14, x + 2, y - 20, id + "snag", { lw: 1.4, color: "rgba(90,60,45,0.8)" });
-  // 垂下来被风掀起的边
-  InkLine(ctx, x + 3, y + 14, x + 10, y + 20, id + "flap", { lw: 1.6, color: "#b8968e", amp: 2.4 });
+  InkLine(ctx, x, top + 1, x + 2, top - 6, id + "snag", { lw: 1.4, color: "rgba(90,60,45,0.8)" });
 }
 
 // 石子堆：投掷的"弹药箱"。
@@ -6132,33 +6389,68 @@ export function DrawShed(ctx, x, groundY, id) {
     [x - 26, groundY - H * 0.50], [x - 10, groundY - H * 0.18], [x - 14, groundY]],
   id + "fallRoof", "#3d3220", { amp: 2.6, lw: 2.2, shade: "rgba(20,14,8,0.34)" });
   // 烧断的椽子：黑茬。**至少一根要探过屋面的剪影**——"塌了"这件事远看
-  // 全靠天际线上那一道斜茬说，埋在墙色里等于没画
-  InkLine(ctx, x - W / 2 + 16, groundY, x - W / 2 + 34, groundY - H * 0.86, id + "charA",
-    { lw: 4.6, color: "#2b211a", amp: 1.2 });
-  InkLine(ctx, x - W / 2 + 40, groundY - 4, x - W / 2 + 50, groundY - H * 0.62, id + "charB",
-    { lw: 3.8, color: "#332619", amp: 1.4 });
-  InkLine(ctx, x - 30, groundY - H * 0.10, x - 50, groundY - H * 0.46, id + "charC",
-    { lw: 3.2, color: "#2b211a", amp: 1.2 });
-  // 椽头的焦白（烧透的木头茬发灰白，不是纯黑）
-  for (const [tx, ty] of [[x - W / 2 + 34, groundY - H * 0.86], [x - W / 2 + 50, groundY - H * 0.62]]) {
+  // 全靠天际线上那一道斜茬说，埋在墙色里等于没画。
+  // 一根烧过的椽子不是一条深色的线：根上还是木头、越往梢越炭化、断口是**炸开
+  // 的尖茬**不是平头，而且炭面要炸出龟裂（2026-08-17 用户："焦木…根本就不像"）
+  const CharBeam = (bx0, by0, bx1, by1, w, bid) => {
+    const dx = bx1 - bx0, dy = by1 - by0, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L;
     ctx.save();
-    ctx.fillStyle = "rgba(150,138,120,0.5)";
-    ctx.beginPath(); ctx.ellipse(tx, ty, 2.6, 1.6, 0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-  // 墙根的灰堆：埋着瓦罐的那片烧土（第一章"找吃的"翻的就是这儿）
-  InkFill(ctx, [[x - W / 2 + 8, groundY], [x - W / 2 + 16, groundY - 9],
-    [x - W / 2 + 36, groundY - 11], [x - W / 2 + 52, groundY - 6], [x - W / 2 + 58, groundY]],
-  id + "ash", "#4e463c", { amp: 1.8, lw: 1.6, shade: "rgba(0,0,0,0.2)" });
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#8a8074";
-  for (let i = 0; i < 4; i += 1) {
+    // 梁身：根粗梢细的一条，木色→炭色
     ctx.beginPath();
-    ctx.ellipse(x - W / 2 + 18 + i * 10, groundY - 4 - Hash(id + "af" + i) * 5, 4.5, 2, 0, 0, Math.PI * 2);
+    ctx.moveTo(bx0 - nx * w * 0.5, by0 - ny * w * 0.5);
+    ctx.lineTo(bx1 - nx * w * 0.3, by1 - ny * w * 0.3);
+    ctx.lineTo(bx1 + nx * w * 0.3, by1 + ny * w * 0.3);
+    ctx.lineTo(bx0 + nx * w * 0.5, by0 + ny * w * 0.5);
+    ctx.closePath();
+    const bg = ctx.createLinearGradient(bx0, by0, bx1, by1);
+    bg.addColorStop(0, "#4a3a26");
+    bg.addColorStop(0.45, "#241a12");
+    bg.addColorStop(1, "#12100c");
+    ctx.fillStyle = bg;
     ctx.fill();
-  }
-  ctx.restore();
+    ctx.save();
+    ctx.clip();
+    // 五六个像素粗的椽子上铺不下龟裂的网格（铺了就是一条铁链——第一版实拍
+    // 正是这样）。这个尺度上"焦"只剩一样读得出来的记号：**横着一道道的裂口**，
+    // 越靠梢越密。缝里透出的炭灰给一线，不给整圈
+    const nick = Math.max(3, Math.round(L / (w * 3.2)));
+    for (let i = 1; i < nick; i += 1) {
+      const t = i / nick + Sym(bid + "nt", i, 0.05);
+      const px = bx0 + dx * t, py = by0 + dy * t;
+      const side = Hash(bid + "ns" + i) > 0.5 ? 1 : -1;
+      const hw2 = w * 0.34 * (0.5 + Hash(bid + "n" + i) * 0.7);
+      ctx.strokeStyle = `rgba(146,136,120,${0.10 + t * 0.12})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(px + nx * w * 0.32 * side, py + ny * w * 0.32 * side);
+      ctx.lineTo(px + nx * (w * 0.32 * side - hw2 * side), py + ny * (w * 0.32 * side - hw2 * side));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 断口：炸开的尖茬，梢上一点烧透的灰白
+    ctx.strokeStyle = "#100d09";
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 3; i += 1) {
+      const o = (i - 1) * w * 0.32;
+      ctx.beginPath();
+      ctx.moveTo(bx1 + nx * o, by1 + ny * o);
+      ctx.lineTo(bx1 + nx * o + dx / L * (3 + Hash(bid + "t" + i) * 7),
+        by1 + ny * o + dy / L * (3 + Hash(bid + "t" + i) * 7));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(176,166,148,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(bx1, by1, w * 0.42, w * 0.3, Math.atan2(dy, dx), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  CharBeam(x - W / 2 + 16, groundY, x - W / 2 + 34, groundY - H * 0.86, 5.2, id + "charA");
+  CharBeam(x - W / 2 + 40, groundY - 4, x - W / 2 + 50, groundY - H * 0.62, 4.4, id + "charB");
+  CharBeam(x - 30, groundY - H * 0.10, x - 50, groundY - H * 0.46, 3.8, id + "charC");
+  // 墙根的灰堆：埋着瓦罐的那片烧土（第一章"找吃的"翻的就是这儿）
+  DrawAshHeap(ctx, x - W / 2 + 33, groundY, 26, 11, id + "ash");
   // —— 东半边：还立着的那半 ——
   // 右柱 2/3 高处接过一段，缠三道草绳
   InkLine(ctx, x + W / 2 - 12, groundY, x + W / 2 - 14, groundY - H * 0.42, id + "postRa",
@@ -6298,26 +6590,74 @@ export function DrawThatchMat(ctx, ax, ay, id, { len = 38, dir = 1, torn = 0, gr
  */
 export function DrawCharredPlank(ctx, ax, ay, id, { len = 72 } = {}) {
   const th = 11;
-  InkFill(ctx, [[ax, ay - 1], [ax + 2, ay - th + 1], [ax + len * 0.5, ay - th - 1.4],
-    [ax + len, ay - th + 2], [ax + len, ay - 0.5], [ax + len * 0.45, ay + 1]],
-  id + "body", "#5b4a33", { amp: 1.3, lw: 2.2, shade: "rgba(14,9,5,0.3)" });
+  const outline = [[ax, ay - 1], [ax + 2, ay - th + 1], [ax + len * 0.5, ay - th - 1.4],
+    [ax + len, ay - th + 2], [ax + len, ay - 0.5], [ax + len * 0.45, ay + 1]];
+  InkFill(ctx, outline, id + "body", "#5b4a33", { amp: 1.3, lw: 2.2, shade: "rgba(14,9,5,0.3)" });
+  // 没烧着那半截的木纹：顺着长边一道道，深浅不匀——有纹才看得出是木头
+  for (let i = 0; i < 5; i += 1) {
+    const y = ay - 1.6 - i * 1.9;
+    ctx.save();
+    ctx.strokeStyle = i % 2 ? "rgba(46,34,20,0.32)" : "rgba(126,104,72,0.30)";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(ax + len * 0.34, y);
+    ctx.quadraticCurveTo(ax + len * 0.66, y - 0.9 + Sym(id + "gr", i, 1.2), ax + len - 3, y - 0.4);
+    ctx.stroke();
+    ctx.restore();
+  }
   // 板缝：三块板拼的一扇门，缝顺着长边
   for (let i = 0; i < 2; i += 1) {
     const y = ay - 3.6 - i * 3.6;
     InkLine(ctx, ax + 4, y, ax + len - 5, y - 0.8 + Sym(id + "gd", i, 1.4),
       id + "gap" + i, { lw: 1, color: "rgba(34,24,14,0.55)", amp: 1.2 });
   }
-  // 烧焦的那一头：黑透，边上崩了口
+  // 烧焦的那一头。**"焦"读得出来靠龟裂，不靠深色**：老版是一块 0.72 透明度的
+  // 深褐色补丁，跟"这半截脏了"没有区别（2026-08-17 用户："焦木…根本就不像"）。
+  // 三样一起给：① 烧界线不齐，是一路啃进去的；② 焦面炸成一格一格发亮的黑鳞，
+  // 缝里是灰白的炭灰；③ 交界处一圈烤黄的焦痕，从木色过渡到炭色
   ctx.save();
-  ctx.globalAlpha = 0.72;
-  ctx.fillStyle = "#241a11";
   ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(ax, ay - th + 1);
-  ctx.quadraticCurveTo(ax + len * 0.16, ay - th - 1, ax + len * 0.3, ay - th * 0.55);
-  ctx.quadraticCurveTo(ax + len * 0.2, ay - 2, ax + len * 0.1, ay);
+  ctx.moveTo(ax - 1, ay + 1.5);
+  ctx.lineTo(ax - 1, ay - th - 2);
+  for (let i = 0; i <= 6; i += 1) {
+    const t = i / 6;
+    ctx.lineTo(ax + len * (0.30 + Sym(id + "burn", i, 0.055)), ay - th - 1 + t * (th + 3));
+  }
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "#1d1610";
+  ctx.fillRect(ax - 2, ay - th - 3, len * 0.4, th + 6);
+  CharScale(ctx, ax, ay - th, ax + len * 0.34, ay, id + "scale", { cell: 5.4 });
+  ctx.restore();
+  ctx.restore();
+  // 烤黄的焦痕：从炭到木的那一指宽
+  ctx.save();
+  const sc = ctx.createLinearGradient(ax + len * 0.26, 0, ax + len * 0.52, 0);
+  sc.addColorStop(0, "rgba(32,22,12,0.75)");
+  sc.addColorStop(1, "rgba(32,22,12,0)");
+  ctx.fillStyle = sc;
+  ctx.beginPath();
+  ctx.moveTo(ax + len * 0.26, ay + 1);
+  ctx.lineTo(ax + len * 0.26, ay - th - 1.6);
+  ctx.lineTo(ax + len * 0.56, ay - th - 0.6);
+  ctx.lineTo(ax + len * 0.56, ay + 0.6);
   ctx.closePath();
   ctx.fill();
+  // 烧塌那一头的板茬：崩掉的口子里探出几根没烧尽的木刺
+  ctx.strokeStyle = "#0f0b07";
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i += 1) {
+    const y = ay - 2 - i * 3.2;
+    ctx.beginPath();
+    ctx.moveTo(ax + 1, y);
+    ctx.lineTo(ax - 3 - Hash(id + "sp" + i) * 5, y - 1 + Sym(id + "spy", i, 2.2));
+    ctx.stroke();
+  }
+  // 炭面上落的一层白灰
+  Speckle(ctx, ax, ay - th, len * 0.3, th, id + "ash",
+    { count: 14, alpha: 0.4, size: 1.3, color: "#b6ad9c" });
   ctx.restore();
   // 还看得出是门：轴头（东头那个圆木榫）与两颗门闩钉
   InkFill(ctx, [[ax + len - 2, ay - th + 2], [ax + len + 5, ay - th + 3],
@@ -6348,39 +6688,10 @@ export function DrawAshMound(ctx, ax, ay, id,
   { k = 0, jar = false, open = false, caught = false, clear = 0, taken = false, jarX, x } = {}) {
   const hw = 29;                                  // 半幅 0.6m
   const h = 24 * (1 - 0.55 * Math.max(0, Math.min(1, k)));
-  const N = 9;
-  const pts = [[ax - hw, ay]];
-  for (let i = 0; i <= N; i += 1) {
-    const t = i / N;
-    // 堆不是一条光滑的弧：几处塌、几处鼓（手扒出来的坑就在这儿）
-    const bump = Math.sin(t * Math.PI) * h + Math.sin(t * 7.3 + 1.1) * h * 0.14;
-    pts.push([ax - hw + hw * 2 * t, ay - Math.max(1.5, bump) - Sym(id + "top" + Math.round(k * 4), i, 1.8)]);
-  }
-  pts.push([ax + hw, ay]);
-  InkFill(ctx, pts, id + "heap" + Math.round(k * 4), "#4a4238",
-    { amp: 1.8, lw: 1.8, shade: "rgba(0,0,0,0.24)" });
-  // 面上的浮灰（发灰白）与几块没烧透的炭
-  ctx.save();
-  ctx.globalAlpha = 0.32;
-  ctx.fillStyle = "#8a8074";
-  for (let i = 0; i < 6; i += 1) {
-    const t = 0.1 + Hash(id + "ax" + i) * 0.8;
-    ctx.beginPath();
-    ctx.ellipse(ax - hw + hw * 2 * t, ay - 3 - Hash(id + "ay" + i) * h * 0.55,
-      4 + Hash(id + "ar" + i) * 2.6, 1.9, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-  ctx.save();
-  ctx.fillStyle = "#221a12";
-  for (let i = 0; i < 4; i += 1) {
-    const t = 0.16 + Hash(id + "cx" + i) * 0.7;
-    ctx.beginPath();
-    ctx.ellipse(ax - hw + hw * 2 * t, ay - 2 - Hash(id + "cy" + i) * h * 0.4,
-      2.4 + Hash(id + "cr" + i) * 1.6, 1.5, Hash(id + "ca" + i), 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  // 堆身走通用的灰笔（DrawAshHeap）：不描外轮廓、顶上发白底下发沉、埋着炭块与
+  // 秫秸茬。老版是一个 InkFill 的半圆加几粒椭圆——实拍读出来是路边一块灰石头
+  //（2026-08-17 用户："灰…根本就不像"）。扒过几把就在面上留几个坑
+  DrawAshHeap(ctx, ax, ay, hw, h, id + "heap", { scoops: Math.round(Math.max(0, Math.min(1, k)) * 3) });
   if (!jar && !caught && clear <= 0 && !taken) return;
   // 坛肩锚在 Core 的 shoulderY 上（0.16m×48px/米），不跟着堆矮——
   // 坛子埋在土里，矮下去的是堆，不是它
@@ -7198,9 +7509,14 @@ export function DrawClothBundle(ctx, x, groundY, id) {
   // 布卷：低低的一卷，塞在墙根
   InkFill(ctx, [[x - 15, groundY], [x - 14, groundY - 9], [x - 4, groundY - 13], [x + 10, groundY - 11], [x + 14, groundY - 4], [x + 13, groundY]],
     id + "roll", "#463c33", { amp: 1.2, lw: 1.8, shade: "rgba(0,0,0,0.24)" });
-  // 布的折痕
-  InkLine(ctx, x - 10, groundY - 6, x + 8, groundY - 7, id + "foldA", { lw: 0.9, color: "rgba(24,19,15,0.6)", amp: 0.9 });
-  InkLine(ctx, x - 6, groundY - 10, x + 4, groundY - 10.5, id + "foldB", { lw: 0.8, color: "rgba(24,19,15,0.5)", amp: 0.8 });
+  // 卷起来的布：褶顺着卷的方向绕，谷心暗、脊上亮——一卷布和一根木头的区别
+  // 就在这几道软褶上
+  ClothFold(ctx, x - 13, groundY - 1.5, x - 3, groundY - 12.5, 2.4,
+    { bow: -1.8, dark: "rgba(14,10,8,0.5)", lit: "rgba(196,178,150,0.24)" });
+  ClothFold(ctx, x - 2, groundY - 0.8, x + 6, groundY - 12, 2.0,
+    { bow: -1.5, dark: "rgba(14,10,8,0.42)", lit: "rgba(196,178,150,0.2)" });
+  ClothFold(ctx, x + 7, groundY - 0.6, x + 12, groundY - 10, 1.7,
+    { bow: -1.1, dark: "rgba(14,10,8,0.36)", lit: "rgba(196,178,150,0.18)" });
   // 发暗的渍：两小块，压得很沉
   ctx.save();
   ctx.globalAlpha = 0.55;
@@ -7242,12 +7558,14 @@ export function DrawSpreadCoat(ctx, x, groundY, id, { green = false } = {}) {
     id + "cornerW", "#1d2534", { amp: 1.0, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
   InkFill(ctx, [[x + 21, groundY], [x + 22, groundY - 4], [x + 27, groundY - 8.6], [x + 31, groundY - 6], [x + 31, groundY]],
     id + "cornerE", "#1d2534", { amp: 1.0, lw: 1.4, shade: "rgba(0,0,0,0.24)" });
-  // 两道褶 + 几点白花（这件就是他身上那件破褂子，花色不用跟娘的短褂一样，
-  // 素一点：只给一两点洗白的补丁色）
-  InkLine(ctx, x - 18, groundY - 2.2, x + 6, groundY - 2.8, id + "foldA",
-    { lw: 0.8, color: "rgba(12,14,20,0.6)", amp: 0.9 });
-  InkLine(ctx, x - 4, groundY - 1.2, x + 18, groundY - 1.8, id + "foldB",
-    { lw: 0.7, color: "rgba(12,14,20,0.5)", amp: 0.8 });
+  // 褶：摊在地上的布，褶是从压住的两个角**斜着拉过去**的，不是两条平行横线。
+  // 一道褶＝谷心一条暗＋旁边一条被绷亮的脊（ClothFold），布才不是一块纸板
+  ClothFold(ctx, x - 24, groundY - 5.5, x + 6, groundY - 2.2, 2.6,
+    { bow: 1.6, dark: "rgba(8,10,16,0.5)", lit: "rgba(120,140,175,0.26)" });
+  ClothFold(ctx, x + 24, groundY - 5.4, x - 2, groundY - 1.6, 2.2,
+    { bow: -1.4, dark: "rgba(8,10,16,0.44)", lit: "rgba(120,140,175,0.22)" });
+  ClothFold(ctx, x - 12, groundY - 2.6, x + 16, groundY - 3.0, 1.6,
+    { bow: 1.0, dark: "rgba(8,10,16,0.36)", lit: "rgba(120,140,175,0.2)" });
   ctx.save();
   ctx.fillStyle = "rgba(168,160,140,0.45)";
   ctx.beginPath(); ctx.ellipse(x - 12, groundY - 2.4, 2.2, 1.2, 0.2, 0, Math.PI * 2); ctx.fill();
@@ -12281,35 +12599,57 @@ export function DrawPrologueCard(ctx, W, H, kind) {
 // 高度按真尺寸给（15cm 上下，PPM 48 ≈ 7px），宽度反倒要拉开——摊得越开越不显眼，
 // 这正是"分散消纳"这件事本身。
 // 颜色比表土深一档：深层黏土见了光就是这个色，也正因为深，撒进菜畦一眼就穿。
+// 垫在洼处的新土。**"新土"读得出来靠土坷垃，不靠一块深色**（2026-08-17 用户：
+// "泥土…根本就不像"）：刚倒下去的黏土耙得再匀也是一疙瘩一疙瘩的，每一块有受光
+// 的顶、有背光的肚子、还在旁边压一小片自己的影；表面一层晒干发白的碎末，
+// 底下压着的那一层还是湿的、比周围沉两档。老版是一条光滑的平色带子加七粒椭圆。
 export function DrawFreshDirt(ctx, x, groundY, w, id) {
   const W = w, H = 7;
   const top = [];
-  for (let i = 0; i <= 9; i += 1) {
-    const t = i / 9;
-    // 中间略厚两头收薄——是倒下去再耙开的形状，不是拍出来的棱堆
-    const swell = Math.sin(t * Math.PI) * H * 0.72;
-    top.push([x - W / 2 + W * t, groundY - swell + Sym(id + "t", i, 1.1)]);
+  for (let i = 0; i <= 16; i += 1) {
+    const t = i / 16;
+    // 上沿不是一条弧：一疙瘩一疙瘩堆着，所以是**锯齿状的**
+    const swell = Math.sin(t * Math.PI) * H * 0.66 + Math.abs(Math.sin(t * 11.7 + Hash(id + "s") * 6)) * H * 0.3;
+    top.push([x - W / 2 + W * t, groundY - swell + Sym(id + "t", i, 1.0)]);
   }
-  // 颜色按 sRGB 那条老账压两档：浅色摊在土地上等于没画（同 UpdateDirtPour 的土粒）
   InkFill(ctx, top.concat([[x + W / 2, groundY], [x - W / 2, groundY]]), id,
-    "#3d3021", { amp: 1.4, lw: 1.3, shade: "rgba(24,18,10,0.3)" });
-  // 没耙散的土疙瘩：新土的记号就在这儿——耙得再匀，黏土也会结块
-  for (let i = 0; i < 7; i += 1) {
-    const cx = x - W / 2 + 5 + Rnd(id + "c", i) * (W - 10);
-    const r = 1.4 + Rnd(id + "cr", i) * 1.6;
+    "#3d3021", { amp: 1.2, lw: 1.3, shade: "rgba(24,18,10,0.3)" });
+  // 湿的那一层：底下压着的还没干，比周围沉两档
+  ctx.save();
+  ctx.fillStyle = "rgba(22,16,9,0.42)";
+  ctx.beginPath();
+  ctx.ellipse(x, groundY - 0.6, W * 0.44, 2.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // 土坷垃：大小各不一样（一样大就是一串珠子），每块顶上受光、身下垫一线影
+  const n = Math.max(8, Math.round(W / 7));
+  for (let i = 0; i < n; i += 1) {
+    const cx = x - W / 2 + 4 + Rnd(id + "c", i) * (W - 8);
+    const cy = groundY - 1.2 - Rnd(id + "cy", i) * (H * 0.75);
+    const r = 1.6 + Rnd(id + "cr", i) ** 2 * 4.2;
     ctx.save();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = "#2e2417";
+    ctx.fillStyle = "rgba(16,11,6,0.34)";
     ctx.beginPath();
-    ctx.ellipse(cx, groundY - 1.4 - Rnd(id + "cy", i) * 3, r, r * 0.7, Rnd(id + "ca", i) * 2, 0, Math.PI * 2);
+    ctx.ellipse(cx + r * 0.4, cy + r * 0.5, r * 1.02, r * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = Rnd(id + "ck", i) > 0.5 ? "#4a3a26" : "#3a2d1d";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.72, Rnd(id + "ca", i) * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(196,172,128,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.26, cy - r * 0.3, r * 0.42, r * 0.24, -0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
-  // 耙痕：横着一道道，说明有人把它摊开过（不是倒完就走）
-  for (let i = 0; i < 3; i += 1) {
-    const ly = groundY - 1.6 - i * 1.8;
-    InkLine(ctx, x - W / 2 + 4, ly, x + W / 2 - 4, ly + Sym(id + "r", i, 1),
-      id + "rake" + i, { lw: 0.9, color: "rgba(40,31,20,0.34)", amp: 0.8 });
+  // 晒干的碎末：面上一层发白的细屑
+  Speckle(ctx, x - W / 2 + 3, groundY - H, W - 6, H, id + "dry",
+    { count: Math.round(W / 4), alpha: 0.34, size: 1.2, color: "#b39a6c" });
+  // 铁锹拍出来的面：一两道平的痕，说明有人把它摊开过（不是倒完就走）
+  for (let i = 0; i < 2; i += 1) {
+    const lx = x - W / 2 + W * (0.26 + i * 0.4);
+    InkLine(ctx, lx, groundY - 1.2, lx + W * 0.2, groundY - 2.6 + Sym(id + "r", i, 1),
+      id + "pat" + i, { lw: 1.1, color: "rgba(178,156,116,0.4)", amp: 0.6 });
   }
 }
 
@@ -12703,39 +13043,74 @@ export function DrawCharredBeam(ctx, ax, ay, id, { len = 72 } = {}) {
 
 // 草苫旁留着的那块整布（八稿 §9 末柱子放下的；§12 撕过之后 torn=true——
 // 少了一条，边上翻着毛口）。夜窖里只求读得出"叠着的蓝布"。
+// 草苫旁那块整布（蓝底白花，全章的暗线）。它是**叠起来的一摞**，不是一个团：
+// 叠布的特征全在两头——一头是折过来的**闭合折边**（圆的、一层压一层），
+// 另一头是散着的**布口**（一道道薄边错开）。老版是一个五边形加一条横线，
+// 读出来是块深色的砖（2026-08-17 用户："布料…根本就不像"）。
 export function DrawClothRest(ctx, ax, ay, id, { torn = false } = {}) {
   const w = torn ? 15 : 18, h = torn ? 6.5 : 8;
-  InkFill(ctx, [[ax - w, ay - 1], [ax + w * 0.9, ay - 1.6], [ax + w, ay - h],
-    [ax + w * 0.5, ay - h - 1.6], [ax - w * 0.8, ay - h + 0.6]],
-  id + "pile" + (torn ? "T" : ""), "#232b37",
-  { amp: 1.1, lw: 1.6, shade: "rgba(0,0,0,0.3)" });
-  // 叠层的口：两道浅线
-  InkLine(ctx, ax - w * 0.8, ay - h * 0.55, ax + w * 0.85, ay - h * 0.62, id + "fold1",
-    { lw: 0.9, color: "rgba(110,122,140,0.4)", amp: 0.8 });
-  // 撕过：东侧翻起一片毛口，几根线头
+  const LAY = 3;
+  const face = "#2b3444", faceLit = "#3b4658", edge = "rgba(120,134,156,0.55)";
+  ctx.save();
+  for (let L = LAY - 1; L >= 0; L -= 1) {
+    const t = L / (LAY - 1 || 1);
+    const yTop = ay - 1 - (h - 1) * (L + 1) / LAY;
+    const yBot = ay - 1 - (h - 1) * L / LAY;
+    const left = ax - w + t * 1.6, right = ax + w - t * 2.4;
+    ctx.beginPath();
+    // 西头：折回来的闭合边（圆的）
+    ctx.moveTo(left + 3, yBot);
+    ctx.quadraticCurveTo(left - 2.2, (yTop + yBot) / 2, left + 3, yTop);
+    // 上沿略鼓：布是软的
+    ctx.quadraticCurveTo(ax, yTop - 1.1, right - 1, yTop + 0.4);
+    // 东头：散着的布口，一层比一层短
+    ctx.lineTo(right + 1.2, yTop + 1.4);
+    ctx.lineTo(right - 0.6, yBot);
+    ctx.closePath();
+    ctx.fillStyle = L === LAY - 1 ? faceLit : face;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(16,20,28,0.7)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // 每一层底下压一线暗：层与层之间要分得开
+    ctx.strokeStyle = "rgba(8,10,16,0.5)";
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(left + 3, yBot - 0.4);
+    ctx.quadraticCurveTo(ax, yBot - 1.1, right - 0.8, yBot - 0.4);
+    ctx.stroke();
+  }
+  // 顶上那一层的软褶：折过的布放平了也回不去
+  ClothFold(ctx, ax - w * 0.5, ay - h + 1.4, ax + w * 0.45, ay - h + 2.2, 2.0,
+    { bow: -1.4, dark: "rgba(6,9,16,0.45)", lit: "rgba(150,166,190,0.30)" });
+  // 白花：印花是**一朵一朵**的（五瓣小花），不是三个圆点
+  ctx.fillStyle = "rgba(198,208,222,0.6)";
+  for (let i = 0; i < 5; i += 1) {
+    const fx = ax - w * 0.62 + i * w * 0.32;
+    const fy = ay - h * (0.35 + (i % 2) * 0.42) - 0.5;
+    for (let p = 0; p < 5; p += 1) {
+      const a = (p / 5) * Math.PI * 2 + Hash(id + "fa" + i);
+      ctx.beginPath();
+      ctx.ellipse(fx + Math.cos(a) * 1.1, fy + Math.sin(a) * 0.8, 0.75, 0.6, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+  // 撕过：东侧翻起一片毛口，几根经纬线头
   if (torn) {
     InkFill(ctx, [[ax + w * 0.55, ay - h - 1], [ax + w, ay - h], [ax + w * 0.9, ay - h + 2.4],
-      [ax + w * 0.5, ay - h + 1.6]], id + "rag", "#2e3644", { amp: 1.2, lw: 1.1 });
+      [ax + w * 0.5, ay - h + 1.6]], id + "rag", "#374254", { amp: 1.2, lw: 1.1 });
     ctx.save();
-    ctx.strokeStyle = "rgba(140,150,166,0.55)";
+    ctx.strokeStyle = "rgba(170,182,200,0.7)";
     ctx.lineWidth = 0.6;
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       ctx.beginPath();
-      ctx.moveTo(ax + w * (0.6 + i * 0.14), ay - h + 0.6);
-      ctx.lineTo(ax + w * (0.64 + i * 0.14), ay - h - 1.8);
+      ctx.moveTo(ax + w * (0.58 + i * 0.12), ay - h + 0.6);
+      ctx.lineTo(ax + w * (0.62 + i * 0.12) + Sym(id + "tx", i, 1.4), ay - h - 1.6 - Hash(id + "tl" + i) * 2);
       ctx.stroke();
     }
     ctx.restore();
   }
-  // 白花两三点
-  ctx.save();
-  ctx.fillStyle = "rgba(150,158,172,0.35)";
-  for (let i = 0; i < 3; i += 1) {
-    ctx.beginPath();
-    ctx.arc(ax - w * 0.5 + i * w * 0.45, ay - h * 0.45 - (i % 2) * 2, 1.1, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
 }
 
 // 灶火与热气（World 的 stoveFire 小画布每帧调）。cx=灶口中线，gy=画布地线。

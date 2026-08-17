@@ -22,7 +22,7 @@ import {
 import { PPM, SS, SpriteOf, CoverBandOf } from "./Data_Scenes.mjs";
 // 无状态的画笔/烘焙/绘制序工具（2026-08-15 从 CreateWorld 闭包抽出）——见该文件头
 import {
-  AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees,
+  AddBandEdge, AddCover, AddGroundBand, AddGroundPlane, AddGroundShadow, AddParallaxTrees, AddRoadPlane,
   AddRidgeBand, AddStrip, BakeSprite, CanvasTexture, Darken, DepthOrder, FixOrder, LAYER_ORDER,
   MakeCanvas, MakeCastShadow, MakeFlatShadow, ORDER_DARK, ORDER_GLOW, ORDER_INSERT,
   PlaceSprite, PlaceSpriteFlip, SUN, ScaleKeepGround, SetLayerOrder, SetPlayOrder,
@@ -1349,15 +1349,23 @@ export function CreateWorld(canvasEl) {
           const r = ART.Hash(sceneKey + "tuft" + Math.round(px));
           const base = gy + Wob(px);
           if (r > 0.42) {
-            ctx.strokeStyle = r > 0.72 ? grass : (night ? "rgba(120,104,72,0.7)" : "rgba(168,148,102,0.75)");
-            ctx.lineWidth = 1.6;
-            for (let b = 0; b < 3; b += 1) {
-              const bx = px + (b - 1) * 2.4;
+            // 一片草是**尖的**：根粗梢细、还得往一边披。老版是三根等宽的直线段，
+            // 这块贴图在画面上要放大四五倍——上屏读出来是一排绿色小方块
+            //（2026-08-17 用户："你画的很多东西我都看不出来到底是什么"）
+            ctx.fillStyle = r > 0.72 ? grass : (night ? "rgba(120,104,72,0.8)" : "rgba(150,128,84,0.85)");
+            for (let b = 0; b < 4; b += 1) {
+              const bx = px + (b - 1.5) * 2.2;
+              const hgt = 4 + ART.Hash(sceneKey + "th" + px + b) * 8;
+              const lean = (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 1.5;
+              const wRoot = 1.5 + ART.Hash(sceneKey + "tw" + px + b) * 0.9;
               ctx.beginPath();
-              ctx.moveTo(bx, base + 1);
-              ctx.lineTo(bx + (ART.Hash(sceneKey + "tb" + px + b) - 0.5) * 6,
-                base - 3 - ART.Hash(sceneKey + "th" + px + b) * 7);
-              ctx.stroke();
+              ctx.moveTo(bx - wRoot / 2, base + 1);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.3, base - hgt * 0.55,
+                bx + lean * hgt, base - hgt);
+              ctx.quadraticCurveTo(bx + lean * hgt * 0.18, base - hgt * 0.45,
+                bx + wRoot / 2, base + 1);
+              ctx.closePath();
+              ctx.fill();
             }
           } else if (r < 0.14) {
             // 翻出来的土坷垃：压在沿上，一半在线上一半在线下
@@ -2108,6 +2116,10 @@ export function CreateWorld(canvasEl) {
 
     // 真正的地面（躺平的几何，向地平线收敛）
     AddGroundPlane(layers.play, L, ch.light, ch.scene + "gp");
+    // 街面：只管镜头跟前那七米，贴图密度是大地面的三十倍（大地面一张贴图要摊
+    // 410 米宽，横着只有 3.4 像素/米——车辙画出来是两米四宽的一条色带）。
+    // 地下场景不用：那儿的"地"是地道底
+    if (!sceneDef.underOnly) AddRoadPlane(layers.play, L, ch.light, ch.scene + "road");
     // 第八章：院子一带留下焦土
     if (state.flags.ruined) {
       for (const bx of [30, 62, 92]) {

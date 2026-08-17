@@ -88,6 +88,11 @@ export const SCENES = SCENE_DATA.scenes;
 for (const [key, scene] of Object.entries(SCENES)) {
   for (const p of scene.props || []) {
     if (!PROP_ART[p.kind]) throw new Error(`场景 ${key} 的 ${p.id} 用了没登记的 kind "${p.kind}"（补进 Data_PropArt.json 的 props）`);
+    // 逐件的深度带覆盖：同一种东西，摆在墙根跟摆在路当中不是一档深度
+    //（石子堆在路边等着垫路、垫洼的新土就摊在车辙里）。仍然只许从 BAND 表里挑
+    if (p.band !== undefined && BAND[p.band] === undefined) {
+      throw new Error(`场景 ${key} 的 ${p.id} 的 band = "${p.band}" 不在 Data_DepthSpec 的 BAND 表里`);
+    }
   }
   for (const c of scene.covers || []) {
     if (!COVER_ART[c.kind]) throw new Error(`场景 ${key} 的掩体 ${c.id} 用了没登记的 kind "${c.kind}"（补进 Data_PropArt.json 的 covers）`);
@@ -180,7 +185,9 @@ export function SpriteOf(kind, obj = {}, { cover = false } = {}) {
     ax: s.anchor === "center" ? w / 2 : s.anchor,
     ay: h - s.baseline,          // 脚踩地平线：底边往上数 baseline 像素
     ss: SS[spec.ss] ?? SS.prop,
-    z: spec.band !== undefined ? BAND[spec.band] : undefined,
+    // 逐件的 band 覆盖优先于这一类的默认（加载期已校验过在表里）
+    z: obj.band !== undefined ? BAND[obj.band]
+      : (spec.band !== undefined ? BAND[spec.band] : undefined),
     yOffset: spec.yOffset || 0,
     placeAt: spec.placeAt || "center",
     shadow: spec.shadow,
