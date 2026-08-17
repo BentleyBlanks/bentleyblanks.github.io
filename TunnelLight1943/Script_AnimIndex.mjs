@@ -22,10 +22,10 @@ export const ANIM_FILES = {
     "Data_ScriptC8.mjs", "Script_World.js"],
 };
 
-// 轨道/姿势里会出现的 17 个字段（Rig 的 TRACK_FIELDS 同一张表；2026-08-18 加了脖子与两只手腕）
-export const RIG_FIELDS = ["hipY", "hipX", "torso", "head", "neck", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "handB", "armF", "foreF", "handF"];
+// 轨道/姿势里会出现的 18 个字段（Rig 的 TRACK_FIELDS 同一张表；2026-08-18 加了脖子、两只手腕与胸）
+export const RIG_FIELDS = ["hipY", "hipX", "torso", "chest", "head", "neck", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "handB", "armF", "foreF", "handF"];
 export const RIG_FIELD_LABEL = {
-  hipY: "胯高", hipX: "胯前后", torso: "躯干", head: "头", neck: "脖子（探）",
+  hipY: "胯高", hipX: "胯前后", torso: "腰", chest: "胸（再折）", head: "头", neck: "脖子（探）",
   thighB: "后大腿", shinB: "后小腿", footB: "后脚", thighF: "前大腿", shinF: "前小腿", footF: "前脚",
   armB: "后上臂", foreB: "后前臂", handB: "后手", armF: "前上臂", foreF: "前前臂", handF: "前手",
 };
