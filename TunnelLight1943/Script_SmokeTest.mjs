@@ -306,9 +306,11 @@ function TestVision() {
 // 另一侧照过来的光——兵绕过去，你就得跟着绕。
 function TestCoverIsDirectional() {
   const scene = SCENES.village;
-  const hay = scene.covers.find((c) => c.id === "hayB");     // 高掩体：草垛 x=68
-  const wood = scene.covers.find((c) => c.id === "woodB");   // 矮掩体：柴堆 x=78
-  assert.ok(hay?.tall && !wood?.tall, "断言依赖 hayB 是高掩体、woodB 是矮掩体");
+  const hay = scene.covers.find((c) => c.id === "hayB");        // 高掩体：草垛 x=68
+  // 矮掩体：院门边那垛柴 x=44.5（2026-08-18 换的——原来点的是 woodB，
+  // 村东剪到 72 之后 78 那垛柴跟着删了）
+  const wood = scene.covers.find((c) => c.id === "firewood");
+  assert.ok(hay?.tall && !wood?.tall, "断言依赖 hayB 是高掩体、firewood 是矮掩体");
 
   // 站位按掩体自己的宽度算，别写死坐标：草垛收窄过一次（3.2→2.6m），
   // 写死的 70.2 当场落到掩体范围外，测试红了却跟"正反面"这条规矩毫无关系
@@ -727,9 +729,11 @@ function TestVaultC1() {
   const list = ChapterBeatList(0);
   // 新版第一章不教学翻越（关卡设计文档）：巷口那堵塌墙留给第二章正式复用，
   // 这里只借 c1_well 的自由活动验"翻越机制本身没坏"
+  // 2026-08-18 那堵墙从 84 挪到 62.6（村东剪到 72，84 连走都走不到了），
+  // 起讫点跟着挪进新的行走范围 [6.2, 72]
   const cases = [
-    { beat: "c1_well", from: 79, to: 92, top: 0.82, label: "塌进巷子的院墙（东行）" },
-    { beat: "c1_well", from: 92, to: 79, top: 0.82, label: "塌进巷子的院墙（西行）" },
+    { beat: "c1_well", from: 58.5, to: 67, top: 0.82, label: "塌进巷子的院墙（东行）" },
+    { beat: "c1_well", from: 67, to: 58.5, top: 0.82, label: "塌进巷子的院墙（西行）" },
   ];
   for (const c of cases) {
     const state = CreateGame(0);
@@ -808,17 +812,20 @@ function TestVaultC1() {
       `翻越上限 ${VAULT_MAX_TOP} 偏离了基准（第一章那堵塌墙 0.82m）`);
   }
 
-  // 摆位铁律：跑腿路线（院子 31~70：水桶、木料、独轮车都在这一段）上
+  // 摆位铁律：跑腿路线（院子 31 到井台 60：水桶、木料、独轮车都在这一段）上
   // 一块可翻越物都不许有。玩家的原话是"提着水桶扛着木头的途中居然要翻越"。
   // 带旗标的不算——倒塌的柴垛只在扫荡开始后才存在，那会儿家务早结束了，
   // 手里空着；反过来说，**它也必须带着旗标**，否则就压在打水那条路上。
+  // 东端 2026-08-18 从 70 收到 60：能走的街收到 72，主线最东就是井台(58，
+  // 区域到 60.5)，井台以东那截巷子上没有一趟是拿着东西走的。
+  const ERRAND_E = 60;
   {
     const always = SCENES.village.vaults.filter((v) => !v.flag);
-    const errand = always.filter((v) => v.x > 30 && v.x < 72);
+    const errand = always.filter((v) => v.x > 30 && v.x < ERRAND_E);
     assert.equal(errand.length, 0,
       `跑腿路线上不该有常驻的可翻越物，却有 ${errand.map((v) => v.x).join(",")}`);
     for (const v of SCENES.village.vaults) {
-      if (v.x > 30 && v.x < 72) {
+      if (v.x > 30 && v.x < ERRAND_E) {
         assert.equal(v.flag, "raidStarted", `院子里的可翻越物 ${v.x} 必须只在扫荡后出现`);
       }
     }
@@ -828,7 +835,7 @@ function TestVaultC1() {
   {
     const state = CreateGame(0);
     DebugJump(state, 0, list.findIndex((b) => b.id === "c1_well"));
-    state.player.x = 79;
+    state.player.x = 58.5;
     state.player.item = { id: "plankA", label: "木料", big: true };
     let heavy = false, dur = 0;
     for (let i = 0; i < 900; i += 1) {
@@ -836,7 +843,7 @@ function TestVaultC1() {
       state.cues.length = 0;
       if (state.player.pose === "clamber") heavy = true;
       if (state.player.vaultT > 0) dur = Math.max(dur, state.player.vaultDur);
-      if (state.player.x >= 92) break;
+      if (state.player.x >= 67) break;
     }
     assert.ok(heavy, "扛着木料翻越必须走 clamber 那一档");
     assert.ok(dur > 0.9, "扛着东西翻越必须更慢");
@@ -847,8 +854,8 @@ function TestVaultC1() {
     const state = CreateGame(0);
     DebugJump(state, 0, list.findIndex((b) => b.id === "c1_well"));
     state.player.item = null;
-    state.cart = { x: 84.4, kind: "barrow" };
-    state.player.x = 82.6;
+    state.cart = { x: 63.0, kind: "barrow" };
+    state.player.x = 61.2;
     let vaulted = false;
     for (let i = 0; i < 120; i += 1) {
       StepGame(state, { ...NONE, moveX: 1, interact: true }, 1 / 60);
@@ -914,11 +921,13 @@ function TestChainSurvivesEarlyDrop() {
   // 「搁桶查井绳」是第一步。结算会把手清空（SettleBeat 链尾的规矩），
   // 桶手动塞回来再撂在半路。
   // pickedT 给个负数：CanFreeDrop 的拾取保护窗（0.35s）别把这只手动塞的桶拦下。
-  // 撂桶点选 96：躲开收藏品的拾取圈（140.6 有一枚石雷拉火管，会抢 E）
+  // 撂桶点选 42：井台区域(55.5~60.5)之外＝真的"半路"，又躲开收藏品/看点/
+  // 翻越物的拾取圈（它们都会抢 E）。2026-08-18 从 96 挪来——村里能走的街
+  // 收到 [6.2, 72]，96 会被行走范围一把夹到东界上，正好夹进弹壳哨子的圈里
   const sis = state2.actors.find((a) => a.id === "sister");
   if (sis) { sis.following = false; sis.cineTarget = null; sis.x = 57.2; }
   state2.player.item = { id: "bucket", label: "挂着布兜的空桶", big: true, pickedT: -1 };
-  state2.player.x = 96.0; state2.player.level = "surface";
+  state2.player.x = 42.0; state2.player.level = "surface";
   step2({}, 30); step2({ interact: true }); step2({}, 2);
   assert.equal(state2.player.item, null, "半路应该放得下");
   const dropped = state2.groundItems.find((it) => it.id === "bucket");

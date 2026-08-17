@@ -29,17 +29,18 @@ export function ChapterC2(K) {
         { stage: "谷雨过了。门框上的正字，添到了第十三道。", d: 3.6,
           cam: { kind: "insert", x: 33.62, y: 0.76, dist: 0.95 },
           on: (state) => { state.beat.indoorScene = true; state.doorLeaf = null; } },
-        // 村东头＝新的村界（2026-08-18 村庄从 190 米剪到 120 米，村东那片
-        // 从来走不到、也只在这两镜里露过脸的空场整个删了）。这两个 cam.x
-        // 跟着 RAID_LEAD_X 走：队头 82、日军三排 104~112
+        // 村东口＝新的村界（2026-08-18 第二趟：能走的街收到 [6.2, 72]，
+        // 72 以东的房子院墙草垛全删了，那头是出村的路与庄稼地）。
+        // 第一镜框村东口那条空路——惊起乌鸦的东西还没进画；
+        // 第二镜跟着 RAID_LEAD_X 走：队头 78、日军三排 100~108
         { stage: "这天晌午，村东头的乌鸦轰的一声全飞起来了。", d: 3.2,
-          cam: { kind: "shot", x: 108, y: 2.2, dist: 9 },
+          cam: { kind: "shot", x: 76, y: 2.2, dist: 9 },
           on: (state) => {
             Cue(state, "flutter", { gain: 0.9 });
             Cue(state, "flutter", { gain: 0.7, delay: 0.7 });
           } },
         { stage: "鬼子又进村了。这一回是梳篦式的——一条街一条街，一户不落。", d: 5.0,
-          cam: { kind: "shot", x: 110, y: 1.8, dist: 10, pan: -8 },
+          cam: { kind: "shot", x: 104, y: 1.8, dist: 10, pan: -8 },
           on: (state) => {
             SpawnRaidSoldiers(state);
             // 点户的伪保长又打头来了——梳篦扫荡照册子篦，名册还在他手上

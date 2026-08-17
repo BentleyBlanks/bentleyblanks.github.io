@@ -4378,14 +4378,14 @@ function BuildRaidOrder() {
   return out;
 }
 const RAID_ORDER = BuildRaidOrder();
-// 队头（自行车）入场时的位置＝已经进了村东口。**这就是真正的入场坐标**
-// （2026-08-18）：老版写 148，然后 c2 再 `a.x -= 46` 挪一次——两处各写一半，
-// 而 148 那个数是村庄还有 190 米长时留下的。现在村东那六十多米剪掉了
-// （见 Data_Scenes 的 village.length），队伍直接从这儿进村：
-// 队头 82、队尾（raid2）117.2，整队 35.2 米；两个过场镜头（c2_open 的
-// 「乌鸦飞起来」与「梳篦式的」）框的是队伍中后段的日军那三排（104~112）。
-// 改这个数就要跟着看 c2_open 那两个 cam.x —— 它们框的就是这支队伍。
-const RAID_LEAD_X = 82;
+// 队头（自行车）入场时的位置＝**还在村外那条路上**，正往村东口压过来。
+// （2026-08-18 第二趟：村里能走的街收到 [6.2, 72]，72 以东的房子院墙草垛全删了，
+// 那四十多米从此是村外的路与庄稼地——队伍不再是"已经进了村"，而是"正从村外
+// 开进来"，这也更像那年冀中的样子：无险可守的平原，人是顺着大路来的。）
+// 队头 78、队尾（raid2）113.2，整队 35.2 米；两个过场镜头（c2_open 的
+// 「乌鸦飞起来」与「梳篦式的」）一个框村东口那条空路、一个框队伍中后段的
+// 日军那三排（100~108）。改这个数就要跟着看 c2_open 那两个 cam.x。
+const RAID_LEAD_X = 78;
 const RAID_START_X = (() => {
   const m = new Map();
   let x = RAID_LEAD_X;
@@ -4659,10 +4659,12 @@ function StartRescueLoop(state) {
 
 function SetupRuinedVillage(state) {
   state.flags.ruined = true;
-  state.player.x = 105;
+  // 从村东口那头进村（2026-08-18：能走的街收到 [6.2, 72]，老版写的 105 已经在
+  // 墙外头了——会被 MovePlayer 的行走范围一把夹回 72，第一帧就瞬移）
+  state.player.x = 69;
   state.player.level = "surface";
   let sister = FindActor(state, "sister");
-  if (!sister) { sister = MakeActor("sister", "sister", 107, { label: "妹妹" }); state.actors.push(sister); }
+  if (!sister) { sister = MakeActor("sister", "sister", 70.5, { label: "妹妹" }); state.actors.push(sister); }
   sister.visible = true; sister.following = true; sister.level = "surface";
   sister.x = state.player.x + 1.5;
   state.actors = state.actors.filter((a) => !IsEnemy(a) && a.kind !== "villager");
