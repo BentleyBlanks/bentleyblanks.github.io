@@ -638,56 +638,145 @@ export function AddGroundPlane(group, length, light, id) {
 // 原来 amp 给到 40/26，画出来是两道山梁——地理错了，故事也就跟着不成立。
 // hazeTint：雾色。它在 World 里是随昼夜重烘变的（let hazeColor），所以走参数
 // 递进来，画笔不偷读闭包——漏传就是默认的日间雾色，夜里会发灰，别漏。
-export function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, haze = 0.4, rows = 0, hazeTint = "#e2d8bc" } = {}) {
+export const RIDGE_XS = 2.9;      // 这张贴图上屏时横向被拉这么多（见下面那条硬账）
+export function AddRidgeBand(group, length, color, id, { amp = 5, base = 34, blur = 2.2, lift = 0.6, haze = 0.4, rows = 0, hazeTint = "#e2d8bc", edge = 0 } = {}) {
   const worldW = length * 0.5 + 90;
   const wPx = Math.ceil(worldW * PPM * 0.34);
   const hPx = 180;
+  const XS = RIDGE_XS;
   const mesh = BakeSprite(wPx, hPx, 0, hPx, (ctx) => {
+    const SkyY = (px) => hPx - base
+      - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, hPx);
     for (let px = 0; px <= wPx; px += 22) {
       // 平原的地平线不是一把尺子：留一点极缓的起伏（田块与土路的高差）
-      const y = hPx - base - Math.sin(px * 0.006 + ART.Hash(id) * 6) * amp - Math.sin(px * 0.017) * (amp * 0.5);
-      ctx.lineTo(px, y);
+      ctx.lineTo(px, SkyY(px));
     }
     ctx.lineTo(wPx, hPx);
     ctx.closePath();
     ctx.fill();
+
     // 平原的纵深全靠地平线上那一排小东西：防风林的树行、几户人家的屋脊。
-    // 跟带子同色同一张贴图里画完，不额外增加网格
-    // 比带子本身深一档：同色画上去等于没画（用户："背景里有一些山看不清"）
-    ctx.fillStyle = Darken(color, 0.82);
+    // 跟带子同色同一张贴图里画完，不额外增加网格。
+    //
+    // **这张贴图横向被拉 2.9 倍**（下面 `ScaleKeepGround(mesh, 2.9, 1)`，只拉 x
+    // 不拉 y）——2026-08-18 用户："优化一下远景 这也太奇怪了 一点层次没有不说
+    // 还根本不像远景层"。病根就在这儿：老版直接在贴图坐标系里画圆冠、画屋脊，
+    // 上屏一律被横着抻成 2.9 倍，再叠上 2~3px 的糊，**每一样东西都成了一摊
+    // 横躺的污渍**——看着像镜头脏了，不像地平线上有东西。
+    // 治法：整组内容先 `scale(1/XS, 1)`，里头一律按**世界像素**（48px/米）画，
+    // 出来的比例才是对的。新加内容一律进这个坐标系。
+    // **剪影要压得动**：跟带子只差两成的深浅，糊完等于没画（老账"背景里有一些山
+    // 看不清"就是这么来的）。压到 0.62，糊 2.4 之后仍读得出是一趟树、一片房
+    ctx.fillStyle = Darken(color, 0.62);
     for (let i = 0; i < rows; i += 1) {
-      const px = (i + 0.5) * (wPx / rows) + ART.Hash(id + "r" + i) * 60 - 30;
-      const top = hPx - base - 2;
-      if (ART.Hash(id + "k" + i) > 0.45) {
-        // 树行：几团挨着的圆冠，一带就是一道防风林
-        const n = 3 + Math.floor(ART.Hash(id + "n" + i) * 4);
-        for (let t = 0; t < n; t += 1) {
-          const tx = px + t * 9 - n * 4.5;
-          const r = 4.5 + ART.Hash(id + "t" + i + t) * 3;
-          ctx.beginPath();
-          ctx.ellipse(tx, top - r * 0.5, r, r * 0.9, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else {
-        // 远处的一户：矮墙 + 一道屋脊
-        const w2 = 14 + ART.Hash(id + "w" + i) * 12;
-        ctx.fillRect(px - w2 / 2, top - 7, w2, 8);
+      const px = (i + 0.5) * (wPx / rows) + (ART.Hash(id + "r" + i) - 0.5) * (wPx / rows) * 0.8;
+      const top = SkyY(px) + 1;
+      const kind = ART.Hash(id + "k" + i);
+      ctx.save();
+      ctx.translate(px, top);
+      ctx.scale(1 / XS, 1);                 // ← 从这儿起是世界像素
+      if (kind > 0.42) {
+        // **防风林是一"道"，不是几个点。** 冀中的村子和田块四周种着一趟趟杨树、
+        // 柳树挡风沙；地平线上读到的是一条**高低不齐、连成一片**的深色带子，
+        // 中间偶尔窜出一棵高的。老版三四个分开的小圆冠，糊完只剩三四个点。
+        const runW = 90 + ART.Hash(id + "rw" + i) * 150;
+        const n = Math.max(5, Math.round(runW / 13));
+        const hBase = 11 + ART.Hash(id + "rh" + i) * 7;
         ctx.beginPath();
-        ctx.moveTo(px - w2 / 2 - 3, top - 7);
-        ctx.lineTo(px, top - 13);
-        ctx.lineTo(px + w2 / 2 + 3, top - 7);
+        ctx.moveTo(-runW / 2, 2);
+        for (let t = 0; t <= n; t += 1) {
+          const u = t / n;
+          const tx = -runW / 2 + runW * u;
+          // 两头矮、中间高，再叠一层各自的抖——一趟树的轮廓
+          const taper = 0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, Math.max(0, u)));
+          const th = hBase * taper * (0.72 + ART.Hash(id + "tt" + i + "_" + t) * 0.62);
+          ctx.lineTo(tx, -th);
+        }
+        ctx.lineTo(runW / 2, 2);
         ctx.closePath();
         ctx.fill();
+        // 窜出来的那一两棵：树行不是一道平顶的墙
+        for (let t = 0; t < 2; t += 1) {
+          if (ART.Hash(id + "tall" + i + t) < 0.45) continue;
+          const tx = (ART.Hash(id + "tx" + i + t) - 0.5) * runW * 0.8;
+          const th = hBase * (1.25 + ART.Hash(id + "th" + i + t) * 0.5);
+          const rr = 3.4 + ART.Hash(id + "tr" + i + t) * 2.2;
+          ctx.beginPath();
+          ctx.ellipse(tx, -th, rr, rr * 1.15, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(tx - 0.8, -th, 1.6, th);
+        }
+      } else {
+        // 远处的一个村子：**一簇高低错落的屋脊**（泥平顶，没有尖山墙），
+        // 两头各压一小片树。单独一栋读不出"村"，也读不出"远"
+        const n = 3 + Math.floor(ART.Hash(id + "hn" + i) * 4);
+        const unit = 20 + ART.Hash(id + "hu" + i) * 10;
+        for (let t = 0; t < n; t += 1) {
+          const w2 = unit * (0.7 + ART.Hash(id + "hw" + i + t) * 0.6);
+          const h2 = 8 + ART.Hash(id + "hh" + i + t) * 6;
+          const hx = (t - (n - 1) / 2) * unit * 0.92 + (ART.Hash(id + "ho" + i + t) - 0.5) * 6;
+          ctx.beginPath();
+          ctx.moveTo(hx - w2 / 2, 2);
+          ctx.lineTo(hx - w2 / 2, -h2);
+          ctx.lineTo(hx - w2 * 0.3, -h2 - 2.4);      // 泥平顶：出檐一点，微微起脊
+          ctx.lineTo(hx + w2 * 0.3, -h2 - 2.2);
+          ctx.lineTo(hx + w2 / 2, -h2 + 0.6);
+          ctx.lineTo(hx + w2 / 2, 2);
+          ctx.closePath();
+          ctx.fill();
+        }
+        for (const sgn of [-1, 1]) {
+          const tx = sgn * (n * unit * 0.5 + 6);
+          const rr = 5 + ART.Hash(id + "vt" + i + sgn) * 3;
+          ctx.beginPath();
+          ctx.ellipse(tx, -rr * 1.5, rr, rr * 1.25, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
+      ctx.restore();
     }
+
+    // **地平线要有一条线。** 平原上天与地交界处永远读得到一道细边（地比天沉、
+    // 又被地面的浮尘托着）。缺了它，天和地就是两块渐变糊在一起——用户说的
+    // "根本不像远景层"，一半是这条线没有。只给最近那条带子（edge>0）。
+    if (edge > 0) {
+      ctx.strokeStyle = Darken(color, 0.72);
+      ctx.globalAlpha = edge;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (let px = 0; px <= wPx; px += 14) {
+        const y = SkyY(px);
+        if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // **带子的下缘要化开。** 这是一块实心的立牌，下缘原来是画布底那条硬边——
+    // 它比自己前面那层的地平线高（ridge 的底在 1.6m、hills 在 0.7m），所以
+    // 上屏就是横贯全画面的一道直线。老版靠满屏的浓雾糊住了它；雾一收（2026-08-18）
+    // 它立刻现形，比"没有层次"更糟。现在下缘用 destination-out 淡出，
+    // 谁在前面它就融进谁。
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    // 必须**在画布底之前就擦干净**：擦到底才刚好归零的话，最后几行还剩一两成
+    // 浓度，上屏就是一条淡淡的直线（实拍把这层染红才看见的）
+    const fade = ctx.createLinearGradient(0, hPx - 42, 0, hPx - 8);
+    fade.addColorStop(0, "rgba(0,0,0,0)");
+    fade.addColorStop(0.55, "rgba(0,0,0,0.5)");
+    fade.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, hPx - 42, wPx, 42);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, hPx - 8, wPx, 8);
+    ctx.restore();
     // 平原的地平线本来就淡，再叠一层半透明就整个化进天里读不出来了——
     // 这两条带子也一律实心，退感只由染色量给（用户："背景里有一些山看不清"）
   }, blur, 1, { color: hazeTint, amount: haze });
   PlaceSprite(mesh, -30, SURFACE_Y + lift, 0);
-  ScaleKeepGround(mesh, 2.9, 1);
+  ScaleKeepGround(mesh, XS, 1);
   group.add(mesh);
 }
 
