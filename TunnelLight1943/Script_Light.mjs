@@ -258,6 +258,10 @@ uniform vec3 uBounceColor; // 反射回来的：在土地上滚过一道，暖�
 // 四个"看着调"的量（world.__shaftLight() 拿得到，浏览器里现调现看）
 uniform vec4 uWash;        // x=面光强度 y=洞口处半宽 z=每米张开 w=沿程衰减
 uniform vec3 uHead;        // x=洞口过曝 y=细光柱强度 z=细光柱沿程衰减
+uniform sampler2D uBlockTex;  // 演员剪影靶（宿主每帧单渲一遍，见 MaskAt）
+uniform mat4 uBlockVP;        // 渲那张靶用的相机矩阵：世界 → 靶上的 uv
+uniform float uBlockZ;        // 演员所在的那一档 z（投影要用）
+uniform float uBlockOn;       // 靶备好没有；没有就退回方盒子
 uniform int uBlockerCount;
 uniform vec4 uBlockers[${MAX_BLOCKERS}];
 varying vec2 vWorld;
@@ -302,6 +306,21 @@ float Hash21(vec2 p) {
   return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
 }
 
+// 人体挡光**照真剪影**（2026-08-18 用户："你角色过去怎么遮挡的形状是个方块
+// 而不是角色的边缘啊"）。方盒子那一版（BlockedSeg，留在下面当兜底）的形状是
+// 半宽 0.20m 的躯干柱，所以人一进光柱，画面上断掉的是一个方块。
+// 现在宿主每帧把演员**单独渲进一张小离屏靶**（Script_World 的 BLOCK_LAYER），
+// 这儿沿光线采它的 alpha——头发、袖子、抱在怀里的孩子，什么形状挡出来就是
+// 什么形状。累加而不是 min/break：随深度连续，不会再起横杠。
+// **要多走一米**：光源是地表那条板缝，踩在板上的人身子整个在原点上头，
+// 只走到原点就一根头发也采不到（方盒子那版靠"线段到盒的距离"才蒙对）
+float MaskAt(vec2 w) {
+  vec4 c = uBlockVP * vec4(w, uBlockZ, 1.0);
+  vec2 uv = (c.xy / c.w) * 0.5 + 0.5;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
+  return texture2D(uBlockTex, uv).a;
+}
+
 // 软透射：从 p 沿 dir 走 len 米，问这一路吃了多少土。
 // **一律走这条，不许再用"撞到实心就归零 break"**——面光铺满整间窖，硬阈值
 // 会把掩码那些 6 像素/米的轴对齐方盒子的直边整条画在墙上（实拍抓到过两回）。
@@ -310,6 +329,15 @@ float Transmit(vec2 p, vec2 dir, float len, float k) {
   float acc = 0.0;
   for (int i = 1; i <= 12; i++) acc += SolidAt(p + dir * (len * float(i) / 13.0));
   return exp(-acc * k);
+}
+
+// 挡多少：有剪影靶就照剪影，没有（还没渲出第一帧）退回方盒子
+float Blocked(vec2 p0, vec2 dir, float len) {
+  if (uBlockOn < 0.5) return BlockedSeg(p0, dir, len);
+  float total = len + 1.0;
+  float acc = 0.0;
+  for (int i = 1; i <= 14; i++) acc += MaskAt(p0 + dir * (total * float(i) / 15.0));
+  return 1.0 - exp(-acc * 0.62);
 }
 
 void main() {
@@ -404,7 +432,7 @@ void main() {
   float selfSolid = SolidAt(vWorld);
   // 着色点自己就在土里：留一点点受光感，不然洞壁没有被照到的样子
   float airLit = Transmit(vWorld, -uDir, dist, 1.45)
-    * (1.0 - BlockedSeg(vWorld, -uDir, dist) * 0.94)
+    * (1.0 - Blocked(vWorld, -uDir, dist) * 0.94)
     * mix(1.0, 0.30, selfSolid);
 
   // 落地那摊亮斑的遮挡要**在光轴上算一次**，不许逐片元竖着回溯。
@@ -417,7 +445,7 @@ void main() {
     // 人挡在光轴上时这摊亮斑跟着灭——但要**灭得像影子挪过去**，不是整摊一起
     // 跳闸：poolSrc 全屏只有三个点，逐点采样的话兵一跨进那格，整摊光当场消失
     poolLit = Transmit(poolSrc, -uDir, L2, 1.45)
-      * (1.0 - BlockedSeg(poolSrc, -uDir, L2) * 0.94);
+      * (1.0 - Blocked(poolSrc, -uDir, L2) * 0.94);
   }
 
   // 间接光自己的遮挡：从这一点连到亮斑，中间隔着土就照不到。
@@ -439,7 +467,7 @@ void main() {
       bLit = exp(-acc * 0.62);
       // 挡在中间的人也吃掉一截，但**只吃一截**：间接光的源是地上那一大摊，
       // 一个人挡不干净它。同样走解析式，不然人一动这层也跟着起横杠
-      bLit *= mix(1.0, 0.33, BlockedSeg(vWorld, dn, L));
+      bLit *= mix(1.0, 0.33, Blocked(vWorld, dn, L));
     }
     // 打在土墙上的间接光**要留下来**——照亮四壁正是它的活；
     // 只把埋在土里的那部分收掉一档
@@ -506,8 +534,12 @@ export function CreateLightShafts(occluder, {
       // 参考《勇敢的心》配的一组：**面光是主角**，细光柱只剩一小截、
       // 1.05/米 的衰减让它一米开外就散了；洞口过曝到 1.8。
       // uWash.w=1.15m 是"掉到一半"的距离——窖底 3.6m 处只剩不到一成
-      uWash: { value: new THREE.Vector4(1.25, 0.28, 0.75, 0.85) },
-      uHead: { value: new THREE.Vector3(2.0, 0.65, 1.10) },
+      uWash: { value: new THREE.Vector4(0.38, 0.26, 0.72, 0.80) },
+      uHead: { value: new THREE.Vector3(0.85, 0.30, 1.20) },
+      uBlockTex: { value: null },
+      uBlockVP: { value: new THREE.Matrix4() },
+      uBlockZ: { value: 0.6 },
+      uBlockOn: { value: 0 },
       uBlockerCount: { value: 0 },
       uBlockers: { value: blockers },
     },
@@ -549,6 +581,13 @@ export function CreateLightShafts(occluder, {
     mat.uniforms.uCount.value = n;
   };
   mesh.userData.SetIntensity = (v) => { mat.uniforms.uIntensity.value = v; };
+  // 演员剪影靶（宿主每帧渲一张）：挡光从此照真轮廓，不再是方盒子
+  mesh.userData.SetBlockMask = (tex, vp, z) => {
+    mat.uniforms.uBlockTex.value = tex;
+    if (tex) mat.uniforms.uBlockVP.value.copy(vp);
+    mat.uniforms.uBlockZ.value = z;
+    mat.uniforms.uBlockOn.value = tex ? 1 : 0;
+  };
   mesh.userData.SetFloor = (y) => { mat.uniforms.uFloorY.value = y; };
   mesh.userData.SetDust = (v) => { mat.uniforms.uDust.value = v; };
   mesh.userData.SetTime = (t) => { mat.uniforms.uTime.value = t; };
