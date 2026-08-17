@@ -1211,16 +1211,31 @@ function SampleTrack(name, time) {
   const a = keys[i];
   const b = keys[Math.min(i + 1, keys.length - 1)];
   const span = Math.max(1e-4, b.t - a.t);
-  let u = Math.max(0, Math.min(1, (t - a.t) / span));
-  u = u * u * (3 - 2 * u);           // smoothstep：缓入缓出
+  const u = Math.max(0, Math.min(1, (t - a.t) / span));
   const ValAt = (ki, joint) => {
-    for (let k = ki; k >= 0; k -= 1) if (keys[k][joint] !== undefined) return keys[k][joint];
-    for (let k = ki + 1; k < keys.length; k += 1) if (keys[k][joint] !== undefined) return keys[k][joint];
+    const n = keys.length;
+    const j = tr.loop ? ((ki % n) + n) % n : Math.max(0, Math.min(n - 1, ki));
+    for (let k = j; k >= 0; k -= 1) if (keys[k][joint] !== undefined) return keys[k][joint];
+    for (let k = j + 1; k < n; k += 1) if (keys[k][joint] !== undefined) return keys[k][joint];
     return 0;
   };
+  // **三次 Hermite 穿过关键帧**（2026-08-17 用户："给人物的关节、动画…优化一下
+  // 流畅和精致度"）。老版是**每一段各自 smoothstep**：缓入缓出听着好，可它让
+  // 速度在**每一个关键帧上都归零**——一段五帧的动作于是走成"停—走—停—走—停"，
+  // 那正是"不流畅"的来源。Hermite 用前后各一帧算切线，速度连着过关键帧，
+  // 动作才是一条流下来的线。
+  // 张力取 0.40（Catmull-Rom 是 0.50）：小一点，免得 hipY 冲过头把脚踩进地里。
+  const TAU = 0.40;
+  const u2 = u * u, u3 = u2 * u;
+  const h1 = 2 * u3 - 3 * u2 + 1, h2 = u3 - 2 * u2 + u, h3 = -2 * u3 + 3 * u2, h4 = u3 - u2;
+  const Sample = (joint) => {
+    const p0 = ValAt(i - 1, joint), p1 = ValAt(i, joint);
+    const p2 = ValAt(i + 1, joint), p3 = ValAt(i + 2, joint);
+    return h1 * p1 + h2 * (TAU * (p2 - p0)) + h3 * p2 + h4 * (TAU * (p3 - p1));
+  };
   const out = {};
-  for (const joint of ["hipY", "hipX"]) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u);
-  for (const joint of TRACK_JOINTS) out[joint] = Lerp(ValAt(i, joint), ValAt(Math.min(i + 1, keys.length - 1), joint), u) * DEG;
+  for (const joint of ["hipY", "hipX"]) out[joint] = Sample(joint);
+  for (const joint of TRACK_JOINTS) out[joint] = Sample(joint) * DEG;
   return out;
 }
 
@@ -1269,7 +1284,9 @@ function AimFrontHand(target, aim, both = false) {
 export function PoseRig(rig, s, dt) {
   const j = rig.joints;
   const p = s.phase || 0;
-  const blend = Math.min(1, (dt || 0.016) * 12);   // 姿态之间连续过渡，不会跳
+  // 姿态之间的过渡：**真正的指数平滑**。老版是 dt*12 的线性近似——掉帧那几帧
+  // 一步跨过去（>1 被夹住＝硬切），高帧率下又比设计的慢。1−e^(−λt) 与帧率无关
+  const blend = 1 - Math.exp(-14 * (dt || 0.016));
   const t = rig.pose || (rig.pose = {
     hipY: 0, hipX: 0, torso: 0, head: 0,
     thighB: 0, shinB: 0, footB: 0, thighF: 0, shinF: 0, footF: 0,

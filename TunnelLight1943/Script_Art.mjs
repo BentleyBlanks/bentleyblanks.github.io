@@ -954,7 +954,35 @@ export function DrawLimb(ctx, px, py, len, w0, w1, color, id,
     const a = Math.PI + (i / 4) * Math.PI;
     pts.push([px + Math.cos(a) * r0, py + Math.sin(a) * r0 * capTop]);
   }
-  InkFill(ctx, pts, id, color, { amp: 0.9 * k, lw: lw * k, shade: "rgba(0,0,0,0.16)", shadeAt: 0.56 });
+  InkFill(ctx, pts, id, color, { amp: 0.9 * k, lw: lw * k, shade: null });
+  // —— 精致度那两笔（2026-08-17 用户："给人物的关节、部件设计优化一下…精致度"）。
+  // 老版的暗部是 InkFill 的 `shade`：一块压在右下角的方块，肢体因此读成一片剪纸。
+  // 一条胳膊是个**圆柱**：暗在背光那一侧、沿着长边一路走；亮边贴着受光那一侧。
+  ctx.save();
+  ctx.beginPath();
+  const wob = (t) => rAt(t);
+  ctx.moveTo(px + wob(0), py);
+  for (let i = 1; i <= 8; i += 1) ctx.lineTo(px + wob(i / 8), py + len * (i / 8));
+  ctx.lineTo(px + Math.cos(Math.PI * 0.5) * r1, py + len + r1 * capBot);
+  for (let i = 8; i >= 0; i -= 1) ctx.lineTo(px - wob(i / 8), py + len * (i / 8));
+  ctx.closePath();
+  ctx.clip();
+  const gx = ctx.createLinearGradient(px - r0, 0, px + r0, 0);
+  gx.addColorStop(0, "rgba(0,0,0,0.22)");        // 背光那一侧（身后）
+  gx.addColorStop(0.42, "rgba(0,0,0,0.03)");
+  gx.addColorStop(0.82, "rgba(255,246,226,0.10)");   // 受光那一侧（身前）
+  gx.addColorStop(1, "rgba(0,0,0,0.10)");        // 边上再收一点，才是圆的
+  ctx.fillStyle = gx;
+  ctx.fillRect(px - r0 * 1.4, py - r0, r0 * 2.8, len + r1 * 2);
+  // 关节处的一道衣褶：肘/膝一弯，布就在那儿堆一道。**只给一道**，多了成花纹
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = Math.max(1, 1.1 * k);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(px - r1 * 0.82, py + len * 0.80);
+  ctx.quadraticCurveTo(px, py + len * 0.86, px + r1 * 0.82, py + len * 0.78);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
@@ -1137,101 +1165,64 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   ctx.fill();
   ctx.restore();
 
-  // ④ 五官。**自家人（中国人这一路）一张脸都不画**（2026-08-17 用户定：
-  // 「主角一家索兴别画脸了，丑就算了，还没有表情还不如没有」）。
-  // 这颗头只有 55px 半径，眉眼鼻嘴挤进去必糊；而糊出来的那张脸是**死的**——
-  // 一整章都是同一个表情，比不画更糟。情绪改由**头顶那枚气泡**说
-  // （`Art.DrawMoodBubble`，参考《勇敢的心》的漫画气泡），一个 icon 顶十张脸。
-  // 剩下的读法全交给剪影：鼻子给朝向、发型给身份、衣色给人。
-  //
-  // **日军与军官例外**：他们要的正是"面无表情"（用户："日军应该面无表情，凶一点
-  // 变态一点"）——那张冷脸本身就是内容，所以只有 hard 这一路画五官。
-  if (hard) {
-    ctx.save();
-    clipFace();
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const nx = px + r * (F.brow - 0.56), ny = py - r * 1.02;   // 眼线 0.50H
-    const fx = px + r * (F.brow - 0.22), fy = py - r * 1.00;   // 远侧那只：整只都得在脸里
-    // 眼窝：一小片贴着眉的暗，眼睛才是坐进去的
-    ctx.globalAlpha = 0.28;
-    ctx.fillStyle = "#6b4326";
-    ctx.beginPath();
-    ctx.ellipse(nx + r * 0.06, ny - r * 0.05, r * 0.30, r * 0.14, -0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // 眉：低而直、往鼻侧压——凶就在这一下
-    ctx.strokeStyle = "rgba(28,20,14,0.92)";
-    ctx.lineWidth = 1.5 * k;
-    ctx.beginPath();
-    ctx.moveTo(nx - r * 0.22, ny - r * 0.28);
-    ctx.lineTo(nx + r * 0.26, ny - r * 0.36);
-    ctx.stroke();
-    ctx.lineWidth = 1.2 * k;
-    ctx.beginPath();
-    ctx.moveTo(fx - r * 0.08, fy - r * 0.26);
-    ctx.quadraticCurveTo(fx + r * 0.02, fy - r * 0.31, fx + r * 0.11, fy - r * 0.27);
-    ctx.stroke();
-    // 眼：收成一道缝，瞳一粒钉在中间
-    const eyeH = r * 0.055, eyeW = r * 0.145;
-    const slit = (cx, cy, w, h) => {
-      ctx.beginPath();
-      ctx.moveTo(cx - w, cy + h * 0.2);
-      ctx.quadraticCurveTo(cx - w * 0.2, cy - h * 1.25, cx + w, cy - h * 0.15);
-      ctx.quadraticCurveTo(cx + w * 0.1, cy + h * 0.95, cx - w, cy + h * 0.2);
-      ctx.closePath();
-      ctx.fillStyle = IN.ink;
-      ctx.fill();
-    };
-    slit(nx, ny, eyeW, eyeH);
-    slit(fx, fy, eyeW * 0.6, eyeH * 0.86);
-    // 鼻梁：两只眼之间那一道，不留就并成一副墨镜
-    ctx.globalAlpha = 0.3;
-    ctx.strokeStyle = "#7a4a28";
-    ctx.lineWidth = 1.0 * k;
-    ctx.beginPath();
-    ctx.moveTo(px + r * (F.brow - 0.26), py - r * 1.14);
-    ctx.quadraticCurveTo(px + r * (F.brow - 0.24), py - r * 0.98, px + r * (F.brow - 0.28), py - r * 0.86);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    // 唇缝：**一条平直线**——面无表情
-    const mw = r * 0.13, mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
-    ctx.strokeStyle = "rgba(58,34,28,0.9)";
-    ctx.lineWidth = 1.3 * k;
-    ctx.beginPath();
-    ctx.moveTo(mcx - mw, my + r * 0.01);
-    ctx.lineTo(mcx + mw, my - r * 0.01);
-    ctx.stroke();
-    // 一粒鼻孔
-    ctx.fillStyle = "rgba(96,58,34,0.42)";
-    ctx.beginPath();
-    ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // 耳：颧弓后头、眼线高度。一小片软肉，**不许有内环**
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(px - r * 0.40, py - r * 1.00);
-    ctx.quadraticCurveTo(px - r * 0.60, py - r * 0.96, px - r * 0.58, py - r * 0.74);
-    ctx.quadraticCurveTo(px - r * 0.56, py - r * 0.56, px - r * 0.42, py - r * 0.60);
-    ctx.closePath();
-    ctx.fillStyle = "#bf9068";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(106,68,42,0.45)";
-    ctx.lineWidth = 0.7 * k;
-    ctx.stroke();
-    ctx.restore();
-  }
+  // ④ 五官：**耳、鼻、嘴、颏都画，眼睛让头发／帽檐挡住不画**
+  //（2026-08-17 用户定：「耳朵怎么没有 画出来啊；每个人物的眼睛都可以假装被头发/
+  // 帽子遮住而不画（参考勇敢的心的做法）」）。
+  // 上一版是把脸整个留空——读出来是一张面具。《勇敢的心》的做法是**遮**不是**空**：
+  // 刘海／帽檐压到眼线上，底下垫一片阴影，眼睛"在阴影里"——观众自己会补上那双眼，
+  // 而且永远不会出现一整章不变的死表情。耳朵反而必须画：它是这颗头唯一的横向
+  // 参照，少了它脸和后脑连成一块饼。
+  ctx.save();
+  clipFace();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // 嘴：一小截唇缝。自家人略弯，日军一条平直线（面无表情）
+  const mw = r * (child ? 0.11 : 0.13);
+  const mcx = px + r * (F.brow - 0.17), my = py - r * 0.40;
+  ctx.strokeStyle = hard ? "rgba(58,34,28,0.9)" : "rgba(108,56,46,0.7)";
+  ctx.lineWidth = (hard ? 1.3 : 1.1) * k;
+  ctx.beginPath();
+  ctx.moveTo(mcx - mw, my + r * 0.01);
+  if (hard) ctx.lineTo(mcx + mw, my - r * 0.01);
+  else ctx.quadraticCurveTo(mcx, my + r * 0.04, mcx + mw, my - r * 0.015);
+  ctx.stroke();
+  // 一粒鼻孔，点到为止
+  ctx.fillStyle = "rgba(96,58,34,0.42)";
+  ctx.beginPath();
+  ctx.ellipse(px + r * (F.brow - 0.04), py + r * (F.noseY + 0.13), r * 0.05, r * 0.028, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 耳：颧弓后头、眼线到鼻底那一段（规范位置 0.50H~0.72H）。一小片软肉＋
+  // 耳轮后上那半道折。**不许描一整圈**——两条同心的边就是一枚靶心
+  ctx.save();
+  const eax = px - r * 0.40, eay = py - r * 0.80;
+  ctx.beginPath();
+  ctx.moveTo(eax + r * 0.10, eay - r * 0.20);
+  ctx.quadraticCurveTo(eax - r * 0.13, eay - r * 0.24, eax - r * 0.12, eay + r * 0.02);
+  ctx.quadraticCurveTo(eax - r * 0.11, eay + r * 0.22, eax + r * 0.03, eay + r * 0.24);
+  ctx.quadraticCurveTo(eax + r * 0.11, eay + r * 0.14, eax + r * 0.10, eay - r * 0.20);
+  ctx.closePath();
+  ctx.fillStyle = hard ? "#c2946b" : "#d09d69";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(104,66,42,0.55)";
+  ctx.lineWidth = 1.1 * k;
+  ctx.stroke();
+  ctx.beginPath();                       // 耳轮：只描后上那半道
+  ctx.moveTo(eax + r * 0.04, eay - r * 0.14);
+  ctx.quadraticCurveTo(eax - r * 0.07, eay - r * 0.16, eax - r * 0.065, eay + r * 0.06);
+  ctx.stroke();
+  ctx.restore();
 
   // ⑤ 头饰：最后画（帽子压住颅顶与鬓角；军官的卫生胡也在这一段，压在唇缝上）
   if (kind === "soldier") {
     DrawCapFlap(ctx, px, py, r, id, k);
     InkFill(ctx, Spline([P(-1.06, -1.26), P(-0.90, -1.74), P(-0.30, -2.04), P(0.36, -2.00),
-      P(0.82, -1.78), P(0.98, -1.56), P(0.92, -1.38), P(-1.00, -1.12)], 4),
+      P(0.82, -1.72), P(0.98, -1.42), P(0.92, -1.10), P(-1.00, -0.98)], 4),
     id + "cap", "#5f5a30", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
     InkFill(ctx, [P(0.84, -1.50), P(1.58, -1.36), P(1.52, -1.18), P(0.86, -1.30)],
       id + "brim", "#4a461f", { amp: 0.6 * k, lw: lw * 0.85 });
-    HardBrowShadow(ctx, px, py, r, F, -1.32);
+    EyeShade(ctx, px, py, r, F, -1.06, 0.5, 0.32);
   } else if (kind === "officer") {
     // **卫生胡（方块胡）**：太君脸就靠这一撮认。横在人中上，鼻底与唇缝之间
     ctx.save();
@@ -1242,25 +1233,27 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
     ], id + "stache", "#1e160f", { amp: 0.35 * k, lw: 1.1 * k });
     ctx.restore();
     InkFill(ctx, Spline([P(-1.10, -1.42), P(-1.00, -1.94), P(-0.58, -2.26), P(0.32, -2.32),
-      P(0.82, -2.04), P(1.00, -1.70), P(1.04, -1.42), P(-1.02, -1.26)], 4),
+      P(0.82, -1.98), P(1.00, -1.56), P(1.04, -1.22), P(-1.02, -1.08)], 4),
     id + "cap", "#4a4f34", { amp: 0.6 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
-    InkFill(ctx, [P(-1.02, -1.44), P(1.04, -1.50), P(1.04, -1.32), P(-1.00, -1.26)],
+    InkFill(ctx, [P(-1.02, -1.30), P(1.04, -1.36), P(1.04, -1.14), P(-1.00, -1.08)],
       id + "band", "#4e2018", { amp: 0.5 * k, lw: lw * 0.7 });
     ctx.beginPath();
-    ctx.arc(px + r * 0.72, py - r * 1.39, r * 0.085, 0, Math.PI * 2);
+    ctx.arc(px + r * 0.72, py - r * 1.23, r * 0.085, 0, Math.PI * 2);
     ctx.fillStyle = "#8a7a3a";
     ctx.fill();
-    InkFill(ctx, [P(0.86, -1.42), P(1.88, -1.30), P(1.84, -1.08), P(0.86, -1.22)],
+    InkFill(ctx, [P(0.86, -1.28), P(1.88, -1.16), P(1.84, -0.94), P(0.86, -1.08)],
       id + "visor", "#232616", { amp: 0.5 * k, lw: lw * 0.8 });
-    HardBrowShadow(ctx, px, py, r, F, -1.36);
+    EyeShade(ctx, px, py, r, F, -1.04, 0.54, 0.32);
   } else if (kind === "puppet") {
     InkFill(ctx, Spline([P(-1.06, -1.16), P(-0.96, -1.64), P(-0.38, -2.00), P(0.32, -1.98),
-      P(0.86, -1.76), P(1.00, -1.48), P(0.90, -1.32), P(-0.96, -1.02)], 4),
+      P(0.86, -1.70), P(1.00, -1.36), P(0.90, -1.04), P(-0.96, -0.92)], 4),
     id + "hat", "#3a352c", { amp: 0.7 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.14)" });
+    EyeShade(ctx, px, py, r, F, -1.00, 0.38, 0.28);
   } else if (kind === "militia") {
     InkFill(ctx, Spline([P(-1.08, -1.12), P(-0.94, -1.66), P(-0.34, -1.98), P(0.32, -1.96),
-      P(0.90, -1.74), P(1.04, -1.46), P(0.94, -1.30), P(-0.98, -0.98)], 4),
+      P(0.90, -1.68), P(1.04, -1.34), P(0.94, -1.02), P(-0.98, -0.90)], 4),
     id + "towel", "#ddd6c2", { amp: 0.8 * k, lw: lw * 0.95, shade: "rgba(0,0,0,0.08)" });
+    EyeShade(ctx, px, py, r, F, -0.98, 0.34, 0.26);
     InkFill(ctx, [P(-1.00, -1.08), P(-1.56, -0.58), P(-1.18, -0.42), P(-0.94, -0.84)],
       id + "tail", "#ccc4ae", { amp: 0.9 * k, lw: lw * 0.8 });
   } else {
@@ -1268,20 +1261,37 @@ export function DrawHeadPart(ctx, px, py, r, kind, id, k = 1) {
   }
 }
 
-/** 帽檐底下压的一片阴影：眼睛沉进去，脸就冷了（日军与军官专用） */
-function HardBrowShadow(ctx, px, py, r, F, y) {
+/**
+ * 头发/帽檐底下那片阴影——**眼睛就"藏"在这儿**（《勇敢的心》的做法）。
+ * y = 遮挡物的下沿（单位 r），阴影从那儿往下化开 depth。
+ * 越深越冷：日军给 0.52，自家人给 0.34（还能看出是张脸，只是眼在暗处）。
+ */
+function EyeShade(ctx, px, py, r, F, y, alpha = 0.34, depth = 0.30) {
   ctx.save();
-  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + 0.44));
-  g.addColorStop(0, "rgba(18,14,10,0.46)");
-  g.addColorStop(1, "rgba(18,14,10,0)");
+  const g = ctx.createLinearGradient(0, py + r * y, 0, py + r * (y + depth));
+  g.addColorStop(0, `rgba(20,15,10,${alpha})`);
+  g.addColorStop(0.5, `rgba(20,15,10,${alpha * 0.7})`);
+  g.addColorStop(1, "rgba(20,15,10,0)");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(px - r * 0.58, py + r * y);
-  ctx.lineTo(px + r * (F.brow - 0.02), py + r * (y + 0.06));
-  ctx.lineTo(px + r * (F.brow - 0.10), py + r * (y + 0.46));
-  ctx.lineTo(px - r * 0.56, py + r * (y + 0.42));
+  ctx.moveTo(px - r * 0.62, py + r * (y - 0.02));
+  ctx.lineTo(px + r * (F.brow + 0.02), py + r * (y + 0.02));
+  ctx.lineTo(px + r * (F.brow - 0.06), py + r * (y + depth + 0.02));
+  ctx.lineTo(px - r * 0.60, py + r * (y + depth - 0.02));
   ctx.closePath();
   ctx.fill();
+  // 阴影里埋两团很虚的暗：**不是眼睛**，是让眼睛"在那儿"的暗示。
+  // 观众会自己把它读成一双眼，而且永远不会有死表情（这就是遮眼这一招的划算处）
+  const ey = py + r * (y + depth * 0.42);
+  for (const [dx, w] of [[F.brow - 0.52, 0.15], [F.brow - 0.18, 0.11]]) {
+    const rg = ctx.createRadialGradient(px + r * dx, ey, 0, px + r * dx, ey, r * w * 1.7);
+    rg.addColorStop(0, `rgba(14,10,7,${alpha * 0.85})`);
+    rg.addColorStop(1, "rgba(14,10,7,0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.ellipse(px + r * dx, ey, r * w * 1.7, r * w * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -1293,20 +1303,45 @@ function HeadHair(ctx, px, py, r, kind, id, k, lw, F) {
   const child = kind === "sister";
   const tone = kind === "family" ? "#2a1f18" : child ? "#3a2a1e" : "#31241a";
   const P = (x, y) => [px + r * x, py + r * y];
+  // 刘海压到**眼线**上：眼睛就藏在它底下（《勇敢的心》的做法）。
+  // 外沿＝颅骨往外一层，内沿＝**刘海的下缘**，从耳前一路往前压到眉弓前缘；
+  // 耳朵在它底下、后头，所以露得出来
+  const fringe = child ? -1.00 : -1.06;
   InkFill(ctx, Spline([
-    P(F.brow - 0.16, child ? -1.42 : -1.56),   // 发际线（孩子的刘海压低一点）
-    P(0.36, -1.86),
+    P(F.brow - 0.12, fringe),                  // 刘海前下角（停在眉弓下沿，让开鼻梁）
+    P(F.brow + 0.02, -1.26),                   // 沿眉弓往上（外沿）
+    P(F.brow - 0.16, -1.54),
+    P(0.32, -1.86),
     P(-0.20, F.crown - 0.10),                  // 颅顶外一层
-    P(-0.72, -1.80),
+    P(-0.74, -1.80),
     P(F.back - 0.10, -1.26),
     P(-1.02, -0.78),
     P(-0.84, -0.46),                           // 项（发脚）
     P(-0.66, -0.56),
-    P(-0.62, -0.88),                           // 耳后
-    P(-0.46, -1.14),                           // 绕过耳上
-    P(-0.08, -1.34),                           // 鬓角
-    P(0.28, -1.50),                            // 太阳穴
-  ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.2)", shadeAt: 0.5 });
+    P(-0.62, -0.92),                           // 耳后（让开耳朵）
+    P(-0.50, -1.08),                           // 绕过耳上
+    P(-0.18, fringe - 0.06),                   // ← 刘海下缘往前压
+    P(0.22, fringe - 0.02),
+    P(0.50, fringe - 0.01),
+  ], 6), id + "hair", tone, { amp: 0.36 * k, lw: lw * 0.72, shade: "rgba(0,0,0,0.18)", shadeAt: 0.5 });
+  // 刘海底下那片阴影：眼睛在这儿
+  EyeShade(ctx, px, py, r, F, fringe + 0.01, child ? 0.32 : 0.40, 0.30);
+  // 两三根散下来的发丝，压在阴影上——刘海不是一块板
+  ctx.save();
+  ctx.fillStyle = tone;
+  for (let i = 0; i < 4; i += 1) {
+    const t = i / 3;
+    const bx = px + r * (-0.06 + t * 0.80);
+    const dp = r * (0.04 + Hash(id + "fr" + i) * 0.09);   // 每一绺长短差得开
+    const hw2 = r * (0.09 + Hash(id + "fw" + i) * 0.04);
+    ctx.beginPath();                                       // 圆头的一绺，不是尖齿
+    ctx.moveTo(bx - hw2, py + r * (fringe - 0.03));
+    ctx.quadraticCurveTo(bx - hw2 * 0.6, py + r * fringe + dp, bx, py + r * fringe + dp);
+    ctx.quadraticCurveTo(bx + hw2 * 0.6, py + r * fringe + dp * 0.86, bx + hw2, py + r * (fringe - 0.03));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   if (child) {
     // 妹妹：头顶偏后一只小抓髻（**扎进头发里**，别浮在头顶上）＋一根红头绳，
     // 颈后一小绺散下来的
