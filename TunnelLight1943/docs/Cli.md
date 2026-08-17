@@ -22,7 +22,7 @@ node TunnelLight1943/Script_Cli.mjs
 | `shot <id>@line=N,at=T` | **钉到"第 N 句台词的第 T 秒"**那一格（拍过场用这个，别拿 `--dur` 猜）。**微过场也认**：链的某一步 `effect` 里起的那种，配 `step=N,pre=e,cine=keep` 用，数的是 `microCine.i` |
 | `shot <id>@zoom=<谁>` | 顺手再裁一张近景（`zoom=sister` / `zoom=player` / `zoom=31.15:0.2`） |
 | `shot <id>@hold=d,dur=1.5,live=1` | **拍走动中的那一格**（走/跑姿势、脚下的土这类随步子发的东西）：按住键、不冻帧不 Settle。默认的 hold 拍在走满 dur 后冻帧再 Settle 三秒——位移归零，走路是按位移判的，人当场站定、土也散了，拍出来永远是站姿 |
-| `menu [页 ...]` | 拍**菜单类界面**（`title` / `continue` 有存档 / `confirm` / `controls` / `settings` / `pause` / `debug` / `anim`）→ `_shots/menu_*.png`。`shot` 一上来就 StartGame，看不到标题页；各态怎么摆（存档要先写 localStorage 再刷新、确认框要有档才弹得出来）都固化在这儿。`menu anim --anim scoopChild --at 0.55` 拍动画工作台钉在某一秒 |
+| `menu [页 ...]` | 拍**菜单类界面**（`splash` 按任意键那一屏 / `title` / `continue` 有存档 / `confirm` / `controls` / `settings` / `pause` / `debug` / `anim`）→ `_shots/menu_*.png`。`shot` 一上来就 StartGame，看不到标题页；各态怎么摆（存档要先写 localStorage 再刷新、确认框要有档才弹得出来、第一屏要真按一下键菜单才出来）都固化在这儿。`--keys ArrowDown,Enter` 真按几颗键再拍（验回车按不按得下去），`--eval` 截图前在页面里问一句（同 shot）。`menu anim --anim scoopChild --at 0.55` 拍动画工作台钉在某一秒 |
 | `anims [片段]` | **骨架里全部动作的清单**（56 轨道 / 48 姿势 / 19 步态）：名字 · 时长/循环/帧数 · `Script_Rig.mjs:行` · 谁在用 · 用于哪几拍。改动画先在这儿点名，别再描述画面 |
 | `anim <名字>` | 一条动作的全部：源码说明 / 关键帧表（每帧的 14 个关节值 + 行内注释）/ 由什么驱动（poseK/poseU/呼吸/相位）/ 用在哪几拍（文件:行 + 节拍 id + 谁）/ 一行可贴的引用 |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口占用 |

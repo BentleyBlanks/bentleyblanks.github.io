@@ -818,8 +818,9 @@ async function CmdShot(o) {
 // ---------------------------------------------------------------------------
 const MENU_PAGES = {
   // key: [说明, 到这一态要做什么（在页面里跑）]
-  title: ["标题页（没有存档）", null],
-  continue: ["标题页（有存档）", "save"],
+  splash: ["标题页第一屏（按任意键）", null],
+  title: ["标题页菜单（没有存档）", null],
+  continue: ["标题页菜单（有存档）", "save"],
   confirm: ["新游戏覆盖确认框", "save"],
   controls: ["操作说明", null],
   settings: ["标题页上的设置面板", null],
@@ -857,6 +858,23 @@ async function CmdMenu(o) {
       if (prep === "save") await page.evaluate((seed) => localStorage.setItem("tunnelLight1943.save.v1", JSON.stringify(seed)), SEED);
       await page.reload({ waitUntil: "load", timeout: 60000 });
       await page.waitForFunction(() => window.TunnelLight !== undefined, { timeout: 60000 });
+      // 标题页背后是活的场景，靠 rAF 渲染；无头下 rAF 几乎不走，先 Tick 几帧把戏
+      // 搭出来（世界首帧要烘贴图，多推几下）。第一屏是「按任意键」，除了拍它本身，
+      // 其余各态都得先按一下把菜单叫出来（真按键，走的是玩家那条路）
+      await page.evaluate(() => window.TunnelLight.Tick(6, 1 / 30));
+      if (key !== "splash") {
+        await page.keyboard.press("Space");
+        await page.waitForTimeout(900);          // 题名飞到左上角 + 菜单从左边出来
+      }
+      await page.evaluate(() => window.TunnelLight.Tick(30, 1 / 30));
+      // --keys ArrowDown,Enter：真按几颗键再拍（拍"键盘选到第三条"这类态；
+      // 也是验"回车真的按得下去"的唯一办法——那走的是按钮的默认行为，JS 里看不见）
+      if (o.keys) {
+        for (const k of String(o.keys).split(",").map((s) => s.trim()).filter(Boolean)) {
+          await page.keyboard.press(k);
+          await page.waitForTimeout(120);
+        }
+      }
       if (key === "confirm") await page.click("#startButton");
       if (key === "controls") await page.click("#btnControls");
       if (key === "settings") await page.click("#btnTitleSettings");
@@ -894,6 +912,16 @@ async function CmdMenu(o) {
         await page.click("#btnSettings");
       }
       await page.waitForTimeout(220);
+      // --eval：截图前在页面里跑一段（同 shot 的 --eval：一个表达式，带 tl/state/world），
+      // 问"这块的计算样式是什么 / 焦点在哪"这类截图看不出的事
+      if (o.eval) {
+        const r = await page.evaluate(async (src) => {
+          const tl = window.TunnelLight;
+          try { return { ok: await new Function("tl", "state", "world", `return (${src});`)(tl, tl.state, tl.world) }; }
+          catch (e) { return { err: String(e) }; }
+        }, String(o.eval));
+        console.log(`  eval[${key}] ${r.err ? r.err : JSON.stringify(r.ok)}`);
+      }
       const suffix = (key === "anim" && o.anim) ? `_${String(o.anim).replace(/[^A-Za-z0-9_]/g, "")}`
         : (key === "art" && o.who) ? `_${String(o.who).replace(/[^A-Za-z0-9_]/g, "")}` : "";
       const file = path.join(outDir, `menu_${key}${suffix}.png`);
@@ -965,7 +993,7 @@ const HELP = `《地道里的光》命令行工作台
       （姿势是 0.2s 的闪现，不真按键就只能截到站姿）；--actor 把某人动画相位清零
       转场的圆形黑幕会等它拉开再拍（轮询 TunnelLight.iris），不用自己调等待时间
   menu [页 ...]           拍菜单类界面 → _shots/menu_*.png（--w --h 换画框）
-      title 标题页 / continue 有存档的标题页 / confirm 覆盖确认 / controls 操作说明
+      splash 标题第一屏（按任意键）/ title 标题菜单 / continue 有存档的标题菜单 / confirm 覆盖确认 / controls 操作说明
       settings 标题页上的设置 / pause 游戏里的暂停 / debug 调试面板（选关）
       anim 动画工作台（--anim scoopChild 选中哪条，--at 0.55 钉到第几秒，--kind sister@0.60 --ghosts --flip）
       art 人物美术样式（--who sister 选人，--anim loco:run 右栏那具骨架跑哪条）

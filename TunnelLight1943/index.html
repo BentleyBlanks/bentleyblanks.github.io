@@ -330,32 +330,40 @@
     </div>
   </section>
 
-  <!-- 主菜单（2026-08-17 重做，用户：「这开始菜单还弄个两层是干什么？」）：
-       一列竖着的条目，市面上的叙事游戏都是这个形。老版把「从第一章开始 ／
-       跳到任意一幕」两颗钮、八枚章节牌、一张键盘对照表全摊在标题页上——
-       三摞东西各说各的；而**选章节**在一个线性剧情游戏里本来就不该给玩家
-       （跳关＝把故事拆了），键盘对照表也该在「操作说明」里。现在：
-       继续（有存档才出，主位）／新游戏／操作说明／设置，选关退回调试面板。 -->
-  <section id="titleScreen">
-    <div class="titleInner">
-      <p class="eyebrow">WHITEBOX PROTOTYPE · 1942–1943 华北敌后</p>
+  <!-- 主菜单（2026-08-18 照《勇敢的心》的标题页重排，用户：「参考一下勇敢的心的
+       主菜单是怎么做的 你就仿照着他做」）。两态一台戏：
+       · 背后是**活的场景**（Script_Main 的 MountTableau：村街那一段、柱子与妹妹
+         站在当中、游戏钟冻住、HUD 整层藏起），不是一张黑底——勇敢的心的标题页
+         就是主角与狗站在废墟前，菜单压在戏上；
+       · `.splash`（按任意键）：题名居中大字、下面一行副题，底边「按任意键」；
+       · `.menu`：题名缩到左上角（FLIP 动画），菜单从左边贴着画框边出来——
+         一列条目、条目之间一根细线、选中的那条整条压一块暗红（勇敢的心的
+         那块红条）、右上角版本号、左下角按键提示。
+       条目仍是 2026-08-17 定的四条：继续（有存档才出）／新游戏／操作说明／设置；
+       选关在调试面板（线性剧情不给玩家跳关）。id 一个没改，测试与 CLI 照旧点。 -->
+  <section id="titleScreen" class="splash">
+    <div class="titleLogo" id="titleLogo">
       <h1><span>地道里的光</span></h1>
-      <p class="thesis">一个只想保护母亲和妹妹的普通青年，在一次次失去之后，被迫学会保护更多人。</p>
-      <nav id="titleMenu" aria-label="主菜单">
-        <!-- 「继续」没存档时整枚不出：灰着的按钮是在说"这儿本该有东西"，
-             可第一次进来的人没什么可继续的 -->
-        <button id="btnContinue" type="button" hidden>
-          <b>继续</b><small id="continueWhere"></small>
-        </button>
-        <button id="startButton" type="button">
-          <b>新游戏</b><small id="startNote">从序 · 那天开始</small>
-        </button>
-        <button id="btnControls" type="button"><b>操作说明</b><small>走动 · 四个动作</small></button>
-        <button id="btnTitleSettings" type="button"><b>设置</b><small>声音 · 音量</small></button>
-      </nav>
-      <p class="titleFoot">目标不是消灭敌人，而是保护群众、保存力量、让所有人活着离开。</p>
-      <p class="contentNote">本作依据抗战史实创作，包含日军针对平民的战争暴行场景（不含血腥特写）。</p>
+      <p class="subtitle">— 1942 · 1943　华北敌后 —</p>
     </div>
+    <p class="thesis">一个只想保护母亲和妹妹的普通青年，在一次次失去之后，被迫学会保护更多人。</p>
+    <p class="pressAny" id="pressAny"><span>按任意键</span></p>
+    <nav id="titleMenu" aria-label="主菜单">
+      <!-- 「继续」没存档时整枚不出：灰着的按钮是在说"这儿本该有东西"，
+           可第一次进来的人没什么可继续的。小注跟在条目同一行里（存档在哪一幕、
+           新游戏会不会盖掉进度）——勇敢的心的条目只有一行字，我们的小注也不另起一行 -->
+      <button id="btnContinue" type="button" hidden>
+        <b>继续</b><small id="continueWhere"></small>
+      </button>
+      <button id="startButton" type="button">
+        <b>新游戏</b><small id="startNote">从序 · 那天开始</small>
+      </button>
+      <button id="btnControls" type="button"><b>操作说明</b><small></small></button>
+      <button id="btnTitleSettings" type="button"><b>设置</b><small></small></button>
+    </nav>
+    <div class="titleKeys" aria-hidden="true"><span><kbd>↑↓</kbd>选择</span><span><kbd>Enter</kbd>确定</span></div>
+    <div class="titleVersion" id="titleVersion"></div>
+    <p class="contentNote">白盒原型 · 本作依据抗战史实创作，包含日军针对平民的战争暴行场景（不含血腥特写）。</p>
   </section>
 
   <!-- 操作说明：标题页与游戏里（设置面板）共用这一页。
