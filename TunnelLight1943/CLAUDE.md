@@ -39,7 +39,7 @@ node TunnelLight1943/Script_Cli.mjs
 | `beats [c1]` · `beat <id>` | 全部节拍 · 某一拍的步骤/区域/needs/旗标/台词/源码位置 |
 | `state <id> [--x --level --step --input --flag --frames --json --cues]` | 无头跑到那一拍、喂真输入、打状态；`--cues` 验声音 |
 | `shot <id ...>` / `shot "<id>@line=N,at=T,zoom=<谁>,<旗标>=1"` | 实拍→`_shots/`；过场钉格用 `@line/at`，别用 `--dur` 猜；`--probe` 报深度违规与手脚离地 |
-| `menu [页]` | 拍菜单类界面（标题/继续/确认/操作/设置/暂停/调试/anim/art） |
+| `menu [页]` | 拍菜单类界面（splash/标题/继续/确认/操作/设置/暂停/调试/anim/art；`--keys` 真按键 `--eval` 问一句） |
 | `anims [片段]` · `anim <名字>` | 骨架全部动作清单 · 一条动作的关键帧/驱动/用在哪几拍。**改动画先在这儿点名** |
 | `doctor` | 分支/上游落后/未提交/缓存戳/端口 |
 
@@ -133,7 +133,7 @@ node TunnelLight1943/Script_Cli.mjs
 - 收藏品每件要真有史实出处、注解成掌故；开合判断看 `bagOpen`；疑兵草丛必须掺。
 
 ### UI（`docs/Ui.md`）
-- 标题页只有一列条目；选关只在调试面板；一个自动存档位按幕存、认 id 不认序号；设置面板即暂停（`MenuFrozen`）；改完必看 `menu` 实拍。
+- 标题页只有一列条目、版式照《勇敢的心》（活场景打底＝`state.tableau` 那台戏，不存档不走 StepGame；按任意键→红条菜单）；选关只在调试面板；一个自动存档位按幕存、认 id 不认序号；设置面板即暂停（`MenuFrozen`）；改完必看 `menu` 实拍。
 - 会被盯着看的 canvas 必须超采样（`HINT_SS/PROP_SS/DETAIL_SS`）。
 - 拇指落点上不许压别的东西：判据用画高不用画宽、通知不吃触摸、底边让开安全区（RenderHealthTest「拇指控件三态无遮挡」）。
 - 目标 HUD 只有左上角那一枚牌（`#objectiveTab`）＋出框时画框边缘牌，同源同画笔（`Core.BeatHintIcon` ↔ `Art.HudGlyph`）。
