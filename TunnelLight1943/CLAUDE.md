@@ -122,6 +122,16 @@ index.html 的 import map（TestModuleGraphIsCacheBusted 盯着）。
   不调它——之前所有 micro-cine 行内走位都是死的）。行首触发一次，机制与
   StepCinematic 的 lineFired 同款；跳幕结算仍然只跑 effect 不跑 on()，
   所以旗标必须落在 effect 里、on() 只做画面。
+- **一整段戏只长在微过场里时，那一拍要写 `settle`**（2026-08-17 加，`SettleBeat`
+  末尾对**每一种 kind** 都调 `def.settle?.(state)`；原来只有 `linger` 那一档认）。
+  effect 只能起微过场，**结算并不播它**，行内 `on()` 里的东西整段作废——序章
+  「三天后」那一页翻过去（娘走了、翻板重新敞着、天亮回来）就全写在 c1_open 的
+  微过场里，于是从序章任何一幕往后跳，**娘一直跪在窖口守着翻板，一路守到 §8
+  兄妹俩做饭**，屋里那块盖板也一直合着往窖里打光（用户 2026-08-17 报的）。
+  口径同 effect：`settle` **只写状态不写画面**（落点归 SettleDest，镜头/字卡本来
+  就不该在跳幕里出现），而且**跟 on() 调同一个函数**（c1_open 的 `DayThreeWorld`
+  是样板）——抄两份迟早分家。判据：这一拍改了世界，而改世界那几行在 `on()` 里？
+  那就欠一个 `settle`。
 - **cinematic 不跑 onStart**（2026-08-13 又栽了一回）：过场拍的布景一律写在
   **第一行的 on() 里**（c1_rescue/c1_mend 是样板）；onStart 只有 chain/scribe/
   hold(onEnter)/doomedHold 认。
