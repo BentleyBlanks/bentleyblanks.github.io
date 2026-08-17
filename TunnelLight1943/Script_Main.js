@@ -870,8 +870,11 @@ const DIR_GLYPH = {
     + '<path d="M15.8 12H8.6M8.6 12l3-3M8.6 12l3 3"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
     + '<path d="M8.2 12h7.2M15.4 12l-3-3M15.4 12l-3 3"/></svg>',
+  // 左右都行（掰红薯干、顺着坛肩来回抹）：盘子里一支双头箭
+  horiz: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.6"/>'
+    + '<path d="M7.4 12h9.2M9.6 9.6L7.2 12l2.4 2.4M14.4 9.6l2.4 2.4-2.4 2.4"/></svg>',
 };
-const DIR_KEY = { up: "↑", down: "↓", left: "←", right: "→" };
+const DIR_KEY = { up: "↑", down: "↓", left: "←", right: "→", horiz: "↔" };
 
 function KeyChipHtml(act) {
   if (!act) return "";
@@ -964,6 +967,13 @@ function SyncActPrompt(state, pr, fill) {
   // 位置一律取整像素落位——半个像素上的字就是"HUD 有点糊"的老根。
   const vs = world.viewSize;
   const cw = canvas.clientWidth, chh = canvas.clientHeight;
+  // 活卡铺满画框那几拍（抠泥封/掰红薯干/撕布/划线）看不见柱子——键帽钉在卡的
+  // 下沿正中，别按他头顶的位置漂到卡上不知哪个角去
+  if (LiveCardOn(state) && cw && chh) {
+    el.style.left = Math.round(cw / 2 - actBox.w / 2) + "px";
+    el.style.top = Math.round(chh * 0.80 - actBox.h / 2) + "px";
+    return;
+  }
   if (!vs?.w || !cw || !chh) { el.style.left = "50%"; el.style.top = "70%"; return; }
   const p = state.player;
   const headY = LevelY(p.level) + (p.crouch ? 1.55 : 2.15);
@@ -1175,11 +1185,9 @@ function SyncHud(state, dt, shotFade) {
   // 已连元素和 CSS 一起拆掉，别加回来。
   if (ui.touchControls) {
     ui.touchControls.classList.toggle("dimmed", !!inCinematic || state.phase !== "playing");
-    // 划线时整张画框就是操作面：摇杆和按钮全收走，免得手指落在左下角
-    // 那截小臂上却被摇杆截胡（这一拍本来也走不动路）
-    // 名单走 Core 的 LiveCardOn（唯一一份）——这儿原先手抄了五张，撕布/缝针/
-    // 分食三张没跟上，手机上摇杆就一直压在卡的左下角截胡手指
-    ui.touchControls.classList.toggle("gone", LiveCardOn(state) && state.phase === "playing");
+    // 活卡那几拍摇杆与互动钮**留着**（2026-08-17 四动词第二轮）：抠泥封/掰红薯干/
+    // 撕布/划线如今全靠「互动钮 ＋ 摇杆方向」，收走就没法玩了。老版收走是因为
+    // 卡面要用手拖；只剩缝三针那张还认手拖，它两条路都通，摇杆照旧留着
   }
 
   if (state.toast !== toastShown) {
