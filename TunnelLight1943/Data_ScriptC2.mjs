@@ -29,14 +29,17 @@ export function ChapterC2(K) {
         { stage: "谷雨过了。门框上的正字，添到了第十三道。", d: 3.6,
           cam: { kind: "insert", x: 33.62, y: 0.76, dist: 0.95 },
           on: (state) => { state.beat.indoorScene = true; state.doorLeaf = null; } },
+        // 村东头＝新的村界（2026-08-18 村庄从 190 米剪到 120 米，村东那片
+        // 从来走不到、也只在这两镜里露过脸的空场整个删了）。这两个 cam.x
+        // 跟着 RAID_LEAD_X 走：队头 82、日军三排 104~112
         { stage: "这天晌午，村东头的乌鸦轰的一声全飞起来了。", d: 3.2,
-          cam: { kind: "shot", x: 120, y: 2.2, dist: 9 },
+          cam: { kind: "shot", x: 108, y: 2.2, dist: 9 },
           on: (state) => {
             Cue(state, "flutter", { gain: 0.9 });
             Cue(state, "flutter", { gain: 0.7, delay: 0.7 });
           } },
         { stage: "鬼子又进村了。这一回是梳篦式的——一条街一条街，一户不落。", d: 5.0,
-          cam: { kind: "shot", x: 130, y: 1.8, dist: 10, pan: -8 },
+          cam: { kind: "shot", x: 110, y: 1.8, dist: 10, pan: -8 },
           on: (state) => {
             SpawnRaidSoldiers(state);
             // 点户的伪保长又打头来了——梳篦扫荡照册子篦，名册还在他手上
@@ -46,11 +49,13 @@ export function ChapterC2(K) {
             );
             Cue(state, "motorPutt", { gain: 0.55 });
             // 整支队伍压进东街：从村东口一路往西碾。真参与判定的两个兵
-            // 收了巡逻，先跟着队伍走——判定到舀水支线才开考
+            // 收了巡逻，先跟着队伍走——判定到舀水支线才开考。
+            // **入场坐标不在这儿改**（2026-08-18 删掉了原来那句 `a.x -= 46`）：
+            // 队序与入场位只有 Core 的 RAID_LEAD_X / RAID_START_X 一处真相，
+            // 在这儿再挪一次，等于同一件事写在两个文件里各写一半
             for (const a of state.actors) {
               if (!(IsEnemy(a) || a.id === "officer")) continue;
               a.patrol = null;
-              a.x -= 46;
               a.heading = -1;
               if (a.pinTo) continue;
               a.cineTarget = { x: a.x - 20 };
@@ -215,7 +220,8 @@ export function ChapterC2(K) {
         // 自家盖板上，怎么掀（c2_found 那拨是折回来的新篦子）
         for (const id of ["srch1", "srch2", "srch3"]) {
           const a = FindActor(state, id);
-          if (a) { a.patrol = null; a.cineTarget = { x: 120 }; a.cineSpeed = 1.8; a.cineVanish = true; a.heading = 1; }
+          // 114 ＝ 剪短后的村东界内（老版写 120，那会儿村子还有 190 米长）
+          if (a) { a.patrol = null; a.cineTarget = { x: 114 }; a.cineSpeed = 1.8; a.cineVanish = true; a.heading = 1; }
         }
       },
     },

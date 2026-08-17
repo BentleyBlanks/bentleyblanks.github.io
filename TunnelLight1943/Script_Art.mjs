@@ -3718,8 +3718,14 @@ function LeafClump(ctx, cx, cy, r, id, fill, { line = null, lw = 0, squash = 0.8
 // 树。**不许再画成棒棒糖**：一根等宽的棍上顶一个绿球，是这版被打回来的样子。
 // 树的形是从下往上分出来的——根盘摊在土面上、主干带锥度、到腰上分叉、
 // 每根枝的梢上才挂叶团；叶团分前后两层，后层压暗，树冠才有厚度。
+// `picked`＝**被薅过的树**（2026-08-18 用户："华北 大家都没东西吃 远处的树咋可能
+// 还有叶子呢"）。这一作是 1943 年春的冀中，谷雨前后正是青黄不接最狠的时候：
+// 榆钱、槐花、柳芽、树叶都是口粮，够得着的一律撸光，低枝还年年砍去当柴。
+// 所以村子跟前的树**不是满冠的绿球，也不是冬天的秃杈**——低处空、只有高处
+// 够不着的地方剩几簇，而且稀。全秃的那几棵（`bare`）另有说法：榆树连皮都被
+// 刮走了，那是死透的（见 `stripped`）。
 export function DrawTree(ctx, x, groundY, id,
-  { big = false, night = false, bare = false, stripped = false } = {}) {
+  { big = false, night = false, bare = false, stripped = false, picked = false } = {}) {
   const H = big ? 150 : 104;
   const trunkW = big ? 15 : 9.5;
   const bark = night ? "#3e3427" : "#6b5136";
@@ -3919,7 +3925,7 @@ export function DrawTree(ctx, x, groundY, id,
   const base = night ? PAL.treeDark : PAL.tree;
   const backC = night ? "#2b3826" : "#41542c";
   const litC = night ? "#4a5c3a" : "#78904a";
-  const cr = (big ? 26 : 18);
+  const cr = (big ? 26 : 18) * (picked ? 0.60 : 1);
   let cx0 = 0, cy0 = 0;
   for (const [tx, ty] of tips) { cx0 += tx; cy0 += ty; }
   cx0 /= tips.length; cy0 /= tips.length;
@@ -3929,9 +3935,12 @@ export function DrawTree(ctx, x, groundY, id,
   // 错位也只是在这张饼里面挪。现在树冠**由一簇一簇搭起来**——底下一层暗的
   // 只在枝根附近垫着（背光面），轮廓完全交给外圈那几团自己的凹凸，
   // 团与团之间留得出天空，枝梢从缝里穿出去。
-  const back = [], front = [];
+  const back = [], front = [], leafTips = [];
   for (let i = 0; i < tips.length; i += 1) {
     const [tx0, ty0] = tips[i];
+    // 薅过的树：**低的那几枝先空**（人踮脚够得着的都撸走了），叶子只剩最高处
+    if (picked && ty0 > forkY - H * 0.16) continue;
+    leafTips.push(tips[i]);
     const tx = tx0 + (cx0 - tx0) * 0.10;
     const ty = ty0 + (cy0 - ty0) * 0.10;
     const r = cr * (0.72 + Rnd(id + "cr", i) * 0.42);
@@ -3939,12 +3948,15 @@ export function DrawTree(ctx, x, groundY, id,
     front.push([tx + Sym(id + "dx", i, r * 0.3), ty - r * 0.20 + Sym(id + "dy", i, r * 0.22), r * 0.84]);
   }
   // 背光层：压在枝根与冠腹，冠有厚度靠它。再沿每根枝的中段补一团——
-  // 只在枝梢挂叶，冠底下就空一圈，读成"几团绿浮在树上头"
-  for (let i = 0; i < tips.length; i += 1) {
-    const [tx, ty] = tips[i];
-    const mx = forkX + (tx - forkX) * 0.62, my = forkY + (ty - forkY) * 0.62;
-    LeafClump(ctx, mx + Sym(id + "mx", i, cr * 0.3), my + cr * 0.22, cr * (0.52 + Rnd(id + "mr", i) * 0.24),
-      id + "km" + i, backC, { lobes: 4 });
+  // 只在枝梢挂叶，冠底下就空一圈，读成"几团绿浮在树上头"。
+  // **薅过的树没有这一层**：枝中段正是伸手够得到的高度，那儿的叶早没了
+  if (!picked) {
+    for (let i = 0; i < tips.length; i += 1) {
+      const [tx, ty] = tips[i];
+      const mx = forkX + (tx - forkX) * 0.62, my = forkY + (ty - forkY) * 0.62;
+      LeafClump(ctx, mx + Sym(id + "mx", i, cr * 0.3), my + cr * 0.22, cr * (0.52 + Rnd(id + "mr", i) * 0.24),
+        id + "km" + i, backC, { lobes: 4 });
+    }
   }
   for (let i = 0; i < back.length; i += 1) {
     LeafClump(ctx, back[i][0], back[i][1], back[i][2], id + "kb" + i, backC, { lobes: 4 + (i % 3) });
@@ -3967,9 +3979,10 @@ export function DrawTree(ctx, x, groundY, id,
     LeafClump(ctx, front[i][0], front[i][1], front[i][2], id + "kf" + i, i % 2 ? base : litC,
       { line: "rgba(43,31,22,0.42)", lw: 1.5, lobes: 5 + (i % 2) });
   }
-  // 破轮廓的几团小的：挂在冠外沿，专门把那条圆弧咬缺一块
-  for (let i = 0; i < tips.length; i += 1) {
-    const [tx, ty] = tips[i];
+  // 破轮廓的几团小的：挂在冠外沿，专门把那条圆弧咬缺一块。
+  // 只挂在**还有叶子的那几枝**上（薅过的树低枝是空的，这儿再撒一圈就白空了）
+  for (let i = 0; i < leafTips.length; i += 1) {
+    const [tx, ty] = leafTips[i];
     const a = Math.atan2(ty - cy0, tx - cx0) + Sym(id + "ea", i, 0.5);
     const d = cr * (0.62 + Rnd(id + "ed", i) * 0.5);
     LeafClump(ctx, tx + Math.cos(a) * d, ty + Math.sin(a) * d * 0.8, cr * (0.30 + Rnd(id + "er", i) * 0.22),
@@ -15252,30 +15265,10 @@ export function DrawStoveFire(ctx, cx, gy, t) {
   ctx.restore();
 }
 
-// 靴子踩上翻板：板缝里落下来的灰（World 摆位置与淡出，这儿只画一撮）
-export function DrawSlatDust(ctx, ax, ay, id) {
-  ctx.save();
-  // 两三道细流
-  ctx.strokeStyle = "rgba(168,152,128,0.5)";
-  ctx.lineCap = "round";
-  for (let i = 0; i < 3; i += 1) {
-    ctx.lineWidth = 1.2 + Hash(id + "w" + i) * 0.8;
-    const dx = ax + (i - 1) * 7 + Sym(id + "x", i, 2.5);
-    ctx.beginPath();
-    ctx.moveTo(dx, ay - 52 + Hash(id + "t" + i) * 6);
-    ctx.lineTo(dx + Sym(id + "dx", i, 2), ay - 14 - Hash(id + "b" + i) * 8);
-    ctx.stroke();
-  }
-  // 尘粒
-  ctx.fillStyle = "rgba(178,162,138,0.5)";
-  for (let i = 0; i < 7; i += 1) {
-    ctx.beginPath();
-    ctx.arc(ax + Sym(id + "px", i, 9), ay - 10 - Hash(id + "py" + i) * 38,
-      0.8 + Hash(id + "pr" + i) * 0.9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
+// 靴子踩上翻板：板缝里筛下来的灰**不再是一张烘死的贴图**（2026-08-18 删）：三根笔直的细杆
+// 加七个点，整块往下平移再淡出——三根棍子一起滑，既不像灰也不落在光里。
+// 现在由 Script_World 逐帧画粒子（`SLAT_DUST` + `DustDot`），三条缝各一股，
+// 缝的偏移与打进来的三束光同源。要改灰的样子改那儿，别在这儿再长一张贴图出来。
 
 // 脚后跟蹬起来的一小摊干土（2026-08-18 用户：「人物前后跑动的时候 应该脚后跟这里
 // 都有对应的烟雾特效」→ 第二轮「应该是泥土灰尘起来了 不是烟雾 颜色质感不对」，

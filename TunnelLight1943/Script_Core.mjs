@@ -4378,7 +4378,14 @@ function BuildRaidOrder() {
   return out;
 }
 const RAID_ORDER = BuildRaidOrder();
-const RAID_LEAD_X = 148;            // 队头（自行车）入场时的位置（已进了村东口）
+// 队头（自行车）入场时的位置＝已经进了村东口。**这就是真正的入场坐标**
+// （2026-08-18）：老版写 148，然后 c2 再 `a.x -= 46` 挪一次——两处各写一半，
+// 而 148 那个数是村庄还有 190 米长时留下的。现在村东那六十多米剪掉了
+// （见 Data_Scenes 的 village.length），队伍直接从这儿进村：
+// 队头 82、队尾（raid2）117.2，整队 35.2 米；两个过场镜头（c2_open 的
+// 「乌鸦飞起来」与「梳篦式的」）框的是队伍中后段的日军那三排（104~112）。
+// 改这个数就要跟着看 c2_open 那两个 cam.x —— 它们框的就是这支队伍。
+const RAID_LEAD_X = 82;
 const RAID_START_X = (() => {
   const m = new Map();
   let x = RAID_LEAD_X;
