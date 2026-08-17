@@ -1397,8 +1397,8 @@ function HideTitle() {
 // 废墟前，人不大、景要全）。位置往右让一点——菜单占着左边三成画框。
 const TABLEAU = {
   chapter: 0, beat: "c1_return",
-  x: 53.3,        // 柱子（枯树与草垛之间的平地上；再往东是垫路的那堆新土，别站在土堆上）
-  sisterDx: 1.0,  // 妹妹站在他右手边、草垛跟前，脸朝他
+  x: 52.9,        // 柱子（枯树与草垛之间的平地上；东边 53.8 起是垫路的那堆新土，两个人都别站上去）
+  sisterDx: 0.8,  // 妹妹站在他右手边、草垛跟前，脸朝他
   camDx: -0.55,   // 机位偏左 ⇒ 两个人落在画框六成处（左边三成是菜单）
   hw: 5.15,       // 玩法 4.45 退一小档；封顶 HW_WIDE_MAX（本作没有全景）
 };
@@ -1416,6 +1416,9 @@ function MountTableau() {
   if (sis) {
     sis.x = TABLEAU.x + TABLEAU.sisterDx; sis.level = "surface"; sis.heading = -1;
     sis.visible = true; sis.following = false; sis.cineTarget = null; sis.pose = null;
+    // 结算到这一拍时她还带着上一场留下的抬升（坐炕上 lift 0.52）——不清掉就浮在
+    // 半空里，跟哥哥不在一条地平线上（用户 2026-08-18 报的）。爬梯/抬升一律归零
+    sis.lift = 0; sis.climbing = null; sis.climbT = 0; sis.heldByPlayer = false;
   }
   RebuildBagStrip();
   lastSaveKey = "";
