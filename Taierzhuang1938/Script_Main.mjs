@@ -19,9 +19,11 @@ import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { Hud } from "./Script_Hud.mjs";
+import { StoryDirector } from "./Script_Story.mjs";
+import { CombatSystem } from "./Script_Combat.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT } from "./Data_Battle.mjs";
-import { HISTORY_NOTES } from "./Data_History.mjs";
+import { HISTORY_NOTES, EPILOGUE_LINES } from "./Data_History.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
@@ -106,6 +108,15 @@ const state = {
   ordersOpen: false,
   spawnAccumulator: 0,
   smokeHandles: [],           // 常驻烟柱的 handle，换阶段时要一根根拆掉
+  // 弹药账。杂牌部队的弹是紧的：中央军一条带装一百发，第 2 集团军「最多也就二三十发」。
+  // 之前开火不消耗、不需要装填，桥夹压弹那套动画白做了。
+  ammo: 0, clips: 0, grenades: 0, bundles: 0,
+  cook: 0,                    // 投弹蓄力/攥弹时间
+  cooking: null,              // "Grenade" | "GrenadeBundle"
+  outcome: null,              // null | "victory" | "defeat"
+  prevAllies: 0,
+  storyObjective: null,
+  playerAliveLast: true,
 };
 
 let battlefield = null;
@@ -114,6 +125,8 @@ let ai = null;
 let vfx = null;
 let viewmodel = null;
 let actorFactory = null;
+let story = null;
+let combat = null;
 let currentWeapon = "HanYang";
 
 // ---------------------------------------------------------------------------
@@ -180,6 +193,14 @@ async function Boot() {
     battlefield, actorFactory, scene, vfx, audio, player,
   }, { maxAlive: SCALE.maxAlive, seed: 19380324 });
 
+  // 叙事层：把 Data_Script 那本考据过的剧本派发进开放战场。
+  // 在这之前它除了 importmap 之外没有任何地方 import —— 数据在，玩不到。
+  story = new StoryDirector({ hud, audio });
+  combat = new CombatSystem({
+    battlefield, ai, vfx, audio, lights, player, library, scene, story,
+    onKill: (soldier) => { state.ijaPool = Math.max(0, state.ijaPool - 1); },
+  });
+
   await nextFrame();
   setStep("就绪", 1.0);
   EnterPhase(state.phaseIndex, true);
@@ -187,10 +208,25 @@ async function Boot() {
   bootStart.disabled = false;
   bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
 
+  // 各阶段的配置时长，给通关冒烟按出厂配置跑用
+  state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, battlefield,
     player, ai, vfx, viewmodel, hud, audio, state,
+    story, combat,
     StepFrames, JumpToPhase: EnterPhase,
+    // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
+    Debug: {
+      Reload, DoMelee, CallMortar, EndBattle,
+      Throw: (kind, power) => {
+        state.cooking = kind; state.cook = (power ?? 0.8) * 1.1; ReleaseCook();
+      },
+      Fire: () => { input.fire = true; TryFire(1); input.fire = false; },
+      Ammo: () => ({ ammo: state.ammo, clips: state.clips, grenades: state.grenades, bundles: state.bundles }),
+      Spoken: () => hud.spoken.slice(),
+      StoryFired: () => story.fired.slice(),
+      Outcome: () => state.outcome,
+    },
   };
 
   if (SHOT) StartRun();
@@ -212,6 +248,15 @@ function EnterPhase(index, initial = false) {
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
   audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
+
+  // 装载这一阶段的剧本段落。phase.story 是 Data_Battle 里早就留好的字段
+  // （P1_Wall / P2_Breach / ...），一直没人读。
+  if (story) {
+    const loaded = story.BeginPhase(phase.story);
+    state.storyObjective = null;
+    if (phase.counterattack) story.Signal("counterattack");
+    if (loaded === 0) console.warn("这一阶段没有剧本段落：", phase.story);
+  }
 
   // 战线：反攻阶段之前，日军从北往南推；反攻阶段反过来
   if (initial || !player.Alive) RespawnPlayer(true);
@@ -415,9 +460,16 @@ function RespawnPlayer(initial = false) {
   const open = FindOpenSpot(spot.x, spot.z + 18, spot.radius, seed);
   player.Spawn(open.x, open.z, Math.PI);
   player.bandages = COMBAT.bandages;
+  // 领的家当。弹带大半是瘪的 —— 这不是难度设计，是他们上阵时的实际情况。
+  const w = WEAPONS[currentWeapon];
+  state.ammo = w?.magazine ?? 5;
+  state.clips = phase.nightRaid ? 3 : 5;
+  state.grenades = phase.nightRaid ? 8 : 4;   // 敢死队标准携行：背后四枚 + 胸前四枚
+  state.bundles = 2;
   viewmodel.Equip(currentWeapon);
   hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "步枪");
   state.pendingRespawn = false;
+  state.playerAliveLast = true;
 }
 
 function OnPlayerDown() {
@@ -428,6 +480,7 @@ function OnPlayerDown() {
   state.deathTimer = REINFORCE.deathCardSeconds;
   state.pendingRespawn = true;
   audio.Play("bodyFall", { volume: 0.9 });
+  if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
   if (state.nraPool > 0 && state.nraPool / PHASES[state.phaseIndex].nraPool < REINFORCE.lastDitchAt) {
     hud.Say("团长", REINFORCE.lastDitchLine, 6);
@@ -460,8 +513,11 @@ document.addEventListener("keydown", (e) => {
   if (e.code === "KeyC") input.crouchPressed = true;
   if (e.code === "KeyZ") input.pronePressed = true;
   if (e.code === "KeyB") { if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 }); }
-  if (e.code === "KeyR") viewmodel?.TriggerReload();
-  if (e.code === "KeyV") viewmodel?.TriggerMelee();
+  if (e.code === "KeyR") Reload();
+  if (e.code === "KeyV") DoMelee();
+  if (e.code === "KeyG") BeginCook("Grenade");
+  if (e.code === "KeyH") BeginCook("GrenadeBundle");
+  if (e.code === "KeyF") CallMortar();
   if (e.code === "Tab") { e.preventDefault(); state.ordersOpen = true; hud.SetOrdersVisible(true); }
   const order = ORDERS.find((o) => e.code === `Digit${o.key}`);
   if (order && ai && player) {
@@ -473,6 +529,7 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("keyup", (e) => {
   keys.delete(e.code);
+  if (e.code === "KeyG" || e.code === "KeyH") ReleaseCook();
   if (e.code === "Tab") { state.ordersOpen = false; hud.SetOrdersVisible(false); }
 });
 document.addEventListener("mousemove", (e) => {
@@ -513,6 +570,71 @@ function AimPoint(maxDist = 120) {
 }
 
 // ---------------------------------------------------------------------------
+// 动作：装填 / 投弹 / 白刃 / 支援
+// ---------------------------------------------------------------------------
+
+/** 装填。桥夹压入固定弹仓，一次五发；没有备弹就只能去死人身上找。 */
+function Reload() {
+  if (!player.Alive || viewmodel.IsBusy?.()) return false;
+  const w = WEAPONS[currentWeapon];
+  if (!w || state.clips <= 0 || state.ammo >= (w.magazine ?? 5)) return false;
+  state.clips -= 1;
+  state.ammo = w.magazine ?? 5;
+  viewmodel.TriggerReload();
+  audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
+  return true;
+}
+
+/** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
+function BeginCook(kind) {
+  if (!player.Alive || state.cooking) return;
+  if (kind === "Grenade" && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
+  if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint("没有集束了", 2); return; }
+  state.cooking = kind;
+  state.cook = 0;
+  audio.Play("grenadePin", { volume: 0.7 });
+}
+
+function ReleaseCook() {
+  if (!state.cooking || !player.Alive) { state.cooking = null; return; }
+  const kind = state.cooking;
+  state.cooking = null;
+  // 蓄力越久扔越远；同时引信也在烧（cook）—— 这两件事共用同一个计时器，
+  // 所以「想扔远」和「想落地即炸」是一对取舍，不是白拿的收益。
+  const power = Clamp01(state.cook / 1.1);
+  const cooked = Math.max(0, state.cook - 0.35);
+  const dir = player.AimDirection(_aimDir).clone();
+  combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
+  if (kind === "Grenade") state.grenades -= 1; else state.bundles -= 1;
+  viewmodel.TriggerThrow?.(power);
+  state.cook = 0;
+}
+
+/** 白刃。大刀是近身补充兵器 —— 这是最后一手，不是第一手。 */
+function DoMelee() {
+  if (!player.Alive || viewmodel.IsBusy?.()) return false;
+  viewmodel.TriggerMelee();
+  const weaponId = WEAPONS[currentWeapon]?.bayonet ? currentWeapon : "Dadao";
+  const result = combat.Melee(weaponId === currentWeapon ? currentWeapon : "Dadao",
+    player.position.clone(), player.AimDirection(_aimDir).clone());
+  if (result?.died) state.ijaPool = Math.max(0, state.ijaPool - 1);
+  return !!result;
+}
+
+/** 呼叫迫击炮。全集团军的迫击炮数得过来，一局两发 —— 这条稀缺本身就是史实。 */
+function CallMortar() {
+  if (!player.Alive) return;
+  const target = AimPoint(160);
+  const r = combat.CallMortar(target);
+  if (r.ok) {
+    hud.Say("你", `迫击炮，坐标——`, 2.6);
+    hud.Hint(`炮弹在路上（还剩 ${r.left} 发）`, 4);
+  } else {
+    hud.Hint(r.reason, 2.4);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 开火
 // ---------------------------------------------------------------------------
 let fireCooldown = 0;
@@ -525,6 +647,15 @@ function TryFire(dt) {
   if (viewmodel.IsBusy?.()) return;
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
+  if (state.ammo <= 0) {
+    // 空仓那一下：栓停在后面，得自己压桥夹。不提示弹药数（ER2 的步兵 HUD 也不显示），
+    // 但空膛的"咔"必须听得出来，不然玩家不知道自己在空按扳机。
+    audio.Play("bolt", { volume: 0.5 });
+    fireCooldown = 0.35;
+    if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
+    return;
+  }
+  state.ammo -= 1;
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
@@ -636,11 +767,9 @@ function Frame(dt) {
   }
 
   ReadKeys();
-  const wasAlive = player.Alive;
   player.Update(dt, input, WEAPONS[currentWeapon]);
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false;
-  if (wasAlive && !player.Alive) OnPlayerDown();
 
   if (player.Alive) TryFire(dt);
 
@@ -659,16 +788,61 @@ function Frame(dt) {
     crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
   });
 
+  // 友军倒下：叙事层要靠它触发「他倒了我上，我倒了你上」那几句。
+  // 用计数差而不是回调 —— AiDirector 没有死亡事件，加一个回调等于改它的契约，
+  // 而计数差在这里够用且不会漏（同一帧死两个人只报一次，叙事上也没差别）。
+  const alliesNow = ai.CountSide("nra");
+  if (state.prevAllies > 0 && alliesNow < state.prevAllies && story) story.Signal("allyDown");
+  state.prevAllies = alliesNow;
+
   ai.Update(dt, camera);
   vfx.Update(dt, camera, state.elapsed);
+  combat.Update(dt, { phase: PHASES[state.phaseIndex] });
+
+  // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
+  if (state.cooking) state.cook += dt;
   sky.Update(state.elapsed);
   lights.Update(dt, state.elapsed);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
 
+  // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
+  // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
+  // combat.Update 里 —— 判定放在 player.Update 紧后面的话，那一类死法会被整个吞掉：
+  // 不弹卡片、兵员池不扣、不换人，玩家永远躺在地上。
+  if (state.playerAliveLast && !player.Alive) OnPlayerDown();
+  state.playerAliveLast = player.Alive;
+
   const contested = UpdateObjectives(dt);
 
+  // --- 叙事层 ---
+  // 身边六十米内有敌人在开枪 = 正在交火。原剧本的 wave:N / waveClear:N
+  // 就映射到这个计数上 —— 开放战场没有编排好的波次，但"身边打起来了"这件事有。
+  let fighting = false;
+  for (const s2 of ai.soldiers) {
+    if (!s2.alive || s2.side === "nra") continue;
+    if (state.elapsed - s2.lastFire > 2.5) continue;
+    if (s2.position.distanceTo(player.position) < 60) { fighting = true; break; }
+  }
+  story.SetFighting(fighting);
+  const playerZone = battlefield.objectives.find((o) =>
+    Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
+  story.Update(dt, { playerZone: playerZone ? playerZone.id : null });
+  if (story.ObjectiveText) state.storyObjective = story.ObjectiveText;
+
   // 阶段推进：时间到了就往下走（战况只影响兵员池，不影响史实进程）
+  // --- 胜负 ---
+  // 之前兵员池减到 0 也不结束、占领点全丢也不结束、阶段只按时间走 —— 没有胜负的
+  // 战场只是个靶场。这两条是最低限度：人打光了就守不住，撑到最后一夜就是大捷。
+  if (!state.outcome) {
+    if (state.nraPool <= 0 && !player.Alive) EndBattle("defeat");
+    else if (state.phaseIndex === PHASES.length - 1
+      && state.phaseTime > PHASES[state.phaseIndex].minutes * 60 * 0.85) {
+      const held = battlefield.objectives.filter((o) => o.owner === "nra").length;
+      if (held >= 3) EndBattle("victory");
+    }
+  }
+
   state.phaseTime += dt;
   const phase = PHASES[state.phaseIndex];
   if (state.phaseTime > phase.minutes * 60 && state.phaseIndex < PHASES.length - 1) {
@@ -681,7 +855,7 @@ function Frame(dt) {
   // --- HUD ---
   const ourZone = battlefield.objectives.find((o) =>
     Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
-  hud.SetObjective(contested ? `争夺中：${contested}` : (phase.label),
+  hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
     state.nraPool, ourZone ? state.ijaPool : null);
   hud.SetState({
     stance: STANCE[player.stance].label,
@@ -690,6 +864,12 @@ function Frame(dt) {
     bandages: player.bandages,
     breath: player.breathHold,
     order: state.order,
+    // 不显示子弹数（ER2 的步兵 HUD 也不显示，自己数或者听拉栓那一下），
+    // 但手榴弹与集束是要计划的资源，这两个得看得见。
+    grenades: state.grenades,
+    bundles: state.bundles,
+    mortar: combat.MortarReady ? combat.MortarLeft : 0,
+    cooking: state.cooking ? Math.min(1, state.cook / 1.1) : 0,
   });
   hud.SetSuppression(player.suppression);
   hud.SetDamage(Clamp01((1 - player.health / 70)) * 0.62);
@@ -728,6 +908,29 @@ function Frame(dt) {
     damage: Clamp01(1 - player.health / 62) * 0.55,
     motionBlur: 0.15,
   });
+}
+
+/**
+ * 收尾。不打歼敌数 —— 中日双方口径至今没有定论，那是宣传数字不是史实。
+ * 用「日军残部向峄县、枣庄退却」这种事实性表述收场。
+ */
+function EndBattle(outcome) {
+  if (state.outcome) return;
+  state.outcome = outcome;
+  if (outcome === "victory") {
+    hud.ShowEpilogue(EPILOGUE_LINES);
+    audio.Music("aftermath");
+  } else {
+    hud.ShowEpilogue([
+      "台儿庄失守。",
+      "",
+      "史实里没有发生这件事 —— 一九三八年四月七日凌晨，",
+      "中国军队全线反攻，日军残部向峄县、枣庄退却。",
+      "",
+      "第二集团军是拿伤亡逾十分之七换来的。",
+    ]);
+    audio.Music(null);
+  }
 }
 
 /** 出图/测试用：推进固定帧数（不依赖真实时间，画面可复现）。 */

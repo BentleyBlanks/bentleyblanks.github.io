@@ -21,6 +21,12 @@ export class Hud {
     this.noteQueue = [];
     this.noteTimer = 0;
     this.subtitleTimer = 0;
+    this.titleTimer = 0;
+    this.hintTimer = 0;
+    this.briefTimer = 0;
+    this.deathTimer = 0;
+    /** 说过的每一句纯文本。通关冒烟拿它断言剧本真的播了。 */
+    this.spoken = [];
   }
 
   Build() {
@@ -48,6 +54,9 @@ export class Hud {
     this.minimapCtx = this.el.minimap.getContext("2d");
     this.el.deathCard = mk("hudDeathCard");
     this.el.brief = mk("hudBrief");
+    this.el.title = mk("hudTitle");
+    this.el.epilogue = mk("hudEpilogue");
+    this.el.cook = mk("hudCook");
 
     for (const o of ORDERS) {
       const row = document.createElement("div");
@@ -78,14 +87,23 @@ export class Hud {
   }
 
   /** 姿态 / 伤口 / 绷带。**不显示弹药数** —— 自己数，或者听拉栓那一下。 */
-  SetState({ stance, wounded, bleeding, bandages, breath, order }) {
+  SetState({ stance, wounded, bleeding, bandages, breath, order,
+    grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
     const bits = [`<span class="s">${stance}</span>`];
     if (bleeding > 0) bits.push(`<span class="b">流血</span>`);
     else if (wounded) bits.push(`<span class="w">带伤</span>`);
     if (bandages > 0) bits.push(`<span class="g">绷带 ${bandages}</span>`);
+    // 子弹数不显示（ER2 的步兵 HUD 也不显示），但手榴弹与集束是要计划的资源。
+    // 台儿庄真正的主战兵器是手榴弹 —— 第 31 师一役用掉三十万余枚。
+    if (grenades > 0) bits.push(`<span class="n">手榴弹 ${grenades}</span>`);
+    if (bundles > 0) bits.push(`<span class="n">集束 ${bundles}</span>`);
+    if (mortar > 0) bits.push(`<span class="m">迫击炮 ${mortar}</span>`);
     if (breath) bits.push(`<span class="h">屏息</span>`);
     if (order) bits.push(`<span class="c">${order}</span>`);
     this.el.state.innerHTML = bits.join("");
+    // 蓄力条：攥着数几秒再扔，扔得远但引信也在烧。这一对取舍要看得见。
+    this.el.cook.style.width = cooking > 0 ? `${Math.round(cooking * 120)}px` : "0";
+    this.el.cook.classList.toggle("on", cooking > 0);
   }
 
   SetSuppression(v) {
@@ -96,12 +114,34 @@ export class Hud {
     this.el.damage.style.opacity = String(Math.min(1, v));
   }
 
-  Say(speaker, text, seconds = 3.6) {
+  Say(speaker, text, seconds = 3.6, variant = "") {
     this.el.subtitle.innerHTML = speaker
       ? `<span class="who">${speaker}</span><span class="txt">${text}</span>`
       : `<span class="txt narr">${text}</span>`;
-    this.el.subtitle.classList.add("on");
+    this.el.subtitle.className = `hudSubtitle on${variant ? " " + variant : ""}`;
     this.subtitleTimer = seconds;
+    // 留一份纯文本给通关冒烟断言用 —— 靠解析 innerHTML 判断"台词有没有出现过"
+    // 一改样式就会碎，而这条断言是剧本层唯一的回归保护。
+    this.spoken.push(String(text));
+    if (this.spoken.length > 400) this.spoken.shift();
+  }
+
+  /** 章节卡：阶段开场那一行大字。 */
+  Title(text, sub = "") {
+    this.el.title.innerHTML = `<div class="tMain">${text}</div>`
+      + (sub ? `<div class="tSub">${sub}</div>` : "");
+    this.el.title.classList.add("on");
+    this.titleTimer = 4.2;
+    this.spoken.push(String(text));
+  }
+
+  /** 尾声：一行一行浮出来，不打歼敌数。 */
+  ShowEpilogue(lines) {
+    this.el.epilogue.innerHTML = lines
+      .map((l) => (l ? `<div class="eLine">${l}</div>` : `<div class="eGap"></div>`))
+      .join("");
+    this.el.epilogue.classList.add("on");
+    for (const l of lines) if (l) this.spoken.push(String(l));
   }
 
   Hint(text, seconds = 4.5) {
@@ -221,6 +261,10 @@ export class Hud {
     if (this.subtitleTimer > 0) {
       this.subtitleTimer -= dt;
       if (this.subtitleTimer <= 0) this.el.subtitle.classList.remove("on");
+    }
+    if (this.titleTimer > 0) {
+      this.titleTimer -= dt;
+      if (this.titleTimer <= 0) this.el.title.classList.remove("on");
     }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
