@@ -1907,6 +1907,52 @@ export function GaitToeOff(g) {
   return { F: duty * TAU, B: ((duty + 0.5) % 1) * TAU };
 }
 // 走路/跑步的胳膊：与同侧腿反着摆；跑起来抡得大、肘折死
+// ── 步态底片：mocap 循环轨（2026-08-18，用户："做 1 会不会丢掉视频里的真实感"）────────
+// 走/跑不再由 GaitLegs 的弧线拼，而是拿 Script_MocapTrack 导出的**真人循环轨**当底片：
+// 相位 → 轨道时间（每条轨先对齐到"前脚踝迈到最前那一格＝相位 0"，与 GaitLegs 的 u=0
+// 同一个约定，走↔跑之间才插得起来）；走↔跑按 gait 逐关节插值；步频照旧由 World 按
+// WalkCadence 给；脚贴地照旧由 ApplyPose 的地面吸附管（所以底片的 hipY 只是参考，
+// 站在哪儿由腿的几何定）。GaitLegs 留着当兜底：哪个姿势没底片、或轨道被删，就还走它。
+// 猫腰/蹲/爬三支只借底片的**腿**（`legsOnly`），躯干与头照旧按洞顶净高给
+// （POSTURE_HEAD 那笔账在 Core），胳膊各支自己写。
+const LOCO_CLIP = { walk: "mocapWalk", run: "mocapRun", stoop: "mocapStoop", crouch: "mocapCrouch", crawl: "mocapCrawl" };
+const LOCO_LEG_FIELDS = ["thighB", "shinB", "footB", "thighF", "shinF", "footF"];
+const LOCO_ALL_FIELDS = ["hipY", "hipX", "torso", ...LOCO_LEG_FIELDS, "armB", "foreB", "armF", "foreF"];
+function AnkleX(th, sh) { return -BONE.thigh * Math.sin(th) - BONE.shin * Math.sin(th + sh); }
+function LocoSample(name, phase) {
+  const tr = TRACKS[name];
+  if (!tr) return null;
+  if (tr._u0 === undefined) {
+    // 对齐：扫一圈找前脚踝最靠前的那一格，记下它在轨道里的相位
+    let best = -1e9, bu = 0;
+    for (let i = 0; i < 96; i += 1) {
+      const u = i / 96, k = SampleTrack(name, u * tr.dur);
+      const x = AnkleX(k.thighF, k.shinF);
+      if (x > best) { best = x; bu = u; }
+    }
+    tr._u0 = bu;
+  }
+  const u = ((phase / (2 * Math.PI) + tr._u0) % 1 + 1) % 1;
+  return SampleTrack(name, u * tr.dur);
+}
+/**
+ * 用 mocap 底片摆步态。slow/fast 是两条循环轨的名字（缺 fast 就只用 slow），g 0..1 走→跑，
+ * legsOnly 只写腿。返回与 GaitLegs 同形的 {xF, xB}（脚踝相对胯前后，归一到半步），
+ * 底片不存在返回 null——调用处接 `|| GaitLegs(...)`
+ */
+function MocapLegs(target, p, g, o = {}) {
+  const A = LocoSample(o.slow || LOCO_CLIP.walk, p);
+  if (!A) return null;
+  const B = g > 0.001 && o.fast ? LocoSample(o.fast, p) : null;
+  const gg = B ? Math.max(0, Math.min(1, g)) : 0;
+  for (const f of (o.legsOnly ? LOCO_LEG_FIELDS : LOCO_ALL_FIELDS)) {
+    const a = A[f], b = B ? B[f] : a;
+    target[f] = a + (b - a) * gg;
+  }
+  const norm = (v) => Math.max(-1, Math.min(1, v / 0.26));
+  return { xF: norm(AnkleX(target.thighF, target.shinF)), xB: norm(AnkleX(target.thighB, target.shinB)), mocap: true };
+}
+
 function GaitArms(target, gait, g, o = {}) {
   const amp = o.amp ?? Lerp(24, 46, g);
   const fold = o.fold ?? Lerp(16, 46, g);           // 肘的基础折度
@@ -2873,7 +2919,8 @@ export function PoseRig(rig, s, dt) {
     // 两只手还得差着十来度，不然左右手叠成一条粗胳膊。
     if (c) {
       // 走：腿按脚在地上怎么走解（膝盖略屈的矮胯、步子收一档），胳膊跟着反摆
-      const gait = GaitLegs(target, p, 0, { hip: 0.52, stride: 0.46, lift: 0.045, duty: 0.62, backKick: 0.03, kneeUp: 0.02 });
+      const gait = MocapLegs(target, p, 0, { slow: LOCO_CLIP.stoop, legsOnly: true })
+        || GaitLegs(target, p, 0, { hip: 0.52, stride: 0.46, lift: 0.045, duty: 0.62, backKick: 0.03, kneeUp: 0.02 });
       GaitArms(target, gait, 0, { amp: 20, fold: 16, pump: 14 });
     } else {
       target.armB = -6 * DEG;
@@ -2900,7 +2947,8 @@ export function PoseRig(rig, s, dt) {
     target.head = -20 * DEG;
     if (c) {
       // 蹲着挪：胯压得低（膝深屈）、小步、脚几乎不抬
-      const gait = GaitLegs(target, p, 0, { hip: 0.44, stride: 0.34, lift: 0.035, duty: 0.64, backKick: 0.02, kneeUp: 0.01 });
+      const gait = MocapLegs(target, p, 0, { slow: LOCO_CLIP.crouch, legsOnly: true })
+        || GaitLegs(target, p, 0, { hip: 0.44, stride: 0.34, lift: 0.035, duty: 0.64, backKick: 0.02, kneeUp: 0.01 });
       target.armB = (-24 + gait.xB * 8) * DEG;
       target.foreB = -52 * DEG;
       target.armF = (-30 + gait.xF * 8) * DEG;
@@ -2936,7 +2984,8 @@ export function PoseRig(rig, s, dt) {
     let gait = null;
     if (c) {
       const g = Math.max(0, Math.min(1, s.gait || 0)) * (1 - 0.5 * w);   // 提着满桶跑不起来
-      gait = GaitLegs(target, p, g, { stride: Lerp(0.56, 0.66, g) - 0.14 * w, lift: Lerp(0.05, 0.10, g) - 0.02 * w });
+      gait = MocapLegs(target, p, g, { slow: LOCO_CLIP.walk, fast: LOCO_CLIP.run, legsOnly: true })
+        || GaitLegs(target, p, g, { stride: Lerp(0.56, 0.66, g) - 0.14 * w, lift: Lerp(0.05, 0.10, g) - 0.02 * w });
     } else {
       target.thighB = -3 * DEG; target.shinB = 4 * DEG; target.footB = -3 * DEG;
       target.thighF = 3 * DEG; target.shinF = 2 * DEG; target.footF = -3 * DEG;
@@ -2974,7 +3023,8 @@ export function PoseRig(rig, s, dt) {
     // 腿：抱着人步子收一档、脚不抬高。站住时两条腿一前一后错开倒重心，
     // 别让抱着人的姿势又退回"两根平行的棍子"
     if (c) {
-      GaitLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.5, { stride: 0.44, lift: 0.045, backKick: 0.03, kneeUp: 0.02 });
+      MocapLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.5, { slow: LOCO_CLIP.walk, fast: LOCO_CLIP.run, legsOnly: true })
+        || GaitLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.5, { stride: 0.44, lift: 0.045, backKick: 0.03, kneeUp: 0.02 });
     } else {
       target.thighB = (-3 - sway * 2.6) * DEG;
       target.shinB = (4 + sway * 2.0) * DEG;
@@ -3014,7 +3064,8 @@ export function PoseRig(rig, s, dt) {
     target.foreF = -64 * DEG;
     // 后臂：不参与扶，随步子自然摆（跟同侧腿反着）
     if (s.moving) {
-      const gait = GaitLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.6, { stride: 0.48, lift: 0.05, backKick: 0.03, kneeUp: 0.03 });
+      const gait = MocapLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.6, { slow: LOCO_CLIP.walk, fast: LOCO_CLIP.run, legsOnly: true })
+        || GaitLegs(target, p, Math.max(0, Math.min(1, s.gait || 0)) * 0.6, { stride: 0.48, lift: 0.05, backKick: 0.03, kneeUp: 0.03 });
       target.armB = (gait.xB * 18) * DEG;
     } else {
       target.armB = 6 * DEG;
@@ -3033,11 +3084,14 @@ export function PoseRig(rig, s, dt) {
     // 2026-08-18：腿改由 GaitLegs 解（脚在地上怎么走 → 反解出腿），胳膊跟着同侧腿反摆。
     // 起伏、腾空、脚跟抬起都从那儿来；这里只管躯干与头
     const g = Math.max(0, Math.min(1, s.gait || 0));
-    const gait = GaitLegs(target, p, g);
-    target.hipX = 0.03 * g;
-    target.torso = (5 + 13 * g) * DEG;
+    // 有底片走底片（真人的曲线：落地前刹一下、脚跟先着、胳膊晚半拍），没有才拼弧线
+    const gait = MocapLegs(target, p, g, { slow: LOCO_CLIP.walk, fast: LOCO_CLIP.run }) || GaitLegs(target, p, g);
+    if (!gait.mocap) {
+      target.hipX = 0.03 * g;
+      target.torso = (5 + 13 * g) * DEG;
+      GaitArms(target, gait, g);
+    }
     target.head = (-2 - 9 * g) * DEG;      // 躯干压前，脖子抬回来（脸不许冲着自己的脚）
-    GaitArms(target, gait, g);
     const fist = -12 - 30 * g; Hands(target, fist, fist);              // 跑起来手攥成拳
     target.chest = 6 * g * DEG;                                                   // 跑起来含着胸
   } else {

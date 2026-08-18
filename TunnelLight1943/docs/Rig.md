@@ -270,6 +270,14 @@ poseK、几件事挂同一个造型几秒、旁边的人一帧不动，都算）
   步频（跑一步 ≈0.35s）压回去。周期用自相关的**第一个真峰**，不取全局最大（站立相长的信号
   全局最大落在窗口第一格）。左右腿在交叉那一帧常被估计器认反：先按连续性重配再平滑，
   顺序反了会把两条腿平均成一条。
+- 【进游戏了：步态底片】走/跑不再由 `GaitLegs` 的弧线拼——`MocapLegs`（Rig）拿 `LOCO_CLIP`
+  里的两条真人循环轨（`mocapWalk`/`mocapRun`）当底片：相位→轨道时间（每条轨先对齐到"前脚踝
+  迈到最前那一格＝相位 0"，与 GaitLegs 的 u=0 同一约定），走↔跑按 `gait` 逐关节插值；步频照旧
+  `WalkCadence`，脚贴地照旧地面吸附（所以底片的 hipY 只是参考，站在哪儿由腿的几何定）。
+  提桶/扛料/抱孩子那几支只借底片的**腿**（`legsOnly`），胳膊各自写；猫腰/蹲/爬也接了口子
+  （`LOCO_CLIP.stoop/crouch/crawl`），但这轮生的三段素材周期不干净（蹲的几乎不挪、爬的
+  左右腿缠住），**没进 TRACKS，走 GaitLegs 兜底**——轨道不存在时 MocapLegs 返回 null 自动退回。
+  【守着它的】工作台 `walk`/`run` 与 `mocapWalk`/`mocapRun` 并排看；`shot "c1_walk@x=36,hold=d,dur=1,live=1,zoom=player"`。
 - 【坑】① Hub 上 Seedance 2.0 连败三次（每次 15 分钟才报 "seedance task failed"，积分会退），
   MiniMax-H3 768P 9:16 8s 一次成（4 分钟）；Hub 的 `/api/generate/video` 是**同步等到完成**的，
   客户端 8 秒超时断开也没关系，网关自己继续跑、成品落到 `%APPDATA%\@hilo\desktop\output_files`，
