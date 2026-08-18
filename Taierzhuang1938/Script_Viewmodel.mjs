@@ -38,7 +38,16 @@ const DEG = Math.PI / 180;
 // 贴图密度。Script_Geo 的 TILE_METERS 是给建筑调的（砖墙一格 1.2 m），
 // 一支枪只有房子的十分之一大，直接套过来一整支枪只吃到贴图的三十分之一，
 // 木纹会糊成一片色块。这里另立一套"枪械尺度"的格距。
-const VM_TILE = { steel: 0.30, wood: 0.34, cloth: 0.16 };
+//
+// 事故（第 1 轮视觉审查抓到的）：这三个数原本是 0.30 / 0.34 / 0.16，
+// 机匣长 0.245 m ÷ 0.30 = UV 跨度 0.817，而 BakeSteel 的凹坑场是 12 格/UV，
+// 沿枪长正好摊成 10 个凹坑；在 1600×900 上每个凹坑 50 px 宽 —— 机匣读成
+// "带半球凸点的防滑铁板"，不是金属。要的是"一格贴图 = 几毫米的机加工痕"，
+// 所以格距得按**毫米级**给，不是按厘米级。0.055 m 让机匣吃到 4.5 个 UV 跨度、
+// 约 54 个凹坑，缩到 5 px 一个，才读成细密的加工纹。
+// 注意别去动 BuildMaterials 里的 repeat：UV 已经由 MakeBox/ScaleUvInPlace
+// 按世界尺寸算过一遍了，repeat 是在那之上再乘一次，不是这里的旋钮。
+const VM_TILE = { steel: 0.055, wood: 0.085, cloth: 0.045 };
 
 // 眼睛到照门的距离。真实据枪约 8—12 cm，但那样照门会顶到近裁面，
 // 而且遮掉大半个屏幕；15.5 cm 是"看得清缺口又不挡视野"的折中。
@@ -165,11 +174,16 @@ function SafeMaterial(library, name, options, fallback) {
 
 function BuildMaterials(library) {
   return {
-    steel: SafeMaterial(library, "Steel", { repeat: 1, roughness: 0.62, metalness: 1.0, normalScale: 0.8 },
+    // normalScale 跟着 VM_TILE 一起收：格距缩到 1/5.5 之后，同一张法线图在屏幕上
+    // 的坡度会陡 5.5 倍，0.8 会把机加工纹重新打成浮雕。metalness 也从 1.0 退到 0.84 ——
+    // 纯金属没有漫反射项，暗部会塌成纯黑底 + 一排高光点（P1 的 lo 像素 3.4% 就是它）；
+    // 留一点非金属分量，暗部才看得出材质。roughness 提到 0.46 是 1938 年发蓝钢的手感，
+    // 0.62 太哑，反不出拉丝。
+    steel: SafeMaterial(library, "Steel", { repeat: 1, roughness: 0.46, metalness: 0.84, normalScale: 0.20 },
       { color: 0x4d5054, roughness: 0.5, metalness: 0.9 }),
-    // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.6，
-    // 不然近距离看木纹像浮雕（贴图是按 1 m 尺度烘的，贴到 0.3 m 的护木上法线会过强）
-    wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.6 },
+    // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
+    // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
+    wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.24 },
       { color: 0x6d4a2c, roughness: 0.7, metalness: 0 }),
     cloth: SafeMaterial(library, "ClothNra", { repeat: 1, roughness: 0.95, metalness: 0 },
       { color: 0x6e7684, roughness: 0.95, metalness: 0 }),
@@ -304,16 +318,18 @@ function BuildBoltRifle(materials, weapon, key) {
   // --- 枪管 -----------------------------------------------------------------
   const barrelLen = Math.abs(spec.muzzleZ + 0.2175);
   const barrelMidZ = -0.2175 - barrelLen / 2;
-  steel.push(Tube(spec.barrelR, spec.barrelR * 1.32, barrelLen, 12, VM_TILE.steel,
+  // 20 段而不是 12：枪管是全画面离相机最近的圆柱，12 边形在近端每面宽 50 px，
+  // 明暗台阶一眼能数出来 —— 读成方钢不是圆管。多出来的三角形不到 100 个
+  steel.push(Tube(spec.barrelR, spec.barrelR * 1.32, barrelLen, 20, VM_TILE.steel,
     { x: 0, y: bore, z: barrelMidZ }));
   if (spec.jacketR > 0) {
     // 汉阳造的薄套筒：包住枪管前 3/4，尾端留出机匣环
     const jacketLen = barrelLen - 0.09;
-    steel.push(Tube(spec.jacketR, spec.jacketR, jacketLen, 14, VM_TILE.steel,
+    steel.push(Tube(spec.jacketR, spec.jacketR, jacketLen, 20, VM_TILE.steel,
       { x: 0, y: bore, z: -0.2575 - jacketLen / 2 }));
   }
   // 枪口帽/护圈
-  steel.push(Tube(spec.barrelR * 1.5, spec.barrelR * 1.5, 0.024, 12, VM_TILE.steel,
+  steel.push(Tube(spec.barrelR * 1.5, spec.barrelR * 1.5, 0.024, 20, VM_TILE.steel,
     { x: 0, y: bore, z: spec.muzzleZ + 0.012 }));
 
   // --- 木件：护木 + 上护盖 + 枪颈 + 枪托 ------------------------------------
@@ -655,9 +671,14 @@ const BUILDERS = {
  * 各武器的腰射姿态（枪在画面里的位置）。
  * 这张表是最该反复调的东西：枪压得越低越"沉"，越靠右越像端着走。
  */
+// 事故：rifle 原本 pz = -0.095，机匣后端面（局部 z = -0.095 + 0.245/2）停在离
+// 相机 6.75 cm 的地方，机匣在 1600×900 上有 243 px 高 —— 一根横穿右半屏的钢梁。
+// 3A 的第一人称枪机匣在这个分辨率上通常是 110—140 px。把 pz 推到 -0.320
+// （后端面退到 ~29 cm）才落回那个区间。注意**只有 pz 改画面**：整体缩放绕相机
+// 原点是等比的，改 depthBudget 一个像素都不动，它管的是"枪会不会插进墙里"。
 const HIP_POSES = {
-  rifle: { px: 0.088, py: -0.108, pz: -0.095, rx: 0.055, ry: -0.075, rz: 0.030 },
-  lmg: { px: 0.100, py: -0.130, pz: -0.080, rx: 0.070, ry: -0.090, rz: 0.045 },
+  rifle: { px: 0.100, py: -0.142, pz: -0.320, rx: 0.045, ry: -0.060, rz: 0.028 },
+  lmg: { px: 0.100, py: -0.165, pz: -0.300, rx: 0.070, ry: -0.090, rz: 0.045 },
   pistol: { px: 0.055, py: -0.090, pz: -0.140, rx: 0.030, ry: -0.050, rz: 0.020 },
   throwable: { px: 0.130, py: -0.150, pz: -0.130, rx: 0.150, ry: -0.250, rz: 0.100 },
   melee: { px: 0.115, py: -0.165, pz: -0.130, rx: -0.180, ry: -0.420, rz: 0.320 },

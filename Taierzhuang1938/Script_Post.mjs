@@ -138,7 +138,9 @@ void main() {
   // 只有一档半径的话，要么墙角糊成一片灰，要么沙包脚下什么都没有。
   float occlusion = 0.0;
   for (int i = 0; i < SAMPLES; i++) {
-    float radius = (i < 7) ? uRadius : uRadius * 0.22;
+    // 后 7 个抽样走近半径，专抓接触带。0.22 → 0.12：半径本身收到 0.52 之后，
+    // 0.22 那一档已经跨到墙面中段去了，暗带会离根部一截、整片墙发灰
+    float radius = (i < 7) ? uRadius : uRadius * 0.12;
     vec3 samplePos = origin + (tbn * KERNEL[i]) * radius;
     vec4 clip = uProjection * vec4(samplePos, 1.0);
     vec2 suv = (clip.xy / clip.w) * 0.5 + 0.5;
@@ -527,8 +529,11 @@ export class PostPipeline {
 
     this.uniformsAo = {
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
-      uProjection: { value: new THREE.Matrix4() }, uRadius: { value: 0.78 },
-      uBias: { value: 0.030 }, uIntensity: { value: 1.30 }, uFrame: { value: 0 },
+      // 半径 0.52 / 强度 1.85（原来 0.78 / 1.30）：通路本身是对的（双半径 14 抽样 +
+      // 双边模糊 + 只乘 indirectDiffuse），量给小了 —— 沙包脚下、墙地交线、碎砖下缘
+      // 一条暗带都没有，碎砖像贴纸浮在地上。半径收小是为了让暗带贴根而不是整墙发灰。
+      uProjection: { value: new THREE.Matrix4() }, uRadius: { value: 0.52 },
+      uBias: { value: 0.030 }, uIntensity: { value: 1.85 }, uFrame: { value: 0 },
       uProjScale: { value: new THREE.Vector2(1, 1) },
     };
     this.matAo = this._Mat(FRAG_SSAO, this.uniformsAo);
@@ -692,8 +697,8 @@ export class PostPipeline {
       this.uniformsAo.uProjection.value.copy(camera.projectionMatrix);
       this.uniformsAo.uProjScale.value.set(projScaleX, projScaleY);
       this.uniformsAo.uFrame.value = frame;
-      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.78;
-      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.30;
+      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.52;
+      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.85;
       this._Blit(this.matAo, T.ao);
 
       this.uniformsAoBlur.uTexel.value.set(1 / T.ao.width, 1 / T.ao.height);

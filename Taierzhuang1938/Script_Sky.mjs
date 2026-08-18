@@ -79,8 +79,12 @@ void main() {
   // --- 高空烟／云：拉长的 fbm，越靠地平线越压扁 ---
   if (uSmoke > 0.001) {
     vec3 p = dir / max(abs(up) + 0.12, 0.06);
-    float cloud = Fbm3(p * 0.9 + vec3(uTime * 0.006, 0.0, uTime * 0.004));
-    cloud = smoothstep(0.42, 0.86, cloud) * smoothstep(-0.02, 0.22, up);
+    // 事故：原来是 Fbm3(p * 0.9) 配 smoothstep(0.42, 0.86)。五倍频 fbm 的取值
+    // 实际集中在 0.48 ± 0.08，0.86 这个上限相当于 +4.7σ —— 云项恒等于 0，
+    // 白天四张的天全是一块 sRGB 234 的死白。频率提到 5.5 才有云团大小的团块，
+    // 阈值窗口收到 0.445—0.615 才真的落在分布里被触发。
+    float cloud = Fbm3(p * 5.5 + vec3(uTime * 0.006, 0.0, uTime * 0.004));
+    cloud = smoothstep(0.445, 0.615, cloud) * smoothstep(-0.02, 0.22, up);
     // 烟被太阳打透的那一侧要亮：这一笔没有的话烟就是一块贴纸
     vec3 lit = mix(uSmokeColor, uSmokeColor * 2.4 + uSunColor * 0.25, pow(max(sunDot, 0.0), 3.0));
     sky = mix(sky, lit, clamp(cloud * uSmoke, 0.0, 0.94));
@@ -95,8 +99,12 @@ void main() {
 
   // --- 星（夜战关）---
   if (uStars > 0.001 && up > 0.0) {
-    vec3 sp = dir * 190.0;
-    float star = pow(Hash31(floor(sp)), 220.0);
+    // 190 的格距在 1600×900 上一格有 4—8 px 宽，而 floor() 取的是整格常数 ——
+    // 星星就是一个个硬边方块，还会被 FXAA 啃出十字，看着像屏幕坏点。
+    // 900 让一格缩到 1—2 px，再乘一个格内径向衰减把方块磨成圆点。
+    vec3 sp = dir * 900.0;
+    float star = pow(Hash31(floor(sp)), 220.0)
+      * (1.0 - smoothstep(0.15, 0.5, length(fract(sp) - 0.5)));
     sky += vec3(0.85, 0.9, 1.0) * star * uStars * smoothstep(0.02, 0.35, up);
   }
 
@@ -129,11 +137,21 @@ export const SKY_PRESETS = {
     zenith: [1.90, 2.35, 3.20], horizon: [5.40, 5.20, 4.90], ground: [0.58, 0.52, 0.42],
     sunColor: [1.0, 0.92, 0.78], sunIntensity: 120, sunSize: 0.0030, glow: 1.35, glowSpread: 12,
     smoke: 0.72, smokeColor: [3.30, 3.10, 2.85], smokeHeight: 0.30, stars: 0.0,
-    lightColor: 0xffe6c4, lightIntensity: 4.8,
-    hemiSky: 0x9fb0c6, hemiGround: 0x5a4c3c, hemiIntensity: 1.05,
-    envIntensity: 1.20,
+    // 天地比：实测天 sRGB 234 / 地 136 只有 3.4:1 的线性亮度比，屋脊和人的轮廓
+    // 从天上剥不出来。ER2 那种照片感是 6—8:1。修法必须是**降 lightIntensity**
+    // 而不是降 exposure —— 降 exposure 天会跟着一起暗，比例白调。
+    // 同时把半球光拉大（1.05 → 1.40）并把两端拉开：朝上的面吃冷天光、
+    // 屋檐下与下巴吃暖地反光，「暖主光 + 冷阴影」才成立。
+    lightColor: 0xffe6c4, lightIntensity: 3.1,
+    hemiSky: 0x7796c8, hemiGround: 0x6f4c26, hemiIntensity: 1.40,
+    // 真正压住地面亮度的是这一项，不是 lightIntensity。实测：平行光从 4.8 砍到 3.1，
+    // 街景地面/墙面均值只从 sRGB 108 动到 107 —— 这几面墙全在背光侧，亮度几乎
+    // 都来自 scene.environment 那张天空 IBL。1.20 → 0.95 才把均值压到 90—110、
+    // 天仍留在 237，天地线性亮度比从 3.4:1 拉到 6:1 上下。
+    // 别再往下砍：试过 0.75，地面掉到 74，暗部糊成一片。
+    envIntensity: 0.95,
     fog: { density: 0.0125, falloff: 20, max: 0.94,
-      sky: [0.72, 0.70, 0.66], ground: [0.44, 0.40, 0.34], sunGain: 0.24,
+      sky: [0.72, 0.70, 0.66], ground: [0.38, 0.39, 0.42], sunGain: 0.24,
       desat: 0.50, flatten: 0.15 },
     exposure: 0.42, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
   },
@@ -158,9 +176,9 @@ export const SKY_PRESETS = {
     zenith: [0.78, 0.92, 1.35], horizon: [3.90, 2.55, 1.45], ground: [0.50, 0.40, 0.30],
     sunColor: [1.0, 0.70, 0.38], sunIntensity: 88, sunSize: 0.0034, glow: 2.4, glowSpread: 13,
     smoke: 0.88, smokeColor: [1.85, 1.35, 1.00], smokeHeight: 0.36, stars: 0.0,
-    lightColor: 0xffbb80, lightIntensity: 3.9,
-    hemiSky: 0x8a7f8c, hemiGround: 0x63472e, hemiIntensity: 0.95,
-    envIntensity: 1.20,
+    lightColor: 0xffbb80, lightIntensity: 2.7,
+    hemiSky: 0x6a7ba8, hemiGround: 0x63472e, hemiIntensity: 1.30,
+    envIntensity: 0.95,
     fog: { density: 0.0165, falloff: 16, max: 0.95,
       sky: [0.74, 0.52, 0.36], ground: [0.42, 0.32, 0.26], sunGain: 0.38,
       desat: 0.45, flatten: 0.13 },
@@ -171,7 +189,7 @@ export const SKY_PRESETS = {
     sunElevation: 34, sunAzimuth: 96,
     zenith: [0.020, 0.030, 0.062], horizon: [0.075, 0.086, 0.125], ground: [0.026, 0.026, 0.032],
     sunColor: [0.52, 0.62, 0.92], sunIntensity: 2.4, sunSize: 0.010, glow: 0.22, glowSpread: 7,
-    smoke: 0.55, smokeColor: [0.085, 0.095, 0.130], smokeHeight: 0.26, stars: 1.0,
+    smoke: 0.55, smokeColor: [0.085, 0.095, 0.130], smokeHeight: 0.26, stars: 0.55,
     lightColor: 0x9fb4e8, lightIntensity: 0.42,
     hemiSky: 0x2b3a5c, hemiGround: 0x171310, hemiIntensity: 0.30,
     envIntensity: 1.40,
@@ -186,9 +204,9 @@ export const SKY_PRESETS = {
     zenith: [0.50, 0.72, 1.30], horizon: [4.60, 2.70, 1.45], ground: [0.48, 0.40, 0.32],
     sunColor: [1.0, 0.64, 0.36], sunIntensity: 105, sunSize: 0.0044, glow: 3.6, glowSpread: 15,
     smoke: 0.58, smokeColor: [1.80, 1.25, 0.90], smokeHeight: 0.21, stars: 0.04,
-    lightColor: 0xffc890, lightIntensity: 4.4,
-    hemiSky: 0x7e8eae, hemiGround: 0x50402f, hemiIntensity: 0.92,
-    envIntensity: 1.30,
+    lightColor: 0xffc890, lightIntensity: 3.0,
+    hemiSky: 0x6b84b8, hemiGround: 0x50402f, hemiIntensity: 1.30,
+    envIntensity: 1.05,
     fog: { density: 0.0090, falloff: 24, max: 0.93,
       sky: [0.92, 0.60, 0.40], ground: [0.42, 0.33, 0.27], sunGain: 0.45,
       desat: 0.42, flatten: 0.11 },

@@ -635,23 +635,45 @@ export function AddTree(sink, { x, z, seed = "t", scale = 1 }) {
   }
   trunk.computeVertexNormals();
   const uv = trunk.attributes.uv;
-  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 1.2);
+  // h/1.2 会把一棵 7 m 的树只切成六格，树皮被竖着拉成一根水泥杆上的条纹。
+  // h/0.45 才是"一格 45 cm"的树皮尺度
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 0.45);
   sink.Add("WoodBeam", PlaceGeometry(trunk, { x, y: h / 2, z }));
   // 枝条：几根细长的分叉，不加叶片团
+  //
+  // 事故（第 1 轮视觉审查抓到的）：枝条中心放在 cos(a)*len*0.42*sin(tilt)，
+  // 而旋转写的是 rz = cos(a)*tilt, rx = sin(a)*tilt —— 位置的方位角基与欧拉角的
+  // 方位角基根本不是同一套，结果是三四根枝条**跟树干脱开、悬在半空**。
+  // 改法：先把枝条的原点从"杆中点"挪到"根端"（PlaceGeometry y: len/2），
+  // 之后整根按 ry = a 转方位、rz = tilt 扳倒，再摆到树干上的挂点。
+  // 这样根端永远压在 (0, h*t, 0) 上，怎么转都接得住。
   const branches = [];
-  const count = 7 + Math.floor(rnd() * 5);
+  // 挂点从 0.45—0.95 收到 0.62—0.96：杨柳的枝在上三分之一，下面是净杆
+  const count = 11 + Math.floor(rnd() * 6);
   for (let i = 0; i < count; i += 1) {
-    const t = 0.45 + rnd() * 0.5;
+    const t = 0.62 + rnd() * 0.34;
     const len = (1.2 + rnd() * 2.2) * scale;
     const a = rnd() * Math.PI * 2;
     const tilt = 0.5 + rnd() * 0.7;
-    const g = new THREE.CylinderGeometry(0.02 * scale, 0.06 * scale, len, 5);
-    branches.push(PlaceGeometry(g, {
-      x: Math.cos(a) * len * 0.42 * Math.sin(tilt),
-      y: h * t + Math.cos(tilt) * len * 0.42,
-      z: Math.sin(a) * len * 0.42 * Math.sin(tilt),
-      rz: Math.cos(a) * tilt, rx: Math.sin(a) * tilt,
-    }));
+    const g = PlaceGeometry(
+      new THREE.CylinderGeometry(0.02 * scale, 0.06 * scale, len, 5), { y: len / 2 });
+    const anchor = { x: 0, y: h * t, z: 0, ry: a, rz: tilt };
+    branches.push(PlaceGeometry(g, anchor));
+    // 二级枝：轮廓端点数从 9 个升到 40 个上下，才读得出"三月枝条透光、新叶未展"
+    for (let j = 0; j < 3; j += 1) {
+      const sub = (0.34 + rnd() * 0.10) * len;
+      const along = 0.45 + j * 0.22 + rnd() * 0.12;
+      const g2 = PlaceGeometry(
+        new THREE.CylinderGeometry(0.010 * scale, 0.022 * scale, sub, 4), { y: sub / 2 });
+      // 先在主枝的局部系里挂好（沿主枝长度 along、再偏 0.5—0.9 rad），
+      // 然后整体套上主枝那一套 anchor —— 父子变换手动展开一层
+      const local = PlaceGeometry(g2, {
+        y: len * along,
+        ry: rnd() * Math.PI * 2,
+        rz: 0.5 + rnd() * 0.4,          // 相对主枝再偏 0.5—0.9 rad
+      });
+      branches.push(PlaceGeometry(local, anchor));
+    }
   }
   sink.Add("WoodBeam", PlaceGeometry(MergeGeometries(branches), { x, y: 0, z }));
   sink.Solid(x, h / 2, z, 0.3 * scale, h / 2, 0.3 * scale, "prop");

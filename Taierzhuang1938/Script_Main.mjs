@@ -24,6 +24,12 @@ import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT } f
 import { HISTORY_NOTES } from "./Data_History.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
+// 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
+// 别照着"近景要几个人"直接填这两个数 —— 实测一个 Actor 是 **37 个 draw call**
+// （身体部件没合批），撒 14 个近身兵就把 phase4 的 calls 从 1043 顶到 1468，
+// 越过 1400 的红线。5 + 4 落在 1300 上下。要再加人，先去合批 Actor。
+const NEAR_SQUAD = { nra: 5, ija: 4 };
+
 const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
@@ -60,7 +66,9 @@ const post = new PostPipeline(renderer, {
 const ssao = {
   map: { value: post.AoTexture },
   resolution: { value: new THREE.Vector2(post.targets.aoBlur.width, post.targets.aoBlur.height) },
-  strength: { value: 0.78 },
+  // 0.95：AO 只乘在 indirectDiffuse 上，而第 6 条把 hemiIntensity 拉高之后
+  // 间接光在总光里的占比变大了，同样的强度在画面上的可见度本来就会翻倍
+  strength: { value: 0.95 },
 };
 const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
 const sky = new SkyDome(renderer);
@@ -85,6 +93,7 @@ const state = {
   order: "follow",
   ordersOpen: false,
   spawnAccumulator: 0,
+  smokeHandles: [],           // 常驻烟柱的 handle，换阶段时要一根根拆掉
 };
 
 let battlefield = null;
@@ -131,7 +140,17 @@ async function Boot() {
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
   vfx = new VfxSystem(scene, library, { quality: QUALITY, maxParticles: SCALE.vfxBudget });
-  viewmodel = new Viewmodel(library, { fov: 52 });
+  // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
+  // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
+  // 别放进 EnterPhase —— 每换一关重建一次粒子网格是白扔的 GC。
+  vfx.AmbientDust(new THREE.Box3(
+    new THREE.Vector3(battlefield.bounds.minX, 0, battlefield.bounds.minZ),
+    new THREE.Vector3(battlefield.bounds.maxX, 22, battlefield.bounds.maxZ)), 0.075);
+  // depthBudget 1.22（默认 0.90）：腰射姿态把枪往前推到 pz = -0.32 之后，
+  // 最深点（枪口 + 刺刀）变成 |0.32 + 0.8175| + 0.04 + 0.02 ≈ 1.20 m，
+  // 沿用 0.90 会被 _RecomputeCompensation 压到 0.55 的下限，枪整体缩到眼前 ——
+  // 画面不变（等比缩放绕相机原点是恒等的），但枪口离眼睛只剩半米，贴墙时会穿模
+  viewmodel = new Viewmodel(library, { fov: 52, depthBudget: 1.22 });
   camera.add(viewmodel.root);
   scene.add(camera);
   // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，
@@ -185,13 +204,102 @@ function EnterPhase(index, initial = false) {
   // 战线：反攻阶段之前，日军从北往南推；反攻阶段反过来
   if (initial || !player.Alive) RespawnPlayer(true);
   SeedSoldiers(phase);
+  SeedSmokeColumns(phase);
+}
+
+/**
+ * 按阶段挂三根常驻烟柱。
+ *
+ * 为什么非有不可：台儿庄打了半个月，天上一直是烟。没有烟柱的空街等于没打过仗，
+ * 而且烟柱是这个场景里唯一能在三百米外读出来、又能把构图竖着切开的东西。
+ * VfxSystem.SmokeSource 早就写好了，一次都没被调用过 —— 这里只是接线。
+ *
+ * 选点：优先已被日方拿下的目标（那儿在烧），不够就按离玩家的距离补。
+ * 排掉 45 m 以内的：烟柱底盘半径十几米，长在脸上就是一堵灰墙。
+ */
+function SeedSmokeColumns(phase) {
+  for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
+  state.smokeHandles.length = 0;
+
+  const px = player.position.x;
+  const pz = player.position.z;
+  const ranked = battlefield.objectives
+    .map((o) => ({ o, far: Math.hypot(o.x - px, o.z - pz) }))
+    .filter((e) => e.far > 45)
+    .sort((a, b) => {
+      const ka = a.o.owner === "ija" ? 0 : 1;
+      const kb = b.o.owner === "ija" ? 0 : 1;
+      if (ka !== kb) return ka - kb;
+      return a.far - b.far;
+    });
+
+  const burning = phase.sky === "burningStreet";
+  for (const entry of ranked.slice(0, 3)) {
+    const { o } = entry;
+    const y = battlefield.GroundHeight(o.x, o.z) + 1.1;
+    // rate 15 而不是拍脑袋的 26：烟池容量 = vfxBudget × 0.30，小规模档只有 660 个，
+    // 三根柱子 × 26/s × 9 s ≈ 700 会把池子占满，爆炸和枪口烟就一个都出不来了
+    state.smokeHandles.push(vfx.SmokeSource({ x: o.x, y, z: o.z }, {
+      kind: "black", rate: 15, radius: 1.1, rise: 3.4,
+      sizeStart: 1.2, sizeEnd: 11.0, life: 9.0, opacity: 0.34,
+      fire: burning ? 0.35 : 0,
+    }));
+  }
+}
+
+/** 玩家周围半径 r 米内还活着的某一方人数。近身班组靠它「补齐」而不是「每次都加」。 */
+function CountNear(side, radius) {
+  let n = 0;
+  for (const s of ai.soldiers) {
+    if (!s.alive || s.side !== side) continue;
+    if (Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z) <= radius) n += 1;
+  }
+  return n;
 }
 
 /** 按阶段撒兵：中方守占领点，日方从北面压上来。 */
 function SeedSoldiers(phase) {
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
+  // 两个目标数**不减**近身班组：下面两个循环的起点是 CountSide(...)，
+  // 近身班组撒完就已经计进去了。再减一次是双重扣减 ——
+  // 实测那么写会让 phase0 的存活人数从 32 掉到 19，等于把兵搬到镜头前又搬没了。
   const nraTarget = Math.round(SCALE.maxAlive * 0.45);
   const ijaTarget = Math.round(SCALE.maxAlive * 0.5 * phase.ijaPressure / 1.3);
+
+  // --- 近身班组 -------------------------------------------------------------
+  // 事故：实测 59—70 人存活，但 40 m 内只有 1—3 人、120 m 外 43—49 人，
+  // 而 fog.max = 0.94 —— 兵是有的，全被雾墙吃掉了，同屏「一个能辨认的人都没有」。
+  // 撒兵原本只按占领点铺，占领点离玩家动辄一两百米。这里按**镜头**再补一层：
+  // 12—34 m 的环里放中方（近景剪影），55—110 m 的视线方向上放日方（中景）。
+  // 用「补齐到 N」而不是「每次加 N」：SeedSoldiers 每 3 秒被调一次，
+  // 无条件加人会在半分钟内把整个 maxAlive 名额全填成玩家脚边的人。
+  const px = player.position.x;
+  const pz = player.position.z;
+  const fx = -Math.sin(player.yaw);
+  const fz = -Math.cos(player.yaw);
+  for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra; i += 1) {
+    // 前向弧而不是整圈：整圈撒 5 个人，85° 的水平视场只兜得住 1 个。
+    // 这一班本来就是"跟着你往前打"的，压在前方 ±110° 里既合理又让同屏多两个人。
+    // 直接转前向量，不要去凑"yaw 对应的极角"—— player.yaw 的零向是 -Z，
+    // 跟 atan2(z, x) 差一个 -yaw - π/2，凭印象写必错，兵会撒到背后去
+    const a = (rnd() - 0.5) * 3.8;
+    const dx = fx * Math.cos(a) - fz * Math.sin(a);
+    const dz = fz * Math.cos(a) + fx * Math.sin(a);
+    const r = 12 + rnd() * 22;
+    const open = FindOpenSpot(px + dx * r, pz + dz * r, 6,
+      31337 + i * 907 + state.phaseIndex * 53);
+    const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
+    // 不给 holdZone：这一班是跟着镜头走的，钉在占领区里就又跑没影了
+    if (s) { s.holdZone = null; s.goal.set(px + fx * 15, 0, pz + fz * 15); }
+  }
+  for (let i = CountNear("ija", 110); i < NEAR_SQUAD.ija; i += 1) {
+    const d = 55 + rnd() * 55;
+    const lateral = (rnd() - 0.5) * 46;
+    const open = FindOpenSpot(px + fx * d - fz * lateral, pz + fz * d + fx * lateral, 8,
+      65521 + i * 1361 + state.phaseIndex * 89);
+    const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
+    if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
+  }
 
   // 中方：守住还在自己手里的点
   const ours = battlefield.objectives.filter((o) => o.owner === "nra");
