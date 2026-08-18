@@ -17,7 +17,7 @@ export const TILE_METERS = {
  * 按世界尺寸重算 BoxGeometry 的 UV，使各面贴图密度一致。
  * BoxGeometry 的面序固定为 +x, -x, +y, -y, +z, -z，每面 4 个顶点。
  */
-export function ScaleBoxUv(geometry, w, h, d, unitsPerTile, offsetSeed = "") {
+export function ScaleBoxUv(geometry, w, h, d, unitsPerTile, offsetSeed = "", grid = null) {
   const uv = geometry.attributes.uv;
   const faces = [
     [d, h], [d, h],   // ±x
@@ -25,14 +25,23 @@ export function ScaleBoxUv(geometry, w, h, d, unitsPerTile, offsetSeed = "") {
     [w, h], [w, h],   // ±z
   ];
   const rnd = Mulberry32(HashString(String(offsetSeed)));
+  // grid = { u, v, mirror }：把随机偏移**吸附到贴图自己的格子上**（砖墙给 1/列、1/行）。
+  // 为什么非要吸附：AddWall 把一段墙切成 0.85 m 一片，每片各取一个连续随机偏移，
+  // 相邻两片的横向灰缝就错开半皮砖 —— 一面墙上的砖缝每 0.85 m 断一次，
+  // 拐角处两面墙也对不上。吸附到整砖之后，图案照样每片不同，而灰缝是连的。
+  const snap = (value, step) => (step > 0 ? Math.round(value / step) * step : value);
   for (let f = 0; f < 6; f += 1) {
     const [su, sv] = faces[f];
     // 每个面给一个随机偏移：同规格的墙复制五面，不错开一眼看穿是同一块
-    const ou = rnd() * 4, ov = rnd() * 4;
+    let ou = rnd() * 4, ov = rnd() * 4;
+    // 镜像：约一半的面把 U 取负。three 默认的法线贴图走屏幕空间导数求切线
+    //（perturbNormal2Arb），UV 翻向时切线自己跟着翻，所以不会翻出错误的凹凸方向。
+    const flip = grid && grid.mirror && rnd() < 0.5 ? -1 : 1;
+    if (grid) { ou = snap(ou, grid.u || 0); ov = snap(ov, grid.v || 0); }
     for (let i = 0; i < 4; i += 1) {
       const idx = f * 4 + i;
       uv.setXY(idx,
-        uv.getX(idx) * (su / unitsPerTile) + ou,
+        uv.getX(idx) * (su / unitsPerTile) * flip + ou,
         uv.getY(idx) * (sv / unitsPerTile) + ov);
     }
   }
@@ -41,11 +50,17 @@ export function ScaleBoxUv(geometry, w, h, d, unitsPerTile, offsetSeed = "") {
 }
 
 /** 建一块 UV 已经改好的方料。 */
-export function MakeBox(w, h, d, unitsPerTile = 1.2, seed = "box") {
+export function MakeBox(w, h, d, unitsPerTile = 1.2, seed = "box", grid = null) {
   const geometry = new THREE.BoxGeometry(w, h, d);
-  ScaleBoxUv(geometry, w, h, d, unitsPerTile, seed);
+  ScaleBoxUv(geometry, w, h, d, unitsPerTile, seed, grid);
   return geometry;
 }
+
+/**
+ * 砖墙贴图自己的格子：一格贴图 10 列 × 20 行砖（见 Script_TexBake 的 rowsPerTile）。
+ * 只给砖墙用 —— 夯土、瓦、木头没有整齐的格，吸附反而会把它们的随机性吃掉。
+ */
+export const BRICK_UV_GRID = { u: 1 / 10, v: 1 / 20, mirror: true };
 
 /** 平面（地面/屋面）：同样按米算 UV。 */
 export function MakePlane(w, d, unitsPerTile = 2.6, segments = 1) {

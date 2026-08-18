@@ -47,7 +47,10 @@ const DEG = Math.PI / 180;
 // 约 54 个凹坑，缩到 5 px 一个，才读成细密的加工纹。
 // 注意别去动 BuildMaterials 里的 repeat：UV 已经由 MakeBox/ScaleUvInPlace
 // 按世界尺寸算过一遍了，repeat 是在那之上再乘一次，不是这里的旋钮。
-const VM_TILE = { steel: 0.055, wood: 0.085, cloth: 0.045 };
+// steel 再从 0.055 收到 0.030：0.055 已经让机匣读成"喷砂混凝土"级的均匀细麻点，
+// 密度对了但颗粒还是太大。0.030 让机匣吃到约 8 个 UV 跨度、每个凹坑缩到 3 px 以内，
+// 才读成机加工的细纹而不是砂面。
+const VM_TILE = { steel: 0.030, wood: 0.085, cloth: 0.045 };
 
 // 眼睛到照门的距离。真实据枪约 8—12 cm，但那样照门会顶到近裁面，
 // 而且遮掉大半个屏幕；15.5 cm 是"看得清缺口又不挡视野"的折中。
@@ -187,9 +190,20 @@ function BuildMaterials(library) {
       { color: 0x6d4a2c, roughness: 0.7, metalness: 0 }),
     cloth: SafeMaterial(library, "ClothNra", { repeat: 1, roughness: 0.95, metalness: 0 },
       { color: 0x6e7684, roughness: 0.95, metalness: 0 }),
-    // 土黄肤色。北方农家子弟常年日晒，不是白手，也不该是橙色的塑料手
-    skin: library.Plain("VmSkin", { color: 0xb07c50, roughness: 0.74, metalness: 0 }),
-    skinDark: library.Plain("VmSkinDark", { color: 0x8f6440, roughness: 0.78, metalness: 0 }),
+    // 土黄肤色。北方农家子弟常年日晒，不是白手，也不该是橙色的塑料手。
+    //
+    // 从 Plain（纯色无贴图）换成借布料的高度场：手是全屏**最近**的物体，纯色面
+    // 意味着离镜头三十厘米的东西反而是整幅画里最糊的一个，一眼就把观感拉到塑料。
+    // 布的法线在这个尺度上读出来正好是指缝与掌骨的层次（不是布纹 —— VM_TILE.cloth
+    // 的格距只有 4.5 cm，一只手吃不到两格，看到的是低频起伏而不是织纹）。
+    // 颜色同时退饱和：实测原来渲出来约 (240,175,125)、色相 24° 饱和 48%，
+    // 在夜战的深蓝底上直接爆成贴纸；0x9c6f4a 落到约 (200,150,110) / 饱和 32%。
+    skin: SafeMaterial(library, "ClothNra",
+      { repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.35, color: 0x9c6f4a },
+      { color: 0x9c6f4a, roughness: 0.74, metalness: 0 }),
+    skinDark: SafeMaterial(library, "ClothNra",
+      { repeat: 1, roughness: 0.76, metalness: 0, normalScale: 0.35, color: 0x7d5a3c },
+      { color: 0x7d5a3c, roughness: 0.78, metalness: 0 }),
     brass: library.Plain("VmBrass", { color: 0xb08a3c, roughness: 0.34, metalness: 0.95 }),
     blued: library.Plain("VmBlued", { color: 0x2b2e31, roughness: 0.42, metalness: 1.0 }),
     leather: library.Plain("VmLeather", { color: 0x3a2c22, roughness: 0.86, metalness: 0 }),
@@ -337,8 +351,14 @@ function BuildBoltRifle(materials, weapon, key) {
   wood.push(Box(0.044, 0.050, forendLen, VM_TILE.wood, `${key}fore`,
     { x: 0, y: bore - 0.036, z: (spec.forend[0] + spec.forend[1]) / 2 }));
   const guardLen = spec.handguard[0] - spec.handguard[1];
-  wood.push(Box(0.032, 0.020, guardLen, VM_TILE.wood, `${key}guard`,
-    { x: 0, y: bore + 0.020, z: (spec.handguard[0] + spec.handguard[1]) / 2 }));
+  // 上护盖顶面必须**低于瞄准基线**（基线 = bore + 0.026，照门缺口与准星尖都在那儿）。
+  // 原来是 y = bore + 0.020、厚 0.020，顶面 bore + 0.030 —— 比基线还高 4 mm。
+  // 4 mm 在腰射时看不出来，开镜时护盖近端离眼睛只有 7.7 cm，那 4 mm 张成
+  // 整整半个屏幕高：出图上就是横在准星上方、把目标全糊掉的一块木板（实测顶边
+  // 落在 y=393 px，而画面中心是 450）。压到 bore + 0.013、厚 0.018，顶面
+  // bore + 0.022 —— 比基线低 4 mm，护盖就退成基线下方那道朝枪口收拢的楔形。
+  wood.push(Box(0.032, 0.018, guardLen, VM_TILE.wood, `${key}guard`,
+    { x: 0, y: bore + 0.013, z: (spec.handguard[0] + spec.handguard[1]) / 2 }));
   // 枪颈（握持处）：从机匣后下方斜向枪托
   wood.push(Box(0.038, 0.058, 0.185, VM_TILE.wood, `${key}wrist`, { x: 0, y: bore - 0.040, z: 0.105, rx: 0.055 }));
   // 托底：略下垂 + 加厚，这是"抵肩"的形
@@ -773,6 +793,9 @@ export class Viewmodel {
     this.airTime = 0;
     this.compensation = new THREE.Vector3(1, 1, 1);
     this.worldFovBase = 0;
+    // 开镜时要藏掉的部件（见 _CollectAdsHideParts）。带迟滞，别在阈值上抖。
+    this.adsHideParts = [];
+    this.adsHidden = false;
     this.cameraKick = new THREE.Vector2();
     this.cameraKickTaken = new THREE.Vector2();
 
@@ -954,6 +977,8 @@ export class Viewmodel {
     this.adsPose = this._MakeAdsPose(kind);
     this.sprintPose = this._MakeSprintPose(kind);
 
+    this._CollectAdsHideParts();
+
     // 深度预算：整体等比缩 s（画面不变，但枪不再插墙）
     this._RecomputeCompensation(60);
 
@@ -966,6 +991,36 @@ export class Viewmodel {
     // 于是整支枪的间接光被乘成 0，画面下方就是一坨黑。
     if (this.markNoPrepass) this.markNoPrepass();
     return this;
+  }
+
+  /**
+   * 收集"开镜时必须藏掉"的部件。
+   *
+   * 为什么需要这个：开镜姿态的数学本身是**对的** —— 实测 ads=1 时照门落在相机空间
+   * (−0.5 mm, −0.3 mm, −141 mm)，正中且共轴。挡住画面的是几何跨过近裁面：
+   * 相机就架在握持点后面 14 cm，而右小臂的袖口（cuffA/cuffB/fore 三块）在
+   * rig 局部 z ∈ [−0.218, −0.042]，也就是横跨眼位、在相机前 6.6 cm 处被 near=0.06
+   * 切开 —— 出图上就是画面正中下方那一大团橙色。右手掌本身更是整个落在相机**后面**，
+   * 一个像素都用不上，白占两个 draw call。
+   *
+   * 为什么不用"包围盒 max.z 大于阈值就藏"那种通用规则：rig 的木件/钢件各自是一个
+   * **合并网格**（护木 + 上护盖 + 枪颈 + 枪托合成一块），包围盒 max.z 是枪托底板，
+   * 按那个规则会把整支枪连照门准星一起藏掉。所以这里按"角色"点名，不按包围盒。
+   *
+   * 只在有照门的武器上生效：大刀/手榴弹的"开镜"是个举到眼前的预备姿势，
+   * 右手是主体，藏了就是一把悬空的刀。
+   */
+  _CollectAdsHideParts() {
+    this._RestoreAdsHideParts();
+    this.adsHideParts = [];
+    if (!this.rig || !this.rig.sight) return;
+    for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
+  }
+
+  /** 把藏起来的部件放回来（换枪、腰射时都要走一趟，不然枪换了手还是隐形的）。 */
+  _RestoreAdsHideParts() {
+    for (const mesh of this.adsHideParts) mesh.visible = true;
+    this.adsHidden = false;
   }
 
   /**
@@ -1214,6 +1269,15 @@ export class Viewmodel {
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
+    // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
+    if (this.adsHideParts.length) {
+      if (!this.adsHidden && ads > 0.55) {
+        for (const mesh of this.adsHideParts) mesh.visible = false;
+        this.adsHidden = true;
+      } else if (this.adsHidden && ads < 0.45) {
+        this._RestoreAdsHideParts();
+      }
+    }
     const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput));
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));

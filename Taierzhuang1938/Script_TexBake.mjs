@@ -103,7 +103,10 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
     const colF = u * cols + offset;
     const col = Math.floor(colF);
     const inCol = colF - col;
-    const jitter = Mulberry32(((row * 977 + col * 131) >>> 0) + seed * 7919)();
+    // 逐砖随机数必须用**大素数异或**混，别用 row*977 + col*131 这种线性组合：
+    // Mulberry32 对线性相关的种子只做一轮乘加，出来的首值仍带线性结构 ——
+    // 砖多了一倍以后，那点结构在墙上聚成两三块砖宽的米黄色斑，整面墙读作迷彩。
+    const jitter = Mulberry32((((row * 92837111) ^ (col * 689287499) ^ (seed * 283923481)) >>> 0))();
 
     // 灰缝：横缝比竖缝深（坐浆厚、立缝薄）
     const dh = Math.min(inRow, 1 - inRow);
@@ -113,23 +116,40 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
     const grain = TileableFbm2(u * 42, v * 42, 42, { octaves: 4, seed: seed + 11 });
     const coarse = TileableFbm2(u * 7, v * 7, 7, { octaves: 3, seed: seed + 23 });
 
-    // 剥落：Worley 斑块把砖角啃掉
-    const w = Worley2(u * 9, v * 9, seed + 313, 9);
-    const chip = SmoothStep(0.18, 0.02, w.f1) * damage * (0.4 + jitter * 0.6);
+    // 剥落：Worley 斑块把砖角啃掉。
+    //
+    // 事故：原来是 Worley2(u*9, v*9, …, 9)，而砖格是 cols×rows。9×9 个斑点铺在
+    // 6×12 块砖上，比例接近 1:1 —— 出图上每一块砖的**同一个相对位置**都长着一颗
+    // 深色圆斑，整面墙读成冲压出来的花纹板。这是截图里最一眼假的一处。
+    // 两条都要改：① 频率取 7 —— 与砖格的 10 列 / 20 行互质，斑点不再和砖一一对应
+    //   （u 与 v 必须同频：Worley2 的 period 只有一个，给不同频率就会在
+    //    v = period/freq 处裂一条硬缝，比原来的毛病还大）；
+    // ② 剥落是偶发事件，不是每块砖的固有属性 —— 用 jitter 做门限，只约三成砖被啃。
+    // ③ 门限要用**另一个**哈希：jitter 已经在下面决定"这块砖是不是偏暖色"
+    //   （mixWarm 的 0.72 门限），再拿同一个数当剥落门限，暖色砖与剥落砖就是同一批 ——
+    //   两笔叠在一起把三成砖刷成同一种米黄，整面墙读作迷彩瓷砖（实测比原来的
+    //   点阵还难看，这一步是回调出来的，不是推出来的）。
+    const w = Worley2(u * 7, v * 7, seed + 313, 7);
+    const chipRnd = Mulberry32(((row * 613 + col * 1097) >>> 0) + seed * 131)();
+    const chipGate = SmoothStep(0.66, 0.88, chipRnd);
+    const chip = SmoothStep(0.15, 0.02, w.f1) * damage * chipGate;
 
     const h = Clamp01(joint * 0.72 + 0.14 + grain * 0.1 + coarse * 0.06 - chip * 0.55);
 
     // 窑变：青砖出窑深浅不一，一面墙全同色一眼假
-    const tone = 0.82 + jitter * 0.36;
+    // 窑变的**幅度**要跟着砖的密度收：一格贴图从 12×6 块砖变成 20×10 块之后，
+    // 同样 ±18% 的明暗跳变在屏幕上的空间频率高了近三倍，读出来不是"青砖深浅不一"，
+    // 是一面灰米两色的马赛克。0.36 → 0.24、暖色混合 0.7 → 0.5。
+    const tone = 0.88 + jitter * 0.24;
     const brick = [138 * tone, 140 * tone, 137 * tone];
     const brickWarm = [152 * tone, 143 * tone, 126 * tone];
-    const mixWarm = jitter > 0.72 ? 0.7 : 0.12;
+    const mixWarm = jitter > 0.72 ? 0.5 : 0.12;
     const base = [0, 0, 0];
     for (let c = 0; c < 3; c += 1) base[c] = Mix(brick[c], brickWarm[c], mixWarm);
     const mortarCol = [166, 162, 152];
     for (let c = 0; c < 3; c += 1) base[c] = Mix(mortarCol[c], base[c], joint);
     const fresh = [138, 126, 106];
-    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], fresh[c], SmoothStep(0.02, 0.5, chip));
+    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], fresh[c], SmoothStep(0.06, 0.60, chip));
     // 烟熏：墙根与随机竖条发黑（台儿庄的房子烧过）
     const soot = Clamp01(TileableFbm2(u * 3.1, v * 2.2, 3, { octaves: 4, seed: seed + 57 }) * 1.6 - 0.55) * sootiness;
     for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], 26, soot);
@@ -237,9 +257,21 @@ export function BakeWood(size = 512, { seed = 4, hue = [110, 84, 54], planks = 5
 export function BakeCloth(size = 256, { seed = 5, hue = [104, 110, 116], threads = 28, grime = 0.4 } = {}) {
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
-    const wu = Math.sin(u * threads * Math.PI * 2);
-    const wv = Math.sin(v * threads * Math.PI * 2);
-    const weave = (wu * 0.5 + 0.5) * (wv * 0.5 + 0.5);      // 平纹：经纬交替
+    // 事故：原来是两条**严格**的正弦相乘，出来是一个精确到像素的方格短划点阵 ——
+    // 材质球上读作冲孔铁板，而这张图是全场每一个人的主表面（军服 + 视图模型的
+    // 背带/袖口）。土布是手织的：每一根纬线起头的位置对不齐，线本身也有粗有细。
+    // 相位抖动只按**整数线号**取（随 u/v 环绕），贴图才还是无缝的。
+    const weftIndex = Math.floor(v * threads);
+    const warpIndex = Math.floor(u * threads);
+    const rowRnd = Mulberry32(((weftIndex * 7919) >>> 0) + seed)();
+    const colRnd = Mulberry32(((warpIndex * 6151) >>> 0) + seed + 131)();
+    const wu = Math.sin((u * threads + (rowRnd - 0.5) * 0.35) * Math.PI * 2);
+    const wv = Math.sin((v * threads + (colRnd - 0.5) * 0.35) * Math.PI * 2);
+    // 线的胖瘦：指数在 0.75—1.25 之间浮动，等于线宽 ±25%
+    const weave = Math.pow(Clamp01(wu * 0.5 + 0.5), 0.75 + rowRnd * 0.5)
+      * Math.pow(Clamp01(wv * 0.5 + 0.5), 0.75 + colRnd * 0.5);
+    // 褶皱／磨损：比织纹低一个数量级的频率。没有它，布是一块平织面而不是**垂**着的军服
+    const wrinkle = TileableFbm2(u * 3, v * 3, 3, { octaves: 4, seed: seed + 71 });
     const slub = TileableFbm2(u * 30, v * 30, 30, { octaves: 3, seed: seed + 7 });
     const stain = Clamp01(TileableFbm2(u * 4, v * 4, 4, { octaves: 4, seed: seed + 19 }) * 1.6 - 0.5) * grime;
     const dust = TileableFbm2(u * 11, v * 11, 11, { octaves: 3, seed: seed + 37 });
@@ -248,10 +280,12 @@ export function BakeCloth(size = 256, { seed = 5, hue = [104, 110, 116], threads
       col[c] = hue[c] * (0.9 + slub * 0.22);
       col[c] = Mix(col[c], col[c] * 0.68, stain);                                       // 汗碱与泥
       col[c] = Mix(col[c], Mix(col[c], 150, 0.35), Clamp01(dust * 1.4 - 0.55) * 0.6);   // 蒙的一层土
-      col[c] *= 0.86 + weave * 0.2;
+      // 褶皱同时进 albedo 与 height：只进 height 的话，20 m 外法线已经被 mip 抹平，
+      // 布又回到一块平色；只进 albedo 则是印上去的花纹，不受光。
+      col[c] *= 0.86 + weave * 0.2 + (wrinkle - 0.5) * 0.24;
     }
     out.r = col[0]; out.g = col[1]; out.b = col[2];
-    out.h = Clamp01(0.5 + (weave - 0.5) * 0.5 + slub * 0.2);
+    out.h = Clamp01(0.5 + (weave - 0.5) * 0.5 + slub * 0.2 + (wrinkle - 0.5) * 0.24);
     out.rough = Clamp01(0.94 - weave * 0.06 + stain * 0.04);
     out.ao = Clamp01(0.6 + weave * 0.36 - stain * 0.1);
     out.metal = 0;
@@ -361,8 +395,12 @@ export function BakeFlat(size = 4, { color = [128, 128, 128], rough = 0.9, metal
 
 /** 全部配方登记在此，Materials 层按名字取；测试也按这张表逐个烘一遍。 */
 export const RECIPES = {
-  BrickWall: (s) => BakeBrickWall(s ?? 512, { seed: 101 }),
-  BrickWallSooty: (s) => BakeBrickWall(s ?? 512, { seed: 137, damage: 0.6, sootiness: 0.6 }),
+  // 砖墙吃双倍分辨率：它是全场**面积最大**的表面（每一张正片的主体都是砖墙），
+  // 512 那一档一格贴图只塞得下 12×6 块砖，1.2 m 一个循环在两米开外就能数出来。
+  // 注意别写成 `s ?? 1024` —— Materials 层 **总是**显式传 size 进来，?? 永远不生效，
+  // 上一轮就是这么"改了等于没改"。这里按传进来的档位翻倍，低配档跟着降。
+  BrickWall: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 101, rowsPerTile: 20 }),
+  BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.6 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),

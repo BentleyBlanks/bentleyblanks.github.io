@@ -39,6 +39,10 @@ const GAME_SHOTS = [
   { name: "Game_P4_Night", query: "shot=1&phase=3&quality=high&scale=medium" },
   { name: "Game_P5_Burning", query: "shot=1&phase=4&quality=high&scale=medium" },
   { name: "Game_P6_Counter", query: "shot=1&phase=5&quality=high&scale=medium" },
+  // 这两张不是「多出来的花絮」：E3（开镜视野）与 D3（开火表现）此前只能靠审查员
+  // 每轮手搓临时探针去看，连吃两轮盲区。加进常规集，下一轮直接从标准图里评。
+  { name: "Game_P7_Ads", query: "shot=1&phase=1&quality=high&scale=medium&ads=1" },
+  { name: "Game_P8_Fire", query: "shot=1&phase=4&quality=high&scale=medium&fire=1" },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

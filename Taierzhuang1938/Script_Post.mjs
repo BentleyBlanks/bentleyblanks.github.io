@@ -529,11 +529,12 @@ export class PostPipeline {
 
     this.uniformsAo = {
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
-      // 半径 0.52 / 强度 1.85（原来 0.78 / 1.30）：通路本身是对的（双半径 14 抽样 +
-      // 双边模糊 + 只乘 indirectDiffuse），量给小了 —— 沙包脚下、墙地交线、碎砖下缘
-      // 一条暗带都没有，碎砖像贴纸浮在地上。半径收小是为了让暗带贴根而不是整墙发灰。
+      // 半径 0.52 / 强度 1.20。1.85 是上一轮的补偿值：那时候 AO 图被
+      // Script_Main 喂错分辨率、整张错位放大 1.333 倍，看不见暗带就一路往上抬。
+      // 采样位置修正之后再留 1.85 会把墙角压成一团死黑，退回 1.20。
+      // 半径收小是为了让暗带贴根而不是整墙发灰。
       uProjection: { value: new THREE.Matrix4() }, uRadius: { value: 0.52 },
-      uBias: { value: 0.030 }, uIntensity: { value: 1.85 }, uFrame: { value: 0 },
+      uBias: { value: 0.030 }, uIntensity: { value: 1.20 }, uFrame: { value: 0 },
       uProjScale: { value: new THREE.Vector2(1, 1) },
     };
     this.matAo = this._Mat(FRAG_SSAO, this.uniformsAo);
@@ -698,7 +699,7 @@ export class PostPipeline {
       this.uniformsAo.uProjScale.value.set(projScaleX, projScaleY);
       this.uniformsAo.uFrame.value = frame;
       this.uniformsAo.uRadius.value = options.aoRadius ?? 0.52;
-      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.85;
+      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.20;
       this._Blit(this.matAo, T.ao);
 
       this.uniformsAoBlur.uTexel.value.set(1 / T.ao.width, 1 / T.ao.height);

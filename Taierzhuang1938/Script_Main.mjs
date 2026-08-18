@@ -34,6 +34,11 @@ const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
+// 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
+// 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
+// player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
+const SHOT_ADS = !!(SHOT && params.get("ads"));
+const SHOT_FIRE = !!(SHOT && params.get("fire"));
 const START_PHASE = Math.max(0, Math.min(PHASES.length - 1, parseInt(params.get("phase") || "0", 10)));
 
 const canvas = document.getElementById("view");
@@ -65,10 +70,17 @@ const post = new PostPipeline(renderer, {
 });
 const ssao = {
   map: { value: post.AoTexture },
-  resolution: { value: new THREE.Vector2(post.targets.aoBlur.width, post.targets.aoBlur.height) },
-  // 0.95：AO 只乘在 indirectDiffuse 上，而第 6 条把 hemiIntensity 拉高之后
-  // 间接光在总光里的占比变大了，同样的强度在画面上的可见度本来就会翻倍
-  strength: { value: 0.95 },
+  // 这里必须是**主渲染靶**的尺寸，不是 AO 缓冲的尺寸。
+  // 事故（连吃两轮）：Script_Materials 注入的采样是
+  //   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
+  // gl_FragCoord 跑在 hdr 靶上（1600×900），而这里曾经喂 aoBlur 的尺寸 ——
+  // high 档 aoScale=0.75，也就是 1200×675，UV 最大到 1.333：整张 AO 被放大
+  // 1.333 倍并往左下错位，右上四分之一恒取边缘值。上一轮反复调 uRadius /
+  // uIntensity 之所以毫无效果，是在调一张贴错位置的图。
+  resolution: { value: new THREE.Vector2(post.width, post.height) },
+  // 0.80：贴图位置修正后 AO 真的落在几何转折上了，1.85/0.95 那套是为了
+  // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
+  strength: { value: 0.80 },
 };
 const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
 const sky = new SkyDome(renderer);
@@ -257,6 +269,30 @@ function CountNear(side, radius) {
   return n;
 }
 
+const _losFrom = new THREE.Vector3();
+const _losDir = new THREE.Vector3();
+/**
+ * 从玩家眼位到某个落点的胸口（+1.3 m）有没有被静态碰撞体挡死。
+ *
+ * 为什么非加这一条：上一轮的验收指标是错的 —— "投影在视锥内 23 人"被当成达标，
+ * 实测最近两名（15.3 m / 15.9 m）在木板围墙后、44.7 m 那名在砖墙后，
+ * 六张正片里一共只出现一个人。而鲁南民居**对外不开窗、四面围墙**，
+ * 随便撒一个点有一多半落在别人家院子里，玩家永远看不见。
+ * 往战场里加人已经撞了 draw call 红线，所以只能让已有的人被看见 ——
+ * 这是零 draw call 成本的做法。
+ */
+function HasLineOfSight(toX, toZ) {
+  _losFrom.copy(player.EyePosition);
+  const toY = battlefield.GroundHeight(toX, toZ) + 1.3;
+  _losDir.set(toX - _losFrom.x, toY - _losFrom.y, toZ - _losFrom.z);
+  const dist = _losDir.length();
+  if (dist < 1e-3) return true;
+  _losDir.multiplyScalar(1 / dist);
+  const hit = battlefield.Raycast(_losFrom, _losDir, dist);
+  // 留 0.6 m 余量：擦着人身边的墙角不算挡住
+  return !hit || hit.t >= dist - 0.6;
+}
+
 /** 按阶段撒兵：中方守占领点，日方从北面压上来。 */
 function SeedSoldiers(phase) {
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
@@ -282,21 +318,31 @@ function SeedSoldiers(phase) {
     // 这一班本来就是"跟着你往前打"的，压在前方 ±110° 里既合理又让同屏多两个人。
     // 直接转前向量，不要去凑"yaw 对应的极角"—— player.yaw 的零向是 -Z，
     // 跟 atan2(z, x) 差一个 -yaw - π/2，凭印象写必错，兵会撒到背后去
-    const a = (rnd() - 0.5) * 3.8;
-    const dx = fx * Math.cos(a) - fz * Math.sin(a);
-    const dz = fz * Math.cos(a) + fx * Math.sin(a);
-    const r = 12 + rnd() * 22;
-    const open = FindOpenSpot(px + dx * r, pz + dz * r, 6,
-      31337 + i * 907 + state.phaseIndex * 53);
+    let open = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const a = (rnd() - 0.5) * 3.8;
+      const dx = fx * Math.cos(a) - fz * Math.sin(a);
+      const dz = fz * Math.cos(a) + fx * Math.sin(a);
+      const r = 12 + rnd() * 22;
+      const spot = FindOpenSpot(px + dx * r, pz + dz * r, 6,
+        31337 + i * 907 + attempt * 17 + state.phaseIndex * 53);
+      open = spot;
+      if (HasLineOfSight(spot.x, spot.z)) break;
+    }
     const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
     // 不给 holdZone：这一班是跟着镜头走的，钉在占领区里就又跑没影了
     if (s) { s.holdZone = null; s.goal.set(px + fx * 15, 0, pz + fz * 15); }
   }
   for (let i = CountNear("ija", 110); i < NEAR_SQUAD.ija; i += 1) {
-    const d = 55 + rnd() * 55;
-    const lateral = (rnd() - 0.5) * 46;
-    const open = FindOpenSpot(px + fx * d - fz * lateral, pz + fz * d + fx * lateral, 8,
-      65521 + i * 1361 + state.phaseIndex * 89);
+    let open = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const d = 55 + rnd() * 55;
+      const lateral = (rnd() - 0.5) * 46;
+      const spot = FindOpenSpot(px + fx * d - fz * lateral, pz + fz * d + fx * lateral, 8,
+        65521 + i * 1361 + attempt * 29 + state.phaseIndex * 89);
+      open = spot;
+      if (HasLineOfSight(spot.x, spot.z)) break;
+    }
     const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
@@ -452,6 +498,8 @@ function ReadKeys() {
   input.sprint = keys.has("ShiftLeft") || keys.has("ShiftRight");
   input.lean = (keys.has("KeyE") ? 1 : 0) - (keys.has("KeyQ") ? 1 : 0);
   input.breathHold = keys.has("Space");
+  if (SHOT_ADS) input.ads = true;
+  if (SHOT_FIRE) input.fire = true;
 }
 
 const _aimDir = new THREE.Vector3();
@@ -663,7 +711,8 @@ function Frame(dt) {
 
   // --- 渲染 ---
   ssao.map.value = post.AoTexture;
-  ssao.resolution.value.set(post.targets.aoBlur.width, post.targets.aoBlur.height);
+  // 同上：gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
+  ssao.resolution.value.set(post.width, post.height);
   const preset = SKY_PRESETS[phase.sky];
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,

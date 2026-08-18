@@ -91,8 +91,16 @@ void main() {
   }
 
   // --- 贴地的战场烟尘带：整场戏都在这层灰里 ---
+  //
+  // 事故（这是"诊断到一半"的典型）：上一轮把云的频率与阈值修对了，夜景能证明
+  // 云项真的在跑；但紧跟其后的这一行又把云整片刷回去了 —— smokyDay 是
+  // exp(−up/0.30) 配 0.72×0.75+0.18 = 0.72 的混合上限，而 uSmokeColor 3.30 与
+  // uHorizon 5.40 只差百分之几，云和天被刷成同一个值，实测就是 229→250 的单调白。
+  // 这一层是**贴地的一条带**，不是罩住整个天穹的盖子：混合上限压到 0.62，
+  // 底噪从 0.18 压到 0.04（没有烟的时候就该几乎没有这一层），
+  // 再配合各预设把 smokeHeight 从 0.2—0.36 收到 0.10—0.13，它才退回地平线附近。
   float haze = exp(-max(up, 0.0) / max(uSmokeHeight, 0.01));
-  sky = mix(sky, uSmokeColor * (0.85 + glow * 0.6), haze * clamp(uSmoke * 0.75 + 0.18, 0.0, 0.85));
+  sky = mix(sky, uSmokeColor * (0.85 + glow * 0.6), haze * clamp(uSmoke * 0.55 + 0.04, 0.0, 0.62));
 
   // --- 地平线以下：地面反照（IBL 的下半球靠它，不然人物下巴死黑）---
   sky = mix(sky, uGround, smoothstep(0.0, -0.14, up));
@@ -134,9 +142,12 @@ export const SKY_PRESETS = {
   // 3 月 24 日午后：日军攻北门，硝烟遮日
   smokyDay: {
     sunElevation: 38, sunAzimuth: 214,
-    zenith: [1.90, 2.35, 3.20], horizon: [5.40, 5.20, 4.90], ground: [0.58, 0.52, 0.42],
+    // horizon 5.40 亮到把天顶到地平线的整段梯度压平（实测 229→250，11 级）。
+    // 2.40 让它掉回天顶 1.90—2.35 的同一量级，梯度才读得出来；同时给一个冷偏
+    // （B > R），白天的天才有色相可分离，而不是一条橙棕线上的一块白板。
+    zenith: [1.90, 2.35, 3.20], horizon: [2.40, 2.46, 2.62], ground: [0.58, 0.52, 0.42],
     sunColor: [1.0, 0.92, 0.78], sunIntensity: 120, sunSize: 0.0030, glow: 1.35, glowSpread: 12,
-    smoke: 0.72, smokeColor: [3.30, 3.10, 2.85], smokeHeight: 0.30, stars: 0.0,
+    smoke: 0.72, smokeColor: [1.35, 1.33, 1.30], smokeHeight: 0.11, stars: 0.0,
     // 天地比：实测天 sRGB 234 / 地 136 只有 3.4:1 的线性亮度比，屋脊和人的轮廓
     // 从天上剥不出来。ER2 那种照片感是 6—8:1。修法必须是**降 lightIntensity**
     // 而不是降 exposure —— 降 exposure 天会跟着一起暗，比例白调。
@@ -149,8 +160,11 @@ export const SKY_PRESETS = {
     // 都来自 scene.environment 那张天空 IBL。1.20 → 0.95 才把均值压到 90—110、
     // 天仍留在 237，天地线性亮度比从 3.4:1 拉到 6:1 上下。
     // 别再往下砍：试过 0.75，地面掉到 74，暗部糊成一片。
-    envIntensity: 0.95,
-    fog: { density: 0.0125, falloff: 20, max: 0.94,
+    // 0.95 → 1.45：地平线色从 5.40 压到 2.40 之后，这张天烘出来的 IBL 整体暗了三成，
+    // 街景地面均值跟着从 99 掉到 66 —— 天修好了、地塌了，等于把问题挪了个位置。
+    // 这一档补回来，均值回到 90—110 的窗口里。
+    envIntensity: 1.45,
+    fog: { density: 0.0080, falloff: 20, max: 0.84,
       sky: [0.72, 0.70, 0.66], ground: [0.38, 0.39, 0.42], sunGain: 0.24,
       desat: 0.50, flatten: 0.15 },
     exposure: 0.42, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
@@ -173,13 +187,14 @@ export const SKY_PRESETS = {
   // 3 月 27 日——4 月 2 日：城内巷战，一半的天被火烧着
   burningStreet: {
     sunElevation: 21, sunAzimuth: 238,
-    zenith: [0.78, 0.92, 1.35], horizon: [3.90, 2.55, 1.45], ground: [0.50, 0.40, 0.30],
+    zenith: [0.78, 0.92, 1.35], horizon: [2.05, 1.50, 1.05], ground: [0.50, 0.40, 0.30],
     sunColor: [1.0, 0.70, 0.38], sunIntensity: 88, sunSize: 0.0034, glow: 2.4, glowSpread: 13,
-    smoke: 0.88, smokeColor: [1.85, 1.35, 1.00], smokeHeight: 0.36, stars: 0.0,
+    smoke: 0.88, smokeColor: [1.85, 1.35, 1.00], smokeHeight: 0.13, stars: 0.0,
     lightColor: 0xffbb80, lightIntensity: 2.7,
     hemiSky: 0x6a7ba8, hemiGround: 0x63472e, hemiIntensity: 1.30,
-    envIntensity: 0.95,
-    fog: { density: 0.0165, falloff: 16, max: 0.95,
+    // 同 smokyDay：地平线降了近一半，IBL 要补回来（见那一档的注释）
+    envIntensity: 1.55,
+    fog: { density: 0.0090, falloff: 16, max: 0.84,
       sky: [0.74, 0.52, 0.36], ground: [0.42, 0.32, 0.26], sunGain: 0.38,
       desat: 0.45, flatten: 0.13 },
     exposure: 0.48, godStrength: 0.55, bloom: 0.50, saturation: 0.94, contrast: 1.10,
@@ -201,12 +216,13 @@ export const SKY_PRESETS = {
   // 4 月 7 日拂晓：总反攻
   dawn: {
     sunElevation: 4.0, sunAzimuth: 88,
-    zenith: [0.50, 0.72, 1.30], horizon: [4.60, 2.70, 1.45], ground: [0.48, 0.40, 0.32],
+    zenith: [0.50, 0.72, 1.30], horizon: [2.30, 1.55, 1.00], ground: [0.48, 0.40, 0.32],
     sunColor: [1.0, 0.64, 0.36], sunIntensity: 105, sunSize: 0.0044, glow: 3.6, glowSpread: 15,
-    smoke: 0.58, smokeColor: [1.80, 1.25, 0.90], smokeHeight: 0.21, stars: 0.04,
+    smoke: 0.58, smokeColor: [1.80, 1.25, 0.90], smokeHeight: 0.10, stars: 0.04,
     lightColor: 0xffc890, lightIntensity: 3.0,
     hemiSky: 0x6b84b8, hemiGround: 0x50402f, hemiIntensity: 1.30,
-    envIntensity: 1.05,
+    // 同 smokyDay：地平线降了近一半，IBL 要补回来（见那一档的注释）
+    envIntensity: 1.75,
     fog: { density: 0.0090, falloff: 24, max: 0.93,
       sky: [0.92, 0.60, 0.40], ground: [0.42, 0.33, 0.27], sunGain: 0.45,
       desat: 0.42, flatten: 0.11 },

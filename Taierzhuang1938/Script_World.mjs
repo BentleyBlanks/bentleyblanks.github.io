@@ -18,7 +18,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
 import {
   MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
-  MakeRubbleField, MakeInstanced, TILE_METERS,
+  MakeRubbleField, MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 
 /** 建造过程中的收集器：按材质名分桶攒几何体，最后一次性合并。 */
@@ -80,6 +80,10 @@ export function AddWall(sink, material, {
   const rnd = Mulberry32(HashString(seed));
   const slices = Math.max(2, Math.round(length / 0.85));
   const sliceW = length / slices;
+  // 砖墙这一段一段地错开图案（整砖对齐 + 约一半镜像），相邻墙段就不会是同一套明暗排列。
+  // 走 UV 而不是给每段克隆材质：静态几何是按材质名合并成一个大网格的，
+  // 每段一份材质 = 每段一个 draw call，几百段墙直接把 1400 的红线撞穿。
+  const grid = String(material).startsWith("BrickWall") ? BRICK_UV_GRID : null;
   for (let i = 0; i < slices; i += 1) {
     const t = i / (slices - 1 || 1);
     const edge = Math.min(t, 1 - t) * 2;
@@ -87,7 +91,7 @@ export function AddWall(sink, material, {
     const h = Math.max(0.18, height * (1 - bite));
     const lx = -length / 2 + sliceW * (i + 0.5);
     sink.Add(material, PlaceGeometry(
-      MakeBox(sliceW * 1.03, h, thickness, tile, `${seed}:${i}`),
+      MakeBox(sliceW * 1.03, h, thickness, tile, `${seed}:${i}`, grid),
       { x: x + Math.cos(ry) * lx, y: h / 2, z: z - Math.sin(ry) * lx, ry }));
   }
   // 碱脚：旧砖墙下面那两三皮总是深色的条石/糙砖，缺了这一笔墙就"浮"着
