@@ -22,6 +22,14 @@ import {
   FormatRef, DominantKind,
 } from "./Script_AnimIndex.mjs";
 
+// 这一份是哪一版：index.html 的 import map 把每个模块映到 `?v=戳`，所以自己的
+// import.meta.url 上就写着戳。挂在状态栏上（「工作台里怎么还是老的？」——2026-08-18
+// 那次是本地签出停在旧提交上，v=105 对着线上的 158，肉眼看不出来，只能靠它自证）
+const BUILD = (() => {
+  try { const v = new URL(import.meta.url).searchParams.get("v"); return v ? `v${v}` : ""; }
+  catch { return ""; }
+})();
+
 // 相位的走法：World.UpdateOne 的那几个常数，一个数都不许改（改了预览就不是游戏）。
 // 走路的步频与走↔跑由 Rig.WalkCadence / GaitOf 给（2026-08-18 起按自然步频，不按位移数步）
 const BREATH_RATE = 1.4;      // s.idleT += dt*1.4
@@ -125,7 +133,7 @@ export function BuildAnimEntries(idx) {
     });
   }
   for (const L of (idx?.locomotion || LOCOMOTION)) {
-    out.push({ id: "loco:" + L.id, type: "loco", name: L.id, label: L.label, loco: L, cond: L.cond, line: L.line || null, comment: L.comment || "", inputs: L.inputs || [], usages: [], notes: L.note ? [L.note] : [], warnings: L.warnings || [] });
+    out.push({ id: "loco:" + L.id, type: "loco", name: L.id, label: L.label, loco: L, cond: L.cond, line: L.line || null, comment: L.comment || "", inputs: L.inputs || [], usages: [], notes: L.notes || (L.note ? [L.note] : []), warnings: L.warnings || [] });
   }
   return out;
 }
@@ -441,7 +449,8 @@ export function CreateAnimLab({ root }) {
         const meta = e.type === "track" ? `${Fmt(e.dur)}s · ${e.loop ? "循环" : "单次"} · ${e.keys.length} 帧`
           : e.type === "pose" ? (e.progress ? "进度驱动" : e.calmBreath ? "静态 · 呼吸" : "静态")
             : `分支 ${e.loco.cond}`;
-        const who = e.kindGuess ? KIND_LABEL[e.kindGuess] || e.kindGuess : "";
+        const who = e.kindGuess ? KIND_LABEL[e.kindGuess] || e.kindGuess
+          : (e.usages || []).some((u) => u.kind === "底片") ? "步态底片" : "";
         const unused = e.type !== "loco" && !(e.usages || []).some((u) => u.kind !== "check" && u.kind !== "ref");
         li.innerHTML = `<button type="button"><em>${Esc(e.label)}</em><small>${Esc(meta)}${who ? " · " + Esc(who) : ""}${unused ? " · <s>无引用</s>" : ""}</small></button>`;
         li.querySelector("button").addEventListener("click", () => Select(e.id));
@@ -468,7 +477,8 @@ export function CreateAnimLab({ root }) {
       h.querySelector("small").textContent = String(n);
       h.hidden = n === 0;
     }
-    ui.status.textContent = q ? `${shown} / ${entries.length}` : `${index?.counts?.tracks ?? Object.keys(TRACKS).length} 轨道 · ${index?.counts?.poses ?? 0} 姿势 · ${LOCOMOTION.length} 步态`;
+    ui.status.textContent = q ? `${shown} / ${entries.length}`
+      : `${index?.counts?.tracks ?? Object.keys(TRACKS).length} 轨道 · ${index?.counts?.poses ?? 0} 姿势 · ${LOCOMOTION.length} 步态${BUILD ? ` · ${BUILD}` : ""}`;
   }
   function MarkSelected() {
     for (const li of ui.list.querySelectorAll("li")) li.classList.toggle("current", !!cur && li.dataset.id === cur.id);
@@ -677,7 +687,10 @@ export function CreateAnimLab({ root }) {
       facts.push(["相位", e.loco.cycle === "walk" ? "步频按 Rig.WalkCadence：速度÷体型 → 步/秒（快走 2、冲刺封顶 3.5，小孩 ÷√体型），一步 = π；走多远与迈几步脱钩" : e.loco.cycle === "climb" ? "爬梯：phase += 竖向位移×4.5" : e.loco.cycle === "idle" ? "原地：phase += dt×2.2" : "只有呼吸：idleT += dt×1.4"]);
       if (e.inputs?.length) facts.push(["输入", e.inputs.map((i) => `<i class="chip" title="${Esc(i.label)}">${Esc(i.key)}</i>`).join("")]);
     }
-    const who = e.kindGuess ? `${KIND_LABEL[e.kindGuess] || e.kindGuess}` : (e.type === "loco" ? "任何人" : "（剧本里没引用）");
+    const negative = (e.usages || []).some((u) => u.kind === "底片");
+    const who = e.kindGuess ? `${KIND_LABEL[e.kindGuess] || e.kindGuess}`
+      : negative ? "任何人（步态底片：走路/跑的人都在吃它）"
+        : (e.type === "loco" ? "任何人" : "（剧本里没引用）");
     facts.push(["谁在用", Esc(who)]);
 
     const usages = (e.usages || []);

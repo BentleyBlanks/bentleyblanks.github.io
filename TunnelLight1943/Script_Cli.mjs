@@ -278,7 +278,9 @@ async function CmdAnims(o) {
     const us = (r.e.usages || []).filter((u) => u.kind !== "check" && u.kind !== "ref");
     const beats = [...new Set(us.map((u) => u.beat || u.fn).filter(Boolean))];
     const who = DominantKind(r.e.usages);
-    const where = r.type === "步态" ? "" : beats.length ? `用于 ${beats.slice(0, 3).join("/")}${beats.length > 3 ? `…共${beats.length}` : ""}` : "（无引用）";
+    const neg = (r.e.usages || []).filter((u) => u.kind === "底片");
+    const where = r.type === "步态" ? "" : neg.length ? `步态底片 → ${(r.e.negativeFor || []).join("/")}`
+      : beats.length ? `用于 ${beats.slice(0, 3).join("/")}${beats.length > 3 ? `…共${beats.length}` : ""}` : "（无引用）";
     console.log(`  ${r.type} ${r.name.padEnd(18)} ${String(r.meta).padEnd(16)} Script_Rig.mjs:${String(r.line ?? "?").padEnd(5)} ${who ? (KIND_LABEL[who] || who).padEnd(4) : "    "} ${where}`);
   }
   console.log(`\n${hit.length} 条（${idx.counts.tracks} 轨道 / ${idx.counts.poses} 姿势 / ${idx.counts.locomotion} 步态）。看一条：anim <名字>；网页里播：设置 → 调试 · 动画工作台（F4）或 ?anim=<名字>`);
@@ -310,7 +312,7 @@ async function CmdAnim(o) {
   }
   for (const w of e.warnings || []) console.log(`⚠  ${w}`);
   for (const n of e.notes || []) console.log(`·  ${n}`);
-  if (e.note) console.log(`·  ${e.note}`);
+  if (e.note && !(e.notes || []).includes(e.note)) console.log(`·  ${e.note}`);
   if (e.comment) console.log(`\n说明\n${e.comment.split("\n").map((l) => "  " + l).join("\n")}`);
   const us = (e.usages || []);
   const real = us.filter((u) => u.kind !== "check" && u.kind !== "ref");
@@ -1023,7 +1025,8 @@ async function CmdDoctor() {
   const ahead = Sh("git", ["rev-list", "--left-right", "--count", "HEAD...origin/master"]);
   console.log(`与 origin/master  ${ahead || "?"}（左=本地独有 右=上游独有；右边不为 0 先 merge）`);
   const dirty = Sh("git", ["status", "--short"]).split("\n").filter(Boolean);
-  console.log(`未提交  ${dirty.length ? dirty.length + " 个文件：" + dirty.slice(0, 6).map((s) => s.slice(3)).join(" ") : "干净"}`);
+  const Bare = (l) => l.trim().replace(/^[MADRCU?!]{1,2}\s+/, "");   // Sh 会 trim，首行没了前导空格，不能按定长切
+  console.log(`未提交  ${dirty.length ? dirty.length + " 个文件：" + dirty.slice(0, 6).map(Bare).join(" ") : "干净"}`);
 
   const html = fs.readFileSync(path.join(DIR, "index.html"), "utf8");
   const stamp = /\?v=(\d+)/.exec(html)?.[1];
@@ -1036,8 +1039,17 @@ async function CmdDoctor() {
     const busy = net.split("\n").some((l) => new RegExp(`:${p}\\s`).test(l) && /LISTENING/.test(l));
     if (busy) console.log(`端口 ${p}  已被占用（多半是别的会话的 dev server；shot 子命令自己起随机端口，不受影响）`);
   }
-  console.log(`\n跑测试   npm run test:tunnelLight1943`);
-  console.log(`看场景   npm run scene:tunnelLight1943`);
+  const wt = Sh("git", ["rev-parse", "--git-common-dir"]) !== Sh("git", ["rev-parse", "--git-dir"]);
+  if (wt) {
+    // npm 会把 cwd 换到装着 package.json 的主仓库，于是 npm run 测的是**那份**签出，
+    // 跟这棵 worktree 里的改动没关系——全绿也说明不了任何事（2026-08-18 白跑一整轮）
+    console.log(`\n这是 worktree：别用 npm run（cwd 会跳到主仓库，测的是那份签出，全绿说明不了任何事）`);
+    console.log(`跑测试   node TunnelLight1943/Script_SmokeTest.mjs   （＋ Script_SceneAudit.mjs --quiet / Script_RenderHealthTest.mjs / Script_DebugJumpTest.mjs / Script_BgmTest.mjs）`);
+    console.log(`看场景   node TunnelLight1943/Script_SceneAudit.mjs`);
+  } else {
+    console.log(`\n跑测试   npm run test:tunnelLight1943`);
+    console.log(`看场景   npm run scene:tunnelLight1943`);
+  }
   console.log(`问状态   node TunnelLight1943/Script_Cli.mjs state <beatId>`);
 }
 

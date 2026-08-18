@@ -103,6 +103,17 @@ Rig 就重开工作台/重跑 CLI。新加轨道/姿势不用登记（它扫 `TR
 但**步态分支的条件文字改了**要同步 `Script_AnimIndex.LOCOMOTION[].cond`（对不上清单里报「源码里
 没找到条件」）。退回动画时**先开工作台点名**，再谈画面。
 
+**「工作台里怎么还是老的？」先看状态栏那个戳**（2026-08-18 用户原话）。状态栏末尾挂着这一份的
+缓存戳（`v###`，取自 `import.meta.url`，index.html 的 import map 给的），跟 `index.html` 里的
+`?v=` 一比就知道页面是新的还是旧的——那次是**本地签出停在别的分支的旧提交上**（工作台 v105
+对着线上 v158），画面看不出差别，只能靠它自证。开工前 `Script_Cli.mjs doctor` 也报这个。
+
+**步态底片在工作台里显示为「步态底片」，不是「无引用」**：`mocapWalk`/`mocapRun` 不由剧本按名字
+引用，是被 `Rig.MocapLegs` 当底片吃掉的——索引扫的是剧本/Core/World，扫不到那一层，于是它们一度
+挂着「无引用」，看着像"生成了没接上"。`Script_AnimIndex` 现在直接读 Rig 的 `LOCO_CLIP` 表双向挂账：
+底片那条列出谁在吃它，每支步态多一行「腿从哪儿来」（走底片 / 素材没进 TRACKS 退回 `GaitLegs` /
+压根不吃底片）。**加新底片只改 `LOCO_CLIP` 与那支步态的 `clip:` 字段，工作台与 CLI 自动跟上。**
+
 **人物美术样式浏览器的右栏就是它的小舞台**：`CreateRigStage` 那具真骨架按这个人戏里的体型
 （`DefaultPreset`）跑他自己用到的动作（`EntriesForKind`），「工作台 ▸」带着这条过去逐帧看；索引一次
 fetch 两处共用（`EnsureAnimIndex`）。`DrawCharacter` 收的是 `spec.scale`，传 `S` 没人读。

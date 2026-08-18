@@ -38,17 +38,18 @@ export const RIG_FIELD_LABEL = {
 export const LOCOMOTION = [
   { id: "stand", label: "站立（呼吸）", cond: "else", state: {}, cycle: "breath",
     note: "常态。所有一次性戏剧姿势收回之后落到这儿。" },
-  { id: "walk", label: "走路", cond: "s.moving", state: { moving: true }, cycle: "walk", speed: 1.4,
+  { id: "walk", label: "走路", cond: "s.moving", state: { moving: true }, cycle: "walk", speed: 1.4, clip: ["walk", "run"],
     note: "gait 由实测速度给（1.5→3.2m/s 从走到跑），步频按体型折算。" },
-  { id: "run", label: "跑", cond: "s.moving", state: { moving: true }, cycle: "walk", speed: 3.2,
+  { id: "run", label: "跑", cond: "s.moving", state: { moving: true }, cycle: "walk", speed: 3.2, clip: ["walk", "run"],
     note: "跑不是把走路放快：步幅张开、小腿后收、躯干压前、手臂抡开。" },
   { id: "crouchIdle", label: "半蹲·站住", cond: "s.crouch", state: { crouch: true }, cycle: "idle" },
-  { id: "crouchMove", label: "半蹲·挪步", cond: "s.crouch", state: { crouch: true, moving: true }, cycle: "walk", speed: 1.0 },
+  { id: "crouchMove", label: "半蹲·挪步", cond: "s.crouch", state: { crouch: true, moving: true }, cycle: "walk", speed: 1.0, clip: ["crouch"] },
   { id: "stoopIdle", label: "猫腰·站住", cond: 's.posture === "stoop"', state: { posture: "stoop" }, cycle: "breath",
     note: "地道走廊里的常态（净高不够）。" },
-  { id: "stoopMove", label: "猫腰·走", cond: 's.posture === "stoop"', state: { posture: "stoop", moving: true }, cycle: "walk", speed: 1.2 },
+  { id: "stoopMove", label: "猫腰·走", cond: 's.posture === "stoop"', state: { posture: "stoop", moving: true }, cycle: "walk", speed: 1.2, clip: ["stoop"] },
   { id: "crawlIdle", label: "爬行·停住", cond: 's.posture === "crawl"', state: { posture: "crawl" }, cycle: "idle" },
-  { id: "crawlMove", label: "爬行", cond: 's.posture === "crawl"', state: { posture: "crawl", moving: true }, cycle: "walk", speed: 0.7 },
+  { id: "crawlMove", label: "爬行", cond: 's.posture === "crawl"', state: { posture: "crawl", moving: true }, cycle: "walk", speed: 0.7,
+    note: "不吃 mocap 底片：胯高与膝角是按「手撑地＋膝跪地」算死的，塞走路底片的腿进去人会站起来。要用 mocap 得整具走底片（细则在 Rig 的 LOCO_CLIP 注释）。" },
   { id: "climb", label: "爬梯（无梯子后备）", cond: "s.climbing", state: { climbing: true }, cycle: "climb", speed: 1.0,
     note: "游戏里 World 会给 s.climb（这架梯子的横档表），那时走 ClimbPose（Script_Climb 把手脚钉在真横档上）；工作台里没有梯子，演的是没有 s.climb 时的这一支后备。" },
   { id: "climbChild", label: "抱着孩子爬梯（无梯子后备）", cond: "s.climbing && s.childArms", state: { climbing: true, childArms: true }, cycle: "climb", speed: 0.8,
@@ -56,12 +57,12 @@ export const LOCOMOTION = [
   { id: "dig", label: "挖土 / 施工", cond: "s.digging", state: { digging: true }, cycle: "idle" },
   { id: "holdLight", label: "提·轻（石子）", cond: "s.hold", state: { hold: true, holdW: 0.15 }, cycle: "breath" },
   { id: "holdHeavy", label: "提·满桶 站住", cond: "s.hold", state: { hold: true, holdW: 1 }, cycle: "breath" },
-  { id: "holdHeavyMove", label: "提·满桶 走", cond: "s.hold", state: { hold: true, holdW: 1, moving: true }, cycle: "walk", speed: 1.2 },
+  { id: "holdHeavyMove", label: "提·满桶 走", cond: "s.hold", state: { hold: true, holdW: 1, moving: true }, cycle: "walk", speed: 1.2, clip: ["walk", "run"] },
   { id: "childArmsIdle", label: "抱着孩子·站住", cond: "s.childArms", state: { childArms: true }, cycle: "breath",
     note: "这是走姿不是姿势（pose 会把走路顶掉）；站住时倒重心 / 隔一会儿颠一下。" },
-  { id: "childArmsMove", label: "抱着孩子·走", cond: "s.childArms", state: { childArms: true, moving: true }, cycle: "walk", speed: 1.2 },
+  { id: "childArmsMove", label: "抱着孩子·走", cond: "s.childArms", state: { childArms: true, moving: true }, cycle: "walk", speed: 1.2, clip: ["walk", "run"] },
   { id: "carryIdle", label: "扛·站住", cond: "s.carry", state: { carry: true }, cycle: "breath" },
-  { id: "carryMove", label: "扛·走", cond: "s.carry", state: { carry: true, moving: true }, cycle: "walk", speed: 1.3 },
+  { id: "carryMove", label: "扛·走", cond: "s.carry", state: { carry: true, moving: true }, cycle: "walk", speed: 1.3, clip: ["walk", "run"] },
 ];
 
 // 工作台里能挑的人：骨架种类 + 体型（World 里柱子一二章 0.75、妹妹一二章 0.60，
@@ -280,6 +281,19 @@ function ParsePoseRig(lines) {
   return { poses, branches, sets };
 }
 
+// ── 步态底片：Rig 的 LOCO_CLIP 表（2026-08-18）────────────────────────────
+// mocap 循环轨不由剧本按名字引用，是被 `Rig.MocapLegs` 当底片吃掉的。usages 那一遍
+// 只扫剧本/Core/World，扫不到这一层——于是 mocapWalk / mocapRun 在工作台里挂着
+// 「无引用」，看着像"生成了没接上"（2026-08-18 用户："怎么还是老的"）。读这张表就
+// 能双向补上：底片知道谁在吃它，步态知道自己的腿此刻是底片还是 GaitLegs 拼的。
+function ParseLocoClip(lines) {
+  const i = lines.findIndex((l) => /^const LOCO_CLIP = \{/.test(l));
+  if (i < 0) return { line: null, map: {} };
+  const map = {};
+  for (const m of lines[i].matchAll(/([A-Za-z]+):\s*"([A-Za-z0-9_]+)"/g)) map[m[1]] = m[2];
+  return { line: i + 1, map };
+}
+
 // ── World：进度登记 / 躺姿 ───────────────────────────────────────────────
 function ParseWorld(text) {
   const out = { POSE_PROGRESS: [], LIE_POSES: [] };
@@ -393,6 +407,23 @@ export function ScanAnimIndex(read) {
   const usages = ScanUsages(files, names);
   for (const t of Object.values(tracks)) t.usages = usages[t.name] || [];
   for (const p of Object.values(poses)) p.usages = usages[p.name] || [];
+  // 步态底片双向挂账：底片补一条真用法（不然显示「无引用」），步态补一行"腿从哪儿来"
+  const clip = ParseLocoClip(rigLines);
+  for (const L of locomotion) {
+    L.notes = L.note ? [L.note] : [];
+    if (!L.clip) continue;
+    L.clips = L.clip.map((k) => ({ key: k, name: clip.map[k] || null, ok: !!(clip.map[k] && tracks[clip.map[k]]) }));
+    const have = L.clips.filter((c) => c.ok), miss = L.clips.filter((c) => !c.ok);
+    L.notes.push(have.length
+      ? `腿走 mocap 底片：${have.map((c) => c.name).join(" ↔ ")}（\`Rig.MocapLegs\`，Script_Rig.mjs:${clip.line}）${miss.length ? `；${miss.map((c) => c.key).join("/")} 那条还没有素材，缺了退回 GaitLegs` : "；底片缺了才退回 GaitLegs 拼弧线"}`
+      : `腿本该走 mocap 底片 ${L.clips.map((c) => c.name || c.key).join(" / ")}，但素材没进 TRACKS——此刻走的是 GaitLegs 兜底（程序化弧线）`);
+    for (const c of have) {
+      const t = tracks[c.name];
+      (t.negativeFor ||= []).push(L.id);
+      t.usages.push({ file: ANIM_FILES.rig, line: clip.line, kind: "底片", subject: null, kindGuess: null,
+        beat: null, fn: "MocapLegs", text: `LOCO_CLIP.${c.key} = "${c.name}" —— ${L.label}的步态底片（腿/胳膊的曲线原样取自这条轨）` });
+    }
+  }
   return {
     tracks, poses, locomotion, sets: allSets, usages,
     files: [ANIM_FILES.rig, ANIM_FILES.world, ...ANIM_FILES.usages].filter((f, i, a) => a.indexOf(f) === i),

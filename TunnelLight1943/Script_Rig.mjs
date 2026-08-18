@@ -1913,8 +1913,12 @@ export function GaitToeOff(g) {
 // 同一个约定，走↔跑之间才插得起来）；走↔跑按 gait 逐关节插值；步频照旧由 World 按
 // WalkCadence 给；脚贴地照旧由 ApplyPose 的地面吸附管（所以底片的 hipY 只是参考，
 // 站在哪儿由腿的几何定）。GaitLegs 留着当兜底：哪个姿势没底片、或轨道被删，就还走它。
-// 猫腰/蹲/爬三支只借底片的**腿**（`legsOnly`），躯干与头照旧按洞顶净高给
+// 猫腰/蹲两支只借底片的**腿**（`legsOnly`），躯干与头照旧按洞顶净高给
 // （POSTURE_HEAD 那笔账在 Core），胳膊各支自己写。
+// 【爬行是例外，别当成"素材到了就生效"的口子】crawl 那一支的胯高/膝角是按"手撑地 +
+// 膝跪地"的几何算死的（见那支的注释），塞一条走路底片的腿进去人就从地上站起来了。
+// 真要用 mocap 爬行，得整具走底片（不是 legsOnly）、且落点重新过一遍地面吸附——
+// 素材干净了再单独接。表里留着 crawl 是给那天备的名，现在没有调用处。
 const LOCO_CLIP = { walk: "mocapWalk", run: "mocapRun", stoop: "mocapStoop", crouch: "mocapCrouch", crawl: "mocapCrawl" };
 const LOCO_LEG_FIELDS = ["thighB", "shinB", "footB", "thighF", "shinF", "footF"];
 const LOCO_ALL_FIELDS = ["hipY", "hipX", "torso", ...LOCO_LEG_FIELDS, "armB", "foreB", "armF", "foreF"];
@@ -3083,8 +3087,11 @@ export function PoseRig(rig, s, dt) {
     // 手臂抡起来并把肘折死（跑的人不会甩着两条直胳膊）
     // 2026-08-18：腿改由 GaitLegs 解（脚在地上怎么走 → 反解出腿），胳膊跟着同侧腿反摆。
     // 起伏、腾空、脚跟抬起都从那儿来；这里只管躯干与头
+    // 2026-08-18 晚：**腿与胳膊改走 mocap 底片**——mocapWalk / mocapRun 两条真人循环轨
+    // （见 LOCO_CLIP / MocapLegs），走↔跑按 gait 逐关节插值。真人曲线因此保住了：
+    // 落地前刹一下、脚跟先着、胳膊晚半拍、跑步手臂主要往后甩；步频（WalkCadence）、
+    // 体型、脚贴地照旧由程序管。底片缺了（轨道被删/没生成）才退回 GaitLegs 拼弧线
     const g = Math.max(0, Math.min(1, s.gait || 0));
-    // 有底片走底片（真人的曲线：落地前刹一下、脚跟先着、胳膊晚半拍），没有才拼弧线
     const gait = MocapLegs(target, p, g, { slow: LOCO_CLIP.walk, fast: LOCO_CLIP.run }) || GaitLegs(target, p, g);
     if (!gait.mocap) {
       target.hipX = 0.03 * g;
