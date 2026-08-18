@@ -48,7 +48,10 @@ renderer.toneMapping = THREE.NoToneMapping;      // 色调映射收在合成 pas
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.06, 620);
+// FOV 55：Easy Red 2 那种“周围很远、人很小但看得清”的观感靠窄视场。
+// 70 度会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。
+const BASE_FOV = 55;
+const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
 const post = new PostPipeline(renderer, {
@@ -115,7 +118,9 @@ async function Boot() {
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
-  scene.fog = new THREE.Fog(preset.fogColor, preset.fogNear, preset.fogFar);
+  // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
+  // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
+  scene.fog = null;
 
   battlefield = new Battlefield(scene, library, { quality: QUALITY });
   for (const step of battlefield.BuildSteps()) {
@@ -171,11 +176,6 @@ function EnterPhase(index, initial = false) {
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
-  if (scene.fog) {
-    scene.fog.color.setHex(preset.fogColor);
-    scene.fog.near = preset.fogNear;
-    scene.fog.far = preset.fogFar;
-  }
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
   audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
@@ -488,7 +488,7 @@ function Frame(dt) {
 
   // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下
   const weapon = WEAPONS[currentWeapon];
-  const targetFov = 70 * (1 - player.ads * (1 - (weapon?.adsFovScale ?? 0.75)));
+  const targetFov = BASE_FOV * (1 - player.ads * (1 - (weapon?.adsFovScale ?? 0.75)));
   if (Math.abs(camera.fov - targetFov) > 0.01) {
     camera.fov += (targetFov - camera.fov) * Clamp01(dt * 9);
     camera.updateProjectionMatrix();
@@ -557,15 +557,17 @@ function Frame(dt) {
   const preset = SKY_PRESETS[phase.sky];
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
+    sunColor: preset.sunColor,
+    fog: preset.fog,
     exposure: preset.exposure,
     bloom: preset.bloom,
     godStrength: preset.godStrength,
     saturation: preset.saturation * (1 - player.suppression * 0.35),
     contrast: preset.contrast,
-    grain: 0.034,
-    vignette: 0.44 + player.suppression * 0.2,
+    grain: phase.sky === "night" ? 0.020 : 0.014,
+    vignette: 0.42 + player.suppression * 0.22,
     damage: Clamp01(1 - player.health / 62) * 0.55,
-    motionBlur: 0.5,
+    motionBlur: 0.15,
   });
 }
 

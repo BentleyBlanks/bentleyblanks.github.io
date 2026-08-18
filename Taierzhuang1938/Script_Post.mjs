@@ -133,10 +133,12 @@ void main() {
   vec3 bitangent = cross(normal, tangent);
   mat3 tbn = mat3(tangent, bitangent, normal);
 
-  // 近处半径大、远处半径小（世界空间半径恒定，看起来才对）
-  float radius = uRadius;
+  // 双半径：阴天没有硬阴影，形体感全靠 AO。
+  // 前 7 个样本走大半径抓大范围遮蔽，后 7 个走小半径抓贴根的接触阴影 ——
+  // 只有一档半径的话，要么墙角糊成一片灰，要么沙包脚下什么都没有。
   float occlusion = 0.0;
   for (int i = 0; i < SAMPLES; i++) {
+    float radius = (i < 7) ? uRadius : uRadius * 0.22;
     vec3 samplePos = origin + (tbn * KERNEL[i]) * radius;
     vec4 clip = uProjection * vec4(samplePos, 1.0);
     vec2 suv = (clip.xy / clip.w) * 0.5 + 0.5;
@@ -302,6 +304,20 @@ uniform mat4 uInvView;
 uniform vec2 uProjScale;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
+// 大气：Easy Red 2 的“远景退进去”不是靠一层灰纱盖上去，
+// 而是**染在物体自身上**：指数距离雾 x 高度雾，再按雾量去饱和降对比。
+// 三件事合起来才有纵深 —— 只做其中一件都是“屏幕上蒙了层灰”。
+uniform float uFogDensity;
+uniform float uFogFalloff;
+uniform float uFogBase;
+uniform float uFogMax;
+uniform vec3 uFogColorSky;
+uniform vec3 uFogColorGround;
+uniform float uFogSunGain;
+uniform vec3 uSunDir;
+uniform vec3 uSunColorFog;
+uniform float uDepthDesat;
+uniform float uDepthFlatten;
 varying vec2 vUv;
 ${GLSL_COMMON}
 
@@ -365,6 +381,27 @@ void main() {
   color += texture2D(uBloom, uv).rgb * uBloomStrength;
   color += texture2D(uGod, uv).rgb * uGodStrength;
 
+  // 天空（深度 0）不吃雾 —— 它自己的着色器里已经有霾了，
+  // 再叠一层会糊成一块白饼。
+  if (uFogDensity > 0.0 && nd.w > 0.0) {
+    vec3 fogViewPos = ViewPos(uv, nd.w);
+    vec4 worldPos = uInvView * vec4(fogViewPos, 1.0);
+    vec3 camPos = uInvView[3].xyz;
+    vec3 rayDir = normalize(worldPos.xyz - camPos);
+    float fd = 1.0 - exp(-nd.w * uFogDensity);
+    float hFall = exp(-max(worldPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
+    float fog = clamp(fd * hFall, 0.0, uFogMax);
+    // 雾色随视线仰角在“地面色”与“天空色”之间过渡；
+    // 朝太阳那一侧要亮 —— 这一笔是“雾里有阳光”与“屏幕发灰”的分界线。
+    vec3 fogCol = mix(uFogColorGround, uFogColorSky, clamp(rayDir.y * 2.0 + 0.35, 0.0, 1.0));
+    fogCol += uSunColorFog * pow(max(dot(rayDir, normalize(uSunDir)), 0.0), 8.0) * uFogSunGain;
+    // 大气透视第二层：远处不只是被雾盖住，它自身的饱和与对比也在掉
+    float fogLum = Luma(color);
+    color = mix(color, vec3(fogLum), fog * uDepthDesat);
+    color = mix(color, vec3(0.42), fog * uDepthFlatten);
+    color = mix(color, fogCol, fog);
+  }
+
   color *= uExposure;
   color = AcesFitted(color);
 
@@ -382,7 +419,7 @@ void main() {
   }
 
   // --- 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱 ---
-  float vig = 1.0 - uVignette * smoothstep(0.05, 0.62, r2);
+  float vig = 1.0 - uVignette * smoothstep(0.02, 0.50, r2);
   color *= vig;
 
   // --- 胶片颗粒：暗部多、亮部少（真胶片的颗粒就在中间调最明显）---
@@ -458,10 +495,10 @@ export function MarkNoPrepass(material) {
 }
 
 const QUALITY_PRESETS = {
-  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.2 },
-  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.5, sharpen: 0.3 },
-  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 0.5, sharpen: 0.35 },
-  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.35 },
+  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14 },
+  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18 },
+  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 0.75, sharpen: 0.22 },
+  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22 },
 };
 
 export class PostPipeline {
@@ -490,8 +527,8 @@ export class PostPipeline {
 
     this.uniformsAo = {
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
-      uProjection: { value: new THREE.Matrix4() }, uRadius: { value: 0.85 },
-      uBias: { value: 0.035 }, uIntensity: { value: 1.05 }, uFrame: { value: 0 },
+      uProjection: { value: new THREE.Matrix4() }, uRadius: { value: 0.78 },
+      uBias: { value: 0.030 }, uIntensity: { value: 1.30 }, uFrame: { value: 0 },
       uProjScale: { value: new THREE.Vector2(1, 1) },
     };
     this.matAo = this._Mat(FRAG_SSAO, this.uniformsAo);
@@ -502,8 +539,8 @@ export class PostPipeline {
     this.matAoBlur = this._Mat(FRAG_AO_BLUR, this.uniformsAoBlur);
 
     this.uniformsBright = {
-      uSource: { value: null }, uThreshold: { value: 1.05 },
-      uKnee: { value: 0.55 }, uClamp: { value: 24 },
+      uSource: { value: null }, uThreshold: { value: 1.18 },
+      uKnee: { value: 0.55 }, uClamp: { value: 40 },
     };
     this.matBright = this._Mat(FRAG_BRIGHT, this.uniformsBright);
     this.uniformsDown = { uSource: { value: null }, uTexel: { value: new THREE.Vector2() } };
@@ -516,8 +553,8 @@ export class PostPipeline {
 
     this.uniformsGod = {
       uBright: { value: null }, uNormalDepth: { value: null },
-      uSunUv: { value: new THREE.Vector2(0.5, 0.8) }, uDensity: { value: 0.85 },
-      uDecay: { value: 0.955 }, uWeight: { value: 5.2 }, uFrame: { value: 0 },
+      uSunUv: { value: new THREE.Vector2(0.5, 0.8) }, uDensity: { value: 0.52 },
+      uDecay: { value: 0.972 }, uWeight: { value: 3.0 }, uFrame: { value: 0 },
     };
     this.matGod = this._Mat(FRAG_GODRAYS, this.uniformsGod);
 
@@ -525,7 +562,7 @@ export class PostPipeline {
       uHdr: { value: null }, uBloom: { value: null }, uGod: { value: null },
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
       uExposure: { value: 1.0 }, uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
-      uVignette: { value: 0.5 }, uAberration: { value: 0.0022 }, uGrain: { value: 0.045 },
+      uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uGrain: { value: 0.014 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
       uLift: { value: new THREE.Vector3(0.006, 0.004, 0.012) },
       uGain: { value: new THREE.Vector3(1.02, 1.0, 0.965) },
@@ -533,6 +570,14 @@ export class PostPipeline {
       uPrevViewProjection: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() },
       uProjScale: { value: new THREE.Vector2(1, 1) },
       uDamage: { value: 0 }, uFade: { value: 0 },
+      uFogDensity: { value: 0.013 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 },
+      uFogMax: { value: 0.94 },
+      uFogColorSky: { value: new THREE.Vector3(0.62, 0.64, 0.68) },
+      uFogColorGround: { value: new THREE.Vector3(0.42, 0.38, 0.33) },
+      uFogSunGain: { value: 0.28 },
+      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColorFog: { value: new THREE.Vector3(1, 0.92, 0.78) },
+      uDepthDesat: { value: 0.48 }, uDepthFlatten: { value: 0.14 },
     };
     this.matComposite = this._Mat(FRAG_COMPOSITE, this.uniformsComposite);
 
@@ -647,8 +692,8 @@ export class PostPipeline {
       this.uniformsAo.uProjection.value.copy(camera.projectionMatrix);
       this.uniformsAo.uProjScale.value.set(projScaleX, projScaleY);
       this.uniformsAo.uFrame.value = frame;
-      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.85;
-      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.05;
+      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.78;
+      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.30;
       this._Blit(this.matAo, T.ao);
 
       this.uniformsAoBlur.uTexel.value.set(1 / T.ao.width, 1 / T.ao.height);
@@ -668,7 +713,7 @@ export class PostPipeline {
 
     // --- 4) 泛光 ---
     this.uniformsBright.uSource.value = T.hdr.texture;
-    this.uniformsBright.uThreshold.value = options.bloomThreshold ?? 1.05;
+    this.uniformsBright.uThreshold.value = options.bloomThreshold ?? 1.18;
     this._Blit(this.matBright, T.bright);
 
     const levels = this.preset.bloomLevels;
@@ -724,19 +769,32 @@ export class PostPipeline {
     U.uExposure.value = options.exposure ?? 1.0;
     U.uBloomStrength.value = options.bloom ?? 0.5;
     U.uGodStrength.value = godStrength;
-    U.uVignette.value = options.vignette ?? 0.5;
+    U.uVignette.value = options.vignette ?? 0.42;
     U.uAberration.value = options.aberration ?? 0.0022;
-    U.uGrain.value = options.grain ?? 0.045;
+    U.uGrain.value = options.grain ?? 0.014;
     U.uSaturation.value = options.saturation ?? 0.94;
     U.uContrast.value = options.contrast ?? 1.06;
     if (options.lift) U.uLift.value.copy(options.lift);
     if (options.gain) U.uGain.value.copy(options.gain);
+    if (options.fog) {
+      U.uFogDensity.value = options.fog.density ?? 0.013;
+      U.uFogFalloff.value = options.fog.falloff ?? 18;
+      U.uFogBase.value = options.fog.base ?? 0;
+      U.uFogMax.value = options.fog.max ?? 0.94;
+      if (options.fog.sky) U.uFogColorSky.value.fromArray(options.fog.sky);
+      if (options.fog.ground) U.uFogColorGround.value.fromArray(options.fog.ground);
+      U.uFogSunGain.value = options.fog.sunGain ?? 0.28;
+      U.uDepthDesat.value = options.fog.desat ?? 0.48;
+      U.uDepthFlatten.value = options.fog.flatten ?? 0.14;
+    }
+    if (options.sunDirection) U.uSunDir.value.copy(options.sunDirection);
+    if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);
     U.uDamage.value = options.damage ?? 0;
     U.uFade.value = options.fade ?? 0;
     U.uFrame.value = frame;
     U.uProjScale.value.set(projScaleX, projScaleY);
     U.uInvView.value.copy(camera.matrixWorld);
-    U.uMotionScale.value = this.preset.motionBlur && this.hasPrev ? (options.motionBlur ?? 0.55) : 0;
+    U.uMotionScale.value = this.preset.motionBlur && this.hasPrev ? (options.motionBlur ?? 0.15) : 0;
     U.uPrevViewProjection.value.copy(this.prevViewProjection);
     this._Blit(this.matComposite, T.ldr);
 

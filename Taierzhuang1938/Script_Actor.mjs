@@ -893,11 +893,20 @@ export class Actor {
     }
 
     // --- 步态相位 ----------------------------------------------------------
-    // 步频与步幅联动：设 moveSpeed=1 对应 4.2 m/s（冲刺），步幅 = 速度 / 步频。
-    // 这样支撑相里脚相对地面的速度正好为零 —— 不这么算出来的就是滑步。
+    // 设 moveSpeed=1 对应 4.2 m/s（冲刺）。步频不是随手给的：1.6→4.5 步/秒是人的
+    // 真实区间，给低了步幅就会长到腿够不着地（腿长正好等于胯高，任何前后位移都要
+    // 靠沉胯换取），IK 一钳位，脚就开始蹭地。
     const speedMs = moveSpeed * 4.2;
-    const cadence = 1.5 + moveSpeed * 1.65;
-    const stride = moveSpeed > 0.02 ? Clamp(speedMs / cadence, 0.12, 1.5) : 0;
+    const cadence = 1.6 + moveSpeed * 2.9;
+    // 支撑相占比：走路 62%（有双支撑期），跑起来降到 36%（有腾空期）。
+    // 这个数直接决定脚在地上待多久，写死一个值必然在另一端出现滑步。
+    const stanceEnd = Lerp(0.62, 0.36, moveSpeed);
+    const stride = moveSpeed > 0.02 ? Clamp(speedMs / cadence, 0.12, 1.2) : 0;
+    // **不滑步的唯一条件**：支撑相里脚相对身体后移的速度 = 身体前进速度。
+    // 一个 gaitPhase 周期是两步（时长 2/cadence），支撑相时长 = stanceEnd·2/cadence，
+    // 所以这段时间里脚要相对身体走 speedMs × 2·stanceEnd/cadence = 2·stanceEnd·stride。
+    // 早先直接拿 stride 当行程，脚就以 19% 的身速往前飘 —— 那就是「滑步」的来源。
+    const stanceTravel = stride * 2 * stanceEnd;
     if (moveSpeed > 0.02) this.gaitPhase = (this.gaitPhase + dt * cadence * 0.5) % 1;
 
     // --- 站姿高度：蹲就是把胯压下去，膝盖弯多少交给腿 IK 自己算 ------------
@@ -921,7 +930,6 @@ export class Actor {
     // 目标是**踝关节**（两段骨头的末端），所以站立时是 y = ankleY 而不是 0；
     // 写成 0 的话踝会去贴地、整只脚陷进地面里。
     const lift = Lerp(0.05, 0.16, moveSpeed) * H;
-    const stanceEnd = 0.62;                       // 支撑相占 62%，走路才有双支撑期
     for (const tag of ["L", "R"]) {
       const leg = this.legs[tag];
       const phase = (this.gaitPhase + (tag === "R" ? 0.5 : 0)) % 1;
@@ -929,10 +937,10 @@ export class Actor {
       if (stride > 0) {
         if (phase < stanceEnd) {
           // 支撑相：脚钉在地上，身体从它上面走过去
-          footZ = Lerp(-stride * 0.5, stride * 0.5, phase / stanceEnd);
+          footZ = Lerp(-stanceTravel * 0.5, stanceTravel * 0.5, phase / stanceEnd);
         } else {
           const t = (phase - stanceEnd) / (1 - stanceEnd);
-          footZ = Lerp(stride * 0.5, -stride * 0.5, SmoothStep(0, 1, t));
+          footZ = Lerp(stanceTravel * 0.5, -stanceTravel * 0.5, SmoothStep(0, 1, t));
           footY += Math.sin(Math.PI * t) * lift;
         }
       } else {

@@ -32,7 +32,7 @@ renderer.toneMapping = THREE.NoToneMapping;      // 色调映射在合成 pass �
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.08, 900);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.08, 900);
 camera.position.set(0, 1.68, 8);
 
 const post = new PostPipeline(renderer, { width: window.innerWidth, height: window.innerHeight, quality });
@@ -61,7 +61,7 @@ async function Boot() {
   const preset = sky.Apply(presetName);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
-  scene.fog = new THREE.Fog(preset.fogColor, preset.fogNear, preset.fogFar);
+  scene.fog = null;   // 雾收到合成 pass 里
   if (sceneKind === "materials") BuildMaterialScene(); else BuildStreetScene();
   state.ready = true;
   hint.textContent = `preset=${presetName} quality=${quality} scene=${sceneKind}\nhdr=${post.hdrCapable}`;
@@ -210,13 +210,15 @@ function Frame(dt) {
   const preset = SKY_PRESETS[presetName];
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
+    sunColor: preset.sunColor,
+    fog: preset.fog,
     exposure: preset.exposure,
     bloom: preset.bloom,
     godStrength: preset.godStrength,
     saturation: preset.saturation,
     contrast: preset.contrast,
-    grain: 0.032,
-    vignette: 0.46,
+    grain: 0.014,
+    vignette: 0.42,
     fade: 0,
   });
 }

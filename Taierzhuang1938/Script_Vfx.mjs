@@ -142,6 +142,9 @@ varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
 varying vec3 vLitNormal;
 #endif
+#ifdef SHAPE_DECAL
+varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
+#endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
 #endif
@@ -221,6 +224,9 @@ void main() {
 
   vColor = mix(iColorA, iColorB, smoothstep(0.0, 0.8, t01));
   vColorAlt = iColorB;
+#ifdef SHAPE_DECAL
+  vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
+#endif
 
   // fadeIn 是"占寿命的比例"。贴花寿命是 1e5 秒，任何非零比例都会变成几十秒才浮现，
   // 所以 0 必须当"立刻出现"处理，不能靠 max() 兜一个极小值。
@@ -264,6 +270,9 @@ varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
 varying vec3 vLitNormal;
 #endif
+#ifdef SHAPE_DECAL
+varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
+#endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
 #endif
@@ -306,7 +315,9 @@ void main() {
   float n = Vnoise(p * 4.0 + vec2(vSeed * 13.0, 3.0));
   float hole = smoothstep(0.46 + 0.06 * n, 0.16, d);
   float rim = smoothstep(0.26, 0.5, d) * smoothstep(0.86, 0.5, d);
-  float rays = pow(abs(sin(a * 6.0 + vSeed * 31.0)), 9.0) * smoothstep(0.95, 0.3, d);
+  // iExtra.x 在贴花池里当"放射线强度"用：弹孔要那圈断口白线，
+  // 爆炸焦痕放大到几米之后同一套线会变成一个卡通星号，所以给 0。
+  float rays = pow(abs(sin(a * 6.0 + vSeed * 31.0)), 9.0) * smoothstep(0.95, 0.3, d) * vRays;
   mask = hole * 0.95 + rim * 0.5 + rays * 0.35;
   // 贴花不老化，vColor 恒等于 colorA（断口色），暗芯色只能从 colorB 单独取
   color = mix(vColor, vColorAlt, hole);
@@ -1331,8 +1342,9 @@ export class VfxSystem {
       s.x = position.x; s.y = ground + 0.08 + i * 0.05; s.z = position.z;
       s.nx = 0; s.ny = 1; s.nz = 0;
       s.life = 0.9 + i * 0.5;
-      s.sizeStart = radius * 0.25;
-      s.sizeEnd = radius * (1.9 + i * 0.7);
+      s.sizeStart = radius * 0.2;
+      // 环的可见半径约是这个半宽的 0.72 倍，1.05 差不多正好铺到杀伤半径外沿
+      s.sizeEnd = radius * (1.05 + i * 0.4);
       s.opacity = 0.55 - i * 0.18; s.fadeIn = 0.05;
       s.angle = this._Range(0, 3.14);
       s.colorA = VFX_PALETTE.dust; s.colorB = VFX_PALETTE.dustDense;
@@ -1387,8 +1399,8 @@ export class VfxSystem {
       s.ax = this.wind.x * 0.4; s.ay = 0.55; s.az = this.wind.z * 0.4;
       s.drag = 1.5;
       s.life = this._Range(2.6, 5.0);
-      s.sizeStart = radius * 0.2;
-      s.sizeEnd = radius * this._Range(0.7, 1.25);
+      s.sizeStart = radius * 0.14;
+      s.sizeEnd = radius * this._Range(0.42, 0.78);
       s.opacity = 0.5; s.fadeIn = 0.14;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.7);
       // 越靠近爆心越黑（燃烧产物），越往外越是砖粉黄土
@@ -1402,7 +1414,7 @@ export class VfxSystem {
     // 7) 地面焦痕
     TMP_C.set(0, 1, 0);
     this._SpawnDecal({ x: position.x, y: ground + 0.02, z: position.z }, TMP_C,
-      radius * 0.55, VFX_PALETTE.soil, VFX_PALETTE.woodBurnt, 0.55);
+      radius * 0.42, VFX_PALETTE.soil, VFX_PALETTE.woodBurnt, 0.5, 0);
   }
 
   /**
@@ -1595,7 +1607,7 @@ export class VfxSystem {
   }
 
   /** 弹孔贴花：沿法线抬 12 mm + polygonOffset，双保险防 z-fighting。 */
-  _SpawnDecal(position, normal, size, rim, hole, opacity = 0.85) {
+  _SpawnDecal(position, normal, size, rim, hole, opacity = 0.85, rays = 1) {
     const s = ResetSpawn();
     s.x = position.x + normal.x * 0.012;
     s.y = position.y + normal.y * 0.012;
@@ -1604,6 +1616,7 @@ export class VfxSystem {
     s.life = 1e5;                       // 一关打不完；超上限由环形缓冲先进先出淘汰
     s.sizeStart = size; s.sizeEnd = size;
     s.opacity = opacity; s.fadeIn = 0;
+    s.stretch = rays;                    // 贴花池里 stretch 复用为放射线强度
     s.angle = this._Range(0, 6.283);
     s.colorA = rim; s.colorB = hole;
     s.seed = this.random();
