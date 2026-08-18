@@ -696,7 +696,14 @@ export class Viewmodel {
     // 视图模型用自己的 FOV 缩放摆在近裁面内，它的深度不是世界深度。
     // 让它进深度法线预通道，SSAO 会在枪身边缘挖一圈黑边、运动模糊会把枪一起糊。
     // 这里在 Equip 之后统一把整棵树的材质标成 allowOverride = false。
-    this.markNoPrepass = () => this.root.traverse((o) => { if (o.material) MarkNoPrepass(o.material); });
+    // 注意：**不能**遍历 this.root —— 构造完成时树里只有抛壳池和弹夹道具，
+    // 手、枪身、枪口焰要到 Equip() 里才建出来并挂进去。主程序又习惯在
+    // Equip 之前就调一次，结果是一个都没标上。所以这里遍历材质表（那才是全集），
+    // 并且 Equip() 末尾会自己再调一次，调用方怎么调都不会漏。
+    this.markNoPrepass = () => {
+      for (const m of Object.values(this.materials)) MarkNoPrepass(m);
+      this.root.traverse((o) => { if (o.material) MarkNoPrepass(o.material); });
+    };
     this.root.name = "Viewmodel";
     this.fovRig = new THREE.Group();           // FOV 伪造 + 深度压缩（非等比缩放）
     this.swayPivot = new THREE.Group();        // 鼠标摇摆（滞后 + 过冲）
@@ -931,6 +938,12 @@ export class Viewmodel {
 
     // 掏枪动画
     this.equipSpring.Set(0);
+    // 每次换枪都会重建整棵 rig：新建出来的材质必须重新退出深度法线预通道。
+    // 漏了的后果不是“预通道多画一遍”那么轻：枪把自己 0.1—0.9 m 的深度
+    // 写进法线深度图，SSAO 就在枪所在的那块屏幕区域算出几乎全遮蔽，
+    // 而枪自己的材质又正好采样那张图（MaterialLibrary 给每份材质都注了 SSAO）——
+    // 于是整支枪的间接光被乘成 0，画面下方就是一坨黑。
+    if (this.markNoPrepass) this.markNoPrepass();
     return this;
   }
 
@@ -1097,6 +1110,10 @@ export class Viewmodel {
 
   /** 投弹。power 0..1 是蓄力（只影响出手速度与摆幅，不影响时长）。 */
   TriggerThrow(power = 1) {
+    // 其余 Trigger* 都有这道闸，只有这个漏了：空手时 _StepAction 会直接 return，
+    // action 的 t 永远推不到 1，onThrowRelease / onActionEnd 一次都不触发，
+    // 这一发就被静默吞掉了。
+    if (!this.rig) return false;
     if (this.IsBusy()) return false;
     this._StartAction("throw", 0.82);
     this.action.power = Clamp01(power);

@@ -134,6 +134,8 @@ async function Boot() {
   viewmodel = new Viewmodel(library, { fov: 52 });
   camera.add(viewmodel.root);
   scene.add(camera);
+  // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，
+  // 这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
   if (viewmodel.markNoPrepass) viewmodel.markNoPrepass();
 
   player = new PlayerController(camera, {

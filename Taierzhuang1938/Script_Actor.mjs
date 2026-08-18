@@ -953,7 +953,10 @@ export class Actor {
       SolveTwoBone(leg.thigh, leg.knee, this.tmpTarget, d.thighLen, d.shinLen, leg.side * 0.10);
       // 脚踝：抵消大腿+小腿的累计俯仰让鞋底贴地，腾空时勾一下脚尖
       const pitch = ExtractPitch(leg.thigh.quaternion) + ExtractPitch(leg.knee.quaternion);
-      leg.ankle.rotation.set(-pitch + (footY - d.ankleY) * 1.6 - crouch * 0.25, 0, 0);
+      // 这里原本有一项 `- crouch * 0.25`（蹲下压脚尖 14°）。压是压对了，
+      // 但没有配套抬升——鞋料总高才 9.4 cm，压完鞋底就有 4 cm 在地面以下。
+      // IK 本身已经把踝关节钉在了正确高度，脚尖不需要再额外拧。
+      leg.ankle.rotation.set(-pitch + (footY - d.ankleY) * 1.6, 0, 0);
     }
 
     // --- 上身：看的方向按 35% / 65% 分给胸和头 ------------------------------
@@ -1159,6 +1162,12 @@ export class Actor {
     const t = SmoothStep(0, 1, prone);
     this.body.rotation.x = Lerp(this.body.rotation.x, -1.40, t);
     this.body.position.y = Lerp(this.body.position.y, 0.095 * d.height, t);
+    // 躺下之后躯干高度已经由上面这行单独给定；胯上那份 stanceDrop
+    // （站姿用来表示"沉下去"的局部 -Y 偏移）必须清掉。
+    // 不清的话它会跟着转过去的体轴变成"朝后下方"，把小腿整根压进地里，
+    // 手里的枪连刺刀一起扎到地下一米多。这个 bug 在静态正面截图上看不出来。
+    this.hips.position.y = Lerp(this.hips.position.y, 0, t);
+    this.hips.position.z = Lerp(this.hips.position.z, 0, t);
     this.chest.rotation.x = Lerp(this.chest.rotation.x, 0.32, t);
     this.neck.rotation.x = Lerp(this.neck.rotation.x, 0.50, t);
     for (const tag of ["L", "R"]) {
