@@ -71,6 +71,11 @@ def main():
     ap.add_argument("--end", type=float, default=1e9)
     ap.add_argument("--overlay-every", type=int, default=12)
     ap.add_argument("--mode", default="balanced")
+    ap.add_argument("--cycle", default="", help="auto：从两脚踝前后差的振荡里找步态周期，截一个周期做循环轨（走/跑用）；manual：用 --period/--start 指定")
+    ap.add_argument("--period", type=int, default=0, help="cycle=manual 时的周期（源视频帧数）")
+    ap.add_argument("--start-frame", type=int, default=0, help="cycle=manual 时的起始帧")
+    ap.add_argument("--mirror-half", action="store_true", help="给的是半个周期（一步）：把它前后侧互换再接一遍，拼成整周期（走/跑左右对称）")
+    ap.add_argument("--time-scale", type=float, default=1.0, help="时间轴缩放（生成视频常是慢动作：0.25 就是提速四倍）")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
 
@@ -102,10 +107,7 @@ def main():
     K = np.stack([f[1] for f in frames])          # [N,133,2]
     S = np.stack([f[2] for f in frames])          # [N,133]
     T = np.array([f[0] for f in frames])
-    # 时间平滑（像素域）
-    Ks = K.copy()
-    Ks[:, :, 0] = smooth(K[:, :, 0], 5)
-    Ks[:, :, 1] = smooth(K[:, :, 1], 5)
+    Ks = K.copy()          # 先按原始点配左右（见下），配完再平滑——先平滑会把认反那几帧的两条腿平均成一条
 
     # 朝向：鼻子在两肩中点的哪一边（+1 朝图像右）
     if a.face == "auto":
@@ -121,6 +123,38 @@ def main():
     L = dict(sho=LSHO, elb=LELB, wri=LWRI, hip=LHIP, kne=LKNE, ank=LANK, toe=LBTOE, heel=LHEEL, hand=LHAND0, ear=LEAR, eye=LEYE)
     Rr = dict(sho=RSHO, elb=RELB, wri=RWRI, hip=RHIP, kne=RKNE, ank=RANK, toe=RBTOE, heel=RHEEL, hand=RHAND0, ear=REAR, eye=REYE)
     F, B = (L, Rr) if frontLeft else (Rr, L)
+    # 侧视里两条腿/两条胳膊交叉那一刻，估计器常把左右**认反**（跑步尤甚），于是同一条腿
+    # 一帧在前一帧在后，角度来回跳、步态周期看着是真周期的一半。这里不信它的左右标签，
+    # 按**连续性**重新配对：每帧比较"保持 / 交换"两种配法哪种离上一帧的膝踝（肘腕）更近，
+    # 腿和胳膊各自配；配好之后把点**重排**进固定槽位（前侧一律放进 Rr 的下标、后侧放进 L
+    # 的下标），再做时间平滑。之后 F/B 就是固定的两张下标表
+    LEG, ARM = ("hip", "kne", "ank", "toe", "heel"), ("sho", "elb", "wri", "hand")
+    Ko = K.copy(); So = S.copy()
+    prev = {"leg": None, "arm": None}
+    for f in range(len(K)):
+        for grp, keysN in (("leg", LEG), ("arm", ARM)):
+            keep = swap = 0.0
+            if prev[grp] is not None:
+                pf, pb = prev[grp]
+                for kk in keysN[1:3]:
+                    keep += np.linalg.norm(K[f, F[kk]] - pf[kk]) + np.linalg.norm(K[f, B[kk]] - pb[kk])
+                    swap += np.linalg.norm(K[f, B[kk]] - pf[kk]) + np.linalg.norm(K[f, F[kk]] - pb[kk])
+            srcF, srcB = (F, B) if swap >= keep else (B, F)
+            for kk in keysN:
+                if kk == "hand":
+                    for d in range(21):
+                        Ko[f, Rr[kk] + d] = K[f, srcF[kk] + d]; So[f, Rr[kk] + d] = S[f, srcF[kk] + d]
+                        Ko[f, L[kk] + d] = K[f, srcB[kk] + d]; So[f, L[kk] + d] = S[f, srcB[kk] + d]
+                else:
+                    Ko[f, Rr[kk]] = K[f, srcF[kk]]; So[f, Rr[kk]] = S[f, srcF[kk]]
+                    Ko[f, L[kk]] = K[f, srcB[kk]]; So[f, L[kk]] = S[f, srcB[kk]]
+            prev[grp] = ({kk: K[f, srcF[kk]] for kk in keysN}, {kk: K[f, srcB[kk]] for kk in keysN})
+    F, B = Rr, L
+    K, S = Ko, So
+    Ks = K.copy()
+    Ks[:, :, 0] = smooth(K[:, :, 0], 5)
+    Ks[:, :, 1] = smooth(K[:, :, 1], 5)
+    sideF = [F] * len(K); sideB = [B] * len(K)
 
     def vec(p, q, f):
         dx = (q[0] - p[0]) * face          # 前为正
@@ -130,7 +164,7 @@ def main():
     # 尺子：最长的一条腿（像素）＝ thigh+shin
     legpx = 0
     for f in range(len(Ks)):
-        for side in (F, B):
+        for side in (sideF[f], sideB[f]):
             legpx = max(legpx, np.linalg.norm(Ks[f, side["hip"]] - Ks[f, side["kne"]]) + np.linalg.norm(Ks[f, side["kne"]] - Ks[f, side["ank"]]))
     ppm = legpx / (BONE["thigh"] + BONE["shin"])
     print(f"scale {ppm:.1f} px/m (leg {legpx:.0f}px)")
@@ -138,6 +172,7 @@ def main():
     rows = []
     for f in range(len(Ks)):
         k = Ks[f]
+        F, B = sideF[f], sideB[f]
         hipm = (k[LHIP] + k[RHIP]) / 2
         shom = (k[LSHO] + k[RSHO]) / 2
         r = {}
@@ -181,9 +216,60 @@ def main():
         r["_t"] = T[f]
         rows.append(r)
 
+    # 循环步态：拿"前踝 − 后踝"的前后差当相位信号，自相关找周期，从一次过零（两脚并拢、
+    # 前脚正往前迈）截一个整周期出来做 loop 轨。抽稀之后再截，关键帧数＝周期×fps
+    loop = False
+    if a.cycle == "manual":
+        period, start = a.period, a.start_frame
+        allrows = rows
+        rows = rows[start:start + period + 1]
+        loop = True
+        print(f"cycle(manual): period {period} frames = {period / vfps:.2f}s, start frame {start}")
+    elif a.cycle == "auto":
+        sig = np.array([(Ks[f, sideF[f]["ank"]][0] - Ks[f, sideB[f]["ank"]][0]) * face for f in range(len(Ks))])
+        sig = sig - sig.mean()
+        # 自相关取**第一个真正的峰**（比左右邻居都高），不取全局最大：从最小滞后起自相关
+        # 本来就在往下掉，全局最大常常落在搜索窗口的第一格上（跑步那段就是这么把 0.33s
+        # 当成周期的——那只是站立相的长度）
+        ac = {}
+        for lag in range(int(vfps * 0.3), int(vfps * 2.2)):
+            if lag >= len(sig) - 2: break
+            ac[lag] = np.dot(sig[:-lag], sig[lag:]) / (np.linalg.norm(sig[:-lag]) * np.linalg.norm(sig[lag:]) + 1e-9)
+        lags = sorted(ac)
+        peaks = [l for l in lags[1:-1] if ac[l] > ac[l - 1] and ac[l] >= ac[l + 1] and ac[l] > 0.3]
+        best = max(peaks, key=lambda l: ac[l]) if peaks else max(lags, key=lambda l: ac[l])
+        bestv = ac[best]
+        period = best
+        # 起点：信号从负变正的过零（前脚从后往前迈过另一只脚），挑离中段最近的一个
+        zc = [i for i in range(1, len(sig) - period) if sig[i - 1] < 0 <= sig[i]]
+        start = min(zc, key=lambda i: abs(i - len(sig) // 3)) if zc else 0
+        allrows = rows
+        rows = rows[start:start + period + 1]
+        loop = True
+        print(f"cycle: period {period} frames = {period / vfps:.2f}s (r={bestv:.2f}), start frame {start}")
+    # 半个周期镜像成整周期：第二步＝第一步把 F/B 互换（走/跑左右对称）。时间接在末尾
+    if loop and a.mirror_half:
+        SW = [("thighF", "thighB"), ("shinF", "shinB"), ("footF", "footB"), ("armF", "armB"), ("foreF", "foreB"), ("handF", "handB")]
+        half = rows
+        span = half[-1]["_t"] - half[0]["_t"]
+        second = []
+        for r in half[1:]:
+            q = dict(r)
+            for x, y in SW: q[x], q[y] = r[y], r[x]
+            q["_t"] = r["_t"] + span
+            second.append(q)
+        rows = half + second
+    if a.time_scale != 1.0:
+        t00 = rows[0]["_t"]
+        for r in rows: r["_t"] = t00 + (r["_t"] - t00) * a.time_scale
+        vfps_eff = vfps / a.time_scale
+    else:
+        vfps_eff = vfps
     # 抽稀到 --fps
-    step = max(1, int(round(vfps / a.fps)))
+    step = max(1, int(round(vfps_eff / a.fps)))
     keys = rows[::step]
+    if loop and (len(rows) - 1) % step:            # 循环轨末帧要落在周期末尾上
+        keys = keys + [rows[-1]]
     t0 = keys[0]["_t"]
     fields = ["hipY", "hipX", "torso", "chest", "head", "neck", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "handB", "armF", "foreF", "handF"]
     # 角度再夹一遍
@@ -199,14 +285,15 @@ def main():
             v = clampf(fld, kk[fld])
             parts.append(f"{fld}: {v:.3f}" if fld in ("hipY", "hipX") else f"{fld}: {v:.0f}")
         lines.append("      { " + ", ".join(parts) + " },")
-    dur = keys[-1]["_t"] - t0 + 1 / a.fps
-    js = (f"  // —— 视频转骨骼（Script_MocapTrack.py，{os.path.basename(a.video)}，{a.fps:g}fps 抽稀）——\n"
-          f"  {a.name}: {{\n    dur: {dur:.2f}, loop: false,\n    keys: [\n" + "\n".join(lines) + "\n    ],\n  },\n")
+    dur = (keys[-1]["_t"] - t0) if loop else (keys[-1]["_t"] - t0 + 1 / a.fps)
+    cyc = "，截一个步态周期循环" if loop else ""
+    js = (f"  // —— 视频转骨骼（Script_MocapTrack.py，{os.path.basename(a.video)}，{a.fps:g}fps 抽稀{cyc}）——\n"
+          f"  {a.name}: {{\n    dur: {dur:.2f}, loop: {'true' if loop else 'false'},\n    keys: [\n" + "\n".join(lines) + "\n    ],\n  },\n")
     with open(os.path.join(a.out, a.name + ".track.mjs"), "w", encoding="utf-8") as fh:
         fh.write(js)
     with open(os.path.join(a.out, a.name + ".csv"), "w", encoding="utf-8") as fh:
         fh.write("t," + ",".join(fields) + "\n")
-        for kk in rows:
+        for kk in (allrows if loop else rows):
             fh.write(f"{kk['_t']:.3f}," + ",".join(f"{kk[x]:.2f}" for x in fields) + "\n")
     # 叠图
     for idx, fr in enumerate(frames):

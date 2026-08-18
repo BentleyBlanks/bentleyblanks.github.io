@@ -261,12 +261,22 @@ poseK、几件事挂同一个造型几秒、旁边的人一帧不动，都算）
 - 【为什么】它能给的是**时序与幅度**（哪只手先动、抬多高、身子什么时候前倾）——正是手写角度
   最不准的部分；给不了的是我们这套梯子的几何（视频里的梯子是斜的、人是大人），手脚该落在哪档
   仍归 `PlanClimb` 反解。所以合适的用法是"mocap 供上半身/节奏，反解供落点"，不是整条照搬。
+- 【生视频走即梦 CLI】`dreamina text2video --model_version=seedance2.5 --video_resolution=720p
+  --ratio=16:9 --duration=6`（VIP 档；6s 156 积分，约 3 分钟；`--poll=5` 拿到 submit_id 再
+  `query_result` 轮询取 `video_url`）。走路（`mocapWalk`，1.49s 一个周期，`--cycle auto` 自相关
+  截周期成 loop 轨）与跑步（`mocapRun`）两条样本就是这么来的。**AI 出的"跑步"十有八九是慢动作**
+  （一步 2 秒），而且"原地跑""近景"都会跑偏——拿慢动作那条按 `--cycle manual --start-frame N
+  --period P --mirror-half --time-scale k`：截**一步**、前后侧互换镜像成整周期、时间轴按真人
+  步频（跑一步 ≈0.35s）压回去。周期用自相关的**第一个真峰**，不取全局最大（站立相长的信号
+  全局最大落在窗口第一格）。左右腿在交叉那一帧常被估计器认反：先按连续性重配再平滑，
+  顺序反了会把两条腿平均成一条。
 - 【坑】① Hub 上 Seedance 2.0 连败三次（每次 15 分钟才报 "seedance task failed"，积分会退），
   MiniMax-H3 768P 9:16 8s 一次成（4 分钟）；Hub 的 `/api/generate/video` 是**同步等到完成**的，
   客户端 8 秒超时断开也没关系，网关自己继续跑、成品落到 `%APPDATA%\@hilo\desktop\output_files`，
   别重复提交（会双份扣费）；② 侧视没有深度，远侧脚尖点会抖，脚角要靠平滑；③ 生成视频里的
-  梯子多半是斜的，机位要在提示词里钉死"exact 90-degree profile, locked static camera"。
-  【守着它的】`_mocap/compare_sheet.jpg`（视频叠骨架 vs 工作台同一秒）。
+  梯子多半是斜的，机位要在提示词里钉死"exact 90-degree profile, locked static camera"；
+  ④ 人跑出画面那几帧估计器会凭空给点，先 `--start/--end` 切掉。
+  【守着它的】`_mocap/compare_sheet.jpg` / `compare_walk.jpg` / `compare_run.jpg`（视频 vs 工作台同一相位）。
 
 ## 扛与提、携带物标签表（2026-08-18 从项目记忆并入）
 
