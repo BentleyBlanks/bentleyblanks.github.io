@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
+import { DIFFICULTY } from "./Data_Battle.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -33,7 +34,23 @@ export class PlayerController {
     // 这是 ER2「没有准星也打得准」的物理基础 —— 玩家看的是枪，不是屏幕中心。
     this.aimYaw = 0;
     this.aimPitch = 0;
-    this.freeAimLimitDeg = 5.0;
+    // ER2 其实**没有**自由瞄准（benchmark 把这条列为"查不到证据"级别的否定结论）。
+    // 我们保留它，但从 5.0° 降到难度表里的默认 2.0° —— 5° 太大，玩家会觉得枪不听话；
+    // 完全去掉又会退化成"枪很稳但打不中"。0 档要等弹道/视差/后坐三条落地才开放，
+    // 这一批三条都落地了，所以 DIFFICULTY.freeAimDeg 的 0 档现在是合法的。
+    this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
+
+    // --- 后坐 ---------------------------------------------------------------
+    // Data_Weapons 里每支枪都有 recoil:{pitch,yaw,kick,recoverS}，以前一次都没读过：
+    // 开完枪视角纹丝不动，只有散布在变。现在开火时把枪口顶上去，然后**只回落 70%**，
+    // 剩下 30% 要玩家自己压回来 —— 这是"栓动枪打完一发要重新找目标"的手感来源。
+    this.recoilPending = { pitch: 0, yaw: 0 };   // 还没回落完的那部分（弧度）
+    this.recoilRecoverS = 0.4;
+    this.recoilTotal = 0;                       // 本轮累计顶了多少（弧度，取证用）
+
+    // 两脚架。捷克式全班就一挺，架起来才有 800 m 有效射程；ER2 的规矩是**不架不能开镜**。
+    this.bipod = false;
+    this.fastCrawl = false;                     // 卧姿按住 Shift：更快也更响
 
     this.stance = "stand";
     this.stanceBlend = { crouch: 0, prone: 0 };
@@ -80,6 +97,12 @@ export class PlayerController {
     this.stance = "stand";
     this.alive = true;
     this.deadTime = 0;
+    this.recoilPending.pitch = 0;
+    this.recoilPending.yaw = 0;
+    this.recoilTotal = 0;
+    this.bipod = false;
+    this.fastCrawl = false;
+    this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
   }
 
   get Alive() { return this.alive; }
@@ -110,11 +133,25 @@ export class PlayerController {
 
     // --- 视角与自由瞄准 -----------------------------------------------------
     const sens = (input.sensitivity ?? 1) * 0.0022;
-    const adsScale = 1 - this.ads * 0.55;                 // 开镜降灵敏度
+    // 架起两脚架之后转向只剩三成：机枪压在垛口上，横过来要连人带枪挪。
+    // 这是"机枪手必须先选好位置"这条战术决策的成本，不是手感黏滞。
+    const adsScale = (1 - this.ads * 0.55) * (this.bipod ? 0.30 : 1);
     const dx = -input.lookX * sens * adsScale;
     const dy = -input.lookY * sens * adsScale;
 
+    // 后坐回落。指数回落，但**只回 recoilPending 里存的那 70%**：
+    // ApplyRecoil 顶上去 1.0，只往回记 0.7，剩下的 0.3 永久留在 pitch 上。
+    if (this.recoilPending.pitch !== 0 || this.recoilPending.yaw !== 0) {
+      const back = 1 - Math.exp(-dt / Math.max(0.05, this.recoilRecoverS));
+      const bp = this.recoilPending.pitch * back;
+      const by = this.recoilPending.yaw * back;
+      this.pitch -= bp; this.recoilPending.pitch -= bp;
+      this.yaw -= by; this.recoilPending.yaw -= by;
+    }
+
     // 自由瞄准：先动枪，枪顶到边界才推动视线。开镜时收窄到 1.4°（贴脸瞄准没有余量）
+    // 每帧从难度表取，滑条一拨就生效（缓存在字段里的话要重生一次才认）
+    this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * 0.72));
     this.aimYaw += dx;
     this.aimPitch += dy;
@@ -141,14 +178,22 @@ export class PlayerController {
     this.stanceBlend.prone += ((this.stance === "prone" ? 1 : 0) - this.stanceBlend.prone) * rate;
 
     // --- 开镜 / 冲刺 / 侧身 --------------------------------------------------
-    const wantAds = input.ads && this.stance !== "prone" ? 1 : (input.ads ? 1 : 0);
+    // ER2 的规矩：架式武器不架起两脚架就不许开镜（MG42/白朗宁/反坦克枪都是）。
+    // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
+    const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod;
+    const wantAds = input.ads && !bipodBlocked ? 1 : 0;
     const adsSpeed = 1 / Math.max(0.08, weapon?.adsTimeS ?? 0.3);
     this.ads += Clamp((wantAds - this.ads) * dt * adsSpeed * 3, -dt * 6, dt * 6);
     this.ads = Clamp01(this.ads);
+    // 卧姿按住 Shift = 快速匍匐（ER2 有匍匐速度档）。它不是冲刺：不进 sprint 弹簧，
+    // 只把速度从 0.72 提到 1.25，并把脚步声放大 —— 快就得响，这是一对取舍。
+    this.fastCrawl = !!input.sprint && this.stance === "prone" && this.stamina > 0.05;
     const canSprint = input.sprint && this.stamina > 0.05 && this.ads < 0.25
       && this.stance === "stand" && input.forward > 0.3;
     this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * 6));
-    this.stamina = Clamp01(this.stamina + (canSprint ? -dt * 0.20 : dt * 0.13));
+    // 冲刺时长挂难度：staminaSeconds 就是"从满到空能跑几秒"。
+    const burn = 1 / Math.max(1, DIFFICULTY.staminaSeconds);
+    this.stamina = Clamp01(this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * 0.13));
     this.lean += ((input.lean || 0) - this.lean) * (1 - Math.exp(-dt * 9));
 
     // 屏息：只在开镜时有意义，能压住摇摆，但会很快耗尽
@@ -157,6 +202,7 @@ export class PlayerController {
 
     // --- 移动 ---------------------------------------------------------------
     let speed = target.speed;
+    if (this.fastCrawl) speed = 1.25;              // 卧姿 0.72 -> 1.25
     speed *= 1 + this.sprint * 0.72;
     speed *= 1 - this.ads * 0.42;
     speed *= 1 - this.suppression * 0.18;
@@ -313,6 +359,30 @@ export class PlayerController {
     if (this.health <= 0) this.Kill();
   }
 
+  /**
+   * 开一枪的后坐。参数是**弧度**（调用方从 viewmodel.ConsumeCameraKick 取，
+   * 那一份已经按 Data_Weapons 的 recoil 表与开镜量算好了）。
+   *
+   * 顶上去 100%，只往 recoilPending 里记 70% —— 于是回落结束后仍然有 30% 留在
+   * pitch 上，玩家必须自己压回来。这就是"打一发要重新找目标"。
+   */
+  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4) {
+    this.pitch = Clamp(this.pitch + pitchRad, -1.35, 1.35);
+    this.yaw += yawRad;
+    this.recoilPending.pitch += pitchRad * 0.70;
+    this.recoilPending.yaw += yawRad * 0.70;
+    this.recoilRecoverS = recoverS;
+    this.recoilTotal += pitchRad;
+  }
+
+  /** 架/收两脚架。返回是否真的改变了状态（给音效与提示用）。 */
+  ToggleBipod(weapon, canDeploy) {
+    if (!weapon || !weapon.bipod) return false;
+    if (!this.bipod && !canDeploy) return false;
+    this.bipod = !this.bipod;
+    return true;
+  }
+
   /** 子弹从身边飞过：不掉血，但压得抬不起头。 */
   Suppress(amount) {
     this.suppression = Clamp01(this.suppression + amount);
@@ -345,6 +415,7 @@ export class PlayerController {
     sway *= 1 + this.suppression * 0.9;
     sway *= 1 + (1 - this.stamina) * 0.6;
     if (this.breathHold) sway *= 0.28;
+    if (this.bipod) sway *= 0.25;                  // 架上去之后枪自己稳住了
     return sway;
   }
 
@@ -357,6 +428,7 @@ export class PlayerController {
     s *= this.ArmPenalty() * 0.6 + 0.4;
     s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3) * 1.8;
     if (this.breathHold) s *= 0.55;
+    if (this.bipod) s *= 0.35;
     return s;
   }
 }

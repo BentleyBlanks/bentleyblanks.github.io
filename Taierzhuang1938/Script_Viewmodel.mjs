@@ -32,6 +32,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { DIFFICULTY } from "./Data_Battle.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -55,6 +56,27 @@ const VM_TILE = { steel: 0.030, wood: 0.085, cloth: 0.045 };
 // 眼睛到照门的距离。真实据枪约 8—12 cm，但那样照门会顶到近裁面，
 // 而且遮掉大半个屏幕；15.5 cm 是"看得清缺口又不挡视野"的折中。
 const SIGHT_EYE_DISTANCE = 0.155;
+
+/**
+ * 铁瞄偏心。ER2 的作者 Marco 亲自回帖确认过：**照门不落在屏幕正中是故意的**。
+ * 我们原来的 _MakeAdsPose 是 px:-s.x, py:-s.y —— 把照门精确平移到屏幕几何中心，
+ * 也就是"开了镜就等于有准星"，那"没有准星"这条设定就没有物理支撑了。
+ *
+ * 单位换算（别拍脑袋填米）：开镜时世界 FOV 约 55°×0.72 ≈ 39.6°，900 px 高的屏幕上
+ * 一个像素 = 39.6/900 度；照门离眼 SIGHT_EYE_DISTANCE = 0.155 m，
+ * 于是 1 px 屏幕当量 = tan(39.6/900 °) × 0.155 ≈ 1.19e-4 m。
+ * 幅度取 4—8 px：汉阳造是老套筒，枪龄大、膛线磨得厉害，偏得比中正式明显。
+ * 只给横向留大头、纵向只有 2 px —— 纵向偏多了上护盖会爬进画面挡住准星。
+ */
+const SIGHT_OFFSET_PER_PX = 1.19e-4;
+const IRON_SIGHT_OFFSET_PX = {
+  ZhongZheng: { x: 4, y: 2 },
+  HanYang: { x: 8, y: 2 },
+  Zb26: { x: 5, y: 1 },
+  Mauser96: { x: 6, y: 2 },
+  Type38: { x: 5, y: 2 },
+};
+const IRON_SIGHT_OFFSET_DEFAULT = { x: 5, y: 2 };
 
 // ---------------------------------------------------------------------------
 // 小工具
@@ -796,6 +818,7 @@ export class Viewmodel {
     // 开镜时要藏掉的部件（见 _CollectAdsHideParts）。带迟滞，别在阈值上抖。
     this.adsHideParts = [];
     this.adsHidden = false;
+    this.adsOffset = new THREE.Vector3();      // 本支枪的铁瞄偏心量（米），取证用
     this.cameraKick = new THREE.Vector2();
     this.cameraKickTaken = new THREE.Vector2();
 
@@ -1030,13 +1053,18 @@ export class Viewmodel {
    */
   _MakeAdsPose(kind) {
     if (!this.rig || !this.rig.sight) {
+      this.adsOffset.set(0, 0, 0);
       if (kind === "melee") return { px: 0.02, py: -0.075, pz: -0.055, rx: -0.12, ry: -0.22, rz: 0.16 };
       return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
     }
     const s = this.rig.sight;
+    // 偏心量挂难度（体验档 0 = 照门回到正中，写实档 1.4 倍）
+    const px = IRON_SIGHT_OFFSET_PX[this.weaponId] || IRON_SIGHT_OFFSET_DEFAULT;
+    const gain = SIGHT_OFFSET_PER_PX * (DIFFICULTY.ironSightOffset ?? 1);
+    this.adsOffset.set(px.x * gain, px.y * gain, 0);
     return {
-      px: -s.x,
-      py: -s.y,
+      px: -s.x + this.adsOffset.x,
+      py: -s.y + this.adsOffset.y,
       pz: -SIGHT_EYE_DISTANCE - s.z,
       rx: 0, ry: 0, rz: 0,
     };

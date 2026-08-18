@@ -93,7 +93,7 @@ export const PHASES = [
     id: "P1", date: "三月二十四日", label: "日军攻城", sky: "smokyDay",
     minutes: 4,
     ijaPressure: 1.0, ijaSpawn: ["north"], ijaSupport: ["launcher"],
-    nraPool: 900, ijaPool: 700,
+    nraPool: 900, ijaPool: 700, loadout: "L0_Wall",
     brief: ["日军以飞机、重炮、战车猛攻寨墙。", "守北门的一八六团付出重大伤亡，几次把他们打下去。"],
     story: "P1_Wall",
   },
@@ -101,7 +101,7 @@ export const PHASES = [
     id: "P2", date: "三月二十七日 晨五时三十分", label: "突入城内", sky: "dawn",
     minutes: 5,
     ijaPressure: 1.35, ijaSpawn: ["north", "northeast"], ijaSupport: ["launcher", "hmg"],
-    nraPool: 760, ijaPool: 720,
+    nraPool: 760, ijaPool: 720, loadout: "L1_Breach",
     brief: ["日军突入城内。守的不再是墙，是一间一间的房子。", "时人管它叫「室战墙战」。"],
     story: "P2_Breach",
   },
@@ -109,7 +109,7 @@ export const PHASES = [
     id: "P3", date: "三月二十八日", label: "西北角危局", sky: "smokyDay",
     minutes: 5,
     ijaPressure: 1.6, ijaSpawn: ["northwest", "north"], ijaSupport: ["launcher", "hmg", "tank"],
-    nraPool: 600, ijaPool: 700,
+    nraPool: 600, ijaPool: 700, loadout: "L2_RoomWar",
     brief: ["日军转攻西北角，要夺西门。", "第二十七师一五八团三营的两个连翻城墙进来增援 —— 城门已经进不来了。"],
     story: "P3_NorthWest",
   },
@@ -117,7 +117,7 @@ export const PHASES = [
     id: "P4", date: "三月底 · 夜", label: "夜袭", sky: "night",
     minutes: 4,
     ijaPressure: 1.1, ijaSpawn: ["north", "northeast"], ijaSupport: ["hmg"],
-    nraPool: 520, ijaPool: 620,
+    nraPool: 520, ijaPool: 620, loadout: "L3_WhiteTowel",
     nightRaid: true,
     brief: ["阵地白天丢，夜里夺回来。", "日军的飞机、坦克、大炮，夜里都不好使。", "白毛巾缠上，大刀背身后。"],
     story: "P4_Raid",
@@ -126,7 +126,7 @@ export const PHASES = [
     id: "P5", date: "四月四日", label: "三分之二", sky: "burningStreet",
     minutes: 5,
     ijaPressure: 1.9, ijaSpawn: ["north", "northeast", "northwest"], ijaSupport: ["launcher", "hmg", "tank"],
-    nraPool: 380, ijaPool: 640,
+    nraPool: 380, ijaPool: 640, loadout: "L4_LastFiveMinutes",
     brief: [
       "日军控制了三分之二到四分之三的市街，守军只剩西南一隅，背靠运河。",
       "孙连仲报伤亡逾十分之七，请求撤到运河南岸。",
@@ -138,7 +138,7 @@ export const PHASES = [
     id: "P6", date: "四月六日 日没后 — 四月七日 凌晨一时", label: "全线反攻", sky: "night",
     minutes: 6,
     ijaPressure: 0.75, ijaSpawn: ["north"], ijaSupport: ["hmg"],
-    nraPool: 520, ijaPool: 520,
+    nraPool: 520, ijaPool: 520, loadout: "L5_Morning",
     counterattack: true,
     brief: [
       "汤恩伯的第二十军团在外线压上来了。",
@@ -250,3 +250,55 @@ export const COMBAT = {
   aiAccuracyBase: 0.55,
   aiAccuracySuppressed: 0.18,
 };
+
+/**
+ * 难度。**一个对象被所有系统读取，绝不把难度硬编码进各处逻辑。**
+ *
+ * 这一批只接了跟"枪的手感三件套"直接相关的几项（弹道重力、自由瞄准、铁瞄偏心、
+ * 过热），其余字段先立在这里占位，等做难度面板那一批再逐条接上去 ——
+ * 立在这里是为了让后人往同一个地方加，而不是又在七处写死一个魔法数。
+ *
+ * 两条写死的：
+ *  · autoSurrender 恒 false 且不给用户开。ER2 写实档下玩家会被系统判定投降，
+ *    我们不做 —— 孙连仲那句「有敢退过运河的，杀无赦」是这个游戏的命门，
+ *    玩家被系统判定投降会直接摧毁它。（ER2 自己也提供了关掉这条的开关。）
+ *  · freeAimDeg 的 0 档只有在**弹道、视差、后坐**三条都落地之后才可用，
+ *    否则会得到"枪很稳但打不中"这个最糟的组合。这一批三条都落地了，所以 0 档开放。
+ */
+export const FREE_AIM_STEPS = [0, 1.2, 2.0, 3.5];
+
+export const DIFFICULTY_PRESETS = {
+  experience: {
+    id: "experience", label: "体验",
+    aiAccuracy: 0.70, playerDamage: 0.80, suppressionScale: 0.6,
+    bulletGravity: 0.5, freeAimDeg: 3.5, ironSightOffset: 0.0,
+    staminaSeconds: 12, overheat: true, autoSurrender: false,
+    showCrosshair: true, enemyMarkers: true,
+  },
+  standard: {
+    id: "standard", label: "标准",
+    aiAccuracy: 1.0, playerDamage: 1.0, suppressionScale: 1.0,
+    bulletGravity: 1.0, freeAimDeg: 2.0, ironSightOffset: 1.0,
+    staminaSeconds: 8, overheat: true, autoSurrender: false,
+    showCrosshair: false, enemyMarkers: false,
+  },
+  realistic: {
+    id: "realistic", label: "写实",
+    aiAccuracy: 1.15, playerDamage: 1.25, suppressionScale: 1.3,
+    bulletGravity: 1.0, freeAimDeg: 1.2, ironSightOffset: 1.4,
+    staminaSeconds: 5, overheat: true, autoSurrender: false,
+    showCrosshair: false, enemyMarkers: false,
+  },
+};
+
+/** 运行时那一份（可被难度面板改写）。默认标准档。 */
+export const DIFFICULTY = { ...DIFFICULTY_PRESETS.standard };
+
+/** 换档。autoSurrender 永远被强按回 false —— 不接受任何预设把它打开。 */
+export function ApplyDifficulty(presetId) {
+  const preset = DIFFICULTY_PRESETS[presetId];
+  if (!preset) return DIFFICULTY;
+  Object.assign(DIFFICULTY, preset);
+  DIFFICULTY.autoSurrender = false;
+  return DIFFICULTY;
+}

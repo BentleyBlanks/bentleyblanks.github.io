@@ -12,6 +12,7 @@ import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { Battlefield } from "./Script_Battlefield.mjs";
+import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController, STANCE } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
@@ -21,8 +22,9 @@ import { AudioEngine } from "./Script_Audio.mjs";
 import { Hud } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
-import { WEAPONS } from "./Data_Weapons.mjs";
-import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, TOWN, COMBAT } from "./Data_Battle.mjs";
+import { InputRouter } from "./Script_Input.mjs";
+import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
+import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, TOWN, COMBAT, DIFFICULTY } from "./Data_Battle.mjs";
 import { HISTORY_NOTES, EPILOGUE_LINES } from "./Data_History.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
@@ -31,6 +33,30 @@ import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 // （身体部件没合批），撒 14 个近身兵就把 phase4 的 calls 从 1043 顶到 1468，
 // 越过 1400 的红线。5 + 4 落在 1300 上下。要再加人，先去合批 Actor。
 const NEAR_SQUAD = { nra: 5, ija: 4 };
+
+/**
+ * 城墙以内的可站范围。**日方补兵必须落在城里。**
+ *
+ * 第 1 批的补兵算式是 `frontObjective.z - 30 - rnd()*30`，等于假定日军永远在北面 ——
+ * 主攻点一旦是北面的中正门（z = -178）就落到 -208…-238，也就是北寨墙（z = -190）
+ * 外面。独立复核实测 90 秒里 190 次日方生成有 164 次（86%）落在 z < -190，
+ * 最低到 -224；那批人贴着城墙对着砖墙站到死（AI 没有寻路网格、门洞只有 3.2 m 宽），
+ * 常驻 6—12 名滞留在城外，是"打一分半就停摆"的直接成因之一。
+ *
+ * 现在改成沿"前线 → 己方兵力重心"的方向往后退，并且无论如何夹进这个框里。
+ */
+const INSIDE_WALLS = (() => {
+  const margin = TOWN.wallThickness * 0.5 + 6;
+  const north = TOWN.ramparts.find((r) => r.id === "north");
+  const west = TOWN.ramparts.find((r) => r.id === "west");
+  const east = TOWN.ramparts.find((r) => r.id === "east");
+  return {
+    minZ: (north ? north.z : WORLD.minZ) + margin,
+    maxZ: WORLD.maxZ - 10,
+    minX: (west ? west.x : WORLD.minX) + margin,
+    maxX: (east ? east.x : WORLD.maxX) - margin,
+  };
+})();
 
 const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
@@ -120,9 +146,21 @@ const state = {
   phasePoolNra: 0,            // 本阶段缩放后的中方票池上限（见底提示按它算）
   playerShots: 0,             // 玩家开火累计，与 ai.fireCount 合起来就是全场火力
   captureDrainAccum: 0,       // 占点消耗对方兵力的十秒结算钟
+  // --- 武器槽 ---------------------------------------------------------------
+  // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
+  // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
+  // 现在四个槽是真的：1 长枪 / 2 驳壳枪 / 3 大刀 / 4 投掷物，滚轮循环。
+  slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
+  activeSlot: "primary",
+  // 每支枪各记各的弹仓 —— 换回来不该是满的
+  mags: { primary: { ammo: 0, clips: 0 }, secondary: { ammo: 0, clips: 0 } },
+  loadoutId: null,
+  fireMode: "auto",           // 仅捷克式可切（0 键）
+  lastShot: null,             // 最后一发的弹道取证：起点、落点、下坠、枪口视差
 };
 
 let battlefield = null;
+let navGrid = null;
 let player = null;
 let ai = null;
 let vfx = null;
@@ -192,8 +230,12 @@ async function Boot() {
     bounds: battlefield.bounds,
   }, { seed: 1938 });
 
+  // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
+  // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
+  const nav = new NavGrid(battlefield);
+  navGrid = nav;
   ai = new AiDirector({
-    battlefield, actorFactory, scene, vfx, audio, player,
+    battlefield, actorFactory, scene, vfx, audio, player, nav,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
@@ -202,7 +244,7 @@ async function Boot() {
       if (side === "nra") state.nraPool = Math.max(0, state.nraPool - 1);
       else state.ijaPool = Math.max(0, state.ijaPool - 1);
     },
-  }, { maxAlive: SCALE.maxAlive, seed: 19380324 });
+  }, { maxAlive: SCALE.maxAlive, seed: 19380324, insideWalls: INSIDE_WALLS });
 
   // 叙事层：把 Data_Script 那本考据过的剧本派发进开放战场。
   // 在这之前它除了 importmap 之外没有任何地方 import —— 数据在，玩不到。
@@ -223,7 +265,7 @@ async function Boot() {
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, battlefield,
     player, ai, vfx, viewmodel, hud, audio, state,
-    story, combat,
+    story, combat, nav,
     StepFrames, JumpToPhase: EnterPhase,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
@@ -231,7 +273,38 @@ async function Boot() {
       Throw: (kind, power) => {
         state.cooking = kind; state.cook = (power ?? 0.8) * 1.1; ReleaseCook();
       },
-      Fire: () => { input.fire = true; TryFire(1); input.fire = false; },
+      Fire: () => { input.fire = true; fireEdge = true; TryFire(1); input.fire = false; fireEdge = false; },
+      // 键位路由：合成一次键盘事件走完整条链路（KEYMAP -> 上下文 -> OnAction），
+      // 不许直接调 SwitchSlot —— 那样测的是函数，不是键位表。
+      // 不给 down 就是"点按"：按下**并且松开**。
+      // 只发 keydown 的话，InputRouter 会把第二次按下当成长按的自动重复直接吃掉
+      // （held 里还留着这个 code），于是"按 1 再按 2 再按 1"只有头一次生效 ——
+      // 通关冒烟里"切不回长枪"就是这么来的，而真人按键盘不会漏掉抬起。
+      Key: (code, down) => {
+        const Send = (type) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+        if (down === undefined) { Send("keydown"); Send("keyup"); return; }
+        Send(down ? "keydown" : "keyup");
+      },
+      Wheel: (delta) => {
+        document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
+      },
+      Slots: () => ({
+        active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId,
+        slots: { ...state.slots }, viewmodel: viewmodel.weaponId,
+        fireMode: state.fireMode, bipod: player.bipod, ads: player.ads,
+      }),
+      LastShot: () => (state.lastShot ? { ...state.lastShot } : null),
+      Difficulty: () => ({ ...DIFFICULTY }),
+      AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
+      // AI 那边的运行时取证口：某个兵此刻的完整状态
+      SoldierInfo: (soldier) => ({
+        id: soldier.id, side: soldier.side, state: soldier.state, order: soldier.order,
+        holdZone: soldier.holdZone ? soldier.holdZone.id : null,
+        bayonet: soldier.bayonetFixed, heat: soldier.heat,
+        coolFor: Math.max(0, soldier.coolUntil - ai.time),
+        x: soldier.position.x, z: soldier.position.z,
+        goalX: soldier.goal.x, goalZ: soldier.goal.z,
+      }),
       Ammo: () => ({ ammo: state.ammo, clips: state.clips, grenades: state.grenades, bundles: state.bundles }),
       Spoken: () => hud.spoken.slice(),
       StoryFired: () => story.fired.slice(),
@@ -400,7 +473,7 @@ function SeedSoldiers(phase) {
       const dz = fz * Math.cos(a) + fx * Math.sin(a);
       const r = 12 + rnd() * 22;
       const spot = FindOpenSpot(px + dx * r, pz + dz * r, 6,
-        31337 + i * 907 + attempt * 17 + state.phaseIndex * 53);
+        31337 + i * 907 + attempt * 17 + state.phaseIndex * 53, INSIDE_WALLS);
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
@@ -414,7 +487,7 @@ function SeedSoldiers(phase) {
       const d = 55 + rnd() * 55;
       const lateral = (rnd() - 0.5) * 46;
       const spot = FindOpenSpot(px + fx * d - fz * lateral, pz + fz * d + fx * lateral, 8,
-        65521 + i * 1361 + attempt * 29 + state.phaseIndex * 89);
+        65521 + i * 1361 + attempt * 29 + state.phaseIndex * 89, INSIDE_WALLS);
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
@@ -432,7 +505,10 @@ function SeedSoldiers(phase) {
     const o = (front && front.owner === "nra" && rnd() < 0.6)
       ? front
       : (ours[Math.floor(rnd() * ours.length)] || battlefield.objectives[0]);
-    const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31);
+    // 也要夹进城里：中正门那个点圆心 z=-178、半径 26，圆边压到 -204，
+    // 而北寨墙在 z=-190 —— 守这个点的人有一批被撒到了墙的**另一面**，
+    // 跟涌进城的日军隔着 4 m 高的寨墙贴脸站着，谁也看不见谁（见 INSIDE_WALLS 的账）。
+    const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31, INSIDE_WALLS);
     const s = ai.Spawn("nra", open.x, open.z, {
       towel: !!phase.nightRaid && rnd() < 0.55,
     });
@@ -451,12 +527,29 @@ function SeedSoldiers(phase) {
   // 后续的人要横穿全城才到得了，实跑表现就是"打一阵停两分钟"。
   const northGates = TOWN.gates.filter((g) => g.z < -100);
   const ijaFront = ai.frontObjective?.ija;
+  const ijaCentroid = ai.centroid?.ija;
   for (let i = ai.CountSide("ija"); i < ijaTarget; i += 1) {
-    const gate = ijaFront
-      ? { x: ijaFront.x + (rnd() - 0.5) * 50, z: ijaFront.z - 30 - rnd() * 30 }
-      : (northGates[i % Math.max(1, northGates.length)] || { x: 0, z: WORLD.minZ + 40 });
-    const open = FindOpenSpot(gate.x + (rnd() - 0.5) * 40, gate.z + (ijaFront ? 0 : 8 + rnd() * 26), 14,
-      90001 + i * 617 + state.phaseIndex * 43);
+    let gate;
+    if (ijaFront && ijaCentroid) {
+      // 沿"主攻点 → 日军兵力重心"的方向往后退 30—60 m：那一侧才是他们的后方。
+      // 写死 z-30 的话，前线一在北面就把人扔到北寨墙外（见 INSIDE_WALLS 的账）。
+      let bx = ijaCentroid.x - ijaFront.x, bz = ijaCentroid.z - ijaFront.z;
+      let blen = Math.hypot(bx, bz);
+      if (blen < 1) { bx = 0; bz = -1; blen = 1; }   // 重心正压在点上：退回北面
+      bx /= blen; bz /= blen;
+      const back = 30 + rnd() * 30;
+      gate = {
+        x: ijaFront.x + bx * back + (rnd() - 0.5) * 40,
+        z: ijaFront.z + bz * back + (rnd() - 0.5) * 20,
+      };
+    } else {
+      const g = northGates[i % Math.max(1, northGates.length)] || { x: 0, z: WORLD.minZ + 40 };
+      gate = { x: g.x + (rnd() - 0.5) * 40, z: g.z + 8 + rnd() * 26 };
+    }
+    gate.x = Clamp(gate.x, INSIDE_WALLS.minX, INSIDE_WALLS.maxX);
+    gate.z = Clamp(gate.z, INSIDE_WALLS.minZ, INSIDE_WALLS.maxZ);
+    const open = FindOpenSpot(gate.x, gate.z, 14,
+      90001 + i * 617 + state.phaseIndex * 43, INSIDE_WALLS);
     const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
     if (s) {
       const goal = battlefield.objectives.find((o) => o.owner === "nra") || battlefield.objectives[0];
@@ -496,8 +589,12 @@ function CountOpenDirections(x, z, y, probeM = 20, count = 8, need = 99) {
   return open;
 }
 
-function FindOpenSpot(cx, cz, radius, seed) {
+function FindOpenSpot(cx, cz, radius, seed, limits = null) {
   const rnd = Mulberry32(seed);
+  const lo = limits || {
+    minX: WORLD.minX + 6, maxX: WORLD.maxX - 6,
+    minZ: WORLD.minZ + 6, maxZ: WORLD.maxZ - 6,
+  };
   // 通视探测有成本（每个候选点八条射线），所以只给通过"站得下"的候选点做，
   // 并且最多探 16 个：探不到三方位全通的就取探过的里面最好的那个。
   let fallback = null, fallbackOpen = -1, probed = 0;
@@ -506,8 +603,8 @@ function FindOpenSpot(cx, cz, radius, seed) {
     const r = radius * (0.25 + rnd() * 1.35);
     const x = cx + Math.cos(a) * r;
     const z = cz + Math.sin(a) * r;
-    if (x < WORLD.minX + 6 || x > WORLD.maxX - 6) continue;
-    if (z < WORLD.minZ + 6 || z > WORLD.maxZ - 6) continue;
+    if (x < lo.minX || x > lo.maxX) continue;
+    if (z < lo.minZ || z > lo.maxZ) continue;
     const y = battlefield.GroundHeight(x, z);
     let blocked = false;
     for (const b of battlefield.NearbyColliders(x, z, 1.4)) {
@@ -518,13 +615,18 @@ function FindOpenSpot(cx, cz, radius, seed) {
       break;
     }
     if (blocked) continue;
+    // 走得到吗。"一米内没有碰撞盒"只证明站得下 —— 封闭院落的中央当然站得下，
+    // 但那是个谁也走不进去的口袋。撒进去的守军等于不存在。
+    if (navGrid && !navGrid.InMain(x, z)) continue;
     if (probed >= 16) return fallback || { x, z };
     probed += 1;
     const open = CountOpenDirections(x, z, y, 20, 8, 3);
     if (open >= 3) return { x, z };
     if (open > fallbackOpen) { fallbackOpen = open; fallback = { x, z }; }
   }
-  return fallback || { x: cx, z: cz };
+  // 最后的兜底也要夹进边界里。原来直接把圆心原样返回 ——
+  // 传进来的圆心本身在墙外时，这条出口就是把人扔到墙外的那一条。
+  return fallback || { x: Clamp(cx, lo.minX, lo.maxX), z: Clamp(cz, lo.minZ, lo.maxZ) };
 }
 
 function RespawnPlayer(initial = false) {
@@ -538,19 +640,112 @@ function RespawnPlayer(initial = false) {
     ? ours.reduce((a, b) => (a.z < b.z ? a : b))
     : { x: 0, z: 120, radius: 10 };
   // 往我方一侧退 18 米再找位置：生在点心上等于生在交火中央
-  const open = FindOpenSpot(spot.x, spot.z + 18, spot.radius, seed);
+  const open = FindOpenSpot(spot.x, spot.z + 18, spot.radius, seed, INSIDE_WALLS);
   player.Spawn(open.x, open.z, Math.PI);
   player.bandages = COMBAT.bandages;
   // 领的家当。弹带大半是瘪的 —— 这不是难度设计，是他们上阵时的实际情况。
-  const w = WEAPONS[currentWeapon];
-  state.ammo = w?.magazine ?? 5;
-  state.clips = phase.nightRaid ? 3 : 5;
-  state.grenades = phase.nightRaid ? 8 : 4;   // 敢死队标准携行：背后四枚 + 胸前四枚
-  state.bundles = 2;
+  //
+  // 携行改读 LOADOUTS[phase.loadout]。L3_WhiteTowel（一支长枪、一支短枪、
+  // 肩背大刀、腰间挂满手榴弹）是台儿庄最有辨识度的一套装备，以前完全是死的。
+  // 例外：L5_Morning 的 primary 是 null —— 那是"四月七日早上仗打完了"的收场携行，
+  // 真给 P6 反攻阶段的玩家空手是不能玩的，所以为空时退回这个兵自己的枪。
+  const loadout = LOADOUTS[phase.loadout] || null;
+  state.loadoutId = phase.loadout || null;
+  const primary = loadout?.primary || state.identity.weapon;
+  const secondary = loadout?.secondary || null;
+  state.slots.primary = primary;
+  state.slots.secondary = secondary;
+  state.slots.melee = loadout?.melee || null;
+  const throwables = loadout?.throwables || {};
+  state.grenades = throwables.Grenade ?? (phase.nightRaid ? 8 : 4);
+  state.bundles = throwables.GrenadeBundle ?? 2;
+  state.slots.throwable = state.grenades > 0 || !state.bundles ? "Grenade" : "GrenadeBundle";
+  const spareClips = loadout?.spareClips ?? (phase.nightRaid ? 3 : 5);
+  state.mags.primary = { ammo: WEAPONS[primary]?.magazine ?? 5, clips: spareClips };
+  state.mags.secondary = secondary
+    ? { ammo: WEAPONS[secondary]?.magazine ?? 10, clips: 2 }
+    : { ammo: 0, clips: 0 };
+  state.activeSlot = "primary";
+  currentWeapon = primary;
+  state.ammo = state.mags.primary.ammo;
+  state.clips = state.mags.primary.clips;
+  state.fireMode = "auto";
+  player.bipod = false;
   viewmodel.Equip(currentWeapon);
   hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "步枪");
   state.pendingRespawn = false;
   state.playerAliveLast = true;
+}
+
+// ---------------------------------------------------------------------------
+// 武器槽
+// ---------------------------------------------------------------------------
+const SLOT_ORDER = ["primary", "secondary", "melee", "throwable"];
+
+/** 某个槽里现在是哪支枪（投掷物槽里放的是当前选的那一种）。 */
+function SlotWeaponId(slot) {
+  if (slot === "throwable") return state.slots.throwable;
+  return state.slots[slot];
+}
+
+/** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
+function SwitchSlot(slot) {
+  if (!player?.Alive || !SlotWeaponId(slot)) return false;
+  if (slot === state.activeSlot) return false;
+  if (viewmodel.IsBusy?.()) return false;          // 拉栓/压弹播到一半不许换手
+  if (state.mags[state.activeSlot]) {
+    state.mags[state.activeSlot].ammo = state.ammo;
+    state.mags[state.activeSlot].clips = state.clips;
+  }
+  state.activeSlot = slot;
+  currentWeapon = SlotWeaponId(slot);
+  const mag = state.mags[slot];
+  state.ammo = mag ? mag.ammo : 0;
+  state.clips = mag ? mag.clips : 0;
+  player.bipod = false;                            // 换枪就把两脚架收了
+  state.fireMode = "auto";
+  viewmodel.Equip(currentWeapon);
+  hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "");
+  return true;
+}
+
+/** 滚轮循环。空的槽跳过 —— 杂牌部队常常只有一支枪。 */
+function CycleSlot(delta) {
+  const have = SLOT_ORDER.filter((k) => !!SlotWeaponId(k));
+  if (have.length < 2) return false;
+  const at = Math.max(0, have.indexOf(state.activeSlot));
+  const next = have[(at + (delta > 0 ? 1 : have.length - 1)) % have.length];
+  return SwitchSlot(next);
+}
+
+/** 架/收两脚架。须卧倒，或者身边 1.4 m 内有个齐腰高的东西能搭上去。 */
+function ToggleBipod() {
+  if (!player?.Alive) return false;
+  const weapon = WEAPONS[currentWeapon];
+  if (!weapon?.bipod) { hud.Hint("这支枪没有两脚架", 1.8); return false; }
+  let rest = player.stance === "prone";
+  if (!rest) {
+    for (const b of battlefield.NearbyColliders(player.position.x, player.position.z, 1.4)) {
+      const top = b.max[1] - player.position.y;
+      if (top > 0.5 && top < 1.35) { rest = true; break; }
+    }
+  }
+  if (!player.ToggleBipod(weapon, rest)) {
+    hud.Hint("得先趴下，或者靠着能搭枪的东西", 2.2);
+    return false;
+  }
+  audio.Play(player.bipod ? "magIn" : "bolt", { volume: 0.55 });
+  hud.Hint(player.bipod ? "两脚架架好了" : "收了两脚架", 1.6);
+  return true;
+}
+
+/** 单发／连发。只有捷克式有得切（十一年式是日军的，玩家摸不到）。 */
+function ToggleFireMode() {
+  const weapon = WEAPONS[currentWeapon];
+  if (!weapon?.rpm) { hud.Hint("这支枪只有一种发射方式", 1.6); return false; }
+  state.fireMode = state.fireMode === "auto" ? "semi" : "auto";
+  hud.Hint(state.fireMode === "auto" ? "连发" : "单发", 1.6);
+  return true;
 }
 
 function OnPlayerDown() {
@@ -588,54 +783,67 @@ function StartRun() {
 }
 bootStart.addEventListener("click", StartRun);
 
-document.addEventListener("keydown", (e) => {
-  if (keys.has(e.code)) return;
-  keys.add(e.code);
-  if (e.code === "KeyC") input.crouchPressed = true;
-  if (e.code === "KeyZ") input.pronePressed = true;
-  if (e.code === "KeyB") { if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 }); }
-  if (e.code === "KeyR") Reload();
-  if (e.code === "KeyV") DoMelee();
-  if (e.code === "KeyG") BeginCook("Grenade");
-  if (e.code === "KeyH") BeginCook("GrenadeBundle");
-  if (e.code === "KeyF") CallMortar();
-  if (e.code === "Tab") { e.preventDefault(); state.ordersOpen = true; hud.SetOrdersVisible(true); }
-  const order = ORDERS.find((o) => e.code === `Digit${o.key}`);
-  if (order && ai && player) {
-    const aimPoint = AimPoint(60);
-    const n = ai.IssueOrder(order.id, player.position, aimPoint);
-    state.order = order.label;
-    if (n > 0) hud.Say("你", `${order.label}！`, 2.2);
-  }
+// 键位全部走 Script_Input 的那张表。装配层这里只剩两件事：
+// 把动作名翻译成函数调用（OnAction），以及每帧读一次连续量（router.Read）。
+const router = new InputRouter({
+  // Tab 按住时 Digit1-6 是下令，松开之后同样的键是武器槽。
+  Context: () => (state.ordersOpen ? "orders" : "world"),
+  // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
+  Guard: (e) => {
+    if (!state.running) return false;
+    if (document.pointerLockElement !== canvas && !SHOT) { canvas.requestPointerLock?.(); return false; }
+    return true;
+  },
+  OnAction: (action, detail) => {
+    if (!state.ready) return;
+    switch (action) {
+      case "crouch": input.crouchPressed = true; return;
+      case "prone": input.pronePressed = true; return;
+      case "reload": Reload(); return;
+      case "melee": DoMelee(); return;
+      case "bandage":
+        if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 });
+        return;
+      case "support": CallMortar(); return;
+      case "bipod": ToggleBipod(); return;
+      case "fireMode": ToggleFireMode(); return;
+      case "cycleSlot": CycleSlot(detail.delta); return;
+      // Space 这一批只是被腾出来并挡掉浏览器的滚页面；翻越在第 3 批。
+      case "vault": return;
+      case "orders":
+        state.ordersOpen = !!detail.down;
+        hud.SetOrdersVisible(state.ordersOpen);
+        return;
+      default: break;
+    }
+    if (action.startsWith("slot:")) { SwitchSlot(action.slice(5)); return; }
+    if (action.startsWith("cook:")) {
+      if (detail.down) BeginCook(action.slice(5)); else ReleaseCook();
+      return;
+    }
+    if (action.startsWith("order:")) IssueOrderByKey(action.slice(6));
+  },
 });
-document.addEventListener("keyup", (e) => {
-  keys.delete(e.code);
-  if (e.code === "KeyG" || e.code === "KeyH") ReleaseCook();
-  if (e.code === "Tab") { state.ordersOpen = false; hud.SetOrdersVisible(false); }
-});
+router.Bind(document);
+
 document.addEventListener("mousemove", (e) => {
   if (document.pointerLockElement !== canvas) return;
   input.lookX += e.movementX;
   input.lookY += e.movementY;
 });
-document.addEventListener("mousedown", (e) => {
-  if (!state.running) return;
-  if (document.pointerLockElement !== canvas && !SHOT) { canvas.requestPointerLock?.(); return; }
-  if (e.button === 0) input.fire = true;
-  if (e.button === 2) input.ads = true;
-});
-document.addEventListener("mouseup", (e) => {
-  if (e.button === 0) input.fire = false;
-  if (e.button === 2) input.ads = false;
-});
-document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/** Tab 按住时的 Digit1-6。命令表里的 key 字段就是这几个数字。 */
+function IssueOrderByKey(key) {
+  const order = ORDERS.find((o) => o.key === key);
+  if (!order || !ai || !player) return;
+  const aimPoint = AimPoint(60);
+  const n = ai.IssueOrder(order.id, player.position, aimPoint);
+  state.order = order.label;
+  if (n > 0) hud.Say("你", `${order.label}！`, 2.2);
+}
 
 function ReadKeys() {
-  input.forward = (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0);
-  input.strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
-  input.sprint = keys.has("ShiftLeft") || keys.has("ShiftRight");
-  input.lean = (keys.has("KeyE") ? 1 : 0) - (keys.has("KeyQ") ? 1 : 0);
-  input.breathHold = keys.has("Space");
+  router.Read(input, { ads: player ? player.ads : 0 });
   if (SHOT_ADS) input.ads = true;
   if (SHOT_FIRE) input.fire = true;
 }
@@ -718,16 +926,94 @@ function CallMortar() {
 // ---------------------------------------------------------------------------
 // 开火
 // ---------------------------------------------------------------------------
+let lastFootstepAt = 0;
 let fireCooldown = 0;
+let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
 const _hitPoint = new THREE.Vector3();
+const _bulletPos = new THREE.Vector3();
+const _bulletVel = new THREE.Vector3();
+const _segDir = new THREE.Vector3();
+const _rel = new THREE.Vector3();
+const _yAxis = new THREE.Vector3(0, 1, 0);
+const _xAxis = new THREE.Vector3(1, 0, 0);
+const _kick = new THREE.Vector2();
+const _marchTargets = [];
+
+/**
+ * 弹道步进积分。
+ *
+ * 以前是纯 hitscan：一条直线射线 + 圆柱判定，瞬时命中、无重力、无飞行时间。
+ * 后果不只是"不写实"——**表尺归零没有任何东西可以补偿**，600 m 外和 6 m 外的
+ * 落点规律完全一样，提前量这个概念不存在。
+ *
+ * 这里每段 0.02 s、按 AMMO[weapon.ammo].muzzle 的考据初速走（七九 810 / 六五 762 /
+ * 七七 800），段内复用现成的 battlefield.Raycast。7.92×57 在 300 m 上下坠约 0.67 m,
+ * 刚好是"瞄头打胸"的量级：可感知，但不至于挫败。重力挂 difficulty.bulletGravity。
+ *
+ * 40 段 × 每段 16 m ≈ 650 m，覆盖得住最远的 effectiveRangeM（中正式 500 m）。
+ * 一枪 40 次 Raycast 听着多，但玩家一秒才打一发，而 AI 侧仍然是概率命中，不走这条路。
+ */
+function MarchBullet(from, dir, weapon, targets) {
+  const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
+  const gravity = 9.8 * (DIFFICULTY.bulletGravity ?? 1);
+  const range = weapon.effectiveRangeM || 400;
+  const stepS = 0.02;
+  _bulletPos.copy(from);
+  _bulletVel.copy(dir).multiplyScalar(muzzle);
+  let travelled = 0;
+  for (let step = 0; step < 40 && travelled < range; step += 1) {
+    _bulletVel.y -= gravity * stepS;
+    _segDir.copy(_bulletVel).multiplyScalar(stepS);
+    let segLen = _segDir.length();
+    if (segLen < 1e-4) break;
+    if (travelled + segLen > range) segLen = range - travelled;
+    _segDir.normalize();
+
+    // 先看这一段有没有穿过人：到线段的垂距 < 0.45 m 算命中躯干
+    let bestSoldier = null, bestT = Infinity;
+    for (const s of targets) {
+      _rel.set(s.position.x - _bulletPos.x,
+        s.position.y + 0.95 - _bulletPos.y,
+        s.position.z - _bulletPos.z);
+      const t = _rel.dot(_segDir);
+      if (t < 0 || t > segLen) continue;
+      const perp = _rel.addScaledVector(_segDir, -t).length();
+      if (perp < 0.45 && t < bestT) { bestT = t; bestSoldier = s; }
+    }
+    const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen);
+    if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
+      _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
+      return { soldier: bestSoldier, dist: travelled + bestT, dir: _segDir };
+    }
+    if (wallHit) {
+      _hitPoint.copy(_bulletPos).addScaledVector(_segDir, wallHit.t);
+      return { wall: wallHit, dist: travelled + wallHit.t, dir: _segDir };
+    }
+    _bulletPos.addScaledVector(_segDir, segLen);
+    travelled += segLen;
+  }
+  _hitPoint.copy(_bulletPos);
+  return { dist: travelled, dir: _segDir };
+}
 
 function TryFire(dt) {
   fireCooldown -= dt;
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
   if (viewmodel.IsBusy?.()) return;
+  // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
+  if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
+  if (state.activeSlot === "throwable") {
+    if (fireEdge && !state.cooking) BeginCook(state.slots.throwable);
+    return;
+  }
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
+  // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
+  // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
+  if (input.ads && player.ads < 0.9) return;
+  // 单发模式（仅捷克式）：一次按下只出一发
+  if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
   if (state.ammo <= 0) {
     // 空仓那一下：栓停在后面，得自己压桥夹。不提示弹药数（ER2 的步兵 HUD 也不显示），
     // 但空膛的"咔"必须听得出来，不然玩家不知道自己在空按扳机。
@@ -741,6 +1027,12 @@ function TryFire(dt) {
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
+  // 后坐。Data_Weapons 每支枪的 recoil 表以前一次都没读过 —— 开完枪视角纹丝不动。
+  // viewmodel 已经按那张表把这一发的相机踢动算好了（含每发随机的偏航方向与开镜衰减），
+  // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
+  viewmodel.ConsumeCameraKick(_kick);
+  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4);
+
   viewmodel.MuzzleWorld(_muzzle);
   audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra", { position: _muzzle.clone() });
   lights.FlashMuzzle(_muzzle, 24);
@@ -751,39 +1043,56 @@ function TryFire(dt) {
   const dir = player.AimDirection(_aimDir).clone();
   const rnd = Mulberry32(state.frame * 2654435761);
   const ax = (rnd() - 0.5) * spread, ay = (rnd() - 0.5) * spread;
-  dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), ax);
-  dir.applyAxisAngle(new THREE.Vector3(1, 0, 0), ay);
+  dir.applyAxisAngle(_yAxis, ax);
+  dir.applyAxisAngle(_xAxis, ay);
 
-  const from = player.EyePosition.clone();
+  // 视差：起点是**枪口**，不是眼睛。这一行改完之后瞄具与枪管不共轴才成立，
+  // 近距离必须心里修正，「没有准星」这件事才有物理支撑。
+  const from = _muzzle.clone();
+  // 视差量 = 枪口到**瞄准轴**的垂距，不是枪口到眼睛的距离。
+  // 后者主要是"枪口在眼前多远"（一米三，那是枪本身的长度），跟共不共轴没关系；
+  // 真正决定"近距离要不要心里修正"的是这条垂距。
+  const eye = player.EyePosition;
+  _rel.set(from.x - eye.x, from.y - eye.y, from.z - eye.z);
+  const along = _rel.dot(_aimDir);
+  const muzzleOffset = _rel.addScaledVector(_aimDir, -along).length();
+
+  _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
-  // 先看有没有打到人，再看有没有打到墙 —— 取更近的那个
-  let bestSoldier = null, bestT = Infinity;
   for (const s of ai.soldiers) {
     if (!s.alive || s.side === "nra") continue;
-    const to = s.position.clone(); to.y += 0.95;
-    const rel = to.sub(from);
-    const t = rel.dot(dir);
-    if (t < 0 || t > range) continue;
-    const perp = rel.addScaledVector(dir, -t).length();
-    if (perp < 0.45 && t < bestT) { bestT = t; bestSoldier = s; }
+    if (s.position.distanceTo(from) > range + 4) continue;
+    _marchTargets.push(s);
   }
-  const wallHit = battlefield.Raycast(from, dir, range);
-  if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
-    _hitPoint.copy(from).addScaledVector(dir, bestT);
-    const part = bestT < 40 && Mulberry32(state.frame * 7919)() < 0.12 ? "head" : "torso";
+  const shot = MarchBullet(from, dir, weapon, _marchTargets);
+
+  // 弹道取证：落差是相对**实际射出的那条直线**算的，跟散布无关，只跟重力有关
+  const horiz = Math.hypot(dir.x, dir.z) || 1e-6;
+  const horizDist = Math.hypot(_hitPoint.x - from.x, _hitPoint.z - from.z);
+  state.lastShot = {
+    dist: shot.dist,
+    horizDist,
+    dropM: (from.y + dir.y * horizDist / horiz) - _hitPoint.y,
+    muzzleOffsetM: muzzleOffset,
+    hitKind: shot.soldier ? "soldier" : shot.wall ? "wall" : "none",
+    fromY: from.y, endY: _hitPoint.y,
+  };
+
+  if (shot.soldier) {
+    const part = shot.dist < 40 && Mulberry32(state.frame * 7919)() < 0.12 ? "head" : "torso";
     // 这里**不扣票**：扣票走 Soldier.Kill() 发的阵亡事件。
     // 两条路径同时扣的话，玩家亲手打死的人会扣两票。
-    const died = bestSoldier.TakeHit(weapon.damage, part, dir);
+    const died = shot.soldier.TakeHit(weapon.damage, part, dir);
     vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
-  } else if (wallHit) {
-    _hitPoint.copy(from).addScaledVector(dir, wallHit.t);
-    const n = new THREE.Vector3(wallHit.normal[0], wallHit.normal[1], wallHit.normal[2]);
-    const surface = wallHit.box.tag === "barricade" ? "sandbag" : wallHit.box.tag === "prop" ? "wood" : "brick";
+  } else if (shot.wall) {
+    const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
+    const tag = shot.wall.box.tag;
+    const surface = tag === "barricade" ? "sandbag" : tag === "prop" ? "wood" : "brick";
     vfx.Impact(_hitPoint, n, surface);
     audio.Play(surface === "sandbag" ? "impactDirt" : "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
   }
-  vfx.Tracer(_muzzle, _hitPoint.lengthSq() ? _hitPoint : from.clone().addScaledVector(dir, range), { kind: "nra" });
+  vfx.Tracer(_muzzle, _hitPoint.clone(), { kind: "nra" });
 }
 
 // ---------------------------------------------------------------------------
@@ -848,7 +1157,17 @@ function Flip(objective, side) {
 const _forward = new THREE.Vector3();
 const _proj = new THREE.Vector3();
 
-function Frame(dt) {
+/**
+ * @param {number} dt 步长
+ * @param {boolean} render 要不要走渲染。**只有通关冒烟会传 false。**
+ *   理由：通关冒烟要按出厂配置把六个阶段各推四五分钟（近十万帧），而这台机器上
+ *   浏览器是软件光栅（swiftshader），连着渲染几万帧之后渲染进程会**阻塞**
+ *   （CPU 掉到接近零、主线程停在 GL 调用上，实跑十次卡住六七次，每次都卡在最长的
+ *   那一段）。玩法与剧本的断言一帧画面都不需要，画面健康归开机冒烟管
+ *   （Script_BootTest 六个阶段都真渲染并读 draw call）。所以这里给一个口子，
+ *   而不是把断言的时长缩水去迁就它。
+ */
+function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
   if (!state.ready) return;
@@ -861,16 +1180,35 @@ function Frame(dt) {
     }
   }
 
+  const firePrev = input.fire;
   ReadKeys();
+  fireEdge = input.fire && !firePrev;
   player.Update(dt, input, WEAPONS[currentWeapon]);
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false;
 
-  if (player.Alive) TryFire(dt);
+  // 脚步。Script_Audio 里 footstepDirt / footstepRubble 一直没有任何地方调用过。
+  // 快速匍匐那条"更快也更响"的取舍没有脚步声就不存在 —— 玩家听不见自己变响了。
+  if (player.Alive && player.grounded && player.stepDistance - lastFootstepAt > 1.0) {
+    const stride = player.stance === "prone" ? 1.0 : (player.sprint > 0.5 ? 2.4 : 1.9);
+    if (player.stepDistance - lastFootstepAt > stride) {
+      lastFootstepAt = player.stepDistance;
+      audio.Play(state.frame % 3 === 0 ? "footstepRubble" : "footstepDirt", {
+        volume: (player.stance === "prone" ? 0.22 : 0.45) * (player.fastCrawl ? 1.8 : 1),
+      });
+    }
+  }
 
-  // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下
+  if (player.Alive) TryFire(dt);
+  // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
+  if (state.activeSlot === "throwable" && state.cooking && !input.fire) ReleaseCook();
+
+  // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下。
+  // 屏息再收 6%：ER2 屏息时视野有一点点放大，这是"憋住那一口气把注意力收拢"的
+  // 视觉说法，也让玩家一眼知道自己确实在屏息（我们不给体力条）。
   const weapon = WEAPONS[currentWeapon];
-  const targetFov = BASE_FOV * (1 - player.ads * (1 - (weapon?.adsFovScale ?? 0.75)));
+  const targetFov = BASE_FOV * (1 - player.ads * (1 - (weapon?.adsFovScale ?? 0.75)))
+    * (player.breathHold ? 0.94 : 1);
   if (Math.abs(camera.fov - targetFov) > 0.01) {
     camera.fov += (targetFov - camera.fov) * Clamp01(dt * 9);
     camera.updateProjectionMatrix();
@@ -1001,6 +1339,7 @@ function Frame(dt) {
   hud.Update(dt);
 
   // --- 渲染 ---
+  if (!render) return;
   ssao.map.value = post.AoTexture;
   // 同上：gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
@@ -1045,8 +1384,8 @@ function EndBattle(outcome) {
 }
 
 /** 出图/测试用：推进固定帧数（不依赖真实时间，画面可复现）。 */
-function StepFrames(count = 1, dt = 1 / 60) {
-  for (let i = 0; i < count; i += 1) Frame(dt);
+function StepFrames(count = 1, dt = 1 / 60, render = true) {
+  for (let i = 0; i < count; i += 1) Frame(dt, render);
 }
 
 let last = performance.now();

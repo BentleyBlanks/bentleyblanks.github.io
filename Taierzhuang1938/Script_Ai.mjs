@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
-import { COMBAT, NAME_POOL } from "./Data_Battle.mjs";
+import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
@@ -105,7 +105,23 @@ export class Soldier {
     this.stuckTime = 0;         // 想走但走不动已经持续了多久
     this.detourTime = 0;        // 绕行还剩多久
     this.detourYaw = 0;         // 绕行时把前进方向拧多少
+    // 沿墙走的**固定**转向。第 1 批那版每次卡住都重掷一个随机方向，
+    // 于是撞墙→左绕一秒→回头撞墙→右绕一秒，是原地打转不是绕路：
+    // 实跑取证 37 名日军里 15—21 名常年处在"绕行中"，而兵力重心一百二十秒一动不动。
+    // 转向必须一人一个并且**认死**，这样才是真的沿着墙面兜过去。
+    this.detourSign = this.rnd() < 0.5 ? 1 : -1;
+    this.detourGoalDist = 1e9;  // 起绕那一刻离目标多远，用来判断这一圈有没有白绕
     this.towel = false;
+    // 上刺刀。CHARGE 状态一进就上，白刃距离（2 m 内）真的会捅 —— 不是只跑过去开枪。
+    this.bayonetFixed = false;
+    this.meleeTimer = 0;
+    this.chargeUntil = -99;      // 玩家下"上刺刀"之后这道命令的有效期
+    this.flankUntil = -99;       // 绕行命令的有效期，到点或超时就转 advance
+    // 过热。十一年式不能换枪管，约 200 发必须冷却 —— 这是日军机枪火力
+    // 有节奏间隙的史实来源，也是玩家冲过街口的战术窗口。
+    this.heat = 0;
+    this.coolUntil = -99;
+    this.heatSmoke = 0;          // 冷却期间挂的那根白烟的 handle（0 = 没挂）
     // 排队（Conga Line）是 ER2 被骂最狠的毛病之一：一个班沿同一条线走成一串。
     // 对策是每个人生成时就领一个固定的横向偏移，跟随目标时永远偏这么多。
     this.laneOffset = (this.rnd() - 0.5) * 11;
@@ -147,10 +163,26 @@ export class AiDirector {
   /**
    * @param {object} ctx { battlefield, actorFactory, scene, vfx, audio, player }
    */
-  constructor(ctx, { maxAlive = 56, seed = 1938, visibleActors = VISIBLE_ACTOR_BUDGET } = {}) {
+  constructor(ctx, { maxAlive = 56, seed = 1938, visibleActors = VISIBLE_ACTOR_BUDGET,
+    insideWalls = null } = {}) {
     this.ctx = ctx;
     this.soldiers = [];
     this.maxAlive = maxAlive;
+    /**
+     * 城墙以内的可站矩形。**任何一侧的兵都不许被放到墙外去。**
+     *
+     * 这条不变量是实跑逼出来的，而且两边都犯：日方补兵的落点算式把人扔到北寨墙北面
+     * （独立复核实测 86%），而中方守中正门的人 —— 那个点圆心 z=-178、半径 26，
+     * 圆边压到 z=-204，而北寨墙在 z=-190 —— 被 FindOpenSpot 撒到了 z=-192，
+     * 也就是墙的**另一面**。停摆时刻的取证：163 对 40 m 内的敌我里通视 0 对，
+     * 挡住的 60 条射线里 32 条 tag=rampart、28 条 tag=wall，最近的一对相距 3.9 m
+     * 而中间隔着 0.6 m 处一堵 4 m 高的寨墙；那一带 200 条 30 m 射线只有 1 条是通的。
+     * 两军隔着城墙贴脸站了三分钟，谁也看不见谁 —— 这就是「打一分半就停摆」。
+     *
+     * 修在这里而不是修在每一处撒兵的地方：撒兵有五条路径（守点、补兵、近身班组、
+     * 玩家重生、软约束重设目标），漏掉任何一条这个洞就还在。
+     */
+    this.insideWalls = insideWalls;
     this.visibleBudget = visibleActors;
     this.visibleScratch = [];
     this.rnd = Mulberry32(seed);
@@ -165,9 +197,14 @@ export class AiDirector {
     // 紧接着 TryFire 也拿 tmpA 当枪口起点 —— desired 是引用，被就地改成了枪口位置，
     // 于是 d < 1.2、moveSpeed = 0：找掩体和白刃冲锋两条移动路径全是空转。
     this.tmpD = new THREE.Vector3();
+    this.navOut = { x: 0, z: 0 };   // 导航场给出来的那一步方向
     this.fireCount = 0;                       // 全场 AI 开火累计，通关冒烟靠它取证
     this.deaths = { nra: 0, ija: 0 };
     this.frontObjective = { nra: null, ija: null };
+    // 每一侧的兵力重心。补兵落点要靠它判断"哪一侧是自己人的后方" ——
+    // 第 1 批直接写 front.z - 30（假定日军永远在北面），前线一旦是北面的中正门
+    // 就把补兵扔到 z=-208…-238，也就是北寨墙**外面**，那批人这辈子进不了城。
+    this.centroid = { nra: null, ija: null };
     this.frontTimer = 0;
     // 取最近三个敌人的固定槽位。每次 Think 现造数组会在 70 人规模下产生可观的 GC。
     this.nearSlots = [
@@ -180,8 +217,26 @@ export class AiDirector {
   get aliveCount() { return this.soldiers.reduce((n, s) => n + (s.alive ? 1 : 0), 0); }
   CountSide(side) { return this.soldiers.filter((s) => s.side === side && s.alive).length; }
 
+  /** 把一个点夹进城墙以内。没配 insideWalls 时是恒等变换。 */
+  ClampInside(point) {
+    const w = this.insideWalls;
+    if (!w) return point;
+    point.x = Clamp(point.x, w.minX, w.maxX);
+    point.z = Clamp(point.z, w.minZ, w.maxZ);
+    return point;
+  }
+
   Spawn(side, x, z, options = {}) {
     if (this.aliveCount >= this.maxAlive) return null;
+    const w = this.insideWalls;
+    if (w) { x = Clamp(x, w.minX, w.maxX); z = Clamp(z, w.minZ, w.maxZ); }
+    // 走不到的口袋里不许生人：三个占领点的圆心在封闭院落里，守军撒进去之后
+    // 攻方永远够不着，双方隔着一堵墙站到天亮（见 NavGrid.InMain 的账）。
+    const nav = this.ctx.nav;
+    if (nav && !nav.InMain(x, z)) {
+      nav.SnapToMain(x, z, this.navOut);
+      x = this.navOut.x; z = this.navOut.z;
+    }
     const soldier = new Soldier(side, { ...options, x, z });
     soldier.position.y = this.ctx.battlefield.GroundHeight(x, z);
     const kind = side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija";
@@ -198,6 +253,7 @@ export class AiDirector {
   }
 
   Remove(soldier) {
+    if (soldier.heatSmoke) { this.ctx.vfx?.RemoveSmokeSource(soldier.heatSmoke); soldier.heatSmoke = 0; }
     const i = this.soldiers.indexOf(soldier);
     if (i >= 0) this.soldiers.splice(i, 1);
     if (soldier.actor) {
@@ -234,7 +290,9 @@ export class AiDirector {
     // 各打各的最近点会把 38 个人摊到八个方向上 —— 一座 500×460 m 的城里
     // 1.5 m 高度 30 m 的射线只有 19/200 是通的，摊开就等于谁也遇不上谁。
     // ER2 的战场之所以像战场，是因为它有一条**前线**：兵力压在同一处。
-    if (bestD < 40) return best;
+    // 眼前五十五米内还有敌方的点就打眼前这个：导航网格落地之后他们真的走得到，
+    // 不必再像第 1 批那样把所有人硬压到同一条前线上才能碰上面。
+    if (bestD < 55) return best;
     const front = this.frontObjective[s.side];
     return front || best;
   }
@@ -252,13 +310,24 @@ export class AiDirector {
         if (s.side !== side || !s.alive) continue;
         cx += s.position.x; cz += s.position.z; n += 1;
       }
-      if (!n) { this.frontObjective[side] = null; continue; }
+      if (!n) { this.frontObjective[side] = null; this.centroid[side] = null; continue; }
       cx /= n; cz /= n;
+      if (this.centroid[side]) { this.centroid[side].x = cx; this.centroid[side].z = cz; }
+      else this.centroid[side] = { x: cx, z: cz };
       let best = null, bestD = 1e9;
       for (const o of list) {
         if (o.owner === side) continue;
         const d = Math.hypot(o.x - cx, o.z - cz);
         if (d < bestD) { bestD = d; best = o; }
+      }
+      // 迟滞：主攻点一旦定下来，除非**打下来了**或者出现一个近三成半以上的新目标，
+      // 否则不许换。没有这一条的后果是实跑量到的：前线每秒按兵力重心重算，
+      // 重心一飘就换点，四十个人半路集体掉头，两军从此擦肩而过 ——
+      // 采样里连着几段 under70 只有 1 对、targets 0，仗停在"互相找不到"上。
+      const current = this.frontObjective[side];
+      if (current && current.owner !== side) {
+        const dCur = Math.hypot(current.x - cx, current.z - cz);
+        if (!best || dCur < bestD * 1.35) best = current;
       }
       this.frontObjective[side] = best;
     }
@@ -285,14 +354,29 @@ export class AiDirector {
       const a = s.rnd() * Math.PI * 2;
       const r = objective.radius * (0.35 + s.rnd() * 0.55);
       s.goal.set(objective.x + Math.cos(a) * r, 0, objective.z + Math.sin(a) * r);
+      this.ClampInside(s.goal);
       n += 1;
     }
     return n;
   }
 
-  /** 玩家给身边的弟兄下命令。 */
+  /**
+   * 玩家给身边的弟兄下命令。
+   *
+   * flank 与 charge 以前只写了 `s.order = orderId` 就 `n += 1` —— 实跑取证：
+   * IssueOrder("charge") 返回 affected=2 但 goalChanged=false，Act() 里也只判
+   * `s.order === "hold"`。**这两条命令按下去什么也不会发生。**
+   * 上刺刀冲锋对台儿庄是文化上的必做项，不能是一个按下去没反应的键。
+   */
   IssueOrder(orderId, origin, aimPoint, radius = 26) {
     let n = 0;
+    // 绕行要分左右两半，所以先算一条从下令者指向瞄点的法线
+    let px = 0, pz = 0;
+    if (aimPoint) {
+      const dx = aimPoint.x - origin.x, dz = aimPoint.z - origin.z;
+      const len = Math.hypot(dx, dz) || 1;
+      px = -dz / len; pz = dx / len;
+    }
     for (const s of this.soldiers) {
       if (s.side !== "nra" || !s.alive) continue;
       if (s.position.distanceTo(origin) > radius) continue;
@@ -303,14 +387,34 @@ export class AiDirector {
       else if (orderId === "spread") {
         const a = s.rnd() * Math.PI * 2;
         s.goal.set(s.position.x + Math.cos(a) * 7, 0, s.position.z + Math.sin(a) * 7);
+      } else if (orderId === "flank" && aimPoint) {
+        // 瞄点两侧各 25 m 的绕行点，按序号分半数走左、半数走右。
+        // 全班走同一侧等于换个方向正面顶，那就白绕了。
+        const side = (n % 2 === 0) ? 1 : -1;
+        s.goal.set(aimPoint.x + px * 25 * side, 0, aimPoint.z + pz * 25 * side);
+        s.flankUntil = this.time + 30;
+        s.holdZone = null;         // 绕行本身就是要出区，不出去就不叫绕
+      } else if (orderId === "charge") {
+        // 白刃冲锋**例外地覆盖守点纪律**：防守时不许离开占领区是对的，
+        // 但上刺刀是主动出击，那一刻就是要冲出去。有效期 18 秒，之后归队。
+        s.state = STATE.CHARGE;
+        s.stance = 0;
+        s.bayonetFixed = true;
+        s.chargeUntil = this.time + 18;
+        s.goal.copy(aimPoint || origin);
       }
       n += 1;
+    }
+    // 喊杀声只放一次（每个人放一次就是七十条重叠的号音）
+    if (orderId === "charge" && n > 0 && this.ctx.audio) {
+      this.ctx.audio.Play("bugleCharge", { volume: 0.85 });
     }
     return n;
   }
 
   Update(dt, camera) {
     this.time += dt;
+    if (this.ctx.nav) this.ctx.nav.BeginFrame();
     this.frontTimer -= dt;
     if (this.frontTimer <= 0) { this.frontTimer = 1.0; this.UpdateFront(); }
     this.tickIndex += 1;
@@ -449,6 +553,24 @@ export class AiDirector {
       s.stance = s.suppression > 0.3 ? 1 : 0;
     }
 
+    // 命令有效期。绕行到位（或超时）转 advance；冲锋打完 18 秒归队 ——
+    // 不设有效期的话，一次上刺刀就把整个班永久踢出守点纪律。
+    if (s.order === "flank") {
+      const arrived = Math.hypot(s.goal.x - s.position.x, s.goal.z - s.position.z) < 6;
+      if (arrived || this.time > s.flankUntil) s.order = "advance";
+    } else if (s.order === "charge" && this.time > s.chargeUntil) {
+      s.order = "advance";
+      s.bayonetFixed = false;
+    }
+
+    // 上刺刀期间强制保持 CHARGE：状态机上面那一段会按"看不看得见目标"把它打回
+    // advance，于是命令下出去半秒就没了。装填那一档不覆盖 —— 空枪冲锋也得先压弹。
+    if (s.order === "charge" && this.time < s.chargeUntil && s.state !== STATE.RELOAD) {
+      s.state = STATE.CHARGE;
+      s.stance = 0;
+    }
+    if (s.state === STATE.CHARGE) s.bayonetFixed = true;
+
     // 掩体：朝目标方向找一个 1 米内能挡住的点。被压住的人尤其需要。
     if ((s.state === STATE.FIRE || s.state === STATE.SUPPRESSED)
       && (!s.cover || s.rnd() < 0.12)) {
@@ -516,11 +638,20 @@ export class AiDirector {
     let desired = null;
     let speed = 0;
 
+    // 冷却结束就把枪口那根白烟拆掉。**这一句必须在 Act 里**，不能只写在 TryFire 里：
+    // TryFire 只在 FIRE/SUPPRESSED/CHARGE 三个状态下被调用，机枪手一旦转进 ADVANCE
+    // 就再也不进那条路径，烟源留在原地按每秒六颗一直吐到这局结束 ——
+    // 六个阶段跑下来会攒出几十个常驻烟源，粒子池被占满、帧率一路掉下去。
+    if (s.heatSmoke && this.time >= s.coolUntil) {
+      if (this.ctx.vfx) this.ctx.vfx.RemoveSmokeSource(s.heatSmoke);
+      s.heatSmoke = 0;
+    }
+
     // 守点纪律（软约束）。原来是拿坐标硬夹回：越界就把 position 拉到圆边上，
     // 人贴着一个看不见的圆边横向滑动，而且因为点从不易主，中方 AI 被永久钉死。
     // 改成只重设目标点 + 转向内侧，不动 position —— 越界是被允许的，回来是自己走回来的。
     let strayed = false;
-    if (s.holdZone) {
+    if (s.holdZone && s.order !== "charge") {
       const dx = s.position.x - s.holdZone.x, dz = s.position.z - s.holdZone.z;
       const d = Math.hypot(dx, dz);
       if (d > s.holdZone.radius) {
@@ -530,6 +661,9 @@ export class AiDirector {
           const a = s.rnd() * Math.PI * 2;
           const r = s.holdZone.radius * (0.20 + s.rnd() * 0.55);
           s.goal.set(s.holdZone.x + Math.cos(a) * r, 0, s.holdZone.z + Math.sin(a) * r);
+          // 中正门那个点的圆边压过北寨墙，随机撒出来的守位有一部分在墙外面 ——
+          // 人走不过去，只会贴着墙抖到死。
+          this.ClampInside(s.goal);
         }
         if (!s.target && d > 0.001) s.yaw = Math.atan2(dx / d, dz / d);
       }
@@ -563,11 +697,18 @@ export class AiDirector {
         }
         this.TryFire(s, dt, player);
         break;
-      case STATE.CHARGE:
-        // 守点的人不冲锋 —— 冲出去就是把点让出来
-        if (s.target && !s.holdZone) { desired = this.tmpD.copy(s.target.position); speed = 3.6; }
+      case STATE.CHARGE: {
+        // 守点的人平时不冲锋（冲出去就是把点让出来），但玩家下的"上刺刀"是例外。
+        const ordered = s.order === "charge" && this.time < s.chargeUntil;
+        const dest = s.target ? s.target.position : (ordered ? s.goal : null);
+        if (dest && (!s.holdZone || ordered)) {
+          desired = this.tmpD.copy(dest);
+          speed = ordered ? 3.6 * 1.4 : 3.6;      // 下了命令的冲锋跑得更快
+        }
         this.TryFire(s, dt, player);
+        this.TryBayonet(s, dt, player);
         break;
+      }
       case STATE.ADVANCE:
       default:
         desired = this.tmpD.copy(s.goal);
@@ -575,8 +716,11 @@ export class AiDirector {
         break;
     }
 
-    // 走出守区就一切以回区为先：对射也好冲锋也好，都不许把点丢在身后
-    if (strayed) { desired = this.tmpD.copy(s.goal); speed = Math.max(speed, 2.2); }
+    // 走出守区就一切以回区为先：对射也好，都不许把点丢在身后。
+    // **唯一的例外是上刺刀**：玩家亲口下的冲锋命令要能覆盖守点纪律，
+    // 否则守点单位（也就是最需要被冲出去的那批人）按下去纹丝不动 ——
+    // 独立复核实测带 holdZone 时位移 0.00 m，正是被这一行盖回去的。
+    if (strayed && s.order !== "charge") { desired = this.tmpD.copy(s.goal); speed = Math.max(speed, 2.2); }
 
     // 移动：直奔目标 + 撞墙就沿墙滑 + **卡住就拐弯绕**。
     //
@@ -591,7 +735,17 @@ export class AiDirector {
       const d = Math.hypot(dx, dz);
       if (d > 1.2) {
         let nx = dx / d, nz = dz / d;
-        if (s.detourTime > 0) {
+        // 远目标走导航场：直奔目标在这座城里等于直奔一堵院墙。
+        // 近目标（掩体、眼前的敌人）仍然直奔 —— 那种距离上局部避障就够，
+        // 而且导航场是按格量化的，六米以内会把人推得一格一格地跳。
+        let navigated = false;
+        // 门槛取 14 m 而不是 8 m：导航场的目标被量化到 16 m，近距离用它反而会
+        // 把人往格心上推。十四米以内本来就是"看得见就直接过去"的距离。
+        if (this.ctx.nav && d > 14) {
+          navigated = this.ctx.nav.Steer(s.position.x, s.position.z, desired.x, desired.z, this.navOut);
+          if (navigated) { nx = this.navOut.x; nz = this.navOut.z; s.detourTime = 0; s.stuckTime = 0; }
+        }
+        if (!navigated && s.detourTime > 0) {
           s.detourTime -= dt;
           const c = Math.cos(s.detourYaw), sn = Math.sin(s.detourYaw);
           const rx = nx * c - nz * sn, rz = nx * sn + nz * c;
@@ -606,10 +760,15 @@ export class AiDirector {
         const moved = Math.hypot(s.position.x - beforeX, s.position.z - beforeZ);
         if (moved < step * 0.4) {
           s.stuckTime += dt;
-          if (s.stuckTime > 1.2) {
+          // 绕着还是不动就**翻到另一面**再绕。这一条不能写成"只有不在绕行时才重掷"：
+          // 那样一旦直奔方向与拐 99° 的方向同时被挡就是死锁，实跑量到位置整整
+          // 两百四十秒一帧都不动。翻面 + 每次重掷都带一点抖动才出得来。
+          if (s.stuckTime > 0.8) {
             s.stuckTime = 0;
-            s.detourTime = 1.4 + s.rnd() * 1.4;
-            s.detourYaw = (s.rnd() < 0.5 ? 1 : -1) * (Math.PI * 0.5 + s.rnd() * 0.5);
+            if (s.detourTime > 0) s.detourSign = -s.detourSign;
+            s.detourTime = 2.0 + s.rnd() * 1.2;
+            s.detourGoalDist = d;
+            s.detourYaw = s.detourSign * (Math.PI * 0.5 + s.rnd() * 0.55);
           }
         } else {
           s.stuckTime = 0;
@@ -658,8 +817,33 @@ export class AiDirector {
     return false;
   }
 
+  /**
+   * 白刃。上了刺刀冲到 2 m 以内是真的捅，不是跑过去继续开枪 ——
+   * 「上刺刀」按下去只是让人跑快一点的话，这个动词就还是假的。
+   */
+  TryBayonet(s, dt, player) {
+    s.meleeTimer -= dt;
+    if (!s.bayonetFixed || s.meleeTimer > 0 || !s.target) return;
+    const dx = s.target.position.x - s.position.x;
+    const dz = s.target.position.z - s.position.z;
+    if (Math.hypot(dx, dz) > 2.0) return;
+    s.meleeTimer = 1.1;
+    const dir = this.tmpC.set(dx, 0, dz).normalize();
+    // 刺刀伤害比步枪一发重（三八式带刺刀全长 1.663 m，捅上就是致命伤），
+    // 但对玩家减半 —— 一下秒杀玩家会让"被冲锋"变成读盘而不是危机。
+    if (s.target.isPlayer && player) player.TakeHit(110 * 0.5, "torso", dir);
+    else if (s.target.ref) {
+      const died = s.target.ref.TakeHit(110, "torso", dir);
+      if (this.ctx.vfx) this.ctx.vfx.Blood(s.target.position, dir, died ? 1 : 0.6);
+    }
+    if (this.ctx.audio) this.ctx.audio.Play("bayonetHit", { position: s.position.clone(), volume: 0.8 });
+  }
+
   TryFire(s, dt, player) {
     s.fireTimer -= dt;
+    // 过热：Type11.overheatShots = 200 / coolDownS = 8.0 以前是死字段。
+    // 冷却期间枪口冒白烟并且**真的打不出去** —— 这就是玩家冲过街口的那个窗口。
+    if (this.time < s.coolUntil) return;
     if (s.fireTimer > 0 || !s.target || s.ammo <= 0) return;
     s.aimTime += dt;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
@@ -677,6 +861,21 @@ export class AiDirector {
     s.lastFire = this.time;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据
+
+    // 打满 overheatShots 就强制冷却。挂一根白烟在枪口上，让"它现在打不了"看得见。
+    if (DIFFICULTY.overheat && s.weapon.overheatShots) {
+      s.heat += 1;
+      if (s.heat >= s.weapon.overheatShots) {
+        s.heat = 0;
+        s.coolUntil = this.time + (s.weapon.coolDownS ?? 8);
+        if (this.ctx.vfx) {
+          s.heatSmoke = this.ctx.vfx.SmokeSource(
+            { x: s.position.x, y: s.position.y + 0.9, z: s.position.z },
+            { kind: "screen", rate: 6, radius: 0.18, rise: 1.2,
+              sizeStart: 0.10, sizeEnd: 0.9, life: 1.8, opacity: 0.30 });
+        }
+      }
+    }
 
     // 命中判定：基础命中率按距离、压制、姿态修正。**AI 不许百发百中** ——
     // 那会让玩家觉得自己在被作弊，而不是在被压制。
