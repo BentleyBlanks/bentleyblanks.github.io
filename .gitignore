@@ -38,3 +38,7 @@ TunnelLight1943/_mocap/*
 TunnelLight1943/VideoBoard/_c1refs/
 # 音效烘焙的原始素材（每段 1-6MB 的生成长片，切完就没用了；成品在 Audio/Sfx/*.mp3）
 TunnelLight1943/Audio/Sfx/_raw/
+
+# Taierzhuang1938 视觉审查用的截图（每轮重出，不进仓库）
+Taierzhuang1938/_shots/
+Taierzhuang1938/_check_*.html

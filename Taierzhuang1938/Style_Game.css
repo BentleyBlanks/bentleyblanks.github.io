@@ -1,0 +1,176 @@
+/* 《血战台儿庄》HUD 样式。
+   克制是设计目标：Easy Red 2 的步兵 HUD 连弹药数都没有。
+   这里只留：阶段条、当前是谁、姿态、占领点图标、小地图、压制暗角、字幕。 */
+
+:root {
+  --ink: #0d0c0a;
+  --paper: #e6dfcd;
+  --dim: rgba(230, 223, 205, 0.62);
+  --ours: #9dc0e4;
+  --theirs: #d6604a;
+  --warn: #e0b062;
+}
+
+html, body {
+  margin: 0; height: 100%; background: #000; overflow: hidden;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+canvas#view { display: block; width: 100vw; height: 100vh; }
+
+#hud {
+  position: fixed; inset: 0; pointer-events: none;
+  font-size: 14px; line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+/* 压制：径向暗角 + 轻微去色。ER2 的压制表现就是这个。 */
+.hudSuppress {
+  position: absolute; inset: 0; opacity: 0;
+  transition: opacity 0.18s linear;
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,0) 34%, rgba(6,6,8,0.55) 72%, rgba(4,4,6,0.9) 100%);
+}
+.hudDamage {
+  position: absolute; inset: 0; opacity: 0;
+  transition: opacity 0.25s linear;
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,0) 46%, rgba(96,14,10,0.30) 80%, rgba(70,8,6,0.52) 100%);
+}
+
+/* 顶部：阶段与目标 */
+.hudTop {
+  position: absolute; top: 14px; left: 0; right: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.hudPhase .d { color: var(--dim); margin-right: 10px; letter-spacing: 0.06em; }
+.hudPhase .l { font-weight: 600; letter-spacing: 0.12em; }
+.hudObjective { font-size: 13px; color: var(--dim); }
+.hudObjective .o { color: var(--paper); margin-right: 14px; }
+.hudObjective .p { margin-right: 12px; }
+.hudObjective .t { color: var(--theirs); }
+
+/* 左下：你是谁 —— 这一栏在每次阵亡后会换一个名字 */
+.hudIdentity {
+  position: absolute; left: 20px; bottom: 20px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.hudIdentity .n { font-size: 17px; letter-spacing: 0.08em; }
+.hudIdentity .o { font-size: 12px; color: var(--dim); }
+.hudIdentity .w { font-size: 12px; color: var(--warn); opacity: 0.85; }
+
+/* 左下偏上：姿态与伤 */
+.hudState {
+  position: absolute; left: 20px; bottom: 84px;
+  display: flex; gap: 10px; font-size: 12px; color: var(--dim);
+}
+.hudState .b { color: #d6604a; }
+.hudState .w { color: var(--warn); }
+.hudState .h { color: var(--ours); }
+.hudState .c { color: var(--paper); }
+
+/* 字幕 */
+.hudSubtitle {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+  max-width: 62%; text-align: center; opacity: 0;
+  transition: opacity 0.3s ease; font-size: 16px;
+}
+.hudSubtitle.on { opacity: 1; }
+.hudSubtitle .who { color: var(--warn); margin-right: 10px; }
+.hudSubtitle .narr { color: var(--dim); font-style: italic; }
+
+.hudHint {
+  position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%);
+  font-size: 13px; color: var(--dim); opacity: 0; transition: opacity 0.3s ease;
+  border: 1px solid rgba(230,223,205,0.16); padding: 3px 12px; border-radius: 2px;
+  background: rgba(10,10,9,0.42);
+}
+.hudHint.on { opacity: 1; }
+
+/* 史实注记 */
+.hudNote {
+  position: absolute; right: 20px; top: 70px; width: 310px;
+  background: rgba(10,10,9,0.80); border-left: 2px solid var(--warn);
+  padding: 12px 14px; opacity: 0; transform: translateX(12px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.hudNote.on { opacity: 1; transform: translateX(0); }
+.hudNote .nTier {
+  font-size: 11px; color: var(--warn); letter-spacing: 0.14em; margin-bottom: 3px;
+}
+.hudNote .nTitle { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.hudNote .nBody { font-size: 12.5px; line-height: 1.75; color: var(--dim); }
+
+/* 命令表（按住 Tab） */
+.hudOrders {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.94);
+  display: none; grid-template-columns: repeat(3, 1fr); gap: 8px 18px;
+  background: rgba(8,8,7,0.72); padding: 18px 26px; border: 1px solid rgba(230,223,205,0.12);
+}
+.hudOrders.on { display: grid; }
+.hudOrderRow { display: flex; align-items: baseline; gap: 8px; }
+.hudOrderRow b { color: var(--warn); font-size: 13px; }
+
+/* 占领点图标 */
+.hudMarkers { position: absolute; inset: 0; }
+.hudMarker {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; font-size: 11px;
+  opacity: 0.9;
+}
+.hudMarker .ico { font-size: 13px; }
+.hudMarker.ours { color: var(--ours); }
+.hudMarker.theirs { color: var(--theirs); }
+.hudMarker.fight { color: var(--warn); }
+.hudMarker .bar {
+  width: 42px; height: 2px; background: rgba(255,255,255,0.18); margin-top: 2px; display: block;
+}
+.hudMarker .bar i { display: block; height: 100%; background: currentColor; }
+
+.hudMinimap {
+  position: absolute; right: 18px; bottom: 18px; width: 190px; height: 190px;
+  border: 1px solid rgba(230,223,205,0.14); opacity: 0.9;
+}
+
+/* 阵亡卡片 */
+.hudDeathCard {
+  position: absolute; inset: 0; background: #07070a;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.45s ease;
+}
+.hudDeathCard.on { opacity: 1; }
+.hudDeathCard .dcName { font-size: 34px; letter-spacing: 0.22em; }
+.hudDeathCard .dcMeta { font-size: 15px; color: var(--dim); letter-spacing: 0.1em; }
+.hudDeathCard .dcUnit { font-size: 13px; color: rgba(230,223,205,0.4); letter-spacing: 0.14em; }
+
+/* 阶段开场 */
+.hudBrief {
+  position: absolute; left: 8%; top: 34%; max-width: 46%;
+  opacity: 0; transition: opacity 0.6s ease;
+}
+.hudBrief.on { opacity: 1; }
+.hudBrief .bTitle {
+  font-size: 13px; color: var(--warn); letter-spacing: 0.2em; margin-bottom: 10px;
+}
+.hudBrief .bLine { font-size: 17px; line-height: 2.0; }
+
+/* 加载 */
+#boot {
+  position: fixed; inset: 0; background: #08080a; color: var(--paper);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  z-index: 10;
+}
+#boot.gone { display: none; }
+#bootTitle { font-size: 30px; letter-spacing: 0.34em; }
+#bootSub { font-size: 12.5px; color: var(--dim); letter-spacing: 0.16em; }
+#bootBar { width: 300px; height: 2px; background: rgba(230,223,205,0.14); }
+#bootBar i { display: block; height: 100%; width: 0; background: var(--warn); transition: width 0.2s ease; }
+#bootStep { font-size: 12px; color: var(--dim); min-height: 1.4em; }
+#bootStart {
+  margin-top: 12px; pointer-events: auto; cursor: pointer;
+  border: 1px solid rgba(230,223,205,0.3); background: transparent; color: var(--paper);
+  font: inherit; font-size: 15px; letter-spacing: 0.2em; padding: 9px 34px;
+}
+#bootStart[disabled] { opacity: 0.3; cursor: default; }
+#bootStart:not([disabled]):hover { background: rgba(230,223,205,0.08); }

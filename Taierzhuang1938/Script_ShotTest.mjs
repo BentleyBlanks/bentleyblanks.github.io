@@ -1,0 +1,103 @@
+// 《血战台儿庄》出图工具：真浏览器跑页面、推进固定帧数、落 PNG。
+// 视觉审查 agent 的唯一输入来源 —— 所以必须**可复现**：固定视口、固定帧数、
+// 不用 Math.random 的画面抖动。
+//
+// 用法：
+//   node Taierzhuang1938/Script_ShotTest.mjs [输出目录] [--probe] [--only=名字]
+// 默认输出到 Taierzhuang1938/_shots/（已 gitignore）。
+
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { ServeRoot } from "./Script_DevServer.mjs";
+
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(projectDir, "..");
+const args = process.argv.slice(2);
+const outDir = path.resolve(args.find((a) => !a.startsWith("--")) || path.join(projectDir, "_shots"));
+const probeOnly = args.includes("--probe");
+const onlyArg = args.find((a) => a.startsWith("--only="));
+const only = onlyArg ? onlyArg.slice(7).split(",") : null;
+fs.mkdirSync(outDir, { recursive: true });
+
+/** 探针页镜头表：材质球 + 五个时段的街景。 */
+const PROBE_SHOTS = [
+  { name: "Probe_Materials", query: "scene=materials&preset=smokyDay&quality=high" },
+  { name: "Probe_StreetDusk", query: "scene=street&preset=dusk&quality=high" },
+  { name: "Probe_StreetSmokyDay", query: "scene=street&preset=smokyDay&quality=high" },
+  { name: "Probe_StreetBurning", query: "scene=street&preset=burningStreet&quality=high" },
+  { name: "Probe_StreetNight", query: "scene=street&preset=night&quality=high" },
+  { name: "Probe_StreetDawn", query: "scene=street&preset=dawn&quality=high" },
+];
+
+/** 正片镜头表：由 index.html 的 debug 接口驱动（Script_Main 暴露 window.Taierzhuang）。 */
+const GAME_SHOTS = [
+  { name: "Game_P1_Wall", query: "shot=1&phase=0&quality=high&scale=medium" },
+  { name: "Game_P2_Breach", query: "shot=1&phase=1&quality=high&scale=medium" },
+  { name: "Game_P3_NorthWest", query: "shot=1&phase=2&quality=high&scale=medium" },
+  { name: "Game_P4_Night", query: "shot=1&phase=3&quality=high&scale=medium" },
+  { name: "Game_P5_Burning", query: "shot=1&phase=4&quality=high&scale=medium" },
+  { name: "Game_P6_Counter", query: "shot=1&phase=5&quality=high&scale=medium" },
+];
+
+const VIEWPORT = { width: 1600, height: 900 };
+
+const server = await ServeRoot(rootDir, 0);
+const port = server.address().port;
+const browser = await LaunchBrowser();
+const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+
+const problems = [];
+page.on("pageerror", (error) => problems.push(`PAGEERROR ${String(error).slice(0, 300)}`));
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const url = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
+  problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
+});
+
+async function Shoot(pageName, url, globalName) {
+  problems.length = 0;
+  await page.goto(url, { waitUntil: "load", timeout: 90000 });
+  await page.waitForFunction((g) => window[g] !== undefined, globalName, { timeout: 90000 });
+  // 先让加载/烘焙走完，再推进固定帧数把时序相关效果（火焰闪烁、运动模糊历史）稳住
+  // 先推逻辑帧把战场跑活（AI 铺开、粒子起来），再让 rAF 真渲染若干帧。
+  // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。
+  await page.evaluate((g) => window[g].StepFrames(240), globalName);
+  await page.waitForTimeout(700);
+  await page.evaluate((g) => window[g].StepFrames(60), globalName);
+  await page.waitForTimeout(500);
+  const file = path.join(outDir, `${pageName}.png`);
+  await page.screenshot({ path: file });
+  const stat = fs.statSync(file);
+  const status = problems.length ? "ERR" : "ok";
+  console.log(`${status.padEnd(4)} ${pageName.padEnd(24)} ${(stat.size / 1024).toFixed(0)}KB  ${file}`);
+  if (problems.length) for (const p of problems.slice(0, 4)) console.log(`      ${p}`);
+  return problems.length === 0;
+}
+
+let allOk = true;
+const probeList = only ? PROBE_SHOTS.filter((s) => only.includes(s.name)) : PROBE_SHOTS;
+for (const shot of probeList) {
+  const url = `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?${shot.query}`;
+  allOk = (await Shoot(shot.name, url, "Probe")) && allOk;
+}
+
+if (!probeOnly && fs.existsSync(path.join(projectDir, "index.html"))) {
+  const gameList = only ? GAME_SHOTS.filter((s) => only.includes(s.name)) : GAME_SHOTS;
+  for (const shot of gameList) {
+    const url = `http://127.0.0.1:${port}/Taierzhuang1938/?${shot.query}`;
+    try {
+      allOk = (await Shoot(shot.name, url, "Taierzhuang")) && allOk;
+    } catch (error) {
+      console.log(`ERR  ${shot.name.padEnd(24)} ${String(error).slice(0, 160)}`);
+      allOk = false;
+    }
+  }
+}
+
+await browser.close();
+server.close();
+console.log(allOk ? "\n出图完成，无控制台错误。" : "\n出图完成，但有报错，见上。");
+process.exit(allOk ? 0 : 1);

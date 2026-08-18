@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08080a">
+  <meta name="description" content="《血战台儿庄》——1938 年 3 月 23 日至 4 月 7 日，山东峄县台儿庄。一座运河商镇的巷战 FPS 原型。">
+  <title>血战台儿庄 · 一九三八</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="./Style_Game.css?v=1">
+  <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
+       只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
+       里的旧版，桌面刷新就好、手机 Safari 黏得多，于是只在移动端复现。
+       修法是 import map 把每一个第一方模块重映射到带版本的 URL；
+       版本只写在这一张表里，源码里一律不许自己写 ?v=（同一模块两个 URL = 加载两份）。
+       **新增模块必须登记在这里。** -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js?v=1",
+        "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=1",
+
+        "./Script_Noise.mjs": "./Script_Noise.mjs?v=1",
+        "./Script_TexBake.mjs": "./Script_TexBake.mjs?v=1",
+        "./Script_Materials.mjs": "./Script_Materials.mjs?v=1",
+        "./Script_Geo.mjs": "./Script_Geo.mjs?v=1",
+        "./Script_Post.mjs": "./Script_Post.mjs?v=1",
+        "./Script_Sky.mjs": "./Script_Sky.mjs?v=1",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=1",
+        "./Script_World.mjs": "./Script_World.mjs?v=1",
+        "./Script_Battlefield.mjs": "./Script_Battlefield.mjs?v=1",
+        "./Script_Player.mjs": "./Script_Player.mjs?v=1",
+        "./Script_Ai.mjs": "./Script_Ai.mjs?v=1",
+        "./Script_Actor.mjs": "./Script_Actor.mjs?v=1",
+        "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=1",
+        "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=1",
+        "./Script_Audio.mjs": "./Script_Audio.mjs?v=1",
+        "./Script_Hud.mjs": "./Script_Hud.mjs?v=1",
+        "./Data_Weapons.mjs": "./Data_Weapons.mjs?v=1",
+        "./Data_Battle.mjs": "./Data_Battle.mjs?v=1",
+        "./Data_History.mjs": "./Data_History.mjs?v=1",
+        "./Data_Script.mjs": "./Data_Script.mjs?v=1",
+        "./Data_Levels.mjs": "./Data_Levels.mjs?v=1"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud"></div>
+  <div id="boot">
+    <div id="bootTitle">血战台儿庄</div>
+    <div id="bootSub">一九三八年三月二十三日 — 四月七日 · 山东峄县</div>
+    <div id="bootBar"><i></i></div>
+    <div id="bootStep">正在夯地……</div>
+    <button id="bootStart" disabled>进 城</button>
+  </div>
+  <script type="module" src="./Script_Main.mjs?v=1"></script>
+</body>
+</html>
