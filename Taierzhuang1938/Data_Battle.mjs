@@ -233,7 +233,12 @@ export const SUPPORT = {
   ],
 };
 
-/** 压制、伤口、士气的数值。 */
+/**
+ * 压制与伤口的数值。
+ * 这里**没有士气**：屏幕上出现一条「中国守军士气条」在立场上是灾难。
+ * 原来的 moraleBreakAt 定义了却全仓库一行没读，已删；班组密度那个量改叫
+ * Soldier.cohesion，留在 AI 内部，永不出 UI。
+ */
 export const COMBAT = {
   suppressPerNearMiss: 0.16,
   suppressRadius: 2.6,
@@ -241,7 +246,6 @@ export const COMBAT = {
   suppressAccuracyPenalty: 1.3,       // 散布乘数上限
   bleedPerWound: { head: 6, torso: 2.6, arm: 1.4, leg: 1.4 },
   bandages: 2,
-  moraleBreakAt: 0.25,                // 班里活人低于这个比例就会往后缩
   aiReactionS: [0.35, 0.9],
   aiAccuracyBase: 0.55,
   aiAccuracySuppressed: 0.18,

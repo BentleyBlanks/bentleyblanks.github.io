@@ -321,8 +321,10 @@ export class CombatSystem {
       }
       const at = s.position.clone(); at.y += 0.9;
       affect(at, (dmg, dir) => {
-        const died = s.TakeHit(dmg, "torso", dir);
-        if (died && this.host.onKill) this.host.onKill(s);
+        // 不在这里扣票。这条回调以前是 onKill(s) —— 不带 side，装配层写死扣日方池，
+        // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
+        // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
+        s.TakeHit(dmg, "torso", dir);
         s.suppression = Clamp01(s.suppression + 0.8);
       });
     }

@@ -22,7 +22,7 @@ import { Hud } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
-import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT } from "./Data_Battle.mjs";
+import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, TOWN, COMBAT } from "./Data_Battle.mjs";
 import { HISTORY_NOTES, EPILOGUE_LINES } from "./Data_History.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
@@ -117,6 +117,9 @@ const state = {
   prevAllies: 0,
   storyObjective: null,
   playerAliveLast: true,
+  phasePoolNra: 0,            // 本阶段缩放后的中方票池上限（见底提示按它算）
+  playerShots: 0,             // 玩家开火累计，与 ai.fireCount 合起来就是全场火力
+  captureDrainAccum: 0,       // 占点消耗对方兵力的十秒结算钟
 };
 
 let battlefield = null;
@@ -191,6 +194,14 @@ async function Boot() {
 
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player,
+    // 票池 = 兵力池：**谁死了扣谁的**。
+    // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
+    // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
+    // 现在全部走 Soldier.Kill() 发出来的这一条事件，行内扣减一律删掉（会双扣）。
+    onSoldierDeath: (side) => {
+      if (side === "nra") state.nraPool = Math.max(0, state.nraPool - 1);
+      else state.ijaPool = Math.max(0, state.ijaPool - 1);
+    },
   }, { maxAlive: SCALE.maxAlive, seed: 19380324 });
 
   // 叙事层：把 Data_Script 那本考据过的剧本派发进开放战场。
@@ -198,7 +209,6 @@ async function Boot() {
   story = new StoryDirector({ hud, audio });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story,
-    onKill: (soldier) => { state.ijaPool = Math.max(0, state.ijaPool - 1); },
   });
 
   await nextFrame();
@@ -226,6 +236,20 @@ async function Boot() {
       Spoken: () => hud.spoken.slice(),
       StoryFired: () => story.fired.slice(),
       Outcome: () => state.outcome,
+      // 「仗有没有真的在打」只能从运行时取证：全场开火累计（AI + 玩家）、
+      // AI 的状态分布、两侧的阵亡计数。读源码是推断不出来的。
+      FireCount: () => ai.fireCount + state.playerShots,
+      AiStates: () => {
+        const out = {};
+        for (const s2 of ai.soldiers) {
+          if (!s2.alive) continue;
+          out[s2.state] = (out[s2.state] || 0) + 1;
+        }
+        return out;
+      },
+      Deaths: () => ({ ...ai.deaths }),
+      OpenDirections: (x, z, count = 72, probeM = 20) =>
+        CountOpenDirections(x, z, battlefield.GroundHeight(x, z), probeM, count),
     },
   };
 
@@ -239,8 +263,14 @@ function EnterPhase(index, initial = false) {
   state.phaseIndex = Clamp(index, 0, PHASES.length - 1);
   const phase = PHASES[state.phaseIndex];
   state.phaseTime = 0;
-  state.nraPool = initial ? phase.nraPool : REINFORCE.phaseRefill(state.nraPool, phase.nraPool);
-  state.ijaPool = phase.ijaPool;
+  // 票池随战场规模缩放。PHASES 里的 900/700 是照着 70 人档写的，
+  // 与 SCALE_PRESETS（40/70/110）脱钩：小档打光四十个人要耗九百张票，
+  // 池子永远见不到底，「人打光了就守不住」这条胜负规则等于不存在。
+  const poolScale = SCALE.maxAlive / 70;
+  const scaledNra = Math.round(phase.nraPool * poolScale);
+  state.phasePoolNra = scaledNra;
+  state.nraPool = initial ? scaledNra : REINFORCE.phaseRefill(state.nraPool, scaledNra);
+  state.ijaPool = Math.round(phase.ijaPool * poolScale);
 
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
@@ -392,21 +422,42 @@ function SeedSoldiers(phase) {
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
 
-  // 中方：守住还在自己手里的点
+  // 中方：守住还在自己手里的点，**并且往吃紧的那个点增援**。
+  // 原来是在所有己方点里等概率随机撒 —— 于是补进来的人平均分到八个点上，
+  // 前线那个正在被打的点拿到八分之一，前线永远补不上，仗打两下就散了。
+  // 六成去前线、四成铺开：铺开那部分不能省，不然后方的点会空到无人。
   const ours = battlefield.objectives.filter((o) => o.owner === "nra");
+  const front = ai.frontObjective?.ija;
   for (let i = ai.CountSide("nra"); i < nraTarget; i += 1) {
-    const o = ours[Math.floor(rnd() * ours.length)] || battlefield.objectives[0];
+    const o = (front && front.owner === "nra" && rnd() < 0.6)
+      ? front
+      : (ours[Math.floor(rnd() * ours.length)] || battlefield.objectives[0]);
     const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31);
     const s = ai.Spawn("nra", open.x, open.z, {
       towel: !!phase.nightRaid && rnd() < 0.55,
     });
     if (s) { s.holdZone = o; s.goal.set(o.x, 0, o.z); }
   }
-  // 日方：从北面的出生带压进来
+  // 日方：从北面两座城门的缺口**涌进来**，不是在城外列队。
+  //
+  // 原来生在 z = WORLD.minZ - 8，也就是北寨墙**外面**。而 AI 没有寻路网格，
+  // 门洞只有 3.2 m 宽，一百米外它找不到 —— 三十几个人就贴着城墙站成一排对着砖墙瞄。
+  // 实跑取证（改之前）：ija 到最近中方兵的中位距离只有 31 m、38 对里 15—38 对在
+  // 70 m 内，而**通视的是 0 对**，每一条视线撞的都是 tag=rampart 的那道墙。
+  // 于是全场 70 人恒为 advance、开火计数几乎不动 —— 这就是"仗根本没在打"的物理原因。
+  // 生在门内 6—32 m 既解决通视，也正是史实里的样子：日军由城门与城墙缺口突入城内。
+  // 补进来的人也压到前线：主攻点北侧 30—60 m（日军由北往南推，这是他们的后方一侧）。
+  // 还没有前线（开局）时才走城门缺口。补兵永远从城门进的话，前线一旦南移，
+  // 后续的人要横穿全城才到得了，实跑表现就是"打一阵停两分钟"。
+  const northGates = TOWN.gates.filter((g) => g.z < -100);
+  const ijaFront = ai.frontObjective?.ija;
   for (let i = ai.CountSide("ija"); i < ijaTarget; i += 1) {
-    const x = (rnd() - 0.5) * 380;
-    const z = WORLD.minZ - 8 - rnd() * 24;
-    const s = ai.Spawn("ija", x, z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
+    const gate = ijaFront
+      ? { x: ijaFront.x + (rnd() - 0.5) * 50, z: ijaFront.z - 30 - rnd() * 30 }
+      : (northGates[i % Math.max(1, northGates.length)] || { x: 0, z: WORLD.minZ + 40 });
+    const open = FindOpenSpot(gate.x + (rnd() - 0.5) * 40, gate.z + (ijaFront ? 0 : 8 + rnd() * 26), 14,
+      90001 + i * 617 + state.phaseIndex * 43);
+    const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
     if (s) {
       const goal = battlefield.objectives.find((o) => o.owner === "nra") || battlefield.objectives[0];
       s.goal.set(goal.x + s.laneOffset, 0, goal.z + s.laneOffset * 0.4);
@@ -423,8 +474,33 @@ function SeedSoldiers(phase) {
  * 鲁南民居对外不开窗、四面围墙，人一生出来就贴着一堵砖墙，转身也是墙。
  * 这里改成先在街上找：候选点必须**周围一米内没有齐胸以上的碰撞盒**。
  */
+const _openFrom = new THREE.Vector3();
+const _openDir = new THREE.Vector3();
+/**
+ * 从一个点往水平各方向射 probeM 米，数有几条是通的。
+ *
+ * 为什么要有这一条：原来的"站得下"只查了一米内有没有齐胸碰撞盒 ——
+ * 鲁南民居四面围墙，院子中央一米内当然什么都没有，于是玩家出生在封闭院落里，
+ * 实测 72 个方位 26 m 内**一条都不通**：转一圈全是墙。
+ * 站得下不等于打得着，得让候选点至少有三个方向能看出去。
+ */
+function CountOpenDirections(x, z, y, probeM = 20, count = 8, need = 99) {
+  let open = 0;
+  _openFrom.set(x, y + 1.5, z);
+  for (let k = 0; k < count; k += 1) {
+    const a = (k / count) * Math.PI * 2;
+    _openDir.set(Math.cos(a), 0, Math.sin(a));
+    if (!battlefield.Raycast(_openFrom, _openDir, probeM)) open += 1;
+    if (open >= need) return open;
+  }
+  return open;
+}
+
 function FindOpenSpot(cx, cz, radius, seed) {
   const rnd = Mulberry32(seed);
+  // 通视探测有成本（每个候选点八条射线），所以只给通过"站得下"的候选点做，
+  // 并且最多探 16 个：探不到三方位全通的就取探过的里面最好的那个。
+  let fallback = null, fallbackOpen = -1, probed = 0;
   for (let i = 0; i < 48; i += 1) {
     const a = rnd() * Math.PI * 2;
     const r = radius * (0.25 + rnd() * 1.35);
@@ -441,9 +517,14 @@ function FindOpenSpot(cx, cz, radius, seed) {
       blocked = true;
       break;
     }
-    if (!blocked) return { x, z };
+    if (blocked) continue;
+    if (probed >= 16) return fallback || { x, z };
+    probed += 1;
+    const open = CountOpenDirections(x, z, y, 20, 8, 3);
+    if (open >= 3) return { x, z };
+    if (open > fallbackOpen) { fallbackOpen = open; fallback = { x, z }; }
   }
-  return { x: cx, z: cz };
+  return fallback || { x: cx, z: cz };
 }
 
 function RespawnPlayer(initial = false) {
@@ -482,7 +563,7 @@ function OnPlayerDown() {
   audio.Play("bodyFall", { volume: 0.9 });
   if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
-  if (state.nraPool > 0 && state.nraPool / PHASES[state.phaseIndex].nraPool < REINFORCE.lastDitchAt) {
+  if (state.nraPool > 0 && state.nraPool / (state.phasePoolNra || 1) < REINFORCE.lastDitchAt) {
     hud.Say("团长", REINFORCE.lastDitchLine, 6);
   }
 }
@@ -617,7 +698,7 @@ function DoMelee() {
   const weaponId = WEAPONS[currentWeapon]?.bayonet ? currentWeapon : "Dadao";
   const result = combat.Melee(weaponId === currentWeapon ? currentWeapon : "Dadao",
     player.position.clone(), player.AimDirection(_aimDir).clone());
-  if (result?.died) state.ijaPool = Math.max(0, state.ijaPool - 1);
+  // 同上：不在这里扣票，阵亡事件已经扣过了
   return !!result;
 }
 
@@ -656,6 +737,7 @@ function TryFire(dt) {
     return;
   }
   state.ammo -= 1;
+  state.playerShots += 1;
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
@@ -689,10 +771,11 @@ function TryFire(dt) {
   if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
     _hitPoint.copy(from).addScaledVector(dir, bestT);
     const part = bestT < 40 && Mulberry32(state.frame * 7919)() < 0.12 ? "head" : "torso";
+    // 这里**不扣票**：扣票走 Soldier.Kill() 发的阵亡事件。
+    // 两条路径同时扣的话，玩家亲手打死的人会扣两票。
     const died = bestSoldier.TakeHit(weapon.damage, part, dir);
     vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
-    if (died) state.ijaPool = Math.max(0, state.ijaPool - 1);
   } else if (wallHit) {
     _hitPoint.copy(from).addScaledVector(dir, wallHit.t);
     const n = new THREE.Vector3(wallHit.normal[0], wallHit.normal[1], wallHit.normal[2]);
@@ -742,8 +825,20 @@ function Flip(objective, side) {
   if (objective.line) hud.Say(null, objective.line, 6);
   if (objective.note && HISTORY_NOTES[objective.note]) hud.Note(HISTORY_NOTES[objective.note]);
   if (side === "ija") {
-    // 丢了点就把守军释放出来，让他们往下一个点退
-    for (const s of ai.soldiers) if (s.holdZone === objective) s.holdZone = null;
+    // 丢了点不是就地散掉：整班后撤到**最近的一个还在我们手里的点**接着守。
+    // 原来只把 holdZone 清成 null，人就留在已经丢掉的点上原地对射，
+    // 战线不会往后收，也就永远推不动。
+    let fallback = null, fallbackDist = 1e9;
+    for (const o of battlefield.objectives) {
+      if (o === objective || o.owner !== "nra") continue;
+      const d = Math.hypot(o.x - objective.x, o.z - objective.z);
+      if (d < fallbackDist) { fallbackDist = d; fallback = o; }
+    }
+    for (const s of ai.soldiers) {
+      if (s.holdZone !== objective) continue;
+      s.holdZone = fallback;
+      if (fallback) s.goal.set(fallback.x + s.laneOffset * 0.5, 0, fallback.z + s.laneOffset * 0.5);
+    }
   }
 }
 
@@ -814,6 +909,22 @@ function Frame(dt) {
   state.playerAliveLast = player.Alive;
 
   const contested = UpdateObjectives(dt);
+
+  // 占点加速对方兵力流失（ER2 2.0.9 加的那条）。每十秒结算一次：
+  // 对方每持有一个点，己方票池按该点的 value 减半（向上取整）扣。
+  // 意义是把"占领点"从一个装饰性的进度条变成**真会把你耗死的东西** ——
+  // 不去夺点就只是站着流血，这是逼玩家往前打的唯一结构性压力。
+  state.captureDrainAccum += dt;
+  if (state.captureDrainAccum >= 10) {
+    state.captureDrainAccum -= 10;
+    let nraBleed = 0, ijaBleed = 0;
+    for (const o of battlefield.objectives) {
+      const bite = Math.ceil((o.value ?? 2) / 2);
+      if (o.owner === "ija") nraBleed += bite; else ijaBleed += bite;
+    }
+    state.nraPool = Math.max(0, state.nraPool - nraBleed);
+    state.ijaPool = Math.max(0, state.ijaPool - ijaBleed);
+  }
 
   // --- 叙事层 ---
   // 身边六十米内有敌人在开枪 = 正在交火。原剧本的 wave:N / waveClear:N

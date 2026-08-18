@@ -131,6 +131,11 @@ const melee = await page.evaluate(() => {
   // 把一个日军挪到玩家正前方 1.2 m
   // 等上一段测试的装填动画播完 —— IsBusy() 期间 DoMelee 会被挡下来（这是对的行为）
   T.StepFrames(180);
+  // 第 1 批之后战场是真在打的，玩家会在前面几段里被打死。
+  // DoMelee 对死人直接 return false，那样量到的"砍不到人"是测试自己没站稳，
+  // 不是白刃坏了。先把人等活过来。
+  if (!T.player.Alive) T.StepFrames(320);
+  T.player.health = 100;
   const enemy = T.ai.soldiers.find((s) => s.alive && s.side === "ija");
   if (!enemy) return { noEnemy: true };
   const busy = T.viewmodel.IsBusy();
@@ -139,10 +144,11 @@ const melee = await page.evaluate(() => {
     T.player.position.z + fwd.z * 1.2);
   const hpBefore = enemy.health;
   D.DoMelee();
-  return { hpBefore, hpAfter: enemy.health, alive: enemy.alive, busy };
+  return { hpBefore, hpAfter: enemy.health, alive: enemy.alive, busy, playerAlive: T.player.Alive };
 });
 Check("白刃能砍到人", !melee.noEnemy && melee.hpAfter < melee.hpBefore,
-  melee.noEnemy ? "场上没有日军" : `${melee.hpBefore} -> ${melee.hpAfter}（挥刀时 busy=${melee.busy}）`);
+  melee.noEnemy ? "场上没有日军"
+    : `${melee.hpBefore} -> ${melee.hpAfter}（挥刀时 busy=${melee.busy} 玩家活=${melee.playerAlive}）`);
 
 // ===========================================================================
 // 6) 占领点：进度条会动、能翻旗
@@ -151,12 +157,13 @@ const cap = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const o = T.battlefield.objectives[0];
   o.owner = "ija"; o.progress = 0;
-  // 把玩家挪进点里，把点里的日军挪走（双方都在区内应该冻结）
+  // 把玩家挪进点里，把**全部**日军挪走（双方都在区内应该冻结）。
+  // 只挪点里那几个是不够的：第 1 批之后日军会自己往前线走，四十秒里陆续走进来，
+  // 于是这个点全程 contested、进度冻住 —— 量到的是"夺不回来"，
+  // 而要验的是占领结算本身。这里沿用第 7 段那套冻场做法。
   T.player.position.set(o.x, T.battlefield.GroundHeight(o.x, o.z), o.z);
   for (const s of T.ai.soldiers) {
-    if (s.side === "ija" && Math.hypot(s.position.x - o.x, s.position.z - o.z) < o.radius + 5) {
-      s.position.set(o.x + 200, s.position.y, o.z + 200);
-    }
+    if (s.side === "ija") s.position.set(s.position.x + 400, s.position.y, s.position.z + 400);
   }
   const p0 = o.progress;
   T.StepFrames(240);
@@ -181,21 +188,26 @@ const death = await page.evaluate(async () => {
   T.player.health = 100;
   const idBefore = T.state.identity.name;
   const poolBefore = T.state.nraPool;
+  // 十秒一次的占点消耗会在这三帧里撞进来的话读数就不干净，先把钟拨回去
+  T.state.captureDrainAccum = 0;
   T.player.Kill();
   T.StepFrames(3);          // 让 Frame 自己发现"上一帧还活着，这一帧死了"
+  // 紧贴死亡那一刻读票池。第 1 批之后 AI 阵亡也扣票（那是对的：票池 = 兵力池），
+  // 所以再往后推 260 帧去读，量到的是"这段时间全场死了几个人"，不是"玩家这条命"。
+  const poolAtDeath = T.state.nraPool;
   const cardOn = document.querySelector(".hudDeathCard").classList.contains("on");
   const fallen = T.state.fallen.length;
   // 阵亡卡片 2.6 s + 重生
   T.StepFrames(260);
   return {
     idBefore, idAfter: T.state.identity.name,
-    poolBefore, poolAfter: T.state.nraPool,
+    poolBefore, poolAfter: poolAtDeath,
     cardOn, fallen, alive: T.player.Alive,
     origin: T.state.identity.origin,
   };
 });
 Check("阵亡弹卡片", death.cardOn, `阵亡名单 ${death.fallen} 人`);
-Check("兵员池扣一个", death.poolAfter === death.poolBefore - 1,
+Check("玩家这条命扣一张票", death.poolAfter === death.poolBefore - 1,
   `${death.poolBefore} -> ${death.poolAfter}`);
 Check("换成另一个有名有姓有籍贯的人", death.alive && !!death.origin,
   `${death.idBefore} -> ${death.idAfter}（${death.origin}）`);
@@ -292,6 +304,117 @@ Check("两分钟长跑 AI 数量稳定", minAlive >= 8 && maxAlive <= 120,
   `活人 ${minAlive}—${maxAlive}，几何 ${soak.geometries}，程序 ${soak.programs}`);
 Check("投掷物不泄漏", soak.projectiles < 40, `残留 ${soak.projectiles}`);
 Check("长跑无报错", errors.length === 0, errors.slice(0, 3).join(" | "));
+
+// ===========================================================================
+// 11) ER2 对齐第 1 批：仗真的在打 / 票池是兵力池 / 出生点看得出去
+//
+// 这一组每一条都从**运行时状态**取证。第 1 批修的全是"读代码看不出来"的东西：
+// 全场七十个人站着不动、票池方向反了、出生点在封闭院落里 —— 页面照跑、画面照出，
+// 只有把开火计数、状态分布、占领点归属、两个池子的增减读出来才看得见。
+// ===========================================================================
+
+// 11.1 出生点：不但站得下，还得看得出去
+await Boot(0, "small");
+const spawnSmall = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  return {
+    open: D.OpenDirections(T.player.position.x, T.player.position.z, 72, 20),
+    nraPool: T.state.nraPool,
+  };
+});
+Check("玩家出生点向 72 个方位射 20 m 至少三条通",
+  spawnSmall.open >= 3, `${spawnSmall.open}/72 条通`);
+
+// 11.2 票池随战场规模缩放
+await Boot(0, "large");
+const poolLarge = await page.evaluate(() => window.Taierzhuang.state.nraPool);
+Check("兵员池随规模缩放（small ≠ large）", spawnSmall.nraPool !== poolLarge,
+  `small=${spawnSmall.nraPool} large=${poolLarge}`);
+
+// 11.3 六十秒开火计数 / 状态分布 / 占领点易主 —— 玩家全程不动手
+await Boot(2, "medium");
+const battle = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const fire0 = D.FireCount();
+  const owners0 = T.battlefield.objectives.map((o) => o.owner).join(",");
+  const states = {};
+  let ownerChanged = false;
+  // 每秒采一次。只在十秒边界采会漏掉整段交火。
+  // 开火计数只数**头六十秒**；占领点易主给到一百五十秒 —— 守军会往吃紧的点增援，
+  // 一个点真正翻过去要打上一两分钟，这正是我们想要的（一分钟就翻旗说明没人守）。
+  let fired60 = 0;
+  for (let i = 0; i < 150; i += 1) {
+    T.StepFrames(60);
+    if (i === 59) fired60 = D.FireCount() - fire0;
+    const snapshot = D.AiStates();
+    for (const key of Object.keys(snapshot)) states[key] = (states[key] || 0) + snapshot[key];
+    if (T.battlefield.objectives.map((o) => o.owner).join(",") !== owners0) ownerChanged = true;
+  }
+  return {
+    fired: fired60,
+    states,
+    ownerChanged,
+    owners0,
+    owners1: T.battlefield.objectives.map((o) => o.owner).join(","),
+    deaths: D.Deaths(),
+  };
+});
+Check("六十秒内全场开火计数 > 200", battle.fired > 200, `开了 ${battle.fired} 枪`);
+Check("AI 状态分布不再恒为 advance", Object.keys(battle.states).length >= 3,
+  JSON.stringify(battle.states));
+Check("交火与装填两种状态都出现过", !!battle.states.fire && !!battle.states.reload,
+  `fire=${battle.states.fire || 0} reload=${battle.states.reload || 0}`);
+Check("占领点自己易了主（玩家没动手）", battle.ownerChanged,
+  `${battle.owners0} -> ${battle.owners1}`);
+Check("两侧都在真的死人", battle.deaths.nra > 0 && battle.deaths.ija > 0,
+  `nra ${battle.deaths.nra} / ija ${battle.deaths.ija}`);
+
+// 11.4 票池方向：日军炮弹炸死中国兵，扣的必须是**中方**的票
+// 旧 bug 的反向断言。Blast 是同步结算，所以前后两次读数中间不推帧，
+// 不会有别的死亡混进来。
+const blastPool = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const victim = T.ai.soldiers.find((s) => s.alive && s.side === "nra");
+  if (!victim) return { noVictim: true };
+  // 挪到空地上单独炸，免得连坐炸到日军
+  victim.position.set(T.battlefield.bounds.maxX - 30, victim.position.y, T.battlefield.bounds.maxZ - 30);
+  victim.position.y = T.battlefield.GroundHeight(victim.position.x, victim.position.z);
+  const at = victim.position.clone(); at.y += 0.4;
+  const nra0 = T.state.nraPool, ija0 = T.state.ijaPool;
+  T.combat.Blast(at, 6, 400, "shell");
+  return { nra0, ija0, nra1: T.state.nraPool, ija1: T.state.ijaPool, dead: !victim.alive };
+});
+Check("日军炮弹炸死中国兵：扣中方票、日方票不动",
+  !blastPool.noVictim && blastPool.dead
+  && blastPool.nra1 === blastPool.nra0 - 1 && blastPool.ija1 === blastPool.ija0,
+  `nra ${blastPool.nra0}->${blastPool.nra1}, ija ${blastPool.ija0}->${blastPool.ija1}`);
+
+// 11.5 玩家亲手打死一个日军：日方票恰好 -1（不是 -2，防行内扣减与事件双扣）
+const shotPool = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  T.StepFrames(200);                       // 等上一段的动作播完，IsBusy 会挡下开火
+  if (!T.player.Alive) T.StepFrames(320);
+  T.player.health = 100;
+  const target = T.ai.soldiers.find((s) => s.alive && s.side === "ija");
+  if (!target) return { noTarget: true };
+  // 靶子摆在**真正的瞄准射线**上，别拿 player.yaw 现推一条水平前向：
+  // TryFire 的命中判定是「到射线的垂距 < 0.45 m」，而胸口在 position.y + 0.95。
+  // 拿水平前向摆在 3 m 处，胸口比眼位低 0.65 m，垂距 0.65 > 0.45 —— 八枪全从头顶过去。
+  const V = T.player.position.constructor;
+  const dir = T.player.AimDirection(new V());
+  const eye = T.player.EyePosition.clone();
+  const spot = eye.clone().addScaledVector(dir, 4);
+  target.position.set(spot.x, spot.y - 0.95, spot.z);
+  target.health = 1;                        // 一枪必死，把"打了几枪"这个变量消掉
+  const ija0 = T.state.ijaPool;
+  // Debug.Fire 是同步的：中间不推帧，就不会有别的日军死掉混进读数
+  let shots = 0;
+  while (target.alive && shots < 8) { D.Fire(); shots += 1; }
+  return { ija0, ija1: T.state.ijaPool, dead: !target.alive, shots };
+});
+Check("玩家亲手击杀：日方票恰好 -1（没有双扣）",
+  !shotPool.noTarget && shotPool.dead && shotPool.ija1 === shotPool.ija0 - 1,
+  `ijaPool ${shotPool.ija0}->${shotPool.ija1}，打了 ${shotPool.shots} 枪`);
 
 await browser.close();
 server.close();
