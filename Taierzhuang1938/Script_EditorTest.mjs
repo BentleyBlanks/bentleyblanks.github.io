@@ -41,6 +41,27 @@ async function Step(frames = 20) {
   await page.evaluate((n) => window.Taierzhuang.StepFrames(n), frames);
 }
 
+/** 真的按一下画布。笔刷是在 Update 里落的，所以按下与抬起之间要推几帧。 */
+async function CanvasClick(x, y) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await Step(3);
+  await page.mouse.up();
+  await Step(3);
+}
+
+/** 真的拖一下画布。 */
+async function CanvasDrag(x, y, steps = 12) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i += 1) {
+    await page.mouse.move(x + i * 6, y + i * 3);
+    await Step(1);
+  }
+  await page.mouse.up();
+  await Step(2);
+}
+
 // ===========================================================================
 // 启动（正常模式：要验齿轮按钮真的能点）
 // ===========================================================================
@@ -301,6 +322,126 @@ Check("地形笔刷同时改解析高程",
   `${scene.groundBefore} → ${scene.groundAfter}（10 m 外仍 ${scene.groundEdge}）`);
 Check("地形能全部还原", scene.groundReset === scene.groundBefore);
 Check("场景存取往返", scene.roundTrip === "0 → 2", scene.roundTrip);
+
+// ---------------------------------------------------------------------------
+// 6b) 真鼠标：落点与笔刷
+//
+// 用户报的两条都在这一段。它们的共同点是**没有任何报错**，只是「点了没反应」：
+//   · 点「回到玩家」把俯仰归零 = 正对地平线，而拾取是沿射线找地面 ——
+//     水平射线永远碰不到平地，于是屏幕上半边点哪儿都放不下东西；
+//   · 地形笔刷只在 mousemove 里落笔，单击（不拖）什么也不发生；
+//     而拖动时左键同时被拿去转视角，刷子跟着视角跑。
+// 所以这一段一律走**真的鼠标事件**，不调内部方法 —— 那两条 bug 从内部调是复现不出来的。
+// ---------------------------------------------------------------------------
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.ResetTerrain();
+  active.ClearAll();
+  active.GoToPlayer();
+});
+await Step(5);
+const aim = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const rect = T.renderer.domElement.getBoundingClientRect();
+  const hit = T.editor.active.Pick({ clientX: rect.width / 2, clientY: rect.height / 2 });
+  return { pitch: +T.editor.flycam.pitch.toFixed(2), hit: !!hit };
+});
+Check("「回到玩家」之后准心还够得着地面", aim.hit, `俯仰=${aim.pitch}`);
+
+await page.evaluate(() => window.Taierzhuang.editor.active.SetMode("place"));
+await Step(3);
+await CanvasClick(620, 430);
+const placedByMouse = await page.evaluate(() => ({
+  items: window.Taierzhuang.editor.active.items.length,
+  gizmo: !!(window.Taierzhuang.editor.active.gizmo
+    && window.Taierzhuang.editor.active.gizmo.group.visible),
+}));
+Check("「回到玩家」之后还能用鼠标放东西",
+  placedByMouse.items === 1 && placedByMouse.gizmo,
+  `items=${placedByMouse.items} 落点环=${placedByMouse.gizmo}`);
+
+// 先飞到城内台地上空：**只有那张网格够密**（636 m 铺 116×116，约 5.5 m 一格）。
+// 城外那张是绕城的方环，700 m 以外每两百米才一个顶点，笔刷在那儿是改不动网格的。
+const brush = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const active = T.editor.active;
+  active.ClearAll();
+  T.camera.position.set(0, 58, 40);
+  T.editor.flycam.yaw = 0;
+  T.editor.flycam.pitch = -0.95;
+  active.SetMode("terrain");
+  active.brush.kind = "crater";
+  active.brush.radius = 10;
+  active.brush.strength = 1.2;
+  return { before: 0, x: 0, z: 0 };
+});
+await Step(4);
+const brushAt = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const hit = T.editor.active.Pick({ clientX: 620, clientY: 430 });
+  return hit
+    ? { before: +T.battlefield.GroundHeight(hit.x, hit.z).toFixed(3), x: hit.x, z: hit.z }
+    : { before: null, x: 0, z: 0 };
+});
+Object.assign(brush, brushAt);
+await CanvasClick(620, 430);
+const afterClick = await page.evaluate((at) => {
+  const T = window.Taierzhuang;
+  return {
+    ops: T.editor.active.terrainOps.length,
+    after: +T.battlefield.GroundHeight(at.x, at.z).toFixed(3),
+  };
+}, brush);
+Check("地形笔刷：单击一次就出一个坑",
+  afterClick.ops === 1 && afterClick.after < brush.before - 0.5,
+  `ops=${afterClick.ops}  ${brush.before} → ${afterClick.after}`);
+
+const pitchBefore = await page.evaluate(() => window.Taierzhuang.editor.flycam.pitch);
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.ResetTerrain();
+  active.brush.kind = "lower";
+});
+await CanvasDrag(620, 430, 12);
+const afterDrag = await page.evaluate((p) => {
+  const T = window.Taierzhuang;
+  return {
+    ops: T.editor.active.terrainOps.length,
+    pitchMoved: Math.abs(T.editor.flycam.pitch - p) > 1e-6,
+  };
+}, pitchBefore);
+// 12 次移动以前会推 12 个 op（每个都要把十几万顶点走一遍），而且镜头跟着一起转
+Check("地形笔刷：拖动不转镜头、也不把 op 表刷爆",
+  !afterDrag.pitchMoved && afterDrag.ops > 0 && afterDrag.ops <= 6,
+  `12 次移动 → ${afterDrag.ops} 个 op，镜头动了=${afterDrag.pitchMoved}`);
+
+// 城外网格太疏的地方必须**拒绝**这一笔：只改解析高程而网格不动，
+// 就是这个模块开头声明不许出现的那种分歧（看着是平地，人却掉进坑里）。
+const coarse = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const active = T.editor.active;
+  active.ResetTerrain();
+  active.brush.kind = "crater";
+  active.brush.radius = 8;
+  const far = { x: 40, z: -1200 };          // 城外一千两百米：那儿每两百米才一个顶点
+  const before = T.battlefield.GroundHeight(far.x, far.z);
+  active.PaintTerrain(far.x, far.z, false, 1 / 60);
+  return {
+    ops: active.terrainOps.length,
+    touched: active.lastTouched,
+    moved: Math.abs(T.battlefield.GroundHeight(far.x, far.z) - before) > 1e-6,
+  };
+});
+Check("网格太疏的地方拒绝落笔（不留「看着平地却掉坑里」）",
+  coarse.ops === 0 && coarse.touched === 0 && !coarse.moved,
+  `动到顶点=${coarse.touched} 记了 ${coarse.ops} 笔 解析高程变了=${coarse.moved}`);
+
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.ResetTerrain();
+  active.ClearAll();
+  active.SetMode("look");
+});
 
 // 换关：整片切片被拆掉重建。包过的 GroundHeight、放置层的碰撞盒、地形的位移
 // 全都挂在**上一份** city 上，不跟着搬家的话表现是「换完关地形回到原样、

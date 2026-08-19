@@ -76,7 +76,7 @@ export class EditorSuite {
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene,
       game: host.game,
-      studio: suite.studio, flycam: suite.flycam,
+      studio: suite.studio, flycam: suite.flycam, viewport: suite.viewport,
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
       hideInStudio: host.viewmodel ? [host.viewmodel.root] : [],
       get playerWeaponId() { return host.game.currentWeapon; },
@@ -147,8 +147,12 @@ export class EditorSuite {
 
   SetHint(text) {
     if (!this.hint) return;
-    this.hint.textContent = text || "";
-    this.hint.classList.toggle("on", !!text);
+    // 每帧都会有人来设同一句（落点提示是逐帧算的）。不比一下就写的话，
+    // 每帧都在动 textContent —— 白白触发一次布局。
+    const next = text || "";
+    if (this.hint.textContent === next) return;
+    this.hint.textContent = next;
+    this.hint.classList.toggle("on", !!next);
   }
 
   SetCrosshair(on) {
@@ -248,6 +252,11 @@ export class EditorSuite {
     };
     this.viewport.OnPaint = (event, button) => {
       if (this.active && this.active.OnPaint) this.active.OnPaint(event, button);
+    };
+    // 按下那一刻。笔刷靠它划出「一笔」的起点 —— 只有 OnPaint 的话，
+    // 按下去不动（不产生 mousemove）就什么也不会发生。
+    this.viewport.OnPress = (event, button) => {
+      if (this.active && this.active.OnPress) this.active.OnPress(event, button);
     };
 
     this._onKeyDown = (event) => {

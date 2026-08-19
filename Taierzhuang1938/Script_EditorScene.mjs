@@ -27,6 +27,7 @@ import {
   Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea, El,
 } from "./Script_EditorUi.mjs";
 import { PickWorld, ScreenRay } from "./Script_EditorStage.mjs";
+import { MarkNoPrepass } from "./Script_Post.mjs";
 import {
   BuildSink, AddTree, AddPole, AddWell, AddMillstone, AddWaterVat, AddBarricade,
   AddCompound, AddRoomBlock, AddGatehouse, AddRampart, AddDugout, AddPaifang,
@@ -194,7 +195,9 @@ export class SceneEditor {
     this.paletteId = PLACEABLE[0].id;
     this.cat = "景观";
     this.mode = "look";         // look | place | move | terrain
-    this.brush = { radius: 8, strength: 0.6, kind: "raise" };
+    // 半径的下限是被网格分辨率定死的：城内台地 636 m 铺 116×116，约 5.5 m 一格。
+    // 半径 8 只圈得到三四个顶点，刷出来是几个尖，不是坑。14 起步才有形。
+    this.brush = { radius: 14, strength: 0.6, kind: "raise" };
     this.terrainOps = [];
     this.root = new THREE.Group();
     this.root.name = "EditorScenePlacements";
@@ -206,6 +209,18 @@ export class SceneEditor {
     this.groundPatched = null;
     this.measure = { calls: 0, triangles: 0 };
     this.paramSliders = {};
+
+    // --- 笔刷的「一笔」 -----------------------------------------------------
+    // 一次按下到抬起合成**一个** terrainOp，不是每来一个 mousemove 就推一个。
+    // 每个事件推一个的代价是双份的：GroundHeight 每次查询要遍历整张 op 表
+    //（AI 与玩家每帧查几百次），而每个 op 又要把两张地面网格的十几万个顶点
+    // 全走一遍 —— 实测拖一下 12 个事件花了 554 ms，手感就是「刷不动」。
+    this.stroke = null;          // { op, kind }
+    this.paintAt = null;         // 本帧要落笔的屏幕坐标，Update 里统一处理
+    this.groundMeshes = [];      // 缓存的两张地面网格
+    this.gizmo = null;           // 落点指示（环 + 竖针）
+    this.hover = null;           // 最近一次拾取结果
+    this.lastTouched = null;     // 上一笔真的动到了多少个地面顶点
   }
 
   get field() { return this.host.game.battlefield; }
@@ -224,6 +239,7 @@ export class SceneEditor {
     });
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
+    this.BuildGizmo();
     this.PatchGround();
     this.LoadModels();
     // draw call 要按整帧量（一帧十几个 pass），关掉自动清零、每帧自己读自己清
@@ -234,6 +250,7 @@ export class SceneEditor {
 
   Exit() {
     this.ClearBuilt();
+    this.DisposeGizmo();
     this.host.scene.remove(this.root);
     this.UnpatchGround();
     this.host.renderer.info.autoReset = true;
@@ -319,7 +336,7 @@ export class SceneEditor {
       { value: "flatten", label: "抹平" },
     ], this.brush.kind, (v) => { this.brush.kind = v; });
     Slider(terrain, {
-      label: "半径", min: 1, max: 40, step: 0.5, value: this.brush.radius,
+      label: "半径", min: 3, max: 60, step: 0.5, value: this.brush.radius,
       format: (v) => `${v.toFixed(1)} m`,
       onInput: (v) => { this.brush.radius = v; },
     });
@@ -334,6 +351,9 @@ export class SceneEditor {
     ]);
     Note(terrain, "笔刷同时改**网格顶点**与**解析高程**：看得见的地和踩得到的地一起变。"
       + "只改前者的话，人会在坑口上平地走过去。", true);
+    Note(terrain, "刷得动的只有**城内台地**（|x|、|z| < 318 m，约 5.5 m 一个顶点）。"
+      + "城外那张地面是绕城的方环，七百米以外每两百米才一个顶点 —— "
+      + "在那儿落笔会被拒绝并提示，不会偷偷只改解析高程。");
 
     const io = Section(body, "存取");
     ButtonRow(io, [
@@ -410,13 +430,16 @@ export class SceneEditor {
 
   SetMode(mode) {
     this.mode = mode;
-    this.host.SetCrosshair(mode === "place" || mode === "move" || mode === "terrain");
+    // 屏幕正中那个十字**不能用** —— 拾取走的是鼠标位置，两者压根不是一个点，
+    // 画着它反而让人对着十字点。落点改用世界里那个环（RefreshGizmo）。
+    this.host.SetCrosshair(false);
     const text = {
-      look: "",
-      place: "左键点地面放一个；右键拖动转视角",
+      look: "左键拖转视角 · WASD+QE 飞 · 滚轮调速",
+      place: "左键点地面放一个（黄环就是落点）；右键拖转视角",
       move: "先在「已放置」里选一个，再左键点目标位置",
-      terrain: "左键按住涂；Shift 反向",
+      terrain: "左键按住涂（这时候左键不转视角）；Shift 反向；右键拖转视角",
     }[mode];
+    this.modeHint = text;
     this.host.SetHint(text);
   }
 
@@ -424,13 +447,23 @@ export class SceneEditor {
   // 相机
   // -------------------------------------------------------------------------
 
+  /**
+   * 回到玩家站的地方。
+   *
+   * **俯仰不许归零。** 归零 = 正对地平线，而拾取是「沿射线找地面」：
+   * 水平射线永远碰不到平地，于是屏幕上半边点哪儿都放不下东西，还没有任何报错。
+   * 眼高才 1.6 m，压 25° 下去地面才落在准心附近够得着的距离上。
+   * 顺带抬 2 m：站在人眼高度上摆院子，看到的全是自己脚底下那一块。
+   */
   GoToPlayer() {
     const player = this.host.game.player;
     if (!player) return;
     const camera = this.host.camera;
-    camera.position.copy(player.EyePosition ? player.EyePosition : player.position);
+    const eye = player.EyePosition ? player.EyePosition : player.position;
+    camera.position.set(eye.x, eye.y + 2.0, eye.z);
     this.host.flycam.yaw = player.yaw || 0;
-    this.host.flycam.pitch = 0;
+    this.host.flycam.pitch = -0.44;
+    this.host.SetHint("回到玩家 · 镜头已压低，地面在准心下方");
   }
 
   BringPlayer() {
@@ -462,10 +495,41 @@ export class SceneEditor {
     return PickWorld(this.field, camera.position, direction, { maxDist: 600 });
   }
 
+  /**
+   * 拖动。**地形模式下左键是「涂」不是「转头」。**
+   *
+   * 原来两件事绑在同一个键上：按住左键拖，OnDrag 转相机、OnPaint 同时落笔，
+   * 于是刷子跟着视角一起跑 —— 手感是「刷不动」「刷到别处去了」。
+   * 右键在任何模式下都是转头，所以地形模式下也不会失去镜头控制。
+   */
+  OnDrag(dx, dy, button) {
+    if (this.mode === "terrain" && button === 0) return;
+    this.host.flycam.Look(dx, dy);
+  }
+
+  /** 按下那一刻就起笔：按下去不动（不产生 mousemove）也该出一个坑。 */
+  OnPress(event, button) {
+    if (this.mode !== "terrain" || button !== 0) return;
+    this.stroke = null;
+    this.paintAt = { x: event.clientX, y: event.clientY, shift: event.shiftKey };
+  }
+
+  OnPaint(event, button) {
+    if (this.mode !== "terrain" || button !== 0) return;
+    // 只记下位置，真正落笔交给 Update —— 一帧里落一次。
+    // 每个 mousemove 落一次的话，一次拖动会推十几个 op，
+    // 每个 op 都要把两张地面网格的十几万顶点走一遍。
+    this.paintAt = { x: event.clientX, y: event.clientY, shift: event.shiftKey };
+  }
+
   OnClick(event, button) {
     if (button !== 0) return;
+    if (this.mode === "terrain") {
+      // 单击（没拖动）也该落一笔。OnPress 已经记过位置了，这里不重复。
+      return;
+    }
     const hit = this.Pick(event);
-    if (!hit) { this.host.SetHint("这个方向上没有地面"); return; }
+    if (!hit) { this.host.SetHint("准心在地平线以上：那个方向上没有地面"); return; }
     if (this.mode === "place") this.Place(hit.x, hit.z);
     else if (this.mode === "move" && this.selected) {
       this.selected.x = hit.x; this.selected.z = hit.z;
@@ -473,11 +537,67 @@ export class SceneEditor {
     }
   }
 
-  OnPaint(event, button) {
-    if (this.mode !== "terrain" || button !== 0) return;
-    const hit = this.Pick(event);
+  // -------------------------------------------------------------------------
+  // 落点指示
+  //
+  // 没有它的时候，「点下去会落在哪」只能靠猜：屏幕中间那个十字与鼠标位置压根
+  // 不是一回事，而正对地平线时射线根本打不到地 —— 点了没反应，也不知道为什么。
+  // 环画在真实落点上，半径就是笔刷半径；打不到地的时候整个藏起来。
+  // -------------------------------------------------------------------------
+
+  BuildGizmo() {
+    const group = new THREE.Group();
+    group.name = "EditorSceneGizmo";
+    const Mat = (hex) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: hex, transparent: true, opacity: 0.85, depthTest: false,
+      });
+      MarkNoPrepass(material);
+      return material;
+    };
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.02, 6, 48), Mat(0xe0b062));
+    ring.rotation.x = -Math.PI / 2;
+    ring.renderOrder = 900;
+    const pin = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.2, 0.04), Mat(0xe0b062));
+    pin.position.y = 0.6;
+    pin.renderOrder = 900;
+    group.add(ring);
+    group.add(pin);
+    group.visible = false;
+    this.host.scene.add(group);
+    this.gizmo = { group, ring, pin };
+  }
+
+  DisposeGizmo() {
+    if (!this.gizmo) return;
+    this.host.scene.remove(this.gizmo.group);
+    for (const mesh of [this.gizmo.ring, this.gizmo.pin]) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    this.gizmo = null;
+  }
+
+  RefreshGizmo() {
+    if (!this.gizmo) return;
+    const viewport = this.host.viewport;
+    if (this.mode === "look" || !viewport || !viewport.over) {
+      this.gizmo.group.visible = false;
+      this.hover = null;
+      return;
+    }
+    const hit = this.Pick({ clientX: viewport.x, clientY: viewport.y });
+    this.hover = hit;
+    this.gizmo.group.visible = !!hit;
+    // 打不到地的时候必须当场说出来。这是「点了没反应」那一类事故里最气人的一种：
+    // 眼高才 1.6 m，准心一抬到地平线以上射线就再也碰不到地面，
+    // 而屏幕上没有任何东西告诉你这件事。
+    this.host.SetHint(hit ? this.modeHint : "准心在地平线以上 —— 那个方向上没有地面，往下压一点");
     if (!hit) return;
-    this.PaintTerrain(hit.x, hit.z, event.shiftKey);
+    const radius = this.mode === "terrain" ? this.brush.radius : 0.9;
+    this.gizmo.group.position.set(hit.x, hit.y + 0.02, hit.z);
+    this.gizmo.ring.scale.setScalar(radius);
+    this.gizmo.pin.visible = this.mode !== "terrain";
   }
 
   // -------------------------------------------------------------------------
@@ -645,30 +765,59 @@ export class SceneEditor {
     return delta;
   }
 
-  PaintTerrain(x, z, invert) {
+  /**
+   * 落一笔。**一次按下到抬起只合成一个 terrainOp。**
+   *
+   * 原来是每来一个 mousemove 就 push 一个 op，代价是双份的：
+   * GroundHeight 每次查询要遍历整张 op 表（玩家与 AI 每帧查几百次），
+   * 而每个 op 又要把两张地面网格的十几万顶点全走一遍 ——
+   * 实测拖一下 12 个事件花了 554 ms，手感就是「刷不动」。
+   *
+   * 现在：笔尖离开上一个 op 中心超过半径的 40% 才起新的一个，否则把量加进旧的那个，
+   * 网格只按**增量**更新。抬起手（Update 里看 viewport.dragging）这一笔就封口。
+   */
+  PaintTerrain(x, z, invert, dt) {
     const kind = this.brush.kind;
     const radius = this.brush.radius;
-    let amount = this.brush.strength * (1 / 30);   // 一「笔」≈ 一帧的量
-    if (kind === "lower" || invert) amount = -Math.abs(amount);
-    if (kind === "raise" && !invert) amount = Math.abs(amount);
+    const step = Math.max(0.001, Math.min(0.05, dt || 1 / 60));
+    let amount = 0;
     if (kind === "crater") {
-      // 弹坑是一次成型的：一笔挖到位，再点一次是第二个坑，不是越挖越深
-      amount = -this.brush.strength;
-      this.terrainOps.push({ x, z, r: radius, amount, once: true });
-      this.ApplyTerrainToMesh(x, z, radius, amount);
+      // 弹坑一次成型：一笔一个坑，按住不放不会越挖越深
+      if (this.stroke && this.stroke.kind === "crater") return;
+      amount = -this.brush.strength * (invert ? -1 : 1);
+    } else if (kind === "flatten") {
+      // 抹平：把这一片的**编辑量**按比例收回去，回到原始地形
+      const delta = this.TerrainDelta(x, z);
+      if (Math.abs(delta) < 1e-4) return;
+      amount = -delta * Math.min(1, 2.5 * step);
+    } else {
+      amount = this.brush.strength * step * ((kind === "lower") !== !!invert ? -1 : 1);
+    }
+    if (!amount) return;
+
+    const stroke = this.stroke;
+    const near = stroke && Math.hypot(x - stroke.op.x, z - stroke.op.z) < radius * 0.4
+      && stroke.op.r === radius && kind !== "flatten";
+    if (near) {
+      stroke.op.amount += amount;
+      this.ApplyTerrainToMesh(stroke.op.x, stroke.op.z, radius, amount);
       return;
     }
-    if (kind === "flatten") {
-      // 抹平：把这一片的**编辑量**按比例收回去，回到原始地形
-      const before = this.TerrainDelta(x, z);
-      if (Math.abs(before) < 1e-4) return;
-      const back = -before * 0.12;
-      this.terrainOps.push({ x, z, r: radius, amount: back });
-      this.ApplyTerrainToMesh(x, z, radius, back);
+
+    // **动不到任何一个顶点就什么都不记。**
+    //
+    // 城外那张地面是绕城的方环：靠濠一圈约 7 m 一个顶点，700 m 以外只剩 5 圈，
+    // 也就是**每两百米才一个顶点**。在那儿刷，网格一动不动，而解析高程照样凹下去 ——
+    // 结果正好是这个文件开头声明不许出现的那一种：看着是平地，人却掉进坑里。
+    // 与其悄悄留下这种分歧，不如当场拒绝并说清楚在哪儿刷得动。
+    const touched = this.ApplyTerrainToMesh(x, z, radius, amount);
+    if (!touched) {
+      this.host.SetHint(`这一片地面的网格太疏（城外几十米才一个顶点），笔刷改不动它 —— `
+        + `到城内台地（|x|、|z| < 318 m）上刷，或者把半径调大`);
       return;
     }
     this.terrainOps.push({ x, z, r: radius, amount });
-    this.ApplyTerrainToMesh(x, z, radius, amount);
+    this.stroke = { op: this.terrainOps[this.terrainOps.length - 1], kind };
   }
 
   /**
@@ -678,37 +827,58 @@ export class SceneEditor {
    * （没有父变换），position 属性里的 x/z 就是世界 x/z，可以直接比距离。
    * 法线重算很贵（城外那张有十几万顶点），所以攒着，停笔 0.2 秒之后再算一次。
    */
-  ApplyTerrainToMesh(x, z, radius, amount) {
+  /** 两张地面网格。每笔都去 city.meshes 里筛一遍太浪费，换关时清缓存。 */
+  GroundMeshes() {
     const field = this.field;
-    if (!field || !field.city) return;
-    for (const mesh of field.city.meshes) {
-      if (mesh.name !== "CityPlatform" && mesh.name !== "OuterGround") continue;
+    if (!field || !field.city) return [];
+    if (this.groundMeshes.length && this.groundMeshes[0].parent) return this.groundMeshes;
+    this.groundMeshes = field.city.meshes.filter(
+      (m) => m.name === "CityPlatform" || m.name === "OuterGround");
+    return this.groundMeshes;
+  }
+
+  /** @returns {number} 这一笔真的动到了多少个顶点（0 = 这片网格太疏，改不动） */
+  ApplyTerrainToMesh(x, z, radius, amount) {
+    const r2 = radius * radius;
+    let total = 0;
+    for (const mesh of this.GroundMeshes()) {
       const position = mesh.geometry.attributes.position;
+      const array = position.array;
       let touched = false;
-      for (let i = 0; i < position.count; i += 1) {
-        const vx = position.getX(i);
-        const vz = position.getZ(i);
-        const distance = Math.hypot(vx - x, vz - z);
-        if (distance >= radius) continue;
-        position.setY(i, position.getY(i) + amount * BrushFalloff(distance, radius));
+      // 直接走底层数组、比平方距离：城外那张有十几万顶点，
+      // getX/getZ 的函数调用与 Math.hypot 的开方在这个量级上是能量到的开销。
+      for (let i = 0; i < array.length; i += 3) {
+        const dx = array[i] - x;
+        const dz = array[i + 2] - z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= r2) continue;
+        array[i + 1] += amount * BrushFalloff(Math.sqrt(d2), radius);
         touched = true;
+        total += 1;
       }
       if (touched) {
         position.needsUpdate = true;
-        mesh.geometry.computeBoundingSphere();
+        // 包围球与法线都要再走一趟十几万顶点，**都攒到停笔之后再算**。
+        // 每笔各算一次的话，一帧里光这两趟就是三倍的笔刷本身。
         this.normalsDirty.add(mesh);
         this.normalsTimer = 0.2;
       }
     }
+    this.lastTouched = total;
+    return total;
   }
 
   UndoTerrain() {
+    // 正在画的那一笔也可能就是要撤的这一个：不断开的话它还留着指针，
+    // 下一次移动会继续往一个已经不在表里的 op 上加量，网格与解析高程当场对不上
+    this.stroke = null;
     const op = this.terrainOps.pop();
     if (!op) return;
     this.ApplyTerrainToMesh(op.x, op.z, op.r, -op.amount);
   }
 
   ResetTerrain() {
+    this.stroke = null;
     for (const op of this.terrainOps) this.ApplyTerrainToMesh(op.x, op.z, op.r, -op.amount);
     this.terrainOps.length = 0;
   }
@@ -785,14 +955,37 @@ export class SceneEditor {
     if (this.field && this.host.game.state.ready && this.groundPatched !== this.field) {
       this.UnpatchGround();
       this.PatchGround();
+      this.groundMeshes.length = 0;
       this.RebuildAll();
       for (const op of this.terrainOps) this.ApplyTerrainToMesh(op.x, op.z, op.r, op.amount);
     }
 
+    // --- 笔刷：一帧落一次 ---------------------------------------------------
+    // 事件层只记位置（OnPress / OnPaint），真正动顶点在这里。
+    // 按事件落笔的话，一次拖动能来十几次，而每一次都是一趟十几万顶点的遍历。
+    const viewport = this.host.viewport;
+    if (this.paintAt && this.mode === "terrain") {
+      const hit = this.Pick({ clientX: this.paintAt.x, clientY: this.paintAt.y });
+      if (hit) this.PaintTerrain(hit.x, hit.z, this.paintAt.shift, dt);
+      else this.host.SetHint("准心在地平线以上：那个方向上没有地面");
+      // 按住不动要接着涂（抬高/压低是连续量），所以只在松手时清掉
+      if (!viewport || !viewport.dragging) this.paintAt = null;
+    }
+    // 松手 = 这一笔封口。下一次按下重新起一个 op。
+    if ((!viewport || !viewport.dragging) && this.stroke) {
+      this.stroke = null;
+      this.paintAt = null;
+    }
+
+    this.RefreshGizmo();
+
     if (this.normalsTimer > 0) {
       this.normalsTimer -= dt;
       if (this.normalsTimer <= 0) {
-        for (const mesh of this.normalsDirty) mesh.geometry.computeVertexNormals();
+        for (const mesh of this.normalsDirty) {
+          mesh.geometry.computeVertexNormals();
+          mesh.geometry.computeBoundingSphere();
+        }
         this.normalsDirty.clear();
       }
     }
@@ -834,6 +1027,10 @@ export class SceneEditor {
     f.Set("城的网格", field ? field.meshes.length : 0);
     f.Set("碰撞盒", field && field.city ? field.city.colliders.length : 0);
     f.Set("放置 / 地形", `${this.items.length} 个 / ${this.terrainOps.length} 笔`);
+    if (this.mode === "terrain") {
+      f.Set("笔刷动到顶点", this.lastTouched == null ? "—" : this.lastTouched,
+        this.lastTouched === 0 ? "bad" : "good");
+    }
     f.Set("选中", this.selected
       ? `${(this.Entry(this.selected.type) || {}).name} @ ${this.selected.x.toFixed(1)}, ${this.selected.z.toFixed(1)}`
       : "（无）");

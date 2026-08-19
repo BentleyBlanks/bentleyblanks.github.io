@@ -293,20 +293,32 @@ export class ViewportInput {
     this.button = 0;
     this.moved = 0;
     this.enabled = false;
+    // 光标此刻在画布上的位置（客户端像素）。**不只在拖动时记** ——
+    // 编辑器要在没按键的时候就把「点下去会落在哪」画出来，那份预览取的就是这两个数。
+    this.x = 0;
+    this.y = 0;
+    this.over = false;       // 光标在不在画布上（在面板上时为 false）
     this.OnDrag = null;      // (dx, dy, button)
     this.OnWheel = null;     // (delta)
     this.OnClick = null;     // (event, button)  —— 没怎么拖动才算点击
-    this.OnPaint = null;     // (event, button)  —— 按住拖动时每帧给一次（笔刷）
+    this.OnPaint = null;     // (event, button)  —— 按住拖动时每次移动给一次（笔刷）
+    this.OnPress = null;     // (event, button)  —— 按下那一刻（一笔的起点）
 
     this._down = (e) => {
       if (!this.enabled || e.target !== canvas) return;
       this.dragging = true;
       this.button = e.button;
       this.moved = 0;
+      this.x = e.clientX; this.y = e.clientY; this.over = true;
       e.preventDefault();
+      if (this.OnPress) this.OnPress(e, this.button);
     };
     this._move = (e) => {
-      if (!this.enabled || !this.dragging) return;
+      if (!this.enabled) return;
+      const onCanvas = e.target === canvas;
+      if (onCanvas || this.dragging) { this.x = e.clientX; this.y = e.clientY; }
+      this.over = onCanvas || this.dragging;
+      if (!this.dragging) return;
       const dx = e.movementX || 0;
       const dy = e.movementY || 0;
       this.moved += Math.abs(dx) + Math.abs(dy);
@@ -372,18 +384,26 @@ export function PickWorld(field, origin, direction, { maxDist = 400, solids = tr
   if (field && field.GroundHeight) {
     const limit = best ? Math.min(maxDist, best.distance) : maxDist;
     const steps = 90;
+    const Gap = (t) => {
+      _point.copy(origin).addScaledVector(direction, t);
+      return _point.y - field.GroundHeight(_point.x, _point.z);
+    };
     let prevT = 0;
-    let prevGap = origin.y - field.GroundHeight(origin.x, origin.z);
+    let prevGap = Gap(0);
     for (let i = 1; i <= steps; i += 1) {
       const t = (i / steps) * limit;
-      _point.copy(origin).addScaledVector(direction, t);
-      const gap = _point.y - field.GroundHeight(_point.x, _point.z);
-      if (prevGap > 0 && gap <= 0) {
+      const gap = Gap(t);
+      // **任何一次变号都算穿过地面**，不是只认「从上往下扎」。
+      // 原来写的是 prevGap > 0 && gap <= 0，于是相机正好贴在地面上
+      // （gap 恰好等于 0，「回到玩家」之后就是这个高度）时永远进不了这个分支 ——
+      // 症状是「点哪儿都放不下东西」，而且完全没有报错。
+      if ((prevGap > 0 && gap <= 0) || (prevGap <= 0 && gap > 0)) {
+        const rising = prevGap <= 0;
         let lo = prevT, hi = t;
         for (let k = 0; k < 24; k += 1) {
           const mid = (lo + hi) / 2;
-          _point.copy(origin).addScaledVector(direction, mid);
-          if (_point.y - field.GroundHeight(_point.x, _point.z) > 0) lo = mid; else hi = mid;
+          const midGap = Gap(mid);
+          if (rising ? midGap <= 0 : midGap > 0) lo = mid; else hi = mid;
         }
         _point.copy(origin).addScaledVector(direction, hi);
         const ground = {
