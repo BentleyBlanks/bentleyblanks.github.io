@@ -34,6 +34,14 @@ export const SOLDIER_MOUNTS = ["eyes", "gripL", "gripR", "weaponMount", "slingBa
 export const WEAPON_MOUNTS = ["muzzle", "gripR", "gripL", "sight", "magazine"];
 
 /**
+ * 车辆的挂点。**车辆规范系与武器不同**：原点在地面、车体中心，车头朝 -Z
+ * （前方约定与人、枪一致），长在 Z、宽在 X、高在 Y。放置的人写一个 (x, z) 就落地。
+ * 炮塔是关节而不是挂点 —— 它要转，取 nodes.get("turret")。
+ */
+export const VEHICLE_MOUNTS_TANK = ["gunMuzzle", "rearMgMuzzle", "hatch", "mgMuzzle", "hullFront"];
+export const VEHICLE_MOUNTS_TANKETTE = ["gunMuzzle", "towHook", "hullFront"];
+
+/**
  * 降级用的材质合并表：把材质名重映射到另一个桶，合批时就少一个 draw call。
  * 传给 LoadModel 的 options.mergeMap。
  *
@@ -138,6 +146,35 @@ export const MESHES = {
     note: "大刀。**柄尾有真的铁环**、护手是一小片横铁不是圆盘、刀身宽 57→38 mm 背厚 5—6 mm。",
   },
 
+  Type89Launcher: {
+    file: "Type89Launcher.tzm.json", category: "weapon",
+    triangles: 318, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
+    span: [0.098, 0.0932, 0.413], lengthM: 0.413,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "八九式重掷弹筒。筒身 + 粗牙螺杆 + **弧形驻钣**，侧面一块击发机构。"
+      + "**没有两脚架** —— 加了脚架就成了迫击炮。约 45° 手持抵地发射。",
+  },
+  Type89Tank: {
+    file: "Type89Tank.tzm.json", category: "vehicle",
+    triangles: 1160, meshBlocks: 5, nodes: 8, joints: 1,
+    materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
+    span: [2.14, 2.54, 4.2657],
+    draws: { high: 5, medium: 5, low: 5 },   // 车辆没有 accent 桶，低模无处可并
+    note: "八九式中战车（甲）。**前起动轮抬高、履带前段上翘**是它的剪影线；"
+      + "炮塔偏车体前部，塔后另有一挺机枪。装甲 6—17 mm，巷宽 < 2.5 m 进不来。"
+      + "炮塔是关节（turret），将来接载具系统直接转它。",
+  },
+  Type94Tankette: {
+    file: "Type94Tankette.tzm.json", category: "vehicle",
+    triangles: 976, meshBlocks: 5, nodes: 6, joints: 1,
+    materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANKETTE,
+    span: [1.592, 1.5725, 3.1002],
+    draws: { high: 5, medium: 5, low: 5 },   // 车辆没有 accent 桶，低模无处可并
+    note: "九四式轻装甲车（豆战车）。一挺机枪、四只负重轮、**车尾牵引钩** —— "
+      + "它本来是拉弹药拖车的，被拉到前线当装甲车用。",
+  },
+
   Dougong: {
     file: "Dougong.tzm.json", category: "prop",
     triangles: 176, meshBlocks: 1, nodes: 3, joints: 0,
@@ -192,6 +229,10 @@ export function AllMeshUrls() {
 export const WEAPON_MESH_BY_ID = {
   ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38",
   Mauser96: "Mauser96", Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",
+  // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
+  // 两辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
+  Type89Launcher: "Type89Launcher",
+  Type89Tank: "Type89Tank", Type94Tankette: "Type94Tankette",
 };
 
 /** 人物 kind（Script_Actor 的 KIND_SPEC 键）→ 模型 id。 */

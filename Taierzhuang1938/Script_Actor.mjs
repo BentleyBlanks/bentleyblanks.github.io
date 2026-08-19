@@ -1952,6 +1952,31 @@ export class ActorFactory {
    * 实例化一个模型，只为了把它的几何摘下来。
    * 材质给的是一次性哨兵（见文件中段 SentinelMaterials 的账），摘完就 dispose。
    */
+  /**
+   * 取一份**整棵树**的模型实例（车辆走这条，不走 WeaponGeometry）。
+   *
+   * 与 WeaponGeometry 的区别只有一个，但很关键：那条路只收 root 直属的网格，
+   * 因为枪一根关节都没有。车有炮塔关节，炮塔下面的几何在 turret 节点里 ——
+   * 走那条路会**丢掉整个炮塔**。这里把 root 原样交出去，节点树也一并给，
+   * 将来接载具系统直接 `nodes.get("turret").rotation.y = …`。
+   *
+   * @returns {{root, nodes, tris, draws, bounds} | null}
+   */
+  ModelInstance(meshId, materials) {
+    const doc = this.meshDocs.get(meshId);
+    const entry = MESHES[meshId];
+    if (!doc || !entry) return null;
+    try {
+      return InstantiateModel(doc, {
+        materials: materials || {},
+        mergeMap: MESH_MERGE[this.quality] || null,
+      });
+    } catch (error) {
+      console.warn(`[Actor] ${meshId} 实例化失败：${String(error).slice(0, 160)}`);
+      return null;
+    }
+  }
+
   _InstantiateMesh(id) {
     const doc = this.meshDocs.get(id);
     const entry = MESHES[id];
@@ -2256,6 +2281,17 @@ export class ActorFactory {
         () => lib.Get("Steel", { roughness: 0.95, metalness: 0.86, normalScale: 0.20 })),
       wood: this.Material("wood",
         () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0, normalScale: 0.24 })),
+      // 车辆装甲板。走 SteelHelmet 那张图（喷漆钢：低金属度、粗糙、带锈斑），
+      // **不是** Steel（发蓝裸钢）—— 一辆镜面反光的战车比没有模型还糟。
+      // 色是 1938 年在华日军战车的土黄褐单色；albedo 要比"看上去的颜色"再压两档，
+      // 理由与九〇式钢盔那一行一模一样：史料记的是日光下的观感，不是反照率。
+      armor: this.Material("armor", () => lib.Get("SteelHelmet",
+        { color: TintTo("SteelHelmet", 0x55503A), tintId: "armor", roughness: 1, metalness: 0.05 })),
+      // 履带与负重轮：没喷漆的锻钢，接地面被磨得半亮、其余锈着。
+      // 给 steel（metalness 0.86）的话在这条管线的曝光下是**纯黑**：
+      // 一辆车底下糊着一团黑，履带那条前高后低的剪影线全看不见了。
+      track: this.Material("track", () => lib.Get("SteelHelmet",
+        { color: TintTo("SteelHelmet", 0x3E3B34), tintId: "track", roughness: 1, metalness: 0.30 })),
       leather: this.Material("leather",
         () => lib.Plain("leather", { color: HEX.ijaLeather, roughness: 0.66, metalness: 0 })),
       towel: this.Material("towel", () => lib.Plain("towel", { color: HEX.towel, roughness: 0.95, metalness: 0 })),

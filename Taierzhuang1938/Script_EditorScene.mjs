@@ -158,10 +158,17 @@ const PLACEABLE = [
   },
 ];
 
-/** Model/*.tzm.json 里那几个可以当道具摆的（人物模型不进这张表 —— 摆一个不动的兵是穿帮）。 */
+/**
+ * Model/*.tzm.json 里那几个可以当道具摆的。
+ *
+ * 人物模型不进这张表 —— 摆一个不动的兵是穿帮。
+ * **车辆进**：一辆停在街心的八九式是地标，不需要它会动就已经在讲故事了
+ *（Data_Levels 里 L4 与 L6 的 vehicles 字段本来就写了它们的位置）。
+ */
 const MODEL_PLACEABLE = MeshIds().filter((id) => {
   const entry = MESHES[id];
-  return entry && (entry.category === "prop" || entry.category === "weapon");
+  return entry && (entry.category === "prop" || entry.category === "weapon"
+    || entry.category === "vehicle");
 });
 
 for (const id of MODEL_PLACEABLE) {

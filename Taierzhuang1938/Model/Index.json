@@ -5,7 +5,8 @@
  "budget": {
   "soldier": 1800,
   "weapon": 900,
-  "prop": 400
+  "prop": 400,
+  "vehicle": 1600
  },
  "models": [
   {
@@ -438,6 +439,108 @@
      0.18,
      0.63,
      0.24
+    ]
+   }
+  },
+  {
+   "name": "Type89Launcher",
+   "category": "weapon",
+   "file": "Type89Launcher.tzm.json",
+   "triangles": 318,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 12011,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.049,
+     -0.0466,
+     -0.228
+    ],
+    "max": [
+     0.049,
+     0.0466,
+     0.185
+    ]
+   }
+  },
+  {
+   "name": "Type89Tank",
+   "category": "vehicle",
+   "file": "Type89Tank.tzm.json",
+   "triangles": 1160,
+   "meshBlocks": 5,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 45323,
+   "materials": [
+    "armor",
+    "steel",
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.07,
+     0.02,
+     -2.16
+    ],
+    "max": [
+     1.07,
+     2.56,
+     2.10567
+    ]
+   }
+  },
+  {
+   "name": "Type94Tankette",
+   "category": "vehicle",
+   "file": "Type94Tankette.tzm.json",
+   "triangles": 976,
+   "meshBlocks": 5,
+   "nodes": 6,
+   "joints": 1,
+   "bytes": 39234,
+   "materials": [
+    "armor",
+    "steel",
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "gunMuzzle",
+    "towHook",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -0.796,
+     0.0275,
+     -1.57969
+    ],
+    "max": [
+     0.796,
+     1.6,
+     1.52056
     ]
    }
   }

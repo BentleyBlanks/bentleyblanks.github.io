@@ -96,6 +96,11 @@ const MATERIAL_MAP = {
   // 枪眼白茬：新凿开的砖断口比风化面亮两档，这一圈白是滕县的第一符号
   LoopholeRim: { recipe: "Stone", color: 0xffffff },
   Willow: { recipe: "WoodBeam", color: 0xc09a86 },
+  // 车辆装甲板：喷漆钢（SteelHelmet），**不是**发蓝裸钢。
+  // 与 Script_Actor.ActorMaterials 的 armor 一行同色 —— 同一辆车摆进场景
+  // 和摆上台架必须是同一个颜色，不然编辑器里调好的东西进游戏变了样。
+  armor: { recipe: "SteelHelmet", color: 0xb9ad86, roughness: 1, metalness: 0.05 },
+  track: { recipe: "SteelHelmet", color: 0x8f887c, roughness: 1, metalness: 0.30 },
 };
 // 纯色（没有对应烘焙配方的）
 const PLAIN_MAP = {
