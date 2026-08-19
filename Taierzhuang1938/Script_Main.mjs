@@ -98,6 +98,8 @@ const scene = new THREE.Scene();
 // FOV 55：Easy Red 2 那种“周围很远、人很小但看得清”的观感靠窄视场。
 // 70 度会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。
 const BASE_FOV = 55;
+// SSAO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
@@ -116,7 +118,27 @@ const ssao = {
   resolution: { value: new THREE.Vector2(post.width, post.height) },
   // 0.80：贴图位置修正后 AO 真的落在几何转折上了，1.85/0.95 那套是为了
   // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
-  strength: { value: 0.80 },
+  strength: { value: SSAO_BASE },
+};
+
+/**
+ * 画质旋钮。
+ *
+ * 与天光预设**分工分明**：预设（SKY_PRESETS）决定这一关「长什么样」——
+ * 曝光、雾色、泛光阈值全是美术意图，不许被设置面板改掉；
+ * 这张表只决定「画多重」，一律以**倍率**的形式乘在预设算出来的那几项上。
+ * 混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑（预设 exposure 3.6 被当成
+ * 画质项一起压了）。
+ *
+ * renderScale 是唯一真正省时间的那一项：整条合成链（法线深度、AO、泛光六级、
+ * 体积光、运动模糊）都按 post 靶的尺寸走，它减半等于这一整条链省四分之三。
+ */
+const graphics = {
+  renderScale: 1.0,
+  shadows: true,
+  shadowSize: 0,          // 0 = 用出厂档位
+  ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  fov: BASE_FOV,
 };
 const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
 const sky = new SkyDome(renderer);
@@ -442,7 +464,7 @@ async function Boot() {
       // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
       GunFeel: () => ({
         firePunch,
-        fovBase: BASE_FOV,
+        fovBase: graphics.fov,
         fov: camera.fov,
         sprintBlocked: player.sprint > 0.35
           || (state.elapsed - sprintReleaseAt) < SPRINT_FIRE_DELAY_S,
@@ -493,12 +515,12 @@ async function Boot() {
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = new EditorSuite({
-    renderer, scene, camera, canvas, library, lights,
+    renderer, scene, camera, canvas, library, lights, post,
     actorFactory, viewmodel, audio, cutscene,
     shot: !!SHOT,
     ReleasePointerLock,
     game: {
-      state, PHASES, JumpToLevel,
+      state, PHASES, JumpToLevel, graphics, ApplyGraphics,
       get battlefield() { return battlefield; },
       get player() { return player; },
       get currentWeapon() { return currentWeapon; },
@@ -1769,7 +1791,7 @@ function Frame(dt, render = true) {
   const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
   // 屏息那 6% 单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
   breathFov += ((player.breathHold ? 0.94 : 1) - breathFov) * Clamp01(dt * 6);
-  const baseFov = BASE_FOV * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+  const baseFov = graphics.fov * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
 
   // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——
   // 那一下才是"顿"而不是"晃"。叠在 FOV 上 1.9°，约等于开镜变化量的 12%。
@@ -1942,6 +1964,7 @@ function RenderScene(dt) {
   ssao.map.value = post.AoTexture;
   // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
+  ssao.strength.value = SSAO_BASE * graphics.ssao;
   const preset = SKY_PRESETS[phase.sky];
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
@@ -1950,14 +1973,14 @@ function RenderScene(dt) {
     sunColor: preset.sunColor,
     fog: preset.fog,
     exposure: preset.exposure,
-    bloom: preset.bloom,
-    godStrength: preset.godStrength,
+    bloom: preset.bloom * graphics.bloom,
+    godStrength: preset.godStrength * graphics.god,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
-    grain: phase.sky === "night" ? 0.020 : 0.014,
-    vignette: 0.42 + suppression * 0.22,
+    grain: (phase.sky === "night" ? 0.020 : 0.014) * graphics.grain,
+    vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    motionBlur: 0.15,
+    motionBlur: 0.15 * graphics.motionBlur,
   });
 }
 
@@ -2028,12 +2051,42 @@ function Loop(now) {
 }
 requestAnimationFrame(Loop);
 
-window.addEventListener("resize", () => {
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+/**
+ * 把画质旋钮落到渲染器上。**改完必须调它**，改字段本身什么也不会发生。
+ *
+ * 阴影那一条要连着重编译材质：`renderer.shadowMap.enabled` 是编译期的
+ * `#define USE_SHADOWMAP`，只改标志位而不置 needsUpdate 的话，着色器还按老样子
+ * 去采一张已经不再更新的图 —— 画面会留着一层永不变化的假阴影。
+ * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
+ */
+function ApplyGraphics() {
+  const scale = Clamp(graphics.renderScale, 0.4, 1.6);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  post.SetSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  post.SetSize(Math.round(window.innerWidth * scale), Math.round(window.innerHeight * scale));
+
+  const wantShadow = !!graphics.shadows;
+  if (renderer.shadowMap.enabled !== wantShadow) {
+    renderer.shadowMap.enabled = wantShadow;
+    scene.traverse((object) => {
+      const material = object.material;
+      if (!material) return;
+      if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
+      else material.needsUpdate = true;
+    });
+  }
+  if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
+    lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);
+    // 换分辨率必须把旧的那张扔掉，three 才会按新尺寸重建
+    if (lights.sun.shadow.map) {
+      lights.sun.shadow.map.dispose();
+      lights.sun.shadow.map = null;
+    }
+  }
+}
+
+window.addEventListener("resize", ApplyGraphics);
 
 Boot().catch((error) => {
   bootStep.textContent = "启动失败：" + error.message;

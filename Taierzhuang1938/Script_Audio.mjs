@@ -1318,6 +1318,13 @@ export class AudioEngine {
     this.playCounter = 0;
     this.space = "street";
     this.masterVolume = 1;
+    // 玩家的音量设置。ctx 还没建的时候也能设，BuildGraph 会照着这份摆节点。
+    this.mix = { sfx: 1, music: 1, ambience: 1 };
+    this.voiceMute = false;
+    // 「暂停时静音背景」。默认开 —— 暂停了背景还在打枪是个 bug，不是特性。
+    this.pauseSilence = true;
+    this.paused = false;
+    this.pausedState = null;
     this.lastPlayAt = new Map();
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
@@ -1411,16 +1418,27 @@ export class AudioEngine {
 
     // 三条声部总线。duck 只压音乐与环境，音效不压 —— 台词/爆炸时把枪声也压掉
     // 会让人以为战斗停了。
+    //
+    // 每条总线后面再挂一个 *User 节点，专门给玩家的音量滑杆用。
+    // **不许让滑杆直接写 xxxBus.gain** —— 那几个是系统自己的配平：
+    // musicBus 会被 Music() 按 cue 的 level 重写，duck 会把 duckGain 压下去再放回来。
+    // 滑杆写在同一个参数上，下一次换 cue 就把玩家的设置抹掉了。
     this.sfxBus = ctx.createGain();
-    this.sfxBus.connect(this.masterGain);
+    this.sfxUser = ctx.createGain();
+    this.sfxUser.gain.value = this.mix.sfx;
+    this.sfxBus.connect(this.sfxUser).connect(this.masterGain);
     this.duckGain = ctx.createGain();
     this.duckGain.connect(this.masterGain);
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0.5;
-    this.musicBus.connect(this.duckGain);
+    this.musicUser = ctx.createGain();
+    this.musicUser.gain.value = this.mix.music;
+    this.musicBus.connect(this.musicUser).connect(this.duckGain);
     this.ambienceBus = ctx.createGain();
     this.ambienceBus.gain.value = 0.8;
-    this.ambienceBus.connect(this.duckGain);
+    this.ambienceUser = ctx.createGain();
+    this.ambienceUser.gain.value = this.mix.ambience;
+    this.ambienceBus.connect(this.ambienceUser).connect(this.duckGain);
 
     // 两套空间的卷积混响，常驻。回声统一并到 sfx 总线。
     this.reverbs = {};
@@ -1482,8 +1500,11 @@ export class AudioEngine {
       for (const key of Object.keys(this.reverbs || {})) this.reverbs[key].disconnect();
       for (const ret of this.reverbReturns || []) ret.disconnect();
       this.sfxBus.disconnect();
+      this.sfxUser.disconnect();
       this.musicBus.disconnect();
+      this.musicUser.disconnect();
       this.ambienceBus.disconnect();
+      this.ambienceUser.disconnect();
       this.duckGain.disconnect();
       this.masterGain.disconnect();
       this.deafFilter.disconnect();
@@ -1661,7 +1682,7 @@ export class AudioEngine {
    */
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
     side = "nra" } = {}) {
-    if (!this.ctx || this.disposed || !this.voicesReady) return null;
+    if (!this.ctx || this.disposed || !this.voicesReady || this.voiceMute) return null;
     const now = this.ctx.currentTime;
     if (!priority && now - this.lastBarkAt < 0.55) return null;
     // 同类闸的键带上阵营：中国兵刚喊过「鬼子上来咯」，不该把日本兵的
@@ -1872,6 +1893,53 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     // 20 ms 斜坡：直接赋值会在正在响的声音上留一道「咔」。
     this.masterGain.gain.setTargetAtTime(this.masterVolume, t, 0.02);
+  }
+
+  /**
+   * 玩家的分路音量。kind: "sfx" | "music" | "ambience"。
+   * 写的是各自的 *User 节点，与系统自己的配平（cue level、duck）互不干扰。
+   */
+  SetBusVolume(kind, value) {
+    const v = Clamp01(value);
+    if (!(kind in this.mix)) return;
+    this.mix[kind] = v;
+    const node = { sfx: this.sfxUser, music: this.musicUser, ambience: this.ambienceUser }[kind];
+    if (!node || !this.ctx) return;
+    node.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
+  }
+
+  /** 把背景层（环境床 + 音乐）就地停掉。暂停与「退出音效编辑器时游戏还停着」都走它。 */
+  StopBackground() {
+    this.StopAmbience();
+    this.StopMusic();
+  }
+
+  /**
+   * 暂停 / 恢复**背景层**。
+   *
+   * 为什么非得有这一条：暂停玩法（Frame() 提前返回）**一点也拦不住声音**。
+   * 环境床是一张自己在跑的 WebAudio 节点图 + 一个 400 ms 的 setTimeout 调度器，
+   * 每一轮按概率撒远处的枪炮；音乐同理。玩法停了它们照响 ——
+   * 表现就是「我暂停了，背景里的枪声还在」。
+   *
+   * 这里只停背景层，**不 suspend 整个 AudioContext**：音效编辑器要在暂停时试听，
+   * 过场编辑器要听得见过场自己的音效。已经在飞的一次性音（最长两秒的尾巴）
+   * 让它自己响完，硬掐会「咔」一声。
+   */
+  SetPaused(on) {
+    const next = !!on && this.pauseSilence !== false;
+    if (next === this.paused) return this.paused;
+    this.paused = next;
+    if (next) {
+      this.pausedState = { ambience: this.ambiencePreset, music: this.musicCue };
+      this.StopBackground();
+    } else {
+      const saved = this.pausedState || {};
+      this.pausedState = null;
+      if (saved.ambience && saved.ambience !== "silence") this.Ambience(saved.ambience);
+      if (saved.music) this.Music(saved.music);
+    }
+    return this.paused;
   }
 
   /** 台词/爆炸时压低音乐与环境。amount = 压掉的比例（0.6 就是只剩四成）。 */

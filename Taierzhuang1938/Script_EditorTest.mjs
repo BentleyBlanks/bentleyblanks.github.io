@@ -96,13 +96,13 @@ const afterGear = await page.evaluate(() => {
   return {
     capturing: T.Debug.Editor().capturing,
     panelOpen: T.Debug.Editor().panelOpen,
-    entries: document.querySelectorAll(".edPanel.launcher .edBtn").length,
+    entries: document.querySelectorAll(".edPanel.launcher [data-editor]").length,
   };
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 五个编辑器 + 一个「全部关掉」
-Check("面板列出五个编辑器入口", afterGear.entries === 6, `按钮数=${afterGear.entries}`);
+// 两个设置 + 五个编辑器 + 一个「全部关掉」
+Check("面板列出两个设置与五个编辑器入口", afterGear.entries === 8, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -116,6 +116,123 @@ Check("面板开着时玩法暂停",
   paused.before.fire === paused.after.fire
   && paused.before.x === paused.after.x && paused.before.z === paused.after.z,
   `开火 ${paused.before.fire}→${paused.after.fire}`);
+
+// ---------------------------------------------------------------------------
+// 1b) 暂停要连**声音**一起停
+//
+// 用户报的：「我暂停了以后背景里的枪声、背景音都还在」。
+// 原因是这两件事根本不在同一条通道上 —— 玩法停靠 Frame() 提前返回，
+// 而环境床是一张自己在跑的 WebAudio 节点图 + 一个 400 ms 的 setTimeout 调度器，
+// 每一轮按概率撒远处的枪炮。Frame() 返不返回它都照响。
+// ---------------------------------------------------------------------------
+const pauseAudio = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const audio = T.audio;
+  // 先离开暂停、铺一层环境床与音乐 —— 这就是「背景里的枪声」那一层
+  T.editor.TogglePanel(false);
+  audio.Ambience("battle");
+  audio.Music("tension");
+  const running = {
+    nodes: audio.ambienceNodes.length,
+    timer: !!audio.ambienceTimer,
+    music: !!audio.musicTimer,
+  };
+  T.editor.TogglePanel(true);          // 暂停
+  const paused = {
+    flag: audio.paused,
+    nodes: audio.ambienceNodes.length,
+    timer: !!audio.ambienceTimer,
+    music: !!audio.musicTimer,
+  };
+  T.editor.TogglePanel(false);         // 继续
+  const resumed = {
+    flag: audio.paused,
+    nodes: audio.ambienceNodes.length,
+    preset: audio.ambiencePreset,
+    cue: audio.musicCue,
+  };
+  T.editor.TogglePanel(true);          // 回到暂停，后面的断言接着用
+  return { running, paused, resumed };
+});
+Check("暂停时环境床与音乐真的停了",
+  pauseAudio.running.nodes > 0 && pauseAudio.running.timer
+  && pauseAudio.paused.flag && pauseAudio.paused.nodes === 0
+  && !pauseAudio.paused.timer && !pauseAudio.paused.music,
+  `在响 ${pauseAudio.running.nodes} 个节点 → 暂停后 ${pauseAudio.paused.nodes} 个，`
+  + `调度器 ${pauseAudio.running.timer}→${pauseAudio.paused.timer}`);
+Check("继续之后按原样接回来",
+  !pauseAudio.resumed.flag && pauseAudio.resumed.nodes > 0
+  && pauseAudio.resumed.preset === "battle" && pauseAudio.resumed.cue === "tension",
+  `${pauseAudio.resumed.preset} / ${pauseAudio.resumed.cue}`);
+
+// ---------------------------------------------------------------------------
+// 1c) 画质与音效设置面板
+// ---------------------------------------------------------------------------
+await page.click('[data-editor="graphics"]');
+await Step(6);
+const gfx = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const before = { w: T.post.width, h: T.post.height, shadow: T.renderer.shadowMap.enabled };
+  const g = T.editor.active;
+  g.gfx.renderScale = 0.6;
+  g.gfx.bloom = 0.25;
+  g.gfx.fov = 62;
+  g.Apply();
+  window.Taierzhuang.StepFrames(4);
+  const after = { w: T.post.width, h: T.post.height };
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov };
+});
+Check("画质面板：渲染分辨率真的改到合成靶上",
+  gfx.id === "graphics" && gfx.after.w < gfx.before.w * 0.7,
+  `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`);
+Check("画质面板：设置落盘",
+  !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
+  gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");
+
+await page.click('[data-editor="sound"]');
+await Step(6);
+const snd = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const audio = T.audio;
+  audio.SetBusVolume("ambience", 0.3);
+  audio.SetMasterVolume(0.7);
+  audio.voiceMute = true;
+  T.editor.active.Save();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_audio_v1")); } catch (e) { saved = null; }
+  return {
+    id: T.editor.ActiveId,
+    mix: audio.mix.ambience,
+    node: audio.ambienceUser ? +audio.ambienceUser.gain.value.toFixed(2) : null,
+    barked: audio.Bark("rally", { priority: true }),
+    saved,
+  };
+});
+Check("音效面板：分路音量写在 *User 节点上（不动系统配平）",
+  snd.id === "sound" && snd.mix === 0.3 && snd.node !== null,
+  `mix=${snd.mix} 节点=${snd.node}`);
+Check("音效面板：配音开关生效 + 设置落盘",
+  snd.barked === null && !!snd.saved && snd.saved.ambience === 0.3 && snd.saved.voiceMute === true,
+  snd.saved ? `master=${snd.saved.master} 环境=${snd.saved.ambience}` : "没存上");
+
+// 两块设置都要恢复出厂，而且要把落盘的那两份删掉 ——
+// ApplySavedSettings 是**每次开机**都跑的，留在 localStorage 里会串到下一次启动
+// （这个套件后面还要再开一次页面验出图模式）。
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.editor.active.Reset();          // 音效
+  T.editor.Open("graphics");
+  T.editor.active.Reset();          // 画质（fov / renderScale 都在这儿回 55 / 1.0）
+  T.editor.Close();
+  T.audio.voiceMute = false;
+  try {
+    localStorage.removeItem("tengxian1938_graphics_v1");
+    localStorage.removeItem("tengxian1938_audio_v1");
+  } catch (error) { /* 无痕模式 */ }
+});
+await Step(4);
 
 // 记下相机与武器，退出编辑器时必须原样还回来
 const baseline = await page.evaluate(() => {
@@ -131,7 +248,7 @@ const baseline = await page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // 2) 人物动作编辑器
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(1)");
+await page.click('[data-editor="actor"]');
 await Step(20);
 const actor = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -164,7 +281,7 @@ Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`)
 // ---------------------------------------------------------------------------
 // 3) 枪械编辑器
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(2)");
+await page.click('[data-editor="weapon"]');
 await Step(15);
 const weapon = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -199,7 +316,7 @@ Check("车辆条目不建台架也不崩", weapon.tankOk);
 // ---------------------------------------------------------------------------
 // 4) 音效音乐编辑器
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(3)");
+await page.click('[data-editor="audio"]');
 await Step(10);
 const audio = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -235,7 +352,7 @@ Check("每个配方都有分类与说明", undescribed.length === 0,
 // ---------------------------------------------------------------------------
 // 5) Timeline 编辑器
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(4)");
+await page.click('[data-editor="timeline"]');
 await Step(10);
 const timeline = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -266,7 +383,7 @@ Check("停下来之后过场不再占着相机", stopped === false);
 // ---------------------------------------------------------------------------
 // 6) 场景 / 地形编辑器
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(5)");
+await page.click('[data-editor="scene"]');
 await Step(15);
 const scene = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -483,7 +600,7 @@ await page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // 7) 关掉之后有没有还干净
 // ---------------------------------------------------------------------------
-await page.click(".edPanel.launcher .edBtn:nth-child(6)");   // 全部关掉
+await page.click('.edPanel.launcher .edBtn.danger');   // 全部关掉
 await page.keyboard.press("Backquote");                       // 收面板
 await Step(20);
 const restored = await page.evaluate(() => {

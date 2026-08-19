@@ -29,9 +29,18 @@ import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
+import { GraphicsSettings, AudioSettings, ApplySavedSettings } from "./Script_EditorSettings.mjs";
 
-/** 入口表。顺序就是面板上的顺序。 */
+/**
+ * 入口表。顺序就是面板上的顺序。
+ *
+ * 设置与编辑器分两组：**它们不是一回事**。设置改的是玩家自己的偏好、要落盘、
+ * 与这一局无关；编辑器改的是这一局的运行时状态、退出时必须还干净。
+ * 摆在同一排会让人以为「画质」也是个要小心退出的东西。
+ */
+const SETTINGS = [GraphicsSettings, AudioSettings];
 const EDITORS = [ActorEditor, WeaponEditor, AudioEditor, TimelineEditor, SceneEditor];
+const ALL = [...SETTINGS, ...EDITORS];
 
 export class EditorSuite {
   /**
@@ -55,6 +64,12 @@ export class EditorSuite {
 
     this.BuildDom();
     this.BindInput();
+    // 存下来的画质/音量在这一刻装回去。只在打开面板时才生效的设置不叫设置。
+    try {
+      ApplySavedSettings(this.editorHost);
+    } catch (error) {
+      console.warn("[Editor] 设置装不回去：", error);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -72,7 +87,7 @@ export class EditorSuite {
     const suite = this;
     return {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
-      library: host.library, lights: host.lights,
+      library: host.library, lights: host.lights, post: host.post,
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene,
       game: host.game,
@@ -123,15 +138,27 @@ export class EditorSuite {
     root.appendChild(panel);
     this.launcher = panel;
 
-    for (const Editor of EDITORS) {
-      const button = El("div", "edBtn wide", Editor.label);
-      button.title = Editor.hint;
-      button.addEventListener("click", () => this.Toggle(Editor.id));
-      body.appendChild(button);
-      this.entries.set(Editor.id, button);
-    }
+    const Group = (title, list) => {
+      const section = El("div", "edSection");
+      section.appendChild(El("div", "h", title));
+      const box = El("div", "b");
+      for (const Editor of list) {
+        const button = El("div", "edBtn wide", Editor.label);
+        button.title = Editor.hint;
+        // 冒烟测试按这个属性找按钮：按 nth-child 找的话，面板一分组就全错位了
+        button.dataset.editor = Editor.id;
+        button.addEventListener("click", () => this.Toggle(Editor.id));
+        box.appendChild(button);
+        this.entries.set(Editor.id, button);
+      }
+      section.appendChild(box);
+      body.appendChild(section);
+    };
+    Group("设置", SETTINGS);
+    Group("编辑器", EDITORS);
 
     const off = El("div", "edBtn wide danger", "全部关掉");
+    off.dataset.editor = "";
     off.addEventListener("click", () => this.Close());
     body.appendChild(off);
 
@@ -162,6 +189,14 @@ export class EditorSuite {
   RefreshStatus() {
     for (const [id, button] of this.entries) button.classList.toggle("on", id === this.activeId);
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
+    // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
+    // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
+    // Frame() 提前返回一点也拦不住它（见 Script_Audio.SetPaused 的账）。
+    const capturing = this.Capturing;
+    if (capturing !== this._audioPaused) {
+      this._audioPaused = capturing;
+      if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(capturing);
+    }
     if (this.status) {
       this.status.textContent = this.active
         ? `${this.activeId} 接管中 · 玩法已暂停`
@@ -190,7 +225,7 @@ export class EditorSuite {
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
-    const Editor = EDITORS.find((e) => e.id === id);
+    const Editor = ALL.find((e) => e.id === id);
     if (!Editor) return null;
     if (this.active) this.Close();
     this.panelOpen = true;

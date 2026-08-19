@@ -22,6 +22,57 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
 所以入口面板虽然是一排开关，语义是**换到这一个**：开新的自动关旧的。
 
+## 面板分两组：设置 / 编辑器
+
+**它们不是一回事。** 设置改的是玩家自己的偏好、要落盘、与这一局无关；
+编辑器改的是这一局的运行时状态、退出时必须还干净。摆在同一排会让人以为
+「画质」也是个要小心退出的东西。
+
+### 画质 `Script_EditorSettings.GraphicsSettings`
+
+存 `localStorage` 键 `tengxian1938_graphics_v1`，**开机时装回去**
+（`ApplySavedSettings`，`EditorSuite` 的构造函数调）——只在打开面板时才生效的
+设置不叫设置，那叫开关。
+
+- **渲染分辨率**是唯一真正省时间的一根：整条合成链（法线深度、AO、泛光六级、
+  体积光、运动模糊）都按 post 靶的尺寸走，减半就是省掉四分之三。它改的是
+  `post.SetSize()`，不是 `renderer.setPixelRatio` —— 最后一 pass 照样铺满屏幕。
+- **后处理强度一律是倍率**，乘在天光预设算出来的值上。预设决定这一关长什么样
+  （曝光、雾色、泛光阈值是美术意图），设置只决定画多重。两件事混在一张表里的
+  下场是玩家把画质调低之后夜战关变成纯黑 —— 那一关的 `exposure` 是 3.6，被当成
+  画质项一起压了。
+- **开关阴影要连着重编译一次全场材质**（`material.needsUpdate = true`）：
+  `renderer.shadowMap.enabled` 是编译期的 `#define USE_SHADOWMAP`，只改标志位的话
+  着色器还在采一张不再更新的图，画面会留着一层永不变化的假阴影。几百毫秒的卡顿，
+  但这是设置动作不是每帧的事。
+- **档位（low/medium/high/ultra）热切不了**：MSAA 采样数、AO 靶比例、泛光级数是
+  `PostPipeline` 建靶时定死的。所以那一栏老实带 `?quality=` 刷新，不假装能实时换。
+
+### 音效 `Script_EditorSettings.AudioSettings`
+
+存 `tengxian1938_audio_v1`。三条分路音量写的是 `sfxUser` / `musicUser` /
+`ambienceUser` 三个专门的增益节点，**不是 `xxxBus.gain`** —— 那几个是系统自己的
+配平：`Music()` 换 cue 时会重写 `musicBus`，duck 会把 `duckGain` 压下去再放回来，
+滑杆写在同一个参数上，下一次换 cue 就把玩家的设置抹掉了。
+
+## 暂停 ≠ 安静
+
+**暂停玩法一点也拦不住声音。** 这两件事根本不在同一条通道上：玩法停靠
+`Frame()` 提前返回，而环境床是一张自己在跑的 WebAudio 节点图 + 一个 400 ms 的
+`setTimeout` 调度器，每一轮按概率撒远处的枪炮；音乐同理。`Frame()` 返不返回
+它们都照响 —— 症状就是「我暂停了，背景里的枪声还在」。
+
+所以 `EditorSuite.RefreshStatus()` 在 `Capturing` 变化时调 `audio.SetPaused()`，
+它只停**背景层**（环境床 + 音乐），不 `suspend` 整个 `AudioContext`：
+音效编辑器要在暂停时试听，Timeline 要听得见过场自己的音效。已经在飞的一次性音
+（最长两秒的尾巴）让它响完，硬掐会「咔」一声。
+
+一处容易漏的接缝：音效编辑器 `Exit()` 会把环境床与音乐还原成进来时那一份，
+而那时候游戏**还停着**（面板还开着）。所以它还原完要再 `StopBackground()` 一次，
+真正的恢复由离开暂停时的 `SetPaused(false)` 按 `pausedState` 做。
+
+玩家可以在音效设置里关掉这条（「暂停时静音背景」），关掉之后 `SetPaused` 直接短路。
+
 ## 打开编辑器 = 暂停玩法
 
 与过场同一条通道。`Script_Main.Frame()` 看到 `editor.Capturing` 就只走
@@ -133,7 +184,7 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 
 ## 加一个新编辑器
 
-在 `Script_Editor.mjs` 的 `EDITORS` 里加一条。要实现的接口只有这些：
+在 `Script_Editor.mjs` 的 `EDITORS`（或 `SETTINGS`）里加一条。要实现的接口只有这些：
 
 ```js
 export class XxxEditor {
@@ -164,7 +215,7 @@ battlefield 取值器 / PHASES / JumpToLevel），以及 `studio` / `flycam` / `
 node Taierzhuang1938/Script_EditorTest.mjs
 ```
 
-37 条断言，退出码即成败。重点不是「能不能打开」，而是**关掉之后有没有还干净** ——
+43 条断言，退出码即成败。重点不是「能不能打开」，而是**关掉之后有没有还干净** ——
 编辑器是这个项目里唯一会去动运行时状态的一批代码（藏世界、换相机、包 `GroundHeight`、
 往 `city.colliders` 里塞盒子、给 viewmodel 换枪），有一处没还回去，症状会在很远的地方
 才冒出来：撞到空气、退出后视角歪了、举着别人的枪。

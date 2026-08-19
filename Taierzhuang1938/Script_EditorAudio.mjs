@@ -119,6 +119,10 @@ export class AudioEditor {
       // 环境床与音乐是常驻的：不还原的话退出编辑器之后战场上会一直挂着菜单音乐
       audio.Ambience(this.savedAmbience || "silence");
       audio.Music(this.savedMusic || null);
+      // 关掉这个编辑器的时候游戏**还停着**（面板还开着）。上面两行刚把背景层放回去，
+      // 不再停一次的话「暂停时静音」当场就被这里破坏了 ——
+      // 真正的恢复由 SetPaused(false) 在离开暂停时按 pausedState 做。
+      if (audio.paused) audio.StopBackground();
     }
     if (this.panel) this.panel.root.remove();
     this.panel = null;
