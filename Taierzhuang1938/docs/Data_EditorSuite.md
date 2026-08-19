@@ -1,0 +1,139 @@
+# 编辑器套件
+
+开发用的五个编辑器 + 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
+DOM 是 `display:none`，任何截图里都不会有它。
+
+## 怎么进
+
+| 路子 | 什么时候能用 |
+| --- | --- |
+| 点右上角齿轮 | **没拿指针锁**的时候（开局那张「进城」页、或玩家按过 Esc） |
+| 按 `` ` ``（Backquote） | 任何时候。打游戏当中这是唯一的入口 |
+| `window.Tengxian.Debug.OpenEditor("actor")` | 测试与自动化 |
+
+指针锁一挂上，浏览器就把所有鼠标事件路由给 canvas，DOM 上的按钮谁也点不着 ——
+这不是 bug 是指针锁的定义。所以 `` ` `` 那条路在开面板时会顺手交还指针锁。
+
+Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把编辑器也关了。
+
+## 一次只开一个
+
+五个里有三个要接管相机（摄影棚 / 自由飞行）、一个要把相机交给过场导演。
+同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
+所以入口面板虽然是一排开关，语义是**换到这一个**：开新的自动关旧的。
+
+## 打开编辑器 = 暂停玩法
+
+与过场同一条通道。`Script_Main.Frame()` 看到 `editor.Capturing` 就只走
+`editor.Update` + `RenderScene`，玩家、AI、特效、剧本全停。**这一条排在过场那一条之前**
+—— Timeline 编辑器要自己按走带的步长推 `cutscene.Update`，排在后面过场会被推两次。
+
+同时做三件善后：交还指针锁、收起 HUD（`body.edHideHud`，过场自己的 `.csRoot` 留着）、
+把键位路由闸掉（`OnAction` / `Guard` 里判 `editor.Capturing`；不闸的话在编辑器里按 R
+会真的去装填，而那是在一个暂停的世界里改状态）。
+
+## 五个编辑器
+
+### 人物动作 `Script_EditorActor.mjs`
+
+这个项目**没有动画剪辑**：`Actor` 是程序化姿态，每帧的姿势由 `Actor.Update(dt, state)`
+里那十三个连续量算出来。所以「动作列表」不是资产清单，是 `t → state` 的配方表
+（`CLIPS`，18 条）—— 列一堆并不存在的 `.anim` 名字才是骗人。
+
+能取的证：`meshSource`（`box` = Blender 模型没读到、静默退回了方块几何，最常见的换模事故）、
+步频步幅（1 m 米格 + 支撑相不打滑）、持枪挂点、五个 kind 站一排时的身高差。
+
+### 枪械 `Script_EditorWeapon.mjs`
+
+三种看法各答一个问题：**台架**（几何剪影与挂点，枪口/前握画成红蓝小方块）、
+**手持**（`ActorFactory` 那套世界几何）、**第一人称**（`Script_Viewmodel` 的 rig）。
+后两者是**两套几何**，这是既定结构不是 bug：视图模型要在近裁面里假装 FOV、压深度、
+做后坐弹簧，用世界几何直接摆会穿模。
+
+数据卡照抄 `Data_Weapons`，琥珀色的几项（后坐 / 开镜 / 散布）标出来是**手感调校值**，
+不是史料。车辆与掷弹筒没有几何，只出数据卡。
+
+### 音效音乐 `Script_EditorAudio.mjs`
+
+声音全是 WebAudio 现场合成（除了 `Audio/` 那 31 条人声采样），所以没有文件列表可看，
+只有配方名 —— 而 `rifleNra` / `impactFlesh` / `shellIncoming` 光看字面认不出是什么声音。
+于是每条配方配一句中文说明 + 它在游戏里什么时候响（`SOUND_INFO`，32 条，冒烟断言一条不许漏）。
+
+**盲听指认**：随机播一个、给四个候选。认错的那几对通常就是需要重新配平的
+（拉栓与压弹分不开、砖与土分不开，玩家在战场上也就分不开）。
+
+环境床与音乐是常驻的，退出编辑器时会还原成进来时那一份。
+
+### Timeline 过场 `Script_EditorTimeline.mjs`
+
+驱动的**就是正片那一个 `CutsceneDirector`**，只把 `Update` 的步长接到走带上 ——
+另写一个预览器等于把那条时间轴抄第二遍，抄漏一条就会「预览里对、正片里不对」。
+
+回拨靠重放：director 的时间只能往前（字幕靠 `prevTime→time` 的跨越触发、`fired` 是 Set），
+所以「拖到 12.4 秒」= 从头 `Play` 再用 1/60 步长快进过去。快进时把 `director.audio`
+摘掉，否则拖一次进度条会把整场的枪声一次性放出来。
+
+自检栏读 `ValidateCutscene`，另外自己算一条**轨道最快速度**：两个关键帧之间跨太远
+就是「演员以几十米每秒横穿画面」（`hidden` 的那一段是故意瞬移，不算）。
+
+### 场景 / 地形 `Script_EditorScene.mjs`
+
+城是 `Script_TengxianCity` 按 `Data_Tengxian` 的图纸现生成的，这个编辑器不去改那座城
+（改它要改图纸与生成规则，那是源码层的事）。它做的是**叠加层**：
+
+- **放置层**：`Script_World` 里那批已封装的构件（四合院 / 房屋 / 门楼 / 牌坊 / 警报楼 /
+  清真寺 / 天主堂 / 方形炮楼院 / 沙包路障 / 沙包封门 / 防空洞 / 寨墙段 / 树 / 电线杆 /
+  水井 / 石磨 / 水缸）+ `Model/*.tzm.json` 里的道具与枪。碰撞盒**是真的推进
+  `city.colliders`** 的（否则摆出来的墙人能穿过去），退出时按 tag 摘干净。
+- **地形层**：抬高 / 压低 / 弹坑 / 抹平。同时改**网格顶点**与**解析高程
+  `GroundHeight`** —— 只改前者的下场是「看着是个坑，人在坑口上平地走过去」
+  （城内地坪那 190 个弹坑现在就是这个状态，见 `Script_TengxianCity` 里的账）。
+
+两层都能存成 JSON（`localStorage` 键 `tengxian1938_sceneedit_v1`，或导出到文本框），
+这是把「在现场调出来的位置」搬回图纸的通道。
+
+**换关的时机是这个文件里最容易写错的一处**：搬家只能在 `state.ready` 重新变回 `true`
+的那一刻做，不能在「`battlefield` 变了」那一刻做 —— `TengxianCity.BuildSteps` 走到最后会
+`this.colliders = sink.colliders.concat(...)` 整根换掉那个数组，在那之前推进去的盒子
+会被连锅端走，而地形位移那时候连地面网格都还没建出来。
+
+## 加一个新编辑器
+
+在 `Script_Editor.mjs` 的 `EDITORS` 里加一条。要实现的接口只有这些：
+
+```js
+export class XxxEditor {
+  static id = "xxx";            // 唯一名，Debug.OpenEditor 用它
+  static label = "面板上显示的名字";
+  static hint = "鼠标悬停的一句话";
+  constructor(host) { this.cameraMode = "studio" | "fly" | "none"; }
+  Enter(root) {}                // 把自己的面板 append 到 root
+  Update(dt) {}                 // 每帧
+  Exit() {}                     // **把改过的运行时状态一样不落地还回去**
+  OnClick(event, button) {}     // 可选：视口点击
+  OnPaint(event, button) {}     // 可选：视口拖动（笔刷）
+  OnDrag(dx, dy, button) {}     // 可选：自己接管相机拖动
+  OnWheel(delta) {}             // 可选
+}
+```
+
+`host` 给的是渲染侧（renderer / scene / camera / canvas / library / lights）、
+各系统（actorFactory / viewmodel / audio / cutscene）、`game`（state / player /
+battlefield 取值器 / PHASES / JumpToLevel），以及 `studio` / `flycam` / `SetHint` /
+`SetCrosshair` / `SetViewmodelVisible` / `Close`。
+
+**新模块必须登记进 `index.html` 的 import map**（那张表是版本戳的唯一来源）。
+
+## 冒烟
+
+```
+node Taierzhuang1938/Script_EditorTest.mjs
+```
+
+32 条断言，退出码即成败。重点不是「能不能打开」，而是**关掉之后有没有还干净** ——
+编辑器是这个项目里唯一会去动运行时状态的一批代码（藏世界、换相机、包 `GroundHeight`、
+往 `city.colliders` 里塞盒子、给 viewmodel 换枪），有一处没还回去，症状会在很远的地方
+才冒出来：撞到空气、退出后视角歪了、举着别人的枪。
+
+改了编辑器以外的东西照旧跑 `Script_BootTest.mjs`（画面健康 + draw call 红线）与
+`Script_PlayTest.mjs`（玩法与剧本）。

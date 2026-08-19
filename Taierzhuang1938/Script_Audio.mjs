@@ -1133,7 +1133,7 @@ const MIX_GAIN = {
 // ===========================================================================
 // 环境床与音乐的编排表
 // ===========================================================================
-const AMBIENCE_PRESETS = {
+export const AMBIENCE_PRESETS = {
   silence: { wind: 0, windCut: 300, space: "street", events: [] },
   day: {
     wind: 0.055, windCut: 420, space: "street",
@@ -1171,7 +1171,7 @@ const AMBIENCE_PRESETS = {
 
 // 音乐。四个 cue 全是合成音色，**不做电影配乐**：
 // 这场仗的声音本体是枪炮，音乐只负责在缝隙里给一个情绪的落点。
-const MUSIC_CUES = {
+export const MUSIC_CUES = {
   // 菜单：一条不动的低音 + 极稀的单音，像空屋子里的余响。
   menu: { bpm: 52, bass: [0, null, 0, null], motif: [7, null, null, 5], solo: null, drum: false, level: 0.5 },
   // 紧张：低音提琴式持续音 + 一个反复回来的小二度动机（最省的「不安」）。

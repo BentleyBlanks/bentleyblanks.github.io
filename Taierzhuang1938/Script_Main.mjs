@@ -33,6 +33,7 @@ import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { EditorSuite } from "./Script_Editor.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
@@ -187,6 +188,9 @@ let story = null;
 let combat = null;
 let interact = null;
 let cutscene = null;
+// 编辑器套件（齿轮按钮 + 五个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
+// 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
+let editor = null;
 // Script_Ai 的全局人像预算，给"这一关没有自己的预算"时回落用。
 // Boot 里从 AiDirector 实例上取真值 —— 不再 import 一次那个常量，只留一个真相。
 let defaultVisibleActors = 13;
@@ -483,6 +487,36 @@ async function Boot() {
   // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
   // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
   window.Tengxian = window.Taierzhuang;
+
+  // --- 编辑器套件 ---------------------------------------------------------
+  // 建在最后：五个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城）
+  // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
+  // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
+  editor = new EditorSuite({
+    renderer, scene, camera, canvas, library, lights,
+    actorFactory, viewmodel, audio, cutscene,
+    shot: !!SHOT,
+    ReleasePointerLock,
+    game: {
+      state, PHASES, JumpToLevel,
+      get battlefield() { return battlefield; },
+      get player() { return player; },
+      get currentWeapon() { return currentWeapon; },
+    },
+  });
+  window.Taierzhuang.editor = editor;
+  // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态
+  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor.Open(id);
+  window.Taierzhuang.Debug.CloseEditor = () => { editor.TogglePanel(false); };
+  window.Taierzhuang.Debug.Editor = () => ({
+    panelOpen: editor.panelOpen,
+    active: editor.ActiveId,
+    capturing: editor.Capturing,
+    studio: editor.studio.Active,
+    fly: editor.flycam.Active,
+    hidden: !!document.getElementById("edRoot")
+      && document.getElementById("edRoot").classList.contains("off"),
+  });
 
   if (SHOT) StartRun();
 }
@@ -1114,11 +1148,16 @@ const router = new InputRouter({
   // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
   Guard: (e) => {
     if (!state.running) return false;
+    // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
+    if (editor && editor.Capturing) return false;
     if (document.pointerLockElement !== canvas && !SHOT) { canvas.requestPointerLock?.(); return false; }
     return true;
   },
   OnAction: (action, detail) => {
     if (!state.ready) return;
+    // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
+    // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
+    if (editor && editor.Capturing) return;
     switch (action) {
       case "crouch": input.crouchPressed = true; return;
       case "prone": input.pronePressed = true; return;
@@ -1645,6 +1684,16 @@ const _proj = new THREE.Vector3();
 function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
+
+  // 编辑器接管：与过场同一条通道 —— 玩法全停，只推编辑器与画面。
+  // **必须排在过场那一条之前**：Timeline 编辑器要自己按走带的步长推
+  // cutscene.Update（暂停、0.25 倍速、拖进度条全靠它），排在后面的话
+  // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
+  if (editor && editor.Capturing) {
+    editor.Update(dt);
+    if (render) RenderScene(dt);
+    return;
+  }
 
   // 过场期间：只推过场与画面，玩法全停。
   // 不停的话玩家会在看电影的时候被打死，而且 AI 会照常往前走 ——
