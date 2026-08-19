@@ -53,6 +53,18 @@ const r = await page.evaluate(() => {
     kinds: bank.reduce((m, e) => (m[e.kind] = (m[e.kind] || 0) + 1, m), {}),
     durations: bank.map((e) => +e.duration.toFixed(2)),
     hasIja: bank.some((e) => e.kind === "ija"),
+    // 阵营两套并存：中方 side 缺省（兼容默认 nra），日方显式 side:"ija"
+    nra: bank.filter((e) => (e.side || "nra") === "nra").length,
+    ija: bank.filter((e) => e.side === "ija").length,
+    // 日方 text 必须是纯假名。写成汉字的「突撃！」会被 seed-audio 当中文读 ——
+    // 实测出来是中文的两个音节，而假名版是四拍日语。
+    ijaWithHanzi: bank.filter((e) => e.side === "ija" && /[一-鿿]/.test(e.text))
+      .map((e) => e.key),
+    ijaKinds: bank.filter((e) => e.side === "ija")
+      .reduce((a, e) => { a[e.kind] = (a[e.kind] || 0) + 1; return a; }, {}),
+    // 神剧红线：一句「バカヤロー」都不许有
+    ijaBaka: bank.filter((e) => e.side === "ija" && /バカ|ばか|やろ|ヤロ/.test(e.text))
+      .map((e) => e.key),
     firstOk: !!first, secondBlocked: !second, keyedOk: !!keyed,
     ctxState: A.ctx && A.ctx.state,
   };
@@ -92,11 +104,59 @@ Check("配音全部解码成功（一条都不许静默丢）", r.size >= 30 && 
   `载入 ${r.size} 条，错误 ${r.errors.length} 条${r.errors.length ? "：" + r.errors.join(" / ") : ""}`);
 Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 hitmarker 用嘴说了一遍）",
   Object.keys(r.kinds).length >= 6, JSON.stringify(r.kinds));
-Check("日语口令没有混进声库（中文模型读日文，日本兵说中文比不说更糟）", !r.hasIja,
-  r.hasIja ? "混进来了" : "已排除");
+// 这条断言原来是「日语不许混进来」—— 那是还没有日方声库时的写法，
+// 而且它查的是 kind === "ija"，现在日方是 side 不是 kind，等于恒真。
+// 日方声库已经做好了（20 句纯假名），该验的变成了三件事：两边都在、不串味、不神剧。
+Check("中日两套声库都在，且按 side 分开",
+  r.nra >= 30 && r.ija >= 18, `中方 ${r.nra} 条 / 日方 ${r.ija} 条`);
+Check("日方文本是纯假名（写成汉字会被 seed-audio 当中文读）",
+  r.ijaWithHanzi.length === 0,
+  r.ijaWithHanzi.length ? "含汉字：" + r.ijaWithHanzi.join(" ") : "零汉字，正确");
+Check("日方六类齐全（少一类就会复读）",
+  Object.keys(r.ijaKinds).length >= 6, JSON.stringify(r.ijaKinds));
+Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",
+  r.ijaBaka.length === 0, r.ijaBaka.length ? "命中：" + r.ijaBaka.join(" ") : "干净");
 Check("每句都在 0.3—2.6 s（太长的喊话在战场上读不完；太短的多半是模型只吐了半句）",
   r.durations.every((d) => d > 0.3 && d < 2.6),
   `最长 ${Math.max(...r.durations)}s，最短 ${Math.min(...r.durations)}s`);
+const cross = await page.evaluate(() => {
+  const A = window.Taierzhuang.audio;
+  const bank = [...A.voiceBank.values()];
+  const sideOf = new Map(bank.map((e) => [e.key, e.side || "nra"]));
+  const KINDS = ["rally", "spot", "warn", "ammo", "hurt", "move"];
+  let nraPicks = 0, nraOk = 0, ijaPicks = 0, ijaOk = 0, bad = 0;
+  const samples = [];
+  for (let i = 0; i < 60; i += 1) {
+    for (const side of ["nra", "ija"]) {
+      A.lastBarkAt = -99; A.lastBarkKindAt.clear();
+      const before = new Set(A.lastPlayAt ? [...A.lastPlayAt.keys()] : []);
+      const v = A.Bark(KINDS[i % KINDS.length], { seed: i * 7 + 1, side });
+      if (!v) continue;
+      // 找出这一次新播的那条 voice.*
+      let picked = null;
+      if (A.lastPlayAt) {
+        for (const k of A.lastPlayAt.keys()) {
+          if (k.startsWith("voice.") && !before.has(k)) picked = k.slice(6);
+        }
+      }
+      if (!picked) continue;
+      const got = sideOf.get(picked) || "nra";
+      if (side === "nra") { nraPicks += 1; if (got === "nra") nraOk += 1; }
+      else { ijaPicks += 1; if (got === "ija") ijaOk += 1; }
+      if (got !== side) { bad += 1; if (samples.length < 4) samples.push(`${side}->${picked}`); }
+    }
+  }
+  return { nraPicks, nraOk, ijaPicks, ijaOk, bad, samples };
+});
+// 挑错阵营 = 日本兵喊中文（或反过来），比没有配音更糟。
+// 这条直接查 Bark 的挑选池，不靠随机抽样撞运气。
+// 挑错阵营 = 日本兵喊中文（或反过来），比没有配音更糟。
+// 不查池子的静态属性，直接**调 Bark 六十次看实际播出来的是谁** ——
+// 上一版我按池子的静态判据写，写出了一个恒假的表达式，测了个寂寞。
+Check("Bark 按阵营挑，不串味（两边各喊 60 次，看实际播出来的那条属于谁）",
+  cross.bad === 0,
+  `中方喊 ${cross.nraPicks} 次全是中方 ${cross.nraOk}、日方喊 ${cross.ijaPicks} 次全是日方 ${cross.ijaOk}`
+  + (cross.bad ? `　串味 ${cross.bad} 次：${cross.samples.join(" ")}` : ""));
 Check("event 句被挡在随机挑选之外（滕县无战车，不许有人随口喊「战车碾拢来了」）",
   r.eventLeak === 0 && r.eventCount >= 5,
   "event 句 " + r.eventCount + " 条，泄漏进随机池 " + r.eventLeak + " 条");
