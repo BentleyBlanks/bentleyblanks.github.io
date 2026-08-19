@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="血战台儿庄（1938）交互科普馆：战役背景、双方阵容、中日枪械对比、逐日时间线、战场态势图、敢死队、战术解析与史实纠偏。">
 <title>血战台儿庄 · 1938 交互科普馆</title>
-<link rel="stylesheet" href="Style_Main.css?v=4">
+<link rel="stylesheet" href="Style_Main.css?v=5">
 </head>
 <body>
 
@@ -409,102 +409,25 @@
     <div class="secHead">
       <span class="levelBadge lv3">深入 · DEEP</span>
       <h2 class="secTitle"><span class="no">07</span>滕县保卫战 · 逐日详解</h2>
-      <p class="secSub">把前哨战里最惨烈的一场放大看：日军从哪里来、每天打到哪里、王铭章在哪里倒下。点击图上标记查看说明。</p>
+      <p class="secSub">把前哨战里最惨烈的一场放大看：日军从哪里来、每天打到哪里、王铭章在哪里倒下。拖动时间滑块，看 3.13—3.18 双方各部队的逐日位置。</p>
       <div class="secRule"></div>
     </div>
     <div class="txHead" id="tengxianHead"></div>
     <div class="mapPanel">
-      <div class="mapSvgBox">
-        <svg class="mapSvg" viewBox="0 0 860 600" role="img" aria-label="滕县保卫战态势示意（可点击标记）">
-          <rect x="0" y="0" width="860" height="600" fill="#1a140d" rx="8"/>
-          <text class="tl" x="24" y="36" fill="#93856a">滕县保卫战 · 1938.3.13—3.18（示意，北↑）</text>
-          <!-- 津浦铁路 -->
-          <line class="rail" x1="230" y1="60" x2="230" y2="565"/>
-          <text class="tl" x="242" y="330" fill="#93856a">津浦铁路</text>
-          <!-- 界河与对峙线 -->
-          <path class="geo" d="M110 210 L 440 210" stroke="#4a6f86" stroke-width="3"/>
-          <text class="tl" x="118" y="202" fill="#93856a">界河</text>
-          <line x1="110" y1="222" x2="440" y2="222" stroke="#8fb0e0" stroke-width="1.5" stroke-dasharray="6 5"/>
-          <text class="tlCn" x="150" y="238" fill="#9dbbe8">川军第 45 军对峙线（战前）</text>
-          <!-- 滕县城 -->
-          <rect class="wall" x="200" y="300" width="96" height="62" fill="#241c12" stroke="#8a7552" stroke-width="3"/>
-          <text class="tlBig" x="188" y="290" fill="#e9dcc0">滕县城</text>
-          <!-- 日军进攻箭头 -->
-          <path class="mapArrow jp" d="M230 66 L 230 98"/><polygon points="227,104 233,104 230,96" fill="#d4554a"/>
-          <path class="mapArrow jp" d="M230 170 C 302 166 384 164 372 192 C 358 226 306 244 276 250"/><polygon points="272,254 282,250 276,260" fill="#d4554a"/>
-          <path class="mapArrow jp" d="M268 262 L 248 294"/><polygon points="244,299 252,296 248,306" fill="#d4554a"/>
-          <text class="tlJp" x="320" y="100">3.13 濑谷支队自邹县出发</text>
-          <text class="tlJp" x="306" y="204">3.14 破围 · 自龙山以东迂回</text>
-          <text class="tlJp" x="312" y="266">3.15 17 时抵此</text>
-          <!-- 63 联队绕行 -->
-          <path class="mapArrow jp" d="M302 344 C 372 402 426 452 468 474"/><polygon points="471,480 462,472 474,472" fill="#d4554a"/>
-          <text class="tlJp" x="330" y="436">第 63 联队 3.16 起继续南进</text>
-          <text class="tlJp" x="330" y="450">（绕攻台儿庄方向）</text>
-          <!-- 85 军解围 -->
-          <path class="mapArrow cn" d="M240 428 C 274 410 300 392 304 372"/><polygon points="306,366 296,370 304,378" fill="#8fb0e0"/>
-          <text class="tlCn" x="312" y="392">85 军 3.16 占官桥</text>
-          <text class="tlCn" x="312" y="406">向滕县东北攻击（解围未成）</text>
-          <!-- 3.18 南下 -->
-          <path class="mapArrow jp" d="M234 376 L 234 488"/><path class="mapArrow jp" d="M234 492 C 330 500 400 492 464 486"/><polygon points="468,485 456,482 460,492" fill="#d4554a"/>
-          <text class="tlJp" x="300" y="526">3.18 城陷 · 同日临城失守 · 日军顺势南下</text>
-          <!-- 攻城标注 -->
-          <text class="tlJp" x="330" y="352">3.16 飞机掩护攻城 · 3.17 南门被轰开</text>
-          <!-- 可点击标记 -->
-          <g class="tmark jp" data-marker="zouxian" tabindex="0">
-            <circle class="tmarkDot" cx="230" cy="110" r="7"/>
-            <text class="tmarkLbl" x="244" y="108">邹县</text>
-            <text class="tmarkLbl" x="244" y="122">两下店（前进阵地）</text>
-          </g>
-          <g class="tmark cn" data-marker="jiehe" tabindex="0">
-            <circle class="tmarkDot" cx="300" cy="222" r="6"/>
-            <text class="tmarkLbl" x="314" y="226">对峙线</text>
-          </g>
-          <g class="tmark jp" data-marker="longshan" tabindex="0">
-            <circle class="tmarkDot" cx="372" cy="190" r="6"/>
-            <text class="tmarkLbl" x="384" y="186">龙山</text>
-          </g>
-          <g class="tmark jp" data-marker="longyangdian" tabindex="0">
-            <circle class="tmarkDot" cx="274" cy="250" r="6"/>
-            <text class="tmarkLbl" x="286" y="244">龙阳店</text>
-          </g>
-          <g class="tmark cn" data-marker="tengdongguan" tabindex="0">
-            <circle class="tmarkDot" cx="302" cy="330" r="6"/>
-            <text class="tmarkLbl" x="316" y="324">东关</text>
-          </g>
-          <g class="tmark jp" data-marker="tengnanmen" tabindex="0">
-            <circle class="tmarkDot" cx="248" cy="368" r="6"/>
-            <text class="tmarkLbl" x="260" y="382">南门（3.17 被轰开）</text>
-          </g>
-          <g class="tmark cn" data-marker="tengxiguan" tabindex="0">
-            <circle class="tmarkDot" cx="186" cy="336" r="6"/>
-            <text class="tmarkLbl" x="52" y="328">西关 · 电灯厂</text>
-            <text class="tmarkLbl" x="52" y="342">王铭章殉国点（一说）</text>
-          </g>
-          <g class="tmark cn" data-marker="guanqiao" tabindex="0">
-            <circle class="tmarkDot" cx="230" cy="430" r="6"/>
-            <text class="tmarkLbl" x="244" y="426">官桥</text>
-          </g>
-          <g class="tmark jp" data-marker="lincheng" tabindex="0">
-            <circle class="tmarkDot" cx="230" cy="500" r="6"/>
-            <text class="tmarkLbl" x="244" y="496">临城</text>
-          </g>
-          <g class="tmark cn" data-marker="taierzhuang" tabindex="0">
-            <circle class="tmarkDot" cx="480" cy="480" r="7"/>
-            <text class="tmarkLbl" x="494" y="474">台儿庄</text>
-            <text class="tmarkLbl" x="494" y="488">（方位）</text>
-          </g>
-          <g class="tmark cn" data-marker="xuzhou" tabindex="0">
-            <circle class="tmarkDot" cx="230" cy="555" r="7"/>
-            <text class="tmarkLbl" x="246" y="549">徐州</text>
-            <text class="tmarkLbl" x="246" y="566">第五战区司令长官部</text>
-          </g>
-        </svg>
+      <div class="txSliderBar">
+        <button class="tlBtn" id="tengxianPlay">▶ 播放</button>
+        <div class="txSliderWrap">
+          <input type="range" id="tengxianSlider" min="0" max="5" step="1" value="0" aria-label="滕县保卫战时间滑块">
+          <div class="txTicks" id="tengxianTicks"></div>
+        </div>
+        <p class="txStepTitle" id="tengxianStepTitle"></p>
       </div>
+      <div class="mapSvgBox" id="tengxianMapBox"></div>
       <div class="txInfo" id="tengxianInfo"></div>
       <div class="mapLegend">
         <span class="cn"><i></i>中方（川军 / 援军）</span>
         <span class="jp"><i></i>日军（濑谷支队）</span>
-        <span>● 点击标记看说明</span>
+        <span>● 拖动滑块看部队逐日位置 · 点击标记看说明</span>
       </div>
     </div>
     <div class="txDays" id="tengxianDays"></div>
@@ -643,6 +566,6 @@
   </div>
 </footer>
 
-<script type="module" src="Script_Main.mjs?v=4"></script>
+<script type="module" src="Script_Main.mjs?v=5"></script>
 </body>
 </html>
