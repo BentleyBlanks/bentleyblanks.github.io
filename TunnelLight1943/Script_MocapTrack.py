@@ -49,6 +49,18 @@ def wrap(a):
     return a
 
 
+def parse_anchor(spec):
+    """"hipY=-0.36,torso=26,thighF=-44" → {字段: 数}。度/米都按 Rig 姿势里的写法"""
+    out = {}
+    for kv in (spec or "").split(","):
+        kv = kv.strip()
+        if not kv:
+            continue
+        k, _, v = kv.partition("=")
+        out[k.strip()] = float(v)
+    return out
+
+
 def smooth(arr, k=3):
     if k <= 1 or len(arr) < k: return arr
     ker = np.exp(-0.5 * (np.arange(k) - (k - 1) / 2) ** 2 / ((k / 3) ** 2)); ker /= ker.sum()
@@ -76,6 +88,10 @@ def main():
     ap.add_argument("--start-frame", type=int, default=0, help="cycle=manual 时的起始帧")
     ap.add_argument("--mirror-half", action="store_true", help="给的是半个周期（一步）：把它前后侧互换再接一遍，拼成整周期（走/跑左右对称）")
     ap.add_argument("--time-scale", type=float, default=1.0, help="时间轴缩放（生成视频常是慢动作：0.25 就是提速四倍）")
+    ap.add_argument("--anchor-start", default="", help='起落转换用：把开头拽到某个静态姿势上，"hipY=-0.36,torso=26,thighF=-44,..."（度/米，同 Rig 的姿势值）')
+    ap.add_argument("--anchor-end", default="", help="同上，拽末尾。轨道接在姿势前/后播，两端不落在姿势上收尾会跳一下")
+    ap.add_argument("--anchor-frac", type=float, default=0.3, help="两端各用多长比例过渡到锚点（默认三成）")
+    ap.add_argument("--flatten", default="", help="这些字段整段不要 mocap，直接从起锚滑到末锚：侧视里被身子挡住的远侧肢（深弯腰时的远侧胳膊/手）估出来是错的，不是抖")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
 
@@ -271,6 +287,38 @@ def main():
     if loop and (len(rows) - 1) % step:            # 循环轨末帧要落在周期末尾上
         keys = keys + [rows[-1]]
     t0 = keys[0]["_t"]
+    # ── 两端拽到静态姿势上（起落转换）──────────────────────────────────────────
+    # 这类轨道是**接在姿势前后**播的（站→跪那一段播完，人就停在 kneel 上），末帧
+    # 不落在那个姿势上，轨道一收就"啪"地跳一下。真人的曲线只在中段值钱，两端本来
+    # 就该被目标姿势收走，所以按比例平滑地拽过去（smoothstep，不是线性）。
+    def anchor(rows_, vals, at_end, frac):
+        if not vals:
+            return
+        n = len(rows_)
+        span = max(2, int(round(n * max(0.05, min(0.9, frac)))))
+        for i in range(n):
+            j = (i - (n - span)) if at_end else (span - 1 - i)
+            if j < 0:
+                continue
+            u = min(1.0, j / (span - 1))
+            w = u * u * (3 - 2 * u)
+            for f, v in vals.items():
+                if f in rows_[i]:
+                    rows_[i][f] = rows_[i][f] * (1 - w) + v * w
+    A0, A1 = parse_anchor(a.anchor_start), parse_anchor(a.anchor_end)
+    anchor(keys, A0, False, a.anchor_frac)
+    anchor(keys, A1, True, a.anchor_frac)
+    # 整段抹平的字段：深弯腰时远侧胳膊整条藏在身子后头，估计器给的不是噪声而是错值
+    # （量出来一帧 1000°/s 以上的跳）。这类通道 mocap 供不出东西，直接两锚之间滑过去
+    for fld in [x.strip() for x in (a.flatten or "").split(",") if x.strip()]:
+        if fld not in A0 or fld not in A1:
+            print(f"flatten: {fld} 两端都得有锚点，跳过")
+            continue
+        n = len(keys)
+        for i, kk in enumerate(keys):
+            u = i / max(1, n - 1)
+            w = u * u * (3 - 2 * u)
+            kk[fld] = A0[fld] * (1 - w) + A1[fld] * w
     fields = ["hipY", "hipX", "torso", "chest", "head", "neck", "thighB", "shinB", "footB", "thighF", "shinF", "footF", "armB", "foreB", "handB", "armF", "foreF", "handF"]
     # 角度再夹一遍
     def clampf(k, v):

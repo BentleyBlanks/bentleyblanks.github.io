@@ -2960,6 +2960,41 @@ async function TestAnimIndexIsComplete() {
 // ② 胯高由 ApplyPose 的地面吸附按腿的几何算，脚/膝里最低的点钉在地平线上——
 //    Rig 里得有这套件（FootDepth/LowestContact/GroundWeight/RigContact），World 要把
 //    lift/ground 喂给 PoseRig（抱起来/骑着/翻越/躺着才离地）。
+// 起落转换（2026-08-19）：站→跪→站那一段由 Core 的 POSE_SHIFT 挂真人底片。
+// Core 不能 import Rig（Rig 依赖 three），时长只好在 Core 抄一份——这条守着两边不跑偏：
+// 轨道得真的在 TRACKS 里、时长对得上（差 0.02s 以上就算错）、且不许是循环轨。
+function TestPoseShiftMatchesTracks() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
+  const core = fs.readFileSync(path.join(here, "Script_Core.mjs"), "utf8");
+  const tbl = /const POSE_SHIFT = \{([\s\S]*?)\n\};/.exec(core);
+  assert.ok(tbl, "Core 里得有 POSE_SHIFT 表");
+  const rows = [...tbl[1].matchAll(/(\w+): \{ down: "(\w+)", downT: ([\d.]+), rise: "(\w+)", riseT: ([\d.]+) \}/g)];
+  assert.ok(rows.length >= 2, `POSE_SHIFT 至少两条，实为 ${rows.length}`);
+  for (const [, pose, down, downT, rise, riseT] of rows) {
+    assert.ok(rig.includes(`s.pose === "${pose}"`), `POSE_SHIFT 的 ${pose} 在 Rig 里没有对应姿势分支`);
+    for (const [name, want] of [[down, +downT], [rise, +riseT]]) {
+      // 不用正则：轨道头两行的写法是固定的（生成器出的），indexOf 一刀更稳
+      const at = rig.indexOf(`\n  ${name}: {\n    dur: `);
+      assert.ok(at >= 0, `TRACKS 里缺轨道 ${name}`);
+      const head = rig.slice(at, at + 200);
+      const dur = parseFloat(head.slice(head.indexOf("dur: ") + 5));
+      assert.ok(head.includes("loop: false"), `起落转换 ${name} 不许是循环轨`);
+      assert.ok(Math.abs(dur - want) <= 0.02, `${name} 时长对不上：Core 写 ${want}，TRACKS 是 ${dur}`);
+    }
+  }
+  // 四条边界（见 Core 的注释）都要有代码守着，别哪天顺手删了
+  assert.ok(/o\.poseWas === undefined/.test(core), "边界①：出场自带的姿势不许演一遍起落");
+  assert.ok(/o\.track\.shift && o\.moving/.test(core), "边界③：人一走就撤起落轨道");
+  assert.ok(/poseWas = undefined/.test(core), "换幕的 ClearPoses 要把起落记账归零");
+  // 边界⑤：过场的机位是按目标姿势配的（跪着占画面一半，站着头被切），过场路径
+  // 那两处调用必须带 true；玩法那处必须不带，不然起落就白做了
+  assert.strictEqual((core.match(/StepCineActors\(state, dt, true\)/g) || []).length, 2, "过场与微过场两处 StepCineActors 都要带 cine=true");
+  assert.ok(/StepCineActors\(state, dt\);/.test(core), "玩法路径那处 StepCineActors 不许带 cine");
+  assert.ok(/if \(cine\) \{ o\.poseWas = now/.test(core), "边界⑤：过场里不许演起落");
+  console.log(`  ✓ 起落转换：${rows.length} 组（${rows.map((r) => r[1] + "/" + r[4]).join("、")}）时长与 TRACKS 一致`);
+}
+
 function TestGaitCadenceAndGroundSnap() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const rig = fs.readFileSync(path.join(here, "Script_Rig.mjs"), "utf8");
@@ -3027,6 +3062,7 @@ TestModuleGraphIsCacheBusted();
 TestQuieterAudioMix();
 await TestAnimIndexIsComplete();
 TestGaitCadenceAndGroundSnap();
+TestPoseShiftMatchesTracks();
 
 console.log("— 全流程自动通关（第六章走『地下进人』，第二章走『舀水』）—");
 {

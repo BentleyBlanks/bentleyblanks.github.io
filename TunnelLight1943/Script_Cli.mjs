@@ -279,8 +279,10 @@ async function CmdAnims(o) {
     const beats = [...new Set(us.map((u) => u.beat || u.fn).filter(Boolean))];
     const who = DominantKind(r.e.usages);
     const neg = (r.e.usages || []).filter((u) => u.kind === "底片");
+    const shift = (r.e.usages || []).some((u) => u.kind === "起落");
     const where = r.type === "步态" ? "" : neg.length ? `步态底片 → ${(r.e.negativeFor || []).join("/")}`
-      : beats.length ? `用于 ${beats.slice(0, 3).join("/")}${beats.length > 3 ? `…共${beats.length}` : ""}` : "（无引用）";
+      : shift ? `起落转换 → ${r.e.shiftFor}`
+        : beats.length ? `用于 ${beats.slice(0, 3).join("/")}${beats.length > 3 ? `…共${beats.length}` : ""}` : "（无引用）";
     console.log(`  ${r.type} ${r.name.padEnd(18)} ${String(r.meta).padEnd(16)} Script_Rig.mjs:${String(r.line ?? "?").padEnd(5)} ${who ? (KIND_LABEL[who] || who).padEnd(4) : "    "} ${where}`);
   }
   console.log(`\n${hit.length} 条（${idx.counts.tracks} 轨道 / ${idx.counts.poses} 姿势 / ${idx.counts.locomotion} 步态）。看一条：anim <名字>；网页里播：设置 → 调试 · 动画工作台（F4）或 ?anim=<名字>`);
@@ -556,7 +558,12 @@ async function CmdState(o) {
   }
   const dump = {
     beat: { id: def?.id, kind: def?.kind, index: state.beatIndex, stepIndex: state.beat?.stepIndex },
+    // 动画那几路一并报：光有 pose 看不出"这一帧到底在演什么"——起落转换（Core 的
+    // POSE_SHIFT）走的是 track，poseWas/poseRise 是它的记账，缺了没法查为什么没起落
     player: { x: +p.x.toFixed(2), level: p.level, heading: p.heading, crouch: p.crouch, pose: p.pose,
+      poseT: p.poseT === undefined ? null : +(+p.poseT).toFixed(2),
+      track: p.track ? `${p.track.name}@${(+p.track.t).toFixed(2)}${p.track.shift ? "(起落)" : ""}` : null,
+      poseWas: p.poseWas === undefined ? "(还没记账)" : p.poseWas, poseRise: p.poseRise || null,
       item: p.item?.id || null, climbT: +(p.climbT || 0).toFixed(2) },
     prompt: state.prompt, climbHint: state.climbHint || "", objective: def?.objective || "",
     groundItems: state.groundItems.map((g) => `${g.id}@${g.x.toFixed(1)}${g.level === "under" ? "(下)" : ""}`),

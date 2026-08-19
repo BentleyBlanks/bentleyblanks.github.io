@@ -4781,10 +4781,13 @@ function ClearPoses(state) {
   if (!state.player.track?.ambient) state.player.track = null;
   state.pressHold = null;          // 按住是一次性状态，绝不能跨幕带过去
   state.player.forcedCrouch = false;
+  // 起落转换的记账一并归零：换幕是硬切，不许在这儿演一遍"站起来"（边界①）
+  state.player.poseWas = undefined; state.player.poseRise = null;
   for (const a of state.actors) {
     a.pose = null;
     a.poseT = undefined; a.poseU = undefined; a.poseK = undefined;
     if (!a.track?.ambient) a.track = null;
+    a.poseWas = undefined; a.poseRise = null;
   }
 }
 
@@ -5116,10 +5119,61 @@ export function ConfirmChapterCard(state) {
   else if (state.phase === "chapterEnd") StartChapter(state, state.chapterIndex + 1);
 }
 
+// ── 起落转换（2026-08-19，mocap 底片）────────────────────────────────────────
+// 姿势以前是**当帧换**的：`p.pose = "kneel"` 一写，骨架直接从站姿插值到跪姿，
+// 中间那一段（屈膝下沉、膝先着地、坐到脚跟上）根本没演——用户点名的"生硬"，
+// 一多半在这儿。现在按名字挂一对真人底片：进这个姿势先播 down，离开时播 rise，
+// 中间照旧是那个静态姿势（轨道优先于姿势，见 Rig.PoseRig 开头）。
+//
+// 时长在这儿抄一份是因为 Core 不能 import Rig（Rig 依赖 three，node 里加载不起来）；
+// 对不上由 SmokeTest.TestPoseShiftMatchesTracks 当场报出来。
+//
+// 四条边界，都是踩出来的：
+// ① **出场就跪着的不许演一遍跪下**：第一帧只记账（poseWas 从 undefined 起），
+//    只有活着的时候真从"没姿势"变成这个姿势才算"跪下去"；换幕的 ClearPoses 也重记。
+// ② **别抢已经在播的轨道**：脚本自己 FlashTrack 的（抱妹妹那种）优先。
+// ③ **人一走就撤**：轨道盖过步态，起身走到一半迈腿会原地打滑。
+// ④ **起身要排队**：FlashPose 的倒计时常短过底片（拾东西 0.5s、bendDown 0.87s），
+//    姿势撤了 down 还没播完——记下来等它播完再接 rise，别当场截断。
+// ⑤ **过场里不起落**：过场的机位是**按目标姿势配的**——c1_forage 那组解袋口的镜头
+//    可见画高 1.25m，跪着 0.59m 正好占一半，站着 1.10m 头顶就被上黑边切掉（源码里
+//    那条注释是逐帧审查换来的）。所以脚本在过场里摆的姿势当帧到位，起落只给玩法段
+//    （玩家自己的动作，镜头是跟着人走的）。哪一拍要演起落，得连机位一起重配。
+const POSE_SHIFT = {
+  kneel: { down: "kneelDown", downT: 1.61, rise: "kneelRise", riseT: 1.19 },
+  bow: { down: "bendDown", downT: 0.87, rise: "bendRise", riseT: 0.80 },
+};
+
+function Shift(o, dt, cine) {
+  if (!o) return;
+  const now = o.pose || null;
+  if (o.poseWas === undefined) { o.poseWas = now; return; }          // ①
+  if (cine) { o.poseWas = now; o.poseRise = null; return; }          // ⑤ 过场不起落
+  if (o.track && o.track.shift && o.moving) { o.track = null; o.poseRise = null; }   // ③
+  if (now !== o.poseWas) {
+    const from = o.poseWas;
+    o.poseWas = now;
+    if (POSE_SHIFT[now] && !o.track) {
+      const into = POSE_SHIFT[now];
+      o.track = { name: into.down, t: 0, until: into.downT, shift: true };
+      o.poseRise = null;
+    } else if (POSE_SHIFT[from] && !now) {
+      // 站起来：轨道空着就当场播，占着（多半是自己的 down 还没播完）就排队（边界④）
+      if (o.track) o.poseRise = from;
+      else { o.track = { name: POSE_SHIFT[from].rise, t: 0, until: POSE_SHIFT[from].riseT, shift: true }; o.poseRise = null; }
+    }
+  }
+  if (!o.track && o.poseRise) {
+    const r = POSE_SHIFT[o.poseRise];
+    if (r) o.track = { name: r.rise, t: 0, until: r.riseT, shift: true };
+    o.poseRise = null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 过场走位与微过场
 // ---------------------------------------------------------------------------
-function StepCineActors(state, dt) {
+function StepCineActors(state, dt, cine = false) {
   // 关键帧轨道的时钟。t 允许从负数起步：负的那一段是"等待"，
   // 用来把两个演员的轨道对齐到同一个落点（枪托砸到的那一帧）。
   // `until`：播完自动收回常态（FlashTrack 用它——玩法动词的一次性动作
@@ -5131,6 +5185,8 @@ function StepCineActors(state, dt) {
   };
   Advance(state.player);
   for (const a of state.actors) Advance(a);
+  Shift(state.player, dt, cine);
+  for (const a of state.actors) Shift(a, dt, cine);
   // 钉在别人身上的演员（挎斗里的兵钉在摩托上）：先让被钉的走完，再贴上去。
   // dx 以「车头朝 -x」为基准；车往 +x 走时贴图整张镜像，偏移也跟着翻——
   // 挎斗永远在车尾那一侧，不会翻个头就把兵甩到车头前面去
@@ -5318,7 +5374,7 @@ function StepCinematic(state, input, dt) {
       other.heading = -subj.heading;
     }
   }
-  StepCineActors(state, dt);
+  StepCineActors(state, dt, true);
   state.beat.lineT += dt;
   if (input.advance || !LineHeld(line, state.beat.lineT)) {
     state.beat.lineIndex += 1;
@@ -5462,7 +5518,7 @@ export function StepGame(state, input, dt) {
     return;
   }
 
-  if (state.microCine) { StepMicroCine(state, input, dt); StepCineActors(state, dt); return; }
+  if (state.microCine) { StepMicroCine(state, input, dt); StepCineActors(state, dt, true); return; }
   if (def.kind === "cinematic") { StepCinematic(state, input, dt); return; }
   if (def.kind === "choice") { state.caption = null; return; }
 

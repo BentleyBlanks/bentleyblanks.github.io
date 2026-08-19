@@ -294,6 +294,23 @@ function ParseLocoClip(lines) {
   return { line: i + 1, map };
 }
 
+// ── 起落转换：Core 的 POSE_SHIFT 表（2026-08-19）──────────────────────────
+// 同底片一个道理：kneelDown/bendRise 这几条不由剧本按名字引用，是 Core 在"进/出
+// 某个姿势"时自己挂上去的。不读这张表，它们在工作台里就挂着「无引用」。
+function ParsePoseShift(text) {
+  const out = { line: null, map: {} };
+  if (!text) return out;
+  const lines = Lines(text);
+  const i = lines.findIndex((l) => /^const POSE_SHIFT = \{/.test(l));
+  if (i < 0) return out;
+  out.line = i + 1;
+  for (let j = i; j < lines.length && !/^\};/.test(lines[j]); j += 1) {
+    const m = /(\w+): \{ down: "(\w+)", downT: ([\d.]+), rise: "(\w+)", riseT: ([\d.]+) \}/.exec(lines[j]);
+    if (m) out.map[m[1]] = { down: m[2], downT: +m[3], rise: m[4], riseT: +m[5], line: j + 1 };
+  }
+  return out;
+}
+
 // ── World：进度登记 / 躺姿 ───────────────────────────────────────────────
 function ParseWorld(text) {
   const out = { POSE_PROGRESS: [], LIE_POSES: [] };
@@ -424,8 +441,25 @@ export function ScanAnimIndex(read) {
         beat: null, fn: "MocapLegs", text: `LOCO_CLIP.${c.key} = "${c.name}" —— ${L.label}的步态底片（腿/胳膊的曲线原样取自这条轨）` });
     }
   }
+  // 起落转换双向挂账：轨道那边补真用法，姿势那边补一行"进出这个姿势演什么"
+  const shift = ParsePoseShift(read("Script_Core.mjs"));
+  for (const [pose, sh] of Object.entries(shift.map)) {
+    const p = poses[pose];
+    if (p) {
+      p.notes = p.notes || [];
+      p.notes.push(`起落转换：进这个姿势先播 ${sh.down}（${sh.downT}s）、离开时播 ${sh.rise}（${sh.riseT}s），Core 的 POSE_SHIFT:${sh.line}。**过场里不演**（机位是按目标姿势配的）`);
+      p.shift = sh;
+    }
+    for (const [name, which] of [[sh.down, "进"], [sh.rise, "出"]]) {
+      const t = tracks[name];
+      if (!t) continue;
+      t.shiftFor = pose;
+      t.usages.push({ file: "Script_Core.mjs", line: sh.line, kind: "起落", subject: null, kindGuess: null,
+        beat: null, fn: "POSE_SHIFT", text: `POSE_SHIFT.${pose} —— ${which}「${pose}」这个姿势时自动播（玩法段；过场不演）` });
+    }
+  }
   return {
-    tracks, poses, locomotion, sets: allSets, usages,
+    tracks, poses, locomotion, sets: allSets, usages, shift: shift.map,
     files: [ANIM_FILES.rig, ANIM_FILES.world, ...ANIM_FILES.usages].filter((f, i, a) => a.indexOf(f) === i),
     counts: { tracks: Object.keys(tracks).length, poses: Object.keys(poses).length, locomotion: locomotion.length },
   };

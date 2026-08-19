@@ -450,7 +450,8 @@ export function CreateAnimLab({ root }) {
           : e.type === "pose" ? (e.progress ? "进度驱动" : e.calmBreath ? "静态 · 呼吸" : "静态")
             : `分支 ${e.loco.cond}`;
         const who = e.kindGuess ? KIND_LABEL[e.kindGuess] || e.kindGuess
-          : (e.usages || []).some((u) => u.kind === "底片") ? "步态底片" : "";
+          : (e.usages || []).some((u) => u.kind === "底片") ? "步态底片"
+            : (e.usages || []).some((u) => u.kind === "起落") ? "起落转换" : "";
         const unused = e.type !== "loco" && !(e.usages || []).some((u) => u.kind !== "check" && u.kind !== "ref");
         li.innerHTML = `<button type="button"><em>${Esc(e.label)}</em><small>${Esc(meta)}${who ? " · " + Esc(who) : ""}${unused ? " · <s>无引用</s>" : ""}</small></button>`;
         li.querySelector("button").addEventListener("click", () => Select(e.id));
@@ -688,9 +689,11 @@ export function CreateAnimLab({ root }) {
       if (e.inputs?.length) facts.push(["输入", e.inputs.map((i) => `<i class="chip" title="${Esc(i.label)}">${Esc(i.key)}</i>`).join("")]);
     }
     const negative = (e.usages || []).some((u) => u.kind === "底片");
+    const shifted = (e.usages || []).some((u) => u.kind === "起落");
     const who = e.kindGuess ? `${KIND_LABEL[e.kindGuess] || e.kindGuess}`
       : negative ? "任何人（步态底片：走路/跑的人都在吃它）"
-        : (e.type === "loco" ? "任何人" : "（剧本里没引用）");
+        : shifted ? `任何人（起落转换：进出「${e.shiftFor}」这个姿势时自动播；过场里不演）`
+          : (e.type === "loco" ? "任何人" : "（剧本里没引用）");
     facts.push(["谁在用", Esc(who)]);
 
     const usages = (e.usages || []);
