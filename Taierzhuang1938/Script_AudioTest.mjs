@@ -284,6 +284,39 @@ if (cross.mid < 1 || cross.late < 1) {
   Fail(`床的播放头越积越多（${cross.late} 个），旧的没回收`);
 } else Ok(`床跨过两个 ${cross.seg.toFixed(1)}s 周期仍在响（播放头 ${cross.first}→${cross.mid}→${cross.late}）`);
 
+// 听者有没有跟着相机走。
+//
+// 这一条是补的：SetListener 写好之后**全仓库零调用点**，WebAudio 的 listener
+// 一辈子停在世界原点。序·界河的切片在 z = −1470，于是每一发枪声都按一千四百米
+// 算距离 —— 直达声被 panner 压掉三十分贝没了，而混响 send 在 Panner 之前分出去、
+// 不吃距离衰减，玩家听到的就只剩全场每一发枪的混响尾巴糊在一起：密密麻麻、
+// 没有方向（HRTF 只在 25 m 内开）、没有高频（空气低通钳在 700 Hz 的地板上）。
+// 实测直达声 −66.9 → −36.2 dBFS，侧向/中央 −41.8 → −7.5 dB。
+const listener = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  T.JumpToPhase(0);                      // 界河：切片离世界原点一千四百米，钉住不动一眼看得出来
+  await sleep(400);
+  T.StepFrames(30);
+  await sleep(200);
+  const cam = T.camera.position;
+  const L = T.audio.listenerPos;
+  return {
+    cam: { x: cam.x, y: cam.y, z: cam.z },
+    lis: { x: L.x, y: L.y, z: L.z },
+    gap: Math.hypot(cam.x - L.x, cam.y - L.y, cam.z - L.z),
+    fromOrigin: Math.hypot(cam.x, cam.z),
+  };
+});
+if (listener.fromOrigin < 50) {
+  Fail(`这一关的相机离世界原点只有 ${listener.fromOrigin.toFixed(0)} m，测不出听者钉没钉住 —— 换一关再测`);
+} else if (listener.gap > 1.5) {
+  Fail(`听者没跟着相机：相机 (${listener.cam.x.toFixed(0)}, ${listener.cam.z.toFixed(0)}) `
+    + `听者 (${listener.lis.x.toFixed(0)}, ${listener.lis.z.toFixed(0)})，差 ${listener.gap.toFixed(0)} m`);
+} else {
+  Ok(`听者贴着相机（离世界原点 ${listener.fromOrigin.toFixed(0)} m 处，差 ${listener.gap.toFixed(2)} m）`);
+}
+
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 
 await browser.close();

@@ -2084,6 +2084,20 @@ export class AudioEngine {
     return this.Play("voice." + pick.key, { position, volume, pitch, priority });
   }
 
+  /**
+   * 把 WebAudio 的听者贴到相机上。**每帧都要调**（Script_Main 的 RenderScene 里）。
+   *
+   * 不调的后果比"方位不准"严重得多，因为整条空间化链路都挂在听者位置上：
+   *   · panner 的距离衰减 —— 听者停在原点、玩家在 1470 m 外时，直达声被压到
+   *     千分之六，实测比该有的电平低三十分贝，等于**battle 的干声整体消失**；
+   *   · 而混响 send 是在 Panner **之前**分出去的、根本不吃距离衰减，
+   *     于是剩下的全是混响尾巴 —— 全场几十发枪的尾巴糊成一片，
+   *     这就是"刚进游戏一片密密麻麻的音效"的成因；
+   *   · HRTF 只在 25 m 内开，距离恒为一千多米时永远走 equalpower，声像全在正中；
+   *   · 空气低通 18000/(1+0.09d) 被钳在 700 Hz 的地板上，所有枪声都是闷的。
+   * 城里几关更隐蔽：世界原点正好是十字街口，听着"有声音"，
+   * 但全城的枪都按你站在街心算，走到哪儿都一样响。
+   */
   SetListener(camera) {
     if (!this.ctx || !camera || !camera.matrixWorld) return;
     const e = camera.matrixWorld.elements;

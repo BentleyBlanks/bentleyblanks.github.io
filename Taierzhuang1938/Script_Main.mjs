@@ -2373,6 +2373,21 @@ function RenderScene(dt) {
   vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
+  // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
+  //
+  // 事故：AudioEngine.SetListener 全仓库零调用点，于是 WebAudio 的 listener
+  // 一辈子停在世界原点、朝着 −Z。序·界河的可玩切片在 z = −1470，实测每一发枪声
+  // 算出来的距离都是一千四百米，而**混响 send 是在 Panner 之前分出去的、不吃距离衰减**：
+  // 直达声被 panner 压到千分之六听不见，湿声却按 wetScale = 1 + 0.03d 顶到上限 2.6 倍。
+  // 玩家听到的于是不是枪声，是全场每一发枪的混响尾巴同时糊在一起 —— 没有方向
+  // （距离 ≥ 25 m 一律 equalpower，HRTF 从来没开过）、没有高频（空气低通钳在 700 Hz 的地板上）、
+  // 密密麻麻一片。城里几关更隐蔽：原点正好是十字街口，听起来"有声音"，但全城的枪
+  // 都按你站在街心算，走到哪里都一样响。
+  //
+  // 放在这里而不是 Frame() 里：过场与主菜单的相机不走 Frame 那条路，
+  // 但三者都从 RenderScene 出画（见上面那段注释），接在这儿一次覆盖三种镜头。
+  camera.updateWorldMatrix(true, false);   // 取的是这一帧的位姿，不是上一帧的
+  audio.SetListener(camera);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   post.Render(scene, camera, {
