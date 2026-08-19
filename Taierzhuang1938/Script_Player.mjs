@@ -89,6 +89,7 @@ export class PlayerController {
     this.grounded = true;
     this.sprint = 0;
     this.ads = 0;
+    this.wantAds = false;      // 开镜意图（相机侧的 FOV 过渡读它）
     this.lean = 0;                          // -1 左, +1 右
     this.breath = 0;                        // 屏息剩余
     this.breathHold = false;
@@ -355,6 +356,9 @@ export class PlayerController {
     // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
     const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod;
     const wantAds = input.ads && !bipodBlocked ? 1 : 0;
+    // 存下来给相机用。相机侧的 FOV 过渡（固定 150 ms）要跟玩家读同一个"意图"，
+    // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
+    this.wantAds = wantAds === 1;
     const adsSpeed = 1 / Math.max(0.08, weapon?.adsTimeS ?? 0.3);
     this.ads += Clamp((wantAds - this.ads) * dt * adsSpeed * 3, -dt * 6, dt * 6);
     this.ads = Clamp01(this.ads);

@@ -1065,6 +1065,12 @@ const _xAxis = new THREE.Vector3(1, 0, 0);
 const _kick = new THREE.Vector2();
 const _marchTargets = [];
 
+// 开镜 FOV 的过渡时长。战地 BFV 全部 82 支枪都是 0.15 s（AimingFovTransitionTime），
+// 且**不随武器变化** —— 见 docs/Data_BattlefieldNumbers.md。别再改成每枪一个值。
+const ADS_FOV_TIME = 0.15;
+let adsFovT = 0;      // 相机侧的开镜量，与 player.ads（动画侧）分开走
+let breathFov = 1;    // 屏息那 6% 的独立平滑
+
 /**
  * 弹道步进积分。
  *
@@ -1356,11 +1362,34 @@ function Frame(dt, render = true) {
   // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下。
   // 屏息再收 6%：ER2 屏息时视野有一点点放大，这是"憋住那一口气把注意力收拢"的
   // 视觉说法，也让玩家一眼知道自己确实在屏息（我们不给体力条）。
+  //
+  // 【2026-08-19 按战地 datamine 重做，两条】
+  //
+  // 一、**FOV 过渡是固定 150 ms 的，跟哪支枪无关。** BFV 全部 82 支枪的
+  //    AimingFovTransitionTime 都是 0.15 s —— 枪的轻重差异**全在视图模型的动画里**，
+  //    不在相机上。我们原来是「每枪不同的 ads 速度」再串一层 dt*9 的指数平滑
+  //    （≈231 ms 才到位），两层滞后叠在一起，结果驳壳枪和捷克式在相机上反应几乎
+  //    一样糊 —— 分不出轻重，方向正好做反了。
+  //    现在相机走自己那条 150 ms 的线性过渡，枪的轻重仍由 adsTimeS 在动画上体现。
+  //
+  // 二、**拉栓/装填强制退出瞄准。** BF1 的栓动枪拉栓会强制退出瞄准镜，那一下
+  //    「丢失瞄准画面」对栓动枪分量的贡献，比那 2° 后坐大得多。
+  //    Script_Viewmodel 早就在做了（adsInput 乘了 actionBlend），但相机一直没跟上：
+  //    枪都甩出画面了视野还是窄的 —— 玩家看到的是「视野卡住了」，不是「在拉栓」。
   const weapon = WEAPONS[currentWeapon];
-  const targetFov = BASE_FOV * (1 - player.ads * (1 - (weapon?.adsFovScale ?? 0.75)))
-    * (player.breathHold ? 0.94 : 1);
-  if (Math.abs(camera.fov - targetFov) > 0.01) {
-    camera.fov += (targetFov - camera.fov) * Clamp01(dt * 9);
+  const adsHeld = player.wantAds ? 1 : 0;
+  const fovStep = dt / ADS_FOV_TIME;
+  adsFovT = adsHeld > adsFovT ? Math.min(adsHeld, adsFovT + fovStep)
+    : Math.max(adsHeld, adsFovT - fovStep);
+  // 拉栓/装填期间乘上视图模型自己那条脱离瞄准的曲线（Script_Viewmodel.adsSuppress）。
+  // 用它、而不是在这儿另起一个 150 ms 的 snap，是因为因果要对：
+  // 视野丢失是**枪离开了瞄准线**的结果，两者本来就该是同一条曲线。
+  const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
+  // 屏息那 6% 单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
+  breathFov += ((player.breathHold ? 0.94 : 1) - breathFov) * Clamp01(dt * 6);
+  const targetFov = BASE_FOV * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+  if (Math.abs(camera.fov - targetFov) > 0.001) {
+    camera.fov = targetFov;
     camera.updateProjectionMatrix();
   }
 

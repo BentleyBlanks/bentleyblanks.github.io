@@ -955,6 +955,7 @@ export class Viewmodel {
     this.weapon = null;
     this.rig = null;
     this.action = null;
+    this.adsSuppress = 1;      // 拉栓/装填时枪离开瞄准线的程度，相机 FOV 也读它
     this.bobPhase = 0;
     this.elapsed = 0;
     this.shotIndex = 0;
@@ -1452,7 +1453,12 @@ export class Viewmodel {
 
     // 装填/拉栓/劈砍时强制脱离瞄准：手都离开握把了还能瞄才是穿帮
     const actionBlend = this.action ? Ease.Pulse(Clamp01(this.action.t)) : 0;
-    const adsInput = Clamp01(input.ads ?? 0) * (1 - Clamp01(actionBlend * 1.4)) * (1 - sprint * 0.9);
+    // 这一份要给相机看：相机的 FOV 也得跟着枪一起离开瞄准线，
+    // 否则枪都甩出画面了视野还是窄的 —— 玩家读到的是「视野卡住」而不是「在拉栓」。
+    // 让相机读这条曲线（而不是自己另起一个定时器 snap 出去再 snap 回来），
+    // 因果才是对的：**视野丢失是因为枪动了**，两者本来就该是同一条曲线。
+    this.adsSuppress = 1 - Clamp01(actionBlend * 1.4);
+    const adsInput = Clamp01(input.ads ?? 0) * this.adsSuppress * (1 - sprint * 0.9);
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);

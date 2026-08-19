@@ -735,6 +735,74 @@ Check("悬完之后**加速归位**：200 ms 已回落 >55%，450 ms 收干净",
   recoil.d20 > 0.55 && recoil.d45 > 0.999,
   `200 ms ${(recoil.d20 * 100).toFixed(1)}% -> 450 ms ${(recoil.d45 * 100).toFixed(1)}%`);
 
+// 12.5b 开镜 FOV：固定 150 ms、不随枪变；拉栓期间强制退出
+// 对标战地（docs/Data_BattlefieldNumbers.md）：BFV 全部 82 支枪的
+// AimingFovTransitionTime 都是 0.15 s，枪的轻重差异全在动画里、不在相机上。
+const adsFov = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  // 必须走**真鼠标右键**。开镜量每帧都会被 router.Read 从真实输入覆写回去，
+  // 直接往那个字段上赋值当场就被冲掉 —— 上一版这个用例就是这么假过的：
+  // 量到髋射与开镜的 FOV 一模一样 55.0°，等于什么都没测。
+  const Mouse = (down) => document.dispatchEvent(new MouseEvent(
+    down ? "mousedown" : "mouseup", { button: 2, bubbles: true }));
+  const Settle = () => { Mouse(false); T.StepFrames(40); };
+  // 量一支枪从髋射到开镜、相机 FOV 走完 98% 用了多少毫秒
+  const Measure = (id) => {
+    T.viewmodel.Equip(id);
+    T.state.slots.primary = id;
+    Settle();
+    const hip = T.camera.fov;
+    Mouse(true);
+    T.StepFrames(60);                       // 先跑到底拿终值
+    const aim = T.camera.fov;
+    Settle();
+    Mouse(true);
+    let frames = 0;
+    for (let i = 0; i < 60; i += 1) {
+      T.StepFrames(1);
+      frames += 1;
+      if (Math.abs(T.camera.fov - aim) <= Math.abs(hip - aim) * 0.02) break;
+    }
+    Mouse(false);
+    return { id, hip, aim, ms: frames * (1000 / 60) };
+  };
+  const zz = Measure("ZhongZheng");         // adsTimeS 0.28
+  const mp = Measure("Mauser96");           // adsTimeS 0.18（最轻）
+  const hy = Measure("HanYang");            // adsTimeS 0.32（最重）
+
+  // 拉栓期间相机要退出瞄准：开镜稳住 -> 打一发 -> 拉栓动画里读 FOV
+  T.viewmodel.Equip("ZhongZheng");
+  T.state.slots.primary = "ZhongZheng";
+  Mouse(false); T.StepFrames(40);
+  const hip2 = T.camera.fov;
+  Mouse(true); T.StepFrames(60);
+  const aimed = T.camera.fov;
+  T.state.ammo = 5;
+  T.Debug.Fire();
+  let busySeen = false, worst = aimed;
+  for (let i = 0; i < 24; i += 1) {
+    T.StepFrames(1);
+    if (T.viewmodel.IsBusy()) { busySeen = true; worst = Math.max(worst, T.camera.fov); }
+  }
+  Mouse(false);
+  // 0 = 一直贴着瞄准 FOV（没退出），1 = 完全退回髋射
+  const backOut = (worst - aimed) / Math.max(1e-6, hip2 - aimed);
+  return { zz, mp, hy, busySeen, backOut, aimed, worst, hip2 };
+});
+Check("开镜 FOV 过渡是 150 ms（±30 ms）",
+  [adsFov.zz, adsFov.mp, adsFov.hy].every((w) => w.ms > 120 && w.ms < 180),
+  [adsFov.zz, adsFov.mp, adsFov.hy].map((w) => `${w.id} ${w.ms.toFixed(0)} ms`).join(" · ")
+    + `（战地是全局固定 0.15 s）`);
+Check("开镜 FOV 过渡**不随枪变**（轻重差异归动画管，不归相机管）",
+  Math.max(adsFov.zz.ms, adsFov.mp.ms, adsFov.hy.ms)
+    - Math.min(adsFov.zz.ms, adsFov.mp.ms, adsFov.hy.ms) <= 34,
+  `最轻的驳壳枪 ${adsFov.mp.ms.toFixed(0)} ms vs 最重的汉阳造 ${adsFov.hy.ms.toFixed(0)} ms`
+    + `，差 ${Math.abs(adsFov.hy.ms - adsFov.mp.ms).toFixed(0)} ms（adsTimeS 差了 78%）`);
+Check("拉栓强制退出瞄准：那一下「丢失瞄准画面」才是栓动枪的分量",
+  adsFov.busySeen && adsFov.backOut > 0.5,
+  `拉栓中 FOV 从 ${adsFov.aimed.toFixed(1)}° 退到 ${adsFov.worst.toFixed(1)}°`
+    + `（髋射是 ${adsFov.hip2.toFixed(1)}°），退出了 ${(adsFov.backOut * 100).toFixed(0)}%`);
+
 // 12.6 铁瞄偏心：照门不落在屏幕正中，且汉阳造（老套筒）比中正式明显
 const sights = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
