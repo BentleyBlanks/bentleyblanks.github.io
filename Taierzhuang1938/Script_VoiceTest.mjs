@@ -163,6 +163,54 @@ Check("event 句被挡在随机挑选之外（滕县无战车，不许有人随�
 Check("文本是四川话不是普通话（方言零件抽查）",
   r.dialectHits >= 20,
   "31 句里带方言零件（莫/咯/到起/遭/不得/匀/拢/弟兄伙…）的有 " + r.dialectHits + " 句");
+// 响度与底噪：直接量**引擎解出来的那份 AudioBuffer**，不是量磁盘上的文件 ——
+// 要管的就是「播出来一样响吗」。这两条是用户听出来之后补的闸：
+//   · 音量不齐，玩家会把「那一条烘得轻」听成「那个人离得远」，
+//     而远近**只该由距离衰减与遮挡决定**。
+//   · seedaudio 偶尔自带一层房间声/风声，混在战场上就是有人在别的场景里喊话。
+const mix = await page.evaluate(async () => {
+  const A = window.Taierzhuang.audio;
+  const voice = await import("./Data_Voice.mjs");
+  const sampled = new Set(voice.VOICE_LINES.filter((l) => l.sample).map((l) => l.key));
+  const out = [];
+  // voiceBank 只存元数据，解好的缓冲藏在配方闭包里取不到 —— 重新 fetch 一遍最省事
+  for (const line of voice.VOICE_LINES) {
+    const res = await fetch(voice.VOICE_BASE + line.file);
+    const pcm = await A.ctx.decodeAudioData(await res.arrayBuffer());
+    const d = pcm.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < d.length; i += 1) peak = Math.max(peak, Math.abs(d[i]));
+    const n = Math.round(pcm.sampleRate * 0.02);
+    const frames = [];
+    for (let f = 0; (f + 1) * n <= d.length; f += 1) {
+      let s = 0;
+      for (let i = 0; i < n; i += 1) { const v = d[f * n + i]; s += v * v; }
+      frames.push(Math.sqrt(s / n));
+    }
+    const voiced = frames.filter((v) => v >= peak * 0.1);
+    const rms = voiced.length ? Math.sqrt(voiced.reduce((a, v) => a + v * v, 0) / voiced.length) : 0;
+    const sorted = frames.slice().sort((a, b) => a - b);
+    out.push({
+      key: line.key, sampled: sampled.has(line.key),
+      rms: 20 * Math.log10(rms + 1e-9),
+      floor: 20 * Math.log10(sorted[Math.floor(sorted.length * 0.08)] + 1e-9),
+    });
+  }
+  return out;
+});
+const rmsVals = mix.map((m) => m.rms);
+const spread = Math.max(...rmsVals) - Math.min(...rmsVals);
+Check("整批音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不许由文件音量代劳）",
+  spread <= 2.5,
+  `有声段 RMS ${Math.min(...rmsVals).toFixed(1)} … ${Math.max(...rmsVals).toFixed(1)} dB，`
+  + `散布 ${spread.toFixed(1)} dB`);
+// 实录那条（惨叫）的「底噪」量到的是它自己的衰减尾巴，豁免。
+const noisy = mix.filter((m) => !m.sampled && m.floor > -40);
+Check("没有自带环境音（TTS 偶尔会附一层房间声/风声，混在战场上就是穿帮）",
+  noisy.length === 0,
+  noisy.length ? noisy.map((m) => `${m.key} ${m.floor.toFixed(0)}dB`).join(" ")
+    : `最吵的一条 ${Math.max(...mix.filter((m) => !m.sampled).map((m) => m.floor)).toFixed(0)} dB`);
+
 Check("节流生效：连着两句只出一句（五十个人不能同时喊卧倒）", r.firstOk && r.secondBlocked,
   `第一句${r.firstOk ? "出" : "没出"}，第二句${r.secondBlocked ? "被吃掉" : "也出了"}`);
 Check("指定 key 能喊到那一句（下命令不能从 rally 里随便挑）", r.keyedOk, "rally_hold");
