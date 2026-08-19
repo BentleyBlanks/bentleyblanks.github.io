@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="血战台儿庄（1938）交互科普馆：战役背景、双方阵容、中日枪械对比、逐日时间线、战场态势图、敢死队、战术解析与史实纠偏。">
+<title>血战台儿庄 · 1938 交互科普馆</title>
+<link rel="stylesheet" href="Style_Main.css?v=1">
+</head>
+<body>
+
+<header class="siteHeader">
+  <div class="readProgress" id="readProgress"></div>
+  <div class="siteHeaderInner">
+    <div class="siteHeaderTop">
+      <span class="siteBrand"><span class="seal">史</span>血战台儿庄 · 1938</span>
+      <span class="siteBrandSub">交互科普馆 · 由浅入深读懂一场仗</span>
+    </div>
+    <nav class="navLinks" id="navLinks" aria-label="章节导航">
+      <span class="navGroup">入门</span>
+      <a href="#tldr">一分钟看懂</a>
+      <a href="#background">背景</a>
+      <span class="navGroup">进阶</span>
+      <a href="#commanders">双方阵容</a>
+      <a href="#weapons">枪械装备</a>
+      <span class="navGroup">深入</span>
+      <a href="#timeline">战役流程</a>
+      <a href="#map">战场态势</a>
+      <a href="#dare">敢死队</a>
+      <a href="#tactics">战术解析</a>
+      <span class="navGroup">复盘</span>
+      <a href="#aftermath">代价与意义</a>
+      <a href="#myths">纠偏</a>
+      <a href="#glossary">词典</a>
+      <a href="#reading">延伸阅读</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ Hero ============ -->
+<section class="hero" id="top">
+  <div class="heroBg"></div>
+  <div class="wrap">
+    <p class="heroKicker">TAIERZHUANG · 1938</p>
+    <h1 class="heroTitle">血战<span class="blood">台儿庄</span></h1>
+    <p class="heroSub">山东峄县 · 1938 年 3 月 23 日 — 4 月 7 日</p>
+    <p class="heroTagline">一场把已经攻进城里的日军，一间房一间房打回去的仗——抗战全面爆发以来正面战场的第一次大捷。</p>
+    <div class="heroMeta">
+      <span>第五战区 李宗仁</span><span>第 2 集团军 孙连仲</span><span>第 20 军团 汤恩伯</span>
+      <span>濑谷支队</span><span>坂本支队</span><span>3.14 滕县 · 3.14 临沂</span>
+    </div>
+    <div class="statGrid" id="statGrid"></div>
+    <p class="scrollHint">向下滑动 · 由浅入深</p>
+  </div>
+</section>
+
+<!-- ============ 一分钟看懂 ============ -->
+<section id="tldr">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv1">入门 · ENTRY</span>
+      <h2 class="secTitle"><span class="no">01</span>一分钟看懂台儿庄</h2>
+      <p class="secSub">先记住六件事，后面的所有细节都是它们的展开。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="tldrGrid" id="tldrGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 背景 ============ -->
+<section id="background">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv1">入门 · ENTRY</span>
+      <h2 class="secTitle"><span class="no">02</span>为什么是台儿庄</h2>
+      <p class="secSub">这场仗不是孤立的：它是徐州会战的一环，根子在一条铁路上。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="bgGrid">
+      <div class="bgText">
+        <p><strong>南京陷落之后。</strong>1937 年 12 月 13 日南京陷落，日军大本营定下下一个作战目标：<span class="hl">打通津浦铁路</span>，让华北方面军（司令官寺内寿一）与华中派遣军（司令官畑俊六）两个战场连成一片——华北方面军沿津浦线南下，华中派遣军自淮河方向北上，<span class="hl">南北对进夹击徐州</span>。得手后沿陇海路西取郑州，再沿平汉路南下夺武汉。</p>
+        <p><strong>徐州是十字路口。</strong>津浦、陇海两条铁路在徐州交叉——这是徐州成为焦点的唯一理由，不是因为城本身。中国方面由<strong>第五战区司令长官李宗仁</strong>（副司令长官白崇禧实际参与作战指导）负责，统辖的是一支「杂牌拼盘」：西北军系、川军、桂系、东北军、中央军，约 60 万人（含会战期间陆续增援）。日军投入约 24 万人、8 个师团另 3 个旅团级支队。</p>
+        <p><strong>台儿庄是门户。</strong>台儿庄在徐州东北约 60 公里，紧贴运河北岸，是日军南下徐州的必经要道。北线日军分两路南下：<span class="hl">第 10 师团（矶谷廉介）沿津浦路正面南压</span>，<span class="hl">第 5 师团（板垣征四郎）由胶济路南折、经莒县—临沂向西南迂回</span>。两路计划在台儿庄—峄县一带会师，再一举南下徐州——这就是「两把钳子」的构造。</p>
+        <div class="callout">
+          <b>台儿庄战役全部战术张力的来源，一句话：</b>中方要做的，是让两把钳子合不拢。为此需要有人守住东边的临沂、有人拖住西边的滕县、有人在台儿庄城里把南下的那路日军缠住，再有一支好部队从外面把它的退路掐断。
+        </div>
+      </div>
+      <div class="diagramPanel">
+        <h4>南北对进 · 打通津浦线（示意）</h4>
+        <svg class="diagramSvg" viewBox="0 0 560 430" role="img" aria-label="日军南北对进夹击徐州示意图">
+          <rect x="0" y="0" width="560" height="430" fill="#1d1710" rx="8"/>
+          <!-- 津浦铁路 -->
+          <line class="geo" x1="280" y1="60" x2="280" y2="330" stroke="#6d5c3f" stroke-width="3"/>
+          <text class="lbl" x="292" y="200" fill="#93856a">津浦铁路</text>
+          <!-- 陇海线 -->
+          <line class="geo" x1="90" y1="330" x2="470" y2="330" stroke="#6d5c3f" stroke-width="2.5"/>
+          <text class="lbl" x="300" y="352" fill="#93856a">陇海铁路</text>
+          <!-- 徐州 -->
+          <circle cx="280" cy="330" r="9" fill="#41587e" stroke="#8fb0e0" stroke-width="2"/>
+          <text class="big" x="258" y="315" fill="#8fb0e0">徐州</text>
+          <text class="lbl" x="230" y="300" fill="#9dbbe8">第五战区 · 李宗仁</text>
+          <!-- 华北方面军南下 -->
+          <text class="big" x="150" y="52" fill="#e08a80">华北方面军 · 寺内寿一</text>
+          <path class="arrowFlow" d="M262 66 C 266 140, 274 220, 277 312" stroke="#d4554a" stroke-width="3.5" fill="none"/>
+          <polygon points="274,318 281,300 270,302" fill="#d4554a"/>
+          <text class="lbl" x="80" y="190" fill="#e08a80">第 10 师团（矶谷）沿津浦线南下</text>
+          <text class="lbl" x="80" y="207" fill="#e08a80">第 5 师团（板垣）经临沂迂回</text>
+          <!-- 华中派遣军北上 -->
+          <text class="big" x="392" y="410" fill="#e08a80">华中派遣军 · 畑俊六</text>
+          <path class="arrowFlow" d="M448 400 C 420 380, 320 352, 296 340" stroke="#d4554a" stroke-width="3.5" fill="none"/>
+          <polygon points="292,337 300,344 306,334" fill="#d4554a"/>
+          <text class="lbl" x="420" y="180" fill="#93856a">南线在淮河被</text>
+          <text class="lbl" x="420" y="197" fill="#93856a">第 51、59、31 军顶住</text>
+          <!-- 南京 -->
+          <circle cx="472" cy="392" r="6" fill="#6e241c" stroke="#d4554a" stroke-width="1.5"/>
+          <text class="lbl" x="478" y="398" fill="#c9b893">南京（1937.12 陷落）</text>
+          <!-- 战后企图 -->
+          <path d="M284 330 L 400 282" stroke="#8a6a2a" stroke-width="2" stroke-dasharray="6 6" fill="none"/>
+          <polygon points="404,280 390,283 396,291" fill="#8a6a2a"/>
+          <text class="lbl" x="406" y="278" fill="#d9a441">得手后西取郑州</text>
+          <path d="M290 342 L 340 420" stroke="#8a6a2a" stroke-width="2" stroke-dasharray="6 6" fill="none"/>
+          <polygon points="342,424 332,416 334,428" fill="#8a6a2a"/>
+          <text class="lbl" x="330" y="432" fill="#d9a441">南下武汉</text>
+          <!-- 台儿庄位置提示 -->
+          <text class="big" x="376" y="140" fill="#e9dcc0">台儿庄 ↗</text>
+          <text class="lbl" x="376" y="157" fill="#c9b893">徐州东北约 60 公里</text>
+          <text class="lbl" x="376" y="172" fill="#c9b893">运河边的商镇</text>
+        </svg>
+        <p class="cap">示意图，非精确地理。北线两路是台儿庄战役的直接对手；南线被顶在淮河，始终没能与北线合拢。</p>
+      </div>
+    </div>
+
+    <div class="townFacts">
+      <h3>台儿庄城小档案（战场的地理质感，决定了这场仗怎么打）</h3>
+      <ul class="factList" id="factList"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 双方阵容 ============ -->
+<section id="commanders">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv2">进阶 · DEEPER</span>
+      <h2 class="secTitle"><span class="no">03</span>谁在打这场仗</h2>
+      <p class="secSub">点开任何一支番号，看它在战役里的角色。标 ★ 的是核心单位。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="forcesGrid">
+      <div class="forceCol cn">
+        <div class="forceColHead">
+          <h3 id="forceCnTitle"></h3>
+          <p class="sub" id="forceCnSub"></p>
+          <p class="note" id="forceCnNote"></p>
+        </div>
+        <div id="forceCnTree"></div>
+      </div>
+      <div class="forceCol jp">
+        <div class="forceColHead">
+          <h3 id="forceJpTitle"></h3>
+          <p class="sub" id="forceJpSub"></p>
+          <p class="note" id="forceJpNote"></p>
+        </div>
+        <div id="forceJpTree"></div>
+      </div>
+    </div>
+
+    <div class="peopleHead">
+      <h3>人物志 · 20 位关键人物</h3>
+      <p>点筛选按钮只看中方或日方。注意三场仗的人物不要混装：王铭章在滕县、张自忠与庞炳勋在临沂、池峰城与孙连仲在台儿庄、汤恩伯与关麟徵在外线。</p>
+    </div>
+    <div class="peopleFilters" id="peopleFilters"></div>
+    <div class="peopleGrid" id="peopleGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 枪械装备 ============ -->
+<section id="weapons">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv2">进阶 · DEEPER</span>
+      <h2 class="secTitle"><span class="no">04</span>手里的家伙：中日枪械对比</h2>
+      <p class="secSub">一支是工业国的制式装备，一支是补给最差的杂牌军。点开卡片看规格，再往下做同类对比。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="wpnToolbar" id="wpnToolbar"></div>
+    <p class="wpnNote" id="wpnNote"></p>
+    <div class="wpnGrid" id="wpnGrid"></div>
+
+    <div class="comparePanel">
+      <h3>同类对比</h3>
+      <p class="cap">按类别看中方 vs 日方的装备，以及这一类的实战结论。</p>
+      <div class="comparePicks" id="comparePicks"></div>
+      <div class="compareGrid" id="compareGrid"></div>
+    </div>
+
+    <div class="balancePanel">
+      <h3>火力天平（定性示意）</h3>
+      <p class="cap">相对强度 0—10 的示意，不是精确统计。看比例，别看数字。</p>
+      <div class="balanceKey">
+        <span class="cn"><i></i>中方</span>
+        <span class="jp"><i></i>日方</span>
+      </div>
+      <div id="balanceRows"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 武器详情浮层 -->
+<div class="modalMask" id="wpnModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wpnModalTitle">
+    <button class="modalClose" id="wpnModalClose" aria-label="关闭">✕</button>
+    <h3 id="wpnModalTitle"></h3>
+    <p class="mNick" id="wpnModalNick"></p>
+    <p class="mFull" id="wpnModalFull"></p>
+    <div class="mSpec" id="wpnModalSpec"></div>
+    <div class="mNotes" id="wpnModalNotes"></div>
+  </div>
+</div>
+
+<!-- ============ 战役流程 ============ -->
+<section id="timeline">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">深入 · DEEP</span>
+      <h2 class="secTitle"><span class="no">05</span>战役全流程：23 个节点</h2>
+      <p class="secSub">从南京陷落到徐州失守。点击节点展开细节；「自动播放」按时间顺序走一遍。带可信度标：<span class="tierBadge solid">信史</span><span class="tierBadge main">主流记载</span><span class="tierBadge disputed">流传待考</span></p>
+      <div class="secRule"></div>
+    </div>
+    <div class="phaseLegend" id="phaseLegend"></div>
+    <div class="tlControls">
+      <button class="tlBtn" id="tlPlay">▶ 自动播放</button>
+      <button class="tlBtn" id="tlReset">回到起点</button>
+    </div>
+    <div class="timeline" id="tlList"></div>
+  </div>
+</section>
+
+<!-- ============ 战场态势 ============ -->
+<section id="map">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">深入 · DEEP</span>
+      <h2 class="secTitle"><span class="no">06</span>战场态势图：三个阶段</h2>
+      <p class="secSub">切换阶段看态势变化。蓝色箭头＝中国军队，红色箭头＝日军。示意地图，非精确地理。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="mapPanel">
+      <div class="mapTabs" id="mapTabs">
+        <button class="mapTab on" data-phase="prelude">① 前哨战（3.14—3.18）</button>
+        <button class="mapTab" data-phase="street">② 巷战拉锯（3.23—4.5）</button>
+        <button class="mapTab" data-phase="counter">③ 总反攻（4.6—4.7）</button>
+      </div>
+      <div class="mapStage" id="mapStage"></div>
+      <div class="mapSvgBox">
+        <svg class="mapSvg" viewBox="0 0 900 620" role="img" aria-label="台儿庄战役战场态势示意">
+          <rect x="0" y="0" width="900" height="620" fill="#1a140d" rx="8"/>
+          <!-- 地形 -->
+          <text class="tl" x="24" y="36" fill="#93856a">鲁南 · 1938 年 3—4 月（示意）</text>
+          <!-- 沂河 -->
+          <path class="geo" d="M712 40 C 700 110, 716 190, 700 300" stroke="#5d4c31" stroke-width="2.5"/>
+          <text class="tl" x="718" y="150" fill="#93856a">沂河</text>
+          <!-- 运河 -->
+          <path class="canal" d="M330 512 L 880 512"/>
+          <text class="tl" x="340" y="540" fill="#6f9ab8">京杭运河（东西流向）</text>
+          <!-- 津浦铁路 -->
+          <line class="rail" x1="250" y1="70" x2="250" y2="600"/>
+          <text class="tl" x="258" y="300" fill="#93856a">津浦铁路</text>
+          <!-- 支线 -->
+          <path class="branch" d="M250 428 L 455 428"/>
+          <text class="tl" x="300" y="420" fill="#93856a">临枣支线</text>
+          <path class="branch" d="M455 428 L 618 478"/>
+          <text class="tl" x="480" y="466" fill="#93856a">台枣支线</text>
+          <!-- 城镇 -->
+          <circle class="townNeutral" cx="250" cy="200" r="7"/><text class="tlBig" x="262" y="196">滕县</text>
+          <circle class="townNeutral" cx="250" cy="428" r="5"/><text class="tl" x="256" y="424">临城</text>
+          <circle class="townNeutral" cx="250" cy="478" r="4"/><text class="tl" x="256" y="474">韩庄</text>
+          <circle class="townNeutral" cx="455" cy="428" r="5"/><text class="tl" x="461" y="424">枣庄</text>
+          <circle class="townNeutral" cx="482" cy="330" r="5"/><text class="tl" x="488" y="326">峄县</text>
+          <circle class="townCn" cx="250" cy="568" r="9"/><text class="tlBig" x="234" y="556" fill="#8fb0e0">徐州</text>
+          <text class="tlCn" x="262" y="590">第五战区司令长官部</text>
+          <circle class="townNeutral" cx="768" cy="190" r="7"/><text class="tlBig" x="780" y="186">临沂</text>
+          <circle class="townNeutral" cx="768" cy="118" r="4"/><text class="tl" x="774" y="114">汤头</text>
+          <circle class="townNeutral" cx="752" cy="330" r="4"/><text class="tl" x="756" y="326">向城·爱曲</text>
+          <!-- 台儿庄（城区） -->
+          <g>
+            <rect class="townCn" x="596" y="452" width="48" height="36" rx="4"/>
+            <text class="tlBig" x="590" y="446" fill="#e9dcc0">台儿庄</text>
+          </g>
+
+          <!-- ===== 阶段一：前哨战 ===== -->
+          <g class="mapPhase" data-map-phase="prelude">
+            <path class="mapArrow jp" d="M250 214 C 320 260, 430 300, 482 330 L 590 448" />
+            <polygon points="594,452 578,448 588,460" fill="#d4554a"/>
+            <text class="tlJp" x="330" y="290">濑谷支队：3.14 攻滕县 → 3.18 陷滕县、临城 → 南下</text>
+            <path class="mapArrow jp" d="M768 130 L 768 178" />
+            <polygon points="766,182 760,170 772,170" fill="#d4554a"/>
+            <text class="tlJp" x="776" y="152">坂本支队 3.9 起猛攻临沂</text>
+            <path class="mapArrow cn" d="M648 196 L 756 192" />
+            <polygon points="760,192 748,188 750,198" fill="#8fb0e0"/>
+            <text class="tlCn" x="652" y="180">张自忠 59 军 3.14 拂晓渡沂河侧击</text>
+            <line x1="760" y1="182" x2="776" y2="198" stroke="#d4554a" stroke-width="4"/>
+            <line x1="776" y1="182" x2="760" y2="198" stroke="#d4554a" stroke-width="4"/>
+            <text class="tlJp" x="776" y="222">被庞炳勋 3 军团 + 张自忠牵住 → 两把钳子合不拢</text>
+            <text class="tlCn" x="208" y="232">★ 王铭章 3.17 殉国</text>
+            <text class="tlCn" x="180" y="248">（滕县多守三天）</text>
+          </g>
+
+          <!-- ===== 阶段二：巷战拉锯 ===== -->
+          <g class="mapPhase" data-map-phase="street">
+            <g class="mapBlob">
+              <rect x="600" y="448" width="40" height="40" rx="4" fill="rgba(178,58,46,0.55)" stroke="#d4554a" stroke-width="1.5"/>
+            </g>
+            <text class="tlJp" x="560" y="420">日军控制 2/3—3/4 市街（4.4）</text>
+            <text class="tlCn" x="560" y="436">守军退守西南一隅，背靠运河</text>
+            <path class="mapArrow cn" d="M430 270 C 452 292, 468 310, 482 326" />
+            <polygon points="486,330 474,326 478,338" fill="#8fb0e0"/>
+            <text class="tlCn" x="392" y="254">汤恩伯 20 军团：攻峄县、切补给</text>
+            <line x1="466" y1="418" x2="496" y2="438" stroke="#8fb0e0" stroke-width="4"/>
+            <line x1="496" y1="418" x2="466" y2="438" stroke="#8fb0e0" stroke-width="4"/>
+            <text class="tlCn" x="498" y="416">切断台枣支线补给</text>
+            <path class="mapArrow jp" d="M768 204 C 766 260, 756 300, 748 330 L 706 430" />
+            <polygon points="703,435 714,428 706,440" fill="#d4554a"/>
+            <text class="tlJp" x="726" y="380">坂本支队西援：4.2 至台儿庄以东 5—6 km，迟到的、被削弱的</text>
+            <text class="tlCn" x="240" y="602">孙连仲 2 集团军：城内逐屋死守，把濑谷支队「吸」在城里</text>
+          </g>
+
+          <!-- ===== 阶段三：总反攻 ===== -->
+          <g class="mapPhase" data-map-phase="counter">
+            <path class="mapArrow cn" d="M420 262 C 470 330, 540 400, 592 444" />
+            <polygon points="596,448 582,442 590,456" fill="#8fb0e0"/>
+            <text class="tlCn" x="384" y="238">汤恩伯 20 军团主力南下，自北面断敌退路</text>
+            <path class="mapArrow cn" d="M560 524 L 596 496" />
+            <polygon points="600,492 586,494 594,504" fill="#8fb0e0"/>
+            <text class="tlCn" x="520" y="544">孙连仲部自城内反击（4.6 夜全线总攻）</text>
+            <path class="mapArrow retreat" d="M640 452 L 596 420 L 486 336 L 462 420" />
+            <polygon points="458,426 470,420 460,432" fill="#d4554a"/>
+            <text class="tlJp" x="560" y="344">4.6 日没后日军奉命转进（濑谷「独断离脱」）</text>
+            <text class="tlJp" x="398" y="470">向峄县、枣庄退却</text>
+            <text class="tl" x="620" y="586" fill="#c9b893">4.7 凌晨 1 时全线反攻 · 清晨陆诒、范长江进入台儿庄</text>
+          </g>
+        </svg>
+      </div>
+      <div class="mapLegend">
+        <span class="cn"><i></i>中国军队</span>
+        <span class="jp"><i></i>日军</span>
+        <span>✕ 被阻断</span>
+        <span>◆ 城镇</span>
+      </div>
+    </div>
+
+    <div class="townInsetGrid">
+      <div class="townInset">
+        <h4>台儿庄城 · 4 月 4 日最危急时刻（示意）</h4>
+        <p class="cap">日军已控制约三分之二至四分之三市街，守军只剩西南一隅背靠运河。看看这座城的形状，就明白为什么能打成巷战。</p>
+        <svg class="townInsetSvg" viewBox="0 0 540 400" role="img" aria-label="台儿庄城示意图">
+          <rect x="0" y="0" width="540" height="400" fill="#1d1710" rx="8"/>
+          <!-- 日军控制区 -->
+          <path class="jpZone" d="M140 60 L220 60 L380 60 L380 170 L380 300 L220 300 L220 180 L150 140 Z"/>
+          <!-- 守军阵地 -->
+          <path class="cnZone" d="M60 60 L140 60 L150 140 L220 180 L220 300 L60 300 Z"/>
+          <!-- 城墙 -->
+          <rect class="wall" x="60" y="60" width="320" height="240" rx="4"/>
+          <!-- 城门 -->
+          <g class="gate">
+            <text x="108" y="56" fill="#e9dcc0">小北门</text>
+            <text x="196" y="56" fill="#e9dcc0">中正门（主攻方向）</text>
+            <text x="386" y="180" fill="#e9dcc0">东门</text>
+            <text x="212" y="322" fill="#e9dcc0">南门</text>
+            <text x="52" y="168" fill="#e9dcc0">西门（唯一对外通路）</text>
+          </g>
+          <line x1="220" y1="60" x2="220" y2="72" stroke="#e9dcc0" stroke-width="3"/>
+          <line x1="380" y1="160" x2="392" y2="160" stroke="#e9dcc0" stroke-width="3"/>
+          <line x1="220" y1="300" x2="220" y2="312" stroke="#e9dcc0" stroke-width="3"/>
+          <line x1="60" y1="160" x2="48" y2="160" stroke="#e9dcc0" stroke-width="3"/>
+          <!-- 运河与浮桥 -->
+          <path class="canal" d="M20 350 L 520 350"/>
+          <text class="lbl" x="300" y="342" fill="#6f9ab8">京杭运河</text>
+          <line x1="200" y1="300" x2="200" y2="350" stroke="#8a7552" stroke-width="5" stroke-dasharray="8 4"/>
+          <text class="lbl" x="206" y="372" fill="#c9b893">浮桥（战中被断，背水死守）</text>
+          <!-- 据点 -->
+          <circle cx="330" cy="112" r="5" fill="#d4554a"/><text class="lbl" x="336" y="108" fill="#e9dcc0">清真寺（186 团指挥所）</text>
+          <circle cx="345" cy="238" r="5" fill="#d4554a"/><text class="lbl" x="350" y="250" fill="#e9dcc0">关帝庙（池峰城指挥所）</text>
+          <circle cx="180" cy="150" r="4" fill="#8fb0e0"/><text class="lbl" x="120" y="120" fill="#9dbbe8">文昌阁</text>
+          <circle cx="96" cy="258" r="4" fill="#8fb0e0"/><text class="lbl" x="102" y="262" fill="#9dbbe8">火车站</text>
+          <!-- 图例 -->
+          <rect x="380" y="60" width="12" height="12" fill="rgba(178,58,46,0.45)" stroke="#d4554a"/><text class="lbl" x="396" y="72" fill="#c9b893">日军控制区</text>
+          <rect x="380" y="84" width="12" height="12" fill="rgba(109,143,196,0.35)" stroke="#8fb0e0"/><text class="lbl" x="396" y="96" fill="#c9b893">守军最后阵地</text>
+          <text class="lbl" x="24" y="34" fill="#93856a">寨墙：砖包土坯，高约 4 米（不是省城级城垣）</text>
+        </svg>
+      </div>
+      <div class="townInset">
+        <h4>为什么炮火优势在巷子里失效</h4>
+        <p class="cap">台儿庄是明清运河商埠：窄巷 + 院落 + 高墙，鲁南民居对外一律不开窗，窗全朝院里开。</p>
+        <p style="font-size:0.88rem;color:#c9b893;margin-bottom:10px">街上两侧是连续的实墙，看不见人；一旦破门破墙进了院子，窗、廊、屋顶的射界才一下子全打开。守军沿墙根凿射孔、挖半人高的立射壕，隔着一堵墙跟对面钻洞对射——「不止一条小街和一条小路，连一个院落和一间房子」都要争。</p>
+        <p style="font-size:0.88rem;color:#c9b893;margin-bottom:10px">日军战车最厚装甲只有 17mm，窄巷里转不了身、抬不起炮打屋顶；火炮隔墙打不着，飞机看不清目标。于是这场仗被拖进了中国军队的强项：手榴弹、刺刀、大刀和夜里。</p>
+        <p style="font-size:0.88rem;color:#c9b893">「揪住敌人裤腰带打」——这一手大大抵销了日军飞机大炮的杀伤。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 敢死队 ============ -->
+<section id="dare">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">深入 · DEEP</span>
+      <h2 class="secTitle"><span class="no">07</span>敢死队：不止一支</h2>
+      <p class="secSub">台儿庄的敢死队是制度化的、多批次的，不是一次悲壮的孤例。有较明确记载的至少五批。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="dareGrid" id="dareGrid"></div>
+    <div class="dareLoadout">
+      <h4>敢死队标准装备（仵德厚队，主流记载）</h4>
+      <ul id="dareLoadout"></ul>
+    </div>
+    <div class="dareNotes" id="dareNotes"></div>
+  </div>
+</section>
+
+<!-- ============ 战术解析 ============ -->
+<section id="tactics">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">深入 · DEEP</span>
+      <h2 class="secTitle"><span class="no">08</span>为什么会赢：六张牌</h2>
+      <p class="secSub">把这场仗拆开看，赢法其实很清晰——难的是每一张牌都要有人用命去撑住。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="tacticGrid" id="tacticGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 代价与意义 ============ -->
+<section id="aftermath">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">复盘 · REVIEW</span>
+      <h2 class="secTitle"><span class="no">09</span>代价与意义</h2>
+      <p class="secSub">数字最需要谨慎：各方说法差到几倍，本页不做唯一取舍。意义则很清晰。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="meaningGrid">
+      <div class="meaningCard">
+        <h3>第一次把攻进城里的日军逼出去</h3>
+        <p>抗战全面爆发以来正面战场第一次成规模的胜仗：不是迟滞、不是撤退中的斩获，而是把已经攻入城内、占据四分之三市街的日军支队逼退。它打破了「皇军不可战胜」的心理暗示，政治与士气价值远超军事价值本身。</p>
+      </div>
+      <div class="meaningCard">
+        <h3>消息是怎么传遍全国的</h3>
+        <p>1938 年 4 月 4 日，《大公报》范长江与《新华日报》陆诒抵徐州；4 月 7 日清晨，二人进入台儿庄。范长江抢到最早的反攻胜利消息发往汉口，《大公报》为此发了「号外」。陆诒的通讯今天还能查到：《胜利前夜的台儿庄》《踏进台儿庄》《鲁南会战》。</p>
+      </div>
+      <div class="meaningCard">
+        <h3>一个冷静的注脚</h3>
+        <p>毛泽东在《论持久战》（1938 年 5 月）里对台儿庄的表述是警告，不是赞颂：「平型关一个胜仗，冲昏了一些人的头脑；台儿庄再一个胜仗，冲昏了更多的人的头脑。」同年 5 月 19 日徐州失守——胜利是局部的，抗战是长期的。台儿庄的价值，在于证明了「能打赢」，不在于「打完了」。</p>
+      </div>
+    </div>
+    <div id="casTables"></div>
+    <div class="quoteGrid" id="quoteGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 纠偏 ============ -->
+<section id="myths">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">复盘 · REVIEW</span>
+      <h2 class="secTitle"><span class="no">10</span>纠偏：流传的说法 vs 更稳的史实</h2>
+      <p class="secSub">这场仗的名场面大多来自回忆与影视，多数是「主流记载」甚至「流传待考」。分辨清楚，才是对历史真正的尊重。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="mythGrid" id="mythGrid"></div>
+  </div>
+</section>
+
+<!-- ============ 词典 ============ -->
+<section id="glossary">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">复盘 · REVIEW</span>
+      <h2 class="secTitle"><span class="no">11</span>术语小词典</h2>
+      <p class="secSub">读战史常碰到的高频词，点开即查。</p>
+      <div class="secRule"></div>
+    </div>
+    <dl class="glossary" id="glossary"></dl>
+  </div>
+</section>
+
+<!-- ============ 延伸阅读 ============ -->
+<section id="reading">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">复盘 · REVIEW</span>
+      <h2 class="secTitle"><span class="no">12</span>延伸阅读与考据说明</h2>
+      <p class="secSub">本页内容基于本仓库《血战台儿庄》游戏项目的考据底本与公开资料交叉整理。</p>
+      <div class="secRule"></div>
+    </div>
+    <ul class="readingList" id="readingList"></ul>
+    <div class="methodNote">
+      <h4>可信度分级（本页所有历史叙述的标注方式）</h4>
+      <div class="tierLegend">
+        <div><span class="tierBadge solid">信史</span>档案原件、当时报刊或中日双方战史可对勘。</div>
+        <div><span class="tierBadge main">主流记载</span>当事人回忆、口述、地方文史辗转记载，无同时代文件背书。</div>
+        <div><span class="tierBadge disputed">流传待考</span>仅见于百科、网文或影视二次创作，版本互斥。</div>
+      </div>
+      <p style="margin-top:10px">原则：凡是回忆录孤证（如 4 月 4 日深夜李宗仁与孙连仲的通话）标「主流记载」；凡是网传说法（如「每个月打一个台儿庄」）标「流传待考」或直接纠偏。伤亡数字、缴获数字按各方口径并列呈现，不立「唯一权威数字」。</p>
+      <p>主要底本：本仓库 <a href="../Taierzhuang1938/docs/Data_HistoryTimeline.md">Data_HistoryTimeline.md</a>、<a href="../Taierzhuang1938/docs/Data_HistoryQuotes.md">Data_HistoryQuotes.md</a>、<a href="../Taierzhuang1938/docs/Data_HistoryMaterial.md">Data_HistoryMaterial.md</a>（含逐条出处），以及中文维基百科「台儿庄战役 / 徐州会战 / 滕县保卫战 / 临沂保卫战」等条目。</p>
+    </div>
+  </div>
+</section>
+
+<footer class="siteFooter">
+  <div class="wrap">
+    <p class="footTitle">血战台儿庄 · 1938</p>
+    <p>台儿庄不是靠一个人守住的，是靠成千上万个连名字都没留下的人，一间房一间房填上去的。</p>
+    <p style="margin-top:10px">页面为科普用途 · 数字存在不同说法时采用并列呈现 · 2026-08-13</p>
+  </div>
+</footer>
+
+<script type="module" src="Script_Main.mjs?v=1"></script>
+</body>
+</html>
