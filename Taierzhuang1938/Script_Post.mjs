@@ -528,6 +528,13 @@ void main() {
  * 一堆糊在原点的方块，SSAO 与体积光的天空判据跟着一起废。
  *
  * 规矩：**任何半透明的、加性混合的、billboard 的东西，建完材质立刻调这个。**
+ *
+ * 但要清楚它到此为止：allowOverride = false 只是"不换材质"，对象**照样会被画进
+ * 预通道**，只是用的是它自己的着色器 —— 于是 rtNormalDepth 的 xyz 收到的是它的
+ * 颜色、w 收到的是它的 alpha。半透明小片子影响有限，铺满全屏的东西（天空穹）
+ * 就会把整片天空的 w 写成 1.0，下游一律误判成"一米外有实体"。
+ * 覆盖大片屏幕的，还要给对象挂 `userData.skipNormalDepth = true`，
+ * PostPipeline 那一趟会把它整个藏掉。
  */
 export function MarkNoPrepass(material) {
   if (!material) return material;
@@ -562,6 +569,7 @@ export class PostPipeline {
     this.hdrCapable = hasFloatRt;
 
     this.normalDepthMaterial = MakeNormalDepthMaterial();
+    this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.quadMesh.frustumCulled = false;
@@ -703,6 +711,31 @@ export class PostPipeline {
   /** 屏幕空间 AO 贴图 —— 交给 Materials 层注入 MeshStandardMaterial 的间接光。 */
   get AoTexture() { return this.targets.aoBlur.texture; }
 
+  /**
+   * 深度法线预通道（RGBA16F：xyz = 视空间法线，w = 线性视深度）。全分辨率，
+   * 与主 HDR 靶同尺寸，所以采样直接用 gl_FragCoord.xy / (width, height)。
+   * 粒子层要它做软粒子，也要它判断"这一像素背后是不是天空"——
+   * 合成 pass 的雾明写跳过 w = 0 的天空，粒子得自己接上那一半。
+   */
+  get NormalDepthTexture() { return this.targets.normalDepth.texture; }
+
+  /**
+   * 收集这一帧要在预通道里整个藏掉的对象（userData.skipNormalDepth === true）。
+   *
+   * 每帧遍历一次场景图：这一趟本来就要被渲染器自己遍历好几遍，多一次几十微秒，
+   * 换来的是"挂上去就生效"——缓存一份列表的话，换关重建场景那一帧必然是脏的，
+   * 而这个 bug 的表现（天上一个黑洞）恰恰要花一小时才定位得到。
+   * 只收当前可见的：本来就藏着的对象不该被这里"帮忙"打开。
+   */
+  _CollectSkipped(scene) {
+    const list = this._skipScratch;
+    list.length = 0;
+    scene.traverse((object) => {
+      if (object.visible && object.userData && object.userData.skipNormalDepth) list.push(object);
+    });
+    return list;
+  }
+
   _Blit(material, target) {
     this.quadMesh.material = material;
     this.renderer.setRenderTarget(target ?? null);
@@ -726,6 +759,19 @@ export class PostPipeline {
     const projScaleX = projScaleY / camera.aspect;
 
     // --- 1) 深度法线预通道 ---
+    //
+    // 事故（这一条是好几个"远景不对劲"的共同根因）：allowOverride = false 只保证
+    // **不被换材质**，它照样会被画进这一趟。天空穹正是这样用自己那套着色器
+    // 写进 rtNormalDepth 的：xyz 是天空颜色（当法线用是纯垃圾），w 是它的
+    // 不透明度 1.0 —— 于是整片天空在下游看起来像"一米外有东西"。
+    // 后果一路传下去：SSAO 拿天空色当法线算遮蔽；合成 pass 的雾判据
+    // `nd.w > 0.0` 对天空成立（只是雾量≈0，蒙混过关）；而粒子层用
+    // `nd.w > 0.001` 判断"背景是不是天空"时全判反 —— 软粒子把天空前的烟
+    // 整片抹掉（clamp((1.0 − 186)/0.45) = 0），大气透视也补不上去，
+    // 二百米外的黑烟柱就成了天上一个越长越大的黑洞。
+    // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
+    const skipped = this._CollectSkipped(scene);
+    for (const object of skipped) object.visible = false;
     const prevBackground = scene.background;
     const prevOverride = scene.overrideMaterial;
     scene.background = null;
@@ -736,6 +782,7 @@ export class PostPipeline {
     renderer.render(scene, camera);
     scene.overrideMaterial = prevOverride;
     scene.background = prevBackground;
+    for (const object of skipped) object.visible = true;
 
     // --- 2) SSAO ---
     if (this.preset.ssao) {

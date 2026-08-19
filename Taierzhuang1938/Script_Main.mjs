@@ -2365,6 +2365,14 @@ function RenderScene(dt) {
   ssao.resolution.value.set(post.width, post.height);
   ssao.strength.value = SSAO_BASE * graphics.ssao;
   const preset = SKY_PRESETS[phase.sky];
+  // 粒子层要与合成 pass 共用同一份雾：它不进深度法线预通道，合成 pass 那趟
+  // 又明写"深度 0 的天空不吃雾"，于是背景是天空的粒子像素一点雾都吃不到 ——
+  // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
+  // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
+  // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
+  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
+  vfx.SetFog(preset.fog, preset.sunColor);
+  vfx.SetSun(sky.sunDirection);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   post.Render(scene, camera, {

@@ -330,7 +330,12 @@ export class SkyDome {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -1000;
     this.mesh.name = "SkyDome";
-    // 天空穹不参与 AO/法线预通道 —— 它没有法线可言，混进去只会把远景 AO 弄脏
+    // 天空穹不参与 AO/法线预通道 —— 它没有法线可言，混进去只会把远景 AO 弄脏。
+    // 光靠上面那行 allowOverride = false 不够：那只保证"不被换材质"，天空穹
+    // 照样会用自己这套着色器画进预通道，把天空色写进 xyz、把不透明度 1.0 写进 w。
+    // 下游全按 w = 线性视深度读，于是整片天空被当成"一米外有实体"——
+    // 天空前的烟被软粒子整片抹掉、大气透视补不上，远处就多了个越长越大的黑洞。
+    // 真正生效的是这一行：PostPipeline 的预通道会把标了它的对象整个藏掉。
     this.mesh.userData.skipNormalDepth = true;
 
     this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
