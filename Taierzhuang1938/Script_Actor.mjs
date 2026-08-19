@@ -1071,6 +1071,8 @@ export class Actor {
     this.ragdollState = null;
     this.disposed = false;
 
+    this.grenadeGroup = null;           // 投弹时才建，见 EnsureGrenade
+    this.grenadeThrown = false;         // 脱手门闩：一次脉冲只飞一颗
     this.tmpTarget = new THREE.Vector3();
     this.gripR = new THREE.Vector3();
     this.gripL = new THREE.Vector3();
@@ -1105,6 +1107,36 @@ export class Actor {
     this.weaponBolt.copy(built.bolt);
     this.weaponTwoHanded = built.twoHanded;
     return this;
+  }
+
+  /**
+   * 右手里的木柄手榴弹。**投弹时才建、才显示。**
+   *
+   * 为什么非有不可：投弹动作的读数全在「手里有个东西被抡出去」上。手是空的话，
+   * 那条弧线读作「招手」——上一版就是右臂直挺挺举到头顶、手里什么都没有，
+   * 而枪还挂在右手原来的位置跟着一起飞。
+   *
+   * 为什么懒建：一个人两块几何，24 人同屏白摊 48 个 draw call，而一场里真正
+   * 投过弹的人是少数。不可见的 Object3D 在 three 里连遍历都跳过，代价是零。
+   */
+  EnsureGrenade() {
+    if (this.grenadeGroup) return this.grenadeGroup;
+    const built = this.factory.WeaponGeometry("Grenade");
+    if (!built || !built.geometries) return null;
+    const group = new THREE.Group();
+    for (const [key, geometry] of built.geometries) {
+      const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
+      mesh.castShadow = true;
+      group.add(mesh);
+    }
+    group.scale.setScalar(this.weaponScale);
+    // 挂在右小臂末端的握点上（与模型里的 gripR 同一处），弹头朝手指外
+    group.position.set(0, -this.dims.forearmLen * 0.96, 0.010);
+    group.rotation.set(-Math.PI * 0.5, 0, 0);
+    group.visible = false;
+    this.arms.R.elbow.add(group);
+    this.grenadeGroup = group;
+    return group;
   }
 
   /** 敢死队白毛巾（缠头 + 缠左上臂）。 */
@@ -1217,7 +1249,10 @@ export class Actor {
     }
 
     // --- 站姿高度：蹲就是把胯压下去，膝盖弯多少交给腿 IK 自己算 ------------
-    const stanceDrop = crouch * 0.34 + prone * 0.60;
+    // dying 也走这一条（不是事后再减 hips.position.y）：这个高度是在腿 IK **之前**
+    // 定的，IK 会把踝钉回地面；事后减的话整条腿跟着胯一起下去，人直接陷进土里
+    // 半只小腿（旧版濒死下沉就是这么穿模的）。
+    const stanceDrop = crouch * 0.34 + prone * 0.60 + dying * 0.30;
     const breath = Math.sin(elapsed * this.breathRate * Math.PI * 2 + this.idlePhase);
     const idleSway = Math.sin(elapsed * 0.41 * Math.PI * 2 + this.idlePhase * 1.7) * this.swayScale;
     const bob = moveSpeed > 0.02
@@ -1226,7 +1261,10 @@ export class Actor {
 
     this.body.position.set(0, d.hipY, 0);
     this.body.rotation.set(0, 0, 0);
-    this.hips.position.set(0, -stanceDrop * d.hipY + bob - STAND_SETTLE * H, 0);
+    // 蹲下时胯要**往后坐**。只压高度不后坐的话，膝盖为了补上腿长会整个顶到脚尖
+    // 前面去 —— 重心落在脚后跟外，真人这么蹲要仰面摔过去，画面上读作「融化的人」。
+    // 后坐 6% 身高 + 下面把落脚点往前挪一点，重心才回到两脚之间。
+    this.hips.position.set(0, -stanceDrop * d.hipY + bob - STAND_SETTLE * H, crouch * 0.060 * H);
     // 走起来胯要摆、上身反向拧一点，不然像块板子在平移。
     // 用 cos 不用 sin：相位 0 是左脚**最前**（支撑相起点），骨盆这时也该拧到头，
     // 写成 sin 的话摆胯比迈腿慢四分之一个周期，看着像在扭秧歌。
@@ -1253,11 +1291,15 @@ export class Actor {
       } else {
         footZ = leg.side * 0.035 * H;              // 立正也别两脚并齐
       }
+      // 蹲：脚往前挪，配合上面胯的后坐 —— 这两笔合起来才是「蹲」而不是「矮」
+      footZ -= crouch * 0.055 * H;
       const spread = d.hipHalf + crouch * 0.035 * H + Math.abs(strafe) * 0.05 * H;
       const footX = leg.side * spread + strafe * 0.12 * H * (phase < stanceEnd ? 1 : 0.4);
       this.tmpTarget.set(footX, footY, footZ);
       this.RootToHips(this.tmpTarget);
-      SolveTwoBone(leg.thigh, leg.knee, this.tmpTarget, d.thighLen, d.shinLen, leg.side * 0.10);
+      // 膝盖外张：蹲下去两条大腿会顶到胸前的枪与手，往外让开一点才有蹲的剪影
+      SolveTwoBone(leg.thigh, leg.knee, this.tmpTarget, d.thighLen, d.shinLen,
+        leg.side * (0.10 + crouch * 0.20));
       // 脚踝：抵消大腿+小腿的累计俯仰让鞋底贴地，腾空时勾一下脚尖
       const pitch = ExtractPitch(leg.thigh.quaternion) + ExtractPitch(leg.knee.quaternion);
       // 这里原本有一项 `- crouch * 0.25`（蹲下压脚尖 14°）。压是压对了，
@@ -1272,7 +1314,8 @@ export class Actor {
     // 所以「前倾」必须是负的 x，而腿的 IK 解出来的正角度恰好是向前迈 —— 两者不矛盾。
     const lookYaw = Clamp(s.lookYaw ?? 0, -1.4, 1.4);
     const lookPitch = Clamp(s.lookPitch ?? 0, -1.0, 0.9);
-    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.30 + aim * 0.08;
+    // 蹲姿的前倾要够：胯后坐了，上身不压过来重心就在身后。0.30 → 0.44
+    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.44 + aim * 0.08;
     this.chest.rotation.set(
       -leanFwd + lookPitch * 0.22 + this.recoil * 0.06,     // 后坐把上身顶得后仰
       lookYaw * 0.35 + gaitSwing * 0.20,                    // 肩与胯反向拧
@@ -1295,10 +1338,36 @@ export class Actor {
     // 它要减掉上身自己的俯仰偏航才能让枪口指到玩家真正看的方向。
     // 卧倒的人**总是在枪后面**：不瞄准也是枪托抵肩、枪身贴地朝前，所以这里给
     // aim 垫一个底。垫的只是枪与手，上身/头由 PoseProne 定死，不受影响。
-    const weaponAim = Math.max(aim, prone * 0.9);
+    // 白刃突刺也要把枪端平（低姿持枪是枪口朝下 17°，那个角度捅不到人）
+    const bayonet = melee > 0.001 && this.weaponData && this.weaponData.kind !== "melee"
+      && this.weaponData.kind !== "throwable" ? melee : 0;
+    if (bayonet > 0.001) {
+      // 突刺是**腰腿的活**：先拧腰蓄力，再把上身送出去。
+      // **这一段必须排在 PoseWeapon 前面**：持枪挂点是靠减掉上身累积旋转来指向的，
+      // 摆完枪再拧腰，那份补偿就少算了这一拧 —— 枪跟着腰甩到侧面去，人朝前捅、
+      // 刺刀指着左边（这一版调试图上就是这么歪的）。
+      const coil = SmoothStep(0, 0.30, bayonet) * (1 - SmoothStep(0.30, 0.62, bayonet));
+      const lunge = SmoothStep(0.30, 0.62, bayonet);
+      this.chest.rotation.x -= lunge * 0.14;
+      this.chest.rotation.y += coil * 0.26 - lunge * 0.16;
+      this.neck.rotation.y -= coil * 0.16 - lunge * 0.10;
+    }
+
+    const weaponAim = Math.max(aim, prone * 0.9, bayonet * 0.85);
     this.PoseWeapon(weaponAim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee,
-      breath, idleSway, prone);
+      breath, idleSway, prone, bayonet);
     this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone);
+
+    // 手里的手榴弹：抡过 0.66 就脱手。**要一个门闩**，不能只比大小 ——
+    // throwing 是个 0→1→0 的脉冲，光比数值的话，回收段再次路过 0.66 以下，
+    // 弹会凭空回到手里再飞一次。门闩到脉冲归零才复位。
+    if (throwing > 0.001) this.EnsureGrenade();
+    if (throwing < 0.02) this.grenadeThrown = false;
+    else if (throwing >= 0.70) this.grenadeThrown = true;
+    if (this.grenadeGroup) {
+      this.grenadeGroup.visible = throwing > 0.02 && !this.grenadeThrown;
+    }
+
 
     // --- 覆盖姿势：中弹踉跄 / 濒死下沉 --------------------------------------
     if (hurt > 0.001) {
@@ -1310,9 +1379,10 @@ export class Actor {
       this.hips.position.z += 0.03 * H * hurt;
     }
     if (dying > 0.001) {
-      // 濒死是往下瘫、往前塌，和中弹后仰正好相反
-      this.hips.position.y -= dying * d.hipY * 0.35;
+      // 濒死是往下瘫、往前塌，和中弹后仰正好相反。**高度不在这里改** ——
+      // 它走上面的 stanceDrop，那一步在腿 IK 之前，脚才留得住在地面上。
       this.chest.rotation.x -= dying * 0.45;
+      this.neck.rotation.x -= dying * 0.30;          // 头也垂下去
     }
   }
 
@@ -1331,7 +1401,7 @@ export class Actor {
    * 投弹时的收枪。这些常量是按 1.66 m 定的，换身高按 k 缩放。
    */
   PoseWeapon(aim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee, breath, idleSway,
-    prone = 0) {
+    prone = 0, bayonet = 0) {
     const d = this.dims;
     const k = d.height / 1.66;
     const mount = this.weaponMount;
@@ -1355,25 +1425,13 @@ export class Actor {
     const restRx = running ? -0.55 : -0.30;
     const restRy = running ? 0.50 : 0.34;
     const restRz = running ? 0.30 : 0.16;
-    // 据枪：枪托底板顶进右肩窝（肩关节往下 4 cm 的那个窝）。
-    // y=0.325 是按肩高 0.22H 减出来的 —— 早先按 0.29 摆，枪口比眼睛低了 40 cm。
-    //
-    // 卧姿要换一份肩窝坐标，**换的是 z 不是 y**：挂点在 chest 空间里，chest 的
-    // -Z 是「胸口朝外的方向」。人站着时那是正前方，趴下之后它指的是**地面**。
-    // 照抄站姿的 -0.300k，枪就被塞到胸口正下方 30 cm —— 地下。
-    // 贴地时枪身离胸口只有一个身体厚度（6 cm），沿体轴往前伸出去才是对的。
     const t = SmoothStep(0, 1, aim);
-    const aimPy = Lerp(0.325, 0.350, prone) * k;
-    const aimPz = Lerp(-0.300, -0.065, prone) * k;
-    mount.position.set(
-      Lerp(restPx, 0.085 * k, t),
-      Lerp(restPy, aimPy, t) + breath * 0.004 * k * (1 - aim * 0.6),
-      Lerp(restPz, aimPz, t));
 
     // 据枪朝向：先算出「枪身在 root 空间该指哪」，再**整体除掉**上身累积的旋转。
     // 这里必须用四元数，不能写成 aimRx = lookPitch - chest.rotation.x：
     // 欧拉角不能逐轴相减，单看俯仰是准的，可一旦偏航也不为零，两轴耦合最大能偏 8°
     // —— 那正是「准心套住人却打不中」的那类 bug，而且在静止截图上完全看不出来。
+    // **朝向必须排在位置前面**：位置是顺着枪自己的轴推出去的，见下。
     POSE_E.set(lookPitch, lookYaw, 0, "YXZ");
     AIM_Q.setFromEuler(POSE_E);
     PARENT_Q.copy(this.body.quaternion).multiply(this.hips.quaternion).multiply(this.chest.quaternion).invert();
@@ -1381,6 +1439,43 @@ export class Actor {
     POSE_E.set(restRx, restRy, restRz, "XYZ");
     REST_Q.setFromEuler(POSE_E);
     mount.quaternion.slerpQuaternions(REST_Q, AIM_Q, t);
+
+    // 据枪位置 = **右肩窝 + 沿枪轴往前 25 cm**（挂点原点就是右手握把）。
+    // y=0.325 是按肩高 0.22H 减出来的 —— 早先按 0.29 摆，枪口比眼睛低了 40 cm。
+    //
+    // 为什么不写死一份 (x, y, z)：挂点在 chest 空间里，而 chest 的 -Z 是「胸口朝外」。
+    // 人站着时那是正前方，**趴下之后它指的是地面**。写死的 -0.300k 到了卧姿就是
+    // 把握把塞到胸口正下方 30 cm —— 枪进土里，而两只手为了够那个点会缩成两只
+    // 鸡翅膀（上一版卧倒俯视图上那对翅膀就是这么来的）。顺着枪轴推就与姿态无关：
+    // 站、蹲、卧共用同一组数，枪托永远在肩窝，握把永远在枪托前面 25 cm。
+    POSE_A.set(0, 0, -0.250 * k).applyQuaternion(mount.quaternion);
+    mount.position.set(
+      Lerp(restPx, 0.085 * k + POSE_A.x, t),
+      Lerp(restPy, 0.325 * k + POSE_A.y, t) + breath * 0.004 * k * (1 - aim * 0.6),
+      Lerp(restPz, -0.050 * k + POSE_A.z, t));
+
+    // 白刃突刺：枪身**顺着自己的轴**捅出去 42 cm，先收 14 cm 蓄力。
+    // 两只手 IK 在枪上，所以这一下推出去手臂自己就伸了 —— 这是「摆枪、手跟过去」
+    // 这条原则最值的一次：突刺整套动作只有这三行。
+    if (bayonet > 0.001) {
+      const coil = SmoothStep(0, 0.30, bayonet) * (1 - SmoothStep(0.30, 0.62, bayonet));
+      const lunge = SmoothStep(0.30, 0.62, bayonet);
+      POSE_A.set(0, 0, -(lunge * 0.42 - coil * 0.14) * k).applyQuaternion(mount.quaternion);
+      mount.position.add(POSE_A);
+      mount.position.x -= lunge * 0.03 * k;        // 捅出去时枪身往身体中线靠
+    }
+
+    // 投弹：枪**换到左手**、垂在身体左侧，枪口朝上斜着背在身前。
+    // 上一版只给挂点加了 6 cm 偏移，于是右手抡上去了、枪还留在右手原来的位置，
+    // 两样各飞各的 —— 那不是投弹，是甩枪。真人是左手攥着枪、右手抡弹。
+    if (throwing > 0.001 && kind !== "throwable") {
+      const s = SmoothStep(0, 0.30, throwing);
+      POSE_E.set(-1.05, 0.30, -0.45, "XYZ");
+      OFF_Q.setFromEuler(POSE_E);
+      mount.quaternion.slerp(OFF_Q, s);
+      POSE_A.set(-0.150 * k, 0.075 * k, -0.030 * k);
+      mount.position.lerp(POSE_A, s);
+    }
 
     // 匍匐：**先把枪往前送，身体再跟上去**。沿体轴（chest 空间的 +Y）推 5 cm，
     // 手是 IK 到枪上的，所以两只手自己会跟着一送一收 —— 这就是「爬」的读数来源。
@@ -1394,7 +1489,7 @@ export class Actor {
     const kick = (this.weaponData && this.weaponData.recoil ? this.weaponData.recoil.kick : 0.05);
     mount.position.z += this.recoil * kick;             // 枪往肩窝里退
     let extraY = idleSway * 0.006 * (1 - aim);
-    let extraZ = Lerp(restRz, 0.02, t) + throwing * 0.5;
+    let extraZ = Lerp(restRz, 0.02, t);
     if (boltPhase > 0) {
       // 拉栓时把枪往内一转露出抛壳口，右手才有地方去拉 —— 真人就是这么打的
       const cant = Math.sin(boltPhase * Math.PI);
@@ -1402,7 +1497,6 @@ export class Actor {
       extraY += cant * 0.14;
       mount.position.y -= cant * 0.02 * k;
     }
-    if (throwing > 0) mount.position.x += throwing * 0.06 * k;
     POSE_E.set(this.recoil * 0.16 + idleSway * 0.004, extraY, extraZ, "XYZ");
     OFF_Q.setFromEuler(POSE_E);
     mount.quaternion.multiply(OFF_Q);
@@ -1464,18 +1558,33 @@ export class Actor {
       this.gripR.lerp(POSE_A, reach);
     }
 
+    const weaponKind = this.weaponData ? this.weaponData.kind : "boltRifle";
     let leftFollows = this.weaponTwoHanded;
     if (throwing > 0.001) {
-      // 投弹：抡臂 —— 手过肩往后（0—0.45）→ 抡到前上方（0.42—0.72）→ 随挥
+      // 投弹：抡臂 —— 手过肩往后（0—0.45）→ 抡到前上方（0.42—0.72）→ 随挥。
+      // 起手要**过肩**：手从耳后上方抡出去才是投木柄弹的样子，从体侧平甩是掷铁饼。
       const back = 1 - SmoothStep(0, 0.5, throwing);
       const fwd = SmoothStep(0.42, 0.72, throwing);
+      // 这几个数是 **chest 空间**的，而 chest 只有 0.42 m 高 —— 拿身高 H 当尺子写
+      // 0.52H 就是 86 cm，比头顶还高一截，两段 IK 够不着就只好把胳膊竖直举起来
+      // （上一版那只「打车的手」）。手要走的是过肩的一条弧：起手在耳后偏上，
+      // 出手在肩前上方，随挥落到胸前。全程离肩不超过 46 cm（臂展 53）。
+      // 起手要**甩到耳后偏外**：贴着脸抡的话，手里那颗弹整段都埋在脑袋后面，
+      // 观众只看得见一条空胳膊在挥（而这个动作的全部读数就是「手里有东西」）。
       this.gripR.set(
-        0.16 * H * (1 - fwd * 0.4),
-        Lerp(0.30, 0.46, back) * H - fwd * 0.12 * H,
-        Lerp(0.10, -0.42, fwd) * H + back * 0.16 * H);
+        Lerp(0.100, 0.205, back) * H,
+        (0.300 + back * 0.040 - fwd * 0.020) * H,
+        (Lerp(-0.090, -0.265, fwd) + back * 0.245) * H);
       this.chest.rotation.y += back * 0.28 - fwd * 0.34;   // 投弹靠的是腰不是胳膊
-      leftFollows = false;
-    } else if (melee > 0.001) {
+      // 左手改成**攥着枪**（枪这时已经挪到左腰侧）。让它空着自由摆的话，
+      // 一边抡弹一边甩一条闲胳膊，人读起来像在跳舞。
+      if (this.weaponGroup) {
+        leftFollows = true;
+        this.gripL.copy(this.weaponMount.position);
+      } else {
+        leftFollows = false;
+      }
+    } else if (melee > 0.001 && weaponKind === "melee") {
       // 大刀劈砍：右手从右上抡到左下，力线从肩过腰
       const raise = 1 - SmoothStep(0, 0.4, melee);
       const chop = SmoothStep(0.35, 0.72, melee);
@@ -1487,6 +1596,29 @@ export class Actor {
       this.chest.rotation.y += raise * 0.30 - chop * 0.40;
       this.chest.rotation.x += chop * 0.30;
       leftFollows = true;
+    }
+
+    // 左手够不着护木前段就**沿着枪身往回滑**，别让它悬在枪外面。
+    //
+    // 数字：肩到腕 = upperArmLen + forearmLen = 0.32H = 53 cm，而握把到护木前握点
+    // 是 33 cm、握把本身又在左肩前方 30 cm 开外 —— 左手要走的直线距离 68 cm，
+    // 比整条胳膊还长 15 cm。两段 IK 够不着的时候只保证**方向**对，手就停在半空、
+    // 离枪身十几厘米（据枪与卧姿截图上那只悬空的左手）。
+    // 沿枪轴回滑就一定还抓在木头上：护木本来就有一截可抓的长度，真人也是想抓哪抓哪。
+    if (leftFollows) {
+      POSE_B.copy(this.gripL).sub(this.gripR);
+      const barrel = POSE_B.length();
+      if (barrel > 1e-4) {
+        POSE_B.multiplyScalar(1 / barrel);
+        POSE_A.copy(this.gripR).sub(L.shoulder.position);
+        const along = POSE_A.dot(POSE_B);
+        const reach = (lenA + lenB) * 0.97;
+        // |gripR + s·轴 - 肩| = reach 的正根；判别式为负说明整条枪轴都够不着，
+        // 那就取离肩最近的那一点（s = -along），至少手还在枪上
+        const disc = along * along - POSE_A.lengthSq() + reach * reach;
+        const slide = disc > 0 ? -along + Math.sqrt(disc) : -along;
+        this.gripL.copy(POSE_B).multiplyScalar(Clamp(slide, 0, barrel)).add(this.gripR);
+      }
     }
 
     // 肘往哪边弯：roll≈π 是往后，再各加一点让肘尖向外张开。
@@ -1621,10 +1753,23 @@ export class Actor {
       BlendEuler(arm.shoulder, dir * 0.9 * fall - 0.2, 0, leg.side * (0.35 + 0.55 * fall), 1);
       BlendEuler(arm.elbow, -0.5 - 0.4 * fall, 0, 0, 1);
     }
-    // 死了枪就脱手：挂点甩到身侧，不再据枪
+    // 死了枪就脱手：**平躺在身侧的地上**。
+    //
+    // 朝向不能直接写一组欧拉角：上身这时已经翻到脸朝下（body.x ≈ -1.5），挂点是
+    // chest 的子节点，写死的角度会跟着一起翻过去 —— 枪连刺刀扎进土里，从任何角度
+    // 都只看得见一截枪托（旧版倒地截图里那把「不见了」的枪就是埋在身子底下）。
+    // 和据枪走同一条路：先在世界空间摆平，再整体除掉上身累积的旋转。
     if (this.weaponGroup) {
-      this.weaponMount.position.set(0.10 * d.height, -0.05 * d.height, -0.05 * d.height);
-      this.weaponMount.rotation.set(-0.4 * dir, 0.7, 1.1 * fall);
+      POSE_E.set(0, 1.15 + rag.side * 0.5, 0, "YXZ");     // 世界空间：枪身水平，枪口偏向一侧
+      AIM_Q.setFromEuler(POSE_E);
+      PARENT_Q.copy(this.body.quaternion).multiply(this.hips.quaternion)
+        .multiply(this.chest.quaternion).invert();
+      AIM_Q.premultiply(PARENT_Q);
+      this.weaponMount.quaternion.slerp(AIM_Q, 1);
+      // 位置：chest 的 -Z 此刻正朝着地面，所以 -0.075H 就是「落到地上」；
+      // x 把枪挪到身体右侧外面，别插在人身上
+      this.weaponMount.position.set(
+        (0.20 + 0.06 * fall) * d.height, -0.05 * d.height, -0.075 * d.height);
     }
     if (dying > 0) this.body.rotation.x += dying * 0.02;
   }
