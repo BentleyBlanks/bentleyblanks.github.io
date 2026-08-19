@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=1">
+  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
+  <link rel="stylesheet" href="./Style_Menu.css?v=1">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
   <link rel="stylesheet" href="./Style_Editor.css?v=1">
   <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
@@ -57,6 +59,8 @@
         "./Data_Battle.mjs": "./Data_Battle.mjs?v=1",
         "./Data_History.mjs": "./Data_History.mjs?v=1",
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
+        "./Data_Menu.mjs": "./Data_Menu.mjs?v=1",
+        "./Script_Menu.mjs": "./Script_Menu.mjs?v=1",
 
         "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=1",
         "./Script_EditorStage.mjs": "./Script_EditorStage.mjs?v=1",
@@ -81,6 +85,9 @@
     <div id="bootStep">正在夯地……</div>
     <button id="bootStart" disabled>进 城</button>
   </div>
+  <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
+       出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
+  <div id="menu"></div>
   <script type="module" src="./Script_Main.mjs?v=1"></script>
 </body>
 </html>

@@ -65,7 +65,8 @@ async function CanvasDrag(x, y, steps = 12) {
 // ===========================================================================
 // 启动（正常模式：要验齿轮按钮真的能点）
 // ===========================================================================
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=0`,
+// menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=0&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
 

@@ -136,6 +136,14 @@ export class Hud {
     for (const l of lines) if (l) this.spoken.push(String(l));
   }
 
+  /**
+   * 收掉尾声。从菜单重开一关时必须调 —— 不收的话新一关会顶着上一局的结算跑，
+   * 而那一层是不透明的黑底（.hudEpilogue.on），玩家看到的是"进不去游戏"。
+   */
+  HideEpilogue() {
+    this.el.epilogue.classList.remove("on");
+  }
+
   Hint(text, seconds = 4.5) {
     this.el.hint.textContent = text;
     this.el.hint.classList.add("on");

@@ -25,7 +25,8 @@ const Check = (name, ok, note = "") => {
 page.on("console", (m) => { if (m.type() === "error") console.log("  [console] " + m.text()); });
 page.on("pageerror", (e) => console.log("  [pageerror] " + String(e).slice(0, 200)));
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=medium&scale=small`,
+// menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=medium&scale=small&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang && window.Taierzhuang.audio, { timeout: 180000 });
 // 真点一下：没有用户手势时 AudioContext 是 suspended 的
