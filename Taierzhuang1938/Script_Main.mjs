@@ -17,6 +17,7 @@ import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
+import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
@@ -158,12 +159,24 @@ const graphics = {
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 探针体：开关 + 强度倍率。强度乘在预设的 envIntensity 上（跟其它后处理项一个规矩：
+  // 预设定「这一关的天有多强」，设置只定「画多重」）。
+  gi: true, giStrength: 1,
   fov: BASE_FOV,
 };
-const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
+// 探针体（GI）。low 档与 ?gi=0 都直接不建 —— 建了再关等于白背一套 shader 分支。
+const GI_ON = GI_QUALITY[QUALITY] != null && params.get("gi") !== "0";
+const giUniforms = MakeGiUniforms();
+const library = new MaterialLibrary(renderer, {
+  textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+});
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
+// 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变
+const gi = GI_ON
+  ? new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms })
+  : null;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: !SHOT });
 
@@ -273,6 +286,7 @@ async function Boot() {
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
+  if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
@@ -377,7 +391,7 @@ async function Boot() {
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
-    renderer, scene, camera, post, sky, lights, library,
+    renderer, scene, camera, post, sky, lights, library, gi,
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
     story, combat, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
@@ -553,7 +567,7 @@ async function Boot() {
     shot: !!SHOT,
     ReleasePointerLock,
     game: {
-      state, PHASES, JumpToLevel, graphics, ApplyGraphics,
+      state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
       get battlefield() { return battlefield; },
       get player() { return player; },
       get currentWeapon() { return currentWeapon; },
@@ -658,6 +672,9 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
   }
+  // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
+  // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
+  if (gi) gi.SetWorld(battlefield);
 }
 
 /**
@@ -760,6 +777,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
+  if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
   audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
@@ -2231,6 +2249,11 @@ function Frame(dt, render = true) {
   lights.Update(dt, state.elapsed);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
+  if (gi) {
+    gi.Update(dt, camera.position, lights);
+    // 半球光按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
+    lights.SetGiActive(gi.uniforms.enabled.value);
+  }
 
   // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
   // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
@@ -2446,6 +2469,12 @@ function ApplyGraphics() {
       if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
       else material.needsUpdate = true;
     });
+  }
+  if (gi) {
+    gi.enabled = !!graphics.gi;
+    if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
+    const preset = SKY_PRESETS[PHASES[state.phaseIndex].sky];
+    if (preset) gi.ApplyPreset(preset, graphics.giStrength);
   }
   if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
     lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);

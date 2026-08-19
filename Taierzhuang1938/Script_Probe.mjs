@@ -1,6 +1,6 @@
 // 渲染探针：把材质 / 光照 / 后处理单独摆出来看。开发与视觉审查专用。
 // URL 参数：?preset=dusk|smokyDay|burningStreet|night|dawn  &quality=low|medium|high|ultra
-//           &scene=materials|street
+//           &scene=materials|street  &gi=0|1（默认 1）  &giDebug=1（画探针球）
 
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
@@ -9,11 +9,14 @@ import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeBox, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
+import { ProbeVolume, MakeGiUniforms, MakeProbeDebugMesh } from "./Script_Gi.mjs";
 
 const params = new URLSearchParams(location.search);
 const presetName = params.get("preset") || "smokyDay";
 const quality = params.get("quality") || "high";
 const sceneKind = params.get("scene") || "street";
+const giEnabled = params.get("gi") !== "0";
+const giDebug = params.get("giDebug") === "1";
 
 const hint = document.getElementById("hint");
 const canvas = document.createElement("canvas");
@@ -41,11 +44,18 @@ const ssao = {
   resolution: { value: new THREE.Vector2(post.targets.aoBlur.width, post.targets.aoBlur.height) },
   strength: { value: 0.78 },
 };
-const library = new MaterialLibrary(renderer, { textureSize: 512, ssao });
+const giUniforms = MakeGiUniforms();
+const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giEnabled ? giUniforms : null });
 
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
 const lights = new LightRig(scene, { quality });
+// 天空 uniform 直接借给探针体：漏空的射线问的是同一片天
+const gi = giEnabled
+  ? new ProbeVolume(renderer, { quality, skyUniforms: sky.uniforms, uniforms: giUniforms })
+  : null;
+// 探针体的代理几何体：探针页自己攒一张 AABB 表（正片里直接用 battlefield.colliders）
+const giColliders = [];
 
 const state = { ready: false, elapsed: 0, frame: 0 };
 
@@ -63,9 +73,16 @@ async function Boot() {
   lights.ApplyPreset(preset, sky.sunDirection);
   scene.fog = null;   // 雾收到合成 pass 里
   if (sceneKind === "materials") BuildMaterialScene(); else BuildStreetScene();
+  if (gi) {
+    gi.ApplyPreset(preset);
+    gi.SetWorld({ colliders: giColliders, GroundHeight: () => 0 });
+    lights.SetGiActive(1);
+    if (giDebug) scene.add(MakeProbeDebugMesh(gi));
+  }
   state.ready = true;
-  hint.textContent = `preset=${presetName} quality=${quality} scene=${sceneKind}\nhdr=${post.hdrCapable}`;
-  window.Probe = { renderer, scene, camera, post, sky, lights, library, state, StepFrames };
+  hint.textContent = `preset=${presetName} quality=${quality} scene=${sceneKind}\n`
+    + `hdr=${post.hdrCapable} gi=${gi ? `on/${gi.probeCount}探针` : "off"}`;
+  window.Probe = { renderer, scene, camera, post, sky, lights, library, gi, state, StepFrames };
 }
 
 /** 材质球阵：每种配方一个球 + 一块板，看 PBR 反应。 */
@@ -89,6 +106,18 @@ function BuildMaterialScene() {
   });
   camera.position.set(0, 3.2, 6.5);
   camera.lookAt(0, 0.9, -3);
+}
+
+/**
+ * 记一个 GI 代理盒。正片里这张表由 BuildSink.Solid 攒（物理用的那一张），
+ * 探针页没有物理，所以这里手工补几笔 —— 探针体的射线只认这张表。
+ */
+function AddGiBox(cx, cy, cz, hx, hy, hz, tag) {
+  giColliders.push({
+    min: [cx - hx, cy, cz - hz],
+    max: [cx + hx, cy + hy * 2, cz + hz],
+    tag,
+  });
 }
 
 /** 一小段台儿庄式街巷：青砖房、夯土院墙、瓦顶、沙包、瓦砾。 */
@@ -125,6 +154,7 @@ function BuildStreetScene() {
       body.rotation.y = side > 0 ? 0 : Math.PI;
       body.castShadow = true; body.receiveShadow = true;
       scene.add(body);
+      AddGiBox(x, 0, z, w / 2, h / 2, d / 2, "wall");
 
       if (ruin < 0.3) {
         // 硬山瓦顶：两坡 + 出檐
@@ -162,6 +192,7 @@ function BuildStreetScene() {
     wall.rotation.y = Math.PI / 2;
     wall.castShadow = true; wall.receiveShadow = true;
     scene.add(wall);
+    AddGiBox((i % 2 ? 1 : -1) * 9.5, 0, -10 - i * 12, 0.22, 1.05, 3.25, "wall");
   }
 
   // 沙包工事
@@ -205,6 +236,7 @@ function Frame(dt) {
   const forward = new THREE.Vector3();
   camera.getWorldDirection(forward);
   lights.UpdateShadowFrustum(camera.position, forward);
+  if (gi) gi.Update(dt, camera.position, lights);
   ssao.map.value = post.AoTexture;
   ssao.resolution.value.set(post.targets.aoBlur.width, post.targets.aoBlur.height);
   const preset = SKY_PRESETS[presetName];
