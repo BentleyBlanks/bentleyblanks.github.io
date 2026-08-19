@@ -1,0 +1,5 @@
+# 生成产物里的可重建大体积二进制，不入 git（用 Script_GlbToTzm.py 从 .glb 重建）
+__pycache__/
+*.glb
+*_obj.zip
+GeneratedSoldier_*_preview.png
