@@ -1,11 +1,12 @@
 // 音效音乐编辑器：全套声音的试听台 + 指认台。
 //
-// ## 这个项目的声音全是**现场合成**的
-// 除了 Audio/ 下那 31 条人声采样，其余每一个音都是 WebAudio 节点图现算
-//（Script_Audio 的 RECIPES）。所以没有「音频文件列表」可看 ——
-// 能看的是**配方名**，而配方名（rifleNra / impactFlesh / shellIncoming）
-// 光看字面认不出是什么声音。这就是「指认」那一栏存在的理由：
-// 每条配方配一句中文说明 + 它在游戏里什么时候响，听到声音能对上名字。
+// ## 每个音都有两层：实录采样盖在合成配方上
+// 底层是 WebAudio 节点图现算的 32 个配方（Script_Audio 的 RECIPES），
+// 上面盖着一层实录素材（Audio/Sfx/，来源见 Data_SfxSources.mjs）。
+// 采样是异步 fetch 的，**盖不上去就自动退回合成** —— 所以列表里每条都标了
+// 「实录 / 合成」：当前到底在响哪一层，只有摆出来才答得清。
+// 名字（rifleNra / impactFlesh / shellIncoming）光看字面认不出是什么声音，
+// 这就是「指认」那一栏存在的理由：一句中文说明 + 它在游戏里什么时候响。
 //
 // ## 盲听
 // 混音表（MIX_GAIN）是拿实拍峰值配的，但「这一声在战场上够不够清楚」只能靠耳朵。
@@ -87,6 +88,7 @@ export class AudioEditor {
     this.distance = 0;           // 0 = 非空间化
     this.blind = null;           // { answer, options, tries }
     this.blindScore = { right: 0, total: 0 };
+    this.lastSampled = -1;       // 采样是异步载入的，数字一变就重刷列表尾标
     this.savedAmbience = null;
     this.savedMusic = null;
   }
@@ -228,18 +230,31 @@ export class AudioEditor {
 
   FillSounds() {
     const names = this.Names();
+    const sampled = this.audio ? this.audio.sampleCues : new Set();
     this.soundList.Fill(names.map((name) => {
       const info = SOUND_INFO[name] || ["", name, ""];
-      return { id: name, name: info[1], tail: name, title: info[2] };
+      // 尾标直接写「实录 / 合成」：采样包是异步载入的，「怎么听着还是合成的」
+      // 这个问题只有把当前实际生效的那一层摆在列表里才答得出来。
+      const tag = sampled.has(name) ? "实录" : "合成";
+      return { id: name, name: info[1], tail: `${tag} · ${name}`, title: info[2] };
     }));
     if (!names.includes(this.soundName) && names.length) this.soundName = names[0];
     this.soundList.Select(this.soundName);
     this.Describe();
   }
 
+  /** 这一条现在到底在响哪一层：实录素材的出处，还是合成配方。 */
   Describe() {
     const info = SOUND_INFO[this.soundName];
-    this.soundNote.textContent = info ? `${this.soundName} —— ${info[2]}` : this.soundName;
+    const base = info ? `${this.soundName} —— ${info[2]}` : this.soundName;
+    const audio = this.audio;
+    let source = "合成（Script_Audio 的 RECIPES）";
+    if (audio && audio.sampleCues.has(this.soundName)) {
+      const cue = this.soundName === "bugleCharge" ? "bugleTone" : this.soundName;
+      const entry = audio.sfxManifest && audio.sfxManifest.cues[cue];
+      source = entry ? `实录：${entry.credit}（${entry.files.length} 个变体）` : "实录";
+    }
+    this.soundNote.textContent = `${base}\n${source}`;
   }
 
   PlayCurrent(times = 1) {
@@ -359,6 +374,15 @@ export class AudioEditor {
     f.Set("状态", audio.Ready ? "运行中" : "未解锁（点任意一个播放键）", audio.Ready ? "good" : "warn");
     f.Set("在响的节点", audio.liveNodes);
     f.Set("配方数", SOUND_NAMES.length);
+    // 采样一载进来就把同名合成配方盖掉了，列表的尾标要跟着翻
+    const sampled = audio.sampleCues.size;
+    f.Set("实录采样", sampled
+      ? `${sampled} / ${SOUND_NAMES.length} 条已盖上`
+      : "载入中 / 全部走合成", sampled === SOUND_NAMES.length ? "good" : sampled ? "warn" : "warn");
+    if (sampled !== this.lastSampled) { this.lastSampled = sampled; this.FillSounds(); }
+    if (audio.sfxErrors && audio.sfxErrors.length) {
+      f.Set("采样缺失", `${audio.sfxErrors.length} 条读不到（已退回合成）`, "bad");
+    }
     f.Set("人声", audio.voicesReady ? `${audio.voiceBank.size} / ${VOICE_LINES.length} 条已载入`
       : "载入中 / 不可用", audio.voicesReady ? "good" : "warn");
     if (audio.voiceErrors && audio.voiceErrors.length) {

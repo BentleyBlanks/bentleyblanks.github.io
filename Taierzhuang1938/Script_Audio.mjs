@@ -1,8 +1,14 @@
-// 《血战台儿庄》程序化音频引擎 —— 全部现场合成，**零外部音频文件**。
+// 《血战台儿庄》音频引擎 —— **合成打底 + 实录采样盖在上面**。
 //
-// 为什么不用采样：整个项目的底线是「不加载任何外部资源」，而且枪声一旦是
-// 采样，二十几个人同时开枪会立刻听出来是同一个 wav 在复读。合成的好处是
-// 每一枪的频率/包络都能带一点确定性抖动，二十条枪听着才像二十条枪。
+// 底层是 32 个 WebAudio 节点图配方（RECIPES），一个外部文件都不用；
+// 上层是实录素材（Audio/Sfx/，免版税包与 PD/CC0 素材，见 Data_SfxSources.mjs），
+// 由 LoadSfxPack 在解锁之后**逐条盖掉同名配方**，盖不上去就照旧用合成的。
+//
+// 为什么当初一路合成到底：整个项目的底线是「不加载任何外部资源」，而且枪声
+// 一旦是采样，二十几个人同时开枪会立刻听出来是同一个 wav 在复读。
+// 为什么最后还是换了：**枪声的瞬态是炸开的空气，不是包络** —— 噪声过带通再
+// 削顶，出来永远是「啪」不是「炸」。复读的问题在采样层用多变体 + 逐发 ±3%
+// 变调解掉（同一条思路：随机来自播放时，不是来自素材）。
 //
 // 信号链（顺序错一处味道就不对）：
 //   源(osc/noise) → 声部 gain → [距离低通] → PannerNode(HRTF) ┐
@@ -296,6 +302,20 @@ class Voice {
     return node;
   }
 }
+
+// ===========================================================================
+// 冲锋号的动机。**合成版与采样版共用同一张谱**：
+// 换成实录军号之后，音色是美军军乐队的，调子仍然必须是中方的这一条 ——
+// 直接播一段美军 Charge 号，听着就是另一支军队在冲锋。
+// 泛音列 3、4、5、6 次 = sol、do、mi、sol；军号没有活塞，只有这四个音能吹。
+// 三连音一层层往上冲、落在长音上 —— 冲锋号的骨架是「催」，不是旋律。
+// ===========================================================================
+const BUGLE_G4 = 392.0, BUGLE_C5 = 523.25, BUGLE_E5 = 659.25, BUGLE_G5 = 783.99;
+const BUGLE_CHARGE = [
+  [0.00, BUGLE_G4, 0.10], [0.12, BUGLE_C5, 0.10], [0.24, BUGLE_E5, 0.10], [0.36, BUGLE_G5, 0.30],
+  [0.70, BUGLE_E5, 0.09], [0.81, BUGLE_G5, 0.09], [0.92, BUGLE_E5, 0.09], [1.03, BUGLE_C5, 0.24],
+  [1.32, BUGLE_G4, 0.09], [1.43, BUGLE_C5, 0.09], [1.54, BUGLE_E5, 0.09], [1.65, BUGLE_G5, 0.62],
+];
 
 // ===========================================================================
 // 声音配方
@@ -1038,15 +1058,7 @@ const RECIPES = {
   // 高音 do、mi、sol），所以这条动机只用这四个音 —— 这是形制决定的，
   // 随便写个旋律就不是号声了。音色走铜管泛音包，不是方波。
   bugleCharge(A, v) {
-    // 泛音列 3、4、5、6 次 = sol、do、mi、sol。军号没有活塞，**只有这四个音能吹**。
-    const G4 = 392.0, C5 = 523.25, E5 = 659.25, G5 = 783.99;
-    // 三连音一层层往上冲、落在长音上 —— 冲锋号的骨架是「催」，不是旋律。
-    const notes = [
-      [0.00, G4, 0.10], [0.12, C5, 0.10], [0.24, E5, 0.10], [0.36, G5, 0.30],
-      [0.70, E5, 0.09], [0.81, G5, 0.09], [0.92, E5, 0.09], [1.03, C5, 0.24],
-      [1.32, G4, 0.09], [1.43, C5, 0.09], [1.54, E5, 0.09], [1.65, G5, 0.62],
-    ];
-    A.BugleLine(v, notes, 0.3);
+    A.BugleLine(v, BUGLE_CHARGE, 0.3);
     v.wetGain.gain.value = 0.55;   // 号是在街上吹的，尾巴要能撞上墙再回来
     v.Live(2.6);
   },
@@ -1131,6 +1143,114 @@ const MIX_GAIN = {
 };
 
 // ===========================================================================
+// 实录采样层
+//
+// 2026-08-19 起，上面那 32 个合成配方**全部被实录采样盖住**（素材来源与切割
+// 参数见 Data_SfxSources.mjs / Script_SfxBake.mjs）。合成那套一行没删，理由：
+//   · 采样是 fetch 来的，会 404、会被离线、会在没网的本地文件协议下失败；
+//     盖不上去就自动退回合成，**没有音效的战场也仍然是能打的战场**。
+//   · 出图模式（?shot=1）根本不建 AudioContext，那条路上采样从来不参与。
+//
+// 为什么不是「直接把 wav 塞进去播」：
+//   1. **连发的射速不能由素材决定**。素材是三连发的录音，射速就被钉死在录音里了；
+//      九二式「啄木鸟」200 rpm 的身份证会当场作废。所以采样只切**单发**，
+//      射速仍由这张表按史实排（与合成版同一组数字）。
+//   2. **同一个样本连播二十次会听出复读**。所以逐发 ±3% 变调 + 多变体随机挑，
+//      与合成版靠随机种子取噪声偏移是同一个道理。
+//   3. **混音表要重配**。合成版的 MIX_GAIN 是拿合成峰值配的；采样在烘焙时统一
+//      归一化过，峰值都在 0.85—0.97，直接用的话一记脚步和一发炮弹一样响。
+// ===========================================================================
+export const SFX_BASE = "Audio/Sfx/";
+
+/** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
+const SAMPLE_BURST = {
+  zb26: 60 / 500,      // 捷克式 500 rpm
+  type11: 60 / 500,    // 十一年式 500 rpm
+  type92: 60 / 200,    // 九二式 200 rpm ——「啄木鸟」的间隔
+};
+
+/**
+ * 采样版混音表：素材已归一化，这张表定的是「这个声音在战场上站多高」。
+ * 与合成版的 MIX_GAIN 是两套数，不能混用。
+ * 几条不直观的：
+ *   · 操作音（拉栓/压弹/弹匣）录得极干净但很轻，要往上提 —— 它们是**玩法反馈**，
+ *     听不见等于没有。
+ *   · 脚步压到 0.3 以下：它每秒响一两下，与枪声同一个量级的话整场只剩脚步声。
+ *   · 远射两条压到 0.45 上下：环境床按概率一直在撒，撒得太响玩家就分不出
+ *     「远处在打」和「打到我头上了」。
+ */
+const SAMPLE_MIX = {
+  explosionNear: 1.0, shellImpact: 0.95, launcherPop: 0.72,
+  rifleNra: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
+  explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
+  bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
+  dadaoSwing: 0.5, dadaoHit: 0.78, bayonetHit: 0.8,
+  impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72,
+  footstepDirt: 0.26, footstepRubble: 0.28, bodyFall: 0.55, hurt: 0.8, heartbeat: 0.75,
+  bugleCharge: 0.7, whistle: 0.6,
+};
+
+/** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */
+const SAMPLE_WET = {
+  rifleNra: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
+  zb26: 0.36, type11: 0.32, type92: 0.42,
+  explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
+  launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
+  bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
+  footstepDirt: 0.12, footstepRubble: 0.12,
+};
+
+/**
+ * 把一组 AudioBuffer 包成配方。
+ * 走 RECIPES 而不是另开一条播放路径 —— 去重、预算闸、Panner、空气低通、
+ * 混响 send、距离湿度加成这一整套原封不动地免费复用（与人声采样同一个理由）。
+ */
+function SampleRecipe(buffers, name) {
+  const interval = SAMPLE_BURST[name] || 0;
+  const wet = SAMPLE_WET[name];
+  return (A, v) => {
+    const shots = interval ? Clamp(v.burst ?? 1, 1, 14) : 1;
+    for (let i = 0; i < shots; i += 1) {
+      const buf = buffers.length === 1
+        ? buffers[0]
+        : buffers[Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length))];
+      const src = v.Own(A.ctx.createBufferSource());
+      src.buffer = buf;
+      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。
+      const rate = v.pitch * (0.97 + v.rng() * 0.06);
+      src.playbackRate.value = rate;
+      src.connect(v.out);
+      v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
+    }
+    if (wet !== undefined && v.wetGain) v.wetGain.gain.value = wet;
+  };
+}
+
+/**
+ * 冲锋号：一个实录长音 + playbackRate 排出中方的动机。
+ * toneHz 是烘焙时量出来的基频（Last Post 里那个持续音，实测 495.5 Hz）——
+ * 量错了整段就跑调，所以烘焙侧要求自相关置信度 > 0.5 才写进清单。
+ */
+function BugleSampleRecipe(buffer, toneHz) {
+  return (A, v) => {
+    for (const [dt, hz, dur] of BUGLE_CHARGE) {
+      const src = v.Own(A.ctx.createBufferSource());
+      src.buffer = buffer;
+      const rate = (hz / toneHz) * v.pitch;
+      src.playbackRate.value = rate;
+      const g = v.Gain(FLOOR);
+      src.connect(g).connect(v.out);
+      const at = v.t + dt;
+      // 包络整个装进这个音的时长里（与合成版 BugleLine 同一条约束）
+      Swell(g.gain, at, 0.9, dur * 0.2, dur * 0.48, dur * 0.32);
+      v.Start(src, at, Math.min(dur + 0.14, buffer.duration / Math.max(0.1, rate)));
+    }
+    if (v.wetGain) v.wetGain.gain.value = SAMPLE_WET.bugleCharge;
+    v.Live(2.6);
+  };
+}
+
+// ===========================================================================
 // 环境床与音乐的编排表
 // ===========================================================================
 export const AMBIENCE_PRESETS = {
@@ -1203,6 +1323,11 @@ export class AudioEngine {
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;
     this.voiceErrors = [];
+    // --- 实录音效采样。盖不上去就用合成的那套，同样不影响任何其他功能 ---
+    this.sampleCues = new Set();     // 已经被采样盖住的配方名
+    this.sfxErrors = [];
+    this.sfxReady = false;
+    this.sfxManifest = null;
     this.lastBarkAt = -99;
     this.lastBarkKindAt = new Map();
     this.barkCounter = 0;      // 名字 → 上次触发时间（去重用）
@@ -1330,6 +1455,11 @@ export class AudioEngine {
       this.voiceLoading = true;
       this.LoadVoices(VOICE_BASE, VOICE_LINES).catch(() => {});
     }
+    // 实录音效同理：解锁之后才有 ctx 可以 decode。约 350 KB，与人声并行拉。
+    if (!this.sfxReady && !this.sfxLoading) {
+      this.sfxLoading = true;
+      this.LoadSfxPack(SFX_BASE).catch(() => {});
+    }
   }
 
   get Ready() {
@@ -1456,6 +1586,67 @@ export class AudioEngine {
       }
     }));
     this.voicesReady = ok > 0;
+    return ok;
+  }
+
+  /**
+   * 载入实录音效包，**逐条盖掉同名的合成配方**。
+   *
+   * 清单由 Script_SfxBake.mjs 生成（Audio/Sfx/Data_SfxManifest.json），
+   * 一个 cue 可以有好几个变体文件（脚步、砖屑这类每秒都在响的必须多变体）。
+   *
+   * 三条刻意的设计：
+   *   1. **逐 cue 失败**。一条载不到只丢那一条，其余照盖 —— 半套采样 + 半套合成
+   *      仍然是完整的一场仗；整包 all-or-nothing 才是真的会静音。
+   *   2. **盖不上去不留痕迹是不行的**。失败计入 sfxErrors，编辑器那一栏会显示，
+   *      不然「怎么听着还是合成的」这种问题没人查得出来。
+   *   3. **NODE_COST 要跟着改**。采样版一发只有 1—2 个节点（合成版十几个），
+   *      不改的话预算闸会按合成版的开销白白丢掉大量声音。
+   *
+   * @returns {Promise<number>} 成功盖住的 cue 数
+   */
+  async LoadSfxPack(base = SFX_BASE) {
+    if (!this.ctx || this.disposed) return 0;
+    let manifest = null;
+    try {
+      const res = await fetch(base + "Data_SfxManifest.json");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      manifest = await res.json();
+    } catch (err) {
+      this.sfxErrors.push({ file: "Data_SfxManifest.json", message: err && err.message });
+      return 0;
+    }
+    this.sfxManifest = manifest;
+    const entries = Object.entries(manifest.cues || {});
+    let ok = 0;
+    await Promise.all(entries.map(async ([cue, entry]) => {
+      const files = entry.files || (entry.file ? [entry.file] : []);
+      try {
+        const buffers = await Promise.all(files.map(async (file) => {
+          const res = await fetch(base + file);
+          if (!res.ok) throw new Error(file + " HTTP " + res.status);
+          return this.ctx.decodeAudioData(await res.arrayBuffer());
+        }));
+        if (!buffers.length) throw new Error("清单里没有文件");
+        if (cue === "bugleTone") {
+          // 军号是**一个音**，不是一条音效：拿它排 BUGLE_CHARGE 的动机去盖 bugleCharge。
+          RECIPES.bugleCharge = BugleSampleRecipe(buffers[0], entry.toneHz || 495.5);
+          MIX_GAIN.bugleCharge = SAMPLE_MIX.bugleCharge ?? 1;
+          NODE_COST.bugleCharge = BUGLE_CHARGE.length * 2 + 2;
+          this.sampleCues.add("bugleCharge");
+        } else {
+          if (!RECIPES[cue]) throw new Error("没有同名配方，盖不上去");
+          RECIPES[cue] = SampleRecipe(buffers, cue);
+          MIX_GAIN[cue] = SAMPLE_MIX[cue] ?? 1;
+          NODE_COST[cue] = SAMPLE_BURST[cue] ? 8 : 2;
+          this.sampleCues.add(cue);
+        }
+        ok += 1;
+      } catch (err) {
+        this.sfxErrors.push({ file: files[0] || cue, message: err && err.message });
+      }
+    }));
+    this.sfxReady = ok > 0;
     return ok;
   }
 
