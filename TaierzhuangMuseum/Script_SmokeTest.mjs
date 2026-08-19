@@ -10,6 +10,7 @@ import {
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
   DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
   TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS, READING_PATH, PEOPLE_LATER,
+  TENGXIAN_BATTLE, TENGXIAN_MARKERS,
 } from "./Data_Museum.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -131,6 +132,14 @@ check(MEMOIR_EXCERPTS.length === 10, `回忆录选摘 10 段（实际 ${MEMOIR_E
   check(keyPhrases.every((p) => all.includes(p)), "十段关键原文短语逐字在案");
 }
 
+console.log("[6c] 滕县详解");
+check(TENGXIAN_BATTLE.days.length === 6, `滕县逐日 6 天（实际 ${TENGXIAN_BATTLE.days.length}）`);
+check(TENGXIAN_BATTLE.days.every((d) => TIER[d.tier] && d.title && d.body.length > 0), "滕县逐日字段完整且 tier 合法");
+check(TENGXIAN_BATTLE.days[0].date === "3.13" && TENGXIAN_BATTLE.days[5].date === "3.18", "滕县起止为 3.13—3.18");
+check(Object.keys(TENGXIAN_MARKERS).length >= 9, `滕县地图标记 ≥ 9 个（实际 ${Object.keys(TENGXIAN_MARKERS).length}）`);
+check(Object.values(TENGXIAN_MARKERS).every((m) => m.label && m.body && (m.side === "cn" || m.side === "jp")), "滕县标记字段完整");
+check(TENGXIAN_BATTLE.summary.includes("三天"), "滕县摘要点明「三天」的意义");
+
 console.log("[7] index.html 容器与引用");
 {
   const html = readFileSync(join(root, "index.html"), "utf8");
@@ -143,7 +152,8 @@ console.log("[7] index.html 容器与引用");
     "wpnModal", "wpnModalClose", "wpnModalTitle", "wpnModalNick", "wpnModalFull", "wpnModalSpec", "wpnModalNotes",
     "comparePicks", "compareGrid", "balanceRows",
     "phaseLegend", "tlList", "tlPlay", "tlReset",
-    "mapTabs", "mapStage", "dareGrid", "dareLoadout", "dareNotes",
+    "mapTabs", "mapStage", "tengxianHead", "tengxianInfo", "tengxianDays", "tengxianAftermath",
+    "dareGrid", "dareLoadout", "dareNotes",
     "tacticGrid", "casTables", "quoteGrid", "memoirIntro", "memoirList",
     "mythGrid", "glossary", "readingList",
   ];
@@ -152,15 +162,20 @@ console.log("[7] index.html 容器与引用");
   const navBlock = html.match(/navLinks[\s\S]*?<\/nav>/);
   check(Boolean(navBlock), "导航块存在");
   const navHrefs = navBlock ? [...navBlock[0].matchAll(/href="#([^"]+)"/g)].map((m) => m[1]) : [];
-  check(navHrefs.includes("memoir"), "导航含回忆录选摘");
+  check(navHrefs.includes("memoir") && navHrefs.includes("tengxian"), "导航含回忆录选摘与滕县详解");
   const missingSections = navHrefs.filter((id) => !html.includes(`id="${id}"`));
   check(missingSections.length === 0, `导航锚点全部有对应 section${missingSections.length ? `（缺失: ${missingSections.join(",")}）` : ""}`);
+  const svgMarkers = new Set([...html.matchAll(/data-marker="([^"]+)"/g)].map((m) => m[1]));
+  const missingMarkers = Object.keys(TENGXIAN_MARKERS).filter((id) => !svgMarkers.has(id));
+  check(missingMarkers.length === 0, `滕县地图标记全部落在 SVG 上${missingMarkers.length ? `（缺失: ${missingMarkers.join(",")}）` : ""}`);
+  const orphanMarkers = [...svgMarkers].filter((id) => !TENGXIAN_MARKERS[id]);
+  check(orphanMarkers.length === 0, `SVG 标记全部有对应数据${orphanMarkers.length ? `（孤儿: ${orphanMarkers.join(",")}）` : ""}`);
   const mapPhases = (html.match(/class="mapPhase"/g) || []).length;
   check(mapPhases === 3, `态势图 3 个阶段组（实际 ${mapPhases}）`);
   const mapTabs = (html.match(/class="mapTab(?:\s+on)?"/g) || []).length;
   check(mapTabs === 3, `态势图 3 个切换按钮（实际 ${mapTabs}）`);
-  check(html.includes('src="Script_Main.mjs?v=3"'), "引用 Script_Main.mjs?v=3");
-  check(html.includes('href="Style_Main.css?v=3"'), "引用 Style_Main.css?v=3");
+  check(html.includes('src="Script_Main.mjs?v=4"'), "引用 Script_Main.mjs?v=4");
+  check(html.includes('href="Style_Main.css?v=4"'), "引用 Style_Main.css?v=4");
   check(html.includes('id="readingPath"'), "讲解路线容器存在");
   check(READING_PATH.length === 6 && READING_PATH.every((s) => s.href.startsWith("#")), "讲解路线 6 步且为页内锚点");
   const rpAnchors = READING_PATH.map((s) => s.href.slice(1));

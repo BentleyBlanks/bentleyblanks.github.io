@@ -6,6 +6,7 @@ import {
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
   DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
   TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS, READING_PATH, PEOPLE_LATER,
+  TENGXIAN_BATTLE, TENGXIAN_MARKERS,
 } from "./Data_Museum.mjs";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -475,6 +476,58 @@ function initMap() {
   render("prelude");
 }
 
+/* ---------------- 滕县详解 ---------------- */
+function initTengxian() {
+  const head = $("#tengxianHead");
+  const meta = el("div", "txMeta");
+  const metaLine = el("p", "", TENGXIAN_BATTLE.meta);
+  meta.append(metaLine);
+  const sides = el("p", "txSides", TENGXIAN_BATTLE.sides);
+  meta.append(sides);
+  const summary = el("p", "txSummary", TENGXIAN_BATTLE.summary);
+  meta.append(summary);
+  head.append(meta);
+
+  const days = $("#tengxianDays");
+  for (const d of TENGXIAN_BATTLE.days) {
+    const card = el("div", "txDay");
+    const top = el("div", "txDayTop");
+    top.append(el("span", "txDate", d.date));
+    top.append(el("h4", "", d.title));
+    top.append(tierBadge(d.tier));
+    card.append(top);
+    for (const p of d.body) card.append(el("p", "", p));
+    days.append(card);
+  }
+  $("#tengxianAftermath").textContent = TENGXIAN_BATTLE.aftermath;
+
+  const info = $("#tengxianInfo");
+  const showHint = () => {
+    info.replaceChildren();
+    const hint = el("p", "txHint", `◈ ${TENGXIAN_BATTLE.mapHint}`);
+    info.append(hint);
+  };
+  showHint();
+  $$(".tmark").forEach((g) => {
+    const id = g.dataset.marker;
+    const m = TENGXIAN_MARKERS[id];
+    if (!m) return;
+    const render = () => {
+      $$(".tmark").forEach((x) => x.classList.toggle("active", x === g));
+      info.replaceChildren();
+      const top = el("div", "txInfoTop");
+      top.append(el("b", "", m.label));
+      top.append(el("span", `sideTag ${m.side}`, m.side === "cn" ? "中方" : "日方"));
+      info.append(top);
+      info.append(el("p", "", m.body));
+    };
+    g.addEventListener("click", render);
+    g.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); render(); }
+    });
+  });
+}
+
 /* ---------------- 敢死队 ---------------- */
 function initDare() {
   const grid = $("#dareGrid");
@@ -651,6 +704,7 @@ initPeople();
 initWeapons();
 initTimeline();
 initMap();
+initTengxian();
 initDare();
 initTactics();
 initCasualties();

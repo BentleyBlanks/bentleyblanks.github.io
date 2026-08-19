@@ -666,6 +666,57 @@ section { padding: 64px 0 28px; scroll-margin-top: 92px; }
   font-family: var(--serif); font-size: 0.9rem; color: var(--inkDim); letter-spacing: 0.04em; line-height: 1.9;
 }
 
+/* ---------- 滕县详解 ---------- */
+.txHead { margin-bottom: 18px; }
+.txMeta {
+  border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px;
+  background: linear-gradient(160deg, var(--panel), var(--bg2));
+  font-size: 0.88rem; color: var(--inkDim);
+}
+.txMeta p { margin-bottom: 8px; }
+.txMeta p:last-child { margin-bottom: 0; }
+.txMeta .txSides { color: var(--inkFaint); font-size: 0.84rem; }
+.txMeta .txSummary { color: var(--gold); }
+
+.tmark { cursor: pointer; }
+.tmark .tmarkDot {
+  fill: #2f2618; stroke: #93856a; stroke-width: 2;
+  transition: fill 0.15s, stroke 0.15s, r 0.15s;
+}
+.tmark.cn .tmarkDot { stroke: var(--blueBright); }
+.tmark.jp .tmarkDot { stroke: var(--redBright); }
+.tmark .tmarkLbl { font-size: 11px; fill: #c9b893; pointer-events: none; }
+.tmark:hover .tmarkDot, .tmark:focus .tmarkDot, .tmark.active .tmarkDot {
+  fill: var(--gold); stroke: var(--gold); stroke-width: 3;
+}
+.tmark.active .tmarkLbl { fill: var(--ink); font-weight: 700; }
+
+.txInfo {
+  margin: 10px 18px 0; border: 1px solid var(--line); border-radius: 7px;
+  padding: 12px 16px; min-height: 74px; background: rgba(0, 0, 0, 0.22);
+}
+.txInfo .txHint { font-size: 0.82rem; color: var(--inkFaint); }
+.txInfoTop { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.txInfoTop b { font-family: var(--serif); font-size: 1.02rem; color: var(--ink); letter-spacing: 0.04em; }
+.txInfoTop .sideTag { position: static; }
+.txInfo p { font-size: 0.86rem; color: var(--inkDim); line-height: 1.7; }
+
+.txDays { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 22px; }
+.txDay {
+  border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+  background: linear-gradient(160deg, var(--panel), var(--bg2));
+  border-top: 3px solid var(--goldDim);
+}
+.txDayTop { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.txDayTop .txDate { font-family: var(--mono); font-size: 0.92rem; color: var(--gold); white-space: nowrap; }
+.txDayTop h4 { font-family: var(--serif); font-size: 1.02rem; color: var(--ink); }
+.txDay p { font-size: 0.84rem; color: var(--inkDim); margin-bottom: 6px; }
+.txDay p:last-child { margin-bottom: 0; }
+.txAftermath {
+  margin-top: 18px; border-left: 3px solid var(--red); background: rgba(178, 58, 46, 0.08);
+  padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 0.9rem; color: var(--inkDim); line-height: 1.8;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
   .bgGrid, .forcesGrid, .townInsetGrid { grid-template-columns: 1fr; }
