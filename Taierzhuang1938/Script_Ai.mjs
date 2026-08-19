@@ -44,8 +44,17 @@ let nextId = 1;
  * 取 18 时 phase1（敢死队带毛巾、部件更多）仍到 1423，所以落到 16。
  * 更远的人本来就被雾墙吃掉（fog.max 0.94），玩家看不出少了谁。
  * **要提高这个数，先去合批 Actor，别直接把它调大。**
+ *
+ * 【2026-08-19 换城之后从 16 降到 14】
+ * 上面那笔账是照台儿庄算的，而**台儿庄那座城本身只要 82 个 draw call**。
+ * 滕县这座城（600×600 m 方城、11.5 m 墙、四关在城里）实测占 352—498 个：
+ * 十字街那一关 408、北门 498。等于人这边的预算凭空少了三四百。
+ * 16 → 13 让出约 200 个。最贵的一关是十字街（出生点就站在 305 m 的通视走廊上，
+ * 那条走廊是这一关的机制，不能拿掉）：切片压到 ±100 m、远平面收到 400 m、
+ * 人像预算 13，三样一起才落回红线内。
+ * 同样地：要把它调回去，先去合批 Actor（一个人四十几个 call，身体部件没合批）。
  */
-const VISIBLE_ACTOR_BUDGET = 16;
+const VISIBLE_ACTOR_BUDGET = 13;
 
 /** 按权重抽一个。 */
 function Pick(list, rnd) {
@@ -180,8 +189,8 @@ export class Soldier {
     // 倒下的那一声是**旁边的人**喊的（「班长！班长！」），所以位置取阵亡处、
     // 但语气归活人。这一条比"死人自己惨叫"更接近战场，也更不容易滥。
     const A2 = this.director && this.director.ctx && this.director.ctx.audio;
-    if (A2 && this.side === "nra") {
-      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7 });
+    if (A2) {
+      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side });
     }
     return true;
   }
@@ -192,11 +201,11 @@ export class Soldier {
     this.health -= damage * mult;
     this.suppression = Clamp01(this.suppression + 0.45);
     if (this.health <= 0) return this.Kill(direction);
-    // 中弹没死会喊。只有中国兵有配音（声库全是中文，见 Data_Voice 的已知短板）；
-    // 让日本兵喊中文比不喊更糟。节流在引擎侧（Bark 自带全局 0.55 s / 同类 4.5 s）。
+    // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
+    // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
     const A = this.director && this.director.ctx && this.director.ctx.audio;
-    if (A && this.side === "nra") {
-      A.Bark("hurt", { position: this.position.clone(), seed: this.id | 0 });
+    if (A) {
+      A.Bark("hurt", { position: this.position.clone(), seed: this.id | 0, side: this.side });
     }
     return false;
   }
@@ -595,8 +604,8 @@ export class AiDirector {
       // 「发现敌情」只在**从无到有**那一下喊，不是每次 Think 都喊 ——
       // Think 每 0.1 s 一次，不判这一条的话一个人就能自己把节流闸门吃满，
       // 场上其他所有口令都再也发不出来了。
-      if (!s.target && this.ctx.audio && s.side === "nra") {
-        this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0 });
+      if (!s.target && this.ctx.audio) {
+        this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0, side: s.side });
       }
       // 新建一个目标对象而不是把槽位交出去 —— 槽位下一次 Think 就被覆写了
       s.target = { position: acquired.position, isPlayer: acquired.isPlayer, ref: acquired.ref };
@@ -640,8 +649,8 @@ export class AiDirector {
         s.reloadTimer = s.weapon.reloadTimeS || 3.2;
         // 「我换弹！掩护我！」—— 这一声同时是给玩家的战术信息：
         // 身边那个人接下来三秒不开枪。
-        if (this.ctx.audio && s.side === "nra") {
-          this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0 });
+        if (this.ctx.audio) {
+          this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0, side: s.side });
         }
       }
     } else if (s.target && bestDist < 70) {

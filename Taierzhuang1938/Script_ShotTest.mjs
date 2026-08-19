@@ -1,4 +1,4 @@
-// 《血战台儿庄》出图工具：真浏览器跑页面、推进固定帧数、落 PNG。
+// 《滕县 一九三八》出图工具：真浏览器跑页面、推进固定帧数、落 PNG。
 // 视觉审查 agent 的唯一输入来源 —— 所以必须**可复现**：固定视口、固定帧数、
 // 不用 Math.random 的画面抖动。
 //
@@ -33,16 +33,19 @@ const PROBE_SHOTS = [
 
 /** 正片镜头表：由 index.html 的 debug 接口驱动（Script_Main 暴露 window.Taierzhuang）。 */
 const GAME_SHOTS = [
-  { name: "Game_P1_Wall", query: "shot=1&phase=0&quality=high&scale=medium" },
-  { name: "Game_P2_Breach", query: "shot=1&phase=1&quality=high&scale=medium" },
-  { name: "Game_P3_NorthWest", query: "shot=1&phase=2&quality=high&scale=medium" },
-  { name: "Game_P4_Night", query: "shot=1&phase=3&quality=high&scale=medium" },
-  { name: "Game_P5_Burning", query: "shot=1&phase=4&quality=high&scale=medium" },
-  { name: "Game_P6_Counter", query: "shot=1&phase=5&quality=high&scale=medium" },
+  // 七关各一张。名字带关号与地名 —— 视觉审查是按图说话的，
+  // 图名看不出是哪一关的话，评语就落不回代码
+  { name: "Game_L0_Jiehe", query: "shot=1&phase=0&quality=high&scale=medium" },
+  { name: "Game_L1_Beishahe", query: "shot=1&phase=1&quality=high&scale=medium" },
+  { name: "Game_L2_Dongguan", query: "shot=1&phase=2&quality=high&scale=medium" },
+  { name: "Game_L3_Fanji", query: "shot=1&phase=3&quality=high&scale=medium" },
+  { name: "Game_L4_Chengqiang", query: "shot=1&phase=4&quality=high&scale=medium" },
+  { name: "Game_L5_Shizijie", query: "shot=1&phase=5&quality=high&scale=medium" },
+  { name: "Game_L6_Beimen", query: "shot=1&phase=6&quality=high&scale=medium" },
   // 这两张不是「多出来的花絮」：E3（开镜视野）与 D3（开火表现）此前只能靠审查员
   // 每轮手搓临时探针去看，连吃两轮盲区。加进常规集，下一轮直接从标准图里评。
-  { name: "Game_P7_Ads", query: "shot=1&phase=1&quality=high&scale=medium&ads=1" },
-  { name: "Game_P8_Fire", query: "shot=1&phase=4&quality=high&scale=medium&fire=1" },
+  { name: "Game_Z1_Ads", query: "shot=1&phase=2&quality=high&scale=medium&ads=1" },
+  { name: "Game_Z2_Fire", query: "shot=1&phase=4&quality=high&scale=medium&fire=1" },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

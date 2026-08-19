@@ -1,4 +1,4 @@
-// 《血战台儿庄》通关冒烟：真浏览器里**真的去玩**，断言玩法与剧本没被改坏。
+// 《滕县 一九三八》通关冒烟：真浏览器里**真的去玩**，断言玩法与剧本没被改坏。
 //
 // 为什么必须有这一层：开机冒烟（Script_BootTest.mjs）只证明"画得出来"。
 // 而这个项目最容易坏、坏了最看不出来的恰恰是玩法与剧本：
@@ -205,6 +205,10 @@ Check("玩家能走动", moved.dist > 1.5, `1.5 秒走了 ${moved.dist.toFixed(2
 // ===========================================================================
 // 3) 开枪吃弹药 / 能装填 / 空仓打不出去
 // ===========================================================================
+// **这两节要换到有长枪的一关。** 第一关（界河）的携行是没有步枪的 ——
+// 日方记川军三分之一以上没有步枪、各自带手榴弹约六发，所以 L0 的 primary 就是 null。
+// 在那一关测「开枪消耗弹药」，测到的是「空着手当然打不出子弹」，不是回归保护。
+await Boot(2, "small");
 Stage("3 弹药");
 const gun = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
@@ -294,29 +298,73 @@ Check("白刃能砍到人", !melee.noEnemy && melee.hpAfter < melee.hpBefore,
     : `${melee.hpBefore} -> ${melee.hpAfter}（挥刀时 busy=${melee.busy} 玩家活=${melee.playerAlive}）`);
 
 // ===========================================================================
-// 6) 占领点：进度条会动、能翻旗
+// 6) 目标链：走到路标就推进，走完这一关就换关
+//
+// 台儿庄那两条（占领进度会涨 / 能把点夺回来）随占领点一起作废：
+// 线性关卡里路标不会被反夺，"走到就算到"。要验的换成三条 ——
+// 走进圈里会推进、圈里还有敌人时不推进（不然会在挨打时莫名其妙过关）、
+// 目标链走完能真的进下一关。
 // ===========================================================================
-Stage("6 占领");
-const cap = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const o = T.battlefield.objectives[0];
-  o.owner = "ija"; o.progress = 0;
-  // 把玩家挪进点里，把**全部**日军挪走（双方都在区内应该冻结）。
-  // 只挪点里那几个是不够的：第 1 批之后日军会自己往前线走，四十秒里陆续走进来，
-  // 于是这个点全程 contested、进度冻住 —— 量到的是"夺不回来"，
-  // 而要验的是占领结算本身。这里沿用第 7 段那套冻场做法。
-  T.player.position.set(o.x, T.battlefield.GroundHeight(o.x, o.z), o.z);
-  for (const s of T.ai.soldiers) {
-    if (s.side === "ija") s.position.set(s.position.x + 400, s.position.y, s.position.z + 400);
+Stage("6 目标链");
+// 必须重开一次：前面几节把玩家瞬移得满地图都是，目标链早被推过几格了
+await Boot(0);
+const chain = await page.evaluate(async () => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const before = D.Level();
+  const target = T.battlefield.objectives[before.objectiveIndex];
+  // 先把**全部**日军挪到四百米外 —— 这一节验的是目标链本身，
+  // 不是能不能在交火中央站住。留一个在圈里当对照。
+  for (const s2 of T.ai.soldiers) {
+    if (s2.side === "ija") s2.position.set(s2.position.x + 400, s2.position.y, s2.position.z + 400);
   }
-  const p0 = o.progress;
-  T.StepFrames(240);
-  const p1 = o.progress;
-  T.StepFrames(2400, 1 / 60, false);
-  return { p0, p1, p2: o.progress, owner: o.owner, name: o.name };
+  const enemy = T.ai.soldiers.find((s2) => s2.alive && s2.side === "ija");
+  if (enemy) enemy.position.set(target.x + 2, T.battlefield.GroundHeight(target.x + 2, target.z), target.z);
+  T.player.Spawn(target.x, target.z, 0);
+  // 补兵会把人又撒回来，这一节里先关掉（它是每 3 秒一次的定时器）
+  T.state.spawnAccumulator = -1e6;
+  T.StepFrames(60, 1 / 60, false);
+  const blocked = D.Level().objectiveIndex;
+  // 把他挪走，这时候该推进
+  if (enemy) enemy.position.set(target.x + 400, enemy.position.y, target.z + 400);
+  T.player.Spawn(target.x, target.z, 0);
+  T.StepFrames(60, 1 / 60, false);
+  const advanced = D.Level().objectiveIndex;
+  return { start: before.objectiveIndex, count: before.objectiveCount, blocked, advanced,
+    id: before.id, zones: before.zones.map((z) => z.id) };
 });
-Check("占领进度会涨", cap.p1 > cap.p0, `${cap.p0.toFixed(3)} -> ${cap.p1.toFixed(3)}`);
-Check("能把点夺回来", cap.owner === "nra", `${cap.name} 现属 ${cap.owner}，进度 ${cap.p2.toFixed(2)}`);
+Check("敌人还贴在路标里时不推进目标链", chain.blocked === chain.start,
+  `${chain.id} 路标 ${chain.zones.join(">")}，index ${chain.start} -> ${chain.blocked}`);
+Check("走进路标圈里目标链会推进", chain.advanced === chain.blocked + 1,
+  `index ${chain.blocked} -> ${chain.advanced} / ${chain.count}`);
+
+// 七关能依次推进：一关一关点完目标链再换关。
+// 不真走两公里 —— CompleteLevel 把目标链一路点完，AdvanceLevel 建下一片切片。
+// 建切片是异步的（分帧走完），所以这里必须 await，不能只 StepFrames。
+Stage("6.2 七关依次推进（每关都要重建一片切片，约两分钟）");
+const ladder = await page.evaluate(async () => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const seen = [];
+  for (let i = 0; i < 7; i += 1) {
+    const lv = D.Level();
+    // pool 读**本关的配置值**（state.phasePoolNra），不是运行时的 nraPool ——
+    // 后者从进关那一刻起就被战损扣着走，量到的是"这几十帧死了几个人"
+    seen.push({ index: lv.index, id: lv.id, zones: lv.zones.length, pool: T.state.phasePoolNra });
+    if (i === 6) break;
+    D.CompleteLevel();
+    await D.AdvanceLevel({ cutscenes: false });
+  }
+  return { seen, outcome: D.Outcome() };
+}, undefined);
+const ladderIds = ladder.seen.map((r) => r.id);
+Check("七关能依次推进", ladderIds.length === 7 && new Set(ladderIds).size === 7,
+  ladderIds.join(" -> "));
+Check("每关都有自己的目标链与兵员池",
+  ladder.seen.every((r) => r.zones >= 3 && r.pool > 0),
+  ladder.seen.map((r) => `${r.id}:${r.zones}标/${r.pool}人`).join(" "));
+// 「城里还站着的人」是单调下降的（唯一一次上涨由剧本的 system beat 交代）
+const poolCurve = ladder.seen.map((r) => r.pool);
+Check("兵员池按剧本给的曲线走", poolCurve[0] === 220 && poolCurve[6] === 96,
+  poolCurve.join(" -> "));
 
 // ===========================================================================
 // 7) 阵亡换人：卡片 + 换一个有名有姓的人 + 兵员池 -1
@@ -336,8 +384,6 @@ const death = await page.evaluate(async () => {
   T.player.health = 100;
   const idBefore = T.state.identity.name;
   const poolBefore = T.state.nraPool;
-  // 十秒一次的占点消耗会在这三帧里撞进来的话读数就不干净，先把钟拨回去
-  T.state.captureDrainAccum = 0;
   T.player.Kill();
   T.StepFrames(3);          // 让 Frame 自己发现"上一帧还活着，这一帧死了"
   // 紧贴死亡那一刻读票池。第 1 批之后 AI 阵亡也扣票（那是对的：票池 = 兵力池），
@@ -362,76 +408,136 @@ Check("换成另一个有名有姓有籍贯的人", death.alive && !!death.origi
 
 // ===========================================================================
 // 8) 剧本真的在播 —— 这一条是整份测试存在的主要理由
+//
+// 换城之后这一节整个重写：台儿庄那六句（刘振海、孙连仲、黄樵松《榴花》、
+// 王范堂、陆诒、万有福）一句都不再存在。滕县这七关有自己的一本，
+// 断言挑的是**六句有史料出处、且分别落在不同关**的，
+// 漏掉任何一关都会有一条红。
 // ===========================================================================
-Stage("8 剧本长跑（六阶段按出厂时长，约六分钟）");
+Stage("8 剧本长跑（七关按出厂时长的九成推，约七分钟）");
 const storySeen = [];
 // 分块推帧，一块 1800 帧（三十秒）。
 // **不许一次 evaluate 里同步跑一万三千帧**：那是把渲染进程主线程一口气占住
-// 五十到九十秒，浏览器会当它没响应，实跑里这一段十次有六七次就卡死在这儿
-// （每一次都恰好卡在第 8 段，而第 10/11/12 段本来就是分块的，从来没卡过）。
-// 分块之后每次 evaluate 只占住三十帧秒，顺带还能打进度。
-for (let phase = 0; phase < 6; phase += 1) {
+// 五十到九十秒，浏览器会当它没响应，实跑里这一段十次有六七次就卡死在这儿。
+for (let phase = 0; phase < 7; phase += 1) {
   const t0 = Date.now();
-  const total = await page.evaluate((ph) => {
+  const total = await page.evaluate(async (ph) => {
     const T = window.Taierzhuang;
-    // 只推到本阶段时长的九成：推满会触发 Frame 里的自动进入下一阶段，
-    // 那时 story 的队列已经换成下一段的了，Remaining 量到的是新队列。
-    const minutes = T.state.phaseMinutes || [4, 5, 5, 4, 5, 6];
-    T.JumpToPhase(ph);
-    return Math.round(minutes[ph] * 60 * 60 * 0.9);
+    await T.JumpToPhase(ph);
+    // **钉住这一关**：不钉的话玩家在十几分钟里会死上几次，而换人是在当前路标
+    // 附近重生的 —— 目标链会自己往前跳，跳完就自动换关，剧本队列被重置，
+    // 于是"这一关的剧本剩几条"量到的是下一关的。实测这一段的关名整体错了一格。
+    T.Debug.PinLevel(true);
+    // 只推到本关时长的九成：推满会触发自动换关，那时 story 的队列已经换成
+    // 下一关的了，Remaining 量到的是新队列
+    return Math.round(T.state.levelSeconds * 60 * 0.9);
   }, phase);
   for (let done = 0; done < total; done += 1800) {
     // 长跑不渲染：断言一帧画面都不需要，而软件光栅连推几万帧会把渲染进程卡死。
     await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), Math.min(1800, total - done));
   }
-  const row = await page.evaluate((ph) => {
+  const row = await page.evaluate(() => {
     const T = window.Taierzhuang;
-    return { phase: ph, fired: T.story.fired.length, remaining: T.story.Remaining };
-  }, phase);
-  storySeen.push(row);
-  console.log(`    阶段 ${phase}：剧本已播 ${row.fired} 条，本段剩 ${row.remaining} 条`
+    const out = { id: T.Debug.Level().id, fired: T.story.fired.length, remaining: T.story.Remaining };
+    T.Debug.PinLevel(false);
+    return out;
+  });
+  storySeen.push({ phase, ...row });
+  console.log(`    ${row.id.padEnd(14)} 剧本已播 ${row.fired} 条，本关剩 ${row.remaining} 条`
     + `（${((Date.now() - t0) / 1000).toFixed(0)} s）`);
 }
 const storyRun = await page.evaluate((seen) => {
   const T = window.Taierzhuang, D = T.Debug;
-  // 六个阶段各推两分钟，把每一段剧本都跑一遍
-  // 按**各阶段真实配置的时长**推，不要图快用一个统一的短时长 ——
-  // 上一版每阶段只推 180 s，而正片 P3 是 5 分钟，于是断言比出厂配置还严，
-  // 报出来的"剧本卡住"其实是测试自己没给够时间。这里要验的是
-  //「出厂配置下每一句台词都听得到」，那就得按出厂时长跑。
-  const spoken = D.Spoken();
   const fired = D.StoryFired();
+  // 判据用 **StoryFired**（叙事层自己的流水账，不封顶），不用 Spoken ——
+  // hud.spoken 是一条 400 条的环形缓冲，七关一路跑下来早溢出了，
+  // 靠它判断"这句有没有出现过"会**随机地**漏掉最早的几关（实测就漏过一次，
+  // 同一份代码上一轮还是绿的）。这类假红比真红更费时间。
+  const has = (t) => fired.some((f) => (f.text || "").includes(t));
   return {
     seen,
     totalFired: fired.length,
     byTimeout: fired.filter((f) => f.byTimeout).length,
-    hasLiu: spoken.some((t) => t.includes("他倒了我上")),
-    hasSun: spoken.some((t) => t.includes("整个集团军打完为止")),
-    hasPoem: spoken.some((t) => t.includes("榴花原是血染成")),
-    hasFantang: spoken.some((t) => t.includes("王范堂")),
-    hasLuyi: spoken.some((t) => t.includes("新华日报")),
-    hasWanyoufu: spoken.some((t) => t.includes("半缸水")),
-    noteShown: document.querySelectorAll(".hudNote").length > 0,
-    sample: spoken.slice(-6),
+    levels: [...new Set(fired.map((f) => f.level))],
+    // 六句，分别落在 L0 / L1 / L2 / L3 / L5 / L6
+    hasGrenade: has("六颗，一颗都别掉"),                 // L0 手榴弹经济
+    hasBeishahe: has("孙代总司令亲自到北沙河"),          // L1 3/14 夜北沙河会议
+    hasZhaiWall: has("四十公分厚"),                     // L2 日方实测东关寨墙
+    hasNightRaid: has("把东关门夺回来"),                 // L3 张宣武反击
+    hasWestTower: has("西门楼丢了"),                     // L5 3/17 17 时西城门楼失守
+    hasNorthGate: has("扒北门"),                        // L6 侯子平扒开北城门
+    sample: fired.slice(-4).map((f) => `${f.level}:${f.text}`),
   };
 }, storySeen);
 Check("剧本 beats 真的派发出来了", storyRun.totalFired >= 60,
   `播了 ${storyRun.totalFired} 条，其中 ${storyRun.byTimeout} 条靠超时兜底`);
-Check("刘振海那句「他倒了我上」出现过", storyRun.hasLiu);
-Check("孙连仲「整个集团军打完为止」出现过", storyRun.hasSun);
-Check("黄樵松《榴花》出现过", storyRun.hasPoem);
-Check("王范堂自报番号出现过", storyRun.hasFantang);
-Check("记者陆诒出现过", storyRun.hasLuyi);
-Check("万有福「半缸水」出现过", storyRun.hasWanyoufu);
-// 六段剧本每一段都该基本播完，剩太多说明链子卡住了
+Check("七关的剧本都派发过", storyRun.levels.length === 7, storyRun.levels.join(" "));
+Check("L0 班长「六颗，一颗都别掉」出现过", storyRun.hasGrenade);
+Check("L1 北沙河军事会议那句出现过", storyRun.hasBeishahe);
+Check("L2 东关寨墙「四十公分厚」出现过", storyRun.hasZhaiWall);
+Check("L3 张宣武「把东关门夺回来」出现过", storyRun.hasNightRaid);
+Check("L5 「西门楼丢了」出现过", storyRun.hasWestTower);
+Check("L6 侯子平「扒北门」出现过", storyRun.hasNorthGate);
+// 每一关都该基本播完，剩太多说明链子卡住了
 const stuck = storyRun.seen.filter((x) => x.remaining > 6);
-Check("没有哪一段剧本被卡住", stuck.length === 0,
-  stuck.length ? `阶段 ${stuck.map((x) => `${x.phase}(剩${x.remaining})`).join(" ")}` : "六段都跑完了");
+Check("没有哪一关的剧本被卡住", stuck.length === 0,
+  stuck.length ? stuck.map((x) => `${x.id}(剩${x.remaining})`).join(" ") : "七关都跑完了");
 
 // ===========================================================================
-// 9) 胜负判定可达
+// 8.5) 过场：五场都能播、都能跳过，王铭章那场真的触发
 // ===========================================================================
-Stage("9 胜负");
+Stage("8.5 过场");
+await Boot(0);
+const cuts = await page.evaluate(async () => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const ids = ["CS_Chuchuan", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
+  const rows = [];
+  for (const id of ids) {
+    const p = D.PlayCutscene(id);
+    // 起播那一下：应当接管控制权、相机被换掉
+    T.StepFrames(6);
+    const mid = D.Cutscene();
+    const camY = T.camera.position.y;
+    // 跳过之后卡片要读完才 resolve —— 再推几秒把卡片推过去
+    D.SkipCutscene();
+    for (let k = 0; k < 40; k += 1) T.StepFrames(30);
+    const done = await p;
+    rows.push({ id, playing: mid.playing, current: mid.current, camY: +camY.toFixed(1),
+      skipped: !!done.skipped, captured: !!mid.current });
+  }
+  return { rows, played: D.Cutscene().played.map((c) => c.id) };
+});
+Check("五场过场都能播起来", cuts.rows.every((r) => r.playing && r.current === r.id),
+  cuts.rows.map((r) => `${r.id}:${r.playing ? "播" : "没播"}`).join(" "));
+Check("五场过场都能 Esc 跳过（跳过后卡片仍把史实补出来）",
+  cuts.rows.every((r) => r.skipped), cuts.rows.map((r) => `${r.id}:${r.skipped}`).join(" "));
+Check("王铭章殉国那场真的触发得到",
+  cuts.played.includes("CS_WangMingzhang"),
+  `播过：${cuts.played.join(" ")}`);
+// 关卡边界上真的会自动播：第五关（十字街）打完接 CS_WangMingzhang
+const cutTrigger = await page.evaluate(async () => {
+  const T = window.Taierzhuang, D = T.Debug;
+  await T.JumpToPhase(5);
+  D.CompleteLevel();
+  const p = D.AdvanceLevel({ cutscenes: true });
+  T.StepFrames(6);
+  const at = D.Cutscene();
+  D.SkipCutscene();
+  for (let k = 0; k < 60; k += 1) T.StepFrames(30);
+  await p;
+  return { fired: at.current, after: D.Level().id };
+});
+Check("第五关打完自动接王铭章那场过场", cutTrigger.fired === "CS_WangMingzhang",
+  `触发的是 ${cutTrigger.fired}，之后进 ${cutTrigger.after}`);
+
+// ===========================================================================
+// 9) 结束条件可达
+//
+// **没有"守住了"这个结局** —— 滕县三月十七日陷落是信史。
+// 两种收场：七关走完从北门出去（breakout），或者池子空了（defeat）。
+// ===========================================================================
+Stage("9 结束条件");
+await Boot(0);
 const outcome = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   T.state.outcome = null;
@@ -440,13 +546,17 @@ const outcome = await page.evaluate(() => {
   T.StepFrames(6);
   const defeat = D.Outcome();
   T.state.outcome = null;
-  D.EndBattle("victory");
-  const victory = D.Outcome();
+  D.EndBattle("breakout");
+  const breakout = D.Outcome();
   const epilogueOn = document.querySelector(".hudEpilogue").classList.contains("on");
-  return { defeat, victory, epilogueOn };
+  const text = D.Spoken().slice(-9).join(" | ");
+  return { defeat, breakout, epilogueOn, text };
 });
 Check("兵员池归零会判败", outcome.defeat === "defeat", `outcome=${outcome.defeat}`);
-Check("胜局会放尾声", outcome.victory === "victory" && outcome.epilogueOn);
+Check("突围收场会放尾声，且尾声说的是史实（不打歼敌数）",
+  outcome.breakout === "breakout" && outcome.epilogueOn
+  && outcome.text.includes("侯子平") && !outcome.text.includes("歼敌"),
+  outcome.text.slice(0, 80));
 
 // ===========================================================================
 // 10) 长跑不崩、AI 数量稳定
@@ -494,25 +604,30 @@ const spawnSmall = await page.evaluate(() => {
     open: D.OpenDirections(T.player.position.x, T.player.position.z, 8, 20),
     open72: D.OpenDirections(T.player.position.x, T.player.position.z, 72, 20),
     nraPool: T.state.nraPool,
+    poolMax: T.state.phasePoolNra,
   };
 });
 Check("玩家出生点向 8 个方位射 20 m 至少三条通（与 FindOpenSpot 同口径）",
   spawnSmall.open >= 3, `${spawnSmall.open}/8 条通（72 方位口径 ${spawnSmall.open72}/72）`);
 
-// 11.2 票池随战场规模缩放
+// 11.2 票池**不**随战场规模缩放。
+// 台儿庄那一版按 SCALE.maxAlive 缩过（开放战场的票池是个平衡旋钮）；
+// 滕县的「城里还站着的人」是剧本给死的一条曲线（220→196→328→…→96，
+// 登记在 PRESUMED_STAGING.poolCurve），跟同屏人数没有关系 ——
+// 缩了它就不再是那条曲线，屏幕上那个数字也就不再对应剧本里的任何东西。
 await Boot(0, "large");
-const poolLarge = await page.evaluate(() => window.Taierzhuang.state.nraPool);
-Check("兵员池随规模缩放（small ≠ large）", spawnSmall.nraPool !== poolLarge,
-  `small=${spawnSmall.nraPool} large=${poolLarge}`);
+const poolLarge = await page.evaluate(() => window.Taierzhuang.state.phasePoolNra);
+Check("兵员池照剧本给的数，不随战场规模缩放（small === large === 220）",
+  spawnSmall.poolMax === 220 && poolLarge === 220,
+  `small=${spawnSmall.poolMax} large=${poolLarge}`);
 
 // 11.3 六十秒开火计数 / 状态分布 / 占领点易主 —— 玩家全程不动手
 await Boot(2, "medium");
 const battle = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   const fire0 = D.FireCount();
-  const owners0 = T.battlefield.objectives.map((o) => o.owner).join(",");
   const states = {};
-  let ownerChanged = false;
+  let contestedSeen = false;
   // 每秒采一次。只在十秒边界采会漏掉整段交火。
   // 开火计数只数**头六十秒**；占领点易主给到一百五十秒 —— 守军会往吃紧的点增援，
   // 一个点真正翻过去要打上一两分钟，这正是我们想要的（一分钟就翻旗说明没人守）。
@@ -522,14 +637,16 @@ const battle = await page.evaluate(() => {
     if (i === 59) fired60 = D.FireCount() - fire0;
     const snapshot = D.AiStates();
     for (const key of Object.keys(snapshot)) states[key] = (states[key] || 0) + snapshot[key];
-    if (T.battlefield.objectives.map((o) => o.owner).join(",") !== owners0) ownerChanged = true;
+    // 线性关卡里路标不会易主（不存在占领条）。能取证的是**压力**：
+    // 目标链上的路标有没有被日军贴进圈里过。一百五十秒里一次都没有，
+    // 说明敌人根本没压上来 —— 那才是"仗没在打"的另一副面孔。
+    if (T.battlefield.objectives.some((o) => o.contested)) contestedSeen = true;
   }
   return {
     fired: fired60,
     states,
-    ownerChanged,
-    owners0,
-    owners1: T.battlefield.objectives.map((o) => o.owner).join(","),
+    contestedSeen,
+    reached: D.Level().objectiveIndex,
     deaths: D.Deaths(),
   };
 });
@@ -538,8 +655,8 @@ Check("AI 状态分布不再恒为 advance", Object.keys(battle.states).length >
   JSON.stringify(battle.states));
 Check("交火与装填两种状态都出现过", !!battle.states.fire && !!battle.states.reload,
   `fire=${battle.states.fire || 0} reload=${battle.states.reload || 0}`);
-Check("占领点自己易了主（玩家没动手）", battle.ownerChanged,
-  `${battle.owners0} -> ${battle.owners1}`);
+Check("日军真的压到目标链上（路标被贴住过）", battle.contestedSeen,
+  `目标链走到 ${battle.reached}，阵亡 ${JSON.stringify(battle.deaths)}`);
 Check("两侧都在真的死人", battle.deaths.nra > 0 && battle.deaths.ija > 0,
   `nra ${battle.deaths.nra} / ija ${battle.deaths.ija}`);
 
@@ -571,24 +688,50 @@ const shotPool = await page.evaluate(() => {
   T.player.health = 100;
   const target = T.ai.soldiers.find((s) => s.alive && s.side === "ija");
   if (!target) return { noTarget: true };
+  // **先给自己找一条打得出去的射界。** 滕县城内是一进一进的四合院，
+  // 玩家十有八九正贴着一堵墙站着 —— 实测八枪弹着全是 wall，
+  // 量到的"票池没动"是子弹打在砖上，不是双扣没修好。
+  // 做法：原地转一圈，找一条 6 m 内没有东西的方位，把 yaw 转过去。
+  const V0 = T.player.position.constructor;
+  const probe = new V0();
+  let bestYaw = null;
+  for (let k = 0; k < 24; k += 1) {
+    const y = (k / 24) * Math.PI * 2;
+    probe.set(-Math.sin(y), 0, -Math.cos(y));
+    if (!T.battlefield.Raycast(T.player.EyePosition, probe, 6)) { bestYaw = y; break; }
+  }
+  if (bestYaw === null) return { boxedIn: true };
+  T.player.yaw = bestYaw;
+  T.player.aimYaw = 0; T.player.pitch = 0; T.player.aimPitch = 0;
   // 靶子摆在**真正的瞄准射线**上，别拿 player.yaw 现推一条水平前向：
   // TryFire 的命中判定是「到射线的垂距 < 0.45 m」，而胸口在 position.y + 0.95。
   // 拿水平前向摆在 3 m 处，胸口比眼位低 0.65 m，垂距 0.65 > 0.45 —— 八枪全从头顶过去。
   const V = T.player.position.constructor;
   const dir = T.player.AimDirection(new V());
   const eye = T.player.EyePosition.clone();
-  const spot = eye.clone().addScaledVector(dir, 4);
+  // 1.8 m 而不是 4 m：滕县城内是一进一进的四合院，四米外十有八九先撞墙，
+  // 量到的"没打死"是子弹打在砖上，不是票池算错。
+  // 枪口本身就在眼前约 0.8 m，所以 1.8 m 等于枪口前一米，中间不可能夹一堵墙。
+  const spot = eye.clone().addScaledVector(dir, 1.8);
   target.position.set(spot.x, spot.y - 0.95, spot.z);
   target.health = 1;                        // 一枪必死，把"打了几枪"这个变量消掉
   const ija0 = T.state.ijaPool;
   // Debug.Fire 是同步的：中间不推帧，就不会有别的日军死掉混进读数
   let shots = 0;
-  while (target.alive && shots < 8) { D.Fire(); shots += 1; }
-  return { ija0, ija1: T.state.ijaPool, dead: !target.alive, shots };
+  const hits = [];
+  while (target.alive && shots < 8) {
+    D.Fire(); shots += 1;
+    const ls = D.LastShot();
+    if (ls) hits.push(ls.hitKind);
+  }
+  return { ija0, ija1: T.state.ijaPool, dead: !target.alive, shots, hits,
+    ammo: T.state.ammo, yaw: +bestYaw.toFixed(2) };
 });
 Check("玩家亲手击杀：日方票恰好 -1（没有双扣）",
   !shotPool.noTarget && shotPool.dead && shotPool.ija1 === shotPool.ija0 - 1,
-  `ijaPool ${shotPool.ija0}->${shotPool.ija1}，打了 ${shotPool.shots} 枪`);
+  shotPool.boxedIn ? "四周六米内没有一条打得出去的方位"
+    : `ijaPool ${shotPool.ija0}->${shotPool.ija1}，打了 ${shotPool.shots} 枪，`
+      + `弹着 ${(shotPool.hits || []).join("/") || "一发都没出去"}，余弹 ${shotPool.ammo}`);
 
 // ===========================================================================
 // 12) ER2 对齐第 2 批：键位表 / 携行 / 枪的手感三件套 / flank·charge / 两脚架 / 过热
@@ -993,41 +1136,49 @@ const soak300 = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   const spawnZ = [];
   const realSpawn = T.ai.Spawn.bind(T.ai);
-  T.ai.Spawn = (side, x, z, o) => { if (side === "ija") spawnZ.push(z); return realSpawn(side, x, z, o); };
-  const owners0 = T.battlefield.objectives.map((o) => o.owner).join(",");
+  const lb = T.ai.insideWalls;
+  let outsideCount = 0;
+  T.ai.Spawn = (side, x, z, o) => {
+    if (side === "ija") {
+      spawnZ.push(z);
+      if (x < lb.minX || x > lb.maxX || z < lb.minZ || z > lb.maxZ) outsideCount += 1;
+    }
+    return realSpawn(side, x, z, o);
+  };
   const seg = [];
   let prev = D.FireCount();
-  let flips = 0, lastOwners = owners0;
+  // 目标链有没有在动：停摆的另一个面相是"仗还在打但玩家永远推不动"
+  const reached0 = D.Level().objectiveIndex;
   for (let i = 0; i < 15; i += 1) {
     T.StepFrames(20 * 60, 1 / 60, false);
     const now = D.FireCount();
     seg.push(now - prev);
     prev = now;
-    const owners = T.battlefield.objectives.map((o) => o.owner).join(",");
-    if (owners !== lastOwners) { flips += 1; lastOwners = owners; }
   }
+  const reached1 = D.Level().objectiveIndex;
   T.ai.Spawn = realSpawn;
   return {
-    seg, flips, owners0, owners1: lastOwners,
+    seg, reached0, reached1,
     first60: seg[0] + seg[1] + seg[2],
     back150: seg.slice(7).reduce((a, b) => a + b, 0),
     backSegments: seg.slice(7).filter((v) => v > 0).length,
     spawns: spawnZ.length,
-    outside: spawnZ.filter((z) => z < -190).length,
+    // 撒兵有没有跑出本关切片。台儿庄那一版查的是「北寨墙外」（z < -190），
+    // 滕县七关各有各的切片，所以判据换成通用的：落在 levelBounds 之外就算错。
+    outside: outsideCount,
   };
 });
 Check("头六十秒全场开火 > 200", soak300.first60 > 200, `开了 ${soak300.first60} 枪`);
-Check("后一百五十秒仗还在打（不是停摆后靠占点时钟单方面结算）",
+Check("后一百五十秒仗还在打（不是打两分钟就停摆）",
   soak300.backSegments >= 2 && soak300.back150 > 20,
   `每 20 s：${soak300.seg.join("/")}；后半段 ${soak300.back150} 枪、${soak300.backSegments}/8 段有火力`);
-Check("三百秒内占领点反复易主", soak300.flips >= 1,
-  `易主 ${soak300.flips} 次：${soak300.owners0} -> ${soak300.owners1}`);
-Check("日方补兵不再落在北寨墙外", soak300.outside === 0,
-  `${soak300.spawns} 次生成，墙外 ${soak300.outside} 次`);
+Check("日方补兵不会落在本关切片外面", soak300.outside === 0,
+  `${soak300.spawns} 次生成，界外 ${soak300.outside} 次`);
 
-// 12.15 导航网格：八个占领点都走得到。
-// 三个点（清真寺、火车站、新关帝庙）的圆心落在封闭院落里，圆心直接做 BFS 起点
-// 只能淹到 0.1% 的可走面积 —— 必须被吸附到主连通分量上，否则全城拿不到导航信息。
+// 12.15 导航网格：本关的路标都走得到。
+// 鲁南民居对外不开窗、四面围墙，路标圆心完全可能落在一个封闭院落里 ——
+// 那时圆心直接做 BFS 起点只能淹到零点几个百分点的可走面积，
+// 必须被吸附到主连通分量上，否则这一关拿不到任何导航信息，AI 全线撞墙。
 const navStats = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const stats = T.nav.Stats();
@@ -1043,7 +1194,7 @@ const navStats = await page.evaluate(() => {
   }
   return { stats, rows, worst: Math.min(...rows.map((r) => r.pct)) };
 });
-Check("每个占领点都能从全城大部分地方走到（导航场连通）",
+Check("每个路标都能从本关大部分地方走到（导航场连通）",
   navStats.worst > 40,
   `最差 ${navStats.worst}%；` + navStats.rows.map((r) => `${r.id} ${r.pct}%`).join(" "));
 
@@ -1057,34 +1208,63 @@ Check("每个占领点都能从全城大部分地方走到（导航场连通）"
 // 轮盘要走真的键盘事件与真的 mousemove 事件，潜行要看受令者的姿态跟着班长变。
 // ===========================================================================
 Stage("13 第 3 批：翻越 / 上墙 / 下水 / 拾取 / 轮盘 / 潜行");
-await Boot(0, "small");
+// **必须在城里那一关测。** 第一关是界河南岸的开阔野地 —— 没有院墙可翻、
+// 没有上城道可爬、没有护城河可下。在那儿跑这一组，四条会一起报
+// 「没找到马道/没找到可翻的墙/淹 0 m」，而那不是回归，是选错了关。
+// 第五关（城墙）同时有这三样：东门旁的上城道、城内的四合院、南濠。
+await Boot(4, "small");
 
 // 13.1 马道：从坡脚一路走到墙顶（4 m），中途不许被卡住
 const ramp = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const bf = T.battlefield;
-  // 北墙 x = -120 那条马道。台阶是十级独立碰撞盒，取 z 最大的那一级做坡脚
-  const steps = bf.colliders.filter((b) => b.tag === "ramp" && b.min[0] > -122 && b.max[0] < -118);
-  if (!steps.length) return { none: true };
-  const foot = steps.reduce((a, b) => (a.max[2] > b.max[2] ? a : b));
-  const startZ = foot.max[2] + 1.2;
-  T.player.Spawn(-120, startZ, 0);          // yaw = 0 时 forward = (0,-1)，正对着墙
+  const all = bf.colliders.filter((b) => b.tag === "ramp");
+  if (!all.length) return { none: true };
+  // 切片里可能同时有两条上城道（东门旁与南门旁）。**必须先聚类**，
+  // 否则"最低的一级"和"最高的一级"会取自两条不同的坡，推出来的方向指向斜刺里。
+  const Center = (b) => [(b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2];
+  const lowest = all.reduce((a, b) => (a.max[1] < b.max[1] ? a : b));
+  const [lx, lz] = Center(lowest);
+  const steps = all.filter((b) => {
+    const [cx, cz] = Center(b);
+    return Math.hypot(cx - lx, cz - lz) < 45;
+  });
+  const top = steps.reduce((a, b) => (a.max[1] > b.max[1] ? a : b));
+  const [tx, tz] = Center(top);
+  let dx = tx - lx, dz = tz - lz;
+  const len = Math.hypot(dx, dz) || 1;
+  dx /= len; dz /= len;
+  T.player.Spawn(lx - dx * 2.5, lz - dz * 2.5, Math.atan2(-dx, -dz));
   const y0 = T.player.position.y;
   const idle = { forward: 1, strafe: 0, sprint: false, ads: false, lean: 0,
     lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 };
   let peak = -99;
-  const track = [];
-  for (let i = 0; i < 360; i += 1) {
+  for (let i = 0; i < 420; i += 1) {
     T.player.Update(1 / 60, idle, null);
     if (T.player.position.y > peak) peak = T.player.position.y;
-    if (i % 60 === 0) track.push(`${T.player.position.z.toFixed(0)}@${T.player.position.y.toFixed(2)}`);
   }
-  return { steps: steps.length, y0: +y0.toFixed(2), peak: +peak.toFixed(2), track };
+  // 城自己的连通性自检：从城里起洪，看有几段能淌到 11.5 m 的墙顶，
+  // 以及**把上城道全摘掉之后还剩几段**（剩下的就是第五条上墙的路 = 事故）。
+  const corridor = bf.CheckWallCorridor();
+  return { steps: steps.length, y0: +y0.toFixed(2), peak: +peak.toFixed(2),
+    topY: +top.max[1].toFixed(2), corridor };
 });
-Check("马道是能走上去的台阶：玩家从坡脚走到墙顶（4 m）",
-  !ramp.none && ramp.steps >= 8 && ramp.y0 < 0.5 && ramp.peak > 3.8,
-  ramp.none ? "没找到马道台阶"
-    : `${ramp.steps} 级台阶，${ramp.y0} m -> 最高 ${ramp.peak} m；轨迹 ${ramp.track.join(" ")}`);
+// 两条断言，分工不同：
+//  · 台阶走得上去 —— 直着走只能上到转折平台（上城道中段有一个折返平台，
+//    见 Data_Tengxian.RAMP.landingAt），所以判据是"离地四米以上"而不是"到墙顶"。
+//    要一路走到顶得在平台上转向，那是玩家的事，不是这条回归要验的。
+//  · **全城只有四条上城道** —— 这条空间规则是第四、五关的关卡前提，
+//    用城自己的泛洪自检验：摘掉马道之后一段都不许能淌到墙顶。
+Check("上城道是能走上去的台阶（直着走上到转折平台）",
+  !ramp.none && ramp.steps >= 8 && ramp.peak > 4.0,
+  ramp.none ? "没找到上城道台阶"
+    : `${ramp.steps} 级台阶，${ramp.y0} m -> 最高 ${ramp.peak} m（坡顶 ${ramp.topY} m）`);
+Check("没有第五条上墙的路（摘掉马道之后墙顶一段都淌不到）",
+  !ramp.none && ramp.corridor.leakSpan === 0 && ramp.corridor.topReachableSpan > 0,
+  ramp.none ? "没找到上城道台阶"
+    : `可达墙顶 ${ramp.corridor.topReachableSpan} m / ${ramp.corridor.topSegments} 段，`
+      + `漏洞 ${ramp.corridor.leakSpan} m`);
+
 
 // 13.2 翻越：真的翻到墙的另一面去了。
 // 一次成功可能是运气，所以扫四十堵真墙统计成功率。
@@ -1174,13 +1354,16 @@ Check("翻越途中打不出枪，落地就能打",
   vaultFire.none ? "没找到可翻的墙"
     : `半空 ${vaultFire.ammo0}->${vaultFire.ammo1}，落地 ${vaultFire.ammo2}->${vaultFire.ammo3}`);
 
-// 13.4 运河软墙：慢四倍、打不了枪；浮桥上不算下水
+// 13.4 下水软墙：慢四倍、打不了枪。
+// 换城之后水从运河变成**护城河**：宽 10.5 m、深 4.8 m、水面 −1.6 m，
+// 志载「1 丈 5 尺」与日方实测 5 m 双源吻合。濠底到墙顶总落差 16.3 m ——
+// 这条濠是滕县城防的第一层，不是装饰。
 const water = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
-  const canalZ = 232 - 23 + 12;                 // 河心偏北岸一点
+  const M = 318 + 10.5 / 2;                     // 濠心：内岸 318 + 半宽
   const idle = (f) => ({ forward: f, strafe: 0, sprint: false, ads: false, lean: 0,
     lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 });
-  T.player.Spawn(90, canalZ, 0);
+  T.player.Spawn(150, M, 0);                    // 南濠正中（x 取在本关切片里）
   T.player.health = 100;
   T.player.Update(1 / 60, idle(0), null);
   const w = D.Water();
@@ -1191,22 +1374,21 @@ const water = await page.evaluate(() => {
   const ammo0 = T.state.ammo;
   D.Fire();
   const ammo1 = T.state.ammo;
-  // 对照组：同样一秒的岸上位移
-  T.player.Spawn(90, 150, 0);
+  // 对照组：同样一秒的岸上位移（城内顺城街上）
+  T.player.Spawn(150, 260, 0);
   const p1 = { x: T.player.position.x, z: T.player.position.z };
   for (let i = 0; i < 60; i += 1) T.player.Update(1 / 60, idle(1), null);
   const dry = Math.hypot(T.player.position.x - p1.x, T.player.position.z - p1.z);
-  // 浮桥面：全城唯一的退路，走桥不算下水
-  const deck = T.battlefield.WaterDepth(-30, 222, T.battlefield.GroundHeight(-30, 222));
+  // 城里的地坪上不许判成水（判错的话玩家在街上走不动，而且完全看不出为什么）
+  const street = T.battlefield.WaterDepth(150, 260, T.battlefield.GroundHeight(150, 260));
   return { depth: +w.depth.toFixed(2), inWater: w.inWater, wet: +wet.toFixed(2),
-    dry: +dry.toFixed(2), ammo0, ammo1, deck };
+    dry: +dry.toFixed(2), ammo0, ammo1, street };
 });
-Check("下运河：速度掉到岸上的四分之一上下，且开不了枪",
+Check("下护城河：速度掉到岸上的四分之一上下，且开不了枪",
   water.inWater && water.depth > 0.35 && water.wet < water.dry * 0.35
   && water.ammo1 === water.ammo0,
   `淹 ${water.depth} m，一秒走 ${water.wet} m（岸上 ${water.dry} m），弹药 ${water.ammo0}->${water.ammo1}`);
-Check("浮桥面上不算下水（全城唯一的退路不能被自己的规则堵死）",
-  water.deck === 0, `桥面淹没深度 ${water.deck}`);
+Check("城内地坪不算下水", water.street === 0, `顺城街淹没深度 ${water.street}`);
 
 // 13.5 F 拾枪：从尸体上捡三八式，且缴获日械没有备弹
 const pickup = await page.evaluate(() => {
@@ -1519,6 +1701,146 @@ Check("模型读不到时退回程序化方块几何，且不抛",
   Check("开镜时照门落在画面正中（每把枪偏心 ≤14 px）", worst <= 14,
     ads.map((r) => (r.none ? `${r.id}:没照门` : `${r.id}:${r.dx},${r.dy}`)).join(" · "));
 }
+
+// ===========================================================================
+// 14) 指针锁能释放
+//
+// 积压条目：关掉页面 / 切走标签页 / 退出游戏之后鼠标还是不可见，用户以为浏览器死了。
+// 这一节走**真指针锁**（正常模式进页面、点「进城」抢锁），
+// 然后分别用 Esc、blur、pagehide 三条通道各解一次。
+// 不用 shot=1：那个模式根本不进指针锁，测了等于没测（跟 ads 那个坑是同一条路径）。
+// ===========================================================================
+Stage("14 指针锁");
+{
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined && window.Taierzhuang.state.ready,
+    { timeout: 180000 });
+  const rows = [];
+  for (const how of ["escape", "blur", "pagehide"]) {
+    await page.click("#bootStart", { force: true }).catch(() => {});
+    await page.waitForTimeout(300);
+    const locked = await page.evaluate(() => document.pointerLockElement !== null);
+    if (how === "escape") await page.keyboard.press("Escape");
+    else await page.evaluate((k) => window.dispatchEvent(new Event(k)), how);
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => document.pointerLockElement !== null);
+    rows.push({ how, locked, after });
+  }
+  Check("点「进城」真的拿得到指针锁", rows.some((r) => r.locked),
+    rows.map((r) => `${r.how}:${r.locked ? "锁上" : "没锁上"}`).join(" "));
+  Check("Esc / 切走 / 关页 三条通道都会把鼠标还给用户",
+    rows.every((r) => !r.after), rows.map((r) => `${r.how}:${r.after ? "仍锁着" : "已释放"}`).join(" "));
+  // 解锁之后连续输入要清零，否则松锁那一瞬间按着的键会一直"按着"
+  const sticky = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    return { fire: T.input.fire, forward: T.input.forward, sprint: T.input.sprint };
+  });
+  Check("解锁时把连续输入清零（不会一直往前走）",
+    !sticky.fire && sticky.forward === 0 && !sticky.sprint, JSON.stringify(sticky));
+}
+
+// ===========================================================================
+// 15) 枪感第 1 轮那四条方子有没有真的接上
+//
+// 全部走运行时取证，不读源码 —— 上一轮四条缺口里有三条是
+// 「系统建好了但没接线」，而没接线的代码看起来跟接了线的一模一样。
+// ===========================================================================
+Stage("15 枪感四条");
+await Boot(2, "small");
+const feel = await page.evaluate(async () => {
+  const T = window.Taierzhuang, D = T.Debug;
+  T.player.health = 100;
+  for (const s2 of T.ai.soldiers) {
+    if (s2.side === "ija") s2.position.set(s2.position.x + 400, s2.position.y, s2.position.z + 400);
+  }
+  // --- 方子 2：开火画面顿挫 ---
+  T.StepFrames(30);
+  const fovIdle = T.camera.fov;
+  T.state.ammo = 5;
+  D.Fire();
+  T.StepFrames(1, 1 / 240);
+  const fovAfter = T.camera.fov;
+  const punchPeak = D.GunFeel().firePunch;
+  // 85 ms 之后应当基本收干净
+  T.StepFrames(24, 1 / 240);
+  const fovSettled = T.camera.fov;
+
+  // --- 方子 1：拉栓声与停栓 ---
+  // 声音本身在无头里量不到波形，能量到的是"有没有被排进调度"。
+  // AudioEngine.Play 会返回一个句柄（被去重/预算挡掉时返回 null），拦它就够了。
+  const played = [];
+  const realPlay = T.audio.Play.bind(T.audio);
+  T.audio.Play = (name, opts) => { played.push({ name, delay: (opts && opts.delay) || 0 }); return realPlay(name, opts); };
+  // 上一发的 fireCooldown 还压着（汉阳造两发间隔 1.35 s，而 D.Fire 只推 1 s），
+  // 不等它过去的话这一发根本没打出去，拦到的自然是空的 —— 那是测试的时序错，
+  // 不是拉栓声没接上。推 90 帧（1.5 s）让它彻底过去。
+  T.StepFrames(90);
+  T.state.ammo = 5;
+  D.Fire();
+  T.audio.Play = realPlay;
+  const bolt = played.find((e) => e.name === "bolt");
+  const shell = played.find((e) => e.name === "shellImpact");
+  // 最后一发：lowAmmo 要传下去，栓停在后面
+  T.state.ammo = 1;
+  D.Fire();
+  T.StepFrames(90);
+  const low = D.GunFeel();
+
+  // --- 方子 3：sway 输入 ---
+  // **只推一帧就读。** lookDeltaYaw 是帧间增量，推两帧的话第二帧的增量已经是 0，
+  // 读出来永远是「没接上」—— 而弹簧其实已经被推动了。
+  const sway0 = D.GunFeel().swayYaw;
+  T.player.yaw += 0.6;                       // 一帧转 34°
+  T.StepFrames(1);
+  const g3 = D.GunFeel();
+  T.StepFrames(60);
+
+  // --- 方子 4：冲刺 -> 开火延迟 ---
+  // **必须从键盘那一头驱动**：直接写 T.player.sprint 会被 player.Update 用
+  // input.sprint 覆写回去，而 Frame 里"松开冲刺的那一刻"也就永远记不到 ——
+  // 那样量到的是"冲刺根本没发生"，测试全绿而闸门其实没接。
+  T.state.ammo = 5;
+  D.Key("ShiftLeft", true); D.Key("KeyW", true);
+  T.StepFrames(45);                           // 0.75 s：冲刺量涨到 1
+  const sprintUp = T.player.sprint;
+  const ammoSprint0 = T.state.ammo;
+  D.Fire();
+  const ammoSprint1 = T.state.ammo;           // 冲刺中：打不出去
+  D.Key("ShiftLeft", false); D.Key("KeyW", false);
+  T.StepFrames(2);                            // 让 Frame 记下松开冲刺的时刻
+  D.Fire();
+  const ammoJustAfter = T.state.ammo;         // 松开 0.03 s：还在闸门里
+  T.StepFrames(30);                           // 0.5 s
+  D.Fire();
+  const ammoLater = T.state.ammo;             // 闸门过了：打得出去
+
+  return {
+    fovIdle: +fovIdle.toFixed(3), fovAfter: +fovAfter.toFixed(3),
+    fovSettled: +fovSettled.toFixed(3), punchPeak: +punchPeak.toFixed(3),
+    boltDelay: bolt ? bolt.delay : null, shellDelay: shell ? shell.delay : null,
+    lowAmmo: low.lowAmmo, boltOpen: low.boltOpen,
+    sway0, swayYaw: g3.swayYaw, lookDelta: +(g3.lastLookDeltaYaw || 0).toFixed(3),
+    sprintUp: +sprintUp.toFixed(2),
+    ammoSprint0, ammoSprint1, ammoJustAfter, ammoLater,
+  };
+});
+Check("开火有画面顿挫（FOV 冲击 ≈1.9°，85 ms 收干净）",
+  feel.fovAfter - feel.fovIdle > 1.2 && Math.abs(feel.fovSettled - feel.fovIdle) < 0.4,
+  `${feel.fovIdle}° -> ${feel.fovAfter}° -> ${feel.fovSettled}°（峰值 punch=${feel.punchPeak}）`);
+Check("每发之后补拉栓声（delay 0.24 s）与抛壳落地（delay 0.62 s）",
+  feel.boltDelay === 0.24 && feel.shellDelay === 0.62,
+  `bolt delay=${feel.boltDelay} shellImpact delay=${feel.shellDelay}`);
+Check("最后一发把 lowAmmo 传下去，栓停在后面",
+  feel.lowAmmo && feel.boltOpen, `lowAmmo=${feel.lowAmmo} boltOpen=${feel.boltOpen}`);
+Check("sway 输入接上了（视线一动，弹簧就不再恒等于 0）",
+  Math.abs(feel.lookDelta) > 0.1 && Math.abs(feel.swayYaw) > 1e-4,
+  `lookDeltaYaw=${feel.lookDelta} rad，swayYaw ${feel.sway0} -> ${feel.swayYaw}`);
+Check("冲刺中打不出枪，松开后 0.22 s 才恢复",
+  feel.sprintUp > 0.5 && feel.ammoSprint1 === feel.ammoSprint0
+  && feel.ammoJustAfter === feel.ammoSprint1 && feel.ammoLater < feel.ammoJustAfter,
+  `冲刺量 ${feel.sprintUp}；冲刺中 ${feel.ammoSprint0}->${feel.ammoSprint1}，`
+  + `松开 0.03s ${feel.ammoJustAfter}，0.5s 后 ${feel.ammoLater}`);
 
 await browser.close();
 server.close();

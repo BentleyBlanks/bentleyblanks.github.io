@@ -1,17 +1,24 @@
-// 《血战台儿庄》装配层：把渲染、战场、玩家、AI、特效、音效、HUD 拼起来。
+// 《滕县 一九三八》装配层：把渲染、城、玩家、AI、特效、音效、HUD、过场拼起来。
 //
-// 这一份只做三件事：**启动顺序**、**每帧调度**、**输入**。
-// 任何规则都不许写在这里 —— 规则在 Script_Ai / Script_Player / Data_*。
+// 这一份只做四件事：**启动顺序**、**关卡流程**、**每帧调度**、**输入**。
+// 任何规则都不许写在这里 —— 规则在 Script_Ai / Script_Player / Script_Story / Data_*。
+//
+// 与台儿庄那一版最大的结构差别：**关是线性的，而且每关只建一片切片。**
+// 台儿庄是一张开放战场建一次跑到底；滕县七关的地理跨度有两公里
+//（界河在城北二十公里外、车站在城西 1.45 km、东关在城东 520 m），
+// 一次全建出来既撞 draw call 红线也没有意义 —— 玩家在第二关永远看不见车站。
+// 所以换关 = 拆掉旧切片、按 Data_Battle.PHASES[i].bounds 重建一片。
 //
 // 调试口：window.Taierzhuang = { StepFrames, JumpToPhase, state, ... }
-// 出图脚本（Script_ShotTest.mjs）与渲染健康检查全靠它，别删。
+//（全局名沿用 Taierzhuang —— 出图脚本、开机冒烟、通关冒烟三处都按它取运行时。
+//  window.Tengxian 是同一个对象的别名。）
 
 import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
-import { Battlefield } from "./Script_Battlefield.mjs";
+import { TengxianField } from "./Script_TengxianField.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController, STANCE } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -21,46 +28,42 @@ import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { Hud } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
+import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
-import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, TOWN, COMBAT, DIFFICULTY } from "./Data_Battle.mjs";
-import { HISTORY_NOTES, EPILOGUE_LINES } from "./Data_History.mjs";
+import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 别照着"近景要几个人"直接填这两个数 —— 实测一个 Actor 是 **37 个 draw call**
-// （身体部件没合批），撒 14 个近身兵就把 phase4 的 calls 从 1043 顶到 1468，
-// 越过 1400 的红线。5 + 4 落在 1300 上下。要再加人，先去合批 Actor。
+// （身体部件没合批），撒 14 个近身兵就把 calls 顶过 1400 的红线。
+// 5 + 4 落在安全区里。要再加人，先去合批 Actor。
 const NEAR_SQUAD = { nra: 5, ija: 4 };
 
 /**
- * 城墙以内的可站范围。**日方补兵必须落在城里。**
+ * 本关的可站范围。**任何一侧的兵都不许被放到切片外面去。**
  *
- * 第 1 批的补兵算式是 `frontObjective.z - 30 - rnd()*30`，等于假定日军永远在北面 ——
- * 主攻点一旦是北面的中正门（z = -178）就落到 -208…-238，也就是北寨墙（z = -190）
- * 外面。独立复核实测 90 秒里 190 次日方生成有 164 次（86%）落在 z < -190，
- * 最低到 -224；那批人贴着城墙对着砖墙站到死（AI 没有寻路网格、门洞只有 3.2 m 宽），
- * 常驻 6—12 名滞留在城外，是"打一分半就停摆"的直接成因之一。
+ * 台儿庄那一版这里是 INSIDE_WALLS（一个写死的城墙内矩形），已作废：
+ * 滕县七关有三关根本不在城里（界河、西关、城北麦地），
+ * 而在城里的四关又各只用城的一角。所以这个框改成**跟着关卡切片走**，
+ * 在 EnterLevel 里按 PHASES[i].bounds 现算。
  *
- * 现在改成沿"前线 → 己方兵力重心"的方向往后退，并且无论如何夹进这个框里。
+ * 这条不变量本身照旧，而且照旧是实跑逼出来的：撒兵有五条路径
+ *（守路标、补兵、近身班组、玩家重生、软约束重设目标），
+ * 漏掉任何一条，就会出现"两军隔着一堵墙贴脸站着谁也看不见谁"那种停摆。
  */
-const INSIDE_WALLS = (() => {
-  const margin = TOWN.wallThickness * 0.5 + 6;
-  const north = TOWN.ramparts.find((r) => r.id === "north");
-  const west = TOWN.ramparts.find((r) => r.id === "west");
-  const east = TOWN.ramparts.find((r) => r.id === "east");
+let levelBounds = { minX: -300, maxX: 300, minZ: -300, maxZ: 300 };
+
+function MakeLevelBounds(bounds) {
+  const margin = 10;
   return {
-    minZ: (north ? north.z : WORLD.minZ) + margin,
-    // 南边界压到运河北岸再退 6 m：城南那一带现在是真的河槽（见 Battlefield.CanalDepth），
-    // 沿用 WORLD.maxZ - 10 会把守军撒进水里 —— 下水的人走不动也开不了枪，等于白扔一个兵
-    maxZ: Math.min(WORLD.maxZ - 10, TOWN.canal.z - TOWN.canal.width / 2 - 6),
-    minX: (west ? west.x : WORLD.minX) + margin,
-    maxX: (east ? east.x : WORLD.maxX) - margin,
+    minX: bounds.minX + margin, maxX: bounds.maxX - margin,
+    minZ: bounds.minZ + margin, maxZ: bounds.maxZ - margin,
   };
-})();
+}
 
 const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
@@ -144,12 +147,21 @@ const state = {
   cook: 0,                    // 投弹蓄力/攥弹时间
   cooking: null,              // "Grenade" | "GrenadeBundle"
   outcome: null,              // null | "victory" | "defeat"
+  // --- 线性关卡的流程状态 ---
+  objectiveIndex: 0,          // 目标链走到第几个（= 已到达的路标数）
+  objectiveCount: 0,
+  levelSeconds: 0,            // 本关的配置时长（秒）
+  advancing: false,           // 正在换关（建城是分帧的，期间不许再触发一次）
+  cutscene: null,             // 正在播的过场 id；非 null 时玩家没有控制权
+  // 钉住当前关（只给测试用）：剧本长跑要在**一关之内**按出厂时长推满，
+  // 不许中途自动换关 —— 换关会重置剧本队列，量到的就不是这一关的剧本了。
+  pinned: false,
+  cutscenesPlayed: [],        // 播过/跳过的过场，通关冒烟看这张表
   prevAllies: 0,
   storyObjective: null,
   playerAliveLast: true,
   phasePoolNra: 0,            // 本阶段缩放后的中方票池上限（见底提示按它算）
   playerShots: 0,             // 玩家开火累计，与 ai.fireCount 合起来就是全场火力
-  captureDrainAccum: 0,       // 占点消耗对方兵力的十秒结算钟
   // --- 武器槽 ---------------------------------------------------------------
   // LOADOUTS 六套携行躺在 Data_Weapons 里一行没接：玩家永远只有 identity.weapon
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
@@ -174,6 +186,10 @@ let actorFactory = null;
 let story = null;
 let combat = null;
 let interact = null;
+let cutscene = null;
+// Script_Ai 的全局人像预算，给"这一关没有自己的预算"时回落用。
+// Boot 里从 AiDirector 实例上取真值 —— 不再 import 一次那个常量，只留一个真相。
+let defaultVisibleActors = 13;
 let currentWeapon = "HanYang";
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
@@ -206,11 +222,7 @@ async function Boot() {
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
 
-  battlefield = new Battlefield(scene, library, { quality: QUALITY });
-  for (const step of battlefield.BuildSteps()) {
-    setStep(step.label, 0.24 + 0.62 * step.progress);
-    await nextFrame();
-  }
+  await BuildField(PHASES[state.phaseIndex], setStep, 0.24, 0.62, nextFrame);
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
@@ -226,10 +238,9 @@ async function Boot() {
   vfx = new VfxSystem(scene, library, { quality: QUALITY, maxParticles: SCALE.vfxBudget });
   // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
-  // 别放进 EnterPhase —— 每换一关重建一次粒子网格是白扔的 GC。
-  vfx.AmbientDust(new THREE.Box3(
-    new THREE.Vector3(battlefield.bounds.minX, 0, battlefield.bounds.minZ),
-    new THREE.Vector3(battlefield.bounds.maxX, 22, battlefield.bounds.maxZ)), 0.075);
+  // 换关时由 EnterLevel 重新按新切片调一次，别每帧调。
+  // 浮尘只罩玩家附近那一片：切片最大的一关跨两公里，按整片铺会把粒子摊薄到看不见
+  vfx.AmbientDust(DustBox(PHASES[state.phaseIndex]), 0.075);
   // depthBudget 1.22（默认 0.90）：腰射姿态把枪往前推到 pz = -0.32 之后，
   // 最深点（枪口 + 刺刀）变成 |0.32 + 0.8175| + 0.04 + 0.02 ≈ 1.20 m，
   // 沿用 0.90 会被 _RecomputeCompensation 压到 0.55 的下限，枪整体缩到眼前 ——
@@ -255,8 +266,8 @@ async function Boot() {
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
-  const nav = new NavGrid(battlefield);
-  navGrid = nav;
+  navGrid = MakeNavGrid(battlefield);
+  const nav = navGrid;
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player, nav,
     // 票池 = 兵力池：**谁死了扣谁的**。
@@ -267,11 +278,23 @@ async function Boot() {
       if (side === "nra") state.nraPool = Math.max(0, state.nraPool - 1);
       else state.ijaPool = Math.max(0, state.ijaPool - 1);
     },
-  }, { maxAlive: SCALE.maxAlive, seed: 19380324, insideWalls: INSIDE_WALLS });
+  }, { maxAlive: SCALE.maxAlive, seed: 19380317, insideWalls: levelBounds });
+  defaultVisibleActors = ai.visibleBudget;
 
-  // 叙事层：把 Data_Script 那本考据过的剧本派发进开放战场。
-  // 在这之前它除了 importmap 之外没有任何地方 import —— 数据在，玩不到。
+  // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
+  // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
+  // 过场导演。onCapture/onRelease 是夺走与交还玩家控制权的钩子：
+  // 过场期间 Frame() 只跑 director.Update 与渲染，玩法一律停摆
+  //（不停的话玩家会在看电影的时候被打死，而且指针锁还在，鼠标会转动相机）。
+  cutscene = new CutsceneDirector({
+    camera, scene, hud, audio, actorFactory, library, root: hudRoot,
+    onCapture: (cut) => {
+      state.cutscene = cut.id;
+      input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
+    },
+    onRelease: () => { state.cutscene = null; },
+  });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story,
   });
@@ -290,7 +313,7 @@ async function Boot() {
 
   await nextFrame();
   setStep("就绪", 1.0);
-  EnterPhase(state.phaseIndex, true);
+  await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
   state.ready = true;
   bootStart.disabled = false;
   bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
@@ -298,10 +321,10 @@ async function Boot() {
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
-    renderer, scene, camera, post, sky, lights, library, battlefield,
+    renderer, scene, camera, post, sky, lights, library,
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
-    story, combat, nav, interact, wheel,
-    StepFrames, JumpToPhase: EnterPhase,
+    story, combat, interact, wheel,
+    StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
       Reload, DoMelee, CallMortar, EndBattle,
@@ -368,6 +391,69 @@ async function Boot() {
         goalX: soldier.goal.x, goalZ: soldier.goal.z,
       }),
       Ammo: () => ({ ammo: state.ammo, clips: state.clips, grenades: state.grenades, bundles: state.bundles }),
+      // --- 线性关卡的取证口 ---
+      // 这一关是哪一关、目标链走到第几个、路标各在哪儿。
+      // 「七关能依次推进」这条断言只能从这里读，读源码是推断不出来的。
+      Level: () => {
+        const phase = PHASES[state.phaseIndex];
+        return {
+          index: state.phaseIndex, id: phase.id, title: phase.label,
+          objectiveIndex: state.objectiveIndex, objectiveCount: state.objectiveCount,
+          objective: state.storyObjective,
+          zones: battlefield.objectives.map((o) => ({
+            id: o.id, name: o.name, x: o.x, z: o.z, radius: o.radius, reached: o.reached,
+          })),
+          seconds: state.levelSeconds, elapsed: state.phaseTime,
+          pool: state.nraPool, advancing: state.advancing,
+        };
+      },
+      // 直接把玩家挪到第 n 个路标里（通关冒烟靠它一关一关推，不必真走两公里）
+      GotoObjective: (n) => {
+        const objectives = battlefield.objectives;
+        const o = objectives[Math.min(Math.max(0, n), objectives.length - 1)];
+        if (!o) return null;
+        player.Spawn(o.x, o.z, player.yaw);
+        return { x: o.x, z: o.z, id: o.id };
+      },
+      // 把当前这一关的目标链一路点完（不动画、不等 AI 让开）
+      CompleteLevel: () => {
+        const objectives = battlefield.objectives;
+        for (let i = state.objectiveIndex; i < objectives.length; i += 1) ReachObjective(i);
+        return state.objectiveIndex;
+      },
+      AdvanceLevel: (opts) => AdvanceLevel(opts || {}),
+      // 钉住/放开当前关。剧本长跑要用它，见 state.pinned 的注释。
+      PinLevel: (on) => { state.pinned = on !== false; return state.pinned; },
+      // --- 过场的取证口 ---
+      PlayCutscene: (id) => RunCutscene(id),
+      SkipCutscene: () => { if (cutscene) cutscene.Skip(); return !!cutscene; },
+      Cutscene: () => ({
+        playing: cutscene ? cutscene.Playing : false,
+        current: cutscene ? cutscene.CurrentId : null,
+        time: cutscene ? cutscene.Time : 0,
+        played: state.cutscenesPlayed.slice(),
+        log: cutscene ? cutscene.log.slice(-40) : [],
+      }),
+      // --- 枪感第 2 轮的取证口 ---
+      // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
+      GunFeel: () => ({
+        firePunch,
+        fovBase: BASE_FOV,
+        fov: camera.fov,
+        sprintBlocked: player.sprint > 0.35
+          || (state.elapsed - sprintReleaseAt) < SPRINT_FIRE_DELAY_S,
+        sinceSprint: state.elapsed - sprintReleaseAt,
+        swayYaw: viewmodel.swayYaw ? viewmodel.swayYaw.value : null,
+        lastLookDeltaYaw: lastLookDeltaYaw,
+        lowAmmo: state.ammo <= 1,
+        boltOpen: viewmodel.boltOpen,
+      }),
+      // 指针锁：解锁通道有没有真的接上
+      PointerLock: () => ({
+        locked: document.pointerLockElement === canvas,
+        element: document.pointerLockElement ? "canvas" : null,
+      }),
+      ReleasePointerLock,
       Spoken: () => hud.spoken.slice(),
       StoryFired: () => story.fired.slice(),
       Outcome: () => state.outcome,
@@ -387,25 +473,142 @@ async function Boot() {
         CountOpenDirections(x, z, battlefield.GroundHeight(x, z), probeM, count),
     },
   };
+  // battlefield 与 nav **每换一关都会被换成新的一份**（切片重建）。
+  // 写成普通属性的话，调试口会一直指着上一关那份已经 Dispose 掉的城 ——
+  // 表现是"取证读出来的碰撞盒表是空的"，而代码看起来完全正确。所以用取值器。
+  Object.defineProperty(window.Taierzhuang, "battlefield", { get: () => battlefield });
+  Object.defineProperty(window.Taierzhuang, "nav", { get: () => navGrid });
+  Object.defineProperty(window.Taierzhuang, "cutscene", { get: () => cutscene });
+
+  // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
+  // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
+  window.Tengxian = window.Taierzhuang;
 
   if (SHOT) StartRun();
 }
 
 // ---------------------------------------------------------------------------
-// 阶段
+// 关卡流程
 // ---------------------------------------------------------------------------
-function EnterPhase(index, initial = false) {
+
+/** 让出一帧。真在跑就等 rAF（进度条要动），出图/自检模式直接过。 */
+const NextFrame = () => new Promise((r) => requestAnimationFrame(r));
+
+/** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
+async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
+  if (battlefield) { battlefield.Dispose(); battlefield = null; }
+  levelBounds = MakeLevelBounds(phase.bounds);
+  battlefield = new TengxianField(scene, library, {
+    quality: QUALITY,
+    seed: 19380317,
+    bounds: phase.bounds,
+    // LOD 焦点给本关的目标链：玩家会去的地方出全院落，其余按体块剪影。
+    // 焦点给错的后果不是"难看"，是把 draw call 花在玩家永远不去的城角上。
+    foci: phase.zones.map((z) => [z.x, z.z]),
+    zones: phase.zones,
+    // 每关自己的 LOD 分界（Data_Battle.TUNING）；没给就用默认。
+    // 这是 draw call 的主要旋钮之一，改它之前先跑 BootTest 看数
+    detailRadius: (phase.detailRadius ?? 100) * (QUALITY === "low" ? 0.72 : 1),
+    midRadius: (phase.midRadius ?? 210) * (QUALITY === "low" ? 0.72 : 1),
+  });
+  for (const step of battlefield.BuildSteps()) {
+    setStep(step.label, base + span * step.progress);
+    await yieldFrame();
+  }
+}
+
+/**
+ * 导航网格。1 m 一格是"院门通不通"的下限（见 Script_Navigation 的账），
+ * 但界河与西关那两关的切片有一两百万格，建图与每张 BFS 都要翻几倍时间。
+ * 那两关本来就是开阔地，没有 3.2 m 的院门要通，2 m 一格封不死任何东西。
+ */
+function MakeNavGrid(field) {
+  const w = field.bounds.maxX - field.bounds.minX;
+  const h = field.bounds.maxZ - field.bounds.minZ;
+  const cell = (w * h > 900000) ? 2.0 : 1.0;
+  return new NavGrid(field, { cell });
+}
+
+/** 浮尘只罩玩家附近那一片：切片最大的一关跨两公里，按整片铺会摊薄到看不见。 */
+function DustBox(phase) {
+  const z0 = phase.zones[0];
+  return new THREE.Box3(
+    new THREE.Vector3(z0.x - 150, -6, z0.z - 150),
+    new THREE.Vector3(z0.x + 150, 22, z0.z + 150));
+}
+
+/** 换关时把整片切片以外的东西也清干净：兵、尸体、烟柱、在途弹。 */
+function ClearRuntime() {
+  for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
+  state.smokeHandles.length = 0;
+  if (ai) ai.Dispose();
+  if (combat && combat.projectiles) combat.projectiles.length = 0;
+  if (combat && combat.incoming) combat.incoming.length = 0;
+}
+
+/**
+ * 进一关。**这是异步的** —— 建一片切片要分帧走完，不然主线程会卡死几秒，
+ * 浏览器直接判成无响应。期间 state.ready = false，Frame() 只走渲染。
+ *
+ * @param {number} index
+ * @param {object} opts initial 开机那一次（战场已经建好，别重建）；
+ *                      cutscenes 要不要播过场（出图与自检模式一律不播 ——
+ *                      过场的临时布景有近三百个网格，会把 draw call 顶穿红线）
+ */
+async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
+  state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASES.length - 1);
   const phase = PHASES[state.phaseIndex];
+
+  // --- 关前过场 ---
+  if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn);
+
+  if (!initial) {
+    state.ready = false;
+    boot.classList.remove("gone");
+    bootStart.disabled = true;
+    bootStart.textContent = "……";
+    ClearRuntime();
+    await BuildField(phase, (label, progress) => {
+      bootStep.textContent = label;
+      bootBar.style.width = `${Math.round(progress * 100)}%`;
+    }, 0, 1);
+    navGrid = MakeNavGrid(battlefield);
+    ai.ctx.battlefield = battlefield;
+    ai.ctx.nav = navGrid;
+    ai.insideWalls = levelBounds;
+    combat.host.battlefield = battlefield;
+    player.world = {
+      colliders: battlefield.colliders,
+      NearbyColliders: (x, z, r) => battlefield.NearbyColliders(x, z, r),
+      GroundHeight: (x, z) => battlefield.GroundHeight(x, z),
+      WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
+      bounds: battlefield.bounds,
+    };
+    vfx.AmbientDust(DustBox(phase), 0.075);
+  } else {
+    ai.insideWalls = levelBounds;
+  }
+
   state.phaseTime = 0;
-  // 票池随战场规模缩放。PHASES 里的 900/700 是照着 70 人档写的，
-  // 与 SCALE_PRESETS（40/70/110）脱钩：小档打光四十个人要耗九百张票，
-  // 池子永远见不到底，「人打光了就守不住」这条胜负规则等于不存在。
-  const poolScale = SCALE.maxAlive / 70;
-  const scaledNra = Math.round(phase.nraPool * poolScale);
-  state.phasePoolNra = scaledNra;
-  state.nraPool = initial ? scaledNra : REINFORCE.phaseRefill(state.nraPool, scaledNra);
-  state.ijaPool = Math.round(phase.ijaPool * poolScale);
+  state.objectiveIndex = 0;
+  state.objectiveCount = phase.zones.length;
+  state.levelSeconds = phase.minutes * 60;
+  // 「城里还站着的人」按剧本给的曲线走。**不做橡皮筋补给** ——
+  // 这座城里没有后方，数字只会往下走（唯一一次上涨是 L1 收容 757 团残部，
+  // 由剧本的 event:Regroup 那一条 system beat 交代，见 Data_TengxianScript）。
+  state.nraPool = phase.nraPool;
+  state.phasePoolNra = phase.nraPool;
+  state.ijaPool = phase.ijaPool;
+
+  // 远平面按关走：雾在两三百米外已经把东西吃干净了，远平面收进去只是让
+  // 视锥剔除把那些看不见的网格提前扔掉（见 Data_Battle 的 cameraFar 注释）
+  const far = phase.cameraFar ?? 620;
+  if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
+  // 同屏可见 Actor 的上限也按关走（见 Data_Battle 的 visibleActors 注释）。
+  // 一个 Actor 四十几个 draw call，这是最粗的一根旋钮 ——
+  // 只给真的需要的那一关调，全局调会让每一关的战场都变空。
+  ai.visibleBudget = phase.visibleActors ?? defaultVisibleActors;
 
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
@@ -414,46 +617,78 @@ function EnterPhase(index, initial = false) {
   hud.ShowBrief(phase);
   audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
 
-  // 装载这一阶段的剧本段落。phase.story 是 Data_Battle 里早就留好的字段
-  // （P1_Wall / P2_Breach / ...），一直没人读。
-  if (story) {
-    const loaded = story.BeginPhase(phase.story);
-    state.storyObjective = null;
-    if (phase.counterattack) story.Signal("counterattack");
-    if (loaded === 0) console.warn("这一阶段没有剧本段落：", phase.story);
-  }
+  const loaded = story.BeginLevel(phase.id);
+  state.storyObjective = phase.objectives[0] || null;
+  if (loaded === 0) console.warn("这一关没有剧本：", phase.id);
 
-  // 战线：反攻阶段之前，日军从北往南推；反攻阶段反过来
-  if (initial || !player.Alive) RespawnPlayer(true);
+  RespawnPlayer(true);
   SeedSoldiers(phase);
   SeedSmokeColumns(phase);
+
+  if (!initial) {
+    boot.classList.add("gone");
+    bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
+  }
+  state.ready = true;
+  state.advancing = false;
+  return state.phaseIndex;
 }
 
 /**
- * 按阶段挂三根常驻烟柱。
+ * 播一场过场并等它播完（或被 Esc 跳过后卡片读完）。
+ * 播过场期间玩家没有控制权，指针锁也要放掉 —— 不放的话鼠标还在转相机，
+ * 而相机已经被过场接管，玩家会看到画面在自己抖。
+ */
+async function RunCutscene(id) {
+  if (!cutscene) return null;
+  ReleasePointerLock();
+  const result = await cutscene.Play(id, { poolOut: state.nraPool });
+  state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
+  if (state.running && !SHOT) canvas.requestPointerLock?.();
+  return result;
+}
+
+/** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
+async function AdvanceLevel(opts = {}) {
+  if (state.advancing) return state.phaseIndex;
+  const phase = PHASES[state.phaseIndex];
+  const cutscenes = opts.cutscenes ?? !SHOT;
+  state.advancing = true;
+  // 关末那几条还没播的旁白先倒出来，别跟着关卡一起消失
+  story.FlushTail();
+  if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut);
+  state.advancing = false;
+  if (state.phaseIndex >= PHASES.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
+  return EnterLevel(state.phaseIndex + 1, { cutscenes });
+}
+
+/** 调试口：直接跳到某一关（不播过场）。出图与自检走这条。 */
+function JumpToLevel(index) {
+  return EnterLevel(index, { cutscenes: false });
+}
+
+/**
+ * 按关挂两三根常驻烟柱。
  *
- * 为什么非有不可：台儿庄打了半个月，天上一直是烟。没有烟柱的空街等于没打过仗，
- * 而且烟柱是这个场景里唯一能在三百米外读出来、又能把构图竖着切开的东西。
- * VfxSystem.SmokeSource 早就写好了，一次都没被调用过 —— 这里只是接线。
+ * 为什么非有不可：三月十七日「集中炮击致城内起火，时而强劲的南风将烟吹得笼罩全城」
+ * 是信史。没有烟柱的空街等于没打过仗，而且烟柱是这个场景里唯一能在三百米外
+ * 读出来、又能把构图竖着切开的东西。
  *
- * 选点：优先已被日方拿下的目标（那儿在烧），不够就按离玩家的距离补。
+ * 选点：挂在**还没走到的那几个路标**上 —— 前面在烧，那是你要去的方向。
  * 排掉 45 m 以内的：烟柱底盘半径十几米，长在脸上就是一堵灰墙。
+ * 界河那一关不挂（城外野地，没有房子可烧）。
  */
 function SeedSmokeColumns(phase) {
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
+  if (phase.id === "L0_Jiehe") return;
 
   const px = player.position.x;
   const pz = player.position.z;
   const ranked = battlefield.objectives
     .map((o) => ({ o, far: Math.hypot(o.x - px, o.z - pz) }))
-    .filter((e) => e.far > 45)
-    .sort((a, b) => {
-      const ka = a.o.owner === "ija" ? 0 : 1;
-      const kb = b.o.owner === "ija" ? 0 : 1;
-      if (ka !== kb) return ka - kb;
-      return a.far - b.far;
-    });
+    .filter((e) => e.far > 45 && !e.o.reached)
+    .sort((a, b) => a.far - b.far);
 
   const burning = phase.sky === "burningStreet";
   for (const entry of ranked.slice(0, 3)) {
@@ -503,29 +738,40 @@ function HasLineOfSight(toX, toZ) {
   return !hit || hit.t >= dist - 0.6;
 }
 
-/** 按阶段撒兵：中方守占领点，日方从北面压上来。 */
+/**
+ * 撒兵。**线性关卡的形状：友军在你身边和身后，敌军在你和下一个路标之间。**
+ *
+ * 台儿庄那一版是"中方守占领点、日方从北面城门涌进来"，整个作废 ——
+ * 那是开放战场 + 占领点的形状。线性关卡里方向是明确的：
+ * 玩家从当前路标走向下一个路标，那条线就是战线，敌人压在线的前方。
+ *
+ * 保留下来的两条经验（都是实跑逼出来的，换城不换账）：
+ *   · 近身班组按**镜头**补，不按路标补 —— 路标动辄一两百米远，
+ *     只按路标撒的结果是同屏「一个能辨认的人都没有」，人全被雾墙吃掉了；
+ *   · 每个候选点要过 HasLineOfSight —— 鲁南民居对外不开窗、四面围墙，
+ *     随便撒一个点有一多半落在别人家院子里，玩家永远看不见。
+ */
 function SeedSoldiers(phase) {
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
-  // 两个目标数**不减**近身班组：下面两个循环的起点是 CountSide(...)，
-  // 近身班组撒完就已经计进去了。再减一次是双重扣减 ——
-  // 实测那么写会让 phase0 的存活人数从 32 掉到 19，等于把兵搬到镜头前又搬没了。
-  const nraTarget = Math.round(SCALE.maxAlive * 0.45);
+  const nraTarget = Math.round(SCALE.maxAlive * 0.42);
   const ijaTarget = Math.round(SCALE.maxAlive * 0.5 * phase.ijaPressure / 1.3);
 
-  // --- 近身班组 -------------------------------------------------------------
-  // 事故：实测 59—70 人存活，但 40 m 内只有 1—3 人、120 m 外 43—49 人，
-  // 而 fog.max = 0.94 —— 兵是有的，全被雾墙吃掉了，同屏「一个能辨认的人都没有」。
-  // 撒兵原本只按占领点铺，占领点离玩家动辄一两百米。这里按**镜头**再补一层：
-  // 12—34 m 的环里放中方（近景剪影），55—110 m 的视线方向上放日方（中景）。
-  // 用「补齐到 N」而不是「每次加 N」：SeedSoldiers 每 3 秒被调一次，
-  // 无条件加人会在半分钟内把整个 maxAlive 名额全填成玩家脚边的人。
   const px = player.position.x;
   const pz = player.position.z;
+  // 战线方向：当前路标 → 下一个路标。走完了就用玩家的朝向兜底。
+  const next = battlefield.objectives[Math.min(state.objectiveIndex, battlefield.objectives.length - 1)];
+  let ax = next ? next.x - px : -Math.sin(player.yaw);
+  let az = next ? next.z - pz : -Math.cos(player.yaw);
+  let alen = Math.hypot(ax, az);
+  if (alen < 1) { ax = -Math.sin(player.yaw); az = -Math.cos(player.yaw); alen = 1; }
+  ax /= alen; az /= alen;
+  // 近身班组用镜头方向（人要在画面里），战线用路标方向（人要在该在的地方）
   const fx = -Math.sin(player.yaw);
   const fz = -Math.cos(player.yaw);
+
+  // --- 近身班组：跟着你的班 -------------------------------------------------
   for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra; i += 1) {
     // 前向弧而不是整圈：整圈撒 5 个人，85° 的水平视场只兜得住 1 个。
-    // 这一班本来就是"跟着你往前打"的，压在前方 ±110° 里既合理又让同屏多两个人。
     // 直接转前向量，不要去凑"yaw 对应的极角"—— player.yaw 的零向是 -Z，
     // 跟 atan2(z, x) 差一个 -yaw - π/2，凭印象写必错，兵会撒到背后去
     let open = null;
@@ -533,23 +779,24 @@ function SeedSoldiers(phase) {
       const a = (rnd() - 0.5) * 3.8;
       const dx = fx * Math.cos(a) - fz * Math.sin(a);
       const dz = fz * Math.cos(a) + fx * Math.sin(a);
-      const r = 12 + rnd() * 22;
+      const r = 10 + rnd() * 20;
       const spot = FindOpenSpot(px + dx * r, pz + dz * r, 6,
-        31337 + i * 907 + attempt * 17 + state.phaseIndex * 53, INSIDE_WALLS);
+        31337 + i * 907 + attempt * 17 + state.phaseIndex * 53, levelBounds);
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
     const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
-    // 不给 holdZone：这一班是跟着镜头走的，钉在占领区里就又跑没影了
-    if (s) { s.holdZone = null; s.goal.set(px + fx * 15, 0, pz + fz * 15); }
+    // 不给 holdZone：这一班是跟着镜头走的，钉在某个路标上就又跑没影了
+    if (s) { s.holdZone = null; s.goal.set(px + ax * 15, 0, pz + az * 15); }
   }
+  // --- 中景的敌人：压在你与下一个路标之间 -----------------------------------
   for (let i = CountNear("ija", 110); i < NEAR_SQUAD.ija; i += 1) {
     let open = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const d = 55 + rnd() * 55;
+      const d = 45 + rnd() * 55;
       const lateral = (rnd() - 0.5) * 46;
-      const spot = FindOpenSpot(px + fx * d - fz * lateral, pz + fz * d + fx * lateral, 8,
-        65521 + i * 1361 + attempt * 29 + state.phaseIndex * 89, INSIDE_WALLS);
+      const spot = FindOpenSpot(px + ax * d - az * lateral, pz + az * d + ax * lateral, 8,
+        65521 + i * 1361 + attempt * 29 + state.phaseIndex * 89, levelBounds);
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
@@ -557,66 +804,36 @@ function SeedSoldiers(phase) {
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
 
-  // 中方：守住还在自己手里的点，**并且往吃紧的那个点增援**。
-  // 原来是在所有己方点里等概率随机撒 —— 于是补进来的人平均分到八个点上，
-  // 前线那个正在被打的点拿到八分之一，前线永远补不上，仗打两下就散了。
-  // 六成去前线、四成铺开：铺开那部分不能省，不然后方的点会空到无人。
-  const ours = battlefield.objectives.filter((o) => o.owner === "nra");
-  const front = ai.frontObjective?.ija;
+  // --- 中方：铺在已经走过的那几个路标上（你身后还有人在守） -----------------
+  const behind = battlefield.objectives.filter((o) => o.reached);
   for (let i = ai.CountSide("nra"); i < nraTarget; i += 1) {
-    const o = (front && front.owner === "nra" && rnd() < 0.6)
-      ? front
-      : (ours[Math.floor(rnd() * ours.length)] || battlefield.objectives[0]);
-    // 也要夹进城里：中正门那个点圆心 z=-178、半径 26，圆边压到 -204，
-    // 而北寨墙在 z=-190 —— 守这个点的人有一批被撒到了墙的**另一面**，
-    // 跟涌进城的日军隔着 4 m 高的寨墙贴脸站着，谁也看不见谁（见 INSIDE_WALLS 的账）。
-    const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31, INSIDE_WALLS);
-    const s = ai.Spawn("nra", open.x, open.z, {
-      towel: !!phase.nightRaid && rnd() < 0.55,
-    });
+    // 六成压在当前路标（前线），四成铺在身后 —— 铺开那部分不能省，
+    // 不然后方空到无人，玩家一回头就是一条死街
+    const o = (rnd() < 0.6 || !behind.length)
+      ? (next || battlefield.objectives[0])
+      : behind[Math.floor(rnd() * behind.length)];
+    if (!o) break;
+    const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31, levelBounds);
+    const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
     if (s) { s.holdZone = o; s.goal.set(o.x, 0, o.z); }
   }
-  // 日方：从北面两座城门的缺口**涌进来**，不是在城外列队。
-  //
-  // 原来生在 z = WORLD.minZ - 8，也就是北寨墙**外面**。而 AI 没有寻路网格，
-  // 门洞只有 3.2 m 宽，一百米外它找不到 —— 三十几个人就贴着城墙站成一排对着砖墙瞄。
-  // 实跑取证（改之前）：ija 到最近中方兵的中位距离只有 31 m、38 对里 15—38 对在
-  // 70 m 内，而**通视的是 0 对**，每一条视线撞的都是 tag=rampart 的那道墙。
-  // 于是全场 70 人恒为 advance、开火计数几乎不动 —— 这就是"仗根本没在打"的物理原因。
-  // 生在门内 6—32 m 既解决通视，也正是史实里的样子：日军由城门与城墙缺口突入城内。
-  // 补进来的人也压到前线：主攻点北侧 30—60 m（日军由北往南推，这是他们的后方一侧）。
-  // 还没有前线（开局）时才走城门缺口。补兵永远从城门进的话，前线一旦南移，
-  // 后续的人要横穿全城才到得了，实跑表现就是"打一阵停两分钟"。
-  const northGates = TOWN.gates.filter((g) => g.z < -100);
-  const ijaFront = ai.frontObjective?.ija;
-  const ijaCentroid = ai.centroid?.ija;
+  // --- 日方：从战线前方 60—140 m 压上来 -------------------------------------
+  // 写死一个方位（台儿庄那一版是"北面城门"）在这里行不通：
+  // 东关是从东打过来、十字街是从西打过来、城墙那一关是从城外往墙上打。
+  // 唯一稳定的是「他们在你与下一个路标的更前方」，所以就照这条撒。
   for (let i = ai.CountSide("ija"); i < ijaTarget; i += 1) {
-    let gate;
-    if (ijaFront && ijaCentroid) {
-      // 沿"主攻点 → 日军兵力重心"的方向往后退 30—60 m：那一侧才是他们的后方。
-      // 写死 z-30 的话，前线一在北面就把人扔到北寨墙外（见 INSIDE_WALLS 的账）。
-      let bx = ijaCentroid.x - ijaFront.x, bz = ijaCentroid.z - ijaFront.z;
-      let blen = Math.hypot(bx, bz);
-      if (blen < 1) { bx = 0; bz = -1; blen = 1; }   // 重心正压在点上：退回北面
-      bx /= blen; bz /= blen;
-      const back = 30 + rnd() * 30;
-      gate = {
-        x: ijaFront.x + bx * back + (rnd() - 0.5) * 40,
-        z: ijaFront.z + bz * back + (rnd() - 0.5) * 20,
-      };
-    } else {
-      const g = northGates[i % Math.max(1, northGates.length)] || { x: 0, z: WORLD.minZ + 40 };
-      gate = { x: g.x + (rnd() - 0.5) * 40, z: g.z + 8 + rnd() * 26 };
-    }
-    gate.x = Clamp(gate.x, INSIDE_WALLS.minX, INSIDE_WALLS.maxX);
-    gate.z = Clamp(gate.z, INSIDE_WALLS.minZ, INSIDE_WALLS.maxZ);
-    const open = FindOpenSpot(gate.x, gate.z, 14,
-      90001 + i * 617 + state.phaseIndex * 43, INSIDE_WALLS);
+    const d = 60 + rnd() * 80;
+    const lateral = (rnd() - 0.5) * 90;
+    const at = {
+      x: px + ax * d - az * lateral,
+      z: pz + az * d + ax * lateral,
+    };
+    at.x = Clamp(at.x, levelBounds.minX, levelBounds.maxX);
+    at.z = Clamp(at.z, levelBounds.minZ, levelBounds.maxZ);
+    const open = FindOpenSpot(at.x, at.z, 14,
+      90001 + i * 617 + state.phaseIndex * 43, levelBounds);
     const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
-    if (s) {
-      const goal = battlefield.objectives.find((o) => o.owner === "nra") || battlefield.objectives[0];
-      s.goal.set(goal.x + s.laneOffset, 0, goal.z + s.laneOffset * 0.4);
-    }
+    if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
 }
 
@@ -691,50 +908,94 @@ function FindOpenSpot(cx, cz, radius, seed, limits = null) {
   return fallback || { x: Clamp(cx, lo.minX, lo.maxX), z: Clamp(cz, lo.minZ, lo.maxZ) };
 }
 
+/**
+ * 出生 / 换人。
+ *
+ * **开局是在阵地上跟着你的班，不是空地中央。** 上一版是"在还属于我方、
+ * 离前线最近的那个占领点上随机找一块空地"，在线性关卡里那条规则的结果是
+ * 玩家被扔在关卡起点附近的某个随机空院子里，四面是墙，班在别处 ——
+ * 一开局就不知道该往哪儿走，而这是线性关卡最不该出的问题。
+ * 现在开局站位由 Data_Battle.PHASES[i].spawn 写死（登记为推定值），
+ * 朝向对着第一个路标；近身班组会在同一帧撒到身边 12—30 m 里。
+ *
+ * 死了换人时才回到"就近找一块站得下的地方"那条路 —— 换人不该重置进度，
+ * 所以从**当前路标**往回退一段生。
+ */
 function RespawnPlayer(initial = false) {
   const phase = PHASES[state.phaseIndex];
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
   state.identity = MakeSoldierIdentity(seed);
   currentWeapon = state.identity.weapon;
-  // 在还属于我方、离前线最近的那个点上生
-  const ours = battlefield.objectives.filter((o) => o.owner === "nra");
-  const spot = ours.length
-    ? ours.reduce((a, b) => (a.z < b.z ? a : b))
-    : { x: 0, z: 120, radius: 10 };
-  // 往我方一侧退 18 米再找位置：生在点心上等于生在交火中央
-  const open = FindOpenSpot(spot.x, spot.z + 18, spot.radius, seed, INSIDE_WALLS);
-  player.Spawn(open.x, open.z, Math.PI);
+
+  if (initial && phase.spawn) {
+    player.Spawn(phase.spawn.x, phase.spawn.z, phase.spawn.ry ?? 0);
+  } else {
+    // 换人：退到当前路标后方 20 m。往哪边算"后方"？朝上一个路标的方向。
+    const objectives = battlefield.objectives;
+    const here = objectives[Math.min(state.objectiveIndex, objectives.length - 1)] || phase.spawn;
+    const prev = state.objectiveIndex > 0 ? objectives[state.objectiveIndex - 1] : phase.spawn;
+    let bx = (prev?.x ?? here.x) - here.x;
+    let bz = (prev?.z ?? here.z) - here.z;
+    const blen = Math.hypot(bx, bz) || 1;
+    bx /= blen; bz /= blen;
+    // 退到**路标圈外**再生。
+    // 事故：原来退 20 m，而路标半径就有 16—46 m —— 换的人一出生就站在圈里，
+    // UpdateObjectives 下一帧判定"到了"，目标链自己往前跳一格。
+    // 后果不是少走一段路：一关里死几次就能把整条目标链走完并自动换关，
+    // 长跑里表现为"剧本被吞了"（换关时 FlushTail 会把没播的对话跳过去）。
+    // 这是死一次就能跳过一段关卡的漏洞，不是数值问题。
+    const back = (here.radius ?? 14) + 24;
+    const open = FindOpenSpot(here.x + bx * back, here.z + bz * back, 14, seed, levelBounds);
+    player.Spawn(open.x, open.z, Math.atan2(-(here.x - open.x), -(here.z - open.z)));
+  }
   player.bandages = COMBAT.bandages;
-  // 领的家当。弹带大半是瘪的 —— 这不是难度设计，是他们上阵时的实际情况。
+
+  // 领的家当。弹带大半是瘪的 —— 这不是难度设计，是他们上阵时的实际情况：
+  // 日方记川军三分之一以上没有步枪、各自带手榴弹约六发。
   //
-  // 携行改读 LOADOUTS[phase.loadout]。L3_WhiteTowel（一支长枪、一支短枪、
-  // 肩背大刀、腰间挂满手榴弹）是台儿庄最有辨识度的一套装备，以前完全是死的。
-  // 例外：L5_Morning 的 primary 是 null —— 那是"四月七日早上仗打完了"的收场携行，
-  // 真给 P6 反攻阶段的玩家空手是不能玩的，所以为空时退回这个兵自己的枪。
-  const loadout = LOADOUTS[phase.loadout] || null;
-  state.loadoutId = phase.loadout || null;
-  const primary = loadout?.primary || state.identity.weapon;
-  const secondary = loadout?.secondary || null;
+  // 携行优先读本关自己的 loadoutOverride（Data_Battle），没有才回退到
+  // Data_Weapons.LOADOUTS 里那几套。第一关的 primary 就是 null —— **这是史实，
+  // 不是难度设计**，玩家要从倒下的人身上捡枪。第六关整个武器栏是空的（脱离战斗）。
+  const loadout = phase.loadoutOverride || LOADOUTS[phase.loadout] || null;
+  state.loadoutId = phase.loadoutOverride ? `${phase.id}_override` : (phase.loadout || null);
+  const disarmed = !!phase.disarmed;
+  const primary = disarmed ? null : (loadout ? loadout.primary : state.identity.weapon);
+  const secondary = disarmed ? null : (loadout?.secondary || null);
   state.slots.primary = primary;
   state.slots.secondary = secondary;
-  state.slots.melee = loadout?.melee || null;
+  state.slots.melee = disarmed ? null : (loadout?.melee || null);
   const throwables = loadout?.throwables || {};
-  state.grenades = throwables.Grenade ?? (phase.nightRaid ? 8 : 4);
-  state.bundles = throwables.GrenadeBundle ?? 2;
-  state.slots.throwable = state.grenades > 0 || !state.bundles ? "Grenade" : "GrenadeBundle";
+  // disarmed 是「脱离战斗」那一关：武器栏**整个**是空的，手榴弹也没有。
+  // 不写这一条的话 `?? 4` 那个兜底会把四颗手榴弹塞回去 ——
+  // 而那一关的机制原话是「弹药：无。唯一的动作是走和拽人」。
+  state.grenades = disarmed ? 0 : (throwables.Grenade ?? (phase.nightRaid ? 8 : 4));
+  state.bundles = disarmed ? 0 : (throwables.GrenadeBundle ?? 0);
+  state.slots.throwable = state.grenades > 0 ? "Grenade" : (state.bundles > 0 ? "GrenadeBundle" : null);
   const spareClips = loadout?.spareClips ?? (phase.nightRaid ? 3 : 5);
-  state.mags.primary = { ammo: WEAPONS[primary]?.magazine ?? 5, clips: spareClips };
+  state.mags.primary = primary
+    ? { ammo: WEAPONS[primary]?.magazine ?? 5, clips: spareClips }
+    : { ammo: 0, clips: 0 };
   state.mags.secondary = secondary
     ? { ammo: WEAPONS[secondary]?.magazine ?? 10, clips: 2 }
     : { ammo: 0, clips: 0 };
-  state.activeSlot = "primary";
-  currentWeapon = primary;
+  // 没有长枪时手里拿什么：**大刀，不是手榴弹。**
+  //
+  // 投掷物槽拿在手上会让视图模型去 Equip("Grenade")，而手榴弹没有第一人称 rig，
+  // 退回去的是一个没贴图的大方块糊在屏幕右下角（第一关的出图上一眼就看得见）。
+  // 而且这也不是他们的样子：没枪的川军手里是大刀，手榴弹在腰上的布袋里，
+  // 用 G 键扔 —— 扔弹本来就不需要把它"拿在手上"（见 BeginCook 那条通道）。
+  // 两样都没有（第六关脱离战斗）就空着手。
+  state.activeSlot = primary ? "primary" : (state.slots.melee ? "melee" : "primary");
+  currentWeapon = SlotWeaponId(state.activeSlot) || null;
   state.ammo = state.mags.primary.ammo;
   state.clips = state.mags.primary.clips;
   state.fireMode = "auto";
   player.bipod = false;
+  // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
+  // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
   viewmodel.Equip(currentWeapon);
-  hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "步枪");
+  hud.SetIdentity(state.identity,
+    currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
   state.pendingRespawn = false;
   state.playerAliveLast = true;
 }
@@ -976,7 +1237,11 @@ function ReleaseCook() {
   const cooked = Math.max(0, state.cook - 0.35);
   const dir = player.AimDirection(_aimDir).clone();
   combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
-  if (kind === "Grenade") state.grenades -= 1; else state.bundles -= 1;
+  // 夹到 0：BeginCook 已经挡过"没货就别拔弦"，但调试口（Debug.Throw）是直接
+  // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
+  // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。
+  if (kind === "Grenade") state.grenades = Math.max(0, state.grenades - 1);
+  else state.bundles = Math.max(0, state.bundles - 1);
   viewmodel.TriggerThrow?.(power);
   state.cook = 0;
 }
@@ -1020,9 +1285,16 @@ function DoInteract() {
 function PickUpWeapon(weaponId, clips) {
   if (!player?.Alive || !WEAPONS[weaponId]) return false;
   const magazine = WEAPONS[weaponId].magazine ?? 5;
+  // 本来就没有长枪的时候，捡到的枪要**直接到手上**。
+  // 第一关的目标之一就是「找一支枪（从倒下的人身上捡）」——
+  // 捡完还得自己按 1 才拿得出来的话，那一条目标在玩家眼里就是没生效。
+  // 判据是"原来 primary 是空的"，不是"当前槽是 primary"：
+  // 空着手的时候当前槽是投掷物或大刀（见 RespawnPlayer 的选槽逻辑）。
+  const hadNoRifle = !state.slots.primary;
   state.slots.primary = weaponId;
   state.mags.primary = { ammo: magazine, clips };
   state.pickedUp = weaponId;
+  if (hadNoRifle) state.activeSlot = "primary";
   if (state.activeSlot === "primary") {
     currentWeapon = weaponId;
     state.ammo = magazine;
@@ -1070,6 +1342,27 @@ const _marchTargets = [];
 const ADS_FOV_TIME = 0.15;
 let adsFovT = 0;      // 相机侧的开镜量，与 player.ads（动画侧）分开走
 let breathFov = 1;    // 屏息那 6% 的独立平滑
+
+// --- 枪感第 1 轮的方子 2 / 3 / 4 所需的状态量 ------------------------------
+// 方子 2「开火画面顿挫」：实测原来开火 FOV 偏移 0.0000°，全仓库无任何 shake/punch。
+// 这是唯一的 0 分项，而且落在权重 x3 那一组里。
+// firePunch 是 0→1 的冲击量，按 85 ms 衰减；FOV 上叠 1.9°（ADS 变化量的 12%）。
+// **衰减用平方**：前两帧占掉 60%，那一下才是"顿"而不是"晃"。
+const FIRE_PUNCH_DECAY_S = 0.085;
+const FIRE_PUNCH_FOV_DEG = 1.9;
+let firePunch = 0;
+// 方子 4「冲刺→开火延迟」：实测松开冲刺后 sprintSpring 要 771 ms 才回位，
+// 0.22 s 是「摆回来一大半但还没稳」的点。不加这一条，
+// 「冲进院子贴脸开枪」是零成本最优解 —— 而这是全场最该有代价的动作。
+const SPRINT_FIRE_DELAY_S = 0.22;
+let sprintReleaseAt = -99;
+let sprintWasOn = false;
+// 方子 3「接上 sway 输入」：Script_Viewmodel 的三个弹簧全写好了，
+// 而这里一直传的是写死的 0 —— 实测相机转 398°，弹簧恒等于 0。
+// 弹簧常数一个都不用动，只要把每帧的视角增量算出来传进去。
+let lastViewYaw = 0;
+let lastViewPitch = 0;
+let lastLookDeltaYaw = 0;      // 上一帧真的传给 sway 弹簧的那个数（取证用）
 
 /**
  * 弹道步进积分。
@@ -1150,9 +1443,15 @@ function TryFire(dt) {
   fireCooldown -= dt;
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
   if (viewmodel.IsBusy?.()) return;
-  // 翻墙翻到一半、或者人泡在运河里：枪都不在手上/在水里，打不出去。
+  // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
   if (player.Busy || player.InWater) return;
+  // 枪感方子 4：冲刺 → 开火有 0.22 s 的延迟。
+  // 实测松开冲刺后视图模型的 sprintSpring 要 771 ms 才回位，
+  // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
+  // 0.22 s 是「摆回来一大半但还没稳」的点：够短，不至于让人觉得枪卡住了。
+  if (player.sprint > 0.35) return;
+  if (state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) return;
   // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
   if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   if (state.activeSlot === "throwable") {
@@ -1179,6 +1478,8 @@ function TryFire(dt) {
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
+  // 枪感方子 2：开火那一下画面要"顿"。这是第 1 轮唯一的 0 分项。
+  firePunch = 1;
   // 后坐。Data_Weapons 每支枪的 recoil 表以前一次都没读过 —— 开完枪视角纹丝不动。
   // viewmodel 已经按那张表把这一发的相机踢动算好了（含每发随机的偏航方向与开镜衰减），
   // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
@@ -1186,7 +1487,21 @@ function TryFire(dt) {
   player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 1.0);
 
   viewmodel.MuzzleWorld(_muzzle);
-  audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra", { position: _muzzle.clone() });
+  audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra",
+    // priority：与几十个 AI 共用同一个 22 ms 去重窗口时，玩家自己的枪声实测丢 8.3%。
+    // 别的都可以丢，自己扣的扳机不许没声。
+    { position: _muzzle.clone(), priority: true });
+  // 枪感方子 1：**每发之后的自动拉栓要有声音。**
+  // bolt 那条配方 19 节点三段式做得极好，而全仓库只有空扣扳机与架两脚架会播它 ——
+  // 打完一发之后一声不响。我们不显示弹药数，这条信息通道原来整个关着：
+  // 玩家既听不出自己在拉栓，也听不出这是最后一发。
+  // 0.24 s 是枪响之后手真的去够枪机的时间；0.62 s 是弹壳落地。
+  // 判据是 kind === "boltRifle"（Data_Weapons 里每支枪都有），
+  // 不是"有没有 rpm" —— 驳壳枪与捷克式自己上膛，没有手拉的那一下。
+  if (weapon.kind === "boltRifle") {
+    audio.Play("bolt", { position: _muzzle.clone(), volume: 0.42, delay: 0.24 });
+  }
+  audio.Play("shellImpact", { position: _muzzle.clone(), volume: 0.30, delay: 0.62 });
   lights.FlashMuzzle(_muzzle, 24);
   vfx.MuzzleFlash(_muzzle, player.AimDirection(_aimDir), { scale: 1.0 });
 
@@ -1248,59 +1563,67 @@ function TryFire(dt) {
 }
 
 // ---------------------------------------------------------------------------
-// 占领
+// 目标链
 // ---------------------------------------------------------------------------
+/**
+ * 线性关卡的目标推进。**这里没有占领条，也没有翻旗。**
+ *
+ * 台儿庄那一版是 ER2 式的占领点：双方都在区内就冻结、只有一方在就按人数推进度、
+ * 到头翻旗、丢了整班后撤。那一整套跟着开放战场一起作废了 ——
+ * 滕县七关是一条路标链，走到就算到，不会被夺回去。
+ *
+ * 「走到就算到」的判据不只是进圈：还要求圈里当下没有敌人贴着
+ *（半径内 8 m 以内有活着的日兵就先不算到），否则玩家会在被压着打的时候
+ * 莫名其妙被推进到下一段剧本。
+ *
+ * @returns {string|null} 当前正在争夺的路标名（HUD 顶栏用）
+ */
 function UpdateObjectives(dt) {
-  let contestedName = null;
-  for (const o of battlefield.objectives) {
-    let ours = 0, theirs = 0;
-    if (player.Alive && Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius) ours += 1;
+  const objectives = battlefield.objectives;
+  if (!objectives.length) return null;
+  const index = Math.min(state.objectiveIndex, objectives.length - 1);
+  const target = objectives[index];
+  let contested = null;
+
+  for (const o of objectives) {
+    let theirs = 0;
     for (const s of ai.soldiers) {
-      if (!s.alive) continue;
+      if (!s.alive || s.side === "nra") continue;
       if (Math.hypot(s.position.x - o.x, s.position.z - o.z) > o.radius) continue;
-      if (s.side === "nra") ours += 1; else theirs += 1;
+      theirs += 1;
     }
-    o.contested = ours > 0 && theirs > 0;
-    if (o.contested) contestedName = o.name;
-    // 双方都在区内就冻结；只有一方在就按人数推进度
-    if (!o.contested) {
-      const rate = dt / 26;
-      if (theirs > 0 && o.owner === "nra") {
-        o.progress -= rate * Math.min(3, theirs) * 0.6;
-        if (o.progress <= 0) { o.progress = 0; Flip(o, "ija"); }
-      } else if (ours > 0 && o.owner === "ija") {
-        o.progress += rate * Math.min(3, ours) * 0.6;
-        if (o.progress >= 1) { o.progress = 1; Flip(o, "nra"); }
-      }
-    }
+    o.contested = theirs > 0 && !o.reached;
+    if (o === target && o.contested) contested = o.name;
   }
-  return contestedName;
+
+  if (state.objectiveIndex >= objectives.length) return contested;
+  if (!player.Alive) return contested;
+  const dist = Math.hypot(player.position.x - target.x, player.position.z - target.z);
+  if (dist > target.radius) return contested;
+  // 圈里还有人贴着就先不算到
+  for (const s of ai.soldiers) {
+    if (!s.alive || s.side === "nra") continue;
+    if (Math.hypot(s.position.x - target.x, s.position.z - target.z) < 8) return contested;
+  }
+  ReachObjective(index);
+  return contested;
 }
 
-function Flip(objective, side) {
-  objective.owner = side;
-  objective.progress = side === "nra" ? 1 : 0;
-  hud.Say(null, side === "nra"
-    ? `${objective.name} 夺回来了。`
-    : `${objective.name} 丢了。`, 4.2);
-  if (objective.line) hud.Say(null, objective.line, 6);
-  if (objective.note && HISTORY_NOTES[objective.note]) hud.Note(HISTORY_NOTES[objective.note]);
-  if (side === "ija") {
-    // 丢了点不是就地散掉：整班后撤到**最近的一个还在我们手里的点**接着守。
-    // 原来只把 holdZone 清成 null，人就留在已经丢掉的点上原地对射，
-    // 战线不会往后收，也就永远推不动。
-    let fallback = null, fallbackDist = 1e9;
-    for (const o of battlefield.objectives) {
-      if (o === objective || o.owner !== "nra") continue;
-      const d = Math.hypot(o.x - objective.x, o.z - objective.z);
-      if (d < fallbackDist) { fallbackDist = d; fallback = o; }
-    }
-    for (const s of ai.soldiers) {
-      if (s.holdZone !== objective) continue;
-      s.holdZone = fallback;
-      if (fallback) s.goal.set(fallback.x + s.laneOffset * 0.5, 0, fallback.z + s.laneOffset * 0.5);
-    }
+/** 到达一个路标。剧本的 zone: 触发、下一条目标文案、烟柱重挂都挂在这里。 */
+function ReachObjective(index) {
+  const objectives = battlefield.objectives;
+  const o = objectives[index];
+  if (!o || o.reached) return;
+  o.reached = true;
+  o.contested = false;
+  state.objectiveIndex = Math.min(index + 1, objectives.length);
+  const phase = PHASES[state.phaseIndex];
+  const text = phase.objectives[state.objectiveIndex];
+  if (text) {
+    state.storyObjective = text;
+    hud.Hint(text, 5.0);
   }
+  SeedSmokeColumns(phase);
 }
 
 // ---------------------------------------------------------------------------
@@ -1322,6 +1645,16 @@ const _proj = new THREE.Vector3();
 function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
+
+  // 过场期间：只推过场与画面，玩法全停。
+  // 不停的话玩家会在看电影的时候被打死，而且 AI 会照常往前走 ——
+  // 过场结束时战场已经不是过场开始时那个战场了。
+  if (cutscene && cutscene.Playing) {
+    cutscene.Update(dt);
+    if (render) RenderScene(dt);
+    return;
+  }
+  // 建切片期间（换关）也只走画面：碰撞盒表正在被换掉，规则层这时候查什么都是错的
   if (!state.ready) return;
 
   if (state.deathTimer > 0) {
@@ -1387,17 +1720,56 @@ function Frame(dt, render = true) {
   const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
   // 屏息那 6% 单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
   breathFov += ((player.breathHold ? 0.94 : 1) - breathFov) * Clamp01(dt * 6);
-  const targetFov = BASE_FOV * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+  const baseFov = BASE_FOV * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+
+  // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——
+  // 那一下才是"顿"而不是"晃"。叠在 FOV 上 1.9°，约等于开镜变化量的 12%。
+  //
+  // 关于「把 FOV 追踪系数 dt*9 提到 dt*26」那一条：**那个系数已经不存在了。**
+  // 上一轮照战地 datamine 把相机侧的指数平滑整个换成了固定 150 ms 的线性过渡
+  //（见上面那段注释），camera.fov 现在是每帧直接赋值的，没有任何一层平滑会
+  // 把 1.9° 抹平。所以这一条方子的目的（"别让顿挫被插值吃掉"）现在由结构保证，
+  // 不需要那个魔法数。这不是漏做，是前提变了。
+  if (firePunch > 0) {
+    firePunch = Math.max(0, firePunch - dt / FIRE_PUNCH_DECAY_S);
+  }
+  const punch = firePunch * firePunch;
+  const targetFov = baseFov + punch * FIRE_PUNCH_FOV_DEG;
   if (Math.abs(camera.fov - targetFov) > 0.001) {
     camera.fov = targetFov;
     camera.updateProjectionMatrix();
   }
 
+  // 枪感方子 4 的另一半：记下松开冲刺的时刻（TryFire 读它）
+  const sprintOn = player.sprint > 0.35;
+  if (sprintWasOn && !sprintOn) sprintReleaseAt = state.elapsed;
+  sprintWasOn = sprintOn;
+
+  // 枪感方子 3：**把视线增量接进 sway 弹簧。**
+  // 三个弹簧、限幅、增量换算 Script_Viewmodel 全写好了，而这里一直传的是 0 ——
+  // 实测相机转了 398° 而三个弹簧恒等于 0，等于整套"枪滞后于视线"没接线。
+  // 算增量要用**枪口方向**（yaw + aimYaw），不是视线：自由瞄准那一段偏移
+  // 本来就是"枪还没跟上"的一部分，漏掉它枪会在自由瞄准范围内诡异地不动。
+  const viewYaw = player.yaw + player.aimYaw;
+  const viewPitch = player.pitch + player.aimPitch;
+  let dYaw = viewYaw - lastViewYaw;
+  // 绕过 ±π 那一圈：不处理的话转身穿过背后时会甩出一个 2π 的假增量，
+  // 枪会整个飞出画面（弹簧限幅救不了，因为输入本身错了三个数量级）
+  if (dYaw > Math.PI) dYaw -= Math.PI * 2;
+  else if (dYaw < -Math.PI) dYaw += Math.PI * 2;
+  const dPitch = viewPitch - lastViewPitch;
+  lastViewYaw = viewYaw;
+  lastViewPitch = viewPitch;
+  lastLookDeltaYaw = dYaw;
+
   viewmodel.Update(dt, {
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
-    ads: player.ads, lookDeltaYaw: 0, lookDeltaPitch: 0,
+    ads: player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
     crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
+    // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
+    // 我们不显示弹药数，这是玩家唯一能"看见"自己没子弹了的通道。
+    lowAmmo: state.ammo <= 1,
   });
 
   // 友军倒下：叙事层要靠它触发「他倒了我上，我倒了你上」那几句。
@@ -1427,21 +1799,9 @@ function Frame(dt, render = true) {
 
   const contested = UpdateObjectives(dt);
 
-  // 占点加速对方兵力流失（ER2 2.0.9 加的那条）。每十秒结算一次：
-  // 对方每持有一个点，己方票池按该点的 value 减半（向上取整）扣。
-  // 意义是把"占领点"从一个装饰性的进度条变成**真会把你耗死的东西** ——
-  // 不去夺点就只是站着流血，这是逼玩家往前打的唯一结构性压力。
-  state.captureDrainAccum += dt;
-  if (state.captureDrainAccum >= 10) {
-    state.captureDrainAccum -= 10;
-    let nraBleed = 0, ijaBleed = 0;
-    for (const o of battlefield.objectives) {
-      const bite = Math.ceil((o.value ?? 2) / 2);
-      if (o.owner === "ija") nraBleed += bite; else ijaBleed += bite;
-    }
-    state.nraPool = Math.max(0, state.nraPool - nraBleed);
-    state.ijaPool = Math.max(0, state.ijaPool - ijaBleed);
-  }
+  // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
+  // 线性关卡里逼玩家往前打的是**时间**与**剧本**，不是一条会把你耗死的进度条：
+  // 城是必然陷落的，磨时间没有任何好处。
 
   // --- 叙事层 ---
   // 身边六十米内有敌人在开枪 = 正在交火。原剧本的 wave:N / waveClear:N
@@ -1455,36 +1815,37 @@ function Frame(dt, render = true) {
   story.SetFighting(fighting);
   const playerZone = battlefield.objectives.find((o) =>
     Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
-  story.Update(dt, { playerZone: playerZone ? playerZone.id : null });
+  story.Update(dt, {
+    zone: playerZone ? playerZone.id : null,
+    objectiveIndex: state.objectiveIndex,
+    objectiveCount: state.objectiveCount,
+    levelSeconds: state.levelSeconds,
+    pool: state.nraPool,
+  });
   if (story.ObjectiveText) state.storyObjective = story.ObjectiveText;
 
-  // 阶段推进：时间到了就往下走（战况只影响兵员池，不影响史实进程）
-  // --- 胜负 ---
-  // 之前兵员池减到 0 也不结束、占领点全丢也不结束、阶段只按时间走 —— 没有胜负的
-  // 战场只是个靶场。这两条是最低限度：人打光了就守不住，撑到最后一夜就是大捷。
-  if (!state.outcome) {
-    if (state.nraPool <= 0 && !player.Alive) EndBattle("defeat");
-    else if (state.phaseIndex === PHASES.length - 1
-      && state.phaseTime > PHASES[state.phaseIndex].minutes * 60 * 0.85) {
-      const held = battlefield.objectives.filter((o) => o.owner === "nra").length;
-      if (held >= 3) EndBattle("victory");
-    }
-  }
+  // --- 结束条件 ---
+  // **这座城没有"守住"这个结局。** 三月十七日它陷落，十八日午前肃清完毕，
+  // 这是信史，不给玩家改。所以"赢"只有一种意思：这一关的目标链走完了。
+  // 唯一的失败是池子空了 —— 「城里还站着的人」减到零，再没有人可以填上去。
+  if (!state.outcome && state.nraPool <= 0 && !player.Alive) EndBattle("defeat");
 
   state.phaseTime += dt;
   const phase = PHASES[state.phaseIndex];
-  if (state.phaseTime > phase.minutes * 60 && state.phaseIndex < PHASES.length - 1) {
-    EnterPhase(state.phaseIndex + 1);
+  // 换关：目标链走完，或者配置时长到了（史实时段是往前走的，不等玩家）
+  const levelOver = !state.pinned
+    && (state.objectiveIndex >= state.objectiveCount || state.phaseTime > state.levelSeconds);
+  if (levelOver && !state.advancing && !state.outcome) {
+    // 异步：建下一片切片要分帧走完。这里只管点火，别 await —— Frame 是同步的。
+    AdvanceLevel().catch((error) => console.error("换关失败", error));
   }
   // 补兵
   state.spawnAccumulator += dt;
   if (state.spawnAccumulator > 3) { state.spawnAccumulator = 0; SeedSoldiers(phase); }
 
   // --- HUD ---
-  const ourZone = battlefield.objectives.find((o) =>
-    Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
   hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
-    state.nraPool, ourZone ? state.ijaPool : null);
+    state.nraPool, null);
   hud.SetState({
     stance: STANCE[player.stance].label,
     wounded: player.wounds.length > 0,
@@ -1519,10 +1880,22 @@ function Frame(dt, render = true) {
 
   // --- 渲染 ---
   if (!render) return;
+  RenderScene(dt);
+}
+
+/**
+ * 合成与出画。抽成函数是因为**过场也要走同一条** ——
+ * 曝光、雾、泛光、去饱和全按当关的天光预设装配，过场那条分支自己再抄一份
+ * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
+ */
+function RenderScene(dt) {
+  const phase = PHASES[state.phaseIndex];
   ssao.map.value = post.AoTexture;
-  // 同上：gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
+  // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
   const preset = SKY_PRESETS[phase.sky];
+  const suppression = player ? player.suppression : 0;
+  const health = player ? player.health : 100;
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
@@ -1530,42 +1903,71 @@ function Frame(dt, render = true) {
     exposure: preset.exposure,
     bloom: preset.bloom,
     godStrength: preset.godStrength,
-    saturation: preset.saturation * (1 - player.suppression * 0.35),
+    saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: phase.sky === "night" ? 0.020 : 0.014,
-    vignette: 0.42 + player.suppression * 0.22,
-    damage: Clamp01(1 - player.health / 62) * 0.55,
+    vignette: 0.42 + suppression * 0.22,
+    damage: Clamp01(1 - health / 62) * 0.55,
     motionBlur: 0.15,
   });
 }
 
 /**
- * 收尾。不打歼敌数 —— 中日双方口径至今没有定论，那是宣传数字不是史实。
- * 用「日军残部向峄县、枣庄退却」这种事实性表述收场。
+ * 收尾。
+ *
+ * **不打歼敌数** —— 中日双方口径至今没有定论，那是宣传数字不是史实。
+ * 也**不给"守住了"这个结局**：滕县三月十七日陷落是信史，不由玩家改。
+ * 两种收场：
+ *   breakout —— 七关走完，从北门出去。这是史实里发生过的那一种。
+ *   defeat   —— 「城里还站着的人」减到零，再没有人可以填上去。
  */
 function EndBattle(outcome) {
   if (state.outcome) return;
   state.outcome = outcome;
-  if (outcome === "victory") {
-    hud.ShowEpilogue(EPILOGUE_LINES);
-    audio.Music("aftermath");
-  } else {
-    hud.ShowEpilogue([
-      "台儿庄失守。",
-      "",
-      "史实里没有发生这件事 —— 一九三八年四月七日凌晨，",
-      "中国军队全线反攻，日军残部向峄县、枣庄退却。",
-      "",
-      "第二集团军是拿伤亡逾十分之七换来的。",
-    ]);
-    audio.Music(null);
-  }
+  hud.ShowEpilogue(outcome === "breakout" ? EPILOGUE.breakout : EPILOGUE.wipedOut);
+  audio.Music(outcome === "breakout" ? "aftermath" : null);
 }
 
 /** 出图/测试用：推进固定帧数（不依赖真实时间，画面可复现）。 */
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
   for (let i = 0; i < count; i += 1) Frame(dt, render);
 }
+
+// ---------------------------------------------------------------------------
+// 指针锁
+// ---------------------------------------------------------------------------
+/**
+ * 把鼠标还给用户。
+ *
+ * 事故（第 4 批的积压条目）：退出游戏 / 切走标签页 / 按 Esc 之后鼠标还是不可见 ——
+ * 浏览器自己只在 Esc 与文档隐藏时**有时候**会解锁，一旦页面被 bfcache 冻结、
+ * 或者是我们自己把玩家控制权收走（过场、换关、结算），锁就一直挂在那儿。
+ * 表现是用户以为浏览器卡死了。
+ *
+ * 修法是四条事件都调一次 exitPointerLock：pointerlockchange（锁掉了要同步状态）、
+ * blur（切走）、pagehide（关页/前进后退缓存）、Esc（用户主动退）。
+ * exitPointerLock 在没有锁的时候调是无害的。
+ */
+function ReleasePointerLock() {
+  if (document.pointerLockElement) document.exitPointerLock?.();
+}
+
+document.addEventListener("pointerlockchange", () => {
+  // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
+  if (document.pointerLockElement !== canvas) {
+    input.fire = false; input.ads = false;
+    input.forward = 0; input.strafe = 0; input.sprint = false;
+    if (state.ordersOpen) { state.ordersOpen = false; hud.SetOrdersVisible(false); wheel.Close(); }
+  }
+});
+window.addEventListener("blur", ReleasePointerLock);
+window.addEventListener("pagehide", ReleasePointerLock);
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出
+  if (state.cutscene) return;
+  ReleasePointerLock();
+});
 
 let last = performance.now();
 function Loop(now) {

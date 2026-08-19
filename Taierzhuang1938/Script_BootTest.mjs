@@ -1,4 +1,4 @@
-// 《血战台儿庄》开机冒烟：真浏览器把整页跑起来，看它活不活。
+// 《滕县 一九三八》开机冒烟：真浏览器把整页跑起来，看它活不活。
 //
 // 存在的理由：视觉迭代每一轮都在动 shader 与姿态代码，而 shader 编译失败
 // three 是**静默吞掉**的（GL 1282 不抛异常），页面照样跑、画面直接没了。
@@ -29,9 +29,14 @@ page.on("console", (message) => {
   problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
 });
 
+// 性能红线。新城比台儿庄大得多（600×600 m 方城、11.5 m 高墙、四关在城里），
+// 所以这两条从"看看而已"升级成**断言**：越线就是 FAIL，不许靠人去读日志发现。
+const MAX_DRAW_CALLS = 1400;
+const MAX_TRIANGLES = 3200000;
+
 let failed = 0;
-// 六个阶段各启一次：每个阶段换天光、换预设，是不同的 shader 分支组合
-for (const phase of [0, 1, 2, 3, 4, 5]) {
+// 七关各启一次：每关换天光、换切片，是不同的 shader 分支组合与不同的几何量
+for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   problems.length = 0;
   const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=high&scale=small`;
   let health = null;
@@ -77,6 +82,7 @@ for (const phase of [0, 1, 2, 3, 4, 5]) {
         alive: T.ai ? T.ai.aliveCount : -1,
         drawCalls: T.renderer.info.render.calls,
         triangles: T.renderer.info.render.triangles,
+        level: T.Debug.Level ? T.Debug.Level().id : "?",
       };
     });
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
@@ -96,12 +102,19 @@ for (const phase of [0, 1, 2, 3, 4, 5]) {
     if (health.tones < toneFloor) bad.push(`色调档位太少 tones=${health.tones}`);
     if (health.drawCalls < 12) bad.push(`几乎没画东西 calls=${health.drawCalls}`);
     if (health.triangles < 50000) bad.push(`三角形太少 tris=${health.triangles}`);
+    // 性能红线（上界）。越线不是"慢一点"，是这一关在真机上不能玩
+    if (health.drawCalls > MAX_DRAW_CALLS) {
+      bad.push(`draw call 越线 ${health.drawCalls} > ${MAX_DRAW_CALLS}`);
+    }
+    if (health.triangles > MAX_TRIANGLES) {
+      bad.push(`三角形越线 ${(health.triangles / 1e6).toFixed(2)}M > 3.20M`);
+    }
   }
   const ok = bad.length === 0;
   if (!ok) failed += 1;
   console.log(`${ok ? "ok  " : "FAIL"} phase=${phase} `
     + (health
-      ? `spread=${health.spread} tones=${health.tones} calls=${health.drawCalls} `
+      ? `${String(health.level).padEnd(14)} spread=${health.spread} tones=${health.tones} calls=${health.drawCalls} `
         + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive}`
       : "(no health)")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));
@@ -110,5 +123,5 @@ for (const phase of [0, 1, 2, 3, 4, 5]) {
 
 await browser.close();
 server.close();
-console.log(failed === 0 ? "\n开机冒烟全过。" : `\n开机冒烟失败：${failed} 个阶段有问题。`);
+console.log(failed === 0 ? "\n开机冒烟全过。" : `\n开机冒烟失败：${failed} 关有问题。`);
 process.exit(failed === 0 ? 0 : 1);

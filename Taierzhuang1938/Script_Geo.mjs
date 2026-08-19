@@ -209,3 +209,38 @@ export function CarveCraters(planeGeometry, craters) {
   planeGeometry.computeVertexNormals();
   return planeGeometry;
 }
+
+
+/**
+ * 射线 vs 轴对齐盒（slab 法）。返回 { t, normal, box } 或 null。
+ *
+ * 场景全是方料，所以静态几何的求交一律走这条 —— 不建 BVH，也不用 three 的
+ * Raycaster（那要遍历网格的每个三角形，而我们的碰撞体是一张 AABB 表）。
+ *
+ * 原来住在 Script_Battlefield.mjs（台儿庄那座城）里。那个模块随台儿庄一起退役了，
+ * 而这个函数与哪座城无关，所以搬到纯几何模块来。
+ */
+export function RayAabb(origin, direction, box, maxDist) {
+  let tmin = 0, tmax = maxDist;
+  let axis = -1, sign = 1;
+  const o = [origin.x, origin.y, origin.z];
+  const d = [direction.x, direction.y, direction.z];
+  for (let i = 0; i < 3; i += 1) {
+    if (Math.abs(d[i]) < 1e-8) {
+      if (o[i] < box.min[i] || o[i] > box.max[i]) return null;
+      continue;
+    }
+    const inv = 1 / d[i];
+    let t1 = (box.min[i] - o[i]) * inv;
+    let t2 = (box.max[i] - o[i]) * inv;
+    let s = -1;
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; s = 1; }
+    if (t1 > tmin) { tmin = t1; axis = i; sign = s; }
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+  if (axis < 0) return null;
+  const normal = [0, 0, 0];
+  normal[axis] = sign;
+  return { t: tmin, normal, box };
+}

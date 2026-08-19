@@ -43,7 +43,13 @@ export const CITY = {
   plinthHeight: 1.8,
   // 城内地坪比濠外高 1.2 m（依据「东面高起入城内」的现地描述 + 推定）。
   // 整座城是一块微微抬起的台地，不是平铺在平地上。
-  platformY: 1.2,
+  //
+  // 基准的取法：**城内地坪定为 y=0，濠外原野压到 y=-1.2**，而不是反过来。
+  // 理由是工程的：鲁南民居那一整套构件（AddCompound / AddRoomBlock / AddWall）
+  // 全部以 y=0 起砌且没有 baseY 参数，把城内抬到 +1.2 就等于让城里每一座
+  // 四合院沉进地里 1.2 m。高差是同一个高差，只是把零点放在了城里。
+  platformY: 0,
+  outerY: -1.2,
   // 台地外沿（= 护城河内岸顶）离城心的距离：墙脚 310 + 濠内边距 8。
   platformEdge: 318,
   // 顺城街：墙内脚下留出的一圈空地，走人、堆物、开防空洞、接上城道。宽度推定。
@@ -53,8 +59,8 @@ export const CITY = {
 /** 墙脚（外侧）与墙顶的绝对坐标，省得到处重算。 */
 export const WALL_OUTER_FOOT = CITY.wallCenter + CITY.wallBaseWidth / 2;   // 310
 export const WALL_INNER_FOOT = CITY.wallCenter - CITY.wallBaseWidth / 2;   // 300
-export const WALL_TOP_Y = CITY.platformY + CITY.wallHeight;                // 12.7
-export const PARAPET_TOP_Y = WALL_TOP_Y + CITY.parapetHeight;              // 14.3
+export const WALL_TOP_Y = CITY.platformY + CITY.wallHeight;                // 11.5
+export const PARAPET_TOP_Y = WALL_TOP_Y + CITY.parapetHeight;              // 13.1
 
 /**
  * 护城河。志载 3 丈 5 尺（10.5 m）与日方实测 10 m 双源吻合；
@@ -66,13 +72,13 @@ export const MOAT = {
   innerEdge: CITY.platformEdge,          // 318：内岸顶，标高 = platformY
   width: 10.5,
   depth: 4.8,                            // 自内岸顶往下量
-  get outerEdge() { return this.innerEdge + this.width; },   // 328.5，标高 0
+  get outerEdge() { return this.innerEdge + this.width; },   // 328.5，标高 = outerY
   bankRunInner: 2.5,                     // 内岸坡水平投影（推定）
   bankRunOuter: 2.1,                     // 外岸坡水平投影（推定）
-  get bottomY() { return CITY.platformY - this.depth; },     // -3.6
-  waterY: -0.4,                          // 水面：此高度处水面宽约 9.4 m，合志载 8—9 m
+  get bottomY() { return CITY.platformY - this.depth; },     // -4.8
+  waterY: -1.6,                          // 水面：此高度处水面宽约 9.4 m，合志载 8—9 m
   // 濠岸栽柳（史料）。三月柳条无叶，深褐红枝条。间距推定。
-  willowSpacing: 45,
+  willowSpacing: 58,
 };
 
 /**
@@ -186,11 +192,13 @@ export const CORNER_TOWERS = [
  * at = 坡道中点沿墙的局部坐标（正负决定在门的哪一侧）；坡长 28 m 为推定
  * （11.5 m 升高 ÷ 0.46 m 每级 × 1.0 m 踏面 + 中间 2 m 转折平台）。
  */
+// dir：坡自 at 起沿哪个方向爬。**必须背离城门** —— 朝着城门爬的话坡身会压进
+// z=0（或 x=0）那条不许有任何遮挡的视线走廊里。
 export const RAMPS = [
-  { side: "East", at: 30, seed: "rampE" },
-  { side: "West", at: -30, seed: "rampW" },
-  { side: "South", at: 30, seed: "rampS" },
-  { side: "North", at: -30, seed: "rampN" },
+  { side: "East", at: 30, dir: 1, seed: "rampE" },
+  { side: "West", at: -30, dir: -1, seed: "rampW" },
+  { side: "South", at: 30, dir: 1, seed: "rampS" },
+  { side: "North", at: -30, dir: -1, seed: "rampN" },
 ];
 export const RAMP = { width: 2.4, run: 1.0, landingAt: 13, landingRun: 2.0 };
 
@@ -237,9 +245,11 @@ export const LANDMARKS = [
   // 注意：现址的仪门、谯楼门、善国门是 2007 年后复建的仿古建筑，不能照抄细部。
   { id: "Yamen", kind: "yamen", x: 230, z: -30, ry: 0, w: 90, d: 140 },
   // 西门里街上的三处（位置为主流记载，形制推定）
-  { id: "LongPaifang", kind: "paifang", x: -120, z: 0, ry: Math.PI / 2, span: 9 },
+  // 跨街的牌坊。明间（中间两根柱之间）净宽 = span/3 = 4 m，
+  // 正好把 z=0 那条通视轴线让出来 —— 柱子站在街两侧，不站在轴线上。
+  { id: "LongPaifang", kind: "paifang", x: -120, z: 0, ry: Math.PI / 2, span: 12 },
   { id: "AlarmTower", kind: "alarmTower", x: -200, z: -9, ry: 0, height: 9 },
-  { id: "WangShrine", kind: "shrine", x: -250, z: 15, ry: 0, w: 26, d: 22 },
+  { id: "WangShrine", kind: "shrine", x: -250, z: 17, ry: 0, w: 26, d: 22 },
   // 北门里街东侧
   { id: "SquareFort", kind: "squareFort", x: 20, z: -200, ry: 0, w: 32, d: 32 },
   // 铁牌坊，坐东朝西（朝向为主流记载）
