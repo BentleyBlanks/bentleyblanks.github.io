@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="血战台儿庄（1938）交互科普馆：战役背景、双方阵容、中日枪械对比、逐日时间线、战场态势图、敢死队、战术解析与史实纠偏。">
 <title>血战台儿庄 · 1938 交互科普馆</title>
-<link rel="stylesheet" href="Style_Main.css?v=3">
+<link rel="stylesheet" href="Style_Main.css?v=5">
 </head>
 <body>
 
@@ -26,6 +26,7 @@
       <span class="navGroup">深入</span>
       <a href="#timeline">战役流程</a>
       <a href="#map">战场态势</a>
+      <a href="#tengxian">滕县详解</a>
       <a href="#dare">敢死队</a>
       <a href="#tactics">战术解析</a>
       <span class="navGroup">复盘</span>
@@ -402,12 +403,44 @@
   </div>
 </section>
 
+<!-- ============ 滕县详解 ============ -->
+<section id="tengxian">
+  <div class="wrap">
+    <div class="secHead">
+      <span class="levelBadge lv3">深入 · DEEP</span>
+      <h2 class="secTitle"><span class="no">07</span>滕县保卫战 · 逐日详解</h2>
+      <p class="secSub">把前哨战里最惨烈的一场放大看：日军从哪里来、每天打到哪里、王铭章在哪里倒下。拖动时间滑块，看 3.13—3.18 双方各部队的逐日位置。</p>
+      <div class="secRule"></div>
+    </div>
+    <div class="txHead" id="tengxianHead"></div>
+    <div class="mapPanel">
+      <div class="txSliderBar">
+        <button class="tlBtn" id="tengxianPlay">▶ 播放</button>
+        <div class="txSliderWrap">
+          <input type="range" id="tengxianSlider" min="0" max="5" step="1" value="0" aria-label="滕县保卫战时间滑块">
+          <div class="txTicks" id="tengxianTicks"></div>
+        </div>
+        <p class="txStepTitle" id="tengxianStepTitle"></p>
+      </div>
+      <div class="mapSvgBox" id="tengxianMapBox"></div>
+      <div class="txInfo" id="tengxianInfo"></div>
+      <div class="mapLegend">
+        <span class="cn"><i></i>中方（川军 / 援军）</span>
+        <span class="jp"><i></i>日军（濑谷支队）</span>
+        <span>● 拖动滑块看部队逐日位置 · 点击标记看说明</span>
+      </div>
+    </div>
+    <div class="txDays" id="tengxianDays"></div>
+    <div class="txAftermath" id="tengxianAftermath"></div>
+  </div>
+</section>
+
 <!-- ============ 敢死队 ============ -->
 <section id="dare">
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">深入 · DEEP</span>
-      <h2 class="secTitle"><span class="no">07</span>敢死队：不止一支</h2>
+      <h2 class="secTitle"><span class="no">08</span>敢死队：不止一支</h2>
       <p class="secSub">台儿庄的敢死队是制度化的、多批次的，不是一次悲壮的孤例。有较明确记载的至少五批。</p>
       <div class="secRule"></div>
     </div>
@@ -425,7 +458,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">深入 · DEEP</span>
-      <h2 class="secTitle"><span class="no">08</span>为什么会赢：六张牌</h2>
+      <h2 class="secTitle"><span class="no">09</span>为什么会赢：六张牌</h2>
       <p class="secSub">把这场仗拆开看，赢法其实很清晰——难的是每一张牌都要有人用命去撑住。</p>
       <div class="secRule"></div>
     </div>
@@ -438,7 +471,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">复盘 · REVIEW</span>
-      <h2 class="secTitle"><span class="no">09</span>代价与意义</h2>
+      <h2 class="secTitle"><span class="no">10</span>代价与意义</h2>
       <p class="secSub">数字最需要谨慎：各方说法差到几倍，本页不做唯一取舍。意义则很清晰。</p>
       <div class="secRule"></div>
     </div>
@@ -466,7 +499,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">复盘 · REVIEW</span>
-      <h2 class="secTitle"><span class="no">10</span>李宗仁回忆录 · 台儿庄选摘</h2>
+      <h2 class="secTitle"><span class="no">11</span>李宗仁回忆录 · 台儿庄选摘</h2>
       <p class="secSub">这场仗的许多「名场面」没有同时代档案，最早的完整叙述都出自这部回忆录。逐字选摘十段，并附对照与存疑提示。</p>
       <div class="secRule"></div>
     </div>
@@ -480,7 +513,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">复盘 · REVIEW</span>
-      <h2 class="secTitle"><span class="no">11</span>纠偏：流传的说法 vs 更稳的史实</h2>
+      <h2 class="secTitle"><span class="no">12</span>纠偏：流传的说法 vs 更稳的史实</h2>
       <p class="secSub">这场仗的名场面大多来自回忆与影视，多数是「主流记载」甚至「流传待考」。分辨清楚，才是对历史真正的尊重。</p>
       <div class="secRule"></div>
     </div>
@@ -493,7 +526,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">复盘 · REVIEW</span>
-      <h2 class="secTitle"><span class="no">12</span>术语小词典</h2>
+      <h2 class="secTitle"><span class="no">13</span>术语小词典</h2>
       <p class="secSub">读战史常碰到的高频词，点开即查。</p>
       <div class="secRule"></div>
     </div>
@@ -506,7 +539,7 @@
   <div class="wrap">
     <div class="secHead">
       <span class="levelBadge lv3">复盘 · REVIEW</span>
-      <h2 class="secTitle"><span class="no">13</span>延伸阅读与考据说明</h2>
+      <h2 class="secTitle"><span class="no">14</span>延伸阅读与考据说明</h2>
       <p class="secSub">本页内容基于本仓库《血战台儿庄》游戏项目的考据底本与公开资料交叉整理。</p>
       <div class="secRule"></div>
     </div>
@@ -533,6 +566,6 @@
   </div>
 </footer>
 
-<script type="module" src="Script_Main.mjs?v=3"></script>
+<script type="module" src="Script_Main.mjs?v=5"></script>
 </body>
 </html>

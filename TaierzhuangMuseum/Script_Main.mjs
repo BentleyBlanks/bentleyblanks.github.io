@@ -6,6 +6,7 @@ import {
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
   DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
   TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS, READING_PATH, PEOPLE_LATER,
+  TENGXIAN_BATTLE, TENGXIAN_MARKERS, TENGXIAN_UNITS, TENGXIAN_STEPS,
 } from "./Data_Museum.mjs";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -475,6 +476,226 @@ function initMap() {
   render("prelude");
 }
 
+/* ---------------- 滕县详解 ---------------- */
+const TX_NS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs, text) {
+  const node = document.createElementNS(TX_NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function initTengxian() {
+  const head = $("#tengxianHead");
+  const meta = el("div", "txMeta");
+  meta.append(el("p", "", TENGXIAN_BATTLE.meta));
+  meta.append(el("p", "txSides", TENGXIAN_BATTLE.sides));
+  meta.append(el("p", "txPositions", TENGXIAN_BATTLE.positions));
+  meta.append(el("p", "txSummary", TENGXIAN_BATTLE.summary));
+  head.append(meta);
+
+  const days = $("#tengxianDays");
+  const dayNodes = [];
+  TENGXIAN_BATTLE.days.forEach((d, idx) => {
+    const card = el("div", "txDay");
+    const top = el("div", "txDayTop");
+    top.append(el("span", "txDate", d.date));
+    top.append(el("h4", "", d.title));
+    top.append(tierBadge(d.tier));
+    card.append(top);
+    for (const p of d.body) card.append(el("p", "", p));
+    days.append(card);
+    dayNodes.push(card);
+  });
+  $("#tengxianAftermath").textContent = TENGXIAN_BATTLE.aftermath;
+
+  const info = $("#tengxianInfo");
+  const showHint = () => {
+    info.replaceChildren();
+    info.append(el("p", "txHint", `◈ ${TENGXIAN_BATTLE.mapHint}`));
+  };
+  showHint();
+
+  const tx = buildTengxianMap(info, dayNodes);
+  initTengxianSlider(tx.renderStep, dayNodes);
+}
+
+/** 构建沙盘 SVG，返回 { renderStep }。 */
+function buildTengxianMap(info, dayNodes) {
+  const box = $("#tengxianMapBox");
+  box.replaceChildren();
+  const svg = svgEl("svg", { class: "mapSvg", viewBox: "0 0 860 600", role: "img", "aria-label": "滕县保卫战沙盘（可拖动时间滑块）" });
+  box.append(svg);
+
+  /* ---- 基础层 ---- */
+  svg.append(svgEl("rect", { x: 0, y: 0, width: 860, height: 600, fill: "#1a140d", rx: 8 }));
+  svg.append(svgEl("text", { class: "tl", x: 24, y: 36, fill: "#93856a" }, "滕县保卫战 · 沙盘（拖动滑块看 3.13—3.18，北↑）"));
+  // 津浦铁路
+  svg.append(svgEl("line", { class: "rail", x1: 230, y1: 60, x2: 230, y2: 565 }));
+  svg.append(svgEl("text", { class: "tl", x: 242, y: 330, fill: "#93856a" }, "津浦铁路"));
+  // 界河
+  svg.append(svgEl("path", { class: "geo", d: "M110 210 L 500 210", stroke: "#4a6f86", "stroke-width": 3 }));
+  svg.append(svgEl("text", { class: "tl", x: 118, y: 202, fill: "#93856a" }, "界河"));
+  // 北沙河（第二线位置）
+  svg.append(svgEl("path", { class: "geo", d: "M150 272 L 350 272", stroke: "#4a6f86", "stroke-width": 2, "stroke-dasharray": "5 4" }));
+  svg.append(svgEl("text", { class: "tl", x: 160, y: 286, fill: "#6f9ab8" }, "北沙河"));
+
+  /* ---- 城态层 ---- */
+  const city = svgEl("g", { "data-city": "normal" });
+  city.append(svgEl("rect", { class: "txWall", x: 190, y: 300, width: 80, height: 60, fill: "#241c12", stroke: "#8a7552", "stroke-width": 3 }));
+  // 门
+  city.append(svgEl("line", { x1: 230, y1: 360, x2: 230, y2: 352, stroke: "#e9dcc0", "stroke-width": 3 }));
+  city.append(svgEl("line", { x1: 270, y1: 330, x2: 262, y2: 330, stroke: "#e9dcc0", "stroke-width": 3 }));
+  city.append(svgEl("line", { x1: 190, y1: 330, x2: 198, y2: 330, stroke: "#e9dcc0", "stroke-width": 3 }));
+  const cityOverlay = svgEl("g", {});
+  city.append(cityOverlay);
+  svg.append(city);
+  svg.append(svgEl("text", { class: "tlBig", x: 172, y: 292, fill: "#e9dcc0" }, "滕县城"));
+
+  /* ---- 对峙线层 ---- */
+  const lineLayer = svgEl("g", {});
+  lineLayer.append(svgEl("line", { x1: 140, y1: 222, x2: 470, y2: 222, stroke: "#8fb0e0", "stroke-width": 1.5, "stroke-dasharray": "7 5" }));
+  for (const x of [350, 408, 360, 230]) {
+    lineLayer.append(svgEl("path", { d: `M${x} 222 l -5 -7 l 10 0 z`, fill: "#8fb0e0" }));
+  }
+  lineLayer.append(svgEl("text", { class: "tlCn", x: 120, y: 240, fill: "#9dbbe8" }, "川军第 45 军第一线（对峙）"));
+  svg.append(lineLayer);
+
+  /* ---- 标记层（可点击） ---- */
+  const markerGroup = svgEl("g", {});
+  const showMarker = (id) => {
+    const m = TENGXIAN_MARKERS[id];
+    if (!m) return;
+    $$(".tmark", box).forEach((x) => x.classList.toggle("active", x.dataset.marker === id));
+    info.replaceChildren();
+    const top = el("div", "txInfoTop");
+    top.append(el("b", "", m.label));
+    top.append(el("span", `sideTag ${m.side}`, m.side === "cn" ? "中方" : "日方"));
+    info.append(top);
+    info.append(el("p", "", m.body));
+  };
+  for (const [id, m] of Object.entries(TENGXIAN_MARKERS)) {
+    const g = svgEl("g", { class: `tmark ${m.side}`, "data-marker": id, tabindex: 0 });
+    if (m.icon === "fort") {
+      g.append(svgEl("rect", { class: "tmarkDot", x: m.pos[0] - 6, y: m.pos[1] - 6, width: 12, height: 12 }));
+    } else if (m.icon === "forward") {
+      g.append(svgEl("line", { class: "tmarkDot", x1: m.pos[0] - 8, y1: m.pos[1] - 3, x2: m.pos[0] + 8, y2: m.pos[1] - 3 }));
+      g.append(svgEl("line", { class: "tmarkDot", x1: m.pos[0] - 8, y1: m.pos[1] + 3, x2: m.pos[0] + 8, y2: m.pos[1] + 3 }));
+    } else {
+      g.append(svgEl("circle", { class: "tmarkDot", cx: m.pos[0], cy: m.pos[1], r: m.r || 6 }));
+    }
+    g.append(svgEl("text", { class: "tmarkLbl", x: m.lpos[0], y: m.lpos[1] }, m.label));
+    if (m.lpos2) g.append(svgEl("text", { class: "tmarkLbl2", x: m.lpos2[0], y: m.lpos2[1] }, m.lpos2Text || ""));
+    g.addEventListener("click", () => showMarker(id));
+    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showMarker(id); } });
+    markerGroup.append(g);
+  }
+  svg.append(markerGroup);
+
+  /* ---- 部队层（持久节点，移动有过渡动画） ---- */
+  const unitLayer = svgEl("g", {});
+  const unitNodes = {};
+  for (const [uid, def] of Object.entries(TENGXIAN_UNITS)) {
+    const g = svgEl("g", { class: `txUnit ${def.side}`, "data-unit": uid });
+    g.style.transition = "transform 0.55s ease";
+    const dot = svgEl("circle", { class: "txUnitDot", cx: 0, cy: 0, r: 7 });
+    const lbl = svgEl("text", { class: "txUnitLbl", x: 12, y: -7 }, def.short);
+    const tip = svgEl("title", {}, def.label);
+    g.append(dot, lbl, tip);
+    unitLayer.append(g);
+    unitNodes[uid] = g;
+  }
+  svg.append(unitLayer);
+
+  /* ---- 箭头层与标注层 ---- */
+  const arrowLayer = svgEl("g", {});
+  const extraLayer = svgEl("g", {});
+  svg.append(arrowLayer, extraLayer);
+
+  /* ---- 按步渲染 ---- */
+  const renderStep = (i) => {
+    const step = TENGXIAN_STEPS[i];
+    if (!step) return;
+    lineLayer.style.display = step.line ? "" : "none";
+    for (const [uid, g] of Object.entries(unitNodes)) {
+      const pos = step.units[uid];
+      if (!pos) { g.style.display = "none"; continue; }
+      g.style.display = "";
+      g.setAttribute("transform", `translate(${pos[0]} ${pos[1]})`);
+      g.dataset.state = pos[2] || "idle";
+    }
+    arrowLayer.replaceChildren();
+    for (const a of step.arrows || []) {
+      const path = svgEl("path", { class: `mapArrow ${a.side}`, d: a.d });
+      arrowLayer.append(path);
+      const end = (a.d.match(/([\d.]+)\s+([\d.]+)\s*$/) || []).slice(1, 3).map(Number);
+      if (end.length === 2) arrowLayer.append(svgEl("circle", { class: "txArrowHead", cx: end[0], cy: end[1], r: 3.5, fill: a.side === "cn" ? "#8fb0e0" : "#d4554a" }));
+      if (a.label) arrowLayer.append(svgEl("text", { class: a.side === "cn" ? "tlCn" : "tlJp", x: a.pos[0], y: a.pos[1] }, a.label));
+    }
+    extraLayer.replaceChildren();
+    for (const t of step.extras || []) {
+      extraLayer.append(svgEl("text", { class: t.cls, x: t.pos[0], y: t.pos[1] }, t.text));
+    }
+    city.setAttribute("data-city", step.city);
+    cityOverlay.replaceChildren();
+    if (step.city === "attack") {
+      for (const [bx, by] of [[206, 298], [248, 296], [272, 314]]) {
+        cityOverlay.append(svgEl("circle", { class: "txBurst", cx: bx, cy: by, r: 6, fill: "none", stroke: "#d4554a", "stroke-width": 2 }));
+      }
+    } else if (step.city === "breach") {
+      cityOverlay.append(svgEl("path", { d: "M222 362 L 238 362 L 230 392 Z", fill: "rgba(178,58,46,0.55)", stroke: "#d4554a", "stroke-width": 1.5 }));
+    } else if (step.city === "fallen") {
+      cityOverlay.append(svgEl("line", { x1: 190, y1: 300, x2: 270, y2: 360, stroke: "#d4554a", "stroke-width": 2 }));
+      cityOverlay.append(svgEl("line", { x1: 190, y1: 360, x2: 270, y2: 300, stroke: "#d4554a", "stroke-width": 2 }));
+      cityOverlay.append(svgEl("text", { class: "txFallen", x: 230, y: 340, "text-anchor": "middle" }, "城陷"));
+    }
+    const title = $("#tengxianStepTitle");
+    if (title) {
+      title.replaceChildren();
+      title.append(el("b", "", `${step.date} ${step.title}`));
+      title.append(document.createTextNode(` —— ${step.summary}`));
+    }
+    dayNodes.forEach((n, idx) => n.classList.toggle("active", idx === i));
+    const ticks = $$("#tengxianTicks button");
+    ticks.forEach((t, idx) => t.classList.toggle("active", idx === i));
+  };
+  renderStep(0);
+  return { renderStep };
+}
+
+function initTengxianSlider(renderStep, dayNodes) {
+  const slider = $("#tengxianSlider");
+  const play = $("#tengxianPlay");
+  const ticksBox = $("#tengxianTicks");
+  let timer = null;
+
+  TENGXIAN_STEPS.forEach((s, i) => {
+    const b = el("button", "txTick", s.date);
+    b.title = s.title;
+    b.addEventListener("click", () => { slider.value = String(i); renderStep(i); });
+    ticksBox.append(b);
+  });
+  slider.addEventListener("input", () => renderStep(Number(slider.value)));
+  dayNodes.forEach((n, idx) => {
+    n.addEventListener("click", () => { slider.value = String(idx); renderStep(idx); });
+  });
+
+  const stop = () => { if (timer) clearInterval(timer); timer = null; play.textContent = "▶ 播放"; };
+  play.addEventListener("click", () => {
+    if (timer) { stop(); return; }
+    play.textContent = "⏸ 暂停";
+    let i = Number(slider.value);
+    if (i >= TENGXIAN_STEPS.length - 1) i = -1;
+    timer = setInterval(() => {
+      i += 1;
+      slider.value = String(i);
+      renderStep(i);
+      if (i >= TENGXIAN_STEPS.length - 1) stop();
+    }, 1500);
+  });
+}
+
 /* ---------------- 敢死队 ---------------- */
 function initDare() {
   const grid = $("#dareGrid");
@@ -651,6 +872,7 @@ initPeople();
 initWeapons();
 initTimeline();
 initMap();
+initTengxian();
 initDare();
 initTactics();
 initCasualties();

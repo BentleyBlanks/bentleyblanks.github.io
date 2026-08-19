@@ -1,0 +1,209 @@
+/* 《滕县 一九三八》编辑器套件样式。
+   与 Style_Game.css 分开的理由：这一套**不对玩家开放**，
+   出图模式（?shot=1）下整棵树 display:none，不许进任何一张截图。
+
+   视觉上刻意和 HUD 拉开距离：HUD 是宋体、无框、克制；
+   编辑器是等宽数字 + 明确的框线 + 可点的控件，一眼就知道自己在工具里。 */
+
+#edRoot {
+  position: fixed; inset: 0; z-index: 40;
+  pointer-events: none;                       /* 只有面板本身吃鼠标，其余全透 */
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  color: var(--paper, #e6dfcd);
+  font-size: 13px; line-height: 1.5;
+}
+#edRoot.off { display: none; }
+
+/* 数字一律等宽：调参时读数跳动会让人以为值在抖 */
+#edRoot .num, #edRoot input[type="number"], #edRoot .edVal, #edRoot .edMono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 齿轮按钮 ------------------------------------------------------------ */
+.edGear {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; border-radius: 3px;
+  pointer-events: auto; cursor: pointer;
+  background: rgba(12, 12, 10, 0.55);
+  border: 1px solid rgba(230, 223, 205, 0.28);
+  color: var(--paper, #e6dfcd);
+  font-size: 17px; line-height: 32px; text-align: center;
+  transition: background 0.15s linear, border-color 0.15s linear;
+}
+.edGear:hover { background: rgba(30, 28, 22, 0.85); border-color: rgba(224, 176, 98, 0.7); }
+.edGear.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); }
+
+/* --- 面板 ---------------------------------------------------------------- */
+.edPanel {
+  position: absolute; top: 58px; bottom: 18px;
+  width: 268px;
+  pointer-events: auto;
+  display: flex; flex-direction: column;
+  background: rgba(10, 10, 9, 0.86);
+  border: 1px solid rgba(230, 223, 205, 0.20);
+  border-radius: 3px;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.55);
+}
+.edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 76px); }
+.edPanel.work { right: 14px; width: 320px; }
+.edPanel.wide { width: 396px; }
+
+.edHead {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(230, 223, 205, 0.16);
+  letter-spacing: 0.10em; font-size: 13px;
+}
+.edHead .edTitle { flex: 1 1 auto; }
+.edHead .edSub { color: rgba(230, 223, 205, 0.5); font-size: 11px; letter-spacing: 0; }
+.edHead .edX {
+  cursor: pointer; width: 18px; height: 18px; text-align: center; line-height: 16px;
+  border: 1px solid rgba(230, 223, 205, 0.25); border-radius: 2px; font-size: 12px;
+}
+.edHead .edX:hover { border-color: var(--theirs, #d6604a); color: var(--theirs, #d6604a); }
+
+.edBody { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 8px 10px 12px; }
+.edBody::-webkit-scrollbar { width: 8px; }
+.edBody::-webkit-scrollbar-thumb { background: rgba(230, 223, 205, 0.18); border-radius: 4px; }
+
+/* --- 分节 ---------------------------------------------------------------- */
+.edSection { margin: 10px 0 4px; }
+.edSection:first-child { margin-top: 2px; }
+.edSection > .h {
+  color: var(--warn, #e0b062); font-size: 11px; letter-spacing: 0.18em;
+  border-bottom: 1px dotted rgba(224, 176, 98, 0.35);
+  padding-bottom: 2px; margin-bottom: 6px;
+}
+
+/* --- 行与控件 ------------------------------------------------------------ */
+.edRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.edRow > .l { flex: 0 0 82px; color: rgba(230, 223, 205, 0.62); font-size: 12px; }
+.edRow > .c { flex: 1 1 auto; min-width: 0; }
+
+.edBtn {
+  cursor: pointer; user-select: none;
+  padding: 3px 8px; border-radius: 2px; font-size: 12px;
+  background: rgba(230, 223, 205, 0.06);
+  border: 1px solid rgba(230, 223, 205, 0.22);
+  color: var(--paper, #e6dfcd);
+}
+.edBtn:hover { background: rgba(230, 223, 205, 0.16); }
+.edBtn.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); background: rgba(224, 176, 98, 0.10); }
+.edBtn.danger:hover { border-color: var(--theirs, #d6604a); color: var(--theirs, #d6604a); }
+.edBtn.wide { display: block; width: 100%; text-align: center; }
+.edBtns { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
+
+.edChips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.edChip {
+  cursor: pointer; user-select: none; font-size: 12px;
+  padding: 2px 7px; border-radius: 10px;
+  border: 1px solid rgba(230, 223, 205, 0.20);
+  color: rgba(230, 223, 205, 0.82);
+}
+.edChip:hover { border-color: rgba(230, 223, 205, 0.55); color: var(--paper, #e6dfcd); }
+.edChip.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); background: rgba(224, 176, 98, 0.12); }
+
+.edPanel select, .edPanel input[type="text"], .edPanel textarea {
+  width: 100%; box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(230, 223, 205, 0.22);
+  color: var(--paper, #e6dfcd);
+  border-radius: 2px; padding: 3px 5px; font-size: 12px;
+  font-family: inherit;
+}
+.edPanel textarea { resize: vertical; min-height: 56px; font-family: ui-monospace, Consolas, monospace; }
+.edPanel select:focus, .edPanel input:focus, .edPanel textarea:focus {
+  outline: none; border-color: var(--warn, #e0b062);
+}
+.edPanel select option { background: #0d0c0a; }
+
+/* 滑杆：轨道压扁、滑块方形，和游戏里的圆润 UI 拉开 */
+.edPanel input[type="range"] {
+  width: 100%; height: 14px; margin: 0; background: transparent;
+  -webkit-appearance: none; appearance: none;
+}
+.edPanel input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px; background: rgba(230, 223, 205, 0.22); border-radius: 2px;
+}
+.edPanel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 9px; height: 13px; margin-top: -5px; border-radius: 1px;
+  background: var(--paper, #e6dfcd); border: none; cursor: pointer;
+}
+.edPanel input[type="range"]::-moz-range-track { height: 3px; background: rgba(230, 223, 205, 0.22); }
+.edPanel input[type="range"]::-moz-range-thumb {
+  width: 9px; height: 13px; border-radius: 1px; background: var(--paper, #e6dfcd); border: none; cursor: pointer;
+}
+
+/* --- 列表 ---------------------------------------------------------------- */
+.edList { border: 1px solid rgba(230, 223, 205, 0.14); border-radius: 2px; overflow-y: auto; }
+.edList .it {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 3px 6px; cursor: pointer; border-bottom: 1px solid rgba(230, 223, 205, 0.07);
+}
+.edList .it:last-child { border-bottom: none; }
+.edList .it:hover { background: rgba(230, 223, 205, 0.08); }
+.edList .it.on { background: rgba(224, 176, 98, 0.14); color: var(--warn, #e0b062); }
+.edList .it .n { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edList .it .t { flex: 0 0 auto; color: rgba(230, 223, 205, 0.45); font-size: 11px; }
+
+/* --- 读数 ---------------------------------------------------------------- */
+.edFacts { margin: 4px 0; }
+.edFacts .f { display: flex; gap: 8px; font-size: 12px; padding: 1px 0; }
+.edFacts .f .k { flex: 0 0 92px; color: rgba(230, 223, 205, 0.5); }
+.edFacts .f .v { flex: 1 1 auto; word-break: break-all; }
+.edFacts .f .v.warn { color: var(--warn, #e0b062); }
+.edFacts .f .v.bad { color: var(--theirs, #d6604a); }
+.edFacts .f .v.good { color: var(--ours, #9dc0e4); }
+
+.edNote {
+  font-size: 11.5px; color: rgba(230, 223, 205, 0.55); line-height: 1.55;
+  border-left: 2px solid rgba(230, 223, 205, 0.18); padding: 2px 0 2px 7px; margin: 5px 0;
+}
+.edNote.warn { border-left-color: var(--warn, #e0b062); color: rgba(224, 176, 98, 0.85); }
+
+/* --- 时间轴 -------------------------------------------------------------- */
+.edTrack {
+  position: relative; height: 22px; margin: 6px 0 2px;
+  border: 1px solid rgba(230, 223, 205, 0.18); border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35); cursor: pointer; overflow: hidden;
+}
+.edTrack .shot {
+  position: absolute; top: 0; bottom: 0;
+  border-right: 1px solid rgba(230, 223, 205, 0.22);
+  font-size: 10px; color: rgba(230, 223, 205, 0.45);
+  text-align: center; line-height: 20px; overflow: hidden;
+}
+.edTrack .shot.on { background: rgba(224, 176, 98, 0.16); color: var(--warn, #e0b062); }
+.edTrack .play { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--theirs, #d6604a); }
+
+/* --- 屏幕中央的提示（拾取/放置模式） ------------------------------------- */
+.edHint {
+  position: absolute; left: 50%; top: 16px; transform: translateX(-50%);
+  padding: 3px 12px; border-radius: 2px; font-size: 12px;
+  background: rgba(10, 10, 9, 0.75); border: 1px solid rgba(224, 176, 98, 0.45);
+  color: var(--warn, #e0b062); pointer-events: none; opacity: 0;
+  transition: opacity 0.18s linear;
+}
+.edHint.on { opacity: 1; }
+
+/* 十字标：放置/地形笔刷时的准心 */
+.edCross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; display: none; }
+.edCross.on { display: block; }
+.edCross::before, .edCross::after {
+  content: ""; position: absolute; background: rgba(224, 176, 98, 0.8);
+}
+.edCross::before { left: -9px; top: -1px; width: 18px; height: 1px; }
+.edCross::after { left: -1px; top: -9px; width: 1px; height: 18px; }
+
+/* 编辑器接管时把 HUD 收起来（过场自己的 .csRoot 必须留着 —— Timeline 要看它） */
+body.edHideHud #hud > [class^="hud"] { display: none !important; }
+
+/* 窄屏：面板改成上下叠、宽度跟着视口 */
+@media (max-width: 900px) {
+  .edPanel.launcher { width: 160px; }
+  .edPanel.work { width: 250px; }
+  .edPanel.wide { width: 280px; }
+}

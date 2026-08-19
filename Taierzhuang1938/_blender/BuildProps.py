@@ -37,11 +37,15 @@ def BuildDougong():
         Ring(0.085, rx=0.150, rz=0.150, power=6.0),
     ], 4, smooth=False)
     # 十字卯口：两块相交的方料，从斗顶往下挖 40 mm
+    # 两刀分开挖。Join 出来的十字是**自交**的（两块方料在正中重叠），
+    # 而 EXACT 求解器对自交体的绕数判定是未定义行为 —— 实测直接返回空网格，
+    # 整个坐斗凭空消失。挖两次，每次的刀都是一块干净的凸方料。
     slotA = Box(0.320, 0.044, 0.062)
     Transform(slotA, y=0.085)
+    seat = BooleanDifference(seat, slotA)
     slotB = Box(0.062, 0.044, 0.320)
     Transform(slotB, y=0.085)
-    seat = BooleanDifference(seat, Join(slotA, slotB))
+    seat = BooleanDifference(seat, slotB)
     body.Add("WoodBeam", seat, tile="wood")
 
     # 拱：横过来的一根弯枋，两端起翘

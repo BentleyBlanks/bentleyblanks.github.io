@@ -65,14 +65,18 @@ export function ValueNoise3(x, y, z, seed = 0) {
 }
 
 // --- 可平铺的 value noise（贴图必须无缝，不然墙上一眼看见接缝）--------------
-export function TileableValue2(x, y, period, seed = 0) {
+export function TileableValue2(x, y, period, seed = 0, periodY = period) {
   const p = Math.max(1, Math.round(period));
+  // 两轴分开的周期：条状噪声（布的织向、枪管的拉丝）要把一轴拉长四五倍，
+  // 两轴共用一个周期的话被拉长的那一轴根本走不满一圈 —— 图不平铺，接缝就回来了。
+  const q = Math.max(1, Math.round(periodY));
   const xi = Math.floor(x), yi = Math.floor(y);
   const xf = x - xi, yf = y - yi;
   const u = Fade(xf), v = Fade(yf);
-  const wrap = (n) => ((n % p) + p) % p;
-  const a = Hash2(wrap(xi), wrap(yi), seed), b = Hash2(wrap(xi + 1), wrap(yi), seed);
-  const c = Hash2(wrap(xi), wrap(yi + 1), seed), d = Hash2(wrap(xi + 1), wrap(yi + 1), seed);
+  const wrapX = (n) => ((n % p) + p) % p;
+  const wrapY = (n) => ((n % q) + q) % q;
+  const a = Hash2(wrapX(xi), wrapY(yi), seed), b = Hash2(wrapX(xi + 1), wrapY(yi), seed);
+  const c = Hash2(wrapX(xi), wrapY(yi + 1), seed), d = Hash2(wrapX(xi + 1), wrapY(yi + 1), seed);
   return Lerp(Lerp(a, b, u), Lerp(c, d, u), v);
 }
 
@@ -88,10 +92,13 @@ export function Fbm2(x, y, { octaves = 5, lacunarity = 2.0, gain = 0.5, seed = 0
   return sum / norm;
 }
 
-export function TileableFbm2(x, y, period, { octaves = 5, lacunarity = 2.0, gain = 0.5, seed = 0 } = {}) {
+export function TileableFbm2(x, y, period, {
+  octaves = 5, lacunarity = 2.0, gain = 0.5, seed = 0, periodY = null,
+} = {}) {
   let sum = 0, amp = 1, freq = 1, norm = 0;
+  const py = periodY == null ? period : periodY;
   for (let i = 0; i < octaves; i += 1) {
-    sum += amp * TileableValue2(x * freq, y * freq, period * freq, seed + i * 131);
+    sum += amp * TileableValue2(x * freq, y * freq, period * freq, seed + i * 131, py * freq);
     norm += amp;
     amp *= gain;
     freq *= lacunarity;

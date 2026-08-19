@@ -1,0 +1,290 @@
+{
+  "note": "由 Script_SfxBake.mjs 生成；来源与许可见 Data_SfxSources.mjs",
+  "licenses": {
+    "sonniss": {
+      "name": "Sonniss GDC Game Audio Bundle",
+      "terms": "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
+      "via": "https://archive.org/details/sonniss.com-gdc-game-audio-bundles"
+    },
+    "commons": {
+      "name": "Wikimedia Commons",
+      "terms": "军号为美国政府作品（Public Domain）；哨子为 CC0",
+      "via": "https://commons.wikimedia.org/"
+    }
+  },
+  "cues": {
+    "rifleNra": {
+      "files": [
+        "AudioSfx_RifleNra_01.mp3",
+        "AudioSfx_RifleNra_02.mp3",
+        "AudioSfx_RifleNra_03.mp3"
+      ],
+      "seconds": 1.15,
+      "credit": "Pole Position Production · K98k 7.92×57 毛瑟 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "rifleNraFar": {
+      "files": [
+        "AudioSfx_RifleNraFar_01.mp3",
+        "AudioSfx_RifleNraFar_02.mp3",
+        "AudioSfx_RifleNraFar_03.mp3"
+      ],
+      "seconds": 1.5,
+      "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "rifleIja": {
+      "files": [
+        "AudioSfx_RifleIja_01.mp3",
+        "AudioSfx_RifleIja_02.mp3",
+        "AudioSfx_RifleIja_03.mp3"
+      ],
+      "seconds": 0.864,
+      "credit": "Pole Position Production · 斯普林菲尔德 M1903A3 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "rifleIjaFar": {
+      "files": [
+        "AudioSfx_RifleIjaFar_01.mp3"
+      ],
+      "seconds": 0.849,
+      "credit": "Watson Wu · 两次大战步枪（来弹视角）· Sonniss Game Audio Monthly #3",
+      "license": "sonniss"
+    },
+    "zb26": {
+      "files": [
+        "AudioSfx_Zb26_01.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "Pole Position Production · L7A2 GPMG 7.62×51 单发 · Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "type11": {
+      "files": [
+        "AudioSfx_Type11_01.mp3"
+      ],
+      "seconds": 0.536,
+      "credit": "Pole Position Production · M1919A4 .30cal · Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "type92": {
+      "files": [
+        "AudioSfx_Type92_01.mp3"
+      ],
+      "seconds": 0.922,
+      "credit": "Pole Position Production · M1919A4 .30cal（枪架）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "bolt": {
+      "files": [
+        "AudioSfx_Bolt_01.mp3"
+      ],
+      "seconds": 1.25,
+      "credit": "Pole Position Production · M1903A3 拉栓 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "stripperLoad": {
+      "files": [
+        "AudioSfx_StripperLoad_01.mp3"
+      ],
+      "seconds": 1.1,
+      "credit": "Pole Position Production · K98k 操作音 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "magIn": {
+      "files": [
+        "AudioSfx_MagIn_01.mp3"
+      ],
+      "seconds": 0.65,
+      "credit": "Dramatic Cat · 步枪弹匣入位 · Sonniss GDC 2024",
+      "license": "sonniss"
+    },
+    "grenadePin": {
+      "files": [
+        "AudioSfx_GrenadePin_01.mp3"
+      ],
+      "seconds": 0.6,
+      "credit": "TS Sound · 火柴摩擦点燃 · Sonniss Game Audio Monthly #4",
+      "license": "sonniss"
+    },
+    "grenadeThrow": {
+      "files": [
+        "AudioSfx_GrenadeThrow_01.mp3"
+      ],
+      "seconds": 0.55,
+      "credit": "David Dumais Audio · 重挥破风 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "explosionNear": {
+      "files": [
+        "AudioSfx_ExplosionNear_01.mp3"
+      ],
+      "seconds": 2.4,
+      "credit": "Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023",
+      "license": "sonniss"
+    },
+    "explosionFar": {
+      "files": [
+        "AudioSfx_ExplosionFar_01.mp3"
+      ],
+      "seconds": 2.6,
+      "credit": "Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "shellIncoming": {
+      "files": [
+        "AudioSfx_ShellIncoming_01.mp3"
+      ],
+      "seconds": 2,
+      "credit": "Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "shellImpact": {
+      "files": [
+        "AudioSfx_ShellImpact_01.mp3"
+      ],
+      "seconds": 2.8,
+      "credit": "Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015",
+      "license": "sonniss"
+    },
+    "launcherPop": {
+      "files": [
+        "AudioSfx_LauncherPop_01.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "Bluezone Corporation · 榴弹发射 · Sonniss GDC 2023",
+      "license": "sonniss"
+    },
+    "dadaoSwing": {
+      "files": [
+        "AudioSfx_DadaoSwing_01.mp3"
+      ],
+      "seconds": 0.5,
+      "credit": "David Dumais Audio · 大型冷兵器挥空 · Sonniss GDC 2023",
+      "license": "sonniss"
+    },
+    "dadaoHit": {
+      "files": [
+        "AudioSfx_DadaoHit_01.mp3",
+        "AudioSfx_DadaoHit_02.mp3"
+      ],
+      "seconds": 0.8,
+      "credit": "Justsoundeffects · 双手斧入肉 · Sonniss GDC 2024",
+      "license": "sonniss"
+    },
+    "bayonetHit": {
+      "files": [
+        "AudioSfx_BayonetHit_01.mp3"
+      ],
+      "seconds": 0.7,
+      "credit": "PMSFX · 利刃刺入 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "impactBrick": {
+      "files": [
+        "AudioSfx_ImpactBrick_01.mp3",
+        "AudioSfx_ImpactBrick_02.mp3",
+        "AudioSfx_ImpactBrick_03.mp3"
+      ],
+      "seconds": 0.329,
+      "credit": "Gamemaster Audio · 弹着砖石 · Sonniss GDC 2017 ／ PMSFX · 青砖碎裂 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "impactDirt": {
+      "files": [
+        "AudioSfx_ImpactDirt_01.mp3"
+      ],
+      "seconds": 0.42,
+      "credit": "PMSFX · 弹着夯土 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "impactWood": {
+      "files": [
+        "AudioSfx_ImpactWood_01.mp3",
+        "AudioSfx_ImpactWood_02.mp3"
+      ],
+      "seconds": 0.45,
+      "credit": "Double Trouble Audio · 木料受击开裂 · Sonniss GDC 2017 ／ Double Trouble Audio · 木料受击（硬）· Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "impactMetal": {
+      "files": [
+        "AudioSfx_ImpactMetal_01.mp3"
+      ],
+      "seconds": 0.75,
+      "credit": "Gamemaster Audio · 弹着厚金属 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "impactFlesh": {
+      "files": [
+        "AudioSfx_ImpactFlesh_01.mp3"
+      ],
+      "seconds": 0.5,
+      "credit": "PMSFX · 弹着人体 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "footstepDirt": {
+      "files": [
+        "AudioSfx_FootstepDirt_01.mp3",
+        "AudioSfx_FootstepDirt_02.mp3"
+      ],
+      "seconds": 0.4,
+      "credit": "PMSFX · 土路单步 · Sonniss GDC 2019 ／ PMSFX · 土路单步 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "footstepRubble": {
+      "files": [
+        "AudioSfx_FootstepRubble_01.mp3",
+        "AudioSfx_FootstepRubble_02.mp3",
+        "AudioSfx_FootstepRubble_03.mp3",
+        "AudioSfx_FootstepRubble_04.mp3"
+      ],
+      "seconds": 0.4,
+      "credit": "Studio 23 · 碎石路行走 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "bodyFall": {
+      "files": [
+        "AudioSfx_BodyFall_01.mp3"
+      ],
+      "seconds": 1.1,
+      "credit": "Red Libraries · 人体倒地（土地面）· Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "hurt": {
+      "files": [
+        "AudioSfx_Hurt_01.mp3",
+        "AudioSfx_Hurt_02.mp3"
+      ],
+      "seconds": 0.581,
+      "credit": "Articulated Sounds · 男性痛呼 · Sonniss GDC 2019 ／ 344 Audio · 士兵闷哼 · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "heartbeat": {
+      "files": [
+        "AudioSfx_Heartbeat_01.mp3"
+      ],
+      "seconds": 0.7,
+      "credit": "Airborne Sound · 心跳 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "bugleTone": {
+      "files": [
+        "AudioSfx_BugleTone_01.mp3"
+      ],
+      "seconds": 1,
+      "toneHz": 495.51,
+      "credit": "Sgt. Codie Lynn Williams, U.S. Marine Corps · 军号（PD）· Wikimedia Commons",
+      "license": "commons"
+    },
+    "whistle": {
+      "files": [
+        "AudioSfx_Whistle_01.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "SpliceSound · 哨子（CC0）· Wikimedia Commons",
+      "license": "commons"
+    }
+  },
+  "bakedAt": "2026-08-19"
+}

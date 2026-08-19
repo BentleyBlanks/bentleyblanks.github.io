@@ -63,7 +63,7 @@ export const MESHES = {
     triangles: 1764, meshBlocks: 21, nodes: 29, joints: 13,
     materials: ["accentA", "accentB", "accessory", "shoe", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.5618, 1.6747, 0.3215], height: 1.66,
+    span: [0.5187, 1.6747, 0.3215], height: 1.66,
     draws: { high: 19, medium: 17, low: 16 },
     note: "第 2 集团军第 31 师步兵。布军帽 + 青天白日帽徽、灰蓝土布军装、"
       + "斜挎布子弹带（只有靠身三格鼓着）、缠出层叠的绑腿、草鞋或布鞋。**无钢盔。**",
@@ -73,7 +73,7 @@ export const MESHES = {
     triangles: 1776, meshBlocks: 23, nodes: 32, joints: 13,
     materials: ["accentA", "accentB", "helmet", "leather", "shoe", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.5414, 1.631, 0.348], height: 1.62,
+    span: [0.501, 1.631, 0.348], height: 1.62,
     draws: { high: 19, medium: 18, low: 17 },
     note: "濑谷支队步兵。立领昭五式 + 步兵红领章、九〇式钢盔（外翻盔沿 + 正面五角星）、"
       + "皮弹药盒三只、编上靴 + 脚绊。**1938 年 3—4 月无屁帘。**",
@@ -140,9 +140,9 @@ export const MESHES = {
 
   Dougong: {
     file: "Dougong.tzm.json", category: "prop",
-    triangles: 164, meshBlocks: 1, nodes: 3, joints: 0,
+    triangles: 176, meshBlocks: 1, nodes: 3, joints: 0,
     materials: ["WoodBeam"], mounts: ["top"],
-    span: [0.642, 0.196, 0.300],
+    span: [0.642, 0.196, 0.2853],
     draws: { high: 1, medium: 1, low: 1 },
     note: "门楼斗拱（一斗三升简化）。坐斗上的十字卯口是真挖出来的（布尔）。原点在坐斗底面。",
   },

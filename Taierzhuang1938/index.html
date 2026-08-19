@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=1">
+  <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
+  <link rel="stylesheet" href="./Style_Editor.css?v=1">
   <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
        只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
        里的旧版，桌面刷新就好、手机 Safari 黏得多，于是只在移动端复现。
@@ -54,7 +56,17 @@
         "./Data_Weapons.mjs": "./Data_Weapons.mjs?v=1",
         "./Data_Battle.mjs": "./Data_Battle.mjs?v=1",
         "./Data_History.mjs": "./Data_History.mjs?v=1",
-        "./Data_Script.mjs": "./Data_Script.mjs?v=1"
+        "./Data_Script.mjs": "./Data_Script.mjs?v=1",
+
+        "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=1",
+        "./Script_EditorStage.mjs": "./Script_EditorStage.mjs?v=1",
+        "./Script_EditorActor.mjs": "./Script_EditorActor.mjs?v=1",
+        "./Script_EditorWeapon.mjs": "./Script_EditorWeapon.mjs?v=1",
+        "./Script_EditorTimeline.mjs": "./Script_EditorTimeline.mjs?v=1",
+        "./Script_EditorAudio.mjs": "./Script_EditorAudio.mjs?v=1",
+        "./Script_EditorScene.mjs": "./Script_EditorScene.mjs?v=1",
+        "./Script_EditorSettings.mjs": "./Script_EditorSettings.mjs?v=1",
+        "./Script_Editor.mjs": "./Script_Editor.mjs?v=1"
       }
     }
   </script>

@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from TzmCore import ResetScene, WriteTzm      # noqa: E402
+from TzmCore import FLIPPED, ResetScene, WriteTzm      # noqa: E402
 import BuildSoldiers                 # noqa: E402
 import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
@@ -73,6 +73,7 @@ def main():
 
     for name, category, builder, notes in jobs:
         ResetScene()
+        FLIPPED.clear()
         built = builder()
         root = built[0] if isinstance(built, tuple) else built
         path = os.path.join(out, name + ".tzm.json")
@@ -117,6 +118,10 @@ def main():
         print("%-4s %-16s %-8s tris=%-5d blocks=%-3d nodes=%-3d joints=%-3d %6.1f KB  mats=%s"
               % ("ok" if ok else "FAIL", name, category, tris, blocks,
                  len(doc["nodes"]), joints, size / 1024.0, ",".join(materials)))
+        # 翻面体检的战果。**这里有内容不是好消息**：说明某个建模原语的绕向写反了，
+        # 兜底给你救回来了，但根子在原语上，去那儿修。
+        if FLIPPED:
+            print("     翻面兜底：" + "  ".join(FLIPPED))
 
     index_path = os.path.join(out, "Index.json")
     with open(index_path, "w", encoding="utf-8") as handle:

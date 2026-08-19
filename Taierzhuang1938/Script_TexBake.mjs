@@ -271,43 +271,62 @@ export function BakeWood(size = 512, { seed = 4, hue = [110, 84, 54], planks = 5
   }, { normalStrength: 2.0 });
 }
 
-/** 土布军装：粗平纹 + 汗渍 + 浮土。西北军灰蓝布 / 日军土黄。 */
-export function BakeCloth(size = 256, { seed = 5, hue = [104, 110, 116], threads = 28, grime = 0.4 } = {}) {
+/**
+ * 土布军装：**一块近乎纯色的布**，靠垂坠的褶、汗渍浮土和一点织向立住，不靠花纹。
+ * 西北军灰蓝布 / 日军土黄。
+ *
+ * 事故（这一版修的就是它）：原来这张图在一格 0.6 m 里画 28 根经纬线 ——
+ * 一根线 21 mm，比拇指还粗。更要命的是那套织纹同时进了 albedo、height、AO、
+ * roughness **四条通道**，于是每个交叉点都是一颗有明暗有高光的珠子：全场每个人
+ * 身上罩着一层锁子甲。玩家的评语是「还不如纯色」，这话是准确的。
+ *
+ * 定量的根子：256 px 铺 0.6 m，一个纹素 2.3 mm；而土布的经纬线是 1 mm 量级。
+ * **在这个贴图密度下织纹根本不可表达**（奈奎斯特：能画的最细周期是 4.7 mm，
+ * 比真线粗五倍）。硬画出来的必然是一张比布粗一个数量级的假格子，而且它一定
+ * 同时在 albedo 和法线上闪 —— 越走近越像铁。
+ *
+ * 所以这一版把**可读的图案全部让给比纹素大得多的东西**：
+ *   · 褶（20 cm）—— 军装是宽松的，「垂」才是布的第一读数；
+ *   · 死褶（10 cm）—— 肘窝、膝弯、下摆压出来的折痕；
+ *   · 深浅不匀（2.5 cm）—— 手织土布一匹布染不匀，这是「土布」的身份证；
+ *   · 织向（1.5 cm 的**条状**噪声，不是格子）—— 只进 height 与 roughness，
+ *     一点都不进 albedo。它给的是「有织向」的高光，不是印上去的花纹。
+ * albedo 的总起伏压在 ±8% 以内：三米外这块布必须读作一块颜色。
+ */
+export function BakeCloth(size = 256, { seed = 5, hue = [104, 110, 116], grime = 0.4 } = {}) {
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
-    // 事故：原来是两条**严格**的正弦相乘，出来是一个精确到像素的方格短划点阵 ——
-    // 材质球上读作冲孔铁板，而这张图是全场每一个人的主表面（军服 + 视图模型的
-    // 背带/袖口）。土布是手织的：每一根纬线起头的位置对不齐，线本身也有粗有细。
-    // 相位抖动只按**整数线号**取（随 u/v 环绕），贴图才还是无缝的。
-    const weftIndex = Math.floor(v * threads);
-    const warpIndex = Math.floor(u * threads);
-    const rowRnd = Mulberry32(((weftIndex * 7919) >>> 0) + seed)();
-    const colRnd = Mulberry32(((warpIndex * 6151) >>> 0) + seed + 131)();
-    const wu = Math.sin((u * threads + (rowRnd - 0.5) * 0.35) * Math.PI * 2);
-    const wv = Math.sin((v * threads + (colRnd - 0.5) * 0.35) * Math.PI * 2);
-    // 线的胖瘦：指数在 0.75—1.25 之间浮动，等于线宽 ±25%
-    const weave = Math.pow(Clamp01(wu * 0.5 + 0.5), 0.75 + rowRnd * 0.5)
-      * Math.pow(Clamp01(wv * 0.5 + 0.5), 0.75 + colRnd * 0.5);
-    // 褶皱／磨损：比织纹低一个数量级的频率。没有它，布是一块平织面而不是**垂**着的军服
-    const wrinkle = TileableFbm2(u * 3, v * 3, 3, { octaves: 4, seed: seed + 71 });
-    const slub = TileableFbm2(u * 30, v * 30, 30, { octaves: 3, seed: seed + 7 });
-    const stain = Clamp01(TileableFbm2(u * 4, v * 4, 4, { octaves: 4, seed: seed + 19 }) * 1.6 - 0.5) * grime;
-    const dust = TileableFbm2(u * 11, v * 11, 11, { octaves: 3, seed: seed + 37 });
+    // 褶：宽松军装的垂坠。低频大幅度，绝大部分幅度进 height（受光），不进颜色
+    const fold = TileableFbm2(u * 3, v * 3, 3, { octaves: 4, seed: seed + 71 });
+    // 死褶：脊状噪声的窄脊就是压出来的折痕线
+    const crease = 1 - Math.abs(TileableFbm2(u * 6, v * 6, 6, { octaves: 3, seed: seed + 53 }) * 2 - 1);
+    // 纱结 / 染色不匀：手织土布唯一该进 albedo 的「纹」，而且只有 ±3.5%
+    const slub = TileableFbm2(u * 24, v * 24, 24, { octaves: 2, seed: seed + 7 });
+    // 织向：经纬各一组 4:1 的**条状**噪声。两轴周期不同，所以要 periodY，
+    // 否则被拉长的那一轴走不满一圈，图就不平铺了
+    const warpGrain = TileableFbm2(u * 32, v * 8, 32, { octaves: 2, seed: seed + 17, periodY: 8 });
+    const weftGrain = TileableFbm2(u * 8, v * 32, 8, { octaves: 2, seed: seed + 29, periodY: 32 });
+    const grain = (warpGrain + weftGrain) * 0.5;
+    const stain = Clamp01(TileableFbm2(u * 4, v * 4, 4, { octaves: 4, seed: seed + 19 }) * 1.7 - 0.62) * grime;
+    const dust = Clamp01(TileableFbm2(u * 7, v * 7, 7, { octaves: 3, seed: seed + 37 }) * 1.5 - 0.72);
+    const sun = TileableFbm2(u * 2, v * 2, 2, { octaves: 2, seed: seed + 91 });   // 日晒褪色不匀
     const col = [0, 0, 0];
     for (let c = 0; c < 3; c += 1) {
-      col[c] = hue[c] * (0.9 + slub * 0.22);
-      col[c] = Mix(col[c], col[c] * 0.68, stain);                                       // 汗碱与泥
-      col[c] = Mix(col[c], Mix(col[c], 150, 0.35), Clamp01(dust * 1.4 - 0.55) * 0.6);   // 蒙的一层土
-      // 褶皱同时进 albedo 与 height：只进 height 的话，20 m 外法线已经被 mip 抹平，
-      // 布又回到一块平色；只进 albedo 则是印上去的花纹，不受光。
-      col[c] *= 0.86 + weave * 0.2 + (wrinkle - 0.5) * 0.24;
+      col[c] = hue[c] * (0.965 + slub * 0.07 + (sun - 0.5) * 0.06);
+      col[c] = Mix(col[c], col[c] * 0.80, stain);                        // 汗碱与泥
+      col[c] = Mix(col[c], Mix(col[c], 152, 0.38), dust * 0.42);         // 蒙的一层土
+      // 褶在 albedo 上只留很轻的一道自阴影。画重了就成了印花：不受光、转个身还在
+      col[c] *= 1 - (1 - fold) * 0.05 - crease * 0.04;
     }
     out.r = col[0]; out.g = col[1]; out.b = col[2];
-    out.h = Clamp01(0.5 + (weave - 0.5) * 0.5 + slub * 0.2 + (wrinkle - 0.5) * 0.24);
-    out.rough = Clamp01(0.94 - weave * 0.06 + stain * 0.04);
-    out.ao = Clamp01(0.6 + weave * 0.36 - stain * 0.1);
+    out.h = Clamp01(0.5 + (fold - 0.5) * 0.55 + (crease - 0.5) * 0.18
+      + (slub - 0.5) * 0.06 + (grain - 0.5) * 0.05);
+    out.rough = Clamp01(0.90 + (grain - 0.5) * 0.10 + slub * 0.04 + stain * 0.05);
+    // AO 只由褶的凹处给。挂在织纹上是上一版「锁子甲」最关键的一条 ——
+    // AO 乘的是间接光，逐颗珠子的 AO = 逐颗珠子的暗边 = 一眼看见的颗粒
+    out.ao = Clamp01(0.80 + fold * 0.20 - crease * 0.12 - stain * 0.06);
     out.metal = 0;
-  }, { normalStrength: 0.9 });
+  }, { normalStrength: 2.4 });
 }
 
 /** 烤蓝钢 / 铸铁：枪管、钢盔、机件。金属度与粗糙度不均 + 锈斑。 */

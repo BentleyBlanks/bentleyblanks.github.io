@@ -34,6 +34,7 @@ import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { EditorSuite } from "./Script_Editor.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
@@ -98,6 +99,8 @@ const scene = new THREE.Scene();
 // FOV 55：Easy Red 2 那种“周围很远、人很小但看得清”的观感靠窄视场。
 // 70 度会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。
 const BASE_FOV = 55;
+// SSAO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
+const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
@@ -116,7 +119,27 @@ const ssao = {
   resolution: { value: new THREE.Vector2(post.width, post.height) },
   // 0.80：贴图位置修正后 AO 真的落在几何转折上了，1.85/0.95 那套是为了
   // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
-  strength: { value: 0.80 },
+  strength: { value: SSAO_BASE },
+};
+
+/**
+ * 画质旋钮。
+ *
+ * 与天光预设**分工分明**：预设（SKY_PRESETS）决定这一关「长什么样」——
+ * 曝光、雾色、泛光阈值全是美术意图，不许被设置面板改掉；
+ * 这张表只决定「画多重」，一律以**倍率**的形式乘在预设算出来的那几项上。
+ * 混在一张表里的下场是玩家把画质调低之后夜战关变成纯黑（预设 exposure 3.6 被当成
+ * 画质项一起压了）。
+ *
+ * renderScale 是唯一真正省时间的那一项：整条合成链（法线深度、AO、泛光六级、
+ * 体积光、运动模糊）都按 post 靶的尺寸走，它减半等于这一整条链省四分之三。
+ */
+const graphics = {
+  renderScale: 1.0,
+  shadows: true,
+  shadowSize: 0,          // 0 = 用出厂档位
+  ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  fov: BASE_FOV,
 };
 const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
 const sky = new SkyDome(renderer);
@@ -188,6 +211,9 @@ let story = null;
 let combat = null;
 let interact = null;
 let cutscene = null;
+// 编辑器套件（齿轮按钮 + 五个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
+// 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
+let editor = null;
 // Script_Ai 的全局人像预算，给"这一关没有自己的预算"时回落用。
 // Boot 里从 AiDirector 实例上取真值 —— 不再 import 一次那个常量，只留一个真相。
 let defaultVisibleActors = 13;
@@ -439,7 +465,7 @@ async function Boot() {
       // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
       GunFeel: () => ({
         firePunch,
-        fovBase: BASE_FOV,
+        fovBase: graphics.fov,
         fov: camera.fov,
         sprintBlocked: player.sprint > 0.35
           || (state.elapsed - sprintReleaseAt) < SPRINT_FIRE_DELAY_S,
@@ -484,6 +510,36 @@ async function Boot() {
   // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
   // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
   window.Tengxian = window.Taierzhuang;
+
+  // --- 编辑器套件 ---------------------------------------------------------
+  // 建在最后：五个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城）
+  // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
+  // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
+  editor = new EditorSuite({
+    renderer, scene, camera, canvas, library, lights, post,
+    actorFactory, viewmodel, audio, cutscene,
+    shot: !!SHOT,
+    ReleasePointerLock,
+    game: {
+      state, PHASES, JumpToLevel, graphics, ApplyGraphics,
+      get battlefield() { return battlefield; },
+      get player() { return player; },
+      get currentWeapon() { return currentWeapon; },
+    },
+  });
+  window.Taierzhuang.editor = editor;
+  // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态
+  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor.Open(id);
+  window.Taierzhuang.Debug.CloseEditor = () => { editor.TogglePanel(false); };
+  window.Taierzhuang.Debug.Editor = () => ({
+    panelOpen: editor.panelOpen,
+    active: editor.ActiveId,
+    capturing: editor.Capturing,
+    studio: editor.studio.Active,
+    fly: editor.flycam.Active,
+    hidden: !!document.getElementById("edRoot")
+      && document.getElementById("edRoot").classList.contains("off"),
+  });
 
   if (SHOT) StartRun();
 }
@@ -1142,11 +1198,16 @@ const router = new InputRouter({
   // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
   Guard: (e) => {
     if (!state.running) return false;
+    // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
+    if (editor && editor.Capturing) return false;
     if (document.pointerLockElement !== canvas && !SHOT) { canvas.requestPointerLock?.(); return false; }
     return true;
   },
   OnAction: (action, detail) => {
     if (!state.ready) return;
+    // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
+    // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
+    if (editor && editor.Capturing) return;
     switch (action) {
       case "crouch": input.crouchPressed = true; return;
       case "prone": input.pronePressed = true; return;
@@ -1674,6 +1735,16 @@ function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
 
+  // 编辑器接管：与过场同一条通道 —— 玩法全停，只推编辑器与画面。
+  // **必须排在过场那一条之前**：Timeline 编辑器要自己按走带的步长推
+  // cutscene.Update（暂停、0.25 倍速、拖进度条全靠它），排在后面的话
+  // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
+  if (editor && editor.Capturing) {
+    editor.Update(dt);
+    if (render) RenderScene(dt);
+    return;
+  }
+
   // 过场期间：只推过场与画面，玩法全停。
   // 不停的话玩家会在看电影的时候被打死，而且 AI 会照常往前走 ——
   // 过场结束时战场已经不是过场开始时那个战场了。
@@ -1748,7 +1819,7 @@ function Frame(dt, render = true) {
   const adsEff = adsFovT * (viewmodel.adsSuppress ?? 1);
   // 屏息那 6% 单独平滑：它跟开镜不是一回事，snap 会"啵"一下。
   breathFov += ((player.breathHold ? 0.94 : 1) - breathFov) * Clamp01(dt * 6);
-  const baseFov = BASE_FOV * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
+  const baseFov = graphics.fov * (1 - adsEff * (1 - (weapon?.adsFovScale ?? 0.75))) * breathFov;
 
   // 枪感方子 2：开火顿挫。85 ms 衰减，**平方**衰减让前两帧吃掉六成 ——
   // 那一下才是"顿"而不是"晃"。叠在 FOV 上 1.9°，约等于开镜变化量的 12%。
@@ -1921,6 +1992,7 @@ function RenderScene(dt) {
   ssao.map.value = post.AoTexture;
   // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
+  ssao.strength.value = SSAO_BASE * graphics.ssao;
   const preset = SKY_PRESETS[phase.sky];
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
@@ -1929,14 +2001,14 @@ function RenderScene(dt) {
     sunColor: preset.sunColor,
     fog: preset.fog,
     exposure: preset.exposure,
-    bloom: preset.bloom,
-    godStrength: preset.godStrength,
+    bloom: preset.bloom * graphics.bloom,
+    godStrength: preset.godStrength * graphics.god,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
-    grain: phase.sky === "night" ? 0.020 : 0.014,
-    vignette: 0.42 + suppression * 0.22,
+    grain: (phase.sky === "night" ? 0.020 : 0.014) * graphics.grain,
+    vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    motionBlur: 0.15,
+    motionBlur: 0.15 * graphics.motionBlur,
   });
 }
 
@@ -2007,12 +2079,42 @@ function Loop(now) {
 }
 requestAnimationFrame(Loop);
 
-window.addEventListener("resize", () => {
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+/**
+ * 把画质旋钮落到渲染器上。**改完必须调它**，改字段本身什么也不会发生。
+ *
+ * 阴影那一条要连着重编译材质：`renderer.shadowMap.enabled` 是编译期的
+ * `#define USE_SHADOWMAP`，只改标志位而不置 needsUpdate 的话，着色器还按老样子
+ * 去采一张已经不再更新的图 —— 画面会留着一层永不变化的假阴影。
+ * 重编译是一次性的（几百毫秒），而这是个设置动作，不是每帧的事。
+ */
+function ApplyGraphics() {
+  const scale = Clamp(graphics.renderScale, 0.4, 1.6);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  post.SetSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  post.SetSize(Math.round(window.innerWidth * scale), Math.round(window.innerHeight * scale));
+
+  const wantShadow = !!graphics.shadows;
+  if (renderer.shadowMap.enabled !== wantShadow) {
+    renderer.shadowMap.enabled = wantShadow;
+    scene.traverse((object) => {
+      const material = object.material;
+      if (!material) return;
+      if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
+      else material.needsUpdate = true;
+    });
+  }
+  if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
+    lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);
+    // 换分辨率必须把旧的那张扔掉，three 才会按新尺寸重建
+    if (lights.sun.shadow.map) {
+      lights.sun.shadow.map.dispose();
+      lights.sun.shadow.map = null;
+    }
+  }
+}
+
+window.addEventListener("resize", ApplyGraphics);
 
 Boot().catch((error) => {
   bootStep.textContent = "启动失败：" + error.message;

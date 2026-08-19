@@ -876,7 +876,12 @@ export class AiDirector {
           const rx = nx * c - nz * sn, rz = nx * sn + nz * c;
           nx = rx; nz = rz;
         }
-        const step = speed * dt * (s.stance === 1 ? 0.6 : s.stance === 2 ? 0.3 : 1);
+        // 姿态减速：蹲 0.6、卧 0.3。这个系数**必须同时进 moveSpeed** ——
+        // 它是喂给 Script_Actor 的唯一速度信号，动作层拿它算步频与匍匐的循环频率。
+        // 只减位移不减信号的话，趴着的人以三倍于真实位移的频率蹬腿，
+        // 蹲着的人步频快 1.67 倍：两样都是在原地蹭。
+        const stanceMul = s.stance === 1 ? 0.6 : s.stance === 2 ? 0.3 : 1;
+        const step = speed * dt * stanceMul;
         const beforeX = s.position.x, beforeZ = s.position.z;
         const tryX = s.position.x + nx * step;
         const tryZ = s.position.z + nz * step;
@@ -902,7 +907,7 @@ export class AiDirector {
           s.stuckTime = 0;
         }
         s.yaw = Math.atan2(-nx, -nz);
-        s.moveSpeed = Clamp01(speed / 3.6);
+        s.moveSpeed = Clamp01(speed * stanceMul / 3.6);
       } else {
         s.moveSpeed = 0;
         s.stuckTime = 0;
