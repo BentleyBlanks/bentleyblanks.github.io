@@ -22,6 +22,7 @@
 // 这样同一场回放里第 N 次开枪永远是同一条枪声，逐轮截图/录音比对才有意义。
 
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
+import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -1197,7 +1198,14 @@ export class AudioEngine {
     this.playCounter = 0;
     this.space = "street";
     this.masterVolume = 1;
-    this.lastPlayAt = new Map();      // 名字 → 上次触发时间（去重用）
+    this.lastPlayAt = new Map();
+    // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
+    this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
+    this.voicesReady = false;
+    this.voiceErrors = [];
+    this.lastBarkAt = -99;
+    this.lastBarkKindAt = new Map();
+    this.barkCounter = 0;      // 名字 → 上次触发时间（去重用）
     this.noiseCache = new Map();
     this.shaperCache = new Map();
     this.waveCache = new Map();
@@ -1315,6 +1323,13 @@ export class AudioEngine {
     // 解锁前设过的环境/音乐是「挂起」状态，这里补跑一次。
     if (this.ambiencePreset && this.ambiencePreset !== "silence") this.Ambience(this.ambiencePreset);
     if (this.musicCue) this.Music(this.musicCue);
+    // 人声采样在这儿载入而不是在构造里：解锁之前根本没有 AudioContext，
+    // decodeAudioData 无处可去。放在手势之后也顺带避免了"页面一开就拉 300 KB"。
+    // 失败不影响任何其他功能 —— 没有配音的战场仍然是能打的战场。
+    if (!this.voicesReady && !this.voiceLoading) {
+      this.voiceLoading = true;
+      this.LoadVoices(VOICE_BASE, VOICE_LINES).catch(() => {});
+    }
   }
 
   get Ready() {
@@ -1395,6 +1410,89 @@ export class AudioEngine {
    * 用 matrixWorld 直接取基向量，不走 getWorldDirection —— 那个会分配临时 Vector3，
    * 每帧一次不多，但这是 60 fps 下的热路径，能不分配就不分配。
    */
+  /**
+   * 载入外部人声采样（战场口令）。
+   *
+   * 在这之前整个引擎是**纯合成**的，一个外部音源都没有 —— 这是它最大的长处
+   * （零加载、零 404、完全确定性），也是它做不了人嗓的原因：喊话不是能算出来的。
+   *
+   * 接入方式刻意选了「注册成配方」而不是另开一条播放路径：
+   * 采样一旦进了 RECIPES，去重、预算闸、Panner、空气低通、混响 send、距离湿度加成
+   * 这一整套就**原封不动地免费复用**了。另开一条路的话，这些全要再写一遍，
+   * 而且必然会漂（远处的喊声混响不对、预算不计入、齐喊时不去重）。
+   *
+   * 失败一律吞掉并计数，绝不抛：**没有配音的战场仍然是能打的战场**，
+   * 但静默失败要留痕迹（this.voiceErrors），不然没人会发现口令没响。
+   *
+   * @param {string} base    目录前缀，例如 "Audio/"
+   * @param {Array}  entries Data_Voice.VOICE_LINES
+   * @returns {Promise<number>} 真正解码成功的条数
+   */
+  async LoadVoices(base, entries) {
+    if (!this.ctx || this.disposed || !Array.isArray(entries)) return 0;
+    this.voiceErrors = this.voiceErrors || [];
+    let ok = 0;
+    await Promise.all(entries.map(async (e) => {
+      try {
+        const res = await fetch(base + e.file);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+        const name = "voice." + e.key;
+        RECIPES[name] = (A, v) => {
+          const src = v.Own(A.ctx.createBufferSource());
+          src.buffer = buf;
+          // 变调用 playbackRate：喊话的音高与语速一起变，正是"另一个人"的听感。
+          // 只有 6 个标准普通话音色，靠 ±4% 的变调把一个班喊出不同的人来。
+          src.playbackRate.value = v.pitch;
+          src.connect(v.out);
+          v.Start(src, v.t, buf.duration / Math.max(0.1, v.pitch));
+        };
+        MIX_GAIN[name] = e.gain ?? 1;
+        NODE_COST[name] = 2;
+        this.voiceBank.set(e.key, { ...e, duration: buf.duration });
+        ok += 1;
+      } catch (err) {
+        this.voiceErrors.push({ file: e.file, message: err && err.message });
+      }
+    }));
+    this.voicesReady = ok > 0;
+    return ok;
+  }
+
+  /**
+   * 喊一句。按 kind 从声库里挑，自带节流。
+   *
+   * 节流不是性能考虑，是**听感**考虑：一条街上五十个人，不加闸门就会出现
+   * 二十个人同时喊"卧倒"的滑稽场面。两层闸：
+   *   · 全局 0.55 s —— 任何时刻场上最多一句人声压着另一句的尾巴
+   *   · 同类 4.5 s  —— 同一句话不会连着来第二遍
+   * 玩家自己那句（priority）不受全局闸限制，但仍受同类闸限制。
+   */
+  Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null } = {}) {
+    if (!this.ctx || this.disposed || !this.voicesReady) return null;
+    const now = this.ctx.currentTime;
+    if (!priority && now - this.lastBarkAt < 0.55) return null;
+    if (now - (this.lastBarkKindAt.get(kind) || -99) < 4.5) return null;
+
+    const pool = [];
+    for (const e of this.voiceBank.values()) {
+      // 指定了 key 就只认那一句（下命令要喊对应的那句，不能"从 rally 里随便挑一句"）
+      if (key ? e.key === key : e.kind === kind) pool.push(e);
+    }
+    if (!pool.length) return null;
+    // 确定性挑选：种子给调用方（通常是士兵 id），同一个人倾向于喊同样的话，
+    // 但不同的人不一样 —— 这比纯随机更像一个班。
+    const rng = Mulberry32((HashString(kind) ^ Math.imul(seed + this.barkCounter, 2654435761)) >>> 0);
+    this.barkCounter += 1;
+    const pick = pool[Math.floor(rng() * pool.length) % pool.length];
+    // ±4% 变调：把 6 个音色摊成一个班。种子固定 => 同一个兵的嗓子是稳定的。
+    const pitch = 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
+
+    this.lastBarkAt = now;
+    this.lastBarkKindAt.set(kind, now);
+    return this.Play("voice." + pick.key, { position, volume, pitch, priority });
+  }
+
   SetListener(camera) {
     if (!this.ctx || !camera || !camera.matrixWorld) return;
     const e = camera.matrixWorld.elements;

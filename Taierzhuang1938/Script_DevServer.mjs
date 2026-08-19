@@ -18,6 +18,12 @@ const MIME = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  // 人声采样。不写这一条会以 application/octet-stream 送出去 ——
+  // decodeAudioData 其实不看 Content-Type，但 Range 请求与缓存策略会变，
+  // 而且浏览器控制台会刷一片 "Resource interpreted as Document" 的噪音。
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
 };
 
 export function ServeRoot(rootDir, port = 0) {

@@ -177,6 +177,12 @@ export class Soldier {
     // 以前扣票分散在三处（Combat.Blast 的 onKill、Main.TryFire、Main.DoMelee），
     // 结果是：日军炮弹炸死中国兵扣日方的票，玩家亲手打死人扣两票。
     if (this.director) this.director.NotifyDeath(this);
+    // 倒下的那一声是**旁边的人**喊的（「班长！班长！」），所以位置取阵亡处、
+    // 但语气归活人。这一条比"死人自己惨叫"更接近战场，也更不容易滥。
+    const A2 = this.director && this.director.ctx && this.director.ctx.audio;
+    if (A2 && this.side === "nra") {
+      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7 });
+    }
     return true;
   }
 
@@ -186,6 +192,12 @@ export class Soldier {
     this.health -= damage * mult;
     this.suppression = Clamp01(this.suppression + 0.45);
     if (this.health <= 0) return this.Kill(direction);
+    // 中弹没死会喊。只有中国兵有配音（声库全是中文，见 Data_Voice 的已知短板）；
+    // 让日本兵喊中文比不喊更糟。节流在引擎侧（Bark 自带全局 0.55 s / 同类 4.5 s）。
+    const A = this.director && this.director.ctx && this.director.ctx.audio;
+    if (A && this.side === "nra") {
+      A.Bark("hurt", { position: this.position.clone(), seed: this.id | 0 });
+    }
     return false;
   }
 }
@@ -407,6 +419,20 @@ export class AiDirector {
    */
   IssueOrder(orderId, origin, aimPoint, radius = 26) {
     let n = 0;
+    // 下令要**听得见**。原来命令只改数据不出声，玩家按了 Tab 转轮盘松手，
+    // 除了小队开始动之外没有任何反馈 —— 不知道令下没下、下的是哪条。
+    // priority: true —— 玩家自己下的令必须响，不能被一街的喊杀挤掉。
+    const ORDER_LINE = {
+      follow: "rally_follow", advance: "move_go", charge: "rally_charge",
+      hold: "rally_hold", spread: "move_flank", flank: "move_flank",
+      cover: "move_cover", fire: "rally_shoot",
+    };
+    if (this.ctx.audio && ORDER_LINE[orderId]) {
+      this.ctx.audio.Bark("rally", {
+        key: ORDER_LINE[orderId], position: origin ? origin.clone() : null,
+        priority: true, volume: 1.1,
+      });
+    }
     // 绕行要分左右两半，所以先算一条从下令者指向瞄点的法线
     let px = 0, pz = 0;
     if (aimPoint) {
@@ -566,6 +592,12 @@ export class AiDirector {
     }
 
     if (acquired) {
+      // 「发现敌情」只在**从无到有**那一下喊，不是每次 Think 都喊 ——
+      // Think 每 0.1 s 一次，不判这一条的话一个人就能自己把节流闸门吃满，
+      // 场上其他所有口令都再也发不出来了。
+      if (!s.target && this.ctx.audio && s.side === "nra") {
+        this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0 });
+      }
       // 新建一个目标对象而不是把槽位交出去 —— 槽位下一次 Think 就被覆写了
       s.target = { position: acquired.position, isPlayer: acquired.isPlayer, ref: acquired.ref };
       s.targetLostTime = 0;
@@ -606,6 +638,11 @@ export class AiDirector {
       if (s.state !== STATE.RELOAD) {
         s.state = STATE.RELOAD;
         s.reloadTimer = s.weapon.reloadTimeS || 3.2;
+        // 「我换弹！掩护我！」—— 这一声同时是给玩家的战术信息：
+        // 身边那个人接下来三秒不开枪。
+        if (this.ctx.audio && s.side === "nra") {
+          this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0 });
+        }
       }
     } else if (s.target && bestDist < 70) {
       // 近了就压上去打（尤其反攻阶段），远了就找掩体对射
