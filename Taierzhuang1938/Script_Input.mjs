@@ -46,17 +46,21 @@ export const KEYMAP = [
   { code: "Digit4", action: "order:4", mode: "press", context: "orders" },
   { code: "Digit5", action: "order:5", mode: "press", context: "orders" },
   { code: "Digit6", action: "order:6", mode: "press", context: "orders" },
+  { code: "Digit7", action: "order:7", mode: "press", context: "orders" },
+  { code: "Digit8", action: "order:8", mode: "press", context: "orders" },
 
   // --- 动词 -----------------------------------------------------------------
   { code: "KeyR", action: "reload", mode: "press", context: "any" },
   { code: "KeyT", action: "bipod", mode: "press", context: "any" },
   { code: "KeyV", action: "melee", mode: "press", context: "any" },
   { code: "KeyB", action: "bandage", mode: "press", context: "any" },
-  { code: "KeyF", action: "support", mode: "press", context: "any" },
+  // F 是最拥挤的一个键，语义按上下文分流（拾枪拾弹 / 分弹药 / 将来的救人拖人）。
+  // **它不再是"叫炮"** —— 叫炮进了 Tab 轮盘的第 8 格。
+  { code: "KeyF", action: "interact", mode: "press", context: "any" },
   { code: "KeyG", action: "cook:Grenade", mode: "holdAction", context: "any" },
   { code: "KeyH", action: "cook:GrenadeBundle", mode: "holdAction", context: "any" },
-  // Space 这一批只做两件事：从屏息手里腾出来、把浏览器的滚页面挡掉。
-  // 真正的翻越在第 3 批（Script_Player.TryVault），现在按下去只是空转一次动作名。
+  // Space = 翻越。**不是跳跃**：贴到能翻的东西才响应，空地按下去什么也不发生。
+  // prevent 一定要留着，否则浏览器会把它当成滚页面。
   { code: "Space", action: "vault", mode: "press", context: "any", prevent: true },
 ];
 

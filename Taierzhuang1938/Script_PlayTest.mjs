@@ -840,6 +840,347 @@ Check("每个占领点都能从全城大部分地方走到（导航场连通）"
   `最差 ${navStats.worst}%；` + navStats.rows.map((r) => `${r.id} ${r.pct}%`).join(" "));
 
 
+// ===========================================================================
+// 13) ER2 对齐第 3 批：翻越 / 上墙 / 下水软墙 / 拾枪拾弹 / 径向轮盘 / 姿态传染
+//
+// 这一批加的是**动词**，而动词最容易做成"按下去有动画但世界没变"。所以每一条都
+// 从运行时状态取证：翻越要看人真的到了墙的另一面，上墙要看脚下高程真的到了 4 m，
+// 下水要拿同一秒的位移跟岸上对照，捡枪要看槽位里的枪 id 真的换了，
+// 轮盘要走真的键盘事件与真的 mousemove 事件，潜行要看受令者的姿态跟着班长变。
+// ===========================================================================
+Stage("13 第 3 批：翻越 / 上墙 / 下水 / 拾取 / 轮盘 / 潜行");
+await Boot(0, "small");
+
+// 13.1 马道：从坡脚一路走到墙顶（4 m），中途不许被卡住
+const ramp = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const bf = T.battlefield;
+  // 北墙 x = -120 那条马道。台阶是十级独立碰撞盒，取 z 最大的那一级做坡脚
+  const steps = bf.colliders.filter((b) => b.tag === "ramp" && b.min[0] > -122 && b.max[0] < -118);
+  if (!steps.length) return { none: true };
+  const foot = steps.reduce((a, b) => (a.max[2] > b.max[2] ? a : b));
+  const startZ = foot.max[2] + 1.2;
+  T.player.Spawn(-120, startZ, 0);          // yaw = 0 时 forward = (0,-1)，正对着墙
+  const y0 = T.player.position.y;
+  const idle = { forward: 1, strafe: 0, sprint: false, ads: false, lean: 0,
+    lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 };
+  let peak = -99;
+  const track = [];
+  for (let i = 0; i < 360; i += 1) {
+    T.player.Update(1 / 60, idle, null);
+    if (T.player.position.y > peak) peak = T.player.position.y;
+    if (i % 60 === 0) track.push(`${T.player.position.z.toFixed(0)}@${T.player.position.y.toFixed(2)}`);
+  }
+  return { steps: steps.length, y0: +y0.toFixed(2), peak: +peak.toFixed(2), track };
+});
+Check("马道是能走上去的台阶：玩家从坡脚走到墙顶（4 m）",
+  !ramp.none && ramp.steps >= 8 && ramp.y0 < 0.5 && ramp.peak > 3.8,
+  ramp.none ? "没找到马道台阶"
+    : `${ramp.steps} 级台阶，${ramp.y0} m -> 最高 ${ramp.peak} m；轨迹 ${ramp.track.join(" ")}`);
+
+// 13.2 翻越：真的翻到墙的另一面去了。
+// 一次成功可能是运气，所以扫四十堵真墙统计成功率。
+const vault = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const bf = T.battlefield;
+  const cands = [];
+  for (const b of bf.colliders) {
+    const w = b.max[0] - b.min[0], d = b.max[2] - b.min[2];
+    const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
+    const h = b.max[1] - bf.GroundHeight(cx, cz);
+    if (h < 1.0 || h > 2.2) continue;                 // 院墙那一档（自动抬腿到不了）
+    const thinX = w < 0.6 && d > 2, thinZ = d < 0.6 && w > 2;
+    if (!thinX && !thinZ) continue;
+    cands.push({ cx, cz, thinX, h, tag: b.tag });
+  }
+  const tries = [];
+  for (const c of cands.slice(0, 40)) {
+    const nx = c.thinX ? 1 : 0, nz = c.thinX ? 0 : 1;
+    T.player.Spawn(c.cx - nx * 0.75, c.cz - nz * 0.75, 0);
+    T.player.yaw = Math.atan2(-nx, -nz);              // 正对着墙
+    const before = D.Vault().count;
+    D.Key("Space");                                    // 走完整条键位链路，不直接调 TryVault
+    T.StepFrames(80);
+    const v = D.Vault();
+    // 起跳前在墙的负侧，落地必须在正侧 —— 这是"真的过去了"唯一算数的证据
+    const crossed = (v.x - c.cx) * nx + (v.z - c.cz) * nz;
+    tries.push({ tag: c.tag, h: +c.h.toFixed(2), fired: v.count > before, crossed: +crossed.toFixed(2) });
+  }
+  // 空地上按 Space 必须什么也不发生（这不是跳跃键）
+  T.player.Spawn(0, 60, 0);
+  for (let k = 0; k < 40 && !T.player.Alive; k += 1) T.StepFrames(60);
+  const openBefore = D.Vault().count;
+  D.Key("Space"); T.StepFrames(20);
+  return {
+    tried: tries.length, good: tries.filter((t) => t.fired && t.crossed > 0.2).length,
+    sample: tries.filter((t) => t.fired && t.crossed > 0.2).slice(0, 2),
+    openGround: D.Vault().count - openBefore,
+  };
+});
+Check("翻越：对着院墙按 Space 真的翻到墙那一面（四十堵墙的成功率）",
+  vault.good >= vault.tried * 0.6 && vault.tried >= 20,
+  `${vault.good}/${vault.tried} 堵翻过去了，例：`
+  + vault.sample.map((t) => `${t.tag} 高 ${t.h} m 越过 ${t.crossed} m`).join(" / "));
+Check("空地按 Space 什么也不发生（Space 不是跳跃键）", vault.openGround === 0,
+  `空地上翻越计数 +${vault.openGround}`);
+
+// 13.3 翻越途中不许开火
+const vaultFire = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const bf = T.battlefield;
+  // 不能拿"第一堵符合条件的墙"就开测：四十堵里有三堵因为墙那边没地方落脚翻不过去
+  // （那是对的行为），碰上那种就变成在测"没起跳时能不能开枪"。所以找到**真的起跳了**
+  // 的那一堵为止。
+  const cands = bf.colliders.filter((c) => {
+    const w = c.max[0] - c.min[0], d = c.max[2] - c.min[2];
+    const h = c.max[1] - bf.GroundHeight((c.min[0] + c.max[0]) / 2, (c.min[2] + c.max[2]) / 2);
+    return h > 1.2 && h < 2.2 && ((w < 0.6 && d > 2) || (d < 0.6 && w > 2));
+  });
+  let busy = false, tried = 0;
+  for (const b of cands.slice(0, 25)) {
+    const thinX = (b.max[0] - b.min[0]) < 0.6;
+    const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
+    const nx = thinX ? 1 : 0, nz = thinX ? 0 : 1;
+    T.player.Spawn(cx - nx * 0.75, cz - nz * 0.75, 0);
+    T.player.yaw = Math.atan2(-nx, -nz);
+    tried += 1;
+    D.Key("Space");
+    T.StepFrames(4);
+    busy = D.Vault().active;
+    if (busy) break;
+  }
+  if (!busy) return { none: true, tried };
+  T.state.ammo = 5;
+  const ammo0 = T.state.ammo;
+  D.Fire();                                   // 半空中扣扳机
+  const ammo1 = T.state.ammo;
+  T.StepFrames(90);                           // 落地之后再来一发，证明只是被翻越挡住
+  T.state.ammo = 5;
+  const ammo2 = T.state.ammo;
+  D.Fire();
+  return { busy, tried, ammo0, ammo1, landed: !D.Vault().active, ammo2, ammo3: T.state.ammo };
+});
+Check("翻越途中打不出枪，落地就能打",
+  !vaultFire.none && vaultFire.busy && vaultFire.ammo1 === vaultFire.ammo0
+  && vaultFire.landed && vaultFire.ammo3 < vaultFire.ammo2,
+  vaultFire.none ? "没找到可翻的墙"
+    : `半空 ${vaultFire.ammo0}->${vaultFire.ammo1}，落地 ${vaultFire.ammo2}->${vaultFire.ammo3}`);
+
+// 13.4 运河软墙：慢四倍、打不了枪；浮桥上不算下水
+const water = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const canalZ = 232 - 23 + 12;                 // 河心偏北岸一点
+  const idle = (f) => ({ forward: f, strafe: 0, sprint: false, ads: false, lean: 0,
+    lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 });
+  T.player.Spawn(90, canalZ, 0);
+  T.player.health = 100;
+  T.player.Update(1 / 60, idle(0), null);
+  const w = D.Water();
+  const p0 = { x: T.player.position.x, z: T.player.position.z };
+  for (let i = 0; i < 60; i += 1) T.player.Update(1 / 60, idle(1), null);
+  const wet = Math.hypot(T.player.position.x - p0.x, T.player.position.z - p0.z);
+  T.state.ammo = 5;
+  const ammo0 = T.state.ammo;
+  D.Fire();
+  const ammo1 = T.state.ammo;
+  // 对照组：同样一秒的岸上位移
+  T.player.Spawn(90, 150, 0);
+  const p1 = { x: T.player.position.x, z: T.player.position.z };
+  for (let i = 0; i < 60; i += 1) T.player.Update(1 / 60, idle(1), null);
+  const dry = Math.hypot(T.player.position.x - p1.x, T.player.position.z - p1.z);
+  // 浮桥面：全城唯一的退路，走桥不算下水
+  const deck = T.battlefield.WaterDepth(-30, 222, T.battlefield.GroundHeight(-30, 222));
+  return { depth: +w.depth.toFixed(2), inWater: w.inWater, wet: +wet.toFixed(2),
+    dry: +dry.toFixed(2), ammo0, ammo1, deck };
+});
+Check("下运河：速度掉到岸上的四分之一上下，且开不了枪",
+  water.inWater && water.depth > 0.35 && water.wet < water.dry * 0.35
+  && water.ammo1 === water.ammo0,
+  `淹 ${water.depth} m，一秒走 ${water.wet} m（岸上 ${water.dry} m），弹药 ${water.ammo0}->${water.ammo1}`);
+Check("浮桥面上不算下水（全城唯一的退路不能被自己的规则堵死）",
+  water.deck === 0, `桥面淹没深度 ${water.deck}`);
+
+// 13.5 F 拾枪：从尸体上捡三八式，且缴获日械没有备弹
+const pickup = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  T.state.spawnAccumulator = -1e6;
+  for (const s2 of T.ai.soldiers) {
+    if (s2.side === "ija") s2.position.set(s2.position.x + 400, s2.position.y, s2.position.z + 400);
+  }
+  for (let k = 0; k < 8 && !T.player.Alive; k += 1) T.StepFrames(200);
+  T.player.health = 100;
+  const victim = T.ai.soldiers.find((s2) => s2.alive && s2.side === "ija");
+  if (!victim) return { none: true };
+  victim.weaponId = "Type38";
+  victim.position.set(T.player.position.x + 1.0, T.player.position.y, T.player.position.z);
+  victim.Kill();
+  T.StepFrames(2);
+  const before = D.Interact();
+  D.Key("KeyF");                       // 走键位表，不直接调 interact.Perform
+  T.StepFrames(4);
+  const after = D.Interact();
+  return { before, after, ammo: D.Ammo(), slots: D.Slots() };
+});
+Check("按 F 能从尸体上捡起那支枪（槽位与手上的枪都换了）",
+  !pickup.none && pickup.before.kind === "pickup" && pickup.after.pickups === 1
+  && pickup.after.weapon === "Type38" && pickup.slots.slots.primary === "Type38",
+  pickup.none ? "场上没有日军"
+    : `${pickup.before.label} -> 手上是 ${pickup.after.weapon}，1 号槽 ${pickup.slots.slots.primary}`);
+Check("缴获日械只有枪里那五发（六五口径我们没有补给）",
+  !pickup.none && pickup.ammo.ammo === 5 && pickup.ammo.clips === 0,
+  `ammo=${pickup.ammo.ammo} 桥夹=${pickup.ammo.clips}`);
+
+// 13.6 F 分弹药给打光了的弟兄
+const handout = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const mate = T.ai.soldiers.find((s2) => s2.alive && s2.side === "nra");
+  if (!mate) return { none: true };
+  // 让尸体那条分支让开：把刚才那具尸体挪远
+  for (const s2 of T.ai.soldiers) {
+    if (!s2.alive) s2.position.set(s2.position.x + 300, s2.position.y, s2.position.z + 300);
+  }
+  mate.position.set(T.player.position.x + 1.2, T.player.position.y, T.player.position.z);
+  mate.ammo = 0;
+  T.state.clips = 4;
+  const before = D.Interact();
+  const clips0 = T.state.clips;
+  D.Key("KeyF");
+  T.StepFrames(2);
+  return { before, after: D.Interact(), clips0, clips1: T.state.clips, mateAmmo: mate.ammo };
+});
+Check("按 F 能把一个桥夹分给弹尽的弟兄（自己少一个，他满上）",
+  !handout.none && handout.before.kind === "ammo" && handout.after.handouts === 1
+  && handout.clips1 === handout.clips0 - 1 && handout.mateAmmo > 0,
+  handout.none ? "身边没有弟兄"
+    : `桥夹 ${handout.clips0}->${handout.clips1}，他的弹仓 0->${handout.mateAmmo}`);
+
+// 13.7 Tab 径向轮盘：按住出盘、推鼠标指格、松手下令。
+// 键走 KEYMAP，鼠标走真的 mousemove 事件 —— 指针锁下拿不到 clientX/Y 但 movementX/Y 照常送达，
+// 所以轮盘只认位移增量，这一条正是它能在指针锁里工作的原因。
+const wheelRun = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const Move = (dx, dy) => document.dispatchEvent(
+    new MouseEvent("mousemove", { movementX: dx, movementY: dy, bubbles: true }));
+  D.Key("Tab", true);
+  const opened = D.Orders();
+  Move(0, -90);                       // 正上方 = 第 1 格
+  const up = D.Orders();
+  Move(0, 180);                       // 推到正下方 = 另一格
+  const down = D.Orders();
+  D.Key("Tab", false);                // 松手：把指着的那一格下出去
+  const after = D.Orders();
+  return { opened, up, down, after };
+});
+Check("按住 Tab 出径向轮盘，推鼠标能指到不同的格",
+  wheelRun.opened.open && wheelRun.opened.index === -1
+  && wheelRun.up.index === 0 && wheelRun.down.index !== wheelRun.up.index,
+  `打开时 index=${wheelRun.opened.index}，上=${wheelRun.up.label}，下=${wheelRun.down.label}`);
+Check("松开 Tab 把指着的那条命令真的下出去了",
+  !wheelRun.after.open && wheelRun.after.order === wheelRun.down.label,
+  `当前命令：${wheelRun.after.order}（松手时指着 ${wheelRun.down.label}）`);
+
+// 13.8 F 不再是叫炮：叫炮进了轮盘第 8 格
+const mortar = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const Move = (dx, dy) => document.dispatchEvent(
+    new MouseEvent("mousemove", { movementX: dx, movementY: dy, bubbles: true }));
+  for (let k = 0; k < 8 && !T.player.Alive; k += 1) T.StepFrames(200);
+  T.player.health = 100;
+  const left0 = T.combat.MortarLeft;
+  D.Key("KeyF"); T.StepFrames(2);
+  const afterF = T.combat.MortarLeft;
+  // 轮盘第 8 格「要炮」：数字键直选是轮盘的兜底通道，一样走 KEYMAP
+  D.Key("Tab", true);
+  Move(0, -90);
+  D.Key("Digit8");
+  T.StepFrames(2);
+  const afterWheel = T.combat.MortarLeft;
+  D.Key("Tab", false);
+  T.StepFrames(2);
+  return { left0, afterF, afterWheel, afterRelease: T.combat.MortarLeft };
+});
+Check("F 不再是叫炮（迫击炮挪进 Tab 轮盘的「要炮」格）",
+  mortar.afterF === mortar.left0 && mortar.afterWheel === mortar.left0 - 1
+  && mortar.afterRelease === mortar.afterWheel,
+  `按 F 剩 ${mortar.afterF} 发（原 ${mortar.left0}），轮盘要炮后剩 ${mortar.afterWheel}`);
+
+// 13.9 姿态传染（Covert Movements）：跟着班长的姿态走，而且不开枪
+const covert = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const near = T.ai.soldiers.filter((s2) => s2.alive && s2.side === "nra").slice(0, 5);
+  if (near.length < 3) return { none: true };
+  for (const s2 of near) {
+    s2.position.copy(T.player.position);
+    s2.holdZone = null; s2.stance = 0; s2.order = "advance";
+  }
+  T.player.stance = "prone";
+  const n = T.ai.IssueOrder("covert", T.player.position, null);
+  T.StepFrames(240);                         // 4 s，Think 每 0.1 s 轮到一次
+  const prone = near.filter((s2) => s2.stance === 2).length;
+  const t = T.ai.time;
+  const fired = near.filter((s2) => t - s2.lastFire < 4).length;
+  // 班长站起来，全班跟着站起来 —— 这才叫传染，不是"一次性趴下"
+  T.player.stance = "stand";
+  T.StepFrames(240);
+  const stood = near.filter((s2) => s2.stance === 0).length;
+  return { n, prone, stood, fired, count: near.length };
+});
+Check("潜行：全班跟着班长的姿态（趴下/起立都跟）",
+  !covert.none && covert.prone === covert.count && covert.stood === covert.count,
+  covert.none ? "身边人不够"
+    : `受令 ${covert.n} 人；班长趴下时 ${covert.prone}/${covert.count} 卧倒，起立后 ${covert.stood}/${covert.count} 站起`);
+Check("潜行期间受令者一枪不开", !covert.none && covert.fired === 0,
+  `四秒内开过枪的 ${covert.fired}/${covert.count} 人`);
+
+// 13.10 姿态决定被发现的距离：站 120 / 蹲 80 / 卧 45 m
+const sight = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  // 城外空地上摆一对：城里随便哪条 60 m 射线都会撞墙，量到的会是通视不是视距
+  const observer = T.ai.soldiers.find((s2) => s2.alive && s2.side === "nra");
+  const enemy = T.ai.soldiers.find((s2) => s2.alive && s2.side === "ija");
+  if (!observer || !enemy) return { none: true };
+  // 其余日军挪走：留一个人在场上，量到的才是"这一个目标看不看得见"，
+  // 而不是"这一带还有没有别的目标"
+  for (const s2 of T.ai.soldiers) {
+    if (s2.side === "ija" && s2 !== enemy) s2.position.set(s2.position.x + 600, s2.position.y, s2.position.z + 600);
+  }
+  observer.state = "idle";
+  const ox = 0, oz = -215;
+  observer.position.set(ox, T.battlefield.GroundHeight(ox, oz), oz);
+  observer.stance = 0;
+  const Probe = (stance, gap) => {
+    enemy.position.set(ox + gap, T.battlefield.GroundHeight(ox + gap, oz), oz);
+    enemy.stance = stance;
+    observer.target = null;
+    observer.targetLostTime = 99;
+    for (const e of observer.losCache) { e.id = 0; e.time = -99; }
+    T.ai.Think(observer, 3, T.player);
+    return !!observer.target;
+  };
+  return {
+    standAt60: Probe(0, 60), proneAt60: Probe(2, 60),
+    proneAt30: Probe(2, 30), standAt110: Probe(0, 110),
+  };
+});
+Check("姿态决定被发现的距离：60 m 上站着的看得见、趴着的看不见，30 m 上趴着的照样看得见",
+  !sight.none && sight.standAt60 && !sight.proneAt60 && sight.proneAt30,
+  sight.none ? "场上人不够"
+    : `站@60=${sight.standAt60} 卧@60=${sight.proneAt60} 卧@30=${sight.proneAt30} 站@110=${sight.standAt110}`);
+
+// 13.11 AI 也会翻墙：不给它开这一条，玩家翻墙抄后路就是单方面作弊
+Stage("13.11 AI 翻越（一分钟）");
+await Boot(2, "medium");
+const aiVault = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const v0 = T.ai.vaultCount;
+  T.StepFrames(60 * 60, 1 / 60, false);
+  return { v0, v1: T.ai.vaultCount, alive: T.ai.aliveCount };
+});
+Check("AI 一分钟里真的翻过墙（这个动词不是玩家专属）",
+  aiVault.v1 - aiVault.v0 > 0,
+  `六十秒翻了 ${aiVault.v1 - aiVault.v0} 次（活人 ${aiVault.alive}）`);
+
+
 await browser.close();
 server.close();
 

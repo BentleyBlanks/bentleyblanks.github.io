@@ -198,14 +198,26 @@ export const SCALE_PRESETS = {
   large: { label: "大（110 人）", maxAlive: 110, vfxBudget: 4200, shadow: 4096, warn: "需要较好的设备" },
 };
 
-/** 玩家能下的命令。按住 Tab 出径向菜单（纯 DOM，零 3D 开销）。 */
+/**
+ * 玩家能下的命令。按住 Tab 出**径向轮盘**（Script_Wheel，纯 Canvas 2D，零 3D 开销），
+ * 推鼠标指方向、松手下令；轮盘打开期间按 Digit1-8 直选，作为兜底与可访问性通道。
+ *
+ * 八条对齐 ER2 的十二条指令表里我们够得着的那些。key 字段既是数字键，
+ * 也是轮盘上那一格右下角印的数字 —— 两者必须是同一个数，别各写一份。
+ */
 export const ORDERS = [
-  { id: "follow", key: "1", label: "跟我来", hint: "弟兄们跟在你身后，不主动脱离" },
-  { id: "advance", key: "2", label: "向前", hint: "向你瞄的方向逐段跃进，用掩体" },
+  { id: "follow", key: "1", label: "跟我来", hint: "跟在你身后，不主动脱离" },
+  { id: "advance", key: "2", label: "向前", hint: "向你瞄的方向逐段跃进" },
   { id: "hold", key: "3", label: "固守", hint: "就地找掩体，不再前进" },
-  { id: "spread", key: "4", label: "散开", hint: "拉开间距 —— 挨掷弹筒的时候这条能救命" },
-  { id: "flank", key: "5", label: "绕过去", hint: "从侧面兜过去，别从正面顶" },
-  { id: "charge", key: "6", label: "上刺刀", hint: "白刃冲锋。这是最后一手，不是第一手" },
+  { id: "spread", key: "4", label: "散开", hint: "拉开间距，防掷弹筒" },
+  { id: "flank", key: "5", label: "绕过去", hint: "从侧面兜过去，别正面顶" },
+  { id: "charge", key: "6", label: "上刺刀", hint: "白刃冲锋，最后一手" },
+  // 潜行 = ER2 的 Covert Movements：全班照班长的姿态走，而且不开枪。
+  // 你趴他们也趴 —— 加上"卧倒的人四十五米外看不见"，夜袭那一关才真的是夜袭。
+  { id: "covert", key: "7", label: "潜行", hint: "照你的姿态走，不许开枪" },
+  // 要炮不走 IssueOrder（那是给弟兄下令的通道），装配层单独分流到 CallMortar。
+  // F 键腾给通用交互之后，这是叫炮唯一的入口。
+  { id: "callFire", key: "8", label: "要炮", hint: "往你瞄的地方打一发迫击炮" },
 ];
 
 /**

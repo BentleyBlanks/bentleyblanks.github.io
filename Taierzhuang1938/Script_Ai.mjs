@@ -18,7 +18,17 @@ import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
   SUPPRESSED: "suppressed", RELOAD: "reload", DEAD: "dead", CHARGE: "charge",
+  VAULT: "vault",
 };
+
+/**
+ * 被发现的距离，按**目标自己的姿态**缩放：站 120 / 蹲 80 / 卧 45 m。
+ *
+ * 这是 ER2 的 Covert Movements 那条机制里最便宜也最值钱的一半：姿态第一次真的
+ * 影响"会不会被打"。原来两边一律 120 m 一刀切，趴下除了走得慢没有任何收益，
+ * 于是玩家（和 AI）永远没有理由卧倒。
+ */
+const SIGHT_BY_STANCE = [120, 80, 45];
 
 let nextId = 1;
 
@@ -117,6 +127,18 @@ export class Soldier {
     this.meleeTimer = 0;
     this.chargeUntil = -99;      // 玩家下"上刺刀"之后这道命令的有效期
     this.flankUntil = -99;       // 绕行命令的有效期，到点或超时就转 advance
+    this.covertUntil = -99;      // 潜行命令的有效期：跟班长同姿态且不开枪
+    // 翻越。院墙 2 m、窗台 0.9 m，而 Blocked() 的自动抬腿只到 0.56 m ——
+    // 不给 AI 开这一条的话，玩家翻墙抄到院子里，追他的人只能绕门洞，
+    // 这个动词就变成了单方面的作弊。
+    this.vaultT = -1;            // >= 0 表示正在翻
+    this.vaultDuration = 0.5;
+    this.vaultFrom = null;
+    this.vaultTo = null;
+    this.vaultApex = 0;
+    // 尸体上的家当。ER2 的拾取靠它，L4_LastFiveMinutes 那句"子弹得从倒下的人身上取"
+    // 以前是一条死注释 —— 死人身上什么都没有。
+    this.drop = null;
     // 过热。十一年式不能换枪管，约 200 发必须冷却 —— 这是日军机枪火力
     // 有节奏间隙的史实来源，也是玩家冲过街口的战术窗口。
     this.heat = 0;
@@ -141,6 +163,15 @@ export class Soldier {
     this.state = STATE.DEAD;
     this.health = 0;
     this.deadTime = 0;
+    this.vaultT = -1;
+    // 倒下的人身上留下枪和还没打完的桥夹。
+    // 缴获的日械**不给备弹**：六五口径我们自己没有补给线，捡了三八式就只有
+    // 枪里那五发。这既是史实，也正好是"捡枪"不至于破坏弹药经济的天然闸门。
+    this.drop = {
+      weaponId: this.weaponId,
+      clips: this.side === "ija" ? 0 : Math.floor(this.rnd() * 3),
+      taken: false,
+    };
     if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1));
     // 阵亡事件从这里出，是**唯一**的一条路。
     // 以前扣票分散在三处（Combat.Blast 的 onKill、Main.TryFire、Main.DoMelee），
@@ -199,6 +230,7 @@ export class AiDirector {
     this.tmpD = new THREE.Vector3();
     this.navOut = { x: 0, z: 0 };   // 导航场给出来的那一步方向
     this.fireCount = 0;                       // 全场 AI 开火累计，通关冒烟靠它取证
+    this.vaultCount = 0;                      // 全场 AI 翻越累计，同上
     this.deaths = { nra: 0, ija: 0 };
     this.frontObjective = { nra: null, ija: null };
     // 每一侧的兵力重心。补兵落点要靠它判断"哪一侧是自己人的后方" ——
@@ -394,6 +426,14 @@ export class AiDirector {
         s.goal.set(aimPoint.x + px * 25 * side, 0, aimPoint.z + pz * 25 * side);
         s.flankUntil = this.time + 30;
         s.holdZone = null;         // 绕行本身就是要出区，不出去就不叫绕
+      } else if (orderId === "covert") {
+        // 姿态传染（ER2 的 Covert Movements）：全班照班长的姿态走，而且不开枪。
+        // P4 夜袭阶段（白毛巾缠上、大刀背身后）几乎是为这条机制生的 ——
+        // 在它落地之前，那一关除了换天光与换携行之外，玩法上跟白天没有任何区别。
+        s.covertUntil = this.time + 60;
+        s.holdZone = null;
+        s.target = null;
+        s.goal.copy(origin);
       } else if (orderId === "charge") {
         // 白刃冲锋**例外地覆盖守点纪律**：防守时不许离开占领区是对的，
         // 但上刺刀是主动出击，那一刻就是要冲出去。有效期 18 秒，之后归队。
@@ -476,6 +516,8 @@ export class AiDirector {
   // ---------------------------------------------------------------- 决策
   Think(s, dt, player) {
     s.suppression = Math.max(0, s.suppression - COMBAT.suppressDecayPerS * dt);
+    // 翻墙翻到一半不做决策：状态机会立刻把 VAULT 打回 advance，人卡在墙头上
+    if (s.state === STATE.VAULT) return;
 
     // 找目标：取最近的**三个**敌人，逐个试通视。
     // 只试最近那一个的后果是实跑出来的：一堵院墙就能让整条战线永远没有目标 ——
@@ -483,15 +525,19 @@ export class AiDirector {
     const enemySide = s.side === "nra" ? "ija" : "nra";
     const slots = this.nearSlots;
     for (const slot of slots) { slot.dist = 1e9; slot.ref = null; slot.position = null; }
+    // 距离门槛按**目标的姿态**缩放：站着的人一百二十米外就看得见，趴下的四十五米。
+    // 这是姿态第一次真的影响"会不会被打"，也是潜行命令能成立的前提。
     if (enemySide === "nra" && player && player.Alive) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
-      if (d < 120) this._PushNear(d, player, true, -1, st, player.position);
+      if (d < SIGHT_BY_STANCE[st]) this._PushNear(d, player, true, -1, st, player.position);
     }
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
       const d = s.position.distanceTo(other.position);
-      if (d < 120) this._PushNear(d, other, false, other.id, other.stance, other.position);
+      if (d < (SIGHT_BY_STANCE[other.stance] ?? 120)) {
+        this._PushNear(d, other, false, other.id, other.stance, other.position);
+      }
     }
 
     let acquired = null, bestDist = 1e9;
@@ -551,6 +597,19 @@ export class AiDirector {
     } else {
       s.state = STATE.ADVANCE;
       s.stance = s.suppression > 0.3 ? 1 : 0;
+    }
+
+    // 潜行：跟着班长（玩家）的姿态走，跟着他的位置走，而且**不开枪**。
+    // 必须压在状态机后面 —— 上面那段刚按"看不看得见敌人"重设过 stance。
+    if (s.order === "covert") {
+      if (this.time > s.covertUntil) {
+        s.order = "advance";
+      } else if (player) {
+        s.stance = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
+        s.state = s.state === STATE.RELOAD ? STATE.RELOAD : STATE.ADVANCE;
+        s.goal.set(player.position.x + s.laneOffset * 0.5, 0, player.position.z + s.laneOffset * 0.35);
+        this.ClampInside(s.goal);
+      }
     }
 
     // 命令有效期。绕行到位（或超时）转 advance；冲锋打完 18 秒归队 ——
@@ -637,6 +696,9 @@ export class AiDirector {
     const bf = this.ctx.battlefield;
     let desired = null;
     let speed = 0;
+
+    // 翻越途中接管整帧：走位移曲线，不做别的。
+    if (s.state === STATE.VAULT) { this.StepVault(s, dt); return; }
 
     // 冷却结束就把枪口那根白烟拆掉。**这一句必须在 Act 里**，不能只写在 TryFire 里：
     // TryFire 只在 FIRE/SUPPRESSED/CHARGE 三个状态下被调用，机枪手一旦转进 ADVANCE
@@ -760,6 +822,9 @@ export class AiDirector {
         const moved = Math.hypot(s.position.x - beforeX, s.position.z - beforeZ);
         if (moved < step * 0.4) {
           s.stuckTime += dt;
+          // 挡在前面的要是一堵翻得过去的墙，就翻过去 —— 别沿着院墙兜半圈找门洞。
+          // 门槛比"卡住就绕"的 0.8 s 早一点：能翻就不该先绕。
+          if (s.stuckTime > 0.3 && this.TryVault(s, nx, nz)) return;
           // 绕着还是不动就**翻到另一面**再绕。这一条不能写成"只有不在绕行时才重掷"：
           // 那样一旦直奔方向与拐 99° 的方向同时被挡就是死锁，实跑量到位置整整
           // 两百四十秒一帧都不动。翻面 + 每次重掷都带一点抖动才出得来。
@@ -788,7 +853,9 @@ export class AiDirector {
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
       s.yaw = Math.atan2(-dx, -dz);
     }
-    s.position.y = bf.GroundHeight(s.position.x, s.position.z);
+    // 站立面而不是地皮：马道那八级台阶、墙顶、翻过去落在台面上，都要靠它。
+    // 以前一律贴 GroundHeight，于是马道修好了 AI 也上不去 —— 人从台阶里穿过去。
+    s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
 
     if (s.actor) {
       s.actor.root.position.copy(s.position);
@@ -801,6 +868,73 @@ export class AiDirector {
         firing: this.time - s.lastFire < 0.12,
         elapsed: this.time,
         lookYaw: 0, lookPitch: 0,
+      });
+    }
+  }
+
+  /**
+   * AI 侧的翻越。玩家能翻墙进院，追他的人只能绕门洞的话，这个动词就是单方面作弊。
+   *
+   * 判据跟玩家那份一致：正前方顶面在 0.6—2.25 m 之间、落点站得下。
+   * 不同的是 AI 不做物理，所以位移曲线直接改 position，落地高度问 StandHeight。
+   *
+   * @param {number} nx,nz 当前想走的方向（已归一化）
+   */
+  TryVault(s, nx, nz) {
+    if (s.stance === 2) return false;             // 趴着的人先站起来再说
+    const bf = this.ctx.battlefield;
+    const feet = s.position.y;
+    const probeX = s.position.x + nx * 0.7;
+    const probeZ = s.position.z + nz * 0.7;
+    let top = -Infinity;
+    for (const b of bf.NearbyColliders(probeX, probeZ, 1.0)) {
+      if (probeX < b.min[0] - 0.35 || probeX > b.max[0] + 0.35) continue;
+      if (probeZ < b.min[2] - 0.35 || probeZ > b.max[2] + 0.35) continue;
+      const rel = b.max[1] - feet;
+      if (rel < 0.56 || rel > 2.25) continue;
+      if (b.min[1] > feet + 1.0) continue;
+      if (b.max[1] > top) top = b.max[1];
+    }
+    if (!Number.isFinite(top)) return false;
+    const landX = s.position.x + nx * 1.7;
+    const landZ = s.position.z + nz * 1.7;
+    const landY = bf.StandHeight(landX, landZ, top);
+    if (landY > top + 0.05) return false;
+    if (this.Blocked(landX, landZ, landY)) return false;
+    s.state = STATE.VAULT;
+    s.vaultT = 0;
+    s.vaultDuration = 0.55 + Math.max(0, top - feet - 0.56) * 0.16;
+    s.vaultFrom = { x: s.position.x, y: feet, z: s.position.z };
+    s.vaultTo = { x: landX, y: landY, z: landZ };
+    s.vaultApex = top + 0.3;
+    s.stuckTime = 0;
+    s.detourTime = 0;
+    this.vaultCount += 1;
+    return true;
+  }
+
+  /** 翻越途中的一帧。走完就落回 ADVANCE，由下一次 Think 重新决策。 */
+  StepVault(s, dt) {
+    s.vaultT += dt;
+    const k = Clamp01(s.vaultT / s.vaultDuration);
+    const from = s.vaultFrom, to = s.vaultTo;
+    s.position.x = from.x + (to.x - from.x) * k;
+    s.position.z = from.z + (to.z - from.z) * k;
+    const base = from.y + (to.y - from.y) * k;
+    s.position.y = base + Math.max(0, s.vaultApex - Math.max(from.y, to.y)) * Math.sin(Math.PI * k);
+    s.moveSpeed = 1;
+    s.yaw = Math.atan2(-(to.x - from.x), -(to.z - from.z));
+    if (k >= 1) {
+      s.vaultT = -1;
+      s.state = STATE.ADVANCE;
+      s.position.x = to.x; s.position.y = to.y; s.position.z = to.z;
+    }
+    if (s.actor) {
+      s.actor.root.position.copy(s.position);
+      s.actor.root.rotation.y = s.yaw;
+      s.actor.Update(dt, {
+        moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
+        elapsed: this.time, lookYaw: 0, lookPitch: 0,
       });
     }
   }
@@ -841,6 +975,8 @@ export class AiDirector {
 
   TryFire(s, dt, player) {
     s.fireTimer -= dt;
+    // 潜行的班不许开枪 —— 这是那道命令的全部代价，也是它区别于"跟我来"的地方
+    if (s.order === "covert" && this.time < s.covertUntil) return;
     // 过热：Type11.overheatShots = 200 / coolDownS = 8.0 以前是死字段。
     // 冷却期间枪口冒白烟并且**真的打不出去** —— 这就是玩家冲过街口的那个窗口。
     if (this.time < s.coolUntil) return;

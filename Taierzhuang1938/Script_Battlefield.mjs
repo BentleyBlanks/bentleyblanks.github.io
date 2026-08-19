@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp01, Clamp } from "./Script_Noise.mjs";
 import { WORLD, TOWN, OBJECTIVES } from "./Data_Battle.mjs";
 import {
-  BuildSink, AddCompound, AddRampart, AddMosque, AddGatehouse, AddBarricade,
+  BuildSink, AddCompound, AddRampart, AddRampWay, AddMosque, AddGatehouse, AddBarricade,
   AddTree, AddPole, AddWell, AddWall,
 } from "./Script_World.mjs";
 import {
@@ -38,6 +38,54 @@ const LANDMARKS = [
   { id: "Station", x: -160, z: 140, w: 40, d: 24 },
   { id: "WenchangPavilion", x: -110, z: 20, w: 24, d: 22 },
 ];
+
+/**
+ * 运河河槽的下切深度。
+ *
+ * 为什么非有不可：`TOWN.canal` 在数据里躺了很久，运行时**一根几何都没有** ——
+ * 城南那片就是普通旱地。第 3 批要给"下水就慢、就不许开火"这条软墙找个可见的由头，
+ * 而一条看不见的水是 bug 不是规则：玩家会觉得自己莫名其妙走不动。
+ *
+ * 河槽必须**同时**改地面网格与 GroundHeight 那条解析式，所以抽成一个函数两边共用；
+ * 各写一份的下场是水面浮在土坡上，或者人在水里踩着看不见的空气。
+ */
+export function CanalDepth(z) {
+  const half = TOWN.canal.width / 2;
+  const t = Math.abs(z - TOWN.canal.z) / half;
+  if (t >= 1) return 0;
+  // 岸坡不是直上直下：余弦过渡，边上浅、中间 2.2 m 深
+  return 2.2 * (0.5 - 0.5 * Math.cos((1 - t) * Math.PI));
+}
+
+/**
+ * 马道占位。**院子不许盖在马道上。**
+ *
+ * 这一条是实跑逼出来的：马道改成能走的台阶之后，北墙 x=-120 那条仍然上不去 ——
+ * 取证发现一个 21×18 m 的体块房（silhouette，顶面 2.9 m）正压在坡上，
+ * 玩家爬的是那栋房子的屋顶，不是马道。院落是按街网切格铺的，从来没避过马道。
+ * 城墙内侧留出一条上墙的通道，本来也是史实里的样子。
+ */
+function InRampZone(x, z, pad = 13) {
+  for (const r of TOWN.ramparts) {
+    const cos = Math.cos(r.ry), sin = Math.sin(r.ry);
+    for (const at of (r.ramps || [])) {
+      const lz = -(TOWN.wallThickness / 2 + 6);
+      const cx = r.x + cos * at - sin * lz;
+      const cz = r.z - sin * at - cos * lz;
+      // 坡是长条：沿墙方向窄（2.4 m）、往城里长（12 m），按各向不同的余量判
+      const alongX = Math.abs(cos) > 0.5;
+      const hx = (alongX ? 1.2 : 7) + pad;
+      const hz = (alongX ? 7 : 1.2) + pad;
+      if (Math.abs(x - cx) < hx && Math.abs(z - cz) < hz) return true;
+    }
+  }
+  return false;
+}
+
+/** 浮桥的桥面：唯一一条能干着脚过运河的路。 */
+export function OnPontoon(x) {
+  return Math.abs(x - TOWN.pontoon.x) <= TOWN.pontoon.width / 2;
+}
 
 function InLandmark(x, z, pad = 4) {
   for (const l of LANDMARKS) {
@@ -71,6 +119,10 @@ export class Battlefield {
     this.gridSize = 10;
     this.craters = [];
     this.groundMesh = null;
+    this.waterMesh = null;
+    // 河面高程。地面基准面在 0 上下起伏 ±0.8，水面压在 -0.55：
+    // 岸边露滩、河心没顶，正好是"能下水但不该下"的那种深度。
+    this.waterY = -0.55;
     this.objectives = OBJECTIVES.map((o) => ({ ...o, progress: o.owner === "nra" ? 1 : 0, contested: false }));
     this.bounds = { minX: WORLD.minX, maxX: WORLD.maxX, minZ: WORLD.minZ, maxZ: WORLD.maxZ };
     this.spawnPoints = { nra: [], ija: [] };
@@ -89,6 +141,9 @@ export class Battlefield {
 
     yield { label: "开城门", progress: 0.2 };
     this.BuildGates(rnd);
+
+    yield { label: "架浮桥", progress: 0.22 };
+    this.BuildCanal(rnd);
 
     // --- 院落：按街网切格 ---
     const cells = this.PlanCompounds(rnd);
@@ -122,6 +177,7 @@ export class Battlefield {
 
     yield { label: "合批", progress: 0.92 };
     this.meshes = sink.Flush(this.scene, this.library);
+    if (this.waterMesh) this.meshes.push(this.waterMesh);
     this.FlushProps();
     this.colliders = sink.colliders;
     this.covers = sink.covers;
@@ -156,7 +212,8 @@ export class Battlefield {
       const x = position.getX(i), z = position.getZ(i);
       const h = Math.sin(x * 0.021 + 1.3) * 0.24 + Math.cos(z * 0.017 - 0.7) * 0.28
         + Math.sin((x + z) * 0.008) * 0.34;
-      position.setY(i, h);
+      // 运河河槽。GroundHeight 里减的是同一个量 —— 两处必须同源，否则水面会浮在土上
+      position.setY(i, h - CanalDepth(z));
     }
     CarveCraters(geometry, craters);
     this.craters = craters;
@@ -173,7 +230,7 @@ export class Battlefield {
   /** 地面高度：从生成时的解析式反推，不去查网格（查网格每帧几百次太贵）。 */
   GroundHeight(x, z) {
     let h = Math.sin(x * 0.021 + 1.3) * 0.24 + Math.cos(z * 0.017 - 0.7) * 0.28
-      + Math.sin((x + z) * 0.008) * 0.34;
+      + Math.sin((x + z) * 0.008) * 0.34 - CanalDepth(z);
     for (const c of this.craters) {
       const d = Math.hypot(x - c.x, z - c.z);
       if (d > c.radius * 1.7) continue;
@@ -191,19 +248,67 @@ export class Battlefield {
         x: r.x, z: r.z, length: r.length, ry: r.ry,
         height: TOWN.wallHeight, thickness: TOWN.wallThickness,
         seed: `rampart_${r.id}`, breach,
-        ramp: r.ramps && r.ramps.length ? { at: r.ramps[0] } : null,
       });
-      // 其余马道单独补
-      for (let i = 1; i < (r.ramps?.length ?? 0); i += 1) {
-        const at = r.ramps[i];
+      // 马道全部在这里建（AddRampart 自己不建了）。坡脚的地面高程只有这一层查得到，
+      // 而台阶必须照着它砌 —— 北墙内侧的地面在 −0.7 m，按绝对高度砌的话
+      // 第一级相对脚下就有 1.2 m，越过抬腿线，人在坡底顶着上不去。
+      const ramps = r.ramps || [];
+      for (let i = 0; i < ramps.length; i += 1) {
         const cos = Math.cos(r.ry), sin = Math.sin(r.ry);
-        const rz = -(TOWN.wallThickness / 2 + 3.2);
-        const rx2 = r.x + cos * at - sin * rz;
-        const rz2 = r.z - sin * at - cos * rz;
-        this.sink.Add("Ground", PlaceGeometry(
-          MakeBox(3.0, TOWN.wallHeight, 7.0, TILE_METERS.ground, `ramp_${r.id}_${i}`),
-          { x: rx2, y: TOWN.wallHeight / 2 - 0.6, z: rz2, ry: r.ry, rx: Math.atan2(TOWN.wallHeight, 7.0) }));
-        this.sink.Solid(rx2, TOWN.wallHeight / 2 - 0.6, rz2, 1.8, TOWN.wallHeight / 2, 3.8, "ramp");
+        const lz = -(TOWN.wallThickness / 2 + 6);      // 坡身中段
+        const fx = r.x + cos * ramps[i] - sin * lz;
+        const fz = r.z - sin * ramps[i] - cos * lz;
+        AddRampWay(this.sink, {
+          x: r.x, z: r.z, at: ramps[i], ry: r.ry,
+          height: TOWN.wallHeight, thickness: TOWN.wallThickness,
+          baseY: this.GroundHeight(fx, fz), seed: `ramp_${r.id}_${i}`,
+        });
+      }
+    }
+  }
+
+  /**
+   * 大运河与浮桥。
+   *
+   * 玩法上这是一条**软墙**：全城唯一的退路与补给线是那道 5.5 m 宽的浮桥，
+   * 玩家能下水但下了就慢、就打不了枪、就一直掉体力（规则在 Script_Player）。
+   * 这里只负责把它做得看得见 —— 一条看不见的水是 bug 不是规则。
+   *
+   * 河面用一块 Plain 材质的平板（一次 draw call）；河槽的深度由 CanalDepth
+   * 在地面网格上真切下去，所以岸边是浅滩、中间才没顶。
+   */
+  BuildCanal(rnd) {
+    const c = TOWN.canal;
+    const width = c.width + 6;                 // 水面比河槽略宽一点，压住岸线的锯齿
+    const water = MakePlane(WORLD.groundSize, width, 8, 1);
+    const mesh = new THREE.Mesh(water, this.library.Plain("canalWater", {
+      color: 0x3c4a44, roughness: 0.22, metalness: 0.0,
+    }));
+    mesh.position.set(0, this.waterY, c.z);
+    mesh.receiveShadow = true;
+    mesh.name = "CanalWater";
+    this.scene.add(mesh);
+    // 不能推进 this.meshes：合批那一步是 `this.meshes = sink.Flush(...)`，
+    // 整个数组会被换掉，推早了等于把这块面板从 Dispose 名单里漏出去
+    this.waterMesh = mesh;
+
+    // 浮桥：并排的门板搭在木舟上。走上去脚下是干的，所以桥面要有碰撞盒。
+    const deckY = this.waterY + 0.16;
+    const segs = 12;
+    const segLen = (c.width + 4) / segs;
+    for (let i = 0; i < segs; i += 1) {
+      const z = c.z - (c.width + 4) / 2 + segLen * (i + 0.5);
+      this.sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(TOWN.pontoon.width, 0.22, segLen * 0.94, TILE_METERS.wood, `pontoon_${i}`),
+        { x: TOWN.pontoon.x, y: deckY, z }));
+      this.sink.Solid(TOWN.pontoon.x, deckY - 0.6, z, TOWN.pontoon.width / 2, 0.72, segLen / 2, "pontoon");
+      // 两侧的绳栏杆立柱：桥在河面上是一条极窄的亮线，没有立柱看不出它是桥
+      if (i % 3 === 0) {
+        for (const s of [-1, 1]) {
+          this.sink.Add("WoodBeam", PlaceGeometry(
+            MakeBox(0.12, 0.9, 0.12, TILE_METERS.wood, `pontoonPost_${i}${s}`),
+            { x: TOWN.pontoon.x + s * TOWN.pontoon.width / 2, y: deckY + 0.45, z }));
+        }
       }
     }
   }
@@ -255,6 +360,7 @@ export class Battlefield {
             const cx = x0 + c * (cw + ALLEY_W) + cw / 2;
             const cz = z0 + r * (cd + ALLEY_W) + cd / 2;
             if (InLandmark(cx, cz)) continue;
+            if (InRampZone(cx, cz)) continue;          // 别把院子盖在上墙的马道上
             if (Math.abs(cx) > 236 || Math.abs(cz) > 200) continue;
             const damage = DamageAt(cx, cz, rnd);
             cells.push({
@@ -448,6 +554,43 @@ export class Battlefield {
         }
       }
     }
+  }
+
+  /**
+   * 脚下能踩住的最高一层。
+   *
+   * 为什么要有它：AI 以前一律 `position.y = GroundHeight(x, z)`，也就是永远贴着地皮，
+   * 所以马道修好了 AI 也上不去、翻过墙头会瞬间掉回地面。玩家侧是靠碰撞盒解决的，
+   * AI 侧不做物理，只能给一个"站立面"查询。
+   *
+   * 只认顶面**不高过脚 + 0.6 m** 的盒子（能抬腿上去的那一档），所以人不会凭空
+   * 站到屋顶上；马道那八级 0.5 m 的台阶正好一级一级被认出来。
+   * 直接查散列里的那一格，不走 NearbyColliders —— 那个函数每次都新建数组并做
+   * includes 去重，每帧七十个人调一次是白扔的 GC。
+   */
+  StandHeight(x, z, fromY) {
+    let h = this.GroundHeight(x, z);
+    const g = this.gridSize;
+    const list = this.grid.get(Math.floor(x / g) * 100003 + Math.floor(z / g));
+    if (!list) return h;
+    const ceiling = fromY + 0.6;
+    for (const b of list) {
+      if (x < b.min[0] || x > b.max[0] || z < b.min[2] || z > b.max[2]) continue;
+      const top = b.max[1];
+      if (top > ceiling || top <= h) continue;
+      h = top;
+    }
+    return h;
+  }
+
+  /**
+   * 淹没深度（米）。0 = 干的。
+   * 浮桥面上恒为 0 —— 那是全城唯一的退路，走桥就不算下水。
+   */
+  WaterDepth(x, z, y) {
+    if (CanalDepth(z) <= 0) return 0;
+    if (OnPontoon(x)) return 0;
+    return Math.max(0, this.waterY - y);
   }
 
   NearbyColliders(x, z, radius = 3) {

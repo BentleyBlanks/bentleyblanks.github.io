@@ -23,6 +23,8 @@ import { Hud } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
+import { RadialWheel } from "./Script_Wheel.mjs";
+import { InteractSystem } from "./Script_Interact.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { OBJECTIVES, PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, TOWN, COMBAT, DIFFICULTY } from "./Data_Battle.mjs";
 import { HISTORY_NOTES, EPILOGUE_LINES } from "./Data_History.mjs";
@@ -52,7 +54,9 @@ const INSIDE_WALLS = (() => {
   const east = TOWN.ramparts.find((r) => r.id === "east");
   return {
     minZ: (north ? north.z : WORLD.minZ) + margin,
-    maxZ: WORLD.maxZ - 10,
+    // 南边界压到运河北岸再退 6 m：城南那一带现在是真的河槽（见 Battlefield.CanalDepth），
+    // 沿用 WORLD.maxZ - 10 会把守军撒进水里 —— 下水的人走不动也开不了枪，等于白扔一个兵
+    maxZ: Math.min(WORLD.maxZ - 10, TOWN.canal.z - TOWN.canal.width / 2 - 6),
     minX: (west ? west.x : WORLD.minX) + margin,
     maxX: (east ? east.x : WORLD.maxX) - margin,
   };
@@ -156,6 +160,7 @@ const state = {
   mags: { primary: { ammo: 0, clips: 0 }, secondary: { ammo: 0, clips: 0 } },
   loadoutId: null,
   fireMode: "auto",           // 仅捷克式可切（0 键）
+  pickedUp: null,             // 最近一次从尸体上捡到的枪（取证用）
   lastShot: null,             // 最后一发的弹道取证：起点、落点、下坠、枪口视差
 };
 
@@ -168,7 +173,11 @@ let viewmodel = null;
 let actorFactory = null;
 let story = null;
 let combat = null;
+let interact = null;
 let currentWeapon = "HanYang";
+// 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
+// ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
+const wheel = new RadialWheel(hudRoot);
 
 // ---------------------------------------------------------------------------
 // 启动
@@ -227,6 +236,9 @@ async function Boot() {
     colliders: battlefield.colliders,
     NearbyColliders: (x, z, r) => battlefield.NearbyColliders(x, z, r),
     GroundHeight: (x, z) => battlefield.GroundHeight(x, z),
+    // 下水判定。运河不做游泳系统，做一条软墙 —— 规则在 Script_Player，
+    // 地形在 Script_Battlefield，装配层只负责把这条查询接上
+    WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
     bounds: battlefield.bounds,
   }, { seed: 1938 });
 
@@ -253,6 +265,18 @@ async function Boot() {
     battlefield, ai, vfx, audio, lights, player, library, scene, story,
   });
 
+  // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
+  // 所以规则在 Script_Interact，改状态的那三下通过 hooks 交回这里。
+  interact = new InteractSystem({ ai, audio, hud }, {
+    SpareClips: () => state.clips,
+    TakeWeapon: (weaponId, clips) => PickUpWeapon(weaponId, clips),
+    GiveClip: () => {
+      if (state.clips <= 1) return false;
+      state.clips -= 1;
+      return true;
+    },
+  });
+
   await nextFrame();
   setStep("就绪", 1.0);
   EnterPhase(state.phaseIndex, true);
@@ -265,7 +289,7 @@ async function Boot() {
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, battlefield,
     player, ai, vfx, viewmodel, hud, audio, state,
-    story, combat, nav,
+    story, combat, nav, interact, wheel,
     StepFrames, JumpToPhase: EnterPhase,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
@@ -295,6 +319,33 @@ async function Boot() {
       }),
       LastShot: () => (state.lastShot ? { ...state.lastShot } : null),
       Difficulty: () => ({ ...DIFFICULTY }),
+      // --- 第 3 批的取证口 ---
+      // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）
+      Vault: () => ({
+        count: player.vaultCount, active: player.vault.active,
+        y: player.position.y, x: player.position.x, z: player.position.z,
+        aiVaults: ai.vaultCount,
+      }),
+      // 下水：淹了多深、算不算下水。软墙的三条代价（慢/不能开枪/掉体力）都挂在它上面
+      Water: () => ({
+        depth: player.waterDepth, inWater: player.InWater, stamina: player.stamina,
+      }),
+      // 下令轮盘：开着没有、此刻指着第几格、那一格是什么。
+      // **名字不许叫 Wheel** —— 上面那个 Wheel 是"滚一下鼠标滚轮"，
+      // 同名会把它整个盖掉：实跑里表现为滚轮切槽突然失灵，而两处代码都没错。
+      Orders: () => ({
+        open: state.ordersOpen, index: wheel.index, label: wheel.Label,
+        cursor: { x: wheel.cursorX, y: wheel.cursorY }, order: state.order,
+      }),
+      // 交互：够得着什么、捡过几次、分过几次弹
+      Interact: () => {
+        const c = interact.Query(player);
+        return {
+          kind: c ? c.kind : null, label: c ? c.label : null,
+          pickups: interact.pickups, handouts: interact.handouts,
+          pickedUp: state.pickedUp, weapon: currentWeapon,
+        };
+      },
       AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
       // AI 那边的运行时取证口：某个兵此刻的完整状态
       SoldierInfo: (soldier) => ({
@@ -804,15 +855,21 @@ const router = new InputRouter({
       case "bandage":
         if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 });
         return;
-      case "support": CallMortar(); return;
+      case "interact": DoInteract(); return;
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
       case "cycleSlot": CycleSlot(detail.delta); return;
-      // Space 这一批只是被腾出来并挡掉浏览器的滚页面；翻越在第 3 批。
-      case "vault": return;
+      case "vault": DoVault(); return;
       case "orders":
+        // 按住 Tab 出轮盘，松手把指着的那一格下出去。
+        // 松手时 ordersOpen 必须**先**置回 false，否则 mousemove 还认为轮盘开着
         state.ordersOpen = !!detail.down;
         hud.SetOrdersVisible(state.ordersOpen);
+        if (detail.down) wheel.Open(ORDERS);
+        else {
+          const picked = wheel.Close();
+          if (picked) IssueOrderByKey(picked.key);
+        }
         return;
       default: break;
     }
@@ -821,21 +878,35 @@ const router = new InputRouter({
       if (detail.down) BeginCook(action.slice(5)); else ReleaseCook();
       return;
     }
-    if (action.startsWith("order:")) IssueOrderByKey(action.slice(6));
+    if (action.startsWith("order:")) {
+      // 数字键直选：轮盘的兜底通道。选完立刻下令，并把轮盘的指向清掉 ——
+      // 不清的话松开 Tab 会把同一条命令再下一次
+      const key = action.slice(6);
+      wheel.Point(ORDERS.findIndex((o) => o.key === key));
+      IssueOrderByKey(key);
+      wheel.ClearPick();
+    }
   },
 });
 router.Bind(document);
 
 document.addEventListener("mousemove", (e) => {
+  // 轮盘开着的时候鼠标是在选格子，不是在转头。
+  // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
+  // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。
+  if (state.ordersOpen) { wheel.Move(e.movementX, e.movementY); return; }
   if (document.pointerLockElement !== canvas) return;
   input.lookX += e.movementX;
   input.lookY += e.movementY;
 });
 
-/** Tab 按住时的 Digit1-6。命令表里的 key 字段就是这几个数字。 */
+/** 轮盘选中的那一格（数字键与松手两条路都走这里）。 */
 function IssueOrderByKey(key) {
   const order = ORDERS.find((o) => o.key === key);
   if (!order || !ai || !player) return;
+  // 「要炮」不是给弟兄下的令：它不走 IssueOrder，直接进支援通道。
+  // F 键腾给通用交互之后，这是叫炮唯一的入口。
+  if (order.id === "callFire") { CallMortar(); return; }
   const aimPoint = AimPoint(60);
   const n = ai.IssueOrder(order.id, player.position, aimPoint);
   state.order = order.label;
@@ -908,6 +979,49 @@ function DoMelee() {
     player.position.clone(), player.AimDirection(_aimDir).clone());
   // 同上：不在这里扣票，阵亡事件已经扣过了
   return !!result;
+}
+
+/**
+ * 翻越（Space）。**不是跳跃**：贴到能翻的东西才响应，空地按下去什么也不发生，
+ * 所以这里对失败一声不吭 —— 一个键老是弹"这里翻不过去"比没反应更烦。
+ */
+function DoVault() {
+  if (!player?.Alive || viewmodel.IsBusy?.()) return false;
+  if (!player.TryVault()) return false;
+  audio.Play("footstepRubble", { volume: 0.7 });
+  return true;
+}
+
+/**
+ * 通用交互（F）。语义按上下文分流，规则在 Script_Interact。
+ * 够不着任何东西时同样一声不吭。
+ */
+function DoInteract() {
+  if (!player?.Alive || !interact) return false;
+  return !!interact.Perform(player);
+}
+
+/**
+ * 捡枪。捡到的枪进 1 号槽（长枪位）—— 杂牌部队换枪就是这么换的：
+ * 手上这支打坏了就捡地上那支，`L2_RoomWar` 那条注释说的就是这件事。
+ * 缴获日械没有备弹（clips = 0），只有枪里那几发。
+ */
+function PickUpWeapon(weaponId, clips) {
+  if (!player?.Alive || !WEAPONS[weaponId]) return false;
+  const magazine = WEAPONS[weaponId].magazine ?? 5;
+  state.slots.primary = weaponId;
+  state.mags.primary = { ammo: magazine, clips };
+  state.pickedUp = weaponId;
+  if (state.activeSlot === "primary") {
+    currentWeapon = weaponId;
+    state.ammo = magazine;
+    state.clips = clips;
+    player.bipod = false;
+    state.fireMode = "auto";
+    viewmodel.Equip(currentWeapon);
+    hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "");
+  }
+  return true;
 }
 
 /** 呼叫迫击炮。全集团军的迫击炮数得过来，一局两发 —— 这条稀缺本身就是史实。 */
@@ -1001,6 +1115,9 @@ function TryFire(dt) {
   fireCooldown -= dt;
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
   if (viewmodel.IsBusy?.()) return;
+  // 翻墙翻到一半、或者人泡在运河里：枪都不在手上/在水里，打不出去。
+  // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
+  if (player.Busy || player.InWater) return;
   // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
   if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   if (state.activeSlot === "throwable") {
@@ -1198,6 +1315,10 @@ function Frame(dt, render = true) {
       });
     }
   }
+
+  // 交互提示：每六帧扫一次身边够得着的东西。每帧扫等于每帧遍历全场七十个人，
+  // 而这条提示是给人看的，六帧（0.1 s）的延迟看不出来
+  if (interact && player.Alive && state.frame % 6 === 0) interact.UpdatePrompt(player);
 
   if (player.Alive) TryFire(dt);
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）

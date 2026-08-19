@@ -8,7 +8,7 @@
 // 生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
-import { ORDERS, REINFORCE } from "./Data_Battle.mjs";
+import { REINFORCE } from "./Data_Battle.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -46,7 +46,6 @@ export class Hud {
     this.el.subtitle = mk("hudSubtitle");
     this.el.hint = mk("hudHint");
     this.el.note = mk("hudNote");
-    this.el.orders = mk("hudOrders");
     this.el.markers = mk("hudMarkers");
     this.el.minimap = mk("hudMinimap", this.root, "canvas");
     this.el.minimap.width = 190;
@@ -57,13 +56,6 @@ export class Hud {
     this.el.title = mk("hudTitle");
     this.el.epilogue = mk("hudEpilogue");
     this.el.cook = mk("hudCook");
-
-    for (const o of ORDERS) {
-      const row = document.createElement("div");
-      row.className = "hudOrderRow";
-      row.innerHTML = `<b>${o.key}</b><span>${o.label}</span>`;
-      this.el.orders.appendChild(row);
-    }
   }
 
   /** 上方一行：阶段 / 日期 / 当前要打的点。 */
@@ -292,7 +284,12 @@ export class Hud {
     }
   }
 
+  /**
+   * 下令面板已经改成 Script_Wheel 的径向轮盘（按住 Tab 推鼠标选）。
+   * 这里留一个空实现是为了让"命令面板归 HUD 管"这条契约还在 ——
+   * 轮盘自己画自己的，HUD 只需要知道它现在是开着的（将来要压暗其余 UI 时从这儿改）。
+   */
   SetOrdersVisible(on) {
-    this.el.orders.classList.toggle("on", !!on);
+    this.ordersOpen = !!on;
   }
 }

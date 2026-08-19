@@ -480,7 +480,7 @@ export function AddWaterVat(sink, x, z, seed = "vat") {
  */
 export function AddRampart(sink, {
   x, z, length, ry = 0, seed = "rp", height = 4.0, thickness = 2.2,
-  breach = null, merlons = true, ramp = null,
+  breach = null, merlons = true,
 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const segs = Math.max(4, Math.round(length / 2.2));
@@ -518,14 +518,52 @@ export function AddRampart(sink, {
       }
     }
   }
-  // 墙内侧的马道（土坡），玩家靠它上墙
-  if (ramp) {
-    const rz = -(thickness / 2 + 3.2);
-    const [rx, rzz] = [x + cos * ramp.at - sin * rz, z - sin * ramp.at - cos * rz];
-    const g = MakeBox(3.0, height, 7.0, TILE_METERS.ground, `${seed}:ramp`);
-    // 把上表面斜切成坡：直接用旋转的板代替楔形，够用且合批便宜
-    sink.Add("Ground", PlaceGeometry(g, { x: rx, y: height / 2 - 0.6, z: rzz, ry, rx: Math.atan2(height, 7.0) }));
-    sink.Solid(rx, height / 2 - 0.6, rzz, 1.8, height / 2, 3.8, "ramp");
+  // 马道由调用方单独建（AddRampWay）：它要知道坡脚的地面高程，而这里查不到地形。
+}
+
+/**
+ * 马道（上墙的坡道）。**必须一级一级地建，不能建成一块斜着的板。**
+ *
+ * 原来那版是一块旋转过的长方体 + 一个 3.6×2.8×7.6 的实心碰撞盒：画面上是坡，
+ * 碰撞上是一堵 3.4 m 高的墙。玩家撞上去就停住，AI 的 Blocked() 也直接判死。
+ * 于是「城墙是台儿庄的主战场」这句话在运行时是假的 —— 谁也上不去。
+ *
+ * 现在拆成 RAMP_STEPS 级台阶，每级抬 (墙顶 − 坡脚地面) / RAMP_STEPS，
+ * 压在玩家 MoveWithCollision 与 AI Blocked() 那条 0.56 m 的自动抬腿线以下，
+ * 于是两边都是「走上去」而不是「被挡住」。
+ *
+ * **baseY 必须是坡脚那儿的真实地面高程，不能当成 0。** 第一版就是这么错的：
+ * 台阶按绝对高度砌（0.5 / 1.0 / …），而北墙内侧的地面在 −0.7 m，
+ * 于是第一级相对脚下就有 1.2 m —— 越过抬腿线，人在坡底原地顶着，
+ * 实跑量到玩家爬到 2.86 m 就再也上不去。地形是起伏的，这个数每条马道都不一样。
+ *
+ * 台阶盒一律从地面以下砌满（不是悬空的一片），这样从侧面撞过来是一堵矮墙，
+ * 从下往上走才是台阶 —— 悬空片会让人从坡底钻进坡肚子里。
+ */
+export const RAMP_STEPS = 10;
+export const RAMP_RUN_M = 1.2;
+export const RAMP_WIDTH_M = 2.4;
+
+export function AddRampWay(sink, {
+  x, z, at = 0, ry = 0, height = 4.0, thickness = 2.2, baseY = 0, seed = "ramp",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  // 局部坐标：lx 沿墙，lz 往城里为负（与 AddRampart 其余部分同一套约定）
+  const L = (lx, lz) => [x + cos * lx - sin * lz, z - sin * lx - cos * lz];
+  const bottom = baseY - 1.4;                     // 砌到地面以下，免得坡底露出缝
+  const rise = (height - baseY) / RAMP_STEPS;
+  const hx = Math.abs(cos) * RAMP_WIDTH_M / 2 + Math.abs(sin) * RAMP_RUN_M / 2;
+  const hz = Math.abs(sin) * RAMP_WIDTH_M / 2 + Math.abs(cos) * RAMP_RUN_M / 2;
+  for (let i = 0; i < RAMP_STEPS; i += 1) {
+    // i = 0 是最高的一级（顶面正好齐墙顶），越往城里越矮
+    const top = height - rise * i;
+    const lz = -(thickness / 2 + RAMP_RUN_M * (i + 0.5));
+    const [sx, sz] = L(at, lz);
+    const h = top - bottom;
+    sink.Add("Ground", PlaceGeometry(
+      MakeBox(RAMP_WIDTH_M, h, RAMP_RUN_M * 1.02, TILE_METERS.ground, `${seed}:s${i}`),
+      { x: sx, y: bottom + h / 2, z: sz, ry }));
+    sink.Solid(sx, bottom + h / 2, sz, hx, h / 2, hz, "ramp");
   }
 }
 
