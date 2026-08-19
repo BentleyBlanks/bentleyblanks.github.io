@@ -57,7 +57,19 @@ const VM_TILE = { steel: 0.030, wood: 0.085, cloth: 0.045 };
 
 // 眼睛到照门的距离。真实据枪约 8—12 cm，但那样照门会顶到近裁面，
 // 而且遮掉大半个屏幕；15.5 cm 是"看得清缺口又不挡视野"的折中。
-const SIGHT_EYE_DISTANCE = 0.155;
+// 眼睛到照门的距离。
+//
+// **原来是 0.155 —— 那是真人据枪的实际距离，但游戏不是用肉眼在看。**
+// 开镜时世界 FOV 收到 40.7°，而人眼水平视野约 120°：同一个物体在屏幕上被放大
+// 了将近三倍。于是"物理正确"的 15.5 cm 渲出来是：φ27 mm 的枪管套筒张 14°，
+// 占掉 40.7° 画面的三分之一 —— 用户截图里正中那块盖住整个下半屏的黑板就是它。
+// 照门座（30 mm 宽）张 11°，比目标还大。
+//
+// 0.30 m 是把这个放大倍数抵消掉的距离：套筒退到 5.9°、照门座 5.5°，
+// 剩下的画面才是"沿着枪管看出去"。**枪并没有变小**，只是不再怼在眼球上 ——
+// 前后照门仍然共轴、仍然落在画面正中（那是解出来的，不受这个距离影响）。
+// 这是所有 FPS 都在用的那一手；ER2 的铁瞄画面同样不是按 15 cm 摆的。
+const SIGHT_EYE_DISTANCE = 0.300;
 
 /**
  * 铁瞄偏心。ER2 的作者 Marco 亲自回帖确认过：**照门不落在屏幕正中是故意的**。
@@ -65,12 +77,14 @@ const SIGHT_EYE_DISTANCE = 0.155;
  * 也就是"开了镜就等于有准星"，那"没有准星"这条设定就没有物理支撑了。
  *
  * 单位换算（别拍脑袋填米）：开镜时世界 FOV 约 55°×0.72 ≈ 39.6°，900 px 高的屏幕上
- * 一个像素 = 39.6/900 度；照门离眼 SIGHT_EYE_DISTANCE = 0.155 m，
- * 于是 1 px 屏幕当量 = tan(39.6/900 °) × 0.155 ≈ 1.19e-4 m。
+ * 一个像素 = 39.6/900 度；照门离眼 SIGHT_EYE_DISTANCE = 0.300 m，
+ * 于是 1 px 屏幕当量 = tan(39.6/900 °) × 0.300 ≈ 2.30e-4 m。
+ * **这个数跟着眼距走**：眼距从 0.155 改到 0.300 时它没跟着改的话，
+ * 偏心量会凭空缩一半（同样的米数在两倍远处只有一半的角）。
  * 幅度取 4—8 px：汉阳造是老套筒，枪龄大、膛线磨得厉害，偏得比中正式明显。
  * 只给横向留大头、纵向只有 2 px —— 纵向偏多了上护盖会爬进画面挡住准星。
  */
-const SIGHT_OFFSET_PER_PX = 1.19e-4;
+const SIGHT_OFFSET_PER_PX = 2.30e-4;
 const IRON_SIGHT_OFFSET_PX = {
   ZhongZheng: { x: 4, y: 2 },
   HanYang: { x: 8, y: 2 },
@@ -167,8 +181,15 @@ function Tube(rTop, rBottom, len, segments, tile, pose) {
   return Place(geometry, pose);
 }
 
-/** 把一组几何合成一个可独立运动的部件，pivot 是它自己的旋转轴心。 */
+/** group.add 的安全版：MakePart 对空桶返回 null，直接 add(null) 会抛。 */
+function AddPart(group, mesh) {
+  if (mesh) group.add(mesh);
+  return mesh;
+}
+
+/** 把一组几何合成一个可独立运动的部件，pivot 是它自己的旋转轴心。空桶返回 null。 */
 function MakePart(geometries, material, pivot = { x: 0, y: 0, z: 0 }) {
+  if (!geometries || geometries.length === 0) return null;   // 见下方 AddPart
   const merged = MergeGeometries(geometries);
   merged.translate(-pivot.x, -pivot.y, -pivot.z);
   const mesh = new THREE.Mesh(merged, material);
@@ -231,8 +252,12 @@ function BuildMaterials(library) {
     // 纯金属没有漫反射项，暗部会塌成纯黑底 + 一排高光点（P1 的 lo 像素 3.4% 就是它）；
     // 留一点非金属分量，暗部才看得出材质。roughness 提到 0.46 是 1938 年发蓝钢的手感，
     // 0.62 太哑，反不出拉丝。
-    steel: SafeMaterial(library, "Steel", { repeat: 1, roughness: 0.46, metalness: 0.84, normalScale: 0.20 },
-      { color: 0x4d5054, roughness: 0.5, metalness: 0.9 }),
+    // roughness 0.46 → 0.88：BakeSteel 的粗糙度图本身就偏光滑（按 polish 0.35 烘的，
+    // 均值约 0.45），标量是**乘**在图上的，0.46 乘完只剩 0.21 —— 那是镜面。
+    // 据枪时机匣顶面正对天空，整块反成一张没有细节的浅灰板，读作桌面不是钢件。
+    // 0.88 乘完落到约 0.40，是 1938 年发蓝钢该有的半哑光。
+    steel: SafeMaterial(library, "Steel", { repeat: 1, roughness: 0.88, metalness: 0.84, normalScale: 0.20 },
+      { color: 0x4d5054, roughness: 0.75, metalness: 0.9 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
     wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.24 },
@@ -394,10 +419,28 @@ function BuildBoltRifle(materials, weapon, key) {
   const steel = [];
   const wood = [];
   const strap = [];
+  // near* 三桶 = **开镜时整块藏掉**的零件：它们全都落在眼睛后面或 6.6 cm 近裁面
+  // 死区里，画出来只会被切成一片穿帮的截面。分桶而不是按包围盒判 —— 木件/钢件
+  // 各自是一个合并网格，按包围盒会把整支枪连照门一起藏掉（这条教训写在
+  // _CollectAdsHideParts 的注释里，这里只是把它执行到底）。
+  const nearSteel = [];
+  const nearWood = [];
+  const nearStrap = [];
 
   // --- 机匣 -----------------------------------------------------------------
-  steel.push(Box(0.036, 0.050, 0.245, VM_TILE.steel, `${key}rec`, { x: 0, y: bore, z: -0.095 }));
-  // 机匣环（枪管接进机匣的那一段粗箍），毛瑟系的特征
+  // 高度 50 → 38 mm（真毛瑟机匣外径约 35 mm），中心再下压 2 mm：顶面落到
+  // bore+0.017，比瞄准基线（bore+0.032）低 15 mm。**这一条是开镜穿模的正根**：
+  // 原来顶面 bore+0.025、基线 bore+0.026 —— 眼睛贴着机匣顶面飞，只高出 1.0 mm，
+  // 稍微一晃相机就钻进机匣里，近裁面从机匣正中切一刀，出图上就是准星下方
+  // 十几像素处那一大块黑色方料（用户截图里的那团）。
+  //
+  // 机匣同时进 nearSteel 桶：开镜时眼睛在 rig z=-0.14 上下，机匣前端才到 -0.2175，
+  // 也就是整条机匣**几乎全部落在 6.6 cm 的近裁面死区里**，露出来的只有十几毫米
+  // 一道被切开的截面。真枪据枪时也看不见机匣（它在视线下方、脸颊后面）。
+  steel.push(Box(0.030, 0.038, 0.245, VM_TILE.steel, `${key}rec`, { x: 0, y: bore - 0.002, z: -0.095 }));
+  // 机匣环（枪管接进机匣的那一段粗箍），毛瑟系的特征。
+  // 也进 near 桶：它后端在 rig z=-0.170，开镜时离眼只有 2.3 cm，被近裁面
+  // 从中间切一刀，露出来的是个圆环截面 —— 挂在准星下方十二度处的一个黑圈。
   steel.push(Tube(0.0175, 0.0175, 0.052, 12, VM_TILE.steel, { x: 0, y: bore, z: -0.196 }));
 
   // --- 枪管 -----------------------------------------------------------------
@@ -421,7 +464,13 @@ function BuildBoltRifle(materials, weapon, key) {
   const forendLen = spec.forend[0] - spec.forend[1];
   wood.push(Box(0.044, 0.050, forendLen, VM_TILE.wood, `${key}fore`,
     { x: 0, y: bore - 0.036, z: (spec.forend[0] + spec.forend[1]) / 2 }));
-  const guardLen = spec.handguard[0] - spec.handguard[1];
+  // 上护盖的**后端必须在照门前面**。原来三支枪都是 -0.225/-0.230，比照门还靠后
+  // 47—70 mm，也就是开镜时它的后端离眼睛只有 6.5—8.8 cm —— 顶面比基线低 4 mm，
+  // 在 6.5 cm 处张成 3.5°，往下整个下半屏全是这块木头（用户截图里准星下方那块）。
+  // 挪到照门前 45 mm 之后，后端离眼 17 cm 以上，同样 4 mm 的落差只张成 1.3°，
+  // 退成基线下方一道朝枪口收拢的窄楔形 —— 那才是据枪时该看到的样子。
+  const guardBackZ = Math.min(spec.handguard[0], spec.rearSightZ - 0.045);
+  const guardLen = guardBackZ - spec.handguard[1];
   // 上护盖顶面必须**低于瞄准基线**（基线 = bore + 0.026，照门缺口与准星尖都在那儿）。
   // 原来是 y = bore + 0.020、厚 0.020，顶面 bore + 0.030 —— 比基线还高 4 mm。
   // 4 mm 在腰射时看不出来，开镜时护盖近端离眼睛只有 7.7 cm，那 4 mm 张成
@@ -429,34 +478,37 @@ function BuildBoltRifle(materials, weapon, key) {
   // 落在 y=393 px，而画面中心是 450）。压到 bore + 0.013、厚 0.018，顶面
   // bore + 0.022 —— 比基线低 4 mm，护盖就退成基线下方那道朝枪口收拢的楔形。
   wood.push(Box(0.032, 0.018, guardLen, VM_TILE.wood, `${key}guard`,
-    { x: 0, y: bore + 0.013, z: (spec.handguard[0] + spec.handguard[1]) / 2 }));
-  // 枪颈（握持处）：从机匣后下方斜向枪托
-  wood.push(Box(0.038, 0.058, 0.185, VM_TILE.wood, `${key}wrist`, { x: 0, y: bore - 0.040, z: 0.105, rx: 0.055 }));
+    { x: 0, y: bore + 0.013, z: (guardBackZ + spec.handguard[1]) / 2 }));
+  // 枪颈（握持处）：从机匣后下方斜向枪托。**在眼睛后面**，开镜时藏。
+  nearWood.push(Box(0.038, 0.058, 0.185, VM_TILE.wood, `${key}wrist`, { x: 0, y: bore - 0.040, z: 0.105, rx: 0.055 }));
   // 托底：略下垂 + 加厚，这是"抵肩"的形
-  wood.push(Box(0.046, 0.106, 0.135, VM_TILE.wood, `${key}butt`,
+  nearWood.push(Box(0.046, 0.106, 0.135, VM_TILE.wood, `${key}butt`,
     { x: 0, y: bore - 0.062, z: spec.buttZ - 0.062, rx: 0.055 }));
   // 托底钢板
-  steel.push(Box(0.048, 0.118, 0.010, VM_TILE.steel, `${key}plate`,
+  nearSteel.push(Box(0.048, 0.118, 0.010, VM_TILE.steel, `${key}plate`,
     { x: 0, y: bore - 0.065, z: spec.buttZ, rx: 0.055 }));
 
   // --- 箍、扳机、弹仓 -------------------------------------------------------
   for (let i = 0; i < spec.bands.length; i += 1) {
     steel.push(Box(0.048, 0.058, 0.016, VM_TILE.steel, `${key}band${i}`, { x: 0, y: bore - 0.012, z: spec.bands[i] }));
   }
-  steel.push(Box(0.030, 0.010, 0.090, VM_TILE.steel, `${key}tg`, { x: 0, y: bore - 0.072, z: -0.020 }));
-  steel.push(Box(0.010, 0.022, 0.010, VM_TILE.steel, `${key}trig`, { x: 0, y: bore - 0.062, z: -0.004 }));
-  steel.push(Box(0.038, 0.030, 0.098, VM_TILE.steel, `${key}mag`, { x: 0, y: bore - 0.048, z: -0.100 }));
+  nearSteel.push(Box(0.030, 0.010, 0.090, VM_TILE.steel, `${key}tg`, { x: 0, y: bore - 0.072, z: -0.020 }));
+  nearSteel.push(Box(0.010, 0.022, 0.010, VM_TILE.steel, `${key}trig`, { x: 0, y: bore - 0.062, z: -0.004 }));
+  nearSteel.push(Box(0.038, 0.030, 0.098, VM_TILE.steel, `${key}mag`, { x: 0, y: bore - 0.048, z: -0.100 }));
 
   // --- 照门与准星（开镜要真的对准画面中心，所以这两个必须共轴）--------------
-  const sightY = bore + 0.026;
-  steel.push(Box(0.030, 0.014, 0.062, VM_TILE.steel, `${key}rsBase`, { x: 0, y: bore + 0.012, z: spec.rearSightZ }));
+  // 基线从 bore+0.026 抬到 bore+0.032：机匣压薄之后要把这 6 mm 还给"眼睛离
+  // 机匣顶面的余量"，否则压薄的好处又被基线吃回去。真枪的照门缺口本来也在
+  // 机匣顶面上方一节（立框表尺的底座有厚度）。
+  const sightY = bore + 0.040;
+  steel.push(Box(0.030, 0.024, 0.062, VM_TILE.steel, `${key}rsBase`, { x: 0, y: bore + 0.022, z: spec.rearSightZ }));
   // 缺口做成两块小块中间留缝：真的能"看见"缺口，不是一块实心方料
   for (const s of [-1, 1]) {
     steel.push(Box(0.010, 0.014, 0.010, VM_TILE.steel, `${key}rsL${s}`,
       { x: s * 0.0075, y: sightY - 0.002, z: spec.rearSightZ - 0.020 }));
   }
   steel.push(Box(0.005, 0.016, 0.007, VM_TILE.steel, `${key}fs`, { x: 0, y: sightY - 0.003, z: spec.frontSightZ }));
-  steel.push(Box(0.026, 0.008, 0.020, VM_TILE.steel, `${key}fsBase`, { x: 0, y: bore + 0.012, z: spec.frontSightZ }));
+  steel.push(Box(0.026, 0.020, 0.020, VM_TILE.steel, `${key}fsBase`, { x: 0, y: bore + 0.018, z: spec.frontSightZ }));
   // 准星护耳：两片，防止逆光时准星糊在天空里看不见
   for (const s of [-1, 1]) {
     steel.push(Box(0.004, 0.020, 0.018, VM_TILE.steel, `${key}fsEar${s}`,
@@ -465,16 +517,19 @@ function BuildBoltRifle(materials, weapon, key) {
 
   // --- 背带（挂在下箍与枪颈之间，垂一小段）---------------------------------
   strap.push(Box(0.026, 0.006, 0.090, VM_TILE.cloth, `${key}sling`, { x: 0, y: bore - 0.060, z: spec.bands[1] + 0.05, rx: -0.5 }));
-  strap.push(Box(0.026, 0.006, 0.120, VM_TILE.cloth, `${key}sling2`, { x: 0, y: bore - 0.090, z: -0.30, rx: 0.15 }));
+  nearStrap.push(Box(0.026, 0.006, 0.120, VM_TILE.cloth, `${key}sling2`, { x: 0, y: bore - 0.090, z: -0.30, rx: 0.15 }));
 
   // --- 可动件：枪机 ---------------------------------------------------------
-  const boltPivot = { x: 0, y: bore, z: -0.055 };
+  // 枪机抬到 bore+0.010：机匣顶面在 bore+0.017，枪机顶就露出 3.5 mm。
+  // 原来枪机圆心与膛线轴同高，整根埋在机匣里 —— 开镜时机匣顶是一块光板，
+  // 读不出这是栓动枪（真枪的枪机就是压在机匣顶的机槽里、露出上半个圆）。
+  const boltPivot = { x: 0, y: bore + 0.010, z: -0.055 };
   const boltGeo = [];
-  boltGeo.push(Tube(0.0105, 0.0105, 0.170, 10, VM_TILE.steel, { x: 0, y: bore, z: -0.055 }));
-  boltGeo.push(Tube(0.0135, 0.0135, 0.022, 10, VM_TILE.steel, { x: 0, y: bore, z: 0.038 }));  // 保险/击针尾
+  boltGeo.push(Tube(0.0105, 0.0105, 0.170, 10, VM_TILE.steel, { x: 0, y: bore + 0.010, z: -0.055 }));
+  boltGeo.push(Tube(0.0135, 0.0135, 0.022, 10, VM_TILE.steel, { x: 0, y: bore + 0.010, z: 0.038 }));  // 保险/击针尾
   // 拉机柄：斜向右下，这样右手抬手就能抓到（毛瑟直柄、三八式也是直柄）
-  boltGeo.push(Box(0.040, 0.012, 0.014, VM_TILE.steel, `${key}bhStem`, { x: 0.020, y: bore + 0.002, z: 0.008, rz: -0.30 }));
-  boltGeo.push(Tube(0.011, 0.011, 0.016, 10, VM_TILE.steel, { x: 0.042, y: bore - 0.010, z: 0.008, rx: Math.PI / 2 }));
+  boltGeo.push(Box(0.040, 0.012, 0.014, VM_TILE.steel, `${key}bhStem`, { x: 0.020, y: bore + 0.012, z: 0.008, rz: -0.30 }));
+  boltGeo.push(Tube(0.011, 0.011, 0.016, 10, VM_TILE.steel, { x: 0.042, y: bore, z: 0.008, rx: Math.PI / 2 }));
   const bolt = MakePart(boltGeo, materials.blued, boltPivot);
 
   // --- 可动件：三八式防尘盖 -------------------------------------------------
@@ -496,9 +551,17 @@ function BuildBoltRifle(materials, weapon, key) {
   bayonet.visible = false;
 
   const group = new THREE.Group();
-  group.add(MakePart(steel, materials.steel));
-  group.add(MakePart(wood, materials.wood));
-  group.add(MakePart(strap, materials.cloth));
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(wood, materials.wood));
+  AddPart(group, MakePart(strap, materials.cloth));
+  // 眼后那三块单独成网格：腰射时照常画（多 3 个 draw call），
+  // 开镜时整块 visible=false（那时反而**省**掉它们）
+  const nearParts = [
+    MakePart(nearSteel, materials.steel),
+    MakePart(nearWood, materials.wood),
+    MakePart(nearStrap, materials.cloth),
+  ];
+  for (const mesh of nearParts) AddPart(group, mesh);
   group.add(bolt);
   if (dustCover) group.add(dustCover);
   group.add(bayonet);
@@ -506,6 +569,9 @@ function BuildBoltRifle(materials, weapon, key) {
   return {
     group,
     parts: { bolt, dustCover, bayonet },
+    // 枪机与防尘盖**不藏**：眼睛退到 30 cm 之后它们落在机匣顶面上、视线正下方，
+    // 是据枪画面里唯一能读出"栓动"的细节。藏了机匣顶就成了一块没东西的铁板。
+    adsHide: nearParts.filter(Boolean),
     boltTravel: 0.078,
     ejectAt: new THREE.Vector3(0.024, bore + 0.012, -0.030),
     clipSeat: new THREE.Vector3(0, bore + 0.030, -0.150),
@@ -555,12 +621,16 @@ function BuildZb26(materials, weapon, key) {
   steel.push(Box(0.006, 0.018, 0.008, VM_TILE.steel, `${key}fs`, { x: sightX, y: sightY - 0.004, z: -0.690 }));
   steel.push(Box(0.020, 0.026, 0.016, VM_TILE.steel, `${key}fsBase`, { x: sightX, y: bore + 0.036, z: -0.690 }));
 
-  // 握把 + 扳机
-  wood.push(Box(0.034, 0.100, 0.046, VM_TILE.wood, `${key}grip`, { x: 0, y: bore - 0.088, z: 0.010, rx: 0.20 }));
-  steel.push(Box(0.030, 0.010, 0.080, VM_TILE.steel, `${key}tg`, { x: 0, y: bore - 0.044, z: -0.030 }));
+  // 握把 + 扳机 + 枪托：全在眼睛后面（开镜时眼在 rig z≈+0.02），进 near 桶。
+  // 不分桶的话这一串会从 z=+0.30 一直伸到相机后面 30 cm，被近裁面从中间切开 ——
+  // 出图上就是画面下半部那一大块穿帮的木头（跟栓动步枪那三支是同一个病）。
+  const nearSteel = [];
+  const nearWood = [];
+  nearWood.push(Box(0.034, 0.100, 0.046, VM_TILE.wood, `${key}grip`, { x: 0, y: bore - 0.088, z: 0.010, rx: 0.20 }));
+  nearSteel.push(Box(0.030, 0.010, 0.080, VM_TILE.steel, `${key}tg`, { x: 0, y: bore - 0.044, z: -0.030 }));
   // 枪托：ZB-26 的托是直的，托底还有个可折的托肩板
-  wood.push(Box(0.040, 0.062, 0.230, VM_TILE.wood, `${key}stock`, { x: 0, y: bore - 0.020, z: 0.185 }));
-  steel.push(Box(0.046, 0.090, 0.012, VM_TILE.steel, `${key}plate`, { x: 0, y: bore - 0.026, z: 0.300 }));
+  nearWood.push(Box(0.040, 0.062, 0.230, VM_TILE.wood, `${key}stock`, { x: 0, y: bore - 0.020, z: 0.185 }));
+  nearSteel.push(Box(0.046, 0.090, 0.012, VM_TILE.steel, `${key}plate`, { x: 0, y: bore - 0.026, z: 0.300 }));
 
   // 两脚架：折叠状态贴在枪管下方（巷战里没人架着两脚架跑）
   for (const s of [-1, 1]) {
@@ -575,14 +645,17 @@ function BuildZb26(materials, weapon, key) {
   const bolt = MakePart(boltGeo, materials.blued, { x: 0.030, y: bore - 0.008, z: -0.020 });
 
   const group = new THREE.Group();
-  group.add(MakePart(steel, materials.steel));
-  group.add(MakePart(wood, materials.wood));
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(wood, materials.wood));
+  const nearParts = [MakePart(nearSteel, materials.steel), MakePart(nearWood, materials.wood)];
+  for (const mesh of nearParts) AddPart(group, mesh);
   group.add(magazine);
   group.add(bolt);
 
   return {
     group,
     parts: { bolt, magazine, dustCover: null, bayonet: null },
+    adsHide: nearParts.filter(Boolean),
     boltTravel: 0.062,
     // 抛壳口在下方（这是捷克式的又一个考据点）
     ejectAt: new THREE.Vector3(0.010, bore - 0.048, -0.120),
@@ -625,8 +698,8 @@ function BuildMauser96(materials, weapon, key) {
   steel.push(Box(0.005, 0.012, 0.006, VM_TILE.steel, `${key}fs`, { x: 0, y: sightY - 0.004, z: -0.264 }));
 
   const group = new THREE.Group();
-  group.add(MakePart(steel, materials.steel));
-  group.add(MakePart(wood, materials.wood));
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(wood, materials.wood));
 
   // 套筒（射击时后座）
   const slideGeo = [Box(0.026, 0.024, 0.090, VM_TILE.steel, `${key}slide`, { x: 0, y: bore + 0.014, z: -0.120 })];
@@ -665,8 +738,8 @@ function BuildGrenadeProp(materials, key) {
   steel.push(Tube(0.016, 0.016, 0.012, 10, VM_TILE.steel, { x: 0, y: 0, z: 0.112 }));
 
   const group = new THREE.Group();
-  group.add(MakePart(steel, materials.steel));
-  group.add(MakePart(wood, materials.wood));
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(wood, materials.wood));
   return group;
 }
 
@@ -727,8 +800,8 @@ function BuildDadao(materials, weapon, key) {
   steel.push(new THREE.TorusGeometry(0.036, 0.0055, 6, 14).rotateY(Math.PI / 2).translate(0, 0, 0.132));
 
   const group = new THREE.Group();
-  group.add(MakePart(steel, materials.steel));
-  group.add(MakePart(cloth, materials.redCloth));
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(cloth, materials.redCloth));
 
   return {
     group,
@@ -1198,6 +1271,12 @@ export class Viewmodel {
     this.adsHideParts = [];
     if (!this.rig || !this.rig.sight) return;
     for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
+    // rig 自己报的那一份（枪身上落在眼后 / 近裁面死区里的零件）。
+    // 由建 rig 的那个函数点名，因为只有它知道哪块料是机匣、哪块是枪托 ——
+    // 这里拿包围盒猜必然连照门一起藏掉。
+    if (Array.isArray(this.rig.adsHide)) {
+      for (const mesh of this.rig.adsHide) if (mesh) this.adsHideParts.push(mesh);
+    }
   }
 
   /** 把藏起来的部件放回来（换枪、腰射时都要走一趟，不然枪换了手还是隐形的）。 */
