@@ -765,7 +765,7 @@ async function RunCutscene(id) {
   ReleasePointerLock();
   const result = await cutscene.Play(id, { poolOut: state.nraPool });
   state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
-  if (state.running && !SHOT) canvas.requestPointerLock?.();
+  if (state.running) RequestPointerLock();
   return result;
 }
 
@@ -1219,12 +1219,32 @@ const input = {
 };
 const keys = new Set();
 
+/**
+ * 抢指针锁。**必须吞掉 NotAllowedError**：用户手势的有效期只有几秒，而
+ * 「点开始 -> 播三十八秒关前过场 -> 进游戏」这条路上，过场播完时手势早过期了，
+ * 浏览器会把 requestPointerLock() 的 promise reject 掉。
+ *
+ * 抓不到锁本身不是事故 —— 键位路由里那条「没拿到锁的第一次点击只用来抢锁」会接住；
+ * 但不吞的话控制台会留一条 unhandled rejection，而开机冒烟把 console.error 当事故。
+ * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
+ */
+function RequestPointerLock() {
+  if (SHOT) return;
+  const nudge = () => hud?.Hint("点一下画面，接管镜头", 3.0);
+  try {
+    const pending = canvas.requestPointerLock?.();
+    if (pending && typeof pending.catch === "function") pending.catch(nudge);
+  } catch (error) {
+    nudge();
+  }
+}
+
 function StartRun() {
   boot.classList.add("gone");
   state.menu = false;
   state.running = true;
   if (!SHOT) {
-    canvas.requestPointerLock?.();
+    RequestPointerLock();
     audio.Unlock();
   }
 }
@@ -1396,7 +1416,7 @@ function ResumeFromPause() {
   state.running = true;
   hudRoot.style.display = "";
   audio.SetPaused(false);
-  if (!SHOT) canvas.requestPointerLock?.();
+  RequestPointerLock();
 }
 
 /**
@@ -2319,7 +2339,12 @@ function Loop(now) {
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   if (state.menu && menu && menu.live && state.ready) { MenuFrame(dt); return; }
-  if (!state.running) return;
+  // 过场没有自己的帧驱动，全靠 Frame() 里那条 cutscene 分支推。
+  // 而从主菜单进关时 state.running 还是 false（要等过场播完才 StartRun）——
+  // 不放行的话「开始」会卡死在关前过场里：过场在等一个永远不来的帧，
+  // 而 StartRun 在等过场结束。关卡之间那条路之所以没暴露这个坑，
+  // 是因为换关时玩家还在游戏里，state.running 一直是 true。
+  if (!state.running && !(cutscene && cutscene.Playing)) return;
   Frame(dt);
 }
 requestAnimationFrame(Loop);

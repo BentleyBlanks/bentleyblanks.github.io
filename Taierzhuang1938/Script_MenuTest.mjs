@@ -162,6 +162,47 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
+// 3.5) 战役入口：「开始」要播关前过场，而且**过场必须真的在走**
+//
+// 这一条是补票。过场没有自己的帧驱动，全靠 Frame() 推；而从菜单进关时
+// state.running 还是 false（要等过场播完才 StartRun）——主循环里那道
+// 「没在跑就直接 return」曾经把「开始」卡死在出川的黑场里：过场在等一个
+// 永远不来的帧，而 StartRun 在等过场结束。选章那条路不播过场，测不到它。
+// ===========================================================================
+{
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("start"));
+  await page.waitForTimeout(900);
+  const a = await page.evaluate(() => ({
+    playing: !!window.Taierzhuang.cutscene?.Playing,
+    id: window.Taierzhuang.state.cutscene,
+    t: window.Taierzhuang.cutscene?.time || 0,
+  }));
+  await page.waitForTimeout(1200);
+  const b = await page.evaluate(() => window.Taierzhuang.cutscene?.time || 0);
+  Check("「开始」播关前过场", a.playing && a.id === "CS_Chuchuan", `id=${a.id} playing=${a.playing}`);
+  Check("过场真的在往前走（不是卡在第一帧）", b > a.t + 0.5, `t ${a.t.toFixed(2)} -> ${b.toFixed(2)} s`);
+
+  // Esc 跳过，别在冒烟里干等三十八秒
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => window.Taierzhuang.state.running === true, { timeout: 180000 })
+    .catch(() => {});
+  const done = await page.evaluate(() => ({
+    running: window.Taierzhuang.state.running,
+    level: window.Taierzhuang.Debug.Level().id,
+    open: window.Taierzhuang.Debug.Menu().open,
+  }));
+  Check("跳过过场之后真的进了序 · 界河", done.running && done.level === "L0_Jiehe" && !done.open,
+    `running=${done.running} level=${done.level}`);
+
+  // 回主菜单，下一节从选章再进一次
+  await page.evaluate(() => {
+    window.Taierzhuang.Debug.Pause();
+    window.Taierzhuang.Debug.MenuAct("title");
+  });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+}
+
+// ===========================================================================
 // 4) 从选章进关：切片重建、玩法真的跑起来
 // ===========================================================================
 {
