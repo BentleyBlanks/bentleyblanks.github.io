@@ -9,7 +9,7 @@ import {
   STATS, TLDR, TIER, TIMELINE_PHASES, TIMELINE, FORCES, PEOPLE,
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
   DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
-  TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS,
+  TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS, READING_PATH, PEOPLE_LATER,
 } from "./Data_Museum.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +28,7 @@ check(Array.isArray(TIMELINE_PHASES) && TIMELINE_PHASES.length === 5, "TIMELINE_
 
 console.log("[2] 时间线");
 check(TIMELINE.length === 23, `TIMELINE 23 节点（实际 ${TIMELINE.length}）`);
+check(TIMELINE.filter((t) => t.key).length === 4, "关键时刻 4 处（滕县 / 突入 / 最后五分钟 / 光复）");
 {
   const ids = new Set(TIMELINE.map((t) => t.id));
   check(ids.size === TIMELINE.length, "时间线 id 唯一");
@@ -70,6 +71,10 @@ console.log("[4] 人物志");
   check(PEOPLE.filter((p) => p.side === "jp").length === 6, "日方 6 人");
   check(PEOPLE.every((p) => p.story.length > 0), "人物故事非空");
   check(PEOPLE.every((p) => !p.quote || TIER[p.quote.tier]), "人物语录 tier 合法");
+  const laterIds = Object.keys(PEOPLE_LATER);
+  check(laterIds.length >= 12, `人物「后来」≥ 12 条（实际 ${laterIds.length}）`);
+  const personIds = new Set(PEOPLE.map((p) => p.id));
+  check(laterIds.every((id) => personIds.has(id)), "「后来」键全部对应人物 id");
 }
 
 console.log("[5] 武器");
@@ -154,8 +159,14 @@ console.log("[7] index.html 容器与引用");
   check(mapPhases === 3, `态势图 3 个阶段组（实际 ${mapPhases}）`);
   const mapTabs = (html.match(/class="mapTab(?:\s+on)?"/g) || []).length;
   check(mapTabs === 3, `态势图 3 个切换按钮（实际 ${mapTabs}）`);
-  check(html.includes('src="Script_Main.mjs?v=2"'), "引用 Script_Main.mjs?v=2");
-  check(html.includes('href="Style_Main.css?v=2"'), "引用 Style_Main.css?v=2");
+  check(html.includes('src="Script_Main.mjs?v=3"'), "引用 Script_Main.mjs?v=3");
+  check(html.includes('href="Style_Main.css?v=3"'), "引用 Style_Main.css?v=3");
+  check(html.includes('id="readingPath"'), "讲解路线容器存在");
+  check(READING_PATH.length === 6 && READING_PATH.every((s) => s.href.startsWith("#")), "讲解路线 6 步且为页内锚点");
+  const rpAnchors = READING_PATH.map((s) => s.href.slice(1));
+  const missingRp = rpAnchors.filter((id) => !html.includes(`id="${id}"`));
+  check(missingRp.length === 0, `讲解路线锚点全部存在${missingRp.length ? `（缺失: ${missingRp.join(",")}）` : ""}`);
+  check(READING.some((r) => r.url.includes("bilibili.com/video/BV1Czk3BCE9t")), "延伸阅读含讲解视频链接");
   const anchors = MEMOIR_EXCERPTS.map((m) => m.link.href.slice(1));
   const missingAnchors = anchors.filter((id) => !html.includes(`id="${id}"`));
   check(missingAnchors.length === 0, `选摘对照锚点全部存在${missingAnchors.length ? `（缺失: ${missingAnchors.join(",")}）` : ""}`);

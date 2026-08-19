@@ -616,6 +616,56 @@ section { padding: 64px 0 28px; scroll-margin-top: 92px; }
 .memoirLink::before { content: "⇢"; color: var(--goldDim); }
 .memoirLink:hover { text-decoration: underline; }
 
+/* ---------- 讲解路线 ---------- */
+.readingPath {
+  margin: 30px auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  max-width: 980px;
+}
+.rpStep {
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line2); border-radius: 999px; padding: 6px 16px 6px 8px;
+  color: var(--inkDim); text-decoration: none; background: rgba(36, 27, 18, 0.65);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.rpStep:hover { border-color: var(--goldDim); color: var(--gold); transform: translateY(-2px); text-decoration: none; }
+.rpStep::after { content: "→"; color: var(--goldDim); font-size: 0.8rem; margin-left: 2px; }
+.rpStep:last-child::after { content: ""; }
+.rpNo {
+  font-family: var(--mono); font-size: 0.78rem; color: var(--gold);
+  border: 1px solid var(--goldDim); border-radius: 50%; width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: rgba(217, 164, 65, 0.08);
+}
+.rpBody { display: inline-flex; flex-direction: column; line-height: 1.25; text-align: left; }
+.rpLabel { font-size: 0.88rem; color: var(--ink); letter-spacing: 0.12em; }
+.rpDesc { font-size: 0.72rem; color: var(--inkFaint); }
+
+/* ---------- 人物「后来」 ---------- */
+.personCard .later {
+  margin-top: 10px; padding: 8px 12px; border-radius: 5px;
+  background: rgba(0, 0, 0, 0.25); border: 1px dashed var(--line2);
+  font-size: 0.8rem; color: var(--inkFaint); line-height: 1.65;
+}
+.personCard .later .laterTag {
+  display: inline-block; margin-right: 7px; font-size: 0.68rem; letter-spacing: 0.2em;
+  color: var(--inkDim); border: 1px solid var(--line2); border-radius: 3px; padding: 0 6px;
+}
+
+/* ---------- 时间线关键时刻 ---------- */
+.tlKey {
+  font-size: 0.68rem; letter-spacing: 0.1em; padding: 1px 7px; border-radius: 3px;
+  background: rgba(212, 85, 74, 0.16); color: var(--redBright); border: 1px solid rgba(212, 85, 74, 0.5);
+  white-space: nowrap;
+}
+.tlItem.key .tlCard { border-color: rgba(212, 85, 74, 0.45); }
+.tlItem.key::before { border-color: var(--redBright); background: rgba(212, 85, 74, 0.5); }
+
+/* ---------- 页脚致敬 ---------- */
+.siteFooter .footTribute {
+  margin-top: 12px; max-width: 720px; margin-left: auto; margin-right: auto;
+  font-family: var(--serif); font-size: 0.9rem; color: var(--inkDim); letter-spacing: 0.04em; line-height: 1.9;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
   .bgGrid, .forcesGrid, .townInsetGrid { grid-template-columns: 1fr; }

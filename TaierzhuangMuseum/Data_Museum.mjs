@@ -88,7 +88,7 @@ export const TIMELINE = [
     ],
   },
   {
-    id: "t06", phase: "flanks", tier: "solid",
+    id: "t06", phase: "flanks", tier: "solid", key: true,
     date: "1938.3.17", dateSort: "1938-03-17", title: "王铭章滕县殉国",
     body: [
       "濑谷支队突入滕县东关与南城墙。第 122 师师长、第 41 军代军长王铭章在西关电灯厂附近中弹殉国，同时殉国的还有参谋长赵渭宾。",
@@ -132,7 +132,7 @@ export const TIMELINE = [
     ],
   },
   {
-    id: "t12", phase: "street", tier: "solid",
+    id: "t12", phase: "street", tier: "solid", key: true,
     date: "1938.3.27 晨 5:30", dateSort: "1938-03-27", title: "日军突入城内",
     body: [
       "日军两次猛攻，占领东北角城墙，一部突入北门。第 31 师转入城内攻防——时人叫它「室战墙战」。此时守军伤亡已过半。",
@@ -184,7 +184,7 @@ export const TIMELINE = [
     ],
   },
   {
-    id: "t19", phase: "street", tier: "main",
+    id: "t19", phase: "street", tier: "main", key: true,
     date: "1938.4.4 深夜", dateSort: "1938-04-04", title: "最后五分钟",
     body: [
       "日军已控制约三分之二至四分之三市街，中方仅余西南一隅背靠运河。深夜，孙连仲报告第 2 集团军伤亡已逾十分之七，请求撤到运河南岸「留点种子」。",
@@ -208,7 +208,7 @@ export const TIMELINE = [
     ],
   },
   {
-    id: "t22", phase: "counter", tier: "solid",
+    id: "t22", phase: "counter", tier: "solid", key: true,
     date: "1938.4.7 凌晨 1 时", dateSort: "1938-04-07", title: "台儿庄光复",
     body: [
       "中国军队全线反攻、追击，日军向峄县、枣庄方向撤退，一部突围固守待援。战役结束。",
@@ -881,8 +881,37 @@ export const READING = [
   { title: "人民网党史频道 · 台儿庄抗日大战", url: "http://dangshi.people.com.cn/n/2013/0413/c85037-21124845.html" },
   { title: "凤凰网 · 抗日首次大胜：血战台儿庄全记录", url: "http://phtv.ifeng.com/program/fhdsy/200803/0326_1720_461448_3.shtml" },
   { title: "抗日战争纪念网 · 台儿庄大捷（逐日战斗介绍）", url: "https://www.krzzjn.com/show-360-25093.html" },
+  { title: "B 站 · 《二战的故事》血战台儿庄：一座孤城与一场不可能的胜利（瑞克Zero，本页讲解路线参考此片）", url: "https://www.bilibili.com/video/BV1Czk3BCE9t" },
   { title: "本仓库 · 血战台儿庄（1938 第一人称白盒游戏）", url: "../Taierzhuang1938/" },
 ];
+
+/** 讲解路线（参考《二战的故事》瑞克Zero 的叙述弧：谷底 → 棋盘 → 前哨 → 孤城 → 翻盘 → 盖棺）。 */
+export const READING_PATH = [
+  { id: "rp1", label: "谷底", desc: "南京陷落 · 韩复榘弃守", href: "#background", note: "先让读者明白为什么「不可能」" },
+  { id: "rp2", label: "前哨", desc: "临沂 · 滕县，两场买时间的仗", href: "#timeline", note: "两把钳子合不拢的前提" },
+  { id: "rp3", label: "孤城", desc: "台儿庄巷战拉锯", href: "#map", note: "把敌人吸在城里的两周" },
+  { id: "rp4", label: "翻盘", desc: "敢死队与总反攻", href: "#dare", note: "情绪顶点：最后五分钟" },
+  { id: "rp5", label: "辨析", desc: "意义与各方数字", href: "#aftermath", note: "胜利是真的，神话要拆掉" },
+  { id: "rp6", label: "盖棺", desc: "人物后来的结局", href: "#commanders", note: "记住的是人，不只是番号" },
+];
+
+/** 人物后来（盖棺）。视频讲解的落点是人的结局，本页以数据表承接，渲染在人物卡底部。 */
+export const PEOPLE_LATER = {
+  pLi: "1949 年赴美，1965 年归国，1969 年病逝于北京——晚年口述的回忆录，正是本页选摘的底本。",
+  pBai: "1949 年赴台，1966 年病逝于台北。",
+  pSun: "战后赴台，1990 年病逝于台北，享年 97 岁。",
+  pChi: "1949 年 4 月在北平被捕入狱，1955 年病逝狱中。台儿庄的光复者，人生却以另一种方式落幕。",
+  pHuang: "1948 年太原战役中酝酿起义，事泄被捕，同年 11 月就义于南京雨花台——《榴花》成了他自己的谶语。",
+  pTang: "1949 年赴台，1954 年病逝于东京。关于他在台儿庄的评价，至今仍是两说。",
+  pGuan: "1949 年辞职赴港，1980 年病逝于香港。",
+  pPang: "1943 年被俘后投敌任伪职，成为一生最大的污点；战后赴台，1963 年病逝。",
+  pZhang: "1940 年 5 月在枣宜会战中壮烈殉国，是抗战中殉国军衔最高的将领之一——临沂只是他正名的第一站。",
+  pWangMZ: "殉国后国民政府追赠陆军上将；毛泽东亲书挽联「奋战守孤城，视死如归，是革命军人本色」。遗体运回四川安葬。",
+  pSunZ: "1949 年赴台，1985 年病逝。",
+  pWu: "战后一度入狱，获释后回陕西泾阳老家务农；2007 年病逝，享年 97 岁，被媒体称为「台儿庄最后的敢死队长」。",
+  pIsogai: "1942—1944 年任日军香港占领地总督；战后被定为战犯，判处终身监禁，1967 年病死狱中。",
+  pItagaki: "1948 年 12 月被远东国际军事法庭判处绞刑。",
+};
 
 /** 台儿庄城小档案。 */
 export const TOWN_FACTS = [
