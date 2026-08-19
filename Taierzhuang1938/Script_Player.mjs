@@ -96,6 +96,7 @@ export class PlayerController {
     this.wounds = [];                       // { part, bleed, since }
     this.bandages = 2;
     this.suppression = 0;                   // 0..1，被打压的程度
+    this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
     this.stamina = 1;
 
     this.eyeHeight = STANCE.stand.eye;
@@ -123,6 +124,7 @@ export class PlayerController {
     this.bleeding = 0;
     this.wounds.length = 0;
     this.suppression = 0;
+    this.suppressedUpright = false;
     this.stamina = 1;
     this.stance = "stand";
     this.alive = true;
@@ -295,7 +297,17 @@ export class PlayerController {
     if (input.pronePressed) this.stance = this.stance === "prone" ? "stand" : "prone";
     else if (input.crouchPressed) this.stance = this.stance === "crouch" ? "stand" : "crouch";
     // 压制到一定程度会被逼得趴下 —— 这是 ER2 式压制最有说服力的一笔
-    if (this.suppression > 0.85 && this.stance === "stand") this.stance = "crouch";
+    // 压制**不再偷偷改玩家的姿态**。
+    // 原来是 suppression > 0.85 就把 stance 直接改成 crouch：玩家没按任何键，
+    // HUD 上姿态从「立」自己跳到「蹲」，移动速度从 3.05 掉到 1.62 ——
+    // 体感就是「WASD 时灵时不灵」，而且找不到原因（唯一的反馈是一圈很淡的暗角）。
+    // 改成只在**玩家自己按下过蹲/卧**之后才由压制维持；纯站着挨打就只是走得慢一点，
+    // 是不是趴下由玩家自己决定。这也更接近 ER2：压制影响的是精度与视野，不是替你操作。
+    if (this.suppression > 0.85 && this.stance === "stand") {
+      this.suppressedUpright = true;          // 只做提示，不改姿态
+    } else if (this.suppression < 0.5) {
+      this.suppressedUpright = false;
+    }
     const target = STANCE[this.stance];
     const rate = 1 - Math.exp(-dt * 8.5);
     this.eyeHeight += (target.eye - this.eyeHeight) * rate;
@@ -345,14 +357,18 @@ export class PlayerController {
     if (this.fastCrawl) speed = 1.25;              // 卧姿 0.72 -> 1.25
     speed *= 1 + this.sprint * 0.72;
     speed *= 1 - this.ads * 0.42;
-    speed *= 1 - this.suppression * 0.18;
+    // 被压制时腿会软，但这是个温和的惩罚（最多 -25%），不是把人按到蹲姿的 -47%
+    speed *= 1 - this.suppression * 0.25;
     if (this.InWater) speed *= 0.25;               // 齐腰的水里迈不开腿
     // 腿部中弹会拖着走
     speed *= this.LegPenalty();
     speed *= Clamp(this.health / 60, 0.45, 1);
 
     const forward = this._forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const right = this._right.crossVectors(forward, UP).normalize().negate();
+    // 右向量**不能再取反**。朝向 -Z、上方 +Y 时 cross(forward, up) 出来的已经是 +X，
+    // 也就是正确的右手边；多一个 negate 就成了左边，按 D 往左横移。
+    // 实测（yaw=0）：修之前按 D 走 dx=-2.54、按 A 走 dx=+2.67，整个反的。
+    const right = this._right.crossVectors(forward, UP).normalize();
     const wish = this._tmp.set(0, 0, 0)
       .addScaledVector(forward, input.forward || 0)
       .addScaledVector(right, input.strafe || 0);

@@ -69,11 +69,125 @@ Check("调试口齐全", api.hasStory && api.hasCombat && api.fns.length === 8,
   `story=${api.hasStory} combat=${api.hasCombat} fns=${api.fns.length}/8`);
 
 // ===========================================================================
-// 2) 能走
+// 2) 真键盘走完整路径 —— 这一节是补票
+//
+// 事故：A/D 反了（按 D 往左横移），而且压制会偷偷把玩家按成蹲姿、速度砍一半。
+// 两个都是用户第一时间就感觉到的问题，而通关冒烟一路是绿的 ——
+// 因为下面第 3 节那种测法是**直接推 player.Update 喂合成的 input 对象**，
+// 把「键盘事件 -> InputRouter -> input」整段完全绕开了。
+// 键位一重构（Script_Input.mjs），那一段就成了没有任何测试保护的裸奔区。
+//
+// 所以这一节必须走真键盘：正常模式进页面 -> 点「进城」拿指针锁 -> page.keyboard.down。
+// ===========================================================================
+{
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=low&scale=small`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.click("#bootStart");
+  await page.waitForTimeout(400);
+
+  // 找一块 9 m 内没有齐胸障碍的空地，免得把撞墙当成移动 bug
+  const spot = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    for (let r = 6; r < 90; r += 3) {
+      for (let a = 0; a < 12; a += 1) {
+        const th = (a / 12) * Math.PI * 2;
+        const x = T.player.position.x + Math.cos(th) * r;
+        const z = T.player.position.z + Math.sin(th) * r;
+        let blocked = false;
+        for (const b of T.battlefield.NearbyColliders(x, z, 9)) {
+          if (b.max[1] - T.battlefield.GroundHeight(x, z) < 0.6) continue;
+          blocked = true; break;
+        }
+        if (!blocked) return { x, z };
+      }
+    }
+    return null;
+  });
+
+  const Walk = async (code, seconds = 1.6) => {
+    await page.evaluate((sp) => {
+      const T = window.Taierzhuang;
+      T.player.position.set(sp.x, T.battlefield.GroundHeight(sp.x, sp.z), sp.z);
+      T.player.velocity.set(0, 0, 0);
+      T.player.yaw = 0;                 // 固定朝向 -Z，方向符号才有意义
+      T.player.stance = "stand";
+      T.player.suppression = 0;
+      T.player.health = 100;
+    }, spot);
+    await page.waitForTimeout(120);
+    const p0 = await page.evaluate(() => [window.Taierzhuang.player.position.x,
+      window.Taierzhuang.player.position.z]);
+    await page.keyboard.down(code);
+    await page.waitForTimeout(seconds * 1000);
+    const snap = await page.evaluate(() => {
+      const T = window.Taierzhuang;
+      return { x: T.player.position.x, z: T.player.position.z,
+        v: Math.hypot(T.player.velocity.x, T.player.velocity.z) };
+    });
+    await page.keyboard.up(code);
+    await page.waitForTimeout(200);
+    return { dx: snap.x - p0[0], dz: snap.z - p0[1], v: snap.v };
+  };
+
+  const w = await Walk("KeyW");
+  const sBack = await Walk("KeyS");
+  const a = await Walk("KeyA");
+  const d = await Walk("KeyD");
+
+  Check("键盘 W 往前（-Z）", w.dz < -1.5 && Math.abs(w.dx) < 0.6,
+    `dx=${w.dx.toFixed(2)} dz=${w.dz.toFixed(2)} v=${w.v.toFixed(2)}`);
+  Check("键盘 S 往后（+Z）且比前进慢", sBack.dz > 1.0 && sBack.v < w.v * 0.9,
+    `dz=${sBack.dz.toFixed(2)} v=${sBack.v.toFixed(2)} vs 前进 ${w.v.toFixed(2)}`);
+  // 这两条就是那次事故的正主：A/D 的符号
+  Check("键盘 A 往左（-X）", a.dx < -1.5 && Math.abs(a.dz) < 0.6,
+    `dx=${a.dx.toFixed(2)} dz=${a.dz.toFixed(2)}`);
+  Check("键盘 D 往右（+X）", d.dx > 1.5 && Math.abs(d.dz) < 0.6,
+    `dx=${d.dx.toFixed(2)} dz=${d.dz.toFixed(2)}`);
+  Check("横移不比前进慢一大截", a.v > w.v * 0.85 && d.v > w.v * 0.85,
+    `左 ${a.v.toFixed(2)} 右 ${d.v.toFixed(2)} 前 ${w.v.toFixed(2)}`);
+
+  // 压制不许替玩家改姿态：站着挨打只该慢一点，不该自己蹲下
+  const supp = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    T.player.stance = "stand";
+    T.player.suppression = 1.0;
+    T.StepFrames(30);
+    return { stance: T.player.stance, upright: !!T.player.suppressedUpright };
+  });
+  Check("压制不替玩家改姿态", supp.stance === "stand",
+    `压满之后 stance=${supp.stance}，提示位 ${supp.upright}`);
+
+  // 姿态键与探头走的也是真键盘
+  const stance = await page.evaluate(() => window.Taierzhuang.player.stance);
+  await page.keyboard.press("KeyC");
+  await page.waitForTimeout(350);
+  const crouched = await page.evaluate(() => window.Taierzhuang.player.stance);
+  await page.keyboard.press("KeyZ");
+  await page.waitForTimeout(350);
+  const proned = await page.evaluate(() => window.Taierzhuang.player.stance);
+  Check("键盘 C 蹲 / Z 卧", crouched === "crouch" && proned === "prone",
+    `${stance} -> ${crouched} -> ${proned}`);
+
+  await page.keyboard.down("KeyE");
+  await page.waitForTimeout(320);
+  const leaned = await page.evaluate(() => window.Taierzhuang.player.lean);
+  await page.keyboard.up("KeyE");
+  Check("键盘 E 探头", leaned > 0.15, `lean=${leaned.toFixed(3)}`);
+}
+
+// ===========================================================================
+// 3) 能走（直接推控制器，与上一节互为对照）
 // ===========================================================================
 Stage("2 走动");
 const moved = await page.evaluate(() => {
   const T = window.Taierzhuang;
+  // 上一节按过 C/Z，人还趴着；不复位的话这里量到的是卧姿速度 0.72 m/s，
+  // 会被误读成"移动坏了"。测试之间必须自己把状态收干净。
+  T.player.stance = "stand";
+  T.player.suppression = 0;
+  T.player.health = 100;
+  T.StepFrames(20);
   const p0 = T.player.position.clone();
   // 直接推玩家控制器，不去合成键盘事件：出图模式下没有指针锁，
   // 键盘路径本来就走不通，而我们要测的是移动本身。
