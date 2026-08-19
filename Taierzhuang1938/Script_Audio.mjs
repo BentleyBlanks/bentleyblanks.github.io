@@ -1477,7 +1477,14 @@ export class AudioEngine {
     const pool = [];
     for (const e of this.voiceBank.values()) {
       // 指定了 key 就只认那一句（下命令要喊对应的那句，不能"从 rally 里随便挑一句"）
-      if (key ? e.key === key : e.kind === kind) pool.push(e);
+      if (key) { if (e.key === key) pool.push(e); continue; }
+      // event 句**有前提条件**，不许被同类随机抽中 —— 只能由知道前提的调用方用 key 点名。
+      // 滕县攻城日军无战车（34 辆九四式全配属给打临城的第 63 联队，见 docs/Data_TengxianCity.md），
+      // 一个兵随机喊出「战车！战车来咯！」就是穿帮；同理，手里还有子弹的兵不该喊
+      // 「手榴弹莫得咯」，全班有枪时不该被喊「莫得枪的，跟到走」。
+      // 这道闸比在每个关卡里挨个屏蔽可靠：漏配的默认行为是**不喊**，而不是乱喊。
+      if (e.event) continue;
+      if (e.kind === kind) pool.push(e);
     }
     if (!pool.length) return null;
     // 确定性挑选：种子给调用方（通常是士兵 id），同一个人倾向于喊同样的话，

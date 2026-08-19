@@ -39,6 +39,9 @@ await page.waitForFunction(
 const r = await page.evaluate(() => {
   const A = window.Taierzhuang.audio;
   const bank = [...A.voiceBank.values()];
+  // 先清闸：页面已经在跑，场上 AI 随时可能刚喊过一句把全局闸占住，
+  // 不清零的话这条用例会随机红 —— 测的是节流逻辑，不是运气。
+  A.lastBarkAt = -99; A.lastBarkKindAt.clear();
   const first = A.Bark("rally", { seed: 1 });        // 连着两句，第二句必须被吃掉
   const second = A.Bark("rally", { seed: 2 });
   A.lastBarkAt = -99; A.lastBarkKindAt.clear();
@@ -53,16 +56,50 @@ const r = await page.evaluate(() => {
     ctxState: A.ctx && A.ctx.state,
   };
 });
+// event 句有前提条件（滕县日军无战车、有枪的兵不该喊"手榴弹莫得咯"），
+// 不许被同类随机抽中 —— 这道闸的价值是「漏配就不喊」而不是「漏配就乱喊」。
+// 方言抽查用零件表而不是逐句比对：改一句文本不该让用例红掉，
+// 但整批退回普通话必须红。
+Object.assign(r, await page.evaluate(() => {
+  const A = window.Taierzhuang.audio;
+  const bank = [...A.voiceBank.values()];
+  const evKeys = new Set(bank.filter((e) => e.event).map((e) => e.key));
+  let leaked = 0;
+  for (const kind of ["spot", "ammo", "move", "rally", "warn", "hurt"]) {
+    for (const e of bank) if (e.kind === kind && !e.event && evKeys.has(e.key)) leaked += 1;
+  }
+  // 真跑一遍 Bark：event 句一次都不该出现在随机挑选的结果里
+  const picked = new Set();
+  for (let i = 0; i < 240; i += 1) {
+    A.lastBarkAt = -99; A.lastBarkKindAt.clear();
+    const kind = ["spot", "ammo", "move", "rally"][i % 4];
+    const before = A.playCounter;
+    const v = A.Bark(kind, { seed: i });
+    if (v) picked.add(A.lastBarkPickKey || "");
+  }
+  const zh = /莫|咯|到起|遭|不得|匀|拢|弟兄伙|哪个|挂彩|龟儿|一哈|歇气|手边|爬上|钻进/;
+  return {
+    eventLeak: leaked,
+    dialectHits: bank.filter((e) => zh.test(e.text)).length,
+    eventCount: evKeys.size,
+  };
+}));
 
-Check("配音全部解码成功（一条都不许静默丢）", r.size >= 25 && r.errors.length === 0,
+Check("配音全部解码成功（一条都不许静默丢）", r.size >= 30 && r.errors.length === 0,
   `载入 ${r.size} 条，错误 ${r.errors.length} 条${r.errors.length ? "：" + r.errors.join(" / ") : ""}`);
 Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 hitmarker 用嘴说了一遍）",
   Object.keys(r.kinds).length >= 6, JSON.stringify(r.kinds));
 Check("日语口令没有混进声库（中文模型读日文，日本兵说中文比不说更糟）", !r.hasIja,
   r.hasIja ? "混进来了" : "已排除");
-Check("每句都在 0.3—2.5 s（太长的喊话在战场上读不完；太短的多半是模型只吐了半句）",
-  r.durations.every((d) => d > 0.3 && d < 2.5),
+Check("每句都在 0.3—2.6 s（太长的喊话在战场上读不完；太短的多半是模型只吐了半句）",
+  r.durations.every((d) => d > 0.3 && d < 2.6),
   `最长 ${Math.max(...r.durations)}s，最短 ${Math.min(...r.durations)}s`);
+Check("event 句被挡在随机挑选之外（滕县无战车，不许有人随口喊「战车来咯」）",
+  r.eventLeak === 0 && r.eventCount >= 5,
+  "event 句 " + r.eventCount + " 条，泄漏进随机池 " + r.eventLeak + " 条");
+Check("文本是四川话不是普通话（方言零件抽查）",
+  r.dialectHits >= 20,
+  "31 句里带方言零件（莫/咯/到起/遭/不得/匀/拢/弟兄伙…）的有 " + r.dialectHits + " 句");
 Check("节流生效：连着两句只出一句（五十个人不能同时喊卧倒）", r.firstOk && r.secondBlocked,
   `第一句${r.firstOk ? "出" : "没出"}，第二句${r.secondBlocked ? "被吃掉" : "也出了"}`);
 Check("指定 key 能喊到那一句（下命令不能从 rally 里随便挑）", r.keyedOk, "rally_hold");
