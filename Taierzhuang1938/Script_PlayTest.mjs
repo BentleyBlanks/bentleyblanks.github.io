@@ -667,9 +667,13 @@ const ballistics = await page.evaluate(() => {
   if (shot) { shot.slot = D.Slots().active; shot.weapon = D.Slots().weapon; }
   return shot || { none: true, slot: D.Slots().active, alive: T.player.Alive };
 });
-Check("平射三百米有可感知的下坠（0.4—0.9 m）",
+// 验收带 2026-08-19 从 0.4—0.9 m 上调到 1.1—1.7 m：加了二次阻力之后 300 m 的
+// 飞行时间从 0.370 s 变成 0.571 s，下坠自然从 0.71 m 涨到 1.32 m。
+// 对照战地的 datamine（Gewehr 98 300 m 下坠 1.40 m、存速 45%）—— 我们的存速也是 45%，
+// 但重力仍是真实的 9.8（战地那个 12 是街机化处理，见 docs/Data_BattlefieldNumbers.md）。
+Check("平射三百米有可感知的下坠（1.1—1.7 m，战地是 1.40 m）",
   !ballistics.none && ballistics.horizDist > 280 && ballistics.horizDist < 320
-  && ballistics.dropM > 0.4 && ballistics.dropM < 0.9,
+  && ballistics.dropM > 1.1 && ballistics.dropM < 1.7,
   ballistics.none
     ? `没打出去（槽位 ${ballistics.slot}，人活着=${ballistics.alive}）`
     : `${ballistics.weapon} 水平 ${ballistics.horizDist.toFixed(1)} m，`

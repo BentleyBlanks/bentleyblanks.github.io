@@ -1073,12 +1073,26 @@ const _marchTargets = [];
  * 落点规律完全一样，提前量这个概念不存在。
  *
  * 这里每段 0.02 s、按 AMMO[weapon.ammo].muzzle 的考据初速走（七九 810 / 六五 762 /
- * 七七 800），段内复用现成的 battlefield.Raycast。7.92×57 在 300 m 上下坠约 0.67 m,
- * 刚好是"瞄头打胸"的量级：可感知，但不至于挫败。重力挂 difficulty.bulletGravity。
+ * 七七 800），段内复用现成的 battlefield.Raycast。重力挂 difficulty.bulletGravity。
  *
- * 40 段 × 每段 16 m ≈ 650 m，覆盖得住最远的 effectiveRangeM（中正式 500 m）。
- * 一枪 40 次 Raycast 听着多，但玩家一秒才打一发，而 AI 侧仍然是概率命中，不走这条路。
+ * **空气阻力（2026-08-19 补）。** 在这之前子弹是一路 810 m/s 飞到底的，
+ * 这才是"弹道太平"的根因 —— 不是重力太小，是飞行时间太短。
+ * 战地的模型是二次阻力 `a = -k·v²`，k ≈ 0.0025 /m（datamine：Gewehr 98 到 300 m
+ * 只剩 45% 初速，反解 k = ln(1/0.45)/300 = 0.00266）。这条我们照抄，因为它是真的
+ * 物理，不是手感调参。
+ *
+ * 但战地那个 **g = 12 m/s² 我们不抄**。那是为了让下坠在屏幕上读得出来做的街机化
+ * 处理；这个项目从城墙尺寸到台词出处都以史料为准，重力改成假的说不过去。
+ * 结果反而更好：光靠真实阻力把 300 m 的飞行时间从 0.370 s 拉到 0.552 s，
+ * 下坠就从 0.67 m 变成约 1.49 m —— 已经在战地那个 1.40 m 的量级上，
+ * 而且每一个数字都是真的。
+ *
+ * 步数从 40 提到 64：带阻力之后同样的 0.02 s 走不了那么远了，
+ * 40 段只够 385 m，够不着中正式 500 m 的标称射程。64 段 ≈ 511 m。
+ * 一枪 64 次 Raycast 听着多，但玩家一秒才打一发，而 AI 侧仍然是概率命中，不走这条路。
  */
+const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
+
 function MarchBullet(from, dir, weapon, targets) {
   const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
   const gravity = 9.8 * (DIFFICULTY.bulletGravity ?? 1);
@@ -1087,7 +1101,11 @@ function MarchBullet(from, dir, weapon, targets) {
   _bulletPos.copy(from);
   _bulletVel.copy(dir).multiplyScalar(muzzle);
   let travelled = 0;
-  for (let step = 0; step < 40 && travelled < range; step += 1) {
+  for (let step = 0; step < 64 && travelled < range; step += 1) {
+    // 阻力先于重力：a = -k·v²·v̂，显式欧拉在 0.02 s 步长上误差可以忽略
+    // （810 m/s 一步掉 32 m/s，约 4%）。
+    const speed = _bulletVel.length();
+    if (speed > 1) _bulletVel.multiplyScalar(Math.max(0, 1 - BULLET_DRAG_K * speed * stepS));
     _bulletVel.y -= gravity * stepS;
     _segDir.copy(_bulletVel).multiplyScalar(stepS);
     let segLen = _segDir.length();
