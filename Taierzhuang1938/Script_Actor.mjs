@@ -100,7 +100,7 @@ function Dimensions(height) {
     // 躯干的收分：腰窄肩宽。这是「不是胶囊 + 球」的第一眼判据。
     waistHalf: 0.086 * H, waistDepth: 0.068 * H,
     chestHalf: 0.107 * H, chestDepth: 0.083 * H,
-    headW: 0.113 * H, headH: 0.132 * H, headD: 0.143 * H,
+    headW: 0.102 * H, headH: 0.132 * H, headD: 0.126 * H,
     // 脚的高度**等于**踝关节高度：IK 解到踝，脚这块料正好从踝铺到地面，
     // 随手给个 0.04H 的话人会陷进地里或者浮起来。
     footLen: 0.148 * H, footW: 0.056 * H, footH: 0.055 * H,
@@ -283,10 +283,17 @@ function ExtractPitch(q) {
   return TMP_E.x;
 }
 
-/** 把一根骨头朝一组欧拉角混过去（蹲/卧/倒地这些覆盖姿势都叠在 IK 之上）。 */
-function BlendEuler(object, x, y, z, t) {
+/**
+ * 把一根骨头朝一组欧拉角混过去（蹲/卧/倒地这些覆盖姿势都叠在 IK 之上）。
+ *
+ * order 不是可有可无的装饰：欧拉序决定**哪一轴先转**，而先转的那一轴才是
+ * 「在骨头自己的坐标系里」转。匍匐的青蛙腿必须先绕大腿自己的长轴滚 90°
+ * （把膝盖的弯曲轴滚到朝天），再外展 —— 用默认的 YXZ（滚是最外层）就变成
+ * 「先外展再整条腿绕竖轴甩」，膝盖会抬到半空去。
+ */
+function BlendEuler(object, x, y, z, t, order = "YXZ") {
   if (t <= 0) return;
-  TMP_E.set(x, y, z, "YXZ");
+  TMP_E.set(x, y, z, order);
   TMP_Q1.setFromEuler(TMP_E);
   object.quaternion.slerp(TMP_Q1, Clamp01(t));
 }
@@ -810,7 +817,15 @@ function ShellAudit(geometry) {
  * **只有真截图才看得见**。
  *
  * 阈值取 ±0.25 而不是 0：平片（帽徽、领章）这两个值本来就在 0 附近晃，
- * 只有明确翻了面的壳才动它。模型侧修好之后这一段自动变空操作。
+ * 只有明确翻了面的壳才动它。
+ *
+ * **这个阈值也正是它救不回全部的原因**，记在这里当教训：肩膀、手、日方大腿的
+ * facing 落在 −0.13 到 −0.25 之间（细长的壳，形心指向与法线本来就不太一致），
+ * 全部躲过了这道网 —— 于是那一版的两条胳膊贴近看是能看进袖子内壁的。
+ * 靠形心朝向猜是**启发式**，救不了边界情况。根治在模型侧：
+ * TzmCore 的 Loft 按 rings 的走向定绕向、封口绕向也修了，Node.Add 再逐**连通块**
+ * 用有符号体积（闭合壳为负 = 必定里外翻，这是几何事实不是猜）兜一道。
+ * 现在这一段是空操作，留着只当换模的回归网。
  */
 function HealInvertedShell(geometry) {
   const { facing, consistency } = ShellAudit(geometry);
@@ -854,17 +869,16 @@ function HealBucket(bucket, modelId, where) {
 /**
  * 把帽徽 / 领章 / 五角星转到脸那一侧。
  *
- * 这是在给模型侧的一处不一致打补丁：BuildSoldiers.py 里躯干的装具是按
- * **-Z 是正面**摆的（腰前小弹盒在 z = -waistDepth，跟这个文件里的程序化几何一致），
- * 可头上那一套 —— 帽徽、钢盔五角星、连同 eyes 挂点 —— 是按 +Z 是正面摆的。
- * 后果：正面看过去人是**没有帽徽**的，而青天白日帽徽与步兵红领章是史实红线里
- * 点名的敌我识别标志（docs/Data_HistoryMaterial.md 第三节），全场唯二的高饱和点。
+ * 这一段的来历：BuildSoldiers.py 里躯干的装具是按 **-Z 是正面**摆的
+ * （腰前小弹盒在 z = -waistDepth，跟这个文件里的程序化几何一致），可头上那一套
+ * —— 头形、帽子、帽檐、帽徽、钢盔五角星、连同 eyes 挂点 —— 曾经是按 +Z 摆的，
+ * 等于**把整个头装反了**：帽檐扣在后脑勺上，正面看过去人是**没有帽徽**的。
+ * 而青天白日帽徽与步兵红领章是史实红线里点名的敌我识别标志
+ * （docs/Data_HistoryMaterial.md 第三节），是全场唯二的高饱和点。
  *
- * 只转 accent 这两个桶（都是贴在帽子上的平面片），不动帽子本体 —— 帽檐还是在
- * 后面，那个得回 BuildSoldiers.py 修，改这里治不了根。
- *
- * **按包围盒判断再转**：模型侧修好之后（帽徽 z 变成负的）这一段自动变成空操作，
- * 不会二次翻转。
+ * 根治已经在模型侧做了（HeadShape / FieldCap / 帽徽 / 五角星 / eyes 全部翻到 -Z），
+ * 所以**这一段现在是空操作**。留着是当换模的回归网：它按包围盒判断再转，
+ * 方向对的时候一个字节都不动，方向错的时候顺手救回来并打一条 warn。
  */
 function FaceForward(bucket, modelId, nudge = 0) {
   if (!bucket) return;
@@ -1001,9 +1015,10 @@ export class Actor {
     this.eyes.name = "eyes";
     const eyeOffset = build.mounts && build.mounts.eyes;
     if (eyeOffset) {
-      // 正面是 -Z（全场约定，装具的前后就是照这个摆的）。BuildSoldiers.py 里
-      // eyes 挂点给的是 +headD*0.42，也就是后脑勺 —— 那边的 z 号写反了。
-      // 这里按约定取 -|z|：模型侧修好之后这一行照样成立，不会二次翻转。
+      // 正面是 -Z（全场约定，装具的前后就是照这个摆的）。取 -|z| 而不是直接用 z：
+      // 模型侧曾经把整个头部（含 eyes 挂点）按 +Z 摆过一版，等于**把头装反了**。
+      // 那一版已经在 BuildSoldiers.py 里改正，这一行如今是空操作 —— 留着是因为
+      // 它的代价为零，而换模改错方向的代价是「所有人的视线从后脑勺发出」。
       this.eyes.position.set(eyeOffset.x, eyeOffset.y, -Math.abs(eyeOffset.z));
     } else {
       this.eyes.position.set(0, d.headCenterY - d.neckY + 0.011 * d.height, -d.headD * 0.52);
@@ -1033,6 +1048,9 @@ export class Actor {
     // --- 动画内部状态（全部确定性）---
     this.time = 0;
     this.gaitPhase = rnd();                  // 起步相位各不相同，一排人才不像广播体操
+    // 匍匐自己一条相位。跟 gaitPhase 分开是必须的：共用的话，从跑动中扑倒的
+    // 那一帧，腿会从「迈步到一半」直接跳到「收膝到一半」，一记硬切。
+    this.pronePhase = rnd();
     this.idlePhase = rnd() * Math.PI * 2;
     this.breathRate = 0.72 + rnd() * 0.22;
     this.swayScale = 0.75 + rnd() * 0.5;
@@ -1181,6 +1199,11 @@ export class Actor {
     // 早先直接拿 stride 当行程，脚就以 19% 的身速往前飘 —— 那就是「滑步」的来源。
     const stanceTravel = stride * 2 * stanceEnd;
     if (moveSpeed > 0.02) this.gaitPhase = (this.gaitPhase + dt * cadence * 0.5) % 1;
+    // 匍匐的循环频率：一个周期 = 左右各蹬一次。0.42—0.9 Hz，也就是一次一秒多。
+    // 拿步态那套 1.6—4.5 步/秒推匍匐，出来是「在地上游泳」。
+    if (prone > 0.5 && moveSpeed > 0.02) {
+      this.pronePhase = (this.pronePhase + dt * (0.42 + moveSpeed * 1.9)) % 1;
+    }
 
     // --- 站姿高度：蹲就是把胯压下去，膝盖弯多少交给腿 IK 自己算 ------------
     const stanceDrop = crouch * 0.34 + prone * 0.60;
@@ -1250,13 +1273,23 @@ export class Actor {
       lookYaw * 0.65 - aim * 0.10,
       aim * 0.13 + idleSway * 0.01);                        // 据枪时头偏向照门
 
+    // --- 覆盖姿势：卧倒 ------------------------------------------------------
+    // **必须排在持枪与手臂之前。** PoseWeapon 是靠「减掉上身累积的旋转」把枪口
+    // 指到玩家真正看的方向的，而卧倒改的正是 body 的俯仰。先摆枪再翻身体，那份
+    // 补偿就是按站姿算的 —— 上身转平了、枪跟着转，枪口连刺刀一起扎进土里。
+    // （旧版卧倒截图里那把插在地上的中正式就是这么来的。）
+    if (prone > 0.001) this.PoseProne(prone, moveSpeed);
+
     // PoseWeapon 必须在 chest.rotation 写完之后调用：挂点是 chest 的子节点，
     // 它要减掉上身自己的俯仰偏航才能让枪口指到玩家真正看的方向。
-    this.PoseWeapon(aim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee, breath, idleSway);
-    this.PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt);
+    // 卧倒的人**总是在枪后面**：不瞄准也是枪托抵肩、枪身贴地朝前，所以这里给
+    // aim 垫一个底。垫的只是枪与手，上身/头由 PoseProne 定死，不受影响。
+    const weaponAim = Math.max(aim, prone * 0.9);
+    this.PoseWeapon(weaponAim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee,
+      breath, idleSway, prone);
+    this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone);
 
-    // --- 覆盖姿势：卧倒 / 中弹踉跄 / 濒死下沉 ------------------------------
-    if (prone > 0.001) this.PoseProne(prone);
+    // --- 覆盖姿势：中弹踉跄 / 濒死下沉 --------------------------------------
     if (hurt > 0.001) {
       // 中弹踉跄：上身被顶得后仰、头往后甩、脚下往后错半步
       const shake = Math.sin(elapsed * 26) * hurt;
@@ -1286,7 +1319,8 @@ export class Actor {
    * 持枪挂点的位姿：低姿持枪 ↔ 枪托贴肩之间插值，再叠上后坐、拉栓的横滚、
    * 投弹时的收枪。这些常量是按 1.66 m 定的，换身高按 k 缩放。
    */
-  PoseWeapon(aim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee, breath, idleSway) {
+  PoseWeapon(aim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee, breath, idleSway,
+    prone = 0) {
     const d = this.dims;
     const k = d.height / 1.66;
     const mount = this.weaponMount;
@@ -1312,11 +1346,18 @@ export class Actor {
     const restRz = running ? 0.30 : 0.16;
     // 据枪：枪托底板顶进右肩窝（肩关节往下 4 cm 的那个窝）。
     // y=0.325 是按肩高 0.22H 减出来的 —— 早先按 0.29 摆，枪口比眼睛低了 40 cm。
+    //
+    // 卧姿要换一份肩窝坐标，**换的是 z 不是 y**：挂点在 chest 空间里，chest 的
+    // -Z 是「胸口朝外的方向」。人站着时那是正前方，趴下之后它指的是**地面**。
+    // 照抄站姿的 -0.300k，枪就被塞到胸口正下方 30 cm —— 地下。
+    // 贴地时枪身离胸口只有一个身体厚度（6 cm），沿体轴往前伸出去才是对的。
     const t = SmoothStep(0, 1, aim);
+    const aimPy = Lerp(0.325, 0.350, prone) * k;
+    const aimPz = Lerp(-0.300, -0.065, prone) * k;
     mount.position.set(
       Lerp(restPx, 0.085 * k, t),
-      Lerp(restPy, 0.325 * k, t) + breath * 0.004 * k * (1 - aim * 0.6),
-      Lerp(restPz, -0.300 * k, t));
+      Lerp(restPy, aimPy, t) + breath * 0.004 * k * (1 - aim * 0.6),
+      Lerp(restPz, aimPz, t));
 
     // 据枪朝向：先算出「枪身在 root 空间该指哪」，再**整体除掉**上身累积的旋转。
     // 这里必须用四元数，不能写成 aimRx = lookPitch - chest.rotation.x：
@@ -1329,6 +1370,14 @@ export class Actor {
     POSE_E.set(restRx, restRy, restRz, "XYZ");
     REST_Q.setFromEuler(POSE_E);
     mount.quaternion.slerpQuaternions(REST_Q, AIM_Q, t);
+
+    // 匍匐：**先把枪往前送，身体再跟上去**。沿体轴（chest 空间的 +Y）推 5 cm，
+    // 手是 IK 到枪上的，所以两只手自己会跟着一送一收 —— 这就是「爬」的读数来源。
+    if (prone > 0.001) {
+      const push = Math.sin(this.pronePhase * Math.PI * 2) * Clamp01(moveSpeed / 0.22) * prone;
+      mount.position.y += push * 0.05 * k;
+      mount.position.x += push * 0.012 * k;
+    }
 
     // 附加动作都绕枪自己的轴，所以右乘：后坐抬头、拉栓横滚、投弹让位
     const kick = (this.weaponData && this.weaponData.recoil ? this.weaponData.recoil.kick : 0.05);
@@ -1352,7 +1401,7 @@ export class Actor {
    * 手臂。有枪就两只手 IK 到枪上的握点（**先摆枪、手再跟过去**），
    * 空手才走自由摆臂。反过来做的话手永远对不上枪。
    */
-  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt) {
+  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0) {
     const d = this.dims;
     const H = d.height;
     const L = this.arms.L, R = this.arms.R;
@@ -1365,6 +1414,25 @@ export class Actor {
       R.shoulder.rotation.set(swing, 0, 0.13 + moveSpeed * 0.06);
       L.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
       R.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
+      if (prone > 0.001) {
+        // 空手趴着：上臂从肩往**前下方**伸到地面，前臂再往前铺开，两肘就是支点。
+        // **撑起来**是这个姿势的全部意义 —— 平摊着的话头埋在土里什么都看不见
+        // （百姓在弹幕下就是这么爬的）。
+        //
+        // y = π 是把整条胳膊绕自己的长轴滚半圈，滚了肘才往**前**折。不滚的话肘只
+        // 会往后折（人的胳膊就长这样）：上臂朝前下、前臂朝后上，摆出来是一只
+        // 反关节的螃蟹。用 ZXY 序 —— 滚在最内层，先滚再抬，抬的角度才还是
+        // 「从肩往前下」的那个角度。
+        const reach = Clamp01(moveSpeed / 0.22) * Math.sin(this.pronePhase * Math.PI * 2);
+        for (const tag of ["L", "R"]) {
+          const arm = this.arms[tag];
+          const side = tag === "L" ? -1 : 1;
+          const pull = reach * side;                 // 左右手交替往前扒
+          BlendEuler(arm.shoulder, 2.05 + pull * 0.28, Math.PI, side * (0.42 + pull * 0.10),
+            prone, "ZXY");
+          BlendEuler(arm.elbow, -1.00 + pull * 0.42, 0, 0, prone);
+        }
+      }
       return;
     }
 
@@ -1412,8 +1480,13 @@ export class Actor {
 
     // 肘往哪边弯：roll≈π 是往后，再各加一点让肘尖向外张开。
     // 这几个数是对着截图调出来的，不是算出来的 —— 改之前先存一张对比图。
-    const rollR = Math.PI * (1.16 - aim * 0.10) + hurt * 0.2;
-    const rollL = Math.PI * (0.80 + aim * 0.06) - hurt * 0.2;
+    //
+    // 卧姿要整整转半圈：roll 绕的是肩→手那根轴，站着的时候肘尖朝身后（chest 的
+    // +Z），而趴下之后 chest 的 +Z 是**朝天**的 —— 照抄站姿就成了「两肘朝天举枪」。
+    // 差半圈才是两肘撑地，而两肘撑地正是卧姿据枪唯一的支点。
+    const proneRoll = prone * Math.PI;
+    const rollR = Math.PI * (1.16 - aim * 0.10) + hurt * 0.2 - proneRoll;
+    const rollL = Math.PI * (0.80 + aim * 0.06) - hurt * 0.2 + proneRoll;
     SolveTwoBone(R.shoulder, R.elbow, this.gripR, lenA, lenB, rollR);
     if (leftFollows) {
       SolveTwoBone(L.shoulder, L.elbow, this.gripL, lenA, lenB, rollL);
@@ -1426,29 +1499,80 @@ export class Actor {
   }
 
   /**
-   * 卧倒：整个人绕胯翻到接近水平（**负的** x 才是脸朝下、头朝前），
-   * 腿顺着身体轴往后伸直，上身用肘撑起来一点，不然趴下去就什么都看不见了。
-   * 身体轴比水平低约 10°，正好让踝落回地面附近 —— 腿这里不需要再单独摆。
+   * 卧倒 / 匍匐前进。
+   *
+   * 静止卧姿（moveSpeed≈0）：整个人绕胯翻到接近水平（**负的** x 才是脸朝下、
+   * 头朝前），体轴比水平高约 10° —— 头这一端抬起来才看得见前方，而且踝正好落
+   * 回地面附近。腿顺着体轴往后伸直、微微分开，脚**背**贴地（脚掌朝天）。
+   * 上身由两肘撑起，头再抬一档：趴下去什么都看不见的话，这个姿势在玩法上不成立。
+   *
+   * 匍匐（moveSpeed>0）：低姿匍匐的动力不在腿上，在**一侧收膝 + 对侧肘往回扒**，
+   * 身体贴着地一拱一拱往前挪，同时绕体轴左右滚一点。所以这里排的是：
+   *   · 收膝：一条腿外展 + 屈膝（青蛙腿）到位，另一条腿蹬直，左右差半个周期；
+   *   · 滚身：body 的 z 滚 ±6°，跟收膝同相 —— 收哪边的膝就往哪边滚；
+   *   · 拧胯：胯往收膝那侧偏航，胸反向拧回来（真人就是靠这一拧把身体带过去的）；
+   *   · 推枪：枪沿体轴前后推 5 cm。人是**先把枪往前送，身体再跟上去**的。
+   * 腿的动作**不**走站立那套落脚点 IK：贴着地面的脚没有摆动相，
+   * 拿 IK 去解会得到一条抬到半空的腿。
+   *
+   * @param {number} prone     0—1
+   * @param {number} moveSpeed 0—1（0.22 以上算全速匍匐）
    */
-  PoseProne(prone) {
+  PoseProne(prone, moveSpeed = 0) {
     const d = this.dims;
+    const H = d.height;
     const t = SmoothStep(0, 1, prone);
+    const crawl = Clamp01(moveSpeed / 0.22) * t;
+    const p = this.pronePhase;
+    const swing = Math.sin(p * Math.PI * 2);          // +1 = 收左膝，-1 = 收右膝
+    const heave = 0.5 - 0.5 * Math.cos(p * Math.PI * 4);   // 一个周期拱两次
+
     this.body.rotation.x = Lerp(this.body.rotation.x, -1.40, t);
-    this.body.position.y = Lerp(this.body.position.y, 0.095 * d.height, t);
+    this.body.rotation.z = Lerp(this.body.rotation.z, swing * 0.11 * crawl, t);
+    // 贴地的躯干厚度就这么多；一拱一拱时上身还会离地一点点（2 cm 量级，别多）
+    this.body.position.y = Lerp(this.body.position.y, (0.095 + heave * 0.012) * H, t);
     // 躺下之后躯干高度已经由上面这行单独给定；胯上那份 stanceDrop
     // （站姿用来表示"沉下去"的局部 -Y 偏移）必须清掉。
     // 不清的话它会跟着转过去的体轴变成"朝后下方"，把小腿整根压进地里，
     // 手里的枪连刺刀一起扎到地下一米多。这个 bug 在静态正面截图上看不出来。
     this.hips.position.y = Lerp(this.hips.position.y, 0, t);
     this.hips.position.z = Lerp(this.hips.position.z, 0, t);
-    this.chest.rotation.x = Lerp(this.chest.rotation.x, 0.32, t);
+    this.hips.rotation.y = Lerp(this.hips.rotation.y, -swing * 0.20 * crawl, t);
+    this.hips.rotation.z = Lerp(this.hips.rotation.z, 0, t);
+    this.chest.rotation.x = Lerp(this.chest.rotation.x, 0.32 + heave * 0.05 * crawl, t);
+    this.chest.rotation.y = Lerp(this.chest.rotation.y, swing * 0.14 * crawl, t);
+    this.chest.rotation.z = Lerp(this.chest.rotation.z, -swing * 0.06 * crawl, t);
     this.neck.rotation.x = Lerp(this.neck.rotation.x, 0.50, t);
+    this.neck.rotation.y = Lerp(this.neck.rotation.y, swing * 0.10 * crawl, t);
+
+    // 腿在这个姿势下的坐标系（趴着的人整个 body 绕 X 转了 -80°，别凭直觉写）：
+    //   -Y 局部 = 顺着体轴往后 = 腿伸直的方向
+    //   +X 局部 = 人的右手边（还是水平的）
+    //   +Z 局部 = **朝天**
+    // 于是「腿往两边张开」是绕 Z 转（贴着地面扫），「腿抬离地面」才是绕 X 转。
+    // 而膝盖只会绕自己的 X 弯 —— 大腿不滚的话，那根弯曲轴是水平的，
+    // 一弯膝盖整条小腿就竖到天上去（第一版匍匐就是这样，一条腿举在半空）。
+    // 所以收膝时把大腿绕自己的长轴滚 90°，把膝盖的弯曲轴滚到朝天，
+    // 小腿就贴着地面往外侧折 —— 这才是青蛙腿。
     for (const tag of ["L", "R"]) {
       const leg = this.legs[tag];
-      BlendEuler(leg.thigh, 0.06, 0, leg.side * 0.22, t);
-      BlendEuler(leg.knee, -0.18, 0, 0, t);
-      BlendEuler(leg.ankle, 0.70, 0, 0, t);                 // 脚背贴地
-      BlendEuler(this.arms[tag].shoulder, 0, 0, leg.side * 0.55, t * 0.55);
+      // 左腿在 swing>0 时收膝，右腿差半个周期
+      const ph = (p + (tag === "R" ? 0.5 : 0)) % 1;
+      const draw = (0.5 - 0.5 * Math.cos(ph * Math.PI * 2)) * crawl;   // 0 蹬直 → 1 收到位
+      // 滚的量**不跟着 draw 线性走**，一弯膝就得滚满 90°：滚一半的话弯曲轴是斜的，
+      // 小腿就斜着往天上翘（第一版匍匐一条腿举在半空，就是这个数只走到 49°）。
+      // 直腿绕自己的长轴滚是看不出来的，所以提前滚满没有代价。
+      const roll = leg.side * Math.PI * 0.5 * SmoothStep(0, 0.22, draw);
+      BlendEuler(leg.thigh,
+        0.02 - draw * 0.06,                          // 几乎不抬离地面
+        roll,                                        // 绕长轴滚，把膝的弯曲轴滚到朝天
+        leg.side * (0.12 + draw * 0.30),             // 外展：贴着地面往体侧扫
+        t, "ZXY");
+      BlendEuler(leg.knee, -0.10 - draw * 1.35, 0, 0, t);
+      // 脚背贴地：脚要**继续沿着腿往后伸**再往下压一点，脚掌朝天。
+      // 这里给正数就成了「脚尖朝前折在腿底下」—— 一个跪着的膝盖，不是趴着的脚。
+      // y 上把大腿那 90° 滚回来，脚才还是脚背朝下而不是侧着立在地上。
+      BlendEuler(leg.ankle, -0.42 + draw * 0.34, -roll, 0, t);
     }
   }
 

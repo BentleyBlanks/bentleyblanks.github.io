@@ -38,7 +38,7 @@ def Dimensions(height):
         "shoulderHalf": 0.113 * H,
         "waistHalf": 0.086 * H, "waistDepth": 0.068 * H,
         "chestHalf": 0.107 * H, "chestDepth": 0.083 * H,
-        "headW": 0.113 * H, "headH": 0.132 * H, "headD": 0.143 * H,
+        "headW": 0.102 * H, "headH": 0.132 * H, "headD": 0.126 * H,
         "footLen": 0.148 * H, "footW": 0.056 * H, "footH": 0.055 * H,
     }
 
@@ -97,9 +97,12 @@ def Pelvis(d):
 
 
 def UpperArm(d, sleeve):
-    """上臂：**有粗细变化的旋转体**，肩头鼓、肘窝收。圆柱一眼假就假在这里。"""
+    """上臂：**有粗细变化的旋转体**，肩头鼓、肘窝收。圆柱一眼假就假在这里。
+
+    半径是按**连军装袖子** φ12—13 cm 定的。原来给的 0.052H（φ17.3，袖子一乘
+    到 φ18.7）比大腿还粗，剪影上两条胳膊糊成两根圆木，遮住半个躯干。"""
     L = d["upperArmLen"]
-    r = 0.052 * d["height"]
+    r = 0.040 * d["height"]
     return Loft([
         Ring(0.018, r=r * 1.02 * sleeve, power=2.3),
         Ring(-L * 0.18, r=r * 1.00 * sleeve, power=2.2),
@@ -111,7 +114,7 @@ def UpperArm(d, sleeve):
 def ForeArm(d, sleeve, cuff):
     """小臂 + 袖口。cuff>0 时袖口鼓出一圈（军装袖口是有翻边的）。"""
     L = d["forearmLen"]
-    r = 0.044 * d["height"]
+    r = 0.033 * d["height"]
     rings = [
         Ring(0.008, r=r * 0.98 * sleeve, power=2.2),
         Ring(-L * 0.35, r=r * 0.90 * sleeve, power=2.2),
@@ -142,7 +145,7 @@ def Hand(d, side):
 def Thigh(d, trouser):
     """大腿：军裤是宽松的，上粗下细但**膝上要留一点垮下来的余量**。"""
     L = d["thighLen"]
-    r = 0.070 * d["height"]
+    r = 0.059 * d["height"]
     return Loft([
         Ring(0.02, rx=r * 1.06 * trouser, rz=r * 1.00 * trouser, power=2.6),
         Ring(-L * 0.30, rx=r * 0.95 * trouser, rz=r * 0.92 * trouser, power=2.5),
@@ -159,8 +162,8 @@ def ShinPuttee(d, wraps, tone):
     这一招不多花一个三角形 —— 层数就是放样的圈数。
     """
     L = d["shinLen"]
-    kneeR = 0.062 * d["height"]
-    ankleR = 0.036 * d["height"]
+    kneeR = 0.053 * d["height"]
+    ankleR = 0.032 * d["height"]
     rings = [Ring(0.015, r=kneeR * 1.02, power=2.4),
              Ring(-L * 0.14, r=kneeR * 0.94, power=2.4)]
     # 绑腿从膝下缠到踝上
@@ -187,15 +190,21 @@ def Foot(d, toeLift):
 
 
 def HeadShape(d):
-    """头：颅顶圆、下颌方并且往前收 —— **下巴的剪影**是「有脸」的最低要求。"""
+    """头：颅顶圆、下颌方并且往前收 —— **下巴的剪影**是「有脸」的最低要求。
+
+    **脸朝 -Z。** 这条跟躯干（枪在 -Z、背包在 +Z）是同一个约定。
+    整个头部这一套（头/帽/帽檐/帽徽/钢盔/五角星/eyes 挂点）原来是按 +Z 摆的，
+    等于**把头装反了**：帽檐扣在后脑勺上、帽徽长在脑后、eyes 挂点在后脑 —— 而
+    帽徽与领章是史实红线里点名的敌我识别标志，正面看过去一个都没有。
+    """
     W, HH, D = d["headW"], d["headH"], d["headD"]
     return Loft([
-        Ring(-HH * 0.50, rx=W * 0.30, rz=D * 0.26, cz=D * 0.02, power=2.6),      # 下巴尖
-        Ring(-HH * 0.36, rx=W * 0.40, rz=D * 0.36, cz=-D * 0.01, power=2.8),     # 下颌
-        Ring(-HH * 0.14, rx=W * 0.47, rz=D * 0.44, cz=-D * 0.02, power=2.8),     # 颧骨
-        Ring(HH * 0.08, rx=W * 0.50, rz=D * 0.47, cz=-D * 0.03, power=2.7),      # 颅最宽
-        Ring(HH * 0.30, rx=W * 0.45, rz=D * 0.42, cz=-D * 0.04, power=2.5),
-        Ring(HH * 0.46, rx=W * 0.30, rz=D * 0.27, cz=-D * 0.04, power=2.3),
+        Ring(-HH * 0.50, rx=W * 0.30, rz=D * 0.26, cz=-D * 0.02, power=2.6),     # 下巴尖
+        Ring(-HH * 0.36, rx=W * 0.40, rz=D * 0.36, cz=D * 0.01, power=2.8),      # 下颌
+        Ring(-HH * 0.14, rx=W * 0.47, rz=D * 0.44, cz=D * 0.02, power=2.8),      # 颧骨
+        Ring(HH * 0.08, rx=W * 0.50, rz=D * 0.47, cz=D * 0.03, power=2.7),       # 颅最宽
+        Ring(HH * 0.30, rx=W * 0.45, rz=D * 0.42, cz=D * 0.04, power=2.5),
+        Ring(HH * 0.46, rx=W * 0.30, rz=D * 0.27, cz=D * 0.04, power=2.3),
         Ring(HH * 0.52, r=0.0),
     ], SEG_HEAD)
 
@@ -214,21 +223,23 @@ def FieldCap(d):
     帽墙上还有一圈翻起来的护耳布带 —— 这三样凑齐才不像棒球帽。"""
     W, HH, D = d["headW"], d["headH"], d["headD"]
     crown = Loft([
-        Ring(HH * 0.02, rx=W * 0.53, rz=D * 0.50, cz=-D * 0.03, power=2.7),
-        Ring(HH * 0.16, rx=W * 0.54, rz=D * 0.51, cz=-D * 0.03, power=2.7),   # 帽墙
-        Ring(HH * 0.20, rx=W * 0.55, rz=D * 0.52, cz=-D * 0.03, power=2.7),   # 翻边
-        Ring(HH * 0.40, rx=W * 0.50, rz=D * 0.47, cz=-D * 0.04, power=2.5),
-        Ring(HH * 0.56, rx=W * 0.34, rz=D * 0.31, cz=-D * 0.05, power=2.3),
+        Ring(HH * 0.02, rx=W * 0.53, rz=D * 0.50, cz=D * 0.03, power=2.7),
+        Ring(HH * 0.16, rx=W * 0.54, rz=D * 0.51, cz=D * 0.03, power=2.7),    # 帽墙
+        Ring(HH * 0.20, rx=W * 0.55, rz=D * 0.52, cz=D * 0.03, power=2.7),    # 翻边
+        Ring(HH * 0.40, rx=W * 0.50, rz=D * 0.47, cz=D * 0.04, power=2.5),
+        Ring(HH * 0.56, rx=W * 0.34, rz=D * 0.31, cz=D * 0.05, power=2.3),
         Ring(HH * 0.62, r=0.0),
     ], SEG_HEAD)
-    # 帽檐：一片下倾的扁料，前缘比根部窄
+    # 帽檐：一片下倾的扁料，前缘比根部窄。装在**脸这一侧**（-Z），
+    # 前缘往下扣 —— 所以摆到 -Z 之后俯仰角要跟着反号，不然帽檐是往天上翘的。
     brim = Loft([
-        Ring(0.0, rx=W * 0.46, rz=D * 0.055, cz=0.0, power=3.4),
-        Ring(-0.010, rx=W * 0.36, rz=D * 0.045, cz=0.0, power=3.4),
+        Ring(0.0, rx=W * 0.50, rz=D * 0.115, cz=0.0, power=3.4),
+        Ring(-0.009, rx=W * 0.40, rz=D * 0.100, cz=0.0, power=3.4),
     ], 8, smooth=False)
-    Transform(brim, sz=1.0)
-    Transform(brim, rx=0.30)
-    Transform(brim, y=HH * 0.06, z=D * 0.46)
+    Transform(brim, rx=-0.30)
+    # 往前挪到**探出帽墙 3.5 cm** 的位置（帽墙前缘在 z=-0.48D）：原来那片只探出
+    # 4 mm，等于没有帽檐，正面看这顶帽子是个圆帽壳，跟布军帽的剪影对不上。
+    Transform(brim, y=HH * 0.06, z=-D * 0.55)
     return Join(crown, brim)
 
 
@@ -237,8 +248,8 @@ def SunBadgeBlue(d):
     轮廓压成两段（两端都收到轴上），转出来是 16 个三角的透镜片。
     帽徽在屏幕上是三个像素，给它 60 个三角是把预算烧在看不见的地方。"""
     disc = Lathe([(0.0, 0.0), (0.0128, 0.0011), (0.0, 0.0024)], 8, smooth=False)
-    Transform(disc, rx=PI * 0.5)
-    Transform(disc, y=d["headH"] * 0.16, z=d["headD"] * 0.50)
+    Transform(disc, rx=-PI * 0.5)
+    Transform(disc, y=d["headH"] * 0.16, z=-d["headD"] * 0.50)
     return disc
 
 
@@ -246,8 +257,8 @@ def SunBadgeWhite(d):
     """白日十二芒。芒尖靠 10 边低多边形的锥面暗示，不逐根建 ——
     12 根光芒逐根建是 100+ 三角，而它在屏幕上比一个像素大不了多少。"""
     sun = Lathe([(0.0, 0.0), (0.0092, 0.0012), (0.0, 0.0034)], 10, smooth=False)
-    Transform(sun, rx=PI * 0.5)
-    Transform(sun, y=d["headH"] * 0.16, z=d["headD"] * 0.50 + 0.0022)
+    Transform(sun, rx=-PI * 0.5)
+    Transform(sun, y=d["headH"] * 0.16, z=-d["headD"] * 0.50 - 0.0022)
     return sun
 
 
@@ -328,8 +339,8 @@ def Type90Helmet(d):
         Ring(0.0, rx=rx * 0.62, rz=rz * 0.10, power=3.2),
         Ring(-0.012, rx=rx * 0.50, rz=rz * 0.075, power=3.2),
     ], 8, smooth=False)
-    Transform(peak, rx=0.34)
-    Transform(peak, y=-HH * 0.205, z=rz * 1.00)
+    Transform(peak, rx=-0.34)
+    Transform(peak, y=-HH * 0.205, z=-rz * 1.00)
     # 盔箍（内衬圈露出来的一线）
     band = Loft([
         Ring(-HH * 0.150, rx=rx * 0.97, rz=rz * 0.98, power=2.5),
@@ -342,9 +353,11 @@ def HelmetStar(d):
     """正面黄铜五角星。五角靠 5 段 Lathe 的星形轮廓做不到，直接用一个
     5 边棱台 + 中心抬高 —— 屏幕上它只有几个像素，剪影是五边形就够。"""
     star = Lathe([(0.0, 0.0), (0.0165, 0.0), (0.0060, 0.0034), (0.0, 0.0038)], 5, smooth=False)
-    Transform(star, rx=PI * 0.5)
+    # 先绕车削轴（Y）转 18°，再立起来 —— 顺序反了的话 ry 是在**已经立起来的**
+    # 星上做偏航，星面就不正对前方了（原来那版就是反的，只是 16 mm 的星看不出来）
     Transform(star, ry=PI * 0.1)   # 让一个尖朝上
-    Transform(star, y=d["headH"] * 0.02, z=d["headD"] * 0.545 + 0.004)
+    Transform(star, rx=-PI * 0.5)
+    Transform(star, y=d["headH"] * 0.02, z=-d["headD"] * 0.545 - 0.004)
     return star
 
 
@@ -389,8 +402,8 @@ def MarchingBoot(d):
     """编上靴：靴筒到小腿肚，**外面再打脚绊（布带缠踝）**。日军没有绑腿，
     脚绊只缠踝上一小段 —— 别做成中方那种缠到膝下的绑腿。"""
     L = d["shinLen"]
-    kneeR = 0.062 * d["height"]
-    ankleR = 0.038 * d["height"]
+    kneeR = 0.053 * d["height"]
+    ankleR = 0.034 * d["height"]
     rings = [Ring(0.015, r=kneeR * 1.02, power=2.4),
              Ring(-L * 0.20, r=kneeR * 0.92, power=2.4),
              Ring(-L * 0.52, r=kneeR * 0.74, power=2.4),
@@ -477,7 +490,7 @@ def BuildNraSoldier():
     badge.Add("accentA", SunBadgeBlue(d), tile="cloth")
     badge.Add("accentB", SunBadgeWhite(d), tile="cloth")
     # 视线挂点：给瞄准/看向用
-    head.Child("eyes", t=(0.0, d["headH"] * 0.05, d["headD"] * 0.42))
+    head.Child("eyes", t=(0.0, d["headH"] * 0.05, -d["headD"] * 0.42))
 
     _Limbs({"hips": hips, "chest": chest}, d, {
         "sleeve": 1.06, "cuff": 0.012, "trouser": 1.10, "legwrap": "puttee",
@@ -506,7 +519,7 @@ def BuildIjaSoldier():
         tag = "L" if side < 0 else "R"
         collar = chest.Child(
             "collarTab" + tag,
-            t=(side * 0.050, d["shoulderY"] - d["waistY"] + 0.030, 0.040))
+            t=(side * 0.050, d["shoulderY"] - d["waistY"] + 0.030, -0.040))
         collar.Add("accentA", CollarTab(d, side), tile="cloth")
 
     neck = chest.Child("neck", t=(0.0, d["neckY"] - d["waistY"], 0.0), joint=True)
@@ -516,7 +529,7 @@ def BuildIjaSoldier():
     helmet = head.Child("helmet", t=(0.0, 0.006, 0.0))
     helmet.Add("helmet", Type90Helmet(d), tile="steel")
     helmet.Child("helmetStar").Add("accentB", HelmetStar(d), tile="steel")
-    head.Child("eyes", t=(0.0, d["headH"] * 0.02, d["headD"] * 0.42))
+    head.Child("eyes", t=(0.0, d["headH"] * 0.02, -d["headD"] * 0.42))
 
     _Limbs({"hips": hips, "chest": chest}, d, {
         "sleeve": 1.02, "cuff": 0.0, "trouser": 1.04, "legwrap": "boot",

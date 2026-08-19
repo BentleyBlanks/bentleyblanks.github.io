@@ -47,6 +47,10 @@ MATERIAL_NAMES = {
     "Stone", "WoodBeam", "WoodDoor", "RoofTile", "BrickWall", "Adobe",
 }
 
+# Node.Add 的翻面体检报告：`节点/材质 ×块数`。BuildAll 每建完一个模型打一次并清空。
+# 空的才是正常状态 —— 有内容说明某个建模原语的绕向写反了。
+FLIPPED = []
+
 
 # ---------------------------------------------------------------------------
 # 建模原语：全部返回一个独立的 bmesh
@@ -111,10 +115,24 @@ def Loft(rings, segments=12, capStart=True, capEnd=True, smooth=True):
                 f = bm.faces.new((a[i], b[i], b[j], a[j]))
                 f.smooth = smooth
 
+    # 封口的绕向：θ 递增的一圈点，**原序**的法线是 -Y（从上往下看是顺时针）。
+    # 所以起点圈用原序（朝下 = 朝外）、终点圈用反序（朝上 = 朝外）。
+    # 原来两边都写反了 —— 藏在关节里的封口没人看得见，可鞋底、帽檐的上下两面
+    # 就是封口面，于是**鞋底从下面看是空的、帽檐是一片穿透的薄唇**。
     if capStart and len(layers[0]) > 2:
-        bm.faces.new(list(reversed(layers[0]))).smooth = False
+        bm.faces.new(layers[0]).smooth = False
     if capEnd and len(layers[-1]) > 2:
-        bm.faces.new(layers[-1]).smooth = False
+        bm.faces.new(list(reversed(layers[-1]))).smooth = False
+
+    # 上面那套绕向只在 rings **由下往上**写（y 递增）时朝外。
+    # 而四肢、钢盔、鞋、绑腿、帽檐全是从关节往下写的（y 从 0 掉到 -L）——
+    # 一个"往上"变成"往下"，cross(向上, 切向) 就整个反号，出来的是**里外翻的壳**。
+    # 后果分两档：只有法线反的（袖子、裤腿）迎光面渲成暗的，整个人读起来是平的；
+    # 连绕序一起反的（钢盔、鞋）直接被背面剔除吞掉。而包围盒、三角数、材质桶、
+    # draw call 全部正常，Verify 全绿，**只有真截图看得见**——这一版就是这么翻的车。
+    # 所以方向判据写在这里，别让每个调用方自己去记"rings 必须递增"。
+    if len(layers) > 1 and rings[-1]["y"] < rings[0]["y"]:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
     bm.normal_update()
     return bm
 
@@ -208,6 +226,64 @@ def Strip(points, width, thickness, smooth=False):
     return bm
 
 
+def _FaceComponents(bm):
+    """把 bmesh 拆成若干连通块（按共边连通）。Join 出来的零件天然是分开的块，
+    所以体检必须**逐块**做：整块合起来算体积，一只翻了面的小鞋会被一条大裤腿的
+    正体积盖过去。"""
+    seen = set()
+    out = []
+    for seed in bm.faces:
+        if seed in seen:
+            continue
+        stack = [seed]
+        seen.add(seed)
+        group = []
+        while stack:
+            face = stack.pop()
+            group.append(face)
+            for edge in face.edges:
+                for other in edge.link_faces:
+                    if other not in seen:
+                        seen.add(other)
+                        stack.append(other)
+        out.append(group)
+    return out
+
+
+def OrientOutward(bm):
+    """把每个**封闭**连通块翻成法线朝外。返回翻了几块。
+
+    判据是有符号体积 Σ (a×b)·c / 6：闭合壳为负就是里外翻的，这是几何事实，
+    跟凸不凸、有没有洞都无关，不是启发式。开放的块（背带、腰带、盔沿这种
+    没封口的片）体积没意义，一律不动 —— 它们的正面由 Loft / Strip 的绕向定死。
+
+    为什么把它挂在 Node.Add 这一个口子上：全场几何都要从这里进节点树，
+    在这里体检等于**没有一块料能绕过体检**。翻面事故的特征是所有可自动断言的
+    数字（三角数、包围盒、draw call、材质桶）全部正常，Verify 全绿，
+    只有截图看得见 —— 那就不能只靠某个原语自己写对。
+    """
+    flipped = 0
+    for group in _FaceComponents(bm):
+        edges = set()
+        for face in group:
+            edges.update(face.edges)
+        if any(len(e.link_faces) != 2 for e in edges):
+            continue                      # 开放块：体积没有意义
+        volume = 0.0
+        for face in group:
+            verts = face.verts[:]
+            a = verts[0].co
+            for i in range(1, len(verts) - 1):
+                b, c = verts[i].co, verts[i + 1].co
+                volume += a.cross(b).dot(c)
+        if volume < 0.0:
+            bmesh.ops.reverse_faces(bm, faces=group)
+            flipped += 1
+    if flipped:
+        bm.normal_update()
+    return flipped
+
+
 def Transform(bm, x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0, sx=1.0, sy=1.0, sz=1.0):
     """就地变换一个 bmesh。顺序：缩放 → ZYX 欧拉 → 平移。"""
     m = (Matrix.Translation((x, y, z))
@@ -244,7 +320,11 @@ def BooleanDifference(bmA, bmB):
     """A 减 B。bmesh 没有布尔算子，只能借 bpy 的 Boolean 修改器 + depsgraph
     求值 —— 无头模式下这条路是通的（不需要 bpy.ops.object.modifier_apply）。
     只在「洞是造型本身」的地方用（斗拱的十字卯口），别拿它做倒角，
-    布尔出来的三角数不可控，三角预算扛不住。"""
+    布尔出来的三角数不可控，三角预算扛不住。
+
+    **两个输入都必须是不自交的闭合体。** EXACT 求解器按绕数判定内外，
+    自交体（比如 Join 出来的十字刀）的绕数是 2，判定结果未定义 —— 实测会
+    整块返回空网格。要挖十字就挖两刀，别先把两块料并成一把刀。"""
     objA = _BmToObject(bmA, "boolA")
     objB = _BmToObject(bmB, "boolB")
     mod = objA.modifiers.new("diff", "BOOLEAN")
@@ -314,11 +394,19 @@ class Node:
         return node
 
     def Add(self, material, bm, tile="cloth", **place):
-        """往节点上挂一块几何。place 走 Transform 的参数（在节点局部系里摆位）。"""
+        """往节点上挂一块几何。place 走 Transform 的参数（在节点局部系里摆位）。
+
+        进树之前过一道翻面体检（OrientOutward）：这是全场几何唯一的入口，
+        在这里体检就没有一块料能绕过去。翻了的块记在 FLIPPED 里，BuildAll 会打出来 ——
+        **看到这一行不是"修好了"，是"某个原语的绕向写错了，去改那个原语"**。
+        """
         if material not in MATERIAL_NAMES:
             raise ValueError("材质名不在白名单里：%s" % material)
         if place:
             Transform(bm, **place)
+        healed = OrientOutward(bm)
+        if healed:
+            FLIPPED.append("%s/%s ×%d" % (self.name, material, healed))
         self.parts.append((material, bm, TILE_METERS.get(tile, 1.0) if isinstance(tile, str) else float(tile)))
         return self
 
