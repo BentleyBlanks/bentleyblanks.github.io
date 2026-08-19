@@ -8,7 +8,8 @@ import { dirname, join } from "node:path";
 import {
   STATS, TLDR, TIER, TIMELINE_PHASES, TIMELINE, FORCES, PEOPLE,
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
-  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING, TOWN_FACTS,
+  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
+  TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS,
 } from "./Data_Museum.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -111,6 +112,20 @@ function GLOBAL_GLOSSARY_CHECK(g) {
   return Array.isArray(g) && g.length > 0 && g.every((x) => x.term && x.def);
 }
 
+console.log("[6b] 回忆录选摘");
+check(MEMOIR_INTRO.book.includes("李宗仁") && MEMOIR_INTRO.rules.length === 3, "回忆录简介与 3 条阅读守则");
+check(MEMOIR_EXCERPTS.length === 10, `回忆录选摘 10 段（实际 ${MEMOIR_EXCERPTS.length}）`);
+{
+  const ids = new Set(MEMOIR_EXCERPTS.map((m) => m.id));
+  check(ids.size === MEMOIR_EXCERPTS.length, "选摘 id 唯一");
+  check(MEMOIR_EXCERPTS.every((m) => m.quote.length >= 60), "选摘引文 ≥ 60 字");
+  check(MEMOIR_EXCERPTS.every((m) => m.part && m.title && m.note), "选摘字段完整");
+  check(MEMOIR_EXCERPTS.every((m) => m.link && m.link.href.startsWith("#")), "选摘对照链接为页内锚点");
+  const keyPhrases = ["好得很", "捐弃个人前嫌", "孤军深入", "全师殉城", "请君入瓮", "每一住宅皆系一堡垒", "逡巡不进", "最后五分钟", "杀无赦", "空前的胜利"];
+  const all = MEMOIR_EXCERPTS.map((m) => m.quote).join("");
+  check(keyPhrases.every((p) => all.includes(p)), "十段关键原文短语逐字在案");
+}
+
 console.log("[7] index.html 容器与引用");
 {
   const html = readFileSync(join(root, "index.html"), "utf8");
@@ -124,21 +139,26 @@ console.log("[7] index.html 容器与引用");
     "comparePicks", "compareGrid", "balanceRows",
     "phaseLegend", "tlList", "tlPlay", "tlReset",
     "mapTabs", "mapStage", "dareGrid", "dareLoadout", "dareNotes",
-    "tacticGrid", "casTables", "quoteGrid", "mythGrid", "glossary", "readingList",
+    "tacticGrid", "casTables", "quoteGrid", "memoirIntro", "memoirList",
+    "mythGrid", "glossary", "readingList",
   ];
   const missingIds = requiredIds.filter((id) => !html.includes(`id="${id}"`));
   check(missingIds.length === 0, `容器 id 全部存在${missingIds.length ? `（缺失: ${missingIds.join(",")}）` : ""}`);
   const navBlock = html.match(/navLinks[\s\S]*?<\/nav>/);
   check(Boolean(navBlock), "导航块存在");
   const navHrefs = navBlock ? [...navBlock[0].matchAll(/href="#([^"]+)"/g)].map((m) => m[1]) : [];
+  check(navHrefs.includes("memoir"), "导航含回忆录选摘");
   const missingSections = navHrefs.filter((id) => !html.includes(`id="${id}"`));
   check(missingSections.length === 0, `导航锚点全部有对应 section${missingSections.length ? `（缺失: ${missingSections.join(",")}）` : ""}`);
   const mapPhases = (html.match(/class="mapPhase"/g) || []).length;
   check(mapPhases === 3, `态势图 3 个阶段组（实际 ${mapPhases}）`);
   const mapTabs = (html.match(/class="mapTab(?:\s+on)?"/g) || []).length;
   check(mapTabs === 3, `态势图 3 个切换按钮（实际 ${mapTabs}）`);
-  check(html.includes('src="Script_Main.mjs?v=1"'), "引用 Script_Main.mjs");
-  check(html.includes('href="Style_Main.css?v=1"'), "引用 Style_Main.css");
+  check(html.includes('src="Script_Main.mjs?v=2"'), "引用 Script_Main.mjs?v=2");
+  check(html.includes('href="Style_Main.css?v=2"'), "引用 Style_Main.css?v=2");
+  const anchors = MEMOIR_EXCERPTS.map((m) => m.link.href.slice(1));
+  const missingAnchors = anchors.filter((id) => !html.includes(`id="${id}"`));
+  check(missingAnchors.length === 0, `选摘对照锚点全部存在${missingAnchors.length ? `（缺失: ${missingAnchors.join(",")}）` : ""}`);
 }
 
 console.log("[8] 脚本语法（node --check）");

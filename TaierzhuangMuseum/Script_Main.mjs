@@ -4,7 +4,8 @@
 import {
   SITE, STATS, TLDR, TIER, TIMELINE_PHASES, TIMELINE, FORCES, PEOPLE,
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
-  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING, TOWN_FACTS,
+  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
+  TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS,
 } from "./Data_Museum.mjs";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -560,6 +561,37 @@ function initMyths() {
   }
 }
 
+/* ---------------- 回忆录选摘 ---------------- */
+function initMemoir() {
+  const intro = $("#memoirIntro");
+  const head = el("div", "memoirIntroHead");
+  head.append(el("h3", "", MEMOIR_INTRO.title));
+  head.append(el("p", "book", MEMOIR_INTRO.book));
+  head.append(el("p", "pub", MEMOIR_INTRO.pub));
+  head.append(el("p", "src", MEMOIR_INTRO.source));
+  intro.append(head);
+  const rules = el("ul", "memoirRules");
+  for (const r of MEMOIR_INTRO.rules) rules.append(el("li", "", r));
+  intro.append(rules);
+
+  const list = $("#memoirList");
+  for (const m of MEMOIR_EXCERPTS) {
+    const card = el("article", "memoirCard");
+    const top = el("div", "memoirTop");
+    top.append(el("span", "memoirPart", m.part));
+    top.append(tierBadge("main"));
+    card.append(top);
+    card.append(el("h4", "memoirTitle", m.title));
+    card.append(el("blockquote", "memoirQuote", `「${m.quote}」`));
+    const note = el("p", "memoirNote", m.note);
+    card.append(note);
+    const link = el("a", "memoirLink", m.link.label);
+    link.href = m.link.href;
+    card.append(link);
+    list.append(card);
+  }
+}
+
 /* ---------------- 词典 ---------------- */
 function initGlossary() {
   const dl = $("#glossary");
@@ -600,6 +632,7 @@ initDare();
 initTactics();
 initCasualties();
 initQuotes();
+initMemoir();
 initMyths();
 initGlossary();
 initReading();
