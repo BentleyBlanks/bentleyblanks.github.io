@@ -57,7 +57,7 @@ const r = await page.evaluate(() => {
     ctxState: A.ctx && A.ctx.state,
   };
 });
-// event 句有前提条件（滕县日军无战车、有枪的兵不该喊"手榴弹莫得咯"），
+// event 句有前提条件（滕县日军无战车、有枪的兵不该喊"手榴弹！莫得了！"），
 // 不许被同类随机抽中 —— 这道闸的价值是「漏配就不喊」而不是「漏配就乱喊」。
 // 方言抽查用零件表而不是逐句比对：改一句文本不该让用例红掉，
 // 但整批退回普通话必须红。
@@ -78,7 +78,9 @@ Object.assign(r, await page.evaluate(() => {
     const v = A.Bark(kind, { seed: i });
     if (v) picked.add(A.lastBarkPickKey || "");
   }
-  const zh = /莫|咯|到起|遭|不得|匀|拢|弟兄伙|哪个|挂彩|龟儿|一哈|歇气|手边|爬上|钻进/;
+  // 零件表里**语法件**（补语「起」「到起」「到」、否定「莫」、被动「遭」）比词汇件更要紧：
+  // 光换词、语法还是普通话骨架的话，出来就是「普通话演员念台词本」。
+  const zh = /莫|咯|到起|遭|不得|匀|拢|弟兄伙|哪个|挂彩|龟儿|一哈|歇气|手边|爬上|钻进|上起|躲起|跟到/;
   return {
     eventLeak: leaked,
     dialectHits: bank.filter((e) => zh.test(e.text)).length,
@@ -95,7 +97,7 @@ Check("日语口令没有混进声库（中文模型读日文，日本兵说中�
 Check("每句都在 0.3—2.6 s（太长的喊话在战场上读不完；太短的多半是模型只吐了半句）",
   r.durations.every((d) => d > 0.3 && d < 2.6),
   `最长 ${Math.max(...r.durations)}s，最短 ${Math.min(...r.durations)}s`);
-Check("event 句被挡在随机挑选之外（滕县无战车，不许有人随口喊「战车来咯」）",
+Check("event 句被挡在随机挑选之外（滕县无战车，不许有人随口喊「战车碾拢来了」）",
   r.eventLeak === 0 && r.eventCount >= 5,
   "event 句 " + r.eventCount + " 条，泄漏进随机池 " + r.eventLeak + " 条");
 Check("文本是四川话不是普通话（方言零件抽查）",

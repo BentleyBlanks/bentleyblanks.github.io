@@ -35,8 +35,12 @@
 //     定死：真倒下才用「倒」（趴倒、人不倒），持续用「到起」，完成／附着用「起」。
 //   · **「给老子」全篇限两处**，都在班长督战句。一个普通兵对同班平级自称「老子」
 //     是身份越位，不是川味是失真。
-//   · **「咯」要压** —— 27 句里 9 句以「咯」收尾的话，密集连播会变成可听见的口头禅，
-//     反而暴露是同一个 TTS 在念一张表。现为 7 条。
+//   · **「咯」全部删光（2026-08-20）** —— 起初只是嫌它密（27 句里 9 句以「咯」收尾，
+//     连播会变成可听见的口头禅）。真正的问题比这个严重：**「咯」在报警句上是轻快的**。
+//     「鬼子上来咯」「战车来咯」听着像在报喜，玩家收到的情绪与画面里正在发生的事相反。
+//     它是完成体 + 缓和语气的组合，适合「饭熟咯」，不适合「敌人上来了」。
+//     现在报警句一律用「了」收尾并把关键名词重复一遍（「战车！战车碾拢来了！」），
+//     急迫感来自**重复与语序**，不来自语气词。全表 0 条「咯」。
 //
 // ## event 字段
 // 标了 event 的句子**有前提条件**，不许被同类随机抽中，只能由知道前提的调用方
@@ -102,34 +106,34 @@
 export const VOICE_BASE = "Audio/";
 
 export const VOICE_LINES = [
-  { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 1.72,  role: "老兵",    pitch: -4,                  text: "刺刀上起！" },
+  { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 2.34,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
   { key: "rally_charge",    kind: "rally",  file: "vo_rally_charge.mp3",   dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
-  { key: "rally_dadao",     kind: "rally",  file: "vo_rally_dadao.mp3",    dur: 2.51,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍！" },
+  { key: "rally_dadao",     kind: "rally",  file: "vo_rally_dadao.mp3",    dur: 2.36,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍拢去！" },
   { key: "rally_follow",    kind: "rally",  file: "vo_rally_follow.mp3",   dur: 2.14,  role: "班长",    pitch: -2,                  text: "弟兄伙，跟到我上！" },
   { key: "rally_grenade",   kind: "rally",  file: "vo_rally_grenade.mp3",  dur: 2.51,  role: "老兵",    pitch: -4,  event: true,  text: "莫慌！等他走拢再甩！" },
   { key: "rally_hold",      kind: "rally",  file: "vo_rally_hold.mp3",     dur: 2.51,  role: "班长",    pitch: -2,                  text: "顶到起！给老子顶到起！" },
   { key: "rally_hold2",     kind: "rally",  file: "vo_rally_hold2.mp3",    dur: 2.50,  role: "班长",    pitch: -2,                  text: "人不倒，阵地就不得丢！" },
-  { key: "rally_noretreat", kind: "rally",  file: "vo_rally_noretreat.mp3", dur: 1.01,  role: "班长",    pitch: -2,                  text: "一步都莫退！" },
+  { key: "rally_noretreat", kind: "rally",  file: "vo_rally_noretreat.mp3", dur: 2.36,  role: "班长",    pitch: -2,                  text: "莫退！一步都莫退！" },
   { key: "rally_oath",      kind: "rally",  file: "vo_rally_oath.mp3",     dur: 2.49,  role: "班长",    pitch: -2,                  text: "鬼子不打完，莫回四川！" },
   { key: "rally_shoot",     kind: "rally",  file: "vo_rally_shoot.mp3",    dur: 2.50,  role: "班长",    pitch: -2,                  text: "打！打！莫歇气！" },
   { key: "spot_east",       kind: "spot",   file: "vo_spot_east.mp3",      dur: 2.29,  role: "普通兵",   pitch: 0,                   text: "东边！东边有鬼子！" },
-  { key: "spot_enemy",      kind: "spot",   file: "vo_spot_enemy.mp3",     dur: 2.05,  role: "普通兵",   pitch: 0,                   text: "鬼子上来咯！" },
-  { key: "spot_gap",        kind: "spot",   file: "vo_spot_gap.mp3",       dur: 2.30,  role: "普通兵",   pitch: 0,                   text: "缺口！鬼子钻进来咯！" },
+  { key: "spot_enemy",      kind: "spot",   file: "vo_spot_enemy.mp3",     dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "鬼子！鬼子摸拢来了！" },
+  { key: "spot_gap",        kind: "spot",   file: "vo_spot_gap.mp3",       dur: 2.35,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "缺口！鬼子钻进来了！" },
   { key: "spot_plane",      kind: "spot",   file: "vo_spot_plane.mp3",     dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
-  { key: "spot_tank",       kind: "spot",   file: "vo_spot_tank.mp3",      dur: 2.30,  role: "新兵",    pitch: 2,   event: true,  text: "战车！战车来咯！" },
-  { key: "spot_wall",       kind: "spot",   file: "vo_spot_wall.mp3",      dur: 2.31,  role: "普通兵",   pitch: 0,                   text: "鬼子爬上墙咯！" },
+  { key: "spot_tank",       kind: "spot",   file: "vo_spot_tank.mp3",      dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },
+  { key: "spot_wall",       kind: "spot",   file: "vo_spot_wall.mp3",      dur: 2.33,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
   { key: "warn_down",       kind: "warn",   file: "vo_warn_down.mp3",      dur: 1.98,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
   { key: "warn_grenade",    kind: "warn",   file: "vo_warn_grenade.mp3",   dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },
-  { key: "warn_shell",      kind: "warn",   file: "vo_warn_shell.mp3",     dur: 2.13,  role: "老兵",    pitch: -4,                  text: "炮来咯！趴倒！" },
-  { key: "ammo_ask",        kind: "ammo",   file: "vo_ammo_ask.mp3",       dur: 1.80,  role: "普通兵",   pitch: 0,                   text: "哪个匀我一个桥夹！" },
-  { key: "ammo_grenade",    kind: "ammo",   file: "vo_ammo_grenade.mp3",   dur: 1.51,  role: "普通兵",   pitch: 0,   event: true,  text: "手榴弹莫得咯！" },
-  { key: "ammo_out",        kind: "ammo",   file: "vo_ammo_out.mp3",       dur: 1.70,  role: "普通兵",   pitch: 0,                   text: "我莫得子弹咯！" },
+  { key: "warn_shell",      kind: "warn",   file: "vo_warn_shell.mp3",     dur: 2.37,  role: "老兵",    pitch: -4,                  speed: 1.1, text: "炮来了！趴倒！莫动！" },
+  { key: "ammo_ask",        kind: "ammo",   file: "vo_ammo_ask.mp3",       dur: 2.17,  role: "普通兵",   pitch: 0,                   text: "桥夹！哪个匀我一个！" },
+  { key: "ammo_grenade",    kind: "ammo",   file: "vo_ammo_grenade.mp3",   dur: 2.36,  role: "普通兵",   pitch: 0,   event: true,  text: "手榴弹！莫得了！" },
+  { key: "ammo_out",        kind: "ammo",   file: "vo_ammo_out.mp3",       dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "子弹！我莫得子弹了！" },
   { key: "ammo_reload",     kind: "ammo",   file: "vo_ammo_reload.mp3",    dur: 2.51,  role: "普通兵",   pitch: 0,                   text: "我压子弹！掩护我一哈！" },
   { key: "hurt_down",       kind: "hurt",   file: "vo_hurt_down.mp3",      dur: 1.92,  role: "普通兵",   pitch: 0,                   text: "班长哦！班长！" },
-  { key: "hurt_hit",        kind: "hurt",   file: "vo_hurt_hit.mp3",       dur: 1.51,  role: "普通兵",   pitch: 0,                   text: "我遭枪子咯！" },
+  { key: "hurt_hit",        kind: "hurt",   file: "vo_hurt_hit.mp3",       dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "遭了！我遭枪子了！" },
   { key: "hurt_medic",      kind: "hurt",   file: "vo_hurt_medic.mp3",     dur: 2.50,  role: "普通兵",   pitch: 0,                   text: "担架兵！这头有人挂彩！" },
   { key: "hurt_scream",     kind: "hurt",   file: "vo_hurt_scream.mp3",    dur: 2.50,  role: "新兵",    pitch: 2,                   text: "啊——！" },
-  { key: "move_cover",      kind: "move",   file: "vo_move_cover.mp3",     dur: 2.47,  role: "班长",    pitch: -2,                  text: "找掩护！躲起！" },
+  { key: "move_cover",      kind: "move",   file: "vo_move_cover.mp3",     dur: 2.37,  role: "班长",    pitch: -2,                  text: "找掩护！躲到起！" },
   { key: "move_flank",      kind: "move",   file: "vo_move_flank.mp3",     dur: 1.73,  role: "班长",    pitch: -2,                  text: "左手边！绕过去！" },
   { key: "move_go",         kind: "move",   file: "vo_move_go.mp3",        dur: 1.84,  role: "班长",    pitch: -2,                  text: "走！莫站到起！" },
   { key: "move_nogun",      kind: "move",   file: "vo_move_nogun.mp3",     dur: 2.22,  role: "班长",    pitch: -2,  event: true,  text: "莫得枪的，跟到走！" },
