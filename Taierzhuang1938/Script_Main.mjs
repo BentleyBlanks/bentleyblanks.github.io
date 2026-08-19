@@ -1159,7 +1159,7 @@ function TryFire(dt) {
   // viewmodel 已经按那张表把这一发的相机踢动算好了（含每发随机的偏航方向与开镜衰减），
   // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
   viewmodel.ConsumeCameraKick(_kick);
-  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 0.72);
+  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 1.0);
 
   viewmodel.MuzzleWorld(_muzzle);
   audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra", { position: _muzzle.clone() });

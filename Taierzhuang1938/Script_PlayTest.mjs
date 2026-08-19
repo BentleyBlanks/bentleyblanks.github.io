@@ -678,15 +678,17 @@ Check("射线起点是枪口不是眼睛（视差生效）",
   !ballistics.none && ballistics.muzzleOffsetM > 0.02 && ballistics.muzzleOffsetM < 0.6,
   ballistics.none ? "没打出去" : `枪口离瞄准轴 ${ballistics.muzzleOffsetM.toFixed(3)} m`);
 
-// 12.5 后坐：连开三枪 pitch 单调上升，回落只回七成
+// 12.5 后坐：连开三枪 pitch 单调上升，然后照战地的曲线回到**精确的零**
 const recoil = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   T.player.position.set(0, 90, 40);
   T.player.pitch = 0; T.player.ads = 0;
-  // 上一段（弹道）已经打过一发，回落账上还欠着那一发的七成。
-  // 不清零的话这里量到的"回落比"是两段加在一起的，会读成 11%。
+  // 上一段（弹道）已经打过一发，回落账上还欠着它。
+  // 不清零的话这里量到的是两段加在一起的曲线。
   T.player.recoilPending.pitch = 0;
   T.player.recoilPending.yaw = 0;
+  T.player.recoilPeak = 0;
+  T.player.recoilSince = 999;
   const pitches = [T.player.pitch];
   for (let i = 0; i < 3; i += 1) {
     // Debug.Fire 走的是 TryFire(dt=1)，而栓动枪的射击间隔是 1.25—1.40 s ——
@@ -699,15 +701,35 @@ const recoil = await page.evaluate(() => {
   const peak = T.player.pitch;
   const idle = { forward: 0, strafe: 0, sprint: false, ads: false, lean: 0,
     lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 };
-  for (let i = 0; i < 90; i += 1) T.player.Update(1 / 60, idle, null);
-  return { pitches, peak, after: T.player.pitch, residual: T.player.pitch / (peak || 1) };
+  // 逐帧采样回落曲线 —— 只看首尾读不出"悬住再加速"这个形状。
+  const curve = [];
+  for (let i = 0; i < 90; i += 1) {
+    T.player.Update(1 / 60, idle, null);
+    curve.push({ t: (i + 1) / 60, done: 1 - T.player.pitch / (peak || 1) });
+  }
+  const At = (tt) => (curve.find((c) => c.t >= tt) || { done: 1 }).done;
+  return {
+    pitches, peak, after: T.player.pitch, residual: T.player.pitch / (peak || 1),
+    exactZero: T.player.pitch === 0,
+    d05: At(0.05), d20: At(0.20), d45: At(0.45),
+  };
 });
 Check("连开三枪枪口单调上抬",
   recoil.pitches.every((v, i) => i === 0 || v > recoil.pitches[i - 1]) && recoil.peak > 0.02,
   recoil.pitches.map((v) => v.toFixed(4)).join(" -> "));
-Check("一秒半后回落到峰值的 30%±10%（只回七成）",
-  recoil.residual > 0.20 && recoil.residual < 0.40,
-  `峰值 ${recoil.peak.toFixed(4)} -> ${recoil.after.toFixed(4)}（${(recoil.residual * 100).toFixed(0)}%）`);
+// 这三条一起验战地那条回落曲线。**旧版这里断言的是「只回七成、留三成残留」，那是错的** ——
+// datamine 显示 BF1/BFV 栓动步枪残留为零（docs/Data_BattlefieldNumbers.md）。
+Check("后坐回到**精确的零**，没有残留（战地是回到原瞄准点的）",
+  recoil.exactZero,
+  `峰值 ${recoil.peak.toFixed(4)} -> ${recoil.after.toFixed(4)}（残留 ${(recoil.residual * 100).toFixed(3)}%）`
+  + `，精确零=${recoil.exactZero}`);
+Check("回落**从零速率起步**（枪先「悬」一下）：50 ms 内回落 <16%",
+  recoil.d05 < 0.16,
+  `50 ms 回落 ${(recoil.d05 * 100).toFixed(1)}%（同样收干净时间的指数回落是 18.8%，`
+  + `而且它起步最快、尾巴最长 —— 那是「画面在往下淌」的手感）`);
+Check("悬完之后**加速归位**：200 ms 已回落 >55%，450 ms 收干净",
+  recoil.d20 > 0.55 && recoil.d45 > 0.999,
+  `200 ms ${(recoil.d20 * 100).toFixed(1)}% -> 450 ms ${(recoil.d45 * 100).toFixed(1)}%`);
 
 // 12.6 铁瞄偏心：照门不落在屏幕正中，且汉阳造（老套筒）比中正式明显
 const sights = await page.evaluate(() => {

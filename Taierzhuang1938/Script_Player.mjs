@@ -62,7 +62,9 @@ export class PlayerController {
     // 剩下 30% 要玩家自己压回来 —— 这是"栓动枪打完一发要重新找目标"的手感来源。
     this.recoilPending = { pitch: 0, yaw: 0 };   // 还没回落完的那部分（弧度）
     this.recoilRecoverS = 0.4;
-    this.recoilTotal = 0;                       // 本轮累计顶了多少（弧度，取证用）
+    this.recoilTotal = 0;                       // 尚未收回的净后坐（弧度，取证用；收干净即 0）
+    this.recoilSince = 999;                     // 距上一发多久（回落曲线的 TimeSinceLastShot）
+    this.recoilPeak = 0;                        // 上一发顶到的峰值，回落曲线按它归一化
 
     // 两脚架。捷克式全班就一挺，架起来才有 800 m 有效射程；ER2 的规矩是**不架不能开镜**。
     this.bipod = false;
@@ -141,6 +143,8 @@ export class PlayerController {
     this.recoilPending.pitch = 0;
     this.recoilPending.yaw = 0;
     this.recoilTotal = 0;
+    this.recoilSince = 999;
+    this.recoilPeak = 0;
     this.bipod = false;
     this.fastCrawl = false;
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
@@ -277,14 +281,35 @@ export class PlayerController {
     const dx = -input.lookX * sens * adsScale;
     const dy = -input.lookY * sens * adsScale;
 
-    // 后坐回落。指数回落，但**只回 recoilPending 里存的那 70%**：
-    // ApplyRecoil 顶上去 1.0，只往回记 0.7，剩下的 0.3 永久留在 pitch 上。
-    if (this.recoilPending.pitch !== 0 || this.recoilPending.yaw !== 0) {
-      const back = 1 - Math.exp(-dt / Math.max(0.05, this.recoilRecoverS));
-      const bp = this.recoilPending.pitch * back;
-      const by = this.recoilPending.yaw * back;
+    // 后坐回落 —— 照战地的曲线，不是指数衰减。出处见 docs/Data_BattlefieldNumbers.md。
+    //
+    //   Decrease ∝ (|R| / R0)^0.6 · (R0 / T) · K · **TimeSinceLastShot^0.5** · dt
+    //
+    // 两个要点，缺一个手感就不对：
+    //   · **回到零，不留残留。** 我按"留 28% 让玩家自己压"做过一版 —— 那是 CS /
+    //     Valorant 的喷射弹道逻辑。战地的栓动步枪 0.25—0.5 s 收干净，而两发间隔
+    //     1.0—2.4 s，**每一发都从同一个瞄准点开始**。
+    //   · **重量感在 TimeSinceLastShot^0.5 上。** t=0 时该因子为 0，回落**从零速率
+    //     起步再加速** —— 踢上去、悬住、加速归位。那一"悬"就是枪的重量。
+    //     指数回落是反过来的（起步最快、尾巴最长），所以它永远像"画面在往下淌"。
+    //
+    // 指数 0.6 < 1 还有一个好处：dR/dt ∝ R^0.6 是**有限时间收敛到精确的零**的，
+    // 不像指数回落拖一条永远抹不掉的微小尾巴。
+    // K = 1.432 / sqrt(T) 是解出来的：让回稳时间恒等于 1.9×T，与后坐大小无关。
+    this.recoilSince += dt;
+    const pend = Math.hypot(this.recoilPending.pitch, this.recoilPending.yaw);
+    if (pend > 1e-7) {
+      const T = Math.max(0.05, this.recoilRecoverS);
+      const peak = Math.max(pend, this.recoilPeak || pend);
+      const K = 1.432 / Math.sqrt(T);
+      const dec = Math.pow(pend / peak, 0.6) * (peak / T) * K * Math.sqrt(this.recoilSince) * dt;
+      const scale = Math.max(0, 1 - dec / pend);
+      const bp = this.recoilPending.pitch * (1 - scale);
+      const by = this.recoilPending.yaw * (1 - scale);
       this.pitch -= bp; this.recoilPending.pitch -= bp;
       this.yaw -= by; this.recoilPending.yaw -= by;
+      this.recoilTotal -= bp;                 // 取证字段跟着回，归零即"已收干净"
+      if (scale <= 0) this.recoilPeak = 0;
     }
 
     // 自由瞄准：先动枪，枪顶到边界才推动视线。开镜时收窄到 1.4°（贴脸瞄准没有余量）
@@ -408,20 +433,6 @@ export class PlayerController {
     }
 
     if (this.spawnGrace > 0) this.spawnGrace -= dt;
-
-    // 后坐回落：照战地的曲线，**不是指数衰减**。
-    //   Decrease = ((|R|/0.5)^0.6 + 0.001) * RecoilDec * dt * TimeSinceLastShot^0.5 * C
-    // 关键是最后那个 TimeSinceLastShot^0.5：t=0 时它是 0，所以回落**从零速率起步、
-    // 然后加速** —— 踢上去、悬住、加速归位。这条曲线本身就是重量感，
-    // 而不是"留一截让玩家压"（那是 CS 的逻辑，战地的残留是零）。
-    this.elapsedForRecoil = (this.elapsedForRecoil ?? 0) + dt;
-    if (this.recoilTotal !== 0) {
-      const since = Math.max(0, this.elapsedForRecoil - (this.lastRecoilAt ?? 0));
-      const term = Math.pow(Math.abs(this.recoilTotal) / 0.5, 0.6) + 0.001;
-      const dec = term * 4.5 * dt * Math.sqrt(since) * 5.0;
-      if (this.recoilTotal > 0) this.recoilTotal = Math.max(0, this.recoilTotal - dec);
-      else this.recoilTotal = Math.min(0, this.recoilTotal + dec);
-    }
 
     // --- 压制自然衰减 -------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - dt * 0.55);
@@ -562,19 +573,22 @@ export class PlayerController {
    * 开一枪的后坐。参数是**弧度**（调用方从 viewmodel.ConsumeCameraKick 取，
    * 那一份已经按 Data_Weapons 的 recoil 表与开镜量算好了）。
    *
-   * 顶上去 100%，只往 recoilPending 里记 70% —— 于是回落结束后仍然有 30% 留在
-   * pitch 上，玩家必须自己压回来。这就是"打一发要重新找目标"。
+   * 顶上去多少就往 recoilPending 里记多少（recoverFrac = 1.0）——
+   * **战地的后坐是回到零的，没有残留**，见 docs/Data_BattlefieldNumbers.md。
+   * 参数留着是为了将来真有哪支枪要破例，默认值不许再动。
    */
-  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4, recoverFrac = 0.72) {
-    // 保留比按枪读（Data_Weapons.recoverFrac，由调用方传进来）。写死 0.70 的问题实测出来了：
-    // 驳壳枪 0.16 s 一发，五连发残留滚到 1.613°，而它开镜散布只有 0.9°。
-    const keep = Number.isFinite(recoverFrac) ? recoverFrac : 0.72;
+  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4, recoverFrac = 1.0) {
+    const keep = Number.isFinite(recoverFrac) ? recoverFrac : 1.0;
     this.pitch = Clamp(this.pitch + pitchRad, -1.35, 1.35);
     this.yaw += yawRad;
     this.recoilPending.pitch += pitchRad * keep;
     this.recoilPending.yaw += yawRad * keep;
     this.recoilRecoverS = recoverS;
     this.recoilTotal += pitchRad;
+    // 重新起表：回落速率里的 TimeSinceLastShot 从这一发算起，
+    // 所以连发时后一发会把前一发"已经跑起来"的回落打回零速率 —— 连打就压得住。
+    this.recoilSince = 0;
+    this.recoilPeak = Math.hypot(this.recoilPending.pitch, this.recoilPending.yaw);
   }
 
   /** 架/收两脚架。返回是否真的改变了状态（给音效与提示用）。 */

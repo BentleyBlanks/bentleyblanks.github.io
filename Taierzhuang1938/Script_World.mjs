@@ -50,13 +50,22 @@ export class BuildSink {
     this.covers.push({ x, z, height, faceX, faceZ });
   }
 
-  /** 把攒的东西合成网格挂进场景。 */
-  Flush(scene, library, { castShadow = true, receiveShadow = true } = {}) {
+  /**
+   * 把攒的东西合成网格挂进场景。
+   *
+   * resolve：桶名 → 材质的解析函数，默认就是 library.Get(name)。
+   * 滕县那一套要的是**同一张烘焙贴图的不同调色**（城砖 #7A7F84 / 民居青砖 #7E8388 /
+   * 条石 #B0ADA3 / 夯土芯 #A38F6C 都得从既有配方染出来，因为 Script_TexBake 不归这一轮改），
+   * 于是桶名必须能是「逻辑材质名」而不是配方名。给个钩子比在这里写死一张映射表干净：
+   * 台儿庄那边一个字不用改，滕县那边把自己的调色表传进来。
+   */
+  Flush(scene, library, { castShadow = true, receiveShadow = true, resolve = null } = {}) {
     const meshes = [];
+    const pick = resolve || ((name) => library.Get(name));
     for (const [name, list] of this.buckets) {
       const geometry = MergeGeometries(list);
       if (!geometry.attributes.position || geometry.attributes.position.count === 0) continue;
-      const mesh = new THREE.Mesh(geometry, library.Get(name));
+      const mesh = new THREE.Mesh(geometry, pick(name, library));
       mesh.castShadow = castShadow;
       mesh.receiveShadow = receiveShadow;
       mesh.name = `Static_${name}`;
@@ -732,9 +741,10 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
 }
 
 /** 杨树/柳树：三四月枝条透光、新叶初展，**不做浓密树冠**。 */
-export function AddTree(sink, { x, z, seed = "t", scale = 1 }) {
+export function AddTree(sink, { x, z, seed = "t", scale = 1, material = "WoodBeam", height = 0 }) {
   const rnd = Mulberry32(HashString(seed));
-  const h = (5.5 + rnd() * 3.0) * scale;
+  // height 给死的话就照给的高度长（濠岸的柳比街边的杨矮一档），否则按老规矩随机
+  const h = height > 0 ? height : (5.5 + rnd() * 3.0) * scale;
   const trunk = new THREE.CylinderGeometry(0.13 * scale, 0.22 * scale, h, 8, 3);
   const pos = trunk.attributes.position;
   for (let i = 0; i < pos.count; i += 1) {
@@ -747,7 +757,7 @@ export function AddTree(sink, { x, z, seed = "t", scale = 1 }) {
   // h/1.2 会把一棵 7 m 的树只切成六格，树皮被竖着拉成一根水泥杆上的条纹。
   // h/0.45 才是"一格 45 cm"的树皮尺度
   for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 0.45);
-  sink.Add("WoodBeam", PlaceGeometry(trunk, { x, y: h / 2, z }));
+  sink.Add(material, PlaceGeometry(trunk, { x, y: h / 2, z }));
   // 枝条：几根细长的分叉，不加叶片团
   //
   // 事故（第 1 轮视觉审查抓到的）：枝条中心放在 cos(a)*len*0.42*sin(tilt)，
@@ -784,7 +794,7 @@ export function AddTree(sink, { x, z, seed = "t", scale = 1 }) {
       branches.push(PlaceGeometry(local, anchor));
     }
   }
-  sink.Add("WoodBeam", PlaceGeometry(MergeGeometries(branches), { x, y: 0, z }));
+  sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: 0, z }));
   sink.Solid(x, h / 2, z, 0.3 * scale, h / 2, 0.3 * scale, "prop");
 }
 
@@ -795,4 +805,1293 @@ export function AddPole(sink, { x, z, seed = "pole", height = 6.5 }) {
   sink.Add("WoodBeam", PlaceGeometry(
     MakeBox(1.5, 0.09, 0.09, TILE_METERS.wood, `${seed}:arm`), { x, y: height - 0.5, z }));
   sink.Solid(x, height / 2, z, 0.16, height / 2, 0.16, "prop");
+}
+
+// ===========================================================================
+// 滕县构件（1938 年 3 月）
+//
+// 以下全部是**滕县专用**，与上面台儿庄那一套并存、不互相替换：
+// 台儿庄的 AddRampart（4 m 民防寨墙）、AddGatehouse（7 m 寨门）、AddMosque
+// 在滕县一律不用 —— 11.5 m 的包砖县城墙与 4 m 的寨墙差一个量级，改皮复用是错的。
+// 但鲁南民居那一套（AddCompound / AddRoomBlock / AddHardMountainRoof / AddWall /
+// AddDoorReveal / AddWell / AddMillstone / AddWaterVat / AddTree / AddPole）
+// 滕县与台儿庄同属鲁南，硬山小青瓦、四合院、对外不开窗、过墙石都成立，直接搬。
+//
+// 材质名在这里写的是**逻辑名**（CityBrick / Ashlar / RammedEarth / TubeTile …），
+// 由 Script_TengxianCity 的 resolve 表映射到既有烘焙配方 + 调色。
+// 这样 Script_TexBake 一个字不用改，也不必给滕县单开一套贴图。
+// ===========================================================================
+
+/** 城墙的默认规格。数字的出处与推定标注见 Data_Tengxian.mjs。 */
+export const CITY_WALL = {
+  height: 11.5, parapet: 1.6, topWidth: 5.0, baseWidth: 10.0, plinth: 1.8,
+  courses: 4, sliceLen: 8.0, merlonPeriod: 1.7, merlonWidth: 1.15, merlonThickness: 0.55,
+  innerParapetH: 0.9, innerParapetT: 0.45,
+};
+
+/**
+ * 一段城墙（墙身 11.5 m + 女墙 1.6 m + 顶宽 5 / 底宽 10 的收分）。
+ *
+ * 局部坐标：+x 沿墙展开，+z 指向**城外**，ry 是「这面墙朝外」的方向。
+ *
+ * 三条形制必须同时成立，少一条这面墙就不是 1938 年的滕县城：
+ *   ① 自下而上分层：条石勒脚 1.8 m → 青砖 → 民国碎砖补丁。
+ *      条石那条灰白带是滕县区别于纯砖城镇的最强读图信号（鲁南是石灰岩产区）。
+ *   ② 收分：底 10 m 收到顶 5 m。墙脚看过去是外倾的，不是一块竖板。
+ *   ③ **缺口断面必须露夯土芯**：砖包夯土，轰塌之后露出来的是黄土不是砖。
+ *      少了这一笔，缺口读作「贴图破了」而不是「城墙被打开了」。
+ *
+ * 性能：整段墙按 sliceLen 切片，全部并进 CityBrick / Ashlar 两个桶，
+ * 2.44 km 周长约 300 片 × 十来个盒子 —— 合批之后是两个 draw call。
+ */
+export function AddCityWall(sink, {
+  x, z, ry = 0, length, baseY = 0, seed = "cityWall",
+  height = CITY_WALL.height, parapet = CITY_WALL.parapet,
+  topWidth = CITY_WALL.topWidth, baseWidth = CITY_WALL.baseWidth,
+  plinth = CITY_WALL.plinth, courses = CITY_WALL.courses, sliceLen = CITY_WALL.sliceLen,
+  gaps = [], breaches = [], merlons = true, innerParapet = true,
+  brick = "CityBrick", stone = "Ashlar", core = "RammedEarth",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const rnd = Mulberry32(HashString(seed));
+  const top = baseY + height;
+  // 某个高度上的墙厚（线性收分）
+  const widthAt = (y) => baseWidth + (topWidth - baseWidth) * ((y - baseY) / height);
+  // 这个位置的墙头在哪：null = 门洞／完全没墙；否则返回绝对高度
+  const crestAt = (lx) => {
+    for (const g of gaps) if (Math.abs(lx - g.at) < g.width / 2) return null;
+    let h = height;
+    for (const b of breaches) {
+      const half = b.width / 2;
+      const d = Math.abs(lx - b.at);
+      if (d >= half) continue;
+      // 缺口剖面：中间塌到 floor（默认 0.22），往两边按 1.6 次幂长回去 —— 平底的缺口一眼假
+      const t = d / half;
+      const floor = b.floor ?? 0.22;
+      h = Math.min(h, height * (floor + (1 - floor) * Math.pow(t, 1.6)));
+    }
+    return baseY + h;
+  };
+
+  const slices = Math.max(2, Math.round(length / sliceLen));
+  const segLen = length / slices;
+  for (let i = 0; i < slices; i += 1) {
+    const lx = -length / 2 + segLen * (i + 0.5);
+    const crest = crestAt(lx);
+    if (crest === null) continue;
+    const intact = crest >= top - 0.05;
+
+    // ① 条石勒脚
+    const plinthTop = Math.min(crest, baseY + plinth);
+    if (plinthTop > baseY + 0.05) {
+      const w = widthAt((baseY + plinthTop) / 2);
+      const p = L(lx, 0);
+      sink.Add(stone, PlaceGeometry(
+        MakeBox(segLen * 1.02, plinthTop - baseY, w, TILE_METERS.stone, `${seed}:pl${i}`),
+        { x: p.x, y: (baseY + plinthTop) / 2, z: p.z, ry }));
+    }
+    // ② 青砖墙身，逐层收分
+    const bodyBottom = baseY + plinth;
+    for (let c = 0; c < courses; c += 1) {
+      const y0 = bodyBottom + (top - bodyBottom) * (c / courses);
+      const y1 = bodyBottom + (top - bodyBottom) * ((c + 1) / courses);
+      const yTop = Math.min(y1, crest);
+      if (yTop <= y0 + 0.05) break;
+      const w = widthAt((y0 + yTop) / 2);
+      const p = L(lx, 0);
+      // 民国碎砖／水泥乱砌补丁：约一成的砖层换成风化更重的那张贴图
+      const mat = rnd() < 0.11 ? `${brick}Worn` : brick;
+      sink.Add(mat, PlaceGeometry(
+        MakeBox(segLen * 1.02, yTop - y0, w, TILE_METERS.brick, `${seed}:b${i}${c}`, BRICK_UV_GRID),
+        { x: p.x, y: (y0 + yTop) / 2, z: p.z, ry }));
+    }
+    // ③ 缺口断面：砖皮没了，露出来的是夯土芯
+    if (!intact) {
+      const coreTop = Math.min(top - 0.4, crest + 0.6 + rnd() * 1.6);
+      if (coreTop > crest + 0.2) {
+        const w = widthAt(crest) * 0.62;
+        const p = L(lx, (rnd() - 0.5) * 0.6);
+        sink.Add(core, PlaceGeometry(
+          MakeBox(segLen * 0.96, coreTop - crest, w, TILE_METERS.adobe, `${seed}:core${i}`),
+          { x: p.x, y: (crest + coreTop) / 2, z: p.z, ry }));
+      }
+      // 缺口脚下的砖土堆：没有它，缺口读作被橡皮擦掉的一块
+      const foot = L(lx, widthAt(baseY) / 2 + 1.6);
+      sink.props.push({ kind: "breachSpill", x: foot.x, z: foot.z, radius: segLen * 0.9, seed: `${seed}:sp${i}` });
+    }
+
+    // 碰撞：下半段按墙脚宽（外面撞上去是一堵斜墙），上半段按墙顶宽（人在顶上走的是 5 m）
+    const p = L(lx, 0);
+    const midW = widthAt(baseY + height * 0.3);
+    const hx = Math.abs(cos) * segLen / 2 + Math.abs(sin) * midW / 2;
+    const hz = Math.abs(sin) * segLen / 2 + Math.abs(cos) * midW / 2;
+    const lowTop = Math.min(crest, baseY + height * 0.6);
+    sink.Solid(p.x, (baseY - 1.5 + lowTop) / 2, p.z, hx, (lowTop - baseY + 1.5) / 2, hz, "cityWall");
+    if (intact) {
+      const thx = Math.abs(cos) * segLen / 2 + Math.abs(sin) * topWidth / 2;
+      const thz = Math.abs(sin) * segLen / 2 + Math.abs(cos) * topWidth / 2;
+      sink.Solid(p.x, (lowTop + top) / 2, p.z, thx, (top - lowTop) / 2, thz, "cityWall");
+    }
+  }
+
+  // 女墙与垛口。周期沿整段墙连续算，切片边界上不会错半个垛口
+  if (merlons || innerParapet) {
+    const period = CITY_WALL.merlonPeriod;
+    const n = Math.max(2, Math.round(length / period));
+    for (let m = 0; m < n; m += 1) {
+      const lx = -length / 2 + (m + 0.5) * (length / n);
+      const crest = crestAt(lx);
+      if (crest === null || crest < top - 0.05) continue;
+      if (merlons && m % 2 === 0) {
+        const lz = topWidth / 2 - CITY_WALL.merlonThickness / 2;
+        const p = L(lx, lz);
+        sink.Add(brick, PlaceGeometry(
+          MakeBox(CITY_WALL.merlonWidth, parapet, CITY_WALL.merlonThickness, TILE_METERS.brick,
+            `${seed}:mer${m}`, BRICK_UV_GRID),
+          { x: p.x, y: top + parapet / 2, z: p.z, ry }));
+        sink.Solid(p.x, top + parapet / 2,
+          p.z, Math.abs(cos) * 0.6 + Math.abs(sin) * 0.28, parapet / 2,
+          Math.abs(sin) * 0.6 + Math.abs(cos) * 0.28, "parapet");
+        sink.Cover(p.x, p.z, top + parapet, sin, cos);
+      }
+      if (innerParapet) {
+        // 宇墙：内侧那道矮墙。没有它，城墙顶在画面上是一条没有边的板
+        const lz = -(topWidth / 2 - CITY_WALL.innerParapetT / 2);
+        const p = L(lx, lz);
+        sink.Add(brick, PlaceGeometry(
+          MakeBox(length / n * 1.02, CITY_WALL.innerParapetH, CITY_WALL.innerParapetT,
+            TILE_METERS.brick, `${seed}:inn${m}`, BRICK_UV_GRID),
+          { x: p.x, y: top + CITY_WALL.innerParapetH / 2, z: p.z, ry }));
+        sink.Solid(p.x, top + CITY_WALL.innerParapetH / 2, p.z,
+          Math.abs(cos) * (length / n) / 2 + Math.abs(sin) * 0.24, CITY_WALL.innerParapetH / 2,
+          Math.abs(sin) * (length / n) / 2 + Math.abs(cos) * 0.24, "parapet");
+      }
+    }
+  }
+}
+
+/**
+ * 马面／敌台：凸出墙外 4 m、面宽 8 m 的方台，供侧射。
+ * 志载「24 个城堡」是数量，形制与尺寸**全部为推定**（见 Data_Tengxian.PRESUMED）。
+ * 它们把一条 610 m 的直墙切成六段，每段都有两侧的交叉火力 —— 明清城防的常规做法。
+ */
+export function AddBastion(sink, {
+  x, z, ry = 0, baseY = 0, seed = "bastion",
+  out = 4.0, width = 8.0, height = CITY_WALL.height, parapet = CITY_WALL.parapet,
+  wallBaseWidth = CITY_WALL.baseWidth, wallTopWidth = CITY_WALL.topWidth,
+  plinth = CITY_WALL.plinth, brick = "CityBrick", stone = "Ashlar",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const top = baseY + height;
+  // 台身跟着主墙一起收分，凸出量也跟着收（顶上凸出略少）
+  const courses = 5;
+  for (let c = 0; c < courses; c += 1) {
+    const y0 = baseY + (height * c) / courses;
+    const y1 = baseY + (height * (c + 1)) / courses;
+    const t = ((y0 + y1) / 2 - baseY) / height;
+    const outAt = out * (1 - t * 0.18);
+    const wAt = width * (1 - t * 0.10);
+    const wallFace = (wallBaseWidth + (wallTopWidth - wallBaseWidth) * t) / 2;
+    const depth = outAt + 1.2;                       // 往墙里咬 1.2 m，接缝不露天
+    const lz = wallFace + outAt - depth / 2;
+    const p = L(0, lz);
+    const mat = (y1 <= baseY + plinth) ? stone : brick;
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(wAt, y1 - y0, depth, mat === stone ? TILE_METERS.stone : TILE_METERS.brick,
+        `${seed}:c${c}`, mat === stone ? null : BRICK_UV_GRID),
+      { x: p.x, y: (y0 + y1) / 2, z: p.z, ry }));
+    if (c === 0) {
+      sink.Solid(p.x, (baseY - 1 + y1) / 2, p.z,
+        Math.abs(cos) * wAt / 2 + Math.abs(sin) * depth / 2, (y1 - baseY + 1) / 2,
+        Math.abs(sin) * wAt / 2 + Math.abs(cos) * depth / 2, "cityWall");
+    }
+  }
+  // 台顶三面垛口：马面的价值全在这三面能打出去
+  const faceZ = wallTopWidth / 2 + out * 0.82;
+  const wTop = width * 0.9;
+  for (let i = 0; i < 5; i += 1) {
+    const lx = -wTop / 2 + (i + 0.5) * (wTop / 5);
+    if (i % 2 === 1) continue;
+    const p = L(lx, faceZ - 0.3);
+    sink.Add(brick, PlaceGeometry(
+      MakeBox(1.05, parapet, 0.55, TILE_METERS.brick, `${seed}:m${i}`, BRICK_UV_GRID),
+      { x: p.x, y: top + parapet / 2, z: p.z, ry }));
+    sink.Cover(p.x, p.z, top + parapet, sin, cos);
+  }
+  for (const s of [-1, 1]) {
+    const p = L(s * (wTop / 2 - 0.28), (wallTopWidth / 2 + faceZ) / 2);
+    sink.Add(brick, PlaceGeometry(
+      MakeBox(0.55, parapet, out * 0.85, TILE_METERS.brick, `${seed}:ms${s}`, BRICK_UV_GRID),
+      { x: p.x, y: top + parapet / 2, z: p.z, ry }));
+  }
+  // 台顶铺面（人能站上去）
+  const pTop = L(0, (wallTopWidth / 2 + faceZ) / 2);
+  sink.Add(stone, PlaceGeometry(
+    MakeBox(wTop, 0.24, out * 0.9, TILE_METERS.stone, `${seed}:deck`),
+    { x: pTop.x, y: top - 0.12, z: pTop.z, ry }));
+  sink.Solid(pTop.x, top - 0.6, pTop.z,
+    Math.abs(cos) * wTop / 2 + Math.abs(sin) * out * 0.45, 0.6,
+    Math.abs(sin) * wTop / 2 + Math.abs(cos) * out * 0.45, "cityWall");
+}
+
+/**
+ * 望角楼：四角各一座（志载 + 日方「東南角望楼」双源吻合，形制尺寸推定）。
+ * 做成城墙拐角上的一座小方亭：砖台 + 四柱 + 四坡瓦顶，不做重檐（重檐留给城楼）。
+ */
+export function AddCornerTower(sink, {
+  x, z, baseY = 0, seed = "corner", size = 6.0, height = CITY_WALL.height,
+  parapet = CITY_WALL.parapet, brick = "CityBrick", stone = "Ashlar",
+}) {
+  const top = baseY + height;
+  // 拐角平台：把两面墙的墙顶连起来，不然拐角处是两块板对不上
+  sink.Add(stone, PlaceGeometry(
+    MakeBox(CITY_WALL.topWidth + size * 0.4, 0.3, CITY_WALL.topWidth + size * 0.4,
+      TILE_METERS.stone, `${seed}:deck`), { x, y: top - 0.15, z }));
+  sink.Solid(x, top - 1.2, z, (CITY_WALL.topWidth + size * 0.4) / 2, 1.2,
+    (CITY_WALL.topWidth + size * 0.4) / 2, "cityWall");
+  // 亭身：四根角柱 + 一圈栏板
+  const colH = 3.1;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.28, colH, 0.28, TILE_METERS.wood, `${seed}:col${sx}${sz}`),
+        { x: x + sx * size * 0.36, y: top + colH / 2, z: z + sz * size * 0.36 }));
+    }
+  }
+  for (const s of [-1, 1]) {
+    sink.Add(brick, PlaceGeometry(
+      MakeBox(size * 0.86, 1.0, 0.32, TILE_METERS.brick, `${seed}:rlx${s}`, BRICK_UV_GRID),
+      { x, y: top + 0.5, z: z + s * size * 0.4 }));
+    sink.Add(brick, PlaceGeometry(
+      MakeBox(0.32, 1.0, size * 0.86, TILE_METERS.brick, `${seed}:rlz${s}`, BRICK_UV_GRID),
+      { x: x + s * size * 0.4, y: top + 0.5, z }));
+  }
+  // 四坡顶：四块斜板 + 一个小宝顶
+  const eave = top + colH;
+  for (let k = 0; k < 4; k += 1) {
+    const a = (k * Math.PI) / 2;
+    const cz = size * 0.30;
+    sink.Add("TubeTile", PlaceGeometry(
+      MakeBox(size * 1.25, 0.14, size * 0.78, TILE_METERS.roof, `${seed}:rf${k}`),
+      { x: x + Math.sin(a) * cz, y: eave + 0.55, z: z + Math.cos(a) * cz, ry: a, rx: -0.62 }));
+  }
+  sink.Add("TubeTile", PlaceGeometry(
+    MakeBox(0.6, 0.7, 0.6, TILE_METERS.roof, `${seed}:top`), { x, y: eave + 1.5, z }));
+  sink.Cover(x, z, top + 1.0, 0, 1);
+}
+
+/**
+ * 上城道（马道）—— **全城只有四条，每座城门内侧旁一条**。
+ *
+ * 这条规则是滕县全局最重要的空间约束：城墙是一条只有四个出入口的高空回廊。
+ * 所以这一段代码必须在**碰撞上真的成立** —— 台儿庄那次的教训是马道做成了
+ * 一块斜板 + 一个实心大盒子，画面上是坡、碰撞上是墙，谁也上不去。
+ * 这里一级一级砌，每级抬高压在 0.56 m 的自动抬腿线以下。
+ *
+ * 走向：沿墙**平行**爬升（与史实的马道一致），踏面宽 2.4 m。
+ * 墙内面是收分的，所以每一级的横向位置跟着那一级的高度往外挪 ——
+ * 顶上最后一级正好接到 5 m 宽的墙顶走道，不留缝。
+ */
+export function AddCityRamp(sink, {
+  x, z, ry = 0, at = 0, baseY = 0, topY, seed = "ramp",
+  width = 2.4, run = 1.0, landingAt = 13, landingRun = 2.0,
+  wallCenterOffset = CITY_WALL.baseWidth / 2, wallTopOffset = CITY_WALL.topWidth / 2,
+  material = "Ashlar", dir = 1,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const rise = 0.46;
+  const steps = Math.max(4, Math.ceil((topY - baseY) / rise));
+  const stepRise = (topY - baseY) / steps;
+  let along = 0;
+  for (let i = 0; i < steps; i += 1) {
+    const yTop = baseY + stepRise * (i + 1);
+    const t = (yTop - baseY) / (topY - baseY);
+    // 那一级所在高度上的墙内面位置（收分：底 -5、顶 -2.5）
+    const face = -(wallCenterOffset + (wallTopOffset - wallCenterOffset) * t);
+    const lz = face + width / 2;      // 踏面从墙面往城里量 2.4 m
+    const thisRun = (i === landingAt) ? landingRun : run;
+    const lx = at + dir * (along + thisRun / 2);
+    const p = L(lx, lz);
+    const h = yTop - (baseY - 1.6);   // 砌到地面以下，侧面撞过来是一堵矮墙不是悬空片
+    sink.Add(material, PlaceGeometry(
+      MakeBox(thisRun * 1.02, h, width, TILE_METERS.stone, `${seed}:s${i}`),
+      { x: p.x, y: yTop - h / 2, z: p.z, ry }));
+    sink.Solid(p.x, yTop - h / 2, p.z,
+      Math.abs(cos) * thisRun / 2 + Math.abs(sin) * width / 2, h / 2,
+      Math.abs(sin) * thisRun / 2 + Math.abs(cos) * width / 2, "ramp");
+    along += thisRun;
+  }
+  // 外侧的挡墙：没有它，人从马道上一步就掉到 11 m 底下
+  const guardH = 0.85;
+  const nSeg = Math.max(2, Math.round(along / 2.0));
+  for (let i = 0; i < nSeg; i += 1) {
+    const a0 = (along * i) / nSeg, a1 = (along * (i + 1)) / nSeg;
+    const t = ((a0 + a1) / 2) / along;
+    const yMid = baseY + (topY - baseY) * t;
+    const face = -(wallCenterOffset + (wallTopOffset - wallCenterOffset) * t);
+    const lz = face + width + 0.16;
+    const p = L(at + dir * (a0 + a1) / 2, lz);
+    sink.Add(material, PlaceGeometry(
+      MakeBox((a1 - a0) * 1.02, guardH, 0.32, TILE_METERS.stone, `${seed}:g${i}`),
+      { x: p.x, y: yMid + guardH / 2, z: p.z, ry }));
+  }
+}
+
+/**
+ * 墙脚防空洞：城墙内侧墙根，每 40 m 一个。
+ * 「守城部队在城墙脚下的防空洞内隐蔽、休息，待敌冲锋爬城时再迅速登城抵抗」——
+ * 存在为主流记载，尺寸推定。做成券洞口 + 一段深色进深，不做可进入空间。
+ */
+export function AddDugout(sink, {
+  x, z, ry = 0, seed = "dugout", width = 1.2, height = 1.6, depth = 3.0,
+  baseY = 0, frame = "Ashlar",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  // 洞口两侧的石砌门框 + 过梁：三条亮线把黑洞框出来（同 AddDoorReveal 的道理）
+  for (const s of [-1, 1]) {
+    const p = L(s * (width / 2 + 0.16), 0);
+    sink.Add(frame, PlaceGeometry(
+      MakeBox(0.3, height, 0.5, TILE_METERS.stone, `${seed}:j${s}`),
+      { x: p.x, y: baseY + height / 2, z: p.z, ry }));
+  }
+  const head = L(0, 0);
+  sink.Add(frame, PlaceGeometry(
+    MakeBox(width + 0.62, 0.3, 0.5, TILE_METERS.stone, `${seed}:h`),
+    { x: head.x, y: baseY + height + 0.15, z: head.z, ry }));
+  // 洞里：一块深色的挡板，读作「里面是暗的」而不是「这里没有东西」
+  const back = L(0, -depth * 0.5);
+  sink.Add("CityBrickWorn", PlaceGeometry(
+    MakeBox(width, height, 0.4, TILE_METERS.brick, `${seed}:back`),
+    { x: back.x, y: baseY + height / 2, z: back.z, ry }));
+  // 洞口外堆的土
+  const spoil = L(0, depth * 0.42);
+  sink.Add("RammedEarth", PlaceGeometry(
+    MakeBox(width + 1.4, 0.42, 1.1, TILE_METERS.adobe, `${seed}:spoil`),
+    { x: spoil.x, y: baseY + 0.2, z: spoil.z, ry }));
+  sink.Cover(spoil.x, spoil.z, 0.6, sin, cos);
+}
+
+/**
+ * 枪眼 —— **滕县巷战的第一视觉符号**。
+ *
+ * 日方战详报反复点名：「敌一步一步利用房屋的枪眼，对道路纵射或侧射」。
+ * 家家在临街墙上新掏铳眼，**新掏的孔边缘发白**（砖被凿开露出的断口比风化面亮两档）。
+ * 所以这里的做法是：一圈发白的边 + 中间一个深色的洞。少了发白那一圈，
+ * 它读作「墙上有个脏印子」；少了深色的洞，它读作「墙上贴了块白瓷砖」。
+ *
+ * @param {object} spec x,z 墙面中心；ry 墙的朝向（局部 +z 指向街）；ys 一组高度
+ */
+export function AddLoopholes(sink, {
+  x, z, ry = 0, ys = [1.15], count = 2, spread = 2.4, seed = "lp",
+  size = 0.24, wallFace = 0.18, rim = "LoopholeRim",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const rnd = Mulberry32(HashString(seed));
+  for (let i = 0; i < count; i += 1) {
+    const lx = count === 1 ? 0 : -spread / 2 + (spread * i) / (count - 1) + (rnd() - 0.5) * 0.4;
+    const y = ys[i % ys.length] + (rnd() - 0.5) * 0.16;
+    const p = L(lx, wallFace);
+    // 白茬的边：一个略大的浅色薄片，压在墙面外一点
+    sink.Add(rim, PlaceGeometry(
+      MakeBox(size * 1.85, size * 1.85, 0.05, TILE_METERS.stone, `${seed}:r${i}`),
+      { x: p.x, y, z: p.z, ry }));
+    // 洞：缩在白边里的深色方孔
+    const q = L(lx, wallFace - 0.06);
+    sink.Add("Charred", PlaceGeometry(
+      MakeBox(size, size, 0.08, TILE_METERS.stone, `${seed}:h${i}`),
+      { x: q.x, y, z: q.z, ry }));
+  }
+}
+
+/**
+ * 城门 —— 内外二门 + **半圆形瓮城** + 重檐亭阁式城楼。
+ *
+ * 志载：「城门皆有内外两门，外门呈半圆形称关门，两门之间俗称瓮城，
+ * 内门上有方砖铺平台、以石围栏之城楼，叠脊筒瓦，重檐翘厦，雕梁画栋，俨若亭阁。」
+ * **半圆瓮城是滕县的特征点，不做方瓮城。**
+ *
+ * 1938 年的门禁状态由 blocked 决定：
+ *   "full"    土袋堵死（南门迎薰门、北门望阙门）
+ *   "partial" 土袋半堵（东门宗鲁门）
+ *   "slit"    只剩一人宽（西门怀古门 —— 唯一的活口，也是落城时的死亡瓶颈）
+ *
+ * 局部坐标：+z 指向城外，+x 沿墙。
+ */
+export function AddGateComplex(sink, spec) {
+  const {
+    x, z, ry = 0, baseY = 0, seed = "gate",
+    blockWidth = 22, wallHeight = CITY_WALL.height, parapet = CITY_WALL.parapet,
+    topWidth = CITY_WALL.topWidth, baseWidth = CITY_WALL.baseWidth, plinth = CITY_WALL.plinth,
+    innerW = 3.8, innerH = 5.6, outerW = 3.4, outerH = 5.0,
+    barbicanRadius = 18, barbicanH = 9.0, barbicanT = 4.0,
+    blocked = "none", slitWidth = 0.9, sidework = null, tower = true,
+    plaqueInner = "", plaqueOuter = "",
+  } = spec;
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const top = baseY + wallHeight;
+  const widthAt = (y) => baseWidth + (topWidth - baseWidth) * ((y - baseY) / wallHeight);
+
+  // --- 门洞两侧的墙墩（就是城墙本身，只是在这一段里绕开门洞）---
+  const pierW = (blockWidth - innerW) / 2;
+  for (const s of [-1, 1]) {
+    const lx = s * (innerW / 2 + pierW / 2);
+    AddCityWall(sink, {
+      ...L(lx, 0), ry, length: pierW, baseY, seed: `${seed}:pier${s}`,
+      height: wallHeight, parapet, topWidth, baseWidth, plinth, sliceLen: 4.5,
+      merlons: true, innerParapet: true,
+    });
+  }
+  // --- 门洞上方的墙体 ---
+  const archTop = baseY + innerH + innerW / 2;
+  const above = L(0, 0);
+  sink.Add("CityBrick", PlaceGeometry(
+    MakeBox(innerW + 0.1, top - archTop, widthAt((archTop + top) / 2), TILE_METERS.brick,
+      `${seed}:above`, BRICK_UV_GRID),
+    { x: above.x, y: (archTop + top) / 2, z: above.z, ry }));
+  // 券顶：五皮砖砌出半圆券，方门洞一眼假
+  for (let k = 0; k < 5; k += 1) {
+    const t0 = k / 5, t1 = (k + 1) / 5;
+    const y0 = baseY + innerH + (innerW / 2) * t0;
+    const y1 = baseY + innerH + (innerW / 2) * t1;
+    const halfW = (innerW / 2) * Math.cos(Math.asin(Math.min(1, (t0 + t1) / 2)));
+    const w = innerW - halfW * 2;
+    for (const s of [-1, 1]) {
+      const p = L(s * (halfW + w / 4), 0);
+      sink.Add("CityBrick", PlaceGeometry(
+        MakeBox(Math.max(0.08, w / 2), y1 - y0, widthAt(y0), TILE_METERS.brick,
+          `${seed}:arch${k}${s}`, BRICK_UV_GRID),
+        { x: p.x, y: (y0 + y1) / 2, z: p.z, ry }));
+    }
+  }
+  // 门道墁地
+  const pave = L(0, 0);
+  sink.Add("Ashlar", PlaceGeometry(
+    MakeBox(innerW + 0.3, 0.16, baseWidth + 1.0, TILE_METERS.stone, `${seed}:pave`),
+    { x: pave.x, y: baseY + 0.06, z: pave.z, ry }));
+  // 内外两块石刻门额（内门额与外门额字不同，是很强的符号）
+  for (const [s, text] of [[-1, plaqueInner], [1, plaqueOuter]]) {
+    if (!text) continue;
+    const p = L(0, s * (baseWidth / 2 - 0.2));
+    sink.Add("Ashlar", PlaceGeometry(
+      MakeBox(2.3, 0.72, 0.16, TILE_METERS.stone, `${seed}:plq${s}`),
+      { x: p.x, y: baseY + innerH + 0.75, z: p.z, ry }));
+  }
+  // 包铁大门：两扇，堵死的门后面看不见，半堵的还挂着
+  if (blocked !== "full") {
+    for (const s of [-1, 1]) {
+      const p = L(s * innerW / 4, -baseWidth / 2 + 0.35);
+      sink.Add("IronPlate", PlaceGeometry(
+        MakeBox(innerW / 2 - 0.06, innerH - 0.1, 0.14, TILE_METERS.wood, `${seed}:leaf${s}`),
+        { x: p.x, y: baseY + (innerH - 0.1) / 2, z: p.z, ry: ry + s * 0.5 }));
+    }
+  }
+
+  // --- 土袋堵门 ---
+  if (blocked !== "none") {
+    AddSandbagPlug(sink, {
+      x, z, ry, baseY, seed: `${seed}:plug`,
+      openW: innerW, openH: innerH, depth: baseWidth,
+      mode: blocked, slitWidth,
+    });
+  } else {
+    sink.Solid(x, baseY + innerH / 2, z, 0.1, innerH / 2, 0.1, "none");
+  }
+
+  // --- 半圆瓮城 ---
+  // 半圆的圆心落在城墙外脚的门轴上，半径 18 m，墙厚 4 m。
+  const rMid = barbicanRadius - barbicanT / 2;
+  const foot = baseWidth / 2;
+  const segs = 26;
+  const halfGateAngle = Math.asin(Math.min(0.9, (outerW / 2 + 0.9) / rMid));
+  for (let i = 0; i < segs; i += 1) {
+    const a0 = -Math.PI / 2 + (Math.PI * i) / segs;
+    const a1 = -Math.PI / 2 + (Math.PI * (i + 1)) / segs;
+    const am = (a0 + a1) / 2;
+    if (Math.abs(am) < halfGateAngle) continue;      // 外门洞的位置留空
+    const chord = rMid * (a1 - a0) * 1.06;
+    const lx = Math.sin(am) * rMid;
+    const lz = foot + Math.cos(am) * rMid;
+    const p = L(lx, lz);
+    // 瓮城墙也分层：条石勒脚 + 青砖
+    sink.Add("Ashlar", PlaceGeometry(
+      MakeBox(chord, plinth, barbicanT + 0.2, TILE_METERS.stone, `${seed}:bp${i}`),
+      { x: p.x, y: baseY + plinth / 2, z: p.z, ry: ry + am }));
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(chord, barbicanH - plinth, barbicanT, TILE_METERS.brick, `${seed}:bb${i}`, BRICK_UV_GRID),
+      { x: p.x, y: baseY + plinth + (barbicanH - plinth) / 2, z: p.z, ry: ry + am }));
+    // 垛口
+    if (i % 2 === 0) {
+      sink.Add("CityBrick", PlaceGeometry(
+        MakeBox(chord * 0.62, parapet, 0.5, TILE_METERS.brick, `${seed}:bm${i}`, BRICK_UV_GRID),
+        {
+          x: p.x + Math.sin(ry + am) * (barbicanT / 2 - 0.25),
+          y: baseY + barbicanH + parapet / 2,
+          z: p.z + Math.cos(ry + am) * (barbicanT / 2 - 0.25), ry: ry + am,
+        }));
+      sink.Cover(p.x, p.z, baseY + barbicanH + parapet, Math.sin(ry + am), Math.cos(ry + am));
+    }
+    const hx = Math.abs(Math.cos(ry + am)) * chord / 2 + Math.abs(Math.sin(ry + am)) * barbicanT / 2;
+    const hz = Math.abs(Math.sin(ry + am)) * chord / 2 + Math.abs(Math.cos(ry + am)) * barbicanT / 2;
+    sink.Solid(p.x, baseY + barbicanH / 2, p.z, hx, barbicanH / 2 + 1, hz, "cityWall");
+  }
+  // 外门（关门）：券洞
+  {
+    const lz = foot + rMid;
+    const p = L(0, lz);
+    const oPierW = 2 * (rMid * Math.sin(halfGateAngle)) - outerW / 2;
+    for (const s of [-1, 1]) {
+      const q = L(s * (outerW / 2 + oPierW / 2), lz);
+      sink.Add("CityBrick", PlaceGeometry(
+        MakeBox(oPierW, barbicanH, barbicanT, TILE_METERS.brick, `${seed}:op${s}`, BRICK_UV_GRID),
+        { x: q.x, y: baseY + barbicanH / 2, z: q.z, ry }));
+      sink.Solid(q.x, baseY + barbicanH / 2, q.z,
+        Math.abs(cos) * oPierW / 2 + Math.abs(sin) * barbicanT / 2, barbicanH / 2,
+        Math.abs(sin) * oPierW / 2 + Math.abs(cos) * barbicanT / 2, "cityWall");
+    }
+    const oArch = baseY + outerH + outerW / 2;
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(outerW + 0.1, barbicanH - (oArch - baseY), barbicanT, TILE_METERS.brick,
+        `${seed}:oa`, BRICK_UV_GRID),
+      { x: p.x, y: (oArch + baseY + barbicanH) / 2, z: p.z, ry }));
+    for (let k = 0; k < 4; k += 1) {
+      const t = (k + 0.5) / 4;
+      const y0 = baseY + outerH + (outerW / 2) * (k / 4);
+      const y1 = baseY + outerH + (outerW / 2) * ((k + 1) / 4);
+      const halfW = (outerW / 2) * Math.cos(Math.asin(t));
+      for (const s of [-1, 1]) {
+        const q = L(s * (halfW + (outerW / 2 - halfW) / 2), lz);
+        sink.Add("CityBrick", PlaceGeometry(
+          MakeBox(Math.max(0.06, outerW / 2 - halfW), y1 - y0, barbicanT, TILE_METERS.brick,
+            `${seed}:oar${k}${s}`, BRICK_UV_GRID),
+          { x: q.x, y: (y0 + y1) / 2, z: q.z, ry }));
+      }
+    }
+    if (plaqueOuter) {
+      const q = L(0, lz + barbicanT / 2 - 0.1);
+      sink.Add("Ashlar", PlaceGeometry(
+        MakeBox(2.0, 0.66, 0.14, TILE_METERS.stone, `${seed}:oplq`),
+        { x: q.x, y: baseY + outerH + 0.7, z: q.z, ry }));
+    }
+  }
+
+  // --- 城楼（重檐亭阁式，坐在内门之上）---
+  if (tower) {
+    AddGateTower(sink, { x, z, ry, baseY: top, seed: `${seed}:tower` });
+  }
+
+  // --- 东门侧防机关：凸出的、带射孔的高台 ---
+  // 日方原文「最モ堅固ナル東門側防機関ノ直下ニアリテ瞰制セラレ」——
+  // 位置高、能俯瞰城外突破口、还在手榴弹投掷距离内。这是东门打不进去的直接原因。
+  if (sidework) {
+    const lx = sidework.offset;
+    const p = L(lx, foot + sidework.out / 2);
+    const h = sidework.height;
+    sink.Add("Ashlar", PlaceGeometry(
+      MakeBox(sidework.width, plinth, sidework.out + 2.0, TILE_METERS.stone, `${seed}:sw0`),
+      { x: p.x, y: baseY + plinth / 2, z: p.z, ry }));
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(sidework.width, h - plinth, sidework.out + 2.0, TILE_METERS.brick, `${seed}:sw1`, BRICK_UV_GRID),
+      { x: p.x, y: baseY + plinth + (h - plinth) / 2, z: p.z, ry }));
+    sink.Solid(p.x, baseY + h / 2, p.z,
+      Math.abs(cos) * sidework.width / 2 + Math.abs(sin) * (sidework.out + 2) / 2, h / 2,
+      Math.abs(sin) * sidework.width / 2 + Math.abs(cos) * (sidework.out + 2) / 2, "cityWall");
+    // 射孔：三层，朝城外与朝瓮城各一组
+    for (let k = 0; k < 3; k += 1) {
+      const y = baseY + 3.2 + k * 2.6;
+      AddLoopholes(sink, {
+        x: p.x, z: p.z, ry, ys: [y], count: 3, spread: sidework.width * 0.62,
+        seed: `${seed}:swlp${k}`, wallFace: (sidework.out + 2.0) / 2 + 0.03, size: 0.3,
+      });
+    }
+    // 台顶垛口
+    for (let i = 0; i < 5; i += 2) {
+      const q = L(lx - sidework.width / 2 + (i + 0.5) * (sidework.width / 5), foot + sidework.out);
+      sink.Add("CityBrick", PlaceGeometry(
+        MakeBox(1.0, parapet, 0.5, TILE_METERS.brick, `${seed}:swm${i}`, BRICK_UV_GRID),
+        { x: q.x, y: baseY + h + parapet / 2, z: q.z, ry }));
+      sink.Cover(q.x, q.z, baseY + h + parapet, sin, cos);
+    }
+  }
+}
+
+/**
+ * 土袋堵门。史料：东、北、南三门以土袋封堵（另一说封南北两门），
+ * 西门被土袋挤成「只留一人能通过的通路」—— 落城时士兵争相涌向脱出口，
+ * 「外门与内门之间完全是人的漩涡」（日军第九中队安田少尉手记）。
+ *
+ * mode: full 堵死 / partial 堵到一半 / slit 只剩一人宽（缺口居中，让门轴线仍然通视）
+ */
+export function AddSandbagPlug(sink, {
+  x, z, ry = 0, baseY = 0, seed = "plug", openW = 3.8, openH = 5.6, depth = 10,
+  mode = "full", slitWidth = 0.9,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const rnd = Mulberry32(HashString(seed));
+  const fillH = mode === "full" ? openH : (mode === "partial" ? openH * 0.62 : openH * 0.9);
+  const rows = Math.max(3, Math.round(fillH / 0.26));
+  const matrices = [];
+  const dummy = new THREE.Object3D();
+  for (let r = 0; r < rows; r += 1) {
+    const y = baseY + 0.13 + r * 0.26;
+    const n = Math.max(3, Math.round(openW / 0.62));
+    for (let i = 0; i < n; i += 1) {
+      const lx = -openW / 2 + (i + 0.5) * (openW / n);
+      // slit：中间留一条一人宽的缝 —— 这条缝就是 1938 年 3 月 17 日夜里全城唯一的出口
+      if (mode === "slit" && Math.abs(lx) < slitWidth / 2) continue;
+      for (const lz of [-depth * 0.3, 0, depth * 0.3]) {
+        dummy.position.set(...(() => { const p = L(lx + (rnd() - 0.5) * 0.1, lz); return [p.x, y, p.z]; })());
+        dummy.rotation.set((rnd() - 0.5) * 0.12, ry + (rnd() - 0.5) * 0.3, (rnd() - 0.5) * 0.12);
+        dummy.scale.set(1, 0.95 + rnd() * 0.14, 1);
+        dummy.updateMatrix();
+        matrices.push(dummy.matrix.clone());
+      }
+    }
+  }
+  sink.props.push({ kind: "sandbags", matrices });
+  // 碰撞：堵死的整片挡住，留缝的分两块挡住缝的两侧
+  if (mode === "slit") {
+    for (const s of [-1, 1]) {
+      const segW = (openW - slitWidth) / 2;
+      const p = L(s * (slitWidth / 2 + segW / 2), 0);
+      sink.Solid(p.x, baseY + fillH / 2, p.z,
+        Math.abs(cos) * segW / 2 + Math.abs(sin) * depth / 2, fillH / 2,
+        Math.abs(sin) * segW / 2 + Math.abs(cos) * depth / 2, "sandbagPlug");
+    }
+  } else {
+    sink.Solid(x, baseY + fillH / 2, z,
+      Math.abs(cos) * openW / 2 + Math.abs(sin) * depth / 2, fillH / 2,
+      Math.abs(sin) * openW / 2 + Math.abs(cos) * depth / 2, "sandbagPlug");
+  }
+  sink.Cover(x, z, fillH, sin, cos);
+}
+
+/**
+ * 城楼：内门之上的重檐亭阁。
+ *
+ * 志载「内门上有方砖铺平台、以石围栏之城楼，叠脊筒瓦，重檐翘厦，雕梁画栋，俨若亭阁」。
+ * 关键词是「俨若亭阁」—— 体量不大，是亭子不是箭楼；下面必须先有一层**露明的方砖月台
+ * 加石栏**，城楼坐在月台上。彩画在 1938 年应严重褪色、蒙尘、局部剥落，
+ * 所以红绿两色都往灰里压（PALETTE.paintRed 用的是褪色值 #9A6A55 不是新漆的 #8C3A2E）。
+ */
+export function AddGateTower(sink, {
+  x, z, ry = 0, baseY = 0, seed = "gateTower",
+  terraceW = 17, terraceD = 11, terraceH = 0.45,
+  bodyW = 11.4, bodyD = 7.2, columnH = 4.4, upperH = 3.0, eaveOut = 1.6,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+
+  // --- 方砖月台 ---
+  sink.Add("Ashlar", PlaceGeometry(
+    MakeBox(terraceW, terraceH, terraceD, TILE_METERS.stone, `${seed}:terrace`),
+    { x, y: baseY + terraceH / 2, z, ry }));
+  sink.Solid(x, baseY + terraceH / 2, z,
+    Math.abs(cos) * terraceW / 2 + Math.abs(sin) * terraceD / 2, terraceH / 2 + 0.6,
+    Math.abs(sin) * terraceW / 2 + Math.abs(cos) * terraceD / 2, "tower");
+  const deck = baseY + terraceH;
+
+  // --- 石围栏：望柱 + 栏板 ---
+  const railH = 0.95;
+  const posts = 9;
+  for (let side = 0; side < 4; side += 1) {
+    const alongX = side < 2;
+    const len = alongX ? terraceW : terraceD;
+    const off = (alongX ? terraceD : terraceW) / 2 - 0.14;
+    const s = side % 2 === 0 ? -1 : 1;
+    for (let i = 0; i <= posts; i += 1) {
+      const t = -len / 2 + (len * i) / posts;
+      const p = alongX ? L(t, s * off) : L(s * off, t);
+      sink.Add("Ashlar", PlaceGeometry(
+        MakeBox(0.22, railH, 0.22, TILE_METERS.stone, `${seed}:post${side}${i}`),
+        { x: p.x, y: deck + railH / 2, z: p.z, ry }));
+    }
+    const p = alongX ? L(0, s * off) : L(s * off, 0);
+    sink.Add("Ashlar", PlaceGeometry(
+      MakeBox(alongX ? len : 0.14, railH * 0.62, alongX ? 0.14 : len, TILE_METERS.stone,
+        `${seed}:rail${side}`),
+      { x: p.x, y: deck + railH * 0.34, z: p.z, ry }));
+  }
+
+  // --- 楼身：台明 + 十二根柱 + 彩画额枋 ---
+  sink.Add("Ashlar", PlaceGeometry(
+    MakeBox(bodyW + 1.0, 0.34, bodyD + 1.0, TILE_METERS.stone, `${seed}:base`),
+    { x, y: deck + 0.17, z, ry }));
+  const floor = deck + 0.34;
+  for (let cx = 0; cx < 4; cx += 1) {
+    for (let cz = 0; cz < 2; cz += 1) {
+      const lx = -bodyW / 2 + (bodyW * cx) / 3;
+      const lz = -bodyD / 2 + bodyD * cz;
+      const p = L(lx, lz);
+      sink.Add("PaintRed", PlaceGeometry(
+        MakeBox(0.34, columnH, 0.34, TILE_METERS.wood, `${seed}:col${cx}${cz}`),
+        { x: p.x, y: floor + columnH / 2, z: p.z, ry }));
+    }
+  }
+  // 额枋（彩画那一条）：褪色的青绿 + 一条红
+  for (const s of [-1, 1]) {
+    const p = L(0, s * bodyD / 2);
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(bodyW + 0.5, 0.42, 0.3, TILE_METERS.wood, `${seed}:arc${s}`),
+      { x: p.x, y: floor + columnH - 0.3, z: p.z, ry }));
+    sink.Add("PaintRed", PlaceGeometry(
+      MakeBox(bodyW + 0.5, 0.18, 0.34, TILE_METERS.wood, `${seed}:arcr${s}`),
+      { x: p.x, y: floor + columnH - 0.66, z: p.z, ry }));
+    const q = L(s * bodyW / 2, 0);
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(0.3, 0.42, bodyD + 0.5, TILE_METERS.wood, `${seed}:arcx${s}`),
+      { x: q.x, y: floor + columnH - 0.3, z: q.z, ry }));
+  }
+  // 下层槛墙：只砌半人高，上面是敞的（亭阁，不是碉楼）
+  for (const s of [-1, 1]) {
+    const p = L(0, s * (bodyD / 2 - 0.05));
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(bodyW, 1.15, 0.28, TILE_METERS.brick, `${seed}:sill${s}`, BRICK_UV_GRID),
+      { x: p.x, y: floor + 0.58, z: p.z, ry }));
+    const q = L(s * (bodyW / 2 - 0.05), 0);
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(0.28, 1.15, bodyD, TILE_METERS.brick, `${seed}:sillx${s}`, BRICK_UV_GRID),
+      { x: q.x, y: floor + 0.58, z: q.z, ry }));
+  }
+  sink.Solid(x, floor + 0.6, z,
+    Math.abs(cos) * bodyW / 2 + Math.abs(sin) * bodyD / 2, 0.6,
+    Math.abs(sin) * bodyW / 2 + Math.abs(cos) * bodyD / 2, "tower");
+  sink.Cover(x, z, floor + 1.15, sin, cos);
+
+  // --- 下檐（重檐的第一层）：四坡筒瓦，出檐 1.6 m ---
+  const eave1 = floor + columnH;
+  const RoofRing = (yEave, w, d, tag) => {
+    for (const s of [-1, 1]) {
+      const p = L(0, s * (d / 2 + eaveOut) / 2);
+      sink.Add("TubeTile", PlaceGeometry(
+        MakeBox(w + eaveOut * 2 + 0.6, 0.16, Math.hypot(d / 2 + eaveOut, 1.1), TILE_METERS.roof,
+          `${seed}:${tag}z${s}`),
+        { x: p.x, y: yEave + 0.55, z: p.z, ry, rx: -s * 0.62 }));
+      const q = L(s * (w / 2 + eaveOut) / 2, 0);
+      sink.Add("TubeTile", PlaceGeometry(
+        MakeBox(Math.hypot(w / 2 + eaveOut, 1.1), 0.16, d + eaveOut * 2 + 0.6, TILE_METERS.roof,
+          `${seed}:${tag}x${s}`),
+        { x: q.x, y: yEave + 0.55, z: q.z, ry, rz: s * 0.62 }));
+    }
+    // 叠脊：一条略高的正脊 + 四条垂脊
+    sink.Add("TubeTile", PlaceGeometry(
+      MakeBox(w * 0.72, 0.3, 0.42, TILE_METERS.roof, `${seed}:${tag}ridge`),
+      { x, y: yEave + 1.24, z, ry }));
+  };
+  RoofRing(eave1, bodyW, bodyD, "r1");
+
+  // --- 上层：矮一圈的楼身 + 上檐 ---
+  const upW = bodyW * 0.74, upD = bodyD * 0.74;
+  const upFloor = eave1 + 0.9;
+  for (let cx = 0; cx < 4; cx += 1) {
+    for (let cz = 0; cz < 2; cz += 1) {
+      const lx = -upW / 2 + (upW * cx) / 3;
+      const lz = -upD / 2 + upD * cz;
+      const p = L(lx, lz);
+      sink.Add("PaintRed", PlaceGeometry(
+        MakeBox(0.28, upperH, 0.28, TILE_METERS.wood, `${seed}:ucol${cx}${cz}`),
+        { x: p.x, y: upFloor + upperH / 2, z: p.z, ry }));
+    }
+  }
+  for (const s of [-1, 1]) {
+    const p = L(0, s * upD / 2);
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(upW + 0.4, 0.34, 0.26, TILE_METERS.wood, `${seed}:uarc${s}`),
+      { x: p.x, y: upFloor + upperH - 0.25, z: p.z, ry }));
+    sink.Add("CityBrick", PlaceGeometry(
+      MakeBox(upW, 0.9, 0.24, TILE_METERS.brick, `${seed}:usill${s}`, BRICK_UV_GRID),
+      { x: p.x, y: upFloor + 0.45, z: p.z, ry }));
+  }
+  RoofRing(upFloor + upperH, upW, upD, "r2");
+}
+
+/**
+ * 县衙 —— 城内**唯一有实物可参照的建筑**（旧县衙大堂尚存，2006 年省级文保，
+ * 认定为典型明代建筑；正堂五间面阔约 22 m 就是照它做的）。
+ *
+ * 轴线自南（大门）向北：坊枕街（题「善国」）→ 大门带谯楼 → 仪门 → 戒石亭 →
+ * 正堂五间 → 琴堂。堂左幕厅，右銮驾库、甲杖库；东西六房 30 间。
+ *
+ * **不要照抄 2007 年后复建的仪门与谯楼门细部** —— 那不是原物。
+ * 这里只做体量与轴线关系，不做斗拱与雕饰。
+ *
+ * 局部坐标：+z 指向**北**（往院子深处），大门在 z=0。
+ */
+export function AddYamen(sink, { x, z, ry = 0, w = 90, d = 140, seed = "yamen", damage = 0.25 }) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  // 局部 +z 往里（北）。世界里 z 负方向是北，所以这里的 L 把局部 +z 映射到世界 -z
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * -lz, z: z - sin * lx + cos * -lz });
+  const wallH = 3.2;
+
+  // --- 院墙一圈 ---
+  const gateW = 6.0;
+  for (const s of [-1, 1]) {
+    const segLen = (w - gateW) / 2;
+    const p = L(s * (gateW / 2 + segLen / 2), 0);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: segLen, height: wallH, thickness: 0.5, ry,
+      ruin: damage * 0.5, seed: `${seed}:ws${s}`, plinth: "CrossStone", cope: true,
+    });
+  }
+  {
+    const p = L(0, d);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: w, height: wallH, thickness: 0.5, ry,
+      ruin: damage * 0.5, seed: `${seed}:wn`, plinth: "CrossStone", cope: true,
+    });
+  }
+  for (const s of [-1, 1]) {
+    const p = L(s * w / 2, d / 2);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: d, height: wallH, thickness: 0.5, ry: ry + Math.PI / 2,
+      ruin: damage * 0.5, seed: `${seed}:we${s}`, plinth: "CrossStone", cope: true,
+    });
+  }
+
+  // --- 坊枕街（题「善国」）：跨在街上的一座牌坊，在大门之外 ---
+  const fang = L(0, -9);
+  AddPaifang(sink, { x: fang.x, z: fang.z, ry: ry + Math.PI / 2, span: 9, seed: `${seed}:fang` });
+
+  // --- 大门带谯楼 ---
+  const gate = L(0, 0);
+  AddRoomBlock(sink, {
+    x: gate.x, z: gate.z, ry, width: gateW + 6, depth: 6.5,
+    eaveY: 4.2, ridgeY: 6.4, seed: `${seed}:gate`, damage: damage * 0.6, facing: 1, bays: 3,
+  });
+  // 谯楼：大门之上的一层小楼（形制只做体量，细部无实据）
+  const qiao = L(0, 0);
+  sink.Add("HouseBrick", PlaceGeometry(
+    MakeBox(gateW + 2.4, 2.6, 4.4, TILE_METERS.brick, `${seed}:qiao`, BRICK_UV_GRID),
+    { x: qiao.x, y: 6.6, z: qiao.z, ry }));
+  AddHardMountainRoof(sink, {
+    x: qiao.x, z: qiao.z, width: gateW + 3.2, depth: 5.0, eaveY: 9.2, ridgeY: 10.9,
+    ry, seed: `${seed}:qiaoRoof`,
+  });
+
+  // --- 仪门 ---
+  const yi = L(0, 32);
+  AddRoomBlock(sink, {
+    x: yi.x, z: yi.z, ry, width: 14, depth: 5.5, eaveY: 3.6, ridgeY: 5.4,
+    seed: `${seed}:yimen`, damage: damage * 0.7, facing: 1, bays: 3,
+  });
+
+  // --- 东西六房（30 间）：仪门与正堂之间的两列廊房 ---
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 3; k += 1) {
+      const p = L(s * (w / 2 - 9), 44 + k * 12);
+      AddRoomBlock(sink, {
+        x: p.x, z: p.z, ry: ry + (s > 0 ? -Math.PI / 2 : Math.PI / 2),
+        width: 11, depth: 5.2, eaveY: 2.9, ridgeY: 4.5,
+        seed: `${seed}:liufang${s}${k}`, damage: damage * 0.8, facing: 1, bays: 3,
+      });
+    }
+  }
+
+  // --- 戒石亭：正堂之前、仪门之后的一座小亭，石刻「尔俸尔禄，民膏民脂……」---
+  const jie = L(0, 58);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const p = L(sx * 1.6, 58 + sz * 1.6);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.24, 2.7, 0.24, TILE_METERS.wood, `${seed}:jcol${sx}${sz}`),
+        { x: p.x, y: 1.35, z: p.z, ry }));
+    }
+  }
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(0.5, 2.0, 1.3, TILE_METERS.stone, `${seed}:jstele`), { x: jie.x, y: 1.0, z: jie.z, ry }));
+  for (let k = 0; k < 4; k += 1) {
+    const a = (k * Math.PI) / 2;
+    sink.Add("RoofTile", PlaceGeometry(
+      MakeBox(4.6, 0.12, 2.6, TILE_METERS.roof, `${seed}:jrf${k}`),
+      { x: jie.x + Math.sin(a) * 1.0, y: 3.1, z: jie.z + Math.cos(a) * 1.0, ry: ry + a, rx: -0.55 }));
+  }
+
+  // --- 正堂五间（面阔约 22 m，照现存明代大堂实物）---
+  const hall = L(0, 80);
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(26, 0.9, 16, TILE_METERS.stone, `${seed}:hallBase`), { x: hall.x, y: 0.45, z: hall.z, ry }));
+  AddRoomBlock(sink, {
+    x: hall.x, z: hall.z, ry, width: 22, depth: 12.5, eaveY: 5.6, ridgeY: 9.2,
+    seed: `${seed}:hall`, damage: damage * 0.4, facing: 1, bays: 5,
+  });
+  // 月台前的踏跺
+  const step = L(0, 71.5);
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(9, 0.9, 3.0, TILE_METERS.stone, `${seed}:hallStep`), { x: step.x, y: 0.45, z: step.z, ry }));
+
+  // --- 琴堂（正堂之后）---
+  const qin = L(0, 104);
+  AddRoomBlock(sink, {
+    x: qin.x, z: qin.z, ry, width: 16, depth: 9, eaveY: 3.9, ridgeY: 6.2,
+    seed: `${seed}:qintang`, damage: damage * 0.6, facing: 1, bays: 3,
+  });
+
+  // --- 堂左幕厅；堂右銮驾库、甲杖库（面南时左为东）---
+  const mu = L(-20, 80);
+  AddRoomBlock(sink, {
+    x: mu.x, z: mu.z, ry: ry + Math.PI / 2, width: 12, depth: 6.5, eaveY: 3.2, ridgeY: 5.0,
+    seed: `${seed}:muting`, damage: damage * 0.7, facing: 1, bays: 3,
+  });
+  for (let k = 0; k < 2; k += 1) {
+    const p = L(21, 74 + k * 12);
+    AddRoomBlock(sink, {
+      x: p.x, z: p.z, ry: ry - Math.PI / 2, width: 10, depth: 6.0, eaveY: 3.1, ridgeY: 4.8,
+      seed: `${seed}:ku${k}`, damage: damage * 0.7, facing: 1, bays: 2,
+    });
+  }
+}
+
+/**
+ * 牌坊。西门里街上的龙家牌坊、北门里街东侧坐东朝西的铁牌坊、
+ * 城南驿道上的「善国门」（**那是牌坊式阁门楼，不是第五座城门**）都用这一个。
+ * 四柱三间，两层小檐；形制尺寸全为推定（只有街名与朝向有记载）。
+ */
+export function AddPaifang(sink, {
+  x, z, ry = 0, span = 9, seed = "paifang", height = 7.2, iron = false, arch = false,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const post = iron ? "IronPlate" : "CrossStone";
+  const beam = iron ? "IronPlate" : "PaintRed";
+  // 四柱：中间两根高，边上两根矮
+  for (const [lx, h] of [[-span / 2, height * 0.78], [-span / 6, height],
+    [span / 6, height], [span / 2, height * 0.78]]) {
+    const p = L(lx, 0);
+    sink.Add(post, PlaceGeometry(
+      MakeBox(0.42, h, 0.42, TILE_METERS.stone, `${seed}:p${lx}`),
+      { x: p.x, y: h / 2, z: p.z, ry }));
+    sink.Solid(p.x, h / 2, p.z,
+      Math.abs(cos) * 0.3 + Math.abs(sin) * 0.3, h / 2,
+      Math.abs(sin) * 0.3 + Math.abs(cos) * 0.3, "prop");
+    // 夹杆石
+    sink.Add("CrossStone", PlaceGeometry(
+      MakeBox(0.8, 1.0, 0.8, TILE_METERS.stone, `${seed}:d${lx}`),
+      { x: p.x, y: 0.5, z: p.z, ry }));
+  }
+  // 额枋两道 + 匾心
+  for (const [y, w] of [[height * 0.66, span + 0.9], [height * 0.80, span * 0.42]]) {
+    const p = L(0, 0);
+    sink.Add(beam, PlaceGeometry(
+      MakeBox(w, 0.52, 0.34, TILE_METERS.wood, `${seed}:b${y}`),
+      { x: p.x, y, z: p.z, ry }));
+  }
+  const plaque = L(0, 0.02);
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(span * 0.3, 0.78, 0.12, TILE_METERS.stone, `${seed}:plq`),
+    { x: plaque.x, y: height * 0.73, z: plaque.z, ry }));
+  // 小檐（三重）
+  for (const [lx, w, y] of [[-span / 3, span / 2.4, height * 0.84],
+    [0, span * 0.5, height * 0.94], [span / 3, span / 2.4, height * 0.84]]) {
+    for (const s of [-1, 1]) {
+      const p = L(lx, s * 0.42);
+      sink.Add("TubeTile", PlaceGeometry(
+        MakeBox(w, 0.12, 1.15, TILE_METERS.roof, `${seed}:rf${lx}${s}`),
+        { x: p.x, y, z: p.z, ry, rx: -s * 0.5 }));
+    }
+  }
+  // 阁门楼式的（善国门）：柱间加一道券洞墙
+  if (arch) {
+    for (const s of [-1, 1]) {
+      const p = L(s * (span / 3), 0);
+      sink.Add("HouseBrick", PlaceGeometry(
+        MakeBox(span / 3, height * 0.6, 1.2, TILE_METERS.brick, `${seed}:aw${s}`, BRICK_UV_GRID),
+        { x: p.x, y: height * 0.3, z: p.z, ry }));
+    }
+  }
+}
+
+/**
+ * 警报楼（西门里街 x=-200，高 9 m）。街名与「有警报楼」有记载，
+ * 形制无任何资料 —— 做成一座砖砌方塔，顶上一圈敞开的观察层加一口钟架，全为推定。
+ */
+export function AddAlarmTower(sink, { x, z, ry = 0, height = 9, seed = "alarm", side = 4.0 }) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const bodyH = height - 2.4;
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(side + 0.7, 0.8, side + 0.7, TILE_METERS.stone, `${seed}:base`), { x, y: 0.4, z, ry }));
+  sink.Add("HouseBrick", PlaceGeometry(
+    MakeBox(side, bodyH, side, TILE_METERS.brick, `${seed}:body`, BRICK_UV_GRID),
+    { x, y: 0.8 + bodyH / 2, z, ry }));
+  sink.Solid(x, (0.8 + bodyH) / 2, z, side / 2 + 0.35, (0.8 + bodyH) / 2, side / 2 + 0.35, "wall");
+  // 观察层：四根柱 + 一圈栏
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const p = L(sx * side * 0.42, sz * side * 0.42);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.22, 2.0, 0.22, TILE_METERS.wood, `${seed}:c${sx}${sz}`),
+        { x: p.x, y: 0.8 + bodyH + 1.0, z: p.z, ry }));
+    }
+  }
+  for (const s of [-1, 1]) {
+    const p = L(0, s * side * 0.44);
+    sink.Add("HouseBrick", PlaceGeometry(
+      MakeBox(side * 0.9, 0.75, 0.22, TILE_METERS.brick, `${seed}:rl${s}`, BRICK_UV_GRID),
+      { x: p.x, y: 0.8 + bodyH + 0.38, z: p.z, ry }));
+    const q = L(s * side * 0.44, 0);
+    sink.Add("HouseBrick", PlaceGeometry(
+      MakeBox(0.22, 0.75, side * 0.9, TILE_METERS.brick, `${seed}:rlx${s}`, BRICK_UV_GRID),
+      { x: q.x, y: 0.8 + bodyH + 0.38, z: q.z, ry }));
+  }
+  // 四坡小顶
+  for (let k = 0; k < 4; k += 1) {
+    const a = (k * Math.PI) / 2;
+    sink.Add("RoofTile", PlaceGeometry(
+      MakeBox(side * 1.5, 0.12, side * 0.72, TILE_METERS.roof, `${seed}:rf${k}`),
+      {
+        x: x + Math.sin(a) * side * 0.3, y: height + 0.55,
+        z: z + Math.cos(a) * side * 0.3, ry: ry + a, rx: -0.6,
+      }));
+  }
+  // 枪眼：这种高的砖楼在巷战里一定被守军用上
+  AddLoopholes(sink, {
+    x, z, ry, ys: [3.2, 5.4], count: 2, spread: side * 0.5,
+    seed: `${seed}:lp`, wallFace: side / 2 + 0.03,
+  });
+}
+
+/**
+ * 四方城（北门里街东侧）。只有名字与大致方位有记载，形制、性质一概无资料 ——
+ * 按字面做成一座方形的小围子：一圈 3 m 高的砖墙，南面一个门洞，里面几间房。
+ * **整体为推定。**
+ */
+export function AddSquareFort(sink, { x, z, ry = 0, w = 32, d = 32, seed = "sqfort", damage = 0.3 }) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const h = 3.1;
+  const gateW = 2.6;
+  for (const s of [-1, 1]) {
+    const segLen = (w - gateW) / 2;
+    const p = L(s * (gateW / 2 + segLen / 2), d / 2);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: segLen, height: h, thickness: 0.6, ry,
+      ruin: damage, seed: `${seed}:s${s}`, plinth: "CrossStone", cope: true,
+    });
+  }
+  const gp = L(0, d / 2);
+  AddGatehouse(sink, { x: gp.x, z: gp.z, ry, seed: `${seed}:gate`, damage: damage * 0.7, openW: gateW });
+  const rest = [
+    { lx: 0, lz: -d / 2, len: w, rot: 0 },
+    { lx: -w / 2, lz: 0, len: d, rot: Math.PI / 2 },
+    { lx: w / 2, lz: 0, len: d, rot: Math.PI / 2 },
+  ];
+  rest.forEach((r, i) => {
+    const p = L(r.lx, r.lz);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: r.len, height: h, thickness: 0.6, ry: ry + r.rot,
+      ruin: damage, seed: `${seed}:w${i}`, plinth: "CrossStone", cope: true,
+    });
+    AddLoopholes(sink, {
+      x: p.x, z: p.z, ry: ry + r.rot, ys: [1.25], count: 3, spread: r.len * 0.5,
+      seed: `${seed}:lp${i}`, wallFace: 0.33,
+    });
+  });
+  const inner = L(0, -d / 2 + 6);
+  AddRoomBlock(sink, {
+    x: inner.x, z: inner.z, ry, width: w * 0.55, depth: 7, eaveY: 3.0, ridgeY: 4.8,
+    seed: `${seed}:hall`, damage: damage * 0.9, facing: 1, bays: 3,
+  });
+}
+
+/**
+ * 天主堂（德式小堂）。
+ *
+ * **形制、规模、有无钟楼一概无资料**，做最保守的单钟塔小堂：
+ * 清水砖砌、单中厅、陡坡瓦顶、山面一座方钟塔加锥顶、券顶窗。
+ * 它在剧情上重要：日军接到「保护外国权益」的命令，十六日因此不敢彻底破坏城内建筑，
+ * 十七日才改为焦土方针 —— 一座德国教堂在战术上短暂地庇护了一段城墙。
+ *
+ * 位置两说（日方记城内近内城墙、中方记南关）无法判定，各建一处不合并。
+ */
+export function AddChurch(sink, {
+  x, z, ry = 0, nave = [11, 24], towerH = 16, seed = "church", damage = 0.15,
+}) {
+  const [w, d] = nave;
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const eave = 7.4, ridge = 11.6;
+
+  // 中厅四壁（清水砖，砌到檐口）
+  const sides = [
+    { lx: 0, lz: -d / 2, len: w, rot: 0 },
+    { lx: 0, lz: d / 2, len: w, rot: 0 },
+    { lx: -w / 2, lz: 0, len: d, rot: Math.PI / 2 },
+    { lx: w / 2, lz: 0, len: d, rot: Math.PI / 2 },
+  ];
+  sides.forEach((s, i) => {
+    const p = L(s.lx, s.lz);
+    AddWall(sink, "HouseBrick", {
+      x: p.x, z: p.z, length: s.len, height: eave, thickness: 0.55, ry: ry + s.rot,
+      ruin: damage * 0.5, seed: `${seed}:w${i}`, plinth: "CrossStone",
+    });
+    // 券顶窗：一排竖长的浅色石套，德式清水砖立面靠这一排线脚才立得住
+    if (i >= 2) {
+      const n = 5;
+      for (let k = 0; k < n; k += 1) {
+        const along = -s.len / 2 + (s.len * (k + 0.5)) / n;
+        const q = L(s.lx + (s.rot === 0 ? along : 0), s.lz + (s.rot === 0 ? 0 : -along));
+        sink.Add("CrossStone", PlaceGeometry(
+          MakeBox(0.9, 3.0, 0.62, TILE_METERS.stone, `${seed}:win${i}${k}`),
+          { x: q.x, y: 3.6, z: q.z, ry: ry + s.rot }));
+        sink.Add("Charred", PlaceGeometry(
+          MakeBox(0.62, 2.5, 0.66, TILE_METERS.stone, `${seed}:winh${i}${k}`),
+          { x: q.x, y: 3.6, z: q.z, ry: ry + s.rot }));
+      }
+    }
+  });
+  AddHardMountainRoof(sink, {
+    x, z, width: w, depth: d, eaveY: eave, ridgeY: ridge, ry, seed: `${seed}:roof`,
+  });
+
+  // 钟塔：山面一座方塔 + 四坡锥顶
+  const tw = 4.6;
+  const tp = L(0, d / 2 + tw / 2 - 0.4);
+  sink.Add("CrossStone", PlaceGeometry(
+    MakeBox(tw + 0.8, 1.0, tw + 0.8, TILE_METERS.stone, `${seed}:tbase`),
+    { x: tp.x, y: 0.5, z: tp.z, ry }));
+  sink.Add("HouseBrick", PlaceGeometry(
+    MakeBox(tw, towerH - 1.0, tw, TILE_METERS.brick, `${seed}:tower`, BRICK_UV_GRID),
+    { x: tp.x, y: 1.0 + (towerH - 1.0) / 2, z: tp.z, ry }));
+  sink.Solid(tp.x, towerH / 2, tp.z, tw / 2 + 0.4, towerH / 2, tw / 2 + 0.4, "wall");
+  // 钟层的券洞
+  for (const s of [-1, 1]) {
+    const p = L(s * (tw / 2 - 0.02), d / 2 + tw / 2 - 0.4);
+    sink.Add("Charred", PlaceGeometry(
+      MakeBox(0.2, 2.4, 1.5, TILE_METERS.stone, `${seed}:bell${s}`),
+      { x: p.x, y: towerH - 2.6, z: p.z, ry }));
+  }
+  // 锥顶
+  const spire = new THREE.ConeGeometry(tw * 0.78, 4.6, 4);
+  const uv = spire.attributes.uv;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3);
+  sink.Add("TubeTile", PlaceGeometry(spire, { x: tp.x, y: towerH + 2.3, z: tp.z, ry: ry + Math.PI / 4 }));
+  // 大门
+  const door = L(0, d / 2 + tw - 0.42);
+  AddDoorReveal(sink, {
+    x: door.x, z: door.z, ry: ry + Math.PI, openW: 1.9, openH: 3.0, depth: 1.4,
+    seed: `${seed}:door`, paving: "CrossStone", sill: "CrossStone",
+  });
+}
+
+/**
+ * 龙泉塔 —— **城东郊、荆河西岸，不在城内**。八角九级砖塔。
+ *
+ * 1938 年 3 月的状态必须做残的：**塔刹已倾毁、顶层塔室部分倾塌、挑檐斗拱脱落**。
+ *（今天完整的宝葫芦塔刹是 1984 年新装的；照今塔做就是错的。）
+ * 三月十七日十时被日军观测班占领作炮兵观测所，从 30 m 高处逐一报告城内弹着点 ——
+ * 城之所以在十七日下午被精确轰开，是因为这座塔。日方只登到 30 m 而非全高，
+ * 也侧证顶层当时已不可用。
+ *
+ * 始建年代四说互斥、形制两说互斥（密檐式／楼阁式）、高度三说 —— 台词与 UI 不能说死。
+ */
+export function AddPagoda(sink, {
+  x, z, tiers = 9, seed = "pagoda", baseY = 0, baseRadius = 4.3, topRadius = 2.1,
+}) {
+  const rnd = Mulberry32(HashString(seed));
+  // 台基
+  const plinthG = new THREE.CylinderGeometry(baseRadius + 1.5, baseRadius + 1.9, 1.6, 8);
+  ScalePagodaUv(plinthG, 3.0, 1.2);
+  sink.Add("Ashlar", PlaceGeometry(plinthG, { x, y: baseY + 0.8, z }));
+  sink.Solid(x, baseY + 0.8, z, baseRadius + 1.9, 0.8, baseRadius + 1.9, "prop");
+
+  let y = baseY + 1.6;
+  for (let t = 0; t < tiers; t += 1) {
+    const f0 = t / tiers, f1 = (t + 1) / tiers;
+    const r0 = baseRadius + (topRadius - baseRadius) * f0;
+    const r1 = baseRadius + (topRadius - baseRadius) * f1;
+    // 层高逐级递减：九级到顶约 34 m（残塔），日方能登到的第八级顶正好在 30 m 上下
+    const h = 5.0 - t * 0.32;
+    const broken = t === tiers - 1;          // 顶层塔室部分倾塌
+    const bodyH = broken ? h * 0.45 : h;
+    const shaft = new THREE.CylinderGeometry(r1, r0, bodyH, 8);
+    ScalePagodaUv(shaft, 3.2, bodyH / 1.2);
+    sink.Add(t < 2 ? "CityBrick" : "CityBrickWorn", PlaceGeometry(shaft, { x, y: y + bodyH / 2, z }));
+    if (t === 0) sink.Solid(x, y + bodyH / 2, z, r0, bodyH / 2, r0, "wall");
+
+    // 券门：八面里的四面开门（每层错开半角是楼阁式砖塔的常规做法）
+    if (!broken) {
+      for (let k = 0; k < 4; k += 1) {
+        const a = (k * Math.PI) / 2 + (t % 2) * (Math.PI / 4);
+        sink.Add("Charred", PlaceGeometry(
+          MakeBox(0.9, Math.min(2.2, bodyH * 0.5), 0.5, TILE_METERS.stone, `${seed}:d${t}${k}`),
+          { x: x + Math.sin(a) * (r0 - 0.15), y: y + bodyH * 0.32, z: z + Math.cos(a) * (r0 - 0.15), ry: a }));
+      }
+    }
+    // 挑檐：1938 年**檐角斗拱有脱落**，所以逐层随机缺角，不做齐整的八角檐
+    const eaveR = r1 + (broken ? 0.5 : 1.15);
+    const eaveG = new THREE.CylinderGeometry(r1 + 0.15, eaveR, 0.3, 8);
+    ScalePagodaUv(eaveG, 3.4, 0.5);
+    sink.Add("TubeTile", PlaceGeometry(eaveG, { x, y: y + bodyH + 0.15, z }));
+    if (!broken) {
+      for (let k = 0; k < 8; k += 1) {
+        if (rnd() < 0.28) continue;         // 掉了的那几个斗拱
+        const a = (k * Math.PI) / 4 + Math.PI / 8;
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBox(0.22, 0.24, 0.85, TILE_METERS.wood, `${seed}:br${t}${k}`),
+          { x: x + Math.sin(a) * (r1 + 0.5), y: y + bodyH - 0.18, z: z + Math.cos(a) * (r1 + 0.5), ry: a }));
+      }
+    }
+    y += bodyH + 0.3;
+  }
+  // **不装塔刹**：1938 年 3 月它已经倾毁。顶上留一圈参差的断砖。
+  for (let k = 0; k < 6; k += 1) {
+    const a = rnd() * Math.PI * 2;
+    const r = topRadius * (0.3 + rnd() * 0.6);
+    sink.Add("CityBrickWorn", PlaceGeometry(
+      MakeBox(0.6 + rnd() * 0.5, 0.35 + rnd() * 0.5, 0.5, TILE_METERS.brick, `${seed}:stub${k}`),
+      { x: x + Math.sin(a) * r, y: y + 0.2, z: z + Math.cos(a) * r, ry: a, rz: (rnd() - 0.5) * 0.4 }));
+  }
+}
+
+/** 圆柱面 UV 按世界米数重算（塔身是 30 m 高的砖面，默认 0..1 的 UV 会把砖拉成竖条纹）。 */
+function ScalePagodaUv(geometry, uScale, vScale) {
+  const uv = geometry.attributes.uv;
+  if (!uv) return geometry;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * uScale, uv.getY(i) * vScale);
+  uv.needsUpdate = true;
+  return geometry;
+}
+
+/**
+ * 关厢寨墙（东关）。日方实测：**高 2 m、顶宽 0.4 m** —— 极薄，一炮一个口。
+ * 与内城墙差一个量级，这条对比本身就是关卡叙事：
+ * 「对守军有利的不是城墙的高度与坚固，而是外城的存在与环绕城墙的密集民房。」
+ */
+export function AddZhaiWall(sink, {
+  x, z, ry = 0, length, height = 2.0, topWidth = 0.4, baseWidth = 0.9,
+  seed = "zhai", gaps = [], breaches = [], baseY = 0,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const rnd = Mulberry32(HashString(seed));
+  const segs = Math.max(4, Math.round(length / 1.6));
+  const segLen = length / segs;
+  for (let i = 0; i < segs; i += 1) {
+    const lx = -length / 2 + segLen * (i + 0.5);
+    let skip = false;
+    for (const g of gaps) if (Math.abs(lx - g.at) < g.width / 2) skip = true;
+    if (skip) continue;
+    let h = height;
+    for (const b of breaches) {
+      const d = Math.abs(lx - b.at);
+      if (d < b.width / 2) h = Math.min(h, height * (0.12 + 0.88 * Math.pow(d / (b.width / 2), 1.5)));
+    }
+    h *= 0.94 + rnd() * 0.12;          // 土墙顶本来就是参差的
+    const p = L(lx, 0);
+    sink.Add("ZhaiEarth", PlaceGeometry(
+      MakeBox(segLen * 1.03, h, (topWidth + baseWidth) / 2, TILE_METERS.adobe, `${seed}:s${i}`),
+      { x: p.x, y: baseY + h / 2, z: p.z, ry }));
+    if (h > height * 0.6) {
+      sink.Solid(p.x, baseY + h / 2, p.z,
+        Math.abs(cos) * segLen / 2 + Math.abs(sin) * baseWidth / 2, h / 2,
+        Math.abs(sin) * segLen / 2 + Math.abs(cos) * baseWidth / 2, "zhaiWall");
+      sink.Cover(p.x, p.z, baseY + h, sin, cos);
+    }
+  }
 }
