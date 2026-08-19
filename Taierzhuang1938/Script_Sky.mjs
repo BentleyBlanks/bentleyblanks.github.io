@@ -125,23 +125,53 @@ void main() {
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
 export const SKY_PRESETS = {
+  // ==========================================================================
+  // 太阳仰角这一栏是本作**最贵的一个数**，改之前先读这一段。
+  //
+  // 实测（Probe_StreetSmokyDay，主街净宽 5.2 m、檐口 4.6 m）：
+  // 把 lightIntensity 从 3.1 一路抬到 30，街上墙面只从 sRGB 88.5 动到 89.8 ——
+  // **平行光一点都没照进街里**，全场亮度都来自 scene.environment 那张天空 IBL。
+  // IBL 从各个方向来的值差不多，于是每一面墙、地、瓦都是同一个亮度、同一个色相：
+  // 这就是「整体偏单色土黄、没有暖主光 + 冷阴影分离」的**唯一根因**，
+  // 不是调色不够，也不是饱和度不对。
+  //
+  // 街是一条峡谷：檐高 h、街宽 w，太阳仰角必须满足 tan(elev) > h/w 才有一线阳光
+  // 落到街面上。这里 atan(4.6/5.2) = 41.5° —— 原来的 smokyDay 38° 差一点点，
+  // burningStreet 21° 差得远。抬过这条线，街上立刻出现「一条晒着的地 + 一面
+  // 晒着的墙 + 一面阴着的墙」，形体是白送的。
+  //
+  // 上限由史实定死：台儿庄 34.56°N，三月末赤纬 +2°，正午最大仰角 57.4°。
+  // 所以白天档只能落在 41.5°—57° 这个窄窗里，写在下面每一档的注释里。
+  // 抬仰角之后必须**同步压 envIntensity** —— 否则阴影侧被 IBL 提起来，
+  // 明暗比又白调，等于只把整张图提亮。
+  // ==========================================================================
+
   // 3 月 23 日黄昏：部队进城布防
   dusk: {
-    sunElevation: 7.5, sunAzimuth: 262,
+    // 黄昏就是**该**低于峡谷线：街底全在阴影里，只有屋面与山墙顶端挂着最后一道
+    // 橙光 —— 这个上明下暗的分层本身就是形体。7.5° 太低（连屋脊都吃不满），
+    // 12° 让檐口以上那一米真的亮起来，仍是日落前 40 分钟的样子。
+    sunElevation: 12.0, sunAzimuth: 262,
     zenith: [0.42, 0.62, 1.15], horizon: [4.20, 2.30, 1.05], ground: [0.46, 0.38, 0.30],
     sunColor: [1.0, 0.54, 0.26], sunIntensity: 90, sunSize: 0.0042, glow: 3.2, glowSpread: 18,
     smoke: 0.50, smokeColor: [1.55, 1.05, 0.70], smokeHeight: 0.17, stars: 0.0,
-    lightColor: 0xffb072, lightIntensity: 4.2,
-    hemiSky: 0x6d7f9c, hemiGround: 0x4a3a28, hemiIntensity: 0.85,
-    envIntensity: 1.25,
-    fog: { density: 0.0075, falloff: 22, max: 0.93,
+    lightColor: 0xffb072, lightIntensity: 8.8,
+    // 街底唯一的光源是天空，所以半球光的「天」端要真的冷、真的够亮 ——
+    // 它是黄昏档冷阴影的全部来源
+    hemiSky: 0x7d95c4, hemiGround: 0x4a3a28, hemiIntensity: 1.40,
+    envIntensity: 0.98,
+    fog: { density: 0.0125, falloff: 17, max: 0.93,
       sky: [0.86, 0.56, 0.34], ground: [0.40, 0.30, 0.24], sunGain: 0.42,
       desat: 0.40, flatten: 0.10 },
-    exposure: 0.60, godStrength: 0.45, bloom: 0.42, saturation: 0.98, contrast: 1.08,
+    exposure: 0.62, godStrength: 0.45, bloom: 0.42, saturation: 0.98, contrast: 1.08,
   },
   // 3 月 24 日午后：日军攻北门，硝烟遮日
   smokyDay: {
-    sunElevation: 38, sunAzimuth: 214,
+    // 38° 差 3.5° 越不过峡谷线（atan(4.6/5.2)=41.5°），街上一寸阳光都没有。
+    // 52° 是三月末台儿庄 13:30 前后的真实仰角（正午上限 57.4°），
+    // 檐影长 4.6×tan(38°)=3.6 m < 街宽 5.2 m —— 街上留出 1.6 m 的晒条，
+    // 对面那半面墙从墙根到檐口全亮。这一改是本轮画面变化最大的一笔。
+    sunElevation: 52, sunAzimuth: 214,
     // horizon 5.40 亮到把天顶到地平线的整段梯度压平（实测 229→250，11 级）。
     // 2.40 让它掉回天顶 1.90—2.35 的同一量级，梯度才读得出来；同时给一个冷偏
     // （B > R），白天的天才有色相可分离，而不是一条橙棕线上的一块白板。
@@ -153,8 +183,10 @@ export const SKY_PRESETS = {
     // 而不是降 exposure —— 降 exposure 天会跟着一起暗，比例白调。
     // 同时把半球光拉大（1.05 → 1.40）并把两端拉开：朝上的面吃冷天光、
     // 屋檐下与下巴吃暖地反光，「暖主光 + 冷阴影」才成立。
-    lightColor: 0xffe6c4, lightIntensity: 3.1,
-    hemiSky: 0x7796c8, hemiGround: 0x6f4c26, hemiIntensity: 1.40,
+    // 太阳翻过峡谷线之后，lightIntensity 第一次真的作用在墙和地上，
+    // 3.1 那一档是「反正照不进来、调它没用」时期留下的数
+    lightColor: 0xffe6c4, lightIntensity: 8.6,
+    hemiSky: 0x8fb0e0, hemiGround: 0x7a5228, hemiIntensity: 1.55,
     // 真正压住地面亮度的是这一项，不是 lightIntensity。实测：平行光从 4.8 砍到 3.1，
     // 街景地面/墙面均值只从 sRGB 108 动到 107 —— 这几面墙全在背光侧，亮度几乎
     // 都来自 scene.environment 那张天空 IBL。1.20 → 0.95 才把均值压到 90—110、
@@ -163,11 +195,13 @@ export const SKY_PRESETS = {
     // 0.95 → 1.45：地平线色从 5.40 压到 2.40 之后，这张天烘出来的 IBL 整体暗了三成，
     // 街景地面均值跟着从 99 掉到 66 —— 天修好了、地塌了，等于把问题挪了个位置。
     // 这一档补回来，均值回到 90—110 的窗口里。
-    envIntensity: 1.45,
-    fog: { density: 0.0080, falloff: 20, max: 0.84,
+    // 1.45 → 1.05：太阳抬到 52° 之后 IBL 不再是唯一光源了。留在 1.45 的话，
+    // 阴影侧被环境光整片提起来，明暗比又白调 —— 等于只是把整张图提亮一档。
+    envIntensity: 1.05,
+    fog: { density: 0.0145, falloff: 15, max: 0.88,
       sky: [0.72, 0.70, 0.66], ground: [0.38, 0.39, 0.42], sunGain: 0.24,
       desat: 0.50, flatten: 0.15 },
-    exposure: 0.42, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
+    exposure: 0.46, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
   },
   // 阴天：鲁南三四月多西南风、浮尘大，天是一块均匀的亮。
   // 这一档没有硬阴影，形体感全靠 AO 与环境光——最难做，也最能看出管线水平。
@@ -186,18 +220,22 @@ export const SKY_PRESETS = {
   },
   // 3 月 27 日——4 月 2 日：城内巷战，一半的天被火烧着
   burningStreet: {
-    sunElevation: 21, sunAzimuth: 238,
+    // 巷战打了七天，不必挑在傍晚。21° 是全部预设里离峡谷线最远的一档，
+    // 街上零阳光；45° 约合 14:30，檐影 4.6 m 略短于街宽，一条晒地贴着对面墙根。
+    // 方位角从 238 收到 226：更贴近 STREETS_NS（南北向主街）的走向，
+    // 光顺着街打下来，视线被自然引向街的深处（评分表 D7）。
+    sunElevation: 45, sunAzimuth: 226,
     zenith: [0.78, 0.92, 1.35], horizon: [2.05, 1.50, 1.05], ground: [0.50, 0.40, 0.30],
     sunColor: [1.0, 0.70, 0.38], sunIntensity: 88, sunSize: 0.0034, glow: 2.4, glowSpread: 13,
     smoke: 0.88, smokeColor: [1.85, 1.35, 1.00], smokeHeight: 0.13, stars: 0.0,
-    lightColor: 0xffbb80, lightIntensity: 2.7,
-    hemiSky: 0x6a7ba8, hemiGround: 0x63472e, hemiIntensity: 1.30,
-    // 同 smokyDay：地平线降了近一半，IBL 要补回来（见那一档的注释）
-    envIntensity: 1.55,
-    fog: { density: 0.0090, falloff: 16, max: 0.84,
+    lightColor: 0xffbb80, lightIntensity: 7.6,
+    hemiSky: 0x7f97cf, hemiGround: 0x63472e, hemiIntensity: 1.55,
+    // 同 smokyDay：太阳翻过峡谷线，IBL 要让位，否则阴影侧被提平
+    envIntensity: 1.10,
+    fog: { density: 0.0160, falloff: 14, max: 0.88,
       sky: [0.74, 0.52, 0.36], ground: [0.42, 0.32, 0.26], sunGain: 0.38,
       desat: 0.45, flatten: 0.13 },
-    exposure: 0.48, godStrength: 0.55, bloom: 0.50, saturation: 0.94, contrast: 1.10,
+    exposure: 0.54, godStrength: 0.55, bloom: 0.50, saturation: 0.94, contrast: 1.10,
   },
   // 4 月 3 日夜：敢死队
   night: {
@@ -215,18 +253,22 @@ export const SKY_PRESETS = {
   },
   // 4 月 7 日拂晓：总反攻
   dawn: {
-    sunElevation: 4.0, sunAzimuth: 88,
+    // 六个关卡阶段里有两个用这一档（含「破口」那一关），它的画面权重最高。
+    // 4° 太低：屋脊都吃不满光，整关只剩一片褐。11° 约合日出后 45 分钟，
+    // 仍是拂晓（反攻本来就打了一整个上午），而檐口以上、山墙、寨墙顶全部亮起来，
+    // 街底留在冷影里 —— 上暖下冷的分层是这一档形体的全部来源。
+    sunElevation: 11.0, sunAzimuth: 88,
     zenith: [0.50, 0.72, 1.30], horizon: [2.30, 1.55, 1.00], ground: [0.48, 0.40, 0.32],
     sunColor: [1.0, 0.64, 0.36], sunIntensity: 105, sunSize: 0.0044, glow: 3.6, glowSpread: 15,
     smoke: 0.58, smokeColor: [1.80, 1.25, 0.90], smokeHeight: 0.10, stars: 0.04,
-    lightColor: 0xffc890, lightIntensity: 3.0,
-    hemiSky: 0x6b84b8, hemiGround: 0x50402f, hemiIntensity: 1.30,
-    // 同 smokyDay：地平线降了近一半，IBL 要补回来（见那一档的注释）
-    envIntensity: 1.75,
-    fog: { density: 0.0090, falloff: 24, max: 0.93,
+    lightColor: 0xffc890, lightIntensity: 8.2,
+    hemiSky: 0x7d9ad4, hemiGround: 0x50402f, hemiIntensity: 1.55,
+    // 1.75 是「街底全靠 IBL」时代的补偿值；抬了太阳之后它会把冷影冲平
+    envIntensity: 1.15,
+    fog: { density: 0.0140, falloff: 18, max: 0.93,
       sky: [0.92, 0.60, 0.40], ground: [0.42, 0.33, 0.27], sunGain: 0.45,
       desat: 0.42, flatten: 0.11 },
-    exposure: 0.50, godStrength: 0.60, bloom: 0.46, saturation: 0.96, contrast: 1.09,
+    exposure: 0.56, godStrength: 0.60, bloom: 0.46, saturation: 0.96, contrast: 1.09,
   },
 };
 

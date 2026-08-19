@@ -147,19 +147,32 @@ export class Hud {
     this.noteQueue.push(note);
   }
 
-  /** 阵亡卡片：名字、籍贯、生卒年、番号。 */
+  /**
+   * 阵亡卡片。照 Easy Red 2 的呈现：黑底、居中、无装饰，
+   * 姓名（大）-> 籍贯 · 生卒（小）-> 番号（更小更暗），期间不出任何别的 HUD。
+   *
+   * 为什么这张卡值得单独讲究：它是这个游戏唯一一处把"一条命"具体化的地方。
+   * 姓名是中文的、籍贯是真地名（河北雄县、河南尉氏、陕西泾阳…按第 2 集团军的
+   * 实际构成抽），生年由年龄反推 —— 十七到三十四岁，绝大多数活不到二十五。
+   * 孙连仲那句命令的原话就是这个机制：「士兵打完了，你自己填上去。你填过了，我来填。」
+   */
   ShowDeathCard(identity, unit, seconds) {
     const born = 1938 - identity.age;
     this.el.deathCard.innerHTML =
       `<div class="dcName">${identity.name}</div>`
-      + `<div class="dcMeta">${identity.origin} · ${born}—1938</div>`
+      + `<div class="dcOrigin">籍贯　${identity.origin}</div>`
+      + `<div class="dcYears">${born} — 1938</div>`
       + `<div class="dcUnit">${unit}</div>`;
     this.el.deathCard.classList.add("on");
+    // 卡片在的时候把别的 HUD 全压掉 —— ER2 那一屏是干净的，
+    // 旁边还挂着小地图和弹药提示就成了"死亡结算界面"，不是那个意思。
+    this.root.classList.add("deathCardOn");
     this.deathTimer = seconds;
   }
 
   HideDeathCard() {
     this.el.deathCard.classList.remove("on");
+    this.root.classList.remove("deathCardOn");
   }
 
   ShowBrief(phase) {

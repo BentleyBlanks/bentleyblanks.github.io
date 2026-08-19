@@ -140,9 +140,23 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.45s ease;
 }
 .hudDeathCard.on { opacity: 1; }
-.hudDeathCard .dcName { font-size: 34px; letter-spacing: 0.22em; }
-.hudDeathCard .dcMeta { font-size: 15px; color: var(--dim); letter-spacing: 0.1em; }
-.hudDeathCard .dcUnit { font-size: 13px; color: rgba(230,223,205,0.4); letter-spacing: 0.14em; }
+.hudDeathCard .dcName {
+  font-size: 40px; letter-spacing: 0.30em; text-indent: 0.30em;  /* 字距会把最后一个字推偏，缩进补回来 */
+  font-weight: 500;
+}
+.hudDeathCard .dcOrigin {
+  margin-top: 14px; font-size: 15px; color: var(--dim); letter-spacing: 0.14em;
+}
+.hudDeathCard .dcYears {
+  margin-top: 4px; font-size: 15px; color: var(--dim); letter-spacing: 0.20em;
+}
+.hudDeathCard .dcUnit {
+  margin-top: 20px; font-size: 12.5px; color: rgba(230,223,205,0.34); letter-spacing: 0.18em;
+}
+
+/* 阵亡卡片在的时候，别的 HUD 全压掉。
+   ER2 那一屏是干净的；旁边还挂着小地图和弹药提示就成了"结算界面"，不是那个意思。 */
+#hud.deathCardOn > *:not(.hudDeathCard) { opacity: 0 !important; transition: opacity 0.3s ease; }
 
 /* 阶段开场 */
 .hudBrief {

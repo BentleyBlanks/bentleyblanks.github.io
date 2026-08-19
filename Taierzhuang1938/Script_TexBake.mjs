@@ -114,7 +114,11 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
     const joint = Math.min(SmoothStep(0, mortar, dh), SmoothStep(0, mortar * 0.75, dv));
 
     const grain = TileableFbm2(u * 42, v * 42, 42, { octaves: 4, seed: seed + 11 });
-    const coarse = TileableFbm2(u * 7, v * 7, 7, { octaves: 3, seed: seed + 23 });
+    // 平铺可见性的第一性原理：**一张要无限平铺的图，不许含有低于约 1/4 格波长的能量**。
+    // 低频斑块在一格里只出现两三团，铺到十米长的墙上就是同一组斑点重复十次，
+    // 眼睛一眼锁定（评分表 B3）。所以这里所有"大团"噪声的频率都往上推，
+    // 让每一格里出现十几团 —— 团还在、可读的图案没了。coarse 7 → 13。
+    const coarse = TileableFbm2(u * 13, v * 13, 13, { octaves: 3, seed: seed + 23 });
 
     // 剥落：Worley 斑块把砖角啃掉。
     //
@@ -129,7 +133,9 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
     //   （mixWarm 的 0.72 门限），再拿同一个数当剥落门限，暖色砖与剥落砖就是同一批 ——
     //   两笔叠在一起把三成砖刷成同一种米黄，整面墙读作迷彩瓷砖（实测比原来的
     //   点阵还难看，这一步是回调出来的，不是推出来的）。
-    const w = Worley2(u * 7, v * 7, seed + 313, 7);
+    // 11 与砖格的 10 列 / 20 行仍然互质，斑点不会和砖一一对应；
+    // 比 7 更细，一格里的剥落团从七八处变成十几处，平铺的可读性再降一档
+    const w = Worley2(u * 11, v * 11, seed + 313, 11);
     const chipRnd = Mulberry32(((row * 613 + col * 1097) >>> 0) + seed * 131)();
     const chipGate = SmoothStep(0.66, 0.88, chipRnd);
     const chip = SmoothStep(0.15, 0.02, w.f1) * damage * chipGate;
@@ -150,9 +156,18 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
     for (let c = 0; c < 3; c += 1) base[c] = Mix(mortarCol[c], base[c], joint);
     const fresh = [138, 126, 106];
     for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], fresh[c], SmoothStep(0.06, 0.60, chip));
-    // 烟熏：墙根与随机竖条发黑（台儿庄的房子烧过）
-    const soot = Clamp01(TileableFbm2(u * 3.1, v * 2.2, 3, { octaves: 4, seed: seed + 57 }) * 1.6 - 0.55) * sootiness;
-    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], 26, soot);
+    // 烟熏：墙根与随机竖条发黑（台儿庄的房子烧过）。
+    //
+    // 这一项是全砖墙里**唯一进 albedo 的低频项**，也就是出图上"每 1.2 m 重复一次
+    // 的深色斑"的正主 —— 原来 3.1×2.2 的频率，一格里只有三团，铺满一面十米长的墙
+    // 就是三团重复八次，眼睛一眼锁定（评分表 B3）。
+    // 提到 13×8.6（竖向压扁一点，像顺着墙流下来的烟痕）之后还差一步：
+    // 贴脸看（正片 P2 就是贴着墙拍的）仍是一块块**硬边黑斑**，读作豹纹／霉斑。
+    // 所以再收两处：用 grain 调制让烟痕边缘碎掉、跟着砖面高频走；
+    // 混合目标从近黑的 26 抬到 52 并把总量封在 0.72 —— 烧黑的砖是深灰，不是黑洞。
+    const sootBase = Clamp01(TileableFbm2(u * 13, v * 8.6, 13, { octaves: 3, seed: seed + 57 }) * 1.55 - 0.56);
+    const soot = Clamp01(sootBase * (0.55 + grain * 0.9)) * sootiness * 0.72;
+    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], 52, soot);
 
     const lum = (grain - 0.5) * 18;
     out.r = base[0] + lum; out.g = base[1] + lum; out.b = base[2] + lum;
@@ -167,9 +182,12 @@ export function BakeBrickWall(size = 512, { seed = 1, rowsPerTile = 12, damage =
 export function BakeAdobe(size = 512, { seed = 2, wear = 0.55 } = {}) {
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
-    const coarse = TileableFbm2(u * 5, v * 5, 5, { octaves: 5, seed: seed + 3 });
+    // 同砖墙与地面：一格 1.6 m 的夯土，coarse 5 / Worley 4.2 各只有四五团，
+    // 铺到一段十几米的院墙上就是一排复制的剥落斑。频率各推两倍多，
+    // 再把 coarse 进 albedo 的幅度从 ±13 收到 ±8（起伏留给 height）。
+    const coarse = TileableFbm2(u * 11, v * 11, 11, { octaves: 5, seed: seed + 3 });
     const fine = TileableFbm2(u * 40, v * 40, 40, { octaves: 4, seed: seed + 9 });
-    const w = Worley2(u * 4.2, v * 4.2, seed + 71, 4);
+    const w = Worley2(u * 9.4, v * 9.4, seed + 71, 9);
     const patch = SmoothStep(0.42, 0.16, w.f2 - w.f1);
     const peel = Clamp01(patch * wear + coarse * 0.35 - 0.18);
     // 土坯里的麦秸草筋：细长高频条纹
@@ -185,7 +203,7 @@ export function BakeAdobe(size = 512, { seed = 2, wear = 0.55 } = {}) {
     for (let c = 0; c < 3; c += 1) col[c] = Mix(dry[c], core[c], Clamp01(peel * 1.4));
     const strawCol = [176, 158, 118];
     for (let c = 0; c < 3; c += 1) col[c] = Mix(col[c], strawCol[c], strawMask * 0.6);
-    const shade = (coarse - 0.5) * 26 + (fine - 0.5) * 10;
+    const shade = (coarse - 0.5) * 16 + (fine - 0.5) * 10;
     out.r = col[0] + shade; out.g = col[1] + shade; out.b = col[2] + shade;
     out.h = h;
     out.rough = Clamp01(0.93 + fine * 0.06 - peel * 0.04);
@@ -319,7 +337,11 @@ export function BakeSteel(size = 256, { seed = 6, base = [58, 60, 64], rust = 0.
 export function BakeRubbleGround(size = 512, { seed = 7, brickiness = 0.5, wet = 0 } = {}) {
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
-    const soil = TileableFbm2(u * 6, v * 6, 6, { octaves: 5, seed: seed + 2 });
+    // 地面一格 2.6 m，是全场铺得最开的一张图（整座城一张地）。
+    // soil 原来 6 —— 一格里只有六团 43 cm 的深浅斑，沿街往远处看就是等距的地砖花纹。
+    // 推到 14（团缩到 19 cm、一格十几团）并把它在 albedo 里的幅度从 0.34 收到 0.22：
+    // 起伏交给 height（那一路不参与平铺的可读性，因为受光方向随几何变）。
+    const soil = TileableFbm2(u * 14, v * 14, 14, { octaves: 5, seed: seed + 2 });
     const fine = TileableFbm2(u * 55, v * 55, 55, { octaves: 3, seed: seed + 13 });
     // 碎砖块：Worley 单元当碎片，随机挑一部分算砖
     const w = Worley2(u * 22, v * 22, seed + 47, 22);
@@ -331,7 +353,7 @@ export function BakeRubbleGround(size = 512, { seed = 7, brickiness = 0.5, wet =
     const brick = [130, 116, 104];
     const col = [0, 0, 0];
     for (let c = 0; c < 3; c += 1) {
-      col[c] = dirt[c] * (0.82 + soil * 0.34);
+      col[c] = dirt[c] * (0.89 + soil * 0.22);
       col[c] = Mix(col[c], brick[c] * (0.9 + isBrick * 0.3), shard);
       col[c] = Mix(col[c], col[c] * 0.55, wet * Clamp01(1 - h) * 1.2);
     }
@@ -366,21 +388,56 @@ export function BakeSandbag(size = 256, { seed = 8 } = {}) {
   }, { normalStrength: 1.1 });
 }
 
-/** 石活：城门墩、井台、碾盘。 */
-export function BakeStone(size = 512, { seed = 9 } = {}) {
+/**
+ * 石活：碱脚（过墙石）、城门墩、井台、门槛、门道墁地。
+ *
+ * 原来是 Worley(5) 的泰森多边形 —— 出来是一片**乱石拼花**（crazy paving），
+ * 那是欧洲花园小径的砌法。而这张图在正片里的实际用途是每一段墙脚下那条
+ * 碱脚：鲁南是**条石顺砌、一皮一皮错缝**的。乱石拼花铺在几百米墙根上，
+ * 是每张街景截图里最扎眼的一处形制错误。
+ *
+ * 改成分皮砌：一格贴图 1.4 m → 四皮，皮高 35 cm（条石的真实尺寸）；
+ * 每皮一个随机错缝量，每块石头单独的深浅与鼓凸。
+ * 色按 docs/Data_HistoryMaterial.md 的过墙石 #B3B0A6 往回收一档（贴图是 albedo，
+ * 不是最终观感；直接写 179 会让碱脚成为全场最亮的东西）。
+ */
+export function BakeStone(size = 512, { seed = 9, courses = 4, perCourse = 3 } = {}) {
+  const mortarH = 0.052, mortarV = 0.042;
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
-    const w = Worley2(u * 5, v * 5, seed + 3, 5);
-    const seam = SmoothStep(0.0, 0.06, w.f2 - w.f1);
+    const rowF = v * courses;
+    const row = Math.floor(rowF);
+    const inRow = rowF - row;
+    // 每一皮一个随机错缝量。吸附到 1/(2*perCourse) 的格上，图案随机但竖缝不会
+    // 在贴图接缝处对不齐（这张图是要无缝平铺的）
+    const shiftRnd = Mulberry32((((row * 374761393) ^ (seed * 668265263)) >>> 0))();
+    const shift = Math.round(shiftRnd * perCourse * 2) / (perCourse * 2);
+    const colF = u * perCourse + shift;
+    const col = Math.floor(colF);
+    const inCol = colF - col;
+    // 逐石随机：大素数异或混，别用线性组合（同 BakeBrickWall 那条注释的坑）
+    const stone = Mulberry32((((row * 92837111) ^ (col * 689287499) ^ (seed * 283923481)) >>> 0))();
+
+    const dh = Math.min(inRow, 1 - inRow);
+    const dv = Math.min(inCol, 1 - inCol);
+    const joint = Math.min(SmoothStep(0, mortarH, dh), SmoothStep(0, mortarV, dv));
+
     const grain = TileableFbm2(u * 48, v * 48, 48, { octaves: 4, seed: seed + 17 });
+    // 凿痕：条石表面是錾出来的，一道道斜纹
+    const chisel = Math.abs(TileableFbm2(u * 26, v * 96, 26, { octaves: 2, seed: seed + 61 }) - 0.5) * 2;
     const pit = SmoothStep(0.22, 0.05, Worley2(u * 34, v * 34, seed + 53, 34).f1) * 0.35;
-    const tone = 0.85 + TileableValue2(u * 5, v * 5, 5, seed + 3) * 0.3;
-    const base = [118 * tone, 116 * tone, 110 * tone];
-    const sh = (grain - 0.5) * 22;
+    // 石面中间鼓、边上收（条石不是平板）
+    const belly = Math.pow(Clamp01(Math.sin(inCol * Math.PI) * Math.sin(inRow * Math.PI)), 0.5);
+
+    const tone = 0.86 + stone * 0.26;
+    const base = [148 * tone, 145 * tone, 137 * tone];
+    const mortarCol = [124, 122, 116];
+    for (let c = 0; c < 3; c += 1) base[c] = Mix(mortarCol[c], base[c], joint);
+    const sh = (grain - 0.5) * 18 - chisel * 6;
     out.r = base[0] + sh; out.g = base[1] + sh; out.b = base[2] + sh;
-    out.h = Clamp01(0.35 + seam * 0.5 + grain * 0.12 - pit * 0.3);
-    out.rough = Clamp01(0.82 + grain * 0.14);
-    out.ao = Clamp01(0.4 + seam * 0.55 - pit * 0.2);
+    out.h = Clamp01(0.28 + joint * 0.42 + belly * 0.14 + grain * 0.1 - pit * 0.26 - chisel * 0.05);
+    out.rough = Clamp01(0.80 + grain * 0.14 + pit * 0.08);
+    out.ao = Clamp01(0.40 + joint * 0.52 + belly * 0.08 - pit * 0.18);
     out.metal = 0;
   }, { normalStrength: 2.4 });
 }
@@ -400,7 +457,7 @@ export const RECIPES = {
   // 注意别写成 `s ?? 1024` —— Materials 层 **总是**显式传 size 进来，?? 永远不生效，
   // 上一轮就是这么"改了等于没改"。这里按传进来的档位翻倍，低配档跟着降。
   BrickWall: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 101, rowsPerTile: 20 }),
-  BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.6 }),
+  BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),

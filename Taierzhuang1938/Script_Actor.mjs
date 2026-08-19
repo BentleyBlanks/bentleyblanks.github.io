@@ -25,6 +25,10 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
+import {
+  MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
+} from "./Data_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
 
@@ -102,6 +106,13 @@ function Dimensions(height) {
     footLen: 0.148 * H, footW: 0.056 * H, footH: 0.055 * H,
   };
 }
+
+/**
+ * 九〇式钢盔真正喂给材质的 albedo。**不是** HEX.ijaHelmet ——
+ * 那个是史料记的"看上去的颜色"，当 albedo 用会被这条管线的曝光顶成暖白色。
+ * 账记在 ActorMaterials 里 helmet 那一行上面。
+ */
+const IJA_HELMET_ALBEDO = 0x3C3A30;
 
 /** 站直也留一点膝盖弯：腿绷成一条直线是「假人」最明显的一处。 */
 const STAND_SETTLE = 0.014;
@@ -650,6 +661,247 @@ function BuildWeaponGeometry(id, quality) {
 // 人物
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 从 Blender 出的 TZM 模型取骨头
+//
+// 换模的接缝就在这一小段：加载器（Script_MeshLoad）把「两个关节之间的所有网格
+// 按材质烘成一块」，也就是说它交出来的每个关节底下正好是 1—4 个 Mesh，
+// **和这个文件里 bones.xxx 那张 materialKey -> BufferGeometry 的表是同一个形状**。
+// 所以只要把网格身上的材质名认回来，模型就能原样塞进现有的骨架，
+// 姿态代码（PoseWeapon / PoseArms / PoseProne / PoseRagdoll）一行都不用改。
+//
+// 认名字的办法是**哨兵材质**而不是解析 mesh.name：加载器给网格起的名字是
+// `模型名_关节名_材质名`，靠 split("_") 认回来，哪天模型名里多一个下划线就静默错桶
+// （错桶不报错，只是军装变成皮肤色）。给它一组一次性的空材质、按对象身份反查，
+// 这条路不可能认错。
+// ---------------------------------------------------------------------------
+
+/**
+ * 换模时的合批档。**故意不直接用 Data_Meshes 的 MERGE_PROFILES**：
+ * 那张表在 medium 就把 accentA/accentB 并进军装了，而这两个桶正是
+ * 青天白日帽徽与步兵红领章 —— 全场唯二的高饱和点，也是「这是哪一方的兵」
+ * 在三十米外唯一读得出来的东西。为省 2 个 draw call 把敌我识别标志抹掉，
+ * 换的价钱不对（BootTest 实测 high 档全场才 1030 calls，余量 370）。
+ *
+ * 另一条容易白忙的规矩（Data_Meshes 里也写了）：**只有同一个关节上的两个桶
+ * 合并才真省 draw call**。鞋只挂在踝上、踝上也只有鞋，把 shoe 并进 uniform
+ * 一个 call 都省不到，只是把草鞋染成了军装色。所以下面这张表只并真的同关节的桶：
+ *   accessory / leather 在躯干上和军装同关节（子弹带、皮弹盒）—— 省 1
+ *   accentA / accentB 在头上和帽子同关节（帽徽、五角星）—— 省 2，只在 low 才动
+ */
+const MESH_MERGE = {
+  high: null,
+  medium: null,
+  low: { accessory: "uniform", leather: "uniform", accentA: "uniform", accentB: "uniform" },
+};
+
+/** 关节名 -> Actor 里 bones 表的键。模型没有独立的 head/hand 关节，照抄 Actor。 */
+const MODEL_BONE_BY_JOINT = {
+  hips: "hips", chest: "chest", neck: "head",
+  shoulderL: "armL", shoulderR: "armR",
+  elbowL: "foreL", elbowR: "foreR",
+  thighL: "thighL", thighR: "thighR",
+  kneeL: "shinL", kneeR: "shinR",
+  ankleL: "footL", ankleR: "footR",
+};
+
+/** 一组只用来认桶名的空材质。用完立刻 dispose —— 它们一个像素都不画。 */
+function SentinelMaterials(names) {
+  const table = {};
+  for (const name of names) {
+    const material = new THREE.MeshBasicMaterial();
+    material.name = name;
+    table[name] = material;
+  }
+  return table;
+}
+
+/**
+ * 把一个关节底下的网格收成 materialKey -> BufferGeometry。
+ * scale ≠ 1 时就地缩放几何：模型按 MESHES[id].height 建，而 kind 的身高可能不同
+ * （敢死队 1.68 / 军官 1.64），关节偏移由 Dimensions() 给，几何按同一个比例缩就对齐。
+ */
+function TakeJointGeometry(node, scale) {
+  const map = new Map();
+  if (!node) return map;
+  for (const child of node.children) {
+    if (!child.isMesh || !child.geometry) continue;
+    const key = (child.material && child.material.name) || "uniform";
+    const geometry = child.geometry;
+    if (scale && Math.abs(scale - 1) > 1e-4) geometry.scale(scale, scale, scale);
+    if (map.has(key)) {
+      // 加载器按 (关节, 材质) 分桶，同一个关节下不该出现两块同材质的网格。
+      // 真出现了就合并 —— 宁可多花一次合并，也不能默默丢掉一块几何。
+      map.set(key, MergeGeometries([map.get(key), geometry]));
+    } else {
+      map.set(key, geometry);
+    }
+  }
+  return map;
+}
+
+/** 已经报过一次的模型，别每个 kind 再刷一遍同样的 warn。 */
+const FACED_WARNED = new Set();
+const NORMAL_WARNED = new Set();
+
+/**
+ * 一块几何的翻面体检。要分开量**两件独立的事**，一起量会把好的也改坏：
+ *
+ *   facing      —— 顶点法线朝外还是朝里：法线与「形心指向该点」的夹角余弦均值。
+ *                  凸壳朝外接近 +1，法线整块反了接近 −1，平片接近 0。
+ *   consistency —— 三角**绕序**推出来的几何法线，跟顶点法线是不是一致：
+ *                  一致接近 +1，不一致接近 −1。
+ *
+ * 于是绕序自己的朝外程度 = facing × sign(consistency)。四种组合各治各的：
+ *   法线反、绕序也反（钢盔）→ 两样都翻；
+ *   只有法线反（袖子、裤腿、绑腿、鞋）→ 只翻法线，**绝不能动绕序** ——
+ *     动了就把本来朝外的面剔掉，腿会变成一段惨白的空壳（这一版就这么翻过一次车）。
+ */
+function ShellAudit(geometry) {
+  const pos = geometry.attributes.position;
+  const nrm = geometry.attributes.normal;
+  if (!pos || !nrm || pos.count === 0) return { facing: 1, consistency: 1 };
+  let cx = 0, cy = 0, cz = 0;
+  for (let i = 0; i < pos.count; i += 1) { cx += pos.getX(i); cy += pos.getY(i); cz += pos.getZ(i); }
+  cx /= pos.count; cy /= pos.count; cz /= pos.count;
+
+  let acc = 0, weight = 0;
+  for (let i = 0; i < pos.count; i += 1) {
+    const dx = pos.getX(i) - cx, dy = pos.getY(i) - cy, dz = pos.getZ(i) - cz;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-6) continue;
+    acc += (nrm.getX(i) * dx + nrm.getY(i) * dy + nrm.getZ(i) * dz) / len;
+    weight += 1;
+  }
+  const facing = weight ? acc / weight : 1;
+
+  const index = geometry.index;
+  let agree = 0, tris = 0;
+  const triCount = index ? index.count / 3 : pos.count / 3;
+  for (let t = 0; t < triCount; t += 1) {
+    const ia = index ? index.getX(t * 3) : t * 3;
+    const ib = index ? index.getX(t * 3 + 1) : t * 3 + 1;
+    const ic = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+    const ax = pos.getX(ia), ay = pos.getY(ia), az = pos.getZ(ia);
+    const ux = pos.getX(ib) - ax, uy = pos.getY(ib) - ay, uz = pos.getZ(ib) - az;
+    const vx = pos.getX(ic) - ax, vy = pos.getY(ic) - ay, vz = pos.getZ(ic) - az;
+    const gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+    const glen = Math.hypot(gx, gy, gz);
+    if (glen < 1e-12) continue;
+    const nx = (nrm.getX(ia) + nrm.getX(ib) + nrm.getX(ic)) / 3;
+    const ny = (nrm.getY(ia) + nrm.getY(ib) + nrm.getY(ic)) / 3;
+    const nz = (nrm.getZ(ia) + nrm.getZ(ib) + nrm.getZ(ic)) / 3;
+    const nlen = Math.hypot(nx, ny, nz);
+    if (nlen < 1e-6) continue;
+    agree += (gx * nx + gy * ny + gz * nz) / (glen * nlen);
+    tris += 1;
+  }
+  return { facing, consistency: tris ? agree / tris : 1 };
+}
+
+/**
+ * 把翻了面的几何翻回来。
+ *
+ * 事故：模型里**大半个人是内外翻的** —— 九〇式钢盔的半球、两条袖子、两条裤腿、
+ * 绑腿、鞋、编上靴。钢盔那一块连绕序一起反了，后果不是"看着怪"，是整顶盔
+ * 被背面剔除丢掉、日本兵变成一颗光头；其余几块只有法线反，剪影还在，
+ * 但受光是反的 —— 迎光面渲成暗的、背光面渲成亮的，整个人读起来是"平的"。
+ * 而包围盒、三角数、draw call、材质桶全部正常，_blender/Verify.mjs 也全绿，
+ * **只有真截图才看得见**。
+ *
+ * 阈值取 ±0.25 而不是 0：平片（帽徽、领章）这两个值本来就在 0 附近晃，
+ * 只有明确翻了面的壳才动它。模型侧修好之后这一段自动变空操作。
+ */
+function HealInvertedShell(geometry) {
+  const { facing, consistency } = ShellAudit(geometry);
+  let changed = false;
+  if (facing < -0.25) {
+    const nrm = geometry.attributes.normal;
+    for (let i = 0; i < nrm.count; i += 1) {
+      nrm.setXYZ(i, -nrm.getX(i), -nrm.getY(i), -nrm.getZ(i));
+    }
+    nrm.needsUpdate = true;
+    changed = true;
+  }
+  // 绕序的朝外程度 = 法线朝外程度 × 两者是否一致
+  const windingOut = facing * (consistency >= 0 ? 1 : -1);
+  if (windingOut < -0.25 && geometry.index) {
+    const a = geometry.index.array;
+    for (let i = 0; i + 2 < a.length; i += 3) { const t = a[i]; a[i] = a[i + 2]; a[i + 2] = t; }
+    geometry.index.needsUpdate = true;
+    changed = true;
+  }
+  return changed;
+}
+
+/** 对一个材质桶表整体做一次翻面体检。返回翻了几块。 */
+function HealBucket(bucket, modelId, where) {
+  if (!bucket) return 0;
+  let healed = 0;
+  for (const [key, geometry] of bucket) {
+    if (HealInvertedShell(geometry)) {
+      healed += 1;
+      const tag = `${modelId}:${where}:${key}`;
+      if (!NORMAL_WARNED.has(tag)) {
+        NORMAL_WARNED.add(tag);
+        console.warn(`[Actor] ${modelId} 的 ${where}/${key} 是内外翻的（受光反了，严重时整块被背面剔除吞掉），已翻回来`);
+      }
+    }
+  }
+  return healed;
+}
+
+/**
+ * 把帽徽 / 领章 / 五角星转到脸那一侧。
+ *
+ * 这是在给模型侧的一处不一致打补丁：BuildSoldiers.py 里躯干的装具是按
+ * **-Z 是正面**摆的（腰前小弹盒在 z = -waistDepth，跟这个文件里的程序化几何一致），
+ * 可头上那一套 —— 帽徽、钢盔五角星、连同 eyes 挂点 —— 是按 +Z 是正面摆的。
+ * 后果：正面看过去人是**没有帽徽**的，而青天白日帽徽与步兵红领章是史实红线里
+ * 点名的敌我识别标志（docs/Data_HistoryMaterial.md 第三节），全场唯二的高饱和点。
+ *
+ * 只转 accent 这两个桶（都是贴在帽子上的平面片），不动帽子本体 —— 帽檐还是在
+ * 后面，那个得回 BuildSoldiers.py 修，改这里治不了根。
+ *
+ * **按包围盒判断再转**：模型侧修好之后（帽徽 z 变成负的）这一段自动变成空操作，
+ * 不会二次翻转。
+ */
+function FaceForward(bucket, modelId, nudge = 0) {
+  if (!bucket) return;
+  let flipped = 0;
+  for (const key of ["accentA", "accentB"]) {
+    const geometry = bucket.get(key);
+    if (!geometry) continue;
+    geometry.computeBoundingBox();
+    const center = (geometry.boundingBox.min.z + geometry.boundingBox.max.z) * 0.5;
+    if (center <= 0) continue;            // 已经在脸那一侧，什么都不用做
+    geometry.rotateY(Math.PI);
+    // 帽徽是贴在帽墙上的一片薄圆片，建模时留的间隙只有 1 mm，转到正面之后
+    // 正好埋进帽子的前脸里（实测转完仍然一点看不见）。往前再让出 6 mm 才露得出来。
+    if (nudge) geometry.translate(0, 0, -nudge);
+    flipped += 1;
+  }
+  if (flipped && !FACED_WARNED.has(modelId)) {
+    FACED_WARNED.add(modelId);
+    console.warn(`[Actor] ${modelId} 的帽徽/领章建在了后脑勺（+Z），已转到正面；`
+      + "根治要改 _blender/BuildSoldiers.py 里头部那一套的 z 号");
+  }
+}
+
+/**
+ * 取一个挂点相对某根骨头的局部偏移。
+ * 静止姿势里全树的旋转都是 0，所以两个世界坐标直接相减就是局部偏移；
+ * 真要是哪天模型里给挂点加了旋转，这里得改成矩阵求逆 —— 留个记号。
+ */
+function MountOffset(built, mountName, jointName, scale) {
+  const mount = built.nodes.get(mountName);
+  const joint = built.nodes.get(jointName);
+  if (!mount || !joint) return null;
+  const a = new THREE.Vector3().setFromMatrixPosition(mount.matrixWorld);
+  const b = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
+  return a.sub(b).multiplyScalar(scale || 1);
+}
+
 /** 一根骨头：Group + 若干按材质合并好的网格。 */
 function AttachBone(parent, geometries, materials, position) {
   const bone = new THREE.Group();
@@ -699,6 +951,10 @@ export class Actor {
     const d = build.dims;
     this.dims = d;
     this.materials = factory.ActorMaterials(kind, rnd);
+    // "box" = Blender 模型没读到，退回了程序化方块几何。别把这个字段藏起来：
+    // 换模最容易的失败方式就是**静默**退回，画面看着还行、其实一个模型都没用上。
+    this.meshSource = build.source;
+    this.usingModel = build.source === "model";
 
     this.root = new THREE.Group();
     this.root.name = `Actor_${kind}_${options.seed ?? 0}`;
@@ -728,14 +984,31 @@ export class Actor {
     this.legs = {};
     for (const side of [-1, 1]) {
       const tag = side < 0 ? "L" : "R";
-      const thigh = AttachBone(this.hips, build.bones.thigh, this.materials,
+      // 程序化几何左右腿共用一份（thigh / foot），模型是左右各一份（绑腿的结在外侧、
+      // 靴筒的褶不对称）。两种都要能接上，所以按 side 先找、找不到再退回共用的那份。
+      const thigh = AttachBone(this.hips, build.bones[`thigh${tag}`] || build.bones.thigh, this.materials,
         new THREE.Vector3(side * d.hipHalf, 0, 0));
       const knee = AttachBone(thigh, build.bones[`shin${tag}`], this.materials,
         new THREE.Vector3(0, -d.thighLen, 0));
-      const ankle = AttachBone(knee, build.bones.foot, this.materials,
+      const ankle = AttachBone(knee, build.bones[`foot${tag}`] || build.bones.foot, this.materials,
         new THREE.Vector3(0, -d.shinLen, 0));
       this.legs[tag] = { thigh, knee, ankle, side };
     }
+
+    // 视线挂点。模型里 eyes 是头上的一个空节点，没模型时按头心比例补一个 ——
+    // 上层（音源、AI 视线、过场取景）拿到的接口两条路一模一样。
+    this.eyes = new THREE.Group();
+    this.eyes.name = "eyes";
+    const eyeOffset = build.mounts && build.mounts.eyes;
+    if (eyeOffset) {
+      // 正面是 -Z（全场约定，装具的前后就是照这个摆的）。BuildSoldiers.py 里
+      // eyes 挂点给的是 +headD*0.42，也就是后脑勺 —— 那边的 z 号写反了。
+      // 这里按约定取 -|z|：模型侧修好之后这一行照样成立，不会二次翻转。
+      this.eyes.position.set(eyeOffset.x, eyeOffset.y, -Math.abs(eyeOffset.z));
+    } else {
+      this.eyes.position.set(0, d.headCenterY - d.neckY + 0.011 * d.height, -d.headD * 0.52);
+    }
+    this.neck.add(this.eyes);
 
     // 白毛巾：缠头或缠左上臂，敢死队的识别标志（3 月 28 日夜那批还换穿了日军军服）
     this.towelHead = AttachBone(this.neck, build.bones.towelHead, this.materials, null);
@@ -1250,7 +1523,99 @@ export class ActorFactory {
     this.kindCache = new Map();      // kind -> { dims, bones }
     this.weaponCache = new Map();    // weaponId|quality -> { geometries, muzzle, ... }
     this.materialCache = new Map();
+    this.meshDocs = new Map();       // 模型 id -> 解码好的 TZM 文档
+    this.meshLoading = null;
+    this.meshReport = { requested: 0, loaded: 0, missing: [], ready: false };
     this.disposed = false;
+  }
+
+  /**
+   * 预读 Blender 出的模型（_blender/BuildAll.py → Model/*.tzm.json）。
+   *
+   * **必须在造第一个 Actor 之前 await 掉。** KindGeometry / WeaponGeometry 是同步的
+   * （它们在 Actor 构造函数里被调，那条路上不能有 await），只会去 meshDocs 里拿
+   * 已经解码好的文档；没预读就一律走程序化方块几何 —— 不报错、不黑屏，只是没换模。
+   *
+   * 一个模型 404 也只作废那一个 id（LoadDocument 返回 null 不抛），别的照用。
+   */
+  async PreloadMeshes() {
+    if (this.meshLoading) return this.meshLoading;
+    const wanted = new Set([
+      ...Object.values(SOLDIER_MESH_BY_KIND),
+      ...Object.values(WEAPON_MESH_BY_ID),
+    ]);
+    const ids = [...wanted].filter((id) => MESHES[id]);
+    this.meshLoading = (async () => {
+      const docs = await Promise.all(ids.map((id) => LoadDocument(MeshUrl(id))));
+      ids.forEach((id, i) => { if (docs[i]) this.meshDocs.set(id, docs[i]); });
+      this.meshReport = {
+        requested: ids.length,
+        loaded: this.meshDocs.size,
+        missing: ids.filter((id) => !this.meshDocs.has(id)),
+        ready: true,
+      };
+      return this.meshReport;
+    })();
+    return this.meshLoading;
+  }
+
+  /**
+   * 实例化一个模型，只为了把它的几何摘下来。
+   * 材质给的是一次性哨兵（见文件中段 SentinelMaterials 的账），摘完就 dispose。
+   */
+  _InstantiateMesh(id) {
+    const doc = this.meshDocs.get(id);
+    const entry = MESHES[id];
+    if (!doc || !entry) return null;
+    const profile = MESH_MERGE[this.quality] || null;
+    const names = new Set(entry.materials);
+    if (profile) for (const target of Object.values(profile)) names.add(target);
+    names.add("uniform");
+    const sentinels = SentinelMaterials(names);
+    let built = null;
+    try {
+      built = InstantiateModel(doc, { materials: sentinels, mergeMap: profile });
+    } catch (error) {
+      console.warn(`[Actor] 模型 ${id} 实例化失败：${String(error).slice(0, 160)}`);
+      built = null;
+    }
+    for (const material of Object.values(sentinels)) material.dispose();
+    if (built) built.root.updateMatrixWorld(true);
+    return built;
+  }
+
+  /** 用模型搭一个 kind 的骨头表。任何一环对不上就返回 null，调用方退回方块几何。 */
+  _ModelKindGeometry(kind, spec, dims) {
+    const id = SOLDIER_MESH_BY_KIND[kind];
+    if (!id || !this.meshDocs.has(id)) return null;
+    const built = this._InstantiateMesh(id);
+    if (!built) return null;
+    // 骨架必须逐字对上再动手摘几何：先查后摘，缺一根就整个退回，不留半拉子。
+    for (const joint of SOLDIER_JOINTS) {
+      if (!built.nodes.has(joint)) {
+        console.warn(`[Actor] 模型 ${id} 缺关节 ${joint}，这个 kind 退回程序化几何`);
+        return null;
+      }
+    }
+    const scale = spec.height / (MESHES[id].height || spec.height);
+    const bones = {};
+    for (const [joint, boneKey] of Object.entries(MODEL_BONE_BY_JOINT)) {
+      bones[boneKey] = TakeJointGeometry(built.nodes.get(joint), scale);
+    }
+    // 头上（帽徽 / 钢盔五角星）与领口（步兵红领章）两处都栽在同一个 z 号上
+    // 头上（帽徽 / 钢盔五角星）要再往外让 6 mm 才不被帽子吃掉；
+    // 领章贴在立领外面，转过来就够，再往外推会飘到胸口去
+    FaceForward(bones.head, id, 0.006);
+    FaceForward(bones.chest, id, 0);
+    for (const [boneKey, bucket] of Object.entries(bones)) HealBucket(bucket, id, boneKey);
+    const mounts = {
+      eyes: MountOffset(built, "eyes", "neck", scale),
+      weaponMount: MountOffset(built, "weaponMount", "chest", scale),
+      slingBack: MountOffset(built, "slingBack", "chest", scale),
+      gripL: MountOffset(built, "gripL", "elbowL", scale),
+      gripR: MountOffset(built, "gripR", "elbowR", scale),
+    };
+    return { bones, mounts, meshId: id };
   }
 
   /**
@@ -1261,14 +1626,62 @@ export class ActorFactory {
     return new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
   }
 
-  /** 按 kind 缓存整套骨骼几何：24 个人各自合并六十来个盒子会卡出一个肉眼可见的顿。 */
+  /**
+   * 按 kind 缓存整套骨骼几何：24 个人各自合并六十来个盒子会卡出一个肉眼可见的顿。
+   *
+   * 两条路：先试 Blender 出的模型，读不到就退回程序化方块几何。
+   * **不许在这里 await** —— 它在 Actor 构造函数里被调，异步化会让"造一个人"
+   * 变成异步操作，AI 那边一整条生成链都要跟着改。预读走 PreloadMeshes()。
+   */
   KindGeometry(kind) {
     const cached = this.kindCache.get(kind);
     if (cached) return cached;
     const spec = KIND_SPEC[kind];
     const dims = Dimensions(spec.height);
+    const fromModel = this._ModelKindGeometry(kind, spec, dims);
+    const entry = fromModel
+      ? { dims, bones: fromModel.bones, mounts: fromModel.mounts, source: "model", meshId: fromModel.meshId }
+      : { dims, bones: this._BoxKindGeometry(spec, dims), mounts: null, source: "box", meshId: null };
+    // 毛巾 / 背后的大刀 / 腰间的手榴弹带：模型里没有这三样（敢死队是按 kind 临时挂的，
+    // 而且 SetTowel 会在战斗中途开关），两条路都从这里补。
+    this._AttachExtraBones(entry.bones, spec, dims);
+    entry.meshCount = Object.values(entry.bones)
+      .reduce((sum, bone) => sum + (bone ? bone.size : 0), 0);
+    this.kindCache.set(kind, entry);
+    return entry;
+  }
+
+  /** 敢死队的白毛巾 / 背刀 / 手榴弹带。两条路共用，所以单独拎出来。 */
+  _AttachExtraBones(bones, spec, dims) {
     const quality = this.quality;
     const hy = dims.headCenterY - dims.neckY;
+    const lod = LOD[quality];
+    const make = (fn) => {
+      const buckets = new Map();
+      buckets.remap = lod.mergeTo;
+      fn(buckets);
+      return BakeBuckets(buckets);
+    };
+    // 白毛巾默认就建好，用 visible 开关 —— SetTowel 可能在战斗中途调用，
+    // 那时候再合并几何会掉帧。
+    bones.towelHead = make((b) => {
+      Add(b, "towel", TubeY(dims.headW * 0.66, dims.headW * 0.68, 0.042 * dims.height, 10, TILE_METERS.cloth),
+        { y: hy + 0.052 * dims.height });
+      Add(b, "towel", Cloth(0.03 * dims.height, 0.09 * dims.height, 0.02 * dims.height, "towelTail"),
+        { x: dims.headW * 0.6, y: hy + 0.012 * dims.height, z: 0.03 * dims.height, rz: 0.3 });
+    });
+    bones.towelArm = make((b) => {
+      Add(b, "towel", Cloth(0.072 * dims.height, 0.062 * dims.height, 0.072 * dims.height, "towelArm"),
+        { y: -dims.upperArmLen * 0.34 });
+    });
+    if (spec.dadao) bones.dadao = make((b) => BuildDadao(b, dims, quality));
+    if (spec.grenadeBelt) bones.grenades = make((b) => BuildGrenadeBelt(b, dims, quality));
+    return bones;
+  }
+
+  /** 程序化方块几何（模型读不到时的退路，也是这个项目前几轮的主力）。 */
+  _BoxKindGeometry(spec, dims) {
+    const quality = this.quality;
     const lod = LOD[quality];
     const bones = {};
     const make = (fn) => {
@@ -1300,36 +1713,87 @@ export class ActorFactory {
     bones.shinL = make(shin(-1));
     bones.shinR = make(shin(1));
     bones.foot = lod.footInShin ? null : make((b) => BuildLeg(b, dims, spec, quality, 1, "foot"));
-
-    // 白毛巾默认就建好，用 visible 开关 —— SetTowel 可能在战斗中途调用，
-    // 那时候再合并几何会掉帧。
-    bones.towelHead = make((b) => {
-      Add(b, "towel", TubeY(dims.headW * 0.66, dims.headW * 0.68, 0.042 * dims.height, 10, TILE_METERS.cloth),
-        { y: hy + 0.052 * dims.height });
-      Add(b, "towel", Cloth(0.03 * dims.height, 0.09 * dims.height, 0.02 * dims.height, "towelTail"),
-        { x: dims.headW * 0.6, y: hy + 0.012 * dims.height, z: 0.03 * dims.height, rz: 0.3 });
-    });
-    bones.towelArm = make((b) => {
-      Add(b, "towel", Cloth(0.072 * dims.height, 0.062 * dims.height, 0.072 * dims.height, "towelArm"),
-        { y: -dims.upperArmLen * 0.34 });
-    });
-
-    if (spec.dadao) bones.dadao = make((b) => BuildDadao(b, dims, quality));
-    if (spec.grenadeBelt) bones.grenades = make((b) => BuildGrenadeBelt(b, dims, quality));
-
-    const entry = { dims, bones };
-    this.kindCache.set(kind, entry);
-    return entry;
+    return bones;
   }
 
+  /**
+   * 手持武器的几何 + 挂点。先试模型，读不到退回 BuildWeaponGeometry。
+   * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
+   * 所以 Actor.SetWeapon 一行都不用改。
+   */
   WeaponGeometry(weaponId) {
     const key = `${weaponId}|${this.quality}`;
     let built = this.weaponCache.get(key);
     if (!built) {
-      built = BuildWeaponGeometry(weaponId, this.quality);
+      built = this._ModelWeaponGeometry(weaponId) || BuildWeaponGeometry(weaponId, this.quality);
       this.weaponCache.set(key, built);
     }
     return built;
+  }
+
+  /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
+  _ModelWeaponGeometry(weaponId) {
+    const id = WEAPON_MESH_BY_ID[weaponId];
+    if (!id || !this.meshDocs.has(id)) return null;
+    const data = WEAPONS[weaponId];
+    const built = this._InstantiateMesh(id);
+    if (!built || !built.nodes.has("muzzle")) return null;
+
+    // 枪模型一根关节都没有（MESHES[id].joints === 0），所以整把枪的网格都挂在
+    // root 上、局部变换是单位阵 —— 直接摘就是规范坐标系里的几何。
+    const kind = data ? data.kind : "boltRifle";
+    // 大刀与手榴弹：模型是**刀身朝 -Z**建的（跟枪一个规范系），
+    // 而这个文件里的劈砍/投掷动作是按**刀身朝 +Y**写的。绕 X 转 +90° 把两边对上，
+    // 这样 PoseWeapon 里那套 swing 常量一个都不用重调。
+    const upright = kind === "melee" || kind === "throwable";
+    const geometries = new Map();
+    for (const child of built.root.children) {
+      if (!child.isMesh || !child.geometry) continue;
+      const bucket = (child.material && child.material.name) || "steel";
+      if (upright) child.geometry.rotateX(Math.PI / 2);
+      if (geometries.has(bucket)) {
+        geometries.set(bucket, MergeGeometries([geometries.get(bucket), child.geometry]));
+      } else {
+        geometries.set(bucket, child.geometry);
+      }
+    }
+    if (!geometries.size) return null;
+    HealBucket(geometries, id, "weapon");
+
+    const Mount = (name) => {
+      const node = built.nodes.get(name);
+      if (!node) return null;
+      const v = new THREE.Vector3().setFromMatrixPosition(node.matrixWorld);
+      if (upright) v.set(v.x, -v.z, v.y);
+      return v;
+    };
+    const bore = 0.035;
+    const muzzle = Mount("muzzle");
+    const gripFront = Mount("gripL")
+      || (upright ? new THREE.Vector3(0, 0.12, 0) : new THREE.Vector3(0, -0.012, -0.30));
+    // 拉栓的抓握点：模型没有这个挂点（栓在钢件里烘死了），沿用规范坐标系里的常量。
+    // 枪机在膛线轴稍上、机匣右侧一点 —— 这两个数是按 BuildWeaponGeometry 定的。
+    const bolt = kind === "pistol"
+      ? new THREE.Vector3(0.02, 0.05, -0.01)
+      : new THREE.Vector3(0.04, bore + 0.012, 0.02);
+    return {
+      geometries,
+      muzzle,
+      gripFront,
+      bolt,
+      twoHanded: kind !== "pistol" && kind !== "throwable",
+      source: "model",
+      meshId: id,
+    };
+  }
+
+  /** 换模有没有真的生效。测试与 HUD 调试面板读这个，别去猜。 */
+  MeshStatus() {
+    const kinds = {};
+    for (const [kind, entry] of this.kindCache) kinds[kind] = entry.source;
+    const weapons = {};
+    for (const [key, built] of this.weaponCache) weapons[key] = built.source === "model" ? "model" : "box";
+    return { ...this.meshReport, quality: this.quality, kinds, weapons };
   }
 
   /** 取（并缓存）一份材质。同一组参数全场只建一个，省的是着色器编译不是内存。 */
@@ -1373,8 +1837,18 @@ export class ActorFactory {
         () => lib.Plain(`shoe${shoeHex}`, { color: shoeHex, roughness: 0.94, metalness: 0 })),
       skin: this.Material(`skin:${skinHex}`,
         () => lib.Plain(`skin${skinHex}`, { color: skinHex, roughness: 0.78, metalness: 0 })),
+      // 九〇式铁帽。三处都栽过，写下来：
+      //  1) 它是**喷漆**的钢盔不是裸钢，metalness 必须接近 0（原来给的是 0.85）；
+      //  2) SteelHelmet 这张贴图是按 polish 0.2 烘的，粗糙度图本身偏光滑，
+      //     材质上的 roughness 标量是**乘**在那张图上的，给到 1 也压不哑，
+      //     所以只能靠压暗 albedo 来救；
+      //  3) HEX.ijaHelmet(#5A5646) 是史料给的**日光下看到的颜色**，不是 albedo。
+      //     直接拿它当 albedo，TintTo 会算出 (1.99, 1.71, 1.36) 的乘数把那张暗底
+      //     贴图整体提亮两倍 —— 换成模型的整块半球之后，实测渲出来是一颗
+      //     **和皮肤同色**的暖白球，三十米外等于没戴盔（方块时代那顶盔是几个折面，
+      //     高光被切碎了，所以一直没暴露）。落到 albedo 要再压两档。
       helmet: this.Material("helmet", () => lib.Get("SteelHelmet",
-        { color: TintTo("SteelHelmet", HEX.ijaHelmet), tintId: "helm", roughness: 0.72, metalness: 0.85 })),
+        { color: TintTo("SteelHelmet", IJA_HELMET_ALBEDO), tintId: "helm", roughness: 1, metalness: 0.04 })),
       steel: this.Material("steel", () => lib.Get("Steel", { roughness: 0.62, metalness: 0.9 })),
       wood: this.Material("wood", () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0 })),
       leather: this.Material("leather",

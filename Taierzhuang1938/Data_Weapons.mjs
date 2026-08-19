@@ -5,6 +5,24 @@
 // 一条设计底线：**中方装备必须参差**。第 2 集团军是杂牌，一个班里至少三种枪，
 // 轻机枪每班 0—1 挺，子弹带大半是瘪的。把中正式做成制式统一装备就失真了。
 
+/**
+ * 后坐的两个字段（实测校出来的，别再拍脑袋改）：
+ *   recoverS    —— 回落时间常数。实测原来的 0.42 s 意味着 95% 回稳要 1063 ms，
+ *                  而中正式两发间隔才 1250 ms —— 只剩 190 ms 是"静止的"，
+ *                  玩家读不到那截残留，只感到画面一直在缓慢往下淌。
+ *   recoverFrac —— **保留多少残留。战地的答案是：一点都不留。**
+ *
+ *   这条我改错过一次，记在这里免得再犯。上一版按"留 28% 让玩家自己压"做，
+ *   那是 CS / Valorant 的喷射弹道逻辑。战地的 datamine 数据说得很清楚：
+ *   BF1/BFV 的栓动步枪**后坐永远回到零**，0.25—0.5 s 收干净，
+ *   而两发间隔是 1.0—2.4 s —— **每一发都从同一个瞄准点开始**。
+ *
+ *   那它的"重量感"从哪来？从**回落曲线的形状**：
+ *     Decrease ∝ RecoilTerm * RecoilDec * dt * TimeSinceLastShot^0.5
+ *   t=0 时最后那一项是 0，所以回落**从零速率起步、然后加速** ——
+ *   踢上去、悬住、加速归位。是这条曲线在卖那一枪，不是残留。
+ *   （出处见 docs/Data_BattlefieldNumbers.md，sym.gg 的出货原值 + 公式）
+ */
 export const AMMO = {
   Mauser792: { label: "七九", caliber: "7.92×57mm", muzzle: 810 },
   Arisaka65: { label: "六五", caliber: "6.5×50mm", muzzle: 762 },
@@ -32,7 +50,7 @@ export const WEAPONS = {
     boltTimeS: 1.05,                          // 拉栓一次：抬-拉-推-闭
     fireIntervalS: 1.25,
     reloadTimeS: 3.4,
-    recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.42 },
+    recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
     swayScale: 1.0, adsTimeS: 0.28, adsFovScale: 0.72,
     spreadHipDeg: 2.6, spreadAdsDeg: 0.18,
     bayonet: true, bayonetLengthM: 0.395,
@@ -49,7 +67,7 @@ export const WEAPONS = {
     magazine: 5, reloadKind: "stripper",
     damage: 74, headMultiplier: 2.6, effectiveRangeM: 400,
     boltTimeS: 1.18, fireIntervalS: 1.40, reloadTimeS: 3.8,
-    recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.46 },
+    recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
     swayScale: 1.12, adsTimeS: 0.32, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,
     bayonet: true, bayonetLengthM: 0.395,
@@ -66,7 +84,7 @@ export const WEAPONS = {
     magazine: 20, reloadKind: "topMag",       // 20 发弧形弹匣**上方**插入
     damage: 70, headMultiplier: 2.2, effectiveRangeM: 800,
     rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 3.0,
-    recoil: { pitch: 0.85, yaw: 0.34, kick: 0.02, recoverS: 0.16 },
+    recoil: { pitch: 0.85, yaw: 0.34, kick: 0.02, recoverS: 0.11, recoverFrac: 1.0 },
     swayScale: 1.35, adsTimeS: 0.40, adsFovScale: 0.80,
     spreadHipDeg: 4.2, spreadAdsDeg: 0.55, bipod: true,
     note: "全班就这一挺，弹匣从上面插。抛壳口在下方。第 2 集团军每班 0—1 挺。",
@@ -82,7 +100,7 @@ export const WEAPONS = {
     magazine: 10, reloadKind: "stripper",
     damage: 42, headMultiplier: 2.2, effectiveRangeM: 60,
     fireIntervalS: 0.16, reloadTimeS: 2.6,
-    recoil: { pitch: 1.5, yaw: 0.8, kick: 0.03, recoverS: 0.18 },
+    recoil: { pitch: 1.5, yaw: 0.8, kick: 0.03, recoverS: 0.13, recoverFrac: 1.0 },
     swayScale: 0.75, adsTimeS: 0.18, adsFovScale: 0.86,
     spreadHipDeg: 3.4, spreadAdsDeg: 0.9,
     note: "敢死队标配「一支长枪、一支短枪」里的短枪。近战自动火力全靠它。",

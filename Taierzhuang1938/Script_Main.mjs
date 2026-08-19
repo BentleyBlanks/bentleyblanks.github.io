@@ -214,6 +214,15 @@ async function Boot() {
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
+  // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
+  // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
+  // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
+  const meshes = await actorFactory.PreloadMeshes();
+  if (meshes.missing.length) {
+    // warn 不是 error：BootTest 把 console.error 当事故，而少一个模型只是降级不是崩
+    console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
+  }
+  setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
   vfx = new VfxSystem(scene, library, { quality: QUALITY, maxParticles: SCALE.vfxBudget });
   // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
@@ -225,7 +234,9 @@ async function Boot() {
   // 最深点（枪口 + 刺刀）变成 |0.32 + 0.8175| + 0.04 + 0.02 ≈ 1.20 m，
   // 沿用 0.90 会被 _RecomputeCompensation 压到 0.55 的下限，枪整体缩到眼前 ——
   // 画面不变（等比缩放绕相机原点是恒等的），但枪口离眼睛只剩半米，贴墙时会穿模
-  viewmodel = new Viewmodel(library, { fov: 52, depthBudget: 1.22 });
+  // meshDocs 直接借 ActorFactory 已经解码好的那份：同一个 .tzm.json 解两遍
+  // 既多花开机时间又多占一份内存，而两边要的就是同一棵节点树。
+  viewmodel = new Viewmodel(library, { fov: 52, depthBudget: 1.22, meshDocs: actorFactory.meshDocs });
   camera.add(viewmodel.root);
   scene.add(camera);
   // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，
@@ -288,7 +299,7 @@ async function Boot() {
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, battlefield,
-    player, ai, vfx, viewmodel, hud, audio, state,
+    player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
     story, combat, nav, interact, wheel,
     StepFrames, JumpToPhase: EnterPhase,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
@@ -1148,7 +1159,7 @@ function TryFire(dt) {
   // viewmodel 已经按那张表把这一发的相机踢动算好了（含每发随机的偏航方向与开镜衰减），
   // 这里取走并交给 player：顶上去 100%、只回落 70%，剩 30% 要玩家自己压。
   viewmodel.ConsumeCameraKick(_kick);
-  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4);
+  player.ApplyRecoil(_kick.x, _kick.y, weapon.recoil?.recoverS ?? 0.4, weapon.recoil?.recoverFrac ?? 0.72);
 
   viewmodel.MuzzleWorld(_muzzle);
   audio.Play(currentWeapon === "Zb26" ? "zb26" : "rifleNra", { position: _muzzle.clone() });

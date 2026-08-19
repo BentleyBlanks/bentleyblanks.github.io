@@ -276,8 +276,13 @@ export function AddCompound(sink, spec) {
   if (rnd() < 0.55) AddWell(sink, ...L((rnd() - 0.5) * width * 0.4, yardZ - rnd() * 2));
   if (rnd() < 0.45) AddMillstone(sink, ...L((rnd() - 0.5) * width * 0.5, yardZ - 1 - rnd() * 2), `${seed}:ms`);
   if (rnd() < 0.4) AddWaterVat(sink, ...L(width / 2 - 1.2, yardZ - 0.6), `${seed}:vat`);
-  // 影壁：门内一堵挡视线的短墙，进院第一眼看到的就是它
-  if (gateSide === "south" && rnd() < 0.5) {
+  // 影壁：门内一堵挡视线的短墙，进院第一眼看到的就是它。
+  //
+  // 概率从 0.5 提到必有（形制上本来也是四合院的标配）。理由不只是考据：
+  // 影壁是**从街上透过门洞唯一能看见的一片受光面**。有它，门洞里是一堵晒着的砖墙；
+  // 没它，门洞里是院子的空气加上被墙挡住的天光 —— 出图上就是纯黑。
+  // 它站在门内 2.0 m、宽 2.4 m > 门净宽 1.5 m，正好把门洞填满。
+  if (gateSide === "south") {
     const [px, pz] = L(0, depth / 2 - 2.0);
     AddWall(sink, "BrickWall", {
       x: px, z: pz, length: 2.4, height: 1.9, thickness: 0.28, ry,
@@ -355,6 +360,12 @@ export function AddRoomBlock(sink, spec) {
             MakeBox(1.25, eaveY - doorH - 0.18, 0.36, TILE_METERS.brick, `${seed}:up${b}`),
             { x: bx, y: doorH + 0.18 + (eaveY - doorH - 0.18) / 2, z: bz, ry: ry + f.rot }));
         }
+        // 同门楼：给屋门也做出进深。f.lz 是这面墙在房子局部坐标里的位置，
+        // lz<0 那一面的"里"在反方向，所以要多转 180°，不然门槛与墁地会跑到街上去
+        AddDoorReveal(sink, {
+          x: bx, z: bz, ry: ry + f.rot + (f.lz >= 0 ? 0 : Math.PI),
+          openW: 1.25, openH: doorH, depth: 1.5, seed: `${seed}:rv${b}`,
+        });
         if (rnd() < 0.55) {
           for (const s3 of [-1, 1]) {
             sink.Add("WoodDoor", PlaceGeometry(
@@ -404,6 +415,60 @@ export function AddRoomBlock(sink, spec) {
   }
 }
 
+/**
+ * 门洞的"里子"：门槛石 + 门道墁地 + 木门框 + 门道内壁。
+ *
+ * 为什么单独抽出来：鲁南民居对外不开窗，**门洞是街上唯一的开口** ——
+ * 它在每一张街景截图里都是唯一的深色块，眼睛必然落上去。而原来这里
+ * 什么都没有：墙上挖个洞，洞里是院子/屋里的空气，出图上就是一个纯黑方块，
+ * 一眼假（视觉审查连着两轮点名）。
+ *
+ * 一个真门洞被眼睛读作"有进深"，靠的是三条**亮**的线，不是靠里面亮：
+ *   ① 门槛石高出地面一指，顶面接天光 —— 门洞底下那条亮边；
+ *   ② 门道墁的青砖比土路浅，从洞口往里能看到一小片地；
+ *   ③ 木门框把洞口框出两条竖亮线 + 一条横亮线。
+ * 有了这三条，中间那块黑就读作"里面是暗的"，而不是"这里没有东西"。
+ *
+ * @param {object} spec x,z,ry 门洞中心与朝向（+z 局部轴指向"里"）；
+ *        openW 净宽；openH 净高；depth 门道进深；jamb 是否上木门框
+ */
+export function AddDoorReveal(sink, {
+  x, z, ry, openW = 1.5, openH = 2.15, depth = 1.9, seed = "dv",
+  jamb = true, paving = "Stone", sill = "Stone",
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  // 局部 +z 轴（PlaceGeometry 绕 Y 转 ry 之后）指向世界 (sin, cos)：门道朝里的方向
+  const At = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+
+  // ① 门槛石：高出地面 0.13 m。它同时也是"人要抬腿跨进去"的形制交代
+  const sillPos = At(0, 0);
+  sink.Add(sill, PlaceGeometry(
+    MakeBox(openW + 0.14, 0.16, 0.46, TILE_METERS.stone, `${seed}:sill`),
+    { x: sillPos.x, y: 0.07, z: sillPos.z, ry }));
+
+  // ② 门道墁地：一片比土路浅得多的石／砖地，从门槛往里铺。
+  //    厚 0.10、顶面在 +0.04，压在地面网格上面一点，不会被地形起伏吃掉
+  const pavePos = At(0, depth / 2 + 0.2);
+  sink.Add(paving, PlaceGeometry(
+    MakeBox(openW + 0.05, 0.1, depth, TILE_METERS.stone, `${seed}:pave`),
+    { x: pavePos.x, y: -0.01, z: pavePos.z, ry }));
+
+  // ③ 木门框：两根立柱 + 一根上槛，缩在洞口里 0.24 m，
+  //    所以正面看是"框在黑洞外面的一圈亮木头"，侧面看是门道的厚度
+  if (jamb) {
+    for (const s of [-1, 1]) {
+      const p = At(s * (openW / 2 - 0.05), 0.24);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.11, openH, 0.13, TILE_METERS.wood, `${seed}:jamb${s}`),
+        { x: p.x, y: openH / 2 + 0.14, z: p.z, ry }));
+    }
+    const head = At(0, 0.24);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(openW + 0.02, 0.13, 0.13, TILE_METERS.wood, `${seed}:head`),
+      { x: head.x, y: openH + 0.14, z: head.z, ry }));
+  }
+}
+
 /** 门楼：3.5—4.5 m，双扇木门 + 门墩石 + 小瓦顶。街上唯一的开口。 */
 export function AddGatehouse(sink, { x, z, ry, seed, damage = 0, burnt = false, openW = 1.5 }) {
   const h = 3.6;
@@ -433,6 +498,8 @@ export function AddGatehouse(sink, { x, z, ry, seed, damage = 0, burnt = false, 
     sink.Add("RoofTile", PlaceGeometry(MakeBox(openW + 2.1, 0.16, 0.24, TILE_METERS.roof, `${seed}:rdg`),
       { x, y: h + 0.5, z, ry }));
   }
+  // 门洞的里子：门槛 + 门道墁地 + 木框。没有它，门楼在街景里就是一个纯黑方块
+  AddDoorReveal(sink, { x, z, ry, openW, openH: 2.18, depth: 2.1, seed: `${seed}:rv` });
   // 门板（一扇歪着，一扇掉了——打了半个月的镇子不会有齐整的门）
   if (damage < 0.75) {
     sink.Add("WoodDoor", PlaceGeometry(MakeBox(openW / 2 - 0.04, 2.15, 0.07, TILE_METERS.wood, `${seed}:d0`),

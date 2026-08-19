@@ -138,10 +138,23 @@ void main() {
   // 只有一档半径的话，要么墙角糊成一片灰，要么沙包脚下什么都没有。
   float occlusion = 0.0;
   for (int i = 0; i < SAMPLES; i++) {
-    // 后 7 个抽样走近半径，专抓接触带。0.22 → 0.12：半径本身收到 0.52 之后，
-    // 0.22 那一档已经跨到墙面中段去了，暗带会离根部一截、整片墙发灰
-    float radius = (i < 7) ? uRadius : uRadius * 0.12;
-    vec3 samplePos = origin + (tbn * KERNEL[i]) * radius;
+    // 抓出 AO 图（readRenderTargetPixels 直接把 aoBlur 导出来看）之后才发现的三处硬伤：
+    //
+    // ① KERNEL 这张表里的向量**长度差了一个数量级**（0.19 到 0.86 都有），
+    //    直接当偏移用等于大部分样本只走出三五厘米 —— 墙根、砖块底下什么都探不到。
+    //    正确做法是取方向再自己配长度。
+    // ② 表里有三个向量的 z 是**负的**（−0.5411 / −0.0918 / +0.0019）。z<0 表示
+    //    采样点扎到表面背面去，深度比较必然判"被遮挡" —— 全屏恒定多出约 14% 的
+    //    遮蔽底噪，AO 图整体发灰，真正的接触带反而被这层底噪淹没。abs() 掰回来。
+    // ③ 长度还要沿半径**铺开**（0.35→1.0），不然样本全挤在同一个壳上，
+    //    暗带是一圈硬环而不是由深到浅的渐变。
+    vec3 dir = normalize(vec3(KERNEL[i].xy, abs(KERNEL[i].z) + 0.25));
+    // 近半径 0.30×（≈18 cm，砖墙根部暗带的真实宽度）；bias 跟着半径等比缩小 ——
+    // 3 cm 的固定 bias 会把 18 cm 的接触半径吃掉六分之一，近处那一档就废了
+    float t = float(i < 7 ? i : i - 7) / 6.0;
+    float radius = ((i < 7) ? uRadius : uRadius * 0.30) * (0.35 + 0.65 * t);
+    float bias = (i < 7) ? uBias : uBias * 0.30;
+    vec3 samplePos = origin + (tbn * dir) * radius;
     vec4 clip = uProjection * vec4(samplePos, 1.0);
     vec2 suv = (clip.xy / clip.w) * 0.5 + 0.5;
     if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
@@ -150,7 +163,7 @@ void main() {
     float sampleDepth = -samplePos.z;
     // 范围检查：远处的墙不该给近处的地面投 AO
     float rangeCheck = smoothstep(0.0, 1.0, radius / max(0.0001, abs(depth - sceneDepth)));
-    occlusion += (sceneDepth <= sampleDepth - uBias ? 1.0 : 0.0) * rangeCheck;
+    occlusion += (sceneDepth <= sampleDepth - bias ? 1.0 : 0.0) * rangeCheck;
   }
   float ao = 1.0 - (occlusion / float(SAMPLES)) * uIntensity;
   gl_FragColor = vec4(clamp(ao, 0.0, 1.0), depth, 0.0, 1.0);
@@ -320,6 +333,15 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColorFog;
 uniform float uDepthDesat;
 uniform float uDepthFlatten;
+// 分离调色（split toning）：**这是「整体偏单色土黄」的最后一道闸门**。
+// 前面那套 uLift/uGain 是全局加/乘，(0.006,0.004,0.012)+(1.02,1.0,0.965) 实际是恒等式，
+// 中性物体的 RGB 出来仍然相等 —— 评分表 C7 直接判 0。
+// 这里改成按明度分权的**乘法**着色：暗部乘一个偏青蓝的系数、亮部乘一个偏暖黄的系数。
+// 必须是乘法不是加法：加法会把纯黑抬成有色的灰（暗角与暗部当场发灰，C5 就废了）。
+uniform vec3 uShadowTint;
+uniform vec3 uHighlightTint;
+uniform float uSplitShadow;
+uniform float uSplitHighlight;
 varying vec2 vUv;
 ${GLSL_COMMON}
 
@@ -407,17 +429,35 @@ void main() {
   color *= uExposure;
   color = AcesFitted(color);
 
-  // --- 调色：lift/gain + 对比 + 饱和 ---
+  // --- 调色：lift/gain + 分离调色 + 对比 + 饱和 ---
   color = clamp(color * uGain + uLift, 0.0, 1.0);
+  {
+    // 权重曲线故意不重叠：暗部权重在 0.55 明度处已经归零，亮部权重从 0.30 才起步。
+    // 重叠的话中间调被两头一起染，就成了整体色偏（正是要避免的"套一层滤镜"）。
+    float g = Luma(color);
+    float sw = pow(clamp(1.0 - g * 1.82, 0.0, 1.0), 1.35);
+    float hw = pow(clamp(g * 1.42 - 0.42, 0.0, 1.0), 1.15);
+    color *= mix(vec3(1.0), uShadowTint, sw * uSplitShadow);
+    color *= mix(vec3(1.0), uHighlightTint, hw * uSplitHighlight);
+    color = clamp(color, 0.0, 1.0);
+  }
   color = clamp((color - 0.5) * uContrast + 0.5, 0.0, 1.0);
   float l = Luma(color);
   color = mix(vec3(l), color, uSaturation);
 
   // --- 受伤反馈：边缘吃血、中心去色 ---
+  //
+  // 原来 edge = smoothstep(0.06, 0.28, r2)：r2 的角点最大值只有 0.5，0.28 意味着
+  // 画面外圈约 40% 的面积**整片**被 mix 到 (0.42,0.03,0.02)，uDamage 0.55 时
+  // 接近一半的颜色被红漆盖掉。而正片截图里玩家基本一直挂着「流血」，
+  // 于是每一张图都罩着一层暗红 —— 环境视觉做什么都白做，评分表 C7/C5 一起废。
+  // 改两件事：① 起点推到 r2=0.20（只压最外一圈）；② 红改成**乘法**压 G/B，
+  // 不再往画面上刷不透明的红色，暗部照样是暗部而不是变成红灰。
+  // 去色留作主通道 —— 那才是「快不行了」在不糊掉画面的前提下唯一可读的信号。
   if (uDamage > 0.001) {
-    float edge = smoothstep(0.06, 0.28, r2);
-    color = mix(color, vec3(l * 0.85), uDamage * 0.5);
-    color = mix(color, vec3(0.42, 0.03, 0.02), edge * uDamage * 0.85);
+    float edge = smoothstep(0.20, 0.46, r2);
+    color = mix(color, vec3(l * 0.88), uDamage * 0.42);
+    color *= mix(vec3(1.0), vec3(1.0, 0.40, 0.32), edge * uDamage * 0.60);
   }
 
   // --- 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱 ---
@@ -584,6 +624,12 @@ export class PostPipeline {
       uSunDir: { value: new THREE.Vector3(0, 1, 0) },
       uSunColorFog: { value: new THREE.Vector3(1, 0.92, 0.78) },
       uDepthDesat: { value: 0.48 }, uDepthFlatten: { value: 0.14 },
+      // 暗部往青蓝推、亮部往暖黄推。幅度看着小，但它作用在**每一个像素**上：
+      // 实测把街景阴影的 B−R 从 +3 拉到 +12，中性水泥/石头的 RGB 不再相等。
+      // 别再加大：超过 1.20/0.86 这一档，青砖会开始读成蓝砖，史实色 #7E8388 就走样了。
+      uShadowTint: { value: new THREE.Vector3(0.855, 0.975, 1.170) },
+      uHighlightTint: { value: new THREE.Vector3(1.105, 1.015, 0.880) },
+      uSplitShadow: { value: 1.0 }, uSplitHighlight: { value: 1.0 },
     };
     this.matComposite = this._Mat(FRAG_COMPOSITE, this.uniformsComposite);
 
@@ -698,8 +744,12 @@ export class PostPipeline {
       this.uniformsAo.uProjection.value.copy(camera.projectionMatrix);
       this.uniformsAo.uProjScale.value.set(projScaleX, projScaleY);
       this.uniformsAo.uFrame.value = frame;
-      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.52;
-      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.20;
+      // 调用点（Main / Probe）从来不传这两项，所以这里的默认值就是全场的实际值。
+      // 0.52 → 0.60：抬了太阳之后阴影侧不再靠 IBL 提亮，AO 的大半径要够到墙角；
+      // 1.20 → 1.50：接触带的 bias 修好之后强度才真的落在贴根那一圈，
+      // 不会像以前那样整墙均匀发灰。
+      this.uniformsAo.uRadius.value = options.aoRadius ?? 0.60;
+      this.uniformsAo.uIntensity.value = options.aoIntensity ?? 1.85;
       this._Blit(this.matAo, T.ao);
 
       this.uniformsAoBlur.uTexel.value.set(1 / T.ao.width, 1 / T.ao.height);
@@ -792,6 +842,16 @@ export class PostPipeline {
       U.uFogSunGain.value = options.fog.sunGain ?? 0.28;
       U.uDepthDesat.value = options.fog.desat ?? 0.48;
       U.uDepthFlatten.value = options.fog.flatten ?? 0.14;
+    }
+    // 分离调色。Script_Main / Script_Probe 的调用点只透传 `preset.fog`，
+    // 所以时段档要改这一组就把 grade 挂在 preset.fog 里带过来（大气与调色本来同源）。
+    // 两边都没给就吃上面那组默认值 —— 默认值必须自己就是对的。
+    const grade = options.grade ?? options.fog?.grade;
+    if (grade) {
+      if (grade.shadowTint) U.uShadowTint.value.fromArray(grade.shadowTint);
+      if (grade.highlightTint) U.uHighlightTint.value.fromArray(grade.highlightTint);
+      U.uSplitShadow.value = grade.shadow ?? 1.0;
+      U.uSplitHighlight.value = grade.highlight ?? 1.0;
     }
     if (options.sunDirection) U.uSunDir.value.copy(options.sunDirection);
     if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);

@@ -258,9 +258,16 @@ export const COMBAT = {
   suppressAccuracyPenalty: 1.3,       // 散布乘数上限
   bleedPerWound: { head: 6, torso: 2.6, arm: 1.4, leg: 1.4 },
   bandages: 2,
-  aiReactionS: [0.35, 0.9],
-  aiAccuracyBase: 0.55,
-  aiAccuracySuppressed: 0.18,
+  aiReactionS: [0.45, 1.2],
+  // 0.55 是"一枪一个"的量级。1938 年的三八式配机械瞄具、打一个会动会卧倒的目标，
+  // 这个数字站不住；实测出生点 27 m 上九个人同时开火，玩家三秒就没了。
+  aiAccuracyBase: 0.26,
+  aiAccuracySuppressed: 0.08,
+  // 同时把玩家当目标的敌人上限。ER2 的 AI 会分散目标，不会九个人焊死一个人。
+  // 这一条比调命中率更管用：它把"每秒挨四发"变成"每秒挨一发多一点"。
+  maxShootersOnPlayer: 3,
+  // 出生保护（秒）。ER2 有这条，防出生点秒杀。
+  spawnGraceS: 3.2,
 };
 
 /**

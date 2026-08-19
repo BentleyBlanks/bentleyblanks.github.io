@@ -1,0 +1,558 @@
+# -*- coding: utf-8 -*-
+"""《血战台儿庄》Blender 程序化建模内核 —— 建模原语 + 节点树 + TZM 导出。
+
+为什么自己定一个 .tzm.json 而不是 glTF：
+  仓里的 three 只有 vendor/three/build 的核心库，**没有 examples/jsm**，
+  也就没有 GLTFLoader。为了读七把枪把整个 addon 拖进来，代价（体积、维护、
+  和自研管线的 tone mapping / 预通道约定打架）远大于收益。
+  自研格式只需要表达四件事：节点层级、每节点局部变换、每节点挂的网格、材质名。
+  这四件事写出来不到 200 行，读它的加载器也不到 200 行。
+
+为什么在 Blender 里直接按**游戏坐标系（Y 上、-Z 前）**建模，而不是 Blender
+的 Z 上：
+  无头程序化生成根本不看视口，转轴反而是纯风险 —— 轴换手性的时候法线要跟着
+  翻，翻漏一处就是「这块面从里面看才有」。所以这里全程 Y 上，导出零变换。
+  副作用：拿 Blender GUI 打开 .blend 会看到模型躺着。这是刻意的，别去"修"。
+
+三角面预算（超了同屏 24 人会掉帧，见任务书性能红线）：
+  士兵 ≤ 1800、武器 ≤ 900、建筑构件 ≤ 400。BuildAll 会逐个断言。
+"""
+
+import base64
+import json
+import math
+import os
+import struct
+
+import bpy
+import bmesh
+from mathutils import Matrix, Vector
+
+TAU = math.pi * 2.0
+
+# 每格贴图代表多少米。必须与 Script_Geo.mjs 的 TILE_METERS 一致，
+# 否则同一张 ClothNra 贴在人身上和贴在沙袋上密度不同，一眼看穿是两套资产。
+TILE_METERS = {
+    "brick": 1.2, "adobe": 1.6, "roof": 1.1, "wood": 1.0,
+    "ground": 2.6, "stone": 1.4, "sandbag": 0.9, "cloth": 0.6, "steel": 0.35,
+}
+
+# 允许出现在模型里的材质名。必须是 Script_Actor.ActorMaterials() 返回的桶名的子集 ——
+# 加载器不造材质，只按名字去现成的材质表里取。写错名字导出时就报错，
+# 别等到运行时才发现半个人是黑的。
+MATERIAL_NAMES = {
+    "uniform", "accessory", "shoe", "skin", "helmet", "steel", "wood",
+    "leather", "towel", "red", "accentA", "accentB",
+    # 建筑构件用的是 MaterialLibrary 的配方名，加载器同样直接透传
+    "Stone", "WoodBeam", "WoodDoor", "RoofTile", "BrickWall", "Adobe",
+}
+
+
+# ---------------------------------------------------------------------------
+# 建模原语：全部返回一个独立的 bmesh
+# ---------------------------------------------------------------------------
+
+def _SuperEllipse(theta, rx, rz, power):
+    """超椭圆采样。power=2 是正圆，power=4 往方里收 —— 躯干、枪托、弹药盒
+    都不是正圆柱，这个指数就是「不像胶囊」的第一道分水岭。"""
+    c, s = math.cos(theta), math.sin(theta)
+    e = 2.0 / power
+    x = rx * math.copysign(abs(c) ** e, c)
+    z = rz * math.copysign(abs(s) ** e, s)
+    return x, z
+
+
+def Ring(y, r=None, rx=None, rz=None, cx=0.0, cz=0.0, power=2.0, roll=0.0):
+    """一圈截面。r 是 rx==rz 的简写；roll 让截面绕 Y 转（缠绑腿的错层靠它）。"""
+    return {
+        "y": y,
+        "rx": rx if rx is not None else r,
+        "rz": rz if rz is not None else r,
+        "cx": cx, "cz": cz, "power": power, "roll": roll,
+    }
+
+
+def Loft(rings, segments=12, capStart=True, capEnd=True, smooth=True):
+    """把一串截面放样成一个实体。躯干的肩宽腰窄、四肢的粗细变化、钢盔的
+    半球带檐，全是这一个函数出来的 —— 圆柱是它 rings 全同的退化情形。"""
+    bm = bmesh.new()
+    layers = []
+    for ring in rings:
+        verts = []
+        degenerate = abs(ring["rx"]) < 1e-6 and abs(ring["rz"]) < 1e-6
+        if degenerate:
+            # 半径收到 0 的圈退化成一个极点，否则顶端会挤出一撮零面积三角形
+            verts = [bm.verts.new((ring["cx"], ring["y"], ring["cz"]))]
+        else:
+            for i in range(segments):
+                th = TAU * i / segments + ring["roll"]
+                x, z = _SuperEllipse(th, ring["rx"], ring["rz"], ring["power"])
+                verts.append(bm.verts.new((ring["cx"] + x, ring["y"], ring["cz"] + z)))
+        layers.append(verts)
+
+    for a, b in zip(layers, layers[1:]):
+        if len(a) == 1 and len(b) == 1:
+            continue
+        if len(a) == 1:
+            for i in range(segments):
+                j = (i + 1) % segments
+                f = bm.faces.new((a[0], b[i], b[j]))
+                f.smooth = smooth
+        elif len(b) == 1:
+            for i in range(segments):
+                j = (i + 1) % segments
+                f = bm.faces.new((a[i], b[0], a[j]))
+                f.smooth = smooth
+        else:
+            for i in range(segments):
+                j = (i + 1) % segments
+                # 绕向定死成 (下i, 上i, 上j, 下j)：cross(向上, 切向) 朝外，
+                # 这样闭合体不靠 recalc 也是对的，开放片（背带）才有确定的正面
+                f = bm.faces.new((a[i], b[i], b[j], a[j]))
+                f.smooth = smooth
+
+    if capStart and len(layers[0]) > 2:
+        bm.faces.new(list(reversed(layers[0]))).smooth = False
+    if capEnd and len(layers[-1]) > 2:
+        bm.faces.new(layers[-1]).smooth = False
+    bm.normal_update()
+    return bm
+
+
+def Lathe(profile, segments=12, smooth=True, closed=False):
+    """旋转体：profile 是 [(r, y), ...] 的外轮廓，绕 Y 轴用 bmesh.ops.spin 转一圈。
+    手榴弹弹体、水壶、帽顶、门墩鼓面走这条。
+
+    closed=True 会把轮廓首尾连上 —— 轮廓两端都**不在轴上**时（圆环、垫圈）必须开，
+    否则转出来是一张开放的面片，背面剔除一开就半边消失。
+    """
+    bm = bmesh.new()
+    verts = [bm.verts.new((p[0], p[1], 0.0)) for p in profile]
+    edges = [bm.edges.new((verts[i], verts[i + 1])) for i in range(len(verts) - 1)]
+    if closed and len(verts) > 2:
+        edges.append(bm.edges.new((verts[-1], verts[0])))
+    bmesh.ops.spin(
+        bm, geom=verts + edges, axis=(0.0, 1.0, 0.0), cent=(0.0, 0.0, 0.0),
+        dvec=(0.0, 0.0, 0.0), angle=TAU, steps=segments, use_merge=True, use_duplicate=False)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    for f in bm.faces:
+        f.smooth = smooth
+    bm.normal_update()
+    return bm
+
+
+def Box(w, h, d, bevel=0.0, segments=1, smooth=False):
+    """一块方料。bevel > 0 时倒角 —— 直角在近距离视图模型上是塑料感的主因。"""
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=Vector((w, h, d)), verts=bm.verts[:])
+    if bevel > 0.0:
+        bmesh.ops.bevel(
+            bm, geom=bm.verts[:] + bm.edges[:], offset=bevel, segments=segments,
+            profile=0.5, affect="EDGES", clamp_overlap=True)
+    for f in bm.faces:
+        f.smooth = smooth
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.normal_update()
+    return bm
+
+
+def TubeY(r0, r1, length, segments=10, power=2.0, cap=True, smooth=True):
+    """沿 +Y 的锥台。y 从 -length/2 到 +length/2。"""
+    return Loft([Ring(-length * 0.5, r=r0, power=power),
+                 Ring(length * 0.5, r=r1, power=power)],
+                segments, capStart=cap, capEnd=cap, smooth=smooth)
+
+
+def TubeZ(r0, r1, length, segments=10, power=2.0, cap=True, smooth=True):
+    """沿 -Z 的锥台（武器坐标系：枪管朝 -Z）。z 从 0 到 -length。"""
+    bm = TubeY(r0, r1, length, segments, power, cap, smooth)
+    # 绕 X 转 -90°：+Y 变 -Z
+    Transform(bm, rx=-math.pi * 0.5, y=0.0)
+    Transform(bm, z=-length * 0.5)
+    return bm
+
+
+def Strip(points, width, thickness, smooth=False):
+    """把一串 (x, y, z) 骨架点扫成一条有厚度的带子。斜挎子弹带、背包带、
+    刀鞘的挎带走这条 —— 用一根扁盒子代替它会立刻穿帮成「贴在身上的贴纸」。"""
+    bm = bmesh.new()
+    layers = []
+    for i, p in enumerate(points):
+        p = Vector(p)
+        nxt = Vector(points[min(i + 1, len(points) - 1)])
+        prv = Vector(points[max(i - 1, 0)])
+        tangent = (nxt - prv)
+        if tangent.length < 1e-6:
+            tangent = Vector((0.0, 1.0, 0.0))
+        tangent.normalize()
+        side = tangent.cross(Vector((0.0, 0.0, 1.0)))
+        if side.length < 1e-4:
+            side = tangent.cross(Vector((0.0, 1.0, 0.0)))
+        side.normalize()
+        out = side.cross(tangent).normalized()
+        hw, ht = width * 0.5, thickness * 0.5
+        quad = [p + side * hw + out * ht, p - side * hw + out * ht,
+                p - side * hw - out * ht, p + side * hw - out * ht]
+        layers.append([bm.verts.new(tuple(v)) for v in quad])
+    for a, b in zip(layers, layers[1:]):
+        for i in range(4):
+            j = (i + 1) % 4
+            f = bm.faces.new((a[i], b[i], b[j], a[j]))
+            f.smooth = smooth
+    bm.faces.new(list(reversed(layers[0]))).smooth = False
+    bm.faces.new(layers[-1]).smooth = False
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.normal_update()
+    return bm
+
+
+def Transform(bm, x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0, sx=1.0, sy=1.0, sz=1.0):
+    """就地变换一个 bmesh。顺序：缩放 → ZYX 欧拉 → 平移。"""
+    m = (Matrix.Translation((x, y, z))
+         @ Matrix.Rotation(rz, 4, "Z")
+         @ Matrix.Rotation(ry, 4, "Y")
+         @ Matrix.Rotation(rx, 4, "X")
+         @ Matrix.Diagonal((sx, sy, sz, 1.0)))
+    bmesh.ops.transform(bm, matrix=m, verts=bm.verts[:])
+    bm.normal_update()
+    return bm
+
+
+def Join(*meshes):
+    """把若干 bmesh 并成一个（不做焊接：不同零件焊在一起会把法线拉花）。"""
+    out = bmesh.new()
+    for src in meshes:
+        if src is None:
+            continue
+        src.verts.index_update()
+        remap = {v.index: out.verts.new(v.co) for v in src.verts}
+        out.verts.index_update()
+        for f in src.faces:
+            try:
+                nf = out.faces.new([remap[v.index] for v in f.verts])
+                nf.smooth = f.smooth
+            except ValueError:
+                pass    # 重复面：直接丢，别让整条管线炸在一块看不见的皮上
+        src.free()
+    out.normal_update()
+    return out
+
+
+def BooleanDifference(bmA, bmB):
+    """A 减 B。bmesh 没有布尔算子，只能借 bpy 的 Boolean 修改器 + depsgraph
+    求值 —— 无头模式下这条路是通的（不需要 bpy.ops.object.modifier_apply）。
+    只在「洞是造型本身」的地方用（斗拱的十字卯口），别拿它做倒角，
+    布尔出来的三角数不可控，三角预算扛不住。"""
+    objA = _BmToObject(bmA, "boolA")
+    objB = _BmToObject(bmB, "boolB")
+    mod = objA.modifiers.new("diff", "BOOLEAN")
+    mod.operation = "DIFFERENCE"
+    mod.object = objB
+    mod.solver = "EXACT"
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = objA.evaluated_get(depsgraph)
+    result = bmesh.new()
+    result.from_mesh(evaluated.to_mesh())
+    evaluated.to_mesh_clear()
+    for o in (objA, objB):
+        bpy.data.objects.remove(o, do_unlink=True)
+    bmesh.ops.recalc_face_normals(result, faces=result.faces[:])
+    result.normal_update()
+    return result
+
+
+def _BmToObject(bm, name):
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
+def Decimate(bm, ratio):
+    """兜底减面。建模段数控制不住时才用 —— 它会把规整的环切打成乱三角，
+    法线也跟着糙，能不用就不用。"""
+    if ratio >= 0.999:
+        return bm
+    obj = _BmToObject(bm, "dec")
+    mod = obj.modifiers.new("dec", "DECIMATE")
+    mod.ratio = ratio
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph)
+    out = bmesh.new()
+    out.from_mesh(evaluated.to_mesh())
+    evaluated.to_mesh_clear()
+    bpy.data.objects.remove(obj, do_unlink=True)
+    out.normal_update()
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 节点树
+# ---------------------------------------------------------------------------
+
+class Node:
+    """一个节点。joint=True 表示「运行时会被逐帧改 rotation」——
+    加载器就是按 joint 切合批区间的：一个 joint 到下一个 joint 之间的所有
+    网格按材质合并成 1—2 个 draw call。挂点（枪口/握把）是没有网格的 joint=False
+    节点，加载器照样把它们放进 nodes 表里。"""
+
+    def __init__(self, name, t=(0.0, 0.0, 0.0), r=(0.0, 0.0, 0.0), s=1.0, joint=False):
+        self.name = name
+        self.t = tuple(float(v) for v in t)
+        self.r = tuple(float(v) for v in r)
+        self.s = (float(s), float(s), float(s)) if isinstance(s, (int, float)) else tuple(s)
+        self.joint = bool(joint)
+        self.parts = []          # [(material, bmesh, tileMeters)]
+        self.children = []
+
+    def Child(self, name, t=(0.0, 0.0, 0.0), r=(0.0, 0.0, 0.0), s=1.0, joint=False):
+        node = Node(name, t, r, s, joint)
+        self.children.append(node)
+        return node
+
+    def Add(self, material, bm, tile="cloth", **place):
+        """往节点上挂一块几何。place 走 Transform 的参数（在节点局部系里摆位）。"""
+        if material not in MATERIAL_NAMES:
+            raise ValueError("材质名不在白名单里：%s" % material)
+        if place:
+            Transform(bm, **place)
+        self.parts.append((material, bm, TILE_METERS.get(tile, 1.0) if isinstance(tile, str) else float(tile)))
+        return self
+
+    def Walk(self):
+        yield self
+        for c in self.children:
+            for n in c.Walk():
+                yield n
+
+
+# ---------------------------------------------------------------------------
+# 三角化 / 法线 / UV / 量化
+# ---------------------------------------------------------------------------
+
+def _ExtractLoops(bm, tile):
+    """三角化并吐出 (position, normal, uv) 三元组序列。
+
+    光滑法线只由**相邻的 smooth 面**加权累加：直接拿 vert.normal 的话，
+    圆柱端盖（flat）会把侧壁（smooth）的法线往轴向拽，柱面边缘出现一圈死光。
+    """
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    bm.normal_update()
+    bm.verts.index_update()
+    bm.faces.index_update()
+
+    smooth_normals = {}
+    for f in bm.faces:
+        if not f.smooth:
+            continue
+        try:
+            weight = f.calc_area()
+        except ValueError:
+            weight = 0.0
+        for v in f.verts:
+            acc = smooth_normals.get(v.index)
+            if acc is None:
+                acc = Vector((0.0, 0.0, 0.0))
+                smooth_normals[v.index] = acc
+            acc += f.normal * max(weight, 1e-9)
+
+    inv_tile = 1.0 / max(tile, 1e-6)
+    out = []
+    for f in bm.faces:
+        fn = f.normal.copy()
+        if fn.length < 1e-9:
+            continue
+        fn.normalize()
+        # UV：按面法线的主轴做盒式投影，尺度换算成「米 / 每格米数」。
+        # 全场贴图密度统一是这套管线的既有规矩（见 Script_Geo 的抬头注释）。
+        ax = max(range(3), key=lambda i: abs(fn[i]))
+        for loop in f.loops:
+            v = loop.vert
+            if f.smooth and v.index in smooth_normals:
+                n = smooth_normals[v.index].copy()
+                if n.length < 1e-9:
+                    n = fn.copy()
+                n.normalize()
+            else:
+                n = fn
+            co = v.co
+            if ax == 0:
+                uv = (co.z * inv_tile, co.y * inv_tile)
+            elif ax == 1:
+                uv = (co.x * inv_tile, co.z * inv_tile)
+            else:
+                uv = (co.x * inv_tile, co.y * inv_tile)
+            out.append(((co.x, co.y, co.z), (n.x, n.y, n.z), uv))
+    return out
+
+
+def _BuildMesh(loops):
+    """去重成索引网格。键量化到 0.1 mm / 0.01 法线 / 0.001 UV —— 太严了
+    去不掉重，太松了会把两个不同硬边的角焊在一起。"""
+    lookup = {}
+    positions, normals, uvs, indices = [], [], [], []
+    for p, n, uv in loops:
+        key = (round(p[0], 5), round(p[1], 5), round(p[2], 5),
+               round(n[0], 3), round(n[1], 3), round(n[2], 3),
+               round(uv[0], 4), round(uv[1], 4))
+        idx = lookup.get(key)
+        if idx is None:
+            idx = len(positions) // 3
+            lookup[key] = idx
+            positions.extend(p)
+            normals.extend(n)
+            uvs.extend(uv)
+        indices.append(idx)
+    return positions, normals, uvs, indices
+
+
+def _B64(fmt, values):
+    return base64.b64encode(struct.pack("<%d%s" % (len(values), fmt), *values)).decode("ascii")
+
+
+def _Quantize(positions, normals, uvs, indices):
+    """位置 / UV 量化成 uint16，法线量化成 int8。
+
+    为什么值得量化：一个士兵约 1000 顶点，明文十进制 JSON 要 70 KB 上下，
+    量化后 base64 出来约 18 KB。节点树仍然是明文的 —— 要读要改的是层级，
+    不是顶点浮点数。
+    """
+    count = len(positions) // 3
+    pmin = [min(positions[i::3]) for i in range(3)]
+    pmax = [max(positions[i::3]) for i in range(3)]
+    pscale = [max(pmax[i] - pmin[i], 1e-6) / 65535.0 for i in range(3)]
+    qpos = []
+    for i in range(count):
+        for a in range(3):
+            qpos.append(max(0, min(65535, int(round((positions[i * 3 + a] - pmin[a]) / pscale[a])))))
+
+    umin = [min(uvs[0::2]) if count else 0.0, min(uvs[1::2]) if count else 0.0]
+    umax = [max(uvs[0::2]) if count else 1.0, max(uvs[1::2]) if count else 1.0]
+    uscale = [max(umax[i] - umin[i], 1e-6) / 65535.0 for i in range(2)]
+    quv = []
+    for i in range(count):
+        for a in range(2):
+            quv.append(max(0, min(65535, int(round((uvs[i * 2 + a] - umin[a]) / uscale[a])))))
+
+    qnrm = [max(-127, min(127, int(round(v * 127.0)))) for v in normals]
+
+    wide = count > 65535
+    return {
+        "count": count,
+        "posMin": [round(v, 6) for v in pmin],
+        "posScale": [pscale[i] for i in range(3)],
+        "uvMin": [round(v, 5) for v in umin],
+        "uvScale": [uscale[i] for i in range(2)],
+        "pos": _B64("H", qpos),
+        "nrm": _B64("b", qnrm),
+        "uv": _B64("H", quv),
+        "idxBits": 32 if wide else 16,
+        "idxCount": len(indices),
+        "idx": _B64("I" if wide else "H", indices),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 导出
+# ---------------------------------------------------------------------------
+
+def WriteTzm(root, path, name, notes=""):
+    """把节点树写成 .tzm.json。返回 (三角数, 网格块数, 字节数)。"""
+    nodes, meshes = [], []
+    index_of = {}
+    order = list(root.Walk())
+    for i, node in enumerate(order):
+        index_of[id(node)] = i
+
+    parent_of = {id(root): -1}
+    for node in order:
+        for c in node.children:
+            parent_of[id(c)] = index_of[id(node)]
+
+    # 包围盒必须在**根空间**里量，不能把每个节点的局部坐标堆在一起 ——
+    # 堆出来的数字看着像模像样，其实是「所有零件都摆在原点」的假象，
+    # 于是 1.66 m 的人报出 0.79 m 的高度，视锥剔除和落地判定跟着一起错。
+    worlds = []
+    for node in order:
+        local = (Matrix.Translation(node.t)
+                 @ Matrix.Rotation(node.r[2], 4, "Z")
+                 @ Matrix.Rotation(node.r[1], 4, "Y")
+                 @ Matrix.Rotation(node.r[0], 4, "X")
+                 @ Matrix.Diagonal((node.s[0], node.s[1], node.s[2], 1.0)))
+        parent = parent_of[id(node)]
+        worlds.append(local if parent < 0 else worlds[parent] @ local)
+
+    total_tris = 0
+    bounds_min = [1e9] * 3
+    bounds_max = [-1e9] * 3
+    for nodeIndex, node in enumerate(order):
+        # 同一节点上同材质的零件先合成一块：帽子 6 个零件都是 uniform，
+        # 不在这里并的话文件里就是 6 个 mesh 块，加载器还得再并一次
+        by_material = {}
+        for material, bm, tile in node.parts:
+            by_material.setdefault((material, tile), []).append(bm)
+        entry = {
+            "name": node.name,
+            "parent": parent_of[id(node)],
+            "t": [round(v, 6) for v in node.t],
+            "r": [round(v, 6) for v in node.r],
+        }
+        if node.s != (1.0, 1.0, 1.0):
+            entry["s"] = [round(v, 6) for v in node.s]
+        if node.joint:
+            entry["joint"] = True
+        mesh_ids = []
+        for (material, tile), bms in by_material.items():
+            loops = []
+            for bm in bms:
+                loops.extend(_ExtractLoops(bm, tile))
+                bm.free()
+            if not loops:
+                continue
+            positions, normals, uvs, indices = _BuildMesh(loops)
+            if not indices:
+                continue
+            world = worlds[nodeIndex]
+            for i in range(0, len(positions), 3):
+                p = world @ Vector((positions[i], positions[i + 1], positions[i + 2]))
+                for a in range(3):
+                    bounds_min[a] = min(bounds_min[a], p[a])
+                    bounds_max[a] = max(bounds_max[a], p[a])
+            block = _Quantize(positions, normals, uvs, indices)
+            block["material"] = material
+            total_tris += len(indices) // 3
+            mesh_ids.append(len(meshes))
+            meshes.append(block)
+        if mesh_ids:
+            entry["meshes"] = mesh_ids
+        nodes.append(entry)
+
+    doc = {
+        "format": "tzm",
+        "version": 1,
+        "name": name,
+        "units": "meters",
+        "axis": "Y-up, -Z forward",
+        "generator": "Blender %s / Taierzhuang1938/_blender" % bpy.app.version_string,
+        "notes": notes,
+        "triangles": total_tris,
+        "bounds": {
+            "min": [round(v, 5) for v in bounds_min],
+            "max": [round(v, 5) for v in bounds_max],
+        },
+        "nodes": nodes,
+        "meshes": meshes,
+    }
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(doc, handle, ensure_ascii=False, separators=(",", ":"))
+    return total_tris, len(meshes), os.path.getsize(path)
+
+
+def ResetScene():
+    """清空场景。布尔/减面借了 bpy 的对象，跑完一个模型就扫干净，
+    不然下一个模型的 depsgraph 里还挂着上一个的残骸。"""
+    bpy.ops.wm.read_factory_settings(use_empty=True)

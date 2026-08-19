@@ -224,6 +224,11 @@ export class AiDirector {
     this.tmpA = new THREE.Vector3();
     this.tmpB = new THREE.Vector3();
     this.tmpC = new THREE.Vector3();
+    this.playerTargetedBy = 0;
+    // 本帧有多少人把玩家当目标。上限见 COMBAT.maxShootersOnPlayer ——
+    // 没有这个闸门，一条街上的人会全部焊死玩家一个，出生点 27 m 上九支枪
+    // 同时开火，三秒必死，而且玩家完全不知道自己做错了什么。
+    this.playerTargetedBy = 0;
     // desired 必须有**自己**的向量。事故：Act 里写 desired = this.tmpA.set(cover)，
     // 紧接着 TryFire 也拿 tmpA 当枪口起点 —— desired 是引用，被就地改成了枪口位置，
     // 于是 d < 1.2、moveSpeed = 0：找掩体和白刃冲锋两条移动路径全是空转。
@@ -458,6 +463,12 @@ export class AiDirector {
     this.frontTimer -= dt;
     if (this.frontTimer <= 0) { this.frontTimer = 1.0; this.UpdateFront(); }
     this.tickIndex += 1;
+    // 重数当前锁着玩家的人。Think 是分帧轮转的，所以按实际 target 重算，
+    // 不能每帧清零 —— 清零的话上限只对当帧被 Think 的那六分之一生效。
+    this.playerTargetedBy = 0;
+    for (const s2 of this.soldiers) {
+      if (s2.alive && s2.target && s2.target.isPlayer) this.playerTargetedBy += 1;
+    }
     const slice = this.tickIndex % 6;
     const player = this.ctx.player;
 
@@ -527,7 +538,13 @@ export class AiDirector {
     for (const slot of slots) { slot.dist = 1e9; slot.ref = null; slot.position = null; }
     // 距离门槛按**目标的姿态**缩放：站着的人一百二十米外就看得见，趴下的四十五米。
     // 这是姿态第一次真的影响"会不会被打"，也是潜行命令能成立的前提。
-    if (enemySide === "nra" && player && player.Alive) {
+    // 玩家能不能被选中，取决于三件事：活着、出生保护过了、**已经锁他的人还没到上限**。
+    // 最后一条比调命中率管用得多：实测出生点 27 m 上九个人同时开火，
+    // 每秒挨四发，三秒必死，而玩家完全不知道自己做错了什么。
+    // ER2 的 AI 会分散目标，不会九个人焊死一个人。
+    const playerOpen = player && player.Alive && !player.Protected
+      && this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3);
+    if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
       if (d < SIGHT_BY_STANCE[st]) this._PushNear(d, player, true, -1, st, player.position);
@@ -1015,8 +1032,11 @@ export class AiDirector {
 
     // 命中判定：基础命中率按距离、压制、姿态修正。**AI 不许百发百中** ——
     // 那会让玩家觉得自己在被作弊，而不是在被压制。
-    let acc = (s.weapon.aiAccuracy ?? COMBAT.aiAccuracyBase);
-    acc *= Clamp(1.25 - dist / (s.weapon.effectiveRangeM || 400) * 1.6, 0.08, 1);
+    let acc = COMBAT.aiAccuracyBase;
+    // 距离衰减按**绝对米数**，不按枪的标称有效射程 —— 三八式标称 460 m，
+    // 于是原来的式子在 27 m 上算出来还是满命中（1.25 − 0.09 → 钳到 1）。
+    // 实际上机械瞄具打一个会动的人：25 m 内基本能打中，100 m 打一半，200 m 靠运气。
+    acc *= Clamp(1.0 - Math.max(0, dist - 25) / 175, 0.10, 1);
     acc *= s.suppression > 0.3 ? COMBAT.aiAccuracySuppressed / COMBAT.aiAccuracyBase : 1;
     if (s.target.isPlayer && player) acc *= player.stance === "prone" ? 0.45 : player.stance === "crouch" ? 0.72 : 1;
 

@@ -33,6 +33,8 @@ import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs"
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { DIFFICULTY } from "./Data_Battle.mjs";
+import { InstantiateModel } from "./Script_MeshLoad.mjs";
+import { WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -189,6 +191,31 @@ function MakePart(geometries, material, pivot = { x: 0, y: 0, z: 0 }) {
  * 而视图模型经常在加载条还没跑完时就被 Equip 一次（换弹演示、菜单预览）。
  * 手上没枪比抛异常黑屏好。
  */
+/**
+ * 烘焙好的贴图上再套一层染色，**必须先除以配方的基色**。
+ *
+ * 事故（这一轮抓到的，比"荧光橙的手"更糟）：手的材质从 Plain 换成
+ * `library.Get("ClothNra", { color: 0x9c6f4a })`，以为这样能借布料的高度场当皮肤。
+ * 可 material.color 是**乘在贴图上的**，而 ClothNra 烘出来是灰蓝的 (104,110,116)。
+ * 灰蓝 × 土黄 = 一块又暗又脏的灰褐色 —— 出图上手成了两块砖，比橙色更假。
+ * 要得到目标色就得除回去：multiplier = target / base（在线性空间里除，
+ * THREE.Color 的分量本来就是浮点、不钳到 1，所以大于 1 的分量是合法的）。
+ *
+ * @param {number[]} base   配方烘焙时的基色（0—255 的 sRGB，抄自 Script_TexBake 的 hue）
+ * @param {number}   target 想要的最终颜色
+ */
+function TintTo(base, target) {
+  const b = new THREE.Color().setRGB(base[0] / 255, base[1] / 255, base[2] / 255, THREE.SRGBColorSpace);
+  const t = new THREE.Color(target);
+  return new THREE.Color(
+    Clamp(t.r / Math.max(b.r, 0.004), 0.04, 4),
+    Clamp(t.g / Math.max(b.g, 0.004), 0.04, 4),
+    Clamp(t.b / Math.max(b.b, 0.004), 0.04, 4));
+}
+
+/** ClothNra 烘焙时的基色（Script_TexBake.BakeCloth 的 hue 默认值）。 */
+const CLOTH_NRA_BASE = [104, 110, 116];
+
 function SafeMaterial(library, name, options, fallback) {
   try {
     return library.Get(name, options);
@@ -220,11 +247,20 @@ function BuildMaterials(library) {
     // 的格距只有 4.5 cm，一只手吃不到两格，看到的是低频起伏而不是织纹）。
     // 颜色同时退饱和：实测原来渲出来约 (240,175,125)、色相 24° 饱和 48%，
     // 在夜战的深蓝底上直接爆成贴纸；0x9c6f4a 落到约 (200,150,110) / 饱和 32%。
+    // tintId 只是为了让 Get 的缓存键分得开：Get 用 JSON.stringify(options) 做键，
+    // 而 THREE.Color.toJSON() 返回 getHex()，会把大于 1 的染色分量钳到 0xff，
+    // 两个不同的亮色染色会撞成同一份材质。
     skin: SafeMaterial(library, "ClothNra",
-      { repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.35, color: 0x9c6f4a },
+      {
+        repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.35,
+        color: TintTo(CLOTH_NRA_BASE, 0x9c6f4a), tintId: "vmSkin",
+      },
       { color: 0x9c6f4a, roughness: 0.74, metalness: 0 }),
     skinDark: SafeMaterial(library, "ClothNra",
-      { repeat: 1, roughness: 0.76, metalness: 0, normalScale: 0.35, color: 0x7d5a3c },
+      {
+        repeat: 1, roughness: 0.76, metalness: 0, normalScale: 0.35,
+        color: TintTo(CLOTH_NRA_BASE, 0x7d5a3c), tintId: "vmSkinDark",
+      },
       { color: 0x7d5a3c, roughness: 0.78, metalness: 0 }),
     brass: library.Plain("VmBrass", { color: 0xb08a3c, roughness: 0.34, metalness: 0.95 }),
     blued: library.Plain("VmBlued", { color: 0x2b2e31, roughness: 0.42, metalness: 1.0 }),
@@ -262,15 +298,28 @@ function BuildHandGeometry(side, key) {
   // 掌沿（小指侧）稍厚一点，手就不是一块板
   skin.push(Box(0.022, 0.034, 0.070, VM_TILE.cloth, `${key}edge`, { x: -S * 0.030, y: -0.030, z: -0.006, rz: S * 0.12 }));
 
-  // 四指近节：从掌前缘绕到握持轴前方
-  skin.push(Box(0.072, 0.026, 0.030, VM_TILE.cloth, `${key}f1`, { x: 0, y: -0.014, z: 0.030, rx: -0.34 }));
-  // 四指远节：扣回轴心上方，形成"合拢"的拳
-  skin.push(Box(0.068, 0.024, 0.024, VM_TILE.cloth, `${key}f2`, { x: 0, y: 0.016, z: 0.030, rx: -1.15 }));
-  // 指缝：两道浅槽，靠两块窄料压出来（低模上比法线贴图管用）
-  for (let i = 0; i < 2; i += 1) {
-    skin.push(Box(0.004, 0.020, 0.026, VM_TILE.cloth, `${key}gap${i}`,
-      { x: (i - 0.5) * 0.030, y: -0.008, z: 0.040, rx: -0.34 }));
+  // 四指**逐根**建，每根两段（近节 + 远节）。
+  //
+  // 为什么不是原来那两块通料加两道压槽：一整块 72 mm 宽的料在开镜前一刻离镜头
+  // 只有二十几厘米，四指连成一条没有断口的板 —— 那正是"手是一块方料"的来源。
+  // 压槽在低模上救不回来，因为槽只有 4 mm 宽，一旦手转过 30° 就被自己遮住。
+  // 四根各自成形之后，指间是**真的通到底的缝**，从任何角度都读得出四根手指。
+  // 代价是每只手多 4 个盒子 ≈ 48 三角，而两只手总共还是各 1 个 draw call
+  // （MakePart 把整只手的皮肤料合成一块）。
+  const fingerW = 0.0152;
+  const pitch = 0.0185;                      // 指距：略大于指宽，留出真缝
+  for (let i = 0; i < 4; i += 1) {
+    // i=0 是食指侧（靠拇指），越往小指越短、越屈 —— 握圆柱时四指本来就不齐
+    const x = (i - 1.5) * pitch * S;
+    const shrink = 1 - i * 0.06;
+    const curl = 0.30 + i * 0.05;
+    skin.push(Box(fingerW, 0.025 * shrink, 0.032 * shrink, VM_TILE.cloth, `${key}fa${i}`,
+      { x, y: -0.014, z: 0.030, rx: -curl }));
+    skin.push(Box(fingerW * 0.94, 0.022 * shrink, 0.026 * shrink, VM_TILE.cloth, `${key}fb${i}`,
+      { x, y: 0.014 - i * 0.002, z: 0.031, rx: -(1.10 + i * 0.06) }));
   }
+  // 掌指关节那一排：手背上一道横棱，握拳时最先顶出来的就是它
+  skin.push(Box(0.070, 0.014, 0.020, VM_TILE.cloth, `${key}knuckle`, { x: 0, y: -0.024, z: 0.026, rx: -0.30 }));
 
   // 拇指：绕到握持轴的后方（虎口卡住），两段
   skin.push(Box(0.020, 0.022, 0.048, VM_TILE.cloth, `${key}t1`, { x: S * 0.032, y: -0.020, z: -0.018, rx: 0.55, ry: -S * 0.30 }));
@@ -709,6 +758,104 @@ const BUILDERS = {
   Dadao: BuildDadao,
 };
 
+// ---------------------------------------------------------------------------
+// 用 Blender 出的 TZM 模型当第一人称的枪身
+//
+// **哪些枪能换、哪些不能，是由模型的结构决定的，不是懒。**
+// _blender 出的武器模型 joints 全是 0（见 Data_Meshes 的 MESHES 表），也就是说
+// 整把枪烘成一块静态几何，拉机柄是**焊死在钢件里**的。第一人称的栓动步枪
+// （中正式 / 汉阳造 / 三八式）、捷克式、驳壳枪都有一个会动的枪机：每打一发，
+// bolt 这个 Group 要后拉 boltTravel、从 ejectAt 抛一枚壳出去，三八式还要滑开防尘盖。
+// 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
+// 所以这三类保留手搭的 rig；**大刀与手榴弹没有任何可动件**，换过去零损失，
+// 就走模型。
+//
+// 要把步枪也换过来，改的是模型那一侧：BuildWeapons.py 里把 BoltHandle / 防尘盖
+// 挂成 joint:true 的子节点（加载器就会把它们留成独立的可动节点，见 TZM 格式说明
+// 里"joint 是合批的分界线"那一段），这里的 MODEL_FP 表再把对应的 id 加进来即可。
+const MODEL_FP = new Set(["Dadao", "Grenade", "GrenadeBundle"]);
+
+/** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
+const VM_MATERIAL_BY_MESH = {
+  steel: "steel", wood: "wood", accessory: "cloth", red: "redCloth",
+  leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
+  accentA: "redCloth", accentB: "brass", shoe: "leather",
+};
+
+/**
+ * 每把枪在**第一人称手里**的摆法。模型的规范系是"右手握把 = 原点、刃/柄朝 -Z"，
+ * 而第一人称要把它端到眼前、稍微立起来一点，所以这里给一层姿态修正。
+ * 手的**朝向**推不出来（挂点只有位置没有旋转），沿用手搭 rig 里调好的那几个角。
+ */
+const MODEL_FP_TWEAK = {
+  Dadao: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0, 0, -1.52], left: [0, 0, 1.60] },
+  },
+  Grenade: {
+    // 弹体朝前上方：跟手搭 rig 里 prop.rotation.x = -0.35 是同一个角
+    pose: { x: 0, y: 0.02, z: -0.02, rx: -0.35, ry: 0, rz: 0 },
+    handRot: { right: [0.30, 0, -1.52], left: [0.10, 0.5, 1.30] },
+  },
+};
+
+/**
+ * 拿一个 TZM 文档搭第一人称的 rig。契约与 BuildBoltRifle 那几个完全一致，
+ * 所以 Equip / 开镜 / 枪口焰 / 深度预算一行都不用改。读不到就返回 null，
+ * 调用方退回手搭的 rig —— 少一个模型不能让人空着手。
+ */
+function BuildFromModel(materials, weapon, key, doc) {
+  const tweak = MODEL_FP_TWEAK[key] || MODEL_FP_TWEAK[key.replace("Bundle", "")]
+    || { pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 }, handRot: { right: [0, 0, -1.5], left: [0, 0, 1.6] } };
+  const table = {};
+  for (const [meshName, vmName] of Object.entries(VM_MATERIAL_BY_MESH)) {
+    if (materials[vmName]) table[meshName] = materials[vmName];
+  }
+  let built = null;
+  try {
+    built = InstantiateModel(doc, { materials: table });
+  } catch (error) {
+    console.warn(`[Viewmodel] ${key} 模型实例化失败：${String(error).slice(0, 160)}`);
+    return null;
+  }
+  if (!built || !built.nodes.has("muzzle")) return null;
+
+  const group = new THREE.Group();
+  group.name = `VmModel_${key}`;
+  built.root.position.set(tweak.pose.x, tweak.pose.y, tweak.pose.z);
+  built.root.rotation.set(tweak.pose.rx, tweak.pose.ry, tweak.pose.rz, "XYZ");
+  group.add(built.root);
+  // group 还没进场景，它的 matrixWorld 就是单位阵 —— 于是挂点的 matrixWorld
+  // 读出来正好是 rig 局部坐标，正是 muzzle / hands 要的那个空间。
+  group.updateMatrixWorld(true);
+  const Mount = (name, fallback) => {
+    const node = built.nodes.get(name);
+    if (!node) return fallback || null;
+    return new THREE.Vector3().setFromMatrixPosition(node.matrixWorld);
+  };
+  const gripR = Mount("gripR", new THREE.Vector3());
+  const gripL = Mount("gripL", gripR.clone());
+  const hr = tweak.handRot.right;
+  const hl = tweak.handRot.left;
+
+  return {
+    group,
+    parts: { bolt: null, dustCover: null, bayonet: null },
+    boltTravel: 0,
+    ejectAt: new THREE.Vector3(0, 0, 0),
+    clipSeat: new THREE.Vector3(0, 0, 0),
+    muzzle: Mount("muzzle", new THREE.Vector3(0, 0, -0.2)),
+    // 大刀与手榴弹没有照门：开镜退化成"举到眼前"的预备姿态（_MakeAdsPose 自己处理）
+    sight: null,
+    hands: {
+      right: { x: gripR.x, y: gripR.y, z: gripR.z, rx: hr[0], ry: hr[1], rz: hr[2] },
+      left: { x: gripL.x, y: gripL.y, z: gripL.z, rx: hl[0], ry: hl[1], rz: hl[2] },
+    },
+    boltHandle: new THREE.Vector3(0, 0, 0),
+    source: "model",
+  };
+}
+
 /**
  * 各武器的腰射姿态（枪在画面里的位置）。
  * 这张表是最该反复调的东西：枪压得越低越"沉"，越靠右越像端着走。
@@ -745,9 +892,13 @@ export class Viewmodel {
    * @param {object} options fov 视图模型的观感 FOV；depthBudget 允许伸出眼前多少米
    */
   constructor(library, {
-    fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel",
+    fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel", meshDocs = null,
   } = {}) {
     this.library = library;
+    // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
+    // 不再自己 fetch —— 同一个模型解码两次是白花的内存与开机时间）。
+    this.meshDocs = meshDocs;
+    this.rigSource = "box";
     this.materials = BuildMaterials(library);
     this.fov = fov;
     this.depthBudget = depthBudget;
@@ -963,8 +1114,16 @@ export class Viewmodel {
       return this;
     }
 
-    const builder = BUILDERS[weaponId] || BuildBoltRifle;
-    this.rig = builder(this.materials, this.weapon, weaponId);
+    // 先试模型（只有确定零损失的那几把在 MODEL_FP 里），退回手搭的 rig。
+    // 退回不是异常路径：栓动步枪本来就走手搭那条，见 MODEL_FP 上面那段账。
+    const meshId = MODEL_FP.has(weaponId) ? WEAPON_MESH_BY_ID[weaponId] : null;
+    const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
+    this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
+    if (!this.rig) {
+      const builder = BUILDERS[weaponId] || BuildBoltRifle;
+      this.rig = builder(this.materials, this.weapon, weaponId);
+    }
+    this.rigSource = this.rig.source === "model" ? "model" : "box";
     this.weaponMount.add(this.rig.group);
     this.rig.group.add(this.handRight.group);
     this.rig.group.add(this.handLeft.group);

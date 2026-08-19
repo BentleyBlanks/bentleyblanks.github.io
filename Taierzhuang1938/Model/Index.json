@@ -1,0 +1,445 @@
+{
+ "format": "tzm-index",
+ "version": 1,
+ "generator": "Taierzhuang1938/_blender/BuildAll.py",
+ "budget": {
+  "soldier": 1800,
+  "weapon": 900,
+  "prop": 400
+ },
+ "models": [
+  {
+   "name": "SoldierNra",
+   "category": "soldier",
+   "file": "SoldierNra.tzm.json",
+   "triangles": 1764,
+   "meshBlocks": 21,
+   "nodes": 29,
+   "joints": 13,
+   "bytes": 58904,
+   "materials": [
+    "accentA",
+    "accentB",
+    "accessory",
+    "shoe",
+    "skin",
+    "uniform"
+   ],
+   "mounts": [
+    "root",
+    "body",
+    "eyes",
+    "gripL",
+    "gripR",
+    "weaponMount",
+    "slingBack",
+    "kneeL",
+    "kneeR"
+   ],
+   "bounds": {
+    "min": [
+     -0.28091,
+     0.0,
+     -0.17778
+    ],
+    "max": [
+     0.28091,
+     1.67471,
+     0.14374
+    ]
+   }
+  },
+  {
+   "name": "SoldierIja",
+   "category": "soldier",
+   "file": "SoldierIja.tzm.json",
+   "triangles": 1776,
+   "meshBlocks": 23,
+   "nodes": 32,
+   "joints": 13,
+   "bytes": 59029,
+   "materials": [
+    "accentA",
+    "accentB",
+    "helmet",
+    "leather",
+    "shoe",
+    "skin",
+    "uniform"
+   ],
+   "mounts": [
+    "root",
+    "body",
+    "eyes",
+    "gripL",
+    "gripR",
+    "weaponMount",
+    "slingBack",
+    "kneeL",
+    "kneeR"
+   ],
+   "bounds": {
+    "min": [
+     -0.2707,
+     0.0,
+     -0.16774
+    ],
+    "max": [
+     0.2707,
+     1.63098,
+     0.18025
+    ]
+   }
+  },
+  {
+   "name": "ZhongZheng",
+   "category": "weapon",
+   "file": "ZhongZheng.tzm.json",
+   "triangles": 556,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 20730,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.022,
+     -0.056,
+     -0.855
+    ],
+    "max": [
+     0.07079,
+     0.08044,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "HanYang",
+   "category": "weapon",
+   "file": "HanYang.tzm.json",
+   "triangles": 540,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 20257,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.022,
+     -0.05344,
+     -0.995
+    ],
+    "max": [
+     0.06878,
+     0.08328,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "Zb26",
+   "category": "weapon",
+   "file": "Zb26.tzm.json",
+   "triangles": 520,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 19279,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.0835,
+     -0.19773,
+     -0.91
+    ],
+    "max": [
+     0.08436,
+     0.1865,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "Type38",
+   "category": "weapon",
+   "file": "Type38.tzm.json",
+   "triangles": 612,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 23329,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.022,
+     -0.04832,
+     -1.021
+    ],
+    "max": [
+     0.07691,
+     0.07612,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "Mauser96",
+   "category": "weapon",
+   "file": "Mauser96.tzm.json",
+   "triangles": 300,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 13452,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.019,
+     -0.08694,
+     -0.242
+    ],
+    "max": [
+     0.019,
+     0.06883,
+     0.0455
+    ]
+   }
+  },
+  {
+   "name": "Grenade",
+   "category": "weapon",
+   "file": "Grenade.tzm.json",
+   "triangles": 148,
+   "meshBlocks": 2,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 5320,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR"
+   ],
+   "bounds": {
+    "min": [
+     -0.029,
+     -0.02771,
+     -0.175
+    ],
+    "max": [
+     0.029,
+     0.02771,
+     0.05
+    ]
+   }
+  },
+  {
+   "name": "Dadao",
+   "category": "weapon",
+   "file": "Dadao.tzm.json",
+   "triangles": 296,
+   "meshBlocks": 3,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 13878,
+   "materials": [
+    "accessory",
+    "red",
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.04,
+     -0.04,
+     -0.615
+    ],
+    "max": [
+     0.04,
+     0.04,
+     0.282
+    ]
+   }
+  },
+  {
+   "name": "Dougong",
+   "category": "prop",
+   "file": "Dougong.tzm.json",
+   "triangles": 164,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 7186,
+   "materials": [
+    "WoodBeam"
+   ],
+   "mounts": [
+    "root",
+    "top"
+   ],
+   "bounds": {
+    "min": [
+     -0.321,
+     0.0,
+     -0.15
+    ],
+    "max": [
+     0.321,
+     0.196,
+     0.15
+    ]
+   }
+  },
+  {
+   "name": "RidgeBeast",
+   "category": "prop",
+   "file": "RidgeBeast.tzm.json",
+   "triangles": 172,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 5750,
+   "materials": [
+    "RoofTile"
+   ],
+   "mounts": [
+    "root",
+    "ridge"
+   ],
+   "bounds": {
+    "min": [
+     -0.072,
+     0.0,
+     -0.125
+    ],
+    "max": [
+     0.072,
+     0.275,
+     0.125
+    ]
+   }
+  },
+  {
+   "name": "WindowLattice",
+   "category": "prop",
+   "file": "WindowLattice.tzm.json",
+   "triangles": 284,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 13429,
+   "materials": [
+    "WoodDoor"
+   ],
+   "mounts": [
+    "root",
+    "sillCenter"
+   ],
+   "bounds": {
+    "min": [
+     -0.55,
+     0.0,
+     -0.0275
+    ],
+    "max": [
+     0.55,
+     1.35,
+     0.0275
+    ]
+   }
+  },
+  {
+   "name": "DoorPier",
+   "category": "prop",
+   "file": "DoorPier.tzm.json",
+   "triangles": 248,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 8990,
+   "materials": [
+    "Stone"
+   ],
+   "mounts": [
+    "root",
+    "doorSide"
+   ],
+   "bounds": {
+    "min": [
+     -0.18,
+     0.0,
+     -0.24
+    ],
+    "max": [
+     0.18,
+     0.63,
+     0.24
+    ]
+   }
+  }
+ ]
+}

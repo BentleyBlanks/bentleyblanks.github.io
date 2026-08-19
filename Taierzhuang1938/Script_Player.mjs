@@ -107,6 +107,12 @@ export class PlayerController {
     this.lastFootstep = 0;
     this.deadTime = 0;
     this.alive = true;
+    /**
+     * 出生保护（秒）。ER2 的做法：重生后几秒无敌，防出生点秒杀。
+     * 这不是"照顾玩家"，是修一个结构性问题：接替者必然出生在还在打的地方，
+     * 没有这几秒，他睁眼那一刻就已经在九支枪的射界里了。
+     */
+    this.spawnGrace = 0;
 
     this._tmp = new THREE.Vector3();
     this._forward = new THREE.Vector3();
@@ -129,6 +135,9 @@ export class PlayerController {
     this.stance = "stand";
     this.alive = true;
     this.deadTime = 0;
+    // 出生保护。ER2 有这条（重生后几秒无敌），我写进了对齐文档却一直没实现 ——
+    // 而接替者必然出生在还在打的地方，没有这几秒，他睁眼那一刻就在九支枪的射界里。
+    this.spawnGrace = 3.2;
     this.recoilPending.pitch = 0;
     this.recoilPending.yaw = 0;
     this.recoilTotal = 0;
@@ -140,6 +149,7 @@ export class PlayerController {
   }
 
   get Alive() { return this.alive; }
+  get Protected() { return this.spawnGrace > 0; }
   /** 翻越/下水期间不许开火。装配层的 TryFire 读这一条。 */
   get Busy() { return this.vault.active; }
   get InWater() { return this.waterDepth > 0.35; }
@@ -397,6 +407,22 @@ export class PlayerController {
       if (this.health <= 0) this.Kill();
     }
 
+    if (this.spawnGrace > 0) this.spawnGrace -= dt;
+
+    // 后坐回落：照战地的曲线，**不是指数衰减**。
+    //   Decrease = ((|R|/0.5)^0.6 + 0.001) * RecoilDec * dt * TimeSinceLastShot^0.5 * C
+    // 关键是最后那个 TimeSinceLastShot^0.5：t=0 时它是 0，所以回落**从零速率起步、
+    // 然后加速** —— 踢上去、悬住、加速归位。这条曲线本身就是重量感，
+    // 而不是"留一截让玩家压"（那是 CS 的逻辑，战地的残留是零）。
+    this.elapsedForRecoil = (this.elapsedForRecoil ?? 0) + dt;
+    if (this.recoilTotal !== 0) {
+      const since = Math.max(0, this.elapsedForRecoil - (this.lastRecoilAt ?? 0));
+      const term = Math.pow(Math.abs(this.recoilTotal) / 0.5, 0.6) + 0.001;
+      const dec = term * 4.5 * dt * Math.sqrt(since) * 5.0;
+      if (this.recoilTotal > 0) this.recoilTotal = Math.max(0, this.recoilTotal - dec);
+      else this.recoilTotal = Math.min(0, this.recoilTotal + dec);
+    }
+
     // --- 压制自然衰减 -------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - dt * 0.55);
 
@@ -511,6 +537,12 @@ export class PlayerController {
   /** 被弹片/子弹擦过或命中。part: head/torso/arm/leg */
   TakeHit(damage, part = "torso", direction = null) {
     if (!this.alive) return;
+    // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
+    // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
+    if (this.spawnGrace > 0) {
+      this.suppression = Clamp01(this.suppression + 0.35);
+      return;
+    }
     const mult = part === "head" ? 3.4 : part === "torso" ? 1.0 : 0.62;
     this.health -= damage * mult;
     const bleed = part === "head" ? 6 : part === "torso" ? 2.6 : 1.4;
@@ -533,11 +565,14 @@ export class PlayerController {
    * 顶上去 100%，只往 recoilPending 里记 70% —— 于是回落结束后仍然有 30% 留在
    * pitch 上，玩家必须自己压回来。这就是"打一发要重新找目标"。
    */
-  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4) {
+  ApplyRecoil(pitchRad, yawRad, recoverS = 0.4, recoverFrac = 0.72) {
+    // 保留比按枪读（Data_Weapons.recoverFrac，由调用方传进来）。写死 0.70 的问题实测出来了：
+    // 驳壳枪 0.16 s 一发，五连发残留滚到 1.613°，而它开镜散布只有 0.9°。
+    const keep = Number.isFinite(recoverFrac) ? recoverFrac : 0.72;
     this.pitch = Clamp(this.pitch + pitchRad, -1.35, 1.35);
     this.yaw += yawRad;
-    this.recoilPending.pitch += pitchRad * 0.70;
-    this.recoilPending.yaw += yawRad * 0.70;
+    this.recoilPending.pitch += pitchRad * keep;
+    this.recoilPending.yaw += yawRad * keep;
     this.recoilRecoverS = recoverS;
     this.recoilTotal += pitchRad;
   }

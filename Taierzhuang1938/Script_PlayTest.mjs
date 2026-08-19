@@ -1295,6 +1295,137 @@ Check("AI 一分钟里真的翻过墙（这个动词不是玩家专属）",
   `六十秒翻了 ${aiVault.v1 - aiVault.v0} 次（活人 ${aiVault.alive}）`);
 
 
+// ===========================================================================
+// 14) 换模：Blender 出的 .tzm.json 有没有真的顶上来
+//
+// 为什么这一节必须存在：换模最舒服的失败方式是**静默降级** —— 模型 404、
+// 关节名对不上、材质桶认错，加载器一律 warn + 返回 null，页面照跑、画面照出，
+// 只是人还是原来那堆方块。光看截图分不出"模型糙"和"根本没换"，所以这里一律
+// 从运行时取证：源头是 model 还是 box、挂点在不在、单人 draw call 多少。
+// ===========================================================================
+Stage("14 换模");
+await Boot(0, "small");
+const mesh = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const f = T.actorFactory;
+  const status = f.MeshStatus();
+  // 场上随便抓一个活人，看他身上到底挂的是哪一套几何
+  const s = T.ai.soldiers.find((x) => x.alive && x.actor);
+  const a = s ? s.actor : null;
+  let draws = 0;
+  let tris = 0;
+  if (a) {
+    a.root.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      // 祖先里只要有一个 visible=false（没戴毛巾的人身上那两块）就不进管线
+      for (let p = o; p; p = p.parent) if (!p.visible) return;
+      draws += 1;
+      tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+    });
+  }
+  // 关节与挂点：姿态代码逐帧写的就是这些对象，缺一个就是断手断脚
+  const joints = !!a && !!a.hips && !!a.chest && !!a.neck
+    && ["L", "R"].every((t) => a.arms[t] && a.arms[t].shoulder && a.arms[t].elbow
+      && a.legs[t] && a.legs[t].thigh && a.legs[t].knee && a.legs[t].ankle);
+  return {
+    status,
+    kind: a ? a.kind : null,
+    source: a ? a.meshSource : null,
+    joints,
+    hasEyes: !!(a && a.eyes),
+    eyesAhead: a ? a.eyes.position.z < 0 : false,      // 视线挂点必须在脸那一侧（-Z）
+    hasMount: !!(a && a.weaponMount),
+    weapon: a ? a.weaponId : null,
+    weaponSource: a && a.weaponId
+      ? (f.weaponCache.get(`${a.weaponId}|${f.quality}`) || {}).source || "box" : null,
+    muzzleZ: a && a.weaponGroup ? a.weaponMuzzle.z : null,
+    draws,
+    tris,
+    vmSource: T.viewmodel.rigSource,
+  };
+});
+Check("人与枪的模型全部读到（一个都不许静默丢）",
+  mesh.status.ready && mesh.status.loaded === mesh.status.requested && mesh.status.missing.length === 0,
+  `读到 ${mesh.status.loaded}/${mesh.status.requested}${mesh.status.missing.length ? "，缺：" + mesh.status.missing.join(",") : ""}`);
+Check("场上的人用的是 Blender 模型，不是退回的方块",
+  mesh.source === "model", `${mesh.kind} 用的是 ${mesh.source}`);
+Check("模型接上了现有骨架：13 根骨头一根不少",
+  mesh.joints, mesh.joints ? "hips/chest/neck + 双臂双腿齐全" : "有骨头没接上");
+Check("挂点在：eyes 在脸那一侧、weaponMount 在",
+  mesh.hasEyes && mesh.eyesAhead && mesh.hasMount,
+  `eyes=${mesh.hasEyes} 朝前=${mesh.eyesAhead} weaponMount=${mesh.hasMount}`);
+Check("手里的枪也是模型，枪口挂点在枪管前端（-Z 一侧）",
+  mesh.weaponSource === "model" && mesh.muzzleZ !== null && mesh.muzzleZ < -0.15,
+  `${mesh.weapon} 用的是 ${mesh.weaponSource}，muzzle.z=${mesh.muzzleZ}`);
+// 预算：单人 21 块左右（模型 19 + 枪 2）。给到 26 是留给敢死队的背刀与手榴弹带，
+// 再多就说明合批漏了 —— 24 人同屏时每人多一块就是全场多 24 个 draw call。
+Check("单人 draw call 在预算内（≤26）", mesh.draws > 0 && mesh.draws <= 26,
+  `${mesh.draws} 块可见网格 / ${Math.round(mesh.tris)} 三角`);
+
+// 14.6 加载失败要退回方块，**不许抛**。造一个没预读过模型的工厂即可复现"模型 404"。
+const fallback = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  try {
+    const Factory = T.actorFactory.constructor;
+    const bare = new Factory(T.library, { quality: "medium" });   // 故意不 await PreloadMeshes
+    const a = bare.Create("nra", { seed: 4242, weapon: "ZhongZheng" });
+    const out = {
+      source: a.meshSource,
+      hasBones: !!(a.chest && a.legs.L.ankle && a.arms.R.elbow),
+      hasWeapon: !!a.weaponGroup,
+      hasEyes: !!a.eyes,
+    };
+    // 摆几个姿势确认动画代码在方块路上照样跑
+    a.Update(0.016, { moveSpeed: 0.7, aim: 0.5, elapsed: 1 });
+    a.Update(0.016, { prone: 1, elapsed: 2 });
+    a.Update(0.016, { dead: true, elapsed: 3 });
+    a.Dispose();
+    bare.Dispose();
+    return out;
+  } catch (error) {
+    return { threw: String(error).slice(0, 200) };
+  }
+});
+Check("模型读不到时退回程序化方块几何，且不抛",
+  !fallback.threw && fallback.source === "box" && fallback.hasBones
+    && fallback.hasWeapon && fallback.hasEyes,
+  fallback.threw ? `抛了：${fallback.threw}`
+    : `source=${fallback.source} 骨架=${fallback.hasBones} 枪=${fallback.hasWeapon} 视线=${fallback.hasEyes}`);
+
+// 14.7 开镜：照门必须落在画面正中。这条是之前专门解出来的（_MakeAdsPose 是解方程
+// 不是手调），换模/改手位最容易把它碰掉，而静态截图上"差二十个像素"看不出来。
+{
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&ads=1&phase=0&quality=medium&scale=small`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+  const ads = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const out = [];
+    for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96"]) {
+      T.viewmodel.Equip(id);
+      T.StepFrames(150);
+      const vm = T.viewmodel;
+      if (!vm.rig || !vm.rig.sight) { out.push({ id, none: true }); continue; }
+      vm.rig.group.updateWorldMatrix(true, false);
+      const p = vm.rig.sight.clone().applyMatrix4(vm.rig.group.matrixWorld);
+      T.camera.updateMatrixWorld(true);
+      const v = p.project(T.camera);
+      out.push({
+        id,
+        dx: Math.round((v.x * 0.5 + 0.5) * 1280 - 640),
+        dy: Math.round((-v.y * 0.5 + 0.5) * 720 - 360),
+        ads: +T.player.ads.toFixed(2),
+      });
+    }
+    return out;
+  });
+  // ±14 px：铁瞄偏心是**故意的**（4—8 px，见 IRON_SIGHT_OFFSET_PX），
+  // 留一点余量给弹簧的残余摆动，但偏到二十几 px 就是姿态解错了。
+  const worst = ads.reduce((m, r) => Math.max(m, r.none ? 999 : Math.hypot(r.dx, r.dy)), 0);
+  Check("开镜时照门落在画面正中（每把枪偏心 ≤14 px）", worst <= 14,
+    ads.map((r) => (r.none ? `${r.id}:没照门` : `${r.id}:${r.dx},${r.dy}`)).join(" · "));
+}
+
 await browser.close();
 server.close();
 

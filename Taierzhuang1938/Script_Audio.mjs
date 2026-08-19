@@ -1438,7 +1438,11 @@ export class AudioEngine {
    *        delay    延后多少秒开始
    *        burst    连发武器的点射发数
    */
-  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null } = {}) {
+  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false } = {}) {
+    // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
+    // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
+    // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
+    // 开出一枪完全没有声音是最伤沉浸感的一类 bug：玩家会以为自己没打出去。
     if (!this.ctx || this.disposed) return null;
     const recipe = RECIPES[name];
     if (!recipe) return null;
