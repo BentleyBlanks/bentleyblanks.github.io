@@ -565,6 +565,107 @@ section { padding: 64px 0 28px; scroll-margin-top: 92px; }
 }
 .siteFooter .footTitle { font-family: var(--serif); color: var(--inkDim); letter-spacing: 0.2em; margin-bottom: 8px; }
 
+/* ---------- 回忆录选摘 ---------- */
+.memoirIntro {
+  border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px;
+  background: linear-gradient(160deg, rgba(217, 164, 65, 0.05), var(--bg2));
+  margin-bottom: 20px;
+}
+.memoirIntroHead h3 {
+  font-family: var(--serif); font-size: 1.25rem; letter-spacing: 0.08em; color: var(--ink);
+  margin-bottom: 8px;
+}
+.memoirIntroHead .book { font-family: var(--serif); color: var(--gold); font-size: 0.95rem; }
+.memoirIntroHead .pub { font-size: 0.82rem; color: var(--inkDim); margin-top: 6px; }
+.memoirIntroHead .src { font-size: 0.78rem; color: var(--inkFaint); margin-top: 6px; }
+.memoirRules { list-style: none; margin-top: 14px; border-top: 1px dashed var(--line2); padding-top: 12px; }
+.memoirRules li {
+  font-size: 0.86rem; color: var(--inkDim); padding: 4px 0 4px 22px; position: relative;
+}
+.memoirRules li::before {
+  content: "※"; position: absolute; left: 0; top: 4px; color: var(--goldDim); font-family: var(--serif);
+}
+.memoirList { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+.memoirCard {
+  border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 16px;
+  background: linear-gradient(165deg, var(--panel), var(--bg2));
+  position: relative; display: flex; flex-direction: column; gap: 10px;
+}
+.memoirCard::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--gold), var(--goldDim));
+}
+.memoirTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.memoirPart {
+  font-size: 0.72rem; letter-spacing: 0.18em; color: var(--gold);
+  border: 1px solid var(--goldDim); border-radius: 3px; padding: 1px 9px;
+}
+.memoirTitle { font-family: var(--serif); font-size: 1.06rem; color: var(--ink); letter-spacing: 0.03em; }
+.memoirQuote {
+  font-family: var(--serif); font-size: 0.95rem; line-height: 1.95; color: var(--inkDim);
+  border-left: none; margin: 0; padding: 2px 0 2px 12px; border-left: 2px solid rgba(217, 164, 65, 0.35);
+}
+.memoirNote {
+  font-size: 0.8rem; color: var(--inkFaint); line-height: 1.7;
+  border-top: 1px dashed var(--line); padding-top: 10px;
+}
+.memoirLink {
+  font-size: 0.8rem; color: var(--gold); margin-top: auto;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+.memoirLink::before { content: "⇢"; color: var(--goldDim); }
+.memoirLink:hover { text-decoration: underline; }
+
+/* ---------- 讲解路线 ---------- */
+.readingPath {
+  margin: 30px auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  max-width: 980px;
+}
+.rpStep {
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 1px solid var(--line2); border-radius: 999px; padding: 6px 16px 6px 8px;
+  color: var(--inkDim); text-decoration: none; background: rgba(36, 27, 18, 0.65);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.rpStep:hover { border-color: var(--goldDim); color: var(--gold); transform: translateY(-2px); text-decoration: none; }
+.rpStep::after { content: "→"; color: var(--goldDim); font-size: 0.8rem; margin-left: 2px; }
+.rpStep:last-child::after { content: ""; }
+.rpNo {
+  font-family: var(--mono); font-size: 0.78rem; color: var(--gold);
+  border: 1px solid var(--goldDim); border-radius: 50%; width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: rgba(217, 164, 65, 0.08);
+}
+.rpBody { display: inline-flex; flex-direction: column; line-height: 1.25; text-align: left; }
+.rpLabel { font-size: 0.88rem; color: var(--ink); letter-spacing: 0.12em; }
+.rpDesc { font-size: 0.72rem; color: var(--inkFaint); }
+
+/* ---------- 人物「后来」 ---------- */
+.personCard .later {
+  margin-top: 10px; padding: 8px 12px; border-radius: 5px;
+  background: rgba(0, 0, 0, 0.25); border: 1px dashed var(--line2);
+  font-size: 0.8rem; color: var(--inkFaint); line-height: 1.65;
+}
+.personCard .later .laterTag {
+  display: inline-block; margin-right: 7px; font-size: 0.68rem; letter-spacing: 0.2em;
+  color: var(--inkDim); border: 1px solid var(--line2); border-radius: 3px; padding: 0 6px;
+}
+
+/* ---------- 时间线关键时刻 ---------- */
+.tlKey {
+  font-size: 0.68rem; letter-spacing: 0.1em; padding: 1px 7px; border-radius: 3px;
+  background: rgba(212, 85, 74, 0.16); color: var(--redBright); border: 1px solid rgba(212, 85, 74, 0.5);
+  white-space: nowrap;
+}
+.tlItem.key .tlCard { border-color: rgba(212, 85, 74, 0.45); }
+.tlItem.key::before { border-color: var(--redBright); background: rgba(212, 85, 74, 0.5); }
+
+/* ---------- 页脚致敬 ---------- */
+.siteFooter .footTribute {
+  margin-top: 12px; max-width: 720px; margin-left: auto; margin-right: auto;
+  font-family: var(--serif); font-size: 0.9rem; color: var(--inkDim); letter-spacing: 0.04em; line-height: 1.9;
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
   .bgGrid, .forcesGrid, .townInsetGrid { grid-template-columns: 1fr; }

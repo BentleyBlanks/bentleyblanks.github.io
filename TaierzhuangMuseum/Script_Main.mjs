@@ -4,7 +4,8 @@
 import {
   SITE, STATS, TLDR, TIER, TIMELINE_PHASES, TIMELINE, FORCES, PEOPLE,
   WEAPON_CATEGORIES, WEAPONS, WEAPON_PAIRS, BALANCE, DARES, DARE_LOADOUT,
-  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING, TOWN_FACTS,
+  DARE_NOTES, TACTICS, CASUALTY_TABLE, QUOTES, MYTHS, GLOSSARY, READING,
+  TOWN_FACTS, MEMOIR_INTRO, MEMOIR_EXCERPTS, READING_PATH, PEOPLE_LATER,
 } from "./Data_Museum.mjs";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -167,6 +168,12 @@ function renderPerson(p) {
     q.append(document.createTextNode(`「${p.quote.text}」`));
     q.append(el("span", "tier", `${TIER[p.quote.tier].label} · 语录`));
     card.append(q);
+  }
+  if (PEOPLE_LATER[p.id]) {
+    const later = el("div", "later");
+    later.append(el("span", "laterTag", "后来"));
+    later.append(el("span", "", PEOPLE_LATER[p.id]));
+    card.append(later);
   }
   return card;
 }
@@ -376,11 +383,12 @@ function initTimeline() {
     const entries = TIMELINE.filter((t) => t.phase === phase.id);
     if (entries.length === 0) continue;
     for (const t of entries) {
-      const item = el("div", `tlItem ${phase.id}`);
+      const item = el("div", `tlItem ${phase.id}${t.key ? " key" : ""}`);
       const card = el("div", "tlCard");
       const top = el("div", "tlTop");
       top.append(el("span", "tlDate", t.date));
       top.append(el("span", "tlTitle", t.title));
+      if (t.key) top.append(el("span", "tlKey", "★ 关键时刻"));
       top.append(tierBadge(t.tier));
       card.append(top);
       const body = el("div", "tlBody");
@@ -560,6 +568,37 @@ function initMyths() {
   }
 }
 
+/* ---------------- 回忆录选摘 ---------------- */
+function initMemoir() {
+  const intro = $("#memoirIntro");
+  const head = el("div", "memoirIntroHead");
+  head.append(el("h3", "", MEMOIR_INTRO.title));
+  head.append(el("p", "book", MEMOIR_INTRO.book));
+  head.append(el("p", "pub", MEMOIR_INTRO.pub));
+  head.append(el("p", "src", MEMOIR_INTRO.source));
+  intro.append(head);
+  const rules = el("ul", "memoirRules");
+  for (const r of MEMOIR_INTRO.rules) rules.append(el("li", "", r));
+  intro.append(rules);
+
+  const list = $("#memoirList");
+  for (const m of MEMOIR_EXCERPTS) {
+    const card = el("article", "memoirCard");
+    const top = el("div", "memoirTop");
+    top.append(el("span", "memoirPart", m.part));
+    top.append(tierBadge("main"));
+    card.append(top);
+    card.append(el("h4", "memoirTitle", m.title));
+    card.append(el("blockquote", "memoirQuote", `「${m.quote}」`));
+    const note = el("p", "memoirNote", m.note);
+    card.append(note);
+    const link = el("a", "memoirLink", m.link.label);
+    link.href = m.link.href;
+    card.append(link);
+    list.append(card);
+  }
+}
+
 /* ---------------- 词典 ---------------- */
 function initGlossary() {
   const dl = $("#glossary");
@@ -569,6 +608,22 @@ function initGlossary() {
     dt.addEventListener("click", () => dt.classList.toggle("open"));
     dl.append(dt, dd);
   }
+}
+
+/* ---------------- 讲解路线 ---------------- */
+function initReadingPath() {
+  const bar = $("#readingPath");
+  READING_PATH.forEach((step, i) => {
+    const a = el("a", "rpStep", "");
+    a.href = step.href;
+    a.append(el("span", "rpNo", String(i + 1).padStart(2, "0")));
+    const body = el("span", "rpBody");
+    body.append(el("b", "rpLabel", step.label));
+    body.append(el("span", "rpDesc", step.desc));
+    a.append(body);
+    a.title = step.note;
+    bar.append(a);
+  });
 }
 
 /* ---------------- 延伸阅读 ---------------- */
@@ -600,6 +655,8 @@ initDare();
 initTactics();
 initCasualties();
 initQuotes();
+initMemoir();
 initMyths();
 initGlossary();
+initReadingPath();
 initReading();
