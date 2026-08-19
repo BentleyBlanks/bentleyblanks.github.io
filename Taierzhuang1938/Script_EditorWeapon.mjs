@@ -170,6 +170,15 @@ export class WeaponEditor {
     this.benchGroup = null;
   }
 
+  /** 换镜头。退出编辑器时 Studio.Close 会把进来之前那一份原样还回去，
+      所以这里只管当前这一档，不必自己存。 */
+  SetStudioFov(fov) {
+    const camera = this.studio.camera;
+    if (!camera || camera.fov === fov) return;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+
   Rebuild() {
     this.ClearStand();
     this.time = 0;
@@ -181,10 +190,17 @@ export class WeaponEditor {
 
     if (this.mode === "fp") {
       if (this.host.viewmodel) this.host.viewmodel.Equip(HasGeometry(this.weaponId) ? this.weaponId : null);
-      // 第一人称的枪挂在相机上，展台上什么也不放；镜头退到一个看得见枪的距离
+      // 第一人称的枪挂在相机上，展台上什么也不放；镜头退到一个看得见枪的距离。
+      //
+      // **FOV 必须换回正片的 55°。** 摄影棚为了看模型不畸变把相机压到 42
+      // （85 mm 等效），而视图模型的每一处位姿都是按 BASE_FOV=55 摆的 ——
+      // 42° 的画框比 55° 窄三成，枪整个掉到画面右下角外头去，这一栏只剩地面。
+      // 台架/手持两档再换回 42，两种看法各自的镜头语言不串。
+      this.SetStudioFov(55);
       this.studio.Frame(1.7, 2.6);
       return;
     }
+    this.SetStudioFov(42);
 
     if (this.mode === "held") {
       const kind = weapon.side === "ija" ? "ija" : "nra";
