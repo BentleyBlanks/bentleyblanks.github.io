@@ -504,10 +504,13 @@ async function Boot() {
         lowAmmo: state.ammo <= 1,
         boltOpen: viewmodel.boltOpen,
       }),
-      // 指针锁：解锁通道有没有真的接上
+      // 指针锁：解锁通道有没有真的接上。fake=true 说明走的是页内假后端
+      // （webdriver / 出图），真指针锁一次都没碰 —— 见 FAKE_POINTER_LOCK 的注释。
       PointerLock: () => ({
-        locked: document.pointerLockElement === canvas,
-        element: document.pointerLockElement ? "canvas" : null,
+        locked: PointerLocked(),
+        element: PointerLocked() ? "canvas" : null,
+        fake: FAKE_POINTER_LOCK,
+        browserLocked: document.pointerLockElement !== null,
       }),
       ReleasePointerLock,
       Spoken: () => hud.spoken.slice(),
@@ -1247,6 +1250,34 @@ const input = {
 };
 const keys = new Set();
 
+// ---------------------------------------------------------------------------
+// 指针锁：一个开关，两条后端
+// ---------------------------------------------------------------------------
+/**
+ * 自动化（Playwright 冒烟 / 出图 / 任何 navigator.webdriver 的浏览器）下
+ * **不碰浏览器的真指针锁**，只在页内记一个布尔。
+ *
+ * 事故（2026-08-20）：开发机上鼠标隔一阵就被夹在屏幕左上角一块区域里动不了，
+ * 跟正在干什么无关。根子不在游戏逻辑，在浏览器实现：Chromium on Windows 的
+ * 指针锁 = `::ClipCursor(窗口矩形)`，而 ClipCursor 是**全系统**的光标夹具。
+ * 无头 Edge 的（不可见）窗口落在屏幕 (27,95)-(1297,805)，冒烟脚本一点「进城」
+ * 抢到锁，真人的鼠标就被夹进那一块 —— 而且无头模式下 exitPointerLock
+ * **并不会**解除 ClipCursor（有头会），要等浏览器进程退出才松。
+ * 实测（Script_BrowserTestKit 那条启动路径）：锁上 → GetClipCursor=(27,95,1297,805)；
+ * 页面 exit → 仍夹着；browser.close() → 才恢复全屏。
+ *
+ * 所以 webdriver 下一律走假后端：游戏逻辑里「锁上 / 没锁上」照常流转
+ * （Guard 的「第一次点击只抢锁」、mousemove 转头、解锁清输入三条都不改），
+ * 冒烟照常验四条解锁通道，只是再也不碰真鼠标。调试口 PointerLock().fake 说明用的是哪条。
+ */
+const FAKE_POINTER_LOCK = !!(SHOT || navigator.webdriver);
+let fakeLocked = false;
+
+/** 现在锁在我们的画布上没有（两条后端统一的读法，全文件只认这一个）。 */
+function PointerLocked() {
+  return FAKE_POINTER_LOCK ? fakeLocked : document.pointerLockElement === canvas;
+}
+
 /**
  * 抢指针锁。**必须吞掉 NotAllowedError**：用户手势的有效期只有几秒，而
  * 「点开始 -> 播三十八秒关前过场 -> 进游戏」这条路上，过场播完时手势早过期了，
@@ -1258,6 +1289,10 @@ const keys = new Set();
  */
 function RequestPointerLock() {
   if (SHOT) return;
+  if (FAKE_POINTER_LOCK) {
+    if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
+    return;
+  }
   const nudge = () => hud?.Hint("点一下画面，接管镜头", 3.0);
   try {
     const pending = canvas.requestPointerLock?.();
@@ -1265,6 +1300,35 @@ function RequestPointerLock() {
   } catch (error) {
     nudge();
   }
+}
+
+/**
+ * 把鼠标还给用户。
+ *
+ * 事故（第 4 批的积压条目）：退出游戏 / 切走标签页 / 按 Esc 之后鼠标还是不可见 ——
+ * 浏览器自己只在 Esc 与文档隐藏时**有时候**会解锁，一旦页面被 bfcache 冻结、
+ * 或者是我们自己把玩家控制权收走（过场、换关、结算），锁就一直挂在那儿。
+ * 表现是用户以为浏览器卡死了。
+ *
+ * 修法是五条事件都调一次 exitPointerLock：pointerlockchange（锁掉了要同步状态）、
+ * blur（切走）、pagehide（关页/前进后退缓存）、visibilitychange（标签切后台）、
+ * Esc（用户主动退）。exitPointerLock 在没有锁的时候调是无害的。
+ */
+function ReleasePointerLock() {
+  if (FAKE_POINTER_LOCK) {
+    if (fakeLocked) { fakeLocked = false; OnPointerLockChange(); }
+    return;
+  }
+  if (document.pointerLockElement) document.exitPointerLock?.();
+}
+
+/** 锁的状态变了（真后端由 pointerlockchange 事件进来，假后端由上面两个函数直调）。 */
+function OnPointerLockChange() {
+  // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
+  if (PointerLocked()) return;
+  input.fire = false; input.ads = false;
+  input.forward = 0; input.strafe = 0; input.sprint = false;
+  if (state.ordersOpen) { state.ordersOpen = false; hud.SetOrdersVisible(false); wheel.Close(); }
 }
 
 function StartRun() {
@@ -1479,7 +1543,7 @@ const router = new InputRouter({
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
     if (editor && editor.Capturing) return false;
-    if (document.pointerLockElement !== canvas && !SHOT) { canvas.requestPointerLock?.(); return false; }
+    if (!PointerLocked() && !SHOT) { RequestPointerLock(); return false; }
     return true;
   },
   OnAction: (action, detail) => {
@@ -1535,7 +1599,7 @@ document.addEventListener("mousemove", (e) => {
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
   // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。
   if (state.ordersOpen) { wheel.Move(e.movementX, e.movementY); return; }
-  if (document.pointerLockElement !== canvas) return;
+  if (!PointerLocked()) return;
   input.lookX += e.movementX;
   input.lookY += e.movementY;
 });
@@ -2321,34 +2385,15 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 }
 
 // ---------------------------------------------------------------------------
-// 指针锁
+// 指针锁：五条解锁通道（函数本体在「输入」一节，跟 RequestPointerLock 放一起）
 // ---------------------------------------------------------------------------
-/**
- * 把鼠标还给用户。
- *
- * 事故（第 4 批的积压条目）：退出游戏 / 切走标签页 / 按 Esc 之后鼠标还是不可见 ——
- * 浏览器自己只在 Esc 与文档隐藏时**有时候**会解锁，一旦页面被 bfcache 冻结、
- * 或者是我们自己把玩家控制权收走（过场、换关、结算），锁就一直挂在那儿。
- * 表现是用户以为浏览器卡死了。
- *
- * 修法是四条事件都调一次 exitPointerLock：pointerlockchange（锁掉了要同步状态）、
- * blur（切走）、pagehide（关页/前进后退缓存）、Esc（用户主动退）。
- * exitPointerLock 在没有锁的时候调是无害的。
- */
-function ReleasePointerLock() {
-  if (document.pointerLockElement) document.exitPointerLock?.();
-}
-
-document.addEventListener("pointerlockchange", () => {
-  // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
-  if (document.pointerLockElement !== canvas) {
-    input.fire = false; input.ads = false;
-    input.forward = 0; input.strafe = 0; input.sprint = false;
-    if (state.ordersOpen) { state.ordersOpen = false; hud.SetOrdersVisible(false); wheel.Close(); }
-  }
-});
+document.addEventListener("pointerlockchange", OnPointerLockChange);
 window.addEventListener("blur", ReleasePointerLock);
 window.addEventListener("pagehide", ReleasePointerLock);
+// 标签页切到后台也放掉：blur 管的是窗口失焦，visibilitychange 管的是标签切换 /
+// 最小化；两条并不总是一起来。锁挂在一个看不见的标签上，等于把鼠标夹在一个
+// 用户看不见的矩形里（Windows 上指针锁就是 ClipCursor，见 FAKE_POINTER_LOCK 注释）。
+document.addEventListener("visibilitychange", () => { if (document.hidden) ReleasePointerLock(); });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出

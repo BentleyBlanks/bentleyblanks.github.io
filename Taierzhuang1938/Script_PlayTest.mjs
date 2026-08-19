@@ -1735,9 +1735,15 @@ Check("模型读不到时退回程序化方块几何，且不抛",
 // 14) 指针锁能释放
 //
 // 积压条目：关掉页面 / 切走标签页 / 退出游戏之后鼠标还是不可见，用户以为浏览器死了。
-// 这一节走**真指针锁**（正常模式进页面、点「进城」抢锁），
-// 然后分别用 Esc、blur、pagehide 三条通道各解一次。
+// 这一节走正常模式进页面、点「进城」抢锁，然后分别用 Esc、blur、pagehide、
+// visibilitychange 四条通道各解一次。
 // 不用 shot=1：那个模式根本不进指针锁，测了等于没测（跟 ads 那个坑是同一条路径）。
+//
+// **这里拿到的是游戏自己的假指针锁，不是浏览器的**：Chromium on Windows 的指针锁
+// 是全系统的 ::ClipCursor，无头 Edge 一抢锁，开发机上真人的鼠标就被夹在屏幕左上角
+// (27,95)-(1297,805) 那一块动不了，而且无头下 exit 也不松夹，要等进程退出。
+// 所以游戏在 navigator.webdriver 下走页内假后端（见 Script_Main FAKE_POINTER_LOCK），
+// 这一节断言的是游戏逻辑「抢 / 放」两头都接上了，并且真指针锁一次都没碰。
 // ===========================================================================
 Stage("14 指针锁");
 {
@@ -1746,21 +1752,37 @@ Stage("14 指针锁");
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined && window.Taierzhuang.state.ready,
     { timeout: 180000 });
+  const ReadLock = () => page.evaluate(() => window.Taierzhuang.Debug.PointerLock());
   const rows = [];
-  for (const how of ["escape", "blur", "pagehide"]) {
+  for (const how of ["escape", "blur", "pagehide", "hidden"]) {
+    // 第一轮点「进城」抢锁；「进城」页一收掉这颗按钮就点不着了，之后几轮靠
+    // 「没拿到锁的第一次点击只用来抢锁」那条 Guard：点一下画面中央。
+    // 原先每轮都点 #bootStart，第二轮起根本没抢到锁，后面的「已释放」是空话。
     await page.click("#bootStart", { force: true }).catch(() => {});
     await page.waitForTimeout(300);
-    const locked = await page.evaluate(() => document.pointerLockElement !== null);
+    if (!(await ReadLock()).locked) { await page.mouse.click(640, 360); await page.waitForTimeout(300); }
+    const before = await ReadLock();
     if (how === "escape") await page.keyboard.press("Escape");
-    else await page.evaluate((k) => window.dispatchEvent(new Event(k)), how);
+    else if (how === "hidden") {
+      // 标签切到后台：Playwright 没有直接的 API，改写 document.hidden 再派事件
+      await page.evaluate(() => {
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+        document.dispatchEvent(new Event("visibilitychange"));
+        delete document.hidden;
+      });
+    } else await page.evaluate((k) => window.dispatchEvent(new Event(k)), how);
     await page.waitForTimeout(300);
-    const after = await page.evaluate(() => document.pointerLockElement !== null);
-    rows.push({ how, locked, after });
+    const after = await ReadLock();
+    rows.push({ how, locked: before.locked, after: after.locked, touchedBrowser: before.browserLocked || after.browserLocked, fake: before.fake });
   }
-  Check("点「进城」真的拿得到指针锁", rows.some((r) => r.locked),
+  Check("点「进城」/ 点画面 每一轮都真的拿得到指针锁", rows.every((r) => r.locked),
     rows.map((r) => `${r.how}:${r.locked ? "锁上" : "没锁上"}`).join(" "));
-  Check("Esc / 切走 / 关页 三条通道都会把鼠标还给用户",
+  Check("Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
     rows.every((r) => !r.after), rows.map((r) => `${r.how}:${r.after ? "仍锁着" : "已释放"}`).join(" "));
+  // 无头浏览器抢到真指针锁 = 开发机的真鼠标被 ClipCursor 夹在屏幕左上角。这条红了就是那事故回来了。
+  Check("自动化下走的是假指针锁，浏览器的真锁一次没碰（否则开发机鼠标会被夹住）",
+    rows.every((r) => r.fake && !r.touchedBrowser),
+    rows.map((r) => `${r.how}:fake=${r.fake} browser=${r.touchedBrowser}`).join(" "));
   // 解锁之后连续输入要清零，否则松锁那一瞬间按着的键会一直"按着"
   const sticky = await page.evaluate(() => {
     const T = window.Taierzhuang;
