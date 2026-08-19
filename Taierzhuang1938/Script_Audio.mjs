@@ -1468,14 +1468,21 @@ export class AudioEngine {
    *   · 同类 4.5 s  —— 同一句话不会连着来第二遍
    * 玩家自己那句（priority）不受全局闸限制，但仍受同类闸限制。
    */
-  Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null } = {}) {
+  Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
+    side = "nra" } = {}) {
     if (!this.ctx || this.disposed || !this.voicesReady) return null;
     const now = this.ctx.currentTime;
     if (!priority && now - this.lastBarkAt < 0.55) return null;
-    if (now - (this.lastBarkKindAt.get(kind) || -99) < 4.5) return null;
+    // 同类闸的键带上阵营：中国兵刚喊过「鬼子上来咯」，不该把日本兵的
+    // 「てきだ！」一起闸掉 —— 那是两个人在对喊，不是同一句复读。
+    const kindKey = side + ":" + kind;
+    if (now - (this.lastBarkKindAt.get(kindKey) || -99) < 4.5) return null;
 
     const pool = [];
     for (const e of this.voiceBank.values()) {
+      // 阵营先过滤。声库里中日两套并存，挑错阵营就是日本兵喊中文（或反过来），
+      // 那比没有配音更糟。未标 side 的一律按中方处理（旧条目的兼容默认）。
+      if ((e.side || "nra") !== side) continue;
       // 指定了 key 就只认那一句（下命令要喊对应的那句，不能"从 rally 里随便挑一句"）
       if (key) { if (e.key === key) pool.push(e); continue; }
       // event 句**有前提条件**，不许被同类随机抽中 —— 只能由知道前提的调用方用 key 点名。
@@ -1496,7 +1503,7 @@ export class AudioEngine {
     const pitch = 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
 
     this.lastBarkAt = now;
-    this.lastBarkKindAt.set(kind, now);
+    this.lastBarkKindAt.set(kindKey, now);
     return this.Play("voice." + pick.key, { position, volume, pitch, priority });
   }
 

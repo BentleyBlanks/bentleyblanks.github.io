@@ -25,6 +25,10 @@ const UP = new THREE.Vector3(0, 1, 0);
  * 墙高一点就该翻不过去，这是"扒墙头"不是撑杆跳。
  */
 const VAULT_MIN_M = 0.60;          // 比这矮的自动抬腿就过去了（MoveWithCollision 的 0.56 档）
+// 单帧解算最多把人挪多远（米）。人一旦整个陷进一栋房子的碰撞盒里，
+// 「推到最近的外面」在数值上是对的，但那可能是 7.5 m —— 观感就是瞬移。
+// 封顶之后陷进去的人会在几帧里挤出来，而正常贴墙行走远小于这个值，不受影响。
+const PUSH_MAX = 0.45;
 const VAULT_MAX_M = 2.25;
 const VAULT_REACH_M = 1.62;        // 落点离起跳点多远：院墙厚 0.35，这个距离能落到墙另一面
 const VAULT_BASE_S = 0.45;         // 方案给的位移曲线时长（矮物）；越高翻得越慢
@@ -489,20 +493,46 @@ export class PlayerController {
           this.grounded = true;
           continue;
         }
+        // 推出方向按**离哪一面近**判，不按 step 的正负判。
+        // 按 step 判的毛病：人一旦已经陷在盒子里（出生点落在建筑体内、或被别的
+        // 解算挤进去），朝哪边走就被甩到哪一面 —— 实测能一秒横移 20 m。
+        // 按最近面推则是把人「挤回最近的外面」，位移有界。
         if (axis === "x") {
-          this.position.x = step.x > 0 ? box.min[0] - r : box.max[0] + r;
+          const dLeft = px - (box.min[0] - r), dRight = (box.max[0] + r) - px;
+          const target = dLeft < dRight ? box.min[0] - r : box.max[0] + r;
+          this.position.x = px + Clamp(target - px, -PUSH_MAX, PUSH_MAX);
           this.velocity.x = 0;
         } else if (axis === "z") {
-          this.position.z = step.z > 0 ? box.min[2] - r : box.max[2] + r;
+          const dNear = pz - (box.min[2] - r), dFar = (box.max[2] + r) - pz;
+          const target = dNear < dFar ? box.min[2] - r : box.max[2] + r;
+          this.position.z = pz + Clamp(target - pz, -PUSH_MAX, PUSH_MAX);
           this.velocity.z = 0;
         } else {
+          // Y 轴。**必须先判断人是从哪一侧来的**，不能一律吸到顶面/底面。
+          //
+          // 原来是「下落中 => position.y = box.max[1]」，不问人是不是真的在这个盒子
+          // 上方。而 X/Z 推出恰恰会把人放在**紧贴盒子侧面**的位置：
+          // px === box.min[0] - r，于是重叠判据 px + r < box.min[0] 变成
+          // box.min[0] < box.min[0] —— false，这个盒子不被跳过。
+          // 结果是「贴着墙站着 + 重力」每帧都命中这一条，人被吸到墙顶。
+          // 实测：朝任意一堵高墙直走，32/32 次上房顶，单帧跳升 4—5.4 m。
+          //
+          // 只加这一条判断就够了。别顺手去动上面的抬腿逻辑：那一块看着也可疑，
+          // 但它同时在替「跨过重叠的瓦砾堆」兜底 —— 我收紧过一版，
+          // 空旷地一秒只走得动 0.46 m（原本 2.69 m），整堆碎石变成隐形墙。
+          const prevY = py - step.y;              // 这一帧位移之前的脚底高度
           if (step.y < 0) {
-            this.position.y = box.max[1];
-            this.grounded = true;
-          } else {
-            this.position.y = box.min[1] - height;
+            if (prevY >= box.max[1] - 1e-3) {     // 本来就在顶面之上 => 落到它上面
+              this.position.y = box.max[1];
+              this.grounded = true;
+              this.velocity.y = 0;
+            }
+          } else if (step.y > 0) {
+            if (prevY + height <= box.min[1] + 1e-3) {   // 本来就在底面之下 => 顶到它
+              this.position.y = box.min[1] - height;
+              this.velocity.y = 0;
+            }
           }
-          this.velocity.y = 0;
         }
       }
     }

@@ -1223,9 +1223,18 @@ const ramp = await page.evaluate(() => {
   // 切片里可能同时有两条上城道（东门旁与南门旁）。**必须先聚类**，
   // 否则"最低的一级"和"最高的一级"会取自两条不同的坡，推出来的方向指向斜刺里。
   const Center = (b) => [(b.min[0] + b.max[0]) / 2, (b.min[2] + b.max[2]) / 2];
-  const lowest = all.reduce((a, b) => (a.max[1] < b.max[1] ? a : b));
+  // **只挑坡脚落在关卡可行走边界内的那条**。切片里会有边界外的马道，
+  // 而 MoveWithCollision 结尾会把玩家钳回 bounds 内 —— 选中界外那条的话，
+  // 玩家一辈子够不着它，用例测的是钳位不是台阶。
+  // （这条是实测出来的：选中的坡脚 footInBounds=false，玩家被钉在 13 m 外。）
+  const b0 = bf.bounds;
+  const inB = (bx, bz) => !b0 || (bx > b0.minX + 1 && bx < b0.maxX - 1
+    && bz > b0.minZ + 1 && bz < b0.maxZ - 1);
+  const reachable = all.filter((b) => { const [cx, cz] = Center(b); return inB(cx, cz); });
+  const pool = reachable.length ? reachable : all;
+  const lowest = pool.reduce((a, b) => (a.max[1] < b.max[1] ? a : b));
   const [lx, lz] = Center(lowest);
-  const steps = all.filter((b) => {
+  const steps = pool.filter((b) => {
     const [cx, cz] = Center(b);
     return Math.hypot(cx - lx, cz - lz) < 45;
   });
@@ -1239,7 +1248,14 @@ const ramp = await page.evaluate(() => {
   const idle = { forward: 1, strafe: 0, sprint: false, ads: false, lean: 0,
     lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, breathHold: false, sensitivity: 1 };
   let peak = -99;
+  // **每帧重新对准坡顶**，不是设一次 yaw 就一路直走。
+  // 原来那个写法测不到东西：实测玩家一路在**远离**马道（离最低一级 10.5 m 走到 29.4 m），
+  // 全程 y=0，中间被当时碰撞解算的一个 bug 弹上墙一帧（5.30 m），
+  // peak>4 就这么"过"了 —— 它从来没真的走上过马道。
+  // 修掉那个 bug 之后这条立刻红了，红得对。
   for (let i = 0; i < 420; i += 1) {
+    const ax = tx - T.player.position.x, az = tz - T.player.position.z;
+    if (Math.hypot(ax, az) > 0.8) T.player.yaw = Math.atan2(-ax, -az);
     T.player.Update(1 / 60, idle, null);
     if (T.player.position.y > peak) peak = T.player.position.y;
   }
