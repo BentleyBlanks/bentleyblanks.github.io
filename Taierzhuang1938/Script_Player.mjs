@@ -4,8 +4,16 @@
 // 在视野里滑动，不是死钉在屏幕中心）；栓动枪一发一拉，节奏本身就是压力来源；
 // 受伤是流血与失能，不是一格一格掉的血条。
 //
-// 碰撞用胶囊 vs AABB 表，不上物理引擎 —— 场景是静态的，AABB 表在建关时一次生成，
-// 每帧只查玩家附近那一小格。
+// 碰撞走 Rapier 的运动学角色控制器（Script_Physics）。
+//
+// 这里原本是一套自己写的「胶囊 vs AABB 表 + 分轴推出」。它每修一条就压出另一条：
+// 贴着墙站着会被重力顺着侧面吸上墙顶（实测 32/32 次上房顶）、陷进房子里朝哪边走
+// 就被甩到哪一面（一秒横移 20 m）、把判据收紧之后整片碎石变成隐形墙。
+// 三条补丁的长注释都还留在 git 历史里，那不是写得不好，是这套解法本身给不出
+// 「贴墙滑、上台阶、不卡角」这三件事的一致解。
+//
+// 现在这三件事交给引擎：胶囊 + autostep 0.55 m + 贴地吸附 + 52° 坡度上限。
+// 玩家这边只负责算**想走多远**，走不走得动是引擎的事。
 
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
@@ -24,11 +32,7 @@ const UP = new THREE.Vector3(0, 1, 0);
  * 取 2.25 之后一半以上的院墙进得去，剩下的高墙仍然要走门洞 —— 那是对的：
  * 墙高一点就该翻不过去，这是"扒墙头"不是撑杆跳。
  */
-const VAULT_MIN_M = 0.60;          // 比这矮的自动抬腿就过去了（MoveWithCollision 的 0.56 档）
-// 单帧解算最多把人挪多远（米）。人一旦整个陷进一栋房子的碰撞盒里，
-// 「推到最近的外面」在数值上是对的，但那可能是 7.5 m —— 观感就是瞬移。
-// 封顶之后陷进去的人会在几帧里挤出来，而正常贴墙行走远小于这个值，不受影响。
-const PUSH_MAX = 0.45;
+const VAULT_MIN_M = 0.60;          // 比这矮的引擎自己抬腿就过去了（autostep 0.55 m）
 const VAULT_MAX_M = 2.25;
 const VAULT_REACH_M = 1.62;        // 落点离起跳点多远：院墙厚 0.35，这个距离能落到墙另一面
 const VAULT_BASE_S = 0.45;         // 方案给的位移曲线时长（矮物）；越高翻得越慢
@@ -45,6 +49,12 @@ export class PlayerController {
   {
     this.camera = camera;
     this.world = world;                    // { colliders, GroundHeight(x,z), bounds }
+    /**
+     * 物理世界里的那具胶囊。**换关会换一份**（切片重建 = 物理世界重建），
+     * 所以它由装配层通过 AttachPhysics 交进来，而不是在这里 new。
+     */
+    this.physics = null;
+    this.body = null;
     this.position = new THREE.Vector3(0, 0, 0);
     this.velocity = new THREE.Vector3();
     this.yaw = 0;
@@ -126,8 +136,31 @@ export class PlayerController {
     this._right = new THREE.Vector3();
   }
 
+  /**
+   * 换一份物理世界（开机一次、每换一关一次）。
+   * 旧的那具胶囊跟着旧世界一起没了，这里只管建新的。
+   */
+  AttachPhysics(physics) {
+    this.physics = physics;
+    this.body = physics
+      ? physics.MakeCharacter({
+        radius: this.radius,
+        height: Math.max(0.62, this.eyeHeight + 0.16),
+        position: this.position,
+      })
+      : null;
+  }
+
   Spawn(x, z, ry = 0) {
-    this.position.set(x, this.world.GroundHeight(x, z), z);
+    // 出生点先问一句「这儿站得下人吗」。
+    // 撒兵点与重生点来自关卡数据与随机数，它们并不知道那儿正好是一堵院墙；
+    // 而运动学角色控制器**没有脱困能力** —— 埋进墙里就再也出不来了
+    //（老解算靠「推到最近的外面」硬挤，挤得动是运气）。
+    const free = this.physics
+      ? this.physics.FindFreeSpot(x, z, STANCE.stand.radius, STANCE.stand.eye + 0.16)
+      : { x, y: this.world.GroundHeight(x, z), z };
+    this.position.set(free.x, free.y, free.z);
+    if (this.body) this.body.Teleport(this.position.x, this.position.y, this.position.z);
     this.yaw = ry;
     this.pitch = 0;
     this.aimYaw = 0;
@@ -269,6 +302,9 @@ export class PlayerController {
       this.position.copy(to);
       this.grounded = true;
     }
+    // 翻越是一段**写死的位移曲线**，不走碰撞解算（人要从墙里穿过去）。
+    // 但胶囊得跟着走，不然落地那一帧引擎按起跳点算，人会被弹回墙这边。
+    if (this.body) this.body.Teleport(this.position.x, this.position.y, this.position.z);
     this.SyncCamera(dt);
     return { planarSpeed: 0 };
   }
@@ -462,92 +498,48 @@ export class PlayerController {
     return Math.min(3.2, p);
   }
 
-  /** 胶囊 vs AABB：分轴推出。够用，而且绝不会被挤进墙里。 */
+  /**
+   * 走一步。位移交给 Rapier 的角色控制器：贴墙滑、上台阶、卡坡都是它的事。
+   *
+   * 这里只剩三件玩家侧的事：
+   *   1. 姿态变了就换胶囊尺寸（站 1.78 / 蹲 1.21 / 卧 0.58，卧姿还更粗）；
+   *   2. 落地了就把下落速度清零（不清的话重力会一直累加，走下坡时会突然"吸"下去）；
+   *   3. 把人夹在本关切片里。
+   */
   MoveWithCollision(dt) {
-    const r = this.radius;
-    const height = Math.max(0.5, this.eyeHeight + 0.16);
-    const step = this._tmp.copy(this.velocity).multiplyScalar(dt);
-    const axes = ["x", "z", "y"];
-    for (const axis of axes) {
-      this.position[axis] += step[axis];
-      const list = this.world.NearbyColliders
-        ? this.world.NearbyColliders(this.position.x, this.position.z, r + 2)
-        : this.world.colliders;
-      for (const box of list) {
-        // 玩家的包围盒：脚底 position.y 到 position.y+height
-        const px = this.position.x, py = this.position.y, pz = this.position.z;
-        if (px + r < box.min[0] || px - r > box.max[0]) continue;
-        if (pz + r < box.min[2] || pz - r > box.max[2]) continue;
-        if (py + height < box.min[1] || py > box.max[1]) continue;
-        // 能踩上去的矮物（0.55 m 以下）直接抬腿，不当墙。
-        // topRel === 0 这一档必须一起放行，那是**站在盒顶上**的情形：
-        // 上面那道过滤只在 py 严格大于盒顶时跳过，脚正好踩在顶面时会掉进
-        // 下面的分轴推出，人被自己站着的那块台面横向弹开 ——
-        // 马道八级台阶与墙顶都踩在这条边界上，不放行就一步也走不上去。
-        const topRel = box.max[1] - py;
-        if (axis !== "y" && topRel < 0.56) {
-          if (topRel > 0) {
-            this.position.y = box.max[1];
-            this.velocity.y = Math.max(0, this.velocity.y);
-          }
-          this.grounded = true;
-          continue;
-        }
-        // 推出方向按**离哪一面近**判，不按 step 的正负判。
-        // 按 step 判的毛病：人一旦已经陷在盒子里（出生点落在建筑体内、或被别的
-        // 解算挤进去），朝哪边走就被甩到哪一面 —— 实测能一秒横移 20 m。
-        // 按最近面推则是把人「挤回最近的外面」，位移有界。
-        if (axis === "x") {
-          const dLeft = px - (box.min[0] - r), dRight = (box.max[0] + r) - px;
-          const target = dLeft < dRight ? box.min[0] - r : box.max[0] + r;
-          this.position.x = px + Clamp(target - px, -PUSH_MAX, PUSH_MAX);
-          this.velocity.x = 0;
-        } else if (axis === "z") {
-          const dNear = pz - (box.min[2] - r), dFar = (box.max[2] + r) - pz;
-          const target = dNear < dFar ? box.min[2] - r : box.max[2] + r;
-          this.position.z = pz + Clamp(target - pz, -PUSH_MAX, PUSH_MAX);
-          this.velocity.z = 0;
-        } else {
-          // Y 轴。**必须先判断人是从哪一侧来的**，不能一律吸到顶面/底面。
-          //
-          // 原来是「下落中 => position.y = box.max[1]」，不问人是不是真的在这个盒子
-          // 上方。而 X/Z 推出恰恰会把人放在**紧贴盒子侧面**的位置：
-          // px === box.min[0] - r，于是重叠判据 px + r < box.min[0] 变成
-          // box.min[0] < box.min[0] —— false，这个盒子不被跳过。
-          // 结果是「贴着墙站着 + 重力」每帧都命中这一条，人被吸到墙顶。
-          // 实测：朝任意一堵高墙直走，32/32 次上房顶，单帧跳升 4—5.4 m。
-          //
-          // 只加这一条判断就够了。别顺手去动上面的抬腿逻辑：那一块看着也可疑，
-          // 但它同时在替「跨过重叠的瓦砾堆」兜底 —— 我收紧过一版，
-          // 空旷地一秒只走得动 0.46 m（原本 2.69 m），整堆碎石变成隐形墙。
-          const prevY = py - step.y;              // 这一帧位移之前的脚底高度
-          if (step.y < 0) {
-            if (prevY >= box.max[1] - 1e-3) {     // 本来就在顶面之上 => 落到它上面
-              this.position.y = box.max[1];
-              this.grounded = true;
-              this.velocity.y = 0;
-            }
-          } else if (step.y > 0) {
-            if (prevY + height <= box.min[1] + 1e-3) {   // 本来就在底面之下 => 顶到它
-              this.position.y = box.min[1] - height;
-              this.velocity.y = 0;
-            }
-          }
-        }
-      }
+    const body = this.body;
+    const height = Math.max(0.62, this.eyeHeight + 0.16);
+    if (!body) {
+      // 物理世界还没接上（开机的头几帧、或者出图模式直接摆相机）。
+      // 退回"只贴地"，别把人留在半空。
+      this.position.addScaledVector(this.velocity, dt);
+      const g0 = this.world.GroundHeight(this.position.x, this.position.z);
+      if (this.position.y <= g0) { this.position.y = g0; this.velocity.y = 0; this.grounded = true; }
+      return;
     }
-    const ground = this.world.GroundHeight(this.position.x, this.position.z);
-    if (this.position.y <= ground + 1e-3) {
-      this.position.y = ground;
-      this.velocity.y = 0;
-      this.grounded = true;
-    } else if (this.velocity.y < -0.05) {
-      this.grounded = false;
+    // 有人绕过物理直接改了 position（过场摆位、冒烟脚本摆人）就认外面那份
+    body.ReconcileTo(this.position.x, this.position.y, this.position.z);
+    body.SetSize(this.radius, height);
+    const step = this._tmp.copy(this.velocity).multiplyScalar(dt);
+    const moved = body.Move(step.x, step.y, step.z);
+    this.position.set(moved.x, moved.y, moved.z);
+    this.grounded = moved.grounded;
+    if (this.grounded && this.velocity.y < 0) this.velocity.y = 0;
+    // 撞上东西就把那一轴的速度吃掉，不然贴着墙走会一直攒速度，
+    // 松开墙的那一帧人会"弹"出去。
+    if (moved.blocked) {
+      this.velocity.x *= 0.2;
+      this.velocity.z *= 0.2;
     }
     const b = this.world.bounds;
     if (b) {
-      this.position.x = Clamp(this.position.x, b.minX + 1, b.maxX - 1);
-      this.position.z = Clamp(this.position.z, b.minZ + 1, b.maxZ - 1);
+      const cx = Clamp(this.position.x, b.minX + 1, b.maxX - 1);
+      const cz = Clamp(this.position.z, b.minZ + 1, b.maxZ - 1);
+      if (cx !== this.position.x || cz !== this.position.z) {
+        this.position.x = cx;
+        this.position.z = cz;
+        body.Teleport(cx, this.position.y, cz);
+      }
     }
   }
 

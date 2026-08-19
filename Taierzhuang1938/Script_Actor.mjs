@@ -130,6 +130,12 @@ const IJA_HELMET_ALBEDO = 0x3C3A30;
 
 /** 站直也留一点膝盖弯：腿绷成一条直线是「假人」最明显的一处。 */
 const STAND_SETTLE = 0.014;
+/** 脚贴地能修正的最大高差（米，root 局部尺度）。超过这个数说明人本来就该掉下去。 */
+const FOOT_IK_RANGE = 0.55;
+/** 贴地量的收敛速率（每秒）。太快会在台阶边缘抖，太慢上台阶时脚会拖一截。 */
+const FOOT_IK_RATE = 14;
+/** 鞋底贴斜面的角度上限（弧度，约 22°）。 */
+const FOOT_IK_TILT = 0.38;
 
 /**
  * LOD 表。这里要记住一条反直觉的事：**只有同一根骨头上的两个材质桶合并才真省
@@ -1033,6 +1039,10 @@ export class Actor {
         new THREE.Vector3(0, -d.shinLen, 0));
       this.legs[tag] = { thigh, knee, ankle, side };
     }
+    /** 两条腿这一帧的落点计划（先算完两只脚才知道骨盆要压多少，见 Update）。 */
+    this._legPlan = { L: { x: 0, y: 0, z: 0, phase: 0, swing: 0 }, R: { x: 0, y: 0, z: 0, phase: 0, swing: 0 } };
+    /** 脚贴地的平滑状态：y 是贴地高差，nx/nz 是地面法线在人物朝向里的分量。 */
+    this.footIk = { L: { y: 0, nx: 0, nz: 0 }, R: { y: 0, nx: 0, nz: 0 } };
 
     // 视线挂点。模型里 eyes 是头上的一个空节点，没模型时按头心比例补一个 ——
     // 上层（音源、AI 视线、过场取景）拿到的接口两条路一模一样。
@@ -1288,11 +1298,16 @@ export class Actor {
     // --- 腿：落脚点 IK -----------------------------------------------------
     // 目标是**踝关节**（两段骨头的末端），所以站立时是 y = ankleY 而不是 0；
     // 写成 0 的话踝会去贴地、整只脚陷进地面里。
+    //
+    // 两趟：先把两只脚的落点都算出来并各探一次地，再据此压骨盆、最后解腿。
+    // 顺序不能反 —— 骨盆要压多少取决于**两只脚里更低的那一只**，
+    // 一只一只解的话第一只解完骨盆还没动，它会先被拉直再被压下去，抖一帧。
     const lift = Lerp(0.05, 0.16, moveSpeed) * H;
+    const plan = this._legPlan;
     for (const tag of ["L", "R"]) {
       const leg = this.legs[tag];
       const phase = (this.gaitPhase + (tag === "R" ? 0.5 : 0)) % 1;
-      let footZ = 0, footY = d.ankleY;
+      let footZ = 0, footY = d.ankleY, swing = 0;
       if (stride > 0) {
         if (phase < stanceEnd) {
           // 支撑相：脚钉在地上，身体从它上面走过去
@@ -1300,7 +1315,8 @@ export class Actor {
         } else {
           const t = (phase - stanceEnd) / (1 - stanceEnd);
           footZ = Lerp(stanceTravel * 0.5, -stanceTravel * 0.5, SmoothStep(0, 1, t));
-          footY += Math.sin(Math.PI * t) * lift;
+          swing = Math.sin(Math.PI * t) * lift;
+          footY += swing;
         }
       } else {
         footZ = leg.side * 0.035 * H;              // 立正也别两脚并齐
@@ -1309,7 +1325,78 @@ export class Actor {
       footZ -= crouch * 0.055 * H;
       const spread = d.hipHalf + crouch * 0.035 * H + Math.abs(strafe) * 0.05 * H;
       const footX = leg.side * spread + strafe * 0.12 * H * (phase < stanceEnd ? 1 : 0.4);
-      this.tmpTarget.set(footX, footY, footZ);
+      const p = plan[tag];
+      p.x = footX; p.y = footY; p.z = footZ; p.phase = phase; p.swing = swing;
+    }
+
+    // --- 脚贴地：把落点抬到**真实地面**上，够不着就压骨盆 -------------------
+    //
+    // 在这一段之前，腿的 IK 是一套「平地上的原地步态」：脚永远落在 y = ankleY，
+    // 也就是假设脚下是一张无限大的水平地板。于是上马道时人是从台阶里穿上去的、
+    // 站在瓦砾堆上两只脚都埋在石头里、走斜坡时一只脚悬空一只脚陷进土里。
+    //
+    // 现在每只脚各朝下探一次（与角色控制器问的是同一条 GroundProbe），
+    //   · 地面比脚下这层高 => 那只脚抬上去（上台阶时前脚先落到上一级）
+    //   · 地面比脚下这层低 => 那只脚放下去，同时**骨盆按更低的那只脚下沉**，
+    //     不压骨盆的话腿会被拉直、脚仍旧够不着（这是脚部 IK 的标准做法）
+    //   · 脚掌再按地面法线拧一下，鞋底贴着斜面而不是插进去
+    //
+    // 只在**看得见的人**身上做（两条射线/人/帧）。趴着、倒地、在半空的人不做：
+    // 那三种姿态下脚本来就不该踩在地上。
+    let pelvisDrop = 0;
+    const probe = this.factory && this.factory.groundProbe;
+    const doFootIk = !!probe && this.root.visible && prone < 0.5 && dying < 0.02 && !this.ragdollState;
+    const scale = this.sizeScale || 1;
+    if (doFootIk) {
+      const yaw = this.root.rotation.y;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const rate = 1 - Math.exp(-dt * FOOT_IK_RATE);
+      for (const tag of ["L", "R"]) {
+        const p = plan[tag];
+        // 落点的世界坐标（root 带 sizeScale 的整体缩放，别忘了乘）
+        const wx = this.root.position.x + (p.x * cy + p.z * sy) * scale;
+        const wz = this.root.position.z + (-p.x * sy + p.z * cy) * scale;
+        const g = probe(wx, wz, this.root.position.y);
+        const ik = this.footIk[tag];
+        // 地面相对「脚下这一层」高多少（换算回 root 的局部尺度）
+        const delta = Clamp((g.y - this.root.position.y) / scale, -FOOT_IK_RANGE, FOOT_IK_RANGE);
+        ik.y += (delta - ik.y) * rate;
+        // 法线转进人物自己的朝向：nx 决定左右倾（rotation.z），nz 决定前后仰（rotation.x）
+        const n = g.normal;
+        const nxl = n[0] * cy - n[2] * sy;
+        const nzl = n[0] * sy + n[2] * cy;
+        ik.nx += (nxl - ik.nx) * rate;
+        ik.nz += (nzl - ik.nz) * rate;
+        if (ik.y < pelvisDrop) pelvisDrop = ik.y;
+      }
+      // 骨盆按**更低的那只脚**整量下沉。
+      //
+      // 「整量」不是保守选择，是这具骨架逼出来的：胯高 0.842·H、踝高 0.089·H，
+      // 腿长正好等于两者之差 —— 也就是说**站直时两条腿已经是伸直的**
+      // （这条在上面步频那段注释里也提过）。所以脚只要往下挪一厘米，
+      // 腿就够不着了，SolveTwoBone 会把距离钳回臂长，脚停在半空。
+      // 取一半试过：台阶外那只脚离地 0.225 m（正常 0.089 m），腿绷成一根直棍。
+      //
+      // **压骨盆不需要给脚补偿。** 落脚点是在 root 空间给的，RootToHips 每帧重新
+      // 把它换算进胯的父子链 —— 胯往下走，换算出来的目标自然就变远，腿自己伸长。
+      // 早先这里多写了一项 `footY -= pelvisDrop`，等于把胯的位移又加回脚上，
+      // 结果是两只脚一起浮起 0.3 m（实测踝关节离地 0.391 m）。
+      this.hips.position.y += pelvisDrop;
+    } else {
+      for (const tag of ["L", "R"]) {
+        const ik = this.footIk[tag];
+        ik.y *= 0.86; ik.nx *= 0.86; ik.nz *= 0.86;   // 关掉时缓缓归零，别跳一下
+      }
+    }
+
+    for (const tag of ["L", "R"]) {
+      const leg = this.legs[tag];
+      const p = plan[tag];
+      const ik = this.footIk[tag];
+      // 腾空的那只脚不该被地面拽着走，所以按摆动相的高度把贴地量淡出
+      const ground = doFootIk ? ik.y * (1 - Clamp01(p.swing / Math.max(1e-4, lift))) : 0;
+      const footY = p.y + ground;
+      this.tmpTarget.set(p.x, footY, p.z);
       this.RootToHips(this.tmpTarget);
       // 膝盖外张：蹲下去两条大腿会顶到胸前的枪与手，往外让开一点才有蹲的剪影
       SolveTwoBone(leg.thigh, leg.knee, this.tmpTarget, d.thighLen, d.shinLen,
@@ -1319,7 +1406,15 @@ export class Actor {
       // 这里原本有一项 `- crouch * 0.25`（蹲下压脚尖 14°）。压是压对了，
       // 但没有配套抬升——鞋料总高才 9.4 cm，压完鞋底就有 4 cm 在地面以下。
       // IK 本身已经把踝关节钉在了正确高度，脚尖不需要再额外拧。
-      leg.ankle.rotation.set(-pitch + (footY - d.ankleY) * 1.6, 0, 0);
+      //
+      // 末两项是这一轮加的**鞋底贴斜面**：地面往哪边倒，脚掌就往哪边拧多少。
+      // 幅度按摆动相淡出（脚在半空时不该跟着地面转），并钳在 22° 以内 ——
+      // 再大就不是"踩在坡上"而是"脚踝扭断了"。
+      const tilt = doFootIk ? (1 - Clamp01(p.swing / Math.max(1e-4, lift))) : 0;
+      leg.ankle.rotation.set(
+        -pitch + (p.y - d.ankleY) * 1.6 + Clamp(ik.nz * tilt, -FOOT_IK_TILT, FOOT_IK_TILT),
+        0,
+        Clamp(-ik.nx * tilt, -FOOT_IK_TILT, FOOT_IK_TILT));
     }
 
     // --- 上身：看的方向按 35% / 65% 分给胸和头 ------------------------------

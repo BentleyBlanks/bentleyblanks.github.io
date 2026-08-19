@@ -55,11 +55,28 @@ export class BuildSink {
     this.buckets.get(key).push(geometry);
   }
 
-  /** 记一个轴对齐碰撞盒（中心 + 半长）。 */
-  Solid(cx, cy, cz, hx, hy, hz, tag = "wall") {
+  /**
+   * 记一个碰撞盒（中心 + 半长 + **绕 Y 的朝向**）。
+   *
+   * ry 这个参数是这一轮补上的，而它是「整个碰撞完全不对」的正解。
+   * 以前只有轴对齐盒，斜着摆的墙/房/路基只能**再套一个轴对齐包围盒**登记 ——
+   * 一段 20 m 长、0.4 m 厚的 45° 斜墙会变成 14×14 m 的实心方块，
+   * 于是空地上有隐形墙、子弹打在空气上、贴着墙根本走不过去。
+   *
+   * 两份数据同时留着，各有各的用处：
+   *   · c/h/ry  —— **真实朝向的长方体**，交给 Script_Physics 建 Rapier 碰撞体
+   *   · min/max —— 仍然是那个轴对齐包围盒。AI 找掩体、导航位图、编辑器拾取
+   *                这些「粗筛」照旧读它，一个字都不用改（ry=0 时两者完全等价）。
+   */
+  Solid(cx, cy, cz, hx, hy, hz, tag = "wall", ry = 0) {
+    const ax = Math.abs(Math.cos(ry)) * hx + Math.abs(Math.sin(ry)) * hz;
+    const az = Math.abs(Math.sin(ry)) * hx + Math.abs(Math.cos(ry)) * hz;
     this.colliders.push({
-      min: [cx - hx, cy - hy, cz - hz],
-      max: [cx + hx, cy + hy, cz + hz],
+      min: [cx - ax, cy - hy, cz - az],
+      max: [cx + ax, cy + hy, cz + az],
+      c: [cx, cy, cz],
+      h: [hx, hy, hz],
+      ry,
       tag,
     });
   }
@@ -136,9 +153,7 @@ export function AddWall(sink, material, {
       { x, y: height + 0.045, z, ry }));
   }
   if (solid) {
-    const hx = Math.abs(Math.cos(ry)) * length / 2 + Math.abs(Math.sin(ry)) * thickness / 2;
-    const hz = Math.abs(Math.sin(ry)) * length / 2 + Math.abs(Math.cos(ry)) * thickness / 2;
-    sink.Solid(x, height / 2, z, hx, height / 2, hz, "wall");
+    sink.Solid(x, height / 2, z, length / 2, height / 2, thickness / 2, "wall", ry);
     sink.Cover(x, z, height * (1 - ruin * 0.5), Math.sin(ry), Math.cos(ry));
   }
 }
@@ -508,7 +523,7 @@ export function AddGatehouse(sink, { x, z, ry, seed, damage = 0, burnt = false, 
     const lx = s * (openW / 2 + 0.28);
     sink.Add(mat, PlaceGeometry(MakeBox(0.56, h, 0.72, TILE_METERS.brick, `${seed}:pier${s}`),
       { x: x + cos * lx, y: h / 2, z: z - sin * lx, ry }));
-    sink.Solid(x + cos * lx, h / 2, z - sin * lx, 0.4, h / 2, 0.4, "wall");
+    sink.Solid(x + cos * lx, h / 2, z - sin * lx, 0.32, h / 2, 0.4, "wall", ry);
     // 门墩石
     sink.Add("Stone", PlaceGeometry(MakeBox(0.42, 0.52, 0.42, TILE_METERS.stone, `${seed}:dun${s}`),
       { x: x + cos * (lx + s * 0.16), y: 0.26, z: z - sin * (lx + s * 0.16), ry }));
@@ -596,9 +611,7 @@ export function AddRampart(sink, {
       MakeBox(segLen * 1.02, h, thickness, TILE_METERS.brick, `${seed}:s${i}`),
       { x: x + cos * lx, y: h / 2, z: z - sin * lx, ry }));
     if (h > height * 0.9) {
-      sink.Solid(x + cos * lx, h / 2, z - sin * lx,
-        Math.abs(cos) * segLen / 2 + Math.abs(sin) * thickness / 2, h / 2,
-        Math.abs(sin) * segLen / 2 + Math.abs(cos) * thickness / 2, "rampart");
+      sink.Solid(x + cos * lx, h / 2, z - sin * lx, segLen / 2, h / 2, thickness / 2, "rampart", ry);
     }
     // 垛口：一段实、一段空，实的高 1.1 m
     if (merlons && h > height * 0.9) {
@@ -648,8 +661,8 @@ export function AddRampWay(sink, {
   const L = (lx, lz) => [x + cos * lx - sin * lz, z - sin * lx - cos * lz];
   const bottom = baseY - 1.4;                     // 砌到地面以下，免得坡底露出缝
   const rise = (height - baseY) / RAMP_STEPS;
-  const hx = Math.abs(cos) * RAMP_WIDTH_M / 2 + Math.abs(sin) * RAMP_RUN_M / 2;
-  const hz = Math.abs(sin) * RAMP_WIDTH_M / 2 + Math.abs(cos) * RAMP_RUN_M / 2;
+  const hx = RAMP_WIDTH_M / 2;
+  const hz = RAMP_RUN_M / 2;
   for (let i = 0; i < RAMP_STEPS; i += 1) {
     // i = 0 是最高的一级（顶面正好齐墙顶），越往城里越矮
     const top = height - rise * i;
@@ -659,7 +672,7 @@ export function AddRampWay(sink, {
     sink.Add("Ground", PlaceGeometry(
       MakeBox(RAMP_WIDTH_M, h, RAMP_RUN_M * 1.02, TILE_METERS.ground, `${seed}:s${i}`),
       { x: sx, y: bottom + h / 2, z: sz, ry }));
-    sink.Solid(sx, bottom + h / 2, sz, hx, h / 2, hz, "ramp");
+    sink.Solid(sx, bottom + h / 2, sz, hx, h / 2, hz, "ramp", ry);
   }
 }
 
@@ -747,8 +760,7 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
     }
   }
   sink.props.push({ kind: "sandbags", matrices: bags });
-  sink.Solid(x, height / 2, z,
-    Math.abs(cos) * length / 2 + 0.3, height / 2, Math.abs(sin) * length / 2 + 0.3, "barricade");
+  sink.Solid(x, height / 2, z, length / 2 + 0.15, height / 2, 0.3, "barricade", ry);
   sink.Cover(x, z, height, sin, cos);
 
   // 掺进去的就便器材：门板斜靠、水缸、独轮车
@@ -944,14 +956,12 @@ export function AddCityWall(sink, {
     // 碰撞：下半段按墙脚宽（外面撞上去是一堵斜墙），上半段按墙顶宽（人在顶上走的是 5 m）
     const p = L(lx, 0);
     const midW = widthAt(baseY + height * 0.3);
-    const hx = Math.abs(cos) * segLen / 2 + Math.abs(sin) * midW / 2;
-    const hz = Math.abs(sin) * segLen / 2 + Math.abs(cos) * midW / 2;
     const lowTop = Math.min(crest, baseY + height * 0.6);
-    sink.Solid(p.x, (baseY - 1.5 + lowTop) / 2, p.z, hx, (lowTop - baseY + 1.5) / 2, hz, "cityWall");
+    sink.Solid(p.x, (baseY - 1.5 + lowTop) / 2, p.z,
+      segLen / 2, (lowTop - baseY + 1.5) / 2, midW / 2, "cityWall", ry);
     if (intact) {
-      const thx = Math.abs(cos) * segLen / 2 + Math.abs(sin) * topWidth / 2;
-      const thz = Math.abs(sin) * segLen / 2 + Math.abs(cos) * topWidth / 2;
-      sink.Solid(p.x, (lowTop + top) / 2, p.z, thx, (top - lowTop) / 2, thz, "cityWall");
+      sink.Solid(p.x, (lowTop + top) / 2, p.z,
+        segLen / 2, (top - lowTop) / 2, topWidth / 2, "cityWall", ry);
     }
   }
 
@@ -971,8 +981,7 @@ export function AddCityWall(sink, {
             `${seed}:mer${m}`, BRICK_UV_GRID),
           { x: p.x, y: top + parapet / 2, z: p.z, ry }));
         sink.Solid(p.x, top + parapet / 2,
-          p.z, Math.abs(cos) * 0.6 + Math.abs(sin) * 0.28, parapet / 2,
-          Math.abs(sin) * 0.6 + Math.abs(cos) * 0.28, "parapet");
+          p.z, 0.6, parapet / 2, 0.28, "parapet", ry);
         sink.Cover(p.x, p.z, top + parapet, sin, cos);
       }
       // innerGaps：宇墙在上城道到顶的那一段必须断开。
@@ -988,9 +997,7 @@ export function AddCityWall(sink, {
           MakeBox(length / n * 1.02, CITY_WALL.innerParapetH, CITY_WALL.innerParapetT,
             TILE_METERS.brick, `${seed}:inn${m}`, BRICK_UV_GRID),
           { x: p.x, y: top + CITY_WALL.innerParapetH / 2, z: p.z, ry }));
-        sink.Solid(p.x, top + CITY_WALL.innerParapetH / 2, p.z,
-          Math.abs(cos) * (length / n) / 2 + Math.abs(sin) * 0.24, CITY_WALL.innerParapetH / 2,
-          Math.abs(sin) * (length / n) / 2 + Math.abs(cos) * 0.24, "parapet");
+        sink.Solid(p.x, top + CITY_WALL.innerParapetH / 2, p.z, (length / n) / 2, CITY_WALL.innerParapetH / 2, 0.24, "parapet", ry);
       }
     }
   }
@@ -1028,9 +1035,7 @@ export function AddBastion(sink, {
         `${seed}:c${c}`, mat === stone ? null : BRICK_UV_GRID),
       { x: p.x, y: (y0 + y1) / 2, z: p.z, ry }));
     if (c === 0) {
-      sink.Solid(p.x, (baseY - 1 + y1) / 2, p.z,
-        Math.abs(cos) * wAt / 2 + Math.abs(sin) * depth / 2, (y1 - baseY + 1) / 2,
-        Math.abs(sin) * wAt / 2 + Math.abs(cos) * depth / 2, "cityWall");
+      sink.Solid(p.x, (baseY - 1 + y1) / 2, p.z, wAt / 2, (y1 - baseY + 1) / 2, depth / 2, "cityWall", ry);
     }
   }
   // 台顶三面垛口：马面的价值全在这三面能打出去
@@ -1056,9 +1061,7 @@ export function AddBastion(sink, {
   sink.Add(stone, PlaceGeometry(
     MakeBox(wTop, 0.24, out * 0.9, TILE_METERS.stone, `${seed}:deck`),
     { x: pTop.x, y: top - 0.12, z: pTop.z, ry }));
-  sink.Solid(pTop.x, top - 0.6, pTop.z,
-    Math.abs(cos) * wTop / 2 + Math.abs(sin) * out * 0.45, 0.6,
-    Math.abs(sin) * wTop / 2 + Math.abs(cos) * out * 0.45, "cityWall");
+  sink.Solid(pTop.x, top - 0.6, pTop.z, wTop / 2, 0.6, out * 0.45, "cityWall", ry);
 }
 
 /**
@@ -1146,9 +1149,7 @@ export function AddCityRamp(sink, {
     sink.Add(material, PlaceGeometry(
       MakeBox(thisRun * 1.02, h, width, TILE_METERS.stone, `${seed}:s${i}`),
       { x: p.x, y: yTop - h / 2, z: p.z, ry }));
-    sink.Solid(p.x, yTop - h / 2, p.z,
-      Math.abs(cos) * thisRun / 2 + Math.abs(sin) * width / 2, h / 2,
-      Math.abs(sin) * thisRun / 2 + Math.abs(cos) * width / 2, "ramp");
+    sink.Solid(p.x, yTop - h / 2, p.z, thisRun / 2, h / 2, width / 2, "ramp", ry);
     along += thisRun;
   }
   // 外侧的挡墙：没有它，人从马道上一步就掉到 11 m 底下
@@ -1363,9 +1364,8 @@ export function AddGateComplex(sink, spec) {
         }));
       sink.Cover(p.x, p.z, baseY + barbicanH + parapet, Math.sin(ry + am), Math.cos(ry + am));
     }
-    const hx = Math.abs(Math.cos(ry + am)) * chord / 2 + Math.abs(Math.sin(ry + am)) * barbicanT / 2;
-    const hz = Math.abs(Math.sin(ry + am)) * chord / 2 + Math.abs(Math.cos(ry + am)) * barbicanT / 2;
-    sink.Solid(p.x, baseY + barbicanH / 2, p.z, hx, barbicanH / 2 + 1, hz, "cityWall");
+    sink.Solid(p.x, baseY + barbicanH / 2, p.z,
+      chord / 2, barbicanH / 2 + 1, barbicanT / 2, "cityWall", ry + am);
   }
   // 外门（关门）：券洞
   {
@@ -1377,9 +1377,7 @@ export function AddGateComplex(sink, spec) {
       sink.Add("CityBrick", PlaceGeometry(
         MakeBox(oPierW, barbicanH, barbicanT, TILE_METERS.brick, `${seed}:op${s}`, BRICK_UV_GRID),
         { x: q.x, y: baseY + barbicanH / 2, z: q.z, ry }));
-      sink.Solid(q.x, baseY + barbicanH / 2, q.z,
-        Math.abs(cos) * oPierW / 2 + Math.abs(sin) * barbicanT / 2, barbicanH / 2,
-        Math.abs(sin) * oPierW / 2 + Math.abs(cos) * barbicanT / 2, "cityWall");
+      sink.Solid(q.x, baseY + barbicanH / 2, q.z, oPierW / 2, barbicanH / 2, barbicanT / 2, "cityWall", ry);
     }
     const oArch = baseY + outerH + outerW / 2;
     sink.Add("CityBrick", PlaceGeometry(
@@ -1425,9 +1423,7 @@ export function AddGateComplex(sink, spec) {
     sink.Add("CityBrick", PlaceGeometry(
       MakeBox(sidework.width, h - plinth, sidework.out + 2.0, TILE_METERS.brick, `${seed}:sw1`, BRICK_UV_GRID),
       { x: p.x, y: baseY + plinth + (h - plinth) / 2, z: p.z, ry }));
-    sink.Solid(p.x, baseY + h / 2, p.z,
-      Math.abs(cos) * sidework.width / 2 + Math.abs(sin) * (sidework.out + 2) / 2, h / 2,
-      Math.abs(sin) * sidework.width / 2 + Math.abs(cos) * (sidework.out + 2) / 2, "cityWall");
+    sink.Solid(p.x, baseY + h / 2, p.z, sidework.width / 2, h / 2, (sidework.out + 2) / 2, "cityWall", ry);
     // 射孔：三层，朝城外与朝瓮城各一组
     for (let k = 0; k < 3; k += 1) {
       const y = baseY + 3.2 + k * 2.6;
@@ -1487,14 +1483,10 @@ export function AddSandbagPlug(sink, {
     for (const s of [-1, 1]) {
       const segW = (openW - slitWidth) / 2;
       const p = L(s * (slitWidth / 2 + segW / 2), 0);
-      sink.Solid(p.x, baseY + fillH / 2, p.z,
-        Math.abs(cos) * segW / 2 + Math.abs(sin) * depth / 2, fillH / 2,
-        Math.abs(sin) * segW / 2 + Math.abs(cos) * depth / 2, "sandbagPlug");
+      sink.Solid(p.x, baseY + fillH / 2, p.z, segW / 2, fillH / 2, depth / 2, "sandbagPlug", ry);
     }
   } else {
-    sink.Solid(x, baseY + fillH / 2, z,
-      Math.abs(cos) * openW / 2 + Math.abs(sin) * depth / 2, fillH / 2,
-      Math.abs(sin) * openW / 2 + Math.abs(cos) * depth / 2, "sandbagPlug");
+    sink.Solid(x, baseY + fillH / 2, z, openW / 2, fillH / 2, depth / 2, "sandbagPlug", ry);
   }
   sink.Cover(x, z, fillH, sin, cos);
 }
@@ -1519,9 +1511,7 @@ export function AddGateTower(sink, {
   sink.Add("Ashlar", PlaceGeometry(
     MakeBox(terraceW, terraceH, terraceD, TILE_METERS.stone, `${seed}:terrace`),
     { x, y: baseY + terraceH / 2, z, ry }));
-  sink.Solid(x, baseY + terraceH / 2 - 0.6, z,
-    Math.abs(cos) * terraceW / 2 + Math.abs(sin) * terraceD / 2, terraceH / 2 + 0.6,
-    Math.abs(sin) * terraceW / 2 + Math.abs(cos) * terraceD / 2, "tower");
+  sink.Solid(x, baseY + terraceH / 2 - 0.6, z, terraceW / 2, terraceH / 2 + 0.6, terraceD / 2, "tower", ry);
   const deck = baseY + terraceH;
 
   // --- 石围栏：望柱 + 栏板 ---
@@ -1597,9 +1587,7 @@ export function AddGateTower(sink, {
     sink.Add("CityBrick", PlaceGeometry(
       MakeBox(bodyW, 1.15, 0.28, TILE_METERS.brick, `${seed}:sill${s}`, BRICK_UV_GRID),
       { x: p.x, y: floor + 0.58, z: p.z, ry }));
-    sink.Solid(p.x, floor + 0.58, p.z,
-      Math.abs(cos) * bodyW / 2 + Math.abs(sin) * 0.2, 0.58,
-      Math.abs(sin) * bodyW / 2 + Math.abs(cos) * 0.2, "tower");
+    sink.Solid(p.x, floor + 0.58, p.z, bodyW / 2, 0.58, 0.2, "tower", ry);
     for (const half of [-1, 1]) {
       const segLen = bodyD / 2 - walkGap;
       if (segLen < 0.4) continue;
@@ -1607,9 +1595,7 @@ export function AddGateTower(sink, {
       sink.Add("CityBrick", PlaceGeometry(
         MakeBox(0.28, 1.15, segLen, TILE_METERS.brick, `${seed}:sillx${s}${half}`, BRICK_UV_GRID),
         { x: q.x, y: floor + 0.58, z: q.z, ry }));
-      sink.Solid(q.x, floor + 0.58, q.z,
-        Math.abs(cos) * 0.2 + Math.abs(sin) * segLen / 2, 0.58,
-        Math.abs(sin) * 0.2 + Math.abs(cos) * segLen / 2, "tower");
+      sink.Solid(q.x, floor + 0.58, q.z, 0.2, 0.58, segLen / 2, "tower", ry);
     }
   }
   sink.Cover(x, z, floor + 1.15, sin, cos);
@@ -1816,9 +1802,7 @@ export function AddPaifang(sink, {
     sink.Add(post, PlaceGeometry(
       MakeBox(0.42, h, 0.42, TILE_METERS.stone, `${seed}:p${lx}`),
       { x: p.x, y: h / 2, z: p.z, ry }));
-    sink.Solid(p.x, h / 2, p.z,
-      Math.abs(cos) * 0.3 + Math.abs(sin) * 0.3, h / 2,
-      Math.abs(sin) * 0.3 + Math.abs(cos) * 0.3, "prop");
+    sink.Solid(p.x, h / 2, p.z, 0.3, h / 2, 0.3, "prop", ry);
     // 夹杆石
     sink.Add("CrossStone", PlaceGeometry(
       MakeBox(0.8, 1.0, 0.8, TILE_METERS.stone, `${seed}:d${lx}`),
@@ -2138,9 +2122,7 @@ export function AddZhaiWall(sink, {
       MakeBox(segLen * 1.03, h, (topWidth + baseWidth) / 2, TILE_METERS.adobe, `${seed}:s${i}`),
       { x: p.x, y: baseY + h / 2, z: p.z, ry }));
     if (h > height * 0.6) {
-      sink.Solid(p.x, baseY + h / 2, p.z,
-        Math.abs(cos) * segLen / 2 + Math.abs(sin) * baseWidth / 2, h / 2,
-        Math.abs(sin) * segLen / 2 + Math.abs(cos) * baseWidth / 2, "zhaiWall");
+      sink.Solid(p.x, baseY + h / 2, p.z, segLen / 2, h / 2, baseWidth / 2, "zhaiWall", ry);
       sink.Cover(p.x, p.z, baseY + h, sin, cos);
     }
   }

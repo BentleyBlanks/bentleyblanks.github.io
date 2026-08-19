@@ -1,0 +1,1 @@
+@dimforge/rapier3d-compat 0.20.0

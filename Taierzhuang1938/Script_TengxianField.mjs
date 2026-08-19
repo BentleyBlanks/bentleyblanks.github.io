@@ -82,6 +82,8 @@ export class TengxianField {
       groundAt: (x, z) => this.city.GroundHeight(x, z),
     });
     // 规则层要的那几张表，建完城之后从 city 上接过来（BuildSteps 末尾）
+    /** 物理世界。由装配层在建完切片之后挂上来（见 Script_Main.BuildPhysics）。 */
+    this.physics = null;
     this.colliders = [];
     this.covers = [];
     this.meshes = [];
@@ -122,6 +124,20 @@ export class TengxianField {
     // 直接沿用 city.grid 的话，城外那几千个盒子对射线、对 AI、对玩家全是隐形的
     // —— 画面上有土坎，子弹照穿。
     this.grid = this.outfield.active ? this.BuildCollisionGrid() : this.city.grid;
+  }
+
+  /**
+   * 城或城外的碰撞表被改过之后重刷本层的合并表与散列。
+   *
+   * 编辑器摆件是往 `city.colliders` 里推的，而**本层的 `colliders` 是一份
+   * concat 出来的快照**、`grid` 在有城外内容时也是本层自己那一份 ——
+   * 只刷 city 的话，摆出来的东西对 AI 找掩体、对导航位图、对编辑器拾取全是隐形的
+   *（表现：换关之后摆的院子还在，人却从墙中间走过去）。
+   */
+  RefreshColliders() {
+    this.colliders = this.city.colliders.concat(this.outfield.active ? this.outfield.colliders : []);
+    this.grid = this.outfield.active ? this.BuildCollisionGrid() : this.city.grid;
+    return this.colliders.length;
   }
 
   /** 把 colliders 刷进空间散列（与 TengxianCity.BuildCollisionGrid 同一套判据）。 */
@@ -208,8 +224,26 @@ export class TengxianField {
     return out;
   }
 
-  /** 射线 vs 静态几何（AABB slab）。沿射线走格子，只查经过的那几格。 */
-  Raycast(origin, direction, maxDist = 200) {
+  /**
+   * 射线 vs 静态几何。
+   *
+   * 有物理世界（正常情形）就走 Rapier：**盒子是带朝向的真实长方体**，
+   * 而下面那条 AABB 版只认轴对齐 —— 斜置的瓮城弧段、村墙、路基在它眼里
+   * 一律是套出来的大方块，子弹会打在空气上。
+   *
+   * options.terrain 为真时还与解析地表求交（子弹与抛掷物给 true）。
+   * **AI 视线判据一律不给** —— 那会一次性改掉整套交战节奏，是另一件事。
+   *
+   * 没有物理世界的场合只剩一个：编辑器在切片重建的空档里点了一下。
+   * 那时退回 AABB 版，结果糙一点但不会抛。
+   */
+  Raycast(origin, direction, maxDist = 200, options = null) {
+    if (this.physics) return this.physics.Raycast(origin, direction, maxDist, options);
+    return this.RaycastAabb(origin, direction, maxDist);
+  }
+
+  /** 老的 AABB 版（空间散列 + slab）。留着做没有物理世界时的兜底。 */
+  RaycastAabb(origin, direction, maxDist = 200) {
     const g = this.gridSize;
     let best = null;
     const steps = Math.ceil(maxDist / g) + 1;

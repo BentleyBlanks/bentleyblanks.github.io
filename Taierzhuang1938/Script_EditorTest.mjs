@@ -66,7 +66,14 @@ async function CanvasDrag(x, y, steps = 12) {
 // 启动（正常模式：要验齿轮按钮真的能点）
 // ===========================================================================
 // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=0&menu=0`,
+// **在城里那几关跑，不在序·界河（phase 0）跑。**
+// 界河是独立场景（JieheField）：它没有 `.city`，地皮是分块的 JieheGround_i_j，
+// 而且那张地表一格 40 m 上下 —— 地形笔刷的「网格太疏就拒绝落笔」判据在那儿
+// 恒为真，也就是说**地形编辑器在那一关本来就用不了**，那六条断言不可能过。
+// 这不是这一趟改出来的（这个文件之前停在 phase 0，第一条取证就抛
+// `T.battlefield.city is undefined`，整个冒烟根本没跑到地形那一段）。
+// 界河要不要支持地形笔刷是另一件事，别混在这里。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
 
@@ -245,7 +252,7 @@ const baseline = await page.evaluate(() => {
   return {
     camera: [T.camera.position.x, T.camera.position.y, T.camera.position.z, T.camera.fov],
     weapon: T.viewmodel.weaponId,
-    colliders: T.battlefield.city.colliders.length,
+    colliders: (T.battlefield.city || T.battlefield).colliders.length,
     ground: T.battlefield.GroundHeight(4, 4),
   };
 });
@@ -403,14 +410,14 @@ const scene = await page.evaluate(() => {
   const editor = T.editor;
   const active = editor.active;
   const out = { id: editor.ActiveId, fly: editor.flycam.Active };
-  const before = T.battlefield.city.colliders.length;
+  const before = (T.battlefield.city || T.battlefield).colliders.length;
 
   // 摆一个四合院：碰撞盒必须真的进城的格子（否则玩家能穿墙走过去）
   active.SetPalette("Compound");
   active.Place(30, 30);
   out.items = active.items.length;
   out.nodes = active.root.children.length;
-  out.colliderGain = T.battlefield.city.colliders.length - before;
+  out.colliderGain = (T.battlefield.city || T.battlefield).colliders.length - before;
   out.nearby = T.battlefield.NearbyColliders(30, 30, 12)
     .filter((b) => b.tag === "editorPlacement").length;
 
@@ -625,7 +632,7 @@ const restored = await page.evaluate(() => {
     weapon: T.viewmodel.weaponId,
     handWeapon: T.Debug.Slots().weapon,
     viewmodel: T.viewmodel.root.visible,
-    leftovers: T.battlefield.city.colliders.filter((b) => b.tag === "editorPlacement").length,
+    leftovers: (T.battlefield.city || T.battlefield).colliders.filter((b) => b.tag === "editorPlacement").length,
     ground: T.battlefield.GroundHeight(4, 4),
     worldVisible: T.battlefield.meshes.every((m) => m.visible),
     hudHidden: document.body.classList.contains("edHideHud"),

@@ -17,6 +17,7 @@
     "bake:taierzhuang1938:amb": "node Taierzhuang1938/Script_AmbBake.mjs",
     "bake:taierzhuang1938:music": "node Taierzhuang1938/Script_MusicBake.mjs",
     "test:taierzhuang1938:audio": "node Taierzhuang1938/Script_AudioTest.mjs",
+    "test:taierzhuang1938:physics": "node Taierzhuang1938/Script_PhysicsTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",
     "test:tunnelBell1942:browser": "node TunnelBell1942/Script_RenderHealthTest.mjs",
     "shots:tunnelBell1942": "node TunnelBell1942/Script_Screenshot.mjs",
