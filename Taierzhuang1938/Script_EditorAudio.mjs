@@ -174,14 +174,16 @@ export class AudioEditor {
     for (const name of Object.keys(AMBIENCE_PRESETS)) {
       Button(ambBox, name, () => { if (this.audio) this.audio.Ambience(name); });
     }
-    Note(amb, "环境床 = 风 + 按概率随机撒的远处枪炮。**不贴循环样本**，"
-      + "撒出来的每一发都是现算的，永远不重复。");
+    Note(amb, "环境床 = 2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
+      + "＋ 按概率撒的一次性音。每条床挂两条播放头，各自从素材的随机位置起播、"
+      + "互相交叉淡 —— **没有循环点**，同一条素材永远不会以同样的方式接第二次。");
+    this.ambFacts = Facts(amb);
 
     const music = Section(body, "音乐");
     const musicBox = El("div", "edBtns");
     music.appendChild(musicBox);
-    for (const cue of Object.keys(MUSIC_CUES)) {
-      Button(musicBox, cue, () => { if (this.audio) this.audio.Music(cue); });
+    for (const [cue, cfg] of Object.entries(MUSIC_CUES)) {
+      Button(musicBox, `${cue}·${cfg.label}`, () => { if (this.audio) this.audio.Music(cue); });
     }
     Button(musicBox, "停", () => { if (this.audio) this.audio.Music(null); }, { cls: "danger" });
     this.musicFacts = Facts(music);
@@ -392,10 +394,26 @@ export class AudioEditor {
     if (audio.voiceErrors && audio.voiceErrors.length) {
       f.Set("人声缺失", `${audio.voiceErrors.length} 条读不到`, "bad");
     }
+    if (this.ambFacts) {
+      const beds = audio.ambBuffers ? audio.ambBuffers.size : 0;
+      this.ambFacts.Set("当前环境", audio.ambiencePreset || "silence");
+      this.ambFacts.Set("在放的床", `${audio.ambLayers ? audio.ambLayers.length : 0} 层`
+        + (audio.ambReady ? "" : "（实录还没载到，正在用合成兜底）"),
+      audio.ambReady ? "good" : "warn");
+      this.ambFacts.Set("床素材", beds ? `${beds} 条已载入` : "载入中 / 不可用", beds ? "good" : "warn");
+      if (audio.ambErrors && audio.ambErrors.length) {
+        this.ambFacts.Set("环境缺失", `${audio.ambErrors.length} 条读不到`, "bad");
+      }
+      this.ambFacts.Set("空间", audio.space || "—");
+    }
     if (this.musicFacts) {
       this.musicFacts.Set("当前音乐", audio.musicCue || "（无）");
-      this.musicFacts.Set("当前环境", audio.ambiencePreset || "silence");
-      this.musicFacts.Set("空间", audio.space || "—");
+      // 音乐没有合成兜底 —— 载不到就是没有音乐，这一栏必须看得出来。
+      this.musicFacts.Set("曲子", audio.musicReady ? `${audio.musicBuffers.size} 段已载入`
+        : "载入中 / 不可用（没有音乐）", audio.musicReady ? "good" : "warn");
+      if (audio.musicErrors && audio.musicErrors.length) {
+        this.musicFacts.Set("音乐缺失", `${audio.musicErrors.length} 段读不到`, "bad");
+      }
     }
   }
 }

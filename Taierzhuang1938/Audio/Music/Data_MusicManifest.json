@@ -1,0 +1,31 @@
+{
+ "generated": "Script_MusicBake.mjs",
+ "sampleRate": 44100,
+ "cues": {
+  "menu": {
+   "file": "AudioMusic_Menu.mp3",
+   "seconds": 46
+  },
+  "siege": {
+   "file": "AudioMusic_Siege.mp3",
+   "seconds": 40
+  },
+  "tension": {
+   "file": "AudioMusic_Night.mp3",
+   "seconds": 52
+  },
+  "charge": {
+   "file": "AudioMusic_Charge.mp3",
+   "seconds": 38
+  },
+  "aftermath": {
+   "file": "AudioMusic_Aftermath.mp3",
+   "seconds": 50
+  }
+ },
+ "license": {
+  "name": "MiniMax music-3.0（本机 MiniMax Hub 网关生成）",
+  "terms": "生成内容，随项目使用",
+  "via": "http://127.0.0.1:8001/api/generate/music"
+ }
+}

@@ -264,6 +264,7 @@ export const PHASES = LEVELS.map((level) => {
     label: level.title,
     place: level.place,
     sky: level.sky,
+    music: level.music || null,
     minutes: level.minutes,
     brief: level.brief,
     story: level.id,                 // 叙事层直接按关卡 id 装载，不再有翻译表

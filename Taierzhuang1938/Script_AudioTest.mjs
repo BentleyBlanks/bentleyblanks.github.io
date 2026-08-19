@@ -1,4 +1,4 @@
-// 《滕县 一九三八》音频冒烟：真浏览器里把实录采样包载进去，逐条播一遍。
+// 《滕县 一九三八》音频冒烟：真浏览器里把三个实录包载进去（音效 / 环境床 / 音乐），逐条播一遍。
 //
 // 为什么单开一层：音效的失败是**静默**的 ——
 //   · 采样 404 了，LoadSfxPack 吞掉异常退回合成，画面照跑、控制台干净，
@@ -140,6 +140,149 @@ const burst = await page.evaluate(async () => {
 if (burst.manyLife - burst.oneLife < 1.0) {
   Fail(`九二式点射没排开：单发 ${burst.oneLife.toFixed(2)}s，5 发 ${burst.manyLife.toFixed(2)}s`);
 } else Ok(`九二式 5 发点射排开到 ${burst.manyLife.toFixed(2)}s（单发 ${burst.oneLife.toFixed(2)}s）`);
+
+// ---------------------------------------------------------------------------
+// 环境床与音乐
+//
+// 这两层的失败同样是**静默**的，而且比音效更难发现：环境床载不到会退回一层
+// 合成的风（听着「有点动静」，其实整套实录都没进来），音乐载不到就是没有音乐。
+// 两者都不会报错、不会掉帧、通关冒烟全绿。所以逐条断言。
+// ---------------------------------------------------------------------------
+await page.waitForFunction(
+  () => { const a = window.Taierzhuang.audio; return (a.ambReady && a.musicReady) || a.ambErrors.length > 0 || a.musicErrors.length > 0; },
+  { timeout: 60000 },
+).catch(() => {});
+
+const packs = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  return {
+    beds: a.ambBuffers.size,
+    bedNames: [...a.ambBuffers.keys()].sort(),
+    manifestBeds: a.ambManifest ? Object.keys(a.ambManifest.beds).length : 0,
+    manifestCues: a.ambManifest ? Object.keys(a.ambManifest.cues).length : 0,
+    ambCues: [...a.sampleCues].filter((n) => n.startsWith("amb.")).sort(),
+    ambErrors: a.ambErrors.slice(0, 6),
+    music: a.musicBuffers.size,
+    musicNames: [...a.musicBuffers.keys()].sort(),
+    musicErrors: a.musicErrors.slice(0, 6),
+    presets: Object.keys(mod.AMBIENCE_PRESETS),
+    musicCues: Object.keys(mod.MUSIC_CUES),
+    // 每一档环境引用到的床，必须条条都在清单里 —— 写错一个名字，那一层就
+    // 悄悄地少了，游戏照跑。
+    missing: Object.entries(mod.AMBIENCE_PRESETS).flatMap(([name, cfg]) =>
+      (cfg.layers || []).filter((l) => !a.ambBuffers.has(l.bed)).map((l) => `${name}:${l.bed}`)),
+    // 事件引用到的配方同理。
+    missingEvents: Object.entries(mod.AMBIENCE_PRESETS).flatMap(([name, cfg]) =>
+      (cfg.events || []).filter((e) => !mod.SOUND_NAMES.includes(e.name) && !a.sampleCues.has(e.name))
+        .map((e) => `${name}:${e.name}`)),
+  };
+});
+
+if (packs.ambErrors.length) Fail(`环境床载入报错 ${JSON.stringify(packs.ambErrors)}`);
+else Ok("环境床载入零报错");
+if (packs.beds !== packs.manifestBeds || !packs.beds) {
+  Fail(`床载入 ${packs.beds} / 清单 ${packs.manifestBeds}`);
+} else Ok(`${packs.beds} 条床全部载入`);
+if (packs.ambCues.length !== packs.manifestCues || !packs.manifestCues) {
+  Fail(`环境一次性音注册 ${packs.ambCues.length} / 清单 ${packs.manifestCues}`);
+} else Ok(`${packs.ambCues.length} 条环境一次性音注册成配方`);
+if (packs.missing.length) Fail(`环境档引用了不存在的床：${packs.missing.join(" ")}`);
+else Ok(`${packs.presets.length} 档环境引用的床条条都在`);
+if (packs.missingEvents.length) Fail(`环境事件引用了不存在的配方：${packs.missingEvents.join(" ")}`);
+else Ok("环境事件引用的配方条条都在");
+
+if (packs.musicErrors.length) Fail(`音乐载入报错 ${JSON.stringify(packs.musicErrors)}`);
+else Ok("音乐载入零报错");
+if (packs.music !== packs.musicCues.length) {
+  Fail(`音乐载入 ${packs.music} / cue 表 ${packs.musicCues.length}（${packs.musicNames.join(" ")}）`);
+} else Ok(`${packs.music} 段音乐全部载入`);
+
+// 逐档切一遍：每一档该起几层就起几层，而且切走之后节点必须归零 ——
+// 常驻节点泄漏在这一层最容易出：床是一直在响的，漏掉的那几个不会自己停。
+const layers = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Ambience("silence"); a.Music(null);
+  await sleep(400);
+  const base = a.liveNodes;
+  const rows = [];
+  for (const [name, cfg] of Object.entries(mod.AMBIENCE_PRESETS)) {
+    a.Ambience(name);
+    await sleep(350);
+    // 常驻开销按**播放头**数，不按 liveNodes 的差 —— 前面逐条播过 32 个音效，
+    // 尾巴还在飞，差值会算出负数来。
+    rows.push({ name, want: (cfg.layers || []).length, got: a.ambLayers.length,
+      nodes: a.ambLayers.reduce((n, l) => n + l.heads.size * 2, 0) });
+  }
+  a.Ambience("silence");
+  await sleep(400);
+  return { rows, base, after: a.liveNodes };
+});
+
+const badLayers = layers.rows.filter((r) => r.got !== r.want);
+if (badLayers.length) {
+  Fail(`环境层数不对：${badLayers.map((r) => `${r.name} ${r.got}/${r.want}`).join(" ")}`);
+} else Ok(`${layers.rows.length} 档环境层数全对（最多 ${Math.max(...layers.rows.map((r) => r.nodes))} 个常驻节点）`);
+// 床是**一直在响的**，它吃掉的预算直接从同屏枪声里扣。留个上限，别让谁随手加到八层。
+const peakNodes = Math.max(...layers.rows.map((r) => r.nodes));
+if (peakNodes > 24) Fail(`某一档环境的常驻节点到了 ${peakNodes} 个（上限 24，再多就该从枪声里抢了）`);
+else Ok(`常驻节点峰值 ${peakNodes} / 24`);
+if (layers.after > layers.base + 2) {
+  Fail(`环境切回 silence 之后还剩 ${layers.after - layers.base} 个节点没回收`);
+} else Ok("环境切走之后节点归零");
+
+// 音乐：切 cue 要能接上（旧的淡出、新的淡入），停掉之后不许留节点。
+const musicRun = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Music(null);
+  await sleep(2200);
+  const base = a.liveNodes;
+  const rows = [];
+  for (const cue of Object.keys(mod.MUSIC_CUES)) {
+    a.Music(cue);
+    await sleep(300);
+    rows.push({ cue, heads: a.musicLayer ? a.musicLayer.heads.size : 0 });
+  }
+  a.Music(null);
+  await sleep(2400);
+  return { rows, base, after: a.liveNodes, cue: a.musicCue };
+});
+
+const badMusic = musicRun.rows.filter((r) => r.heads < 1);
+if (badMusic.length) Fail(`这几段音乐没起来：${badMusic.map((r) => r.cue).join(" ")}`);
+else Ok(`${musicRun.rows.length} 段音乐都能起播（切 cue 交叉淡）`);
+if (musicRun.after > musicRun.base + 2) {
+  Fail(`音乐停掉之后还剩 ${musicRun.after - musicRun.base} 个节点没回收`);
+} else Ok("音乐停掉之后节点归零");
+
+// 床的交叉淡：放过一个完整的 seg 周期之后，播放头必须还在（说明续上了），
+// 而且不许越积越多（说明旧的回收了）。这一条是「循环有没有断」的唯一机器判据。
+const cross = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Ambience("burningStreet");
+  await sleep(500);
+  const layer = a.ambLayers.find((l) => l.seg <= 8) || a.ambLayers[0];
+  const seg = layer.seg;
+  const first = layer.heads.size;
+  await sleep((seg + 1.5) * 1000);
+  const mid = layer.heads.size;
+  await sleep((seg + 1.5) * 1000);
+  const late = layer.heads.size;
+  a.Ambience("silence");
+  await sleep(300);
+  return { seg, first, mid, late, stopped: a.ambLayers.length };
+});
+
+if (cross.mid < 1 || cross.late < 1) {
+  Fail(`床没续上：seg ${cross.seg.toFixed(1)}s，播放头 ${cross.first}→${cross.mid}→${cross.late}`);
+} else if (cross.late > 2) {
+  Fail(`床的播放头越积越多（${cross.late} 个），旧的没回收`);
+} else Ok(`床跨过两个 ${cross.seg.toFixed(1)}s 周期仍在响（播放头 ${cross.first}→${cross.mid}→${cross.late}）`);
 
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 

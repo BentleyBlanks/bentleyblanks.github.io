@@ -123,32 +123,36 @@ Check("面板开着时玩法暂停",
 //
 // 用户报的：「我暂停了以后背景里的枪声、背景音都还在」。
 // 原因是这两件事根本不在同一条通道上 —— 玩法停靠 Frame() 提前返回，
-// 而环境床是一张自己在跑的 WebAudio 节点图 + 一个 400 ms 的 setTimeout 调度器，
+// 而环境床是几条自己在跑的实录循环（LoopLayer）+ 一个 400 ms 的 setTimeout 调度器，
 // 每一轮按概率撒远处的枪炮。Frame() 返不返回它都照响。
+//
+// 数「在响的层」要同时看 ambLayers（实录床）与 ambienceNodes（实录还没载到时的
+// 合成兜底）—— 只看后者的话，包一载好这条断言就恒真了，测了个寂寞。
 // ---------------------------------------------------------------------------
 const pauseAudio = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const audio = T.audio;
   // 先离开暂停、铺一层环境床与音乐 —— 这就是「背景里的枪声」那一层
   T.editor.TogglePanel(false);
-  audio.Ambience("battle");
+  audio.Ambience("smokyDay");
   audio.Music("tension");
+  const Live = () => audio.ambLayers.length + audio.ambienceNodes.length;
   const running = {
-    nodes: audio.ambienceNodes.length,
+    nodes: Live(),
     timer: !!audio.ambienceTimer,
-    music: !!audio.musicTimer,
+    music: !!audio.musicLayer,
   };
   T.editor.TogglePanel(true);          // 暂停
   const paused = {
     flag: audio.paused,
-    nodes: audio.ambienceNodes.length,
+    nodes: Live(),
     timer: !!audio.ambienceTimer,
-    music: !!audio.musicTimer,
+    music: !!audio.musicLayer,
   };
   T.editor.TogglePanel(false);         // 继续
   const resumed = {
     flag: audio.paused,
-    nodes: audio.ambienceNodes.length,
+    nodes: Live(),
     preset: audio.ambiencePreset,
     cue: audio.musicCue,
   };
@@ -163,7 +167,7 @@ Check("暂停时环境床与音乐真的停了",
   + `调度器 ${pauseAudio.running.timer}→${pauseAudio.paused.timer}`);
 Check("继续之后按原样接回来",
   !pauseAudio.resumed.flag && pauseAudio.resumed.nodes > 0
-  && pauseAudio.resumed.preset === "battle" && pauseAudio.resumed.cue === "tension",
+  && pauseAudio.resumed.preset === "smokyDay" && pauseAudio.resumed.cue === "tension",
   `${pauseAudio.resumed.preset} / ${pauseAudio.resumed.cue}`);
 
 // ---------------------------------------------------------------------------

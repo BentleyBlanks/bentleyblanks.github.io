@@ -14,6 +14,8 @@
     "shots:tunnelLight1943": "node TunnelLight1943/Script_ShotTest.mjs",
     "bake:tunnelLight1943:sfx": "node TunnelLight1943/Script_SfxBake.mjs",
     "bake:taierzhuang1938:sfx": "node Taierzhuang1938/Script_SfxBake.mjs",
+    "bake:taierzhuang1938:amb": "node Taierzhuang1938/Script_AmbBake.mjs",
+    "bake:taierzhuang1938:music": "node Taierzhuang1938/Script_MusicBake.mjs",
     "test:taierzhuang1938:audio": "node Taierzhuang1938/Script_AudioTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",
     "test:tunnelBell1942:browser": "node TunnelBell1942/Script_RenderHealthTest.mjs",

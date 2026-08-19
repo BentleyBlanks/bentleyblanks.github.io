@@ -780,7 +780,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
-  audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
+  // 环境档与天空档同名，直接把 phase.sky 递进去。
+  // 旧写法是 night/dawn 之外一律「battle」，于是「烟尘白天」和「烧着的街」
+  // 共用一档 —— 第三关满街在烧却听不见火，就是这么丢的。
+  audio.Ambience(phase.sky);
+  // 音乐按关走。上一版整场只有结局那一下会响 —— 四个 cue 里三个从来没进过游戏。
+  audio.Music(phase.music);
 
   const loaded = story.BeginLevel(phase.id);
   state.storyObjective = phase.objectives[0] || null;

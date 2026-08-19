@@ -18,8 +18,8 @@
 //
 // ## 音效这一栏
 // 三条总线各有一个 *User 增益节点（Script_Audio.BuildGraph）。滑杆写的是它们，
-// **不是 xxxBus.gain** —— 那几个是系统自己的配平，Music() 换 cue 时会重写 musicBus，
-// duck 会把 duckGain 压下去再放回来，滑杆写在同一个参数上会被抹掉。
+// **不是 xxxBus.gain** —— 那几个是系统自己的配平（每段音乐的 level 由 LoopLayer 施加，
+// duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
 
@@ -301,8 +301,8 @@ export class AudioSettings {
     };
     Bus("sfx", "音效", "枪炮、命中、脚步、人声都走这条。压制与耳鸣不受它影响。");
     Bus("music", "音乐");
-    Bus("ambience", "环境床", "风 + 按概率随机撒的远处枪炮。觉得战场太吵先压这一条，"
-      + "它是「一直在响」的那一层。");
+    Bus("ambience", "环境床", "2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
+      + "＋ 按概率撒的一次性音。觉得战场太吵先压这一条，它是「一直在响」的那一层。");
 
     const opts = Section(body, "开关");
     const box = document.createElement("div");
@@ -316,7 +316,7 @@ export class AudioSettings {
       this.Save();
     });
     Note(opts, "「暂停时静音背景」修的是这条：暂停只让 Frame() 提前返回，"
-      + "**一点也拦不住声音** —— 环境床是一张自己在跑的节点图 + 一个 400 ms 的调度器，"
+      + "**一点也拦不住声音** —— 环境床是几条自己在跑的实录循环 + 一个 400 ms 的调度器，"
       + "玩法停了它照样每隔几百毫秒撒一发远处的枪声。", true);
 
     ButtonRow(opts, [
