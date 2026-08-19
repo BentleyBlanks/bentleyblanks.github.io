@@ -16,8 +16,10 @@
 
 import * as THREE from "three";
 import { TengxianCity } from "./Script_TengxianCity.mjs";
+import { TengxianOutfield, HasOutfield } from "./Script_TengxianOutfield.mjs";
 import { RayAabb } from "./Script_Geo.mjs";
 import { CITY, MOAT, OUTSKIRTS } from "./Data_Tengxian.mjs";
+import { WORLD } from "./Data_Battle.mjs";
 import { Clamp } from "./Script_Noise.mjs";
 
 /** 荆河河面标高（Script_TengxianCity.BuildOutskirts 里那张水面网格的 y）。 */
@@ -48,14 +50,36 @@ export class TengxianField {
    *   foci                  LOD 焦点（一般给本关的目标链坐标）
    *   zones                 本关的目标链（Data_Battle.ZONES 里挑出来的那几条）
    *   detailRadius/midRadius 同 TengxianCity
+   *   levelId               关卡 id（Data_Battle.PHASES[*].id）。**城外内容按它开关** ——
+   *                         见 Script_TengxianOutfield.OUTFIELD_SCENES 的白名单
    */
   constructor(scene, library, {
     quality = "high", seed = 19380317, bounds = null, foci = [[0, 0]],
-    zones = [], detailRadius = 100, midRadius = 210,
+    zones = [], detailRadius = 100, midRadius = 210, levelId = null,
   } = {}) {
     this.scene = scene;
+    // 一·北沙河整关都站在濠外 1.45 km 的远圈上，那张地表默认只有 5 圈
+    //（径向 200 m 一格）。给它加密到 24 圈；城内六关不传这个参数，
+    // 走默认 5 = **原行为，一个像素都不变**。
+    //
+    // 序·界河也曾经走这条路，但 24 圈仍然是 42 m 一格 —— 刻不出 38 m 的河槽。
+    // 那一关现在是独立场景（Script_JieheField），不再经过这里。
     this.city = new TengxianCity(scene, library, {
       quality, seed, foci, detailRadius, midRadius, bounds,
+      farGroundRings: HasOutfield(levelId) ? 24 : 5,
+    });
+    /**
+     * 城外的鲁南平原。
+     *
+     * Script_TengxianCity 只管城 —— 濠外它铺了一张地皮、撒了四十来棵树与几块麦地，
+     * 而且那几样是围着城心撒的（半径 360—1140 m）。序关在城北 1.5 km、
+     * 一关在城西 1.45 km，**出了那个圈世界就只剩地皮**（实测 L0 场上 3 个碰撞盒）。
+     * 这一份补的就是那片地：河道河堤、土坎、散兵胸墙、坟头、光秃乔木、
+     * 麦田田埂、村落轮廓、津浦路路基。只对白名单里的关生效。
+     */
+    this.outfield = new TengxianOutfield(scene, library, {
+      levelId, bounds, quality, seed: seed ^ 0x4A49,
+      groundAt: (x, z) => this.city.GroundHeight(x, z),
     });
     // 规则层要的那几张表，建完城之后从 city 上接过来（BuildSteps 末尾）
     this.colliders = [];
@@ -66,6 +90,8 @@ export class TengxianField {
     this.bounds = bounds
       ? { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }
       : { minX: -700, maxX: 700, minZ: -700, maxZ: 700 };
+    // 这张图铺到哪儿（撒兵兜底范围按它走 —— 每张图一份，见 Data_Battle.WORLD 的注释）
+    this.worldLimits = WORLD;
     /**
      * 目标链。**线性关卡里它不是 ER2 的占领点**：没有占领条、不会被反夺，
      * owner 恒为 nra，只是给 HUD 标记、小地图与剧本的 zone: 触发用的一串路标。
@@ -79,12 +105,41 @@ export class TengxianField {
 
   /** 分帧生成。用法与 Battlefield 一致。 */
   *BuildSteps() {
+    // 城先建（城外要用 city.GroundHeight 定标高，而那是解析式的、建不建都能问，
+    // 所以顺序上其实自由；先城后野只是为了进度条读起来是「由内向外」）
     for (const step of this.city.BuildSteps()) yield step;
-    this.colliders = this.city.colliders;
-    this.covers = this.city.covers;
-    this.meshes = this.city.meshes;
-    this.grid = this.city.grid;
+    if (this.outfield.active) {
+      for (const step of this.outfield.BuildSteps()) {
+        // 城占 0—0.9，城外挤在末尾那一段
+        yield { label: step.label, progress: 0.9 + 0.1 * step.progress };
+      }
+    }
+    this.colliders = this.city.colliders.concat(this.outfield.colliders);
+    this.covers = this.city.covers.concat(this.outfield.covers);
+    this.meshes = this.city.meshes.concat(this.outfield.meshes);
     this.gridSize = this.city.gridSize;
+    // **格子必须重建**：city.BuildCollisionGrid 只刷了城自己那张表，
+    // 直接沿用 city.grid 的话，城外那几千个盒子对射线、对 AI、对玩家全是隐形的
+    // —— 画面上有土坎，子弹照穿。
+    this.grid = this.outfield.active ? this.BuildCollisionGrid() : this.city.grid;
+  }
+
+  /** 把 colliders 刷进空间散列（与 TengxianCity.BuildCollisionGrid 同一套判据）。 */
+  BuildCollisionGrid() {
+    const grid = new Map();
+    const g = this.gridSize;
+    for (const box of this.colliders) {
+      const x0 = Math.floor(box.min[0] / g), x1 = Math.floor(box.max[0] / g);
+      const z0 = Math.floor(box.min[2] / g), z1 = Math.floor(box.max[2] / g);
+      for (let x = x0; x <= x1; x += 1) {
+        for (let z = z0; z <= z1; z += 1) {
+          const key = x * 100003 + z;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(box);
+        }
+      }
+    }
+    return grid;
   }
 
   // -------------------------------------------------------------------------
@@ -101,7 +156,7 @@ export class TengxianField {
    */
   StandHeight(x, z, fromY) {
     let h = this.GroundHeight(x, z);
-    const list = this.city.BoxesNear(x, z);
+    const list = this.BoxesNear(x, z);
     if (!list.length) return h;
     const ceiling = fromY + 0.6;
     for (const b of list) {
@@ -121,7 +176,7 @@ export class TengxianField {
   WaterDepth(x, z, y) {
     const m = Math.max(Math.abs(x), Math.abs(z));
     if (m > MOAT.innerEdge - 2 && m < MOAT.outerEdge + 2) {
-      for (const b of this.city.BoxesNear(x, z)) {
+      for (const b of this.BoxesNear(x, z)) {
         if (b.tag !== "bridge") continue;
         if (x >= b.min[0] && x <= b.max[0] && z >= b.min[2] && z <= b.max[2]) return 0;
       }
@@ -131,6 +186,12 @@ export class TengxianField {
       return Math.max(0, RIVER_SURFACE_Y - y);
     }
     return 0;
+  }
+
+  /** 本层格子里这一格的盒子（含城外那一份 —— city.BoxesNear 只认城自己的）。 */
+  BoxesNear(x, z) {
+    const g = this.gridSize;
+    return this.grid.get(Math.floor(x / g) * 100003 + Math.floor(z / g)) || [];
   }
 
   NearbyColliders(x, z, radius = 3) {
@@ -199,6 +260,7 @@ export class TengxianField {
     }
     this.meshes.length = 0;
     this.city.meshes.length = 0;
+    this.outfield.meshes.length = 0;
     this.colliders = [];
     this.covers = [];
     this.grid.clear();

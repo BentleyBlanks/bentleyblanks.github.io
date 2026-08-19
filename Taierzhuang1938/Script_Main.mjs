@@ -19,6 +19,7 @@ import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
+import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController, STANCE } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -494,14 +495,34 @@ async function Boot() {
 /** 让出一帧。真在跑就等 rAF（进度条要动），出图/自检模式直接过。 */
 const NextFrame = () => new Promise((r) => requestAnimationFrame(r));
 
+/**
+ * 这一关站在哪张图上。
+ *
+ * **不是每一关都在滕县城里。** 设计书 §2.8 那张切片表把七关分成两类：
+ *   · 序·界河 —— 「另一张外围地图，非滕县城」，独立场景（界河在城北二十公里）；
+ *   · 一—六   —— 同一座城的切片。
+ * 两边实现的是**同一套查询接口**（Script_TengxianField 的文件头列了全表），
+ * 所以规则层四个模块（Ai / Player / Navigation / Combat）一个字都不用改。
+ *
+ * 别把这张表挪进 Data_Battle：那是数据层，import 一个世界类进去会让
+ * 数据模块反向依赖渲染模块（BootTest 里那几个纯数据的自检也会被拖进 three）。
+ */
+const WORLD_CLASSES = { [JIEHE_LEVEL_ID]: JieheField };
+function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
+
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   if (battlefield) { battlefield.Dispose(); battlefield = null; }
   levelBounds = MakeLevelBounds(phase.bounds);
-  battlefield = new TengxianField(scene, library, {
+  const World = WorldClassFor(phase);
+  battlefield = new World(scene, library, {
     quality: QUALITY,
     seed: 19380317,
     bounds: phase.bounds,
+    // 城外内容按关卡 id 开关（一·北沙河那一关整关都在城外原野上，
+    // 城的生成器管不到那儿）。见 Script_TengxianOutfield.OUTFIELD_SCENES。
+    // 独立场景（界河）也按它取自己那份布景表。
+    levelId: phase.id,
     // LOD 焦点给本关的目标链：玩家会去的地方出全院落，其余按体块剪影。
     // 焦点给错的后果不是"难看"，是把 draw call 花在玩家永远不去的城角上。
     foci: phase.zones.map((z) => [z.x, z.z]),
@@ -602,8 +623,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.ijaPool = phase.ijaPool;
 
   // 远平面按关走：雾在两三百米外已经把东西吃干净了，远平面收进去只是让
-  // 视锥剔除把那些看不见的网格提前扔掉（见 Data_Battle 的 cameraFar 注释）
-  const far = phase.cameraFar ?? 620;
+  // 视锥剔除把那些看不见的网格提前扔掉（见 Data_Battle 的 cameraFar 注释）。
+  //
+  // 优先级：本关显式配置 > **本张图自己的默认值** > 620（城）。
+  // 中间那一档是拆分带来的：独立场景比城小得多，地皮只铺到 1250 m，
+  // 硬套城的 620 既浪费剔除机会，也可能把远平面推到地皮外面去（穿帮成天空）。
+  const far = phase.cameraFar ?? battlefield.cameraFar ?? 620;
   if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
   // 同屏可见 Actor 的上限也按关走（见 Data_Battle 的 visibleActors 注释）。
   // 一个 Actor 四十几个 draw call，这是最粗的一根旋钮 ——
@@ -870,9 +895,12 @@ function CountOpenDirections(x, z, y, probeM = 20, count = 8, need = 99) {
 
 function FindOpenSpot(cx, cz, radius, seed, limits = null) {
   const rnd = Mulberry32(seed);
+  // 兜底范围按**当前这张图**走，不是按滕县城那一张：
+  // 界河是独立场景（地皮只铺到 ±1250），照城的 ±1650 撒会撒到地皮外面去。
+  const world = (battlefield && battlefield.worldLimits) || WORLD;
   const lo = limits || {
-    minX: WORLD.minX + 6, maxX: WORLD.maxX - 6,
-    minZ: WORLD.minZ + 6, maxZ: WORLD.maxZ - 6,
+    minX: world.minX + 6, maxX: world.maxX - 6,
+    minZ: world.minZ + 6, maxZ: world.maxZ - 6,
   };
   // 通视探测有成本（每个候选点八条射线），所以只给通过"站得下"的候选点做，
   // 并且最多探 16 个：探不到三方位全通的就取探过的里面最好的那个。

@@ -319,6 +319,18 @@ const chain = await page.evaluate(async () => {
   }
   const enemy = T.ai.soldiers.find((s2) => s2.alive && s2.side === "ija");
   if (enemy) enemy.position.set(target.x + 2, T.battlefield.GroundHeight(target.x + 2, target.z), target.z);
+  // 隔离**两侧**，不只是日方。
+  //
+  // 事故（城外内容那一轮抓到的）：留在圈里当对照的那个日军，站在玩家两米外、
+  // 站在自己班中间 —— 一秒之内被中方两枪打死（实测 78 + 74 伤害，torso），
+  // 圈里于是没有敌人了，目标链照常推进。断言挂掉，但挂掉的原因是**友军枪法**，
+  // 不是「圈里有敌人时不推进」这条规则坏了。
+  //
+  // 为什么以前没挂：撒兵位置来自 FindOpenSpot + HasLineOfSight，
+  // 而这两个查询的结果一变，外层 rnd 的调用次数就变，整场撒兵重排。
+  // 也就是说**任何关卡内容改动都能把这条断言掷成另一面** —— 它测的是运气。
+  // 把对照的那个人钉成打不死的，断言就只剩它本来要验的那一条。
+  if (enemy) enemy.health = 1e9;
   T.player.Spawn(target.x, target.z, 0);
   // 补兵会把人又撒回来，这一节里先关掉（它是每 3 秒一次的定时器）
   T.state.spawnAccumulator = -1e6;

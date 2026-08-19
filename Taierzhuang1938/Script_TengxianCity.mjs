@@ -279,6 +279,7 @@ export class TengxianCity {
   constructor(scene, library, {
     quality = "high", seed = 19380317, foci = [[0, 0]],
     detailRadius = 100, midRadius = 210, bounds = null, breaches = true,
+    farGroundRings = 5,
   } = {}) {
     this.scene = scene;
     this.library = library;
@@ -289,6 +290,21 @@ export class TengxianCity {
     this.midRadius = midRadius;
     this.bounds = bounds;
     this.wantBreaches = breaches;
+    /**
+     * 濠外原野那张网格在 700—1700 m 之间分几圈。
+     *
+     * 默认 5 = **原行为，城内六关一个像素都不变**（那六关的切片最远只到 700 m，
+     * 远圈只是天边的一层皮，5 圈够了）。
+     * 一·北沙河（x≈-1450）整关都站在这段远圈上，5 圈意味着径向 200 m 一格：
+     * 那张地表是 5 条 200 m 宽的巨型三角带，地面起伏被彻底混叠掉，
+     * 贴在上面的麦田块会被网格插值误差吃进去半块。那一关传 24（径向 ~42 m），
+     * 代价是全场多约 1.8 万三角。
+     *
+     * 序·界河曾经也走这条路，但 42 m 一格仍然刻不出 38 m 宽的河槽 ——
+     * 那一关已经拆成独立场景（Script_JieheField，自己铺地、河槽一带 3.2 m 一格），
+     * 不再经过这里。**这个参数现在只有 L1 用。**
+     */
+    this.farGroundRings = Math.max(1, Math.round(farGroundRings));
 
     this.sink = new BuildSink();          // 近景：投阴影
     this.farSink = new BuildSink();       // 远景剪影：不投阴影（省掉阴影 pass 的那一份三角形）
@@ -469,7 +485,7 @@ export class TengxianCity {
   BuildOuterGround() {
     const perSide = 108;
     const near = 700, far = 1700;
-    const radialNear = 52, radialFar = 5;
+    const radialNear = 52, radialFar = this.farGroundRings;
     const s0 = CITY.platformEdge;
     const geometries = [];
     for (let side = 0; side < 4; side += 1) {

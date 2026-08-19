@@ -33,6 +33,11 @@ export const TOWN = {
 /**
  * 世界范围：整座城 + 城外原野。Script_TengxianCity 的城外地面铺到 1700 m，
  * 超出这个圈就没有地皮了，所以任何关卡切片都不许越过它。
+ *
+ * **这是「滕县城」那张图的范围，不是全游戏的。** 序·界河是另一张图
+ *（Script_JieheField，地皮 ±1250 / groundLimit 1250），它自己带一份
+ * JIEHE_WORLD。运行时想知道"现在这张图铺到哪儿"要读 battlefield.worldLimits，
+ * 别直接拿这一份当全局真相 —— 那正是「L0 是一张空地皮」那一版的思路。
  */
 export const WORLD = {
   minX: -1650, maxX: 1650, minZ: -1650, maxZ: 1650,
