@@ -35,6 +35,8 @@ import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
+import { MainMenu, Progress } from "./Script_Menu.mjs";
+import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
@@ -76,10 +78,27 @@ const SHOT = params.get("shot");                 // 出图模式：不进指针�
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
 const SHOT_ADS = !!(SHOT && params.get("ads"));
 const SHOT_FIRE = !!(SHOT && params.get("fire"));
-const START_PHASE = Math.max(0, Math.min(PHASES.length - 1, parseInt(params.get("phase") || "0", 10)));
+/**
+ * 主菜单。**出图与 ?menu=0 下不建** —— 那两种模式要的是「进页面就是这一关」：
+ * 三个冒烟脚本（PlayTest / EditorTest / VoiceTest）点的都是 #bootStart 那颗按钮，
+ * 出图脚本连点都不点，直接 StepFrames。菜单只服务真人。
+ */
+const MENU_ON = !SHOT && params.get("menu") !== "0";
+/**
+ * 开机建哪一片切片。
+ * 给了 ?phase= 就听它的（出图、冒烟、调机位都靠这条）；
+ * 没给且要进菜单，就建 MENU_SCENE.slice —— 菜单背后那片活场景是城墙那一关，
+ * 城墙是这座城的招牌，序关的界河是二十公里外的空地，当不了门面。
+ */
+const PHASE_PARAM = params.get("phase");
+const MENU_SLICE = Math.max(0, PHASES.findIndex((p) => p.id === MENU_SCENE.slice));
+const START_PHASE = PHASE_PARAM !== null
+  ? Math.max(0, Math.min(PHASES.length - 1, parseInt(PHASE_PARAM, 10)))
+  : (MENU_ON ? MENU_SLICE : 0);
 
 const canvas = document.getElementById("view");
 const hudRoot = document.getElementById("hud");
+const menuRoot = document.getElementById("menu");
 const boot = document.getElementById("boot");
 const bootBar = document.querySelector("#bootBar i");
 const bootStep = document.getElementById("bootStep");
@@ -151,6 +170,13 @@ const audio = new AudioEngine({ enabled: !SHOT });
 const state = {
   ready: false,
   running: false,
+  // 菜单态：主菜单开着（开机那一次或从暂停回来）。running 与它互斥 ——
+  // 菜单在跑运镜时玩法必须整个停摆，否则玩家会在看菜单的时候被打死。
+  menu: false,
+  // 现在**建好的**是哪一关的切片。与 phaseIndex 的区别只有一次性但要命：
+  // 菜单背后那片场景可能是第四关，而玩家按「开始」要进的是第一关 ——
+  // 这两个数不相等时必须重建切片，相等时不许重建（白等十几秒）。
+  builtPhase: -1,
   elapsed: 0,
   frame: 0,
   phaseIndex: START_PHASE,
@@ -214,6 +240,8 @@ let cutscene = null;
 // 编辑器套件（齿轮按钮 + 五个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
 // 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
 let editor = null;
+// 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
+let menu = null;
 // Script_Ai 的全局人像预算，给"这一关没有自己的预算"时回落用。
 // Boot 里从 AiDirector 实例上取真值 —— 不再 import 一次那个常量，只留一个真相。
 let defaultVisibleActors = 13;
@@ -344,6 +372,7 @@ async function Boot() {
   state.ready = true;
   bootStart.disabled = false;
   bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
+
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASES.map((p) => p.minutes);
@@ -541,6 +570,40 @@ async function Boot() {
       && document.getElementById("edRoot").classList.contains("off"),
   });
 
+  // --- 主菜单 --------------------------------------------------------------
+  // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
+  // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
+  if (MENU_ON && menuRoot) {
+    menu = new MainMenu({
+      root: menuRoot, camera, phases: PHASES,
+      SliceIndex: () => state.builtPhase,
+      GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
+      Unlock: () => audio.Unlock(),
+      Play: (index, opts) => StartLevel(index, opts),
+      Resume: () => ResumeFromPause(),
+      Crowd: (anchor) => PlaceMenuGarrison(anchor),
+    });
+    window.Taierzhuang.menu = menu;
+    // 菜单的取证口：冒烟不点像素，直接从这里读状态、驱动动作
+    window.Taierzhuang.Debug.Menu = () => ({
+      open: menu.open, live: menu.live, mode: menu.mode,
+      items: menu.items.map((i) => i.id),
+      item: menu.items[menu.itemIndex]?.id || null,
+      selected: menu.selected,
+      shot: menu.shots[menu.shotIndex]?.id || null,
+      shotCount: menu.shots.length,
+      slice: state.builtPhase,
+      camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z, fov: camera.fov },
+      progress: Progress.Read(),
+    });
+    window.Taierzhuang.Debug.MenuAct = (id) => menu.Activate(id);
+    window.Taierzhuang.Debug.MenuShow = (mode) => menu.Show(mode);
+    window.Taierzhuang.Debug.MenuPlay = (index, opts) => menu.Play(index, opts);
+    window.Taierzhuang.Debug.Pause = () => PauseGame();
+    window.Taierzhuang.Debug.ResetProgress = () => { Progress.Reset(); };
+    OpenMenu();
+  }
+
   if (SHOT) StartRun();
 }
 
@@ -710,6 +773,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     boot.classList.add("gone");
     bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
   }
+  // 这一片切片是哪一关的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
+  state.builtPhase = state.phaseIndex;
   state.ready = true;
   state.advancing = false;
   return state.phaseIndex;
@@ -725,13 +790,15 @@ async function RunCutscene(id) {
   ReleasePointerLock();
   const result = await cutscene.Play(id, { poolOut: state.nraPool });
   state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
-  if (state.running && !SHOT) canvas.requestPointerLock?.();
+  if (state.running) RequestPointerLock();
   return result;
 }
 
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
   if (state.advancing) return state.phaseIndex;
+  // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
+  Progress.MarkCleared(PHASES[state.phaseIndex].id, state.phaseIndex);
   const phase = PHASES[state.phaseIndex];
   const cutscenes = opts.cutscenes ?? !SHOT;
   state.advancing = true;
@@ -1180,15 +1247,227 @@ const input = {
 };
 const keys = new Set();
 
+/**
+ * 抢指针锁。**必须吞掉 NotAllowedError**：用户手势的有效期只有几秒，而
+ * 「点开始 -> 播三十八秒关前过场 -> 进游戏」这条路上，过场播完时手势早过期了，
+ * 浏览器会把 requestPointerLock() 的 promise reject 掉。
+ *
+ * 抓不到锁本身不是事故 —— 键位路由里那条「没拿到锁的第一次点击只用来抢锁」会接住；
+ * 但不吞的话控制台会留一条 unhandled rejection，而开机冒烟把 console.error 当事故。
+ * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
+ */
+function RequestPointerLock() {
+  if (SHOT) return;
+  const nudge = () => hud?.Hint("点一下画面，接管镜头", 3.0);
+  try {
+    const pending = canvas.requestPointerLock?.();
+    if (pending && typeof pending.catch === "function") pending.catch(nudge);
+  } catch (error) {
+    nudge();
+  }
+}
+
 function StartRun() {
   boot.classList.add("gone");
+  state.menu = false;
   state.running = true;
   if (!SHOT) {
-    canvas.requestPointerLock?.();
+    RequestPointerLock();
     audio.Unlock();
   }
 }
 bootStart.addEventListener("click", StartRun);
+
+// ---------------------------------------------------------------------------
+// 主菜单：开机进这里，游戏中按 Esc 也回这里
+// ---------------------------------------------------------------------------
+/**
+ * 打开主菜单（开机那一次）。
+ *
+ * 菜单背后是**活的战场**（对标 Easy Red 2），所以要做三件事，缺一样都会露馅：
+ *   1. 玩法停摆（state.running = false）—— 相机被菜单接管，玩家的身体不许再动；
+ *   2. HUD 与手里那支枪藏起来 —— 枪是相机的子物体，不藏的话运镜里会有一支
+ *      三八式横在画面前面；
+ *   3. 把兵撤掉 —— 撒兵是按玩家位置撒的，而菜单机位在两百米外的城墙上，
+ *      留着他们既是白烧 draw call，又会在镜头前打起来（打起来就会死人，
+ *      而兵员池是关卡状态，玩家还没按开始就被消耗掉是说不通的）。
+ */
+function OpenMenu() {
+  if (!menu) return;
+  state.running = false;
+  state.menu = true;
+  ReleasePointerLock();
+  // 主菜单背后是活场景，环境床照响（ER2 的菜单也是有声音的）。
+  // 「暂停 -> 回主菜单」这条路要显式解一次暂停，不解的话菜单是哑的。
+  audio.SetPaused(false);
+  hudRoot.style.display = "none";
+  if (viewmodel) viewmodel.root.visible = false;
+  boot.classList.add("gone");
+  if (ai) ai.Dispose();
+  // 齿轮按钮藏起来：菜单是给玩家看的，编辑器是给我们自己用的
+  document.getElementById("edRoot")?.classList.add("off");
+  menu.Open();
+}
+
+/** 收起菜单，把 HUD、枪、齿轮还回来。 */
+function CloseMenu() {
+  if (!menu) return;
+  menu.Close();
+  state.menu = false;
+  hudRoot.style.display = "";
+  if (viewmodel) viewmodel.root.visible = true;
+  if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
+}
+
+/**
+ * 从菜单进一关。
+ *
+ * **切片相同就不重建**：菜单背后那片场景本来就是一关的切片，
+ * 玩家在选章里点的正好是它时，重建一遍要十几秒而画面一模一样。
+ * 相同时走 EnterLevel 的 initial 分支 —— 那一支只重置关卡状态（剧本、兵、出生点），
+ * 不碰几何。
+ */
+async function StartLevel(index, { cutscenes = false } = {}) {
+  if (!menu || state.advancing) return state.phaseIndex;
+  const target = Clamp(index, 0, PHASES.length - 1);
+  CloseMenu();
+  // 上一局的残留：结算层与阵亡卡片都是不透明的全屏层，不收掉的话新一关
+  // 顶着它们跑，玩家看到的是「点了开始但进不去游戏」。
+  state.outcome = null;
+  state.deathTimer = 0;
+  state.pendingRespawn = false;
+  state.fallen.length = 0;
+  hud.HideEpilogue();
+  hud.HideDeathCard();
+  const sameSlice = state.builtPhase === target;
+  await EnterLevel(target, { initial: sameSlice, cutscenes });
+  StartRun();
+  return target;
+}
+
+/**
+ * 菜单场景里那几个站着的守军。
+ *
+ * ER2 的主菜单背后是有人的 —— 空城比空镜更假。但**一个日军都不放**：
+ * 有敌人就会开打，开打就会死人，而兵员池是关卡状态（见 OpenMenu 第三条）。
+ * 只有守军时 AI 找不到目标，Think 走的是「守住 holdZone」那一支，
+ * 表现就是几个人在原地小幅走动、换姿势 —— 正是菜单要的那种「活着但没在打」。
+ *
+ * 换机位时整批瞬移过去（那一下正好被黑场盖住），不重建 Actor：
+ * 一个 Actor 三十七个 draw call，每十六秒拆建五个纯属白烧。
+ *
+ * @param {object|null} anchor 菜单给的落点 {x, z, r, faceX, faceZ, count}；null = 这一机位不摆人
+ */
+function PlaceMenuGarrison(anchor) {
+  if (!ai || !battlefield) return;
+  if (!anchor || !anchor.count) { ai.Dispose(); return; }
+  while (ai.soldiers.length > anchor.count) ai.Remove(ai.soldiers[ai.soldiers.length - 1]);
+
+  const cam = new THREE.Vector3(anchor.from[0], anchor.from[1], anchor.from[2]);
+  const look = new THREE.Vector3(anchor.look[0], anchor.look[1], anchor.look[2]);
+  let fx = look.x - cam.x;
+  let fz = look.z - cam.z;
+  const span = Math.hypot(fx, fz) || 1;
+  fx /= span; fz /= span;
+  const yaw = Math.atan2(-fx, -fz);          // Actor 正面是局部 -Z：让他们背对镜头看向战场
+  const rnd = Mulberry32(6151 + state.builtPhase * 31);
+  const dir = new THREE.Vector3();
+  const placed = [];
+
+  /**
+   * 「相机看得见这个点吗」。这一条是整段的核心 —— 光按比例撒人的那一版
+   * 在东门机位上把五个人全撒进了关厢院落的迷宫，画面上一个人都没有。
+   * 判据：从机位往这个人的胸口打一条射线，第一次撞到东西的距离要比人还远。
+   */
+  const Visible = (x, y, z) => {
+    dir.set(x - cam.x, y + 1.1 - cam.y, z - cam.z);
+    const dist = dir.length();
+    if (dist < 6) return false;               // 贴在镜头上的人只会糊成一团
+    dir.divideScalar(dist);
+    const hit = battlefield.Raycast(cam, dir, dist);
+    return !hit || hit.t > dist - 1.2;
+  };
+
+  for (let i = 0; i < anchor.count; i += 1) {
+    let best = null;
+    for (let attempt = 0; attempt < 26; attempt += 1) {
+      const t = anchor.near + (anchor.far - anchor.near) * rnd();
+      const lateral = (rnd() - 0.5) * 2 * anchor.spread;
+      // 沿连线取一点，再往侧向推开（侧向 = 连线的法线）
+      const x = cam.x + (look.x - cam.x) * t - fz * lateral;
+      const z = cam.z + (look.z - cam.z) * t + fx * lateral;
+      const spot = FindOpenSpot(x, z, 5, 977 + i * 131 + attempt * 17, levelBounds);
+      const y = battlefield.GroundHeight(spot.x, spot.z);
+      // 别几个人叠在一起
+      let crowded = false;
+      for (const p of placed) if (Math.hypot(p.x - spot.x, p.z - spot.z) < 2.4) { crowded = true; break; }
+      if (crowded) continue;
+      if (!best) best = { x: spot.x, y, z: spot.z };
+      if (Visible(spot.x, y, spot.z)) { best = { x: spot.x, y, z: spot.z }; break; }
+    }
+    if (!best) continue;
+    placed.push(best);
+    const soldier = ai.soldiers[i] || ai.Spawn("nra", best.x, best.z, {});
+    if (!soldier) continue;
+    soldier.position.set(best.x, best.y, best.z);
+    soldier.goal.set(best.x, 0, best.z);
+    // 守位圈给小一点：人只在这一小圈里挪动，不会自己走出画面
+    soldier.holdZone = { id: "MenuStage", x: best.x, z: best.z, radius: 5 };
+    soldier.yaw = yaw;
+    if (soldier.actor) {
+      soldier.actor.root.position.copy(soldier.position);
+      soldier.actor.root.rotation.y = yaw;
+    }
+  }
+}
+
+/** 游戏中按 Esc：挂暂停。世界冻在原地（Frame 不跑），相机不动。 */
+function PauseGame() {
+  if (!menu || !state.running || state.cutscene || state.advancing) return false;
+  state.running = false;
+  ReleasePointerLock();
+  // 背景枪声也得停。玩法停靠 Frame() 提前返回，而环境床与音乐是一张自己在跑的
+  // WebAudio 节点图 —— Frame() 返不返回它们都照响（见 Script_Audio.SetPaused）。
+  audio.SetPaused(true);
+  // HUD 收起来：暂停屏是给人读菜单的，顶着阶段条、简报、小地图和阵亡卡片读不清。
+  // ER2 的暂停也是「冻住的画面 + 一层压暗 + 一列字」，HUD 不留。
+  hudRoot.style.display = "none";
+  menu.OpenPause();
+  return true;
+}
+
+/** 暂停里的「继续」。 */
+function ResumeFromPause() {
+  if (!menu) return;
+  menu.Close();
+  state.menu = false;
+  state.running = true;
+  hudRoot.style.display = "";
+  audio.SetPaused(false);
+  RequestPointerLock();
+}
+
+/**
+ * 菜单每帧：只推运镜、浮尘与画面。
+ * **AI 与玩法一律不推** —— 见 OpenMenu 的第三条。
+ */
+function MenuFrame(dt, render = true) {
+  state.elapsed += dt;
+  state.frame += 1;
+  menu.Update(dt);
+  // 场上那几个守军：只有守军，所以 AI 找不到目标，跑的是「守住 holdZone」那一支。
+  // 不推它的话人是几尊定在地上的雕像 —— 比没有人还假。
+  if (ai && ai.soldiers.length) ai.Update(dt, camera);
+  // 浮尘与烟柱照跑：菜单要的就是「这片场景是活的」，静止的烟等于一张背景图
+  if (vfx) vfx.Update(dt, camera, state.elapsed);
+  if (sky) sky.Update(state.elapsed);
+  if (lights) {
+    lights.Update(dt, state.elapsed);
+    camera.getWorldDirection(_forward);
+    lights.UpdateShadowFrustum(camera.position, _forward);
+  }
+  if (render) RenderScene(dt);
+}
 
 // 键位全部走 Script_Input 的那张表。装配层这里只剩两件事：
 // 把动作名翻译成函数调用（OnAction），以及每帧读一次连续量（router.Read）。
@@ -2028,9 +2307,17 @@ function EndBattle(outcome) {
   audio.Music(outcome === "breakout" ? "aftermath" : null);
 }
 
-/** 出图/测试用：推进固定帧数（不依赖真实时间，画面可复现）。 */
+/**
+ * 出图/测试用：推进固定帧数（不依赖真实时间，画面可复现）。
+ *
+ * 菜单开着时推的是**菜单帧**，不是玩法帧 —— 推玩法帧会在菜单背后真的打起来，
+ * 而那正是 OpenMenu 花力气避免的事（见那里第三条）。
+ */
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
-  for (let i = 0; i < count; i += 1) Frame(dt, render);
+  for (let i = 0; i < count; i += 1) {
+    if (state.menu && menu && menu.live) MenuFrame(dt, render);
+    else Frame(dt, render);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2067,6 +2354,9 @@ document.addEventListener("keydown", (event) => {
   // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出
   if (state.cutscene) return;
   ReleasePointerLock();
+  // 有菜单时 Esc 是「暂停」：ER2 也是这个键。菜单自己那份 Esc 管的是面板返回，
+  // 两边不会打架 —— 它只在 menu.open 时响应，这里只在游戏中响应。
+  if (menu && state.running) PauseGame();
 });
 
 let last = performance.now();
@@ -2074,7 +2364,15 @@ function Loop(now) {
   requestAnimationFrame(Loop);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!state.running) return;
+  // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
+  // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
+  if (state.menu && menu && menu.live && state.ready) { MenuFrame(dt); return; }
+  // 过场没有自己的帧驱动，全靠 Frame() 里那条 cutscene 分支推。
+  // 而从主菜单进关时 state.running 还是 false（要等过场播完才 StartRun）——
+  // 不放行的话「开始」会卡死在关前过场里：过场在等一个永远不来的帧，
+  // 而 StartRun 在等过场结束。关卡之间那条路之所以没暴露这个坑，
+  // 是因为换关时玩家还在游戏里，state.running 一直是 true。
+  if (!state.running && !(cutscene && cutscene.Playing)) return;
   Frame(dt);
 }
 requestAnimationFrame(Loop);

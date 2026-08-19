@@ -1685,7 +1685,7 @@ export class AudioEngine {
     if (!this.ctx || this.disposed || !this.voicesReady || this.voiceMute) return null;
     const now = this.ctx.currentTime;
     if (!priority && now - this.lastBarkAt < 0.55) return null;
-    // 同类闸的键带上阵营：中国兵刚喊过「鬼子上来咯」，不该把日本兵的
+    // 同类闸的键带上阵营：中国兵刚喊过「鬼子摸拢来了」，不该把日本兵的
     // 「てきだ！」一起闸掉 —— 那是两个人在对喊，不是同一句复读。
     const kindKey = side + ":" + kind;
     if (now - (this.lastBarkKindAt.get(kindKey) || -99) < 4.5) return null;
@@ -1699,8 +1699,8 @@ export class AudioEngine {
       if (key) { if (e.key === key) pool.push(e); continue; }
       // event 句**有前提条件**，不许被同类随机抽中 —— 只能由知道前提的调用方用 key 点名。
       // 滕县攻城日军无战车（34 辆九四式全配属给打临城的第 63 联队，见 docs/Data_TengxianCity.md），
-      // 一个兵随机喊出「战车！战车来咯！」就是穿帮；同理，手里还有子弹的兵不该喊
-      // 「手榴弹莫得咯」，全班有枪时不该被喊「莫得枪的，跟到走」。
+      // 一个兵随机喊出「战车！战车碾拢来了！」就是穿帮；同理，手里还有子弹的兵不该喊
+      // 「手榴弹！莫得了！」，全班有枪时不该被喊「莫得枪的，跟到走」。
       // 这道闸比在每个关卡里挨个屏蔽可靠：漏配的默认行为是**不喊**，而不是乱喊。
       if (e.event) continue;
       if (e.kind === kind) pool.push(e);

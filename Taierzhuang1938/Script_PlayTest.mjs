@@ -80,7 +80,8 @@ Check("调试口齐全", api.hasStory && api.hasCombat && api.fns.length === 8,
 // 所以这一节必须走真键盘：正常模式进页面 -> 点「进城」拿指针锁 -> page.keyboard.down。
 // ===========================================================================
 {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=low&scale=small`,
+  // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
   await page.click("#bootStart");
@@ -1740,7 +1741,8 @@ Check("模型读不到时退回程序化方块几何，且不抛",
 // ===========================================================================
 Stage("14 指针锁");
 {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small`,
+  // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined && window.Taierzhuang.state.ready,
     { timeout: 180000 });

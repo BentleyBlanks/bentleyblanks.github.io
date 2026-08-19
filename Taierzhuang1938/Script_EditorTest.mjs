@@ -65,7 +65,8 @@ async function CanvasDrag(x, y, steps = 12) {
 // ===========================================================================
 // 启动（正常模式：要验齿轮按钮真的能点）
 // ===========================================================================
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=0`,
+// menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=0&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
 
@@ -298,6 +299,10 @@ const weapon = await page.evaluate(() => {
   window.Taierzhuang.StepFrames(10);
   out.fp = window.Taierzhuang.viewmodel.weaponId === "Zb26";
   out.fpVisible = window.Taierzhuang.viewmodel.root.visible;
+  // 第一人称这一档必须换回正片的 55°。摄影棚默认的 42°（85 mm 等效，为的是
+  // 看模型不畸变）比它窄三成，而视图模型的位姿全是按 55° 摆的 —— 用 42° 看，
+  // 枪整个掉到画框外，这一栏只剩地面。**「可见」不等于「看得见枪」。**
+  out.fpFov = window.Taierzhuang.camera.fov;
   active.Trigger("fire");
   active.Trigger("reload");
   window.Taierzhuang.StepFrames(20);
@@ -307,10 +312,14 @@ const weapon = await page.evaluate(() => {
   active.SetWeapon("Type89Tank");
   window.Taierzhuang.StepFrames(10);
   out.tankOk = active.benchGroup === null;
+  out.benchFov = window.Taierzhuang.camera.fov;
   return out;
 });
 Check("枪械编辑器三视图", weapon.id === "weapon" && weapon.bench && weapon.held && weapon.fp,
   `台架网格=${weapon.benchMeshes} fp可见=${weapon.fpVisible}`);
+Check("第一人称换回正片镜头、台架换回 85 mm",
+  weapon.fpFov === 55 && weapon.benchFov === 42,
+  `fp=${weapon.fpFov}° 台架=${weapon.benchFov}°`);
 Check("车辆条目不建台架也不崩", weapon.tankOk);
 
 // ---------------------------------------------------------------------------

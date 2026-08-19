@@ -77,11 +77,29 @@ def main():
         built = builder()
         root = built[0] if isinstance(built, tuple) else built
         path = os.path.join(out, name + ".tzm.json")
-        tris, blocks, size = WriteTzm(root, path, name, notes)
+        tris, blocks, size, audit = WriteTzm(root, path, name, notes)
         limit = BUDGET[category]
         ok = tris <= limit
         if not ok:
             failures.append("%s 三角超预算：%d > %d" % (name, tris, limit))
+
+        # 实体性自检。**武器是硬失败**：玩家会把枪怼到脸上看，一处飘着的零件
+        # 就是一处穿帮；人物与建筑构件只警告（背带、帽徽这类本来就是贴着的皮，
+        # 包围盒判据对它们会误报，见 TzmCore.AuditSolid 的抬头注释）。
+        for label, near, gap in audit["strays"]:
+            line = "%s 零件飘着：%s 离 %s 还差 %.1f mm" % (name, label, near, gap * 1000.0)
+            if category == "weapon":
+                ok = False
+                failures.append(line)
+            else:
+                print("warn " + line)
+        for a, b, gap in audit["coplanar"]:
+            line = "%s 面贴面（会闪）：%s / %s 只重叠 %.2f mm" % (name, a, b, gap * 1000.0)
+            if category == "weapon":
+                ok = False
+                failures.append(line)
+            else:
+                print("warn " + line)
         joints = 0
         mounts = []
         with open(path, "r", encoding="utf-8") as handle:

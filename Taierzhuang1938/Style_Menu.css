@@ -1,0 +1,256 @@
+/* 《滕县 一九三八》主菜单样式。
+   与 Style_Game.css 分开的理由：HUD 是「战斗中的克制」，菜单是「战斗之前的一页纸」——
+   两套东西唯一必须共用的是颜色与字距（:root 在 Style_Game.css 里定义，这里只引用）。
+
+   版式抄 Easy Red 2 的骨架：活场景打底、左侧一列字、右下角一行说明、
+   上下各压一道渐变让字浮得起来。**不抄**它的横排大按钮与蓝色高亮色。 */
+
+#menu {
+  position: fixed; inset: 0; z-index: 30;
+  pointer-events: none;                        /* 只有能点的东西自己开 auto */
+  color: var(--paper, #e6dfcd);
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  -webkit-font-smoothing: antialiased;
+}
+#menu.off { display: none; }
+
+/* 上下两道渐变：ER2 那一屏的字之所以在亮天空上还读得清，靠的就是这个 */
+.mnVignette {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to right, rgba(6,6,8,0.78) 0%, rgba(6,6,8,0.34) 34%, rgba(6,6,8,0) 62%),
+    linear-gradient(to bottom, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 26%, rgba(6,6,8,0) 62%, rgba(6,6,8,0.72) 100%);
+}
+/* 切机位的黑场。opacity 由 Script_Menu 每帧写 */
+.mnFade {
+  position: absolute; inset: 0; background: #05050a; opacity: 0;
+}
+/* 暂停态：整屏压暗一档，且不放黑场 */
+#menu.pause .mnVignette { background: rgba(6, 6, 8, 0.62); }
+#menu.pause .mnTitle .mnTitleLines { display: none; }
+/* 机位说明是运镜的字幕。暂停里相机是玩家自己的，留着就是一行对不上的字 */
+#menu.pause .mnShotNote { display: none; }
+
+/* --- 标题 ---------------------------------------------------------------- */
+.mnTitle {
+  position: absolute; left: 7%; top: 15%;
+  max-width: 44%;
+}
+.mnTitleMain {
+  font-size: 46px; letter-spacing: 0.34em; text-indent: 0.34em; font-weight: 500;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.8);
+}
+.mnTitleSub {
+  margin-top: 12px; font-size: 12.5px; letter-spacing: 0.18em;
+  color: var(--dim, rgba(230,223,205,0.62));
+}
+.mnTitleLines { margin-top: 26px; }
+.mnTitleLine {
+  font-size: 14px; line-height: 2.0; color: rgba(230, 223, 205, 0.72);
+  letter-spacing: 0.04em;
+}
+
+/* --- 主列表 -------------------------------------------------------------- */
+.mnList {
+  position: absolute; left: 7%; bottom: 16%;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+}
+.mnItem {
+  pointer-events: auto; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  border: 0; background: transparent; color: rgba(230, 223, 205, 0.78);
+  font: inherit; font-size: 21px; letter-spacing: 0.22em;
+  padding: 7px 4px; text-align: left;
+  transition: color 0.16s linear, transform 0.16s ease;
+}
+.mnItemBar {
+  display: block; width: 0; height: 1px; background: var(--warn, #e0b062);
+  transition: width 0.18s ease;
+}
+.mnItem.on { color: var(--paper, #e6dfcd); transform: translateX(4px); }
+.mnItem.on .mnItemBar { width: 26px; }
+.mnItemHint {
+  margin-top: 10px; min-height: 1.5em; font-size: 12.5px; letter-spacing: 0.08em;
+  color: var(--dim, rgba(230,223,205,0.62));
+}
+
+/* --- 角上两行小字 -------------------------------------------------------- */
+.mnShotNote {
+  position: absolute; right: 22px; bottom: 40px; max-width: 40%;
+  text-align: right; font-size: 11.5px; letter-spacing: 0.08em;
+  color: rgba(230, 223, 205, 0.42);
+}
+.mnFoot {
+  position: absolute; right: 22px; bottom: 20px;
+  font-size: 11.5px; letter-spacing: 0.10em; color: rgba(230, 223, 205, 0.34);
+}
+
+/* --- 面板（选章 / 史实注记 / 关于）--------------------------------------- */
+.mnPanel {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.985);
+  width: min(1180px, 92vw); height: min(760px, 86vh);
+  display: none; flex-direction: column;
+  pointer-events: auto;
+  background: rgba(9, 9, 8, 0.90);
+  border: 1px solid rgba(230, 223, 205, 0.18);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+.mnPanel.on { display: flex; }
+/* 面板开着时，标题与列表让位（ER2 也是整屏换页，不做叠加） */
+#menu.panelOn .mnTitle, #menu.panelOn .mnList, #menu.panelOn .mnShotNote { opacity: 0.12; }
+
+.mnPanelHead {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px; border-bottom: 1px solid rgba(230, 223, 205, 0.16);
+}
+.mnPanelTitle { flex: 1 1 auto; font-size: 16px; letter-spacing: 0.24em; }
+.mnBack {
+  pointer-events: auto; cursor: pointer;
+  border: 1px solid rgba(230, 223, 205, 0.28); background: transparent;
+  color: var(--paper, #e6dfcd); font: inherit; font-size: 12.5px;
+  letter-spacing: 0.16em; padding: 5px 16px;
+}
+.mnBack:hover { background: rgba(230, 223, 205, 0.08); }
+.mnPanelBody { flex: 1 1 auto; min-height: 0; display: flex; }
+
+/* --- 选章 ---------------------------------------------------------------- */
+.mnLevels { display: flex; width: 100%; min-height: 0; }
+.mnLevelList {
+  flex: 0 0 292px; overflow-y: auto; border-right: 1px solid rgba(230, 223, 205, 0.12);
+  padding: 8px 0;
+}
+.mnLevel {
+  pointer-events: auto; cursor: pointer;
+  display: grid; grid-template-columns: 34px 1fr auto; grid-row-gap: 2px;
+  width: 100%; text-align: left;
+  border: 0; border-left: 2px solid transparent; background: transparent;
+  color: rgba(230, 223, 205, 0.72); font: inherit;
+  padding: 11px 16px 11px 14px;
+  transition: background 0.14s linear, color 0.14s linear;
+}
+.mnLevel:hover { background: rgba(230, 223, 205, 0.05); }
+.mnLevel.on {
+  background: rgba(224, 176, 98, 0.10); border-left-color: var(--warn, #e0b062);
+  color: var(--paper, #e6dfcd);
+}
+.mnLvNo {
+  grid-row: 1 / span 2; align-self: center;
+  font-size: 19px; letter-spacing: 0.06em; color: var(--warn, #e0b062); opacity: 0.85;
+}
+.mnLvName { font-size: 15.5px; letter-spacing: 0.10em; }
+.mnLvDate {
+  grid-column: 2 / span 2; font-size: 11px; letter-spacing: 0.04em;
+  color: rgba(230, 223, 205, 0.42);
+}
+.mnLvMark {
+  grid-column: 3; grid-row: 1; align-self: center;
+  font-size: 10.5px; letter-spacing: 0.12em; color: rgba(230, 223, 205, 0.38);
+}
+.mnLvMark.done { color: var(--ours, #9dc0e4); }
+
+.mnBrief {
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 24px 26px;
+}
+.mnBriefTitle { font-size: 24px; letter-spacing: 0.16em; }
+.mnBriefPlace { margin-top: 8px; font-size: 12.5px; color: rgba(230, 223, 205, 0.62); }
+.mnBriefDate { margin-top: 3px; font-size: 12.5px; color: rgba(230, 223, 205, 0.42); }
+.mnBriefMeta {
+  margin-top: 10px; display: flex; gap: 18px;
+  font-size: 11.5px; letter-spacing: 0.08em; color: var(--warn, #e0b062); opacity: 0.9;
+}
+.mnBriefHead {
+  margin-top: 18px; font-size: 11.5px; letter-spacing: 0.20em;
+  color: rgba(230, 223, 205, 0.42);
+}
+.mnBriefLines { margin-top: 14px; }
+.mnBriefLines p {
+  margin: 0 0 6px; font-size: 13.5px; line-height: 1.95;
+  color: rgba(230, 223, 205, 0.80);
+}
+.mnObjectives { margin: 8px 0 0; padding-left: 20px; }
+.mnObjectives li {
+  font-size: 13px; line-height: 1.95; color: rgba(230, 223, 205, 0.72);
+}
+.mnMechanic {
+  margin-top: 8px; font-size: 12.5px; line-height: 1.85;
+  color: rgba(230, 223, 205, 0.62);
+  border-left: 2px solid rgba(224, 176, 98, 0.5); padding-left: 12px;
+}
+/* 「进入」钉在简报栏底边：简报是滚动的，按钮跟着正文滚下去的话，
+   目标清单长一点的关（序·界河五条）在第一屏根本看不见入口。
+   底色必须不透明 —— 它下面还有正在滚动的正文。 */
+.mnGo {
+  position: sticky; bottom: -26px; z-index: 2;
+  display: block; width: 100%; box-sizing: border-box; text-align: center;
+  margin-top: 22px; pointer-events: auto; cursor: pointer;
+  border: 1px solid rgba(224, 176, 98, 0.65);
+  background: linear-gradient(rgba(24, 21, 16, 0.97), rgba(24, 21, 16, 0.97)),
+              rgba(224, 176, 98, 0.08);
+  color: var(--paper, #e6dfcd); font: inherit; font-size: 15px;
+  letter-spacing: 0.20em; padding: 12px 32px;
+}
+.mnGo:hover { background: rgba(224, 176, 98, 0.20); }
+
+/* --- 选章里的那张全图 ---------------------------------------------------- */
+.mnMap {
+  display: block; width: min(420px, 100%); height: auto; margin: 16px 0 4px;
+  background: rgba(20, 19, 16, 0.55); border: 1px solid rgba(230, 223, 205, 0.12);
+}
+.mnMapWall { fill: rgba(230, 223, 205, 0.05); stroke: rgba(230, 223, 205, 0.55); stroke-width: 1.1; }
+.mnMapMoat { fill: none; stroke: rgba(157, 192, 228, 0.30); stroke-width: 0.7; }
+.mnMapStreet { stroke: rgba(230, 223, 205, 0.22); stroke-width: 0.6; }
+.mnMapGate { fill: var(--warn, #e0b062); opacity: 0.8; }
+.mnMapSuburb { fill: rgba(230, 223, 205, 0.05); stroke: rgba(230, 223, 205, 0.26); stroke-width: 0.6; }
+.mnMapWater { fill: none; stroke: rgba(157, 192, 228, 0.42); stroke-width: 0.9; }
+.mnMapRail { stroke: rgba(230, 223, 205, 0.30); stroke-width: 0.7; stroke-dasharray: 3 2.5; }
+.mnMapDot { fill: rgba(230, 223, 205, 0.62); }
+.mnMapLabel { fill: rgba(230, 223, 205, 0.46); font-size: 6.4px; letter-spacing: 0.04em; }
+.mnMapSlice {
+  fill: rgba(224, 176, 98, 0.07); stroke: var(--warn, #e0b062);
+  stroke-width: 0.9; stroke-dasharray: 4 3;
+}
+.mnMapZone { fill: var(--warn, #e0b062); }
+.mnMapPath { stroke: var(--warn, #e0b062); stroke-width: 0.8; opacity: 0.7; }
+.mnMapZoneLabel { fill: var(--warn, #e0b062); font-size: 7px; letter-spacing: 0.06em; }
+.mnMapNorth { fill: rgba(230, 223, 205, 0.40); font-size: 7px; letter-spacing: 0.10em; }
+
+/* --- 史实注记 / 关于 ----------------------------------------------------- */
+.mnText {
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 30px 30px;
+  font-size: 13.5px; line-height: 2.0; color: rgba(230, 223, 205, 0.78);
+}
+.mnText p { margin: 0 0 4px; }
+.mnText .mnGap { height: 12px; }
+.mnText h4 {
+  margin: 22px 0 10px; font-size: 12px; letter-spacing: 0.20em; font-weight: 500;
+  color: var(--warn, #e0b062);
+}
+.mnCodexRow {
+  display: grid; grid-template-columns: 190px 190px 1fr; gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid rgba(230, 223, 205, 0.08);
+  font-size: 12px; line-height: 1.7;
+}
+.mnCodexId {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: rgba(230, 223, 205, 0.55); font-size: 11.5px;
+}
+.mnCodexVal {
+  font-variant-numeric: tabular-nums; color: var(--paper, #e6dfcd);
+}
+.mnCodexNote { color: rgba(230, 223, 205, 0.55); }
+
+/* --- 窄屏（手机横屏 / 小窗）--------------------------------------------- */
+@media (max-width: 900px) {
+  .mnTitle { left: 6%; top: 10%; max-width: 62%; }
+  .mnTitleMain { font-size: 32px; letter-spacing: 0.24em; }
+  .mnTitleLines { display: none; }
+  .mnList { left: 6%; bottom: 12%; }
+  .mnItem { font-size: 18px; }
+  .mnLevels { flex-direction: column; }
+  .mnLevelList {
+    flex: 0 0 auto; max-height: 34%; border-right: 0;
+    border-bottom: 1px solid rgba(230, 223, 205, 0.12);
+  }
+  .mnCodexRow { grid-template-columns: 1fr; gap: 2px; }
+}

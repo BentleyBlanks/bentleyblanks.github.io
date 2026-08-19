@@ -201,6 +201,17 @@ const Cloth = (w, h, d, seed) => MakeBox(w, h, d, TILE_METERS.cloth, seed);
 const SteelBox = (w, h, d, seed) => MakeBox(w, h, d, TILE_METERS.steel, seed);
 const WoodBox = (w, h, d, seed) => MakeBox(w, h, d, TILE_METERS.wood, seed);
 
+// 枪械尺度的贴图格距。**枪不许用 TILE_METERS 那一套**（那是给砖墙、门板调的）：
+// 一支枪只有房子的十分之一大，用 wood=1.0 m 的格距，枪托横向只吃到贴图的 4%，
+// 木纹的年轮带会拉成横跨整个托身的虎斑。三处必须是同一套数，否则同一把枪
+// 在第一人称、在别人手里、在编辑器台架上是三种花纹：
+//   · 第一人称手搭 rig —— Script_Viewmodel.VM_TILE
+//   · Blender 出的模型 —— _blender/TzmCore.GUN_TILE
+//   · 下面这套（模型读不到时的兜底几何，外加腰间手榴弹、背后大刀）
+const GUN_TILE = { steel: 0.030, wood: 0.085 };
+const GunSteelBox = (w, h, d, seed) => MakeBox(w, h, d, GUN_TILE.steel, seed);
+const GunWoodBox = (w, h, d, seed) => MakeBox(w, h, d, GUN_TILE.wood, seed);
+
 /** 圆管，按米重算 UV。CylinderGeometry 默认沿 Y，枪管要沿 Z。 */
 function TubeY(rTop, rBottom, len, segments, tile) {
   const g = new THREE.CylinderGeometry(rTop, rBottom, len, segments, 1, false);
@@ -515,8 +526,8 @@ function BuildGrenadeBelt(buckets, d, quality) {
     const z = -d.waistDepth - 0.026 * H + Math.abs(t - 0.5) * 0.06 * H;
     const tilt = (t - 0.5) * 0.3;
     // 弹体近似圆柱 φ58 × 92 mm、木柄 φ29 —— 改良后全长 220 mm
-    Add(buckets, "steel", TubeY(0.029, 0.029, 0.092, 8, TILE_METERS.steel), { x, y: -0.052 * H, z, rz: tilt });
-    Add(buckets, "wood", TubeY(0.0145, 0.0145, 0.125, 6, TILE_METERS.wood), { x, y: -0.135 * H, z, rz: tilt });
+    Add(buckets, "steel", TubeY(0.029, 0.029, 0.092, 8, GUN_TILE.steel), { x, y: -0.052 * H, z, rz: tilt });
+    Add(buckets, "wood", TubeY(0.0145, 0.0145, 0.125, 6, GUN_TILE.wood), { x, y: -0.135 * H, z, rz: tilt });
   }
 }
 
@@ -531,9 +542,9 @@ function BuildDadao(buckets, d, quality) {
   const rise = d.shoulderY - d.waistY;
   const local = new Map();
   // 刃长 595、身宽 57→38、刀背厚 5—6、护手是一小片铁、柄长 215、柄尾必有铁环
-  Add(local, "steel", SteelBox(0.052, 0.50, 0.0055, "blade"), { y: 0.40 });
-  Add(local, "steel", SteelBox(0.042, 0.10, 0.0055, "tip"), { y: 0.70, rz: 0.05 });
-  Add(local, "steel", SteelBox(0.025, 0.012, 0.026, "guard"), { y: 0.14 });
+  Add(local, "steel", GunSteelBox(0.052, 0.50, 0.0055, "blade"), { y: 0.40 });
+  Add(local, "steel", GunSteelBox(0.042, 0.10, 0.0055, "tip"), { y: 0.70, rz: 0.05 });
+  Add(local, "steel", GunSteelBox(0.025, 0.012, 0.026, "guard"), { y: 0.14 });
   Add(local, "accessory", Cloth(0.030, 0.20, 0.026, "grip"), { y: 0.03 });
   Add(local, "steel", new THREE.TorusGeometry(0.038, 0.006, 6, 12), { y: -0.10, rx: Math.PI / 2 });
   if (quality !== "low") Add(local, "red", Cloth(0.026, 0.05, 0.024, "rag"), { y: -0.075 });
@@ -571,61 +582,61 @@ function BuildWeaponGeometry(id, quality) {
     result.gripFront.set(0, -0.012, muzzleZ * 0.52);       // 左手扶在护木中段
 
     // 枪托分三段（底板 / 托腮 / 握把颈）：一根方料是玩具，分段才有枪托的剪影
-    Add(buckets, "wood", WoodBox(0.042, 0.128, 0.032, "buttPlate"), { y: 0.012, z: buttZ });
-    Add(buckets, "wood", WoodBox(0.040, 0.105, 0.160, "comb"), { y: 0.018, z: buttZ - 0.10, rx: 0.05 });
-    Add(buckets, "wood", WoodBox(0.036, 0.062, 0.130, "wrist"), { y: 0.002, z: 0.075 });
+    Add(buckets, "wood", GunWoodBox(0.042, 0.128, 0.032, "buttPlate"), { y: 0.012, z: buttZ });
+    Add(buckets, "wood", GunWoodBox(0.040, 0.105, 0.160, "comb"), { y: 0.018, z: buttZ - 0.10, rx: 0.05 });
+    Add(buckets, "wood", GunWoodBox(0.036, 0.062, 0.130, "wrist"), { y: 0.002, z: 0.075 });
     // 机匣 + 弹仓（中正式是 5 发桥夹压入的固定弹仓，机匣下方一块凸料）
-    Add(buckets, "steel", SteelBox(0.034, 0.050, 0.190, "receiver"), { y: bore - 0.004, z: -0.055 });
-    Add(buckets, "wood", WoodBox(0.038, 0.050, 0.090, "magazine"), { y: -0.008, z: -0.045 });
+    Add(buckets, "steel", GunSteelBox(0.034, 0.050, 0.190, "receiver"), { y: bore - 0.004, z: -0.055 });
+    Add(buckets, "wood", GunWoodBox(0.038, 0.050, 0.090, "magazine"), { y: -0.008, z: -0.045 });
     // 护木 + 枪管 + 准星照门
     const foreLen = Math.abs(muzzleZ) * 0.72;
-    Add(buckets, "wood", WoodBox(0.036, 0.044, foreLen, "forend"), { y: bore - 0.026, z: -0.155 - foreLen * 0.5 });
+    Add(buckets, "wood", GunWoodBox(0.036, 0.044, foreLen, "forend"), { y: bore - 0.026, z: -0.155 - foreLen * 0.5 });
     Add(buckets, "steel",
-      TubeZ(0.0085, 0.0092, Math.min(barrelLen, Math.abs(muzzleZ) - 0.02), seg, TILE_METERS.steel),
+      TubeZ(0.0085, 0.0092, Math.min(barrelLen, Math.abs(muzzleZ) - 0.02), seg, GUN_TILE.steel),
       { y: bore, z: muzzleZ * 0.62 });
-    Add(buckets, "steel", SteelBox(0.008, 0.020, 0.016, "frontSight"), { y: bore + 0.016, z: muzzleZ + 0.03 });
-    Add(buckets, "steel", SteelBox(0.026, 0.014, 0.050, "rearSight"), { y: bore + 0.026, z: -0.02 });
-    Add(buckets, "steel", SteelBox(0.030, 0.026, 0.040, "trigger"), { y: -0.036, z: 0.028 });
+    Add(buckets, "steel", GunSteelBox(0.008, 0.020, 0.016, "frontSight"), { y: bore + 0.016, z: muzzleZ + 0.03 });
+    Add(buckets, "steel", GunSteelBox(0.026, 0.014, 0.050, "rearSight"), { y: bore + 0.026, z: -0.02 });
+    Add(buckets, "steel", GunSteelBox(0.030, 0.026, 0.040, "trigger"), { y: -0.036, z: 0.028 });
     if (quality !== "low") {
       // 拉机柄：拉栓动画里唯一「看得见」的零件，低模也别省
-      Add(buckets, "steel", TubeZ(0.006, 0.006, 0.055, 6, TILE_METERS.steel),
+      Add(buckets, "steel", TubeZ(0.006, 0.006, 0.055, 6, GUN_TILE.steel),
         { x: 0.032, y: bore + 0.006, z: 0.01, ry: Math.PI / 2, rz: 0.35 });
-      Add(buckets, "steel", TubeZ(0.011, 0.011, 0.012, 6, TILE_METERS.steel), { x: 0.058, y: bore + 0.020, z: 0.01 });
+      Add(buckets, "steel", TubeZ(0.011, 0.011, 0.012, 6, GUN_TILE.steel), { x: 0.058, y: bore + 0.020, z: 0.01 });
     }
 
     if (id === "HanYang") {
       // 老套筒：枪管外那层薄套筒，是它区别于中正式的剪影特征
-      Add(buckets, "steel", TubeZ(0.0155, 0.0165, Math.abs(muzzleZ) * 0.52, seg, TILE_METERS.steel),
+      Add(buckets, "steel", TubeZ(0.0155, 0.0165, Math.abs(muzzleZ) * 0.52, seg, GUN_TILE.steel),
         { y: bore, z: muzzleZ * 0.66 });
     }
     if (id === "Type38") {
       // 三八式的防尘滑盖：机匣上方一块随栓前后滑动的薄板
-      Add(buckets, "steel", SteelBox(0.030, 0.010, 0.145, "dustCover"), { y: bore + 0.026, z: -0.05 });
+      Add(buckets, "steel", GunSteelBox(0.030, 0.010, 0.145, "dustCover"), { y: bore + 0.026, z: -0.05 });
     }
     if (id === "Zb26") {
       // 捷克式：20 发弧形弹匣**从上方插入**（做成下插就废了），提把在枪管上方
       for (let i = 0; i < 3; i += 1) {
-        Add(buckets, "steel", SteelBox(0.030, 0.075, 0.042 - i * 0.004, `mag${i}`),
+        Add(buckets, "steel", GunSteelBox(0.030, 0.075, 0.042 - i * 0.004, `mag${i}`),
           { y: bore + 0.06 + i * 0.07, z: -0.09 - i * 0.016, rx: -0.1 * i });
       }
-      Add(buckets, "wood", WoodBox(0.026, 0.05, 0.16, "carryHandle"), { y: bore + 0.055, z: -0.30 });
+      Add(buckets, "wood", GunWoodBox(0.026, 0.05, 0.16, "carryHandle"), { y: bore + 0.055, z: -0.30 });
       for (const s of [-1, 1]) {
-        Add(buckets, "steel", SteelBox(0.008, 0.24, 0.008, `bipod${s}`),
+        Add(buckets, "steel", GunSteelBox(0.008, 0.24, 0.008, `bipod${s}`),
           { x: s * 0.06, y: bore - 0.13, z: muzzleZ * 0.78, rz: s * 0.32, rx: -0.12 });
       }
     }
     if (id === "Type11") {
       // 歪把子：左上方一个敞口方斗（装 6 个 5 发桥夹）+ 顶部压弹板
-      Add(buckets, "steel", SteelBox(0.075, 0.090, 0.115, "hopper"), { x: -0.055, y: bore + 0.05, z: -0.05 });
-      Add(buckets, "steel", SteelBox(0.065, 0.012, 0.100, "hopperLid"), { x: -0.055, y: bore + 0.10, z: -0.05 });
+      Add(buckets, "steel", GunSteelBox(0.075, 0.090, 0.115, "hopper"), { x: -0.055, y: bore + 0.05, z: -0.05 });
+      Add(buckets, "steel", GunSteelBox(0.065, 0.012, 0.100, "hopperLid"), { x: -0.055, y: bore + 0.10, z: -0.05 });
       for (const s of [-1, 1]) {
-        Add(buckets, "steel", SteelBox(0.008, 0.20, 0.008, `bipod${s}`),
+        Add(buckets, "steel", GunSteelBox(0.008, 0.20, 0.008, `bipod${s}`),
           { x: s * 0.05, y: bore - 0.11, z: muzzleZ * 0.8, rz: s * 0.3 });
       }
     }
     if (data.bayonet && quality === "high") {
       const bl = data.bayonetLengthM || 0.395;
-      Add(buckets, "steel", SteelBox(0.016, 0.024, bl, "bayonet"), { y: bore - 0.006, z: muzzleZ - bl * 0.5 });
+      Add(buckets, "steel", GunSteelBox(0.016, 0.024, bl, "bayonet"), { y: bore - 0.006, z: muzzleZ - bl * 0.5 });
     }
   } else if (data.kind === "pistol") {
     // 驳壳枪：方机匣 + 前伸的固定弹仓 + 细枪管。单手武器。
@@ -633,18 +644,18 @@ function BuildWeaponGeometry(id, quality) {
     result.gripFront.set(0, -0.02, -0.06);
     result.bolt.set(0.02, 0.05, -0.01);
     result.twoHanded = false;
-    Add(buckets, "wood", WoodBox(0.030, 0.115, 0.042, "grip"), { y: -0.05, z: 0.012, rx: -0.12 });
-    Add(buckets, "steel", SteelBox(0.028, 0.062, 0.145, "frame"), { y: 0.024, z: -0.055 });
-    Add(buckets, "steel", SteelBox(0.026, 0.050, 0.048, "mag"), { y: -0.012, z: -0.058 });
-    Add(buckets, "steel", TubeZ(0.0065, 0.0065, 0.088, 6, TILE_METERS.steel), { y: 0.032, z: -0.148 });
+    Add(buckets, "wood", GunWoodBox(0.030, 0.115, 0.042, "grip"), { y: -0.05, z: 0.012, rx: -0.12 });
+    Add(buckets, "steel", GunSteelBox(0.028, 0.062, 0.145, "frame"), { y: 0.024, z: -0.055 });
+    Add(buckets, "steel", GunSteelBox(0.026, 0.050, 0.048, "mag"), { y: -0.012, z: -0.058 });
+    Add(buckets, "steel", TubeZ(0.0065, 0.0065, 0.088, 6, GUN_TILE.steel), { y: 0.032, z: -0.148 });
   } else if (data.kind === "melee") {
     // 大刀：刀身朝 +Y（劈砍时挂点自己会把它抡下来）
     result.muzzle.set(0, 0.42, -0.02);
     result.gripFront.set(0, 0.12, 0);
     result.twoHanded = true;
-    Add(buckets, "steel", SteelBox(0.052, 0.50, 0.0055, "blade"), { y: 0.40 });
-    Add(buckets, "steel", SteelBox(0.042, 0.10, 0.0055, "tip"), { y: 0.70, rz: 0.05 });
-    Add(buckets, "steel", SteelBox(0.025, 0.012, 0.026, "guard"), { y: 0.14 });
+    Add(buckets, "steel", GunSteelBox(0.052, 0.50, 0.0055, "blade"), { y: 0.40 });
+    Add(buckets, "steel", GunSteelBox(0.042, 0.10, 0.0055, "tip"), { y: 0.70, rz: 0.05 });
+    Add(buckets, "steel", GunSteelBox(0.025, 0.012, 0.026, "guard"), { y: 0.14 });
     Add(buckets, "accessory", Cloth(0.030, 0.20, 0.026, "handle"), { y: 0.03 });
     Add(buckets, "steel", new THREE.TorusGeometry(0.038, 0.006, 6, 12), { y: -0.10, rx: Math.PI / 2 });
     if (quality !== "low") Add(buckets, "red", Cloth(0.026, 0.05, 0.024, "rag"), { y: -0.075 });
@@ -652,14 +663,14 @@ function BuildWeaponGeometry(id, quality) {
     // 巩式木柄手榴弹：弹体 φ58×92、木柄 φ29、全长 220
     result.muzzle.set(0, 0.10, 0);
     result.twoHanded = false;
-    Add(buckets, "steel", TubeY(0.029, 0.029, 0.092, 8, TILE_METERS.steel), { y: 0.16 });
-    Add(buckets, "wood", TubeY(0.0145, 0.0145, 0.128, 6, TILE_METERS.wood), { y: 0.05 });
+    Add(buckets, "steel", TubeY(0.029, 0.029, 0.092, 8, GUN_TILE.steel), { y: 0.16 });
+    Add(buckets, "wood", TubeY(0.0145, 0.0145, 0.128, 6, GUN_TILE.wood), { y: 0.05 });
   } else {
     // 掷弹筒之类：一根带弧形驻钣的短筒。至少别让人空着手站那儿。
     result.muzzle.set(0, 0.05, -0.30);
     result.gripFront.set(0, 0.02, -0.14);
-    Add(buckets, "steel", TubeZ(0.025, 0.025, data.lengthM || 0.41, seg, TILE_METERS.steel), { y: 0.04, z: -0.2 });
-    Add(buckets, "wood", WoodBox(0.05, 0.05, 0.12, "base"), { y: 0.02, z: 0.06 });
+    Add(buckets, "steel", TubeZ(0.025, 0.025, data.lengthM || 0.41, seg, GUN_TILE.steel), { y: 0.04, z: -0.2 });
+    Add(buckets, "wood", GunWoodBox(0.05, 0.05, 0.12, "base"), { y: 0.02, z: 0.06 });
   }
   return Object.assign(result, { geometries: BakeBuckets(buckets) });
 }
@@ -1973,8 +1984,24 @@ export class ActorFactory {
       //     高光被切碎了，所以一直没暴露）。落到 albedo 要再压两档。
       helmet: this.Material("helmet", () => lib.Get("SteelHelmet",
         { color: TintTo("SteelHelmet", IJA_HELMET_ALBEDO), tintId: "helm", roughness: 1, metalness: 0.04 })),
-      steel: this.Material("steel", () => lib.Get("Steel", { roughness: 0.62, metalness: 0.9 })),
-      wood: this.Material("wood", () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0 })),
+      // 枪身钢与枪托木。这两桶**只有武器模型在用**（人身上的钢件走 helmet，
+      // 皮件走 leather），所以这里的数按枪来调，不必迁就人物。
+      //
+      // 两处跟着 _blender 的 GUN_TILE 一起改的（第 2 轮视觉审查）：
+      //  1) normalScale。模型侧的贴图格距从 0.35 m 收到 0.030 m（钢）/
+      //     1.0 m 收到 0.085 m（木），同一张法线图在屏幕上的坡度会陡十倍，
+      //     还留 1.0 的话机加工纹会被凿成沟、木纹变成搓衣板。
+      //     0.20 / 0.24 抄第一人称那一套（Script_Viewmodel.BuildMaterials）——
+      //     两边现在贴的是同密度的同一张图，法线强度没有理由不一样。
+      //  2) roughness 从 0.62 提到 0.95。**这是"大刀半边雪白半边漆黑"的真凶**：
+      //     BakeSteel 的粗糙度图本身就偏光滑（按 polish 0.35 烘的，均值约 0.45），
+      //     材质上的标量是乘在图上的，0.62 乘完只剩 0.28 —— 那是镜面。
+      //     刀身于是上半截照到天空反出一片白、下半截照到地面反出一片黑，
+      //     中间一条硬边。1938 年的发蓝钢不是镜子，乘完落到 0.43 才对。
+      steel: this.Material("steel",
+        () => lib.Get("Steel", { roughness: 0.95, metalness: 0.86, normalScale: 0.20 })),
+      wood: this.Material("wood",
+        () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0, normalScale: 0.24 })),
       leather: this.Material("leather",
         () => lib.Plain("leather", { color: HEX.ijaLeather, roughness: 0.66, metalness: 0 })),
       towel: this.Material("towel", () => lib.Plain("towel", { color: HEX.towel, roughness: 0.95, metalness: 0 })),
