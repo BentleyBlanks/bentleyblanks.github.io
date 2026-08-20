@@ -105,6 +105,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         if (v > max) max = v;
         tones.add(Math.round(v / 8));
       }
+      const level = T.Debug.Level ? T.Debug.Level().id : "?";
       return {
         glError,
         spread: max - min,
@@ -115,8 +116,12 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         alive: T.ai ? T.ai.aliveCount : -1,
         drawCalls: T.renderer.info.render.calls,
         triangles: T.renderer.info.render.triangles,
-        level: T.Debug.Level ? T.Debug.Level().id : "?",
+        level,
         environment: T.Debug.Environment ? T.Debug.Environment() : null,
+        wallCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckWallCorridor
+          ? T.battlefield.CheckWallCorridor() : null,
+        sightCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckSightCorridor
+          ? T.battlefield.CheckSightCorridor() : null,
         skyTexels,
         geoTexels,
         // 粒子层接没接上预通道与当关的雾：这两条断了，远处的烟就没有大气透视
@@ -176,6 +181,18 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         bad.push(`城镇生活层不足 household=${city?.householdProps ?? "?"} streetClusters=${city?.streetClusters ?? "?"} streetProps=${city?.streetProps ?? "?"} roadMarks=${city?.roadMarks ?? "?"}`);
       }
     }
+    if (phase === 4) {
+      const city = health.environment?.city;
+      if (!city || city.wallDetails < 80 || city.cornerTowerDetails < 40) {
+        bad.push(`城墙细节层不足 wall=${city?.wallDetails ?? "?"} corner=${city?.cornerTowerDetails ?? "?"}`);
+      }
+      if (!health.wallCorridor?.ok) {
+        bad.push(`城墙回廊失联 top=${health.wallCorridor?.topReachableSpan ?? "?"} leak=${health.wallCorridor?.leakSpan ?? "?"}`);
+      }
+      if (!health.sightCorridor?.ok) {
+        bad.push(`西门至十字街通视被挡 blockers=${health.sightCorridor?.blockers?.length ?? "?"}`);
+      }
+    }
     if (health.decalOrigin.join(",") !== "17,3,-9") bad.push(`贴花仍被物理抬离命中面 ${health.decalOrigin}`);
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
@@ -189,6 +206,10 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive} `
         + `sky=${(health.skyTexels / (health.skyTexels + health.geoTexels) * 100).toFixed(0)}%`
         + (phase === 0 ? ` villageProps=${health.environment?.outfield?.villageProps ?? "?"}` : "")
+        + (phase === 4 ? ` wallDetails=${health.environment?.city?.wallDetails ?? "?"}`
+          + ` cornerDetails=${health.environment?.city?.cornerTowerDetails ?? "?"}`
+          + ` wallTop=${health.wallCorridor?.topReachableSpan ?? "?"}m`
+          + ` leak=${health.wallCorridor?.leakSpan ?? "?"}m` : "")
         + (phase === 5 ? ` streetProps=${health.environment?.city?.streetProps ?? "?"}`
           + ` householdProps=${health.environment?.city?.householdProps ?? "?"}`
           + ` roadMarks=${health.environment?.city?.roadMarks ?? "?"}` : "")

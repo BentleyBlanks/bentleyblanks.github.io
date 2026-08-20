@@ -75,7 +75,9 @@ const MATERIAL_MAP = {
   // 城墙一套
   CityBrick: { recipe: "BrickWall", color: 0xdde4ee, roughness: 1.0 },
   CityBrickWorn: { recipe: "BrickWallSooty", color: 0xe6eaf0 },
+  CityBrickPatch: { recipe: "BrickWallSooty", color: 0xcad0d8, roughness: 1.0 },
   Ashlar: { recipe: "Stone", color: 0xf4f6ff },
+  WallPaving: { recipe: "Stone", color: 0xd4d8df, roughness: 1.0 },
   RammedEarth: { recipe: "Adobe", color: 0xf0dcb4 },
   ZhaiEarth: { recipe: "Adobe", color: 0xe8d8ae },
   // 民居一套（鲁南：青砖 + 淡色过墙石交织，平原段大量土坯 + 麦秸泥）
@@ -328,6 +330,7 @@ export class TengxianCity {
     this.stats = {
       compoundsDetail: 0, compoundsMid: 0, silhouettes: 0,
       householdProps: 0, streetClusters: 0, streetProps: 0, roadMarks: 0,
+      wallDetails: 0, cornerTowerDetails: 0,
     };
     this.wallTopY = WALL_TOP_Y;
 
@@ -686,10 +689,11 @@ export class TengxianCity {
       const innerGaps = RAMPS.filter((r) => r.side === side.id)
         .map((r) => ({ at: r.at + r.dir * (RampRunLength() - 4), width: 12 }));
       this.sink.SetSector(`Wall${side.id}`);
-      AddCityWall(this.sink, {
+      const built = AddCityWall(this.sink, {
         x: side.x, z: side.z, ry: side.ry, length: half * 2, baseY: CITY.platformY,
         seed: `wall${side.id}`, gaps, breaches, innerGaps,
       });
+      this.stats.wallDetails += built?.detailCount || 0;
       this.sink.SetSector("");
     }
     // 墙脚防空洞：内侧墙根，每 40 m 一个
@@ -738,7 +742,10 @@ export class TengxianCity {
     for (const c of CORNER_TOWERS) {
       if (!this.InBounds(c.x, c.z, 30)) continue;
       this.sink.SetSector(SectorKey(c.x, c.z));
-      AddCornerTower(this.sink, { x: c.x, z: c.z, baseY: CITY.platformY, seed: `corner${c.id}` });
+      const built = AddCornerTower(this.sink, {
+        x: c.x, z: c.z, baseY: CITY.platformY, seed: `corner${c.id}`,
+      });
+      this.stats.cornerTowerDetails += built?.detailCount || 0;
     }
     this.sink.SetSector("");
   }

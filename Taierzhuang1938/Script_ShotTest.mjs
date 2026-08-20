@@ -59,6 +59,13 @@ const GAME_SHOTS = [
     setup: { x: 88, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
   { name: "Game_Z5_VillageLife", query: "shot=1&phase=0&quality=high&scale=medium",
     setup: { x: -160, z: -1322, yaw: 0, pitch: -0.05, quiet: true } },
+  // 角楼专项：复用菜单里用户实际看见问题的“东南角望楼”长焦机位。
+  // 旧四块交叉板屋顶在玩法近景不一定暴露，但这个镜头会直接看出悬空和穿插。
+  { name: "Game_Z6_CornerTower", query: "quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower" } },
+  // 墙身专项：东墙外近距离仰看包砖修补、泄水孔、垛口压顶与墙顶铺砖。
+  { name: "Game_Z7_WallDetail", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 364, z: 198, yaw: Math.PI / 2, pitch: 0.19, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };
@@ -89,6 +96,15 @@ async function Shoot(pageName, url, globalName, setup = null) {
   if (setup) {
     await page.evaluate(({ g, pose }) => {
       const game = window[g];
+      if (pose.menuShot) {
+        const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
+        if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
+        game.menu.shotIndex = index;
+        game.menu.shotTime = 0;
+        game.menu.ApplyShot(0.45);
+        game.StepFrames(12);
+        return;
+      }
       game.player.Spawn(pose.x, pose.z, pose.yaw);
       game.player.pitch = pose.pitch || 0;
       if (pose.quiet) {

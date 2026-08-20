@@ -915,7 +915,9 @@ export function AddCityWall(sink, {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
   const rnd = Mulberry32(HashString(seed));
+  const detailRnd = Mulberry32(HashString(`${seed}:wallDetails`));
   const top = baseY + height;
+  let detailCount = 0;
   // 某个高度上的墙厚（线性收分）
   const widthAt = (y) => baseWidth + (topWidth - baseWidth) * ((y - baseY) / height);
   // 这个位置的墙头在哪：null = 门洞／完全没墙；否则返回绝对高度
@@ -965,6 +967,16 @@ export function AddCityWall(sink, {
       sink.Add(mat, PlaceGeometry(
         MakeBox(segLen * 1.02, yTop - y0, w, TILE_METERS.brick, `${seed}:b${i}${c}`, BRICK_UV_GRID),
         { x: p.x, y: (y0 + yTop) / 2, z: p.z, ry }));
+      // 分段包砖的竖向砌筑缝：每约五十米一条，按各收分层贴住墙皮，避免做成
+      // 从上到下悬空的一块黑板。它不是凸出的扶壁，不改变墙体轮廓与碰撞。
+      if (intact && i % 6 === 0) {
+        const joint = L(lx - segLen * 0.47, w / 2 + 0.034);
+        sink.Add("CityBrickPatch", PlaceGeometry(
+          MakeBox(0.11, (yTop - y0) * 0.94, 0.048, TILE_METERS.brick,
+            `${seed}:joint${i}${c}`, BRICK_UV_GRID),
+          { x: joint.x, y: (y0 + yTop) / 2, z: joint.z, ry }));
+        detailCount += 1;
+      }
     }
     // ③ 缺口断面：砖皮没了，露出来的是夯土芯
     if (!intact) {
@@ -979,6 +991,79 @@ export function AddCityWall(sink, {
       // 缺口脚下的砖土堆：没有它，缺口读作被橡皮擦掉的一块
       const foot = L(lx, widthAt(baseY) / 2 + 1.6);
       sink.props.push({ kind: "breachSpill", x: foot.x, z: foot.z, radius: segLen * 0.9, seed: `${seed}:sp${i}` });
+    }
+
+    if (intact) {
+      // 墙顶马道不是一条裸露的青砖盒盖：用浅灰铺砖分段压住顶面，近看能读出
+      // 一块块修补过的走道，远看也能把墙顶与墙身分开。
+      const deck = L(lx, 0);
+      sink.Add("WallPaving", PlaceGeometry(
+        MakeBox(segLen * 0.995, 0.07, topWidth * 0.91, TILE_METERS.stone,
+          `${seed}:paving${i}`),
+        { x: deck.x, y: top + 0.035, z: deck.z, ry }));
+      detailCount += 1;
+
+      // 女墙脚下的连续压顶线，把墙身、墙顶和垛口三层明确分开。
+      const corniceY = top - 0.30;
+      const cornice = L(lx, widthAt(corniceY) / 2 + 0.10);
+      sink.Add("WallPaving", PlaceGeometry(
+        MakeBox(segLen * 0.995, 0.17, 0.24, TILE_METERS.stone, `${seed}:cornice${i}`),
+        { x: cornice.x, y: corniceY, z: cornice.z, ry }));
+      detailCount += 1;
+
+      // 外墙面上不规则的旧砖修补。另起一套随机源，避免新增细节改变原有墙身损伤分布。
+      if (i % 4 === 1) {
+        const patchY = baseY + 3.0 + (i % 3) * 2.15 + detailRnd() * 0.45;
+        const patchW = segLen * (0.28 + detailRnd() * 0.20);
+        const patchH = 0.66 + detailRnd() * 0.46;
+        const patchX = lx + (detailRnd() - 0.5) * segLen * 0.25;
+        // 三排错缝补砖做出参差边界，避免修补层读成贴在墙上的深色广告牌。
+        for (let row = 0; row < 3; row += 1) {
+          const rowY = patchY + (row - 1) * patchH / 3;
+          const rowW = patchW * (0.62 + detailRnd() * 0.30);
+          const rowX = patchX + (detailRnd() - 0.5) * (patchW - rowW) * 0.72;
+          const face = L(rowX, widthAt(rowY) / 2 + 0.035);
+          sink.Add("CityBrickPatch", PlaceGeometry(
+            MakeBox(rowW, patchH / 3 * 1.06, 0.052, TILE_METERS.brick,
+              `${seed}:repair${i}${row}`, BRICK_UV_GRID),
+            { x: face.x, y: rowY, z: face.z, ry }));
+          detailCount += 1;
+        }
+      }
+
+      // 城墙排水/泄水小孔：在墙顶下方形成一排稀疏暗点，打破六百米整墙的空白。
+      if (i % 5 === 3) {
+        const drainY = top - 1.18 - detailRnd() * 0.34;
+        const face = L(lx, widthAt(drainY) / 2 + 0.045);
+        sink.Add("Charred", PlaceGeometry(
+          MakeBox(0.46, 0.29, 0.045, TILE_METERS.stone, `${seed}:drain${i}`),
+          { x: face.x, y: drainY, z: face.z, ry }));
+        const sill = L(lx, widthAt(drainY) / 2 + 0.13);
+        sink.Add("WallPaving", PlaceGeometry(
+          MakeBox(0.58, 0.09, 0.26, TILE_METERS.stone, `${seed}:drainSill${i}`),
+          { x: sill.x, y: drainY - 0.18, z: sill.z, ry }));
+        const streakY = drainY - 1.05;
+        const streak = L(lx + (detailRnd() - 0.5) * 0.12,
+          widthAt(streakY) / 2 + 0.038);
+        sink.Add("CityBrickPatch", PlaceGeometry(
+          MakeBox(0.22, 1.65, 0.045, TILE_METERS.brick, `${seed}:rainStreak${i}`,
+            BRICK_UV_GRID),
+          { x: streak.x, y: streakY, z: streak.z, ry }));
+        detailCount += 3;
+      }
+
+      // 稀疏守城物资：只靠宇墙内侧放低矮木箱，不占马道中线，也不登记碰撞。
+      if (i % 13 === 5) {
+        const crate = L(lx - segLen * 0.18, -topWidth * 0.23);
+        sink.Add("WoodDoor", PlaceGeometry(
+          MakeBox(0.82, 0.46, 0.62, TILE_METERS.wood, `${seed}:crate${i}`),
+          { x: crate.x, y: top + 0.23, z: crate.z, ry: ry + 0.08 }));
+        const box = L(lx + segLen * 0.12, -topWidth * 0.25);
+        sink.Add("WoodDoor", PlaceGeometry(
+          MakeBox(0.58, 0.34, 0.52, TILE_METERS.wood, `${seed}:box${i}`),
+          { x: box.x, y: top + 0.17, z: box.z, ry: ry - 0.11 }));
+        detailCount += 2;
+      }
     }
 
     // 碰撞：下半段按墙脚宽（外面撞上去是一堵斜墙），上半段按墙顶宽（人在顶上走的是 5 m）
@@ -1008,6 +1093,18 @@ export function AddCityWall(sink, {
           MakeBox(CITY_WALL.merlonWidth, parapet, CITY_WALL.merlonThickness, TILE_METERS.brick,
             `${seed}:mer${m}`, BRICK_UV_GRID),
           { x: p.x, y: top + parapet / 2, z: p.z, ry }));
+        sink.Add("WallPaving", PlaceGeometry(
+          MakeBox(CITY_WALL.merlonWidth + 0.12, 0.09, CITY_WALL.merlonThickness + 0.14,
+            TILE_METERS.stone, `${seed}:merCap${m}`),
+          { x: p.x, y: top + parapet + 0.045, z: p.z, ry }));
+        detailCount += 1;
+        if (m % 6 === 0) {
+          const slit = L(lx, topWidth / 2 + 0.018);
+          sink.Add("Charred", PlaceGeometry(
+            MakeBox(0.22, 0.34, 0.035, TILE_METERS.stone, `${seed}:merSlit${m}`),
+            { x: slit.x, y: top + parapet * 0.56, z: slit.z, ry }));
+          detailCount += 1;
+        }
         sink.Solid(p.x, top + parapet / 2,
           p.z, 0.6, parapet / 2, 0.28, "parapet", ry);
         sink.Cover(p.x, p.z, top + parapet, sin, cos);
@@ -1025,10 +1122,16 @@ export function AddCityWall(sink, {
           MakeBox(length / n * 1.02, CITY_WALL.innerParapetH, CITY_WALL.innerParapetT,
             TILE_METERS.brick, `${seed}:inn${m}`, BRICK_UV_GRID),
           { x: p.x, y: top + CITY_WALL.innerParapetH / 2, z: p.z, ry }));
+        sink.Add("WallPaving", PlaceGeometry(
+          MakeBox(length / n * 1.02, 0.075, CITY_WALL.innerParapetT + 0.12,
+            TILE_METERS.stone, `${seed}:innerCap${m}`),
+          { x: p.x, y: top + CITY_WALL.innerParapetH + 0.038, z: p.z, ry }));
+        detailCount += 1;
         sink.Solid(p.x, top + CITY_WALL.innerParapetH / 2, p.z, (length / n) / 2, CITY_WALL.innerParapetH / 2, 0.24, "parapet", ry);
       }
     }
   }
+  return { detailCount };
 }
 
 /**
@@ -1101,41 +1204,151 @@ export function AddCornerTower(sink, {
   parapet = CITY_WALL.parapet, brick = "CityBrick", stone = "Ashlar",
 }) {
   const top = baseY + height;
-  // 拐角平台：把两面墙的墙顶连起来，不然拐角处是两块板对不上
+  let detailCount = 0;
+  // 拐角平台：把两面墙的墙顶连成一块带台明的方台，两向马道在这里转弯。
+  const deckSize = CITY_WALL.topWidth + size * 0.66;
   sink.Add(stone, PlaceGeometry(
-    MakeBox(CITY_WALL.topWidth + size * 0.4, 0.3, CITY_WALL.topWidth + size * 0.4,
+    MakeBox(deckSize, 0.30, deckSize,
       TILE_METERS.stone, `${seed}:deck`), { x, y: top - 0.15, z }));
-  sink.Solid(x, top - 1.2, z, (CITY_WALL.topWidth + size * 0.4) / 2, 1.2,
-    (CITY_WALL.topWidth + size * 0.4) / 2, "cityWall");
-  // 亭身：四根角柱 + 一圈栏板
-  const colH = 3.1;
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      sink.Add("WoodBeam", PlaceGeometry(
-        MakeBox(0.28, colH, 0.28, TILE_METERS.wood, `${seed}:col${sx}${sz}`),
-        { x: x + sx * size * 0.36, y: top + colH / 2, z: z + sz * size * 0.36 }));
+  sink.Solid(x, top - 1.2, z, deckSize / 2, 1.2, deckSize / 2, "cityWall");
+  sink.Add("WallPaving", PlaceGeometry(
+    MakeBox(deckSize * 0.94, 0.08, deckSize * 0.94, TILE_METERS.stone, `${seed}:deckPaving`),
+    { x, y: top + 0.04, z }));
+  const floor = top + 0.34;
+  sink.Add(stone, PlaceGeometry(
+    MakeBox(size + 0.72, 0.34, size + 0.72, TILE_METERS.stone, `${seed}:plinth`),
+    { x, y: top + 0.17, z }));
+  detailCount += 3;
+
+  // 亭身：八根檐柱 + 低槛墙 + 连续额枋。东南/东北等四角自动把通向城内的
+  // 两面明间留空，墙顶回廊能在亭内转九十度，不再是一圈无门的栏板。
+  const span = size * 0.37;
+  const colH = 3.25;
+  const eave = floor + colH;
+  const columns = [
+    [-span, -span], [0, -span], [span, -span],
+    [-span, 0], [span, 0],
+    [-span, span], [0, span], [span, span],
+  ];
+  for (let i = 0; i < columns.length; i += 1) {
+    const [cx, cz] = columns[i];
+    sink.Add("PaintRed", PlaceGeometry(
+      MakeBox(0.28, colH, 0.28, TILE_METERS.wood, `${seed}:col${i}`),
+      { x: x + cx, y: floor + colH / 2, z: z + cz }));
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(0.54, 0.22, 0.54, TILE_METERS.wood, `${seed}:bracket${i}`),
+      { x: x + cx, y: eave - 0.20, z: z + cz }));
+    detailCount += 2;
+  }
+  for (const side of [-1, 1]) {
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(span * 2 + 0.54, 0.34, 0.28, TILE_METERS.wood, `${seed}:beamZ${side}`),
+      { x, y: eave - 0.42, z: z + side * span }));
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(0.28, 0.34, span * 2 + 0.54, TILE_METERS.wood, `${seed}:beamX${side}`),
+      { x: x + side * span, y: eave - 0.42, z }));
+    detailCount += 2;
+  }
+
+  const innerX = -Math.sign(x || 1);
+  const innerZ = -Math.sign(z || 1);
+  const sillH = 0.82;
+  const doorW = 2.10;
+  const AddSillFace = (axis, side, open) => {
+    const wallLength = span * 2;
+    const AddSegment = (center, length, tag) => {
+      if (axis === "x") {
+        sink.Add(brick, PlaceGeometry(
+          MakeBox(length, sillH, 0.28, TILE_METERS.brick, `${seed}:${tag}`, BRICK_UV_GRID),
+          { x: x + center, y: floor + sillH / 2, z: z + side * span }));
+      } else {
+        sink.Add(brick, PlaceGeometry(
+          MakeBox(0.28, sillH, length, TILE_METERS.brick, `${seed}:${tag}`, BRICK_UV_GRID),
+          { x: x + side * span, y: floor + sillH / 2, z: z + center }));
+      }
+      detailCount += 1;
+    };
+    if (!open) { AddSegment(0, wallLength, `sill${axis}${side}`); return; }
+    const segment = (wallLength - doorW) / 2;
+    for (const half of [-1, 1]) {
+      AddSegment(half * (doorW / 2 + segment / 2), segment,
+        `sill${axis}${side}${half}`);
+    }
+  };
+  for (const side of [-1, 1]) {
+    AddSillFace("x", side, side === innerZ);
+    AddSillFace("z", side, side === innerX);
+  }
+
+  // 闭合歇山/四坡屋面：顶面、底皮和檐口共用顶点，彻底替换旧的四块交叉板。
+  const eaveOut = 1.05;
+  const rise = 1.72;
+  const cornerLift = 0.18;
+  const roofW = size + 0.25;
+  const roofD = size + 0.25;
+  const halfW = roofW / 2 + eaveOut;
+  const halfD = roofD / 2 + eaveOut;
+  const ridgeHalf = Math.max(roofW * 0.24, halfW - halfD * 0.78);
+  const EaveY = (lx) => {
+    const t = Math.max(0, (Math.abs(lx) - ridgeHalf) / Math.max(0.01, halfW - ridgeHalf));
+    return cornerLift * t * t;
+  };
+  const PlaceRoof = (material, geometry) => sink.Add(material,
+    PlaceGeometry(geometry, { x, y: eave, z }));
+  PlaceRoof("TubeTile", MakeGateRoofShell(roofW, roofD, {
+    eaveOut, rise, cornerLift, thickness: 0.15, seed: `${seed}:roofShell`,
+  }));
+  detailCount += 1;
+
+  // 四面连续檐枋。
+  const cuts = [-halfW, -ridgeHalf, 0, ridgeHalf, halfW];
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < cuts.length - 1; i += 1) {
+      const a = cuts[i], b = cuts[i + 1];
+      PlaceRoof("PaintGreen", MakeBeamBetween(
+        [a, EaveY(a) - 0.17, side * halfD], [b, EaveY(b) - 0.17, side * halfD],
+        0.17, TILE_METERS.wood, `${seed}:fascia${side}${i}`));
+      detailCount += 1;
+    }
+    PlaceRoof("PaintRed", MakeBeamBetween(
+      [side * halfW, EaveY(halfW) - 0.22, -halfD],
+      [side * halfW, EaveY(halfW) - 0.22, halfD],
+      0.16, TILE_METERS.wood, `${seed}:sideFascia${side}`));
+    detailCount += 1;
+  }
+
+  // 筒瓦垄、正脊与四条戗脊都贴着同一张壳，逆光轮廓不会再裂开。
+  const tileRows = 11;
+  for (const side of [-1, 1]) {
+    for (let i = 0; i <= tileRows; i += 1) {
+      const lx = -halfW + (halfW * 2 * i) / tileRows;
+      const ridgeX = Math.max(-ridgeHalf, Math.min(ridgeHalf, lx));
+      PlaceRoof("TubeTile", MakeBeamBetween(
+        [lx, EaveY(lx) + 0.07, side * halfD], [ridgeX, rise + 0.07, 0],
+        0.065, TILE_METERS.roof, `${seed}:tile${side}${i}`));
+      detailCount += 1;
     }
   }
-  for (const s of [-1, 1]) {
-    sink.Add(brick, PlaceGeometry(
-      MakeBox(size * 0.86, 1.0, 0.32, TILE_METERS.brick, `${seed}:rlx${s}`, BRICK_UV_GRID),
-      { x, y: top + 0.5, z: z + s * size * 0.4 }));
-    sink.Add(brick, PlaceGeometry(
-      MakeBox(0.32, 1.0, size * 0.86, TILE_METERS.brick, `${seed}:rlz${s}`, BRICK_UV_GRID),
-      { x: x + s * size * 0.4, y: top + 0.5, z }));
+  PlaceRoof("TubeTile", MakeBeamBetween(
+    [-ridgeHalf - 0.24, rise + 0.12, 0], [ridgeHalf + 0.24, rise + 0.12, 0],
+    0.27, TILE_METERS.roof, `${seed}:ridge`));
+  detailCount += 1;
+  for (const sideX of [-1, 1]) {
+    for (const sideZ of [-1, 1]) {
+      PlaceRoof("TubeTile", MakeBeamBetween(
+        [sideX * ridgeHalf, rise + 0.09, 0],
+        [sideX * halfW, EaveY(halfW) + 0.09, sideZ * halfD],
+        0.19, TILE_METERS.roof, `${seed}:hip${sideX}${sideZ}`));
+      detailCount += 1;
+    }
+    PlaceRoof("TubeTile", PlaceGeometry(
+      MakeBox(0.34, 0.58, 0.34, TILE_METERS.roof, `${seed}:ridgeBeast${sideX}`),
+      { x: sideX * (ridgeHalf + 0.16), y: rise + 0.36, z: 0 }));
+    detailCount += 1;
   }
-  // 四坡顶：四块斜板 + 一个小宝顶
-  const eave = top + colH;
-  for (let k = 0; k < 4; k += 1) {
-    const a = (k * Math.PI) / 2;
-    const cz = size * 0.30;
-    sink.Add("TubeTile", PlaceGeometry(
-      MakeBox(size * 1.25, 0.14, size * 0.78, TILE_METERS.roof, `${seed}:rf${k}`),
-      { x: x + Math.sin(a) * cz, y: eave + 0.55, z: z + Math.cos(a) * cz, ry: a, rx: -0.62 }));
-  }
-  sink.Add("TubeTile", PlaceGeometry(
-    MakeBox(0.6, 0.7, 0.6, TILE_METERS.roof, `${seed}:top`), { x, y: eave + 1.5, z }));
   sink.Cover(x, z, top + 1.0, 0, 1);
+  void parapet;
+  return { detailCount };
 }
 
 /**
