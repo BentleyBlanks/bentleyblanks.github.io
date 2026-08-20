@@ -2,7 +2,8 @@
 //
 // 用法：
 //   node Taierzhuang1938/Script_MusicBake.mjs           # 切（原曲要在 Audio/Music/_raw/）
-//   node Taierzhuang1938/Script_MusicBake.mjs --gen     # 缺的先去本机网关生成再切
+//   node Taierzhuang1938/Script_MusicBake.mjs --gen     # 缺的生成曲先去本机网关生成再切
+//   node Taierzhuang1938/Script_MusicBake.mjs --fetch   # 缺的 CC0 下载曲先从登记地址下载再切
 //   node Taierzhuang1938/Script_MusicBake.mjs --report  # 只打候选段落表，不落文件
 //   node Taierzhuang1938/Script_MusicBake.mjs Charge    # 只烘这一条
 //
@@ -60,6 +61,11 @@ function Generate(src, rawFile) {
   const from = path.join(ws.dir, res.path);
   fs.copyFileSync(from, rawFile);
   return res.duration;
+}
+
+function Download(src, rawFile) {
+  execFileSync("curl", ["-L", "--fail", "--silent", "--show-error", "--max-time", "180",
+    "-o", rawFile, src.downloadUrl], { maxBuffer: 1 << 24 });
 }
 
 function DecodeMono(file) {
@@ -141,6 +147,7 @@ async function Main() {
   const argv = process.argv.slice(2);
   const report = argv.includes("--report");
   const gen = argv.includes("--gen");
+  const fetchExternal = argv.includes("--fetch");
   const only = argv.filter((a) => !a.startsWith("--"));
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -152,13 +159,19 @@ async function Main() {
   const failures = [];
 
   for (const src of list) {
-    const rawFile = path.join(RAW_DIR, src.id + ".mp3");
+    const rawFile = path.join(RAW_DIR, `${src.id}.${src.rawExt || "mp3"}`);
     console.log(`\n[${src.id}] → ${src.cue}`);
     try {
       if (!fs.existsSync(rawFile)) {
-        if (!gen) { console.log("  跳过（_raw 里没有原曲；要生成加 --gen）"); continue; }
-        const d = Generate(src, rawFile);
-        console.log(`  生成 ${d.toFixed(1)} s`);
+        if (src.downloadUrl) {
+          if (!fetchExternal) { console.log("  跳过（_raw 里没有下载曲；要下载加 --fetch）"); continue; }
+          Download(src, rawFile);
+          console.log(`  下载 ${src.source && src.source.title ? src.source.title : src.id}`);
+        } else {
+          if (!gen) { console.log("  跳过（_raw 里没有生成曲；要生成加 --gen）"); continue; }
+          const d = Generate(src, rawFile);
+          console.log(`  生成 ${d.toFixed(1)} s`);
+        }
       }
       const mono = DecodeMono(rawFile);
       const win = PickWindow(mono, src, report);
@@ -193,7 +206,10 @@ async function Main() {
         "-i", rawFile, "-af", filters.join(","), "-ac", "2", "-ar", String(SR), "-b:a", BITRATE, outFile]);
       const size = fs.statSync(outFile).size;
       bytes += size;
-      manifest.cues[src.cue] = { file, seconds: +src.durS.toFixed(2) };
+      manifest.cues[src.cue] = {
+        file, seconds: +src.durS.toFixed(2),
+        source: src.source || { title: src.id, license: MUSIC_LICENSE.name },
+      };
       console.log(`    → ${file}  ${(size / 1024).toFixed(1)} KB  推了 ${gainDb.toFixed(1)} dB（原段 ${meanDb.toFixed(1)} dBFS）`);
     } catch (err) {
       console.error(`  失败：${err.message}`);

@@ -1,4 +1,4 @@
-// 音乐来源表 —— 五段曲子的提示词、选段规则与配平。
+// 音乐来源表 —— 生成曲与下载曲的来源、选段规则与配平。
 //
 // ## 为什么不再合成
 // 上一版的音乐是四条 WebAudio 配方：一条低音提琴式的持续音、一个「简化铜管」、
@@ -74,5 +74,50 @@ export const MUSIC_SOURCES = [
     // 结局。全场唯一一处允许「像配乐」的地方 —— 仗已经打完了。
     mood: "sparse", durS: 50, rms: -25, fadeS: 3.5,
     prompt: "Solo erhu playing a slow funeral lament, alone, with one very quiet low string drone underneath. North China 1938. Free rhythm, long sustained notes, wide silences, unresolved ending. No drums, no percussion, no piano, no synthesizer, no orchestra, no vocals.",
+  },
+  {
+    id: "FieldLament",
+    cue: "fieldLament",
+    // 界河是开阔地上的第一场败退。这里要宽、慢、压着走，不能像胜利进行曲。
+    mood: "steady", durS: 48, rms: -30, fadeS: 3.0, rawExt: "mp3",
+    downloadUrl: "https://opengameart.org/sites/default/files/Lament%20of%20the%20War%20-%20MP3%20Preview_0.mp3",
+    source: {
+      title: "Laments of the War", author: "Cethiel", license: "CC0 1.0",
+      page: "https://opengameart.org/content/laments-of-the-war",
+    },
+  },
+  {
+    id: "WallPressure",
+    cue: "wallPressure",
+    // 城墙关的炮兵优势。截最平稳的一段，再压到枪炮声下面，只留推进压力。
+    mood: "steady", durS: 44, rms: -32, fadeS: 3.0, rawExt: "ogg",
+    downloadUrl: "https://opengameart.org/sites/default/files/war%20theme%20ver%202_0.ogg",
+    source: {
+      title: "War Theme (version 2)", author: "Spring Spring", license: "CC0 1.0",
+      page: "https://opengameart.org/content/war-theme",
+    },
+  },
+  {
+    id: "StreetDistress",
+    cue: "streetDistress",
+    // 十字街：不是冲锋，是四面火力封住之后持续收紧的焦灼。
+    mood: "steady", durS: 46, rms: -30, fadeS: 3.0, rawExt: "wav",
+    downloadUrl: "https://opengameart.org/sites/default/files/aflicao.wav",
+    source: {
+      title: "tension and distress", author: "allen yatsura", license: "CC0 1.0",
+      page: "https://opengameart.org/content/tension-and-distress",
+    },
+  },
+  {
+    id: "Exodus",
+    cue: "exodus",
+    // 北门已经没有弹药，也没有胜利目标；音乐只留下废墟与离城感。
+    // 自动稀疏评分会偏爱 91 秒处那段「一次大峰值 + 长静音」；42 秒处更连贯。
+    mood: "sparse", durS: 52, rms: -27, fadeS: 3.5, rawExt: "mp3", atS: 42,
+    downloadUrl: "https://opengameart.org/sites/default/files/Village%20Ruins%20-%20isaiah658_0.mp3",
+    source: {
+      title: "Village Ruins", author: "isaiah658", license: "CC0 1.0",
+      page: "https://opengameart.org/content/village-ruins",
+    },
   },
 ];

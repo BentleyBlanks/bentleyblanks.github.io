@@ -118,7 +118,7 @@ export const LEVELS = [
     clock: { from: "03-14 05:30", to: "03-14 19:00" },
     sky: "dawn",
     // 北上接敌。垫底的一层，几乎察觉不到。
-    music: "siege",
+    music: "fieldLament",
     bounds: "L0Jiehe",
     minutes: 14,
     pool: { start: 220, end: 196, label: "城里还站着的人", presumed: true },
@@ -303,7 +303,7 @@ export const LEVELS = [
     date: "一九三八年三月十七日 八时 — 十五时",
     clock: { from: "03-17 08:00", to: "03-17 15:00" },
     sky: "smokyDay",
-    music: "siege",
+    music: "wallPressure",
     bounds: "L4Wall",
     minutes: 20,
     pool: { start: 236, end: 178, label: "城里还站着的人", presumed: true },
@@ -347,7 +347,7 @@ export const LEVELS = [
     date: "一九三八年三月十七日 十五时 — 十七时三十分",
     clock: { from: "03-17 15:00", to: "03-17 17:30" },
     sky: "burningStreet",
-    music: "siege",
+    music: "streetDistress",
     bounds: "L5Crossroad",
     minutes: 16,
     pool: { start: 178, end: 96, label: "城里还站着的人", presumed: true },
@@ -390,8 +390,8 @@ export const LEVELS = [
     date: "一九三八年三月十七日 二十一时 — 十八日 午",
     clock: { from: "03-17 21:00", to: "03-18 12:00" },
     sky: "night",
-    // 北门突围 —— 另一处。
-    music: "charge",
+    // 北门突围不是反攻：玩家已经没有弹药，音乐也不再使用战鼓。
+    music: "exodus",
     bounds: "L6Breakout",
     minutes: 12,
     pool: { start: 96, end: 40, label: "城里还站着的人", presumed: true },
@@ -518,7 +518,9 @@ export const CREDITS = [
   "凡「推定」的数值（街巷宽度、瓮城尺寸、兵员池数字……）都不是史实，",
   "登记表见 Data_Tengxian.mjs 的 PRESUMED 与本文件的 PRESUMED_STAGING。",
   "",
-  "美术与音效全部程序化生成，未使用任何外部素材。",
+  "场景美术由程序生成；枪炮、环境与音乐包含外部录音 / 曲目，来源与授权随音频清单登记。",
+  "新增 CC0 音乐：Cethiel《Laments of the War》、Spring Spring《War Theme》、",
+  "allen yatsura《tension and distress》、isaiah658《Village Ruins》（经剪辑、配平后使用）。",
 ];
 
 // ===========================================================================

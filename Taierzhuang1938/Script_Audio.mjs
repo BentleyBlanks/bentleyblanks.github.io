@@ -1238,6 +1238,7 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
+export const MUSIC_PACK_VERSION = "2";
 
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
 const SAMPLE_BURST = {
@@ -1482,7 +1483,7 @@ export const AMBIENCE_PRESETS = {
 };
 
 /**
- * 音乐。**五段实录（生成）曲子**，一段一个 cue，提示词与选段规则见
+ * 音乐。**九段生成 / CC0 下载曲**，一段一个 cue，提示词、来源与选段规则见
  * Data_MusicSources.mjs，成品在 Audio/Music/，由 Script_MusicBake.mjs 烘。
  *
  * 上一版这里是四条 WebAudio 配方（低音提琴式持续音 + 简化铜管 + 独奏弦 + 军鼓），
@@ -1505,6 +1506,14 @@ export const MUSIC_CUES = {
   charge: { level: 0.6, label: "反攻" },
   // 结局。全场唯一允许「像配乐」的地方 —— 仗已经打完了。
   aftermath: { level: 0.62, label: "战后" },
+  // 界河开阔地：宽而沉，不给第一次接敌加英雄色彩。
+  fieldLament: { level: 0.34, label: "界河" },
+  // 城墙炮击：只留下持续推进的压力，必须沉在炮声下面。
+  wallPressure: { level: 0.24, label: "城墙" },
+  // 十字街封锁：近距离、持续收紧。
+  streetDistress: { level: 0.32, label: "十字街" },
+  // 北门突围：无武器、无反攻，只剩离城。
+  exodus: { level: 0.48, label: "突围" },
 };
 
 /**
@@ -2084,7 +2093,7 @@ export class AudioEngine {
   /**
    * 载入音乐包（Audio/Music/Data_MusicManifest.json，由 Script_MusicBake.mjs 生成）。
    *
-   * 五段合起来约 1.8 MB，是三个包里最大的一份，所以**最后拉**：
+   * 九段合起来约 3.5 MB，是三个包里最大的一份，所以**最后拉**：
    * 音效与人声关系到「打得响不响」，音乐晚十秒才进来没人会在意。
    * 与音效包的两处不同：没有同名合成配方可盖（合成音乐整套删了），
    * 而且不进 RECIPES —— 音乐是一条常驻的循环，不是一次性音。
@@ -2095,7 +2104,7 @@ export class AudioEngine {
     if (!this.ctx || this.disposed) return 0;
     let manifest = null;
     try {
-      const res = await fetch(base + "Data_MusicManifest.json");
+      const res = await fetch(base + "Data_MusicManifest.json?v=" + MUSIC_PACK_VERSION);
       if (!res.ok) throw new Error("HTTP " + res.status);
       manifest = await res.json();
     } catch (err) {
@@ -2105,7 +2114,7 @@ export class AudioEngine {
     let ok = 0;
     await Promise.all(Object.entries(manifest.cues || {}).map(async ([cue, entry]) => {
       try {
-        const res = await fetch(base + entry.file);
+        const res = await fetch(base + entry.file + "?v=" + MUSIC_PACK_VERSION);
         if (!res.ok) throw new Error(entry.file + " HTTP " + res.status);
         this.musicBuffers.set(cue, await this.ctx.decodeAudioData(await res.arrayBuffer()));
         ok += 1;

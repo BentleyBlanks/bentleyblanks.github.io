@@ -21,6 +21,46 @@
   "aftermath": {
    "file": "AudioMusic_Aftermath.mp3",
    "seconds": 50
+  },
+  "fieldLament": {
+   "file": "AudioMusic_FieldLament.mp3",
+   "seconds": 48,
+   "source": {
+    "title": "Laments of the War",
+    "author": "Cethiel",
+    "license": "CC0 1.0",
+    "page": "https://opengameart.org/content/laments-of-the-war"
+   }
+  },
+  "wallPressure": {
+   "file": "AudioMusic_WallPressure.mp3",
+   "seconds": 44,
+   "source": {
+    "title": "War Theme (version 2)",
+    "author": "Spring Spring",
+    "license": "CC0 1.0",
+    "page": "https://opengameart.org/content/war-theme"
+   }
+  },
+  "streetDistress": {
+   "file": "AudioMusic_StreetDistress.mp3",
+   "seconds": 46,
+   "source": {
+    "title": "tension and distress",
+    "author": "allen yatsura",
+    "license": "CC0 1.0",
+    "page": "https://opengameart.org/content/tension-and-distress"
+   }
+  },
+  "exodus": {
+   "file": "AudioMusic_Exodus.mp3",
+   "seconds": 52,
+   "source": {
+    "title": "Village Ruins",
+    "author": "isaiah658",
+    "license": "CC0 1.0",
+    "page": "https://opengameart.org/content/village-ruins"
+   }
   }
  },
  "license": {
