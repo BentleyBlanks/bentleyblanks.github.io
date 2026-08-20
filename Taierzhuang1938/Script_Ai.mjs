@@ -53,8 +53,40 @@ let nextId = 1;
  * 那条走廊是这一关的机制，不能拿掉）：切片压到 ±100 m、远平面收到 400 m、
  * 人像预算 13，三样一起才落回红线内。
  * 同样地：要把它调回去，先去合批 Actor（一个人四十几个 call，身体部件没合批）。
+ *
+ * 【2026-08-20 名额分配重做：预算没错，错的是发给谁】
+ * 玩家的原话是"还是看不到日军啊，离得特别近才看得到"。实测三关（东关/十字街/城墙）
+ * 的名额去向完全一致：**13 个名额 100% 被守军占满**，可见的人全在 30—46 m 以内，
+ * 而活着的日军 36—37 人、最近的一个在 65—70 m，**150 m 内的日军一个都没画出来**。
+ *
+ * 两个原因叠在一起：
+ *   1) 排序只看距离，而玩家的班组是**跟着玩家走**的 —— 十几个守军永远比任何一个
+ *      日军近，名额天生就轮不到敌人。这不是调参能救的，是排序键选错了。
+ *   2) 名额发给了**镜头背后**的人。three 本来就逐 mesh 做视锥剔除，屏幕外的 Actor
+ *      一个 draw call 都不花 —— 拿名额去照顾他们等于把预算烧在看不见的地方。
+ *
+ * 所以改成：先过视锥（屏幕外的直接不占名额），再按「距离 × 权重」排。
+ * 权重让敌人先拿、尸体最后拿 —— 战场上看不见开枪的人是最伤的一类 bug。
  */
 const VISIBLE_ACTOR_BUDGET = 13;
+
+/**
+ * 名额排序的权重（乘在距离上，越小越优先）。
+ *
+ * 0.42：让 70 m 的日军（排序值 29）压过 35 m 的自己人（35）。这个数是照实测配的 ——
+ * 敌人最近 65—70 m、自己人 20—46 m，要跨过这一档至少得乘到 0.5 以下；
+ * 再小就会把贴脸的自己人也挤掉，而"班长站在我旁边却是个透明人"同样穿帮。
+ * 2.6：尸体不占活人的名额。战场上得有尸体，但一具趴着的尸体永远不如
+ * 一个正在朝你开枪的人重要。
+ */
+const RANK_ENEMY = 0.42;
+const RANK_CORPSE = 2.6;
+// 视锥判定用的包围球：半径给到 1.6 m（人高 1.7 上下）再加一点余量，
+// 免得屏幕边缘上的人在转身时一格一格地闪出来。
+const ACTOR_BOUND_R = 1.6;
+const _cullFrustum = new THREE.Frustum();
+const _cullMatrix = new THREE.Matrix4();
+const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_BOUND_R);
 
 /** 按权重抽一个。 */
 function Pick(list, rnd) {
@@ -581,14 +613,32 @@ export class AiDirector {
     this.CullActors(camera);
   }
 
-  /** 只显示离镜头最近的 visibleBudget 个人（含尸体）。见 VISIBLE_ACTOR_BUDGET 的账。 */
+  /**
+   * 发放同屏可见 Actor 的名额。见 VISIBLE_ACTOR_BUDGET 上面那一大段账。
+   *
+   * 两步：① 屏幕外的一律不占名额（它们本来就不花 draw call）；
+   *      ② 剩下的按「距离 × 权重」排，敌人优先、尸体垫底，取前 visibleBudget 个。
+   */
   CullActors(camera) {
     if (!camera) return;
+    // 视图矩阵自己从 matrixWorld 求，**不要用 camera.matrixWorldInverse** ——
+    // 那个只在 renderer.render() 里更新，剔除跑在逻辑帧里，读到的是上一帧的机位。
+    // 平时差一帧看不出来，换关/过场刚把相机瞬移过去的那一帧就是整批人闪一下。
+    camera.updateMatrixWorld();
+    _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
+    _cullFrustum.setFromProjectionMatrix(_cullMatrix);
     const list = this.visibleScratch;
     list.length = 0;
     for (const s of this.soldiers) {
       if (!s.actor) continue;
-      s.camDist = s.position.distanceToSquared(camera.position);
+      // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
+      _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
+      if (!_cullFrustum.intersectsSphere(_cullSphere)) {
+        s.actor.root.visible = false;
+        continue;
+      }
+      const weight = !s.alive ? RANK_CORPSE : (s.side === "ija" ? RANK_ENEMY : 1);
+      s.camDist = Math.sqrt(s.position.distanceToSquared(camera.position)) * weight;
       list.push(s);
     }
     list.sort((a, b) => a.camDist - b.camDist);
