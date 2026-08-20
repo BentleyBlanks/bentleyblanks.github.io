@@ -92,7 +92,7 @@
 .edBtn:hover { background: rgba(230, 223, 205, 0.16); }
 .edBtn.on { border-color: var(--warn, #e0b062); color: var(--warn, #e0b062); background: rgba(224, 176, 98, 0.10); }
 .edBtn.danger:hover { border-color: var(--theirs, #d6604a); color: var(--theirs, #d6604a); }
-.edBtn.wide { display: block; width: 100%; text-align: center; }
+.edBtn.wide { display: block; width: 100%; box-sizing: border-box; text-align: center; }
 .edBtns { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
 
 .edChips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }

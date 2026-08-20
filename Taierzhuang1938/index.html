@@ -14,7 +14,7 @@
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=1">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
-  <link rel="stylesheet" href="./Style_Editor.css?v=2">
+  <link rel="stylesheet" href="./Style_Editor.css?v=3">
   <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
        只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
        里的旧版，桌面刷新就好、手机 Safari 黏得多，于是只在移动端复现。
@@ -76,7 +76,7 @@
         "./Script_EditorAudio.mjs": "./Script_EditorAudio.mjs?v=2",
         "./Script_EditorScene.mjs": "./Script_EditorScene.mjs?v=4",
         "./Script_EditorSettings.mjs": "./Script_EditorSettings.mjs?v=2",
-        "./Script_Editor.mjs": "./Script_Editor.mjs?v=3"
+        "./Script_Editor.mjs": "./Script_Editor.mjs?v=4"
       }
     }
   </script>
@@ -94,6 +94,6 @@
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=13"></script>
+  <script type="module" src="./Script_Main.mjs?v=14"></script>
 </body>
 </html>

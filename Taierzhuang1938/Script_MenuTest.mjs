@@ -274,6 +274,35 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
+// 5b) 齿轮设置 -> 返回主菜单
+// ===========================================================================
+{
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuPlay(2));
+  await page.waitForFunction(() => window.Taierzhuang.state.running === true, { timeout: 180000 });
+  await page.keyboard.press("Backquote");
+  const option = await page.evaluate(() => ({
+    panelOpen: window.Taierzhuang.Debug.Editor().panelOpen,
+    text: document.querySelector('[data-action="main-menu"]')?.textContent || "",
+  }));
+  Check("设置菜单里有返回主菜单选项",
+    option.panelOpen && option.text.trim() === "返回主菜单", JSON.stringify(option));
+
+  await page.click('[data-action="main-menu"]');
+  await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+  const returned = await page.evaluate(() => ({
+    menu: window.Taierzhuang.Debug.Menu(),
+    editor: window.Taierzhuang.Debug.Editor(),
+    running: window.Taierzhuang.state.running,
+    inMenu: window.Taierzhuang.state.menu,
+    hudHidden: document.getElementById("hud").style.display === "none",
+  }));
+  Check("设置菜单能直接回到主菜单",
+    returned.menu.open && returned.menu.live && returned.inMenu && !returned.running
+      && !returned.editor.capturing && returned.hudHidden,
+    `open=${returned.menu.open} running=${returned.running} editor=${returned.editor.capturing}`);
+}
+
+// ===========================================================================
 // 6) 进度：通过一关之后，菜单的第一项变成「继续」，选章里标「已通过」
 // ===========================================================================
 {

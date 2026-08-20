@@ -702,6 +702,7 @@ async function Boot() {
     actorFactory, viewmodel, audio, cutscene,
     shot: !!SHOT,
     ReleasePointerLock,
+    ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
       state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
       get battlefield() { return battlefield; },

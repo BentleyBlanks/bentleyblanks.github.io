@@ -50,6 +50,7 @@ export class EditorSuite {
    *   renderer / scene / camera / canvas / library / lights   —— 渲染侧
    *   actorFactory / viewmodel / audio / cutscene             —— 各编辑器要用的系统
    *   game        { state, player, PHASES, JumpToLevel, get battlefield, get currentWeapon }
+   *   ReturnToMainMenu  从暂停面板退出当前战局并打开主菜单；无主菜单的测试模式不传
    *   shot        出图模式（整棵 DOM 藏起来）
    */
   constructor(host) {
@@ -156,6 +157,22 @@ export class EditorSuite {
       section.appendChild(box);
       body.appendChild(section);
     };
+    if (this.host.ReturnToMainMenu) {
+      const section = El("div", "edSection");
+      section.appendChild(El("div", "h", "游戏"));
+      const button = El("button", "edBtn wide", "返回主菜单");
+      button.type = "button";
+      button.dataset.action = "main-menu";
+      button.title = "放弃当前战局，回到主菜单";
+      button.addEventListener("click", () => {
+        // 先让编辑器归还相机、HUD 与声音，再由游戏装配层切换菜单状态。
+        // 顺序反过来会让 Close() 在主菜单已经打开后又改一次暂停状态。
+        this.TogglePanel(false);
+        this.host.ReturnToMainMenu();
+      });
+      section.appendChild(button);
+      body.appendChild(section);
+    }
     Group("设置", SETTINGS);
     Group("编辑器", EDITORS);
 
