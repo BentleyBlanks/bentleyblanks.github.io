@@ -895,9 +895,11 @@ function BuildDadao(materials, weapon, key) {
     muzzle: new THREE.Vector3(0, 0.01, -0.70),
     sight: null,
     hands: {
-      // 双手握柄：右手在上（靠护手），左手在下（靠铁环）
-      right: { x: 0, y: 0, z: -0.055, rx: 0, ry: 0, rz: -1.52 },
-      left: { x: 0, y: 0, z: 0.055, rx: 0, ry: 0, rz: 1.60 },
+      // 双手握柄：右手在上（靠护手），左手在下（靠铁环）。
+      // ry = π 的理由与 MODEL_FP_TWEAK.Dadao 那条一样：小臂要顺着刀柄往身体方向
+      // 伸，不能顺着刀身伸。这条是模型读不到时的退路，两边得给同一个手位。
+      right: { x: 0, y: 0, z: -0.055, rx: 0, ry: Math.PI, rz: -1.52 },
+      left: { x: 0, y: 0, z: 0.055, rx: 0, ry: Math.PI, rz: 1.60 },
     },
     boltHandle: new THREE.Vector3(0, 0, 0),
   };
@@ -946,7 +948,13 @@ const VM_MATERIAL_BY_MESH = {
 const MODEL_FP_TWEAK = {
   Dadao: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0, 0, -1.52], left: [0, 0, 1.60] },
+    // ry = π：**小臂朝哪边伸**。手的局部 -Z 是小臂方向（袖口/前臂那三根管子都摆在
+    // z < 0 一侧，见 BuildHandGeometry），原来 ry = 0 让小臂顺着武器的 -Z 伸出去 ——
+    // 那是刀身的方向。旧姿态里刀平举向前，小臂跟着指向画面深处还看不出毛病；
+    // 新姿态把刀立起来之后，两条小臂就变成两截灰盒子横在刀身上，把刀刃挡掉一半。
+    // 加 π 之后小臂改朝武器 +Z（刀柄、柄尾环那一侧），也就是顺着握把往下、往画外
+    // 伸回身体 —— 这才是双手握刀该有的样子，画面里也只剩下拳头。
+    handRot: { right: [0, Math.PI, -1.52], left: [0, Math.PI, 1.60] },
   },
   Grenade: {
     // 弹体朝前上方：跟手搭 rig 里 prop.rotation.x = -0.35 是同一个角
@@ -1026,7 +1034,26 @@ const HIP_POSES = {
   lmg: { px: 0.100, py: -0.165, pz: -0.300, rx: 0.070, ry: -0.090, rz: 0.045 },
   pistol: { px: 0.055, py: -0.090, pz: -0.140, rx: 0.030, ry: -0.050, rz: 0.020 },
   throwable: { px: 0.130, py: -0.150, pz: -0.130, rx: 0.150, ry: -0.250, rz: 0.100 },
-  melee: { px: 0.115, py: -0.165, pz: -0.130, rx: -0.180, ry: -0.420, rz: 0.320 },
+  // 大刀。**上一版这一行等于"没拿刀"**：pz = -0.130 把刀柄摆在眼前 13 cm，
+  // 而 py = -0.165 —— 也就是握把在视线下方 atan(0.165/0.130) = 52°，而半视场只有
+  // 27.5°。整只手连同刀柄全部落在画面下沿之外；刀身又几乎顺着视线方向指出去
+  // （rx 只有 -0.18，等于平举向前），60 cm 的刀身在屏幕上是一条端面朝人的细线，
+  // 剩下那一点点还正好被右下角的小地图盖住。逐顶点投影的取证：整把刀只有刀身
+  // 那一块有 21% 的顶点落在 1600×900 里，而且全挤在 x>1217、y>755 的那个角上，
+  // 手是 0%。玩家报的"拿着大刀但基本上看不到"就是这么来的，不是亮度问题
+  // ——同一帧同一光照下汉阳造是看得见的。
+  //
+  // 这一版按"能看见"反解：
+  //   · pz 从 -0.130 推到 -0.500 —— 刀是 0.9 m 的长家伙，握把离眼 13 cm 时
+  //     刀身张角超过整个视场，必然要么怼脸要么出框。半米才是"举在身前"的距离。
+  //     （只有 pz/px/py 的**比值**改画面：整体等比缩放绕相机原点不动一个像素，
+  //     深度预算会自己把总尺度收回 0.9 m 以内，见 _RecomputeCompensation。）
+  //   · rx +0.75 / ry -0.75 把刀身从"指着前方"抬成"斜举于右前"，刀尖落在
+  //     画面右上（约 x1350 y240），刀柄在右下角出框 —— 一条完整的斜线。
+  //   · rz -1.60 是绕刀身自转：刃口转到朝左前方，刀面侧对镜头。刃朝前的话
+  //     屏幕上只有 5.4 mm 的厚度，刀面朝人才有 57 mm 的宽度可读。
+  //     顺带这个刃向也正是下一刀"右上劈向左下"的起手方向。
+  melee: { px: 0.260, py: -0.205, pz: -0.500, rx: 0.750, ry: -0.750, rz: -1.600 },
 };
 
 function PoseKindOf(weapon) {
@@ -1082,6 +1109,11 @@ export class Viewmodel {
     this.actionPivot = new THREE.Group();      // 拉栓 / 装填 / 突刺 / 投弹的整枪位移
     this.recoilPivot = new THREE.Group();      // 后坐
     this.weaponMount = new THREE.Group();      // 腰射↔开镜↔冲刺的姿态插值
+    // 绕**握把**转的那一层。上面每一层的原点都在相机原点，绕它们转只会把武器
+    // 整个平移过屏幕、朝向几乎不变 —— 那是"端着枪走位"，不是"抡刀"。
+    // 挥刀要的是刀身自己绕手转过一百多度，只有原点落在握把上的这一层能做到
+    // （weaponMount 的原点就是 rig 的原点，也就是模型规范里的右手握持点）。
+    this.swingPivot = new THREE.Group();
     this.root.add(this.fovRig);
     this.fovRig.add(this.swayPivot);
     this.swayPivot.add(this.bobPivot);
@@ -1089,6 +1121,7 @@ export class Viewmodel {
     this.statePivot.add(this.actionPivot);
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
+    this.weaponMount.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
     // 阻尼比 0.42：明显欠阻尼，鼠标停下后枪还会甩过去一点再回来 —— 这就是"重量"
@@ -1281,7 +1314,7 @@ export class Viewmodel {
       this.rig = builder(this.materials, this.weapon, weaponId);
     }
     this.rigSource = this.rig.source === "model" ? "model" : "box";
-    this.weaponMount.add(this.rig.group);
+    this.swingPivot.add(this.rig.group);
     this.rig.group.add(this.handRight.group);
     this.rig.group.add(this.handLeft.group);
 
@@ -1376,7 +1409,10 @@ export class Viewmodel {
   _MakeAdsPose(kind) {
     if (!this.rig || !this.rig.sight) {
       this.adsOffset.set(0, 0, 0);
-      if (kind === "melee") return { px: 0.02, py: -0.075, pz: -0.055, rx: -0.12, ry: -0.22, rz: 0.16 };
+      // 大刀的"开镜"是架刀预备：双手把刀提到胸前、刀身更竖更靠中线，
+      // 刀尖压进画面上沿以内。**不能沿用旧的那组数**（pz -0.055 把刀柄贴在眼球上，
+      // 和旧腰射姿态一样整只手都在画外），理由见 HIP_POSES.melee 那段账。
+      if (kind === "melee") return { px: 0.175, py: -0.170, pz: -0.470, rx: 0.900, ry: -0.540, rz: -1.500 };
       return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
     }
     const s = this.rig.sight;
@@ -1395,6 +1431,22 @@ export class Viewmodel {
   /** 冲刺：枪斜向下约 40°，同时向右外侧甩开，视野让出来。 */
   _MakeSprintPose(kind) {
     const base = HIP_POSES[kind];
+    // 大刀不能套这组绝对角：rx/ry/rz 是照着"枪口朝前"写的，把它们盖到刀上等于
+    // 把刀重新平举回视线方向 —— 又变回看不见的那一版。刀的冲刺是"刀锋压低、
+    // 往右外侧带"，所以从它自己的腰射姿态上做增量。
+    if (kind === "melee") {
+      return {
+        px: base.px + 0.020,
+        py: base.py - 0.030,
+        pz: base.pz + 0.020,
+        // 刀尖从"斜举"压到略低于水平（rx 0.75 -> -0.10），整把刀落到画面右下角，
+        // 中间那块视野让出来。压过头（试过 -0.52 那一版）刀会整个沉出下沿，
+        // 冲刺时又变成"手里没东西"——这正是这轮要修的毛病，不能在冲刺上重犯。
+        rx: base.rx - 0.85,
+        ry: base.ry + 0.10,
+        rz: base.rz + 0.35,
+      };
+    }
     return {
       px: base.px + 0.045,
       py: base.py - 0.055,
@@ -1444,7 +1496,7 @@ export class Viewmodel {
     if (this.rig) {
       this.rig.group.remove(this.handRight.group);
       this.rig.group.remove(this.handLeft.group);
-      this.weaponMount.remove(this.rig.group);
+      this.swingPivot.remove(this.rig.group);
       this.rig.group.traverse((node) => {
         if (node.isMesh && node.geometry) node.geometry.dispose();
       });
@@ -1807,6 +1859,7 @@ export class Viewmodel {
   _ResetAnimatedParts() {
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
+    this.swingPivot.rotation.set(0, 0, 0);
     if (!this.rig) return;
     this.handRight.group.position.copy(this.handBase.right);
     this.handRight.group.rotation.copy(this.handBaseRot.right);
@@ -1997,19 +2050,35 @@ export class Viewmodel {
   /** 近战：刺刀突刺 / 大刀劈砍 / 枪托砸。 */
   _AnimMelee(t, mode) {
     if (mode === "slash") {
-      // 大刀：从右上抡到左下，收势时刀身横在胸前
-      const wind = Ease.Out(Ease.Seg(t, 0.00, 0.26));
-      const cut = Ease.In(Ease.Seg(t, 0.26, 0.52));
-      const recover = Ease.Out(Ease.Seg(t, 0.52, 1.00));
-      const swing = cut - recover * 0.85;
+      // 大刀：抡到右上举顶，再从右上劈到左下，收势回预备。
+      //
+      // **符号是照着 actionPivot 在相机坐标里的效果定的，不是照着"手臂怎么动"。**
+      // actionPivot 挂在 weaponMount 之上、原点就在相机原点，所以它的三个角
+      // 直接就是刀在屏幕上的运动：
+      //   +rx 抬（刀往画面上方走）  +ry 往左扫  +rz 逆时针滚
+      // 旧的一组数是配"刀平举向前"那版腰射姿态写的，符号正好相反 —— 起手往左下
+      // 沉、劈向右上，配上新姿态就是"从画外抡到画外"，一帧都看不到刀。
+      const wind = Ease.Out(Ease.Seg(t, 0.00, 0.24));
+      const cut = Ease.In(Ease.Seg(t, 0.24, 0.50));
+      const recover = Ease.Out(Ease.Seg(t, 0.50, 1.00));
+      const swing = cut - recover * 0.92;
+      // 主体：刀身绕握把在**自己的劈砍平面**里转过约 130°。
+      // 绕武器局部 X 轴转就是沿刃口方向走刀（-X 朝刃、+X 朝刀背，见 BuildDadao 的
+      // 截面），负角 = 往刃口那侧劈。而腰射姿态的 rz 已经把刀面侧对镜头，于是这个
+      // 劈砍平面差不多就是屏幕平面 —— 刀尖从右上抡过画面顶再落到左下，整条弧线
+      // 都在画面里。这是这一版最要紧的一条：绕相机原点转多少度都只是平移，
+      // 刀在屏幕上的朝向不会变，看着像端着刀走位而不是抡刀。
+      this.swingPivot.rotation.set(0.22 * wind - 2.35 * swing, 0.26 * swing, 0, "YXZ");
+      // 附加：整个人跟着送一下肩、压一下身，给这一刀配重量。幅度按半视场
+      // （27.5° ≈ 0.48 rad）来定，超过它就是整把刀甩出画面。
       this.actionPivot.position.set(
-        Mix(0, 0.10, wind) - swing * 0.30,
-        Mix(0, 0.14, wind) - swing * 0.22,
-        Mix(0, 0.09, wind) - swing * 0.16);
+        0.030 * wind - 0.070 * swing,
+        0.035 * wind - 0.075 * swing,
+        0.020 * wind - 0.055 * swing);
       this.actionPivot.rotation.set(
-        Mix(0, -0.55, wind) + swing * 0.95,
-        Mix(0, 0.60, wind) - swing * 1.35,
-        Mix(0, -0.85, wind) + swing * 1.95, "YXZ");
+        0.10 * wind - 0.20 * swing,
+        -0.05 * wind + 0.16 * swing,
+        -0.06 * wind + 0.18 * swing, "YXZ");
       return;
     }
     if (mode === "thrust") {
