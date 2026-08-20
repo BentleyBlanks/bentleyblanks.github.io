@@ -364,7 +364,12 @@ async function Boot() {
   // 画面不变（等比缩放绕相机原点是恒等的），但枪口离眼睛只剩半米，贴墙时会穿模
   // meshDocs 直接借 ActorFactory 已经解码好的那份：同一个 .tzm.json 解两遍
   // 既多花开机时间又多占一份内存，而两边要的就是同一棵节点树。
-  viewmodel = new Viewmodel(library, { fov: 52, depthBudget: 1.22, meshDocs: actorFactory.meshDocs });
+  viewmodel = new Viewmodel(library, {
+    fov: 52,
+    depthBudget: 1.22,
+    meshDocs: actorFactory.meshDocs,
+    riggedAssets: actorFactory.riggedAssets,
+  });
   camera.add(viewmodel.root);
   scene.add(camera);
   // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，

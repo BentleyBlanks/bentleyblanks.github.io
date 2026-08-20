@@ -26,6 +26,10 @@
       "imports": {
         "three": "./vendor/three/build/three.module.js?v=1",
         "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=1",
+        "./vendor/three/examples/jsm/loaders/GLTFLoader.js": "./vendor/three/examples/jsm/loaders/GLTFLoader.js?v=1",
+        "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js": "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js?v=1",
+        "./vendor/three/examples/jsm/utils/SkeletonUtils.js": "./vendor/three/examples/jsm/utils/SkeletonUtils.js?v=1",
+        "./vendor/three/examples/jsm/animation/CCDIKSolver.js": "./vendor/three/examples/jsm/animation/CCDIKSolver.js?v=1",
         "./vendor/rapier/build/rapier.module.mjs": "./vendor/rapier/build/rapier.module.mjs?v=1",
 
         "./Script_Physics.mjs": "./Script_Physics.mjs?v=3",
@@ -36,6 +40,7 @@
         "./Script_Geo.mjs": "./Script_Geo.mjs?v=1",
         "./Script_LivedInProps.mjs": "./Script_LivedInProps.mjs?v=1",
         "./Script_MeshLoad.mjs": "./Script_MeshLoad.mjs?v=1",
+        "./Script_RiggedModel.mjs": "./Script_RiggedModel.mjs?v=1",
         "./Data_Meshes.mjs": "./Data_Meshes.mjs?v=4",
         "./Script_Post.mjs": "./Script_Post.mjs?v=3",
         "./Script_Sky.mjs": "./Script_Sky.mjs?v=2",
@@ -53,8 +58,8 @@
         "./Script_Interact.mjs": "./Script_Interact.mjs?v=2",
         "./Script_Player.mjs": "./Script_Player.mjs?v=2",
         "./Script_Ai.mjs": "./Script_Ai.mjs?v=5",
-        "./Script_Actor.mjs": "./Script_Actor.mjs?v=4",
-        "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=4",
+        "./Script_Actor.mjs": "./Script_Actor.mjs?v=5",
+        "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=5",
         "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=3",
         "./Script_Audio.mjs": "./Script_Audio.mjs?v=2",
         "./Script_Hud.mjs": "./Script_Hud.mjs?v=8",
@@ -109,6 +114,6 @@
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=22"></script>
+  <script type="module" src="./Script_Main.mjs?v=23"></script>
 </body>
 </html>

@@ -26,6 +26,7 @@ import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noi
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
+import { LoadRiggedAssets, IjaSoldierSkin } from "./Script_RiggedModel.mjs";
 import {
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
 } from "./Data_Meshes.mjs";
@@ -1192,6 +1193,15 @@ export class Actor {
     this.gripL = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
 
+    // 日军换成带贴图、完整 Humanoid 骨骼的 GLB。旧 13 关节层级仍在下面跑，
+    // 枪口、握点、AI 与既有动作时序全部不动；IjaSoldierSkin 只把关节增量重定向
+    // 到新骨架。模型读取失败时这里是 null，旧几何自动保持可见。
+    this.riggedSkin = factory.CreateRiggedSkin(this);
+    if (this.riggedSkin) {
+      this.meshSource = "rigged";
+      this.usingModel = true;
+    }
+
     this.Update(0, { moveSpeed: 0, aim: 0, elapsed: 0 });
   }
 
@@ -1362,6 +1372,7 @@ export class Actor {
     if (this.ragdollState) {
       this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
       this.PoseRagdoll(this.ragdollState, dying);
+      if (this.riggedSkin) this.riggedSkin.Update();
       return;
     }
 
@@ -1648,6 +1659,7 @@ export class Actor {
       this.chest.rotation.x -= dying * 0.45;
       this.neck.rotation.x -= dying * 0.30;          // 头也垂下去
     }
+    if (this.riggedSkin) this.riggedSkin.Update();
   }
 
   /** 把 root 空间的落脚点换算进 hips 的父子链（body 与 hips 都可能有旋转/位移）。 */
@@ -2060,9 +2072,11 @@ export class Actor {
    */
   Dispose() {
     if (this.disposed) return;
+    if (this.riggedSkin) this.riggedSkin.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
     this.root.clear();
     this.weaponGroup = null;
+    this.riggedSkin = null;
     this.disposed = true;
   }
 }
@@ -2086,6 +2100,7 @@ export class ActorFactory {
     this.meshDocs = new Map();       // 模型 id -> 解码好的 TZM 文档
     this.meshLoading = null;
     this.meshReport = { requested: 0, loaded: 0, missing: [], ready: false };
+    this.riggedAssets = null;
     this.disposed = false;
   }
 
@@ -2106,13 +2121,18 @@ export class ActorFactory {
     ]);
     const ids = [...wanted].filter((id) => MESHES[id]);
     this.meshLoading = (async () => {
-      const docs = await Promise.all(ids.map((id) => LoadDocument(MeshUrl(id))));
+      const [docs, riggedAssets] = await Promise.all([
+        Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
+        LoadRiggedAssets(),
+      ]);
       ids.forEach((id, i) => { if (docs[i]) this.meshDocs.set(id, docs[i]); });
+      this.riggedAssets = riggedAssets;
       this.meshReport = {
         requested: ids.length,
         loaded: this.meshDocs.size,
         missing: ids.filter((id) => !this.meshDocs.has(id)),
         ready: true,
+        rigged: riggedAssets.report,
       };
       return this.meshReport;
     })();
@@ -2209,6 +2229,17 @@ export class ActorFactory {
    */
   Create(kind, options = {}) {
     return new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
+  }
+
+  /** 同步克隆已经预读好的日军皮肤；Actor 创建链保持同步。 */
+  CreateRiggedSkin(actor) {
+    if (!actor || !actor.kind.startsWith("ija") || !this.riggedAssets || !this.riggedAssets.ijaSoldier) return null;
+    try {
+      return new IjaSoldierSkin(this.riggedAssets.ijaSoldier, actor);
+    } catch (error) {
+      console.warn(`[Actor] 日军骨骼模型实例化失败，退回旧几何：${String(error).slice(0, 180)}`);
+      return null;
+    }
   }
 
   /**

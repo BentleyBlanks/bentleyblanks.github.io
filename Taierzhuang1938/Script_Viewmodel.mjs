@@ -35,6 +35,7 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 import { DIFFICULTY } from "./Data_Battle.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
+import { FpsArmRig } from "./Script_RiggedModel.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -1109,6 +1110,7 @@ export class Viewmodel {
    */
   constructor(library, {
     fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel", meshDocs = null,
+    riggedAssets = null,
   } = {}) {
     this.library = library;
     // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
@@ -1210,6 +1212,14 @@ export class Viewmodel {
     // --- 手 -----------------------------------------------------------------
     this.handRight = MakeHand(this.materials, 1, "hr");
     this.handLeft = MakeHand(this.materials, -1, "hl");
+    this.riggedArms = null;
+    if (riggedAssets && riggedAssets.fpsArms) {
+      try {
+        this.riggedArms = new FpsArmRig(riggedAssets.fpsArms);
+      } catch (error) {
+        console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
+      }
+    }
     this.handBase = { right: new THREE.Vector3(), left: new THREE.Vector3() };
     this.handBaseRot = { right: new THREE.Euler(), left: new THREE.Euler() };
 
@@ -1367,6 +1377,14 @@ export class Viewmodel {
     this.handBase.left.copy(this.handLeft.group.position);
     this.handBaseRot.right.copy(this.handRight.group.rotation);
     this.handBaseRot.left.copy(this.handLeft.group.rotation);
+
+    // 新手臂用 IK 追随上面两只旧手的握点。旧手只当隐藏动画靶，既有每把枪的
+    // 拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用，不需要重做动作表。
+    if (this.riggedArms) {
+      this.riggedArms.Attach(this.rig.group, this.handRight.group, this.handLeft.group,
+        [this.handRight, this.handLeft]);
+      this.rigSource = `${this.rigSource}+riggedArms`;
+    }
 
     // 枪口焰锚点
     this.muzzleAnchor = new THREE.Object3D();
@@ -1527,6 +1545,7 @@ export class Viewmodel {
   }
 
   _ClearRig() {
+    if (this.riggedArms) this.riggedArms.Detach();
     if (this.muzzleAnchor) {
       this.muzzleAnchor.remove(this.flash);
       this.muzzleAnchor = null;
@@ -1846,6 +1865,7 @@ export class Viewmodel {
     // --- 枪焰 / 碎屑 ---------------------------------------------------------
     this._StepFlash(step);
     this._StepDebris(step);
+    if (this.riggedArms) this.riggedArms.Update(step);
   }
 
   _MixPose(a, b, t) {
@@ -2278,6 +2298,7 @@ export class Viewmodel {
 
   Dispose() {
     this._ClearRig();
+    if (this.riggedArms) this.riggedArms.Dispose();
     const seen = new Set();
     this.root.traverse((node) => {
       if (node.isMesh && node.geometry && !seen.has(node.geometry)) {

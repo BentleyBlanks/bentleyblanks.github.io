@@ -1,8 +1,9 @@
-# 血战台儿庄 · 外部枪模来源与许可
+# 血战台儿庄 · 外部模型来源与许可
 
-游戏运行时只加载 `Model/*.tzm.json`。下面这些源文件给 `_blender/ImportWeapons.py` 重建用，不进页面。
+游戏运行时加载 `Model/*.tzm.json`，并为人物换模额外加载
+`Model_FpsArms.glb` 与 `Model_IjaSoldier.glb`。`_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
 
-TZM 只保留几何：外部 PBR 贴图全部丢掉，钢/木走游戏内 `steel` / `wood` 盒式投影，和人物、沙包同一套烘焙材质。
+武器 TZM 只保留几何：外部 PBR 贴图全部丢掉，钢/木走游戏内 `steel` / `wood` 盒式投影，和人物、沙包同一套烘焙材质。两份人物 GLB 则保留各自的贴图、蒙皮、骨架与动画。
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
@@ -17,3 +18,19 @@ TZM 只保留几何：外部 PBR 贴图全部丢掉，钢/木走游戏内 `steel
 - 手榴弹、大刀、八九式掷弹筒：继续用已按史料尺寸建好的程序化模型。
 
 CC0 不强制署名；表里的作者与链接是为了以后还能找回源文件。
+
+## 人物与第一人称手臂
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
+|---|---|---|---|---|
+| 第一人称双臂 `Model_FpsArms.glb` | `Source/Model_WradArms.glb` | [wwwriks / WRAD Arms](https://github.com/wwwriks/wrad-arms) | CC0 | 保留 50 根手指/手臂骨骼与 512×512 皮肤贴图；离线细分平滑并增加 `GripIdle`，运行时用双臂 IK 跟随原有握点。原始许可副本为 `Source/License_WradArms.txt`。 |
+| 日军步兵 `Model_IjaSoldier.glb` | `Source/Model_LowpolyWw2Soldier.fbx` + `Source/Texture_LowpolyWw2Soldier.png` | [nisu / Rigged Lowpoly WW2 Soldier](https://opengameart.org/content/rigged-lowpoly-ww2-soldier) | CC0 | 保留原始 49 骨骨架、蒙皮和贴图，并内置 Idle / Walk / AimRifle / Death 四段动画；制服重着色为土黄、另建九〇式钢盔。为无损复用本作既有动作，另离线生成与 13 关节旧骨架同轴的纹理分段作为运行时显示层。 |
+
+人物构建命令：
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --python Taierzhuang1938/_import/BuildRiggedCharacters.py
+```
+
+运行时 GLB 仍包含源蒙皮、骨架和动画；兼容分段只解决“旧动作能不能直接套”的坐标差异，
+不改变枪口、握点、AI 状态或动作时序。
