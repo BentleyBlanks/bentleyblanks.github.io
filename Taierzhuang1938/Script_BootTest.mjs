@@ -51,6 +51,22 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       const T = window.Taierzhuang;
       const gl = T.renderer.getContext();
       const glError = gl.getError();
+      // 贴花回归：命中点不能再沿法线物理抬高；RGB 仍做正常叠色，但 HDR alpha
+      // 必须保留，且 fragment shader 必须用预通道把离开承载面的 quad 裁掉。
+      const decalPool = T.vfx.pools.decal;
+      const decalIndex = decalPool.cursor;
+      T.vfx._SpawnDecal({ x: 17, y: 3, z: -9 }, { x: 0, y: 1, z: 0 },
+        0.12, [0.5, 0.5, 0.5], [0.1, 0.1, 0.1]);
+      const decalOrigin = Array.from(decalPool.arrays.iOrigin.slice(decalIndex * 3, decalIndex * 3 + 3));
+      const decalMaterial = decalPool.material;
+      let readableIjaMaterials = 0;
+      const ija = T.ai.soldiers.find((soldier) => soldier.side === "ija" && soldier.actor);
+      if (ija) ija.actor.root.traverse((object) => {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          if (material?.userData?.distantIjaReadable) readableIjaMaterials += 1;
+        }
+      });
       // renderer.info.render 每次 renderer.render() 都会重置，而一帧里有十几个
       // pass。不关掉 autoReset 的话，读到的永远只是最后那一块全屏四边形 = 1。
       T.renderer.info.autoReset = false;
@@ -106,6 +122,13 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         // 粒子层接没接上预通道与当关的雾：这两条断了，远处的烟就没有大气透视
         vfxDepthValid: T.vfx.shared.uDepthValid.value,
         vfxFogDensity: T.vfx.shared.uFogDensity.value,
+        decalOrigin,
+        decalPreservesTargetAlpha: decalMaterial.userData.preserveTargetAlpha === true
+          && decalMaterial.blendSrcAlpha === 200
+          && decalMaterial.blendDstAlpha === 201,
+        decalUsesSurfaceClip: decalMaterial.fragmentShader.includes("surfaceTolerance")
+          && decalMaterial.fragmentShader.includes("abs(sceneDepth - vViewDepth)"),
+        readableIjaMaterials,
       };
     });
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
@@ -153,6 +176,10 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         bad.push(`城镇生活层不足 household=${city?.householdProps ?? "?"} streetClusters=${city?.streetClusters ?? "?"} streetProps=${city?.streetProps ?? "?"} roadMarks=${city?.roadMarks ?? "?"}`);
       }
     }
+    if (health.decalOrigin.join(",") !== "17,3,-9") bad.push(`贴花仍被物理抬离命中面 ${health.decalOrigin}`);
+    if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
+    if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
+    if (health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
   }
   const ok = bad.length === 0;
   if (!ok) failed += 1;

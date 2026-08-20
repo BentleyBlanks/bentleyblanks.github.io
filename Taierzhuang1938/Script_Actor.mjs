@@ -148,6 +148,33 @@ function Dimensions(height) {
  */
 const IJA_HELMET_ALBEDO = 0x3C3A30;
 
+/**
+ * 日军远景辨识补偿。不是描边 UI：它仍走原 PBR、雾和后处理，只在 70 m 外逐渐给
+ * 军装/钢盔的掠射轮廓补一点低饱和卡其反光。原色与鲁南春季黄土地太接近，三百米上
+ * 剩四五个像素时会完全融进地面；这层把“人形边”留下，但 55 m 内严格为零。
+ */
+function AddDistantIjaReadability(material, strength = 1) {
+  if (!material || material.userData.distantIjaReadable) return material;
+  const previousCompile = material.onBeforeCompile;
+  const previousKey = material.customProgramCacheKey;
+  material.onBeforeCompile = (shader, renderer) => {
+    if (previousCompile) previousCompile.call(material, shader, renderer);
+    shader.uniforms.uIjaReadabilityColor = { value: new THREE.Color(0x8B7A48).multiplyScalar(strength) };
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nuniform vec3 uIjaReadabilityColor;`)
+      .replace("#include <opaque_fragment>", `
+        float ijaReadableRange = smoothstep(70.0, 240.0, length(vViewPosition));
+        float ijaReadableRim = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 1.6);
+        outgoingLight += uIjaReadabilityColor * ijaReadableRange * (0.025 + ijaReadableRim * 0.16);
+        #include <opaque_fragment>`);
+  };
+  material.customProgramCacheKey = () => `${previousKey ? previousKey.call(material) : ""}|ijaReadable:${strength}`;
+  material.userData.distantIjaReadable = true;
+  material.userData.distantIjaStartM = 70;
+  material.needsUpdate = true;
+  return material;
+}
+
 /** 站直也留一点膝盖弯：腿绷成一条直线是「假人」最明显的一处。 */
 const STAND_SETTLE = 0.014;
 /** 脚贴地能修正的最大高差（米，root 局部尺度）。超过这个数说明人本来就该掉下去。 */
@@ -2398,6 +2425,11 @@ export class ActorFactory {
     const accessory = this.Material(`acc:${recipe}:${accessoryHex}`,
       () => lib.Get(recipe, { color: TintTo(recipe, accessoryHex), tintId: `a${accessoryHex}`, roughness: 1 }));
 
+    if (kind === "ija" || kind === "ijaOfficer") {
+      AddDistantIjaReadability(uniform, 1.0);
+      AddDistantIjaReadability(accessory, 0.72);
+    }
+
     // 台儿庄是 3—4 月，草鞋与布鞋**混杂**出现，所以这里掷一次骰子
     const shoeHex = spec.shoe === "boot" ? HEX.ijaBoot
       : (spec.shoe === "clothShoe" || rnd() < 0.45 ? HEX.clothShoe : HEX.strawShoe);
@@ -2419,8 +2451,8 @@ export class ActorFactory {
       //     贴图整体提亮两倍 —— 换成模型的整块半球之后，实测渲出来是一颗
       //     **和皮肤同色**的暖白球，三十米外等于没戴盔（方块时代那顶盔是几个折面，
       //     高光被切碎了，所以一直没暴露）。落到 albedo 要再压两档。
-      helmet: this.Material("helmet", () => lib.Get("SteelHelmet",
-        { color: TintTo("SteelHelmet", IJA_HELMET_ALBEDO), tintId: "helm", roughness: 1, metalness: 0.04 })),
+      helmet: AddDistantIjaReadability(this.Material("helmet", () => lib.Get("SteelHelmet",
+        { color: TintTo("SteelHelmet", IJA_HELMET_ALBEDO), tintId: "helm", roughness: 1, metalness: 0.04 })), 0.9),
       // 枪身钢与枪托木。这两桶**只有武器模型在用**（人身上的钢件走 helmet，
       // 皮件走 leather），所以这里的数按枪来调，不必迁就人物。
       //

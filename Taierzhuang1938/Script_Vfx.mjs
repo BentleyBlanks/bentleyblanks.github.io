@@ -169,6 +169,7 @@ varying vec3 vLitNormal;
 #endif
 #ifdef SHAPE_DECAL
 varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
+varying float vDecalSize;  // 深度裁边容差要随贴花尺寸增长；焦痕比弹孔跨过更多地表起伏
 #endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
@@ -251,6 +252,7 @@ void main() {
   vColorAlt = iColorB;
 #ifdef SHAPE_DECAL
   vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
+  vDecalSize = size;
 #endif
 
   // fadeIn 是"占寿命的比例"。贴花寿命是 1e5 秒，任何非零比例都会变成几十秒才浮现，
@@ -315,6 +317,7 @@ varying vec3 vLitNormal;
 #endif
 #ifdef SHAPE_DECAL
 varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
+varying float vDecalSize;
 #endif
 #ifdef LIT
 varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
@@ -393,6 +396,17 @@ void main() {
   float sceneDepth = uDepthValid > 0.5
     ? texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w
     : 0.0;
+
+#ifdef SHAPE_DECAL
+  // 贴花只是命中点切平面上的 quad，不是真正投影到承载几何上的网格。过去它靠 12 mm
+  // 物理抬升躲 z-fighting：贴到墙沿会探出去，墙被打穿后还会整片留在空中。现在几何
+  // 就放回命中面，polygonOffset 只改深度比较；同时拿预通道逐像素确认后面仍是原表面。
+  // 小弹孔容差约 1—2 cm，大焦痕按尺寸放宽，允许它顺着轻微起伏的地面铺开。
+  if (uDepthValid > 0.5) {
+    float surfaceTolerance = max(0.006 + vDecalSize * 0.08, vViewDepth * 0.00008);
+    if (sceneDepth <= 0.001 || abs(sceneDepth - vViewDepth) > surfaceTolerance) discard;
+  }
+#endif
 
 #ifdef AERIAL
   // 补雾，且**只补背景是天空的那一半**（见文件头）。背景有实体时合成 pass 已经
@@ -640,6 +654,7 @@ class ParticlePool {
     if (config.bounce) defines.GROUND_BOUNCE = "";
     if (config.aerial) defines.AERIAL = "";
 
+    const preserveTargetAlpha = !!config.preserveTargetAlpha;
     this.material = new THREE.ShaderMaterial({
       defines,
       uniforms: Object.assign({}, shared, { uSoftRange: { value: config.softRange ?? 0.6 } }),
@@ -648,12 +663,21 @@ class ParticlePool {
       transparent: true,
       depthTest: true,
       depthWrite: false,                 // 半透明粒子写深度 = 互相切出硬边
-      blending: config.blending,
+      // 默认 NormalBlending 会把离屏 HDR 靶的 alpha 也按 srcAlpha 混低：贴花越深，
+      // 承载物在后续链路里越像“透明了”。贴花只改 RGB，alpha 必须原样保留。
+      blending: preserveTargetAlpha ? THREE.CustomBlending : config.blending,
+      blendSrc: preserveTargetAlpha ? THREE.SrcAlphaFactor : undefined,
+      blendDst: preserveTargetAlpha ? THREE.OneMinusSrcAlphaFactor : undefined,
+      blendEquation: preserveTargetAlpha ? THREE.AddEquation : undefined,
+      blendSrcAlpha: preserveTargetAlpha ? THREE.ZeroFactor : undefined,
+      blendDstAlpha: preserveTargetAlpha ? THREE.OneFactor : undefined,
+      blendEquationAlpha: preserveTargetAlpha ? THREE.AddEquation : undefined,
       side: THREE.DoubleSide,
       polygonOffset: !!config.polygonOffset,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -4,
     });
+    this.material.userData.preserveTargetAlpha = preserveTargetAlpha;
     // 粒子是加性/半透明的 billboard：进了深度法线预通道就会在 SSAO 里
     // 挖出一片乱码，还会把体积光的天空判据搞坏。
     MarkNoPrepass(this.material);
@@ -1073,10 +1097,11 @@ export class VfxSystem {
         shape: "ring", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 5,
       }, this.shared),
-      // 弹孔贴花：贴面 + 法线偏移 + polygonOffset，双保险防 z-fighting
+      // 弹孔贴花：几何留在命中面，polygonOffset 只动深度；预通道逐像素裁掉悬空部分。
       decal: new ParticlePool(Math.min(this.preset.decals, cap(POOL_SHARE.decal, 32)), {
         shape: "decal", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 3, polygonOffset: true,
+        preserveTargetAlpha: true,
       }, this.shared),
     };
     this.debris = new DebrisPool(cap(POOL_SHARE.debris, 48), this.shared);
@@ -1755,12 +1780,12 @@ export class VfxSystem {
     this.debris.Spawn(d, this.time);
   }
 
-  /** 弹孔贴花：沿法线抬 12 mm + polygonOffset，双保险防 z-fighting。 */
+  /** 弹孔贴花：原位贴面；polygonOffset 负责防 z-fighting，深度预通道负责裁悬空边。 */
   _SpawnDecal(position, normal, size, rim, hole, opacity = 0.85, rays = 1) {
     const s = ResetSpawn();
-    s.x = position.x + normal.x * 0.012;
-    s.y = position.y + normal.y * 0.012;
-    s.z = position.z + normal.z * 0.012;
+    s.x = position.x;
+    s.y = position.y;
+    s.z = position.z;
     s.nx = normal.x; s.ny = normal.y; s.nz = normal.z;
     s.life = 1e5;                       // 一关打不完；超上限由环形缓冲先进先出淘汰
     s.sizeStart = size; s.sizeEnd = size;
