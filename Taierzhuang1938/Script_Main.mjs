@@ -567,7 +567,10 @@ async function Boot() {
       SoldierInfo: (soldier) => ({
         id: soldier.id, side: soldier.side, state: soldier.state, order: soldier.order,
         squad: soldier.squadId, squadSlot: soldier.squadSlot, role: soldier.tacticalRole,
-        stance: soldier.stance, yaw: soldier.yaw, targetChanges: soldier.targetChanges,
+        stance: soldier.stance, yaw: soldier.yaw, lookYaw: soldier.lookYaw,
+        aim: soldier.aimBlend, targetChanges: soldier.targetChanges,
+        squadFocus: soldier.squadFocusKind, squadFocusId: soldier.squadFocusId,
+        squadForward: [soldier.squadForwardX, soldier.squadForwardZ],
         holdZone: soldier.holdZone ? soldier.holdZone.id : null,
         bayonet: soldier.bayonetFixed, heat: soldier.heat,
         coolFor: Math.max(0, soldier.coolUntil - ai.time),
@@ -1135,7 +1138,10 @@ function SeedSoldiers(phase) {
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
-    const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
+    const s = ai.Spawn("nra", open.x, open.z, {
+      towel: !!phase.nightRaid && rnd() < 0.55,
+      squadId: `Near_${phase.id}`,
+    });
     // 不给 holdZone：这一班是跟着镜头走的，钉在某个路标上就又跑没影了
     if (s) { s.holdZone = null; s.goal.set(px + ax * 15, 0, pz + az * 15); }
   }
@@ -1150,7 +1156,10 @@ function SeedSoldiers(phase) {
       open = spot;
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
-    const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
+    const s = ai.Spawn("ija", open.x, open.z, {
+      weapon: rnd() < 0.12 ? "Type11" : "Type38",
+      squadId: `Contact_${phase.id}`,
+    });
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
 
@@ -1164,7 +1173,10 @@ function SeedSoldiers(phase) {
       : behind[Math.floor(rnd() * behind.length)];
     if (!o) break;
     const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31, levelBounds);
-    const s = ai.Spawn("nra", open.x, open.z, { towel: !!phase.nightRaid && rnd() < 0.55 });
+    const s = ai.Spawn("nra", open.x, open.z, {
+      towel: !!phase.nightRaid && rnd() < 0.55,
+      squadId: `Defend_${phase.id}_${o.id}_${Math.floor(i / 6)}`,
+    });
     if (s) { s.holdZone = o; s.goal.set(o.x, 0, o.z); }
   }
   // --- 日方：从战线前方 60—140 m 压上来 -------------------------------------
@@ -1194,7 +1206,10 @@ function SeedSoldiers(phase) {
     at.z = Clamp(at.z, levelBounds.minZ, levelBounds.maxZ);
     const open = FindOpenSpot(at.x, at.z, 14,
       90001 + i * 617 + state.phaseIndex * 43, levelBounds);
-    const s = ai.Spawn("ija", open.x, open.z, { weapon: rnd() < 0.12 ? "Type11" : "Type38" });
+    const s = ai.Spawn("ija", open.x, open.z, {
+      weapon: rnd() < 0.12 ? "Type11" : "Type38",
+      squadId: `Attack_${phase.id}_${Math.floor(i / 6)}`,
+    });
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
   }
 }

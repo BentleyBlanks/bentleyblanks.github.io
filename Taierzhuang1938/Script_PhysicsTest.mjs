@@ -185,6 +185,38 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
 //     原本要等 world.step() 才同步，于是"自己按 1/60 调 player.Update 跑几百次"
 //     这种用法下人会原地不动（通关冒烟里「上城道走不上去」正是这一条）。
 //     现在 Move/Teleport 会当场同步碰撞体，这里就用最苛刻的那种驱动方式来验。
+//
+// 先单独锁住解析坡面的贴地：解析地形不在 Rapier 里，控制器自带 snapToGround
+// 看不见它。没有项目侧补偿时，角色会沿坡反复「离地一两帧—掉回地面」。
+{
+  const r = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const PhysicsWorld = T.physics.constructor;
+    const Ground = (x) => 10 - x * 0.6;             // 约 31°，仍在可走坡范围内
+    const testWorld = new PhysicsWorld({
+      groundAt: (x) => Ground(x),
+      bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 },
+    });
+    const body = testWorld.MakeCharacter({ radius: 0.34, height: 1.78,
+      position: { x: 0, y: Ground(0), z: 0 } });
+    let grounded = true, velocityY = 0, airFrames = 0, maxGap = 0;
+    for (let i = 0; i < 240; i += 1) {
+      velocityY = grounded ? -0.6 : velocityY - 19.6 / 60;
+      const moved = body.Move(0.045, velocityY / 60, 0);
+      testWorld.Step(1 / 60);
+      grounded = moved.grounded;
+      if (grounded) velocityY = 0;
+      else airFrames += 1;
+      maxGap = Math.max(maxGap, Math.abs(moved.y - Ground(moved.x)));
+    }
+    const out = { airFrames, maxGap, x: body.position.x, y: body.position.y };
+    testWorld.Dispose();
+    return out;
+  });
+  Check("解析下坡保持贴地，不再一路小跳", r.airFrames === 0 && r.maxGap < 0.015,
+    `离地帧=${r.airFrames}/240 最大脚底间隙=${r.maxGap.toFixed(3)} m`);
+}
+
 {
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;

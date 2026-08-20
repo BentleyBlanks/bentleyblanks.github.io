@@ -43,9 +43,12 @@ try {
         target: soldier.target?.isPlayer ? "player" : (soldier.target?.ref?.id ?? null),
         x: soldier.position.x, z: soldier.position.z,
         stanceChanges: 0, targetChanges: 0, maxYawStep: 0, maxBlendStep: 0,
-        movingSamples: 0, directedSamples: 0, supportCharges: 0,
+        maxLookYawStep: 0, maxAimStep: 0,
+        movingSamples: 0, directedSamples: 0, squadSamples: 0, squadDirectedSamples: 0,
+        supportCharges: 0,
         stanceHistory: [],
         crouch: soldier.crouchBlend, prone: soldier.proneBlend,
+        lookYaw: soldier.lookYaw, aim: soldier.aimBlend,
       });
     }
 
@@ -60,6 +63,10 @@ try {
         const blendStep = Math.max(Math.abs(soldier.crouchBlend - prev.crouch),
           Math.abs(soldier.proneBlend - prev.prone));
         prev.maxBlendStep = Math.max(prev.maxBlendStep, blendStep);
+        prev.maxLookYawStep = Math.max(prev.maxLookYawStep,
+          Math.abs(soldier.lookYaw - prev.lookYaw));
+        prev.maxAimStep = Math.max(prev.maxAimStep,
+          Math.abs(soldier.aimBlend - prev.aim));
         if (soldier.stance !== prev.stance) {
           prev.stanceChanges += 1;
           prev.stanceHistory.push(`${frame}:${prev.stance}>${soldier.stance}/${soldier.state}/${soldier.suppression.toFixed(2)}`);
@@ -76,10 +83,17 @@ try {
           const dot = (-Math.sin(soldier.yaw) * dx - Math.cos(soldier.yaw) * dz) / moved;
           prev.movingSamples += 1;
           if (dot > 0.15) prev.directedSamples += 1;
+          if (!soldier.holdZone && soldier.order === "advance"
+            && Math.hypot(soldier.squadForwardX, soldier.squadForwardZ) > 0.5) {
+            const squadDot = (soldier.squadForwardX * dx + soldier.squadForwardZ * dz) / moved;
+            prev.squadSamples += 1;
+            if (squadDot > 0) prev.squadDirectedSamples += 1;
+          }
         }
         prev.yaw = soldier.yaw; prev.stance = soldier.stance; prev.target = target;
         prev.x = soldier.position.x; prev.z = soldier.position.z;
         prev.crouch = soldier.crouchBlend; prev.prone = soldier.proneBlend;
+        prev.lookYaw = soldier.lookYaw; prev.aim = soldier.aimBlend;
       }
     }
 
@@ -91,6 +105,8 @@ try {
     const squads = [...new Set(soldiers.map((soldier) => soldier.squad))];
     const moving = soldiers.reduce((sum, soldier) => sum + soldier.movingSamples, 0);
     const directed = soldiers.reduce((sum, soldier) => sum + soldier.directedSamples, 0);
+    const squadSamples = soldiers.reduce((sum, soldier) => sum + soldier.squadSamples, 0);
+    const squadDirected = soldiers.reduce((sum, soldier) => sum + soldier.squadDirectedSamples, 0);
     const stanceWorst = soldiers.slice().sort((a, b) => b.stanceChanges - a.stanceChanges)[0];
     // 规则层直调也按新契约把枪口摆正、把目标标为可见，确认方向闸门没有误伤过热账。
     const gunner = T.ai.soldiers.find((soldier) => soldier.alive && soldier.side === "ija");
@@ -111,15 +127,43 @@ try {
         overheatShots += T.ai.fireCount - before;
       }
     }
+
+    // 把日军临时从规则层隐藏，强制走「没有近敌」分支：仍在自动推进的友军小队
+    // 必须统一锁当前未完成路标，不能恢复成每人挑最近点。
+    const savedIjaStates = T.ai.soldiers
+      .filter((soldier) => soldier.side === "ija")
+      .map((soldier) => [soldier, soldier.state]);
+    for (const [soldier] of savedIjaStates) soldier.state = "dead";
+    T.ai.UpdateSquads();
+    const mission = T.battlefield.objectives.find((objective) => !objective.reached)
+      || T.battlefield.objectives[T.battlefield.objectives.length - 1];
+    const fallback = T.ai.soldiers.filter((soldier) => soldier.alive && soldier.side === "nra"
+      && !soldier.holdZone && soldier.order === "advance" && T.ai.time >= soldier.manualGoalUntil);
+    const fallbackFocused = fallback.filter((soldier) => soldier.squadFocusKind === "objective"
+      && soldier.squadFocusId === mission?.id).length;
+    const fallbackDirected = fallback.filter((soldier) => {
+      const gx = soldier.goal.x - soldier.position.x;
+      const gz = soldier.goal.z - soldier.position.z;
+      const ox = (mission?.x ?? soldier.position.x) - soldier.position.x;
+      const oz = (mission?.z ?? soldier.position.z) - soldier.position.z;
+      return gx * ox + gz * oz > 0;
+    }).length;
+    for (const [soldier, state] of savedIjaStates) soldier.state = state;
     return {
       count: soldiers.length, roles, squads,
       maxYawStep: Math.max(...soldiers.map((soldier) => soldier.maxYawStep)),
       maxBlendStep: Math.max(...soldiers.map((soldier) => soldier.maxBlendStep)),
+      maxLookYawStep: Math.max(...soldiers.map((soldier) => soldier.maxLookYawStep)),
+      maxAimStep: Math.max(...soldiers.map((soldier) => soldier.maxAimStep)),
       maxStanceChanges: Math.max(...soldiers.map((soldier) => soldier.stanceChanges)),
       stanceWorst: stanceWorst ? `${stanceWorst.side}/${stanceWorst.role}/${stanceWorst.id} ${stanceWorst.stanceHistory.join(",")}` : "none",
       maxTargetChanges: Math.max(...soldiers.map((soldier) => soldier.targetChanges)),
       supportCharges: soldiers.reduce((sum, soldier) => sum + soldier.supportCharges, 0),
       directionRatio: moving ? directed / moving : 0,
+      squadDirectionRatio: squadSamples ? squadDirected / squadSamples : 0,
+      fallbackCount: fallback.length,
+      fallbackFocused,
+      fallbackDirected,
       overheatShots,
     };
   });
@@ -131,6 +175,8 @@ try {
     `单帧最大 ${(sample.maxYawStep * 180 / Math.PI).toFixed(2)}°`);
   Check("蹲卧动画连续", sample.maxBlendStep <= 0.071,
     `单帧最大 blend=${sample.maxBlendStep.toFixed(4)}`);
+  Check("枪口转向与据枪连续", sample.maxLookYawStep <= 0.081 && sample.maxAimStep <= 0.093,
+    `单帧 look=${sample.maxLookYawStep.toFixed(4)} aim=${sample.maxAimStep.toFixed(4)}`);
   Check("姿态没有阈值抽动", sample.maxStanceChanges <= 6,
     `12 秒单兵最多切换 ${sample.maxStanceChanges} 次（${sample.stanceWorst}）`);
   Check("目标锁没有来回甩枪口", sample.maxTargetChanges <= 7,
@@ -141,6 +187,12 @@ try {
     `触发冷却前开火=${sample.overheatShots}`);
   Check("移动方向与身体朝向一致", sample.directionRatio >= 0.6,
     `一致采样 ${(sample.directionRatio * 100).toFixed(1)}%`);
+  Check("自动推进服从小队共同方向", sample.squadDirectionRatio >= 0.58,
+    `同向采样 ${(sample.squadDirectionRatio * 100).toFixed(1)}%`);
+  Check("无近敌时整队回退到当前任务路标", sample.fallbackCount >= 2
+    && sample.fallbackFocused === sample.fallbackCount
+    && sample.fallbackDirected >= sample.fallbackCount * 0.8,
+  `友军=${sample.fallbackCount} 同焦点=${sample.fallbackFocused} 朝路标=${sample.fallbackDirected}`);
   Check("浏览器无脚本错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } finally {
   await browser.close();

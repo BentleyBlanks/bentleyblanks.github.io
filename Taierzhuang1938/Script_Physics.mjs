@@ -95,6 +95,9 @@ const DT_MAX = 1 / 30;
  * 水平分量按本来该走的距离缩回去 —— 人不会因此走快。
  */
 const AUTOSTEP_PROBE_M = 0.14;
+// Rapier 的 snapToGround 只认识灌进物理世界的实体；解析地形不在 Rapier 里。
+// 同样给解析地表 0.45 m 的吸附距离，才不会走下坡时逐帧「离地—落下」。
+const ANALYTIC_GROUND_SNAP_M = 0.45;
 
 const _q = { x: 0, y: 0, z: 0, w: 1 };
 /** 绕 Y 轴 ry 的四元数（这座城里所有旋转都只有偏航）。 */
@@ -685,6 +688,7 @@ export class CharacterBody {
     let mx = m.x, my = m.y, mz = m.z;
     this.hitCount = cc.numComputedCollisions();
     this.grounded = cc.computedGrounded();
+    const hasPhysicsGround = this.grounded;
 
     // 被挡住了？按 AUTOSTEP_PROBE_M 再解一次，看看是不是一级抬得上去的台阶。
     // 只在**站在地上且几乎没走动**时才试，所以正常行走一帧只解一次。
@@ -708,9 +712,17 @@ export class CharacterBody {
     this.position.y += mv.y;
     this.position.z += mv.z;
 
-    // 地表兜底。解析地形不在物理世界里，所以脚底穿到地面以下要自己提上来。
+    // 地表兜底。解析地形不在物理世界里，所以 Rapier 自带的 snapToGround 对它
+    // 完全无效。旧版只在穿到地面以下时往上提：下坡时脚底先高出坡面一小截，
+    // 下一帧 grounded=false 开始落，再下一帧被提回去，人物就沿坡一路小跳。
+    //
+    // 只在 Rapier **没有**找到实体支撑、上一帧确实站着、且没有向上跳时吸附解析面；
+    // 这样 0.3 m 高的实体台子不会被错误拉穿，玩家起跳也不会被吸回地上。
     const g = pw.groundAt(this.position.x, this.position.z);
-    if (this.position.y < g) {
+    const analyticGap = this.position.y - g;
+    const snapAnalytic = !hasPhysicsGround && wasGrounded && dy <= 0 && my <= 1e-4
+      && analyticGap >= 0 && analyticGap <= ANALYTIC_GROUND_SNAP_M;
+    if (this.position.y < g || snapAnalytic) {
       this.position.y = g;
       this.grounded = true;
     }

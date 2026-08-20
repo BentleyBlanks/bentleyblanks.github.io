@@ -34,6 +34,9 @@ const SIGHT_BY_STANCE = [120, 80, 45];
 // 组长定方向，突击手靠前，机枪/掩护手压后，侧翼手走最外侧，步枪手填中间。
 // Spawn 顺序固定，所以这张表也固定；同一种子重跑不会换队形。
 const SQUAD_SIZE = 6;
+const SQUAD_ENEMY_FOCUS_M = 92;
+const SQUAD_LOOKAHEAD_M = 22;
+const SQUAD_TURN_PER_UPDATE = 0.72;
 const SQUAD_SLOTS = [
   { role: "leader", lateral: 0, depth: 1 },
   { role: "assault", lateral: -2.5, depth: -4 },
@@ -133,6 +136,11 @@ export class Soldier {
     // 身体又逐帧朝新目标转，视觉上就是原地转圈。
     this.targetLockUntil = -99;
     this.targetChanges = 0;
+    // 枪不直接吃离散状态。FIRE/ADVANCE 在决策边界上偶尔切一次时，枪托仍应连续
+    // 上肩/放下；上身看向也必须相对「当前身体」而不是会量化跳变的导航方向。
+    this.aimBlend = 0;
+    this.aimUntil = -99;
+    this.lookYaw = 0;
     /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
     this.playerLockAt = -99;
     this.aimTime = 0;
@@ -214,6 +222,11 @@ export class Soldier {
     this.squadSlot = 0;
     this.tacticalRole = "rifleman";
     this.squadMateCount = 0;
+    this.squadForwardX = 0;
+    this.squadForwardZ = -1;
+    this.squadFocusKind = "none";
+    this.squadFocusId = null;
+    this.manualGoalUntil = -99;
     // 守点纪律：ER2 的 AI 会在赶路途中就地对射、根本不进点，导致「只要防守方
     // 看得见攻方，这张图就极好打」。这里给防守单位一条硬规矩：
     // 一旦被派去守某个占领区，除非死亡，否则不许离开该区半径。
@@ -375,9 +388,27 @@ export class AiDirector {
     }
     const soldier = new Soldier(side, { ...options, x, z });
     const serial = this.spawnSerial[side]++;
-    const slot = serial % SQUAD_SIZE;
+    const explicitSquadId = typeof options.squadId === "string" && options.squadId
+      ? `${side}_${options.squadId}` : null;
+    let assignedSquadId = explicitSquadId;
+    if (assignedSquadId) {
+      let overflow = 1;
+      while (this.soldiers.filter((candidate) => candidate.alive
+        && candidate.squadId === assignedSquadId).length >= SQUAD_SIZE) {
+        assignedSquadId = `${explicitSquadId}_${overflow}`;
+        overflow += 1;
+      }
+    }
+    let slot = serial % SQUAD_SIZE;
+    if (assignedSquadId) {
+      const used = new Set(this.soldiers
+        .filter((candidate) => candidate.alive && candidate.squadId === assignedSquadId)
+        .map((candidate) => candidate.squadSlot));
+      slot = SQUAD_SLOTS.findIndex((_, index) => !used.has(index));
+      if (slot < 0) slot = serial % SQUAD_SIZE;
+    }
     const slotSpec = SQUAD_SLOTS[slot];
-    soldier.squadId = `${side}_${Math.floor(serial / SQUAD_SIZE)}`;
+    soldier.squadId = assignedSquadId || `${side}_${Math.floor(serial / SQUAD_SIZE)}`;
     soldier.squadSlot = slot;
     // 真正的轻机枪手永远承担掩护，不会因为出生序号恰好落在突击位就抱着机枪冲刺。
     soldier.tacticalRole = soldier.weapon.rpm ? "support" : slotSpec.role;
@@ -426,37 +457,23 @@ export class AiDirector {
   }
 
   /**
-   * 离这个兵最近的、还在对方手上的占领点。
-   * 日方每次 Think 都要重取 —— 用生成那一刻的快照会让整条战线钉死在开局的那个点上，
-   * 点丢了也没人往下一个点推，于是八个点的 owner 从头到尾一个都不变。
+   * 当前任务链上的推进路标。
+   *
+   * 滕县是线性路标链，owner 恒为 nra；拿 owner 当筛选条件会把已走过、还没走到的
+   * 所有点都当成「敌方点」，每个人再各挑一个最近的，整班自然往八个方向散。
+   * 两边都以第一个未完成路标为会合方向：友军向任务推进，前方日军向同一处压来。
    */
-  NearestEnemyObjective(s) {
+  CurrentMissionObjective() {
     const list = this.ctx.battlefield?.objectives;
     if (!list || !list.length) return null;
-    let best = null, bestD = 1e9;
-    for (const o of list) {
-      if (o.owner === s.side) continue;
-      const d = Math.hypot(o.x - s.position.x, o.z - s.position.z);
-      if (d < bestD) { bestD = d; best = o; }
-    }
-    // 已经近在眼前的点就打眼前这个，否则归队去打全军的那个主攻点。
-    // 各打各的最近点会把 38 个人摊到八个方向上 —— 一座 500×460 m 的城里
-    // 1.5 m 高度 30 m 的射线只有 19/200 是通的，摊开就等于谁也遇不上谁。
-    // ER2 的战场之所以像战场，是因为它有一条**前线**：兵力压在同一处。
-    // 眼前五十五米内还有敌方的点就打眼前这个：导航网格落地之后他们真的走得到，
-    // 不必再像第 1 批那样把所有人硬压到同一条前线上才能碰上面。
-    if (bestD < 55) return best;
-    const front = this.frontObjective[s.side];
-    return front || best;
+    return list.find((objective) => !objective.reached) || list[list.length - 1];
   }
 
-  /**
-   * 每一侧的主攻点：己方兵力重心最近的那个敌方占领点。
-   * 一秒重算一次就够 —— 这是战线的位置，不是瞄准点。
-   */
+  /** 每秒汇总两侧重心与当前任务路标；随后统一更新小队意图。 */
   UpdateFront() {
     const list = this.ctx.battlefield?.objectives;
     if (!list || !list.length) return;
+    const mission = this.CurrentMissionObjective();
     for (const side of ["nra", "ija"]) {
       let cx = 0, cz = 0, n = 0;
       for (const s of this.soldiers) {
@@ -467,64 +484,155 @@ export class AiDirector {
       cx /= n; cz /= n;
       if (this.centroid[side]) { this.centroid[side].x = cx; this.centroid[side].z = cz; }
       else this.centroid[side] = { x: cx, z: cz };
-      let best = null, bestD = 1e9;
-      for (const o of list) {
-        if (o.owner === side) continue;
-        const d = Math.hypot(o.x - cx, o.z - cz);
-        if (d < bestD) { bestD = d; best = o; }
-      }
-      // 迟滞：主攻点一旦定下来，除非**打下来了**或者出现一个近三成半以上的新目标，
-      // 否则不许换。没有这一条的后果是实跑量到的：前线每秒按兵力重心重算，
-      // 重心一飘就换点，四十个人半路集体掉头，两军从此擦肩而过 ——
-      // 采样里连着几段 under70 只有 1 对、targets 0，仗停在"互相找不到"上。
-      const current = this.frontObjective[side];
-      if (current && current.owner !== side) {
-        const dCur = Math.hypot(current.x - cx, current.z - cz);
-        if (!best || dCur < bestD * 1.35) best = current;
-      }
-      this.frontObjective[side] = best;
+      this.frontObjective[side] = mission;
     }
     this.UpdateSquads();
   }
 
   /**
-   * 每秒汇总一次战斗组位置。队形只影响共同目标附近的落位，不逐帧拽人，
-   * 所以不会制造另一种「磁铁吸附」抖动。
+   * 每秒给每个战斗组做一次真正的「队级意图」。
+   *
+   * 旧版虽然给人写了 squadId，却仍是每名士兵各自挑目标、各自把 goal 摆到几百米外
+   * 的终点；导航场在街口给六个人不同答案时，画面仍是一群散兵乱走。现在先由全队
+   * 共享一个焦点和方向，再把滚动队形锚放到前方 22 m：
+   *   · 92 m 内有敌人：锁住最近敌情至少四秒，全队朝该方向压；
+   *   · 没有近敌：朝当前第一个未完成任务路标推进；
+   *   · 守点与玩家手动命令不被自动意图覆盖。
    */
   UpdateSquads() {
-    this.squadCenters.clear();
+    const previous = this.squadCenters;
+    const groups = new Map();
     for (const s of this.soldiers) {
       if (!s.alive) continue;
-      let group = this.squadCenters.get(s.squadId);
+      let group = groups.get(s.squadId);
       if (!group) {
-        group = { x: 0, z: 0, count: 0 };
-        this.squadCenters.set(s.squadId, group);
+        const old = previous.get(s.squadId);
+        group = {
+          id: s.squadId, side: s.side, x: 0, z: 0, count: 0, members: [],
+          forwardX: old?.forwardX ?? 0,
+          forwardZ: old?.forwardZ ?? 0,
+          focusKind: old?.focusKind ?? "none",
+          focusId: old?.focusId ?? null,
+          focusX: old?.focusX ?? s.position.x,
+          focusZ: old?.focusZ ?? s.position.z - 1,
+          focusUntil: old?.focusUntil ?? -99,
+        };
+        groups.set(s.squadId, group);
       }
-      group.x += s.position.x; group.z += s.position.z; group.count += 1;
+      group.x += s.position.x;
+      group.z += s.position.z;
+      group.count += 1;
+      group.members.push(s);
     }
-    for (const group of this.squadCenters.values()) {
-      group.x /= group.count; group.z /= group.count;
+
+    const player = this.ctx.player;
+    const mission = this.CurrentMissionObjective();
+    for (const group of groups.values()) {
+      group.x /= group.count;
+      group.z /= group.count;
+
+      // 最近敌情由小队统一看：一个人接敌，旁边五个人不应继续各走各的。
+      let nearest = null;
+      let nearestD = SQUAD_ENEMY_FOCUS_M;
+      const enemySide = group.side === "nra" ? "ija" : "nra";
+      for (const other of this.soldiers) {
+        if (!other.alive || other.side !== enemySide) continue;
+        const d = Math.hypot(other.position.x - group.x, other.position.z - group.z);
+        if (d < nearestD) {
+          nearestD = d;
+          nearest = { id: other.id, x: other.position.x, z: other.position.z, ref: other };
+        }
+      }
+      if (group.side === "ija" && player?.Alive && !player.Protected) {
+        const d = Math.hypot(player.position.x - group.x, player.position.z - group.z);
+        if (d < nearestD) {
+          nearestD = d;
+          nearest = { id: -1, x: player.position.x, z: player.position.z, ref: player };
+        }
+      }
+
+      // 已锁住的近敌还活着、还没远到脱离战斗时，距离差不到三成就不换。
+      // 这是队级迟滞；否则两名距离相近的敌人会让六把枪一起左右摆。
+      let oldEnemy = null;
+      if (group.focusKind === "enemy") {
+        if (group.focusId === -1 && player?.Alive) {
+          oldEnemy = { id: -1, x: player.position.x, z: player.position.z, ref: player };
+        } else {
+          const ref = this.soldiers.find((candidate) => candidate.id === group.focusId && candidate.alive);
+          if (ref) oldEnemy = { id: ref.id, x: ref.position.x, z: ref.position.z, ref };
+        }
+        if (oldEnemy) {
+          oldEnemy.dist = Math.hypot(oldEnemy.x - group.x, oldEnemy.z - group.z);
+          if (oldEnemy.dist > SQUAD_ENEMY_FOCUS_M * 1.25) oldEnemy = null;
+        }
+      }
+      if (oldEnemy && (this.time < group.focusUntil || !nearest || oldEnemy.dist <= nearestD * 1.3)) {
+        nearest = oldEnemy;
+        nearestD = oldEnemy.dist;
+      }
+
+      let focus = nearest;
+      if (focus) {
+        if (group.focusKind !== "enemy" || group.focusId !== focus.id) {
+          group.focusUntil = this.time + 4.0;
+        }
+        group.focusKind = "enemy";
+        group.focusId = focus.id;
+      } else if (mission) {
+        focus = mission;
+        group.focusKind = "objective";
+        group.focusId = mission.id;
+      } else {
+        group.focusKind = "none";
+        group.focusId = null;
+      }
+
+      if (focus) {
+        group.focusX = focus.x;
+        group.focusZ = focus.z;
+        const dx = focus.x - group.x;
+        const dz = focus.z - group.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.5) {
+          const wanted = Math.atan2(dx, dz);
+          const hasHeading = Math.hypot(group.forwardX, group.forwardZ) > 0.5;
+          const current = hasHeading ? Math.atan2(group.forwardX, group.forwardZ) : wanted;
+          const heading = ApproachAngle(current, wanted, SQUAD_TURN_PER_UPDATE);
+          group.forwardX = Math.sin(heading);
+          group.forwardZ = Math.cos(heading);
+        }
+      }
+
+      for (const s of group.members) {
+        s.squadMateCount = group.count - 1;
+        s.squadForwardX = group.forwardX;
+        s.squadForwardZ = group.forwardZ;
+        s.squadFocusKind = group.focusKind;
+        s.squadFocusId = group.focusId;
+        const autoAdvance = !s.holdZone && s.order === "advance" && this.time >= s.manualGoalUntil;
+        if (focus && autoAdvance) this.SetSquadGoal(s, group);
+      }
     }
-    for (const s of this.soldiers) {
-      const group = this.squadCenters.get(s.squadId);
-      s.squadMateCount = group ? group.count - 1 : 0;
-    }
+    this.squadCenters = groups;
   }
 
-  /** 给共同目标排一个有前后、左右层次的六人落位。 */
-  SetSquadGoal(s, objective) {
-    const group = this.squadCenters.get(s.squadId) || this.centroid[s.side];
+  /**
+   * 给滚动锚排一个有前后、左右层次的六人落位。
+   * 锚只放到队伍前方一小段，不再把每个人直接拽到几百米外的终点。
+   */
+  SetSquadGoal(s, group) {
     const slot = SQUAD_SLOTS[s.squadSlot] || SQUAD_SLOTS[2];
-    let fx = objective.x - (group?.x ?? s.position.x);
-    let fz = objective.z - (group?.z ?? s.position.z);
-    const len = Math.hypot(fx, fz) || 1;
-    fx /= len; fz /= len;
+    const fx = group.forwardX, fz = group.forwardZ;
     const rx = -fz, rz = fx;
+    const focusDist = Math.hypot(group.focusX - group.x, group.focusZ - group.z);
+    const lookahead = Math.min(focusDist, group.focusKind === "enemy" ? 14 : SQUAD_LOOKAHEAD_M);
+    const anchorX = group.x + fx * lookahead;
+    const anchorZ = group.z + fz * lookahead;
     // 支援位即使序号不是 3，也按掩护纵深站；机枪手不顶到突击手前面。
     const depth = s.tacticalRole === "support" ? Math.max(8, slot.depth) : slot.depth;
     const lateral = slot.lateral + s.laneOffset * 0.18;
-    s.goal.set(objective.x + rx * lateral - fx * depth, 0,
-      objective.z + rz * lateral - fz * depth);
+    s.goal.set(anchorX + rx * lateral - fx * depth, 0,
+      anchorZ + rz * lateral - fz * depth);
     this.ClampInside(s.goal);
   }
 
@@ -590,6 +698,8 @@ export class AiDirector {
       if (s.side !== "nra" || !s.alive) continue;
       if (s.position.distanceTo(origin) > radius) continue;
       s.order = orderId;
+      // 玩家明确点出的推进点保留三十秒；队级任务 fallback 不能下一秒就把它盖掉。
+      if (orderId === "advance") s.manualGoalUntil = this.time + 30;
       if (orderId === "follow") s.goal.copy(origin);
       else if (orderId === "advance" && aimPoint) s.goal.copy(aimPoint);
       else if (orderId === "hold") s.goal.copy(s.position);
@@ -841,13 +951,6 @@ export class AiDirector {
     }
     s.cohesion = Clamp01(0.35 + mates / 8);
     s.lonelyTime = close > 0 ? 0 : s.lonelyTime + dt;
-
-    // 日方的总目标每次 Think 重取：往当前还在中方手里的、离自己最近的那个点压。
-    // 守点的人与跟着镜头走的近身班组不动（他们的 goal 由别处负责）。
-    if (s.side === "ija" && !s.holdZone && s.order !== "hold" && s.order !== "follow") {
-      const objective = this.NearestEnemyObjective(s);
-      if (objective) this.SetSquadGoal(s, objective);
-    }
 
     // 状态机。压制门槛从 0.72 降到 0.50：ER2 的 allowFindCoverWhenSuppressed
     // 是一条**独立行为**，被打得抬不起头的表现是往掩体里缩，不是站着不动。
@@ -1183,18 +1286,33 @@ export class AiDirector {
       s.stuckTime = 0;
     }
 
-    let lookYaw = 0;
+    let targetYaw = null;
     if (s.target) {
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
-      const targetYaw = Math.atan2(-dx, -dz);
+      targetYaw = Math.atan2(-dx, -dz);
       // 停火瞄准与冲锋面向敌人；跑向掩体时身体面向移动方向，只让上身有限度地看敌。
       // 旧代码无条件用 targetYaw 覆盖移动朝向，移动与目标分列两侧时会逐帧互相抢方向。
       if (s.moveSpeed < 0.08 || s.state === STATE.CHARGE) wantedYaw = targetYaw;
-      lookYaw = Clamp(AngleDelta(wantedYaw, targetYaw), -0.75, 0.75);
     }
     // 人体不可能一帧转 180°。移动时略快，卧倒/受压时更慢；所有角度都走最短弧。
     const turnRate = s.stance === 2 ? 2.4 : s.moveSpeed > 0.08 ? 5.0 : 3.4;
     s.yaw = ApproachAngle(s.yaw, wantedYaw, turnRate * dt);
+
+    // 枪口/上身偏航必须相对**这一帧真实的身体朝向**。旧版拿 wantedYaw 当基准，
+    // 导航场在相邻格之间切方向时 wantedYaw 会左右跳，身体因为有转速限制尚且平滑，
+    // 枪却每帧直接吃跳变后的 lookYaw，于是原地疯狂改枪口方向。
+    const wantedLookYaw = targetYaw === null
+      ? 0 : Clamp(AngleDelta(s.yaw, targetYaw), -0.75, 0.75);
+    s.lookYaw += Clamp(wantedLookYaw - s.lookYaw, -4.8 * dt, 4.8 * dt);
+
+    // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
+    // 的据枪承诺，再用连续 blend 上肩/放下，距离阈值两侧不会横着甩枪。
+    const mayAim = s.state === STATE.FIRE
+      || (s.state === STATE.SUPPRESSED && s.target && s.suppression <= 0.75);
+    if (mayAim && s.target) s.aimUntil = this.time + 0.35;
+    const wantedAim = s.target && this.time < s.aimUntil ? 1 : 0;
+    const aimRate = wantedAim ? 5.5 : 4.0;
+    s.aimBlend += Clamp(wantedAim - s.aimBlend, -aimRate * dt, aimRate * dt);
 
     // 0.24—0.32 秒完成一次姿态过渡。胶囊仍立刻采用战术姿态，视觉骨架连续插值。
     const blendStep = dt / (s.stance === 2 || s.proneBlend > 0.01 ? 0.32 : 0.24);
@@ -1211,7 +1329,7 @@ export class AiDirector {
       s.actor.root.rotation.y = s.yaw;
       s.actor.Update(dt, {
         moveSpeed: s.moveSpeed,
-        aim: s.state === STATE.FIRE ? 1 : 0,
+        aim: s.aimBlend,
         crouch: s.crouchBlend,
         prone: s.proneBlend,
         grounded: s.grounded,
@@ -1219,7 +1337,7 @@ export class AiDirector {
         firing: this.time - s.lastFire < 0.12,
         fireSequence: s.fireSequence,
         elapsed: this.time,
-        lookYaw, lookPitch: 0,
+        lookYaw: s.lookYaw, lookPitch: 0,
       });
     }
   }
