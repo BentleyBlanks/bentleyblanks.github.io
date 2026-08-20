@@ -26,6 +26,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 const KINDS = [
   { id: "nra", name: "川军步兵", note: "布军帽 + 青天白日帽徽，无钢盔，草鞋/布鞋混杂" },
   { id: "nraDare", name: "敢死队", note: "白毛巾 + 背后大刀 + 腰间手榴弹" },
+  { id: "nraOfficer", name: "川军军官", note: "武装带 + 枪套，不背枪（过场里的师长／参谋长／长官）" },
   { id: "ija", name: "日军步兵", note: "昭五式立领 + 九〇式钢盔，1938 年 3—4 月无屁帘" },
   { id: "ijaOfficer", name: "日军军官", note: "军帽 + 驳壳枪（本作用它代指指挥角色）" },
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },

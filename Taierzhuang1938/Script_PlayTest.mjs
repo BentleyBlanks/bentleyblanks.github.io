@@ -1748,7 +1748,8 @@ Check("模型读不到时退回程序化方块几何，且不抛",
 Stage("14 指针锁");
 {
   // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&menu=0`,
+  // intro=0：这一节测的是「点进城拿指针锁」，不是开场过场（正常入口点进城会先播出川）
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&menu=0&intro=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined && window.Taierzhuang.state.ready,
     { timeout: 180000 });

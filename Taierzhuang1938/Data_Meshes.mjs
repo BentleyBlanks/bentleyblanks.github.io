@@ -237,6 +237,6 @@ export const WEAPON_MESH_BY_ID = {
 
 /** 人物 kind（Script_Actor 的 KIND_SPEC 键）→ 模型 id。 */
 export const SOLDIER_MESH_BY_KIND = {
-  nra: "SoldierNra", nraDare: "SoldierNra",
+  nra: "SoldierNra", nraDare: "SoldierNra", nraOfficer: "SoldierNra",
   ija: "SoldierIja", ijaOfficer: "SoldierIja",
 };

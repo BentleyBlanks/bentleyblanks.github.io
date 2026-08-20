@@ -261,6 +261,8 @@ let story = null;
 let combat = null;
 let interact = null;
 let cutscene = null;
+// 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
+let cutsceneSky = null;
 // 编辑器套件（齿轮按钮 + 五个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
 // 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
 let editor = null;
@@ -392,8 +394,33 @@ async function Boot() {
     onCapture: (cut) => {
       state.cutscene = cut.id;
       input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
+      // 玩家手里的枪挂在相机下：不藏的话每一镜右下角都趴着一支带刺刀的步枪，
+      // 五个分镜 agent 全靠把 look 点推到 45 m 外抬高近平面来切它 —— 这里一行就够。
+      if (viewmodel && viewmodel.root) viewmodel.root.visible = false;
     },
-    onRelease: () => { state.cutscene = null; },
+    onRelease: () => {
+      state.cutscene = null;
+      if (viewmodel && viewmodel.root) viewmodel.root.visible = true;
+    },
+    // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
+    // 套预设 = 天空着色器 + 重烘 IBL + 平行光/半球光三件一起换，少一件就是
+    // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
+    applySky: (name) => {
+      if (!SKY_PRESETS[name]) return false;
+      cutsceneSky = name;
+      const preset = sky.Apply(name);
+      sky.BakeEnvironment(scene);
+      lights.ApplyPreset(preset, sky.sunDirection);
+      return true;
+    },
+    restoreSky: () => {
+      if (!cutsceneSky) return;
+      cutsceneSky = null;
+      const phase = PHASES[state.phaseIndex];
+      const preset = sky.Apply(phase.sky);
+      sky.BakeEnvironment(scene);
+      lights.ApplyPreset(preset, sky.sunDirection);
+    },
   });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics,
@@ -1449,10 +1476,21 @@ function StartRun() {
   boot.classList.add("gone");
   state.menu = false;
   state.running = true;
-  if (!SHOT) {
-    RequestPointerLock();
-    audio.Unlock();
+  if (SHOT) return;
+  audio.Unlock();
+  // 开场过场。EnterLevel(initial) 是按 cutscenes:false 建的场（开机不能夺控制权），
+  // 所以第一关的 cutsceneIn（出川）原来**从来没播过** —— 只有编辑器里点得到它。
+  // 这里在玩家按下「进城」的那一下补播：点击本身就是音频与指针锁要的那次用户手势。
+  // 调试入口（?phase=N 直跳某关、?intro=0）不播开场 —— 冒烟测试点完「进城」就要拿到
+  // 指针锁与键盘，过场一夺控制权它们全挂。玩家正常打开页面没有这些参数。
+  const phase = PHASES[state.phaseIndex];
+  const wantIntro = !params.has("phase") && params.get("intro") !== "0";
+  const intro = wantIntro && phase && phase.cutsceneIn;
+  if (intro && !state.cutscenesPlayed.some((c) => c.id === intro)) {
+    RunCutscene(intro);      // 播完 RunCutscene 自己会把指针锁要回来
+    return;
   }
+  RequestPointerLock();
 }
 bootStart.addEventListener("click", StartRun);
 
@@ -2257,6 +2295,14 @@ function Frame(dt, render = true) {
   // 过场结束时战场已经不是过场开始时那个战场了。
   if (cutscene && cutscene.Playing) {
     cutscene.Update(dt);
+    // 天、灯、烟尘还要活着：云在飘、火光在闪、常驻烟柱在冒 —— 这些不归玩法管。
+    // 阴影框要跟着**过场相机**走，不能留在玩家脚下：独立布景在两千米外，
+    // 阴影框留在城里等于整场布景没有阴影（看上去就是「人浮在地上」）。
+    sky.Update(state.elapsed);
+    lights.Update(dt, state.elapsed);
+    if (vfx) vfx.Update(dt, camera, state.elapsed);
+    camera.getWorldDirection(_forward);
+    lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;
   }
@@ -2510,7 +2556,15 @@ function RenderScene(dt) {
   // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
   ssao.strength.value = SSAO_BASE * graphics.ssao;
-  const preset = SKY_PRESETS[phase.sky];
+  // 天空穹跟着相机走。它是一只半径 4000 m 的球，原来钉在原点 ——
+  // 过场把独立布景摆到 (4000,4000) 之后相机就在球**外面**，画面上是一块
+  // 黑底上的大亮盘（出川过场那张「什么鬼背景」就是这个）。着色器用的是
+  // 「相机到顶点」的方向，所以球心摆哪里都不影响天的样子，跟着相机最稳。
+  sky.mesh.position.copy(camera.position);
+  // 过场可以自带天空（cut.sky）：正在播的过场套了预设就按它的后期参数走，
+  // 否则按本关的。夜战预设 exposure 3.6、白天 0.5，抄错一档整帧就黑/就白。
+  const skyName = cutsceneSky || phase.sky;
+  const preset = SKY_PRESETS[skyName] || SKY_PRESETS[phase.sky];
   // 粒子层要与合成 pass 共用同一份雾：它不进深度法线预通道，合成 pass 那趟
   // 又明写"深度 0 的天空不吃雾"，于是背景是天空的粒子像素一点雾都吃不到 ——
   // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
@@ -2545,7 +2599,7 @@ function RenderScene(dt) {
     godStrength: preset.godStrength * graphics.god,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
-    grain: (phase.sky === "night" ? 0.020 : 0.014) * graphics.grain,
+    grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
     motionBlur: 0.15 * graphics.motionBlur,

@@ -42,7 +42,7 @@ const HEX = {
   nraWebbing: [0x8C8467, 0x7B7660, 0x6F6A55],
   badgeBlue: 0x1F3A93,
   badgeWhite: 0xEDEFF2,
-  strawShoe: 0xC4A96C,
+  strawShoe: 0x9E875A,   // 顺光下 C4A96C 是一块发光的亮黄方块（出川过场贴地镜），压一档
   clothShoe: 0x2B2B2E,
   towel: 0xEDE9DF,
   redBinding: 0x9E2B22,            // 大刀柄尾铁环上缠的红布
@@ -170,7 +170,7 @@ const LOD = {
   medium: { handSkin: false, capDisc: true, footInShin: false, pelvisInChest: true, mergeTo: null },
   low: {
     handSkin: false, capDisc: false, footInShin: true, pelvisInChest: true,
-    mergeTo: { accessory: "uniform", leather: "uniform", shoe: "uniform", red: "uniform" },
+    mergeTo: { accessory: "uniform", leather: "uniform", shoe: "uniform", red: "uniform", hair: "uniform" },
   },
 };
 
@@ -183,6 +183,11 @@ const KIND_SPEC = {
     height: 1.68, clothRecipe: "ClothNra", clothHex: HEX.nraCloth,
     headgear: "cap", shoe: "mixed", gear: "nra", defaultWeapon: "HanYang",
     dadao: true, grenadeBelt: true, towelOn: true,
+  },
+  // 军官：武装带 + 枪套 + 皮鞋、不背枪（过场里的师长/参谋长/长官都用它）
+  nraOfficer: {
+    height: 1.70, clothRecipe: "ClothNra", clothHex: HEX.nraCloth,
+    headgear: "peakCap", shoe: "boot", gear: "officer", defaultWeapon: null,
   },
   ija: {
     height: 1.62, clothRecipe: "ClothIja", clothHex: HEX.ijaCloth,
@@ -445,8 +450,18 @@ function BuildHead(buckets, d, spec, quality) {
     Add(buckets, "uniform", Cloth(d.headW * 1.08, 0.048 * H, d.headD * 1.06, "offCap"), { y: hy + 0.058 * H });
     Add(buckets, "uniform", Cloth(d.headW * 1.0, 0.012 * H, 0.058 * H, "offVisor"),
       { y: hy + 0.036 * H, z: -d.headD * 0.66, rx: -0.14 });
-    Add(buckets, "accentB", StarGeometry(5, 0.014, 0.0062),
-      { y: hy + 0.05 * H, z: -d.headD * 0.6, ry: Math.PI });
+    if (spec.gear === "officer") {
+      // 中方大檐帽：帽徽仍是青天白日（蓝底白十二芒），不是日军的五角星
+      if (LOD[quality].capDisc) {
+        Add(buckets, "accentA", new THREE.CircleGeometry(0.016, 14),
+          { y: hy + 0.05 * H, z: -d.headD * 0.595, ry: Math.PI });
+      }
+      Add(buckets, "accentB", StarGeometry(12, 0.0112, 0.0052),
+        { y: hy + 0.05 * H, z: -d.headD * 0.606, ry: Math.PI });
+    } else {
+      Add(buckets, "accentB", StarGeometry(5, 0.014, 0.0062),
+        { y: hy + 0.05 * H, z: -d.headD * 0.6, ry: Math.PI });
+    }
   } else {
     // 平民包头巾：一圈布 + 侧面一个结
     Add(buckets, "accessory", TubeY(d.headW * 0.62, d.headW * 0.66, 0.052 * H, 10, TILE_METERS.cloth),
@@ -553,6 +568,21 @@ function BuildGear(buckets, d, spec, quality) {
       { x: -d.waistHalf - 0.022 * H, y: -0.11 * H, z: 0.02 * H, rx: 0.18 });
     Add(buckets, "leather", TubeZ(0.045 * H, 0.045 * H, 0.032 * H, 10, TILE_METERS.cloth),
       { x: 0.085 * H, y: -0.03 * H, z: d.waistDepth + 0.032 * H });
+  } else if (spec.gear === "officer") {
+    // 军官武装带：宽皮腰带 + 自右肩斜下到左胯的斜皮带 + 右胯一只枪套。
+    // 没有子弹带、没有干粮袋 —— 剪影上一眼能和兵分开。
+    Add(buckets, "leather", Cloth(d.waistHalf * 2.08, 0.042 * H, d.waistDepth * 2.08, "offBelt"), { y: -0.012 * H });
+    const ax = 0.08 * H, ay = rise - 0.01 * H;
+    const bx = -0.07 * H, by = -0.02 * H;
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    const rz = Math.atan2(dx, -dy);
+    Add(buckets, "leather", Cloth(0.03 * H, len, 0.012 * H, "offStrap"),
+      { x: (ax + bx) / 2, y: (ay + by) / 2, z: -d.chestDepth * 0.92 - 0.018 * H, rz });
+    Add(buckets, "leather", Cloth(0.03 * H, len, 0.012 * H, "offStrapBack"),
+      { x: (ax + bx) / 2, y: (ay + by) / 2, z: d.chestDepth * 0.88 + 0.016 * H, rz: -rz });
+    Add(buckets, "leather", Cloth(0.05 * H, 0.10 * H, 0.04 * H, "holster"),
+      { x: d.waistHalf + 0.02 * H, y: -0.07 * H, z: 0.01 * H, rz: -0.08 });
   }
 }
 
@@ -1086,6 +1116,8 @@ export class Actor {
     this.SetTowel(!!spec.towelOn);
 
     // 背后的大刀 / 腰间的手榴弹：挂在 chest 上，跟着上身一起晃
+    if (build.bones.officerGear) AttachBone(this.chest, build.bones.officerGear, this.materials, null);
+    if (build.bones.hairBack) AttachBone(this.neck, build.bones.hairBack, this.materials, null);
     if (build.bones.dadao) AttachBone(this.chest, build.bones.dadao, this.materials, null);
     if (build.bones.grenades) AttachBone(this.chest, build.bones.grenades, this.materials, null);
 
@@ -1222,6 +1254,9 @@ export class Actor {
       // 子弹朝人物正面（-Z）飞 = 打在背上 = 往前扑
       forward: local.z < 0 ? 1 : -1,
       side: Clamp(local.x, -1, 1),
+      // 从**此刻的胯高**开始倒，不是从站直的 hipY。跪着/蹲着的人一 dead 会先弹起
+      // 站直再倒 —— 殉国那一秒成了「尸体先站起来」（王铭章过场出图抓到的）。
+      startY: this.body.position.y + this.hips.position.y,
     };
     return this;
   }
@@ -1239,6 +1274,11 @@ export class Actor {
     const throwing = Clamp01(s.throwing ?? 0);
     const melee = Clamp01(s.melee ?? 0);
     const dying = Clamp01(s.dying ?? 0);
+    // 过场用的三个姿态（战斗 AI 不给）：kneel 双膝跪地；reach 空手往前伸够桌面/袋子/扶人；
+    // binoculars 双手举到眼前。都是 0—1 的混合量。
+    const kneel = Clamp01(s.kneel ?? 0);
+    const reach = Clamp01(s.reach ?? 0);
+    const binoculars = Clamp01(s.binoculars ?? 0);
     // 卧倒/投弹/劈砍时据不了标准枪，把 aim 压下去，不然肩线会拧成麻花
     const aim = Clamp01(s.aim ?? 0) * (1 - prone * 0.45) * (1 - throwing) * (1 - melee);
     const elapsed = s.elapsed ?? (this.time + dt);
@@ -1296,12 +1336,36 @@ export class Actor {
     // dying 也走这一条（不是事后再减 hips.position.y）：这个高度是在腿 IK **之前**
     // 定的，IK 会把踝钉回地面；事后减的话整条腿跟着胯一起下去，人直接陷进土里
     // 半只小腿（旧版濒死下沉就是这么穿模的）。
-    const stanceDrop = crouch * 0.34 + prone * 0.60 + dying * 0.30;
+    // 跪：胯落到「大腿长 + 膝盖离地 0.07H」，脚往后摆到小腿平铺 —— 两段 IK 自己
+    // 会把膝盖解到前下方贴地。kneel 与 crouch 同时给时跪说了算。
+    const kneelHipY = d.thighLen + 0.07 * H;
+    const kneelDrop = kneel * (d.hipY - kneelHipY) / d.hipY;
+    const stanceDrop = Math.max(crouch * 0.34, kneelDrop) + prone * 0.60 + dying * 0.30;
     const breath = Math.sin(elapsed * this.breathRate * Math.PI * 2 + this.idlePhase);
     const idleSway = Math.sin(elapsed * 0.41 * Math.PI * 2 + this.idlePhase * 1.7) * this.swayScale;
-    const bob = moveSpeed > 0.02
-      ? -Math.abs(Math.sin(this.gaitPhase * Math.PI * 2)) * 0.022 * H * (0.4 + moveSpeed)
-      : breath * 0.004 * H;
+    // 走路时胯的起伏是**倒立摆**：腿立直在胯正下方时最高，前后叉开（双支撑期）
+    // 时最低。高度由「腿长 × 支撑脚离胯的水平距离」反解。
+    //
+    // 旧写法是 −|sin(gaitPhase·2π)|·0.022H —— 相位反了：|sin| 在腿正好立在胯下
+    // （phase 0.25/0.75）时取最大，于是人在腿最该绷直的那一刻蹲得最深，膝盖从
+    // 大腿下面戳出来，从侧面看像反关节的鸟腿。出川过场那张「人物反关节走路」
+    // 就是这么来的。
+    let support = 0;
+    for (const tag of ["L", "R"]) {
+      const side = tag === "L" ? -1 : 1;
+      const ph = (this.gaitPhase + (tag === "R" ? 0.5 : 0)) % 1;
+      if (stride > 0 && ph >= stanceEnd) continue;          // 腾空的那只不承重
+      const fz = stride > 0
+        ? Lerp(-stanceTravel * 0.5, stanceTravel * 0.5, ph / stanceEnd)
+        : side * 0.035 * H;
+      const fx = crouch * 0.035 * H + Math.abs(strafe) * 0.05 * H;   // 相对胯的横向偏移
+      support = Math.max(support, Math.hypot(fz, fx));
+    }
+    // 站直时 thighLen + shinLen 正好等于 hipY − ankleY，所以 support=0 时这一项是 0，
+    // 那点常驻膝弯由下面的 STAND_SETTLE 给。
+    const legSpan = d.thighLen + d.shinLen;
+    const bob = Math.sqrt(Math.max(0, legSpan * legSpan - support * support)) - (d.hipY - d.ankleY)
+      + (moveSpeed > 0.02 ? 0 : breath * 0.004 * H);
 
     this.body.position.set(0, d.hipY, 0);
     this.body.rotation.set(0, 0, 0);
@@ -1344,7 +1408,13 @@ export class Actor {
       // 蹲：脚往前挪，配合上面胯的后坐 —— 这两笔合起来才是「蹲」而不是「矮」
       footZ -= crouch * 0.055 * H;
       const spread = d.hipHalf + crouch * 0.035 * H + Math.abs(strafe) * 0.05 * H;
-      const footX = leg.side * spread + strafe * 0.12 * H * (phase < stanceEnd ? 1 : 0.4);
+      let footX = leg.side * spread + strafe * 0.12 * H * (phase < stanceEnd ? 1 : 0.4);
+      if (kneel > 0.001) {
+        // 跪姿：脚落到胯后方一个小腿长（小腿平铺在地上），左右略分开
+        footZ = Lerp(footZ, d.shinLen * 0.92, kneel);
+        footX = Lerp(footX, leg.side * d.hipHalf * 1.3, kneel);
+        footY = Lerp(footY, d.ankleY * 0.8, kneel);
+      }
       const p = plan[tag];
       p.x = footX; p.y = footY; p.z = footZ; p.phase = phase; p.swing = swing;
     }
@@ -1431,8 +1501,9 @@ export class Actor {
       // 幅度按摆动相淡出（脚在半空时不该跟着地面转），并钳在 22° 以内 ——
       // 再大就不是"踩在坡上"而是"脚踝扭断了"。
       const tilt = doFootIk ? (1 - Clamp01(p.swing / Math.max(1e-4, lift))) : 0;
+      // 跪姿脚尖绷直朝后下（脚背贴地），不是平放
       leg.ankle.rotation.set(
-        -pitch + (p.y - d.ankleY) * 1.6 + Clamp(ik.nz * tilt, -FOOT_IK_TILT, FOOT_IK_TILT),
+        -pitch + (p.y - d.ankleY) * 1.6 + Clamp(ik.nz * tilt, -FOOT_IK_TILT, FOOT_IK_TILT) - kneel * 1.25,
         0,
         Clamp(-ik.nx * tilt, -FOOT_IK_TILT, FOOT_IK_TILT));
     }
@@ -1444,7 +1515,7 @@ export class Actor {
     const lookYaw = Clamp(s.lookYaw ?? 0, -1.4, 1.4);
     const lookPitch = Clamp(s.lookPitch ?? 0, -1.0, 0.9);
     // 蹲姿的前倾要够：胯后坐了，上身不压过来重心就在身后。0.30 → 0.44
-    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.44 + aim * 0.08;
+    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.44 + aim * 0.08 + kneel * 0.10 + reach * 0.22;
     this.chest.rotation.set(
       -leanFwd + lookPitch * 0.22 + this.recoil * 0.06,     // 后坐把上身顶得后仰
       lookYaw * 0.35 + gaitSwing * 0.20,                    // 肩与胯反向拧
@@ -1485,7 +1556,7 @@ export class Actor {
     const weaponAim = Math.max(aim, prone * 0.9, bayonet * 0.85);
     this.PoseWeapon(weaponAim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee,
       breath, idleSway, prone, bayonet);
-    this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone);
+    this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone, reach, binoculars);
 
     // 手里的手榴弹：抡过 0.66 就脱手。**要一个门闩**，不能只比大小 ——
     // throwing 是个 0→1→0 的脉冲，光比数值的话，回收段再次路过 0.66 以下，
@@ -1635,7 +1706,7 @@ export class Actor {
    * 手臂。有枪就两只手 IK 到枪上的握点（**先摆枪、手再跟过去**），
    * 空手才走自由摆臂。反过来做的话手永远对不上枪。
    */
-  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0) {
+  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0, reach = 0, binoculars = 0) {
     const d = this.dims;
     const H = d.height;
     const L = this.arms.L, R = this.arms.R;
@@ -1648,6 +1719,22 @@ export class Actor {
       R.shoulder.rotation.set(swing, 0, 0.13 + moveSpeed * 0.06);
       L.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
       R.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
+      // 空手的两个过场手势（符号：shoulder.x 正 = 胳膊往前抬；elbow.x 负 = 肘屈）。
+      //   reach      双手往前下方伸（够桌面、电键、土袋、扶人）；叠 melee 当一下一下地扒/拽
+      //   binoculars 双手举到眼前（望远镜）
+      if (reach > 0.001) {
+        const tug = melee * 0.35;
+        BlendEuler(L.shoulder, 0.95 + tug * 0.3, 0.10, -0.16, reach);
+        BlendEuler(R.shoulder, 0.95 + tug * 0.3, -0.10, 0.16, reach);
+        BlendEuler(L.elbow, -0.45 - tug, 0, 0, reach);
+        BlendEuler(R.elbow, -0.45 - tug, 0, 0, reach);
+      }
+      if (binoculars > 0.001) {
+        BlendEuler(L.shoulder, 1.05, 0.35, -0.30, binoculars);
+        BlendEuler(R.shoulder, 1.05, -0.35, 0.30, binoculars);
+        BlendEuler(L.elbow, -2.35, 0, 0, binoculars);
+        BlendEuler(R.elbow, -2.35, 0, 0, binoculars);
+      }
       if (prone > 0.001) {
         // 空手趴着：上臂从肩往**前下方**伸到地面，前臂再往前铺开，两肘就是支点。
         // **撑起来**是这个姿势的全部意义 —— 平摊着的话头埋在土里什么都看不见
@@ -1863,7 +1950,7 @@ export class Actor {
     const dir = rag.forward;
 
     // 胯落到 0.085H：贴地的躯干厚度就这么多。翻转方向是 -dir —— 正的 x 是后仰。
-    this.body.position.set(0, Lerp(d.hipY, 0.085 * d.height, SmoothStep(0.05, 0.82, t)), 0);
+    this.body.position.set(0, Lerp(rag.startY ?? d.hipY, 0.085 * d.height, SmoothStep(0.05, 0.82, t)), 0);
     this.body.rotation.set(-dir * Lerp(0, 1.52, fall), rag.side * 0.35 * fall, rag.side * 0.28 * fall);
     this.hips.position.set(0, -knee * 0.22 * d.hipY, 0);
     this.hips.rotation.set(0, 0, 0);
@@ -2108,6 +2195,19 @@ export class ActorFactory {
       Add(b, "towel", Cloth(0.072 * dims.height, 0.062 * dims.height, 0.072 * dims.height, "towelArm"),
         { y: -dims.upperArmLen * 0.34 });
     });
+    // 军官武装带 + 枪套：模型里没有（士兵模型只有子弹带），两条路都从这里补
+    if (spec.gear === "officer") bones.officerGear = make((b) => BuildGear(b, dims, spec, quality));
+    // 后脑勺：头是一颗肤色球 + 帽子，帽檐以下的后脑与脸同色，背影镜从后面看像正脸
+    //（五场过场的复审全都抓到这条）。给一块深色的发盖，正面看不见它。
+    if (spec.headgear !== "helmet") {
+      bones.hairBack = make((b) => {
+        // 尺寸按模型量的（头：宽 0.169、深 0.189、帽檐底在脖子关节上约 0.118 m）。
+        // 覆盖整个后半球、一路盖到下颌角 —— 只盖到耳根的话深色带下面又露出一段
+        // 肤色后颈，背影里读成「戴了个黑眼罩」。
+        Add(b, "hair", Cloth(dims.headW * 0.93, dims.headH * 0.50, dims.headD * 0.44, "hairBack"),
+          { y: hy - 0.030 * dims.height, z: dims.headD * 0.26 });
+      });
+    }
     if (spec.dadao) bones.dadao = make((b) => BuildDadao(b, dims, quality));
     if (spec.grenadeBelt) bones.grenades = make((b) => BuildGrenadeBelt(b, dims, quality));
     return bones;
@@ -2129,7 +2229,8 @@ export class ActorFactory {
     bones.hips = lod.pelvisInChest ? null : make((b) => BuildHips(b, dims, spec, quality));
     bones.chest = make((b) => {
       BuildChest(b, dims, spec, quality);
-      BuildGear(b, dims, spec, quality);
+      // 军官装具走 _AttachExtraBones（模型路与方块路共用），这里不重复建
+      if (spec.gear !== "officer") BuildGear(b, dims, spec, quality);
       if (lod.pelvisInChest) AddShifted(b, (t) => BuildHips(t, dims, spec, quality), dims.hipY - dims.waistY);
     });
     bones.head = make((b) => BuildHead(b, dims, spec, quality));
@@ -2315,6 +2416,7 @@ export class ActorFactory {
       leather: this.Material("leather",
         () => lib.Plain("leather", { color: HEX.ijaLeather, roughness: 0.66, metalness: 0 })),
       towel: this.Material("towel", () => lib.Plain("towel", { color: HEX.towel, roughness: 0.95, metalness: 0 })),
+      hair: this.Material("hair", () => lib.Plain("hair", { color: 0x26211b, roughness: 0.96, metalness: 0 })),
       red: this.Material("red", () => lib.Plain("red", { color: HEX.redBinding, roughness: 0.92, metalness: 0 })),
       // 全场唯二的高饱和点：青天白日帽徽的蓝白、日军领章的红。别再加第三处。
       // 都是单面 Shape/Circle，正反装错就消失，所以一律 DoubleSide。

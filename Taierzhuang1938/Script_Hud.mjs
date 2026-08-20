@@ -395,4 +395,12 @@ export class Hud {
   SetOrdersVisible(on) {
     this.ordersOpen = !!on;
   }
+
+  /**
+   * 过场模式：整套 HUD 让位（准星、弹药、小地图、提示全部淡出），
+   * 只留过场自己挂在同一个根下的字幕层。过场一完就还回来。
+   */
+  SetCinematic(on) {
+    this.root.classList.toggle("cinematic", !!on);
+  }
 }

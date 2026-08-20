@@ -178,6 +178,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 阵亡卡片在的时候，别的 HUD 全压掉。
    ER2 那一屏是干净的；旁边还挂着小地图和弹药提示就成了"结算界面"，不是那个意思。 */
 #hud.deathCardOn > *:not(.hudDeathCard) { opacity: 0 !important; transition: opacity 0.3s ease; }
+/* 过场期间：HUD 全部让位，只留过场自己的字幕层（.csRoot 也挂在 #hud 下） */
+#hud.cinematic > *:not(.csRoot) { opacity: 0 !important; transition: none !important; }
 
 /* 阶段开场 */
 .hudBrief {

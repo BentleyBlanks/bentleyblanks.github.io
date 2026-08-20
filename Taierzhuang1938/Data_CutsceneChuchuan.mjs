@@ -1,0 +1,354 @@
+// 《滕县 1938》过场分镜 —— 出川（开场）（CS_Chuchuan）。
+//
+// **纯数据，不许 import three**。被 Data_TengxianScript.mjs 汇总进 CUTSCENES，
+// Script_Cutscene.mjs 是唯一消费者；字段说明见 Data_TengxianScript.mjs「过场」一节
+// 与 docs/Data_CutsceneRedo.md（§1 引擎契约、§2.1 本场施工单）。
+//
+// 本场专属的人物表条目写在 people（并进 CAST），本场新引入的推定值写在 presumed
+// （并进 PRESUMED_STAGING）—— 五场各自一个文件，是为了能并行改而不互相踩。
+//
+// ── 2026-08-20 重做 ────────────────────────────────────────────────────────
+// 旧版讲闷罐车、掉队解绑带、车厢里门缝光扫脸，被用户否了（背景是黑底亮盘、前景是
+// 木纹盒子、地面拉丝、人反关节）。新版按施工单 §2.1：
+//   · 先两张黑场字卡讲**这一仗怎么来的**（南京陷落 → 会师徐州 → 濑谷支队南下 → 滕县是门户）；
+//   · 再四镜实景讲**这支部队和你是谁**（出川 → 娘子关 → 划归第五战区 → 王铭章守城 →
+//     你是九连二等兵谢长顺，身边是班长）；
+//   · 最后一张日期卡接 L0 界河。
+// 实景不再独立搭景，直接拍在 L0（界河）切片的原野上：真地形、真雾、真拂晓。
+// **注意方位**：L0 切片是城北 20 km 的界河原野（Data_Battle.TUNING.L0_Jiehe），城墙不在场里。
+// 镜 5 那道雾里的城墙是本场自带的剪影道具 —— 这几镜拍的是「三月上旬开赴滕县」的路上，
+// 不是界河阵地上（在界河看得见滕县城墙才是史实错误，见 Data_Battle 的注）。
+//
+// ── 2026-08-20 复审后二改（review pass 7 的清单逐条）────────────────────────
+//   · [major] 秃树重做：4 根 3 m 等粗直枝读成电线杆/电视天线 → 7 根 1.2–1.8 m 主枝
+//     （截面 0.05、抬角随方位变化）+ 每根末端两根细枝，两级分叉；树A 东移出镜 7 视轴。
+//   · [minor] 城墙顶那条 4000 m 的绝对直线：加两座敌台（马面）打断轮廓。
+//   · [minor] 镜 7 画左半个 m8：机位/视轴西移 + m8 向东让出半步（行军松散不违和）。
+//   · [minor] 「最后一道屏障」是修辞（后面还有临城、韩庄、运河一线）→ 改「门户」。
+//   · [minor] 日期卡改「滕县以北 界河」，交代界河在哪、为什么没进城先在界河打。
+//   · 总长 46.4 → 42.0 s：黑卡与实景逐镜压到字幕可读下限之上（0.22×字＋1.2 全满足），
+//     被压掉的从句（打通津浦路／第十师团／几经转调／无钢盔）一句不丢，全在 skipCard。
+
+// ---------------------------------------------------------------------------
+// 布景基准（全部推定，登记在 presumed）
+// ---------------------------------------------------------------------------
+
+/** 原野地面高度：L0 切片里 (-200,-1290) 一带实测 −1.28～−1.30，取 −1.29（见 OuterHeight）。 */
+const G = -1.29;
+/** 纵队中线的 x；两列分别在 X0∓0.8。 */
+const X0 = -200;
+/** 行军开始时刻（黑场字卡期间就已在走，t=10.4 镜 3 淡入时脚正好进画）与速度。 */
+const T0 = 9.4;
+const T_END = 37.7;
+/** 正常行军 moveSpeed 0.30 ↔ 1.26 m/s。**轨道速度必须与它对得上**，改一个就改另一个。 */
+const MOVE = 0.30;
+const V = MOVE * 4.2;
+/** 队头在 T0 时的 z；纵队朝 +z（南，朝城墙）走，ry = atan2(-0, -1) = π。 */
+const Z_HEAD = -1292.0;
+const FACING = Math.PI;
+
+/**
+ * 一条匀速直行的轨道。extra 是途中要插的状态帧 [[t, state], …]（位置按匀速反算，
+ * 所以插多少帧都不会滑步）。hidden 之前的人引擎本来就不画，不必另写 hidden 帧。
+ */
+function March(x, zStart, extra = []) {
+  const at = (t) => [x, G, zStart + V * (t - T0)];
+  const frames = [{ t: T0, pos: at(T0), ry: FACING, state: { moveSpeed: MOVE } }];
+  for (const [t, state] of extra) frames.push({ t, pos: at(t), ry: FACING, state: { moveSpeed: MOVE, ...state } });
+  frames.push({ t: T_END, pos: at(T_END), ry: FACING, state: { moveSpeed: MOVE } });
+  return frames;
+}
+
+/** 行军纵队的一排：左列 x=X0−0.8，右列 x=X0+0.8 错后 1.1 m。row 从队头数起，排距 2.4 m。 */
+const L = (row, dx = 0) => [X0 - 0.8 + dx, Z_HEAD - 2.4 * row];
+const R = (row, dx = 0) => [X0 + 0.8 + dx, Z_HEAD - 2.4 * row - 1.1];
+
+/**
+ * 城墙剪影摆在纵队前方约 190 m 的雾里（镜 5 的背景）。120 m 时砖缝都数得清、像个大盒子，推到 200 m 雾才吃得动墙身，只剩城楼轮廓清楚。
+ * **墙脚前那条发绿的亮带不是 bug，是 L0 场自带的冬麦地**（mesh「WinterWheat」，x −611～287、z −1224～−774、
+ * 高 −1.6～−0.5，一块 1 m 厚的平板）：纵队走到 z=−1224 之前一直在麦地北边，城墙无论摆在 −1065 还是 −1195 都站在麦地里，
+ * 墙脚都被麦子挡住。把它当「城北麦地」用（L1/L6 也有这块地），机位压低让麦地只剩一条线、别从上面俯看它的顶面。
+ */
+const WALL_Z = -1100;
+const WALL_X = X0 + 6;
+const WALL_BASE = -1.7;            // 比地面低半米，墙脚埋进土里，免得浮着
+/** 剪影色：墙身/女墙/月台一律染成同一种暗土色、粗糙度拉满，雾里只剩一条轮廓，不读砖纹、不发亮。 */
+const WALL_TINT = 0x7a6a5a;
+
+/**
+ * 一棵三月的秃树。上一轮的写法（一根干 + 四根 3 m 等粗直枝）在出图里全读成
+ * 电线杆/电视天线（review pass 7 的 major），这一轮做成**两级分叉**：
+ *   · 主枝 7 根，长 1.2–1.8 m、截面 0.05、沿树干顶部 2 m 内错落生根；
+ *   · 每根主枝末端再挂 2 根 0.6–0.75 m、截面 0.035 的细枝，方位/抬角各偏一点。
+ * 只有 rx/ry 两个转角可用：枝做成**沿局部 X** 的细长盒（three 欧拉序 XYZ，
+ * 向量先绕 Y 再绕 X）：方向 = Rx(rx)·Ry(ry)·(1,0,0) = (cos ry, sin ry·sin rx, −sin ry·cos rx)。
+ * 抬升量 = sin(ry)·sin(rx)，所以 **rx 的符号跟 sin(ry) 走**，保证枝梢一律朝上翘；
+ * sin(ry)≈0 的那两根接近水平，正好当横出的老枝。盒子的中心 = 枝根 + 半长 × 方向。
+ */
+function Tree(name, x, z, trunkH, spin) {
+  const color = 0x4a4036;
+  const Dir = (rx, ry) => {
+    const c = Math.cos(ry), sn = Math.sin(ry);
+    return [c, sn * Math.sin(rx), -sn * Math.cos(rx)];
+  };
+  const list = [
+    { kind: "cyl", size: [0.14, trunkH], pos: [x, G + trunkH / 2, z], color, name: `${name}干` },
+  ];
+  // [方位角, 抬角幅度, 长度] —— 7 根，方位大致均布 + 抖动，长短粗细参差
+  const MAINS = [
+    [0.35, 0.95, 1.75], [1.25, 0.70, 1.45], [2.15, 1.05, 1.65], [3.05, 0.60, 1.30],
+    [3.90, 0.90, 1.55], [4.75, 0.75, 1.20], [5.55, 1.00, 1.50],
+  ];
+  // [方位偏转, 抬角增量, 长度] —— 每根主枝末端两根
+  const TWIGS = [[-0.55, 0.30, 0.75], [0.50, -0.20, 0.60]];
+  MAINS.forEach(([a, lift, len], i) => {
+    const ry = a + spin;
+    const rx = (Math.sin(ry) >= 0 ? 1 : -1) * lift;
+    const dir = Dir(rx, ry);
+    const root = [x, G + trunkH - 0.25 - i * 0.3, z];
+    list.push({
+      kind: "box", size: [len, 0.05, 0.05], rx, ry,
+      pos: [root[0] + dir[0] * len / 2, root[1] + dir[1] * len / 2, root[2] + dir[2] * len / 2],
+      color, name: `${name}枝${i}`,
+    });
+    const end = [root[0] + dir[0] * len, root[1] + dir[1] * len, root[2] + dir[2] * len];
+    TWIGS.forEach(([da, dl, tlen], j) => {
+      const ry2 = ry + da;
+      const rx2 = (Math.sin(ry2) >= 0 ? 1 : -1) * Math.min(1.2, Math.max(0.35, lift + dl));
+      const d2 = Dir(rx2, ry2);
+      list.push({
+        kind: "box", size: [tlen, 0.035, 0.035], rx: rx2, ry: ry2,
+        pos: [end[0] + d2[0] * tlen / 2, end[1] + d2[1] * tlen / 2, end[2] + d2[2] * tlen / 2],
+        color, name: `${name}枝${i}${j ? "b" : "a"}`,
+      });
+    });
+  });
+  return list;
+}
+
+export const CS_Chuchuan = {
+  id: "CS_Chuchuan",
+  title: "出川",
+  seconds: 42.0,
+  trigger: "beforeLevel:L0_Jiehe",
+  // 出川那段过场：一间空屋子的调子（master 那边给七关与本场配的音乐）。
+  music: "menu",
+  // 不给 sky：沿用 L0 的 dawn（拂晓、太阳在东边 11°，纵队朝南走，侧逆光出剪影）。
+  standalone: false,
+  setOrigin: [0, 0, 0],
+  fadeIn: 0.8,
+  why: "开篇先说这一仗怎么来的（津浦路、徐州、濑谷支队、滕县是门户），再说这支部队和你是谁：被推来推去才到这里的川军，装备差不是设定，是历史。",
+
+  // 全场不给脸 —— 既是分镜要求（脸是光板），也顺带避免了给虚构人物做定妆。
+  props: [
+    // ── 雾里的滕县城墙（剪影）─────────────────────────────────────────────
+    // 按 Data_Tengxian.CITY 的尺寸：墙身 11.5 m、底宽 10、条石勒脚 1.8、女墙 1.6；
+    // 城楼重檐两层；半圆瓮城 r=18。120 m 外只读轮廓，细节不做。
+    // 墙身 4000 m 长：两头必须伸到雾外面去（1600 m 时镜 4 斜看还露出一个硬切的断头，像一条到头的堤坝；box 多长都不要钱）。
+    // 不做勒脚、月台也不用 Stone：Stone 在拂晓雾里渲成一条发绿的亮带，比墙身还扎眼。
+    // 不做瓮城：半圆柱在 200 m 外渲成一块比墙身更亮的浅色方块贴在墙中间，像打了个补丁。
+    { kind: "box", size: [4000, 11.5, 10], pos: [WALL_X, WALL_BASE + 5.75, WALL_Z], mat: "BrickWall", tint: WALL_TINT, roughness: 1, name: "城墙" },
+    { kind: "box", size: [4000, 1.6, 1.0], pos: [WALL_X, WALL_BASE + 11.5 + 0.8, WALL_Z - 4.5], mat: "BrickWall", tint: WALL_TINT, roughness: 1, name: "女墙" },
+    // 两座敌台（马面）：打断「城墙顶边一条贯穿全画的绝对直线」（review 修法）。
+    // 高 12.5 → 顶在墙顶上冒 1 m，深 13 → 里外各凸 1.5 m，间距 90 m 在明清城制 60–90 m 内。
+    // review 建议 ±75，但 50 mm 镜 5 在 185 m 外半幅只覆 ±78 m —— ±75 正压在画框边上、雾里读不出来，
+    // 出图核对后收进 ±45：正好一左一右夹着城楼，顶边的直线被切成三段。
+    // 高 15（顶超出女墙线 1.9 m）：第一版做 12.5 结果比女墙（13.1）还矮，剪影整个藏在女墙后面，
+    // 顶边照旧一条直线 —— 敌台在剪影里必须**高过**女墙才存在。
+    { kind: "box", size: [9, 15, 13], pos: [WALL_X - 45, WALL_BASE + 7.5, WALL_Z], mat: "BrickWall", tint: WALL_TINT, roughness: 1, name: "敌台西" },
+    { kind: "box", size: [9, 15, 13], pos: [WALL_X + 45, WALL_BASE + 7.5, WALL_Z], mat: "BrickWall", tint: WALL_TINT, roughness: 1, name: "敌台东" },
+    { kind: "box", size: [17, 0.45, 11], pos: [WALL_X, WALL_BASE + 11.5 + 0.22, WALL_Z], mat: "BrickWall", tint: WALL_TINT, roughness: 1, name: "月台" },
+    { kind: "box", size: [11.4, 4.4, 7.2], pos: [WALL_X, WALL_BASE + 11.95 + 2.2, WALL_Z], mat: "WoodDoor", tint: 0x5a4630, name: "城楼下层" },
+    { kind: "box", size: [14.6, 0.9, 10.4], pos: [WALL_X, WALL_BASE + 16.35 + 0.45, WALL_Z], mat: "RoofTile", name: "城楼下檐" },
+    { kind: "box", size: [9.0, 3.0, 5.6], pos: [WALL_X, WALL_BASE + 17.25 + 1.5, WALL_Z], mat: "WoodDoor", tint: 0x5a4630, name: "城楼上层" },
+    { kind: "box", size: [12.0, 1.0, 8.4], pos: [WALL_X, WALL_BASE + 18.75 + 0.5, WALL_Z], mat: "RoofTile", name: "城楼上檐" },
+    { kind: "box", size: [12.6, 0.5, 1.2], pos: [WALL_X, WALL_BASE + 19.75 + 0.25, WALL_Z], mat: "RoofTile", name: "城楼脊" },
+    // ── 路边三棵秃树（三月落叶乔木，只有骨架）：给空原野一点纵深与剪影 ────────
+    // 树A 从 X0+13 东移到 X0+24：旧位置的枝正好从镜 7 里 xie 的帽顶伸出来，像插了根羽毛。
+    ...Tree("树A", X0 + 24, -1268, 6.4, 0.3),
+    ...Tree("树B", X0 - 19, -1236, 7.6, 1.9),
+    ...Tree("树C", X0 + 34, -1205, 7.0, 4.1),
+  ],
+
+  // ★ 一条轨从头走到尾：四镜实景拍的是**同一队人**，机位切来切去，人不换场、不瞬移。
+  // ★ 每三人里有一人空着手（weapon:null）：日方记川军三分之一以上没有步枪。
+  //   玩家（xie）也空手 —— L0 开局「无枪」是合法初始状态（Data_Battle.loadoutOverride）。
+  cast: [
+    { id: "m1", kind: "nra", weapon: "HanYang", seed: "chu1", track: March(...L(0, 0.05)) },
+    { id: "m2", kind: "nra", weapon: null, seed: "chu2", track: March(...R(0, -0.05)) },
+    { id: "m3", kind: "nra", weapon: "HanYang", seed: "chu3", track: March(...L(1, -0.1)) },
+    { id: "m4", kind: "nra", weapon: "HanYang", seed: "chu4", track: March(...R(1, 0.08)) },
+    { id: "m5", kind: "nra", weapon: null, seed: "chu5", track: March(...L(2, 0.12)) },
+    { id: "m6", kind: "nra", weapon: "HanYang", seed: "chu6", track: March(...R(2, -0.06)) },
+    { id: "m7", kind: "nra", weapon: "HanYang", seed: "chu7", track: March(...L(3, -0.04)) },
+    // m8 向东让出半步（dx 0.6）：他走在 xie 右前方 1.3 m，镜 7 从 xie 左后方拍时
+    // 正好切进画左半个身子（review minor）；行军松散，队列里有人偏出半步不违和。
+    { id: "m8", kind: "nra", weapon: null, seed: "chu8", track: March(...R(3, 0.6)) },
+    // 队尾一排：玩家（左）与班长（右）。镜 6a 班长转头看他（lookYaw 负 = 朝自己右手边，
+    // 纵队朝 +z 走时右手边是 −x，正是 xie 那一列）；镜 6b 推到玩家背影。
+    { id: "xie", kind: "nra", weapon: null, seed: "chuXie", track: March(...L(4), [
+      [29.0, { lookYaw: 0 }], [30.0, { lookYaw: 0.55 }], [31.8, { lookYaw: 0.55 }], [32.7, { lookYaw: 0 }],
+    ]) },
+    { id: "qiu", kind: "nra", weapon: "HanYang", seed: "chuQiu", track: March(...R(4), [
+      // 转得快（0.6 s）、停得久（2.9 s）；−0.9 从后面看不出来转了头，拉到 −1.3（引擎上限 1.4）
+      [28.4, { lookYaw: 0 }], [29.0, { lookYaw: -1.3 }], [31.9, { lookYaw: -1.3 }], [32.7, { lookYaw: 0 }],
+    ]) },
+  ],
+
+  shots: [
+    // ── 1 黑场字卡：这一仗怎么来的（上）────────────────────────────────────
+    {
+      n: 1, seconds: 4.8, focalMm: 24, black: true, titleCard: true,
+      note: "黑场字卡（black 必须显式给，titleCard 只管字幕居中）：南京陷落 → 日军南北对进要会师徐州。「打通津浦路」压进 skipCard（镜 2 连着两句津浦路，画面上不重复）",
+      camera: { from: [X0, G + 12, -1310], look: [X0, G, -1200] },
+      subs: [
+        { at: 0.2, seconds: 4.55, tier: "主流", text: "一九三七年十二月，南京陷落。" },
+        { at: 0.2, seconds: 4.55, tier: "主流", text: "日军南北对进，要会师徐州。" },
+      ],
+    },
+    // ── 2 黑场字卡：这一仗怎么来的（下）────────────────────────────────────
+    {
+      n: 2, seconds: 5.6, focalMm: 50, black: true, titleCard: true,
+      note: "黑场字卡：濑谷支队沿津浦路南下；滕县是门户。「最后一道屏障」是修辞（滕县之后还有临城、韩庄、运河一线，review minor），改「门户」——Timeline「滕县陷落后津浦路正面洞开」能背书门户，背不动最后一道。「第十师团」在 skipCard",
+      camera: { from: [X0, G + 1.5, -1320], look: [X0, G + 1.5, -1300] },
+      subs: [
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "一九三八年三月，濑谷支队沿津浦路南下。" },
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "滕县，是徐州以北津浦路正面的门户。" },
+      ],
+    },
+    // ── 3 实景：拂晓原野，贴地机位，脚与绑腿一双双走过 ───────────────────────
+    {
+      n: 3, seconds: 6.3, focalMm: 135, fadeIn: 1.0,
+      note: "从黑淡入。固定、贴地 0.30 m、135 mm，摆在左列外侧（西侧）2.8 m，朝北偏东 33° 回望纵队：画幅只到膝，草鞋、绑腿一双接一双从画面深处走来、走出画面。上一轮摆在东侧顺光拍，鞋头被低日直射渲成一块块发光的亮黄方块，所以镜像到西侧；视轴不许偏东超过 33°（135 mm 右边缘 42°）—— L0 这一关自己的守军就站在东北方 45°–55° 的地平线上，再偏就把一排小人拍进背景里",
+      // 视轴与左列的交点在 z≈−1292.3：队头在 T0 刚过、队尾 t≈16.8（镜末）才过，6.3 s 里脚不断档
+      camera: { from: [X0 - 3.6, G + 0.30, -1288.0], look: [X0 - 0.88, G + 0.12, -1292.2] },
+      sfx: [
+        { at: 0.6, name: "footstepDirt", volume: 0.5 },
+        { at: 1.4, name: "footstepDirt", volume: 0.42 },
+        { at: 2.2, name: "footstepDirt", volume: 0.5 },
+        { at: 3.0, name: "footstepDirt", volume: 0.4 },
+        { at: 3.8, name: "footstepDirt", volume: 0.48 },
+        { at: 4.6, name: "footstepDirt", volume: 0.4 },
+        { at: 5.4, name: "footstepDirt", volume: 0.46 },
+      ],
+      subs: [
+        { at: 0.2, seconds: 6.1, tier: "主流", text: "守滕县的是川军第二十二集团军。" },
+        { at: 0.2, seconds: 6.1, tier: "主流", text: "一九三七年九月出川，徒步一千四百余公里北上。" },
+      ],
+    },
+    // ── 4 实景：东侧平行跟拍，纵队侧影（低日在背后给人身顺光）────────────────
+    {
+      n: 4, seconds: 5.6, focalMm: 50,
+      note: "侧后跟拍：机位在纵队东侧 5.5 m、偏后 9.5 m、高 1.1 m（低于头顶，最近几颗头落在天空线以下由地面承光），锚在倒数第二排 m7，与队列同速跟进并缓缓前滑 2.0 m，朝南偏西 30° 看纵队的 3/4 背侧影，东边的低日在相机背后给人身顺光。上一轮摆在西侧逆光，队尾三颗头正对拂晓泛白成光球，所以换到东侧；视轴不许偏西超过 30°（50 mm 右边缘 53°）—— 再偏，城墙在 400 m 外会露出一个硬切的断头（引擎在 ~400 m 处把它切掉了，不是 box 太短）",
+      camera: {
+        fromActor: "m7", from: [5.5, 1.1, -9.5], to: [5.5, 1.1, -7.5],
+        lookActor: "m7", look: [-0.3, 1.0, 0.5], lookTo: [-0.3, 1.0, 0.5], ease: "linear",
+      },
+      sfx: [
+        { at: 0.5, name: "footstepDirt", volume: 0.36 },
+        { at: 1.3, name: "footstepDirt", volume: 0.32 },
+        { at: 2.1, name: "footstepDirt", volume: 0.36 },
+        { at: 2.9, name: "footstepDirt", volume: 0.3 },
+        { at: 3.7, name: "footstepDirt", volume: 0.36 },
+        { at: 4.5, name: "footstepDirt", volume: 0.3 },
+        { at: 5.3, name: "footstepDirt", volume: 0.34 },
+      ],
+      subs: [
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "十月娘子关，一周损失过半。" },
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "此后无人补充，划归第五战区，开赴鲁南。" },
+      ],
+    },
+    // ── 5 实景：队尾身后回看整队背影，雾里是滕县城墙 ─────────────────────────
+    {
+      n: 5, seconds: 5.6, focalMm: 50,
+      note: "锚在队尾 xie 身后 16 m、高 1.7 m 缓缓跟进：十个背影朝雾里的城墙走，城墙在 185 m 外横过地平线只剩一条暗色轮廓（墙身染成剪影色、粗糙度拉满、去掉瓮城与 Stone 月台；两座敌台打断顶边直线），城楼最清楚；墙脚前那条绿线是 L0 的冬麦地（见 WALL_Z 注），机位压到 1.7 m 让它只剩一条线。85 mm 时墙占了整幅画、像一块大板，退回 50；look 的 y 抬到 2.6 让墙在画里占得更少",
+      camera: {
+        fromActor: "xie", from: [1.0, 1.7, -16.0], to: [1.0, 1.6, -13.6],
+        lookActor: "xie", look: [0.3, 2.6, 40], lookTo: [0.3, 2.6, 40], ease: "easeInOut",
+      },
+      sfx: [
+        { at: 0.4, name: "footstepDirt", volume: 0.4 },
+        { at: 1.2, name: "footstepDirt", volume: 0.34 },
+        { at: 2.0, name: "footstepDirt", volume: 0.4 },
+        { at: 2.8, name: "footstepDirt", volume: 0.34 },
+        { at: 3.6, name: "footstepDirt", volume: 0.4 },
+        { at: 4.4, name: "footstepDirt", volume: 0.34 },
+        { at: 5.2, name: "footstepDirt", volume: 0.38 },
+      ],
+      subs: [
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "第一二二师师长王铭章，奉命守滕县城。" },
+        { at: 0.2, seconds: 5.4, tier: "主流", text: "能战之兵不足两千，三分之一以上无步枪。" },
+      ],
+    },
+    // ── 6a 实景：班长转头看身边的年轻兵 ─────────────────────────────────────
+    {
+      n: 6, seconds: 4.6, focalMm: 50,
+      note: "锚在班长左后方（+x 侧，画面左）2.6 m、高 1.25 m（低于肩），看向两人中间偏下：头压到画面上 1/4，以肩背与挎带为主体；班长 0.6 s 内转头（lookYaw −1.3）朝自己右手边（−x，画面右）的长顺说话、停 2.9 s —— 从左后方拍，只见后脑勺转过去，不给脸",
+      camera: {
+        fromActor: "qiu", from: [2.6, 1.25, -3.4],
+        lookActor: "qiu", look: [-0.8, 1.05, 0.6],
+      },
+      sfx: [
+        { at: 0.3, name: "footstepDirt", volume: 0.4 },
+        { at: 1.1, name: "footstepDirt", volume: 0.34 },
+        { at: 1.9, name: "footstepDirt", volume: 0.4 },
+        { at: 2.7, name: "footstepDirt", volume: 0.34 },
+        { at: 3.5, name: "footstepDirt", volume: 0.4 },
+      ],
+      lines: [{ at: 0.25, seconds: 4.3, who: "qiu", tier: "虚构", text: "长顺，跟紧了。进了城就有饭。" }],
+    },
+    // ── 6b 实景：推向玩家的背影，字幕交代你是谁 ─────────────────────────────
+    {
+      n: 7, seconds: 5.0, focalMm: 50,
+      note: "锚在玩家右后方（−x 侧，班长在他左后方、整个裁在画外），从 2.8 m 缓推到 2.2 m：一个空着手的年轻兵的背影、布军帽、绑腿，前面是整队人和雾里的城墙。末尾黑出。注意相机朝 +z 看时画面左边是 +x —— 上一轮画左始终切着半个 m8（review minor）：机位与视轴各往 −x 挪 0.2/0.15，m8 再向东让 0.5（见 cast 注），他就整个出画；树A 也东移过了，帽顶不再长树枝",
+      camera: {
+        fromActor: "xie", from: [-2.0, 1.35, -2.8], to: [-1.5, 1.3, -2.2],
+        lookActor: "xie", look: [-0.25, 1.15, 2.0], lookTo: [-0.15, 1.12, 2.0], ease: "easeInOut",
+      },
+      sfx: [
+        { at: 0.2, name: "footstepDirt", volume: 0.4 },
+        { at: 1.0, name: "footstepDirt", volume: 0.34 },
+        { at: 1.8, name: "footstepDirt", volume: 0.4 },
+        { at: 2.6, name: "footstepDirt", volume: 0.34 },
+        { at: 3.4, name: "footstepDirt", volume: 0.36 },
+      ],
+      subs: [
+        { at: 0.2, seconds: 4.75, tier: "虚构", text: "你是谢长顺，四川三台人，十八岁。" },
+        // 727 团是真实番号，但「三营九连二等兵谢长顺」是本作虚构的玩家身份 —— 整句按虚构标，与 skipCard 一致
+        { at: 0.2, seconds: 4.75, tier: "虚构", text: "第七二七团三营九连，二等兵。" },
+      ],
+      blackOutAt: 4.4,
+    },
+    // ── 7 黑场日期卡，接 L0 界河 ───────────────────────────────────────────
+    {
+      n: 8, seconds: 4.5, focalMm: 50, black: true, titleCard: true,
+      note: "黑场日期卡。加「滕县以北」（review minor）：前四镜队伍朝城墙走、班长说进了城就有饭，下一秒却在界河开打 —— 不交代界河在滕县以北，玩家不知道为什么没进城先打野外",
+      camera: { from: [X0, G + 1.5, -1320], look: [X0, G + 1.5, -1300] },
+      subs: [{ at: 0.2, seconds: 4.3, tier: "主流", date: true, text: "三月十四日 拂晓 · 滕县以北 界河" }],
+    },
+  ],
+
+  // 跳过后仍要把史实补出来 —— 信息不许因为跳过而丢失。
+  // 正片里被压掉的从句（打通津浦路／第十师团／几经转调／无钢盔）在这里保持全须全尾。
+  skipCard: {
+    title: "出川",
+    lines: [
+      { tier: "主流", text: "一九三七年十二月，南京陷落。日军南北对进，要打通津浦路，会师徐州。" },
+      { tier: "主流", text: "一九三八年三月，第十师团濑谷支队沿津浦路南下。滕县，是徐州以北津浦路正面的门户。" },
+      { tier: "主流", text: "守滕县的是川军第二十二集团军。一九三七年九月出川，徒步一千四百余公里北上。" },
+      { tier: "主流", text: "十月娘子关，一周损失过半。此后无人补充，几经转调，一九三八年初划归第五战区，开赴鲁南。" },
+      { tier: "主流", text: "第四十一军第一二二师师长王铭章，奉命守滕县城。城内能战之兵不足两千，无钢盔，三分之一以上无步枪。" },
+      { tier: "虚构", text: "你是第七二七团三营九连二等兵谢长顺，四川三台人，十八岁。" },
+    ],
+  },
+
+  presumed: [
+    { id: "chuchuanStaging", value: "行军纵队 10 人（4 人空手）；城墙剪影摆在纵队前方约 190 m（WALL_Z=−1100，队头 −1292），敌台两座、间距 90 m",
+      note: "过场布景推定。镜 3—7 拍的是三月上旬开赴滕县的路上，不是界河阵地（界河在城北二十公里，看不见城墙）；纵队人数、空手比例按「三分之一以上无步枪」取整；敌台间距 90 m 取明清城制 60—90 m 的上限（Data_Tengxian 的 BASTIONS 按 24 座均布算出来是 101.7 m，同一量级）" },
+  ],
+
+  // 绝不引用「抗日无力扰民有余」「土匪部队」「诸葛亮还扎草人当疑兵」这三句 ——
+  // 均只见于通俗读物与网文，未见 1937—38 年文件或当事人同时代记录背书。
+  // 川军被推诿的事实框架可用，这几句对白不可用。
+  forbiddenLines: ["抗日无力，扰民有余", "土匪部队", "诸葛亮还扎草人当疑兵"],
+};

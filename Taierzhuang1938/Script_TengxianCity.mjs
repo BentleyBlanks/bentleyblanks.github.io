@@ -1376,8 +1376,10 @@ export class TengxianCity {
         + rnd() * (MARCH_GROUND.wheatPatch.maxSize - MARCH_GROUND.wheatPatch.minSize);
       const d = w * (0.55 + rnd() * 0.7);
       const y = this.OuterHeight(x, z);
+      // 苗高 15—30 cm：盒子 0.3 m 厚、中心压到地面下 0.05，露出地面的只有 10 cm。
+      // 原来 0.6 m 厚顶在 +0.36 m，城外任何远景都带一条发绿的「堤坝」（出川过场出图抓到）。
       patches.push(PlaceGeometry(
-        MakeBox(w, 0.6, d, TILE_METERS.ground, `wheat${i}`), { x, y: y + 0.06, z, ry: rnd() * 0.4 }));
+        MakeBox(w, 0.3, d, TILE_METERS.ground, `wheat${i}`), { x, y: y - 0.05, z, ry: rnd() * 0.4 }));
     }
     if (patches.length) {
       // 冬小麦返青期：苗高 15—30 cm，贴地、不连续 —— 不是一片绿毯

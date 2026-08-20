@@ -46,6 +46,17 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 // 两份实现迟早会有一份被改。
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
+import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
+
+/** 各材质配方一张贴图铺几米（与城里的 AddWall / MakeBox 同一套数）。 */
+const TILE_BY_RECIPE = {
+  Ground: TILE_METERS.ground, GroundRubble: TILE_METERS.ground,
+  BrickWall: TILE_METERS.brick, BrickWallSooty: TILE_METERS.brick,
+  Adobe: TILE_METERS.adobe, RoofTile: TILE_METERS.roof, Stone: TILE_METERS.stone,
+  WoodDoor: TILE_METERS.wood, WoodBeam: TILE_METERS.wood, WoodStock: TILE_METERS.wood,
+  Sandbag: TILE_METERS.sandbag, Steel: TILE_METERS.steel, SteelHelmet: TILE_METERS.steel,
+  ClothNra: TILE_METERS.cloth, ClothIja: TILE_METERS.cloth,
+};
 
 // ---------------------------------------------------------------------------
 // 镜头数学
@@ -87,49 +98,12 @@ export function YawFacing(dx, dz) {
 }
 
 // ---------------------------------------------------------------------------
-// 数据自检
+// 数据自检 —— 规则在 Script_CutsceneCheck.mjs（纯数据，Node 里能跑），这里只 re-export，
+// 正片 Play() 前的硬断言与命令行 `node Taierzhuang1938/Script_CutsceneCheck.mjs` 是同一份。
 // ---------------------------------------------------------------------------
 
-/**
- * 分镜的秒数之和必须等于这一场声明的总时长。
- *
- * 这条自检不是洁癖：设计书给死了每场的秒数（38/26/22/36/24），
- * 时长对不上就意味着有人偷偷加减了镜头，而这种改动在画面上看不出来 ——
- * 只会表现为「字幕来不及读完」或「黑场多了两秒」，最难查。
- */
-export function ValidateCutscene(cut) {
-  const problems = [];
-  if (!cut || !cut.id) return ["过场数据为空"];
-  const shots = cut.shots || [];
-  if (!shots.length) problems.push(`${cut.id}: 没有任何分镜`);
-  const sum = shots.reduce((a, s) => a + (s.seconds || 0), 0);
-  if (Math.abs(sum - cut.seconds) > 0.005) {
-    problems.push(`${cut.id}: 分镜秒数之和 ${sum.toFixed(2)} ≠ 声明时长 ${cut.seconds}`);
-  }
-  for (const shot of shots) {
-    if (!shot.camera || !shot.camera.from) problems.push(`${cut.id} 镜${shot.n}: 缺机位`);
-    if (!shot.focalMm) problems.push(`${cut.id} 镜${shot.n}: 缺焦距`);
-    for (const line of shot.lines || []) {
-      if (line.who && !CAST[line.who]) problems.push(`${cut.id} 镜${shot.n}: 人物表里没有 ${line.who}`);
-    }
-  }
-  for (const actor of cut.cast || []) {
-    if (!actor.track || !actor.track.length) { problems.push(`${cut.id}: ${actor.id} 没有轨道`); continue; }
-    for (let i = 1; i < actor.track.length; i += 1) {
-      if (actor.track[i].t < actor.track[i - 1].t) {
-        problems.push(`${cut.id}: ${actor.id} 的关键帧时间没有递增（第 ${i} 帧）`);
-      }
-    }
-  }
-  return problems;
-}
-
-/** 全部五场一起校验，给自检脚本用。 */
-export function ValidateAllCutscenes(table = CUTSCENES) {
-  const problems = [];
-  for (const cut of Object.values(table)) problems.push(...ValidateCutscene(cut));
-  return problems;
-}
+import { ValidateCutscene, ValidateAllCutscenes } from "./Script_CutsceneCheck.mjs";
+export { ValidateCutscene, ValidateAllCutscenes };
 
 // ---------------------------------------------------------------------------
 // 关键帧采样
@@ -188,7 +162,12 @@ const CSS = `
 .csBar.top{top:0}
 .csBar.bot{bottom:0}
 .csBlack{position:absolute;inset:0;background:#000;opacity:0}
-.csSubs{position:absolute;left:8%;right:8%;bottom:${BAR_RATIO * 100 + 4}%;text-align:center}
+/* 字幕层比台词层高一档：两层都锚在 bottom:16% 时，同屏出现会直接压在一起
+   （李宗仁那一场因此只能把带时刻的字幕全挪进跳过卡）。字幕在上、台词在下。 */
+.csSubs{position:absolute;left:8%;right:8%;bottom:${BAR_RATIO * 100 + 11}%;text-align:center}
+.csSubs.center{bottom:auto;top:50%;transform:translateY(-50%)}
+.csSub.title{font-size:clamp(26px,3.2vw,52px);letter-spacing:.32em;color:#f2ead6;margin:0 0 .6em}
+.csSub.date{font-size:clamp(14px,1.3vw,22px);letter-spacing:.22em;color:#b9b1a1}
 .csSub{color:#e7dfcc;font-size:clamp(15px,1.55vw,25px);line-height:1.6;
   text-shadow:0 2px 6px #000,0 0 2px #000;margin:0 0 .35em}
 .csSub.big{font-size:clamp(21px,2.4vw,38px);letter-spacing:.14em;color:#f2ead6}
@@ -248,6 +227,7 @@ export class CutsceneDirector {
   constructor({
     camera, scene, hud = null, audio = null, actorFactory = null, library = null,
     root = null, onCapture = null, onRelease = null, includeProbeProps = false,
+    applySky = null, restoreSky = null,
     table = CUTSCENES,
   } = {}) {
     this.camera = camera;
@@ -259,6 +239,10 @@ export class CutsceneDirector {
     this.table = table;
     this.onCapture = onCapture;
     this.onRelease = onRelease;
+    // 过场自带天空（cut.sky）的两只钩子：套 / 还。没接的话就沿用当前关的天。
+    this.applySky = applySky;
+    this.restoreSky = restoreSky;
+    this.skyApplied = false;
     this.includeProbeProps = includeProbeProps;
 
     this.doc = (root && root.ownerDocument) || (typeof document !== "undefined" ? document : null);
@@ -363,16 +347,25 @@ export class CutsceneDirector {
     this.subSlots.length = 0;
     this.lineSlot = null;
     this.cardTime = -1;
-    this.blackAlpha = 0;
+    // fadeIn：从黑场淡入（开场过场用）。没写就是硬切进第一镜。
+    this.blackAlpha = cut.fadeIn ? 1 : 0;
     this.shakeSeed = HashString(`shake:${id}`);
     this.playing = true;
 
     this._SaveCamera();
+    // 天空要**先于**布景套：BakeEnvironment 烘的是天，布景材质吃的 IBL 是那一张。
+    this.skyApplied = false;
+    if (cut.sky && this.applySky) this.skyApplied = !!this.applySky(cut.sky);
     this._BuildSet(cut);
     if (this.hud && typeof this.hud.SetOrdersVisible === "function") this.hud.SetOrdersVisible(false);
+    if (this.hud && typeof this.hud.SetCinematic === "function") this.hud.SetCinematic(true);
     if (this.onCapture) this.onCapture(cut);
     if (this.dom) {
+      // 进场不走 0.35 s 的淡入过渡（黑场开场会透出后面的实景），退场再恢复
+      this.dom.root.style.transition = "none";
       this.dom.root.classList.add("on");
+      void this.dom.root.offsetWidth;
+      this.dom.root.style.transition = "";
       this.dom.card.classList.remove("on");
       this.dom.card.innerHTML = "";
       this.dom.skip.style.display = "";
@@ -417,9 +410,11 @@ export class CutsceneDirector {
     }
     if (!shot) return;
     local = Clamp(local, 0, shot.seconds);
+    this.curShot = shot;
 
-    this._ApplyCamera(cut, shot, local);
+    // 先摆人再摆机位：机位可以 lookActor / fromActor 跟着人走，人得先就位。
     this._ApplyActors(cut, dt);
+    this._ApplyCamera(cut, shot, local);
     this._ApplyProps(shot, local);
     this._FireCues(cut, shot, start, local);
     this._ApplyFlashes(cut, shot, start);
@@ -453,8 +448,12 @@ export class CutsceneDirector {
       const mesh = this._MakeProp(spec);
       if (!mesh) continue;
       this.setRoot.add(mesh);
+      const light = mesh.children.find((c) => c.isPointLight) || null;
       this.props.set(spec.name || `prop${this.props.size}`, {
-        mesh, base: mesh.position.clone(),
+        mesh, base: mesh.position.clone(), baseRot: mesh.rotation.clone(),
+        light, lightBase: light ? light.intensity : 0,
+        flicker: spec.light && spec.light.flicker ? Clamp01(spec.light.flicker) : 0,
+        flickerSeed: HashString(`flicker:${spec.name || this.props.size}`) % 100,
       });
     }
 
@@ -484,19 +483,44 @@ export class CutsceneDirector {
   _MakeProp(spec) {
     const size = spec.size || [1, 1, 1];
     let geometry = null;
+    // 贴图按**世界尺寸**铺：一张 Ground 是 2.6 m、一张砖是 1.2 m。Box/Plane 的 UV
+    // 默认每面 0—1，不按尺寸重算的话 7 m 的墙就是七块巨砖、140 m 的地是一片拉丝
+    //（出川那张地面、最后一电那面墙都是这么来的）。spec.repeat 给了就按它来。
+    const tile = spec.mat ? (TILE_BY_RECIPE[spec.mat] || 1.0) : 1.0;
     if (spec.kind === "cyl") {
       geometry = new THREE.CylinderGeometry(size[0], size[0], size[1], 14, 1);
+      if (spec.mat && spec.repeat === undefined) {
+        const uv = geometry.attributes.uv;
+        const around = (2 * Math.PI * size[0]) / tile, tall = size[1] / tile;
+        for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * around, uv.getY(i) * tall);
+        uv.needsUpdate = true;
+      }
     } else if (spec.kind === "plane") {
       geometry = new THREE.PlaneGeometry(size[0], size[1]);
       geometry.rotateX(-Math.PI / 2);
+      if (spec.mat && spec.repeat === undefined) {
+        const uv = geometry.attributes.uv;
+        for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * (size[0] / tile), uv.getY(i) * (size[1] / tile));
+        uv.needsUpdate = true;
+      }
     } else {
       geometry = new THREE.BoxGeometry(size[0], size[1], size[2] ?? size[0]);
+      if (spec.mat && spec.repeat === undefined) {
+        ScaleBoxUv(geometry, size[0], size[1], size[2] ?? size[0], tile, spec.name || "prop");
+      }
     }
     this.ownedGeometries.push(geometry);
 
     let material = null;
     if (spec.mat && this.library && typeof this.library.Get === "function") {
-      try { material = this.library.Get(spec.mat); } catch (error) { material = null; }
+      // repeat：贴图在这块几何上铺几遍。Box/Plane 的 UV 是每面 0—1，一张 2 m 的
+      // 土路纹理铺满 140 m 的地面就是一片拉丝（出川那张地面的「流水纹」就是它）。
+      // 按「几何尺寸 ÷ 贴图的物理尺寸（约 2 m）」给 repeat，地面才像地面。
+      const options = {};
+      if (spec.repeat !== undefined) options.repeat = spec.repeat;
+      if (spec.tint !== undefined) options.color = spec.tint;
+      if (spec.roughness !== undefined) options.roughness = spec.roughness;
+      try { material = this.library.Get(spec.mat, options); } catch (error) { material = null; }
     }
     if (!material || spec.inside || spec.emissive) {
       // 需要 BackSide 或自发光时不能直接用库里的共享材质 —— 一改就改到全场。
@@ -521,14 +545,19 @@ export class CutsceneDirector {
     // 就必须挂一盏点光 —— 少了它，三场室内戏在 night 预设下是纯黑的，
     // 而且看不出是 bug，只会以为「夜景就这样」。
     if (spec.light) {
+      // decay 默认 2（物理正确的平方反比）—— 但「远处城头一片火照亮几十米外的
+      // 麦地」这种气氛光按平方反比在 40 m 外就归零了。给数据一个旋钮：
+      // decay 1 是线性衰减，0 是完全不衰减（只受 distance 截断）。
       const light = new THREE.PointLight(
-        spec.light.color ?? 0xffd9a0, spec.light.intensity ?? 8, spec.light.distance ?? 8, 2);
+        spec.light.color ?? 0xffd9a0, spec.light.intensity ?? 8, spec.light.distance ?? 8,
+        spec.light.decay ?? 2);
       light.position.set(0, spec.light.offsetY ?? 0, 0);
       mesh.add(light);
     }
     mesh.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
     if (spec.rx) mesh.rotation.x = spec.rx;
     if (spec.ry) mesh.rotation.y = spec.ry;
+    if (spec.rz) mesh.rotation.z = spec.rz;   // 挂钟指针、斜靠的东西都要它
     mesh.castShadow = !spec.inside;
     mesh.receiveShadow = true;
     mesh.name = spec.name || "prop";
@@ -544,9 +573,29 @@ export class CutsceneDirector {
   _BuildFlashPool() {
     const geometry = new THREE.PlaneGeometry(1, 1);
     this.ownedGeometries.push(geometry);
+    // 径向渐变的 alpha 图：没有它，加性方片近看是几个套着的方块、远看是一块淡方晕
+    //（王铭章过场反打那一镜抓到的）。64×64 的 Canvas 一张，四片共用。
+    if (!this.flashTexture && typeof document !== "undefined") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0.0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.25, "rgba(255,240,200,0.85)");
+      grad.addColorStop(0.6, "rgba(255,200,120,0.25)");
+      grad.addColorStop(1.0, "rgba(255,160,60,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      // 十字星芒：两条细亮线
+      ctx.fillStyle = "rgba(255,245,220,0.55)";
+      ctx.fillRect(0, 30, 64, 4);
+      ctx.fillRect(30, 0, 4, 64);
+      this.flashTexture = new THREE.CanvasTexture(canvas);
+      this.flashTexture.colorSpace = THREE.SRGBColorSpace;
+    }
     for (let i = 0; i < 4; i += 1) {
       const material = new THREE.MeshBasicMaterial({
-        color: 0xffd9a0, blending: THREE.AdditiveBlending,
+        color: 0xffd9a0, blending: THREE.AdditiveBlending, map: this.flashTexture || null,
         transparent: true, opacity: 0, depthWrite: false, fog: false,
       });
       MarkNoPrepass(material);
@@ -609,6 +658,7 @@ export class CutsceneDirector {
       quaternion: this.camera.quaternion.clone(),
       fov: this.camera.fov,
       near: this.camera.near,
+      far: this.camera.far,
     };
   }
 
@@ -618,6 +668,7 @@ export class CutsceneDirector {
     this.camera.quaternion.copy(this.savedCamera.quaternion);
     this.camera.fov = this.savedCamera.fov;
     this.camera.near = this.savedCamera.near;
+    this.camera.far = this.savedCamera.far;
     this.camera.updateProjectionMatrix();
     this.savedCamera = null;
   }
@@ -633,15 +684,23 @@ export class CutsceneDirector {
     const look = cam.look || [from[0], from[1], from[2] - 1];
     const lookTo = cam.lookTo || look;
 
+    // 机位/被摄物可以锚在演员身上：fromActor / lookActor 给演员 id，
+    // from/look 这时是**相对那个演员脚下**的偏移（世界轴向，不随他转身）。
+    // 好处是跟拍/反打不用逐秒反算坐标 —— 人走到哪，镜头就跟到哪。
+    const anchorFrom = cam.fromActor ? this._ActorLocalPos(cam.fromActor) : null;
+    const anchorLook = cam.lookActor ? this._ActorLocalPos(cam.lookActor) : null;
+    const fx = anchorFrom ? anchorFrom.x : 0, fy = anchorFrom ? anchorFrom.y : 0, fz = anchorFrom ? anchorFrom.z : 0;
+    const lx = anchorLook ? anchorLook.x : 0, ly = anchorLook ? anchorLook.y : 0, lz = anchorLook ? anchorLook.z : 0;
+
     this.camera.position.set(
-      o.x + Lerp(from[0], to[0], e),
-      o.y + Lerp(from[1], to[1], e),
-      o.z + Lerp(from[2], to[2], e),
+      o.x + fx + Lerp(from[0], to[0], e),
+      o.y + fy + Lerp(from[1], to[1], e),
+      o.z + fz + Lerp(from[2], to[2], e),
     );
     const target = new THREE.Vector3(
-      o.x + Lerp(look[0], lookTo[0], e),
-      o.y + Lerp(look[1], lookTo[1], e),
-      o.z + Lerp(look[2], lookTo[2], e),
+      o.x + lx + Lerp(look[0], lookTo[0], e),
+      o.y + ly + Lerp(look[1], lookTo[1], e),
+      o.z + lz + Lerp(look[2], lookTo[2], e),
     );
     // 近平面：微距特写（85 mm 打 0.4 m 外的纸）默认 0.08 也够，但长焦回望
     // 300 m 外的城墙时把 near 抬起来能省一大截深度精度。按机位到被摄物的距离给。
@@ -651,6 +710,11 @@ export class CutsceneDirector {
     // 画面上表现为「准星没了」，而不是报错 —— 这类 bug 只能靠出图发现。
     this.camera.near = shot.gunsight ? 0.02 : Clamp(dist * 0.03, 0.03, 1.2);
     this.camera.fov = FovFromFocalMm(shot.focalMm);
+    // 远平面：正片按关给（L5 收到 400 m 是为了压 draw call），但过场常要拍
+    // 几百米外的城墙剪影 —— 远处的大布景会在远平面上被硬切出一个断头。
+    // shot.cameraFar / cut.cameraFar 给了就用它，播完 _RestoreCamera 还原。
+    const wantFar = shot.cameraFar ?? (this.cut && this.cut.cameraFar);
+    if (wantFar && this.camera.far !== wantFar) this.camera.far = wantFar;
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(target);
 
@@ -687,6 +751,20 @@ export class CutsceneDirector {
     }
   }
 
+  /** 某演员此刻在布景局部系里的脚下位置（没这个人 / 还没上场 → null）。 */
+  _ActorLocalPos(id) {
+    const entry = this.actors.get(id);
+    if (!entry) {
+      // 没造出 Actor（无工厂 / 造失败）时退回轨道采样，机位至少不会飞到原点
+      const spec = (this.cut.cast || []).find((c) => c.id === id);
+      if (!spec) return null;
+      const sample = SampleTrack(spec.track, this.time);
+      return sample.pos ? { x: sample.pos[0], y: sample.pos[1], z: sample.pos[2] } : null;
+    }
+    const p = entry.actor.root.position;
+    return { x: p.x, y: p.y, z: p.z };
+  }
+
   _ApplyActors(cut, dt) {
     for (const { actor, spec } of this.actors.values()) {
       const sample = SampleTrack(spec.track, this.time);
@@ -703,8 +781,21 @@ export class CutsceneDirector {
   _ApplyProps(shot, local) {
     // 每帧先把所有道具放回基准位，再叠加本镜的位移 ——
     // 否则上一镜的位移会留在道具身上，切回来道具就飘在半空。
-    for (const entry of this.props.values()) entry.mesh.position.copy(entry.base);
+    for (const entry of this.props.values()) {
+      entry.mesh.position.copy(entry.base);
+      if (entry.baseRot) entry.mesh.rotation.copy(entry.baseRot);
+    }
+    // 同一道具可以给多段位移（先掉到地上再滑、震一下再回弹）：只让**已经开始**的那
+    // 一段里最晚开始的生效。原来是「数组里最后一条赢」—— 第二段在自己 startAt 之前
+    // 会拿 from 把第一段盖掉，两段动作永远做不成。
+    const active = new Map();
     for (const move of shot.propMoves || []) {
+      const startAt = move.startAt || 0;
+      if (local < startAt) continue;
+      const prev = active.get(move.name);
+      if (!prev || (prev.startAt || 0) <= startAt) active.set(move.name, move);
+    }
+    for (const move of active.values()) {
       const entry = this.props.get(move.name);
       if (!entry) continue;
       const k = Clamp01((local - (move.startAt || 0)) / Math.max(1e-6, (move.endAt || 1) - (move.startAt || 0)));
@@ -714,6 +805,19 @@ export class CutsceneDirector {
         Lerp(move.from[1], move.to[1], e),
         Lerp(move.from[2], move.to[2], e),
       );
+      // 可选：rotFrom/rotTo [rx,ry,rz]（弧度），摔下来的东西能翻个面
+      if (move.rotFrom || move.rotTo) {
+        const r0 = move.rotFrom || [entry.mesh.rotation.x, entry.mesh.rotation.y, entry.mesh.rotation.z];
+        const r1 = move.rotTo || r0;
+        entry.mesh.rotation.set(Lerp(r0[0], r1[0], e), Lerp(r0[1], r1[1], e), Lerp(r0[2], r1[2], e));
+      }
+    }
+    // 火光闪烁：light.flicker 给了幅度（0—1），点光强度按确定性噪声抖
+    for (const entry of this.props.values()) {
+      if (!entry.light || !entry.flicker) continue;
+      const n = ValueNoise2(this.time * 9.0, entry.flickerSeed, this.shakeSeed) - 0.5;
+      const n2 = ValueNoise2(this.time * 23.0, entry.flickerSeed + 7.3, this.shakeSeed) - 0.5;
+      entry.light.intensity = entry.lightBase * (1 + (n * 0.7 + n2 * 0.3) * 2 * entry.flicker);
     }
   }
 
@@ -728,7 +832,9 @@ export class CutsceneDirector {
       slot += 1;
       const k = 1 - (this.time - t0) / life;
       mesh.visible = true;
-      mesh.material.opacity = 0.9 * k;
+      mesh.material.opacity = Math.min(1, 1.0 * k + 0.15);
+      // HDR 增益：加性片的颜色乘 2.5，远处的焰才压得过天光
+      mesh.material.color.setRGB(2.5, 2.1, 1.5);
       mesh.position.set(flash.pos[0], flash.pos[1], flash.pos[2]);
       mesh.scale.setScalar((flash.size || 1) * (0.75 + 0.35 * k));
       // billboard：贴片始终正对相机。相机在世界系，贴片在 setRoot 局部系。
@@ -742,6 +848,12 @@ export class CutsceneDirector {
     else if (shot.blackOutAt !== undefined && local >= shot.blackOutAt) {
       want = Clamp01((local - shot.blackOutAt) / Math.max(0.2, shot.seconds - shot.blackOutAt));
     }
+    // 镜头开头从黑淡入（shot.fadeIn 秒）；整场开头从黑淡入（cut.fadeIn 秒）。
+    // 两条都是「想要的黑度」的下限，与黑场/黑出取最大，不互相覆盖。
+    if (shot.fadeIn > 0) want = Math.max(want, 1 - Clamp01(local / shot.fadeIn));
+    if (this.cut && this.cut.fadeIn > 0) want = Math.max(want, 1 - Clamp01(this.time / this.cut.fadeIn));
+    // 黑场镜**第一帧就全黑**（硬切进黑，不收敛）：字卡开场漏 0.25 s 旧画面就是这么来的
+    if (shot.black) { this.blackAlpha = 1; if (this.dom) this.dom.black.style.opacity = "1"; return; }
     // 硬切不淡入，其余用 4 秒/单位的速度收敛（≈0.25 s 全黑）
     this.blackAlpha = want >= this.blackAlpha
       ? Math.min(want, this.blackAlpha + dt * 4)
@@ -807,8 +919,10 @@ export class CutsceneDirector {
 
   _RenderSubs() {
     if (!this.dom) return;
+    // titleCard 的镜（黑场上的章节字卡）字幕居中；其余压在下黑边上方
+    this.dom.subs.classList.toggle("center", !!(this.curShot && this.curShot.titleCard));
     this.dom.subs.innerHTML = this.subSlots.map((s) => {
-      const cls = `csSub${s.big ? " big" : ""}${s.small ? " small" : ""}`;
+      const cls = `csSub${s.big ? " big" : ""}${s.small ? " small" : ""}${s.title ? " title" : ""}${s.date ? " date" : ""}`;
       const note = s.small && typeof s.small === "string"
         ? `<span class="csSubNote">${s.small}</span>` : "";
       return `<p class="${cls}">${TierTag(s.tier)}${s.text}${note}</p>`;
@@ -887,7 +1001,10 @@ export class CutsceneDirector {
     }
     this.blackAlpha = 0;
     this._RestoreCamera();
+    if (this.skyApplied && this.restoreSky) this.restoreSky();
+    this.skyApplied = false;
     if (this.hud && typeof this.hud.SetOrdersVisible === "function") this.hud.SetOrdersVisible(true);
+    if (this.hud && typeof this.hud.SetCinematic === "function") this.hud.SetCinematic(false);
     if (this.onRelease) this.onRelease(this.cut);
     const resolve = this.resolve;
     this.resolve = null;
@@ -901,6 +1018,7 @@ export class CutsceneDirector {
     if (this.doc && this._onKey) this.doc.removeEventListener("keydown", this._onKey);
     if (this.dom && this.dom.root.parentNode) this.dom.root.parentNode.removeChild(this.dom.root);
     this.dom = null;
+    if (this.flashTexture) { this.flashTexture.dispose(); this.flashTexture = null; }
   }
 }
 
