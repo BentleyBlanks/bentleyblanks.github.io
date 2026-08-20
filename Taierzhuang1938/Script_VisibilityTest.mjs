@@ -1,4 +1,5 @@
-// 《滕县 一九三八》人物可见性回归：人数预算不得再藏活人，尸体不得在本关内消失。
+// 《滕县 一九三八》人物可见性回归：近景 Actor + 远景 LOD 必须覆盖所有人，
+// 人数预算不得再藏活人，尸体不得在本关内消失。
 //
 // 用法：node Taierzhuang1938/Script_VisibilityTest.mjs
 // 退出码即成败。
@@ -52,14 +53,34 @@ try {
     T.ai.CullActors(T.camera);
     return {
       arranged: actors.length,
-      visible: actors.filter((soldier) => soldier.actor.root.visible).length,
+      rendered: actors.filter((soldier) => soldier.renderLod === "detail" || soldier.renderLod === "crowd").length,
+      detailed: actors.filter((soldier) => soldier.renderLod === "detail").length,
+      crowd: actors.filter((soldier) => soldier.renderLod === "crowd").length,
       legacyBudgetPresent: Object.hasOwn(T.ai, "visibleBudget"),
     };
   });
   Check("视锥内超过旧 13 人上限仍全部显示",
-    visibility.arranged > 13 && visibility.visible === visibility.arranged,
-    `${visibility.visible}/${visibility.arranged}`);
+    visibility.arranged > 13 && visibility.rendered === visibility.arranged,
+    `${visibility.rendered}/${visibility.arranged} = 近景 ${visibility.detailed} + LOD ${visibility.crowd}`);
+  Check("距离 LOD 确实接管远处人物", visibility.detailed > 0 && visibility.crowd > 0,
+    `近景 ${visibility.detailed} / LOD ${visibility.crowd}`);
   Check("运行时已没有人物可见名额", !visibility.legacyBudgetPresent);
+
+  const crowdCapacity = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const crowd = T.ai.crowd;
+    const actor = T.ai.soldiers.find((soldier) => soldier.actor)?.actor;
+    if (!crowd || !actor) return 0;
+    crowd.Begin();
+    for (let index = 0; index < 480; index += 1) {
+      crowd.Push(actor.kind, actor.root.position, 0, actor.sizeScale ?? 1, 1);
+    }
+    crowd.End();
+    const count = crowd.Count;
+    T.ai.CullActors(T.camera);       // 把人为容量探针还原成真实战场列表
+    return count;
+  });
+  Check("远景层容得下最大 480 人票池", crowdCapacity === 480, `${crowdCapacity}/480`);
 
   const corpses = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -75,15 +96,18 @@ try {
     return {
       killed: victims.length,
       retained: victims.filter((soldier) => T.ai.soldiers.includes(soldier) && soldier.actor).length,
-      visible: victims.filter((soldier) => soldier.actor?.root.visible).length,
+      rendered: victims.filter((soldier) => soldier.renderLod === "detail" || soldier.renderLod === "crowd").length,
+      detailed: victims.filter((soldier) => soldier.renderLod === "detail").length,
+      crowd: victims.filter((soldier) => soldier.renderLod === "crowd").length,
       oldestSeconds: Math.max(0, ...victims.map((soldier) => soldier.deadTime)),
     };
   });
   Check("超过旧 26 具上限后尸体仍全部保留",
     corpses.killed > 26 && corpses.retained === corpses.killed,
     `${corpses.retained}/${corpses.killed}`);
-  Check("尸体稳定落地后仍可见", corpses.visible === corpses.killed,
-    `${corpses.visible}/${corpses.killed}，最老 ${corpses.oldestSeconds.toFixed(1)} s`);
+  Check("尸体稳定落地后仍可见", corpses.rendered === corpses.killed,
+    `${corpses.rendered}/${corpses.killed}（近景 ${corpses.detailed} + LOD ${corpses.crowd}），`
+      + `最老 ${corpses.oldestSeconds.toFixed(1)} s`);
   Check("整趟没有页面报错", errors.length === 0, errors.slice(0, 3).join(" | "));
 } finally {
   await browser.close();

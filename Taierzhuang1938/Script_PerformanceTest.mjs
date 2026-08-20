@@ -1,0 +1,126 @@
+// 《滕县 一九三八》人物方向性能回归：朝向敌军密集区不能让人物提交量失控。
+//
+// 用法：node Taierzhuang1938/Script_PerformanceTest.mjs
+// 退出码即成败。
+
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { ServeRoot } from "./Script_DevServer.mjs";
+
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(projectDir, "..");
+const server = await ServeRoot(rootDir, 0);
+const port = server.address().port;
+const browser = await LaunchBrowser();
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+
+const errors = [];
+page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 240)}`));
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const url = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
+  errors.push(`CONSOLE ${message.text().slice(0, 240)}`);
+});
+
+let result = null;
+try {
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=low&scale=small`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  result = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.StepFrames(60);
+    const player = T.player;
+    const enemies = T.ai.soldiers.filter((soldier) => soldier.side === "ija" && soldier.actor);
+    const allies = T.ai.soldiers.filter((soldier) => soldier.side === "nra" && soldier.actor);
+    // 人为摆出一条最坏的通视走廊：前方是日军密集区，后方只留少量守军。
+    // 测的是“转头”这一个变量，不把关卡随机撒兵当成性能依据。
+    const origin = player.position.clone();
+    const Place = (soldier, x, z) => {
+      soldier.position.set(origin.x + x, origin.y, origin.z + z);
+      soldier.actor.root.position.copy(soldier.position);
+      if (soldier.body) soldier.body.Teleport(soldier.position.x, soldier.position.y, soldier.position.z);
+    };
+    enemies.slice(0, 30).forEach((soldier, index) => {
+      const column = index % 10;
+      const row = Math.floor(index / 10);
+      Place(soldier, (column - 4.5) * 3.2, -34 - row * 20);
+    });
+    allies.slice(0, 8).forEach((soldier, index) => {
+      Place(soldier, (index - 3.5) * 3.2, 38 + (index % 2) * 8);
+    });
+
+    // CPU 回归不只看墙钟（CI 负载会让 ms 波动）：同时统计真正进入姿态
+    // 解算的次数。这个数是确定的，可以锁住“远处 23 人又每帧全算”的回归。
+    for (const soldier of T.ai.soldiers) {
+      if (!soldier.actor || soldier.actor.userDataPerformanceWrapped) continue;
+      const Update = soldier.actor.Update.bind(soldier.actor);
+      soldier.actor.Update = (...args) => {
+        soldier.actor.performanceUpdateCount = (soldier.actor.performanceUpdateCount || 0) + 1;
+        return Update(...args);
+      };
+      soldier.actor.userDataPerformanceWrapped = true;
+    }
+
+    const Sample = (yaw) => {
+      for (const soldier of T.ai.soldiers) {
+        if (soldier.actor) soldier.actor.performanceUpdateCount = 0;
+      }
+      player.yaw = yaw;
+      player.pitch = 0;
+      player.aimYaw = 0;
+      player.aimPitch = 0;
+      T.StepFrames(2);
+      T.renderer.info.autoReset = false;
+      T.renderer.info.reset();
+      const started = performance.now();
+      T.StepFrames(12);
+      T.renderer.getContext().finish();
+      const cpuMs = (performance.now() - started) / 12;
+      const rendered = T.ai.soldiers.filter((soldier) => soldier.renderLod === "detail"
+        || soldier.renderLod === "crowd");
+      const metrics = {
+        cpuMs,
+        drawCalls: T.renderer.info.render.calls / 12,
+        triangles: T.renderer.info.render.triangles / 12,
+        renderedIja: rendered.filter((soldier) => soldier.side === "ija").length,
+        renderedNra: rendered.filter((soldier) => soldier.side === "nra").length,
+        detailIja: rendered.filter((soldier) => soldier.side === "ija" && soldier.renderLod === "detail").length,
+        crowdIja: rendered.filter((soldier) => soldier.side === "ija" && soldier.renderLod === "crowd").length,
+        animatedIja: T.ai.soldiers.filter((soldier) => soldier.side === "ija")
+          .reduce((sum, soldier) => sum + (soldier.actor?.performanceUpdateCount || 0), 0),
+      };
+      T.renderer.info.autoReset = true;
+      return metrics;
+    };
+    return { toward: Sample(0), away: Sample(Math.PI) };
+  });
+} finally {
+  await browser.close();
+  server.close();
+}
+
+if (result) {
+  const Format = (sample) => `CPU ${sample.cpuMs.toFixed(1)} ms | calls ${sample.drawCalls.toFixed(0)}`
+    + ` | tris ${(sample.triangles / 1e6).toFixed(2)}M | IJA ${sample.renderedIja}`
+    + ` (${sample.detailIja} detail + ${sample.crowdIja} LOD, ${sample.animatedIja} pose updates)`
+    + ` | NRA ${sample.renderedNra}`;
+  console.log(`toward  ${Format(result.toward)}`);
+  console.log(`away    ${Format(result.away)}`);
+  console.log(`ratio   CPU ${(result.toward.cpuMs / result.away.cpuMs).toFixed(2)}x | calls `
+    + `${(result.toward.drawCalls / result.away.drawCalls).toFixed(2)}x`);
+}
+for (const error of errors) console.log(error);
+const failures = [];
+if (result) {
+  if (result.toward.renderedIja < 20) failures.push(`镜头前日军渲染不足 ${result.toward.renderedIja} < 20`);
+  if (result.toward.crowdIja < 10) failures.push(`远景 LOD 未接管 ${result.toward.crowdIja} < 10`);
+  if (result.toward.animatedIja > 60) failures.push(`日军姿态更新过多 ${result.toward.animatedIja} > 60`);
+  if (result.toward.drawCalls > 650) failures.push(`朝敌方向 calls 过高 ${result.toward.drawCalls.toFixed(0)} > 650`);
+  const callRatio = result.toward.drawCalls / Math.max(1, result.away.drawCalls);
+  if (callRatio > 1.35) failures.push(`转向 calls 尖峰 ${callRatio.toFixed(2)}x > 1.35x`);
+}
+for (const failure of failures) console.log(`FAIL ${failure}`);
+process.exit(errors.length || failures.length || !result ? 1 : 0);

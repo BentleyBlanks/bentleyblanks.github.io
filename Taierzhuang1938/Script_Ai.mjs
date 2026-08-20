@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
+import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
@@ -63,16 +64,37 @@ let nextId = 1;
  * 才进入静态远景人群，导致镜头里第 14 个人若在 55 m 内就被直接设成 invisible；
  * 尸体既不进远景层、排序又垫底，通常倒下当帧就从画面消失。
  *
- * 这里现在只做真正的视锥判断：屏幕内的活人和尸体全部显示完整 Actor，屏幕外的
- * root 暂时隐藏，转回镜头后立刻恢复。draw call / 三角形预算不得再改变战场内容；
- * 将来要优化，只能合批、共享蒙皮或做能保持人数与尸体的等价 LOD。
+ * 2026-08-21 性能取证：相机朝向 23 名日军时一帧 27.5 ms / 948 calls，
+ * 转身只看 8 名守军时 11.0 ms / 500 calls。视锥内全用完整 Actor 会让“朝向敌人”
+ * 本身变成 CPU 尖峰；而 root.visible 又打开了每人每帧两次足底物理探测。
+ *
+ * 所以保留“视锥内每个人都必须看得见”，但改为距离 LOD：近处是完整 Actor，
+ * 远处是 ActorCrowd 烘焙出的同款模型实例。这不按人数发名额，不会隐藏第 N 个人；
+ * 活人、卧倒者与尸体都进 LOD，只是二十几像素高时不再白算关节、脚 IK 与逐件提交。
  */
+const ACTOR_DETAIL_ENTER_M = 46;
+const ACTOR_DETAIL_EXIT_M = 56;
+const ACTOR_ANIMATION_60HZ_M = 20;
+const ACTOR_ANIMATION_30HZ_M = 32;
+const ACTOR_FOOT_IK_M = 18;
+const ACTOR_SHADOW_M = 24;
 // 视锥判定用的包围球：半径给到 1.6 m（人高 1.7 上下）再加一点余量，
 // 免得屏幕边缘上的人在转身时一格一格地闪出来。
 const ACTOR_BOUND_R = 1.6;
 const _cullFrustum = new THREE.Frustum();
 const _cullMatrix = new THREE.Matrix4();
 const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_BOUND_R);
+
+/**
+ * 屏幕上只有二十来像素高的人不需要 60 Hz 解十三个关节。位移与转向仍每帧同步，
+ * 只把内部姿势分档；用士兵 id 错开更新帧，避免十个人在同一帧一起算。
+ */
+function ActorAnimationCadence(soldier) {
+  const distanceSq = soldier.actor?.renderDistanceSq ?? 0;
+  if (distanceSq > ACTOR_ANIMATION_30HZ_M * ACTOR_ANIMATION_30HZ_M) return 3;
+  if (distanceSq > ACTOR_ANIMATION_60HZ_M * ACTOR_ANIMATION_60HZ_M) return 2;
+  return 1;
+}
 
 /** 按权重抽一个。 */
 function Pick(list, rnd) {
@@ -760,7 +782,11 @@ export class AiDirector {
       if (!s.alive) {
         s.deadTime += dt;
         this.StepCorpse(s, dt);
-        if (s.actor) s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
+        // 镜头外/远景的活人不白算骨架。死亡前 0.9 s 例外：让隐藏的
+        // 精细层也把倒地姿势收完，以后若在近处重新进精细层不会突然“复活”。
+        if (s.actor && (s.actor.root.visible || s.deadTime <= 0.9)) {
+          s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
+        }
         continue;
       }
       // 「想」分帧轮转：每帧只有六分之一的人重新决策
@@ -772,7 +798,8 @@ export class AiDirector {
   }
 
   /**
-   * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量与距离名额。
+   * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；
+   * 只按投影尺寸近似值（距离）选完整 Actor / 合批远景层。
    */
   CullActors(camera) {
     if (!camera) return;
@@ -782,12 +809,41 @@ export class AiDirector {
     camera.updateMatrixWorld();
     _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
     _cullFrustum.setFromProjectionMatrix(_cullMatrix);
+    const crowd = this._Crowd();
+    if (crowd) crowd.Begin();
     for (const s of this.soldiers) {
       if (!s.actor) continue;
       // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
       _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
-      s.actor.root.visible = _cullFrustum.intersectsSphere(_cullSphere);
+      if (!_cullFrustum.intersectsSphere(_cullSphere)) {
+        s.actor.root.visible = false;
+        s.actor.allowFootIk = false;
+        s.renderLod = "culled";
+        continue;
+      }
+      const distanceSq = s.position.distanceToSquared(camera.position);
+      s.actor.renderDistanceSq = distanceSq;
+      s.actor.allowFootIk = distanceSq <= ACTOR_FOOT_IK_M * ACTOR_FOOT_IK_M;
+      s.actor.SetShadowEnabled(distanceSq <= ACTOR_SHADOW_M * ACTOR_SHADOW_M);
+      const detailLimit = s.renderLod === "detail" ? ACTOR_DETAIL_EXIT_M : ACTOR_DETAIL_ENTER_M;
+      // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
+      const detailed = !crowd || distanceSq <= detailLimit * detailLimit;
+      s.actor.root.visible = detailed;
+      s.renderLod = detailed ? "detail" : "crowd";
+      if (!detailed) {
+        const prone = !s.alive ? 1 : Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
+        crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone);
+      }
     }
+    if (crowd) crowd.End();
+  }
+
+  /** 远景层按需建；纯逻辑环境下一直是 null。 */
+  _Crowd() {
+    if (this.crowd !== undefined) return this.crowd;
+    const { scene, actorFactory } = this.ctx;
+    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory) : null;
+    return this.crowd;
   }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
@@ -1327,7 +1383,8 @@ export class AiDirector {
     if (s.actor) {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
-      s.actor.Update(dt, {
+      const cadence = ActorAnimationCadence(s);
+      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
         moveSpeed: s.moveSpeed,
         aim: s.aimBlend,
         crouch: s.crouchBlend,
@@ -1406,7 +1463,8 @@ export class AiDirector {
     if (s.actor) {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
-      s.actor.Update(dt, {
+      const cadence = ActorAnimationCadence(s);
+      if (s.actor.root.visible && (this.tickIndex + s.id) % cadence === 0) s.actor.Update(dt * cadence, {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
         grounded: false,
         verticalVelocity: Math.cos(Math.PI * k) * Math.PI
@@ -1657,6 +1715,8 @@ export class AiDirector {
   Dispose() {
     for (const s of [...this.soldiers]) this.Remove(s);
     this.soldiers.length = 0;
+    if (this.crowd) this.crowd.Dispose();
+    this.crowd = undefined;
   }
 }
 

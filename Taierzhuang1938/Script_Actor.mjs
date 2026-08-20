@@ -1508,7 +1508,9 @@ export class Actor {
     // 那三种姿态下脚本来就不该踩在地上。
     let pelvisDrop = 0;
     const probe = this.factory && this.factory.groundProbe;
-    const doFootIk = !!probe && this.root.visible && grounded
+    // AI 会在中景关掉这条：18 m 外的鞋底已经读不出贴地偏差，
+    // 但两条 Rapier 探测 / 人 / 帧仍然是真实 CPU 成本。过场和独立 Actor 没设值时继续开。
+    const doFootIk = !!probe && this.root.visible && this.allowFootIk !== false && grounded
       && prone < 0.5 && dying < 0.02 && !this.ragdollState;
     const scale = this.sizeScale || 1;
     if (doFootIk) {
@@ -2064,6 +2066,24 @@ export class Actor {
         (0.20 + 0.06 * fall) * d.height, -0.05 * d.height, -0.075 * d.height);
     }
     if (dying > 0) this.body.rotation.x += dying * 0.02;
+  }
+
+  /**
+   * 中景人物的影子连一个像素都不到，但每个身体分件仍会在阴影 pass
+   * 里再提交一遍。只在距离档切换时遍历，并记住每个网格原本是否投影，
+   * 近景恢复时不会错把枪口火、辅助面之类的原生 false 改成 true。
+   */
+  SetShadowEnabled(enabled) {
+    const next = !!enabled;
+    if (this.shadowEnabled === next) return;
+    this.shadowEnabled = next;
+    this.root.traverse((object) => {
+      if (!object.isMesh) return;
+      if (object.userData.actorOriginalCastShadow === undefined) {
+        object.userData.actorOriginalCastShadow = object.castShadow === true;
+      }
+      object.castShadow = next && object.userData.actorOriginalCastShadow;
+    });
   }
 
   /**
