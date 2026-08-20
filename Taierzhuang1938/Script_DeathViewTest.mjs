@@ -53,6 +53,10 @@ try {
     const biographyStyle = getComputedStyle(biographyNode);
     const biographyRect = biographyNode.getBoundingClientRect();
     const nameStyle = getComputedStyle(card.querySelector(".dcName"));
+    const yearsNode = card.querySelector(".dcYears");
+    const originNode = card.querySelector(".dcOrigin");
+    const yearsStyle = getComputedStyle(yearsNode);
+    const originStyle = getComputedStyle(originNode);
     const dof = T.post.uniformsComposite;
     const probe = document.createElement("canvas");
     probe.width = 96; probe.height = 54;
@@ -78,6 +82,9 @@ try {
         - innerWidth * 0.5) < 2 && biographyStyle.textAlign === "center",
       nameFontPx: parseFloat(nameStyle.fontSize),
       nameWeight: parseInt(nameStyle.fontWeight, 10),
+      yearsAboveOrigin: yearsNode.getBoundingClientRect().top < originNode.getBoundingClientRect().top,
+      yearsFontPx: parseFloat(yearsStyle.fontSize),
+      originFontPx: parseFloat(originStyle.fontSize),
       dofStrength: dof.uDofStrength.value,
       dofFocus: dof.uDofFocus.value,
       dofRange: dof.uDofRange.value,
@@ -99,6 +106,7 @@ try {
     `strength=${result.dofStrength} focus=${result.dofFocus} range=${result.dofRange} max=${result.dofMaxPx}px`],
     ["居中大号粗体生平 UI", result.cardOn && /^rgba\(/.test(result.background)
       && result.biographyCentered && result.nameFontPx >= 80 && result.nameWeight >= 700
+      && result.yearsAboveOrigin && result.yearsFontPx > result.originFontPx
       && !result.biography.includes("籍贯") && result.biography.includes("1938"),
     `${result.background} / ${result.biography}`],
     ["倒地收枪", result.weaponHidden, `hidden=${result.weaponHidden}`],

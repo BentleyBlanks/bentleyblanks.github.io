@@ -379,8 +379,8 @@ export class Hud {
       + `<div class="dcKicker">阵亡</div>`
       + `<div class="dcName">${identity.name}</div>`
       + `<div class="dcRule"></div>`
-      + `<div class="dcOrigin">${identity.origin}</div>`
       + `<div class="dcYears">${born} — 1938</div>`
+      + `<div class="dcOrigin">${identity.origin}</div>`
       + `<div class="dcUnit">${unit}</div>`
       + `</div>`;
     this.el.deathCard.classList.add("on");

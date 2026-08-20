@@ -271,12 +271,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   background: linear-gradient(90deg, rgba(238,233,221,0), rgba(238,233,221,0.52), rgba(238,233,221,0));
 }
 .hudDeathCard .dcOrigin {
-  font-size: 18px; color: rgba(238,233,221,0.82); letter-spacing: 0.18em;
+  margin-top: 7px; font-size: 17px; color: rgba(238,233,221,0.72); letter-spacing: 0.18em;
   text-indent: 0.18em;
 }
 .hudDeathCard .dcYears {
-  margin-top: 5px; font-size: 17px; color: rgba(238,233,221,0.76); letter-spacing: 0.20em;
-  text-indent: 0.20em;
+  font-size: 22px; color: rgba(238,233,221,0.84); letter-spacing: 0.22em;
+  text-indent: 0.22em;
 }
 .hudDeathCard .dcUnit {
   margin-top: 17px; font-size: 14px; color: rgba(238,233,221,0.52); letter-spacing: 0.18em;
@@ -289,7 +289,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 @media (max-width: 640px) {
   .hudDeathCard { padding: 7vh 7vw 0; }
   .hudDeathCard .dcName { font-size: 58px; }
-  .hudDeathCard .dcOrigin { font-size: 16px; }
+  .hudDeathCard .dcYears { font-size: 20px; }
+  .hudDeathCard .dcOrigin { font-size: 15px; }
 }
 /* 过场期间：HUD 全部让位，只留过场自己的字幕层（.csRoot 也挂在 #hud 下） */
 #hud.cinematic > *:not(.csRoot) { opacity: 0 !important; transition: none !important; }
