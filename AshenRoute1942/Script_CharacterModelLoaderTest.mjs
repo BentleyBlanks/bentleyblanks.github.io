@@ -279,6 +279,30 @@ function TestAimingAndMuzzleSocket() {
 }
 
 
+function TestBandageHandAnimation() {
+  const harness = CreateHarness("./Model_TongcenCourier.glb", "player", 0.93);
+  StepAnimator(harness, { speed: 0, crouch: 0, injured: 1, aiming: 0, alert: 0, bandaging: 0 }, 45);
+  const idleLeftHand = ReadWorldPosition(harness.nodes.leftHand);
+  const idleRightHand = ReadWorldPosition(harness.nodes.rightHand);
+  const idleMeanHandY = (idleLeftHand.y + idleRightHand.y) * 0.5;
+  harness.animator.Reset();
+  StepAnimator(harness, { speed: 0, crouch: 0, injured: 1, aiming: 0, alert: 0, bandaging: 1 }, 45);
+  const bandageLeftHand = ReadWorldPosition(harness.nodes.leftHand);
+  const bandageRightHand = ReadWorldPosition(harness.nodes.rightHand);
+  const bandageMeanHandY = (bandageLeftHand.y + bandageRightHand.y) * 0.5;
+  assert.ok(
+    bandageMeanHandY > idleMeanHandY + 0.1,
+    `bandaging should lift both hands to the torso (${idleMeanHandY.toFixed(3)} -> ${bandageMeanHandY.toFixed(3)})`,
+  );
+  assert.ok(
+    bandageLeftHand.distanceTo(bandageRightHand) < 0.42,
+    `bandaging hands should meet across the wound (${bandageLeftHand.distanceTo(bandageRightHand).toFixed(3)} m)`,
+  );
+  assert.ok(harness.animator.blend.bandaging > 0.9, "bandage pose should reach full blend weight");
+  AssertFiniteTransforms(harness);
+}
+
+
 function TestCompanionSkeleton() {
   const harness = CreateHarness("./Model_XiangyunGuide.glb", "companion", 0.9);
   StepAnimator(harness, { speed: 0.7, crouch: 1, injured: 1, aiming: 0, alert: 0.8 }, 100);
@@ -369,6 +393,7 @@ const tests = [
   ["GLB walk crouch and injury poses remain finite and readable", TestLocomotionAndStances],
   ["GLB idle walk crouch and sprint have distinct pose envelopes", TestLocomotionSilhouetteEnvelopes],
   ["GLB aim pose aligns hands and an exact local minus-Z muzzle socket", TestAimingAndMuzzleSocket],
+  ["GLB bandage pose brings both hands together at the torso", TestBandageHandAnimation],
   ["companion GLB maps the shared skeleton and sickle prop", TestCompanionSkeleton],
   ["material primitives must share one exact courier skeleton", TestMaterialPrimitivesShareOneCourierSkeleton],
   ["friendly GLB swaps atomically without changing the public rig group", TestSafeAsynchronousSwap],

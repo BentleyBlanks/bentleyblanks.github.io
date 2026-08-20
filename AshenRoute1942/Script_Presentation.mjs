@@ -7,7 +7,7 @@
  * host so the page can pin its own vendored version.
  */
 
-import { BeginFriendlyCharacterModelUpgrades } from "./Script_CharacterModelLoader.mjs?v=20260730s";
+import { BeginFriendlyCharacterModelUpgrades } from "./Script_CharacterModelLoader.mjs?v=20260820a";
 
 const DesktopRenderingProfile = Object.freeze({
   terrainSegments: 64,
@@ -2413,8 +2413,8 @@ export function CreateCharacterAnimator(rig, options = {}) {
   let secondaryMotion = reducedMotion ? 0.16 : 1;
   let elapsed = 0;
   let phase = Number(options.phase) || 0;
-  const blend = { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 };
-  const state = { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 };
+  const blend = { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 };
+  const state = { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 };
   const basePelvisY = nodes.pelvis.position.y;
   const baseTorsoScaleY = nodes.torsoMesh.scale.y;
   const baseWeaponRotation = nodes.weaponPivot.rotation.clone();
@@ -2486,11 +2486,13 @@ export function CreateCharacterAnimator(rig, options = {}) {
     const injuryTarget = Clamp(typeof state.injured === "boolean" ? Number(state.injured) : state.injured);
     const aimingTarget = Clamp(typeof state.aiming === "boolean" ? Number(state.aiming) : state.aiming);
     const alertTarget = Clamp(state.alert);
+    const bandageTarget = Clamp(typeof state.bandaging === "boolean" ? Number(state.bandaging) : state.bandaging);
     blend.speed = Damp(blend.speed, speedTarget, 8, safeDelta);
     blend.crouch = Damp(blend.crouch, crouchTarget, 7, safeDelta);
     blend.injured = Damp(blend.injured, injuryTarget, 4.5, safeDelta);
     blend.aiming = Damp(blend.aiming, aimingTarget, 10, safeDelta);
     blend.alert = Damp(blend.alert, alertTarget, 5, safeDelta);
+    blend.bandaging = Damp(blend.bandaging, bandageTarget, bandageTarget > blend.bandaging ? 15 : 9, safeDelta);
 
     phase += safeDelta * (1.4 + blend.speed * (5.5 - blend.crouch * 1.4));
     const strideWave = Math.sin(phase);
@@ -2516,7 +2518,7 @@ export function CreateCharacterAnimator(rig, options = {}) {
     nodes.leftFoot.rotation.x = -strideLift * strideAmount * 0.16;
     nodes.rightFoot.rotation.x = -Math.max(0, Math.sin(phase - Math.PI / 2)) * strideAmount * 0.16;
 
-    const armSwing = strideWave * strideAmount * 0.72 * (1 - blend.aiming);
+    const armSwing = strideWave * strideAmount * 0.72 * (1 - blend.aiming) * (1 - blend.bandaging);
     const aimPoseBlend = 1 - blend.aiming * 0.72;
     const friendlyIdleWeight = rig.role === "enemy" ? 0 : (1 - blend.speed) * (1 - blend.aiming);
     const idleGesture = Math.sin(elapsed * 0.72 + (rig.role === "companion" ? 1.4 : 0.25))
@@ -2531,13 +2533,26 @@ export function CreateCharacterAnimator(rig, options = {}) {
     nodes.rightElbow.rotation.x = basePose.rightElbowX + blend.crouch * 0.18 - blend.aiming * (basePose.rightElbowX + 0.65);
     nodes.leftElbow.rotation.z = basePose.leftElbowZ * (1 - blend.aiming * 0.86) + idleGesture * 0.55;
     nodes.rightElbow.rotation.z = basePose.rightElbowZ * (1 - blend.aiming * 0.86) - idleGesture * 0.18;
+    if (rig.role === "player" && blend.bandaging > 0.001) {
+      const wrapWave = Math.sin(elapsed * 11.5) * 0.16 * secondaryMotion;
+      nodes.leftShoulder.rotation.x += (-1.02 - nodes.leftShoulder.rotation.x) * blend.bandaging;
+      nodes.rightShoulder.rotation.x += (-0.92 - nodes.rightShoulder.rotation.x) * blend.bandaging;
+      nodes.leftShoulder.rotation.z += (0.58 + wrapWave - nodes.leftShoulder.rotation.z) * blend.bandaging;
+      nodes.rightShoulder.rotation.z += (-0.52 - wrapWave - nodes.rightShoulder.rotation.z) * blend.bandaging;
+      nodes.leftElbow.rotation.x += (-0.42 - nodes.leftElbow.rotation.x) * blend.bandaging;
+      nodes.rightElbow.rotation.x += (-0.5 - nodes.rightElbow.rotation.x) * blend.bandaging;
+      nodes.leftElbow.rotation.z += (0.52 + wrapWave - nodes.leftElbow.rotation.z) * blend.bandaging;
+      nodes.rightElbow.rotation.z += (-0.46 - wrapWave - nodes.rightElbow.rotation.z) * blend.bandaging;
+      nodes.head.rotation.x -= blend.bandaging * 0.12;
+    }
     nodes.weaponPivot.rotation.x = baseWeaponRotation.x - blend.aiming * 0.48;
     nodes.weaponPivot.rotation.y = baseWeaponRotation.y + blend.aiming * 0.1;
     nodes.weaponPivot.rotation.z = baseWeaponRotation.z + blend.aiming * (rig.role === "enemy" ? -0.03 : 0.38);
   }
 
   function Reset() {
-    SetState({ mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 });
+    SetState({ mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 });
+    blend.bandaging = 0;
     Update(1, state);
     elapsed = 0;
   }

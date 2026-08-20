@@ -326,8 +326,8 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
   let elapsed = 0;
   const initialPhase = Number(options.phase) || 0;
   let phase = initialPhase;
-  const blend = { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 };
-  const state = { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 };
+  const blend = { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 };
+  const state = { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 };
   const poseNodes = [
     nodes.pelvis,
     nodes.spine,
@@ -357,9 +357,13 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
     : new THREE.Quaternion();
   const leftLocomotionTarget = new THREE.Object3D();
   const rightLocomotionTarget = new THREE.Object3D();
+  const leftBandageTarget = new THREE.Object3D();
+  const rightBandageTarget = new THREE.Object3D();
   leftLocomotionTarget.name = "PoseTarget_LeftHandLocomotion";
   rightLocomotionTarget.name = "PoseTarget_RightHandLocomotion";
-  options.modelHost.add(leftLocomotionTarget, rightLocomotionTarget);
+  leftBandageTarget.name = "PoseTarget_LeftHandBandage";
+  rightBandageTarget.name = "PoseTarget_RightHandBandage";
+  options.modelHost.add(leftLocomotionTarget, rightLocomotionTarget, leftBandageTarget, rightBandageTarget);
 
   function RestorePose() {
     restTransforms.forEach((restTransform, object) => {
@@ -412,11 +416,13 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
     const injuryTarget = Clamp(typeof state.injured === "boolean" ? Number(state.injured) : state.injured);
     const aimingTarget = Clamp(typeof state.aiming === "boolean" ? Number(state.aiming) : state.aiming);
     const alertTarget = Clamp(state.alert);
+    const bandageTarget = Clamp(typeof state.bandaging === "boolean" ? Number(state.bandaging) : state.bandaging);
     blend.speed = Damp(blend.speed, speedTarget, 8, safeDelta);
     blend.crouch = Damp(blend.crouch, crouchTarget, 7, safeDelta);
     blend.injured = Damp(blend.injured, injuryTarget, 4.5, safeDelta);
     blend.aiming = Damp(blend.aiming, aimingTarget, 10, safeDelta);
     blend.alert = Damp(blend.alert, alertTarget, 5, safeDelta);
+    blend.bandaging = Damp(blend.bandaging, bandageTarget, bandageTarget > blend.bandaging ? 15 : 9, safeDelta);
 
     RestorePose();
     const sprintBlend = Clamp((blend.speed - 0.68) / 0.32) * (1 - blend.crouch) * (1 - blend.aiming);
@@ -468,7 +474,7 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
     ApplyLocalOffset(nodes.leftFoot, -strideLiftLeft * strideAmount * 0.24 - blend.crouch * 0.31, 0, 0);
     ApplyLocalOffset(nodes.rightFoot, -strideLiftRight * strideAmount * 0.24 - blend.crouch * 0.31, 0, 0);
 
-    const armSwing = strideWave * strideAmount * 0.68 * (1 - blend.aiming);
+    const armSwing = strideWave * strideAmount * 0.68 * (1 - blend.aiming) * (1 - blend.bandaging);
     const playerBias = rig.role === "player" ? 1 : -1;
     ApplyParentOffset(
       nodes.leftShoulder,
@@ -516,6 +522,34 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
       locomotionIkWeight,
     );
 
+    if (rig.role === "player" && blend.bandaging > 0.001) {
+      const wrapPhase = elapsed * 10.5;
+      const wrapX = Math.sin(wrapPhase) * 0.055 * secondaryMotion;
+      const wrapY = Math.cos(wrapPhase * 0.5) * 0.045 * secondaryMotion;
+      leftBandageTarget.position.set(-0.12 + wrapX, 1.12 + wrapY, 0.19);
+      rightBandageTarget.position.set(0.12 - wrapX, 1.02 - wrapY, 0.23);
+      rig.group.updateWorldMatrix(true, true);
+      ApplyTwoBoneAim(
+        THREE,
+        nodes.leftShoulder,
+        nodes.leftElbow,
+        nodes.leftHand,
+        leftBandageTarget,
+        1,
+        blend.bandaging,
+      );
+      ApplyTwoBoneAim(
+        THREE,
+        nodes.rightShoulder,
+        nodes.rightElbow,
+        nodes.rightHand,
+        rightBandageTarget,
+        -1,
+        blend.bandaging,
+      );
+      ApplyParentOffset(nodes.head, -0.1 * blend.bandaging, 0, 0);
+    }
+
     if (rig.role === "player" && nodes.rifleRestDirection) {
       const weaponRest = restTransforms.get(nodes.weaponPivot);
       const weaponAimQuaternion = weaponRest.quaternion.clone().multiply(weaponAimDelta);
@@ -548,8 +582,8 @@ export function CreateSkinnedCharacterAnimator(THREE, rig, nodes, options = {}) 
   }
 
   function Reset() {
-    Object.assign(state, { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 });
-    Object.assign(blend, { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0 });
+    Object.assign(state, { mode: "idle", speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 });
+    Object.assign(blend, { speed: 0, crouch: 0, injured: 0, aiming: 0, alert: 0, bandaging: 0 });
     elapsed = 0;
     phase = initialPhase;
     RestorePose();

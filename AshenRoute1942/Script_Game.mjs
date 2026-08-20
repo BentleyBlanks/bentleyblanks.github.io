@@ -4,7 +4,7 @@ import * as Level from "./Data_Level.mjs?v=20260730s";
 import * as Systems from "./Script_GameplaySystems.mjs?v=20260730s";
 import * as Narrative from "./Script_NarrativeState.mjs?v=20260730s";
 import * as KilnDefense from "./Script_KilnDefense.mjs?v=20260730s";
-import { CreatePresentation, GetTerrainHeight } from "./Script_Presentation.mjs?v=20260730s";
+import { CreatePresentation, GetTerrainHeight } from "./Script_Presentation.mjs?v=20260820a";
 
 const settingsKey = "AshenRoute1942_Settings_V2";
 const checkpointKey = "AshenRoute1942_Checkpoint_V1";
@@ -370,6 +370,7 @@ function CreateRuntime() {
       sprinting: false,
       aiming: false,
       injured: false,
+      bandageAnimationUntil: 0,
     },
     companion: {
       position: {
@@ -881,6 +882,7 @@ function OnCanvasPointerDown(event) {
   if (event.pointerType && event.pointerType !== "mouse") return;
   if (mode !== "Playing") return;
   presentation?.audio?.Enable?.();
+  if (IsPlayerBandaging()) return;
   if (event.button === 2) {
     input.aim = true;
     runtime.player.aiming = true;
@@ -1184,8 +1186,13 @@ function UpdateDecoys(delta) {
   runtime.noises = Systems.PruneNoises(runtime.noises, runtime.elapsedSeconds, runtime.systems.config);
 }
 
+function IsPlayerBandaging() {
+  return Boolean(runtime && runtime.elapsedSeconds < (runtime.player.bandageAnimationUntil || 0));
+}
+
 function UseBandage() {
   if (mode !== "Playing") return;
+  if (IsPlayerBandaging()) return;
   if (runtime.resources.bandage <= 0) return ShowToast("没有包扎带。", 1.6);
   if (runtime.player.health >= 95) return ShowToast("现在不需要包扎。", 1.6);
   const nearestAlert = runtime.enemies.some((enemy) => enemy.active && ["alert", "engage"].includes(enemy.state) && Distance(enemy.position, runtime.player.position) < 17);
@@ -1193,6 +1200,10 @@ function UseBandage() {
   runtime.resources.bandage -= 1;
   runtime.player.health = Math.min(100, runtime.player.health + 48);
   runtime.player.injured = runtime.player.health < 55;
+  runtime.player.aiming = false;
+  input.aim = false;
+  elements.aimReticle.hidden = true;
+  runtime.player.bandageAnimationUntil = runtime.elapsedSeconds + 1.8;
   EmitWorldNoise(runtime.player.position, 1.8, "bandage");
   PlayAudio("heal", runtime.player.position, 0.75);
   ShowToast("伤口暂时压住了。", 2);
@@ -1518,6 +1529,7 @@ function DamagePlayer(amount, source) {
 
 function FireWeapon() {
   if (mode !== "Playing") return;
+  if (IsPlayerBandaging()) return;
   const aim = { x: -Math.sin(input.cameraYaw), z: -Math.cos(input.cameraYaw) };
   const shotResult = runtime.systems.FireWeapon(RuntimeInventory(), {
     actorId: "zhaoTongcen",
@@ -2087,6 +2099,7 @@ function UpdatePresentation(delta) {
       crouch: runtime.player.crouched,
       injured: runtime.player.injured,
       aiming: runtime.player.aiming,
+      bandaging: runtime.elapsedSeconds < (runtime.player.bandageAnimationUntil || 0),
       alert: strongestAlert,
     },
     companion: {
