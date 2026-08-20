@@ -569,6 +569,7 @@ async function Boot() {
         marks: hud.confirms.slice(),
         cues: { hit: audio.RequestedCount("hitConfirm"), kill: audio.RequestedCount("killConfirm") },
         markerOn: DIFFICULTY.hitMarker !== false,
+        visual: hud.HitmarkState(),
       }),
       // --- 第 3 批的取证口 ---
       // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）

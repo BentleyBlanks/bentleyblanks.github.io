@@ -851,10 +851,14 @@ Check("打中了有回执：屏幕记号 hit + 听觉 hitConfirm，且不误报�
   !hfWhy && hf.hitShot && hf.hitShot.hitKind === "soldier"
     && hf.afterHit.marks.length === hf.before.marks.length + 1
     && hf.afterHit.marks[hf.afterHit.marks.length - 1] === "hit"
+    && hf.afterHit.visual.active && hf.afterHit.visual.opacity > 0.95
+    && hf.afterHit.visual.strokes === 4 && hf.afterHit.visual.visibleStrokes === 4
+    && hf.afterHit.visual.zIndex >= 4
     && hf.afterHit.cues.hit === hf.before.cues.hit + 1
     && hf.afterHit.cues.kill === hf.before.cues.kill,
   hfWhy || `弹着 ${hf.hitShot ? hf.hitShot.hitKind : "一发都没出去"}，`
     + `记号 ${JSON.stringify(hf.afterHit.marks.slice(-3))}，`
+    + `画面 ${JSON.stringify(hf.afterHit.visual)}，`
     + `cue hit ${hf.before.cues.hit}->${hf.afterHit.cues.hit} / `
     + `kill ${hf.before.cues.kill}->${hf.afterHit.cues.kill}`);
 Check("打死了给的是击杀回执：记号 kill + 听觉 killConfirm，之后自己消失",

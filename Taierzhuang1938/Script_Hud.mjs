@@ -338,7 +338,10 @@ export class Hud {
    */
   Hitmark(kind = "hit") {
     this.el.hitmark.className = `hudHitmark on ${kind}`;
-    this.hitmarkSpan = kind === "kill" ? 0.42 : 0.26;
+    // 旧值（命中 0.26 s / 击杀 0.42 s）在 60 Hz 下只亮 16 帧，第一帧又常被
+    // 枪口焰和后坐遮掉；高分屏上的 1.5 px 细线更容易被抗锯齿吃掉。稍微延长，
+    // 仍然短到不能被当成常驻准星，但玩家确实能读到这一枪有没有打中。
+    this.hitmarkSpan = kind === "kill" ? 0.50 : 0.34;
     this.hitmarkTimer = this.hitmarkSpan;
     // 立刻亮，不等下一帧的 Update —— 命中回执迟一帧就等于枪响与记号对不上，
     // 而这一记号存在的全部理由就是"这一枪"和"打中了"要绑在同一个瞬间。
@@ -347,6 +350,27 @@ export class Hud {
     // 取证：冒烟脚本拿它断言"打中了真的给了回执"，别靠解析 style。
     this.confirms.push(kind);
     if (this.confirms.length > 200) this.confirms.shift();
+  }
+
+  /**
+   * 命中反馈的真实渲染状态，给浏览器冒烟取证。
+   * 过去测试只数 `confirms`，即使 CSS 把四道线画成 0 px / 透明 / 压到别层下面也会过。
+   */
+  HitmarkState() {
+    const strokes = [...this.el.hitmark.querySelectorAll(".t")];
+    const style = getComputedStyle(this.el.hitmark);
+    return {
+      active: this.el.hitmark.classList.contains("on"),
+      opacity: Number.parseFloat(style.opacity) || 0,
+      zIndex: Number.parseInt(style.zIndex, 10) || 0,
+      strokes: strokes.length,
+      visibleStrokes: strokes.filter((stroke) => {
+        const strokeStyle = getComputedStyle(stroke);
+        return Number.parseFloat(strokeStyle.width) >= 7
+          && Number.parseFloat(strokeStyle.height) >= 2
+          && strokeStyle.backgroundColor !== "rgba(0, 0, 0, 0)";
+      }).length,
+    };
   }
 
   SetSuppression(v) {

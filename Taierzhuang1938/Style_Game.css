@@ -518,12 +518,14 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    它叠在准心上仍必须小、暗、短命，不能盖住跑动和腰射的方向反馈。
    四道撇按 45° 斜角排，靠 --spread 往外弹一下；命中是骨白，击杀是干血红且更长。 */
 .hudHitmark {
-  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
-  opacity: 0; --spread: 4px; --len: 7px; --mk: rgba(232, 224, 204, 0.9);
+  position: absolute; left: 50%; top: 50%; width: 34px; height: 34px;
+  margin: -17px 0 0 -17px; z-index: 4; isolation: isolate;
+  opacity: 0; --spread: 5px; --len: 9px; --mk: rgba(246, 240, 222, 1);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.9));
 }
 .hudHitmark .t {
-  position: absolute; left: 0; top: 0; display: block;
-  width: var(--len); height: 1.5px; background: var(--mk);
+  position: absolute; left: 17px; top: 16px; display: block;
+  width: var(--len); height: 2px; background: var(--mk);
   transform-origin: 0 50%;
 }
 .hudHitmark .t:nth-child(1) { transform: rotate(45deg)   translateX(var(--spread)); }
@@ -531,4 +533,4 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudHitmark .t:nth-child(3) { transform: rotate(-135deg) translateX(var(--spread)); }
 .hudHitmark .t:nth-child(4) { transform: rotate(-45deg)  translateX(var(--spread)); }
 /* 击杀：更长、干血红。不做旋转/放大动画 —— 那是连杀播报的语汇，不是这个游戏的。 */
-.hudHitmark.kill { --len: 10px; --mk: rgba(178, 58, 42, 0.95); }
+.hudHitmark.kill { --len: 13px; --mk: rgba(204, 66, 48, 1); }
