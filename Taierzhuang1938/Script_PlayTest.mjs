@@ -1615,15 +1615,20 @@ const mesh = await page.evaluate(() => {
   const f = T.actorFactory;
   const status = f.MeshStatus();
   // 场上随便抓一个活人，看他身上到底挂的是哪一套几何
-  const s = T.ai.soldiers.find((x) => x.alive && x.actor);
+  // 优先抓一个**没被可见预算藏起来**的人：名额收到 13 之后场上二十几个人里
+  // 大半是 visible=false 的，抓到那种人下面一块网格都数不出来。
+  const s = T.ai.soldiers.find((x) => x.alive && x.actor && x.actor.root.visible)
+    || T.ai.soldiers.find((x) => x.alive && x.actor);
   const a = s ? s.actor : null;
   let draws = 0;
   let tris = 0;
   if (a) {
     a.root.traverse((o) => {
       if (!o.isMesh || !o.geometry) return;
-      // 祖先里只要有一个 visible=false（没戴毛巾的人身上那两块）就不进管线
-      for (let p = o; p; p = p.parent) if (!p.visible) return;
+      // 祖先里只要有一个 visible=false（没戴毛巾的人身上那两块）就不进管线。
+      // **只查到 actor.root 为止**：root 自己的 visible 是「此刻在不在画面上」
+      // （AI 的可见预算每帧在改），与「这个人身上有几块网格」是两回事。
+      for (let p = o; p && p !== a.root; p = p.parent) if (!p.visible) return;
       draws += 1;
       tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
     });
