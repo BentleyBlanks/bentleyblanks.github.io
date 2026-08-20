@@ -547,6 +547,8 @@ async function Boot() {
       // AI 那边的运行时取证口：某个兵此刻的完整状态
       SoldierInfo: (soldier) => ({
         id: soldier.id, side: soldier.side, state: soldier.state, order: soldier.order,
+        squad: soldier.squadId, squadSlot: soldier.squadSlot, role: soldier.tacticalRole,
+        stance: soldier.stance, yaw: soldier.yaw, targetChanges: soldier.targetChanges,
         holdZone: soldier.holdZone ? soldier.holdZone.id : null,
         bayonet: soldier.bayonetFixed, heat: soldier.heat,
         coolFor: Math.max(0, soldier.coolUntil - ai.time),

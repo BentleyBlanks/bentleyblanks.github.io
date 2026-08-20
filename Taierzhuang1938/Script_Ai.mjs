@@ -31,6 +31,27 @@ const STATE = {
  */
 const SIGHT_BY_STANCE = [120, 80, 45];
 
+// 六人战斗组。不是给 HUD 看的职业系统，而是让一群人不再对着同一个点做同一个动作：
+// 组长定方向，突击手靠前，机枪/掩护手压后，侧翼手走最外侧，步枪手填中间。
+// Spawn 顺序固定，所以这张表也固定；同一种子重跑不会换队形。
+const SQUAD_SIZE = 6;
+const SQUAD_SLOTS = [
+  { role: "leader", lateral: 0, depth: 1 },
+  { role: "assault", lateral: -2.5, depth: -4 },
+  { role: "rifleman", lateral: 4, depth: 1 },
+  { role: "support", lateral: -3, depth: 9 },
+  { role: "rifleman", lateral: -6, depth: 3 },
+  { role: "flank", lateral: 9, depth: -1 },
+];
+
+function AngleDelta(from, to) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
+function ApproachAngle(from, to, maxStep) {
+  return from + Clamp(AngleDelta(from, to), -maxStep, maxStep);
+}
+
 let nextId = 1;
 
 /**
@@ -145,10 +166,22 @@ export class Soldier {
     this.health = 100;
     this.state = STATE.IDLE;
     this.stateTime = 0;
+    this.combatModeUntil = -99;
     this.suppression = 0;
     this.stance = 0;                        // 0 站 1 蹲 2 卧
+    // 姿态决定是离散的，画面过渡必须是连续的。以前 Think 每 0.1 s 在阈值两侧切 0/1，
+    // Actor 每次都直接吃满 0/1，于是整个人像电门一样反复蹲起。
+    this.crouchBlend = 0;
+    this.proneBlend = 0;
+    this.stanceUntil = -99;
+    this.lastProneAt = -99;
     this.target = null;
+    this.targetVisible = false;
     this.targetLostTime = 0;
+    // 目标锁至少维持一小段时间；否则距离相近的两个人每次 Think 都互换名次，
+    // 身体又逐帧朝新目标转，视觉上就是原地转圈。
+    this.targetLockUntil = -99;
+    this.targetChanges = 0;
     /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
     this.playerLockAt = -99;
     this.aimTime = 0;
@@ -156,6 +189,7 @@ export class Soldier {
     this.reloadTimer = 0;
     this.fireTimer = 0;
     this.cover = null;
+    this.coverUntil = -99;
     this.goal = new THREE.Vector3(options.x || 0, 0, options.z || 0);
     this.order = "advance";
     this.rnd = Mulberry32(this.id * 2654435761);
@@ -225,6 +259,10 @@ export class Soldier {
     // 排队（Conga Line）是 ER2 被骂最狠的毛病之一：一个班沿同一条线走成一串。
     // 对策是每个人生成时就领一个固定的横向偏移，跟随目标时永远偏这么多。
     this.laneOffset = (this.rnd() - 0.5) * 11;
+    this.squadId = "";
+    this.squadSlot = 0;
+    this.tacticalRole = "rifleman";
+    this.squadMateCount = 0;
     // 守点纪律：ER2 的 AI 会在赶路途中就地对射、根本不进点，导致「只要防守方
     // 看得见攻方，这张图就极好打」。这里给防守单位一条硬规矩：
     // 一旦被派去守某个占领区，除非死亡，否则不许离开该区半径。
@@ -345,6 +383,8 @@ export class AiDirector {
     // 就把补兵扔到 z=-208…-238，也就是北寨墙**外面**，那批人这辈子进不了城。
     this.centroid = { nra: null, ija: null };
     this.frontTimer = 0;
+    this.spawnSerial = { nra: 0, ija: 0 };
+    this.squadCenters = new Map();
     // 取最近三个敌人的固定槽位。每次 Think 现造数组会在 70 人规模下产生可观的 GC。
     this.nearSlots = [
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null },
@@ -388,6 +428,13 @@ export class AiDirector {
       y = this.ctx.battlefield.GroundHeight(x, z);
     }
     const soldier = new Soldier(side, { ...options, x, z });
+    const serial = this.spawnSerial[side]++;
+    const slot = serial % SQUAD_SIZE;
+    const slotSpec = SQUAD_SLOTS[slot];
+    soldier.squadId = `${side}_${Math.floor(serial / SQUAD_SIZE)}`;
+    soldier.squadSlot = slot;
+    // 真正的轻机枪手永远承担掩护，不会因为出生序号恰好落在突击位就抱着机枪冲刺。
+    soldier.tacticalRole = soldier.weapon.rpm ? "support" : slotSpec.role;
     soldier.position.y = y;
     if (physics) {
       soldier.body = physics.MakeCharacter({
@@ -491,6 +538,48 @@ export class AiDirector {
       }
       this.frontObjective[side] = best;
     }
+    this.UpdateSquads();
+  }
+
+  /**
+   * 每秒汇总一次战斗组位置。队形只影响共同目标附近的落位，不逐帧拽人，
+   * 所以不会制造另一种「磁铁吸附」抖动。
+   */
+  UpdateSquads() {
+    this.squadCenters.clear();
+    for (const s of this.soldiers) {
+      if (!s.alive) continue;
+      let group = this.squadCenters.get(s.squadId);
+      if (!group) {
+        group = { x: 0, z: 0, count: 0 };
+        this.squadCenters.set(s.squadId, group);
+      }
+      group.x += s.position.x; group.z += s.position.z; group.count += 1;
+    }
+    for (const group of this.squadCenters.values()) {
+      group.x /= group.count; group.z /= group.count;
+    }
+    for (const s of this.soldiers) {
+      const group = this.squadCenters.get(s.squadId);
+      s.squadMateCount = group ? group.count - 1 : 0;
+    }
+  }
+
+  /** 给共同目标排一个有前后、左右层次的六人落位。 */
+  SetSquadGoal(s, objective) {
+    const group = this.squadCenters.get(s.squadId) || this.centroid[s.side];
+    const slot = SQUAD_SLOTS[s.squadSlot] || SQUAD_SLOTS[2];
+    let fx = objective.x - (group?.x ?? s.position.x);
+    let fz = objective.z - (group?.z ?? s.position.z);
+    const len = Math.hypot(fx, fz) || 1;
+    fx /= len; fz /= len;
+    const rx = -fz, rz = fx;
+    // 支援位即使序号不是 3，也按掩护纵深站；机枪手不顶到突击手前面。
+    const depth = s.tacticalRole === "support" ? Math.max(8, slot.depth) : slot.depth;
+    const lateral = slot.lateral + s.laneOffset * 0.18;
+    s.goal.set(objective.x + rx * lateral - fx * depth, 0,
+      objective.z + rz * lateral - fz * depth);
+    this.ClampInside(s.goal);
   }
 
   /** 给某一侧下达总目标（占领点）。带横向偏移，避免全班走成一条线。 */
@@ -575,6 +664,7 @@ export class AiDirector {
         s.covertUntil = this.time + 60;
         s.holdZone = null;
         s.target = null;
+        s.targetVisible = false;
         s.goal.copy(origin);
       } else if (orderId === "charge") {
         // 白刃冲锋**例外地覆盖守点纪律**：防守时不许离开占领区是对的，
@@ -688,6 +778,45 @@ export class AiDirector {
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
   static StanceEye(stance) { return stance === 2 ? 0.5 : stance === 1 ? 1.0 : 1.5; }
 
+  /**
+   * 卧倒可以立即发生（活命反应），重新起身必须等承诺时间过去。
+   * 这道迟滞专门消掉 suppression=0.50、距离=20 m 两侧的站蹲振荡。
+   */
+  SetStance(s, stance, holdS = 0.9, force = false) {
+    if (s.stance === stance) return;
+    // 真正需要抢先执行的只有「卧倒」。站→蹲只是射击姿势，仍应尊重上一姿态的承诺；
+    // 否则冲锋边界上依旧会站/蹲各抢一次。
+    const emergencyDrop = stance === 2 && stance > s.stance;
+    if (!force && !emergencyDrop && this.time < s.stanceUntil) return;
+    s.stance = stance;
+    s.stanceUntil = this.time + holdS;
+  }
+
+  /** 换目标只有这一条入口，锁定时长与切换计数都在这里结算。 */
+  SetTarget(s, candidate) {
+    const same = s.target && (candidate.isPlayer
+      ? s.target.isPlayer
+      : !s.target.isPlayer && s.target.ref === candidate.ref);
+    if (same) {
+      s.target.position = candidate.position;
+      s.target.stance = candidate.stance;
+      s.targetLostTime = 0;
+      s.targetVisible = true;
+      return false;
+    }
+    if (s.target) s.targetChanges += 1;
+    const wasPlayer = !!(s.target && s.target.isPlayer);
+    s.target = {
+      position: candidate.position, isPlayer: candidate.isPlayer, ref: candidate.ref,
+      id: candidate.id, stance: candidate.stance,
+    };
+    s.targetLostTime = 0;
+    s.targetVisible = true;
+    s.targetLockUntil = this.time + 3.0 + s.rnd() * 0.8;
+    if (candidate.isPlayer && !wasPlayer) s.playerLockAt = this.time;
+    return true;
+  }
+
   /** 把一个候选敌人塞进"最近三个"的槽位里（插入排序，不产生垃圾）。 */
   _PushNear(dist, ref, isPlayer, id, stance, position) {
     const slots = this.nearSlots;
@@ -723,7 +852,9 @@ export class AiDirector {
     // 每秒挨四发，三秒必死，而玩家完全不知道自己做错了什么。
     // ER2 的 AI 会分散目标，不会九个人焊死一个人。
     const playerOpen = player && player.Alive && !player.Protected
-      && this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3);
+      // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
+      // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
+      && (s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3));
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
@@ -745,24 +876,53 @@ export class AiDirector {
       break;
     }
 
-    if (acquired) {
-      // 「发现敌情」只在**从无到有**那一下喊，不是每次 Think 都喊 ——
-      // Think 每 0.1 s 一次，不判这一条的话一个人就能自己把节流闸门吃满，
-      // 场上其他所有口令都再也发不出来了。
-      if (!s.target && this.ctx.audio) {
+    // 先问旧目标还在不在、还看不看得见。旧目标不必是最近三个之一：交火中略近一米
+    // 的人不该让枪口立刻甩过去。只有锁定期已过且新目标近到一半，才允许主动换人。
+    let currentVisible = false;
+    let currentDist = 1e9;
+    if (s.target) {
+      const alive = s.target.isPlayer ? !!(player && player.Alive) : !!s.target.ref?.alive;
+      if (!alive) { s.target = null; s.targetVisible = false; }
+      else {
+        s.target.position = s.target.isPlayer ? player.position : s.target.ref.position;
+        s.target.stance = s.target.isPlayer
+          ? (player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0)
+          : s.target.ref.stance;
+        currentDist = s.position.distanceTo(s.target.position);
+        currentVisible = currentDist < (SIGHT_BY_STANCE[s.target.stance] ?? 120) * 1.12
+          && this.HasLineOfSight(s, s.target);
+      }
+    }
+    const sameAcquired = acquired && s.target && (acquired.isPlayer
+      ? s.target.isPlayer
+      : !s.target.isPlayer && acquired.ref === s.target.ref);
+    const muchBetter = acquired && s.target && !sameAcquired
+      && this.time >= s.targetLockUntil && acquired.dist < currentDist * 0.50;
+
+    if (currentVisible && !muchBetter) {
+      bestDist = currentDist;
+      s.targetLostTime = 0;
+      s.targetVisible = true;
+    } else if (s.target && !currentVisible && s.targetLostTime < 1.2) {
+      // 墙角、烟尘、队友身体会让通视短暂闪断。至少等 1.2 秒再把枪口甩给别人；
+      // 目标已死亡时上面已清空，不会因此对尸体发呆。
+      s.targetLostTime += dt;
+      bestDist = currentDist;
+      s.targetVisible = false;
+    } else if (acquired) {
+      const hadTarget = !!s.target;
+      const changed = this.SetTarget(s, acquired);
+      bestDist = acquired.dist;
+      // 「发现敌情」只在从无到有那一下喊；目标切换不重复喊。
+      if (!hadTarget && changed && this.ctx.audio) {
         this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0, side: s.side });
       }
-      // 新建一个目标对象而不是把槽位交出去 —— 槽位下一次 Think 就被覆写了
-      const wasPlayer = !!(s.target && s.target.isPlayer);
-      s.target = { position: acquired.position, isPlayer: acquired.isPlayer, ref: acquired.ref };
-      s.targetLostTime = 0;
-      // 「刚把枪口转到玩家身上」的时刻。TryFire 用它让这一秒的枪必偏 ——
-      // 见 COMBAT.player.firstShotGraceS 那段账。只在**从别处切到玩家**时重置，
-      // 不然 Think 每 0.1 s 跑一次会把窗口无限续上，那就成了永远打不中。
-      if (acquired.isPlayer && !wasPlayer) s.playerLockAt = this.time;
     } else if (s.target) {
       s.targetLostTime += dt;
-      if (s.targetLostTime > 2.5) s.target = null;
+      s.targetVisible = false;
+      // 保留较长的「最后所见目标」记忆，重新露头时仍是同一个锁，不经历 null→目标
+      // 的二次甩枪口。看不见时 TryFire 有独立闸门，不会隔墙射击。
+      if (s.targetLostTime > 5) s.target = null;
       else bestDist = s.position.distanceTo(s.target.position);
     }
 
@@ -781,14 +941,24 @@ export class AiDirector {
     // 守点的人与跟着镜头走的近身班组不动（他们的 goal 由别处负责）。
     if (s.side === "ija" && !s.holdZone && s.order !== "hold" && s.order !== "follow") {
       const objective = this.NearestEnemyObjective(s);
-      if (objective) s.goal.set(objective.x + s.laneOffset, 0, objective.z + s.laneOffset * 0.4);
+      if (objective) this.SetSquadGoal(s, objective);
     }
 
     // 状态机。压制门槛从 0.72 降到 0.50：ER2 的 allowFindCoverWhenSuppressed
     // 是一条**独立行为**，被打得抬不起头的表现是往掩体里缩，不是站着不动。
-    if (s.suppression > 0.50) {
+    const engageRange = s.tacticalRole === "support" ? 95 : 74;
+    const wasEngaged = s.state === STATE.FIRE || s.state === STATE.CHARGE;
+    if (s.suppression > 0.50 || (s.state === STATE.SUPPRESSED && s.suppression > 0.32)) {
       s.state = STATE.SUPPRESSED;
-      s.stance = 2;
+      // 中等压制先蹲住，强压制才卧倒；刚爬起来三秒内除非压制爆表，不重复趴。
+      // 旧版每一发近失弹都触发「卧倒→衰减→起身」，连续枪声下看起来就像抽搐。
+      const mayProne = this.time - s.lastProneAt > 3.2 || s.suppression > 0.82;
+      if (s.stance === 2 || (s.suppression > 0.66 && mayProne)) {
+        if (s.stance !== 2) s.lastProneAt = this.time;
+        this.SetStance(s, 2, 1.8, true);
+      } else {
+        this.SetStance(s, 1, 1.35);
+      }
     } else if (s.ammo <= 0) {
       // 计时器**只在进入这个状态的那一次**上弦。
       // 原来每次 Think 都重设 —— Think 每 0.1 s 跑一次，而 reloadTimeS 是 3.2 s，
@@ -803,13 +973,26 @@ export class AiDirector {
           this.ctx.audio.Bark("ammo", { position: s.position.clone(), seed: s.id | 0, side: s.side });
         }
       }
-    } else if (s.target && bestDist < 70) {
-      // 近了就压上去打（尤其反攻阶段），远了就找掩体对射
-      s.state = bestDist < 16 && s.cohesion > 0.5 ? STATE.CHARGE : STATE.FIRE;
-      s.stance = bestDist < 20 ? 0 : 1;
+    } else if (s.target && bestDist < engageRange + (wasEngaged ? 12 : 0)) {
+      // 六人组内不再人人同一种打法：突击位先压、侧翼位次之，步枪位只在贴脸时冲，
+      // 支援位永不自行冲锋，留在后方持续射击。
+      const chargeRange = s.tacticalRole === "assault" ? 24
+        : s.tacticalRole === "flank" ? 18
+          : s.tacticalRole === "leader" ? 13
+            : s.tacticalRole === "rifleman" ? 10 : 0;
+      const wasAutoCharge = s.state === STATE.CHARGE && s.order !== "charge";
+      const charge = chargeRange > 0
+        && (bestDist < chargeRange || (wasAutoCharge && bestDist < chargeRange + 7))
+        && s.cohesion > 0.5 && s.squadMateCount > 0;
+      if (charge && !wasAutoCharge) s.combatModeUntil = this.time + 1.4;
+      const committedCharge = charge || (wasAutoCharge && this.time < s.combatModeUntil
+        && bestDist < chargeRange + 10);
+      s.state = committedCharge ? STATE.CHARGE : STATE.FIRE;
+      this.SetStance(s, committedCharge ? 0 : 1, committedCharge ? 1.0 : 1.35,
+        committedCharge);
     } else {
       s.state = STATE.ADVANCE;
-      s.stance = s.suppression > 0.3 ? 1 : 0;
+      this.SetStance(s, s.suppression > 0.3 ? 1 : 0, 1.0);
     }
 
     // 潜行：跟着班长（玩家）的姿态走，跟着他的位置走，而且**不开枪**。
@@ -818,7 +1001,8 @@ export class AiDirector {
       if (this.time > s.covertUntil) {
         s.order = "advance";
       } else if (player) {
-        s.stance = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
+        this.SetStance(s, player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0,
+          0.7, true);
         s.state = s.state === STATE.RELOAD ? STATE.RELOAD : STATE.ADVANCE;
         s.goal.set(player.position.x + s.laneOffset * 0.5, 0, player.position.z + s.laneOffset * 0.35);
         this.ClampInside(s.goal);
@@ -839,14 +1023,16 @@ export class AiDirector {
     // advance，于是命令下出去半秒就没了。装填那一档不覆盖 —— 空枪冲锋也得先压弹。
     if (s.order === "charge" && this.time < s.chargeUntil && s.state !== STATE.RELOAD) {
       s.state = STATE.CHARGE;
-      s.stance = 0;
+      this.SetStance(s, 0, 0.7, true);
     }
     if (s.state === STATE.CHARGE) s.bayonetFixed = true;
 
     // 掩体：朝目标方向找一个 1 米内能挡住的点。被压住的人尤其需要。
     if ((s.state === STATE.FIRE || s.state === STATE.SUPPRESSED)
-      && (!s.cover || s.rnd() < 0.12)) {
-      s.cover = this.FindCover(s, s.target ? s.target.position : null);
+      && (!s.cover || this.time >= s.coverUntil)) {
+      const nextCover = this.FindCover(s, s.target ? s.target.position : null);
+      if (nextCover) s.cover = nextCover;
+      s.coverUntil = this.time + 4 + s.rnd() * 2;
     }
   }
 
@@ -908,6 +1094,7 @@ export class AiDirector {
   Act(s, dt, player) {
     let desired = null;
     let speed = 0;
+    let wantedYaw = s.yaw;
     // 这一帧有没有走过物理。没走的（站着不动、在射击）也要补一次 ——
     // 不补的话站在墙头上的人在墙被炸掉之后会浮在半空。
     let stepped = false;
@@ -942,7 +1129,7 @@ export class AiDirector {
           // 人走不过去，只会贴着墙抖到死。
           this.ClampInside(s.goal);
         }
-        if (!s.target && d > 0.001) s.yaw = Math.atan2(dx / d, dz / d);
+        if (!s.target && d > 0.001) wantedYaw = Math.atan2(dx / d, dz / d);
       }
     }
 
@@ -1056,7 +1243,7 @@ export class AiDirector {
         } else {
           s.stuckTime = 0;
         }
-        s.yaw = Math.atan2(-nx, -nz);
+        wantedYaw = Math.atan2(-nx, -nz);
         s.moveSpeed = Clamp01(speed * stanceMul / 3.6);
       } else {
         s.moveSpeed = 0;
@@ -1067,10 +1254,25 @@ export class AiDirector {
       s.stuckTime = 0;
     }
 
+    let lookYaw = 0;
     if (s.target) {
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
-      s.yaw = Math.atan2(-dx, -dz);
+      const targetYaw = Math.atan2(-dx, -dz);
+      // 停火瞄准与冲锋面向敌人；跑向掩体时身体面向移动方向，只让上身有限度地看敌。
+      // 旧代码无条件用 targetYaw 覆盖移动朝向，移动与目标分列两侧时会逐帧互相抢方向。
+      if (s.moveSpeed < 0.08 || s.state === STATE.CHARGE) wantedYaw = targetYaw;
+      lookYaw = Clamp(AngleDelta(wantedYaw, targetYaw), -0.75, 0.75);
     }
+    // 人体不可能一帧转 180°。移动时略快，卧倒/受压时更慢；所有角度都走最短弧。
+    const turnRate = s.stance === 2 ? 2.4 : s.moveSpeed > 0.08 ? 5.0 : 3.4;
+    s.yaw = ApproachAngle(s.yaw, wantedYaw, turnRate * dt);
+
+    // 0.24—0.32 秒完成一次姿态过渡。胶囊仍立刻采用战术姿态，视觉骨架连续插值。
+    const blendStep = dt / (s.stance === 2 || s.proneBlend > 0.01 ? 0.32 : 0.24);
+    const crouchTarget = s.stance === 1 ? 1 : 0;
+    const proneTarget = s.stance === 2 ? 1 : 0;
+    s.crouchBlend += Clamp(crouchTarget - s.crouchBlend, -blendStep, blendStep);
+    s.proneBlend += Clamp(proneTarget - s.proneBlend, -blendStep, blendStep);
     // 站着不动的人也要走一次物理：重力、脚下的东西被炸掉、被别的东西顶开，
     // 都得在这一步里结算。
     if (!stepped) this.StepBody(s, 0, 0, dt);
@@ -1081,14 +1283,14 @@ export class AiDirector {
       s.actor.Update(dt, {
         moveSpeed: s.moveSpeed,
         aim: s.state === STATE.FIRE ? 1 : 0,
-        crouch: s.stance === 1 ? 1 : 0,
-        prone: s.stance === 2 ? 1 : 0,
+        crouch: s.crouchBlend,
+        prone: s.proneBlend,
         grounded: s.grounded,
         verticalVelocity: s.velocityY,
         firing: this.time - s.lastFire < 0.12,
         fireSequence: s.fireSequence,
         elapsed: this.time,
-        lookYaw: 0, lookPitch: 0,
+        lookYaw, lookPitch: 0,
       });
     }
   }
@@ -1280,9 +1482,16 @@ export class AiDirector {
     // 冷却期间枪口冒白烟并且**真的打不出去** —— 这就是玩家冲过街口的那个窗口。
     if (this.time < s.coolUntil) return;
     if (s.fireTimer > 0 || !s.target || s.ammo <= 0) return;
+    if (s.targetVisible === false) return;
     s.aimTime += dt;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
     if (s.aimTime < aimNeeded * (1 + s.suppression)) return;
+    // 枪口还没转过去就不能凭概率从侧后方命中。方向闸门也让「转身—瞄准—开火」
+    // 成为能看懂的动作链，而不是身体原地转圈、子弹照样四面飞。
+    const tx = s.target.position.x - s.position.x;
+    const tz = s.target.position.z - s.position.z;
+    const targetYaw = Math.atan2(-tx, -tz);
+    if (Math.abs(AngleDelta(s.yaw, targetYaw)) > 0.34) return;
 
     const from = this.tmpA.set(s.position.x, s.position.y + (s.stance === 2 ? 0.5 : s.stance === 1 ? 1.1 : 1.5), s.position.z);
     const to = this.tmpB.copy(s.target.position);

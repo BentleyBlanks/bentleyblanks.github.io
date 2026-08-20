@@ -1248,6 +1248,9 @@ const overheat = await page.evaluate(() => {
     effectiveRangeM: 600, damage: 66, kind: "lmg" };
   s2.target = { position: { x: s2.position.x + 30, y: s2.position.y, z: s2.position.z },
     isPlayer: false, ref: null };
+  s2.targetVisible = true;
+  // TryFire 现在有枪口方向闸门；规则层直调靶场先把身体转向目标。
+  s2.yaw = -Math.PI * 0.5;
   s2.heat = 0; s2.coolUntil = -99;     // 从干净的枪管开始数，"两百发"才是确定的
   const Drive = () => {
     const before = T.ai.fireCount;

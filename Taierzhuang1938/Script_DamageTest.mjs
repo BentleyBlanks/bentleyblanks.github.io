@@ -91,6 +91,10 @@ await page.evaluate(() => {
         s.coolUntil = -1;
         s.heat = 0;
         s.target = { position: player.position, isPlayer: true, ref: null };
+        s.targetVisible = true;
+        // TryFire 现在要求身体先转到枪口方向；靶场直接调用规则层，先把人摆正。
+        s.yaw = Math.atan2(-(player.position.x - s.position.x),
+          -(player.position.z - s.position.z));
         s.playerLockAt = opt.fresh ? ai.time : -999;   // fresh=首发必偏那一发
       });
 
@@ -241,6 +245,9 @@ const fresh = await page.evaluate(() => {
     player.spawnGrace = 0;
     s.position.set(player.position.x + 12, player.position.y, player.position.z);
     s.target = { position: player.position, isPlayer: true, ref: null };
+    s.targetVisible = true;
+    s.yaw = Math.atan2(-(player.position.x - s.position.x),
+      -(player.position.z - s.position.z));
     s.playerLockAt = ai.time;                 // 就在这一刻锁上
     s.fireTimer = 0; s.aimTime = 99; s.suppression = 0; s.ammo = 99; s.coolUntil = -1;
     const before = player.health;
