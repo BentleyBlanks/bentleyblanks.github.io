@@ -81,17 +81,23 @@ Data_TengxianScript.mjs    七关 beats + 五场分镜 + CAST
 
 ---
 
-## 四、性能红线与旋钮
+## 四、可见性硬规则与性能观测线
 
-`Script_BootTest.mjs` 现在把两条红线断言化（越线即 FAIL）：
-**drawCalls ≤ 1400、triangles ≤ 320 万**。
+2026-08-20 起，**视锥内所有活人与尸体都必须显示，尸体保留到本关结束**。不得再用
+人物名额、距离空洞或尸体数量上限减少战场内容。`Script_VisibilityTest.mjs` 锁定
+“30/30 人可见、超过旧 26 具上限仍 30/30 保留”。
+
+`Script_BootTest.mjs` 继续逐关观测 **drawCalls 1400、triangles 320 万** 两条旧线，
+但只报告 `[PERF]`，不再因此判画面健康失败。完整人物开启后的 small/high 实测：
+界河 1892、北沙河 2225、东关 2849、夜袭 793、城墙 349、十字街 3170、北门 2336；
+三角形最高 267 万。`Script_PhysicsTest.mjs` 的十字街 low/small 实测 15.75 ms/帧，
+仍低于原测试线 26 ms/帧。
 
 按影响从大到小的旋钮：
 
 1. **`TUNING[*].bounds`（关卡切片）** —— 少生成才是少 draw call。
-2. **`VISIBLE_ACTOR_BUDGET`（`Script_Ai.mjs`）** —— 一个 Actor 四十几个 call，身体部件没合批。
-   这一轮从 16 降到 14：台儿庄那座城本身只占 82 个 call，滕县这座占 352—498 个，
-   等于人这边的预算凭空少了三四百。**要调回去，先去合批 Actor。**
+2. **Actor 合批 / 共享骨架 / 等价 LOD** —— 只能减少提交开销，不能减少可见人数或尸体。
+   当前一个完整 Actor 约 22 个可见网格，这是下一轮性能工作的主目标。
 3. `TUNING[*].detailRadius / midRadius` —— **反直觉，慎用**：
    实测把 `detailRadius` 从 100 压到 62，三角形掉了 24% 而 calls 反而涨了。
    院落从 detail 掉到 silhouette 之后进的是**按扇区分批**的远景 sink，扇区多一个就多一批。

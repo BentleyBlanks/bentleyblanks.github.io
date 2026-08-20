@@ -268,9 +268,6 @@ let cutsceneSky = null;
 let editor = null;
 // 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
 let menu = null;
-// Script_Ai 的全局人像预算，给"这一关没有自己的预算"时回落用。
-// Boot 里从 AiDirector 实例上取真值 —— 不再 import 一次那个常量，只留一个真相。
-let defaultVisibleActors = 13;
 let currentWeapon = "HanYang";
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
@@ -381,7 +378,6 @@ async function Boot() {
       else state.ijaPool = Math.max(0, state.ijaPool - 1);
     },
   }, { maxAlive: SCALE.maxAlive, seed: 19380317, insideWalls: levelBounds });
-  defaultVisibleActors = ai.visibleBudget;
 
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
@@ -912,11 +908,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 硬套城的 620 既浪费剔除机会，也可能把远平面推到地皮外面去（穿帮成天空）。
   const far = phase.cameraFar ?? battlefield.cameraFar ?? 620;
   if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
-  // 同屏可见 Actor 的上限也按关走（见 Data_Battle 的 visibleActors 注释）。
-  // 一个 Actor 四十几个 draw call，这是最粗的一根旋钮 ——
-  // 只给真的需要的那一关调，全局调会让每一关的战场都变空。
-  ai.visibleBudget = phase.visibleActors ?? defaultVisibleActors;
-
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
@@ -1148,8 +1139,8 @@ function SeedSoldiers(phase) {
     //
     // 压力不会因此掉三成：远的那批是**朝你走过来的**，先当背景、后成压力，
     // 一波一波压上街的观感正是这一关要的。近端那七成一个没动。
-    // 这一档能成立的前提是 Script_ActorCrowd 那一层 —— 在它之前，
-    // 140 m 外的人是画不起的（一个精细 Actor 四十几个 draw call）。
+    // 这一档现在也走完整 Actor：人物可见性优先于原来的 draw call 红线，
+    // 不能再以“画不起”为由让 140 m 外的活人从战场上消失。
     const deep = rnd() < 0.3;
     const d = deep ? 140 + rnd() * 220 : 60 + rnd() * 80;
     const lateral = (rnd() - 0.5) * (deep ? 130 : 90);

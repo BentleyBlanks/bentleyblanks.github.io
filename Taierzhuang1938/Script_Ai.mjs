@@ -14,7 +14,6 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
-import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
@@ -55,64 +54,16 @@ function ApproachAngle(from, to, maxStep) {
 let nextId = 1;
 
 /**
- * 同屏可见 Actor 的预算。
+ * 【2026-08-20 可见性优先】不再给人物发“可见名额”。
  *
- * 实测（phase4 / high / small）：整个世界本身只有 **82** 个 draw call，
- * 而一个 Actor 是四十几个（身体部件没合批）—— 也就是说开销几乎全在人身上。
- * 第 1 批把两边的兵压到同一条前线上之后，镜头前的人从五六个涨到二十七个，
- * calls 从 1290 顶到 2011，越过 1400 的红线。
+ * 旧实现只让 13 个（十字街甚至 10 个）Actor 走完整模型。其余活人只有超过 55 m
+ * 才进入静态远景人群，导致镜头里第 14 个人若在 55 m 内就被直接设成 invisible；
+ * 尸体既不进远景层、排序又垫底，通常倒下当帧就从画面消失。
  *
- * 这里按到镜头的距离排序，只显示最近的这么多个。实测 20 个 = 1376 calls；
- * 取 18 时 phase1（敢死队带毛巾、部件更多）仍到 1423，所以落到 16。
- * 更远的人本来就被雾墙吃掉（fog.max 0.94），玩家看不出少了谁。
- * **要提高这个数，先去合批 Actor，别直接把它调大。**
- *
- * 【2026-08-19 换城之后从 16 降到 14】
- * 上面那笔账是照台儿庄算的，而**台儿庄那座城本身只要 82 个 draw call**。
- * 滕县这座城（600×600 m 方城、11.5 m 墙、四关在城里）实测占 352—498 个：
- * 十字街那一关 408、北门 498。等于人这边的预算凭空少了三四百。
- * 16 → 13 让出约 200 个。最贵的一关是十字街（出生点就站在 305 m 的通视走廊上，
- * 那条走廊是这一关的机制，不能拿掉）：切片压到 ±100 m、远平面收到 400 m、
- * 人像预算 13，三样一起才落回红线内。
- * 同样地：要把它调回去，先去合批 Actor（一个人四十几个 call，身体部件没合批）。
- *
- * 【2026-08-20 名额分配重做：预算没错，错的是发给谁】
- * 玩家的原话是"还是看不到日军啊，离得特别近才看得到"。实测三关（东关/十字街/城墙）
- * 的名额去向完全一致：**13 个名额 100% 被守军占满**，可见的人全在 30—46 m 以内，
- * 而活着的日军 36—37 人、最近的一个在 65—70 m，**150 m 内的日军一个都没画出来**。
- *
- * 两个原因叠在一起：
- *   1) 排序只看距离，而玩家的班组是**跟着玩家走**的 —— 十几个守军永远比任何一个
- *      日军近，名额天生就轮不到敌人。这不是调参能救的，是排序键选错了。
- *   2) 名额发给了**镜头背后**的人。three 本来就逐 mesh 做视锥剔除，屏幕外的 Actor
- *      一个 draw call 都不花 —— 拿名额去照顾他们等于把预算烧在看不见的地方。
- *
- * 所以改成：先过视锥（屏幕外的直接不占名额），再按「距离 × 权重」排。
- * 权重让敌人先拿、尸体最后拿 —— 战场上看不见开枪的人是最伤的一类 bug。
+ * 这里现在只做真正的视锥判断：屏幕内的活人和尸体全部显示完整 Actor，屏幕外的
+ * root 暂时隐藏，转回镜头后立刻恢复。draw call / 三角形预算不得再改变战场内容；
+ * 将来要优化，只能合批、共享蒙皮或做能保持人数与尸体的等价 LOD。
  */
-const VISIBLE_ACTOR_BUDGET = 13;
-
-/**
- * 名额排序的权重（乘在距离上，越小越优先）。
- *
- * 0.42：让 70 m 的日军（排序值 29）压过 35 m 的自己人（35）。这个数是照实测配的 ——
- * 敌人最近 65—70 m、自己人 20—46 m，要跨过这一档至少得乘到 0.5 以下；
- * 再小就会把贴脸的自己人也挤掉，而"班长站在我旁边却是个透明人"同样穿帮。
- * 2.6：尸体不占活人的名额。战场上得有尸体，但一具趴着的尸体永远不如
- * 一个正在朝你开枪的人重要。
- */
-const RANK_ENEMY = 0.42;
-const RANK_CORPSE = 2.6;
-
-/**
- * 远景人群的近端门槛（米）。名额之外、且比这个远的人交给 ActorCrowd 的
- * InstancedMesh 去画（静态姿势，全场合起来约二十个 draw call）。
- *
- * 55 m：那个距离上一个人在 900 px 高的屏幕上是 28 px，动作已经读不出来了，
- * 而 40 m（41 px）还看得出胳膊不动。比这更近的人如果挤不进名额，宁可不画 ——
- * 眼前站着一个一动不动的塑料兵比少一个人穿帮得多。
- */
-const CROWD_MIN_DISTANCE = 55;
 // 视锥判定用的包围球：半径给到 1.6 m（人高 1.7 上下）再加一点余量，
 // 免得屏幕边缘上的人在转身时一格一格地闪出来。
 const ACTOR_BOUND_R = 1.6;
@@ -334,8 +285,7 @@ export class AiDirector {
   /**
    * @param {object} ctx { battlefield, actorFactory, scene, vfx, audio, player }
    */
-  constructor(ctx, { maxAlive = 56, seed = 1938, visibleActors = VISIBLE_ACTOR_BUDGET,
-    insideWalls = null } = {}) {
+  constructor(ctx, { maxAlive = 56, seed = 1938, insideWalls = null } = {}) {
     this.ctx = ctx;
     this.soldiers = [];
     this.maxAlive = maxAlive;
@@ -354,13 +304,9 @@ export class AiDirector {
      * 玩家重生、软约束重设目标），漏掉任何一条这个洞就还在。
      */
     this.insideWalls = insideWalls;
-    this.visibleBudget = visibleActors;
-    this.visibleScratch = [];
     this.rnd = Mulberry32(seed);
     this.tickIndex = 0;
     this.time = 0;
-    this.corpses = [];
-    this.maxCorpses = 26;
     this.tmpA = new THREE.Vector3();
     this.tmpB = new THREE.Vector3();
     this.tmpC = new THREE.Vector3();
@@ -712,18 +658,11 @@ export class AiDirector {
       this.Act(s, dt, player);
     }
 
-    // 尸体上限：超了就把最早的移走（战场上得有尸体，但不能无限堆）
-    const dead = this.soldiers.filter((s) => !s.alive).sort((a, b) => b.deadTime - a.deadTime);
-    while (dead.length > this.maxCorpses) this.Remove(dead.shift());
-
     this.CullActors(camera);
   }
 
   /**
-   * 发放同屏可见 Actor 的名额。见 VISIBLE_ACTOR_BUDGET 上面那一大段账。
-   *
-   * 两步：① 屏幕外的一律不占名额（它们本来就不花 draw call）；
-   *      ② 剩下的按「距离 × 权重」排，敌人优先、尸体垫底，取前 visibleBudget 个。
+   * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量与距离名额。
    */
   CullActors(camera) {
     if (!camera) return;
@@ -733,46 +672,12 @@ export class AiDirector {
     camera.updateMatrixWorld();
     _cullMatrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
     _cullFrustum.setFromProjectionMatrix(_cullMatrix);
-    const list = this.visibleScratch;
-    list.length = 0;
     for (const s of this.soldiers) {
       if (!s.actor) continue;
       // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
       _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
-      if (!_cullFrustum.intersectsSphere(_cullSphere)) {
-        s.actor.root.visible = false;
-        continue;
-      }
-      const weight = !s.alive ? RANK_CORPSE : (s.side === "ija" ? RANK_ENEMY : 1);
-      s.camRange = Math.sqrt(s.position.distanceToSquared(camera.position));
-      s.camDist = s.camRange * weight;
-      list.push(s);
+      s.actor.root.visible = _cullFrustum.intersectsSphere(_cullSphere);
     }
-    list.sort((a, b) => a.camDist - b.camDist);
-
-    // 名额内的走精细 Actor；名额外、又够远的交给远景人群（一批人共二十来个
-    // draw call，与人数无关）。**这是"最远能看见多远"的那条线** ——
-    // 精细层受 draw call 限制只能到七八十米，远景层一直铺到相机远平面。
-    const crowd = this._Crowd();
-    if (crowd) crowd.Begin();
-    for (let i = 0; i < list.length; i += 1) {
-      const s = list[i];
-      const detailed = i < this.visibleBudget;
-      s.actor.root.visible = detailed;
-      if (detailed || !crowd || !s.alive) continue;
-      if (s.camRange < CROWD_MIN_DISTANCE) continue;
-      crowd.Push(s.actor.kind, s.position, s.yaw ?? 0,
-        s.actor.sizeScale ?? 1, s.stance === 2 ? 1 : 0);
-    }
-    if (crowd) crowd.End();
-  }
-
-  /** 远景人群按需建：没有场景或工厂（纯逻辑冒烟测试）时就一直没有。 */
-  _Crowd() {
-    if (this.crowd !== undefined) return this.crowd;
-    const { scene, actorFactory } = this.ctx;
-    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory) : null;
-    return this.crowd;
   }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
@@ -1600,9 +1505,6 @@ export class AiDirector {
   Dispose() {
     for (const s of [...this.soldiers]) this.Remove(s);
     this.soldiers.length = 0;
-    // 远景人群的几何是这里烘的，拆关时要还回去；材质是工厂缓存的共用件，不动。
-    if (this.crowd) this.crowd.Dispose();
-    this.crowd = undefined;
   }
 }
 

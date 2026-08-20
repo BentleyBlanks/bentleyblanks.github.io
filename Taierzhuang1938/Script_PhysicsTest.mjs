@@ -273,7 +273,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
 {
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
-    // 可见性由 CullActors 按镜头距离挑，出图模式下常常只剩一两个 ——
+    // 可见性由 CullActors 按视锥判断，出图机位下样本仍可能只剩一两个 ——
     // 样本太薄会让这条断言时灵时不灵。这里把离玩家最近的一批强制显示，
     // 再跑几帧让脚部 IK 收敛（它是按 14/s 平滑过去的，一帧到不了位）。
     const near = T.ai.soldiers.filter((s) => s.alive && s.actor)
