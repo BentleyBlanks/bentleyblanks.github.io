@@ -1156,3 +1156,48 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 - 颗粒/抖动用 `Math.random()` 会让逐轮截图对比失效（画面自己在抖，判断不了“这一版比上一版好”）。全部用 `frameIndex` 驱动的确定性噪声（interleavedGradientNoise + 黄金比推进），视觉审查 agent 才能打分。
 - god rays / 体积 raymarch 不抖动起点 → 明显的同心环带（banding）。抖动了但不随帧变 → 静态噪点固定在屏幕上，看起来像脏镜头。两者都要：`Ign(gl_FragCoord.xy + frame * k)`。
 - 运动模糊没排除武器/手臂 layer → 转身时枪身糊成一坨，FPS 手感直接塌。给第一人称模型单独 layer 并在速度缓冲里写 0。
+
+---
+
+## CPU 提交量：2026-08-21 那一轮无损优化
+
+玩家反馈「挺卡的」。先量再改，量出来的结论是**整帧卡在 CPU 的提交上，不是 GPU**：
+`gl.finish()` 在 RTX 4070 上不等任何东西，而 `renderer.render()` 的 JS 侧自耗
+占了整帧的四分之三。phase=2（东关）1280×720 实测基线：
+
+| | 基线 | 改后 |
+|---|---|---|
+| 一帧 draw call（预通道＋主场景＋阴影） | 1670 | 523 |
+| 纯渲染（不含玩法逻辑） | 12.2—16.3 ms | 6.5—7.9 ms |
+| 整帧 | 17.2—22.9 ms | 12.4—13.4 ms |
+
+CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`projectObject` 6.6%、
+`traverse` 4.1% —— 全是**场景图的固定开销**，与三角形数无关。三条改动，逐像素无损：
+
+1. **阴影图一帧只烘一次**（`renderer.shadowMap.autoUpdate = false`，`RenderScene` 每帧点一次
+   `needsUpdate`）。three 默认每次 `renderer.render()` 都重烘全部阴影图，而我们一帧要
+   `render()` 二十几次（预通道 1 ＋ 主场景 1 ＋ GI 探针那二十来次小四边形）。
+   同一帧里灯与投影体都没动过，重烘出来本来就是同一张图。→ 阴影 draw 444/帧 → 222/帧。
+2. **世界矩阵一帧只算一次**（`scene.matrixWorldAutoUpdate = false`，`RenderScene` 出画前
+   显式 `scene.updateMatrixWorld()`）。原来预通道与主场景各把四千个节点的矩阵重算一遍。
+   注意：**这不改任何人读到的东西** —— 原来也只在渲染时更新，逻辑层读到的一样是上一次出画的位姿。
+3. **人物分件合批**（`Script_ActorBatch.mjs`）。69 个人 × 24—33 个分件网格 = 一帧 1408 个
+   draw call（全场的 84%），却只有 15 万个三角形。全场只有 69 份几何 × 29 份材质，
+   按「几何 × 材质」收成 `InstancedMesh`，实例矩阵直接取分件自己的 `matrixWorld`。
+   原网格不删不改 `visible`，只挪到第 30 层（相机与灯的 layers 掩码都只有第 0 位）。
+   → 人物 draw 1408 → 一百多。细节与三条边界（`castShadow` 逐分件、`skipNormalDepth`、
+   逐人剔除）写在那个文件的抬头。
+
+回归口：`node Taierzhuang1938/Script_ActorBatchTest.mjs` —— 推 200 帧后**冻住玩法**，
+同一份世界开/关合批各读一次 backbuffer 直接比像素（跨进程重跑对不齐：同样推 180 帧，
+两次跑出来的画面差 27% 的像素，城里的战斗不是逐帧可复现的）。实测差异 ≤ 0.0006%，
+与渲染器自己的噪声底同一量级。
+
+### 还剩什么没做（下一轮的账）
+
+- `updateMatrixWorld` 仍占 15%，根子是人物那三千六百个骨骼/分件节点。r185 的
+  `updateMatrixWorld` **不会因为 `matrixWorldAutoUpdate = false` 就跳过子树**
+  （那个标志只跳过本节点的合成，递归照走，且 `matrixAutoUpdate` 会把 force 传下去），
+  所以「冻住远处人物的矩阵」这条路走不通，除非改成不用场景图挂骨骼。
+- 静态布景（两百多个单网格）关掉 `matrixAutoUpdate` 还能再省几个点，没做是因为
+  要先确认破坏系统不会在运行时挪它们。

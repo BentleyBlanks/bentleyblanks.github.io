@@ -1068,6 +1068,9 @@ export class Actor {
     const rnd = Mulberry32(HashString(seedText));
 
     this.factory = factory;
+    // 分件表的版本号。合批层按它判断要不要重扫这个人的网格 ——
+    // 换枪、掏手榴弹、挂日军 GLB 皮肤都会在原地增删网格。
+    this.partsRevision = 0;
     this.kind = kind;
     this.spec = spec;
     this.seed = seedText;
@@ -1200,6 +1203,7 @@ export class Actor {
     if (this.riggedSkin) {
       this.meshSource = "rigged";
       this.usingModel = true;
+      this.partsRevision += 1;
     }
 
     this.Update(0, { moveSpeed: 0, aim: 0, elapsed: 0 });
@@ -1213,6 +1217,7 @@ export class Actor {
     }
     this.weaponId = weaponId || null;
     this.weaponData = weaponId ? WEAPONS[weaponId] || null : null;
+    this.partsRevision += 1;
     if (!weaponId) { this.weaponTwoHanded = false; return this; }
     const built = this.factory.WeaponGeometry(weaponId);
     const group = new THREE.Group();
@@ -1260,6 +1265,7 @@ export class Actor {
     group.visible = false;
     this.arms.R.elbow.add(group);
     this.grenadeGroup = group;
+    this.partsRevision += 1;
     return group;
   }
 
@@ -2092,6 +2098,7 @@ export class Actor {
    */
   Dispose() {
     if (this.disposed) return;
+    if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
     if (this.riggedSkin) this.riggedSkin.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
     this.root.clear();
@@ -2114,6 +2121,7 @@ export class ActorFactory {
   constructor(library, { quality = "high" } = {}) {
     this.library = library;
     this.quality = quality === "low" || quality === "medium" ? quality : "high";
+    this.batcher = null;             // 人物合批层，见 SetBatcher
     this.kindCache = new Map();      // kind -> { dims, bones }
     this.weaponCache = new Map();    // weaponId|quality -> { geometries, muzzle, ... }
     this.materialCache = new Map();
@@ -2248,7 +2256,18 @@ export class ActorFactory {
    * options: { seed, weapon (Data_Weapons 的 id 或 null), rank }
    */
   Create(kind, options = {}) {
-    return new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
+    const actor = new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
+    // 合批层（Script_ActorBatch）在这里挂钩：造出来就登记，Dispose 时摘掉。
+    // 挂在工厂上而不是各个调用点上 —— 人物有五个建造口（AI／过场／人群／
+    // 编辑器两处），漏掉一个的后果是那批人在画面上整个消失，而不是掉帧。
+    if (this.batcher) this.batcher.Add(actor);
+    return actor;
+  }
+
+  /** 接上人物合批层。传 null 就是关掉（每个分件退回自己一个 draw call）。 */
+  SetBatcher(batcher) {
+    this.batcher = batcher || null;
+    return this;
   }
 
   /** 同步克隆已经预读好的人物显示层；Actor 创建链保持同步。 */

@@ -26,6 +26,7 @@ import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
+import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
@@ -134,10 +135,26 @@ renderer.shadowMap.enabled = true;
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
 renderer.shadowMap.type = THREE.PCFShadowMap;
+// 阴影图一帧只烘一次。three 默认 autoUpdate = true，意思是**每一次
+// renderer.render() 都把所有灯的阴影图重烘一遍** —— 而我们一帧里
+// renderer.render 要跑二十几次（深度法线预通道 1 次 + 主场景 1 次 +
+// GI 探针那二十来次小四边形）。实测 phase=2 城里：阴影 draw call
+// 从 444/帧掉到 222/帧，纯渲染耗时 17.3 ms → 15.5 ms，画面逐像素不变
+// （同一帧里灯和投影体都没动过，重烘出来的本来就是同一张图）。
+// 每帧由 RenderScene 在出画前点一次 needsUpdate（见那里）。
+renderer.shadowMap.autoUpdate = false;
 renderer.toneMapping = THREE.NoToneMapping;      // 色调映射收在合成 pass 里
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
+// 世界矩阵一帧只算一次。three 的 renderer.render() 每次都会把整棵场景树
+// 重算一遍 matrixWorld，而一帧里主相机就要渲两趟（深度法线预通道 + 主场景），
+// 城里这棵树是**四千个节点**（六十九个人物各带四五十个骨骼/部件节点）——
+// 白算一整趟。关掉自动更新，改由 RenderScene 在出画前显式算一次；
+// 两趟渲染读到的是同一份矩阵，画面逐像素不变。
+// 注意：以后任何在 RenderScene 之外要读 matrixWorld / getWorldPosition 的新代码，
+// 拿到的仍是「上一次出画时」的位姿 —— 这一点和改之前完全一样（原来也是渲染时才更新）。
+scene.matrixWorldAutoUpdate = false;
 // FOV 55：Easy Red 2 那种“周围很远、人很小但看得清”的观感靠窄视场。
 // 70 度会把巷战拉成鱼眼，远处的人缩成一个点，尺度感全没了。
 const BASE_FOV = 55;
@@ -277,6 +294,7 @@ let ai = null;
 let vfx = null;
 let viewmodel = null;
 let actorFactory = null;
+let actorBatch = null;
 let story = null;
 let combat = null;
 let destruction = null;
@@ -349,6 +367,10 @@ async function Boot() {
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
+  // 人物合批：全场人物的分件按「几何 × 材质」收成 InstancedMesh，
+  // 一帧 1408 个人物 draw call 收到几十个。逐像素等价，账见 Script_ActorBatch.mjs。
+  actorBatch = new ActorBatcher(scene);
+  actorFactory.SetBatcher(actorBatch);
   /**
    * 脚部 IK 的探地口。**走取值器读 physics/battlefield，不能捕获当前那一份** ——
    * 两者每换一关都会被换成新的实例，捕获旧的等于让所有人踩着上一关的地。
@@ -496,7 +518,7 @@ async function Boot() {
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, gi,
-    player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
+    player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     story, combat, destruction, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
@@ -2844,6 +2866,9 @@ function Frame(dt, render = true) {
  */
 function RenderScene(dt) {
   const phase = PHASES[state.phaseIndex];
+  // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
+  // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
+  renderer.shadowMap.needsUpdate = true;
   ssao.map.value = post.AoTexture;
   // gl_FragCoord 在主靶的像素域里，喂 AO 靶尺寸会整张错位
   ssao.resolution.value.set(post.width, post.height);
@@ -2880,6 +2905,11 @@ function RenderScene(dt) {
   // 但三者都从 RenderScene 出画（见上面那段注释），接在这儿一次覆盖三种镜头。
   camera.updateWorldMatrix(true, false);   // 取的是这一帧的位姿，不是上一帧的
   audio.SetListener(camera);
+  // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
+  // 必须排在天空穹跟位、相机 updateWorldMatrix 之后 —— 它们改的是这一帧的位姿。
+  scene.updateMatrixWorld();
+  // 人物合批的实例矩阵读的就是刚算完的那份 matrixWorld，所以必须排在这后面。
+  if (actorBatch) actorBatch.Update(camera);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明

@@ -17,6 +17,7 @@
     "bake:taierzhuang1938:amb": "node Taierzhuang1938/Script_AmbBake.mjs",
     "bake:taierzhuang1938:music": "node Taierzhuang1938/Script_MusicBake.mjs",
     "test:taierzhuang1938:audio": "node Taierzhuang1938/Script_AudioTest.mjs",
+    "test:taierzhuang1938:actorbatch": "node Taierzhuang1938/Script_ActorBatchTest.mjs",
     "test:taierzhuang1938:physics": "node Taierzhuang1938/Script_PhysicsTest.mjs",
     "test:taierzhuang1938:ai": "node Taierzhuang1938/Script_AiBehaviorTest.mjs",
     "test:taierzhuang1938:destruction": "node Taierzhuang1938/Script_DestructionTest.mjs",
