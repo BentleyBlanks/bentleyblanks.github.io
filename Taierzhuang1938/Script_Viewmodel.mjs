@@ -1007,23 +1007,43 @@ function BuildFromModel(materials, weapon, key, doc) {
   };
   const gripR = Mount("gripR", new THREE.Vector3());
   const gripL = Mount("gripL", gripR.clone());
+  const sight = Mount("sight", null);
+  const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
+  const isBoltRifle = weapon?.kind === "boltRifle";
+  // 导入枪模把整支枪合成了一个网格，没有独立 bolt joint。仍给动作层一个代理节点：
+  // 它让栓动链完整跑起来（右手离开握把、抓机柄、整枪受力、抛壳），而不是枪响后
+  // 只退 FOV、手和枪都不动。下次重建模型把枪机拆成 joint 时，只需把这里换成真实节点。
+  const boltProxy = isBoltRifle ? new THREE.Object3D() : null;
+  if (boltProxy) {
+    boltProxy.name = `VmBoltProxy_${key}`;
+    group.add(boltProxy);
+  }
+  const boltHandle = sight
+    ? sight.clone().add(new THREE.Vector3(0.046, -0.010, 0.135))
+    : new THREE.Vector3(0.046, 0.035, -0.04);
+  const ejectAt = sight
+    ? sight.clone().add(new THREE.Vector3(0.026, 0.004, 0.055))
+    : new THREE.Vector3(0.026, 0.035, -0.06);
+  const clipSeat = magazine.clone();
+  clipSeat.y += 0.045;
   const hr = tweak.handRot.right;
   const hl = tweak.handRot.left;
 
   return {
     group,
-    parts: { bolt: null, dustCover: null, bayonet: null },
-    boltTravel: 0,
-    ejectAt: new THREE.Vector3(0, 0, 0),
-    clipSeat: new THREE.Vector3(0, 0, 0),
+    parts: { bolt: boltProxy, dustCover: null, bayonet: null },
+    boltTravel: isBoltRifle ? 0.078 : 0,
+    ejectAt,
+    clipSeat,
     muzzle: Mount("muzzle", new THREE.Vector3(0, 0, -0.2)),
-    // 大刀与手榴弹没有照门：开镜退化成"举到眼前"的预备姿态（_MakeAdsPose 自己处理）
-    sight: null,
+    // 大刀与手榴弹的模型没有 sight，仍会退化成“举到眼前”；导入枪模则必须读取
+    // 已经写进 TZM 的 sight 挂点。过去这里硬编码 null，三把新枪都丢了铁瞄。
+    sight,
     hands: {
       right: { x: gripR.x, y: gripR.y, z: gripR.z, rx: hr[0], ry: hr[1], rz: hr[2] },
       left: { x: gripL.x, y: gripL.y, z: gripL.z, rx: hl[0], ry: hl[1], rz: hl[2] },
     },
-    boltHandle: new THREE.Vector3(0, 0, 0),
+    boltHandle,
     source: "model",
   };
 }

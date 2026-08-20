@@ -951,14 +951,21 @@ const SURFACE_PROFILES = {
   },
 };
 
-/** 枪口焰形制：口径越大焰越长，掷弹筒是另一个量级。 */
+/**
+ * 枪口焰形制。
+ *
+ * smoke 是出膛瞬间被高压气体推走的快烟；wisps 是火光灭后才读出来的慢余烟。
+ * 过去只有前者，而且所有调用方都漏传 kind，结果每把枪都是同一团两片烟。
+ * 两层拆开以后，栓动步枪是一声一缕，机枪则靠连续的小缕叠成一条烟带。
+ */
 const MUZZLE_KINDS = {
-  rifle: { size: 0.30, life: 0.05, smoke: 2, spikes: 2 },
-  boltRifle: { size: 0.30, life: 0.05, smoke: 2, spikes: 2 },
-  lmg: { size: 0.34, life: 0.05, smoke: 2, spikes: 2 },
-  hmg: { size: 0.44, life: 0.055, smoke: 3, spikes: 3 },
-  pistol: { size: 0.22, life: 0.045, smoke: 1, spikes: 2 },
-  launcher: { size: 0.58, life: 0.075, smoke: 5, spikes: 3 },
+  rifle: { size: 0.29, life: 0.048, smoke: 2, wisps: 2, spikes: 2 },
+  boltRifle: { size: 0.31, life: 0.052, smoke: 2, wisps: 3, spikes: 2 },
+  // 自动武器单发焰略短；连续射击靠频率累积亮度和烟，不把每发都做成火球。
+  lmg: { size: 0.28, life: 0.042, smoke: 2, wisps: 1, spikes: 2 },
+  hmg: { size: 0.40, life: 0.050, smoke: 3, wisps: 2, spikes: 3 },
+  pistol: { size: 0.19, life: 0.040, smoke: 1, wisps: 1, spikes: 2 },
+  launcher: { size: 0.58, life: 0.075, smoke: 5, wisps: 4, spikes: 3 },
 };
 
 const EXPLOSION_KINDS = {
@@ -997,6 +1004,8 @@ export class VfxSystem {
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
     this.smokeSources = new Map();
     this.nextSourceId = 1;
+    // 运行时取证：冒烟测试确认调用方传了真实枪种、快烟与余烟两层都生成。
+    this.lastMuzzleProfile = null;
 
     this.root = new THREE.Group();
     this.root.name = "VfxRoot";
@@ -1201,6 +1210,15 @@ export class VfxSystem {
     const profile = MUZZLE_KINDS[kind] || MUZZLE_KINDS.rifle;
     const dir = TMP_A.copy(direction).normalize();
     const size = profile.size * scale;
+    const smokeCount = Math.max(1, Math.round(profile.smoke * this.spawnScale));
+    const wispCount = Math.max(1, Math.round(profile.wisps * this.spawnScale));
+    this.lastMuzzleProfile = {
+      kind: MUZZLE_KINDS[kind] ? kind : "rifle",
+      size,
+      smokeCount,
+      wispCount,
+      life: profile.life,
+    };
 
     for (let i = 0; i < profile.spikes; i += 1) {
       const s = ResetSpawn();
@@ -1253,7 +1271,6 @@ export class VfxSystem {
     }
 
     // 发白的火药烟，被枪口气流往前推一点点
-    const smokeCount = Math.max(1, Math.round(profile.smoke * this.spawnScale));
     for (let i = 0; i < smokeCount; i += 1) {
       const s = ResetSpawn();
       s.x = position.x + dir.x * (0.1 + i * 0.05) + this._Signed(0.03);
@@ -1268,6 +1285,29 @@ export class VfxSystem {
       s.sizeStart = 0.06 * scale; s.sizeEnd = this._Range(0.35, 0.6) * scale;
       s.opacity = 0.34; s.fadeIn = 0.12;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(1.6);
+      s.colorA = VFX_PALETTE.powderThin; s.colorB = VFX_PALETTE.powderSmoke;
+      s.seed = this.random();
+      this.pools.smoke.Spawn(s, this.time);
+    }
+
+    // 慢余烟：初速很低、受风比爆口快烟更明显，并用较长 fadeIn 让它在火光灭后浮出来。
+    // 它们立即进 GPU 粒子池但前 0.12—0.20 s 几乎透明，不需要 CPU 定时器或逐帧发射器。
+    for (let i = 0; i < wispCount; i += 1) {
+      const s = ResetSpawn();
+      const along = 0.045 + i * 0.025;
+      s.x = position.x + dir.x * along + this._Signed(0.012);
+      s.y = position.y + dir.y * along + this._Signed(0.012);
+      s.z = position.z + dir.z * along + this._Signed(0.012);
+      s.vx = dir.x * this._Range(0.10, 0.28) + this._Signed(0.05);
+      s.vy = dir.y * 0.12 + this._Range(0.10, 0.22);
+      s.vz = dir.z * this._Range(0.10, 0.28) + this._Signed(0.05);
+      s.ax = this.wind.x * 0.9; s.ay = 0.22; s.az = this.wind.z * 0.9;
+      s.drag = 0.72;
+      s.life = this._Range(0.90, 1.45) * Math.sqrt(scale);
+      s.sizeStart = this._Range(0.018, 0.035) * scale;
+      s.sizeEnd = this._Range(0.16, 0.28) * scale;
+      s.opacity = 0.18; s.fadeIn = this._Range(0.14, 0.22);
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.65);
       s.colorA = VFX_PALETTE.powderThin; s.colorB = VFX_PALETTE.powderSmoke;
       s.seed = this.random();
       this.pools.smoke.Spawn(s, this.time);

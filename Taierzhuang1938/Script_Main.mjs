@@ -2243,7 +2243,13 @@ function TryFire(dt) {
   }
   audio.Play("shellImpact", { position: _muzzle.clone(), volume: 0.30, delay: 0.62 });
   lights.FlashMuzzle(_muzzle, 24);
-  vfx.MuzzleFlash(_muzzle, player.AimDirection(_aimDir), { scale: 1.0 });
+  // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
+  // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
+  // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
+  vfx.MuzzleFlash(_muzzle, player.AimDirection(_aimDir), {
+    scale: 1.0,
+    kind: weapon.kind,
+  });
 
   // 散布：没有准星，散布决定落点。移动、压制、带伤都会把它撑大。
   const spread = THREE.MathUtils.degToRad(player.SpreadDeg(weapon));

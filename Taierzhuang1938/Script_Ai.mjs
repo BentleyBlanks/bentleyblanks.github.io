@@ -231,6 +231,9 @@ export class Soldier {
     this.holdZone = null;
     this.muzzle = new THREE.Vector3();
     this.lastFire = -99;
+    // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
+    // 一发，布尔会从第一发起一直为 true，人物后坐只触发一次。序号让每发都有边沿。
+    this.fireSequence = 0;
     this.director = null;       // AiDirector.Spawn 填上，Kill 时用它发阵亡事件
   }
 
@@ -1083,6 +1086,7 @@ export class AiDirector {
         grounded: s.grounded,
         verticalVelocity: s.velocityY,
         firing: this.time - s.lastFire < 0.12,
+        fireSequence: s.fireSequence,
         elapsed: this.time,
         lookYaw: 0, lookPitch: 0,
       });
@@ -1290,6 +1294,7 @@ export class AiDirector {
     s.ammo -= 1;
     s.fireTimer = s.weapon.fireIntervalS ?? 1.2;
     s.lastFire = this.time;
+    s.fireSequence += 1;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据
 
@@ -1331,7 +1336,10 @@ export class AiDirector {
     const vfx = this.ctx.vfx;
     const audio = this.ctx.audio;
     if (vfx) {
-      vfx.MuzzleFlash(from, dir, { scale: s.weapon.kind === "lmg" ? 1.25 : 1 });
+      vfx.MuzzleFlash(from, dir, {
+        scale: s.weapon.kind === "lmg" ? 1.15 : 1,
+        kind: s.weapon.kind,
+      });
       vfx.Tracer(from, this.tmpB.clone().copy(from).addScaledVector(dir, dist), {
         kind: s.side === "nra" ? "nra" : "ija",
       });

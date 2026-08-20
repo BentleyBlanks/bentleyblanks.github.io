@@ -1163,6 +1163,8 @@ export class Actor {
     this.prevFiring = false;
     this.boltTimer = null;
     this.recoil = 0;
+    this.recoilAge = 999;
+    this.prevFireSequence = 0;
     this.ragdollState = null;
     this.disposed = false;
 
@@ -1311,14 +1313,26 @@ export class Actor {
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
     const weapon = this.weaponData;
-    if (firing && !this.prevFiring) {
+    // fireSequence 是战斗 AI 的逐发边沿；过场仍只给 firing，保留旧的布尔退路。
+    // 这解决了 500 rpm 机枪 firing 恒 true、整段连射只有第一发人物会动的问题。
+    const fireSequence = Number.isFinite(s.fireSequence) ? s.fireSequence : null;
+    const fired = fireSequence !== null
+      ? fireSequence !== this.prevFireSequence
+      : firing && !this.prevFiring;
+    if (fired) {
       this.recoil = 1;
+      this.recoilAge = 0;
       // 拉栓要**看得见**：延后 0.12 秒起手，先让后坐把枪推回来再动右手
       if (weapon && weapon.kind === "boltRifle") this.boltTimer = -0.12;
     }
+    if (fireSequence !== null) this.prevFireSequence = fireSequence;
     this.prevFiring = firing;
     const recoverS = (weapon && weapon.recoil && weapon.recoil.recoverS) || 0.35;
-    this.recoil = Math.max(0, this.recoil - dt / recoverS);
+    this.recoilAge += dt;
+    // 开枪先在峰值停极短的一拍，再加速回肩。原来的线性 1→0 是一根匀速标尺，
+    // 既没有出膛的顿挫，也没有枪托重新吃回肩窝的分量。
+    const recoilT = Clamp01(this.recoilAge / Math.max(0.05, recoverS));
+    this.recoil = fired ? 1 : 1 - SmoothStep(0.10, 1, recoilT);
     let boltPhase = 0;
     if (this.boltTimer !== null) {
       this.boltTimer += dt;
