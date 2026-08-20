@@ -20,6 +20,7 @@
     "test:taierzhuang1938:physics": "node Taierzhuang1938/Script_PhysicsTest.mjs",
     "test:taierzhuang1938:ai": "node Taierzhuang1938/Script_AiBehaviorTest.mjs",
     "test:taierzhuang1938:destruction": "node Taierzhuang1938/Script_DestructionTest.mjs",
+    "test:taierzhuang1938:destructionEditor": "node Taierzhuang1938/Script_DestructionEditorTest.mjs",
     "test:taierzhuang1938:jump": "node Taierzhuang1938/Script_JumpTest.mjs",
     "test:taierzhuang1938:bootprop": "node Taierzhuang1938/Script_BootPropTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",

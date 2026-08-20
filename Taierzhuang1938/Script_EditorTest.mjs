@@ -1,4 +1,4 @@
-// 《滕县 一九三八》编辑器套件冒烟：真浏览器里把五个编辑器一个个打开、用一遍、关掉。
+// 《滕县 一九三八》编辑器套件冒烟：真浏览器里把六个编辑器一个个打开、用一遍、关掉。
 //
 // 为什么要有这一层：编辑器是**唯一会去动运行时状态**的一批代码 ——
 // 藏世界、换相机、包 GroundHeight、往 city.colliders 里塞盒子、给 viewmodel 换枪。
@@ -109,8 +109,8 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 五个编辑器 + 一个「全部关掉」
-Check("面板列出三个设置与五个编辑器入口", afterGear.entries === 9, `按钮数=${afterGear.entries}`);
+// 三个设置 + 六个编辑器 + 一个「全部关掉」
+Check("面板列出三个设置与六个编辑器入口", afterGear.entries === 10, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -300,7 +300,8 @@ const actor = await page.evaluate(() => {
 });
 Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${actor.kind}`);
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
-Check("单人 / 五人对比", actor.one === 1 && actor.five === 5, `${actor.one} → ${actor.five}`);
+// KINDS 现在含川军、敢死队、军官、日军、日军军官、百姓，共六种。
+Check("单人 / 六种人物对比", actor.one === 1 && actor.five === 6, `${actor.one} → ${actor.five}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 
 // ---------------------------------------------------------------------------
@@ -331,11 +332,11 @@ const weapon = await page.evaluate(() => {
   active.Trigger("reload");
   window.Taierzhuang.StepFrames(20);
   out.busy = typeof window.Taierzhuang.viewmodel.IsBusy === "function";
-  // 数据卡：车辆没有几何，不许把台架建崩
+  // 两辆战车已有 .tzm；车辆走整棵关节树并落地，不能再按旧规则当成“无几何”。
   active.SetMode("bench");
   active.SetWeapon("Type89Tank");
   window.Taierzhuang.StepFrames(10);
-  out.tankOk = active.benchGroup === null;
+  out.tankOk = active.benchGroup !== null && active.vehicleNodes !== null;
   out.benchFov = window.Taierzhuang.camera.fov;
   return out;
 });
@@ -344,7 +345,7 @@ Check("枪械编辑器三视图", weapon.id === "weapon" && weapon.bench && weap
 Check("第一人称换回正片镜头、台架换回 85 mm",
   weapon.fpFov === 55 && weapon.benchFov === 42,
   `fp=${weapon.fpFov}° 台架=${weapon.benchFov}°`);
-Check("车辆条目不建台架也不崩", weapon.tankOk);
+Check("车辆条目按完整关节树建落地台架", weapon.tankOk);
 
 // ---------------------------------------------------------------------------
 // 4) 音效音乐编辑器

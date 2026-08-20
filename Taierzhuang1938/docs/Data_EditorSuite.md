@@ -1,6 +1,6 @@
 # 编辑器套件
 
-开发用的五个编辑器 + 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
+开发用的六个编辑器 + 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
 DOM 是 `display:none`，任何截图里都不会有它。
 
 ## 怎么进
@@ -18,7 +18,7 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 
 ## 一次只开一个
 
-五个里有三个要接管相机（摄影棚 / 自由飞行）、一个要把相机交给过场导演。
+六个里有四个要接管相机（摄影棚 / 自由飞行）、一个要把相机交给过场导演。
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
 所以入口面板虽然是一排开关，语义是**换到这一个**：开新的自动关旧的。
 
@@ -83,7 +83,7 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 把键位路由闸掉（`OnAction` / `Guard` 里判 `editor.Capturing`；不闸的话在编辑器里按 R
 会真的去装填，而那是在一个暂停的世界里改状态）。
 
-## 五个编辑器
+## 六个编辑器
 
 ### 人物动作 `Script_EditorActor.mjs`
 
@@ -163,6 +163,16 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 两层都能存成 JSON（`localStorage` 键 `tengxian1938_sceneedit_v1`，或导出到文本框），
 这是把「在现场调出来的位置」搬回图纸的通道。
 
+### 可破坏场景预览 `Script_EditorDestruction.mjs`
+
+直接进入七关的正式场景，调用正片同一套 `DestructionSystem.Hit/Blast` 检查墙面、
+楼板、桥面与布景的耐久、局部破口、Rapier 碰撞拆分、残骸、掩体和导航重建。
+`cityWall` / `rampart` / `ramp` / `tower` 是承重白名单，编辑器会用蓝色碰撞框标出，
+再高的测试能量也不会拆除。
+
+进入时抓取“视觉 + 碰撞 + 耐久 + 导航”快照；按 R、点「复原预览」或退出时都会
+完整恢复。只清 shader 破口不算复原，因为那会留下看不见但可穿行的物理洞。
+
 ### 拾取与落点
 
 拾取不用 `THREE.Raycaster`（城是几十个几万三角的合批网格，逐三角求交点一下卡半秒），
@@ -203,7 +213,7 @@ export class XxxEditor {
 ```
 
 `host` 给的是渲染侧（renderer / scene / camera / canvas / library / lights）、
-各系统（actorFactory / viewmodel / audio / cutscene）、`game`（state / player /
+各系统（actorFactory / viewmodel / audio / cutscene / destruction）、`game`（state / player /
 battlefield 取值器 / PHASES / JumpToLevel），以及 `studio` / `flycam` / `SetHint` /
 `SetCrosshair` / `SetViewmodelVisible` / `Close`。
 
@@ -213,9 +223,11 @@ battlefield 取值器 / PHASES / JumpToLevel），以及 `studio` / `flycam` / `
 
 ```
 node Taierzhuang1938/Script_EditorTest.mjs
+node Taierzhuang1938/Script_DestructionEditorTest.mjs
 ```
 
-43 条断言，退出码即成败。重点不是「能不能打开」，而是**关掉之后有没有还干净** ——
+编辑器套件 48 条断言，另有破坏预览专项取证；退出码即成败。重点不是「能不能打开」，
+而是**关掉之后有没有还干净** ——
 编辑器是这个项目里唯一会去动运行时状态的一批代码（藏世界、换相机、包 `GroundHeight`、
 往 `city.colliders` 里塞盒子、给 viewmodel 换枪），有一处没还回去，症状会在很远的地方
 才冒出来：撞到空气、退出后视角歪了、举着别人的枪。

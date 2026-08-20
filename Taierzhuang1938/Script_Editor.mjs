@@ -1,7 +1,7 @@
 // 编辑器套件的外壳：右上角那个齿轮 + 一张「各编辑器入口开关」的面板 + 调度。
 //
 // ## 一次只开一个
-// 五个编辑器里有四个要**接管相机**（摄影棚 / 过场 / 自由飞行），
+// 六个编辑器里有五个要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
 // 所以入口面板是一排开关，但语义是「换到这一个」：开新的自动关旧的。
 // 这条写在面板上，不让人猜。
@@ -29,6 +29,7 @@ import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
+import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -41,7 +42,9 @@ import {
  * 摆在同一排会让人以为「画质」也是个要小心退出的东西。
  */
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
-const EDITORS = [ActorEditor, WeaponEditor, AudioEditor, TimelineEditor, SceneEditor];
+const EDITORS = [
+  ActorEditor, WeaponEditor, AudioEditor, TimelineEditor, SceneEditor, DestructionEditor,
+];
 const ALL = [...SETTINGS, ...EDITORS];
 
 export class EditorSuite {
@@ -92,7 +95,7 @@ export class EditorSuite {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
       library: host.library, lights: host.lights, post: host.post,
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
-      audio: host.audio, cutscene: host.cutscene,
+      audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,
       studio: suite.studio, flycam: suite.flycam, viewport: suite.viewport,
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
@@ -184,7 +187,7 @@ export class EditorSuite {
     this.status = El("div", "edNote warn", "");
     body.appendChild(this.status);
     body.appendChild(El("div", "edNote",
-      "一次只开一个：四个编辑器都要接管相机，同时开会打架。"
+      "一次只开一个：五个编辑器都要接管相机，同时开会打架。"
       + "开着任意一个时玩法暂停（与过场同一条通道）。"));
 
     this.workHost = El("div");

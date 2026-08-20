@@ -284,7 +284,7 @@ let interact = null;
 let cutscene = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
-// 编辑器套件（齿轮按钮 + 五个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
+// 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
 // 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
 let editor = null;
 // 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
@@ -733,12 +733,12 @@ async function Boot() {
   window.Tengxian = window.Taierzhuang;
 
   // --- 编辑器套件 ---------------------------------------------------------
-  // 建在最后：五个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城）
+  // 建在最后：六个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城、破坏系统）
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = new EditorSuite({
     renderer, scene, camera, canvas, library, lights, post,
-    actorFactory, viewmodel, audio, cutscene,
+    actorFactory, viewmodel, audio, cutscene, destruction,
     shot: !!SHOT,
     ReleasePointerLock,
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,

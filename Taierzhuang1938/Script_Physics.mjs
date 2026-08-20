@@ -245,6 +245,29 @@ export class PhysicsWorld {
     this.recordByHandle.delete(handle);
   }
 
+  /**
+   * 让暂停态里刚增删的静态碰撞立刻进入场景查询。
+   *
+   * 正常玩法下一帧的 Step 会做这件事；编辑器暂停玩法后没有下一帧物理步进，
+   * 若不主动传播，复原的墙已有 handle、射线却仍会从旧 broad phase 穿过去。
+   * 这里只同步刚体到碰撞体，不推进时间，也不会让角色或动态残骸偷跑一帧。
+   */
+  RefreshStaticQueries() {
+    if (this.disposed) return false;
+    this.world.propagateModifiedBodyPositionsToColliders();
+    // Rapier 0.26 的 JS World 没有公开 updateSceneQueries；新增 collider 只有走一次
+    // pipeline 才进入 broad phase。dt=0 只提交拓扑，不积分速度/重力。保留原 timestep，
+    // 下一帧正式 Step 仍按正常钳位值推进。
+    const timestep = this.world.timestep;
+    try {
+      this.world.timestep = 0;
+      this.world.step();
+    } finally {
+      this.world.timestep = timestep;
+    }
+    return true;
+  }
+
   // -------------------------------------------------------------------------
   // 步进
   // -------------------------------------------------------------------------

@@ -314,6 +314,145 @@ export class DestructionSystem {
     this.lastFocus.set(1e9, 1e9, 1e9);
   }
 
+  /**
+   * 给破坏预览编辑器留一张可逆快照。
+   *
+   * 不能只记 breaches：开洞会同时替换三份碰撞数组、摘 Rapier 盒、删掩体点并
+   * 重烘导航。编辑器退出时若只把 shader 数量清零，画面看似复原，玩家却仍会穿墙。
+   * 这张快照因此把“画面 + 拓扑 + 耐久”三层一起记住；对象本身不深拷贝，保留
+   * 与 PhysicsWorld.recordByHandle 相同的身份。
+   */
+  CaptureSnapshot() {
+    const field = this.battlefield;
+    if (!field || !this.physics) return null;
+    const CopyList = (list) => (Array.isArray(list) ? list.slice() : null);
+    const damage = [];
+    for (const [box, state] of this.damage) {
+      damage.push([box, {
+        profile: state.profile, health: state.health, damage: state.damage, stage: state.stage,
+      }]);
+    }
+    return {
+      battlefield: field,
+      physics: this.physics,
+      nav: this.nav,
+      colliders: CopyList(field.colliders),
+      cityColliders: field.city ? CopyList(field.city.colliders) : null,
+      outfieldColliders: field.outfield ? CopyList(field.outfield.colliders) : null,
+      covers: CopyList(field.covers),
+      damage,
+      breaches: this.breaches.map((breach) => ({
+        ...breach, center: breach.center.slice(), half: breach.half.slice(),
+        sourceHalf: breach.sourceHalf ? breach.sourceHalf.slice() : null,
+      })),
+      nextBreachId: this.nextBreachId,
+      damagedCount: this.damagedCount,
+      protectedHits: this.protectedHits,
+      topologyRebuilds: this.topologyRebuilds,
+      rubbleCount: this.rubble.count,
+      rubbleCursor: this.rubbleCursor,
+      rubbleMatrices: this.rubble.instanceMatrix.array.slice(),
+      rubbleColors: this.rubble.instanceColor ? this.rubble.instanceColor.array.slice() : null,
+      navRevisions: this.nav && Number.isFinite(this.nav.revisions) ? this.nav.revisions : null,
+    };
+  }
+
+  /**
+   * 把 CaptureSnapshot() 之后的所有试拆复原。只接受同一关、同一 PhysicsWorld：
+   * 换关会销毁旧世界，那时旧快照自然作废，绝不能拿旧 handle 去碰新关。
+   */
+  RestoreSnapshot(snapshot) {
+    if (!snapshot || snapshot.battlefield !== this.battlefield
+      || snapshot.physics !== this.physics || !this.battlefield || !this.physics) return false;
+    const field = this.battlefield;
+    const physics = this.physics;
+    const active = new Set();
+    const AddActive = (list) => {
+      if (!Array.isArray(list)) return;
+      for (const box of list) if (box) active.add(box);
+    };
+    AddActive(field.colliders);
+    if (field.city) AddActive(field.city.colliders);
+    if (field.outfield) AddActive(field.outfield.colliders);
+    // 当前仍活着的碎片全部摘掉；更早一代碎片在继续开洞时已经由 _Commit 摘过。
+    for (const box of active) {
+      if (box._physicsHandle !== null && box._physicsHandle !== undefined) {
+        physics.RemoveSolid(box._physicsHandle);
+      }
+    }
+
+    const RestoreList = (list, saved) => {
+      if (!Array.isArray(list) || !Array.isArray(saved)) return;
+      list.length = 0;
+      list.push(...saved);
+    };
+    RestoreList(field.colliders, snapshot.colliders);
+    if (field.city) RestoreList(field.city.colliders, snapshot.cityColliders);
+    if (field.outfield) RestoreList(field.outfield.colliders, snapshot.outfieldColliders);
+    RestoreList(field.covers, snapshot.covers);
+
+    // 一只盒可能同时在 field 与 city/outfield 快照里；Rapier 只加一次。
+    const restored = new Set();
+    const RestorePhysics = (list) => {
+      if (!Array.isArray(list)) return;
+      for (const box of list) {
+        if (!box || restored.has(box)) continue;
+        restored.add(box);
+        box.destroyed = false;
+        box._physicsHandle = physics.AddSolid(box);
+      }
+    };
+    RestorePhysics(snapshot.colliders);
+    RestorePhysics(snapshot.cityColliders);
+    RestorePhysics(snapshot.outfieldColliders);
+    if (typeof physics.RefreshStaticQueries === "function") physics.RefreshStaticQueries();
+
+    // 子层与合并层都重刷：SceneEditor 之后若 RefreshColliders，不能从一张旧 city.grid
+    // 把已经复原的墙再次弄成“画面在、射线不认”。
+    const RebuildGrid = (owner) => {
+      if (!owner || typeof owner.BuildCollisionGrid !== "function") return;
+      const grid = owner.BuildCollisionGrid();
+      if (grid) owner.grid = grid;
+    };
+    RebuildGrid(field.city);
+    RebuildGrid(field.outfield);
+    RebuildGrid(field);
+
+    this.damage.clear();
+    for (const [box, state] of snapshot.damage) this.damage.set(box, { ...state });
+    this.breaches.length = 0;
+    for (const breach of snapshot.breaches) {
+      this.breaches.push({
+        ...breach, center: breach.center.slice(), half: breach.half.slice(),
+        sourceHalf: breach.sourceHalf ? breach.sourceHalf.slice() : null,
+      });
+    }
+    this.nextBreachId = snapshot.nextBreachId;
+    this.damagedCount = snapshot.damagedCount;
+    this.protectedHits = snapshot.protectedHits;
+    this.topologyRebuilds = snapshot.topologyRebuilds;
+    this.rubble.count = snapshot.rubbleCount;
+    this.rubbleCursor = snapshot.rubbleCursor;
+    this.rubble.instanceMatrix.array.set(snapshot.rubbleMatrices);
+    this.rubble.instanceMatrix.needsUpdate = true;
+    if (snapshot.rubbleColors) {
+      if (!this.rubble.instanceColor) {
+        this.rubble.instanceColor = new THREE.InstancedBufferAttribute(
+          new Float32Array(snapshot.rubbleColors.length), 3);
+      }
+      this.rubble.instanceColor.array.set(snapshot.rubbleColors);
+      this.rubble.instanceColor.needsUpdate = true;
+    }
+    if (this.nav && typeof this.nav.Refresh === "function") {
+      this.nav.Refresh(field);
+      if (snapshot.navRevisions !== null) this.nav.revisions = snapshot.navRevisions;
+    }
+    this.uniforms.count.value = 0;
+    this.uniformDirty = true;
+    this.lastFocus.set(1e9, 1e9, 1e9);
+    return true;
+  }
+
   Profile(box) {
     const id = box && box.destruction && box.destruction.profile;
     return (id && DESTRUCTION_PROFILES[id]) || DestructionProfileForTag(box ? box.tag : "wall");
