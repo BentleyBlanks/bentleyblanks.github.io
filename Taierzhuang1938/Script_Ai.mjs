@@ -893,11 +893,13 @@ export class AiDirector {
       const committedCharge = charge || (wasAutoCharge && this.time < s.combatModeUntil
         && bestDist < chargeRange + 10);
       s.state = committedCharge ? STATE.CHARGE : STATE.FIRE;
-      this.SetStance(s, committedCharge ? 0 : 1, committedCharge ? 1.0 : 1.35,
-        committedCharge);
+      this.SetStance(s, committedCharge ? 0 : this.FireStance(s, bestDist),
+        committedCharge ? 1.0 : 1.35, committedCharge);
     } else {
+      // 推进途中的蹲行门槛从 0.3 提到 0.55：0.3 一发近失弹就能压到，
+      // 于是整条推进线都在以 0.6 倍速半蹲着蹭。真被打住了才蹲着走。
       s.state = STATE.ADVANCE;
-      this.SetStance(s, s.suppression > 0.3 ? 1 : 0, 1.0);
+      this.SetStance(s, s.suppression > 0.55 ? 1 : 0, 1.0);
     }
 
     // 潜行：跟着班长（玩家）的姿态走，跟着他的位置走，而且**不开枪**。
@@ -939,6 +941,28 @@ export class AiDirector {
       if (nextCover) s.cover = nextCover;
       s.coverUntil = this.time + 4 + s.rnd() * 2;
     }
+  }
+
+  /**
+   * 交火时站还是蹲。
+   *
+   * 旧版是 `FIRE 一律蹲` —— 实跑取证 12 秒内全场 80% 的人帧在蹲，其中 fire/1 独占
+   * 一万九千帧，而且七成以上的**移动**帧也是蹲着的：一群人半蹲着在街上以 0.6 倍速
+   * 蹭来蹭去，既看不出在打谁，也看不出在往哪去 —— 「老是下蹲不知道在干嘛」就是这个。
+   *
+   * 蹲是有代价的姿势（移动减速 40%、视线降到 1.0 m），所以要有理由才蹲。三条理由：
+   *   1. 有人正朝我打（suppression 起来了）——最正当的一条；
+   *   2. 我已经缩到矮掩体后面了：跑向掩体的路上站着跑，**到位**才蹲下去；
+   *      掩体本身高过 1.25 m 的话站着就能靠，蹲下反而看不见敌人；
+   *   3. 二十六米内的对射：这个距离缩小轮廓才划算。
+   * 一条都不占就站着打 —— 远距离站姿射击本来就是这场仗里最常见的样子。
+   */
+  FireStance(s, bestDist) {
+    if (s.suppression > 0.25) return 1;
+    const c = s.cover;
+    if (c && (c.height ?? 1) < 1.25
+      && Math.hypot(c.x - s.position.x, c.z - s.position.z) < 1.3) return 1;
+    return bestDist < 26 ? 1 : 0;
   }
 
   FindCover(s, threatPos) {
