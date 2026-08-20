@@ -64,6 +64,7 @@ export class PlayerController {
     // 这是 ER2「没有准星也打得准」的物理基础 —— 玩家看的是枪，不是屏幕中心。
     this.aimYaw = 0;
     this.aimPitch = 0;
+    this.lookIdle = 0;                     // 鼠标停了多久（归位只在停下之后发生）
     // ER2 其实**没有**自由瞄准（benchmark 把这条列为"查不到证据"级别的否定结论）。
     // 我们保留它，但从 5.0° 降到难度表里的默认 2.0° —— 5° 太大，玩家会觉得枪不听话；
     // 完全去掉又会退化成"枪很稳但打不中"。0 档要等弹道/视差/后坐三条落地才开放，
@@ -178,6 +179,7 @@ export class PlayerController {
     this.pitch = 0;
     this.aimYaw = 0;
     this.aimPitch = 0;
+    this.lookIdle = 0;
     this.velocity.set(0, 0, 0);
     this.health = 100;
     this.bleeding = 0;
@@ -380,10 +382,32 @@ export class PlayerController {
     if (this.aimYaw < -limit) { this.yaw += this.aimYaw + limit; this.aimYaw = -limit; }
     if (this.aimPitch > limit) { this.pitch += this.aimPitch - limit; this.aimPitch = limit; }
     if (this.aimPitch < -limit) { this.pitch += this.aimPitch + limit; this.aimPitch = -limit; }
-    // 枪慢慢回到视线中心（松手之后自己归位，不然久了会一直歪着）
-    const recentre = Math.exp(-dt * (2.2 + this.ads * 5));
-    this.aimYaw *= recentre;
-    this.aimPitch *= recentre;
+    // 枪慢慢回到视线中心（松手之后自己归位，不然久了会一直歪着）——
+    // **但只在手停下来之后归位。**
+    //
+    // 原来是每帧无条件乘一个 exp(-dt·2.2)，那等于给自由瞄准装了一个漏斗：
+    // 持续推鼠标时偏移会停在稳态 aimYaw* = 鼠标角速度 / 2.2，
+    // 慢推（< 0.077 rad/s，也就是约 35 count/s）时枪口永远顶不到 2° 的边界，
+    // 于是**视线一步都不转**，而自由瞄准那一段当时又没画出来（见 Script_Viewmodel
+    // 的 freeAim 层）—— 屏幕上就是"鼠标动了，什么都没动"。小幅微调整个失灵。
+    //
+    // 归位延后 0.10 s 起、再用 0.12 s 拉满。手在动的时候不归位，
+    // 于是鼠标位移 1:1 全额落在枪口方向（yaw + aimYaw）上：
+    // 边界以内动的是枪、边界以外动的是视线，但**总瞄准角与鼠标永远是 1:1**。
+    const looking = Math.abs(dx) + Math.abs(dy) > 1e-6;
+    this.lookIdle = looking ? 0 : this.lookIdle + dt;
+    const settle = Clamp01((this.lookIdle - 0.10) / 0.12);
+    if (settle > 0) {
+      const recentre = Math.exp(-dt * (2.2 + this.ads * 5) * settle);
+      // 归位收回来的这一段**交给视线**，不是凭空丢掉：
+      // 枪回到画面中间的同时相机自己转过同样的角度，枪口在世界里指着的那个点不动。
+      // 不补的话，玩家把枪停在目标上、手一松，瞄准点会在 1.5 s 里自己漂掉 2°
+      // （一百米上 3.5 m），而画面上什么提示都没有 —— 那才是真正没法瞄。
+      const backYaw = this.aimYaw * (1 - recentre);
+      const backPitch = this.aimPitch * (1 - recentre);
+      this.aimYaw -= backYaw; this.yaw += backYaw;
+      this.aimPitch -= backPitch; this.pitch += backPitch;
+    }
     this.pitch = Clamp(this.pitch, -1.35, 1.35);
 
     // --- 姿态 ---------------------------------------------------------------

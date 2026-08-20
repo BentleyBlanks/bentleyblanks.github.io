@@ -1110,6 +1110,11 @@ export class Viewmodel {
       this.root.traverse((o) => { if (o.material) MarkNoPrepass(o.material); });
     };
     this.root.name = "Viewmodel";
+    // 自由瞄准那一段偏移就画在 root 自己身上（原点＝相机原点，绕它转 θ
+    // 等于整把枪在画面里挪过 θ 个视场角）。它必须在 fovRig **之上**：
+    // fovRig 带一个非等比的深度压缩，转在它下面会把枪拧变形；
+    // 而 MuzzleWorld / 抛壳都是走 root 的 world<->local 往返，挂在 root 上
+    // 它们自动跟着偏 —— 枪口焰、弹壳、弹着点这才是同一个方向。
     this.fovRig = new THREE.Group();           // FOV 伪造 + 深度压缩（非等比缩放）
     this.swayPivot = new THREE.Group();        // 鼠标摇摆（滞后 + 过冲）
     this.bobPivot = new THREE.Group();         // 步伐晃动
@@ -1662,7 +1667,8 @@ export class Viewmodel {
   /**
    * @param {number} dt 秒
    * @param {object} input { moveSpeed, strafe, grounded, sprint, ads, lookDeltaYaw,
-   *                         lookDeltaPitch, crouch, elapsed, lowAmmo, wallDistance }
+   *                         lookDeltaPitch, freeAimYaw, freeAimPitch,
+   *                         crouch, elapsed, lowAmmo, wallDistance }
    */
   Update(dt, input = {}) {
     // 掉帧保护：dt 大到 0.2 s 时弹簧不炸也会把枪甩到画面外
@@ -1715,6 +1721,17 @@ export class Viewmodel {
     }
     this.prevGrounded = grounded;
     const land = this.landSpring.Step(step, grounded ? 0 : 0.35);
+
+    // --- 自由瞄准：枪口偏离视线中心的那一段，**画出来** ---------------------
+    // 这条以前一行都没有：Script_Player 里 aimYaw/aimPitch 一直在动（弹道也照它走），
+    // 可相机只读 yaw/pitch、视图模型只读帧间增量，于是 2° 以内推鼠标画面上
+    // 一动不动 —— 本作又**没有准星**，等于小幅移动完全没有反馈。
+    // 枪就是准星：绕相机原点转同样的角度，枪在画面里挪过的正好是弹道偏离的角度
+    // （55° 视场 1080 p 上 1° ≈ 20 px，一个鼠标计数 ≈ 2.5 px，看得见）。
+    // 开镜时不衰减：那时自由瞄准本来就只剩 0.56°，衰减掉就等于铁瞄在骗人。
+    const freeAimYaw = Clamp(input.freeAimYaw ?? 0, -0.25, 0.25);
+    const freeAimPitch = Clamp(input.freeAimPitch ?? 0, -0.25, 0.25);
+    this.root.rotation.set(freeAimPitch, freeAimYaw, 0, "YXZ");
 
     // --- 摇摆：枪滞后于视线，停下后过冲一点再回来 ---------------------------
     // 传进来的是"这一帧转了多少弧度"，先换算成角速度，否则帧率一变手感就变

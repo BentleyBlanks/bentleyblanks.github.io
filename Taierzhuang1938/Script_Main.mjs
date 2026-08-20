@@ -2497,6 +2497,10 @@ function Frame(dt, render = true) {
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
     ads: player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
+    // 自由瞄准的**绝对**偏移（不是增量）：枪要真的指到那儿去。
+    // 没有这两条的话，2° 锥内推鼠标只有弹道在偏、画面一动不动 ——
+    // 而本作没有准星，玩家读不到任何东西（见 docs/Data_GunFeelReview.md 末节）。
+    freeAimYaw: player.aimYaw, freeAimPitch: player.aimPitch,
     crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
     // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
     // 我们不显示弹药数，这是玩家唯一能"看见"自己没子弹了的通道。

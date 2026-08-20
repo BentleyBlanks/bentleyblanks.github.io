@@ -1244,6 +1244,60 @@ Check("自由瞄准默认 2.0°（不再是 5°），推鼠标时枪先动",
 Check("玩家永不自动投降：difficulty.autoSurrender 恒 false",
   freeAim.autoSurrender === false, `autoSurrender=${freeAim.autoSurrender}`);
 
+// 12.13b 微动必须看得见（2026-08-20，用户报「鼠标移动小距离，屏幕上的枪没反应」）
+//
+// 两条毛病叠在一起，各自都足以让小幅瞄准彻底失灵：
+//   · **自由瞄准那 2° 从来没画出来。** 相机只读 yaw/pitch，视图模型只读帧间增量，
+//     aimYaw 只有弹道在用 —— 而本作没有准星，于是锥内推鼠标画面一动不动。
+//   · **归位每帧无条件跑，把慢推的鼠标当噪声吃了。** 稳态偏移 = 鼠标角速度 / 2.2，
+//     实测（改之前的等价复现）推 15.13° 只瞄过去 7.17°，少了一半；
+//     35 count/s 以下更是连视线都不会转。
+// 所以这一条测三件事：枪在画面里真的动了、鼠标到枪口是 1:1、归位不让瞄准点漂。
+const micro = await page.evaluate(() => {
+  const T = window.Taierzhuang, P = T.player, DEG = 180 / Math.PI;
+  // 这一段要推四秒的真帧，中途挨死了 Update 会整帧早退（aimYaw 冻住）——
+  // 那样测的就不是瞄准了。出生保护期正是为这种情况留的：吃压制不吃伤。
+  // 两脚架架着时转向只剩三成（12.10 把它架起来了就没收），开镜也压 55% ——
+  // 那两条都是**故意**的转向代价，量在这里会把它们当成 bug。先收干净。
+  const Keep = () => {
+    P.health = 100; P.spawnGrace = 9; P.suppression = 0;
+    P.bipod = false; P.ads = 0; T.input.ads = false;
+  };
+  const Push = (counts, frames) => {
+    Keep();
+    P.yaw = 0; P.pitch = 0; P.aimYaw = 0; P.aimPitch = 0; P.lookIdle = 0;
+    T.StepFrames(2);
+    P.yaw = 0; P.aimYaw = 0;
+    for (let i = 0; i < frames; i += 1) { T.input.lookX += counts; T.StepFrames(1); }
+    return {
+      mouseDeg: counts * frames * 0.0022 * DEG,
+      aimedDeg: Math.abs(P.yaw + P.aimYaw) * DEG,
+      gunDeg: Math.abs(P.aimYaw) * DEG,
+      vmDeg: Math.abs(T.viewmodel.root.rotation.y) * DEG,
+    };
+  };
+  const tiny = Push(1, 8);            // 八个鼠标计数 ≈ 1°，全在自由瞄准锥里
+  const slow = Push(1, 120);          // 60 count/s 推两秒：锥顶满，其余交给视线
+  // 手停之后：枪回到画面中间，但瞄准点一步都不许漂
+  const aimed0 = P.yaw + P.aimYaw;
+  Keep();
+  T.StepFrames(90);
+  return { tiny, slow, parkedDeg: slow.gunDeg,
+    settledGunDeg: Math.abs(P.aimYaw) * DEG,
+    driftDeg: Math.abs((P.yaw + P.aimYaw) - aimed0) * DEG };
+});
+Check("微动 1° 时枪在画面里真的动了（自由瞄准画出来了）",
+  micro.tiny.vmDeg > 0.5 && Math.abs(micro.tiny.vmDeg - micro.tiny.gunDeg) < 0.02,
+  `枪口偏 ${micro.tiny.gunDeg.toFixed(3)}°，视图模型转了 ${micro.tiny.vmDeg.toFixed(3)}°`);
+Check("鼠标到枪口 1:1：锥内锥外都不打折",
+  Math.abs(micro.tiny.aimedDeg - micro.tiny.mouseDeg) < micro.tiny.mouseDeg * 0.02
+  && Math.abs(micro.slow.aimedDeg - micro.slow.mouseDeg) < micro.slow.mouseDeg * 0.02,
+  `微动 ${micro.tiny.mouseDeg.toFixed(2)}°→${micro.tiny.aimedDeg.toFixed(2)}°；`
+  + `慢推 ${micro.slow.mouseDeg.toFixed(2)}°→${micro.slow.aimedDeg.toFixed(2)}°`);
+Check("枪归位时视线补上同一段，瞄准点不自己漂",
+  micro.settledGunDeg < micro.parkedDeg * 0.5 && micro.driftDeg < 0.01,
+  `枪 ${micro.parkedDeg.toFixed(2)}°→${micro.settledGunDeg.toFixed(2)}°，瞄准点漂 ${micro.driftDeg.toFixed(4)}°`);
+
 // 12.14 停摆检查：三百秒分段看开火，后一半必须还有仗打。
 // 这一条是独立复核逼出来的：上一批的断言只数头六十秒，而实跑里仗打到九十秒就停，
 // 之后 AI 状态精确回到 {advance: 70}，胜负改由占点消耗的时钟单方面决定 ——
