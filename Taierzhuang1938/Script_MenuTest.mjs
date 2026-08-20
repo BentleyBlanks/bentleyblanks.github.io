@@ -232,11 +232,13 @@ for (let i = 0; i < 3; i += 1) {
 // 5) Esc 暂停 -> 回主菜单 -> 再进一关
 // ===========================================================================
 {
-  const paused = await page.evaluate(() => {
-    const ok = window.Taierzhuang.Debug.Pause();
-    return { ok, ...window.Taierzhuang.Debug.Menu(), running: window.Taierzhuang.state.running };
-  });
-  Check("Esc 能暂停", paused.ok && paused.open && paused.mode === "pause" && !paused.running,
+  // 以前这里直接调 Debug.Pause()，绕开了真实 Esc 与指针锁，正好漏掉了玩家侧的事故。
+  await page.keyboard.press("Escape");
+  const paused = await page.evaluate(() => ({
+    ...window.Taierzhuang.Debug.Menu(), running: window.Taierzhuang.state.running,
+  }));
+  Check("Esc 能暂停并显示菜单",
+    paused.open && paused.mode === "pause" && !paused.running && paused.items.includes("settings"),
     `mode=${paused.mode} running=${paused.running}`);
   // 暂停要连声音一起停：环境床与音乐是自己在跑的 WebAudio 图，Frame() 停了它们照响
   //（上游 Script_Audio.SetPaused 已经把闸装好了，这里验菜单这条路真的去拉了闸）
@@ -252,6 +254,22 @@ for (let i = 0; i < 3; i += 1) {
   Check("暂停时相机不动", Math.hypot(camB.x - camA.x, camB.y - camA.y, camB.z - camA.z) < 0.001);
   await page.screenshot({ path: path.join(outDir, "Menu_Pause.png") });
 
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("settings"));
+  const settings = await page.evaluate(() => ({
+    editor: window.Taierzhuang.Debug.Editor(),
+    menu: window.Taierzhuang.Debug.Menu(),
+    running: window.Taierzhuang.state.running,
+  }));
+  Check("暂停菜单能打开设置，战斗仍冻结",
+    settings.editor.panelOpen && settings.menu.mode === "pause" && !settings.running,
+    JSON.stringify(settings));
+  await page.keyboard.press("Escape");
+  const settingsClosed = await page.evaluate(() => ({
+    editor: window.Taierzhuang.Debug.Editor(), menu: window.Taierzhuang.Debug.Menu(),
+  }));
+  Check("设置里按 Esc 回到暂停菜单",
+    !settingsClosed.editor.panelOpen && settingsClosed.menu.open && settingsClosed.menu.mode === "pause");
+
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
   const resumed = await page.evaluate(() => ({
     running: window.Taierzhuang.state.running, open: window.Taierzhuang.Debug.Menu().open,
@@ -261,6 +279,18 @@ for (let i = 0; i < 3; i += 1) {
   Check("继续之后背景音接回来", audioBack === false, `audio.paused=${audioBack}`);
   const hudBack = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
   Check("继续之后 HUD 回来", hudBack !== "none", `display=${hudBack}`);
+
+  const unlockPause = await page.evaluate(() => {
+    window.Taierzhuang.Debug.DropPointerLock();
+    return {
+      menu: window.Taierzhuang.Debug.Menu(),
+      running: window.Taierzhuang.state.running,
+    };
+  });
+  Check("浏览器吞掉 Esc、只解除指针锁时也会暂停",
+    unlockPause.menu.open && unlockPause.menu.mode === "pause" && !unlockPause.running,
+    JSON.stringify(unlockPause));
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
 
   await page.evaluate(() => {
     window.Taierzhuang.Debug.Pause();

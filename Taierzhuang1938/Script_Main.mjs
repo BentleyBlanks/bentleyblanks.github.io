@@ -693,6 +693,14 @@ async function Boot() {
         browserLocked: document.pointerLockElement !== null,
       }),
       ReleasePointerLock,
+      // 模拟浏览器吞掉 Esc、只抛 pointerlockchange 的真实路径；菜单冒烟锁死这条回归。
+      DropPointerLock: () => {
+        if (FAKE_POINTER_LOCK) {
+          if (fakeLocked) { fakeLocked = false; OnPointerLockChange(); }
+        } else if (document.pointerLockElement && typeof document.exitPointerLock === "function") {
+          document.exitPointerLock();
+        }
+      },
       Spoken: () => hud.spoken.slice(),
       StoryFired: () => story.fired.slice(),
       Outcome: () => state.outcome,
@@ -766,6 +774,8 @@ async function Boot() {
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
       Resume: () => ResumeFromPause(),
+      // 暂停菜单留在下面；关掉设置面板后仍回到暂停层，不会误恢复战斗。
+      Settings: () => editor.TogglePanel(true),
       Crowd: (anchor) => PlaceMenuGarrison(anchor),
     });
     window.Taierzhuang.menu = menu;
@@ -1540,6 +1550,9 @@ const keys = new Set();
  */
 const FAKE_POINTER_LOCK = !!(SHOT || navigator.webdriver);
 let fakeLocked = false;
+// 自己主动交还指针锁（过场、菜单、失焦）不等于玩家按 Esc。
+// 真浏览器会吞掉锁内的 Esc 键，只留下 pointerlockchange，所以必须记住解锁来源。
+let intentionalPointerUnlock = false;
 
 /** 现在锁在我们的画布上没有（两条后端统一的读法，全文件只认这一个）。 */
 function PointerLocked() {
@@ -1584,19 +1597,37 @@ function RequestPointerLock() {
  */
 function ReleasePointerLock() {
   if (FAKE_POINTER_LOCK) {
-    if (fakeLocked) { fakeLocked = false; OnPointerLockChange(); }
+    if (fakeLocked) {
+      intentionalPointerUnlock = true;
+      fakeLocked = false;
+      OnPointerLockChange();
+    }
     return;
   }
-  if (document.pointerLockElement) document.exitPointerLock?.();
+  if (document.pointerLockElement && typeof document.exitPointerLock === "function") {
+    intentionalPointerUnlock = true;
+    document.exitPointerLock();
+  }
 }
 
 /** 锁的状态变了（真后端由 pointerlockchange 事件进来，假后端由上面两个函数直调）。 */
 function OnPointerLockChange() {
   // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
-  if (PointerLocked()) return;
+  if (PointerLocked()) {
+    intentionalPointerUnlock = false;
+    return;
+  }
+  const intentional = intentionalPointerUnlock;
+  intentionalPointerUnlock = false;
   input.fire = false; input.ads = false;
   input.forward = 0; input.strafe = 0; input.sprint = false;
   if (state.ordersOpen) { state.ordersOpen = false; hud.SetOrdersVisible(false); wheel.Close(); }
+  // Chrome/Edge 在指针锁内会把 Esc 留给浏览器：页面收不到 keydown，只收到解锁事件。
+  // 这条兜底让真人按 Esc 与冒烟合成 Esc 走到同一个 PauseGame。
+  if (!intentional && state.ready && state.running && menu
+      && !state.cutscene && !state.advancing && !(editor && editor.Capturing)) {
+    PauseGame();
+  }
 }
 
 function StartRun() {
@@ -2900,10 +2931,14 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出
   if (state.cutscene) return;
-  ReleasePointerLock();
   // 有菜单时 Esc 是「暂停」：ER2 也是这个键。菜单自己那份 Esc 管的是面板返回，
   // 两边不会打架 —— 它只在 menu.open 时响应，这里只在游戏中响应。
-  if (menu && state.running) PauseGame();
+  if (menu && state.running) {
+    event.preventDefault();
+    PauseGame();
+    // MainMenu 也监听 Esc；不截住同一次事件，它会在暂停层刚打开后立刻执行「继续」。
+    event.stopImmediatePropagation();
+  }
 });
 
 let last = performance.now();

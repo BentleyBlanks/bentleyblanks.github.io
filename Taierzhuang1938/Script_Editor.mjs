@@ -324,7 +324,12 @@ export class EditorSuite {
       if (event.code === "Escape" && this.Capturing) {
         // 过场正在播的时候 Esc 归过场（跳过），别顺手把编辑器也关了
         const playing = this.host.cutscene && this.host.cutscene.Playing;
-        if (!playing) { this.TogglePanel(false); event.preventDefault(); }
+        if (!playing) {
+          this.TogglePanel(false);
+          event.preventDefault();
+          // 暂停菜单也监听 Esc；设置关掉后不能让同一次按键继续穿透成「恢复战斗」。
+          event.stopImmediatePropagation();
+        }
         return;
       }
       if (this.active && this.active.cameraMode === "fly") this.flycam.keys.add(event.code);

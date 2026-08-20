@@ -190,6 +190,7 @@ export class MainMenu {
    *   phases       Data_Battle.PHASES
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   Resume()     暂停态的「继续」
+   *   Settings()   暂停态的「设置」
    *   SliceIndex() 当前建好的是哪一关的切片
    *   Unlock()     第一次用户手势时解锁音频（可选）
    *   GroundHeight(x, z) 可选：把机位抬到地面之上，免得穿地
@@ -282,10 +283,11 @@ export class MainMenu {
     ];
   }
 
-  /** 暂停态的三项。 */
+  /** 暂停态：继续、设置与退出路径都留在同一层。 */
   PauseItems() {
     return [
       { id: "resume", label: "继续", hint: "回到这一关" },
+      { id: "settings", label: "设置", hint: "操作、画面与声音" },
       { id: "levels", label: MENU.chapters, hint: "换一关打（这一局的进度会丢）" },
       { id: "title", label: "主菜单", hint: "放弃这一局，回到主菜单" },
     ];
@@ -517,6 +519,7 @@ export class MainMenu {
       case "codex": this.Show("codex"); return;
       case "credits": this.Show("credits"); return;
       case "resume": this.host.Resume?.(); return;
+      case "settings": this.host.Settings?.(); return;
       case "title": this.ToTitle(); return;
       default: break;
     }
