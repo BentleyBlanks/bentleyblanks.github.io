@@ -1092,7 +1092,7 @@ const breath = await page.evaluate(() => {
   return { withShift, withSpace };
 });
 Check("开镜时按住 Shift 是屏息", breath.withShift === true, `breathHold=${breath.withShift}`);
-Check("按 Space 不再触发屏息（腾给第 3 批的翻越）", breath.withSpace === false,
+Check("按 Space 不再触发屏息（腾给翻越 / 跳跃）", breath.withSpace === false,
   `breathHold=${breath.withSpace}`);
 
 // 12.8 / 12.9 flank 与 charge 从"只写了个字符串"变成真的会动
@@ -1482,23 +1482,47 @@ const vault = await page.evaluate(() => {
     const crossed = (v.x - c.cx) * nx + (v.z - c.cz) * nz;
     tries.push({ tag: c.tag, h: +c.h.toFixed(2), fired: v.count > before, crossed: +crossed.toFixed(2) });
   }
-  // 空地上按 Space 必须什么也不发生（这不是跳跃键）
+  // 空地上按 Space 走跳跃分支，不能误触发翻越。
   T.player.Spawn(0, 60, 0);
   for (let k = 0; k < 40 && !T.player.Alive; k += 1) T.StepFrames(60);
   const openBefore = D.Vault().count;
-  D.Key("Space"); T.StepFrames(20);
+  const jumpBefore = D.Jump().count;
+  const staminaBefore = T.player.stamina;
+  const y0 = T.player.position.y;
+  D.Key("Space");
+  let peak = y0, sawAir = false, viewMin = Infinity, viewMax = -Infinity;
+  let staminaAfterTakeoff = staminaBefore;
+  for (let k = 0; k < 70; k += 1) {
+    T.StepFrames(1);
+    const j = D.Jump();
+    if (k === 0) staminaAfterTakeoff = T.player.stamina;
+    peak = Math.max(peak, j.y);
+    sawAir ||= !j.grounded;
+    viewMin = Math.min(viewMin, j.viewPitch);
+    viewMax = Math.max(viewMax, j.viewPitch);
+  }
+  const jump = D.Jump();
   return {
     tried: tries.length, good: tries.filter((t) => t.fired && t.crossed > 0.2).length,
     sample: tries.filter((t) => t.fired && t.crossed > 0.2).slice(0, 2),
     openGround: D.Vault().count - openBefore,
+    jumpCount: jump.count - jumpBefore,
+    rise: +(peak - y0).toFixed(3), sawAir, landed: jump.grounded,
+    staminaCost: +(staminaBefore - staminaAfterTakeoff).toFixed(3),
+    viewTravel: +(viewMax - viewMin).toFixed(3), landSerial: jump.landSerial,
   };
 });
 Check("翻越：对着院墙按 Space 真的翻到墙那一面（四十堵墙的成功率）",
   vault.good >= vault.tried * 0.6 && vault.tried >= 20,
   `${vault.good}/${vault.tried} 堵翻过去了，例：`
   + vault.sample.map((t) => `${t.tag} 高 ${t.h} m 越过 ${t.crossed} m`).join(" / "));
-Check("空地按 Space 什么也不发生（Space 不是跳跃键）", vault.openGround === 0,
-  `空地上翻越计数 +${vault.openGround}`);
+Check("空地 Space 是受限跳跃，不会误触翻越",
+  vault.openGround === 0 && vault.jumpCount === 1 && vault.sawAir && vault.landed
+  && vault.rise > 0.42 && vault.rise < 0.68,
+  `翻越 +${vault.openGround} / 跳跃 +${vault.jumpCount} / 抬高 ${vault.rise} m / 落地 ${vault.landed}`);
+Check("跳跃有体力成本，并驱动起跳—下落视图动作",
+  vault.staminaCost > 0.02 && vault.viewTravel > 0.08 && vault.landSerial > 0,
+  `净体力 ${vault.staminaCost} / 枪身俯仰行程 ${vault.viewTravel} rad / 落地边沿 ${vault.landSerial}`);
 
 // 13.3 翻越途中不许开火
 const vaultFire = await page.evaluate(() => {

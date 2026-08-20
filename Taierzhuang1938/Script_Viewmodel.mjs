@@ -1668,8 +1668,8 @@ export class Viewmodel {
 
   /**
    * @param {number} dt 秒
-   * @param {object} input { moveSpeed, strafe, grounded, sprint, ads, lookDeltaYaw,
-   *                         lookDeltaPitch, freeAimYaw, freeAimPitch,
+   * @param {object} input { moveSpeed, strafe, grounded, verticalVelocity, sprint, ads,
+   *                         lookDeltaYaw, lookDeltaPitch, freeAimYaw, freeAimPitch,
    *                         crouch, elapsed, lowAmmo, wallDistance }
    */
   Update(dt, input = {}) {
@@ -1680,6 +1680,9 @@ export class Viewmodel {
     const moveSpeed = Clamp01(input.moveSpeed ?? 0);
     const strafe = Clamp(input.strafe ?? 0, -1, 1);
     const grounded = input.grounded !== false;
+    const verticalVelocity = Clamp(input.verticalVelocity ?? 0, -14, 6);
+    const jumpRise = grounded ? 0 : Clamp01(verticalVelocity / 4.65);
+    const jumpFall = grounded ? 0 : Clamp01(-verticalVelocity / 8);
     const sprint = Clamp01(input.sprint ?? 0);
     const crouch = Clamp01(input.crouch ?? 0);
     const lowAmmo = !!input.lowAmmo;
@@ -1711,7 +1714,7 @@ export class Viewmodel {
         this._RestoreAdsHideParts();
       }
     }
-    const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput));
+    const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));
 
@@ -1776,10 +1779,13 @@ export class Viewmodel {
       Math.sin(phase) * 0.014 * bobScale,
       -Math.sin(phase) * 0.018 * bobScale);
 
-    // --- 状态层：落地下沉 / 腾空上浮 / 蹲低 / 掏枪 / 贴墙收枪 ----------------
-    let stateY = land * 0.055 + crouchValue * -0.012 + (1 - equip) * -0.26;
-    let stateZ = crouchValue * 0.010;
-    let stateRx = land * 0.16 + (1 - equip) * -0.55;
+    // --- 状态层：起跳收枪 / 滞空换重心 / 落地下沉 / 蹲低 / 掏枪 / 贴墙收枪 ---
+    // 上升段枪口略压、枪身贴胸；越过最高点以后手臂开始向前接落地。
+    // 这里读竖直速度而不是只读 grounded，同一次滞空才会有清楚的两段动作。
+    let stateY = land * 0.055 - jumpRise * 0.026 + jumpFall * 0.014
+      + crouchValue * -0.012 + (1 - equip) * -0.26;
+    let stateZ = jumpRise * 0.030 - jumpFall * 0.012 + crouchValue * 0.010;
+    let stateRx = land * 0.16 - jumpRise * 0.13 + jumpFall * 0.09 + (1 - equip) * -0.55;
     const wall = input.wallDistance;
     if (wall != null && wall < 0.9) {
       // 贴墙收枪：不做的话枪管会从墙那边捅出去，这是单场景视图模型唯一的解

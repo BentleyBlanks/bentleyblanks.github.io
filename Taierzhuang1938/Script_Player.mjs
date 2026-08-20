@@ -37,6 +37,19 @@ const VAULT_MAX_M = 2.25;
 const VAULT_REACH_M = 1.62;        // 落点离起跳点多远：院墙厚 0.35，这个距离能落到墙另一面
 const VAULT_BASE_S = 0.45;         // 方案给的位移曲线时长（矮物）；越高翻得越慢
 
+/**
+ * 跳跃不是跑酷动词，是越沟、上瓦砾、脱离低矮卡点的最后半步。
+ * 4.65 m/s 配 19.6 m/s² 重力：净抬高约 0.55 m、完整滞空约 0.47 s。
+ * 这个量级与 Easy Red 2 那种背着装备的步兵感一致，也低于自动翻越的 0.6 m 判据，
+ * 所以按 Space 时仍然是「能翻就翻，不能翻才跳」，不会用原地跳取代院墙动作。
+ */
+const GRAVITY_MPS2 = 19.6;
+const JUMP_SPEED_MPS = 4.65;
+const JUMP_STAMINA = 0.08;
+const JUMP_COYOTE_S = 0.10;
+const JUMP_BUFFER_S = 0.12;
+const JUMP_COOLDOWN_S = 0.24;
+
 /** 姿态参数。眼高按真人来：站 1.62，蹲 1.05，卧 0.42（趴下之后视线只比枪高一点）。 */
 export const STANCE = {
   stand: { eye: 1.62, speed: 3.05, radius: 0.34, sway: 1.0, spread: 1.0, label: "立" },
@@ -93,6 +106,14 @@ export class PlayerController {
     this._vaultFrom = new THREE.Vector3();
     this._vaultTo = new THREE.Vector3();
     this.vaultCount = 0;                        // 翻过几次（运行时取证用）
+
+    // --- 跳跃 ---------------------------------------------------------------
+    // coyote / buffer 都很短，只用来消掉 60 Hz 输入与落地帧之间的偶然误差；
+    // cooldown + 体力成本负责挡住兔子跳。landSerial 是装配层的落地音效边沿。
+    this.jump = {
+      count: 0, coyote: JUMP_COYOTE_S, buffer: 0, cooldown: 0,
+      airTime: 0, landSerial: 0, landImpact: 0,
+    };
 
     // --- 下水 ---------------------------------------------------------------
     // 运河不做游泳系统，做一条软墙：慢、不许开火、一直掉体力。
@@ -192,6 +213,7 @@ export class PlayerController {
     this.hitEvents.length = 0;
     this.heartbeatTimer = 0;
     this.stance = "stand";
+    this.grounded = true;
     this.alive = true;
     this.deadTime = 0;
     // 出生保护。ER2 有这条（重生后几秒无敌），我写进了对齐文档却一直没实现 ——
@@ -206,6 +228,11 @@ export class PlayerController {
     this.fastCrawl = false;
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     this.vault.active = false;
+    this.jump.coyote = JUMP_COYOTE_S;
+    this.jump.buffer = 0;
+    this.jump.cooldown = 0;
+    this.jump.airTime = 0;
+    this.jump.landImpact = 0;
     this.waterDepth = 0;
   }
 
@@ -240,13 +267,13 @@ export class PlayerController {
    * 翻越。朝前探一次：前方 0.6 m 有个顶面在 0.6—2.25 m 之间的东西，
    * 而且顶面往前落得下脚，就播一段位移曲线翻过去。
    *
-   * 空地按 Space **什么也不发生** —— 这不是跳跃键。ER2 的掩体之所以是"可穿越
-   * 地形"而不是墙，靠的就是这个动词只在贴到东西时响应。
+   * 这条只负责翻越探测；同一个 Space 在探测失败后会由装配层转入受限跳跃。
+   * 必须先探翻越再跳，否则人会先离地，院墙动作反而永远触发不了。
    *
-   * @returns {boolean} 真的起跳了没有
+   * @returns {boolean} 真的进入翻越动作没有
    */
   TryVault() {
-    if (!this.alive || this.vault.active) return false;
+    if (!this.alive || this.vault.active || !this.grounded) return false;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const feet = this.position.y;
     const probeX = this.position.x + fx * 0.6;
@@ -300,6 +327,32 @@ export class PlayerController {
     return true;
   }
 
+  /**
+   * 空地跳跃。翻越探测由调用方先做；这里只有「现在能不能离地」这一条规则。
+   * 已经在半空时会留下 120 ms 的输入缓冲，落地前略早按下也不会丢键。
+   * @returns {boolean} 这一刻是否真的起跳
+   */
+  TryJump() {
+    if (!this.alive || this.vault.active || this.InWater || this.stance === "prone") return false;
+    if (this.jump.cooldown > 0 || this.stamina < JUMP_STAMINA) return false;
+    if (!this.grounded && this.jump.coyote <= 0) {
+      this.jump.buffer = JUMP_BUFFER_S;
+      return false;
+    }
+    this.stance = "stand";
+    this.velocity.y = JUMP_SPEED_MPS;
+    this.grounded = false;
+    this.jump.coyote = 0;
+    this.jump.buffer = 0;
+    this.jump.cooldown = JUMP_COOLDOWN_S;
+    this.jump.airTime = 0;
+    this.jump.count += 1;
+    this.stamina = Clamp01(this.stamina - JUMP_STAMINA);
+    this.ads = Math.min(this.ads, 0.2);             // 起跳先把枪从照门上摘下来
+    this.wantAds = false;
+    return true;
+  }
+
   /** 翻越途中的一帧：位移曲线走完就落地。期间禁开火、禁转身（视角只轻微下压）。 */
   _StepVault(dt) {
     const v = this.vault;
@@ -332,6 +385,12 @@ export class PlayerController {
     if (!this.alive) { this.deadTime += dt; return; }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
     if (this.vault.active) return this._StepVault(dt);
+
+    this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
+    if (this.jump.buffer > 0) {
+      this.jump.buffer = Math.max(0, this.jump.buffer - dt);
+      if (this.grounded && this.jump.cooldown <= 0) this.TryJump();
+    }
 
     // --- 视角与自由瞄准 -----------------------------------------------------
     const sens = (input.sensitivity ?? 1) * 0.0022;
@@ -436,7 +495,7 @@ export class PlayerController {
     // ER2 的规矩：架式武器不架起两脚架就不许开镜（MG42/白朗宁/反坦克枪都是）。
     // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
     const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod;
-    const wantAds = input.ads && !bipodBlocked ? 1 : 0;
+    const wantAds = input.ads && !bipodBlocked && this.grounded ? 1 : 0;
     // 存下来给相机用。相机侧的 FOV 过渡（固定 150 ms）要跟玩家读同一个"意图"，
     // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
     this.wantAds = wantAds === 1;
@@ -500,9 +559,25 @@ export class PlayerController {
     const accel = this.grounded ? 14 : 3;
     this.velocity.x += (desired.x - this.velocity.x) * Clamp01(dt * accel);
     this.velocity.z += (desired.z - this.velocity.z) * Clamp01(dt * accel);
-    this.velocity.y -= 19.6 * dt;
+    const wasGrounded = this.grounded;
+    const fallSpeed = Math.max(0, -this.velocity.y);
+    this.velocity.y -= GRAVITY_MPS2 * dt;
 
     this.MoveWithCollision(dt);
+
+    if (!this.grounded) {
+      this.jump.airTime += dt;
+      this.jump.coyote = Math.max(0, this.jump.coyote - dt);
+    } else {
+      this.jump.coyote = JUMP_COYOTE_S;
+      if (!wasGrounded) {
+        this.jump.landImpact = Clamp01((fallSpeed - 2.2) / 6.8);
+        this.jump.landSerial += 1;
+        this.jump.airTime = 0;
+        // 落地以后要把重心重新接住，不能在同一帧把缓冲输入变成下一跳。
+        this.jump.cooldown = Math.max(this.jump.cooldown, 0.16);
+      }
+    }
 
     // --- 脚步 / 晃动 --------------------------------------------------------
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
@@ -589,7 +664,10 @@ export class PlayerController {
     const step = this._tmp.copy(this.velocity).multiplyScalar(dt);
     const moved = body.Move(step.x, step.y, step.z);
     this.position.set(moved.x, moved.y, moved.z);
-    this.grounded = moved.grounded;
+    // Rapier 在离地首帧仍可能把脚底旧接触报成 grounded（实测会把 4.65 m/s 的
+    // 起跳在第一帧清零，只抬高 7 cm）。明确向上运动时，脚底接触不能算落地；
+    // 只有到达顶点开始下落以后，控制器的 grounded 才重新有裁决权。
+    this.grounded = this.velocity.y > 0.01 ? false : moved.grounded;
     if (this.grounded && this.velocity.y < 0) this.velocity.y = 0;
     // 撞上东西就把那一轴的速度吃掉，不然贴着墙走会一直攒速度，
     // 松开墙的那一帧人会"弹"出去。
@@ -613,7 +691,8 @@ export class PlayerController {
     const cam = this.camera;
     // 步伐晃动：走路上下 + 左右 8 字。开镜压到 20%，卧倒几乎没有。
     const damp = (1 - this.ads * 0.8) * (1 - this.stanceBlend.prone * 0.7);
-    const bobAmp = 0.028 * damp * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3);
+    const bobAmp = 0.028 * damp * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3)
+      * (this.grounded ? 1 : 0);
     const bobY = Math.sin(this.stepDistance * 6.8) * bobAmp;
     const bobX = Math.sin(this.stepDistance * 3.4) * bobAmp * 1.3;
     // 侧身：身体横移 + 相机滚转，探头出去看的那一下必须有位移，不然只是画面歪了
@@ -787,6 +866,7 @@ export class PlayerController {
     s *= 1 + this.suppression * 1.3;
     s *= this.ArmPenalty() * 0.6 + 0.4;
     s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3) * 1.8;
+    if (!this.grounded) s *= 2.4;                    // 半空开火可以，但绝不是稳定射击姿态
     if (this.breathHold) s *= 0.55;
     if (this.bipod) s *= 0.35;
     return s;

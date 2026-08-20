@@ -298,7 +298,7 @@ ER2 有完整可驾驶载具（座位制、装甲穿透、弹道模拟、HE/AP/A
 | Shift（按住） | 冲刺；ads>0.6 时＝屏息；prone 时＝快速匍匐（更快更响） | 同（ER2 冲刺/屏息就是同键复用） | 要改 |
 | C | 蹲（默认点按切换，设置可切「按住」） | 同 | 要改 |
 | Z | 卧 | 同 | 已实现 |
-| Space | 翻越 / 攀爬（贴到可翻物才响应，空地不跳）；须 preventDefault | 同（vault） | 要新增 |
+| Space | 翻越优先 / 空地受限跳跃；须 preventDefault | 同（vault/jump） | 已实现 |
 | Q / E | 左右探头（含 0.42 m 身体横移＋相机滚转） | 同 | 已实现 |
 | AltLeft（按住） | 自由观察（头转身不转）；须 preventDefault，否则 Windows 版浏览器点亮菜单栏吞键 | 同 | 要新增 |
 | 鼠标左键 | 开火 | 同 | 已实现 |
@@ -387,14 +387,14 @@ ER2 有完整可驾驶载具（座位制、装甲穿透、弹道模拟、HE/AP/A
 - IssueOrder('flank') 后受令者 goal 与下令前不同（affected>0 且 goalChanged=true）
 - IssueOrder('charge') 后守点单位（holdZone 非空）也进入 CHARGE 状态并离开了 holdZone
 - 按住 Shift 且 ads>0.6 时 breathHold 为真、stamina 下降；未开镜时是冲刺
-- 按 Space 不再触发屏息
+- 按 Space 不再触发屏息；墙前翻越、空地跳跃
 - 未架两脚架时 Zb26 右键不进 ADS，架起后 ads 能到 1.0
 - Type11 连发 200 发后强制停火，8 秒内不再开火
 
-### 第 3 批：三个新动词 —— 翻越、通用交互 F、径向轮盘
+### 第 3 批：场景移动、通用交互 F、径向轮盘
 
 **做什么**
-- Script_Player.TryVault()：朝前 0.6 m 射线，命中 box.max[1] 在 0.6–1.9 m 且顶面前方 0.7 m 无遮挡则播 0.45 s 位移曲线（期间禁开火禁转身，视角轻微下压）；Space 绑定并 preventDefault
+- Script_Player.TryVault()：朝前探测可翻物并播位移曲线；失败后由同一个 Space 调 TryJump（0.55 m 净抬高、体力成本、落地恢复、空中散布惩罚）；Space 绑定并 preventDefault
 - AI 同步开翻越：Script_Ai.Blocked() 加 vaultable 返回值，Act() 加 VAULT 状态
 - 城墙马道：Script_World 按 TOWN.ramparts.ramps 的 [-120,0,120] 建真斜面（坡度<30°、宽 2.4 m）并进 collider 表
 - 运河软墙：入水速度 ×0.25、禁开火、每秒掉 2 体力；不做游泳系统
@@ -412,7 +412,7 @@ ER2 有完整可驾驶载具（座位制、装甲穿透、弹道模拟、HE/AP/A
 
 **要加的通关断言**
 - 把玩家贴到一段 1.2 m 高院墙前按 Space，0.6 秒后位置越到了墙的另一侧
-- 空地按 Space 位置不变（不做兔子跳）
+- 空地按 Space 完成一次约 0.55 m 的受限跳跃并落回地面；不会增加 vaultCount
 - AI 至少有一名在 60 秒内触发过 VAULT 状态
 - 玩家能沿马道走到城墙顶（y > 4.0）
 - 走进运河（z > 209）后速度 < 1.0 m/s 且 TryFire 不消耗弹药

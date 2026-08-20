@@ -1293,6 +1293,11 @@ export class Actor {
     const throwing = Clamp01(s.throwing ?? 0);
     const melee = Clamp01(s.melee ?? 0);
     const dying = Clamp01(s.dying ?? 0);
+    const grounded = s.grounded !== false;
+    const verticalVelocity = Clamp(s.verticalVelocity ?? 0, -14, 7);
+    const jumpRise = grounded ? 0 : Clamp01(verticalVelocity / 4.65);
+    const jumpFall = grounded ? 0 : Clamp01(-verticalVelocity / 8);
+    const airborne = grounded ? 0 : 1;
     // 过场用的三个姿态（战斗 AI 不给）：kneel 双膝跪地；reach 空手往前伸够桌面/袋子/扶人；
     // binoculars 双手举到眼前。都是 0—1 的混合量。
     const kneel = Clamp01(s.kneel ?? 0);
@@ -1386,8 +1391,8 @@ export class Actor {
     const bob = Math.sqrt(Math.max(0, legSpan * legSpan - support * support)) - (d.hipY - d.ankleY)
       + (moveSpeed > 0.02 ? 0 : breath * 0.004 * H);
 
-    this.body.position.set(0, d.hipY, 0);
-    this.body.rotation.set(0, 0, 0);
+    this.body.position.set(0, d.hipY - airborne * 0.025 * H, 0);
+    this.body.rotation.set(jumpRise * -0.07 + jumpFall * 0.09, 0, 0);
     // 蹲下时胯要**往后坐**。只压高度不后坐的话，膝盖为了补上腿长会整个顶到脚尖
     // 前面去 —— 重心落在脚后跟外，真人这么蹲要仰面摔过去，画面上读作「融化的人」。
     // 后坐 6% 身高 + 下面把落脚点往前挪一点，重心才回到两脚之间。
@@ -1434,6 +1439,13 @@ export class Actor {
         footX = Lerp(footX, leg.side * d.hipHalf * 1.3, kneel);
         footY = Lerp(footY, d.ankleY * 0.8, kneel);
       }
+      if (airborne > 0) {
+        // 起跳收腿、下落伸腿接地。左右脚前后错开一点，避免空中变成并腿木偶。
+        footZ = Lerp(leg.side * 0.12 * H, leg.side * 0.035 * H, jumpFall);
+        footX = leg.side * d.hipHalf * 0.92;
+        footY += Lerp(0.15, 0.07, jumpFall) * H;
+        swing = Math.max(swing, 0.10 * H);
+      }
       const p = plan[tag];
       p.x = footX; p.y = footY; p.z = footZ; p.phase = phase; p.swing = swing;
     }
@@ -1454,7 +1466,8 @@ export class Actor {
     // 那三种姿态下脚本来就不该踩在地上。
     let pelvisDrop = 0;
     const probe = this.factory && this.factory.groundProbe;
-    const doFootIk = !!probe && this.root.visible && prone < 0.5 && dying < 0.02 && !this.ragdollState;
+    const doFootIk = !!probe && this.root.visible && grounded
+      && prone < 0.5 && dying < 0.02 && !this.ragdollState;
     const scale = this.sizeScale || 1;
     if (doFootIk) {
       const yaw = this.root.rotation.y;
@@ -1534,7 +1547,8 @@ export class Actor {
     const lookYaw = Clamp(s.lookYaw ?? 0, -1.4, 1.4);
     const lookPitch = Clamp(s.lookPitch ?? 0, -1.0, 0.9);
     // 蹲姿的前倾要够：胯后坐了，上身不压过来重心就在身后。0.30 → 0.44
-    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.44 + aim * 0.08 + kneel * 0.10 + reach * 0.22;
+    const leanFwd = 0.06 + moveSpeed * 0.26 + crouch * 0.44 + aim * 0.08
+      + kneel * 0.10 + reach * 0.22 + jumpRise * 0.08 - jumpFall * 0.05;
     this.chest.rotation.set(
       -leanFwd + lookPitch * 0.22 + this.recoil * 0.06,     // 后坐把上身顶得后仰
       lookYaw * 0.35 + gaitSwing * 0.20,                    // 肩与胯反向拧

@@ -1080,6 +1080,8 @@ export class AiDirector {
         aim: s.state === STATE.FIRE ? 1 : 0,
         crouch: s.stance === 1 ? 1 : 0,
         prone: s.stance === 2 ? 1 : 0,
+        grounded: s.grounded,
+        verticalVelocity: s.velocityY,
         firing: this.time - s.lastFire < 0.12,
         elapsed: this.time,
         lookYaw: 0, lookPitch: 0,
@@ -1153,6 +1155,9 @@ export class AiDirector {
       s.actor.root.rotation.y = s.yaw;
       s.actor.Update(dt, {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
+        grounded: false,
+        verticalVelocity: Math.cos(Math.PI * k) * Math.PI
+          * Math.max(0, s.vaultApex - Math.max(from.y, to.y)) / s.vaultDuration,
         elapsed: this.time, lookYaw: 0, lookPitch: 0,
       });
     }

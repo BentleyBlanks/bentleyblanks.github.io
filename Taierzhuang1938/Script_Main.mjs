@@ -513,6 +513,15 @@ async function Boot() {
         y: player.position.y, x: player.position.x, z: player.position.z,
         aiVaults: ai.vaultCount,
       }),
+      // 跳跃：起跳次数、滞空/落地边沿与视图模型动作位移。
+      Jump: () => ({
+        count: player.jump.count, grounded: player.grounded,
+        y: player.position.y, velocityY: player.velocity.y,
+        airTime: player.jump.airTime, landSerial: player.jump.landSerial,
+        landImpact: player.jump.landImpact,
+        viewY: viewmodel.statePivot.position.y,
+        viewPitch: viewmodel.statePivot.rotation.x,
+      }),
       // 下水：淹了多深、算不算下水。软墙的三条代价（慢/不能开枪/掉体力）都挂在它上面
       Water: () => ({
         depth: player.waterDepth, inWater: player.InWater, stamina: player.stamina,
@@ -1768,7 +1777,7 @@ const router = new InputRouter({
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
       case "cycleSlot": CycleSlot(detail.delta); return;
-      case "vault": DoVault(); return;
+      case "traverse": DoTraverse(); return;
       case "orders":
         // 按住 Tab 出轮盘，松手把指着的那一格下出去。
         // 松手时 ordersOpen 必须**先**置回 false，否则 mousemove 还认为轮盘开着
@@ -1896,14 +1905,18 @@ function DoMelee() {
 }
 
 /**
- * 翻越（Space）。**不是跳跃**：贴到能翻的东西才响应，空地按下去什么也不发生，
- * 所以这里对失败一声不吭 —— 一个键老是弹"这里翻不过去"比没反应更烦。
+ * Space 的场景动作：能翻越就翻越，否则尝试一次受限跳跃。
+ * 顺序不能反——院墙前若先给竖直速度，翻越探测就会因为已经离地而失败。
  */
-function DoVault() {
+function DoTraverse() {
   if (!player?.Alive || viewmodel.IsBusy?.()) return false;
-  if (!player.TryVault()) return false;
-  audio.Play("footstepRubble", { volume: 0.7 });
-  return true;
+  if (player.TryVault()) {
+    audio.Play("footstepRubble", { volume: 0.7 });
+    return "vault";
+  }
+  if (!player.TryJump()) return false;
+  audio.Play("footstepDirt", { volume: 0.34 });
+  return "jump";
 }
 
 /**
@@ -1980,6 +1993,7 @@ function CallMortar() {
 // 开火
 // ---------------------------------------------------------------------------
 let lastFootstepAt = 0;
+let lastLandSerial = 0;
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
@@ -2423,6 +2437,15 @@ function Frame(dt, render = true) {
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false;
 
+  // 落地是一次边沿事件，不能拿 grounded 每帧播。轻跳只给靴底闷响，
+  // 高处跌落才叠 bodyFall；声音强度读实际下落速度折出的 impact。
+  if (player.jump.landSerial !== lastLandSerial) {
+    lastLandSerial = player.jump.landSerial;
+    const impact = player.jump.landImpact;
+    audio.Play("footstepRubble", { volume: 0.42 + impact * 0.38 });
+    if (impact > 0.55) audio.Play("bodyFall", { volume: 0.22 + impact * 0.35 });
+  }
+
   // 脚步。Script_Audio 里 footstepDirt / footstepRubble 一直没有任何地方调用过。
   // 快速匍匐那条"更快也更响"的取舍没有脚步声就不存在 —— 玩家听不见自己变响了。
   if (player.Alive && player.grounded && player.stepDistance - lastFootstepAt > 1.0) {
@@ -2516,6 +2539,7 @@ function Frame(dt, render = true) {
   viewmodel.Update(dt, {
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
+    verticalVelocity: player.velocity.y,
     ads: player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
     // 自由瞄准的**绝对**偏移（不是增量）：枪要真的指到那儿去。
     // 没有这两条的话，2° 锥内推鼠标只有弹道在偏、画面一动不动 ——

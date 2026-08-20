@@ -5,7 +5,7 @@
 // 干不同的事」这三件事的任何一件，都要在七处 if 里改 —— 而这一批恰好三件都要做：
 //   · Shift 一个键要按 ads 分流成「冲刺」与「屏息」（ER2 就是同键复用）；
 //   · Digit1-6 从「下令」腾给「武器槽」，下令收进 Tab 按住时的上下文；
-//   · Space 从「屏息」腾出来给第 3 批的翻越，且必须 preventDefault（否则滚页面）。
+//   · Space 从「屏息」腾出来给翻越/跳跃，且必须 preventDefault（否则滚页面）。
 //
 // 上下文（context）是这一层的核心：同一个 code 可以登记多条，
 // 路由器按 Context() 返回的当前上下文挑一条。"any" 表示任何上下文都吃。
@@ -99,9 +99,9 @@ export const KEYMAP = [
   { code: "KeyF", action: "interact", mode: "press", context: "any" },
   { code: "KeyG", action: "cook:Grenade", mode: "holdAction", context: "any" },
   { code: "KeyH", action: "cook:GrenadeBundle", mode: "holdAction", context: "any" },
-  // Space = 翻越。**不是跳跃**：贴到能翻的东西才响应，空地按下去什么也不发生。
+  // Space = 翻越优先 / 空地跳跃。先探墙再决定动作，避免在院墙前原地蹦。
   // prevent 一定要留着，否则浏览器会把它当成滚页面。
-  { code: "Space", action: "vault", mode: "press", context: "any", prevent: true },
+  { code: "Space", action: "traverse", mode: "press", context: "any", prevent: true },
 ];
 
 /** 鼠标：左键开火、右键开镜，都是连续量。滚轮循环切武器槽。 */
