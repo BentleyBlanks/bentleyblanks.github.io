@@ -242,8 +242,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 .hudMinimap {
   position: absolute; right: 18px; bottom: 18px; width: 190px; height: 190px;
-  border: 1px solid rgba(230,223,205,0.14); opacity: 0.9;
+  display: none; border: 1px solid rgba(230,223,205,0.14); opacity: 0.9;
 }
+.hudMinimap.on { display: block; }
 
 /* 阵亡：第一人称镜头在 Canvas 里倒地，这一层只做半透明去色与生平。
    不再用不透明黑底；战场必须一直看得见，死亡才仍然发生在同一个地方。 */

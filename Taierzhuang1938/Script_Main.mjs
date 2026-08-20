@@ -1814,6 +1814,7 @@ const router = new InputRouter({
       case "interact": DoInteract(); return;
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
+      case "map": hud.ToggleMinimap(); return;
       case "cycleSlot": CycleSlot(detail.delta); return;
       case "traverse": DoTraverse(); return;
       case "orders":

@@ -45,6 +45,7 @@ export const CONTROL_GUIDE = [
   {
     title: "班组与菜单",
     rows: [
+      { keys: "M", label: "显示 / 隐藏战场地图" },
       { keys: "按住 Tab", label: "打开命令轮盘，鼠标选择" },
       { keys: "Tab + 1—8", label: "直接下达对应命令" },
       { keys: "Esc", label: "暂停 / 返回" },
@@ -97,6 +98,8 @@ export const KEYMAP = [
   // F 是最拥挤的一个键，语义按上下文分流（拾枪拾弹 / 分弹药 / 将来的救人拖人）。
   // **它不再是"叫炮"** —— 叫炮进了 Tab 轮盘的第 8 格。
   { code: "KeyF", action: "interact", mode: "press", context: "any" },
+  // ER2 的地图不是常驻 HUD：默认收起，需要时按 M 看一眼，再按一次回到战场。
+  { code: "KeyM", action: "map", mode: "press", context: "world" },
   { code: "KeyG", action: "cook:Grenade", mode: "holdAction", context: "any" },
   { code: "KeyH", action: "cook:GrenadeBundle", mode: "holdAction", context: "any" },
   // Space = 翻越优先 / 空地跳跃。先探墙再决定动作，避免在院墙前原地蹦。

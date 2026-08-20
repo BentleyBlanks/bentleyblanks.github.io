@@ -33,6 +33,28 @@ try {
   assert.ok(controls.rows >= 16);
   assert.match(controls.text, /拾枪、换枪/);
   assert.match(controls.text, /包扎止血/);
+  assert.match(controls.text, /M显示 \/ 隐藏战场地图/);
+
+  const mapToggle = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.editor.TogglePanel(false);
+    const minimap = document.querySelector(".hudMinimap");
+    const snapshot = () => ({
+      on: minimap.classList.contains("on"),
+      display: getComputedStyle(minimap).display,
+      ariaHidden: minimap.getAttribute("aria-hidden"),
+    });
+    const initial = snapshot();
+    T.Debug.Key("KeyM");
+    T.StepFrames(1, 1 / 60, false);
+    const shown = snapshot();
+    T.Debug.Key("KeyM");
+    const hiddenAgain = snapshot();
+    return { initial, shown, hiddenAgain };
+  });
+  assert.deepEqual(mapToggle.initial, { on: false, display: "none", ariaHidden: "true" });
+  assert.deepEqual(mapToggle.shown, { on: true, display: "block", ariaHidden: "false" });
+  assert.deepEqual(mapToggle.hiddenAgain, { on: false, display: "none", ariaHidden: "true" });
 
   const prompts = await page.evaluate(() => {
     const T = window.Taierzhuang;

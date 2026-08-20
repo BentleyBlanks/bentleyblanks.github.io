@@ -75,6 +75,7 @@ export class Hud {
   constructor(root) {
     this.root = root;
     this.el = {};
+    this.minimapVisible = false;
     this.minimapDirty = 0;
     this.Build();
     this.noteQueue = [];
@@ -130,6 +131,7 @@ export class Hud {
     this.el.minimap.width = 190;
     this.el.minimap.height = 190;
     this.minimapCtx = this.el.minimap.getContext("2d");
+    this.SetMinimapVisible(false);
     // 命中记号：屏幕正中四道短撇。**四个 span 常驻，不每次 new** ——
     // 一场仗打几百次命中，每次重建 DOM 会在 GC 上攒出可见的顿。
     this.el.hitmark = mk("hudHitmark");
@@ -522,6 +524,8 @@ export class Hud {
 
   /** 小地图：200ms 重绘一次就够，不必每帧。 */
   UpdateMinimap(dt, { player, objectives, soldiers, bounds }) {
+    // 地图收起时连 Canvas 都不重绘；按 M 打开后的第一帧会立刻补一张。
+    if (!this.minimapVisible) return;
     this.minimapDirty += dt;
     if (this.minimapDirty < 0.2) return;
     this.minimapDirty = 0;
@@ -575,6 +579,19 @@ export class Hud {
     ctx.fillStyle = "#e8e0cc";
     ctx.fill();
     ctx.restore();
+  }
+
+  /** 对齐 ER2：地图默认隐藏，M 键按需切换。 */
+  SetMinimapVisible(on) {
+    this.minimapVisible = !!on;
+    this.el.minimap.classList.toggle("on", this.minimapVisible);
+    this.el.minimap.setAttribute("aria-hidden", String(!this.minimapVisible));
+    if (this.minimapVisible) this.minimapDirty = 0.2;
+    return this.minimapVisible;
+  }
+
+  ToggleMinimap() {
+    return this.SetMinimapVisible(!this.minimapVisible);
   }
 
   Update(dt) {
