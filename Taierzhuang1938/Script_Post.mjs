@@ -605,7 +605,9 @@ export function MarkNoPrepass(material) {
 const QUALITY_PRESETS = {
   low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14 },
   medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18 },
-  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 0.75, sharpen: 0.22 },
+  // high 已有最后一趟 FXAA + 锐化。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
+  // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家。
+  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.75, sharpen: 0.22 },
   ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22 },
 };
 

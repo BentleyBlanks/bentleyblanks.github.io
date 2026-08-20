@@ -197,7 +197,10 @@ export class ActorBatcher {
   _EnsureBuffer(group, kind, need) {
     const buffer = group.buffer[kind];
     if (buffer.length >= need * 16) return buffer;
-    const grown = new Float32Array(Math.max(need, (buffer.length / 16) * 2) * 16);
+    // 第一次真正出画时本关人物已经全部登记完。按总人数一次预留，避免玩家转头
+    // 看见更多士兵时，每个材质桶都在那一帧从 16→32→64 反复分配/拷贝。
+    const capacity = Math.max(need, this.records.size, (buffer.length / 16) * 2);
+    const grown = new Float32Array(capacity * 16);
     grown.set(buffer);
     group.buffer[kind] = grown;
     return grown;
@@ -210,7 +213,10 @@ export class ActorBatcher {
       if (existing.parent) existing.parent.remove(existing);
       existing.dispose();
     }
-    const capacity = Math.max(MIN_CAPACITY, need, existing ? existing.instanceMatrix.count * 2 : 0);
+    // 同 CPU buffer：首次创建就按本关 Actor 总数留足。矩阵只有 64 B / 人，
+    // 即使七十个桶都留 70 人也不到 320 KB，换掉的是转头时几十次 GPU buffer 重建。
+    const capacity = Math.max(MIN_CAPACITY, need, this.records.size,
+      existing ? existing.instanceMatrix.count * 2 : 0);
     const mesh = new THREE.InstancedMesh(group.geometry, group.material, capacity);
     mesh.name = `ActorBatch_${group.key}_${kind}`;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

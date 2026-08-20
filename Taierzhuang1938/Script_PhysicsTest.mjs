@@ -311,12 +311,12 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
     const near = T.ai.soldiers.filter((s) => s.alive && s.actor)
       .sort((a, b) => a.position.distanceTo(T.player.position) - b.position.distanceTo(T.player.position))
       .slice(0, 10);
-    for (const s of near) s.actor.root.visible = true;
+    for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
     for (let i = 0; i < 40; i += 1) {
-      for (const s of near) s.actor.root.visible = true;
+      for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
       T.StepFrames(1);
     }
-    for (const s of near) s.actor.root.visible = true;
+    for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
     const v = new (Object.getPrototypeOf(T.player.position).constructor)();
     const rows = [];
     const why = { total: 0, dead: 0, noActor: 0, hidden: 0, prone: 0, ok: 0 };

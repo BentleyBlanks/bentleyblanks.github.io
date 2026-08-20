@@ -816,7 +816,7 @@ export class AiDirector {
       // 包围球取胸口高度：脚下那个点在贴地俯视时会掉出视锥，人整个闪掉
       _cullSphere.center.set(s.position.x, s.position.y + 0.9, s.position.z);
       if (!_cullFrustum.intersectsSphere(_cullSphere)) {
-        s.actor.root.visible = false;
+        this._SetDetailedAttached(s.actor, false);
         s.actor.allowFootIk = false;
         s.renderLod = "culled";
         continue;
@@ -828,7 +828,7 @@ export class AiDirector {
       const detailLimit = s.renderLod === "detail" ? ACTOR_DETAIL_EXIT_M : ACTOR_DETAIL_ENTER_M;
       // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
       const detailed = !crowd || distanceSq <= detailLimit * detailLimit;
-      s.actor.root.visible = detailed;
+      this._SetDetailedAttached(s.actor, detailed);
       s.renderLod = detailed ? "detail" : "crowd";
       if (!detailed) {
         const prone = !s.alive ? 1 : Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
@@ -836,6 +836,25 @@ export class AiDirector {
       }
     }
     if (crowd) crowd.End();
+  }
+
+  /**
+   * 完整人物进远景 LOD / 屏外时，不只设 invisible，还从场景树摘下整棵分件子树。
+   * three 的 updateMatrixWorld 与 projectObject 都会递归 invisible 子树：69 个人约四千
+   * 节点，即使画面里只有几个人也曾经每帧全走一遍。远景画面由 ActorCrowd 接手，
+   * 逻辑位姿仍写 actor.root；回到近景时挂回同一 scene，本帧统一更新世界矩阵。
+   */
+  _SetDetailedAttached(actor, detailed) {
+    const root = actor?.root;
+    if (!root) return;
+    const scene = this.ctx.scene;
+    root.visible = !!detailed;
+    if (!scene) return;
+    if (detailed) {
+      if (!root.parent) scene.add(root);
+    } else if (root.parent === scene) {
+      scene.remove(root);
+    }
   }
 
   /** 远景层按需建；纯逻辑环境下一直是 null。 */

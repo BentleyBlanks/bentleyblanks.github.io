@@ -1193,11 +1193,24 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 两次跑出来的画面差 27% 的像素，城里的战斗不是逐帧可复现的）。实测差异 ≤ 0.0006%，
 与渲染器自己的噪声底同一量级。
 
-### 还剩什么没做（下一轮的账）
+### 第二轮：别遍历根本不画的完整人物
 
-- `updateMatrixWorld` 仍占 15%，根子是人物那三千六百个骨骼/分件节点。r185 的
-  `updateMatrixWorld` **不会因为 `matrixWorldAutoUpdate = false` 就跳过子树**
-  （那个标志只跳过本节点的合成，递归照走，且 `matrixAutoUpdate` 会把 force 传下去），
-  所以「冻住远处人物的矩阵」这条路走不通，除非改成不用场景图挂骨骼。
-- 静态布景（两百多个单网格）关掉 `matrixAutoUpdate` 还能再省几个点，没做是因为
-  要先确认破坏系统不会在运行时挪它们。
+`matrixWorldAutoUpdate = false` 只能避免矩阵相乘，不能阻止 three 递归 invisible 子树；
+69 个人约四千个骨骼/分件节点仍会每帧全走一遍。现在 `AiDirector.CullActors` 在人物进入
+远景 LOD 或屏外时把完整 `actor.root` 从 scene 摘下，逻辑位姿仍照常写 root，画面由
+`ActorCrowd` 接手；回近景时挂回同一 scene，本帧统一更新。3394×1348 / high / phase=2：
+
+| | 摘树前 | 摘树后 |
+|---|---:|---:|
+| `scene.updateMatrixWorld` | 1.72 ms | 0.44 ms |
+| `ActorBatcher.Update` | 0.31 ms | 0.18 ms |
+| 90 帧平均整帧 | 7.52 ms | 4.70 ms |
+
+另把人物实例缓冲按本关总人数一次预留，转头时不再让几十个材质桶依次 16→32→64
+扩容；high 档去掉与最终 FXAA 重复的 4×MSAA，4× 只留给 ultra。RTX 4070 SUPER
+同一超宽测试里，4×MSAA 单独把 GPU 从约 3.8 ms 抬到 4.8 ms。
+复测入口：`node Taierzhuang1938/Script_FrameProfileTest.mjs`（真实 GPU timer query，
+同时输出 CPU 分项、逐项消融与 GI 跨格尖峰）。
+
+还没动的是静态布景（两百多个单网格）的 `matrixAutoUpdate`；破坏系统可能在运行时挪它们，
+必须先确认所有写入口，不能靠全局 traverse 粗暴冻结。

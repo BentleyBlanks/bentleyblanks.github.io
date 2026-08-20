@@ -91,6 +91,12 @@ try {
         crowdIja: rendered.filter((soldier) => soldier.side === "ija" && soldier.renderLod === "crowd").length,
         animatedIja: T.ai.soldiers.filter((soldier) => soldier.side === "ija")
           .reduce((sum, soldier) => sum + (soldier.actor?.performanceUpdateCount || 0), 0),
+        detachedActors: T.ai.soldiers.filter((soldier) => soldier.actor
+          && soldier.renderLod !== "detail" && !soldier.actor.root.parent).length,
+        batchRecords: T.actorBatch?.records.size ?? 0,
+        smallestBatchCapacity: Math.min(Infinity, ...[...(T.actorBatch?.groups.values() ?? [])]
+          .flatMap((group) => Object.values(group.meshes).filter(Boolean))
+          .map((mesh) => mesh.instanceMatrix.count)),
       };
       T.renderer.info.autoReset = true;
       return metrics;
@@ -118,6 +124,10 @@ if (result) {
   if (result.toward.renderedIja < 20) failures.push(`镜头前日军渲染不足 ${result.toward.renderedIja} < 20`);
   if (result.toward.crowdIja < 10) failures.push(`远景 LOD 未接管 ${result.toward.crowdIja} < 10`);
   if (result.toward.animatedIja > 60) failures.push(`日军姿态更新过多 ${result.toward.animatedIja} > 60`);
+  if (result.toward.detachedActors < 10) failures.push(`屏外/远景完整模型仍挂在场景树 ${result.toward.detachedActors} < 10`);
+  if (result.toward.smallestBatchCapacity < result.toward.batchRecords) {
+    failures.push(`人物批次仍会随转头扩容 ${result.toward.smallestBatchCapacity} < ${result.toward.batchRecords}`);
+  }
   if (result.toward.drawCalls > 650) failures.push(`朝敌方向 calls 过高 ${result.toward.drawCalls.toFixed(0)} > 650`);
   const callRatio = result.toward.drawCalls / Math.max(1, result.away.drawCalls);
   if (callRatio > 1.35) failures.push(`转向 calls 尖峰 ${callRatio.toFixed(2)}x > 1.35x`);
