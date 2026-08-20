@@ -21,6 +21,7 @@
     "test:taierzhuang1938:ai": "node Taierzhuang1938/Script_AiBehaviorTest.mjs",
     "test:taierzhuang1938:destruction": "node Taierzhuang1938/Script_DestructionTest.mjs",
     "test:taierzhuang1938:jump": "node Taierzhuang1938/Script_JumpTest.mjs",
+    "test:taierzhuang1938:bootprop": "node Taierzhuang1938/Script_BootPropTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",
     "test:tunnelBell1942:browser": "node TunnelBell1942/Script_RenderHealthTest.mjs",
     "shots:tunnelBell1942": "node TunnelBell1942/Script_Screenshot.mjs",

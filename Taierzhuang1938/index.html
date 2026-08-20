@@ -25,6 +25,7 @@
     {
       "imports": {
         "three": "./vendor/three/build/three.module.js?v=1",
+        "./vendor/three/build/three.module.js": "./vendor/three/build/three.module.js?v=1",
         "./vendor/three/build/three.core.js": "./vendor/three/build/three.core.js?v=1",
         "./vendor/three/examples/jsm/loaders/GLTFLoader.js": "./vendor/three/examples/jsm/loaders/GLTFLoader.js?v=1",
         "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js": "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js?v=1",
@@ -74,7 +75,8 @@
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=1",
         "./Script_Menu.mjs": "./Script_Menu.mjs?v=2",
-        "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=1",
+        "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=2",
+        "./Script_BootPropStage.mjs": "./Script_BootPropStage.mjs?v=1",
 
         "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=1",
         "./Script_EditorStage.mjs": "./Script_EditorStage.mjs?v=1",
@@ -93,7 +95,8 @@
   <canvas id="view"></canvas>
   <div id="hud"></div>
   <div id="boot">
-    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。 -->
+    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。
+         转动跑在 worker 里，主线程建关卡卡多久都不影响它。 -->
     <canvas id="bootProp"></canvas>
     <div id="bootVeil"></div>
     <div id="bootHead">
@@ -103,7 +106,6 @@
     <div id="bootCard">
       <div id="bootPropName"></div>
       <div id="bootPropNote"></div>
-      <div id="bootPropHint">拖动可转动</div>
     </div>
     <div id="bootFoot">
       <button id="bootStart" disabled>进 城</button>

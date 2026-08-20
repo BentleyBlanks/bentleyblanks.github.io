@@ -434,10 +434,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 #bootPropNote {
   font-size: 12px; line-height: 1.7; color: var(--dim); margin-top: 6px;
 }
-#bootPropHint {
-  font-size: 11px; color: rgba(230,223,205,0.34); letter-spacing: 0.18em; margin-top: 9px;
-}
-
 #bootFoot {
   position: absolute; left: 0; right: 0; bottom: 0;
   display: flex; flex-direction: column; align-items: center; gap: 14px;

@@ -24,7 +24,10 @@
 //   一个关节下，合完就是 skin / uniform / accentA / accentB 四块，而不是
 //   十来个零件各一块。会动的（四肢、武器）自然分在各自的关节里，一根不少。
 
-import * as THREE from "three";
+// three 走相对路径不写裸名 "three"：这个模块也在加载画面那个 worker 里跑，
+// worker 没有 import map，裸名解析不了。页面侧 index.html 把这条相对路径
+// 映射到同一个带版本的 URL，所以页面上仍然只有一份 three。
+import * as THREE from "./vendor/three/build/three.module.js";
 import { HashString } from "./Script_Noise.mjs";
 
 /** 解析结果缓存：同一个 url 只 fetch + 解码一次，实例化可以来很多次。 */

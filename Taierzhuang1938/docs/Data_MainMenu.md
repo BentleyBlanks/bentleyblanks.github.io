@@ -82,7 +82,7 @@ Esc 在游戏里是暂停（继续 / 选章 / 回主菜单）。暂停会连背�
 - `?shot=1`（出图模式）：同样不建菜单，出图不许拍到 UI。
 - `window.Taierzhuang.Debug.Menu()` / `MenuAct(id)` / `Pause()`：冒烟脚本从运行时取证用。
 
-## 加载画面（`Script_BootProp.mjs`）
+## 加载画面（`Script_BootProp.mjs` + `Script_BootPropStage.mjs` + `Script_BootPropWorker.mjs`）
 
 菜单背后是活场景，但**菜单之前还有一段谁都躲不掉的等待**：首关建场十几秒。
 ER2 拿装备展示台填这段时间，这里照办：
@@ -92,6 +92,8 @@ ER2 拿装备展示台填这段时间，这里照办：
   展示池里**没有士兵**：TZM 的人是绑定姿势，单摆出来像人体模型。
 - **鼠标可以拖着转**：横拖转 yaw、竖拖转 pitch（夹在 -0.55 ~ 0.85，转到正上方
   会露出模型底面的空洞）、松手带惯性衰减，最后交回 0.28 rad/s 的匀速自转。
+  **屏幕上不写「拖动可转动」**：加载画面上除了名字、注记、进度就不该再有第四行字，
+  能转的东西自己会转，看见它在转的人自然会去拨它。
 - 进度条挪到**屏幕底部并加粗**（`min(74vw, 760px) × 6px`）。原来那条 300×2 px
   摆在正中间，既不好读又和展示台抢中央那块地方。
 
@@ -99,6 +101,32 @@ ER2 拿装备展示台填这段时间，这里照办：
 `Script_MeshLoad` + `Data_Meshes`：它要在主场景还没建起来时就转，那时候
 `MaterialLibrary` 还不存在，材质因此在模块内现造（那台展示台没有深度法线预通道，
 不受「不许自己造材质」那条约束）。出图模式（`?shot=1`）下不建 —— 截图里不许有它。
+
+### 它跑在 worker 里，不在主线程上
+
+**「分帧生成」只保证进度条会动，不保证帧率。** 实测（`?quality=low&scale=small`）
+建首关那 9.3 秒，主线程一共只交出去 26 帧：最长的一块（城外村落轮廓 + 树）
+一口气占住 3.08 秒，其次是河道 1.08 秒、烘 BrickWall 1.41 秒。一次 `yield`
+之间的那块活儿是不可分的，切得再细也是一块一块地卡 —— 留在主线程上，
+那件"能转的道具"就是一张幻灯片。
+
+所以展示台整个搬进 worker：
+
+| | 跑在哪 | 干什么 |
+|---|---|---|
+| `Script_BootPropStage.mjs` | 两边都能跑 | 场景、灯、机位、转动、加载一件模型。**不碰 DOM** |
+| `Script_BootPropWorker.mjs` | worker | 拿过继来的 `OffscreenCanvas` 跑 `PropStage`，16 ms 一拍（worker 里没有 rAF） |
+| `Script_BootProp.mjs` | 主线程 | 宿主：收 pointer、量尺寸、写卡片；worker 起不来时**换一张画布**退回主线程 |
+
+同一段加载，worker 侧探针 367–433 拍、超过 60 ms 的只有 2 拍。回归口
+`Script_BootPropTest.mjs`（`npm run test:taierzhuang1938:bootprop`）断言的就是这个数，
+谁把它挪回主线程都会当场红。
+
+一个连带约束：**worker 没有 import map**，所以这条链上（Stage / `Script_MeshLoad` /
+`Script_Noise` / `Data_Meshes` / three）一律不许写裸名 `"three"`，要走相对路径。
+页面那一侧靠 `index.html` 把这条相对路径映射到同一个带版本的 URL，
+所以页面上仍然只有一份 three（`import("three") === import("./vendor/.../three.module.js")`
+在实机上验过）；worker 是另一个 realm，本来就要自己再拿一份。
 
 `#boot` 的显隐从此**只走 `Script_Main.ShowBoot(on)`**：`.gone` 与展示台的启停要同步，
 漏一处它就会在游戏里空转一台渲染器。
