@@ -280,9 +280,11 @@ const OUTFIELD_SCENES = {
     villages: [
       { id: "LiangxiadianW", x: -320, z: -1652, w: 150, d: 66, count: 9, far: true },
       { id: "LiangxiadianE", x: 296, z: -1668, w: 122, d: 58, count: 7, far: true },
-      // 「石墙」：370 旅阵地的地名。做成一圈干垒石墙的小村
-      { id: "Shiqiang", x: -524, z: -1348, w: 118, d: 86, count: 8, stoneWall: true },
-      { id: "BeishaheTown", x: 70, z: -742, w: 210, d: 84, count: 12, far: true },
+      // 「石墙」与北沙河原先都在 460 m 远平面/浓雾之外：数据里有村，玩家一间
+      // 房也看不见。把两处轮廓收到目标链两侧，主通道仍保留至少 150 m 净空。
+      // 石墙是开场西南侧的小村；北沙河镇在第二阵地之后的东南天际线上接住终点。
+      { id: "Shiqiang", x: -160, z: -1350, w: 86, d: 60, count: 7, stoneWall: true },
+      { id: "BeishaheTown", x: 315, z: -1050, w: 138, d: 74, count: 9 },
     ],
     // 田埂上的树行（华北平原的地界树）
     // 平原上唯一的竖线。**中段（z -1420…-1280）必须有几行** ——
@@ -574,6 +576,85 @@ export class TengxianOutfield {
   // =========================================================================
 
   /**
+   * 把一块地表薄层逐顶点压到最终地形上。
+   *
+   * 高度图接入前，耕地、麦垄和道路都是几十米长的水平 Box：中心点虽然贴地，
+   * 四角在坡上仍会悬空一两米。这里按 4—6 m 网格采样 groundAt，并补齐四周侧壁；
+   * topOffset 是可见顶面，bottomOffset 埋进土里，所以不会再露出“漂浮地砖”的底边。
+   */
+  TerrainSlab(width, depth, {
+    x, z, ry = 0, topOffset = 0.04, bottomOffset = -0.08,
+    cell = 5, tile = TILE_METERS.ground,
+  }) {
+    const nx = Math.max(1, Math.ceil(width / cell));
+    const nz = Math.max(1, Math.ceil(depth / cell));
+    const cols = nx + 1, rows = nz + 1;
+    const positions = [], uvs = [], indices = [];
+    const cos = Math.cos(ry), sin = Math.sin(ry);
+    const WorldPoint = (ix, iz, offset) => {
+      const lx = -width / 2 + width * ix / nx;
+      const lz = -depth / 2 + depth * iz / nz;
+      const wx = x + cos * lx + sin * lz;
+      const wz = z - sin * lx + cos * lz;
+      return [wx, this.groundAt(wx, wz) + offset, wz, lx, lz];
+    };
+    // 顶、底两张同采样网格。顶面向上、底面向下。
+    for (const offset of [topOffset, bottomOffset]) {
+      for (let iz = 0; iz < rows; iz += 1) {
+        for (let ix = 0; ix < cols; ix += 1) {
+          const [wx, wy, wz, lx, lz] = WorldPoint(ix, iz, offset);
+          positions.push(wx, wy, wz);
+          uvs.push(lx / tile, lz / tile);
+        }
+      }
+    }
+    const layerSize = cols * rows;
+    for (let iz = 0; iz < nz; iz += 1) {
+      for (let ix = 0; ix < nx; ix += 1) {
+        const a = iz * cols + ix, b = a + 1, c = a + cols, d = c + 1;
+        indices.push(a, c, b, b, c, d);
+        indices.push(layerSize + a, layerSize + b, layerSize + c,
+          layerSize + b, layerSize + d, layerSize + c);
+      }
+    }
+    // 四周封边；顶/底顶点直接复用，避免接缝漏光。
+    const PushSide = (topA, topB) => {
+      const bottomA = layerSize + topA, bottomB = layerSize + topB;
+      indices.push(topA, bottomA, topB, topB, bottomA, bottomB);
+    };
+    for (let ix = 0; ix < nx; ix += 1) {
+      PushSide(ix, ix + 1);
+      PushSide((rows - 1) * cols + ix + 1, (rows - 1) * cols + ix);
+    }
+    for (let iz = 0; iz < nz; iz += 1) {
+      PushSide((iz + 1) * cols, iz * cols);
+      PushSide(iz * cols + cols - 1, (iz + 1) * cols + cols - 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    const IndexArray = positions.length / 3 > 65535 ? Uint32Array : Uint16Array;
+    geometry.setIndex(new THREE.BufferAttribute(new IndexArray(indices), 1));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  /** 把底面原本在局部 y=0 的构件逐顶点贴到地形；高度与横截面仍保留。 */
+  DrapeGeometry(geometry, { x, z, ry = 0, groundOffset = 0 }) {
+    const placed = PlaceGeometry(geometry, { x, z, ry });
+    const position = placed.attributes.position;
+    for (let i = 0; i < position.count; i += 1) {
+      const wx = position.getX(i), wz = position.getZ(i);
+      position.setY(i, position.getY(i) + this.groundAt(wx, wz) + groundOffset);
+    }
+    position.needsUpdate = true;
+    placed.computeVertexNormals();
+    placed.computeBoundingSphere();
+    return placed;
+  }
+
+  /**
    * 一条土垄（河堤／土坎／田埂共用）。
    *
    * 碰撞是**四级台阶**，不是一个大盒子：
@@ -612,18 +693,18 @@ export class TengxianOutfield {
       if (!this.InRegion(sx, sz)) { rnd(); continue; }
       const h = height * (1 + (rnd() - 0.5) * jitter);
       const wob = (rnd() - 0.5) * 0.5;
-      const y = this.groundAt(sx + nx * wob, sz + nz * wob);
       if (sector) sink.SetSector(SectorKey(sx, sz));
       // 相邻段换色：一条一千米的堤全用一个色，实拍出来就是一根挤出来的塑料条
       const mat = (material === "FieldEarth" && rnd() < 0.42) ? "FieldEarthDark" : material;
-      sink.Add(mat, PlaceGeometry(
+      sink.Add(mat, this.DrapeGeometry(
         RidgePrism(segL * 1.04, h, baseHalf, topHalf, { u0: mid }),
-        { x: sx + nx * wob, y, z: sz + nz * wob, ry }));
+        { x: sx + nx * wob, z: sz + nz * wob, ry }));
       // 垄顶那一道新翻的土（真阵地上土坎顶总有一条被踩/被挖出来的浅色带）
       if (crest && rnd() < 0.55) {
-        sink.Add(crest, PlaceGeometry(
-          MakeBox(segL * 0.9, 0.12, topHalf * 1.5, EARTH_TILE, `${seed}:c${i}`),
-          { x: sx + nx * wob, y: y + h, z: sz + nz * wob, ry }));
+        sink.Add(crest, this.TerrainSlab(segL * 0.9, topHalf * 1.5, {
+          x: sx + nx * wob, z: sz + nz * wob, ry,
+          topOffset: h + 0.05, bottomOffset: h - 0.07, cell: 3, tile: EARTH_TILE,
+        }));
       }
       if (sector) sink.SetSector("");
     }
@@ -680,16 +761,16 @@ export class TengxianOutfield {
       const cx = (x + x1) / 2;
       if (!this.InRegion(cx, this.RiverCenterZ(cx))) continue;
       const cz = this.RiverCenterZ(cx);
-      const y = this.groundAt(cx, cz);
       const w = x1 - x;
       const half = rv.bedHalf * (0.88 + rnd() * 0.24);
-      bed.push(PlaceGeometry(
-        MakeBox(w * 1.04, 0.9, half * 2, TILE_METERS.ground, `bed${Math.round(cx)}`),
-        { x: cx, y: y + 0.16 - 0.45, z: cz }));
+      bed.push(this.TerrainSlab(w * 1.04, half * 2, {
+        x: cx, z: cz, topOffset: 0.035, bottomOffset: -0.08, cell: 3.5,
+      }));
       const wh = rv.waterHalf * (0.7 + rnd() * 0.6);
-      water.push(PlaceGeometry(
-        MakeBox(w * 1.04, 0.08, wh * 2, 6.0, `wat${Math.round(cx)}`),
-        { x: cx, y: y + 0.20, z: cz + (rnd() - 0.5) * rv.bedHalf * 0.5 }));
+      water.push(this.TerrainSlab(w * 1.04, wh * 2, {
+        x: cx, z: cz + (rnd() - 0.5) * rv.bedHalf * 0.5,
+        topOffset: 0.24, bottomOffset: 0.18, cell: 3.5, tile: 6.0,
+      }));
     }
     if (bed.length) this.groundSink.Add("RiverSand", MergeGeometries(bed));
     if (water.length) this.groundSink.Add("ShallowWater", MergeGeometries(water));
@@ -762,8 +843,8 @@ export class TengxianOutfield {
           const h = 0.95 + seedRnd() * 0.22;
           const y = this.groundAt(x + len / 2, z);
           this.sink.SetSector(SectorKey(x, z));
-          this.sink.Add("FieldEarth", PlaceGeometry(
-            RidgePrism(len, h, 1.15, 0.5, { u0: x }), { x: x + len / 2, y, z }));
+          this.sink.Add("FieldEarth", this.DrapeGeometry(
+            RidgePrism(len, h, 1.15, 0.5, { u0: x }), { x: x + len / 2, z }));
           this.sink.SetSector("");
           // 胸墙比人矮，一个盒子就够（0.95 m > 0.56 的自动抬腿档，是真掩体；
           // 又 < 2.25 m 的翻越上限，翻得过去 —— ER2 那种「可穿越掩体」）
@@ -900,9 +981,9 @@ export class TengxianOutfield {
         // 这样地块压过路口时被路盖住，不会打架
         const tone = fRnd();
         if (tone > 0.3) {
-          const box = PlaceGeometry(
-            MakeBox(w, 0.9, d, TILE_METERS.ground, `fs${ix}:${iz}`),
-            { x: cx, y: this.groundAt(cx, cz) + 0.07 - 0.45, z: cz, ry });
+          const box = this.TerrainSlab(w, d, {
+            x: cx, z: cz, ry, topOffset: 0.035, bottomOffset: -0.08, cell: 5,
+          });
           (tone > 0.65 ? soilA : soilB).push(box);
         }
         // 田埂：两条长边。它是平原上唯一的线条，没有它整片地读不出「这是耕地」。
@@ -924,9 +1005,19 @@ export class TengxianOutfield {
           const bz = cz - Math.sin(ry) * (w / 2) * sgn;
           if (this.Blocked(bx, bz, 1)) continue;
           const bh = 0.26 + fRnd() * 0.12;
-          balks.push(PlaceGeometry(
-            RidgePrism(d, bh, 0.72, 0.26, { u0: cz }),
-            { x: bx, y: this.groundAt(bx, bz), z: bz, ry: ry + Math.PI / 2 }));
+          // 70 m 长垄不能再用一个水平棱柱：切成 6 m 小段，每段再逐顶点贴地。
+          const visualCount = Math.max(1, Math.ceil(d / 6));
+          const visualLength = d / visualCount;
+          const visualUx = -Math.sin(ry), visualUz = -Math.cos(ry);
+          for (let visualIndex = 0; visualIndex < visualCount; visualIndex += 1) {
+            const visualT = -d / 2 + (visualIndex + 0.5) * visualLength;
+            const visualX = bx + visualUx * visualT;
+            const visualZ = bz + visualUz * visualT;
+            balks.push(this.DrapeGeometry(
+              RidgePrism(visualLength * 1.03, bh, 0.72, 0.26,
+                { u0: cz + visualIndex * visualLength }),
+              { x: visualX, z: visualZ, ry: ry + Math.PI / 2 }));
+          }
           if (!collide) continue;
           // PlaceGeometry 的 ry 是绕 Y 转：局部 +X 落到 (cos, 0, -sin)，
           // 这里 ry' = ry + π/2，于是垄的走向是 (-sin ry, 0, -cos ry) —— 南北向
@@ -962,9 +1053,10 @@ export class TengxianOutfield {
           const pz = cz - Math.sin(ry) * ox - Math.cos(ry) * oz;
           if (this.Blocked(px, pz, 1)) continue;
           // 顶面 +0.26 m = 苗高的上沿；块体埋进地里 0.6 m，免得地表起伏时露出块底
-          (fRnd() < 0.34 ? wheatDry : wheat).push(PlaceGeometry(
-            MakeBox(rowW, 0.86, rd, TILE_METERS.ground, `wf${ix}:${iz}:${k}`),
-            { x: px, y: this.groundAt(px, pz) + 0.22 - 0.43, z: pz, ry }));
+          (fRnd() < 0.34 ? wheatDry : wheat).push(this.TerrainSlab(rowW, rd, {
+            x: px, z: pz, ry, topOffset: 0.18, bottomOffset: -0.025,
+            cell: 4, tile: TILE_METERS.ground,
+          }));
         }
         this.stats.wheatPlots += 1;
       }
@@ -1074,10 +1166,10 @@ export class TengxianOutfield {
           const cx = (ax + bx) / 2, cz = (az + bz) / 2;
           if (!this.InRegion(cx, cz)) continue;
           const ry = Math.atan2(-(bz - az), bx - ax);
-          quads.push(PlaceGeometry(
-            MakeBox(Math.hypot(bx - ax, bz - az) * 1.06, 0.86,
-              road.width * (0.92 + rnd() * 0.18), TILE_METERS.ground, `rd${Math.round(cx)}${Math.round(cz)}`),
-            { x: cx, y: this.groundAt(cx, cz) + 0.22 - 0.43, z: cz, ry }));
+          quads.push(this.TerrainSlab(Math.hypot(bx - ax, bz - az) * 1.06,
+            road.width * (0.92 + rnd() * 0.18), {
+              x: cx, z: cz, ry, topOffset: 0.045, bottomOffset: -0.07, cell: 3.5,
+            }));
         }
       }
     }
@@ -1116,11 +1208,10 @@ export class TengxianOutfield {
     let ties = 0;
     for (let z = rw.fromZ; z < rw.toZ; z += 0.9) {
       if (InGap(z) || !this.InRegion(rw.x, z)) continue;
-      const y = this.groundAt(rw.x, z) + h;
       this.sink.SetSector(SectorKey(rw.x, z));
-      this.sink.Add("WoodBeam", PlaceGeometry(
+      this.sink.Add("WoodBeam", this.DrapeGeometry(
         MakeBox(2.5, 0.16, 0.24, TILE_METERS.wood, `tie${Math.round(z * 10)}`),
-        { x: rw.x + (rnd() - 0.5) * 0.06, y: y + 0.08, z }));
+        { x: rw.x + (rnd() - 0.5) * 0.06, z, groundOffset: h + 0.08 }));
       this.sink.SetSector("");
       ties += 1;
     }
@@ -1129,12 +1220,11 @@ export class TengxianOutfield {
         const z1 = Math.min(z + 20, rw.toZ);
         const cz = (z + z1) / 2;
         if (InGap(cz) || !this.InRegion(rw.x, cz)) continue;
-        const y = this.groundAt(rw.x, cz) + h;
         this.sink.SetSector(SectorKey(rw.x, cz));
-        this.sink.Add("RailSteel", PlaceGeometry(
+        this.sink.Add("RailSteel", this.DrapeGeometry(
           // 标准轨距 1.435 m（Data_Tengxian.WEST_SUBURB.railway.gauge）
           MakeBox(0.12, 0.15, z1 - z, TILE_METERS.steel, `rail${s}${Math.round(z)}`),
-          { x: rw.x + s * 0.7175, y: y + 0.23, z: cz }));
+          { x: rw.x + s * 0.7175, z: cz, groundOffset: h + 0.23 }));
         this.sink.SetSector("");
       }
     }
@@ -1145,9 +1235,9 @@ export class TengxianOutfield {
     const xing = [];
     for (const c of rw.crossings || []) {
       if (!this.InRegion(rw.x, c)) continue;
-      xing.push(PlaceGeometry(
-        MakeBox(baseHalf * 2 + 10, 0.9, 7.0, TILE_METERS.ground, `xing${Math.round(c)}`),
-        { x: rw.x, y: this.groundAt(rw.x, c) + 0.24 - 0.45, z: c }));
+      xing.push(this.TerrainSlab(baseHalf * 2 + 10, 7.0, {
+        x: rw.x, z: c, topOffset: 0.05, bottomOffset: -0.08, cell: 3.5,
+      }));
     }
     if (xing.length) this.groundSink.Add("CartRoad", MergeGeometries(xing));
 
@@ -1216,19 +1306,50 @@ export class TengxianOutfield {
         const z = v.z + (vRnd() - 0.5) * v.d;
         const w = 8 + vRnd() * 9, d = 6 + vRnd() * 6;
         const eave = 2.4 + vRnd() * 0.5;              // 鲁南民居檐高 2.4—2.8（Data_Tengxian 的 houseDims）
-        const y = this.groundAt(x, z);
         const ry = (vRnd() - 0.5) * 0.5;
+        // 房屋是刚体，不能像麦田一样扭曲；用足印最高点作室内坪，再用埋入
+        // 足印最低点的石基础收住坡脚，四角都不会悬空。
+        let minGround = Infinity, maxGround = -Infinity;
+        for (const sx of [-0.5, 0, 0.5]) {
+          for (const sz of [-0.5, 0, 0.5]) {
+            const sampleX = x + Math.cos(ry) * sx * w + Math.sin(ry) * sz * d;
+            const sampleZ = z - Math.sin(ry) * sx * w + Math.cos(ry) * sz * d;
+            const sampleY = this.groundAt(sampleX, sampleZ);
+            minGround = Math.min(minGround, sampleY);
+            maxGround = Math.max(maxGround, sampleY);
+          }
+        }
+        const floorY = maxGround + 0.04;
+        const foundationBottom = minGround - 0.12;
+        const foundationHeight = floorY - foundationBottom;
+        sink.Add("DryStone", PlaceGeometry(
+          MakeBox(w + 0.5, foundationHeight, d + 0.5, TILE_METERS.stone, `${v.id}:f${i}`),
+          { x, y: foundationBottom + foundationHeight / 2, z, ry }));
         sink.Add("HouseBrick", PlaceGeometry(
           MakeBox(w, eave, d, TILE_METERS.brick, `${v.id}:${i}`, BRICK_UV_GRID),
-          { x, y: y + eave / 2, z, ry }));
-        // 硬山小青瓦：一条脊 + 两坡（远景只要读得出「中式硬山顶」的剪影）
+          { x, y: floorY + eave / 2, z, ry }));
+        // 真正的两坡硬山顶。旧版只是两个水平盒子叠起来，远处只读成一排矮砖块，
+        // 正是“有数据但看不出村庄”的另一半原因。
+        const roofPitch = 0.34;
+        const roofRise = (d / 2 + 0.35) * Math.tan(roofPitch);
+        const roofDepth = (d / 2 + 0.65) / Math.cos(roofPitch);
+        for (const side of [-1, 1]) {
+          const localZ = side * d * 0.25;
+          sink.Add("RoofTile", PlaceGeometry(
+            MakeBox(w + 0.9, 0.18, roofDepth, TILE_METERS.roof, `${v.id}:r${i}:${side}`),
+            {
+              x: x + Math.sin(ry) * localZ,
+              y: floorY + eave + roofRise / 2 + 0.05,
+              z: z + Math.cos(ry) * localZ,
+              ry, rx: side * roofPitch,
+            }));
+        }
         sink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w + 0.7, 0.22, d + 0.7, TILE_METERS.roof, `${v.id}:r${i}`),
-          { x, y: y + eave + 0.11, z, ry }));
-        sink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w * 0.94, 0.5, d * 0.44, TILE_METERS.roof, `${v.id}:rr${i}`),
-          { x, y: y + eave + 0.36, z, ry }));
-        if (!v.far) sink.Solid(x, y + (eave + 0.5) / 2, z, w / 2, (eave + 0.5) / 2, d / 2, "wall");
+          MakeBox(w + 1.0, 0.22, 0.32, TILE_METERS.roof, `${v.id}:ridge${i}`),
+          { x, y: floorY + eave + roofRise + 0.05, z, ry }));
+        const buildingHeight = floorY - foundationBottom + eave + roofRise + 0.18;
+        if (!v.far) sink.Solid(x, foundationBottom + buildingHeight / 2,
+          z, w / 2, buildingHeight / 2, d / 2, "wall");
       }
       // 「石墙」：地名的由来 —— 一圈干垒石墙。真碰撞体
       if (v.stoneWall) {

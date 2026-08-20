@@ -41,6 +41,7 @@ try {
     const height = await import("./Script_JieheHeight.mjs");
     const heightmap = await import("./Heightmap/Data_TaierzhuangHeightmap.mjs");
     const field = T.battlefield;
+    const outfieldModule = await import("./Script_TengxianOutfield.mjs");
 
     // 只量真正交火的南岸核心区，避开本来就有 1.9 m 落差的界河河槽。
     let minY = Infinity, maxY = -Infinity;
@@ -88,7 +89,8 @@ try {
       if (!groundTags.has(box.tag)) continue;
       const cx = box.c ? box.c[0] : (box.min[0] + box.max[0]) * 0.5;
       const cz = box.c ? box.c[2] : (box.min[2] + box.max[2]) * 0.5;
-      const gap = Math.abs(box.min[1] - field.GroundHeight(cx, cz));
+      // 基础可以埋进坡里（负值），只把底面高于地面的正间隙算“悬空”。
+      const gap = Math.max(0, box.min[1] - field.GroundHeight(cx, cz));
       anchorCount += 1;
       if (gap < 0.08) matchedAnchors += 1;
       else if (badAnchors.length < 12) badAnchors.push({ tag: box.tag, x: cx, z: cz, gap });
@@ -102,6 +104,32 @@ try {
           Math.abs(field.GroundHeight(x, z) - height.SampleJieheHeight(x, z)));
       }
     }
+
+    // 高度图接入后的视觉回归：长条耕地/麦垄/道路必须逐顶点贴地，不能只拿
+    // 中心点对齐后让四角悬空。薄层允许的最高露出是麦苗 0.18 m。
+    const groundLayerMaterials = new Set([
+      "FieldSoil", "FieldSoilDark", "WheatRow", "WheatRowDry", "CartRoad", "RiverSand",
+    ]);
+    let groundLayerVertices = 0, minGroundLayerGap = Infinity, maxGroundLayerGap = -Infinity;
+    for (const mesh of field.outfield.meshes) {
+      const materialName = mesh.name.split("|").at(-1).replace("Static_", "");
+      if (!groundLayerMaterials.has(materialName)) continue;
+      const position = mesh.geometry.attributes.position;
+      for (let i = 0; i < position.count; i += 1) {
+        const gap = position.getY(i) - field.GroundHeight(position.getX(i), position.getZ(i));
+        groundLayerVertices += 1;
+        minGroundLayerGap = Math.min(minGroundLayerGap, gap);
+        maxGroundLayerGap = Math.max(maxGroundLayerGap, gap);
+      }
+    }
+
+    // 村子不只要“数据里存在”，还要落在玩家走线的 460 m 远平面内。
+    const villageSpec = outfieldModule.OutfieldSpec("L0_Jiehe").villages || [];
+    const routeProbes = [[0, -1470], [0, -1255]];
+    const openingVillages = villageSpec.filter((v) => v.z >= -1500
+      && Math.hypot(v.x, v.z + 1470) < field.cameraFar).map((v) => v.id);
+    const routeVillages = [...new Set(villageSpec.filter((v) => routeProbes.some(([x, z]) =>
+      v.z >= z - 40 && Math.hypot(v.x - x, v.z - z) < field.cameraFar)).map((v) => v.id))];
     return {
       level: T.Debug.Level().id,
       minY, maxY, range: maxY - minY,
@@ -112,6 +140,8 @@ try {
       sourceUrl: heightmap.TAIZHUANG_HEIGHTMAP.source.url,
       samplerError,
       matchedAnchors, anchorCount, worstAnchorGap, badAnchors,
+      groundLayerVertices, minGroundLayerGap, maxGroundLayerGap,
+      openingVillages, routeVillages,
     };
   });
 
@@ -132,6 +162,13 @@ try {
   Check("现有布设碰撞体已重新贴合高度图",
     result.anchorCount > 300 && result.matchedAnchors >= result.anchorCount * 0.995,
     `${result.matchedAnchors}/${result.anchorCount} 个地面锚点；最大偏差 ${result.worstAnchorGap.toFixed(3)} m`);
+  Check("耕地、麦垄与道路逐顶点贴地",
+    result.groundLayerVertices > 100000
+      && result.minGroundLayerGap >= -0.09 && result.maxGroundLayerGap <= 0.19,
+    `${result.groundLayerVertices} 顶点；离地 ${result.minGroundLayerGap.toFixed(3)}…${result.maxGroundLayerGap.toFixed(3)} m`);
+  Check("目标走线上能看到一至两个村落",
+    result.openingVillages.length >= 1 && result.routeVillages.length >= 2,
+    `开场 ${result.openingVillages.join("/") || "无"}；全程 ${result.routeVillages.join("/") || "无"}`);
   for (const lane of result.laneChecks) {
     console.log(`    ${lane.id.padEnd(22)} 肩高=${lane.shoulders.map((v) => v.toFixed(2)).join("/")} m  命中=${lane.lowHits.join("/")}`);
   }
