@@ -27,19 +27,26 @@ const MARKER_SEP_X = 130;
 const GRENADE_WARNING_LIMIT = 4;
 
 /**
- * 情境提示的图标。照 Easy Red 2 的做法：按键 + 一个说明动作的小图，
- * 让玩家不必读完汉字就知道这条提示是"捡"还是"包扎"。
- * 用内联 SVG 而不是字体图标：描边随 currentColor 走，和按键框同色同亮度。
+ * 情境提示的图标。**提示上不写字**：一行只有按键框 + 一个说明动作的小图 ——
+ * 战斗中没人有工夫读「分一个桥夹给邱茂才」，但一眼能认出那是子弹。
+ * 汉字说明仍挂在 title/aria-label 上（读屏与冒烟测试读它）。
+ *
+ * 用内联 SVG 而不是字体图标或下载的图标包：描边随 currentColor 走，
+ * 和按键框同色同亮度；也不额外拖一个网络请求。
+ * 一律 24×24 viewBox、只描边不填充，粗细交给 CSS 统一。
  */
 const ACTION_ICONS = {
-  // 一只伸出去的手：拾取 / 互动
+  // 一只伸出去的手：通用交互（够不着别的语义时的兜底）
   interact: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12V5.6a1.6 1.6 0 0 1 3.2 0V11m0-1.2a1.6 1.6 0 0 1 3.2 0V12m0-1a1.6 1.6 0 0 1 3.2 0v5.2A5.8 5.8 0 0 1 12.6 22h-1A5.6 5.6 0 0 1 6 16.4v-3l-1.6.9a1.5 1.5 0 0 0-.6 2l.9 1.7"/></svg>`,
-  // 十字绷带：止血
-  bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>`,
+  // 一支斜着的步枪：从倒下的人身上拾枪 / 换枪
+  pickup: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 18.4 19.6 6.6M2.8 20.6 6.2 17.2M10.6 12.8l1.8 2.6M13.8 9.8l2.2 1.4"/></svg>`,
+  // 两发桥夹弹：分弹药给打光了的自己人
+  ammo: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20.5V10l2-3.5L11 10v10.5zM14 20.5V10l2-3.5 2 3.5v10.5zM5.5 15.5h14"/></svg>`,
+  // 一片创可贴：止血
+  bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.2" y="9" width="17.6" height="6" rx="3"/><path d="M9 9v6M15 9v6"/></g></svg>`,
   // 双向箭头：换枪
   switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
 };
-ACTION_ICONS.pickup = ACTION_ICONS.interact;
 ACTION_ICONS.action = ACTION_ICONS.interact;
 
 /**
@@ -371,10 +378,10 @@ export class Hud {
       const icon = document.createElement("span");
       icon.className = "ico";
       icon.innerHTML = ACTION_ICONS[prompt.kind] || ACTION_ICONS.action;
-      const label = document.createElement("span");
-      label.className = "txt";
-      label.textContent = prompt.label;
-      row.append(key, icon, label);
+      // 文字不上屏，只留在无障碍属性里
+      row.title = prompt.label;
+      row.setAttribute("aria-label", `${prompt.keys}：${prompt.label}`);
+      row.append(key, icon);
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);

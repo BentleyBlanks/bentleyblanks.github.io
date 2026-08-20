@@ -72,13 +72,18 @@ try {
     T.StepFrames(12);
     return {
       prompts: T.Debug.Prompts(),
+      // 行上**只有按键字母**，汉字说明只留在 title 上
       rows: [...document.querySelectorAll(".hudAction")].map((row) => row.textContent),
+      titles: [...document.querySelectorAll(".hudAction")].map((row) => row.title),
+      icons: [...document.querySelectorAll(".hudAction .ico svg")].length,
       on: document.querySelector(".hudActions")?.classList.contains("on"),
     };
   });
   assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind), ["bandage", "switchWeapon"]);
   assert.equal(prompts.on, true);
-  assert.ok(prompts.rows.some((row) => row.includes("包扎止血")));
+  assert.deepEqual(prompts.rows, ["B", "1 / 2"]);
+  assert.equal(prompts.icons, 2);
+  assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
   const weaponPrompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
