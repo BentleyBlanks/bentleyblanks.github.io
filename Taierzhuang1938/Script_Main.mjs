@@ -39,6 +39,7 @@ import { InteractSystem } from "./Script_Interact.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
+import { BootProp } from "./Script_BootProp.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -111,6 +112,20 @@ const boot = document.getElementById("boot");
 const bootBar = document.querySelector("#bootBar i");
 const bootStep = document.getElementById("bootStep");
 const bootStart = document.getElementById("bootStart");
+
+// 加载画面的道具展示台。**开机就转起来**，不等主场景 —— 它自己一台小 renderer，
+// 与主渲染器无关；建关那十几秒里玩家能拖着它转。出图模式下不建（截图里不许有它）。
+const bootProp = SHOT ? null : new BootProp(
+  document.getElementById("bootProp"),
+  document.getElementById("bootPropName"),
+  document.getElementById("bootPropNote"),
+);
+/** 加载画面收放的唯一入口：`.gone` 与展示台的启停必须同步，否则它在游戏里空转。 */
+function ShowBoot(on) {
+  boot.classList.toggle("gone", !on);
+  if (on) bootProp?.Show(); else bootProp?.Hide();
+}
+bootProp?.Show();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
@@ -888,7 +903,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   if (!initial) {
     state.ready = false;
-    boot.classList.remove("gone");
+    ShowBoot(true);
     bootStart.disabled = true;
     bootStart.textContent = "……";
     ClearRuntime();
@@ -958,7 +973,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   SeedSmokeColumns(phase);
 
   if (!initial) {
-    boot.classList.add("gone");
+    ShowBoot(false);
     bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
   }
   // 这一片切片是哪一关的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
@@ -1558,7 +1573,7 @@ function OnPointerLockChange() {
 }
 
 function StartRun() {
-  boot.classList.add("gone");
+  ShowBoot(false);
   state.menu = false;
   state.running = true;
   if (SHOT) return;
@@ -1603,7 +1618,7 @@ function OpenMenu() {
   audio.SetPaused(false);
   hudRoot.style.display = "none";
   if (viewmodel) viewmodel.root.visible = false;
-  boot.classList.add("gone");
+  ShowBoot(false);
   if (ai) ai.Dispose();
   // 齿轮按钮藏起来：菜单是给玩家看的，编辑器是给我们自己用的
   document.getElementById("edRoot")?.classList.add("off");

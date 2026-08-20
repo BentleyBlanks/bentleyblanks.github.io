@@ -67,6 +67,7 @@
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=1",
         "./Script_Menu.mjs": "./Script_Menu.mjs?v=1",
+        "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=1",
 
         "./Script_EditorUi.mjs": "./Script_EditorUi.mjs?v=1",
         "./Script_EditorStage.mjs": "./Script_EditorStage.mjs?v=1",
@@ -85,15 +86,27 @@
   <canvas id="view"></canvas>
   <div id="hud"></div>
   <div id="boot">
-    <div id="bootTitle">滕县 一九三八</div>
-    <div id="bootSub">一九三八年三月十四日 — 十八日 · 山东滕县</div>
-    <div id="bootBar"><i></i></div>
-    <div id="bootStep">正在夯地……</div>
-    <button id="bootStart" disabled>进 城</button>
+    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。 -->
+    <canvas id="bootProp"></canvas>
+    <div id="bootVeil"></div>
+    <div id="bootHead">
+      <div id="bootTitle">滕县 一九三八</div>
+      <div id="bootSub">一九三八年三月十四日 — 十八日 · 山东滕县</div>
+    </div>
+    <div id="bootCard">
+      <div id="bootPropName"></div>
+      <div id="bootPropNote"></div>
+      <div id="bootPropHint">拖动可转动</div>
+    </div>
+    <div id="bootFoot">
+      <button id="bootStart" disabled>进 城</button>
+      <div id="bootStep">正在夯地……</div>
+      <div id="bootBar"><i></i></div>
+    </div>
   </div>
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=14"></script>
+  <script type="module" src="./Script_Main.mjs?v=15"></script>
 </body>
 </html>
