@@ -29,7 +29,7 @@
 //   CS_BeimenBreakout  293 网格 / 26.5k 三角 / 0 灯   ★ 叠在滕县城之上
 //
 //   带 ★ 的两场发生在城里，绘制量是**加在城头上的**。性能红线是
-//   drawCalls ≤ 4500 / triangles ≤ 320 万，26.5k 三角可以忽略，
+//   drawCalls ≤ 1400 / triangles ≤ 320 万，26.5k 三角可以忽略，
 //   但 293 个网格 ≈ 293 个 draw call 不能忽略 —— 一个 Actor 在 medium 下
 //   约 16 个材质桶，13 个人就是 200 多。
 //   **接进正片时给过场单独建一个 quality:"low" 的 ActorFactory**（约 12 桶/人），

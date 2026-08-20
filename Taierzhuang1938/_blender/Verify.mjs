@@ -290,9 +290,8 @@ Report(result.glError === 0, `GL 错误码 ${result.glError}`);
 Report(result.programs > 0, `shader 程序编译了 ${result.programs} 个`);
 Report(result.fallbackOk === true, "404 兜底返回 null（不抛）");
 Report(result.junkOk === true, "非 TZM 文档兜底返回 null（不抛）");
-Report(result.batchedDraws <= result.unbatchedDraws && result.batchedDraws > 0,
-  `合批：中方士兵 ${result.unbatchedDraws} → ${result.batchedDraws} draw call`
-  + (result.batchedDraws < result.unbatchedDraws ? "" : "（导入人物已按关节+材质预合批）"));
+Report(result.batchedDraws < result.unbatchedDraws,
+  `合批见效：中方士兵 ${result.unbatchedDraws} → ${result.batchedDraws} draw call`);
 for (const error of result.errors) Report(false, error);
 for (const p of problems) Report(false, p);
 
