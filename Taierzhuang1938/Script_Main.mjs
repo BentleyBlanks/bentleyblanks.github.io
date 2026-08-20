@@ -38,6 +38,7 @@ import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
+import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -130,8 +131,11 @@ const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
+// 破口 uniform 同时喂主材质、阴影与深度法线预通道，三条链必须是一只洞。
+const destructionUniforms = MakeDestructionUniforms();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
+  destruction: destructionUniforms,
 });
 const ssao = {
   map: { value: post.AoTexture },
@@ -175,6 +179,7 @@ const GI_ON = GI_QUALITY[QUALITY] != null && params.get("gi") !== "0";
 const giUniforms = MakeGiUniforms();
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+  destruction: destructionUniforms,
 });
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
@@ -259,6 +264,7 @@ let viewmodel = null;
 let actorFactory = null;
 let story = null;
 let combat = null;
+let destruction = null;
 let interact = null;
 let cutscene = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
@@ -367,8 +373,10 @@ async function Boot() {
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
   navGrid = MakeNavGrid(battlefield);
   const nav = navGrid;
+  destruction = new DestructionSystem(scene, library, destructionUniforms, { vfx, audio });
+  destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
-    battlefield, actorFactory, scene, vfx, audio, player, nav, physics,
+    battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
@@ -419,7 +427,7 @@ async function Boot() {
     },
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
@@ -451,7 +459,7 @@ async function Boot() {
   window.Taierzhuang = {
     renderer, scene, camera, post, sky, lights, library, gi,
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
-    story, combat, interact, wheel,
+    story, combat, destruction, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
@@ -563,6 +571,22 @@ async function Boot() {
         playerBody: !!(player && player.body),
         grounded: player ? player.grounded : null,
       } : null),
+      /** 破坏层取证：可破坏/承重数量、破口、常驻残骸与拓扑重建次数。 */
+      Destruction: () => destruction ? destruction.Stats() : null,
+      /** 冒烟靶场用：走正式材质耐久与拓扑链，不绕过破坏系统。 */
+      DamageCollider: (box, energy = 1000, kind = "shell", normal = null) => {
+        if (!destruction || !box) return null;
+        const c = box.c || [
+          (box.min[0] + box.max[0]) * 0.5,
+          (box.min[1] + box.max[1]) * 0.5,
+          (box.min[2] + box.max[2]) * 0.5,
+        ];
+        const n = normal || { x: 0, y: 0, z: 1 };
+        const point = { x: c[0], y: c[1], z: c[2] };
+        const result = destruction.Hit(box, point, energy, { kind, normal: n });
+        destruction.Update(player.position);
+        return { ...result, stats: destruction.Stats() };
+      },
       /** 从某点朝某方向打一条射线（斜墙/空气墙的取证）。 */
       Ray: (ox, oy, oz, dx, dy, dz, maxDist = 60, terrain = false) => {
         const d = Math.hypot(dx, dy, dz) || 1;
@@ -760,6 +784,7 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
+  if (destruction) destruction.Clear();
   if (battlefield) { battlefield.Dispose(); battlefield = null; }
   levelBounds = MakeLevelBounds(phase.bounds);
   const World = WorldClassFor(phase);
@@ -790,6 +815,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   setStep("砌墙（物理）……", base + span);
   await yieldFrame();
   BuildPhysics();
+  if (destruction) destruction.SetWorld(battlefield, physics, null);
 }
 
 /**
@@ -870,6 +896,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       bootBar.style.width = `${Math.round(progress * 100)}%`;
     }, 0, 1);
     navGrid = MakeNavGrid(battlefield);
+    destruction.SetWorld(battlefield, physics, navGrid);
     ai.ctx.battlefield = battlefield;
     ai.ctx.physics = physics;
     ai.ctx.nav = navGrid;
@@ -2076,6 +2103,7 @@ const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
 const SURFACE_BY_TAG = {
   barricade: "sandbag",
   prop: "wood", balk: "wood", bridge: "wood", platform: "wood",
+  floor: "wood", ceiling: "wood", roof: "wood", door: "wood", furniture: "wood",
   ramp: "dirt", grave: "dirt", embankment: "dirt", kan: "dirt",
   wall: "brick", parapet: "brick",
 };
@@ -2309,6 +2337,11 @@ function TryFire(dt) {
     const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";
     vfx.Impact(_hitPoint, n, surface);
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
+    // 子弹不再只留贴花：同一位置持续受击会按砖／木／土耐久形成真实破口。
+    // 解析地表的虚拟记录不在破坏层里（它没有可替换的 Rapier 盒）。
+    if (destruction && shot.wall.box && shot.wall.box.tag !== "dirt") {
+      destruction.Hit(shot.wall.box, _hitPoint, weapon.damage, { kind: "bullet", normal: n });
+    }
   }
   // 【2026-08-20】曳光**按比例出**，不是每发都出。
   //
@@ -2580,6 +2613,9 @@ function Frame(dt, render = true) {
   if (physics) physics.Step(dt);
   vfx.Update(dt, camera, state.elapsed);
   combat.Update(dt, { phase: PHASES[state.phaseIndex] });
+  // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
+  // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
+  if (destruction) destruction.Update(player.position);
 
   // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
   if (state.cooking) state.cook += dt;

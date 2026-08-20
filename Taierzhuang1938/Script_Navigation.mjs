@@ -44,6 +44,9 @@ export class NavGrid {
     this.width = Math.max(1, Math.ceil((b.maxX - b.minX) / cell));
     this.height = Math.max(1, Math.ceil((b.maxZ - b.minZ) / cell));
     this.blocked = new Uint8Array(this.width * this.height);
+    this.margin = margin;
+    this.stepOver = stepOver;
+    this.revisions = 0;
     this.fieldCache = new Map();
     this.fieldLimit = fieldCache;
     this.fieldHits = 0;
@@ -54,10 +57,26 @@ export class NavGrid {
     this.budget = budgetPerFrame;
     this.queue = new Int32Array(this.width * this.height);
 
+    this.Refresh(battlefield);
+  }
+
+  /**
+   * 场景破坏后的导航瓦片重建。
+   *
+   * 真 3A 会只重烘受影响的 navmesh tile；本作是 1—2 m 位图，整张最重也只有几十万
+   * 字节，重刷一次比维护局部连通分量更便宜、更可靠。破坏层会把同一次爆炸的所有
+   * 盒子先批完再只调一次这里，不会一块砖跑一遍 BFS。
+   */
+  Refresh(battlefield) {
+    if (!battlefield) return false;
+    const margin = this.margin;
+    const stepOver = this.stepOver;
+    this.blocked.fill(0);
     // 栅格化。不逐格去查碰撞盒（那要几万次空间散列），而是反过来把每个盒子刷进格子里。
     // 「挡不挡路」的判据照抄 AiDirector.Blocked：盒顶比地面高出 0.56 m 以上才算墙，
     // 矮的东西（沙袋边、门槛、瓦砾）能跨过去，不许把街面刷成死路。
     for (const box of battlefield.colliders) {
+      if (!box || box.destroyed) continue;
       const cx = (box.min[0] + box.max[0]) * 0.5;
       const cz = (box.min[2] + box.max[2]) * 0.5;
       const ground = battlefield.GroundHeight(cx, cz);
@@ -78,7 +97,11 @@ export class NavGrid {
     }
     this.openCells = 0;
     for (let i = 0; i < this.blocked.length; i += 1) if (!this.blocked[i]) this.openCells += 1;
+    this.fieldCache.clear();
+    this.budget = this.budgetPerFrame;
     this._BuildComponents();
+    this.revisions += 1;
+    return true;
   }
 
   /**
@@ -283,6 +306,7 @@ export class NavGrid {
       fields: this.fieldCache.size,
       components: this.componentCount, mainSize: this.mainSize,
       hits: this.fieldHits, misses: this.fieldMisses, starved: this.fieldStarved,
+      revisions: this.revisions,
     };
   }
 }

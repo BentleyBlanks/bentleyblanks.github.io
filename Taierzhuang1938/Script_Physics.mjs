@@ -188,6 +188,9 @@ export class PhysicsWorld {
       if (!desc) continue;
       const collider = this.world.createCollider(desc, this.staticBody);
       this.recordByHandle.set(collider.handle, box);
+      // 运行时破坏按记录摘掉这一只碰撞体。把 handle 反写回同一条记录，
+      // 就不必再扫 recordByHandle 做 O(n) 反查。
+      box._physicsHandle = collider.handle;
       n += 1;
     }
     // broad phase 要走一次 step 才认得新碰撞体，不然紧接着的射线一律打空。
@@ -226,6 +229,7 @@ export class PhysicsWorld {
     if (!desc) return null;
     const collider = this.world.createCollider(desc, this.staticBody);
     this.recordByHandle.set(collider.handle, box);
+    box._physicsHandle = collider.handle;
     return collider.handle;
   }
 
@@ -233,6 +237,8 @@ export class PhysicsWorld {
     if (handle === null || handle === undefined) return;
     const collider = this.world.getCollider(handle);
     if (collider) this.world.removeCollider(collider, false);
+    const record = this.recordByHandle.get(handle);
+    if (record && record._physicsHandle === handle) record._physicsHandle = null;
     this.recordByHandle.delete(handle);
   }
 

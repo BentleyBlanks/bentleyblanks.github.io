@@ -43,7 +43,7 @@ class Projectile {
 
 export class CombatSystem {
   /**
-   * @param {object} host { battlefield, ai, vfx, audio, lights, player, library, scene, story }
+   * @param {object} host { battlefield, ai, vfx, audio, lights, player, library, scene, story, destruction }
    */
   constructor(host) {
     this.host = host;
@@ -354,6 +354,12 @@ export class CombatSystem {
     }
     if (this.host.lights) {
       this.host.lights.FlashMuzzle(position, Clamp(radius * 9, 40, 120));
+    }
+    // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
+    // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
+    // 空间散列与导航只重建一次。
+    if (this.host.destruction) {
+      this.host.destruction.Blast(position, radius, damage, { kind });
     }
     const bf = this.host.battlefield;
     const ai = this.host.ai;

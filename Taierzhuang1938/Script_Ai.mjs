@@ -1496,7 +1496,17 @@ export class AiDirector {
         const h = bf.Raycast(from, missPoint.sub(from).normalize(), dist + 6);
         if (h) {
           const p = from.clone().addScaledVector(missPoint, h.t);
-          vfx.Impact(p, new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]), "brick");
+          const normal = new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]);
+          const tag = h.box ? h.box.tag : "wall";
+          const surface = tag === "prop" || tag === "balk" || tag === "bridge" || tag === "platform"
+            ? "wood" : (tag === "kan" || tag === "embankment" || tag === "grave") ? "dirt" : "brick";
+          vfx.Impact(p, normal, surface);
+          // AI 的流弹也走同一份局部耐久。这里仍只在“真的打到静态碰撞体”时记伤，
+          // 概率命中人物的那一支不会凭空再穿过去伤一堵墙。
+          if (this.ctx.destruction && h.box) {
+            this.ctx.destruction.Hit(h.box, p, s.weapon.damage,
+              { kind: "bullet", normal });
+          }
         }
       }
     }

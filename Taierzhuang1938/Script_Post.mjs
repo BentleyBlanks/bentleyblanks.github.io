@@ -18,6 +18,7 @@
 // 截图比对，画面自己在抖的话根本判断不了"这一版比上一版好"。
 
 import * as THREE from "three";
+import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
 
 const QUAD_GEOMETRY = new THREE.PlaneGeometry(2, 2);
 const QUAD_CAMERA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -52,13 +53,17 @@ float Hash12(vec2 p) {
 // 用 three 的 chunk 拼，USE_INSTANCING / 形变这些分支交给它自己处理，
 // 不然实例化的瓦砾在预通道里全部塌到原点，AO 就是一片乱码。
 // ---------------------------------------------------------------------------
-function MakeNormalDepthMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: { uFar: { value: 500 } },
+function MakeNormalDepthMaterial(destruction = null) {
+  const uniforms = { uFar: { value: 500 } };
+  const damageEnabled = { value: 0 };
+  if (destruction) BindDestructionUniforms(uniforms, destruction, damageEnabled);
+  const material = new THREE.ShaderMaterial({
+    uniforms,
     vertexShader: /* glsl */`
       #include <common>
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
       void main() {
         #include <beginnormal_vertex>
         #include <morphinstance_vertex>
@@ -69,13 +74,25 @@ function MakeNormalDepthMaterial() {
         #include <morphtarget_vertex>
         #include <project_vertex>
         vViewDepth = -mvPosition.z;
+        ${destruction ? `
+        vec4 damageWorld = vec4(transformed, 1.0);
+        #ifdef USE_BATCHING
+          damageWorld = batchingMatrix * damageWorld;
+        #endif
+        #ifdef USE_INSTANCING
+          damageWorld = instanceMatrix * damageWorld;
+        #endif
+        vDamageWorldPos = (modelMatrix * damageWorld).xyz;` : ""}
       }
     `,
     fragmentShader: /* glsl */`
       uniform float uFar;
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      ${destruction ? `varying vec3 vDamageWorldPos;
+${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
       void main() {
+        ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
         gl_FragColor = vec4(n, vViewDepth);
@@ -83,6 +100,10 @@ function MakeNormalDepthMaterial() {
     `,
     side: THREE.FrontSide,
   });
+  // BuildSink 的静态网格会在自己的 onBeforeRender/onAfterRender 里只为这一 draw
+  // 打开裁切。演员、枪、碎片共用 overrideMaterial，但不会被破口 OBB 切掉。
+  if (destruction) material.userData.damageObjectEnabled = damageEnabled;
+  return material;
 }
 
 // ---------------------------------------------------------------------------
@@ -579,7 +600,7 @@ const QUALITY_PRESETS = {
 };
 
 export class PostPipeline {
-  constructor(renderer, { width, height, quality = "high" } = {}) {
+  constructor(renderer, { width, height, quality = "high", destruction = null } = {}) {
     this.renderer = renderer;
     this.quality = QUALITY_PRESETS[quality] ? quality : "high";
     this.preset = { ...QUALITY_PRESETS[this.quality] };
@@ -596,7 +617,7 @@ export class PostPipeline {
     this.hdrType = hasFloatRt ? THREE.HalfFloatType : THREE.UnsignedByteType;
     this.hdrCapable = hasFloatRt;
 
-    this.normalDepthMaterial = MakeNormalDepthMaterial();
+    this.normalDepthMaterial = MakeNormalDepthMaterial(destruction);
     this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);

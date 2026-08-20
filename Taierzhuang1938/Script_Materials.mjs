@@ -10,6 +10,9 @@
 import * as THREE from "three";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
+import {
+  BindDestructionUniforms, DestructionShaderGlsl,
+} from "./Script_Destruction.mjs";
 
 /** 把一张烘焙结果的某个通道包成 DataTexture。 */
 function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } = {}) {
@@ -40,9 +43,10 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
  *          镜面那一路（radiance）留给 IBL，但按 GI/天空的亮度比做一次遮蔽 ——
  *          否则屋里的金属件照样反着一片亮天。
  */
-export function InjectIndirectLighting(material, { ssao = null, gi = null } = {}) {
+export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
+  material.userData.destructionUniforms = destruction;
   material.onBeforeCompile = (shader) => {
     let vertex = shader.vertexShader;
     let fragment = shader.fragmentShader;
@@ -111,11 +115,67 @@ ${GI_SAMPLE_GLSL}`)
         #endif`);
     }
 
+    if (destruction) {
+      BindDestructionUniforms(shader.uniforms, destruction);
+      // 跟 GI 一样必须自己传世界坐标。这里不能拿 vViewPosition 反推：静态合批网格
+      // 分区之后 modelMatrix 虽然通常是单位阵，但编辑器与过场会真的移动整棵节点。
+      vertex = vertex
+        .replace("#include <common>", `#include <common>
+        varying vec3 vDamageWorldPos;`)
+        .replace("#include <project_vertex>", `#include <project_vertex>
+        {
+          vec4 damageWorld = vec4(transformed, 1.0);
+          #ifdef USE_BATCHING
+            damageWorld = batchingMatrix * damageWorld;
+          #endif
+          #ifdef USE_INSTANCING
+            damageWorld = instanceMatrix * damageWorld;
+          #endif
+          vDamageWorldPos = (modelMatrix * damageWorld).xyz;
+        }`);
+      fragment = fragment
+        .replace("#include <common>", `#include <common>
+        varying vec3 vDamageWorldPos;
+${DestructionShaderGlsl(destruction.maxVolumes)}`)
+        .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
+        ApplyDamageVolumes(vDamageWorldPos);`);
+    }
+
     shader.vertexShader = vertex;
     shader.fragmentShader = fragment;
   };
   // 缓存键必须跟着注入组合走：两种组合共用一份编译结果 = 有的材质拿不到 GI
-  material.customProgramCacheKey = () => `indirect:${ssao ? 1 : 0}${gi ? 1 : 0}`;
+  material.customProgramCacheKey = () => `indirect:${ssao ? 1 : 0}${gi ? 1 : 0}${destruction ? 1 : 0}`;
+  return material;
+}
+
+/** 阴影深度也裁同一批洞；否则墙已经穿了，太阳底下还留一块完整墙影。 */
+function MakeDestructionDepthMaterial(uniforms) {
+  const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  material.onBeforeCompile = (shader) => {
+    BindDestructionUniforms(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>
+      varying vec3 vDamageWorldPos;`)
+      .replace("#include <project_vertex>", `#include <project_vertex>
+      {
+        vec4 damageWorld = vec4(transformed, 1.0);
+        #ifdef USE_BATCHING
+          damageWorld = batchingMatrix * damageWorld;
+        #endif
+        #ifdef USE_INSTANCING
+          damageWorld = instanceMatrix * damageWorld;
+        #endif
+        vDamageWorldPos = (modelMatrix * damageWorld).xyz;
+      }`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>
+      varying vec3 vDamageWorldPos;
+${DestructionShaderGlsl(uniforms.maxVolumes)}`)
+      .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
+      ApplyDamageVolumes(vDamageWorldPos);`);
+  };
+  material.customProgramCacheKey = () => `damageDepth:${uniforms.maxVolumes}`;
   return material;
 }
 
@@ -129,14 +189,19 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
  * 加载条能真的动起来（一次性烘 15 张 512 会把主线程卡死 3 秒，白屏就是这么来的）。
  */
 export class MaterialLibrary {
-  constructor(renderer, { textureSize = 512, ssao = null, gi = null } = {}) {
+  constructor(renderer, { textureSize = 512, ssao = null, gi = null, destruction = null } = {}) {
     this.renderer = renderer;
     this.textureSize = textureSize;
     this.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
     this.ssao = ssao;         // { map: {value}, resolution: {value}, strength: {value} }
     this.gi = gi;             // MakeGiUniforms() 那一包，与 ProbeVolume 共用同一批对象
+    this.destruction = destruction;
     this.baked = new Map();   // name -> { albedo, normal, orm }（three 纹理）
     this.materials = new Map();
+    // 演员也会复用 BrickWall / WoodBeam 的底材，不能把破口 shader 直接挂到底材上，
+    // 否则人走过洞口时身体也会被裁掉。Static() 只给 BuildSink 的场景网格克隆一份。
+    this.staticMaterials = new Map();
+    this.staticDepthMaterial = destruction ? MakeDestructionDepthMaterial(destruction) : null;
   }
 
   /** 逐个配方烘焙，每 yield 一次交还主线程。 */
@@ -225,12 +290,33 @@ export class MaterialLibrary {
     return material;
   }
 
+  /** 把普通底材变成“只用于静态布景”的可裁切版本；同一底材始终复用同一克隆。 */
+  Static(material) {
+    if (!this.destruction || !material) return material;
+    const key = material.uuid;
+    if (this.staticMaterials.has(key)) return this.staticMaterials.get(key);
+    const clone = material.clone();
+    clone.name = `${material.name || material.type}_DestructibleStatic`;
+    InjectIndirectLighting(clone, {
+      ssao: this.ssao,
+      gi: this.gi,
+      destruction: this.destruction,
+    });
+    this.staticMaterials.set(key, clone);
+    return clone;
+  }
+
+  StaticDepth() { return this.staticDepthMaterial; }
+
   Dispose() {
     for (const set of this.baked.values()) {
       set.albedo.dispose(); set.normal.dispose(); set.orm.dispose();
     }
     for (const m of this.materials.values()) m.dispose();
+    for (const m of this.staticMaterials.values()) m.dispose();
+    if (this.staticDepthMaterial) this.staticDepthMaterial.dispose();
     this.baked.clear();
     this.materials.clear();
+    this.staticMaterials.clear();
   }
 }
