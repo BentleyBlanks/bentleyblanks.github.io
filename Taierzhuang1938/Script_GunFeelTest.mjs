@@ -100,6 +100,20 @@ const report = await page.evaluate(() => {
     };
   }
 
+  const armSides = [];
+  T.viewmodel.riggedArms?.root?.traverse((object) => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) if (material) armSides.push(material.side);
+  });
+  // 走真人同一条键位链：Shift + W，而不是直接写 viewmodel 的 sprint 弹簧。
+  D.Key("ShiftLeft", true);
+  D.Key("KeyW", true);
+  T.StepFrames(90);
+  const sprintAmount = T.player.sprint;
+  D.Key("ShiftLeft", false);
+  D.Key("KeyW", false);
+
   // 三、模拟一挺持续 firing=true 的机枪。只有逐发序号能让第二发重新回峰。
   const soldier = T.ai.soldiers.find((entry) => entry.actor);
   const actor = soldier?.actor || null;
@@ -127,6 +141,8 @@ const report = await page.evaluate(() => {
     profiles,
     repeated,
     sights,
+    armSides,
+    sprintAmount,
   };
 });
 
@@ -161,6 +177,9 @@ Check("导入枪模保留铁瞄挂点与栓动动作链",
   Object.entries(report.sights)
     .map(([id, entry]) => `${id}: sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));
+Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
+  report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),
+  `Shift+W sprint=${report.sprintAmount.toFixed(2)} · material.side=${report.armSides.join(",") || "missing"}`);
 Check("页面无运行时错误", errors.length === 0, errors.join(" | "));
 
 await browser.close();

@@ -91,6 +91,18 @@ export class FpsArmRig {
     this._BuildSolver();
     this.root.traverse((object) => {
       if (object.isMesh) {
+        // 这副 WRAD 手臂的源材质标了 doubleSided。腰射时肩膀在相机后方问题不明显，
+        // 但冲刺姿态会把整套 weaponMount 下压并外旋，粗模上臂便从近平面横扫过去；
+        // 双面渲染会把人站在袖筒内部看到的背面也画出来，于是一个粉色三角面铺满
+        // 半个屏幕。第一人称手臂只该从皮肤/袖筒外侧观看，强制正面渲染既消掉
+        // 这块“粉色遮屏”，也不改变 IK、枪位或冲刺动作本身。
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          if (!material) continue;
+          material.side = THREE.FrontSide;
+          material.shadowSide = THREE.FrontSide;
+          material.needsUpdate = true;
+        }
         object.frustumCulled = false;
         object.castShadow = false;
         object.receiveShadow = false;
