@@ -98,6 +98,19 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
     T.StepFrames(2);
     const through = T.battlefield.Raycast(origin, normal, thickness * 2 + 0.9);
     const stats = T.Debug.Destruction();
+    const breach = T.destruction.breaches.at(-1);
+    const rubble = T.destruction.rubble;
+    const matrix = T.destruction.matrix;
+    const position = T.destruction.position;
+    const quaternion = T.destruction.quaternion;
+    const scale = T.destruction.scale;
+    const baseY = breach.center[1] - breach.half[1];
+    let highestCenterAboveBase = 0;
+    for (let index = 0; index < rubble.count; index += 1) {
+      rubble.getMatrixAt(index, matrix);
+      matrix.decompose(position, quaternion, scale);
+      highestCenterAboveBase = Math.max(highestCenterAboveBase, position.y - baseY);
+    }
     return {
       staged, stillThere, broken,
       originalGone: !T.battlefield.colliders.includes(box),
@@ -105,6 +118,12 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
       maxDistance: thickness * 2 + 0.9,
       stats,
       navAdvanced: T.nav.Stats().revisions === beforeNav + 1,
+      highestCenterAboveBase,
+      rubbleUsesIndirectLight: Boolean(rubble.material.userData.ssaoUniforms
+        || rubble.material.userData.giUniforms),
+      rubbleHasShadowColorFloor: rubble.material.emissive?.getHex() !== 0
+        && rubble.material.emissiveIntensity > 0,
+      rubbleIsIrregular: rubble.geometry.type === "DodecahedronGeometry",
     };
   });
   Check("墙面有分阶段耐久", !r.missing && r.staged?.damaged && !r.staged?.broken && r.stillThere,
@@ -113,8 +132,15 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
     && r.originalGone && r.through === null,
   r.missing ? "" : `ray=${r.through ?? "clear"} max=${Number(r.maxDistance).toFixed(2)}`);
   Check("破口视觉、残骸与导航一起提交", !r.missing && r.stats?.breaches === 1
-    && r.stats.activeVolumes === 1 && r.stats.rubble >= 18 && r.navAdvanced,
+    && r.stats.activeVolumes === 1 && r.stats.rubble >= 8 && r.navAdvanced,
   r.missing ? "" : `洞=${r.stats?.breaches} 残骸=${r.stats?.rubble} nav=${r.navAdvanced}`);
+  Check("常驻残骸只落在洞脚而不沿洞口悬空", !r.missing && r.highestCenterAboveBase <= 0.35,
+    r.missing ? "" : `最高中心离洞脚 ${Number(r.highestCenterAboveBase).toFixed(2)}m`);
+  Check("残骸背光面保留砖土色而非纯黑", !r.missing
+    && r.rubbleUsesIndirectLight && r.rubbleHasShadowColorFloor,
+  r.missing ? "" : `间接光=${r.rubbleUsesIndirectLight} 暗面底色=${r.rubbleHasShadowColorFloor}`);
+  Check("破口残骸使用不规则碎石而非调试方盒", !r.missing && r.rubbleIsIrregular,
+    r.missing ? "" : `geometry=${r.rubbleIsIrregular ? "irregular" : "box"}`);
 }
 
 // 4. 第一关石墙村的新村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。

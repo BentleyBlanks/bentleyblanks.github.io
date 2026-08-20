@@ -234,9 +234,11 @@ function DistanceToAabb(point, box) {
 }
 
 function SurfaceColor(surface, variation = 0) {
-  if (surface === "wood") return new THREE.Color().setHex(variation > 0.55 ? 0x5a4634 : 0x7a6247);
-  if (surface === "dirt" || surface === "sandbag") return new THREE.Color().setHex(variation > 0.55 ? 0x76664e : 0x9a8461);
-  return new THREE.Color().setHex(variation > 0.55 ? 0x574f49 : 0x82766c);
+  // 实例色是线性色参与 PBR，旧值在黄昏背光下会比十六进制色板看起来暗很多。
+  // 保持土木差异，但底限必须仍能读成砖、土、木，不能坍成无材质的纯黑轮廓。
+  if (surface === "wood") return new THREE.Color().setHex(variation > 0.55 ? 0x755b42 : 0x95785a);
+  if (surface === "dirt" || surface === "sandbag") return new THREE.Color().setHex(variation > 0.55 ? 0x8b7657 : 0xac926c);
+  return new THREE.Color().setHex(variation > 0.55 ? 0x876e5c : 0xa98c72);
 }
 
 export class DestructionSystem {
@@ -258,10 +260,25 @@ export class DestructionSystem {
     this.lastFocus = new THREE.Vector3(1e9, 1e9, 1e9);
     this.uniformDirty = true;
 
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff, roughness: 0.98, metalness: 0, vertexColors: true,
-    });
+    // 破口残骸不能再用正方体：哪怕位置与受光都修好，轮廓仍会像一排黑色调试盒。
+    // 低面数碎石给出不规则断面；实例缩放再把砖土块压成矮碎片。
+    const geometry = new THREE.DodecahedronGeometry(0.62, 0);
+    // 事故：这里原来手搓了一份裸 MeshStandardMaterial，绕过了 MaterialLibrary 的
+    // GI/SSAO 注入。洞口又天然是背光面，于是实例色再正常也会被压成截图里的纯黑块。
+    // 用库里的唯一纯色材质接回同一套间接光，再打开实例色；一点极暗暖色 emissive
+    // 只保住背光面的材质身份，不会把残骸照成自发光物。
+    const material = library?.Plain
+      ? library.Plain("DestructionRubble", {
+        color: 0xffffff, roughness: 0.98, metalness: 0, flatShading: true,
+        emissive: 0x38261b, emissiveIntensity: 0.32,
+      })
+      : new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 0.98, metalness: 0, flatShading: true,
+        emissive: 0x38261b, emissiveIntensity: 0.32,
+      });
+    this.rubbleMaterialOwned = !library?.Plain;
+    material.vertexColors = true;
+    material.needsUpdate = true;
     this.rubble = new THREE.InstancedMesh(geometry, material, RUBBLE_CAPACITY);
     this.rubble.name = "Destruction_Rubble";
     this.rubble.castShadow = true;
@@ -456,26 +473,46 @@ export class DestructionSystem {
     };
     const planeAxes = axis === "x" ? [2, 1] : axis === "y" ? [0, 2] : [0, 1];
     const u = planeAxes[0], v = planeAxes[1];
-    const pieces = axis === "y" ? 18 : 22;
+    // 这些是常驻的断砖，不是爆炸瞬间飞出去的 VFX。旧实现用 18/22 块沿洞口四边
+    // 排一圈，等于亲手把一串盒子钉在半空。短命飞散已经由 Vfx.Impact 负责；常驻层
+    // 只留洞脚的一小堆，既说明这里刚塌过，也不会遮住射线与通路。
+    const pieces = axis === "y" ? 8 : 10;
     for (let i = 0; i < pieces; i += 1) {
-      const edge = i % 4;
+      const size = 0.075 + random(i + 21) * (surface === "wood" ? 0.18 : 0.12);
+      const scaleX = size * (0.65 + random(i + 22) * 0.7);
+      const scaleY = size * (0.32 + random(i + 23) * 0.38);
+      const scaleZ = size * (surface === "wood"
+        ? 1.7 + random(i + 24) * 1.7
+        : 0.65 + random(i + 24) * 0.7);
+      this.scale.set(scaleX, scaleY, scaleZ);
+
       const local = [0, 0, 0];
-      if (edge < 2) {
-        local[u] = (edge === 0 ? -1 : 1) * half[u] * (0.92 + random(i) * 0.12);
-        local[v] = (random(i + 7) * 2 - 1) * half[v];
-      } else {
-        local[v] = (edge === 2 ? -1 : 1) * half[v] * (0.92 + random(i) * 0.12);
-        local[u] = (random(i + 11) * 2 - 1) * half[u];
-      }
       const depthAxis = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-      local[depthAxis] = (random(i + 17) * 2 - 1) * Math.min(half[depthAxis], 0.20);
+      if (axis === "y") {
+        // 楼板洞：残块留在洞沿上表面，不能掉进洞中央悬着。
+        const edge = i % 4;
+        if (edge < 2) {
+          local[u] = (edge === 0 ? -1 : 1) * (half[u] + scaleX * 0.35);
+          local[v] = (random(i + 7) * 2 - 1) * half[v];
+        } else {
+          local[v] = (edge === 2 ? -1 : 1) * (half[v] + scaleZ * 0.35);
+          local[u] = (random(i + 11) * 2 - 1) * half[u];
+        }
+        local[1] = half[1] + scaleY * 0.64;
+      } else {
+        // 墙洞：碎块落在两侧墙脚的小堆，不再横跨整个洞口排成一行调试盒。
+        const side = i % 2 === 0 ? -1 : 1;
+        local[u] = side * half[u] * (0.56 + random(i + 7) * 0.34)
+          + (random(i + 9) - 0.5) * size * 0.9;
+        local[1] = -half[1] + scaleY * 0.64 + (i % 3 === 0 ? scaleY * 0.34 : 0);
+        local[depthAxis] = (random(i + 17) * 2 - 1) * Math.min(half[depthAxis] + 0.10, 0.24);
+      }
       const world = LocalToWorld({ x: local[0], y: local[1], z: local[2] }, breach.center, breach.ry);
       this.position.set(world.x, world.y, world.z);
-      const size = 0.10 + random(i + 21) * (surface === "wood" ? 0.32 : 0.22);
-      this.scale.set(size * (0.65 + random(i + 22)), size * (0.45 + random(i + 23)),
-        size * (surface === "wood" ? 2.2 + random(i + 24) * 2.4 : 0.65 + random(i + 24)));
-      this.euler.set(random(i + 30) * Math.PI, breach.ry + random(i + 31) * Math.PI,
-        random(i + 32) * Math.PI);
+      // 常驻块已经落稳，只留小角度歪斜；整圈随机翻滚是“半空飞行”的姿态。
+      this.euler.set((random(i + 30) - 0.5) * 0.28,
+        breach.ry + random(i + 31) * Math.PI,
+        (random(i + 32) - 0.5) * 0.28);
       this.quaternion.setFromEuler(this.euler);
       this.matrix.compose(this.position, this.quaternion, this.scale);
       const index = this.rubbleCursor % RUBBLE_CAPACITY;
@@ -537,7 +574,8 @@ export class DestructionSystem {
   Dispose() {
     this.scene.remove(this.rubble);
     this.rubble.geometry.dispose();
-    this.rubble.material.dispose();
+    // MaterialLibrary 管理并复用自己的材质；只有 fallback 裸材质由本系统释放。
+    if (this.rubbleMaterialOwned) this.rubble.material.dispose();
     this.Clear();
   }
 }
