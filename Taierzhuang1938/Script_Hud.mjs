@@ -27,6 +27,22 @@ const MARKER_SEP_X = 130;
 const GRENADE_WARNING_LIMIT = 4;
 
 /**
+ * 情境提示的图标。照 Easy Red 2 的做法：按键 + 一个说明动作的小图，
+ * 让玩家不必读完汉字就知道这条提示是"捡"还是"包扎"。
+ * 用内联 SVG 而不是字体图标：描边随 currentColor 走，和按键框同色同亮度。
+ */
+const ACTION_ICONS = {
+  // 一只伸出去的手：拾取 / 互动
+  interact: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12V5.6a1.6 1.6 0 0 1 3.2 0V11m0-1.2a1.6 1.6 0 0 1 3.2 0V12m0-1a1.6 1.6 0 0 1 3.2 0v5.2A5.8 5.8 0 0 1 12.6 22h-1A5.6 5.6 0 0 1 6 16.4v-3l-1.6.9a1.5 1.5 0 0 0-.6 2l.9 1.7"/></svg>`,
+  // 十字绷带：止血
+  bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>`,
+  // 双向箭头：换枪
+  switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
+};
+ACTION_ICONS.pickup = ACTION_ICONS.interact;
+ACTION_ICONS.action = ACTION_ICONS.interact;
+
+/**
  * 从真实玩法状态生成情境操作提示。只要条件不成立就不返回那一项：
  * 没有第二支枪不提示换枪，够不着尸体不提示拾枪，没有绷带或没流血不提示包扎。
  * 保持纯函数，浏览器冒烟可以直接把三组边界状态喂进来验证。
@@ -350,9 +366,13 @@ export class Hud {
       row.className = `hudAction ${prompt.kind}`;
       const key = document.createElement("kbd");
       key.textContent = prompt.keys;
+      const icon = document.createElement("span");
+      icon.className = "ico";
+      icon.innerHTML = ACTION_ICONS[prompt.kind] || ACTION_ICONS.action;
       const label = document.createElement("span");
+      label.className = "txt";
       label.textContent = prompt.label;
-      row.append(key, label);
+      row.append(key, icon, label);
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);

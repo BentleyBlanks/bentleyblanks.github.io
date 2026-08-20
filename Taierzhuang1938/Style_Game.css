@@ -115,27 +115,37 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudHint.on { opacity: 1; }
 
-/* 情境操作提示：只由真实可执行状态驱动，常驻；一次性反馈仍走上面的 hudHint。 */
+/* 情境操作提示：只由真实可执行状态驱动，常驻；一次性反馈仍走上面的 hudHint。
+   位置照 Easy Red 2：不在屏幕底沿，而是准星左下那一小块——视线不用离开准星就能读到，
+   又不压住准星本身。竖排左对齐，按键框 + 图标 + 文字，比原来的底部小灰条显眼一档。 */
 .hudActions {
-  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  max-width: min(76vw, 860px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
+  position: absolute; left: 50%; top: 50%; transform: translate(-100%, -6%);
+  margin-left: -34px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  max-width: min(34vw, 360px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
   white-space: nowrap;
 }
 .hudActions.on { opacity: 1; }
 .hudAction {
-  display: flex; align-items: center; gap: 7px;
-  padding: 4px 9px 4px 5px; border: 1px solid rgba(230,223,205,0.17); border-radius: 2px;
-  background: rgba(10,10,9,0.58); color: rgba(230,223,205,0.76); font-size: 12px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 12px 5px 6px; border: 1px solid rgba(230,223,205,0.24); border-radius: 2px;
+  background: rgba(10,10,9,0.62); color: rgba(230,223,205,0.92); font-size: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.35);
 }
 .hudAction kbd {
-  min-width: 24px; box-sizing: border-box; padding: 1px 5px;
-  border: 1px solid rgba(230,223,205,0.36); border-radius: 2px;
-  background: rgba(230,223,205,0.07); color: var(--paper);
-  font: 11px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; text-align: center;
+  min-width: 26px; box-sizing: border-box; padding: 2px 6px;
+  border: 1px solid rgba(230,223,205,0.5); border-radius: 2px;
+  background: rgba(230,223,205,0.12); color: var(--paper);
+  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; text-align: center;
 }
-.hudAction.pickup kbd, .hudAction.bandage kbd { border-color: rgba(224,176,98,0.72); color: var(--warn); }
-.hudAction.bandage span { color: #e2a48e; }
+.hudAction .ico { display: flex; width: 17px; height: 17px; opacity: 0.9; }
+.hudAction .ico svg {
+  width: 100%; height: 100%; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.hudAction.pickup kbd, .hudAction.bandage kbd { border-color: rgba(224,176,98,0.82); color: var(--warn); }
+.hudAction.pickup .ico, .hudAction.interact .ico { color: var(--warn); }
+.hudAction.bandage .ico, .hudAction.bandage .txt { color: #e2a48e; }
 
 /* 史实注记 */
 .hudNote {
