@@ -167,6 +167,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    功能层在最底下、演出层盖在它上面，纯属建序的巧合而不是设计。
    写成显式的三档，以后往 Build() 里插一个元素不会再默默改变谁压谁。 */
 .hudMarkers { z-index: 1; }
+.hudGrenadeWarnings { z-index: 2; }
 .hudBrief, .hudTitle { z-index: 3; }
 .hudDeathCard { z-index: 5; }
 
@@ -181,6 +182,37 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
 #hud.staging .hudMarkers, #hud.staging .hudActions { opacity: 0; }
 .hudMarkers { transition: opacity 0.4s ease; }
+
+/* 近弹警告：屏内钉在活手榴弹上，屏外贴边。没有秒数倒计时——引信只用来驱动
+   最后一秒的红色脉冲，给玩家“马上离开”的紧迫度，不把内部精确数值白送出来。 */
+.hudGrenadeWarnings { position: absolute; inset: 0; }
+.hudGrenadeWarning {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 7px;
+  color: #ead39c; font: 600 12px/1.2 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0.05em; white-space: nowrap;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.95));
+}
+.hudGrenadeWarning .ico {
+  width: 16px; height: 16px; box-sizing: border-box;
+  display: grid; place-items: center;
+  border: 2px solid currentColor; background: rgba(20,14,8,0.55);
+  transform: rotate(45deg);
+}
+.hudGrenadeWarning .ico i {
+  display: block; transform: rotate(-45deg);
+  font: 800 11px/1 Arial, sans-serif; font-style: normal;
+}
+.hudGrenadeWarning .txt {
+  padding: 2px 5px; border-radius: 2px; background: rgba(12,9,7,0.55);
+}
+.hudGrenadeWarning.edge .ico { border-width: 3px; }
+.hudGrenadeWarning.lethal { color: #e79a63; }
+.hudGrenadeWarning.urgent { color: #e65e46; animation: hudGrenadePulse 0.42s ease-in-out infinite; }
+@keyframes hudGrenadePulse {
+  0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(0.94); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
 
 /* 占领点图标 */
 .hudMarkers { position: absolute; inset: 0; }

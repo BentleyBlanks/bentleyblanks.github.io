@@ -2648,6 +2648,17 @@ function Frame(dt, render = true) {
       dist,
     };
   });
+  // 活手榴弹进入实际爆炸伤害范围才提示；屏内钉住落点，屏外贴边指方向。
+  // 单独再投影一次最多只有四颗，避免把目标路标与爆炸警告绑成一套生命周期。
+  hud.UpdateGrenadeWarnings(combat.GrenadeThreats(player.position), player, (x, y, z) => {
+    _proj.set(x, y, z);
+    _proj.project(camera);
+    return {
+      x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
+      visible: _proj.z > -1 && _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
+    };
+  });
   hud.UpdateMinimap(dt, {
     player, objectives: battlefield.objectives, soldiers: ai.soldiers, bounds: battlefield.bounds,
   });

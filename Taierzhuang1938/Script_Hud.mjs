@@ -24,6 +24,7 @@ const TITLE_AFTER_BRIEF_S = 0.55;
  */
 const MARKER_SEP_Y = 40;
 const MARKER_SEP_X = 130;
+const GRENADE_WARNING_LIMIT = 4;
 
 /**
  * 从真实玩法状态生成情境操作提示。只要条件不成立就不返回那一项：
@@ -103,6 +104,12 @@ export class Hud {
     this.el.actions = mk("hudActions");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
+    this.el.grenadeWarnings = mk("hudGrenadeWarnings");
+    for (let i = 0; i < GRENADE_WARNING_LIMIT; i += 1) {
+      const warning = mk("hudGrenadeWarning", this.el.grenadeWarnings);
+      warning.innerHTML = `<span class="ico"><i>!</i></span><span class="txt"></span>`;
+      warning.style.display = "none";
+    }
     this.el.minimap = mk("hudMinimap", this.root, "canvas");
     this.el.minimap.width = 190;
     this.el.minimap.height = 190;
@@ -437,6 +444,56 @@ export class Hud {
       done.push(m);
       m.el.style.left = `${m.x}px`;
       m.el.style.top = `${m.y}px`;
+    }
+  }
+
+  /**
+   * Easy Red 2 式近弹提示：图标钉在手榴弹的屏幕位置；转身把它甩出视野后，
+   * 图标贴到屏幕边缘继续指方向。只接收 CombatSystem 按真实伤害范围筛过的弹，
+   * HUD 不重复发明“附近”是多少米。
+   */
+  UpdateGrenadeWarnings(threats, player, project) {
+    const box = this.el.grenadeWarnings;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const centerX = width * 0.5;
+    const centerY = height * 0.5;
+    const edgeX = Math.max(40, centerX - 58);
+    const edgeY = Math.max(40, centerY - 76);
+    const count = Math.min(GRENADE_WARNING_LIMIT, threats.length);
+
+    for (let i = 0; i < GRENADE_WARNING_LIMIT; i += 1) {
+      const el = box.children[i];
+      if (i >= count) { el.style.display = "none"; continue; }
+      const threat = threats[i];
+      const p = project(threat.position.x, threat.position.y + 0.45, threat.position.z);
+      let x = p.x;
+      let y = p.y;
+      let offscreen = !p.visible;
+
+      if (offscreen) {
+        const dx = threat.position.x - player.position.x;
+        const dz = threat.position.z - player.position.z;
+        const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+        const forward = dx * -sin + dz * -cos;
+        const right = dx * cos + dz * -sin;
+        const angle = Math.atan2(right, forward);
+        x = centerX + Math.sin(angle) * edgeX;
+        y = centerY - Math.cos(angle) * edgeY;
+      }
+      x = Math.max(42, Math.min(width - 42, x));
+      y = Math.max(48, Math.min(height - 48, y));
+
+      const urgent = threat.fuse <= 1.35;
+      const lethal = threat.distance <= threat.dangerRadius * 0.58;
+      el.style.display = "";
+      el.style.left = `${x.toFixed(1)}px`;
+      el.style.top = `${y.toFixed(1)}px`;
+      el.className = `hudGrenadeWarning${offscreen ? " edge" : ""}`
+        + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}`;
+      el.children[1].textContent = `${threat.kind === "GrenadeBundle" ? "集束" : "手榴弹"}`
+        + ` ${Math.max(1, Math.ceil(threat.distance))}m`;
+      el.setAttribute("aria-label", `${el.children[1].textContent}，附近爆炸物`);
     }
   }
 

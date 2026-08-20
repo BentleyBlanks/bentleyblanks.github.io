@@ -30,6 +30,9 @@ class Projectile {
     this.weapon = weapon;
     this.owner = owner;               // "player" | "ija"
     this.fuse = weapon.fuseS ?? 4.2;
+    // 刚脱手的己方弹会在镜头前掠过；给它一点离手宽限，避免每次正常投掷都闪一下警告。
+    // 如果弹落回脚边，宽限结束后仍会按真实杀伤范围报警。
+    this.age = 0;
     this.alive = true;
     this.spin = 0;
     this.mesh = null;
@@ -223,6 +226,7 @@ export class CombatSystem {
     const physics = this.host.physics;
     for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
       const p = this.projectiles[i];
+      p.age += dt;
       p.fuse -= dt;
       if (p.body) {
         // 刚体版：飞行、撞墙、弹跳、滚动全归引擎。这里只补一件引擎不知道的事 ——
@@ -403,6 +407,37 @@ export class CombatSystem {
 
   get MortarLeft() { return this.support.mortar; }
   get MortarReady() { return this.support.mortar > 0 && this.mortarCooldown <= 0; }
+
+  /**
+   * 玩家附近仍在烧引信的手榴弹。提示半径直接取 Blast() 的实际伤害外沿，
+   * 不另造一套“看着危险、其实炸不到”的 HUD 数值。
+   *
+   * 刚脱手的玩家弹有 0.35 s 宽限，避免正常远投时图标在准星旁闪一下；敌方弹
+   * 不吃这条宽限，接口也为之后 AI 投弹保留了 owner="ija" 的完整行为。
+   */
+  GrenadeThreats(playerPosition) {
+    const threats = [];
+    for (const p of this.projectiles) {
+      if (!p.alive || p.fuse <= 0) continue;
+      if (p.owner === "player" && p.age < 0.35) continue;
+      const dx = p.position.x - playerPosition.x;
+      const dz = p.position.z - playerPosition.z;
+      const distance = Math.hypot(dx, dz);
+      const dangerRadius = p.weapon.radiusM * 1.9;
+      if (distance > dangerRadius) continue;
+      threats.push({
+        kind: p.kind,
+        owner: p.owner,
+        position: p.position,
+        fuse: p.fuse,
+        distance,
+        dangerRadius,
+      });
+    }
+    // 先保命：更快爆的排前面；同一引信下更近的排前面。
+    threats.sort((a, b) => a.fuse - b.fuse || a.distance - b.distance);
+    return threats;
+  }
 
   /** 把在途的投掷物连刚体一起清掉（换关、重开都要走）。 */
   ClearProjectiles() {

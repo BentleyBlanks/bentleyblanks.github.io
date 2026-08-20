@@ -298,7 +298,38 @@ Check("弧指向来弹方位（右侧 +90°）",
   feedback.angle !== null && Math.abs(feedback.angle - 90) < 8, `${feedback.angle}°`);
 
 // ===========================================================================
-// 5) 低血搏动与濒死心跳（两个素材烘好了一直没人播）
+// 5) 活手榴弹进入真实杀伤范围后有方向提示，离开/爆炸后收掉
+// ===========================================================================
+const grenadeWarning = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const { player, combat } = T;
+  combat.ClearProjectiles();
+  player.Spawn(player.position.x, player.position.z, 0); // 朝 -Z
+  const start = player.EyePosition.clone();
+  start.x += 5;                                      // 正右方五米
+  const still = player.position.clone().set(0, 0, 0);
+  const grenade = combat.Throw("Grenade", 0, start, still, 0);
+  T.StepFrames(24);                                  // 越过己方离手宽限 0.35 s
+  const el = document.querySelector(".hudGrenadeWarning");
+  const shown = getComputedStyle(el).display !== "none";
+  const x = Number.parseFloat(el.style.left || "0");
+  const text = el.textContent.trim();
+  grenade.fuse = 1.0;
+  T.StepFrames(1);
+  const urgent = el.classList.contains("urgent");
+  combat.ClearProjectiles();
+  T.StepFrames(1);
+  const hidden = getComputedStyle(el).display === "none";
+  return { shown, x, text, urgent, hidden };
+});
+Check("附近活手榴弹会亮警告", grenadeWarning.shown && /手榴弹/.test(grenadeWarning.text),
+  `${grenadeWarning.text || "没有文字"}`);
+Check("手榴弹在右侧，警告也指向右侧", grenadeWarning.x > 640, `x=${grenadeWarning.x}`);
+Check("引信将尽时警告变红脉冲", grenadeWarning.urgent);
+Check("手榴弹清除后警告同帧消失", grenadeWarning.hidden);
+
+// ===========================================================================
+// 6) 低血搏动与濒死心跳（两个素材烘好了一直没人播）
 // ===========================================================================
 const pulse = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -326,7 +357,7 @@ Check("濒死有心跳（AudioSfx_Heartbeat 第一次被播）", pulse.beat > 0,
 Check("濒死暗角进入搏动", pulse.low);
 
 // ===========================================================================
-// 6) 站姿/蹲/卧仍然分得出来，爆炸与白刃仍然重
+// 7) 站姿/蹲/卧仍然分得出来，爆炸与白刃仍然重
 // ===========================================================================
 const stances = {};
 for (const st of ["stand", "crouch", "prone"]) {
