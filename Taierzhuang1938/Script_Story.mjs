@@ -278,8 +278,12 @@ export class StoryDirector {
         this.hud.Say(null, beat.text, 3.6, "system");
         this.sinceLast = 0;
         break;
+      // 临时关掉：剧情层级的底部一次性提示（"主武器是手榴弹。子弹要省，命更要省"等
+      // 共 19 条，分散在 Data_TengxianScript.mjs / Data_Script.mjs 里）。机制反馈
+      // （按 R 压弹 / 没有手榴弹了 等）走 hud.Hint 另一条调用，保留显示；这里只
+      // 抑制剧本教学提示，画面太满。fired 仍照常记录，PlayTest 不会受影响。
       case "hint":
-        this.hud.Hint(beat.text, 5.5);
+        // this.hud.Hint(beat.text, 5.5);
         break;
       case "objective":
         this.objectiveText = beat.text;
