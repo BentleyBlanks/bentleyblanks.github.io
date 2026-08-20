@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
+import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 
 const STATE = {
   IDLE: "idle", ADVANCE: "advance", COVER: "cover", FIRE: "fire",
@@ -81,6 +82,16 @@ const VISIBLE_ACTOR_BUDGET = 13;
  */
 const RANK_ENEMY = 0.42;
 const RANK_CORPSE = 2.6;
+
+/**
+ * 远景人群的近端门槛（米）。名额之外、且比这个远的人交给 ActorCrowd 的
+ * InstancedMesh 去画（静态姿势，全场合起来约二十个 draw call）。
+ *
+ * 55 m：那个距离上一个人在 900 px 高的屏幕上是 28 px，动作已经读不出来了，
+ * 而 40 m（41 px）还看得出胳膊不动。比这更近的人如果挤不进名额，宁可不画 ——
+ * 眼前站着一个一动不动的塑料兵比少一个人穿帮得多。
+ */
+const CROWD_MIN_DISTANCE = 55;
 // 视锥判定用的包围球：半径给到 1.6 m（人高 1.7 上下）再加一点余量，
 // 免得屏幕边缘上的人在转身时一格一格地闪出来。
 const ACTOR_BOUND_R = 1.6;
@@ -638,11 +649,35 @@ export class AiDirector {
         continue;
       }
       const weight = !s.alive ? RANK_CORPSE : (s.side === "ija" ? RANK_ENEMY : 1);
-      s.camDist = Math.sqrt(s.position.distanceToSquared(camera.position)) * weight;
+      s.camRange = Math.sqrt(s.position.distanceToSquared(camera.position));
+      s.camDist = s.camRange * weight;
       list.push(s);
     }
     list.sort((a, b) => a.camDist - b.camDist);
-    for (let i = 0; i < list.length; i += 1) list[i].actor.root.visible = i < this.visibleBudget;
+
+    // 名额内的走精细 Actor；名额外、又够远的交给远景人群（一批人共二十来个
+    // draw call，与人数无关）。**这是"最远能看见多远"的那条线** ——
+    // 精细层受 draw call 限制只能到七八十米，远景层一直铺到相机远平面。
+    const crowd = this._Crowd();
+    if (crowd) crowd.Begin();
+    for (let i = 0; i < list.length; i += 1) {
+      const s = list[i];
+      const detailed = i < this.visibleBudget;
+      s.actor.root.visible = detailed;
+      if (detailed || !crowd || !s.alive) continue;
+      if (s.camRange < CROWD_MIN_DISTANCE) continue;
+      crowd.Push(s.actor.kind, s.position, s.yaw ?? 0,
+        s.actor.sizeScale ?? 1, s.stance === 2 ? 1 : 0);
+    }
+    if (crowd) crowd.End();
+  }
+
+  /** 远景人群按需建：没有场景或工厂（纯逻辑冒烟测试）时就一直没有。 */
+  _Crowd() {
+    if (this.crowd !== undefined) return this.crowd;
+    const { scene, actorFactory } = this.ctx;
+    this.crowd = (scene && actorFactory) ? new ActorCrowd(scene, actorFactory) : null;
+    return this.crowd;
   }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
@@ -1318,6 +1353,9 @@ export class AiDirector {
   Dispose() {
     for (const s of [...this.soldiers]) this.Remove(s);
     this.soldiers.length = 0;
+    // 远景人群的几何是这里烘的，拆关时要还回去；材质是工厂缓存的共用件，不动。
+    if (this.crowd) this.crowd.Dispose();
+    this.crowd = undefined;
   }
 }
 
