@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { RECIPES } from "./Script_TexBake.mjs";
+import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
 
 /** 把一张烘焙结果的某个通道包成 DataTexture。 */
 function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } = {}) {
@@ -27,21 +28,35 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
 }
 
 /**
- * 给材质挂上屏幕空间 AO。
- * 用 onBeforeCompile 改 <aomap_fragment>：这是 three 里唯一一个"只动间接光"的钩子。
+ * 给材质挂上「间接光的两件事」：屏幕空间 AO 与探针体 GI。
+ *
+ * 两件事必须**在同一个 onBeforeCompile 里**做完 —— three 一个材质只有一个钩子，
+ * 分两次写的话后一次会把前一次整个覆盖掉（AO 会静默消失，且没有任何报错）。
+ *
+ * 分工：
+ *   AO  —— 只压间接光，且只压「接触处」那种小尺度遮蔽（<aomap_fragment>）；
+ *   GI  —— 直接**替换**天空 IBL 的漫反射项。探针体里已经含了天光，
+ *          再加一份就是双份；而 iblIrradiance 本身没有位置概念，正是要被换掉的那个。
+ *          镜面那一路（radiance）留给 IBL，但按 GI/天空的亮度比做一次遮蔽 ——
+ *          否则屋里的金属件照样反着一片亮天。
  */
-export function InjectScreenSpaceAo(material, aoUniforms) {
-  material.userData.ssaoUniforms = aoUniforms;
+export function InjectIndirectLighting(material, { ssao = null, gi = null } = {}) {
+  material.userData.ssaoUniforms = ssao;
+  material.userData.giUniforms = gi;
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uSsaoMap = aoUniforms.map;
-    shader.uniforms.uSsaoResolution = aoUniforms.resolution;
-    shader.uniforms.uSsaoStrength = aoUniforms.strength;
-    shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>
+    let vertex = shader.vertexShader;
+    let fragment = shader.fragmentShader;
+
+    if (ssao) {
+      shader.uniforms.uSsaoMap = ssao.map;
+      shader.uniforms.uSsaoResolution = ssao.resolution;
+      shader.uniforms.uSsaoStrength = ssao.strength;
+      fragment = fragment
+        .replace("#include <common>", `#include <common>
         uniform sampler2D uSsaoMap;
         uniform vec2 uSsaoResolution;
         uniform float uSsaoStrength;`)
-      .replace("#include <aomap_fragment>", `#include <aomap_fragment>
+        .replace("#include <aomap_fragment>", `#include <aomap_fragment>
         {
           float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
           ssao = mix(1.0, ssao, uSsaoStrength);
@@ -49,9 +64,64 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
           // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
           reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
         }`);
+    }
+
+    if (gi) {
+      BindGiUniforms(shader.uniforms, gi);
+      // 世界坐标要自己传：three 的 worldPosition 只在开了阴影/envMap 时才有，
+      // 靠它等于把 GI 的生死系在别的开关上。实例化/骨骼的矩阵顺序照抄 <project_vertex>。
+      vertex = vertex
+        .replace("#include <common>", `#include <common>
+        varying vec3 vGiWorldPos;`)
+        .replace("#include <project_vertex>", `#include <project_vertex>
+        {
+          vec4 giWorld = vec4(transformed, 1.0);
+          #ifdef USE_BATCHING
+            giWorld = batchingMatrix * giWorld;
+          #endif
+          #ifdef USE_INSTANCING
+            giWorld = instanceMatrix * giWorld;
+          #endif
+          vGiWorldPos = (modelMatrix * giWorld).xyz;
+        }`);
+      fragment = fragment
+        .replace("#include <common>", `#include <common>
+        varying vec3 vGiWorldPos;
+${GI_SAMPLE_GLSL}`)
+        .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
+        #if defined( RE_IndirectDiffuse )
+        if (uGiEnabled > 0.001) {
+          // geometryNormal 是**视空间**的，不转回世界空间就会得到一张跟着镜头转的假 GI
+          vec3 giNormal = transformNormalByInverseViewMatrix(geometryNormal, viewMatrix);
+          vec3 giView = normalize(cameraPosition - vGiWorldPos);
+          float giConfidence;
+          vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
+          // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
+          giConfidence *= uGiEnabled;
+          if (giConfidence > 0.0) {
+            #if defined( RE_IndirectSpecular )
+            float giSkyLum = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+            float giLum = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
+            float giOcclusion = clamp(giLum / giSkyLum, 0.0, 1.0);
+            radiance *= mix(1.0, mix(1.0, giOcclusion, giConfidence), uGiSpecularOcclusion);
+            #endif
+            iblIrradiance = mix(iblIrradiance, giIrradiance, giConfidence);
+          }
+        }
+        #endif`);
+    }
+
+    shader.vertexShader = vertex;
+    shader.fragmentShader = fragment;
   };
-  material.customProgramCacheKey = () => "ssao1";
+  // 缓存键必须跟着注入组合走：两种组合共用一份编译结果 = 有的材质拿不到 GI
+  material.customProgramCacheKey = () => `indirect:${ssao ? 1 : 0}${gi ? 1 : 0}`;
   return material;
+}
+
+/** 兼容旧调用点：只挂 AO。 */
+export function InjectScreenSpaceAo(material, aoUniforms) {
+  return InjectIndirectLighting(material, { ssao: aoUniforms });
 }
 
 /**
@@ -59,11 +129,12 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
  * 加载条能真的动起来（一次性烘 15 张 512 会把主线程卡死 3 秒，白屏就是这么来的）。
  */
 export class MaterialLibrary {
-  constructor(renderer, { textureSize = 512, ssao = null } = {}) {
+  constructor(renderer, { textureSize = 512, ssao = null, gi = null } = {}) {
     this.renderer = renderer;
     this.textureSize = textureSize;
     this.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
     this.ssao = ssao;         // { map: {value}, resolution: {value}, strength: {value} }
+    this.gi = gi;             // MakeGiUniforms() 那一包，与 ProbeVolume 共用同一批对象
     this.baked = new Map();   // name -> { albedo, normal, orm }（three 纹理）
     this.materials = new Map();
   }
@@ -126,7 +197,7 @@ export class MaterialLibrary {
       opacity: options.opacity ?? 1,
       flatShading: !!options.flatShading,
     });
-    if (this.ssao) InjectScreenSpaceAo(material, this.ssao);
+    if (this.ssao || this.gi) InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi });
     this.materials.set(key, material);
     return material;
   }
@@ -147,7 +218,9 @@ export class MaterialLibrary {
       flatShading: !!params.flatShading,
       depthWrite: params.depthWrite ?? true,
     });
-    if (this.ssao && !params.transparent) InjectScreenSpaceAo(material, this.ssao);
+    if (!params.transparent && (this.ssao || this.gi)) {
+      InjectIndirectLighting(material, { ssao: this.ssao, gi: this.gi });
+    }
     this.materials.set(key, material);
     return material;
   }

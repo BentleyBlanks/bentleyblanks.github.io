@@ -18,8 +18,8 @@
 //
 // ## 音效这一栏
 // 三条总线各有一个 *User 增益节点（Script_Audio.BuildGraph）。滑杆写的是它们，
-// **不是 xxxBus.gain** —— 那几个是系统自己的配平，Music() 换 cue 时会重写 musicBus，
-// duck 会把 duckGain 压下去再放回来，滑杆写在同一个参数上会被抹掉。
+// **不是 xxxBus.gain** —— 那几个是系统自己的配平（每段音乐的 level 由 LoopLayer 施加，
+// duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
 
@@ -71,7 +71,7 @@ export function ApplySavedSettings(host) {
 export class GraphicsSettings {
   static id = "graphics";
   static label = "画质";
-  static hint = "分辨率、阴影、后处理强度、视场";
+  static hint = "分辨率、阴影、全局光照、后处理强度、视场";
 
   constructor(host) {
     this.host = host;
@@ -130,6 +130,20 @@ export class GraphicsSettings {
     Note(perf, "开关阴影要重编译一次全场材质（几百毫秒的卡顿），因为它是编译期的 "
       + "#define。只改标志位不重编译的话，画面会留着一层永不更新的假阴影。", true);
 
+    const giBox = Section(body, "全局光照（探针体）");
+    const giRow = document.createElement("div");
+    giRow.className = "edBtns";
+    giBox.appendChild(giRow);
+    Toggle(giRow, "探针体 GI", gfx.gi !== false, (on) => { gfx.gi = on; this.Apply(); });
+    Slider(giBox, {
+      label: "间接光强度", min: 0, max: 2, step: 0.05, value: gfx.giStrength ?? 1,
+      format: (v) => `×${v.toFixed(2)}`,
+      onInput: (v) => { gfx.giStrength = v; this.Apply(); },
+    });
+    Note(giBox, "半实时辐照度探针：一帧只重算十几个探针，走一步或换时段要一两秒才收敛回来"
+      + "（这是设计如此，不是卡）。关掉之后间接光退回一张各向同性的天空 IBL —— "
+      + "屋里屋外一个亮度，那正是它要解决的问题。low 画质档不建探针体，这一栏对它无效。", true);
+
     const post = Section(body, "后处理强度（倍率）");
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
@@ -183,6 +197,7 @@ export class GraphicsSettings {
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
+    gfx.gi = true; gfx.giStrength = 1;
     this.Apply();
     if (this.panel) {
       this.panel.body.innerHTML = "";
@@ -286,8 +301,8 @@ export class AudioSettings {
     };
     Bus("sfx", "音效", "枪炮、命中、脚步、人声都走这条。压制与耳鸣不受它影响。");
     Bus("music", "音乐");
-    Bus("ambience", "环境床", "风 + 按概率随机撒的远处枪炮。觉得战场太吵先压这一条，"
-      + "它是「一直在响」的那一层。");
+    Bus("ambience", "环境床", "2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
+      + "＋ 按概率撒的一次性音。觉得战场太吵先压这一条，它是「一直在响」的那一层。");
 
     const opts = Section(body, "开关");
     const box = document.createElement("div");
@@ -301,7 +316,7 @@ export class AudioSettings {
       this.Save();
     });
     Note(opts, "「暂停时静音背景」修的是这条：暂停只让 Frame() 提前返回，"
-      + "**一点也拦不住声音** —— 环境床是一张自己在跑的节点图 + 一个 400 ms 的调度器，"
+      + "**一点也拦不住声音** —— 环境床是几条自己在跑的实录循环 + 一个 400 ms 的调度器，"
       + "玩法停了它照样每隔几百毫秒撒一发远处的枪声。", true);
 
     ButtonRow(opts, [

@@ -117,6 +117,8 @@ export const LEVELS = [
     date: "一九三八年三月十四日 拂晓 — 十九时",
     clock: { from: "03-14 05:30", to: "03-14 19:00" },
     sky: "dawn",
+    // 北上接敌。垫底的一层，几乎察觉不到。
+    music: "siege",
     bounds: "L0Jiehe",
     minutes: 14,
     pool: { start: 220, end: 196, label: "城里还站着的人", presumed: true },
@@ -162,6 +164,8 @@ export const LEVELS = [
     date: "一九三八年三月十四日夜 — 十五日黄昏",
     clock: { from: "03-14 21:00", to: "03-15 18:00" },
     sky: "night",
+    // 夜里摸进城。
+    music: "tension",
     bounds: "L1Approach",
     minutes: 16,
     // 全局唯一一次上涨：收容第 127 师 757 团残部数百人（史料）。
@@ -209,6 +213,7 @@ export const LEVELS = [
     date: "一九三八年三月十六日 十时三十分 — 十七时",
     clock: { from: "03-16 10:30", to: "03-16 17:00" },
     sky: "smokyDay",
+    music: "siege",
     bounds: "L2EastSuburb",
     minutes: 22,
     pool: { start: 328, end: 300, label: "城里还站着的人", presumed: true },
@@ -254,6 +259,8 @@ export const LEVELS = [
     date: "一九三八年三月十六日 十八时 — 二十四时",
     clock: { from: "03-16 18:00", to: "03-17 00:00" },
     sky: "night",
+    // 夺回东关门 —— 全场两处反攻之一，战鼓在这儿。
+    music: "charge",
     bounds: "L3EastNight",
     minutes: 15,
     pool: { start: 300, end: 236, label: "城里还站着的人", presumed: true },
@@ -296,6 +303,7 @@ export const LEVELS = [
     date: "一九三八年三月十七日 八时 — 十五时",
     clock: { from: "03-17 08:00", to: "03-17 15:00" },
     sky: "smokyDay",
+    music: "siege",
     bounds: "L4Wall",
     minutes: 20,
     pool: { start: 236, end: 178, label: "城里还站着的人", presumed: true },
@@ -339,6 +347,7 @@ export const LEVELS = [
     date: "一九三八年三月十七日 十五时 — 十七时三十分",
     clock: { from: "03-17 15:00", to: "03-17 17:30" },
     sky: "burningStreet",
+    music: "siege",
     bounds: "L5Crossroad",
     minutes: 16,
     pool: { start: 178, end: 96, label: "城里还站着的人", presumed: true },
@@ -381,6 +390,8 @@ export const LEVELS = [
     date: "一九三八年三月十七日 二十一时 — 十八日 午",
     clock: { from: "03-17 21:00", to: "03-18 12:00" },
     sky: "night",
+    // 北门突围 —— 另一处。
+    music: "charge",
     bounds: "L6Breakout",
     minutes: 12,
     pool: { start: 96, end: 40, label: "城里还站着的人", presumed: true },
@@ -447,6 +458,8 @@ export const CUTSCENES = {
     seconds: 38.0,
     trigger: "beforeLevel:L0_Jiehe",
     sky: "overcast",
+    // 出川那段过场：一间空屋子的调子。
+    music: "menu",
     // 1937 年秋的川陕道上，不在滕县地图内 —— 自带布景，摆在离城很远的地方，
     // 免得和城的碰撞体、导航格、灯光探针撞上。
     standalone: true,

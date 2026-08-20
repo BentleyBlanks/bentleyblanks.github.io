@@ -33,6 +33,8 @@ class Projectile {
     this.alive = true;
     this.spin = 0;
     this.mesh = null;
+    /** 物理世界里的那颗刚体（有物理时才有；见 CombatSystem.Launch）。 */
+    this.body = null;
   }
 }
 
@@ -98,6 +100,7 @@ export class CombatSystem {
     const start = fromPosition.clone().addScaledVector(direction, 0.4);
     start.y += 0.1;
     const p = new Projectile(kind, start, velocity, weapon, "player");
+    this.Attach(p);
     // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来
     p.fuse = Math.max(0.35, p.fuse - cookedFor);
     p.mesh = this.TakeMesh();
@@ -105,6 +108,35 @@ export class CombatSystem {
     this.projectiles.push(p);
     if (this.host.audio) this.host.audio.Play("grenadeThrow", { position: start.clone(), volume: 0.8 });
     return p;
+  }
+
+  /**
+   * 给一枚投掷物挂上刚体。
+   *
+   * 木柄手榴弹在地上是**滚**的，而原来那套「射线撞到就按法线反射 + 落地衰减」
+   * 滚不起来：弹到墙角会原地抖，落地之后水平速度每帧乘 0.62，十几帧就钉死。
+   * 换成真刚体之后墙角、台阶、坡面这些地方的行为都不用再各写一条规则。
+   *
+   * 半径给 0.055 m —— 木柄弹的弹体直径约 5 cm，滚起来的手感由它决定。
+   */
+  Attach(p) {
+    const physics = this.host.physics;
+    if (!physics) return p;
+    p.body = physics.MakeSphere({
+      position: p.position,
+      velocity: p.velocity,
+      radius: 0.055,
+      mass: p.kind === "GrenadeBundle" ? 3.2 : 0.6,
+      restitution: 0.24,
+      friction: 0.68,
+    });
+    return p;
+  }
+
+  /** 拆刚体。爆炸、换关、超时都要走这一条，不然刚体会一直攒着。 */
+  Detach(p) {
+    if (p.body && this.host.physics) this.host.physics.RemoveBody(p.body);
+    p.body = null;
   }
 
   /** 白刃：正前方一个扇形，够着谁算谁。大刀比刺刀短一点但伤害高。 */
@@ -188,39 +220,54 @@ export class CombatSystem {
 
   StepProjectiles(dt) {
     const bf = this.host.battlefield;
+    const physics = this.host.physics;
     for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
       const p = this.projectiles[i];
       p.fuse -= dt;
-      p.velocity.y -= GRAVITY * dt;
-      const step = this.tmp.copy(p.velocity).multiplyScalar(dt);
-      const dist = step.length();
-      // 撞墙就弹一下 —— 巷战里手榴弹撞墙反弹回自己脚下是真实存在的风险
-      if (dist > 1e-4) {
-        const dir = this.tmpB.copy(step).divideScalar(dist);
-        const hit = bf.Raycast(p.position, dir, dist);
-        if (hit) {
-          p.position.addScaledVector(dir, Math.max(0, hit.t - 0.03));
-          const n = new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]);
-          p.velocity.reflect(n).multiplyScalar(0.34);
-        } else {
-          p.position.add(step);
+      if (p.body) {
+        // 刚体版：飞行、撞墙、弹跳、滚动全归引擎。这里只补一件引擎不知道的事 ——
+        // 地表是解析式的（不在物理世界里），落到土地上那一下要手写。
+        const t = p.body.translation();
+        p.position.set(t.x, t.y, t.z);
+        physics.ClampToGround(p.body, dt);
+        const q = p.body.rotation();
+        if (p.mesh) {
+          p.mesh.position.copy(p.position);
+          p.mesh.quaternion.set(q.x, q.y, q.z, q.w);
         }
-      }
-      const ground = bf.GroundHeight(p.position.x, p.position.z);
-      if (p.position.y < ground + 0.03) {
-        p.position.y = ground + 0.03;
-        p.velocity.y = Math.abs(p.velocity.y) * 0.26;
-        p.velocity.x *= 0.62;
-        p.velocity.z *= 0.62;
-      }
-      if (p.mesh) {
-        p.mesh.position.copy(p.position);
-        p.spin += dt * 9;
-        p.mesh.rotation.set(p.spin, p.spin * 0.7, 0);
+      } else {
+        // 没有物理世界时的兜底（编辑器在切片重建的空档里也会跑这条路）
+        p.velocity.y -= GRAVITY * dt;
+        const step = this.tmp.copy(p.velocity).multiplyScalar(dt);
+        const dist = step.length();
+        if (dist > 1e-4) {
+          const dir = this.tmpB.copy(step).divideScalar(dist);
+          const hit = bf.Raycast(p.position, dir, dist, { terrain: true });
+          if (hit) {
+            p.position.addScaledVector(dir, Math.max(0, hit.t - 0.03));
+            const n = new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]);
+            p.velocity.reflect(n).multiplyScalar(0.34);
+          } else {
+            p.position.add(step);
+          }
+        }
+        const ground = bf.GroundHeight(p.position.x, p.position.z);
+        if (p.position.y < ground + 0.03) {
+          p.position.y = ground + 0.03;
+          p.velocity.y = Math.abs(p.velocity.y) * 0.26;
+          p.velocity.x *= 0.62;
+          p.velocity.z *= 0.62;
+        }
+        if (p.mesh) {
+          p.mesh.position.copy(p.position);
+          p.spin += dt * 9;
+          p.mesh.rotation.set(p.spin, p.spin * 0.7, 0);
+        }
       }
       if (p.fuse <= 0) {
         this.Detonate(p);
         if (p.mesh) p.mesh.visible = false;
+        this.Detach(p);
         this.projectiles.splice(i, 1);
       }
     }
@@ -341,13 +388,22 @@ export class CombatSystem {
   get MortarLeft() { return this.support.mortar; }
   get MortarReady() { return this.support.mortar > 0 && this.mortarCooldown <= 0; }
 
+  /** 把在途的投掷物连刚体一起清掉（换关、重开都要走）。 */
+  ClearProjectiles() {
+    for (const p of this.projectiles) {
+      this.Detach(p);
+      if (p.mesh) p.mesh.visible = false;
+    }
+    this.projectiles.length = 0;
+  }
+
   Dispose() {
+    this.ClearProjectiles();
     for (const m of this.pool) {
       this.host.scene.remove(m);
       for (const child of m.children) child.geometry.dispose();
     }
     this.pool.length = 0;
-    this.projectiles.length = 0;
     this.incoming.length = 0;
   }
 }

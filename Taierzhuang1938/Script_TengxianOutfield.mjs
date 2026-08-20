@@ -1270,9 +1270,7 @@ export class TengxianOutfield {
             sink.Add("DryStone", PlaceGeometry(
               MakeBox(len / segs * 1.03, hh, 0.55, TILE_METERS.stone, `${v.id}:sw${k}${ax}${az}`),
               { x: px, y: y + hh / 2, z: pz, ry }));
-            const hx = Math.abs(Math.cos(ry)) * len / segs / 2 + Math.abs(Math.sin(ry)) * 0.3;
-            const hz = Math.abs(Math.sin(ry)) * len / segs / 2 + Math.abs(Math.cos(ry)) * 0.3;
-            sink.Solid(px, y + hh / 2, pz, hx, hh / 2, hz, "wall");
+            sink.Solid(px, y + hh / 2, pz, len / segs / 2, hh / 2, 0.3, "wall", ry);
             sink.Cover(px, pz, hh, Math.sin(ry), Math.cos(ry));
           }
         }

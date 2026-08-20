@@ -59,6 +59,21 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       // 夜战预设 exposure 是 3.6，被写死成 0.5 时整帧读出来就是纯黑，
       // 探针报"画面近乎纯色"，测的是测试自己写错的曝光，不是画面。
       T.StepFrames(1);
+
+      // 深度法线预通道的**天空判据**：w = 线性视深度，0 = 这一路没打到东西。
+      // 事故：天空穹的 allowOverride = false 只保证"不被换材质"，它照样会用
+      // 自己那套着色器画进这一趟，把不透明度 1.0 写成 w —— 整片天空于是变成
+      // "一米外有实体"。后果是天空前的烟被软粒子整片抹掉（(1−186)/0.45 → 0）、
+      // 大气透视也补不上，二百米外的黑烟柱在天上留下一个越长越大的黑洞。
+      // 这里直接从靶上取证：只看 alpha 的半浮点位模式是不是 0，不必解码。
+      const nd = T.post.targets.normalDepth;
+      const raw = new Uint16Array(nd.width * nd.height * 4);
+      T.renderer.readRenderTargetPixels(nd, 0, 0, nd.width, nd.height, raw);
+      let skyTexels = 0, geoTexels = 0;
+      for (let i = 3; i < raw.length; i += 4) {
+        if (raw[i] === 0) skyTexels += 1; else geoTexels += 1;
+      }
+
       const probe = document.createElement("canvas");
       probe.width = 64; probe.height = 36;
       const ctx = probe.getContext("2d");
@@ -83,6 +98,11 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         drawCalls: T.renderer.info.render.calls,
         triangles: T.renderer.info.render.triangles,
         level: T.Debug.Level ? T.Debug.Level().id : "?",
+        skyTexels,
+        geoTexels,
+        // 粒子层接没接上预通道与当关的雾：这两条断了，远处的烟就没有大气透视
+        vfxDepthValid: T.vfx.shared.uDepthValid.value,
+        vfxFogDensity: T.vfx.shared.uFogDensity.value,
       };
     });
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
@@ -109,13 +129,20 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (health.triangles > MAX_TRIANGLES) {
       bad.push(`三角形越线 ${(health.triangles / 1e6).toFixed(2)}M > 3.20M`);
     }
+    // 预通道的天空判据（见上面取证那一段）。天上看得见天的关，w = 0 的像素
+    // 必须有一片；一个都没有就说明又有铺满屏幕的东西把自己写进预通道了。
+    if (health.geoTexels === 0) bad.push("预通道是空的");
+    if (health.skyTexels === 0) bad.push("预通道里没有 w=0 的天空像素（天空穹又混进预通道了？）");
+    if (health.vfxDepthValid !== 1) bad.push("粒子层没接上预通道（远处的烟会没有大气透视）");
+    if (!(health.vfxFogDensity > 0)) bad.push(`粒子层的雾没接上 density=${health.vfxFogDensity}`);
   }
   const ok = bad.length === 0;
   if (!ok) failed += 1;
   console.log(`${ok ? "ok  " : "FAIL"} phase=${phase} `
     + (health
       ? `${String(health.level).padEnd(14)} spread=${health.spread} tones=${health.tones} calls=${health.drawCalls} `
-        + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive}`
+        + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive} `
+        + `sky=${(health.skyTexels / (health.skyTexels + health.geoTexels) * 100).toFixed(0)}%`
       : "(no health)")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));
   for (const p of problems.slice(0, 4)) console.log(`       ${p}`);

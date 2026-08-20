@@ -22,22 +22,32 @@ from TzmCore import FLIPPED, ResetScene, WriteTzm      # noqa: E402
 import BuildSoldiers                 # noqa: E402
 import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
+import BuildVehicles                 # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
-BUDGET = {"soldier": 1800, "weapon": 900, "prop": 400}
+BUDGET = {"soldier": 1800, "weapon": 900, "prop": 400, "vehicle": 1600}
 
 # 武器全长（米），抄自 Data_Weapons.mjs 的 lengthM，**是史实数据，不许为了好看改**。
 # 断言的是模型在 Z 上的实际跨度 —— 它一次就逮出了汉阳造的套筒建到枪口前头去、
 # 顺带把那一段的面全朝里翻了的 bug。容差 20 mm 留给准星护翼和枪托底板的圆角。
 WEAPON_LENGTH = {
     "ZhongZheng": 1.110, "HanYang": 1.250, "Zb26": 1.165, "Type38": 1.276,
-    "Mauser96": 0.288, "Grenade": 0.220, "Dadao": 0.900,
+    "Mauser96": 0.288, "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
 }
 LENGTH_TOLERANCE = 0.020
 
 # 士兵身高（米）：模型在 Y 上从脚底到头顶（含帽/盔）的跨度应当接近它。
 SOLDIER_HEIGHT = {"SoldierNra": 1.66, "SoldierIja": 1.62}
+
+# 车辆三围（宽 X / 高 Y / 长 Z，米），抄自 Data_Weapons.mjs，**同样是史实数据**。
+# 车比枪更容易越建越胖：每加一块装甲板都想往外挪一点，五块之后车就宽了半米，
+# 而巷宽 2.5 m 进不进得来是一条**玩法规则**（Data_Levels 抬头）。所以逐轴断言。
+VEHICLE_SPAN = {
+    "Type89Tank": (2.15, 2.56, 4.30),
+    "Type94Tankette": (1.60, 1.60, 3.10),
+}
+VEHICLE_TOLERANCE = 0.08
 HEIGHT_TOLERANCE = 0.070
 
 
@@ -70,6 +80,13 @@ def main():
         jobs.append((name, "weapon", builder, ""))
     for name, builder in BuildProps.PROP_BUILDERS.items():
         jobs.append((name, "prop", builder, ""))
+    jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,
+                 "八九式重掷弹筒：筒身 + 螺杆 + 弧形驻钣。无两脚架，约 45° 手持发射。"))
+    jobs.append(("Type89Tank", "vehicle", BuildVehicles.BuildType89Tank,
+                 "八九式中战车：前起动轮抬高、履带前段上翘，炮塔偏前，塔后另有一挺机枪。"
+                 "装甲 6—17 mm。巷宽小于 2.5 m 进不来。"))
+    jobs.append(("Type94Tankette", "vehicle", BuildVehicles.BuildType94Tankette,
+                 "九四式轻装甲车（豆战车）：一挺机枪，车尾牵引钩 —— 它本来是拉弹药拖车的。"))
 
     for name, category, builder, notes in jobs:
         ResetScene()
@@ -112,6 +129,17 @@ def main():
             if abs(span - want) > LENGTH_TOLERANCE:
                 ok = False
                 failures.append("%s 全长对不上史实：%.3f m ≠ %.3f m" % (name, span, want))
+        if name in VEHICLE_SPAN:
+            want = VEHICLE_SPAN[name]
+            got = tuple(bmax[i] - bmin[i] for i in range(3))
+            for i, axis in enumerate("XYZ"):
+                if abs(got[i] - want[i]) > VEHICLE_TOLERANCE:
+                    ok = False
+                    failures.append("%s 车身 %s 向对不上：%.3f m ≠ %.3f m"
+                                    % (name, axis, got[i], want[i]))
+            if abs(bmin[1]) > 0.03:
+                ok = False
+                failures.append("%s 履带没落在 y=0：%.3f" % (name, bmin[1]))
         if name in SOLDIER_HEIGHT:
             span = bmax[1] - bmin[1]
             want = SOLDIER_HEIGHT[name]

@@ -53,12 +53,22 @@ TILE_METERS = {
 GUN_TILE = {"gunSteel": 0.030, "gunWood": 0.085, "gunCloth": 0.045}
 TILE_METERS.update(GUN_TILE)
 
+# 车辆钢板：**跟钢盔同一档 0.35 m**。SteelHelmet 那张图的锈斑在这个密度下是
+# 2 cm 一处的细点，读作「风吹日晒的旧漆」——正是九〇式钢盔在人头上的样子。
+# 试过 0.75 与 1.5：锈斑跟着放大到 5 cm、10 cm，整辆车像出了一身橘红麻疹。
+# 锈斑这类**离散斑点**的观感只由「一个斑在屏幕上多大」决定，与物体多大无关。
+TILE_METERS["armor"] = 0.35
+# 履带板：一块 15 cm，所以格距给 0.30 —— 一格里正好两块板的尺度
+TILE_METERS["track"] = 0.30
+
 # 允许出现在模型里的材质名。必须是 Script_Actor.ActorMaterials() 返回的桶名的子集 ——
 # 加载器不造材质，只按名字去现成的材质表里取。写错名字导出时就报错，
 # 别等到运行时才发现半个人是黑的。
 MATERIAL_NAMES = {
     "uniform", "accessory", "shoe", "skin", "helmet", "steel", "wood",
     "leather", "towel", "red", "accentA", "accentB",
+    # 车辆装甲板（喷漆钢，不是裸钢）与履带 —— 见 Script_Actor.ActorMaterials
+    "armor", "track",
     # 建筑构件用的是 MaterialLibrary 的配方名，加载器同样直接透传
     "Stone", "WoodBeam", "WoodDoor", "RoofTile", "BrickWall", "Adobe",
 }

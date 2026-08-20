@@ -24,10 +24,39 @@ const KIND_LABEL = {
   throwable: "投掷物", melee: "近战", mortar: "掷弹筒", vehicle: "车辆",
 };
 
-/** 台架上能摆出来的（有几何的）那几把；车辆与掷弹筒没有模型，只看数据。 */
+/**
+ * 有没有几何。**判据是模型表，不是 kind。**
+ *
+ * 原来写的是「kind 不是 vehicle 也不是 mortar」——那是在用「这一类东西没人建过模型」
+ * 当判据。掷弹筒与两辆车现在都有 .tzm 了，判据要换成「Model 里有没有这一件」，
+ * 否则下一件新模型进来还得回这儿改一次。
+ */
 function HasGeometry(id) {
   const w = WEAPONS[id];
-  return !!w && w.kind !== "vehicle" && w.kind !== "mortar";
+  if (!w) return false;
+  if (MESHES[WEAPON_MESH_BY_ID[id]]) return true;
+  return w.kind !== "vehicle" && w.kind !== "mortar";
+}
+
+/** 车辆：台架上要落地摆、不能像枪那样平举在 1.1 m，人也拿不了它。 */
+function IsVehicle(id) {
+  const w = WEAPONS[id];
+  return !!w && w.kind === "vehicle" && !!MESHES[WEAPON_MESH_BY_ID[id]];
+}
+
+/** 人能拿在手里的。车辆不算 —— 手持那一栏对它没有意义。 */
+function IsHandheld(id) {
+  return HasGeometry(id) && !IsVehicle(id);
+}
+
+/**
+ * 有没有第一人称视图模型。**掷弹筒也没有** —— 视图模型是给**玩家自己的枪**建的
+ * 一套单独几何（Script_Viewmodel 的 rig），中方玩家永远不会端着日军的掷弹筒。
+ * 让它去 Equip 一个没登记的 id 只会拿到一支空手。
+ */
+function IsViewmodel(id) {
+  const w = WEAPONS[id];
+  return IsHandheld(id) && !!w && w.kind !== "mortar";
 }
 
 export class WeaponEditor {
@@ -46,6 +75,7 @@ export class WeaponEditor {
     this.time = 0;
     this.actor = null;
     this.benchGroup = null;
+    this.vehicleNodes = null;
     this.materials = null;
     this.ads = 0;
     this.autoFire = false;
@@ -168,6 +198,7 @@ export class WeaponEditor {
     if (this.actor) { this.actor.Dispose(); this.actor = null; }
     this.studio.ClearStand();
     this.benchGroup = null;
+    this.vehicleNodes = null;
   }
 
   /** 换镜头。退出编辑器时 Studio.Close 会把进来之前那一份原样还回去，
@@ -189,7 +220,7 @@ export class WeaponEditor {
     this.host.SetViewmodelVisible(this.mode === "fp");
 
     if (this.mode === "fp") {
-      if (this.host.viewmodel) this.host.viewmodel.Equip(HasGeometry(this.weaponId) ? this.weaponId : null);
+      if (this.host.viewmodel) this.host.viewmodel.Equip(IsViewmodel(this.weaponId) ? this.weaponId : null);
       // 第一人称的枪挂在相机上，展台上什么也不放；镜头退到一个看得见枪的距离。
       //
       // **FOV 必须换回正片的 55°。** 摄影棚为了看模型不畸变把相机压到 42
@@ -204,7 +235,7 @@ export class WeaponEditor {
 
     if (this.mode === "held") {
       const kind = weapon.side === "ija" ? "ija" : "nra";
-      this.actor = factory.Create(kind, { seed: 5, weapon: HasGeometry(this.weaponId) ? this.weaponId : null });
+      this.actor = factory.Create(kind, { seed: 5, weapon: IsHandheld(this.weaponId) ? this.weaponId : null });
       this.studio.stand.add(this.actor.root);
       this.studio.Frame(1.75, 3.2);
       return;
@@ -216,6 +247,26 @@ export class WeaponEditor {
       return;
     }
     if (!this.materials) this.materials = factory.ActorMaterials("nra", Mulberry32(7));
+
+    // 车辆：**整棵树落地摆**。不走 WeaponGeometry —— 那条路只收 root 直属的网格，
+    // 而炮塔是关节、几何在 turret 节点里，走那条路整个炮塔会不见。
+    // 也不抬到 1.1 m：车的原点在地面，抬起来就是一辆悬空的坦克。
+    if (IsVehicle(this.weaponId)) {
+      const built = factory.ModelInstance(WEAPON_MESH_BY_ID[this.weaponId], this.materials);
+      if (built) {
+        const holder = new THREE.Group();
+        holder.add(built.root);
+        holder.rotation.y = Math.PI / 2;      // 车头朝 -Z，转成正侧面看全长
+        this.studio.stand.add(holder);
+        this.benchGroup = holder;
+        this.vehicleNodes = built.nodes;
+      }
+      const len = weapon.lengthM || 4;
+      this.studio.Frame(weapon.heightM || 2, Math.max(4.5, len * 1.9));
+      this.studio.orbit.target.set(0, (weapon.heightM || 2) * 0.5, 0);
+      this.studio.ApplyCamera();
+      return;
+    }
     const built = factory.WeaponGeometry(this.weaponId);
     const group = new THREE.Group();
     for (const [key, geometry] of built.geometries) {

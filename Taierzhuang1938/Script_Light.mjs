@@ -32,6 +32,10 @@ export class LightRig {
     scene.add(this.sun);
     scene.add(this.sun.target);
 
+    // 探针体接管间接光之后，半球光要让位（见 SetGiActive）
+    this.hemiBase = 0.6;
+    this.giFill = 1;
+
     // 半球光只做"天空冷 / 地面暖"的方向性补光。真正的间接光靠 scene.environment，
     // 这一盏只是把 IBL 撑不起来的那一点点方向感补上，强度必须小。
     this.hemi = new THREE.HemisphereLight(0x8899aa, 0x4a4034, 0.6);
@@ -57,13 +61,27 @@ export class LightRig {
     this.sunDirection = new THREE.Vector3(0, 1, 0);
   }
 
+  /**
+   * 半球光与探针体的分工。
+   *
+   * 半球光原本干的是「天空把冷色洒到朝上的面」这件事 —— 而这正是探针体算得
+   * **更准**的那一部分（它还知道头顶有没有屋顶）。两个一起开就是双份天光，
+   * 屋里会亮得像在院子里。所以 GI 一上，半球光退成一点点底噪：
+   * 探针还没收敛的那一两帧、以及探针体外的远景，靠它兜着不至于死黑。
+   */
+  SetGiActive(active) {
+    this.giFill = active ? 0.3 : 1;
+    this.hemi.intensity = this.hemiBase * this.giFill;
+  }
+
   /** 套用 SKY_PRESETS 里那一份光照参数。 */
   ApplyPreset(preset, sunDirection) {
     this.sun.color.setHex(preset.lightColor);
     this.sun.intensity = preset.lightIntensity;
     this.hemi.color.setHex(preset.hemiSky);
     this.hemi.groundColor.setHex(preset.hemiGround);
-    this.hemi.intensity = preset.hemiIntensity;
+    this.hemiBase = preset.hemiIntensity;
+    this.hemi.intensity = this.hemiBase * this.giFill;
     this.sunDirection.copy(sunDirection).normalize();
     this.sun.castShadow = this.quality !== "low" && preset.lightIntensity > 0.35;
   }

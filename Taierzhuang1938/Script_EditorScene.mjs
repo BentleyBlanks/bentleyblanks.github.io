@@ -158,10 +158,17 @@ const PLACEABLE = [
   },
 ];
 
-/** Model/*.tzm.json 里那几个可以当道具摆的（人物模型不进这张表 —— 摆一个不动的兵是穿帮）。 */
+/**
+ * Model/*.tzm.json 里那几个可以当道具摆的。
+ *
+ * 人物模型不进这张表 —— 摆一个不动的兵是穿帮。
+ * **车辆进**：一辆停在街心的八九式是地标，不需要它会动就已经在讲故事了
+ *（Data_Levels 里 L4 与 L6 的 vehicles 字段本来就写了它们的位置）。
+ */
 const MODEL_PLACEABLE = MeshIds().filter((id) => {
   const entry = MESHES[id];
-  return entry && (entry.category === "prop" || entry.category === "weapon");
+  return entry && (entry.category === "prop" || entry.category === "weapon"
+    || entry.category === "vehicle");
 });
 
 for (const id of MODEL_PLACEABLE) {
@@ -203,6 +210,14 @@ export class SceneEditor {
     this.root.name = "EditorScenePlacements";
     this.ownedGeometries = [];
     this.colliderTag = "editorPlacement";
+    /** 摆件在物理世界里的碰撞体句柄（RebuildAll 加、DropColliders 撤）。 */
+    this.physicsHandles = [];
+    /**
+     * 上面那些句柄属于**哪一个**物理世界。
+     * 句柄是索引，换关之后世界整个换了一份，拿旧索引去新世界里删
+     * 等于随手删掉一堵真墙。所以撤销之前要先认一下东家。
+     */
+    this.physicsWorld = null;
     this.modelDocs = new Map();
     this.normalsDirty = new Set();
     this.normalsTimer = 0;
@@ -648,15 +663,40 @@ export class SceneEditor {
     this.DropColliders();
   }
 
+  /**
+   * 碰撞盒挂在谁身上。
+   *
+   * 城里那六关是 TengxianField，它的碰撞表在 `field.city` 上（城 + 城外两份合并）；
+   * 序·界河是独立场景 JieheField，碰撞表就在它自己身上、没有 `.city`。
+   * 原来这一层只认 `field.city`，于是**在界河那一关摆的东西全都没有碰撞** ——
+   * 画面上有掩体，人直接穿过去。两个类的这三样接口本来就是一样的，取一下就行。
+   */
+  ColliderHost() {
+    const field = this.field;
+    if (!field) return null;
+    return field.city || (field.colliders && field.BuildCollisionGrid ? field : null);
+  }
+
   DropColliders() {
     const field = this.field;
-    if (!field || !field.city) return;
-    const before = field.city.colliders.length;
-    const kept = field.city.colliders.filter((box) => box.tag !== this.colliderTag);
+    // 摆件的碰撞体也要从**物理世界**里撤掉。只清 field.city.colliders 的话，
+    // 画面上东西没了、人还是会撞到一堵看不见的墙（Rapier 那边的碰撞体还在）。
+    if (this.physicsHandles.length) {
+      if (this.physicsWorld && field && field.physics === this.physicsWorld) {
+        for (const h of this.physicsHandles) this.physicsWorld.RemoveSolid(h);
+      }
+      this.physicsHandles.length = 0;
+      this.physicsWorld = null;
+    }
+    const host = this.ColliderHost();
+    if (!host) return;
+    const before = host.colliders.length;
+    const kept = host.colliders.filter((box) => box.tag !== this.colliderTag);
     if (kept.length !== before) {
-      field.city.colliders.length = 0;
-      field.city.colliders.push(...kept);
-      field.city.BuildCollisionGrid();
+      host.colliders.length = 0;
+      host.colliders.push(...kept);
+      host.BuildCollisionGrid();
+      if (field && field.RefreshColliders) field.RefreshColliders();
     }
   }
 
@@ -699,9 +739,19 @@ export class SceneEditor {
       this.root.add(node);
       item.node = node;
     }
-    if (colliders.length && field && field.city) {
-      field.city.colliders.push(...colliders);
-      field.city.BuildCollisionGrid();
+    const host = this.ColliderHost();
+    if (colliders.length && host) {
+      host.colliders.push(...colliders);
+      host.BuildCollisionGrid();
+      // 本层的合并表与散列也要跟着刷（见 TengxianField.RefreshColliders 的账）
+      if (field && field.RefreshColliders) field.RefreshColliders();
+    }
+    if (colliders.length && field && field.physics) {
+      this.physicsWorld = field.physics;
+      for (const box of colliders) {
+        const h = field.physics.AddSolid(box);
+        if (h !== null) this.physicsHandles.push(h);
+      }
     }
     this.RefreshPlacedList();
   }
@@ -1025,7 +1075,7 @@ export class SceneEditor {
     f.Set("三角", `${(this.measure.triangles / 1000).toFixed(0)}k`,
       this.measure.triangles > 3200000 ? "bad" : "good");
     f.Set("城的网格", field ? field.meshes.length : 0);
-    f.Set("碰撞盒", field && field.city ? field.city.colliders.length : 0);
+    f.Set("碰撞盒", field ? (field.city ? field.city.colliders : field.colliders || []).length : 0);
     f.Set("放置 / 地形", `${this.items.length} 个 / ${this.terrainOps.length} 笔`);
     if (this.mode === "terrain") {
       f.Set("笔刷动到顶点", this.lastTouched == null ? "—" : this.lastTouched,

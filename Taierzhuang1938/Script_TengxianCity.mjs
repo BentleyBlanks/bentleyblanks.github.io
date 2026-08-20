@@ -96,6 +96,11 @@ const MATERIAL_MAP = {
   // 枪眼白茬：新凿开的砖断口比风化面亮两档，这一圈白是滕县的第一符号
   LoopholeRim: { recipe: "Stone", color: 0xffffff },
   Willow: { recipe: "WoodBeam", color: 0xc09a86 },
+  // 车辆装甲板：喷漆钢（SteelHelmet），**不是**发蓝裸钢。
+  // 与 Script_Actor.ActorMaterials 的 armor 一行同色 —— 同一辆车摆进场景
+  // 和摆上台架必须是同一个颜色，不然编辑器里调好的东西进游戏变了样。
+  armor: { recipe: "SteelHelmet", color: 0xb9ad86, roughness: 1, metalness: 0.05 },
+  track: { recipe: "SteelHelmet", color: 0x8f887c, roughness: 1, metalness: 0.30 },
 };
 // 纯色（没有对应烘焙配方的）
 const PLAIN_MAP = {
@@ -627,9 +632,7 @@ export class TengxianCity {
       this.sink.Add("WoodBeam", PlaceGeometry(
         MakeBox(4.4, 0.32, MOAT.width + 3.0, TILE_METERS.wood, `bridge${gate.id}`),
         { x: cx, y: -0.32, z: cz, ry }));
-      this.sink.Solid(cx, -0.4, cz,
-        Math.abs(dirZ) * 2.2 + Math.abs(dirX) * (MOAT.width / 2 + 1.5), 0.4,
-        Math.abs(dirX) * 2.2 + Math.abs(dirZ) * (MOAT.width / 2 + 1.5), "bridge");
+      this.sink.Solid(cx, -0.4, cz, 2.2, 0.4, MOAT.width / 2 + 1.5, "bridge", ry);
       for (const s of [-1, 1]) {
         this.sink.Add("WoodBeam", PlaceGeometry(
           MakeBox(0.16, 0.9, MOAT.width + 2.4, TILE_METERS.wood, `bridgeRail${gate.id}${s}`),
@@ -965,9 +968,7 @@ export class TengxianCity {
         MakeBox(len, h, 0.42, mat === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
           `${seed}:sw${ox}${oz}`, mat === "Adobe" ? null : BRICK_UV_GRID),
         { x: x + ox, y: CITY.platformY + h / 2, z: z + oz, ry }));
-      sink.Solid(x + ox, CITY.platformY + h / 2, z + oz,
-        Math.abs(Math.cos(ry)) * len / 2 + 0.25, h / 2,
-        Math.abs(Math.sin(ry)) * len / 2 + 0.25, "wall");
+      sink.Solid(x + ox, CITY.platformY + h / 2, z + oz, len / 2, h / 2, 0.25, "wall", ry);
     }
     const bw = w * 0.62, bd = d * 0.42;
     const eave = 2.6, ridge = 3.9;
@@ -1241,9 +1242,7 @@ export class TengxianCity {
         MakeBox(len, h, 0.42, mat === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
           `${seed}:sw${ox}${oz}`, mat === "Adobe" ? null : BRICK_UV_GRID),
         { x: x + ox, y: baseY + h / 2, z: z + oz, ry }));
-      sink.Solid(x + ox, baseY + h / 2, z + oz,
-        Math.abs(Math.cos(ry)) * len / 2 + 0.25, h / 2,
-        Math.abs(Math.sin(ry)) * len / 2 + 0.25, "wall");
+      sink.Solid(x + ox, baseY + h / 2, z + oz, len / 2, h / 2, 0.25, "wall", ry);
     }
     const bw = w * 0.62, bd = d * 0.44;
     sink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(

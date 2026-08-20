@@ -330,22 +330,7 @@ export function BakeCloth(size = 256, { seed = 5, hue = [104, 110, 116], grime =
 }
 
 /** 烤蓝钢 / 铸铁：枪管、钢盔、机件。金属度与粗糙度不均 + 锈斑。 */
-/**
- * 钢件。**base 是给 metalness≈0.95 的材质用的，所以它不是「照片里钢看起来的颜色」，
- * 是 F0（垂直入射反射率）。** 这两件事差得很远，写错的代价是整块金属在任何光照下
- * 都只能是黑的 —— 金属没有漫反射项，albedo 直接就是 F0。
- *
- * 原值 [58,60,64] 换算成线性是 0.044，等于要求这块钢只反射 4.4% 的入射光。
- * 实机后果：第五关十字街玩家手里那支枪的机匣是一块纯黑板（用户实拍报的就是这个）。
- * 真实的铁 F0 ≈ 0.56 线性。**但不能照抄 0.56**：这批钢件是烤蓝的旧枪、
- * 又在灰白浮尘天下被天空球整个照着，取到 [150,154,160]（线性 0.29）时
- * 机匣直接过曝成一块白板（实拍确认，比原来的黑板还糟）。
- * 定在 [104,107,112]（线性 ≈0.14）：脱离黑洞区，又压得住天光。
- *
- * 同一条账在 Script_Viewmodel.mjs:230 给 steel 记过一次，当时漏了 blued 与这里。
- * 这是**第三次**踩同一个坑，所以把它写在配方头上而不是调用处。
- */
-export function BakeSteel(size = 256, { seed = 6, base = [104, 107, 112], rust = 0.25, polish = 0.35 } = {}) {
+export function BakeSteel(size = 256, { seed = 6, base = [58, 60, 64], rust = 0.25, polish = 0.35 } = {}) {
   return BakeMaps(size, (px, py, out) => {
     const u = px / size, v = py / size;
     const micro = TileableFbm2(u * 150, v * 150, 150, { octaves: 2, seed: seed + 3 });
@@ -500,9 +485,7 @@ export const RECIPES = {
   ClothNra: (s) => BakeCloth(s ?? 256, { seed: 503, hue: [106, 112, 118] }),
   ClothIja: (s) => BakeCloth(s ?? 256, { seed: 521, hue: [124, 116, 82] }),
   Steel: (s) => BakeSteel(s ?? 256, { seed: 601 }),
-  // 钢盔同理（原 [64,66,60] 线性 0.049）。取比枪件更暗一档：
-  // 中正式钢盔是漆面、又蒙尘，本来就该比枪机哑。
-  SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [92, 95, 88], polish: 0.2, rust: 0.35 }),
+  SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [64, 66, 60], polish: 0.2, rust: 0.35 }),
   Ground: (s) => BakeRubbleGround(s ?? 512, { seed: 701 }),
   GroundRubble: (s) => BakeRubbleGround(s ?? 512, { seed: 719, brickiness: 0.85 }),
   Sandbag: (s) => BakeSandbag(s ?? 256, { seed: 809 }),

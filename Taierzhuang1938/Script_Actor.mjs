@@ -47,7 +47,21 @@ const HEX = {
   towel: 0xEDE9DF,
   redBinding: 0x9E2B22,            // 大刀柄尾铁环上缠的红布
   // 日方
-  ijaCloth: [0x7C7350, 0x8B8158, 0x968C6E],
+  // 昭五式土黄。**这三个数是按可读性压过的，不是史料色**，压的理由值得写下来：
+  //
+  // 实测第五关（十字街）站在出生点上，最近的日军在 66 m 外、在 900 px 的屏幕上
+  // 高 21 px，往后 75—115 m 那一批只有 12—19 px。而原来这三个色的亮度是
+  // 114 / 128 / 140，地面（RubbleGround 的 dirt）是 119 —— **和地面一模一样**，
+  // 而且同属暖黄色相。二十个像素高、和背景同亮度同色相的东西，人眼是找不到的：
+  // 玩家的原话是"我完全看不到敌军在哪里，这怎么玩"。
+  //
+  // 国军那一套之所以没这个问题，是因为它偏冷蓝（亮度 100—137 但色相是冷的），
+  // 在暖色地面上靠色相就分出来了。日方两头都没有。
+  //
+  // 现在压到亮度 85 / 95 / 105，比地面低一档半。色相仍是土黄（史料是茶褐色，
+  // 实物羊毛在照片上本来就比想象的暗），只是把"和地面同一档"这件事挪开。
+  // **这是可读性决定，不是考据修正** —— 改回去之前先想清楚 66 m / 21 px 这两个数。
+  ijaCloth: [0x5C563A, 0x67603F, 0x716A4E],
   ijaCollar: 0xB03A2E,             // 步兵红领章 —— 昭五式的识别点
   ijaHelmet: 0x5A5646,
   ijaStar: 0xB08A3C,
@@ -116,6 +130,12 @@ const IJA_HELMET_ALBEDO = 0x3C3A30;
 
 /** 站直也留一点膝盖弯：腿绷成一条直线是「假人」最明显的一处。 */
 const STAND_SETTLE = 0.014;
+/** 脚贴地能修正的最大高差（米，root 局部尺度）。超过这个数说明人本来就该掉下去。 */
+const FOOT_IK_RANGE = 0.55;
+/** 贴地量的收敛速率（每秒）。太快会在台阶边缘抖，太慢上台阶时脚会拖一截。 */
+const FOOT_IK_RATE = 14;
+/** 鞋底贴斜面的角度上限（弧度，约 22°）。 */
+const FOOT_IK_TILT = 0.38;
 
 /**
  * LOD 表。这里要记住一条反直觉的事：**只有同一根骨头上的两个材质桶合并才真省
@@ -1019,6 +1039,10 @@ export class Actor {
         new THREE.Vector3(0, -d.shinLen, 0));
       this.legs[tag] = { thigh, knee, ankle, side };
     }
+    /** 两条腿这一帧的落点计划（先算完两只脚才知道骨盆要压多少，见 Update）。 */
+    this._legPlan = { L: { x: 0, y: 0, z: 0, phase: 0, swing: 0 }, R: { x: 0, y: 0, z: 0, phase: 0, swing: 0 } };
+    /** 脚贴地的平滑状态：y 是贴地高差，nx/nz 是地面法线在人物朝向里的分量。 */
+    this.footIk = { L: { y: 0, nx: 0, nz: 0 }, R: { y: 0, nx: 0, nz: 0 } };
 
     // 视线挂点。模型里 eyes 是头上的一个空节点，没模型时按头心比例补一个 ——
     // 上层（音源、AI 视线、过场取景）拿到的接口两条路一模一样。
@@ -1274,11 +1298,16 @@ export class Actor {
     // --- 腿：落脚点 IK -----------------------------------------------------
     // 目标是**踝关节**（两段骨头的末端），所以站立时是 y = ankleY 而不是 0；
     // 写成 0 的话踝会去贴地、整只脚陷进地面里。
+    //
+    // 两趟：先把两只脚的落点都算出来并各探一次地，再据此压骨盆、最后解腿。
+    // 顺序不能反 —— 骨盆要压多少取决于**两只脚里更低的那一只**，
+    // 一只一只解的话第一只解完骨盆还没动，它会先被拉直再被压下去，抖一帧。
     const lift = Lerp(0.05, 0.16, moveSpeed) * H;
+    const plan = this._legPlan;
     for (const tag of ["L", "R"]) {
       const leg = this.legs[tag];
       const phase = (this.gaitPhase + (tag === "R" ? 0.5 : 0)) % 1;
-      let footZ = 0, footY = d.ankleY;
+      let footZ = 0, footY = d.ankleY, swing = 0;
       if (stride > 0) {
         if (phase < stanceEnd) {
           // 支撑相：脚钉在地上，身体从它上面走过去
@@ -1286,7 +1315,8 @@ export class Actor {
         } else {
           const t = (phase - stanceEnd) / (1 - stanceEnd);
           footZ = Lerp(stanceTravel * 0.5, -stanceTravel * 0.5, SmoothStep(0, 1, t));
-          footY += Math.sin(Math.PI * t) * lift;
+          swing = Math.sin(Math.PI * t) * lift;
+          footY += swing;
         }
       } else {
         footZ = leg.side * 0.035 * H;              // 立正也别两脚并齐
@@ -1295,7 +1325,78 @@ export class Actor {
       footZ -= crouch * 0.055 * H;
       const spread = d.hipHalf + crouch * 0.035 * H + Math.abs(strafe) * 0.05 * H;
       const footX = leg.side * spread + strafe * 0.12 * H * (phase < stanceEnd ? 1 : 0.4);
-      this.tmpTarget.set(footX, footY, footZ);
+      const p = plan[tag];
+      p.x = footX; p.y = footY; p.z = footZ; p.phase = phase; p.swing = swing;
+    }
+
+    // --- 脚贴地：把落点抬到**真实地面**上，够不着就压骨盆 -------------------
+    //
+    // 在这一段之前，腿的 IK 是一套「平地上的原地步态」：脚永远落在 y = ankleY，
+    // 也就是假设脚下是一张无限大的水平地板。于是上马道时人是从台阶里穿上去的、
+    // 站在瓦砾堆上两只脚都埋在石头里、走斜坡时一只脚悬空一只脚陷进土里。
+    //
+    // 现在每只脚各朝下探一次（与角色控制器问的是同一条 GroundProbe），
+    //   · 地面比脚下这层高 => 那只脚抬上去（上台阶时前脚先落到上一级）
+    //   · 地面比脚下这层低 => 那只脚放下去，同时**骨盆按更低的那只脚下沉**，
+    //     不压骨盆的话腿会被拉直、脚仍旧够不着（这是脚部 IK 的标准做法）
+    //   · 脚掌再按地面法线拧一下，鞋底贴着斜面而不是插进去
+    //
+    // 只在**看得见的人**身上做（两条射线/人/帧）。趴着、倒地、在半空的人不做：
+    // 那三种姿态下脚本来就不该踩在地上。
+    let pelvisDrop = 0;
+    const probe = this.factory && this.factory.groundProbe;
+    const doFootIk = !!probe && this.root.visible && prone < 0.5 && dying < 0.02 && !this.ragdollState;
+    const scale = this.sizeScale || 1;
+    if (doFootIk) {
+      const yaw = this.root.rotation.y;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const rate = 1 - Math.exp(-dt * FOOT_IK_RATE);
+      for (const tag of ["L", "R"]) {
+        const p = plan[tag];
+        // 落点的世界坐标（root 带 sizeScale 的整体缩放，别忘了乘）
+        const wx = this.root.position.x + (p.x * cy + p.z * sy) * scale;
+        const wz = this.root.position.z + (-p.x * sy + p.z * cy) * scale;
+        const g = probe(wx, wz, this.root.position.y);
+        const ik = this.footIk[tag];
+        // 地面相对「脚下这一层」高多少（换算回 root 的局部尺度）
+        const delta = Clamp((g.y - this.root.position.y) / scale, -FOOT_IK_RANGE, FOOT_IK_RANGE);
+        ik.y += (delta - ik.y) * rate;
+        // 法线转进人物自己的朝向：nx 决定左右倾（rotation.z），nz 决定前后仰（rotation.x）
+        const n = g.normal;
+        const nxl = n[0] * cy - n[2] * sy;
+        const nzl = n[0] * sy + n[2] * cy;
+        ik.nx += (nxl - ik.nx) * rate;
+        ik.nz += (nzl - ik.nz) * rate;
+        if (ik.y < pelvisDrop) pelvisDrop = ik.y;
+      }
+      // 骨盆按**更低的那只脚**整量下沉。
+      //
+      // 「整量」不是保守选择，是这具骨架逼出来的：胯高 0.842·H、踝高 0.089·H，
+      // 腿长正好等于两者之差 —— 也就是说**站直时两条腿已经是伸直的**
+      // （这条在上面步频那段注释里也提过）。所以脚只要往下挪一厘米，
+      // 腿就够不着了，SolveTwoBone 会把距离钳回臂长，脚停在半空。
+      // 取一半试过：台阶外那只脚离地 0.225 m（正常 0.089 m），腿绷成一根直棍。
+      //
+      // **压骨盆不需要给脚补偿。** 落脚点是在 root 空间给的，RootToHips 每帧重新
+      // 把它换算进胯的父子链 —— 胯往下走，换算出来的目标自然就变远，腿自己伸长。
+      // 早先这里多写了一项 `footY -= pelvisDrop`，等于把胯的位移又加回脚上，
+      // 结果是两只脚一起浮起 0.3 m（实测踝关节离地 0.391 m）。
+      this.hips.position.y += pelvisDrop;
+    } else {
+      for (const tag of ["L", "R"]) {
+        const ik = this.footIk[tag];
+        ik.y *= 0.86; ik.nx *= 0.86; ik.nz *= 0.86;   // 关掉时缓缓归零，别跳一下
+      }
+    }
+
+    for (const tag of ["L", "R"]) {
+      const leg = this.legs[tag];
+      const p = plan[tag];
+      const ik = this.footIk[tag];
+      // 腾空的那只脚不该被地面拽着走，所以按摆动相的高度把贴地量淡出
+      const ground = doFootIk ? ik.y * (1 - Clamp01(p.swing / Math.max(1e-4, lift))) : 0;
+      const footY = p.y + ground;
+      this.tmpTarget.set(p.x, footY, p.z);
       this.RootToHips(this.tmpTarget);
       // 膝盖外张：蹲下去两条大腿会顶到胸前的枪与手，往外让开一点才有蹲的剪影
       SolveTwoBone(leg.thigh, leg.knee, this.tmpTarget, d.thighLen, d.shinLen,
@@ -1305,7 +1406,15 @@ export class Actor {
       // 这里原本有一项 `- crouch * 0.25`（蹲下压脚尖 14°）。压是压对了，
       // 但没有配套抬升——鞋料总高才 9.4 cm，压完鞋底就有 4 cm 在地面以下。
       // IK 本身已经把踝关节钉在了正确高度，脚尖不需要再额外拧。
-      leg.ankle.rotation.set(-pitch + (footY - d.ankleY) * 1.6, 0, 0);
+      //
+      // 末两项是这一轮加的**鞋底贴斜面**：地面往哪边倒，脚掌就往哪边拧多少。
+      // 幅度按摆动相淡出（脚在半空时不该跟着地面转），并钳在 22° 以内 ——
+      // 再大就不是"踩在坡上"而是"脚踝扭断了"。
+      const tilt = doFootIk ? (1 - Clamp01(p.swing / Math.max(1e-4, lift))) : 0;
+      leg.ankle.rotation.set(
+        -pitch + (p.y - d.ankleY) * 1.6 + Clamp(ik.nz * tilt, -FOOT_IK_TILT, FOOT_IK_TILT),
+        0,
+        Clamp(-ik.nx * tilt, -FOOT_IK_TILT, FOOT_IK_TILT));
     }
 
     // --- 上身：看的方向按 35% / 65% 分给胸和头 ------------------------------
@@ -1843,6 +1952,31 @@ export class ActorFactory {
    * 实例化一个模型，只为了把它的几何摘下来。
    * 材质给的是一次性哨兵（见文件中段 SentinelMaterials 的账），摘完就 dispose。
    */
+  /**
+   * 取一份**整棵树**的模型实例（车辆走这条，不走 WeaponGeometry）。
+   *
+   * 与 WeaponGeometry 的区别只有一个，但很关键：那条路只收 root 直属的网格，
+   * 因为枪一根关节都没有。车有炮塔关节，炮塔下面的几何在 turret 节点里 ——
+   * 走那条路会**丢掉整个炮塔**。这里把 root 原样交出去，节点树也一并给，
+   * 将来接载具系统直接 `nodes.get("turret").rotation.y = …`。
+   *
+   * @returns {{root, nodes, tris, draws, bounds} | null}
+   */
+  ModelInstance(meshId, materials) {
+    const doc = this.meshDocs.get(meshId);
+    const entry = MESHES[meshId];
+    if (!doc || !entry) return null;
+    try {
+      return InstantiateModel(doc, {
+        materials: materials || {},
+        mergeMap: MESH_MERGE[this.quality] || null,
+      });
+    } catch (error) {
+      console.warn(`[Actor] ${meshId} 实例化失败：${String(error).slice(0, 160)}`);
+      return null;
+    }
+  }
+
   _InstantiateMesh(id) {
     const doc = this.meshDocs.get(id);
     const entry = MESHES[id];
@@ -2147,6 +2281,17 @@ export class ActorFactory {
         () => lib.Get("Steel", { roughness: 0.95, metalness: 0.86, normalScale: 0.20 })),
       wood: this.Material("wood",
         () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0, normalScale: 0.24 })),
+      // 车辆装甲板。走 SteelHelmet 那张图（喷漆钢：低金属度、粗糙、带锈斑），
+      // **不是** Steel（发蓝裸钢）—— 一辆镜面反光的战车比没有模型还糟。
+      // 色是 1938 年在华日军战车的土黄褐单色；albedo 要比"看上去的颜色"再压两档，
+      // 理由与九〇式钢盔那一行一模一样：史料记的是日光下的观感，不是反照率。
+      armor: this.Material("armor", () => lib.Get("SteelHelmet",
+        { color: TintTo("SteelHelmet", 0x55503A), tintId: "armor", roughness: 1, metalness: 0.05 })),
+      // 履带与负重轮：没喷漆的锻钢，接地面被磨得半亮、其余锈着。
+      // 给 steel（metalness 0.86）的话在这条管线的曝光下是**纯黑**：
+      // 一辆车底下糊着一团黑，履带那条前高后低的剪影线全看不见了。
+      track: this.Material("track", () => lib.Get("SteelHelmet",
+        { color: TintTo("SteelHelmet", 0x3E3B34), tintId: "track", roughness: 1, metalness: 0.30 })),
       leather: this.Material("leather",
         () => lib.Plain("leather", { color: HEX.ijaLeather, roughness: 0.66, metalness: 0 })),
       towel: this.Material("towel", () => lib.Plain("towel", { color: HEX.towel, roughness: 0.95, metalness: 0 })),

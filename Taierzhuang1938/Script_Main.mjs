@@ -17,8 +17,10 @@ import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
+import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
+import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController, STANCE } from "./Script_Player.mjs";
@@ -46,6 +48,11 @@ import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 // （身体部件没合批），撒 14 个近身兵就把 calls 顶过 1400 的红线。
 // 5 + 4 落在安全区里。要再加人，先去合批 Actor。
 const NEAR_SQUAD = { nra: 5, ija: 4 };
+
+/** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
+const TERRAIN_RAY = { terrain: true };
+/** 没有物理世界时脚部 IK 拿到的法线（平地）。 */
+const FLAT_NORMAL = [0, 1, 0];
 
 /**
  * 本关的可站范围。**任何一侧的兵都不许被放到切片外面去。**
@@ -158,12 +165,24 @@ const graphics = {
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 探针体：开关 + 强度倍率。强度乘在预设的 envIntensity 上（跟其它后处理项一个规矩：
+  // 预设定「这一关的天有多强」，设置只定「画多重」）。
+  gi: true, giStrength: 1,
   fov: BASE_FOV,
 };
-const library = new MaterialLibrary(renderer, { textureSize: QUALITY === "low" ? 256 : 512, ssao });
+// 探针体（GI）。low 档与 ?gi=0 都直接不建 —— 建了再关等于白背一套 shader 分支。
+const GI_ON = GI_QUALITY[QUALITY] != null && params.get("gi") !== "0";
+const giUniforms = MakeGiUniforms();
+const library = new MaterialLibrary(renderer, {
+  textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
+});
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
+// 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变
+const gi = GI_ON
+  ? new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms })
+  : null;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: !SHOT });
 
@@ -227,6 +246,11 @@ const state = {
 };
 
 let battlefield = null;
+/**
+ * 物理世界（Rapier）。**与 battlefield 一一对应，换关一起换。**
+ * 静态几何在 BuildField 末尾一次性灌进去；玩家、AI、抛掷物、布娃娃都挂在它上面。
+ */
+let physics = null;
 let navGrid = null;
 let player = null;
 let ai = null;
@@ -269,10 +293,16 @@ async function Boot() {
     await nextFrame();
   }
 
+  // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
+  // BuildField 末尾就要拿它建碰撞体了。
+  setStep("装物理引擎……", 0.245);
+  await InitPhysics();
+
   const phase = PHASES[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
+  if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
@@ -281,6 +311,18 @@ async function Boot() {
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
+  /**
+   * 脚部 IK 的探地口。**走取值器读 physics/battlefield，不能捕获当前那一份** ——
+   * 两者每换一关都会被换成新的实例，捕获旧的等于让所有人踩着上一关的地。
+   *
+   * 物理世界还没建好时退回解析地表：那是开机的头几帧与过场里摆的临时人物，
+   * 让他们踩在地皮上比让 IK 抛异常好。
+   */
+  actorFactory.groundProbe = (x, z, fromY) => {
+    if (physics) return physics.GroundProbe(x, z, fromY, 0.6, 2.4);
+    const y = battlefield ? battlefield.GroundHeight(x, z) : 0;
+    return { y, normal: FLAT_NORMAL, tag: "terrain" };
+  };
   // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
@@ -318,13 +360,16 @@ async function Boot() {
     WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
     bounds: battlefield.bounds,
   }, { seed: 1938 });
+  // 胶囊挂进物理世界。BuildField 已经把这一关的静态几何灌好了，
+  // 这里补的是「玩家」这一具 —— 换关时由 EnterLevel 再挂一次新的。
+  player.AttachPhysics(physics);
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
   navGrid = MakeNavGrid(battlefield);
   const nav = navGrid;
   ai = new AiDirector({
-    battlefield, actorFactory, scene, vfx, audio, player, nav,
+    battlefield, actorFactory, scene, vfx, audio, player, nav, physics,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
@@ -351,7 +396,7 @@ async function Boot() {
     onRelease: () => { state.cutscene = null; },
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics,
   });
 
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
@@ -377,7 +422,7 @@ async function Boot() {
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
-    renderer, scene, camera, post, sky, lights, library,
+    renderer, scene, camera, post, sky, lights, library, gi,
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, input,
     story, combat, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
@@ -447,6 +492,26 @@ async function Boot() {
         goalX: soldier.goal.x, goalZ: soldier.goal.z,
       }),
       Ammo: () => ({ ammo: state.ammo, clips: state.clips, grenades: state.grenades, bundles: state.bundles }),
+      /**
+       * 物理层的取证口。冒烟脚本靠它断言「碰撞真的接上了」——
+       * 读源码看不出运行时到底有没有把盒子灌进去（曾经就有一版把城外的
+       * 几千个盒子漏在外面，画面上有土坎、子弹照穿）。
+       */
+      Physics: () => (physics ? {
+        ...physics.Stats(),
+        fieldColliders: battlefield ? battlefield.colliders.length : 0,
+        playerBody: !!(player && player.body),
+        grounded: player ? player.grounded : null,
+      } : null),
+      /** 从某点朝某方向打一条射线（斜墙/空气墙的取证）。 */
+      Ray: (ox, oy, oz, dx, dy, dz, maxDist = 60, terrain = false) => {
+        const d = Math.hypot(dx, dy, dz) || 1;
+        const hit = battlefield.Raycast(
+          { x: ox, y: oy, z: oz }, { x: dx / d, y: dy / d, z: dz / d }, maxDist, { terrain });
+        return hit ? { t: hit.t, normal: hit.normal, tag: hit.box ? hit.box.tag : null } : null;
+      },
+      /** 脚下探地（脚部 IK 与"这层站得住吗"共用的那条查询）。 */
+      Probe: (x, z, fromY) => (physics ? physics.GroundProbe(x, z, fromY) : null),
       // --- 线性关卡的取证口 ---
       // 这一关是哪一关、目标链走到第几个、路标各在哪儿。
       // 「七关能依次推进」这条断言只能从这里读，读源码是推断不出来的。
@@ -536,6 +601,7 @@ async function Boot() {
   // 写成普通属性的话，调试口会一直指着上一关那份已经 Dispose 掉的城 ——
   // 表现是"取证读出来的碰撞盒表是空的"，而代码看起来完全正确。所以用取值器。
   Object.defineProperty(window.Taierzhuang, "battlefield", { get: () => battlefield });
+  Object.defineProperty(window.Taierzhuang, "physics", { get: () => physics });
   Object.defineProperty(window.Taierzhuang, "nav", { get: () => navGrid });
   Object.defineProperty(window.Taierzhuang, "cutscene", { get: () => cutscene });
 
@@ -553,7 +619,7 @@ async function Boot() {
     shot: !!SHOT,
     ReleasePointerLock,
     game: {
-      state, PHASES, JumpToLevel, graphics, ApplyGraphics,
+      state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
       get battlefield() { return battlefield; },
       get player() { return player; },
       get currentWeapon() { return currentWeapon; },
@@ -658,6 +724,33 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
   }
+  // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
+  // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
+  if (gi) gi.SetWorld(battlefield);
+  setStep("砌墙（物理）……", base + span);
+  await yieldFrame();
+  BuildPhysics();
+}
+
+/**
+ * 按当前切片重建物理世界。
+ *
+ * 顺序上必须**排在 battlefield.BuildSteps 走完之后** —— 城外那几千个盒子是最后
+ * 一步才并进 field.colliders 的，早一步灌进去，土坎与路基在物理里就是不存在的。
+ *
+ * field.physics 这条反向引用是给 Raycast 用的：Ai / Combat / Main / Editor 四处
+ * 都是照 field.Raycast 写的，把实现换掉比改四处调用点干净。
+ */
+function BuildPhysics() {
+  if (physics) { physics.Dispose(); physics = null; }
+  physics = new PhysicsWorld({
+    groundAt: (x, z) => battlefield.GroundHeight(x, z),
+    bounds: battlefield.bounds,
+  });
+  const n = physics.BuildStatic(battlefield.colliders);
+  battlefield.physics = physics;
+  if (player) player.AttachPhysics(physics);
+  return n;
 }
 
 /**
@@ -685,7 +778,7 @@ function ClearRuntime() {
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
   if (ai) ai.Dispose();
-  if (combat && combat.projectiles) combat.projectiles.length = 0;
+  if (combat) combat.ClearProjectiles();
   if (combat && combat.incoming) combat.incoming.length = 0;
 }
 
@@ -718,9 +811,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     }, 0, 1);
     navGrid = MakeNavGrid(battlefield);
     ai.ctx.battlefield = battlefield;
+    ai.ctx.physics = physics;
     ai.ctx.nav = navGrid;
     ai.insideWalls = levelBounds;
     combat.host.battlefield = battlefield;
+    combat.host.physics = physics;
+    player.AttachPhysics(physics);
     player.world = {
       colliders: battlefield.colliders,
       NearbyColliders: (x, z, r) => battlefield.NearbyColliders(x, z, r),
@@ -760,9 +856,15 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
+  if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
-  audio.Ambience(phase.sky === "night" ? "night" : phase.sky === "dawn" ? "dawn" : "battle");
+  // 环境档与天空档同名，直接把 phase.sky 递进去。
+  // 旧写法是 night/dawn 之外一律「battle」，于是「烟尘白天」和「烧着的街」
+  // 共用一档 —— 第三关满街在烧却听不见火，就是这么丢的。
+  audio.Ambience(phase.sky);
+  // 音乐按关走。上一版整场只有结局那一下会响 —— 四个 cue 里三个从来没进过游戏。
+  audio.Music(phase.music);
 
   const loaded = story.BeginLevel(phase.id);
   state.storyObjective = phase.objectives[0] || null;
@@ -1887,7 +1989,9 @@ function MarchBullet(from, dir, weapon, targets) {
       const perp = _rel.addScaledVector(_segDir, -t).length();
       if (perp < 0.45 && t < bestT) { bestT = t; bestSoldier = s; }
     }
-    const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen);
+    // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
+    // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。
+    const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen, TERRAIN_RAY);
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
       return { soldier: bestSoldier, dist: travelled + bestT, dir: _segDir };
@@ -2270,6 +2374,11 @@ function Frame(dt, render = true) {
   state.prevAllies = alliesNow;
 
   ai.Update(dt, camera);
+  // 物理步进排在**人都走完之后、特效与投掷物之前**：
+  // 玩家与 AI 是运动学体，它们这一帧的位移要先写进刚体，引擎再把碰撞体同步过去；
+  // 手雷是动态刚体，它读的就是同步之后的那份位置。顺序反了会差一帧，
+  // 表现为「手雷从刚跑过去的人身上穿过去」。
+  if (physics) physics.Step(dt);
   vfx.Update(dt, camera, state.elapsed);
   combat.Update(dt, { phase: PHASES[state.phaseIndex] });
 
@@ -2279,6 +2388,11 @@ function Frame(dt, render = true) {
   lights.Update(dt, state.elapsed);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
+  if (gi) {
+    gi.Update(dt, camera.position, lights);
+    // 半球光按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
+    lights.SetGiActive(gi.uniforms.enabled.value);
+  }
 
   // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
   // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
@@ -2385,6 +2499,29 @@ function RenderScene(dt) {
   ssao.resolution.value.set(post.width, post.height);
   ssao.strength.value = SSAO_BASE * graphics.ssao;
   const preset = SKY_PRESETS[phase.sky];
+  // 粒子层要与合成 pass 共用同一份雾：它不进深度法线预通道，合成 pass 那趟
+  // 又明写"深度 0 的天空不吃雾"，于是背景是天空的粒子像素一点雾都吃不到 ——
+  // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
+  // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
+  // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
+  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
+  vfx.SetFog(preset.fog, preset.sunColor);
+  vfx.SetSun(sky.sunDirection);
+  // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
+  //
+  // 事故：AudioEngine.SetListener 全仓库零调用点，于是 WebAudio 的 listener
+  // 一辈子停在世界原点、朝着 −Z。序·界河的可玩切片在 z = −1470，实测每一发枪声
+  // 算出来的距离都是一千四百米，而**混响 send 是在 Panner 之前分出去的、不吃距离衰减**：
+  // 直达声被 panner 压到千分之六听不见，湿声却按 wetScale = 1 + 0.03d 顶到上限 2.6 倍。
+  // 玩家听到的于是不是枪声，是全场每一发枪的混响尾巴同时糊在一起 —— 没有方向
+  // （距离 ≥ 25 m 一律 equalpower，HRTF 从来没开过）、没有高频（空气低通钳在 700 Hz 的地板上）、
+  // 密密麻麻一片。城里几关更隐蔽：原点正好是十字街口，听起来"有声音"，但全城的枪
+  // 都按你站在街心算，走到哪里都一样响。
+  //
+  // 放在这里而不是 Frame() 里：过场与主菜单的相机不走 Frame 那条路，
+  // 但三者都从 RenderScene 出画（见上面那段注释），接在这儿一次覆盖三种镜头。
+  camera.updateWorldMatrix(true, false);   // 取的是这一帧的位姿，不是上一帧的
+  audio.SetListener(camera);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   post.Render(scene, camera, {
@@ -2494,6 +2631,12 @@ function ApplyGraphics() {
       if (Array.isArray(material)) material.forEach((m) => { m.needsUpdate = true; });
       else material.needsUpdate = true;
     });
+  }
+  if (gi) {
+    gi.enabled = !!graphics.gi;
+    if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
+    const preset = SKY_PRESETS[PHASES[state.phaseIndex].sky];
+    if (preset) gi.ApplyPreset(preset, graphics.giStrength);
   }
   if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
     lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);

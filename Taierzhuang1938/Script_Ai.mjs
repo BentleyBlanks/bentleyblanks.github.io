@@ -79,6 +79,16 @@ export function MakeSoldierIdentity(seed) {
   };
 }
 
+/**
+ * 三种姿态的胶囊。与 Script_Player.STANCE 是同一套数 ——
+ * 两边对"人有多高多粗"必须一致，否则玩家钻得过去的门洞 AI 钻不过去。
+ */
+const CAPSULE = [
+  { radius: 0.34, height: 1.78 },     // 0 站
+  { radius: 0.34, height: 1.21 },     // 1 蹲
+  { radius: 0.42, height: 0.58 },     // 2 卧
+];
+
 export class Soldier {
   constructor(side, options = {}) {
     this.id = nextId++;
@@ -107,6 +117,20 @@ export class Soldier {
     this.actor = null;
     this.deadTime = 0;
     this.moveSpeed = 0;
+    /**
+     * 物理世界里的胶囊。**这是这一轮最要紧的一条改动** ——
+     * 在此之前 AI 完全没有碰撞：位移直接写 position，再拿 StandHeight 把人吸到
+     * 「脚下最高的那层」，挡不挡得住只由一个 Blocked() 启发式说了算。
+     * 于是人从墙里穿过去是常态，站到房顶上也是常态。
+     * 现在跟玩家用**同一套**角色控制器，两边对「这儿走不走得过去」只有一个答案。
+     */
+    this.body = null;
+    this.velocityY = 0;
+    this.grounded = true;
+    /** 死后接管位移的那具刚体（见 AiDirector.StepCorpse）。 */
+    this.corpse = null;
+    /** 中弹方向 × 力度，死的那一帧交给尸体刚体当初速度。 */
+    this.deathPush = null;
     // 通视缓存按**目标 id** 存三份。原来一人只有一份、不区分目标：
     // 最近的那个被墙挡住，缓存写下 clear=false，接下来 0.25 s 内换谁来问都答"看不见"，
     // 于是整条战线一起瞎掉（实跑：losCache.clear 为 true 的 0 人）。
@@ -182,6 +206,15 @@ export class Soldier {
       taken: false,
     };
     if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1));
+    // 中弹的方向 × 一点力度，交给尸体刚体当初速度（见 AiDirector.StepCorpse）。
+    // 不给的话人是"原地融化"；给太大就成了被炮弹掀飞，1.6 m/s 大约是踉跄一步。
+    if (direction) {
+      this.deathPush = {
+        x: direction.x * 1.6,
+        y: 0.6,
+        z: direction.z * 1.6,
+      };
+    }
     // 阵亡事件从这里出，是**唯一**的一条路。
     // 以前扣票分散在三处（Combat.Blast 的 onKill、Main.TryFire、Main.DoMelee），
     // 结果是：日军炮弹炸死中国兵扣日方的票，玩家亲手打死人扣两票。
@@ -295,8 +328,24 @@ export class AiDirector {
       nav.SnapToMain(x, z, this.navOut);
       x = this.navOut.x; z = this.navOut.z;
     }
+    // 撒兵点来自关卡数据与随机数，它并不知道那儿正好是一堵院墙。
+    // 埋进墙里的人再也走不出来（运动学角色控制器没有脱困能力），
+    // 所以放人之前先问一句「这儿站得下吗」。
+    const physics = this.ctx.physics;
+    let y;
+    if (physics) {
+      const free = physics.FindFreeSpot(x, z, CAPSULE[0].radius, CAPSULE[0].height);
+      x = free.x; z = free.z; y = free.y;
+    } else {
+      y = this.ctx.battlefield.GroundHeight(x, z);
+    }
     const soldier = new Soldier(side, { ...options, x, z });
-    soldier.position.y = this.ctx.battlefield.GroundHeight(x, z);
+    soldier.position.y = y;
+    if (physics) {
+      soldier.body = physics.MakeCharacter({
+        radius: CAPSULE[0].radius, height: CAPSULE[0].height, position: soldier.position,
+      });
+    }
     const kind = side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija";
     soldier.actor = this.ctx.actorFactory.Create(kind, {
       seed: soldier.id * 131 + 7,
@@ -311,6 +360,11 @@ export class AiDirector {
   }
 
   Remove(soldier) {
+    if (soldier.body) { soldier.body.Remove(); soldier.body = null; }
+    if (soldier.corpse) {
+      if (this.ctx.physics) this.ctx.physics.RemoveBody(soldier.corpse);
+      soldier.corpse = null;
+    }
     if (soldier.heatSmoke) { this.ctx.vfx?.RemoveSmokeSource(soldier.heatSmoke); soldier.heatSmoke = 0; }
     const i = this.soldiers.indexOf(soldier);
     if (i >= 0) this.soldiers.splice(i, 1);
@@ -511,6 +565,7 @@ export class AiDirector {
       const s = this.soldiers[i];
       if (!s.alive) {
         s.deadTime += dt;
+        this.StepCorpse(s, dt);
         if (s.actor) s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         continue;
       }
@@ -756,9 +811,11 @@ export class AiDirector {
 
   // ---------------------------------------------------------------- 执行
   Act(s, dt, player) {
-    const bf = this.ctx.battlefield;
     let desired = null;
     let speed = 0;
+    // 这一帧有没有走过物理。没走的（站着不动、在射击）也要补一次 ——
+    // 不补的话站在墙头上的人在墙被炸掉之后会浮在半空。
+    let stepped = false;
 
     // 翻越途中接管整帧：走位移曲线，不做别的。
     if (s.state === STATE.VAULT) { this.StepVault(s, dt); return; }
@@ -883,10 +940,8 @@ export class AiDirector {
         const stanceMul = s.stance === 1 ? 0.6 : s.stance === 2 ? 0.3 : 1;
         const step = speed * dt * stanceMul;
         const beforeX = s.position.x, beforeZ = s.position.z;
-        const tryX = s.position.x + nx * step;
-        const tryZ = s.position.z + nz * step;
-        if (!this.Blocked(tryX, s.position.z, s.position.y)) s.position.x = tryX;
-        if (!this.Blocked(s.position.x, tryZ, s.position.y)) s.position.z = tryZ;
+        this.StepBody(s, nx * step, nz * step, dt);
+        stepped = true;
         const moved = Math.hypot(s.position.x - beforeX, s.position.z - beforeZ);
         if (moved < step * 0.4) {
           s.stuckTime += dt;
@@ -921,9 +976,9 @@ export class AiDirector {
       const dx = s.target.position.x - s.position.x, dz = s.target.position.z - s.position.z;
       s.yaw = Math.atan2(-dx, -dz);
     }
-    // 站立面而不是地皮：马道那八级台阶、墙顶、翻过去落在台面上，都要靠它。
-    // 以前一律贴 GroundHeight，于是马道修好了 AI 也上不去 —— 人从台阶里穿过去。
-    s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
+    // 站着不动的人也要走一次物理：重力、脚下的东西被炸掉、被别的东西顶开，
+    // 都得在这一步里结算。
+    if (!stepped) this.StepBody(s, 0, 0, dt);
 
     if (s.actor) {
       s.actor.root.position.copy(s.position);
@@ -997,6 +1052,10 @@ export class AiDirector {
       s.state = STATE.ADVANCE;
       s.position.x = to.x; s.position.y = to.y; s.position.z = to.z;
     }
+    // 翻越是一段写死的位移曲线（人要从墙上跨过去），胶囊得跟着瞬移，
+    // 不然落地那一帧引擎按起跳点算，人会被弹回墙这边。
+    if (s.body) s.body.Teleport(s.position.x, s.position.y, s.position.z);
+    if (s.body) { s.velocityY = 0; s.grounded = true; }
     if (s.actor) {
       s.actor.root.position.copy(s.position);
       s.actor.root.rotation.y = s.yaw;
@@ -1005,6 +1064,74 @@ export class AiDirector {
         elapsed: this.time, lookYaw: 0, lookPitch: 0,
       });
     }
+  }
+
+  /**
+   * 尸体的一帧。
+   *
+   * 断气之前，人的位移归运动学角色控制器；断气之后归一具**动态刚体**（见
+   * PhysicsWorld.MakeCorpse）。这一步补的是原来完全没有的一件事：
+   * 在城墙上、马道上、屋顶上中弹的人**会掉下来**。以前他钉在断气那一帧的坐标上，
+   * 悬在半空 —— 那是「站立面」查询的必然结果，因为死人不再走 Act，
+   * 也就不再重新问脚下有没有东西。
+   *
+   * 停下来之后（速度足够小、或者超过 4 秒）就把刚体拆掉：
+   * 一场仗几十具尸体，留着全是白算的。
+   */
+  StepCorpse(s, dt) {
+    const physics = this.ctx.physics;
+    if (!physics) return;
+    // 活着那具胶囊要先拆：留着的话尸体会一直挡着路，而且它是运动学的，不会掉
+    if (s.body) { s.body.Remove(); s.body = null; }
+    if (!s.corpse) {
+      if (s.corpseSettled) return;
+      s.corpse = physics.MakeCorpse({ position: s.position, velocity: s.deathPush });
+      s.deathPush = null;
+    }
+    // **先钳地再读位置。** 反过来的话读到的是"还没落地"的那一帧，
+    // 而尸体停稳之后刚体就被拆了，那个偏差会永久留在尸体上（实测下沉 0.15 m）。
+    physics.ClampToGround(s.corpse, dt, { lift: s.corpse.userFeetOffset || 0.85, restitution: 0, rollDrag: 6 });
+    const t = s.corpse.translation();
+    const feet = t.y - (s.corpse.userFeetOffset || 0);
+    s.position.set(t.x, feet, t.z);
+    if (s.actor) s.actor.root.position.copy(s.position);
+    const v = s.corpse.linvel();
+    if (s.deadTime > 4 || (Math.hypot(v.x, v.y, v.z) < 0.08 && s.deadTime > 0.6)) {
+      physics.RemoveBody(s.corpse);
+      s.corpse = null;
+      s.corpseSettled = true;
+    }
+  }
+
+  /**
+   * 走一步（AI 侧）。位移与落地全部交给角色控制器，与玩家同一套解算。
+   *
+   * 姿态一变就换胶囊：趴着的人只有 0.58 m 高，得能从 0.6 m 的窗台底下爬过去，
+   * 而站着的人不行 —— 这一条在原来的 Blocked() 里是做不到的（它只认一个高度）。
+   *
+   * 没有物理世界时退回老路（Blocked + StandHeight）：编辑器在切片重建的空档里
+   * 也会驱动 AI，那时物理世界正好是空的。
+   */
+  StepBody(s, dx, dz, dt) {
+    const body = s.body;
+    if (!body) {
+      const bf = this.ctx.battlefield;
+      if (!this.Blocked(s.position.x + dx, s.position.z, s.position.y)) s.position.x += dx;
+      if (!this.Blocked(s.position.x, s.position.z + dz, s.position.y)) s.position.z += dz;
+      s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
+      return;
+    }
+    // 有人绕过物理直接改了 position（撒兵、剧本摆位、冒烟脚本摆人）就认外面那份。
+    // 不对账的话表现很怪：把人挪到某处，下一帧他自己"弹"回胶囊所在的老位置 ——
+    // 通关冒烟里「圈里留一个敌人」那一条就是这么失效的（人被弹回去，圈里没人了）。
+    body.ReconcileTo(s.position.x, s.position.y, s.position.z);
+    const cap = CAPSULE[s.stance] || CAPSULE[0];
+    body.SetSize(cap.radius, cap.height);
+    s.velocityY = s.grounded ? -0.6 : s.velocityY - 19.6 * dt;   // 贴地那一点向下的力保证 grounded 稳定
+    const r = body.Move(dx, s.velocityY * dt, dz);
+    s.position.set(r.x, r.y, r.z);
+    s.grounded = r.grounded;
+    if (r.grounded) s.velocityY = 0;
   }
 
   Blocked(x, z, y) {

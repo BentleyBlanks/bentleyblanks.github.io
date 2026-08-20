@@ -23,6 +23,14 @@
 // 烟为什么"有体积"：多层半透明 billboard + 各自旋转 + 随时间膨胀 + 用
 // rtNormalDepth 做软粒子（与背景深度差小的地方淡出，否则烟像刀切进地面）+
 // 每片按假球面法线做一次朗伯着色（没有明暗面的话，叠再多层也还是一张灰纸）。
+//
+// 约束 2 有一条必须自己还的债：**粒子不进预通道，就吃不到合成 pass 的雾**。
+// Script_Post 的大气透视挂在 rtNormalDepth 的 w 上，而且明写「深度 0 的天空不吃雾」；
+// 粒子在预通道里是隐身的，于是背景是天空的那些像素上 nd.w = 0，整段雾被跳过。
+// 近处看不出来（雾量本来就接近 0），两百米外的黑烟柱就变成天上一个**纯黑的洞**，
+// 而且随着烟越积越多越长越大 —— 这不是 NaN，是缺了大气透视。
+// 所以 AERIAL 那一段在粒子自己的着色器里补雾，且只补「背景是天空」的那一半：
+// 背景有实体时合成 pass 已经按背景深度盖过雾了，再补一次就是双份。
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
@@ -89,6 +97,11 @@ const QUALITY_PRESETS = {
   ultra: { budget: 1.0, spawn: 1.25, decals: 240, dust: 1.25, soft: true },
 };
 
+// 升柱烟的阻尼系数。闭式解 v(t) = a/k + (v0 − a/k)e^(−kt)：只要浮力给成 rise·k，
+// 终速就锁在 rise 上，烟柱这条支线才有"一直往上"这个行为。
+// 0.55 是"还看得出初速衰减、但九秒能爬三十米"的折中；再大就又变回一颗球。
+const BUOYANT_DRAG = 0.55;
+
 // 池容量分配（占总预算的比例）。烟最费，因为它活得久、片子大。
 const POOL_SHARE = {
   smoke: 0.30, fire: 0.16, streak: 0.14, debris: 0.10,
@@ -131,6 +144,18 @@ attribute vec3 iNormal;
 
 uniform float uTime;
 uniform float uGlobalFade;
+#ifdef AERIAL
+uniform vec3 uSunDirection;
+uniform float uFogDensity;
+uniform float uFogFalloff;
+uniform float uFogBase;
+uniform float uFogMax;
+uniform vec3 uFogColorSky;
+uniform vec3 uFogColorGround;
+uniform float uFogSunGain;
+uniform vec3 uSunColorFog;
+varying vec4 vAerial;        // rgb 雾色 / a 雾量。逐顶点算：片子只有四个角，逐片元纯浪费
+#endif
 
 varying vec2 vShape;
 varying vec3 vColor;
@@ -237,6 +262,20 @@ void main() {
     flicker = 0.5 + 0.5 * sin(age * iExtra.y * 6.2831853 + iParams.w * 17.0);
   }
   vAlpha = iParams.x * fadeIn * fadeOut * flicker * uGlobalFade;
+
+#ifdef AERIAL
+  // 大气透视，公式与 Script_Post 的雾逐项对齐（密度/高度衰减/上限/雾色/朝阳增益）。
+  // 对不齐的话，一根烟柱跨过屋脊线时会在天空与实体的交界上裂出一条硬边。
+  vAerial = vec4(0.0);
+  if (uFogDensity > 0.0) {
+    vec3 rayDir = normalize(finalPos - cameraPosition);
+    float fd = 1.0 - exp(-max(vViewDepth, 0.0) * uFogDensity);
+    float hFall = exp(-max(finalPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
+    vec3 col = mix(uFogColorGround, uFogColorSky, clamp(rayDir.y * 2.0 + 0.35, 0.0, 1.0));
+    col += uSunColorFog * pow(max(dot(rayDir, normalize(uSunDirection)), 0.0), 8.0) * uFogSunGain;
+    vAerial = vec4(col, clamp(fd * hFall, 0.0, uFogMax));
+  }
+#endif
 }
 `;
 
@@ -252,6 +291,7 @@ vec3 toCamOrZ(vec3 world) {
 
 const FRAG_PARTICLE = /* glsl */`
 uniform sampler2D uNormalDepth;
+uniform float uDepthValid;   // 1 = uNormalDepth 是真的预通道靶，不是 1x1 兜底
 uniform vec2 uResolution;
 uniform float uSoftEnabled;
 uniform float uSoftRange;
@@ -259,6 +299,9 @@ uniform float uNearFade;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
+#ifdef AERIAL
+varying vec4 vAerial;
+#endif
 
 varying vec2 vShape;
 varying vec3 vColor;
@@ -345,18 +388,30 @@ void main() {
   color *= uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
 #endif
 
+  // rtNormalDepth 的 w 是线性视深度；清成 0 的像素代表"这一路没打到东西"（= 天空）。
+  // 软粒子与大气透视都要这个值，所以只取一次。
+  float sceneDepth = uDepthValid > 0.5
+    ? texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w
+    : 0.0;
+
+#ifdef AERIAL
+  // 补雾，且**只补背景是天空的那一半**（见文件头）。背景有实体时合成 pass 已经
+  // 按背景深度上过雾了 —— 那个深度比粒子稍远，雾略微过量，但连续、无缝，
+  // 而这里再叠一次就成了双份，烟柱会在屋脊线上被切成深浅两截。
+  // 兜底深度图（uDepthValid = 0）时按天空处理：宁可略过量，也不要天上留个黑洞。
+  if (vAerial.a > 0.0 && sceneDepth <= 0.001) {
+    color = mix(color, vAerial.rgb, vAerial.a);
+  }
+#endif
+
   // 软粒子：与背景深度差小的地方淡出。没这一步，烟会像一把刀切进地面。
-  // rtNormalDepth 的 w 是线性视深度；清成 0 的像素代表"这一路没打到东西"，
-  // 那里必须按 1 处理，否则天空前的粒子会整片消失。
+  // 天空（sceneDepth = 0）必须按"无穷远"处理，否则天空前的粒子会整片消失。
   //
   // uSoftRange = 0 表示这个池**贴着面**存在（弹孔贴花、贴地尘环）：它们与背景的
   // 深度差本来就只有那点法线偏移，一做软化就整体淡到看不见 —— 弹孔一度完全不显形
   // 就是栽在这儿。贴面的池靠 polygonOffset 防 z-fighting，不靠软粒子。
-  if (uSoftEnabled > 0.5 && uSoftRange > 0.0) {
-    float sceneDepth = texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w;
-    if (sceneDepth > 0.001) {
-      alpha *= clamp((sceneDepth - vViewDepth) / uSoftRange, 0.0, 1.0);
-    }
+  if (uSoftEnabled > 0.5 && uSoftRange > 0.0 && sceneDepth > 0.001) {
+    alpha *= clamp((sceneDepth - vViewDepth) / uSoftRange, 0.0, 1.0);
   }
   // 贴脸淡出：拿不到深度图时这是唯一的保险，也防止一片烟糊满屏幕
   alpha *= clamp((vViewDepth - uNearFade * 0.4) / max(uNearFade, 0.001), 0.0, 1.0);
@@ -583,6 +638,7 @@ class ParticlePool {
     if (config.lit) defines.LIT = "";
     if (config.litSurface) defines.LIT_SURFACE = "";
     if (config.bounce) defines.GROUND_BOUNCE = "";
+    if (config.aerial) defines.AERIAL = "";
 
     this.material = new THREE.ShaderMaterial({
       defines,
@@ -963,14 +1019,28 @@ export class VfxSystem {
       // 这里给小了的话，碎块和烟会比同一场景里的 PBR 物体暗一大截，一眼假。
       uSunColor: { value: new THREE.Vector3(1.72, 1.58, 1.34) },
       uSkyColor: { value: new THREE.Vector3(0.14, 0.17, 0.22) },
+      // 大气透视。默认值抄 SKY_PRESETS.smokyDay.fog —— 调用方不接 SetFog 时
+      // 也得有一档能用的雾，不然远处的烟又变回天上的黑洞。
+      uDepthValid: { value: 0 },
+      uFogDensity: { value: 0.0145 },
+      uFogFalloff: { value: 15 },
+      uFogBase: { value: 0 },
+      uFogMax: { value: 0.88 },
+      uFogColorSky: { value: new THREE.Vector3(0.72, 0.70, 0.66) },
+      uFogColorGround: { value: new THREE.Vector3(0.38, 0.39, 0.42) },
+      uFogSunGain: { value: 0.24 },
+      uSunColorFog: { value: new THREE.Vector3(1, 0.92, 0.78) },
     };
 
     const cap = (share, floor) => Math.max(floor, Math.round(this.budget * share));
     this.pools = {
-      // 烟：alpha 混合 + 朗伯着色 + 软粒子，是"体积感"的全部来源
+      // 烟：alpha 混合 + 朗伯着色 + 软粒子，是"体积感"的全部来源。
+      // aerial 只给它一个池：加性的火/曳光/枪口焰是 HDR 自发光，大气透视对它们
+      // 是**消光**（乘 1−fog）而不是混向雾色，压下去两百米外的火就没了；
+      // 它们又都是零点几秒的短命货，天上留不住洞。要补的话另开一轮，别混在这儿。
       smoke: new ParticlePool(cap(POOL_SHARE.smoke, 96), {
         shape: "puff", orient: "billboard", blending: THREE.NormalBlending,
-        lit: true, softRange: 0.45, renderOrder: 6,
+        lit: true, aerial: true, softRange: 0.45, renderOrder: 6,
       }, this.shared),
       // 火/闪光：加性，HDR 3—22，交给 Script_Post 的泛光
       fire: new ParticlePool(cap(POOL_SHARE.fire, 64), {
@@ -1027,10 +1097,14 @@ export class VfxSystem {
     if (!texture) {
       this.shared.uNormalDepth.value = this.fallbackDepth;
       this.shared.uSoftEnabled.value = 0;
+      this.shared.uDepthValid.value = 0;
       return;
     }
     this.shared.uNormalDepth.value = texture;
     this.shared.uSoftEnabled.value = this.preset.soft ? 1 : 0;
+    // 软粒子可以按画质档关掉，但"背景是不是天空"这个判据不能跟着关 ——
+    // 大气透视要靠它区分"合成 pass 已经上过雾"和"这一像素合成 pass 根本不管"。
+    this.shared.uDepthValid.value = 1;
     const image = texture.image;
     const w = width || (image && image.width) || this.shared.uResolution.value.x;
     const h = height || (image && image.height) || this.shared.uResolution.value.y;
@@ -1058,6 +1132,27 @@ export class VfxSystem {
       this.shared.uSkyColor.value.set(
         SCRATCH_COLOR.r * skyIntensity, SCRATCH_COLOR.g * skyIntensity, SCRATCH_COLOR.b * skyIntensity);
     }
+  }
+
+  /**
+   * 大气透视。参数就是 SKY_PRESETS[...].fog 那一坨，原样传进来即可：
+   *   SetFog(preset.fog, preset.sunColor);
+   * 必须与喂给 post.Render 的是同一份 —— 两边对不齐，烟柱跨过屋脊线会裂成两截。
+   */
+  SetFog(fog, sunColor = null) {
+    const U = this.shared;
+    if (fog) {
+      U.uFogDensity.value = fog.density ?? 0.0145;
+      U.uFogFalloff.value = fog.falloff ?? 15;
+      U.uFogBase.value = fog.base ?? 0;
+      U.uFogMax.value = fog.max ?? 0.88;
+      if (fog.sky) U.uFogColorSky.value.fromArray(fog.sky);
+      if (fog.ground) U.uFogColorGround.value.fromArray(fog.ground);
+      U.uFogSunGain.value = fog.sunGain ?? 0.24;
+    } else {
+      U.uFogDensity.value = 0;
+    }
+    if (sunColor) U.uSunColorFog.value.fromArray(sunColor);
   }
 
   SetWind(vector) { this.wind.copy(vector); }
@@ -1641,9 +1736,16 @@ export class VfxSystem {
         s.vz = this._Signed(0.25) + this.wind.z * 0.4;
         s.ax = this.wind.x * 0.5;
         // 发烟筒是贴地翻滚的：浮力压到接近零，让它铺开而不是升柱
-        s.ay = source.groundHug ? 0.05 : 0.42;
+        //
+        // 事故：升柱那一支原来是 drag 1.3 配固定浮力 0.42 —— 闭式解的终速是 a/k，
+        // 也就是 0.32 m/s，rise 给到 3.4 也没用，初速在半秒内就被阻尼吃干净。
+        // 实测九秒寿命的"烟柱"最高只爬到 6.6 m，而同一片子膨到 11 m 半径：
+        // 宽度是高度的三倍多，柱子变成一颗球，几百片叠在一起 alpha 直接饱和。
+        // 天上那个越长越大的黑球就是这么来的（另一半原因是没有大气透视）。
+        // 浮力改成跟着 rise 走（a = rise·k），终速就等于 rise，柱子才真的是柱子。
+        s.ay = source.groundHug ? 0.05 : source.rise * BUOYANT_DRAG;
         s.az = this.wind.z * 0.5;
-        s.drag = source.groundHug ? 0.9 : 1.3;
+        s.drag = source.groundHug ? 0.9 : BUOYANT_DRAG;
         s.life = source.life * this._Range(0.75, 1.25);
         s.sizeStart = source.sizeStart;
         s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);

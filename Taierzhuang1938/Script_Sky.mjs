@@ -21,7 +21,14 @@ void main() {
 }
 `;
 
-const SKY_FRAG = /* glsl */`
+// 天空的解析式本体。抽成独立的一段 GLSL 是因为**探针体的漏空射线也要问同一片天**
+// （见 Script_Gi.mjs）：两处各抄一份的下场是改了天空预设、GI 还照着旧的天在积分，
+// 阴影侧的补光和天穹对不上色。uniform 声明一起抽出来，两边共用同一批 uniform 对象。
+//
+// sunDiskGain：天穹本体传 1.0；探针积分传 0.0 —— 太阳的直接光在材质里是
+// DirectionalLight 那一路算的，射线再撞上太阳盘就是双份，而且 0.003 大小的
+// 盘用 64 根射线去采必然爆方差（有的探针撞上、有的没撞上，闪成一片噪点）。
+export const SKY_RADIANCE_GLSL = /* glsl */`
 uniform vec3 uSunDirection;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
@@ -36,7 +43,6 @@ uniform vec3 uSmokeColor;
 uniform float uSmokeHeight;
 uniform float uStars;
 uniform float uTime;
-varying vec3 vWorldDirection;
 
 float Hash31(vec3 p) {
   p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
@@ -59,8 +65,7 @@ float Fbm3(vec3 p) {
   return v;
 }
 
-void main() {
-  vec3 dir = normalize(vWorldDirection);
+vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   float up = dir.y;
   float sunDot = dot(dir, normalize(uSunDirection));
 
@@ -74,7 +79,7 @@ void main() {
 
   // --- 太阳盘：给足 HDR 值，泛光与 IBL 都靠它 ---
   float disk = smoothstep(1.0 - uSunSize, 1.0 - uSunSize * 0.35, sunDot);
-  sky += uSunColor * disk * uSunIntensity;
+  sky += uSunColor * disk * uSunIntensity * sunDiskGain;
 
   // --- 高空烟／云：拉长的 fbm，越靠地平线越压扁 ---
   if (uSmoke > 0.001) {
@@ -106,7 +111,7 @@ void main() {
   sky = mix(sky, uGround, smoothstep(0.0, -0.14, up));
 
   // --- 星（夜战关）---
-  if (uStars > 0.001 && up > 0.0) {
+  if (uStars > 0.001 && up > 0.0 && sunDiskGain > 0.5) {
     // 190 的格距在 1600×900 上一格有 4—8 px 宽，而 floor() 取的是整格常数 ——
     // 星星就是一个个硬边方块，还会被 FXAA 啃出十字，看着像屏幕坏点。
     // 900 让一格缩到 1—2 px，再乘一个格内径向衰减把方块磨成圆点。
@@ -116,7 +121,14 @@ void main() {
     sky += vec3(0.85, 0.9, 1.0) * star * uStars * smoothstep(0.02, 0.35, up);
   }
 
-  gl_FragColor = vec4(max(sky, vec3(0.0)), 1.0);
+  return max(sky, vec3(0.0));
+}
+`;
+
+const SKY_FRAG = SKY_RADIANCE_GLSL + /* glsl */`
+varying vec3 vWorldDirection;
+void main() {
+  gl_FragColor = vec4(SkyRadiance(normalize(vWorldDirection), 1.0), 1.0);
 }
 `;
 
@@ -318,7 +330,12 @@ export class SkyDome {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -1000;
     this.mesh.name = "SkyDome";
-    // 天空穹不参与 AO/法线预通道 —— 它没有法线可言，混进去只会把远景 AO 弄脏
+    // 天空穹不参与 AO/法线预通道 —— 它没有法线可言，混进去只会把远景 AO 弄脏。
+    // 光靠上面那行 allowOverride = false 不够：那只保证"不被换材质"，天空穹
+    // 照样会用自己这套着色器画进预通道，把天空色写进 xyz、把不透明度 1.0 写进 w。
+    // 下游全按 w = 线性视深度读，于是整片天空被当成"一米外有实体"——
+    // 天空前的烟被软粒子整片抹掉、大气透视补不上，远处就多了个越长越大的黑洞。
+    // 真正生效的是这一行：PostPipeline 的预通道会把标了它的对象整个藏掉。
     this.mesh.userData.skipNormalDepth = true;
 
     this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;

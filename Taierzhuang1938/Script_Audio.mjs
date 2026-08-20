@@ -1187,6 +1187,8 @@ const MIX_GAIN = {
 //      归一化过，峰值都在 0.85—0.97，直接用的话一记脚步和一发炮弹一样响。
 // ===========================================================================
 export const SFX_BASE = "Audio/Sfx/";
+export const AMB_BASE = "Audio/Amb/";
+export const MUSIC_BASE = "Audio/Music/";
 
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
 const SAMPLE_BURST = {
@@ -1224,6 +1226,17 @@ const SAMPLE_WET = {
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
   footstepDirt: 0.12, footstepRubble: 0.12,
+};
+
+/**
+ * 环境一次性音的混响 send。整体比音效那张表更湿 —— 这些东西**全都在远处**，
+ * 而远处的声音里混响占比就是更高（直达声按距离衰减，混响场基本不衰减）。
+ * 落屑与吱呀是例外：那两样就在你旁边的废墟上。
+ */
+const AMB_WET = {
+  "amb.cannonFar": 0.6, "amb.whizz": 0.3, "amb.crow": 0.5, "amb.dogFar": 0.55,
+  "amb.rooster": 0.55, "amb.creak": 0.22, "amb.debris": 0.2,
+  "amb.planeFar": 0.5, "amb.moanFar": 0.6,
 };
 
 /**
@@ -1279,59 +1292,278 @@ function BugleSampleRecipe(buffer, toneHz) {
 // ===========================================================================
 // 环境床与音乐的编排表
 // ===========================================================================
+// 环境事件调度的节拍：0.4 秒掷一次骰子，一分钟 150 次。
+const AMB_TICK_MS = 400;
+const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
+
+/**
+ * 环境床编排表。**按天空预设取名**（Script_Sky 的 SKY_PRESETS），
+ * 关卡切场时直接把 phase.sky 递进来就行 —— 上一版在 Script_Main 里写
+ * `night ? "night" : dawn ? "dawn" : "battle"`，于是「烟尘白天」和「烧着的街」
+ * 共用同一档环境，第三关整条街在烧却听不见火。
+ *
+ * 一档 = 若干条实录床（layers）+ 撒在上面的一次性音（events）。
+ *   layers[].bed   Data_AmbManifest.json 里的床名
+ *   layers[].gain  这一层的音量（**层间的配平就是全部的调音**：
+ *                  同样几条素材，火 0.8 与火 0.3 是两个不同的战场）
+ *   layers[].seg   一条播放头放多久再换到下一个随机位置（秒，默认 11）
+ *   events[].perMin 一分钟平均响几次
+ *
+ * 层数控制在 4 条以内：每条床同时挂两条播放头（source+gain），
+ * 4 条就是 16 个常驻节点，占掉 NODE_BUDGET 的 13% —— 再多就要从枪声里抢了。
+ */
 export const AMBIENCE_PRESETS = {
-  silence: { wind: 0, windCut: 300, space: "street", events: [] },
-  day: {
-    wind: 0.055, windCut: 420, space: "street",
+  silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
+
+  // 序 · 上墙（L0，smokyDay）：站在北寨墙上，墙北是护城河与开阔地。
+  // 风最大、远处最响、流弹最多 —— 这一关是「你正站在战线上」。
+  smokyDay: {
+    space: "open", fallbackWind: 0.075, fallbackCut: 520,
+    layers: [
+      { bed: "windPlain", gain: 0.9, seg: 13 },
+      { bed: "battleFar", gain: 0.85, seg: 11 },
+      { bed: "shellingFar", gain: 0.7, seg: 9 },
+      { bed: "crowdFar", gain: 0.3, seg: 10 },
+    ],
     events: [
-      { name: "rifleNraFar", chance: 0.05, volume: 0.16 },
-      { name: "explosionFar", chance: 0.012, volume: 0.14 },
+      { name: "amb.whizz", perMin: 5.0, volume: 0.5 },
+      { name: "amb.cannonFar", perMin: 3.0, volume: 0.55 },
+      { name: "rifleNraFar", perMin: 9.0, volume: 0.24 },
+      { name: "rifleIjaFar", perMin: 7.0, volume: 0.22 },
+      { name: "type92", perMin: 2.0, volume: 0.13, burst: 4 },
+      { name: "amb.crow", perMin: 0.8, volume: 0.3 },
+      { name: "amb.planeFar", perMin: 0.5, volume: 0.4 },
     ],
   },
-  // 战斗：远处零星枪声（间隔随机）+ 远处炮的闷响 + 风。
-  // 关键是**别太密**：一直响的话，玩家分不出「远处在打」和「打到我头上了」。
-  battle: {
-    wind: 0.075, windCut: 520, space: "street",
-    events: [
-      { name: "rifleNraFar", chance: 0.24, volume: 0.24 },
-      { name: "rifleIjaFar", chance: 0.20, volume: 0.22 },
-      { name: "explosionFar", chance: 0.075, volume: 0.34 },
-      { name: "type92", chance: 0.045, volume: 0.13, burst: 4 },
-      { name: "zb26", chance: 0.05, volume: 0.12, burst: 5 },
-    ],
-  },
-  night: {
-    wind: 0.07, windCut: 340, space: "open", crickets: 0.055,
-    events: [
-      { name: "rifleIjaFar", chance: 0.045, volume: 0.13 },
-      { name: "explosionFar", chance: 0.02, volume: 0.16 },
-    ],
-  },
+
+  // 一 · 破口（L1）与 五 · 天亮（L5）都是 dawn。天光刚起，城外的鸡还在打鸣 ——
+  // 这一声是整套环境里唯一的「日子还在过」，别调响，远远的就够。
   dawn: {
-    wind: 0.05, windCut: 480, space: "open", birds: 0.5,
+    space: "open", fallbackWind: 0.05, fallbackCut: 480,
+    layers: [
+      { bed: "dawnField", gain: 0.7, seg: 15 },
+      { bed: "windPlain", gain: 0.5, seg: 12 },
+      { bed: "battleFar", gain: 0.55, seg: 11 },
+      { bed: "fireFar", gain: 0.3, seg: 7 },
+    ],
     events: [
-      { name: "rifleNraFar", chance: 0.02, volume: 0.1 },
+      { name: "amb.rooster", perMin: 0.7, volume: 0.34 },
+      { name: "amb.crow", perMin: 1.2, volume: 0.3 },
+      { name: "rifleNraFar", perMin: 4.0, volume: 0.2 },
+      { name: "rifleIjaFar", perMin: 3.5, volume: 0.19 },
+      { name: "amb.cannonFar", perMin: 1.2, volume: 0.4 },
+      { name: "amb.dogFar", perMin: 0.8, volume: 0.26 },
+    ],
+  },
+
+  // 二 · 巷战（L2，burningStreet）：整条街在烧。近火是这一档的主角，
+  // 风退到街巷里（windStreet 带着零碎的吱呀），远处的仗反而被火盖掉一半。
+  burningStreet: {
+    space: "street", fallbackWind: 0.06, fallbackCut: 400,
+    layers: [
+      { bed: "fireNear", gain: 0.8, seg: 7 },
+      { bed: "windStreet", gain: 0.6, seg: 11 },
+      { bed: "battleFar", gain: 0.7, seg: 10 },
+      { bed: "fireFar", gain: 0.45, seg: 6 },
+    ],
+    events: [
+      { name: "amb.debris", perMin: 4.0, volume: 0.4 },
+      { name: "amb.creak", perMin: 3.0, volume: 0.34 },
+      { name: "amb.whizz", perMin: 4.0, volume: 0.45 },
+      { name: "rifleIjaFar", perMin: 6.0, volume: 0.22 },
+      { name: "rifleNraFar", perMin: 5.0, volume: 0.22 },
+      { name: "zb26", perMin: 2.0, volume: 0.13, burst: 5 },
+      { name: "amb.cannonFar", perMin: 1.5, volume: 0.42 },
+    ],
+  },
+
+  // 三 · 白毛巾（L3）与 四 · 最后五分钟（L4）都是 night。
+  // **夜里最要紧的是「静」**：床只剩风，远处的仗压到刚够听见。
+  // 狗、呻吟、木料吱呀撒得极稀（一分钟一两次）—— 稀才吓人，密了就成了背景音乐。
+  night: {
+    space: "open", fallbackWind: 0.045, fallbackCut: 340,
+    layers: [
+      { bed: "windNight", gain: 0.8, seg: 17 },
+      { bed: "battleFar", gain: 0.32, seg: 11 },
+      { bed: "shellingFar", gain: 0.3, seg: 9 },
+      { bed: "fireFar", gain: 0.22, seg: 7 },
+    ],
+    events: [
+      { name: "amb.dogFar", perMin: 1.5, volume: 0.3 },
+      { name: "amb.moanFar", perMin: 0.9, volume: 0.26 },
+      { name: "amb.creak", perMin: 1.6, volume: 0.28 },
+      { name: "rifleIjaFar", perMin: 2.0, volume: 0.15 },
+      { name: "amb.cannonFar", perMin: 0.8, volume: 0.34 },
+    ],
+  },
+
+  // 黄昏与阴天：Script_Sky 里有这两档，关卡表暂时没人用，
+  // 但环境表不许有洞 —— 一旦某关改成 dusk 却没有对应环境，游戏是**静音**的，
+  // 而静音这种失败在冒烟测试里看不出来。
+  dusk: {
+    space: "open", fallbackWind: 0.055, fallbackCut: 440,
+    layers: [
+      { bed: "windPlain", gain: 0.75, seg: 13 },
+      { bed: "battleFar", gain: 0.5, seg: 11 },
+      { bed: "fireFar", gain: 0.35, seg: 7 },
+    ],
+    events: [
+      { name: "amb.crow", perMin: 1.5, volume: 0.32 },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.2 },
+      { name: "amb.cannonFar", perMin: 1.0, volume: 0.36 },
+      { name: "amb.dogFar", perMin: 0.7, volume: 0.24 },
+    ],
+  },
+  overcast: {
+    space: "street", fallbackWind: 0.06, fallbackCut: 460,
+    layers: [
+      { bed: "windStreet", gain: 0.75, seg: 12 },
+      { bed: "battleFar", gain: 0.65, seg: 11 },
+      { bed: "crowdFar", gain: 0.35, seg: 10 },
+      { bed: "shellingFar", gain: 0.45, seg: 9 },
+    ],
+    events: [
+      { name: "amb.whizz", perMin: 3.0, volume: 0.45 },
+      { name: "rifleNraFar", perMin: 6.0, volume: 0.22 },
+      { name: "rifleIjaFar", perMin: 5.0, volume: 0.21 },
+      { name: "amb.debris", perMin: 2.0, volume: 0.34 },
+      { name: "amb.cannonFar", perMin: 1.5, volume: 0.4 },
     ],
   },
 };
 
-// 音乐。四个 cue 全是合成音色，**不做电影配乐**：
-// 这场仗的声音本体是枪炮，音乐只负责在缝隙里给一个情绪的落点。
+/**
+ * 音乐。**五段实录（生成）曲子**，一段一个 cue，提示词与选段规则见
+ * Data_MusicSources.mjs，成品在 Audio/Music/，由 Script_MusicBake.mjs 烘。
+ *
+ * 上一版这里是四条 WebAudio 配方（低音提琴式持续音 + 简化铜管 + 独奏弦 + 军鼓），
+ * 音高按 D 小调五声骨架排。整套删掉了，**没有留合成兜底**：
+ * 一个振荡器过低通，包络写得再细也是电子管风琴，那正是「氛围完全不对」的来源。
+ * 载不到就没有音乐 —— **没有音乐的战场仍然是能打的战场，走调的配乐不是**。
+ *
+ * 原则没变（上一版这句是对的，只是执行不到位）：
+ * 这场仗的声音本体是枪炮，音乐只负责在缝隙里给一个情绪的落点。
+ * 所以 level 全部压得很低，而且大部分时间根本不放。
+ */
 export const MUSIC_CUES = {
-  // 菜单：一条不动的低音 + 极稀的单音，像空屋子里的余响。
-  menu: { bpm: 52, bass: [0, null, 0, null], motif: [7, null, null, 5], solo: null, drum: false, level: 0.5 },
-  // 紧张：低音提琴式持续音 + 一个反复回来的小二度动机（最省的「不安」）。
-  tension: { bpm: 46, bass: [0, 0, -5, -5], motif: [null, 1, null, 0], solo: null, drum: false, level: 0.55 },
-  // 反攻：进行曲的**节奏骨架**（强弱 强弱，附点在前）+ 四度五度的上行走向。
-  // 只借《大刀进行曲》那类军歌的律动与音程方向，不写它的旋律。
-  charge: { bpm: 112, bass: [0, 0, 5, 5], motif: [0, 5, 7, 12], solo: null, drum: true, level: 0.62 },
-  // 战后：一件独奏乐器的长音，别的什么都不加。
-  aftermath: { bpm: 40, bass: [0, null, null, null], motif: null, solo: [0, 3, 5, 3], drum: false, level: 0.5 },
+  // 进城之前：一间空屋子。
+  menu: { level: 0.55, label: "菜单" },
+  // 白天守城时垫在枪炮底下的一层，几乎察觉不到 —— 察觉到了就说明太响。
+  siege: { level: 0.3, label: "守城" },
+  // 夜里潜行与等待。
+  tension: { level: 0.38, label: "夜" },
+  // 反攻与白刃，五段里唯一有律动的。
+  charge: { level: 0.6, label: "反攻" },
+  // 结局。全场唯一允许「像配乐」的地方 —— 仗已经打完了。
+  aftermath: { level: 0.62, label: "战后" },
 };
 
-// D 小调五声骨架的半音偏移基准（以 D2 = 73.42 Hz 为根）。
-const MUSIC_ROOT = 73.42;
-const SemiToHz = (semi) => MUSIC_ROOT * Math.pow(2, semi / 12);
+/**
+ * 一条环境床。**它没有循环点。**
+ *
+ * 做法是老录音棚那一手：同一条素材挂两条播放头，各自从**随机位置**起播，
+ * 一条放到一半时另一条淡进来，两条等功率交叉，然后前一条淡出停掉。
+ * 于是听到的是一条永远接得上、却永远不重复的空气。
+ *
+ * 为什么不烘一个无缝 loop 再 loop=true：
+ *   1. **MP3 有编码器补零**。解出来首尾各多十几毫秒静音，接缝处必咔一下，
+ *      而且不同浏览器补的量还不一样，没法在烘焙期抵消。
+ *   2. 无缝也挡不住「记住」。风的某一记呼啸每 23 秒回来一次，
+ *      玩家两三分钟内一定会认出来 —— 露馅的从来不是接缝，是重复本身。
+ *
+ * 代价是常驻 4 个节点（两条播放头各 source+gain）。为此每条床都不开 panner：
+ * 素材本身就是立体声，宽度已经在里面了。
+ */
+class LoopLayer {
+  constructor(engine, buffer, cfg) {
+    this.engine = engine;
+    this.buffer = buffer;
+    this.level = cfg.gain ?? 0.6;
+    this.busName = cfg.bus || "ambience";
+    // random=false 是音乐用的：曲子必须从头放，随机起播点对音乐是灾难。
+    this.random = cfg.random !== false;
+    // 一条播放头放多久。素材短的时候按比例缩 —— 不缩的话随机起播点会被挤没，
+    // 每次都从头附近开始，等于又变回了循环。
+    this.seg = this.random ? Math.min(cfg.seg ?? 11, buffer.duration * 0.55) : (cfg.seg ?? buffer.duration * 0.8);
+    this.xf = cfg.fade ?? Math.min(3.0, this.seg * 0.4);
+    this.heads = new Set();
+    this.timer = 0;
+    this.stopped = false;
+    this.rng = Mulberry32(HashString("loop:" + (cfg.bed || "?")));
+    this.nextAt = 0;
+  }
+
+  Start() {
+    if (!this.engine.ctx) return;
+    this.nextAt = this.engine.ctx.currentTime + 0.05;
+    this.Spawn(true);
+  }
+
+  /** 起一条新播放头，并把下一条排进日程。 */
+  Spawn(first) {
+    const engine = this.engine;
+    const ctx = engine.ctx;
+    if (this.stopped || !ctx) return;
+    const at = Math.max(ctx.currentTime + 0.02, this.nextAt);
+    // 素材里随机取一个起点，保证放得完 seg + 淡出。
+    const room = Math.max(0, this.buffer.duration - (this.seg + this.xf + 0.1));
+    const offset = this.random ? this.rng() * room : 0;
+    const src = ctx.createBufferSource();
+    src.buffer = this.buffer;
+    const g = ctx.createGain();
+    // 每条播放头的音量再抖一点：床于是有很慢的起伏，像风一阵一阵的。
+    // 每条播放头的音量再抖一点：床于是有很慢的起伏，像风一阵一阵的。
+    // 音乐不抖 —— 一段曲子每循环一次响度变一点，听起来像有人在推推子。
+    const level = this.random ? this.level * (0.82 + this.rng() * 0.36) : this.level;
+    const fadeIn = first ? Math.min(2.5, this.xf) : this.xf;
+    g.gain.setValueAtTime(FLOOR, at);
+    // 等功率交叉在这里用「先快后慢」的两段近似：直接线性交叉会在中点掉 3 dB，
+    // 一条一直在响的床上，每 11 秒陷一下比循环还明显。
+    g.gain.setTargetAtTime(level, at, fadeIn * 0.32);
+    const outAt = at + this.seg;
+    g.gain.setValueAtTime(level, outAt);
+    g.gain.setTargetAtTime(FLOOR, outAt, this.xf * 0.32);
+    src.connect(g).connect(engine.Bus(this.busName));
+    src.start(at, offset, this.seg + this.xf + 0.05);
+    const head = { src, g };
+    this.heads.add(head);
+    engine.liveNodes += 2;
+    // 回收点按**绝对时间**算：at 可能比现在晚（第一条留了 50 ms 余量），
+    // 按 seg 直接算相对毫秒会早回收，把还在响的那一段掐掉。
+    head.timer = engine.Later((at + this.seg + this.xf + 0.2 - ctx.currentTime) * 1000, () => this.Kill(head));
+
+    // 下一条在这一条开始淡出的时刻起播 —— 两条重叠 xf 秒。
+    this.nextAt = outAt;
+    const wait = Math.max(60, (this.nextAt - ctx.currentTime) * 1000 - 120);
+    this.timer = engine.Later(wait, () => this.Spawn(false));
+  }
+
+  Kill(head) {
+    if (!this.heads.delete(head)) return;
+    try { head.src.stop(); } catch (err) { /* 已经停了 */ }
+    try { head.src.disconnect(); head.g.disconnect(); } catch (err) { /* ok */ }
+    this.engine.liveNodes = Math.max(0, this.engine.liveNodes - 2);
+  }
+
+  /** 停。fade > 0 时先淡出再回收（切音乐用；环境切场时是硬停，反正紧接着就换了一层）。 */
+  Stop(fade = 0) {
+    this.stopped = true;
+    if (this.timer) { clearTimeout(this.timer); this.engine.timers.delete(this.timer); this.timer = 0; }
+    const ctx = this.engine.ctx;
+    for (const head of Array.from(this.heads)) {
+      if (head.timer) { clearTimeout(head.timer); this.engine.timers.delete(head.timer); }
+      if (fade > 0 && ctx) {
+        head.timer = 0;
+        head.g.gain.cancelScheduledValues(ctx.currentTime);
+        head.g.gain.setValueAtTime(Math.max(FLOOR, head.g.gain.value), ctx.currentTime);
+        head.g.gain.setTargetAtTime(FLOOR, ctx.currentTime, fade * 0.32);
+        this.engine.Later(fade * 1000 + 120, () => this.Kill(head));
+      } else {
+        this.Kill(head);
+      }
+    }
+  }
+}
 
 // ===========================================================================
 // AudioEngine
@@ -1372,11 +1604,19 @@ export class AudioEngine {
     this.lastError = null;            // 最近一次配方异常，给调试用（正常一直是 null）
     this.errorCount = 0;
     this.ambienceNodes = [];
-    this.musicNodes = [];
+    // --- 实录环境床。载不到就退回一层合成的风，同样不影响任何其他功能 ---
+    this.ambBuffers = new Map();     // 床名 -> AudioBuffer
+    this.ambLayers = [];             // 当前这一档正在放的床
+    this.ambErrors = [];
+    this.ambReady = false;
+    this.ambManifest = null;
+    // --- 实录（生成）音乐。没有合成兜底：载不到就是没有音乐 ---
+    this.musicBuffers = new Map();   // cue -> AudioBuffer
+    this.musicLayer = null;          // 当前在放的那一段
+    this.musicErrors = [];
+    this.musicReady = false;
     this.ambiencePreset = "silence";
     this.musicCue = null;
-    this.musicStep = 0;
-    this.musicNextTime = 0;
     this.disposed = false;
     // 听者位姿的缓存：Play 里要按距离算低通与 HRTF 开关，每次读 camera 太贵。
     this.listenerPos = { x: 0, y: 1.6, z: 0 };
@@ -1456,7 +1696,9 @@ export class AudioEngine {
     this.duckGain = ctx.createGain();
     this.duckGain.connect(this.masterGain);
     this.musicBus = ctx.createGain();
-    this.musicBus.gain.value = 0.5;
+    // 常数。每段曲子的配平在 MUSIC_CUES[cue].level 上，由 LoopLayer 施加 ——
+    // 上一版是 Music() 去 ramp 这条总线，于是「切 cue」和「调音量」用的是同一个旋钮。
+    this.musicBus.gain.value = 1;
     this.musicUser = ctx.createGain();
     this.musicUser.gain.value = this.mix.music;
     this.musicBus.connect(this.musicUser).connect(this.duckGain);
@@ -1503,6 +1745,24 @@ export class AudioEngine {
     if (!this.sfxReady && !this.sfxLoading) {
       this.sfxLoading = true;
       this.LoadSfxPack(SFX_BASE).catch(() => {});
+    }
+    // 环境床约 1.2 MB，是三个包里最大的一份，但**必须和别的并行拉**：
+    // 串在音效后面的话，开局头十几秒是一片死寂，那正是玩家第一次听这个游戏的时候。
+    if (!this.ambReady && !this.ambLoading) {
+      this.ambLoading = true;
+      this.LoadAmbPack(AMB_BASE).then((n) => {
+        // 载完时如果已经在某一档环境里了，就地重开一次 —— 否则这一关自始至终
+        // 都在用合成兜底的那层风，玩家听不到刚下载完的那 1.2 MB。
+        if (n > 0 && this.ambiencePreset && this.ambiencePreset !== "silence") this.Ambience(this.ambiencePreset);
+      }).catch(() => {});
+    }
+    // 音乐 1.8 MB，最后拉。同样要在载完后补一次 —— 否则「进城前」那段
+    // 永远赶不上开机那一刻。
+    if (!this.musicReady && !this.musicLoading) {
+      this.musicLoading = true;
+      this.LoadMusicPack(MUSIC_BASE).then((n) => {
+        if (n > 0 && this.musicCue) this.Music(this.musicCue);
+      }).catch(() => {});
     }
   }
 
@@ -1698,6 +1958,111 @@ export class AudioEngine {
   }
 
   /**
+   * 载入实录环境包（Audio/Amb/Data_AmbManifest.json，由 Script_AmbBake.mjs 生成）。
+   *
+   * 两类东西：
+   *   · beds —— 长段的空气，解成 AudioBuffer 存着，由 AmbLayer 拿去放。
+   *   · cues —— 一次性音（狗、乌鸦、弹啸、落屑…），**注册成新的配方**，
+   *     名字统一带 `amb.` 前缀。这一步刻意与 LoadVoices 走同一条路子：
+   *     进了 RECIPES，去重、预算闸、声像、混响 send 这一整套就原封不动地复用了。
+   *
+   * 与音效包的一处不同：这些 cue **没有同名的合成配方可盖**，载不到就是没有。
+   * 这是故意的 —— 一只合成的乌鸦比没有乌鸦更糟。
+   *
+   * 失败一律吞掉并计数（this.ambErrors），绝不抛。
+   *
+   * @returns {Promise<number>} 载进来的床 + 一次性音总数
+   */
+  async LoadAmbPack(base = AMB_BASE) {
+    if (!this.ctx || this.disposed) return 0;
+    let manifest = null;
+    try {
+      const res = await fetch(base + "Data_AmbManifest.json");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      manifest = await res.json();
+    } catch (err) {
+      this.ambErrors.push({ file: "Data_AmbManifest.json", message: err && err.message });
+      return 0;
+    }
+    this.ambManifest = manifest;
+    let ok = 0;
+
+    const beds = Object.entries(manifest.beds || {});
+    await Promise.all(beds.map(async ([bed, entry]) => {
+      try {
+        const res = await fetch(base + entry.file);
+        if (!res.ok) throw new Error(entry.file + " HTTP " + res.status);
+        const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+        this.ambBuffers.set(bed, buf);
+        ok += 1;
+      } catch (err) {
+        this.ambErrors.push({ file: entry.file || bed, message: err && err.message });
+      }
+    }));
+
+    const cues = Object.entries(manifest.cues || {});
+    await Promise.all(cues.map(async ([cue, entry]) => {
+      const files = entry.files || (entry.file ? [entry.file] : []);
+      try {
+        const buffers = await Promise.all(files.map(async (file) => {
+          const res = await fetch(base + file);
+          if (!res.ok) throw new Error(file + " HTTP " + res.status);
+          return this.ctx.decodeAudioData(await res.arrayBuffer());
+        }));
+        if (!buffers.length) throw new Error("清单里没有文件");
+        const name = "amb." + cue.replace(/^amb/, "").replace(/^./, (c) => c.toLowerCase());
+        SAMPLE_WET[name] = AMB_WET[name] ?? 0.45;      // SampleRecipe 建的时候要读到
+        RECIPES[name] = SampleRecipe(buffers, name);
+        MIX_GAIN[name] = 1;
+        NODE_COST[name] = 2;
+        this.sampleCues.add(name);
+        ok += 1;
+      } catch (err) {
+        this.ambErrors.push({ file: files[0] || cue, message: err && err.message });
+      }
+    }));
+
+    this.ambReady = this.ambBuffers.size > 0;
+    return ok;
+  }
+
+  /**
+   * 载入音乐包（Audio/Music/Data_MusicManifest.json，由 Script_MusicBake.mjs 生成）。
+   *
+   * 五段合起来约 1.8 MB，是三个包里最大的一份，所以**最后拉**：
+   * 音效与人声关系到「打得响不响」，音乐晚十秒才进来没人会在意。
+   * 与音效包的两处不同：没有同名合成配方可盖（合成音乐整套删了），
+   * 而且不进 RECIPES —— 音乐是一条常驻的循环，不是一次性音。
+   *
+   * @returns {Promise<number>} 解码成功的段数
+   */
+  async LoadMusicPack(base = MUSIC_BASE) {
+    if (!this.ctx || this.disposed) return 0;
+    let manifest = null;
+    try {
+      const res = await fetch(base + "Data_MusicManifest.json");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      manifest = await res.json();
+    } catch (err) {
+      this.musicErrors.push({ file: "Data_MusicManifest.json", message: err && err.message });
+      return 0;
+    }
+    let ok = 0;
+    await Promise.all(Object.entries(manifest.cues || {}).map(async ([cue, entry]) => {
+      try {
+        const res = await fetch(base + entry.file);
+        if (!res.ok) throw new Error(entry.file + " HTTP " + res.status);
+        this.musicBuffers.set(cue, await this.ctx.decodeAudioData(await res.arrayBuffer()));
+        ok += 1;
+      } catch (err) {
+        this.musicErrors.push({ file: entry.file || cue, message: err && err.message });
+      }
+    }));
+    this.musicReady = this.musicBuffers.size > 0;
+    return ok;
+  }
+
+  /**
    * 喊一句。按 kind 从声库里挑，自带节流。
    *
    * 节流不是性能考虑，是**听感**考虑：一条街上五十个人，不加闸门就会出现
@@ -1745,6 +2110,20 @@ export class AudioEngine {
     return this.Play("voice." + pick.key, { position, volume, pitch, priority });
   }
 
+  /**
+   * 把 WebAudio 的听者贴到相机上。**每帧都要调**（Script_Main 的 RenderScene 里）。
+   *
+   * 不调的后果比"方位不准"严重得多，因为整条空间化链路都挂在听者位置上：
+   *   · panner 的距离衰减 —— 听者停在原点、玩家在 1470 m 外时，直达声被压到
+   *     千分之六，实测比该有的电平低三十分贝，等于**battle 的干声整体消失**；
+   *   · 而混响 send 是在 Panner **之前**分出去的、根本不吃距离衰减，
+   *     于是剩下的全是混响尾巴 —— 全场几十发枪的尾巴糊成一片，
+   *     这就是"刚进游戏一片密密麻麻的音效"的成因；
+   *   · HRTF 只在 25 m 内开，距离恒为一千多米时永远走 equalpower，声像全在正中；
+   *   · 空气低通 18000/(1+0.09d) 被钳在 700 Hz 的地板上，所有枪声都是闷的。
+   * 城里几关更隐蔽：世界原点正好是十字街口，听着"有声音"，
+   * 但全城的枪都按你站在街心算，走到哪儿都一样响。
+   */
   SetListener(camera) {
     if (!this.ctx || !camera || !camera.matrixWorld) return;
     const e = camera.matrixWorld.elements;
@@ -1824,7 +2203,8 @@ export class AudioEngine {
     return voice;
   }
 
-  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false } = {}) {
+  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false,
+    bus = "sfx" } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -1900,9 +2280,9 @@ export class AudioEngine {
     } else if (pan !== 0 && ctx.createStereoPanner) {
       const sp = v.Own(ctx.createStereoPanner());
       sp.pan.value = Clamp(pan, -1, 1);
-      src.connect(sp).connect(this.sfxBus);
+      src.connect(sp).connect(this.Bus(bus));
     } else {
-      src.connect(this.sfxBus);
+      src.connect(this.Bus(bus));
     }
 
     try {
@@ -1961,6 +2341,13 @@ export class AudioEngine {
    * 玩家的分路音量。kind: "sfx" | "music" | "ambience"。
    * 写的是各自的 *User 节点，与系统自己的配平（cue level、duck）互不干扰。
    */
+  /** 分路总线。Play 的 bus 选项用它 —— 环境音走 ambienceBus，玩家那条「环境」推子才管得着。 */
+  Bus(kind) {
+    if (kind === "ambience") return this.ambienceBus;
+    if (kind === "music") return this.musicBus;
+    return this.sfxBus;
+  }
+
   SetBusVolume(kind, value) {
     const v = Clamp01(value);
     if (!(kind in this.mix)) return;
@@ -2056,11 +2443,18 @@ export class AudioEngine {
   // --- 环境床 -------------------------------------------------------------
 
   /**
-   * 切环境。风是常驻的循环层，零星事件由一个 0.4 秒粒度的调度器随机撒 ——
-   * **不许贴循环样本**：三十秒的战场循环听两遍就露馅，玩家会开始记「那声炮响
-   * 又来了」。撒出来的每一发都是现算的枪声，永远不重复。
+   * 切环境。一档环境 = 若干条**实录床**叠在一起 + 一个撒一次性音的调度器。
+   *
+   * 床的播放方式见 LoopLayer：两条播放头各自从素材的随机位置起播、互相交叉淡，
+   * 所以**没有循环点**，同一条 23 秒的素材永远不会以同样的方式接第二次。
+   *
+   * 采样载不到时退回一条合成的风（Fallback）—— 有底噪总比死寂强，
+   * 但**不再合成虫和鸟**：那两样一听就是振荡器，而且三月的鲁南本来也没有虫。
    */
   Ambience(preset) {
+    // 名字打错时退到 silence，但**要吭一声**：环境的失败是静默的，
+    // 一关从头到尾没有环境音，冒烟测试照样全绿。
+    if (preset && !AMBIENCE_PRESETS[preset]) console.warn("没有这一档环境：", preset);
     const name = AMBIENCE_PRESETS[preset] ? preset : "silence";
     this.ambiencePreset = name;
     if (!this.ctx) return;
@@ -2069,123 +2463,82 @@ export class AudioEngine {
     this.space = cfg.space || "street";
     if (name === "silence") return;
 
-    const ctx = this.ctx;
-    const t = ctx.currentTime;
-    const own = (n) => { this.ambienceNodes.push(n); this.liveNodes += 1; return n; };
-
-    // --- 风：棕噪 + 缓慢移动的低通。频率不动的话就是「白噪声开着」，不是风。
-    if (cfg.wind > 0) {
-      const src = own(ctx.createBufferSource());
-      src.buffer = this.NoiseBuffer("brown");
-      src.loop = true;
-      const lp = own(ctx.createBiquadFilter());
-      lp.type = "lowpass";
-      lp.frequency.value = cfg.windCut;
-      lp.Q.value = 0.6;
-      const lfo = own(ctx.createOscillator());
-      lfo.type = "sine";
-      lfo.frequency.value = 0.07;                    // 十几秒一次的呼吸
-      const lfoGain = own(ctx.createGain());
-      lfoGain.gain.value = cfg.windCut * 0.45;
-      lfo.connect(lfoGain).connect(lp.frequency);
-      const g = own(ctx.createGain());
-      g.gain.setValueAtTime(FLOOR, t);
-      g.gain.linearRampToValueAtTime(cfg.wind, t + 1.8);   // 淡入，别硬切
-      src.connect(lp).connect(g).connect(this.ambienceBus);
-      src.start(t);
-      lfo.start(t);
+    for (const layer of cfg.layers || []) {
+      const buffer = this.ambBuffers.get(layer.bed);
+      if (!buffer) continue;                       // 这一层没载到就少一层，其余照放
+      const inst = new LoopLayer(this, buffer, layer);
+      inst.Start();
+      this.ambLayers.push(inst);
     }
-
-    // --- 虫声：两条高频振荡器被一条 ~30 Hz 的方波门断成「唧唧唧」。
-    // 逐只虫去调度太贵（一片虫要几十个 voice），做成床最划算。
-    if (cfg.crickets) {
-      // 慢门（一阵一阵地叫，不是一直响）两层共用一条 —— 夜景的环境床是常驻开销，
-      // 省下来的每个节点都直接变成能同时响的枪声。
-      const slow = own(ctx.createOscillator());
-      slow.type = "sine";
-      slow.frequency.value = 0.11;
-      slow.start(t);
-      for (let i = 0; i < 2; i += 1) {
-        const osc = own(ctx.createOscillator());
-        osc.type = "sine";
-        osc.frequency.value = 4300 + i * 620;
-        const trill = own(ctx.createOscillator());
-        trill.type = "square";
-        trill.frequency.value = 27 + i * 5;
-        const trillGain = own(ctx.createGain());
-        trillGain.gain.value = 0.5;
-        const vca = own(ctx.createGain());
-        vca.gain.value = 0.5;
-        trill.connect(trillGain).connect(vca.gain);
-        const slowGain = own(ctx.createGain());
-        slowGain.gain.value = cfg.crickets * (0.6 - i * 0.15);   // 两层深度不同才不同步
-        const out = own(ctx.createGain());
-        out.gain.value = cfg.crickets * 0.4;
-        slow.connect(slowGain).connect(out.gain);
-        osc.connect(vca).connect(out).connect(this.ambienceBus);
-        osc.start(t); trill.start(t);
-      }
-    }
+    // 一条床都没有（整包没载到 / 还在下载）时才合成兜底。
+    if (!this.ambLayers.length) this.AmbienceFallback(cfg);
 
     this.ScheduleAmbienceEvent();
   }
 
-  /** 环境事件调度：每 0.4 秒掷一次骰子。间隔的不规则性就是「零星」的来源。 */
+  /**
+   * 采样没到位时的垫底：一层棕噪过缓慢移动的低通。
+   * 它**不是**上一版那个「环境床」——上一版拿它当主角，所以整场仗听着像开着的嘶声。
+   * 现在它只在实录载不到的那几秒里顶一下。
+   */
+  AmbienceFallback(cfg) {
+    const wind = cfg.fallbackWind ?? 0.05;
+    if (!(wind > 0)) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const own = (n) => { this.ambienceNodes.push(n); this.liveNodes += 1; return n; };
+    const src = own(ctx.createBufferSource());
+    src.buffer = this.NoiseBuffer("brown");
+    src.loop = true;
+    const lp = own(ctx.createBiquadFilter());
+    lp.type = "lowpass";
+    lp.frequency.value = cfg.fallbackCut ?? 420;
+    lp.Q.value = 0.6;
+    const lfo = own(ctx.createOscillator());
+    lfo.type = "sine";
+    lfo.frequency.value = 0.07;
+    const lfoGain = own(ctx.createGain());
+    lfoGain.gain.value = (cfg.fallbackCut ?? 420) * 0.45;
+    lfo.connect(lfoGain).connect(lp.frequency);
+    const g = own(ctx.createGain());
+    g.gain.setValueAtTime(FLOOR, t);
+    g.gain.linearRampToValueAtTime(wind, t + 1.8);
+    src.connect(lp).connect(g).connect(this.ambienceBus);
+    src.start(t);
+    lfo.start(t);
+  }
+
+  /**
+   * 环境事件调度：每 0.4 秒掷一次骰子。间隔的不规则性就是「零星」的来源。
+   * 表里写的是 perMin（一分钟平均几次）—— 比写 0.4 秒里的概率好读得多，
+   * 「远处的狗一分钟叫 1.5 次」是能想象的，「chance: 0.01」不是。
+   */
   ScheduleAmbienceEvent() {
     const cfg = AMBIENCE_PRESETS[this.ambiencePreset];
     if (!cfg || !this.ctx) return;
-    this.ambienceTimer = this.Later(400, () => {
+    this.ambienceTimer = this.Later(AMB_TICK_MS, () => {
       const c = AMBIENCE_PRESETS[this.ambiencePreset];
       if (!c) return;
-      for (let i = 0; i < c.events.length; i += 1) {
-        const ev = c.events[i];
-        if (this.ambienceRng() >= ev.chance) continue;
+      for (const ev of c.events || []) {
+        if (this.ambienceRng() >= (ev.perMin || 0) / AMB_TICKS_PER_MIN) continue;
         this.Play(ev.name, {
           volume: ev.volume * (0.7 + this.ambienceRng() * 0.6),
           // 远处的声音在立体声里撒开，别都堆在正中。
           pan: this.ambienceRng() * 2 - 1,
-          pitch: 0.9 + this.ambienceRng() * 0.2,
+          pitch: (ev.pitch ?? 1) * (0.94 + this.ambienceRng() * 0.12),
           delay: this.ambienceRng() * 0.35,
           burst: ev.burst ?? undefined,
+          bus: "ambience",
         });
       }
-      // 鸟：黎明专属，一小段上滑的啾。
-      if (c.birds && this.ambienceRng() < 0.09) this.Bird();
       this.ScheduleAmbienceEvent();
     });
   }
 
-  /** 一声鸟叫：两三个快速上滑的短音。用振荡器扫频比噪声更像鸟。 */
-  Bird() {
-    if (!this.ctx || this.liveNodes + 8 > NODE_BUDGET) return;
-    const ctx = this.ctx;
-    const t = ctx.currentTime + this.ambienceRng() * 0.2;
-    const nodes = [];
-    const count = 2 + Math.floor(this.ambienceRng() * 2);
-    const base = 2400 + this.ambienceRng() * 1600;
-    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    if (pan) { pan.pan.value = this.ambienceRng() * 2 - 1; pan.connect(this.ambienceBus); nodes.push(pan); }
-    for (let i = 0; i < count; i += 1) {
-      const at = t + i * 0.11;
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      const f0 = base * (0.9 + this.ambienceRng() * 0.3);
-      osc.frequency.setValueAtTime(f0, at);
-      osc.frequency.exponentialRampToValueAtTime(f0 * 1.5, at + 0.05);
-      osc.frequency.exponentialRampToValueAtTime(f0 * 1.1, at + 0.09);
-      const g = ctx.createGain();
-      Hit(g.gain, at, 0.045, 0.008, 0.08);
-      osc.connect(g).connect(pan || this.ambienceBus);
-      osc.start(at); osc.stop(at + 0.14);
-      nodes.push(osc, g);
-    }
-    this.liveNodes += nodes.length;
-    // 同 Deafen：挂进 pendingVoices，否则黎明关卡切场时这一串鸟会留在总线上。
-    this.ReleaseVoice({ nodes }, 0.7);
-  }
-
   StopAmbience() {
     if (this.ambienceTimer) { clearTimeout(this.ambienceTimer); this.timers.delete(this.ambienceTimer); this.ambienceTimer = 0; }
+    for (const layer of this.ambLayers) layer.Stop();
+    this.ambLayers.length = 0;
     for (const n of this.ambienceNodes) {
       try { if (n.stop) n.stop(); } catch (err) { /* 没 start 过 */ }
       try { n.disconnect(); } catch (err) { /* ok */ }
@@ -2193,195 +2546,40 @@ export class AudioEngine {
     this.liveNodes = Math.max(0, this.liveNodes - this.ambienceNodes.length);
     this.ambienceNodes.length = 0;
   }
-
   // --- 音乐 ---------------------------------------------------------------
 
   /**
    * 切音乐 cue。null = 停。
-   * 用「前瞻调度」：定时器只负责把未来 0.6 秒内的音排进 WebAudio 的时钟，
-   * 真正的发声时间由 ctx.currentTime 决定 —— setTimeout 的抖动有十几毫秒，
-   * 直接拿它触发的话，节奏会一直晃。
+   *
+   * 播放走 LoopLayer（与环境床同一个播放器），只是 random 关掉 ——
+   * 曲子必须从头放，随机起播点对音乐是灾难。首尾各留 3.2 秒交叉淡，
+   * 循环点因此听不出来。
+   *
+   * cue 之间是**交叉**而不是硬切：旧的淡出 1.6 秒，新的立刻淡入。
+   * 硬切在战斗里特别刺耳 —— 玩家会以为是自己把什么按坏了。
    */
   Music(cue) {
     const name = MUSIC_CUES[cue] ? cue : null;
+    if (cue && !MUSIC_CUES[cue]) console.warn("没有这一段音乐：", cue);
     this.musicCue = name;
     if (!this.ctx) return;
-    this.StopMusic();
+    this.StopMusic(1.6);
     if (!name) return;
-    this.musicStep = 0;
-    this.musicNextTime = this.ctx.currentTime + 0.15;
-    this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.musicBus.gain.setValueAtTime(FLOOR, this.ctx.currentTime);
-    this.musicBus.gain.linearRampToValueAtTime(MUSIC_CUES[name].level, this.ctx.currentTime + 2.0);
-    this.MusicTick();
-  }
-
-  MusicTick() {
-    if (!this.ctx || !this.musicCue) return;
-    const cfg = MUSIC_CUES[this.musicCue];
-    const beat = 60 / cfg.bpm;
-    const horizon = this.ctx.currentTime + 0.6;
-    while (this.musicNextTime < horizon) {
-      this.MusicStep(cfg, this.musicStep, this.musicNextTime, beat);
-      this.musicStep += 1;
-      this.musicNextTime += beat;
-    }
-    this.musicTimer = this.Later(180, () => this.MusicTick());
-  }
-
-  MusicStep(cfg, step, t, beat) {
-    const bar = cfg.bass.length;
-    const i = step % bar;
-    // 每四小节换一次和声底：一直不动会腻，动太多就成了配乐。
-    const phrase = Math.floor(step / (bar * 4)) % 2;
-    const shift = phrase === 0 ? 0 : -2;
-
-    if (cfg.bass[i] !== null && cfg.bass[i] !== undefined) {
-      this.BassNote(t, SemiToHz(cfg.bass[i] + shift), beat * (cfg.drum ? 0.9 : 3.4));
-    }
-    if (cfg.motif && cfg.motif[i] !== null && cfg.motif[i] !== undefined) {
-      const hz = SemiToHz(cfg.motif[i] + shift + 24);
-      this.BrassSimple(t + beat * 0.02, hz, beat * (cfg.drum ? 0.55 : 1.6), cfg.drum ? 0.16 : 0.09);
-    }
-    if (cfg.solo && cfg.solo[i] !== null && cfg.solo[i] !== undefined) {
-      this.SoloNote(t, SemiToHz(cfg.solo[i] + shift + 24), beat * 3.2);
-    }
-    if (cfg.drum) {
-      // 进行曲骨架：重拍在 1、3，附点前置的小军鼓在 2、4 的后半拍。
-      if (i % 2 === 0) this.MusicDrum(t, "low");
-      else this.MusicDrum(t, "high");
-      if (i % 2 === 1) this.MusicDrum(t + beat * 0.5, "high", 0.5);
-    }
-  }
-
-  /** 低音提琴式持续低音：泛音少的波 + 低通 + 慢起慢收。 */
-  BassNote(t, hz, dur) {
-    if (!this.ctx || this.liveNodes + 5 > NODE_BUDGET) return;
-    const ctx = this.ctx;
-    const osc = ctx.createOscillator();
-    osc.setPeriodicWave(this.Wave("bass"));
-    osc.frequency.value = hz;
-    const osc2 = ctx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.value = hz * 0.5;         // 低八度衬底，给「弓压在弦上」的重量
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.setValueAtTime(hz * 6, t);
-    lp.frequency.exponentialRampToValueAtTime(hz * 2.2, t + dur * 0.7);
-    lp.Q.value = 0.9;
-    const g = ctx.createGain();
-    Swell(g.gain, t, 0.34, dur * 0.22, dur * 0.4, dur * 0.5);
-    osc.connect(lp); osc2.connect(lp);
-    lp.connect(g).connect(this.musicBus);
-    osc.start(t); osc2.start(t);
-    osc.stop(t + dur + 0.6); osc2.stop(t + dur + 0.6);
-    this.TrackMusicNodes([osc, osc2, lp, g], dur + 0.9);
-  }
-
-  /** 单音动机用的简化铜管（一个振荡器 + 亮度包络）。 */
-  BrassSimple(t, hz, dur, level) {
-    if (!this.ctx || this.liveNodes + 4 > NODE_BUDGET) return;
-    const ctx = this.ctx;
-    const osc = ctx.createOscillator();
-    osc.setPeriodicWave(this.Wave("brass"));
-    osc.frequency.value = hz;
-    const bp = ctx.createBiquadFilter();
-    bp.type = "lowpass";
-    // 铜管的「亮」是起音时冲上去再回落，恒定亮度听着就是电子管风琴。
-    bp.frequency.setValueAtTime(hz * 2, t);
-    bp.frequency.linearRampToValueAtTime(hz * 8, t + 0.06);
-    bp.frequency.exponentialRampToValueAtTime(hz * 3, t + dur);
-    bp.Q.value = 1.1;
-    const g = ctx.createGain();
-    Swell(g.gain, t, level, 0.035, dur * 0.5, dur * 0.5);
-    osc.connect(bp).connect(g).connect(this.musicBus);
-    osc.start(t); osc.stop(t + dur + 0.4);
-    this.TrackMusicNodes([osc, bp, g], dur + 0.7);
-  }
-
-  /** 独奏长音（战后）：弦色 + 慢揉弦，一件乐器，别的什么都不加。 */
-  SoloNote(t, hz, dur) {
-    if (!this.ctx || this.liveNodes + 6 > NODE_BUDGET) return;
-    const ctx = this.ctx;
-    const osc = ctx.createOscillator();
-    osc.setPeriodicWave(this.Wave("string"));
-    osc.frequency.value = hz;
-    const vib = ctx.createOscillator();
-    vib.type = "sine";
-    vib.frequency.value = 4.6;
-    const vibGain = ctx.createGain();
-    // 揉弦要**延后**进来：一上来就抖是合成器，人是先出音再揉。
-    vibGain.gain.setValueAtTime(0, t);
-    vibGain.gain.linearRampToValueAtTime(14, t + dur * 0.35);
-    vib.connect(vibGain).connect(osc.detune);
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = hz * 2.6;
-    bp.Q.value = 1.6;
-    const g = ctx.createGain();
-    Swell(g.gain, t, 0.3, dur * 0.3, dur * 0.25, dur * 0.6);
-    osc.connect(bp).connect(g).connect(this.musicBus);
-    osc.start(t); vib.start(t);
-    osc.stop(t + dur + 0.8); vib.stop(t + dur + 0.8);
-    this.TrackMusicNodes([osc, vib, vibGain, bp, g], dur + 1.1);
-  }
-
-  /** 进行曲的鼓骨架。低 = 大鼓，高 = 小鼓（噪声）。 */
-  MusicDrum(t, kind, scale = 1) {
-    if (!this.ctx || this.liveNodes + 4 > NODE_BUDGET) return;
-    const ctx = this.ctx;
-    if (kind === "low") {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(110, t);
-      osc.frequency.exponentialRampToValueAtTime(44, t + 0.14);
-      const g = ctx.createGain();
-      Hit(g.gain, t, 0.34 * scale, 0.003, 0.2);
-      osc.connect(g).connect(this.musicBus);
-      osc.start(t); osc.stop(t + 0.3);
-      this.TrackMusicNodes([osc, g], 0.4);
-    } else {
-      const src = ctx.createBufferSource();
-      src.buffer = this.NoiseBuffer("white");
-      const hp = ctx.createBiquadFilter();
-      hp.type = "bandpass";
-      hp.frequency.value = 1900;
-      hp.Q.value = 0.8;
-      const g = ctx.createGain();
-      Hit(g.gain, t, 0.13 * scale, 0.002, 0.11);
-      src.connect(hp).connect(g).connect(this.musicBus);
-      src.start(t, 0.5, 0.2); src.stop(t + 0.2);
-      this.TrackMusicNodes([src, hp, g], 0.35);
-    }
-  }
-
-  TrackMusicNodes(nodes, seconds) {
-    this.liveNodes += nodes.length;
-    this.musicNodes.push(...nodes);
-    this.Later(seconds * 1000 + 200, () => {
-      // **只扣还在册的那些**。切 cue 时 StopMusic 已经把整批扣过一次了，
-      // 这里再按 nodes.length 扣一遍，liveNodes 会一路飘向 0 ——
-      // 预算闸门随之失效，切几次音乐之后同屏音效就无限制了。
-      let freed = 0;
-      for (const n of nodes) {
-        const idx = this.musicNodes.indexOf(n);
-        if (idx < 0) continue;
-        this.musicNodes.splice(idx, 1);
-        try { n.disconnect(); } catch (err) { /* ok */ }
-        freed += 1;
-      }
-      this.liveNodes = Math.max(0, this.liveNodes - freed);
+    const buf = this.musicBuffers.get(name);
+    if (!buf) return;                       // 还没载到（或载失败）：这一段就是没有音乐
+    const fade = Math.min(3.2, buf.duration * 0.2);
+    this.musicLayer = new LoopLayer(this, buf, {
+      bed: "music:" + name, gain: MUSIC_CUES[name].level, bus: "music",
+      random: false, seg: buf.duration - fade, fade,
     });
+    this.musicLayer.Start();
   }
 
-  StopMusic() {
-    if (this.musicTimer) { clearTimeout(this.musicTimer); this.timers.delete(this.musicTimer); this.musicTimer = 0; }
-    for (const n of this.musicNodes) {
-      try { if (n.stop) n.stop(); } catch (err) { /* 没 start 过 */ }
-      try { n.disconnect(); } catch (err) { /* ok */ }
-    }
-    this.liveNodes = Math.max(0, this.liveNodes - this.musicNodes.length);
-    this.musicNodes.length = 0;
+  /** 停音乐。fade > 0 时淡出，别硬掐。 */
+  StopMusic(fade = 0) {
+    if (!this.musicLayer) return;
+    this.musicLayer.Stop(fade);
+    this.musicLayer = null;
   }
 
   /**
