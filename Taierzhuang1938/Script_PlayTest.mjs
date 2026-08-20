@@ -443,7 +443,7 @@ Check("阵亡层半透明且保留战场",
   /^rgba\(/.test(death.cardBackground) && death.cardBackdrop !== "none",
   `${death.cardBackground} / ${death.cardBackdrop}`);
 Check("阵亡卡显示动态生平",
-  death.biography.includes("籍贯") && death.biography.includes("1938")
+  !death.biography.includes("籍贯") && death.biography.includes("1938")
     && death.biography.includes("第三十一师"), death.biography);
 Check("第一人称镜头倒到贴地侧卧",
   death.cameraDrop > 0.8 && death.deathRoll > 0.8,

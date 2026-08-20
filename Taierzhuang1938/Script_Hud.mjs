@@ -365,7 +365,7 @@ export class Hud {
 
   /**
    * 阵亡卡片。照 Easy Red 2 的呈现：第一人称倒地画面仍看得见，
-   * 全屏半透明去色，姓名（大）-> 籍贯 · 生卒（小）-> 番号（更小更暗）。
+   * 全屏半透明去色，姓名（特大加粗）-> 籍贯地名 · 生卒（小）-> 番号（更小更暗）。
    *
    * 为什么这张卡值得单独讲究：它是这个游戏唯一一处把"一条命"具体化的地方。
    * 姓名是中文的、籍贯是真地名（河北雄县、河南尉氏、陕西泾阳…按第 2 集团军的
@@ -379,7 +379,7 @@ export class Hud {
       + `<div class="dcKicker">阵亡</div>`
       + `<div class="dcName">${identity.name}</div>`
       + `<div class="dcRule"></div>`
-      + `<div class="dcOrigin">籍贯　${identity.origin}</div>`
+      + `<div class="dcOrigin">${identity.origin}</div>`
       + `<div class="dcYears">${born} — 1938</div>`
       + `<div class="dcUnit">${unit}</div>`
       + `</div>`;

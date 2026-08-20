@@ -49,6 +49,10 @@ try {
 
     const card = document.querySelector(".hudDeathCard");
     const style = getComputedStyle(card);
+    const biographyNode = card.querySelector(".dcBiography");
+    const biographyStyle = getComputedStyle(biographyNode);
+    const biographyRect = biographyNode.getBoundingClientRect();
+    const nameStyle = getComputedStyle(card.querySelector(".dcName"));
     const dof = T.post.uniformsComposite;
     const probe = document.createElement("canvas");
     probe.width = 96; probe.height = 54;
@@ -69,7 +73,11 @@ try {
       roll: Math.abs(T.camera.rotation.z),
       cardOn: card.classList.contains("on"),
       background: style.backgroundColor,
-      biography: card.querySelector(".dcBiography")?.textContent || "",
+      biography: biographyNode?.textContent || "",
+      biographyCentered: Math.abs(biographyRect.left + biographyRect.width * 0.5
+        - innerWidth * 0.5) < 2 && biographyStyle.textAlign === "center",
+      nameFontPx: parseFloat(nameStyle.fontSize),
+      nameWeight: parseInt(nameStyle.fontWeight, 10),
       dofStrength: dof.uDofStrength.value,
       dofFocus: dof.uDofFocus.value,
       dofRange: dof.uDofRange.value,
@@ -89,8 +97,9 @@ try {
     ["前景焦点重 DOF", result.dofStrength > 0.95 && result.dofFocus <= 1.5
       && result.dofRange <= 3 && result.dofMaxPx >= 10,
     `strength=${result.dofStrength} focus=${result.dofFocus} range=${result.dofRange} max=${result.dofMaxPx}px`],
-    ["半透明生平 UI", result.cardOn && /^rgba\(/.test(result.background)
-      && result.biography.includes("籍贯") && result.biography.includes("1938"),
+    ["居中大号粗体生平 UI", result.cardOn && /^rgba\(/.test(result.background)
+      && result.biographyCentered && result.nameFontPx >= 80 && result.nameWeight >= 700
+      && !result.biography.includes("籍贯") && result.biography.includes("1938"),
     `${result.background} / ${result.biography}`],
     ["倒地收枪", result.weaponHidden, `hidden=${result.weaponHidden}`],
     ["画面健康", result.glError === 0 && result.mean > 8 && result.variance > 20,
