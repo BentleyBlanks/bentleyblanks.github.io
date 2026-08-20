@@ -425,6 +425,26 @@ def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, fac
         transform = (Matrix.Translation(pivot) @ rotation @ Matrix.Translation(-source_head)
                      @ normalize @ body.matrix_world)
         mesh.transform(Matrix.Translation(-pivot) @ transform)
+        if segment == "neck" and mesh.vertices:
+            # Some Quaternius characters deliberately use a chibi head: after
+            # body-height normalization the head alone is roughly 0.58 m wide
+            # and reaches 0.62 m above the neck.  The game is realistic rather
+            # than stylised, so cap each axis at the established Actor human
+            # proportions.  Only shrink here; the correctly proportioned IJA
+            # source already fits these limits and remains untouched.
+            # Blender space is X width / Y depth / Z up.  glTF export maps Z
+            # to Three.js Y later, so perform the cap before that conversion.
+            half_x = max(abs(vertex.co.x) for vertex in mesh.vertices)
+            half_y = max(abs(vertex.co.y) for vertex in mesh.vertices)
+            top_z = max(vertex.co.z for vertex in mesh.vertices)
+            scale_x = min(1.0, (0.054 * height) / max(half_x, 1e-6))
+            scale_y = min(1.0, (0.070 * height) / max(half_y, 1e-6))
+            scale_z = min(1.0, (0.145 * height) / max(top_z, 1e-6))
+            for vertex in mesh.vertices:
+                vertex.co.x *= scale_x
+                vertex.co.y *= scale_y
+                vertex.co.z *= scale_z
+            mesh.update()
         obj = bpy.data.objects.new(f"Segment_{segment}", mesh)
         bpy.context.collection.objects.link(obj)
         obj.location = pivot
@@ -438,7 +458,9 @@ def BuildSegmentHelmet(height=1.62):
     material = MakeFlatMaterial("Material_IjaHelmet", (0.20, 0.22, 0.12))
     star_material = MakeFlatMaterial("Material_IjaHelmetStar", (0.48, 0.12, 0.08), 0.72, 0.05)
     head_z = 0.952 * height
-    radius = 0.098 * height
+    # M1930 helmet outer width is about 0.29 m on a 1.62 m soldier.  The old
+    # 0.098H dome plus 1.13x brim produced a 0.36 m cartoon silhouette.
+    radius = 0.083 * height
 
     bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12)
     dome = bpy.context.object
@@ -449,7 +471,7 @@ def BuildSegmentHelmet(height=1.62):
     dome.location = pivot
     dome.data.materials.append(material)
 
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius * 1.13, depth=0.010 * height)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius * 1.10, depth=0.010 * height)
     brim = bpy.context.object
     brim.name = "Segment_neck_HelmetBrim"
     brim.scale.y = 0.88
