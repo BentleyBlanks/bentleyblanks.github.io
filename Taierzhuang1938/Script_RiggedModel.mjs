@@ -94,6 +94,7 @@ export class FpsArmRig {
     this.wrists = {};
     this.targets = {};
     this.calibration = {};
+    this.sprintFallback = false;
     this.tmpPosition = new THREE.Vector3();
     this.tmpQuaternion = new THREE.Quaternion();
     this.tmpQuaternion2 = new THREE.Quaternion();
@@ -143,6 +144,8 @@ export class FpsArmRig {
     this.hands = { r: handRight, l: handLeft };
     this.legacyMeshes = legacyHands.flatMap((hand) => hand.meshes || []);
     for (const mesh of this.legacyMeshes) mesh.visible = false;
+    this.sprintFallback = false;
+    this.root.visible = true;
     rigGroup.add(this.root);
     this.root.position.set(0, -0.075, 0.34);
     this.root.rotation.set(0, 0, 0);
@@ -158,11 +161,26 @@ export class FpsArmRig {
     this.Update(0);
   }
 
+  /**
+   * 冲刺姿态绕相机原点转整套 weaponMount。下载来的 WRAD 是“从肩到手”的完整手臂，
+   * 肩在相机后方；跟着这层旋转时上臂必然扫过近平面，形成铺屏三角面。旧手模只有
+   * 握把附近的手和短袖口，原本就是按这套相机姿态制作的，因此冲刺期间切回它。
+   */
+  SetSprintFallback(enabled) {
+    const next = !!enabled;
+    if (next === this.sprintFallback) return;
+    this.sprintFallback = next;
+    this.root.visible = !next;
+    for (const mesh of this.legacyMeshes) mesh.visible = next;
+  }
+
   Detach() {
     if (this.root.parent) this.root.parent.remove(this.root);
     for (const mesh of this.legacyMeshes) mesh.visible = true;
     this.legacyMeshes.length = 0;
     this.hands = null;
+    this.sprintFallback = false;
+    this.root.visible = true;
   }
 
   _PlaceTarget(side) {

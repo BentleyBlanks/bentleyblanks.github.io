@@ -1454,7 +1454,12 @@ export class Viewmodel {
     this._RestoreAdsHideParts();
     this.adsHideParts = [];
     if (!this.rig || !this.rig.sight) return;
-    for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
+    // 导入整臂启用时，旧手模只是 IK 动画靶，不能再交给 ADS 显隐逻辑。
+    // 旧代码把它塞进 adsHideParts 后，_RestoreAdsHideParts 会把 Attach() 刚藏掉的
+    // 旧手重新打开，结果腰射时新旧两套手同时在画。冲刺回退由 FpsArmRig 独占控制。
+    if (!this.riggedArms) {
+      for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
+    }
     // rig 自己报的那一份（枪身上落在眼后 / 近裁面死区里的零件）。
     // 由建 rig 的那个函数点名，因为只有它知道哪块料是机匣、哪块是枪托 ——
     // 这里拿包围盒猜必然连照门一起藏掉。
@@ -1769,6 +1774,11 @@ export class Viewmodel {
       }
     }
     const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+    // 按下 Shift 立刻切走完整肩臂；松开后等冲刺弹簧回到安全区再恢复，避免退出
+    // 冲刺的半途姿态仍让上臂穿过相机。旧手模和整臂只会有一套可见。
+    if (this.riggedArms) {
+      this.riggedArms.SetSprintFallback(sprint > 0.03 || sprintValue > 0.08);
+    }
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));
 
