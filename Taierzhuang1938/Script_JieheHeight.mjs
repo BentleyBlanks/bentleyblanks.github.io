@@ -61,13 +61,22 @@ export const JIEHE_TACTICAL_TERRAIN = Object.freeze({
     { id: "CentralApproachRise", from: [-168, -1398], to: [112, -1358], width: 42, height: 2.60 },
     { id: "WestForwardRise", from: [-430, -1430], to: [-105, -1378], width: 34, height: 2.15 },
     { id: "EastForwardRise", from: [92, -1368], to: [430, -1318], width: 38, height: 2.35 },
+    // 宽缓大坡提供整体落差，下面这些短土岗负责玩家肉眼可读的近景轮廓。
+    // 它们贴着村沿与田界，不堵 x≈0 的撤退主线。
+    { id: "ShiqiangVillageKnoll", from: [-132, -1410], to: [-62, -1362], width: 18, height: 1.75 },
+    { id: "EastOrchardKnoll", from: [58, -1388], to: [156, -1338], width: 21, height: 1.65 },
+    { id: "WestKanShoulder", from: [-242, -1328], to: [-76, -1278], width: 23, height: 1.80 },
+    { id: "EastKanShoulder", from: [72, -1302], to: [224, -1248], width: 22, height: 1.72 },
     { id: "WestRearRise", from: [-465, -1218], to: [-118, -1160], width: 42, height: 1.85 },
     { id: "EastRearRise", from: [105, -1128], to: [455, -1078], width: 46, height: 1.65 },
   ]),
   lanes: Object.freeze([
     { id: "FrontIrrigationCut", from: [-310, -1444], to: [305, -1423], inner: 4.5, outer: 13.0, depth: 1.35 },
     { id: "WestDrain", from: [-255, -1438], to: [-82, -1284], inner: 4.8, outer: 13.5, depth: 1.45 },
+    { id: "ShiqiangYardDrain", from: [-142, -1440], to: [-22, -1342], inner: 3.8, outer: 10.5, depth: 1.18 },
+    { id: "EastApproachDrain", from: [28, -1388], to: [184, -1306], inner: 4.0, outer: 11.0, depth: 1.24 },
     { id: "EastDrain", from: [238, -1362], to: [66, -1198], inner: 5.2, outer: 14.5, depth: 1.30 },
+    { id: "KanVillageDrain", from: [-204, -1288], to: [-28, -1208], inner: 4.2, outer: 11.8, depth: 1.28 },
     { id: "SouthCartHollow", from: [-330, -1094], to: [-42, -1018], inner: 6.0, outer: 17.0, depth: 1.20 },
   ]),
 });

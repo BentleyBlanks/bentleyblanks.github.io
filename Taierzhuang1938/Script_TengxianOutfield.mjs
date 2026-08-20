@@ -288,22 +288,42 @@ const OUTFIELD_SCENES = {
         // [186,226] 那个缺口是给津浦路路基让路的（路基在 x=205）：
         // 一道 2 m 土坎横穿 1.35 m 的道砟堤，实拍就是两根土条打架
         gaps: [[-370, -336], [-96, -60], [186, 226], [498, 534]] },
+      // 开场原来只有横平竖直的矮田埂，第一眼仍像一张铺平的棋盘。下面四条
+      // 是沿地界、灌溉沟和村口弯出去的老土坎：全部避开 x≈0 的主撤退走廊，
+      // 但人趴到侧翼时能获得连续掩蔽。斜线也把近景切出明确纵深。
+      { id: "ShiqiangCrookedBank", from: [-292, -1434], to: [-102, -1380],
+        height: 1.08, baseHalf: 1.85, topHalf: 0.58, tag: "fieldBank",
+        gaps: [[-224, -210], [-154, -140]] },
+      { id: "EastApproachBank", from: [48, -1398], to: [266, -1332],
+        height: 0.96, baseHalf: 1.72, topHalf: 0.52, tag: "fieldBank",
+        gaps: [[112, 128], [206, 224]] },
+      { id: "WestKanSpur", from: [-286, -1338], to: [-58, -1285],
+        height: 1.22, baseHalf: 2.05, topHalf: 0.64, tag: "fieldBank",
+        gaps: [[-196, -178], [-106, -90]] },
+      { id: "EastKanSpur", from: [66, -1308], to: [292, -1238],
+        height: 1.12, baseHalf: 1.92, topHalf: 0.60, tag: "fieldBank",
+        gaps: [[136, 154], [232, 250]] },
     ],
     parapets: [
       { z: -1455, fromX: -180, toX: 190, seed: "L0zero" },     // 出生点这一线
       { z: -1428, fromX: -300, toX: 320, seed: "L0first" },
       { z: -1408, fromX: -250, toX: 240, seed: "L0firstB" },
+      { z: -1378, fromX: -228, toX: -38, seed: "L0villageFallback" },
+      { z: -1352, fromX: 34, toX: 246, seed: "L0eastFallback" },
       { z: -1240, fromX: -340, toX: 340, seed: "L0second" },
       { z: -1222, fromX: -300, toX: 300, seed: "L0secondB" },
     ],
     pits: [
       { z: -1462, fromX: -150, toX: 160, count: 7, seed: "L0pit0" },
       { z: -1440, fromX: -280, toX: 300, count: 9, seed: "L0pitA" },
+      { z: -1366, fromX: -240, toX: 255, count: 10, seed: "L0pitMid" },
       { z: -1230, fromX: -320, toX: 320, count: 9, seed: "L0pitB" },
     ],
     // 「他们的炮先来，人后来」—— 阵地上得有炮坑，那句台词才有布景
     craters: [
       { z: -1440, fromX: -260, toX: 280, spread: 46, count: 11, seed: "L0crA" },
+      { z: -1372, fromX: -238, toX: 258, spread: 58, count: 15, seed: "L0crMid" },
+      { z: -1312, fromX: -360, toX: 338, spread: 66, count: 14, seed: "L0crKanApproach" },
       { z: -1250, fromX: -300, toX: 300, spread: 42, count: 9, seed: "L0crB" },
     ],
     // --- 津浦铁路 ---
@@ -325,10 +345,19 @@ const OUTFIELD_SCENES = {
     villages: [
       { id: "LiangxiadianW", x: -320, z: -1652, w: 150, d: 66, count: 12, far: true },
       { id: "LiangxiadianE", x: 296, z: -1668, w: 122, d: 58, count: 10, far: true },
-      // 「石墙」与北沙河原先都在 460 m 远平面/浓雾之外：数据里有村，玩家一间
-      // 房也看不见。把两处轮廓收到目标链两侧，主通道仍保留至少 150 m 净空。
-      // 石墙是开场西南侧的小村；北沙河镇在第二阵地之后的东南天际线上接住终点。
-      { id: "Shiqiang", x: -160, z: -1350, w: 96, d: 68, count: 11, stoneWall: true },
+      // 「石墙」原来虽在相机远平面内，却躲在左侧宽缓土岗背后；出生镜头一间房
+      // 都看不到。现在把村北院收到玩家左前 65—105 m，并让旧村核在后面接成一片。
+      // 两组院落最靠路的一边仍离 x=0 三十余米，主目标走廊和 AI 队形都不被封死。
+      { id: "ShiqiangNorthYard", x: -74, z: -1390, w: 68, d: 46,
+        count: 9, stoneWall: true },
+      { id: "RiverbankEastYard", x: 68, z: -1394, w: 60, d: 44,
+        count: 8, stoneWall: true },
+      { id: "Shiqiang", x: -154, z: -1344, w: 118, d: 82,
+        count: 16, stoneWall: true },
+      // 右侧不再是一整片空田：几个生产院落与棚屋压在第二道沟后，既形成交叉
+      // 天际线，也给离开石墙村之后的玩家一个可进入、可绕行的侧翼掩体群。
+      { id: "EastFieldstead", x: 92, z: -1308, w: 76, d: 54, count: 8 },
+      { id: "KanRoadHamlet", x: -112, z: -1186, w: 92, d: 62, count: 10 },
       { id: "BeishaheTown", x: 315, z: -1050, w: 152, d: 82, count: 14 },
     ],
     // 田埂上的树行（华北平原的地界树）
@@ -340,14 +369,20 @@ const OUTFIELD_SCENES = {
     treeRows: [
       { from: [-560, -1352], to: [560, -1358], pitch: 17 },
       { from: [-500, -1412], to: [520, -1418], pitch: 21 },
+      // 石墙村北的三排小果园直接进入开场视野；仍是三月无叶状态。
+      { from: [-122, -1422], to: [-40, -1420], pitch: 12 },
+      { from: [-126, -1408], to: [-38, -1406], pitch: 12 },
+      { from: [-130, -1394], to: [-42, -1392], pitch: 12 },
       { from: [-460, -1296], to: [470, -1302], pitch: 19 },
+      { from: [48, -1348], to: [198, -1306], pitch: 14 },
+      { from: [-238, -1238], to: [-62, -1190], pitch: 15 },
       { from: [-420, -1178], to: [430, -1186], pitch: 16 },
       { from: [-300, -1620], to: [-296, -1300], pitch: 19 },
       { from: [268, -1300], to: [274, -960], pitch: 18 },
       { from: [-96, -1240], to: [-90, -940], pitch: 20 },
     ],
-    graves: { clusters: 19, seed: "L0grave" },
-    trees: { count: 96, seed: "L0tree" },
+    graves: { clusters: 24, seed: "L0grave" },
+    trees: { count: 124, seed: "L0tree" },
     // collide：**田埂要挡子弹**。见 BuildFields 里那一段账 ——
     // 这一关的核心是「手榴弹经济 + 找掩体」，0.30 m 的田埂是「趴下能活、
     // 跪起来就死」的那条线，不给碰撞盒它就只是画上去的一道棱。

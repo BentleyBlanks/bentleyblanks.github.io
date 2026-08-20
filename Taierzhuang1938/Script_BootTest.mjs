@@ -173,6 +173,13 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       if (!outfield || outfield.villagePropClusters < 1 || outfield.villageProps < 5) {
         bad.push(`村落生活层为空 clusters=${outfield?.villagePropClusters ?? "?"} props=${outfield?.villageProps ?? "?"}`);
       }
+      if (!outfield || outfield.banks < 5 || outfield.pits < 25
+        || outfield.craters < 35 || outfield.graves < 40 || outfield.trees < 250
+        || outfield.villageBuildings < 105) {
+        bad.push(`界河战术布设不足 banks=${outfield?.banks ?? "?"} pits=${outfield?.pits ?? "?"}`
+          + ` craters=${outfield?.craters ?? "?"} graves=${outfield?.graves ?? "?"}`
+          + ` trees=${outfield?.trees ?? "?"} houses=${outfield?.villageBuildings ?? "?"}`);
+      }
     }
     if (phase === 5) {
       const city = health.environment?.city;

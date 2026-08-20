@@ -82,7 +82,9 @@ try {
       && lane.lowHits.includes("dirt")).length;
     // 当前关卡所有落地碰撞体都应贴着最终高度图地面。prop 里含“栽在堤顶的树”，
     // bridge 本来就悬空，二者不纳入地面锚点。
-    const groundTags = new Set(["parapet", "grave", "balk", "kan", "embankment", "wall", "platform"]);
+    const groundTags = new Set([
+      "parapet", "grave", "balk", "kan", "fieldBank", "embankment", "wall", "platform",
+    ]);
     let matchedAnchors = 0, anchorCount = 0, worstAnchorGap = 0;
     const badAnchors = [];
     for (const box of field.colliders) {
@@ -128,6 +130,17 @@ try {
     const routeProbes = [[0, -1470], [0, -1255]];
     const openingVillages = villageSpec.filter((v) => v.z >= -1500
       && Math.hypot(v.x, v.z + 1470) < field.cameraFar).map((v) => v.id);
+    // 远平面内不代表玩家开场真能读到。这里只数离出生点 180 m 内、院落边缘
+    // 落入主视锥附近的近景村院，并确认左右都有轮廓、中央撤退走廊仍畅通。
+    const openingCompounds = villageSpec.filter((v) => !v.far
+      && Math.hypot(v.x, v.z + 1470) <= 180
+      && Math.abs(v.x) - v.w / 2 <= 125).map((v) => v.id);
+    const openingSides = {
+      west: villageSpec.some((v) => openingCompounds.includes(v.id) && v.x < 0),
+      east: villageSpec.some((v) => openingCompounds.includes(v.id) && v.x > 0),
+    };
+    const openingClearance = villageSpec.filter((v) => openingCompounds.includes(v.id))
+      .reduce((best, v) => Math.min(best, Math.abs(v.x) - v.w / 2 - (v.stoneWall ? 8 : 0)), Infinity);
     const routeVillages = [...new Set(villageSpec.filter((v) => routeProbes.some(([x, z]) =>
       v.z >= z - 40 && Math.hypot(v.x - x, v.z - z) < field.cameraFar)).map((v) => v.id))];
     const villageStats = JSON.parse(JSON.stringify(field.outfield.stats));
@@ -148,7 +161,7 @@ try {
       samplerError,
       matchedAnchors, anchorCount, worstAnchorGap, badAnchors,
       groundLayerVertices, minGroundLayerGap, maxGroundLayerGap,
-      openingVillages, routeVillages,
+      openingVillages, openingCompounds, openingSides, openingClearance, routeVillages,
       villageStats,
       villageArchetypes: [...outfieldModule.VILLAGE_BUILDING_ARCHETYPES],
       roofRidgeY: roof.ridgeY, roofOuterY: roof.outerY, roofSlopeDirections,
@@ -179,13 +192,25 @@ try {
   Check("目标走线上能看到一至两个村落",
     result.openingVillages.length >= 1 && result.routeVillages.length >= 2,
     `开场 ${result.openingVillages.join("/") || "无"}；全程 ${result.routeVillages.join("/") || "无"}`);
+  Check("出生镜头左右两侧都有近景院落且中央走廊畅通",
+    result.openingCompounds.length >= 2
+      && result.openingSides.west && result.openingSides.east
+      && result.openingClearance >= 28,
+    `${result.openingCompounds.join("/") || "无"}；最窄净空 ${result.openingClearance.toFixed(1)} m`);
   Check("村屋扩充为至少七种组合原型",
     result.villageArchetypes.length >= 7
       && new Set(result.villageArchetypes).size === result.villageArchetypes.length,
     result.villageArchetypes.join("/"));
-  Check("四处村落生成足够多的房屋与生活细节",
-    result.villageStats.villageBuildings >= 45 && result.villageStats.villageDetails >= 45,
+  Check("界河沿线生成足够多的房屋与生活细节",
+    result.villageStats.villageBuildings >= 105 && result.villageStats.villageDetails >= 760,
     `${result.villageStats.villageBuildings} 栋，${result.villageStats.villageDetails} 组细节`);
+  Check("近景土坎、掩体、弹坑和树带达到战术密度",
+    result.villageStats.banks >= 5 && result.villageStats.pits >= 25
+      && result.villageStats.craters >= 35 && result.villageStats.graves >= 40
+      && result.villageStats.trees >= 250,
+    `土坎 ${result.villageStats.banks} / 散兵坑 ${result.villageStats.pits}`
+      + ` / 弹坑 ${result.villageStats.craters} / 坟丘 ${result.villageStats.graves}`
+      + ` / 树木 ${result.villageStats.trees}`);
   Check("硬山顶从正脊向前后檐下降且坡向相反",
     result.roofRidgeY > result.roofOuterY
       && result.roofSlopeDirections.length === 2

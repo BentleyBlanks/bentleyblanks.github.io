@@ -36,10 +36,14 @@ const GAME_SHOTS = [
   // 七关各一张。名字带关号与地名 —— 视觉审查是按图说话的，
   // 图名看不出是哪一关的话，评语就落不回代码
   { name: "Game_L0_Jiehe", query: "shot=1&phase=0&quality=high&scale=medium" },
-  // 村落专项回归：从石墙村南侧 55 m 看院内正立面。默认 L0 开场图里村子只有
-  // 天际线高度，屋脊方向、门窗和院落变体都验不出来。
+  // 村落专项回归：从石墙村南侧看院内正立面。村核扩建后镜头后移到村界外，
+  // 避免回归图出生在新房墙体内。
   { name: "Game_L0_JieheVillage", query: "shot=1&phase=0&quality=high&scale=medium",
-    setup: { x: -160, z: -1322, yaw: 0, pitch: -0.04 } },
+    setup: { x: -154, z: -1278, yaw: 0, pitch: -0.04, quiet: true } },
+  // 主路线专项：越过第一道阵地回望土坎，固定验收斜田坎、下切水沟、两侧农院
+  // 与弹坑群是否真的进入玩法空间，而不是只在出生镜头摆一层远景。
+  { name: "Game_L0_JieheRoute", query: "shot=1&phase=0&quality=high&scale=medium",
+    setup: { x: 0, z: -1348, yaw: Math.PI, pitch: -0.06, quiet: true } },
   { name: "Game_L1_Beishahe", query: "shot=1&phase=1&quality=high&scale=medium" },
   { name: "Game_L2_Dongguan", query: "shot=1&phase=2&quality=high&scale=medium" },
   { name: "Game_L3_Fanji", query: "shot=1&phase=3&quality=high&scale=medium" },
@@ -58,7 +62,7 @@ const GAME_SHOTS = [
   { name: "Game_Z4_CityLife", query: "shot=1&phase=5&quality=high&scale=medium",
     setup: { x: 88, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
   { name: "Game_Z5_VillageLife", query: "shot=1&phase=0&quality=high&scale=medium",
-    setup: { x: -160, z: -1322, yaw: 0, pitch: -0.05, quiet: true } },
+    setup: { x: -154, z: -1278, yaw: 0, pitch: -0.05, quiet: true } },
   // 角楼专项：复用菜单里用户实际看见问题的“东南角望楼”长焦机位。
   // 旧四块交叉板屋顶在玩法近景不一定暴露，但这个镜头会直接看出悬空和穿插。
   { name: "Game_Z6_CornerTower", query: "quality=high&scale=medium",
