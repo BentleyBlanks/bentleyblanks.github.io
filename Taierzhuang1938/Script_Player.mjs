@@ -442,16 +442,30 @@ export class PlayerController {
       if (scale <= 0) this.recoilPeak = 0;
     }
 
-    // 自由瞄准：先动枪，枪顶到边界才推动视线。开镜时收窄到 1.4°（贴脸瞄准没有余量）
-    // 每帧从难度表取，滑条一拨就生效（缓存在字段里的话要重生一次才认）
+    // 自由瞄准：静止时先动枪，枪顶到边界才推动视线。开镜时收窄到 1.4°。
+    // 走路时必须改成相机直跟鼠标：步伐摆枪会遮住 2° 锥内的枪口反馈，继续让枪先动
+    // 就会表现成「鼠标已经动了，相机却黏在原处」。移动输入一出现，新的鼠标增量全额
+    // 交给 yaw/pitch；原有的枪口偏移快速收回，同时等量补给相机以保持世界瞄准点不跳。
+    // 每帧从难度表取，滑条一拨就生效（缓存在字段里的话要重生一次才认）。
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * 0.72));
-    this.aimYaw += dx;
-    this.aimPitch += dy;
-    if (this.aimYaw > limit) { this.yaw += this.aimYaw - limit; this.aimYaw = limit; }
-    if (this.aimYaw < -limit) { this.yaw += this.aimYaw + limit; this.aimYaw = -limit; }
-    if (this.aimPitch > limit) { this.pitch += this.aimPitch - limit; this.aimPitch = limit; }
-    if (this.aimPitch < -limit) { this.pitch += this.aimPitch + limit; this.aimPitch = -limit; }
+    const walking = Math.hypot(input.forward || 0, input.strafe || 0) > 0.05;
+    if (walking) {
+      this.yaw += dx;
+      this.pitch += dy;
+      const recentre = 1 - Math.exp(-dt * 18);
+      const backYaw = this.aimYaw * recentre;
+      const backPitch = this.aimPitch * recentre;
+      this.aimYaw -= backYaw; this.yaw += backYaw;
+      this.aimPitch -= backPitch; this.pitch += backPitch;
+    } else {
+      this.aimYaw += dx;
+      this.aimPitch += dy;
+      if (this.aimYaw > limit) { this.yaw += this.aimYaw - limit; this.aimYaw = limit; }
+      if (this.aimYaw < -limit) { this.yaw += this.aimYaw + limit; this.aimYaw = -limit; }
+      if (this.aimPitch > limit) { this.pitch += this.aimPitch - limit; this.aimPitch = limit; }
+      if (this.aimPitch < -limit) { this.pitch += this.aimPitch + limit; this.aimPitch = -limit; }
+    }
     // 枪慢慢回到视线中心（松手之后自己归位，不然久了会一直歪着）——
     // **但只在手停下来之后归位。**
     //
@@ -464,7 +478,7 @@ export class PlayerController {
     // 归位延后 0.10 s 起、再用 0.12 s 拉满。手在动的时候不归位，
     // 于是鼠标位移 1:1 全额落在枪口方向（yaw + aimYaw）上：
     // 边界以内动的是枪、边界以外动的是视线，但**总瞄准角与鼠标永远是 1:1**。
-    const looking = Math.abs(dx) + Math.abs(dy) > 1e-6;
+    const looking = walking || Math.abs(dx) + Math.abs(dy) > 1e-6;
     this.lookIdle = looking ? 0 : this.lookIdle + dt;
     const settle = Clamp01((this.lookIdle - 0.10) / 0.12);
     if (settle > 0) {

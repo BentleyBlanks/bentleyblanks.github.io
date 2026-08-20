@@ -1343,6 +1343,30 @@ Check("枪归位时视线补上同一段，瞄准点不自己漂",
   micro.settledGunDeg < micro.parkedDeg * 0.5 && micro.driftDeg < 0.01,
   `枪 ${micro.parkedDeg.toFixed(2)}°→${micro.settledGunDeg.toFixed(2)}°，瞄准点漂 ${micro.driftDeg.toFixed(4)}°`);
 
+// 12.13c 走路观察不能再经过自由瞄准死区（2026-08-20，用户报「持枪走路移动镜头有粘滞感」）
+// 静止时 2° 自由瞄准仍保留；只要 WASD 有移动输入，鼠标的第一帧就必须直接转相机。
+const walkingLook = await page.evaluate(() => {
+  const P = window.Taierzhuang.player;
+  const input = { forward: 1, strafe: 0, sprint: false, ads: false, lean: 0,
+    lookX: 8, lookY: -4, crouchPressed: false, pronePressed: false,
+    breathHold: false, sensitivity: 1 };
+  P.health = 100; P.spawnGrace = 9; P.suppression = 0; P.bipod = false; P.ads = 0;
+  P.yaw = 0; P.pitch = 0; P.aimYaw = 0; P.aimPitch = 0; P.lookIdle = 0;
+  P.Update(1 / 60, input, null);
+  return {
+    expectedYaw: -input.lookX * 0.0022,
+    expectedPitch: -input.lookY * 0.0022,
+    yaw: P.yaw, pitch: P.pitch, aimYaw: P.aimYaw, aimPitch: P.aimPitch,
+  };
+});
+Check("持枪走路时鼠标第一帧直接转相机，不再卡在自由瞄准锥里",
+  Math.abs(walkingLook.yaw - walkingLook.expectedYaw) < 1e-6
+  && Math.abs(walkingLook.pitch - walkingLook.expectedPitch) < 1e-6
+  && Math.abs(walkingLook.aimYaw) < 1e-6 && Math.abs(walkingLook.aimPitch) < 1e-6,
+  `yaw ${walkingLook.yaw.toFixed(5)} / ${walkingLook.expectedYaw.toFixed(5)}，`
+  + `pitch ${walkingLook.pitch.toFixed(5)} / ${walkingLook.expectedPitch.toFixed(5)}，`
+  + `freeAim=(${walkingLook.aimYaw.toFixed(5)}, ${walkingLook.aimPitch.toFixed(5)})`);
+
 // 12.14 停摆检查：三百秒分段看开火，后一半必须还有仗打。
 // 这一条是独立复核逼出来的：上一批的断言只数头六十秒，而实跑里仗打到九十秒就停，
 // 之后 AI 状态精确回到 {advance: 70}，胜负改由占点消耗的时钟单方面决定 ——
