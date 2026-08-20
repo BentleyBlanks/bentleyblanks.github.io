@@ -139,11 +139,13 @@ export const MESHES = {
   },
   Dadao: {
     file: "Dadao.tzm.json", category: "weapon",
-    triangles: 308, meshBlocks: 3, nodes: 5, joints: 0,
-    materials: ["accessory", "red", "steel"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.0420, 0.0530, 0.8960], lengthM: 0.900, bladeM: 0.595,
+    triangles: 686, meshBlocks: 3, nodes: 5, joints: 0,
+    materials: ["red", "steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
+    span: [0.0340, 0.1227, 0.8990], lengthM: 0.900, bladeM: 0.595,
     draws: { high: 3, medium: 3, low: 2 },
-    note: "大刀。**柄尾有真的铁环**、护手是一小片横铁不是圆盘、刀身宽 57→38 mm 背厚 5—6 mm。",
+    note: "大刀。**柄尾有真的铁环**（环面与刀面同向、侧看是整圆）、护手是 S 形卷铁"
+      + "（不是圆盘也不是方块）、刀身宽 38→57 mm（**前宽后窄**）背厚 5—6 mm、"
+      + "刀尖靠刀背斜切收。Y 向 123 mm 是刀身那道 16 mm 的弧加护手的高度，不是建歪了。",
   },
 
   Type89Launcher: {

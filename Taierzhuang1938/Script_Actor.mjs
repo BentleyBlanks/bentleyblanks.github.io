@@ -611,13 +611,32 @@ function BuildDadao(buckets, d, quality) {
   const H = d.height;
   const rise = d.shoulderY - d.waistY;
   const local = new Map();
-  // 刃长 595、身宽 57→38、刀背厚 5—6、护手是一小片铁、柄长 215、柄尾必有铁环
-  Add(local, "steel", GunSteelBox(0.052, 0.50, 0.0055, "blade"), { y: 0.40 });
-  Add(local, "steel", GunSteelBox(0.042, 0.10, 0.0055, "tip"), { y: 0.70, rz: 0.05 });
-  Add(local, "steel", GunSteelBox(0.025, 0.012, 0.026, "guard"), { y: 0.14 });
-  Add(local, "accessory", Cloth(0.030, 0.20, 0.026, "grip"), { y: 0.03 });
-  Add(local, "steel", new THREE.TorusGeometry(0.038, 0.006, 6, 12), { y: -0.10, rx: Math.PI / 2 });
-  if (quality !== "low") Add(local, "red", Cloth(0.026, 0.05, 0.024, "rag"), { y: -0.075 });
+  // 刃长 595、身宽 38→57（**前宽后窄**，不是等宽铁条）、刀背厚 5—6、
+  // 护手是一片 S 形卷铁、柄长 215、柄尾必有铁环。
+  //
+  // 上一版是"一条 52 mm 等宽的板 + 一小截刀尖 + 一个方块护手"——远看是把菜刀。
+  // 剪影上真正认得出大刀的只有三件事：**往前放宽的刃**、**刀背斜切下来的尖**、
+  // **柄尾那个整圆的铁环**。这三件在背上这把一样要有：玩家在战场上看到的大刀，
+  // 绝大多数是别人背上这一把，不是自己手里那把。
+  //
+  // 局部系：刀尖朝 +Y、刃宽在 X、刀面法向在 Z。逐段往 -X 挪一点再微转，
+  // 拼出刀身那道弧 —— 直的一条在 30 m 外和刺刀分不出来。
+  Add(local, "steel", GunSteelBox(0.040, 0.175, 0.0058, "bladeA"), { y: 0.225 });
+  Add(local, "steel", GunSteelBox(0.047, 0.170, 0.0056, "bladeB"), { x: -0.004, y: 0.390, rz: 0.030 });
+  Add(local, "steel", GunSteelBox(0.055, 0.160, 0.0052, "bladeC"), { x: -0.014, y: 0.548, rz: 0.060 });
+  // 斜切刀尖：转过来的一小块，出来的是"背斜下来收尖"，不是两边对称的剑尖
+  Add(local, "steel", GunSteelBox(0.046, 0.090, 0.0044, "tip"), { x: -0.030, y: 0.655, rz: 0.230 });
+  // S 形护手：中间一道横铁 + 两头反向卷的短臂（一头朝刃、一头朝柄）
+  Add(local, "steel", GunSteelBox(0.030, 0.011, 0.020, "guard"), { y: 0.145 });
+  Add(local, "steel", GunSteelBox(0.013, 0.032, 0.015, "quillonA"), { x: 0.028, y: 0.156, rz: -0.55 });
+  Add(local, "steel", GunSteelBox(0.013, 0.032, 0.015, "quillonB"), { x: -0.028, y: 0.134, rz: -0.55 });
+  // 柄是浅色的（木/缠绳）。原来给 accessory＝土布，灰蓝柄配灰蓝刀身，
+  // 远看整把刀糊成一根同色的棍子，柄与刃的分界一点都读不出来
+  Add(local, "wood", GunWoodBox(0.030, 0.200, 0.026, "grip"), { y: 0.030 });
+  // 柄尾铁环：环面**与刀面同向**（Torus 默认就在 XY 平面里，别再绕 X 转 90°
+  // —— 那样环轴顺着柄，侧看只剩一根竖杠，那是垫圈不是刀环）
+  Add(local, "steel", new THREE.TorusGeometry(0.030, 0.006, 6, 12), { y: -0.098 });
+  if (quality !== "low") Add(local, "red", Cloth(0.024, 0.046, 0.022, "rag"), { y: -0.124 });
   // rz≈-2.54：刀尖甩到右下、刀柄露到左肩上方；rx 让刀身贴住后背的弧度
   const sling = { x: -0.026 * H, y: rise - 0.047 * H, z: d.chestDepth + 0.03 * H, rz: -2.54, rx: 0.14 };
   for (const [key, list] of local) Add(buckets, key, MergeGeometries(list), sling);
