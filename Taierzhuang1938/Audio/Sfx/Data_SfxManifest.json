@@ -284,7 +284,17 @@
       "seconds": 0.9,
       "credit": "SpliceSound · 哨子（CC0）· Wikimedia Commons",
       "license": "commons"
+    },
+    "shellDrop": {
+      "files": [
+        "AudioSfx_ShellDrop_01.mp3",
+        "AudioSfx_ShellDrop_02.mp3",
+        "AudioSfx_ShellDrop_03.mp3"
+      ],
+      "seconds": 0.988,
+      "credit": "SculpTunes · 弹壳落在水泥地上（户外）· Sonniss GDC 2020",
+      "license": "sonniss"
     }
   },
-  "bakedAt": "2026-08-19"
+  "bakedAt": "2026-08-20"
 }

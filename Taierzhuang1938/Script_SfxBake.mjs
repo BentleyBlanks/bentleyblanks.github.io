@@ -241,6 +241,11 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
 
   // rate 走重采样：音高与长度一起变，这正是「同一把枪换了口径」的听感。
   const filters = [];
+  // notch 在**变速之前**：写的是素材原始的那个频率。
+  // 弹壳那条素材（SculpTunes）整库都有一记 9 kHz 的电子啸叫烘在里面 ——
+  // 单听在 −70 dB 上，但归一化会把它抬起来，而这一声每开一枪响一次，
+  // 稳态纯音正是耳朵最容易从噪声里拎出来的东西。
+  if (cut.notch) filters.push(`bandreject=f=${cut.notch}:width_type=h:w=${cut.notchWidth || 220}`);
   if (cut.rate && cut.rate !== 1) filters.push(`asetrate=${Math.round(SR * cut.rate)}`, `aresample=${SR}`);
   if (cut.hp) filters.push(`highpass=f=${cut.hp}`);
   if (cut.lp) filters.push(`lowpass=f=${cut.lp}`);

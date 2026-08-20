@@ -343,7 +343,13 @@ export class CombatSystem {
   Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false) {
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     if (this.host.audio) {
-      this.host.audio.Play(radius > 8 ? "explosionNear" : "explosionNear",
+      // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，
+      // 不按爆炸半径挑 —— 原来那行是 `radius > 8 ? "explosionNear" : "explosionNear"`，
+      // 三元的两边一模一样，于是两百米外的一颗手榴弹也拿贴脸那条 2.4 秒的城区爆炸播。
+      const audio = this.host.audio;
+      const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
+      const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
+      audio.Play(d > 60 ? "explosionFar" : "explosionNear",
         { position: position.clone(), volume: Clamp(radius / 8, 0.5, 1.2) });
     }
     if (this.host.lights) {

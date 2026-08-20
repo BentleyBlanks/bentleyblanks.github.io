@@ -11,8 +11,8 @@
 // 变调解掉（同一条思路：随机来自播放时，不是来自素材）。
 //
 // 信号链（顺序错一处味道就不对）：
-//   源(osc/noise) → 声部 gain → [距离低通] → PannerNode(HRTF) ┐
-//                 └→ 混响 send → Convolver(现场生成 IR) → 回声总线 ┤
+//   源(osc/noise) → 声部 gain → [距离低通] →┬→ PannerNode(HRTF) ┐
+//                                          └→ 混响 send → Convolver(现场生成 IR) → 回声总线 ┤
 //                                                   sfx/music/amb 三条总线 ┤
 //                             → duck gain → master gain → 耳鸣低通 → 限幅 → 输出
 //
@@ -650,6 +650,31 @@ const RECIPES = {
     v.Live(0.4);
   },
 
+  /**
+   * 抛壳落地：一记落地 + 越来越密越来越轻的几下弹跳。
+   *
+   * 这条 cue 是 2026-08-20 补的。在此之前，栓动步枪每打一发，0.62 秒后播的是
+   * `shellImpact` —— 「野外迫击炮爆炸实录」，2.8 秒长。**每一发都跟一记迫击炮**，
+   * 这是「打起来就一片不知道哪儿来的拖尾」里最响、也最容易听出来的一条。
+   *
+   * 弹壳是**很轻的一样东西**（一个空黄铜壳二十克），所以电平压得极低：
+   * 它是玩法反馈的边料，不是事件。
+   */
+  shellDrop(A, v) {
+    // 第一记落地最重，后面几下按 0.62 递减、间隔也越缩越短（弹跳的物理）。
+    let at = v.t, level = 0.20, gap = 0.085;
+    for (let i = 0; i < 5; i += 1) {
+      MetalClick(v, at, v.R(2400, 4200), level, 0.035 + v.rng() * 0.02, 11);
+      at += gap * (0.7 + v.rng() * 0.6);
+      level *= 0.62;
+      gap *= 0.78;
+    }
+    // 最后在地上滚两下：一小串更碎的颗粒。
+    Ticks(v, at, 4, 0.16, 3200, 5600, 0.045, 0.018, 9);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.8);
+  },
+
   // 拉弦（木柄手榴弹是拉火不是拔销，但沿用契约名）：细金属的一声「叮」+ 火帽的嘶。
   grenadePin(A, v) {
     MetalClick(v, v.t, 3900, 0.2, 0.07, 20);
@@ -1143,7 +1168,7 @@ const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3 };
 // 的**主声**——把主声列进「预算紧张先丢」，等于交火最激烈的时候远处全体静音。
 const LOW_PRIORITY = new Set([
   "footstepDirt", "footstepRubble", "impactDirt", "impactBrick",
-  "impactWood",
+  "impactWood", "shellDrop",
 ]);
 const LOW_PRIORITY_HEADROOM = 0.62;
 
@@ -1164,11 +1189,84 @@ const LOW_PRIORITY_HEADROOM = 0.62;
  * 机枪只会把两种枪的辨识度一起毁掉，宁可少一层。
  */
 const FAR_CUE = { rifleNra: "rifleNraFar", rifleIja: "rifleIjaFar" };
+/** FAR_CUE 的值集合 —— 远场那两条自己也是枪，culling 与配平都要认得它们。 */
+const FAR_CUE_TARGET = new Set(Object.values(FAR_CUE));
 
 // 交叉淡入区间。近场素材是 1 m 近距录音、远场素材录于 50 m 外，
 // 所以纯近场只留到 45 m，45—130 m 两层同时在（等功率），130 m 外只剩远场。
 const GUN_NEAR_M = 45;
 const GUN_FAR_M = 130;
+
+/**
+ * **这么远以外的枪不再逐发播**（2026-08-20）。
+ *
+ * 那么远的一枪直达声只剩 −32 dB，方位也早被 equalpower 抹平了 —— 它对玩家唯一的
+ * 作用就是往混响里再倒一勺。而「几百米外连成一片的仗」这层本来就有专人负责：
+ * 环境床 `battleFar` 是一整条持续交火的实录，它给的是一片战场，
+ * 不是四十个各自为战的点声源。
+ *
+ * 160 m 这个数不是拍的：远场素材录于 50 m 外、近远交叉在 130 m 上收尾，
+ * 再往外**没有任何一层还在变化**，只是同一条尾巴越来越轻。
+ * 留 30 m 余量给「刚退出交叉带那一段」，到 160 m 交给床。
+ *
+ * **诚实地说：现有七关它几乎一次都不触发** —— AI 的交火距离由武器射程管着，
+ * 场上真在对射的基本都在 130 m 以内，两三百米外那几个兵根本没在开枪
+ * （`drops.distance` 里记到的那些几乎全是 VOICE_CULL_M 掐掉的喊话）。
+ * 所以这一条是**闸**，不是这一轮听感变化的功臣；
+ * 它保的是「哪一关的视野一旦拉开，也不会再糊回去」。
+ */
+const GUN_CULL_M = 160;
+
+/**
+ * 超过这个距离的位置音按低优先级算（预算紧张时先丢它们）。
+ * 45 m 正好是近场素材的作用边界：再远就已经在往远场那段录音上过渡了。
+ */
+const FAR_LOW_PRIORITY_M = 45;
+
+/** 人喊一嗓子传得到的距离。四百米外那句「卧倒」不是听不清，是根本不存在。 */
+const VOICE_CULL_M = 90;
+
+/**
+ * 兜底：再远的位置音一概不播。
+ *
+ * 炮、爆炸、军号本来就传得远，所以这个数给得很松（panner 的 maxDistance 是 600）。
+ * 它防的是另一类事：某一声离玩家三四百米，于是它以 −40 dB 的干声进来，
+ * 唯一听得见的成分是那条不带方位的混响尾巴。**听不见的东西不该占混响。**
+ */
+const CULL_DEFAULT_M = 400;
+
+/** 这一声还值不值得播（按名字分档，见上面三个常数）。 */
+function CullDistance(name) {
+  if (FAR_CUE[name] || SAMPLE_BURST[name] || FAR_CUE_TARGET.has(name)) return GUN_CULL_M;
+  if (name.startsWith("voice.")) return VOICE_CULL_M;
+  return CULL_DEFAULT_M;
+}
+
+/**
+ * 混响 send 的距离衰减。**这是「一打起来就糊成一片」的根子。**
+ *
+ * 混响 send 分在 Panner **之前**（那是对的，湿信号不该吃方位衰减），
+ * 但它原来完全不吃**距离**衰减，反而还随距离往上加：`1 + d*0.03`，
+ * 加到 1.0 封顶。于是一百六十米外那一枪：
+ *   干声 3.5/(3.5+0.9×156.5) = 0.024，湿 0.42×2.6→钳到 1.0 —— **湿是干的 20 倍**。
+ * 实测七关逐关站在玩家耳朵里听十五秒，整场的湿/干能量比在 **4.2—19.8 倍**之间
+ * （最糟的是「三·反击」那一关的夜战：开阔地的 IR 拖 2.6 s，中位交火距离 112 m）：
+ * 玩家听到的几乎全是卷积混响，
+ * 而混响是立体声、不带方位、拖 0.95 s（街）到 2.6 s（开阔地）的尾巴。
+ * 「不知道从哪儿来的、带拖尾的、糊在一起的音效」——**那就是它，一层不差**。
+ *
+ * 正确的模型不是「混响不衰减」。房间里混响场确实近似均匀，但那说的是
+ * **同一个房间里**；一支枪在四百米外的野地上响，你这儿的混响场里当然也只剩
+ * 那一点点能量。所以湿也按距离掉，只是掉得比直达声慢：
+ *   干 ∝ 1/(1+d)，湿 ∝ 1/√(1+d) —— dB 上正好一半。
+ * 湿/干比因此仍然随距离**上升**（远处更「空」的听感保住了），
+ * 但绝对电平跟着走：一百六十米外的尾巴比原来轻 16 dB。
+ */
+function WetFalloff(distance) {
+  // 与 panner 的 inverse 曲线同一条（refDistance 3.5 / rolloff 0.9），取平方根。
+  const dry = 3.5 / (3.5 + 0.9 * Math.max(0, distance - 3.5));
+  return Math.sqrt(dry);
+}
 
 /**
  * 每个配方的节点开销（实测值，见 scratchpad 的 Measure 脚本）。
@@ -1183,6 +1281,7 @@ const NODE_COST = {
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
   grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
   dadaoHit: 12, shellIncoming: 11, whistle: 11,
+  shellDrop: 22,
   grenadeThrow: 10, launcherPop: 10, impactDirt: 10, impactFlesh: 10,
   footstepDirt: 10, heartbeat: 10,
   explosionFar: 9, dadaoSwing: 7, bugleCharge: 7,
@@ -1212,6 +1311,7 @@ const MIX_GAIN = {
   impactMetal: 1.75, grenadeThrow: 1.5, impactBrick: 1.5,
   bayonetHit: 1.4, explosionNear: 1.25,
   bodyFall: 0.65,   // 实拍能量比步枪声还高，一个人倒下不该比开枪响
+  shellDrop: 1.0,   // 空壳二十克，配方里的 level 已经压到 0.2，这儿不再动
   // 回执不空间化，整条链上没有距离衰减也没有空气低通，配平只能靠这里。
   // 0.55 是"枪响完那 40 ms 的空当里听得见、但绝不盖过枪声"的量。
   hitConfirm: 0.55, killConfirm: 0.62,
@@ -1265,6 +1365,8 @@ const SAMPLE_MIX = {
   dadaoSwing: 0.5, dadaoHit: 0.78, bayonetHit: 0.8,
   impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72,
   footstepDirt: 0.26, footstepRubble: 0.28, bodyFall: 0.55, hurt: 0.8, heartbeat: 0.75,
+  // 弹壳与脚步同一档：每开一枪响一次的东西，与枪声同量级的话整场只剩叮叮当当。
+  shellDrop: 0.3,
   bugleCharge: 0.7, whistle: 0.6,
 };
 
@@ -1275,7 +1377,7 @@ const SAMPLE_WET = {
   explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
-  footstepDirt: 0.12, footstepRubble: 0.12,
+  footstepDirt: 0.12, footstepRubble: 0.12, shellDrop: 0.12,
 };
 
 /**
@@ -1287,6 +1389,25 @@ const AMB_WET = {
   "amb.cannonFar": 0.6, "amb.whizz": 0.3, "amb.crow": 0.5, "amb.dogFar": 0.55,
   "amb.rooster": 0.55, "amb.creak": 0.22, "amb.debris": 0.2,
   "amb.planeFar": 0.5, "amb.moanFar": 0.6,
+};
+
+/**
+ * 环境一次性音的**空气低通**（Hz）。
+ *
+ * 位置音的这一层由 Play 按距离自己算（18000/(1+0.09d)），但环境一次性音没有
+ * position —— 它们「在很远的地方」这件事没有任何东西可以表达，于是原来一律
+ * 带着全套高频从立体声里蹦出来：一记远处的枪听着像有人在你身后开枪，
+ * 而它同时又不带任何方位（只有一个随机 pan）。**「不知道从哪儿来的音效」
+ * 有一半是这么来的。**
+ *
+ * 数值就照位置音那条公式反推：两百米上是 950 Hz，三百米上是 640 Hz。
+ * 三条例外：弹啸（`amb.whizz`）本来就是从你耳边过去的，落屑与吱呀就在旁边的
+ * 废墟上 —— 这三条**不滤**，它们「近」正是它们吓人的原因。
+ */
+const AMB_AIR = {   // → Play 的 airCut
+  rifleNraFar: 1200, rifleIjaFar: 1200, zb26: 1100, type92: 1000, type11: 1100,
+  "amb.cannonFar": 800, "amb.planeFar": 1800, "amb.moanFar": 1400,
+  "amb.crow": 2600, "amb.dogFar": 2200, "amb.rooster": 2200,
 };
 
 /**
@@ -1358,6 +1479,12 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  *                  同样几条素材，火 0.8 与火 0.3 是两个不同的战场）
  *   layers[].seg   一条播放头放多久再换到下一个随机位置（秒，默认 11）
  *   events[].perMin 一分钟平均响几次
+ *   events[].volume  一次多响 —— **枪声那几条 2026-08-20 整体压了 7 dB 并减了次数**。
+ *                    它们代表的是「比 GUN_CULL_M（160 m）还远的那些枪」，
+ *                    所以绝对电平必须**低于**一发真的一百六十米外的枪
+ *                    （实测干声 0.021）。旧值 0.22 折算下来比那还高 12 dB ——
+ *                    也就是说：撒出来的假枪声比场上真在打的还响，而且不带方位。
+ *                    这是玩家说的「不知道从哪儿冒出来一堆音效」里的另一半。
  *
  * 层数控制在 4 条以内：每条床同时挂两条播放头（source+gain），
  * 4 条就是 16 个常驻节点，占掉 NODE_BUDGET 的 13% —— 再多就要从枪声里抢了。
@@ -1378,9 +1505,9 @@ export const AMBIENCE_PRESETS = {
     events: [
       { name: "amb.whizz", perMin: 5.0, volume: 0.5 },
       { name: "amb.cannonFar", perMin: 3.0, volume: 0.55 },
-      { name: "rifleNraFar", perMin: 9.0, volume: 0.24 },
-      { name: "rifleIjaFar", perMin: 7.0, volume: 0.22 },
-      { name: "type92", perMin: 2.0, volume: 0.13, burst: 4 },
+      { name: "rifleNraFar", perMin: 5.0, volume: 0.10 },
+      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
+      { name: "type92", perMin: 1.5, volume: 0.07, burst: 4 },
       { name: "amb.crow", perMin: 0.8, volume: 0.3 },
       { name: "amb.planeFar", perMin: 0.5, volume: 0.4 },
     ],
@@ -1399,8 +1526,8 @@ export const AMBIENCE_PRESETS = {
     events: [
       { name: "amb.rooster", perMin: 0.7, volume: 0.34 },
       { name: "amb.crow", perMin: 1.2, volume: 0.3 },
-      { name: "rifleNraFar", perMin: 4.0, volume: 0.2 },
-      { name: "rifleIjaFar", perMin: 3.5, volume: 0.19 },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.09 },
+      { name: "rifleIjaFar", perMin: 2.5, volume: 0.09 },
       { name: "amb.cannonFar", perMin: 1.2, volume: 0.4 },
       { name: "amb.dogFar", perMin: 0.8, volume: 0.26 },
     ],
@@ -1420,9 +1547,9 @@ export const AMBIENCE_PRESETS = {
       { name: "amb.debris", perMin: 4.0, volume: 0.4 },
       { name: "amb.creak", perMin: 3.0, volume: 0.34 },
       { name: "amb.whizz", perMin: 4.0, volume: 0.45 },
-      { name: "rifleIjaFar", perMin: 6.0, volume: 0.22 },
-      { name: "rifleNraFar", perMin: 5.0, volume: 0.22 },
-      { name: "zb26", perMin: 2.0, volume: 0.13, burst: 5 },
+      { name: "rifleIjaFar", perMin: 4.0, volume: 0.10 },
+      { name: "rifleNraFar", perMin: 3.5, volume: 0.10 },
+      { name: "zb26", perMin: 1.5, volume: 0.07, burst: 5 },
       { name: "amb.cannonFar", perMin: 1.5, volume: 0.42 },
     ],
   },
@@ -1442,7 +1569,7 @@ export const AMBIENCE_PRESETS = {
       { name: "amb.dogFar", perMin: 1.5, volume: 0.3 },
       { name: "amb.moanFar", perMin: 0.9, volume: 0.26 },
       { name: "amb.creak", perMin: 1.6, volume: 0.28 },
-      { name: "rifleIjaFar", perMin: 2.0, volume: 0.15 },
+      { name: "rifleIjaFar", perMin: 2.0, volume: 0.09 },
       { name: "amb.cannonFar", perMin: 0.8, volume: 0.34 },
     ],
   },
@@ -1459,7 +1586,7 @@ export const AMBIENCE_PRESETS = {
     ],
     events: [
       { name: "amb.crow", perMin: 1.5, volume: 0.32 },
-      { name: "rifleNraFar", perMin: 3.0, volume: 0.2 },
+      { name: "rifleNraFar", perMin: 3.0, volume: 0.09 },
       { name: "amb.cannonFar", perMin: 1.0, volume: 0.36 },
       { name: "amb.dogFar", perMin: 0.7, volume: 0.24 },
     ],
@@ -1474,8 +1601,8 @@ export const AMBIENCE_PRESETS = {
     ],
     events: [
       { name: "amb.whizz", perMin: 3.0, volume: 0.45 },
-      { name: "rifleNraFar", perMin: 6.0, volume: 0.22 },
-      { name: "rifleIjaFar", perMin: 5.0, volume: 0.21 },
+      { name: "rifleNraFar", perMin: 4.0, volume: 0.10 },
+      { name: "rifleIjaFar", perMin: 3.5, volume: 0.10 },
       { name: "amb.debris", perMin: 2.0, volume: 0.34 },
       { name: "amb.cannonFar", perMin: 1.5, volume: 0.4 },
     ],
@@ -1648,6 +1775,13 @@ export class AudioEngine {
      * WebAudio 起没起来、预算够不够，是另外两件事，混在一个数里就查不出是哪一件坏了。
      */
     this.playRequests = new Map();
+    /**
+     * 三道闸各自吃掉了多少次请求。
+     * 与 playRequests 分开记：一条音「没响」有三种完全不同的原因，
+     * 混在一个数里就查不出该去调哪一个 —— 2026-08-20 这一轮就是靠它分清
+     * 「远处的枪是被距离闸掐掉的还是被 22 ms 去重窗吃掉的」。
+     */
+    this.drops = { dedupe: 0, budget: 0, distance: 0 };
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;
@@ -2138,6 +2272,15 @@ export class AudioEngine {
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
     side = "nra" } = {}) {
     if (!this.ctx || this.disposed || !this.voicesReady || this.voiceMute) return null;
+    // 太远的那一嗓子直接不算数 —— **要在两道节流闸之前判**：
+    // 否则四百米外一个兵张个嘴就把 0.55 s 的全局闸占掉了，
+    // 而他那句本来就播不出来（Play 里的距离闸会把它丢掉）。
+    if (position) {
+      const dx = position.x - this.listenerPos.x;
+      const dy = position.y - this.listenerPos.y;
+      const dz = position.z - this.listenerPos.z;
+      if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) { this.drops.distance += 1; return null; }
+    }
     const now = this.ctx.currentTime;
     if (!priority && now - this.lastBarkAt < 0.55) return null;
     // 同类闸的键带上阵营：中国兵刚喊过「鬼子摸拢来了」，不该把日本兵的
@@ -2226,6 +2369,7 @@ export class AudioEngine {
    * @param {object} opts
    *        position {x,y,z}     世界坐标，给 PannerNode；null = 非空间化（UI/第一人称）
    *        pan      -1..1       非空间化时的立体声位置（环境床用，比 HRTF 便宜得多）
+   *        airCut   Hz          非空间化时的空气低通上限（环境一次性音用，见 AMB_AIR）
    *        volume   增益倍率
    *        pitch    频率倍率（同一把枪逐发做 ±3% 抖动，二十条枪才不像一条）
    *        delay    延后多少秒开始
@@ -2246,12 +2390,20 @@ export class AudioEngine {
    * 就是来弹视角录的，弹头掠过在前、枪声后到，先靠素材把这层意思带出来。
    */
   PlayGunshot(name, opts = {}) {
-    const far = FAR_CUE[name];
-    if (!far || !opts.position) return this.Play(name, opts);
+    if (!opts.position) return this.Play(name, opts);
     const dx = opts.position.x - this.listenerPos.x;
     const dy = opts.position.y - this.listenerPos.y;
     const dz = opts.position.z - this.listenerPos.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    // 太远的一枪不逐发播，交给环境床（见 GUN_CULL_M）。
+    // 闸在这儿而不是在 AI 那边：AI 只知道"我开了一枪"，"听不听得见"是听者的事。
+    if (d > CullDistance(name)) {
+      this.playRequests.set(name, (this.playRequests.get(name) || 0) + 1);
+      this.drops.distance += 1;
+      return null;
+    }
+    const far = FAR_CUE[name];
+    if (!far) return this.Play(name, opts);
     const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
     const base = opts.volume ?? 1;
     const nearGain = Math.cos(t * Math.PI * 0.5);
@@ -2271,7 +2423,7 @@ export class AudioEngine {
   RequestedCount(name) { return this.playRequests.get(name) || 0; }
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false,
-    bus = "sfx" } = {}) {
+    bus = "sfx", airCut = 0 } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -2293,19 +2445,12 @@ export class AudioEngine {
     // 一条被丢掉四成的确认音等于没有确认音。
     if (!priority) {
       const last = this.lastPlayAt.get(name);
-      if (last !== undefined && now - last < DEDUPE_S && delay === 0) return null;
+      if (last !== undefined && now - last < DEDUPE_S && delay === 0) { this.drops.dedupe += 1; return null; }
     }
     this.lastPlayAt.set(name, now);
 
-    // 预算闸门：按实测开销**发声前**判断。连发的开销随点射长度涨一点。
-    // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
-    // priority 的那一档给 15% 超额：够放一条枪声或一条回执，又不至于让"优先"变成"无限"。
-    const cost = NODE_COST[name] ?? DEFAULT_COST;
-    const ceiling = priority ? NODE_BUDGET * 1.15
-      : LOW_PRIORITY.has(name) ? NODE_BUDGET * LOW_PRIORITY_HEADROOM : NODE_BUDGET;
-    if (this.liveNodes + cost > ceiling) return null;
-
-    // 距离：决定 HRTF 开不开、空气低通压多狠、混响给多少。
+    // 距离：决定 HRTF 开不开、空气低通压多狠、混响给多少、**预算紧张时先丢谁**。
+    // 必须算在预算闸**之前** —— 见下面 FAR_LOW_PRIORITY_M 那段。
     let distance = 0;
     if (position) {
       const dx = position.x - this.listenerPos.x;
@@ -2313,6 +2458,27 @@ export class AudioEngine {
       const dz = position.z - this.listenerPos.z;
       distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
+
+    // 距离闸：听不见的东西不该占混响（见 CullDistance）。
+    // 枪声那一档在 PlayGunshot 里就闸掉了（它要在分成近/远两路之前决定），
+    // 这里管的是喊话、弹着、脚步，以及任何绕开 PlayGunshot 直接进来的枪声。
+    if (position && distance > CullDistance(name)) { this.drops.distance += 1; return null; }
+
+    // 预算闸门：按实测开销**发声前**判断。连发的开销随点射长度涨一点。
+    // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
+    // priority 的那一档给 15% 超额：够放一条枪声或一条回执，又不至于让"优先"变成"无限"。
+    //
+    // 【2026-08-20】闸门原来只看名字，不看距离，于是**先到先得**：
+    // 实测东关站在玩家耳朵里听二十秒，367 次枪声请求丢掉 172 次（47%），
+    // 丢的是随机的那 47% —— 一百米外的和眼前的一样看运气。
+    // 可听感上这两者根本不是一回事：远处那一枪本来就只剩一层糊音，
+    // 眼前那一枪缺了就是穿帮。
+    // 现在超过 FAR_LOW_PRIORITY_M 的位置音一律按低优先级算，先丢远的。
+    const cost = NODE_COST[name] ?? DEFAULT_COST;
+    const far = position && distance > FAR_LOW_PRIORITY_M;
+    const ceiling = priority ? NODE_BUDGET * 1.15
+      : (far || LOW_PRIORITY.has(name)) ? NODE_BUDGET * LOW_PRIORITY_HEADROOM : NODE_BUDGET;
+    if (this.liveNodes + cost > ceiling) { this.drops.budget += 1; return null; }
 
     const t = now + Math.max(0, delay) + 0.005;   // 留 5 ms 调度余量，免得首音被吃
     // 种子 = 名字哈希 ^ 播放序号：确定性，但同一个音效每次不一样。
@@ -2330,7 +2496,6 @@ export class AudioEngine {
     // 眼前的枪混响一样多，「远」就完全听不出来。改成事后乘一个 wetScale。
     const wet = v.Gain(0.25);
     v.wetGain = wet;
-    src.connect(wet);
     wet.connect(this.reverbs[this.space] || this.reverbs.street);
 
     if (position) {
@@ -2338,6 +2503,10 @@ export class AudioEngine {
       const airHz = Clamp(18000 / (1 + distance * 0.09), 700, 20000);
       const air = v.Filter("lowpass", airHz, 0.7);
       src.connect(air);
+      // 混响 send 接在空气低通**之后**（坑 1 说的是不能接在 Panner 之后，
+      // 与这一条不冲突）：声音传两百米，高频是在路上被吃掉的，不是到了耳朵才吃 ——
+      // 接在前面的话，远处一枪的尾巴带着全套高频，听着像有人在你旁边的砖房里开枪。
+      air.connect(wet);
       const panner = v.Own(ctx.createPanner());
       // HRTF 很贵，25 m 以外听不出方位差别，改用 equalpower（文件头坑 3）。
       panner.panningModel = distance < 25 ? "HRTF" : "equalpower";
@@ -2353,14 +2522,23 @@ export class AudioEngine {
         panner.setPosition(position.x, position.y, position.z);
       }
       air.connect(panner).connect(this.sfxBus);
-      // 远处的声音混响占比更高（直达声按距离衰减，混响场基本不衰减）。
-      v.wetScale = 1 + Clamp(distance * 0.03, 0, 1.6);
-    } else if (pan !== 0 && ctx.createStereoPanner) {
-      const sp = v.Own(ctx.createStereoPanner());
-      sp.pan.value = Clamp(pan, -1, 1);
-      src.connect(sp).connect(this.Bus(bus));
+      // 混响也要跟着距离掉，只是掉得比直达声慢一半（dB 上正好一半）。
+      // 见 WetFalloff —— 这一行原来是 `1 + distance*0.03`，**方向是反的**。
+      v.wetScale = WetFalloff(distance);
     } else {
-      src.connect(this.Bus(bus));
+      // 非空间化：UI、第一人称、以及环境一次性音。
+      // airCut 是给环境用的 —— 那些东西「在远处」这件事没有 position 可以表达，
+      // 只能显式给一个上限频率。不给就是不滤（玩家自己的枪、回执、拉栓都在耳边）。
+      let node = src;
+      if (airCut) { const lp = v.Filter("lowpass", Clamp(airCut, 200, 20000), 0.7); node.connect(lp); node = lp; }
+      node.connect(wet);
+      if (pan !== 0 && ctx.createStereoPanner) {
+        const sp = v.Own(ctx.createStereoPanner());
+        sp.pan.value = Clamp(pan, -1, 1);
+        node.connect(sp).connect(this.Bus(bus));
+      } else {
+        node.connect(this.Bus(bus));
+      }
     }
 
     try {
@@ -2604,6 +2782,7 @@ export class AudioEngine {
           // 远处的声音在立体声里撒开，别都堆在正中。
           pan: this.ambienceRng() * 2 - 1,
           pitch: (ev.pitch ?? 1) * (0.94 + this.ambienceRng() * 0.12),
+          airCut: ev.airCut ?? AMB_AIR[ev.name] ?? 0,
           delay: this.ambienceRng() * 0.35,
           burst: ev.burst ?? undefined,
           bus: "ambience",

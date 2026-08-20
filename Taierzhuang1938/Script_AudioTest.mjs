@@ -71,7 +71,7 @@ const load = await page.evaluate(() => {
   };
 });
 
-const RECIPE_COUNT = 32;
+const RECIPE_COUNT = 33;   // 2026-08-20 新增 shellDrop（抛壳落地）
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -316,6 +316,100 @@ if (listener.fromOrigin < 50) {
 } else {
   Ok(`听者贴着相机（离世界原点 ${listener.fromOrigin.toFixed(0)} m 处，差 ${listener.gap.toFixed(2)} m）`);
 }
+
+// ---------------------------------------------------------------------------
+// 距离这一层：混响不许压过干声，太远的枪不许逐发播
+//
+// 2026-08-20 之前这三条都是坏的，而且**三条都测不出来** ——
+// 声音全都在响，控制台干净，通关冒烟全绿，只是听起来「一打起来就一片
+// 不知道哪儿来的、带拖尾的音效糊在一起」。三条各自的成因：
+//   1) 混响 send 完全不吃距离衰减，反而随距离**往上加**（1 + d×0.03，1.0 封顶）。
+//      一百六十米外那一枪：干声 0.024、湿 1.0 —— 湿是干的二十倍，
+//      而混响是立体声、不带方位、拖 0.95—2.6 s。玩家听到的几乎全是它。
+//   2) 场上四十个兵，平均一百三十米开外，每一枪都逐发播；
+//      「几百米外连成一片的仗」本来就有环境床 battleFar 负责。
+//   3) 预算闸先到先得，丢的是随机的三成五，眼前那一枪和两百米外那一枪一样看运气。
+// 所以这三条要各留一道断言，别再回去。
+const dist = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  a.Ambience("silence"); a.Music(null);
+  await sleep(500);
+  const L = a.listenerPos;
+  const At = (m) => ({ x: L.x + m, y: L.y, z: L.z });
+  // panner 的 inverse 曲线，与 Script_Audio 里那组参数一致
+  const Dry = (m) => 3.5 / (3.5 + 0.9 * Math.max(0, m - 3.5));
+  const ret = a.space === "open" ? 0.7 : 0.85;
+  const Measure = (m) => {
+    const v = a.Play("rifleNra", { position: At(m), priority: true, volume: 1 });
+    if (!v) return null;
+    const g = v.out.gain.value;
+    return { dry: g * Dry(m), wet: g * v.wetGain.gain.value * ret };
+  };
+  const near = Measure(2);
+  await sleep(120);
+  const far = Measure(120);
+  await sleep(120);
+  const before = { ...a.drops };
+  const culled = a.PlayGunshot("rifleNra", { position: At(300), volume: 1 });
+  await sleep(60);
+  const kept = a.PlayGunshot("rifleNra", { position: At(100), volume: 1 });
+  return { near, far, culled: !culled, kept: !!kept,
+    culledCount: a.drops.distance - before.distance };
+});
+if (!dist.near || !dist.far) {
+  Fail("量不到干湿电平（Play 返回 null，多半是被预算闸挡了）");
+} else {
+  const nearRatio = dist.near.wet / dist.near.dry;
+  const farRatio = dist.far.wet / dist.far.dry;
+  // 近处：混响是点缀。远处：混响占比**可以**上去（那正是「远」的听感），
+  // 但绝不许压过干声一大截 —— 三倍是「还听得出方位」的边界。
+  if (nearRatio > 0.6) Fail(`两米外那一枪湿/干 ${nearRatio.toFixed(2)}（上限 0.6）`);
+  else if (farRatio > 3) Fail(`一百二十米外那一枪湿/干 ${farRatio.toFixed(2)}（上限 3；改坏之前是 19）`);
+  else if (farRatio < nearRatio) Fail(`远处反而比近处干（近 ${nearRatio.toFixed(2)} 远 ${farRatio.toFixed(2)}），距离感是反的`);
+  else Ok(`湿/干随距离上升但不失控：2 m ${nearRatio.toFixed(2)} → 120 m ${farRatio.toFixed(2)}`);
+}
+// culledCount 只要求 ≥1：这一刻场上还在打，两次调用之间可能正好有一句
+// 九十米外的喊话被 VOICE_CULL_M 掐掉，也记在同一个计数上。
+if (!dist.culled || dist.culledCount < 1) {
+  Fail(`三百米外那一枪还在逐发播（应该交给环境床 battleFar；`
+    + `返回 ${dist.culled ? "null" : "有声"}，距离闸计数 +${dist.culledCount}）`);
+}
+else if (!dist.kept) Fail("一百米外那一枪被掐掉了 —— 闸门开得太狠");
+else Ok("三百米外不逐发播、一百米外照播");
+
+// 抛壳落地：这条 cue 以前根本不存在，代码里拿「野外迫击炮爆炸」当弹壳用，
+// 每开一枪跟一记 2.8 秒的迫击炮。所以既要断言 cue 在，也要断言**开枪不再去要它**。
+const shell = await page.evaluate(async () => {
+  const T = window.Taierzhuang, a = T.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const entry = a.sfxManifest && a.sfxManifest.cues.shellDrop;
+  // 得先站到一关里，手上还得有枪有子弹 —— 前面那条听者断言把关卡跳到了序·界河。
+  T.JumpToPhase(2);
+  await sleep(900);
+  T.StepFrames(30);
+  const before = {
+    drop: a.RequestedCount("shellDrop"),
+    mortar: a.RequestedCount("shellImpact"),
+    rifle: a.RequestedCount("rifleNra"),
+  };
+  for (let i = 0; i < 3; i += 1) { T.Debug.Fire(); await sleep(1400); }
+  return {
+    variants: entry ? entry.files.length : 0,
+    seconds: entry ? entry.seconds : 0,
+    drop: a.RequestedCount("shellDrop") - before.drop,
+    mortar: a.RequestedCount("shellImpact") - before.mortar,
+    rifle: a.RequestedCount("rifleNra") - before.rifle,
+    slots: T.Debug.Slots ? T.Debug.Slots() : null,
+    ammo: T.state.ammo,
+  };
+});
+if (shell.variants < 2) Fail(`shellDrop 只有 ${shell.variants} 个变体（每开一枪响一次的音必须多变体）`);
+else if (shell.seconds > 1.4) Fail(`shellDrop 长达 ${shell.seconds}s —— 那不是弹壳，是别的东西`);
+else if (shell.mortar > 0) Fail(`开三枪去要了 ${shell.mortar} 次 shellImpact（迫击炮爆炸），弹壳那条又接错了`);
+else if (shell.rifle < 1) Fail(`Debug.Fire 三次一枪都没打出去（ammo ${shell.ammo}，${JSON.stringify(shell.slots)}）—— 这条断言本身没测到东西`);
+else if (shell.drop < 1) Fail(`打出 ${shell.rifle} 枪，一次弹壳落地都没要`);
+else Ok(`抛壳走 shellDrop（${shell.variants} 变体 / ${shell.seconds}s），开三枪零记迫击炮`);
 
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 

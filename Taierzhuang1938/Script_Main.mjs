@@ -2241,7 +2241,20 @@ function TryFire(dt) {
   if (weapon.kind === "boltRifle") {
     audio.Play("bolt", { position: _muzzle.clone(), volume: 0.42, delay: 0.24 });
   }
-  audio.Play("shellImpact", { position: _muzzle.clone(), volume: 0.30, delay: 0.62 });
+  // 弹壳落地。
+  //
+  // 【2026-08-20】这一行原来播的是 **`shellImpact`** —— 「野外迫击炮爆炸实录」，
+  // 2.8 秒长、混响 send 0.45。也就是说**每开一枪，0.62 秒后跟一记迫击炮**。
+  // 「一打起来就充斥着不知道哪儿来的、带拖尾的音效」，这是其中最响的一条。
+  // 现在有专门的 `shellDrop`（弹壳落在水泥地上，实录，见 Data_SfxSources）。
+  //
+  // 不给 position：壳就掉在自己脚边，第一人称下走空间化那条链只会白花一个 panner。
+  // pan 0.35 —— 中正式与三八式都是**向右抛壳**。
+  // 栓动是拉栓那一下才把壳抛出去（0.24 s），落地再晚 0.4 s；
+  // 捷克式自己抛壳，出膛就飞，落得早。
+  audio.Play("shellDrop", {
+    volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
+  });
   lights.FlashMuzzle(_muzzle, 24);
   // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，

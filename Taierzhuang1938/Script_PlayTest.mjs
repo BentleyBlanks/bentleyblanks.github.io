@@ -2063,7 +2063,10 @@ const feel = await page.evaluate(async () => {
   D.Fire();
   T.audio.Play = realPlay;
   const bolt = played.find((e) => e.name === "bolt");
-  const shell = played.find((e) => e.name === "shellImpact");
+  // 抛壳走 shellDrop —— 2026-08-20 之前这里是 `shellImpact`（野外迫击炮爆炸实录，
+  // 2.8 s），也就是每开一枪跟一记迫击炮。顺带断言那条**不再**被请求。
+  const shell = played.find((e) => e.name === "shellDrop");
+  const mortar = played.find((e) => e.name === "shellImpact");
   // 最后一发：lowAmmo 要传下去，栓停在后面
   T.state.ammo = 1;
   D.Fire();
@@ -2102,6 +2105,7 @@ const feel = await page.evaluate(async () => {
     fovIdle: +fovIdle.toFixed(3), fovAfter: +fovAfter.toFixed(3),
     fovSettled: +fovSettled.toFixed(3), punchPeak: +punchPeak.toFixed(3),
     boltDelay: bolt ? bolt.delay : null, shellDelay: shell ? shell.delay : null,
+    mortar: !!mortar,
     lowAmmo: low.lowAmmo, boltOpen: low.boltOpen,
     sway0, swayYaw: g3.swayYaw, lookDelta: +(g3.lastLookDeltaYaw || 0).toFixed(3),
     sprintUp: +sprintUp.toFixed(2),
@@ -2111,9 +2115,9 @@ const feel = await page.evaluate(async () => {
 Check("开火有画面顿挫（FOV 冲击 ≈1.9°，85 ms 收干净）",
   feel.fovAfter - feel.fovIdle > 1.2 && Math.abs(feel.fovSettled - feel.fovIdle) < 0.4,
   `${feel.fovIdle}° -> ${feel.fovAfter}° -> ${feel.fovSettled}°（峰值 punch=${feel.punchPeak}）`);
-Check("每发之后补拉栓声（delay 0.24 s）与抛壳落地（delay 0.62 s）",
-  feel.boltDelay === 0.24 && feel.shellDelay === 0.62,
-  `bolt delay=${feel.boltDelay} shellImpact delay=${feel.shellDelay}`);
+Check("每发之后补拉栓声（delay 0.24 s）与抛壳落地（shellDrop，delay 0.62 s，不是迫击炮）",
+  feel.boltDelay === 0.24 && feel.shellDelay === 0.62 && !feel.mortar,
+  `bolt delay=${feel.boltDelay} shellDrop delay=${feel.shellDelay} 迫击炮=${feel.mortar}`);
 Check("最后一发把 lowAmmo 传下去，栓停在后面",
   feel.lowAmmo && feel.boltOpen, `lowAmmo=${feel.lowAmmo} boltOpen=${feel.boltOpen}`);
 Check("sway 输入接上了（视线一动，弹簧就不再恒等于 0）",

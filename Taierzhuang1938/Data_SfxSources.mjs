@@ -29,7 +29,7 @@
 //
 // 切割字段：whole 整段用（素材本身就是一次性音）；prefer 挑法（loud/sustain）；
 //   pick:"last" 取末发；variants 切几个变体；append 把变体接到已有 cue 后面；
-//   rate 重采样倍率（>1 升调变短，模拟小口径）；hp/lp 高低通；
+//   rate 重采样倍率（>1 升调变短，模拟小口径）；hp/lp 高低通；notch 陷波（挖掉素材自带的啸叫）；
 //   decay 衰减时长硬筛（挡掉 0.05 秒的咔哒声冒充落地声）；tone 顺便量基频。
 export const SFX_LICENSES = {
   sonniss: {
@@ -155,6 +155,26 @@ export const SFX_SOURCES = [
     credit: "Dramatic Cat · 步枪弹匣入位 · Sonniss GDC 2024",
     license: "sonniss",
     cuts: [{ cue: "magIn", tail: 0.65, gain: 0.9, atS: 7.32 }],
+  },
+  {
+    id: "ShellDrop",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "SculpTunes – Cartridges & Casings Shell/9 mm x 21  - Casings Shell & Cartdridges - Roll on Concrete Floor - Outdoor.mp3",
+    credit: "SculpTunes · 弹壳落在水泥地上（户外）· Sonniss GDC 2020",
+    license: "sonniss",
+    // 抛壳落地。**这条 cue 以前不存在**，而游戏里每开一枪都在播 `shellImpact` ——
+    // 那是「野外迫击炮爆炸实录」，2.8 秒。一发一记迫击炮，正是「打起来就一片
+    // 不知道哪来的拖尾」里最响的一条。
+    //
+    // 选材：要的是**户外硬地**（滕县的街是砖石与夯土，不是室内地砖），
+    // 所以宁可拿 9 mm 手枪壳的户外录音降调，也不用 7.62 步枪壳的「室内地砖」那条 ——
+    // 后者的房间残响是烘死在素材里的，我们自己还要过一层卷积混响，叠起来就是两个房间。
+    // rate 0.86：降调 14% 把壳「压重」—— 7.92×57 的黄铜壳比 9 mm 重三倍多。
+    // 不加 decay 硬筛：弹壳落地本来就是一串「当…啷啷」的短冲头（实测候选 16 处
+    // 衰减全在 0.01—0.04 s），筛了等于全筛掉；那串滚动尾巴由 tail 0.85 s 带出来。
+    // notch 9056 Hz：这一库的录音里烘着一记电子啸叫（实测 9056 Hz，素材里 −72 dB，
+    // 但归一化会把它抬到 −55 上下）。每开一枪响一次的稳态纯音，耳朵一定会拎出来。
+    cuts: [{ cue: "shellDrop", tail: 0.85, gain: 0.85, variants: 3, rate: 0.86, notch: 9056 }],
   },
 
   // === 爆炸 ===============================================================
