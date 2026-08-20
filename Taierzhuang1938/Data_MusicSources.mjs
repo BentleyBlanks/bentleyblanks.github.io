@@ -32,26 +32,31 @@
 // 挑完在引擎里由 LoopLayer 首尾交叉淡地循环（与环境床同一套播放器）。
 
 export const MUSIC_LICENSE = {
-  name: "MiniMax music-3.0（本机 MiniMax Hub 网关生成）",
-  terms: "生成内容，随项目使用",
-  via: "http://127.0.0.1:8001/api/generate/music",
+  name: "逐曲授权（见 cues[].source）",
+  terms: "生成曲随项目使用；Kevin MacLeod 曲目为 CC BY 4.0；CC0 曲目按来源页授权",
+  via: "Data_MusicSources.mjs",
 };
 
 export const MUSIC_SOURCES = [
   {
     id: "Menu",
     cue: "menu",
-    // 进城之前。要的是「一间空屋子」，不是主题曲。
-    mood: "sparse", durS: 46, rms: -26, fadeS: 2.5,
-    prompt: "One low bowed string drone, held continuously and unchanging, with a single breathy bamboo flute entering rarely for one long note and then stopping. Almost nothing happens for a whole minute at a time. No plucked strings, no rhythm, no repeated notes, no drums, no percussion, no synthesizer, no vocals. Cold, empty, north China winter 1938.",
+    // B03：用户试听收藏。正式包直接复用评审时听到的同一份 90 秒成品，避免重新选段走样。
+    durS: 90, reviewedFile: "BgmReview/Audio/Bgm/AudioBgm_CandidateTheDescent.mp3",
+    source: {
+      title: "The Descent", author: "Kevin MacLeod", license: "CC BY 4.0",
+      page: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Descent.mp3",
+    },
   },
   {
     id: "Siege",
     cue: "siege",
-    // 白天守城时垫在枪炮底下的一层。**必须最平稳** —— 底下这一层一旦有起伏，
-    // 玩家会以为是战况在变。
-    mood: "steady", durS: 40, rms: -30, fadeS: 3.0,
-    prompt: "Very slow and heavy. Dark sustained low strings, almost motionless, with a single large Chinese war drum struck once every several bars and left to decay. Oppressive, grim, no melody, no groove, no fast notes, no fills. Chinese traditional instruments only. No synthesizer, no brass, no vocals, no electric instruments.",
+    // B05：用户试听收藏，用在围城与持续承压阶段。
+    durS: 90, reviewedFile: "BgmReview/Audio/Bgm/AudioBgm_CandidateGraveBlow.mp3",
+    source: {
+      title: "Grave Blow", author: "Kevin MacLeod", license: "CC BY 4.0",
+      page: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Grave%20Blow.mp3",
+    },
   },
   {
     id: "Night",
@@ -63,10 +68,12 @@ export const MUSIC_SOURCES = [
   {
     id: "Charge",
     cue: "charge",
-    // 反攻与白刃。这一条是五段里唯一**要有律动**的（实测节拍相关 0.26），
-    // 所以按 steady 挑：要的是骨架最稳的那一段，不是最安静的。
-    mood: "steady", durS: 38, rms: -24, fadeS: 2.0,
-    prompt: "One large Chinese bass war drum, struck slowly and heavily, and nothing else. Deep, dry, spaced-out hits with long silence between them, gradually getting faster and closer together. No melody, no plucked strings, no guqin, no pipa, no cymbals, no gongs, no synthesizer, no vocals. 1938 Chinese army before a broadsword charge.",
+    // B12：用户试听收藏，只用于反攻与白刃的短时高潮。
+    durS: 90, reviewedFile: "BgmReview/Audio/Bgm/AudioBgm_CandidateVolatileReaction.mp3",
+    source: {
+      title: "Volatile Reaction", author: "Kevin MacLeod", license: "CC BY 4.0",
+      page: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3",
+    },
   },
   {
     id: "Aftermath",

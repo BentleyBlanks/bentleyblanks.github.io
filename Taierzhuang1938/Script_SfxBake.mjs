@@ -135,6 +135,12 @@ function FindHits(pcm, { minGapS = 0.35, soft = false } = {}) {
  * 自动挑法挑不准的，看过候选表之后钉死一个位置比再调阈值可靠。
  */
 function Pick(hits, cut, used) {
+  // 连发实录的尾音可能高过下一发的起音，自动包络会把整串合成一个候选。
+  // 评审确认过具体哪一发后，用 exactAtS 按波形时间直接落刀，不再吸附候选。
+  if (cut.exactAtS != null) {
+    const at = Math.max(0, Math.round(cut.exactAtS * SR));
+    return { at, atS: at / SR, decayS: cut.tail, peak: 1, attack: 1, score: 1 };
+  }
   let free = hits.filter((h) => !used.has(h.at));
   if (cut.atS != null && free.length) {
     let best = free[0];

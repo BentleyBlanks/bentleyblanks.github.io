@@ -179,7 +179,7 @@
     <div class="shell">
       <div class="eyebrow">Taierzhuang 1938 · Audio Review</div>
       <h1>音频候选评审台</h1>
-      <p class="lead">先听、再选、最后接入。BGM 已换成悲壮与压迫紧张方向的独立候选；枪械音效按实际菜单分组重找，捷克式保持现状，不在本轮替换范围。</p>
+      <p class="lead">你已收藏的 BGM 与枪械音效已经接入正式包；夜战旧候选已撤下，第二批改成环境压力、夜风与低速暗涌方向。捷克式保持现状。</p>
       <div class="summary">
         <span class="stat">BGM <b id="bgmCount">0</b></span>
         <span class="stat">枪械音效 <b id="sfxCount">0</b></span>
@@ -207,7 +207,7 @@
   <main class="shell">
     <div id="catalog"></div>
     <div class="notice">
-      BGM 为 90 秒响度统一的本地评审段；枪声音效为免版税实录源试听，最终接入时会按你选中的音色重新切单发、做远近层和史实射速。页面收藏与备注保存在本机浏览器，导出的 JSON 就是后续线上交付依据。
+      BGM 为最长 90 秒、响度统一的本地评审段；已收藏枪声已按原始录音重新切成单发并接入正式包。页面收藏与备注仍保存在同一个本机浏览器存储中，新增夜战候选不会清掉原收藏。
     </div>
   </main>
 
@@ -230,6 +230,6 @@
 
   <div class="toast" id="toast" role="status"></div>
   <audio id="audio" preload="metadata"></audio>
-  <script src="./Script_AudioReview.js"></script>
+  <script src="./Script_AudioReview.js?v=2"></script>
 </body>
 </html>

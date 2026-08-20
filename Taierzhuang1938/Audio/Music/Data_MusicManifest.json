@@ -4,11 +4,23 @@
  "cues": {
   "menu": {
    "file": "AudioMusic_Menu.mp3",
-   "seconds": 46
+   "seconds": 90,
+   "source": {
+    "title": "The Descent",
+    "author": "Kevin MacLeod",
+    "license": "CC BY 4.0",
+    "page": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Descent.mp3"
+   }
   },
   "siege": {
    "file": "AudioMusic_Siege.mp3",
-   "seconds": 40
+   "seconds": 90,
+   "source": {
+    "title": "Grave Blow",
+    "author": "Kevin MacLeod",
+    "license": "CC BY 4.0",
+    "page": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Grave%20Blow.mp3"
+   }
   },
   "tension": {
    "file": "AudioMusic_Night.mp3",
@@ -16,7 +28,13 @@
   },
   "charge": {
    "file": "AudioMusic_Charge.mp3",
-   "seconds": 38
+   "seconds": 90,
+   "source": {
+    "title": "Volatile Reaction",
+    "author": "Kevin MacLeod",
+    "license": "CC BY 4.0",
+    "page": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3"
+   }
   },
   "aftermath": {
    "file": "AudioMusic_Aftermath.mp3",
@@ -64,8 +82,8 @@
   }
  },
  "license": {
-  "name": "MiniMax music-3.0（本机 MiniMax Hub 网关生成）",
-  "terms": "生成内容，随项目使用",
-  "via": "http://127.0.0.1:8001/api/generate/music"
+  "name": "逐曲授权（见 cues[].source）",
+  "terms": "生成曲随项目使用；Kevin MacLeod 曲目为 CC BY 4.0；CC0 曲目按来源页授权",
+  "via": "Data_MusicSources.mjs"
  }
 }

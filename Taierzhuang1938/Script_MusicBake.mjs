@@ -162,6 +162,20 @@ async function Main() {
     const rawFile = path.join(RAW_DIR, `${src.id}.${src.rawExt || "mp3"}`);
     console.log(`\n[${src.id}] → ${src.cue}`);
     try {
+      // 评审页里已经由用户听过并收藏的成品必须逐字节复用；重新自动选段会让线上
+      // 听到的不是用户批准的那一版。reviewedFile 也让未来重烘仍可复现这一决定。
+      if (src.reviewedFile) {
+        const reviewedFile = path.join(HERE, src.reviewedFile);
+        if (!fs.existsSync(reviewedFile)) throw new Error(`找不到已批准评审段：${src.reviewedFile}`);
+        const file = `AudioMusic_${src.id}.mp3`;
+        const outFile = path.join(OUT_DIR, file);
+        fs.copyFileSync(reviewedFile, outFile);
+        const size = fs.statSync(outFile).size;
+        bytes += size;
+        manifest.cues[src.cue] = { file, seconds: +src.durS.toFixed(2), source: src.source };
+        console.log(`  复用已批准评审段 → ${file}  ${(size / 1024).toFixed(1)} KB`);
+        continue;
+      }
       if (!fs.existsSync(rawFile)) {
         if (src.downloadUrl) {
           if (!fetchExternal) { console.log("  跳过（_raw 里没有下载曲；要下载加 --fetch）"); continue; }

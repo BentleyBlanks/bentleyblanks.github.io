@@ -58,42 +58,42 @@ export function ArchiveUrl(item, filePath) {
 export const SFX_SOURCES = [
   // === 步枪 ===============================================================
   {
-    id: "K98k",
-    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
-    path: "Pole Position - Mauser Karabiner 98 kurz K98k bolt-action rifle/K98k, Firing, t2, MKH416.mp3",
-    credit: "Pole Position Production · K98k 7.92×57 毛瑟 · Sonniss GDC 2020",
+    id: "MauserMedium",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthly - #3/WatsonWu - Rifles & Pistols Of The World Wars/Rifle_Mauser_8mm_Medium_10.mp3",
+    credit: "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3",
     license: "sonniss",
-    // 中正式就是毛瑟标准型的中国版，同弹（7.92×57）同枪机 —— 这不是「像」，是同一支枪。
-    cuts: [{ cue: "rifleNra", tail: 1.15, gain: 0.94, variants: 3, decay: [0.15, 1.4] }],
+    // 用户在 G01 试听中选定。中正式与毛瑟同属 7.92 mm 体系，保留这一枪完整的中距离尾音。
+    cuts: [{ cue: "rifleNra", tail: 1.3, gain: 0.94, whole: true }],
   },
   {
-    id: "NagantFar",
+    id: "NagantFarMixed",
     item: "sonniss-gdc-2020-game-audio-bundle-normalized",
-    path: "FLYSOUND - Mosin Nagant/NAGANT 50m distant front left shots.mp3",
-    credit: "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020",
+    path: "FLYSOUND - Mosin Nagant/NAGANT mixed long distance shot.mp3",
+    credit: "FLYSOUND · 莫辛纳甘长距离混录 · Sonniss GDC 2020",
     license: "sonniss",
-    // 环境床的主料：远处那一枪的尾巴是野外给的，近射加低通造不出来。
-    cuts: [{ cue: "rifleNraFar", tail: 1.5, gain: 0.8, variants: 3, soft: true, decay: [0.2, 1.6] }],
+    // 用户在 G04 试听中选定；远场尾音来自真实环境，不用近射低通伪造。
+    cuts: [{ cue: "rifleNraFar", tail: 1.8, gain: 0.8, whole: true }],
   },
   {
-    id: "M1903A3",
-    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
-    path: "Pole Position - Springfield 1903A3 bolt-action rifle/M1903A3, Firing, t2, 1m, Right, Above, MKH8060.mp3",
-    credit: "Pole Position Production · 斯普林菲尔德 M1903A3 · Sonniss GDC 2020",
+    id: "GarandClose",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthly - #3/WatsonWu - Rifles & Pistols Of The World Wars/Rifle_M1Garand_30-06_Close_01.mp3",
+    credit: "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3",
     license: "sonniss",
     // 三八式是 6.5×50：小口径长弹，膛压高药量小，中方老兵记它「又尖又脆」。
     // 升调 10% 把 .30-06 的频心抬上去，同时整声变短 —— 与中方那一支必须听得出区别。
-    cuts: [{ cue: "rifleIja", tail: 0.95, gain: 0.92, variants: 3, rate: 1.10, decay: [0.12, 1.2] }],
+    // 用户在 G05 试听中选定；升调 10% 只承担三八式 6.5 mm 的音色适配。
+    cuts: [{ cue: "rifleIja", tail: 1.15, gain: 0.92, rate: 1.10, whole: true }],
   },
   {
-    id: "EnfieldIncoming",
-    item: "game-audio-monthly",
-    path: "Sonniss.com - Game Audio Monthly - #3/WatsonWu - Rifles & Pistols Of The World Wars/Rifle_Enfield_303_Incoming_06.mp3",
-    credit: "Watson Wu · 两次大战步枪（来弹视角）· Sonniss Game Audio Monthly #3",
+    id: "BarFar300",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_300m_in_front_Double_shots_x_1.mp3",
+    credit: "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
     license: "sonniss",
-    // 「远处日军在打你」——录的就是弹着点视角：弹头掠过在前、枪声后到，
-    // 这个先后差是玩家判断「打的是我」的唯一线索。
-    cuts: [{ cue: "rifleIjaFar", tail: 0.9, gain: 0.78, rate: 1.06, whole: true }],
+    // 用户在 G07 试听中选定；只取双发录音的末发，避免上一发的尾巴烘进循环。
+    cuts: [{ cue: "rifleIjaFar", tail: 1.5, gain: 0.78, rate: 1.08, exactAtS: 0.58 }],
   },
 
   // === 自动火器（只切单发，射速交给引擎按史实排）==========================
@@ -110,23 +110,22 @@ export const SFX_SOURCES = [
     cuts: [{ cue: "zb26", tail: 0.9, gain: 0.9, minGap: 0.1, decay: [0.08, 1.2] }],
   },
   {
-    id: "M1919A4",
+    id: "BarClose",
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
-    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal/M1919A4_Browning_Machine_Gun_.30cal_5m_behind_ORTF_blanks_Triple_shots_x_1.mp3",
-    credit: "Pole Position Production · M1919A4 .30cal · Sonniss GDC 2016",
+    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_0.1m_to_right_Double_shots_x_1.mp3",
+    credit: "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016",
     license: "sonniss",
-    // 歪把子十一年式：6.5mm，漏斗供弹机构松散。升调 12% 顶上去。
-    cuts: [{ cue: "type11", tail: 0.6, gain: 0.86, minGap: 0.06, rate: 1.12, atS: 0.25 }],
+    // 用户在 G09 试听中选定。只切末发、升调 12%；500 rpm 仍由引擎按史实排。
+    cuts: [{ cue: "type11", tail: 0.78, gain: 0.86, rate: 1.12, exactAtS: 0.67 }],
   },
   {
-    id: "M1919A4Turret",
+    id: "M1919A4Far200",
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
-    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_1m_left_blanks_Triple_shots_x_2.mp3",
-    credit: "Pole Position Production · M1919A4 .30cal（枪架）· Sonniss GDC 2016",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal/M1919A4_Browning_Machine_Gun_.30cal_200m_left_behind_blanks_Triple_shots_x_1.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal 200 m 侧后 · Sonniss GDC 2016",
     license: "sonniss",
-    // 九二式重机 7.7mm、55 kg 枪架。选「架在枪架上」这版是为了**每发后面那记金属余振** ——
-    // 重机与轻机在听感上真正的分界是它，不是射速。射速（200 rpm 的「啄木鸟」）由引擎排。
-    cuts: [{ cue: "type92", tail: 0.95, gain: 0.92, minGap: 0.06, rate: 1.03, atS: 4.61 }],
+    // 用户在 G11 试听中选定。只切三连发末发，200 rpm 的「啄木鸟」间隔仍由引擎排。
+    cuts: [{ cue: "type92", tail: 1.2, gain: 0.92, rate: 1.03, exactAtS: 0.25 }],
   },
 
   // === 操作音 =============================================================

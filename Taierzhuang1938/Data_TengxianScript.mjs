@@ -164,8 +164,8 @@ export const LEVELS = [
     date: "一九三八年三月十四日夜 — 十五日黄昏",
     clock: { from: "03-14 21:00", to: "03-15 18:00" },
     sky: "night",
-    // 夜里摸进城。
-    music: "tension",
+    // 夜战旧曲整批未通过评审；新候选选定前只留夜风、脚步与远处枪炮。
+    music: null,
     bounds: "L1Approach",
     minutes: 16,
     // 全局唯一一次上涨：收容第 127 师 757 团残部数百人（史料）。

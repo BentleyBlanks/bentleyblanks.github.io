@@ -63,7 +63,8 @@ const load = await page.evaluate(() => {
     enabled: a.enabled,
     ready: a.Ready,
     sfxReady: a.sfxReady,
-    covered: [...a.sampleCues].sort(),
+    // 环境包与音效包并行载入；机器快时 amb.* 可能在这里先注册，不能算进 SFX 覆盖数。
+    covered: [...a.sampleCues].filter((name) => !name.startsWith("amb.")).sort(),
     errors: a.sfxErrors.slice(0, 6),
     manifestCues: a.sfxManifest ? Object.keys(a.sfxManifest.cues).length : 0,
     toneHz: a.sfxManifest && a.sfxManifest.cues.bugleTone

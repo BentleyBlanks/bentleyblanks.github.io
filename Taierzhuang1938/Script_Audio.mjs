@@ -1338,7 +1338,8 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
-export const MUSIC_PACK_VERSION = "2";
+export const SFX_PACK_VERSION = "3";
+export const MUSIC_PACK_VERSION = "3";
 
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
 const SAMPLE_BURST = {
@@ -2114,7 +2115,7 @@ export class AudioEngine {
     if (!this.ctx || this.disposed) return 0;
     let manifest = null;
     try {
-      const res = await fetch(base + "Data_SfxManifest.json");
+      const res = await fetch(base + "Data_SfxManifest.json?v=" + SFX_PACK_VERSION);
       if (!res.ok) throw new Error("HTTP " + res.status);
       manifest = await res.json();
     } catch (err) {
@@ -2128,7 +2129,7 @@ export class AudioEngine {
       const files = entry.files || (entry.file ? [entry.file] : []);
       try {
         const buffers = await Promise.all(files.map(async (file) => {
-          const res = await fetch(base + file);
+          const res = await fetch(base + file + "?v=" + SFX_PACK_VERSION);
           if (!res.ok) throw new Error(file + " HTTP " + res.status);
           return this.ctx.decodeAudioData(await res.arrayBuffer());
         }));

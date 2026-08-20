@@ -15,40 +15,34 @@
   "cues": {
     "rifleNra": {
       "files": [
-        "AudioSfx_RifleNra_01.mp3",
-        "AudioSfx_RifleNra_02.mp3",
-        "AudioSfx_RifleNra_03.mp3"
+        "AudioSfx_RifleNra_01.mp3"
       ],
-      "seconds": 1.15,
-      "credit": "Pole Position Production · K98k 7.92×57 毛瑟 · Sonniss GDC 2020",
+      "seconds": 1.3,
+      "credit": "Watson Wu · 毛瑟 8 mm 中距离实录 · Sonniss Game Audio Monthly #3",
       "license": "sonniss"
     },
     "rifleNraFar": {
       "files": [
-        "AudioSfx_RifleNraFar_01.mp3",
-        "AudioSfx_RifleNraFar_02.mp3",
-        "AudioSfx_RifleNraFar_03.mp3"
+        "AudioSfx_RifleNraFar_01.mp3"
       ],
-      "seconds": 1.5,
-      "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020",
+      "seconds": 1.8,
+      "credit": "FLYSOUND · 莫辛纳甘长距离混录 · Sonniss GDC 2020",
       "license": "sonniss"
     },
     "rifleIja": {
       "files": [
-        "AudioSfx_RifleIja_01.mp3",
-        "AudioSfx_RifleIja_02.mp3",
-        "AudioSfx_RifleIja_03.mp3"
+        "AudioSfx_RifleIja_01.mp3"
       ],
-      "seconds": 0.864,
-      "credit": "Pole Position Production · 斯普林菲尔德 M1903A3 · Sonniss GDC 2020",
+      "seconds": 1.045,
+      "credit": "Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3",
       "license": "sonniss"
     },
     "rifleIjaFar": {
       "files": [
         "AudioSfx_RifleIjaFar_01.mp3"
       ],
-      "seconds": 0.849,
-      "credit": "Watson Wu · 两次大战步枪（来弹视角）· Sonniss Game Audio Monthly #3",
+      "seconds": 1.389,
+      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
       "license": "sonniss"
     },
     "zb26": {
@@ -63,16 +57,16 @@
       "files": [
         "AudioSfx_Type11_01.mp3"
       ],
-      "seconds": 0.536,
-      "credit": "Pole Position Production · M1919A4 .30cal · Sonniss GDC 2016",
+      "seconds": 0.696,
+      "credit": "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016",
       "license": "sonniss"
     },
     "type92": {
       "files": [
         "AudioSfx_Type92_01.mp3"
       ],
-      "seconds": 0.922,
-      "credit": "Pole Position Production · M1919A4 .30cal（枪架）· Sonniss GDC 2016",
+      "seconds": 1.165,
+      "credit": "Pole Position Production · M1919A4 .30cal 200 m 侧后 · Sonniss GDC 2016",
       "license": "sonniss"
     },
     "bolt": {
