@@ -38,6 +38,18 @@ export const DESTRUCTION_PROFILES = Object.freeze({
     bulletOpening: [0.72, 0.70], blastOpening: [1.20, 1.10], maxOpening: [2.25, 1.55],
     fragmentHealthScale: 0.58,
   }),
+  roofTile: FreezeProfile({
+    id: "roofTile", label: "民居瓦顶", destructible: true,
+    health: 105, bulletScale: 0.52, blastScale: 1.48, surface: "brick",
+    bulletOpening: [0.68, 0.62], blastOpening: [1.30, 1.16], maxOpening: [2.35, 1.68],
+    fragmentHealthScale: 0.56,
+  }),
+  straw: FreezeProfile({
+    id: "straw", label: "草垛", destructible: true,
+    health: 38, bulletScale: 0.78, blastScale: 1.70, surface: "dirt",
+    bulletOpening: [0.78, 0.72], blastOpening: [1.36, 1.20], maxOpening: [2.20, 1.75],
+    fragmentHealthScale: 0.48,
+  }),
   sandbag: FreezeProfile({
     id: "sandbag", label: "沙袋与临时工事", destructible: true,
     health: 125, bulletScale: 0.45, blastScale: 1.28, surface: "sandbag",
@@ -67,6 +79,15 @@ const STRUCTURAL_SET = new Set(STRUCTURAL_TAGS);
 
 const TAG_PROFILE = Object.freeze({
   wall: "masonry",
+  villageWall: "masonry",
+  villageFoundation: "heavyMasonry",
+  villageStoneWall: "heavyMasonry",
+  villageCourtyard: "lightMasonry",
+  villageRoof: "roofTile",
+  villageGate: "wood",
+  villagePost: "wood",
+  villageCart: "wood",
+  villageStraw: "straw",
   zhaiWall: "heavyMasonry",
   parapet: "lightMasonry",
   prop: "wood",

@@ -1408,7 +1408,7 @@ export class TengxianOutfield {
             ry: ry + Math.PI / 2 }));
       }
     }
-    return roof.ridgeY;
+    return roof;
   }
 
   AddVillageFacade(sink, {
@@ -1472,23 +1472,33 @@ export class TengxianOutfield {
       MakeBox(width + 0.46, foundationHeight, depth + 0.46,
         TILE_METERS.stone, `${seed}:foundation`),
       { x, y: foundation.bottomY + foundationHeight / 2, z, ry }));
+    sink.Solid(x, foundation.bottomY + foundationHeight / 2, z,
+      width / 2 + 0.23, foundationHeight / 2, depth / 2 + 0.23,
+      "villageFoundation", ry);
 
     const wallMaterial = kind === "AdobeCottage" || kind === "FarmShed"
       ? "Adobe" : "HouseBrick";
     const bodyHeight = kind === "FarmShed" ? eave * 0.82 : eave;
+    const wallThickness = 0.3;
     if (kind === "FarmShed") {
       // 敞口棚：后墙 + 两侧矮墙 + 三根前柱，轮廓与封闭住宅完全不同。
       const back = this.VillagePoint(x, z, ry, 0, -depth / 2);
       sink.Add("Adobe", PlaceGeometry(
         MakeBox(width, bodyHeight, 0.3, TILE_METERS.adobe, `${seed}:back`),
         { x: back.x, y: foundation.floorY + bodyHeight / 2, z: back.z, ry }));
+      sink.Solid(back.x, foundation.floorY + bodyHeight / 2, back.z,
+        width / 2, bodyHeight / 2, wallThickness / 2, "villageWall", ry);
       for (const side of [-1, 1]) {
         const sidePoint = this.VillagePoint(x, z, ry, side * width / 2, 0);
+        const sideHeight = bodyHeight * 0.72;
         sink.Add("Adobe", PlaceGeometry(
-          MakeBox(0.3, bodyHeight * 0.72, depth, TILE_METERS.adobe,
+          MakeBox(0.3, sideHeight, depth, TILE_METERS.adobe,
             `${seed}:side${side}`),
-          { x: sidePoint.x, y: foundation.floorY + bodyHeight * 0.36,
+          { x: sidePoint.x, y: foundation.floorY + sideHeight / 2,
             z: sidePoint.z, ry }));
+        sink.Solid(sidePoint.x, foundation.floorY + sideHeight / 2, sidePoint.z,
+          depth / 2, sideHeight / 2, wallThickness / 2,
+          "villageWall", ry + Math.PI / 2);
       }
       for (const localX of [-width * 0.42, 0, width * 0.42]) {
         const post = this.VillagePoint(x, z, ry, localX, depth / 2);
@@ -1496,6 +1506,8 @@ export class TengxianOutfield {
           MakeBox(0.16, bodyHeight, 0.16, TILE_METERS.wood,
             `${seed}:post${localX}`),
           { x: post.x, y: foundation.floorY + bodyHeight / 2, z: post.z, ry }));
+        sink.Solid(post.x, foundation.floorY + bodyHeight / 2, post.z,
+          0.08, bodyHeight / 2, 0.08, "villagePost", ry);
       }
     } else {
       sink.Add(wallMaterial, PlaceGeometry(
@@ -1503,6 +1515,19 @@ export class TengxianOutfield {
           wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
           `${seed}:body`, wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
         { x, y: foundation.floorY + bodyHeight / 2, z, ry }));
+      // 不再用一只实心大盒包整栋房。四面墙分别破坏后，正墙开洞不会被
+      // 后墙或“屋内空气”的重叠碰撞挡住，AI 导航也能随破口进入屋内。
+      for (const side of [-1, 1]) {
+        const frontBack = this.VillagePoint(x, z, ry, 0,
+          side * (depth / 2 - wallThickness / 2));
+        sink.Solid(frontBack.x, foundation.floorY + bodyHeight / 2, frontBack.z,
+          width / 2, bodyHeight / 2, wallThickness / 2, "villageWall", ry);
+        const leftRight = this.VillagePoint(x, z, ry,
+          side * (width / 2 - wallThickness / 2), 0);
+        sink.Solid(leftRight.x, foundation.floorY + bodyHeight / 2, leftRight.z,
+          Math.max(0.1, depth / 2 - wallThickness), bodyHeight / 2,
+          wallThickness / 2, "villageWall", ry + Math.PI / 2);
+      }
       if (kind === "StoneBaseHouse") {
         sink.Add("DryStone", PlaceGeometry(
           MakeBox(width + 0.06, 0.66, depth + 0.06,
@@ -1516,16 +1541,22 @@ export class TengxianOutfield {
       });
     }
 
-    const ridgeY = this.AddVillageRoof(sink, {
+    const roof = this.AddVillageRoof(sink, {
       x, z, ry, width, depth, eaveY: foundation.floorY + bodyHeight,
       seed, wallMaterial, far,
     });
-    const buildingHeight = ridgeY - foundation.bottomY + 0.22;
-    if (!far) sink.Solid(x, foundation.bottomY + buildingHeight / 2, z,
-      width / 2, buildingHeight / 2, depth / 2, "wall", ry);
+    // Rapier 目前只需 Y 轴朝向；用两只贴合前后坡投影的薄盒近似瓦面。
+    // 它们悬在 1.6 m 以上，不会被导航当成实心房屋足印。
+    const roofRise = Math.max(0.18, roof.ridgeY - roof.outerY);
+    for (const half of roof.halves) {
+      const roofPoint = this.VillagePoint(x, z, ry, 0, half.localZ);
+      sink.Solid(roofPoint.x, half.centerY, roofPoint.z,
+        half.width / 2, roofRise / 2 + 0.11,
+        (depth / 2 + 0.45) / 2, "villageRoof", ry);
+    }
     this.stats.villageBuildings += 1;
     this.stats.villageArchetypes[kind] = (this.stats.villageArchetypes[kind] || 0) + 1;
-    return { floorY: foundation.floorY, ridgeY };
+    return { floorY: foundation.floorY, ridgeY: roof.ridgeY };
   }
 
   AddVillageCourtyard(sink, { x, z, ry, width, depth, seed, material = "Adobe" }) {
@@ -1540,7 +1571,7 @@ export class TengxianOutfield {
           `${seed}:${tag}`, material === "HouseBrick" ? BRICK_UV_GRID : null),
         { x: point.x, y: groundY + wallHeight / 2, z: point.z, ry: segmentRy }));
       sink.Solid(point.x, groundY + wallHeight / 2, point.z,
-        length / 2, wallHeight / 2, 0.14, "wall", segmentRy);
+        length / 2, wallHeight / 2, 0.14, "villageCourtyard", segmentRy);
       sink.Cover(point.x, point.z, wallHeight, Math.sin(segmentRy), Math.cos(segmentRy));
     };
     AddSegment(0, -depth / 2, width, 0, "north");
@@ -1557,7 +1588,7 @@ export class TengxianOutfield {
       MakeBox(gateWidth, 1.75, 0.09, TILE_METERS.wood, `${seed}:gate`),
       { x: gate.x, y: this.groundAt(gate.x, gate.z) + 0.875, z: gate.z, ry }));
     sink.Solid(gate.x, this.groundAt(gate.x, gate.z) + 0.875, gate.z,
-      gateWidth / 2, 0.875, 0.06, "wall", ry);
+      gateWidth / 2, 0.875, 0.06, "villageGate", ry);
     this.stats.villageDetails += 5;
   }
 
@@ -1570,6 +1601,8 @@ export class TengxianOutfield {
     sink.Add("VillageStraw", PlaceGeometry(stack, { x: base.x, y: groundY + 0.67, z: base.z }));
     const cap = new THREE.ConeGeometry(0.78, 0.72, 10);
     sink.Add("VillageStraw", PlaceGeometry(cap, { x: base.x, y: groundY + 1.7, z: base.z }));
+    sink.Solid(base.x, groundY + 0.98, base.z,
+      0.92, 0.98, 0.92, "villageStraw", ry);
 
     // 独轮大车：两个木轮、车板、辕杆。近村才做，远村只留屋顶剪影。
     const cart = this.VillagePoint(x, z, ry, -3.0 - rnd(), 2.0 + rnd() * 1.5);
@@ -1583,12 +1616,17 @@ export class TengxianOutfield {
     sink.Add("WoodDoor", PlaceGeometry(
       MakeBox(1.3, 0.18, 1.65, TILE_METERS.wood, `${seed}:cartBed`),
       { x: cart.x, y: cartY + 0.65, z: cart.z, ry }));
+    sink.Solid(cart.x, cartY + 0.52, cart.z,
+      0.78, 0.52, 0.92, "villageCart", ry);
     for (const side of [-1, 1]) {
       const shaft = this.VillagePoint(cart.x, cart.z, ry, side * 0.38, 1.65);
       sink.Add("WoodBeam", PlaceGeometry(
         MakeBox(0.09, 0.09, 2.2, TILE_METERS.wood, `${seed}:shaft${side}`),
         { x: shaft.x, y: cartY + 0.68, z: shaft.z, ry }));
     }
+    const shaftCenter = this.VillagePoint(cart.x, cart.z, ry, 0, 1.65);
+    sink.Solid(shaftCenter.x, cartY + 0.68, shaftCenter.z,
+      0.48, 0.09, 1.12, "villageCart", ry);
     this.stats.villageDetails += 2;
   }
 
@@ -1663,7 +1701,8 @@ export class TengxianOutfield {
             sink.Add("DryStone", PlaceGeometry(
               MakeBox(len / segs * 1.03, hh, 0.55, TILE_METERS.stone, `${v.id}:sw${k}${ax}${az}`),
               { x: px, y: y + hh / 2, z: pz, ry }));
-            sink.Solid(px, y + hh / 2, pz, len / segs / 2, hh / 2, 0.3, "wall", ry);
+            sink.Solid(px, y + hh / 2, pz, len / segs / 2, hh / 2, 0.3,
+              "villageStoneWall", ry);
             sink.Cover(px, pz, hh, Math.sin(ry), Math.cos(ry));
           }
         }

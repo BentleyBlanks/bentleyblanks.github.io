@@ -117,7 +117,104 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   r.missing ? "" : `洞=${r.stats?.breaches} 残骸=${r.stats?.rubble} nav=${r.navAdvanced}`);
 }
 
-// 4. 换到北沙河：站台/木桥是楼板语义，向下打一只洞后竖直射线要穿过。
+// 4. 第一关石墙村的新村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。
+{
+  const r = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    await T.JumpToPhase(0);
+    T.StepFrames(40);
+    const nearVillage = T.battlefield.colliders.filter((box) => {
+      const c = box.c || [
+        (box.min[0] + box.max[0]) * 0.5,
+        (box.min[1] + box.max[1]) * 0.5,
+        (box.min[2] + box.max[2]) * 0.5,
+      ];
+      return Math.hypot(c[0] + 160, c[2] + 1350) < 92;
+    });
+    const tags = {};
+    for (const box of nearVillage) tags[box.tag] = (tags[box.tag] || 0) + 1;
+    const wall = nearVillage.find((box) => box.tag === "villageWall" && box.h?.[1] > 0.8);
+    const roofs = nearVillage.filter((box) => box.tag === "villageRoof" && box.h?.[1] > 0.2);
+    // 组合院落有相邻厢房；专项射线选一片中心不落入其它瓦顶 OBB 的坡面，
+    // 避免“打穿 A 顶又命中 B 顶”被误报成 A 留下隐形碰撞。
+    const roof = roofs.find((candidate) => roofs.every((other) => {
+      if (other === candidate) return true;
+      const dx = candidate.c[0] - other.c[0], dz = candidate.c[2] - other.c[2];
+      const cos = Math.cos(other.ry || 0), sin = Math.sin(other.ry || 0);
+      const localX = dx * cos - dz * sin;
+      const localZ = dx * sin + dz * cos;
+      return Math.abs(localX) > other.h[0] - 0.04 || Math.abs(localZ) > other.h[2] - 0.04;
+    }));
+    const straw = nearVillage.find((box) => box.tag === "villageStraw");
+    if (!wall || !roof || !straw) return { missing: true, tags };
+
+    const wallC = wall.c.slice(), wallH = wall.h.slice(), wallRy = wall.ry || 0;
+    const wallNormal = { x: Math.sin(wallRy), y: 0, z: Math.cos(wallRy) };
+    const wallOrigin = {
+      x: wallC[0] - wallNormal.x * (wallH[2] + 0.35),
+      y: wall.min[1] + Math.min(0.95, wallH[1]),
+      z: wallC[2] - wallNormal.z * (wallH[2] + 0.35),
+    };
+    const staged = T.destruction.Hit(wall, wallOrigin, 150,
+      { kind: "bullet", normal: wallNormal });
+    const wallBroken = T.destruction.Hit(wall, wallOrigin, 1200,
+      { kind: "shell", normal: wallNormal });
+    const wallRay = T.battlefield.Raycast(wallOrigin, wallNormal, wallH[2] * 2 + 0.7);
+
+    const roofC = roof.c.slice(), roofH = roof.h.slice();
+    const roofOrigin = { x: roofC[0], y: roofC[1] + roofH[1] + 0.28, z: roofC[2] };
+    const roofBroken = T.destruction.Hit(roof, roofOrigin, 520,
+      { kind: "shell", normal: { x: 0, y: 1, z: 0 } });
+    const roofRay = T.battlefield.Raycast(roofOrigin, { x: 0, y: -1, z: 0 }, roofH[1] * 2 + 0.5);
+
+    const strawC = straw.c.slice();
+    const beforeBlast = T.Debug.Destruction();
+    const blast = T.destruction.Blast(
+      { x: strawC[0], y: strawC[1], z: strawC[2] }, 1.8, 420, { kind: "grenade" });
+    T.destruction.Update({ x: -160, y: strawC[1], z: -1350 });
+    T.StepFrames(3);
+    const after = T.Debug.Destruction();
+    return {
+      tags,
+      profiles: {
+        wall: T.destruction.Profile(wall).id,
+        roof: T.destruction.Profile(roof).id,
+        straw: T.destruction.Profile(straw).id,
+      },
+      staged,
+      wallBroken,
+      roofBroken,
+      blast,
+      wallGone: !T.battlefield.colliders.includes(wall),
+      roofGone: !T.battlefield.colliders.includes(roof),
+      strawGone: !T.battlefield.colliders.includes(straw),
+      wallRay: wallRay ? wallRay.t : null,
+      roofRay: roofRay ? roofRay.t : null,
+      roofRayTag: roofRay?.box?.tag || null,
+      topologyDelta: after.topologyRebuilds - beforeBlast.topologyRebuilds,
+      stats: after,
+    };
+  });
+  Check("当前第一关确实生成分件村屋碰撞", !r.missing
+    && r.tags?.villageWall >= 20 && r.tags?.villageRoof >= 10
+    && r.tags?.villageFoundation >= 5 && r.tags?.villageStoneWall >= 8,
+  r.missing ? `缺少代理 ${JSON.stringify(r.tags)}`
+    : `墙 ${r.tags.villageWall} 顶 ${r.tags.villageRoof} 基 ${r.tags.villageFoundation} 石墙 ${r.tags.villageStoneWall}`);
+  Check("村屋墙体累积受损后形成可通行破口", !r.missing
+    && r.profiles?.wall === "masonry" && r.staged?.damaged && !r.staged?.broken
+    && r.wallBroken?.broken && r.wallGone && r.wallRay === null,
+  r.missing ? "" : `profile=${r.profiles?.wall} ray=${r.wallRay ?? "clear"}`);
+  Check("瓦顶可独立打碎且不会留下隐形碰撞", !r.missing
+    && r.profiles?.roof === "roofTile" && r.roofBroken?.broken
+    && r.roofGone && r.roofRay === null,
+  r.missing ? "" : `profile=${r.profiles?.roof} ray=${r.roofRay ?? "clear"} tag=${r.roofRayTag ?? "none"}`);
+  Check("草垛会被爆炸摧毁并刷新物理拓扑", !r.missing
+    && r.profiles?.straw === "straw" && r.blast?.broken >= 1
+    && r.strawGone && r.topologyDelta === 1,
+  r.missing ? "" : `破坏=${r.blast?.broken} 拓扑+${r.topologyDelta}`);
+}
+
+// 5. 换到北沙河：站台/木桥是楼板语义，向下打一只洞后竖直射线要穿过。
 {
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
@@ -147,7 +244,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   r.missing ? "没找到 platform/bridge" : `${r.tag} ray=${r.through ?? "clear"}`);
 }
 
-// 5. 一次爆炸无论拆几块，都只重建一次碰撞格和导航。
+// 6. 一次爆炸无论拆几块，都只重建一次碰撞格和导航。
 {
   const r = await page.evaluate(() => {
     const T = window.Taierzhuang;
