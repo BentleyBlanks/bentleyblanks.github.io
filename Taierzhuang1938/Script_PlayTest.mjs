@@ -395,25 +395,67 @@ const death = await page.evaluate(async () => {
   // OnPlayerDown 也就不会触发，读数会是"一票没动"，看起来像票池坏了。
   for (let k = 0; k < 8 && !T.player.Alive; k += 1) T.StepFrames(200);
   T.player.health = 100;
+  T.player.stance = "stand";
+  T.player.eyeHeight = 1.62;
+  T.StepFrames(2);
   const idBefore = T.state.identity.name;
   const poolBefore = T.state.nraPool;
+  const cameraYBefore = T.camera.position.y;
   T.player.Kill();
   T.StepFrames(3);          // 让 Frame 自己发现"上一帧还活着，这一帧死了"
   // 紧贴死亡那一刻读票池。第 1 批之后 AI 阵亡也扣票（那是对的：票池 = 兵力池），
   // 所以再往后推 260 帧去读，量到的是"这段时间全场死了几个人"，不是"玩家这条命"。
   const poolAtDeath = T.state.nraPool;
-  const cardOn = document.querySelector(".hudDeathCard").classList.contains("on");
+  const card = document.querySelector(".hudDeathCard");
+  const cardStyle = getComputedStyle(card);
+  const cardOn = card.classList.contains("on");
+  const cardBackground = cardStyle.backgroundColor;
+  const cardBackdrop = cardStyle.backdropFilter || cardStyle.webkitBackdropFilter;
+  const biography = card.querySelector(".dcBiography")?.textContent || "";
   const fallen = T.state.fallen.length;
-  // 阵亡卡片 2.6 s + 重生
-  T.StepFrames(260);
+  // 倒地约一秒：机位必须贴地并滚向一侧，第一人称枪模不能悬在画面里。
+  T.StepFrames(55);
+  const cameraDrop = cameraYBefore - T.camera.position.y;
+  const deathRoll = Math.abs(T.camera.rotation.z);
+  const weaponHidden = !T.viewmodel.root.visible;
+  const deathDof = {
+    strength: T.post.uniformsComposite.uDofStrength.value,
+    focus: T.post.uniformsComposite.uDofFocus.value,
+    range: T.post.uniformsComposite.uDofRange.value,
+    maxPx: T.post.uniformsComposite.uDofMaxPx.value,
+  };
+  // 阵亡卡片 2.6 s + 重生（总推进帧数与旧用例一致）
+  T.StepFrames(205);
   return {
     idBefore, idAfter: T.state.identity.name,
     poolBefore, poolAfter: poolAtDeath,
     cardOn, fallen, alive: T.player.Alive,
     origin: T.state.identity.origin,
+    cardBackground, cardBackdrop, biography,
+    cameraDrop, deathRoll, weaponHidden,
+    deathDof,
+    weaponRestored: T.viewmodel.root.visible,
+    dofAfterRespawn: T.post.uniformsComposite.uDofStrength.value,
   };
 });
 Check("阵亡弹卡片", death.cardOn, `阵亡名单 ${death.fallen} 人`);
+Check("阵亡层半透明且保留战场",
+  /^rgba\(/.test(death.cardBackground) && death.cardBackdrop !== "none",
+  `${death.cardBackground} / ${death.cardBackdrop}`);
+Check("阵亡卡显示动态生平",
+  death.biography.includes("籍贯") && death.biography.includes("1938")
+    && death.biography.includes("第三十一师"), death.biography);
+Check("第一人称镜头倒到贴地侧卧",
+  death.cameraDrop > 0.8 && death.deathRoll > 0.8,
+  `下降 ${death.cameraDrop.toFixed(2)}m / 滚转 ${death.deathRoll.toFixed(2)}rad`);
+Check("阵亡景深聚焦前景并重度虚化背景",
+  death.deathDof.strength > 0.95 && death.deathDof.focus <= 1.5
+    && death.deathDof.range <= 3.0 && death.deathDof.maxPx >= 10,
+  JSON.stringify(death.deathDof));
+Check("接管后关闭阵亡景深", death.dofAfterRespawn === 0,
+  `dof=${death.dofAfterRespawn}`);
+Check("倒地收枪且接管后恢复", death.weaponHidden && death.weaponRestored,
+  `倒地 hidden=${death.weaponHidden} / 重生 visible=${death.weaponRestored}`);
 Check("玩家这条命扣一张票", death.poolAfter === death.poolBefore - 1,
   `${death.poolBefore} -> ${death.poolAfter}`);
 Check("换成另一个有名有姓有籍贯的人", death.alive && !!death.origin,

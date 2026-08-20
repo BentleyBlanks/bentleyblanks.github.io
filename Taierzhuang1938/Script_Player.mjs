@@ -159,6 +159,13 @@ export class PlayerController {
     this.lastFootstep = 0;
     this.deadTime = 0;
     this.alive = true;
+    // 第一人称阵亡镜头。Kill() 记下中弹那一帧的真实机位，死亡 Update 再从那里
+    // 落到贴地侧卧；直接用站姿眼高重算会在开镜、侧身或卧姿死亡时先瞬移一下。
+    this.deathCameraStart = new THREE.Vector3();
+    this.deathStartYaw = 0;
+    this.deathStartPitch = 0;
+    this.deathStartRoll = 0;
+    this.deathFallSide = 1;
     /**
      * 出生保护（秒）。ER2 的做法：重生后几秒无敌，防出生点秒杀。
      * 这不是"照顾玩家"，是修一个结构性问题：接替者必然出生在还在打的地方，
@@ -382,7 +389,11 @@ export class PlayerController {
   }
 
   Update(dt, input, weapon) {
-    if (!this.alive) { this.deadTime += dt; return; }
+    if (!this.alive) {
+      this.deadTime += dt;
+      this.SyncDeathCamera();
+      return;
+    }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
     if (this.vault.active) return this._StepVault(dt);
 
@@ -717,6 +728,43 @@ export class PlayerController {
   }
 
   /**
+   * 第一人称倒地：视点留在刚才那个人身上，而不是切黑或升到尸体上方。
+   * 1.05 秒内眼位贴到地面、身体向一侧倒下，末段只留很轻的落地回弹。
+   * 战场是否压暗属于 HUD；这里仅负责真实机位，方便画面与自动化分别验收。
+   */
+  SyncDeathCamera() {
+    const cam = this.camera;
+    const t = Clamp01(this.deadTime / 1.05);
+    const fall = t * t * (3 - 2 * t);
+    const side = this.deathFallSide;
+    const yaw = this.deathStartYaw;
+    const rightX = -Math.cos(yaw);
+    const rightZ = Math.sin(yaw);
+    const forwardX = -Math.sin(yaw);
+    const forwardZ = -Math.cos(yaw);
+    const lateral = side * 0.18 * fall;
+    const forward = 0.08 * fall;
+    // 撞地后的一点点回弹；归零时严格落在目标眼位，不留下持续抖动。
+    const impactT = Clamp01((t - 0.72) / 0.28);
+    const impact = Math.sin(impactT * Math.PI * 2) * (1 - impactT) * 0.025;
+    const targetY = this.position.y + 0.22;
+
+    cam.position.set(
+      this.deathCameraStart.x
+        + (this.position.x + rightX * lateral + forwardX * forward - this.deathCameraStart.x) * fall,
+      Math.max(this.position.y + 0.16,
+        this.deathCameraStart.y + (targetY - this.deathCameraStart.y) * fall + impact),
+      this.deathCameraStart.z
+        + (this.position.z + rightZ * lateral + forwardZ * forward - this.deathCameraStart.z) * fall);
+    cam.rotation.order = "YXZ";
+    cam.rotation.y = this.deathStartYaw + side * 0.10 * fall;
+    cam.rotation.x = this.deathStartPitch
+      + (Clamp(this.deathStartPitch - 0.18, -1.1, 0.45) - this.deathStartPitch) * fall;
+    cam.rotation.z = this.deathStartRoll
+      + (side * 1.22 - this.deathStartRoll) * fall;
+  }
+
+  /**
    * 被弹片/子弹擦过或命中。part: head/torso/arm/leg
    *
    * 部位倍率与单发上限一律读 COMBAT.player —— **不再在这里写死**。
@@ -839,6 +887,11 @@ export class PlayerController {
 
   Kill() {
     if (!this.alive) return;
+    this.deathCameraStart.copy(this.camera.position);
+    this.deathStartYaw = this.camera.rotation.y;
+    this.deathStartPitch = this.camera.rotation.x;
+    this.deathStartRoll = this.camera.rotation.z;
+    this.deathFallSide = this.rnd() < 0.5 ? -1 : 1;
     this.alive = false;
     this.health = 0;
     this.deadTime = 0;

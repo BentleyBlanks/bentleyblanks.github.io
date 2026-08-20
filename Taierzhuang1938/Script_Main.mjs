@@ -1324,6 +1324,7 @@ function RespawnPlayer(initial = false) {
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
   viewmodel.Equip(currentWeapon);
+  viewmodel.root.visible = true;
   hud.SetIdentity(state.identity,
     currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
   state.pendingRespawn = false;
@@ -1435,6 +1436,8 @@ function OnPlayerDown() {
   hud.ShowDeathCard(identity, "第三十一师 一八六团", REINFORCE.deathCardSeconds);
   state.deathTimer = REINFORCE.deathCardSeconds;
   state.pendingRespawn = true;
+  // 倒地镜头保留战场，但手里的枪不能冻结在半空；接管下一名士兵时再恢复。
+  if (viewmodel) viewmodel.root.visible = false;
   audio.Play("bodyFall", { volume: 0.9 });
   if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
@@ -2738,6 +2741,9 @@ function RenderScene(dt) {
   audio.SetListener(camera);
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
+  // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
+  // mask 与生平卡随后由浏览器叠上去。死亡最初 0.32 秒渐入，和 UI 遮罩同步。
+  const deathDof = player && !player.Alive ? Clamp01(player.deadTime / 0.32) : 0;
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
@@ -2750,7 +2756,12 @@ function RenderScene(dt) {
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
-    motionBlur: 0.15 * graphics.motionBlur,
+    // DOF 要把近景钉清楚；死亡时再叠相机运动模糊会把前景也抹掉，焦点层级就没了。
+    motionBlur: 0.15 * graphics.motionBlur * (1 - deathDof),
+    dofStrength: deathDof,
+    dofFocus: 1.5,
+    dofRange: 2.8,
+    dofMaxPx: 11.0,
   });
 }
 

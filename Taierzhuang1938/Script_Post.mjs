@@ -319,6 +319,11 @@ uniform mat4 uInvView;
 uniform vec2 uProjScale;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
+// 阵亡景深：焦点固定在贴地镜头前景，深度越远 CoC 越大；随后 HUD 才叠 mask/UI。
+uniform float uDofStrength;
+uniform float uDofFocus;
+uniform float uDofRange;
+uniform float uDofMaxPx;
 // 大气：Easy Red 2 的“远景退进去”不是靠一层灰纱盖上去，
 // 而是**染在物体自身上**：指数距离雾 x 高度雾，再按雾量去饱和降对比。
 // 三件事合起来才有纵深 —— 只做其中一件都是“屏幕上蒙了层灰”。
@@ -400,6 +405,29 @@ void main() {
     color = acc / float(TAPS);
   } else {
     color = texture2D(uHdr, uv).rgb;
+  }
+
+  // --- 阵亡景深：近景仍锐利，背景用 12 抽样圆盘做重度散焦 ---
+  // 不能用 CSS blur：那会把贴在镜头前的地面也一起糊掉，只剩一张均匀毛玻璃。
+  // rtNormalDepth.w 是线性视深，正好能把「倒地后眼前一两米」与远处战场分开。
+  if (uDofStrength > 0.001) {
+    float coc = nd.w <= 0.0 ? 1.0
+      : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), nd.w);
+    coc *= uDofStrength;
+    if (coc > 0.001) {
+      vec2 radius = vec2(uDofMaxPx * coc) / uResolution;
+      float seed = Ign(gl_FragCoord.xy + uFrame * 3.17) * 6.2831853;
+      vec3 blur = vec3(0.0);
+      const int DOF_TAPS = 12;
+      for (int i = 0; i < DOF_TAPS; i++) {
+        float fi = float(i) + 0.5;
+        float angle = fi * 2.39996323 + seed;
+        float ring = sqrt(fi / float(DOF_TAPS));
+        vec2 offset = vec2(cos(angle), sin(angle)) * ring * radius;
+        blur += texture2D(uHdr, clamp(uv + offset, vec2(0.001), vec2(0.999))).rgb;
+      }
+      color = mix(color, blur / float(DOF_TAPS), coc);
+    }
   }
 
   color += texture2D(uBloom, uv).rgb * uBloomStrength;
@@ -624,6 +652,8 @@ export class PostPipeline {
       uPrevViewProjection: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() },
       uProjScale: { value: new THREE.Vector2(1, 1) },
       uDamage: { value: 0 }, uFade: { value: 0 },
+      uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
+      uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
       uFogDensity: { value: 0.013 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 },
       uFogMax: { value: 0.94 },
       uFogColorSky: { value: new THREE.Vector3(0.62, 0.64, 0.68) },
@@ -904,6 +934,10 @@ export class PostPipeline {
     if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);
     U.uDamage.value = options.damage ?? 0;
     U.uFade.value = options.fade ?? 0;
+    U.uDofStrength.value = options.dofStrength ?? 0;
+    U.uDofFocus.value = options.dofFocus ?? 1.5;
+    U.uDofRange.value = options.dofRange ?? 2.8;
+    U.uDofMaxPx.value = options.dofMaxPx ?? 11.0;
     U.uFrame.value = frame;
     U.uProjScale.value.set(projScaleX, projScaleY);
     U.uInvView.value.copy(camera.matrixWorld);

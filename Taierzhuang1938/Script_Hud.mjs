@@ -4,8 +4,8 @@
 // 命中提示、穿透提示全是可选项。留下的只有：目标图标、小地图、当前是谁、
 // 压制暗角、包扎提示。这里照这个尺度做。
 //
-// 唯一一处比 ER2 多的是「阵亡卡片」——全屏黑底白字打出刚才那个人的名字、籍贯、
-// 生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
+// 唯一一处比 ER2 多的是「阵亡卡片」——倒地后的战场留在半透明去色层下面，
+// 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
 import { REINFORCE } from "./Data_Battle.mjs";
@@ -364,8 +364,8 @@ export class Hud {
   }
 
   /**
-   * 阵亡卡片。照 Easy Red 2 的呈现：黑底、居中、无装饰，
-   * 姓名（大）-> 籍贯 · 生卒（小）-> 番号（更小更暗），期间不出任何别的 HUD。
+   * 阵亡卡片。照 Easy Red 2 的呈现：第一人称倒地画面仍看得见，
+   * 全屏半透明去色，姓名（大）-> 籍贯 · 生卒（小）-> 番号（更小更暗）。
    *
    * 为什么这张卡值得单独讲究：它是这个游戏唯一一处把"一条命"具体化的地方。
    * 姓名是中文的、籍贯是真地名（河北雄县、河南尉氏、陕西泾阳…按第 2 集团军的
@@ -375,13 +375,16 @@ export class Hud {
   ShowDeathCard(identity, unit, seconds) {
     const born = 1938 - identity.age;
     this.el.deathCard.innerHTML =
-      `<div class="dcName">${identity.name}</div>`
+      `<div class="dcBiography">`
+      + `<div class="dcKicker">阵亡</div>`
+      + `<div class="dcName">${identity.name}</div>`
+      + `<div class="dcRule"></div>`
       + `<div class="dcOrigin">籍贯　${identity.origin}</div>`
       + `<div class="dcYears">${born} — 1938</div>`
-      + `<div class="dcUnit">${unit}</div>`;
+      + `<div class="dcUnit">${unit}</div>`
+      + `</div>`;
     this.el.deathCard.classList.add("on");
-    // 卡片在的时候把别的 HUD 全压掉 —— ER2 那一屏是干净的，
-    // 旁边还挂着小地图和弹药提示就成了"死亡结算界面"，不是那个意思。
+    // 卡片在的时候把功能 HUD 全压掉，但底下的第一人称战场继续渲染。
     this.root.classList.add("deathCardOn");
     this.deathTimer = seconds;
   }

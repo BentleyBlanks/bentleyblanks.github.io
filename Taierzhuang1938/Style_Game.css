@@ -235,30 +235,58 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   border: 1px solid rgba(230,223,205,0.14); opacity: 0.9;
 }
 
-/* 阵亡卡片 */
+/* 阵亡：第一人称镜头在 Canvas 里倒地，这一层只做半透明去色与生平。
+   不再用不透明黑底；战场必须一直看得见，死亡才仍然发生在同一个地方。 */
 .hudDeathCard {
-  position: absolute; inset: 0; background: #07070a;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.45s ease;
+  position: absolute; inset: 0; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+  padding: 0 7vw 11vh; opacity: 0; pointer-events: none;
+  color: #eee9dd; background: rgba(5, 7, 9, 0.42);
+  backdrop-filter: grayscale(0.92) saturate(0.38) contrast(0.94) brightness(0.82);
+  -webkit-backdrop-filter: grayscale(0.92) saturate(0.38) contrast(0.94) brightness(0.82);
+  transition: opacity 0.32s ease;
 }
 .hudDeathCard.on { opacity: 1; }
+.hudDeathCard::after {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(5,7,9,0.05) 0%, rgba(5,7,9,0.01) 42%, rgba(5,7,9,0.28) 100%),
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 38%, rgba(0,0,0,0.20) 100%);
+}
+.hudDeathCard .dcBiography {
+  position: relative; z-index: 1; width: min(560px, 82vw);
+  padding-left: 22px; border-left: 1px solid rgba(238,233,221,0.34);
+}
+.hudDeathCard .dcKicker {
+  margin-bottom: 7px; color: rgba(224,176,98,0.92);
+  font-size: 12px; letter-spacing: 0.42em;
+}
 .hudDeathCard .dcName {
-  font-size: 40px; letter-spacing: 0.30em; text-indent: 0.30em;  /* 字距会把最后一个字推偏，缩进补回来 */
-  font-weight: 500;
+  font-size: clamp(34px, 4.3vw, 48px); letter-spacing: 0.24em;
+  font-weight: 500; line-height: 1.18;
+}
+.hudDeathCard .dcRule {
+  width: min(430px, 68vw); height: 1px; margin: 17px 0 13px;
+  background: linear-gradient(90deg, rgba(238,233,221,0.46), rgba(238,233,221,0));
 }
 .hudDeathCard .dcOrigin {
-  margin-top: 14px; font-size: 15px; color: var(--dim); letter-spacing: 0.14em;
+  font-size: 15px; color: rgba(238,233,221,0.76); letter-spacing: 0.14em;
 }
 .hudDeathCard .dcYears {
-  margin-top: 4px; font-size: 15px; color: var(--dim); letter-spacing: 0.20em;
+  margin-top: 3px; font-size: 15px; color: rgba(238,233,221,0.76); letter-spacing: 0.20em;
 }
 .hudDeathCard .dcUnit {
-  margin-top: 20px; font-size: 12.5px; color: rgba(230,223,205,0.34); letter-spacing: 0.18em;
+  margin-top: 14px; font-size: 12.5px; color: rgba(238,233,221,0.48); letter-spacing: 0.18em;
 }
 
-/* 阵亡卡片在的时候，别的 HUD 全压掉。
-   ER2 那一屏是干净的；旁边还挂着小地图和弹药提示就成了"结算界面"，不是那个意思。 */
+/* 阵亡时功能 HUD 退场，底下 Canvas 与环境仍然活着。 */
 #hud.deathCardOn > *:not(.hudDeathCard) { opacity: 0 !important; transition: opacity 0.3s ease; }
+
+@media (max-width: 640px) {
+  .hudDeathCard { padding: 0 8vw 9vh; }
+  .hudDeathCard .dcBiography { padding-left: 15px; }
+  .hudDeathCard .dcName { font-size: 32px; }
+}
 /* 过场期间：HUD 全部让位，只留过场自己的字幕层（.csRoot 也挂在 #hud 下） */
 #hud.cinematic > *:not(.csRoot) { opacity: 0 !important; transition: none !important; }
 
