@@ -23,7 +23,7 @@ import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
-import { PlayerController, STANCE } from "./Script_Player.mjs";
+import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
@@ -226,7 +226,7 @@ const state = {
   deathTimer: 0,
   pendingRespawn: false,
   identity: null,
-  order: "follow",
+  order: "",
   ordersOpen: false,
   spawnAccumulator: 0,
   smokeHandles: [],           // 常驻烟柱的 handle，换阶段时要一根根拆掉
@@ -2191,7 +2191,7 @@ function MarchBullet(from, dir, weapon, targets) {
  * 而我们把它写进 docs/Data_GunFeelReview.md 的裁决表当"默认关的难度选项"就搁下了。
  * 实跑之后这个判断是错的 —— 本作同时做了三件减法：
  *   · 没有准星（Script_Player 抬头）
- *   · 不显示弹药数（Script_Hud.SetState）
+ *   · 当时不显示弹药数（后来已补到 Script_Hud.SetState）
  *   · 结算不打歼敌数（Data_HistoryQuotes §10，这条不许动）
  * 每一条单看都对，叠在一起就把"我这一枪打没打中"的所有出口一起堵死了：
  * 血雾在一百米上只有两三个像素，impactFlesh 走 inverse 衰减到八十米剩 4.8%。
@@ -2236,12 +2236,12 @@ function TryFire(dt) {
   // 单发模式（仅捷克式）：一次按下只出一发
   if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
   if (state.ammo <= 0) {
-    // 空仓那一下：栓停在后面，得自己压桥夹。不提示弹药数（ER2 的步兵 HUD 也不显示），
-    // 但空膛的"咔"必须听得出来，不然玩家不知道自己在空按扳机。
+    // 空仓那一下：栓停在后面，得自己压桥夹。HUD 虽然会变红，但空膛的“咔”
+    // 仍必须听得出来，玩家不该在交火时只能盯着右下角判断。
     //
     // 【2026-08-20】原来空膛和每发之后的拉栓**是同一个 cue**，只差音量 0.50 vs 0.42 ——
-    // 闭着眼睛分不出「这是在拉栓」还是「这是空了」。而我们不显示弹药数，
-    // 这一声本该是玩家唯一的弹药信息通道。
+    // 闭着眼睛分不出「这是在拉栓」还是「这是空了」。声音必须独立于 HUD 成为
+    // 第二条弹药信息通道。
     // 没有独立的空击实录，就用 pitch 把它拉开：击针落在空膛是**又轻又高又短**的一记，
     // 拉栓是「哐啷」两下的重机械声。pitch 1.55 把频心抬上去、整声缩到 65%，
     // 音量再降到 0.34 —— 两者在时长、频心、响度三个维度上同时分开，不靠音量那 8% 硬撑。
@@ -2270,8 +2270,8 @@ function TryFire(dt) {
     { position: _muzzle.clone(), priority: true });
   // 枪感方子 1：**每发之后的自动拉栓要有声音。**
   // bolt 那条配方 19 节点三段式做得极好，而全仓库只有空扣扳机与架两脚架会播它 ——
-  // 打完一发之后一声不响。我们不显示弹药数，这条信息通道原来整个关着：
-  // 玩家既听不出自己在拉栓，也听不出这是最后一发。
+  // 打完一发之后一声不响。这条听觉信息通道原来整个关着：玩家既听不出自己
+  // 在拉栓，也听不出这是最后一发。
   // 0.24 s 是枪响之后手真的去够枪机的时间；0.62 s 是弹壳落地。
   // 判据是 kind === "boltRifle"（Data_Weapons 里每支枪都有），
   // 不是"有没有 rpm" —— 驳壳枪与捷克式自己上膛，没有手拉的那一下。
@@ -2432,7 +2432,6 @@ function ReachObjective(index) {
   const text = phase.objectives[state.objectiveIndex];
   if (text) {
     state.storyObjective = text;
-    hud.Hint(text, 5.0);
   }
   SeedSmokeColumns(phase);
 }
@@ -2611,7 +2610,7 @@ function Frame(dt, render = true) {
     freeAimYaw: player.aimYaw, freeAimPitch: player.aimPitch,
     crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
     // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
-    // 我们不显示弹药数，这是玩家唯一能"看见"自己没子弹了的通道。
+    // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
     lowAmmo: state.ammo <= 1,
   });
 
@@ -2703,14 +2702,16 @@ function Frame(dt, render = true) {
   hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
     state.nraPool, null);
   hud.SetState({
-    stance: STANCE[player.stance].label,
+    stance: player.stance,
     wounded: player.wounds.length > 0,
     bleeding: player.bleeding,
     bandages: player.bandages,
     breath: player.breathHold,
     order: state.order,
-    // 不显示子弹数（ER2 的步兵 HUD 也不显示，自己数或者听拉栓那一下），
-    // 但手榴弹与集束是要计划的资源，这两个得看得见。
+    ammo: state.ammo,
+    clips: state.clips,
+    magazine: weapon?.magazine ?? 0,
+    armed: Number(weapon?.magazine) > 0,
     grenades: state.grenades,
     bundles: state.bundles,
     mortar: combat.MortarReady ? combat.MortarLeft : 0,

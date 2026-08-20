@@ -41,6 +41,7 @@ try {
     const minimap = document.querySelector(".hudMinimap");
     const snapshot = () => ({
       on: minimap.classList.contains("on"),
+      rootOn: document.getElementById("hud")?.classList.contains("mapOn"),
       display: getComputedStyle(minimap).display,
       ariaHidden: minimap.getAttribute("aria-hidden"),
     });
@@ -52,9 +53,9 @@ try {
     const hiddenAgain = snapshot();
     return { initial, shown, hiddenAgain };
   });
-  assert.deepEqual(mapToggle.initial, { on: false, display: "none", ariaHidden: "true" });
-  assert.deepEqual(mapToggle.shown, { on: true, display: "block", ariaHidden: "false" });
-  assert.deepEqual(mapToggle.hiddenAgain, { on: false, display: "none", ariaHidden: "true" });
+  assert.deepEqual(mapToggle.initial, { on: false, rootOn: false, display: "none", ariaHidden: "true" });
+  assert.deepEqual(mapToggle.shown, { on: true, rootOn: true, display: "block", ariaHidden: "false" });
+  assert.deepEqual(mapToggle.hiddenAgain, { on: false, rootOn: false, display: "none", ariaHidden: "true" });
 
   const prompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -84,6 +85,27 @@ try {
   assert.deepEqual(prompts.rows, ["B", "1 / 2"]);
   assert.equal(prompts.icons, 2);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
+
+  const combatHud = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.state.ammo = 1;
+    T.state.clips = 3;
+    T.player.stance = "crouch";
+    T.StepFrames(3);
+    const stance = document.querySelector(".combatStance");
+    return {
+      current: document.querySelector(".ammoCurrent")?.textContent,
+      reserve: document.querySelector(".ammoReserve")?.textContent,
+      stance: stance?.dataset.stance,
+      stanceLabel: stance?.getAttribute("aria-label"),
+      low: document.querySelector(".hudCombat")?.classList.contains("lowAmmo"),
+    };
+  });
+  assert.equal(combatHud.current, "01");
+  assert.equal(combatHud.reserve, "15");
+  assert.equal(combatHud.stance, "crouch");
+  assert.equal(combatHud.stanceLabel, "蹲伏");
+  assert.equal(combatHud.low, true);
 
   const weaponPrompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -119,6 +141,18 @@ try {
   });
   assert.deepEqual(cleared.prompts, []);
   assert.equal(cleared.on, false);
+
+  const objectiveChannel = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.hud.Hint("即时反馈保留位", 10);
+    T.Debug.CompleteLevel();
+    return {
+      hint: document.querySelector(".hudHint")?.textContent,
+      objective: document.querySelector(".hudObjective .o")?.textContent,
+    };
+  });
+  assert.equal(objectiveChannel.hint, "即时反馈保留位");
+  assert.ok(objectiveChannel.objective);
   assert.deepEqual(errors, []);
   console.log("ok  操作面板与情境 HUD 浏览器验证通过");
 } finally {

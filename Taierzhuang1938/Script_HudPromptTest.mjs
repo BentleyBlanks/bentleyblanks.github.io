@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
-import { ContextualActionPrompts } from "./Script_Hud.mjs";
+import { AmmoReadout, ContextualActionPrompts } from "./Script_Hud.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 
 const guideText = CONTROL_GUIDE.flatMap((group) => group.rows)
@@ -12,6 +12,19 @@ assert.match(guideText, /B 有绷带且流血时包扎止血/);
 assert.deepEqual(ContextualActionPrompts(), []);
 assert.deepEqual(ContextualActionPrompts({ bleeding: 1, bandages: 0 }), []);
 assert.deepEqual(ContextualActionPrompts({ bleeding: 0, bandages: 2 }), []);
+
+assert.deepEqual(AmmoReadout({ ammo: 5, clips: 6, magazine: 5 }), {
+  current: "05", reserve: "30", low: false, empty: false,
+});
+assert.deepEqual(AmmoReadout({ ammo: 1, clips: 2, magazine: 5 }), {
+  current: "01", reserve: "10", low: true, empty: false,
+});
+assert.deepEqual(AmmoReadout({ ammo: 0, clips: 0, magazine: 5 }), {
+  current: "00", reserve: "00", low: false, empty: true,
+});
+assert.deepEqual(AmmoReadout({ ammo: 0, clips: 0, magazine: 0, armed: false }), {
+  current: "—", reserve: "—", low: false, empty: false,
+});
 
 const bandageOnly = ContextualActionPrompts({ bleeding: 0.2, bandages: 1 });
 assert.deepEqual(bandageOnly.map((prompt) => prompt.kind), ["bandage"]);

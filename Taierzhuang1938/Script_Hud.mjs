@@ -1,8 +1,7 @@
 // 《血战台儿庄》HUD —— 纯 DOM/CSS，**不进 three 渲染**。
 //
-// 对标 Easy Red 2 的克制：ER2 的步兵武器**连弹药数都不显示**，准星默认关闭，
-// 命中提示、穿透提示全是可选项。留下的只有：目标图标、小地图、当前是谁、
-// 压制暗角、包扎提示。这里照这个尺度做。
+// 战术信息层级参考《战地》：顶部只留目标与兵力，左下地图，右下武器、弹药和姿态；
+// 中央只出现眼下可执行的操作与真正紧急的反馈。准星仍默认关闭，也不打歼敌数字。
 //
 // 唯一一处比 ER2 多的是「阵亡卡片」——倒地后的战场留在半透明去色层下面，
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
@@ -25,6 +24,31 @@ const TITLE_AFTER_BRIEF_S = 0.55;
 const MARKER_SEP_Y = 40;
 const MARKER_SEP_X = 130;
 const GRENADE_WARNING_LIMIT = 4;
+
+const STANCE_LABELS = {
+  stand: "站立",
+  crouch: "蹲伏",
+  prone: "卧倒",
+};
+
+const EQUIPMENT_ICONS = {
+  grenade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h7l2 3v7.5A3.5 3.5 0 0 1 14.5 21h-4A3.5 3.5 0 0 1 7 17.5V10l2-3Z"/><path d="M10 7V4h5v3m0-2h3l1-2"/></svg>`,
+  bundle: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h3v11H7zM14 8h3v11h-3zM10.5 6h3v14h-3zM8 5V3m8 2V3m-4.5 3V3"/></svg>`,
+  mortar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 3 1-3.8 12.5-3-1zM9 17l7 3m-10-2-2 3m11-1 3 1"/><path d="m9.5 3.5 2 .6-.6 2-2-.6z"/></svg>`,
+};
+
+/** 把内部的“剩余弹夹数”换成玩家真正需要判断的剩余弹数。 */
+export function AmmoReadout({ ammo = 0, clips = 0, magazine = 0, armed = true } = {}) {
+  const current = Math.max(0, Math.floor(Number(ammo) || 0));
+  const capacity = Math.max(0, Math.floor(Number(magazine) || 0));
+  const reserve = Math.max(0, Math.floor(Number(clips) || 0)) * capacity;
+  return {
+    current: armed ? String(current).padStart(2, "0") : "—",
+    reserve: armed ? String(reserve).padStart(2, "0") : "—",
+    low: armed && current > 0 && current <= Math.max(1, Math.ceil(capacity * 0.2)),
+    empty: armed && current <= 0,
+  };
+}
 
 /**
  * 情境提示的图标。**提示上不写字**：一行只有按键框 + 一个说明动作的小图 ——
@@ -123,6 +147,33 @@ export class Hud {
     this.el.objective = mk("hudObjective", this.el.top);
     this.el.identity = mk("hudIdentity");
     this.el.state = mk("hudState");
+    this.el.combat = mk("hudCombat");
+    this.el.combat.innerHTML = `
+      <div class="combatWeapon"></div>
+      <div class="combatMain">
+        <div class="combatStance" data-stance="stand" role="img" aria-label="站立">
+          <svg class="stanceStand" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="5.5" r="3"/><path d="M16 9v10m0-7-6 6m6-6 6 5m-6 2-5 10m5-10 6 10"/></svg>
+          <svg class="stanceCrouch" viewBox="0 0 32 32" aria-hidden="true"><circle cx="20.5" cy="7" r="3"/><path d="m19 10-6 7m2-4 8 4m-10 0 6 5m0 0 7 1m-7-1-6 7m13-6 3 6"/></svg>
+          <svg class="stanceProne" viewBox="0 0 32 32" aria-hidden="true"><circle cx="25.5" cy="17" r="3"/><path d="M22 18h-9l-7 5m8-5-5-5m5 5 7 5m-12 0H3"/></svg>
+        </div>
+        <div class="combatAmmo" aria-label="弹药">
+          <span class="ammoCurrent">00</span><span class="ammoDivider"></span><span class="ammoReserve">00</span>
+        </div>
+      </div>
+      <div class="combatEquipment">
+        <span class="equipment grenade" aria-label="手榴弹">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
+        <span class="equipment bundle" aria-label="集束手榴弹">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
+        <span class="equipment mortar" aria-label="迫击炮支援">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
+      </div>`;
+    this.el.combatWeapon = this.el.combat.querySelector(".combatWeapon");
+    this.el.combatStance = this.el.combat.querySelector(".combatStance");
+    this.el.ammoCurrent = this.el.combat.querySelector(".ammoCurrent");
+    this.el.ammoReserve = this.el.combat.querySelector(".ammoReserve");
+    this.el.equipment = {
+      grenades: this.el.combat.querySelector(".equipment.grenade"),
+      bundles: this.el.combat.querySelector(".equipment.bundle"),
+      mortar: this.el.combat.querySelector(".equipment.mortar"),
+    };
     this.el.subtitle = mk("hudSubtitle");
     this.el.hint = mk("hudHint");
     this.el.actions = mk("hudActions");
@@ -156,35 +207,60 @@ export class Hud {
   }
 
   SetObjective(text, ours, theirs) {
-    // ER2 的信息不对称：站在占领区里才看得见对面还剩多少人
+    // 信息不对称：站在占领区里才看得见对面还剩多少人。
+    // 目标只在这一处更新；不再把同一句任务文字重复扔到屏幕下方。
     const intel = theirs === null ? "" : `<span class="t">对面 ${theirs}</span>`;
-    this.el.objective.innerHTML = `<span class="o">${text}</span>`
-      + `<span class="p">${REINFORCE.poolLabel} ${ours}</span>${intel}`;
+    const signature = `${text}|${ours}|${theirs}`;
+    if (this.el.objective.dataset.signature !== signature) {
+      const objectiveChanged = this.el.objective.dataset.objective !== text;
+      this.el.objective.dataset.signature = signature;
+      this.el.objective.dataset.objective = text;
+      this.el.objective.innerHTML = `<span class="objectiveMark">◆</span><span class="o">${text}</span>`
+        + `<span class="forces"><span class="p">${REINFORCE.poolLabel} ${ours}</span>${intel}</span>`;
+      if (objectiveChanged) {
+        this.el.objective.classList.remove("changed");
+        requestAnimationFrame(() => this.el.objective.classList.add("changed"));
+      }
+    }
   }
 
   /** 玩家现在是谁。ER2 左上角只写当前班长是谁，这里写当前你是谁。 */
   SetIdentity(identity, weaponName) {
     this.el.identity.innerHTML =
       `<span class="n">${identity.name}</span>`
-      + `<span class="o">${identity.origin}</span>`
-      + `<span class="w">${weaponName}</span>`;
+      + `<span class="o">${identity.origin}</span>`;
+    this.el.combatWeapon.textContent = weaponName;
   }
 
-  /** 姿态 / 伤口 / 绷带。**不显示弹药数** —— 自己数，或者听拉栓那一下。 */
-  SetState({ stance, wounded, bleeding, bandages, breath, order,
+  /** 右下是姿态、弹药和装备；文字状态栏只保留伤情、屏息与命令。 */
+  SetState({ stance = "stand", wounded, bleeding, bandages, breath, order,
+    ammo = 0, clips = 0, magazine = 0, armed = true,
     grenades = 0, bundles = 0, mortar = 0, cooking = 0 }) {
-    const bits = [`<span class="s">${stance}</span>`];
+    const stanceKey = STANCE_LABELS[stance] ? stance : "stand";
+    this.el.combatStance.dataset.stance = stanceKey;
+    this.el.combatStance.setAttribute("aria-label", STANCE_LABELS[stanceKey]);
+
+    const rounds = AmmoReadout({ ammo, clips, magazine, armed });
+    this.el.ammoCurrent.textContent = rounds.current;
+    this.el.ammoReserve.textContent = rounds.reserve;
+    this.el.combat.classList.toggle("lowAmmo", rounds.low);
+    this.el.combat.classList.toggle("emptyAmmo", rounds.empty);
+
+    for (const [key, value] of Object.entries({ grenades, bundles, mortar })) {
+      const count = Math.max(0, Math.floor(Number(value) || 0));
+      const item = this.el.equipment[key];
+      item.querySelector("b").textContent = count;
+      item.classList.toggle("empty", count <= 0);
+    }
+
+    const bits = [];
     if (bleeding > 0) bits.push(`<span class="b">流血</span>`);
     else if (wounded) bits.push(`<span class="w">带伤</span>`);
     if (bandages > 0) bits.push(`<span class="g">绷带 ${bandages}</span>`);
-    // 子弹数不显示（ER2 的步兵 HUD 也不显示），但手榴弹与集束是要计划的资源。
-    // 台儿庄真正的主战兵器是手榴弹 —— 第 31 师一役用掉三十万余枚。
-    if (grenades > 0) bits.push(`<span class="n">手榴弹 ${grenades}</span>`);
-    if (bundles > 0) bits.push(`<span class="n">集束 ${bundles}</span>`);
-    if (mortar > 0) bits.push(`<span class="m">迫击炮 ${mortar}</span>`);
     if (breath) bits.push(`<span class="h">屏息</span>`);
     if (order) bits.push(`<span class="c">${order}</span>`);
     this.el.state.innerHTML = bits.join("");
+    this.el.state.classList.toggle("on", bits.length > 0);
     // 蓄力条：攥着数几秒再扔，扔得远但引信也在烧。这一对取舍要看得见。
     this.el.cook.style.width = cooking > 0 ? `${Math.round(cooking * 120)}px` : "0";
     this.el.cook.classList.toggle("on", cooking > 0);
@@ -221,8 +297,7 @@ export class Hud {
    * 命中记号。屏幕正中四道短撇往外弹一下就没。
    *
    * 为什么这个游戏需要它，尽管一路做到这里都在做减法：
-   * 本作**没有准星、不显示弹药数、不打歼敌数**，这三条减法各自都对，
-   * 但叠在一起就把「我这一枪打没打中」这个问题的所有出口都堵死了 ——
+   * 本作**没有准星、不打歼敌数**，所以命中因果必须另有一个克制的出口 ——
    * 血雾在一百米上是两三个像素，实录的 impactFlesh 走距离衰减到八十米只剩 4.8%。
    * 减法减到玩家读不出因果，减的就不是 UI 而是玩法了。
    *
@@ -424,10 +499,13 @@ export class Hud {
   }
 
   ShowBrief(phase) {
+    // 旧版把每关三四句史实全铺在左侧，正好又与顶部目标、人物喊话同时出现。
+    // 战术 HUD 只需要一条“刚发生了什么”；其余内容继续由关内对白和史实注记承接。
+    const headline = phase.brief.find((line) => String(line || "").trim()) || phase.label;
     this.el.brief.innerHTML = `<div class="bTitle">${phase.date}</div>`
-      + phase.brief.map((l) => `<div class="bLine">${l}</div>`).join("");
+      + `<div class="bLine">${headline}</div>`;
     this.el.brief.classList.add("on");
-    this.briefTimer = 6.5;
+    this.briefTimer = 4.0;
     // 换关了：上一关没来得及浮出来的章节卡就地作废，别飘到下一关去
     this.pendingTitle = null;
   }
@@ -592,6 +670,7 @@ export class Hud {
   SetMinimapVisible(on) {
     this.minimapVisible = !!on;
     this.el.minimap.classList.toggle("on", this.minimapVisible);
+    this.root.classList.toggle("mapOn", this.minimapVisible);
     this.el.minimap.setAttribute("aria-hidden", String(!this.minimapVisible));
     if (this.minimapVisible) this.minimapDirty = 0.2;
     return this.minimapVisible;

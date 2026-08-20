@@ -1,6 +1,5 @@
 /* 《血战台儿庄》HUD 样式。
-   克制是设计目标：Easy Red 2 的步兵 HUD 连弹药数都没有。
-   这里只留：阶段条、当前是谁、姿态、占领点图标、小地图、压制暗角、字幕。 */
+   战术层级参考《战地》：目标在上、地图在左、武器与弹药在右，中央只留即时反馈。 */
 
 :root {
   --ink: #0d0c0a;
@@ -68,39 +67,104 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* 顶部：阶段与目标 */
 .hudTop {
-  position: absolute; top: 14px; left: 0; right: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  width: min(620px, calc(100vw - 36px));
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
 }
-.hudPhase .d { color: var(--dim); margin-right: 10px; letter-spacing: 0.06em; }
-.hudPhase .l { font-weight: 600; letter-spacing: 0.12em; }
-.hudObjective { font-size: 13px; color: var(--dim); }
-.hudObjective .o { color: var(--paper); margin-right: 14px; }
-.hudObjective .p { margin-right: 12px; }
+.hudPhase { font-size: 10px; color: rgba(230,223,205,0.56); letter-spacing: 0.12em; }
+.hudPhase .d { margin-right: 9px; }
+.hudPhase .l { font-weight: 600; }
+.hudObjective {
+  min-width: min(440px, calc(100vw - 48px)); box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 5px 12px 6px; font-size: 13px; color: var(--dim);
+  background: linear-gradient(90deg, transparent, rgba(8,10,12,0.58) 18%, rgba(8,10,12,0.58) 82%, transparent);
+  border-top: 1px solid rgba(230,223,205,0.12);
+}
+.hudObjective .objectiveMark { color: var(--warn); font-size: 9px; }
+.hudObjective .o { color: var(--paper); font-weight: 600; letter-spacing: 0.05em; }
+.hudObjective .forces { display: flex; gap: 9px; font-size: 11px; white-space: nowrap; }
 .hudObjective .t { color: var(--theirs); }
+@keyframes hudObjectiveChanged {
+  0% { filter: brightness(1); }
+  28% { filter: brightness(1.8); border-top-color: rgba(224,176,98,0.72); }
+  100% { filter: brightness(1); }
+}
+.hudObjective.changed { animation: hudObjectiveChanged 0.72s ease-out; }
 
 /* 左下：你是谁 —— 这一栏在每次阵亡后会换一个名字 */
 .hudIdentity {
   position: absolute; left: 20px; bottom: 20px;
   display: flex; flex-direction: column; gap: 1px;
+  padding-left: 9px; border-left: 2px solid rgba(157,192,228,0.72);
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  transition: bottom 0.18s ease;
 }
-.hudIdentity .n { font-size: 17px; letter-spacing: 0.08em; }
-.hudIdentity .o { font-size: 12px; color: var(--dim); }
-.hudIdentity .w { font-size: 12px; color: var(--warn); opacity: 0.85; }
+#hud.mapOn .hudIdentity { bottom: 218px; }
+.hudIdentity .n { font-size: 14px; font-weight: 600; letter-spacing: 0.07em; }
+.hudIdentity .o { font-size: 10px; color: var(--dim); }
 
-/* 左下偏上：姿态与伤 */
+/* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
 .hudState {
-  position: absolute; left: 20px; bottom: 84px;
-  display: flex; gap: 10px; font-size: 12px; color: var(--dim);
+  position: absolute; right: 18px; bottom: 116px;
+  display: flex; justify-content: flex-end; gap: 9px; max-width: 360px;
+  padding: 3px 7px; font: 600 11px/1.4 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  color: var(--dim); background: rgba(8,10,12,0.48); opacity: 0;
 }
+.hudState.on { opacity: 1; }
 .hudState .b { color: #d6604a; }
 .hudState .w { color: var(--warn); }
 .hudState .h { color: var(--ours); }
 .hudState .c { color: var(--paper); }
 
+/* 右下战斗信息。大号当前弹、细分隔、小号备弹，姿态用人形而不是“站/蹲/趴”文字。 */
+.hudCombat {
+  position: absolute; right: 18px; bottom: 18px; width: 190px;
+  color: var(--paper); font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.68));
+}
+.combatWeapon {
+  min-height: 17px; padding: 0 5px 3px; text-align: right;
+  color: rgba(230,223,205,0.62); font-size: 10px; letter-spacing: 0.12em;
+}
+.combatMain {
+  height: 53px; display: grid; grid-template-columns: 52px 1fr; align-items: stretch;
+  background: linear-gradient(105deg, rgba(13,16,19,0.78), rgba(13,16,19,0.54));
+  border-top: 1px solid rgba(230,223,205,0.23);
+  clip-path: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px);
+}
+.combatStance { display: grid; place-items: center; border-right: 1px solid rgba(230,223,205,0.13); }
+.combatStance svg {
+  display: none; width: 35px; height: 35px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.combatStance[data-stance="stand"] .stanceStand,
+.combatStance[data-stance="crouch"] .stanceCrouch,
+.combatStance[data-stance="prone"] .stanceProne { display: block; }
+.combatAmmo { display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; }
+.ammoCurrent { font: 600 31px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: -0.06em; }
+.ammoDivider { width: 1px; height: 28px; margin: 0 9px; background: rgba(230,223,205,0.24); transform: skewX(-12deg); }
+.ammoReserve { align-self: flex-end; margin-bottom: 9px; color: rgba(230,223,205,0.66); font: 600 14px/1 "Cascadia Mono", Consolas, monospace; }
+.hudCombat.lowAmmo .ammoCurrent { color: var(--warn); }
+.hudCombat.emptyAmmo .ammoCurrent { color: var(--theirs); animation: hudAmmoPulse 0.9s ease-in-out infinite; }
+@keyframes hudAmmoPulse { 50% { opacity: 0.48; } }
+.combatEquipment {
+  display: flex; justify-content: flex-end; gap: 13px; padding: 5px 7px 0;
+  color: rgba(230,223,205,0.78);
+}
+.equipment { display: flex; align-items: center; gap: 4px; min-width: 28px; }
+.equipment svg {
+  width: 16px; height: 16px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.equipment b { font: 600 11px/1 "Cascadia Mono", Consolas, monospace; }
+.equipment.empty { opacity: 0.27; }
+
 /* 字幕 */
 .hudSubtitle {
-  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
-  max-width: 62%; text-align: center; opacity: 0;
+  position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
+  max-width: 56%; text-align: center; opacity: 0;
   transition: opacity 0.3s ease; font-size: 16px;
 }
 .hudSubtitle.on { opacity: 1; }
@@ -244,10 +308,28 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudMarker .bar i { display: block; height: 100%; background: currentColor; }
 
 .hudMinimap {
-  position: absolute; right: 18px; bottom: 18px; width: 190px; height: 190px;
+  position: absolute; left: 18px; bottom: 18px; width: 190px; height: 190px;
   display: none; border: 1px solid rgba(230,223,205,0.14); opacity: 0.9;
 }
 .hudMinimap.on { display: block; }
+
+@media (max-width: 700px) {
+  .hudTop { top: max(7px, env(safe-area-inset-top)); width: calc(100vw - 20px); }
+  .hudPhase { font-size: 9px; }
+  .hudObjective { min-width: 0; width: 100%; padding-inline: 7px; font-size: 11px; gap: 6px; }
+  .hudObjective .forces { font-size: 9px; gap: 5px; }
+  .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
+  .hudIdentity { left: 11px; bottom: max(10px, env(safe-area-inset-bottom)); }
+  #hud.mapOn .hudIdentity { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 132px); }
+  .hudIdentity .o { display: none; }
+  .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 166px; }
+  .combatMain { height: 48px; grid-template-columns: 46px 1fr; }
+  .combatStance svg { width: 31px; height: 31px; }
+  .ammoCurrent { font-size: 27px; }
+  .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 94px); max-width: 230px; }
+  .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
+  .hudHint { bottom: 50px; }
+}
 
 /* 阵亡：第一人称镜头在 Canvas 里倒地，这一层只做半透明去色与生平。
    不再用不透明黑底；战场必须一直看得见，死亡才仍然发生在同一个地方。 */
@@ -409,9 +491,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudEpilogue.on { opacity: 1; }
 .hudEpilogue .eLine { font-size: 17px; line-height: 2.1; letter-spacing: 0.08em; }
 .hudEpilogue .eGap { height: 14px; }
-
-.hudState .n { color: #cbb68a; }
-.hudState .m { color: #9dc0e4; }
 
 /* 投弹蓄力条 */
 .hudCook {
