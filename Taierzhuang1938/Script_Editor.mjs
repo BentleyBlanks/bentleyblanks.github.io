@@ -50,7 +50,7 @@ const ALL = [...SETTINGS, ...EDITORS];
 export class EditorSuite {
   /**
    * @param {object} host
-   *   renderer / scene / camera / canvas / library / lights   —— 渲染侧
+   *   renderer / scene / camera / canvas / library / lights / vfx —— 渲染侧
    *   actorFactory / viewmodel / audio / cutscene             —— 各编辑器要用的系统
    *   game        { state, player, PHASES, JumpToLevel, get battlefield, get currentWeapon }
    *   ReturnToMainMenu  从暂停面板退出当前战局并打开主菜单；无主菜单的测试模式不传
@@ -93,7 +93,7 @@ export class EditorSuite {
     const suite = this;
     return {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
-      library: host.library, lights: host.lights, post: host.post,
+      library: host.library, lights: host.lights, post: host.post, vfx: host.vfx,
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,

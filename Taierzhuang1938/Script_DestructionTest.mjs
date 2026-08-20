@@ -44,6 +44,35 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
     stats ? `承重 ${stats.structural}` : "");
 }
 
+// 正式玩法暂时不允许破坏场景；专项冒烟随后显式进入预览模式。
+{
+  const gate = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const box = T.battlefield.colliders.find((candidate) => candidate.destruction?.destructible);
+    if (!box) return { missing: true };
+    const center = box.c || [
+      (box.min[0] + box.max[0]) * 0.5,
+      (box.min[1] + box.max[1]) * 0.5,
+      (box.min[2] + box.max[2]) * 0.5,
+    ];
+    const count = T.battlefield.colliders.length;
+    const result = T.destruction.Hit(box,
+      { x: center[0], y: center[1], z: center[2] }, 1000000,
+      { kind: "shell", normal: { x: 0, y: 0, z: 1 } });
+    const unchanged = T.battlefield.colliders.length === count
+      && T.battlefield.colliders.includes(box) && !T.destruction.damage.has(box);
+    const before = T.Debug.Destruction();
+    T.destruction.SetPreviewMode(true);
+    const after = T.Debug.Destruction();
+    return { result, unchanged, before, after };
+  });
+  Check("正式玩法暂时关闭场景破坏", !gate.missing && gate.result?.disabled
+    && gate.unchanged && !gate.before?.gameplayEnabled && !gate.before?.previewMode,
+  gate.missing ? "没有可破坏候选" : `disabled=${gate.result?.disabled}`);
+  Check("专项测试可显式进入预览模式", gate.after?.previewMode && !gate.after?.gameplayEnabled,
+    `preview=${gate.after?.previewMode}`);
+}
+
 // 2. 城墙本体是明确白名单：再大的伤害也不摘 Rapier 盒。
 {
   const r = await page.evaluate(() => {
@@ -99,18 +128,25 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
     const through = T.battlefield.Raycast(origin, normal, thickness * 2 + 0.9);
     const stats = T.Debug.Destruction();
     const breach = T.destruction.breaches.at(-1);
-    const rubble = T.destruction.rubble;
-    const matrix = T.destruction.matrix;
-    const position = T.destruction.position;
-    const quaternion = T.destruction.quaternion;
-    const scale = T.destruction.scale;
-    const baseY = breach.center[1] - breach.half[1];
-    let highestCenterAboveBase = 0;
-    for (let index = 0; index < rubble.count; index += 1) {
-      rubble.getMatrixAt(index, matrix);
-      matrix.decompose(position, quaternion, scale);
-      highestCenterAboveBase = Math.max(highestCenterAboveBase, position.y - baseY);
+    const firstFragment = T.destruction.fragmentStates[0];
+    const beforePosition = firstFragment?.position.toArray() || null;
+    T.StepFrames(10);
+    const afterPosition = firstFragment?.position.toArray() || null;
+    const moved = beforePosition && afterPosition
+      ? Math.hypot(afterPosition[0] - beforePosition[0], afterPosition[1] - beforePosition[1],
+        afterPosition[2] - beforePosition[2])
+      : 0;
+    const colors = T.destruction.fragmentStates.map((state) => state.color);
+    const minimumLuma = colors.length ? Math.min(...colors.map((hex) => {
+      const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+      return (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+    })) : 0;
+    const lining = T.destruction.breachMesh;
+    const oldBlackPlaceholder = T.scene.getObjectByName("Destruction_Rubble");
+    for (let frame = 0; frame < 360; frame += 1) {
+      T.destruction.Update(T.player.position, 1 / 60);
     }
+    const fragmentsAfterExpiry = T.destruction.Stats().flyingFragments;
     return {
       staged, stillThere, broken,
       originalGone: !T.battlefield.colliders.includes(box),
@@ -118,12 +154,19 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
       maxDistance: thickness * 2 + 0.9,
       stats,
       navAdvanced: T.nav.Stats().revisions === beforeNav + 1,
-      highestCenterAboveBase,
-      rubbleUsesIndirectLight: Boolean(rubble.material.userData.ssaoUniforms
-        || rubble.material.userData.giUniforms),
-      rubbleHasShadowColorFloor: rubble.material.emissive?.getHex() !== 0
-        && rubble.material.emissiveIntensity > 0,
-      rubbleIsIrregular: rubble.geometry.type === "DodecahedronGeometry",
+      patternId: breach.patternId,
+      patternRadii: breach.patternIndex >= 0,
+      liningHasThickness: lining.geometry.userData.hasThickness
+        && lining.geometry.getAttribute("normal")?.count > 0
+        && lining.geometry.index?.count >= 216,
+      liningOpaque: !lining.material.transparent && lining.material.depthWrite
+        && lining.userData.usesDestructionShader === false,
+      fragmentsArePrebaked: T.destruction.fragments.userData.prefracturedTemplateCount >= 216,
+      fragmentCount: stats.flyingFragments,
+      fragmentMoved: moved,
+      minimumLuma,
+      oldBlackPlaceholder: !!oldBlackPlaceholder,
+      fragmentsAfterExpiry,
     };
   });
   Check("墙面有分阶段耐久", !r.missing && r.staged?.damaged && !r.staged?.broken && r.stillThere,
@@ -131,16 +174,16 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   Check("墙体只移除命中局部并打开物理通路", !r.missing && r.broken?.broken
     && r.originalGone && r.through === null,
   r.missing ? "" : `ray=${r.through ?? "clear"} max=${Number(r.maxDistance).toFixed(2)}`);
-  Check("破口视觉、残骸与导航一起提交", !r.missing && r.stats?.breaches === 1
-    && r.stats.activeVolumes === 1 && r.stats.rubble >= 8 && r.navAdvanced,
-  r.missing ? "" : `洞=${r.stats?.breaches} 残骸=${r.stats?.rubble} nav=${r.navAdvanced}`);
-  Check("常驻残骸只落在洞脚而不沿洞口悬空", !r.missing && r.highestCenterAboveBase <= 0.35,
-    r.missing ? "" : `最高中心离洞脚 ${Number(r.highestCenterAboveBase).toFixed(2)}m`);
-  Check("残骸背光面保留砖土色而非纯黑", !r.missing
-    && r.rubbleUsesIndirectLight && r.rubbleHasShadowColorFloor,
-  r.missing ? "" : `间接光=${r.rubbleUsesIndirectLight} 暗面底色=${r.rubbleHasShadowColorFloor}`);
-  Check("破口残骸使用不规则碎石而非调试方盒", !r.missing && r.rubbleIsIrregular,
-    r.missing ? "" : `geometry=${r.rubbleIsIrregular ? "irregular" : "box"}`);
+  Check("不规则破口、真实厚度断面与导航一起提交", !r.missing && r.stats?.breaches === 1
+    && r.stats.activeVolumes === 1 && r.stats.breachLinings === 1
+    && r.patternId && r.patternRadii && r.liningHasThickness && r.liningOpaque && r.navAdvanced,
+  r.missing ? "" : `洞=${r.stats?.breaches} pattern=${r.patternId} nav=${r.navAdvanced}`);
+  Check("每个缺口生成三十六块对应预烘焙碎片并逐帧飞散", !r.missing
+    && r.fragmentsArePrebaked && r.fragmentCount === 36 && r.fragmentMoved > 0.02,
+  r.missing ? "" : `碎块=${r.fragmentCount} 位移=${Number(r.fragmentMoved).toFixed(3)}m`);
+  Check("碎片色板有亮度底线且旧纯黑常驻块已移除", !r.missing
+    && r.minimumLuma >= 0.42 && !r.oldBlackPlaceholder && r.fragmentsAfterExpiry === 0,
+  r.missing ? "" : `最低亮度=${Number(r.minimumLuma).toFixed(2)} 旧占位=${r.oldBlackPlaceholder} 到期=${r.fragmentsAfterExpiry}`);
 }
 
 // 4. 第一关石墙村的新村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。
@@ -298,6 +341,13 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
 // 新 shader 路径在真的破口激活后仍不得产生 WebGL 错误。
 {
+  const closed = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.destruction.SetPreviewMode(false);
+    return T.Debug.Destruction();
+  });
+  Check("专项测试结束后重新关闭破坏权限", !closed.previewMode && !closed.gameplayEnabled,
+    `preview=${closed.previewMode}`);
   const glError = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.StepFrames(6);

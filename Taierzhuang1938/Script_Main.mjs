@@ -778,7 +778,7 @@ async function Boot() {
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = new EditorSuite({
-    renderer, scene, camera, canvas, library, lights, post,
+    renderer, scene, camera, canvas, library, lights, post, vfx,
     actorFactory, viewmodel, audio, cutscene, destruction,
     shot: !!SHOT,
     ReleasePointerLock,
@@ -2731,7 +2731,7 @@ function Frame(dt, render = true) {
   combat.Update(dt, { phase: PHASES[state.phaseIndex] });
   // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
   // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
-  if (destruction) destruction.Update(player.position);
+  if (destruction) destruction.Update(player.position, dt);
 
   // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
   if (state.cooking) state.cook += dt;

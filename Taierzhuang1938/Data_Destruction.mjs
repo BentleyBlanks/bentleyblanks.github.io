@@ -4,10 +4,14 @@
 //   1. 哪些是承重结构，绝不能因为一颗手榴弹把关卡骨架拆掉；
 //   2. 其余材质吃多少枪弹／爆炸能量才形成一个真正可通行的破口。
 //
-// 运行时算法、Rapier 拓扑与视觉残骸在 Script_Destruction.mjs。把数字留在这里，
+// 运行时算法、Rapier 拓扑、真实断面与飞散碎块在 Script_Destruction.mjs。把数字留在这里，
 // 是为了以后换武器、加场景时不用去碰那套几何布尔逻辑。
 
 const FreezeProfile = (profile) => Object.freeze(profile);
+
+// 新预破碎表现完成专项验收前，正式玩法不改变场景拓扑。破坏预览编辑器会显式
+// 打开 previewMode；以后要向正片放行，只需把这个开关改成 true 并跑完整回归。
+export const GAMEPLAY_DESTRUCTION_ENABLED = false;
 
 export const DESTRUCTION_PROFILES = Object.freeze({
   structural: FreezeProfile({

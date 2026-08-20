@@ -1,11 +1,12 @@
 // 《滕县 一九三八》统一场景破坏层。
 //
-// 这套做法对应现代大场景游戏常见的“代理破坏”，不是把整座城的合批网格拆散：
+// 这套做法对应现代大场景游戏常见的“离线预破碎 + 运行时代理”，不是把整座城的
+// 合批网格临时做布尔：
 //   · 静态主体继续按分区／材质合批，守住 draw call；
 //   · 命中只给局部材料单元记耐久；
-//   · 单元失效时，把一个 Rapier 盒分成洞口四周最多四块残余碰撞；
-//   · 同一只世界空间 OBB 交给 shader 裁掉视觉几何，物理洞与画面洞完全重合；
-//   · 断口边缘用一只 InstancedMesh 留下常驻断砖，短命粉尘仍复用 Script_Vfx；
+//   · 单元失效时，按离线不规则轮廓重排 Rapier 盒，物理与可见缺口近似一致；
+//   · shader 只裁离线轮廓，洞内另建有厚度、有法线、不透明的真实断面；
+//   · 与轮廓严丝合缝的三十六块预烘焙碎片进入 BatchedMesh 池飞散并自动回收；
 //   · 最后批量重建空间散列与导航位图，让 AI 真能从新洞口穿过去。
 //
 // MAX_DAMAGE_VOLUMES 是“当前镜头附近同时送进 shader 的破口”，不是整关破口上限。
@@ -13,20 +14,29 @@
 // 不必给每个材质背几百个 vec4，物理结果又不会因为视觉预算而回滚。
 
 import * as THREE from "three";
-import { DESTRUCTION_PROFILES, DestructionProfileForTag } from "./Data_Destruction.mjs";
+import {
+  DESTRUCTION_PROFILES, DestructionProfileForTag, GAMEPLAY_DESTRUCTION_ENABLED,
+} from "./Data_Destruction.mjs";
+import {
+  FRACTURE_PATTERNS, FRACTURE_SEGMENT_COUNT, FracturePatternAt,
+} from "./Data_FracturePatterns.mjs";
 
 export const MAX_DAMAGE_VOLUMES = 24;
 const MIN_FRAGMENT_HALF = 0.055;
-const RUBBLE_CAPACITY = 768;
+const FRAGMENT_SLOTS_PER_TEMPLATE = 3;
+const FRAGMENT_INSTANCE_CAPACITY = FRACTURE_PATTERNS.reduce(
+  (sum, pattern) => sum + pattern.fragments.length * FRAGMENT_SLOTS_PER_TEMPLATE, 0);
 
 const Clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
 export function MakeDestructionUniforms(maxVolumes = MAX_DAMAGE_VOLUMES) {
   const centers = [];
   const halves = [];
+  const metas = [];
   for (let i = 0; i < maxVolumes; i += 1) {
     centers.push(new THREE.Vector4(0, -10000, 0, 1));
     halves.push(new THREE.Vector4(0, 0, 0, 0));
+    metas.push(new THREE.Vector4(2, 0, 0, 0));
   }
   return {
     maxVolumes,
@@ -34,7 +44,41 @@ export function MakeDestructionUniforms(maxVolumes = MAX_DAMAGE_VOLUMES) {
     count: { value: 0 },
     centers: { value: centers },      // xyz + cos(ry)
     halves: { value: halves },        // xyz + sin(ry)
+    metas: { value: metas },          // axis(0=x/1=y/2=z) + patternIndex
   };
+}
+
+function ShaderPatternGlsl() {
+  const radiusCases = FRACTURE_PATTERNS.map((pattern, patternIndex) => {
+    const sectors = pattern.radii.map((radius, sectorIndex) =>
+      `if (sector < ${Number(sectorIndex + 0.5).toFixed(1)}) return ${radius.toFixed(5)};`).join("\n    ");
+    return `${patternIndex > 0 ? "else " : ""}if (pattern < ${Number(patternIndex + 0.5).toFixed(1)}) {\n    ${sectors}\n    return ${pattern.radii[0].toFixed(5)};\n  }`;
+  }).join(" ");
+  const offsets = FRACTURE_PATTERNS.map((pattern, patternIndex) =>
+    `${patternIndex > 0 ? "else " : ""}if (pattern < ${Number(patternIndex + 0.5).toFixed(1)}) return ${pattern.angleOffset.toFixed(5)};`).join("\n  ");
+  return `
+float FractureSectorRadius(float pattern, float sector) {
+  ${radiusCases}
+  return 0.85;
+}
+
+float FractureAngleOffset(float pattern) {
+  ${offsets}
+  return 0.0;
+}
+
+float FractureRadius(float pattern, float angle) {
+  const float turn = 6.28318530718;
+  const float segmentCount = ${Number(FRACTURE_SEGMENT_COUNT).toFixed(1)};
+  float sector = mod((angle - FractureAngleOffset(pattern)) / turn, 1.0);
+  if (sector < 0.0) sector += 1.0;
+  sector *= segmentCount;
+  float base = floor(sector);
+  float blend = fract(sector);
+  float radiusA = FractureSectorRadius(pattern, base);
+  float radiusB = FractureSectorRadius(pattern, mod(base + 1.0, segmentCount));
+  return mix(radiusA, radiusB, smoothstep(0.0, 1.0, blend));
+}`;
 }
 
 /** Materials 与深度材质共用的 GLSL。 */
@@ -44,15 +88,36 @@ uniform float uDamageVolumeCount;
 uniform float uDamageVolumesEnabled;
 uniform vec4 uDamageVolumeCenter[${maxVolumes}];
 uniform vec4 uDamageVolumeHalf[${maxVolumes}];
+uniform vec4 uDamageVolumeMeta[${maxVolumes}];
+${ShaderPatternGlsl()}
 
 bool InsideDamageVolume(vec3 worldPosition, int index) {
   vec4 center = uDamageVolumeCenter[index];
   vec4 halfSize = uDamageVolumeHalf[index];
+  vec4 meta = uDamageVolumeMeta[index];
   vec3 relative = worldPosition - center.xyz;
   float localX = relative.x * center.w - relative.z * halfSize.w;
   float localZ = relative.x * halfSize.w + relative.z * center.w;
   vec3 localPosition = vec3(localX, relative.y, localZ);
-  return all(lessThanEqual(abs(localPosition), halfSize.xyz));
+  vec2 planePosition;
+  float depth;
+  float depthHalf;
+  if (meta.x < 0.5) {
+    planePosition = vec2(localPosition.z / max(halfSize.z, 0.0001), localPosition.y / max(halfSize.y, 0.0001));
+    depth = localPosition.x;
+    depthHalf = halfSize.x;
+  } else if (meta.x < 1.5) {
+    planePosition = vec2(localPosition.x / max(halfSize.x, 0.0001), localPosition.z / max(halfSize.z, 0.0001));
+    depth = localPosition.y;
+    depthHalf = halfSize.y;
+  } else {
+    planePosition = vec2(localPosition.x / max(halfSize.x, 0.0001), localPosition.y / max(halfSize.y, 0.0001));
+    depth = localPosition.z;
+    depthHalf = halfSize.z;
+  }
+  if (abs(depth) > depthHalf) return false;
+  float boundary = FractureRadius(meta.y, atan(planePosition.y, planePosition.x));
+  return length(planePosition) <= boundary;
 }
 
 void ApplyDamageVolumes(vec3 worldPosition) {
@@ -69,6 +134,7 @@ export function BindDestructionUniforms(shaderUniforms, uniforms, enabled = unif
   shaderUniforms.uDamageVolumeCount = uniforms.count;
   shaderUniforms.uDamageVolumeCenter = uniforms.centers;
   shaderUniforms.uDamageVolumeHalf = uniforms.halves;
+  shaderUniforms.uDamageVolumeMeta = uniforms.metas;
 }
 
 function ColliderCenter(box) {
@@ -160,6 +226,21 @@ function PartitionAxis(fragments, axis, center, half, openingCenter, openingHalf
   addRect(openMinU, openMaxU, openMaxV, maxV);
 }
 
+function AddPatternPhysics(fragments, pattern, axis, center, openingCenter, openingHalf, ry, source) {
+  const axes = axis === "x" ? [2, 1, 0] : axis === "y" ? [0, 2, 1] : [0, 1, 2];
+  const u = axes[0], v = axes[1], depth = axes[2];
+  for (const rect of pattern.physicsRects) {
+    const localCenter = openingCenter.slice();
+    const localHalf = openingHalf.slice();
+    localCenter[u] += rect.center[0] * openingHalf[u];
+    localCenter[v] += rect.center[1] * openingHalf[v];
+    localHalf[u] = rect.half[0] * openingHalf[u];
+    localHalf[v] = rect.half[1] * openingHalf[v];
+    localHalf[depth] = openingHalf[depth];
+    PushFragment(fragments, localCenter, localHalf, center, ry, source);
+  }
+}
+
 function OpeningSize(profile, kind, energy, health) {
   const explosive = kind !== "bullet";
   const base = explosive ? profile.blastOpening : profile.bulletOpening;
@@ -175,7 +256,7 @@ function OpeningSize(profile, kind, energy, health) {
  * 纯几何破口。返回的 fragments 恰好覆盖“原盒减去洞口”的四个矩形区域。
  * axis 取命中面的法向，所以墙形成横向×竖向洞，楼板形成 x×z 的坠落洞。
  */
-export function FractureCollider(box, point, normal, opening) {
+export function FractureCollider(box, point, normal, opening, patternIndex = 0) {
   const center = ColliderCenter(box);
   const half = ColliderHalf(box);
   const ry = box.ry || 0;
@@ -212,6 +293,8 @@ export function FractureCollider(box, point, normal, opening) {
 
   const fragments = [];
   PartitionAxis(fragments, axis, center, half, openingCenter, openingHalf, ry, box);
+  const pattern = FracturePatternAt(patternIndex);
+  AddPatternPhysics(fragments, pattern, axis, center, openingCenter, openingHalf, ry, box);
   const worldCenter = LocalToWorld({ x: openingCenter[0], y: openingCenter[1], z: openingCenter[2] }, center, ry);
   return {
     axis,
@@ -222,8 +305,27 @@ export function FractureCollider(box, point, normal, opening) {
       ry,
       tag: box.tag,
       sourceHalf: half,
+      patternIndex: ((patternIndex % FRACTURE_PATTERNS.length) + FRACTURE_PATTERNS.length)
+        % FRACTURE_PATTERNS.length,
+      patternId: pattern.id,
     },
   };
+}
+
+function PatternIndexFor(box, point) {
+  const center = ColliderCenter(box);
+  const values = [center[0], center[1], center[2], point.x, point.y, point.z];
+  let hash = 2166136261;
+  for (const value of values) {
+    hash ^= Math.round(value * 97) >>> 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  const tag = String(box.tag || "wall");
+  for (let index = 0; index < tag.length; index += 1) {
+    hash ^= tag.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % FRACTURE_PATTERNS.length;
 }
 
 function DistanceToAabb(point, box) {
@@ -233,12 +335,146 @@ function DistanceToAabb(point, box) {
   return Math.hypot(dx, dy, dz);
 }
 
-function SurfaceColor(surface, variation = 0) {
-  // 实例色是线性色参与 PBR，旧值在黄昏背光下会比十六进制色板看起来暗很多。
-  // 保持土木差异，但底限必须仍能读成砖、土、木，不能坍成无材质的纯黑轮廓。
-  if (surface === "wood") return new THREE.Color().setHex(variation > 0.55 ? 0x755b42 : 0x95785a);
-  if (surface === "dirt" || surface === "sandbag") return new THREE.Color().setHex(variation > 0.55 ? 0x8b7657 : 0xac926c);
-  return new THREE.Color().setHex(variation > 0.55 ? 0x876e5c : 0xa98c72);
+function SurfaceColor(surface, variation = 0, fresh = false) {
+  // 所有色板都保留明确亮度下限；常驻黑占位块已经删除，这里只给真实断面与
+  // 短命预碎片着色。fresh 是新鲜断裂面，必须比风化外表更亮、更偏暖。
+  if (surface === "wood") {
+    return new THREE.Color().setHex(fresh
+      ? (variation > 0.5 ? 0xb58b5f : 0xd0a472)
+      : (variation > 0.5 ? 0x806348 : 0xa27f5d));
+  }
+  if (surface === "dirt" || surface === "sandbag") {
+    return new THREE.Color().setHex(fresh
+      ? (variation > 0.5 ? 0xb79b71 : 0xd0b488)
+      : (variation > 0.5 ? 0x927c5c : 0xb49a73));
+  }
+  return new THREE.Color().setHex(fresh
+    ? (variation > 0.5 ? 0xb78d70 : 0xd2aa8a)
+    : (variation > 0.5 ? 0x8f725e : 0xb08d73));
+}
+
+function AxisIndices(axis) {
+  if (axis === "x") return { u: 2, v: 1, depth: 0, code: 0 };
+  if (axis === "y") return { u: 0, v: 2, depth: 1, code: 1 };
+  return { u: 0, v: 1, depth: 2, code: 2 };
+}
+
+function BreachLocalPoint(breach, normalizedU, normalizedV, depthValue) {
+  const axes = AxisIndices(breach.axis);
+  const local = [0, 0, 0];
+  local[axes.u] = normalizedU * breach.half[axes.u];
+  local[axes.v] = normalizedV * breach.half[axes.v];
+  local[axes.depth] = depthValue;
+  return local;
+}
+
+function AddBreachQuad(positions, colors, indices, breach, points, colorA, colorB) {
+  const base = positions.length / 3;
+  for (let index = 0; index < 4; index += 1) {
+    const point = points[index];
+    const world = LocalToWorld({ x: point[0], y: point[1], z: point[2] }, breach.center, breach.ry);
+    positions.push(world.x, world.y, world.z);
+    const color = index < 2 ? colorA : colorB;
+    colors.push(color.r, color.g, color.b);
+  }
+  indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
+
+function BuildBreachGeometry(breaches) {
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  for (const breach of breaches) {
+    const pattern = FracturePatternAt(breach.patternIndex || 0);
+    const axes = AxisIndices(breach.axis);
+    const sourceHalf = breach.sourceHalf || breach.half;
+    const frontDepth = sourceHalf[axes.depth] + 0.012;
+    const backDepth = -sourceHalf[axes.depth] - 0.012;
+    for (let index = 0; index < FRACTURE_SEGMENT_COUNT; index += 1) {
+      const next = (index + 1) % FRACTURE_SEGMENT_COUNT;
+      const angleA = pattern.angleOffset + index * Math.PI * 2 / FRACTURE_SEGMENT_COUNT;
+      const angleB = pattern.angleOffset + (index + 1) * Math.PI * 2 / FRACTURE_SEGMENT_COUNT;
+      const radiusA = pattern.radii[index];
+      const radiusB = pattern.radii[next];
+      // 外圈不是等比例圆环：每一齿略有不同，形成斜切、崩角和可读的厚度变化。
+      const lipA = radiusA + 0.075 + ((index * 37 + breach.id * 11) % 5) * 0.008;
+      const lipB = radiusB + 0.075 + ((next * 37 + breach.id * 11) % 5) * 0.008;
+      const innerAFront = BreachLocalPoint(breach, Math.cos(angleA) * radiusA,
+        Math.sin(angleA) * radiusA, frontDepth);
+      const innerBFront = BreachLocalPoint(breach, Math.cos(angleB) * radiusB,
+        Math.sin(angleB) * radiusB, frontDepth);
+      const innerABack = BreachLocalPoint(breach, Math.cos(angleA) * radiusA,
+        Math.sin(angleA) * radiusA, backDepth);
+      const innerBBack = BreachLocalPoint(breach, Math.cos(angleB) * radiusB,
+        Math.sin(angleB) * radiusB, backDepth);
+      const outerAFront = BreachLocalPoint(breach, Math.cos(angleA) * lipA,
+        Math.sin(angleA) * lipA, frontDepth + 0.018);
+      const outerBFront = BreachLocalPoint(breach, Math.cos(angleB) * lipB,
+        Math.sin(angleB) * lipB, frontDepth + 0.018);
+      const outerABack = BreachLocalPoint(breach, Math.cos(angleA) * lipA,
+        Math.sin(angleA) * lipA, backDepth - 0.018);
+      const outerBBack = BreachLocalPoint(breach, Math.cos(angleB) * lipB,
+        Math.sin(angleB) * lipB, backDepth - 0.018);
+      const sideA = SurfaceColor(breach.surface, ((index + breach.id) % 3) / 2, true);
+      const sideB = SurfaceColor(breach.surface, ((next + breach.id) % 3) / 2, true);
+      const weatheredA = SurfaceColor(breach.surface, ((index + 1) % 4) / 3, false);
+      const weatheredB = SurfaceColor(breach.surface, ((next + 1) % 4) / 3, false);
+      // 洞内侧壁：真正跨越构件前后表面，因此从任何角度看都不再是透明薄片。
+      AddBreachQuad(positions, colors, indices, breach,
+        [innerAFront, innerBFront, innerBBack, innerABack], sideA, sideB);
+      // 前后两面斜切断唇，覆盖裁洞边缘并把旧表面过渡到新鲜断面。
+      AddBreachQuad(positions, colors, indices, breach,
+        [outerAFront, outerBFront, innerBFront, innerAFront], weatheredA, sideB);
+      AddBreachQuad(positions, colors, indices, breach,
+        [outerBBack, outerABack, innerABack, innerBBack], weatheredB, sideA);
+    }
+  }
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  if (positions.length) {
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+  }
+  geometry.userData.breachCount = breaches.length;
+  geometry.userData.hasThickness = breaches.length > 0;
+  geometry.userData.generatedFromPrefracture = true;
+  return geometry;
+}
+
+function MakeShardGeometry(fragment) {
+  const shape = new THREE.Shape();
+  const first = fragment.points[0];
+  shape.moveTo(first[0], first[1]);
+  for (let index = 1; index < fragment.points.length; index += 1) {
+    shape.lineTo(fragment.points[index][0], fragment.points[index][1]);
+  }
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 1,
+    steps: 1,
+    bevelEnabled: true,
+    bevelSegments: 1,
+    bevelSize: 0.018,
+    bevelThickness: 0.025,
+    curveSegments: 1,
+  });
+  geometry.translate(0, 0, -0.5);
+  geometry.computeVertexNormals();
+  geometry.userData.prefractured = true;
+  geometry.userData.ring = fragment.ring;
+  geometry.userData.sector = fragment.sector;
+  return geometry;
+}
+
+function BaseShardQuaternion(axis, ry) {
+  const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry || 0);
+  const axisRotation = new THREE.Quaternion();
+  if (axis === "x") axisRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+  else if (axis === "y") axisRotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+  return yaw.multiply(axisRotation);
 }
 
 export class DestructionSystem {
@@ -257,41 +493,87 @@ export class DestructionSystem {
     this.topologyRebuilds = 0;
     this.damagedCount = 0;
     this.protectedHits = 0;
+    this.disabledHits = 0;
+    this.gameplayEnabled = GAMEPLAY_DESTRUCTION_ENABLED;
+    this.previewMode = false;
     this.lastFocus = new THREE.Vector3(1e9, 1e9, 1e9);
     this.uniformDirty = true;
 
-    // 破口残骸不能再用正方体：哪怕位置与受光都修好，轮廓仍会像一排黑色调试盒。
-    // 低面数碎石给出不规则断面；实例缩放再把砖土块压成矮碎片。
-    const geometry = new THREE.DodecahedronGeometry(0.62, 0);
-    // 事故：这里原来手搓了一份裸 MeshStandardMaterial，绕过了 MaterialLibrary 的
-    // GI/SSAO 注入。洞口又天然是背光面，于是实例色再正常也会被压成截图里的纯黑块。
-    // 用库里的唯一纯色材质接回同一套间接光，再打开实例色；一点极暗暖色 emissive
-    // 只保住背光面的材质身份，不会把残骸照成自发光物。
-    const material = library?.Plain
-      ? library.Plain("DestructionRubble", {
+    const fragmentMaterial = library?.Plain
+      ? library.Plain("DestructionFlyingFragments", {
         color: 0xffffff, roughness: 0.98, metalness: 0, flatShading: true,
-        emissive: 0x38261b, emissiveIntensity: 0.32,
+        emissive: 0x8c6447, emissiveIntensity: 0.62,
       })
       : new THREE.MeshStandardMaterial({
         color: 0xffffff, roughness: 0.98, metalness: 0, flatShading: true,
-        emissive: 0x38261b, emissiveIntensity: 0.32,
+        emissive: 0x8c6447, emissiveIntensity: 0.62,
       });
-    this.rubbleMaterialOwned = !library?.Plain;
-    material.vertexColors = true;
-    material.needsUpdate = true;
-    this.rubble = new THREE.InstancedMesh(geometry, material, RUBBLE_CAPACITY);
-    this.rubble.name = "Destruction_Rubble";
-    this.rubble.castShadow = true;
-    this.rubble.receiveShadow = true;
-    this.rubble.frustumCulled = false;
-    this.rubble.count = 0;
-    this.rubbleCursor = 0;
-    scene.add(this.rubble);
+    this.fragmentMaterialOwned = !library?.Plain;
+    fragmentMaterial.vertexColors = true;
+    fragmentMaterial.needsUpdate = true;
+    this.fragments = new THREE.BatchedMesh(
+      FRAGMENT_INSTANCE_CAPACITY, 65536, 131072, fragmentMaterial);
+    this.fragments.name = "Destruction_FlyingPrefracturedFragments";
+    this.fragments.castShadow = true;
+    this.fragments.receiveShadow = true;
+    this.fragments.frustumCulled = false;
+    this.fragments.userData.prefracturedTemplateCount = FRACTURE_PATTERNS.reduce(
+      (sum, pattern) => sum + pattern.fragments.length, 0);
+    this.fragments.userData.shortLived = true;
+    this.fragmentSlots = [];
+    this.fragmentSlotCursors = [];
+    for (let patternIndex = 0; patternIndex < FRACTURE_PATTERNS.length; patternIndex += 1) {
+      const pattern = FRACTURE_PATTERNS[patternIndex];
+      this.fragmentSlots[patternIndex] = [];
+      this.fragmentSlotCursors[patternIndex] = [];
+      for (let fragmentIndex = 0; fragmentIndex < pattern.fragments.length; fragmentIndex += 1) {
+        const sourceGeometry = MakeShardGeometry(pattern.fragments[fragmentIndex]);
+        const geometryId = this.fragments.addGeometry(sourceGeometry);
+        sourceGeometry.dispose();
+        const slots = [];
+        for (let slot = 0; slot < FRAGMENT_SLOTS_PER_TEMPLATE; slot += 1) {
+          const instanceId = this.fragments.addInstance(geometryId);
+          this.fragments.setVisibleAt(instanceId, false);
+          slots.push(instanceId);
+        }
+        this.fragmentSlots[patternIndex][fragmentIndex] = slots;
+        this.fragmentSlotCursors[patternIndex][fragmentIndex] = 0;
+      }
+    }
+    this.fragmentStates = [];
+    this.fragmentStateByInstance = new Map();
+    scene.add(this.fragments);
+
+    const breachMaterial = library?.Plain
+      ? library.Plain("DestructionFreshBreach", {
+        color: 0xffffff, roughness: 1, metalness: 0, flatShading: true,
+        side: THREE.DoubleSide, emissive: 0x704a31, emissiveIntensity: 0.48,
+      })
+      : new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 1, metalness: 0, flatShading: true,
+        side: THREE.DoubleSide, emissive: 0x704a31, emissiveIntensity: 0.48,
+      });
+    this.breachMaterialOwned = !library?.Plain;
+    breachMaterial.vertexColors = true;
+    breachMaterial.transparent = false;
+    breachMaterial.depthWrite = true;
+    breachMaterial.needsUpdate = true;
+    this.breachMesh = new THREE.Mesh(BuildBreachGeometry([]), breachMaterial);
+    this.breachMesh.name = "Destruction_OpaqueBreachLining";
+    this.breachMesh.castShadow = true;
+    this.breachMesh.receiveShadow = true;
+    this.breachMesh.frustumCulled = false;
+    this.breachMesh.userData.opaqueFractureSurface = true;
+    this.breachMesh.userData.usesDestructionShader = false;
+    scene.add(this.breachMesh);
+
     this.matrix = new THREE.Matrix4();
     this.quaternion = new THREE.Quaternion();
     this.scale = new THREE.Vector3();
     this.position = new THREE.Vector3();
     this.euler = new THREE.Euler();
+    this.tempQuaternion = new THREE.Quaternion();
+    this.tempVector = new THREE.Vector3();
   }
 
   SetWorld(battlefield, physics, nav = null) {
@@ -300,15 +582,23 @@ export class DestructionSystem {
     this.nav = nav;
   }
 
+  SetPreviewMode(enabled) {
+    this.previewMode = !!enabled;
+    return this.previewMode;
+  }
+
+  get Enabled() { return this.gameplayEnabled || this.previewMode; }
+
   Clear() {
     this.damage.clear();
     this.breaches.length = 0;
     this.nextBreachId = 1;
     this.damagedCount = 0;
     this.protectedHits = 0;
+    this.disabledHits = 0;
     this.topologyRebuilds = 0;
-    this.rubble.count = 0;
-    this.rubbleCursor = 0;
+    this._ClearFragments();
+    this._RebuildBreachMesh();
     this.uniforms.count.value = 0;
     this.uniformDirty = true;
     this.lastFocus.set(1e9, 1e9, 1e9);
@@ -344,15 +634,30 @@ export class DestructionSystem {
       breaches: this.breaches.map((breach) => ({
         ...breach, center: breach.center.slice(), half: breach.half.slice(),
         sourceHalf: breach.sourceHalf ? breach.sourceHalf.slice() : null,
+        eject: breach.eject ? breach.eject.slice() : null,
       })),
       nextBreachId: this.nextBreachId,
       damagedCount: this.damagedCount,
       protectedHits: this.protectedHits,
       topologyRebuilds: this.topologyRebuilds,
-      rubbleCount: this.rubble.count,
-      rubbleCursor: this.rubbleCursor,
-      rubbleMatrices: this.rubble.instanceMatrix.array.slice(),
-      rubbleColors: this.rubble.instanceColor ? this.rubble.instanceColor.array.slice() : null,
+      disabledHits: this.disabledHits,
+      fragmentSlotCursors: this.fragmentSlotCursors.map((row) => row.slice()),
+      fragmentStates: this.fragmentStates.map((state) => ({
+        instanceId: state.instanceId,
+        patternIndex: state.patternIndex,
+        fragmentIndex: state.fragmentIndex,
+        position: state.position.toArray(),
+        velocity: state.velocity.toArray(),
+        quaternion: state.quaternion.toArray(),
+        angularAxis: state.angularAxis.toArray(),
+        angularSpeed: state.angularSpeed,
+        scale: state.scale.toArray(),
+        age: state.age,
+        life: state.life,
+        floorY: state.floorY,
+        bounced: state.bounced,
+        color: state.color,
+      })),
       navRevisions: this.nav && Number.isFinite(this.nav.revisions) ? this.nav.revisions : null,
     };
   }
@@ -425,24 +730,19 @@ export class DestructionSystem {
       this.breaches.push({
         ...breach, center: breach.center.slice(), half: breach.half.slice(),
         sourceHalf: breach.sourceHalf ? breach.sourceHalf.slice() : null,
+        eject: breach.eject ? breach.eject.slice() : null,
       });
     }
     this.nextBreachId = snapshot.nextBreachId;
     this.damagedCount = snapshot.damagedCount;
     this.protectedHits = snapshot.protectedHits;
+    this.disabledHits = snapshot.disabledHits || 0;
     this.topologyRebuilds = snapshot.topologyRebuilds;
-    this.rubble.count = snapshot.rubbleCount;
-    this.rubbleCursor = snapshot.rubbleCursor;
-    this.rubble.instanceMatrix.array.set(snapshot.rubbleMatrices);
-    this.rubble.instanceMatrix.needsUpdate = true;
-    if (snapshot.rubbleColors) {
-      if (!this.rubble.instanceColor) {
-        this.rubble.instanceColor = new THREE.InstancedBufferAttribute(
-          new Float32Array(snapshot.rubbleColors.length), 3);
-      }
-      this.rubble.instanceColor.array.set(snapshot.rubbleColors);
-      this.rubble.instanceColor.needsUpdate = true;
+    if (snapshot.fragmentSlotCursors) {
+      this.fragmentSlotCursors = snapshot.fragmentSlotCursors.map((row) => row.slice());
     }
+    this._RebuildBreachMesh();
+    this._RestoreFragmentStates(snapshot.fragmentStates || []);
     if (this.nav && typeof this.nav.Refresh === "function") {
       this.nav.Refresh(field);
       if (snapshot.navRevisions !== null) this.nav.revisions = snapshot.navRevisions;
@@ -471,6 +771,10 @@ export class DestructionSystem {
 
   Hit(box, point, energy, { kind = "bullet", normal = null, deferTopology = false } = {}) {
     if (!box || box.destroyed || !(energy > 0)) return { damaged: false, broken: false };
+    if (!this.Enabled) {
+      this.disabledHits += 1;
+      return { damaged: false, broken: false, disabled: true };
+    }
     const state = this.StateFor(box);
     if (!state.profile.destructible) {
       this.protectedHits += 1;
@@ -496,7 +800,8 @@ export class DestructionSystem {
     const length = Math.hypot(n.x, n.y, n.z) || 1;
     const unit = { x: n.x / length, y: n.y / length, z: n.z / length };
     const opening = OpeningSize(state.profile, kind, energy, state.health);
-    const fracture = FractureCollider(box, point, unit, opening);
+    const patternIndex = PatternIndexFor(box, point);
+    const fracture = FractureCollider(box, point, unit, opening, patternIndex);
     const broken = { box, state, fracture, point: { x: point.x, y: point.y, z: point.z }, normal: unit };
     if (!deferTopology) this._Commit([broken]);
     return { damaged: true, broken: true, ratio, stage: 3, profile: state.profile.id, pending: broken };
@@ -504,6 +809,10 @@ export class DestructionSystem {
 
   Blast(position, radius, energy, { kind = "grenade" } = {}) {
     if (!this.battlefield || !(radius > 0) || !(energy > 0)) return { hits: 0, broken: 0 };
+    if (!this.Enabled) {
+      this.disabledHits += 1;
+      return { hits: 0, broken: 0, disabled: true };
+    }
     const candidates = this.battlefield.NearbyColliders(position.x, position.z, radius + 2.5);
     const broken = [];
     let hits = 0;
@@ -543,9 +852,13 @@ export class DestructionSystem {
         fragment._physicsHandle = this.physics.AddSolid(fragment);
       }
       replacements.set(box, fracture.fragments);
-      const breach = { id: this.nextBreachId++, ...fracture.volume, axis: fracture.axis };
+      const breach = {
+        id: this.nextBreachId++, ...fracture.volume, axis: fracture.axis,
+        surface: state.profile.surface,
+        eject: [broken.normal.x, broken.normal.y, broken.normal.z],
+      };
       this.breaches.push(breach);
-      this._SpawnRubble(breach, state.profile.surface);
+      this._SpawnFragments(breach);
       this._DamagePulse(broken.point, broken.normal, state.profile.surface, 2.4);
       if (this.audio) {
         const cue = state.profile.surface === "wood" ? "impactWood"
@@ -584,6 +897,7 @@ export class DestructionSystem {
     });
     if (this.nav && typeof this.nav.Refresh === "function") this.nav.Refresh(this.battlefield);
     this.topologyRebuilds += 1;
+    this._RebuildBreachMesh();
     this.uniformDirty = true;
   }
 
@@ -602,69 +916,151 @@ export class DestructionSystem {
     }
   }
 
-  _SpawnRubble(breach, surface) {
-    const half = breach.half;
-    const axis = breach.axis;
-    const seed = breach.id * 2654435761;
-    const random = (index) => {
-      const x = Math.sin(seed + index * 91.137) * 43758.5453;
-      return x - Math.floor(x);
-    };
-    const planeAxes = axis === "x" ? [2, 1] : axis === "y" ? [0, 2] : [0, 1];
-    const u = planeAxes[0], v = planeAxes[1];
-    // 这些是常驻的断砖，不是爆炸瞬间飞出去的 VFX。旧实现用 18/22 块沿洞口四边
-    // 排一圈，等于亲手把一串盒子钉在半空。短命飞散已经由 Vfx.Impact 负责；常驻层
-    // 只留洞脚的一小堆，既说明这里刚塌过，也不会遮住射线与通路。
-    const pieces = axis === "y" ? 8 : 10;
-    for (let i = 0; i < pieces; i += 1) {
-      const size = 0.075 + random(i + 21) * (surface === "wood" ? 0.18 : 0.12);
-      const scaleX = size * (0.65 + random(i + 22) * 0.7);
-      const scaleY = size * (0.32 + random(i + 23) * 0.38);
-      const scaleZ = size * (surface === "wood"
-        ? 1.7 + random(i + 24) * 1.7
-        : 0.65 + random(i + 24) * 0.7);
-      this.scale.set(scaleX, scaleY, scaleZ);
-
-      const local = [0, 0, 0];
-      const depthAxis = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-      if (axis === "y") {
-        // 楼板洞：残块留在洞沿上表面，不能掉进洞中央悬着。
-        const edge = i % 4;
-        if (edge < 2) {
-          local[u] = (edge === 0 ? -1 : 1) * (half[u] + scaleX * 0.35);
-          local[v] = (random(i + 7) * 2 - 1) * half[v];
-        } else {
-          local[v] = (edge === 2 ? -1 : 1) * (half[v] + scaleZ * 0.35);
-          local[u] = (random(i + 11) * 2 - 1) * half[u];
-        }
-        local[1] = half[1] + scaleY * 0.64;
-      } else {
-        // 墙洞：碎块落在两侧墙脚的小堆，不再横跨整个洞口排成一行调试盒。
-        const side = i % 2 === 0 ? -1 : 1;
-        local[u] = side * half[u] * (0.56 + random(i + 7) * 0.34)
-          + (random(i + 9) - 0.5) * size * 0.9;
-        local[1] = -half[1] + scaleY * 0.64 + (i % 3 === 0 ? scaleY * 0.34 : 0);
-        local[depthAxis] = (random(i + 17) * 2 - 1) * Math.min(half[depthAxis] + 0.10, 0.24);
-      }
-      const world = LocalToWorld({ x: local[0], y: local[1], z: local[2] }, breach.center, breach.ry);
-      this.position.set(world.x, world.y, world.z);
-      // 常驻块已经落稳，只留小角度歪斜；整圈随机翻滚是“半空飞行”的姿态。
-      this.euler.set((random(i + 30) - 0.5) * 0.28,
-        breach.ry + random(i + 31) * Math.PI,
-        (random(i + 32) - 0.5) * 0.28);
-      this.quaternion.setFromEuler(this.euler);
-      this.matrix.compose(this.position, this.quaternion, this.scale);
-      const index = this.rubbleCursor % RUBBLE_CAPACITY;
-      this.rubbleCursor += 1;
-      this.rubble.setMatrixAt(index, this.matrix);
-      this.rubble.setColorAt(index, SurfaceColor(surface, random(i + 41)));
-      this.rubble.count = Math.min(RUBBLE_CAPACITY, Math.max(this.rubble.count, index + 1));
-    }
-    this.rubble.instanceMatrix.needsUpdate = true;
-    if (this.rubble.instanceColor) this.rubble.instanceColor.needsUpdate = true;
+  _RebuildBreachMesh() {
+    const previous = this.breachMesh.geometry;
+    this.breachMesh.geometry = BuildBreachGeometry(this.breaches);
+    if (previous) previous.dispose();
   }
 
-  Update(focus) {
+  _ClearFragments() {
+    for (const state of this.fragmentStates) this.fragments.setVisibleAt(state.instanceId, false);
+    this.fragmentStates.length = 0;
+    this.fragmentStateByInstance.clear();
+  }
+
+  _SetFragmentMatrix(state) {
+    this.matrix.compose(state.position, state.quaternion, state.scale);
+    this.fragments.setMatrixAt(state.instanceId, this.matrix);
+  }
+
+  _TakeFragmentSlot(patternIndex, fragmentIndex) {
+    const slots = this.fragmentSlots[patternIndex][fragmentIndex];
+    const cursor = this.fragmentSlotCursors[patternIndex][fragmentIndex] % slots.length;
+    this.fragmentSlotCursors[patternIndex][fragmentIndex] = cursor + 1;
+    const instanceId = slots[cursor];
+    const previous = this.fragmentStateByInstance.get(instanceId);
+    if (previous) {
+      const index = this.fragmentStates.indexOf(previous);
+      if (index >= 0) this.fragmentStates.splice(index, 1);
+      this.fragmentStateByInstance.delete(instanceId);
+      this.fragments.setVisibleAt(instanceId, false);
+    }
+    return instanceId;
+  }
+
+  _SpawnFragments(breach) {
+    const patternIndex = breach.patternIndex || 0;
+    const pattern = FracturePatternAt(patternIndex);
+    const axes = AxisIndices(breach.axis);
+    const sourceHalf = breach.sourceHalf || breach.half;
+    const seed = breach.id * 2654435761;
+    const random = (index) => {
+      const value = Math.sin(seed + index * 91.137) * 43758.5453;
+      return value - Math.floor(value);
+    };
+    const eject = new THREE.Vector3(...(breach.eject || [0, 1, 0]));
+    if (eject.lengthSq() < 0.001) eject.set(0, 1, 0); else eject.normalize();
+    const baseQuaternion = BaseShardQuaternion(breach.axis, breach.ry);
+    for (let fragmentIndex = 0; fragmentIndex < pattern.fragments.length; fragmentIndex += 1) {
+      const fragment = pattern.fragments[fragmentIndex];
+      const instanceId = this._TakeFragmentSlot(patternIndex, fragmentIndex);
+      const local = [0, 0, 0];
+      local[axes.u] = fragment.anchor[0] * breach.half[axes.u];
+      local[axes.v] = fragment.anchor[1] * breach.half[axes.v];
+      const world = LocalToWorld({ x: local[0], y: local[1], z: local[2] }, breach.center, breach.ry);
+      const position = new THREE.Vector3(world.x, world.y, world.z).addScaledVector(eject, 0.045);
+      const radial = position.clone().sub(new THREE.Vector3(...breach.center));
+      if (radial.lengthSq() < 0.001) radial.set(random(fragmentIndex) - 0.5, 0.2, random(fragmentIndex + 1) - 0.5);
+      radial.normalize();
+      const speed = 2.6 + random(fragmentIndex + 17) * 3.6;
+      const velocity = eject.clone().multiplyScalar(speed)
+        .addScaledVector(radial, 0.8 + random(fragmentIndex + 19) * 2.1);
+      velocity.y += 1.4 + random(fragmentIndex + 23) * 2.8;
+      const jitter = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        (random(fragmentIndex + 31) - 0.5) * 0.22,
+        (random(fragmentIndex + 37) - 0.5) * 0.22,
+        (random(fragmentIndex + 41) - 0.5) * 0.22));
+      const quaternion = baseQuaternion.clone().multiply(jitter);
+      const angularAxis = new THREE.Vector3(
+        random(fragmentIndex + 43) - 0.5,
+        random(fragmentIndex + 47) - 0.5,
+        random(fragmentIndex + 53) - 0.5).normalize();
+      const scale = new THREE.Vector3(
+        breach.half[axes.u], breach.half[axes.v], Math.max(0.10, sourceHalf[axes.depth] * 2));
+      const color = SurfaceColor(breach.surface, random(fragmentIndex + 59), fragment.ring === "core");
+      const state = {
+        instanceId, patternIndex, fragmentIndex, position, velocity, quaternion, angularAxis,
+        angularSpeed: 2.8 + random(fragmentIndex + 61) * 7.2,
+        scale,
+        age: 0,
+        life: 3.4 + random(fragmentIndex + 67) * 1.8,
+        floorY: breach.axis === "y"
+          ? breach.center[1] - 4.5
+          : breach.center[1] - breach.half[1] + Math.max(0.035, scale.y * 0.08),
+        bounced: false,
+        color: color.getHex(),
+      };
+      this.fragmentStates.push(state);
+      this.fragmentStateByInstance.set(instanceId, state);
+      this.fragments.setColorAt(instanceId, color);
+      this.fragments.setVisibleAt(instanceId, true);
+      this._SetFragmentMatrix(state);
+    }
+  }
+
+  _UpdateFragments(dt) {
+    const step = Clamp(Number(dt) || 0, 0, 0.05);
+    if (!(step > 0)) return;
+    for (let index = this.fragmentStates.length - 1; index >= 0; index -= 1) {
+      const state = this.fragmentStates[index];
+      state.age += step;
+      if (state.age >= state.life) {
+        this.fragments.setVisibleAt(state.instanceId, false);
+        this.fragmentStateByInstance.delete(state.instanceId);
+        this.fragmentStates.splice(index, 1);
+        continue;
+      }
+      state.velocity.y -= 9.81 * step;
+      state.position.addScaledVector(state.velocity, step);
+      if (state.position.y < state.floorY) {
+        state.position.y = state.floorY;
+        if (!state.bounced && Math.abs(state.velocity.y) > 1.1) {
+          state.velocity.y *= -0.24;
+          state.velocity.x *= 0.68;
+          state.velocity.z *= 0.68;
+          state.bounced = true;
+        } else {
+          state.velocity.set(0, 0, 0);
+          state.angularSpeed *= 0.80;
+        }
+      }
+      this.tempQuaternion.setFromAxisAngle(state.angularAxis, state.angularSpeed * step);
+      state.quaternion.multiply(this.tempQuaternion).normalize();
+      this._SetFragmentMatrix(state);
+    }
+  }
+
+  _RestoreFragmentStates(savedStates) {
+    this._ClearFragments();
+    for (const saved of savedStates) {
+      const state = {
+        ...saved,
+        position: new THREE.Vector3().fromArray(saved.position),
+        velocity: new THREE.Vector3().fromArray(saved.velocity),
+        quaternion: new THREE.Quaternion().fromArray(saved.quaternion),
+        angularAxis: new THREE.Vector3().fromArray(saved.angularAxis),
+        scale: new THREE.Vector3().fromArray(saved.scale),
+      };
+      this.fragmentStates.push(state);
+      this.fragmentStateByInstance.set(state.instanceId, state);
+      this.fragments.setColorAt(state.instanceId, new THREE.Color(state.color));
+      this.fragments.setVisibleAt(state.instanceId, true);
+      this._SetFragmentMatrix(state);
+    }
+  }
+
+  Update(focus, dt = 0) {
+    this._UpdateFragments(dt);
     if (!focus || this.breaches.length === 0) {
       if (this.uniforms.count.value !== 0) this.uniforms.count.value = 0;
       return;
@@ -686,6 +1082,8 @@ export class DestructionSystem {
         breach.center[0], breach.center[1], breach.center[2], Math.cos(breach.ry));
       this.uniforms.halves.value[i].set(
         breach.half[0], breach.half[1], breach.half[2], Math.sin(breach.ry));
+      const axes = AxisIndices(breach.axis);
+      this.uniforms.metas.value[i].set(axes.code, breach.patternIndex || 0, 0, 0);
     }
     this.uniformDirty = false;
   }
@@ -704,17 +1102,26 @@ export class DestructionSystem {
       damaged,
       breaches: this.breaches.length,
       activeVolumes: this.uniforms.count.value,
-      rubble: this.rubble.count,
+      breachLinings: this.breachMesh.geometry.userData.breachCount || 0,
+      flyingFragments: this.fragmentStates.length,
+      prefractured: true,
+      gameplayEnabled: this.gameplayEnabled,
+      previewMode: this.previewMode,
       topologyRebuilds: this.topologyRebuilds,
       protectedHits: this.protectedHits,
+      disabledHits: this.disabledHits,
     };
   }
 
   Dispose() {
-    this.scene.remove(this.rubble);
-    this.rubble.geometry.dispose();
-    // MaterialLibrary 管理并复用自己的材质；只有 fallback 裸材质由本系统释放。
-    if (this.rubbleMaterialOwned) this.rubble.material.dispose();
     this.Clear();
+    this.scene.remove(this.fragments);
+    this.scene.remove(this.breachMesh);
+    if (typeof this.fragments.dispose === "function") this.fragments.dispose();
+    else if (this.fragments.geometry) this.fragments.geometry.dispose();
+    this.breachMesh.geometry.dispose();
+    // MaterialLibrary 管理并复用自己的材质；只有 fallback 裸材质由本系统释放。
+    if (this.fragmentMaterialOwned) this.fragments.material.dispose();
+    if (this.breachMaterialOwned) this.breachMesh.material.dispose();
   }
 }

@@ -1,7 +1,7 @@
 // 可破坏场景预览编辑器。
 //
 // 它不另造一套假靶场：预览直接运行正式 DestructionSystem，命中真实关卡的
-// BuildSink 碰撞记录，因此看到的耐久、Rapier 分裂、shader 破口、残骸、掩体与
+// BuildSink 碰撞记录，因此看到的耐久、Rapier 分裂、预烘焙轮廓、厚断面、碎块、掩体与
 // 导航重建就是正片结果。编辑器只负责三件事：选靶、施加测试伤害、把状态读清楚。
 //
 // 退出必须无痕。Enter 时由 DestructionSystem.CaptureSnapshot 留底，重置与 Exit
@@ -88,6 +88,8 @@ export class DestructionEditor {
 
   Enter(root) {
     if (!this.destruction) throw new Error("DestructionSystem 没有接进编辑器宿主");
+    // 正式玩法暂时关闭场景拓扑破坏；只有这个专项预览器持有临时启用权。
+    this.destruction.SetPreviewMode(true);
     this.entered = true;
     this.host.scene.add(this.root);
     this.BuildGizmos();
@@ -119,6 +121,7 @@ export class DestructionEditor {
       this.destruction.RestoreSnapshot(this.baseline);
       this.destruction.Update(this.host.game.player.position);
     }
+    this.destruction.SetPreviewMode(false);
     document.removeEventListener("keydown", this._onKeyDown);
     this.host.scene.remove(this.root);
     this.DisposeGizmos();
@@ -188,7 +191,7 @@ export class DestructionEditor {
       this.showVolumes = on;
       this.RefreshGizmos();
     });
-    Note(tool, "预览调用正式耐久、碰撞和导航链；复原或退出会还原进入编辑器时的状态。", true);
+    Note(tool, "正式玩法中的场景破坏暂时关闭；仅本编辑器临时启用预破碎链。复原或退出会还原进入编辑器时的状态。", true);
 
     const profiles = Section(body, "本关材质分布");
     this.profileList = ListBox(profiles, {
@@ -500,7 +503,10 @@ export class DestructionEditor {
     this.sceneFacts.Set("可破坏 / 承重", stats ? `${stats.destructible} / ${stats.structural}` : "—");
     this.sceneFacts.Set("受损 / 破口", stats ? `${stats.damaged} / ${stats.breaches}` : "—");
     this.sceneFacts.Set("shader 活跃体积", stats ? `${stats.activeVolumes} / ${this.destruction.uniforms.maxVolumes}` : "—");
-    this.sceneFacts.Set("常驻残骸", stats ? stats.rubble : "—");
+    this.sceneFacts.Set("真实断面 / 飞散碎块", stats
+      ? `${stats.breachLinings} / ${stats.flyingFragments}` : "—");
+    this.sceneFacts.Set("正式玩法破坏", stats?.gameplayEnabled ? "已启用" : "暂时关闭",
+      stats?.gameplayEnabled ? "good" : "warn");
     this.sceneFacts.Set("拓扑重建", stats ? stats.topologyRebuilds : "—");
     this.sceneFacts.Set("最近结果", this.message,
       this.lastResult && (this.lastResult.broken || this.lastResult.protected) ? "warn" : "");
@@ -538,7 +544,10 @@ export class DestructionEditor {
   Update(dt) {
     this.host.flycam.Update(dt);
     if (this.field && this.host.game.state.ready && this.boundField !== this.field) this.BindWorld();
-    this.destruction.Update(this.host.camera.position);
+    this.destruction.Update(this.host.camera.position, dt);
+    // 正式玩法帧被编辑器暂停，短命粉尘也必须由预览器推进；否则只有几何碎块在飞，
+    // Impact 产生的尘粒会冻在第一帧，看起来仍像“没有破碎粒子”。
+    if (this.host.vfx) this.host.vfx.Update(dt, this.host.camera, this.host.game.state.elapsed);
     this.hoverTimer -= dt;
     const viewport = this.host.viewport;
     if (this.hoverTimer <= 0 && viewport && viewport.over && !viewport.dragging && !this.loading) {

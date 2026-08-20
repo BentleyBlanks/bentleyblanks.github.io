@@ -61,10 +61,12 @@ function MakeNormalDepthMaterial(destruction = null) {
     uniforms,
     vertexShader: /* glsl */`
       #include <common>
+      #include <batching_pars_vertex>
       varying vec3 vViewNormal;
       varying float vViewDepth;
       ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
       void main() {
+        #include <batching_vertex>
         #include <beginnormal_vertex>
         #include <morphinstance_vertex>
         #include <morphnormal_vertex>

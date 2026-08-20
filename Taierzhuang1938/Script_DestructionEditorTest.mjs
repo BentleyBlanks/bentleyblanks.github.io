@@ -40,6 +40,11 @@ await page.waitForFunction(() => window.Taierzhuang?.destruction && window.Taier
   { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(20));
 
+const gameplayGate = await page.evaluate(() => window.Taierzhuang.Debug.Destruction());
+Check("进入编辑器前正式玩法破坏处于关闭状态", gameplayGate
+  && !gameplayGate.gameplayEnabled && !gameplayGate.previewMode,
+`gameplay=${gameplayGate?.gameplayEnabled} preview=${gameplayGate?.previewMode}`);
+
 // 1. 从统一入口打开：标题、七关列表、自由相机与正式 DestructionSystem 全部就位。
 const opened = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -51,14 +56,15 @@ const opened = await page.evaluate(() => {
     capturing: T.editor.Capturing,
     fly: T.editor.flycam.Active,
     sameSystem: editor?.destruction === T.destruction,
+    previewMode: T.destruction.Stats().previewMode,
     levels: editor?.levelList?.root?.children?.length || 0,
     title: document.querySelector(".edPanel.work .edTitle")?.textContent || "",
     text: document.querySelector(".edPanel.work")?.textContent || "",
   };
 });
 Check("入口打开专用破坏预览编辑器", opened.id === "destruction" && opened.capturing
-  && opened.fly && opened.sameSystem,
-`id=${opened.id} fly=${opened.fly} 正式系统=${opened.sameSystem}`);
+  && opened.fly && opened.sameSystem && opened.previewMode,
+`id=${opened.id} fly=${opened.fly} 正式系统=${opened.sameSystem} preview=${opened.previewMode}`);
 Check("编辑器直接覆盖全部七个正式场景", opened.levels === 7,
   `关卡数=${opened.levels}`);
 Check("工具面板提供检查、枪弹、炮弹、范围爆破与复原",
@@ -93,8 +99,12 @@ const wall = await page.evaluate(() => {
   };
   const beforeRay = Ray();
   editor.shellEnergy = 2000;
+  const vfxBefore = T.vfx.time;
   const hit = editor.ApplyTarget("shell");
+  const fragment = T.destruction.fragmentStates[0];
+  const fragmentBefore = fragment?.position.toArray() || null;
   T.StepFrames(3);
+  const fragmentAfter = fragment?.position.toArray() || null;
   const afterRay = Ray();
   const openedHole = {
     result: hit,
@@ -102,6 +112,15 @@ const wall = await page.evaluate(() => {
     rayClear: afterRay === null,
     breaches: T.destruction.Stats().breaches,
     physicsChanged: T.physics.recordByHandle.size !== baseline.physics,
+    breachLining: T.destruction.breachMesh.geometry.userData.hasThickness
+      && !T.destruction.breachMesh.material.transparent,
+    fragments: T.destruction.Stats().flyingFragments,
+    fragmentMoved: fragmentBefore && fragmentAfter
+      ? Math.hypot(fragmentAfter[0] - fragmentBefore[0], fragmentAfter[1] - fragmentBefore[1],
+        fragmentAfter[2] - fragmentBefore[2])
+      : 0,
+    vfxAdvanced: T.vfx.time > vfxBefore,
+    noOldRubble: !T.scene.getObjectByName("Destruction_Rubble"),
   };
   const reset = editor.ResetPreview();
   T.StepFrames(3);
@@ -129,6 +148,11 @@ Check("普通墙使用正式炮击链形成局部物理破口", !wall.missing
   && wall.openedHole.result?.broken && wall.openedHole.originalGone
   && wall.openedHole.rayClear && wall.openedHole.breaches === wall.baseline.breaches + 1,
 wall.missing ? "当前关没有 wall" : `${wall.tag}/${wall.profile} 洞=${wall.openedHole?.breaches}`);
+Check("编辑器暂停玩法时仍显示真实断面并推进飞散碎块", !wall.missing
+  && wall.openedHole.breachLining && wall.openedHole.fragments === 36
+  && wall.openedHole.fragmentMoved > 0.005 && wall.openedHole.vfxAdvanced
+  && wall.openedHole.noOldRubble,
+wall.missing ? "" : `碎块=${wall.openedHole.fragments} 位移=${Number(wall.openedHole.fragmentMoved).toFixed(3)}m 粉尘=${wall.openedHole.vfxAdvanced}`);
 Check("复原同时恢复 Rapier、射线、掩体与导航", !wall.missing && wall.reset
   && wall.restored.originalBack && wall.restored.handleBack && wall.restored.rayBlocked
   && wall.restored.colliders === wall.baseline.colliders
@@ -206,6 +230,7 @@ const floor = await page.evaluate(async () => {
   const restoredRay = T.battlefield.Raycast(origin, direction, maxDistance);
   const restored = {
     active: T.editor.ActiveId,
+    previewMode: T.destruction.Stats().previewMode,
     colliders: T.battlefield.colliders.length,
     physics: T.physics.recordByHandle.size,
     breaches: T.destruction.Stats().breaches,
@@ -225,7 +250,8 @@ Check("可在编辑器内切换真实场景并打穿楼板/桥面", !floor.missi
   && floor.opened.breaches === floor.baseline.breaches + 1,
 floor.missing ? `切换=${floor.switched} phase=${floor.phase}` : `${floor.tag} ray=${floor.opened.rayClear ? "clear" : "blocked"}`);
 Check("关闭编辑器自动复原当前场景", !floor.missing
-  && floor.restored.active === null && floor.restored.originalBack && floor.restored.rayBlocked
+  && floor.restored.active === null && !floor.restored.previewMode
+  && floor.restored.originalBack && floor.restored.rayBlocked
   && floor.restored.colliders === floor.baseline.colliders
   && floor.restored.physics === floor.baseline.physics
   && floor.restored.breaches === floor.baseline.breaches
@@ -242,8 +268,10 @@ const existingDamage = await page.evaluate(() => {
   const origin = { x: c[0], y: c[1] + h[1] + 0.35, z: c[2] };
   const direction = { x: 0, y: -1, z: 0 };
   const maxDistance = h[1] * 2 + 0.7;
+  T.destruction.SetPreviewMode(true);
   const preHit = T.destruction.Hit(preBox, origin, 2000,
     { kind: "shell", normal: { x: 0, y: 1, z: 0 } });
+  T.destruction.SetPreviewMode(false);
   T.physics.RefreshStaticQueries();
   T.destruction.Update(T.player.position);
   const preRayClear = T.battlefield.Raycast(origin, direction, maxDistance) === null;
