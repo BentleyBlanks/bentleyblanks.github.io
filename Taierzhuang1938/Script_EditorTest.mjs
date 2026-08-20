@@ -109,8 +109,8 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 两个设置 + 五个编辑器 + 一个「全部关掉」
-Check("面板列出两个设置与五个编辑器入口", afterGear.entries === 8, `按钮数=${afterGear.entries}`);
+// 三个设置 + 五个编辑器 + 一个「全部关掉」
+Check("面板列出三个设置与五个编辑器入口", afterGear.entries === 9, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -178,8 +178,21 @@ Check("继续之后按原样接回来",
   `${pauseAudio.resumed.preset} / ${pauseAudio.resumed.cue}`);
 
 // ---------------------------------------------------------------------------
-// 1c) 画质与音效设置面板
+// 1c) 操作、画质与音效设置面板
 // ---------------------------------------------------------------------------
+await page.click('[data-editor="controls"]');
+await Step(3);
+const controls = await page.evaluate(() => ({
+  id: window.Taierzhuang.editor.ActiveId,
+  title: document.querySelector(".edPanel.work .edTitle")?.textContent || "",
+  rows: document.querySelectorAll(".edControlRow").length,
+  text: document.querySelector(".edPanel.work")?.textContent || "",
+}));
+Check("操作面板：列出真实快捷键与情境动作",
+  controls.id === "controls" && controls.rows >= 16
+  && controls.text.includes("拾枪、换枪") && controls.text.includes("包扎止血"),
+  `${controls.title} · ${controls.rows} 行`);
+
 await page.click('[data-editor="graphics"]');
 await Step(6);
 const gfx = await page.evaluate(() => {

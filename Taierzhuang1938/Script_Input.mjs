@@ -13,6 +13,46 @@
 // 这里**不含任何游戏规则** —— 路由器只把物理按键翻译成动作名，
 // 动作干什么全在 Script_Main 的 OnAction 里。
 
+/**
+ * 设置页里的操作说明。它与 KEYMAP 放在同一个文件里，避免改了实际键位却忘了改说明。
+ * 这里只写玩家能直接执行的动作；调试键与编辑器键不混进战斗操作。
+ */
+export const CONTROL_GUIDE = [
+  {
+    title: "移动与观察",
+    rows: [
+      { keys: "W A S D", label: "移动" },
+      { keys: "鼠标", label: "观察" },
+      { keys: "Shift", label: "冲刺；开镜时屏息" },
+      { keys: "Q / E", label: "向左 / 右探身" },
+      { keys: "C / Z", label: "蹲下 / 卧倒" },
+      { keys: "Space", label: "靠近矮墙时翻越" },
+    ],
+  },
+  {
+    title: "武器与救治",
+    rows: [
+      { keys: "左键 / 右键", label: "开火 / 瞄准" },
+      { keys: "1 / 2 / 3 / 4", label: "长枪 / 短枪 / 大刀 / 投掷物" },
+      { keys: "滚轮", label: "循环切换已有武器" },
+      { keys: "R / 0", label: "装填 / 切换射击模式" },
+      { keys: "T / V", label: "架两脚架 / 白刃" },
+      { keys: "G / H", label: "投手榴弹 / 集束手榴弹" },
+      { keys: "F", label: "拾枪、换枪或给战友分弹" },
+      { keys: "B", label: "有绷带且流血时包扎止血" },
+    ],
+  },
+  {
+    title: "班组与菜单",
+    rows: [
+      { keys: "按住 Tab", label: "打开命令轮盘，鼠标选择" },
+      { keys: "Tab + 1—8", label: "直接下达对应命令" },
+      { keys: "Esc", label: "暂停 / 返回" },
+      { keys: "`", label: "打开设置与工具" },
+    ],
+  },
+];
+
 /** 连续量（每帧读）与边沿量（按下那一刻派发一次）的分界写在 mode 上。 */
 export const KEYMAP = [
   // --- 移动：连续量，Read() 里合成成轴 ---------------------------------------

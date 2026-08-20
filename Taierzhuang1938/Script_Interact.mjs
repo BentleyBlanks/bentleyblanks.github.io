@@ -26,6 +26,7 @@ export class InteractSystem {
    * @param {object} ctx { ai, audio, hud }
    * @param {object} hooks
    *   TakeWeapon(weaponId, clips, soldier) -> boolean   捡起一支枪（装配层改槽位与弹仓）
+   *   HasPrimary() -> boolean                           玩家是否已经有长枪（决定“拾起/换上”）
    *   SpareClips() -> number                            玩家手上还有几个桥夹
    *   GiveClip(soldier) -> boolean                      分一个桥夹给弟兄
    */
@@ -52,9 +53,10 @@ export class InteractSystem {
         // 尸体：身上有没有还没被拿走的东西
         if (!s.drop || s.drop.taken || d > CORPSE_REACH_M) continue;
         const name = WEAPONS[s.drop.weaponId]?.name || "枪";
+        const verb = this.hooks.HasPrimary?.() ? "换上" : "拾起";
         if (d < bestDist) {
           bestDist = d;
-          best = { kind: "pickup", soldier: s, label: `拾起 ${name}`, dist: d };
+          best = { kind: "pickup", soldier: s, label: `${verb} ${name}`, dist: d };
         }
         continue;
       }

@@ -25,6 +25,35 @@ const TITLE_AFTER_BRIEF_S = 0.55;
 const MARKER_SEP_Y = 40;
 const MARKER_SEP_X = 130;
 
+/**
+ * 从真实玩法状态生成情境操作提示。只要条件不成立就不返回那一项：
+ * 没有第二支枪不提示换枪，够不着尸体不提示拾枪，没有绷带或没流血不提示包扎。
+ * 保持纯函数，浏览器冒烟可以直接把三组边界状态喂进来验证。
+ */
+export function ContextualActionPrompts({
+  interaction = null, bleeding = 0, bandages = 0, slots = {},
+} = {}) {
+  const prompts = [];
+  if (interaction?.label) {
+    prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
+  }
+  if (Number(bleeding) > 0 && Number(bandages) > 0) {
+    prompts.push({ keys: "B", label: "包扎止血", kind: "bandage" });
+  }
+  const firearms = [
+    ["primary", "1", "长枪"],
+    ["secondary", "2", "短枪"],
+  ].filter(([slot]) => !!slots?.[slot]);
+  if (firearms.length > 1) {
+    prompts.push({
+      keys: firearms.map(([, key]) => key).join(" / "),
+      label: `切换${firearms.map(([, , name]) => name).join(" / ")}`,
+      kind: "switchWeapon",
+    });
+  }
+  return prompts;
+}
+
 export class Hud {
   constructor(root) {
     this.root = root;
@@ -50,6 +79,8 @@ export class Hud {
     this.hitmarkTimer = 0;
     this.hitmarkSpan = 1;
     this.confirms = [];
+    this.actionPrompts = [];
+    this.actionPromptSignature = "";
   }
 
   Build() {
@@ -69,6 +100,7 @@ export class Hud {
     this.el.state = mk("hudState");
     this.el.subtitle = mk("hudSubtitle");
     this.el.hint = mk("hudHint");
+    this.el.actions = mk("hudActions");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
     this.el.minimap = mk("hudMinimap", this.root, "canvas");
@@ -288,6 +320,35 @@ export class Hud {
     this.el.hint.textContent = text;
     this.el.hint.classList.add("on");
     this.hintTimer = seconds;
+  }
+
+  /**
+   * 常驻的情境操作提示，与 Hint 的一次性反馈分开。
+   * 调用方可以每 0.1 秒重算；签名不变就完全不动 DOM，避免战斗中反复触发布局。
+   */
+  SetActionPrompts(prompts = []) {
+    const next = prompts
+      .filter((prompt) => prompt?.keys && prompt?.label)
+      .slice(0, 3)
+      .map((prompt) => ({
+        keys: String(prompt.keys), label: String(prompt.label), kind: String(prompt.kind || "action"),
+      }));
+    const signature = next.map((prompt) => `${prompt.kind}:${prompt.keys}:${prompt.label}`).join("|");
+    if (signature === this.actionPromptSignature) return;
+    this.actionPromptSignature = signature;
+    this.actionPrompts = next;
+    this.el.actions.textContent = "";
+    for (const prompt of next) {
+      const row = document.createElement("div");
+      row.className = `hudAction ${prompt.kind}`;
+      const key = document.createElement("kbd");
+      key.textContent = prompt.keys;
+      const label = document.createElement("span");
+      label.textContent = prompt.label;
+      row.append(key, label);
+      this.el.actions.appendChild(row);
+    }
+    this.el.actions.classList.toggle("on", next.length > 0);
   }
 
   /** 史实注记卡片。排队弹，不叠在一起。 */

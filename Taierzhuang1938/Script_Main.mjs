@@ -29,7 +29,7 @@ import { ActorFactory } from "./Script_Actor.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
-import { Hud } from "./Script_Hud.mjs";
+import { Hud, ContextualActionPrompts } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
@@ -432,6 +432,7 @@ async function Boot() {
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
   // 所以规则在 Script_Interact，改状态的那三下通过 hooks 交回这里。
   interact = new InteractSystem({ ai, audio, hud }, {
+    HasPrimary: () => !!state.slots.primary,
     SpareClips: () => state.clips,
     TakeWeapon: (weaponId, clips) => PickUpWeapon(weaponId, clips),
     GiveClip: () => {
@@ -532,6 +533,7 @@ async function Boot() {
           pickedUp: state.pickedUp, weapon: currentWeapon,
         };
       },
+      Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
       AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
       // AI 那边的运行时取证口：某个兵此刻的完整状态
       SoldierInfo: (soldier) => ({
@@ -1914,6 +1916,24 @@ function DoInteract() {
 }
 
 /**
+ * HUD 的情境操作条只读真实规则查询：F 来自 InteractSystem.Query，B 来自玩家流血与
+ * 绷带库存，1/2 来自实际槽位。没有可执行动作就传空数组，不用计时器伪造教程窗口。
+ */
+function UpdateContextualActionPrompts() {
+  if (!player?.Alive) {
+    hud.SetActionPrompts([]);
+    return;
+  }
+  const interaction = interact?.Query(player) || null;
+  hud.SetActionPrompts(ContextualActionPrompts({
+    interaction,
+    bleeding: player.bleeding,
+    bandages: player.bandages,
+    slots: state.slots,
+  }));
+}
+
+/**
  * 捡枪。捡到的枪进 1 号槽（长枪位）—— 杂牌部队换枪就是这么换的：
  * 手上这支打坏了就捡地上那支，`L2_RoomWar` 那条注释说的就是这件事。
  * 缴获日械没有备弹（clips = 0），只有枪里那几发。
@@ -2415,9 +2435,9 @@ function Frame(dt, render = true) {
     }
   }
 
-  // 交互提示：每六帧扫一次身边够得着的东西。每帧扫等于每帧遍历全场七十个人，
-  // 而这条提示是给人看的，六帧（0.1 s）的延迟看不出来
-  if (interact && player.Alive && state.frame % 6 === 0) interact.UpdatePrompt(player);
+  // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
+  // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。
+  if (state.frame % 6 === 0) UpdateContextualActionPrompts();
 
   if (player.Alive) TryFire(dt);
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）

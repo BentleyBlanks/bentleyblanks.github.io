@@ -115,6 +115,28 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudHint.on { opacity: 1; }
 
+/* 情境操作提示：只由真实可执行状态驱动，常驻；一次性反馈仍走上面的 hudHint。 */
+.hudActions {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  max-width: min(76vw, 860px); z-index: 2; opacity: 0; transition: opacity 0.16s linear;
+  white-space: nowrap;
+}
+.hudActions.on { opacity: 1; }
+.hudAction {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 9px 4px 5px; border: 1px solid rgba(230,223,205,0.17); border-radius: 2px;
+  background: rgba(10,10,9,0.58); color: rgba(230,223,205,0.76); font-size: 12px;
+}
+.hudAction kbd {
+  min-width: 24px; box-sizing: border-box; padding: 1px 5px;
+  border: 1px solid rgba(230,223,205,0.36); border-radius: 2px;
+  background: rgba(230,223,205,0.07); color: var(--paper);
+  font: 11px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace; text-align: center;
+}
+.hudAction.pickup kbd, .hudAction.bandage kbd { border-color: rgba(224,176,98,0.72); color: var(--warn); }
+.hudAction.bandage span { color: #e2a48e; }
+
 /* 史实注记 */
 .hudNote {
   position: absolute; right: 20px; top: 70px; width: 310px;
@@ -157,7 +179,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    要么完整、要么不在。照抄阵亡卡那条先例（第 173 行），不引入新概念。
    那几秒功能层本来也没有决策价值：玩家站在出生点、目标在正前方、
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
-#hud.staging .hudMarkers { opacity: 0; }
+#hud.staging .hudMarkers, #hud.staging .hudActions { opacity: 0; }
 .hudMarkers { transition: opacity 0.4s ease; }
 
 /* 占领点图标 */

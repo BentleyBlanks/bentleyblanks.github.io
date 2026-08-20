@@ -22,6 +22,7 @@
 // duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
+import { CONTROL_GUIDE } from "./Script_Input.mjs";
 
 const KEY_GFX = "tengxian1938_graphics_v1";
 const KEY_SFX = "tengxian1938_audio_v1";
@@ -359,4 +360,61 @@ export class AudioSettings {
   }
 }
 
-export default { GraphicsSettings, AudioSettings, ApplySavedSettings };
+// ===========================================================================
+// 操作说明
+// ===========================================================================
+/**
+ * 操作说明也走设置面板的接口，但它只读、不落盘。键位文案来自 Script_Input，
+ * 所以这里不会另养一份迟早与真实 KEYMAP 分叉的快捷键表。
+ */
+export class ControlsSettings {
+  static id = "controls";
+  static label = "操作";
+  static hint = "键鼠操作、武器槽、交互、包扎与班组命令";
+
+  constructor(host) {
+    this.host = host;
+    this.cameraMode = "none";
+    this.panel = null;
+  }
+
+  Enter(root) {
+    this.panel = Panel({
+      title: "操作说明", sub: "键盘与鼠标",
+      variant: "work wide", onClose: () => this.host.Close(),
+    });
+    root.appendChild(this.panel.root);
+    this.BuildUi(this.panel.body);
+    return this;
+  }
+
+  BuildUi(body) {
+    for (const group of CONTROL_GUIDE) {
+      const section = Section(body, group.title);
+      const grid = document.createElement("div");
+      grid.className = "edControlGrid";
+      for (const row of group.rows) {
+        const item = document.createElement("div");
+        item.className = "edControlRow";
+        const keys = document.createElement("kbd");
+        keys.textContent = row.keys;
+        const label = document.createElement("span");
+        label.textContent = row.label;
+        item.append(keys, label);
+        grid.appendChild(item);
+      }
+      section.appendChild(grid);
+    }
+    Note(body, "情境提示只在动作真的可执行时出现：靠近可用枪械显示 F，"
+      + "拥有两支枪时显示 1 / 2，正在流血且还有绷带时显示 B。");
+  }
+
+  Exit() {
+    if (this.panel) this.panel.root.remove();
+    this.panel = null;
+  }
+
+  Update() {}
+}
+
+export default { GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings };

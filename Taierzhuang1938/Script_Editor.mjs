@@ -29,7 +29,9 @@ import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
-import { GraphicsSettings, AudioSettings, ApplySavedSettings } from "./Script_EditorSettings.mjs";
+import {
+  GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
+} from "./Script_EditorSettings.mjs";
 
 /**
  * 入口表。顺序就是面板上的顺序。
@@ -38,7 +40,7 @@ import { GraphicsSettings, AudioSettings, ApplySavedSettings } from "./Script_Ed
  * 与这一局无关；编辑器改的是这一局的运行时状态、退出时必须还干净。
  * 摆在同一排会让人以为「画质」也是个要小心退出的东西。
  */
-const SETTINGS = [GraphicsSettings, AudioSettings];
+const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [ActorEditor, WeaponEditor, AudioEditor, TimelineEditor, SceneEditor];
 const ALL = [...SETTINGS, ...EDITORS];
 
@@ -114,7 +116,7 @@ export class EditorSuite {
     this.root = root;
 
     const gear = El("div", "edGear", "⚙");
-    gear.title = "编辑器（`）";
+    gear.title = "设置与工具（`）";
     gear.addEventListener("click", () => this.TogglePanel());
     root.appendChild(gear);
     this.gear = gear;
@@ -128,7 +130,7 @@ export class EditorSuite {
     const panel = El("div", "edPanel launcher");
     panel.style.display = "none";
     const head = El("div", "edHead");
-    head.appendChild(El("div", "edTitle", "编辑器"));
+    head.appendChild(El("div", "edTitle", "设置与工具"));
     const x = El("div", "edX", "×");
     x.addEventListener("click", () => this.TogglePanel(false));
     head.appendChild(x);

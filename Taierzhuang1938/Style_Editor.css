@@ -164,6 +164,22 @@
 }
 .edNote.warn { border-left-color: var(--warn, #e0b062); color: rgba(224, 176, 98, 0.85); }
 
+/* --- 操作说明 ------------------------------------------------------------ */
+.edControlGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }
+.edControlRow {
+  display: grid; grid-template-columns: minmax(96px, auto) 1fr; align-items: center; gap: 9px;
+  min-height: 28px; padding: 3px 6px;
+  border-bottom: 1px solid rgba(230, 223, 205, 0.08);
+}
+.edControlRow kbd {
+  justify-self: start; min-width: 72px; box-sizing: border-box;
+  padding: 2px 6px; border: 1px solid rgba(230, 223, 205, 0.26); border-radius: 2px;
+  background: rgba(0, 0, 0, 0.34); color: var(--paper, #e6dfcd);
+  font: 11px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  text-align: center; white-space: nowrap;
+}
+.edControlRow span { color: rgba(230, 223, 205, 0.72); font-size: 11.5px; }
+
 /* --- 时间轴 -------------------------------------------------------------- */
 .edTrack {
   position: relative; height: 22px; margin: 6px 0 2px;
@@ -206,4 +222,5 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   .edPanel.launcher { width: 160px; }
   .edPanel.work { width: 250px; }
   .edPanel.wide { width: 280px; }
+  .edControlGrid { grid-template-columns: 1fr; }
 }
