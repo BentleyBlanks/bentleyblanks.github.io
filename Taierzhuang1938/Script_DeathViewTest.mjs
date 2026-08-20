@@ -84,6 +84,7 @@ try {
       nameWeight: parseInt(nameStyle.fontWeight, 10),
       yearsAboveOrigin: yearsNode.getBoundingClientRect().top < originNode.getBoundingClientRect().top,
       yearsFontPx: parseFloat(yearsStyle.fontSize),
+      yearsWeight: parseInt(yearsStyle.fontWeight, 10),
       originFontPx: parseFloat(originStyle.fontSize),
       dofStrength: dof.uDofStrength.value,
       dofFocus: dof.uDofFocus.value,
@@ -106,7 +107,8 @@ try {
     `strength=${result.dofStrength} focus=${result.dofFocus} range=${result.dofRange} max=${result.dofMaxPx}px`],
     ["居中大号粗体生平 UI", result.cardOn && /^rgba\(/.test(result.background)
       && result.biographyCentered && result.nameFontPx >= 80 && result.nameWeight >= 700
-      && result.yearsAboveOrigin && result.yearsFontPx > result.originFontPx
+      && result.yearsAboveOrigin && result.yearsFontPx >= 23 && result.yearsWeight >= 600
+      && result.yearsFontPx > result.originFontPx
       && !result.biography.includes("籍贯") && result.biography.includes("1938"),
     `${result.background} / ${result.biography}`],
     ["倒地收枪", result.weaponHidden, `hidden=${result.weaponHidden}`],

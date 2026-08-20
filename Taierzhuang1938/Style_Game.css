@@ -275,7 +275,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   text-indent: 0.18em;
 }
 .hudDeathCard .dcYears {
-  font-size: 22px; color: rgba(238,233,221,0.84); letter-spacing: 0.22em;
+  font-size: 23.1px; font-weight: 600; color: rgba(238,233,221,0.84); letter-spacing: 0.22em;
   text-indent: 0.22em;
 }
 .hudDeathCard .dcUnit {
@@ -289,7 +289,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 @media (max-width: 640px) {
   .hudDeathCard { padding: 7vh 7vw 0; }
   .hudDeathCard .dcName { font-size: 58px; }
-  .hudDeathCard .dcYears { font-size: 20px; }
+  .hudDeathCard .dcYears { font-size: 21px; }
   .hudDeathCard .dcOrigin { font-size: 15px; }
 }
 /* 过场期间：HUD 全部让位，只留过场自己的字幕层（.csRoot 也挂在 #hud 下） */
