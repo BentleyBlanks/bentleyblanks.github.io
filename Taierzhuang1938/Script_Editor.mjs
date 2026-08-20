@@ -194,14 +194,17 @@ export class EditorSuite {
     // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
     // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
     // Frame() 提前返回一点也拦不住它（见 Script_Audio.SetPaused 的账）。
-    const capturing = this.Capturing;
-    if (capturing !== this._audioPaused) {
-      this._audioPaused = capturing;
-      if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(capturing);
+    // 音效音乐编辑器是唯一例外：它的工作就是在玩法暂停时试听环境床与音乐。
+    // 以前这里只看 Capturing，结果一次性音效能响、两个背景层却永远被 SetPaused(true)
+    // 掐掉，界面上的环境 / 音乐按钮因此只是改了名字，实际没有播放节点。
+    const silenceBackground = this.Capturing && this.activeId !== AudioEditor.id;
+    if (silenceBackground !== this._audioPaused) {
+      this._audioPaused = silenceBackground;
+      if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(silenceBackground);
     }
     if (this.status) {
       this.status.textContent = this.active
-        ? `${this.activeId} 接管中 · 玩法已暂停`
+        ? `${this.activeId} 接管中 · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}`
         : "玩法已暂停（面板开着）";
     }
     document.body.classList.toggle("edHideHud", !!this.active);

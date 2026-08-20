@@ -366,6 +366,48 @@ const audio = await page.evaluate(() => {
 Check("音效编辑器列出全部配方", audio.id === "audio" && audio.count >= 30, `配方 ${audio.count} 条`);
 Check("盲听出四选一", audio.blind === 4);
 
+// 音效是一次性节点，暂停背景也能响；环境床 / 音乐是常驻节点。必须真的点 UI，
+// 防止编辑器再次退化成「按钮改了 cue 名，但 SetPaused(true) 把播放头全掐掉」。
+await page.click('[data-ambience="night"]');
+await page.click('[data-music="tension"]');
+await Step(8);
+const backgroundPlaying = await page.evaluate(() => {
+  const audio = window.Taierzhuang.audio;
+  return {
+    paused: audio.paused,
+    ambience: audio.ambiencePreset,
+    ambienceLive: audio.ambLayers.length + audio.ambienceNodes.length,
+    ambienceTimer: !!audio.ambienceTimer,
+    music: audio.musicCue,
+    musicLive: !!audio.musicLayer,
+  };
+});
+Check("音效编辑器允许环境床在玩法暂停时试听",
+  !backgroundPlaying.paused && backgroundPlaying.ambience === "night"
+    && backgroundPlaying.ambienceLive > 0 && backgroundPlaying.ambienceTimer,
+  JSON.stringify(backgroundPlaying));
+Check("音效编辑器允许音乐在玩法暂停时试听",
+  !backgroundPlaying.paused && backgroundPlaying.music === "tension" && backgroundPlaying.musicLive,
+  JSON.stringify(backgroundPlaying));
+
+await page.click('[data-stop-ambience]');
+await page.click('[data-stop-music]');
+await Step(4);
+const backgroundStopped = await page.evaluate(() => {
+  const audio = window.Taierzhuang.audio;
+  return {
+    ambience: audio.ambiencePreset,
+    ambienceLive: audio.ambLayers.length + audio.ambienceNodes.length,
+    ambienceTimer: !!audio.ambienceTimer,
+    music: audio.musicCue,
+    musicLive: !!audio.musicLayer,
+  };
+});
+Check("环境与音乐各自都有可用的停止按钮",
+  backgroundStopped.ambience === "silence" && backgroundStopped.ambienceLive === 0
+    && !backgroundStopped.ambienceTimer && backgroundStopped.music === null && !backgroundStopped.musicLive,
+  JSON.stringify(backgroundStopped));
+
 // 每个配方都要有中文说明（"指认" 那一栏，漏一条就等于列表里有个认不出的名字）
 const undescribed = await page.evaluate(async () => {
   const audioModule = await import("./Script_Audio.mjs");

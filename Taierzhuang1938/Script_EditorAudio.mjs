@@ -55,6 +55,8 @@ const SOUND_INFO = {
   impactWood: ["命中", "打在木头上", "门板、房梁、电线杆"],
   impactMetal: ["命中", "打在铁上", "铁门、战车装甲、锅碗。带金属余振"],
   impactFlesh: ["命中", "打中人", "这一声决定玩家知不知道自己命中了"],
+  hitConfirm: ["命中", "命中确认", "贴在听者正中的轻提示，只说明这一发打中了，不代替真实中弹声"],
+  killConfirm: ["命中", "击杀确认", "比命中确认更低、更短；一次爆炸放倒多人也只播一条"],
   footstepDirt: ["身体", "脚步 · 土路", "低优先级：预算紧时先丢它"],
   footstepRubble: ["身体", "脚步 · 瓦砾", "踩碎砖的碎响，城破之后的主要地面"],
   bodyFall: ["身体", "倒地", "一个人倒下的闷响 + 装具的碰撞"],
@@ -91,6 +93,8 @@ export class AudioEditor {
     this.lastSampled = -1;       // 采样是异步载入的，数字一变就重刷列表尾标
     this.savedAmbience = null;
     this.savedMusic = null;
+    this.ambButtons = new Map();
+    this.musicButtons = new Map();
   }
 
   get audio() { return this.host.audio; }
@@ -172,8 +176,13 @@ export class AudioEditor {
     const ambBox = El("div", "edBtns");
     amb.appendChild(ambBox);
     for (const name of Object.keys(AMBIENCE_PRESETS)) {
-      Button(ambBox, name, () => { if (this.audio) this.audio.Ambience(name); });
+      if (name === "silence") continue;
+      const btn = Button(ambBox, `▶ ${name}`, () => this.PreviewAmbience(name));
+      btn.dataset.ambience = name;
+      this.ambButtons.set(name, btn);
     }
+    const stopAmbience = Button(ambBox, "■ 停止环境", () => this.StopAmbiencePreview(), { cls: "danger" });
+    stopAmbience.dataset.stopAmbience = "";
     Note(amb, "环境床 = 2—4 条实录的空气叠在一起（风 / 火 / 远处的仗 / 夜）"
       + "＋ 按概率撒的一次性音。每条床挂两条播放头，各自从素材的随机位置起播、"
       + "互相交叉淡 —— **没有循环点**，同一条素材永远不会以同样的方式接第二次。");
@@ -183,9 +192,12 @@ export class AudioEditor {
     const musicBox = El("div", "edBtns");
     music.appendChild(musicBox);
     for (const [cue, cfg] of Object.entries(MUSIC_CUES)) {
-      Button(musicBox, `${cue}·${cfg.label}`, () => { if (this.audio) this.audio.Music(cue); });
+      const btn = Button(musicBox, `▶ ${cue}·${cfg.label}`, () => this.PreviewMusic(cue));
+      btn.dataset.music = cue;
+      this.musicButtons.set(cue, btn);
     }
-    Button(musicBox, "停", () => { if (this.audio) this.audio.Music(null); }, { cls: "danger" });
+    const stopMusic = Button(musicBox, "■ 停止音乐", () => this.StopMusicPreview(), { cls: "danger" });
+    stopMusic.dataset.stopMusic = "";
     this.musicFacts = Facts(music);
 
     const voice = Section(body, "人声（四川话 · 采样）");
@@ -268,6 +280,35 @@ export class AudioEditor {
     if (!audio) return;
     audio.Unlock();
     for (let i = 0; i < times; i += 1) this.PlayName(this.soundName, i * 0.42);
+  }
+
+  /** 音频编辑器打开时玩法暂停，但背景试听必须单独放行。 */
+  EnableBackgroundPreview() {
+    const audio = this.audio;
+    if (!audio) return null;
+    audio.Unlock();
+    if (audio.paused) audio.SetPaused(false);
+    return audio;
+  }
+
+  PreviewAmbience(name) {
+    const audio = this.EnableBackgroundPreview();
+    if (audio) audio.Ambience(name);
+  }
+
+  StopAmbiencePreview() {
+    const audio = this.EnableBackgroundPreview();
+    if (audio) audio.Ambience("silence");
+  }
+
+  PreviewMusic(cue) {
+    const audio = this.EnableBackgroundPreview();
+    if (audio) audio.Music(cue);
+  }
+
+  StopMusicPreview() {
+    const audio = this.EnableBackgroundPreview();
+    if (audio) audio.Music(null);
   }
 
   PlayName(name, delay = 0) {
@@ -405,6 +446,9 @@ export class AudioEditor {
         this.ambFacts.Set("环境缺失", `${audio.ambErrors.length} 条读不到`, "bad");
       }
       this.ambFacts.Set("空间", audio.space || "—");
+      for (const [name, btn] of this.ambButtons) {
+        btn.classList.toggle("on", audio.ambiencePreset === name && !audio.paused);
+      }
     }
     if (this.musicFacts) {
       this.musicFacts.Set("当前音乐", audio.musicCue || "（无）");
@@ -413,6 +457,9 @@ export class AudioEditor {
         : "载入中 / 不可用（没有音乐）", audio.musicReady ? "good" : "warn");
       if (audio.musicErrors && audio.musicErrors.length) {
         this.musicFacts.Set("音乐缺失", `${audio.musicErrors.length} 段读不到`, "bad");
+      }
+      for (const [cue, btn] of this.musicButtons) {
+        btn.classList.toggle("on", audio.musicCue === cue && !!audio.musicLayer && !audio.paused);
       }
     }
   }
