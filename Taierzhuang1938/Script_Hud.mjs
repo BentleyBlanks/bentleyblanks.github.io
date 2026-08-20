@@ -53,6 +53,7 @@ export class Hud {
     };
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
+    this.BuildHitDirs();
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
@@ -113,12 +114,68 @@ export class Hud {
     this.el.cook.classList.toggle("on", cooking > 0);
   }
 
+  /**
+   * 来弹指示器：屏幕中心外圈的一段弧，指向打你的那一枪是从哪来的。
+   *
+   * 为什么非要有：这一版之前玩家挨枪只有两件事会发生 —— 血掉了、暗角亮一点点
+   *（而暗角是 health<70 才开始的，70 到 0 只隔两发）。也就是说在"还有得救"的
+   * 那段血量里，屏幕上**什么都没发生**，玩家既不知道自己在挨打，更不知道朝哪边躲。
+   * 弧是画在 SVG 里的，五个共用一份几何，转的时候只改 transform。
+   */
+  BuildHitDirs() {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "hudHitDirs");
+    svg.setAttribute("viewBox", "-100 -100 200 200");
+    this.hitDirPaths = [];
+    for (let i = 0; i < 5; i += 1) {
+      const path = document.createElementNS(NS, "path");
+      // 朝正上（= 视线正前）的一段环形扇区，半径 60—76、张角 ±20°。
+      path.setAttribute("d",
+        "M-26.0,-71.4 A76,76 0 0 1 26.0,-71.4 L20.5,-56.4 A60,60 0 0 0 -20.5,-56.4 Z");
+      path.setAttribute("class", "hudHitDir");
+      path.style.opacity = "0";
+      svg.appendChild(path);
+      this.hitDirPaths.push(path);
+    }
+    this.root.appendChild(svg);
+    this.el.hitDirs = svg;
+  }
+
   SetSuppression(v) {
     this.el.suppress.style.opacity = String(Math.min(1, v * 1.15));
   }
 
-  SetDamage(v) {
-    this.el.damage.style.opacity = String(Math.min(1, v));
+  /**
+   * 受伤的全部画面反馈，一次调用。三层叠在同一张暗角上：
+   *   · 底噪 —— 剩余血量（现在从 90 就开始渗，而不是 70：让"我该包扎了"提前到
+   *     还有得救的时候；曲线取 1.6 次幂，越低涨得越快）；
+   *   · 事件 —— 这一发的红闪（player.hitFlash，独立衰减，与剩余血量无关）；
+   *   · 濒死 —— 40 以下整块暗角开始搏动（CSS 动画，零 JS 成本）。
+   * 前两层取 max 而不是相加：相加会让"低血 + 连中"直接糊成纯红看不见路。
+   */
+  SetHurt({ health = 100, flash = 0, marks = null, yaw = 0 } = {}) {
+    const base = Math.pow(Math.max(0, 1 - health / 90), 1.6) * 0.78;
+    const v = Math.min(0.92, Math.max(base, flash * 0.85));
+    this.el.damage.style.opacity = v.toFixed(3);
+    this.el.damage.classList.toggle("low", health < 40 && health > 0);
+
+    const paths = this.hitDirPaths;
+    if (!paths) return;
+    const list = marks || [];
+    for (let i = 0; i < paths.length; i += 1) {
+      const m = list[i];
+      if (!m) { paths[i].style.opacity = "0"; continue; }
+      // 世界方向 → 屏幕角。存的是世界向量，所以转身之后指示器跟着转 ——
+      // 存屏幕角的话你一回头它就指错地方了。
+      const sin = Math.sin(yaw), cos = Math.cos(yaw);
+      const fwd = m.x * -sin + m.z * -cos;
+      const right = m.x * cos + m.z * -sin;
+      const deg = Math.atan2(right, fwd) * 180 / Math.PI;
+      const life = m.max ? m.life / m.max : 0;
+      paths[i].setAttribute("transform", `rotate(${deg.toFixed(1)})`);
+      // 前 0.25 s 满亮，之后淡出：一眼看得见，但不会在屏幕上挂两秒。
+      paths[i].style.opacity = (Math.min(1, life * 1.35) * 0.92).toFixed(3);
+    }
   }
 
   Say(speaker, text, seconds = 3.6, variant = "") {

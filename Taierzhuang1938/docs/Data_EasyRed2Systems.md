@@ -139,7 +139,7 @@ ER2 的触发是**一组离散事件**而非阈值：重度压制 / 所在占领
 ER2 两层：轻伤自救（屏幕去色、不能跑、不能屏息、B 键绷带、不处理会流血死、消耗品分级）；重伤失能（倒地、医护兵诊断匹配器械、可先拖到掩体后再救、职业不锁能力）。
 
 **我们现状**（`Script_Player.mjs`）：
-- 轻伤层**有一半**：`wounds[]` 按部位记（head/torso/arm/leg），`bleeding` 持续掉血且不包扎会死，`B` 键 `Bandage()` 止血 + 回 14 血、消耗绷带（`COMBAT.bandages = 2`）；`LegPenalty()` 腿伤减速 0.72/处、`ArmPenalty()` 臂伤把 sway 放大 1.7 倍、把散布抬高。**缺**：中弹后没有「不能冲刺」「不能屏息」的硬规则（只是 `speed *= Clamp(health/60, 0.45, 1)` 连续衰减），包扎期间可以照常开火，没有去饱和的伤势画面（`hud.SetDamage` 只是一个红边 opacity）；
+- 轻伤层**有一半**：`wounds[]` 按部位记（head/torso/arm/leg），`bleeding` 持续掉血且不包扎会死，`B` 键 `Bandage()` 止血 + 回 14 血、消耗绷带（`COMBAT.bandages = 2`）；`LegPenalty()` 腿伤减速 0.72/处、`ArmPenalty()` 臂伤把 sway 放大 1.7 倍、把散布抬高。**缺**：中弹后没有「不能冲刺」「不能屏息」的硬规则（只是 `speed *= Clamp(health/60, 0.45, 1)` 连续衰减），包扎期间可以照常开火，还没有去饱和的伤势画面；受击反馈这一层已经补上（红闪 + 来弹方位弧 + 濒死搏动 + 闷哼/心跳，见 `docs/Data_PlayerDamage.md`），`hud.SetDamage` 已被 `hud.SetHurt` 取代；
 - **失能层完全没有**：`player.Downed` 不存在，`Incapacitate()` 不存在。血 ≤ 0 直接 `Kill()`；
 - **拖拽伤员没有**，`Script_Actor.Ragdoll()` 有但只用于死亡；
 - **消耗品分级没有**，只有绷带。
@@ -472,7 +472,7 @@ ER2 两层：轻伤自救（屏幕去色、不能跑、不能屏息、B 键绷�
 ### [应做/中] 伤势｜已有但不对齐
 
 - **ER2**：轻伤层：屏幕变黑白/灰、不能跑、不能屏息、按 B 直接用绷带、不处理会流血致死、消耗品分级（罐头 ~40%、药片 ~90%）
-- **现状**：Script_Player 有 wounds[]（按 head/torso/arm/leg 记）、bleeding 持续掉血且不包扎会 Kill、B 键 Bandage() 止血回 14 血消耗绷带（COMBAT.bandages = 2）、LegPenalty 每处腿伤 ×0.72、ArmPenalty 把 sway ×1.7。缺：没有「不能冲刺/不能屏息」的硬规则（只是 speed *= Clamp(health/60,0.45,1) 连续衰减）；包扎期间可以照常开火；没有去饱和的伤势画面（hud.SetDamage 只是红边 opacity）；没有消耗品分级。
+- **现状**：Script_Player 有 wounds[]（按 head/torso/arm/leg 记）、bleeding 持续掉血且不包扎会 Kill、B 键 Bandage() 止血回 14 血消耗绷带（COMBAT.bandages = 2）、LegPenalty 每处腿伤 ×0.72、ArmPenalty 把 sway ×1.7。缺：没有「不能冲刺/不能屏息」的硬规则（只是 speed *= Clamp(health/60,0.45,1) 连续衰减）；包扎期间可以照常开火；还没有去饱和的伤势画面（受击反馈本身已补：红闪 / 来弹方位弧 / 濒死搏动 / 闷哼与心跳，hud.SetDamage 已换成 hud.SetHurt，见 docs/Data_PlayerDamage.md）；没有消耗品分级。
 - **要做**：Script_Player：health < 60 或四肢中弹 → wounded 标记，canSprint 与 breathHold 直接 return false；Bandage 改成 3.2 s 计时，期间 viewmodel.IsBusy() 为真所以自动禁开火；Post 加一个 uDesaturate uniform 由 wounded 驱动。消耗品分级不做（第 2 集团军没有那套补给）。
 - **史实**：不要给第 2 集团军做出补给充足的观感；绷带 2 个已经是紧的，别加
 ### [应做/大] 伤势｜完全没有
@@ -574,7 +574,7 @@ ER2 两层：轻伤自救（屏幕去色、不能跑、不能屏息、B 键绷�
 ### [应做/中] 难度｜完全没有
 
 - **ER2**：难度 = 一组滑条（AI 精度、爆炸半径、压制强度、玩家受伤倍率、体力时长、枪管过热、弹道重力、自动投降开关、准星开关、敌人标记开关），可存预设
-- **现状**：实测 window.Taierzhuang.state 里没有 difficulty，全局也没有难度对象；难度常数散落在 COMBAT（aiAccuracyBase 0.55、aiAccuracySuppressed 0.18、suppressPerNearMiss 0.16）与各处硬编码里。启动页只有一个「进城」按钮。
+- **现状**：DIFFICULTY / DIFFICULTY_PRESETS（体验/标准/写实）已建在 Data_Battle.mjs，弹道重力、自由瞄准、铁瞄偏心、过热四条早已接线；aiAccuracy / playerDamage / suppressionScale 三条在这一批补上（分别接进 Script_Ai.TryFire、Script_Player.TakeHit、Script_Player.Suppress，见 docs/Data_PlayerDamage.md 第四节）。**仍缺**：blastRadius 与 staminaSeconds 还没人读；启动页只有一个「进城」按钮，没有预设/滑条 UI，也不存 localStorage。
 - **要做**：建一个 difficulty 对象 { aiAccuracy, blastRadius, suppressionScale, playerDamage, staminaSeconds, overheat, bulletGravity, autoSurrender:false, showCrosshair, enemyMarkers }，在 Script_Ai.TryFire / Script_Combat.Blast / Script_Player.TakeHit / Suppress 等处读取，绝不硬编码。启动页三个预设按钮（体验/标准/写实）+ 高级展开滑条，存 localStorage。web 默认档偏「体验」：准星开、免疫压制、AI 精度 0.7。
 - **史实**：autoSurrender 恒 false，不给用户开
 ### [应做/小] AI｜已有但不对齐

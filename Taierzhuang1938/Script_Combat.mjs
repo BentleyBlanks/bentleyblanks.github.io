@@ -380,7 +380,14 @@ export class CombatSystem {
       const at = player.position.clone(); at.y += 1.0;
       affect(at, (dmg, dir, falloff) => {
         player.Suppress(0.9 * falloff);
-        if (dmg > 4) player.TakeHit(dmg * 0.7, "torso", dir);
+        // 爆炸对玩家的口径也回数据层（COMBAT.player.blastScale）——
+        // 这里原来写死 0.7，和 Script_Ai 的 0.55、Script_Player 的部位倍率
+        // 各改各的，谁也算不出"一发掷弹筒到底打掉多少血"。
+        // 传 from：屏幕边缘那个指向楔形要知道弹是从哪炸的。
+        if (dmg > 4) {
+          player.TakeHit(dmg * (COMBAT.player?.blastScale ?? 0.55), "torso", dir,
+            { from: position.clone(), blast: true });
+        }
       });
     }
   }

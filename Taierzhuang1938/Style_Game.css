@@ -32,11 +32,38 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   background: radial-gradient(ellipse at center,
     rgba(0,0,0,0) 34%, rgba(6,6,8,0.55) 72%, rgba(4,4,6,0.9) 100%);
 }
+/* 受伤暗角。原来是 0.25 s 线性过渡 + 很淡的一层红（边缘只有 0.30/0.52 alpha），
+   叠上 health<70 才开始亮的曲线，结果是**中弹那一下屏幕上几乎没有事**。
+   现在过渡压到 0.09 s（红闪要跟得上枪响），红也加到看得见的量。 */
 .hudDamage {
   position: absolute; inset: 0; opacity: 0;
-  transition: opacity 0.25s linear;
+  transition: opacity 0.09s linear;
+  /* 停靠点要往里收：16:9 上「100%」是**最远那个角**（离中心 734 px），
+     而屏幕上边缘只到 49% —— 停在 26%/66% 的话，红几乎全堆在四个角上，
+     视野正上下方那两条带子基本没颜色，看起来就还是「没有红框」。 */
   background: radial-gradient(ellipse at center,
-    rgba(0,0,0,0) 46%, rgba(96,14,10,0.30) 80%, rgba(70,8,6,0.52) 100%);
+    rgba(0,0,0,0) 17%, rgba(134,18,12,0.62) 56%, rgba(96,8,6,0.92) 100%);
+}
+/* 濒死搏动：40 以下整块暗角跟着心跳亮一下。CSS 动画，零 JS 成本。
+   只动 filter，**不动 transform 也不动 opacity**：opacity 是 JS 每帧写的内联值，
+   动画会盖掉它；transform 放大一张 inset:0 的全屏层则会把它顶出视口。 */
+.hudDamage.low { animation: hudPulse 0.86s ease-in-out infinite; }
+@keyframes hudPulse {
+  0%, 100% { filter: brightness(0.92) saturate(1); }
+  46%      { filter: brightness(1.55) saturate(1.3); }
+}
+
+/* 来弹指示：屏幕中心外圈的一段弧，指向那一枪是从哪来的。
+   不占布局、不吃事件；五段共用一份几何，只改 transform。 */
+.hudHitDirs {
+  position: absolute; left: 50%; top: 50%;
+  width: 46vmin; height: 46vmin; margin: -23vmin 0 0 -23vmin;
+  pointer-events: none; overflow: visible;
+}
+.hudHitDir {
+  fill: rgba(228,64,44,0.92);
+  stroke: rgba(20,4,3,0.55); stroke-width: 1.2;
+  transition: opacity 0.08s linear;
 }
 
 /* 顶部：阶段与目标 */

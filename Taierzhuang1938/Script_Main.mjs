@@ -481,6 +481,16 @@ async function Boot() {
       }),
       LastShot: () => (state.lastShot ? { ...state.lastShot } : null),
       Difficulty: () => ({ ...DIFFICULTY }),
+      // 数值表本体（不是快照）：伤害冒烟要把 COMBAT.player 改回旧口径跑一遍对照，
+      // 「新数值到底把 TTK 拉长了多少」只能这么取证，算不出来。
+      Tables: () => ({ COMBAT, DIFFICULTY }),
+      // 受击反馈的运行时状态。红闪与来弹方位都是**事件**（自己衰减），
+      // 不是血量的函数，所以必须从这里取证，不能从 health 反推。
+      Hurt: () => ({
+        health: player.health, bleeding: player.bleeding, flash: player.hitFlash,
+        marks: player.hitMarks.map((m) => ({ x: m.x, z: m.z, life: m.life })),
+        wounds: player.wounds.length, alive: player.alive,
+      }),
       // --- 第 3 批的取证口 ---
       // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）
       Vault: () => ({
@@ -1364,6 +1374,33 @@ function ToggleFireMode() {
   state.fireMode = state.fireMode === "auto" ? "semi" : "auto";
   hud.Hint(state.fireMode === "auto" ? "连发" : "单发", 1.6);
   return true;
+}
+
+/**
+ * 挨枪那一声，还有濒死心跳。
+ *
+ * Audio/Sfx 里 `AudioSfx_Hurt_01/02.mp3` 与 `AudioSfx_Heartbeat_01.mp3`
+ * 早就烘好了（Data_SfxSources 里有 PainGrunt / SoldierGrunt / Heartbeat 三条源，
+ * Script_Audio 里有 hurt / heartbeat 两条配方），但**整仓库一行没播过** ——
+ * 玩家中弹是全静音的，这也是"直接就死、没有任何提醒"的一半原因。
+ *
+ * 两条都不给 position：闷哼是自己嘴里发出来的，心跳在颅内，都不该有房间混响
+ * 与 HRTF 方位（Script_Audio 的 heartbeat 配方把 wetGain 写死成 0 就是这个意思）。
+ */
+function PlayHurtCues() {
+  const events = player?.ConsumeHitEvents?.();
+  if (!events) return;
+  let grunted = false;
+  for (const e of events) {
+    if (e.kind === "hurt") {
+      // 一帧只哼一声：一发霰射的弹片能同帧结算好几下，全播出来是一片噪音。
+      if (grunted) continue;
+      grunted = true;
+      audio.Play("hurt", { volume: Clamp(0.55 + e.severity * 0.5, 0.55, 1.0), priority: true });
+    } else if (e.kind === "heartbeat") {
+      audio.Play("heartbeat", { volume: Clamp(0.5 + e.severity * 0.55, 0.5, 1.0) });
+    }
+  }
 }
 
 function OnPlayerDown() {
@@ -2523,7 +2560,17 @@ function Frame(dt, render = true) {
     cooking: state.cooking ? Math.min(1, state.cook / 1.1) : 0,
   });
   hud.SetSuppression(player.suppression);
-  hud.SetDamage(Clamp01((1 - player.health / 70)) * 0.62);
+  // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
+  // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
+  // 满血挨一发三八式（当时 39.6 点）之后暗角只有 0.088 × 边缘 0.52 ≈ 看不见，
+  // 而再挨一发人就没了。玩家说的"连红框都没有"指的就是这一行。
+  hud.SetHurt({
+    health: player.health,
+    flash: player.hitFlash,
+    marks: player.hitMarks,
+    yaw: player.yaw,
+  });
+  PlayHurtCues();
   hud.UpdateMarkers(battlefield.objectives, camera, (x, y, z) => {
     _proj.set(x, y, z);
     const dist = _proj.distanceTo(camera.position);

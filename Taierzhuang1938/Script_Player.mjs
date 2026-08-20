@@ -17,7 +17,7 @@
 
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
-import { DIFFICULTY } from "./Data_Battle.mjs";
+import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -116,6 +116,19 @@ export class PlayerController {
     this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
     this.stamina = 1;
 
+    // --- 受击反馈 -----------------------------------------------------------
+    // 以前**一件都没有**：暗角只是 health 的函数（health<70 才开始亮，
+    // 而 70 到 0 只隔两发），挨枪那一下屏幕上没有任何事件、也没有任何声音
+    //（Audio/Sfx 里 Hurt 与 Heartbeat 两个素材烘好了从来没人播过）。
+    // 结果就是"没有提醒、直接就死"。这三个量是给 HUD/音频读的一次性事件：
+    //   hitFlash   一次中弹的红闪（按伤害定强度，自己衰减，与剩余血量无关）
+    //   hitMarks   来弹方位（屏幕边缘的指向楔形；世界方向，HUD 自己转成屏幕角）
+    //   hitEvents  这一帧新挨的伤（装配层取走后播闷哼）
+    this.hitFlash = 0;
+    this.hitMarks = [];
+    this.hitEvents = [];
+    this.heartbeatTimer = 0;
+
     this.eyeHeight = STANCE.stand.eye;
     this.radius = STANCE.stand.radius;
     this.headBob = 0;
@@ -172,6 +185,10 @@ export class PlayerController {
     this.suppression = 0;
     this.suppressedUpright = false;
     this.stamina = 1;
+    this.hitFlash = 0;
+    this.hitMarks.length = 0;
+    this.hitEvents.length = 0;
+    this.heartbeatTimer = 0;
     this.stance = "stand";
     this.alive = true;
     this.deadTime = 0;
@@ -470,10 +487,35 @@ export class PlayerController {
 
     // --- 流血 ---------------------------------------------------------------
     if (this.bleeding > 0) {
+      // 封顶。伤口是叠加的，四个躯干伤口 = 10.4 HP/s，而衰减是 5%/s ——
+      // 那不是"慢性死亡"，那是一块十秒的秒表，包扎只有两卷也追不上。
+      // 上限之下它仍然逼你去包扎，上限之上它只是替敌人把你打完。
+      const cap = COMBAT.player?.maxBleedPerS ?? 5.5;
+      if (this.bleeding > cap) this.bleeding = cap;
       this.health -= this.bleeding * dt;
       // 伤口自己会慢慢收一点，但收不干净 —— 不包扎就是慢性死亡
       this.bleeding = Math.max(this.bleeding * Math.exp(-dt * 0.05), this.bleeding - dt * 0.02);
       if (this.health <= 0) this.Kill();
+    }
+
+    // --- 受击反馈的寿命 ------------------------------------------------------
+    // 红闪衰减比暗角快：它要读起来像"挨了一下"，不是"我现在很虚"。
+    if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt * 1.7);
+    for (let i = this.hitMarks.length - 1; i >= 0; i -= 1) {
+      const m = this.hitMarks[i];
+      m.life -= dt;
+      if (m.life <= 0) this.hitMarks.splice(i, 1);
+    }
+    // 濒死心跳：血越少跳得越快（Audio/Sfx 的 Heartbeat 素材烘好了一直没人播）。
+    // 只在 45 以下开始 —— 再高就成了背景噪音，那条线也就不再是信号了。
+    if (this.alive && this.health < 45) {
+      this.heartbeatTimer -= dt;
+      if (this.heartbeatTimer <= 0) {
+        this.heartbeatTimer = Clamp(0.42 + this.health * 0.012, 0.42, 1.0);
+        this.PushHitEvent({ kind: "heartbeat", severity: 1 - this.health / 45 });
+      }
+    } else {
+      this.heartbeatTimer = 0;
     }
 
     if (this.spawnGrace > 0) this.spawnGrace -= dt;
@@ -571,8 +613,17 @@ export class PlayerController {
       + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0);
   }
 
-  /** 被弹片/子弹擦过或命中。part: head/torso/arm/leg */
-  TakeHit(damage, part = "torso", direction = null) {
+  /**
+   * 被弹片/子弹擦过或命中。part: head/torso/arm/leg
+   *
+   * 部位倍率与单发上限一律读 COMBAT.player —— **不再在这里写死**。
+   * 原来的 head ×3.4 配上 AI 那边 ×0.55 的枪伤，等于三八式爆头 134 点：
+   * 满血一枪毙，而爆头有 8% 概率，也就是每次交火都可能在第一发结束。
+   * 现在爆头仍然是最重的一发（还会当场把视线打飞），但打不死一个满血的人。
+   *
+   * @param {object} [info] { from: THREE.Vector3 来弹位置, bullet, melee, blast }
+   */
+  TakeHit(damage, part = "torso", direction = null, info = null) {
     if (!this.alive) return;
     // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
     // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
@@ -580,12 +631,38 @@ export class PlayerController {
       this.suppression = Clamp01(this.suppression + 0.35);
       return;
     }
-    const mult = part === "head" ? 3.4 : part === "torso" ? 1.0 : 0.62;
-    this.health -= damage * mult;
-    const bleed = part === "head" ? 6 : part === "torso" ? 2.6 : 1.4;
+    const P = COMBAT.player || {};
+    const mult = part === "head" ? (P.headMultiplier ?? 2.0)
+      : part === "torso" ? (P.torsoMultiplier ?? 1.0)
+        : (P.limbMultiplier ?? 0.5);
+    // 难度档的「玩家受伤倍率」（体验 0.80 / 标准 1.00 / 写实 1.25）。
+    // 这三个数在 DIFFICULTY_PRESETS 里立了很久，**一处都没被读过** ——
+    // 换档只改得动弹道重力、自由瞄准、铁瞄偏心和过热四件事，挨打的强度纹丝不动。
+    let applied = damage * mult * (DIFFICULTY.playerDamage ?? 1);
+    // 单发硬上限只管小口径。炮弹与集束照样能一下要命 —— 那是它们应得的，
+    // 而且它们有啸声、有落点标记、有一秒半的预警，玩家是"没躲开"，不是"没看见"。
+    if (info && info.bullet) applied = Math.min(applied, P.maxBulletDamage ?? 62);
+    this.health -= applied;
+    const bleed = (part === "head" ? 6 : part === "torso" ? 2.6 : 1.4) * (P.bleedScale ?? 0.6);
     this.wounds.push({ part, bleed, since: 0 });
     this.bleeding += bleed;
     this.suppression = Clamp01(this.suppression + 0.5);
+
+    // --- 让"我中弹了"这件事看得见、听得见 -----------------------------------
+    // 红闪按这一发的实际伤害定强度，与剩余血量无关：擦一下腿是一闪，
+    // 挨一发胸口是满屏。这是玩家判断"要不要现在退"的唯一即时信号。
+    this.hitFlash = Clamp01(Math.max(this.hitFlash, 0.30 + applied / 68));
+    const from = info && info.from ? info.from : null;
+    if (from) {
+      // 来弹方位存世界方向（从玩家指向枪口），HUD 每帧按当前 yaw 转成屏幕角。
+      // 存屏幕角的话转身之后指示器就指错了。
+      const dx = from.x - this.position.x, dz = from.z - this.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      this.hitMarks.push({ x: dx / len, z: dz / len, life: 2.2, max: 2.2 });
+      if (this.hitMarks.length > 5) this.hitMarks.shift();
+    }
+    this.PushHitEvent({ kind: "hurt", part, damage: applied, severity: Clamp01(applied / 55) });
+
     if (direction) {
       this.velocity.addScaledVector(direction, 1.2);
       // 中弹把视线打偏 —— 被打中还能稳稳瞄准是最假的一件事
@@ -593,6 +670,23 @@ export class PlayerController {
       this.aimPitch += (this.rnd() - 0.5) * 0.07 + 0.03;
     }
     if (this.health <= 0) this.Kill();
+  }
+
+  /**
+   * 排一条受击事件。**带上限**：过场、编辑器、暂停这些路径不走装配层那一帧的
+   * ConsumeHitEvents，没有上限的话队列会一直攒，回到游戏那一帧一口气全播出来。
+   */
+  PushHitEvent(event) {
+    this.hitEvents.push(event);
+    if (this.hitEvents.length > 8) this.hitEvents.shift();
+  }
+
+  /** 取走这一帧攒下的受击事件（装配层拿去播音效）。取完即清。 */
+  ConsumeHitEvents() {
+    if (this.hitEvents.length === 0) return null;
+    const out = this.hitEvents.slice();
+    this.hitEvents.length = 0;
+    return out;
   }
 
   /**
@@ -625,9 +719,9 @@ export class PlayerController {
     return true;
   }
 
-  /** 子弹从身边飞过：不掉血，但压得抬不起头。 */
+  /** 子弹从身边飞过：不掉血，但压得抬不起头。难度档的 suppressionScale 在这里生效。 */
   Suppress(amount) {
-    this.suppression = Clamp01(this.suppression + amount);
+    this.suppression = Clamp01(this.suppression + amount * (DIFFICULTY.suppressionScale ?? 1));
   }
 
   /** 包扎：止血，不回满血。伤口留着，跑不快。 */

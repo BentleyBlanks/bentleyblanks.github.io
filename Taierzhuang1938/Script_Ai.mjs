@@ -149,6 +149,8 @@ export class Soldier {
     this.stance = 0;                        // 0 站 1 蹲 2 卧
     this.target = null;
     this.targetLostTime = 0;
+    /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
+    this.playerLockAt = -99;
     this.aimTime = 0;
     this.ammo = this.weapon.magazine || 5;
     this.reloadTimer = 0;
@@ -748,8 +750,13 @@ export class AiDirector {
         this.ctx.audio.Bark("spot", { position: s.position.clone(), seed: s.id | 0, side: s.side });
       }
       // 新建一个目标对象而不是把槽位交出去 —— 槽位下一次 Think 就被覆写了
+      const wasPlayer = !!(s.target && s.target.isPlayer);
       s.target = { position: acquired.position, isPlayer: acquired.isPlayer, ref: acquired.ref };
       s.targetLostTime = 0;
+      // 「刚把枪口转到玩家身上」的时刻。TryFire 用它让这一秒的枪必偏 ——
+      // 见 COMBAT.player.firstShotGraceS 那段账。只在**从别处切到玩家**时重置，
+      // 不然 Think 每 0.1 s 跑一次会把窗口无限续上，那就成了永远打不中。
+      if (acquired.isPlayer && !wasPlayer) s.playerLockAt = this.time;
     } else if (s.target) {
       s.targetLostTime += dt;
       if (s.targetLostTime > 2.5) s.target = null;
@@ -1244,9 +1251,12 @@ export class AiDirector {
     s.meleeTimer = 1.1;
     const dir = this.tmpC.set(dx, 0, dz).normalize();
     // 刺刀伤害比步枪一发重（三八式带刺刀全长 1.663 m，捅上就是致命伤），
-    // 但对玩家减半 —— 一下秒杀玩家会让"被冲锋"变成读盘而不是危机。
-    if (s.target.isPlayer && player) player.TakeHit(110 * 0.5, "torso", dir);
-    else if (s.target.ref) {
+    // 但对玩家要缩（COMBAT.player.meleeScale）—— 一下秒杀玩家会让"被冲锋"
+    // 变成读盘而不是危机。46 点仍然是满血的将近一半：挨两下就该退了。
+    if (s.target.isPlayer && player) {
+      player.TakeHit(110 * (COMBAT.player?.meleeScale ?? 0.42), "torso", dir,
+        { from: s.position.clone(), melee: true });
+    } else if (s.target.ref) {
       const died = s.target.ref.TakeHit(110, "torso", dir);
       if (this.ctx.vfx) this.ctx.vfx.Blood(s.target.position, dir, died ? 1 : 0.6);
     }
@@ -1295,13 +1305,22 @@ export class AiDirector {
 
     // 命中判定：基础命中率按距离、压制、姿态修正。**AI 不许百发百中** ——
     // 那会让玩家觉得自己在被作弊，而不是在被压制。
-    let acc = COMBAT.aiAccuracyBase;
+    let acc = COMBAT.aiAccuracyBase * (DIFFICULTY.aiAccuracy ?? 1);
     // 距离衰减按**绝对米数**，不按枪的标称有效射程 —— 三八式标称 460 m，
     // 于是原来的式子在 27 m 上算出来还是满命中（1.25 − 0.09 → 钳到 1）。
     // 实际上机械瞄具打一个会动的人：25 m 内基本能打中，100 m 打一半，200 m 靠运气。
     acc *= Clamp(1.0 - Math.max(0, dist - 25) / 175, 0.10, 1);
     acc *= s.suppression > 0.3 ? COMBAT.aiAccuracySuppressed / COMBAT.aiAccuracyBase : 1;
-    if (s.target.isPlayer && player) acc *= player.stance === "prone" ? 0.45 : player.stance === "crouch" ? 0.72 : 1;
+    if (s.target.isPlayer && player) {
+      acc *= COMBAT.player?.accuracyScale ?? 1;
+      acc *= player.stance === "prone" ? 0.45 : player.stance === "crouch" ? 0.72 : 1;
+    }
+
+    // 刚锁上玩家的那一发必偏。理由与代价都写在 COMBAT.player 那段注释里：
+    // 它买的是**一次预警**——子弹先从耳边过、暗角先亮一下，玩家才有得反应。
+    const firstShot = s.target.isPlayer
+      && this.time - (s.playerLockAt ?? -99) < (COMBAT.player?.firstShotGraceS ?? 0);
+    if (firstShot) acc = 0;
 
     const hit = s.rnd() < acc;
     const vfx = this.ctx.vfx;
@@ -1323,9 +1342,15 @@ export class AiDirector {
     }
 
     if (hit) {
-      const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
-      if (s.target.isPlayer && player) {
-        player.TakeHit(s.weapon.damage * 0.55, part, dir);
+      // 打玩家时爆头概率单独一档（0.035 而不是 0.08）：AI 是照胸口打的，
+      // 而在玩家这边"随机爆头"等于随机读盘 —— 部位倍率见 COMBAT.player。
+      const toPlayer = s.target.isPlayer && !!player;
+      const headChance = toPlayer ? (COMBAT.player?.headChance ?? 0.035) : 0.08;
+      const part = s.rnd() < headChance ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
+      if (toPlayer) {
+        player.TakeHit(s.weapon.damage * (COMBAT.player?.bulletScale ?? 0.40), part, dir, {
+          from: from.clone(), bullet: true,
+        });
       } else if (s.target.ref) {
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir);
         if (vfx) vfx.Blood(to, dir, died ? 1 : 0.5);
