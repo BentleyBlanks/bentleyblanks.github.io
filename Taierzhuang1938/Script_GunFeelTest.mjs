@@ -87,16 +87,17 @@ const report = await page.evaluate(() => {
     profiles[kind] = { ...T.vfx.lastMuzzleProfile };
   }
 
-  // 四、导入的三把新枪必须保留 TZM 里的 sight 挂点；栓动枪还要有动作代理。
+  // 四、全部五支火器必须走 TZM 并保留 sight；三支栓动步枪还要有动作代理。
   const sights = {};
-  for (const id of ["ZhongZheng", "HanYang", "Mauser96"]) {
+  for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96"]) {
     T.viewmodel.Equip(id);
     T.StepFrames(120);
     const vm = T.viewmodel;
     sights[id] = {
       hasSight: !!vm.rig?.sight,
+      isModel: vm.rig?.source === "model",
       offsetMm: Math.hypot(vm.adsOffset.x, vm.adsOffset.y) * 1000,
-      hasBoltAction: id === "Mauser96" ? true : !!vm.rig?.parts?.bolt,
+      hasBoltAction: !["ZhongZheng", "HanYang", "Type38"].includes(id) || !!vm.rig?.parts?.bolt,
     };
   }
 
@@ -171,11 +172,11 @@ Check("持续连射的第二发会重新触发人物后坐",
   report.repeated
     ? `${report.repeated.first.toFixed(2)} -> ${report.repeated.decayed.toFixed(2)} -> ${report.repeated.second.toFixed(2)}`
     : "没有可见 Actor");
-Check("导入枪模保留铁瞄挂点与栓动动作链",
-  Object.values(report.sights).every((entry) => entry.hasSight && entry.offsetMm > 0 && entry.hasBoltAction)
+Check("五支火器走模型、保留铁瞄与栓动动作链",
+  Object.values(report.sights).every((entry) => entry.isModel && entry.hasSight && entry.offsetMm > 0 && entry.hasBoltAction)
     && report.sights.HanYang.offsetMm > report.sights.ZhongZheng.offsetMm,
   Object.entries(report.sights)
-    .map(([id, entry]) => `${id}: sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
+    .map(([id, entry]) => `${id}: model=${entry.isModel} sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));
 Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
   report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),

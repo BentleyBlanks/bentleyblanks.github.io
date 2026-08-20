@@ -9,7 +9,7 @@
 每支枪带五个挂点空节点：muzzle / gripR / gripL / sight / magazine。
 近战与投掷物（大刀、手榴弹）只有 muzzle / gripR (/ gripL)。
 
-三角预算 ≤ 900/把。
+近景武器三角预算 ≤ 6000/把。第一人称枪械是屏幕主角，不再沿用远景道具预算。
 
 --- 两条在第 2 轮视觉审查里补上的硬规矩 -----------------------------------
 
@@ -39,7 +39,7 @@ from TzmCore import BooleanDifference, Box, Join, Lathe, Loft, Node, RibbonYz, R
 PI = math.pi
 BORE = 0.035          # 膛线轴高
 BUTT_Z = 0.255        # 右手握把到枪托底板
-SEG = 8               # 圆截面段数：枪身零件都很细，8 段在屏幕上已经是圆的
+SEG = 16              # 第一人称枪管/护圈：8 段在近景会明显折面，16 段仍很轻
 # 贴图格距名（**不是材质名**）。材质名照旧是 steel / wood / accessory / red ——
 # 那是加载器去材质表里取材质的键，白名单在 TzmCore.MATERIAL_NAMES 里。
 # 这三个只喂给 Add(tile=...)，见抬头第二条。

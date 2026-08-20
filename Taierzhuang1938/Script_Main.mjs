@@ -313,6 +313,24 @@ async function Boot() {
     await nextFrame();
   }
 
+  setStep("加载枪械 PBR……", 0.242);
+  try {
+    await Promise.all([
+      library.LoadExternalSet("Steel", {
+        albedo: "./Texture/Texture_WeaponSteelBase.webp?v=1",
+        normal: "./Texture/Texture_WeaponSteelNormal.webp?v=1",
+        orm: "./Texture/Texture_WeaponSteelOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("WoodStock", {
+        albedo: "./Texture/Texture_WeaponWoodBase.webp?v=1",
+        normal: "./Texture/Texture_WeaponWoodNormal.webp?v=1",
+        orm: "./Texture/Texture_WeaponWoodOrm.webp?v=1",
+      }),
+    ]);
+  } catch (error) {
+    console.warn(`[Main] 枪械 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
+  }
+
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep("装物理引擎……", 0.245);

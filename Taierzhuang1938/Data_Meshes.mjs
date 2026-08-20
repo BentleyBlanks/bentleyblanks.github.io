@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "4";
+const MESH_REV = "5";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -91,44 +91,44 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "ZhongZheng.tzm.json", category: "weapon",
-    triangles: 639, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 2531, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0547, 0.18835, 1.1100], lengthM: 1.110,
+    span: [0.05444, 0.18756, 1.10992], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
     note: "中正式。几何来自 CC0 Kar98k（OpenGameArt / byzmod3d），全长按史实 1.110 m。"
       + "中正式是毛瑟标准型短管，剪影与 Kar98k 同族。",
   },
   HanYang: {
     file: "HanYang.tzm.json", category: "weapon",
-    triangles: 675, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 2543, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0616, 0.2121, 1.2500], lengthM: 1.250,
+    span: [0.06134, 0.21131, 1.24992], lengthM: 1.250,
     note: "汉阳造。同一把 Kar98k 拉到 1.250 m，再套上 φ32 薄套筒。"
       + "**套筒是八八式的剪影特征** —— 没有它就跟中正式分不开。",
     draws: { high: 2, medium: 2, low: 2 },
   },
   Zb26: {
     file: "Zb26.tzm.json", category: "weapon",
-    triangles: 572, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 796, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.1705, 0.3728, 1.1650], lengthM: 1.165,
+    span: [0.17050, 0.37276, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
     note: "ZB-26 轻机枪。**弹匣从上方插**（直的，不是布伦那种弯的）、枪管上提把、"
       + "前段两脚架张开、带散热环的枪管。",
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",
-    triangles: 680, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 920, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0954, 0.1211, 1.2760], lengthM: 1.276,
+    span: [0.09543, 0.12112, 1.27600], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
     note: "三八式。**机匣上方的防尘滑盖**是独门标志；拉机柄近乎水平、球头小。",
   },
   Mauser96: {
     file: "Mauser96.tzm.json", category: "weapon",
-    triangles: 826, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 3341, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0203, 0.15197, 0.2880], lengthM: 0.288,
+    span: [0.02090, 0.15224, 0.28827], lengthM: 0.288,
     draws: { high: 2, medium: 2, low: 2 },
     note: "驳壳枪（毛瑟 C96）。几何来自 CC0 Mauser C96（itch.io / Plewr）。"
       + "扫帚柄握把 + 扳机前方的固定弹仓。",

@@ -280,17 +280,18 @@ function BuildMaterials(library) {
     // 才是 1938 年发蓝钢该有的半哑光。
     steel: SafeMaterial(library, "Steel",
       {
-        repeat: 1, roughness: 0.88, metalness: 0.84, normalScale: 0.20,
-        color: TintTo(STEEL_BASE, 0x72767c), tintId: "vmSteel",
+        repeat: 1, roughness: 0.78, metalness: 0.62, normalScale: 0.28,
+        color: TintTo(STEEL_BASE, 0x858a92), tintId: "vmSteelPbr",
+        envMapIntensity: 1.45,
       },
-      { color: 0x72767c, roughness: 0.88, metalness: 0.84 }),
+      { color: 0x858a92, roughness: 0.78, metalness: 0.62 }),
     // 宽刀面不能沿用带锈斑与凹坑的枪钢贴图。纯净 basecolor 保留真实 PBR 反光，
     // 由几何棱线与环境光写出钢感，不再靠脏纹理冒充细节。
     blade: library.Plain("VmDadaoBlade", { color: 0x929aa2, roughness: 0.30, metalness: 0.96 }),
     grip: library.Plain("VmDadaoGrip", { color: 0x8f7c61, roughness: 0.76, metalness: 0 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
-    wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.24 },
+    wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.32 },
       { color: 0x6d4a2c, roughness: 0.7, metalness: 0 }),
     cloth: SafeMaterial(library, "ClothNra", { repeat: 1, roughness: 0.95, metalness: 0 },
       { color: 0x6e7684, roughness: 0.95, metalness: 0 }),
@@ -931,7 +932,10 @@ const BUILDERS = {
 // 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
 // 大刀 / 手榴弹没有可动件，换过去零损失。中正式 / 汉阳造 / 驳壳枪走导入的
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
-const MODEL_FP = new Set(["Dadao", "Grenade", "GrenadeBundle", "ZhongZheng", "HanYang", "Mauser96"]);
+const MODEL_FP = new Set([
+  "Dadao", "Grenade", "GrenadeBundle",
+  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96",
+]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
 const VM_MATERIAL_BY_MESH = {
@@ -968,6 +972,14 @@ const MODEL_FP_TWEAK = {
   HanYang: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
     handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+  },
+  Type38: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+  },
+  Zb26: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.10, 0, -1.50], left: [0.20, 0.28, 1.32] },
   },
   Mauser96: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
@@ -1353,7 +1365,7 @@ export class Viewmodel {
     }
 
     // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
-    // 三八式 / 捷克式仍走手搭：外部免费模要 Sketchfab 登录，且程序化剪影（防尘盖、上插直匣）不能错。
+    // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
     const meshId = MODEL_FP.has(weaponId) ? WEAPON_MESH_BY_ID[weaponId] : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;

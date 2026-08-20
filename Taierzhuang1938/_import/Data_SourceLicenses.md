@@ -3,7 +3,11 @@
 游戏运行时加载 `Model/*.tzm.json`，并为人物换模额外加载
 `Model_FpsArms.glb` 与 `Model_IjaSoldier.glb`。`_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
 
-武器 TZM 只保留几何：外部 PBR 贴图全部丢掉，钢/木走游戏内 `steel` / `wood` 盒式投影，和人物、沙包同一套烘焙材质。两份人物 GLB 则保留各自的贴图、蒙皮、骨架与动画。
+武器 TZM 保留几何、UV 与 steel/wood 材质分区。源包自带的 2K/4K 贴图不直接进入 Pages；
+全部枪械共享 `Texture/Texture_WeaponSteel*` 与 `Texture/Texture_WeaponWood*` 的 512px
+BaseColor / Normal / ORM，避免一个班每把枪都重复下载大图。两套基础材质由 OpenAI 内置
+imagegen 生成，再由 `BuildWeaponPbr.py` 派生法线与 glTF 通道顺序的 ORM
+（R=AO、G=roughness、B=metalness）。两份人物 GLB 则保留各自贴图、蒙皮、骨架与动画。
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
@@ -11,10 +15,12 @@
 | 汉阳造 `HanYang` | 同一把 Kar98k + 程序化套筒 | 同上 | CC0 | 汉阳造八八式母型是 Gewehr 88。Sketchfab 上有 CC-BY 的 Low-Poly Gewehr 88，但下载要登录。这里用 Kar98k 拉到 1.250 m，再套上 φ32 薄套筒，保住「老套筒」剪影。 |
 | 驳壳枪 `Mauser96` | `Source/Model_MauserC96.glb` | [Plewr](https://plewr.itch.io/mauser-c96-low-poly) | CC0 | 毛瑟 C96。丢掉名为 Boom 的枪口焰网格。 |
 
-未换模、仍走 `_blender/BuildWeapons.py` 程序化几何的：
+仍走 `_blender/BuildWeapons.py` 的史实程序化几何：
 
-- 三八式 `Type38`：Sketchfab 有 CC-BY 的 Type 38 Arisaka（Snijboer），下载要登录。防尘滑盖是独门标志，不能拿毛瑟顶替。
-- 捷克式 `Zb26`：Sketchfab 有 CC-BY 的 ZB26（Larkien），同样要登录。上插直弹匣不能拿布伦弯匣顶替。
+- 三八式 `Type38`：Sketchfab 有 CC-BY 的 Type 38 Arisaka（Snijboer），但本轮无登录/API Key，
+  未绕过下载限制。现模提高到 16 边圆件并保留防尘滑盖、直拉机柄与护翼准星。
+- 捷克式 `Zb26`：Sketchfab 有 CC-BY 的 ZB26（Larkien），同样未绕过登录限制。现模保留
+  上插直弹匣、提把、散热环与两脚架，且第一人称已改为模型路径。
 - 手榴弹、大刀、八九式掷弹筒：继续用已按史料尺寸建好的程序化模型。
 
 CC0 不强制署名；表里的作者与链接是为了以后还能找回源文件。

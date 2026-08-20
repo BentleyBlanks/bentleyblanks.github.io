@@ -2519,7 +2519,9 @@ export class ActorFactory {
       //     刀身于是上半截照到天空反出一片白、下半截照到地面反出一片黑，
       //     中间一条硬边。1938 年的发蓝钢不是镜子，乘完落到 0.43 才对。
       steel: this.Material("steel",
-        () => lib.Get("Steel", { roughness: 0.95, metalness: 0.86, normalScale: 0.20 })),
+        () => lib.Get("Steel", {
+          roughness: 0.82, metalness: 0.68, normalScale: 0.28, envMapIntensity: 1.35,
+        })),
       // 大刀刀身单独走干净的 PBR 钢：不借 BakeSteel 的锈斑/凹坑 basecolor，
       // 避免宽刀面被贴成脏石板；高金属度 + 中低粗糙度让转动时有连续钢光。
       blade: this.Material("blade",
@@ -2527,7 +2529,7 @@ export class ActorFactory {
       grip: this.Material("grip",
         () => lib.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 })),
       wood: this.Material("wood",
-        () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0, normalScale: 0.24 })),
+        () => lib.Get("WoodStock", { roughness: 0.78, metalness: 0, normalScale: 0.32 })),
       // 车辆装甲板。走 SteelHelmet 那张图（喷漆钢：低金属度、粗糙、带锈斑），
       // **不是** Steel（发蓝裸钢）—— 一辆镜面反光的战车比没有模型还糟。
       // 色是 1938 年在华日军战车的土黄褐单色；albedo 要比"看上去的颜色"再压两档，

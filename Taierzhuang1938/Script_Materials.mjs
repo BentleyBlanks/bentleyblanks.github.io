@@ -224,6 +224,33 @@ export class MaterialLibrary {
   }
 
   /**
+   * Replace one procedural recipe with authored PBR images.  Weapon materials use
+   * this after the cheap procedural fallback has been baked, so a missing image
+   * never blocks boot and Pages can still run from a partially warmed cache.
+   */
+  async LoadExternalSet(name, { albedo, normal, orm }) {
+    const loader = new THREE.TextureLoader();
+    const Load = async (url, srgb) => {
+      const texture = await loader.loadAsync(url);
+      texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.generateMipmaps = true;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = this.anisotropy;
+      texture.needsUpdate = true;
+      return texture;
+    };
+    const loaded = await Promise.all([Load(albedo, true), Load(normal, false), Load(orm, false)]);
+    this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: loaded[2] });
+    // LoadExternalSet runs before actors are built. Clear anyway so editor hot reloads
+    // cannot retain a material that still points at the procedural fallback.
+    this.materials.clear();
+    return name;
+  }
+
+  /**
    * 取一份材质。同一个 name + 同一组 options 只建一次。
    * @param {string} name 配方名
    * @param {object} options repeat / normalScale / roughness / metalness / color / side / transparent

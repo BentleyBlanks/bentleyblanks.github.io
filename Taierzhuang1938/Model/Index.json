@@ -4,7 +4,7 @@
  "generator": "Taierzhuang1938/_blender/BuildAll.py",
  "budget": {
   "soldier": 1800,
-  "weapon": 900,
+  "weapon": 6000,
   "prop": 400,
   "vehicle": 1600
  },
@@ -96,11 +96,11 @@
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",
-   "triangles": 639,
+   "triangles": 2531,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 18924,
+   "bytes": 72875,
    "materials": [
     "steel",
     "wood"
@@ -116,13 +116,13 @@
    "bounds": {
     "min": [
      -0.02735,
-     -0.12156,
+     -0.12131,
      -0.855
     ],
     "max": [
-     0.02735,
-     0.06679,
-     0.255
+     0.02709,
+     0.06625,
+     0.25492
     ]
    }
   },
@@ -130,11 +130,11 @@
    "name": "HanYang",
    "category": "weapon",
    "file": "HanYang.tzm.json",
-   "triangles": 675,
+   "triangles": 2543,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 20046,
+   "bytes": 73289,
    "materials": [
     "steel",
     "wood"
@@ -150,13 +150,13 @@
    "bounds": {
     "min": [
      -0.0308,
-     -0.1413,
+     -0.14105,
      -0.995
     ],
     "max": [
-     0.0308,
-     0.0708,
-     0.255
+     0.03054,
+     0.07026,
+     0.25492
     ]
    }
   },
@@ -164,11 +164,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Zb26.tzm.json",
-   "triangles": 572,
+   "triangles": 796,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 21174,
+   "bytes": 25742,
    "materials": [
     "steel",
     "wood"
@@ -198,11 +198,11 @@
    "name": "Type38",
    "category": "weapon",
    "file": "Type38.tzm.json",
-   "triangles": 680,
+   "triangles": 920,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 25473,
+   "bytes": 30378,
    "materials": [
     "steel",
     "wood"
@@ -232,11 +232,11 @@
    "name": "Mauser96",
    "category": "weapon",
    "file": "Mauser96.tzm.json",
-   "triangles": 826,
+   "triangles": 3341,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 23438,
+   "bytes": 117395,
    "materials": [
     "steel",
     "wood"
@@ -252,11 +252,11 @@
    "bounds": {
     "min": [
      -0.01015,
-     -0.10095,
-     -0.242
+     -0.10122,
+     -0.24227
     ],
     "max": [
-     0.01015,
+     0.01075,
      0.05102,
      0.046
     ]

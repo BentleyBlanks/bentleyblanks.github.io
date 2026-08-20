@@ -27,7 +27,7 @@ import ImportWeapons                 # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
-BUDGET = {"soldier": 1800, "weapon": 900, "prop": 400, "vehicle": 1600}
+BUDGET = {"soldier": 1800, "weapon": 6000, "prop": 400, "vehicle": 1600}
 
 # 武器全长（米），抄自 Data_Weapons.mjs 的 lengthM，**是史实数据，不许为了好看改**。
 # 断言的是模型在 Z 上的实际跨度 —— 它一次就逮出了汉阳造的套筒建到枪口前头去、

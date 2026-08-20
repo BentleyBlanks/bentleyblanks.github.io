@@ -4,8 +4,8 @@
 坐标系与 BuildWeapons.py 一致：右手握把 = 原点、枪管沿 -Z、膛线轴 y = +0.035。
 步枪还把枪托底板放到 z = +0.255；驳壳枪按原程序化模型，击锤后端约 z = +0.046。
 
-外部模型只取几何。贴图丢掉 —— TZM 用游戏内 steel/wood 的盒式投影，
-跟人物、沙包走同一套烘焙材质，4K PBR 既进不了加载器也撑爆 Pages。
+外部模型保留几何与材质分区。运行时给 steel/wood 分区绑定 512px authored PBR；
+源包自带的 2K/4K 图不直接进 Pages，避免每把枪重复背一套大图。
 """
 
 import math
@@ -25,7 +25,7 @@ BUTT_Z = 0.255
 PISTOL_REAR_Z = 0.046
 T_STEEL = "gunSteel"
 T_WOOD = "gunWood"
-BUDGET = 900
+BUDGET = 6000
 
 
 def _Src(name):
@@ -220,6 +220,24 @@ def _DecimateToBudget(bms):
     return replaced
 
 
+def _BevelForFirstPerson(bms):
+    """Give hard-surface imports a real highlight roll instead of razor edges."""
+    for bm in bms:
+        candidates = []
+        for edge in bm.edges:
+            if len(edge.link_faces) != 2:
+                continue
+            if edge.calc_face_angle(0.0) > math.radians(28.0):
+                candidates.append(edge)
+        if not candidates:
+            continue
+        try:
+            bmesh.ops.bevel(bm, geom=candidates, offset=0.00075, segments=2, affect="EDGES")
+            bm.normal_update()
+        except Exception as error:
+            print("[ImportWeapons] bevel skipped: %s" % error)
+
+
 def _AddJacket(steel, length_m):
     """汉阳造的套筒：φ32 薄壁，从机匣插到枪口附近。"""
     from BuildWeapons import TubeAlongZ
@@ -265,6 +283,7 @@ def BuildImported(name):
     _FlipIfStockIsForward(bms, wood)
     _FlipIfGripIsAbove(bms, wood, steel)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
+    _BevelForFirstPerson(bms)
     if spec.get("jacket") and steel is not None:
         steel = _AddJacket(steel, spec["lengthM"])
         bms = [bm for bm in (steel, wood) if bm is not None]
