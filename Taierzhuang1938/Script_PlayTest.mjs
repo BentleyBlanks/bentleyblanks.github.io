@@ -746,6 +746,111 @@ Check("玩家亲手击杀：日方票恰好 -1（没有双扣）",
     : `ijaPool ${shotPool.ija0}->${shotPool.ija1}，打了 ${shotPool.shots} 枪，`
       + `弹着 ${(shotPool.hits || []).join("/") || "一发都没出去"}，余弹 ${shotPool.ammo}`);
 
+// 11.6 命中/击杀回执（2026-08-20 补）。
+//
+// 守的是一件读代码看不出来的事：本作**没有准星、不显示弹药数、不打歼敌数**，
+// 三条减法各自都对，叠起来就把「我这一枪打没打中」的所有出口一起堵死了 ——
+// 血雾在一百米上是两三个像素，impactFlesh 走 inverse 衰减到八十米只剩 4.8%。
+// 同时验两件事：打中了给 hit、打死了给 kill，而且**两者不许混** ——
+// 一枪没打死却报了击杀，比没有回执更糟。
+const hitFeedback = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  T.StepFrames(200);                        // 等上一段的动作播完，IsBusy 会挡下开火
+  for (const s2 of T.ai.soldiers) {
+    if (s2.side === "ija") s2.position.set(s2.position.x + 400, s2.position.y, s2.position.z + 400);
+  }
+  T.state.spawnAccumulator = -1e6;
+  for (let k = 0; k < 8 && !T.player.Alive; k += 1) T.StepFrames(200);
+  const target = T.ai.soldiers.find((s2) => s2.alive && s2.side === "ija");
+  if (!target) return { noTarget: true };
+  // 与上一节同一套摆位：先找一条六米内打得出去的方位（城里十有八九正贴着一堵墙）
+  const V = T.player.position.constructor;
+  const probe = new V();
+  let bestYaw = null;
+  for (let k = 0; k < 24; k += 1) {
+    const y = (k / 24) * Math.PI * 2;
+    probe.set(-Math.sin(y), 0, -Math.cos(y));
+    if (!T.battlefield.Raycast(T.player.EyePosition, probe, 6)) { bestYaw = y; break; }
+  }
+  if (bestYaw === null) return { boxedIn: true };
+
+  // 每一枪前重置：血、朝向、槽位、弹仓、靶位。
+  //   · 槽位要按回长枪 —— 第一关开局手上根本没枪，activeSlot 是大刀，D.Fire() 会走白刃；
+  //   · 弹仓要压满 —— 空仓那一下 TryFire 直接 return，lastShot 会停在上一节的读数上；
+  //   · 靶子要按回**瞄准射线**上 —— 中弹会把人往后推，推出射线就成了"打空"。
+  const Ready = () => {
+    T.player.health = 100;
+    T.player.yaw = bestYaw; T.player.aimYaw = 0; T.player.pitch = 0; T.player.aimPitch = 0;
+    T.state.activeSlot = "primary";
+    T.state.ammo = 5; T.state.clips = 4;
+    const dir = T.player.AimDirection(new V());
+    const spot = T.player.EyePosition.clone().addScaledVector(dir, 1.8);
+    target.position.set(spot.x, spot.y - 0.95, spot.z);
+    target.suppression = 1;                 // 贴脸站着的日兵，别让它把测试员打死
+  };
+
+  const before = D.Hits();
+  target.health = 400;                      // 打得中、打不死
+  Ready(); D.Fire();
+  const afterHit = D.Hits();
+  const hitShot = D.LastShot();
+  T.StepFrames(120);                        // 拉栓那一下过去，IsBusy 才放行下一枪
+  target.health = 1;                        // 一枪必死
+  Ready(); D.Fire();
+  const afterKill = D.Hits();
+  T.StepFrames(90);
+  return { before, afterHit, afterKill, hitShot, dead: !target.alive,
+    // 记号会自己消失，不是永久挂在屏幕正中 —— 本作没有准星，挂住就等于偷发了一个
+    cleared: document.querySelector(".hudHitmark").className === "hudHitmark" };
+});
+const hf = hitFeedback;
+const hfWhy = hf.noTarget ? "场上没有日军" : hf.boxedIn ? "四周六米内没有一条打得出去的方位" : "";
+Check("打中了有回执：屏幕记号 hit + 听觉 hitConfirm，且不误报击杀",
+  !hfWhy && hf.hitShot && hf.hitShot.hitKind === "soldier"
+    && hf.afterHit.marks.length === hf.before.marks.length + 1
+    && hf.afterHit.marks[hf.afterHit.marks.length - 1] === "hit"
+    && hf.afterHit.cues.hit === hf.before.cues.hit + 1
+    && hf.afterHit.cues.kill === hf.before.cues.kill,
+  hfWhy || `弹着 ${hf.hitShot ? hf.hitShot.hitKind : "一发都没出去"}，`
+    + `记号 ${JSON.stringify(hf.afterHit.marks.slice(-3))}，`
+    + `cue hit ${hf.before.cues.hit}->${hf.afterHit.cues.hit} / `
+    + `kill ${hf.before.cues.kill}->${hf.afterHit.cues.kill}`);
+Check("打死了给的是击杀回执：记号 kill + 听觉 killConfirm，之后自己消失",
+  !hfWhy && hf.dead && hf.cleared
+    && hf.afterKill.marks[hf.afterKill.marks.length - 1] === "kill"
+    && hf.afterKill.cues.kill === hf.afterHit.cues.kill + 1,
+  hfWhy || `死了=${hf.dead}，记号 ${JSON.stringify(hf.afterKill.marks.slice(-3))}，`
+    + `cue kill ${hf.afterHit.cues.kill}->${hf.afterKill.cues.kill}，记号已收 ${hf.cleared}`);
+
+// 11.7 一次爆炸只回一条。手榴弹放倒四个人就"哒哒哒哒"响四声的话，
+// 那是连杀播报，不是命中确认（Data_DesignFirstPass §385 明写不做连杀播报）。
+const blastFeedback = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const V = T.player.position.constructor;
+  const dir = T.player.AimDirection(new V());
+  const at = T.player.position.clone().addScaledVector(dir, 9);
+  at.y = T.battlefield.GroundHeight(at.x, at.z) + 0.2;
+  // **只挑还活着的。** Soldier.alive 是个只读 getter（state !== DEAD），
+  // 而 page.evaluate 里的代码跑在非严格模式下 —— `s.alive = true` 既不报错也不生效，
+  // 于是"复活四具尸体来炸"会静默地变成"炸四具尸体"，量到的 +0 是测试自己摆错了摊。
+  const staged = T.ai.soldiers.filter((s2) => s2.alive && s2.side === "ija").slice(0, 4);
+  if (staged.length < 2) return { tooFew: true };
+  for (const s2 of staged) { s2.health = 3; s2.position.set(at.x, at.y, at.z); }
+  const before = D.Hits();
+  T.combat.Blast(at, 6, 120, "grenade", "ija", true);
+  const after = D.Hits();
+  return { before, after, staged: staged.length, aliveAfter: staged.filter((s2) => s2.alive).length };
+});
+Check("一枚手榴弹放倒一堆人：回执只出一条（不是连杀播报）",
+  !blastFeedback.tooFew
+    && blastFeedback.after.marks.length === blastFeedback.before.marks.length + 1
+    && blastFeedback.after.marks[blastFeedback.after.marks.length - 1] === "kill"
+    && blastFeedback.after.cues.kill === blastFeedback.before.cues.kill + 1,
+  blastFeedback.tooFew ? "场上没有四个活着的日军可摆"
+    : `摆了 ${blastFeedback.staged} 个、剩 ${blastFeedback.aliveAfter} 个活的，`
+      + `记号 +${blastFeedback.after.marks.length - blastFeedback.before.marks.length}`);
+
+
 // ===========================================================================
 // 12) ER2 对齐第 2 批：键位表 / 携行 / 枪的手感三件套 / flank·charge / 两脚架 / 过热
 //

@@ -424,6 +424,9 @@ async function Boot() {
   });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics,
+    // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
+    // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
+    onPlayerHit: (died) => ConfirmHit(died),
   });
 
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
@@ -490,6 +493,17 @@ async function Boot() {
         health: player.health, bleeding: player.bleeding, flash: player.hitFlash,
         marks: player.hitMarks.map((m) => ({ x: m.x, z: m.z, life: m.life })),
         wounds: player.wounds.length, alive: player.alive,
+      }),
+      /**
+       * 命中回执的取证口（见 ConfirmHit）。**打出去的**那一侧，
+       * 与上面 Hurt() 的 marks（打进来的方位）是两件事，别串。
+       * marks 是按时间顺序的 "hit"/"kill" 序列，cues 是真的排进 WebAudio 的那两条 ——
+       * 只断言 marks 会漏掉"写实档关了记号、听觉回执也一起没了"这一类回归。
+       */
+      Hits: () => ({
+        marks: hud.confirms.slice(),
+        cues: { hit: audio.RequestedCount("hitConfirm"), kill: audio.RequestedCount("killConfirm") },
+        markerOn: DIFFICULTY.hitMarker !== false,
       }),
       // --- 第 3 批的取证口 ---
       // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）
@@ -1875,6 +1889,7 @@ function DoMelee() {
   const result = combat.Melee(weaponId === currentWeapon ? currentWeapon : "Dadao",
     player.position.clone(), player.AimDirection(_aimDir).clone());
   // 同上：不在这里扣票，阵亡事件已经扣过了
+  if (result) ConfirmHit(result.died);
   return !!result;
 }
 
@@ -2094,6 +2109,32 @@ function MarchBullet(from, dir, weapon, targets) {
   return { dist: travelled, dir: _segDir };
 }
 
+/**
+ * 命中/击杀回执。**玩家亲手造成的那一下才有回执**，AI 之间互相打死不给。
+ *
+ * 【2026-08-20 补这条通道】
+ * 对着 Easy Red 2 一项项过的时候一直漏了它：ER2 有 hitmarker（可选），
+ * 而我们把它写进 docs/Data_GunFeelReview.md 的裁决表当"默认关的难度选项"就搁下了。
+ * 实跑之后这个判断是错的 —— 本作同时做了三件减法：
+ *   · 没有准星（Script_Player 抬头）
+ *   · 不显示弹药数（Script_Hud.SetState）
+ *   · 结算不打歼敌数（Data_HistoryQuotes §10，这条不许动）
+ * 每一条单看都对，叠在一起就把"我这一枪打没打中"的所有出口一起堵死了：
+ * 血雾在一百米上只有两三个像素，impactFlesh 走 inverse 衰减到八十米剩 4.8%。
+ * 于是四十米以外开枪与不开枪在玩家的感官里是同一件事。
+ *
+ * 两条通道，都不带数字：
+ *   · 听觉回执（hitConfirm / killConfirm），非空间化、三档难度都给 —— 这是底线；
+ *   · 视觉记号（Hud.Hitmark），挂 DIFFICULTY.hitMarker，写实档关。
+ * 不做的：连杀播报、"+1" 飘字、击杀计数、爆头特写（Data_DesignFirstPass §385）。
+ *
+ * @param {boolean} died 这一下是否打死了人
+ */
+function ConfirmHit(died) {
+  audio.Play(died ? "killConfirm" : "hitConfirm", { priority: true });
+  if (DIFFICULTY.hitMarker !== false) hud.Hitmark(died ? "kill" : "hit");
+}
+
 function TryFire(dt) {
   fireCooldown -= dt;
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
@@ -2214,6 +2255,7 @@ function TryFire(dt) {
     const died = shot.soldier.TakeHit(weapon.damage, part, dir);
     vfx.Blood(_hitPoint, dir, died ? 1 : 0.5);
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
+    ConfirmHit(died);
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
     const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";

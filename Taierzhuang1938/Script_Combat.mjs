@@ -287,7 +287,9 @@ export class CombatSystem {
       const shell = this.mortarInFlight[i];
       shell.t += dt;
       if (shell.t < shell.flight) continue;
-      this.Blast(shell.at, shell.spec.radius, shell.spec.damage, "shell");
+      // 迫击炮是玩家自己呼的，落点炸到人一样要给回执 —— 这一发在两百米外，
+      // 那边的血雾和倒地声一个都传不回来，没有回执就等于不知道打没打着。
+      this.Blast(shell.at, shell.spec.radius, shell.spec.damage, "shell", null, true);
       this.mortarInFlight.splice(i, 1);
     }
   }
@@ -326,7 +328,7 @@ export class CombatSystem {
   Detonate(p) {
     const isBundle = p.kind === "GrenadeBundle";
     this.Blast(p.position, p.weapon.radiusM, p.weapon.damage, isBundle ? "tank" : "grenade",
-      p.owner === "player" ? "ija" : "nra");
+      p.owner === "player" ? "ija" : "nra", p.owner === "player");
   }
 
   /**
@@ -334,7 +336,7 @@ export class CombatSystem {
    * 伤害按距离平方衰减，并且**被墙挡住就不吃伤害** —— 隔一堵墙互相扔手榴弹是
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
-  Blast(position, radius, damage, kind, hurtSide = null) {
+  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false) {
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     if (this.host.audio) {
       this.host.audio.Play(radius > 8 ? "explosionNear" : "explosionNear",
@@ -359,6 +361,9 @@ export class CombatSystem {
       apply(damage * falloff * falloff, dir, falloff);
     };
 
+    // 玩家自己的弹炸中了几个、炸死了几个。**一次爆炸只出一条回执** ——
+    // 一枚手榴弹放倒四个人就"哒哒哒哒"响四声的话，那是连杀播报，不是命中确认。
+    let blastHits = 0, blastKills = 0;
     for (const s of ai.soldiers) {
       if (!s.alive) continue;
       if (hurtSide && s.side !== hurtSide) {
@@ -371,10 +376,14 @@ export class CombatSystem {
         // 不在这里扣票。这条回调以前是 onKill(s) —— 不带 side，装配层写死扣日方池，
         // 于是**日军炮弹炸死中国兵扣的是日军的票**（实跑 ijaPool 700→696 / nraPool 600→600）。
         // 扣票统一由 Soldier.Kill() 发的阵亡事件负责，这里只管伤害与压制。
-        s.TakeHit(dmg, "torso", dir);
+        const died = s.TakeHit(dmg, "torso", dir);
         s.suppression = Clamp01(s.suppression + 0.8);
+        // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"
+        // 是这套反馈能犯的最难看的错。
+        if (byPlayer && s.side === "ija") { blastHits += 1; if (died) blastKills += 1; }
       });
     }
+    if (blastHits > 0 && this.host.onPlayerHit) this.host.onPlayerHit(blastKills > 0);
     const player = this.host.player;
     if (player && player.Alive) {
       const at = player.position.clone(); at.y += 1.0;

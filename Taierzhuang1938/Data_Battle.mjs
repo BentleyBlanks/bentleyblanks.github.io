@@ -538,6 +538,15 @@ export const COMBAT = {
  *    （ER2 自己也提供了关掉这条的开关。）
  *  · freeAimDeg 的 0 档只有在**弹道、视差、后坐**三条都落地之后才可用，
  *    否则会得到"枪很稳但打不中"这个最糟的组合。这一批三条都落地了，所以 0 档开放。
+ *
+ * hitMarker（2026-08-20 接上）：屏幕中央那一记命中/击杀记号。
+ * docs/Data_GunFeelReview.md 的裁决表原来写「默认关，做成难度选项」——
+ * 实跑之后这条判错了：本作**没有准星、不显示弹药数、不打歼敌数**，
+ * 于是「我这一枪到底打没打中」在四十米以外没有任何一条通道能回答。
+ * 血雾在一百米上是两三个像素，impactFlesh 走 inverse 衰减（refDistance 3.5、
+ * rolloff 0.9）到八十米只剩出厂音量的 4.8%，在几十条枪的底噪里等于没有。
+ * 所以改成：体验/标准两档默认**开**，写实档关（那一档只留听觉确认）。
+ * 听觉确认（hitConfirm / killConfirm）不挂难度，三档都给 —— 它是这条通道的底线。
  */
 export const FREE_AIM_STEPS = [0, 1.2, 2.0, 3.5];
 
@@ -547,21 +556,21 @@ export const DIFFICULTY_PRESETS = {
     aiAccuracy: 0.70, playerDamage: 0.80, suppressionScale: 0.6,
     bulletGravity: 0.5, freeAimDeg: 3.5, ironSightOffset: 0.0,
     staminaSeconds: 12, overheat: true, autoSurrender: false,
-    showCrosshair: true, enemyMarkers: true,
+    showCrosshair: true, enemyMarkers: true, hitMarker: true,
   },
   standard: {
     id: "standard", label: "标准",
     aiAccuracy: 1.0, playerDamage: 1.0, suppressionScale: 1.0,
     bulletGravity: 1.0, freeAimDeg: 2.0, ironSightOffset: 1.0,
     staminaSeconds: 8, overheat: true, autoSurrender: false,
-    showCrosshair: false, enemyMarkers: false,
+    showCrosshair: false, enemyMarkers: false, hitMarker: true,
   },
   realistic: {
     id: "realistic", label: "写实",
     aiAccuracy: 1.15, playerDamage: 1.25, suppressionScale: 1.3,
     bulletGravity: 1.0, freeAimDeg: 1.2, ironSightOffset: 1.4,
     staminaSeconds: 5, overheat: true, autoSurrender: false,
-    showCrosshair: false, enemyMarkers: false,
+    showCrosshair: false, enemyMarkers: false, hitMarker: false,
   },
 };
 

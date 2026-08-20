@@ -967,6 +967,49 @@ const RECIPES = {
     v.Live(0.3);
   },
 
+  /**
+   * 命中确认。**非空间化**：Play 时不给 position，它不在战场上，它在开枪的人耳朵里。
+   *
+   * 为什么必须单开一条通道，而不是把 impactFlesh 调响：
+   * impactFlesh 走 PannerNode 的 inverse 衰减（refDistance 3.5、rolloff 0.9），
+   * 八十米上只剩出厂音量的 4.8% —— 在几十条枪的底噪里等于没有。而本作没有准星、
+   * 不显示弹药数、不打歼敌数，「这一枪打没打中」在四十米以外原来没有任何通道能回答。
+   * 那一层实录的 impactFlesh 照旧留在世界里（它是打给旁边的人听的），这一记是回执。
+   *
+   * 音色刻意不做成「叮」：一记极短的干敲击，频心压在 1.2 kHz 上下 ——
+   * 步枪声的能量峰在 400—800 Hz，错开一个八度才在枪响之后的 40 ms 里听得清。
+   * 完全不给混响：有尾巴就会被听成"场景里的某个东西响了"。
+   */
+  hitConfirm(A, v) {
+    const t = v.t;
+    Thud(v, t, 330, 190, 0.045, 0.30, 900);
+    const src = v.Noise("white", 0.04);
+    const band = v.Filter("bandpass", v.F(1250), 2.2);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.20, 0.001, 0.035);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.04);
+    v.wetGain.gain.value = 0;      // 干到底
+    v.Live(0.16);
+  },
+
+  // 击杀确认：同一记敲击，外加 95 ms 后一记更低更软的收尾。
+  // **靠节奏区分，不靠响度区分** —— 两个只差音量的提示音，在战场底噪里等于同一个。
+  // 第二下压到 170→95 Hz，与第一下差了两个八度，闭着眼睛也分得出是一下还是两下。
+  killConfirm(A, v) {
+    const t = v.t;
+    Thud(v, t, 330, 190, 0.045, 0.30, 900);
+    const src = v.Noise("white", 0.04);
+    const band = v.Filter("bandpass", v.F(1250), 2.2);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.20, 0.001, 0.035);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.04);
+    Thud(v, t + 0.095, 175, 95, 0.14, 0.36, 420);
+    v.wetGain.gain.value = 0;
+    v.Live(0.34);
+  },
+
   // --- 人体动作 -----------------------------------------------------------
   // 土路脚步：一记闷的落地 + 一点扬尘的沙沙。
   footstepDirt(A, v) {
@@ -1143,6 +1186,9 @@ const NODE_COST = {
   grenadeThrow: 10, launcherPop: 10, impactDirt: 10, impactFlesh: 10,
   footstepDirt: 10, heartbeat: 10,
   explosionFar: 9, dadaoSwing: 7, bugleCharge: 7,
+  // 命中/击杀回执：一条 Thud（4 节点）+ 一条带通噪声（4 节点），击杀多一条 Thud。
+  // 写实一点点是故意的 —— 这两条**绝不许被预算闸门丢掉**（见 Play 的 priority）。
+  hitConfirm: 9, killConfirm: 13,
 };
 const DEFAULT_COST = 19;
 
@@ -1166,6 +1212,9 @@ const MIX_GAIN = {
   impactMetal: 1.75, grenadeThrow: 1.5, impactBrick: 1.5,
   bayonetHit: 1.4, explosionNear: 1.25,
   bodyFall: 0.65,   // 实拍能量比步枪声还高，一个人倒下不该比开枪响
+  // 回执不空间化，整条链上没有距离衰减也没有空气低通，配平只能靠这里。
+  // 0.55 是"枪响完那 40 ms 的空当里听得见、但绝不盖过枪声"的量。
+  hitConfirm: 0.55, killConfirm: 0.62,
 };
 
 // ===========================================================================
@@ -1584,6 +1633,12 @@ export class AudioEngine {
     this.paused = false;
     this.pausedState = null;
     this.lastPlayAt = new Map();
+    /**
+     * 每个 cue 被**请求**了多少次（不是"响了多少次"）。
+     * 记的是请求而不是发声，因为冒烟脚本要断言的是「打中了有没有去要那一声回执」；
+     * WebAudio 起没起来、预算够不够，是另外两件事，混在一个数里就查不出是哪一件坏了。
+     */
+    this.playRequests = new Map();
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;
@@ -2203,12 +2258,16 @@ export class AudioEngine {
     return voice;
   }
 
+  /** 某个 cue 被请求过多少次。取证专用（见 this.playRequests 的抬头）。 */
+  RequestedCount(name) { return this.playRequests.get(name) || 0; }
+
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false,
     bus = "sfx" } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
     // 开出一枪完全没有声音是最伤沉浸感的一类 bug：玩家会以为自己没打出去。
+    this.playRequests.set(name, (this.playRequests.get(name) || 0) + 1);
     if (!this.ctx || this.disposed) return null;
     const recipe = RECIPES[name];
     if (!recipe) return null;
@@ -2217,14 +2276,24 @@ export class AudioEngine {
     const now = ctx.currentTime;
 
     // 同帧齐射去重（见文件头 DEDUPE_S 的注释）。
-    const last = this.lastPlayAt.get(name);
-    if (last !== undefined && now - last < DEDUPE_S && delay === 0) return null;
+    //
+    // 【2026-08-20】priority 这个参数**上面那段注释写了，函数体里一次都没读**：
+    // 去重与预算两道闸都对它视而不见，所以「玩家自己的枪永远要响」从来没有成立过，
+    // 那 8.3% 的丢枪声一直还在。补上是因为命中/击杀回执正好走同一条路 ——
+    // 回执要在几十条枪同时打的那一刻响，而那恰恰是两道闸最容易关上的时刻，
+    // 一条被丢掉四成的确认音等于没有确认音。
+    if (!priority) {
+      const last = this.lastPlayAt.get(name);
+      if (last !== undefined && now - last < DEDUPE_S && delay === 0) return null;
+    }
     this.lastPlayAt.set(name, now);
 
     // 预算闸门：按实测开销**发声前**判断。连发的开销随点射长度涨一点。
     // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
+    // priority 的那一档给 15% 超额：够放一条枪声或一条回执，又不至于让"优先"变成"无限"。
     const cost = NODE_COST[name] ?? DEFAULT_COST;
-    const ceiling = LOW_PRIORITY.has(name) ? NODE_BUDGET * LOW_PRIORITY_HEADROOM : NODE_BUDGET;
+    const ceiling = priority ? NODE_BUDGET * 1.15
+      : LOW_PRIORITY.has(name) ? NODE_BUDGET * LOW_PRIORITY_HEADROOM : NODE_BUDGET;
     if (this.liveNodes + cost > ceiling) return null;
 
     // 距离：决定 HRTF 开不开、空气低通压多狠、混响给多少。

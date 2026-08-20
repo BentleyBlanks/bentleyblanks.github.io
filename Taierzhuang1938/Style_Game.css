@@ -273,3 +273,23 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   height: 3px; background: var(--warn); opacity: 0; transition: opacity 0.12s linear;
 }
 .hudCook.on { opacity: 0.9; }
+
+/* 命中记号 —— 屏幕正中四道短撇。
+   本作没有准星，所以这是**唯一**会出现在画面正中的东西：它必须小、暗、短命，
+   否则就等于偷偷给了玩家一个准星（见 Script_Hud.Hitmark 的抬头）。
+   四道撇按 45° 斜角排，靠 --spread 往外弹一下；命中是骨白，击杀是干血红且更长。 */
+.hudHitmark {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  opacity: 0; --spread: 4px; --len: 7px; --mk: rgba(232, 224, 204, 0.9);
+}
+.hudHitmark .t {
+  position: absolute; left: 0; top: 0; display: block;
+  width: var(--len); height: 1.5px; background: var(--mk);
+  transform-origin: 0 50%;
+}
+.hudHitmark .t:nth-child(1) { transform: rotate(45deg)   translateX(var(--spread)); }
+.hudHitmark .t:nth-child(2) { transform: rotate(135deg)  translateX(var(--spread)); }
+.hudHitmark .t:nth-child(3) { transform: rotate(-135deg) translateX(var(--spread)); }
+.hudHitmark .t:nth-child(4) { transform: rotate(-45deg)  translateX(var(--spread)); }
+/* 击杀：更长、干血红。不做旋转/放大动画 —— 那是连杀播报的语汇，不是这个游戏的。 */
+.hudHitmark.kill { --len: 10px; --mk: rgba(178, 58, 42, 0.95); }

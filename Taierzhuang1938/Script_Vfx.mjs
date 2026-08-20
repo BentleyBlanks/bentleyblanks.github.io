@@ -990,6 +990,8 @@ export class VfxSystem {
     this.spawnScale = this.preset.spawn;
 
     this.time = 0;
+    /** 上一帧的机位。Blood 按它算屏幕张角做距离补偿（见 Blood 的抬头）。 */
+    this.eye = new THREE.Vector3();
     this.random = Mulberry32(HashString("Taierzhuang.Vfx.1938"));
     this.wind = new THREE.Vector3(0.35, 0, -0.15);     // 鲁南春季多西南风，考据里写死的
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
@@ -1172,6 +1174,9 @@ export class VfxSystem {
     const step = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.1) : 0;
     this.time = Number.isFinite(elapsed) ? elapsed : this.time + step;
     this.shared.uTime.value = this.time;
+    // 记一份机位。Blood 要按距离补尺寸（见那边的抬头），而粒子是**世界尺寸**的
+    // 广告牌，只有拿到相机才知道它在屏幕上究竟有几个像素。
+    if (camera) this.eye.copy(camera.position);
 
     this._UpdateSmokeSources(step);
 
@@ -1601,6 +1606,15 @@ export class VfxSystem {
   Blood(position, direction, amount = 1) {
     const dir = TMP_A.copy(direction).normalize();
     const count = Math.max(1, Math.round(4 * amount * this.spawnScale));
+    // 距离补偿：粒子是世界尺寸的广告牌，0.17 m 的一团在一百米外张角 0.097°，
+    // 1600 px 宽 / 55° 视场上折合 **2.8 个像素** —— 也就是说，四十米以外
+    // 「打中了」这件事在画面上根本没有发生过。
+    // 补偿的是**屏幕张角**而不是"让血更多"：粒子数、寿命、透明度一个不动，
+    // 只把尺寸按距离往上抬，封顶 3.2 倍（一百米上约九个像素，看得见但仍是一小团）。
+    // 25 m 以内不补 —— 贴脸的那一下本来就够大，再放大就成了血浆片。
+    const eyeDist = Math.hypot(position.x - this.eye.x, position.y - this.eye.y,
+      position.z - this.eye.z);
+    const far = Math.min(3.2, Math.max(1, eyeDist / 25));
     for (let i = 0; i < count; i += 1) {
       const s = ResetSpawn();
       this._ConeVelocity(dir, 0.55, this._Range(0.8, 2.4) * amount);
@@ -1608,7 +1622,7 @@ export class VfxSystem {
       s.vx = TMP_B.x; s.vy = TMP_B.y + 0.2; s.vz = TMP_B.z;
       s.ay = -3.6; s.drag = 4.5;
       s.life = this._Range(0.3, 0.6);
-      s.sizeStart = 0.05 * amount; s.sizeEnd = 0.17 * amount;
+      s.sizeStart = 0.05 * amount * far; s.sizeEnd = 0.17 * amount * far;
       s.opacity = 0.5; s.fadeIn = 0.05;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(2);
       s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDark;

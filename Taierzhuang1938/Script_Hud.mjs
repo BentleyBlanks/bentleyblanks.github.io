@@ -42,6 +42,14 @@ export class Hud {
     this.pendingTitle = null;
     /** 说过的每一句纯文本。通关冒烟拿它断言剧本真的播了。 */
     this.spoken = [];
+    /**
+     * 命中记号：剩余时长与总时长（Update 按比例淡出），外加一份取证队列。
+     * **别和 player.hitMarks 搞混**：那个是「谁在打我、从哪个方位」（来弹指示器），
+     * 这个是「我打中了谁」（打出去的回执）。两件事，两个方向，名字长得像纯属倒霉。
+     */
+    this.hitmarkTimer = 0;
+    this.hitmarkSpan = 1;
+    this.confirms = [];
   }
 
   Build() {
@@ -67,6 +75,10 @@ export class Hud {
     this.el.minimap.width = 190;
     this.el.minimap.height = 190;
     this.minimapCtx = this.el.minimap.getContext("2d");
+    // 命中记号：屏幕正中四道短撇。**四个 span 常驻，不每次 new** ——
+    // 一场仗打几百次命中，每次重建 DOM 会在 GC 上攒出可见的顿。
+    this.el.hitmark = mk("hudHitmark");
+    for (let i = 0; i < 4; i += 1) mk("t", this.el.hitmark, "i");
     this.el.deathCard = mk("hudDeathCard");
     this.el.brief = mk("hudBrief");
     this.el.title = mk("hudTitle");
@@ -139,6 +151,34 @@ export class Hud {
     }
     this.root.appendChild(svg);
     this.el.hitDirs = svg;
+  }
+
+  /**
+   * 命中记号。屏幕正中四道短撇往外弹一下就没。
+   *
+   * 为什么这个游戏需要它，尽管一路做到这里都在做减法：
+   * 本作**没有准星、不显示弹药数、不打歼敌数**，这三条减法各自都对，
+   * 但叠在一起就把「我这一枪打没打中」这个问题的所有出口都堵死了 ——
+   * 血雾在一百米上是两三个像素，实录的 impactFlesh 走距离衰减到八十米只剩 4.8%。
+   * 减法减到玩家读不出因果，减的就不是 UI 而是玩法了。
+   *
+   * 与 ER2 的差别：ER2 那一记是贴在准星上的，我们没有准星，所以它是**唯一**
+   * 出现在屏幕正中的东西，也因此必须更短、更小、更暗 —— 命中 0.26 s、
+   * 击杀 0.42 s，不打数字、不打"+1"、不累计连杀（docs/Data_DesignFirstPass.md §385）。
+   *
+   * @param {"hit"|"kill"} kind
+   */
+  Hitmark(kind = "hit") {
+    this.el.hitmark.className = `hudHitmark on ${kind}`;
+    this.hitmarkSpan = kind === "kill" ? 0.42 : 0.26;
+    this.hitmarkTimer = this.hitmarkSpan;
+    // 立刻亮，不等下一帧的 Update —— 命中回执迟一帧就等于枪响与记号对不上，
+    // 而这一记号存在的全部理由就是"这一枪"和"打中了"要绑在同一个瞬间。
+    this.el.hitmark.style.opacity = "1";
+    this.el.hitmark.style.setProperty("--spread", "4px");
+    // 取证：冒烟脚本拿它断言"打中了真的给了回执"，别靠解析 style。
+    this.confirms.push(kind);
+    if (this.confirms.length > 200) this.confirms.shift();
   }
 
   SetSuppression(v) {
@@ -397,6 +437,18 @@ export class Hud {
   }
 
   Update(dt) {
+    // 命中记号：往外弹 + 淡出。用 JS 补间而不是 CSS 动画，因为同一记号会被
+    // 连续两发连点重播，CSS 动画重启要靠强制回流那一套 hack，在这里不值当。
+    if (this.hitmarkTimer > 0) {
+      this.hitmarkTimer -= dt;
+      const k = Math.max(0, this.hitmarkTimer / this.hitmarkSpan);
+      this.el.hitmark.style.opacity = String(k * k);      // 平方：收尾快，不拖尾巴
+      this.el.hitmark.style.setProperty("--spread", `${(1 - k) * 3 + 4}px`);
+      if (this.hitmarkTimer <= 0) {
+        this.el.hitmark.className = "hudHitmark";
+        this.el.hitmark.style.opacity = "0";
+      }
+    }
     if (this.subtitleTimer > 0) {
       this.subtitleTimer -= dt;
       if (this.subtitleTimer <= 0) this.el.subtitle.classList.remove("on");
