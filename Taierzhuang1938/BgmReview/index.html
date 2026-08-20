@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>台儿庄 1938 · 音频候选评审</title>
+  <style>
+    :root {
+      --ink: #eee7d8;
+      --muted: #aaa394;
+      --dim: #777269;
+      --paper: #161614;
+      --panel: #1e1d1a;
+      --panel2: #25231f;
+      --line: #39362f;
+      --gold: #d0a84d;
+      --red: #b94a3f;
+      --red2: #7d302b;
+      --green: #809267;
+      --shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 82% -10%, rgba(139,58,42,.2), transparent 38rem),
+        linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 100% 4px, auto;
+      font-family: "Noto Serif SC", "Songti SC", "Microsoft YaHei", serif;
+      min-height: 100vh;
+      padding-bottom: 116px;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    a { color: #d8bb78; }
+    .shell { width: min(1240px, calc(100% - 36px)); margin: 0 auto; }
+    .mast {
+      padding: 48px 0 26px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      color: var(--gold);
+      font: 700 12px/1.2 ui-monospace, "Cascadia Mono", monospace;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 8px; font-size: clamp(30px, 5vw, 58px); line-height: 1.05; letter-spacing: -.04em; }
+    .lead { max-width: 780px; margin: 0; color: var(--muted); line-height: 1.75; }
+    .summary { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+    .stat { padding: 9px 12px; background: #201f1b; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); }
+    .stat b { color: var(--ink); font-family: ui-monospace, monospace; }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 14px 0;
+      background: rgba(22,22,20,.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(74,69,59,.75);
+    }
+    .toolbarRow { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+    .viewBtn, .chip, .toolBtn, .playBtn, .starBtn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: .16s ease;
+    }
+    .viewBtn, .toolBtn { padding: 10px 14px; }
+    .viewBtn:hover, .chip:hover, .toolBtn:hover, .playBtn:hover, .starBtn:hover { border-color: #716a5c; background: #292721; }
+    .viewBtn.active { background: var(--red2); border-color: #b46156; }
+    .toolbarSpacer { flex: 1 1 20px; }
+    .toolBtn.primary { border-color: #8a6d31; color: #f2d89d; }
+    .filterBar { display: flex; gap: 7px; overflow-x: auto; padding-top: 11px; scrollbar-width: thin; }
+    .chip { flex: 0 0 auto; padding: 7px 11px; color: var(--muted); font-size: 13px; }
+    .chip.active { color: #fff4dc; border-color: #917238; background: #392f1c; }
+    main { padding: 34px 0 60px; }
+    .group { margin-bottom: 42px; }
+    .groupHead { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .groupTitle { margin: 0; font-size: clamp(22px, 3vw, 31px); }
+    .groupDesc { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+    .groupCount { color: var(--dim); font: 12px ui-monospace, monospace; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .card {
+      position: relative;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) 44px;
+      gap: 12px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(255,255,255,.018), transparent 45%), var(--panel);
+      box-shadow: 0 1px 0 rgba(255,255,255,.025) inset;
+    }
+    .card.playing { border-color: #a8843c; box-shadow: 0 0 0 1px rgba(208,168,77,.14), var(--shadow); }
+    .card.favorite { background: linear-gradient(135deg, rgba(208,168,77,.085), transparent 50%), var(--panel); }
+    .playBtn {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #292721;
+      font: 700 18px ui-monospace, monospace;
+    }
+    .card.playing .playBtn { color: #1b170f; background: var(--gold); border-color: var(--gold); }
+    .trackCode { color: var(--gold); font: 11px ui-monospace, monospace; letter-spacing: .08em; }
+    .trackTitle { margin: 3px 0 5px; font-size: 18px; line-height: 1.25; }
+    .trackTitle small { color: var(--muted); font-size: 12px; font-weight: 400; }
+    .trackDesc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .tag { padding: 3px 7px; color: #bdb5a5; border: 1px solid #444036; border-radius: 3px; font: 11px ui-monospace, monospace; }
+    .sourceRow { margin-top: 10px; color: var(--dim); font-size: 11px; line-height: 1.5; }
+    .sourceRow a { text-underline-offset: 3px; }
+    .noteInput {
+      width: 100%;
+      min-height: 34px;
+      margin-top: 11px;
+      padding: 8px 9px;
+      resize: vertical;
+      color: var(--ink);
+      background: #171714;
+      border: 1px solid #343128;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .noteInput:focus { outline: 1px solid #8b6d32; border-color: #8b6d32; }
+    .starBtn { width: 42px; height: 42px; font-size: 20px; color: var(--dim); }
+    .favorite .starBtn { color: #f0c65d; border-color: #7f6735; background: #332b1c; }
+    .empty { padding: 80px 20px; text-align: center; color: var(--muted); border: 1px dashed var(--line); }
+    .player {
+      position: fixed;
+      z-index: 50;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(20,19,17,.96);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid #4d473b;
+      box-shadow: 0 -16px 40px rgba(0,0,0,.33);
+    }
+    .playerInner { min-height: 92px; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(260px, 2fr) minmax(160px, .8fr); align-items: center; gap: 22px; }
+    .nowCode { color: var(--gold); font: 10px ui-monospace, monospace; }
+    .nowTitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+    .transport { display: grid; grid-template-columns: 38px 1fr; align-items: center; gap: 12px; }
+    .mainPlay { width: 38px; height: 38px; color: #15130f; background: var(--gold); border: 0; border-radius: 50%; cursor: pointer; }
+    .range { width: 100%; accent-color: var(--gold); cursor: pointer; }
+    .timeRow { display: flex; justify-content: space-between; color: var(--dim); font: 10px ui-monospace, monospace; }
+    .volume { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+    .notice { margin: 30px 0 0; padding: 13px 15px; color: var(--muted); background: #1c1b18; border-left: 3px solid #7c6332; font-size: 13px; line-height: 1.7; }
+    .toast { position: fixed; z-index: 80; right: 22px; bottom: 112px; padding: 11px 15px; color: #18140d; background: #e0bb67; border-radius: 4px; box-shadow: var(--shadow); transform: translateY(20px); opacity: 0; pointer-events: none; transition: .2s ease; }
+    .toast.show { transform: none; opacity: 1; }
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+      .playerInner { grid-template-columns: 1fr; gap: 7px; padding: 10px 0; }
+      .volume { display: none; }
+      .player { min-height: 112px; }
+      body { padding-bottom: 142px; }
+      .nowTitle { font-size: 13px; }
+      .transport { grid-template-columns: 34px 1fr; }
+    }
+    @media (max-width: 520px) {
+      .shell { width: min(100% - 22px, 1240px); }
+      .mast { padding-top: 32px; }
+      .toolbarSpacer { display: none; }
+      .toolBtn { padding: 9px 10px; font-size: 12px; }
+      .card { grid-template-columns: 48px minmax(0, 1fr) 38px; gap: 9px; padding: 12px; }
+      .playBtn { width: 48px; height: 48px; }
+      .starBtn { width: 38px; height: 38px; }
+      .groupHead { align-items: start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="mast">
+    <div class="shell">
+      <div class="eyebrow">Taierzhuang 1938 · Audio Review</div>
+      <h1>音频候选评审台</h1>
+      <p class="lead">先听、再选、最后接入。BGM 已换成悲壮与压迫紧张方向的独立候选；枪械音效按实际菜单分组重找，捷克式保持现状，不在本轮替换范围。</p>
+      <div class="summary">
+        <span class="stat">BGM <b id="bgmCount">0</b></span>
+        <span class="stat">枪械音效 <b id="sfxCount">0</b></span>
+        <span class="stat">已收藏 <b id="favoriteCount">0</b></span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="toolbar" aria-label="试听筛选">
+    <div class="shell">
+      <div class="toolbarRow" id="viewButtons">
+        <button class="viewBtn active" data-view="all">全部候选</button>
+        <button class="viewBtn" data-view="bgm">只听 BGM</button>
+        <button class="viewBtn" data-view="sfx">只听枪声</button>
+        <button class="viewBtn" data-view="favorites">★ 只看收藏</button>
+        <span class="toolbarSpacer"></span>
+        <button class="toolBtn primary" id="exportButton">导出收藏 JSON</button>
+        <button class="toolBtn" id="copyButton">复制交付清单</button>
+        <button class="toolBtn" id="clearButton">清空收藏</button>
+      </div>
+      <div class="filterBar" id="filterBar" aria-label="场景分类"></div>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <div id="catalog"></div>
+    <div class="notice">
+      BGM 为 90 秒响度统一的本地评审段；枪声音效为免版税实录源试听，最终接入时会按你选中的音色重新切单发、做远近层和史实射速。页面收藏与备注保存在本机浏览器，导出的 JSON 就是后续线上交付依据。
+    </div>
+  </main>
+
+  <footer class="player" aria-label="全局播放器">
+    <div class="shell playerInner">
+      <div>
+        <div class="nowCode" id="nowCode">尚未选择</div>
+        <div class="nowTitle" id="nowTitle">点击任意候选开始试听</div>
+      </div>
+      <div class="transport">
+        <button class="mainPlay" id="mainPlay" aria-label="播放或暂停">▶</button>
+        <div>
+          <input class="range" id="seek" type="range" min="0" max="1000" value="0" aria-label="播放进度">
+          <div class="timeRow"><span id="currentTime">0:00</span><span id="duration">0:00</span></div>
+        </div>
+      </div>
+      <label class="volume">音量 <input class="range" id="volume" type="range" min="0" max="1" step="0.01" value="0.78"></label>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status"></div>
+  <audio id="audio" preload="metadata"></audio>
+  <script src="./Script_AudioReview.js"></script>
+</body>
+</html>
