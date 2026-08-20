@@ -50,6 +50,10 @@ const GAME_SHOTS = [
   // 每轮手搓临时探针去看，连吃两轮盲区。加进常规集，下一轮直接从标准图里评。
   { name: "Game_Z1_Ads", query: "shot=1&phase=2&quality=high&scale=medium&ads=1" },
   { name: "Game_Z2_Fire", query: "shot=1&phase=4&quality=high&scale=medium&fire=1" },
+  // 城楼专项回归：东门外仰看宗鲁门。菜单长焦能验轮廓，这一张负责验屋面不穿插、
+  // 檐下斗拱和月台石栏在近景也确实存在，防止以后又退化成四块交叉板。
+  { name: "Game_Z3_GateTower", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 360, z: 0, yaw: Math.PI / 2, pitch: 0.22 } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

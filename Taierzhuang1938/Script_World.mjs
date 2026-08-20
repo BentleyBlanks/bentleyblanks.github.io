@@ -1511,6 +1511,104 @@ export function AddSandbagPlug(sink, {
 }
 
 /**
+ * 城楼歇山顶的一整张薄壳。
+ *
+ * 旧实现拿四块倾斜 BoxGeometry 交叉成屋顶。四块板既没有共同檐口，也没有共同脊线，
+ * 从城外的菜单长焦机位看过去就变成两只黑色「蝴蝶结」。这里把前后坡、两片撒头和
+ * 屋面底皮做成一张闭合网格：所有坡面共用同一条正脊与四条戗脊，轮廓不会再互相穿插。
+ * 角部单独抬高一点，保留「翘厦」的剪影，但不夸张成影视城飞檐。
+ */
+function MakeGateRoofShell(width, depth, {
+  eaveOut = 1.6, rise = 1.55, cornerLift = 0.26, thickness = 0.14,
+  tile = TILE_METERS.roof, seed = "gateRoof",
+} = {}) {
+  const halfW = width / 2 + eaveOut;
+  const halfD = depth / 2 + eaveOut;
+  const ridgeHalf = Math.max(width * 0.24, halfW - halfD * 0.78);
+  const positions = [];
+  const uvs = [];
+  const seedOffset = (HashString(seed) % 997) / 997 * 3;
+  const P = (x, y, z) => [x, y, z];
+  const EaveY = (x) => {
+    const t = Math.max(0, (Math.abs(x) - ridgeHalf) / Math.max(0.01, halfW - ridgeHalf));
+    return cornerLift * t * t;
+  };
+  const PushTriangle = (a, b, c) => {
+    for (const p of [a, b, c]) {
+      positions.push(p[0], p[1], p[2]);
+      uvs.push(p[0] / tile + seedOffset, (p[2] + p[1] * 0.65) / tile + seedOffset * 0.5);
+    }
+  };
+  const PushFace = (points) => {
+    for (let i = 1; i < points.length - 1; i += 1) PushTriangle(points[0], points[i], points[i + 1]);
+  };
+
+  const frontFaces = [
+    [P(-halfW, EaveY(-halfW), halfD), P(-ridgeHalf, 0, halfD), P(-ridgeHalf, rise, 0)],
+    [P(-ridgeHalf, 0, halfD), P(0, 0, halfD), P(0, rise, 0), P(-ridgeHalf, rise, 0)],
+    [P(0, 0, halfD), P(ridgeHalf, 0, halfD), P(ridgeHalf, rise, 0), P(0, rise, 0)],
+    [P(ridgeHalf, 0, halfD), P(halfW, EaveY(halfW), halfD), P(ridgeHalf, rise, 0)],
+  ];
+  const topFaces = [
+    ...frontFaces,
+    ...frontFaces.map((face) => face.map((p) => P(p[0], p[1], -p[2])).reverse()),
+    [P(halfW, EaveY(halfW), halfD), P(halfW, EaveY(halfW), -halfD), P(ridgeHalf, rise, 0)],
+    [P(-halfW, EaveY(-halfW), -halfD), P(-halfW, EaveY(-halfW), halfD), P(-ridgeHalf, rise, 0)],
+  ];
+  for (const face of topFaces) PushFace(face);
+
+  // 屋面底皮：从墙顶和月台仰看也必须是一整片屋面，不能因为单面材质突然消失。
+  for (const face of topFaces) {
+    PushFace(face.map((p) => P(p[0], p[1] - thickness, p[2])).reverse());
+  }
+
+  // 檐口封边。前后檐分四段，角部抬升后仍保持连续，不再出现悬空板角。
+  const cuts = [-halfW, -ridgeHalf, 0, ridgeHalf, halfW];
+  for (let i = 0; i < cuts.length - 1; i += 1) {
+    const a = cuts[i], b = cuts[i + 1];
+    PushFace([
+      P(a, EaveY(a), halfD), P(a, EaveY(a) - thickness, halfD),
+      P(b, EaveY(b) - thickness, halfD), P(b, EaveY(b), halfD),
+    ]);
+    PushFace([
+      P(b, EaveY(b), -halfD), P(b, EaveY(b) - thickness, -halfD),
+      P(a, EaveY(a) - thickness, -halfD), P(a, EaveY(a), -halfD),
+    ]);
+  }
+  PushFace([
+    P(halfW, EaveY(halfW), -halfD), P(halfW, EaveY(halfW) - thickness, -halfD),
+    P(halfW, EaveY(halfW) - thickness, halfD), P(halfW, EaveY(halfW), halfD),
+  ]);
+  PushFace([
+    P(-halfW, EaveY(-halfW), halfD), P(-halfW, EaveY(-halfW) - thickness, halfD),
+    P(-halfW, EaveY(-halfW) - thickness, -halfD), P(-halfW, EaveY(-halfW), -halfD),
+  ]);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  geometry.userData.gateRoof = { halfW, halfD, ridgeHalf, rise, cornerLift };
+  return geometry;
+}
+
+/** 在两点之间架一根方截面构件；用于戗脊、瓦垄与连续檐枋。 */
+function MakeBeamBetween(a, b, thickness, tile, seed) {
+  const start = new THREE.Vector3(...a);
+  const end = new THREE.Vector3(...b);
+  const delta = end.clone().sub(start);
+  const length = Math.max(0.01, delta.length());
+  const geometry = MakeBox(length, thickness, thickness, tile, seed);
+  const rotation = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(1, 0, 0), delta.normalize());
+  const matrix = new THREE.Matrix4().compose(
+    start.add(end).multiplyScalar(0.5), rotation, new THREE.Vector3(1, 1, 1));
+  geometry.applyMatrix4(matrix);
+  return geometry;
+}
+
+/**
  * 城楼：内门之上的重檐亭阁。
  *
  * 志载「内门上有方砖铺平台、以石围栏之城楼，叠脊筒瓦，重檐翘厦，雕梁画栋，俨若亭阁」。
@@ -1552,12 +1650,18 @@ export function AddGateTower(sink, {
       sink.Add("Ashlar", PlaceGeometry(
         MakeBox(0.22, railH, 0.22, TILE_METERS.stone, `${seed}:post${side}${i}`),
         { x: p.x, y: deck + railH / 2, z: p.z, ry }));
+      sink.Add("Ashlar", PlaceGeometry(
+        MakeBox(0.34, 0.12, 0.34, TILE_METERS.stone, `${seed}:postCap${side}${i}`),
+        { x: p.x, y: deck + railH + 0.02, z: p.z, ry }));
     }
     if (alongX) {
       const p = L(0, s * off);
       sink.Add("Ashlar", PlaceGeometry(
         MakeBox(len, railH * 0.62, 0.14, TILE_METERS.stone, `${seed}:rail${side}`),
         { x: p.x, y: deck + railH * 0.34, z: p.z, ry }));
+      sink.Add("Ashlar", PlaceGeometry(
+        MakeBox(len, 0.15, 0.24, TILE_METERS.stone, `${seed}:railCap${side}`),
+        { x: p.x, y: deck + railH - 0.08, z: p.z, ry }));
     } else {
       for (const half of [-1, 1]) {
         const segLen = len / 2 - walkGap;
@@ -1566,6 +1670,9 @@ export function AddGateTower(sink, {
         sink.Add("Ashlar", PlaceGeometry(
           MakeBox(0.14, railH * 0.62, segLen, TILE_METERS.stone, `${seed}:rail${side}${half}`),
           { x: p.x, y: deck + railH * 0.34, z: p.z, ry }));
+        sink.Add("Ashlar", PlaceGeometry(
+          MakeBox(0.24, 0.15, segLen, TILE_METERS.stone, `${seed}:railCap${side}${half}`),
+          { x: p.x, y: deck + railH - 0.08, z: p.z, ry }));
       }
     }
   }
@@ -1619,27 +1726,160 @@ export function AddGateTower(sink, {
   }
   sink.Cover(x, z, floor + 1.15, sin, cos);
 
-  // --- 下檐（重檐的第一层）：四坡筒瓦，出檐 1.6 m ---
-  const eave1 = floor + columnH;
-  const RoofRing = (yEave, w, d, tag) => {
-    for (const s of [-1, 1]) {
-      const p = L(0, s * (d / 2 + eaveOut) / 2);
-      sink.Add("TubeTile", PlaceGeometry(
-        MakeBox(w + eaveOut * 2 + 0.6, 0.16, Math.hypot(d / 2 + eaveOut, 1.1), TILE_METERS.roof,
-          `${seed}:${tag}z${s}`),
-        { x: p.x, y: yEave + 0.55, z: p.z, ry, rx: -s * 0.62 }));
-      const q = L(s * (w / 2 + eaveOut) / 2, 0);
-      sink.Add("TubeTile", PlaceGeometry(
-        MakeBox(Math.hypot(w / 2 + eaveOut, 1.1), 0.16, d + eaveOut * 2 + 0.6, TILE_METERS.roof,
-          `${seed}:${tag}x${s}`),
-        { x: q.x, y: yEave + 0.55, z: q.z, ry, rz: s * 0.62 }));
+  // 格扇与门框：旧楼身只有柱和矮槛墙，近看像施工中的木架。两侧次间补木格扇，
+  // 明间保留 2.3 m 净门洞，墙顶回廊仍能从城外侧一路穿到城内侧。
+  const AddLatticeScreen = ({ lx, lz, y0, w, h, tag, vertical = 3, horizontal = 2 }) => {
+    const frameT = 0.12;
+    for (const side of [-1, 1]) {
+      const p = L(lx + side * w / 2, lz);
+      sink.Add("PaintRed", PlaceGeometry(
+        MakeBox(frameT, h, 0.14, TILE_METERS.wood, `${seed}:${tag}:jamb${side}`),
+        { x: p.x, y: y0 + h / 2, z: p.z, ry }));
     }
-    // 叠脊：一条略高的正脊 + 四条垂脊
-    sink.Add("TubeTile", PlaceGeometry(
-      MakeBox(w * 0.72, 0.3, 0.42, TILE_METERS.roof, `${seed}:${tag}ridge`),
-      { x, y: yEave + 1.24, z, ry }));
+    for (const side of [0, 1]) {
+      const p = L(lx, lz);
+      sink.Add("PaintGreen", PlaceGeometry(
+        MakeBox(w, frameT, 0.16, TILE_METERS.wood, `${seed}:${tag}:rail${side}`),
+        { x: p.x, y: y0 + side * h, z: p.z, ry }));
+    }
+    for (let i = 1; i <= vertical; i += 1) {
+      const p = L(lx - w / 2 + (w * i) / (vertical + 1), lz);
+      sink.Add("PaintGreen", PlaceGeometry(
+        MakeBox(0.065, h - frameT * 2, 0.11, TILE_METERS.wood, `${seed}:${tag}:v${i}`),
+        { x: p.x, y: y0 + h / 2, z: p.z, ry }));
+    }
+    for (let i = 1; i <= horizontal; i += 1) {
+      const p = L(lx, lz);
+      sink.Add("PaintGreen", PlaceGeometry(
+        MakeBox(w - frameT * 2, 0.065, 0.11, TILE_METERS.wood, `${seed}:${tag}:h${i}`),
+        { x: p.x, y: y0 + (h * i) / (horizontal + 1), z: p.z, ry }));
+    }
   };
-  RoofRing(eave1, bodyW, bodyD, "r1");
+  const lowerScreenY = floor + 1.18;
+  const lowerScreenH = columnH - 1.82;
+  const bayW = bodyW / 3;
+  for (const face of [-1, 1]) {
+    for (const bay of [-1, 1]) {
+      AddLatticeScreen({
+        lx: bay * bayW, lz: face * (bodyD / 2 - 0.09), y0: lowerScreenY,
+        w: bayW - 0.42, h: lowerScreenH, tag: `lowerScreen${face}${bay}`,
+      });
+    }
+    // 明间门框：门洞本身保持全空，既有纵深，也不偷改唯一四条上城道的通行性。
+    for (const jamb of [-1, 1]) {
+      const p = L(jamb * 1.17, face * (bodyD / 2 - 0.10));
+      sink.Add("PaintRed", PlaceGeometry(
+        MakeBox(0.16, lowerScreenH, 0.18, TILE_METERS.wood,
+          `${seed}:doorJamb${face}${jamb}`),
+        { x: p.x, y: lowerScreenY + lowerScreenH / 2, z: p.z, ry }));
+    }
+    const head = L(0, face * (bodyD / 2 - 0.10));
+    sink.Add("PaintGreen", PlaceGeometry(
+      MakeBox(2.5, 0.20, 0.20, TILE_METERS.wood, `${seed}:doorHead${face}`),
+      { x: head.x, y: lowerScreenY + lowerScreenH - 0.10, z: head.z, ry }));
+  }
+
+  // 斗拱和雀替：远景里它们是檐下连续的一条彩色阴影，也是「亭阁」而不是脚手架的关键。
+  const AddBracketSets = (y, w, d, tag, xCount = 4) => {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < xCount; i += 1) {
+        const lx = -w / 2 + (w * i) / Math.max(1, xCount - 1);
+        const p = L(lx, side * d / 2);
+        sink.Add("PaintGreen", PlaceGeometry(
+          MakeBox(0.62, 0.22, 0.96, TILE_METERS.wood, `${seed}:${tag}dg${side}${i}`),
+          { x: p.x, y: y - 0.20, z: p.z, ry }));
+        sink.Add("PaintRed", PlaceGeometry(
+          MakeBox(0.38, 0.34, 0.54, TILE_METERS.wood, `${seed}:${tag}blk${side}${i}`),
+          { x: p.x, y: y - 0.43, z: p.z, ry }));
+      }
+      for (let i = 1; i < 3; i += 1) {
+        const lz = -d / 2 + (d * i) / 3;
+        const p = L(side * w / 2, lz);
+        sink.Add("PaintGreen", PlaceGeometry(
+          MakeBox(0.96, 0.22, 0.62, TILE_METERS.wood, `${seed}:${tag}sideDg${side}${i}`),
+          { x: p.x, y: y - 0.20, z: p.z, ry }));
+      }
+    }
+  };
+
+  // --- 下檐（重檐的第一层）：闭合歇山顶、筒瓦垄、戗脊和吻兽 ---
+  const eave1 = floor + columnH;
+  const AddRoof = (yEave, w, d, tag, detailScale = 1) => {
+    const rise = Math.max(1.12, Math.min(w, d) * 0.22);
+    const cornerLift = 0.26 * detailScale;
+    const halfW = w / 2 + eaveOut;
+    const halfD = d / 2 + eaveOut;
+    const ridgeHalf = Math.max(w * 0.24, halfW - halfD * 0.78);
+    const EaveY = (lx) => {
+      const t = Math.max(0, (Math.abs(lx) - ridgeHalf) / Math.max(0.01, halfW - ridgeHalf));
+      return cornerLift * t * t;
+    };
+    const PlaceLocal = (material, geometry) => sink.Add(material,
+      PlaceGeometry(geometry, { x, y: yEave, z, ry }));
+
+    PlaceLocal("TubeTile", MakeGateRoofShell(w, d, {
+      eaveOut, rise, cornerLift, thickness: 0.15, seed: `${seed}:${tag}:shell`,
+    }));
+
+    // 连续檐枋：四边真正首尾相接；前后檐的末段随翼角一起抬高。
+    const cuts = [-halfW, -ridgeHalf, 0, ridgeHalf, halfW];
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < cuts.length - 1; i += 1) {
+        const a = cuts[i], b = cuts[i + 1];
+        PlaceLocal("PaintGreen", MakeBeamBetween(
+          [a, EaveY(a) - 0.17, side * halfD], [b, EaveY(b) - 0.17, side * halfD],
+          0.18, TILE_METERS.wood, `${seed}:${tag}:fascia${side}${i}`));
+      }
+      PlaceLocal("PaintRed", MakeBeamBetween(
+        [side * halfW, EaveY(halfW) - 0.23, -halfD],
+        [side * halfW, EaveY(halfW) - 0.23, halfD],
+        0.16, TILE_METERS.wood, `${seed}:${tag}:sideFascia${side}`));
+    }
+
+    // 筒瓦垄：不是贴图上的线，而是沿坡面铺的细实体，逆光时仍能读出屋面尺度。
+    const tileRows = Math.max(9, Math.round((w + eaveOut * 2) / 0.72));
+    for (const side of [-1, 1]) {
+      for (let i = 0; i <= tileRows; i += 1) {
+        const lx = -halfW + (halfW * 2 * i) / tileRows;
+        const ridgeX = Math.max(-ridgeHalf, Math.min(ridgeHalf, lx));
+        PlaceLocal("TubeTile", MakeBeamBetween(
+          [lx, EaveY(lx) + 0.08, side * halfD], [ridgeX, rise + 0.08, 0],
+          0.075 * detailScale, TILE_METERS.roof, `${seed}:${tag}:tile${side}${i}`));
+      }
+    }
+
+    // 正脊、四条戗脊与脊端吻兽，合起来把原来最明显的「交叉板」轮廓彻底换掉。
+    PlaceLocal("TubeTile", MakeBeamBetween(
+      [-ridgeHalf - 0.36, rise + 0.14, 0], [ridgeHalf + 0.36, rise + 0.14, 0],
+      0.34 * detailScale, TILE_METERS.roof, `${seed}:${tag}:mainRidge`));
+    for (const sideX of [-1, 1]) {
+      for (const sideZ of [-1, 1]) {
+        PlaceLocal("TubeTile", MakeBeamBetween(
+          [sideX * ridgeHalf, rise + 0.11, 0],
+          [sideX * halfW, EaveY(halfW) + 0.11, sideZ * halfD],
+          0.22 * detailScale, TILE_METERS.roof, `${seed}:${tag}:hip${sideX}${sideZ}`));
+        for (const t of [0.48, 0.68]) {
+          const bx = sideX * (ridgeHalf + (halfW - ridgeHalf) * t);
+          const bz = sideZ * halfD * t;
+          const by = rise * (1 - t) + EaveY(halfW) * t + 0.25;
+          PlaceLocal("TubeTile", PlaceGeometry(
+            MakeBox(0.22 * detailScale, 0.30 * detailScale, 0.22 * detailScale,
+              TILE_METERS.roof, `${seed}:${tag}:beast${sideX}${sideZ}${t}`),
+            { x: bx, y: by, z: bz }));
+        }
+      }
+      PlaceLocal("TubeTile", PlaceGeometry(
+        MakeBox(0.44 * detailScale, 0.72 * detailScale, 0.42 * detailScale,
+          TILE_METERS.roof, `${seed}:${tag}:chiwen${sideX}`),
+        { x: sideX * (ridgeHalf + 0.24), y: rise + 0.44, z: 0 }));
+      PlaceLocal("TubeTile", PlaceGeometry(
+        MakeBox(0.36 * detailScale, 0.20 * detailScale, 0.62 * detailScale,
+          TILE_METERS.roof, `${seed}:${tag}:chiwenNose${sideX}`),
+        { x: sideX * (ridgeHalf + 0.42), y: rise + 0.57, z: 0 }));
+    }
+  };
+  AddBracketSets(eave1, bodyW, bodyD, "lowerBracket", 4);
+  AddRoof(eave1, bodyW, bodyD, "r1", 1);
 
   // --- 上层：矮一圈的楼身 + 上檐 ---
   const upW = bodyW * 0.74, upD = bodyD * 0.74;
@@ -1663,7 +1903,19 @@ export function AddGateTower(sink, {
       MakeBox(upW, 0.9, 0.24, TILE_METERS.brick, `${seed}:usill${s}`, BRICK_UV_GRID),
       { x: p.x, y: upFloor + 0.45, z: p.z, ry }));
   }
-  RoofRing(upFloor + upperH, upW, upD, "r2");
+  // 上层三间格扇。上楼没有玩家通路要求，可以完整收住立面，让第二层不再是八根孤柱。
+  const upperBayW = upW / 3;
+  for (const face of [-1, 1]) {
+    for (const bay of [-1, 0, 1]) {
+      AddLatticeScreen({
+        lx: bay * upperBayW, lz: face * (upD / 2 - 0.08), y0: upFloor + 0.92,
+        w: upperBayW - 0.32, h: upperH - 1.38, tag: `upperScreen${face}${bay}`,
+        vertical: 2, horizontal: 2,
+      });
+    }
+  }
+  AddBracketSets(upFloor + upperH, upW, upD, "upperBracket", 4);
+  AddRoof(upFloor + upperH, upW, upD, "r2", 0.84);
 }
 
 /**
