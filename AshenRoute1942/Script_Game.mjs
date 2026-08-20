@@ -1,7 +1,7 @@
 import * as THREE from "../taihang/vendor/three/build/three.module.mjs";
 import * as Story from "./Data_Story.mjs?v=20260730s";
 import * as Level from "./Data_Level.mjs?v=20260730s";
-import * as Systems from "./Script_GameplaySystems.mjs?v=20260730s";
+import * as Systems from "./Script_GameplaySystems.mjs?v=20260821a";
 import * as Narrative from "./Script_NarrativeState.mjs?v=20260730s";
 import * as KilnDefense from "./Script_KilnDefense.mjs?v=20260730s";
 import { CreatePresentation, GetTerrainHeight } from "./Script_Presentation.mjs?v=20260820a";
@@ -459,6 +459,7 @@ function SetMode(nextMode) {
   mode = nextMode;
   elements.shell.dataset.mode = nextMode;
   if (nextMode !== "Playing" && document.pointerLockElement === elements.canvas) document.exitPointerLock?.();
+  UpdateAimReticle();
   UpdateQaStatus();
 }
 
@@ -886,7 +887,7 @@ function OnCanvasPointerDown(event) {
   if (event.button === 2) {
     input.aim = true;
     runtime.player.aiming = true;
-    elements.aimReticle.hidden = false;
+    UpdateAimReticle();
   } else if (event.button === 0 && input.aim) {
     FireWeapon();
   } else if (event.button === 0 && document.pointerLockElement !== elements.canvas) {
@@ -899,7 +900,7 @@ function OnCanvasPointerUp(event) {
   if (event.button === 2) {
     input.aim = false;
     if (runtime) runtime.player.aiming = false;
-    elements.aimReticle.hidden = true;
+    UpdateAimReticle();
   }
 }
 
@@ -960,7 +961,7 @@ function RunQaAimFireSequence() {
       if (!runtime) return;
       input.aim = false;
       runtime.player.aiming = false;
-      elements.aimReticle.hidden = true;
+      UpdateAimReticle();
       UpdateQaStatus();
     }, 900);
   }, 650);
@@ -1202,7 +1203,7 @@ function UseBandage() {
   runtime.player.injured = runtime.player.health < 55;
   runtime.player.aiming = false;
   input.aim = false;
-  elements.aimReticle.hidden = true;
+  UpdateAimReticle();
   runtime.player.bandageAnimationUntil = runtime.elapsedSeconds + 1.8;
   EmitWorldNoise(runtime.player.position, 1.8, "bandage");
   PlayAudio("heal", runtime.player.position, 0.75);
@@ -1537,7 +1538,9 @@ function FireWeapon() {
     direction: aim,
     timeSeconds: runtime.elapsedSeconds,
     isMoving: Math.hypot(runtime.player.velocity.x, runtime.player.velocity.z) > 0.5,
+    isSprinting: runtime.player.sprinting,
     isCrouched: runtime.player.crouched,
+    isAiming: runtime.player.aiming,
   });
   ApplySystemInventory(shotResult.inventory);
   runtime.noises.push(...shotResult.noiseEvents);
@@ -2169,6 +2172,7 @@ function UpdateHud() {
   elements.companionPanel.classList.toggle("inactive", !runtime.companion.active);
   elements.companionStatus.textContent = !runtime.companion.active ? "尚未会合" : (runtime.companion.assisting ? "正在救援" : `${runtime.companion.command === "stay" ? "留守" : "跟随"} · ${runtime.enemies.some((enemy) => enemy.state === "engage") ? "受压" : "安静"}`);
   elements.companionHealth.style.width = `${runtime.companion.health}%`;
+  UpdateAimReticle();
   const direction = new THREE.Vector3(-Math.sin(input.cameraYaw), 0, -Math.cos(input.cameraYaw));
   const labels = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"];
   let angle = Math.atan2(direction.x, -direction.z);
@@ -2176,6 +2180,30 @@ function UpdateHud() {
   elements.compassLabel.textContent = labels[Math.round(angle / (Math.PI / 4)) % 8];
   UpdateMarker();
   UpdateQaStatus();
+}
+
+function UpdateAimReticle() {
+  if (!runtime || mode !== "Playing" || IsPlayerBandaging()) {
+    elements.aimReticle.hidden = true;
+    return;
+  }
+  const speed = Math.hypot(runtime.player.velocity.x, runtime.player.velocity.z);
+  const isMoving = speed > 0.5;
+  const spread = Systems.CalculateWeaponSpreadRadians({
+    isMoving,
+    isSprinting: runtime.player.sprinting,
+    isCrouched: runtime.player.crouched,
+    isAiming: runtime.player.aiming,
+    weaponCondition: RuntimeInventory().weapon.condition,
+  }, runtime.systems.config);
+  const gapPixels = Clamp(spread * 450, 6, 26);
+  const state = runtime.player.aiming
+    ? "aiming"
+    : (runtime.player.sprinting ? "sprinting" : (isMoving ? "moving" : (runtime.player.crouched ? "crouched" : "ready")));
+  elements.aimReticle.hidden = false;
+  elements.aimReticle.dataset.state = state;
+  elements.aimReticle.style.setProperty("--reticle-gap", `${gapPixels.toFixed(2)}px`);
+  elements.aimReticle.style.setProperty("--reticle-opacity", runtime.player.sprinting ? "0.9" : "0.82");
 }
 
 function UpdateMarker() {

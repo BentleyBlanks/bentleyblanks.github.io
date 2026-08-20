@@ -34,6 +34,7 @@ import {
   EvaluateHearing,
   EvaluateVision,
   FireWeapon,
+  CalculateWeaponSpreadRadians,
   GameplayEventIds,
   LureTypeIds,
   MissionBeatKindIds,
@@ -453,6 +454,27 @@ Test("finite ammunition, deterministic spread, dry fire, and reload all conserve
   assert.equal(reload.transferredAmmo, 3);
   assert.equal(reload.inventory.weapon.magazineAmmo, 3);
   assert.equal(reload.inventory.weapon.reserveAmmo, 0);
+});
+
+Test("Easy Red 2-style reticle rules widen from aimed and crouched to walking and sprinting", () => {
+  const condition = 0.82;
+  const aimed = CalculateWeaponSpreadRadians({ isAiming: true, weaponCondition: condition });
+  const crouched = CalculateWeaponSpreadRadians({ isCrouched: true, weaponCondition: condition });
+  const standing = CalculateWeaponSpreadRadians({ weaponCondition: condition });
+  const walking = CalculateWeaponSpreadRadians({ isMoving: true, weaponCondition: condition });
+  const sprinting = CalculateWeaponSpreadRadians({ isMoving: true, isSprinting: true, weaponCondition: condition });
+  assert.ok(aimed < crouched);
+  assert.ok(crouched < standing);
+  assert.ok(standing < walking);
+  assert.ok(walking < sprinting);
+
+  const sprintShot = FireWeapon(CreateInventory({ magazineAmmo: 1, weapon: { condition } }), {
+    direction: { x: 0, z: 1 },
+    isMoving: true,
+    isSprinting: true,
+    random: CreateSeededRandom(7),
+  });
+  assert.equal(sprintShot.shot.spreadMagnitudeRadians, sprinting);
 });
 
 Test("crafting checks ingredients, consumes exact resources, and never goes negative", () => {

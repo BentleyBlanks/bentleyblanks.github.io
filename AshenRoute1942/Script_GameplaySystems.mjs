@@ -202,7 +202,9 @@ export const DefaultGameplayConfig = DeepFreeze({
     damage: 44,
     noiseRadius: 38,
     baseSpreadRadians: 0.014,
+    aimingSpreadMultiplier: 0.55,
     movingSpreadMultiplier: 1.8,
+    sprintSpreadMultiplier: 3.2,
     crouchSpreadMultiplier: 0.72,
   },
   bandage: {
@@ -1602,6 +1604,24 @@ export function CraftItem(inventory, recipeId, amount = 1, config = DefaultGamep
   };
 }
 
+export function CalculateWeaponSpreadRadians(request = {}, config = DefaultGameplayConfig) {
+  const gameplayConfig = ResolveGameplayConfig(config);
+  let spread = gameplayConfig.weapon.baseSpreadRadians;
+  if (request.isSprinting) {
+    spread *= gameplayConfig.weapon.sprintSpreadMultiplier;
+  } else if (request.isMoving) {
+    spread *= gameplayConfig.weapon.movingSpreadMultiplier;
+  }
+  if (request.isCrouched) {
+    spread *= gameplayConfig.weapon.crouchSpreadMultiplier;
+  }
+  if (request.isAiming) {
+    spread *= gameplayConfig.weapon.aimingSpreadMultiplier;
+  }
+  const condition = Clamp(FiniteOr(request.weaponCondition ?? request.condition, 1), 0, 1);
+  return spread * (1 + (1 - condition) * 1.2);
+}
+
 export function FireWeapon(inventory, request = {}, config = DefaultGameplayConfig) {
   const gameplayConfig = ResolveGameplayConfig(config);
   const nextInventory = CreateInventory(inventory, gameplayConfig);
@@ -1631,14 +1651,10 @@ export function FireWeapon(inventory, request = {}, config = DefaultGameplayConf
   }
   nextInventory.weapon.magazineAmmo -= 1;
   const random = ResolveRandom(request.random, FiniteOr(request.seed, 1942));
-  let spread = gameplayConfig.weapon.baseSpreadRadians;
-  if (request.isMoving) {
-    spread *= gameplayConfig.weapon.movingSpreadMultiplier;
-  }
-  if (request.isCrouched) {
-    spread *= gameplayConfig.weapon.crouchSpreadMultiplier;
-  }
-  spread *= 1 + (1 - nextInventory.weapon.condition) * 1.2;
+  const spread = CalculateWeaponSpreadRadians({
+    ...request,
+    weaponCondition: nextInventory.weapon.condition,
+  }, gameplayConfig);
   const shotId = String(request.shotId
     ?? `${request.actorId ?? "player"}Shot${Math.round(timestamp * 1000)}${nextInventory.weapon.magazineAmmo}`);
   return {

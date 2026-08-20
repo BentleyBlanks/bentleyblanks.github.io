@@ -1599,37 +1599,49 @@ input:focus-visible {
 }
 
 .aimReticle {
+  --reticle-gap: 8px;
+  --reticle-arm: 8px;
+  --reticle-opacity: 0.82;
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 27px;
-  height: 27px;
+  width: 72px;
+  height: 72px;
   transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .aimReticle i {
   position: absolute;
-  background: rgba(238, 231, 216, 0.74);
+  background: rgba(238, 231, 216, var(--reticle-opacity));
+  box-shadow: 0 0 0 1px rgba(8, 10, 9, 0.82), 0 1px 3px rgba(8, 10, 9, 0.9);
+  transition: top 120ms ease-out, left 120ms ease-out, opacity 120ms ease-out;
 }
 
 .aimReticle i:nth-child(1),
 .aimReticle i:nth-child(2) {
-  left: 13px;
-  width: 1px;
-  height: 8px;
+  left: 50%;
+  width: 2px;
+  height: var(--reticle-arm);
+  transform: translateX(-50%);
 }
 
-.aimReticle i:nth-child(1) { top: 0; }
-.aimReticle i:nth-child(2) { bottom: 0; }
+.aimReticle i:nth-child(1) { top: calc(50% - var(--reticle-gap) - var(--reticle-arm)); }
+.aimReticle i:nth-child(2) { top: calc(50% + var(--reticle-gap)); }
 .aimReticle i:nth-child(3),
 .aimReticle i:nth-child(4) {
-  top: 13px;
-  width: 8px;
-  height: 1px;
+  top: 50%;
+  width: var(--reticle-arm);
+  height: 2px;
+  transform: translateY(-50%);
 }
 
-.aimReticle i:nth-child(3) { left: 0; }
-.aimReticle i:nth-child(4) { right: 0; }
+.aimReticle i:nth-child(3) { left: calc(50% - var(--reticle-gap) - var(--reticle-arm)); }
+.aimReticle i:nth-child(4) { left: calc(50% + var(--reticle-gap)); }
+
+.aimReticle[data-state="sprinting"] i {
+  opacity: 1;
+}
 
 .subtitlePanel {
   position: absolute;
