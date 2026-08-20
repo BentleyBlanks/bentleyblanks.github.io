@@ -490,9 +490,32 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudCook.on { opacity: 0.9; }
 
+/* 动态准心。对标 ER2 的状态规则：腰射常驻，跑动时扩大而不是消失，开镜隐藏。
+   准心位置由枪口真实方向投影而来，所以自由瞄准时会跟枪走，不会错误承诺屏幕正中。 */
+.hudCrosshair {
+  position: absolute; left: var(--x, 50%); top: var(--y, 50%); width: 0; height: 0;
+  z-index: 3; opacity: 0; color: rgba(242, 238, 225, 0.96);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9));
+  transition: opacity 0.08s linear;
+}
+.hudCrosshair.on { opacity: 0.94; }
+.hudCrosshair.sprint { opacity: 0.82; }
+.hudCrosshair .arm, .hudCrosshair .dot {
+  position: absolute; display: block; box-sizing: border-box; background: currentColor;
+}
+.hudCrosshair .left, .hudCrosshair .right { top: -1px; width: 8px; height: 2px; }
+.hudCrosshair .left  { right: var(--gap, 5px); }
+.hudCrosshair .right { left:  var(--gap, 5px); }
+.hudCrosshair .up, .hudCrosshair .down { left: -1px; width: 2px; height: 8px; }
+.hudCrosshair .up   { bottom: var(--gap, 5px); }
+.hudCrosshair .down { top:    var(--gap, 5px); }
+.hudCrosshair .dot {
+  left: -1.5px; top: -1.5px; width: 3px; height: 3px; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.66);
+}
+
 /* 命中记号 —— 屏幕正中四道短撇。
-   本作没有准星，所以这是**唯一**会出现在画面正中的东西：它必须小、暗、短命，
-   否则就等于偷偷给了玩家一个准星（见 Script_Hud.Hitmark 的抬头）。
+   它叠在准心上仍必须小、暗、短命，不能盖住跑动和腰射的方向反馈。
    四道撇按 45° 斜角排，靠 --spread 往外弹一下；命中是骨白，击杀是干血红且更长。 */
 .hudHitmark {
   position: absolute; left: 50%; top: 50%; width: 0; height: 0;

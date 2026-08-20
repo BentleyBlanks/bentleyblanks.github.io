@@ -554,7 +554,7 @@ export const DIFFICULTY_PRESETS = {
     aiAccuracy: 1.0, playerDamage: 1.0, suppressionScale: 1.0,
     bulletGravity: 1.0, freeAimDeg: 2.0, ironSightOffset: 1.0,
     staminaSeconds: 8, overheat: true, autoSurrender: false,
-    showCrosshair: false, enemyMarkers: false, hitMarker: true,
+    showCrosshair: true, enemyMarkers: false, hitMarker: true,
   },
   realistic: {
     id: "realistic", label: "写实",

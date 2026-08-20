@@ -1,7 +1,7 @@
 // 《血战台儿庄》HUD —— 纯 DOM/CSS，**不进 three 渲染**。
 //
 // 战术信息层级参考《战地》：顶部只留目标与兵力，左下地图，右下武器、弹药和姿态；
-// 中央只出现眼下可执行的操作与真正紧急的反馈。准星仍默认关闭，也不打歼敌数字。
+// 中央只出现眼下可执行的操作、准心与真正紧急的反馈，不打歼敌数字。
 //
 // 唯一一处比 ER2 多的是「阵亡卡片」——倒地后的战场留在半透明去色层下面，
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
@@ -196,6 +196,13 @@ export class Hud {
     this.el.minimap.height = 190;
     this.minimapCtx = this.el.minimap.getContext("2d");
     this.SetMinimapVisible(false);
+    // ER2 式动态准心：腰射时给方向反馈，冲刺时仍保留但明显扩散，开镜交给机械瞄具。
+    // 四条线和中心点常驻，只改 class/CSS 变量，避免每帧重建 DOM。
+    this.el.crosshair = mk("hudCrosshair");
+    this.el.crosshair.setAttribute("role", "img");
+    this.el.crosshair.setAttribute("aria-label", "腰射准心");
+    for (const side of ["left", "right", "up", "down"]) mk(`arm ${side}`, this.el.crosshair, "i");
+    mk("dot", this.el.crosshair, "i");
     // 命中记号：屏幕正中四道短撇。**四个 span 常驻，不每次 new** ——
     // 一场仗打几百次命中，每次重建 DOM 会在 GC 上攒出可见的顿。
     this.el.hitmark = mk("hudHitmark");
@@ -233,6 +240,25 @@ export class Hud {
   /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。 */
   SetWeaponName(weaponName) {
     this.el.combatWeapon.textContent = weaponName;
+  }
+
+  /**
+   * 动态准心规则对齐 ER2 的读法：腰射可见、跑动扩大、铁瞄隐藏。
+   * x/y 是枪口真实瞄向投影，不写死屏幕中心，避免自由瞄准时准心与弹道说两套话。
+   */
+  SetCrosshair({ visible = false, x = 0.5, y = 0.5, move = 0, sprint = 0, ads = 0 } = {}) {
+    const e = this.el.crosshair;
+    const sprinting = sprint > 0.35;
+    const shown = !!visible && ads < 0.62;
+    const gap = 5 + Math.min(1, Math.max(0, move)) * 3
+      + Math.min(1, Math.max(0, sprint)) * 10;
+    e.classList.toggle("on", shown);
+    e.classList.toggle("sprint", shown && sprinting);
+    e.style.setProperty("--x", `${Math.min(1, Math.max(0, x)) * 100}%`);
+    e.style.setProperty("--y", `${Math.min(1, Math.max(0, y)) * 100}%`);
+    e.style.setProperty("--gap", `${gap.toFixed(1)}px`);
+    e.setAttribute("aria-hidden", String(!shown));
+    e.setAttribute("aria-label", sprinting ? "冲刺扩散准心" : "腰射准心");
   }
 
   /** 右下是姿态、弹药和装备；文字状态栏只保留伤情、屏息与命令。 */
