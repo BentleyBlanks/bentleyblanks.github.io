@@ -12,6 +12,19 @@ import { REINFORCE } from "./Data_Battle.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
 
+/** 章节卡排在简报之后要等多久。0.55 s 让简报那 0.6 s 的淡出先走完。 */
+const TITLE_AFTER_BRIEF_S = 0.55;
+
+/**
+ * 两个目标标签在纵向上至少要隔开多少像素（同时横向要近到 MARKER_SEP_X 才算撞）。
+ * 一个 marker 是「▲ + 名字 + 进度条」三行，实测占 38 px 高。
+ * 线性关卡里所有路标几乎在同一个方位角上 —— 实测第五关「十字街口 62m /
+ * 西门里街 222m / 西门里 340m」三个标签打在同一像素上（x 762–838、y 449.5–465.8），
+ * 两两重叠 1019–1103 px²，而且整关不散。投影点不做避让就必然叠成一坨。
+ */
+const MARKER_SEP_Y = 40;
+const MARKER_SEP_X = 130;
+
 export class Hud {
   constructor(root) {
     this.root = root;
@@ -25,6 +38,8 @@ export class Hud {
     this.hintTimer = 0;
     this.briefTimer = 0;
     this.deathTimer = 0;
+    /** 等简报播完再浮出来的章节卡（见 Title）。 */
+    this.pendingTitle = null;
     /** 说过的每一句纯文本。通关冒烟拿它断言剧本真的播了。 */
     this.spoken = [];
   }
@@ -118,13 +133,41 @@ export class Hud {
     if (this.spoken.length > 400) this.spoken.shift();
   }
 
-  /** 章节卡：阶段开场那一行大字。 */
+  /**
+   * 章节卡：阶段开场那一行大字。
+   *
+   * 【2026-08-20 修「开场三层字叠在一起」】
+   * 实测 1600×900 phase=0：简报可见窗 1.18—8.73 s，章节卡 2.63—7.31 s ——
+   * **章节卡整个生命周期完全套在简报里面，重合 4.68 s，重合率 100%**，
+   * 再加上一直在的目标指示器，开场固定有 4.7 秒三层文字互相压着。
+   * 1280×720 上最糟：12 对墨迹重叠、7412 px²，「界 河」大字直接压在简报第二行上。
+   * 1920×1080 之所以看着没事，是简报右边界离副标题只差 **7 px** ——
+   * 版式里没有任何互斥保证，纯属侥幸。
+   *
+   * 因果上这本来就该是**顺序**关系：Script_Story.mjs:138 那行
+   * `this.sinceLast = MIN_GAP;  // 开场不要立刻甩台词，让 brief 先说完`
+   * 想要的就是这个，但它把闸门变量设成了闸门阈值本身，等于开场就把闸门打开，
+   * 第一条 beat 0.8 s 就播 —— 注释想要的效果一次都没生效过。
+   *
+   * 这里不去动 Story 的节拍（那会改变每关播完多少条 beat，PlayTest 第 8 组在数），
+   * 只把**显示**排到简报后面：beat 照常推进、sinceLast 照常清零，
+   * 纯粹是这张卡片晚一点浮出来。0.55 s 的补偿是让简报那 0.6 s 的淡出先走完，
+   * 不然两张卡会在低透明度上擦一下。
+   */
   Title(text, sub = "") {
+    this.spoken.push(String(text));
+    if (this.briefTimer > 0) {
+      this.pendingTitle = { text, sub, wait: this.briefTimer + TITLE_AFTER_BRIEF_S };
+      return;
+    }
+    this._ShowTitle(text, sub);
+  }
+
+  _ShowTitle(text, sub) {
     this.el.title.innerHTML = `<div class="tMain">${text}</div>`
       + (sub ? `<div class="tSub">${sub}</div>` : "");
     this.el.title.classList.add("on");
     this.titleTimer = 4.2;
-    this.spoken.push(String(text));
   }
 
   /** 尾声：一行一行浮出来，不打歼敌数。 */
@@ -188,6 +231,8 @@ export class Hud {
       + phase.brief.map((l) => `<div class="bLine">${l}</div>`).join("");
     this.el.brief.classList.add("on");
     this.briefTimer = 6.5;
+    // 换关了：上一关没来得及浮出来的章节卡就地作废，别飘到下一关去
+    this.pendingTitle = null;
   }
 
   /** 屏幕空间的占领点图标。ER2：交叉刀剑＝待打，旗帜＝已占。 */
@@ -199,18 +244,42 @@ export class Hud {
       m.innerHTML = `<span class="ico"></span><span class="nm"></span><span class="bar"><i></i></span>`;
       box.appendChild(m);
     }
+    // 先把可见的都投影出来，再统一避让 —— 逐个直接写 left/top 是叠成一坨的根因。
+    const placed = [];
     objectives.forEach((o, i) => {
       const el = box.children[i];
       const p = project(o.x, o.y ?? 1.6, o.z);
       if (!p.visible) { el.style.display = "none"; return; }
       el.style.display = "";
-      el.style.left = `${p.x}px`;
-      el.style.top = `${p.y}px`;
       el.className = `hudMarker ${o.owner === "nra" ? "ours" : o.contested ? "fight" : "theirs"}`;
       el.children[0].textContent = o.owner === "nra" ? "▲" : "✕";
       el.children[1].textContent = `${o.name} ${Math.round(p.dist)}m`;
       el.children[2].firstChild.style.width = `${Math.round(o.progress * 100)}%`;
+      placed.push({ el, x: p.x, y: p.y, dist: p.dist });
     });
+
+    // 纵向避让：近的先占位（它更要紧），远的往下挪，直到不再压着任何一个已放好的。
+    // 只在横向也挨着（|dx| < MARKER_SEP_X）时才算撞 —— 屏幕两头的两个路标
+    // 纵坐标一样也互不干扰，一刀切地往下推会把标签甩到画面外。
+    placed.sort((a, b) => a.dist - b.dist);
+    const done = [];
+    for (const m of placed) {
+      let guard = 0;
+      let moved = true;
+      while (moved && guard < 16) {
+        moved = false;
+        guard += 1;
+        for (const d of done) {
+          if (Math.abs(d.x - m.x) >= MARKER_SEP_X) continue;
+          if (Math.abs(d.y - m.y) >= MARKER_SEP_Y) continue;
+          m.y = d.y + MARKER_SEP_Y;
+          moved = true;
+        }
+      }
+      done.push(m);
+      m.el.style.left = `${m.x}px`;
+      m.el.style.top = `${m.y}px`;
+    }
   }
 
   /** 小地图：200ms 重绘一次就够，不必每帧。 */
@@ -287,6 +356,19 @@ export class Hud {
       this.briefTimer -= dt;
       if (this.briefTimer <= 0) this.el.brief.classList.remove("on");
     }
+    // 排在简报后面的章节卡（见 Title 的注释）
+    if (this.pendingTitle) {
+      this.pendingTitle.wait -= dt;
+      if (this.pendingTitle.wait <= 0) {
+        this._ShowTitle(this.pendingTitle.text, this.pendingTitle.sub);
+        this.pendingTitle = null;
+      }
+    }
+    // 开场演出在的时候把目标指示器压下去。指示器整关都在，唯独这十来秒不该
+    // 跟大字抢同一条带子 —— 实测那一帧最糟的一条 40 px 高的带子里同时排着
+    // 简报第三行、章节副标题、和两个「▲ + 名字 + 距离」，
+    // 「界河南岸 50m」这行字中间被另一个 ▲ 直接钉穿。
+    this.root.classList.toggle("staging", this.briefTimer > 0 || this.titleTimer > 0);
     if (this.deathTimer > 0) {
       this.deathTimer -= dt;
       if (this.deathTimer <= 0) this.HideDeathCard();

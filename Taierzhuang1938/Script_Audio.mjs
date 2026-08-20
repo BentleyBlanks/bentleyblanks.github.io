@@ -1095,11 +1095,37 @@ const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3 };
 
 // 低优先级音效：节点预算紧张时先丢它们（丢一记脚步没人发现，丢一发爆炸就穿帮）。
 // 低优先级的门槛按 NODE_BUDGET * LOW_PRIORITY_HEADROOM 算，给要紧的声音留位置。
+// 【2026-08-20】rifleNraFar / rifleIjaFar 从这张表里**拿掉**了。
+// 它们原来只是环境床上的幽灵枪声（可丢），现在是 PlayGunshot 里「一百米外那一枪」
+// 的**主声**——把主声列进「预算紧张先丢」，等于交火最激烈的时候远处全体静音。
 const LOW_PRIORITY = new Set([
   "footstepDirt", "footstepRubble", "impactDirt", "impactBrick",
-  "impactWood", "rifleNraFar", "rifleIjaFar",
+  "impactWood",
 ]);
 const LOW_PRIORITY_HEADROOM = 0.62;
+
+/**
+ * 近射 → 远射的配方映射。**两段不同的录音**，不是同一段做滤波。
+ *
+ * DICE 明确说过滤波做不出距离感：远处那一枪之所以是「咚——」而不是「啪」，
+ * 是因为声音在空气和地形里滚过几百米之后**波形本身变了**（直达声的瞬态被吃掉、
+ * 地面反射与回声接在后面拖成一条尾巴），低通只能把高频削掉，削不出那条尾巴。
+ * 我们原来正是滤波路线（Play() 里那条 airHz = 18000/(1+d×0.09)）——
+ * 实测把 30 个日兵摆到 15/120/300 m 三档跑 900 帧，63 次开枪里 Far 出现 **0 次**，
+ * 最远 120 m 处播的仍是近场 rifleNra。资产早就做完了，线一直没接。
+ *
+ * 素材（Data_SfxSources.mjs）：
+ *   rifleNraFar = FLYSOUND 莫辛纳甘 50 m 外实录
+ *   rifleIjaFar = Watson Wu「来弹视角」实录（弹头掠过在前、枪声后到）
+ * 捷克式/十一年式/九二式没有对应的远场实录，就**不做**这层 —— 拿步枪的远场去配
+ * 机枪只会把两种枪的辨识度一起毁掉，宁可少一层。
+ */
+const FAR_CUE = { rifleNra: "rifleNraFar", rifleIja: "rifleIjaFar" };
+
+// 交叉淡入区间。近场素材是 1 m 近距录音、远场素材录于 50 m 外，
+// 所以纯近场只留到 45 m，45—130 m 两层同时在（等功率），130 m 外只剩远场。
+const GUN_NEAR_M = 45;
+const GUN_FAR_M = 130;
 
 /**
  * 每个配方的节点开销（实测值，见 scratchpad 的 Measure 脚本）。
@@ -1762,6 +1788,42 @@ export class AudioEngine {
    *        delay    延后多少秒开始
    *        burst    连发武器的点射发数
    */
+  /**
+   * 开一枪：按距离在**两段不同录音**之间等功率交叉淡入（见 FAR_CUE 的注释）。
+   *
+   * 为什么等功率（cos/sin）而不是线性（t / 1−t）：交叉带中点上线性淡入的两路
+   * 各 0.5，功率和是 0.5²+0.5² = 0.5 —— 走到 87 m 会**塌下去 3 dB**，
+   * 听感是「远处那一枪走到半路声音先小了一下再回来」。cos/sin 的平方和恒为 1。
+   *
+   * 没有远场素材的枪（zb26/type11/type92）原样落回 Play()，行为不变。
+   * 玩家自己那一枪 distance = 0，永远纯近场。
+   *
+   * 注意这里**不加声速延迟**（300 m 该晚 0.87 s 到）。那是另一件事，
+   * 会动到所有「开枪→听见」的时序断言，这一轮不碰；rifleIjaFar 那条素材本身
+   * 就是来弹视角录的，弹头掠过在前、枪声后到，先靠素材把这层意思带出来。
+   */
+  PlayGunshot(name, opts = {}) {
+    const far = FAR_CUE[name];
+    if (!far || !opts.position) return this.Play(name, opts);
+    const dx = opts.position.x - this.listenerPos.x;
+    const dy = opts.position.y - this.listenerPos.y;
+    const dz = opts.position.z - this.listenerPos.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const t = Clamp((d - GUN_NEAR_M) / (GUN_FAR_M - GUN_NEAR_M), 0, 1);
+    const base = opts.volume ?? 1;
+    const nearGain = Math.cos(t * Math.PI * 0.5);
+    const farGain = Math.sin(t * Math.PI * 0.5);
+    let voice = null;
+    // 0.02 的门槛是省节点：低于这个增益的那一路在混音里听不见，
+    // 但仍然要占满一条链的预算（rifleNra 一条 16 个节点）。
+    if (nearGain > 0.02) voice = this.Play(name, { ...opts, volume: base * nearGain });
+    if (farGain > 0.02) {
+      const v = this.Play(far, { ...opts, volume: base * farGain });
+      voice = voice || v;
+    }
+    return voice;
+  }
+
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用

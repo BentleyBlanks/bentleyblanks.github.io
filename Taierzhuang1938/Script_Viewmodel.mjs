@@ -216,6 +216,9 @@ function TintTo(base, target) {
 /** ClothNra 烘焙时的基色（Script_TexBake.BakeCloth 的 hue 默认值）。 */
 const CLOTH_NRA_BASE = [104, 110, 116];
 
+/** Steel 烘焙时的基色（Script_TexBake.BakeSteel 的 base 默认值）。 */
+const STEEL_BASE = [58, 60, 64];
+
 function SafeMaterial(library, name, options, fallback) {
   try {
     return library.Get(name, options);
@@ -231,8 +234,30 @@ function BuildMaterials(library) {
     // 纯金属没有漫反射项，暗部会塌成纯黑底 + 一排高光点（P1 的 lo 像素 3.4% 就是它）；
     // 留一点非金属分量，暗部才看得出材质。roughness 提到 0.46 是 1938 年发蓝钢的手感，
     // 0.62 太哑，反不出拉丝。
-    steel: SafeMaterial(library, "Steel", { repeat: 1, roughness: 0.46, metalness: 0.84, normalScale: 0.20 },
-      { color: 0x4d5054, roughness: 0.5, metalness: 0.9 }),
+    // 【2026-08-20 同一次「枪是黑板」的第二处】上面把 metalness 从 1.0 退到 0.84 是对的，
+    // 但漏了更要命的一半：**贴图本身太暗**。BakeSteel 的 base 是 [58,60,64]，
+    // 线性化后 albedo 均值只有 0.044；乘上 ORM 的 metal 均值 0.956 之后生效 metalness 0.80，
+    // 于是 F0 ≈ 0.043、漫反射 ≈ 0.009 —— 总反射率 4–5%，而且集中在 roughness 0.24 的
+    // 窄高光叶里：除了正好把太阳镜射进眼睛的那几个面，机匣与枪管其余部分全黑。
+    // 实测机匣/枪管区线性亮度 0.190（第五关），周围街景 0.409。
+    //
+    // 这个 base 的来历是「照片里发蓝钢看起来的样子」，但发蓝钢在照片里暗，是因为它是
+    // 一面粗糙的镜子照着一间暗屋子 —— 不是因为它只反 4% 的光。当 albedo 被 metalness
+    // 当成 F0 用的时候，照抄照片里的深灰就等于要求这块金属只反射 4% 的入射光。
+    //
+    // 为什么不去改 BakeSteel 的 base：那张贴图是**共用**的，SteelHelmet 走的是
+    // Script_Actor.mjs:2131 的 `metalness: 0.04` —— 在那里同一份 albedo 是当**漫反射**
+    // 用的，而且已经被 TintTo 重新映射过。抬高共用 base 会把钢盔和全世界的钢件一起提亮，
+    // 是七关范围的观感改动，不该混在一个 bug 修复里。这里只给视图模型加一层 tint，
+    // 把生效 albedo 抬到线性 ≈ 0.17（sRGB 0x72767c），F0 落到 0.14 左右。
+    // roughness 从 0.46 提到 0.58：F0 正确之后不再需要靠窄叶硬挤那点高光，
+    // 宽一点才是滚了半个月的战场枪械，而不是刚出厂的抛光件。
+    steel: SafeMaterial(library, "Steel",
+      {
+        repeat: 1, roughness: 0.58, metalness: 0.84, normalScale: 0.20,
+        color: TintTo(STEEL_BASE, 0x72767c), tintId: "vmSteel",
+      },
+      { color: 0x72767c, roughness: 0.58, metalness: 0.84 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
     wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.24 },
@@ -263,7 +288,25 @@ function BuildMaterials(library) {
       },
       { color: 0x7d5a3c, roughness: 0.78, metalness: 0 }),
     brass: library.Plain("VmBrass", { color: 0xb08a3c, roughness: 0.34, metalness: 0.95 }),
-    blued: library.Plain("VmBlued", { color: 0x2b2e31, roughness: 0.42, metalness: 1.0 }),
+    // 【2026-08-20 修「枪是一块黑板」】上面那段注释里写明的教训（纯金属没有漫反射项）
+    // 当时只改了 steel，隔四行的 blued 漏掉了 —— 于是全屏最黑的东西是枪机、弹匣、桥夹。
+    //
+    // 病根不是后处理，是 PBR 参数写错了：Plain() 一张贴图都不挂（Script_Materials.mjs:135），
+    // 所以 metalness 就是字面的 1.0，漫反射项恒等于 0，color **整个被当成金属 F0**。
+    // 0x2b2e31 线性化后是 (0.0242, 0.0273, 0.0307)，即「反射率 2.7% 的金属」——
+    // 自然界没有这种东西（铁的 F0 ≈ 0.56，连塑料这类电介质都有 0.04）。
+    // 实测：枪机区线性亮度 0.0141，比周围街景（0.409）暗 29 倍，8-bit 上是 2–3/255。
+    // 七关都黑，第五关只是把它推到极致 —— L5 出生点背对太阳（elev 45°/azim 226°），
+    // 连那几个「碰巧把太阳镜射进眼睛」的面都没了，于是整支枪塌成纯黑。
+    //
+    // 对照组说明为什么墙没事：BrickWall 也写 metalness: 1，但它走 library.Get()、
+    // 带 ORM，而 ORM 的 metal 通道均值 0.000，把 metalness 乘成了 0。
+    // Get() 靠 ORM 抵消，Plain() 没有 ORM 可抵消 —— 同一个 1.0 在墙上无害、在枪上致命。
+    //
+    // 改法照 steel 的先例：metalness 退到 0.80 留一点漫反射（暗部才看得出材质），
+    // color 抬到线性 ≈ 0.20（sRGB 0x7a7d82）。发蓝钢真值 F0 更高，但它是**烤蓝氧化层**
+    // 且这支枪在战场上滚了半个月，抬到物理真值会变成镀铬件；0.20 是「暗但有形」的落点。
+    blued: library.Plain("VmBlued", { color: 0x7a7d82, roughness: 0.44, metalness: 0.80 }),
     leather: library.Plain("VmLeather", { color: 0x3a2c22, roughness: 0.86, metalness: 0 }),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
@@ -1306,16 +1349,26 @@ export class Viewmodel {
     const yawSign = rnd() < 0.5 ? -1 : 1;
     const yawAmount = recoil.yaw * DEG * (0.45 + rnd() * 0.9) * yawSign;
     // 开镜时抵肩更实，后坐观感减到六成（真实原因是身体姿态，这里用一个系数糊过去）
-    const adsScale = Mix(1.0, 0.6, Clamp01(this.adsSpring.value));
+    //
+    // 【2026-08-20 拆成两个系数】原来这一个 adsScale 同时乘在**枪**和**相机**上。
+    // 战地压的只有瞄准：DICE 的原话是把后坐支点挪到照门，"so we don't mess with
+    // the players aim" —— 压的是准星被顶走多少，枪该怎么跳还怎么跳。
+    // 一起压的后果是开镜之后连枪的视觉后坐都缩水，那正是「开镜之后这枪没劲了」的来源。
+    //
+    // 顺带修一处比例反了的地方：实测相机峰值 1.595°、枪 1.489°，相机比枪还大 7%。
+    // 战地是相机小、枪大。相机侧从 0.55 收到 0.46，枪侧不动 ——
+    // 改完相机/枪 ≈ 0.89，枪重新变成画面上跳得最凶的那个东西。
+    const adsAim = Mix(1.0, 0.6, Clamp01(this.adsSpring.value));   // 只压准星
+    const adsGun = 1;                                              // 枪自己该跳多少就跳多少
 
-    this.recoilKick.Impulse(recoil.kick * adsScale);
-    this.recoilRise.Impulse(recoil.kick * 0.35 * adsScale);
-    this.recoilPitchSpring.Impulse(recoil.pitch * DEG * adsScale);
-    this.recoilYawSpring.Impulse(yawAmount * adsScale);
+    this.recoilKick.Impulse(recoil.kick * adsGun);
+    this.recoilRise.Impulse(recoil.kick * 0.35 * adsGun);
+    this.recoilPitchSpring.Impulse(recoil.pitch * DEG * adsGun);
+    this.recoilYawSpring.Impulse(yawAmount * adsGun);
 
     // 相机踢动交给调用方（视图模型自己转是不够的，准星必须真的被顶上去）
-    this.cameraKick.x += recoil.pitch * DEG * 0.55 * adsScale;
-    this.cameraKick.y += yawAmount * 0.5 * adsScale;
+    this.cameraKick.x += recoil.pitch * DEG * 0.46 * adsAim;
+    this.cameraKick.y += yawAmount * 0.5 * adsAim;
 
     // 枪焰：旋转按发数派生，连发时每一发的形状不同
     this.flashTime = 0;

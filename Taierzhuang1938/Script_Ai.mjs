@@ -1104,7 +1104,10 @@ export class AiDirector {
       const name = s.side === "nra"
         ? (s.weaponId === "Zb26" ? "zb26" : "rifleNra")
         : (s.weaponId === "Type11" ? "type11" : s.weaponId === "Type92Hmg" ? "type92" : "rifleIja");
-      audio.Play(name, { position: from.clone(), volume: 1 });
+      // PlayGunshot 而不是 Play：一百米外那一枪要换成**另一段录音**，
+      // 不是同一段加低通（Script_Audio.FAR_CUE 那段注释）。
+      // 步枪走两层交叉淡入，机枪没有远场素材、内部自动落回 Play()。
+      audio.PlayGunshot(name, { position: from.clone(), volume: 1 });
     }
 
     if (hit) {

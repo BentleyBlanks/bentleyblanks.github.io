@@ -1824,6 +1824,38 @@ let lastLookDeltaYaw = 0;      // 上一帧真的传给 sway 弹簧的那个数�
  */
 const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
 
+/**
+ * 碰撞盒 tag → 弹着表面档案。
+ *
+ * 【2026-08-20】原来这里是一行三目：`barricade→sandbag / prop→wood / 其余→brick`。
+ * Script_Vfx 的 SURFACE_PROFILES 有 7 套，参数差异做得很细（金属 12 颗火星、
+ * 沙包出沙流、木头出长条碎片），但玩家的子弹只映射得到 3 套 ——
+ * **打土坎、打木桥、打坟头，全出砖灰**，dirt 那套档案是死代码；
+ * impactWood / impactMetal 两条实录音全仓库只有过场用过，正片里一辈子听不到。
+ * 资产与配方都在，缺的就是这张表。
+ *
+ * tag 的全集来自 World.Solid() 的实参（wall/prop/parapet/ramp/platform/grave/
+ * bridge/balk）加上 barricade / embankment / kan。没列进来的落回 brick。
+ *
+ * metal 仍然没有来源：全场没有任何一个碰撞盒标成金属（城门是 seed:"gate" 的
+ * 木门，不是铁门）。给它编一个 tag 属于改世界几何，不混在这次修复里。
+ */
+const SURFACE_BY_TAG = {
+  barricade: "sandbag",
+  prop: "wood", balk: "wood", bridge: "wood", platform: "wood",
+  ramp: "dirt", grave: "dirt", embankment: "dirt", kan: "dirt",
+  wall: "brick", parapet: "brick",
+};
+
+/** 表面 → 实录命中音。sandbag 与 dirt 共用土声（沙包里装的就是土）。 */
+const IMPACT_CUE = {
+  brick: "impactBrick", dirt: "impactDirt", sandbag: "impactDirt",
+  wood: "impactWood", metal: "impactMetal", water: "impactDirt",
+};
+
+/** 玩家每几发出一颗曳光。史实上常见的装填比例就是 1/5。见 TryFire 末尾的注释。 */
+const TRACER_EVERY = 5;
+
 function MarchBullet(from, dir, weapon, targets) {
   const muzzle = AMMO[weapon.ammo]?.muzzle || 700;
   const gravity = 9.8 * (DIFFICULTY.bulletGravity ?? 1);
@@ -1900,7 +1932,14 @@ function TryFire(dt) {
   if (state.ammo <= 0) {
     // 空仓那一下：栓停在后面，得自己压桥夹。不提示弹药数（ER2 的步兵 HUD 也不显示），
     // 但空膛的"咔"必须听得出来，不然玩家不知道自己在空按扳机。
-    audio.Play("bolt", { volume: 0.5 });
+    //
+    // 【2026-08-20】原来空膛和每发之后的拉栓**是同一个 cue**，只差音量 0.50 vs 0.42 ——
+    // 闭着眼睛分不出「这是在拉栓」还是「这是空了」。而我们不显示弹药数，
+    // 这一声本该是玩家唯一的弹药信息通道。
+    // 没有独立的空击实录，就用 pitch 把它拉开：击针落在空膛是**又轻又高又短**的一记，
+    // 拉栓是「哐啷」两下的重机械声。pitch 1.55 把频心抬上去、整声缩到 65%，
+    // 音量再降到 0.34 —— 两者在时长、频心、响度三个维度上同时分开，不靠音量那 8% 硬撑。
+    audio.Play("bolt", { volume: 0.34, pitch: 1.55 });
     fireCooldown = 0.35;
     if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
     return;
@@ -1986,12 +2025,21 @@ function TryFire(dt) {
     audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
-    const tag = shot.wall.box.tag;
-    const surface = tag === "barricade" ? "sandbag" : tag === "prop" ? "wood" : "brick";
+    const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";
     vfx.Impact(_hitPoint, n, surface);
-    audio.Play(surface === "sandbag" ? "impactDirt" : "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
+    audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
   }
-  vfx.Tracer(_muzzle, _hitPoint.clone(), { kind: "nra" });
+  // 【2026-08-20】曳光**按比例出**，不是每发都出。
+  //
+  // 原来玩家每一发都拖一条光。史实上曳光弹是按比例压进弹仓的（常见每 5 发一颗，
+  // 而且主要是给机枪指示弹着，栓动步枪的桥夹里往往一颗都没有）；
+  // 更要紧的是它跟本作的设计直接打架 —— 夜袭关要求「摸上去」，
+  // 而每发一条光等于自己举着灯把位置喊出去。
+  //
+  // 用 state.playerShots 取模而不是随机数：确定性（截图比对要可复现），
+  // 而且「五发里有一发看得见弹道」是可学习的节奏，玩家会拿它去校准提前量。
+  // AI 侧仍然逐发出曳光，那是故意的：满场只有靠它才读得出火力从哪个方向来。
+  if (state.playerShots % TRACER_EVERY === 0) vfx.Tracer(_muzzle, _hitPoint.clone(), { kind: "nra" });
 }
 
 // ---------------------------------------------------------------------------

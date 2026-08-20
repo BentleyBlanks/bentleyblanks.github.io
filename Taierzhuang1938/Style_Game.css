@@ -112,6 +112,27 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudOrderRow { display: flex; align-items: baseline; gap: 8px; }
 .hudOrderRow b { color: var(--warn); font-size: 13px; }
 
+/* HUD 各层的叠放次序。
+   【2026-08-20】以前**一层都没设 z-index**（实测 computed 全是 auto），
+   叠放次序＝Hud.Build() 的 DOM 建序，于是 markers(第 9 个) < brief(13) < title(14)：
+   功能层在最底下、演出层盖在它上面，纯属建序的巧合而不是设计。
+   写成显式的三档，以后往 Build() 里插一个元素不会再默默改变谁压谁。 */
+.hudMarkers { z-index: 1; }
+.hudBrief, .hudTitle { z-index: 3; }
+.hudDeathCard { z-index: 5; }
+
+/* 开场演出（简报 / 章节卡）在的时候，把功能层压到 18%。
+   两者本来就不该同时满不透明地占中间那块地方。 */
+/* 开场那几秒**硬关**方向指示器，不是调暗。
+   调暗（原来是 0.18）的问题是：重叠面积一个像素都不少，指示器变成压在
+   考据过的开场白底下的一层脏纹理 —— 既没导航成，还把导航和旁白一起毁了。
+   实测原值下简报与指示器重叠 97774 px²、连续 7 秒。
+   要么完整、要么不在。照抄阵亡卡那条先例（第 173 行），不引入新概念。
+   那几秒功能层本来也没有决策价值：玩家站在出生点、目标在正前方、
+   剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
+#hud.staging .hudMarkers { opacity: 0; }
+.hudMarkers { transition: opacity 0.4s ease; }
+
 /* 占领点图标 */
 .hudMarkers { position: absolute; inset: 0; }
 .hudMarker {
