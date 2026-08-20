@@ -1,0 +1,5 @@
+Quaternius Ultimate Animated Character Pack (Nov 2019), CC0 1.0.
+https://quaternius.com/packs/ultimatedanimatedcharacter.html
+https://opengameart.org/content/animated-characters-pack
+BlueSoldier_Male → 中方；Soldier_Male → 日方。
+网格刚体绑到游戏 13 关节，动画仍走 Script_Actor 的姿态机。

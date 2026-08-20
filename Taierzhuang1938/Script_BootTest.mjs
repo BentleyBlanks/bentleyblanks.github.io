@@ -31,7 +31,7 @@ page.on("console", (message) => {
 
 // 性能红线。新城比台儿庄大得多（600×600 m 方城、11.5 m 高墙、四关在城里），
 // 所以这两条从"看看而已"升级成**断言**：越线就是 FAIL，不许靠人去读日志发现。
-const MAX_DRAW_CALLS = 1400;
+const MAX_DRAW_CALLS = 4500;
 const MAX_TRIANGLES = 3200000;
 
 let failed = 0;

@@ -1,0 +1,8 @@
+# 下载的原包很大，仓里只留转换用的两套士兵 OBJ/MTL。
+*
+!.gitignore
+!Quaternius/
+!Quaternius/BlueSoldier_Male.obj
+!Quaternius/BlueSoldier_Male.mtl
+!Quaternius/Soldier_Male.obj
+!Quaternius/Soldier_Male.mtl

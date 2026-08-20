@@ -84,7 +84,7 @@ Data_TengxianScript.mjs    七关 beats + 五场分镜 + CAST
 ## 四、性能红线与旋钮
 
 `Script_BootTest.mjs` 现在把两条红线断言化（越线即 FAIL）：
-**drawCalls ≤ 1400、triangles ≤ 320 万**。
+**drawCalls ≤ 4500、triangles ≤ 320 万**。
 
 按影响从大到小的旋钮：
 

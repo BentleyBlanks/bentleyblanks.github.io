@@ -19,7 +19,6 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from TzmCore import FLIPPED, ResetScene, WriteTzm      # noqa: E402
-import BuildSoldiers                 # noqa: E402
 import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
@@ -27,7 +26,9 @@ import ImportWeapons                 # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
-BUDGET = {"soldier": 1800, "weapon": 900, "prop": 400, "vehicle": 1600}
+# 士兵改走 ImportSoldiers.py（Quaternius CC0 人物，约 3000 三角）。
+# 1800 是程序化方块人的预算；导入网格是低模游戏角色，24 人同屏仍远低于三角红线。
+BUDGET = {"soldier": 3200, "weapon": 900, "prop": 400, "vehicle": 1600}
 
 # 武器全长（米），抄自 Data_Weapons.mjs 的 lengthM，**是史实数据，不许为了好看改**。
 # 断言的是模型在 Z 上的实际跨度 —— 它一次就逮出了汉阳造的套筒建到枪口前头去、
@@ -64,19 +65,60 @@ def OutDir():
     return os.path.abspath(os.path.join(HERE, "..", "Model"))
 
 
+def RegisterImportedSoldier(out, name, notes, manifest, failures):
+    """把 ImportSoldiers.py 写好的 TZM 登进清单，不重新建模。"""
+    path = os.path.join(out, name + ".tzm.json")
+    if not os.path.isfile(path):
+        failures.append("%s 不存在 —— 先跑 python Taierzhuang1938/_blender/ImportSoldiers.py" % name)
+        return
+    with open(path, "r", encoding="utf-8") as handle:
+        doc = json.load(handle)
+    tris = int(doc.get("triangles") or 0)
+    size = os.path.getsize(path)
+    ok = tris <= BUDGET["soldier"]
+    if not ok:
+        failures.append("%s 三角超预算：%d > %d" % (name, tris, BUDGET["soldier"]))
+    bmin, bmax = doc["bounds"]["min"], doc["bounds"]["max"]
+    if name in SOLDIER_HEIGHT:
+        span = bmax[1] - bmin[1]
+        want = SOLDIER_HEIGHT[name]
+        if abs(span - want) > HEIGHT_TOLERANCE:
+            ok = False
+            failures.append("%s 身高对不上：%.3f m ≠ %.3f m" % (name, span, want))
+        if abs(bmin[1]) > 0.02:
+            ok = False
+            failures.append("%s 脚底没落在 y=0：%.3f" % (name, bmin[1]))
+    joints = sum(1 for node in doc["nodes"] if node.get("joint"))
+    mounts = [node["name"] for node in doc["nodes"] if not node.get("meshes")]
+    materials = sorted({m["material"] for m in doc["meshes"]})
+    manifest.append({
+        "name": name, "category": "soldier", "file": name + ".tzm.json",
+        "triangles": tris, "meshBlocks": len(doc["meshes"]), "nodes": len(doc["nodes"]),
+        "joints": joints, "bytes": size, "materials": materials,
+        "mounts": mounts, "bounds": doc["bounds"],
+    })
+    print("%-4s %-16s %-8s tris=%-5d blocks=%-3d nodes=%-3d joints=%-3d %6.1f KB  mats=%s"
+          % ("ok" if ok else "FAIL", name, "soldier", tris, len(doc["meshes"]),
+             len(doc["nodes"]), joints, size / 1024.0, ",".join(materials)))
+
+
 def main():
     out = OutDir()
     os.makedirs(out, exist_ok=True)
     manifest = []
     failures = []
 
+    RegisterImportedSoldier(
+        out, "SoldierNra",
+        "Quaternius BlueSoldier_Male（CC0）。国民革命军步兵。",
+        manifest, failures)
+    RegisterImportedSoldier(
+        out, "SoldierIja",
+        "Quaternius Soldier_Male（CC0）。濑谷支队步兵。",
+        manifest, failures)
+
     jobs = []
-    jobs.append(("SoldierNra", "soldier", BuildSoldiers.BuildNraSoldier,
-                 "国民革命军第 2 集团军第 31 师步兵：布军帽 + 青天白日帽徽、灰蓝土布军装、"
-                 "斜挎布子弹带（大部分格子瘪着）、绑腿、草鞋或布鞋。无钢盔。"))
-    jobs.append(("SoldierIja", "soldier", BuildSoldiers.BuildIjaSoldier,
-                 "日军濑谷支队步兵：立领昭五式 + 步兵红领章、九〇式钢盔（正面五角星）、"
-                 "皮弹药盒三只、编上靴 + 脚绊。1938 年 3—4 月无屁帘。"))
+    # 士兵已在上面从 ImportSoldiers.py 的 TZM 登记。下面只重建枪 / 构件 / 车。
     for name, builder in BuildWeapons.WEAPON_BUILDERS.items():
         imported = ImportWeapons.BuilderFor(name)
         jobs.append((name, "weapon", imported or builder, ""))

@@ -1,9 +1,9 @@
 {
  "format": "tzm-index",
  "version": 1,
- "generator": "Taierzhuang1938/_blender/BuildAll.py",
+ "generator": "Taierzhuang1938/_blender/ImportSoldiers.py + BuildAll.py",
  "budget": {
-  "soldier": 1800,
+  "soldier": 3200,
   "weapon": 900,
   "prop": 400,
   "vehicle": 1600
@@ -13,16 +13,14 @@
    "name": "SoldierNra",
    "category": "soldier",
    "file": "SoldierNra.tzm.json",
-   "triangles": 1764,
-   "meshBlocks": 21,
-   "nodes": 29,
+   "triangles": 3032,
+   "meshBlocks": 16,
+   "nodes": 20,
    "joints": 13,
-   "bytes": 58925,
+   "bytes": 130865,
    "materials": [
     "accentA",
     "accentB",
-    "accessory",
-    "shoe",
     "skin",
     "uniform"
    ],
@@ -33,20 +31,18 @@
     "gripL",
     "gripR",
     "weaponMount",
-    "slingBack",
-    "kneeL",
-    "kneeR"
+    "slingBack"
    ],
    "bounds": {
     "min": [
-     -0.25937,
+     -0.32849,
      0.0,
-     -0.17778
+     -0.29915
     ],
     "max": [
-     0.25937,
-     1.67471,
-     0.14374
+     0.32842,
+     1.66,
+     0.29205
     ]
    }
   },
@@ -54,17 +50,15 @@
    "name": "SoldierIja",
    "category": "soldier",
    "file": "SoldierIja.tzm.json",
-   "triangles": 1776,
-   "meshBlocks": 23,
-   "nodes": 32,
+   "triangles": 3008,
+   "meshBlocks": 17,
+   "nodes": 20,
    "joints": 13,
-   "bytes": 59059,
+   "bytes": 130592,
    "materials": [
     "accentA",
     "accentB",
     "helmet",
-    "leather",
-    "shoe",
     "skin",
     "uniform"
    ],
@@ -75,20 +69,18 @@
     "gripL",
     "gripR",
     "weaponMount",
-    "slingBack",
-    "kneeL",
-    "kneeR"
+    "slingBack"
    ],
    "bounds": {
     "min": [
-     -0.25048,
+     -0.31803,
      0.0,
-     -0.16774
+     -0.29853
     ],
     "max": [
-     0.25048,
-     1.63098,
-     0.18025
+     0.32014,
+     1.62,
+     0.28802
     ]
    }
   },

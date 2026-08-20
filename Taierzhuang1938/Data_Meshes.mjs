@@ -1,5 +1,5 @@
-// 《血战台儿庄》模型清单：Blender 程序化管线（Taierzhuang1938/_blender/）出的
-// 那批 .tzm.json 的元数据。
+// 《血战台儿庄》模型清单：Blender 程序化管线（枪/构件/车）+ ImportSoldiers.py
+//（Quaternius CC0 人物）出的那批 .tzm.json 的元数据。
 //
 // 这张表是**手写但可校验**的：数字全部抄自 Model/Index.json（BuildAll.py 每次
 // 重建都会重写它），_blender/Verify.mjs 会把两边逐字段对一遍。不直接在运行时
@@ -15,6 +15,8 @@
 
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
+/** 人物 / 枪 TZM 换了内容就加一，避免 Pages 把旧 JSON 粘在手机 Safari 里。 */
+const MESH_REV = "2";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -68,23 +70,23 @@ export const MERGE_PROFILES = {
 export const MESHES = {
   SoldierNra: {
     file: "SoldierNra.tzm.json", category: "soldier",
-    triangles: 1764, meshBlocks: 21, nodes: 29, joints: 13,
-    materials: ["accentA", "accentB", "accessory", "shoe", "skin", "uniform"],
+    triangles: 3032, meshBlocks: 16, nodes: 20, joints: 13,
+    materials: ["accentA", "accentB", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.5187, 1.6747, 0.3215], height: 1.66,
-    draws: { high: 19, medium: 17, low: 16 },
-    note: "第 2 集团军第 31 师步兵。布军帽 + 青天白日帽徽、灰蓝土布军装、"
-      + "斜挎布子弹带（只有靠身三格鼓着）、缠出层叠的绑腿、草鞋或布鞋。**无钢盔。**",
+    span: [0.6569, 1.66, 0.5912], height: 1.66,
+    draws: { high: 16, medium: 14, low: 14 },
+    note: "Quaternius BlueSoldier_Male（CC0）。第 2 集团军步兵。灰蓝土布军装、"
+      + "布料头盔（不当钢盔）、青天白日帽徽。网格刚体绑在 13 关节上，姿态走 Actor。",
   },
   SoldierIja: {
     file: "SoldierIja.tzm.json", category: "soldier",
-    triangles: 1776, meshBlocks: 23, nodes: 32, joints: 13,
-    materials: ["accentA", "accentB", "helmet", "leather", "shoe", "skin", "uniform"],
+    triangles: 3008, meshBlocks: 17, nodes: 20, joints: 13,
+    materials: ["accentA", "accentB", "helmet", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.501, 1.631, 0.348], height: 1.62,
-    draws: { high: 19, medium: 18, low: 17 },
-    note: "濑谷支队步兵。立领昭五式 + 步兵红领章、九〇式钢盔（外翻盔沿 + 正面五角星）、"
-      + "皮弹药盒三只、编上靴 + 脚绊。**1938 年 3—4 月无屁帘。**",
+    span: [0.6382, 1.62, 0.5866], height: 1.62,
+    draws: { high: 17, medium: 15, low: 15 },
+    note: "Quaternius Soldier_Male（CC0）。濑谷支队步兵。橄榄军装 + 钢盔桶 + "
+      + "步兵红领章与五角星。**1938 年 3—4 月无屁帘。**",
   },
 
   ZhongZheng: {
@@ -216,7 +218,7 @@ export const MESHES = {
 /** 取一个模型的 url。id 不认识时返回 null（调用方退回程序化几何）。 */
 export function MeshUrl(id) {
   const entry = MESHES[id];
-  return entry ? MODEL_BASE + entry.file : null;
+  return entry ? `${MODEL_BASE}${entry.file}?v=${MESH_REV}` : null;
 }
 
 /** 按类别列 id。 */
@@ -226,7 +228,7 @@ export function MeshIds(category = null) {
 
 /** 全部模型的 url，给 PreloadModels 用。 */
 export function AllMeshUrls() {
-  return MeshIds().map((id) => MODEL_BASE + MESHES[id].file);
+  return MeshIds().map((id) => `${MODEL_BASE}${MESHES[id].file}?v=${MESH_REV}`);
 }
 
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
