@@ -38,6 +38,8 @@ try {
   const result = await page.evaluate(async () => {
     const T = window.Taierzhuang;
     const terrain = await import("./Script_JieheField.mjs");
+    const height = await import("./Script_JieheHeight.mjs");
+    const heightmap = await import("./Heightmap/Data_TaierzhuangHeightmap.mjs");
     const field = T.battlefield;
 
     // 只量真正交火的南岸核心区，避开本来就有 1.9 m 落差的界河河槽。
@@ -77,15 +79,49 @@ try {
       + lane.lowHits.filter((tag) => tag === "dirt").length, 0);
     const usefulLanes = laneChecks.filter((lane) => lane.shoulders.some((h) => h > 0.85)
       && lane.lowHits.includes("dirt")).length;
+    // 当前关卡所有落地碰撞体都应贴着最终高度图地面。prop 里含“栽在堤顶的树”，
+    // bridge 本来就悬空，二者不纳入地面锚点。
+    const groundTags = new Set(["parapet", "grave", "balk", "kan", "embankment", "wall", "platform"]);
+    let matchedAnchors = 0, anchorCount = 0, worstAnchorGap = 0;
+    const badAnchors = [];
+    for (const box of field.colliders) {
+      if (!groundTags.has(box.tag)) continue;
+      const cx = box.c ? box.c[0] : (box.min[0] + box.max[0]) * 0.5;
+      const cz = box.c ? box.c[2] : (box.min[2] + box.max[2]) * 0.5;
+      const gap = Math.abs(box.min[1] - field.GroundHeight(cx, cz));
+      anchorCount += 1;
+      if (gap < 0.08) matchedAnchors += 1;
+      else if (badAnchors.length < 12) badAnchors.push({ tag: box.tag, x: cx, z: cz, gap });
+      worstAnchorGap = Math.max(worstAnchorGap, gap);
+    }
+
+    let samplerError = 0;
+    for (let x = -620; x <= 620; x += 124) {
+      for (let z = -1620; z <= -900; z += 90) {
+        samplerError = Math.max(samplerError,
+          Math.abs(field.GroundHeight(x, z) - height.SampleJieheHeight(x, z)));
+      }
+    }
     return {
       level: T.Debug.Level().id,
       minY, maxY, range: maxY - minY,
       terrainHits, usefulLanes, laneChecks,
       physics: T.Debug.Physics(),
+      heightmapId: heightmap.TAIZHUANG_HEIGHTMAP.id,
+      heightmapSamples: heightmap.TAIZHUANG_HEIGHTS_DM.length,
+      sourceUrl: heightmap.TAIZHUANG_HEIGHTMAP.source.url,
+      samplerError,
+      matchedAnchors, anchorCount, worstAnchorGap, badAnchors,
     };
   });
 
   Check("加载的是第一关界河", result.level === "L0_Jiehe", result.level);
+  Check("运行时读取台儿庄 SRTM 高度图",
+    result.heightmapId === "TaierzhuangSrtmN34E117" && result.heightmapSamples === 257 * 193
+      && /N34E117\.hgt\.gz$/.test(result.sourceUrl),
+    `${result.heightmapId}，${result.heightmapSamples} 样本`);
+  Check("渲染/物理与 CLI 共用唯一高度采样器", result.samplerError < 1e-9,
+    `最大误差 ${result.samplerError.toExponential(2)} m`);
   Check("核心交火区不再是一张平板", result.range >= 5.0,
     `高程 ${result.minY.toFixed(2)}…${result.maxY.toFixed(2)} m，落差 ${result.range.toFixed(2)} m`);
   Check("至少三条下切通道形成真实地形掩蔽", result.usefulLanes >= 3,
@@ -93,8 +129,14 @@ try {
   Check("地物碰撞仍完整灌进物理世界",
     result.physics && result.physics.solids >= result.physics.fieldColliders * 0.99,
     result.physics ? `${result.physics.solids}/${result.physics.fieldColliders}` : "无物理数据");
+  Check("现有布设碰撞体已重新贴合高度图",
+    result.anchorCount > 300 && result.matchedAnchors >= result.anchorCount * 0.995,
+    `${result.matchedAnchors}/${result.anchorCount} 个地面锚点；最大偏差 ${result.worstAnchorGap.toFixed(3)} m`);
   for (const lane of result.laneChecks) {
     console.log(`    ${lane.id.padEnd(22)} 肩高=${lane.shoulders.map((v) => v.toFixed(2)).join("/")} m  命中=${lane.lowHits.join("/")}`);
+  }
+  for (const anchor of result.badAnchors) {
+    console.log(`    锚点偏差 ${anchor.tag.padEnd(10)} (${anchor.x.toFixed(1)},${anchor.z.toFixed(1)}) ${anchor.gap.toFixed(3)} m`);
   }
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 300)}`);

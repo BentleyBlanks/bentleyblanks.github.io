@@ -78,6 +78,7 @@ import {
 import { BuildSink, AddTree } from "./Script_World.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import { JIEHE_RIVER, JieheRiverCenterZ } from "./Script_JieheHeight.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：城外这一套新增的逻辑名
@@ -230,31 +231,8 @@ const OUTFIELD_SCENES = {
     //（fog.max 0.94），所以城外的东西**必须堆在玩家一百米以内**才读得出来。
     // （河心从 -1524 北移 4 m、两岸堤各外移 4/5 m，是给下切的河槽让出槽肩：
     //   槽肩在河心 ±26，堤脚在 ±27.4 / ±30.1，差 1.4 m 以上不打架。）
-    river: {
-      centerZ: -1528, bedHalf: 19, waterHalf: 6.0, meander: 9,
-      fromX: -960, toX: 960,
-      /**
-       * **河槽是真下切的。**
-       *
-       * 城那张外圈网格 700—1700 m 之间只有 5 圈径向采样（一格 200 m），
-       * 任何窄于 200 m 的地形特征都会被混叠掉 —— 所以在城的世界里，河只能
-       * 靠两岸筑堤"抬"出来。拆成独立场景之后地表是自己铺的（河槽一带 3.2 m
-       * 一格），槽就能真挖下去：Script_JieheField.GroundHeight 按这两个数下切。
-       *   cut 1.9 m  槽底比平地低多少（站进槽里，岸上的人只看得见头顶）
-       *   run 7 m    槽肩到槽底的坡长（1.9/7 ≈ 15°，走得下去也走得上来）
-       * 槽底半宽 = bedHalf 19 → **38 m 宽的平底**，槽肩落在 ±26，
-       * 两道堤（offset −33 / +31，基半宽 2.9 / 3.6）正好坐在槽肩以外的平地上。
-       */
-      channel: { cut: 1.9, run: 7 },
-      // 北岸（敌岸）：矮一档、缺口多 —— 日军要能过得来
-      north: { offset: -33, height: 1.6, baseHalf: 2.9, topHalf: 1.05,
-        gaps: [[-720, -676], [-430, -392], [-178, -126], [150, 188], [452, 496], [734, 778]] },
-      // 南岸土坎（我岸）：**这是 L0 的核心战术地形**，玩家开局就在它后面。
-      // -178…-126 那个缺口与南北向大车路对齐 —— 那是渡口，也是导航图
-      // 南北连通的主通道（两道堤都不留口的话，NavGrid 会把北岸整条切出去）
-      south: { offset: 31, height: 2.2, baseHalf: 3.6, topHalf: 1.35,
-        gaps: [[-560, -524], [-178, -126], [96, 134], [520, 562]] },
-    },
+    // 河槽、河堤与高度采样共用 Script_JieheHeight 的唯一数据表。
+    river: JIEHE_RIVER,
     // --- 两条阵地线 ---
     // ① 界河南岸的一线（Approach 路标）：散兵胸墙 + 单人掩体
     // ② 土坎（Kan 路标）：一道 2.05 m 的田坎，玩家越过它之后回身守
@@ -419,10 +397,7 @@ export function OutfieldSpec(levelId) {
  * 而且差多少取决于 x —— 一眼看不出来的那种错。
  */
 export function RiverCenterAt(river, x) {
-  if (!river) return 0;
-  return river.centerZ
-    + Math.sin(x * 0.0042 + 1.7) * river.meander
-    + Math.sin(x * 0.0131 + 0.4) * river.meander * 0.35;
+  return JieheRiverCenterZ(x, river);
 }
 
 // 合批分区。城里用 150 m（院落密），城外东西稀、跨度大，用 380 m ——
@@ -813,7 +788,6 @@ export class TengxianOutfield {
 
   /** 单人掩体：刨出来的浮土在坑口围成一圈缺口朝后的马蹄。 */
   AddFoxhole(x, z, seed, rnd) {
-    const y = this.groundAt(x, z);
     const r = 1.5 + rnd() * 0.4;
     const h = 0.9 + rnd() * 0.24;
     const arcs = 7;
@@ -823,12 +797,15 @@ export class TengxianOutfield {
       const a = -Math.PI * 0.78 + (i / (arcs - 1)) * Math.PI * 1.56;
       const px = x + Math.sin(a) * r, pz = z - Math.cos(a) * r;
       const hh = h * (0.72 + rnd() * 0.5);
+      const py = this.groundAt(px, pz);
       this.sink.Add("FreshEarth", PlaceGeometry(
         MakeBox(1.05, hh, 0.66, EARTH_TILE, `${seed}:${i}`),
-        { x: px, y: y + hh / 2 - 0.1, z: pz, ry: -a }));
+        { x: px, y: py + hh / 2 - 0.1, z: pz, ry: -a }));
     }
     this.sink.SetSector("");
-    this.sink.Solid(x, y + h / 2, z - r, 1.3, h / 2, 0.5, "parapet");
+    const colliderZ = z - r;
+    const colliderY = this.groundAt(x, colliderZ);
+    this.sink.Solid(x, colliderY + h / 2, colliderZ, 1.3, h / 2, 0.5, "parapet");
     this.sink.Cover(x, z, h, 0, 1);
     this.stats.pits += 1;
   }

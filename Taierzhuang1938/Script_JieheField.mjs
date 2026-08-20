@@ -40,94 +40,27 @@
 //   所有乔木完全落叶、冬小麦贴地不连续露土率高、大片裸露褐土。
 //   本文件只铺**裸土**：地表材质就是城外那张 Ground（鲁南褐土），
 //   绿的、开花的、带叶的东西一概不产。绝不做成绿意盎然的春天。
+//   大尺度高程来自台儿庄古城中心附近 SRTM 高度图，详见
+//   Heightmap/Data_TaierzhuangHeightmap.mjs 与 docs/Data_TaierzhuangHeightmap.md。
 //
 // 工程约束：不许 Math.random（截图比对要可复现）、不许 examples/jsm、
 // 不许 SkinnedMesh、材质走 MaterialLibrary、碰撞盒 tag 要有意义。
 // ---------------------------------------------------------------------------
 
 import * as THREE from "three";
-import { Fbm2, SmoothStep, Clamp } from "./Script_Noise.mjs";
+import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb } from "./Script_Geo.mjs";
-import { CITY } from "./Data_Tengxian.mjs";
 import {
-  TengxianOutfield, OutfieldSpec, RiverCenterAt,
+  TengxianOutfield, OutfieldSpec,
 } from "./Script_TengxianOutfield.mjs";
+import {
+  JIEHE_GROUND, JIEHE_TACTICAL_TERRAIN, JieheRiverCenterZ, SampleJieheHeight,
+} from "./Script_JieheHeight.mjs";
+
+export { JIEHE_GROUND, JIEHE_TACTICAL_TERRAIN } from "./Script_JieheHeight.mjs";
 
 /** 本关的关卡 id（Data_Battle.PHASES[*].id）。 */
 export const JIEHE_LEVEL_ID = "L0_Jiehe";
-
-/**
- * 这张图的地表参数。**它与滕县城那张图没有共用的常数** ——
- * 唯一借过来的是 CITY.outerY（濠外原野的标高 −1.2 m），
- * 借它只是为了让两张图的绝对标高对得上：过场、剧本、撒兵那些代码里
- * 凡是写死 y 的地方（都是按城外地坪调的）换关时不必再分两套。
- */
-export const JIEHE_GROUND = {
-  plainY: CITY.outerY,                 // −1.2 m，鲁南平原地坪
-  // 地表网格铺多大。**这不是可玩范围**（可玩范围是 Data_Battle 的 bounds），
-  // 是「站在切片边上朝外看，看得见的那一圈地皮」。
-  // 相机远平面 JIEHE_CAMERA_FAR（460 m），bounds 最远的角在 (±620,−900)/(±620,−1620)，
-  // 所以地皮至少要铺到 x ±1080、z −2080…−440。下面这一圈是它再加一点余量。
-  minX: -1250, maxX: 1250, minZ: -2200, maxZ: -380,
-  // 采样密度（米/格）。**这一条就是拆分的全部理由**：
-  //   河槽一带 3.2 m —— 河槽宽 38 m、两侧各 7 m 的坡，一个断面上有十几个采样点；
-  //   打起来的那一片 4.5 m —— 新增排水沟与宽缓土岗后要能读出沟肩、反斜面，
-  //     地表插值误差要小于它们自己的高度（0.3—2.2 m），不然东西会浮起来或陷进去；
-  //   其余 7 m，往外按 1.4 倍增长到 110 m 一格（那一圈全在雾里，只是地平线）。
-  // 对比：城那张外圈网格在这个距离上是 **200 m 一格**。
-  cellRiver: 3.2, cellCore: 4.5, cellOuter: 7.0,
-  riverBand: [-1585, -1475],           // 河槽 + 两岸堤脚（河心 −1528 ± 蜿蜒 11）
-  coreBand: [-1700, -880],             // 目标链所在的那一段
-  coreX: 780,                          // |x| ≤ 780 用 cellOuter，往外开始放大
-  core: [-1780, -620],                 // 等距核心区的 z 范围，出了它按 1.4 倍放大
-  growth: 1.4, maxCell: 110,
-  chunk: 44,                           // 每块网格多少格（分块是为了视锥剔除）
-  tile: 3.4,                           // UV：一格贴图 3.4 m（同城外原野）
-  // 起伏：两层缓坡。旧值只有 1.9 m / 385 m，在第一人称眼高中会被透视压成
-  // 一条水平线；现在把大尺度高差拉到约 3.4 m，再叠一层 0.85 m 的田间微起伏。
-  // 仍然是鲁南平原（没有山脊、断崖），但人在地面上能明确读出前后高低。
-  relief: 3.4, reliefFreq: 0.0029, reliefSeed: 19380314,
-  detailRelief: 0.85, detailFreq: 0.0085, detailSeed: 19380338,
-};
-
-/**
- * 界河主战区的解析式微地形。
- *
- * 这些不是装饰模型，而是 GroundHeight 的一部分：玩家、AI、脚部 IK、手榴弹和
- * 子弹射线都认同一份高程。wide ridge 是雨水与耕作留下的宽缓土岗；sunken lane
- * 是田间排水沟/下切大车道。沟底比两侧低 1.2—1.45 m，蹲下或趴下后能整个人
- * 藏进反斜面里，沟肩会由 PhysicsWorld.RaycastTerrain 真正截住来弹。
- *
- * 主目标链 x≈0 始终可走：开局只跨一条缓坡灌排沟，纵深的更深掩蔽线分置两翼。
- * 玩家可以直推，但横移找反斜面会更安全，不做横贯全图的“游戏壕沟”。
- */
-export const JIEHE_TACTICAL_TERRAIN = Object.freeze({
-  ridges: Object.freeze([
-    // 正前方 70—110 m 的中央鞍部：开局抬头就能读出高差，也把第一、二阵地
-    // 分成两个反斜面。走势斜着切过推进轴，左右仍各有绕行低口。
-    { id: "CentralApproachRise", from: [-168, -1398], to: [112, -1358], width: 42, height: 2.60 },
-    { id: "WestForwardRise", from: [-430, -1430], to: [-105, -1378], width: 34, height: 2.15 },
-    { id: "EastForwardRise", from: [92, -1368], to: [430, -1318], width: 38, height: 2.35 },
-    { id: "WestRearRise", from: [-465, -1218], to: [-118, -1160], width: 42, height: 1.85 },
-    { id: "EastRearRise", from: [105, -1128], to: [455, -1078], width: 46, height: 1.65 },
-  ]),
-  lanes: Object.freeze([
-    // 沟宽分 inner/outer：中间是能跑人的缓平底，两侧各 7—9 m 缓坡。
-    // 开局阵地前的横向灌排沟，不是齐整战壕：东高西低、斜着穿过两段胸墙。
-    { id: "FrontIrrigationCut", from: [-310, -1444], to: [305, -1423], inner: 4.5, outer: 13.0, depth: 1.35 },
-    { id: "WestDrain", from: [-255, -1438], to: [-82, -1284], inner: 4.8, outer: 13.5, depth: 1.45 },
-    { id: "EastDrain", from: [238, -1362], to: [66, -1198], inner: 5.2, outer: 14.5, depth: 1.30 },
-    { id: "SouthCartHollow", from: [-330, -1094], to: [-42, -1018], inner: 6.0, outer: 17.0, depth: 1.20 },
-  ]),
-});
-
-/** 点到线段距离。高程和测试都走确定性算术，不引入运行时随机。 */
-function DistanceToSegment(x, z, from, to) {
-  const dx = to[0] - from[0], dz = to[1] - from[1];
-  const len2 = dx * dx + dz * dz || 1;
-  const t = Clamp(((x - from[0]) * dx + (z - from[1]) * dz) / len2, 0, 1);
-  return Math.hypot(x - (from[0] + dx * t), z - (from[1] + dz * t));
-}
 
 /**
  * 相机远平面（米）。城里那六关是 620。
@@ -256,42 +189,16 @@ export class JieheField {
   // -------------------------------------------------------------------------
 
   /** 河心线（与内容层同一条公式 —— 两边差一米，河床就会跑到堤外面去）。 */
-  RiverCenterZ(x) { return RiverCenterAt(this.river, x); }
+  RiverCenterZ(x) { return JieheRiverCenterZ(x, this.river); }
 
   /**
-   * 脚下的地面标高。**解析式** —— 玩家、AI、子弹、撒兵全按它走，
+   * 脚下的地面标高。**高度图采样 + 解析式战术微地形** —— 玩家、AI、子弹、撒兵全按它走，
    * 而下面那张网格是照同一条式子采样出来的，所以「看到的地」与「踩到的地」
    * 是同一个东西（这正是城那张 200 m/格 网格做不到的：网格是线性插值，
    * 解析式是曲面，一格 200 m 时两者能差半米以上）。
    */
   GroundHeight(x, z) {
-    const g = JIEHE_GROUND;
-    let y = g.plainY
-      + (Fbm2(x * g.reliefFreq, z * g.reliefFreq,
-        { octaves: 4, seed: g.reliefSeed }) - 0.5) * g.relief
-      + (Fbm2(x * g.detailFreq, z * g.detailFreq,
-        { octaves: 3, seed: g.detailSeed }) - 0.5) * g.detailRelief;
-
-    // 宽缓土岗：圆头长脊，坡脚到脊顶连续，没有角色控制器跨不过去的断面。
-    for (const ridge of JIEHE_TACTICAL_TERRAIN.ridges) {
-      const d = DistanceToSegment(x, z, ridge.from, ridge.to);
-      y += ridge.height * SmoothStep(ridge.width, 0, d);
-    }
-
-    // 下切排水沟：中间缓平、两侧平滑抬回原地表。身处沟底时，沟肩就是地形掩体。
-    for (const lane of JIEHE_TACTICAL_TERRAIN.lanes) {
-      const d = DistanceToSegment(x, z, lane.from, lane.to);
-      y -= lane.depth * SmoothStep(lane.outer, lane.inner, d);
-    }
-    const ch = this.channel;
-    if (ch) {
-      // 河槽：槽底半宽 bedHalf（38 m 宽的平底），两侧各 run 米的斜坡。
-      // 堤（内容层那两道 1.6/2.2 m 的土堤）坐在槽肩以外的平地上 —— 见 spec 的 offset。
-      const d = Math.abs(z - this.RiverCenterZ(x));
-      const edge = this.river.bedHalf + ch.run;
-      if (d < edge) y -= ch.cut * SmoothStep(edge, this.river.bedHalf, d);
-    }
-    return y;
+    return SampleJieheHeight(x, z);
   }
 
   /**
@@ -328,7 +235,7 @@ export class JieheField {
     this.stats.gridX = XS.length;
     this.stats.gridZ = ZS.length;
     const nzAll = ZS.length;
-    // 高程只算一遍（每个顶点一次 Fbm2；相邻块共用边上的顶点值必须一致，
+    // 高程只算一遍（每个顶点一次统一高度采样；相邻块共用边上的顶点值必须一致，
     // 各块各算的话浮点误差会在块缝上露出一条亮线）
     const H = new Float32Array(XS.length * nzAll);
     for (let i = 0; i < XS.length; i += 1) {

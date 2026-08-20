@@ -140,6 +140,18 @@ Rules:
 - 改动后必须跑 `node TunnelBell1942/Script_SmokeTest.mjs`（纯逻辑，含机器人三幕通关与确定性断言）。动到渲染还要跑 `node TunnelBell1942/Script_RenderHealthTest.mjs`（读 `gl.getError()`、`renderer.info` 与画面像素分布，防"看着在跑其实黑屏"）。截图用 `node TunnelBell1942/Script_Screenshot.mjs`。
 - 页面脚本或资源变更时抬 `index.html` 里的 cache-bust（`?v=…`）。
 
+## Taierzhuang1938 / 序章高度图
+
+- `L0_Jiehe` 的地面唯一入口是 `Taierzhuang1938/Script_JieheHeight.mjs`：真实 SRTM DEM
+  叠加战术土岗、排水沟和界河河槽。渲染、角色、AI、弹道与布设必须共用
+  `SampleJieheHeight(x,z)` / 注入的 `groundAt`，禁止另写高度公式或硬编码绝对 `y`。
+- 高度图与采样数据用 `node Taierzhuang1938/Script_HeightmapCli.mjs download` 同步生成；
+  `Heightmap/_raw/` 不进 Git。来源、坐标、署名和 CLI 用法见
+  `Taierzhuang1938/docs/Data_TaierzhuangHeightmap.md`。
+- 新增离线布设时用 `Script_HeightmapCli.mjs match --input=... --output=...` 批量贴地；
+  改高度图或序章地形后必须跑 `Script_HeightmapCli.mjs verify`、
+  `Script_JieheTerrainTest.mjs` 与 `Script_BootTest.mjs`。
+
 ## BehindTheLines Documentation
 
 - `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
