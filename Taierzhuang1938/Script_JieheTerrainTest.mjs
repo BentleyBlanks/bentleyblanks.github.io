@@ -130,6 +130,13 @@ try {
       && Math.hypot(v.x, v.z + 1470) < field.cameraFar).map((v) => v.id);
     const routeVillages = [...new Set(villageSpec.filter((v) => routeProbes.some(([x, z]) =>
       v.z >= z - 40 && Math.hypot(v.x - x, v.z - z) < field.cameraFar)).map((v) => v.id))];
+    const villageStats = JSON.parse(JSON.stringify(field.outfield.stats));
+    const roof = outfieldModule.VillageRoofLayout(10, 5.2, 2.65);
+    const roofSlopeDirections = roof.halves.map((half) => ({
+      side: half.side,
+      rotationX: half.rotationX,
+      localZ: half.localZ,
+    }));
     return {
       level: T.Debug.Level().id,
       minY, maxY, range: maxY - minY,
@@ -142,6 +149,9 @@ try {
       matchedAnchors, anchorCount, worstAnchorGap, badAnchors,
       groundLayerVertices, minGroundLayerGap, maxGroundLayerGap,
       openingVillages, routeVillages,
+      villageStats,
+      villageArchetypes: [...outfieldModule.VILLAGE_BUILDING_ARCHETYPES],
+      roofRidgeY: roof.ridgeY, roofOuterY: roof.outerY, roofSlopeDirections,
     };
   });
 
@@ -169,6 +179,19 @@ try {
   Check("目标走线上能看到一至两个村落",
     result.openingVillages.length >= 1 && result.routeVillages.length >= 2,
     `开场 ${result.openingVillages.join("/") || "无"}；全程 ${result.routeVillages.join("/") || "无"}`);
+  Check("村屋扩充为至少七种组合原型",
+    result.villageArchetypes.length >= 7
+      && new Set(result.villageArchetypes).size === result.villageArchetypes.length,
+    result.villageArchetypes.join("/"));
+  Check("四处村落生成足够多的房屋与生活细节",
+    result.villageStats.villageBuildings >= 45 && result.villageStats.villageDetails >= 45,
+    `${result.villageStats.villageBuildings} 栋，${result.villageStats.villageDetails} 组细节`);
+  Check("硬山顶从正脊向前后檐下降且坡向相反",
+    result.roofRidgeY > result.roofOuterY
+      && result.roofSlopeDirections.length === 2
+      && result.roofSlopeDirections.every((half) => half.side * half.rotationX > 0
+        && half.side * half.localZ > 0),
+    `脊 ${result.roofRidgeY.toFixed(2)} m，檐 ${result.roofOuterY.toFixed(2)} m`);
   for (const lane of result.laneChecks) {
     console.log(`    ${lane.id.padEnd(22)} 肩高=${lane.shoulders.map((v) => v.toFixed(2)).join("/")} m  命中=${lane.lowHits.join("/")}`);
   }

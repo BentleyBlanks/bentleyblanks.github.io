@@ -36,6 +36,10 @@ const GAME_SHOTS = [
   // 七关各一张。名字带关号与地名 —— 视觉审查是按图说话的，
   // 图名看不出是哪一关的话，评语就落不回代码
   { name: "Game_L0_Jiehe", query: "shot=1&phase=0&quality=high&scale=medium" },
+  // 村落专项回归：从石墙村南侧 55 m 看院内正立面。默认 L0 开场图里村子只有
+  // 天际线高度，屋脊方向、门窗和院落变体都验不出来。
+  { name: "Game_L0_JieheVillage", query: "shot=1&phase=0&quality=high&scale=medium",
+    setup: { x: -160, z: -1322, yaw: 0, pitch: -0.04 } },
   { name: "Game_L1_Beishahe", query: "shot=1&phase=1&quality=high&scale=medium" },
   { name: "Game_L2_Dongguan", query: "shot=1&phase=2&quality=high&scale=medium" },
   { name: "Game_L3_Fanji", query: "shot=1&phase=3&quality=high&scale=medium" },
@@ -64,7 +68,7 @@ page.on("console", (message) => {
   problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
 });
 
-async function Shoot(pageName, url, globalName) {
+async function Shoot(pageName, url, globalName, setup = null) {
   problems.length = 0;
   await page.goto(url, { waitUntil: "load", timeout: 90000 });
   await page.waitForFunction((g) => window[g] !== undefined, globalName, { timeout: 90000 });
@@ -73,6 +77,14 @@ async function Shoot(pageName, url, globalName) {
   // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。
   await page.evaluate((g) => window[g].StepFrames(240), globalName);
   await page.waitForTimeout(700);
+  if (setup) {
+    await page.evaluate(({ g, pose }) => {
+      const game = window[g];
+      game.player.Spawn(pose.x, pose.z, pose.yaw);
+      game.player.pitch = pose.pitch || 0;
+      game.StepFrames(12);
+    }, { g: globalName, pose: setup });
+  }
   await page.evaluate((g) => window[g].StepFrames(60), globalName);
   await page.waitForTimeout(500);
   const file = path.join(outDir, `${pageName}.png`);
@@ -96,7 +108,7 @@ if (!probeOnly && fs.existsSync(path.join(projectDir, "index.html"))) {
   for (const shot of gameList) {
     const url = `http://127.0.0.1:${port}/Taierzhuang1938/?${shot.query}`;
     try {
-      allOk = (await Shoot(shot.name, url, "Taierzhuang")) && allOk;
+      allOk = (await Shoot(shot.name, url, "Taierzhuang", shot.setup || null)) && allOk;
     } catch (error) {
       console.log(`ERR  ${shot.name.padEnd(24)} ${String(error).slice(0, 160)}`);
       allOk = false;

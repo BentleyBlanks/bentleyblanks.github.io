@@ -124,7 +124,51 @@ const OUTFIELD_PLAIN_MAP = {
   RailSteel: { color: 0x6A6058, roughness: 0.46, metalness: 0.55 },
   // 枯水期的浅流，浑浊
   ShallowWater: { color: 0x77796A, roughness: 0.22, transparent: true, opacity: 0.82, depthWrite: false },
+  // 上年收下来的麦秸；不能复用返青冬麦的绿色材质。
+  VillageStraw: { color: 0x8A744E, roughness: 0.98, metalness: 0 },
 };
+
+/**
+ * 城外村屋原型。不是只换材质：每一种都改变房屋组合、尺度或附属空间。
+ *
+ * 依据：鲁南传统民居以坐北朝南的两合院、三合院、四合院为主；常见青砖、
+ * 土坯、石基混合做法，附带粮仓、棚屋等生产空间。这里是远景战场切片，保留
+ * 能从 80—300 m 读出的轮廓差异，不照搬今天复建古城的彩画与高等级装饰。
+ */
+export const VILLAGE_BUILDING_ARCHETYPES = Object.freeze([
+  "ThreeBayBrick",
+  "AdobeCottage",
+  "StoneBaseHouse",
+  "TwinHouse",
+  "LCourtyard",
+  "Granary",
+  "FarmShed",
+]);
+
+/**
+ * 一座硬山顶的确定性剖面。局部 +X 是开间/屋脊方向，局部 +Z 是朝南的进深。
+ * 两片坡面都从 z=0 的正脊向前后檐下降；把这条关系集中在一个函数里，避免
+ * 厢房旋转 90° 后又把宽/深交换一次，出现玩家指出的“楼顶做反了”。
+ */
+export function VillageRoofLayout(width, depth, eaveY, pitch = 0.47, overhang = 0.45) {
+  const halfRun = depth / 2 + overhang;
+  const ridgeY = eaveY + depth / 2 * Math.tan(pitch);
+  const outerY = eaveY - overhang * Math.tan(pitch);
+  const slopeLength = halfRun / Math.cos(pitch);
+  return {
+    ridgeY,
+    outerY,
+    ridgeLength: width + overhang * 2,
+    halves: [-1, 1].map((side) => ({
+      side,
+      localZ: side * halfRun / 2,
+      centerY: (ridgeY + outerY) / 2,
+      rotationX: side * pitch,
+      width: width + overhang * 2,
+      depth: slopeLength,
+    })),
+  };
+}
 
 /**
  * 桶名 → 材质。**先查城外这一张，查不到落回城里那一张**
@@ -278,13 +322,13 @@ const OUTFIELD_SCENES = {
     roads: [{ width: 5.2, points: [[-150, -1690], [-142, -1552], [-158, -1300], [-150, -640]] }],
     // --- 村落轮廓 ---
     villages: [
-      { id: "LiangxiadianW", x: -320, z: -1652, w: 150, d: 66, count: 9, far: true },
-      { id: "LiangxiadianE", x: 296, z: -1668, w: 122, d: 58, count: 7, far: true },
+      { id: "LiangxiadianW", x: -320, z: -1652, w: 150, d: 66, count: 12, far: true },
+      { id: "LiangxiadianE", x: 296, z: -1668, w: 122, d: 58, count: 10, far: true },
       // 「石墙」与北沙河原先都在 460 m 远平面/浓雾之外：数据里有村，玩家一间
       // 房也看不见。把两处轮廓收到目标链两侧，主通道仍保留至少 150 m 净空。
       // 石墙是开场西南侧的小村；北沙河镇在第二阵地之后的东南天际线上接住终点。
-      { id: "Shiqiang", x: -160, z: -1350, w: 86, d: 60, count: 7, stoneWall: true },
-      { id: "BeishaheTown", x: 315, z: -1050, w: 138, d: 74, count: 9 },
+      { id: "Shiqiang", x: -160, z: -1350, w: 96, d: 68, count: 11, stoneWall: true },
+      { id: "BeishaheTown", x: 315, z: -1050, w: 152, d: 82, count: 14 },
     ],
     // 田埂上的树行（华北平原的地界树）
     // 平原上唯一的竖线。**中段（z -1420…-1280）必须有几行** ——
@@ -443,7 +487,8 @@ export class TengxianOutfield {
     this.colliders = [];
     this.covers = [];
     this.stats = { banks: 0, parapets: 0, pits: 0, graves: 0, trees: 0,
-      wheatPlots: 0, soilPlots: 0, balks: 0, craters: 0, villages: 0, railM: 0, ties: 0 };
+      wheatPlots: 0, soilPlots: 0, balks: 0, craters: 0, villages: 0,
+      villageBuildings: 0, villageDetails: 0, villageArchetypes: {}, railM: 0, ties: 0 };
     // 密度：low 砍四成，medium 砍两成
     this.density = quality === "low" ? 0.6 : quality === "medium" ? 0.8 : 1.0;
   }
@@ -1289,10 +1334,267 @@ export class TengxianOutfield {
     }
   }
 
+  VillagePoint(x, z, ry, localX, localZ) {
+    return {
+      x: x + Math.cos(ry) * localX + Math.sin(ry) * localZ,
+      z: z - Math.sin(ry) * localX + Math.cos(ry) * localZ,
+    };
+  }
+
+  /** 刚体房屋用足印最高点作室内坪，石基础一直埋到足印最低点。 */
+  SampleVillageFoundation(x, z, width, depth, ry, floorLift = 0) {
+    let minGround = Infinity, maxGround = -Infinity;
+    for (const sx of [-0.5, 0, 0.5]) {
+      for (const sz of [-0.5, 0, 0.5]) {
+        const point = this.VillagePoint(x, z, ry, sx * width, sz * depth);
+        const sampleY = this.groundAt(point.x, point.z);
+        minGround = Math.min(minGround, sampleY);
+        maxGround = Math.max(maxGround, sampleY);
+      }
+    }
+    const floorY = maxGround + 0.04 + floorLift;
+    return { floorY, bottomY: minGround - 0.14 };
+  }
+
+  /** 两坡硬山顶 + 两端山墙。屋脊永远沿局部 X，不再靠调用处猜宽/深。 */
+  AddVillageRoof(sink, {
+    x, z, ry, width, depth, eaveY, seed, wallMaterial = "HouseBrick", far = false,
+  }) {
+    const roof = VillageRoofLayout(width, depth, eaveY);
+    for (const half of roof.halves) {
+      const point = this.VillagePoint(x, z, ry, 0, half.localZ);
+      sink.Add("RoofTile", PlaceGeometry(
+        MakeBox(half.width, 0.16, half.depth, TILE_METERS.roof,
+          `${seed}:slope${half.side}`),
+        { x: point.x, y: half.centerY, z: point.z, ry, rx: half.rotationX }));
+      if (!far) {
+        const eavePoint = this.VillagePoint(x, z, ry, 0,
+          half.side * (depth / 2 + 0.38));
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBox(width + 0.72, 0.11, 0.12, TILE_METERS.wood,
+            `${seed}:eave${half.side}`),
+          { x: eavePoint.x, y: roof.outerY + 0.08, z: eavePoint.z, ry }));
+        this.stats.villageDetails += 1;
+      }
+    }
+    sink.Add("RoofTile", PlaceGeometry(
+      MakeBox(roof.ridgeLength, far ? 0.22 : 0.28, far ? 0.26 : 0.34,
+        TILE_METERS.roof, `${seed}:ridge`),
+      { x, y: roof.ridgeY + 0.08, z, ry }));
+
+    // 硬山两端高出坡面的三角山墙。原版村屋没有这两片，远看更像欧洲悬山屋。
+    const gableSteps = far ? 3 : 6;
+    for (const end of [-1, 1]) {
+      for (let step = 0; step < gableSteps; step += 1) {
+        const segmentDepth = depth / gableSteps;
+        const localZ = -depth / 2 + segmentDepth * (step + 0.5);
+        const triangle = 1 - Math.abs(localZ) / (depth / 2);
+        const topY = eaveY + Math.max(0, roof.ridgeY - eaveY) * triangle;
+        const height = Math.max(0.08, topY - eaveY);
+        const point = this.VillagePoint(x, z, ry,
+          end * (width / 2 + 0.08), localZ);
+        sink.Add(wallMaterial, PlaceGeometry(
+          MakeBox(0.26, height, segmentDepth * 1.03,
+            wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
+            `${seed}:gable${end}:${step}`,
+            wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
+          { x: point.x, y: eaveY + height / 2, z: point.z, ry }));
+      }
+      if (!far) {
+        const vent = this.VillagePoint(x, z, ry, end * (width / 2 + 0.22), 0);
+        sink.Add("WoodDoor", PlaceGeometry(
+          MakeBox(0.07, 0.32, 0.34, TILE_METERS.wood, `${seed}:vent${end}`),
+          { x: vent.x, y: eaveY + (roof.ridgeY - eaveY) * 0.43, z: vent.z,
+            ry: ry + Math.PI / 2 }));
+      }
+    }
+    return roof.ridgeY;
+  }
+
+  AddVillageFacade(sink, {
+    x, z, ry, width, depth, floorY, eaveY, seed, bays = 3, far = false,
+  }) {
+    if (far) return;
+    const frontZ = depth / 2 + 0.045;
+    const doorOffset = bays === 1 ? width * 0.18 : 0;
+    const door = this.VillagePoint(x, z, ry, doorOffset, frontZ);
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(0.92, 1.86, 0.08, TILE_METERS.wood, `${seed}:door`),
+      { x: door.x, y: floorY + 0.93, z: door.z, ry }));
+    for (const side of [-1, 1]) {
+      const jamb = this.VillagePoint(x, z, ry, doorOffset + side * 0.51, frontZ + 0.055);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.09, 1.98, 0.08, TILE_METERS.wood, `${seed}:jamb${side}`),
+        { x: jamb.x, y: floorY + 0.99, z: jamb.z, ry }));
+    }
+    const lintel = this.VillagePoint(x, z, ry, doorOffset, frontZ + 0.055);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(1.1, 0.11, 0.08, TILE_METERS.wood, `${seed}:lintel`),
+      { x: lintel.x, y: floorY + 1.95, z: lintel.z, ry }));
+    const windowXs = bays >= 3 ? [-width * 0.27, width * 0.27] : [-width * 0.22];
+    for (let index = 0; index < windowXs.length; index += 1) {
+      const windowPoint = this.VillagePoint(x, z, ry, windowXs[index], frontZ + 0.01);
+      sink.Add("WoodDoor", PlaceGeometry(
+        MakeBox(0.82, 0.76, 0.07, TILE_METERS.wood, `${seed}:window${index}`),
+        { x: windowPoint.x, y: floorY + 1.38, z: windowPoint.z, ry }));
+      const sill = this.VillagePoint(x, z, ry, windowXs[index], frontZ + 0.055);
+      sink.Add("DryStone", PlaceGeometry(
+        MakeBox(0.98, 0.1, 0.16, TILE_METERS.stone, `${seed}:sill${index}`),
+        { x: sill.x, y: floorY + 0.98, z: sill.z, ry }));
+      // 直棂窗：鲁南民居的窗全朝院内，外侧山墙仍保持实墙。
+      for (const bar of [-1, 0, 1]) {
+        const mullion = this.VillagePoint(x, z, ry,
+          windowXs[index] + bar * 0.2, frontZ + 0.055);
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBox(0.035, 0.8, 0.035, TILE_METERS.wood,
+            `${seed}:mullion${index}:${bar}`),
+          { x: mullion.x, y: floorY + 1.38, z: mullion.z, ry }));
+      }
+    }
+    // 鲁南墙面常见的淡色过墙石：不做整条欧式腰线，只在砖墙上间断压几块。
+    for (const localX of [-width * 0.38, -width * 0.12, width * 0.14, width * 0.4]) {
+      const stone = this.VillagePoint(x, z, ry, localX, frontZ + 0.045);
+      sink.Add("DryStone", PlaceGeometry(
+        MakeBox(0.46, 0.13, 0.07, TILE_METERS.stone, `${seed}:through${localX}`),
+        { x: stone.x, y: floorY + 0.58, z: stone.z, ry }));
+    }
+    this.stats.villageDetails += 1 + windowXs.length;
+  }
+
+  AddVillageBuilding(sink, options) {
+    const {
+      x, z, ry, width, depth, eave = 2.65, seed, kind = "ThreeBayBrick", far = false,
+    } = options;
+    const floorLift = kind === "Granary" ? 0.32 : 0;
+    const foundation = this.SampleVillageFoundation(x, z, width, depth, ry, floorLift);
+    const foundationHeight = foundation.floorY - foundation.bottomY;
+    sink.Add("DryStone", PlaceGeometry(
+      MakeBox(width + 0.46, foundationHeight, depth + 0.46,
+        TILE_METERS.stone, `${seed}:foundation`),
+      { x, y: foundation.bottomY + foundationHeight / 2, z, ry }));
+
+    const wallMaterial = kind === "AdobeCottage" || kind === "FarmShed"
+      ? "Adobe" : "HouseBrick";
+    const bodyHeight = kind === "FarmShed" ? eave * 0.82 : eave;
+    if (kind === "FarmShed") {
+      // 敞口棚：后墙 + 两侧矮墙 + 三根前柱，轮廓与封闭住宅完全不同。
+      const back = this.VillagePoint(x, z, ry, 0, -depth / 2);
+      sink.Add("Adobe", PlaceGeometry(
+        MakeBox(width, bodyHeight, 0.3, TILE_METERS.adobe, `${seed}:back`),
+        { x: back.x, y: foundation.floorY + bodyHeight / 2, z: back.z, ry }));
+      for (const side of [-1, 1]) {
+        const sidePoint = this.VillagePoint(x, z, ry, side * width / 2, 0);
+        sink.Add("Adobe", PlaceGeometry(
+          MakeBox(0.3, bodyHeight * 0.72, depth, TILE_METERS.adobe,
+            `${seed}:side${side}`),
+          { x: sidePoint.x, y: foundation.floorY + bodyHeight * 0.36,
+            z: sidePoint.z, ry }));
+      }
+      for (const localX of [-width * 0.42, 0, width * 0.42]) {
+        const post = this.VillagePoint(x, z, ry, localX, depth / 2);
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBox(0.16, bodyHeight, 0.16, TILE_METERS.wood,
+            `${seed}:post${localX}`),
+          { x: post.x, y: foundation.floorY + bodyHeight / 2, z: post.z, ry }));
+      }
+    } else {
+      sink.Add(wallMaterial, PlaceGeometry(
+        MakeBox(width, bodyHeight, depth,
+          wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
+          `${seed}:body`, wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
+        { x, y: foundation.floorY + bodyHeight / 2, z, ry }));
+      if (kind === "StoneBaseHouse") {
+        sink.Add("DryStone", PlaceGeometry(
+          MakeBox(width + 0.06, 0.66, depth + 0.06,
+            TILE_METERS.stone, `${seed}:stoneBelt`),
+          { x, y: foundation.floorY + 0.33, z, ry }));
+      }
+      this.AddVillageFacade(sink, {
+        x, z, ry, width, depth, floorY: foundation.floorY,
+        eaveY: foundation.floorY + bodyHeight, seed,
+        bays: kind === "Granary" ? 1 : 3, far,
+      });
+    }
+
+    const ridgeY = this.AddVillageRoof(sink, {
+      x, z, ry, width, depth, eaveY: foundation.floorY + bodyHeight,
+      seed, wallMaterial, far,
+    });
+    const buildingHeight = ridgeY - foundation.bottomY + 0.22;
+    if (!far) sink.Solid(x, foundation.bottomY + buildingHeight / 2, z,
+      width / 2, buildingHeight / 2, depth / 2, "wall", ry);
+    this.stats.villageBuildings += 1;
+    this.stats.villageArchetypes[kind] = (this.stats.villageArchetypes[kind] || 0) + 1;
+    return { floorY: foundation.floorY, ridgeY };
+  }
+
+  AddVillageCourtyard(sink, { x, z, ry, width, depth, seed, material = "Adobe" }) {
+    const wallHeight = 1.55;
+    const AddSegment = (localX, localZ, length, localRy, tag) => {
+      const point = this.VillagePoint(x, z, ry, localX, localZ);
+      const segmentRy = ry + localRy;
+      const groundY = this.groundAt(point.x, point.z);
+      sink.Add(material, PlaceGeometry(
+        MakeBox(length, wallHeight, 0.28,
+          material === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
+          `${seed}:${tag}`, material === "HouseBrick" ? BRICK_UV_GRID : null),
+        { x: point.x, y: groundY + wallHeight / 2, z: point.z, ry: segmentRy }));
+      sink.Solid(point.x, groundY + wallHeight / 2, point.z,
+        length / 2, wallHeight / 2, 0.14, "wall", segmentRy);
+      sink.Cover(point.x, point.z, wallHeight, Math.sin(segmentRy), Math.cos(segmentRy));
+    };
+    AddSegment(0, -depth / 2, width, 0, "north");
+    AddSegment(-width / 2, 0, depth, Math.PI / 2, "west");
+    AddSegment(width / 2, 0, depth, Math.PI / 2, "east");
+    const gateWidth = 1.6;
+    const southLength = (width - gateWidth) / 2;
+    for (const side of [-1, 1]) {
+      AddSegment(side * (gateWidth / 2 + southLength / 2), depth / 2,
+        southLength, 0, `south${side}`);
+    }
+    const gate = this.VillagePoint(x, z, ry, 0, depth / 2 + 0.03);
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(gateWidth, 1.75, 0.09, TILE_METERS.wood, `${seed}:gate`),
+      { x: gate.x, y: this.groundAt(gate.x, gate.z) + 0.875, z: gate.z, ry }));
+    sink.Solid(gate.x, this.groundAt(gate.x, gate.z) + 0.875, gate.z,
+      gateWidth / 2, 0.875, 0.06, "wall", ry);
+    this.stats.villageDetails += 5;
+  }
+
+  AddVillageProps(sink, { x, z, ry, seed, far, rnd }) {
+    if (far) return;
+    const base = this.VillagePoint(x, z, ry, 3.1 + rnd() * 1.4, 2.2 + rnd());
+    const groundY = this.groundAt(base.x, base.z);
+    // 草垛：返青前仍保留上年麦秸，色彩与房屋/裸土拉开，轮廓也不是盒子。
+    const stack = new THREE.CylinderGeometry(0.72, 1.02, 1.34, 10);
+    sink.Add("VillageStraw", PlaceGeometry(stack, { x: base.x, y: groundY + 0.67, z: base.z }));
+    const cap = new THREE.ConeGeometry(0.78, 0.72, 10);
+    sink.Add("VillageStraw", PlaceGeometry(cap, { x: base.x, y: groundY + 1.7, z: base.z }));
+
+    // 独轮大车：两个木轮、车板、辕杆。近村才做，远村只留屋顶剪影。
+    const cart = this.VillagePoint(x, z, ry, -3.0 - rnd(), 2.0 + rnd() * 1.5);
+    const cartY = this.groundAt(cart.x, cart.z);
+    for (const side of [-1, 1]) {
+      const wheel = this.VillagePoint(cart.x, cart.z, ry, side * 0.72, 0);
+      const geometry = new THREE.CylinderGeometry(0.48, 0.48, 0.09, 12);
+      sink.Add("WoodBeam", PlaceGeometry(geometry,
+        { x: wheel.x, y: cartY + 0.48, z: wheel.z, ry, rz: Math.PI / 2 }));
+    }
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(1.3, 0.18, 1.65, TILE_METERS.wood, `${seed}:cartBed`),
+      { x: cart.x, y: cartY + 0.65, z: cart.z, ry }));
+    for (const side of [-1, 1]) {
+      const shaft = this.VillagePoint(cart.x, cart.z, ry, side * 0.38, 1.65);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.09, 0.09, 2.2, TILE_METERS.wood, `${seed}:shaft${side}`),
+        { x: shaft.x, y: cartY + 0.68, z: shaft.z, ry }));
+    }
+    this.stats.villageDetails += 2;
+  }
+
   /**
-   * 村落轮廓。**只做体块剪影，不做可进入空间** ——
-   * 城外的村子在这两关里是地平线上的参照物（两下店在北、北沙河镇在南、
-   * 石墙在路西），玩家不会进去，做成院落是白花 draw call。
+   * 村落不再是同一种砖盒随机缩放：先按坐北朝南排主房，再插入土坯小屋、石基房、
+   * 双屋、L 形院、粮仓和敞口棚。远村保留组合轮廓，近村再加院墙、门窗和农具。
    */
   BuildVillages(rnd) {
     for (const v of this.spec.villages || []) {
@@ -1302,54 +1604,47 @@ export class TengxianOutfield {
       sink.SetSector(SectorKey(v.x, v.z));
       const n = Math.max(3, Math.round(v.count * this.density));
       for (let i = 0; i < n; i += 1) {
-        const x = v.x + (vRnd() - 0.5) * v.w;
-        const z = v.z + (vRnd() - 0.5) * v.d;
-        const w = 8 + vRnd() * 9, d = 6 + vRnd() * 6;
-        const eave = 2.4 + vRnd() * 0.5;              // 鲁南民居檐高 2.4—2.8（Data_Tengxian 的 houseDims）
-        const ry = (vRnd() - 0.5) * 0.5;
-        // 房屋是刚体，不能像麦田一样扭曲；用足印最高点作室内坪，再用埋入
-        // 足印最低点的石基础收住坡脚，四角都不会悬空。
-        let minGround = Infinity, maxGround = -Infinity;
-        for (const sx of [-0.5, 0, 0.5]) {
-          for (const sz of [-0.5, 0, 0.5]) {
-            const sampleX = x + Math.cos(ry) * sx * w + Math.sin(ry) * sz * d;
-            const sampleZ = z - Math.sin(ry) * sx * w + Math.cos(ry) * sz * d;
-            const sampleY = this.groundAt(sampleX, sampleZ);
-            minGround = Math.min(minGround, sampleY);
-            maxGround = Math.max(maxGround, sampleY);
-          }
+        const kind = VILLAGE_BUILDING_ARCHETYPES[i % VILLAGE_BUILDING_ARCHETYPES.length];
+        const x = v.x + (vRnd() - 0.5) * (v.w - 16);
+        const z = v.z + (vRnd() - 0.5) * (v.d - 12);
+        // 鲁南主房坐北朝南；只留少量沿地块边界的偏转，不再每栋乱转 30°。
+        const ry = (vRnd() - 0.5) * 0.18;
+        const width = kind === "Granary" ? 5.2 + vRnd() * 1.8
+          : kind === "FarmShed" ? 6.2 + vRnd() * 2.0
+            : 8.6 + vRnd() * 3.0;
+        const depth = kind === "Granary" ? 4.0 + vRnd() * 0.8
+          : 4.7 + vRnd() * 1.4;
+        const eave = kind === "Granary" ? 2.25 : kind === "FarmShed" ? 2.4
+          : 2.45 + vRnd() * 0.32;
+        this.AddVillageBuilding(sink, {
+          x, z, ry, width, depth, eave, seed: `${v.id}:${i}:main`,
+          kind: kind === "TwinHouse" || kind === "LCourtyard" ? "ThreeBayBrick" : kind,
+          far: !!v.far,
+        });
+
+        if (kind === "TwinHouse") {
+          const annex = this.VillagePoint(x, z, ry, width * 0.42, -depth * 0.88);
+          this.AddVillageBuilding(sink, {
+            x: annex.x, z: annex.z, ry, width: width * 0.72, depth: depth * 0.86,
+            eave: eave - 0.18, seed: `${v.id}:${i}:twin`, kind: "AdobeCottage",
+            far: !!v.far,
+          });
+        } else if (kind === "LCourtyard") {
+          const wing = this.VillagePoint(x, z, ry, width * 0.54, depth * 0.72);
+          this.AddVillageBuilding(sink, {
+            x: wing.x, z: wing.z, ry: ry + Math.PI / 2,
+            width: depth * 1.28, depth: 3.7 + vRnd() * 0.7,
+            eave: eave - 0.24, seed: `${v.id}:${i}:wing`, kind: "StoneBaseHouse",
+            far: !!v.far,
+          });
+          if (!v.far && i % 2 === 0) this.AddVillageCourtyard(sink, {
+            x, z: z + depth * 0.82, ry, width: width + 3.4, depth: depth + 6.4,
+            seed: `${v.id}:${i}:court`, material: i % 4 === 0 ? "Adobe" : "HouseBrick",
+          });
         }
-        const floorY = maxGround + 0.04;
-        const foundationBottom = minGround - 0.12;
-        const foundationHeight = floorY - foundationBottom;
-        sink.Add("DryStone", PlaceGeometry(
-          MakeBox(w + 0.5, foundationHeight, d + 0.5, TILE_METERS.stone, `${v.id}:f${i}`),
-          { x, y: foundationBottom + foundationHeight / 2, z, ry }));
-        sink.Add("HouseBrick", PlaceGeometry(
-          MakeBox(w, eave, d, TILE_METERS.brick, `${v.id}:${i}`, BRICK_UV_GRID),
-          { x, y: floorY + eave / 2, z, ry }));
-        // 真正的两坡硬山顶。旧版只是两个水平盒子叠起来，远处只读成一排矮砖块，
-        // 正是“有数据但看不出村庄”的另一半原因。
-        const roofPitch = 0.34;
-        const roofRise = (d / 2 + 0.35) * Math.tan(roofPitch);
-        const roofDepth = (d / 2 + 0.65) / Math.cos(roofPitch);
-        for (const side of [-1, 1]) {
-          const localZ = side * d * 0.25;
-          sink.Add("RoofTile", PlaceGeometry(
-            MakeBox(w + 0.9, 0.18, roofDepth, TILE_METERS.roof, `${v.id}:r${i}:${side}`),
-            {
-              x: x + Math.sin(ry) * localZ,
-              y: floorY + eave + roofRise / 2 + 0.05,
-              z: z + Math.cos(ry) * localZ,
-              ry, rx: side * roofPitch,
-            }));
-        }
-        sink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w + 1.0, 0.22, 0.32, TILE_METERS.roof, `${v.id}:ridge${i}`),
-          { x, y: floorY + eave + roofRise + 0.05, z, ry }));
-        const buildingHeight = floorY - foundationBottom + eave + roofRise + 0.18;
-        if (!v.far) sink.Solid(x, foundationBottom + buildingHeight / 2,
-          z, w / 2, buildingHeight / 2, d / 2, "wall");
+        if (!v.far && i % 3 === 1) this.AddVillageProps(sink, {
+          x, z, ry, seed: `${v.id}:${i}:props`, far: false, rnd: vRnd,
+        });
       }
       // 「石墙」：地名的由来 —— 一圈干垒石墙。真碰撞体
       if (v.stoneWall) {
@@ -1466,7 +1761,7 @@ export const PRESUMED_OUTFIELD = [
   { id: "l0RailwayX", value: 205, unit: "m",
     note: "**序关那一段路基的 x**。界河一段的真实线位不在本切片的量程内（城西正线 x=-1500，z 只到 ±900）。序关按史实的相对方位把路基放在玩家以东，使玩家处于「津浦路西」。两段几何永不同屏。205 而不是 415：雾在两百多米外把东西吃干净，摆在 415 m 外时「津浦路西」这半句副标题在画面上一帧都兑现不了" },
   { id: "villageSites", value: ["两下店方向", "石墙", "北沙河镇", "五里屯", "路口小店"],
-    note: "村落只做体块剪影。地名与大致方位为主流记载，**具体坐标、规模、户数全为推定**；石墙那一圈干垒石墙是照地名做的形象推定，无形制资料" },
+    note: "远村保留组合剪影，目标走线旁的近村做七种房屋/院落原型与少量生产生活细节。坐北朝南、两/三/四合院、硬山小青瓦、青砖/土坯/石基混用来自鲁南民居主流记载；**具体坐标、规模、户数与每种原型的分布全为推定**。石墙那一圈干垒石墙是照地名做的形象推定，无形制资料" },
   { id: "fieldPlots", value: { cell: [36, 74], wheatShare: 0.42, soilShare: 0.7 }, unit: "m",
     note: "地块尺寸（L0 36×74 / L1 38×78 的抖动格）、长边南北向、返青地块占四成、地色分三档。**露土率高与麦苗贴地为写景図的一手图像证据**，具体比例与田块划分为推定" },
   { id: "wheatRows", value: { rowWidth: [0.9, 1.6], pitch: [1.75, 3.35], height: 0.22 }, unit: "m",
