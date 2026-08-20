@@ -139,7 +139,8 @@ export const WEAPONS = {
     kind: "melee",
     lengthM: 0.90, bladeM: 0.595, massKg: 2.0,
     damage: 260, headMultiplier: 1.0,
-    swingTimeS: 0.62, reachM: 2.05,
+    // 大刀不该像抡钝器一样拖：短蓄力后整刀在半秒内劈完，命中窗口仍由 Combat 管。
+    swingTimeS: 0.50, reachM: 2.05,
     silent: true,
     note: "柄尾有铁环，常缠红布。斜挎背在身后，刀柄露在左肩上方，右手过左肩抽出。",
   },
