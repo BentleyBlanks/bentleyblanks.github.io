@@ -181,7 +181,18 @@ export const VOICE_LINES = [
   { key: "ija_rally_charge",    kind: "rally",  file: "vo_ija_rally_charge.mp3", dur: 1.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "とつげき！", kanji: "突撃！", cn: "冲锋！" },
   { key: "ija_rally_fire",      kind: "rally",  file: "vo_ija_rally_fire.mp3",   dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "うちかたはじめ！", kanji: "撃ち方始め！", cn: "开始射击！" },
   { key: "ija_rally_follow",    kind: "rally",  file: "vo_ija_rally_follow.mp3", dur: 1.42,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "われにつづけ！", kanji: "我に続け！", cn: "跟我上！" },
-  { key: "ija_spot_enemy",      kind: "spot",   file: "vo_ija_spot_enemy.mp3",   dur: 2.31,  role: "兵",     pitch: 0,   side: "ija",                 text: "てきだ！ひだり！ひだりだ！", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
+  // ija_spot_enemy「てきだ！ひだり！ひだりだ！」（敵だ！左！左だ！）**暂时摘掉**。
+  //
+  // 不是文本的问题 —— 那句是两位评审一致选的，省助词、方位单独成句再补一遍，
+  // 是被枪声压住时的真实口语形态。摘掉是**音频质量**：这一条 seedaudio 出来时
+  // 自带一层房间声，源文件底噪 −38.8 dB，走完对齐链是 −32 dB，
+  // 而闸门要求 ≤ −40（Script_VoiceTest「没有自带环境音」那条）。
+  // 两级 afftdn 频域降噪也只压到 −32；再往下压就开始吃气声了。
+  //
+  // 正解是**重摇一条干净的**（memory 里那条「TTS 自带环境音要重摇」）。
+  // 摇的时候本机 MiniMax Hub 连不上（连接被拒），所以先摘。
+  // Hub 恢复后：拿 lines_ija.json 里这一条重生成，底噪 ≤−45 再放回来，
+  // 文本一个字都不用改。spot 类还剩 4 条，短期不会复读。
   { key: "ija_spot_mg",         kind: "spot",   file: "vo_ija_spot_mg.mp3",      dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
   { key: "ija_spot_shina",      kind: "spot",   file: "vo_ija_spot_shina.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
   { key: "ija_spot_target",     kind: "spot",   file: "vo_ija_spot_target.mp3",  dur: 2.30,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", kanji: "目標！右前方！", cn: "目标！右前方！" },
