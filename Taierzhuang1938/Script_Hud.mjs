@@ -145,7 +145,6 @@ export class Hud {
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
-    this.el.identity = mk("hudIdentity");
     this.el.state = mk("hudState");
     this.el.combat = mk("hudCombat");
     this.el.combat.innerHTML = `
@@ -224,11 +223,8 @@ export class Hud {
     }
   }
 
-  /** 玩家现在是谁。ER2 左上角只写当前班长是谁，这里写当前你是谁。 */
-  SetIdentity(identity, weaponName) {
-    this.el.identity.innerHTML =
-      `<span class="n">${identity.name}</span>`
-      + `<span class="o">${identity.origin}</span>`;
+  /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。 */
+  SetWeaponName(weaponName) {
     this.el.combatWeapon.textContent = weaponName;
   }
 
@@ -670,7 +666,6 @@ export class Hud {
   SetMinimapVisible(on) {
     this.minimapVisible = !!on;
     this.el.minimap.classList.toggle("on", this.minimapVisible);
-    this.root.classList.toggle("mapOn", this.minimapVisible);
     this.el.minimap.setAttribute("aria-hidden", String(!this.minimapVisible));
     if (this.minimapVisible) this.minimapDirty = 0.2;
     return this.minimapVisible;

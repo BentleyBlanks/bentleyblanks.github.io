@@ -41,7 +41,6 @@ try {
     const minimap = document.querySelector(".hudMinimap");
     const snapshot = () => ({
       on: minimap.classList.contains("on"),
-      rootOn: document.getElementById("hud")?.classList.contains("mapOn"),
       display: getComputedStyle(minimap).display,
       ariaHidden: minimap.getAttribute("aria-hidden"),
     });
@@ -53,9 +52,10 @@ try {
     const hiddenAgain = snapshot();
     return { initial, shown, hiddenAgain };
   });
-  assert.deepEqual(mapToggle.initial, { on: false, rootOn: false, display: "none", ariaHidden: "true" });
-  assert.deepEqual(mapToggle.shown, { on: true, rootOn: true, display: "block", ariaHidden: "false" });
-  assert.deepEqual(mapToggle.hiddenAgain, { on: false, rootOn: false, display: "none", ariaHidden: "true" });
+  assert.deepEqual(mapToggle.initial, { on: false, display: "none", ariaHidden: "true" });
+  assert.deepEqual(mapToggle.shown, { on: true, display: "block", ariaHidden: "false" });
+  assert.deepEqual(mapToggle.hiddenAgain, { on: false, display: "none", ariaHidden: "true" });
+  assert.equal(await page.locator(".hudIdentity").count(), 0);
 
   const prompts = await page.evaluate(() => {
     const T = window.Taierzhuang;

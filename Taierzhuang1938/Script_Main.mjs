@@ -1388,8 +1388,7 @@ function RespawnPlayer(initial = false) {
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
   viewmodel.Equip(currentWeapon);
   viewmodel.root.visible = true;
-  hud.SetIdentity(state.identity,
-    currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
+  hud.SetWeaponName(currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
   state.pendingRespawn = false;
   state.playerAliveLast = true;
 }
@@ -1422,7 +1421,7 @@ function SwitchSlot(slot) {
   player.bipod = false;                            // 换枪就把两脚架收了
   state.fireMode = "auto";
   viewmodel.Equip(currentWeapon);
-  hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "");
+  hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   return true;
 }
 
@@ -2038,7 +2037,7 @@ function PickUpWeapon(weaponId, clips) {
     player.bipod = false;
     state.fireMode = "auto";
     viewmodel.Equip(currentWeapon);
-    hud.SetIdentity(state.identity, WEAPONS[currentWeapon]?.name || "");
+    hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   }
   return true;
 }

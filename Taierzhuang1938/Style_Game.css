@@ -93,18 +93,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudObjective.changed { animation: hudObjectiveChanged 0.72s ease-out; }
 
-/* 左下：你是谁 —— 这一栏在每次阵亡后会换一个名字 */
-.hudIdentity {
-  position: absolute; left: 20px; bottom: 20px;
-  display: flex; flex-direction: column; gap: 1px;
-  padding-left: 9px; border-left: 2px solid rgba(157,192,228,0.72);
-  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  transition: bottom 0.18s ease;
-}
-#hud.mapOn .hudIdentity { bottom: 218px; }
-.hudIdentity .n { font-size: 14px; font-weight: 600; letter-spacing: 0.07em; }
-.hudIdentity .o { font-size: 10px; color: var(--dim); }
-
 /* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
 .hudState {
   position: absolute; right: 18px; bottom: 116px;
@@ -319,9 +307,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .hudObjective { min-width: 0; width: 100%; padding-inline: 7px; font-size: 11px; gap: 6px; }
   .hudObjective .forces { font-size: 9px; gap: 5px; }
   .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
-  .hudIdentity { left: 11px; bottom: max(10px, env(safe-area-inset-bottom)); }
-  #hud.mapOn .hudIdentity { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 132px); }
-  .hudIdentity .o { display: none; }
   .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 166px; }
   .combatMain { height: 48px; grid-template-columns: 46px 1fr; }
   .combatStance svg { width: 31px; height: 31px; }
