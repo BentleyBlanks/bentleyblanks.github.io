@@ -93,6 +93,8 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
     const THREE = await import("./vendor/three/build/three.module.js");
     const plain = {
       steel: new THREE.MeshStandardMaterial({ color: 0x3B3E42, roughness: 0.55, metalness: 0.85 }),
+      blade: new THREE.MeshStandardMaterial({ color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
+      grip: new THREE.MeshStandardMaterial({ color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
       wood: new THREE.MeshStandardMaterial({ color: 0x6A472B, roughness: 0.8, metalness: 0 }),
       accessory: new THREE.MeshStandardMaterial({ color: 0x7A6A52, roughness: 0.95, metalness: 0 }),
       red: new THREE.MeshStandardMaterial({ color: 0x9E2B22, roughness: 0.92, metalness: 0 }),

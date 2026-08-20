@@ -297,15 +297,15 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Dadao.tzm.json",
-   "triangles": 686,
+   "triangles": 624,
    "meshBlocks": 3,
    "nodes": 5,
    "joints": 0,
-   "bytes": 27701,
+   "bytes": 27132,
    "materials": [
-    "red",
-    "steel",
-    "wood"
+    "blade",
+    "grip",
+    "red"
    ],
    "mounts": [
     "root",
@@ -315,14 +315,14 @@
    ],
    "bounds": {
     "min": [
-     -0.017,
-     -0.07,
-     -0.62
+     -0.008,
+     -0.079,
+     -0.624
     ],
     "max": [
-     0.017,
-     0.05273,
-     0.279
+     0.008,
+     0.027,
+     0.27
     ]
    }
   },

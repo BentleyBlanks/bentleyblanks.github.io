@@ -283,6 +283,10 @@ function BuildMaterials(library) {
         color: TintTo(STEEL_BASE, 0x72767c), tintId: "vmSteel",
       },
       { color: 0x72767c, roughness: 0.88, metalness: 0.84 }),
+    // 宽刀面不能沿用带锈斑与凹坑的枪钢贴图。纯净 basecolor 保留真实 PBR 反光，
+    // 由几何棱线与环境光写出钢感，不再靠脏纹理冒充细节。
+    blade: library.Plain("VmDadaoBlade", { color: 0x929aa2, roughness: 0.30, metalness: 0.96 }),
+    grip: library.Plain("VmDadaoGrip", { color: 0x8f7c61, roughness: 0.76, metalness: 0 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
     wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.68, metalness: 0, normalScale: 0.24 },
@@ -851,39 +855,38 @@ function BuildGrenade(materials, weapon, key) {
   };
 }
 
-/** 大刀：全长 900 / 刃长 595 / 最宽 57、最窄 38 / 柄尾铁环 φ76（考据值）。 */
+/** 大刀后备几何：右侧参考型，宽刃、短吞口、带孔全茎柄。主路径读取 TZM 模型。 */
 function BuildDadao(materials, weapon, key) {
-  const steel = [];
+  const blade = [];
+  const grip = [];
   const cloth = [];
 
-  // 刀身：从护手处 38 mm 渐宽到前段 57 mm，刀尖斜切（雁翎过渡，不是日式弧刃）
+  // 刀身：从护手处 40 mm 渐宽到前段 68 mm，刀尖斜切并保留钝口。
   const segments = 5;
   const bladeLen = 0.595;
   for (let i = 0; i < segments; i += 1) {
     const t0 = i / segments;
-    const width = Mix(0.040, 0.058, Math.pow(t0, 0.7));
+    const width = Mix(0.040, 0.068, Math.pow(t0, 0.72));
     const segLen = bladeLen / segments;
-    steel.push(Box(0.0058, width, segLen * 1.02, VM_TILE.steel, `${key}blade${i}`,
-      { x: 0, y: 0.006 + width * 0.02, z: -0.115 - segLen * (i + 0.5) }));
+    blade.push(Box(0.0058, width, segLen * 1.02, VM_TILE.steel, `${key}blade${i}`,
+      { x: 0, y: -0.003 - i * 0.005, z: -0.115 - segLen * (i + 0.5) }));
   }
   // 斜切刀尖
-  steel.push(Box(0.0058, 0.052, 0.070, VM_TILE.steel, `${key}tip`, { x: 0, y: 0.004, z: -0.740, rx: 0.30 }));
+  blade.push(Box(0.0052, 0.052, 0.070, VM_TILE.steel, `${key}tip`, { x: 0, y: -0.030, z: -0.740, rx: 0.30 }));
   // 刀背加厚（5—6 mm，宽厚是西北军大刀的特征，不做薄片）
-  steel.push(Box(0.0075, 0.010, bladeLen, VM_TILE.steel, `${key}spine`, { x: 0, y: 0.028, z: -0.115 - bladeLen / 2 }));
+  blade.push(Box(0.0075, 0.010, bladeLen, VM_TILE.steel, `${key}spine`, { x: 0, y: 0.025, z: -0.115 - bladeLen / 2 }));
 
-  // 护手：一小片铁，不是圆盘
-  steel.push(Box(0.014, 0.090, 0.024, VM_TILE.steel, `${key}guard`, { x: 0, y: 0.004, z: -0.106 }));
+  // 短吞口 + 宽全茎；Torus 与宽柄尾重叠，视觉上是一只穿孔。
+  blade.push(Box(0.014, 0.055, 0.018, VM_TILE.steel, `${key}guard`, { x: 0, y: 0, z: -0.106 }));
+  blade.push(Box(0.010, 0.050, 0.255, VM_TILE.steel, `${key}tang`, { x: 0, y: 0, z: 0.030 }));
 
-  // 柄 215 mm，缠布
-  cloth.push(Tube(0.017, 0.017, 0.200, 10, VM_TILE.cloth, { x: 0, y: 0, z: 0.005 }));
-  for (let i = 0; i < 7; i += 1) {
-    cloth.push(Box(0.037, 0.037, 0.006, VM_TILE.cloth, `${key}wrap${i}`, { x: 0, y: 0, z: -0.080 + i * 0.028, rz: 0.25 }));
-  }
-  // 柄尾铁环 —— 大刀必有，缺了就不是西北军的刀
-  steel.push(new THREE.TorusGeometry(0.036, 0.0055, 6, 14).rotateY(Math.PI / 2).translate(0, 0, 0.132));
+  grip.push(Box(0.014, 0.040, 0.185, VM_TILE.wood, `${key}grip`, { x: 0, y: 0, z: 0.020 }));
+  blade.push(new THREE.TorusGeometry(0.017, 0.005, 6, 14).rotateY(Math.PI / 2).translate(0, 0, 0.145));
+  cloth.push(Box(0.016, 0.048, 0.014, VM_TILE.cloth, `${key}wrap`, { x: 0, y: 0, z: -0.092 }));
 
   const group = new THREE.Group();
-  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(blade, materials.blade));
+  AddPart(group, MakePart(grip, materials.grip));
   AddPart(group, MakePart(cloth, materials.redCloth));
 
   return {
@@ -931,7 +934,7 @@ const MODEL_FP = new Set(["Dadao", "Grenade", "GrenadeBundle", "ZhongZheng", "Ha
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
 const VM_MATERIAL_BY_MESH = {
-  steel: "steel", wood: "wood", accessory: "cloth", red: "redCloth",
+  steel: "steel", blade: "blade", grip: "grip", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
 };

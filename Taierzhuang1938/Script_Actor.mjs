@@ -611,32 +611,22 @@ function BuildDadao(buckets, d, quality) {
   const H = d.height;
   const rise = d.shoulderY - d.waistY;
   const local = new Map();
-  // 刃长 595、身宽 38→57（**前宽后窄**，不是等宽铁条）、刀背厚 5—6、
-  // 护手是一片 S 形卷铁、柄长 215、柄尾必有铁环。
-  //
-  // 上一版是"一条 52 mm 等宽的板 + 一小截刀尖 + 一个方块护手"——远看是把菜刀。
-  // 剪影上真正认得出大刀的只有三件事：**往前放宽的刃**、**刀背斜切下来的尖**、
-  // **柄尾那个整圆的铁环**。这三件在背上这把一样要有：玩家在战场上看到的大刀，
-  // 绝大多数是别人背上这一把，不是自己手里那把。
+  // 与 Blender 主模型同一参考：右侧那把带孔全茎柄大刀。刀根窄、前段放宽，
+  // 刃口外鼓、刀背末段斜切；吞口短，柄尾的圆是孔而不是悬空铁环。
   //
   // 局部系：刀尖朝 +Y、刃宽在 X、刀面法向在 Z。逐段往 -X 挪一点再微转，
   // 拼出刀身那道弧 —— 直的一条在 30 m 外和刺刀分不出来。
-  Add(local, "steel", GunSteelBox(0.040, 0.175, 0.0058, "bladeA"), { y: 0.225 });
-  Add(local, "steel", GunSteelBox(0.047, 0.170, 0.0056, "bladeB"), { x: -0.004, y: 0.390, rz: 0.030 });
-  Add(local, "steel", GunSteelBox(0.055, 0.160, 0.0052, "bladeC"), { x: -0.014, y: 0.548, rz: 0.060 });
+  Add(local, "blade", GunSteelBox(0.042, 0.170, 0.0058, "bladeA"), { y: 0.222 });
+  Add(local, "blade", GunSteelBox(0.054, 0.170, 0.0056, "bladeB"), { x: -0.005, y: 0.386, rz: 0.035 });
+  Add(local, "blade", GunSteelBox(0.068, 0.160, 0.0052, "bladeC"), { x: -0.017, y: 0.546, rz: 0.070 });
   // 斜切刀尖：转过来的一小块，出来的是"背斜下来收尖"，不是两边对称的剑尖
-  Add(local, "steel", GunSteelBox(0.046, 0.090, 0.0044, "tip"), { x: -0.030, y: 0.655, rz: 0.230 });
-  // S 形护手：中间一道横铁 + 两头反向卷的短臂（一头朝刃、一头朝柄）
-  Add(local, "steel", GunSteelBox(0.030, 0.011, 0.020, "guard"), { y: 0.145 });
-  Add(local, "steel", GunSteelBox(0.013, 0.032, 0.015, "quillonA"), { x: 0.028, y: 0.156, rz: -0.55 });
-  Add(local, "steel", GunSteelBox(0.013, 0.032, 0.015, "quillonB"), { x: -0.028, y: 0.134, rz: -0.55 });
-  // 柄是浅色的（木/缠绳）。原来给 accessory＝土布，灰蓝柄配灰蓝刀身，
-  // 远看整把刀糊成一根同色的棍子，柄与刃的分界一点都读不出来
-  Add(local, "wood", GunWoodBox(0.030, 0.200, 0.026, "grip"), { y: 0.030 });
-  // 柄尾铁环：环面**与刀面同向**（Torus 默认就在 XY 平面里，别再绕 X 转 90°
-  // —— 那样环轴顺着柄，侧看只剩一根竖杠，那是垫圈不是刀环）
-  Add(local, "steel", new THREE.TorusGeometry(0.030, 0.006, 6, 12), { y: -0.098 });
-  if (quality !== "low") Add(local, "red", Cloth(0.024, 0.046, 0.022, "rag"), { y: -0.124 });
+  Add(local, "blade", GunSteelBox(0.054, 0.088, 0.0044, "tip"), { x: -0.035, y: 0.655, rz: 0.250 });
+  // 短吞口 + 全茎柄。Torus 与宽柄尾叠在一起，远处读作“柄上开孔”，不是外挂环。
+  Add(local, "blade", GunSteelBox(0.054, 0.016, 0.018, "guard"), { y: 0.137 });
+  Add(local, "blade", GunSteelBox(0.050, 0.255, 0.010, "tang"), { y: 0.010 });
+  Add(local, "grip", GunWoodBox(0.039, 0.185, 0.014, "grip"), { y: 0.030 });
+  Add(local, "blade", new THREE.TorusGeometry(0.017, 0.005, 6, 12), { y: -0.113 });
+  if (quality !== "low") Add(local, "red", Cloth(0.048, 0.015, 0.020, "wrap"), { y: 0.121 });
   // rz≈-2.54：刀尖甩到右下、刀柄露到左肩上方；rx 让刀身贴住后背的弧度
   const sling = { x: -0.026 * H, y: rise - 0.047 * H, z: d.chestDepth + 0.03 * H, rz: -2.54, rx: 0.14 };
   for (const [key, list] of local) Add(buckets, key, MergeGeometries(list), sling);
@@ -2447,6 +2437,12 @@ export class ActorFactory {
       //     中间一条硬边。1938 年的发蓝钢不是镜子，乘完落到 0.43 才对。
       steel: this.Material("steel",
         () => lib.Get("Steel", { roughness: 0.95, metalness: 0.86, normalScale: 0.20 })),
+      // 大刀刀身单独走干净的 PBR 钢：不借 BakeSteel 的锈斑/凹坑 basecolor，
+      // 避免宽刀面被贴成脏石板；高金属度 + 中低粗糙度让转动时有连续钢光。
+      blade: this.Material("blade",
+        () => lib.Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 })),
+      grip: this.Material("grip",
+        () => lib.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 })),
       wood: this.Material("wood",
         () => lib.Get("WoodStock", { roughness: 0.86, metalness: 0, normalScale: 0.24 })),
       // 车辆装甲板。走 SteelHelmet 那张图（喷漆钢：低金属度、粗糙、带锈斑），

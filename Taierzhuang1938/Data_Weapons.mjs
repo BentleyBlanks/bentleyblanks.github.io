@@ -137,12 +137,12 @@ export const WEAPONS = {
     fullName: "西北军大刀",
     side: "nra",
     kind: "melee",
-    lengthM: 0.90, bladeM: 0.595, massKg: 2.0,
+    lengthM: 0.90, bladeM: 0.624, massKg: 2.0,
     damage: 260, headMultiplier: 1.0,
     // 大刀不该像抡钝器一样拖：短蓄力后整刀在半秒内劈完，命中窗口仍由 Combat 管。
     swingTimeS: 0.50, reachM: 2.05,
     silent: true,
-    note: "柄尾有铁环，常缠红布。斜挎背在身后，刀柄露在左肩上方，右手过左肩抽出。",
+    note: "参考右侧实物：短吞口、木握片、柄尾开圆孔。斜挎背在身后，右手过左肩抽出。",
   },
 
   // --- 日方 -----------------------------------------------------------------

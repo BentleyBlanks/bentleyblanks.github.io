@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "3";
+const MESH_REV = "4";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -143,13 +143,12 @@ export const MESHES = {
   },
   Dadao: {
     file: "Dadao.tzm.json", category: "weapon",
-    triangles: 686, meshBlocks: 3, nodes: 5, joints: 0,
-    materials: ["red", "steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.0340, 0.1227, 0.8990], lengthM: 0.900, bladeM: 0.595,
-    draws: { high: 3, medium: 3, low: 2 },
-    note: "大刀。**柄尾有真的铁环**（环面与刀面同向、侧看是整圆）、护手是 S 形卷铁"
-      + "（不是圆盘也不是方块）、刀身宽 38→57 mm（**前宽后窄**）背厚 5—6 mm、"
-      + "刀尖靠刀背斜切收。Y 向 123 mm 是刀身那道 16 mm 的弧加护手的高度，不是建歪了。",
+    triangles: 624, meshBlocks: 3, nodes: 5, joints: 0,
+    materials: ["blade", "grip", "red"], mounts: ["muzzle", "gripR", "gripL"],
+    span: [0.0160, 0.1060, 0.8940], lengthM: 0.900, bladeM: 0.624,
+    draws: { high: 3, medium: 3, low: 3 },
+    note: "参考右侧实物的大刀。刀身宽 40→67 mm、前宽后窄、刃线外鼓，刀背末段斜切"
+      + "并保留钝口；短吞口后接带圆孔全茎柄与木握片。刀身使用干净高金属度 PBR 材质。",
   },
 
   Type89Launcher: {

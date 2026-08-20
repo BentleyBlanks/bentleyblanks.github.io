@@ -136,6 +136,8 @@ const result = await page.evaluate(async () => {
     accentB: Plain("accentB", 0xEDEFF2, 0.7, true),
     helmet: library.Get("SteelHelmet", { roughness: 0.72, metalness: 0.85 }),
     steel: library.Get("Steel", { roughness: 0.62, metalness: 0.9 }),
+    blade: library.Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
+    grip: library.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
     wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
     Stone: library.Get("Stone", { roughness: 0.92, metalness: 0 }),
     WoodBeam: library.Get("WoodBeam", { roughness: 0.9, metalness: 0 }),

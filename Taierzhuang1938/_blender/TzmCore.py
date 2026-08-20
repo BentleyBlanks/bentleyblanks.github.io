@@ -65,7 +65,7 @@ TILE_METERS["track"] = 0.30
 # 加载器不造材质，只按名字去现成的材质表里取。写错名字导出时就报错，
 # 别等到运行时才发现半个人是黑的。
 MATERIAL_NAMES = {
-    "uniform", "accessory", "shoe", "skin", "helmet", "steel", "wood",
+    "uniform", "accessory", "shoe", "skin", "helmet", "steel", "blade", "grip", "wood",
     "leather", "towel", "red", "accentA", "accentB",
     # 车辆装甲板（喷漆钢，不是裸钢）与履带 —— 见 Script_Actor.ActorMaterials
     "armor", "track",
