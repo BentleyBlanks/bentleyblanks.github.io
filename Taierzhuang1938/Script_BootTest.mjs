@@ -100,6 +100,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         drawCalls: T.renderer.info.render.calls,
         triangles: T.renderer.info.render.triangles,
         level: T.Debug.Level ? T.Debug.Level().id : "?",
+        environment: T.Debug.Environment ? T.Debug.Environment() : null,
         skyTexels,
         geoTexels,
         // 粒子层接没接上预通道与当关的雾：这两条断了，远处的烟就没有大气透视
@@ -137,6 +138,21 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (health.skyTexels === 0) bad.push("预通道里没有 w=0 的天空像素（天空穹又混进预通道了？）");
     if (health.vfxDepthValid !== 1) bad.push("粒子层没接上预通道（远处的烟会没有大气透视）");
     if (!(health.vfxFogDensity > 0)) bad.push(`粒子层的雾没接上 density=${health.vfxFogDensity}`);
+    // 生活层必须在实际关卡切片里生成。只查包含对应内容的两关，避免把别关的裁剪
+    // 当事故：L0 负责界河村落，L5 负责城内十字街与精细院落。
+    if (phase === 0) {
+      const outfield = health.environment?.outfield;
+      if (!outfield || outfield.villagePropClusters < 1 || outfield.villageProps < 5) {
+        bad.push(`村落生活层为空 clusters=${outfield?.villagePropClusters ?? "?"} props=${outfield?.villageProps ?? "?"}`);
+      }
+    }
+    if (phase === 5) {
+      const city = health.environment?.city;
+      if (!city || city.householdProps < 5 || city.streetClusters < 1
+        || city.streetProps < 5 || city.roadMarks < 5) {
+        bad.push(`城镇生活层不足 household=${city?.householdProps ?? "?"} streetClusters=${city?.streetClusters ?? "?"} streetProps=${city?.streetProps ?? "?"} roadMarks=${city?.roadMarks ?? "?"}`);
+      }
+    }
   }
   const ok = bad.length === 0;
   if (!ok) failed += 1;
@@ -145,6 +161,10 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       ? `${String(health.level).padEnd(14)} spread=${health.spread} tones=${health.tones} calls=${health.drawCalls} `
         + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive} `
         + `sky=${(health.skyTexels / (health.skyTexels + health.geoTexels) * 100).toFixed(0)}%`
+        + (phase === 0 ? ` villageProps=${health.environment?.outfield?.villageProps ?? "?"}` : "")
+        + (phase === 5 ? ` streetProps=${health.environment?.city?.streetProps ?? "?"}`
+          + ` householdProps=${health.environment?.city?.householdProps ?? "?"}`
+          + ` roadMarks=${health.environment?.city?.roadMarks ?? "?"}` : "")
       : "(no health)")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));
   for (const p of problems.slice(0, 4)) console.log(`       ${p}`);

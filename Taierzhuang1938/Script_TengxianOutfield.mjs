@@ -77,6 +77,7 @@ import {
 } from "./Data_Tengxian.mjs";
 import { BuildSink, AddTree } from "./Script_World.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
+import { AddVillageLife } from "./Script_LivedInProps.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { JIEHE_RIVER, JieheRiverCenterZ } from "./Script_JieheHeight.mjs";
 
@@ -488,7 +489,8 @@ export class TengxianOutfield {
     this.covers = [];
     this.stats = { banks: 0, parapets: 0, pits: 0, graves: 0, trees: 0,
       wheatPlots: 0, soilPlots: 0, balks: 0, craters: 0, villages: 0,
-      villageBuildings: 0, villageDetails: 0, villageArchetypes: {}, railM: 0, ties: 0 };
+      villageBuildings: 0, villageDetails: 0, villageArchetypes: {},
+      villagePropClusters: 0, villageProps: 0, railM: 0, ties: 0 };
     // 密度：low 砍四成，medium 砍两成
     this.density = quality === "low" ? 0.6 : quality === "medium" ? 0.8 : 1.0;
   }
@@ -1594,40 +1596,15 @@ export class TengxianOutfield {
 
   AddVillageProps(sink, { x, z, ry, seed, far, rnd }) {
     if (far) return;
-    const base = this.VillagePoint(x, z, ry, 3.1 + rnd() * 1.4, 2.2 + rnd());
-    const groundY = this.groundAt(base.x, base.z);
-    // 草垛：返青前仍保留上年麦秸，色彩与房屋/裸土拉开，轮廓也不是盒子。
-    const stack = new THREE.CylinderGeometry(0.72, 1.02, 1.34, 10);
-    sink.Add("VillageStraw", PlaceGeometry(stack, { x: base.x, y: groundY + 0.67, z: base.z }));
-    const cap = new THREE.ConeGeometry(0.78, 0.72, 10);
-    sink.Add("VillageStraw", PlaceGeometry(cap, { x: base.x, y: groundY + 1.7, z: base.z }));
-    sink.Solid(base.x, groundY + 0.98, base.z,
-      0.92, 0.98, 0.92, "villageStraw", ry);
-
-    // 独轮大车：两个木轮、车板、辕杆。近村才做，远村只留屋顶剪影。
-    const cart = this.VillagePoint(x, z, ry, -3.0 - rnd(), 2.0 + rnd() * 1.5);
-    const cartY = this.groundAt(cart.x, cart.z);
-    for (const side of [-1, 1]) {
-      const wheel = this.VillagePoint(cart.x, cart.z, ry, side * 0.72, 0);
-      const geometry = new THREE.CylinderGeometry(0.48, 0.48, 0.09, 12);
-      sink.Add("WoodBeam", PlaceGeometry(geometry,
-        { x: wheel.x, y: cartY + 0.48, z: wheel.z, ry, rz: Math.PI / 2 }));
-    }
-    sink.Add("WoodDoor", PlaceGeometry(
-      MakeBox(1.3, 0.18, 1.65, TILE_METERS.wood, `${seed}:cartBed`),
-      { x: cart.x, y: cartY + 0.65, z: cart.z, ry }));
-    sink.Solid(cart.x, cartY + 0.52, cart.z,
-      0.78, 0.52, 0.92, "villageCart", ry);
-    for (const side of [-1, 1]) {
-      const shaft = this.VillagePoint(cart.x, cart.z, ry, side * 0.38, 1.65);
-      sink.Add("WoodBeam", PlaceGeometry(
-        MakeBox(0.09, 0.09, 2.2, TILE_METERS.wood, `${seed}:shaft${side}`),
-        { x: shaft.x, y: cartY + 0.68, z: shaft.z, ry }));
-    }
-    const shaftCenter = this.VillagePoint(cart.x, cart.z, ry, 0, 1.65);
-    sink.Solid(shaftCenter.x, cartY + 0.68, shaftCenter.z,
-      0.48, 0.09, 1.12, "villageCart", ry);
-    this.stats.villageDetails += 2;
+    const yard = this.VillagePoint(x, z, ry, (rnd() - 0.5) * 1.6, 2.4 + rnd() * 1.8);
+    const groundY = this.groundAt(yard.x, yard.z);
+    const items = AddVillageLife(sink, {
+      x: yard.x, z: yard.z, ry, baseY: groundY,
+      seed, strawMaterial: "VillageStraw",
+    });
+    this.stats.villagePropClusters += 1;
+    this.stats.villageProps += items;
+    this.stats.villageDetails += items;
   }
 
   /**
@@ -1680,7 +1657,9 @@ export class TengxianOutfield {
             seed: `${v.id}:${i}:court`, material: i % 4 === 0 ? "Adobe" : "HouseBrick",
           });
         }
-        if (!v.far && i % 3 === 1) this.AddVillageProps(sink, {
+        // 近村约三分之二的住户留下一组生产生活痕迹；原来只有三分之一且永远是
+        // “一个草垛 + 一辆车”，重复感强，空院仍占绝大多数。
+        if (!v.far && (i % 3 !== 2 || kind === "FarmShed")) this.AddVillageProps(sink, {
           x, z, ry, seed: `${v.id}:${i}:props`, far: false, rnd: vRnd,
         });
       }

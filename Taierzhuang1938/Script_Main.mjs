@@ -589,6 +589,14 @@ async function Boot() {
         playerBody: !!(player && player.body),
         grounded: player ? player.grounded : null,
       } : null),
+      /** 城镇/村落程序化细节的运行时计数；视觉回归要能证明不是只改了注释。 */
+      Environment: () => ({
+        city: battlefield?.city?.stats ? { ...battlefield.city.stats } : null,
+        outfield: battlefield?.outfield?.stats ? {
+          ...battlefield.outfield.stats,
+          villageArchetypes: { ...battlefield.outfield.stats.villageArchetypes },
+        } : null,
+      }),
       /** 破坏层取证：可破坏/承重数量、破口、常驻残骸与拓扑重建次数。 */
       Destruction: () => destruction ? destruction.Stats() : null,
       /** 冒烟靶场用：走正式材质耐久与拓扑链，不绕过破坏系统。 */

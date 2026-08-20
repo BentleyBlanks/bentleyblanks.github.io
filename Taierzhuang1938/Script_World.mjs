@@ -21,6 +21,7 @@ import {
   MakeRubbleField, MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import { ColliderDestructionData } from "./Data_Destruction.mjs";
+import { AddCourtyardLife } from "./Script_LivedInProps.mjs";
 
 /** 建造过程中的收集器：按材质名分桶攒几何体，最后一次性合并。 */
 export class BuildSink {
@@ -339,6 +340,13 @@ export function AddCompound(sink, spec) {
   if (rnd() < 0.55) AddWell(sink, ...L((rnd() - 0.5) * width * 0.4, yardZ - rnd() * 2));
   if (rnd() < 0.45) AddMillstone(sink, ...L((rnd() - 0.5) * width * 0.5, yardZ - 1 - rnd() * 2), `${seed}:ms`);
   if (rnd() < 0.4) AddWaterVat(sink, ...L(width / 2 - 1.2, yardZ - 0.6), `${seed}:vat`);
+  // 井/磨盘/水缸只能说明“这里有三个功能点”，不能说明“这里有人过日子”。
+  // 另补靠墙储物、篮筐陶缸、柴垛/晒架/桌凳等组合与被踩实的院心。
+  const [lifeX, lifeZ] = L(0, yardZ - 2.0);
+  const householdProps = AddCourtyardLife(sink, {
+    x: lifeX, z: lifeZ, ry, baseY: 0, seed: `${seed}:life`,
+    width: Math.max(6, width - 3.0), depth: Math.max(4.5, depth - mainD - 1.0), damage,
+  });
   // 影壁：门内一堵挡视线的短墙，进院第一眼看到的就是它。
   //
   // 概率从 0.5 提到必有（形制上本来也是四合院的标配）。理由不只是考据：
@@ -352,6 +360,7 @@ export function AddCompound(sink, spec) {
       ruin: damage * 0.6, seed: `${seed}:screen`, plinth: "Stone", cope: true,
     });
   }
+  return { householdProps };
 }
 
 /** 一栋房：四面墙 + 门 + 朝院子的格子窗 + 硬山瓦顶。 */

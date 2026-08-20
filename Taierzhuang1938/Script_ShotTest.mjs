@@ -54,6 +54,11 @@ const GAME_SHOTS = [
   // 檐下斗拱和月台石栏在近景也确实存在，防止以后又退化成四块交叉板。
   { name: "Game_Z3_GateTower", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 360, z: 0, yaw: Math.PI / 2, pitch: 0.22 } },
+  // 生活层专项：冻结敌军开火，避免中弹红闪把路肩家什、车辙和院落细节染没。
+  { name: "Game_Z4_CityLife", query: "shot=1&phase=5&quality=high&scale=medium",
+    setup: { x: 88, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
+  { name: "Game_Z5_VillageLife", query: "shot=1&phase=0&quality=high&scale=medium",
+    setup: { x: -160, z: -1322, yaw: 0, pitch: -0.05, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };
@@ -86,10 +91,29 @@ async function Shoot(pageName, url, globalName, setup = null) {
       const game = window[g];
       game.player.Spawn(pose.x, pose.z, pose.yaw);
       game.player.pitch = pose.pitch || 0;
+      if (pose.quiet) {
+        // 环境审查不是战斗审查：保留士兵和战场烟火，但让他们暂时不能开枪。
+        // Spawn 会先清一次受伤状态；这里再冻结 AI，保证后续帧不会重新染红画面。
+        game.player.health = 100;
+        game.player.bleeding = 0;
+        game.player.hitFlash = 0;
+        game.player.hitMarks.length = 0;
+        if (game.ai) for (const soldier of game.ai.soldiers) {
+          soldier.coolUntil = 1e9;
+          soldier.fireTimer = 0;
+        }
+      }
       game.StepFrames(12);
     }, { g: globalName, pose: setup });
   }
   await page.evaluate((g) => window[g].StepFrames(60), globalName);
+  if (setup?.quiet) await page.evaluate((g) => {
+    const game = window[g];
+    game.player.health = 100;
+    game.player.bleeding = 0;
+    game.player.hitFlash = 0;
+    game.player.hitMarks.length = 0;
+  }, globalName);
   await page.waitForTimeout(500);
   const file = path.join(outDir, `${pageName}.png`);
   await page.screenshot({ path: file });

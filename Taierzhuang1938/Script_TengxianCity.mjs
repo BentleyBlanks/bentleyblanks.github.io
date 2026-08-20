@@ -48,6 +48,7 @@ import {
   MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
   MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
+import { AddRoadWear, AddStreetLife } from "./Script_LivedInProps.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,12 @@ const MATERIAL_MAP = {
   Ground: { recipe: "Ground" },
   GroundRubble: { recipe: "GroundRubble" },
   DirtRoad: { recipe: "Ground", color: 0xe9d9bb },
+  // 生活层：同一套烘焙底材压成陶器、竹柳编、旧布与被车轮反复碾过的深色土。
+  HouseholdCeramic: { recipe: "Stone", color: 0xb99a82, roughness: 0.96 },
+  Wicker: { recipe: "Sandbag", color: 0xb99761, roughness: 1.0 },
+  HouseholdCloth: { recipe: "ClothNra", color: 0xb7a189, roughness: 1.0 },
+  RoadWear: { recipe: "Ground", color: 0xc4af91, roughness: 1.0 },
+  RoadLitter: { recipe: "GroundRubble", color: 0xb6a88f, roughness: 1.0 },
   // 枪眼白茬：新凿开的砖断口比风化面亮两档，这一圈白是滕县的第一符号
   LoopholeRim: { recipe: "Stone", color: 0xffffff },
   Willow: { recipe: "WoodBeam", color: 0xc09a86 },
@@ -318,7 +325,10 @@ export class TengxianCity {
     this.covers = [];
     this.grid = new Map();
     this.gridSize = 12;
-    this.stats = { compoundsDetail: 0, compoundsMid: 0, silhouettes: 0 };
+    this.stats = {
+      compoundsDetail: 0, compoundsMid: 0, silhouettes: 0,
+      householdProps: 0, streetClusters: 0, streetProps: 0, roadMarks: 0,
+    };
     this.wallTopY = WALL_TOP_Y;
 
     /**
@@ -391,6 +401,9 @@ export class TengxianCity {
 
     yield { label: "东关：家家有枪眼的院落迷宫", progress: 0.84 };
     this.BuildEastSuburb(rnd);
+
+    yield { label: "生活层：门前家什、店铺摊具与路面痕迹", progress: 0.88 };
+    this.BuildStreetLife();
 
     yield { label: "城外：龙泉塔、荆河、西关", progress: 0.90 };
     this.BuildOutskirts(rnd);
@@ -809,6 +822,11 @@ export class TengxianCity {
         MakeBox(s.axis === "x" ? len : s.width, 0.12, s.axis === "x" ? s.width : len,
           TILE_METERS.ground, `road${s.id}`),
         { x: cx, y: CITY.platformY + 0.05, z: cz }));
+      this.stats.roadMarks += AddRoadWear(this.sink, {
+        x: cx, z: cz, ry: s.axis === "x" ? 0 : Math.PI / 2,
+        length: len, width: s.width, baseY: CITY.platformY + 0.118,
+        seed: `roadWear${s.id}`,
+      });
     }
     // 十字街口：全城的中心地标，王铭章亲临这里指挥
     this.sink.Add("DirtRoad", PlaceGeometry(
@@ -816,6 +834,50 @@ export class TengxianCity {
       { x: 0, y: CITY.platformY + 0.06, z: 0 }));
     // 十字街口四角的铺面不在这里单独摆：它就是贴着街口的那一格院子，
     // 由 PlanBlocks 打上 shop 标记、BuildBlock 按临街铺面的样子盖（见那里的注释）。
+    void rnd;
+  }
+
+  /**
+   * 街肩生活层：中线始终留给行军、推炮与西门城楼的历史通视，家什只贴两侧。
+   * 每 26 m 一组但左右交替，并在十字街口、城门与地标门前主动留空。
+   */
+  BuildStreetLife() {
+    for (const street of STREETS) {
+      const rnd = Mulberry32(HashString(`streetLife:${street.id}`));
+      const from = Math.min(street.from, street.to) + 24;
+      const to = Math.max(street.from, street.to) - 24;
+      let index = 0;
+      for (let along = from; along <= to; along += 26) {
+        const jittered = along + (rnd() - 0.5) * 7;
+        if (Math.abs(jittered) < CROSSROAD.size / 2 + 14) continue;
+        const side = index % 2 === 0 ? -1 : 1;
+        // 西门楼到十字街不只是“路心能走”，而是史实上必须保留完整的机枪通视带；
+        // 这一条街的家什退到 ±4.5 m 净宽之外，其他街仍贴路肩摆放。
+        const shoulder = street.id === "WestGateStreet"
+          ? Math.max(street.width / 2 + 0.85, SIGHT_CORRIDOR.clearHalfWidth + 0.85)
+          : Math.max(1.8, street.width / 2 - 0.48);
+        const x = street.axis === "x" ? jittered : street.at + side * shoulder;
+        const z = street.axis === "x" ? street.at + side * shoulder : jittered;
+        index += 1;
+        if (!this.InBounds(x, z, 5)) continue;
+        let blocked = false;
+        for (const rect of this.BlockerRects()) {
+          if (x > rect.minX - 4 && x < rect.maxX + 4 && z > rect.minZ - 4 && z < rect.maxZ + 4) {
+            blocked = true; break;
+          }
+        }
+        if (blocked) continue;
+        this.sink.SetSector(SectorKey(x, z));
+        const count = AddStreetLife(this.sink, {
+          x, z, ry: street.axis === "x" ? 0 : Math.PI / 2,
+          baseY: CITY.platformY + 0.13, seed: `${street.id}:${index}`,
+          commerce: Math.abs(x) < 115 && Math.abs(z) < 115,
+        });
+        this.stats.streetClusters += 1;
+        this.stats.streetProps += count;
+      }
+    }
+    this.sink.SetSector("");
   }
 
   /**
@@ -934,10 +996,11 @@ export class TengxianCity {
       return;
     }
     if (dist < this.detailRadius) {
-      AddCompound(this.sink, {
+      const built = AddCompound(this.sink, {
         x: cell.x, z: cell.z, ry: 0, width: cell.w, depth: cell.d,
         seed: cell.seed, damage, burnt,
       });
+      this.stats.householdProps += built?.householdProps || 0;
       this.AddStreetLoopholes(this.sink, cell, damage);
       this.stats.compoundsDetail += 1;
       return;
@@ -1152,10 +1215,11 @@ export class TengxianCity {
         // 东关的地坪在濠外，标高 0 附近
         const saveY = CITY.platformY;
         if (dist < this.detailRadius) {
-          AddCompound(this.sink, {
+          const built = AddCompound(this.sink, {
             x, z, ry: 0, width: cell.w, depth: cell.d, seed: cell.seed,
             damage: dmg, burnt: dmg > 0.6,
           });
+          this.stats.householdProps += built?.householdProps || 0;
           this.AddSuburbLoopholes(cell, dmg);
           this.stats.compoundsDetail += 1;
         } else if (dist < this.midRadius) {
@@ -1171,6 +1235,37 @@ export class TengxianCity {
     }
     this.sink.SetSector("");
     this.farSink.SetSector("");
+
+    // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件；院落仍为中心留出净路。
+    const eastRoadLength = b.maxX - startX;
+    const eastRoadX = startX + eastRoadLength / 2;
+    if (this.InBounds(eastRoadX, 0, eastRoadLength / 2)) {
+      this.sink.Add("DirtRoad", PlaceGeometry(
+        MakeBox(eastRoadLength, 0.12, 9.0, TILE_METERS.ground, "eastSuburbRoad"),
+        { x: eastRoadX, y: 0.05, z: 0 }));
+      this.stats.roadMarks += AddRoadWear(this.sink, {
+        x: eastRoadX, z: 0, ry: 0, length: eastRoadLength, width: 9.0,
+        baseY: 0.118, seed: "eastSuburbRoadWear",
+      });
+      const streetRnd = Mulberry32(HashString("eastSuburbStreetLife"));
+      let cluster = 0;
+      for (let px = startX + 20; px < b.maxX - 18; px += 25) {
+        const pz = (cluster % 2 ? 1 : -1) * 3.9;
+        cluster += 1;
+        if (!this.InBounds(px, pz, 5)) continue;
+        const temple = EAST_SUBURB.temple;
+        if (Math.abs(px - temple.x) < temple.w / 2 + 8
+          && Math.abs(pz - temple.z) < temple.d / 2 + 8) continue;
+        this.sink.SetSector(SectorKey(px, pz));
+        const count = AddStreetLife(this.sink, {
+          x: px + (streetRnd() - 0.5) * 5, z: pz, ry: 0, baseY: 0.13,
+          seed: `eastSuburbStreet:${cluster}`, commerce: px < startX + 100,
+        });
+        this.stats.streetClusters += 1;
+        this.stats.streetProps += count;
+      }
+      this.sink.SetSector("");
+    }
 
     // 东关寨墙：**高 2 m、顶宽 0.4 m**（日方实测）—— 极薄，一炮一个口。
     const zw = EAST_SUBURB.zhaiWall;
