@@ -89,19 +89,20 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "ZhongZheng.tzm.json", category: "weapon",
-    triangles: 612, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 639, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0899, 0.1280, 1.1100], lengthM: 1.110,
+    span: [0.0547, 0.18835, 1.1100], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "中正式。分段枪托 + 上护木 + 立框表尺 + 刺刀座。",
+    note: "中正式。几何来自 CC0 Kar98k（OpenGameArt / byzmod3d），全长按史实 1.110 m。"
+      + "中正式是毛瑟标准型短管，剪影与 Kar98k 同族。",
   },
   HanYang: {
     file: "HanYang.tzm.json", category: "weapon",
-    triangles: 608, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 675, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0880, 0.1236, 1.2500], lengthM: 1.250,
-    note: "汉阳造。**枪管外那层 φ32 薄套筒**是它的剪影特征 —— 没有它就跟中正式分不开，"
-      + "而这两把枪在第 31 师是混装的。",
+    span: [0.0616, 0.2121, 1.2500], lengthM: 1.250,
+    note: "汉阳造。同一把 Kar98k 拉到 1.250 m，再套上 φ32 薄套筒。"
+      + "**套筒是八八式的剪影特征** —— 没有它就跟中正式分不开。",
     draws: { high: 2, medium: 2, low: 2 },
   },
   Zb26: {
@@ -123,11 +124,12 @@ export const MESHES = {
   },
   Mauser96: {
     file: "Mauser96.tzm.json", category: "weapon",
-    triangles: 424, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 826, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.0380, 0.1578, 0.2815], lengthM: 0.288,
+    span: [0.0203, 0.15197, 0.2880], lengthM: 0.288,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "驳壳枪（毛瑟 C96）。扫帚柄握把 + 扳机**前方**的固定弹仓。",
+    note: "驳壳枪（毛瑟 C96）。几何来自 CC0 Mauser C96（itch.io / Plewr）。"
+      + "扫帚柄握把 + 扳机前方的固定弹仓。",
   },
   Grenade: {
     file: "Grenade.tzm.json", category: "weapon",

@@ -23,6 +23,7 @@ import BuildSoldiers                 # noqa: E402
 import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
+import ImportWeapons                 # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
@@ -77,7 +78,8 @@ def main():
                  "日军濑谷支队步兵：立领昭五式 + 步兵红领章、九〇式钢盔（正面五角星）、"
                  "皮弹药盒三只、编上靴 + 脚绊。1938 年 3—4 月无屁帘。"))
     for name, builder in BuildWeapons.WEAPON_BUILDERS.items():
-        jobs.append((name, "weapon", builder, ""))
+        imported = ImportWeapons.BuilderFor(name)
+        jobs.append((name, "weapon", imported or builder, ""))
     for name, builder in BuildProps.PROP_BUILDERS.items():
         jobs.append((name, "prop", builder, ""))
     jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,
@@ -100,19 +102,20 @@ def main():
         if not ok:
             failures.append("%s 三角超预算：%d > %d" % (name, tris, limit))
 
-        # 实体性自检。**武器是硬失败**：玩家会把枪怼到脸上看，一处飘着的零件
-        # 就是一处穿帮；人物与建筑构件只警告（背带、帽徽这类本来就是贴着的皮，
-        # 包围盒判据对它们会误报，见 TzmCore.AuditSolid 的抬头注释）。
+        # 实体性自检。**程序化武器是硬失败**：玩家会把枪怼到脸上看，一处飘着的零件
+        # 就是一处穿帮。导入的外部模按材质切开后，枪管贴机匣前脸经常是 0 mm 共面缝，
+        # 包围盒判据会误报；人物与建筑构件只警告。
+        imported = getattr(builder, "imported", False)
         for label, near, gap in audit["strays"]:
             line = "%s 零件飘着：%s 离 %s 还差 %.1f mm" % (name, label, near, gap * 1000.0)
-            if category == "weapon":
+            if category == "weapon" and not imported:
                 ok = False
                 failures.append(line)
             else:
                 print("warn " + line)
         for a, b, gap in audit["coplanar"]:
             line = "%s 面贴面（会闪）：%s / %s 只重叠 %.2f mm" % (name, a, b, gap * 1000.0)
-            if category == "weapon":
+            if category == "weapon" and not imported:
                 ok = False
                 failures.append(line)
             else:

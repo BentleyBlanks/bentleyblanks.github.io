@@ -925,13 +925,9 @@ const BUILDERS = {
 // （中正式 / 汉阳造 / 三八式）、捷克式、驳壳枪都有一个会动的枪机：每打一发，
 // bolt 这个 Group 要后拉 boltTravel、从 ejectAt 抛一枚壳出去，三八式还要滑开防尘盖。
 // 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
-// 所以这三类保留手搭的 rig；**大刀与手榴弹没有任何可动件**，换过去零损失，
-// 就走模型。
-//
-// 要把步枪也换过来，改的是模型那一侧：BuildWeapons.py 里把 BoltHandle / 防尘盖
-// 挂成 joint:true 的子节点（加载器就会把它们留成独立的可动节点，见 TZM 格式说明
-// 里"joint 是合批的分界线"那一段），这里的 MODEL_FP 表再把对应的 id 加进来即可。
-const MODEL_FP = new Set(["Dadao", "Grenade", "GrenadeBundle"]);
+// 大刀 / 手榴弹没有可动件，换过去零损失。中正式 / 汉阳造 / 驳壳枪走导入的
+// 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
+const MODEL_FP = new Set(["Dadao", "Grenade", "GrenadeBundle", "ZhongZheng", "HanYang", "Mauser96"]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
 const VM_MATERIAL_BY_MESH = {
@@ -960,6 +956,18 @@ const MODEL_FP_TWEAK = {
     // 弹体朝前上方：跟手搭 rig 里 prop.rotation.x = -0.35 是同一个角
     pose: { x: 0, y: 0.02, z: -0.02, rx: -0.35, ry: 0, rz: 0 },
     handRot: { right: [0.30, 0, -1.52], left: [0.10, 0.5, 1.30] },
+  },
+  ZhongZheng: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+  },
+  HanYang: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+  },
+  Mauser96: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
   },
 };
 
@@ -1304,8 +1312,8 @@ export class Viewmodel {
       return this;
     }
 
-    // 先试模型（只有确定零损失的那几把在 MODEL_FP 里），退回手搭的 rig。
-    // 退回不是异常路径：栓动步枪本来就走手搭那条，见 MODEL_FP 上面那段账。
+    // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
+    // 三八式 / 捷克式仍走手搭：外部免费模要 Sketchfab 登录，且程序化剪影（防尘盖、上插直匣）不能错。
     const meshId = MODEL_FP.has(weaponId) ? WEAPON_MESH_BY_ID[weaponId] : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
