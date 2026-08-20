@@ -12,7 +12,7 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
-  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=4",
+  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=5",
   nraSoldier: "./Model/Model_NraSoldier.glb?v=3",
   civilianMale: "./Model/Model_CivilianMale.glb?v=3",
   civilianFemale: "./Model/Model_CivilianFemale.glb?v=3",
@@ -330,8 +330,27 @@ export class SegmentedCharacterSkin {
         // 猜分段与包围盒猜枢轴，本版已经改成源蒙皮权重 + 源 rest bone。
         target.attach(mesh);
         mesh.traverse((part) => {
-          part.userData.skipNormalDepth = true;
-          if (part.isMesh) { part.castShadow = true; part.receiveShadow = true; }
+          // These compatibility segments are ordinary rigid Meshes, not the
+          // source SkinnedMesh that motivated the prepass exclusion. Let them
+          // write normal/depth so fog, SSAO and soft particles use the soldier
+          // surface instead of the terrain behind it.
+          part.userData.skipNormalDepth = false;
+          if (part.isMesh) {
+            part.castShadow = true;
+            part.receiveShadow = true;
+            const materials = Array.isArray(part.material) ? part.material : [part.material];
+            for (const material of materials) {
+              if (!material) continue;
+              // All character atlases are fully opaque. Defend the runtime
+              // contract even if a future GLB exporter reintroduces BLEND.
+              material.transparent = false;
+              material.opacity = 1;
+              material.alphaTest = 0;
+              material.depthTest = true;
+              material.depthWrite = true;
+              material.needsUpdate = true;
+            }
+          }
         });
         this.segmentMeshes.push(mesh);
       }

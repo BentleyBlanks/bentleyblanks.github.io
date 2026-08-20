@@ -46,8 +46,11 @@ def MakeTexturedMaterial(name, image, roughness=0.86):
     texture.image = image
     shader.inputs["Roughness"].default_value = roughness
     shader.inputs["Metallic"].default_value = 0.0
+    shader.inputs["Alpha"].default_value = 1.0
     links.new(texture.outputs["Color"], shader.inputs["Base Color"])
-    links.new(texture.outputs["Alpha"], shader.inputs["Alpha"])
+    # Uniform atlases have no cutouts. Linking an otherwise unused PNG alpha
+    # channel makes Blender export alphaMode=BLEND; Three.js then disables
+    # depth writes for the whole soldier and body parts show through the head.
     links.new(shader.outputs["BSDF"], output.inputs["Surface"])
     return material
 

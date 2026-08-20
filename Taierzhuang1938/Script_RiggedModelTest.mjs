@@ -26,6 +26,15 @@ function ReadGlb(name) {
 function Names(doc) { return new Set((doc.nodes || []).map((node) => node.name).filter(Boolean)); }
 function Animations(doc) { return new Set((doc.animations || []).map((clip) => clip.name).filter(Boolean)); }
 
+function AssertOpaqueMaterials(doc, label) {
+  for (const material of doc.materials || []) {
+    const alpha = material.pbrMetallicRoughness?.baseColorFactor?.[3] ?? 1;
+    assert.equal(alpha, 1, `${label} material ${material.name} has translucent base color`);
+    assert.equal(material.alphaMode ?? "OPAQUE", "OPAQUE",
+      `${label} material ${material.name} must not use ${material.alphaMode}`);
+  }
+}
+
 function SegmentBounds(doc, name) {
   const node = (doc.nodes || []).find((candidate) => candidate.name === name);
   assert.ok(node, `missing ${name}`);
@@ -59,6 +68,7 @@ assert.ok(Animations(arms).has("GripIdle"), "FPS arms include GripIdle");
 const soldier = ReadGlb("Model_IjaSoldier.glb");
 const soldierNames = Names(soldier);
 const soldierAnimations = Animations(soldier);
+AssertOpaqueMaterials(soldier, "IJA soldier");
 assert.ok((soldier.skins || []).length >= 1, "IJA source skin remains in GLB");
 assert.ok((soldier.textures || []).length >= 1, "IJA uniform texture remains in GLB");
 for (const bone of ["Hips", "Spine2", "Head", "LeftHand", "RightFoot"])
@@ -83,11 +93,8 @@ for (const [file, label] of [
 ]) {
   const character = ReadGlb(file);
   const names = Names(character);
+  AssertOpaqueMaterials(character, label);
   assert.ok((character.meshes || []).length >= 13, `${label} keeps visible meshes`);
-  for (const material of character.materials || []) {
-    const alpha = material.pbrMetallicRoughness?.baseColorFactor?.[3] ?? 1;
-    assert.equal(alpha, 1, `${label} material ${material.name} is opaque`);
-  }
   for (const segment of ["Segment_hips", "Segment_chest", "Segment_neck", "Segment_armL",
     "Segment_foreR", "Segment_thighL", "Segment_shinR", "Segment_footL"])
     assert.ok(names.has(segment), `${label} compatibility segment ${segment}`);

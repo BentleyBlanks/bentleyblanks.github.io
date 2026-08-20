@@ -287,6 +287,19 @@ const actor = await page.evaluate(() => {
   active.Rebuild();
   window.Taierzhuang.StepFrames(10);
   const five = active.actors.length;
+  const rigidShadingSolid = active.actors.every((previewActor) => {
+    const skin = previewActor.riggedSkin;
+    if (!skin || !skin.segmentMode) return false;
+    let solid = true;
+    for (const segment of skin.segmentMeshes) segment.traverse((object) => {
+      if (!object.isMesh) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      solid = solid && object.userData.skipNormalDepth !== true
+        && materials.every((material) => material && !material.transparent
+          && material.opacity === 1 && material.depthWrite && material.depthTest);
+    });
+    return solid;
+  });
   active.lineup = false;
   active.SetClip("dead");
   window.Taierzhuang.StepFrames(30);
@@ -297,7 +310,7 @@ const actor = await page.evaluate(() => {
     && active.weaponId === null
     && active.weaponSelect.Value() === "";
   return {
-    id: editor.ActiveId, one, five, kind, source, ragdoll, civilianUnarmed,
+    id: editor.ActiveId, one, five, kind, source, ragdoll, civilianUnarmed, rigidShadingSolid,
     studio: editor.studio.Active,
     worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
     viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
@@ -307,6 +320,7 @@ Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${act
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
 // KINDS 现在含川军、敢死队、军官、日军、日军军官、百姓，共六种。
 Check("单人 / 六种人物对比", actor.one === 1 && actor.five === 6, `${actor.one} → ${actor.five}`);
+Check("刚体人物头帽是不透明且写入深度/法线", actor.rigidShadingSolid);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 
