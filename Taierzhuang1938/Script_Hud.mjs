@@ -130,6 +130,10 @@ export class Hud {
     this.confirms = [];
     this.actionPrompts = [];
     this.actionPromptSignature = "";
+    /** 帧率读数：累计一小段再平均，免得数字每帧乱跳。 */
+    this.fpsAccum = 0;
+    this.fpsFrames = 0;
+    this.fpsLast = 0;
   }
 
   Build() {
@@ -142,6 +146,9 @@ export class Hud {
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
     this.BuildHitDirs();
+    // 左上角一个小帧率读数：只看性能，字号压到最小、不抢战场信息。
+    this.el.fps = mk("hudFps");
+    this.el.fps.textContent = "-- FPS";
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
@@ -675,7 +682,28 @@ export class Hud {
     return this.SetMinimapVisible(!this.minimapVisible);
   }
 
+  /**
+   * 每 0.25 s 刷一次的平均帧率。
+   * 用 performance.now 自己量，不吃传进来的 dt —— 主循环那个 dt 被 clamp 到
+   * 0.05（见 Script_Main），真掉到 12 fps 时它照样报 20，读数就没意义了。
+   */
+  UpdateFps(dt) {
+    if (!(dt > 0)) { this.fpsLast = 0; return; }           // 暂停时清掉基准，恢复后不把停顿算成一帧
+    const now = performance.now();
+    if (this.fpsLast === 0) { this.fpsLast = now; return; }
+    this.fpsAccum += (now - this.fpsLast) / 1000;
+    this.fpsLast = now;
+    this.fpsFrames += 1;
+    if (this.fpsAccum < 0.25) return;
+    const fps = Math.round(this.fpsFrames / this.fpsAccum);
+    this.fpsAccum = 0;
+    this.fpsFrames = 0;
+    this.el.fps.textContent = `${fps} FPS`;
+    this.el.fps.classList.toggle("low", fps < 30);
+  }
+
   Update(dt) {
+    this.UpdateFps(dt);
     // 命中记号：往外弹 + 淡出。用 JS 补间而不是 CSS 动画，因为同一记号会被
     // 连续两发连点重播，CSS 动画重启要靠强制回流那一套 hack，在这里不值当。
     if (this.hitmarkTimer > 0) {

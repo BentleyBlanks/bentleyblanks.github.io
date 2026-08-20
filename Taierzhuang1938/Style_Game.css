@@ -65,6 +65,16 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transition: opacity 0.08s linear;
 }
 
+/* 左上角：帧率小读数。等宽数字，不跟着位数抖。 */
+.hudFps {
+  position: absolute; top: 10px; left: 12px;
+  font: 600 10px/1 ui-monospace, "Consolas", monospace;
+  letter-spacing: 0.08em; color: rgba(230,223,205,0.42);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.hudFps.low { color: rgba(224,176,98,0.72); }
+
 /* 顶部：阶段与目标 */
 .hudTop {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
