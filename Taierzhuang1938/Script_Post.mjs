@@ -10,7 +10,7 @@
 //   2) SSAO + 双边模糊 -> rtAoBlur (半分辨率)
 //   3) 主场景 (MSAA)   -> rtHdr    (RGBA16F, AO 由 onBeforeCompile 注入到间接光)
 //   4) 亮部提取 + 逐级降/升采样(tent) -> 泛光
-//   5) 体积光（屏幕空间径向模糊，太阳在屏内才跑）
+//   5) 太阳拖影 fallback（屏幕空间方向性模糊，太阳在屏内才跑）
 //   6) 合成：运动模糊 -> 曝光 -> ACES -> 调色 -> 暗角 -> 色差 -> 颗粒 -> sRGB
 //   7) FXAA + 锐化 -> 屏幕
 //
@@ -36,7 +36,7 @@ const GLSL_COMMON = /* glsl */`
 float Luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
 // 交错梯度噪声（Jorge Jimenez）：比 hash 噪声在低样本数下更"均匀"，
-// 泛光抖动、体积光步进、颗粒都用它。
+// 泛光抖动、太阳拖影采样、颗粒都用它。
 float Ign(vec2 p) {
   return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
@@ -219,9 +219,11 @@ void main() {
 // --- 泛光：亮部提取 + 13 抽样降采样 + 3x3 tent 升采样 -----------------------
 const FRAG_BRIGHT = /* glsl */`
 uniform sampler2D uSource;
+uniform sampler2D uNormalDepth;
 uniform float uThreshold;
 uniform float uKnee;
 uniform float uClamp;
+uniform float uPackSky;
 varying vec2 vUv;
 ${GLSL_COMMON}
 void main() {
@@ -232,7 +234,15 @@ void main() {
   float soft = clamp(br - uThreshold + uKnee, 0.0, 2.0 * uKnee);
   soft = soft * soft / (4.0 * uKnee + 1e-4);
   float contrib = max(soft, br - uThreshold) / max(br, 1e-4);
-  gl_FragColor = vec4(c * contrib, 1.0);
+  // 太阳拖影开时借 alpha 带一张低分辨率天空遮挡图。这一趟本来就在读 HDR，
+  // 顺手多读一次深度，可以让后面的径向模糊每步从“亮部+全分辨率深度”
+  // 两次随机访存变成只读这一张图。关拖影时统一写 1，动态分支不读深度。
+  float sky = 1.0;
+  if (uPackSky > 0.5) {
+    float depth = texture2D(uNormalDepth, vUv).w;
+    sky = clamp(step(depth, 0.0001) + step(300.0, depth), 0.0, 1.0);
+  }
+  gl_FragColor = vec4(c * contrib, sky);
 }
 `;
 
@@ -284,34 +294,34 @@ void main() {
 }
 `;
 
-// --- 体积光（屏幕空间径向模糊）---------------------------------------------
+// --- 太阳拖影 fallback（屏幕空间方向性模糊）---------------------------------
 const FRAG_GODRAYS = /* glsl */`
 uniform sampler2D uBright;
-uniform sampler2D uNormalDepth;
 uniform vec2 uSunUv;
 uniform float uDensity;
-uniform float uDecay;
 uniform float uWeight;
 uniform float uFrame;
 varying vec2 vUv;
 ${GLSL_COMMON}
-const int STEPS = 24;
+vec3 TapRay(vec2 ray, float t, float jitter, float weight) {
+  vec4 s = texture2D(uBright, vUv + ray * clamp(t + jitter, 0.0, 1.0));
+  return s.rgb * s.a * weight;
+}
 void main() {
-  vec2 delta = (vUv - uSunUv) * (uDensity / float(STEPS));
-  // 抖动起点：不抖的话 24 步会在画面上排出一圈圈同心条纹
-  vec2 uv = vUv - delta * Ign(gl_FragCoord.xy + uFrame * 3.17);
-  float illum = 1.0;
-  vec3 sum = vec3(0.0);
-  for (int i = 0; i < STEPS; i++) {
-    vec3 s = texture2D(uBright, uv).rgb;
-    // 只有天空（深度为 0 / 极远）才是光源；被砖墙挡住的地方不许透出光柱
-    float depth = texture2D(uNormalDepth, uv).w;
-    float sky = step(depth, 0.0001) + step(300.0, depth);
-    sum += s * illum * clamp(sky, 0.0, 1.0);
-    illum *= uDecay;
-    uv -= delta;
-  }
-  gl_FragColor = vec4(sum * uWeight / float(STEPS), 1.0);
+  // 这不再模拟体积内的逐步光线积分，只做一条指向太阳的屏幕空间拖影。
+  // 8 个非均匀 tap 覆盖与旧版相同的 uDensity 长度；近处密、远处疏，
+  // 低分辨率线性过滤 + 微小帧间抖动会把它融成连续光带。
+  vec2 ray = (uSunUv - vUv) * uDensity;
+  float jitter = (Ign(gl_FragCoord.xy + uFrame * 3.17) - 0.5) * 0.018;
+  vec3 sum = TapRay(ray, 0.02, jitter, 1.00);
+  sum += TapRay(ray, 0.06, jitter, 0.92);
+  sum += TapRay(ray, 0.13, jitter, 0.84);
+  sum += TapRay(ray, 0.23, jitter, 0.74);
+  sum += TapRay(ray, 0.36, jitter, 0.63);
+  sum += TapRay(ray, 0.52, jitter, 0.52);
+  sum += TapRay(ray, 0.70, jitter, 0.42);
+  sum += TapRay(ray, 0.90, jitter, 0.34);
+  gl_FragColor = vec4(sum * (uWeight / 5.41), 1.0);
 }
 `;
 
@@ -574,7 +584,7 @@ void main() {
  * 事故根源：r165 起 `scene.overrideMaterial` 加了 `material.allowOverride` 闸门，
  * 默认 **true** —— 也就是说粒子、贴片（Sprite/Points）、烟、天空穹全都会被
  * 覆盖材质换掉。它们的几何属性对不上覆盖材质的顶点着色器，预通道里就蹦出
- * 一堆糊在原点的方块，SSAO 与体积光的天空判据跟着一起废。
+ * 一堆糊在原点的方块，SSAO 与太阳拖影的天空判据跟着一起废。
  *
  * 规矩：**任何半透明的、加性混合的、billboard 的东西，建完材质立刻调这个。**
  *
@@ -642,8 +652,9 @@ export class PostPipeline {
     this.matAoBlur = this._Mat(FRAG_AO_BLUR, this.uniformsAoBlur);
 
     this.uniformsBright = {
-      uSource: { value: null }, uThreshold: { value: 1.18 },
-      uKnee: { value: 0.55 }, uClamp: { value: 40 },
+      uSource: { value: null }, uNormalDepth: { value: null },
+      uThreshold: { value: 1.18 }, uKnee: { value: 0.55 }, uClamp: { value: 40 },
+      uPackSky: { value: 0 },
     };
     this.matBright = this._Mat(FRAG_BRIGHT, this.uniformsBright);
     this.uniformsDown = { uSource: { value: null }, uTexel: { value: new THREE.Vector2() } };
@@ -655,9 +666,9 @@ export class PostPipeline {
     this.matUp = this._Mat(FRAG_UPSAMPLE, this.uniformsUp);
 
     this.uniformsGod = {
-      uBright: { value: null }, uNormalDepth: { value: null },
+      uBright: { value: null },
       uSunUv: { value: new THREE.Vector2(0.5, 0.8) }, uDensity: { value: 0.52 },
-      uDecay: { value: 0.972 }, uWeight: { value: 3.0 }, uFrame: { value: 0 },
+      uWeight: { value: 3.0 }, uFrame: { value: 0 },
     };
     this.matGod = this._Mat(FRAG_GODRAYS, this.uniformsGod);
 
@@ -699,6 +710,7 @@ export class PostPipeline {
     this.matFxaa = this._Mat(FRAG_FXAA, this.uniformsFxaa);
 
     this.prevViewProjection = new THREE.Matrix4();
+    this.sunWorld = new THREE.Vector3();
     this.hasPrev = false;
     this.targets = {};
     this.bloomMips = [];
@@ -746,7 +758,15 @@ export class PostPipeline {
     this.targets.aoTmp = this._MakeRt(aw, ah, { type: THREE.UnsignedByteType });
     this.targets.aoBlur = this._MakeRt(aw, ah, { type: THREE.UnsignedByteType });
     this.targets.bright = this._MakeRt(w >> 1, h >> 1);
-    this.targets.god = this._MakeRt(Math.max(2, w >> 2), Math.max(2, h >> 2));
+    // 太阳拖影是方向性模糊，放大后本来就没有高频细节。常规 1600×900 仍走 1/4
+    // （360p 量级）；超宽/4K 不再让它跟像素数无上限增长，封顶约 9.6 万像素。
+    // 用户的 3394×1348 截图因此从 848×337 收到约 491×195，宽高比不变。
+    let godW = Math.max(2, w >> 2), godH = Math.max(2, h >> 2);
+    const godMaxPixels = 96000;
+    const godScale = Math.min(1, Math.sqrt(godMaxPixels / (godW * godH)));
+    godW = Math.max(2, Math.round(godW * godScale));
+    godH = Math.max(2, Math.round(godH * godScale));
+    this.targets.god = this._MakeRt(godW, godH);
     this.targets.ldr = this._MakeRt(w, h, { type: THREE.UnsignedByteType });
 
     let mw = w >> 1, mh = h >> 1;
@@ -865,8 +885,29 @@ export class PostPipeline {
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
 
+    // 在亮部提取前就算好这帧会不会跑太阳拖影，因为亮部图的 alpha
+    // 只在这种情况下需要顺手打包天空遮挡。旧版到第 5 pass 才投影太阳，
+    // 亮部 pass 无法知道是否值得多读一张深度图。
+    let godStrength = options.godStrength ?? 0;
+    let godActive = false;
+    if (this.preset.godrays && godStrength > 0 && options.sunDirection) {
+      // 太阳只是方向，拿一个相机前方的有限点做屏幕投影即可。点必须留在远裁面
+      // 以内；界河关卡 far=460，旧版写死 600 会让 ndc.z 越界，fallback 永远不开。
+      const sunProjectionDistance = Math.min(600, camera.far * 0.9);
+      const ndc = this.sunWorld.copy(options.sunDirection).multiplyScalar(sunProjectionDistance)
+        .add(camera.position).project(camera);
+      const edge = Math.max(Math.abs(ndc.x), Math.abs(ndc.y));
+      if (ndc.z < 1 && edge < 1.4) {
+        godStrength *= THREE.MathUtils.clamp(1.4 - edge, 0, 1);
+        godActive = godStrength > 0.0001;
+      }
+    }
+    if (!godActive) godStrength = 0;
+
     // --- 4) 泛光 ---
     this.uniformsBright.uSource.value = T.hdr.texture;
+    this.uniformsBright.uNormalDepth.value = T.normalDepth.texture;
+    this.uniformsBright.uPackSky.value = godActive ? 1 : 0;
     this.uniformsBright.uThreshold.value = options.bloomThreshold ?? 1.18;
     this._Blit(this.matBright, T.bright);
 
@@ -891,26 +932,12 @@ export class PostPipeline {
       carried = dst;
     }
 
-    // --- 5) 体积光 ---
-    let godStrength = options.godStrength ?? 0;
-    if (this.preset.godrays && godStrength > 0 && options.sunDirection) {
-      const sunWorld = options.sunDirection.clone().multiplyScalar(600).add(camera.position);
-      const ndc = sunWorld.project(camera);
-      const onScreen = ndc.z < 1 && Math.abs(ndc.x) < 1.9 && Math.abs(ndc.y) < 1.9;
-      if (onScreen) {
-        this.uniformsGod.uBright.value = T.bright.texture;
-        this.uniformsGod.uNormalDepth.value = T.normalDepth.texture;
-        this.uniformsGod.uSunUv.value.set(ndc.x * 0.5 + 0.5, ndc.y * 0.5 + 0.5);
-        this.uniformsGod.uFrame.value = frame;
-        this._Blit(this.matGod, T.god);
-        // 太阳越接近画面中心，光柱越强（偏出画外就淡出，不然会突然消失）
-        const edge = Math.max(Math.abs(ndc.x), Math.abs(ndc.y));
-        godStrength *= THREE.MathUtils.clamp(1.4 - edge, 0, 1);
-      } else {
-        godStrength = 0;
-      }
-    } else {
-      godStrength = 0;
+    // --- 5) 太阳方向拖影（便宜的屏幕空间 fallback）---
+    if (godActive) {
+      this.uniformsGod.uBright.value = T.bright.texture;
+      this.uniformsGod.uSunUv.value.set(this.sunWorld.x * 0.5 + 0.5, this.sunWorld.y * 0.5 + 0.5);
+      this.uniformsGod.uFrame.value = frame;
+      this._Blit(this.matGod, T.god);
     }
 
     // --- 6) 合成 ---

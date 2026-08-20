@@ -504,7 +504,6 @@ uniform float uGlobalFade;
 varying vec2 vShape;
 varying float vAlpha;
 varying float vViewDepth;
-varying vec3 vWorld;
 
 void main() {
   vec3 p = iBase * uBox;
@@ -520,7 +519,6 @@ void main() {
   vec3 upv   = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
   vShape = position.xy;
   vec3 world = p + (right * position.x + upv * position.y) * iMote.x;
-  vWorld = p;
 
   vec4 viewPos = viewMatrix * modelMatrix * vec4(world, 1.0);
   vViewDepth = -viewPos.z;
@@ -530,7 +528,6 @@ void main() {
 `;
 
 const FRAG_DUST = /* glsl */`
-uniform vec3 uSunDirection;
 uniform float uIntensity;
 uniform vec3 uTint;
 uniform float uNearFade;
@@ -538,16 +535,15 @@ uniform float uNearFade;
 varying vec2 vShape;
 varying float vAlpha;
 varying float vViewDepth;
-varying vec3 vWorld;
 
 void main() {
   float d = length(vShape);
   float mask = smoothstep(1.0, 0.0, d);
   mask *= mask;
-  // 逆光才明显：视线越接近太阳方向，微粒越亮（前向散射）
-  vec3 viewDir = normalize(vWorld - cameraPosition);
-  float backlit = pow(max(dot(viewDir, uSunDirection), 0.0), 3.0);
-  float gain = 0.10 + 1.7 * backlit;
+  // 只留一层很淡的环境浮尘。旧版朝太阳时把 gain 从 0.10 抬到 1.80，
+  // 原本会 discard 的透明片会突然铺满屏幕，在超宽分辨率产生巨量混合 overdraw。
+  // 方向性的太阳光带现在统一交给低分辨率后处理 fallback。
+  float gain = 0.12;
   float near = clamp((vViewDepth - uNearFade) / max(uNearFade, 0.001), 0.0, 1.0);
   float far = 1.0 - smoothstep(28.0, 48.0, vViewDepth);
   float alpha = mask * vAlpha * gain * near * far;
@@ -892,7 +888,6 @@ class DustField {
       uniforms: {
         uTime: shared.uTime,
         uGlobalFade: shared.uGlobalFade,
-        uSunDirection: shared.uSunDirection,
         uNearFade: shared.uNearFade,
         uBox: { value: new THREE.Vector3(30, 9, 30) },
         uCenter: { value: new THREE.Vector3() },
@@ -1148,7 +1143,7 @@ export class VfxSystem {
   }
 
   /**
-   * 太阳方向（指向太阳）与光色 —— 烟的明暗面、碎块的受光、浮尘的逆光都靠它。
+   * 太阳方向（指向太阳）与光色 —— 烟的明暗面与碎块受光都靠它。
    * 粒子不走 PBR，所以强度得手动对齐灯光钻机：漫反射出射亮度 ≈ lightIntensity / π，
    * 环境项约等于 hemi 的天空色乘一个小系数。给 SKY_PRESETS 的话就是
    *   SetSun(sky.sunDirection, preset.lightColor, preset.hemiSky,
@@ -1638,7 +1633,7 @@ export class VfxSystem {
   RemoveSmokeSource(handle) { this.smokeSources.delete(handle); }
 
   /**
-   * 空气里的浮尘。整场战斗都在一层灰里，逆光时才明显。
+   * 空气里的浮尘。只保留很淡的环境层；方向性太阳拖影由后处理负责。
    * @param {THREE.Box3} box 战斗区域；微粒盒会跟着相机走但被夹在这个范围内
    * @param {number} density 每立方米微粒数（0.04—0.12 是合适的量）
    */
