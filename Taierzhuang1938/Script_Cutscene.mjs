@@ -29,11 +29,8 @@
 //   CS_BeimenBreakout  293 网格 / 26.5k 三角 / 0 灯   ★ 叠在滕县城之上
 //
 //   带 ★ 的两场发生在城里，绘制量是**加在城头上的**。性能红线是
-//   drawCalls ≤ 1400 / triangles ≤ 320 万，26.5k 三角可以忽略，
-//   但 293 个网格 ≈ 293 个 draw call 不能忽略 —— 一个 Actor 在 medium 下
-//   约 16 个材质桶，13 个人就是 200 多。
-//   **接进正片时给过场单独建一个 quality:"low" 的 ActorFactory**（约 12 桶/人），
-//   或者把 CS_BeimenBreakout 的群众减到 8 人。这条别等上线才发现。
+//   drawCalls ≤ 5000 / triangles ≤ 600 万。26.5k 三角很轻，293 个网格仍需计入总账，
+//   但不得通过删群众或隐藏人物过线；需要优化时只能合批或使用等价 LOD。
 //
 // ── 与 Script_Actor 的关系 ──────────────────────────────────────────────
 // 本模块**不 import Script_Actor**，工厂由外部注入（actorFactory）。

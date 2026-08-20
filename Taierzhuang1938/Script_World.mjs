@@ -38,7 +38,7 @@ export class BuildSink {
    * 为什么要有这一层：整座城按材质合批 = 三十来个横跨全城的巨型网格，
    * draw call 很漂亮，但**视锥剔除彻底失效** —— 站在西门外也照样把东关整片
    * 送进管线，而深度预通道 + 阴影 + 主通道要各画一遍。滕县实测到 300 万三角，
-   * 逼近红线。按 150 m 见方切区之后 draw call 涨到两三百（离 1400 还很远），
+   * 逼近旧版三角面红线。按 150 m 见方切区之后 draw call 涨到两三百（离 5000 还很远），
    * 换来的是绝大多数分区被视锥直接剔掉。
    *
    * 不调它就是原来的行为（sector 为空串），台儿庄那边一个字不用改。
@@ -128,7 +128,7 @@ export function AddWall(sink, material, {
   const sliceW = length / slices;
   // 砖墙这一段一段地错开图案（整砖对齐 + 约一半镜像），相邻墙段就不会是同一套明暗排列。
   // 走 UV 而不是给每段克隆材质：静态几何是按材质名合并成一个大网格的，
-  // 每段一份材质 = 每段一个 draw call，几百段墙直接把 1400 的红线撞穿。
+  // 每段一份材质 = 每段一个 draw call，几千段墙会直接把 5000 的红线撞穿。
   const grid = String(material).startsWith("BrickWall") ? BRICK_UV_GRID : null;
   for (let i = 0; i < slices; i += 1) {
     const t = i / (slices - 1 || 1);

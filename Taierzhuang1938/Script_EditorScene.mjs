@@ -1071,9 +1071,9 @@ export class SceneEditor {
     f.Set("机位", `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, `
       + `${camera.position.z.toFixed(1)}`);
     f.Set("脚下地高", field ? `${field.GroundHeight(camera.position.x, camera.position.z).toFixed(2)} m` : "—");
-    f.Set("draw call", this.measure.calls, this.measure.calls > 1400 ? "bad" : "good");
+    f.Set("draw call", this.measure.calls, this.measure.calls > 5000 ? "bad" : "good");
     f.Set("三角", `${(this.measure.triangles / 1000).toFixed(0)}k`,
-      this.measure.triangles > 3200000 ? "bad" : "good");
+      this.measure.triangles > 6000000 ? "bad" : "good");
     f.Set("城的网格", field ? field.meshes.length : 0);
     f.Set("碰撞盒", field ? (field.city ? field.city.colliders : field.colliders || []).length : 0);
     f.Set("放置 / 地形", `${this.items.length} 个 / ${this.terrainOps.length} 笔`);

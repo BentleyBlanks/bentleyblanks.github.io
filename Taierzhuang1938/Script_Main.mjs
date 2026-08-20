@@ -44,9 +44,9 @@ import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EP
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
-// 别照着"近景要几个人"直接填这两个数 —— 实测一个 Actor 是 **37 个 draw call**
-// （身体部件没合批），撒 14 个近身兵就把 calls 顶过 1400 的红线。
-// 5 + 4 落在安全区里。要再加人，先去合批 Actor。
+// 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
+// 低于当前 5000 红线。5 + 4 是班组构成，不再是靠藏人的性能上限；全场开销由
+// Script_BootTest 按 5000 dc / 600 万三角面统一验。
 const NEAR_SQUAD = { nra: 5, ija: 4 };
 
 /** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
@@ -848,8 +848,8 @@ function ClearRuntime() {
  *
  * @param {number} index
  * @param {object} opts initial 开机那一次（战场已经建好，别重建）；
- *                      cutscenes 要不要播过场（出图与自检模式一律不播 ——
- *                      过场的临时布景有近三百个网格，会把 draw call 顶穿红线）
+ *                      cutscenes 要不要播过场（出图与自检模式一律不播，保证镜头可复现；
+ *                      过场的临时布景有近三百个网格，另在过场检查里验）
  */
 async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.advancing = true;
@@ -1031,8 +1031,7 @@ const _losDir = new THREE.Vector3();
  * 实测最近两名（15.3 m / 15.9 m）在木板围墙后、44.7 m 那名在砖墙后，
  * 六张正片里一共只出现一个人。而鲁南民居**对外不开窗、四面围墙**，
  * 随便撒一个点有一多半落在别人家院子里，玩家永远看不见。
- * 往战场里加人已经撞了 draw call 红线，所以只能让已有的人被看见 ——
- * 这是零 draw call 成本的做法。
+ * 这里优先让已有的人落在真正看得见的位置，避免无意义地增加总兵力。
  */
 function HasLineOfSight(toX, toZ) {
   _losFrom.copy(player.EyePosition);
@@ -1139,7 +1138,7 @@ function SeedSoldiers(phase) {
     //
     // 压力不会因此掉三成：远的那批是**朝你走过来的**，先当背景、后成压力，
     // 一波一波压上街的观感正是这一关要的。近端那七成一个没动。
-    // 这一档现在也走完整 Actor：人物可见性优先于原来的 draw call 红线，
+    // 这一档现在也走完整 Actor：人物可见性是内容硬规则，性能按 5000 dc / 600 万面验，
     // 不能再以“画不起”为由让 140 m 外的活人从战场上消失。
     const deep = rnd() < 0.3;
     const d = deep ? 140 + rnd() * 220 : 60 + rnd() * 80;

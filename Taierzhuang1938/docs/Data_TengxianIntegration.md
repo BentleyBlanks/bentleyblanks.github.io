@@ -81,17 +81,17 @@ Data_TengxianScript.mjs    七关 beats + 五场分镜 + CAST
 
 ---
 
-## 四、可见性硬规则与性能观测线
+## 四、可见性硬规则与性能红线
 
 2026-08-20 起，**视锥内所有活人与尸体都必须显示，尸体保留到本关结束**。不得再用
 人物名额、距离空洞或尸体数量上限减少战场内容。`Script_VisibilityTest.mjs` 锁定
 “30/30 人可见、超过旧 26 具上限仍 30/30 保留”。
 
-`Script_BootTest.mjs` 继续逐关观测 **drawCalls 1400、triangles 320 万** 两条旧线，
-但只报告 `[PERF]`，不再因此判画面健康失败。完整人物开启后的 small/high 实测：
+性能硬红线现定为 **drawCalls ≤ 5000、triangles ≤ 600 万**；`Script_BootTest.mjs`
+逐关强制断言，越线即 FAIL。完整人物开启后的 small/high 实测：
 界河 1892、北沙河 2225、东关 2849、夜袭 793、城墙 349、十字街 3170、北门 2336；
-三角形最高 267 万。`Script_PhysicsTest.mjs` 的十字街 low/small 实测 15.75 ms/帧，
-仍低于原测试线 26 ms/帧。
+三角形最高 267 万，均在新红线内。`Script_PhysicsTest.mjs` 的十字街 low/small 实测
+15.75 ms/帧，仍低于 26 ms/帧测试线。
 
 按影响从大到小的旋钮：
 
