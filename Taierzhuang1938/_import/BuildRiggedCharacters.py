@@ -1,4 +1,4 @@
-"""Build the redistributable FPS-arms and IJA-soldier GLBs.
+"""Build the redistributable FPS-arms, NRA, IJA and civilian GLBs.
 
 Run with Blender 5.x:
   blender --background --python Taierzhuang1938/_import/BuildRiggedCharacters.py
@@ -61,6 +61,26 @@ def MakeFlatMaterial(name, color, roughness=0.9, metallic=0.0):
     shader.inputs["Roughness"].default_value = roughness
     shader.inputs["Metallic"].default_value = metallic
     return material
+
+
+def FixOpaquePalette(body, palette):
+    """Repair Quaternius FBX materials and apply the game's period palette.
+
+    Blender 5 imports this pack's diffuse alpha as zero. Exporting untouched
+    therefore writes alphaMode=MASK with baseColorFactor.a=0, making the whole
+    downloaded character invisible in Three.js.
+    """
+    for material in body.data.materials:
+        if material is None:
+            continue
+        color = palette.get(material.name, tuple(material.diffuse_color[:3]))
+        material.diffuse_color = (*color, 1.0)
+        material.use_nodes = True
+        shader = material.node_tree.nodes.get("Principled BSDF")
+        if shader:
+            shader.inputs["Base Color"].default_value = (*color, 1.0)
+            shader.inputs["Alpha"].default_value = 1.0
+            shader.inputs["Roughness"].default_value = 0.88
 
 
 def ExportGlb(path):
@@ -290,6 +310,31 @@ SEGMENT_BY_BONE = {
     "RightFoot": "footR", "RightToeBase": "footR", "RightToe_End": "footR",
 }
 
+QUATERNIUS_SEGMENT_BY_BONE = {
+    "Body": "hips", "Hips": "hips",
+    "Abdomen": "chest", "Torso": "chest",
+    "Neck": "neck", "Head": "neck", "Head_end": "neck",
+    "Shoulder.L": "chest", "Shoulder.R": "chest",
+    "UpperArm.L": "armL", "LowerArm.L": "foreL", "Fist.L": "foreL", "Fist.L_end": "foreL",
+    "UpperArm.R": "armR", "LowerArm.R": "foreR", "Fist.R": "foreR", "Fist.R_end": "foreR",
+    "UpperLeg.L": "thighL", "LowerLeg.L": "shinL", "LowerLeg.L_end": "shinL", "Foot.L": "footL",
+    "UpperLeg.R": "thighR", "LowerLeg.R": "shinR", "LowerLeg.R_end": "shinR", "Foot.R": "footR",
+}
+
+IJA_PIVOT_BONES = {
+    "hips": "Hips", "chest": "Spine", "neck": "Neck",
+    "armL": "LeftArm", "foreL": "LeftForeArm", "armR": "RightArm", "foreR": "RightForeArm",
+    "thighL": "LeftUpLeg", "shinL": "LeftLeg", "footL": "LeftFoot",
+    "thighR": "RightUpLeg", "shinR": "RightLeg", "footR": "RightFoot",
+}
+
+QUATERNIUS_PIVOT_BONES = {
+    "hips": "Hips", "chest": "Abdomen", "neck": "Neck",
+    "armL": "UpperArm.L", "foreL": "LowerArm.L", "armR": "UpperArm.R", "foreR": "LowerArm.R",
+    "thighL": "UpperLeg.L", "shinL": "LowerLeg.L", "footL": "Foot.L",
+    "thighR": "UpperLeg.R", "shinR": "LowerLeg.R", "footR": "Foot.R",
+}
+
 
 def OldRigPivots(height=1.62):
     return {
@@ -309,11 +354,16 @@ def OldRigPivots(height=1.62):
     }
 
 
-def BuildRigidSegments(body, height=1.62):
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    evaluated = body.evaluated_get(depsgraph)
-    source_mesh = bpy.data.meshes.new_from_object(
-        evaluated, preserve_all_data_layers=True, depsgraph=depsgraph)
+def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, facing_turn=math.pi):
+    """Bake a downloaded skinned mesh into the game's proven 13 rigid joints.
+
+    The old implementation guessed a limb from its XYZ position, then guessed a
+    pivot from that limb's bounding box. That is why shoulders, sleeves and the
+    helmet visibly separated in the actor editor. Here every face follows the
+    source FBX's actual skin weights and every segment pivots around the source
+    skeleton's real rest bone before it is aligned to the gameplay skeleton.
+    """
+    source_mesh = body.data.copy()
     world_positions = [body.matrix_world @ vertex.co for vertex in source_mesh.vertices]
     minimum = Vector(tuple(min(point[axis] for point in world_positions) for axis in range(3)))
     maximum = Vector(tuple(max(point[axis] for point in world_positions) for axis in range(3)))
@@ -321,41 +371,39 @@ def BuildRigidSegments(body, height=1.62):
     scale = height / source_height
     foot_center = Vector(((minimum.x + maximum.x) * 0.5,
                           (minimum.y + maximum.y) * 0.5, minimum.z))
-    normalize = Matrix.Scale(scale, 4) @ Matrix.Translation(-foot_center) @ body.matrix_world
-    normalized_positions = [normalize @ vertex.co for vertex in source_mesh.vertices]
-    vertex_segments = []
-    for position in normalized_positions:
-        x, z = position.x, position.z
-        side = "L" if x < 0 else "R"
-        if z < 0.13 * height:
-            segment = f"foot{side}"
-        elif z < 0.30 * height:
-            segment = f"shin{side}"
-        elif z < 0.52 * height:
-            segment = f"thigh{side}"
-        elif z < 0.61 * height:
-            segment = "hips"
-        elif abs(x) > 0.12 * height and z > 0.60 * height:
-            segment = f"fore{side}" if abs(x) > 0.30 * height else f"arm{side}"
-        elif z < 0.855 * height:
-            segment = "chest"
-        else:
-            segment = "neck"
-        vertex_segments.append(segment)
-
+    normalize = (Matrix.Rotation(facing_turn, 4, "Z") @ Matrix.Scale(scale, 4)
+                 @ Matrix.Translation(-foot_center))
+    group_names = {group.index: group.name for group in body.vertex_groups}
     face_segments = []
     for polygon in source_mesh.polygons:
         votes = {}
         for vertex_index in polygon.vertices:
-            key = vertex_segments[vertex_index]
-            votes[key] = votes.get(key, 0) + 1
-        face_segments.append(max(votes, key=votes.get))
+            for membership in body.data.vertices[vertex_index].groups:
+                key = segment_by_bone.get(group_names.get(membership.group))
+                if key:
+                    votes[key] = votes.get(key, 0.0) + membership.weight
+        if votes:
+            face_segments.append(max(votes, key=votes.get))
+        else:
+            # A source accessory without weights belongs to the closest broad
+            # body region. This is a last-resort path, not the normal rig path.
+            center = normalize @ body.matrix_world @ polygon.center
+            face_segments.append("neck" if center.z > 0.84 * height else
+                                 ("chest" if center.z > 0.58 * height else "hips"))
 
     pivots = OldRigPivots(height)
+    target_directions = {
+        "hips": Vector((0, 0, 1)), "chest": Vector((0, 0, 1)), "neck": Vector((0, 0, 1)),
+        "armL": Vector((0, 0, -1)), "foreL": Vector((0, 0, -1)),
+        "armR": Vector((0, 0, -1)), "foreR": Vector((0, 0, -1)),
+        "thighL": Vector((0, 0, -1)), "shinL": Vector((0, 0, -1)),
+        "thighR": Vector((0, 0, -1)), "shinR": Vector((0, 0, -1)),
+        # Blender +Y becomes glTF -Z, which is forward everywhere in the game.
+        "footL": Vector((0, 1, 0)), "footR": Vector((0, 1, 0)),
+    }
     built = []
     for segment, pivot in pivots.items():
         mesh = source_mesh.copy()
-        mesh.transform(normalize)
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bm.faces.ensure_lookup_table()
@@ -367,23 +415,16 @@ def BuildRigidSegments(body, height=1.62):
         bm.to_mesh(mesh)
         bm.free()
         mesh.update()
-        coords = [vertex.co for vertex in mesh.vertices]
-        if coords and segment.startswith(("arm", "fore", "thigh", "shin", "foot")):
-            low = Vector(tuple(min(point[axis] for point in coords) for axis in range(3)))
-            high = Vector(tuple(max(point[axis] for point in coords) for axis in range(3)))
-            if segment.endswith("L") and segment.startswith(("arm", "fore")):
-                source_pivot = Vector((high.x, (low.y + high.y) * 0.5, (low.z + high.z) * 0.5))
-                source_direction = Vector((-1, 0, 0))
-            elif segment.endswith("R") and segment.startswith(("arm", "fore")):
-                source_pivot = Vector((low.x, (low.y + high.y) * 0.5, (low.z + high.z) * 0.5))
-                source_direction = Vector((1, 0, 0))
-            else:
-                source_pivot = Vector(((low.x + high.x) * 0.5, (low.y + high.y) * 0.5, high.z))
-                source_direction = Vector((0, 0, -1))
-            target_direction = Vector((0, 0, -1))
-            rotation = source_direction.rotation_difference(target_direction).to_matrix().to_4x4()
-            mesh.transform(Matrix.Translation(pivot) @ rotation @ Matrix.Translation(-source_pivot))
-        mesh.transform(Matrix.Translation(-pivot))
+        bone = armature.data.bones.get(pivot_bones[segment])
+        if bone is None:
+            raise RuntimeError(f"{body.name}: missing pivot bone {pivot_bones[segment]}")
+        source_head = normalize @ armature.matrix_world @ bone.head_local
+        source_tail = normalize @ armature.matrix_world @ bone.tail_local
+        source_direction = (source_tail - source_head).normalized()
+        rotation = source_direction.rotation_difference(target_directions[segment]).to_matrix().to_4x4()
+        transform = (Matrix.Translation(pivot) @ rotation @ Matrix.Translation(-source_head)
+                     @ normalize @ body.matrix_world)
+        mesh.transform(Matrix.Translation(-pivot) @ transform)
         obj = bpy.data.objects.new(f"Segment_{segment}", mesh)
         bpy.context.collection.objects.link(obj)
         obj.location = pivot
@@ -452,14 +493,43 @@ def BuildSoldier():
     material = MakeTexturedMaterial("Material_IjaUniform", uniform)
     body.data.materials.clear()
     body.data.materials.append(material)
-    BuildRigidSegments(body)
+    BuildRigidSegments(body, armature, 1.62, SEGMENT_BY_BONE, IJA_PIVOT_BONES)
     BuildSegmentHelmet()
     AddSoldierActions(armature)
     armature.data.pose_position = "POSE"
     ExportGlb(MODEL / "Model_IjaSoldier.glb")
 
 
+def BuildQuaterniusCharacter(source_name, output_name, height, palette, facing_turn=math.pi):
+    ClearScene()
+    bpy.ops.import_scene.fbx(filepath=str(SOURCE / source_name))
+    armature = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
+    body = next(obj for obj in bpy.context.scene.objects if obj.type == "MESH" and obj.name == "Body")
+    armature.data.pose_position = "REST"
+    bpy.context.view_layer.update()
+    FixOpaquePalette(body, palette)
+    for obj in list(bpy.context.scene.objects):
+        if obj.type == "MESH" and obj is not body:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    BuildRigidSegments(body, armature, height, QUATERNIUS_SEGMENT_BY_BONE,
+                       QUATERNIUS_PIVOT_BONES, facing_turn)
+    ExportGlb(MODEL / output_name)
+
+
 if __name__ == "__main__":
     BuildArms()
     BuildSoldier()
-    print("Built Model_FpsArms.glb and Model_IjaSoldier.glb")
+    nra_palette = {
+        "Skin": (0.48, 0.31, 0.20), "Face": (0.48, 0.31, 0.20),
+        "Main": (0.16, 0.20, 0.27), "Helmet": (0.14, 0.18, 0.24),
+        "Black": (0.025, 0.025, 0.028), "Grey": (0.20, 0.22, 0.25),
+    }
+    civilian_palette = {
+        "Skin": (0.48, 0.31, 0.20), "Face": (0.48, 0.31, 0.20),
+        "Shirt": (0.52, 0.48, 0.39), "Pants": (0.075, 0.095, 0.15),
+        "Belt": (0.055, 0.042, 0.030), "Hair": (0.018, 0.014, 0.011),
+    }
+    BuildQuaterniusCharacter("Model_BlueSoldierMale.fbx", "Model_NraSoldier.glb", 1.66, nra_palette)
+    BuildQuaterniusCharacter("Model_CasualMale.fbx", "Model_CivilianMale.glb", 1.60, civilian_palette)
+    BuildQuaterniusCharacter("Model_CasualFemale.fbx", "Model_CivilianFemale.glb", 1.57, civilian_palette)
+    print("Built FPS arms plus IJA, NRA and civilian character models")

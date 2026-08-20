@@ -26,7 +26,7 @@ import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noi
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
-import { LoadRiggedAssets, IjaSoldierSkin } from "./Script_RiggedModel.mjs";
+import { LoadRiggedAssets, SegmentedCharacterSkin } from "./Script_RiggedModel.mjs";
 import {
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
 } from "./Data_Meshes.mjs";
@@ -1193,9 +1193,9 @@ export class Actor {
     this.gripL = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
 
-    // 日军换成带贴图、完整 Humanoid 骨骼的 GLB。旧 13 关节层级仍在下面跑，
-    // 枪口、握点、AI 与既有动作时序全部不动；IjaSoldierSkin 只把关节增量重定向
-    // 到新骨架。模型读取失败时这里是 null，旧几何自动保持可见。
+    // 日军、国军与百姓都换成已下载的角色 GLB。旧 13 关节层级仍在下面跑，
+    // 枪口、握点、AI 与既有动作时序全部不动；显示层只跟随这些已验证关节。
+    // 任一模型读取失败时这里是 null，对应角色的旧程序化几何自动保持可见。
     this.riggedSkin = factory.CreateRiggedSkin(this);
     if (this.riggedSkin) {
       this.meshSource = "rigged";
@@ -2251,13 +2251,21 @@ export class ActorFactory {
     return new Actor(this, KIND_SPEC[kind] ? kind : "nra", options);
   }
 
-  /** 同步克隆已经预读好的日军皮肤；Actor 创建链保持同步。 */
+  /** 同步克隆已经预读好的人物显示层；Actor 创建链保持同步。 */
   CreateRiggedSkin(actor) {
-    if (!actor || !actor.kind.startsWith("ija") || !this.riggedAssets || !this.riggedAssets.ijaSoldier) return null;
+    if (!actor || !this.riggedAssets) return null;
+    let asset = null;
+    if (actor.kind.startsWith("ija")) asset = this.riggedAssets.ijaSoldier;
+    else if (actor.kind.startsWith("nra")) asset = this.riggedAssets.nraSoldier;
+    else if (actor.kind === "civilian") {
+      asset = (HashString(actor.seed) & 1) === 0
+        ? this.riggedAssets.civilianMale : this.riggedAssets.civilianFemale;
+    }
+    if (!asset) return null;
     try {
-      return new IjaSoldierSkin(this.riggedAssets.ijaSoldier, actor);
+      return new SegmentedCharacterSkin(asset, actor);
     } catch (error) {
-      console.warn(`[Actor] 日军骨骼模型实例化失败，退回旧几何：${String(error).slice(0, 180)}`);
+      console.warn(`[Actor] ${actor.kind} 人物模型实例化失败，退回旧几何：${String(error).slice(0, 180)}`);
       return null;
     }
   }

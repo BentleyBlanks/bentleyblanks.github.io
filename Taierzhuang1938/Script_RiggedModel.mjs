@@ -12,7 +12,10 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
-  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=1",
+  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=3",
+  nraSoldier: "./Model/Model_NraSoldier.glb?v=2",
+  civilianMale: "./Model/Model_CivilianMale.glb?v=2",
+  civilianFemale: "./Model/Model_CivilianFemale.glb?v=2",
 });
 
 const LOADER = new GLTFLoader();
@@ -44,9 +47,15 @@ function Inspect(gltf) {
 export async function LoadRiggedAssets() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    const [fpsArms, ijaSoldier] = await Promise.all([LoadOne("fpsArms"), LoadOne("ijaSoldier")]);
-    const report = { fpsArms: Inspect(fpsArms), ijaSoldier: Inspect(ijaSoldier) };
-    return { fpsArms, ijaSoldier, report };
+    const [fpsArms, ijaSoldier, nraSoldier, civilianMale, civilianFemale] = await Promise.all([
+      LoadOne("fpsArms"), LoadOne("ijaSoldier"), LoadOne("nraSoldier"),
+      LoadOne("civilianMale"), LoadOne("civilianFemale"),
+    ]);
+    const report = {
+      fpsArms: Inspect(fpsArms), ijaSoldier: Inspect(ijaSoldier), nraSoldier: Inspect(nraSoldier),
+      civilianMale: Inspect(civilianMale), civilianFemale: Inspect(civilianFemale),
+    };
+    return { fpsArms, ijaSoldier, nraSoldier, civilianMale, civilianFemale, report };
   })();
   return loadPromise;
 }
@@ -198,6 +207,7 @@ export class FpsArmRig {
 const IJA_MAP = Object.freeze([
   ["Hips", "hips"],
   ["Torso", "chest"],
+  ["Spine2", "chest"],
   ["Neck", "neck"],
   ["Head", "neck"],
   ["UpperArm.L", "armL"],
@@ -210,6 +220,16 @@ const IJA_MAP = Object.freeze([
   ["UpperLeg.R", "thighR"],
   ["LowerLeg.R", "shinR"],
   ["Foot.R", "footR"],
+  ["LeftArm", "armL"],
+  ["LeftForeArm", "foreL"],
+  ["RightArm", "armR"],
+  ["RightForeArm", "foreR"],
+  ["LeftUpLeg", "thighL"],
+  ["LeftLeg", "shinL"],
+  ["LeftFoot", "footL"],
+  ["RightUpLeg", "thighR"],
+  ["RightLeg", "shinR"],
+  ["RightFoot", "footR"],
 ]);
 
 function ActorSources(actor) {
@@ -230,12 +250,12 @@ function ActorSources(actor) {
   };
 }
 
-/** Imported IJA skin driven by world-space deltas from the old 13-joint rig. */
-export class IjaSoldierSkin {
+/** Downloaded character mesh driven by the game's authoritative 13-joint rig. */
+export class SegmentedCharacterSkin {
   constructor(gltf, actor) {
     this.actor = actor;
     this.root = CloneSkeleton(gltf.scene);
-    this.root.name = "RiggedIjaSoldier";
+    this.root.name = "RiggedCharacter";
     this.root.userData.skipNormalDepth = true;
     this.sources = ActorSources(actor);
     this.links = [];
@@ -246,6 +266,10 @@ export class IjaSoldierSkin {
     this.tmpQ2 = new THREE.Quaternion();
     this.tmpPosition = new THREE.Vector3();
     this.segmentMeshes = [];
+    this.mixer = null;
+    this.sourceClip = null;
+    this.sourceHand = null;
+    this.attachedWeapon = null;
 
     const segmentTargets = {
       hips: actor.hips, chest: actor.chest, neck: actor.neck,
@@ -254,9 +278,17 @@ export class IjaSoldierSkin {
       thighL: actor.legs.L.thigh, shinL: actor.legs.L.knee, footL: actor.legs.L.ankle,
       thighR: actor.legs.R.thigh, shinR: actor.legs.R.knee, footR: actor.legs.R.ankle,
     };
+    // 运行时仍使用 13 个刚体关节，兼容现有 normal-depth 预通道；关键区别是
+    // 新分段由源 FBX 蒙皮权重和真实 rest bone 枢轴生成，不再按 XYZ 猜身体部位。
     const segments = [];
+    const useRigidSegments = true;
     this.root.traverse((object) => {
-      if (object.isMesh && object.name.startsWith("Segment_")) segments.push(object);
+      // 一个分段有多个源材质时，GLTFLoader 会把该节点实例化成 Group，再把每个
+      // primitive 放成子 Mesh。只认 isMesh 会漏掉国军/百姓的全部 13 个根节点，
+      // 随后误走 Humanoid 回退链，画面只剩一块黑网格。
+      if (!object.name.startsWith("Segment_")) return;
+      if (object.parent && object.parent.name.startsWith("Segment_")) return;
+      if (useRigidSegments && (object.isMesh || object.isGroup)) segments.push(object);
     });
     if (segments.length) {
       this.segmentMode = true;
@@ -274,18 +306,25 @@ export class IjaSoldierSkin {
         const key = mesh.name.split("_")[1];
         const target = segmentTargets[key];
         if (!target) continue;
-        // attach 保留 GLB 的世界位姿；离线脚本把每个 node 的原点就烘在旧关节
-        // 枢轴上，所以换父节点后它的局部位姿应接近恒等。直接 add+清零会丢掉
-        // glTF 的 Z-up→Y-up 根变换，整个人会像拆开的玩具一样散在地上。
+        // 构建脚本已把几何烘到目标关节枢轴；attach 保留 GLB 场景根的
+        // Blender Z-up → Three.js Y-up 换轴。不能 add 后清零，否则换轴丢失，
+        // 整个人会只剩一块落在地上的网格。旧版散架的根因是离线阶段按 XYZ
+        // 猜分段与包围盒猜枢轴，本版已经改成源蒙皮权重 + 源 rest bone。
         target.attach(mesh);
-        mesh.userData.skipNormalDepth = true;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh.traverse((part) => {
+          part.userData.skipNormalDepth = true;
+          if (part.isMesh) { part.castShadow = true; part.receiveShadow = true; }
+        });
         this.segmentMeshes.push(mesh);
       }
       return;
     }
     this.segmentMode = false;
+
+    // 无兼容分段的旧资产才走原生 SkinnedMesh 回退。
+    this.root.traverse((object) => {
+      if (object.name.startsWith("Segment_")) object.visible = false;
+    });
 
     actor.root.add(this.root);
     this.root.updateWorldMatrix(true, true);
@@ -303,6 +342,16 @@ export class IjaSoldierSkin {
     this.bodyRestPosition = actor.body.position.clone();
     this.bodyRestQuaternion = actor.body.quaternion.clone();
     this.hipsRestPosition = actor.hips.position.clone();
+
+    const wantedClip = actor.kind === "civilian" ? "Idle"
+      : (actor.kind.startsWith("ija") ? "AimRifle" : "Walk_Carry");
+    this.sourceClip = gltf.animations.find((clip) => clip.name === wantedClip || clip.name.endsWith(`|${wantedClip}`))
+      || gltf.animations.find((clip) => clip.name === "Idle" || clip.name.endsWith("|Idle")) || null;
+    if (this.sourceClip) {
+      this.mixer = new THREE.AnimationMixer(this.root);
+      this.mixer.clipAction(this.sourceClip).play();
+    }
+    this.sourceHand = FindByName(this.root, "Fist.R") || FindByName(this.root, "RightHand");
 
     for (const node of [actor.hips, actor.chest, actor.neck,
       actor.arms.L.shoulder, actor.arms.L.elbow, actor.arms.R.shoulder, actor.arms.R.elbow,
@@ -329,12 +378,19 @@ export class IjaSoldierSkin {
         "UpperArm.R": "LowerArm.R", "LowerArm.R": "Fist.R",
         "UpperLeg.L": "LowerLeg.L", "LowerLeg.L": "Foot.L",
         "UpperLeg.R": "LowerLeg.R", "LowerLeg.R": "Foot.R",
+        LeftArm: "LeftForeArm", LeftForeArm: "LeftHand",
+        RightArm: "RightForeArm", RightForeArm: "RightHand",
+        LeftUpLeg: "LeftLeg", LeftLeg: "LeftFoot",
+        RightUpLeg: "RightLeg", RightLeg: "RightFoot",
       }[targetName];
       if (directionTarget) {
         const sourceChild = {
           "UpperArm.L": actor.arms.L.elbow, "UpperArm.R": actor.arms.R.elbow,
           "UpperLeg.L": actor.legs.L.knee, "UpperLeg.R": actor.legs.R.knee,
           "LowerLeg.L": actor.legs.L.ankle, "LowerLeg.R": actor.legs.R.ankle,
+          LeftArm: actor.arms.L.elbow, RightArm: actor.arms.R.elbow,
+          LeftUpLeg: actor.legs.L.knee, RightUpLeg: actor.legs.R.knee,
+          LeftLeg: actor.legs.L.ankle, RightLeg: actor.legs.R.ankle,
         }[targetName] || null;
         const targetChild = FindByName(this.root, directionTarget);
         if (targetChild) this.directionLinks.push({ target, targetChild, source, sourceChild });
@@ -386,6 +442,11 @@ export class IjaSoldierSkin {
     this.root.quaternion.copy(actor.body.quaternion)
       .multiply(this.tmpQ0.copy(this.bodyRestQuaternion).invert())
       .multiply(this.baseQuaternion);
+    if (this.mixer && this.sourceClip) {
+      this.mixer.setTime(actor.time % Math.max(0.01, this.sourceClip.duration));
+      this._UpdateWeapon();
+      return;
+    }
     actor.root.updateWorldMatrix(true, true);
     for (const link of this.links) {
       const current = this._RelativeQuaternion(link.source, this.tmpQ0);
@@ -402,12 +463,33 @@ export class IjaSoldierSkin {
       link.target.updateWorldMatrix(true, true);
     }
     for (const link of this.directionLinks) this._AlignDirection(link);
+    this._UpdateWeapon();
+  }
+
+  _UpdateWeapon() {
+    const weapon = this.actor.weaponGroup;
+    if (!weapon || !this.sourceHand) return;
+    if (weapon !== this.attachedWeapon) {
+      this.actor.root.add(weapon);
+      this.attachedWeapon = weapon;
+    }
+    this.root.updateWorldMatrix(true, true);
+    this.sourceHand.getWorldPosition(this.tmpPosition);
+    this.actor.root.worldToLocal(this.tmpPosition);
+    weapon.position.copy(this.tmpPosition);
+    // 枪械规范统一以 -Z 为枪口方向；人物 root 也以 -Z 为前方。
+    // 不继承不同来源手骨的 roll，避免枪随 FBX 骨轴竖起来。
+    weapon.quaternion.identity();
   }
 
   Dispose() {
+    if (this.mixer) this.mixer.stopAllAction();
     for (const mesh of this.legacyMeshes) mesh.visible = true;
     for (const mesh of this.segmentMeshes) if (mesh.parent) mesh.parent.remove(mesh);
     this.segmentMeshes.length = 0;
     if (this.root.parent) this.root.parent.remove(this.root);
   }
 }
+
+// 兼容旧调用名；新代码统一使用 SegmentedCharacterSkin。
+export const IjaSoldierSkin = SegmentedCharacterSkin;

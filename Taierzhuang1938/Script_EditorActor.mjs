@@ -32,6 +32,11 @@ const KINDS = [
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 
+const DEFAULT_WEAPON_BY_KIND = {
+  nra: "ZhongZheng", nraDare: "HanYang", nraOfficer: null,
+  ija: "Type38", ijaOfficer: "Mauser96", civilian: null,
+};
+
 /** 一个周期性的 0→1→0 脉冲（投弹 / 白刃 / 中弹这类一次性动作靠它循环演示）。 */
 function Pulse(t, period, rise = 0.18, hold = 0.10) {
   const k = t % period;
@@ -76,7 +81,7 @@ const CLIPS = [
 export class ActorEditor {
   static id = "actor";
   static label = "人物动作";
-  static hint = "预览五种人物的全部驱动量组合";
+  static hint = "预览六种人物的全部驱动量组合";
 
   constructor(host) {
     this.host = host;
@@ -136,13 +141,18 @@ export class ActorEditor {
     const who = Section(body, "人物");
     this.kindList = ListBox(who, {
       height: 136,
-      onPick: (id) => { this.kind = id; this.Rebuild(); },
+      onPick: (id) => {
+        this.kind = id;
+        this.weaponId = DEFAULT_WEAPON_BY_KIND[id] ?? null;
+        if (this.weaponSelect) this.weaponSelect.Set(this.weaponId || "");
+        this.Rebuild();
+      },
     });
     this.kindList.Fill(KINDS.map((k) => ({ id: k.id, name: k.name, tail: k.id, title: k.note })));
     this.kindList.Select(this.kind);
     this.kindNote = Note(who, KINDS[0].note);
 
-    Select(who, "武器",
+    this.weaponSelect = Select(who, "武器",
       [{ value: "", label: "（空手）" },
         ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
       this.weaponId, (v) => { this.weaponId = v || null; this.Rebuild(); });
@@ -156,7 +166,7 @@ export class ActorEditor {
     opts.className = "edBtns";
     who.appendChild(opts);
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
-    Toggle(opts, "五人对比", false, (on) => { this.lineup = on; this.Rebuild(); });
+    Toggle(opts, "六人对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
 
     // --- 动作 ---

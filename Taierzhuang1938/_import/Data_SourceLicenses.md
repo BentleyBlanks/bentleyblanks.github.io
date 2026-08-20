@@ -1,13 +1,14 @@
 # 血战台儿庄 · 外部模型来源与许可
 
-游戏运行时加载 `Model/*.tzm.json`，并为人物换模额外加载
-`Model_FpsArms.glb` 与 `Model_IjaSoldier.glb`。`_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
+游戏运行时加载 `Model/*.tzm.json`，并为人物换模额外加载 `Model_FpsArms.glb`、
+`Model_IjaSoldier.glb`、`Model_NraSoldier.glb` 与两份 `Model_Civilian*.glb`。
+`_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
 
 武器 TZM 保留几何、UV 与 steel/wood 材质分区。源包自带的 2K/4K 贴图不直接进入 Pages；
 全部枪械共享 `Texture/Texture_WeaponSteel*` 与 `Texture/Texture_WeaponWood*` 的 512px
 BaseColor / Normal / ORM，避免一个班每把枪都重复下载大图。两套基础材质由 OpenAI 内置
 imagegen 生成，再由 `BuildWeaponPbr.py` 派生法线与 glTF 通道顺序的 ORM
-（R=AO、G=roughness、B=metalness）。两份人物 GLB 则保留各自贴图、蒙皮、骨架与动画。
+（R=AO、G=roughness、B=metalness）。人物 GLB 则保留各自贴图、蒙皮、骨架与动画。
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
@@ -31,6 +32,8 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 |---|---|---|---|---|
 | 第一人称双臂 `Model_FpsArms.glb` | `Source/Model_WradArms.glb` | [wwwriks / WRAD Arms](https://github.com/wwwriks/wrad-arms) | CC0 | 保留 50 根手指/手臂骨骼与 512×512 皮肤贴图；离线细分平滑并增加 `GripIdle`，运行时用双臂 IK 跟随原有握点。原始许可副本为 `Source/License_WradArms.txt`。 |
 | 日军步兵 `Model_IjaSoldier.glb` | `Source/Model_LowpolyWw2Soldier.fbx` + `Source/Texture_LowpolyWw2Soldier.png` | [nisu / Rigged Lowpoly WW2 Soldier](https://opengameart.org/content/rigged-lowpoly-ww2-soldier) | CC0 | 保留原始 49 骨骨架、蒙皮和贴图，并内置 Idle / Walk / AimRifle / Death 四段动画；制服重着色为土黄、另建九〇式钢盔。为无损复用本作既有动作，另离线生成与 13 关节旧骨架同轴的纹理分段作为运行时显示层。 |
+| 国军步兵 `Model_NraSoldier.glb` | `Source/Model_BlueSoldierMale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 使用下载包里的 `BlueSoldier_Male`，保留灰蓝制服、布帽与装具；按源 FBX 的真实蒙皮权重烘成 13 关节显示层，继续使用本作枪械挂点与动作。 |
+| 百姓男/女 `Model_CivilianMale.glb`、`Model_CivilianFemale.glb` | `Source/Model_CasualMale.fbx`、`Source/Model_CasualFemale.fbx` | [Quaternius / Ultimate Animated Character Pack](https://opengameart.org/content/animated-characters-pack) | CC0 | 下载包里的 `Casual_Male` / `Casual_Female` 两种体型；按角色种子稳定选择，烘成同一 13 关节显示层，不携带武器。 |
 
 人物构建命令：
 
@@ -38,5 +41,6 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 & 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --python Taierzhuang1938/_import/BuildRiggedCharacters.py
 ```
 
-运行时 GLB 仍包含源蒙皮、骨架和动画；兼容分段只解决“旧动作能不能直接套”的坐标差异，
+兼容分段按源 FBX 的蒙皮权重归属到关节，并以源骨骼 rest pose 的真实枢轴重对齐；
+不再用模型 XYZ 位置猜胳膊和腿。它只解决“旧动作能不能直接套”的坐标差异，
 不改变枪口、握点、AI 状态或动作时序。

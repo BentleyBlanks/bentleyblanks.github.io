@@ -1,4 +1,4 @@
-// Binary-contract test for the two imported GLBs. No WebGL or DOM required.
+// Binary-contract test for the imported character GLBs. No WebGL or DOM required.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -49,3 +49,21 @@ for (const segment of ["Segment_chest", "Segment_neck", "Segment_armL", "Segment
 
 console.log(`ok   FPS arms: ${arms.skins.length} skin, ${armNames.size} nodes, ${arms.animations.length} animation`);
 console.log(`ok   IJA soldier: ${soldier.skins.length} skin, ${soldierNames.size} nodes, ${soldier.animations.length} animations`);
+
+for (const [file, label] of [
+  ["Model_NraSoldier.glb", "NRA soldier"],
+  ["Model_CivilianMale.glb", "civilian male"],
+  ["Model_CivilianFemale.glb", "civilian female"],
+]) {
+  const character = ReadGlb(file);
+  const names = Names(character);
+  assert.ok((character.meshes || []).length >= 13, `${label} keeps visible meshes`);
+  for (const material of character.materials || []) {
+    const alpha = material.pbrMetallicRoughness?.baseColorFactor?.[3] ?? 1;
+    assert.equal(alpha, 1, `${label} material ${material.name} is opaque`);
+  }
+  for (const segment of ["Segment_hips", "Segment_chest", "Segment_neck", "Segment_armL",
+    "Segment_foreR", "Segment_thighL", "Segment_shinR", "Segment_footL"])
+    assert.ok(names.has(segment), `${label} compatibility segment ${segment}`);
+  console.log(`ok   ${label}: ${character.meshes.length} meshes, ${names.size} nodes`);
+}

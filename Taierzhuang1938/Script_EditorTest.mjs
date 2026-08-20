@@ -291,8 +291,13 @@ const actor = await page.evaluate(() => {
   active.SetClip("dead");
   window.Taierzhuang.StepFrames(30);
   const ragdoll = !!(active.actors[0] && active.actors[0].ragdollState);
+  active.kindList.Select("civilian", true);
+  window.Taierzhuang.StepFrames(10);
+  const civilianUnarmed = active.kind === "civilian"
+    && active.weaponId === null
+    && active.weaponSelect.Value() === "";
   return {
-    id: editor.ActiveId, one, five, kind, source, ragdoll,
+    id: editor.ActiveId, one, five, kind, source, ragdoll, civilianUnarmed,
     studio: editor.studio.Active,
     worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
     viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
@@ -303,6 +308,7 @@ Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden)
 // KINDS 现在含川军、敢死队、军官、日军、日军军官、百姓，共六种。
 Check("单人 / 六种人物对比", actor.one === 1 && actor.five === 6, `${actor.one} → ${actor.five}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
+Check("百姓切换后自动空手", actor.civilianUnarmed);
 
 // ---------------------------------------------------------------------------
 // 3) 枪械编辑器
