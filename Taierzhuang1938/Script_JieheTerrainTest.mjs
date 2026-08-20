@@ -1,0 +1,110 @@
+// 「序 · 界河」微地形冒烟：高差必须可读，排水沟必须真的挡弹。
+//
+// 用法：node Taierzhuang1938/Script_JieheTerrainTest.mjs
+// 退出码即成败。测试走真浏览器和 PhysicsWorld.RaycastTerrain，不读源码猜结果。
+
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { ServeRoot } from "./Script_DevServer.mjs";
+
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(projectDir, "..");
+const server = await ServeRoot(rootDir, 0);
+const port = server.address().port;
+const browser = await LaunchBrowser();
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+
+const problems = [];
+page.on("pageerror", (error) => problems.push(`PAGEERROR ${String(error).slice(0, 260)}`));
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const url = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return;
+  problems.push(`CONSOLE ${message.text().slice(0, 260)}`);
+});
+
+function Check(name, ok, detail = "") {
+  console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? `  — ${detail}` : ""}`);
+  if (!ok) problems.push(name);
+}
+
+try {
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=0&quality=high&scale=small`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(60));
+
+  const result = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    const terrain = await import("./Script_JieheField.mjs");
+    const field = T.battlefield;
+
+    // 只量真正交火的南岸核心区，避开本来就有 1.9 m 落差的界河河槽。
+    let minY = Infinity, maxY = -Infinity;
+    for (let x = -480; x <= 480; x += 20) {
+      for (let z = -1460; z <= -980; z += 16) {
+        const y = field.GroundHeight(x, z);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+
+    const laneChecks = [];
+    for (const lane of terrain.JIEHE_TACTICAL_TERRAIN.lanes) {
+      const x = (lane.from[0] + lane.to[0]) * 0.5;
+      const z = (lane.from[1] + lane.to[1]) * 0.5;
+      const dx = lane.to[0] - lane.from[0], dz = lane.to[1] - lane.from[1];
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len, nz = dx / len;
+      const centerY = field.GroundHeight(x, z);
+      const lowHits = [];
+      const shoulders = [];
+      for (const side of [-1, 1]) {
+        const shoulderX = x + nx * lane.outer * 1.35 * side;
+        const shoulderZ = z + nz * lane.outer * 1.35 * side;
+        const shoulderY = field.GroundHeight(shoulderX, shoulderZ);
+        shoulders.push(shoulderY - centerY);
+        const hit = T.Debug.Ray(x, centerY + 0.62, z, nx * side, 0, nz * side,
+          lane.outer * 1.9, true);
+        lowHits.push(hit ? hit.tag : null);
+      }
+      laneChecks.push({ id: lane.id, shoulders, lowHits });
+    }
+
+    // PhysicsWorld 把解析地表统一标成 dirt（命中反馈要播泥土声），不是 terrain。
+    const terrainHits = laneChecks.reduce((n, lane) => n
+      + lane.lowHits.filter((tag) => tag === "dirt").length, 0);
+    const usefulLanes = laneChecks.filter((lane) => lane.shoulders.some((h) => h > 0.85)
+      && lane.lowHits.includes("dirt")).length;
+    return {
+      level: T.Debug.Level().id,
+      minY, maxY, range: maxY - minY,
+      terrainHits, usefulLanes, laneChecks,
+      physics: T.Debug.Physics(),
+    };
+  });
+
+  Check("加载的是第一关界河", result.level === "L0_Jiehe", result.level);
+  Check("核心交火区不再是一张平板", result.range >= 5.0,
+    `高程 ${result.minY.toFixed(2)}…${result.maxY.toFixed(2)} m，落差 ${result.range.toFixed(2)} m`);
+  Check("至少三条下切通道形成真实地形掩蔽", result.usefulLanes >= 3,
+    `${result.usefulLanes}/${result.laneChecks.length} 条；terrain 命中 ${result.terrainHits} 次`);
+  Check("地物碰撞仍完整灌进物理世界",
+    result.physics && result.physics.solids >= result.physics.fieldColliders * 0.99,
+    result.physics ? `${result.physics.solids}/${result.physics.fieldColliders}` : "无物理数据");
+  for (const lane of result.laneChecks) {
+    console.log(`    ${lane.id.padEnd(22)} 肩高=${lane.shoulders.map((v) => v.toFixed(2)).join("/")} m  命中=${lane.lowHits.join("/")}`);
+  }
+} catch (error) {
+  problems.push(`THROW ${String(error).slice(0, 300)}`);
+}
+
+await browser.close();
+server.close();
+if (problems.length) {
+  console.error(`\n界河地形冒烟失败：${problems.length} 项`);
+  for (const problem of problems) console.error(`  ${problem}`);
+  process.exit(1);
+}
+console.log("\n界河地形冒烟通过。地表高差与挡弹沟槽均为运行时实测。\n");
