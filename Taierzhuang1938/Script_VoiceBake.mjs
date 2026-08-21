@@ -8,7 +8,7 @@
 //   node Taierzhuang1938/Script_VoiceBake.mjs --normalize      # 只统一响度，不重新生成
 //   node Taierzhuang1938/Script_VoiceBake.mjs --clean <key>…   # 只为降底噪重摇，不如旧的就留旧的
 //
-// 烘完把实测时长写回 Data_Voice.mjs 的 dur 字段（Script_VoiceTest 断言 0.3—2.6 s）。
+// 烘完把实测时长写回 Data_Voice.mjs 的 dur 字段；战斗 Bark 断言 0.3—2.6 s，序章对白独立 0.45—4.8 s。
 //
 // ## 为什么用 seedaudio 而不是 minimax_tts
 // 整套声库是 seed-audio-1.0 出的。改几句就换引擎的话，同一个班里会有两种音质，
@@ -208,10 +208,10 @@ function WorkspaceTake(dir, key) {
   return files.length ? path.join(dir, files[0].f) : null;
 }
 
-/** Windows 离线中文生成链：System.Speech 自带 Huihui/Kangkang/Yaoyao，不联网、不上传台词。 */
+/** Windows 离线中文生成链：System.Speech 的男性 Kangkang，不联网、不上传台词。 */
 function SystemSpeechTake(line, dst) {
   const wav = dst + ".system.wav";
-  const voice = line.systemSpeech.voice || "Microsoft Huihui";
+  const voice = line.systemSpeech.voice || "Microsoft Kangkang";
   const rate = Number(line.systemSpeech.rate || 0);
   const quote = (s) => String(s).replace(/'/g, "''");
   const script = [
@@ -227,8 +227,16 @@ function SystemSpeechTake(line, dst) {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
   const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], { encoding: "utf8" });
   if (r.status !== 0 || !fs.existsSync(wav)) return { error: (r.stderr || r.stdout || "System.Speech 生成失败").slice(-240) };
-  const out = Encode(wav, dst, { maxDur: 2.45, maxTempo: 2.6,
-    preFilter: "afftdn=nr=16:nf=-45,agate=threshold=-35dB:ratio=8:attack=5:release=80" });
+  // rubberband 以保时移调区分角色；formant=preserved 防止 ±2 半音变成卡通声。
+  const semitones = Number(line.systemSpeech.pitchSemitones || 0);
+  const pitch = Math.pow(2, semitones / 12);
+  const pitchFx = Math.abs(semitones) > 0.01
+    ? `rubberband=pitch=${pitch.toFixed(5)}:tempo=1:formant=preserved`
+    : "";
+  const pre = [pitchFx, "afftdn=nr=16:nf=-45", "agate=threshold=-35dB:ratio=8:attack=5:release=80"]
+    .filter(Boolean).join(",");
+  const out = Encode(wav, dst, { maxDur: line.prologue ? 4.7 : 2.45,
+    maxTempo: line.prologue ? 1.6 : 2.6, preFilter: pre });
   fs.rmSync(wav, { force: true });
   return out;
 }

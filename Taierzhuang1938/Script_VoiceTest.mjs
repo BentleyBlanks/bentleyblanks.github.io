@@ -102,35 +102,40 @@ Object.assign(r, await page.evaluate(() => {
 
 // 序章对白是时间轴契约：数量、顺序、角色、cue/file 与文本任何一项漂移都必须红。
 const PROLOGUE_EXPECTED = [
-  ["prologue_young_dispatch_01", "年轻传令兵", "vo_prologue_young_dispatch_01.mp3", "我们出川好久了哦。"],
-  ["prologue_old_wound_01", "旧伤士兵", "vo_prologue_old_wound_01.mp3", "路莫问，跟到走就是。"],
-  ["prologue_young_dispatch_02", "年轻传令兵", "vo_prologue_young_dispatch_02.mp3", "我都忘了屋头腊肉是啥味道了。"],
-  ["prologue_machine_gunner_01", "机枪手", "vo_prologue_machine_gunner_01.mp3", "你娃儿还惦记腊肉。"],
-  ["prologue_young_dispatch_03", "年轻传令兵", "vo_prologue_young_dispatch_03.mp3", "不惦记吃的惦记啥子嘛。"],
-  ["prologue_machine_gunner_02", "机枪手", "vo_prologue_machine_gunner_02.mp3", "到了前头，有热水喝你就谢天谢地。"],
-  ["prologue_rifleman_01", "擦枪士兵", "vo_prologue_rifleman_01.mp3", "又卡。"],
-  ["prologue_old_wound_02", "旧伤士兵", "vo_prologue_old_wound_02.mp3", "你少骂两句，它兴许听话点。"],
-  ["prologue_squad_leader_01", "班长", "vo_prologue_squad_leader_01.mp3", "莫摆了。线盘再检查一遍，到了地头就要用。"],
-  ["prologue_old_wound_03", "旧伤士兵", "vo_prologue_old_wound_03.mp3", "近咯。"],
-  ["prologue_squad_leader_02", "班长", "vo_prologue_squad_leader_02.mp3", "都醒起，装备拿好。"],
-  ["prologue_external_officer_01", "车外军官", "vo_prologue_external_officer_01.mp3", "通信排，下车！线盘背起，搞快！"],
+  ["prologue_young_dispatch_01", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", "我们出川好久了哦。"],
+  ["prologue_old_wound_01", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_01.mp3", "路莫问，跟到走就是。"],
+  ["prologue_young_dispatch_02", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_02.mp3", "我都忘了屋头腊肉是啥味道了。"],
+  ["prologue_machine_gunner_01", "机枪手", "AudioSfx_PrologueVoiceMachineGunner_01.mp3", "你娃儿还惦记腊肉。"],
+  ["prologue_young_dispatch_03", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_03.mp3", "不惦记吃的惦记啥子嘛。"],
+  ["prologue_machine_gunner_02", "机枪手", "AudioSfx_PrologueVoiceMachineGunner_02.mp3", "到了前头，有热水喝你就谢天谢地。"],
+  ["prologue_rifleman_01", "擦枪士兵", "AudioSfx_PrologueVoiceRifleman_01.mp3", "又卡。"],
+  ["prologue_old_wound_02", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_02.mp3", "你少骂两句，它兴许听话点。"],
+  ["prologue_squad_leader_01", "班长", "AudioSfx_PrologueVoiceSquadLeader_01.mp3", "莫摆了。线盘再检查一遍，到了地头就要用。"],
+  ["prologue_old_wound_03", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_03.mp3", "近咯。"],
+  ["prologue_squad_leader_02", "班长", "AudioSfx_PrologueVoiceSquadLeader_02.mp3", "都醒起，装备拿好。"],
+  ["prologue_external_officer_01", "车外军官", "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", "通信排，下车！线盘背起，搞快！"],
 ];
 const prologue = await page.evaluate(async () => {
   const mod = await import("./Data_Voice.mjs");
   const bank = new Map([...window.Taierzhuang.audio.voiceBank.values()].map((e) => [e.key, e]));
   return mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
     const loaded = bank.get(e.key) || {};
-    return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0 };
+    return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0,
+      voice: e.systemSpeech?.voice, gender: e.systemSpeech?.gender, pitchSemitones: e.systemSpeech?.pitchSemitones };
   });
 });
 const prologueShape = prologue.length === PROLOGUE_EXPECTED.length
   && prologue.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
     && e.file === PROLOGUE_EXPECTED[i][2] && e.text === PROLOGUE_EXPECTED[i][3]);
-const prologueDurOk = prologue.every((e) => e.duration > 0.3 && e.duration < 2.6);
+const prologueDurOk = prologue.every((e) => e.duration >= 0.45 && e.duration <= 4.8);
 Check("序章配音恰好 12 句且 cue/file/角色/文本/时长逐条匹配", prologueShape,
   `实际 ${prologue.length} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
-Check("序章 12 句实测时长均在 0.3—2.6 s", prologueDurOk,
+Check("序章 12 句实测时长均在 0.45—4.8 s", prologueDurOk,
   `时长 ${prologue.map((e) => e.duration.toFixed(2)).join("/")}`);
+const prologueMaleOnly = prologue.every((e) => e.voice === "Microsoft Kangkang" && e.gender === "Male"
+  && Number.isFinite(e.pitchSemitones));
+Check("序章 12 句仅使用可验证 Male 的 Kangkang，并有固定角色变调", prologueMaleOnly,
+  prologue.map((e) => `${e.key}:${e.voice}/${e.gender}/${e.pitchSemitones}`).join(" "));
 const roleCounts = prologue.reduce((m, e) => (m[e.role] = (m[e.role] || 0) + 1, m), {});
 const expectedRoleCounts = { "年轻传令兵": 3, "旧伤士兵": 3, "机枪手": 2, "擦枪士兵": 1, "班长": 2, "车外军官": 1 };
 Check("序章角色配额 3/3/2/1/2/1", Object.keys(expectedRoleCounts).every((k) => roleCounts[k] === expectedRoleCounts[k]), JSON.stringify(roleCounts));
@@ -151,9 +156,11 @@ Check("日方六类齐全（少一类就会复读）",
   Object.keys(r.ijaKinds).length >= 6, JSON.stringify(r.ijaKinds));
 Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",
   r.ijaBaka.length === 0, r.ijaBaka.length ? "命中：" + r.ijaBaka.join(" ") : "干净");
-Check("每句都在 0.3—2.6 s（太长的喊话在战场上读不完；太短的多半是模型只吐了半句）",
-  r.durations.every((d) => d > 0.3 && d < 2.6),
-  `最长 ${Math.max(...r.durations)}s，最短 ${Math.min(...r.durations)}s`);
+const battleDurations = await page.evaluate(() => [...window.Taierzhuang.audio.voiceBank.values()]
+  .filter((e) => !e.prologue).map((e) => e.duration));
+Check("战斗 Bark 仍在 0.3—2.6 s（序章对白使用独立时长闸）",
+  battleDurations.every((d) => d > 0.3 && d < 2.6),
+  `战斗最长 ${Math.max(...battleDurations).toFixed(2)}s，最短 ${Math.min(...battleDurations).toFixed(2)}s`);
 const cross = await page.evaluate(() => {
   const A = window.Taierzhuang.audio;
   const bank = [...A.voiceBank.values()];
