@@ -104,8 +104,8 @@ const BUOYANT_DRAG = 0.55;
 
 // 池容量分配（占总预算的比例）。烟最费，因为它活得久、片子大。
 const POOL_SHARE = {
-  smoke: 0.30, fire: 0.16, streak: 0.14, debris: 0.10,
-  dust: 0.16, star: 0.03, ring: 0.02, decal: 0.09,
+  smoke: 0.30, fire: 0.08, streak: 0.14, debris: 0.10,
+  dust: 0.16, star: 0.03, ring: 0.02, decal: 0.09, sprite: 0.08,
 };
 
 // ---------------------------------------------------------------------------
@@ -144,6 +144,7 @@ attribute vec3 iNormal;
 
 uniform float uTime;
 uniform float uGlobalFade;
+uniform float uFadeOutStart;   // 淡出起点：普通池 0.45，序列帧火球 0.82（16 帧要播完）
 #ifdef AERIAL
 uniform vec3 uSunDirection;
 uniform float uFogDensity;
@@ -163,6 +164,7 @@ varying vec3 vColorAlt;      // 生命末端色，弹孔那种"同一片上要�
 varying float vAlpha;
 varying float vSeed;
 varying float vAge01;
+varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
 varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
 varying vec3 vLitNormal;
@@ -186,6 +188,7 @@ void main() {
   float t01 = clamp(age / life, 0.0, 1.0);
   vAge01 = t01;
   vSeed = iParams.w;
+  vFrame = iExtra.w;
 
   // 带线性阻尼的弹道闭式解：v' = a - k·v
   //   v(t) = a/k + (v0 - a/k)e^(-kt)
@@ -258,7 +261,7 @@ void main() {
   // fadeIn 是"占寿命的比例"。贴花寿命是 1e5 秒，任何非零比例都会变成几十秒才浮现，
   // 所以 0 必须当"立刻出现"处理，不能靠 max() 兜一个极小值。
   float fadeIn = iParams.y <= 0.0 ? 1.0 : smoothstep(0.0, iParams.y, t01);
-  float fadeOut = 1.0 - smoothstep(0.45, 1.0, t01);
+  float fadeOut = 1.0 - smoothstep(uFadeOutStart, 1.0, t01);
   float flicker = 1.0;
   if (iExtra.y > 0.0) {
     flicker = 0.5 + 0.5 * sin(age * iExtra.y * 6.2831853 + iParams.w * 17.0);
@@ -298,6 +301,9 @@ uniform vec2 uResolution;
 uniform float uSoftEnabled;
 uniform float uSoftRange;
 uniform float uNearFade;
+uniform sampler2D uSpriteMap;    // 序列帧贴图；非 SHAPE_SPRITE 池挂共享的 1×1 白图
+uniform vec2 uSpriteGrid;        // 帧网格（列×行）
+uniform float uSpriteFrames;     // 帧总数
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
@@ -311,6 +317,7 @@ varying vec3 vColorAlt;
 varying float vAlpha;
 varying float vSeed;
 varying float vAge01;
+varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
 varying float vViewDepth;
 #if defined(LIT) || defined(LIT_SURFACE)
 varying vec3 vLitNormal;
@@ -367,6 +374,16 @@ void main() {
   mask = hole * 0.95 + rim * 0.5 + rays * 0.35;
   // 贴花不老化，vColor 恒等于 colorA（断口色），暗芯色只能从 colorB 单独取
   color = mix(vColor, vColorAlt, hole);
+#elif defined(SHAPE_SPRITE)
+  // 序列帧火球（贴图：CC0 16 帧爆炸序列，来源见 _import/Data_SourceLicenses.md）。
+  // 贴图只给"火"的形状细节，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合：
+  // 台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。
+  float f = min(uSpriteFrames - 1.0, vFrame + floor(vAge01 * uSpriteFrames));
+  vec2 cell = vec2(mod(f, uSpriteGrid.x), floor(f / max(uSpriteGrid.x, 1.0)));
+  vec2 uv = (p * 0.5 + 0.5 + cell) / uSpriteGrid;
+  vec4 tex = texture2D(uSpriteMap, uv);
+  mask = tex.a;
+  color = vColor * tex.rgb;
 #else
   mask = smoothstep(1.0, 0.1, d);
 #endif
@@ -562,7 +579,7 @@ const SPAWN = {
   ax: 0, ay: 0, az: 0,
   life: 1, sizeStart: 0.2, sizeEnd: 0.5,
   drag: 0.8, opacity: 1, fadeIn: 0.08,
-  angle: 0, spin: 0, stretch: 0, flicker: 0, groundY: -9999,
+  angle: 0, spin: 0, stretch: 0, flicker: 0, groundY: -9999, frame: 0,
   colorA: VFX_PALETTE.dust, colorB: VFX_PALETTE.dustDense,
   seed: 0, nx: 0, ny: 1, nz: 0,
 };
@@ -581,7 +598,7 @@ function ResetSpawn() {
   SPAWN.life = 1; SPAWN.sizeStart = 0.2; SPAWN.sizeEnd = 0.5;
   SPAWN.drag = 0.8; SPAWN.opacity = 1; SPAWN.fadeIn = 0.08;
   SPAWN.angle = 0; SPAWN.spin = 0; SPAWN.stretch = 0; SPAWN.flicker = 0;
-  SPAWN.groundY = -9999; SPAWN.seed = 0;
+  SPAWN.groundY = -9999; SPAWN.seed = 0; SPAWN.frame = 0;
   SPAWN.colorA = VFX_PALETTE.dust; SPAWN.colorB = VFX_PALETTE.dustDense;
   SPAWN.nx = 0; SPAWN.ny = 1; SPAWN.nz = 0;
   return SPAWN;
@@ -653,7 +670,17 @@ class ParticlePool {
     const preserveTargetAlpha = !!config.preserveTargetAlpha;
     this.material = new THREE.ShaderMaterial({
       defines,
-      uniforms: Object.assign({}, shared, { uSoftRange: { value: config.softRange ?? 0.6 } }),
+      uniforms: Object.assign({}, shared, {
+        uSoftRange: { value: config.softRange ?? 0.6 },
+        uFadeOutStart: { value: config.fadeOutStart ?? 0.45 },
+        uSpriteMap: { value: config.sprite ? config.sprite.texture : shared.uSpriteMap.value },
+        uSpriteGrid: {
+          value: config.sprite
+            ? new THREE.Vector2(config.sprite.grid[0], config.sprite.grid[1])
+            : shared.uSpriteGrid.value,
+        },
+        uSpriteFrames: { value: config.sprite ? config.sprite.frames : shared.uSpriteFrames.value },
+      }),
       vertexShader: `${GLSL_VERT_HELPERS}\n${VERT_PARTICLE}`,
       fragmentShader: `${GLSL_NOISE}\n${FRAG_PARTICLE}`,
       transparent: true,
@@ -703,7 +730,7 @@ class ParticlePool {
     a.iParams[i * 4] = s.opacity; a.iParams[i * 4 + 1] = s.fadeIn;
     a.iParams[i * 4 + 2] = s.drag; a.iParams[i * 4 + 3] = s.seed;
     a.iExtra[i * 4] = s.stretch; a.iExtra[i * 4 + 1] = s.flicker;
-    a.iExtra[i * 4 + 2] = s.groundY; a.iExtra[i * 4 + 3] = 0;
+    a.iExtra[i * 4 + 2] = s.groundY; a.iExtra[i * 4 + 3] = s.frame || 0;
     if (a.iNormal) {
       a.iNormal[i * 3] = s.nx; a.iNormal[i * 3 + 1] = s.ny; a.iNormal[i * 3 + 2] = s.nz;
     }
@@ -1037,6 +1064,11 @@ export class VfxSystem {
       new Float32Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat, THREE.FloatType);
     this.fallbackDepth.needsUpdate = true;
 
+    // 序列帧贴图的 1×1 白图占位：贴图异步加载到位前，火球池采样这张白图，
+    // mask 恒为 1，形状退化成普通辉光圆片 —— 与旧版程序化火球观感一致，绝不黑屏。
+    this.spritePlaceholder = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    this.spritePlaceholder.needsUpdate = true;
+
     this.shared = {
       uTime: { value: 0 },
       uGlobalFade: { value: 1 },
@@ -1044,6 +1076,11 @@ export class VfxSystem {
       uResolution: { value: new THREE.Vector2(1600, 900) },
       uSoftEnabled: { value: 0 },
       uNearFade: { value: 0.45 },
+      // 序列帧与淡出曲线：除火球池外全部用默认值（淡出起点 0.45、单帧白图）。
+      uFadeOutStart: { value: 0.45 },
+      uSpriteMap: { value: this.spritePlaceholder },
+      uSpriteGrid: { value: new THREE.Vector2(1, 1) },
+      uSpriteFrames: { value: 1 },
       uSunDirection: { value: new THREE.Vector3(0.32, 0.62, -0.72).normalize() },
       // 默认值对齐 LightRig 的 smokyDay：平行光 5.4，漫反射出射亮度约 I/π ≈ 1.7。
       // 这里给小了的话，碎块和烟会比同一场景里的 PBR 物体暗一大截，一眼假。
@@ -1077,6 +1114,13 @@ export class VfxSystem {
         shape: "puff", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.25, renderOrder: 8,
       }, this.shared),
+      // 爆炸火球的序列帧核心：CC0 16 帧序列图（4×4）当形状细节，颜色仍乘色板
+      // 走 HDR 加性。与 fire 共享"火"这档预算（0.08 + 0.08），低画质下两层都减薄。
+      sprite: new ParticlePool(cap(POOL_SHARE.sprite, 24), {
+        shape: "sprite", orient: "billboard", blending: THREE.AdditiveBlending,
+        softRange: 0.25, renderOrder: 8, fadeOutStart: 0.82,
+        sprite: { texture: this.spritePlaceholder, grid: [4, 4], frames: 16 },
+      }, this.shared),
       // 曳光与火星共用一个"沿速度拉长"的池
       streak: new ParticlePool(cap(POOL_SHARE.streak, 64), {
         shape: "streak", orient: "stretch", blending: THREE.AdditiveBlending,
@@ -1106,6 +1150,28 @@ export class VfxSystem {
 
     this.dust = null;
     this.dustBox = null;
+
+    // 异步加载爆炸火球序列帧（CC0，来源与许可见 _import/Data_SourceLicenses.md）。
+    // 失败静默留在白图占位 —— 页面绝不因一张贴图报错，爆炸照常走程序化辉光。
+    this.spriteSheet = this.spritePlaceholder;
+    new THREE.TextureLoader().load(
+      new URL("./Texture/Texture_ExplosionFire_01.png", import.meta.url).href,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        // 序列图第一行是第一阶段（火星/初爆），最后一行是开花：UV 必须按图面方向
+        // 走（flipY = false），否则火球会倒着播 —— 从大烟球缩回火星。
+        texture.flipY = false;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.needsUpdate = true;
+        this.spriteSheet = texture;
+        if (this.pools && this.pools.sprite) {
+          this.pools.sprite.material.uniforms.uSpriteMap.value = texture;
+        }
+      },
+      undefined,
+      () => {},                          // 加载失败：留在 1×1 白图，静默降级
+    );
 
     // 深度法线预通道里必须隐身（见文件头第 2 条）。挂钩子而不是改 Script_Post。
     this.previousSceneHook = scene.onBeforeRender;
@@ -1478,8 +1544,33 @@ export class VfxSystem {
       this.pools.fire.Spawn(s, this.time);
     }
 
-    // 2) 火球：向上加速，黄 -> 暗红
-    const fireCount = Math.round(profile.fire * this.spawnScale);
+    // 2) 火球：序列帧核心 + 程序化辉光。
+    //    贴图帧（CC0 16 帧，来源见 _import/Data_SourceLicenses.md）给"火"的形状细节，
+    //    puff 给柔软的边和 HDR 泛光；只有贴图会逐帧跳，只有 puff 火就没有纹理。
+    //    起始帧错开，避免几片同帧同形叠成一张硬边卡。
+    const spriteCount = Math.max(1,
+      Math.min(3, Math.round(profile.fire / 5) * Math.round(this.spawnScale)));
+    for (let i = 0; i < spriteCount; i += 1) {
+      const s = ResetSpawn();
+      const spread = i === 0 ? 0 : radius * 0.18;
+      s.x = position.x + this._Signed(spread);
+      s.y = position.y + this._Range(0, radius * 0.10) + i * radius * 0.06;
+      s.z = position.z + this._Signed(spread);
+      s.vx = this._Signed(1.1) * scale; s.vy = this._Range(1.4, 3.0) * scale; s.vz = this._Signed(1.1) * scale;
+      s.ay = 2.4; s.drag = 2.8;
+      s.life = this._Range(0.40, 0.52);
+      s.sizeStart = radius * (i === 0 ? 0.55 : 0.30);
+      s.sizeEnd = radius * (i === 0 ? 1.45 : 0.85);
+      s.opacity = i === 0 ? 0.95 : 0.6; s.fadeIn = 0.04;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.5);
+      s.frame = i === 0 ? 0 : Math.floor(this.random() * 4);
+      s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
+      s.seed = this.random();
+      this.pools.sprite.Spawn(s, this.time);
+    }
+
+    // 程序化辉光裹在序列帧外面：向上加速，黄 -> 暗红
+    const fireCount = Math.max(1, Math.round(profile.fire * 0.5 * this.spawnScale));
     for (let i = 0; i < fireCount; i += 1) {
       const s = ResetSpawn();
       s.x = position.x + this._Signed(radius * 0.14);
@@ -1730,6 +1821,8 @@ export class VfxSystem {
     for (const pool of Object.values(this.pools)) pool.Dispose();
     this.debris.Dispose();
     if (this.dust) this.dust.Dispose();
+    if (this.spriteSheet && this.spriteSheet !== this.spritePlaceholder) this.spriteSheet.dispose();
+    if (this.spritePlaceholder) this.spritePlaceholder.dispose();
     this.fallbackDepth.dispose();
     this.smokeSources.clear();
     this.dust = null;

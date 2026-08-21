@@ -44,3 +44,16 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 兼容分段按源 FBX 的蒙皮权重归属到关节，并以源骨骼 rest pose 的真实枢轴重对齐；
 不再用模型 XYZ 位置猜胳膊和腿。它只解决“旧动作能不能直接套”的坐标差异，
 不改变枪口、握点、AI 状态或动作时序。
+
+## 特效贴图（爆炸火球序列图）
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
+|---|---|---|---|---|
+| 爆炸火球序列帧 `Texture/Texture_ExplosionFire_01.png` | [Explosion Sheet](https://opengameart.org/content/explosion-sheet) 的 `boom3.png` | [StumpyStrust](https://opengameart.org/users/stumpystrust) | CC0 | 原图未改动（1024×1024，4×4 共 16 帧）。运行时由 `Script_Vfx.mjs` 的火球池按序列帧采样：形状细节来自贴图，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合——台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。贴图加载失败时静默降级回程序化辉光圆片。 |
+
+下载命令（原图即运行时文件，未做任何修改）：
+
+```powershell
+Invoke-WebRequest -Uri 'https://opengameart.org/sites/default/files/boom3.png' `
+  -OutFile 'Taierzhuang1938/Texture/Texture_ExplosionFire_01.png'
+```
