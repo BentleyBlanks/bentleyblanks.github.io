@@ -85,8 +85,13 @@ for (const segment of ["Segment_hips", "Segment_chest", "Segment_neck",
   assert.ok(soldierNames.has(segment), `IJA compatibility segment ${segment}`);
 AssertHumanHead(soldier, "IJA soldier", 1.62);
 const helmet = SegmentBounds(soldier, "Segment_neck_HelmetBrim");
-assert.ok(helmet.max[0] - helmet.min[0] <= 1.62 * 0.19,
+assert.ok(helmet.max[0] - helmet.min[0] <= 1.62 * 0.135,
   `IJA helmet is too wide: ${(helmet.max[0] - helmet.min[0]).toFixed(3)} m`);
+assert.ok(helmet.min[1] >= 1.62 * 0.055,
+  `IJA helmet brim is too low over the face: ${helmet.min[1].toFixed(3)} m above neck`);
+const ijaChest = SegmentBounds(soldier, "Segment_chest");
+assert.ok(ijaChest.max[0] - ijaChest.min[0] <= 0.60,
+  `IJA chest includes detached outliers: ${(ijaChest.max[0] - ijaChest.min[0]).toFixed(3)} m wide`);
 for (const moustache of ["Segment_neck_MoustacheL", "Segment_neck_MoustacheR"])
   assert.ok(soldierNames.has(moustache), `IJA optional moustache ${moustache}`);
 

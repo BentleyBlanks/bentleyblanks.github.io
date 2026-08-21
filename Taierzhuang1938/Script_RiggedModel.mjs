@@ -12,7 +12,7 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
-  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=6",
+  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=7",
   nraSoldier: "./Model/Model_NraSoldier.glb?v=3",
   civilianMale: "./Model/Model_CivilianMale.glb?v=3",
   civilianFemale: "./Model/Model_CivilianFemale.glb?v=3",
@@ -314,9 +314,15 @@ export class SegmentedCharacterSkin {
         actor.arms.L.shoulder, actor.arms.L.elbow, actor.arms.R.shoulder, actor.arms.R.elbow,
         actor.legs.L.thigh, actor.legs.L.knee, actor.legs.L.ankle,
         actor.legs.R.thigh, actor.legs.R.knee, actor.legs.R.ankle]) {
-        for (const child of node.children) {
-          if (child.isMesh) { child.visible = false; this.legacyMeshes.push(child); }
-        }
+        // Hands and small head pieces live one level below the old forearm /
+        // neck meshes.  Hiding only direct children left those pieces behind
+        // as floating, skin-coloured fragments once the GLB skin took over.
+        node.traverse((child) => {
+          if (child !== node && child.isMesh) {
+            child.visible = false;
+            this.legacyMeshes.push(child);
+          }
+        });
       }
       this.root.updateMatrixWorld(true);
       actor.root.updateMatrixWorld(true);

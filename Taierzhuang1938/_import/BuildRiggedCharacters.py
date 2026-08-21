@@ -404,6 +404,43 @@ def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, fac
         # Blender +Y becomes glTF -Z, which is forward everywhere in the game.
         "footL": Vector((0, 1, 0)), "footR": Vector((0, 1, 0)),
     }
+    def PruneChestOutliers(mesh):
+        """Remove disconnected source-skin scraps incorrectly weighted to chest.
+
+        The CC0 soldier contains small, unweighted hand/accessory islands.  The
+        source FBX assigns those islands to the torso, so after the chest is
+        re-pivoted they render as two floating hands far outside the body.
+        A real torso/shoulder component reaches the chest centre; discard only
+        disconnected components whose every vertex is beyond that envelope.
+        """
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bm.faces.ensure_lookup_table()
+        seen = set()
+        discard = []
+        for face in bm.faces:
+            if face.index in seen:
+                continue
+            component = []
+            pending = [face]
+            seen.add(face.index)
+            while pending:
+                current = pending.pop()
+                component.append(current)
+                for edge in current.edges:
+                    for neighbour in edge.link_faces:
+                        if neighbour.index not in seen:
+                            seen.add(neighbour.index)
+                            pending.append(neighbour)
+            vertices = {vertex for part in component for vertex in part.verts}
+            if vertices and min(abs(vertex.co.x) for vertex in vertices) > 0.28:
+                discard.extend(component)
+        if discard:
+            bmesh.ops.delete(bm, geom=discard, context="FACES")
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.update()
+
     built = []
     for segment, pivot in pivots.items():
         mesh = source_mesh.copy()
@@ -428,6 +465,8 @@ def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, fac
         transform = (Matrix.Translation(pivot) @ rotation @ Matrix.Translation(-source_head)
                      @ normalize @ body.matrix_world)
         mesh.transform(Matrix.Translation(-pivot) @ transform)
+        if segment == "chest":
+            PruneChestOutliers(mesh)
         if segment == "neck" and mesh.vertices:
             # Some Quaternius characters deliberately use a chibi head: after
             # body-height normalization the head alone is roughly 0.58 m wide
@@ -458,27 +497,42 @@ def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, fac
 
 def BuildSegmentHelmet(height=1.62):
     pivot = OldRigPivots(height)["neck"]
-    material = MakeFlatMaterial("Material_IjaHelmet", (0.20, 0.22, 0.12))
-    star_material = MakeFlatMaterial("Material_IjaHelmetStar", (0.48, 0.12, 0.08), 0.72, 0.05)
-    head_z = 0.952 * height
-    # Keep the M1930 helmet narrower than the shoulders in tactical view.
-    radius = 0.075 * height
+    # The imported face is deliberately compact.  The previous 24.3 cm dome
+    # and 26.2 cm brim read as a cartoon mushroom above its 15 cm face at the
+    # close combat camera.  A Type 90 still needs a visible turned-out brim,
+    # but it should sit over the brow instead of swallowing the whole head.
+    material = MakeFlatMaterial("Material_IjaHelmet", (0.10, 0.095, 0.060), 0.94, 0.04)
+    star_material = MakeFlatMaterial("Material_IjaHelmetStar", (0.36, 0.18, 0.035), 0.76, 0.04)
+    # `primitive_uv_sphere_add` makes a full sphere.  Keep only the upper
+    # half below, otherwise its lower hemisphere becomes a visor-sized ball
+    # over the soldier's eyes.
+    head_z = 0.922 * height
+    # 19.9 cm dome / 20.9 cm brim on the 1.62 m reference soldier: a realistic
+    # Type 90 silhouette without the previous over-sized "mushroom" profile.
+    radius = 0.0615 * height
 
     bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12)
     dome = bpy.context.object
     dome.name = "Segment_neck_HelmetDome"
-    dome.scale = (radius, radius * 0.92, 0.067 * height)
+    dome.scale = (radius, radius * 0.93, 0.056 * height)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(dome.data)
+    lower_faces = [face for face in bm.faces if face.calc_center_median().z < -1e-6]
+    bmesh.ops.delete(bm, geom=lower_faces, context="FACES")
+    bm.to_mesh(dome.data)
+    bm.free()
+    dome.data.update()
     dome.data.transform(Matrix.Translation(Vector((0, 0, head_z)) - pivot))
     dome.location = pivot
     dome.data.materials.append(material)
 
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius * 1.08, depth=0.010 * height)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius * 1.05, depth=0.009 * height)
     brim = bpy.context.object
     brim.name = "Segment_neck_HelmetBrim"
     brim.scale.y = 0.88
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    brim.data.transform(Matrix.Translation(Vector((0, 0, 0.897 * height)) - pivot))
+    brim.data.transform(Matrix.Translation(Vector((0, 0, 0.924 * height)) - pivot))
     brim.location = pivot
     brim.data.materials.append(material)
 
