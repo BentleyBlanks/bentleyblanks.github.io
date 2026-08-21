@@ -2134,7 +2134,8 @@ export class AudioEngine {
     let ok = 0;
     await Promise.all(entries.map(async (e) => {
       try {
-        const res = await fetch(base + e.file);
+        // 声库资产覆写同名 MP3 时也必须换 URL，否则玩家只会听到浏览器缓存里的旧 take。
+        const res = await fetch(`${base}${e.file}?v=20260822qwenprologue`);
         if (!res.ok) throw new Error("HTTP " + res.status);
         const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
         const name = "voice." + e.key;
