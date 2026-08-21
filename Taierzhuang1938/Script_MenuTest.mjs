@@ -71,7 +71,7 @@ await Boot();
   });
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);
-  Check("菜单四项都在", m.items.length === 4, m.items.join(" / "));
+  Check("菜单五项都在（含调试选项）", m.items.length === 5 && m.items.includes("调试选项"), m.items.join(" / "));
   Check("菜单里 HUD 与手里的枪都藏起来了", m.hudHidden && !m.viewmodel,
     `hud=${m.hudHidden} viewmodel=${m.viewmodel}`);
   // 菜单里摆的是几个守军，**一个日军都不许有** ——
@@ -79,6 +79,26 @@ await Boot();
   Check("菜单场景里只有守军、没有日军", m.nra === 5 && m.ija === 0, `nra=${m.nra} ija=${m.ija}`);
   Check("菜单背后建的是城墙那一关（Data_Menu.MENU_SCENE.slice）", m.menu.slice === 4,
     `slice=${m.menu.slice}`);
+}
+
+// ===========================================================================
+// 1b) 调试选项：开关在主菜单上可见、实际写入运行时，再返回主菜单
+// ===========================================================================
+{
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("debug"));
+  const debugPanel = await page.evaluate(() => ({
+    mode: window.Taierzhuang.Debug.Menu().mode,
+    options: [...document.querySelectorAll("#menu .mnDebugRow")].map((e) => e.dataset.option),
+  }));
+  Check("主菜单能打开五项调试选项", debugPanel.mode === "debug" && debugPanel.options.length === 5,
+    JSON.stringify(debugPanel));
+  await page.screenshot({ path: path.join(outDir, "Menu_Debug.png") });
+  await page.click('#menu .mnDebugRow[data-option="noCollision"] input');
+  const noCollision = await page.evaluate(() => window.Taierzhuang.Debug.DebugOptions());
+  Check("无碰撞开关写入玩法配置", noCollision.noCollision === true, JSON.stringify(noCollision));
+  await page.evaluate(() => window.Taierzhuang.Debug.SetDebugOption("noCollision", false));
+  await page.keyboard.press("Escape");
+  Check("调试面板 Esc 返回主菜单", await page.evaluate(() => window.Taierzhuang.Debug.Menu().mode === "title"));
 }
 
 // ===========================================================================
@@ -226,6 +246,49 @@ for (let i = 0; i < 3; i += 1) {
     `menuOff=${inGame.menuOff} hud=${!inGame.hudHidden} vm=${inGame.viewmodel}`);
   Check("进关后战场上有人", inGame.soldiers > 4, `soldiers=${inGame.soldiers}`);
   await page.screenshot({ path: path.join(outDir, "Menu_InGame.png") });
+}
+
+// ===========================================================================
+// 4b) 调试选项必须改到真实玩法，而不只是菜单上的复选框
+// ===========================================================================
+{
+  const mechanics = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    T.player.health = 35;
+    T.player.bleeding = 3;
+    T.Debug.SetDebugOption("invincible", true);
+    T.player.TakeHit(999, "head");
+    const invincible = T.player.Alive && T.player.health === 100 && T.player.bleeding === 0;
+
+    T.Debug.SetDebugOption("infiniteGrenades", true);
+    const grenadesBefore = T.state.grenades;
+    const throwOriginal = T.combat.Throw;
+    T.combat.Throw = () => {};
+    T.Debug.Throw("Grenade", 0.2);
+    T.combat.Throw = throwOriginal;
+    const infiniteGrenades = grenadesBefore >= 1 && T.state.grenades === grenadesBefore;
+
+    T.state.ammo = 0;
+    T.Debug.SetDebugOption("infiniteAmmo", true);
+    const infiniteAmmo = T.state.ammo > 0;
+
+    T.Debug.SetDebugOption("noCollision", true);
+    const x = T.player.position.x;
+    const z = T.player.position.z;
+    T.player.position.set(x, T.battlefield.GroundHeight(x, z) + 5, z);
+    T.player.velocity.set(0, -20, 0);
+    T.player.MoveWithCollision(0.5);
+    const terrainHeld = Math.abs(T.player.position.y - T.battlefield.GroundHeight(x, z)) < 0.001;
+
+    T.Debug.SetDebugOption("noCollision", false);
+    T.Debug.SetDebugOption("invincible", false);
+    T.Debug.SetDebugOption("infiniteGrenades", false);
+    T.Debug.SetDebugOption("infiniteAmmo", false);
+    return { invincible, infiniteGrenades, infiniteAmmo, terrainHeld, options: T.Debug.DebugOptions() };
+  });
+  Check("无敌、无限补给与无碰撞贴地实际生效",
+    mechanics.invincible && mechanics.infiniteGrenades && mechanics.infiniteAmmo && mechanics.terrainHeld,
+    JSON.stringify(mechanics));
 }
 
 // ===========================================================================

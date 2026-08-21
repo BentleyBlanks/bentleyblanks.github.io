@@ -240,6 +240,40 @@
 }
 .mnCodexNote { color: rgba(230, 223, 205, 0.55); }
 
+/* --- 调试选项 ------------------------------------------------------------ */
+.mnDebug {
+  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 20px 30px 30px;
+  color: rgba(230, 223, 205, 0.78);
+}
+.mnDebugIntro { margin: 0 0 14px; font-size: 13px; line-height: 1.8; color: rgba(230, 223, 205, 0.56); }
+.mnDebugRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 22px;
+  min-height: 68px; padding: 11px 14px 11px 16px;
+  border-top: 1px solid rgba(230, 223, 205, 0.10); cursor: pointer;
+  transition: background 0.14s linear, border-color 0.14s linear;
+}
+.mnDebugRow:last-child { border-bottom: 1px solid rgba(230, 223, 205, 0.10); }
+.mnDebugRow:hover { background: rgba(230, 223, 205, 0.05); }
+.mnDebugRow.on { background: rgba(224, 176, 98, 0.08); border-color: rgba(224, 176, 98, 0.34); }
+.mnDebugCopy { display: flex; flex-direction: column; gap: 5px; }
+.mnDebugCopy b { font-size: 15.5px; font-weight: 500; letter-spacing: 0.12em; color: var(--paper, #e6dfcd); }
+.mnDebugCopy small { max-width: 610px; font-size: 12px; line-height: 1.65; color: rgba(230, 223, 205, 0.52); }
+.mnDebugControl { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.mnDebugControl input {
+  appearance: none; width: 38px; height: 20px; margin: 0; border: 1px solid rgba(230,223,205,0.36);
+  border-radius: 12px; background: rgba(6,6,8,0.8); cursor: pointer; position: relative;
+  transition: background 0.14s linear, border-color 0.14s linear;
+}
+.mnDebugControl input::after {
+  content: ""; position: absolute; left: 3px; top: 3px; width: 12px; height: 12px; border-radius: 50%;
+  background: rgba(230,223,205,0.64); transition: transform 0.14s ease, background 0.14s linear;
+}
+.mnDebugControl input:checked { background: rgba(224,176,98,0.66); border-color: var(--warn, #e0b062); }
+.mnDebugControl input:checked::after { transform: translateX(17px); background: #fff4d9; }
+.mnDebugControl input:focus-visible { outline: 2px solid var(--warn, #e0b062); outline-offset: 3px; }
+.mnDebugControl i { min-width: 1.4em; font-size: 12px; font-style: normal; letter-spacing: 0.1em; color: rgba(230,223,205,0.52); }
+.mnDebugRow.on .mnDebugControl i { color: var(--warn, #e0b062); }
+
 /* --- 窄屏（手机横屏 / 小窗）--------------------------------------------- */
 @media (max-width: 900px) {
   .mnTitle { left: 6%; top: 10%; max-width: 62%; }
@@ -253,4 +287,8 @@
     border-bottom: 1px solid rgba(230, 223, 205, 0.12);
   }
   .mnCodexRow { grid-template-columns: 1fr; gap: 2px; }
+  .mnDebug { padding: 16px 18px 22px; }
+  .mnDebugRow { align-items: flex-start; gap: 12px; padding-inline: 10px; }
+  .mnDebugCopy b { font-size: 14px; }
+  .mnDebugCopy small { font-size: 11px; }
 }

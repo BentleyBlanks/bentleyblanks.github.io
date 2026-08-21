@@ -74,6 +74,16 @@ const MAP = { minX: -1580, maxX: 740, minZ: -1680, maxZ: 500, w: 330, h: 310, pa
 const Px = (x) => MAP.pad + ((x - MAP.minX) / (MAP.maxX - MAP.minX)) * (MAP.w - MAP.pad * 2);
 const Pz = (z) => MAP.pad + ((z - MAP.minZ) / (MAP.maxZ - MAP.minZ)) * (MAP.h - MAP.pad * 2);
 
+// 菜单只声明文案与布局；开关值及实际效果由装配层交回的 host 管，避免菜单
+// 偷偷持有玩家、物理世界或弹药账本。
+const DEBUG_ITEMS = [
+  { id: "noCollision", label: "无碰撞", note: "穿过人物、墙体与掩体；地形与关卡边界仍然生效" },
+  { id: "fastMove", label: "快速移动", note: "步行、冲刺与匍匐移动速度提高至三倍" },
+  { id: "invincible", label: "无敌模式", note: "免疫子弹、爆炸与流血伤害" },
+  { id: "infiniteAmmo", label: "无限子弹", note: "已持有枪械无需装填，空弹仓会自动补满" },
+  { id: "infiniteGrenades", label: "无限手榴弹", note: "普通手榴弹不会消耗；开启时会补给一枚" },
+];
+
 function SvgEl(tag, attrs, parent) {
   const e = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
@@ -191,6 +201,7 @@ export class MainMenu {
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   Resume()     暂停态的「继续」
    *   Settings()   暂停态的「设置」
+   *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
    *   SliceIndex() 当前建好的是哪一关的切片
    *   Unlock()     第一次用户手势时解锁音频（可选）
    *   GroundHeight(x, z) 可选：把机位抬到地面之上，免得穿地
@@ -204,7 +215,7 @@ export class MainMenu {
     this.open = false;
     /** live = 开机菜单（接管相机、跑运镜）；暂停态是 false（世界冻在原地）。 */
     this.live = false;
-    this.mode = "title";           // title | levels | codex | credits | pause
+    this.mode = "title";           // title | levels | codex | credits | debug | pause
     this.busy = false;
     this.time = 0;
     this.shotTime = 0;
@@ -213,6 +224,7 @@ export class MainMenu {
     this.shotSliceId = null;
     this.selected = 0;             // 选章里选中的关号
     this.itemIndex = 0;            // 主列表里高亮第几项
+    this.panelReturnMode = "title";
     this.target = new THREE.Vector3();
 
     this.el = {};
@@ -261,7 +273,7 @@ export class MainMenu {
     this.el.panelTitle = mk("mnPanelTitle", head);
     this.el.panelBack = mk("mnBack", head, "button");
     this.el.panelBack.textContent = "返回";
-    this.el.panelBack.addEventListener("click", () => this.Show("title"));
+    this.el.panelBack.addEventListener("click", () => this.Show(this.panelReturnMode));
     this.el.panelBody = mk("mnPanelBody", this.el.panel);
 
     this.BuildLevels();
@@ -269,7 +281,7 @@ export class MainMenu {
     this.el.text.className = "mnText";
   }
 
-  /** 主列表的四项。文案在 Data_TengxianScript.MENU 里，这里不写死中文。 */
+  /** 主列表。战役文案在 Data_TengxianScript.MENU 里，调试项只在这一层额外出现。 */
   TitleItems() {
     const progress = Progress.Read();
     const resume = progress.furthest > 0 && progress.furthest < this.phases.length;
@@ -280,6 +292,7 @@ export class MainMenu {
       { id: "levels", label: MENU.chapters, hint: "七关任选一关直接进（不播过场）" },
       { id: "codex", label: MENU.codex, hint: "哪些数是史料、哪些是推定" },
       { id: "credits", label: MENU.credits, hint: "史料口径与虚构人物的交代" },
+      { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
     ];
   }
 
@@ -288,6 +301,7 @@ export class MainMenu {
     return [
       { id: "resume", label: "继续", hint: "回到这一关" },
       { id: "settings", label: "设置", hint: "操作、画面与声音" },
+      { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
       { id: "levels", label: MENU.chapters, hint: "换一关打（这一局的进度会丢）" },
       { id: "title", label: "主菜单", hint: "放弃这一局，回到主菜单" },
     ];
@@ -402,8 +416,10 @@ export class MainMenu {
   }
 
   Show(mode) {
+    const wasMode = this.mode;
     this.mode = mode;
-    const panel = mode === "levels" || mode === "codex" || mode === "credits";
+    const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
+    if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     if (mode === "levels") {
@@ -422,6 +438,9 @@ export class MainMenu {
       this.el.text.innerHTML = CREDITS
         .map((line) => (line ? `<p>${line}</p>` : `<p class="mnGap"></p>`)).join("");
       this.el.panelBody.appendChild(this.el.text);
+    } else if (mode === "debug") {
+      this.el.panelTitle.textContent = "调试选项";
+      this.BuildDebugOptions();
     }
   }
 
@@ -448,6 +467,49 @@ export class MainMenu {
       + "游戏内任何文本都不许把它们说成史实；找到实测数据就改表，并把该条删掉。</p>"
       + `<h4>城的几何 · Data_Tengxian.PRESUMED</h4>${rows(PRESUMED)}`
       + `<h4>演出与关卡 · Data_TengxianScript.PRESUMED_STAGING</h4>${rows(PRESUMED_STAGING)}`;
+  }
+
+  /** 每次打开时从 host 重建，切换之后的 on/off 绝不留在过期 DOM 快照里。 */
+  BuildDebugOptions() {
+    const values = this.host.DebugOptions?.() || {};
+    const wrap = document.createElement("div");
+    wrap.className = "mnDebug";
+    const intro = document.createElement("p");
+    intro.className = "mnDebugIntro";
+    intro.textContent = "这些开关只用于测试，可在主菜单或暂停菜单中随时调整。";
+    wrap.appendChild(intro);
+    for (const item of DEBUG_ITEMS) {
+      const row = document.createElement("label");
+      row.className = "mnDebugRow";
+      row.dataset.option = item.id;
+      const copy = document.createElement("span");
+      copy.className = "mnDebugCopy";
+      const name = document.createElement("b");
+      name.textContent = item.label;
+      const note = document.createElement("small");
+      note.textContent = item.note;
+      copy.append(name, note);
+      const control = document.createElement("span");
+      control.className = "mnDebugControl";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = values[item.id] === true;
+      input.setAttribute("aria-label", item.label);
+      const state = document.createElement("i");
+      state.textContent = input.checked ? "开" : "关";
+      input.addEventListener("change", () => {
+        const next = this.host.SetDebugOption?.(item.id, input.checked) || {};
+        input.checked = next[item.id] === true;
+        state.textContent = input.checked ? "开" : "关";
+        row.classList.toggle("on", input.checked);
+      });
+      control.append(input, state);
+      row.append(copy, control);
+      row.classList.toggle("on", input.checked);
+      wrap.appendChild(row);
+    }
+    this.el.panelBody.textContent = "";
+    this.el.panelBody.appendChild(wrap);
   }
 
   SelectLevel(i) {
@@ -518,6 +580,7 @@ export class MainMenu {
       case "levels": this.Show("levels"); return;
       case "codex": this.Show("codex"); return;
       case "credits": this.Show("credits"); return;
+      case "debug": this.Show("debug"); return;
       case "resume": this.host.Resume?.(); return;
       case "settings": this.host.Settings?.(); return;
       case "title": this.ToTitle(); return;
@@ -547,7 +610,7 @@ export class MainMenu {
       const panel = this.root.classList.contains("panelOn");
       switch (event.key) {
         case "Escape":
-          if (panel) { this.Show("title"); event.preventDefault(); }
+          if (panel) { this.Show(this.panelReturnMode); event.preventDefault(); }
           else if (this.mode === "pause") { this.host.Resume?.(); event.preventDefault(); }
           return;
         case "ArrowDown": case "ArrowUp": {

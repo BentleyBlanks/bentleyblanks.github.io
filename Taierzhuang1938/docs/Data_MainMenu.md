@@ -15,7 +15,8 @@ ER2 的主菜单立得住，靠的不是排版：
 文字反倒极克制：一列字、一条选中标记、角上一行版本信息。这三条我们全抄。
 
 **不抄的**：多人、自定义战斗、创意工坊、地图编辑器入口——本作是单人线性关卡原型，
-菜单只有四项（`Data_TengxianScript.MENU`：开始 / 选章 / 史实注记 / 关于）。
+菜单有五项：`Data_TengxianScript.MENU` 的开始 / 选章 / 史实注记 / 关于，以及
+只用于测试的「调试选项」。调试项不改战役菜单的数据契约，也不在叙事文案中出现。
 ER2 的出生菜单同理不抄，理由见 `Data_EasyRed2Parity.md` 那条「阵亡卡片 + X 换人」。
 
 ## 场景是怎么来的
@@ -81,6 +82,9 @@ Esc 在游戏里是暂停（继续 / 选章 / 回主菜单）。暂停会连背�
 - `?menu=0`：不建菜单，进页面就是关卡，「进 城」按钮照旧——三个老冒烟脚本都点它。
 - `?shot=1`（出图模式）：同样不建菜单，出图不许拍到 UI。
 - `window.Taierzhuang.Debug.Menu()` / `MenuAct(id)` / `Pause()`：冒烟脚本从运行时取证用。
+- 「调试选项」在开机主菜单与暂停菜单都可进；状态存 `tengxian1938_debug_options_v1`。
+  可开无碰撞（仅跳过实体与人物碰撞，程序化地形及关卡边界保留）、快速移动、无敌、
+  无限子弹和无限普通手榴弹。`DebugOptions()` / `SetDebugOption(id, on)` 是自动化取证口。
 
 ## 加载画面（`Script_BootProp.mjs` + `Script_BootPropStage.mjs` + `Script_BootPropWorker.mjs`）
 

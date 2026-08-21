@@ -137,6 +137,8 @@ export class PlayerController {
     this.suppression = 0;                   // 0..1，被打压的程度
     this.suppressedUpright = false;         // 压得很狠但还站着（只用于提示，不改姿态）
     this.stamina = 1;
+    // 只由 Script_DebugOptions 经装配层写入。默认全关，保持正式玩法完全不变。
+    this.debug = { noCollision: false, fastMove: false, invincible: false };
 
     // --- 受击反馈 -----------------------------------------------------------
     // 以前**一件都没有**：暗角只是 health 的函数（health<70 才开始亮，
@@ -248,6 +250,17 @@ export class PlayerController {
   /** 翻越/下水期间不许开火。装配层的 TryFire 读这一条。 */
   get Busy() { return this.vault.active; }
   get InWater() { return this.waterDepth > 0.35; }
+
+  SetDebugOptions(options = {}) {
+    this.debug.noCollision = options.noCollision === true;
+    this.debug.fastMove = options.fastMove === true;
+    this.debug.invincible = options.invincible === true;
+    if (this.debug.invincible && this.alive) {
+      this.health = 100;
+      this.bleeding = 0;
+      this.wounds.length = 0;
+    }
+  }
   get EyePosition() {
     return this._tmp.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
   }
@@ -567,6 +580,7 @@ export class PlayerController {
     // 腿部中弹会拖着走
     speed *= this.LegPenalty();
     speed *= Clamp(this.health / 60, 0.45, 1);
+    if (this.debug.fastMove) speed *= 3;
 
     const forward = this._forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     // 右向量**不能再取反**。朝向 -Z、上方 +Y 时 cross(forward, up) 出来的已经是 +X，
@@ -610,7 +624,11 @@ export class PlayerController {
     this.headBob = Math.sin(this.stepDistance * (this.stance === "prone" ? 5.5 : 3.4)) * 0.5 + 0.5;
 
     // --- 流血 ---------------------------------------------------------------
-    if (this.bleeding > 0) {
+    if (this.debug.invincible) {
+      this.health = 100;
+      this.bleeding = 0;
+      this.wounds.length = 0;
+    } else if (this.bleeding > 0) {
       // 封顶。伤口是叠加的，四个躯干伤口 = 10.4 HP/s，而衰减是 5%/s ——
       // 那不是"慢性死亡"，那是一块十秒的秒表，包扎只有两卷也追不上。
       // 上限之下它仍然逼你去包扎，上限之上它只是替敌人把你打完。
@@ -687,6 +705,26 @@ export class PlayerController {
     body.ReconcileTo(this.position.x, this.position.y, this.position.z);
     body.SetSize(this.radius, height);
     const step = this._tmp.copy(this.velocity).multiplyScalar(dt);
+    // 调试无碰撞仍然**不允许穿地**：实体/角色碰撞跳过，但脚底继续被程序化
+    // 地形托住。这里不改 CharacterBody，AI 及其他物理角色始终走正常解算。
+    if (this.debug.noCollision) {
+      this.position.add(step);
+      const ground = this.world.GroundHeight(this.position.x, this.position.z);
+      if (this.position.y <= ground) {
+        this.position.y = ground;
+        this.velocity.y = 0;
+        this.grounded = true;
+      } else {
+        this.grounded = false;
+      }
+      const bounds = this.world.bounds;
+      if (bounds) {
+        this.position.x = Clamp(this.position.x, bounds.minX + 1, bounds.maxX - 1);
+        this.position.z = Clamp(this.position.z, bounds.minZ + 1, bounds.maxZ - 1);
+      }
+      body.Teleport(this.position.x, this.position.y, this.position.z);
+      return;
+    }
     const moved = body.Move(step.x, step.y, step.z);
     this.position.set(moved.x, moved.y, moved.z);
     // Rapier 在离地首帧仍可能把脚底旧接触报成 grounded（实测会把 4.65 m/s 的
@@ -790,6 +828,7 @@ export class PlayerController {
    */
   TakeHit(damage, part = "torso", direction = null, info = null) {
     if (!this.alive) return;
+    if (this.debug.invincible) return;
     // 出生保护期内只吃压制不吃伤 —— 让接替者有几秒找到掩体，
     // 而不是睁眼就躺回去。子弹照样从耳边过，压制照样上。
     if (this.spawnGrace > 0) {

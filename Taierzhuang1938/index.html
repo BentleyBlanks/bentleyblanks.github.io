@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=11">
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
-  <link rel="stylesheet" href="./Style_Menu.css?v=1">
+  <link rel="stylesheet" href="./Style_Menu.css?v=2">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
   <link rel="stylesheet" href="./Style_Editor.css?v=3">
   <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
@@ -60,7 +60,7 @@
         "./Script_Input.mjs": "./Script_Input.mjs?v=3",
         "./Script_Wheel.mjs": "./Script_Wheel.mjs?v=1",
         "./Script_Interact.mjs": "./Script_Interact.mjs?v=2",
-        "./Script_Player.mjs": "./Script_Player.mjs?v=2",
+        "./Script_Player.mjs": "./Script_Player.mjs?v=3",
         "./Script_Ai.mjs": "./Script_Ai.mjs?v=7",
         "./Script_Actor.mjs": "./Script_Actor.mjs?v=7",
         "./Script_ActorCrowd.mjs": "./Script_ActorCrowd.mjs?v=2",
@@ -79,7 +79,8 @@
         "./Data_History.mjs": "./Data_History.mjs?v=1",
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=1",
-        "./Script_Menu.mjs": "./Script_Menu.mjs?v=2",
+        "./Script_Menu.mjs": "./Script_Menu.mjs?v=3",
+        "./Script_DebugOptions.mjs": "./Script_DebugOptions.mjs?v=1",
         "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=2",
         "./Script_BootPropStage.mjs": "./Script_BootPropStage.mjs?v=1",
 
@@ -122,6 +123,6 @@
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=29"></script>
+  <script type="module" src="./Script_Main.mjs?v=30"></script>
 </body>
 </html>

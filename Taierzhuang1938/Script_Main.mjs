@@ -39,6 +39,7 @@ import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
+import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
@@ -314,6 +315,34 @@ let currentWeapon = "HanYang";
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
 const wheel = new RadialWheel(hudRoot);
+const debugOptions = new DebugOptions();
+
+/** 调试补给只补当前已有的装备，不会凭空给本关没有的枪或特殊投掷物。 */
+function EnsureDebugInventory() {
+  if (debugOptions.Enabled("infiniteAmmo")) {
+    const weapon = WEAPONS[currentWeapon];
+    if (weapon?.magazine) {
+      state.ammo = Math.max(state.ammo, weapon.magazine);
+      if (state.mags[state.activeSlot]) state.mags[state.activeSlot].ammo = state.ammo;
+    }
+  }
+  if (debugOptions.Enabled("infiniteGrenades")) {
+    state.grenades = Math.max(1, state.grenades);
+    if (!state.slots.throwable) state.slots.throwable = "Grenade";
+  }
+}
+
+function ApplyDebugOptions() {
+  const options = debugOptions.Get();
+  player?.SetDebugOptions(options);
+  EnsureDebugInventory();
+  return options;
+}
+
+function SetDebugOption(id, enabled) {
+  debugOptions.Set(id, enabled);
+  return ApplyDebugOptions();
+}
 
 // ---------------------------------------------------------------------------
 // 启动
@@ -820,6 +849,8 @@ async function Boot() {
       Resume: () => ResumeFromPause(),
       // 暂停菜单留在下面；关掉设置面板后仍回到暂停层，不会误恢复战斗。
       Settings: () => editor.TogglePanel(true),
+      DebugOptions: () => debugOptions.Get(),
+      SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       Crowd: (anchor) => PlaceMenuGarrison(anchor),
     });
     window.Taierzhuang.menu = menu;
@@ -834,12 +865,15 @@ async function Boot() {
       slice: state.builtPhase,
       camera: { x: camera.position.x, y: camera.position.y, z: camera.position.z, fov: camera.fov },
       progress: Progress.Read(),
+      debugOptions: debugOptions.Get(),
     });
     window.Taierzhuang.Debug.MenuAct = (id) => menu.Activate(id);
     window.Taierzhuang.Debug.MenuShow = (mode) => menu.Show(mode);
     window.Taierzhuang.Debug.MenuPlay = (index, opts) => menu.Play(index, opts);
     window.Taierzhuang.Debug.Pause = () => PauseGame();
     window.Taierzhuang.Debug.ResetProgress = () => { Progress.Reset(); };
+    window.Taierzhuang.Debug.DebugOptions = () => debugOptions.Get();
+    window.Taierzhuang.Debug.SetDebugOption = (id, enabled) => SetDebugOption(id, enabled);
     OpenMenu();
   }
 
@@ -1468,6 +1502,7 @@ function RespawnPlayer(initial = false) {
   viewmodel.Equip(currentWeapon);
   viewmodel.root.visible = true;
   hud.SetWeaponName(currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
+  ApplyDebugOptions();
   state.pendingRespawn = false;
   state.playerAliveLast = true;
 }
@@ -2021,8 +2056,9 @@ function AimPoint(maxDist = 120) {
 function Reload() {
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
-  if (!w || state.clips <= 0 || state.ammo >= (w.magazine ?? 5)) return false;
-  state.clips -= 1;
+  const infiniteAmmo = debugOptions.Enabled("infiniteAmmo");
+  if (!w || (!infiniteAmmo && state.clips <= 0) || state.ammo >= (w.magazine ?? 5)) return false;
+  if (!infiniteAmmo) state.clips -= 1;
   state.ammo = w.magazine ?? 5;
   viewmodel.TriggerReload();
   audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
@@ -2032,7 +2068,8 @@ function Reload() {
 /** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
 function BeginCook(kind) {
   if (!player.Alive || state.cooking) return;
-  if (kind === "Grenade" && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
+  const infiniteGrenades = debugOptions.Enabled("infiniteGrenades");
+  if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint("没有手榴弹了", 2); return; }
   if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint("没有集束了", 2); return; }
   state.cooking = kind;
   state.cook = 0;
@@ -2052,8 +2089,11 @@ function ReleaseCook() {
   // 夹到 0：BeginCook 已经挡过"没货就别拔弦"，但调试口（Debug.Throw）是直接
   // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
   // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。
-  if (kind === "Grenade") state.grenades = Math.max(0, state.grenades - 1);
-  else state.bundles = Math.max(0, state.bundles - 1);
+  if (kind === "Grenade") {
+    if (!debugOptions.Enabled("infiniteGrenades")) state.grenades = Math.max(0, state.grenades - 1);
+  } else {
+    state.bundles = Math.max(0, state.bundles - 1);
+  }
   viewmodel.TriggerThrow?.(power);
   state.cook = 0;
 }
@@ -2357,12 +2397,13 @@ function TryFire(dt) {
   }
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
+  const infiniteAmmo = debugOptions.Enabled("infiniteAmmo");
   // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
   // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
   if (input.ads && player.ads < 0.9) return;
   // 单发模式（仅捷克式）：一次按下只出一发
   if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
-  if (state.ammo <= 0) {
+  if (state.ammo <= 0 && !infiniteAmmo) {
     // 空仓那一下：栓停在后面，得自己压桥夹。HUD 虽然会变红，但空膛的“咔”
     // 仍必须听得出来，玩家不该在交火时只能盯着右下角判断。
     //
@@ -2377,7 +2418,8 @@ function TryFire(dt) {
     if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
     return;
   }
-  state.ammo -= 1;
+  if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
+  else state.ammo -= 1;
   state.playerShots += 1;
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
@@ -2623,6 +2665,7 @@ function Frame(dt, render = true) {
 
   const firePrev = input.fire;
   ReadKeys();
+  EnsureDebugInventory();
   fireEdge = input.fire && !firePrev;
   player.Update(dt, input, WEAPONS[currentWeapon]);
   input.lookX = 0; input.lookY = 0;
