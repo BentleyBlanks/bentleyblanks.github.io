@@ -376,7 +376,7 @@ function CarSeatTrack(pos, lifeState, prepareAt, exitAt, exitEnd, exitX, facingR
   ];
 }
 
-function StationRailTrack(start, end, state = { moveSpeed: 0.13 }) {
+function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
   return [
     { t: 0, pos: start, ry: 0, state: { hidden: true } },
     { t: 50, pos: start, ry: 0, state },
@@ -477,7 +477,7 @@ export const CS_Chuchuan = {
     { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", track: CarSeatTrack([0, CHUCHUAN_CAR_G, 5.45], { checkAmmo: 1 }, 70.0, 93.0, 94.7, 0, Math.PI) },
     { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
     { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
-    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.13, crouch: 0.25 }) },
+    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.03, crouch: 0.25 }) },
     { id: "externalOfficer", kind: "nra", weapon: null, seed: "chuchuanOfficer", track: [
       { t: 0, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: true } },
       { t: 86, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: false, moveSpeed: 0 } },
