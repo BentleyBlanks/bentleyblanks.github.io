@@ -801,7 +801,7 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
 }
 
 /** 杨树/柳树：三四月枝条透光、新叶初展，**不做浓密树冠**。 */
-export function AddTree(sink, { x, z, seed = "t", scale = 1, material = "WoodBeam", height = 0, baseY = 0 }) {
+export function AddTree(sink, { x, z, seed = "t", scale = 1, material = "TreeBark", height = 0, baseY = 0 }) {
   const rnd = Mulberry32(HashString(seed));
   // height 给死的话就照给的高度长（濠岸的柳比街边的杨矮一档），否则按老规矩随机
   const h = height > 0 ? height : (5.5 + rnd() * 3.0) * scale;

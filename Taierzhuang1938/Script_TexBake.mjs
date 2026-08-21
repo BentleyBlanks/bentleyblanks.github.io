@@ -481,6 +481,8 @@ export const RECIPES = {
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),
   WoodBeam: (s) => BakeWood(s ?? 256, { seed: 419, planks: 1, weathered: 0.7 }),
+  // 外部的 ImageGen 树皮 PBR 在启动时会覆盖这套同步兜底；失败时树仍不至于丢材质。
+  TreeBark: (s) => BakeWood(s ?? 256, { seed: 457, hue: [92, 82, 66], planks: 1, weathered: 0.9 }),
   WoodStock: (s) => BakeWood(s ?? 256, { seed: 433, hue: [98, 66, 40], planks: 1, weathered: 0.15 }),
   ClothNra: (s) => BakeCloth(s ?? 256, { seed: 503, hue: [106, 112, 118] }),
   ClothIja: (s) => BakeCloth(s ?? 256, { seed: 521, hue: [124, 116, 82] }),

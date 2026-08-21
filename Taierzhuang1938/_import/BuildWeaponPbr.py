@@ -1,4 +1,4 @@
-"""Build compact browser-ready PBR maps from the approved weapon base colors.
+"""Build compact browser-ready PBR maps from the approved authored base colors.
 
 The base-color images are generated material scans.  This step is deterministic:
 it removes baked edge seams, downsamples them, derives tangent-space normals, and
@@ -54,7 +54,18 @@ def build(stem: str, *, normal_strength: float, metalness: int, rough_min: int, 
     )
 
 
+def build_if_source(stem: str, **params) -> None:
+    """Leave pre-existing maps alone when their high-res source is not tracked."""
+    if (SOURCE / f"Texture_{stem}Source.png").is_file():
+        build(stem, **params)
+
+
 if __name__ == "__main__":
     TEXTURE.mkdir(parents=True, exist_ok=True)
-    build("WeaponSteel", normal_strength=2.6, metalness=242, rough_min=92, rough_max=178)
-    build("WeaponWood", normal_strength=3.2, metalness=0, rough_min=148, rough_max=220)
+    build_if_source("WeaponSteel", normal_strength=2.6, metalness=242, rough_min=92, rough_max=178)
+    build_if_source("WeaponWood", normal_strength=3.2, metalness=0, rough_min=148, rough_max=220)
+    # Image-generated, de-lit scans for the shared battlefield surfaces.  The
+    # normal/ORM maps stay deterministic so every channel remains aligned.
+    build_if_source("TreeBark", normal_strength=4.0, metalness=0, rough_min=176, rough_max=238)
+    build_if_source("BrickWall", normal_strength=3.6, metalness=0, rough_min=158, rough_max=224)
+    build_if_source("Ground", normal_strength=2.8, metalness=0, rough_min=178, rough_max=244)

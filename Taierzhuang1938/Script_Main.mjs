@@ -376,14 +376,14 @@ async function Boot() {
 
   setStep("烘贴图……", 0.02);
   let baked = 0;
-  const total = 15;
+  const total = 16;
   for (const name of library.PrepareSteps()) {
     baked += 1;
     setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
     await nextFrame();
   }
 
-  setStep("加载枪械 PBR……", 0.242);
+  setStep("加载 PBR 材质……", 0.242);
   try {
     await Promise.all([
       library.LoadExternalSet("Steel", {
@@ -396,9 +396,29 @@ async function Boot() {
         normal: "./Texture/Texture_WeaponWoodNormal.webp?v=1",
         orm: "./Texture/Texture_WeaponWoodOrm.webp?v=1",
       }),
+      library.LoadExternalSet("TreeBark", {
+        albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",
+        normal: "./Texture/Texture_TreeBarkNormal.webp?v=1",
+        orm: "./Texture/Texture_TreeBarkOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("BrickWall", {
+        albedo: "./Texture/Texture_BrickWallBase.webp?v=1",
+        normal: "./Texture/Texture_BrickWallNormal.webp?v=1",
+        orm: "./Texture/Texture_BrickWallOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("Ground", {
+        albedo: "./Texture/Texture_GroundBase.webp?v=1",
+        normal: "./Texture/Texture_GroundNormal.webp?v=1",
+        orm: "./Texture/Texture_GroundOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("GroundRubble", {
+        albedo: "./Texture/Texture_GroundBase.webp?v=1",
+        normal: "./Texture/Texture_GroundNormal.webp?v=1",
+        orm: "./Texture/Texture_GroundOrm.webp?v=1",
+      }),
     ]);
   } catch (error) {
-    console.warn(`[Main] 枪械 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
+    console.warn(`[Main] 外部 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
   }
 
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
