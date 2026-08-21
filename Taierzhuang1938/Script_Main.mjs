@@ -84,6 +84,17 @@ const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
+// 新版序章是一个**独立预览**：它只展示车厢时间轴，不把下车后的未完玩法
+// 硬接到旧界河。稳定入口固定为 ?preview=CS_Chuchuan；其它 query 仍走正片。
+const PREVIEW_ID = params.get("preview") === "CS_Chuchuan" ? "CS_Chuchuan" : null;
+const PREVIEW = !!PREVIEW_ID;
+// 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
+// AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
+// 在无头/禁音浏览器里留下悬挂的加载与定时器。
+const AUDIO_ENABLED = !SHOT && params.get("audio") !== "0";
+// 截图工具显式打开手动步进后，页面 rAF 不得偷偷推进过场；普通出图模式仍
+// 保留原有的自动循环，只有 Script_CutsceneShot 传 manual=1 才启用此闸。
+const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
@@ -94,7 +105,7 @@ const SHOT_FIRE = !!(SHOT && params.get("fire"));
  * 三个冒烟脚本（PlayTest / EditorTest / VoiceTest）点的都是 #bootStart 那颗按钮，
  * 出图脚本连点都不点，直接 StepFrames。菜单只服务真人。
  */
-const MENU_ON = !SHOT && params.get("menu") !== "0";
+const MENU_ON = !SHOT && !PREVIEW && params.get("menu") !== "0";
 /**
  * 开机建哪一片切片。
  * 给了 ?phase= 就听它的（出图、冒烟、调机位都靠这条）；
@@ -225,11 +236,20 @@ const gi = GI_ON
   ? new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms })
   : null;
 const hud = new Hud(hudRoot);
-const audio = new AudioEngine({ enabled: !SHOT });
+const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
 
 const state = {
   ready: false,
   running: false,
+  // 预览不属于可玩关卡：完成后停在片尾，不自动启动旧 L0 的 AI/战斗。
+  preview: PREVIEW,
+  previewId: PREVIEW_ID,
+  previewDone: false,
+  previewPlaying: false,
+  previewError: null,
+  previewHandoffShown: false,
+  previewHandoffCount: 0,
+  manualStep: MANUAL_STEP,
   // 菜单态：主菜单开着（开机那一次或从暂停回来）。running 与它互斥 ——
   // 菜单在跑运镜时玩法必须整个停摆，否则玩家会在看菜单的时候被打死。
   menu: false,
@@ -751,6 +771,24 @@ async function Boot() {
         played: state.cutscenesPlayed.slice(),
         log: cutscene ? cutscene.log.slice(-40) : [],
       }),
+      // 出图工具默认保持 neutralLook（确定性取证）；明确传 yaw/pitch 时才打开
+      // 头部视线覆盖。SetLook 自带数据范围钳制，所以命令行不会把相机转飞。
+      SetCutsceneLook: (yaw = 0, pitch = 0) => {
+        if (!cutscene || !cutscene.Playing) return null;
+        cutscene.SetNeutralLook(false);
+        return cutscene.SetLook(yaw, pitch);
+      },
+      Preview: () => ({
+        active: PREVIEW,
+        id: PREVIEW_ID,
+        playing: state.previewPlaying,
+        done: state.previewDone,
+        handoff: state.previewHandoffShown ? "跟随通信排。" : null,
+        handoffCount: state.previewHandoffCount,
+        aiAlive: ai ? ai.soldiers.filter((s) => s.alive).length : 0,
+        error: state.previewError,
+        manualStep: MANUAL_STEP,
+      }),
       // --- 枪感第 2 轮的取证口 ---
       // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
       GunFeel: () => ({
@@ -886,6 +924,7 @@ async function Boot() {
   }
 
   if (SHOT) StartRun();
+  else if (PREVIEW) StartPreview();
 }
 
 // ---------------------------------------------------------------------------
@@ -1081,7 +1120,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (loaded === 0) console.warn("这一关没有剧本：", phase.id);
 
   RespawnPlayer(true);
-  SeedSoldiers(phase);
+  // 新版序章预览只借用 L0 的地形/光照作为装配底座；不撒 L0 的兵，
+  // 否则车厢结束后即使画面没有切关，旧 AI 也会在后台先开火/消耗票池。
+  if (!PREVIEW) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
 
   if (!initial) {
@@ -1104,6 +1145,23 @@ async function RunCutscene(id) {
   if (!cutscene) return null;
   const result = await cutscene.Play(id, { poolOut: state.nraPool, neutralLook: SHOT });
   state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
+  // 新版序章的终点是一个可复现的交接提示，不是旧 L0 的开战入口。
+  // 正常播完、Esc 跳过、失焦收口都只会经过这里一次。
+  if (PREVIEW && id === PREVIEW_ID && !state.previewHandoffShown) {
+    const task = "跟随通信排。";
+    state.previewHandoffShown = true;
+    state.previewHandoffCount += 1;
+    state.storyObjective = task;
+    hud.SetObjective(task, state.nraPool, null);
+    hud.Say(null, task, 4.2, "objective");
+    ShowPreviewTerminal(task);
+    state.previewDone = true;
+    state.previewPlaying = false;
+    state.running = false;
+    // 即使未来有人给预览页加了一个普通帧，也不能让旧 L0 的 AI 在片尾启动。
+    if (ai) ai.Dispose();
+    ReleasePointerLock();
+  }
   return result;
 }
 
@@ -1740,6 +1798,53 @@ function OnPointerLockChange() {
   }
 }
 
+function ShowPreviewTerminal(task) {
+  let terminal = document.getElementById("previewTerminal");
+  if (!terminal) {
+    terminal = document.createElement("div");
+    terminal.id = "previewTerminal";
+    terminal.className = "previewTerminal";
+    hudRoot.appendChild(terminal);
+  }
+  terminal.innerHTML = `<div class="title">序章预览结束</div>`
+    + `<div class="task">${task}</div>`
+    + `<div class="note">等待《断线》接手 · 预览不会启动界河战斗</div>`;
+  terminal.classList.add("on");
+  // _Finish() 按正片契约解除 cinematic；预览终点重新锁回 cinematic，
+  // 只留下这个明确的终点卡，不露血量、武器、命令栏等战斗 HUD。
+  hud.SetCinematic(true);
+}
+
+/**
+ * 新版《序章｜出川》的稳定开发入口。
+ *
+ * 预览页不进主菜单、不抢指针锁，也不把车厢的下车动作解释成旧 L0 的
+ * 开战；片尾只显示一次「跟随通信排。」并停住。这样在《断线》完成前，
+ * 新内容可以独立审片而不会制造一个假的玩法接缝。
+ */
+function StartPreview() {
+  if (!PREVIEW_ID || !cutscene || state.previewPlaying || state.previewDone) return false;
+  state.menu = false;
+  state.running = false;
+  state.previewPlaying = true;
+  state.previewDone = false;
+  state.previewError = null;
+  ReleasePointerLock();
+  if (ai) ai.Dispose();
+  ShowBoot(false);
+  const pending = RunCutscene(PREVIEW_ID);
+  pending.catch((error) => {
+    // 预览入口必须在无音频、低画质或数据错误时稳定收口；把错误留在调试口，
+    // 不让一个未处理 rejection 把页面的后续控制器拖死。
+    state.previewPlaying = false;
+    state.previewDone = true;
+    state.previewError = String(error && error.message ? error.message : error);
+    state.running = false;
+    if (ai) ai.Dispose();
+  });
+  return true;
+}
+
 function StartRun() {
   ShowBoot(false);
   state.menu = false;
@@ -1747,7 +1852,7 @@ function StartRun() {
   if (SHOT) return;
   audio.Unlock();
   // 开场过场。EnterLevel(initial) 是按 cutscenes:false 建的场（开机不能夺控制权），
-  // 所以第一关的 cutsceneIn（出川）原来**从来没播过** —— 只有编辑器里点得到它。
+  // 所以第一关的 cutsceneIn（默认是 Legacy 出川）在玩家点击时再播。
   // 这里在玩家按下「进城」的那一下补播：点击本身就是音频与指针锁要的那次用户手势。
   // 调试入口（?phase=N 直跳某关、?intro=0）不播开场 —— 冒烟测试点完「进城」就要拿到
   // 指针锁与键盘，过场一夺控制权它们全挂。玩家正常打开页面没有这些参数。
@@ -2637,6 +2742,13 @@ function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
 
+  // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
+  // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
+  if (PREVIEW && state.previewDone && !(cutscene && cutscene.Playing)) {
+    if (render) RenderScene(dt);
+    return;
+  }
+
   // 编辑器接管：与过场同一条通道 —— 玩法全停，只推编辑器与画面。
   // **必须排在过场那一条之前**：Timeline 编辑器要自己按走带的步长推
   // cutscene.Update（暂停、0.25 倍速、拖进度条全靠它），排在后面的话
@@ -3062,7 +3174,15 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 // 指针锁：五条解锁通道（函数本体在「输入」一节，跟 RequestPointerLock 放一起）
 // ---------------------------------------------------------------------------
 document.addEventListener("pointerlockchange", OnPointerLockChange);
-window.addEventListener("blur", ReleasePointerLock);
+window.addEventListener("blur", () => {
+  ReleasePointerLock();
+  // 预览没有玩家控制权；失焦时直接走一次与 Esc 相同的收口路径，避免
+  // 标签页隐藏后留下一个永远占着相机/字幕层的 Promise。
+  if (PREVIEW && cutscene && cutscene.Playing) {
+    cutscene.Skip();
+    cutscene.Update(99);
+  }
+});
 window.addEventListener("pagehide", ReleasePointerLock);
 // 标签页切到后台也放掉：blur 管的是窗口失焦，visibilitychange 管的是标签切换 /
 // 最小化；两条并不总是一起来。锁挂在一个看不见的标签上，等于把鼠标夹在一个
@@ -3087,6 +3207,10 @@ function Loop(now) {
   requestAnimationFrame(Loop);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  // Script_CutsceneShot 的 manual=1 是一个明确的时钟所有权切换：只允许
+  // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
+  // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
+  if (MANUAL_STEP) return;
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   if (state.menu && menu && menu.live && state.ready) { MenuFrame(dt); return; }

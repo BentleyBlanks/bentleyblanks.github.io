@@ -1,5 +1,12 @@
 # 五场过场重做 · 施工单（2026-08-20）
 
+> **LUNA-05 集成状态（2026-08-21）**：新版 `CS_Chuchuan`（95 s，车厢内
+> headLook）内容完成，当前只作为独立预览入口发布：
+> `Taierzhuang1938/?preview=CS_Chuchuan`。正片默认 `开始游戏 / L0_Jiehe`
+> 仍使用 `CS_ChuchuanLegacy`，因为新版下车后的《断线》玩法尚未完成；新版预览
+> 结束或跳过后只显示一次 `跟随通信排。`，不启动旧 L0 的 AI/战斗。失焦、无音频
+> (`&audio=0`) 与低画质 (`&quality=low`) 走同一条稳定收口路径。
+
 ## 0 为什么重做（用户原话的意思，逐条对应）
 
 1. 「出川过场动画的背景和前景都是什么鬼」—— 背景是一块黑底上的大亮盘（天空穹半径 4000 m 钉在原点，布景摆在 (4000,4000) 相机在球外面）；前景是一块木纹大盒子当「闷罐车」、一块拉丝的地面贴图（26×140 m 的面只铺一遍 2 m 的纹理）。**引擎侧已修**：天空穹跟相机、过场可自带天空预设、地面材质可 repeat。
@@ -131,6 +138,20 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_X --every=1.0          # �
 - 数据自检：`node Taierzhuang1938/Script_CutsceneCheck.mjs CS_X`（纯数据，秒出；硬错 + 软错：字幕读不完、滑步、台词互顶、布景离城太近……）。出图脚本开头也会打印同一份。
 - **worktree 里别用 npm run**，直接 node 调脚本。
 
+`Script_CutsceneShot.mjs` 使用 `manual=1` 把时钟交给 `StepFrames`，批量
+`--times` 不会被页面 rAF 偷推；默认 neutral 视角可复现。需要边界视角时追加
+`--yaw` / `--pitch`（范围 yaw `[-2.09,2.09]`、pitch `[-1.05,0.96]`）：
+
+```bash
+node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=2.09 --pitch=-1.05
+node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=-2.09 --pitch=-1.05
+node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=2.09 --pitch=0.96
+node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=-2.09 --pitch=0.96
+```
+
+四条命令分别取四边界；不传参数就是 neutral。Notion 矩阵 11 时刻可直接使用
+`--times=0.5,8.5,20,35,50.5,60,69,76,82.5,89,94`。
+
 ### 1.7 第二轮引擎补丁（第一轮五位作者的 engineRequests 已落地，**数据侧要跟着改**）
 
 | 能力 | 怎么用 | 对数据的要求 |
@@ -172,7 +193,14 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_X --every=1.0          # �
 - 每句台词/字幕出现的时机与时长按 §1.4 的字数规则。
 - people 里新加的真实人物只做史料里有的事。
 
-### 2.1 CS_Chuchuan 出川（开场，beforeLevel:L0_Jiehe，约 40 s）
+### 2.1 CS_Chuchuan / CS_ChuchuanLegacy 出川（正片默认与新版预览）
+
+`CS_ChuchuanLegacy` 是 `beforeLevel:L0_Jiehe` 的线上默认（约 42 s），保证
+旧界河接缝不变；`CS_Chuchuan` 是已完成的 95 s 新版车厢内容，只从
+`?preview=CS_Chuchuan` 进入，等待《断线》后再接可玩下车段。两者必须同时在
+`CUTSCENES` 与 `CUTSCENE_ORDER` 注册，编辑器和测试都要能单独选择。
+
+#### CS_Chuchuan（新版独立预览，95 s）
 
 目的：开篇先讲**这一仗怎么来的**，再用两三镜讲**这支部队和你是谁**。不再讲闷罐车、不讲掉队解绑带。
 
@@ -260,6 +288,11 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_X --every=1.0          # �
 - 侯子平一句台词照旧；北门扒门史实字幕照旧。
 
 ## 3 交付
+
+本轮集成例外：为保持 Legacy 默认、预览入口与手动截图时钟，LUNA-05 允许
+`Data_TengxianScript.mjs`、`Script_Main.mjs`、`Script_CutsceneShot.mjs`、
+`index.html`、`Style_Game.css` 与测试/文档文件做装配层改动；不改
+`Data_CutsceneChuchuan.mjs`、`Script_Cutscene.mjs`、`Script_Actor.mjs` 或音频数据。
 
 - 各场只改自己的 `Data_Cutscene<Name>.mjs`。**不许改** Script_Cutscene.mjs / Script_Main.mjs / Script_Actor.mjs / Data_TengxianScript.mjs；引擎缺什么在报告里写，别自己动。
 - 交付物：改好的数据文件 + 每镜至少一张出图（路径列在报告里）+ 一张 3—6 行的自评（哪一镜还不满意、为什么、建议引擎加什么）。

@@ -7,6 +7,7 @@
 // 用法：
 //   node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan [--times=0.5,4,9.2]
 //        [--phase=0] [--out=目录] [--quality=high] [--every=1.5] [--width=1600] [--height=900]
+//        [--yaw=2.09] [--pitch=-1.05]
 //
 //   --cut     过场 id（CUTSCENES 的键）；可逗号分隔多场，或 all
 //   --times   要落图的过场秒数（全局时间，不是镜内时间）。不给就按 --every 等间隔，
@@ -42,6 +43,10 @@ const outDir = path.resolve(args.out || path.join(projectDir, "_shots", "cutscen
 fs.mkdirSync(outDir, { recursive: true });
 const quality = args.quality || "high";
 const VIEWPORT = { width: parseInt(args.width || "1600", 10), height: parseInt(args.height || "900", 10) };
+const lookOverride = {
+  yaw: args.yaw === undefined ? null : Number(args.yaw),
+  pitch: args.pitch === undefined ? null : Number(args.pitch),
+};
 
 /** 过场在正片里播的时候脚下是哪一关的场。 */
 function DefaultPhase(cut) {
@@ -91,7 +96,9 @@ for (const id of cutIds) {
     .map((t) => Math.max(0, Math.min(cut.seconds - 0.02, t)))
     .sort((a, b) => a - b);
   problems.length = 0;
-  const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=${quality}&scale=medium`;
+  // manual=1 把过场时钟交给 StepFrames；否则页面自己的 rAF 会在批量落图的
+  // evaluate / screenshot 间偷偷推进，长到 t94 时就会提前结束。
+  const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&phase=${phase}&quality=${quality}&scale=medium`;
   console.log(`\n== ${id}「${cut.title}」 ${cut.seconds}s · ${cut.shots.length} 镜 · 第 ${phase} 关的场 · ${times.length} 张`);
   // 先过一遍数据自检：硬错 Play() 会直接抛，软错（字幕读不完、滑步）在这里提醒
   const hard = ValidateCutscene(cut);
@@ -104,9 +111,8 @@ for (const id of cutIds) {
     // 先让战场跑活、后期历史稳住
     await page.evaluate(() => window.Taierzhuang.StepFrames(90));
     await page.waitForTimeout(400);
-    // **把页面自己的 rAF 主循环停掉**（Loop 见 state.running 为假就不推帧）。
-    // 出图模式一进页面就 StartRun 了，主循环按真实时间在跑 —— 不停的话
-    // 每次 evaluate 之间过场都会偷偷前进零点几秒，落图的「t」就不是真的 t。
+    // manual=1 已经在页面 Loop 里停掉实时推进；这里再把 running 置 false，
+    // 让取证明确保持「只由 StepFrames 走逻辑」的状态。
     await page.evaluate(() => { window.Taierzhuang.state.running = false; });
     // afterLevel 的过场在正片里播的时候这一关已经打完：路标全到了（常驻烟柱不再挂在
     // 未到达的路标上）、场上的 AI 不会正好冻在开局的集结点。出图照这个状态摆：
@@ -120,15 +126,20 @@ for (const id of cutIds) {
         D.state.smokeHandles.length = 0;
       });
     }
-    const started = await page.evaluate((cutId) => {
+    const started = await page.evaluate(({ cutId, look }) => {
       const D = window.Taierzhuang;
       try {
         D.Debug.PlayCutscene(cutId).catch(() => null);
+        // 默认 SHOT 走 neutralLook，保证同一时刻的证据逐次一致；只要命令行
+        // 明确给出 yaw 或 pitch，就切到可控的头部视线并由导演钳在边界内。
+        if (look.yaw !== null || look.pitch !== null) {
+          D.Debug.SetCutsceneLook(look.yaw ?? 0, look.pitch ?? 0);
+        }
         return { ok: D.Debug.Cutscene().playing, error: null };
       } catch (error) {
         return { ok: false, error: String(error && error.message ? error.message : error) };
       }
-    }, id);
+    }, { cutId: id, look: lookOverride });
     if (!started.ok) {
       console.log(`ERR  ${id}: 过场没播起来 —— ${started.error || "未知原因"}`);
       allOk = false;
@@ -159,12 +170,23 @@ for (const id of cutIds) {
       let at = 0, shotN = "?";
       for (const s of cut.shots) { if (t < at + s.seconds) { shotN = s.n; break; } at += s.seconds; }
       console.log(`  t=${t.toFixed(1).padStart(5)}  镜${String(shotN).padEnd(2)} cam=(${info.cam}) fov=${info.fov}  ${(size / 1024).toFixed(0)}KB  ${path.basename(file)}`);
+      if (Math.abs(info.time - t) > 0.035) {
+        console.log(`  ✗ 手动步进漂移：目标 ${t.toFixed(3)} s，导演实际 ${info.time.toFixed(3)} s`);
+        allOk = false;
+      }
       for (const entry of (info.log || []).slice(logged)) {
         const who = entry.who ? `${entry.who}：` : (entry.kind === "sub" ? "〔字幕〕" : "");
         console.log(`           ↳ 镜${entry.shot} ${who}${entry.text}`);
       }
       logged = (info.log || []).length;
-      if (!info.playing) { console.log("           （过场已结束）"); break; }
+      if (!info.playing) {
+        if (t < cut.seconds - 0.1) {
+          console.log(`  ✗ 在目标 t=${t.toFixed(2)} 前提前收口`);
+          allOk = false;
+        }
+        console.log("           （过场已结束）");
+        break;
+      }
     }
     if (problems.length) {
       allOk = false;

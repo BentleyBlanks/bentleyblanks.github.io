@@ -454,7 +454,7 @@ const timeline = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
   const out = { id: editor.ActiveId, cuts: [] };
-  const ids = ["CS_Chuchuan", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
+  const ids = ["CS_Chuchuan", "CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
   for (const id of ids) {
     active.SelectCut(id);
     active.Seek(6.0);
@@ -471,7 +471,7 @@ const timeline = await page.evaluate(() => {
 });
 Check("Timeline 打开", timeline.id === "timeline");
 const seekOk = timeline.cuts.every((c) => c.playing && Math.abs(c.time - 6.0) < 0.4);
-Check("五场都能拖到 6.0 s", seekOk,
+Check("六场（含新版与 Legacy）都能拖到 6.0 s", seekOk,
   timeline.cuts.map((c) => `${c.id}=${c.time}`).join(" "));
 const stopped = await page.evaluate(() => window.Taierzhuang.cutscene.Playing);
 Check("停下来之后过场不再占着相机", stopped === false);
@@ -753,6 +753,84 @@ const shot = await page.evaluate(() => ({
 }));
 Check("出图模式下编辑器不可见但 API 还在",
   shot.hidden && !shot.gearVisible && shot.api);
+
+// ---------------------------------------------------------------------------
+// 9) 新版序章预览入口：独立收口、单次交接、无旧 L0 AI
+// ---------------------------------------------------------------------------
+const previewHref = await page.getAttribute("#bootPreview", "href").catch(() => null);
+Check("开发入口明确指向新版序章预览",
+  previewHref === "?preview=CS_Chuchuan", `href=${previewHref}`);
+
+async function PreviewPage(query = "?preview=CS_Chuchuan") {
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/${query}`,
+    { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined
+    && window.Taierzhuang.state.ready, { timeout: 240000 });
+}
+
+await PreviewPage();
+const previewStart = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  return {
+    preview: T.Debug.Preview(), cut: T.Debug.Cutscene(),
+    ai: T.ai.soldiers.filter((s) => s.alive).length,
+  };
+});
+Check("新版预览自动起播且不提前启动旧 L0 AI",
+  previewStart.preview.active && previewStart.cut.current === "CS_Chuchuan"
+    && previewStart.cut.playing && previewStart.ai === 0,
+  `cut=${previewStart.cut.current} playing=${previewStart.cut.playing} ai=${previewStart.ai}`);
+
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.StepFrames(95 * 60 + 8, 1 / 60, false);
+});
+await page.waitForTimeout(10);
+const previewDone = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const p = T.Debug.Preview();
+  return { ...p, spoken: T.Debug.Spoken().filter((s) => s === "跟随通信排。").length,
+    cutPlaying: T.Debug.Cutscene().playing };
+});
+Check("新版预览正常完成后只交接一次并停在终点",
+  previewDone.done && previewDone.handoffCount === 1 && previewDone.spoken === 1
+    && !previewDone.cutPlaying && previewDone.aiAlive === 0,
+  `done=${previewDone.done} handoff=${previewDone.handoffCount} spoken=${previewDone.spoken} ai=${previewDone.aiAlive}`);
+
+await PreviewPage();
+await page.evaluate(() => window.Taierzhuang.Debug.SkipCutscene());
+await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+await page.waitForTimeout(10);
+const previewSkipped = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const p = T.Debug.Preview();
+  return { ...p, spoken: T.Debug.Spoken().filter((s) => s === "跟随通信排。").length,
+    cutPlaying: T.Debug.Cutscene().playing };
+});
+Check("新版预览 Esc 跳过仍只交接一次并稳定收口",
+  previewSkipped.done && previewSkipped.handoffCount === 1 && previewSkipped.spoken === 1
+    && !previewSkipped.cutPlaying && previewSkipped.aiAlive === 0,
+  `done=${previewSkipped.done} handoff=${previewSkipped.handoffCount} spoken=${previewSkipped.spoken}`);
+
+await PreviewPage("?preview=CS_Chuchuan&quality=low&audio=0");
+const silentLowStart = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const p = T.Debug.Preview();
+  T.Debug.SkipCutscene();
+  return { p, audio: !!T.audio.ctx };
+});
+await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+const silentLow = { ...silentLowStart,
+  done: await page.evaluate(() => window.Taierzhuang.Debug.Preview().done) };
+Check("低画质/无音频预览可起播并收口", silentLow.p.playing
+  && !silentLow.audio && silentLow.done, JSON.stringify(silentLow));
+
+await PreviewPage();
+await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+const blurred = await page.evaluate(() => window.Taierzhuang.Debug.Preview());
+Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurred.playing
+  && blurred.aiAlive === 0, JSON.stringify(blurred));
 
 // ===========================================================================
 await browser.close();

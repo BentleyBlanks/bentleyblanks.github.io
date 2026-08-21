@@ -87,6 +87,27 @@ Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0
   && tengxianForce.bundles === 0 && tengxianForce.grenades === 6,
   `装甲=${tengxianForce.armor} 集束=${tengxianForce.bundles} 木柄弹=${tengxianForce.grenades}`);
 
+// 默认入口回归：主页面不带 phase/preview 时，L0 的「开始」必须播 Legacy；
+// 新版 CS_Chuchuan 只由独立预览 URL 触发。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&menu=0`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined
+  && window.Taierzhuang.state.ready, { timeout: 240000 });
+await page.click("#bootStart");
+await page.waitForTimeout(250);
+const defaultIntro = await page.evaluate(() => ({
+  current: window.Taierzhuang.Debug.Cutscene().current,
+  playing: window.Taierzhuang.Debug.Cutscene().playing,
+  phase: window.Taierzhuang.Debug.Level().id,
+}));
+Check("默认开始游戏/L0 使用 Legacy 出川", defaultIntro.current === "CS_ChuchuanLegacy"
+  && defaultIntro.playing && defaultIntro.phase === "L0_Jiehe", JSON.stringify(defaultIntro));
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  T.Debug.SkipCutscene();
+  T.StepFrames(500, 1 / 60, false);
+});
+
 // ===========================================================================
 // 2) 真键盘走完整路径 —— 这一节是补票
 //
@@ -558,13 +579,13 @@ Check("没有哪一关的剧本被卡住", stuck.length === 0,
   stuck.length ? stuck.map((x) => `${x.id}(剩${x.remaining})`).join(" ") : "七关都跑完了");
 
 // ===========================================================================
-// 8.5) 过场：五场都能播、都能跳过，王铭章那场真的触发
+// 8.5) 过场：六场（含新版与 Legacy）都能播、都能跳过，王铭章那场真的触发
 // ===========================================================================
 Stage("8.5 过场");
 await Boot(0);
 const cuts = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
-  const ids = ["CS_Chuchuan", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
+  const ids = ["CS_Chuchuan", "CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
   const rows = [];
   for (const id of ids) {
     const p = D.PlayCutscene(id);
@@ -581,9 +602,9 @@ const cuts = await page.evaluate(async () => {
   }
   return { rows, played: D.Cutscene().played.map((c) => c.id) };
 });
-Check("五场过场都能播起来", cuts.rows.every((r) => r.playing && r.current === r.id),
+Check("六场过场都能播起来", cuts.rows.every((r) => r.playing && r.current === r.id),
   cuts.rows.map((r) => `${r.id}:${r.playing ? "播" : "没播"}`).join(" "));
-Check("五场过场都能 Esc 跳过（跳过后卡片仍把史实补出来）",
+Check("六场过场都能 Esc 跳过（跳过后卡片仍把史实补出来）",
   cuts.rows.every((r) => r.skipped), cuts.rows.map((r) => `${r.id}:${r.skipped}`).join(" "));
 Check("王铭章殉国那场真的触发得到",
   cuts.played.includes("CS_WangMingzhang"),

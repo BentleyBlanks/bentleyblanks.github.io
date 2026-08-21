@@ -136,7 +136,9 @@ export const LEVELS = [
       "全集团军名义四个师，每旅不过一个团之众，总兵力不过两万员名。",
       "对面是第十师团濑谷支队 —— 一个不满员的步兵联队，背后拖着一个师团级的炮兵群。",
     ],
-    cutsceneIn: "CS_Chuchuan",
+    // 正片入口继续使用已接好界河战斗的旧版出川；新版车厢序章只从
+    // ?preview=CS_Chuchuan 进入，完成后停在预览终点，等待《断线》接手。
+    cutsceneIn: "CS_ChuchuanLegacy",
     beats: [
       { at: "start", type: "title", text: "界河", sub: "一九三八年三月十四日 拂晓　两下店方向", tier: "主流" },
       { at: "start", type: "line", who: "qiu", text: "弟兄，把布袋系紧了。六颗，一颗都别掉。", tier: "虚构" },
@@ -450,14 +452,15 @@ export const LEVELS = [
 // 时长是硬约束：设计书给了每场的总秒数与每镜秒数，shots 的 seconds 之和
 // 必须等于 seconds。Script_Cutscene 的 ValidateCutscene() 会核对，对不上就抛。
 
-import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
+import { CS_Chuchuan, CS_ChuchuanLegacy } from "./Data_CutsceneChuchuan.mjs";
 import { CS_LiZongrenTang } from "./Data_CutsceneLiZongrenTang.mjs";
 import { CS_LastWire } from "./Data_CutsceneLastWire.mjs";
 import { CS_WangMingzhang } from "./Data_CutsceneWangMingzhang.mjs";
 import { CS_BeimenBreakout } from "./Data_CutsceneBeimenBreakout.mjs";
 
 export const CUTSCENES = {
-  CS_Chuchuan, CS_LiZongrenTang, CS_LastWire, CS_WangMingzhang, CS_BeimenBreakout,
+  CS_Chuchuan, CS_ChuchuanLegacy,
+  CS_LiZongrenTang, CS_LastWire, CS_WangMingzhang, CS_BeimenBreakout,
 };
 
 // 各场自带的人物表条目并进 CAST（过场文件不许反过来 import CAST，会成环）。
@@ -479,7 +482,8 @@ export function FindLevel(id) {
 
 /** 过场的播放顺序（给预览页与章节选单用）。 */
 export const CUTSCENE_ORDER = [
-  "CS_Chuchuan", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout",
+  "CS_Chuchuan", "CS_ChuchuanLegacy",
+  "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout",
 ];
 
 // ===========================================================================
