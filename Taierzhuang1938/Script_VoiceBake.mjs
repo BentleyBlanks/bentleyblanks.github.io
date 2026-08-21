@@ -7,6 +7,7 @@
 //   ... --from-workspace                                       # 用上次生成的 wav 重转码
 //   node Taierzhuang1938/Script_VoiceBake.mjs --normalize      # 只统一响度，不重新生成
 //   node Taierzhuang1938/Script_VoiceBake.mjs --clean <key>…   # 只为降底噪重摇，不如旧的就留旧的
+//   node Taierzhuang1938/Script_VoiceBake.mjs --prologue --force # Seed 不可用时自动回退本地 Qwen
 //
 // 烘完把实测时长写回 Data_Voice.mjs 的 dur 字段；战斗 Bark 断言 0.3—2.6 s，序章对白独立 0.45—4.8 s。
 //
@@ -81,6 +82,7 @@ const normalizeOnly = args.includes("--normalize");
 // 模型的底噪是每次生成随机的：不做这道比较，一次「清理」可能把好好的一条换成更脏的
 // （实测 spot_gap 从 -43 dB 被换成 -32.7 dB）。文本改过的行别用这个模式 —— 旧文件念的是旧词。
 const cleanOnly = args.includes("--clean");
+const qwenOnly = args.includes("--qwen");
 const picks = args.filter((a) => !a.startsWith("--"));
 const Has = (line) => fs.existsSync(path.join(AUDIO_DIR, line.file));
 
@@ -208,6 +210,36 @@ function WorkspaceTake(dir, key) {
   return files.length ? path.join(dir, files[0].f) : null;
 }
 
+function WriteDurations(durations) {
+  if (!durations.size) return;
+  let table = fs.readFileSync(VOICE_TABLE, "utf8");
+  for (const [key, dur] of durations) {
+    const re = new RegExp(`(key: "${key}",[\\s\\S]{0,320}?dur: )([0-9.]+)`);
+    if (!re.test(table)) { console.warn(`  ! ${key} 的 dur 没找到，没写回`); continue; }
+    table = table.replace(re, (m, head) => head + dur.toFixed(2));
+  }
+  fs.writeFileSync(VOICE_TABLE, table);
+}
+
+/**
+ * 仅服务序章的离线回退。Seed Audio 是正式首选；网关没有启动时，Qwen 用冻结的
+ * 原创角色参考逐角色克隆，避免退回 Windows 系统朗读声。QWEN_PYTHON 必须指向
+ * 安装 qwen_tts 的本机环境，保持模型与项目文件分离。
+ */
+function BakePrologueWithQwen(qwenLines) {
+  const python = process.env.QWEN_PYTHON;
+  if (!python) throw new Error("Seed Audio 网关不可用，且未设置 QWEN_PYTHON（本地 Qwen3-TTS Python 路径）");
+  const script = path.join(HERE, "Script_PrologueVoiceBakeQwen.py");
+  const result = spawnSync(python, [script, "--force", ...qwenLines.flatMap((line) => ["--key", line.key])], {
+    cwd: HERE, encoding: "utf8", stdio: "inherit",
+  });
+  if (result.status !== 0) throw new Error(`Qwen 序章配音生成失败（退出码 ${result.status ?? "未知"}）`);
+  const durations = new Map(qwenLines.map((line) => [line.key, Math.round(Duration(path.join(AUDIO_DIR, line.file)) * 100) / 100]));
+  if ([...durations.values()].some((dur) => dur <= 0)) throw new Error("Qwen 生成后有序章文件无法读取时长");
+  WriteDurations(durations);
+  console.log(`\nQwen 回退完成 ${qwenLines.length} 条，时长已写回 Data_Voice.mjs`);
+}
+
 /** Windows 离线中文生成链：System.Speech 的男性 Kangkang，不联网、不上传台词。 */
 function SystemSpeechTake(line, dst) {
   const wav = dst + ".system.wav";
@@ -276,6 +308,7 @@ if (normalizeOnly) {
 // ---------------------------------------------------------------------------
 let lines;
 if (picks.length) lines = VOICE_LINES.filter((l) => picks.includes(l.key));
+else if (args.includes("--prologue")) lines = VOICE_LINES.filter((l) => l.prologue);
 else if (args.includes("--missing")) lines = VOICE_LINES.filter((l) => !Has(l));
 else if (args.includes("--all")) lines = VOICE_LINES.slice();
 else { console.log("要指定 key，或 --missing / --all / --normalize"); process.exit(0); }
@@ -288,9 +321,29 @@ if (dry) {
   process.exit(0);
 }
 
-// 纯离线 systemSpeech/sample 批次不应因为 MiniMax Hub 未启动而失败。
-const needsGateway = lines.some((l) => !l.systemSpeech && !l.sample);
-const workspace = needsGateway ? await (await fetch(`${GATEWAY}/api/workspace`)).json() : { dir: AUDIO_DIR };
+const qwenLines = lines.filter((line) => line.qwenVoice);
+if (qwenOnly) {
+  if (qwenLines.length !== lines.length) throw new Error("--qwen 只支持序章 qwenVoice 条目，不可混入战斗 Bark");
+  BakePrologueWithQwen(qwenLines);
+  process.exit(0);
+}
+
+const needsGateway = lines.some((l) => !l.sample);
+let workspace = { dir: AUDIO_DIR };
+if (needsGateway) {
+  try {
+    const response = await fetch(`${GATEWAY}/api/workspace`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    workspace = await response.json();
+  } catch (error) {
+    if (qwenLines.length === lines.length) {
+      console.warn(`Seed Audio 网关不可用（${error.message}），回退本地 Qwen3-TTS。`);
+      BakePrologueWithQwen(qwenLines);
+      process.exit(0);
+    }
+    throw error;
+  }
+}
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 const durations = new Map();
@@ -298,7 +351,7 @@ let ok = 0;
 for (const line of lines) {
   const dst = path.join(AUDIO_DIR, line.file);
 
-  // 序章 12 句走系统内置中文声线；与 MiniMax 分支共享 Encode 的剪静音、时长、响度闸门。
+  // 仅保留旧文件的重烘兼容分支；新版序章不再定义 systemSpeech，走 Seed / Qwen。
   if (line.systemSpeech) {
     const enc = SystemSpeechTake(line, dst);
     if (enc.error) { console.warn(`  ✗ ${line.key} System.Speech：${enc.error}`); continue; }
@@ -401,14 +454,6 @@ for (const line of lines) {
 }
 
 // 把实测时长写回 Data_Voice.mjs：只动 dur 那一列，其余一个字符不碰。
-if (durations.size) {
-  let table = fs.readFileSync(VOICE_TABLE, "utf8");
-  for (const [key, dur] of durations) {
-    const re = new RegExp(`(key: "${key}",[\\s\\S]{0,320}?dur: )([0-9.]+)`);
-    if (!re.test(table)) { console.warn(`  ! ${key} 的 dur 没找到，没写回`); continue; }
-    table = table.replace(re, (m, head) => head + dur.toFixed(2));
-  }
-  fs.writeFileSync(VOICE_TABLE, table);
-}
+WriteDurations(durations);
 console.log(`\n烘好 ${ok} / ${lines.length} 条，时长已写回 Data_Voice.mjs`);
 process.exit(ok === lines.length ? 0 : 1);

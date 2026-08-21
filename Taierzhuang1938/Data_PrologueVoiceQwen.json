@@ -1,0 +1,17 @@
+{
+  "release": "20260822Qwen3Fallback",
+  "language": "Chinese",
+  "designModel": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+  "designRevision": "5ecdb67327fd37bb2e042aab12ff7391903235d3",
+  "cloneModel": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "cloneRevision": "fd4b254389122332181a7c3db7f27e918eec64e3",
+  "modelLicense": "Apache-2.0",
+  "roles": {
+    "YoungDispatch": { "seed": 1938001, "referenceAsset": "AudioVoiceRef_PrologueYoungDispatch_V1.flac", "referenceText": "我们出川好久了哦。", "instruction": "十八岁左右的四川年轻男性通信兵，清亮偏薄但经过长途行军已略有疲惫。四川口语自然，不是播音腔或夸张喜剧腔；车厢里与熟人低声闲谈，语气真诚。干声近讲，无音乐、混响或环境声。" },
+    "OldWound": { "seed": 1938002, "referenceAsset": "AudioVoiceRef_PrologueOldWound_V1.flac", "referenceText": "路莫问，跟到走就是。", "instruction": "三十五岁左右的四川男性老兵，低沉、略沙哑，带旧伤与行军疲惫但不虚弱。四川口语朴实克制，短句沉稳，不像舞台腔。干声近讲，无音乐、混响或环境声。" },
+    "MachineGunner": { "seed": 1938003, "referenceAsset": "AudioVoiceRef_PrologueMachineGunner_V1.flac", "referenceText": "你娃儿还惦记腊肉。", "instruction": "二十七岁左右的四川男性机枪手，结实的男中音，有一点善意打趣但不轻浮。四川口语自然，疲惫车厢中的音量适中，不像配音腔。干声近讲，无音乐、混响或环境声。" },
+    "Rifleman": { "seed": 1938004, "referenceAsset": "AudioVoiceRef_PrologueRifleman_V1.flac", "referenceText": "又卡。", "instruction": "二十多岁的四川男性步枪兵，平实的青年男声。对卡住的枪机低声嘟囔，字短、带一点无奈，不喊叫，不戏剧化。干声近讲，无音乐、混响或环境声。" },
+    "SquadLeader": { "seed": 1938005, "referenceAsset": "AudioVoiceRef_PrologueSquadLeader_V1.flac", "referenceText": "莫摆了。线盘再检查一遍，到了地头就要用。", "instruction": "三十岁左右的四川男性班长，沉稳有压场感的男中音。下令简短、清楚、不过度凶狠，四川口语自然，像狭小车厢里压低声音组织弟兄。干声近讲，无音乐、混响或环境声。" },
+    "ExternalOfficer": { "seed": 1938006, "referenceAsset": "AudioVoiceRef_PrologueExternalOfficer_V1.flac", "referenceText": "通信排，下车！线盘背起，搞快！", "instruction": "三十多岁的四川男性军官，清晰有力的男中音。站在车门外下令，语速稍快但每个战术词可懂；有距离感但不加回声、音乐或环境声。" }
+  }
+}

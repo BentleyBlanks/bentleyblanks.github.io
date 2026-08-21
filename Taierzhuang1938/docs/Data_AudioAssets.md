@@ -22,9 +22,9 @@
 
 - `Script_AmbBake.mjs TrainInteriorGenerated` 生成 30 秒立体声 `AudioAmb_TrainInterior.mp3`，由低频棕噪（车体）、72 Hz 轮轨节奏、290 Hz 木结构共振和高频空气摩擦组成；两端 150 ms 淡入淡出，运行时由 `AmbLayer` 双头交叉淡化。
 - `Script_SfxBake.mjs PrologueTrainGenerated` 用固定 LCG 噪声、衰减正弦和 cue 专属包络生成 `TrainBrake`、`CarriageRattle`、`StretcherWood`、`CoughLow`、`GearRustle`、`CarriageDoorSlide`、`StepBallast`。
-- `Script_VoiceBake.mjs --missing` 对序章行统一使用本机可验证为 Male 的 `Microsoft Kangkang` 离线中文声线，再用 ffmpeg `rubberband` 保时移调：年轻传令兵 +1.5 半音、旧伤士兵 -2、机枪手 -0.5、擦枪士兵 +0.5、班长 -1、车外军官 -0.5。之后共享现有剪静音、响度与底噪闸；MiniMax Hub 不启动时不影响这 12 句。
+- `Script_VoiceBake.mjs --prologue --force` 先请求本机 Seed Audio 网关；网关不可用时自动调用 `QWEN_PYTHON` 指定的 Qwen3-TTS 环境。Qwen 为六个角色各设计一条原创合成参考声线，并固定克隆到该角色的所有句子；不使用真人录音。角色定义在 `Data_PrologueVoiceQwen.json`，逐句绑定在 `Data_PrologueVoiceQwenManifest.json`。
 
-系统声线不是川籍真人录音，轻四川／重庆语感来自冻结台词中的“莫、跟到、屋头、啥子、醒起、搞快”等语法词；序章对白独立使用 0.45—4.8 s 时长闸，长句不再套用战斗 Bark 的 2.6 s 上限。人工试听仍需确认咬字、角色区分和方言可信度。未使用英文、女性声线或无声占位。
+Qwen 声线不是川籍真人录音，轻四川／重庆语感来自冻结台词中的“莫、跟到、屋头、啥子、醒起、搞快”等语法词；序章对白独立使用 0.45—5.2 s 时长闸，长句不再套用战斗 Bark 的 2.6 s 上限。人工试听仍需确认咬字、角色区分和方言可信度。未使用英文、女性声线或无声占位。
 
 ## 序章 12 句清单
 
@@ -32,32 +32,32 @@
 
 | # | 角色 | cue | 文件 | 实测时长 |
 | ---: | --- | --- | --- | ---: |
-| 1 | 年轻传令兵 | `prologue_young_dispatch_01` | `AudioSfx_PrologueVoiceYoungDispatch_01.mp3` | 1.87 s |
-| 2 | 旧伤士兵 | `prologue_old_wound_01` | `AudioSfx_PrologueVoiceOldWound_01.mp3` | 2.59 s |
-| 3 | 年轻传令兵 | `prologue_young_dispatch_02` | `AudioSfx_PrologueVoiceYoungDispatch_02.mp3` | 2.82 s |
-| 4 | 机枪手 | `prologue_machine_gunner_01` | `AudioSfx_PrologueVoiceMachineGunner_01.mp3` | 1.65 s |
-| 5 | 年轻传令兵 | `prologue_young_dispatch_03` | `AudioSfx_PrologueVoiceYoungDispatch_03.mp3` | 2.19 s |
-| 6 | 机枪手 | `prologue_machine_gunner_02` | `AudioSfx_PrologueVoiceMachineGunner_02.mp3` | 3.43 s |
-| 7 | 擦枪士兵 | `prologue_rifleman_01` | `AudioSfx_PrologueVoiceRifleman_01.mp3` | 0.54 s |
-| 8 | 旧伤士兵 | `prologue_old_wound_02` | `AudioSfx_PrologueVoiceOldWound_02.mp3` | 3.78 s |
-| 9 | 班长 | `prologue_squad_leader_01` | `AudioSfx_PrologueVoiceSquadLeader_01.mp3` | 4.71 s |
-| 10 | 旧伤士兵 | `prologue_old_wound_03` | `AudioSfx_PrologueVoiceOldWound_03.mp3` | 0.58 s |
-| 11 | 班长 | `prologue_squad_leader_02` | `AudioSfx_PrologueVoiceSquadLeader_02.mp3` | 2.53 s |
-| 12 | 车外军官 | `prologue_external_officer_01` | `AudioSfx_PrologueVoiceExternalOfficer_01.mp3` | 4.70 s |
+| 1 | 年轻传令兵 | `prologue_young_dispatch_01` | `AudioSfx_PrologueVoiceYoungDispatch_01.mp3` | 1.38 s |
+| 2 | 旧伤士兵 | `prologue_old_wound_01` | `AudioSfx_PrologueVoiceOldWound_01.mp3` | 3.29 s |
+| 3 | 年轻传令兵 | `prologue_young_dispatch_02` | `AudioSfx_PrologueVoiceYoungDispatch_02.mp3` | 2.70 s |
+| 4 | 机枪手 | `prologue_machine_gunner_01` | `AudioSfx_PrologueVoiceMachineGunner_01.mp3` | 1.75 s |
+| 5 | 年轻传令兵 | `prologue_young_dispatch_03` | `AudioSfx_PrologueVoiceYoungDispatch_03.mp3` | 1.91 s |
+| 6 | 机枪手 | `prologue_machine_gunner_02` | `AudioSfx_PrologueVoiceMachineGunner_02.mp3` | 3.62 s |
+| 7 | 擦枪士兵 | `prologue_rifleman_01` | `AudioSfx_PrologueVoiceRifleman_01.mp3` | 2.01 s |
+| 8 | 旧伤士兵 | `prologue_old_wound_02` | `AudioSfx_PrologueVoiceOldWound_02.mp3` | 3.70 s |
+| 9 | 班长 | `prologue_squad_leader_01` | `AudioSfx_PrologueVoiceSquadLeader_01.mp3` | 4.96 s |
+| 10 | 旧伤士兵 | `prologue_old_wound_03` | `AudioSfx_PrologueVoiceOldWound_03.mp3` | 1.08 s |
+| 11 | 班长 | `prologue_squad_leader_02` | `AudioSfx_PrologueVoiceSquadLeader_02.mp3` | 2.68 s |
+| 12 | 车外军官 | `prologue_external_officer_01` | `AudioSfx_PrologueVoiceExternalOfficer_01.mp3` | 3.67 s |
 
 ## 本批验证入口
 
 ```text
 node Taierzhuang1938/Script_AmbBake.mjs TrainInteriorGenerated
 node Taierzhuang1938/Script_SfxBake.mjs PrologueTrainGenerated
-node Taierzhuang1938/Script_VoiceBake.mjs --missing
+node Taierzhuang1938/Script_VoiceBake.mjs --prologue --force
 node Taierzhuang1938/Script_AudioTest.mjs
 node Taierzhuang1938/Script_VoiceTest.mjs
 ```
 
-`Script_AudioTest.mjs` 会检查 40 条 SFX manifest/cue、7 条序章专用音、trainInterior preset、床首尾采样跳变（Δ ≤ 0.03）和循环续接；`Script_VoiceTest.mjs` 会强制检查正好 12 句的顺序、文本、角色、文件和独立 0.45—4.8 s 时长，同时保留战斗 Bark 的 0.3—2.6 s 闸，并复用全声库响度/底噪闸。
+`Script_AudioTest.mjs` 会检查 40 条 SFX manifest/cue、7 条序章专用音、trainInterior preset、床首尾采样跳变（Δ ≤ 0.03）和循环续接；`Script_VoiceTest.mjs` 会强制检查正好 12 句的顺序、文本、角色、文件、Qwen 角色绑定和独立 0.45—5.2 s 时长，同时保留战斗 Bark 的 0.3—2.6 s 闸，并复用全声库响度/底噪闸。
 
-本次生成实测：环境床 44.1 kHz / stereo / 30.00 s，`volumedetect` mean -25.5 dB、峰 -13.1 dB，浏览器解码首尾跳变 Δ 0.00039；七条专用音均 44.1 kHz / mono，时长 0.65—1.80 s，峰值 -0.8 dBFS 或更低（最高响的是门滑 `CarriageDoorSlide`，mean -14.3 dB）。12 句配音浏览器解码 1.87/2.59/2.82/1.65/2.19/3.43/0.54/3.78/4.71/0.58/2.53/4.70 s，整批有声段 RMS 散布 1.3 dB；System.Speech 量化底床最吵约 -40 dB，测试对该本机生成器保留 2 dB 量化容差，明显环境声仍失败。
+本次回退实测：Seed Audio 网关连接被拒，Qwen3-TTS 在本机 RTX 4070 SUPER 上设计 6 条原创角色参考并生成 12 句。浏览器解码目标时长为 1.38/3.29/2.70/1.75/1.91/3.62/2.01/3.70/4.96/1.08/2.68/3.67 s；所有文件以 24 kHz 单声道 48 kbps MP3 输出，并共用有声段 RMS 对齐与底噪闸。
 
 ---
 

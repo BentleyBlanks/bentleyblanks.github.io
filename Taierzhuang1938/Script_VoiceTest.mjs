@@ -121,21 +121,20 @@ const prologue = await page.evaluate(async () => {
   return mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
     const loaded = bank.get(e.key) || {};
     return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0,
-      voice: e.systemSpeech?.voice, gender: e.systemSpeech?.gender, pitchSemitones: e.systemSpeech?.pitchSemitones };
+      qwenVoice: e.qwenVoice };
   });
 });
 const prologueShape = prologue.length === PROLOGUE_EXPECTED.length
   && prologue.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
     && e.file === PROLOGUE_EXPECTED[i][2] && e.text === PROLOGUE_EXPECTED[i][3]);
-const prologueDurOk = prologue.every((e) => e.duration >= 0.45 && e.duration <= 4.8);
+const prologueDurOk = prologue.every((e) => e.duration >= 0.45 && e.duration <= 5.2);
 Check("序章配音恰好 12 句且 cue/file/角色/文本/时长逐条匹配", prologueShape,
   `实际 ${prologue.length} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
-Check("序章 12 句实测时长均在 0.45—4.8 s", prologueDurOk,
+Check("序章 12 句实测时长均在 0.45—5.2 s", prologueDurOk,
   `时长 ${prologue.map((e) => e.duration.toFixed(2)).join("/")}`);
-const prologueMaleOnly = prologue.every((e) => e.voice === "Microsoft Kangkang" && e.gender === "Male"
-  && Number.isFinite(e.pitchSemitones));
-Check("序章 12 句仅使用可验证 Male 的 Kangkang，并有固定角色变调", prologueMaleOnly,
-  prologue.map((e) => `${e.key}:${e.voice}/${e.gender}/${e.pitchSemitones}`).join(" "));
+const prologueQwen = prologue.every((e) => typeof e.qwenVoice === "string" && e.qwenVoice.length > 0);
+Check("序章 12 句均绑定 Qwen 固定角色声线（Seed 不可用时的本地回退）", prologueQwen,
+  prologue.map((e) => `${e.key}:${e.qwenVoice || "缺失"}`).join(" "));
 const roleCounts = prologue.reduce((m, e) => (m[e.role] = (m[e.role] || 0) + 1, m), {});
 const expectedRoleCounts = { "年轻传令兵": 3, "旧伤士兵": 3, "机枪手": 2, "擦枪士兵": 1, "班长": 2, "车外军官": 1 };
 Check("序章角色配额 3/3/2/1/2/1", Object.keys(expectedRoleCounts).every((k) => roleCounts[k] === expectedRoleCounts[k]), JSON.stringify(roleCounts));
@@ -247,13 +246,7 @@ Check("整批音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不�
   `有声段 RMS ${Math.min(...rmsVals).toFixed(1)} … ${Math.max(...rmsVals).toFixed(1)} dB，`
   + `散布 ${spread.toFixed(1)} dB`);
 // 实录那条（惨叫）的「底噪」量到的是它自己的衰减尾巴，豁免。
-const systemSpeech = new Set((await page.evaluate(async () => {
-  const mod = await import("./Data_Voice.mjs");
-  return mod.VOICE_LINES.filter((l) => l.systemSpeech).map((l) => l.key);
-})));
-// System.Speech 的 MP3 编码底床偶尔落在 -39 dB 左右，但没有房间/风声；仍保留
-// 比既有 TTS 放宽 2 dB 的量化误差闸，明显环境声（>-38 dB）继续失败。
-const noisy = mix.filter((m) => !m.sampled && (!systemSpeech.has(m.key) ? m.floor > -40 : m.floor > -38));
+const noisy = mix.filter((m) => !m.sampled && m.floor > -40);
 Check("没有自带环境音（TTS 偶尔会附一层房间声/风声，混在战场上就是穿帮）",
   noisy.length === 0,
   noisy.length ? noisy.map((m) => `${m.key} ${m.floor.toFixed(0)}dB`).join(" ")

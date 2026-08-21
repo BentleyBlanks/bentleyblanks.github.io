@@ -42,6 +42,9 @@ Taierzhuang1938/Audio/Sfx/_raw/
 Taierzhuang1938/Audio/Amb/_raw/
 Taierzhuang1938/Audio/Music/_raw/
 Taierzhuang1938/Heightmap/_raw/
+# Qwen 序章声线烘焙的中间 PCM / Python bytecode；可随时按固定角色参考重新生成。
+Taierzhuang1938/_VoiceQwenWork/
+Taierzhuang1938/__pycache__/
 
 # Taierzhuang1938 视觉审查用的截图（每轮重出，不进仓库）
 Taierzhuang1938/_shots/
