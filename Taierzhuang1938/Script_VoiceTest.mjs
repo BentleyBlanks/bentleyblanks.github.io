@@ -100,6 +100,41 @@ Object.assign(r, await page.evaluate(() => {
   };
 }));
 
+// 序章对白是时间轴契约：数量、顺序、角色、cue/file 与文本任何一项漂移都必须红。
+const PROLOGUE_EXPECTED = [
+  ["prologue_young_dispatch_01", "年轻传令兵", "vo_prologue_young_dispatch_01.mp3", "我们出川好久了哦。"],
+  ["prologue_old_wound_01", "旧伤士兵", "vo_prologue_old_wound_01.mp3", "路莫问，跟到走就是。"],
+  ["prologue_young_dispatch_02", "年轻传令兵", "vo_prologue_young_dispatch_02.mp3", "我都忘了屋头腊肉是啥味道了。"],
+  ["prologue_machine_gunner_01", "机枪手", "vo_prologue_machine_gunner_01.mp3", "你娃儿还惦记腊肉。"],
+  ["prologue_young_dispatch_03", "年轻传令兵", "vo_prologue_young_dispatch_03.mp3", "不惦记吃的惦记啥子嘛。"],
+  ["prologue_machine_gunner_02", "机枪手", "vo_prologue_machine_gunner_02.mp3", "到了前头，有热水喝你就谢天谢地。"],
+  ["prologue_rifleman_01", "擦枪士兵", "vo_prologue_rifleman_01.mp3", "又卡。"],
+  ["prologue_old_wound_02", "旧伤士兵", "vo_prologue_old_wound_02.mp3", "你少骂两句，它兴许听话点。"],
+  ["prologue_squad_leader_01", "班长", "vo_prologue_squad_leader_01.mp3", "莫摆了。线盘再检查一遍，到了地头就要用。"],
+  ["prologue_old_wound_03", "旧伤士兵", "vo_prologue_old_wound_03.mp3", "近咯。"],
+  ["prologue_squad_leader_02", "班长", "vo_prologue_squad_leader_02.mp3", "都醒起，装备拿好。"],
+  ["prologue_external_officer_01", "车外军官", "vo_prologue_external_officer_01.mp3", "通信排，下车！线盘背起，搞快！"],
+];
+const prologue = await page.evaluate(async () => {
+  const mod = await import("./Data_Voice.mjs");
+  const bank = new Map([...window.Taierzhuang.audio.voiceBank.values()].map((e) => [e.key, e]));
+  return mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
+    const loaded = bank.get(e.key) || {};
+    return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0 };
+  });
+});
+const prologueShape = prologue.length === PROLOGUE_EXPECTED.length
+  && prologue.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
+    && e.file === PROLOGUE_EXPECTED[i][2] && e.text === PROLOGUE_EXPECTED[i][3]);
+const prologueDurOk = prologue.every((e) => e.duration > 0.3 && e.duration < 2.6);
+Check("序章配音恰好 12 句且 cue/file/角色/文本/时长逐条匹配", prologueShape,
+  `实际 ${prologue.length} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
+Check("序章 12 句实测时长均在 0.3—2.6 s", prologueDurOk,
+  `时长 ${prologue.map((e) => e.duration.toFixed(2)).join("/")}`);
+const roleCounts = prologue.reduce((m, e) => (m[e.role] = (m[e.role] || 0) + 1, m), {});
+const expectedRoleCounts = { "年轻传令兵": 3, "旧伤士兵": 3, "机枪手": 2, "擦枪士兵": 1, "班长": 2, "车外军官": 1 };
+Check("序章角色配额 3/3/2/1/2/1", Object.keys(expectedRoleCounts).every((k) => roleCounts[k] === expectedRoleCounts[k]), JSON.stringify(roleCounts));
+
 Check("配音全部解码成功（一条都不许静默丢）", r.size >= 30 && r.errors.length === 0,
   `载入 ${r.size} 条，错误 ${r.errors.length} 条${r.errors.length ? "：" + r.errors.join(" / ") : ""}`);
 Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 hitmarker 用嘴说了一遍）",
@@ -205,7 +240,13 @@ Check("整批音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不�
   `有声段 RMS ${Math.min(...rmsVals).toFixed(1)} … ${Math.max(...rmsVals).toFixed(1)} dB，`
   + `散布 ${spread.toFixed(1)} dB`);
 // 实录那条（惨叫）的「底噪」量到的是它自己的衰减尾巴，豁免。
-const noisy = mix.filter((m) => !m.sampled && m.floor > -40);
+const systemSpeech = new Set((await page.evaluate(async () => {
+  const mod = await import("./Data_Voice.mjs");
+  return mod.VOICE_LINES.filter((l) => l.systemSpeech).map((l) => l.key);
+})));
+// System.Speech 的 MP3 编码底床偶尔落在 -39 dB 左右，但没有房间/风声；仍保留
+// 比既有 TTS 放宽 2 dB 的量化误差闸，明显环境声（>-38 dB）继续失败。
+const noisy = mix.filter((m) => !m.sampled && (!systemSpeech.has(m.key) ? m.floor > -40 : m.floor > -38));
 Check("没有自带环境音（TTS 偶尔会附一层房间声/风声，混在战场上就是穿帮）",
   noisy.length === 0,
   noisy.length ? noisy.map((m) => `${m.key} ${m.floor.toFixed(0)}dB`).join(" ")

@@ -42,6 +42,11 @@ export const SFX_LICENSES = {
     terms: "军号为美国政府作品（Public Domain）；哨子为 CC0",
     via: "https://commons.wikimedia.org/",
   },
+  generated: {
+    name: "Taierzhuang1938 procedural synthesis",
+    terms: "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
+    via: "local://Taierzhuang1938/Script_SfxBake.mjs",
+  },
 };
 
 const ARCHIVE = "https://archive.org/download/";
@@ -56,6 +61,22 @@ export function ArchiveUrl(item, filePath) {
  * cuts[].cue 必须与 Script_Audio 的 RECIPES 同名 —— 同名才盖得上去。
  */
 export const SFX_SOURCES = [
+  // 序章专用音：按 cue 独立生成，确保缺少外部素材时仍能稳定回退。
+  {
+    id: "PrologueTrainGenerated",
+    generated: "prologueTrain",
+    credit: "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+    license: "generated",
+    cuts: [
+      { cue: "trainBrake", durS: 1.8 },
+      { cue: "carriageRattle", durS: 0.8 },
+      { cue: "stretcherWood", durS: 0.9 },
+      { cue: "coughLow", durS: 0.8 },
+      { cue: "gearRustle", durS: 0.7 },
+      { cue: "carriageDoorSlide", durS: 1.5 },
+      { cue: "stepBallast", durS: 0.65 },
+    ],
+  },
   // === 步枪 ===============================================================
   {
     id: "MauserMedium",

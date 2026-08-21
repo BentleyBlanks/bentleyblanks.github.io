@@ -46,6 +46,11 @@
    "file": "AudioAmb_FireFar.mp3",
    "seconds": 11,
    "channels": 2
+  },
+  "trainInterior": {
+   "file": "AudioAmb_TrainInterior.mp3",
+   "seconds": 30,
+   "channels": 2
   }
  },
  "cues": {
@@ -209,6 +214,10 @@
    "credit": "Coll Anderson · 战斗结束后的呻吟 · Sonniss GDC 2015",
    "license": "sonniss",
    "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Battle End Agony Moans 02 A.mp3"
+  },
+  "trainInterior": {
+   "credit": "Taierzhuang1938 procedural synthesis · 轮轨、车体低频、木结构轻响",
+   "license": "generated"
   }
  },
  "licenses": {
@@ -216,6 +225,11 @@
    "name": "Sonniss GDC Game Audio Bundle",
    "terms": "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
    "via": "https://archive.org/details/sonniss.com-gdc-game-audio-bundles"
+  },
+  "generated": {
+   "name": "Taierzhuang1938 procedural synthesis",
+   "terms": "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
+   "via": "local://Taierzhuang1938/Script_AmbBake.mjs"
   }
  }
 }

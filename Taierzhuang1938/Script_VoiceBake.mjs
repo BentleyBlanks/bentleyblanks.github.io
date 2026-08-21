@@ -153,14 +153,14 @@ function GainDb(stats) {
  *   3. 归一化到统一的有声段 RMS —— 整批音量必须一致，**远近交给游戏里的距离
  *      衰减与遮挡去管**；文件本身有响有闷的话，玩家会以为「那个人离得远」。
  */
-function Encode(src, dst, { maxDur = 2.35 } = {}) {
+function Encode(src, dst, { maxDur = 2.35, maxTempo = 1.6, preFilter = "" } = {}) {
   const stage = dst + ".stage.wav";
   const trim = "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02"
     + ",areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,areverse";
-  let r = spawnSync(FFMPEG, ["-y", "-v", "error", "-i", src, "-af", trim, stage], { encoding: "utf8" });
+  let r = spawnSync(FFMPEG, ["-y", "-v", "error", "-i", src, "-af", preFilter ? `${trim},${preFilter}` : trim, stage], { encoding: "utf8" });
   if (r.status !== 0) return { error: (r.stderr || "").slice(-160) };
   const raw = Duration(stage);
-  const tempo = raw > maxDur ? Math.min(1.6, raw / maxDur) : 1;
+  const tempo = raw > maxDur ? Math.min(maxTempo, raw / maxDur) : 1;
   if (tempo > 1) {
     const fast = dst + ".fast.wav";
     r = spawnSync(FFMPEG, ["-y", "-v", "error", "-i", stage, "-af", `atempo=${tempo.toFixed(3)}`, fast],
@@ -206,6 +206,31 @@ function WorkspaceTake(dir, key) {
     .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
     .sort((a, b) => b.t - a.t);
   return files.length ? path.join(dir, files[0].f) : null;
+}
+
+/** Windows 离线中文生成链：System.Speech 自带 Huihui/Kangkang/Yaoyao，不联网、不上传台词。 */
+function SystemSpeechTake(line, dst) {
+  const wav = dst + ".system.wav";
+  const voice = line.systemSpeech.voice || "Microsoft Huihui";
+  const rate = Number(line.systemSpeech.rate || 0);
+  const quote = (s) => String(s).replace(/'/g, "''");
+  const script = [
+    "Add-Type -AssemblyName System.Speech",
+    "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer",
+    `$s.SelectVoice('${quote(voice)}')`,
+    `$s.Rate = ${Math.max(-10, Math.min(10, rate))}`,
+    "$s.Volume = 100",
+    `$s.SetOutputToWaveFile('${quote(wav)}')`,
+    `$s.Speak('${quote(line.text)}')`,
+    "$s.Dispose()",
+  ].join(";");
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], { encoding: "utf8" });
+  if (r.status !== 0 || !fs.existsSync(wav)) return { error: (r.stderr || r.stdout || "System.Speech 生成失败").slice(-240) };
+  const out = Encode(wav, dst, { maxDur: 2.45, maxTempo: 2.6,
+    preFilter: "afftdn=nr=16:nf=-45,agate=threshold=-35dB:ratio=8:attack=5:release=80" });
+  fs.rmSync(wav, { force: true });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -255,13 +280,25 @@ if (dry) {
   process.exit(0);
 }
 
-const workspace = await (await fetch(`${GATEWAY}/api/workspace`)).json();
+// 纯离线 systemSpeech/sample 批次不应因为 MiniMax Hub 未启动而失败。
+const needsGateway = lines.some((l) => !l.systemSpeech && !l.sample);
+const workspace = needsGateway ? await (await fetch(`${GATEWAY}/api/workspace`)).json() : { dir: AUDIO_DIR };
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 const durations = new Map();
 let ok = 0;
 for (const line of lines) {
   const dst = path.join(AUDIO_DIR, line.file);
+
+  // 序章 12 句走系统内置中文声线；与 MiniMax 分支共享 Encode 的剪静音、时长、响度闸门。
+  if (line.systemSpeech) {
+    const enc = SystemSpeechTake(line, dst);
+    if (enc.error) { console.warn(`  ✗ ${line.key} System.Speech：${enc.error}`); continue; }
+    durations.set(line.key, enc.dur);
+    ok += 1;
+    console.log(`  ✓ ${line.key.padEnd(28)} ${line.role}  ${enc.dur.toFixed(2)}s  底噪 ${enc.floor}dB  [System.Speech/${line.systemSpeech.voice}]  ${line.text}`);
+    continue;
+  }
 
   // --- 实录行：从免版税素材库下载，不走 TTS ---------------------------------
   if (line.sample) {

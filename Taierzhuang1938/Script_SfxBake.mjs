@@ -265,6 +265,53 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   return { seconds, bytes: fs.statSync(outMp3).size, seg };
 }
 
+// 序章专用音的确定性程序合成。每个 cue 都是独立短音，使用固定 LCG 噪声与衰减正弦，
+// 便于离线重烘、审计峰值并在外部采样不可用时稳定回退。
+function GenerateSyntheticSfx(cue, durS, tmpWav, outMp3) {
+  const n = Math.max(1, Math.round(SR * durS));
+  const pcm = new Float32Array(n);
+  let seed = 0x9e3779b9 ^ cue.split("").reduce((a, c) => (a * 33 + c.charCodeAt(0)) | 0, 0);
+  const noise = () => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return ((seed >>> 0) / 2147483648) - 1; };
+  for (let i = 0; i < n; i += 1) {
+    const t = i / SR;
+    const x = t / durS;
+    let v = 0;
+    if (cue === "trainBrake") {
+      const e = Math.exp(-2.1 * t) * (0.72 + 0.28 * x);
+      v = e * (0.42 * Math.sin(2 * Math.PI * (210 - 105 * x) * t) + 0.30 * noise());
+    } else if (cue === "carriageRattle") {
+      const e = Math.exp(-6.5 * t);
+      v = e * (0.30 * noise() + 0.28 * Math.sin(2 * Math.PI * 1180 * t));
+    } else if (cue === "stretcherWood") {
+      const e = Math.exp(-4.8 * t);
+      v = e * (0.62 * Math.sin(2 * Math.PI * 145 * t) + 0.16 * noise());
+    } else if (cue === "coughLow") {
+      const e = Math.exp(-3.5 * t) * (0.5 + 0.5 * Math.sin(Math.PI * Math.min(1, x)));
+      v = e * (0.52 * noise() + 0.25 * Math.sin(2 * Math.PI * 92 * t));
+    } else if (cue === "gearRustle") {
+      const e = Math.exp(-7.5 * t);
+      v = e * (0.32 * noise() + 0.20 * Math.sin(2 * Math.PI * 2400 * t));
+    } else if (cue === "carriageDoorSlide") {
+      const e = Math.sin(Math.PI * Math.min(1, x));
+      v = e * (0.38 * noise() + 0.28 * Math.sin(2 * Math.PI * (480 + 850 * x) * t));
+    } else if (cue === "stepBallast") {
+      const e = Math.exp(-9 * t);
+      v = e * (0.66 * Math.sin(2 * Math.PI * 86 * t) + 0.22 * noise());
+    }
+    const edge = Math.min(1, i / Math.max(1, Math.round(SR * 0.008)),
+      (n - i) / Math.max(1, Math.round(SR * 0.025)));
+    pcm[i] = v * Math.max(0, edge);
+  }
+  let peak = 0;
+  for (const v of pcm) peak = Math.max(peak, Math.abs(v));
+  const scale = peak > 0 ? Math.min(0.82 / peak, 1) : 1;
+  for (let i = 0; i < pcm.length; i += 1) pcm[i] *= scale;
+  WriteWav(tmpWav, pcm);
+  execFileSync(FFMPEG, ["-y", "-v", "error", "-i", tmpWav, "-ac", "1", "-ar", String(SR), "-b:a", BITRATE, outMp3]);
+  fs.rmSync(tmpWav, { force: true });
+  return { seconds: durS, bytes: fs.statSync(outMp3).size };
+}
+
 const Pascal = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // ---------------------------------------------------------------------------
@@ -289,8 +336,22 @@ async function Main() {
 
   let total = 0;
   for (const group of groups) {
-    const ext = path.extname(new URL(SourceUrl(group)).pathname) || ".mp3";
+    const ext = group.generated ? ".wav" : (path.extname(new URL(SourceUrl(group)).pathname) || ".mp3");
     const rawFile = path.join(RAW_DIR, `${group.id}${ext}`);
+    if (group.generated) {
+      console.log(`[生成] ${group.id}（本地确定性程序合成）`);
+      if (report) { for (const cut of group.cuts) console.log(`   · ${cut.cue} ${cut.durS}s`); continue; }
+      for (const cut of group.cuts) {
+        const name = `AudioSfx_${Pascal(cut.cue)}_01.mp3`;
+        const out = path.join(OUT_DIR, name);
+        const info = GenerateSyntheticSfx(cut.cue, cut.durS, path.join(OUT_DIR, `_${cut.cue}.wav`), out);
+        manifest.cues[cut.cue] = { files: [name], seconds: Number(info.seconds.toFixed(3)),
+          credit: group.credit, license: group.license };
+        total += info.bytes;
+        console.log(`   · ${name} ${info.seconds.toFixed(2)}s ${(info.bytes / 1024).toFixed(1)} KB`);
+      }
+      continue;
+    }
     if (!fs.existsSync(rawFile)) {
       if (recut) { console.log(`[跳过] ${group.id}：--recut 但本地没有素材`); continue; }
       process.stdout.write(`[下载] ${group.id} … `);

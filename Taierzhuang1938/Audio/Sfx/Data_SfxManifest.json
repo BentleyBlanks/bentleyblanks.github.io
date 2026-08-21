@@ -10,6 +10,11 @@
       "name": "Wikimedia Commons",
       "terms": "军号为美国政府作品（Public Domain）；哨子为 CC0",
       "via": "https://commons.wikimedia.org/"
+    },
+    "generated": {
+      "name": "Taierzhuang1938 procedural synthesis",
+      "terms": "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
+      "via": "local://Taierzhuang1938/Script_SfxBake.mjs"
     }
   },
   "cues": {
@@ -288,7 +293,63 @@
       "seconds": 0.988,
       "credit": "SculpTunes · 弹壳落在水泥地上（户外）· Sonniss GDC 2020",
       "license": "sonniss"
+    },
+    "trainBrake": {
+      "files": [
+        "AudioSfx_TrainBrake_01.mp3"
+      ],
+      "seconds": 1.8,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "carriageRattle": {
+      "files": [
+        "AudioSfx_CarriageRattle_01.mp3"
+      ],
+      "seconds": 0.8,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "stretcherWood": {
+      "files": [
+        "AudioSfx_StretcherWood_01.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "coughLow": {
+      "files": [
+        "AudioSfx_CoughLow_01.mp3"
+      ],
+      "seconds": 0.8,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "gearRustle": {
+      "files": [
+        "AudioSfx_GearRustle_01.mp3"
+      ],
+      "seconds": 0.7,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "carriageDoorSlide": {
+      "files": [
+        "AudioSfx_CarriageDoorSlide_01.mp3"
+      ],
+      "seconds": 1.5,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
+    },
+    "stepBallast": {
+      "files": [
+        "AudioSfx_StepBallast_01.mp3"
+      ],
+      "seconds": 0.65,
+      "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
+      "license": "generated"
     }
   },
-  "bakedAt": "2026-08-20"
+  "bakedAt": "2026-08-21"
 }

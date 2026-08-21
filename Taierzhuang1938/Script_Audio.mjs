@@ -1065,6 +1065,61 @@ const RECIPES = {
     v.Live(0.35);
   },
 
+  // === 序章车厢专用音（采样包载入后由同名 cue 覆盖；无包时仍可发声） ===
+  trainBrake(A, v) {
+    const t = v.t;
+    MetalScrape(v, t, 0.9, 760, 220, 0.18);
+    Thud(v, t + 0.03, 180, 72, 0.34, 0.32, 220);
+    v.wetGain.gain.value = 0.18;
+    v.Live(1.15);
+  },
+  carriageRattle(A, v) {
+    const t = v.t;
+    Grains(v, t, 6, 0.1, 1200, 4600, 0.07);
+    MetalClick(v, t + 0.22, 1800, 0.12, 0.06, 9);
+    v.wetGain.gain.value = 0.08;
+    v.Live(0.48);
+  },
+  stretcherWood(A, v) {
+    Thud(v, v.t, 155, 68, 0.14, 0.42, 190);
+    MetalClick(v, v.t + 0.16, 850, 0.12, 0.1, 8);
+    v.wetGain.gain.value = 0.12;
+    v.Live(0.52);
+  },
+  coughLow(A, v) {
+    const t = v.t;
+    const src = v.Noise("pink", 0.42);
+    const band = v.Filter("bandpass", v.F(310), 1.1);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.22, 0.04, 0.16, 0.19);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, 0.42);
+    v.wetGain.gain.value = 0.16;
+    v.Live(0.56);
+  },
+  gearRustle(A, v) {
+    const src = v.Noise("pink", 0.34);
+    const band = v.Filter("bandpass", v.F(2100), 1.2);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, v.t, 0.14, 0.015, 0.16, 0.16);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, v.t, 0.34);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.48);
+  },
+  carriageDoorSlide(A, v) {
+    MetalScrape(v, v.t, 0.8, 500, 1700, 0.22);
+    MetalClick(v, v.t + 0.86, 1250, 0.2, 0.07, 10);
+    v.wetGain.gain.value = 0.2;
+    v.Live(1.18);
+  },
+  stepBallast(A, v) {
+    Thud(v, v.t, 96, 42, 0.12, 0.58, 200);
+    Grains(v, v.t + 0.02, 4, 0.1, 1700, 4500, 0.06);
+    v.wetGain.gain.value = 0.12;
+    v.Live(0.34);
+  },
+
   // 倒地：不是一下，是三下 —— 膝、髋、头/肩，间隔越来越短、力度越来越小。
   // 只做一记闷响的话，永远像麻袋掉地上。
   bodyFall(A, v) {
@@ -1338,7 +1393,7 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
-export const SFX_PACK_VERSION = "3";
+export const SFX_PACK_VERSION = "4";
 export const MUSIC_PACK_VERSION = "3";
 
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
@@ -1492,6 +1547,15 @@ const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
  */
 export const AMBIENCE_PRESETS = {
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
+
+  // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
+  // 而是同一床上的明确事件 cue；LUNA-04 在 0:50—1:08 触发 trainBrake 一次。
+  trainInterior: {
+    space: "street", fallbackWind: 0,
+    layers: [{ bed: "trainInterior", gain: 0.82, seg: 12 }],
+    events: [],
+    transition: { brake: { cue: "trainBrake", atS: 50, endS: 68, mode: "oneShot" } },
+  },
 
   // 序 · 上墙（L0，smokyDay）：站在北寨墙上，墙北是护城河与开阔地。
   // 风最大、远处最响、流弹最多 —— 这一关是「你正站在战线上」。

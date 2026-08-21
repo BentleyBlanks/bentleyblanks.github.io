@@ -9,6 +9,58 @@
 
 ---
 
+# 序章｜出川：车厢音频（2026-08-21）
+
+本批只为新版 95 秒车厢序章服务，仍走现有 ambience / sfx / voice 三总线；不新增播放系统。
+环境床使用 `trainInterior` preset，音乐由过场接入时显式设为 `null`。制动段不是第二套环境床：
+时间轴在 0:50—1:08 触发一次 `trainBrake` 专用 cue；preset 的 `transition.brake` 记录了这一接口。
+两次炮声继续复用现有 `ambCannonFar`，擦枪的发涩枪栓继续复用现有 `bolt`，本批没有重复生成这两条。
+
+## 程序合成与许可
+
+车厢环境与七条专用音全部是仓库内确定性程序合成，没有外部录音、网络下载或第三方许可问题：
+
+- `Script_AmbBake.mjs TrainInteriorGenerated` 生成 30 秒立体声 `AudioAmb_TrainInterior.mp3`，由低频棕噪（车体）、72 Hz 轮轨节奏、290 Hz 木结构共振和高频空气摩擦组成；两端 150 ms 淡入淡出，运行时由 `AmbLayer` 双头交叉淡化。
+- `Script_SfxBake.mjs PrologueTrainGenerated` 用固定 LCG 噪声、衰减正弦和 cue 专属包络生成 `TrainBrake`、`CarriageRattle`、`StretcherWood`、`CoughLow`、`GearRustle`、`CarriageDoorSlide`、`StepBallast`。
+- `Script_VoiceBake.mjs --missing` 对序章行使用 Windows `System.Speech` 的 `Microsoft Huihui`、`Microsoft Kangkang`、`Microsoft Yaoyao` 离线中文声线，再共享现有剪静音、时长、响度与底噪闸；MiniMax Hub 不启动时不影响这 12 句。
+
+系统声线不是川籍真人录音，轻四川／重庆语感来自冻结台词中的“莫、跟到、屋头、啥子、醒起、搞快”等语法词；人工试听仍需确认咬字、角色区分和方言可信度。未使用英文或无声占位。
+
+## 序章 12 句清单
+
+顺序就是时间轴顺序，且 `Data_Voice.mjs` 的 `key`、`file`、`role`、`text`、`dur` 一一对应：
+
+| # | 角色 | cue | 文件 | 实测时长 |
+| ---: | --- | --- | --- | ---: |
+| 1 | 年轻传令兵 | `prologue_young_dispatch_01` | `vo_prologue_young_dispatch_01.mp3` | 1.87 s |
+| 2 | 旧伤士兵 | `prologue_old_wound_01` | `vo_prologue_old_wound_01.mp3` | 2.47 s |
+| 3 | 年轻传令兵 | `prologue_young_dispatch_02` | `vo_prologue_young_dispatch_02.mp3` | 2.45 s |
+| 4 | 机枪手 | `prologue_machine_gunner_01` | `vo_prologue_machine_gunner_01.mp3` | 1.65 s |
+| 5 | 年轻传令兵 | `prologue_young_dispatch_03` | `vo_prologue_young_dispatch_03.mp3` | 2.19 s |
+| 6 | 机枪手 | `prologue_machine_gunner_02` | `vo_prologue_machine_gunner_02.mp3` | 2.45 s |
+| 7 | 擦枪士兵 | `prologue_rifleman_01` | `vo_prologue_rifleman_01.mp3` | 0.54 s |
+| 8 | 旧伤士兵 | `prologue_old_wound_02` | `vo_prologue_old_wound_02.mp3` | 2.45 s |
+| 9 | 班长 | `prologue_squad_leader_01` | `vo_prologue_squad_leader_01.mp3` | 2.44 s |
+| 10 | 旧伤士兵 | `prologue_old_wound_03` | `vo_prologue_old_wound_03.mp3` | 0.58 s |
+| 11 | 班长 | `prologue_squad_leader_02` | `vo_prologue_squad_leader_02.mp3` | 2.46 s |
+| 12 | 车外军官 | `prologue_external_officer_01` | `vo_prologue_external_officer_01.mp3` | 2.45 s |
+
+## 本批验证入口
+
+```text
+node Taierzhuang1938/Script_AmbBake.mjs TrainInteriorGenerated
+node Taierzhuang1938/Script_SfxBake.mjs PrologueTrainGenerated
+node Taierzhuang1938/Script_VoiceBake.mjs --missing
+node Taierzhuang1938/Script_AudioTest.mjs
+node Taierzhuang1938/Script_VoiceTest.mjs
+```
+
+`Script_AudioTest.mjs` 会检查 40 条 SFX manifest/cue、7 条序章专用音、trainInterior preset、床首尾采样跳变（Δ ≤ 0.03）和循环续接；`Script_VoiceTest.mjs` 会强制检查正好 12 句的顺序、文本、角色、文件和 0.3—2.6 s 时长，并复用全声库响度/底噪闸。
+
+本次生成实测：环境床 44.1 kHz / stereo / 30.00 s，`volumedetect` mean -25.5 dB、峰 -13.1 dB，浏览器解码首尾跳变 Δ 0.00039；七条专用音均 44.1 kHz / mono，时长 0.65—1.80 s，峰值 -0.8 dBFS 或更低（最高响的是门滑 `CarriageDoorSlide`，mean -14.3 dB）。12 句配音浏览器解码 1.87/2.47/2.45/1.65/2.19/2.45/0.54/2.45/2.44/0.58/2.46/2.45 s，整批有声段 RMS 散布 1.3 dB；System.Speech 量化底床最吵约 -39 dB，测试对该本机生成器保留 2 dB 量化容差，明显环境声仍失败。
+
+---
+
 # 音效：从「全部合成」换成「实录采样盖在合成上」
 
 2026-08-19。此前这个项目的 32 个音效全部是 WebAudio 现场合成的（`Script_Audio.mjs`
@@ -51,7 +103,7 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 
 ## 成品
 
-50 个文件 / 383 KB（44.1 kHz 单声道 72 kbps MP3），在 `Audio/Sfx/`，
+51 个文件 / 396 KB（44.1 kHz 单声道 72 kbps MP3），在 `Audio/Sfx/`，
 清单 `Audio/Sfx/Data_SfxManifest.json`。
 
 | cue | 变体 | 时长 | 体积 | 素材 |

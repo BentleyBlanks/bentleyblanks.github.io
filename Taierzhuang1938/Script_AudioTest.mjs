@@ -67,12 +67,14 @@ const load = await page.evaluate(() => {
     covered: [...a.sampleCues].filter((name) => !name.startsWith("amb.")).sort(),
     errors: a.sfxErrors.slice(0, 6),
     manifestCues: a.sfxManifest ? Object.keys(a.sfxManifest.cues).length : 0,
+    prologueSfx: ["trainBrake", "carriageRattle", "stretcherWood", "coughLow", "gearRustle", "carriageDoorSlide", "stepBallast"]
+      .filter((name) => !a.sampleCues.has(name)),
     toneHz: a.sfxManifest && a.sfxManifest.cues.bugleTone
       ? a.sfxManifest.cues.bugleTone.toneHz : null,
   };
 });
 
-const RECIPE_COUNT = 33;   // 2026-08-20 新增 shellDrop（抛壳落地）
+const RECIPE_COUNT = 40;   // 2026-08-21 序章车厢新增 7 条专用 cue
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -85,6 +87,8 @@ if (load.covered.length !== RECIPE_COUNT) {
 
 if (load.errors.length) Fail(`采样载入报错 ${JSON.stringify(load.errors)}`);
 else Ok("采样载入零报错");
+if (load.prologueSfx.length) Fail(`序章专用音未盖上：${load.prologueSfx.join(" ")}`);
+else Ok("序章 7 条专用音全部盖上");
 
 // 军号是「一个音 + playbackRate 排动机」，基频量错了整段跑调 ——
 // 495.5 Hz 是 Last Post 那个持续音的实测值（G 号的 B4）。
@@ -157,6 +161,12 @@ await page.waitForFunction(
 const packs = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
   const mod = await import("./Script_Audio.mjs");
+  const train = a.ambBuffers.get("trainInterior");
+  let seam = null;
+  if (train) {
+    const d = train.getChannelData(0);
+    seam = Math.abs(d[0] - d[d.length - 1]);
+  }
   return {
     beds: a.ambBuffers.size,
     bedNames: [...a.ambBuffers.keys()].sort(),
@@ -177,6 +187,8 @@ const packs = await page.evaluate(async () => {
     missingEvents: Object.entries(mod.AMBIENCE_PRESETS).flatMap(([name, cfg]) =>
       (cfg.events || []).filter((e) => !mod.SOUND_NAMES.includes(e.name) && !a.sampleCues.has(e.name))
         .map((e) => `${name}:${e.name}`)),
+    trainSeamDelta: seam,
+    hasTrainPreset: !!mod.AMBIENCE_PRESETS.trainInterior,
   };
 });
 
@@ -192,6 +204,10 @@ if (packs.missing.length) Fail(`环境档引用了不存在的床：${packs.miss
 else Ok(`${packs.presets.length} 档环境引用的床条条都在`);
 if (packs.missingEvents.length) Fail(`环境事件引用了不存在的配方：${packs.missingEvents.join(" ")}`);
 else Ok("环境事件引用的配方条条都在");
+if (!packs.hasTrainPreset || !packs.bedNames.includes("trainInterior")) Fail("序章 trainInterior 床或 preset 缺失");
+else Ok("序章 trainInterior 床与 preset 已接入");
+if (packs.trainSeamDelta === null || packs.trainSeamDelta > 0.03) Fail(`序章床首尾接缝 ${packs.trainSeamDelta}（应 ≤ 0.03）`);
+else Ok(`序章床首尾接缝可量化通过（Δ ${packs.trainSeamDelta.toFixed(5)}）`);
 
 if (packs.musicErrors.length) Fail(`音乐载入报错 ${JSON.stringify(packs.musicErrors)}`);
 else Ok("音乐载入零报错");

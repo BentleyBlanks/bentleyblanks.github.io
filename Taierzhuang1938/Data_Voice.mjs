@@ -106,6 +106,21 @@
 export const VOICE_BASE = "Audio/";
 
 export const VOICE_LINES = [
+  // ===== 序章｜出川（12 句，按过场时间轴固定顺序） ============================
+  // Windows Speech 的中文原声只作为可复现离线生成器；轻四川/重庆语感来自台词本身。
+  { key: "prologue_young_dispatch_01", kind: "prologue", file: "vo_prologue_young_dispatch_01.mp3", dur: 1.87, role: "年轻传令兵", pitch: 0, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -1 }, text: "我们出川好久了哦。" },
+  { key: "prologue_old_wound_01", kind: "prologue", file: "vo_prologue_old_wound_01.mp3", dur: 2.47, role: "旧伤士兵", pitch: -2, prologue: true, systemSpeech: { voice: "Microsoft Huihui", rate: -2 }, text: "路莫问，跟到走就是。" },
+  { key: "prologue_young_dispatch_02", kind: "prologue", file: "vo_prologue_young_dispatch_02.mp3", dur: 2.45, role: "年轻传令兵", pitch: 0, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -1 }, text: "我都忘了屋头腊肉是啥味道了。" },
+  { key: "prologue_machine_gunner_01", kind: "prologue", file: "vo_prologue_machine_gunner_01.mp3", dur: 1.65, role: "机枪手", pitch: -1, prologue: true, systemSpeech: { voice: "Microsoft Huihui", rate: 0 }, text: "你娃儿还惦记腊肉。" },
+  { key: "prologue_young_dispatch_03", kind: "prologue", file: "vo_prologue_young_dispatch_03.mp3", dur: 2.19, role: "年轻传令兵", pitch: 0, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -1 }, text: "不惦记吃的惦记啥子嘛。" },
+  { key: "prologue_machine_gunner_02", kind: "prologue", file: "vo_prologue_machine_gunner_02.mp3", dur: 2.45, role: "机枪手", pitch: -1, prologue: true, systemSpeech: { voice: "Microsoft Huihui", rate: 0 }, text: "到了前头，有热水喝你就谢天谢地。" },
+  { key: "prologue_rifleman_01", kind: "prologue", file: "vo_prologue_rifleman_01.mp3", dur: 0.54, role: "擦枪士兵", pitch: 0, prologue: true, systemSpeech: { voice: "Microsoft Yaoyao", rate: -1 }, text: "又卡。" },
+  { key: "prologue_old_wound_02", kind: "prologue", file: "vo_prologue_old_wound_02.mp3", dur: 2.45, role: "旧伤士兵", pitch: -2, prologue: true, systemSpeech: { voice: "Microsoft Huihui", rate: -2 }, text: "你少骂两句，它兴许听话点。" },
+  { key: "prologue_squad_leader_01", kind: "prologue", file: "vo_prologue_squad_leader_01.mp3", dur: 2.44, role: "班长", pitch: -2, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -2 }, text: "莫摆了。线盘再检查一遍，到了地头就要用。" },
+  { key: "prologue_old_wound_03", kind: "prologue", file: "vo_prologue_old_wound_03.mp3", dur: 0.58, role: "旧伤士兵", pitch: -2, prologue: true, systemSpeech: { voice: "Microsoft Huihui", rate: -2 }, text: "近咯。" },
+  { key: "prologue_squad_leader_02", kind: "prologue", file: "vo_prologue_squad_leader_02.mp3", dur: 2.46, role: "班长", pitch: -2, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -2 }, text: "都醒起，装备拿好。" },
+  { key: "prologue_external_officer_01", kind: "prologue", file: "vo_prologue_external_officer_01.mp3", dur: 2.45, role: "车外军官", pitch: -1, prologue: true, systemSpeech: { voice: "Microsoft Kangkang", rate: -1 }, text: "通信排，下车！线盘背起，搞快！" },
+
   { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
   { key: "rally_charge",    kind: "rally",  file: "vo_rally_charge.mp3",   dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
   { key: "rally_dadao",     kind: "rally",  file: "vo_rally_dadao.mp3",    dur: 2.37,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍拢去！" },

@@ -251,6 +251,24 @@ function Encode(tmpWav, outMp3, { hp, lp, bitrate, channels }) {
   return fs.statSync(outMp3).size;
 }
 
+// 序章车厢床的本地确定性生成：低频车体、轮轨重复节奏、空气摩擦和木结构轻响。
+// 不依赖网络或第三方素材；30 秒母带由引擎侧双头交叉淡化，运行时不会直接撞 MP3 首尾。
+function GenerateTrainInterior(rawFile) {
+  execFileSync(FFMPEG, ["-y", "-v", "error",
+    "-f", "lavfi", "-i", "anoisesrc=color=brown:amplitude=0.22:duration=31",
+    "-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.08:duration=31",
+    "-f", "lavfi", "-i", "sine=frequency=72:duration=31",
+    "-f", "lavfi", "-i", "sine=frequency=290:duration=31",
+    "-filter_complex",
+    "[0:a]lowpass=f=160,volume=0.78[h];"
+      + "[1:a]highpass=f=1500,lowpass=f=7000,volume=0.25, tremolo=f=5.6:d=0.65[a];"
+      + "[2:a]tremolo=f=2.8:d=0.9,volume=0.42[w];"
+      + "[3:a]tremolo=f=5.6:d=0.7,volume=0.16[c];"
+      + "[h][a][w][c]amix=inputs=4:duration=longest:normalize=0,"
+      + "alimiter=limit=0.86,afade=t=in:st=0:d=0.15,afade=t=out:st=30.85:d=0.15[out]",
+    "-map", "[out]", "-ac", "2", "-ar", String(SR), "-c:a", "pcm_s16le", rawFile], { stdio: "inherit" });
+}
+
 /** 按目标 RMS 对齐响度，峰值超了再统一压回来（**不**做限幅，压的是整段）。 */
 function Normalize(chans, targetDb) {
   let sum = 0, n = 0, peak = 0;
@@ -335,10 +353,13 @@ async function Main() {
   const failures = [];
 
   for (const group of groups) {
-    const rawFile = path.join(RAW_DIR, group.id + path.extname(group.path || ".mp3"));
+    const rawFile = path.join(RAW_DIR, group.id + (group.path ? path.extname(group.path) : ".wav"));
     console.log(`\n[${group.id}] ${group.credit}`);
     try {
-      if (!fs.existsSync(rawFile)) {
+      if (group.generated) {
+        if (recut && !fs.existsSync(rawFile)) { console.log("  跳过（--recut，本地没有生成母带）"); continue; }
+        if (group.generated === "trainInterior") GenerateTrainInterior(rawFile);
+      } else if (!fs.existsSync(rawFile)) {
         if (recut) { console.log("  跳过（--recut，本地没有原始素材）"); continue; }
         const n = Download(group, rawFile);
         console.log(`  下载 ${(n / 1e6).toFixed(2)} MB`);

@@ -50,6 +50,11 @@ export const AMB_LICENSES = {
     terms: "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
     via: "https://archive.org/details/sonniss.com-gdc-game-audio-bundles",
   },
+  generated: {
+    name: "Taierzhuang1938 procedural synthesis",
+    terms: "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
+    via: "local://Taierzhuang1938/Script_AmbBake.mjs",
+  },
 };
 
 const ARCHIVE = "https://archive.org/download/";
@@ -60,6 +65,15 @@ export function ArchiveUrl(item, filePath) {
 }
 
 export const AMB_SOURCES = [
+  // 序章车厢床：完全由本地确定性合成器生成，不含外部录音或音乐。
+  // Script_AmbBake.mjs 在缺少 _raw/TrainInteriorGenerated.wav 时按 generator 重建。
+  {
+    id: "TrainInteriorGenerated",
+    generated: "trainInterior",
+    credit: "Taierzhuang1938 procedural synthesis · 轮轨、车体低频、木结构轻响",
+    license: "generated",
+    beds: [{ cue: "trainInterior", durS: 30, rms: -25, lp: 9000 }],
+  },
   // === 空间层：这地方本身的声音 ===========================================
   {
     id: "MeadowPlain",
