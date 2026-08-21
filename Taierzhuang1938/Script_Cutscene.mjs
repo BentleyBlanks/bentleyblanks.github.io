@@ -272,6 +272,10 @@ export class CutsceneDirector {
     this.lookNeutral = false;
     this.lookConfig = ResolveHeadLookConfig(null, null);
     this.headLook = false;
+    this.walkConfig = null;
+    this.walkOffset = new THREE.Vector3();
+    this.walkBob = 0;
+    this.walkKeys = new Set();
     this._released = false;
     this.subSlots = [];               // { text, tier, small, big, note, until }
     this.lineSlot = null;
@@ -284,9 +288,16 @@ export class CutsceneDirector {
       if (!this.playing) return;
       // 卡片阶段优先：这时候 Esc 的意思是「翻过卡片」，不是「再跳过一次」。
       if (this.cardTime >= 0) { this.cardTime = this.cardHold; return; }
-      if (event.key === "Escape") this.Skip();
+      if (event.key === "Escape") { this.Skip(); return; }
+      const key = String(event.key || "").toLowerCase();
+      if (this.walkConfig && ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright"].includes(key)) {
+        this.walkKeys.add(key);
+        event.preventDefault();
+      }
     };
+    this._onKeyUp = (event) => { this.walkKeys.delete(String(event.key || "").toLowerCase()); };
     if (this.doc) this.doc.addEventListener("keydown", this._onKey);
+    if (this.doc) this.doc.addEventListener("keyup", this._onKeyUp);
   }
 
   get Playing() { return this.playing; }
@@ -299,9 +310,10 @@ export class CutsceneDirector {
   AddLook(deltaX = 0, deltaY = 0) {
     if (!this.AllowsLook) return this.Look;
     const scale = this.lookConfig.sensitivityScale * 0.002;
-    this.lookYaw = ClampHeadLook(this.lookYaw + Number(deltaX || 0) * scale, this.lookConfig.yaw);
-    // movementY 正值代表鼠标向下，因此相机 pitch 反向增加才是抬头为正。
-    this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this.lookConfig.pitch);
+    // three 的相机默认朝 -Z：正 yaw 会向左、正 pitch 会向下。此前把两条都按
+    // 常见公式正着加，导致右移看左、下移抬头；这里明确按相机坐标系取反/取正。
+    this.lookYaw = ClampHeadLook(this.lookYaw - Number(deltaX || 0) * scale, this.lookConfig.yaw);
+    this.lookPitch = ClampHeadLook(this.lookPitch + Number(deltaY || 0) * scale, this.lookConfig.pitch);
     return this.Look;
   }
 
@@ -384,6 +396,10 @@ export class CutsceneDirector {
     this.lookNeutral = !!(this.ctx.neutralLook || this.ctx.forceNeutralLook || this.ctx.deterministicView);
     this.lookYaw = 0;
     this.lookPitch = 0;
+    this.walkConfig = cut.walk || null;
+    this.walkOffset.set(0, 0, 0);
+    this.walkBob = 0;
+    this.walkKeys.clear();
     this._released = false;
     // fadeIn：从黑场淡入（开场过场用）。没写就是硬切进第一镜。
     this.blackAlpha = cut.fadeIn ? 1 : 0;
@@ -479,8 +495,9 @@ export class CutsceneDirector {
 
     // 先摆人再摆机位：机位可以 lookActor / fromActor 跟着人走，人得先就位。
     this._ApplyActors(cut, dt);
+    this._UpdateWalk(cut, dt);
     this._ApplyCamera(cut, shot, local);
-    this._ApplyProps(shot, local);
+    this._ApplyProps(cut, shot, local);
     this._FireCues(cut, shot, start, local);
     this._ApplyFlashes(cut, shot, start);
     this._ApplyBlack(shot, local, dt);
@@ -535,6 +552,9 @@ export class CutsceneDirector {
         // KIND_SPEC 里的 defaultWeapon（中正式），于是「王铭章手里是望远镜不是枪」
         // 和「每三人里有一人空着手」这两条都当场作废 —— 后者是史实点，不是美术偏好。
         if ("weapon" in spec && typeof actor.SetWeapon === "function") actor.SetWeapon(spec.weapon || null);
+        // 独立车厢没有接进正片地形的 groundProbe；让它去采远处 L0 的高度会把
+        // 脚踝拉进钢地板。车厢地板是平的，按数据给 root 的脚底高度即可。
+        actor.allowFootIk = false;
         actor.root.visible = false;
         this.setRoot.add(actor.root);
         this.actors.set(spec.id, { actor, spec });
@@ -640,7 +660,9 @@ export class CutsceneDirector {
       // 按「几何尺寸 ÷ 贴图的物理尺寸（约 2 m）」给 repeat，地面才像地面。
       const options = {};
       if (spec.repeat !== undefined) options.repeat = spec.repeat;
-      if (spec.tint !== undefined) options.color = spec.tint;
+      // props 的旧数据多写的是 color，而材质库的调色旋钮叫 color；此前只认
+      // tint，导致车窗外层的深色土野被程序地面贴图冲成一整块发白幕布。
+      if (spec.tint !== undefined || spec.color !== undefined) options.color = spec.tint ?? spec.color;
       if (spec.roughness !== undefined) options.roughness = spec.roughness;
       try { material = this.library.Get(spec.mat, options); } catch (error) { material = null; }
     }
@@ -819,14 +841,14 @@ export class CutsceneDirector {
     const lx = anchorLook ? anchorLook.x : 0, ly = anchorLook ? anchorLook.y : 0, lz = anchorLook ? anchorLook.z : 0;
 
     this.camera.position.set(
-      o.x + fx + Lerp(from[0], to[0], e),
-      o.y + fy + Lerp(from[1], to[1], e),
-      o.z + fz + Lerp(from[2], to[2], e),
+      o.x + fx + Lerp(from[0], to[0], e) + this.walkOffset.x,
+      o.y + fy + Lerp(from[1], to[1], e) + this.walkBob,
+      o.z + fz + Lerp(from[2], to[2], e) + this.walkOffset.z,
     );
     const target = new THREE.Vector3(
-      o.x + lx + Lerp(look[0], lookTo[0], e),
+      o.x + lx + Lerp(look[0], lookTo[0], e) + this.walkOffset.x,
       o.y + ly + Lerp(look[1], lookTo[1], e),
-      o.z + lz + Lerp(look[2], lookTo[2], e),
+      o.z + lz + Lerp(look[2], lookTo[2], e) + this.walkOffset.z,
     );
     // 近平面：微距特写（85 mm 打 0.4 m 外的纸）默认 0.08 也够，但长焦回望
     // 300 m 外的城墙时把 near 抬起来能省一大截深度精度。按机位到被摄物的距离给。
@@ -911,13 +933,46 @@ export class CutsceneDirector {
     }
   }
 
-  _ApplyProps(shot, local) {
+  /** 车厢小空间的受限步行：WASD/方向键可走，但绝不穿过侧墙或关着的车门。 */
+  _UpdateWalk(cut, dt) {
+    const config = cut.walk;
+    if (!config || this.lookNeutral || this.time < (config.startAt || 0)) { this.walkBob = 0; return; }
+    const down = (a, b) => this.walkKeys.has(a) || this.walkKeys.has(b);
+    let x = (down("d", "arrowright") ? 1 : 0) - (down("a", "arrowleft") ? 1 : 0);
+    let z = (down("w", "arrowup") ? 1 : 0) - (down("s", "arrowdown") ? 1 : 0);
+    const moving = x !== 0 || z !== 0;
+    if (moving) {
+      const length = Math.hypot(x, z);
+      x /= length; z /= length;
+      const speed = Number(config.speed) || 2;
+      const min = config.min || [-3, -7];
+      const max = config.max || [3, 7];
+      this.walkOffset.x = Clamp(this.walkOffset.x + x * speed * dt, min[0], max[0]);
+      this.walkOffset.z = Clamp(this.walkOffset.z + z * speed * dt, min[1], max[1]);
+      this.walkBob = Math.sin(this.time * 11.5) * 0.018;
+    } else this.walkBob *= Math.max(0, 1 - dt * 12);
+  }
+
+  _ApplyProps(cut, shot, local) {
     // 每帧先把所有道具放回基准位，再叠加本镜的位移 ——
     // 否则上一镜的位移会留在道具身上，切回来道具就飘在半空。
     for (const entry of this.props.values()) {
       if (entry.attached) continue;
       entry.mesh.position.copy(entry.base);
       if (entry.baseRot) entry.mesh.rotation.copy(entry.baseRot);
+    }
+    // 车窗外的近／中／远景按全局时钟循环移动。局部镜头（如小站）仍可在下面
+    // 用 propMoves 覆盖，以保证关键叙事经过站台时有精确构图。
+    for (const move of cut.ambientMotion || []) {
+      const entry = this.props.get(move.name);
+      if (!entry || entry.attached || !Array.isArray(move.from) || !Array.isArray(move.axis)) continue;
+      const span = Math.max(0.01, Number(move.span) || 1);
+      const d = ((this.time * (Number(move.speed) || 0)) % span + span) % span;
+      entry.mesh.position.set(
+        move.from[0] + move.axis[0] * d,
+        move.from[1] + move.axis[1] * d,
+        move.from[2] + move.axis[2] * d,
+      );
     }
     // 同一道具可以给多段位移（先掉到地上再滑、震一下再回弹）：只让**已经开始**的那
     // 一段里最晚开始的生效。原来是「数组里最后一条赢」—— 第二段在自己 startAt 之前
@@ -1177,6 +1232,7 @@ export class CutsceneDirector {
   Dispose() {
     if (this.playing) this._Finish(true);
     if (this.doc && this._onKey) this.doc.removeEventListener("keydown", this._onKey);
+    if (this.doc && this._onKeyUp) this.doc.removeEventListener("keyup", this._onKeyUp);
     if (this.dom && this.dom.root.parentNode) this.dom.root.parentNode.removeChild(this.dom.root);
     this.dom = null;
     if (this.flashTexture) { this.flashTexture.dispose(); this.flashTexture = null; }

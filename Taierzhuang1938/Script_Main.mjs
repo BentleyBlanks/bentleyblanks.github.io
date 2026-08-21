@@ -417,6 +417,11 @@ async function Boot() {
         orm: "./Texture/Texture_GroundOrm.webp?v=1",
       }),
     ]);
+    await Promise.all([
+      library.LoadExternalAlbedo("CarriageWallSteel", "Steel", "./Texture/Texture_CarriageRivetedSteelBase.png?v=1"),
+      library.LoadExternalAlbedo("CarriageFloorSteel", "Steel", "./Texture/Texture_CarriageTreadSteelBase.png?v=1"),
+      library.LoadExternalAlbedo("CarriageCeilingSteel", "Steel", "./Texture/Texture_CarriageCeilingSteelBase.png?v=1"),
+    ]);
   } catch (error) {
     console.warn(`[Main] 外部 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
   }
@@ -912,6 +917,7 @@ async function Boot() {
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
+      PlayPrologue: () => StartMenuPrologue(),
       Resume: () => ResumeFromPause(),
       // 暂停菜单留在下面；关掉设置面板后仍回到暂停层，不会误恢复战斗。
       Settings: () => editor.TogglePanel(true),
@@ -1849,7 +1855,7 @@ function StartPreview() {
   state.previewDone = false;
   state.previewError = null;
   // WebAudio 必须在真人手势内解锁。预览页保留一次「播放序章」点击，
-  // 点击后 95 秒时间轴仍完全自动推进；直接在 Boot() 尾部自动起播会让
+  // 点击后两分钟时间轴仍完全自动推进；直接在 Boot() 尾部自动起播会让
   // Chrome / Safari 把上下文留在 suspended，结果是画面正常而全段静音。
   audio.Unlock();
   ReleasePointerLock();
@@ -1865,6 +1871,21 @@ function StartPreview() {
     state.running = false;
     if (ai) ai.Dispose();
   });
+  return true;
+}
+
+/** 选章里的临时入口：先不伪造「出川 → 界河」的可玩接缝，播完回到选章。 */
+function StartMenuPrologue() {
+  if (!cutscene || cutscene.Playing) return false;
+  state.menu = false;
+  state.running = false;
+  menu?.Close();
+  hudRoot.style.display = "";
+  audio.Unlock();
+  ReleasePointerLock();
+  RunCutscene("CS_Chuchuan")
+    .catch((error) => console.error("[Main] 序章预览失败", error))
+    .finally(() => { if (MENU_ON) OpenMenu(); });
   return true;
 }
 

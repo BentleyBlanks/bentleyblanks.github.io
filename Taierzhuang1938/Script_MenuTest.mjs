@@ -150,20 +150,21 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 3) 选章：七关、简报、那张全图
+// 3) 选章：临时序章入口、七关、简报、那张全图
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
   await page.waitForTimeout(150);
   const panel = await page.evaluate(() => ({
     levels: [...document.querySelectorAll("#menu .mnLevel")].length,
+    prologue: document.querySelector("#menu .mnProloguePreview")?.textContent || "",
     map: !!document.querySelector("#menu .mnMap"),
     zones: document.querySelectorAll("#menu .mnMapZone").length,
     title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  Check("选章列出七关", panel.levels === 7, `levels=${panel.levels}`);
+  Check("选章列出临时序章入口与七关", panel.levels === 8 && panel.prologue.includes("出川"), `levels=${panel.levels} prologue=${panel.prologue}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
   Check("简报有标题、目标清单与进入按钮",

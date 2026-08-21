@@ -348,6 +348,23 @@ export class MainMenu {
     wrap.appendChild(this.el.brief);
     this.el.levelsWrap = wrap;
 
+    // 这是临时审片入口，不混进 PHASES／存档／默认继续关；等《断线》接完再把它
+    // 变成正式第一关。放在选章最上面，让玩家无需记 query 参数也能选到新版序章。
+    const prologue = document.createElement("button");
+    prologue.className = "mnLevel mnProloguePreview";
+    const prologueSpan = (cls, text) => {
+      const s = document.createElement("span");
+      s.className = cls;
+      s.textContent = text;
+      prologue.appendChild(s);
+    };
+    prologueSpan("mnLvNo", "序");
+    prologueSpan("mnLvName", "出川 · 车厢序章");
+    prologueSpan("mnLvDate", "临时入口 · 约 2 分钟");
+    prologueSpan("mnLvMark", "预览");
+    prologue.addEventListener("click", () => this.host.PlayPrologue?.());
+    this.el.levelList.appendChild(prologue);
+
     this.levelEls = this.phases.map((phase, i) => {
       const b = document.createElement("button");
       b.className = "mnLevel";

@@ -251,6 +251,29 @@ export class MaterialLibrary {
   }
 
   /**
+   * 为局部布景换一张作者绘制的 base color，但继续复用一套已经验过的
+   * normal + ORM。这样车厢可以有专属的铆钉钢板／防滑钢板，同时不把
+   * PBR 降级成一张无粗糙度、无金属度的彩色贴图。
+   */
+  async LoadExternalAlbedo(name, fallbackName, albedo) {
+    const fallback = this.baked.get(fallbackName);
+    if (!fallback) throw new Error(`材质未烘焙：${fallbackName}`);
+    const loader = new THREE.TextureLoader();
+    const texture = await loader.loadAsync(albedo);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = this.anisotropy;
+    texture.needsUpdate = true;
+    this.baked.set(name, { albedo: texture, normal: fallback.normal, orm: fallback.orm });
+    this.materials.clear();
+    return name;
+  }
+
+  /**
    * 取一份材质。同一个 name + 同一组 options 只建一次。
    * @param {string} name 配方名
    * @param {object} options repeat / normalScale / roughness / metalness / color / side / transparent

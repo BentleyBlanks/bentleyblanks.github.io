@@ -63,9 +63,9 @@ const audio = {
 
 const cfg = ResolveHeadLookConfig(cut);
 let yaw = 0, pitch = 0;
-yaw = ClampHeadLook(yaw + 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
-pitch = ClampHeadLook(pitch - (-1000) * cfg.sensitivityScale * 0.002, cfg.pitch);
-assert.deepEqual({ yaw, pitch }, { yaw: 0.2, pitch: 0.1 }, "director look overlay clamps at both limits");
+yaw = ClampHeadLook(yaw - 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
+pitch = ClampHeadLook(pitch + (-1000) * cfg.sensitivityScale * 0.002, cfg.pitch);
+assert.deepEqual({ yaw, pitch }, { yaw: -0.2, pitch: -0.1 }, "right/down mouse motion follows the rendered camera axes and clamps");
 assert.deepEqual({ yaw: 0, pitch: 0 }, { yaw: 0, pitch: 0 }, "neutral view is deterministic");
 assert.equal(oldCut.cameraMode, undefined, "old cutscene has no headLook mode");
 
@@ -77,10 +77,10 @@ director.onRelease = (c) => finished.push(c?.id);
 const play = director.Play(cut.id);
 assert.equal(director.AllowsLook, true);
 director.AddLook(1000, -1000);
-assert.deepEqual(director.Look, { yaw: 0.2, pitch: 0.1 }, "director look clamps at both limits");
+assert.deepEqual(director.Look, { yaw: -0.2, pitch: -0.1 }, "director look uses the corrected rendered-camera directions");
 const baselineYaw = director.camera._yaw;
 director.Update(0);
-assert.equal(director.camera._yaw, baselineYaw + 0.2, "director camera plus Look yaw are composed");
+assert.equal(director.camera._yaw, baselineYaw - 0.2, "director camera plus corrected Look yaw are composed");
 director.SetNeutralLook(true);
 assert.deepEqual(director.Look, { yaw: 0, pitch: 0 }, "neutral view resets look");
 director.Update(1.1);
