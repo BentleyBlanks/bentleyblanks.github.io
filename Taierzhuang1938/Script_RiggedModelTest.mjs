@@ -75,8 +75,13 @@ for (const bone of ["Hips", "Spine2", "Head", "LeftHand", "RightFoot"])
   assert.ok(soldierNames.has(bone), `IJA Humanoid bone ${bone}`);
 for (const clip of ["Idle", "Walk", "AimRifle", "Death"])
   assert.ok(soldierAnimations.has(clip), `IJA animation ${clip}`);
-for (const segment of ["Segment_chest", "Segment_neck", "Segment_armL", "Segment_foreR",
-  "Segment_thighL", "Segment_shinR", "Segment_footL"])
+// Each compatibility segment is independently parented to the old gameplay
+// rig. Keep this exhaustive: a missing limb silently falls back to a detached
+// or invisible procedural piece at runtime.
+for (const segment of ["Segment_hips", "Segment_chest", "Segment_neck",
+  "Segment_armL", "Segment_foreL", "Segment_armR", "Segment_foreR",
+  "Segment_thighL", "Segment_shinL", "Segment_footL",
+  "Segment_thighR", "Segment_shinR", "Segment_footR"])
   assert.ok(soldierNames.has(segment), `IJA compatibility segment ${segment}`);
 AssertHumanHead(soldier, "IJA soldier", 1.62);
 const helmet = SegmentBounds(soldier, "Segment_neck_HelmetBrim");
