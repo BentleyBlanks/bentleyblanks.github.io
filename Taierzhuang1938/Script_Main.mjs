@@ -201,6 +201,9 @@ const graphics = {
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
+  // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
+  godEnabled: false,
   // 探针体：开关 + 强度倍率。强度乘在预设的 envIntensity 上（跟其它后处理项一个规矩：
   // 预设定「这一关的天有多强」，设置只定「画多重」）。
   gi: true, giStrength: 1,
@@ -2938,7 +2941,7 @@ function RenderScene(dt) {
     fog: preset.fog,
     exposure: preset.exposure,
     bloom: preset.bloom * graphics.bloom,
-    godStrength: preset.godStrength * graphics.god,
+    godStrength: graphics.godEnabled ? preset.godStrength * graphics.god : 0,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,

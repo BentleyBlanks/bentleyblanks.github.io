@@ -146,6 +146,14 @@ export class GraphicsSettings {
       + "屋里屋外一个亮度，那正是它要解决的问题。low 画质档不建探针体，这一栏对它无效。", true);
 
     const post = Section(body, "后处理强度（倍率）");
+    const godBox = document.createElement("div");
+    godBox.className = "edBtns";
+    post.appendChild(godBox);
+    Toggle(godBox, "体积光（临时默认关）", gfx.godEnabled === true,
+      (on) => { gfx.godEnabled = on; this.Save(); });
+    Note(post, "体积光近期在观察它对帧率的影响，出厂先关着。这是整个 pass 的总闸："
+      + "关掉时径向模糊那一趟直接不跑，比把强度拉到 0 更省。打开后强度用下面"
+      + "「体积光」那根倍率调。", true);
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
       format: (v) => `×${v.toFixed(2)}`,
@@ -196,7 +204,7 @@ export class GraphicsSettings {
   Reset() {
     const gfx = this.gfx;
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
-    gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1;
+    gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = true; gfx.giStrength = 1;
     this.Apply();
