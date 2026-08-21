@@ -69,7 +69,7 @@ async function Boot() {
     await new Promise((r) => requestAnimationFrame(r));
   }
   const preset = sky.Apply(presetName);
-  sky.ClearEnvironment(scene);
+  sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   scene.fog = null;   // 雾收到合成 pass 里
   if (sceneKind === "materials") BuildMaterialScene(); else BuildStreetScene();

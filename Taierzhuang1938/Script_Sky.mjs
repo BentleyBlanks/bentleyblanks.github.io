@@ -1,8 +1,8 @@
 // 《血战台儿庄》程序化天空。
 //
-// 间接光不再从这张会随关卡重烘的环境贴图来：默认基线由 Script_Light 的通用
-// Global SH Probe + AmbientColor 提供；玩家打开实时 GI 时，探针体负责位置相关
-// 的反弹光。这样默认不再有 PMREM/IBL 的重烘与各向同性补光。
+// 默认间接光由 Global SH Probe + 环境贴图共同提供：SH 托住漫反射的方向感，
+// PMREM 则给人物军装、钢盔和刀枪保留必要的反射。缺掉环境贴图时，背光的人物和
+// 金属会直接压成黑色；实时 GI 打开后再补上位置相关的反弹光。
 //
 // 天空本身是解析式的（不是 Preetham 原版，是一套可控的美术化模型）：
 // 天顶色 -> 地平线色的梯度 + 太阳盘 + 前向散射辉光 + 高空烟层 + 战场烟尘带。
@@ -339,6 +339,9 @@ export class SkyDome {
     // 真正生效的是这一行：PostPipeline 的预通道会把标了它的对象整个藏掉。
     this.mesh.userData.skipNormalDepth = true;
 
+    this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
+    if (this.pmrem) this.pmrem.compileEquirectangularShader();
+    this.envTarget = null;
     this.presetName = null;
     this.preset = null;
     this.sunDirection = new THREE.Vector3(0, 1, 0);
@@ -369,16 +372,23 @@ export class SkyDome {
   }
 
   /**
-   * 清掉旧的 PMREM 环境贴图。
-   *
-   * 保留这个小入口是为了让关卡切换始终显式宣告「天空只负责可见背景」，而不是
-   * 又把它悄悄接回材质 IBL。默认间接光见 Script_Light 的 Global SH Probe。
+   * 把当前天空烘成环境贴图挂到场景上。
+   * 贵（约 10—20ms），只在换关/换时段时调，**不许每帧调**。
    */
-  ClearEnvironment(scene) {
+  BakeEnvironment(scene) {
+    if (!this.pmrem) return null;
+    const skyScene = new THREE.Scene();
+    const dome = new THREE.Mesh(this.mesh.geometry, this.material);
+    dome.frustumCulled = false;
+    skyScene.add(dome);
+    if (this.envTarget) this.envTarget.dispose();
+    this.envTarget = this.pmrem.fromScene(skyScene, 0.04);
+    skyScene.remove(dome);
     if (scene) {
-      scene.environment = null;
-      scene.environmentIntensity = 1;
+      scene.environment = this.envTarget.texture;
+      scene.environmentIntensity = this.preset?.envIntensity ?? 1;
     }
+    return this.envTarget.texture;
   }
 
   Update(elapsedSeconds) {
@@ -388,5 +398,7 @@ export class SkyDome {
   Dispose() {
     this.material.dispose();
     this.mesh.geometry.dispose();
+    if (this.envTarget) this.envTarget.dispose();
+    if (this.pmrem) this.pmrem.dispose();
   }
 }

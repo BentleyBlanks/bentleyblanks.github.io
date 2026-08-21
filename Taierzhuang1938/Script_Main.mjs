@@ -462,7 +462,7 @@ async function Boot() {
 
   const phase = PHASES[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
-  sky.ClearEnvironment(scene);
+  sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
@@ -585,7 +585,7 @@ async function Boot() {
       if (!SKY_PRESETS[name]) return false;
       cutsceneSky = name;
       const preset = sky.Apply(name);
-      sky.ClearEnvironment(scene);
+      sky.BakeEnvironment(scene);
       lights.ApplyPreset(preset, sky.sunDirection);
       return true;
     },
@@ -594,7 +594,7 @@ async function Boot() {
       cutsceneSky = null;
       const phase = PHASES[state.phaseIndex];
       const preset = sky.Apply(phase.sky);
-      sky.ClearEnvironment(scene);
+      sky.BakeEnvironment(scene);
       lights.ApplyPreset(preset, sky.sunDirection);
     },
   });
@@ -1166,7 +1166,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   const far = phase.cameraFar ?? battlefield.cameraFar ?? 620;
   if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
   const preset = sky.Apply(phase.sky);
-  sky.ClearEnvironment(scene);
+  sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);

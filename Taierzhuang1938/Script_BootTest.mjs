@@ -111,6 +111,9 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         spread: max - min,
         tones: tones.size,
         programs: T.renderer.info.programs.length,
+        // 环境贴图不是可有可无的装饰：军装背光和金属刀枪都依赖它的 IBL。
+        // 少它时整个交战双方会压成黑色，普通的全帧色调统计抓不住这条回归。
+        hasEnvironment: T.scene.environment?.isTexture === true,
         geometries: T.renderer.info.memory.geometries,
         soldiers: T.ai ? T.ai.soldiers.length : -1,
         alive: T.ai ? T.ai.aliveCount : -1,
@@ -151,6 +154,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     // 夜战本来就只有很窄的一段动态，阀值得分档
     const toneFloor = (phase === 3 || phase === 5) ? 5 : 12;
     if (health.tones < toneFloor) bad.push(`色调档位太少 tones=${health.tones}`);
+    if (!health.hasEnvironment) bad.push("场景缺少环境贴图（人物与刀枪会变黑）");
     if (health.drawCalls < 12) bad.push(`几乎没画东西 calls=${health.drawCalls}`);
     if (health.triangles < 50000) bad.push(`三角形太少 tris=${health.triangles}`);
     // 性能硬红线（上界）。不能靠隐藏活人与删除尸体把数字压回去。
