@@ -391,14 +391,14 @@ async function Boot() {
   try {
     await Promise.all([
       library.LoadExternalSet("Steel", {
-        albedo: "./Texture/Texture_WeaponSteelBase.webp?v=1",
-        normal: "./Texture/Texture_WeaponSteelNormal.webp?v=1",
-        orm: "./Texture/Texture_WeaponSteelOrm.webp?v=1",
+        albedo: "./Texture/Texture_WeaponSteelV2Base.webp?v=1",
+        normal: "./Texture/Texture_WeaponSteelV2Normal.webp?v=1",
+        orm: "./Texture/Texture_WeaponSteelV2Orm.webp?v=1",
       }),
       library.LoadExternalSet("WoodStock", {
-        albedo: "./Texture/Texture_WeaponWoodBase.webp?v=1",
-        normal: "./Texture/Texture_WeaponWoodNormal.webp?v=1",
-        orm: "./Texture/Texture_WeaponWoodOrm.webp?v=1",
+        albedo: "./Texture/Texture_WeaponWoodV2Base.webp?v=1",
+        normal: "./Texture/Texture_WeaponWoodV2Normal.webp?v=1",
+        orm: "./Texture/Texture_WeaponWoodV2Orm.webp?v=1",
       }),
       library.LoadExternalSet("TreeBark", {
         albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",

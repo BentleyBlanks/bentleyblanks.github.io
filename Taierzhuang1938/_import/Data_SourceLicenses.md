@@ -5,9 +5,13 @@
 `_import/Source/` 下的是可追溯、可重建的原始素材，页面不会直接加载。
 
 武器 TZM 保留几何、UV 与 steel/wood 材质分区。源包自带的 2K/4K 贴图不直接进入 Pages；
-全部枪械共享 `Texture/Texture_WeaponSteel*` 与 `Texture/Texture_WeaponWood*` 的 512px
+全部枪械共享 `Texture/Texture_WeaponSteelV2*` 与 `Texture/Texture_WeaponWoodV2*` 的 512px
 BaseColor / Normal / ORM，避免一个班每把枪都重复下载大图。两套基础材质由 OpenAI 内置
-imagegen 生成，再由 `BuildWeaponPbr.py` 派生法线与 glTF 通道顺序的 ORM
+imagegen 生成去光照、无物体轮廓的可平铺 Albedo；`BuildWeaponPbr.py` 再从同一像素源派生
+法线与 glTF 通道顺序的 ORM（R=AO、G=roughness、B=metalness），以保证四个 PBR 通道对齐。
+历史特征按仓库记录的公开、可再分发来源和以下枪型实物照片进行复核：中正式/汉阳造分别保留
+毛瑟标准型短管与 Gewehr 88 套筒；ZB-26 保留上插直弹匣、散热环、提把与两脚架；三八式保留
+防尘滑盖、直拉机柄、护翼准星与安全帽；C96 保留前置固定弹仓、节套、长抽壳钩与扫帚柄握把。
 （R=AO、G=roughness、B=metalness）。人物 GLB 则保留各自贴图、蒙皮、骨架与动画。
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |

@@ -323,7 +323,17 @@ def BuildZb26():
     receiver = Box(0.040, 0.058, 0.290, bevel=0.005)
     Transform(receiver, y=BORE - 0.008, z=-0.090)
     body.Add("steel", receiver, tile=T_STEEL)
-    body.Add("steel", TriggerGuard(0.006, -0.036, 0.004, drop=0.024), tile=T_STEEL)
+    # 右侧拉机柄与抛壳口：从持枪右侧读到的是一条开口和一根短柄，
+    # 这两处缺失会把机匣读成一整块玩具塑料。
+    ejector = Box(0.004, 0.022, 0.080, bevel=0.0015)
+    Transform(ejector, x=0.021, y=BORE + 0.004, z=-0.105)
+    body.Add("steel", ejector, tile=T_STEEL)
+    charging = Box(0.012, 0.012, 0.046, bevel=0.002)
+    Transform(charging, x=0.019, y=BORE + 0.004, z=-0.020)
+    body.Add("steel", charging, tile=T_STEEL)
+    # 两端上插进机匣 12 mm；此前护圈顶只到机匣下缘下方 4 mm，
+    # 实体审计会正确地把它判成悬空零件。
+    body.Add("steel", TriggerGuard(0.006, -0.036, 0.010, drop=0.024), tile=T_STEEL)
 
     # **弹匣从上方插**：20 发直弹匣，微微后倾。这是 ZB-26 一眼可辨的地方，
     # 也是它和布伦（弯弹匣）的分界。弹匣是竖的，所以沿 +Y 放样再装上机匣顶。
@@ -415,8 +425,19 @@ def BuildType38():
     body.Add("steel", cover, tile=T_STEEL)
 
     body.Add("steel", TubeAlongZ(-0.110, muzzleZ, 0.0082, 0.0070), tile=T_STEEL)
+    # 两道箍和下方通条给长护木一个真实的装配节奏，而不是一根连续木棒。
+    for z in (-0.370, -0.700):
+        body.Add("steel", TubeAlongZ(z + 0.006, z - 0.006, 0.0150, 0.0150,
+                                      segments=12), tile=T_STEEL)
+    body.Add("steel", TubeAlongZ(-0.255, muzzleZ + 0.090, 0.0017, 0.0017,
+                                  segments=8, y=BORE - 0.022), tile=T_STEEL)
     # 三八式的拉机柄近乎水平、球头小
     body.Add("steel", BoltHandle(0.010, 0.10, knob=0.0095), tile=T_STEEL)
+    # 三八式枪机尾的安全帽是与毛瑟族最容易区分的近景体块。
+    safety = LoftZ([Ring(0.050, r=0.012, cz=BORE + 0.005),
+                    Ring(0.030, r=0.013, cz=BORE + 0.005),
+                    Ring(0.015, r=0.010, cz=BORE + 0.005)], 10)
+    body.Add("steel", safety, tile=T_STEEL)
     body.Add("steel", LadderSight(-0.185), tile=T_STEEL)
     body.Add("steel", FrontSight(muzzleZ + 0.024, hooded=True), tile=T_STEEL)
     lug = Box(0.010, 0.014, 0.040)

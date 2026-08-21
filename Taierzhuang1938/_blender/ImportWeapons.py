@@ -15,7 +15,7 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-from TzmCore import Decimate, Join, Node
+from TzmCore import Box, Decimate, Join, Node, Transform
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
@@ -249,6 +249,71 @@ def _AddJacket(steel, length_m):
     return steel
 
 
+def _AddHistoricalDetails(name, steel, wood, length_m):
+    """Layer the recognisable service features onto the license-safe base meshes.
+
+    The donor Kar98k has the right Mauser family proportions but omits the small
+    parts which make a close-up read as a Zhongzheng rather than a generic game
+    rifle.  These additions are deliberately separate, slightly embedded meshes:
+    they keep the source licence boundary clean while giving the first-person
+    silhouette real bands, guides and hardware.
+    """
+    from BuildWeapons import TubeAlongZ
+
+    muzzle_z = -(length_m - BUTT_Z)
+    steel_parts = []
+
+    def SteelBox(w, h, d, *, x=0.0, y=0.0, z=0.0, rz=0.0):
+        part = Box(w, h, d, bevel=0.0012, segments=2)
+        Transform(part, x=x, y=y, z=z, rz=rz)
+        steel_parts.append(part)
+
+    if name == "ZhongZheng":
+        # Clip guide and the two wide barrel bands identify the Mauser-standard
+        # Chinese rifle in close view; a thin cleaning rod completes the fore-end.
+        SteelBox(0.028, 0.008, 0.050, y=BORE + 0.028, z=-0.046)
+        for z in (-0.315, -0.585):
+            steel_parts.append(TubeAlongZ(z + 0.007, z - 0.007, 0.0172, 0.0172,
+                                          segments=12, y=BORE))
+        steel_parts.append(TubeAlongZ(-0.250, muzzle_z + 0.085, 0.0018, 0.0018,
+                                      segments=8, y=BORE - 0.022))
+
+    elif name == "HanYang":
+        # The Gewehr-88-pattern jacket gets stepped retaining collars.  The
+        # exposed cleaning rod and clip-guide stop the long rifle reading as an
+        # up-scaled Kar98k.
+        SteelBox(0.028, 0.008, 0.050, y=BORE + 0.028, z=-0.046)
+        for z in (-0.345, -0.720):
+            steel_parts.append(TubeAlongZ(z + 0.008, z - 0.008, 0.0176, 0.0176,
+                                          segments=12, y=BORE))
+        steel_parts.append(TubeAlongZ(-0.250, muzzle_z + 0.095, 0.0018, 0.0018,
+                                      segments=8, y=BORE - 0.022))
+
+    elif name == "Mauser96":
+        # C96: long right-side extractor, rear sight base and lanyard boss.  The
+        # source model has the major silhouette; these small forms supply the
+        # recognisable machined planes at first-person distance.
+        SteelBox(0.006, 0.006, 0.072, x=0.014, y=BORE + 0.024, z=-0.090)
+        SteelBox(0.022, 0.012, 0.020, y=BORE + 0.022, z=-0.042)
+        SteelBox(0.012, 0.010, 0.012, y=-0.082, z=0.018)
+        if wood is not None:
+            panels = []
+            for side in (-1.0, 1.0):
+                panel = Box(0.0038, 0.056, 0.060, bevel=0.0010, segments=2)
+                Transform(panel, x=side * 0.0185, y=-0.042, z=-0.010, rz=0.10)
+                panels.append(panel)
+            wood = Join(wood, *panels)
+
+    if steel_parts:
+        steel = Join(steel, *steel_parts)
+        bmesh.ops.remove_doubles(steel, verts=steel.verts[:], dist=1e-4)
+        steel.normal_update()
+    if wood is not None:
+        bmesh.ops.remove_doubles(wood, verts=wood.verts[:], dist=1e-4)
+        wood.normal_update()
+    return steel, wood
+
+
 def _Mounts(node, length_m, kind, lo, hi):
     muzzle_z = lo.z - 0.006
     if kind == "rifle":
@@ -287,6 +352,8 @@ def BuildImported(name):
     if spec.get("jacket") and steel is not None:
         steel = _AddJacket(steel, spec["lengthM"])
         bms = [bm for bm in (steel, wood) if bm is not None]
+    steel, wood = _AddHistoricalDetails(name, steel, wood, spec["lengthM"])
+    bms = [bm for bm in (steel, wood) if bm is not None]
     decimated = _DecimateToBudget(bms)
     if decimated is not None:
         steel = decimated[0]

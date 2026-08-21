@@ -44,8 +44,9 @@ def _orm(image: Image.Image, *, metalness: int, rough_min: int, rough_max: int) 
     return Image.fromarray(packed, "RGB")
 
 
-def build(stem: str, *, normal_strength: float, metalness: int, rough_min: int, rough_max: int) -> None:
-    source = SOURCE / f"Texture_{stem}Source.png"
+def build(stem: str, *, source_stem: str | None = None, normal_strength: float,
+          metalness: int, rough_min: int, rough_max: int) -> None:
+    source = SOURCE / f"Texture_{source_stem or stem}Source.png"
     base = _seamless(Image.open(source)).resize((512, 512), Image.Resampling.LANCZOS)
     base.save(TEXTURE / f"Texture_{stem}Base.webp", "WEBP", quality=90, method=6)
     _normal_map(base, normal_strength).save(TEXTURE / f"Texture_{stem}Normal.webp", "WEBP", quality=92, method=6)
@@ -56,14 +57,17 @@ def build(stem: str, *, normal_strength: float, metalness: int, rough_min: int, 
 
 def build_if_source(stem: str, **params) -> None:
     """Leave pre-existing maps alone when their high-res source is not tracked."""
-    if (SOURCE / f"Texture_{stem}Source.png").is_file():
+    source_stem = params.get("source_stem", stem)
+    if (SOURCE / f"Texture_{source_stem}Source.png").is_file():
         build(stem, **params)
 
 
 if __name__ == "__main__":
     TEXTURE.mkdir(parents=True, exist_ok=True)
-    build_if_source("WeaponSteel", normal_strength=2.6, metalness=242, rough_min=92, rough_max=178)
-    build_if_source("WeaponWood", normal_strength=3.2, metalness=0, rough_min=148, rough_max=220)
+    build_if_source("WeaponSteelV2", source_stem="WeaponSteelV2", normal_strength=2.9,
+                    metalness=245, rough_min=82, rough_max=166)
+    build_if_source("WeaponWoodV2", source_stem="WeaponWoodV2", normal_strength=3.5,
+                    metalness=0, rough_min=132, rough_max=214)
     # Image-generated, de-lit scans for the shared battlefield surfaces.  The
     # normal/ORM maps stay deterministic so every channel remains aligned.
     build_if_source("TreeBark", normal_strength=4.0, metalness=0, rough_min=176, rough_max=238)

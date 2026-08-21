@@ -96,11 +96,11 @@
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",
-   "triangles": 2531,
+   "triangles": 2721,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 72875,
+   "bytes": 80943,
    "materials": [
     "steel",
     "wood"
@@ -121,7 +121,7 @@
     ],
     "max": [
      0.02709,
-     0.06625,
+     0.067,
      0.25492
     ]
    }
@@ -130,11 +130,11 @@
    "name": "HanYang",
    "category": "weapon",
    "file": "HanYang.tzm.json",
-   "triangles": 2543,
+   "triangles": 2767,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 73289,
+   "bytes": 82293,
    "materials": [
     "steel",
     "wood"
@@ -164,11 +164,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Zb26.tzm.json",
-   "triangles": 796,
+   "triangles": 884,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 25742,
+   "bytes": 29775,
    "materials": [
     "steel",
     "wood"
@@ -198,11 +198,11 @@
    "name": "Type38",
    "category": "weapon",
    "file": "Type38.tzm.json",
-   "triangles": 920,
+   "triangles": 1092,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 30378,
+   "bytes": 35464,
    "materials": [
     "steel",
     "wood"
@@ -232,11 +232,11 @@
    "name": "Mauser96",
    "category": "weapon",
    "file": "Mauser96.tzm.json",
-   "triangles": 3341,
+   "triangles": 3768,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 117395,
+   "bytes": 140565,
    "materials": [
     "steel",
     "wood"
@@ -251,13 +251,13 @@
    ],
    "bounds": {
     "min": [
-     -0.01015,
+     -0.02309,
      -0.10122,
      -0.24227
     ],
     "max": [
-     0.01075,
-     0.05102,
+     0.02309,
+     0.063,
      0.046
     ]
    }
