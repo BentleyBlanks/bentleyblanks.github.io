@@ -314,10 +314,27 @@ function Figure(pieces, styleKey, options = {}) {
   const weapon = options.weapon || "rifle";
   const shoulderY = legHeight + torsoHeight * 0.86;
   if (weapon === "rifle") {
-    Box(pieces, bodyHeight * 0.55, width * 0.13, width * 0.13, { pos: at(-width * 0.1, shoulderY - bodyHeight * 0.08, -width * 0.3), rot: [0, facing, Math.PI * 0.34], color: modelPalette.timberDark });
+    // 斜挎步枪拆成枪托、护木、机匣、枪管和瞄具；远看仍是强斜线，近看不再像单一长方盒。
+    const rifleTilt = Math.PI * 0.34;
+    const rifleY = shoulderY - bodyHeight * 0.08;
+    const rifleZ = -width * 0.3;
+    Box(pieces, bodyHeight * 0.24, width * 0.17, width * 0.15, { pos: at(-bodyHeight * 0.115, rifleY - bodyHeight * 0.04, rifleZ), rot: [0, facing, rifleTilt], color: modelPalette.timberDark });
+    Box(pieces, bodyHeight * 0.19, width * 0.115, width * 0.12, { pos: at(bodyHeight * 0.10, rifleY + bodyHeight * 0.065, rifleZ), rot: [0, facing, rifleTilt], color: modelPalette.timber });
+    Box(pieces, bodyHeight * 0.12, width * 0.16, width * 0.16, { pos: at(-bodyHeight * 0.005, rifleY + bodyHeight * 0.025, rifleZ), rot: [0, facing, rifleTilt], color: modelPalette.steelDark });
+    Cyl(pieces, width * 0.047, width * 0.047, bodyHeight * 0.34, 6, { pos: at(bodyHeight * 0.25, rifleY + bodyHeight * 0.13, rifleZ), rot: [0, facing, Math.PI / 2 + rifleTilt], color: modelPalette.steel });
+    Box(pieces, width * 0.065, width * 0.09, width * 0.10, { pos: at(bodyHeight * 0.34, rifleY + bodyHeight * 0.165, rifleZ), rot: [0, facing, rifleTilt], color: modelPalette.steelDark });
+    Box(pieces, width * 0.055, width * 0.12, width * 0.025, { pos: at(-bodyHeight * 0.05, rifleY - bodyHeight * 0.025, rifleZ + width * 0.095), rot: [0, facing, rifleTilt], color: modelPalette.charcoal });
+    Box(pieces, width * 0.04, width * 0.10, width * 0.04, { pos: at(bodyHeight * 0.39, rifleY + bodyHeight * 0.19, rifleZ), rot: [0, facing, rifleTilt], color: modelPalette.steel });
   } else if (weapon === "bayonet") {
-    Box(pieces, width * 0.12, bodyHeight * 0.6, width * 0.12, { pos: at(width * 0.42, legHeight + bodyHeight * 0.3, 0), rot: [0, facing, 0], color: modelPalette.timberDark });
-    Box(pieces, width * 0.07, bodyHeight * 0.22, width * 0.07, { pos: at(width * 0.42, legHeight + bodyHeight * 0.68, 0), rot: [0, facing, 0], color: modelPalette.steel });
+    // 立持三八式般的长枪：木托、金属机匣、细枪管、刺刀座与刃部均独立成型。
+    const rifleX = width * 0.42;
+    Box(pieces, width * 0.16, bodyHeight * 0.23, width * 0.14, { pos: at(rifleX, legHeight + bodyHeight * 0.16, 0), rot: [0, facing, 0], color: modelPalette.timberDark });
+    Box(pieces, width * 0.12, bodyHeight * 0.18, width * 0.12, { pos: at(rifleX, legHeight + bodyHeight * 0.36, 0), rot: [0, facing, 0], color: modelPalette.timber });
+    Box(pieces, width * 0.16, bodyHeight * 0.10, width * 0.16, { pos: at(rifleX, legHeight + bodyHeight * 0.45, 0), rot: [0, facing, 0], color: modelPalette.steelDark });
+    Cyl(pieces, width * 0.043, width * 0.043, bodyHeight * 0.38, 6, { pos: at(rifleX, legHeight + bodyHeight * 0.66, 0), rot: [0, facing, 0], color: modelPalette.steel });
+    Box(pieces, width * 0.09, bodyHeight * 0.055, width * 0.09, { pos: at(rifleX, legHeight + bodyHeight * 0.80, 0), rot: [0, facing, 0], color: modelPalette.steelDark });
+    Box(pieces, width * 0.035, bodyHeight * 0.08, width * 0.035, { pos: at(rifleX + width * 0.055, legHeight + bodyHeight * 0.48, 0), rot: [0, facing, 0], color: modelPalette.steel });
+    Cone(pieces, width * 0.07, bodyHeight * 0.19, 4, { pos: at(rifleX, legHeight + bodyHeight * 0.94, 0), color: modelPalette.steel });
   } else if (weapon === "spear") {
     Box(pieces, width * 0.11, bodyHeight * 1.1, width * 0.11, { pos: at(width * 0.5, legHeight + bodyHeight * 0.42, 0), rot: [0, facing, -0.08], color: modelPalette.timber });
     Cone(pieces, width * 0.13, bodyHeight * 0.16, 5, { pos: at(width * 0.56, legHeight + bodyHeight * 1.02, 0), color: modelPalette.steel });
@@ -453,8 +470,11 @@ const friendlyUnitBuilders = {
   Mortar(pieces, rng) {
     UnitPlinth(pieces, 0.24, "#7a3b34");
     for (const slot of LooseFormation(2, rng, 0.14)) Figure(pieces, "regular", { ...slot, crouch: true, weapon: "none" });
-    Box(pieces, 0.09, 0.014, 0.09, { pos: [0, 0.012, 0.02], color: modelPalette.steelDark });
-    Cyl(pieces, 0.016, 0.02, 0.17, 7, { pos: [0, 0.09, -0.01], rot: [-0.5, 0, 0], color: modelPalette.steelDark });
+    Box(pieces, 0.105, 0.014, 0.105, { pos: [0, 0.012, 0.02], color: modelPalette.steelDark });
+    Box(pieces, 0.058, 0.026, 0.05, { pos: [0, 0.029, 0.02], color: modelPalette.steel });
+    Cyl(pieces, 0.014, 0.021, 0.17, 8, { pos: [0, 0.09, -0.01], rot: [-0.5, 0, 0], color: modelPalette.steelDark });
+    Cyl(pieces, 0.022, 0.022, 0.028, 8, { pos: [0, 0.14, -0.038], rot: [-0.5, 0, 0], color: modelPalette.steel });
+    Torus(pieces, 0.021, 0.004, { pos: [0, 0.053, 0.01], rot: [Math.PI / 2, 0, 0], color: modelPalette.steel });
     Box(pieces, 0.006, 0.1, 0.006, { pos: [0.035, 0.05, 0.05], rot: [0.35, 0, -0.3], color: modelPalette.steel });
     Box(pieces, 0.006, 0.1, 0.006, { pos: [-0.035, 0.05, 0.05], rot: [0.35, 0, 0.3], color: modelPalette.steel });
   },
@@ -498,7 +518,9 @@ const enemyUnitBuilders = {
     Wedge(pieces, 0.17, 0.06, 0.17, { pos: [0.13, 0.135, 0], rot: [0, 0, -0.9], color: "#63624f" });
     Box(pieces, 0.34, 0.03, 0.185, { pos: [0, 0.055, 0], color: modelPalette.steelDark });
     Cyl(pieces, 0.062, 0.07, 0.055, 8, { pos: [-0.03, 0.162, 0], color: "#6f6e58" });
-    Cyl(pieces, 0.012, 0.012, 0.16, 6, { pos: [0.06, 0.168, 0], rot: [0, 0, Math.PI / 2], color: modelPalette.steelDark });
+    Cyl(pieces, 0.015, 0.012, 0.12, 7, { pos: [0.045, 0.168, 0], rot: [0, 0, Math.PI / 2], color: modelPalette.steelDark });
+    Cyl(pieces, 0.02, 0.015, 0.025, 7, { pos: [0.103, 0.168, 0], rot: [0, 0, Math.PI / 2], color: modelPalette.steel });
+    Box(pieces, 0.016, 0.014, 0.04, { pos: [0.025, 0.186, 0], color: modelPalette.steel });
     for (let index = 0; index < 3; index += 1) for (const side of [-1, 1]) {
       Cyl(pieces, 0.036, 0.036, 0.026, 8, { pos: [-0.1 + index * 0.1, 0.038, side * 0.088], rot: [Math.PI / 2, 0, 0], color: modelPalette.charcoal });
     }
@@ -514,7 +536,10 @@ const enemyUnitBuilders = {
       }
       Box(pieces, 0.16, 0.012, 0.014, { pos: [-0.08, 0.03, side * 0.05], rot: [0, side * 0.28, 0.12], color: "#5f5f4c" });
     }
-    Cyl(pieces, 0.015, 0.019, 0.22, 8, { pos: [0.06, 0.085, 0], rot: [0, 0, Math.PI / 2 - 0.16], color: modelPalette.steelDark });
+    Cyl(pieces, 0.018, 0.024, 0.055, 8, { pos: [-0.035, 0.073, 0], rot: [0, 0, Math.PI / 2 - 0.16], color: modelPalette.steelDark });
+    Cyl(pieces, 0.012, 0.017, 0.19, 8, { pos: [0.085, 0.102, 0], rot: [0, 0, Math.PI / 2 - 0.16], color: modelPalette.steelDark });
+    Cyl(pieces, 0.021, 0.017, 0.025, 8, { pos: [0.185, 0.128, 0], rot: [0, 0, Math.PI / 2 - 0.16], color: modelPalette.steel });
+    Box(pieces, 0.024, 0.013, 0.05, { pos: [0.015, 0.12, 0], rot: [0, 0, -0.16], color: modelPalette.steel });
     Box(pieces, 0.05, 0.055, 0.13, { pos: [-0.01, 0.075, 0], color: "#63624f" });
     Quad(pieces, 0.11, 0.08, { pos: [0.03, 0.09, 0], rot: [0, Math.PI / 2, 0], color: "#6b6a55" });
     Figure(pieces, "enemy", { x: -0.12, z: 0.1, facing: -0.6, weapon: "none", scale: 0.92, crouch: true });
