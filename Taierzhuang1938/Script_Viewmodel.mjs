@@ -71,6 +71,10 @@ const VM_TILE = { steel: 0.030, wood: 0.085, cloth: 0.045 };
 // 这是所有 FPS 都在用的那一手；ER2 的铁瞄画面同样不是按 15 cm 摆的。
 const SIGHT_EYE_DISTANCE = 0.300;
 
+// 编辑器用的 900p 基准像素 → 照门局部米数。正常玩法的覆盖值恒为 null，
+// 因而仍严格落在屏幕中心；只有枪械校准器会临时写入，退出/换枪立即清掉。
+const SIGHT_CALIBRATION_PER_PX = 2.30e-4;
+
 // ---------------------------------------------------------------------------
 // 小工具
 // ---------------------------------------------------------------------------
@@ -1188,6 +1192,7 @@ export class Viewmodel {
     this.adsHideParts = [];
     this.adsHidden = false;
     this.adsOffset = new THREE.Vector3();      // 满开镜照门中心误差（必须恒为零），取证用
+    this.ironSightOffsetOverride = null;       // 编辑器临时覆盖（900p 基准像素）
     this.cameraKick = new THREE.Vector2();
     this.cameraKickTaken = new THREE.Vector2();
 
@@ -1324,6 +1329,7 @@ export class Viewmodel {
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
   Equip(weaponId) {
     this._ClearRig();
+    this.ironSightOffsetOverride = null;
     this.weaponId = weaponId || null;
     this.weapon = weaponId ? WEAPONS[weaponId] || null : null;
     this.action = null;
@@ -1465,14 +1471,41 @@ export class Viewmodel {
       return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
     }
     const s = this.rig.sight;
-    // 标准 FPS：照门锚点严格解到相机中心，禁止再叠难度偏心或手调修正。
-    this.adsOffset.set(0, 0, 0);
+    // 正常玩法没有 override，照门仍严格解到相机中心。编辑器可临时把枪挪开，
+    // 用红色弹道中心反查模型在实际 ADS FOV 下应当修多少。
+    const offset = this.ironSightOffsetOverride || { x: 0, y: 0 };
+    this.adsOffset.set(
+      offset.x * SIGHT_CALIBRATION_PER_PX,
+      offset.y * SIGHT_CALIBRATION_PER_PX,
+      0);
     return {
-      px: -s.x,
-      py: -s.y,
+      px: -s.x + this.adsOffset.x,
+      py: -s.y + this.adsOffset.y,
       pz: -SIGHT_EYE_DISTANCE - s.z,
       rx: 0, ry: 0, rz: 0,
     };
+  }
+
+  /** 当前编辑器临时偏移；正常玩法与未选中的枪一律是零。 */
+  GetIronSightOffsetPixels(weaponId = this.weaponId) {
+    if (weaponId !== this.weaponId || !this.ironSightOffsetOverride) return { x: 0, y: 0 };
+    return { x: this.ironSightOffsetOverride.x, y: this.ironSightOffsetOverride.y };
+  }
+
+  /** 实时移动开镜铁瞄；不写存档、不改变标准 FPS 的默认零偏心。 */
+  SetIronSightOffsetPixels(x, y) {
+    if (!this.weapon || !this.rig || !this.rig.sight) return false;
+    const ClampPixel = (value) => Math.max(-32, Math.min(32, Number(value) || 0));
+    this.ironSightOffsetOverride = { x: ClampPixel(x), y: ClampPixel(y) };
+    this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon));
+    return true;
+  }
+
+  /** 清除编辑器临时值，恢复照门与屏幕中心严格共轴。 */
+  ResetIronSightOffsetPixels() {
+    this.ironSightOffsetOverride = null;
+    if (this.weapon && this.rig) this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon));
+    return { x: 0, y: 0 };
   }
 
   /** 冲刺：枪斜向下约 40°，同时向右外侧甩开，视野让出来。 */

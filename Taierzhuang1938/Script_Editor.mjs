@@ -103,7 +103,7 @@ export class EditorSuite {
       get playerWeaponId() { return host.game.currentWeapon; },
       SetViewmodelVisible: (on) => { if (host.viewmodel) host.viewmodel.root.visible = !!on; },
       SetHint: (text) => suite.SetHint(text),
-      SetCrosshair: (on) => suite.SetCrosshair(on),
+      SetCrosshair: (on, mode = "") => suite.SetCrosshair(on, mode),
       Close: () => suite.Close(),
     };
   }
@@ -128,6 +128,7 @@ export class EditorSuite {
     this.hint = El("div", "edHint");
     root.appendChild(this.hint);
     this.cross = El("div", "edCross");
+    this.cross.appendChild(El("span", "", "真实弹道"));
     root.appendChild(this.cross);
 
     // 入口面板
@@ -204,8 +205,10 @@ export class EditorSuite {
     this.hint.classList.toggle("on", !!next);
   }
 
-  SetCrosshair(on) {
-    if (this.cross) this.cross.classList.toggle("on", !!on);
+  SetCrosshair(on, mode = "") {
+    if (!this.cross) return;
+    this.cross.classList.toggle("on", !!on);
+    this.cross.classList.toggle("calibration", !!on && mode === "calibration");
   }
 
   RefreshStatus() {

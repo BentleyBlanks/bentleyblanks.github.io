@@ -214,6 +214,17 @@
 .edCross::before { left: -9px; top: -1px; width: 18px; height: 1px; }
 .edCross::after { left: -1px; top: -9px; width: 1px; height: 18px; }
 
+/* 枪械校准：十字交点就是弹道真正经过的屏幕点，不是装饰性准星。 */
+.edCross.calibration::before, .edCross.calibration::after { background: var(--theirs, #d6604a); }
+.edCross.calibration { display: block; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+.edCross.calibration::before { left: -13px; width: 26px; }
+.edCross.calibration::after { top: -13px; height: 26px; }
+.edCross.calibration span {
+  position: absolute; left: 12px; top: 10px; width: max-content;
+  color: var(--theirs, #d6604a); font: 11px/1.2 ui-monospace, Consolas, monospace;
+  text-shadow: 0 1px 2px #000;
+}
+
 /* 编辑器接管时把 HUD 收起来（过场自己的 .csRoot 必须留着 —— Timeline 要看它） */
 body.edHideHud #hud > [class^="hud"] { display: none !important; }
 

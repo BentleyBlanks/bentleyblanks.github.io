@@ -13,7 +13,7 @@
 // 那张表头注写得很清楚：尺寸性能有来源，recoil/sway/adsTime 是调出来的。
 
 import * as THREE from "three";
-import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note, ListBox }
+import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note, ListBox, TextArea }
   from "./Script_EditorUi.mjs";
 import { WEAPONS, AMMO, LOADOUTS } from "./Data_Weapons.mjs";
 import { MESHES, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
@@ -59,6 +59,12 @@ function IsViewmodel(id) {
   return IsHandheld(id) && !!w && w.kind !== "mortar";
 }
 
+/** 只有真正有照门/准星的第一人称火器才显示弹道校准，刀与手榴弹没有这条轴线。 */
+function CanCalibrate(id) {
+  const kind = WEAPONS[id]?.kind;
+  return IsViewmodel(id) && (kind === "boltRifle" || kind === "lmg" || kind === "pistol");
+}
+
 export class WeaponEditor {
   static id = "weapon";
   static label = "枪械";
@@ -78,6 +84,8 @@ export class WeaponEditor {
     this.vehicleNodes = null;
     this.materials = null;
     this.ads = 0;
+    this.calibration = true;
+    this.calibrationByWeapon = new Map();
     this.autoFire = false;
     this.fireTimer = 0;
     this.actorState = { aim: 1, firing: false, throwing: 0, melee: 0, elapsed: 0 };
@@ -103,6 +111,7 @@ export class WeaponEditor {
       this.host.SetViewmodelVisible(true);
       if (this.host.playerWeaponId) this.host.viewmodel.Equip(this.host.playerWeaponId);
     }
+    this.host.SetCrosshair(false);
     if (this.panel) this.panel.root.remove();
     this.panel = null;
     this.studio.Close();
@@ -125,7 +134,7 @@ export class WeaponEditor {
     this.list.Select(this.weaponId);
 
     const view = Section(body, "视图");
-    Chips(view, [
+    this.viewChips = Chips(view, [
       { value: "bench", label: "台架" },
       { value: "held", label: "手持" },
       { value: "fp", label: "第一人称" },
@@ -150,9 +159,37 @@ export class WeaponEditor {
     Toggle(autoBox, "连续开火", false, (on) => { this.autoFire = on; this.fireTimer = 0; });
     this.adsSlider = Slider(act, {
       label: "开镜", min: 0, max: 1, step: 0.01, value: 0,
-      onInput: (v) => { this.ads = v; },
+      onInput: (v) => { this.ads = v; this.UpdateCalibrationView(); },
     });
     Note(act, "开火/拉栓只在「第一人称」与「手持」里有动作；台架是静态几何。");
+
+    const calibration = Section(body, "放大准心校准");
+    const calibrationButtons = document.createElement("div");
+    calibrationButtons.className = "edBtns";
+    calibration.appendChild(calibrationButtons);
+    this.calibrationToggle = Toggle(calibrationButtons, "显示真实弹道点", true, (on) => {
+      this.calibration = on;
+      this.UpdateCalibrationView();
+    });
+    this.offsetXSlider = Slider(calibration, {
+      label: "横向 X", min: -32, max: 32, step: 0.5, value: 0,
+      format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} px`,
+      onInput: () => this.ApplyCalibrationFromUi(),
+    });
+    this.offsetYSlider = Slider(calibration, {
+      label: "纵向 Y", min: -32, max: 32, step: 0.5, value: 0,
+      format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} px`,
+      onInput: () => this.ApplyCalibrationFromUi(),
+    });
+    ButtonRow(calibration, [
+      { label: "进入校准", onClick: () => this.EnterCalibration() },
+      { label: "归零", onClick: () => this.SetCalibration(0, 0) },
+      { label: "恢复预设", onClick: () => this.ResetCalibration() },
+      { label: "复制配置", onClick: () => this.CopyCalibration() },
+    ]);
+    this.calibrationOutput = TextArea(calibration, { rows: 3 });
+    this.calibrationOutput.readOnly = true;
+    Note(calibration, "红十字是实际弹道中心。进入校准后拖动画面可粗调，滑杆做 0.5 px 微调；让准星尖与红十字重合。Y 正值向上。");
 
     const data = Section(body, "数据卡");
     this.facts = Facts(data);
@@ -162,13 +199,120 @@ export class WeaponEditor {
 
   SetMode(mode) {
     this.mode = mode;
+    if (this.viewChips) this.viewChips.Set(mode);
     this.Rebuild();
+    this.UpdateCalibrationView();
   }
 
   SetWeapon(id) {
     this.weaponId = id;
     this.Rebuild();
     this.RefreshCard();
+    this.RefreshCalibrationUi();
+    this.UpdateCalibrationView();
+  }
+
+  EnterCalibration() {
+    this.mode = "fp";
+    if (this.viewChips) this.viewChips.Set("fp");
+    this.ads = 1;
+    if (this.adsSlider) this.adsSlider.Set(1);
+    this.Rebuild();
+    this.RefreshCalibrationUi();
+    this.UpdateCalibrationView();
+  }
+
+  ApplyCalibrationFromUi() {
+    if (!this.offsetXSlider || !this.offsetYSlider) return;
+    this.SetCalibration(this.offsetXSlider.Value(), this.offsetYSlider.Value(), false);
+  }
+
+  SetCalibration(x, y, syncUi = true) {
+    const viewmodel = this.host.viewmodel;
+    if (!viewmodel || !CanCalibrate(this.weaponId)) return;
+    const ClampPixel = (value) => Math.max(-32, Math.min(32, Number(value) || 0));
+    const value = { x: ClampPixel(x), y: ClampPixel(y) };
+    this.calibrationByWeapon.set(this.weaponId, value);
+    if (this.mode === "fp" && viewmodel.weaponId === this.weaponId) {
+      viewmodel.SetIronSightOffsetPixels(value.x, value.y);
+    }
+    if (syncUi) {
+      this.offsetXSlider.Set(value.x);
+      this.offsetYSlider.Set(value.y);
+    }
+    this.RefreshCalibrationOutput();
+  }
+
+  ResetCalibration() {
+    const viewmodel = this.host.viewmodel;
+    if (!viewmodel || !CanCalibrate(this.weaponId)) return;
+    this.calibrationByWeapon.delete(this.weaponId);
+    const value = this.mode === "fp" && viewmodel.weaponId === this.weaponId
+      ? viewmodel.ResetIronSightOffsetPixels() : { x: 0, y: 0 };
+    this.offsetXSlider.Set(value.x);
+    this.offsetYSlider.Set(value.y);
+    this.RefreshCalibrationOutput();
+  }
+
+  RefreshCalibrationUi() {
+    if (!this.offsetXSlider || !this.host.viewmodel) return;
+    if (!CanCalibrate(this.weaponId)) {
+      this.offsetXSlider.Set(0);
+      this.offsetYSlider.Set(0);
+      this.calibrationOutput.value = "此条目没有可校准的第一人称机械瞄具";
+      return;
+    }
+    const value = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+    this.offsetXSlider.Set(value.x);
+    this.offsetYSlider.Set(value.y);
+    this.RefreshCalibrationOutput();
+  }
+
+  RefreshCalibrationOutput() {
+    if (!this.calibrationOutput) return;
+    if (!CanCalibrate(this.weaponId)) {
+      this.calibrationOutput.value = "此条目没有可校准的第一人称机械瞄具";
+      return;
+    }
+    const value = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+    this.calibrationOutput.value = `${this.weaponId}: { x: ${value.x}, y: ${value.y} },\n`
+      + `ADS FOV: ${this.CalibrationFov().toFixed(2)}°\n`
+      + `说明: X 正值向右，Y 正值向上`;
+  }
+
+  async CopyCalibration() {
+    this.RefreshCalibrationOutput();
+    const text = this.calibrationOutput.value.split("\n")[0];
+    try {
+      await navigator.clipboard.writeText(text);
+      this.host.SetHint(`已复制 ${text}`);
+    } catch {
+      this.calibrationOutput.focus();
+      this.calibrationOutput.select();
+      this.host.SetHint("浏览器未授权剪贴板，配置已选中，请按 Ctrl+C");
+    }
+  }
+
+  CalibrationFov() {
+    const weapon = WEAPONS[this.weaponId];
+    return 55 * (1 - this.ads * (1 - (weapon?.adsFovScale ?? 0.75)));
+  }
+
+  UpdateCalibrationView() {
+    const active = this.calibration && this.mode === "fp" && CanCalibrate(this.weaponId);
+    this.host.SetCrosshair(active, active ? "calibration" : "");
+    if (this.mode === "fp" && this.host.camera) this.SetStudioFov(this.CalibrationFov());
+    this.RefreshCalibrationOutput();
+  }
+
+  OnDrag(dx, dy, button) {
+    if (this.mode === "fp" && this.calibration && button === 0) {
+      const current = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+      const scale = 900 / Math.max(1, this.host.canvas.clientHeight || 900);
+      this.SetCalibration(current.x + dx * scale, current.y - dy * scale);
+      return;
+    }
+    if (this.studio.Active) this.studio.Drag(dx, dy, button);
   }
 
   Trigger(kind) {
@@ -221,13 +365,14 @@ export class WeaponEditor {
 
     if (this.mode === "fp") {
       if (this.host.viewmodel) this.host.viewmodel.Equip(IsViewmodel(this.weaponId) ? this.weaponId : null);
+      const saved = this.calibrationByWeapon.get(this.weaponId);
+      if (saved && this.host.viewmodel) this.host.viewmodel.SetIronSightOffsetPixels(saved.x, saved.y);
       // 第一人称的枪挂在相机上，展台上什么也不放；镜头退到一个看得见枪的距离。
       //
-      // **FOV 必须换回正片的 55°。** 摄影棚为了看模型不畸变把相机压到 42
-      // （85 mm 等效），而视图模型的每一处位姿都是按 BASE_FOV=55 摆的 ——
-      // 42° 的画框比 55° 窄三成，枪整个掉到画面右下角外头去，这一栏只剩地面。
-      // 台架/手持两档再换回 42，两种看法各自的镜头语言不串。
-      this.SetStudioFov(55);
+      // 以正片 55° 为基准，再照本枪 adsFovScale 收窄：编辑器里看到的放大倍率
+      // 必须和实战一致，否则在普通 FOV 下对好的准星进战斗一开镜又会错位。
+      // 台架/手持两档仍换回 42°，两种看法各自的镜头语言不串。
+      this.SetStudioFov(this.CalibrationFov());
       this.studio.Frame(1.7, 2.6);
       return;
     }
@@ -344,6 +489,7 @@ export class WeaponEditor {
         ads: this.ads, lookDeltaYaw: 0, lookDeltaPitch: 0,
         crouch: 0, elapsed: this.time, lowAmmo: false,
       });
+      this.UpdateCalibrationView();
     }
 
     if (this.host.lights) {
