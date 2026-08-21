@@ -86,6 +86,26 @@ export const CS_X = {
 ```
 
 - 字幕时长：**每个汉字 ≥ 0.22 s，再加 1.2 s**；一条字幕 ≤ 32 字，超过就拆两条。台词每句 ≤ 22 字。
+
+#### 1.4.1 受限自由转头（headLook）
+
+需要玩家在导演机位上观察时，在过场对象或单个镜头上写 `cameraMode:"headLook"`。
+导演的 `from/to/look/lookTo` 仍按时间轴推进，鼠标只叠加局部 yaw/pitch：
+
+```js
+cameraMode: "headLook",
+headLook: { yaw: [-0.55, 0.55], pitch: [-0.30, 0.30], sensitivityScale: 0.8 },
+```
+
+`yaw`、`pitch` 是弧度范围，也可写 `yawLimit`/`pitchLimit` 或单个对称数字；默认范围为
+±0.65/±0.38。过场期间 InputRouter 只保留 Look 与 Esc，移动、跳跃、开火、ADS、换弹、
+近战、投掷、滚轮换枪和交互全部被吞掉。截图/自动化调用 `Play(id,{neutralLook:true})`
+可强制中性视角（yaw=0、pitch=0）。
+
+台词/字幕可以带 `voiceCue`（兼容 `voice`），接入 `AudioEngine.Play("voice."+cue)`；
+若声库未载入，字幕仍按数据时长显示，若已知语音时长则自动延长字幕到不短于语音。
+`headLook` 过场可声明 `ambience`/`ambienceCue`，入场保存当前环境与音乐、切序章环境并停音乐，
+正常结束或跳过时恢复原状态。
 - 可用音效名见 Data_SfxSources.mjs（footstepDirt / type92 / explosionFar / impactWood / impactMetal / impactBrick / impactDirt / bodyFall / shellIncoming / rifle 等，用 grep 查 `name:` 或 Data_Voice）。
 
 ### 1.5 布景摆哪里

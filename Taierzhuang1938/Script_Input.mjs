@@ -127,6 +127,14 @@ export class InputRouter {
     this.held = new Set();          // 按下的键码
     this.mouse = new Set();         // 按下的鼠标键号
     this.bound = null;
+    this.suppressed = false;         // 过场等夺权上下文：只保留上下文专属输入
+  }
+
+  /** 暂停玩法输入。状态保留在路由器里，避免各动作调用点各自加过场判断。 */
+  SetSuppressed(on = true) {
+    this.suppressed = !!on;
+    if (this.suppressed) { this.held.clear(); this.mouse.clear(); }
+    return this.suppressed;
   }
 
   /** 当前上下文下这个 code 命中的那一条（context 精确匹配优先于 "any"）。 */
@@ -144,6 +152,7 @@ export class InputRouter {
   Bind(target) {
     if (this.bound) return this;
     const onKeyDown = (e) => {
+      if (this.suppressed) { e.preventDefault?.(); return; }
       const entry = this._Lookup(e.code);
       if (entry && entry.prevent) e.preventDefault();
       // 长按的自动重复不算新的一次按下
@@ -155,12 +164,14 @@ export class InputRouter {
     };
     const onKeyUp = (e) => {
       this.held.delete(e.code);
+      if (this.suppressed) return;
       // 抬起时要按**当前**上下文重查：Tab 松开的那一刻上下文已经从 orders 变回 world，
       // 所以 orders 这条本身必须是 context:"any"，否则松不开（曾经就是这么卡住的）。
       const entry = this._Lookup(e.code);
       if (entry && entry.mode === "holdAction") this.OnAction(entry.action, { code: e.code, down: false });
     };
     const onMouseDown = (e) => {
+      if (this.suppressed) { e.preventDefault?.(); return; }
       if (this.Guard(e) === false) return;
       this.mouse.add(e.button);
       const entry = MOUSEMAP.find((m) => m.button === e.button);
@@ -168,6 +179,7 @@ export class InputRouter {
     };
     const onMouseUp = (e) => { this.mouse.delete(e.button); };
     const onWheel = (e) => {
+      if (this.suppressed) { e.preventDefault?.(); return; }
       if (this.Context() !== "world") return;
       this.OnAction("cycleSlot", { delta: e.deltaY > 0 ? 1 : -1 });
     };
@@ -193,6 +205,12 @@ export class InputRouter {
    * @param {object} ctx { ads } —— Shift 分流要用开镜量，路由器自己不该知道玩家状态
    */
   Read(input, { ads = 0 } = {}) {
+    if (this.suppressed) {
+      input.forward = 0; input.strafe = 0; input.lean = 0;
+      input.breathHold = false; input.sprint = false;
+      input.fire = false; input.ads = false;
+      return input;
+    }
     const h = this.held;
     input.forward = (h.has("KeyW") ? 1 : 0) - (h.has("KeyS") ? 1 : 0);
     input.strafe = (h.has("KeyD") ? 1 : 0) - (h.has("KeyA") ? 1 : 0);

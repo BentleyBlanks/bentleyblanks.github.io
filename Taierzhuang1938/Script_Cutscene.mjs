@@ -99,8 +99,10 @@ export function YawFacing(dx, dz) {
 // 正片 Play() 前的硬断言与命令行 `node Taierzhuang1938/Script_CutsceneCheck.mjs` 是同一份。
 // ---------------------------------------------------------------------------
 
-import { ValidateCutscene, ValidateAllCutscenes } from "./Script_CutsceneCheck.mjs";
-export { ValidateCutscene, ValidateAllCutscenes };
+import {
+  ValidateCutscene, ValidateAllCutscenes, ResolveHeadLookConfig, ClampHeadLook,
+} from "./Script_CutsceneCheck.mjs";
+export { ValidateCutscene, ValidateAllCutscenes, ResolveHeadLookConfig, ClampHeadLook };
 
 // ---------------------------------------------------------------------------
 // 关键帧采样
@@ -264,6 +266,13 @@ export class CutsceneDirector {
     this.cardTime = -1;
     this.cardHold = 0;
     this.savedCamera = null;
+    this.savedAudio = null;
+    this.lookYaw = 0;
+    this.lookPitch = 0;
+    this.lookNeutral = false;
+    this.lookConfig = ResolveHeadLookConfig(null, null);
+    this.headLook = false;
+    this._released = false;
     this.subSlots = [];               // { text, tier, small, big, note, until }
     this.lineSlot = null;
     this.shakeSeed = 1;
@@ -283,6 +292,30 @@ export class CutsceneDirector {
   get Playing() { return this.playing; }
   get Time() { return this.time; }
   get CurrentId() { return this.cut ? this.cut.id : null; }
+  get AllowsLook() { return !!(this.playing && this.headLook && !this.lookNeutral); }
+  get Look() { return { yaw: this.lookYaw, pitch: this.lookPitch }; }
+
+  /** 输入层传入鼠标增量；过场机位本身仍由时间轴唯一驱动。 */
+  AddLook(deltaX = 0, deltaY = 0) {
+    if (!this.AllowsLook) return this.Look;
+    const scale = this.lookConfig.sensitivityScale * 0.002;
+    this.lookYaw = ClampHeadLook(this.lookYaw + Number(deltaX || 0) * scale, this.lookConfig.yaw);
+    // movementY 正值代表鼠标向下，因此相机 pitch 反向增加才是抬头为正。
+    this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this.lookConfig.pitch);
+    return this.Look;
+  }
+
+  SetLook(yaw = 0, pitch = 0) {
+    this.lookYaw = ClampHeadLook(yaw, this.lookConfig.yaw);
+    this.lookPitch = ClampHeadLook(pitch, this.lookConfig.pitch);
+    return this.Look;
+  }
+
+  SetNeutralLook(on = true) {
+    this.lookNeutral = !!on;
+    if (this.lookNeutral) { this.lookYaw = 0; this.lookPitch = 0; }
+    return this.lookNeutral;
+  }
 
   // -------------------------------------------------------------------------
   // DOM
@@ -330,9 +363,10 @@ export class CutsceneDirector {
     // 上一场还没播完就被叫了下一场：把旧的 Promise 收掉，别让调用方挂死。
     if (this.playing) {
       const stale = this.resolve;
+      const staleId = this.cut ? this.cut.id : null;
       this.resolve = null;
       this._Finish(true);
-      if (stale) stale({ id: this.cut ? this.cut.id : null, aborted: true });
+      if (stale) stale({ id: staleId, aborted: true });
     }
 
     this.cut = cut;
@@ -344,12 +378,20 @@ export class CutsceneDirector {
     this.subSlots.length = 0;
     this.lineSlot = null;
     this.cardTime = -1;
+    this.headLook = cut.cameraMode === "headLook"
+      || (cut.shots || []).some((shot) => shot.cameraMode === "headLook" || shot.camera?.cameraMode === "headLook");
+    this.lookConfig = ResolveHeadLookConfig(cut, null);
+    this.lookNeutral = !!(this.ctx.neutralLook || this.ctx.forceNeutralLook || this.ctx.deterministicView);
+    this.lookYaw = 0;
+    this.lookPitch = 0;
+    this._released = false;
     // fadeIn：从黑场淡入（开场过场用）。没写就是硬切进第一镜。
     this.blackAlpha = cut.fadeIn ? 1 : 0;
     this.shakeSeed = HashString(`shake:${id}`);
     this.playing = true;
 
     this._SaveCamera();
+    this._SaveAudio(cut);
     // 天空要**先于**布景套：BakeEnvironment 烘的是天，布景材质吃的 IBL 是那一张。
     this.skyApplied = false;
     if (cut.sky && this.applySky) this.skyApplied = !!this.applySky(cut.sky);
@@ -370,6 +412,32 @@ export class CutsceneDirector {
     // 一进场先摆一帧，免得第一帧还停在玩家的机位上（会闪一下旧画面）。
     this.Update(0);
     return new Promise((resolve) => { this.resolve = resolve; });
+  }
+
+  _SaveAudio(cut) {
+    if (!this.audio) return;
+    const hasHeadLook = this.headLook;
+    if (!hasHeadLook) return;
+    this.savedAudio = {
+      ambience: this.audio.ambiencePreset ?? null,
+      music: this.audio.musicCue ?? null,
+    };
+    // 数据显式指定 ambience/ambienceCue 时才切床；未指定保持已保存环境。
+    const ambience = cut.ambience ?? cut.ambienceCue;
+    if (ambience && typeof this.audio.Ambience === "function") this.audio.Ambience(ambience);
+    if (cut.stopMusic !== false) {
+      if (typeof this.audio.StopMusic === "function") this.audio.StopMusic(0.25);
+      else if (typeof this.audio.Music === "function") this.audio.Music(null);
+    }
+  }
+
+  _RestoreAudio() {
+    if (!this.savedAudio || !this.audio) return;
+    const saved = this.savedAudio;
+    if (typeof this.audio.Ambience === "function") this.audio.Ambience(saved.ambience || "silence");
+    if (saved.music && typeof this.audio.Music === "function") this.audio.Music(saved.music);
+    else if (!saved.music && typeof this.audio.StopMusic === "function") this.audio.StopMusic(0.25);
+    this.savedAudio = null;
   }
 
   /** 跳过。字幕仍以卡片补出 —— 史实信息不许因为跳过而丢失。 */
@@ -473,8 +541,65 @@ export class CutsceneDirector {
       }
     }
 
+    this._AttachActorProps(cut);
+
     this._BuildFlashPool();
     this._BuildGunsight();
+  }
+
+  /**
+   * 把分镜道具挂到演员暴露的通用挂点（eyes/weaponMount/arms 等）上。
+   * 不猜鞋、枪或线盘的骨骼名称；若 Actor 没有该挂点，道具留在布景根下并告警，
+   * 这样无模型/旧 Actor 仍能稳定播完。
+   */
+  _AttachActorProps(cut) {
+    const requests = [];
+    for (const spec of cut.props || []) {
+      if (spec.attachTo || spec.actorId || spec.mount) requests.push({ ...spec, actorId: spec.attachTo?.actor || spec.actorId, mount: spec.attachTo?.mount || spec.mount });
+    }
+    for (const actorSpec of cut.cast || []) {
+      const attachments = Array.isArray(actorSpec.attachments) ? actorSpec.attachments
+        : (Array.isArray(actorSpec.mounts) ? actorSpec.mounts : []);
+      for (const attachment of attachments) {
+        requests.push({ ...attachment, actorId: actorSpec.id });
+      }
+    }
+    for (const request of cut.actorProps || cut.attachments || []) requests.push(request);
+    for (const request of requests) {
+      const actorEntry = this.actors.get(request.actorId || request.actor);
+      const propEntry = this.props.get(request.name || request.prop || request.propName);
+      if (!actorEntry || !propEntry) continue;
+      const mount = this._ActorMount(actorEntry.actor, request.mount || request.mountName);
+      if (!mount || typeof mount.add !== "function") {
+        console.warn(`[Cutscene] ${cut.id}: 演员 ${request.actorId || request.actor} 没有挂点 ${request.mount || request.mountName}`);
+        continue;
+      }
+      const mesh = propEntry.mesh;
+      if (mesh.parent) mesh.parent.remove(mesh);
+      mount.add(mesh);
+      mesh.position.set(...(request.offset || request.pos || [0, 0, 0]));
+      const rotation = request.rotation || [request.rx || 0, request.ry || 0, request.rz || 0];
+      mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+      propEntry.attached = { actorId: request.actorId || request.actor, mount: request.mount || request.mountName };
+    }
+  }
+
+  _ActorMount(actor, name) {
+    if (!actor || !name) return null;
+    if (typeof actor.GetMount === "function") {
+      const exposed = actor.GetMount(name);
+      if (exposed && typeof exposed.add === "function") return exposed;
+    }
+    const direct = actor[name];
+    if (direct && typeof direct.add === "function") return direct;
+    const mounts = actor.mounts || actor.mountPoints;
+    const named = mounts && mounts[name];
+    if (named && typeof named.add === "function") return named;
+    if (actor.root && typeof actor.root.getObjectByName === "function") {
+      const found = actor.root.getObjectByName(name);
+      if (found && typeof found.add === "function") return found;
+    }
+    return null;
   }
 
   _MakeProp(spec) {
@@ -672,6 +797,10 @@ export class CutsceneDirector {
 
   _ApplyCamera(cut, shot, local) {
     const cam = shot.camera;
+    const shotHeadLook = shot.cameraMode === "headLook"
+      || cam.cameraMode === "headLook" || cut.cameraMode === "headLook";
+    this.headLook = shotHeadLook;
+    if (shotHeadLook) this.lookConfig = ResolveHeadLookConfig(cut, shot);
     const k = shot.seconds > 0 ? local / shot.seconds : 1;
     const e = Ease(cam.ease, k);
     const o = this.origin;
@@ -734,6 +863,13 @@ export class CutsceneDirector {
       this.camera.translateX(n(1.13, 57.9) * 0.016 * amount);
     }
 
+    // 导演机位完成后再叠加玩家 Look；不修改 from/to/look 时间轴，也不让 Look
+    // 影响下一镜的基准。neutralLook 给截图与测试一个完全确定的中性视角。
+    if (shotHeadLook && !this.lookNeutral) {
+      this.camera.rotateY(this.lookYaw);
+      this.camera.rotateX(this.lookPitch);
+    }
+
     if (this.gunsight) {
       this.gunsight.visible = !!shot.gunsight;
       if (shot.gunsight) {
@@ -779,6 +915,7 @@ export class CutsceneDirector {
     // 每帧先把所有道具放回基准位，再叠加本镜的位移 ——
     // 否则上一镜的位移会留在道具身上，切回来道具就飘在半空。
     for (const entry of this.props.values()) {
+      if (entry.attached) continue;
       entry.mesh.position.copy(entry.base);
       if (entry.baseRot) entry.mesh.rotation.copy(entry.baseRot);
     }
@@ -795,6 +932,8 @@ export class CutsceneDirector {
     for (const move of active.values()) {
       const entry = this.props.get(move.name);
       if (!entry) continue;
+      // 挂载道具的坐标属于演员挂点，不受布景局部 propMoves 重置。
+      if (entry.attached) continue;
       const k = Clamp01((local - (move.startAt || 0)) / Math.max(1e-6, (move.endAt || 1) - (move.startAt || 0)));
       const e = Ease(move.ease, k);
       entry.mesh.position.set(
@@ -862,6 +1001,21 @@ export class CutsceneDirector {
   // 字幕 / 台词 / 音效
   // -------------------------------------------------------------------------
 
+  _VoiceDuration(cue) {
+    if (!cue || !this.audio) return 0;
+    const bank = this.audio.voiceBank;
+    const entry = bank && typeof bank.get === "function" ? bank.get(cue) : null;
+    return Number(entry?.duration) > 0 ? Number(entry.duration) : 0;
+  }
+
+  _PlayVoice(cue) {
+    if (!cue || !this.audio || typeof this.audio.Play !== "function") return 0;
+    const name = String(cue).startsWith("voice.") ? String(cue) : `voice.${cue}`;
+    const voice = this.audio.Play(name, { volume: 1, priority: true });
+    // 缺声库时 Play 会稳定地返回 null；字幕仍按数据时长显示，不阻塞过场。
+    return voice && Number(voice.duration) > 0 ? Number(voice.duration) : this._VoiceDuration(String(cue).replace(/^voice\./, ""));
+  }
+
   _FireCues(cut, shot, shotStart, local) {
     const key = (kind, i) => `${shot.n}:${kind}:${i}`;
     const crossed = (at) => this.prevTime <= shotStart + at && this.time > shotStart + at;
@@ -870,7 +1024,9 @@ export class CutsceneDirector {
       const id = key("sub", i);
       if (this.fired.has(id) || !crossed(sub.at)) return;
       this.fired.add(id);
-      this.subSlots.push({ ...sub, left: sub.seconds || 3.0 });
+      const voiceCue = sub.voiceCue ?? sub.voice ?? null;
+      const voiceDuration = this._PlayVoice(voiceCue);
+      this.subSlots.push({ ...sub, left: Math.max(sub.seconds || 3.0, voiceDuration) });
       this.log.push({ cut: cut.id, shot: shot.n, kind: "sub", tier: sub.tier, text: sub.text });
       this._RenderSubs();
     });
@@ -880,9 +1036,12 @@ export class CutsceneDirector {
       if (this.fired.has(id) || !crossed(line.at)) return;
       this.fired.add(id);
       const who = line.who ? CAST[line.who] : null;
+      const voiceCue = line.voiceCue ?? line.voice ?? null;
+      const voiceDuration = this._PlayVoice(voiceCue);
       this.lineSlot = {
         who: who ? (who.short || who.name) : "",
-        text: line.text, off: !!line.off, tier: line.tier, left: line.seconds || 3.0,
+        text: line.text, off: !!line.off, tier: line.tier,
+        left: Math.max(line.seconds || 3.0, voiceDuration),
       };
       this.log.push({ cut: cut.id, shot: shot.n, kind: "line", who: line.who, tier: line.tier, text: line.text });
       this._RenderLine();
@@ -986,6 +1145,7 @@ export class CutsceneDirector {
   // -------------------------------------------------------------------------
 
   _Finish(silent) {
+    if (!this.playing && !this.cut) return;
     this.playing = false;
     this.cardTime = -1;
     this._TeardownSet();
@@ -998,11 +1158,15 @@ export class CutsceneDirector {
     }
     this.blackAlpha = 0;
     this._RestoreCamera();
+    this._RestoreAudio();
     if (this.skyApplied && this.restoreSky) this.restoreSky();
     this.skyApplied = false;
     if (this.hud && typeof this.hud.SetOrdersVisible === "function") this.hud.SetOrdersVisible(true);
     if (this.hud && typeof this.hud.SetCinematic === "function") this.hud.SetCinematic(false);
-    if (this.onRelease) this.onRelease(this.cut);
+    if (this.onRelease && !this._released) {
+      this._released = true;
+      this.onRelease(this.cut);
+    }
     const resolve = this.resolve;
     this.resolve = null;
     const cut = this.cut;

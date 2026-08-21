@@ -489,14 +489,20 @@ async function Boot() {
     camera, scene, hud, audio, actorFactory, library, root: hudRoot,
     onCapture: (cut) => {
       state.cutscene = cut.id;
+      router?.SetSuppressed(true);
+      // 过场拥有自己的 Look；释放玩家锁避免浏览器吞掉 Esc，结束时再请求。
+      ReleasePointerLock();
       input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
+      input.lookX = 0; input.lookY = 0; input.sprint = false; input.breathHold = false;
       // 玩家手里的枪挂在相机下：不藏的话每一镜右下角都趴着一支带刺刀的步枪，
       // 五个分镜 agent 全靠把 look 点推到 45 m 外抬高近平面来切它 —— 这里一行就够。
       if (viewmodel && viewmodel.root) viewmodel.root.visible = false;
     },
     onRelease: () => {
       state.cutscene = null;
+      router?.SetSuppressed(false);
       if (viewmodel && viewmodel.root) viewmodel.root.visible = true;
+      if (state.running && !state.menu) RequestPointerLock();
     },
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
     // 套预设 = 天空着色器 + 重烘 IBL + 平行光/半球光三件一起换，少一件就是
@@ -740,6 +746,8 @@ async function Boot() {
         playing: cutscene ? cutscene.Playing : false,
         current: cutscene ? cutscene.CurrentId : null,
         time: cutscene ? cutscene.Time : 0,
+        headLook: cutscene ? cutscene.AllowsLook : false,
+        look: cutscene ? cutscene.Look : { yaw: 0, pitch: 0 },
         played: state.cutscenesPlayed.slice(),
         log: cutscene ? cutscene.log.slice(-40) : [],
       }),
@@ -1094,10 +1102,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
  */
 async function RunCutscene(id) {
   if (!cutscene) return null;
-  ReleasePointerLock();
-  const result = await cutscene.Play(id, { poolOut: state.nraPool });
+  const result = await cutscene.Play(id, { poolOut: state.nraPool, neutralLook: SHOT });
   state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
-  if (state.running) RequestPointerLock();
   return result;
 }
 
@@ -1961,6 +1967,7 @@ const router = new InputRouter({
     return true;
   },
   OnAction: (action, detail) => {
+    if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
@@ -2010,6 +2017,11 @@ const router = new InputRouter({
 router.Bind(document);
 
 document.addEventListener("mousemove", (e) => {
+  // headLook 是过场唯一开放的连续输入；不要求玩家锁住指针，避免 Esc 被浏览器吞掉。
+  if (cutscene && cutscene.Playing) {
+    if (cutscene.AllowsLook) cutscene.AddLook(e.movementX, e.movementY);
+    return;
+  }
   // 轮盘开着的时候鼠标是在选格子，不是在转头。
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
   // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。

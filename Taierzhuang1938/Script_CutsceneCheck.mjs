@@ -18,12 +18,50 @@ export function MinReadSeconds(text) {
   return chars * 0.22 + 1.2;
 }
 
+export function ResolveHeadLookConfig(cut, shot = null) {
+  const source = shot?.headLook || shot?.camera?.headLook || cut?.headLook || {};
+  const range = (value, fallback) => {
+    if (Array.isArray(value) && value.length >= 2) {
+      const a = Number(value[0]), b = Number(value[1]);
+      if (Number.isFinite(a) && Number.isFinite(b)) return [Math.min(a, b), Math.max(a, b)];
+    }
+    if (Number.isFinite(value)) return [-Math.abs(value), Math.abs(value)];
+    return fallback;
+  };
+  return {
+    yaw: range(source.yaw ?? source.yawLimit ?? cut?.yawLimit, [-0.65, 0.65]),
+    pitch: range(source.pitch ?? source.pitchLimit ?? cut?.pitchLimit, [-0.38, 0.38]),
+    sensitivityScale: Math.max(0, Math.min(4, Number(source.sensitivityScale ?? cut?.sensitivityScale ?? 1) || 0)),
+  };
+}
+
+export function ClampHeadLook(value, range) {
+  const number = Number.isFinite(value) ? value : 0;
+  return Math.max(range[0], Math.min(range[1], number));
+}
+
 /** 一场过场的硬错。 */
 export function ValidateCutscene(cut, cast = CAST) {
   const problems = [];
   if (!cut || !cut.id) return ["过场数据为空"];
   const shots = cut.shots || [];
   if (!shots.length) problems.push(`${cut.id}: 没有任何分镜`);
+  const cameraModes = new Set(["director", "headLook"]);
+  const checkRange = (value, label) => {
+    if (value === undefined) return;
+    if (Array.isArray(value) && value.length >= 2 && value.every((n) => Number.isFinite(Number(n)))) {
+      if (Number(value[0]) > Number(value[1])) problems.push(`${cut.id}: ${label} 范围倒置`);
+      return;
+    }
+    if (!Number.isFinite(Number(value))) problems.push(`${cut.id}: ${label} 不是数字或二元范围`);
+  };
+  checkRange(cut.yawLimit, "yawLimit");
+  checkRange(cut.pitchLimit, "pitchLimit");
+  checkRange(cut.headLook?.yaw, "headLook.yaw");
+  checkRange(cut.headLook?.pitch, "headLook.pitch");
+  if (cut.sensitivityScale !== undefined && (!Number.isFinite(Number(cut.sensitivityScale)) || Number(cut.sensitivityScale) < 0)) {
+    problems.push(`${cut.id}: sensitivityScale 必须是非负数字`);
+  }
   const sum = shots.reduce((a, s) => a + (s.seconds || 0), 0);
   if (Math.abs(sum - cut.seconds) > 0.005) {
     problems.push(`${cut.id}: 分镜秒数之和 ${sum.toFixed(2)} ≠ 声明时长 ${cut.seconds}`);
@@ -33,11 +71,23 @@ export function ValidateCutscene(cut, cast = CAST) {
     if (!shot.camera || !shot.camera.from) problems.push(`${cut.id} 镜${shot.n}: 缺机位`);
     if (!shot.focalMm) problems.push(`${cut.id} 镜${shot.n}: 缺焦距`);
     const cam = shot.camera || {};
+    const mode = shot.cameraMode || cam.cameraMode || cut.cameraMode || "director";
+    if (!cameraModes.has(mode)) problems.push(`${cut.id} 镜${shot.n}: 未知 cameraMode「${mode}」`);
+    checkRange(shot.headLook?.yaw ?? cam.headLook?.yaw, `镜${shot.n} headLook.yaw`);
+    checkRange(shot.headLook?.pitch ?? cam.headLook?.pitch, `镜${shot.n} headLook.pitch`);
     if (cam.fromActor && !castIds.has(cam.fromActor)) problems.push(`${cut.id} 镜${shot.n}: fromActor「${cam.fromActor}」不在 cast 里`);
     if (cam.lookActor && !castIds.has(cam.lookActor)) problems.push(`${cut.id} 镜${shot.n}: lookActor「${cam.lookActor}」不在 cast 里`);
     for (const line of shot.lines || []) {
       if (line.who && !cast[line.who] && !(cut.people && cut.people[line.who])) {
         problems.push(`${cut.id} 镜${shot.n}: 人物表里没有 ${line.who}`);
+      }
+      if ((line.voiceCue ?? line.voice) !== undefined && typeof (line.voiceCue ?? line.voice) !== "string") {
+        problems.push(`${cut.id} 镜${shot.n}: 台词 voice cue 必须是字符串`);
+      }
+    }
+    for (const sub of shot.subs || []) {
+      if ((sub.voiceCue ?? sub.voice) !== undefined && typeof (sub.voiceCue ?? sub.voice) !== "string") {
+        problems.push(`${cut.id} 镜${shot.n}: 字幕 voice cue 必须是字符串`);
       }
     }
     for (const move of shot.propMoves || []) {
@@ -46,6 +96,15 @@ export function ValidateCutscene(cut, cast = CAST) {
   }
   for (const actor of cut.cast || []) {
     if (!actor.track || !actor.track.length) { problems.push(`${cut.id}: ${actor.id} 没有轨道`); continue; }
+    const attachments = Array.isArray(actor.attachments) ? actor.attachments
+      : (Array.isArray(actor.mounts) ? actor.mounts : []);
+    for (const attachment of attachments) {
+      const propName = attachment.name || attachment.prop || attachment.propName;
+      if (!propName || !(cut.props || []).some((p) => p.name === propName)) {
+        problems.push(`${cut.id}: ${actor.id} 挂载指向不存在的道具「${propName || ""}」`);
+      }
+      if (!(attachment.mount || attachment.mountName)) problems.push(`${cut.id}: ${actor.id} 挂载缺少 mount`);
+    }
     for (let i = 1; i < actor.track.length; i += 1) {
       if (actor.track[i].t < actor.track[i - 1].t) {
         problems.push(`${cut.id}: ${actor.id} 的关键帧时间没有递增（第 ${i} 帧）`);
