@@ -379,6 +379,20 @@ function CarSeatTrack(pos, lifeState, prepareAt, exitAt, exitEnd, exitX, facingR
   ];
 }
 
+/** 站在车门与车厢末端的战士：补足通信排人数，但始终把中间过道留给玩家。 */
+function CarStandTrack(pos, prepareAt, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
+  return [
+    { t: 0, pos, ry: facingRy, state: { moveSpeed: 0 } },
+    { t: CHUCHUAN_PREPARE_AT, pos, ry: facingRy, state: { moveSpeed: 0 } },
+    { t: prepareAt, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
+    { t: 106.6, pos, ry: facingRy, state: { hidden: true, prepare: 1 } },
+    { t: 106.9, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { hidden: true, prepare: 1 } },
+    { t: exitAt, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { prepare: 1, moveSpeed: 0.62 } },
+    { t: exitEnd, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true, prepare: 1, moveSpeed: 0.62 } },
+    { t: CHUCHUAN_END, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true } },
+  ];
+}
+
 function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
   return [
     { t: 0, pos: start, ry: 0, state: { hidden: true } },
@@ -431,8 +445,14 @@ export const CS_Chuchuan = {
   ambientMotion: [
     { name: "WindowNearLayer", from: [5.2, 0.25, -18], axis: [0, 0, 1], speed: 4.8, span: 42 },
     { name: "WindowMidLayer", from: [10.5, 0.5, -21], axis: [0, 0, 1], speed: 2.9, span: 48 },
-    { name: "WindowFarLayer", from: [64, 4.2, -26], axis: [0, 0, 1], speed: 1.25, span: 56 },
-    { name: "DistantPole", from: [12, 1.2, -12], axis: [0, 0, 1], speed: 5.8, span: 34 },
+    { name: "WindowFarLayer", from: [18, 2.15, -26], axis: [0, 0, 1], speed: 1.25, span: 56 },
+    { name: "WindowNearLayerLeft", from: [-5.2, 0.25, -18], axis: [0, 0, 1], speed: 4.8, span: 42 },
+    { name: "WindowMidLayerLeft", from: [-10.5, 0.5, -21], axis: [0, 0, 1], speed: 2.9, span: 48 },
+    { name: "WindowFarLayerLeft", from: [-18, 2.15, -26], axis: [0, 0, 1], speed: 1.25, span: 56 },
+    // 三根电线杆按快于远景、慢于碎石的速度掠过窗框；这是车厢里最清晰的移动参照物。
+    { name: "DistantPoleA", from: [12, 2.05, -14], axis: [0, 0, 1], speed: 5.8, span: 34 },
+    { name: "DistantPoleB", from: [12, 2.05, -2], axis: [0, 0, 1], speed: 5.8, span: 34 },
+    { name: "DistantPoleC", from: [12, 2.05, 10], axis: [0, 0, 1], speed: 5.8, span: 34 },
     { name: "DistantSmokeColumn", from: [20, 3.8, -19], axis: [0, 0, 1], speed: 1.7, span: 44 },
   ],
 
@@ -482,12 +502,18 @@ export const CS_Chuchuan = {
     { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
     { kind: "box", size: [0.35, 0.08, 0.9], pos: [-2.25, 1.15, -2.55], mat: "ClothNra", color: 0x372d26, name: "ShoeTool" },
     { kind: "box", size: [0.16, 0.16, 0.8], pos: [2.1, 0.65, 2.75], mat: "Steel", color: 0x49443e, name: "MachineGunCase" },
-    // 窗外近／中／远三层，站台块只在 50—68 s 通过一次。
+    // 窗外近／中／远三层铺满左右两扇窗：深暗的远方树线压住天空，近处碎石、
+    // 低田和不断掠过的电线杆提供速度差。这样不论玩家转向哪一边都能读出火车正在跑。
     { kind: "box", size: [0.20, 0.35, 42], pos: [5.2, 0.25, 0], mat: "GroundRubble", color: 0x6c6558, name: "WindowNearLayer" },
-    { kind: "box", size: [0.25, 1.0, 48], pos: [10.5, 0.5, 0], mat: "Ground", color: 0x817967, name: "WindowMidLayer" },
-    { kind: "box", size: [0.3, 8, 56], pos: [64, 4.2, 0], mat: "Adobe", color: 0x8f8573, name: "WindowFarLayer" },
+    { kind: "box", size: [0.25, 1.45, 48], pos: [10.5, 0.72, 0], mat: "Ground", color: 0x5e604d, name: "WindowMidLayer" },
+    { kind: "box", size: [0.32, 4.3, 56], pos: [18, 2.15, 0], mat: "WoodDoor", color: 0x343c33, name: "WindowFarLayer" },
+    { kind: "box", size: [0.20, 0.35, 42], pos: [-5.2, 0.25, 0], mat: "GroundRubble", color: 0x6c6558, name: "WindowNearLayerLeft" },
+    { kind: "box", size: [0.25, 1.45, 48], pos: [-10.5, 0.72, 0], mat: "Ground", color: 0x5e604d, name: "WindowMidLayerLeft" },
+    { kind: "box", size: [0.32, 4.3, 56], pos: [-18, 2.15, 0], mat: "WoodDoor", color: 0x343c33, name: "WindowFarLayerLeft" },
     { kind: "box", size: [2.5, 0.16, 42], pos: [6.5, 0.12, 0], mat: "GroundRubble", color: 0x4d4942, name: "TrackBallast" },
-    { kind: "box", size: [0.16, 2.4, 0.16], pos: [12, 1.2, 2], mat: "WoodBeam", color: 0x4e4233, name: "DistantPole" },
+    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, -14], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleA" },
+    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, -2], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleB" },
+    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, 10], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleC" },
     { kind: "cyl", size: [0.32, 2.0], pos: [20, 3.8, -2], mat: "Adobe", color: 0x57483a, name: "DistantSmokeColumn", emissive: 0x201710 },
     { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
     { kind: "box", size: [3.2, 1.4, 2.0], pos: [13.5, 1.15, -100], mat: "WoodBeam", color: 0x6b5846, name: "StationShed" },
@@ -513,6 +539,11 @@ export const CS_Chuchuan = {
     { id: "riflemanC", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleC", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, 4.65], { prepare: 0.25 }, 100.2, 107.5, 109.2, -0.6, -Math.PI / 2) },
     { id: "porter", kind: "nra", weapon: null, seed: "chuchuanPorter", track: CarSeatTrack([2.75, CHUCHUAN_CAR_G, 4.65], { sit: 0.9 }, 100.3, 109.2, 110.9, 0.6, Math.PI / 2) },
     { id: "cook", kind: "nra", weapon: null, seed: "chuchuanCook", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, 6.35], { sit: 0.8 }, 100.5, 110.9, 112.6, -0.2, -Math.PI / 2) },
+    // 车厢末端和门边还有四人站着；总共十六人，仍保留中间一条可走的过道。
+    { id: "standingRearLeft", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingRearLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, -7.35], 100.0, 107.0, 108.7, -1.5, -Math.PI / 2) },
+    { id: "standingRearRight", kind: "nra", weapon: null, seed: "chuchuanStandingRearRight", track: CarStandTrack([2.75, CHUCHUAN_CAR_G, -7.35], 100.2, 108.1, 109.8, 1.5, Math.PI / 2) },
+    { id: "standingDoorLeft", kind: "nra", weapon: null, seed: "chuchuanStandingDoorLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, 7.35], 100.4, 109.2, 110.9, -1.3, -Math.PI / 2) },
+    { id: "standingDoorRight", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingDoorRight", track: CarStandTrack([2.75, CHUCHUAN_CAR_G, 7.35], 100.6, 110.3, 112.0, 1.3, Math.PI / 2) },
     { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
     { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
     { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.03, crouch: 0.25 }) },
