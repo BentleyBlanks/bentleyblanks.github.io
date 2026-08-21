@@ -299,6 +299,29 @@ export const EAST_SUBURB = {
   gully: { x: 555, fromZ: -200, toZ: 220, depth: 3.0, width: 7.5 },
 };
 
+/**
+ * 东关核心白盒的防区锚点（游戏化推定，不是史实测绘坐标）。
+ *
+ * 这些点把城防示意图里的“开阔接近地—城壕—东城墙缺口—东门—中心街区”
+ * 落成可以检查的空间关系：缺口两侧各有投弹位，缺口后方有交叉火力位，
+ * 东关民房后保留一个预备队院落。wallAt 使用东墙局部坐标，East 墙上
+ * worldZ = -wallAt，避免在不同切片里重复手写绝对坐标。
+ */
+export const EAST_DEFENSE = {
+  breachWallAt: 70,
+  grenadePositions: [
+    { id: "BreachNorthGrenade", wallAt: 88, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachSouthGrenade", wallAt: 52, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+  ],
+  crossfirePosition: { id: "BreachMachineGun", wallAt: 70, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
+  reserveCourtyard: { id: "EastReserveCourtyard", x: 388, z: 76, length: 11.0, depth: 3.2, ry: 0 },
+  rubblePiles: [
+    { id: "BreachNorthRubble", wallAt: 94, inward: 0.5, radius: 8.5 },
+    { id: "BreachSouthRubble", wallAt: 46, inward: 0.5, radius: 8.5 },
+    { id: "BreachApronRubble", wallAt: 70, inward: -5.0, radius: 7.0 },
+  ],
+};
+
 /** 西关：电灯厂的烟囱是西关天际线上的关键剪影，且在西城门楼的直瞄射程内。 */
 export const WEST_SUBURB = {
   // 厂房约 30×18 m、烟囱高 22 m（规模为推定；「在西城楼直瞄射程内」为主流记载）。

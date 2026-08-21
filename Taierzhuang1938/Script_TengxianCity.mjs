@@ -35,14 +35,14 @@ import { Mulberry32, HashString, Clamp, Clamp01, Fbm2, SmoothStep } from "./Scri
 import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
   CORNER_TOWERS, RAMPS, RAMP, DUGOUT, CROSSROAD, STREETS, SIGHT_CORRIDOR,
-  LANDMARKS, OUTER_LANDMARKS, EAST_SUBURB, WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
+  LANDMARKS, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
   PALETTE, WALL_TOP_Y,
 } from "./Data_Tengxian.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
   AddChurch, AddPagoda, AddZhaiWall, AddCompound, AddRoomBlock, AddHardMountainRoof,
-  AddTree,
+  AddTree, AddSandbagEmplacement,
 } from "./Script_World.mjs";
 import {
   MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
@@ -1313,6 +1313,41 @@ export class TengxianCity {
           ys: [1.1, 1.5], count: 3, spread: t.d * 0.5, seed: `eastTempleLp${s}`, wallFace: 0.26,
         });
       }
+    }
+    this.BuildEastDefenseLayout();
+  }
+
+  /**
+   * 把东关白盒图中的战斗层次落到地面：两侧投弹位、缺口后的机枪交叉火力、
+   * 后方预备队院落，以及三段把玩家视线导向缺口的坍塌带。
+   */
+  BuildEastDefenseLayout() {
+    const wallX = CITY.wallCenter;
+    const worldPoint = (wallAt, inward = 0) => ({ x: wallX - inward, z: -wallAt });
+    const addPosition = (position, index) => {
+      const point = position.wallAt == null
+        ? { x: position.x, z: position.z }
+        : worldPoint(position.wallAt, position.inward);
+      if (!this.InBounds(point.x, point.z, 18)) return;
+      this.sink.SetSector(SectorKey(point.x, point.z));
+      AddSandbagEmplacement(this.sink, {
+        x: point.x, z: point.z, ry: position.ry,
+        length: position.length, depth: position.depth,
+        height: position.height || 0.72, seed: `eastDefense:${position.id}:${index}`,
+      });
+      this.sink.SetSector("");
+    };
+
+    EAST_DEFENSE.grenadePositions.forEach(addPosition);
+    addPosition(EAST_DEFENSE.crossfirePosition, 0);
+    addPosition(EAST_DEFENSE.reserveCourtyard, 0);
+    for (const pile of EAST_DEFENSE.rubblePiles) {
+      const point = worldPoint(pile.wallAt, pile.inward);
+      if (!this.InBounds(point.x, point.z, pile.radius + 2)) continue;
+      this.sink.props.push({
+        kind: "rubblePile", x: point.x, z: point.z,
+        radius: pile.radius, seed: `eastDefense:${pile.id}`,
+      });
     }
   }
 

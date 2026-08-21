@@ -1733,6 +1733,58 @@ export function AddSandbagPlug(sink, {
 }
 
 /**
+ * 低矮的野战掩体：前沿一排沙袋 + 两侧短翼，后方敞开供补位和撤退。
+ *
+ * 它和 AddSandbagPlug 的用途不同：堵门是连续实体，这里是东关白盒里的
+ * 投弹位、机枪位和预备队院落掩体。仍然复用同一套实例化沙袋，避免为几
+ * 个固定战位引入新的材质或 draw call。
+ */
+export function AddSandbagEmplacement(sink, {
+  x, z, ry = 0, baseY = 0, seed = "emplacement",
+  length = 7.0, depth = 2.6, height = 0.72,
+}) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
+  const bagW = 0.62, bagH = 0.24, bagD = 0.34;
+  const rows = Math.max(1, Math.ceil(height / bagH));
+  const segments = [
+    { axis: "x", lx: 0, lz: depth / 2, len: length },
+    { axis: "z", lx: -length / 2 + bagD / 2, lz: 0, len: depth },
+    { axis: "z", lx: length / 2 - bagD / 2, lz: 0, len: depth },
+  ];
+  const matrices = [];
+  const dummy = new THREE.Object3D();
+  const rnd = Mulberry32(HashString(seed));
+  for (let row = 0; row < rows; row += 1) {
+    const rowOffset = row % 2 ? bagW * 0.5 : 0;
+    for (const segment of segments) {
+      const count = Math.max(1, Math.ceil(segment.len / bagW));
+      for (let i = 0; i < count; i += 1) {
+        const along = -segment.len / 2 + (i + 0.5) * segment.len / count + rowOffset;
+        const p = L(segment.lx + (segment.axis === "x" ? along : 0),
+          segment.lz + (segment.axis === "z" ? along : 0));
+        const axisRy = segment.axis === "x" ? ry : ry + Math.PI / 2;
+        dummy.position.set(p.x, baseY + bagH * (row + 0.5), p.z);
+        dummy.rotation.set((rnd() - 0.5) * 0.10, axisRy + (rnd() - 0.5) * 0.18, (rnd() - 0.5) * 0.10);
+        dummy.scale.set(1, 0.94 + rnd() * 0.12, 1);
+        dummy.updateMatrix();
+        matrices.push(dummy.matrix.clone());
+      }
+    }
+  }
+  sink.props.push({ kind: "sandbags", matrices });
+  const solidH = rows * bagH;
+  for (const segment of segments) {
+    const p = L(segment.lx, segment.lz);
+    const alongHalf = segment.len / 2;
+    const axisAlignedRy = segment.axis === "x" ? ry : ry + Math.PI / 2;
+    sink.Solid(p.x, baseY + solidH / 2, p.z, alongHalf, solidH / 2, bagD / 2,
+      "sandbagEmplacement", axisAlignedRy);
+    sink.Cover(p.x, p.z, baseY + solidH, Math.sin(axisAlignedRy), Math.cos(axisAlignedRy));
+  }
+}
+
+/**
  * 城楼歇山顶的一整张薄壳。
  *
  * 旧实现拿四块倾斜 BoxGeometry 交叉成屋顶。四块板既没有共同檐口，也没有共同脊线，
