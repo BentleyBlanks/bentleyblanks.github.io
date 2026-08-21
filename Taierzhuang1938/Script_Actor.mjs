@@ -33,6 +33,25 @@ import {
 
 const Lerp = (a, b, t) => a + (b - a) * t;
 
+// 车厢生活动作是附加层：所有量都保持 0 时，Update 的结果与旧版完全一致。
+// 这里不把动作拆成互斥枚举，导演可以同时给 sit + repairShoe，或 cleanRifle +
+// checkAmmo，姿态层会按数值混合。非法值（NaN、Infinity、字符串）统一回到 0，
+// 避免一个坏的过场关键帧把整棵骨架污染成 NaN。
+export const LIFE_POSE_NAMES = Object.freeze([
+  "sit", "repairShoe", "cleanRifle", "sleep", "checkAmmo", "prepare",
+]);
+
+const Finite01 = (value) => (typeof value === "number" && Number.isFinite(value)
+  ? Clamp01(value) : 0);
+
+export function NormalizeLifePose(input = {}) {
+  const source = input && typeof input === "object" && input.lifePose
+    && typeof input.lifePose === "object" ? input.lifePose : input;
+  const out = {};
+  for (const name of LIFE_POSE_NAMES) out[name] = Finite01(source && source[name]);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // 色板：全部抄自 docs/Data_HistoryMaterial.md 第三节，别在这里即兴发挥。
 // ---------------------------------------------------------------------------
@@ -1172,6 +1191,44 @@ export class Actor {
     this.weaponTwoHanded = true;
     this.SetWeapon(options.weapon === undefined ? spec.defaultWeapon : options.weapon);
 
+    // 通用挂点只描述人体，不知道鞋、线盘或本序章的道具 ID。节点一经创建就复用，
+    // 因而过场可以在任意帧安全地拿到同一个 Object3D；挂点会随骨骼自然更新。
+    const makeMount = (name, parent, position = null) => {
+      const mount = new THREE.Group();
+      mount.name = name;
+      if (position) mount.position.copy(position);
+      parent.add(mount);
+      return mount;
+    };
+    this.mounts = {
+      eyes: this.eyes,
+      weapon: this.weaponMount,
+      weaponMount: this.weaponMount,
+      handL: makeMount("handL", this.arms.L.elbow,
+        new THREE.Vector3(0, -d.forearmLen * 0.98, 0.01 * d.height)),
+      handR: makeMount("handR", this.arms.R.elbow,
+        new THREE.Vector3(0, -d.forearmLen * 0.98, 0.01 * d.height)),
+      kneeL: makeMount("kneeL", this.legs.L.knee),
+      kneeR: makeMount("kneeR", this.legs.R.knee),
+      footL: makeMount("footL", this.legs.L.ankle),
+      footR: makeMount("footR", this.legs.R.ankle),
+      footEdgeL: makeMount("footEdgeL", this.legs.L.ankle,
+        new THREE.Vector3(0, -d.footH * 0.5, -d.footLen * 0.5)),
+      footEdgeR: makeMount("footEdgeR", this.legs.R.ankle,
+        new THREE.Vector3(0, -d.footH * 0.5, -d.footLen * 0.5)),
+      // 人物正面是 -Z，因此背部在胸口局部 +Z。这个点仅用于挂背包/靠墙参照。
+      back: makeMount("back", this.chest,
+        new THREE.Vector3(0, 0.08 * d.height, 0.11 * d.height)),
+    };
+    this._mountAliases = Object.freeze({
+      eye: "eyes", eyes: "eyes", weapon: "weapon", weaponmount: "weaponMount",
+      hand: "handR", handl: "handL", handleft: "handL", lefthand: "handL",
+      handr: "handR", handright: "handR", righthand: "handR",
+      knee: "kneeR", kneel: "kneeL", kneer: "kneeR",
+      foot: "footR", footl: "footL", footr: "footR", feet: "footR",
+      footedge: "footEdgeR", footedgel: "footEdgeL", footedger: "footEdgeR", back: "back",
+    });
+
     // --- 动画内部状态（全部确定性）---
     this.time = 0;
     this.gaitPhase = rnd();                  // 起步相位各不相同，一排人才不像广播体操
@@ -1188,6 +1245,7 @@ export class Actor {
     this.prevFireSequence = 0;
     this.ragdollState = null;
     this.disposed = false;
+    this.lifePose = NormalizeLifePose();
 
     this.grenadeGroup = null;           // 投弹时才建，见 EnsureGrenade
     this.grenadeThrown = false;         // 脱手门闩：一次脉冲只飞一颗
@@ -1289,6 +1347,18 @@ export class Actor {
   }
 
   /**
+   * 通用人体挂点。返回稳定复用的 Object3D（不是每次 new 的 Vector3），所以调用方可以
+   * 直接把线、弹药袋、背包或镜头目标挂在上面。名称大小写不敏感，未知名称返回 null。
+   * 可用：eyes、handL/handR、back、kneeL/kneeR、footL/footR、footEdgeL/footEdgeR、weaponMount。
+   */
+  GetMount(name) {
+    if (typeof name !== "string" || !this.mounts) return null;
+    const key = name.trim();
+    const canonical = this._mountAliases[key.toLowerCase()] || key;
+    return this.mounts[canonical] || null;
+  }
+
+  /**
    * 倒地。**不做物理** —— 布娃娃在这个规模上既贵又不可复现，而且十有八九摆出一个
    * 考据上不可能的姿势。这里走一段 0.8 秒的确定性姿态过渡：膝先软 → 上身前扑或
    * 后仰 → 最后贴地不再动。
@@ -1338,6 +1408,14 @@ export class Actor {
     const kneel = Clamp01(s.kneel ?? 0);
     const reach = Clamp01(s.reach ?? 0);
     const binoculars = Clamp01(s.binoculars ?? 0);
+    const lifePose = NormalizeLifePose(s);
+    this.lifePose = lifePose;
+    const sit = lifePose.sit;
+    const repairShoe = lifePose.repairShoe;
+    const cleanRifle = lifePose.cleanRifle;
+    const sleep = lifePose.sleep;
+    const checkAmmo = lifePose.checkAmmo;
+    const prepare = lifePose.prepare;
     // 卧倒/投弹/劈砍时据不了标准枪，把 aim 压下去，不然肩线会拧成麻花
     const aim = Clamp01(s.aim ?? 0) * (1 - prone * 0.45) * (1 - throwing) * (1 - melee);
     const elapsed = s.elapsed ?? (this.time + dt);
@@ -1412,7 +1490,11 @@ export class Actor {
     // 会把膝盖解到前下方贴地。kneel 与 crouch 同时给时跪说了算。
     const kneelHipY = d.thighLen + 0.07 * H;
     const kneelDrop = kneel * (d.hipY - kneelHipY) / d.hipY;
-    const stanceDrop = Math.max(crouch * 0.34, kneelDrop) + prone * 0.60 + dying * 0.30;
+    // 坐姿/靠墙睡的胯落到长凳高度；其它生活动作也给一点下沉，组合时不会漂浮。
+    const seated = Math.max(sit, sleep, repairShoe * 0.72, checkAmmo * 0.42, cleanRifle * 0.32)
+      * (1 - prone);
+    const seatedDrop = seated * (d.hipY - d.thighLen - 0.045 * H) / d.hipY;
+    const stanceDrop = Math.max(crouch * 0.34, kneelDrop, seatedDrop) + prone * 0.60 + dying * 0.30;
     const breath = Math.sin(elapsed * this.breathRate * Math.PI * 2 + this.idlePhase);
     const idleSway = Math.sin(elapsed * 0.41 * Math.PI * 2 + this.idlePhase * 1.7) * this.swayScale;
     // 走路时胯的起伏是**倒立摆**：腿立直在胯正下方时最高，前后叉开（双支撑期）
@@ -1486,6 +1568,12 @@ export class Actor {
         footZ = Lerp(footZ, d.shinLen * 0.92, kneel);
         footX = Lerp(footX, leg.side * d.hipHalf * 1.3, kneel);
         footY = Lerp(footY, d.ankleY * 0.8, kneel);
+      }
+      if (seated > 0.001) {
+        // 坐下时膝盖朝车厢前方（-Z），脚仍靠近地板；两段腿 IK 会自动保留接触。
+        footZ = Lerp(footZ, -0.17 * H, seated);
+        footX = Lerp(footX, leg.side * 0.070 * H, seated);
+        footY = Lerp(footY, d.ankleY, seated);
       }
       if (airborne > 0) {
         // 起跳收腿、下落伸腿接地。左右脚前后错开一点，避免空中变成并腿木偶。
@@ -1610,6 +1698,17 @@ export class Actor {
       lookYaw * 0.65 - aim * 0.10,
       aim * 0.13 + idleSway * 0.01);                        // 据枪时头偏向照门
 
+    // 车厢动作的剪影层：先改胸/头，再交给 PoseWeapon / PoseArms 处理接触点。
+    // sleep 是靠墙打盹（头向下），prepare 是炮后停手抬头，后者有意覆盖前者的低头量。
+    const actionLean = repairShoe * 0.16 + cleanRifle * 0.08 + checkAmmo * 0.13;
+    this.chest.rotation.x -= actionLean;
+    this.chest.rotation.z += sleep * 0.055;
+    this.neck.rotation.x += -sleep * 0.82 - repairShoe * 0.24 - checkAmmo * 0.30
+      - cleanRifle * 0.10 + prepare * 0.46;
+    this.neck.rotation.y += sleep * 0.10 - repairShoe * 0.07 + prepare * 0.06;
+    this.hips.position.z += seated * 0.060 * H;
+    this.body.rotation.x += sleep * 0.32;
+
     // --- 覆盖姿势：卧倒 ------------------------------------------------------
     // **必须排在持枪与手臂之前。** PoseWeapon 是靠「减掉上身累积的旋转」把枪口
     // 指到玩家真正看的方向的，而卧倒改的正是 body 的俯仰。先摆枪再翻身体，那份
@@ -1638,8 +1737,9 @@ export class Actor {
 
     const weaponAim = Math.max(aim, prone * 0.9, bayonet * 0.85);
     this.PoseWeapon(weaponAim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee,
-      breath, idleSway, prone, bayonet);
-    this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone, reach, binoculars);
+      breath, idleSway, prone, bayonet, lifePose);
+    this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone, reach, binoculars,
+      lifePose);
 
     // 手里的手榴弹：抡过 0.66 就脱手。**要一个门闩**，不能只比大小 ——
     // throwing 是个 0→1→0 的脉冲，光比数值的话，回收段再次路过 0.66 以下，
@@ -1685,7 +1785,7 @@ export class Actor {
    * 投弹时的收枪。这些常量是按 1.66 m 定的，换身高按 k 缩放。
    */
   PoseWeapon(aim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee, breath, idleSway,
-    prone = 0, bayonet = 0) {
+    prone = 0, bayonet = 0, lifePose = null) {
     const d = this.dims;
     const k = d.height / 1.66;
     const mount = this.weaponMount;
@@ -1784,17 +1884,79 @@ export class Actor {
     POSE_E.set(this.recoil * 0.16 + idleSway * 0.004, extraY, extraZ, "XYZ");
     OFF_Q.setFromEuler(POSE_E);
     mount.quaternion.multiply(OFF_Q);
+
+    // 擦枪时把枪压到膝前，保持枪身成为一条清晰的横向剪影；手臂会在 PoseArms
+    // 里沿这条枪移动。cleanRifle=0 时完全不执行，旧战斗动作不受影响。
+    const clean = lifePose ? lifePose.cleanRifle : 0;
+    if (clean > 0.001 && !throwing && !melee && !prone) {
+      // 枪身沿 -Z；绕 Y 约 66° 后横跨膝前，擦布/机匣的接触线才读得出来。
+      POSE_E.set(0.15, -1.15, 0.06, "XYZ");
+      OFF_Q.setFromEuler(POSE_E);
+      mount.quaternion.slerp(OFF_Q, SmoothStep(0, 1, clean));
+      mount.position.x = Lerp(mount.position.x, 0.050 * k, clean);
+      mount.position.y = Lerp(mount.position.y, -0.030 * k, clean);
+      mount.position.z = Lerp(mount.position.z, -0.115 * k, clean);
+      // 擦布碰到机匣时有短促卡顿，不另造时间轴；确定性相位来自个体 idlePhase。
+      mount.rotation.z += Math.sin(this.time * 3.8 + this.idlePhase) * 0.045 * clean;
+    }
   }
 
   /**
    * 手臂。有枪就两只手 IK 到枪上的握点（**先摆枪、手再跟过去**），
    * 空手才走自由摆臂。反过来做的话手永远对不上枪。
    */
-  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0, reach = 0, binoculars = 0) {
+  PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB) {
+    const action = Math.max(repairShoe, sleep, checkAmmo, prepare);
+    if (action <= 0.001) return;
+    const solveBlended = (arm, target, amount, roll) => {
+      if (amount <= 0.001) return;
+      REST_Q.copy(arm.shoulder.quaternion);
+      OFF_Q.copy(arm.elbow.quaternion);
+      SolveTwoBone(arm.shoulder, arm.elbow, target, lenA, lenB, roll);
+      arm.shoulder.quaternion.slerp(REST_Q, 1 - amount);
+      arm.elbow.quaternion.slerp(OFF_Q, 1 - amount);
+    };
+    // 坐在车厢长凳上补鞋：双手落到膝前同一小块区域，手臂形成可读的低头剪影。
+    if (repairShoe > 0.001) {
+      POSE_A.set(0.090 * H, -0.205 * H, -0.205 * H);
+      POSE_B.set(-0.045 * H, -0.195 * H, -0.215 * H);
+      solveBlended(this.arms.R, POSE_A, repairShoe, Math.PI * 1.12);
+      solveBlended(this.arms.L, POSE_B, repairShoe, Math.PI * 0.88);
+    }
+    // 查弹药：右手去腰腹，左手留在胸前，动作不会误读成敬礼或招手。
+    if (checkAmmo > 0.001) {
+      POSE_A.set(0.145 * H, -0.105 * H, -0.120 * H);
+      POSE_B.set(-0.105 * H, 0.025 * H, -0.165 * H);
+      solveBlended(this.arms.R, POSE_A, checkAmmo, Math.PI * 1.06);
+      solveBlended(this.arms.L, POSE_B, checkAmmo, Math.PI * 0.94);
+    }
+    // 靠墙睡：手臂收在腹前；prepare 会把它们稳定地放回身侧并停止游移。
+    if (sleep > 0.001) {
+      BlendEuler(this.arms.L.shoulder, 0.24, 0, -0.18, sleep);
+      BlendEuler(this.arms.R.shoulder, 0.24, 0, 0.18, sleep);
+      BlendEuler(this.arms.L.elbow, -0.85, 0, 0, sleep);
+      BlendEuler(this.arms.R.elbow, -0.85, 0, 0, sleep);
+    }
+    if (prepare > 0.001) {
+      BlendEuler(this.arms.L.shoulder, 0.08, 0, -0.12, prepare);
+      BlendEuler(this.arms.R.shoulder, 0.08, 0, 0.12, prepare);
+      BlendEuler(this.arms.L.elbow, -0.30, 0, 0, prepare);
+      BlendEuler(this.arms.R.elbow, -0.30, 0, 0, prepare);
+    }
+  }
+
+  PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0, reach = 0, binoculars = 0,
+    lifePose = null) {
     const d = this.dims;
     const H = d.height;
     const L = this.arms.L, R = this.arms.R;
     const lenA = d.upperArmLen, lenB = d.forearmLen;
+    const life = lifePose || NormalizeLifePose();
+    const repairShoe = life.repairShoe;
+    const cleanRifle = life.cleanRifle;
+    const sleep = life.sleep;
+    const checkAmmo = life.checkAmmo;
+    const prepare = life.prepare;
 
     if (!this.weaponGroup) {
       // 空手摆臂。同样用 cos 与步态同相：相位 0 左腿在前，左臂就该在后。
@@ -1837,6 +1999,9 @@ export class Actor {
             prone, "ZXY");
           BlendEuler(arm.elbow, -1.00 + pull * 0.42, 0, 0, prone);
         }
+      }
+      if (prone <= 0.001) {
+        this.PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB);
       }
       return;
     }
@@ -1896,6 +2061,25 @@ export class Actor {
       this.chest.rotation.y += raise * 0.30 - chop * 0.40;
       this.chest.rotation.x += chop * 0.30;
       leftFollows = true;
+    }
+
+    // 有枪时生活动作仍优先保证接触：擦枪是双手沿枪身移动，查弹药是右手离枪
+    // 去腰间取弹，准备动作则让双手停在炮后低姿持枪位。
+    if (cleanRifle > 0.001 && !throwing && !melee && !prone) {
+      const wipe = 0.5 + 0.5 * Math.sin(this.time * 3.8 + this.idlePhase);
+      POSE_A.copy(this.gripL).lerp(this.gripR, 0.25 + wipe * 0.45);
+      this.gripR.lerp(POSE_A, cleanRifle);
+      leftFollows = true;
+    }
+    if (checkAmmo > 0.001 && !throwing && !melee && !prone) {
+      // chest 局部：右手在腰腹弹药带，左手仍托枪，头部低头由 Update 处理。
+      POSE_A.set(0.14 * H, 0.10 * H, -0.28 * H);
+      this.gripR.lerp(POSE_A, checkAmmo);
+    }
+    if (prepare > 0.001 && !throwing && !melee && !prone) {
+      // 炮后抬头准备：不再做擦枪/查弹的手部游移，双手回到稳定托枪点。
+      this.gripR.lerp(this.weaponMount.position, prepare * 0.35);
+      if (leftFollows) this.gripL.lerp(this.weaponMount.position, prepare * 0.20);
     }
 
     // 左手够不着护木前段就**沿着枪身往回滑**，别让它悬在枪外面。
