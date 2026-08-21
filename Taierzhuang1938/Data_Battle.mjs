@@ -11,10 +11,12 @@
 //   · 本文件只新增**打法层**的数字（敌军压力、支援种类、携行、切片范围、路标坐标），
 //     这些**全部是推定**，逐条登记在下面的 PRESUMED_TUNING。
 //
-// 世界坐标：X 向东，Z 向南，城心为原点。城墙中心线 ±305，四门居各边正中。
+// 世界坐标：X 向东，Z 向南，城心为原点。城墙中心线 ±305；四门位置按城防示意图略作错位。
 
 import { LEVELS } from "./Data_TengxianScript.mjs";
 import { CITY, GATES, EAST_SUBURB, WEST_SUBURB, LANDMARKS, CROSSROAD } from "./Data_Tengxian.mjs";
+
+const GATE = (id) => GATES.find((gate) => gate.id === id);
 
 /**
  * 城的骨架摘要 —— 只是把 Data_Tengxian 里规则层用得到的那几个数搬过来，
@@ -74,28 +76,28 @@ export const ZONES = {
     id: "PowerPlant", name: "电灯厂", radius: 34,
     x: WEST_SUBURB.powerPlant.x, z: WEST_SUBURB.powerPlant.z,
   },
-  WestGate: { id: "WestGate", name: "西门 · 怀古门", x: -330, z: 0, radius: 26 },
+  WestGate: { id: "WestGate", name: "西门 · 怀古门", x: -330, z: GATE("West").z, radius: 26 },
 
   // --- 二 · 东关（本战真正的主战场，打了整整二十四小时） ---
   ZhaiGate: {
-    id: "ZhaiGate", name: "东寨门", radius: 20,
-    x: EAST_SUBURB.zhaiGate.x, z: EAST_SUBURB.zhaiGate.z,
+    id: "ZhaiGate", name: "东关街口", radius: 20,
+    x: 480, z: EAST_SUBURB.roadZ,
   },
-  Courtyard: { id: "Courtyard", name: "关厢院落", x: 462, z: 46, radius: 26 },
+  Courtyard: { id: "Courtyard", name: "关厢院落", x: 462, z: -59, radius: 26 },
   Temple: {
     id: "Temple", name: "寺院地", radius: 26,
     x: EAST_SUBURB.temple.x, z: EAST_SUBURB.temple.z,
   },
-  Breach: { id: "Breach", name: "缺口", x: 500, z: -20, radius: 22 },
+  Breach: { id: "Breach", name: "缺口", x: 500, z: -105, radius: 22 },
 
   // --- 三 · 夺回东关门（夜） ---
-  Lane: { id: "Lane", name: "巷道", x: 478, z: -24, radius: 22 },
-  GateRetake: { id: "GateRetake", name: "东关门", x: 516, z: 0, radius: 20 },
-  EastGateIn: { id: "EastGateIn", name: "东门 · 宗鲁门", x: 296, z: 0, radius: 24 },
+  Lane: { id: "Lane", name: "巷道", x: 478, z: -129, radius: 22 },
+  GateRetake: { id: "GateRetake", name: "东关门", x: 516, z: -105, radius: 20 },
+  EastGateIn: { id: "EastGateIn", name: "东门 · 宗鲁门", x: 296, z: GATE("East").z, radius: 24 },
 
   // --- 四 · 城墙 ---
   // 上城道：RAMPS 里东门旁那一条，沿墙内侧爬。坐标是墙内侧顺城街上的落脚点。
-  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: 34, radius: 16 },
+  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: -75, radius: 16 },
   Rampart: { id: "Rampart", name: "东南角望楼", x: 294, z: 288, radius: 22 },
   SouthWall: { id: "SouthWall", name: "南城墙", x: 150, z: 296, radius: 26 },
   SouthBreach: { id: "SouthBreach", name: "南墙缺口", x: 285, z: 296, radius: 18 },
@@ -107,13 +109,13 @@ export const ZONES = {
     x: LANDMARKS.find((l) => l.id === "Yamen").x,
     z: LANDMARKS.find((l) => l.id === "Yamen").z,
   },
-  WestStreet: { id: "WestStreet", name: "西门里街", x: -160, z: 0, radius: 24 },
-  WestGateInner: { id: "WestGateInner", name: "西门里", x: -278, z: 0, radius: 20 },
+  WestStreet: { id: "WestStreet", name: "西门里街", x: -160, z: GATE("West").z, radius: 24 },
+  WestGateInner: { id: "WestGateInner", name: "西门里", x: -278, z: GATE("West").z, radius: 20 },
 
   // --- 六 · 北门突围 ---
-  WestBarbican: { id: "WestBarbican", name: "西门瓮城", x: -322, z: 0, radius: 16 },
-  NorthStreet: { id: "NorthStreet", name: "北门里街", x: 0, z: -160, radius: 24 },
-  NorthGate: { id: "NorthGate", name: "北门 · 望阙门", x: 0, z: -296, radius: 20 },
+  WestBarbican: { id: "WestBarbican", name: "西门瓮城", x: -322, z: GATE("West").z, radius: 16 },
+  NorthStreet: { id: "NorthStreet", name: "北门里街", x: GATE("North").x, z: -160, radius: 24 },
+  NorthGate: { id: "NorthGate", name: "北门 · 望阙门", x: GATE("North").x, z: -296, radius: 20 },
   WheatField: { id: "WheatField", name: "城北麦地", x: 0, z: -520, radius: 46 },
 };
 
@@ -209,9 +211,11 @@ const TUNING = {
     },
   },
   L4_Chengqiang: {
-    bounds: { minX: 40, maxX: 620, minZ: -120, maxZ: 400 },
+    // 城墙关卡要能验证四条上城道和完整的城防图外轮廓，因此生成四面墙；
+    // 东南主战区仍由 spawn 与 zones 控制，不靠裁掉北墙来省几百个三角形。
+    bounds: { minX: -360, maxX: 620, minZ: -360, maxZ: 400 },
     zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
-    spawn: { x: 276, z: 46, ry: Math.PI / 2 },
+    spawn: { x: 276, z: -65, ry: Math.PI / 2 },
     ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],
     ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 480,
@@ -226,10 +230,8 @@ const TUNING = {
   L5_Shizijie: {
     // 全城最贵的一关：路标横跨 515 m（县衙在东、西门里在西），
     // 但南北只用中间那一条 —— 北门里街与南门里街是第六关的事。
-    // 县衙占地 90×140、中心 (230,-30)，所以 z 要留到 ±180 才装得下它。
-    // 县衙占地 90×140、中心 (230,-30)，所以 maxX 要留到 285 才装得下它；
-    // 南北压到 ±100 —— 这一关只用东西向那一条街，北门里街与南门里街是第六关的事。
-    // 南北保留 ±100 是为了只生成本关会去的东西；当前性能红线为 5000 dc / 600 万面。
+    // 城防图的中心街区按东西向西门大街与北门大街、南门大街的错位关系复用，
+    // 县署和师部不再被压缩到一条规则中轴线上。
     bounds: { minX: -325, maxX: 285, minZ: -100, maxZ: 100 },
     // 全城最贵的一关：出生点就站在东门里街上，一眼望穿 305 m 的通视走廊
     //（那条走廊是这一关的机制，不能拿掉）。实测 calls 1600。
@@ -237,13 +239,13 @@ const TUNING = {
     cameraFar: 400,
     zones: ["Crossroad", "Yamen", "WestStreet", "WestGateInner"],
     // 站在东门里街上（街心 z=0，宽 8 m）朝西，正对十字街口
-    spawn: { x: 62, z: 0, ry: Math.PI / 2 },
+    spawn: { x: 62, z: 20, ry: Math.PI / 2 },
     ijaPressure: 1.9, ijaSpawn: ["west", "south"], ijaSupport: ["hmg", "launcher"],
     ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 460,
     // 西城门楼 → 西门里街 → 十字街口 是一条通视的直街，被一挺重机枪完全控制。
     // 这条走廊的几何硬约束在 Data_Tengxian.SIGHT_CORRIDOR，城的自检会核对。
-    corridorGun: { x: -300, z: 0, y: 13.0, note: "3/17 17 时日军夺西城门楼后向十字街口扫射" },
+    corridorGun: { x: -300, z: 20, y: 13.0, note: "3/17 17 时日军夺西城门楼后向十字街口扫射" },
     loadout: "L4_LastFiveMinutes",
   },
   L6_Beimen: {
@@ -251,7 +253,7 @@ const TUNING = {
     zones: ["WestBarbican", "NorthStreet", "NorthGate", "WheatField"],
     detailRadius: 70, midRadius: 170,
     // 朝西：第一个目标是「跟着人流去西门」（挤不出去）
-    spawn: { x: -286, z: 0, ry: Math.PI / 2 },
+    spawn: { x: -286, z: 20, ry: Math.PI / 2 },
     ijaPressure: 0.6, ijaSpawn: ["west"], ijaSupport: [],
     ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 240,

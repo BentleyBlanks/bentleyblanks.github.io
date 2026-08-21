@@ -82,7 +82,7 @@ export const MOAT = {
 };
 
 /**
- * 四座城门。居各边正中，每座内外二门 + **半圆形**瓮城
+ * 四座城门。按城防示意图在四边形成错位的门位，每座内外二门 + **半圆形**瓮城
  * （半圆是滕县的特征点，志载「外门呈半圆形称关门」，**不做方瓮城**）。
  *
  * 1938 年 3 月的门禁状态两说并列：一说封东北南三门，一说封南北两门而东西留通行。
@@ -93,7 +93,7 @@ export const MOAT = {
 export const GATES = [
   {
     id: "East", name: "宗鲁门", plaqueInner: "云连东岱", plaqueOuter: "宗鲁门",
-    x: 305, z: 0, ry: Math.PI / 2, outward: [1, 0],
+    x: 305, z: -105, ry: Math.PI / 2, outward: [1, 0],
     blocked: "partial",                  // 土袋半堵
     // 日方原文「最モ堅固ナル東門側防機関ノ直下ニアリテ瞰制セラレ」：
     // 东门旁有专门的侧射工事，位置高、能俯瞰城外突破口，还在手榴弹投掷距离内。
@@ -102,7 +102,7 @@ export const GATES = [
   },
   {
     id: "West", name: "怀古门", plaqueInner: "宝庆西畴", plaqueOuter: "怀古门",
-    x: -305, z: 0, ry: -Math.PI / 2, outward: [-1, 0],
+    x: -305, z: 20, ry: -Math.PI / 2, outward: [-1, 0],
     // 1938 年唯一的活口。土袋堵到只剩一人宽通道 —— 落城时「外门与内门之间
     // 完全是人的漩涡」（日军第九中队安田少尉手记）。缺口净宽 0.9 m 为推定。
     blocked: "slit", slitWidth: 0.9,
@@ -110,13 +110,13 @@ export const GATES = [
   },
   {
     id: "South", name: "迎薰门", plaqueInner: "化洽南离", plaqueOuter: "迎薰门",
-    x: 0, z: 305, ry: 0, outward: [0, 1],
+    x: 70, z: 305, ry: 0, outward: [0, 1],
     blocked: "full",
     sidework: null,
   },
   {
     id: "North", name: "望阙门", plaqueInner: "恩承北极", plaqueOuter: "望阙门",
-    x: 0, z: -305, ry: Math.PI, outward: [0, -1],
+    x: -70, z: -305, ry: Math.PI, outward: [0, -1],
     // 土袋堵死，突围当夜被守军「扒开已屯闭的北城门」。
     blocked: "full",
     sidework: null,
@@ -195,10 +195,10 @@ export const CORNER_TOWERS = [
 // dir：坡自 at 起沿哪个方向爬。**必须背离城门** —— 朝着城门爬的话坡身会压进
 // z=0（或 x=0）那条不许有任何遮挡的视线走廊里。
 export const RAMPS = [
-  { side: "East", at: 30, dir: 1, seed: "rampE" },
-  { side: "West", at: -30, dir: -1, seed: "rampW" },
-  { side: "South", at: 30, dir: 1, seed: "rampS" },
-  { side: "North", at: -30, dir: -1, seed: "rampN" },
+  { side: "East", at: 105, dir: 1, seed: "rampE" },
+  { side: "West", at: 20, dir: -1, seed: "rampW" },
+  { side: "South", at: 70, dir: 1, seed: "rampS" },
+  { side: "North", at: -70, dir: -1, seed: "rampN" },
 ];
 export const RAMP = { width: 2.4, run: 1.0, landingAt: 13, landingRun: 2.0 };
 
@@ -209,19 +209,20 @@ export const DUGOUT = { spacing: 40, width: 1.2, height: 1.6, depth: 3.0 };
  * 城内骨架：十字街口 + 四条门里街。
  * **街巷宽度全部为推定，无任何实测数据。**
  */
-export const CROSSROAD = { x: 0, z: 0, size: 30 };
+export const CROSSROAD = { x: 0, z: 20, size: 30 };
 
 export const STREETS = [
-  // 建国前最繁华的商业街。**z=0 上不得有任何遮挡** —— 见 SIGHT_CORRIDOR。
-  { id: "WestGateStreet", axis: "x", at: 0, from: -300, to: 0, width: 9 },
-  { id: "EastGateStreet", axis: "x", at: 0, from: 0, to: 300, width: 8 },
-  { id: "SouthGateStreet", axis: "z", at: 0, from: 0, to: 300, width: 7 },
-  { id: "NorthGateStreet", axis: "z", at: 0, from: -300, to: 0, width: 6 },
-  // 次街（全部推定）。书院街的岔口位置 x=-160 有记载，走向无载。
-  { id: "ShuyuanStreet", axis: "z", at: -160, from: -240, to: 240, width: 4 },
-  { id: "EastSecondStreet", axis: "z", at: 155, from: -240, to: 240, width: 4 },
-  { id: "NorthSecondStreet", axis: "x", at: -155, from: -280, to: 280, width: 4 },
-  { id: "SouthSecondStreet", axis: "x", at: 155, from: -280, to: 280, width: 4 },
+  // 这组街线按 Notion「滕县城防示意图」的门位和街区关系重排：西门大街在中线偏南，
+  // 东门大街位于北半城，南北门不在同一条中轴线上，城内因此不是规则棋盘格。
+  { id: "WestGateStreet", axis: "x", at: 20, from: -300, to: 20, width: 9 },
+  { id: "EastGateStreet", axis: "x", at: -105, from: -20, to: 300, width: 9 },
+  { id: "SouthGateStreet", axis: "z", at: 70, from: 20, to: 300, width: 8 },
+  { id: "NorthGateStreet", axis: "z", at: -70, from: -300, to: 20, width: 7 },
+  { id: "NorthRingStreet", axis: "x", at: -215, from: -250, to: 250, width: 5 },
+  { id: "WestInnerStreet", axis: "z", at: -185, from: -215, to: 250, width: 5 },
+  { id: "EastInnerStreet", axis: "z", at: 155, from: -215, to: 250, width: 5 },
+  { id: "SouthRingStreet", axis: "x", at: 155, from: -250, to: 250, width: 5 },
+  { id: "CentralEastStreet", axis: "x", at: 85, from: -175, to: 240, width: 4 },
 ];
 
 /**
@@ -232,7 +233,7 @@ export const STREETS = [
  * 任何几何（院落、牌坊、街垒、土袋）都不许侵入这条走廊的净宽。
  */
 export const SIGHT_CORRIDOR = {
-  fromX: -305, toX: 0, atZ: 0, clearHalfWidth: 4.5, eyeY: 1.65,
+  fromX: -305, toX: 0, atZ: 20, clearHalfWidth: 4.5, eyeY: 1.65,
 };
 
 /**
@@ -243,24 +244,47 @@ export const LANDMARKS = [
   // 县衙：城内唯一有实物可参照的建筑（旧县衙大堂尚存，2006 年省级文保，典型明代建筑）。
   // 大门中心 (230,-30)，轴线朝南，占地约 90×140 m（占地为推定，位置为主流记载）。
   // 注意：现址的仪门、谯楼门、善国门是 2007 年后复建的仿古建筑，不能照抄细部。
-  { id: "Yamen", kind: "yamen", x: 230, z: -30, ry: 0, w: 90, d: 140 },
+  { id: "Yamen", kind: "yamen", x: 178, z: -132, ry: 0, w: 62, d: 54 },
   // 西门里街上的三处（位置为主流记载，形制推定）
   // 跨街的牌坊。明间（中间两根柱之间）净宽 = span/3 = 4 m，
   // 正好把 z=0 那条通视轴线让出来 —— 柱子站在街两侧，不站在轴线上。
-  { id: "LongPaifang", kind: "paifang", x: -120, z: 0, ry: Math.PI / 2, span: 12 },
-  { id: "AlarmTower", kind: "alarmTower", x: -200, z: -9, ry: 0, height: 9 },
-  { id: "WangShrine", kind: "shrine", x: -250, z: 17, ry: 0, w: 26, d: 22 },
+  { id: "LongPaifang", kind: "paifang", x: -120, z: 20, ry: Math.PI / 2, span: 12 },
+  { id: "AlarmTower", kind: "alarmTower", x: -205, z: 8, ry: 0, height: 9 },
+  { id: "WangShrine", kind: "shrine", x: -250, z: 42, ry: 0, w: 26, d: 22 },
   // 北门里街东侧
-  { id: "SquareFort", kind: "squareFort", x: 20, z: -200, ry: 0, w: 32, d: 32 },
+  { id: "SquareFort", kind: "squareFort", x: -70, z: -255, ry: 0, w: 32, d: 32 },
   // 铁牌坊，坐东朝西（朝向为主流记载）
-  { id: "IronPaifang", kind: "paifang", x: 8, z: -150, ry: 0, span: 7, iron: true },
+  { id: "IronPaifang", kind: "paifang", x: -70, z: -155, ry: 0, span: 7, iron: true },
   // 南门里街西侧，1931 年中共滕县特支驻地
-  { id: "PeoplesBookshop", kind: "shop", x: -8, z: 130, ry: -Math.PI / 2, w: 12, d: 9 },
+  { id: "PeoplesBookshop", kind: "shop", x: -110, z: 125, ry: -Math.PI / 2, w: 12, d: 9 },
   // 城内西北的德国天主堂。日方战详报「城内外国建築物」指的就是它 ——
   // 日军接到「保护外国权益」的命令，十六日因此不敢彻底破坏城内建筑，
   // 十七日才改为「纵使把滕县城化为灰烬也在所不惜」的焦土方针。
   // **形制、规模、有无钟楼一概无资料**，做最保守的单钟塔小堂。
-  { id: "CatholicChurchInner", kind: "church", x: -230, z: -200, ry: 0, nave: [11, 24], towerH: 16 },
+  { id: "CatholicChurchInner", kind: "church", x: 25, z: 190, ry: 0, nave: [11, 24], towerH: 16 },
+];
+
+/**
+ * 城防图上能辨认出的主要院落和公共建筑。它们不是番号永久驻地，而是把图上的
+ * 形状、街区位置和功能关系落成可见的场景节点；具体建制仍由战斗时段数据决定。
+ */
+export const CITY_FEATURES = [
+  { id: "Battalion727", kind: "compound", x: -115, z: -245, w: 96, d: 42, damage: 0.18 },
+  { id: "DragonKingTemple", kind: "temple", x: 50, z: -220, w: 40, d: 32, damage: 0.22 },
+  { id: "SupplyCourtyard", kind: "compound", x: -215, z: -175, w: 58, d: 44, damage: 0.22 },
+  { id: "PoliceStation", kind: "roomBlock", x: 92, z: -176, w: 40, d: 30, damage: 0.18 },
+  { id: "CommerceGuild", kind: "roomBlock", x: 28, z: -148, w: 46, d: 28, damage: 0.18 },
+  { id: "CountyPrison", kind: "compound", x: 220, z: -155, w: 40, d: 34, damage: 0.2 },
+  { id: "DivisionHQ124", kind: "compound", x: -92, z: -72, w: 98, d: 62, damage: 0.14 },
+  { id: "DivisionHQ127", kind: "compound", x: -92, z: 100, w: 98, d: 62, damage: 0.18 },
+  { id: "SpecialBattalion1", kind: "compound", x: -205, z: -90, w: 64, d: 70, damage: 0.26 },
+  { id: "DistrictOffice", kind: "compound", x: 220, z: 8, w: 58, d: 82, damage: 0.28 },
+  { id: "AdministrativeOffice", kind: "compound", x: -198, z: 112, w: 62, d: 46, damage: 0.3 },
+  { id: "WenzhongSchool", kind: "school", x: -166, z: 177, w: 72, d: 44, damage: 0.26 },
+  { id: "FireGodTemple", kind: "temple", x: -20, z: 200, w: 34, d: 30, damage: 0.28 },
+  { id: "SpecialBattalion2", kind: "compound", x: 145, z: 178, w: 82, d: 58, damage: 0.35 },
+  { id: "SouthWestBlock", kind: "compound", x: -210, z: 245, w: 72, d: 34, damage: 0.32 },
+  { id: "SouthEastBlock", kind: "compound", x: 160, z: 245, w: 72, d: 34, damage: 0.36 },
 ];
 
 /** 城外地标。南关教堂与城内那座两说并列，各建一处，不合并。 */
@@ -286,14 +310,15 @@ export const OUTER_LANDMARKS = [
  * 东关不是一堵坚固的墙，是一片可以被打穿的、家家有枪眼的院落迷宫。
  */
 export const EAST_SUBURB = {
-  bounds: { minX: 310, maxX: 520, minZ: -180, maxZ: 180 },   // 约 210×360 m
+  bounds: { minX: 334, maxX: 540, minZ: -235, maxZ: 220 },   // 与城防图东关外侧的长条街区对应
+  roadZ: -105,
   lane: { min: 1.5, max: 2.5 },                              // 巷宽（推定）
   // 东关寨墙：日方实测高 2 m、顶宽 0.4 m —— 极薄，一炮一个口。
-  zhaiWall: { x: 520, fromZ: -180, toZ: 180, height: 2.0, topWidth: 0.4, baseWidth: 0.9 },
+  zhaiWall: { enabled: false, x: 540, fromZ: -235, toZ: 220, height: 2.0, topWidth: 0.4, baseWidth: 0.9 },
   // 东寨门：砖券洞，宽 3 m（宽度推定）。1938-03-16 14:00 被 105 mm 榴弹第一发命中打毁。
-  zhaiGate: { x: 520, z: 0, width: 3.0, height: 3.4 },
+  zhaiGate: { x: 540, z: -105, width: 3.0, height: 3.4 },
   // 日方称之为「敌之有力据点」的寺院地阵地。位置为日方要图，形制推定。
-  temple: { x: 420, z: -60, w: 26, d: 22 },
+  temple: { x: 414, z: -176, w: 26, d: 22 },
   // 地隙：河西岸与外城之间的南北向冲沟，日军沿此沟可掩蔽接近到寨墙 200 m 处
   // 而不暴露（存在与作用为日方实测；具体断面尺寸推定）。
   gully: { x: 555, fromZ: -200, toZ: 220, depth: 3.0, width: 7.5 },
@@ -308,17 +333,17 @@ export const EAST_SUBURB = {
  * worldZ = -wallAt，避免在不同切片里重复手写绝对坐标。
  */
 export const EAST_DEFENSE = {
-  breachWallAt: 70,
+  breachWallAt: 105,
   grenadePositions: [
-    { id: "BreachNorthGrenade", wallAt: 88, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
-    { id: "BreachSouthGrenade", wallAt: 52, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachNorthGrenade", wallAt: 126, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachSouthGrenade", wallAt: 84, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
   ],
-  crossfirePosition: { id: "BreachMachineGun", wallAt: 70, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
-  reserveCourtyard: { id: "EastReserveCourtyard", x: 388, z: 76, length: 11.0, depth: 3.2, ry: 0 },
+  crossfirePosition: { id: "BreachMachineGun", wallAt: 105, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
+  reserveCourtyard: { id: "EastReserveCourtyard", x: 390, z: -164, length: 11.0, depth: 3.2, ry: 0 },
   rubblePiles: [
-    { id: "BreachNorthRubble", wallAt: 94, inward: 0.5, radius: 8.5 },
-    { id: "BreachSouthRubble", wallAt: 46, inward: 0.5, radius: 8.5 },
-    { id: "BreachApronRubble", wallAt: 70, inward: -5.0, radius: 7.0 },
+    { id: "BreachNorthRubble", wallAt: 130, inward: 0.5, radius: 8.5 },
+    { id: "BreachSouthRubble", wallAt: 80, inward: 0.5, radius: 8.5 },
+    { id: "BreachApronRubble", wallAt: 105, inward: -5.0, radius: 7.0 },
   ],
 };
 

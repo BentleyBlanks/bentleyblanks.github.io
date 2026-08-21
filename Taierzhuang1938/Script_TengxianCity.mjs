@@ -35,7 +35,7 @@ import { Mulberry32, HashString, Clamp, Clamp01, Fbm2, SmoothStep } from "./Scri
 import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
   CORNER_TOWERS, RAMPS, RAMP, DUGOUT, CROSSROAD, STREETS, SIGHT_CORRIDOR,
-  LANDMARKS, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
+  LANDMARKS, CITY_FEATURES, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
   PALETTE, WALL_TOP_Y,
 } from "./Data_Tengxian.mjs";
 import {
@@ -401,6 +401,7 @@ export class TengxianCity {
 
     yield { label: "县衙、警报楼、牌坊、天主堂", progress: 0.77 };
     this.BuildLandmarks(rnd);
+    this.BuildMapFeatures(rnd);
 
     yield { label: "东关：家家有枪眼的院落迷宫", progress: 0.84 };
     this.BuildEastSuburb(rnd);
@@ -683,7 +684,11 @@ export class TengxianCity {
     for (const side of WALL_SIDES) {
       if (!this.InBounds(side.x, side.z, 340)) continue;
       // 城门那一段由 AddGateComplex 自己砌（它要在里面掏门洞），这里留出 22 m 的空
-      const gaps = [{ at: 0, width: 22 }];
+      const gate = GATES.find((candidate) => candidate.id === side.id);
+      const gateAt = gate
+        ? (side.axis === "x" ? gate.x - side.x : (gate.z - side.z) / (-Math.sin(side.ry)))
+        : 0;
+      const gaps = [{ at: gateAt, width: 22 }];
       const breaches = this.wantBreaches ? (this.breaches[side.id] || []) : [];
       // 上城道到顶的那一段要在宇墙上开口，否则爬到墙顶被 0.9 m 的宇墙挡住
       const innerGaps = RAMPS.filter((r) => r.side === side.id)
@@ -953,6 +958,10 @@ export class TengxianCity {
       const lw = (l.w || l.span || 12) / 2 + 3, ld = (l.d || l.span || 12) / 2 + 3;
       list.push({ minX: l.x - lw, maxX: l.x + lw, minZ: l.z - ld, maxZ: l.z + ld });
     }
+    for (const f of CITY_FEATURES) {
+      const fw = (f.w || 16) / 2 + 3, fd = (f.d || 16) / 2 + 3;
+      list.push({ minX: f.x - fw, maxX: f.x + fw, minZ: f.z - fd, maxZ: f.z + fd });
+    }
     this.blockerRects = list;
     return list;
   }
@@ -1165,6 +1174,52 @@ export class TengxianCity {
     void y;
   }
 
+  /**
+   * 城防图上的功能院落。这里不把图上的番号当成永久驻防，而是把“师部—县署—
+   * 警察所—学校—特务营”等可辨认的空间块做成稳定的建筑节点，供各战斗阶段复用。
+   */
+  BuildMapFeatures(rnd) {
+    for (const f of CITY_FEATURES) {
+      if (!this.InBounds(f.x, f.z, Math.max(f.w, f.d) / 2 + 18)) continue;
+      const damage = f.damage ?? 0.22;
+      this.sink.SetSector(SectorKey(f.x, f.z));
+      if (f.kind === "compound") {
+        AddCompound(this.sink, {
+          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
+          seed: `map:${f.id}`, damage, burnt: damage > 0.62,
+        });
+      } else if (f.kind === "roomBlock") {
+        AddRoomBlock(this.sink, {
+          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
+          eaveY: 3.0, ridgeY: 4.8, seed: `map:${f.id}`,
+          damage, facing: 1, bays: Math.max(2, Math.round(f.w / 10)),
+        });
+      } else if (f.kind === "school") {
+        AddCompound(this.sink, {
+          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
+          seed: `map:${f.id}:yard`, damage, burnt: damage > 0.62,
+        });
+        AddRoomBlock(this.sink, {
+          x: f.x, z: f.z - f.d * 0.16, ry: 0, width: f.w * 0.66, depth: f.d * 0.38,
+          eaveY: 3.2, ridgeY: 5.0, seed: `map:${f.id}:hall`,
+          damage, facing: 1, bays: 5,
+        });
+      } else if (f.kind === "temple") {
+        AddCompound(this.sink, {
+          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
+          seed: `map:${f.id}:yard`, damage, burnt: damage > 0.62,
+        });
+        AddRoomBlock(this.sink, {
+          x: f.x, z: f.z - f.d * 0.18, ry: 0, width: f.w * 0.58, depth: f.d * 0.42,
+          eaveY: 3.6, ridgeY: 5.8, seed: `map:${f.id}:hall`,
+          damage, facing: 1, bays: 3,
+        });
+      }
+      this.sink.SetSector("");
+    }
+    void rnd;
+  }
+
   /** 远景剪影群（北关的弘道院／华北神学院一带：位置布局形制均无资料，只做远景）。 */
   AddCluster(l) {
     const rnd = Mulberry32(HashString(l.id));
@@ -1209,7 +1264,7 @@ export class TengxianCity {
         const z = b.minZ + pitchZ * (j + 0.5);
         if (!this.InBounds(x, z, 16)) continue;
         // 东关大街：一条穿关而过的东西向街，正对东城门
-        if (Math.abs(z) < 5.5) continue;
+        if (Math.abs(z - (b.roadZ ?? 0)) < 5.5) continue;
         // 寺院地阵地那一块留给寺庙
         const t = EAST_SUBURB.temple;
         if (Math.abs(x - t.x) < t.w / 2 + 8 && Math.abs(z - t.z) < t.d / 2 + 8) continue;
@@ -1246,18 +1301,19 @@ export class TengxianCity {
     // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件；院落仍为中心留出净路。
     const eastRoadLength = b.maxX - startX;
     const eastRoadX = startX + eastRoadLength / 2;
-    if (this.InBounds(eastRoadX, 0, eastRoadLength / 2)) {
+    const eastRoadZ = b.roadZ ?? 0;
+    if (this.InBounds(eastRoadX, eastRoadZ, eastRoadLength / 2)) {
       this.sink.Add("DirtRoad", PlaceGeometry(
         MakeBox(eastRoadLength, 0.12, 9.0, TILE_METERS.ground, "eastSuburbRoad"),
-        { x: eastRoadX, y: 0.05, z: 0 }));
+        { x: eastRoadX, y: 0.05, z: eastRoadZ }));
       this.stats.roadMarks += AddRoadWear(this.sink, {
-        x: eastRoadX, z: 0, ry: 0, length: eastRoadLength, width: 9.0,
+        x: eastRoadX, z: eastRoadZ, ry: 0, length: eastRoadLength, width: 9.0,
         baseY: 0.118, seed: "eastSuburbRoadWear",
       });
       const streetRnd = Mulberry32(HashString("eastSuburbStreetLife"));
       let cluster = 0;
       for (let px = startX + 20; px < b.maxX - 18; px += 25) {
-        const pz = (cluster % 2 ? 1 : -1) * 3.9;
+        const pz = eastRoadZ + (cluster % 2 ? 1 : -1) * 3.9;
         cluster += 1;
         if (!this.InBounds(px, pz, 5)) continue;
         const temple = EAST_SUBURB.temple;
@@ -1276,7 +1332,7 @@ export class TengxianCity {
 
     // 东关寨墙：**高 2 m、顶宽 0.4 m**（日方实测）—— 极薄，一炮一个口。
     const zw = EAST_SUBURB.zhaiWall;
-    if (this.InBounds(zw.x, 0, 220)) {
+    if (zw.enabled !== false && this.InBounds(zw.x, 0, 260)) {
       AddZhaiWall(this.sink, {
         x: zw.x, z: 0, ry: Math.PI / 2, length: zw.toZ - zw.fromZ,
         height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth, seed: "zhaiEast",
