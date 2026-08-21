@@ -126,8 +126,8 @@ function Tree(name, x, z, trunkH, spin) {
   return list;
 }
 
-export const CS_Chuchuan = {
-  id: "CS_Chuchuan",
+export const CS_ChuchuanLegacy = {
+  id: "CS_ChuchuanLegacy",
   title: "出川",
   seconds: 42.0,
   trigger: "beforeLevel:L0_Jiehe",
@@ -351,4 +351,226 @@ export const CS_Chuchuan = {
   // 均只见于通俗读物与网文，未见 1937—38 年文件或当事人同时代记录背书。
   // 川军被推诿的事实框架可用，这几句对白不可用。
   forbiddenLines: ["抗日无力，扰民有余", "土匪部队", "诸葛亮还扎草人当疑兵"],
+};
+
+// ---------------------------------------------------------------------------
+// LUNA-04：新版《序章｜出川》——静止车厢、移动窗外层、严格 95 秒时间轴。
+// 车厢坐标是独立局部系；不绑定界河高度图。这里只写数据，不 import three。
+// ---------------------------------------------------------------------------
+
+const CHUCHUAN_CAR_G = 0.08;
+const CHUCHUAN_CAR_RY = Math.PI;
+
+function CarSeatTrack(pos, lifeState, prepareAt, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
+  return [
+    { t: 0, pos, ry: facingRy, state: { sit: 1, ...lifeState } },
+    { t: 68.0, pos, ry: facingRy, state: { sit: 1, ...lifeState } },
+    // 炮声后按人错峰停手；进入 prepare 时清零 repairShoe/cleanRifle/sleep 等生活态。
+    { t: prepareAt, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
+    // 82—86.1 s 地点黑卡期间预位，黑场隐藏，不穿过仍关闭的门。
+    { t: 82.0, pos, ry: facingRy, state: { hidden: true, prepare: 1 } },
+    { t: 86.1, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { hidden: true, prepare: 1 } },
+    { t: exitAt, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { prepare: 1, moveSpeed: 0.62 } },
+    { t: exitEnd, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true, prepare: 1, moveSpeed: 0.62 } },
+    { t: 95, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true } },
+  ];
+}
+
+function StationRailTrack(start, end, state = { moveSpeed: 0.13 }) {
+  return [
+    { t: 0, pos: start, ry: 0, state: { hidden: true } },
+    { t: 50, pos: start, ry: 0, state },
+    { t: 68, pos: end, ry: 0, state },
+    { t: 69, pos: end, ry: 0, state: { hidden: true } },
+  ];
+}
+
+const CHUCHUAN_PEOPLE = {
+  youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
+  rifleman: { name: "擦枪士兵", short: "擦枪士兵", real: false, note: "车厢内可见 NPC；检查发涩枪栓" },
+  oldWound: { name: "旧伤士兵", short: "旧伤士兵", real: false, note: "车厢内可见 NPC；腿缠旧绷带，靠墙休息" },
+  machineGunner: { name: "机枪手", short: "机枪手", real: false, note: "车厢内可见 NPC；机枪放在脚边" },
+  squadLeader: { name: "班长", short: "班长", real: false, note: "车厢内可见 NPC；检查弹药并组织下车" },
+  stretcherBearerA: { name: "担架兵甲", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
+  stretcherBearerB: { name: "担架兵乙", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
+  lightWounded: { name: "轻伤员", short: "轻伤员", real: false, note: "小站窗外可走轻伤员" },
+  externalOfficer: { name: "车外军官", short: "车外军官", real: false, note: "门外喊话 NPC" },
+};
+
+export const CS_Chuchuan = {
+  id: "CS_Chuchuan",
+  title: "出川",
+  seconds: 95.0,
+  trigger: "beforeLevel:L0_Jiehe",
+  standalone: true,
+  setOrigin: [2400, 0, 2400],
+  cameraMode: "headLook",
+  headLook: { yaw: [-2.09, 2.09], pitch: [-1.05, 0.96], sensitivityScale: 0.8 },
+  ambience: "trainInterior",
+  stopMusic: true,
+  music: null,
+  fadeIn: 0.35,
+  cameraFar: 120,
+  suppress: { movement: true, weapon: true, crosshair: true, combatHud: true },
+  objective: "跟随通信排。",
+  handoff: { task: "跟随通信排。", once: true },
+  why: "1937 年出川抗战，1938 年 3 月增援滕县；玩家以不可见通信兵视角在车厢内观察五名战友，听到炮声后随通信排下车。",
+
+  props: [
+    // 封闭车厢：两侧在窗洞处拆成墙段，四边视角均由地板、顶梁、端墙和窗外层封住。
+    { kind: "box", size: [8, 0.20, 18], pos: [0, 0, 0], mat: "WoodStock", color: 0x3b3026, name: "CarriageFloor" },
+    { kind: "box", size: [8, 0.20, 18], pos: [0, 4.2, 0], mat: "WoodBeam", color: 0x2b2926, name: "CarriageCeiling", inside: true },
+    { kind: "box", size: [0.20, 4.2, 5.0], pos: [-4, 2.1, -6.5], mat: "WoodBeam", color: 0x46372b, name: "WallLeftRear", inside: true },
+    { kind: "box", size: [0.20, 0.85, 6.0], pos: [-4, 0.52, 0], mat: "WoodBeam", color: 0x46372b, name: "WallLeftWindowLow", inside: true },
+    { kind: "box", size: [0.20, 1.20, 6.0], pos: [-4, 3.58, 0], mat: "WoodBeam", color: 0x46372b, name: "WallLeftWindowHigh", inside: true },
+    { kind: "box", size: [0.20, 4.2, 5.0], pos: [-4, 2.1, 6.5], mat: "WoodBeam", color: 0x46372b, name: "WallLeftFront", inside: true },
+    { kind: "box", size: [0.20, 4.2, 5.0], pos: [4, 2.1, -6.5], mat: "WoodBeam", color: 0x46372b, name: "WallRightRear", inside: true },
+    { kind: "box", size: [0.20, 0.85, 6.0], pos: [4, 0.52, 0], mat: "WoodBeam", color: 0x46372b, name: "WallRightWindowLow", inside: true },
+    { kind: "box", size: [0.20, 1.20, 6.0], pos: [4, 3.58, 0], mat: "WoodBeam", color: 0x46372b, name: "WallRightWindowHigh", inside: true },
+    { kind: "box", size: [0.20, 4.2, 5.0], pos: [4, 2.1, 6.5], mat: "WoodBeam", color: 0x46372b, name: "WallRightFront", inside: true },
+    { kind: "box", size: [8, 4.2, 0.20], pos: [0, 2.1, -8.9], mat: "WoodBeam", color: 0x45372d, name: "RearWall", inside: true },
+    { kind: "box", size: [2.9, 4.2, 0.20], pos: [-2.55, 2.1, 8.9], mat: "WoodBeam", color: 0x45372d, name: "DoorWallLeft", inside: true },
+    { kind: "box", size: [2.9, 4.2, 0.20], pos: [2.55, 2.1, 8.9], mat: "WoodBeam", color: 0x45372d, name: "DoorWallRight", inside: true },
+    { kind: "box", size: [8, 1.0, 0.20], pos: [0, 3.7, 8.9], mat: "WoodBeam", color: 0x45372d, name: "DoorWallTop", inside: true },
+    { kind: "box", size: [8, 0.55, 0.20], pos: [0, 0.28, 8.9], mat: "WoodBeam", color: 0x45372d, name: "DoorWallStep", inside: true },
+    { kind: "box", size: [0.12, 3.5, 0.12], pos: [-3.8, 2.05, -3.15], mat: "Steel", color: 0x777064, name: "WindowFrameLeftRear" },
+    { kind: "box", size: [0.12, 3.5, 0.12], pos: [-3.8, 2.05, 3.15], mat: "Steel", color: 0x777064, name: "WindowFrameLeftFront" },
+    { kind: "box", size: [0.12, 3.5, 0.12], pos: [3.8, 2.05, -3.15], mat: "Steel", color: 0x777064, name: "WindowFrameRightRear" },
+    { kind: "box", size: [0.12, 3.5, 0.12], pos: [3.8, 2.05, 3.15], mat: "Steel", color: 0x777064, name: "WindowFrameRightFront" },
+    { kind: "box", size: [0.22, 0.14, 6.2], pos: [3.75, 3.75, 0], mat: "Steel", color: 0x777064, name: "WindowFrameRightTop" },
+    { kind: "box", size: [0.22, 0.14, 6.2], pos: [-3.75, 3.75, 0], mat: "Steel", color: 0x777064, name: "WindowFrameLeftTop" },
+    // 长凳与两个清晰空位；铺盖、军帽和旧装备是损耗的生活痕迹，不摆成祭坛。
+    { kind: "box", size: [0.72, 0.62, 16], pos: [-2.8, 0.72, 0], mat: "WoodStock", color: 0x5b4634, name: "BenchLeft" },
+    { kind: "box", size: [0.72, 0.62, 16], pos: [2.8, 0.72, 0], mat: "WoodStock", color: 0x5b4634, name: "BenchRight" },
+    { kind: "box", size: [0.62, 0.18, 1.5], pos: [-2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyLeft" },
+    { kind: "box", size: [0.62, 0.18, 1.5], pos: [2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyRight" },
+    { kind: "cyl", size: [0.22, 0.12], pos: [2.55, 1.25, 0.25], mat: "SteelHelmet", color: 0x554c40, name: "OldMilitaryCap" },
+    { kind: "box", size: [0.65, 0.5, 0.85], pos: [-2.2, 1.0, 0.35], mat: "ClothNra", color: 0x403a33, name: "OldPack" },
+    { kind: "box", size: [0.45, 0.4, 0.6], pos: [2.15, 1.0, -0.65], mat: "ClothNra", color: 0x3f3931, name: "AmmoBag" },
+    { kind: "cyl", size: [0.28, 0.22], pos: [-1.35, 0.72, -5.2], mat: "WoodStock", color: 0x59402b, name: "PlayerLineSpool" },
+    { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
+    { kind: "box", size: [0.35, 0.08, 0.9], pos: [-2.25, 1.15, -2.55], mat: "ClothNra", color: 0x372d26, name: "ShoeTool" },
+    { kind: "box", size: [0.16, 0.16, 0.8], pos: [2.1, 0.65, 2.75], mat: "Steel", color: 0x49443e, name: "MachineGunCase" },
+    // 窗外近／中／远三层，站台块只在 50—68 s 通过一次。
+    { kind: "box", size: [0.20, 0.35, 42], pos: [5.2, 0.25, 0], mat: "GroundRubble", color: 0x6c6558, name: "WindowNearLayer" },
+    { kind: "box", size: [0.25, 1.0, 48], pos: [10.5, 0.5, 0], mat: "Ground", color: 0x817967, name: "WindowMidLayer" },
+    { kind: "box", size: [0.3, 8, 56], pos: [64, 4.2, 0], mat: "Adobe", color: 0x8f8573, name: "WindowFarLayer" },
+    { kind: "box", size: [2.5, 0.16, 42], pos: [6.5, 0.12, 0], mat: "GroundRubble", color: 0x4d4942, name: "TrackBallast" },
+    { kind: "box", size: [0.16, 2.4, 0.16], pos: [12, 1.2, 2], mat: "WoodBeam", color: 0x4e4233, name: "DistantPole" },
+    { kind: "cyl", size: [0.32, 2.0], pos: [20, 3.8, -2], mat: "Adobe", color: 0x57483a, name: "DistantSmokeColumn", emissive: 0x201710 },
+    { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
+    { kind: "box", size: [3.2, 1.4, 2.0], pos: [13.5, 1.15, -100], mat: "WoodBeam", color: 0x6b5846, name: "StationShed" },
+    { kind: "box", size: [1.8, 0.24, 2.4], pos: [8.4, 1.18, -100], mat: "ClothNra", color: 0xb29a78, name: "SingleStretcher" },
+    { kind: "box", size: [0.16, 0.6, 1.95], pos: [7.75, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleA" },
+    { kind: "box", size: [0.16, 0.6, 1.95], pos: [9.05, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleB" },
+    { kind: "box", size: [2.2, 2.6, 0.12], pos: [0, 1.65, 8.85], mat: "Steel", color: 0x49433b, name: "CarriageDoor" },
+    { kind: "box", size: [2.2, 0.16, 1.1], pos: [0, 0.1, 9.5], mat: "GroundRubble", color: 0x575047, name: "DoorStepBallast" },
+    { kind: "box", size: [18, 0.12, 18], pos: [0, -0.08, 18], mat: "GroundRubble", color: 0x5f5a51, name: "OutsideBallast" },
+    { kind: "cyl", size: [0.25, 1.6], pos: [5.8, 0.85, 11.5], mat: "WoodStock", color: 0x634d37, name: "DoorMarkerPost" },
+  ],
+
+  cast: [
+    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-2.2, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 69.4, 86.2, 87.9, -0.8, -Math.PI / 2) },
+    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", track: CarSeatTrack([2.2, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 69.0, 87.9, 89.6, 0.2, Math.PI / 2) },
+    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", track: CarSeatTrack([-2.2, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 68.7, 89.6, 91.3, -0.4, -Math.PI / 2) },
+    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", track: CarSeatTrack([2.2, CHUCHUAN_CAR_G, 2.75], {}, 68.5, 91.3, 93.0, 0.8, Math.PI / 2) },
+    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", track: CarSeatTrack([0, CHUCHUAN_CAR_G, 5.45], { checkAmmo: 1 }, 70.0, 93.0, 94.7, 0, Math.PI) },
+    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
+    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
+    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.13, crouch: 0.25 }) },
+    { id: "externalOfficer", kind: "nra", weapon: null, seed: "chuchuanOfficer", track: [
+      { t: 0, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: true } },
+      { t: 86, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: false, moveSpeed: 0 } },
+      { t: 95, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: false, moveSpeed: 0 } },
+    ] },
+  ],
+
+  people: CHUCHUAN_PEOPLE,
+
+  shots: [
+    { n: 1, seconds: 4, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true,
+      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
+      subs: [{ at: 0.2, seconds: 3.5, title: true, text: "1937年，第二十二集团军出川抗战。" }] },
+    { n: 2, seconds: 4, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true,
+      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
+      subs: [{ at: 0.2, seconds: 3.5, title: true, text: "1938年3月，经历山西作战后的第122师奉命增援滕县。" }] },
+
+    // 8—50 s：九个可读动作镜头与一个余拍，车厢固定、演员生活姿态确定性插值。
+    { n: 3, seconds: 4, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.2, -2.5] },
+      lines: [{ at: 0.25, seconds: 3.18, who: "youngDispatch", voiceCue: "prologue_young_dispatch_01", text: "我们出川好久了哦。" }] },
+    { n: 4, seconds: 4, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.15, 2.7] },
+      lines: [{ at: 0.25, seconds: 3.40, who: "oldWound", voiceCue: "prologue_old_wound_01", text: "路莫问，跟到走就是。" }] },
+    { n: 5, seconds: 5, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.2, -2.5] },
+      lines: [{ at: 0.25, seconds: 4.28, who: "youngDispatch", voiceCue: "prologue_young_dispatch_02", text: "我都忘了屋头腊肉是啥味道了。" }] },
+    { n: 6, seconds: 4, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [2.1, 1.2, 2.7] },
+      lines: [{ at: 0.25, seconds: 3.18, who: "machineGunner", voiceCue: "prologue_machine_gunner_01", text: "你娃儿还惦记腊肉。" }] },
+    { n: 7, seconds: 4, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.2, -2.5] },
+      lines: [{ at: 0.25, seconds: 3.62, who: "youngDispatch", voiceCue: "prologue_young_dispatch_03", text: "不惦记吃的惦记啥子嘛。" }] },
+    { n: 8, seconds: 5, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [2.1, 1.2, 2.7] },
+      lines: [{ at: 0.25, seconds: 4.72, who: "machineGunner", voiceCue: "prologue_machine_gunner_02", text: "到了前头，有热水喝你就谢天谢地。" }] },
+    { n: 9, seconds: 2, focalMm: 85, cameraMode: "headLook", camera: { from: [0, 1.55, -6], look: [2.15, 1.25, -2.55] },
+      sfx: [{ at: 0.45, name: "bolt", volume: 0.42 }],
+      lines: [{ at: 0.2, seconds: 1.86, who: "rifleman", voiceCue: "prologue_rifleman_01", text: "又卡。" }] },
+    { n: 10, seconds: 5, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.2, 2.7] },
+      sfx: [{ at: 0.7, name: "gearRustle", volume: 0.28 }],
+      lines: [{ at: 0.25, seconds: 4.06, who: "oldWound", voiceCue: "prologue_old_wound_02", text: "你少骂两句，它兴许听话点。" }] },
+    { n: 11, seconds: 6, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [0, 1.2, 5.2] },
+      sfx: [{ at: 0.8, name: "carriageRattle", volume: 0.32 }],
+      lines: [{ at: 0.25, seconds: 5.60, who: "squadLeader", voiceCue: "prologue_squad_leader_01", text: "莫摆了。线盘再检查一遍，到了地头就要用。" }] },
+    { n: 12, seconds: 3, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [0, 1.6, -1] },
+      sfx: [{ at: 0.4, name: "carriageRattle", volume: 0.25 }] },
+
+    // 50—68 s：小站只通过一次；窗外近／中／远层和站台沿固定轨道移动。
+    { n: 13, seconds: 9, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.8, -6], look: [8, 1.9, -0.5] },
+      sfx: [{ at: 0.25, name: "trainBrake", volume: 0.62 }, { at: 2.1, name: "stretcherWood", volume: 0.42 }, { at: 4.2, name: "coughLow", volume: 0.32 }],
+      propMoves: [
+        { name: "WindowNearLayer", startAt: 0, endAt: 9, from: [5.2, 0.25, -12], to: [5.2, 0.25, 12] },
+        { name: "WindowMidLayer", startAt: 0, endAt: 9, from: [10.5, 0.5, -14], to: [10.5, 0.5, 14] },
+        { name: "WindowFarLayer", startAt: 0, endAt: 9, from: [64, 4.2, -16], to: [64, 4.2, 16] },
+        { name: "StationPlatform", startAt: 0, endAt: 9, from: [7.2, 0.45, -0.8], to: [7.2, 0.45, 0] },
+        { name: "StationShed", startAt: 0, endAt: 9, from: [13.5, 1.15, -0.8], to: [13.5, 1.15, 0] },
+        { name: "SingleStretcher", startAt: 0, endAt: 9, from: [8.4, 1.18, -0.8], to: [8.4, 1.18, 0] },
+        { name: "StretcherPoleA", startAt: 0, endAt: 9, from: [7.75, 0.98, -0.8], to: [7.75, 0.98, 0] },
+        { name: "StretcherPoleB", startAt: 0, endAt: 9, from: [9.05, 0.98, -0.8], to: [9.05, 0.98, 0] },
+      ] },
+    { n: 14, seconds: 9, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.8, -6], look: [8, 1.9, 1.7] },
+      propMoves: [
+        { name: "WindowNearLayer", startAt: 0, endAt: 9, from: [5.2, 0.25, 12], to: [5.2, 0.25, 30] },
+        { name: "WindowMidLayer", startAt: 0, endAt: 9, from: [10.5, 0.5, 14], to: [10.5, 0.5, 28] },
+        { name: "WindowFarLayer", startAt: 0, endAt: 9, from: [64, 4.2, 16], to: [64, 4.2, 26] },
+        { name: "StationPlatform", startAt: 0, endAt: 9, from: [7.2, 0.45, 0], to: [7.2, 0.45, 1.5] },
+        { name: "StationShed", startAt: 0, endAt: 9, from: [13.5, 1.15, 0], to: [13.5, 1.15, 1.5] },
+        { name: "SingleStretcher", startAt: 0, endAt: 9, from: [8.4, 1.18, 0], to: [8.4, 1.18, 1.5] },
+        { name: "StretcherPoleA", startAt: 0, endAt: 9, from: [7.75, 0.98, 0], to: [7.75, 0.98, 1.5] },
+        { name: "StretcherPoleB", startAt: 0, endAt: 9, from: [9.05, 0.98, 0], to: [9.05, 0.98, 1.5] },
+      ] },
+
+    // 68—82 s：恰好两次炮声。第二声使用更近、更清楚的 explosionFar。
+    { n: 15, seconds: 7, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [-2.0, 1.2, 2.7] },
+      shakeAt: [{ at: 0.45, seconds: 0.7, amount: 0.42 }],
+      sfx: [{ at: 0.45, name: "amb.cannonFar", volume: 0.48 }],
+      lines: [{ at: 0.9, seconds: 1.86, who: "oldWound", voiceCue: "prologue_old_wound_03", text: "近咯。" }] },
+    { n: 16, seconds: 7, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [0, 1.2, 5.2] },
+      shakeAt: [{ at: 0.45, seconds: 0.95, amount: 0.82 }],
+      sfx: [{ at: 0.45, name: "explosionFar", volume: 0.68 }],
+      lines: [{ at: 1.1, seconds: 3.18, who: "squadLeader", voiceCue: "prologue_squad_leader_02", text: "都醒起，装备拿好。" }] },
+
+    // 82—95 s：地点卡、开门、五人固定轨道离场，最后保留玩家轻量下车机位。
+    { n: 17, seconds: 4.1, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true,
+      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
+      subs: [{ at: 0, seconds: 4.1, title: true, date: true, text: "山东·滕县／1938年3月" }] },
+    { n: 18, seconds: 8.9, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.55, 5.5], to: [0, 1.55, 7.0], look: [0, 1.45, 8.0], lookTo: [0, 1.35, 8.6], ease: "easeInOut" },
+      sfx: [{ at: 0.1, name: "carriageDoorSlide", volume: 0.7 }, { at: 2.8, name: "stepBallast", volume: 0.45 }, { at: 4.5, name: "stepBallast", volume: 0.45 }, { at: 6.2, name: "stepBallast", volume: 0.45 }],
+      propMoves: [{ name: "CarriageDoor", startAt: 0, endAt: 2.0, from: [0, 1.65, 8.85], to: [-2.3, 1.65, 8.85] }],
+      lines: [{ at: 0.35, seconds: 4.75, who: "externalOfficer", voiceCue: "prologue_external_officer_01", text: "通信排，下车！线盘背起，搞快！", off: true }] },
+  ],
+
+  skipCard: {
+    title: "出川",
+    lines: [
+      { text: "1937年，第二十二集团军出川抗战。", tier: "主流" },
+      { text: "1938年3月，经历山西作战后的第122师奉命增援滕县。", tier: "主流" },
+      { text: "山东·滕县／1938年3月", tier: "主流" },
+    ],
+  },
 };
