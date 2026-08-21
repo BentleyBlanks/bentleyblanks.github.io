@@ -28,8 +28,8 @@ const report = await page.evaluate(() => {
       on: e.classList.contains("on"),
       sprint: e.classList.contains("sprint"),
       gap: parseFloat(e.style.getPropertyValue("--gap")),
-      x: parseFloat(e.style.getPropertyValue("--x")),
-      y: parseFloat(e.style.getPropertyValue("--y")),
+      centerX: e.getBoundingClientRect().left,
+      centerY: e.getBoundingClientRect().top,
       hidden: e.getAttribute("aria-hidden"),
       label: e.getAttribute("aria-label"),
       arms: e.querySelectorAll(".arm").length,
@@ -78,7 +78,8 @@ const passed = report.idle.on && !report.idle.sprint && report.idle.arms === 4
   && report.running.on && report.running.sprint && report.running.sprintValue > 0.95
   && report.running.gap >= report.idle.gap + 8
   && report.running.label === "冲刺扩散准心"
-  && Number.isFinite(report.running.x) && Number.isFinite(report.running.y)
+  && Math.abs(report.idle.centerX - 640) < 0.1 && Math.abs(report.idle.centerY - 360) < 0.1
+  && Math.abs(report.running.centerX - 640) < 0.1 && Math.abs(report.running.centerY - 360) < 0.1
   && !report.ads.on && report.ads.adsValue > 0.9
   && !report.realistic.on && errors.length === 0;
 console.log(`${passed ? "ok  " : "FAIL"} 跑动保留扩散准心，开镜与写实档隐藏`);

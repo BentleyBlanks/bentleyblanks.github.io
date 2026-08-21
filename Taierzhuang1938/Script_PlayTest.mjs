@@ -1129,7 +1129,7 @@ Check("拉栓强制退出瞄准：那一下「丢失瞄准画面」才是栓动�
   `拉栓中 FOV 从 ${adsFov.aimed.toFixed(1)}° 退到 ${adsFov.worst.toFixed(1)}°`
     + `（髋射是 ${adsFov.hip2.toFixed(1)}°），退出了 ${(adsFov.backOut * 100).toFixed(0)}%`);
 
-// 12.6 铁瞄偏心：照门不落在屏幕正中，且汉阳造（老套筒）比中正式明显
+// 12.6 标准 FPS 铁瞄：所有枪的照门都必须零偏心，不能让模型与屏幕中心说两套话。
 const sights = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   T.viewmodel.Equip("ZhongZheng");
@@ -1138,8 +1138,9 @@ const sights = await page.evaluate(() => {
   const hy = D.AdsOffset();
   return { zz, hy };
 });
-Check("铁瞄有偏心，且汉阳造比中正式明显",
-  sights.zz.x > 0 && sights.hy.x > sights.zz.x,
+Check("铁瞄零偏心：中正式与汉阳造都对齐屏幕中心",
+  Math.hypot(sights.zz.x, sights.zz.y) < 1e-7
+  && Math.hypot(sights.hy.x, sights.hy.y) < 1e-7,
   `中正式 ${(sights.zz.x * 1000).toFixed(2)} mm，汉阳造 ${(sights.hy.x * 1000).toFixed(2)} mm`);
 
 // 12.7 屏息挪到 Shift（按开镜量分流），Space 腾空
@@ -1292,7 +1293,7 @@ Check("十一年式打满两百发强制冷却，冷却期间一发也打不出�
   !overheat.none && overheat.shots === 200 && overheat.coolFor > 7.5 && overheat.duringCool === 0,
   `打了 ${overheat.shots} 发，冷却 ${overheat.coolFor?.toFixed(1)} s，冷却期间 ${overheat.duringCool} 发`);
 
-// 12.13 自由瞄准做成难度滑条：默认 2.0°（不再是 5°），枪仍然在视野里先动
+// 12.13 标准 FPS 瞄准：默认自由瞄准为 0，鼠标直接转相机与弹道。
 const freeAim = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   T.player.aimYaw = 0; T.player.yaw = 0; T.player.ads = 0;
@@ -1306,21 +1307,14 @@ const freeAim = await page.evaluate(() => {
     aimYaw: Math.abs(T.player.aimYaw), yaw: Math.abs(T.player.yaw),
   };
 });
-Check("自由瞄准默认 2.0°（不再是 5°），推鼠标时枪先动",
-  freeAim.deg === 2.0 && freeAim.aimYaw > 1e-4,
+Check("默认自由瞄准为 0°，鼠标直接转相机",
+  freeAim.deg === 0 && freeAim.aimYaw < 1e-6 && freeAim.yaw > 1e-4,
   `freeAimDeg=${freeAim.deg}，aimYaw=${freeAim.aimYaw.toFixed(4)} rad / yaw=${freeAim.yaw.toFixed(4)} rad`);
 Check("玩家永不自动投降：difficulty.autoSurrender 恒 false",
   freeAim.autoSurrender === false, `autoSurrender=${freeAim.autoSurrender}`);
 
-// 12.13b 微动必须看得见（2026-08-20，用户报「鼠标移动小距离，屏幕上的枪没反应」）
-//
-// 两条毛病叠在一起，各自都足以让小幅瞄准彻底失灵：
-//   · **自由瞄准那 2° 从来没画出来。** 相机只读 yaw/pitch，视图模型只读帧间增量，
-//     aimYaw 只有弹道在用 —— 而本作没有准星，于是锥内推鼠标画面一动不动。
-//   · **归位每帧无条件跑，把慢推的鼠标当噪声吃了。** 稳态偏移 = 鼠标角速度 / 2.2，
-//     实测（改之前的等价复现）推 15.13° 只瞄过去 7.17°，少了一半；
-//     35 count/s 以下更是连视线都不会转。
-// 所以这一条测三件事：枪在画面里真的动了、鼠标到枪口是 1:1、归位不让瞄准点漂。
+// 12.13b 微动必须直接转视线，不能先让枪和 HUD 准心在画面里游动。
+// 测三件事：枪体不积累自由瞄准偏移、鼠标到视线是 1:1、停手后瞄准点不漂。
 const micro = await page.evaluate(() => {
   const T = window.Taierzhuang, P = T.player, DEG = 180 / Math.PI;
   // 这一段要推四秒的真帧，中途挨死了 Update 会整帧早退（aimYaw 冻住）——
@@ -1354,16 +1348,16 @@ const micro = await page.evaluate(() => {
     settledGunDeg: Math.abs(P.aimYaw) * DEG,
     driftDeg: Math.abs((P.yaw + P.aimYaw) - aimed0) * DEG };
 });
-Check("微动 1° 时枪在画面里真的动了（自由瞄准画出来了）",
-  micro.tiny.vmDeg > 0.5 && Math.abs(micro.tiny.vmDeg - micro.tiny.gunDeg) < 0.02,
+Check("微动 1° 直接转相机，枪体不偏离屏幕中心",
+  micro.tiny.vmDeg < 0.01 && micro.tiny.gunDeg < 0.01,
   `枪口偏 ${micro.tiny.gunDeg.toFixed(3)}°，视图模型转了 ${micro.tiny.vmDeg.toFixed(3)}°`);
 Check("鼠标到枪口 1:1：锥内锥外都不打折",
   Math.abs(micro.tiny.aimedDeg - micro.tiny.mouseDeg) < micro.tiny.mouseDeg * 0.02
   && Math.abs(micro.slow.aimedDeg - micro.slow.mouseDeg) < micro.slow.mouseDeg * 0.02,
   `微动 ${micro.tiny.mouseDeg.toFixed(2)}°→${micro.tiny.aimedDeg.toFixed(2)}°；`
   + `慢推 ${micro.slow.mouseDeg.toFixed(2)}°→${micro.slow.aimedDeg.toFixed(2)}°`);
-Check("枪归位时视线补上同一段，瞄准点不自己漂",
-  micro.settledGunDeg < micro.parkedDeg * 0.5 && micro.driftDeg < 0.01,
+Check("停手后枪体仍在中心，瞄准点不自己漂",
+  micro.parkedDeg < 0.01 && micro.settledGunDeg < 0.01 && micro.driftDeg < 0.01,
   `枪 ${micro.parkedDeg.toFixed(2)}°→${micro.settledGunDeg.toFixed(2)}°，瞄准点漂 ${micro.driftDeg.toFixed(4)}°`);
 
 // 12.13c 走路观察不能再经过自由瞄准死区（2026-08-20，用户报「持枪走路移动镜头有粘滞感」）

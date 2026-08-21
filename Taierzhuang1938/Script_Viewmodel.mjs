@@ -32,7 +32,6 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
-import { DIFFICULTY } from "./Data_Battle.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
@@ -71,29 +70,6 @@ const VM_TILE = { steel: 0.030, wood: 0.085, cloth: 0.045 };
 // 前后照门仍然共轴、仍然落在画面正中（那是解出来的，不受这个距离影响）。
 // 这是所有 FPS 都在用的那一手；ER2 的铁瞄画面同样不是按 15 cm 摆的。
 const SIGHT_EYE_DISTANCE = 0.300;
-
-/**
- * 铁瞄偏心。ER2 的作者 Marco 亲自回帖确认过：**照门不落在屏幕正中是故意的**。
- * 我们原来的 _MakeAdsPose 是 px:-s.x, py:-s.y —— 把照门精确平移到屏幕几何中心，
- * 也就是"开了镜就等于有准星"，那"没有准星"这条设定就没有物理支撑了。
- *
- * 单位换算（别拍脑袋填米）：开镜时世界 FOV 约 55°×0.72 ≈ 39.6°，900 px 高的屏幕上
- * 一个像素 = 39.6/900 度；照门离眼 SIGHT_EYE_DISTANCE = 0.300 m，
- * 于是 1 px 屏幕当量 = tan(39.6/900 °) × 0.300 ≈ 2.30e-4 m。
- * **这个数跟着眼距走**：眼距从 0.155 改到 0.300 时它没跟着改的话，
- * 偏心量会凭空缩一半（同样的米数在两倍远处只有一半的角）。
- * 幅度取 4—8 px：汉阳造是老套筒，枪龄大、膛线磨得厉害，偏得比中正式明显。
- * 只给横向留大头、纵向只有 2 px —— 纵向偏多了上护盖会爬进画面挡住准星。
- */
-const SIGHT_OFFSET_PER_PX = 2.30e-4;
-const IRON_SIGHT_OFFSET_PX = {
-  ZhongZheng: { x: 4, y: 2 },
-  HanYang: { x: 8, y: 2 },
-  Zb26: { x: 5, y: 1 },
-  Mauser96: { x: 6, y: 2 },
-  Type38: { x: 5, y: 2 },
-};
-const IRON_SIGHT_OFFSET_DEFAULT = { x: 5, y: 2 };
 
 // ---------------------------------------------------------------------------
 // 小工具
@@ -1211,7 +1187,7 @@ export class Viewmodel {
     // 开镜时要藏掉的部件（见 _CollectAdsHideParts）。带迟滞，别在阈值上抖。
     this.adsHideParts = [];
     this.adsHidden = false;
-    this.adsOffset = new THREE.Vector3();      // 本支枪的铁瞄偏心量（米），取证用
+    this.adsOffset = new THREE.Vector3();      // 满开镜照门中心误差（必须恒为零），取证用
     this.cameraKick = new THREE.Vector2();
     this.cameraKickTaken = new THREE.Vector2();
 
@@ -1489,13 +1465,11 @@ export class Viewmodel {
       return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
     }
     const s = this.rig.sight;
-    // 偏心量挂难度（体验档 0 = 照门回到正中，写实档 1.4 倍）
-    const px = IRON_SIGHT_OFFSET_PX[this.weaponId] || IRON_SIGHT_OFFSET_DEFAULT;
-    const gain = SIGHT_OFFSET_PER_PX * (DIFFICULTY.ironSightOffset ?? 1);
-    this.adsOffset.set(px.x * gain, px.y * gain, 0);
+    // 标准 FPS：照门锚点严格解到相机中心，禁止再叠难度偏心或手调修正。
+    this.adsOffset.set(0, 0, 0);
     return {
-      px: -s.x + this.adsOffset.x,
-      py: -s.y + this.adsOffset.y,
+      px: -s.x,
+      py: -s.y,
       pz: -SIGHT_EYE_DISTANCE - s.z,
       rx: 0, ry: 0, rz: 0,
     };
@@ -1791,13 +1765,8 @@ export class Viewmodel {
     this.prevGrounded = grounded;
     const land = this.landSpring.Step(step, grounded ? 0 : 0.35);
 
-    // --- 自由瞄准：枪口偏离视线中心的那一段，**画出来** ---------------------
-    // 这条以前一行都没有：Script_Player 里 aimYaw/aimPitch 一直在动（弹道也照它走），
-    // 可相机只读 yaw/pitch、视图模型只读帧间增量，于是 2° 以内推鼠标画面上
-    // 一动不动 —— 本作又**没有准星**，等于小幅移动完全没有反馈。
-    // 枪就是准星：绕相机原点转同样的角度，枪在画面里挪过的正好是弹道偏离的角度
-    // （55° 视场 1080 p 上 1° ≈ 20 px，一个鼠标计数 ≈ 2.5 px，看得见）。
-    // 开镜时不衰减：那时自由瞄准本来就只剩 0.56°，衰减掉就等于铁瞄在骗人。
+    // 自定义自由瞄准值仍可驱动枪体，但默认三档均为 0：标准 FPS 下鼠标直接转相机，
+    // HUD、弹道与机械瞄具共用屏幕中心，不再让枪口先在画面里游动。
     const freeAimYaw = Clamp(input.freeAimYaw ?? 0, -0.25, 0.25);
     const freeAimPitch = Clamp(input.freeAimPitch ?? 0, -0.25, 0.25);
     this.root.rotation.set(freeAimPitch, freeAimYaw, 0, "YXZ");
@@ -1807,7 +1776,8 @@ export class Viewmodel {
     const rate = step > 1e-5 ? 1 / step : 0;
     const yawRate = (input.lookDeltaYaw || 0) * rate;
     const pitchRate = (input.lookDeltaPitch || 0) * rate;
-    const swayGain = (this.weapon ? this.weapon.swayScale ?? 1 : 1) * Mix(1, 0.35, ads);
+    const adsVisual = Clamp01(ads);
+    const swayGain = (this.weapon ? this.weapon.swayScale ?? 1 : 1) * (1 - adsVisual);
     const yawTarget = Clamp(-yawRate * 0.030, -0.22, 0.22) * swayGain;
     const pitchTarget = Clamp(pitchRate * 0.026, -0.18, 0.18) * swayGain;
     const rollTarget = (Clamp(-yawRate * 0.012, -0.10, 0.10) - strafe * 0.045) * swayGain;
@@ -1825,7 +1795,7 @@ export class Viewmodel {
     const cadence = Mix(1.55, 2.50, sprint) * Mix(1.0, 0.78, crouchValue) * Math.PI * 2;
     this.bobPhase += step * cadence * (0.25 + gait * 0.75);
     if (this.bobPhase > Math.PI * 200) this.bobPhase -= Math.PI * 200;   // 别让 float 精度慢慢烂掉
-    const bobScale = gait * Mix(1, 0.15, Clamp01(ads)) * Mix(1, 0.55, crouchValue);
+    const bobScale = gait * (1 - adsVisual) * Mix(1, 0.55, crouchValue);
     const ampX = Mix(0.013, 0.030, sprint) * bobScale;
     const ampY = Mix(0.009, 0.020, sprint) * bobScale;
     const phase = this.bobPhase;
@@ -1833,7 +1803,7 @@ export class Viewmodel {
     const bobX = Math.sin(phase) * ampX;
     const bobY = Math.sin(phase * 2) * ampY * 0.5 - Math.abs(Math.sin(phase)) * ampY;
     // 站着不动时的呼吸：幅度只有走路的十分之一，但没有它枪就是"钉死"的
-    const idle = (1 - gait) * Mix(1, 0.25, Clamp01(ads));
+    const idle = (1 - gait) * (1 - adsVisual);
     const breathY = Math.sin(this.elapsed * 1.15) * 0.0026 * idle;
     const breathX = Math.sin(this.elapsed * 0.73 + 1.3) * 0.0020 * idle;
 

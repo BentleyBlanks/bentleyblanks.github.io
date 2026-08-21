@@ -172,9 +172,9 @@ Check("持续连射的第二发会重新触发人物后坐",
   report.repeated
     ? `${report.repeated.first.toFixed(2)} -> ${report.repeated.decayed.toFixed(2)} -> ${report.repeated.second.toFixed(2)}`
     : "没有可见 Actor");
-Check("五支火器走模型、保留铁瞄与栓动动作链",
-  Object.values(report.sights).every((entry) => entry.isModel && entry.hasSight && entry.offsetMm > 0 && entry.hasBoltAction)
-    && report.sights.HanYang.offsetMm > report.sights.ZhongZheng.offsetMm,
+Check("五支火器走模型、铁瞄零偏心并保留栓动动作链",
+  Object.values(report.sights).every((entry) => entry.isModel && entry.hasSight
+    && entry.offsetMm < 0.001 && entry.hasBoltAction),
   Object.entries(report.sights)
     .map(([id, entry]) => `${id}: model=${entry.isModel} sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));

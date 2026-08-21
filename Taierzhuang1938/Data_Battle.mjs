@@ -545,7 +545,7 @@ export const COMBAT = {
 /**
  * 难度。**一个对象被所有系统读取，绝不把难度硬编码进各处逻辑。**
  *
- * 这一批只接了跟"枪的手感三件套"直接相关的几项（弹道重力、自由瞄准、铁瞄偏心、
+ * 这一批只接了跟"枪的手感三件套"直接相关的几项（弹道重力、瞄准、
  * 过热），其余字段先立在这里占位，等做难度面板那一批再逐条接上去 ——
  * 立在这里是为了让后人往同一个地方加，而不是又在七处写死一个魔法数。
  *
@@ -554,12 +554,12 @@ export const COMBAT = {
  *    我们不做 —— 这座城里的人是打到最后一批才从北门扒开土袋走出去的，
  *    让系统替玩家决定「他投降了」会直接摧毁这件事。
  *    （ER2 自己也提供了关掉这条的开关。）
- *  · freeAimDeg 的 0 档只有在**弹道、视差、后坐**三条都落地之后才可用，
- *    否则会得到"枪很稳但打不中"这个最糟的组合。这一批三条都落地了，所以 0 档开放。
+ *  · 标准 FPS 的屏幕中心是唯一瞄准基准：默认预设全部关闭自由瞄准与铁瞄偏心。
+ *    枪体可以做表现性摆动，但弹道、HUD 准心与满开镜机械瞄具必须共轴。
  *
  * hitMarker（2026-08-20 接上）：屏幕中央那一记命中/击杀记号。
  * docs/Data_GunFeelReview.md 的裁决表原来写「默认关，做成难度选项」——
- * 实跑之后这条判错了：本作**没有准星、不显示弹药数、不打歼敌数**，
+ * 实跑之后这条判错了：写实档没有准心，远距离目标反馈仍然很弱，
  * 于是「我这一枪到底打没打中」在四十米以外没有任何一条通道能回答。
  * 血雾在一百米上是两三个像素，impactFlesh 走 inverse 衰减（refDistance 3.5、
  * rolloff 0.9）到八十米只剩出厂音量的 4.8%，在几十条枪的底噪里等于没有。
@@ -572,21 +572,21 @@ export const DIFFICULTY_PRESETS = {
   experience: {
     id: "experience", label: "体验",
     aiAccuracy: 0.70, playerDamage: 0.80, suppressionScale: 0.6,
-    bulletGravity: 0.5, freeAimDeg: 3.5, ironSightOffset: 0.0,
+    bulletGravity: 0.5, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 12, overheat: true, autoSurrender: false,
     showCrosshair: true, enemyMarkers: true, hitMarker: true,
   },
   standard: {
     id: "standard", label: "标准",
     aiAccuracy: 1.0, playerDamage: 1.0, suppressionScale: 1.0,
-    bulletGravity: 1.0, freeAimDeg: 2.0, ironSightOffset: 1.0,
+    bulletGravity: 1.0, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 8, overheat: true, autoSurrender: false,
     showCrosshair: true, enemyMarkers: false, hitMarker: true,
   },
   realistic: {
     id: "realistic", label: "写实",
     aiAccuracy: 1.15, playerDamage: 1.25, suppressionScale: 1.3,
-    bulletGravity: 1.0, freeAimDeg: 1.2, ironSightOffset: 1.4,
+    bulletGravity: 1.0, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 5, overheat: true, autoSurrender: false,
     showCrosshair: false, enemyMarkers: false, hitMarker: false,
   },

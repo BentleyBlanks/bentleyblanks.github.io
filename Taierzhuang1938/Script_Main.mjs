@@ -2610,7 +2610,6 @@ function ReachObjective(index) {
 // ---------------------------------------------------------------------------
 const _forward = new THREE.Vector3();
 const _proj = new THREE.Vector3();
-const _crosshairDir = new THREE.Vector3();
 
 /**
  * @param {number} dt 步长
@@ -2888,17 +2887,11 @@ function Frame(dt, render = true) {
     mortar: combat.MortarReady ? combat.MortarLeft : 0,
     cooking: state.cooking ? Math.min(1, state.cook / 1.1) : 0,
   });
-  // 准心投影枪口的真实方向（含自由瞄准偏移），不拿屏幕中心冒充落点。
-  // ER2 的关键状态规则是：跑动扩大但不消失，开镜则让位给机械瞄具。
-  player.AimDirection(_crosshairDir);
-  _proj.copy(camera.position).addScaledVector(_crosshairDir, 50).project(camera);
-  const crosshairInView = _proj.z > -1 && _proj.z < 1
-    && Math.abs(_proj.x) <= 1 && Math.abs(_proj.y) <= 1;
+  // 标准 FPS 规则：准心固定屏幕中心。枪体动画不能拖着 HUD 基准移动；
+  // 默认难度下 AimDirection 与 ViewDirection 共轴，开镜时机械瞄具也解到同一中心。
   hud.SetCrosshair({
-    visible: DIFFICULTY.showCrosshair !== false && player.Alive && crosshairInView
+    visible: DIFFICULTY.showCrosshair !== false && player.Alive
       && !state.ordersOpen && !state.cutscene,
-    x: _proj.x * 0.5 + 0.5,
-    y: -_proj.y * 0.5 + 0.5,
     move: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     sprint: player.sprint,
     ads: player.ads,

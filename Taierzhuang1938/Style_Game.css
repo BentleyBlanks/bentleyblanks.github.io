@@ -490,10 +490,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudCook.on { opacity: 0.9; }
 
-/* 动态准心。对标 ER2 的状态规则：腰射常驻，跑动时扩大而不是消失，开镜隐藏。
-   准心位置由枪口真实方向投影而来，所以自由瞄准时会跟枪走，不会错误承诺屏幕正中。 */
+/* 标准 FPS 动态准心：固定屏幕中心；腰射常驻，跑动扩大，开镜隐藏。
+   枪体动画与后坐可以动，但 HUD 瞄准基准绝不能跟着视图模型漂移。 */
 .hudCrosshair {
-  position: absolute; left: var(--x, 50%); top: var(--y, 50%); width: 0; height: 0;
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
   z-index: 3; opacity: 0; color: rgba(242, 238, 225, 0.96);
   filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9));
   transition: opacity 0.08s linear;

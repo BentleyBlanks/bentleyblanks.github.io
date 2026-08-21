@@ -244,9 +244,9 @@ export class Hud {
 
   /**
    * 动态准心规则对齐 ER2 的读法：腰射可见、跑动扩大、铁瞄隐藏。
-   * x/y 是枪口真实瞄向投影，不写死屏幕中心，避免自由瞄准时准心与弹道说两套话。
+   * 准心永远固定屏幕几何中心。武器摆动只能作为动画反馈，不能拖着 HUD 瞄准基准走。
    */
-  SetCrosshair({ visible = false, x = 0.5, y = 0.5, move = 0, sprint = 0, ads = 0 } = {}) {
+  SetCrosshair({ visible = false, move = 0, sprint = 0, ads = 0 } = {}) {
     const e = this.el.crosshair;
     const sprinting = sprint > 0.35;
     const shown = !!visible && ads < 0.62;
@@ -254,8 +254,6 @@ export class Hud {
       + Math.min(1, Math.max(0, sprint)) * 10;
     e.classList.toggle("on", shown);
     e.classList.toggle("sprint", shown && sprinting);
-    e.style.setProperty("--x", `${Math.min(1, Math.max(0, x)) * 100}%`);
-    e.style.setProperty("--y", `${Math.min(1, Math.max(0, y)) * 100}%`);
     e.style.setProperty("--gap", `${gap.toFixed(1)}px`);
     e.setAttribute("aria-hidden", String(!shown));
     e.setAttribute("aria-label", sprinting ? "冲刺扩散准心" : "腰射准心");
