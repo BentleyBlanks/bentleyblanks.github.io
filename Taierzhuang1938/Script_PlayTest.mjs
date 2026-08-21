@@ -68,6 +68,25 @@ const api = await page.evaluate(() => {
 Check("调试口齐全", api.hasStory && api.hasCombat && api.fns.length === 8,
   `story=${api.hasStory} combat=${api.hasCombat} fns=${api.fns.length}/8`);
 
+// 滕县攻城的日军是合成火力，不是整队随机步枪兵；但战车、装甲车与反坦克集束弹
+// 都不属于这一阶段。这个断言直接从已经建好的第一关取证，防止以后又把配置写回去。
+const tengxianForce = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const soldiers = T.ai.soldiers || [];
+  return {
+    hmg: soldiers.filter((s) => s.side === "ija" && s.weaponId === "Type92Hmg").length,
+    lmg: soldiers.filter((s) => s.side === "ija" && s.weaponId === "Type11").length,
+    armor: soldiers.filter((s) => s.side === "ija" && /Tank|Tankette/.test(s.weaponId || "")).length,
+    bundles: T.state?.bundles ?? -1,
+    grenades: T.state?.grenades ?? -1,
+  };
+});
+Check("滕县日军有固定重机枪组与分队轻机枪", tengxianForce.hmg >= 1 && tengxianForce.lmg >= 1,
+  `重机=${tengxianForce.hmg} 轻机=${tengxianForce.lmg}`);
+Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0
+  && tengxianForce.bundles === 0 && tengxianForce.grenades === 6,
+  `装甲=${tengxianForce.armor} 集束=${tengxianForce.bundles} 木柄弹=${tengxianForce.grenades}`);
+
 // ===========================================================================
 // 2) 真键盘走完整路径 —— 这一节是补票
 //

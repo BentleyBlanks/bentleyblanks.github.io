@@ -42,7 +42,7 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
-import { WEAPONS, LOADOUTS, AMMO } from "./Data_Weapons.mjs";
+import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
@@ -1188,6 +1188,31 @@ function SeedSoldiers(phase) {
   // 近身班组用镜头方向（人要在画面里），战线用路标方向（人要在该在的地方）
   const fx = -Math.sin(player.yaw);
   const fz = -Math.cos(player.yaw);
+  // 日军不是散兵抽签：按 13 人分队固定给一挺十一年式。这样每一波推进都能
+  // 读出「步枪组压上、歪把子留在后面掩护」的编组，而不是一串完全相同的步枪兵。
+  const lmgEvery = phase.ijaForce?.lmgEvery || IJA_SQUAD.size;
+  const IjaWeaponAt = (ordinal) => (ordinal % lmgEvery === lmgEvery - 1 ? "Type11" : "Type38");
+
+  // 重机枪是阵地火力，不该跟突击兵一起随机冲脸。每关按配置摆在纵深，
+  // 用九二式真的开火；位置、数量是玩法推定，存在本身来自日方战详报。
+  const hmgTeams = phase.ijaSupport?.includes("hmg") ? (phase.ijaForce?.hmgTeams || 0) : 0;
+  for (let i = 0; i < hmgTeams; i += 1) {
+    const d = 105 + i * 26;
+    const lateral = (i - (hmgTeams - 1) * 0.5) * 34;
+    const at = {
+      x: Clamp(px + ax * d - az * lateral, levelBounds.minX, levelBounds.maxX),
+      z: Clamp(pz + az * d + ax * lateral, levelBounds.minZ, levelBounds.maxZ),
+    };
+    const open = FindOpenSpot(at.x, at.z, 12, 83011 + state.phaseIndex * 131 + i * 29, levelBounds);
+    const s = ai.Spawn("ija", open.x, open.z, {
+      weapon: "Type92Hmg", squadId: `Hmg_${phase.id}_${i}`,
+    });
+    if (s) {
+      s.order = "hold";
+      s.holdZone = { id: `Hmg_${phase.id}_${i}`, x: open.x, z: open.z, radius: 7 };
+      s.goal.set(open.x, 0, open.z);
+    }
+  }
 
   // --- 近身班组：跟着你的班 -------------------------------------------------
   for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra; i += 1) {
@@ -1224,7 +1249,7 @@ function SeedSoldiers(phase) {
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
     const s = ai.Spawn("ija", open.x, open.z, {
-      weapon: rnd() < 0.12 ? "Type11" : "Type38",
+      weapon: IjaWeaponAt(i + hmgTeams),
       squadId: `Contact_${phase.id}`,
     });
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);
@@ -1274,7 +1299,7 @@ function SeedSoldiers(phase) {
     const open = FindOpenSpot(at.x, at.z, 14,
       90001 + i * 617 + state.phaseIndex * 43, levelBounds);
     const s = ai.Spawn("ija", open.x, open.z, {
-      weapon: rnd() < 0.12 ? "Type11" : "Type38",
+      weapon: IjaWeaponAt(i + hmgTeams),
       squadId: `Attack_${phase.id}_${Math.floor(i / 6)}`,
     });
     if (s) s.goal.set(px + s.laneOffset, 0, pz + s.laneOffset * 0.4);

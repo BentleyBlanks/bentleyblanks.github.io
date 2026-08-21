@@ -142,7 +142,10 @@ const TUNING = {
     bounds: { minX: -620, maxX: 620, minZ: -1620, maxZ: -900 },
     zones: ["Approach", "Kan", "Beishahe"],
     spawn: { x: 0, z: -1470, ry: Math.PI },
-    ijaPressure: 1.0, ijaSpawn: ["north"], ijaSupport: ["artillery"],
+    ijaPressure: 1.0, ijaSpawn: ["north"], ijaSupport: ["artillery", "hmg"],
+    // 滕县方向的日军不是一排散兵：步兵分队的轻机枪、沿河架设的重机枪与后方
+    // 炮兵共同推进。装甲栏明确为零——34 辆九四式在临城方向，不进本关。
+    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 260,
     // 手榴弹经济：手榴弹是主武器，步枪是奢侈品。**「无枪」是合法初始状态。**
     // 日方记川军三分之一以上没有步枪，各自带手榴弹约六发。
@@ -159,6 +162,7 @@ const TUNING = {
     // 朝南：这一关是沿津浦路一路南撤，第一个路标在身前
     spawn: { x: -1450, z: -430, ry: Math.PI },
     ijaPressure: 1.15, ijaSpawn: ["north"], ijaSupport: ["artillery", "hmg"],
+    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 300,
     loadoutOverride: {
       primary: "HanYang", secondary: null, melee: "Dadao",
@@ -172,8 +176,15 @@ const TUNING = {
     // 站在寨门里侧、朝东正对缺口（东寨门在 x=520）
     spawn: { x: 496, z: 0, ry: -Math.PI / 2 },
     ijaPressure: 1.5, ijaSpawn: ["east"], ijaSupport: ["launcher", "hmg", "artillery"],
+    // 日军战详报：工兵逐间爆破民房打通墙体；联队炮四门在土城子西侧，
+    // 重机枪沿河西岸配置。没有战车或装甲车参加滕县攻城。
+    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 420,
-    loadout: "L2_RoomWar",
+    loadoutOverride: {
+      primary: "HanYang", secondary: null, melee: "Dadao",
+      throwables: { Grenade: 6 }, spareClips: 4,
+      note: "木柄手榴弹六枚；东关靠密集投弹和院墙，不靠并不存在的反坦克集束弹。",
+    },
   },
   L3_Fanji: {
     // 比 L2 窄一条：这一关的路标全落在 z ∈ [-60, 0]，南北两端的关厢从不去。
@@ -189,18 +200,28 @@ const TUNING = {
     spawn: { x: 398, z: -88, ry: Math.atan2(-22, -28) },
     // 夜里日军火力优势削掉一半 —— 全局唯一一次玩家在交换比上占便宜的时段
     ijaPressure: 0.85, ijaSpawn: ["east"], ijaSupport: ["hmg"],
+    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 300, nightRaid: true,
-    loadout: "L3_WhiteTowel",
+    loadoutOverride: {
+      primary: "HanYang", secondary: "Mauser96", melee: "Dadao",
+      throwables: { Grenade: 6 }, spareClips: 3,
+      note: "夜袭携行仍按约六枚木柄手榴弹；白刃是近距补充，不是无限火力。",
+    },
   },
   L4_Chengqiang: {
     bounds: { minX: 40, maxX: 620, minZ: -120, maxZ: 400 },
     zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
     spawn: { x: 276, z: 46, ry: Math.PI / 2 },
     ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],
+    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 480,
     // 龙泉塔上的观测班：十时之后落弹从随机变成「跟着你走」。塔打不掉，只能拖。
     spotter: { fromLevelSeconds: 240, at: [620, 210], note: "3/17 10 时日军观测班占领城东龙泉塔" },
-    loadout: "L2_RoomWar",
+    loadoutOverride: {
+      primary: "HanYang", secondary: null, melee: "Dadao",
+      throwables: { Grenade: 4 }, spareClips: 3,
+      note: "守了两昼夜，木柄手榴弹只剩四枚；没有集束弹，也没有可打的战车。",
+    },
   },
   L5_Shizijie: {
     // 全城最贵的一关：路标横跨 515 m（县衙在东、西门里在西），
@@ -218,6 +239,7 @@ const TUNING = {
     // 站在东门里街上（街心 z=0，宽 8 m）朝西，正对十字街口
     spawn: { x: 62, z: 0, ry: Math.PI / 2 },
     ijaPressure: 1.9, ijaSpawn: ["west", "south"], ijaSupport: ["hmg", "launcher"],
+    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 460,
     // 西城门楼 → 西门里街 → 十字街口 是一条通视的直街，被一挺重机枪完全控制。
     // 这条走廊的几何硬约束在 Data_Tengxian.SIGHT_CORRIDOR，城的自检会核对。
@@ -231,6 +253,7 @@ const TUNING = {
     // 朝西：第一个目标是「跟着人流去西门」（挤不出去）
     spawn: { x: -286, z: 0, ry: Math.PI / 2 },
     ijaPressure: 0.6, ijaSpawn: ["west"], ijaSupport: [],
+    ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 240,
     // 脱离战斗：武器栏清空、瞄准失效，唯一的动作是走和拽人。
     disarmed: true,
@@ -325,6 +348,8 @@ export const PRESUMED_TUNING = [
     note: "日方兵员池。史料给的是「一个不满员的步兵联队 + 师团级炮兵群」，没有逐时段兵力数" },
   { id: "ijaPressure", value: [1.0, 1.15, 1.5, 0.85, 1.7, 1.9, 0.6],
     note: "压力系数，纯难度曲线。唯一有史料支撑的形状是 L3 那一档低于两边——「夜里日军火力优势削掉一半」见张宣武回忆" },
+  { id: "ijaForce", value: "TUNING[*].ijaForce",
+    note: "日军合成攻击编组。步兵分队约十三人配一挺十一年式轻机枪是编制参照；每关可见重机枪组数、出现位置与后方运输呈现为玩法推定。装甲数为零是滕县攻城战的史实约束：34 辆九四式配属临城方向，战车队 3 月 26 日后才用于台儿庄" },
   { id: "loadout", value: "TUNING[*].loadoutOverride",
     note: "携行。「三分之一以上没有步枪、各带手榴弹约六发」为日方记载，具体到每关发几颗、几个桥夹是推定" },
   { id: "spawn", value: "TUNING[*].spawn",
@@ -418,7 +443,8 @@ export const ORDERS = [
  * 支援。**不对称是史实，而且在滕县比在任何一处都更极端**：
  * 第 22 集团军是川军，出川时轻装、娘子关下来之后未获补充，
  * 全师几乎没有炮；对面是一个不满员的步兵联队**背后拖着一个师团级的炮兵群**，
- * 外加掷弹筒、九二式重机与航空兵。
+ * 外加掷弹筒、九二式重机与侦察机。这里不能写成战车火力：滕县攻城时
+ * 濑谷支队未配属战车或装甲车，汽车运输只在后方，不作为城区突击单位。
  * 迫击炮这一条留着，但只有两发 —— 有比没有更说明问题。
  */
 export const SUPPORT = {
@@ -437,7 +463,8 @@ export const SUPPORT = {
   ],
   ija: [
     { id: "launcher", name: "掷弹筒", intervalS: 14, radius: 5, damage: 110, warnS: 1.6 },
-    { id: "artillery", name: "野战重炮", intervalS: 42, radius: 11, damage: 160, warnS: 2.6 },
+    { id: "artillery", name: "联队炮与师团炮兵", intervalS: 42, radius: 11, damage: 160, warnS: 2.6,
+      note: "日军战详报记联队炮四门架于土城子西侧；口径与每发间隔不据此断言。" },
   ],
 };
 

@@ -112,11 +112,11 @@ export const WEAPONS = {
     side: "nra",
     kind: "throwable",
     lengthM: 0.220, massKg: 0.50,
-    magazine: 8,                               // 敢死队标准携行：背后 4 + 胸前 4
+    magazine: 6,                               // 滕县日方记录：守军遗体旁约六发余
     damage: 130, radiusM: 6.5, fuseS: 4.2,
     throwSpeedMin: 14, throwSpeedMax: 26,       // 优秀士兵 40—50 m，高手 70—80 m
     cookable: true,
-    note: "台儿庄真正的主战兵器。第 31 师一役用掉三十万余枚。",
+    note: "巩县兵工厂仿德式木柄弹；旋开底盖后拉火绳起爆。滕县日方记录川军士兵约携六发余，近距投弹是其主要火力。",
   },
   GrenadeBundle: {
     id: "GrenadeBundle",
@@ -129,7 +129,7 @@ export const WEAPONS = {
     damage: 620, radiusM: 4.2, fuseS: 3.6,
     throwSpeedMin: 8, throwSpeedMax: 13,
     armorPiercing: true,
-    note: "打战车用。八九式中战车装甲只有 6—17 mm，从上面砸下去才有用。",
+    note: "仅供台儿庄战车关使用；滕县攻城阶段未配属战车或装甲车，关卡不得发放此项。",
   },
   Dadao: {
     id: "Dadao",

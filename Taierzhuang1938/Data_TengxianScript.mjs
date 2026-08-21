@@ -142,7 +142,7 @@ export const LEVELS = [
       { at: "start", type: "line", who: "qiu", text: "弟兄，把布袋系紧了。六颗，一颗都别掉。", tier: "虚构" },
       { at: "delay:3.0", type: "line", who: "qiu", text: "没枪的跟着有枪的走。谁倒了，枪归下一个。", tier: "虚构",
         source: "日方记川军三分之一以上没有步枪，各自带手榴弹约六发" },
-      { at: "delay:5.0", type: "hint", text: "主武器是手榴弹。子弹要省，命更要省", tier: "提示" },
+      { at: "delay:5.0", type: "hint", text: "主武器是木柄手榴弹：旋开底盖，拉火绳，贴近再扔", tier: "提示" },
       { at: "zone:Kan", type: "objective", text: "守住土坎，顶过第一轮炮击" },
       { at: "zone:Kan", type: "line", who: "yang", text: "弟兄们，趴住。他们的炮先来，人后来。", tier: "虚构" },
       { at: "event:FirstBarrage", type: "line", who: "qiu", text: "数着点儿。一轮打完他们才动。", tier: "虚构" },
