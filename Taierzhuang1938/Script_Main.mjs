@@ -569,7 +569,7 @@ async function Boot() {
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
   state.ready = true;
   bootStart.disabled = false;
-  bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
+  bootStart.textContent = SHOT ? "（出图模式）" : (PREVIEW ? "播放序章" : "进 城");
 
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
@@ -924,7 +924,6 @@ async function Boot() {
   }
 
   if (SHOT) StartRun();
-  else if (PREVIEW) StartPreview();
 }
 
 // ---------------------------------------------------------------------------
@@ -1127,7 +1126,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   if (!initial) {
     ShowBoot(false);
-    bootStart.textContent = SHOT ? "（出图模式）" : "进 城";
+    bootStart.textContent = SHOT ? "（出图模式）" : (PREVIEW ? "播放序章" : "进 城");
   }
   // 这一片切片是哪一关的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
   state.builtPhase = state.phaseIndex;
@@ -1829,6 +1828,10 @@ function StartPreview() {
   state.previewPlaying = true;
   state.previewDone = false;
   state.previewError = null;
+  // WebAudio 必须在真人手势内解锁。预览页保留一次「播放序章」点击，
+  // 点击后 95 秒时间轴仍完全自动推进；直接在 Boot() 尾部自动起播会让
+  // Chrome / Safari 把上下文留在 suspended，结果是画面正常而全段静音。
+  audio.Unlock();
   ReleasePointerLock();
   if (ai) ai.Dispose();
   ShowBoot(false);
@@ -1865,7 +1868,7 @@ function StartRun() {
   }
   RequestPointerLock();
 }
-bootStart.addEventListener("click", StartRun);
+bootStart.addEventListener("click", PREVIEW ? StartPreview : StartRun);
 
 // ---------------------------------------------------------------------------
 // 主菜单：开机进这里，游戏中按 Esc 也回这里

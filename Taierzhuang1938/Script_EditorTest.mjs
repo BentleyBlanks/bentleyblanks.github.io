@@ -435,7 +435,7 @@ const undescribed = await page.evaluate(async () => {
   const editor = window.Taierzhuang.editor.active;
   // 用编辑器自己的过滤器逐类点一遍，凑齐的名字应该等于 SOUND_NAMES
   const seen = new Set();
-  for (const cat of ["枪械", "爆炸", "命中", "白刃", "身体", "信号"]) {
+  for (const cat of ["环境", "枪械", "爆炸", "命中", "白刃", "身体", "信号"]) {
     editor.category = cat;
     for (const name of editor.Names()) seen.add(name);
   }
@@ -766,6 +766,9 @@ async function PreviewPage(query = "?preview=CS_Chuchuan") {
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined
     && window.Taierzhuang.state.ready, { timeout: 240000 });
+  await page.click("#bootStart");
+  await page.waitForFunction(() => window.Taierzhuang.Debug.Preview().playing,
+    { timeout: 30000 });
 }
 
 await PreviewPage();
@@ -774,12 +777,13 @@ const previewStart = await page.evaluate(() => {
   return {
     preview: T.Debug.Preview(), cut: T.Debug.Cutscene(),
     ai: T.ai.soldiers.filter((s) => s.alive).length,
+    audioState: T.audio.ctx ? T.audio.ctx.state : null,
   };
 });
-Check("新版预览自动起播且不提前启动旧 L0 AI",
+Check("新版预览点击播放后自动推进且不提前启动旧 L0 AI",
   previewStart.preview.active && previewStart.cut.current === "CS_Chuchuan"
-    && previewStart.cut.playing && previewStart.ai === 0,
-  `cut=${previewStart.cut.current} playing=${previewStart.cut.playing} ai=${previewStart.ai}`);
+    && previewStart.cut.playing && previewStart.ai === 0 && previewStart.audioState === "running",
+  `cut=${previewStart.cut.current} playing=${previewStart.cut.playing} ai=${previewStart.ai} audio=${previewStart.audioState}`);
 
 await page.evaluate(() => {
   const T = window.Taierzhuang;
