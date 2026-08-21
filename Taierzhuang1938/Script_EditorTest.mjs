@@ -836,6 +836,65 @@ const blurred = await page.evaluate(() => window.Taierzhuang.Debug.Preview());
 Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurred.playing
   && blurred.aiAlive === 0, JSON.stringify(blurred));
 
+// ---------------------------------------------------------------------------
+// 12) 主菜单 → 场景编辑器 → 关卡切片
+//
+// 这条专门锁住一个容易被 menu=0 冒烟漏掉的路径：主菜单的活场景有自己的
+// 相机循环。若菜单没有在场景编辑器接管时退出，点切片后会继续显示菜单原有场景，
+// 并且新 field 完成后编辑层不会重新包 GroundHeight。
+// ---------------------------------------------------------------------------
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined
+  && window.Taierzhuang.state.ready && window.Taierzhuang.state.menu, { timeout: 240000 });
+const menuToEditor = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，场景工具必须先收起它。
+  T.editor.Open("scene");
+  return {
+    menu: T.state.menu,
+    menuVisible: !document.getElementById("menu").classList.contains("off"),
+    editor: T.editor.ActiveId,
+    capturing: T.editor.Capturing,
+  };
+});
+Check("从主菜单打开场景编辑器会交还菜单相机",
+  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "scene"
+    && menuToEditor.capturing, JSON.stringify(menuToEditor));
+
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  // 走 ListBox 行的真实 click，不直接调 JumpToLevel，确保 UI 选关链路也在测试内。
+  active.levelList.root.children[1].click();
+});
+await page.waitForFunction(() => {
+  const T = window.Taierzhuang;
+  return T.state.ready && T.state.builtPhase === 1 && T.editor.active
+    && T.editor.active.groundPatched === T.battlefield;
+}, { timeout: 240000 });
+const menuSlice = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  return {
+    id: T.Debug.Level().id,
+    built: T.state.builtPhase,
+    menu: T.state.menu,
+    bounds: T.battlefield.bounds,
+    expected: { minX: -1560, maxX: -230, minZ: -470, maxZ: 170 },
+    patched: !!T.battlefield.__editorBaseGroundHeight,
+  };
+});
+Check("主菜单打开的地形编辑器能切到所选关卡切片",
+  menuSlice.id === "L1_Beishahe" && menuSlice.built === 1 && !menuSlice.menu
+    && JSON.stringify(menuSlice.bounds) === JSON.stringify(menuSlice.expected) && menuSlice.patched,
+  JSON.stringify(menuSlice));
+await page.evaluate(() => window.Taierzhuang.editor.Close());
+const returnedToMenu = await page.evaluate(() => ({
+  menu: window.Taierzhuang.state.menu,
+  visible: !document.getElementById("menu").classList.contains("off"),
+}));
+Check("关闭场景编辑器后回到原菜单层", returnedToMenu.menu && returnedToMenu.visible,
+  JSON.stringify(returnedToMenu));
+
 // ===========================================================================
 await browser.close();
 server.close();

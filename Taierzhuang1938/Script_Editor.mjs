@@ -255,7 +255,8 @@ export class EditorSuite {
   Open(id) {
     const Editor = ALL.find((e) => e.id === id);
     if (!Editor) return null;
-    if (this.active) this.Close();
+    // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
+    if (this.active) this.Close({ switching: true });
     this.panelOpen = true;
     this.launcher.style.display = "flex";
     this.host.ReleasePointerLock();
@@ -274,7 +275,7 @@ export class EditorSuite {
     return this.active;
   }
 
-  Close() {
+  Close({ switching = false } = {}) {
     if (this.active) {
       try { this.active.Exit(); } catch (error) { console.error("[Editor] 关闭出错：", error); }
     }
@@ -284,6 +285,7 @@ export class EditorSuite {
     this.SetHint("");
     this.SetCrosshair(false);
     this.RefreshStatus();
+    if (!switching) this.host.game.FinishEditorSession?.();
   }
 
   // -------------------------------------------------------------------------

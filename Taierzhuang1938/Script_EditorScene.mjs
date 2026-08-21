@@ -245,6 +245,9 @@ export class SceneEditor {
   // -------------------------------------------------------------------------
 
   Enter(root) {
+    // 菜单的活场景有自己的相机帧循环；不先交还它，用户从「设置」打开本工具后
+    // 点关卡切片会看见菜单旧画面，且新场景建好后编辑层没有机会重新挂到新 field。
+    this.host.game.PrepareSceneEditing?.();
     this.host.scene.add(this.root);
     this.host.flycam.Open();
     this.host.SetViewmodelVisible(false);

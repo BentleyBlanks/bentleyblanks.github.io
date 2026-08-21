@@ -331,6 +331,8 @@ let cutsceneSky = null;
 let editor = null;
 // 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
 let menu = null;
+// 从菜单进入场景编辑器时，关闭工具后要回到原来的菜单层；正常游戏中打开则为 null。
+let editorReturnMenuMode = null;
 let currentWeapon = "HanYang";
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
@@ -888,6 +890,15 @@ async function Boot() {
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
       state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
+      // 场景编辑器也能从主菜单的「设置」进来。菜单仍接管相机/画面时，
+      // 地图切片即使已重建，编辑器也拿不到 Update，画面就会停在菜单那一片。
+      // 场景工具一打开便收起菜单，保留「编辑器暂停玩法」的语义。
+      PrepareSceneEditing: () => {
+        editorReturnMenuMode = state.menu && menu ? menu.mode : null;
+        if (state.menu) CloseMenu();
+        ReleasePointerLock();
+      },
+      FinishEditorSession: () => FinishEditorSession(),
       get battlefield() { return battlefield; },
       get player() { return player; },
       get currentWeapon() { return currentWeapon; },
@@ -1950,6 +1961,23 @@ function CloseMenu() {
   hudRoot.style.display = "";
   if (viewmodel) viewmodel.root.visible = true;
   if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
+}
+
+/** 场景编辑器从菜单进来时，完整关闭编辑器后回到原来的菜单层。 */
+function FinishEditorSession() {
+  const mode = editorReturnMenuMode;
+  editorReturnMenuMode = null;
+  if (!mode || !menu) return;
+  if (mode !== "pause") { OpenMenu(); return; }
+
+  state.running = false;
+  state.menu = true;
+  ReleasePointerLock();
+  audio.SetPaused(true);
+  hudRoot.style.display = "none";
+  if (viewmodel) viewmodel.root.visible = false;
+  document.getElementById("edRoot")?.classList.add("off");
+  menu.OpenPause();
 }
 
 /**
@@ -3209,7 +3237,9 @@ function EndBattle(outcome) {
  */
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
   for (let i = 0; i < count; i += 1) {
-    if (state.menu && menu && menu.live) MenuFrame(dt, render);
+    // 编辑器接管时必须压过主菜单。否则从菜单打开场景编辑器后，
+    // StepFrames 只会推进菜单运镜，换切片后编辑器无法把地形/碰撞层接到新场景。
+    if (!(editor && editor.Capturing) && state.menu && menu && menu.live) MenuFrame(dt, render);
     else Frame(dt, render);
   }
 }
@@ -3257,13 +3287,19 @@ function Loop(now) {
   if (MANUAL_STEP) return;
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
-  if (state.menu && menu && menu.live && state.ready) { MenuFrame(dt); return; }
+  // 编辑器与菜单都要独占相机；编辑器优先，以便能从菜单里的设置入口直接编辑切片。
+  if (!(editor && editor.Capturing) && state.menu && menu && menu.live && state.ready) {
+    MenuFrame(dt);
+    return;
+  }
   // 过场没有自己的帧驱动，全靠 Frame() 里那条 cutscene 分支推。
   // 而从主菜单进关时 state.running 还是 false（要等过场播完才 StartRun）——
   // 不放行的话「开始」会卡死在关前过场里：过场在等一个永远不来的帧，
   // 而 StartRun 在等过场结束。关卡之间那条路之所以没暴露这个坑，
   // 是因为换关时玩家还在游戏里，state.running 一直是 true。
-  if (!state.running && !(cutscene && cutscene.Playing)) return;
+  // 从主菜单或暂停菜单打开编辑器时 running 都是 false；仍要让编辑器更新，
+  // 否则切片重建完成后的 GroundHeight、碰撞和地形网格无法重新挂载。
+  if (!state.running && !(cutscene && cutscene.Playing) && !(editor && editor.Capturing)) return;
   Frame(dt);
 }
 requestAnimationFrame(Loop);
