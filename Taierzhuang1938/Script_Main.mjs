@@ -216,13 +216,14 @@ const graphics = {
   // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
   // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
   godEnabled: false,
-  // 探针体：开关 + 强度倍率。强度乘在预设的 envIntensity 上（跟其它后处理项一个规矩：
-  // 预设定「这一关的天有多强」，设置只定「画多重」）。
-  gi: true, giStrength: 1,
+  // 实时探针体默认关。默认间接光由 Global SH Probe + AmbientColor 提供；打开时
+  // 才跑五个 GI pass/帧，并在图集收敛后渐进接管室内与墙角的反弹光。
+  gi: params.get("gi") === "1", giStrength: 1,
   fov: BASE_FOV,
 };
-// 探针体（GI）。low 档与 ?gi=0 都直接不建 —— 建了再关等于白背一套 shader 分支。
-const GI_ON = GI_QUALITY[QUALITY] != null && params.get("gi") !== "0";
+// 探针体（GI）。保留构造与材质入口，才能从画质面板即时打开；默认不更新、不出
+// trace/blend pass。low 档没有配置，仍按原规则不建。
+const GI_ON = GI_QUALITY[QUALITY] != null;
 const giUniforms = MakeGiUniforms();
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
@@ -235,6 +236,7 @@ const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
 const gi = GI_ON
   ? new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms })
   : null;
+if (gi) gi.enabled = graphics.gi;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
 
@@ -435,7 +437,7 @@ async function Boot() {
 
   const phase = PHASES[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
-  sky.BakeEnvironment(scene);
+  sky.ClearEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
@@ -552,13 +554,13 @@ async function Boot() {
       if (state.running && !state.menu) RequestPointerLock();
     },
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
-    // 套预设 = 天空着色器 + 重烘 IBL + 平行光/半球光三件一起换，少一件就是
+    // 套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，少一件就是
     // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
     applySky: (name) => {
       if (!SKY_PRESETS[name]) return false;
       cutsceneSky = name;
       const preset = sky.Apply(name);
-      sky.BakeEnvironment(scene);
+      sky.ClearEnvironment(scene);
       lights.ApplyPreset(preset, sky.sunDirection);
       return true;
     },
@@ -567,7 +569,7 @@ async function Boot() {
       cutsceneSky = null;
       const phase = PHASES[state.phaseIndex];
       const preset = sky.Apply(phase.sky);
-      sky.BakeEnvironment(scene);
+      sky.ClearEnvironment(scene);
       lights.ApplyPreset(preset, sky.sunDirection);
     },
   });
@@ -1139,7 +1141,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   const far = phase.cameraFar ?? battlefield.cameraFar ?? 620;
   if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
   const preset = sky.Apply(phase.sky);
-  sky.BakeEnvironment(scene);
+  sky.ClearEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
@@ -3007,7 +3009,7 @@ function Frame(dt, render = true) {
   lights.UpdateShadowFrustum(player.position, _forward);
   if (gi) {
     gi.Update(dt, camera.position, lights);
-    // 半球光按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
+    // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
     lights.SetGiActive(gi.uniforms.enabled.value);
   }
 

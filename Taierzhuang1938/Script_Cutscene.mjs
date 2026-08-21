@@ -408,7 +408,7 @@ export class CutsceneDirector {
 
     this._SaveCamera();
     this._SaveAudio(cut);
-    // 天空要**先于**布景套：BakeEnvironment 烘的是天，布景材质吃的 IBL 是那一张。
+    // 天空要**先于**布景套：Global SH 强度与直射光都随这份预设一并落位。
     this.skyApplied = false;
     if (cut.sky && this.applySky) this.skyApplied = !!this.applySky(cut.sky);
     this._BuildSet(cut);

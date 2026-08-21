@@ -1,4 +1,4 @@
-// 《血战台儿庄》灯光装置：太阳（含跟随式阴影框）、半球补光、火光池、枪口闪光。
+// 《血战台儿庄》灯光装置：太阳（含跟随式阴影框）、Global SH Probe、环境底色、火光池、枪口闪光。
 //
 // 阴影是"3A 与网页 demo"的第一道分水岭。要点：
 //  - 平行光的正交阴影框必须**跟着玩家走**并且尽量小：框开到 500 米，2048 的图
@@ -9,6 +9,7 @@
 //    影子整个飘起来（peter-panning）。
 
 import * as THREE from "three";
+import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
 
 const SHADOW_SIZE = { low: 1024, medium: 2048, high: 4096, ultra: 4096 };
 
@@ -32,14 +33,18 @@ export class LightRig {
     scene.add(this.sun);
     scene.add(this.sun.target);
 
-    // 探针体接管间接光之后，半球光要让位（见 SetGiActive）
-    this.hemiBase = 0.6;
+    // 默认间接光基线：下载的通用 HDR 积分出的全局 L2 SH + 一盏很弱的环境底色。
+    // 与旧的实时探针体不同，它不跑 ray-trace pass，也不依赖 scene.environment；
+    // SH 保留「天比地亮」的方向性，AmbientLight 只托住阴影最深处的材质信息。
+    this.globalProbe = new THREE.LightProbe();
+    this.globalProbe.sh.fromArray(GLOBAL_SH_PROBE_COEFFICIENTS);
+    this.globalProbe.intensity = 0.34;
+    scene.add(this.globalProbe);
+    this.ambient = new THREE.AmbientLight(0x607085, 0.16);
+    scene.add(this.ambient);
+    this.probeBase = this.globalProbe.intensity;
+    this.ambientBase = this.ambient.intensity;
     this.giFill = 1;
-
-    // 半球光只做"天空冷 / 地面暖"的方向性补光。真正的间接光靠 scene.environment，
-    // 这一盏只是把 IBL 撑不起来的那一点点方向感补上，强度必须小。
-    this.hemi = new THREE.HemisphereLight(0x8899aa, 0x4a4034, 0.6);
-    scene.add(this.hemi);
 
     this.fireLights = [];
     this.fireStates = [];
@@ -62,26 +67,27 @@ export class LightRig {
   }
 
   /**
-   * 半球光与探针体的分工。
+   * Global SH 基线与探针体的分工。
    *
-   * 半球光原本干的是「天空把冷色洒到朝上的面」这件事 —— 而这正是探针体算得
-   * **更准**的那一部分（它还知道头顶有没有屋顶）。两个一起开就是双份天光，
-   * 屋里会亮得像在院子里。所以 GI 一上，半球光退成一点点底噪：
-   * 探针还没收敛的那一两帧、以及探针体外的远景，靠它兜着不至于死黑。
+   * 全局 SH 是默认、无位置感的室外天光；实时探针体打开后会算得更准（尤其是
+   * 头顶有没有屋顶）。两者全量叠加会双份补光，所以 GI 收敛后把全局基线压低，
+   * 仍留一点给探针体外的远景和图集刚重置的几帧兜底。
    */
   SetGiActive(active) {
-    this.giFill = active ? 0.3 : 1;
-    this.hemi.intensity = this.hemiBase * this.giFill;
+    this.giFill = active ? 0.42 : 1;
+    this.globalProbe.intensity = this.probeBase * this.giFill;
+    this.ambient.intensity = this.ambientBase * (active ? 0.72 : 1);
   }
 
   /** 套用 SKY_PRESETS 里那一份光照参数。 */
   ApplyPreset(preset, sunDirection) {
     this.sun.color.setHex(preset.lightColor);
     this.sun.intensity = preset.lightIntensity;
-    this.hemi.color.setHex(preset.hemiSky);
-    this.hemi.groundColor.setHex(preset.hemiGround);
-    this.hemiBase = preset.hemiIntensity;
-    this.hemi.intensity = this.hemiBase * this.giFill;
+    // 全局 Probe 本身固定来源于通用 HDR；只按时段缩放，避免夜战仍吃正午亮度。
+    this.probeBase = preset.shProbeIntensity ?? (preset.lightIntensity <= 0.5 ? 0.11 : 0.34);
+    this.ambientBase = preset.ambientIntensity ?? (preset.lightIntensity <= 0.5 ? 0.045 : 0.16);
+    this.globalProbe.intensity = this.probeBase * this.giFill;
+    this.ambient.intensity = this.ambientBase * (this.giFill < 1 ? 0.72 : 1);
     this.sunDirection.copy(sunDirection).normalize();
     this.sun.castShadow = this.quality !== "low" && preset.lightIntensity > 0.35;
   }
@@ -182,7 +188,7 @@ export class LightRig {
   }
 
   Dispose() {
-    this.scene.remove(this.sun, this.sun.target, this.hemi, this.muzzle);
+    this.scene.remove(this.sun, this.sun.target, this.globalProbe, this.ambient, this.muzzle);
     for (const l of this.fireLights) this.scene.remove(l);
   }
 }

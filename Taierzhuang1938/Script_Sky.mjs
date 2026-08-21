@@ -1,9 +1,8 @@
-// 《血战台儿庄》程序化天空 + 基于图像的照明（IBL）。
+// 《血战台儿庄》程序化天空。
 //
-// 为什么非要有 IBL：只打一盏平行光的场景，背光面必然是死黑一片 —— 那是 2005 年
-// 的观感。真正拉开档次的是**间接光有颜色**：天空把冷蓝洒在背光面，地面把暖黄
-// 反到人物下巴上。这里用 PMREMGenerator 把这张程序化天空烘成环境贴图，
-// scene.environment 一挂，所有 MeshStandardMaterial 立刻吃到。
+// 间接光不再从这张会随关卡重烘的环境贴图来：默认基线由 Script_Light 的通用
+// Global SH Probe + AmbientColor 提供；玩家打开实时 GI 时，探针体负责位置相关
+// 的反弹光。这样默认不再有 PMREM/IBL 的重烘与各向同性补光。
 //
 // 天空本身是解析式的（不是 Preetham 原版，是一套可控的美术化模型）：
 // 天顶色 -> 地平线色的梯度 + 太阳盘 + 前向散射辉光 + 高空烟层 + 战场烟尘带。
@@ -142,7 +141,9 @@ export const SKY_PRESETS = {
   //
   // 实测（Probe_StreetSmokyDay，主街净宽 5.2 m、檐口 4.6 m）：
   // 把 lightIntensity 从 3.1 一路抬到 30，街上墙面只从 sRGB 88.5 动到 89.8 ——
-  // **平行光一点都没照进街里**，全场亮度都来自 scene.environment 那张天空 IBL。
+  // **平行光一点都没照进街里**；旧版整场亮度都来自 scene.environment 的天空 IBL，
+  // 现在则由默认 Global SH Probe 托底。两者都没有位置概念，所以这条街仍必须让
+  // 太阳越过峡谷线，才能形成真正的明暗分离。
   // IBL 从各个方向来的值差不多，于是每一面墙、地、瓦都是同一个亮度、同一个色相：
   // 这就是「整体偏单色土黄、没有暖主光 + 冷阴影分离」的**唯一根因**，
   // 不是调色不够，也不是饱和度不对。
@@ -165,7 +166,7 @@ export const SKY_PRESETS = {
     // 12° 让檐口以上那一米真的亮起来，仍是日落前 40 分钟的样子。
     sunElevation: 12.0, sunAzimuth: 262,
     zenith: [0.42, 0.62, 1.15], horizon: [4.20, 2.30, 1.05], ground: [0.46, 0.38, 0.30],
-    sunColor: [1.0, 0.54, 0.26], sunIntensity: 90, sunSize: 0.0042, glow: 3.2, glowSpread: 18,
+    sunColor: [1.0, 0.54, 0.26], sunIntensity: 90, sunSize: 0.000012, glow: 3.2, glowSpread: 18,
     smoke: 0.50, smokeColor: [1.55, 1.05, 0.70], smokeHeight: 0.17, stars: 0.0,
     lightColor: 0xffb072, lightIntensity: 8.8,
     // 街底唯一的光源是天空，所以半球光的「天」端要真的冷、真的够亮 ——
@@ -188,7 +189,7 @@ export const SKY_PRESETS = {
     // 2.40 让它掉回天顶 1.90—2.35 的同一量级，梯度才读得出来；同时给一个冷偏
     // （B > R），白天的天才有色相可分离，而不是一条橙棕线上的一块白板。
     zenith: [1.90, 2.35, 3.20], horizon: [2.40, 2.46, 2.62], ground: [0.58, 0.52, 0.42],
-    sunColor: [1.0, 0.92, 0.78], sunIntensity: 120, sunSize: 0.0030, glow: 1.35, glowSpread: 12,
+    sunColor: [1.0, 0.92, 0.78], sunIntensity: 120, sunSize: 0.000012, glow: 1.35, glowSpread: 12,
     smoke: 0.72, smokeColor: [1.35, 1.33, 1.30], smokeHeight: 0.11, stars: 0.0,
     // 天地比：实测天 sRGB 234 / 地 136 只有 3.4:1 的线性亮度比，屋脊和人的轮廓
     // 从天上剥不出来。ER2 那种照片感是 6—8:1。修法必须是**降 lightIntensity**
@@ -220,7 +221,7 @@ export const SKY_PRESETS = {
   overcast: {
     sunElevation: 42, sunAzimuth: 200,
     zenith: [1.55, 1.68, 1.95], horizon: [2.30, 2.32, 2.34], ground: [0.50, 0.46, 0.40],
-    sunColor: [1.0, 0.98, 0.94], sunIntensity: 6, sunSize: 0.020, glow: 0.6, glowSpread: 4,
+    sunColor: [1.0, 0.98, 0.94], sunIntensity: 6, sunSize: 0.000018, glow: 0.6, glowSpread: 4,
     smoke: 0.62, smokeColor: [2.05, 2.02, 1.96], smokeHeight: 0.42, stars: 0.0,
     lightColor: 0xf0f2f5, lightIntensity: 1.6,
     hemiSky: 0xb6bcc4, hemiGround: 0x585048, hemiIntensity: 1.6,
@@ -238,7 +239,7 @@ export const SKY_PRESETS = {
     // 光顺着街打下来，视线被自然引向街的深处（评分表 D7）。
     sunElevation: 45, sunAzimuth: 226,
     zenith: [0.78, 0.92, 1.35], horizon: [2.05, 1.50, 1.05], ground: [0.50, 0.40, 0.30],
-    sunColor: [1.0, 0.70, 0.38], sunIntensity: 88, sunSize: 0.0034, glow: 2.4, glowSpread: 13,
+    sunColor: [1.0, 0.70, 0.38], sunIntensity: 88, sunSize: 0.000012, glow: 2.4, glowSpread: 13,
     smoke: 0.88, smokeColor: [1.85, 1.35, 1.00], smokeHeight: 0.13, stars: 0.0,
     lightColor: 0xffbb80, lightIntensity: 7.6,
     hemiSky: 0x7f97cf, hemiGround: 0x63472e, hemiIntensity: 1.55,
@@ -253,7 +254,7 @@ export const SKY_PRESETS = {
   night: {
     sunElevation: 34, sunAzimuth: 96,
     zenith: [0.020, 0.030, 0.062], horizon: [0.075, 0.086, 0.125], ground: [0.026, 0.026, 0.032],
-    sunColor: [0.52, 0.62, 0.92], sunIntensity: 2.4, sunSize: 0.010, glow: 0.22, glowSpread: 7,
+    sunColor: [0.52, 0.62, 0.92], sunIntensity: 2.4, sunSize: 0.000012, glow: 0.22, glowSpread: 7,
     smoke: 0.55, smokeColor: [0.085, 0.095, 0.130], smokeHeight: 0.26, stars: 0.55,
     lightColor: 0x9fb4e8, lightIntensity: 0.42,
     hemiSky: 0x2b3a5c, hemiGround: 0x171310, hemiIntensity: 0.30,
@@ -271,7 +272,7 @@ export const SKY_PRESETS = {
     // 街底留在冷影里 —— 上暖下冷的分层是这一档形体的全部来源。
     sunElevation: 11.0, sunAzimuth: 88,
     zenith: [0.50, 0.72, 1.30], horizon: [2.30, 1.55, 1.00], ground: [0.48, 0.40, 0.32],
-    sunColor: [1.0, 0.64, 0.36], sunIntensity: 105, sunSize: 0.0044, glow: 3.6, glowSpread: 15,
+    sunColor: [1.0, 0.64, 0.36], sunIntensity: 105, sunSize: 0.000012, glow: 3.6, glowSpread: 15,
     smoke: 0.58, smokeColor: [1.80, 1.25, 0.90], smokeHeight: 0.10, stars: 0.04,
     lightColor: 0xffc890, lightIntensity: 8.2,
     hemiSky: 0x7d9ad4, hemiGround: 0x50402f, hemiIntensity: 1.55,
@@ -338,9 +339,6 @@ export class SkyDome {
     // 真正生效的是这一行：PostPipeline 的预通道会把标了它的对象整个藏掉。
     this.mesh.userData.skipNormalDepth = true;
 
-    this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
-    if (this.pmrem) this.pmrem.compileEquirectangularShader();
-    this.envTarget = null;
     this.presetName = null;
     this.preset = null;
     this.sunDirection = new THREE.Vector3(0, 1, 0);
@@ -371,23 +369,16 @@ export class SkyDome {
   }
 
   /**
-   * 把当前天空烘成环境贴图挂到场景上。
-   * 贵（约 10—20ms），只在换关/换时段时调，**不许每帧调**。
+   * 清掉旧的 PMREM 环境贴图。
+   *
+   * 保留这个小入口是为了让关卡切换始终显式宣告「天空只负责可见背景」，而不是
+   * 又把它悄悄接回材质 IBL。默认间接光见 Script_Light 的 Global SH Probe。
    */
-  BakeEnvironment(scene) {
-    if (!this.pmrem) return null;
-    const skyScene = new THREE.Scene();
-    const dome = new THREE.Mesh(this.mesh.geometry, this.material);
-    dome.frustumCulled = false;
-    skyScene.add(dome);
-    if (this.envTarget) this.envTarget.dispose();
-    this.envTarget = this.pmrem.fromScene(skyScene, 0.04);
-    skyScene.remove(dome);
+  ClearEnvironment(scene) {
     if (scene) {
-      scene.environment = this.envTarget.texture;
-      scene.environmentIntensity = this.preset?.envIntensity ?? 1;
+      scene.environment = null;
+      scene.environmentIntensity = 1;
     }
-    return this.envTarget.texture;
   }
 
   Update(elapsedSeconds) {
@@ -397,7 +388,5 @@ export class SkyDome {
   Dispose() {
     this.material.dispose();
     this.mesh.geometry.dispose();
-    if (this.envTarget) this.envTarget.dispose();
-    if (this.pmrem) this.pmrem.dispose();
   }
 }

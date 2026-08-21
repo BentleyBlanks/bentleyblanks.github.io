@@ -131,19 +131,19 @@ export class GraphicsSettings {
     Note(perf, "开关阴影要重编译一次全场材质（几百毫秒的卡顿），因为它是编译期的 "
       + "#define。只改标志位不重编译的话，画面会留着一层永不更新的假阴影。", true);
 
-    const giBox = Section(body, "全局光照（探针体）");
+    const giBox = Section(body, "全局光照（实时探针体）");
     const giRow = document.createElement("div");
     giRow.className = "edBtns";
     giBox.appendChild(giRow);
-    Toggle(giRow, "探针体 GI", gfx.gi !== false, (on) => { gfx.gi = on; this.Apply(); });
+    Toggle(giRow, "探针体 GI（默认关）", gfx.gi === true, (on) => { gfx.gi = on; this.Apply(); });
     Slider(giBox, {
       label: "间接光强度", min: 0, max: 2, step: 0.05, value: gfx.giStrength ?? 1,
       format: (v) => `×${v.toFixed(2)}`,
       onInput: (v) => { gfx.giStrength = v; this.Apply(); },
     });
-    Note(giBox, "半实时辐照度探针：一帧只重算十几个探针，走一步或换时段要一两秒才收敛回来"
-      + "（这是设计如此，不是卡）。关掉之后间接光退回一张各向同性的天空 IBL —— "
-      + "屋里屋外一个亮度，那正是它要解决的问题。low 画质档不建探针体，这一栏对它无效。", true);
+    Note(giBox, "默认使用下载的通用 Global SH Probe + 冷灰蓝 AmbientColor：没有实时 GI pass，"
+      + "但仍保留有方向的室外补光。打开后才启用半实时辐照度探针；它一帧重算十几个探针，"
+      + "走一步或换时段要一两秒收敛。low 画质档不建探针体，这一栏对它无效。", true);
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
@@ -206,7 +206,7 @@ export class GraphicsSettings {
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
-    gfx.gi = true; gfx.giStrength = 1;
+    gfx.gi = false; gfx.giStrength = 1;
     this.Apply();
     if (this.panel) {
       this.panel.body.innerHTML = "";
