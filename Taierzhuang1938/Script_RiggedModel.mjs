@@ -329,6 +329,11 @@ export class SegmentedCharacterSkin {
         // 整个人会只剩一块落在地上的网格。旧版散架的根因是离线阶段按 XYZ
         // 猜分段与包围盒猜枢轴，本版已经改成源蒙皮权重 + 源 rest bone。
         target.attach(mesh);
+        // Classic moustaches are a deterministic 1-in-3 Japanese-soldier
+        // variant. The seed is stable across reloads, so this stays visual.
+        if (mesh.name.startsWith("Segment_neck_Moustache")) {
+          mesh.visible = actor.kind.startsWith("ija") && (HashString(actor.seed) % 3 === 0);
+        }
         mesh.traverse((part) => {
           // These compatibility segments are ordinary rigid Meshes, not the
           // source SkinnedMesh that motivated the prepass exclusion. Let them

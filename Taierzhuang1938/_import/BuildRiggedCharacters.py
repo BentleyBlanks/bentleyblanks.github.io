@@ -498,6 +498,22 @@ def BuildSegmentHelmet(height=1.62):
     star.data.materials.append(star_material)
 
 
+def BuildSegmentMoustache(height=1.62):
+    """Create optional upper-lip lobes that follow the existing neck joint."""
+    pivot = OldRigPivots(height)["neck"]
+    material = MakeFlatMaterial("Material_IjaMoustache", (0.050, 0.032, 0.020), 0.95)
+    for side, suffix in ((-1, "L"), (1, "R")):
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=6)
+        lobe = bpy.context.object
+        lobe.name = f"Segment_neck_Moustache{suffix}"
+        lobe.scale = (0.026 * height, 0.006 * height, 0.008 * height)
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        lobe.data.transform(Matrix.Translation(Vector((side * 0.020 * height, 0.118 * height,
+                                                       0.902 * height)) - pivot))
+        lobe.location = pivot
+        lobe.data.materials.append(material)
+
+
 def BuildSoldier():
     ClearScene()
     bpy.ops.import_scene.fbx(filepath=str(SOURCE / "Model_LowpolyWw2Soldier.fbx"))
@@ -519,6 +535,7 @@ def BuildSoldier():
     body.data.materials.append(material)
     BuildRigidSegments(body, armature, 1.62, SEGMENT_BY_BONE, IJA_PIVOT_BONES)
     BuildSegmentHelmet()
+    BuildSegmentMoustache()
     AddSoldierActions(armature)
     armature.data.pose_position = "POSE"
     ExportGlb(MODEL / "Model_IjaSoldier.glb")

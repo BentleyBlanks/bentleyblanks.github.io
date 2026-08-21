@@ -87,6 +87,8 @@ AssertHumanHead(soldier, "IJA soldier", 1.62);
 const helmet = SegmentBounds(soldier, "Segment_neck_HelmetBrim");
 assert.ok(helmet.max[0] - helmet.min[0] <= 1.62 * 0.19,
   `IJA helmet is too wide: ${(helmet.max[0] - helmet.min[0]).toFixed(3)} m`);
+for (const moustache of ["Segment_neck_MoustacheL", "Segment_neck_MoustacheR"])
+  assert.ok(soldierNames.has(moustache), `IJA optional moustache ${moustache}`);
 
 console.log(`ok   FPS arms: ${arms.skins.length} skin, ${armNames.size} nodes, ${arms.animations.length} animation`);
 console.log(`ok   IJA soldier: ${soldier.skins.length} skin, ${soldierNames.size} nodes, ${soldier.animations.length} animations`);
