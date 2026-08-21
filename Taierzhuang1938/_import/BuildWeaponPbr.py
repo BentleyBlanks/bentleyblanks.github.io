@@ -62,6 +62,20 @@ def build_if_source(stem: str, **params) -> None:
         build(stem, **params)
 
 
+def export_standalone_metallic_roughness(stem: str) -> None:
+    """Export inspector-friendly PBR channels while runtime keeps compact ORM."""
+    packed = TEXTURE / f"Texture_{stem}Orm.webp"
+    if not packed.is_file():
+        return
+    orm = np.asarray(Image.open(packed).convert("RGB"))
+    Image.fromarray(orm[:, :, 1], "L").save(
+        TEXTURE / f"Texture_{stem}Roughness.webp", "WEBP", quality=92, method=6
+    )
+    Image.fromarray(orm[:, :, 2], "L").save(
+        TEXTURE / f"Texture_{stem}Metallic.webp", "WEBP", quality=92, method=6
+    )
+
+
 if __name__ == "__main__":
     TEXTURE.mkdir(parents=True, exist_ok=True)
     build_if_source("WeaponSteelV2", source_stem="WeaponSteelV2", normal_strength=2.9,
@@ -73,3 +87,13 @@ if __name__ == "__main__":
     build_if_source("TreeBark", normal_strength=4.0, metalness=0, rough_min=176, rough_max=238)
     build_if_source("BrickWall", normal_strength=3.6, metalness=0, rough_min=158, rough_max=224)
     build_if_source("Ground", normal_strength=2.8, metalness=0, rough_min=178, rough_max=244)
+    build_if_source("RoofTile", normal_strength=3.0, metalness=0, rough_min=126, rough_max=208)
+    build_if_source("Sandbag", normal_strength=1.8, metalness=0, rough_min=208, rough_max=255)
+    build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
+    build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
+    build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
+    for stem in (
+        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag",
+        "BrickWallSooty", "Adobe", "Stone",
+    ):
+        export_standalone_metallic_roughness(stem)

@@ -420,6 +420,31 @@ async function Boot() {
         normal: "./Texture/Texture_GroundNormal.webp?v=1",
         orm: "./Texture/Texture_GroundOrm.webp?v=1",
       }),
+      library.LoadExternalSet("RoofTile", {
+        albedo: "./Texture/Texture_RoofTileBase.webp?v=1",
+        normal: "./Texture/Texture_RoofTileNormal.webp?v=1",
+        orm: "./Texture/Texture_RoofTileOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("Sandbag", {
+        albedo: "./Texture/Texture_SandbagBase.webp?v=1",
+        normal: "./Texture/Texture_SandbagNormal.webp?v=1",
+        orm: "./Texture/Texture_SandbagOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("BrickWallSooty", {
+        albedo: "./Texture/Texture_BrickWallSootyBase.webp?v=1",
+        normal: "./Texture/Texture_BrickWallSootyNormal.webp?v=1",
+        orm: "./Texture/Texture_BrickWallSootyOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("Adobe", {
+        albedo: "./Texture/Texture_AdobeBase.webp?v=1",
+        normal: "./Texture/Texture_AdobeNormal.webp?v=1",
+        orm: "./Texture/Texture_AdobeOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("Stone", {
+        albedo: "./Texture/Texture_StoneBase.webp?v=1",
+        normal: "./Texture/Texture_StoneNormal.webp?v=1",
+        orm: "./Texture/Texture_StoneOrm.webp?v=1",
+      }),
     ]);
     await Promise.all([
       library.LoadExternalAlbedo("CarriageWallSteel", "Steel", "./Texture/Texture_CarriageRivetedSteelBase.png?v=1"),
