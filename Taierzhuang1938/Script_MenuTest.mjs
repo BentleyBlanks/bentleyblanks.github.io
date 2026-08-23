@@ -41,6 +41,18 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 
+// index.html 直接承载启动标题和按钮；一旦被工具误存成 GBK，浏览器会按
+// <meta charset="utf-8"> 解码成乱码，残缺的闭合标签还会把后面的主菜单吞进
+// 启动层。先在启动浏览器前锁死文件编码，避免只测到脚本数据仍然正确。
+let indexText = "";
+try {
+  indexText = new TextDecoder("utf-8", { fatal: true })
+    .decode(fs.readFileSync(path.join(projectDir, "index.html")));
+  Check("入口 HTML 是有效 UTF-8", !indexText.includes("\uFFFD"));
+} catch (error) {
+  Check("入口 HTML 是有效 UTF-8", false, String(error));
+}
+
 const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small${query}`;
 
 async function Boot(query = "") {
@@ -67,8 +79,29 @@ await Boot();
       ija: T.ai.soldiers.filter((s) => s.side === "ija").length,
       rootOff: document.getElementById("menu").classList.contains("off"),
       items: [...document.querySelectorAll("#menu .mnItem")].map((e) => e.textContent.trim()),
+      documentTitle: document.title,
+      bootTitle: document.getElementById("bootTitle")?.textContent.trim(),
+      bootSubtitle: document.getElementById("bootSub")?.textContent.trim(),
+      bootStart: document.getElementById("bootStart")?.textContent.trim(),
+      bootHierarchy: document.getElementById("bootTitle")?.parentElement?.id,
+      menuTitle: document.querySelector("#menu .mnTitleMain")?.textContent.trim(),
+      menuSubtitle: document.querySelector("#menu .mnTitleSub")?.textContent.trim(),
+      menuLines: [...document.querySelectorAll("#menu .mnTitleLine")].map((e) => e.textContent.trim()),
     };
   });
+  Check("启动界面标题、日期与按钮文字正确",
+    m.documentTitle === "滕县 一九三八"
+      && m.bootTitle === "滕县 一九三八"
+      && m.bootSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
+      && m.bootStart === "进 城"
+      && m.bootHierarchy === "bootHead",
+    `${m.documentTitle} / ${m.bootTitle} / ${m.bootSubtitle} / ${m.bootStart}`);
+  Check("主菜单标题与战役说明文字正确",
+    m.menuTitle === "滕县 一九三八"
+      && m.menuSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
+      && m.menuLines.length === 3
+      && m.menuLines.every((line) => line.length > 0 && !line.includes("\uFFFD")),
+    `${m.menuTitle} / ${m.menuSubtitle} / ${m.menuLines.join(" | ")}`);
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);
   Check("菜单五项都在（含调试选项）", m.items.length === 5 && m.items.includes("调试选项"), m.items.join(" / "));
@@ -200,7 +233,7 @@ for (let i = 0; i < 3; i += 1) {
   }));
   await page.waitForTimeout(1200);
   const b = await page.evaluate(() => window.Taierzhuang.cutscene?.time || 0);
-  Check("「开始」播关前过场", a.playing && a.id === "CS_Chuchuan", `id=${a.id} playing=${a.playing}`);
+  Check("「开始」播关前过场", a.playing && a.id === "CS_ChuchuanLegacy", `id=${a.id} playing=${a.playing}`);
   Check("过场真的在往前走（不是卡在第一帧）", b > a.t + 0.5, `t ${a.t.toFixed(2)} -> ${b.toFixed(2)} s`);
 
   // Esc 跳过，别在冒烟里干等三十八秒
@@ -416,7 +449,8 @@ for (let i = 0; i < 3; i += 1) {
   });
   Check("有进度时第一项是「继续」", m.first.startsWith("继续"), m.first);
   Check("打过的两关标「已通过」，下一关标「下一关」",
-    m.marks[0] === "已通过" && m.marks[1] === "已通过" && m.marks[2] === "下一关",
+    m.marks[0] === "预览" && m.marks[1] === "已通过"
+      && m.marks[2] === "已通过" && m.marks[3] === "下一关",
     m.marks.join("|"));
   Check("选章默认落在下一关上", m.selected === 2, `selected=${m.selected}`);
   await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
