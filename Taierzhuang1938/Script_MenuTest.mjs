@@ -104,7 +104,9 @@ await Boot();
     `${m.menuTitle} / ${m.menuSubtitle} / ${m.menuLines.join(" | ")}`);
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);
-  Check("菜单五项都在（含调试选项）", m.items.length === 5 && m.items.includes("调试选项"), m.items.join(" / "));
+  Check("菜单六项都在（含设置与调试选项）",
+    m.items.length === 6 && m.items.includes("调试选项") && m.items.includes("设置"),
+    m.items.join(" / "));
   Check("菜单里 HUD 与手里的枪都藏起来了", m.hudHidden && !m.viewmodel,
     `hud=${m.hudHidden} viewmodel=${m.viewmodel}`);
   // 菜单里摆的是几个守军，**一个日军都不许有** ——

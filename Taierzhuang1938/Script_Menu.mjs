@@ -292,6 +292,7 @@ export class MainMenu {
       { id: "levels", label: MENU.chapters, hint: "七关任选一关直接进（不播过场）" },
       { id: "codex", label: MENU.codex, hint: "哪些数是史料、哪些是推定" },
       { id: "credits", label: MENU.credits, hint: "史料口径与虚构人物的交代" },
+      { id: "settings", label: "设置", hint: "操作、画面与声音" },
       { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
     ];
   }
