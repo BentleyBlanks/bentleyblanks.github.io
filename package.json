@@ -16,6 +16,8 @@
     "bake:taierzhuang1938:sfx": "node Taierzhuang1938/Script_SfxBake.mjs",
     "bake:taierzhuang1938:amb": "node Taierzhuang1938/Script_AmbBake.mjs",
     "bake:taierzhuang1938:music": "node Taierzhuang1938/Script_MusicBake.mjs",
+    "test:taierzhuang1938": "node Taierzhuang1938/Script_TestRunner.mjs --tier=0",
+    "test:taierzhuang1938:t2": "node Taierzhuang1938/Script_TestRunner.mjs --tier=2",
     "test:taierzhuang1938:audio": "node Taierzhuang1938/Script_AudioTest.mjs",
     "test:taierzhuang1938:actorbatch": "node Taierzhuang1938/Script_ActorBatchTest.mjs",
     "test:taierzhuang1938:physics": "node Taierzhuang1938/Script_PhysicsTest.mjs",
