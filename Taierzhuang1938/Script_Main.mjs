@@ -918,15 +918,18 @@ async function Boot() {
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
       state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
-      // 场景编辑器也能从主菜单的「设置」进来。菜单仍接管相机/画面时，
-      // 地图切片即使已重建，编辑器也拿不到 Update，画面就会停在菜单那一片。
-      // 场景工具一打开便收起菜单，保留「编辑器暂停玩法」的语义。
-      PrepareSceneEditing: () => {
+      // 所有真正的编辑器都从菜单交接出来：主菜单本身有运镜，暂停菜单有
+      // 「继续 / 设置 / 调试选项」；两者都不该和编辑器叠在同一张画面上。
+      // 同时保留原菜单层，完整退出编辑器后再回去，而不是意外恢复战斗。
+      PrepareEditor: () => {
         // 暂停菜单不会把 state.menu 设为 true（它表示的是“主菜单活场景”），
         // 但 menu.open 仍然为 true。只看 state.menu 会漏掉“暂停 → 设置 →
-        // 场景/地形”这条路径，让暂停标题和按钮继续盖在编辑器后面。
-        editorReturnMenuMode = menu && menu.open ? menu.mode : null;
-        if (menu && menu.open) CloseMenu();
+        // 构件库 / 摄影棚”等路径，让暂停标题和按钮继续盖在编辑器后面。
+        // 编辑器内切换工具时菜单已经关闭，不能清掉第一次记录的返回层。
+        if (menu && menu.open) {
+          editorReturnMenuMode = menu.mode;
+          CloseMenu();
+        }
         ReleasePointerLock();
       },
       FinishEditorSession: () => FinishEditorSession(),
@@ -2007,7 +2010,7 @@ function CloseMenu() {
   if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
 }
 
-/** 场景编辑器从菜单进来时，完整关闭编辑器后回到原来的菜单层。 */
+/** 编辑器从菜单进来时，完整关闭后回到原来的菜单层。 */
 function FinishEditorSession() {
   const mode = editorReturnMenuMode;
   editorReturnMenuMode = null;

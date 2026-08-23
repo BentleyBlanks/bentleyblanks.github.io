@@ -268,6 +268,11 @@ export class EditorSuite {
     if (!Editor) return null;
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
     if (this.active) this.Close({ switching: true });
+    // 设置可以留在暂停菜单上调；真正的编辑器必须接管整张画面。
+    // 以前只有 SceneEditor 自己做这一步，构件库等摄影棚工具就会把
+    // 「继续 / 设置 / 调试选项」留在背后，既像 UI 叠层又容易误以为
+    // 还在游戏流程里。把交接放在所有 EDITORS 的公共入口，不能漏工具。
+    if (EDITORS.includes(Editor)) this.host.game.PrepareEditor?.();
     this.panelOpen = true;
     this.launcher.style.display = "flex";
     this.host.ReleasePointerLock();

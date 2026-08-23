@@ -404,37 +404,38 @@ for (let i = 0; i < 3; i += 1) {
   Check("设置里按 Esc 回到暂停菜单",
     !settingsClosed.editor.panelOpen && settingsClosed.menu.open && settingsClosed.menu.mode === "pause");
 
-  // 实际复现玩家路径：暂停 → 设置 → 场景/地形。场景编辑器接管后，暂停
-  // 菜单必须整层隐藏；关闭工具后再回到原暂停层，不能顺手恢复战斗。
+  // 实际复现玩家路径：暂停 → 设置 → 构件库预览。过去只有场景/地形工具会
+  // 收起暂停菜单，摄影棚类编辑器会把「继续 / 设置 / 调试选项」叠在背景里。
+  // 所有编辑器接管后都必须整层隐藏菜单；关闭工具后再回原暂停层，不能恢复战斗。
   await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuAct("settings");
-    window.Taierzhuang.Debug.OpenEditor("scene");
+    window.Taierzhuang.Debug.OpenEditor("props");
   });
   await page.evaluate(() => window.Taierzhuang.StepFrames(4));
-  const sceneEditorOpen = await page.evaluate(() => ({
+  const propEditorOpen = await page.evaluate(() => ({
     editor: window.Taierzhuang.Debug.Editor(),
     menu: window.Taierzhuang.Debug.Menu(),
     menuDisplay: getComputedStyle(document.getElementById("menu")).display,
     running: window.Taierzhuang.state.running,
   }));
-  Check("场景编辑器打开时暂停菜单整层隐藏",
-    sceneEditorOpen.editor.active === "scene" && !sceneEditorOpen.menu.open
-      && sceneEditorOpen.menuDisplay === "none" && !sceneEditorOpen.running,
-    JSON.stringify(sceneEditorOpen));
-  await page.screenshot({ path: path.join(outDir, "Menu_SceneEditorFromPause.png") });
+  Check("构件库编辑器打开时暂停菜单整层隐藏",
+    propEditorOpen.editor.active === "props" && !propEditorOpen.menu.open
+      && propEditorOpen.menuDisplay === "none" && !propEditorOpen.running,
+    JSON.stringify(propEditorOpen));
+  await page.screenshot({ path: path.join(outDir, "Menu_PropEditorFromPause.png") });
 
   await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
-  const sceneEditorClosed = await page.evaluate(() => ({
+  const propEditorClosed = await page.evaluate(() => ({
     editor: window.Taierzhuang.Debug.Editor(),
     menu: window.Taierzhuang.Debug.Menu(),
     menuDisplay: getComputedStyle(document.getElementById("menu")).display,
     running: window.Taierzhuang.state.running,
   }));
-  Check("关闭场景编辑器后恢复原暂停菜单",
-    !sceneEditorClosed.editor.capturing && sceneEditorClosed.menu.open
-      && sceneEditorClosed.menu.mode === "pause" && sceneEditorClosed.menuDisplay !== "none"
-      && !sceneEditorClosed.running,
-    JSON.stringify(sceneEditorClosed));
+  Check("关闭构件库编辑器后恢复原暂停菜单",
+    !propEditorClosed.editor.capturing && propEditorClosed.menu.open
+      && propEditorClosed.menu.mode === "pause" && propEditorClosed.menuDisplay !== "none"
+      && !propEditorClosed.running,
+    JSON.stringify(propEditorClosed));
 
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
   const resumed = await page.evaluate(() => ({
