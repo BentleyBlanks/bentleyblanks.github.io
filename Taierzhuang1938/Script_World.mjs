@@ -159,18 +159,19 @@ export function AddWall(sink, material, {
     sink.Add(material, PlaceGeometry(
       MakeBox(sliceW * 1.03, h, thickness, tile, `${seed}:${i}`, grid),
       { x: x + Math.cos(ry) * lx, y: h / 2, z: z - Math.sin(ry) * lx, ry }));
+    // 破损墙头必须让压顶跟着每一段落下。此前连续一整根瓦压顶悬在
+    // 被炮火削低的墙段上方，在方形炮楼院里读成了一条凭空飘着的长条。
+    if (cope && ruin < 0.35) {
+      sink.Add("RoofTile", PlaceGeometry(
+        MakeBox(sliceW * 1.05, 0.09, thickness + 0.16, TILE_METERS.roof, `${seed}:cp${i}`),
+        { x: x + Math.cos(ry) * lx, y: h + 0.045, z: z - Math.sin(ry) * lx, ry }));
+    }
   }
   // 碱脚：旧砖墙下面那两三皮总是深色的条石/糙砖，缺了这一笔墙就"浮"着
   if (plinth) {
     sink.Add(plinth, PlaceGeometry(
       MakeBox(length + 0.06, 0.42, thickness + 0.07, TILE_METERS.stone, `${seed}:pl`),
       { x, y: 0.21, z, ry }));
-  }
-  // 墙帽：院墙顶上压一列小瓦，没有的话墙头像被刀切过
-  if (cope && ruin < 0.35) {
-    sink.Add("RoofTile", PlaceGeometry(
-      MakeBox(length, 0.09, thickness + 0.16, TILE_METERS.roof, `${seed}:cp`),
-      { x, y: height + 0.045, z, ry }));
   }
   if (solid) {
     sink.Solid(x, height / 2, z, length / 2, height / 2, thickness / 2, "wall", ry);
@@ -184,6 +185,7 @@ export function AddWall(sink, material, {
  */
 export function AddHardMountainRoof(sink, {
   x, z, width, depth, eaveY, ridgeY, ry = 0, seed = "r", ruined = false, burnt = false,
+  rafters = true,
 }) {
   const rise = ridgeY - eaveY;
   const halfDepth = depth / 2;
@@ -204,12 +206,14 @@ export function AddHardMountainRoof(sink, {
         ry, rx: -s * angle,
       }));
       // 檐口下的椽子：一排小方料，逆光时是一条整齐的锯齿阴影
-      const rafters = Math.max(4, Math.round(width / 0.42));
-      for (let i = 0; i < rafters; i += 1) {
-        const lx = -width / 2 + (i + 0.5) * (width / rafters);
-        const ez = s * (halfDepth + overhang * 0.5);
+      const rafterCount = Math.max(4, Math.round(width / 0.42));
+      const rafterLen = overhang * 1.1;
+      for (let i = 0; rafters && i < rafterCount; i += 1) {
+        const lx = -width / 2 + (i + 0.5) * (width / rafterCount);
+        // 椽头压在瓦檐下，不再越过屋面轮廓刺到墙外。
+        const ez = s * (halfDepth + 0.02);
         sink.Add("WoodBeam", PlaceGeometry(
-          MakeBox(0.07, 0.09, overhang * 1.5, TILE_METERS.wood, `${seed}:rf${s}${i}`),
+          MakeBox(0.07, 0.09, rafterLen, TILE_METERS.wood, `${seed}:rf${s}${i}`),
           {
             x: x + Math.cos(ry) * lx - Math.sin(ry) * ez,
             y: eaveY - 0.06,
@@ -367,7 +371,7 @@ export function AddCompound(sink, spec) {
 export function AddRoomBlock(sink, spec) {
   const {
     x, z, ry, width, depth, eaveY, ridgeY, seed, damage = 0, burnt = false,
-    facing = 1, bays = 3,
+    facing = 1, bays = 3, roofRafters = true,
   } = spec;
   const rnd = Mulberry32(HashString(`${seed}:rb`));
   const wallMat = burnt ? "BrickWallSooty" : "BrickWall";
@@ -478,7 +482,7 @@ export function AddRoomBlock(sink, spec) {
 
   AddHardMountainRoof(sink, {
     x, z, width, depth, eaveY, ridgeY, ry, seed: `${seed}:roof`,
-    ruined: collapsed, burnt,
+    ruined: collapsed, burnt, rafters: roofRafters,
   });
 
   // 塌了的房子脚下有一堆瓦砾，没有的话看起来像被橡皮擦掉的
@@ -745,18 +749,18 @@ export function AddMosque(sink, { x, z, ry = 0, seed = "mq", damage = 0.4 }) {
   const [hx, hz] = L(0, -D / 2 + 7.5);
   AddRoomBlock(sink, {
     x: hx, z: hz, ry, width: 18, depth: 11, eaveY: 3.4, ridgeY: 6.1,
-    seed: `${seed}:hall`, damage: damage * 0.7, facing: 1, bays: 5,
+    seed: `${seed}:hall`, damage: damage * 0.7, facing: 1, bays: 5, roofRafters: false,
   });
   // 讲堂（西）与配房（东）
   const [jx, jz] = L(-W / 2 + 4.2, 2.0);
   AddRoomBlock(sink, {
     x: jx, z: jz, ry: ry + Math.PI / 2, width: 10, depth: 5.6,
-    eaveY: 2.7, ridgeY: 4.4, seed: `${seed}:jiang`, damage: damage * 0.9, facing: 1, bays: 3,
+    eaveY: 2.7, ridgeY: 4.4, seed: `${seed}:jiang`, damage: damage * 0.9, facing: 1, bays: 3, roofRafters: false,
   });
   const [ex, ez] = L(W / 2 - 4.2, 2.0);
   AddRoomBlock(sink, {
     x: ex, z: ez, ry: ry - Math.PI / 2, width: 10, depth: 5.0,
-    eaveY: 2.6, ridgeY: 4.2, seed: `${seed}:pei`, damage: damage * 0.8, facing: 1, bays: 3,
+    eaveY: 2.6, ridgeY: 4.2, seed: `${seed}:pei`, damage: damage * 0.8, facing: 1, bays: 3, roofRafters: false,
   });
 
   // 院里的老树与石阶
@@ -2500,7 +2504,7 @@ export function AddPaifang(sink, {
       const p = L(lx, s * 0.42);
       sink.Add("TubeTile", PlaceGeometry(
         MakeBox(w, 0.12, 1.15, TILE_METERS.roof, `${seed}:rf${lx}${s}`),
-        { x: p.x, y, z: p.z, ry, rx: -s * 0.5 }));
+        { x: p.x, y, z: p.z, ry, rx: s * 0.5 }));
     }
   }
   // 阁门楼式的（善国门）：柱间加一道券洞墙
@@ -2554,7 +2558,7 @@ export function AddAlarmTower(sink, { x, z, ry = 0, height = 9, seed = "alarm", 
       MakeBox(side * 1.5, 0.12, side * 0.72, TILE_METERS.roof, `${seed}:rf${k}`),
       {
         x: x + Math.sin(a) * side * 0.3, y: height + 0.55,
-        z: z + Math.cos(a) * side * 0.3, ry: ry + a, rx: -0.6,
+        z: z + Math.cos(a) * side * 0.3, ry: ry + a, rx: 0.6,
       }));
   }
   // 枪眼：这种高的砖楼在巷战里一定被守军用上
@@ -2654,7 +2658,7 @@ export function AddChurch(sink, {
     }
   });
   AddHardMountainRoof(sink, {
-    x, z, width: w, depth: d, eaveY: eave, ridgeY: ridge, ry, seed: `${seed}:roof`,
+    x, z, width: w, depth: d, eaveY: eave, ridgeY: ridge, ry, seed: `${seed}:roof`, rafters: false,
   });
 
   // 钟塔：山面一座方塔 + 四坡锥顶

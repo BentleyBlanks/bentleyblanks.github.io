@@ -35,7 +35,7 @@ import {
   AddAlarmTower, AddSquareFort, AddChurch, AddMosque, AddSandbagPlug,
 } from "./Script_World.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
-import { MakeBox, MakeInstanced, TILE_METERS } from "./Script_Geo.mjs";
+import { MakeBox, MakeSandbag, MakeInstanced, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
@@ -1210,7 +1210,7 @@ export function FlushSinkProps(sink, target, library, owned) {
   }
   sink.props.length = 0;
   if (matrices.length) {
-    const geometry = MakeBox(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag");
+    const geometry = MakeSandbag(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag");
     const mesh = MakeInstanced(geometry, ResolveTengxianMaterial("Sandbag", library), matrices);
     mesh.name = "PlacedSandbags";
     target.add(mesh);

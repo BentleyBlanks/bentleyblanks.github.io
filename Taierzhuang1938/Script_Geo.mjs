@@ -57,6 +57,67 @@ export function MakeBox(w, h, d, unitsPerTile = 1.2, seed = "box", grid = null) 
 }
 
 /**
+ * 一只装满土的麻布沙袋。
+ *
+ * 沙袋不是砖：中段被填料撑鼓、两端被扎绳勒细。保留原来的外接尺寸，
+ * 所以既有的摆放矩阵和碰撞盒无需改动；只替换实例化时的可见轮廓。
+ */
+export function MakeSandbag(w = 0.62, h = 0.24, d = 0.34, unitsPerTile = TILE_METERS.sandbag, seed = "sandbag") {
+  const profile = [
+    [-0.50, 0.16], [-0.44, 0.58], [-0.32, 0.88], [-0.16, 1.0],
+    [0.0, 1.0], [0.16, 1.0], [0.32, 0.88], [0.44, 0.58], [0.50, 0.16],
+  ];
+  const around = 10;
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const rnd = Mulberry32(HashString(seed));
+  const uOffset = rnd() * 3;
+  const vOffset = rnd() * 3;
+  for (let r = 0; r < profile.length; r += 1) {
+    const [along, fullness] = profile[r];
+    for (let a = 0; a <= around; a += 1) {
+      const theta = (a / around) * Math.PI * 2;
+      positions.push(
+        along * w,
+        Math.sin(theta) * h * 0.5 * fullness,
+        Math.cos(theta) * d * 0.5 * fullness,
+      );
+      uvs.push(
+        uOffset + (r / (profile.length - 1)) * (w / unitsPerTile),
+        vOffset + (a / around) * ((Math.PI * (h + d) * 0.5) / unitsPerTile),
+      );
+    }
+  }
+  const ring = around + 1;
+  for (let r = 0; r < profile.length - 1; r += 1) {
+    for (let a = 0; a < around; a += 1) {
+      const i = r * ring + a;
+      indices.push(i, i + ring, i + 1, i + 1, i + ring, i + ring + 1);
+    }
+  }
+  // 两端封口藏在扎绳处，避免斜看时露出黑洞。
+  const leftCap = positions.length / 3;
+  positions.push(-w * 0.5, 0, 0);
+  uvs.push(uOffset, vOffset + 0.5);
+  const rightCap = positions.length / 3;
+  positions.push(w * 0.5, 0, 0);
+  uvs.push(uOffset + w / unitsPerTile, vOffset + 0.5);
+  const rightRing = (profile.length - 1) * ring;
+  for (let a = 0; a < around; a += 1) {
+    indices.push(leftCap, a + 1, a);
+    indices.push(rightCap, rightRing + a, rightRing + a + 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/**
  * 砖墙贴图自己的格子：一格贴图 10 列 × 20 行砖（见 Script_TexBake 的 rowsPerTile）。
  * 只给砖墙用 —— 夯土、瓦、木头没有整齐的格，吸附反而会把它们的随机性吃掉。
  */

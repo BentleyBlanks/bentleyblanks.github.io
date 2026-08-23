@@ -7,7 +7,7 @@ import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
-import { MakeBox, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
+import { MakeBox, MakeSandbag, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { ProbeVolume, MakeGiUniforms, MakeProbeDebugMesh } from "./Script_Gi.mjs";
 
@@ -196,7 +196,7 @@ function BuildStreetScene() {
   }
 
   // 沙包工事
-  const bagGeometry = MakeBox(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag");
+  const bagGeometry = MakeSandbag(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag");
   const bags = [];
   const dummy = new THREE.Object3D();
   for (let row = 0; row < 4; row += 1) {

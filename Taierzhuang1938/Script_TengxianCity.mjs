@@ -47,7 +47,7 @@ import {
   AddCypress, AddPoplar, AddOrchardTree,
 } from "./Script_World.mjs";
 import {
-  MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
+  MakeBox, MakeSandbag, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
   MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import {
@@ -2168,7 +2168,7 @@ export class TengxianCity {
       sink.props.length = 0;
     }
     if (bagMatrices.length) {
-      const mesh = MakeInstanced(MakeBox(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag"),
+      const mesh = MakeInstanced(MakeSandbag(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag"),
         ResolveTengxianMaterial("Sandbag", this.library), bagMatrices);
       mesh.name = "SandbagPlugs";
       this.scene.add(mesh);
