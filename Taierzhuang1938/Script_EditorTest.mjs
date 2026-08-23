@@ -125,6 +125,33 @@ Check("面板开着时玩法暂停",
   && paused.before.x === paused.after.x && paused.before.z === paused.after.z,
   `开火 ${paused.before.fire}→${paused.after.fire}`);
 
+// 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
+// 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
+await page.click('[data-editor="scene"]');
+await Step(4);
+const sliderFound = await page.locator('.edPanel.work input[type="range"]').count();
+if (sliderFound) await page.click('.edPanel.work input[type="range"]');
+await page.keyboard.down("w");
+const sliderKeyboard = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const slider = document.querySelector('.edPanel.work input[type="range"]');
+  if (!slider) return { found: false };
+  return {
+    found: true,
+    focused: document.activeElement === slider,
+    heldAfterDown: T.editor.flycam.keys.has("KeyW"),
+  };
+});
+await page.keyboard.up("w");
+sliderKeyboard.released = await page.evaluate(() => !window.Taierzhuang.editor.flycam.keys.has("KeyW"));
+Check("调过滑杆后 WASD 仍控制编辑器飞行",
+  sliderKeyboard.found && sliderKeyboard.focused && sliderKeyboard.heldAfterDown && sliderKeyboard.released,
+  sliderKeyboard.found
+    ? `焦点=${sliderKeyboard.focused} 按下=${sliderKeyboard.heldAfterDown} 松开=${sliderKeyboard.released}`
+    : "未找到滑杆");
+await page.evaluate(() => window.Taierzhuang.editor.Close());
+await Step(3);
+
 // ---------------------------------------------------------------------------
 // 1b) 暂停要连**声音**一起停
 //

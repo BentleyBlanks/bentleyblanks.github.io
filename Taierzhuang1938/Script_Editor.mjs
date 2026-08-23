@@ -336,9 +336,12 @@ export class EditorSuite {
     };
 
     this._onKeyDown = (event) => {
-      // 输入框里打字不许被当成快捷键（TextArea 自己也 stopPropagation 了，这是双保险）
+      // 文本控件里打字不许被当成快捷键（TextArea 自己也 stopPropagation 了，
+      // 这是双保险）。range 例外：滑杆点过以后会一直拿着焦点；若连它也
+      // 一概拦住，场景编辑器的 WASD+QE 飞行就会在调过任一滑杆后失效。
       const tag = event.target && event.target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const isRange = tag === "INPUT" && event.target.type === "range";
+      if (!isRange && (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT")) return;
       if (event.code === "Backquote") { this.TogglePanel(); event.preventDefault(); return; }
       if (event.code === "Escape" && this.Capturing) {
         // 过场正在播的时候 Esc 归过场（跳过），别顺手把编辑器也关了
