@@ -167,8 +167,20 @@ export function VillageRoofLayout(width, depth, eaveY, pitch = 0.47, overhang = 
       rotationX: side * pitch,
       width: width + overhang * 2,
       depth: slopeLength,
+      // These are the two local endpoints of the *actual rotated slab*.
+      // Keeping them with the layout makes it impossible for callers/tests to
+      // confuse a pretty scalar ridgeY with a visually inverted V-shaped roof.
+      localRidgeZ: -side * slopeLength / 2,
+      localEaveZ: side * slopeLength / 2,
+      slabRidgeY: ridgeY,
+      slabEaveY: outerY,
     })),
   };
+}
+
+/** Height of a rotated roof slab at one of its local-Z coordinates. */
+export function VillageRoofSlabY(half, localZ) {
+  return half.centerY - Math.sin(half.rotationX) * localZ;
 }
 
 /**
@@ -1552,6 +1564,56 @@ export class TengxianOutfield {
     this.stats.villageDetails += 15;
   }
 
+  /**
+   * Roof courses and a small chimney break the toy-block silhouette from the
+   * aerial camera.  They follow the same rotated slabs as the roof itself,
+   * so their high end is always the ridge and never the eave.
+   */
+  AddVillageRoofCraft(sink, { x, z, ry, width, depth, roof, seed, wallMaterial, far, level }) {
+    const courseCount = far ? 2 : 4;
+    for (const half of roof.halves) {
+      for (let index = 1; index <= courseCount; index += 1) {
+        const progress = index / (courseCount + 1);
+        const slabZ = half.localRidgeZ + (half.localEaveZ - half.localRidgeZ) * progress;
+        const localZ = half.localZ + slabZ * Math.cos(half.rotationX);
+        const point = this.VillagePoint(x, z, ry, 0, localZ);
+        sink.Add("RoofTile", PlaceGeometry(
+          MakeBox(width + 0.76, 0.05, far ? 0.075 : 0.11, TILE_METERS.roof,
+            `${seed}:course${half.side}:${index}`),
+          { x: point.x, y: VillageRoofSlabY(half, slabZ) + 0.105, z: point.z,
+            ry, rx: half.rotationX }));
+      }
+      if (!far) {
+        const eavePoint = this.VillagePoint(x, z, ry, 0,
+          half.side * (depth / 2 + 0.39));
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBox(width + 0.76, 0.12, 0.14, TILE_METERS.wood,
+            `${seed}:eave${half.side}`),
+          { x: eavePoint.x, y: roof.outerY + 0.08, z: eavePoint.z, ry }));
+      }
+    }
+
+    // Chimneys are deliberately sparse: a few raised clay flues make the
+    // settlement inhabited, while every roof having one would look modern and
+    // mechanically repeated.  Collapsed houses have no standing flue.
+    if (far || level >= 3 || HashString(`${seed}:chimney`) % 3 !== 0) return;
+    const side = HashString(`${seed}:chimneySide`) % 2 ? -1 : 1;
+    const localX = (HashString(`${seed}:chimneyX`) % 11 - 5) * 0.12;
+    const localZ = side * depth * 0.2;
+    const point = this.VillagePoint(x, z, ry, localX, localZ);
+    const roofY = roof.ridgeY - Math.abs(localZ) * (roof.ridgeY - roof.outerY)
+      / (depth / 2 + 0.45);
+    const brickTile = wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick;
+    sink.Add(wallMaterial, PlaceGeometry(
+      MakeBox(0.48, 0.78, 0.48, brickTile, `${seed}:chimney`,
+        wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
+      { x: point.x, y: roofY + 0.39, z: point.z, ry }));
+    sink.Add("RoofTile", PlaceGeometry(
+      MakeBox(0.62, 0.10, 0.62, TILE_METERS.roof, `${seed}:chimneyCap`),
+      { x: point.x, y: roofY + 0.82, z: point.z, ry }));
+    this.stats.villageDetails += 1;
+  }
+
   /** 两坡硬山顶 + 两端山墙。屋脊永远沿局部 X，不再靠调用处猜宽/深。
    *  传 ruin 时按损毁档位动顶：二档在豁口上方那片坡掀掉一块露出断椽，
    *  三档整顶塌光只留一端山尖；返回值带 collapsed 与逐坡碰撞盒。 */
@@ -1607,21 +1669,15 @@ export class TengxianOutfield {
             hx: half.width / 2, hy: roofRise / 2 + 0.11,
             hz: (depth / 2 + 0.45) / 2,
           });
-          if (!far) {
-            const eavePoint = this.VillagePoint(x, z, ry, 0,
-              half.side * (depth / 2 + 0.38));
-            sink.Add("WoodBeam", PlaceGeometry(
-              MakeBox(width + 0.72, 0.11, 0.12, TILE_METERS.wood,
-                `${seed}:eave${half.side}`),
-              { x: eavePoint.x, y: roof.outerY + 0.08, z: eavePoint.z, ry }));
-            this.stats.villageDetails += 1;
-          }
         }
       }
       sink.Add("RoofTile", PlaceGeometry(
         MakeBox(roof.ridgeLength, far ? 0.22 : 0.28, far ? 0.26 : 0.34,
           TILE_METERS.roof, `${seed}:ridge`),
         { x, y: roof.ridgeY + 0.08, z, ry }));
+      this.AddVillageRoofCraft(sink, {
+        x, z, ry, width, depth, roof, seed, wallMaterial, far, level,
+      });
     }
 
     // 硬山两端高出坡面的三角山墙。原版村屋没有这两片，远看更像欧洲悬山屋。

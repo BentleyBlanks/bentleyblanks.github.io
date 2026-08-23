@@ -149,6 +149,9 @@ try {
       side: half.side,
       rotationX: half.rotationX,
       localZ: half.localZ,
+      ridgeY: outfieldModule.VillageRoofSlabY(half, half.localRidgeZ),
+      eaveY: outfieldModule.VillageRoofSlabY(half, half.localEaveZ),
+      ridgeLocalZ: half.localZ + half.localRidgeZ * Math.cos(half.rotationX),
     }));
     return {
       level: T.Debug.Level().id,
@@ -214,8 +217,13 @@ try {
   Check("硬山顶从正脊向前后檐下降且坡向相反",
     result.roofRidgeY > result.roofOuterY
       && result.roofSlopeDirections.length === 2
-      && result.roofSlopeDirections.every((half) => half.side * half.rotationX > 0
-        && half.side * half.localZ > 0),
+      // Measure the transformed slab endpoints, rather than only trusting
+      // sign conventions.  This is the regression that catches a visually
+      // inverted (centre-low) roof after a transform/order refactor.
+      && result.roofSlopeDirections.every((half) => half.ridgeY > half.eaveY
+        && Math.abs(half.ridgeY - result.roofRidgeY) < 0.02
+        && Math.abs(half.eaveY - result.roofOuterY) < 0.02
+        && Math.abs(half.ridgeLocalZ) < 0.02),
     `脊 ${result.roofRidgeY.toFixed(2)} m，檐 ${result.roofOuterY.toFixed(2)} m`);
   for (const lane of result.laneChecks) {
     console.log(`    ${lane.id.padEnd(22)} 肩高=${lane.shoulders.map((v) => v.toFixed(2)).join("/")} m  命中=${lane.lowHits.join("/")}`);
