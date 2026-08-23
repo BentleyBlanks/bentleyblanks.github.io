@@ -12,7 +12,7 @@
 //      而这四条必须真的走得上去（台儿庄那次的教训是马道做成了一块斜板 +
 //      一个实心大盒子，画面上是坡、碰撞上是墙，谁也上不去）。
 //
-//   ② **z=0 上不得有任何遮挡**：西城门楼 →西门里街 →十字街口 是一条通视直线走廊。
+//   ② **SIGHT_CORRIDOR 上不得有任何遮挡**：西城门楼 →西门里街 →十字街口 是一条通视直线走廊。
 //      「日兵占领西城门楼后，即集中火力向城中心十字街口扫射」——
 //      这条视线是全城崩溃的机制原因，也是王铭章殉国那一段的空间前提。
 //      CheckSightCorridor() 每次生成完都要跑一遍，挡住了就是事故。
@@ -846,10 +846,29 @@ export class TengxianCity {
   StreetZones() {
     if (this.streetZones) return this.streetZones;
     const zones = STREETS.map((s) => ({
-      axis: s.axis, at: s.at, half: s.width / 2 + 1.2, from: s.from, to: s.to,
+      axis: s.axis, at: s.at, half: s.width / 2 + 1.2,
+      from: Math.min(s.from, s.to), to: Math.max(s.from, s.to),
     }));
     this.streetZones = zones;
     return zones;
+  }
+
+  /** 十字街并不必然在世界原点：位置与尺度都只认 Data_Tengxian。 */
+  CrossroadRect(pad = 0) {
+    const half = CROSSROAD.size / 2 + pad;
+    return {
+      minX: CROSSROAD.x - half, maxX: CROSSROAD.x + half,
+      minZ: CROSSROAD.z - half, maxZ: CROSSROAD.z + half,
+    };
+  }
+
+  /** 街道是有限线段；给街坊规划用的矩形还包含两侧退让，不能把短街误切成贯城空带。 */
+  StreetRects() {
+    return this.StreetZones().map((street) => (street.axis === "x" ? {
+      minX: street.from, maxX: street.to, minZ: street.at - street.half, maxZ: street.at + street.half,
+    } : {
+      minX: street.at - street.half, maxX: street.at + street.half, minZ: street.from, maxZ: street.to,
+    }));
   }
 
   /**
@@ -864,7 +883,8 @@ export class TengxianCity {
         if (Math.abs(z - s.at) < s.half + hz && x + hx >= s.from - 1 && x - hx <= s.to + 1) return true;
       } else if (Math.abs(x - s.at) < s.half + hx && z + hz >= s.from - 1 && z - hz <= s.to + 1) return true;
     }
-    if (Math.abs(x) < CROSSROAD.size / 2 + hx && Math.abs(z) < CROSSROAD.size / 2 + hz) return true;
+    const cross = this.CrossroadRect();
+    if (x + hx > cross.minX && x - hx < cross.maxX && z + hz > cross.minZ && z - hz < cross.maxZ) return true;
     return false;
   }
 
@@ -888,7 +908,7 @@ export class TengxianCity {
     // 十字街口：全城的中心地标，王铭章亲临这里指挥
     this.sink.Add("DirtRoad", PlaceGeometry(
       MakeBox(CROSSROAD.size, 0.14, CROSSROAD.size, TILE_METERS.ground, "crossroad"),
-      { x: 0, y: CITY.platformY + 0.06, z: 0 }));
+      { x: CROSSROAD.x, y: CITY.platformY + 0.06, z: CROSSROAD.z }));
     // 十字街口四角的铺面不在这里单独摆：它就是贴着街口的那一格院子，
     // 由 PlanBlocks 打上 shop 标记、BuildBlock 按临街铺面的样子盖（见那里的注释）。
     void rnd;
@@ -906,7 +926,8 @@ export class TengxianCity {
       let index = 0;
       for (let along = from; along <= to; along += 26) {
         const jittered = along + (rnd() - 0.5) * 7;
-        if (Math.abs(jittered) < CROSSROAD.size / 2 + 14) continue;
+        const crossAlong = street.axis === "x" ? CROSSROAD.x : CROSSROAD.z;
+        if (Math.abs(jittered - crossAlong) < CROSSROAD.size / 2 + 14) continue;
         const side = index % 2 === 0 ? -1 : 1;
         // 西门楼到十字街不只是“路心能走”，而是史实上必须保留完整的机枪通视带；
         // 这一条街的家什退到 ±4.5 m 净宽之外，其他街仍贴路肩摆放。
@@ -944,49 +965,47 @@ export class TengxianCity {
    */
   PlanBlocks(rnd) {
     const inner = CITY.wallCenter - CITY.wallBaseWidth / 2 - CITY.innerRingWidth;   // 286
-    // 先把街网切出来的「大街坊」找出来，再在每个街坊里按 27×23 的节奏分院子。
-    // 直接铺一张全城的格子是不行的：格子与街的位置对不上，靠街那一排院子
-    // 总会有一半压在街上被剔掉，街两侧就永远是缺牙的。
-    const bandsX = SplitBands(-inner, inner, this.StreetZones().filter((s) => s.axis === "z"));
-    const bandsZ = SplitBands(-inner, inner, this.StreetZones().filter((s) => s.axis === "x"));
+    // 以稳定的小院基准格覆盖全城，再只裁掉真正与其相交的**有限街段**。
+    // 不能先把每一条短街无限延长来切 bands：新街网里东门联络街、文庙街都只有
+    // 一段，延长后会在整座城留下几十米宽的假空场。
     const cells = [];
-    const lane = 2.0;
-    for (let bi = 0; bi < bandsX.length; bi += 1) {
-      const bx = bandsX[bi];
-      const nx = Math.max(1, Math.round((bx[1] - bx[0]) / 27));
-      const cw = (bx[1] - bx[0]) / nx - lane;
-      if (cw < 8) continue;
-      for (let bj = 0; bj < bandsZ.length; bj += 1) {
-        const bz = bandsZ[bj];
-        const nz = Math.max(1, Math.round((bz[1] - bz[0]) / 23));
-        const cd = (bz[1] - bz[0]) / nz - lane;
-        if (cd < 8) continue;
-        for (let i = 0; i < nx; i += 1) {
-          for (let j = 0; j < nz; j += 1) {
-            const x = bx[0] + ((bx[1] - bx[0]) * (i + 0.5)) / nx;
-            const z = bz[0] + ((bz[1] - bz[0]) * (j + 0.5)) / nz;
-            if (!this.InBounds(x, z, 20)) continue;
-            if (this.HitsRamp(x, z, cw / 2, cd / 2)) continue;
-            const cell = { x0: x - cw / 2, x1: x + cw / 2, z0: z - cd / 2, z1: z + cd / 2 };
-            let alive = true;
-            for (const b of this.BlockerRects()) {
-              if (!ClipCell(cell, b)) { alive = false; break; }
-            }
-            if (!alive) continue;
-            const cx = (cell.x0 + cell.x1) / 2, cz = (cell.z0 + cell.z1) / 2;
-            // 贴着十字街口的那一圈 = 志载「十字街口四角有铺面」。
-            // 不另摆四座铺子，而是把这一格盖成临街铺面 —— 另摆的话它会把
-            // 同一格院子裁到活不下去，街口四周反而空一大片（实测踩过这个坑）。
-            const half = CROSSROAD.size / 2;
-            const shop = Math.abs(cx) < half + 26 && Math.abs(cz) < half + 26
-              && (Math.abs(cell.x0) < half + 3 || Math.abs(cell.x1) < half + 3
-                || Math.abs(cell.z0) < half + 3 || Math.abs(cell.z1) < half + 3);
-            cells.push({
-              x: cx, z: cz, w: cell.x1 - cell.x0, d: cell.z1 - cell.z0,
-              seed: `blk${bi}_${bj}_${i}_${j}`, shop,
-            });
-          }
+    // 东关资料给出的 1.5—2.5 m 巷宽也是本城民巷唯一有明确范围的尺度；
+    // 城内不再另造一个看似精确的“2 m”常数。
+    const lane = (EAST_SUBURB.lane.min + EAST_SUBURB.lane.max) / 2;
+    const nx = Math.max(1, Math.round((inner * 2) / 27));
+    const nz = Math.max(1, Math.round((inner * 2) / 23));
+    const cw = (inner * 2) / nx - lane;
+    const cd = (inner * 2) / nz - lane;
+    const streetRects = this.StreetRects();
+    for (let i = 0; i < nx; i += 1) {
+      for (let j = 0; j < nz; j += 1) {
+        const x = -inner + (inner * 2 * (i + 0.5)) / nx;
+        const z = -inner + (inner * 2 * (j + 0.5)) / nz;
+        if (!this.InBounds(x, z, 20)) continue;
+        if (this.HitsRamp(x, z, cw / 2, cd / 2)) continue;
+        const cell = { x0: x - cw / 2, x1: x + cw / 2, z0: z - cd / 2, z1: z + cd / 2 };
+        let alive = true;
+        for (const street of streetRects) {
+          if (!ClipCell(cell, street, 0)) { alive = false; break; }
         }
+        if (!alive) continue;
+        for (const b of this.BlockerRects()) {
+          if (!ClipCell(cell, b)) { alive = false; break; }
+        }
+        if (!alive) continue;
+        const cx = (cell.x0 + cell.x1) / 2, cz = (cell.z0 + cell.z1) / 2;
+        // 贴着十字街口的那一圈 = 志载「十字街口四角有铺面」。
+        // 不另摆四座铺子，而是把这一格盖成临街铺面 —— 另摆的话它会把
+        // 同一格院子裁到活不下去，街口四周反而空一大片（实测踩过这个坑）。
+        const cross = this.CrossroadRect();
+        const shop = cx > cross.minX - 26 && cx < cross.maxX + 26
+          && cz > cross.minZ - 26 && cz < cross.maxZ + 26
+          && (cell.x0 < cross.minX + 3 || cell.x1 > cross.maxX - 3
+            || cell.z0 < cross.minZ + 3 || cell.z1 > cross.maxZ - 3);
+        cells.push({
+          x: cx, z: cz, w: cell.x1 - cell.x0, d: cell.z1 - cell.z0,
+          seed: `blk${i}_${j}`, shop,
+        });
       }
     }
     return cells;
@@ -995,10 +1014,7 @@ export class TengxianCity {
   /** 院子不许占的矩形：十字街口、四角铺面、各处地标。 */
   BlockerRects() {
     if (this.blockerRects) return this.blockerRects;
-    const list = [{
-      minX: -CROSSROAD.size / 2, maxX: CROSSROAD.size / 2,
-      minZ: -CROSSROAD.size / 2, maxZ: CROSSROAD.size / 2,
-    }];
+    const list = [this.CrossroadRect()];
     for (const l of LANDMARKS) {
       const lw = (l.w || l.span || 12) / 2 + 3, ld = (l.d || l.span || 12) / 2 + 3;
       list.push({ minX: l.x - lw, maxX: l.x + lw, minZ: l.z - ld, maxZ: l.z + ld });
@@ -1033,6 +1049,15 @@ export class TengxianCity {
    *   mid     简化院落：一圈墙 + 一座正房 + 屋顶，仍带枪眼（枪眼是滕县的符号，不许省）
    *   far     体块剪影：一个盒子 + 一片坡顶，不投阴影
    */
+  DamageProfile(value) {
+    // 这是生成时的静态战损解释，不是把整城接进实时破坏：
+    // 完整 = 连续屋面/院墙；受损 = 局部缺墙、残瓦；崩溃 = 无连续屋面且焦黑。
+    // 三档阈值与构件开关集中在这里，避免每一种建筑各自悄悄解释 damage。
+    if (value < 0.32) return { state: "intact", damage: Math.min(value, 0.24), burnt: false };
+    if (value < 0.67) return { state: "damaged", damage: Math.max(0.38, value), burnt: false };
+    return { state: "collapsed", damage: Math.max(0.78, value), burnt: true };
+  }
+
   BuildBlock(cell, rnd) {
     this.sink.SetSector(SectorKey(cell.x, cell.z));
     this.farSink.SetSector(SectorKey(cell.x, cell.z));
@@ -1040,8 +1065,10 @@ export class TengxianCity {
     // 破坏梯度：东半城与东南角打得最烂（日军自东面攻，十七日下午城内起火）
     const eastness = Clamp01((cell.x + 300) / 600);
     const seedRnd = Mulberry32(HashString(cell.seed));
-    const damage = Clamp(0.10 + Math.pow(eastness, 1.6) * 0.55 + (seedRnd() - 0.5) * 0.25, 0, 0.92);
-    const burnt = seedRnd() < 0.12 + eastness * 0.3;
+    const rawDamage = Clamp(0.10 + Math.pow(eastness, 1.6) * 0.55 + (seedRnd() - 0.5) * 0.25, 0, 0.92);
+    const profile = this.DamageProfile(rawDamage);
+    const damage = profile.damage;
+    const burnt = profile.burnt || (profile.state === "damaged" && seedRnd() < 0.12 + eastness * 0.3);
 
     if (cell.shop) {
       // 铺面：临街一长条房，不是内向的四合院 —— 商业街的立面是连着的铺板门
@@ -1223,41 +1250,99 @@ export class TengxianCity {
    * 城防图上的功能院落。这里不把图上的番号当成永久驻防，而是把“师部—县署—
    * 警察所—学校—特务营”等可辨认的空间块做成稳定的建筑节点，供各战斗阶段复用。
    */
+  FeatureOrientation(f) {
+    if (f.ry != null) return f.ry;
+    // 图上的各块并非同向的四合院：下列只表达入口/长边面对哪条街，
+    // 占地、坐标仍完全使用 Data_Tengxian 的 feature 值。
+    const directions = {
+      NorthCompound727: Math.PI, NorthWestCourtyard: Math.PI / 2,
+      PoliceStation: Math.PI / 2, CommerceGuild: Math.PI,
+      CountyPrison: -Math.PI / 2, CentralCompound124: 0, CentralCompound127: Math.PI,
+      WestSpecialCompound: Math.PI / 2, EastDistrictOffice: -Math.PI / 2,
+      SouthWestOffice: Math.PI, WenzhongSchool: Math.PI / 2,
+      FireGodTemple: 0, SouthEastSpecialCompound: Math.PI,
+      SouthWestBlock: 0, SouthEastBlock: Math.PI,
+    };
+    return directions[f.id] ?? 0;
+  }
+
+  FeaturePoint(f, ry, lx, lz) {
+    const cos = Math.cos(ry), sin = Math.sin(ry);
+    return { x: f.x + cos * lx - sin * lz, z: f.z - sin * lx - cos * lz };
+  }
+
+  AddFeatureRoom(f, ry, lx, lz, width, depth, spec) {
+    const p = this.FeaturePoint(f, ry, lx, lz);
+    // 功能建筑的附属翼不准占到铺好的街面；遇到资料位置正贴街，保留外院，
+    // 只省去会侵街的翼房，绝不把街面扩成空广场。
+    if (this.OnStreet(p.x, p.z, width / 2, depth / 2)) return;
+    AddRoomBlock(this.sink, {
+      x: p.x, z: p.z, ry, width, depth,
+      eaveY: spec.eaveY, ridgeY: spec.ridgeY,
+      seed: spec.seed, damage: spec.damage, burnt: spec.burnt,
+      facing: spec.facing, bays: spec.bays,
+    });
+  }
+
   BuildMapFeatures(rnd) {
     for (const f of CITY_FEATURES) {
       if (!this.InBounds(f.x, f.z, Math.max(f.w, f.d) / 2 + 18)) continue;
-      const damage = f.damage ?? 0.22;
+      const profile = this.DamageProfile(f.damage ?? 0.22);
+      const damage = profile.damage;
+      const burnt = profile.burnt;
+      const ry = this.FeatureOrientation(f);
       this.sink.SetSector(SectorKey(f.x, f.z));
       if (f.kind === "compound") {
         AddCompound(this.sink, {
-          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
-          seed: `map:${f.id}`, damage, burnt: damage > 0.62,
+          x: f.x, z: f.z, ry, width: f.w, depth: f.d,
+          seed: `map:${f.id}`, damage, burnt,
         });
+        // 师部/营部读作“院墙里的办公、库房、厢房层级”，而不是放大版民居。
+        if (/CentralCompound|NorthCompound|DistrictOffice|Office/.test(f.id)) {
+          this.AddFeatureRoom(f, ry, 0, 0, f.w * 0.42, f.d * 0.18, {
+            eaveY: 3.2, ridgeY: 5.0, seed: `map:${f.id}:office`, damage, burnt, facing: -1, bays: 5,
+          });
+        }
+        if (/Compound727|SpecialCompound|NorthWestCourtyard/.test(f.id)) {
+          for (const side of [-1, 1]) {
+            this.AddFeatureRoom(f, ry, side * f.w * 0.27, 0, f.d * 0.34, f.w * 0.14, {
+              eaveY: 2.7, ridgeY: 4.1, seed: `map:${f.id}:store${side}`,
+              damage, burnt, facing: side, bays: 3,
+            });
+          }
+        }
       } else if (f.kind === "roomBlock") {
         AddRoomBlock(this.sink, {
-          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
+          x: f.x, z: f.z, ry, width: f.w, depth: f.d,
           eaveY: 3.0, ridgeY: 4.8, seed: `map:${f.id}`,
-          damage, facing: 1, bays: Math.max(2, Math.round(f.w / 10)),
+          damage, burnt, facing: 1, bays: Math.max(2, Math.round(f.w / 10)),
+        });
+        // 警署、商会、监所各自有一条较矮的后翼，正面则保留连续街墙。
+        this.AddFeatureRoom(f, ry, 0, -f.d * 0.27, f.w * 0.48, f.d * 0.18, {
+          eaveY: 2.6, ridgeY: 3.9, seed: `map:${f.id}:rearWing`, damage, burnt, facing: -1, bays: 3,
         });
       } else if (f.kind === "school") {
         AddCompound(this.sink, {
-          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
-          seed: `map:${f.id}:yard`, damage, burnt: damage > 0.62,
+          x: f.x, z: f.z, ry, width: f.w, depth: f.d,
+          seed: `map:${f.id}:yard`, damage, burnt,
         });
-        AddRoomBlock(this.sink, {
-          x: f.x, z: f.z - f.d * 0.16, ry: 0, width: f.w * 0.66, depth: f.d * 0.38,
-          eaveY: 3.2, ridgeY: 5.0, seed: `map:${f.id}:hall`,
-          damage, facing: 1, bays: 5,
+        // 学校是长教室 + 两翼围出的操场，不套用普通院落的一正两厢。
+        this.AddFeatureRoom(f, ry, 0, -f.d * 0.16, f.w * 0.72, f.d * 0.24, {
+          eaveY: 3.2, ridgeY: 5.0, seed: `map:${f.id}:classroom`, damage, burnt, facing: 1, bays: 5,
         });
+        for (const side of [-1, 1]) {
+          this.AddFeatureRoom(f, ry, side * f.w * 0.30, f.d * 0.12, f.d * 0.34, f.w * 0.12, {
+            eaveY: 2.6, ridgeY: 3.9, seed: `map:${f.id}:wing${side}`, damage, burnt, facing: side, bays: 3,
+          });
+        }
       } else if (f.kind === "temple") {
         AddCompound(this.sink, {
-          x: f.x, z: f.z, ry: 0, width: f.w, depth: f.d,
-          seed: `map:${f.id}:yard`, damage, burnt: damage > 0.62,
+          x: f.x, z: f.z, ry, width: f.w, depth: f.d,
+          seed: `map:${f.id}:yard`, damage, burnt,
         });
-        AddRoomBlock(this.sink, {
-          x: f.x, z: f.z - f.d * 0.18, ry: 0, width: f.w * 0.58, depth: f.d * 0.42,
-          eaveY: 3.6, ridgeY: 5.8, seed: `map:${f.id}:hall`,
-          damage, facing: 1, bays: 3,
+        // 庙宇主殿抬高一档；前庭留空，和学校/营部一眼可分。
+        this.AddFeatureRoom(f, ry, 0, -f.d * 0.18, f.w * 0.58, f.d * 0.42, {
+          eaveY: 3.6, ridgeY: 5.8, seed: `map:${f.id}:hall`, damage, burnt, facing: 1, bays: 3,
         });
       }
       this.sink.SetSector("");
@@ -1300,59 +1385,95 @@ export class TengxianCity {
   BuildEastSuburb(rnd) {
     const b = EAST_SUBURB.bounds;
     const startX = Math.max(b.minX, MOAT.outerEdge + GATE_BULGE + 6);
-    const pitchX = 20, pitchZ = 18;
-    const nx = Math.floor((b.maxX - 4 - startX) / pitchX);
-    const nz = Math.floor((b.maxZ - b.minZ) / pitchZ);
-    for (let i = 0; i < nx; i += 1) {
-      for (let j = 0; j < nz; j += 1) {
-        const x = startX + pitchX * (i + 0.5);
-        const z = b.minZ + pitchZ * (j + 0.5);
-        if (!this.InBounds(x, z, 16)) continue;
-        // 东关大街：一条穿关而过的东西向街，正对东城门
-        if (Math.abs(z - (b.roadZ ?? 0)) < 5.5) continue;
-        // 寺院地阵地那一块留给寺庙
-        const t = EAST_SUBURB.temple;
-        if (Math.abs(x - t.x) < t.w / 2 + 8 && Math.abs(z - t.z) < t.d / 2 + 8) continue;
-        const cell = { x, z, w: pitchX - 2.0, d: pitchZ - 1.8, seed: `east${i}_${j}` };
-        this.sink.SetSector(SectorKey(x, z));
-        this.farSink.SetSector(SectorKey(x, z));
-        const dist = this.FocusDistance(x, z);
-        const dmg = Clamp(0.3 + (1 - (x - startX) / (b.maxX - startX)) * 0.35
-          + (Mulberry32(HashString(cell.seed))() - 0.5) * 0.24, 0, 0.95);
-        // 东关的地坪在濠外，标高 0 附近
-        const saveY = CITY.platformY;
-        if (dist < this.detailRadius) {
-          const built = AddCompound(this.sink, {
-            x, z, ry: 0, width: cell.w, depth: cell.d, seed: cell.seed,
-            damage: dmg, burnt: dmg > 0.6,
-          });
-          this.stats.householdProps += built?.householdProps || 0;
-          this.AddSuburbLoopholes(cell, dmg);
-          this.stats.compoundsDetail += 1;
-        } else if (dist < this.midRadius) {
-          this.AddSimpleCompoundAt(this.sink, cell, dmg, dmg > 0.6, 0);
-          this.AddSuburbLoopholes(cell, dmg);
-          this.stats.compoundsMid += 1;
-        } else {
-          this.AddSilhouetteAt(cell, dmg, dmg > 0.6, 0);
-          this.stats.silhouettes += 1;
+    const lane = EAST_SUBURB.lane;
+    const eastGateStreet = STREETS.find((street) => street.id === "EastGateStreet");
+    const mainRoadWidth = eastGateStreet.width;
+    // 三条南北巷由东门大街接入。它们没有车辙，只有压实土和枪眼相对的墙：
+    // 是穿院、转移和逐屋争夺的“可读路径”，不是把整片东关切成棋盘。
+    const laneFractions = [0.27, 0.56, 0.81];
+    const sideLanes = laneFractions.map((fraction, index) => ({
+      axis: "z", at: startX + (b.maxX - startX) * fraction,
+      half: [lane.min, (lane.min + lane.max) / 2, lane.max][index] / 2,
+      from: b.minZ, to: b.maxZ,
+    }));
+    const bandsX = SplitBands(startX, b.maxX, sideLanes);
+    const mainRoad = { axis: "x", at: b.roadZ, half: mainRoadWidth / 2, from: startX, to: b.maxX };
+    const bandsZ = SplitBands(b.minZ, b.maxZ, [mainRoad]);
+    // 数量只决定把资料边界里的地块切几份；所有实际间隙宽度均来自 EAST_SUBURB.lane。
+    const targetColumnSpan = (b.maxX - startX) / 10;
+    const targetRowSpan = (b.maxZ - b.minZ) / 24;
+    for (let bi = 0; bi < bandsX.length; bi += 1) {
+      const bx = bandsX[bi];
+      const nx = Math.max(1, Math.round((bx[1] - bx[0]) / targetColumnSpan));
+      for (let bj = 0; bj < bandsZ.length; bj += 1) {
+        const bz = bandsZ[bj];
+        const nz = Math.max(1, Math.round((bz[1] - bz[0]) / targetRowSpan));
+        for (let i = 0; i < nx; i += 1) {
+          for (let j = 0; j < nz; j += 1) {
+            const seed = `east${bi}_${bj}_${i}_${j}`;
+            const cellRnd = Mulberry32(HashString(seed));
+            const gapX = lane.min + (lane.max - lane.min) * cellRnd();
+            const gapZ = lane.min + (lane.max - lane.min) * cellRnd();
+            const x = bx[0] + ((bx[1] - bx[0]) * (i + 0.5)) / nx;
+            const z = bz[0] + ((bz[1] - bz[0]) * (j + 0.5)) / nz;
+            const w = (bx[1] - bx[0]) / nx - gapX;
+            const d = (bz[1] - bz[0]) / nz - gapZ;
+            if (w < lane.max * 3 || d < lane.max * 3) continue;
+            if (!this.InBounds(x, z, 16)) continue;
+            // 寺院地阵地那一块留给寺庙
+            const t = EAST_SUBURB.temple;
+            if (Math.abs(x - t.x) < t.w / 2 + 8 && Math.abs(z - t.z) < t.d / 2 + 8) continue;
+            // 各 LOD 共用轴对齐院墙与枪眼；不只转 detail，避免中远景切换时枪眼漂浮。
+            const cell = { x, z, w, d, seed };
+            this.sink.SetSector(SectorKey(x, z));
+            this.farSink.SetSector(SectorKey(x, z));
+            const dist = this.FocusDistance(x, z);
+            const rawDamage = Clamp(0.3 + (1 - (x - startX) / (b.maxX - startX)) * 0.35
+              + (cellRnd() - 0.5) * 0.24, 0, 0.95);
+            const profile = this.DamageProfile(rawDamage);
+            const dmg = profile.damage;
+            // 东关的地坪在濠外，标高 0 附近
+            if (dist < this.detailRadius) {
+              const built = AddCompound(this.sink, {
+                x, z, ry: 0, width: cell.w, depth: cell.d, seed: cell.seed,
+                damage: dmg, burnt: profile.burnt,
+              });
+              this.stats.householdProps += built?.householdProps || 0;
+              this.AddSuburbLoopholes(cell, dmg);
+              this.stats.compoundsDetail += 1;
+            } else if (dist < this.midRadius) {
+              this.AddSimpleCompoundAt(this.sink, cell, dmg, profile.burnt, 0);
+              this.AddSuburbLoopholes(cell, dmg);
+              this.stats.compoundsMid += 1;
+            } else {
+              this.AddSilhouetteAt(cell, dmg, profile.burnt, 0);
+              this.stats.silhouettes += 1;
+            }
+          }
         }
-        void saveY;
       }
     }
     this.sink.SetSector("");
     this.farSink.SetSector("");
 
+    for (let i = 0; i < sideLanes.length; i += 1) {
+      const alley = sideLanes[i];
+      const length = alley.to - alley.from;
+      this.sink.Add("DirtRoad", PlaceGeometry(
+        MakeBox(alley.half * 2, 0.075, length, TILE_METERS.ground, `eastAlley${i}`),
+        { x: alley.at, y: 0.038, z: (alley.from + alley.to) / 2 }));
+    }
+
     // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件；院落仍为中心留出净路。
     const eastRoadLength = b.maxX - startX;
     const eastRoadX = startX + eastRoadLength / 2;
-    const eastRoadZ = b.roadZ ?? 0;
+    const eastRoadZ = b.roadZ;
     if (this.InBounds(eastRoadX, eastRoadZ, eastRoadLength / 2)) {
       this.sink.Add("DirtRoad", PlaceGeometry(
-        MakeBox(eastRoadLength, 0.12, 9.0, TILE_METERS.ground, "eastSuburbRoad"),
+        MakeBox(eastRoadLength, 0.12, mainRoadWidth, TILE_METERS.ground, "eastSuburbRoad"),
         { x: eastRoadX, y: 0.05, z: eastRoadZ }));
       this.stats.roadMarks += AddRoadWear(this.sink, {
-        x: eastRoadX, z: eastRoadZ, ry: 0, length: eastRoadLength, width: 9.0,
+        x: eastRoadX, z: eastRoadZ, ry: 0, length: eastRoadLength, width: mainRoadWidth,
         baseY: 0.118, seed: "eastSuburbRoadWear",
       });
       const streetRnd = Mulberry32(HashString("eastSuburbStreetLife"));
@@ -1971,6 +2092,13 @@ export class TengxianCity {
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (!this.InBounds(x, z, 120)) continue;
       if (Math.max(Math.abs(x), Math.abs(z)) < MOAT.outerEdge + 30) continue;
+      // 东关街区与东郊耕地有各自的道路、院落和田畦生成器；通用麦田若落进这里，
+      // 会变成穿过主街和房屋的整块绿色地台。给两块专属区域留出一点接缝余量。
+      const inReservedEastArea = (bounds, margin = 8) => (
+        x >= bounds.minX - margin && x <= bounds.maxX + margin
+        && z >= bounds.minZ - margin && z <= bounds.maxZ + margin
+      );
+      if (inReservedEastArea(EAST_SUBURB.bounds) || inReservedEastArea(EAST_FIELD.bounds)) continue;
       const w = MARCH_GROUND.wheatPatch.minSize
         + rnd() * (MARCH_GROUND.wheatPatch.maxSize - MARCH_GROUND.wheatPatch.minSize);
       const d = w * (0.55 + rnd() * 0.7);

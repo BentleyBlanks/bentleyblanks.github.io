@@ -93,7 +93,8 @@ export const MOAT = {
 export const GATES = [
   {
     id: "East", name: "宗鲁门", plaqueInner: "云连东岱", plaqueOuter: "宗鲁门",
-    x: 305, z: -105, ry: Math.PI / 2, outward: [1, 0],
+    // 门位按 Notion《滕县城防示意图》相对 600 m 方城换算；仅相对位置可读，故为推定。
+    x: 305, z: -65, ry: Math.PI / 2, outward: [1, 0],
     blocked: "partial",                  // 土袋半堵
     // 日方原文「最モ堅固ナル東門側防機関ノ直下ニアリテ瞰制セラレ」：
     // 东门旁有专门的侧射工事，位置高、能俯瞰城外突破口，还在手榴弹投掷距离内。
@@ -102,7 +103,7 @@ export const GATES = [
   },
   {
     id: "West", name: "怀古门", plaqueInner: "宝庆西畴", plaqueOuter: "怀古门",
-    x: -305, z: 20, ry: -Math.PI / 2, outward: [-1, 0],
+    x: -305, z: 0, ry: -Math.PI / 2, outward: [-1, 0],
     // 1938 年唯一的活口。土袋堵到只剩一人宽通道 —— 落城时「外门与内门之间
     // 完全是人的漩涡」（日军第九中队安田少尉手记）。缺口净宽 0.9 m 为推定。
     blocked: "slit", slitWidth: 0.9,
@@ -116,7 +117,7 @@ export const GATES = [
   },
   {
     id: "North", name: "望阙门", plaqueInner: "恩承北极", plaqueOuter: "望阙门",
-    x: -70, z: -305, ry: Math.PI, outward: [0, -1],
+    x: -145, z: -305, ry: Math.PI, outward: [0, -1],
     // 土袋堵死，突围当夜被守军「扒开已屯闭的北城门」。
     blocked: "full",
     sidework: null,
@@ -195,10 +196,10 @@ export const CORNER_TOWERS = [
 // dir：坡自 at 起沿哪个方向爬。**必须背离城门** —— 朝着城门爬的话坡身会压进
 // z=0（或 x=0）那条不许有任何遮挡的视线走廊里。
 export const RAMPS = [
-  { side: "East", at: 105, dir: 1, seed: "rampE" },
-  { side: "West", at: 20, dir: -1, seed: "rampW" },
+  { side: "East", at: 65, dir: 1, seed: "rampE" },
+  { side: "West", at: 0, dir: -1, seed: "rampW" },
   { side: "South", at: 70, dir: 1, seed: "rampS" },
-  { side: "North", at: -70, dir: -1, seed: "rampN" },
+  { side: "North", at: 145, dir: -1, seed: "rampN" },
 ];
 export const RAMP = { width: 2.4, run: 1.0, landingAt: 13, landingRun: 2.0 };
 
@@ -209,31 +210,36 @@ export const DUGOUT = { spacing: 40, width: 1.2, height: 1.6, depth: 3.0 };
  * 城内骨架：十字街口 + 四条门里街。
  * **街巷宽度全部为推定，无任何实测数据。**
  */
-export const CROSSROAD = { x: 0, z: 20, size: 30 };
+// 生成器、碰撞与菜单都以原点绘制十字街口；不得再把数据路标偏到 z=20。
+export const CROSSROAD = { x: 0, z: 0, size: 30 };
 
 export const STREETS = [
-  // 这组街线按 Notion「滕县城防示意图」的门位和街区关系重排：西门大街在中线偏南，
-  // 东门大街位于北半城，南北门不在同一条中轴线上，城内因此不是规则棋盘格。
-  { id: "WestGateStreet", axis: "x", at: 20, from: -300, to: 20, width: 9 },
-  { id: "EastGateStreet", axis: "x", at: -105, from: -20, to: 300, width: 9 },
-  { id: "SouthGateStreet", axis: "z", at: 70, from: 20, to: 300, width: 8 },
-  { id: "NorthGateStreet", axis: "z", at: -70, from: -300, to: 20, width: 7 },
-  { id: "NorthRingStreet", axis: "x", at: -215, from: -250, to: 250, width: 5 },
-  { id: "WestInnerStreet", axis: "z", at: -185, from: -215, to: 250, width: 5 },
-  { id: "EastInnerStreet", axis: "z", at: 155, from: -215, to: 250, width: 5 },
-  { id: "SouthRingStreet", axis: "x", at: 155, from: -250, to: 250, width: 5 },
-  { id: "CentralEastStreet", axis: "x", at: 85, from: -175, to: 240, width: 4 },
+  // 按 Notion 图的相对位置转写：东、南、北门错位；西门直通十字街是战斗硬约束。
+  { id: "WestGateStreet", axis: "x", at: 0, from: -305, to: 0, width: 9, label: "西门大街" },
+  { id: "CentralEastStreet", axis: "x", at: 0, from: 0, to: 75, width: 8, label: "十字街" },
+  { id: "EastGateStreet", axis: "x", at: -65, from: 52, to: 300, width: 9, label: "东门大街" },
+  { id: "EastGateLink", axis: "z", at: 52, from: -65, to: 0, width: 6, label: "县署前街" },
+  { id: "NorthGateStreet", axis: "z", at: -145, from: -300, to: -145, width: 7, label: "北关大街" },
+  { id: "LongwangTempleStreet", axis: "x", at: -145, from: -145, to: 0, width: 5, label: "龙王庙街" },
+  { id: "CentralNorthStreet", axis: "z", at: 0, from: -145, to: 0, width: 7, label: "北关大街南段" },
+  { id: "WenTempleStreet", axis: "z", at: -185, from: -120, to: 150, width: 5, label: "文庙街" },
+  { id: "GuanXiDianStreet", axis: "z", at: 42, from: -98, to: 122, width: 5, label: "关西店街" },
+  { id: "DianDongStreet", axis: "x", at: -90, from: -118, to: 86, width: 5, label: "当典东街" },
+  { id: "CentralSouthStreet", axis: "z", at: 0, from: 0, to: 66, width: 7, label: "南门里大街北段" },
+  { id: "SouthGateLink", axis: "x", at: 66, from: 0, to: 70, width: 6, label: "南门里大街转折" },
+  { id: "SouthGateStreet", axis: "z", at: 70, from: 66, to: 300, width: 8, label: "南门里大街" },
+  { id: "DongWenBingStreet", axis: "z", at: 192, from: 66, to: 210, width: 5, label: "董文炳街" },
+  { id: "FireGodTempleEastStreet", axis: "x", at: 210, from: -145, to: 192, width: 5, label: "火神庙东街" },
 ];
 
 /**
- * 硬约束：西城门楼 → 西门里街 → 十字街口 必须是一条通视的直线走廊。
+ * 硬约束：西城门楼 → 西门大街 → 十字街口必须是一条通视走廊。
  *
- * 「日兵占领西城门楼后，即集中火力向城中心十字街口扫射」——
- * 这条视线是全城崩溃的机制原因，也是王铭章殉国那一段的空间前提。
- * 任何几何（院落、牌坊、街垒、土袋）都不许侵入这条走廊的净宽。
+ * 「日兵占领西城门楼后，即集中火力向城中心十字街口扫射」是更强的一手战斗约束。
+ * 图面示意的西门偏移不得覆盖这条空间机制；任何几何都不许侵入其净宽。
  */
 export const SIGHT_CORRIDOR = {
-  fromX: -305, toX: 0, atZ: 20, clearHalfWidth: 4.5, eyeY: 1.65,
+  fromX: -305, toX: 0, atZ: 0, clearHalfWidth: 4.5, eyeY: 1.65,
 };
 
 /**
@@ -242,21 +248,21 @@ export const SIGHT_CORRIDOR = {
  */
 export const LANDMARKS = [
   // 县衙：城内唯一有实物可参照的建筑（旧县衙大堂尚存，2006 年省级文保，典型明代建筑）。
-  // 大门中心 (230,-30)，轴线朝南，占地约 90×140 m（占地为推定，位置为主流记载）。
+  // 图上县公署位于东北偏中，轴线朝南；占地与精确落点均为推定。
   // 注意：现址的仪门、谯楼门、善国门是 2007 年后复建的仿古建筑，不能照抄细部。
-  { id: "Yamen", kind: "yamen", x: 178, z: -132, ry: 0, w: 62, d: 54 },
+  { id: "Yamen", kind: "yamen", x: 128, z: -118, ry: 0, w: 62, d: 54 },
   // 西门里街上的三处（位置为主流记载，形制推定）
   // 跨街的牌坊。明间（中间两根柱之间）净宽 = span/3 = 4 m，
   // 正好把 z=0 那条通视轴线让出来 —— 柱子站在街两侧，不站在轴线上。
-  { id: "LongPaifang", kind: "paifang", x: -120, z: 20, ry: Math.PI / 2, span: 12 },
-  { id: "AlarmTower", kind: "alarmTower", x: -205, z: 8, ry: 0, height: 9 },
-  { id: "WangShrine", kind: "shrine", x: -250, z: 42, ry: 0, w: 26, d: 22 },
+  { id: "LongPaifang", kind: "paifang", x: -120, z: 0, ry: Math.PI / 2, span: 12 },
+  { id: "AlarmTower", kind: "alarmTower", x: -205, z: -12, ry: 0, height: 9 },
+  { id: "WangShrine", kind: "shrine", x: -250, z: 28, ry: 0, w: 26, d: 22 },
   // 北门里街东侧
-  { id: "SquareFort", kind: "squareFort", x: -70, z: -255, ry: 0, w: 32, d: 32 },
+  { id: "SquareFort", kind: "squareFort", x: -145, z: -255, ry: 0, w: 32, d: 32 },
   // 铁牌坊，坐东朝西（朝向为主流记载）
-  { id: "IronPaifang", kind: "paifang", x: -70, z: -155, ry: 0, span: 7, iron: true },
+  { id: "IronPaifang", kind: "paifang", x: -145, z: -160, ry: 0, span: 7, iron: true },
   // 南门里街西侧，1931 年中共滕县特支驻地
-  { id: "PeoplesBookshop", kind: "shop", x: -110, z: 125, ry: -Math.PI / 2, w: 12, d: 9 },
+  { id: "PeoplesBookshop", kind: "shop", x: -108, z: 132, ry: -Math.PI / 2, w: 12, d: 9 },
   // 城内西北的德国天主堂。日方战详报「城内外国建築物」指的就是它 ——
   // 日军接到「保护外国权益」的命令，十六日因此不敢彻底破坏城内建筑，
   // 十七日才改为「纵使把滕县城化为灰烬也在所不惜」的焦土方针。
@@ -269,22 +275,24 @@ export const LANDMARKS = [
  * 形状、街区位置和功能关系落成可见的场景节点；具体建制仍由战斗时段数据决定。
  */
 export const CITY_FEATURES = [
-  { id: "Battalion727", kind: "compound", x: -115, z: -245, w: 96, d: 42, damage: 0.18 },
-  { id: "DragonKingTemple", kind: "temple", x: 50, z: -220, w: 40, d: 32, damage: 0.22 },
-  { id: "SupplyCourtyard", kind: "compound", x: -215, z: -175, w: 58, d: 44, damage: 0.22 },
-  { id: "PoliceStation", kind: "roomBlock", x: 92, z: -176, w: 40, d: 30, damage: 0.18 },
-  { id: "CommerceGuild", kind: "roomBlock", x: 28, z: -148, w: 46, d: 28, damage: 0.18 },
-  { id: "CountyPrison", kind: "compound", x: 220, z: -155, w: 40, d: 34, damage: 0.2 },
-  { id: "DivisionHQ124", kind: "compound", x: -92, z: -72, w: 98, d: 62, damage: 0.14 },
-  { id: "DivisionHQ127", kind: "compound", x: -92, z: 100, w: 98, d: 62, damage: 0.18 },
-  { id: "SpecialBattalion1", kind: "compound", x: -205, z: -90, w: 64, d: 70, damage: 0.26 },
-  { id: "DistrictOffice", kind: "compound", x: 220, z: 8, w: 58, d: 82, damage: 0.28 },
-  { id: "AdministrativeOffice", kind: "compound", x: -198, z: 112, w: 62, d: 46, damage: 0.3 },
-  { id: "WenzhongSchool", kind: "school", x: -166, z: 177, w: 72, d: 44, damage: 0.26 },
-  { id: "FireGodTemple", kind: "temple", x: -20, z: 200, w: 34, d: 30, damage: 0.28 },
-  { id: "SpecialBattalion2", kind: "compound", x: 145, z: 178, w: 82, d: 58, damage: 0.35 },
-  { id: "SouthWestBlock", kind: "compound", x: -210, z: 245, w: 72, d: 34, damage: 0.32 },
-  { id: "SouthEastBlock", kind: "compound", x: 160, z: 245, w: 72, d: 34, damage: 0.36 },
+  // label 只记录图号/功能，不表达永久驻防；相对坐标、尺寸、类型均为 PRESUMED。
+  { id: "NorthCompound727", label: "第727团1营", kind: "compound", x: -94, z: -238, w: 88, d: 40, damage: 0.18, source: "diagram", notPermanentGarrison: true },
+  { id: "DragonKingTemple", label: "龙王庙", kind: "temple", x: -8, z: -226, w: 42, d: 30, damage: 0.22, source: "diagram" },
+  { id: "NorthWestCourtyard", label: "苗家胡同院落", kind: "compound", x: -205, z: -166, w: 52, d: 42, damage: 0.22, source: "diagram" },
+  { id: "PoliceStation", label: "警察所", kind: "roomBlock", x: 56, z: -126, w: 34, d: 28, damage: 0.18, source: "diagram" },
+  { id: "CommerceGuild", label: "商会", kind: "roomBlock", x: -60, z: -116, w: 40, d: 26, damage: 0.18, source: "diagram" },
+  { id: "CountyPrison", label: "看守所", kind: "compound", x: 188, z: -112, w: 38, d: 32, damage: 0.2, source: "diagram" },
+  { id: "CentralCompound124", label: "第124师师部", kind: "compound", x: -58, z: -55, w: 94, d: 54, damage: 0.14, source: "diagram", notPermanentGarrison: true },
+  { id: "CentralCompound127", label: "第127师师部", kind: "compound", x: -72, z: 56, w: 94, d: 48, damage: 0.18, source: "diagram", notPermanentGarrison: true },
+  { id: "WestSpecialCompound", label: "特务营第1连", kind: "compound", x: -225, z: -50, w: 52, d: 62, damage: 0.26, source: "diagram", notPermanentGarrison: true },
+  { id: "EastDistrictOffice", label: "第二区公所", kind: "compound", x: 218, z: 12, w: 50, d: 74, damage: 0.28, source: "diagram" },
+  { id: "SouthWestOffice", label: "办事处", kind: "compound", x: -140, z: 126, w: 50, d: 44, damage: 0.3, source: "diagram" },
+  { id: "WenzhongSchool", label: "滕文中学旧址", kind: "school", x: -186, z: 220, w: 66, d: 40, damage: 0.26, source: "diagram" },
+  { id: "ShuyuanPrimarySchool", label: "书院小学", kind: "school", x: -105, z: 238, w: 48, d: 30, damage: 0.24, source: "diagram" },
+  { id: "FireGodTemple", label: "天主堂", kind: "temple", x: 0, z: 244, w: 34, d: 26, damage: 0.28, source: "diagram" },
+  { id: "SouthEastSpecialCompound", label: "特务营第2连", kind: "compound", x: 142, z: 247, w: 76, d: 42, damage: 0.35, source: "diagram", notPermanentGarrison: true },
+  { id: "SouthWestBlock", kind: "compound", x: -245, z: 260, w: 72, d: 34, damage: 0.32 },
+  { id: "SouthEastBlock", kind: "compound", x: 230, z: 260, w: 72, d: 34, damage: 0.36 },
 ];
 
 /** 城外地标。南关教堂与城内那座两说并列，各建一处，不合并。 */
@@ -311,12 +319,12 @@ export const OUTER_LANDMARKS = [
  */
 export const EAST_SUBURB = {
   bounds: { minX: 334, maxX: 540, minZ: -235, maxZ: 220 },   // 与城防图东关外侧的长条街区对应
-  roadZ: -105,
+  roadZ: -65,
   lane: { min: 1.5, max: 2.5 },                              // 巷宽（推定）
   // 东关寨墙：日方实测高 2 m、顶宽 0.4 m —— 极薄，一炮一个口。
   zhaiWall: { enabled: false, x: 540, fromZ: -235, toZ: 220, height: 2.0, topWidth: 0.4, baseWidth: 0.9 },
   // 东寨门：砖券洞，宽 3 m（宽度推定）。1938-03-16 14:00 被 105 mm 榴弹第一发命中打毁。
-  zhaiGate: { x: 540, z: -105, width: 3.0, height: 3.4 },
+  zhaiGate: { x: 540, z: -65, width: 3.0, height: 3.4 },
   // 日方称之为「敌之有力据点」的寺院地阵地。位置为日方要图，形制推定。
   temple: { x: 414, z: -176, w: 26, d: 22 },
   // 地隙：河西岸与外城之间的南北向冲沟，日军沿此沟可掩蔽接近到寨墙 200 m 处
@@ -333,17 +341,17 @@ export const EAST_SUBURB = {
  * worldZ = -wallAt，避免在不同切片里重复手写绝对坐标。
  */
 export const EAST_DEFENSE = {
-  breachWallAt: 105,
+  breachWallAt: 65,
   grenadePositions: [
-    { id: "BreachNorthGrenade", wallAt: 126, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
-    { id: "BreachSouthGrenade", wallAt: 84, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachNorthGrenade", wallAt: 86, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachSouthGrenade", wallAt: 44, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
   ],
-  crossfirePosition: { id: "BreachMachineGun", wallAt: 105, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
-  reserveCourtyard: { id: "EastReserveCourtyard", x: 390, z: -164, length: 11.0, depth: 3.2, ry: 0 },
+  crossfirePosition: { id: "BreachMachineGun", wallAt: 65, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
+  reserveCourtyard: { id: "EastReserveCourtyard", x: 390, z: -124, length: 11.0, depth: 3.2, ry: 0 },
   rubblePiles: [
-    { id: "BreachNorthRubble", wallAt: 130, inward: 0.5, radius: 8.5 },
-    { id: "BreachSouthRubble", wallAt: 80, inward: 0.5, radius: 8.5 },
-    { id: "BreachApronRubble", wallAt: 105, inward: -5.0, radius: 7.0 },
+    { id: "BreachNorthRubble", wallAt: 90, inward: 0.5, radius: 8.5 },
+    { id: "BreachSouthRubble", wallAt: 40, inward: 0.5, radius: 8.5 },
+    { id: "BreachApronRubble", wallAt: 65, inward: -5.0, radius: 7.0 },
   ],
 };
 
@@ -358,7 +366,7 @@ export const EAST_DEFENSE = {
  */
 export const EAST_FIELD = {
   bounds: { minX: 548, maxX: 756, minZ: -250, maxZ: 250 },
-  roadZ: -105,
+  roadZ: -65,
   // 战术地形：压在濠外原野解析高程上（Script_TengxianCity.OuterHeight）。
   // ridges：{id, from, to, width, height} —— 距中线 width 处衰减到 0；
   // lanes ：{id, from, to, inner, outer, depth} —— inner 内全深、outer 外为 0。
@@ -392,13 +400,14 @@ export const EAST_FIELD = {
 
 /** 西关：电灯厂的烟囱是西关天际线上的关键剪影，且在西城门楼的直瞄射程内。 */
 export const WEST_SUBURB = {
-  // 厂房约 30×18 m、烟囱高 22 m（规模为推定；「在西城楼直瞄射程内」为主流记载）。
-  // 距西城门楼约 395 m。
-  powerPlant: { x: -700, z: 30, w: 30, d: 18, chimneyH: 22 },
+  // 西关紧贴西门与津浦铁路：通信队、电灯厂、交易所与车站的相对关系来自城防图；尺度推定。
+  communications: { x: -402, z: -28, w: 30, d: 72 },
+  powerPlant: { x: -408, z: 62, w: 30, d: 18, chimneyH: 22 },
+  exchange: { x: -438, z: 116, w: 24, d: 28 },
   // 津浦路滕县站，1911 年竣工、德国承建的北段。三等小站不会有钟楼与大厅。
   // 形制全部为推定：单层局部两层、清水砖墙、石质窗套与转角、陡坡瓦屋面、木构月台雨棚。
-  station: { x: -1450, z: 40, w: 34, d: 12 },
-  railway: { x: -1500, fromZ: -900, toZ: 900, gauge: 1.435 },   // 位置为推定
+  station: { x: -458, z: -82, w: 34, d: 12 },
+  railway: { x: -480, fromZ: -900, toZ: 900, gauge: 1.435 },   // 相对城墙位置为推定
 };
 
 /** 城外水系与地表。 */
@@ -497,10 +506,13 @@ export const PRESUMED = [
   { id: "eastGateSidework", value: { out: 6.5, width: 11, height: 13.0 }, unit: "m", note: "东门侧防机关的存在与作用为日方一手史料，形制尺寸无载" },
   { id: "rampLength", value: 28, unit: "m", note: "上城道每门旁一条、宽 2.4 m 为主流记载；坡长、级高、中间转折平台全为推定" },
   { id: "dugoutSize", value: { width: 1.2, height: 1.6, depth: 3.0, spacing: 40 }, unit: "m", note: "墙脚防空洞存在为主流记载，尺寸与间距无载" },
-  { id: "streetWidths", value: { west: 9, east: 8, south: 7, north: 6, secondary: 4, lane: 2.0 }, unit: "m", note: "**街巷宽度全部为推定，无任何实测数据**" },
+  { id: "streetWidths", value: { west: 9, east: 9, south: 8, north: 7, secondary: 5, lane: 2.0 }, unit: "m", note: "**街巷宽度全部为推定，无任何实测数据**" },
+  { id: "crossroadPosition", value: [0, 0], unit: "m", note: "十字街口以城心为原点；为与生成器、碰撞和菜单统一，已取消旧数据 z=20 的无依据偏移" },
   { id: "crossroadSize", value: 30, unit: "m", note: "十字街口的开阔尺寸，无载" },
-  { id: "secondaryStreetLines", value: [-160, 155, -155, 155], unit: "m", note: "次街位置。仅书院街岔口 x=-160 有记载，走向与其余次街全为推定" },
-  { id: "yamenFootprint", value: [90, 140], unit: "m", note: "县衙占地。大门位置与轴线朝南为主流记载，占地尺寸无载；正堂五间面阔约 22 m 照现存明代大堂实物" },
+  { id: "streetTopology", value: "STREETS", note: "西门大街、东门大街、北关大街、当典东街、南门里大街、文庙街等的相对关系依据 Notion 城防示意图；具体米制坐标、转折点与街宽均为推定" },
+  { id: "gateOffsets", value: { eastZ: -65, westZ: 0, northX: -145, southX: 70 }, unit: "m", note: "东、南、北门错位关系据 Notion 城防示意图按约 600 m 方城比例换算；西门固定在十字街 z=0 直瞄轴上，优先服从战斗史料硬约束" },
+  { id: "yamenFootprint", value: [62, 54], unit: "m", note: "县公署/旧县衙位于城内东北偏中、轴线朝南为图示与主流记载；白盒占地尺寸无载" },
+  { id: "cityFeatureLayout", value: "CITY_FEATURES", note: "主要公共院落的相对位置、白盒占地、类型均由 Notion 城防示意图转写，除图中文字外一律为推定；图中番号只作 1938 年 3 月态势标签，不表示永久驻防" },
   { id: "landmarkForms", value: ["LongPaifang", "AlarmTower", "WangShrine", "SquareFort", "IronPaifang", "PeoplesBookshop"], note: "西门里街与北门里街上这几处只有街名记载，位置为街上大致里程推定，形制尺寸全无资料" },
   { id: "churchForm", value: { nave: [11, 24], towerH: 16 }, unit: "m", note: "城内德国天主堂：存在为日方一手史料，形制、规模、有无钟楼一概无资料，做最保守的单钟塔小堂" },
   { id: "churchLocation", value: "两说并列", note: "日方记城内近内城墙、中方记南关，无法判定，各建一处不合并" },
@@ -509,8 +521,9 @@ export const PRESUMED = [
   { id: "gullySection", value: { depth: 3.0, width: 7.5 }, unit: "m", note: "地隙的存在与「可掩蔽接近到寨墙 200 m」为日方实测，断面尺寸无载" },
   { id: "eastSuburbLayout", value: "18×16 m 院落密铺", note: "东关「密集院落、院墙相连」为日方描述，具体地块划分无资料" },
   { id: "powerPlantSize", value: { w: 30, d: 18, chimneyH: 22 }, unit: "m", note: "电灯厂位置与「在西城楼直瞄射程内」为主流记载，厂房规模与烟囱高度无载" },
+  { id: "westSuburbLayout", value: "WEST_SUBURB", note: "津浦铁路在城西，以及西关的车站、通信队、电灯厂、交易所关系为 Notion 城防示意图可见信息；其坐标、尺度和站房形式均为推定" },
   { id: "stationForm", value: { w: 34, d: 12 }, unit: "m", note: "滕县站位置为主流记载，1911 年德建为史料，站房形制尺寸全为推定" },
-  { id: "railwayX", value: -1500, unit: "m", note: "津浦铁路距西墙 1.2 km 为推定，需用卫星图对齐新兴路步行街与大同路滕州站校正" },
+  { id: "railwayX", value: -480, unit: "m", note: "津浦铁路在城西为主流记载；相对西城墙距离按 Notion 城防示意图比例换算，绝对坐标为推定" },
   { id: "hollowForts", value: [[370, 370], [-370, 370]], note: "城外空心炮台 2 座（1908 建）为主流记载，**位置无载**，暂置东南／西南墙外 60 m" },
   { id: "houseDims", value: { eave: [2.4, 2.8], ridge: [3.5, 4.2], courtWall: [1.8, 2.2] }, unit: "m", note: "鲁南民居形制为主流记载，具体高度为推定" },
   { id: "loopholeSize", value: 0.24, unit: "m", note: "家家掏枪眼、新掏边缘发白为日方一手史料反复点名，孔径与分布密度无载" },

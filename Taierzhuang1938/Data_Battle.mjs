@@ -66,8 +66,8 @@ export const ZONES = {
   Beishahe: { id: "Beishahe", name: "北沙河", x: 0, z: -1000, radius: 34 },
 
   // --- 一 · 北沙河 → 津浦路 → 西关 → 西门 ---
-  SecondLine: { id: "SecondLine", name: "第二线阵地", x: -1450, z: -380, radius: 34 },
-  Dawn: { id: "Dawn", name: "天亮前的路口", x: -1450, z: -160, radius: 30 },
+  SecondLine: { id: "SecondLine", name: "第二线阵地", x: -480, z: -180, radius: 34 },
+  Dawn: { id: "Dawn", name: "天亮前的路口", x: -480, z: -130, radius: 30 },
   XiguanStation: {
     id: "XiguanStation", name: "滕县车站", radius: 42,
     x: WEST_SUBURB.station.x, z: WEST_SUBURB.station.z,
@@ -83,21 +83,21 @@ export const ZONES = {
     id: "ZhaiGate", name: "东关街口", radius: 20,
     x: 480, z: EAST_SUBURB.roadZ,
   },
-  Courtyard: { id: "Courtyard", name: "关厢院落", x: 462, z: -59, radius: 26 },
+  Courtyard: { id: "Courtyard", name: "关厢院落", x: 462, z: -19, radius: 26 },
   Temple: {
     id: "Temple", name: "寺院地", radius: 26,
     x: EAST_SUBURB.temple.x, z: EAST_SUBURB.temple.z,
   },
-  Breach: { id: "Breach", name: "缺口", x: 500, z: -105, radius: 22 },
+  Breach: { id: "Breach", name: "缺口", x: 500, z: EAST_SUBURB.roadZ, radius: 22 },
 
   // --- 三 · 夺回东关门（夜） ---
-  Lane: { id: "Lane", name: "巷道", x: 478, z: -129, radius: 22 },
-  GateRetake: { id: "GateRetake", name: "东关门", x: 516, z: -105, radius: 20 },
+  Lane: { id: "Lane", name: "巷道", x: 478, z: -89, radius: 22 },
+  GateRetake: { id: "GateRetake", name: "东关门", x: 516, z: EAST_SUBURB.roadZ, radius: 20 },
   EastGateIn: { id: "EastGateIn", name: "东门 · 宗鲁门", x: 296, z: GATE("East").z, radius: 24 },
 
   // --- 四 · 城墙 ---
   // 上城道：RAMPS 里东门旁那一条，沿墙内侧爬。坐标是墙内侧顺城街上的落脚点。
-  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: -75, radius: 16 },
+  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z, radius: 16 },
   Rampart: { id: "Rampart", name: "东南角望楼", x: 294, z: 288, radius: 22 },
   SouthWall: { id: "SouthWall", name: "南城墙", x: 150, z: 296, radius: 26 },
   SouthBreach: { id: "SouthBreach", name: "南墙缺口", x: 285, z: 296, radius: 18 },
@@ -109,12 +109,12 @@ export const ZONES = {
     x: LANDMARKS.find((l) => l.id === "Yamen").x,
     z: LANDMARKS.find((l) => l.id === "Yamen").z,
   },
-  WestStreet: { id: "WestStreet", name: "西门里街", x: -160, z: GATE("West").z, radius: 24 },
+  WestStreet: { id: "WestStreet", name: "西门大街", x: -160, z: GATE("West").z, radius: 24 },
   WestGateInner: { id: "WestGateInner", name: "西门里", x: -278, z: GATE("West").z, radius: 20 },
 
   // --- 六 · 北门突围 ---
   WestBarbican: { id: "WestBarbican", name: "西门瓮城", x: -322, z: GATE("West").z, radius: 16 },
-  NorthStreet: { id: "NorthStreet", name: "北门里街", x: GATE("North").x, z: -160, radius: 24 },
+  NorthStreet: { id: "NorthStreet", name: "北关大街", x: GATE("North").x, z: -160, radius: 24 },
   NorthGate: { id: "NorthGate", name: "北门 · 望阙门", x: GATE("North").x, z: -296, radius: 20 },
   WheatField: { id: "WheatField", name: "城北麦地", x: 0, z: -520, radius: 46 },
 };
@@ -159,10 +159,10 @@ const TUNING = {
     scavengeRifle: true,
   },
   L1_Beishahe: {
-    bounds: { minX: -1560, maxX: -230, minZ: -470, maxZ: 170 },
+    bounds: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
     zones: ["SecondLine", "Dawn", "XiguanStation", "PowerPlant", "WestGate"],
-    // 朝南：这一关是沿津浦路一路南撤，第一个路标在身前
-    spawn: { x: -1450, z: -430, ry: Math.PI },
+    // 朝南：西关沿贴城津浦路一路南撤，车站与通信队就在西门外。
+    spawn: { x: -480, z: -205, ry: Math.PI },
     ijaPressure: 1.15, ijaSpawn: ["north"], ijaSupport: ["artillery", "hmg"],
     ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 300,
@@ -175,8 +175,8 @@ const TUNING = {
   L2_Dongguan: {
     bounds: { minX: 250, maxX: 620, minZ: -240, maxZ: 240 },
     zones: ["ZhaiGate", "Courtyard", "Temple", "Breach"],
-    // 站在寨门里侧、朝东正对缺口（东寨门在 x=520）
-    spawn: { x: 496, z: 0, ry: -Math.PI / 2 },
+    // 东门大街的清路中央，避开两侧门前家什；朝东正对东关门与缺口。
+    spawn: { x: 432, z: EAST_SUBURB.roadZ, ry: -Math.PI / 2 },
     ijaPressure: 1.5, ijaSpawn: ["east"], ijaSupport: ["launcher", "hmg", "artillery"],
     // 日军战详报：工兵逐间爆破民房打通墙体；联队炮四门在土城子西侧，
     // 重机枪沿河西岸配置。没有战车或装甲车参加滕县攻城。
@@ -189,17 +189,17 @@ const TUNING = {
     },
   },
   L3_Fanji: {
-    // 比 L2 窄一条：这一关的路标全落在 z ∈ [-60, 0]，南北两端的关厢从不去。
+    // 比 L2 窄一条：保留寺院地至东门的北段巷网，南端的关厢从不去。
     // **调 draw call 优先调 bounds，不是调 detailRadius** ——
     // 实测把 detailRadius 从 100 压到 62，三角形掉了 24% 而 calls 反而涨了：
     // 院落从 detail 掉到 silhouette 之后进的是**按扇区分批**的远景 sink，
     // 扇区多一个就多一批。少生成才是少 draw call，降细节不是。
-    bounds: { minX: 250, maxX: 600, minZ: -170, maxZ: 170 },
+    bounds: { minX: 250, maxX: 600, minZ: -200, maxZ: 170 },
     zones: ["Temple", "Lane", "GateRetake", "EastGateIn"],
     // 出生点要**出**寺院的屋檐：原来站在 (414,-76)，正压在寺院地那座
     // 26×22 m 房子的檐下，出图上是一条横贯全屏的黑带（屋顶的背面）。
-    // 退到院外 25 m，朝着寺院站——那是这一关第一个集合点。
-    spawn: { x: 398, z: -88, ry: Math.atan2(-22, -28) },
+    // 第二区纵向巷（生成器 x≈456 m 的明确车道）上，离寺院院墙留出 30 m 以上；朝寺院集合。
+    spawn: { x: 456.6, z: -128, ry: Math.atan2(-48, -42.6) },
     // 夜里日军火力优势削掉一半 —— 全局唯一一次玩家在交换比上占便宜的时段
     ijaPressure: 0.85, ijaSpawn: ["east"], ijaSupport: ["hmg"],
     ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: true, armor: 0, motorTransport: "rearOnly" },
@@ -215,7 +215,7 @@ const TUNING = {
     // 东南主战区仍由 spawn 与 zones 控制，不靠裁掉北墙来省几百个三角形。
     bounds: { minX: -360, maxX: 620, minZ: -360, maxZ: 400 },
     zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
-    spawn: { x: 276, z: -65, ry: Math.PI / 2 },
+    spawn: { x: 276, z: GATE("East").z, ry: Math.PI / 2 },
     ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],
     ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 480,
@@ -228,24 +228,16 @@ const TUNING = {
     },
   },
   L5_Shizijie: {
-    // 全城最贵的一关：路标横跨 515 m（县衙在东、西门里在西），
-    // 但南北只用中间那一条 —— 北门里街与南门里街是第六关的事。
-    // 城防图的中心街区按东西向西门大街与北门大街、南门大街的错位关系复用，
-    // 县署和师部不再被压缩到一条规则中轴线上。
-    bounds: { minX: -325, maxX: 285, minZ: -100, maxZ: 100 },
-    // 全城最贵的一关：出生点就站在东门里街上，一眼望穿 305 m 的通视走廊
-    //（那条走廊是这一关的机制，不能拿掉）。实测 calls 1600。
-    // 西城门楼在 x=-305，离出生点 367 m，所以远平面收到 420 而不是更小。
+    // 西门、十字街口与西门大街共用 z=0 的直瞄轴；县署前街与其余门位仍保留错位。
+    bounds: { minX: -325, maxX: 285, minZ: -190, maxZ: 140 },
+    // 出生点站在原点十字街口，正对西城门楼的贴地火力走廊。
     cameraFar: 400,
     zones: ["Crossroad", "Yamen", "WestStreet", "WestGateInner"],
-    // 站在东门里街上（街心 z=0，宽 8 m）朝西，正对十字街口
-    spawn: { x: 62, z: 20, ry: Math.PI / 2 },
+    spawn: { x: 62, z: CROSSROAD.z, ry: Math.PI / 2 },
     ijaPressure: 1.9, ijaSpawn: ["west", "south"], ijaSupport: ["hmg", "launcher"],
     ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 460,
-    // 西城门楼 → 西门里街 → 十字街口 是一条通视的直街，被一挺重机枪完全控制。
-    // 这条走廊的几何硬约束在 Data_Tengxian.SIGHT_CORRIDOR，城的自检会核对。
-    corridorGun: { x: -300, z: 20, y: 13.0, note: "3/17 17 时日军夺西城门楼后向十字街口扫射" },
+    corridorGun: { x: -300, z: CROSSROAD.z, y: 13.0, note: "3/17 17 时日军夺西城门楼后沿西门大街向十字街口扫射" },
     loadout: "L4_LastFiveMinutes",
   },
   L6_Beimen: {
@@ -253,7 +245,7 @@ const TUNING = {
     zones: ["WestBarbican", "NorthStreet", "NorthGate", "WheatField"],
     detailRadius: 70, midRadius: 170,
     // 朝西：第一个目标是「跟着人流去西门」（挤不出去）
-    spawn: { x: -286, z: 20, ry: Math.PI / 2 },
+    spawn: { x: -286, z: GATE("West").z, ry: Math.PI / 2 },
     ijaPressure: 0.6, ijaSpawn: ["west"], ijaSupport: [],
     ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
     ijaPool: 240,

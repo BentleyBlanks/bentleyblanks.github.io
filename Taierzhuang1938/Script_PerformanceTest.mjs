@@ -33,8 +33,10 @@ try {
     const T = window.Taierzhuang;
     T.StepFrames(60);
     const player = T.player;
-    const enemies = T.ai.soldiers.filter((soldier) => soldier.side === "ija" && soldier.actor);
-    const allies = T.ai.soldiers.filter((soldier) => soldier.side === "nra" && soldier.actor);
+    // 初始 60 帧里双方可能已经交火；阵亡者有独立的倒地动画更新规则，不能混进
+    // “活人转头 LOD”基准，否则场景出生点一变就会让计数随早期伤亡漂移。
+    const enemies = T.ai.soldiers.filter((soldier) => soldier.side === "ija" && soldier.alive && soldier.actor);
+    const allies = T.ai.soldiers.filter((soldier) => soldier.side === "nra" && soldier.alive && soldier.actor);
     // 人为摆出一条最坏的通视走廊：前方是日军密集区，后方只留少量守军。
     // 测的是“转头”这一个变量，不把关卡随机撒兵当成性能依据。
     const origin = player.position.clone();
@@ -47,6 +49,11 @@ try {
       const column = index % 10;
       const row = Math.floor(index / 10);
       Place(soldier, (column - 4.5) * 3.2, -34 - row * 20);
+    });
+    // 关卡出生点与街网会迭代，不能让“第 31 人以后”的随机出生位置混进结果；
+    // 全部移到两组采样视锥的侧后方，测试只保留上面明确摆出的 30 名日军。
+    enemies.slice(30).forEach((soldier, index) => {
+      Place(soldier, 500 + (index % 8) * 4, (Math.floor(index / 8) - 2) * 8);
     });
     allies.slice(0, 8).forEach((soldier, index) => {
       Place(soldier, (index - 3.5) * 3.2, 38 + (index % 2) * 8);
@@ -89,7 +96,7 @@ try {
         renderedNra: rendered.filter((soldier) => soldier.side === "nra").length,
         detailIja: rendered.filter((soldier) => soldier.side === "ija" && soldier.renderLod === "detail").length,
         crowdIja: rendered.filter((soldier) => soldier.side === "ija" && soldier.renderLod === "crowd").length,
-        animatedIja: T.ai.soldiers.filter((soldier) => soldier.side === "ija")
+        animatedIja: T.ai.soldiers.filter((soldier) => soldier.side === "ija" && soldier.alive)
           .reduce((sum, soldier) => sum + (soldier.actor?.performanceUpdateCount || 0), 0),
         detachedActors: T.ai.soldiers.filter((soldier) => soldier.actor
           && soldier.renderLod !== "detail" && !soldier.actor.root.parent).length,

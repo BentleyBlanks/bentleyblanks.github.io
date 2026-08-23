@@ -60,7 +60,8 @@ const GAME_SHOTS = [
     setup: { x: 360, z: 0, yaw: Math.PI / 2, pitch: 0.22 } },
   // 生活层专项：冻结敌军开火，避免中弹红闪把路肩家什、车辙和院落细节染没。
   { name: "Game_Z4_CityLife", query: "shot=1&phase=5&quality=high&scale=medium",
-    setup: { x: 88, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
+    // CentralEastStreet 只延伸到 x=75；旧 x=88 在城图重排后会落进院墙。
+    setup: { x: 62, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
   { name: "Game_Z5_VillageLife", query: "shot=1&phase=0&quality=high&scale=medium",
     setup: { x: -154, z: -1278, yaw: 0, pitch: -0.05, quiet: true } },
   // 角楼专项：复用菜单里用户实际看见问题的“东南角望楼”长焦机位。
@@ -70,6 +71,18 @@ const GAME_SHOTS = [
   // 墙身专项：东墙外近距离仰看包砖修补、泄水孔、垛口压顶与墙顶铺砖。
   { name: "Game_Z7_WallDetail", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 364, z: 198, yaw: Math.PI / 2, pitch: 0.19, quiet: true } },
+  // 城图布局回归：从县衙上方俯看公共院落和交叉街，验主次街尺度、
+  // 院落不压路以及功能区的体量差，而不是又拍一次十字街正面。
+  { name: "Game_Z8_CityLayout", query: "phase=5&quality=high&scale=medium",
+    setup: { menuShot: "Yamen" } },
+  // 东关连续性：从濠外沿东门大街回看东门，必须同时读到关厢住宅带、道路和城门，
+  // 防止东关生成成与城门脱节的一块独立布景。
+  { name: "Game_Z9_EastGateStreet", query: "quality=high&scale=medium",
+    setup: { menuShot: "EastGate" } },
+  // 防区空间关系：站在东墙炮击缺口向城内看，验缺口后的街、掩体与城内纵深，
+  // 避免和既有东门仰视、东关常规战斗镜头重复。
+  { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };
