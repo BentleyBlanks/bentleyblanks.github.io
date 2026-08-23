@@ -172,6 +172,35 @@ export function VillageRoofLayout(width, depth, eaveY, pitch = 0.47, overhang = 
 }
 
 /**
+ * 村屋损毁档位。断壁残垣不是贴一层灰：同一种原型按种子分四档，
+ * 档位决定墙是不是分段错落、有没有豁口、顶是掀了一角还是整顶塌光。
+ *
+ * 档位分布刻意压向「受损」——1938 年 3 月的滕县外围刚被炮车和溃兵碾过，
+ * 完好的院子不该过半：
+ *   0 完好（约 18%）—— 走原来的整块体量路径，零额外开销；
+ *   1 擦伤（约 24%）—— 四面墙分段、段顶高低错落，顶完好；
+ *   2 破墙（约 34%）—— 一条长墙上开豁口（留可跨越的矮 stub），碎料泼在墙根，
+ *     豁口上方那片瓦也被掀掉一角；
+ *   3 塌顶（约 24%）—— 整顶塌光，两条垂直方向的墙各塌一段，留一端山尖、
+ *     断脊梁、散椽与满地瓦。
+ *
+ * 全部走 Mulberry32 / HashString，同一栋房子每次重建分毫不变（截图可比对）。
+ */
+export function VillageRuinProfile(seed) {
+  const rnd = Mulberry32(HashString(`${seed}:ruin`));
+  const u = rnd();
+  const level = u < 0.18 ? 0 : u < 0.42 ? 1 : u < 0.76 ? 2 : 3;
+  return {
+    level,
+    // 豁口优先开在正面长墙：玩家推进方向第一眼读得到破口。
+    breachFront: rnd() < 0.72,
+    breachT: 0.2 + rnd() * 0.6,
+    gableEnd: rnd() < 0.5 ? -1 : 1,
+    rnd,
+  };
+}
+
+/**
  * 桶名 → 材质。**先查城外这一张，查不到落回城里那一张**
  *（城外要用到城里的 Willow / HouseBrick / RoofTile / Wheat / Stone 等等）。
  */
@@ -1393,41 +1422,221 @@ export class TengxianOutfield {
     return { floorY, bottomY: minGround - 0.14 };
   }
 
-  /** 两坡硬山顶 + 两端山墙。屋脊永远沿局部 X，不再靠调用处猜宽/深。 */
+  /**
+   * 一档以上的墙：整块大方盒拆成四面分段墙，段顶高低错落——炸塌的墙
+   * 从来不是平头。豁口段是一段 0.34—0.48 m 的矮 stub：视觉与碰撞同源，
+   * 导航图（顶面高出地面 >0.56 m 判不可走）与玩家自动抬腿（≤0.56 m）
+   * 都吃得下，人和 AI 都能真的跨进屋里。
+   * 返回豁口的世界外沿坐标（泼瓦砾用），没开豁口返回 null。
+   */
+  AddVillageWallSlabs(sink, {
+    x, z, ry, width, depth, floorY, bodyHeight, wallMaterial, seed, ruin,
+  }) {
+    const thickness = 0.3;
+    const tile = wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick;
+    const grid = wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null;
+    const stubH = 0.34 + ruin.rnd() * 0.14;
+    const breachLongSide = ruin.breachFront ? 1 : -1;
+    // 三档塌顶：与豁口垂直的那条墙再塌一段——废墟的剪影靠这种「不止一处
+    // 缺口」的不对称立起来，单豁口远看仍像一栋完整的房。
+    const sideBreachSide = ruin.rnd() < 0.5 ? -1 : 1;
+    let breachSpot = null;
+    const EmitWall = (axis, side) => {
+      const length = axis === "x" ? width : depth;
+      const n = Math.max(2, Math.round(length / 3.2));
+      const segLen = length / n;
+      const breachIndex = (axis === "x" && side === breachLongSide)
+        || (ruin.level === 3 && axis === "z" && side === sideBreachSide)
+        ? Math.min(n - 2, Math.max(1, Math.floor(
+          (axis === "x" ? ruin.breachT : ruin.rnd()) * n)))
+        : -1;
+      for (let i = 0; i < n; i += 1) {
+        const along = -length / 2 + segLen * (i + 0.5);
+        const breached = i === breachIndex;
+        const h = breached ? stubH
+          : bodyHeight * ((i === 0 || i === n - 1)
+            ? 0.95
+            : (ruin.level === 1 ? 0.72 : 0.8) + ruin.rnd() * (ruin.level === 1 ? 0.26 : 0.2));
+        const localX = axis === "x" ? along : side * (width / 2 - thickness / 2);
+        const localZ = axis === "x" ? side * (depth / 2 - thickness / 2) : along;
+        const point = this.VillagePoint(x, z, ry, localX, localZ);
+        sink.Add(wallMaterial, PlaceGeometry(
+          MakeBox(axis === "x" ? segLen * 1.02 : thickness, h,
+            axis === "x" ? thickness : segLen * 1.02,
+            tile, `${seed}:w${axis}${side}:${i}`, grid),
+          { x: point.x, y: floorY + h / 2, z: point.z, ry }));
+        sink.Solid(point.x, floorY + h / 2, point.z,
+          axis === "x" ? segLen / 2 : thickness / 2,
+          h / 2,
+          axis === "x" ? thickness / 2 : segLen / 2,
+          "villageWall", ry + (axis === "x" ? 0 : Math.PI / 2));
+        if (breached && breachSpot === null) {
+          breachSpot = { lx: along, lz: side * (depth / 2 + 0.55) };
+        } else if (breached) {
+          // 侧墙的塌口也泼一摊，别让第二处缺口干巴巴的。
+          this.AddVillageRubble(sink, {
+            x: point.x, z: point.z, ry, seed: `${seed}:side${axis}${side}`,
+            lx: 0, lz: 0, rx: 1.1, rz: 0.9, count: 4, skirt: false,
+            materials: [wallMaterial, "RoofTile", "DryStone"],
+          });
+        }
+      }
+    };
+    EmitWall("x", 1);
+    EmitWall("x", -1);
+    EmitWall("z", -1);
+    EmitWall("z", 1);
+    return breachSpot;
+  }
+
+  /**
+   * 塌墙碎料：一条埋进土里的「瓦砾裙」压住体量，再撒一圈砖石瓦块。
+   * 纯装饰不进碰撞（碎块都在脚踝高以下，进了碰撞反而卡导航）。
+   */
+  AddVillageRubble(sink, {
+    x, z, ry, seed, lx = 0, lz = 0, rx = 1.4, rz = 0.8,
+    count = 8, materials = ["HouseBrick"], skirt = true,
+  }) {
+    const rnd = Mulberry32(HashString(`${seed}:bits`));
+    const center = this.VillagePoint(x, z, ry, lx, lz);
+    const baseY = this.groundAt(center.x, center.z);
+    const TileFor = (name) => name === "Adobe" ? TILE_METERS.adobe
+      : name === "RoofTile" ? TILE_METERS.roof
+        : name === "DryStone" ? TILE_METERS.stone : TILE_METERS.brick;
+    if (skirt) {
+      sink.Add(materials[0], PlaceGeometry(
+        MakeBox(rx * 2.1, 0.13, rz * 2.1, TileFor(materials[0]), `${seed}:skirt`,
+          materials[0] === "HouseBrick" ? BRICK_UV_GRID : null),
+        { x: center.x, y: baseY + 0.05, z: center.z, ry }));
+    }
+    for (let i = 0; i < count; i += 1) {
+      const name = materials[i % materials.length];
+      const size = 0.16 + rnd() * 0.27;
+      const angle = rnd() * Math.PI * 2;
+      const radius = Math.sqrt(rnd());
+      const px = center.x + Math.cos(angle) * radius * rx;
+      const pz = center.z + Math.sin(angle) * radius * rz;
+      sink.Add(name, PlaceGeometry(
+        MakeBox(size, size * (0.5 + rnd() * 0.5), size * 0.82, TileFor(name),
+          `${seed}:bit${i}`, name === "HouseBrick" ? BRICK_UV_GRID : null),
+        { x: px, y: this.groundAt(px, pz) + 0.06 + rnd() * 0.1, z: pz,
+          ry: rnd() * Math.PI, rz: (rnd() - 0.5) * 0.3 }));
+    }
+    this.stats.villageDetails += count + (skirt ? 1 : 0);
+  }
+
+  /** 三档塌顶的地面遗骸：断脊梁斜卡在残墙间、椽子散落、碎瓦撒一圈。全贴地、无碰撞。 */
+  AddCollapsedRoofKit(sink, { x, z, ry, width, depth, floorY, seed, ruin }) {
+    const rnd = ruin.rnd;
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(width * 0.82, 0.17, 0.17, TILE_METERS.wood, `${seed}:fallenridge`),
+      { x, y: floorY + 0.34, z, ry: ry + 0.1, rz: 0.16 }));
+    for (let i = 0; i < 4; i += 1) {
+      const point = this.VillagePoint(x, z, ry,
+        (rnd() - 0.5) * width * 0.7, (rnd() - 0.5) * depth * 0.7);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.08, 0.08, depth * (0.5 + rnd() * 0.3), TILE_METERS.wood,
+          `${seed}:rafter${i}`),
+        { x: point.x, y: floorY + 0.07, z: point.z,
+          ry: ry + Math.PI / 2 + (rnd() - 0.5) * 0.7 }));
+    }
+    for (let i = 0; i < 10; i += 1) {
+      const point = this.VillagePoint(x, z, ry,
+        (rnd() - 0.5) * width * 0.9, (rnd() - 0.5) * depth * 0.9);
+      const size = 0.3 + rnd() * 0.24;
+      sink.Add("RoofTile", PlaceGeometry(
+        MakeBox(size, 0.045, size * 0.72, TILE_METERS.roof, `${seed}:shard${i}`),
+        { x: point.x, y: this.groundAt(point.x, point.z) + 0.03, z: point.z,
+          ry: rnd() * Math.PI, rz: (rnd() - 0.5) * 0.24 }));
+    }
+    this.stats.villageDetails += 15;
+  }
+
+  /** 两坡硬山顶 + 两端山墙。屋脊永远沿局部 X，不再靠调用处猜宽/深。
+   *  传 ruin 时按损毁档位动顶：二档在豁口上方那片坡掀掉一块露出断椽，
+   *  三档整顶塌光只留一端山尖；返回值带 collapsed 与逐坡碰撞盒。 */
   AddVillageRoof(sink, {
-    x, z, ry, width, depth, eaveY, seed, wallMaterial = "HouseBrick", far = false,
+    x, z, ry, width, depth, eaveY, floorY = eaveY - 2.4, seed,
+    wallMaterial = "HouseBrick", far = false, ruin = null,
   }) {
     const roof = VillageRoofLayout(width, depth, eaveY);
-    for (const half of roof.halves) {
-      const point = this.VillagePoint(x, z, ry, 0, half.localZ);
-      sink.Add("RoofTile", PlaceGeometry(
-        MakeBox(half.width, 0.16, half.depth, TILE_METERS.roof,
-          `${seed}:slope${half.side}`),
-        { x: point.x, y: half.centerY, z: point.z, ry, rx: half.rotationX }));
-      if (!far) {
-        const eavePoint = this.VillagePoint(x, z, ry, 0,
-          half.side * (depth / 2 + 0.38));
-        sink.Add("WoodBeam", PlaceGeometry(
-          MakeBox(width + 0.72, 0.11, 0.12, TILE_METERS.wood,
-            `${seed}:eave${half.side}`),
-          { x: eavePoint.x, y: roof.outerY + 0.08, z: eavePoint.z, ry }));
-        this.stats.villageDetails += 1;
+    const level = ruin && !far ? ruin.level : 0;
+    const roofRise = Math.max(0.18, roof.ridgeY - roof.outerY);
+    const solids = [];
+    if (level === 3) {
+      this.AddCollapsedRoofKit(sink, { x, z, ry, width, depth, floorY, seed, ruin });
+    } else {
+      const holeSide = level >= 2 ? (ruin.breachFront ? 1 : -1) : 0;
+      for (const half of roof.halves) {
+        if (half.side === holeSide) {
+          // 掀顶：坡面沿屋脊方向拆成两段，中段缺失，断口挑出两根断椽。
+          const holeW = Math.min(3.2, width * 0.42);
+          const holeCenter = (ruin.breachT - 0.5) * width;
+          const leftW = Math.max(0.6, holeCenter - holeW / 2 + width / 2);
+          const rightW = Math.max(0.6, width / 2 - (holeCenter + holeW / 2));
+          for (const [startX, stripW] of [[-width / 2, leftW], [width / 2 - rightW, rightW]]) {
+            const point = this.VillagePoint(x, z, ry, startX + stripW / 2, half.localZ);
+            sink.Add("RoofTile", PlaceGeometry(
+              MakeBox(stripW, 0.16, half.depth, TILE_METERS.roof,
+                `${seed}:holeslope${half.side}:${startX.toFixed(2)}`),
+              { x: point.x, y: half.centerY, z: point.z, ry, rx: half.rotationX }));
+            solids.push({
+              cx: point.x, cy: half.centerY, cz: point.z,
+              hx: stripW / 2, hy: roofRise / 2 + 0.11,
+              hz: (depth / 2 + 0.45) / 2,
+            });
+          }
+          for (const edge of [-1, 1]) {
+            const rafterPoint = this.VillagePoint(x, z, ry,
+              holeCenter + edge * (holeW / 2 + 0.06), half.localZ);
+            sink.Add("WoodBeam", PlaceGeometry(
+              MakeBox(0.09, 0.09, half.depth * 0.94, TILE_METERS.wood,
+                `${seed}:holerafter${half.side}:${edge}`),
+              { x: rafterPoint.x, y: half.centerY + 0.03, z: rafterPoint.z,
+                ry, rx: half.rotationX }));
+          }
+          this.stats.villageDetails += 2;
+        } else {
+          const point = this.VillagePoint(x, z, ry, 0, half.localZ);
+          sink.Add("RoofTile", PlaceGeometry(
+            MakeBox(half.width, 0.16, half.depth, TILE_METERS.roof,
+              `${seed}:slope${half.side}`),
+            { x: point.x, y: half.centerY, z: point.z, ry, rx: half.rotationX }));
+          solids.push({
+            cx: point.x, cy: half.centerY, cz: point.z,
+            hx: half.width / 2, hy: roofRise / 2 + 0.11,
+            hz: (depth / 2 + 0.45) / 2,
+          });
+          if (!far) {
+            const eavePoint = this.VillagePoint(x, z, ry, 0,
+              half.side * (depth / 2 + 0.38));
+            sink.Add("WoodBeam", PlaceGeometry(
+              MakeBox(width + 0.72, 0.11, 0.12, TILE_METERS.wood,
+                `${seed}:eave${half.side}`),
+              { x: eavePoint.x, y: roof.outerY + 0.08, z: eavePoint.z, ry }));
+            this.stats.villageDetails += 1;
+          }
+        }
       }
+      sink.Add("RoofTile", PlaceGeometry(
+        MakeBox(roof.ridgeLength, far ? 0.22 : 0.28, far ? 0.26 : 0.34,
+          TILE_METERS.roof, `${seed}:ridge`),
+        { x, y: roof.ridgeY + 0.08, z, ry }));
     }
-    sink.Add("RoofTile", PlaceGeometry(
-      MakeBox(roof.ridgeLength, far ? 0.22 : 0.28, far ? 0.26 : 0.34,
-        TILE_METERS.roof, `${seed}:ridge`),
-      { x, y: roof.ridgeY + 0.08, z, ry }));
 
     // 硬山两端高出坡面的三角山墙。原版村屋没有这两片，远看更像欧洲悬山屋。
-    const gableSteps = far ? 3 : 6;
+    // 三档塌顶只留一端烧剩的山尖，且整体压矮一档——孤零零的半截山墙
+    // 正是废墟剪影里最读得出「这里曾经有座房」的一笔。
+    const gableSteps = level === 3 ? 3 : far ? 3 : 6;
+    const gableScale = level === 3 ? 0.72 : 1;
     for (const end of [-1, 1]) {
+      if (level === 3 && end !== ruin.gableEnd) continue;
       for (let step = 0; step < gableSteps; step += 1) {
         const segmentDepth = depth / gableSteps;
         const localZ = -depth / 2 + segmentDepth * (step + 0.5);
         const triangle = 1 - Math.abs(localZ) / (depth / 2);
         const topY = eaveY + Math.max(0, roof.ridgeY - eaveY) * triangle;
-        const height = Math.max(0.08, topY - eaveY);
+        const height = Math.max(0.08, topY - eaveY) * gableScale;
         const point = this.VillagePoint(x, z, ry,
           end * (width / 2 + 0.08), localZ);
         sink.Add(wallMaterial, PlaceGeometry(
@@ -1437,7 +1646,7 @@ export class TengxianOutfield {
             wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
           { x: point.x, y: eaveY + height / 2, z: point.z, ry }));
       }
-      if (!far) {
+      if (!far && level < 3) {
         const vent = this.VillagePoint(x, z, ry, end * (width / 2 + 0.22), 0);
         sink.Add("WoodDoor", PlaceGeometry(
           MakeBox(0.07, 0.32, 0.34, TILE_METERS.wood, `${seed}:vent${end}`),
@@ -1445,7 +1654,7 @@ export class TengxianOutfield {
             ry: ry + Math.PI / 2 }));
       }
     }
-    return roof;
+    return { ...roof, collapsed: level === 3, solids };
   }
 
   AddVillageFacade(sink, {
@@ -1502,6 +1711,8 @@ export class TengxianOutfield {
     const {
       x, z, ry, width, depth, eave = 2.65, seed, kind = "ThreeBayBrick", far = false,
     } = options;
+    // 敞口棚本来就是空的，没有「塌」可言；远村只求轮廓，不加损毁细节。
+    const ruin = far || kind === "FarmShed" ? null : VillageRuinProfile(seed);
     const floorLift = kind === "Granary" ? 0.32 : 0;
     const foundation = this.SampleVillageFoundation(x, z, width, depth, ry, floorLift);
     const foundationHeight = foundation.floorY - foundation.bottomY;
@@ -1546,7 +1757,7 @@ export class TengxianOutfield {
         sink.Solid(post.x, foundation.floorY + bodyHeight / 2, post.z,
           0.08, bodyHeight / 2, 0.08, "villagePost", ry);
       }
-    } else {
+    } else if (!ruin || ruin.level === 0) {
       sink.Add(wallMaterial, PlaceGeometry(
         MakeBox(width, bodyHeight, depth,
           wallMaterial === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
@@ -1565,12 +1776,45 @@ export class TengxianOutfield {
           Math.max(0.1, depth / 2 - wallThickness), bodyHeight / 2,
           wallThickness / 2, "villageWall", ry + Math.PI / 2);
       }
-      if (kind === "StoneBaseHouse") {
-        sink.Add("DryStone", PlaceGeometry(
-          MakeBox(width + 0.06, 0.66, depth + 0.06,
-            TILE_METERS.stone, `${seed}:stoneBelt`),
-          { x, y: foundation.floorY + 0.33, z, ry }));
+    } else {
+      // 一档起：整块体量换成四面分段残墙（段顶错落），豁口从二档开始。
+      const breachSpot = this.AddVillageWallSlabs(sink, {
+        x, z, ry, width, depth, floorY: foundation.floorY,
+        bodyHeight, wallMaterial, seed, ruin,
+      });
+      if (ruin.level >= 2 && breachSpot) {
+        // 豁口外的瓦砾泼坡：碎砖石混着旧瓦，压住断口的几何断面。
+        this.AddVillageRubble(sink, {
+          x, z, ry, seed: `${seed}:spill`, lx: breachSpot.lx, lz: breachSpot.lz,
+          rx: 1.5, rz: 1.0, count: ruin.level === 3 ? 10 : 7,
+          materials: [wallMaterial, wallMaterial, "RoofTile", "DryStone"],
+        });
+        // 半张瓦面顺着豁口滑下来，斜插在瓦砾堆里——塌顶不是凭空消失的。
+        const slabPoint = this.VillagePoint(x, z, ry, breachSpot.lx, breachSpot.lz + 0.2);
+        sink.Add("RoofTile", PlaceGeometry(
+          MakeBox(1.6, 0.12, 1.1, TILE_METERS.roof, `${seed}:slidslab`),
+          { x: slabPoint.x, y: this.groundAt(slabPoint.x, slabPoint.z) + 0.22,
+            z: slabPoint.z, ry: ry + 0.2, rz: 0.5 }));
+        this.stats.villageDetails += 1;
       }
+      if (ruin.level === 3) {
+        // 塌顶后的屋内遗骸：塌下来的家当铺在原地。
+        this.AddVillageRubble(sink, {
+          x, z, ry, seed: `${seed}:inner`, rx: width * 0.3, rz: depth * 0.28,
+          count: 6, skirt: false,
+          materials: [wallMaterial, "RoofTile", "DryStone"],
+        });
+      }
+    }
+    if (kind === "StoneBaseHouse") {
+      sink.Add("DryStone", PlaceGeometry(
+        MakeBox(width + 0.06, 0.66, depth + 0.06,
+          TILE_METERS.stone, `${seed}:stoneBelt`),
+        { x, y: foundation.floorY + 0.33, z, ry }));
+    }
+    if (!ruin || ruin.level < 3) {
+      // 三档塌顶的壳子里门窗楣还挂着一半反而假：整面省掉，
+      // 让豁口和山尖自己说话。
       this.AddVillageFacade(sink, {
         x, z, ry, width, depth, floorY: foundation.floorY,
         eaveY: foundation.floorY + bodyHeight, seed,
@@ -1580,16 +1824,16 @@ export class TengxianOutfield {
 
     const roof = this.AddVillageRoof(sink, {
       x, z, ry, width, depth, eaveY: foundation.floorY + bodyHeight,
-      seed, wallMaterial, far,
+      floorY: foundation.floorY, seed, wallMaterial, far, ruin,
     });
     // Rapier 目前只需 Y 轴朝向；用两只贴合前后坡投影的薄盒近似瓦面。
     // 它们悬在 1.6 m 以上，不会被导航当成实心房屋足印。
-    const roofRise = Math.max(0.18, roof.ridgeY - roof.outerY);
-    for (const half of roof.halves) {
-      const roofPoint = this.VillagePoint(x, z, ry, 0, half.localZ);
-      sink.Solid(roofPoint.x, half.centerY, roofPoint.z,
-        half.width / 2, roofRise / 2 + 0.11,
-        (depth / 2 + 0.45) / 2, "villageRoof", ry);
+    // 三档塌顶没有瓦面，碰撞一并撤掉——射线和炮弹穿过的就是真的窟窿。
+    if (!roof.collapsed) {
+      for (const solid of roof.solids) {
+        sink.Solid(solid.cx, solid.cy, solid.cz,
+          solid.hx, solid.hy, solid.hz, "villageRoof", ry);
+      }
     }
     this.stats.villageBuildings += 1;
     this.stats.villageArchetypes[kind] = (this.stats.villageArchetypes[kind] || 0) + 1;
@@ -1598,9 +1842,24 @@ export class TengxianOutfield {
 
   AddVillageCourtyard(sink, { x, z, ry, width, depth, seed, material = "Adobe" }) {
     const wallHeight = 1.55;
+    // 院墙也吃炮火：每段 16% 概率整段塌成瓦砾线，院门 12% 概率只剩门框洞。
+    const courtRnd = Mulberry32(HashString(`${seed}:courtruin`));
+    const fallenSegments = new Set();
+    for (const key of ["north", "west", "east", "south-1", "south1"]) {
+      if (courtRnd() < 0.16) fallenSegments.add(key);
+    }
+    const gateFallen = courtRnd() < 0.12;
     const AddSegment = (localX, localZ, length, localRy, tag) => {
       const point = this.VillagePoint(x, z, ry, localX, localZ);
       const segmentRy = ry + localRy;
+      if (fallenSegments.has(tag)) {
+        this.AddVillageRubble(sink, {
+          x: point.x, z: point.z, ry: segmentRy, seed: `${seed}:${tag}`,
+          rx: length / 2, rz: 0.7, count: 4,
+          materials: [material, material, "DryStone"],
+        });
+        return;
+      }
       const groundY = this.groundAt(point.x, point.z);
       sink.Add(material, PlaceGeometry(
         MakeBox(length, wallHeight, 0.28,
@@ -1620,12 +1879,14 @@ export class TengxianOutfield {
       AddSegment(side * (gateWidth / 2 + southLength / 2), depth / 2,
         southLength, 0, `south${side}`);
     }
-    const gate = this.VillagePoint(x, z, ry, 0, depth / 2 + 0.03);
-    sink.Add("WoodDoor", PlaceGeometry(
-      MakeBox(gateWidth, 1.75, 0.09, TILE_METERS.wood, `${seed}:gate`),
-      { x: gate.x, y: this.groundAt(gate.x, gate.z) + 0.875, z: gate.z, ry }));
-    sink.Solid(gate.x, this.groundAt(gate.x, gate.z) + 0.875, gate.z,
-      gateWidth / 2, 0.875, 0.06, "villageGate", ry);
+    if (!gateFallen) {
+      const gate = this.VillagePoint(x, z, ry, 0, depth / 2 + 0.03);
+      sink.Add("WoodDoor", PlaceGeometry(
+        MakeBox(gateWidth, 1.75, 0.09, TILE_METERS.wood, `${seed}:gate`),
+        { x: gate.x, y: this.groundAt(gate.x, gate.z) + 0.875, z: gate.z, ry }));
+      sink.Solid(gate.x, this.groundAt(gate.x, gate.z) + 0.875, gate.z,
+        gateWidth / 2, 0.875, 0.06, "villageGate", ry);
+    }
     this.stats.villageDetails += 5;
   }
 
