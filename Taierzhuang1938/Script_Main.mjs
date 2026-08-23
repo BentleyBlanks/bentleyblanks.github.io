@@ -1293,12 +1293,11 @@ function SeedSmokeColumns(phase) {
   for (const entry of ranked.slice(0, 3)) {
     const { o } = entry;
     const y = battlefield.GroundHeight(o.x, o.z) + 1.1;
-    // 常驻烟柱是远方失火的方向提示，不是前景遮罩。旧参数（15/s、直径 22 m、
-    // 0.34 alpha）会把三根柱子的烟团叠到近乎不透明，读起来像穿过城墙的黑洞。
-    // 收成稀疏、缓慢扩散的羽流：近处仍有深色核心，顶端则由风和雾自然散掉。
+    // 常驻烟柱是远方失火的方向提示，不是前景遮罩。密度保留可辨认的团絮和
+    // 深色内芯，但不再叠成一块不透明黑布；摇摆与缓慢扩散来自上升气流。
     state.smokeHandles.push(vfx.SmokeSource({ x: o.x, y, z: o.z }, {
-      kind: "black", rate: 8, radius: 0.75, rise: 3.0,
-      sizeStart: 0.7, sizeEnd: 5.2, life: 7.5, opacity: 0.18, growthPower: 0.78,
+      kind: "black", rate: 10, radius: 0.72, rise: 3.0,
+      sizeStart: 0.58, sizeEnd: 5.8, life: 8.0, opacity: 0.22, growthPower: 0.90, turbulence: 0.30,
       fire: burning ? 0.35 : 0,
     }));
   }

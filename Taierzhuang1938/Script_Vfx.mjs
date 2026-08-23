@@ -201,6 +201,19 @@ void main() {
     + (iVelocity - iAccel / k) * ((1.0 - exp(-k * age)) / k)
     + iAccel * (age / k);
 
+#ifdef SHAPE_PUFF
+  // 常驻烟源把 iExtra.z 写成很小的上升流摆幅；没有写时仍是 -9999，
+  // max 后完全等价于旧弹道。两条不同频率的横向卷动不改变烟的总体风向，
+  // 只让同一根烟柱的团絮不再像一串对齐的圆片。
+  float plumeWobble = max(iExtra.z, 0.0);
+  if (plumeWobble > 0.0) {
+    float phase = iParams.w * 31.0;
+    float swell = plumeWobble * (0.20 + t01 * 0.95);
+    world.x += (sin(age * 0.77 + phase) - sin(phase)) * swell;
+    world.z += (sin(age * 1.13 + phase * 1.7) - sin(phase * 1.7)) * swell * 0.72;
+  }
+#endif
+
 #ifdef GROUND_BOUNCE
   // 假弹跳：陷得越深回弹越低，一定会停在地面上。真解算多次弹跳要迭代，
   // 而火星/碎块只需要"跳一下然后趴下"这个观感。
@@ -343,10 +356,15 @@ void main() {
   vec3 color = vColor;
 
 #if defined(SHAPE_PUFF)
-  // 烟/尘：圆盘 + 一层噪声把轮廓啃出缺口
-  float n = Vnoise(p * 2.1 + vec2(vSeed * 37.0, vSeed * 11.0));
-  float edge = 1.0 - 0.34 * n;
-  mask = smoothstep(edge, edge * 0.08, d);
+  // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
+  // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
+  // 多片叠起来才会出现烟羽的深浅团块。
+  float coarse = Vnoise(p * 1.9 + vec2(vSeed * 37.0, vSeed * 11.0));
+  float fine = Vnoise(p * 5.4 + vec2(vSeed * 19.0 + vAge01 * 1.7, vSeed * 29.0));
+  float edge = 0.76 + coarse * 0.26 - fine * 0.12;
+  float outer = smoothstep(edge, edge * 0.16, d);
+  float core = smoothstep(1.02, 0.08, d);
+  mask = outer * mix(0.46 + fine * 0.16, 1.0, core * core);
   mask *= mask;                                  // 中心厚、边缘薄，叠层才有体积
 #elif defined(SHAPE_STAR)
   // 枪口焰：不规则星芒 + 白核。两帧就灭，所以形状比动画重要。
@@ -1718,8 +1736,10 @@ export class VfxSystem {
       life: opts.life ?? 4.5,
       opacity: opts.opacity ?? 0.42,
       // 黑烟是持续上升的羽流，不能套爆炸烟“半程已膨到终值”的曲线。
-      // 发烟筒仍略快一些，让贴地扩散读得出来；其余保持原来的默认节奏。
+      // turbulence 让每个烟团以不同相位轻轻摆动：层级来自上升流，不是堆
+      // 更大的黑色透明片。发烟筒仍略快一些，让贴地扩散读得出来。
       growthPower: opts.growthPower ?? (kind === "black" ? 0.82 : kind === "screen" ? 1.35 : 2.0),
+      turbulence: opts.turbulence ?? (kind === "black" ? 0.28 : 0),
       fire: opts.fire ?? 0,
       colorA: opts.colorA || palette[0],
       colorB: opts.colorB || palette[1],
@@ -1922,6 +1942,9 @@ export class VfxSystem {
         s.ay = source.groundHug ? 0.05 : source.rise * BUOYANT_DRAG;
         s.az = this.wind.z * 0.5;
         s.drag = source.groundHug ? 0.9 : BUOYANT_DRAG;
+        // 标准烟团不走 GROUND_BOUNCE，故 iExtra.z 可安全作为羽流摇摆幅度。
+        // 负值是 ResetSpawn 的“未启用”哨兵，别让枪烟与尘土也开始摇。
+        s.groundY = source.turbulence > 0 ? source.turbulence : -9999;
         s.life = source.life * this._Range(0.75, 1.25);
         s.sizeStart = source.sizeStart;
         s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);
