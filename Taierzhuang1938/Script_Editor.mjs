@@ -1,7 +1,7 @@
 // 编辑器套件的外壳：右上角那个齿轮 + 一张「各编辑器入口开关」的面板 + 调度。
 //
 // ## 一次只开一个
-// 六个编辑器里有五个要**接管相机**（摄影棚 / 过场 / 自由飞行），
+// 八个编辑器里有七个要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
 // 所以入口面板是一排开关，但语义是「换到这一个」：开新的自动关旧的。
 // 这条写在面板上，不让人猜。
@@ -29,6 +29,8 @@ import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
+import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
+import { TerrainEditor } from "./Script_EditorTerrain.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
@@ -43,7 +45,8 @@ import {
  */
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
-  ActorEditor, WeaponEditor, AudioEditor, TimelineEditor, SceneEditor, DestructionEditor,
+  ActorEditor, WeaponEditor, AudioEditor, TimelineEditor,
+  SceneEditor, PropLibraryEditor, TerrainEditor, DestructionEditor,
 ];
 const ALL = [...SETTINGS, ...EDITORS];
 
@@ -63,6 +66,9 @@ export class EditorSuite {
     this.activeId = null;
     this.panelOpen = false;
     this.entries = new Map();
+    // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
+    // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
+    this.worldEditDocument = null;
 
     this.studio = new Studio({ scene: host.scene, camera: host.camera, library: host.library });
     this.flycam = new FlyCam(host.camera);
@@ -104,6 +110,11 @@ export class EditorSuite {
       SetViewmodelVisible: (on) => { if (host.viewmodel) host.viewmodel.root.visible = !!on; },
       SetHint: (text) => suite.SetHint(text),
       SetCrosshair: (on, mode = "") => suite.SetCrosshair(on, mode),
+      GetWorldEditDocument: () => (suite.worldEditDocument
+        ? JSON.parse(JSON.stringify(suite.worldEditDocument)) : null),
+      SetWorldEditDocument: (data) => {
+        suite.worldEditDocument = data ? JSON.parse(JSON.stringify(data)) : null;
+      },
       Close: () => suite.Close(),
     };
   }
@@ -188,7 +199,7 @@ export class EditorSuite {
     this.status = El("div", "edNote warn", "");
     body.appendChild(this.status);
     body.appendChild(El("div", "edNote",
-      "一次只开一个：五个编辑器都要接管相机，同时开会打架。"
+      "一次只开一个：预览与编辑工具会接管相机，同时开会打架。"
       + "开着任意一个时玩法暂停（与过场同一条通道）。"));
 
     this.workHost = El("div");

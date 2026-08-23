@@ -137,6 +137,34 @@ export function Slider(parent, {
 }
 
 /**
+ * 编辑器预览相机的投影参数。
+ *
+ * 这里只改正在被编辑器接管的相机；Studio / FlyCam 会在退出时把原始 FOV 与
+ * 远裁剪面完整还回去。三个世界预览工具共用这一份控件，避免某个入口改了
+ * projection matrix、另一个只改字段却忘记刷新。
+ */
+export function CameraProjectionControls(parent, camera, {
+  fovMin = 25, fovMax = 100, farMin = 100, farMax = 4000,
+} = {}) {
+  const Apply = (key, value) => {
+    camera[key] = value;
+    camera.updateProjectionMatrix();
+  };
+  const fov = Slider(parent, {
+    label: "FOV", min: fovMin, max: fovMax, step: 1, value: camera.fov,
+    format: (v) => `${v.toFixed(0)}°`,
+    onInput: (v) => Apply("fov", v),
+  });
+  const far = Slider(parent, {
+    label: "远裁剪面", min: farMin, max: farMax, step: 10,
+    value: Math.max(farMin, Math.min(farMax, camera.far)),
+    format: (v) => `${v.toFixed(0)} m`,
+    onInput: (v) => Apply("far", v),
+  });
+  return { fov, far };
+}
+
+/**
  * 下拉。options 可以是 ["a","b"] 或 [{value,label}]。
  */
 export function Select(parent, label, options, value, onChange) {

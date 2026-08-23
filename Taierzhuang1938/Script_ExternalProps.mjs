@@ -10,11 +10,11 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 
 const LOADER = new GLTFLoader();
 const ASSETS = Object.freeze({
-  house: { url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null },
-  cart: { url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam" },
-  fence: { url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam" },
-  crate: { url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor" },
-  rubble: { url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble" },
+  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null },
+  cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam" },
+  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam" },
+  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor" },
+  rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble" },
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
@@ -81,6 +81,34 @@ function ApplyRuntimeMaterial(root, material) {
   });
 }
 
+function CloneLoadedAsset(id, gltf, library) {
+  if (!gltf) return null;
+  const prop = gltf.scene.clone(true);
+  const spec = ASSETS[id];
+  ApplyRuntimeMaterial(prop, spec.material
+    ? library.Get(spec.material, { roughness: 0.9, metalness: 0 }) : null);
+  prop.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    object.userData.skipNormalDepth = false;
+  });
+  return prop;
+}
+
+/** Dedicated editor catalog; runtime placement coordinates stay private below. */
+export function ExternalPropCatalog() {
+  return Object.entries(ASSETS).map(([id, spec]) => ({
+    id, label: spec.label, url: spec.url, material: spec.material,
+  }));
+}
+
+/** Clone one runtime prop for the component-library studio without placing it in a level. */
+export async function InstantiateExternalProp(id, library) {
+  if (!ASSETS[id]) return null;
+  return CloneLoadedAsset(id, await LoadAsset(id), library);
+}
+
 /** Remove the previous level's visual-only props before its scene is disposed. */
 export function ClearExternalProps() {
   if (!liveRoot) return;
@@ -112,19 +140,11 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt }) {
   for (const placement of placements) {
     const gltf = models.get(placement.asset);
     if (!gltf) { failed.push(placement.asset); continue; }
-    const prop = gltf.scene.clone(true);
+    const prop = CloneLoadedAsset(placement.asset, gltf, library);
     prop.name = `External_${placement.asset}_${count}`;
     prop.position.set(placement.x, groundAt(placement.x, placement.z), placement.z);
     prop.rotation.y = placement.ry || 0;
     prop.scale.setScalar(placement.scale || 1);
-    ApplyRuntimeMaterial(prop, ASSETS[placement.asset].material
-      ? library.Get(ASSETS[placement.asset].material, { roughness: 0.9, metalness: 0 }) : null);
-    prop.traverse((object) => {
-      if (!object.isMesh) return;
-      object.castShadow = true;
-      object.receiveShadow = true;
-      object.userData.skipNormalDepth = false;
-    });
     root.add(prop);
     count += 1;
   }

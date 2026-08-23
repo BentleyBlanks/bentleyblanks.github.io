@@ -1,14 +1,14 @@
-// 场景编辑器：在**正在跑的这一关**里飞、摆、挖。
+// 场景关卡编辑器 + 场景/地形共享内核。
 //
 // ## 它编辑的是什么
 // 滕县的城不是摆出来的资产，是 Script_TengxianCity 按 Data_Tengxian 的图纸
 // **现生成**的（城墙、街、院落、地形全是程序化）。所以这个编辑器不去改那座城 ——
 // 改它要改图纸与生成规则，那是源码层的事。
 //
-// 它做的是**叠加层**：
+// 它做的是**叠加层**，但入口已经拆开：
 //   · 放置层：把 Script_World 里那批已经封装好的构件（院落、门楼、牌坊、警报楼、
-//     沙包、防空洞、寨墙段…）与 Model/*.tzm 里那几个模型摆到地上；
-//   · 地形层：一支笔刷，抬高 / 压低 / 挖坑 / 抹平。
+//     沙包、防空洞、寨墙段…）与 Model/*.tzm 里那几个模型摆到地上，由 SceneEditor 暴露；
+//   · 地形层：抬高 / 压低 / 挖坑 / 抹平，由 Script_EditorTerrain 的 TerrainEditor 暴露。
 // 两层都能存成 JSON 带走 —— 这是把「在现场调出来的位置」搬回图纸的通道。
 //
 // ## 地形笔刷改的是两样东西，必须同时改
@@ -24,7 +24,8 @@
 
 import * as THREE from "three";
 import {
-  Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea, El,
+  Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note, ListBox, TextArea, El,
+  CameraProjectionControls,
 } from "./Script_EditorUi.mjs";
 import { PickWorld, ScreenRay } from "./Script_EditorStage.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
@@ -49,7 +50,7 @@ const SAVE_KEY = "tengxian1938_sceneedit_v1";
  *   build    (sink, item) → void。**用世界坐标建**，只有 y 由外面补
  *            （构件全部以 y=0 起砌，濠外原野在 -1.2，所以整组再往下挪一点）
  */
-const PLACEABLE = [
+export const PLACEABLE = [
   {
     id: "Tree", name: "树", cat: "景观", uses: ["scale"], defaults: { scale: 1.1 },
     build: (sink, it) => AddTree(sink, { x: it.x, z: it.z, seed: it.seed, scale: it.scale }),
@@ -165,7 +166,7 @@ const PLACEABLE = [
  * **车辆进**：一辆停在街心的八九式是地标，不需要它会动就已经在讲故事了
  *（Data_Levels 里 L4 与 L6 的 vehicles 字段本来就写了它们的位置）。
  */
-const MODEL_PLACEABLE = MeshIds().filter((id) => {
+export const MODEL_PLACEABLE = MeshIds().filter((id) => {
   const entry = MESHES[id];
   return entry && (entry.category === "prop" || entry.category === "weapon"
     || entry.category === "vehicle");
@@ -178,7 +179,7 @@ for (const id of MODEL_PLACEABLE) {
   });
 }
 
-const CATS = ["景观", "院落小件", "工事", "建筑", "地标", "模型"];
+export const PLACEABLE_CATEGORIES = ["景观", "院落小件", "工事", "建筑", "地标", "模型"];
 
 /** 笔刷的落差场：中间满、边缘平滑到 0（余弦），不是硬圆盘。 */
 function BrushFalloff(distance, radius) {
@@ -186,15 +187,56 @@ function BrushFalloff(distance, radius) {
   return 0.5 + 0.5 * Math.cos((distance / radius) * Math.PI);
 }
 
+/**
+ * 用正片同一套生成器构建一个可放置构件的可见节点。
+ * 场景关卡编辑器与构件库预览器共用，避免预览器另抄一份“看起来差不多”的模型。
+ */
+export function BuildPlaceableVisual(target, entry, item, {
+  library, modelDocs = new Map(), ownedGeometries = [],
+} = {}) {
+  if (!entry) return { loaded: false, colliders: [], meshes: 0 };
+  if (entry.model) {
+    const doc = modelDocs.get(entry.model);
+    if (!doc) return { loaded: false, colliders: [], meshes: 0 };
+    const spec = MESHES[entry.model];
+    const materials = {};
+    for (const name of spec.materials) materials[name] = ResolveTengxianMaterial(name, library);
+    const built = InstantiateModel(doc, { materials });
+    built.root.position.set(item.x, item.h || 0, item.z);
+    built.root.rotation.y = item.ry || 0;
+    built.root.scale.setScalar(item.scale || 1);
+    target.add(built.root);
+    let meshes = 0;
+    built.root.traverse((node) => { if (node.isMesh) meshes += 1; });
+    return { loaded: true, colliders: [], meshes };
+  }
+
+  const sink = new BuildSink();
+  try {
+    entry.build(sink, item);
+  } catch (error) {
+    console.warn(`[SceneEditor] ${entry.id} 建不出来：${String(error).slice(0, 160)}`);
+  }
+  FlushSinkProps(sink, target, library, ownedGeometries);
+  const flushed = sink.Flush(target, library, { resolve: ResolveTengxianMaterial });
+  for (const mesh of flushed) ownedGeometries.push(mesh.geometry);
+  let meshes = 0;
+  target.traverse((node) => { if (node.isMesh) meshes += 1; });
+  return { loaded: true, colliders: sink.colliders, meshes };
+}
+
 export class SceneEditor {
   static id = "scene";
-  static label = "场景 / 地形";
-  static hint = "自由飞行、摆构件、挖地形，可存成 JSON";
+  static label = "场景关卡";
+  static hint = "切换关卡切片、自由飞行并布设 Prop；不编辑地形";
+  static panelTitle = "场景关卡编辑器";
+  static panelSub = "WASD+QE 飞 · 左键拖转头";
 
   constructor(host) {
     this.host = host;
     this.panel = null;
     this.cameraMode = "fly";
+    this.supportsTerrain = false;
 
     this.items = [];
     this.nextId = 1;
@@ -236,6 +278,7 @@ export class SceneEditor {
     this.gizmo = null;           // 落点指示（环 + 竖针）
     this.hover = null;           // 最近一次拾取结果
     this.lastTouched = null;     // 上一笔真的动到了多少个地面顶点
+    this.groundedObjectsDirty = false;
   }
 
   get field() { return this.host.game.battlefield; }
@@ -252,7 +295,8 @@ export class SceneEditor {
     this.host.flycam.Open();
     this.host.SetViewmodelVisible(false);
     this.panel = Panel({
-      title: "场景 / 地形编辑器", sub: "WASD+QE 飞 · 左键拖转头",
+      title: this.constructor.panelTitle || this.constructor.label,
+      sub: this.constructor.panelSub || "WASD+QE 飞",
       variant: "work wide", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -262,11 +306,12 @@ export class SceneEditor {
     this.LoadModels();
     // draw call 要按整帧量（一帧十几个 pass），关掉自动清零、每帧自己读自己清
     this.host.renderer.info.autoReset = false;
-    this.Restore();
+    this.RestoreSession();
     return this;
   }
 
   Exit() {
+    this.RememberDocument();
     this.ClearBuilt();
     this.DisposeGizmo();
     this.host.scene.remove(this.root);
@@ -293,6 +338,14 @@ export class SceneEditor {
   // -------------------------------------------------------------------------
 
   BuildUi(body) {
+    this.BuildLevelUi(body);
+    this.BuildCameraUi(body, ["look", "place", "move"]);
+    this.BuildPlacementUi(body);
+    this.BuildStorageUi(body);
+    this.BuildStatsUi(body);
+  }
+
+  BuildLevelUi(body) {
     const level = Section(body, "关卡切片");
     this.levelList = ListBox(level, {
       height: 132,
@@ -305,27 +358,31 @@ export class SceneEditor {
       id: p.id, name: p.label, tail: p.date || "", title: p.brief || "",
     })));
     this.levelFacts = Facts(level);
+  }
 
+  BuildCameraUi(body, modes = ["look"]) {
     const cam = Section(body, "相机");
-    Chips(cam, [
-      { value: "look", label: "看" },
-      { value: "place", label: "放置" },
-      { value: "move", label: "挪动所选" },
-      { value: "terrain", label: "地形笔刷" },
-    ], this.mode, (v) => this.SetMode(v));
+    const labels = {
+      look: "看", place: "放置", move: "挪动所选", terrain: "地形笔刷",
+    };
+    Chips(cam, modes.map((value) => ({ value, label: labels[value] || value })),
+      this.mode, (v) => this.SetMode(v));
     Slider(cam, {
       label: "飞行速度", min: 1, max: 80, step: 1, value: 14,
       format: (v) => `${v.toFixed(0)} m/s`,
       onInput: (v) => { this.host.flycam.speed = v; },
     });
+    this.projectionControls = CameraProjectionControls(cam, this.host.camera);
     ButtonRow(cam, [
       { label: "回到玩家", onClick: () => this.GoToPlayer() },
       { label: "把玩家挪来", onClick: () => this.BringPlayer() },
       { label: "俯瞰全城", onClick: () => this.TopDown() },
     ]);
+  }
 
+  BuildPlacementUi(body) {
     const put = Section(body, "构件库");
-    Chips(put, CATS, this.cat, (v) => { this.cat = v; this.FillPalette(); });
+    Chips(put, PLACEABLE_CATEGORIES, this.cat, (v) => { this.cat = v; this.FillPalette(); });
     this.palette = ListBox(put, { height: 150, onPick: (id) => this.SetPalette(id) });
     this.FillPalette();
     this.paramBox = El("div", "b");
@@ -345,7 +402,9 @@ export class SceneEditor {
     const solid = El("div", "edBtns");
     list.appendChild(solid);
     this.solidToggle = Toggle(solid, "碰撞盒生效", true, () => this.RebuildAll());
+  }
 
+  BuildTerrainUi(body) {
     const terrain = Section(body, "地形笔刷");
     Chips(terrain, [
       { value: "raise", label: "抬高" },
@@ -372,7 +431,11 @@ export class SceneEditor {
     Note(terrain, "刷得动的只有**城内台地**（|x|、|z| < 318 m，约 5.5 m 一个顶点）。"
       + "城外那张地面是绕城的方环，七百米以外每两百米才一个顶点 —— "
       + "在那儿落笔会被拒绝并提示，不会偷偷只改解析高程。");
+    Note(terrain, "场景关卡编辑器放置的构件会按自己的落地点重新采样地高："
+      + "地面抬升/下挖时，模型与碰撞盒会一起同步，不会悬空或埋进地里。", true);
+  }
 
+  BuildStorageUi(body) {
     const io = Section(body, "存取");
     ButtonRow(io, [
       { label: "存到本地", onClick: () => this.Save() },
@@ -382,7 +445,9 @@ export class SceneEditor {
     ]);
     this.io = TextArea(io, { rows: 3, placeholder: "{ \"v\":1, \"items\":[…], \"terrain\":[…] }" });
     this.ioNote = Note(io, `本地存档键：${SAVE_KEY}`);
+  }
 
+  BuildStatsUi(body) {
     const stats = Section(body, "取证");
     this.facts = Facts(stats);
   }
@@ -447,6 +512,11 @@ export class SceneEditor {
   }
 
   SetMode(mode) {
+    if (mode === "terrain" && !this.supportsTerrain) {
+      this.mode = "look";
+      this.host.SetHint("场景关卡编辑器不改地形；请切换到“地形编辑器”");
+      return;
+    }
     this.mode = mode;
     // 屏幕正中那个十字**不能用** —— 拾取走的是鼠标位置，两者压根不是一个点，
     // 画着它反而让人对着十字点。落点改用世界里那个环（RefreshGizmo）。
@@ -716,27 +786,16 @@ export class SceneEditor {
       const node = new THREE.Group();
       node.name = `Placed_${item.type}_${item.id}`;
       node.position.y = groundY;
-      if (entry.model) {
-        this.BuildModelItem(node, entry, item);
-      } else {
-        const sink = new BuildSink();
-        try {
-          entry.build(sink, item);
-        } catch (error) {
-          console.warn(`[SceneEditor] ${entry.id} 建不出来：${String(error).slice(0, 160)}`);
-        }
-        FlushSinkProps(sink, node, library, this.ownedGeometries);
-        for (const mesh of sink.Flush(node, library, { resolve: ResolveTengxianMaterial })) {
-          this.ownedGeometries.push(mesh.geometry);
-        }
-        if (addColliders) {
-          for (const box of sink.colliders) {
-            colliders.push({
-              min: [box.min[0], box.min[1] + groundY, box.min[2]],
-              max: [box.max[0], box.max[1] + groundY, box.max[2]],
-              tag: this.colliderTag,
-            });
-          }
+      const built = BuildPlaceableVisual(node, entry, item, {
+        library, modelDocs: this.modelDocs, ownedGeometries: this.ownedGeometries,
+      });
+      if (addColliders) {
+        for (const box of built.colliders) {
+          colliders.push({
+            min: [box.min[0], box.min[1] + groundY, box.min[2]],
+            max: [box.max[0], box.max[1] + groundY, box.max[2]],
+            tag: this.colliderTag,
+          });
         }
       }
       this.root.add(node);
@@ -757,21 +816,25 @@ export class SceneEditor {
       }
     }
     this.RefreshPlacedList();
+    this.groundedObjectsDirty = false;
   }
 
-  BuildModelItem(node, entry, item) {
-    const doc = this.modelDocs.get(entry.model);
-    if (!doc) return;
-    const spec = MESHES[entry.model];
-    const materials = {};
-    for (const name of spec.materials) materials[name] = ResolveTengxianMaterial(name, this.host.library);
-    // 枪的材质名（steel / wood）不在城的材质表里，退回材质库的同名配方
-    const built = InstantiateModel(doc, { materials });
-    built.root.position.set(item.x, item.h || 0, item.z);
-    built.root.rotation.y = item.ry || 0;
-    const scale = item.scale || 1;
-    built.root.scale.setScalar(scale);
-    node.add(built.root);
+  /**
+   * 让放置层跟着新的解析地高走。
+   *
+   * 涂抹过程中先只挪可见节点，保证每帧都贴地；松手后再 RebuildAll 一次，
+   * 把 AABB 与 Rapier 碰撞体按新高度重建。玩法此时暂停，不需要每个笔刷采样都
+   * 重建物理世界，但退出这一笔时视觉与碰撞必须落在同一个高度。
+   */
+  SyncGroundedObjects(rebuildColliders = false) {
+    const field = this.field;
+    if (!field) return;
+    for (const item of this.items) {
+      if (item.node) item.node.position.y = field.GroundHeight(item.x, item.z);
+    }
+    if (!this.items.length) { this.groundedObjectsDirty = false; return; }
+    if (rebuildColliders) this.RebuildAll();
+    else this.groundedObjectsDirty = true;
   }
 
   RefreshPlacedList() {
@@ -830,6 +893,10 @@ export class SceneEditor {
    * 网格只按**增量**更新。抬起手（Update 里看 viewport.dragging）这一笔就封口。
    */
   PaintTerrain(x, z, invert, dt) {
+    if (!this.supportsTerrain) {
+      this.host.SetHint("场景关卡编辑器不改地形；请切换到“地形编辑器”");
+      return;
+    }
     const kind = this.brush.kind;
     const radius = this.brush.radius;
     const step = Math.max(0.001, Math.min(0.05, dt || 1 / 60));
@@ -854,6 +921,7 @@ export class SceneEditor {
     if (near) {
       stroke.op.amount += amount;
       this.ApplyTerrainToMesh(stroke.op.x, stroke.op.z, radius, amount);
+      this.SyncGroundedObjects();
       return;
     }
 
@@ -871,6 +939,7 @@ export class SceneEditor {
     }
     this.terrainOps.push({ x, z, r: radius, amount });
     this.stroke = { op: this.terrainOps[this.terrainOps.length - 1], kind };
+    this.SyncGroundedObjects();
   }
 
   /**
@@ -928,12 +997,14 @@ export class SceneEditor {
     const op = this.terrainOps.pop();
     if (!op) return;
     this.ApplyTerrainToMesh(op.x, op.z, op.r, -op.amount);
+    this.SyncGroundedObjects(true);
   }
 
   ResetTerrain() {
     this.stroke = null;
     for (const op of this.terrainOps) this.ApplyTerrainToMesh(op.x, op.z, op.r, -op.amount);
     this.terrainOps.length = 0;
+    this.SyncGroundedObjects(true);
   }
 
   // -------------------------------------------------------------------------
@@ -955,7 +1026,9 @@ export class SceneEditor {
 
   Save() {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(this.Serialize()));
+      const data = this.Serialize();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      this.host.SetWorldEditDocument?.(data);
       this.ioNote.textContent = `已存：${this.items.length} 个构件 / ${this.terrainOps.length} 笔地形`;
     } catch (error) {
       this.ioNote.textContent = `存不进去：${String(error).slice(0, 80)}`;
@@ -966,27 +1039,44 @@ export class SceneEditor {
     let raw = null;
     try { raw = localStorage.getItem(SAVE_KEY); } catch (error) { raw = null; }
     if (!raw) { if (loud) this.ioNote.textContent = "本地没有存档"; return; }
-    this.Import(raw, loud);
+    // 读回存档属于装载完整共享文档；即使当前是“场景关卡”入口，也要把已经存在的
+    // 地形画出来，只是这个入口本身不提供任何地形修改动作。
+    this.Import(raw, loud, { terrain: true });
   }
 
-  Import(text, loud = true) {
+  RestoreSession() {
+    const data = this.host.GetWorldEditDocument?.();
+    if (data) this.Import(JSON.stringify(data), false, { terrain: true });
+    else this.Restore(false);
+  }
+
+  RememberDocument() {
+    this.host.SetWorldEditDocument?.(this.Serialize());
+  }
+
+  Import(text, loud = true, { terrain = this.supportsTerrain } = {}) {
     let data = null;
     try { data = JSON.parse(text); } catch (error) { data = null; }
     if (!data || !Array.isArray(data.items)) {
       if (loud) this.ioNote.textContent = "读不出来：JSON 不对";
       return;
     }
-    this.ResetTerrain();
+    if (terrain) this.ResetTerrain();
     this.items = data.items.map((it) => ({ ...it }));
     this.nextId = this.items.reduce((a, it) => Math.max(a, (it.id || 0) + 1), 1);
     this.selected = null;
     this.RebuildAll();
-    for (const op of data.terrain || []) {
-      this.terrainOps.push({ ...op });
-      this.ApplyTerrainToMesh(op.x, op.z, op.r, op.amount);
+    if (terrain) {
+      for (const op of data.terrain || []) {
+        this.terrainOps.push({ ...op });
+        this.ApplyTerrainToMesh(op.x, op.z, op.r, op.amount);
+      }
+      this.SyncGroundedObjects(true);
     }
-    this.ioNote.textContent = `读回：${this.items.length} 个构件 / ${this.terrainOps.length} 笔地形`
-      + (data.level ? `（存的是 ${data.level}）` : "");
+    if (this.ioNote) {
+      this.ioNote.textContent = `读回：${this.items.length} 个构件 / ${this.terrainOps.length} 笔地形`
+        + (data.level ? `（存的是 ${data.level}）` : "");
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1028,6 +1118,7 @@ export class SceneEditor {
     if ((!viewport || !viewport.dragging) && this.stroke) {
       this.stroke = null;
       this.paintAt = null;
+      if (this.groundedObjectsDirty) this.SyncGroundedObjects(true);
     }
 
     this.RefreshGizmo();
@@ -1097,7 +1188,7 @@ export class SceneEditor {
  * 那一份和城的生命周期绑在一起，这里不能借。**不展开的后果不是难看，是消失** ——
  * AddBarricade 整条沙包墙都在 props 里，不展开的话点了「沙包路障」什么也不出现。
  */
-function FlushSinkProps(sink, target, library, owned) {
+export function FlushSinkProps(sink, target, library, owned) {
   const matrices = [];
   for (const prop of sink.props) {
     if (prop.kind === "sandbags") { matrices.push(...prop.matrices); continue; }

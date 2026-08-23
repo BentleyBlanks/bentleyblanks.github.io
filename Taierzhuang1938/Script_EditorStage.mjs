@@ -238,6 +238,8 @@ export class FlyCam {
       position: this.camera.position.clone(),
       quaternion: this.camera.quaternion.clone(),
       fov: this.camera.fov,
+      near: this.camera.near,
+      far: this.camera.far,
     };
     // 从玩家当前视角接着飞，别把人瞬移到原点 —— 「我刚才在哪」是最要紧的上下文
     const e = new THREE.Euler().setFromQuaternion(this.camera.quaternion, "YXZ");
@@ -251,6 +253,8 @@ export class FlyCam {
     this.camera.position.copy(this.saved.position);
     this.camera.quaternion.copy(this.saved.quaternion);
     this.camera.fov = this.saved.fov;
+    this.camera.near = this.saved.near;
+    this.camera.far = this.saved.far;
     this.camera.updateProjectionMatrix();
     this.saved = null;
     this.keys.clear();
