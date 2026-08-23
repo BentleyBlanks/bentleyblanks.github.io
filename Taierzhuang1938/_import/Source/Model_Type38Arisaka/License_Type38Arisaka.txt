@@ -1,0 +1,11 @@
+Model Information:
+* title:	Type 38 Arisaka rifle
+* source:	https://sketchfab.com/3d-models/type-38-arisaka-rifle-40d06bd1d25b45e48fb9965c39901b13
+* author:	Snijboer (https://sketchfab.com/Snijboer)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Type 38 Arisaka rifle" (https://sketchfab.com/3d-models/type-38-arisaka-rifle-40d06bd1d25b45e48fb9965c39901b13) by Snijboer (https://sketchfab.com/Snijboer) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

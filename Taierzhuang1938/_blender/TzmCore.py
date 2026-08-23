@@ -422,7 +422,17 @@ def Decimate(bm, ratio):
     obj = _BmToObject(bm, "dec")
     mod = obj.modifiers.new("dec", "DECIMATE")
     mod.ratio = ratio
+    # collapse 默认输出以四边面为主，1 面折 2 三角，预算断言按三角数算会算出
+    # 一笔糊涂账；而且四边输出在深减面上经常减不动（实测卡在目标比例以上）。
+    # 管线反正要在导出时三角化，这里直接出三角，数量可预期。
+    mod.use_collapse_triangulate = True
+    # 不加这两步的话新加的修改器根本不会被求值：Blender 5.x 里 evaluated_get
+    # 拿到的还是**没带修改器**的网格，减面对输入毫无效果（实测 76k→56k，
+    # 加了 update 之后 76k→6.3k），而超预算的模型会带着 58k 三角"成功"写出，
+    # BuildAll 才在最后一刻把它判死。这是 2026-08 捷克式换模时逮到的。
+    bpy.context.view_layer.update()
     depsgraph = bpy.context.evaluated_depsgraph_get()
+    depsgraph.update()
     evaluated = obj.evaluated_get(depsgraph)
     out = bmesh.new()
     out.from_mesh(evaluated.to_mesh())

@@ -33,6 +33,14 @@ def _Src(name):
 
 
 # 每把枪对应一份可再分发的免费源。史实对应写在 Data_SourceLicenses.md。
+#
+# 外部模型的木/钢分区有三种喂法，按来源模型的结构选一种：
+#   nameBucket —— 按**对象祖先节点名**分桶（Sketchfab 的 UModeler 拆件经常把
+#                 All_Wood 整组挂在网格的父节点上，比材质名可靠）。
+#   matName    —— 按**材质名**分桶（颜色写在 baseColorFactor 里的低模）。
+#   colorSplit —— 按**面采样的漫反射颜色**分桶（整枪共用一张图、只有贴图里有木色）。
+# 不带这三种的走 matIndex / 槽名启发式。所有源图的 2K/4K 贴图都不进 Pages，
+# 运行时统一绑 steel/wood 两套 512px authored PBR（见 Data_SourceLicenses.md）。
 SOURCES = {
     "ZhongZheng": {
         "file": "Model_Kar98k.obj",
@@ -43,14 +51,36 @@ SOURCES = {
                 "剪影与 Kar98k 同族，全长按史实 1.110 m 缩放。",
     },
     "HanYang": {
-        "file": "Model_Kar98k.obj",
+        "file": os.path.join("Model_Gewehr88", "scene.gltf"),
         "lengthM": 1.250,
         "kind": "rifle",
-        "matIndex": {0: "wood", 1: "steel", 2: "steel"},
-        "jacket": True,
-        "note": "同一把 Kar98k 拉到汉阳造的 1.250 m，再套上 φ32 薄套筒。"
-                "套筒是八八式的剪影特征；完整 Gewehr 88 免费模 Sketchfab 要登录才能下。",
+        "matName": {"Material": "wood", "Material.004": "steel", "Material.005": "steel",
+                    "Material.006": "steel", "Material.007": "steel"},
+        "noDetails": True,
+        "mounts": {"muzzleZ": -1.003, "gripZ": -0.418, "sightZ": -0.160,
+                   "magY": BORE - 0.050, "magZ": -0.040},
+        "note": "CC-BY Gewehr 88（Sketchfab / TastyTony）→ 汉阳八八式。整长套筒、"
+                "曼利夏漏夹弹仓与露出式通条是八八式自带的剪影，不再用 Kar98k 拉长加套筒。"
+                "全长按史实 1.250 m。",
     },
+    "Type38": {
+        "file": os.path.join("Model_Type38Arisaka", "scene.gltf"),
+        "lengthM": 1.276,
+        "kind": "rifle",
+        # UModeler 拆件：木器整组叫 All_Wood，钢件按 End_Barrel / Receiver2 /
+        # Front_Barrel / Bolt_Part / Trigger / Type38_Magazine 等组名分散。
+        # 背带条按木色桶走（皮革/帆布读作棕件，别读成蓝钢条）。
+        "nameBucket": {"All_Wood": "wood", "Sling_Front": "wood",
+                       "Sling_BackStock": "wood", "Sling2": "wood"},
+        "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
+                   "magY": BORE - 0.036, "magZ": -0.060},
+        "note": "CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）→ 三八式。"
+                "防尘滑盖、直拉机柄、护翼准星、两道箍与通条齐备；全长按史实 1.276 m。",
+    },
+    # ZB-26 仍走程序化（BuildWeapons.BuildZb26）：Sketchfab 的 CC-BY 候选
+    # （Larkien 17.4k 面 / TTadive 9.5k 面）在 Blender 5.1 的减面上都卡在
+    # ~0.70 减不下去（全局 / 逐连通岛 / dissolve 三种路都试过），三角预算
+    # 6000 是任务书性能红线，放行不了。详见 Data_SourceLicenses.md。
     "Mauser96": {
         "file": "Model_MauserC96.glb",
         "lengthM": 0.288,
@@ -71,7 +101,13 @@ def _ImportFile(path):
         raise ValueError("不支持的枪模格式：%s" % path)
 
 
-def _GuessMaterial(slot_name, index, mat_index):
+def _GuessMaterial(slot_name, index, mat_index, mat_name=None, forced=None):
+    """决定一个面/零件的桶。优先级：强制桶（按节点名）→ 材质名表 → 槽索引表
+    → 名称启发式（wood/stock/grab/grip/handle）→ 默认 steel。"""
+    if forced:
+        return forced
+    if mat_name and slot_name in mat_name:
+        return mat_name[slot_name]
     if mat_index and index in mat_index:
         return mat_index[index]
     name = (slot_name or "").lower()
@@ -80,7 +116,106 @@ def _GuessMaterial(slot_name, index, mat_index):
     return "steel"
 
 
-def _Collect(mat_index=None, skip=()):
+def _ObjectBucket(obj, name_bucket):
+    """按对象自身的名字链（含祖先）匹配 nameBucket 的键。
+
+    Sketchfab 导出把 UModeler 的部件组名放在**父节点**上，网格对象本身通常叫
+    defaultMaterial —— 只读 obj.name 会全部落空。反例是重建的 Blender 命名
+    defaultMaterial.008，所以链上任何一层命中都算数。
+    """
+    if not name_bucket:
+        return None
+    chain = []
+    node = obj
+    while node is not None:
+        chain.append(node.name)
+        node = node.parent
+    for key, bucket in name_bucket.items():
+        if any(key in name for name in chain):
+            return bucket
+    return None
+
+
+def _BaseColorImage(material):
+    """取 Principled BSDF 的 Base Color 纹理图像（导入的 glTF 材质）。"""
+    if material is None or not material.use_nodes:
+        return None
+    tree = material.node_tree
+    if tree is None:
+        return None
+    principled = None
+    for node in tree.nodes:
+        if node.type == "BSDF_PRINCIPLED":
+            principled = node
+            break
+    if principled is not None:
+        link = principled.inputs.get("Base Color")
+        for conn in (link.links if link else []):
+            if conn.from_node.type == "TEX_IMAGE" and conn.from_node.image:
+                return conn.from_node.image
+    for node in tree.nodes:
+        if node.type == "TEX_IMAGE" and node.image:
+            return node.image
+    return None
+
+
+def _SplitByColor(part, image):
+    """把一份 bmesh 按漫反射采样色拆成 (steel, wood)。
+
+    只用来喂"整枪只有一张贴图"的模型：木器在贴图里是棕的（r 明显大于 b），
+    钢件是灰/蓝灰（r≈b）。采样的是 Blender 导入后的图像与 UV，双向一致，
+    不需要额外翻转。tile 模式下 UV 会越界（>1 或 <0），取模到 [0,1)。
+    """
+    if image is None or image.size[0] < 1 or image.size[1] < 1:
+        return part, None
+    pixel_count = image.size[0] * image.size[1]
+    pixels = image.pixels[:] or [0.0] * (pixel_count * 4)
+    uv_layer = part.loops.layers.uv.active
+    w, h = image.size
+    steel = bmesh.new()
+    wood = bmesh.new()
+    steel_verts = {}
+    wood_verts = {}
+
+    def Target(bm, map_v, face):
+        return (bm, map_v)
+
+    for face in part.faces:
+        if uv_layer is None:
+            bucket = "steel"
+        else:
+            u = v = 0.0
+            base = (0, 0)
+            for loop in face.loops:
+                u += loop[uv_layer].uv.x
+                v += loop[uv_layer].uv.y
+            u /= len(face.loops)
+            v /= len(face.loops)
+            x = min(w - 1, int((u % 1.0) * w))
+            y = min(h - 1, int((v % 1.0) * h))
+            idx = (y * w + x) * 4
+            r, g, b = pixels[idx], pixels[idx + 1], pixels[idx + 2]
+            # 木色：红通道明显高于蓝，且红>绿>蓝的整体趋势
+            bucket = "wood" if (r - b) > 0.05 and (r - g) > 0.015 else "steel"
+        bm, remap = Target(wood if bucket == "wood" else steel,
+                           wood_verts if bucket == "wood" else steel_verts, face)
+        verts = [remap.setdefault(v.index, bm.verts.new(v.co)) for v in face.verts]
+        try:
+            new_f = bm.faces.new(verts)
+            new_f.smooth = face.smooth
+        except ValueError:
+            pass  # 重复面：丢
+    part.free()
+    if not wood.faces:
+        wood.free()
+        wood = None
+    if not steel.faces:
+        steel.free()
+        steel = None
+    return steel, wood
+
+
+def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False):
     """把场景里的网格按 steel/wood 收成两个 bmesh。跳过 skip 里的对象名。"""
     skip = {s.lower() for s in skip}
     buckets = {"steel": [], "wood": []}
@@ -98,6 +233,16 @@ def _Collect(mat_index=None, skip=()):
         bmesh.ops.transform(raw, matrix=evaluated.matrix_world, verts=raw.verts[:])
         evaluated.to_mesh_clear()
         raw.faces.ensure_lookup_table()
+        forced = _ObjectBucket(obj, name_bucket)
+        if color_split:
+            image = None
+            if obj.material_slots and obj.material_slots[0].material:
+                image = _BaseColorImage(obj.material_slots[0].material)
+            steel_part, wood_part = _SplitByColor(raw, image)
+            for bucket, part in (("steel", steel_part), ("wood", wood_part)):
+                if part is not None and part.faces:
+                    buckets[bucket].append(part)
+            continue
         by_slot = {}
         for face in raw.faces:
             by_slot.setdefault(face.material_index, []).append(face)
@@ -106,7 +251,7 @@ def _Collect(mat_index=None, skip=()):
             slot_name = ""
             if slot_i < len(slots) and slots[slot_i].material:
                 slot_name = slots[slot_i].material.name
-            material = _GuessMaterial(slot_name, slot_i, mat_index)
+            material = _GuessMaterial(slot_name, slot_i, mat_index, mat_name, forced)
             part = raw.copy()
             drop = [f for f in part.faces if f.material_index != slot_i]
             bmesh.ops.delete(part, geom=drop, context="FACES")
@@ -146,7 +291,7 @@ def _Xform(bms, matrix):
         bm.normal_update()
 
 
-def _AlignLongAxisToZ(bms):
+def _AlignLongAxisToZ(bms, roll=1.0):
     lo, hi = _Aabb(bms)
     span = hi - lo
     axis = max(range(3), key=lambda i: span[i])
@@ -157,6 +302,13 @@ def _AlignLongAxisToZ(bms):
     else:
         rot = Matrix.Identity(4)
     _Xform(bms, rot)
+    # 长轴落位后，剩下两轴里跨度大的是「上下」。Sketchfab 的 Z-up 导出（没带
+    # -90° 旋转包装）会把高度留在 X 上，枪就侧躺 —— 绕 Z 转 90° 放回 Y。
+    # 方向由 roll（±1）控制，装进 SOURCES 便于按模型订正。
+    lo, hi = _Aabb(bms)
+    span = hi - lo
+    if span[0] > span[1]:
+        _Xform(bms, Matrix.Rotation(math.pi * 0.5 * roll, 4, "Z"))
 
 
 def _FlipIfGripIsAbove(bms, wood, steel):
@@ -203,20 +355,104 @@ def _Place(bms, steel, wood, length_m, kind):
     _Xform(bms, Matrix.Translation((shift_x, shift_y, shift_z)))
 
 
+def _SplitIslands(bm):
+    """按顶点连通把一张 bmesh 拆成若干独立 bmesh（原 bm 不动）。
+
+    有些来源模型是几百个小壳体叠出来的 —— 全局 DECIMATE 的 ratio 是「总面数
+    比例」，单壳体反复碰撞误差后整体根本减不动（捷克式实测卡在 0.70 上限）。
+    逐个壳体减面才能真的到比例。
+    """
+    bm.verts.index_update()
+    parent = list(range(len(bm.verts)))
+
+    def Find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for edge in bm.edges:
+        a, b = Find(edge.verts[0].index), Find(edge.verts[1].index)
+        if a != b:
+            parent[a] = b
+    groups = {}
+    for face in bm.faces:
+        groups.setdefault(Find(face.verts[0].index), []).append(face)
+    out = []
+    for faces in groups.values():
+        part = bm.copy()
+        part.faces.index_update()
+        keep = {f.index for f in faces}
+        drop = [f for f in part.faces if f.index not in keep]
+        bmesh.ops.delete(part, geom=drop, context="FACES")
+        loose_v = [v for v in part.verts if not v.link_faces]
+        if loose_v:
+            bmesh.ops.delete(part, geom=loose_v, context="VERTS")
+        loose_e = [e for e in part.edges if not e.link_faces]
+        if loose_e:
+            bmesh.ops.delete(part, geom=loose_e, context="EDGES")
+        if part.faces:
+            out.append(part)
+    return out
+
+
 def _DecimateToBudget(bms):
-    total = sum(len(bm.faces) for bm in bms)
-    # OBJ 的面可能是四边，WriteTzm 会三角化；按 2× 面数估一下上限
-    estimated = 0
-    for bm in bms:
-        estimated += sum(max(len(f.verts) - 2, 1) for f in bm.faces)
-    if estimated <= BUDGET:
-        return
-    ratio = max(0.12, (BUDGET * 0.92) / float(estimated))
-    replaced = []
-    for bm in bms:
-        decimated = Decimate(bm, ratio)
-        bm.free()
-        replaced.append(decimated)
+    # OBJ 的面可能是四边，WriteTzm 会三角化；按 max(len(f.verts)-2, 1) 估三角数
+    def Est(list_):
+        return sum(sum(max(len(f.verts) - 2, 1) for f in bm.faces) for bm in list_)
+
+    if Est(bms) <= BUDGET:
+        return None
+
+    # 1) 按连通岛逐个减面。多壳体来源（Sketchfab 拆件模型 = 一两百个独立壳体）
+    #    的全局 collapse 减到一半就停（捷克式实测卡在 0.70），因为壳与壳之间的
+    #    互相穿插让 quadric 无处下手；**在干净的原始网格上**逐个壳体减才能到比例
+    #    —— 顺序必须是先分岛、后全局，反过来（先全局后分岛）只会拿到被揉坏的网格。
+    islands = []          # (bucketIndex, bmesh)
+    for idx, bm in enumerate(bms):
+        islands.extend((idx, part) for part in _SplitIslands(bm))
+    movable = [(idx, part) for idx, part in islands if Est([part]) > 12]
+    total = sum(Est([part]) for _, part in movable)
+    if total > BUDGET * 0.92:
+        per_ratio = max(0.12, 0.85 * (BUDGET * 0.92) / float(total))
+        done = []
+        for idx, part in islands:
+            if Est([part]) <= 12:
+                done.append((idx, part))
+                continue
+            reduced = Decimate(part, per_ratio)
+            part.free()
+            done.append((idx, reduced))
+        buckets = {}
+        for idx, part in done:
+            buckets.setdefault(idx, []).append(part)
+        merged = []
+        for idx in sorted(buckets):
+            merged.append(Join(*buckets[idx]))
+        if Est(merged) <= BUDGET:
+            return merged
+        # 分岛减面没达标也要**用这份结果**继续跑全局（不能 free 了再回头引用）
+    else:
+        merged = [bm for _, bm in islands]
+
+    # 2) 兜底：全局 collapse 数轮（DECIMATE 的 ratio 按**面数**实现、预算按三角数，
+    #    四边折算留 0.85 余量；减不动就收下这份结果，不硬压到塌质量）。
+    replaced = list(merged)
+    for _ in range(3):
+        estimated = Est(replaced)
+        if estimated <= BUDGET:
+            break
+        ratio = max(0.12, 0.85 * (BUDGET * 0.92) / float(estimated))
+        prev_faces = sum(len(bm.faces) for bm in replaced)
+        next_ = []
+        for bm in replaced:
+            decimated = Decimate(bm, ratio)
+            bm.free()
+            next_.append(decimated)
+        unchanged = sum(len(bm.faces) for bm in next_) >= prev_faces
+        replaced = next_
+        if unchanged:
+            break
     return replaced
 
 
@@ -314,21 +550,24 @@ def _AddHistoricalDetails(name, steel, wood, length_m):
     return steel, wood
 
 
-def _Mounts(node, length_m, kind, lo, hi):
+def _Mounts(node, length_m, kind, lo, hi, spec):
+    """挂空节点。默认值沿用历史枪模的通用配方；spec["mounts"] 里的键可逐项覆盖
+    （muzzleZ / gripZ / sightZ / magY / magZ），与程序化 BuildWeapons.Mounts 对齐。"""
     muzzle_z = lo.z - 0.006
     if kind == "rifle":
-        grip_l = (0.0, -0.012, muzzle_z * 0.58)
-        sight_z = -0.165 * (length_m / 1.110)
-        mag = (0.0, BORE - 0.045, -0.055)
+        defaults = {"muzzleZ": muzzle_z, "gripZ": muzzle_z * 0.58,
+                    "sightZ": -0.165 * (length_m / 1.110),
+                    "magY": BORE - 0.045, "magZ": -0.055}
     else:
-        grip_l = (0.0, -0.012, -0.055)
-        sight_z = -0.078
-        mag = (0.0, BORE - 0.040, -0.062)
-    node.Child("muzzle", t=(0.0, BORE, muzzle_z))
+        defaults = {"muzzleZ": muzzle_z, "gripZ": -0.055,
+                    "sightZ": -0.078, "magY": BORE - 0.040, "magZ": -0.062}
+    cfg = dict(defaults)
+    cfg.update(spec.get("mounts") or {})
+    node.Child("muzzle", t=(0.0, BORE, cfg["muzzleZ"]))
     node.Child("gripR", t=(0.0, 0.0, 0.0))
-    node.Child("gripL", t=grip_l)
-    node.Child("sight", t=(0.0, BORE + 0.020, sight_z))
-    node.Child("magazine", t=mag)
+    node.Child("gripL", t=(0.0, -0.012, cfg["gripZ"]))
+    node.Child("sight", t=(0.0, BORE + 0.020, cfg["sightZ"]))
+    node.Child("magazine", t=(0.0, cfg["magY"], cfg["magZ"]))
 
 
 def BuildImported(name):
@@ -338,21 +577,26 @@ def BuildImported(name):
         raise FileNotFoundError(path)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _ImportFile(path)
-    buckets = _Collect(spec.get("matIndex"), spec.get("skip", ()))
+    buckets = _Collect(spec.get("matIndex"), spec.get("skip", ()),
+                       name_bucket=spec.get("nameBucket"),
+                       mat_name=spec.get("matName"),
+                       color_split=spec.get("colorSplit", False))
     if "steel" not in buckets:
         raise RuntimeError("%s 导入后没有钢件" % name)
     wood = buckets.get("wood")
     steel = buckets["steel"]
     bms = [bm for bm in (steel, wood) if bm is not None]
-    _AlignLongAxisToZ(bms)
+    _AlignLongAxisToZ(bms, spec.get("roll", 1.0))
     _FlipIfStockIsForward(bms, wood)
     _FlipIfGripIsAbove(bms, wood, steel)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
-    _BevelForFirstPerson(bms)
+    if not spec.get("noBevel"):
+        _BevelForFirstPerson(bms)
     if spec.get("jacket") and steel is not None:
         steel = _AddJacket(steel, spec["lengthM"])
         bms = [bm for bm in (steel, wood) if bm is not None]
-    steel, wood = _AddHistoricalDetails(name, steel, wood, spec["lengthM"])
+    if not spec.get("noDetails"):
+        steel, wood = _AddHistoricalDetails(name, steel, wood, spec["lengthM"])
     bms = [bm for bm in (steel, wood) if bm is not None]
     decimated = _DecimateToBudget(bms)
     if decimated is not None:
@@ -365,7 +609,7 @@ def BuildImported(name):
     if wood is not None:
         body.Add("wood", wood, tile=T_WOOD)
     body.Add("steel", steel, tile=T_STEEL)
-    _Mounts(body, spec["lengthM"], spec["kind"], lo, hi)
+    _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec)
     return root
 
 

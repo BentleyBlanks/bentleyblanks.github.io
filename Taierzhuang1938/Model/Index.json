@@ -130,11 +130,11 @@
    "name": "HanYang",
    "category": "weapon",
    "file": "HanYang.tzm.json",
-   "triangles": 2767,
+   "triangles": 4686,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 82293,
+   "bytes": 265644,
    "materials": [
     "steel",
     "wood"
@@ -149,14 +149,14 @@
    ],
    "bounds": {
     "min": [
-     -0.0308,
-     -0.14105,
+     -0.04024,
+     -0.12489,
      -0.995
     ],
     "max": [
-     0.03054,
-     0.07026,
-     0.25492
+     0.04028,
+     0.06824,
+     0.25476
     ]
    }
   },
@@ -198,11 +198,11 @@
    "name": "Type38",
    "category": "weapon",
    "file": "Type38.tzm.json",
-   "triangles": 1092,
+   "triangles": 4690,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 35464,
+   "bytes": 166263,
    "materials": [
     "steel",
     "wood"
@@ -217,14 +217,14 @@
    ],
    "bounds": {
     "min": [
-     -0.0225,
-     -0.051,
+     -0.04904,
+     -0.1299,
      -1.021
     ],
     "max": [
-     0.07293,
-     0.07012,
-     0.255
+     0.0491,
+     0.06677,
+     0.25462
     ]
    }
   },

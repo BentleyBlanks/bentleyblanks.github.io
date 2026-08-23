@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "6";
+const MESH_REV = "7";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -100,11 +100,12 @@ export const MESHES = {
   },
   HanYang: {
     file: "HanYang.tzm.json", category: "weapon",
-    triangles: 2767, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 4686, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.06134, 0.21131, 1.24992], lengthM: 1.250,
-    note: "汉阳造。同一把 Kar98k 拉到 1.250 m，再套上 φ32 薄套筒。"
-      + "**套筒是八八式的剪影特征** —— 没有它就跟中正式分不开。",
+    span: [0.08052, 0.19313, 1.24976], lengthM: 1.250,
+    note: "汉阳造。几何来自 CC-BY Gewehr 88（Sketchfab / TastyTony）—— 汉阳八八式"
+      + "的母型就是 Gewehr 88：整长套筒、曼利夏漏夹弹仓与露出式通条都是模型自带的，"
+      + "不再用 Kar98k 拉长加假套筒。",
     draws: { high: 2, medium: 2, low: 2 },
   },
   Zb26: {
@@ -118,11 +119,12 @@ export const MESHES = {
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",
-    triangles: 1092, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 4690, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.09543, 0.12112, 1.27600], lengthM: 1.276,
+    span: [0.09814, 0.19667, 1.27562], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "三八式。**机匣上方的防尘滑盖**是独门标志；拉机柄近乎水平、球头小。",
+    note: "三八式。几何来自 CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）："
+      + "机匣上方的防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条齐备。",
   },
   Mauser96: {
     file: "Mauser96.tzm.json", category: "weapon",

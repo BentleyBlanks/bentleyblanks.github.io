@@ -11,3 +11,6 @@ kar98k.obj
 mauserc96.glb
 mauserc96.blend
 Texture_*Source.png
+
+# Sketchfab 源包的贴图不进仓库（导入管线只用几何，Steel/Wood 共享 PBR 在 Texture/）
+Model_*/textures/
