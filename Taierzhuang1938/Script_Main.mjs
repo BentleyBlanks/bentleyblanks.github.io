@@ -42,6 +42,7 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
+import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -1025,6 +1026,7 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   if (destruction) destruction.Clear();
+  ClearExternalProps();
   if (battlefield) { battlefield.Dispose(); battlefield = null; }
   levelBounds = MakeLevelBounds(phase.bounds);
   const World = WorldClassFor(phase);
@@ -1049,6 +1051,11 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
   }
+  const external = await AddExternalProps({
+    scene, library, phaseId: phase.id,
+    groundAt: (x, z) => battlefield.GroundHeight(x, z),
+  });
+  battlefield.externalProps = external;
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
   // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
   if (gi) gi.SetWorld(battlefield);

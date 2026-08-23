@@ -121,6 +121,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         triangles: T.renderer.info.render.triangles,
         level,
         environment: T.Debug.Environment ? T.Debug.Environment() : null,
+        externalProps: T.battlefield?.externalProps || null,
         wallCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckWallCorridor
           ? T.battlefield.CheckWallCorridor() : null,
         sightCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckSightCorridor
@@ -208,6 +209,12 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
     if (health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
+    const expectedExternalProps = [3, 5, 4, 3, 2, 3, 3][phase];
+    if (!health.externalProps || health.externalProps.count !== expectedExternalProps
+      || health.externalProps.failed?.length) {
+      bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
+        + ` expected=${expectedExternalProps} failed=${health.externalProps?.failed?.join(",") || "none"}`);
+    }
   }
   const ok = bad.length === 0;
   if (!ok) failed += 1;
