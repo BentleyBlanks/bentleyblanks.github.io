@@ -24,6 +24,7 @@ import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
 import ImportWeapons                 # noqa: E402
+import ImportVehicles                # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
@@ -84,11 +85,12 @@ def main():
         jobs.append((name, "prop", builder, ""))
     jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,
                  "八九式重掷弹筒：筒身 + 螺杆 + 弧形驻钣。无两脚架，约 45° 手持发射。"))
-    jobs.append(("Type89Tank", "vehicle", BuildVehicles.BuildType89Tank,
-                 "八九式中战车：前起动轮抬高、履带前段上翘，炮塔偏前，塔后另有一挺机枪。"
-                 "装甲 6—17 mm。巷宽小于 2.5 m 进不来。"))
-    jobs.append(("Type94Tankette", "vehicle", BuildVehicles.BuildType94Tankette,
-                 "九四式轻装甲车（豆战车）：一挺机枪，车尾牵引钩 —— 它本来是拉弹药拖车的。"))
+    for name, builder in BuildVehicles.VEHICLE_BUILDERS.items():
+        # 掷弹筒是单兵武器（走上面 weapon 那行），不进 vehicle 名单
+        if name == "Type89Launcher":
+            continue
+        imported = ImportVehicles.BuilderFor(name)
+        jobs.append((name, "vehicle", imported or builder, ""))
 
     for name, category, builder, notes in jobs:
         ResetScene()

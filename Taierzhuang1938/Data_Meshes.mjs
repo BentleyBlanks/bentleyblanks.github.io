@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "7";
+const MESH_REV = "8";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -164,13 +164,14 @@ export const MESHES = {
   },
   Type89Tank: {
     file: "Type89Tank.tzm.json", category: "vehicle",
-    triangles: 1160, meshBlocks: 5, nodes: 8, joints: 1,
+    triangles: 1239, meshBlocks: 4, nodes: 8, joints: 1,
     materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
-    span: [2.14, 2.54, 4.2657],
-    draws: { high: 5, medium: 5, low: 5 },   // 车辆没有 accent 桶，低模无处可并
-    note: "八九式中战车（甲）。**前起动轮抬高、履带前段上翘**是它的剪影线；"
-      + "炮塔偏车体前部，塔后另有一挺机枪。装甲 6—17 mm，巷宽 < 2.5 m 进不来。"
-      + "炮塔是关节（turret），将来接载具系统直接转它。",
+    span: [2.18538, 2.56785, 4.26924],
+    draws: { high: 4, medium: 4, low: 4 },   // body 两桶（armor/track）+ turret 两桶（armor/steel）
+    note: "八九式中战车（甲）。几何来自 CC-BY Type 89 I-Go (Chi-Ro)（Sketchfab / snrnsrk5）："
+      + "炮塔偏前、塔后机枪与车体右前机枪球座、前起动轮抬高都是模型自带的。"
+      + "尺寸按史实 2.15 × 2.56 × 4.30 m 归一（2.19/2.57/4.27 为换模减面后实测）。"
+      + "装甲 6—17 mm，巷宽 < 2.5 m 进不来。炮塔是关节（turret），将来接载具系统直接转它。",
   },
   Type94Tankette: {
     file: "Type94Tankette.tzm.json", category: "vehicle",

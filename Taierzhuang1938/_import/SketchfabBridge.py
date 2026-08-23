@@ -52,6 +52,8 @@ def CompactSearch(results):
             "license": (r.get("license") or {}).get("label"),
             "faceCount": r.get("faceCount"),
             "vertexCount": r.get("vertexCount"),
+            "description": (r.get("description") or "")[:160],
+            "thumb": ((r.get("thumbnails") or {}).get("images") or [{}])[0].get("url"),
             "downloadable": r.get("isDownloadable"),
             "categories": [c.get("name") for c in (r.get("categories") or [])],
         })

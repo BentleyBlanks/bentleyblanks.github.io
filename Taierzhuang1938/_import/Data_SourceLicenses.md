@@ -35,14 +35,27 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，
 文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
 
-仍走 `_blender/BuildWeapons.py` 的史实程序化几何：
+## 战车（同样经本机 BlenderMCP 下载）
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
+|---|---|---|---|---|
+| 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；摄影测量件先 0.6 mm 焊接再逐连通岛减面到车辆预算 1600 三角（实测 1239）。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
+
+仍走 `_blender/BuildWeapons.py` / `BuildVehicles.py` 的程序化几何：
 
 - 捷克式 `Zb26`：Sketchfab 的 CC-BY 候选（Larkien `6920684e…` 17.4k 面 /
   TTadive `ced9fd15…` 9.5k 面）在这版 Blender 5.1 的减面里**卡在 ~0.70 压不下去**
   （全局 collapse、逐连通岛 collapse、dissolve 三条路都试过，最终三角数 6.5–6.7k），
   6000 三角是任务书性能红线，放行不了。现模保留上插直弹匣、提把、散热环与两脚架，
   且第一人称已改为模型路径。将来若换渲染器/减面算法，这两个 UID 可直接回炉。
-- 手榴弹、大刀、八九式掷弹筒：继续用已按史料尺寸建好的程序化模型。
+- 九四式轻装甲车 `Type94Tankette`：Sketchfab 仅有的 CC-BY 候选
+  （siaobai77 `ba15d7ee…`，49,999 面、单材质炮塔与车体融成一体、履带无分桶）
+  在 1600 三角预算与「炮塔必须是关节」的契约下不可用，保留程序化模型。
+- 十一年式轻机枪 `Type11` / 九二式重机枪 `Type92Hmg`：Sketchfab 无 CC-BY 候选
+  （试过 type 11 light machine、nambu machine gun、type 92 heavy machine gun、
+  japanese ww2 weapon/machine 等词条），保留运行时程序化兜底几何
+  （歪把子的左上方敞口方斗特征已做进兜底）。
+- 手榴弹、大刀、八九式重掷弹筒：程序化模型已按史料特征建好，无免费源可替换。
 
 CC0 不强制署名；表里的作者与链接是为了以后还能找回源文件。
 

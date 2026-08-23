@@ -396,12 +396,12 @@ def _SplitIslands(bm):
     return out
 
 
-def _DecimateToBudget(bms):
+def _DecimateToBudget(bms, budget=BUDGET):
     # OBJ 的面可能是四边，WriteTzm 会三角化；按 max(len(f.verts)-2, 1) 估三角数
     def Est(list_):
         return sum(sum(max(len(f.verts) - 2, 1) for f in bm.faces) for bm in list_)
 
-    if Est(bms) <= BUDGET:
+    if Est(bms) <= budget:
         return None
 
     # 1) 按连通岛逐个减面。多壳体来源（Sketchfab 拆件模型 = 一两百个独立壳体）
@@ -413,8 +413,8 @@ def _DecimateToBudget(bms):
         islands.extend((idx, part) for part in _SplitIslands(bm))
     movable = [(idx, part) for idx, part in islands if Est([part]) > 12]
     total = sum(Est([part]) for _, part in movable)
-    if total > BUDGET * 0.92:
-        per_ratio = max(0.12, 0.85 * (BUDGET * 0.92) / float(total))
+    if total > budget * 0.92:
+        per_ratio = max(0.12, 0.85 * (budget * 0.92) / float(total))
         done = []
         for idx, part in islands:
             if Est([part]) <= 12:
@@ -429,7 +429,7 @@ def _DecimateToBudget(bms):
         merged = []
         for idx in sorted(buckets):
             merged.append(Join(*buckets[idx]))
-        if Est(merged) <= BUDGET:
+        if Est(merged) <= budget:
             return merged
         # 分岛减面没达标也要**用这份结果**继续跑全局（不能 free 了再回头引用）
     else:
@@ -440,9 +440,9 @@ def _DecimateToBudget(bms):
     replaced = list(merged)
     for _ in range(3):
         estimated = Est(replaced)
-        if estimated <= BUDGET:
+        if estimated <= budget:
             break
-        ratio = max(0.12, 0.85 * (BUDGET * 0.92) / float(estimated))
+        ratio = max(0.12, 0.85 * (budget * 0.92) / float(estimated))
         prev_faces = sum(len(bm.faces) for bm in replaced)
         next_ = []
         for bm in replaced:
