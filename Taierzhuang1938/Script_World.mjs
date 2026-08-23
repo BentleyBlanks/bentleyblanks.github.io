@@ -804,62 +804,159 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
   if (rnd() < 0.5) AddWaterVat(sink, x + cos * (length / 2 + 0.5), z - sin * (length / 2 + 0.5), `${seed}:v`);
 }
 
-/** 杨树/柳树：三四月枝条透光、新叶初展，**不做浓密树冠**。 */
-export function AddTree(sink, { x, z, seed = "t", scale = 1, material = "TreeBark", height = 0, baseY = 0 }) {
-  const rnd = Mulberry32(HashString(seed));
-  // height 给死的话就照给的高度长（濠岸的柳比街边的杨矮一档），否则按老规矩随机
-  const h = height > 0 ? height : (5.5 + rnd() * 3.0) * scale;
-  const trunk = new THREE.CylinderGeometry(0.13 * scale, 0.22 * scale, h, 8, 3);
-  const pos = trunk.attributes.position;
-  for (let i = 0; i < pos.count; i += 1) {
-    const t = (pos.getY(i) + h / 2) / h;
-    pos.setX(i, pos.getX(i) + Math.sin(t * 3.1 + rnd()) * 0.12 * scale * t);
-    pos.setZ(i, pos.getZ(i) + Math.cos(t * 2.3 + rnd()) * 0.10 * scale * t);
+// 三月的乔木没有树叶可帮忙遮形，树干与枝桠本身必须读得出树形。这里不再用
+// "一根杆 + 一圈十字枝"：每根大枝从树干生出、折向天空，再分出细枝；根颈由
+// 加粗的下段主干承托。所有点都在本地坐标系里算，最后才一次性平移到世界坐标，避免
+// 旧版二级枝被 x/z 平移两次而漂到树干外。
+const TREE_UP = new THREE.Vector3(0, 1, 0);
+
+function ApplyTreeBarkUv(geometry, length, offset = 0) {
+  const uv = geometry.attributes.uv;
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setXY(index, uv.getX(index) * 1.55 + offset, uv.getY(index) * length / 0.45);
   }
-  trunk.computeVertexNormals();
-  const uv = trunk.attributes.uv;
-  // h/1.2 会把一棵 7 m 的树只切成六格，树皮被竖着拉成一根水泥杆上的条纹。
-  // h/0.45 才是"一格 45 cm"的树皮尺度
-  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 0.45);
-  sink.Add(material, PlaceGeometry(trunk, { x, y: baseY + h / 2, z }));
-  // 枝条：几根细长的分叉，不加叶片团
-  //
-  // 事故（第 1 轮视觉审查抓到的）：枝条中心放在 cos(a)*len*0.42*sin(tilt)，
-  // 而旋转写的是 rz = cos(a)*tilt, rx = sin(a)*tilt —— 位置的方位角基与欧拉角的
-  // 方位角基根本不是同一套，结果是三四根枝条**跟树干脱开、悬在半空**。
-  // 改法：先把枝条的原点从"杆中点"挪到"根端"（PlaceGeometry y: len/2），
-  // 之后整根按 ry = a 转方位、rz = tilt 扳倒，再摆到树干上的挂点。
-  // 这样根端永远压在 (0, h*t, 0) 上，怎么转都接得住。
-  const branches = [];
-  // 挂点从 0.45—0.95 收到 0.62—0.96：杨柳的枝在上三分之一，下面是净杆
-  const count = 11 + Math.floor(rnd() * 6);
-  for (let i = 0; i < count; i += 1) {
-    const t = 0.62 + rnd() * 0.34;
-    const len = (1.2 + rnd() * 2.2) * scale;
-    const a = rnd() * Math.PI * 2;
-    const tilt = 0.5 + rnd() * 0.7;
-    const g = PlaceGeometry(
-      new THREE.CylinderGeometry(0.02 * scale, 0.06 * scale, len, 5), { y: len / 2 });
-    const anchor = { x: 0, y: h * t, z: 0, ry: a, rz: tilt };
-    branches.push(PlaceGeometry(g, anchor));
-    // 二级枝：轮廓端点数从 9 个升到 40 个上下，才读得出"三月枝条透光、新叶未展"
-    for (let j = 0; j < 3; j += 1) {
-      const sub = (0.34 + rnd() * 0.10) * len;
-      const along = 0.45 + j * 0.22 + rnd() * 0.12;
-      const g2 = PlaceGeometry(
-        new THREE.CylinderGeometry(0.010 * scale, 0.022 * scale, sub, 4), { y: sub / 2 });
-      // 先在主枝的局部系里挂好（沿主枝长度 along、再偏 0.5—0.9 rad），
-      // 然后整体套上主枝那一套 anchor —— 父子变换手动展开一层
-      const local = PlaceGeometry(g2, {
-        y: len * along,
-        ry: rnd() * Math.PI * 2,
-        rz: 0.5 + rnd() * 0.4,          // 相对主枝再偏 0.5—0.9 rad
-      });
-      branches.push(PlaceGeometry(local, anchor));
+  uv.needsUpdate = true;
+  return geometry;
+}
+
+/** 一截连接两点的锥形枝干。Cylinder 的两端严格贴在 from / to，绝不悬枝。 */
+function MakeTreeLimb(from, to, baseRadius, tipRadius, sides = 6, uvOffset = 0) {
+  const direction = to.clone().sub(from);
+  const length = direction.length();
+  if (length < 0.001) return null;
+  const geometry = ApplyTreeBarkUv(
+    new THREE.CylinderGeometry(tipRadius, baseRadius, length, sides, 1), length, uvOffset,
+  );
+  const rotation = new THREE.Quaternion().setFromUnitVectors(TREE_UP, direction.normalize());
+  const midpoint = from.clone().add(to).multiplyScalar(0.5);
+  geometry.applyMatrix4(new THREE.Matrix4().compose(
+    midpoint, rotation, new THREE.Vector3(1, 1, 1),
+  ));
+  return geometry;
+}
+
+function StemPoint(points, height, t) {
+  const y = t * height;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const from = points[index];
+    const to = points[index + 1];
+    if (y <= to.y || index === points.length - 2) {
+      const span = Math.max(0.001, to.y - from.y);
+      return from.clone().lerp(to, Math.max(0, Math.min(1, (y - from.y) / span)));
     }
   }
-  sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: baseY, z }));
-  sink.Solid(x, baseY + h / 2, z, 0.3 * scale, h / 2, 0.3 * scale, "prop");
+  return points[points.length - 1].clone();
+}
+
+/**
+ * 造一棵落叶乔木的骨架。profile 只控制树种剪影；枝条层级、树干弯曲与根部都由
+ * seed 固定，出图与编辑器每次重建都会得到同一棵树。
+ */
+function AddLeaflessTree(sink, {
+  x, z, seed, scale, material, height, baseY,
+}, profile) {
+  const rnd = Mulberry32(HashString(seed));
+  const h = height > 0 ? height : (profile.heightMin + rnd() * profile.heightRange) * scale;
+  const shapeScale = h / profile.referenceHeight;
+  const baseRadius = profile.baseRadius * shapeScale;
+  const branchScale = h * profile.branchScale;
+  const trunkLean = profile.trunkLean * shapeScale;
+  const geometries = [];
+  const addLimb = (from, to, base, tip, sides = 6) => {
+    const limb = MakeTreeLimb(from, to, base, tip, sides, rnd() * 3);
+    if (limb) geometries.push(limb);
+  };
+
+  // 四段主干让树有重量和生长方向，而不是一根笔直的电线杆。
+  const stem = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3((rnd() - 0.5) * trunkLean * 0.45, h * 0.28,
+      (rnd() - 0.5) * trunkLean * 0.45),
+    new THREE.Vector3((rnd() - 0.5) * trunkLean, h * 0.58,
+      (rnd() - 0.5) * trunkLean),
+    new THREE.Vector3((rnd() - 0.5) * trunkLean * 1.35, h * 0.79,
+      (rnd() - 0.5) * trunkLean * 1.35),
+    new THREE.Vector3((rnd() - 0.5) * trunkLean * 1.6, h,
+      (rnd() - 0.5) * trunkLean * 1.6),
+  ];
+  // 加宽第一截的根颈。横向根须在当前低机位会与地表形成黑色十字，不如让体量
+  // 留在真正可读的树干上。
+  const stemRadii = [baseRadius * 1.30, baseRadius * 0.88, baseRadius * 0.56,
+    baseRadius * 0.34, baseRadius * 0.12];
+  for (let index = 0; index < stem.length - 1; index += 1) {
+    addLimb(stem[index], stem[index + 1], stemRadii[index], stemRadii[index + 1], 8);
+  }
+
+  // 大枝不按一层等高的轮生排布：每一根先拱出去，再向上分叉。远中景读到的
+  // 是一个有呼吸的枝网，而不是路牌上的十字架。
+  const branchCount = profile.branchCount + Math.floor(rnd() * profile.branchJitter);
+  const crownTop = 0.91 + rnd() * 0.05;
+  const crownSpan = crownTop - profile.crownStart;
+  const spin = rnd() * Math.PI * 2;
+  for (let index = 0; index < branchCount; index += 1) {
+    const tier = branchCount > 1 ? index / (branchCount - 1) : 0;
+    const t = profile.crownStart + crownSpan * tier + (rnd() - 0.5) * 0.075;
+    const anchor = StemPoint(stem, h, Math.max(profile.crownStart, Math.min(crownTop, t)));
+    const angle = spin + index / branchCount * Math.PI * 2 + (rnd() - 0.5) * 0.56;
+    const horizontal = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+    const len = branchScale * (profile.branchMin + rnd() * (profile.branchMax - profile.branchMin));
+    const rise = len * (profile.riseMin + rnd() * (profile.riseMax - profile.riseMin));
+    const knee = anchor.clone()
+      .addScaledVector(horizontal, len * (0.42 + rnd() * 0.10))
+      .add(new THREE.Vector3((rnd() - 0.5) * len * 0.12, rise * 0.44,
+        (rnd() - 0.5) * len * 0.12));
+    const tip = anchor.clone().addScaledVector(horizontal, len)
+      .add(new THREE.Vector3(0, rise, 0));
+    const limbRadius = baseRadius * (0.36 + rnd() * 0.14);
+    addLimb(anchor, knee, limbRadius, limbRadius * 0.68, 6);
+    addLimb(knee, tip, limbRadius * 0.68, limbRadius * 0.34, 6);
+
+    // 每根大枝的两条二级枝形成真正的分叉节奏；顶端再留一根短梢，保持三月
+    // "枝条透光"，却不退回到稀疏杆状物。
+    for (let childIndex = 0; childIndex < 2; childIndex += 1) {
+      const along = 0.30 + childIndex * 0.36 + rnd() * 0.12;
+      const childStart = anchor.clone().lerp(tip, along);
+      const side = childIndex === 0 ? -1 : 1;
+      const childAngle = angle + side * (0.48 + rnd() * 0.38);
+      const childHorizontal = new THREE.Vector3(Math.cos(childAngle), 0, Math.sin(childAngle));
+      const childLength = len * (0.38 + rnd() * 0.17);
+      const childTip = childStart.clone().addScaledVector(childHorizontal, childLength)
+        .add(new THREE.Vector3(0, childLength * (0.28 + rnd() * 0.24), 0));
+      const childBase = limbRadius * (0.42 + rnd() * 0.10);
+      addLimb(childStart, childTip, childBase, childBase * 0.35, 5);
+
+      const twigAngle = childAngle + (rnd() - 0.5) * 0.72;
+      const twigLength = childLength * (0.36 + rnd() * 0.14);
+      const twigTip = childTip.clone().add(
+        new THREE.Vector3(Math.cos(twigAngle) * twigLength, twigLength * (0.30 + rnd() * 0.25),
+          Math.sin(twigAngle) * twigLength),
+      );
+      addLimb(childTip, twigTip, childBase * 0.34, Math.max(0.009, childBase * 0.13), 4);
+    }
+    const leaderAngle = angle + (rnd() - 0.5) * 0.44;
+    const leaderLength = len * (0.24 + rnd() * 0.12);
+    addLimb(tip, tip.clone().add(new THREE.Vector3(
+      Math.cos(leaderAngle) * leaderLength, leaderLength * (0.50 + rnd() * 0.18),
+      Math.sin(leaderAngle) * leaderLength,
+    )), limbRadius * 0.30, Math.max(0.008, limbRadius * 0.09), 4);
+  }
+
+  sink.Add(material, PlaceGeometry(MergeGeometries(geometries), { x, y: baseY, z }));
+  sink.Solid(x, baseY + h / 2, z, baseRadius * 1.45, h / 2, baseRadius * 1.45, "prop");
+}
+
+/** 杨树/柳树：三四月枝条透光、新叶尚未展开，靠真实分叉而非一团假树冠读形。 */
+export function AddTree(sink, {
+  x, z, seed = "t", scale = 1, material = "TreeBark", height = 0, baseY = 0,
+}) {
+  AddLeaflessTree(sink, { x, z, seed, scale, material, height, baseY }, {
+    heightMin: 5.5, heightRange: 3.0, referenceHeight: 7.0,
+    baseRadius: 0.22, branchScale: 1,
+    trunkLean: 0.28, crownStart: 0.46,
+    branchCount: 7, branchJitter: 3,
+    branchMin: 0.17, branchMax: 0.30,
+    riseMin: 0.16, riseMax: 0.38,
+  });
 }
 
 /**
@@ -913,41 +1010,15 @@ export function AddPoplar(sink, {
   x, z, seed = "poplar", scale = 1, height = 0, baseY = 0,
   material = "TreeBark",
 }) {
-  const rnd = Mulberry32(HashString(seed));
-  const h = height > 0 ? height : (8.5 + rnd() * 3.5) * scale;
-  const trunk = new THREE.CylinderGeometry(0.10 * scale, 0.19 * scale, h, 8, 2);
-  // 主干几乎不弯：只给一点点漂移
-  const pos = trunk.attributes.position;
-  for (let i = 0; i < pos.count; i += 1) {
-    const t = (pos.getY(i) + h / 2) / h;
-    pos.setX(i, pos.getX(i) + Math.sin(t * 1.7 + rnd()) * 0.05 * scale * t);
-  }
-  trunk.computeVertexNormals();
-  const uv = trunk.attributes.uv;
-  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 0.45);
-  sink.Add(material, PlaceGeometry(trunk, { x, y: baseY + h / 2, z }));
-  // 枝条全部聚在顶部 28%，倾角很小（贴着主干往上蹿），二级枝更短更陡
-  const branches = [];
-  const count = 7 + Math.floor(rnd() * 4);
-  for (let i = 0; i < count; i += 1) {
-    const t = 0.72 + rnd() * 0.26;
-    const len = (1.6 + rnd() * 2.0) * scale;
-    const a = rnd() * Math.PI * 2;
-    const tilt = 0.14 + rnd() * 0.30;
-    branches.push(PlaceGeometry(
-      PlaceGeometry(new THREE.CylinderGeometry(0.018 * scale, 0.05 * scale, len, 5),
-        { y: len / 2 }),
-      { y: h * t, ry: a, rz: tilt }));
-    for (let j = 0; j < 2; j += 1) {
-      const sub = (0.30 + rnd() * 0.12) * len;
-      branches.push(PlaceGeometry(PlaceGeometry(
-        new THREE.CylinderGeometry(0.008 * scale, 0.02 * scale, sub, 4),
-        { y: sub / 2, ry: rnd() * Math.PI * 2, rz: 0.25 + rnd() * 0.3 }),
-        { y: h * t, ry: a, rz: tilt }));
-    }
-  }
-  sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: baseY, z }));
-  sink.Solid(x, baseY + h / 2, z, 0.24 * scale, h / 2, 0.24 * scale, "prop");
+  AddLeaflessTree(sink, { x, z, seed, scale, material, height, baseY }, {
+    heightMin: 8.5, heightRange: 3.5, referenceHeight: 10.0,
+    baseRadius: 0.19, branchScale: 1,
+    // 杨树的净杆长、主干直；枝网收在顶端并向上抽，不拿柳树的横向披挂来套。
+    trunkLean: 0.09, crownStart: 0.62,
+    branchCount: 6, branchJitter: 3,
+    branchMin: 0.12, branchMax: 0.20,
+    riseMin: 0.34, riseMax: 0.62,
+  });
 }
 
 /**
@@ -981,9 +1052,11 @@ export function AddOrchardTree(sink, {
         new THREE.CylinderGeometry(0.014 * scale, 0.03 * scale, sub, 4),
         { y: sub / 2, ry: rnd() * Math.PI * 2, rz: 0.5 + rnd() * 0.5 }),
         {
-          x: x - Math.sin(tilt) * Math.cos(a) * len * f,
-          y: baseY + boleH + Math.cos(tilt) * len * f,
-          z: z + Math.sin(tilt) * Math.sin(a) * len * f,
+          // branches 是本地几何，树整体会在 sink.Add 时平移到 x/z/baseY。
+          // 这里再塞世界坐标会把二级枝挪两次，果树就像爆炸了一样散开。
+          x: -Math.sin(tilt) * Math.cos(a) * len * f,
+          y: boleH + Math.cos(tilt) * len * f,
+          z: Math.sin(tilt) * Math.sin(a) * len * f,
         }));
     }
   }
