@@ -152,10 +152,12 @@ Rules:
   改高度图或序章地形后必须跑 `Script_HeightmapCli.mjs verify`、
   `Script_JieheTerrainTest.mjs` 与 `Script_BootTest.mjs`。
 - 测试按爆炸半径分档，入口 `node Taierzhuang1938/Script_TestRunner.mjs`
-  （默认 = Tier 0 每次必跑；`--domain=…` 领域专项；`--list` 查全表）。
-  分级依据、领域归属与当前已知红清单见
+  （默认 = Tier 0 每次必跑；优先用 `--changed=origin/master` 自动追加受影响的
+  Tier 1；`--domain=…` 显式领域也会叠加 Tier 0；`--list` 查全表）。
+  PlayTest 历史红会显示为 `BASELINE`，只有新增红默认阻断；需要历史红也阻断时加
+  `--strict-baseline`。分级依据、自动映射与当前基线见
   `Taierzhuang1938/docs/Data_TestTiers.md`；新增测试必须在 runner 的
-  `TestDefs` 登记。
+  `testDefs` 登记，并通过 `Script_TestRunnerTest.mjs` 的完整性扫描。
 
 ## BehindTheLines Documentation
 

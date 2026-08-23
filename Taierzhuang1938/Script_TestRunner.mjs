@@ -1,38 +1,62 @@
 // ===========================================================================
 // Script_TestRunner.mjs —— 台儿庄白盒的测试分级入口
 //
-// 22 个测试不该每次全跑，也不该靠人肉记“改了 X 要跑哪几个”。
-// 这里按爆炸半径分三档，一次说清：
+// 现有测试按爆炸半径分三档：
+//   Tier 0：每次改动必跑的整机安全网与纯 Node 快测。
+//   Tier 1：按领域触发的自动深度探针；--changed 可从 Git 改动自动推断。
+//   Tier 2：对机器敏感或需要人工看图的低频审查，不被 --changed 自动触发。
 //
-//   Tier 0（每次改动必跑）: BootTest + PlayTest + 两个纯 Node 测试。
-//       PlayTest 是真浏览器端到端通关（输入→开火→AI→目标点→阵亡→过关），
-//       跨模块回归由它兜底——不管你在哪个模块改的代码。
-//   Tier 1（按领域触发，--domain=…）: 只在深碰某子系统时加跑深度探针。
-//       共享底座（高度图/物理）的领域串着下游一起跑；叶子系统（音频/语音/
-//       编辑器）碰了才跑。
-//   Tier 2（低频人工）: 出图与性能红线，对机器敏感、要人看，不进常规回归。
+// 常用命令：
+//   node Taierzhuang1938/Script_TestRunner.mjs
+//   node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master
+//   node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain
+//   node Taierzhuang1938/Script_TestRunner.mjs --tier=1
+//   node Taierzhuang1938/Script_TestRunner.mjs --tier=2
+//   node Taierzhuang1938/Script_TestRunner.mjs --only=PlayTest
+//   node Taierzhuang1938/Script_TestRunner.mjs --list
 //
-// 用法：
-//   node Taierzhuang1938/Script_TestRunner.mjs                 # = --tier=0
-//   node Taierzhuang1938/Script_TestRunner.mjs --tier=2        # 低频审查类
-//   node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain # 领域专项
-//   node Taierzhuang1938/Script_TestRunner.mjs --only=PlayTest  # 单挑一个
-//   node Taierzhuang1938/Script_TestRunner.mjs --list           # 列出全部分级
-//
-// 输出纪律：子进程输出默认只留失败尾巴（省 token），--verbose 才透传全程。
-// 分级依据详见 docs/Data_TestTiers.md。worktree 里直接 node 本脚本，
-// 不要经 npm run（npm 会把 cwd 挪回主仓库，测的是另一棵树）。
+// 默认只透出子测试的阶段行和每分钟心跳；失败时打印尾部，--verbose 透传全程。
+// PlayTest 的历史红按断言名显式基线化：历史红仍显示，但只有新增红使默认命令失败；
+// --strict-baseline 可让历史红也返回失败。
 // ===========================================================================
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DirHere = path.dirname(fileURLToPath(import.meta.url));
+const fileHere = fileURLToPath(import.meta.url);
+const dirHere = path.dirname(fileHere);
+const repoRoot = path.resolve(dirHere, "..");
+const defaultTimeoutMs = 10 * 60 * 1000;
+const heartbeatMs = 60 * 1000;
+const maxCaptureChars = 4 * 1024 * 1024;
 
-const TestDefs = {
-  BootTest: { file: "Script_BootTest.mjs", desc: "七关开机冒烟 + draw call/triangles 红线" },
-  PlayTest: { file: "Script_PlayTest.mjs", desc: "真浏览器端到端通关，15 组断言，跨模块安全网" },
+const playTestExpectedFailures = [
+  "六十秒内全场开火计数 > 200",
+  "玩家亲手击杀：日方票恰好 -1（没有双扣）",
+  "打中了有回执：屏幕记号 hit + 听觉 hitConfirm，且不误报击杀",
+  "打死了给的是击杀回执：记号 kill + 听觉 killConfirm，之后自己消失",
+  "P4 夜袭的携行是 L3_WhiteTowel：一支长枪、一支短枪、肩背大刀",
+  "头六十秒全场开火 > 200",
+  "姿态决定被发现的距离：60 m 上站着的看得见、趴着的看不见，30 m 上趴着的照样看得见",
+  "场上的人用的是 Blender 模型，不是退回的方块",
+  "单人 draw call 在预算内（≤26）",
+  "Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
+];
+
+export const testDefs = {
+  BootTest: {
+    file: "Script_BootTest.mjs",
+    timeoutMs: 4 * 60 * 1000,
+    desc: "七关开机冒烟 + draw call/triangles 红线",
+  },
+  PlayTest: {
+    file: "Script_PlayTest.mjs",
+    timeoutMs: 20 * 60 * 1000,
+    expectedFailures: playTestExpectedFailures,
+    desc: "真浏览器端到端通关，130 条断言，跨模块安全网",
+  },
+  TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: ".tzm.json 绑定模型数据（纯 Node，秒级）" },
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
@@ -50,6 +74,7 @@ const TestDefs = {
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
   JieheTerrainTest: { file: "Script_JieheTerrainTest.mjs", desc: "界河高度图采样与贴地" },
+  TengxianLayoutTest: { file: "Script_TengxianLayoutTest.mjs", desc: "滕县城防、街路与功能区布局（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
@@ -59,21 +84,37 @@ const TestDefs = {
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
-  GiTest: { file: "Script_GiTest.mjs", desc: "全局光照开关对照" },
-  PerformanceTest: { file: "Script_PerformanceTest.mjs", desc: "帧率/负载实测（对机器敏感）" },
-  FrameProfileTest: { file: "Script_FrameProfileTest.mjs", desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
-  GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", desc: "体积光方向性性能回归（对机器敏感）" },
-  DeathViewTest: { file: "Script_DeathViewTest.mjs", desc: "阵亡镜头出图（人工审）" },
-  ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], desc: "逐关逐机位实拍出图（人工审）" },
+  GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
+  PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
+  FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
+  GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
+  DeathViewTest: { file: "Script_DeathViewTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "阵亡镜头出图（人工审）" },
+  ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 30 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
 };
 
-const Tier0 = ["BootTest", "PlayTest", "HudPromptTest", "RiggedModelTest", "FractureBakeTest", "CutsceneControlTest"];
-const Tier2 = ["ShotTest", "GiTest", "PerformanceTest", "DeathViewTest", "FrameProfileTest", "GodRaysPerformanceTest"];
+export const tier0 = [
+  "BootTest",
+  "PlayTest",
+  "TestRunnerTest",
+  "HudPromptTest",
+  "RiggedModelTest",
+  "FractureBakeTest",
+  "CutsceneControlTest",
+];
 
-const Domains = {
+export const tier2 = [
+  "ShotTest",
+  "GiTest",
+  "PerformanceTest",
+  "DeathViewTest",
+  "FrameProfileTest",
+  "GodRaysPerformanceTest",
+];
+
+export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -91,125 +132,476 @@ const Domains = {
   editor: { label: "场景编辑器/可破坏编辑器", tests: ["EditorTest", "DestructionEditorTest"] },
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
-    label: "渲染/GI/视觉审查（ActorBatch 是产品契约，其余人工审）",
-    tests: ["GiTest", "ActorBatchTest", "DeathViewTest", "ShotTest"],
+    label: "渲染与合批自动契约",
+    tests: ["ActorBatchTest"],
+    tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
-  perf: { label: "性能红线实测", tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest"] },
+  perf: {
+    label: "性能红线实测（仅提示 Tier 2，不自动跑）",
+    tests: [],
+    tier2Tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest"],
+  },
 };
 
-function ParseArgs(argv) {
-  const opts = { tier: null, domains: [], only: [], list: false, verbose: false, failFast: false };
+const changedDomainRules = [
+  { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
+  { domain: "physics", pattern: /(Physics|Player|Navigation|Movement|Jump|Destruction|Fracture|Battlefield|Outfield)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input)/i },
+  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle)/i },
+  { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Script_Input|index\.html)/i },
+  { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
+  { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
+  { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
+  { domain: "editor", pattern: /(Editor|Data_Levels)/i },
+  { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|\.glsl|index\.html)/i },
+  { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
+];
+
+let activeChild = null;
+let interruptedSignal = null;
+
+function Unique(values) {
+  return [...new Set(values)];
+}
+
+export function GetTier1Tests() {
+  return Unique(Object.values(domains).flatMap((domain) => domain.tests))
+    .filter((name) => !tier0.includes(name) && !tier2.includes(name));
+}
+
+function ValidateDomains(names) {
+  for (const name of names) {
+    if (!domains[name]) throw new Error(`未知 domain=${name}（用 --list 查）`);
+  }
+}
+
+export function ValidateRegistry() {
+  const classified = new Set([...tier0, ...tier2]);
+  for (const domain of Object.values(domains)) {
+    for (const name of [...domain.tests, ...(domain.tier2Tests ?? [])]) classified.add(name);
+  }
+  for (const name of classified) {
+    if (!testDefs[name]) throw new Error(`分级引用了未登记测试：${name}`);
+  }
+  for (const [name, def] of Object.entries(testDefs)) {
+    if (!classified.has(name)) throw new Error(`测试未归入 tier/domain：${name}`);
+    if (!path.isAbsolute(def.file) && !def.file.endsWith(".mjs")) {
+      throw new Error(`测试文件扩展名异常：${name} -> ${def.file}`);
+    }
+  }
+}
+
+function ValidateOptions(opts) {
+  const hasOnly = opts.only.length > 0;
+  const hasSelectors = opts.tier !== null || opts.domains.length || opts.domainOnly.length || opts.changedBase;
+  if (hasOnly && hasSelectors) throw new Error("--only 不能和 --tier/--domain/--domain-only/--changed 混用");
+  if (opts.domainOnly.length && (opts.domains.length || opts.changedBase || opts.tier !== null)) {
+    throw new Error("--domain-only 是排障专用的独占选择器，不能和其他选择器混用");
+  }
+  if (opts.tier === 2 && (opts.domains.length || opts.changedBase)) {
+    throw new Error("--tier=2 是独立人工审查档，不能和 --domain/--changed 混用");
+  }
+}
+
+export function ParseArgs(argv) {
+  const opts = {
+    tier: null,
+    domains: [],
+    domainOnly: [],
+    only: [],
+    changedBase: null,
+    list: false,
+    dryRun: false,
+    verbose: false,
+    failFast: false,
+    strictBaseline: false,
+  };
   for (const raw of argv) {
-    const arg = raw.replace(/^--/, "");
+    if (!raw.startsWith("--")) throw new Error(`参数必须以 -- 开头：${raw}`);
+    const arg = raw.slice(2);
     const eq = arg.indexOf("=");
     const key = eq === -1 ? arg : arg.slice(0, eq);
     const val = eq === -1 ? "" : arg.slice(eq + 1);
     if (key === "list") opts.list = true;
+    else if (key === "dry-run") opts.dryRun = true;
     else if (key === "verbose") opts.verbose = true;
     else if (key === "fail-fast") opts.failFast = true;
-    else if (key === "tier") opts.tier = Number(val);
-    else if (key === "domain") opts.domains.push(...val.split(",").filter(Boolean));
-    else if (key === "only") opts.only.push(...val.split(",").filter(Boolean));
+    else if (key === "strict-baseline") opts.strictBaseline = true;
+    else if (key === "changed") opts.changedBase = val || "origin/master";
+    else if (key === "tier") {
+      if (!/^[012]$/.test(val)) throw new Error(`未知 tier=${val || "(空)"}（可用：0、1、2）`);
+      opts.tier = Number(val);
+    } else if (key === "domain") {
+      if (!val) throw new Error("--domain 需要 =领域名");
+      opts.domains.push(...val.split(",").filter(Boolean));
+    } else if (key === "domain-only") {
+      if (!val) throw new Error("--domain-only 需要 =领域名");
+      opts.domainOnly.push(...val.split(",").filter(Boolean));
+    } else if (key === "only") {
+      if (!val) throw new Error("--only 需要 =测试名");
+      opts.only.push(...val.split(",").filter(Boolean));
+    }
     else throw new Error(`未知参数：${raw}`);
   }
+  opts.domains = Unique(opts.domains);
+  opts.domainOnly = Unique(opts.domainOnly);
+  opts.only = Unique(opts.only);
+  ValidateOptions(opts);
   return opts;
 }
 
-function ResolveSelection(opts) {
-  let names = [];
-  if (opts.only.length) names = opts.only;
-  else if (opts.tier === 0 || (opts.tier === null && !opts.domains.length)) names = Tier0.slice();
-  else if (opts.tier === 2) names = Tier2.slice();
-  else if (opts.tier !== null) throw new Error(`未知 tier=${opts.tier}（可用：0、2；领域用 --domain=…）`);
-  for (const d of opts.domains) {
-    if (!Domains[d]) throw new Error(`未知 domain=${d}（用 --list 查）`);
-    names.push(...Domains[d].tests);
-  }
-  const seen = new Set();
-  return names.filter((n) => (seen.has(n) ? false : (seen.add(n), true)));
+export function ResolveSelection(opts, inferredDomains = []) {
+  ValidateDomains([...opts.domains, ...opts.domainOnly, ...inferredDomains]);
+  if (opts.only.length) return opts.only.slice();
+  if (opts.tier === 2) return tier2.slice();
+  if (opts.domainOnly.length) return Unique(opts.domainOnly.flatMap((name) => domains[name].tests));
+
+  const names = tier0.slice();
+  if (opts.tier === 1) names.push(...GetTier1Tests());
+  for (const name of Unique([...opts.domains, ...inferredDomains])) names.push(...domains[name].tests);
+  return Unique(names);
 }
 
-function RunOne(name, def, verbose) {
+function RunGitLines(args) {
+  const result = spawnSync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.error) throw new Error(`git ${args.join(" ")} 启动失败：${result.error.message}`);
+  if (result.status !== 0) {
+    const detail = (result.stderr || result.stdout || "未知错误").trim();
+    throw new Error(`git ${args.join(" ")} 失败：${detail}`);
+  }
+  return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+export function CollectChangedFiles(base = "origin/master") {
+  return Unique([
+    ...RunGitLines(["diff", "--name-only", `${base}...HEAD`]),
+    ...RunGitLines(["diff", "--name-only", "HEAD"]),
+    ...RunGitLines(["ls-files", "--others", "--exclude-standard"]),
+  ]).sort();
+}
+
+export function InferDomains(files) {
+  const found = new Set();
+  const unmatchedProjectFiles = [];
+  const allAutomatedDomains = Object.keys(domains).filter((name) => domains[name].tests.length);
+  const testByFile = new Map(Object.entries(testDefs).map(([name, def]) => [def.file, name]));
+
+  for (const rawFile of files) {
+    const file = rawFile.replaceAll("\\", "/");
+    if (!file.startsWith("Taierzhuang1938/")) continue;
+    const leaf = path.posix.basename(file);
+    let matched = false;
+
+    if (leaf === "Script_Main.mjs") {
+      for (const name of allAutomatedDomains) found.add(name);
+      matched = true;
+    }
+    if (leaf === "Data_Levels.mjs") {
+      for (const name of ["terrain", "physics", "ai", "editor", "cutscene", "render"]) found.add(name);
+      matched = true;
+    }
+    if (leaf === "Data_Battle.mjs") {
+      for (const name of ["combat", "ai"]) found.add(name);
+      matched = true;
+    }
+    if (/^(Data_Tengxian|Script_TengxianCity|Script_TengxianLayoutTest)\.mjs$/.test(leaf)) {
+      for (const name of ["terrain", "editor", "render"]) found.add(name);
+      matched = true;
+    }
+
+    const testName = testByFile.get(leaf);
+    if (testName) {
+      for (const [domainName, domain] of Object.entries(domains)) {
+        if ([...domain.tests, ...(domain.tier2Tests ?? [])].includes(testName)) found.add(domainName);
+      }
+      matched = true;
+    }
+
+    for (const rule of changedDomainRules) {
+      if (rule.pattern.test(file)) {
+        found.add(rule.domain);
+        matched = true;
+      }
+    }
+    if (!matched) unmatchedProjectFiles.push(file);
+  }
+  return { domains: [...found], unmatchedProjectFiles };
+}
+
+export function GetTier2Recommendations(domainNames) {
+  return Unique(domainNames.flatMap((name) => domains[name]?.tier2Tests ?? []));
+}
+
+function AppendCaptured(current, chunk) {
+  const combined = current + chunk.toString("utf8");
+  if (combined.length <= maxCaptureChars) return combined;
+  return `……（输出超过 ${Math.round(maxCaptureChars / 1024 / 1024)} MiB，前部已截断）\n${combined.slice(-maxCaptureChars)}`;
+}
+
+function MakeCollector(name, verbose, target, append) {
+  let partial = "";
+  return (chunk) => {
+    append(chunk);
+    if (verbose) {
+      target.write(chunk);
+      return;
+    }
+    partial += chunk.toString("utf8");
+    const lines = partial.split(/\r?\n/);
+    partial = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.startsWith("--- ")) console.log(`[${name}] ${line}`);
+    }
+  };
+}
+
+function KillProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  } else {
+    child.kill("SIGTERM");
+  }
+}
+
+export function RunOne(name, def, verbose = false) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
-    const child = spawn(process.execPath, [path.join(DirHere, def.file), ...(def.args ?? [])], {
-      cwd: DirHere,
+    const timeoutMs = def.timeoutMs ?? defaultTimeoutMs;
+    const child = spawn(process.execPath, [path.join(dirHere, def.file), ...(def.args ?? [])], {
+      cwd: dirHere,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
-    const chunks = [];
-    const collect = (chunk) => {
-      chunks.push(chunk);
-      if (verbose) process.stdout.write(chunk);
+    activeChild = child;
+    let text = "";
+    let timedOut = false;
+    let settled = false;
+    const append = (chunk) => { text = AppendCaptured(text, chunk); };
+    child.stdout.on("data", MakeCollector(name, verbose, process.stdout, append));
+    child.stderr.on("data", MakeCollector(name, verbose, process.stderr, append));
+
+    const heartbeat = setInterval(() => {
+      const secs = Math.round((Date.now() - startedAt) / 1000);
+      console.log(`[runner] … ${name} 已运行 ${secs}s（上限 ${Math.round(timeoutMs / 1000)}s）`);
+    }, heartbeatMs);
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      text = AppendCaptured(text, `\nrunner 超时：${Math.round(timeoutMs / 1000)}s\n`);
+      KillProcessTree(child);
+    }, timeoutMs);
+
+    const Finish = (code, signal = null) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(heartbeat);
+      clearTimeout(timeout);
+      if (activeChild === child) activeChild = null;
+      resolve({ name, code, signal, timedOut, ms: Date.now() - startedAt, text });
     };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
-    child.on("close", (code) => resolve({
-      name, code, ms: Date.now() - startedAt,
-      text: Buffer.concat(chunks).toString("utf8"),
-    }));
-    child.on("error", (err) => resolve({
-      name, code: -1, ms: Date.now() - startedAt,
-      text: `spawn 失败：${err.message}\n`,
-    }));
+    child.on("close", Finish);
+    child.on("error", (error) => {
+      text = AppendCaptured(text, `\nspawn 失败：${error.message}\n`);
+      Finish(-1);
+    });
   });
 }
 
-function Tail(text, lines = 60) {
+export function ExtractFailureEntries(text) {
+  const marker = text.lastIndexOf("没过的：");
+  if (marker === -1) return [];
+  const summary = text.slice(marker);
+  return [...summary.matchAll(/^\s*·\s+(.+?)\s+—\s*(.*)$/gm)].map((match) => ({
+    name: match[1].trim(),
+    detail: match[2].trim(),
+  }));
+}
+
+export function ExtractFailureNames(text) {
+  return ExtractFailureEntries(text).map((entry) => entry.name);
+}
+
+function SubtractMultiset(values, allowed) {
+  const counts = new Map();
+  for (const value of allowed) counts.set(value, (counts.get(value) ?? 0) + 1);
+  const remainder = [];
+  for (const value of values) {
+    const count = counts.get(value) ?? 0;
+    if (count > 0) counts.set(value, count - 1);
+    else remainder.push(value);
+  }
+  return remainder;
+}
+
+export function AssessResult(result, def, strictBaseline = false) {
+  if (result.code === 0 && !result.timedOut) {
+    return { ...result, ok: true, baselineOnly: false, actualFailures: [], failureEntries: [] };
+  }
+  const expected = def.expectedFailures ?? [];
+  const hasCompletedSummary = /通关冒烟：\d+\/\d+ 过/.test(result.text) && result.text.includes("没过的：");
+  if (expected.length && !result.timedOut && hasCompletedSummary) {
+    const failureEntries = ExtractFailureEntries(result.text);
+    const actualFailures = failureEntries.map((entry) => entry.name);
+    const unexpectedFailures = SubtractMultiset(actualFailures, expected);
+    const resolvedFailures = SubtractMultiset(expected, actualFailures);
+    if (!unexpectedFailures.length && actualFailures.length) {
+      return {
+        ...result,
+        ok: !strictBaseline,
+        baselineOnly: true,
+        actualFailures,
+        failureEntries,
+        unexpectedFailures,
+        resolvedFailures,
+      };
+    }
+  }
+  return {
+    ...result,
+    ok: false,
+    baselineOnly: false,
+    actualFailures: ExtractFailureNames(result.text),
+    failureEntries: ExtractFailureEntries(result.text),
+    unexpectedFailures: [],
+    resolvedFailures: [],
+  };
+}
+
+export function Tail(text, lines = 80) {
   const all = text.split(/\r?\n/);
   const cut = all.slice(-lines);
   return (all.length > lines ? `……（前 ${all.length - lines} 行略，--verbose 看全程）\n` : "") + cut.join("\n");
 }
 
-async function main() {
-  const opts = ParseArgs(process.argv.slice(2));
-  if (opts.list) {
-    console.log("Tier 0（每次改动必跑）：");
-    for (const n of Tier0) console.log(`  ${n.padEnd(20)} ${TestDefs[n].desc}`);
-    console.log("Tier 2（低频人工审查）：");
-    for (const n of Tier2) console.log(`  ${n.padEnd(20)} ${TestDefs[n].desc}`);
-    console.log("领域（--domain=名字）：");
-    for (const [key, dom] of Object.entries(Domains)) {
-      console.log(`  ${key.padEnd(10)} ${dom.label}`);
-      for (const n of dom.tests) console.log(`    ${n.padEnd(18)} ${TestDefs[n].desc}`);
-    }
-    console.log("其余单项（--only=名字）：");
-    for (const n of Object.keys(TestDefs).filter((k) => !Tier0.includes(k) && !Tier2.includes(k))) {
-      console.log(`  ${n.padEnd(20)} ${TestDefs[n].desc}`);
-    }
-    return;
-  }
+function InstallSignalHandlers() {
+  const HandleSignal = (signal) => {
+    if (interruptedSignal) return;
+    interruptedSignal = signal;
+    console.error(`[runner] 收到 ${signal}，正在清理当前子进程…`);
+    KillProcessTree(activeChild);
+  };
+  const HandleSigint = () => HandleSignal("SIGINT");
+  const HandleSigterm = () => HandleSignal("SIGTERM");
+  process.once("SIGINT", HandleSigint);
+  process.once("SIGTERM", HandleSigterm);
+  return () => {
+    process.removeListener("SIGINT", HandleSigint);
+    process.removeListener("SIGTERM", HandleSigterm);
+  };
+}
 
-  const selection = ResolveSelection(opts);
-  for (const n of selection) {
-    if (!TestDefs[n]) throw new Error(`未知测试名：${n}（用 --list 查）`);
-  }
-  console.log(`[runner] 共 ${selection.length} 个：${selection.join(", ")}`);
-
-  const results = [];
-  for (const name of selection) {
-    process.stdout.write(`[runner] ▶ ${name} …\n`);
-    const result = await RunOne(name, TestDefs[name], opts.verbose);
-    results.push(result);
-    const secs = (result.ms / 1000).toFixed(1);
-    if (result.code === 0) console.log(`[PASS] ${name} (${secs}s)`);
-    else {
-      console.log(`[FAIL] ${name} (${secs}s, exit ${result.code})\n${Tail(result.text)}`);
-      if (opts.failFast) break;
-    }
-  }
-
-  const failed = results.filter((r) => r.code !== 0);
-  const totalSecs = (results.reduce((s, r) => s + r.ms, 0) / 1000).toFixed(1);
-  console.log(`[runner] ${results.length - failed.length}/${results.length} 通过，共 ${totalSecs}s`);
-  if (failed.length) {
-    console.log(`[runner] 未通过：${failed.map((r) => r.name).join(", ")}`);
-    process.exit(1);
+function PrintList() {
+  console.log("Tier 0（每次改动必跑）：");
+  for (const name of tier0) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
+  console.log("Tier 1（全部自动领域探针；通常优先用 --changed/--domain）：");
+  for (const name of GetTier1Tests()) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
+  console.log("Tier 2（低频人工审查，不由 --changed 自动触发）：");
+  for (const name of tier2) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
+  console.log("领域（--domain=名字 默认叠加 Tier 0；--domain-only=名字仅排障）：");
+  for (const [key, domain] of Object.entries(domains)) {
+    console.log(`  ${key.padEnd(10)} ${domain.label}`);
+    for (const name of domain.tests) console.log(`    ${name.padEnd(18)} ${testDefs[name].desc}`);
+    if (domain.tier2Tests?.length) console.log(`    Tier 2 建议：${domain.tier2Tests.join(", ")}`);
   }
 }
 
-main().catch((err) => {
-  console.error(`[runner] ${err.message}`);
-  process.exit(2);
-});
+export async function Main(argv = process.argv.slice(2)) {
+  ValidateRegistry();
+  const opts = ParseArgs(argv);
+  if (opts.list) {
+    PrintList();
+    return 0;
+  }
+
+  let changedFiles = [];
+  let inferred = { domains: [], unmatchedProjectFiles: [] };
+  if (opts.changedBase) {
+    changedFiles = CollectChangedFiles(opts.changedBase);
+    inferred = InferDomains(changedFiles);
+    console.log(`[runner] Git 改动 ${changedFiles.length} 个；推断领域：${inferred.domains.join(", ") || "无"}`);
+    if (inferred.unmatchedProjectFiles.length) {
+      console.log(`[runner] 未匹配领域、已由 Tier 0 保守兜底：${inferred.unmatchedProjectFiles.join(", ")}`);
+    }
+  }
+
+  const selection = ResolveSelection(opts, inferred.domains);
+  for (const name of selection) {
+    if (!testDefs[name]) throw new Error(`未知测试名：${name}（用 --list 查）`);
+  }
+  if (!selection.length) throw new Error("选择结果为空；该领域可能只有 Tier 2 建议，请用 --tier=2 或 --list");
+
+  const activeDomains = Unique([...opts.domains, ...opts.domainOnly, ...inferred.domains]);
+  const recommendations = GetTier2Recommendations(activeDomains);
+  if (recommendations.length) console.log(`[runner] 本次另建议人工审查 Tier 2：${recommendations.join(", ")}`);
+  console.log(`[runner] 共 ${selection.length} 个：${selection.join(", ")}`);
+  if (opts.dryRun) {
+    console.log("[runner] --dry-run：只展示选择，不执行测试");
+    return 0;
+  }
+
+  interruptedSignal = null;
+  const removeSignalHandlers = InstallSignalHandlers();
+  const results = [];
+  try {
+    for (const name of selection) {
+      process.stdout.write(`[runner] ▶ ${name} …\n`);
+      const rawResult = await RunOne(name, testDefs[name], opts.verbose);
+      if (interruptedSignal) {
+        console.log(`[runner] ${name} 已中断，子进程已清理`);
+        break;
+      }
+      const result = AssessResult(rawResult, testDefs[name], opts.strictBaseline);
+      results.push(result);
+      const secs = (result.ms / 1000).toFixed(1);
+      if (result.ok && result.baselineOnly) {
+        console.log(`[BASELINE] ${name} (${secs}s)：${result.actualFailures.length} 条历史红，未发现新增红`);
+        for (const entry of result.failureEntries) {
+          console.log(`  · ${entry.name}${entry.detail ? ` — ${entry.detail}` : ""}`);
+        }
+        if (result.resolvedFailures.length) {
+          console.log(`[runner] 已转绿、应更新基线：${result.resolvedFailures.join("；")}`);
+        }
+      } else if (result.ok) {
+        console.log(`[PASS] ${name} (${secs}s)`);
+      } else {
+        const reason = result.timedOut ? "timeout" : `exit ${result.code}`;
+        console.log(`[FAIL] ${name} (${secs}s, ${reason})\n${Tail(result.text)}`);
+        if (result.baselineOnly && opts.strictBaseline) console.log("[runner] --strict-baseline 将历史红计为失败");
+        if (opts.failFast) break;
+      }
+    }
+  } finally {
+    removeSignalHandlers();
+  }
+
+  if (interruptedSignal) return interruptedSignal === "SIGINT" ? 130 : 143;
+  const passed = results.filter((result) => result.ok && !result.baselineOnly);
+  const baselined = results.filter((result) => result.ok && result.baselineOnly);
+  const failed = results.filter((result) => !result.ok);
+  const totalSecs = (results.reduce((sum, result) => sum + result.ms, 0) / 1000).toFixed(1);
+  console.log(`[runner] 通过 ${passed.length}，历史基线 ${baselined.length}，失败 ${failed.length}，共 ${totalSecs}s`);
+  if (failed.length) {
+    console.log(`[runner] 未通过：${failed.map((result) => result.name).join(", ")}`);
+    return 1;
+  }
+  return 0;
+}
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileHere;
+if (isMain) {
+  Main().then((code) => {
+    process.exitCode = code;
+  }).catch((error) => {
+    console.error(`[runner] ${error.message}`);
+    process.exitCode = 2;
+  });
+}

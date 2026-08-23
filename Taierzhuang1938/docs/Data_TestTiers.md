@@ -1,95 +1,120 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
-> 分级入口：`node Taierzhuang1938/Script_TestRunner.mjs`。本文解释每一档为什么存在、什么时候跑。
-> 最后全量核对日期：2026-08-23（origin/master @ `11f90d93`，33 个测试）。
+> 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
+> 最后登记核对：2026-08-24，35/35 个 `Script_*Test.mjs` 已登记，另含高度图 verify。
 
-## 一、原则：按爆炸半径分档，不按"被碰的模块"分档
+## 一、目标与纪律
 
-一个需求当然会牵连别的模块——但这个仓库的牵连方式是特定的：
+测试按爆炸半径分档，领域选择既可以显式指定，也可以从 Git 改动自动推断：
 
-- **静态依赖是星型**：`Script_Physics`、`Script_Combat`、`Script_Input` 都只被
-  `Script_Main.mjs` 一个文件 import，模块之间不互调，全在 Main 里装配后才运行时耦合。
-- **跨模块回归发生在整机里**，而 `Script_PlayTest.mjs` 就是那台整机：真浏览器端到端
-  （输入→移动→开火→AI→目标点→阵亡换人→过关），15 组断言，音频 cue 计数、翻越、拾取、
-  径向轮盘都在里面。所以不管你在哪个模块改代码，Tier 0 都会把它兜住。
-- 领域专项测的不是"有没有坏"，而是 **PlayTest 够不到的深度**（伤害口径重放、整墙碰撞
-  扫掠、AI 决策树）。只在深碰那个子系统时才值得花这份时间。
+1. **Tier 0 每次必跑**：七关开机、端到端通关和纯 Node 快测；
+2. **Tier 1 按领域追加**：优先使用 `--changed` 自动选择，或显式 `--domain=…`；
+3. **Tier 2 低频人工审查**：性能实测与出图不被 `--changed` 自动触发，只给出建议。
 
-三句话纪律：
+`Script_PlayTest.mjs` 是跨模块整机安全网，但领域专项仍负责它够不到的深度，
+例如伤害口径重放、整墙碰撞扫掠、AI 决策和编辑器数据契约。
 
-1. **每次改动跑 Tier 0**（约 12 分钟，本机实测）；
-2. **碰共享底座（高度图/物理/弹道输入链）跑成串**（对应 domain 的全部下游）；
-3. **叶子系统（音频/语音/菜单/编辑器）碰了才跑**，其余靠 Tier 0 兜底。
-
-## 二、用法
+## 二、推荐命令
 
 ```powershell
-node Taierzhuang1938/Script_TestRunner.mjs                  # = --tier=0，默认档
-node Taierzhuang1938/Script_TestRunner.mjs --tier=2         # 低频人工审查类
-node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain # 领域专项（--list 查全部领域）
+# 默认：Tier 0
+node Taierzhuang1938/Script_TestRunner.mjs
+
+# 推荐：比较 origin/master、当前提交、暂存/未暂存和未跟踪文件，
+# 自动运行 Tier 0 + 命中的 Tier 1，并提示相关 Tier 2
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master
+
+# 先看自动选择，不执行
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --dry-run
+
+# 显式领域：默认仍会叠加 Tier 0
+node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain
+
+# 排障专用：只跑领域探针，明确绕过 Tier 0
+node Taierzhuang1938/Script_TestRunner.mjs --domain-only=terrain
+
+# Tier 0 + 全部自动 Tier 1 / 独立人工 Tier 2 / 单项
+node Taierzhuang1938/Script_TestRunner.mjs --tier=1
+node Taierzhuang1938/Script_TestRunner.mjs --tier=2
 node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
-node Taierzhuang1938/Script_TestRunner.mjs --list           # 列出全部分级
 ```
 
-输出纪律：子进程输出默认只留**失败尾巴**（省 token），`--verbose` 才透传全程；
-`--fail-fast` 第一红即停。退出码即成败。
+`--list` 显示完整分级；`--fail-fast` 第一条新增红即停；`--verbose` 透传全部输出；
+`--strict-baseline` 把 PlayTest 的历史红也计为失败。
 
-worktree 里直接 `node` 本脚本，不要经 `npm run`（npm 会把 cwd 挪回主仓库，
-测的是另一棵树）。
+可以直接在 worktree 中运行上述 `node` 命令，也可以使用仓库的 npm scripts。
+npm 会以当前 worktree 的 `package.json` 为项目根，不会切回共享主检出。
 
-## 三、Tier 0 —— 每次改动必跑
+## 三、输出、超时与退出码
 
-| 测试 | 守什么 | 本机耗时 |
-|---|---|---|
-| BootTest | 七关开机冒烟 + draw call/triangles 红线 | ~80 s |
-| PlayTest | 端到端通关 15 组断言，跨模块安全网 | ~620 s |
-| HudPromptTest | HUD 提示规则（纯 Node） | <1 s |
-| RiggedModelTest | .tzm.json 绑定模型数据（纯 Node） | <1 s |
-| FractureBakeTest | 预破碎离线数据（纯 Node） | <1 s |
-| CutsceneControlTest | 过场导演机位/生命周期（桩 three，纯 Node） | <1 s |
+- 默认透出子测试的 `--- 阶段` 行，并每 60 秒打印心跳；其余输出只在失败时显示尾部。
+- BootTest 上限 4 分钟，PlayTest 上限 20 分钟，一般测试上限 10 分钟；
+  性能/出图测试按项目登记放宽到 20—30 分钟。
+- `Ctrl+C`、终止信号和超时会清理当前测试及其浏览器子进程。
+- `PASS`：测试全绿；`BASELINE`：只有已登记历史红；`FAIL`：新增红、崩溃或超时。
+- 默认只要没有 `FAIL` 就返回 0；`--strict-baseline` 下历史红也返回 1。
 
-## 四、Tier 1 —— 领域触发（`--domain=`）
+2026-08-24 在 master `5c0781b9` 上完整实测：BootTest 92.7 秒、PlayTest
+610.5 秒、Tier 0 合计 703.7 秒；同日其他两轮曾达到 887.9 与 996.7 秒。
+耗时受机器和渲染改动影响，不再使用“约 12 分钟”作为保证值。
 
-| 领域 | 何时跑 | 包含 |
-|---|---|---|
-| terrain | 动高度图/地形（AGENTS.md 点名必跑的 verify 在这里） | HeightmapVerify → JieheTerrain → Physics → Jump → Destruction |
-| physics | 动碰撞、移动、破坏链（共享底座，下游成串） | Physics → Jump → Destruction → FractureBake |
-| combat | 动武器/伤害/弹道/瞄准输入（共享底座） | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel |
-| ai | 动 AI 决策或战场内容预算 | AiBehavior、Visibility |
-| hud | 动 HUD 提示/交互 | HudPrompt（Node+浏览器两条） |
-| audio / voice | 动音效烘焙管线 / 语音资产 | AudioTest / VoiceTest |
-| menu | 动主菜单、开机陈设 | MenuTest、BootPropTest |
-| editor | 动场景编辑器或可破坏编辑器 | EditorTest、DestructionEditorTest |
-| cutscene | 动过场、车厢生活动作 | CutsceneControl、ActorPose |
-| render | 动光照/GI/合批/出图审查 | GiTest、ActorBatch（产品契约）、DeathView、Shot（人工审） |
-| perf | 动渲染负载、LOD、体积光 | Performance、FrameProfile、GodRaysPerformance |
+## 四、Tier 0 —— 每次改动必跑
 
-## 五、Tier 2 —— 低频人工审查
+| 测试 | 守什么 |
+|---|---|
+| BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线 |
+| PlayTest | 真浏览器端到端通关，130 条运行时断言 |
+| TestRunnerTest | 分级选择、Git 映射、历史基线、登记完整性 |
+| HudPromptTest | HUD 提示纯逻辑 |
+| RiggedModelTest | `.tzm.json` 绑定模型数据 |
+| FractureBakeTest | 预破碎离线数据 |
+| CutsceneControlTest | 过场导演机位与生命周期 |
 
-ShotTest / GiTest / DeathViewTest / FrameProfileTest / GodRaysPerformanceTest /
-PerformanceTest。对机器敏感或需要人看图，不进常规回归，按里程碑跑。
+## 五、Tier 1 —— 自动领域探针
 
-## 六、已知红清单（截至 2026-08-23 @ origin/master `11f90d93`）
+`--domain=…` 默认运行 Tier 0 加下表自动探针。`--changed` 依据文件名与共享底座
+规则匹配一个或多个领域；无法识别的台儿庄文件会明确列出，并由 Tier 0 保守兜底。
 
-Tier 0 里 BootTest 与四个纯 Node 测试全绿；**PlayTest 有 10 条红（120/130 过），
-全部先于本次改动存在**。清零之前，L0 的 PlayTest 输出需人工判读。按性质分两组：
+| 领域 | 自动探针 |
+|---|---|
+| terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
+| physics | Physics → Jump → Destruction → FractureBake |
+| combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel |
+| ai | AiBehavior、Visibility |
+| hud | HudPrompt、HudPromptBrowser |
+| audio / voice | AudioTest / VoiceTest |
+| menu | MenuTest、BootPropTest |
+| editor | EditorTest、DestructionEditorTest |
+| cutscene | CutsceneControl、ActorPose |
+| render | ActorBatchTest；另提示相关 Tier 2 |
+| perf | 不自动跑机器敏感测试，只提示 Tier 2 |
 
-疑似过期预期（玩法有意改了、断言没跟上，改断言即可）：
+改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。
 
-- P4 夜袭携行应为 L3_WhiteTowel，实际吃到 `L3_Fanji_override`
-  （`17dc8c84` 引入 per-phase `loadoutOverride`，PlayTest 预期未同步）
-- 单人 draw call ≤26，实测 31 块网格/2994 三角
-  （模型精修 `5522ac92`/`5522ac92` 系列之后预算没抬）
-- 头六十秒全场开火 >200，实测 121（火力节奏改动后阈值未校，需复核是有意放慢还是回归）
+## 六、Tier 2 —— 低频人工审查
 
-疑似真回归（要先修代码再谈断言）：
+`ShotTest`、`GiTest`、`DeathViewTest`、`PerformanceTest`、`FrameProfileTest`、
+`GodRaysPerformanceTest`。其中出图测试进程成功只代表产物生成成功，仍需人工看图。
 
-- Esc 通道指针锁不释放（escape:仍锁着；HEAD `11f90d93` 刚动过菜单接线，重点排查）
-- 姿态可见度全 false（站@60 都看不见，潜行链路疑似坏）
-- 玩家亲手击杀四连败（四周六米没有打得出去的方位，命中回执链路）
+## 七、PlayTest 历史红基线
 
-## 七、维护规矩
+截至 2026-08-24，PlayTest 有 10 条历史红。runner 按**完整断言名和重复次数**核对：
 
-- 新增测试必须在 `Script_TestRunner.mjs` 的 `TestDefs` 登记并归档（tier/domain 二选一起步）。
-- 改玩法必须同步受影响的断言；让 PlayTest 长期带红等于拆掉唯一的安全网。
-- 本文的红清单过期时直接整节重写，注明新的核对日期与 commit。
+- 实际红是基线子集：显示 `BASELINE`，缺失项会提示“已转绿、应更新基线”；
+- 出现未登记断言名：显示 `FAIL` 并返回 1；
+- 没有正常的通关汇总（崩溃、卡死、超时）：始终 `FAIL`；
+- 同名历史红的实际细节仍会列出，不等于问题已被认可或修复。
+
+当前基线包括两条火力节奏、三条玩家命中/击杀回执、夜袭携行、姿态可见度、
+Blender 模型来源、单人 draw call 和 Esc 指针锁。清理一条后应立即删除 runner 中对应基线。
+
+## 八、维护规则
+
+- 新增 `Script_*Test.mjs` 必须登记到 `testDefs` 并归入 tier/domain；
+  `Script_TestRunnerTest.mjs` 会扫描目录阻止漏登。
+- 新模块要补 `changedDomainRules`；未匹配警告不能长期搁置。
+- Tier 2 不得塞进自动领域 `tests`；用 `tier2Tests` 给出人工建议。
+- 改玩法同步更新断言；历史红基线只隔离既有债务，不得用于吞掉新增回归。
+- 修改 runner 后至少执行：
+  `node --check Taierzhuang1938/Script_TestRunner.mjs` 和
+  `node Taierzhuang1938/Script_TestRunnerTest.mjs`。
