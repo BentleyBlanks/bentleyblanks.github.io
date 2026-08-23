@@ -1,26 +1,26 @@
-﻿<!doctype html>
+<!doctype html>
 <!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#08080a">
-  <meta name="description" content="銆婃粫鍘?涓€涔濅笁鍏€嬧€斺€?938 骞?3 鏈?14 鏃ヨ嚦 18 鏃ワ紝灞变笢婊曞幙銆傚窛鍐涚 122 甯堝畧鍩庡洓鏃ョ殑绾挎€у叧鍗?FPS 鍘熷瀷銆?>
-  <title>婊曞幙 涓€涔濅笁鍏?/title>
+  <meta name="description" content="《滕�?一九三八》—�?938 �?3 �?14 日至 18 日，山东滕县。川军第 122 师守城四日的线性关�?FPS 原型�?>
+  <title>滕县 一九三�?/title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=13">
-  <!-- 涓昏彍鍗曚笌閫夌珷銆傞鑹蹭笌瀛楄窛娌跨敤 Style_Game.css 鐨?:root锛屾墍浠ュ繀椤绘帓鍦ㄥ畠鍚庨潰銆?-->
+  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css �?:root，所以必须排在它后面�?-->
   <link rel="stylesheet" href="./Style_Menu.css?v=3">
-  <!-- 缂栬緫鍣ㄥ浠剁殑鏍峰紡銆傚嚭鍥炬ā寮忎笅鏁存５ DOM 鏄?display:none锛岃繘涓嶄簡浠讳綍涓€寮犳埅鍥俱€?-->
+  <!-- 编辑器套件的样式。出图模式下整棵 DOM �?display:none，进不了任何一张截图�?-->
   <link rel="stylesheet" href="./Style_Editor.css?v=4">
-  <!-- 鐗堟湰鎴冲繀椤荤洊鍒版暣寮犳ā鍧楀浘涓婏紝涓嶈兘鍙洊鍏ュ彛銆?
-       鍙粰鍏ュ彛鐩栨埑鐨勫悗鏋滄槸銆屾柊澹抽厤鏃ц姱銆嶏細鍏ュ彛鎷垮埌鏂扮増锛屽畠 import 鐨勬ā鍧楀悆缂撳瓨
-       閲岀殑鏃х増锛屾闈㈠埛鏂板氨濂姐€佹墜鏈?Safari 榛忓緱澶氾紝浜庢槸鍙湪绉诲姩绔鐜般€?
-       淇硶鏄?import map 鎶婃瘡涓€涓涓€鏂规ā鍧楅噸鏄犲皠鍒板甫鐗堟湰鐨?URL锛?
-       鐗堟湰鍙啓鍦ㄨ繖涓€寮犺〃閲岋紝婧愮爜閲屼竴寰嬩笉璁歌嚜宸卞啓 ?v=锛堝悓涓€妯″潡涓や釜 URL = 鍔犺浇涓や唤锛夈€?
-       **鏂板妯″潡蹇呴』鐧昏鍦ㄨ繖閲屻€?* -->
+  <!-- 版本戳必须盖到整张模块图上，不能只盖入口�?
+       只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
+       里的旧版，桌面刷新就好、手�?Safari 黏得多，于是只在移动端复现�?
+       修法�?import map 把每一个第一方模块重映射到带版本�?URL�?
+       版本只写在这一张表里，源码里一律不许自己写 ?v=（同一模块两个 URL = 加载两份）�?
+       **新增模块必须登记在这里�?* -->
   <script type="importmap">
     {
       "imports": {
@@ -57,7 +57,8 @@
         "./Script_JieheField.mjs": "./Script_JieheField.mjs?v=1",
         "./Script_TengxianOutfield.mjs": "./Script_TengxianOutfield.mjs?v=6",
         "./Data_Tengxian.mjs": "./Data_Tengxian.mjs?v=5",
-        "./Script_TengxianCity.mjs": "./Script_TengxianCity.mjs?v=9",
+        "./Script_TengxianCity.mjs": "./Script_TengxianCity.mjs?v=10",
+        "./Script_Water.mjs": "./Script_Water.mjs?v=1",
         "./Script_Navigation.mjs": "./Script_Navigation.mjs?v=2",
         "./Script_Input.mjs": "./Script_Input.mjs?v=3",
         "./Script_Wheel.mjs": "./Script_Wheel.mjs?v=1",
@@ -108,27 +109,27 @@
   <canvas id="view"></canvas>
   <div id="hud"></div>
   <div id="boot">
-    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。
-         转动跑在 worker 里，主线程建关卡卡多久都不影响它。 -->
+    <!-- ���ػ���ĵ���չʾ̨�����һ����Ϸ�ڵ� TZM ģ�ͣ���������ת��Script_BootProp����
+         ת������ worker ����߳̽��ؿ�����ö���Ӱ������ -->
     <canvas id="bootProp"></canvas>
     <div id="bootVeil"></div>
     <div id="bootHead">
-      <div id="bootTitle">滕县 一九三八</div>
-      <div id="bootSub">一九三八年三月十四日 — 十八日 · 山东滕县</div>
+      <div id="bootTitle">���� һ������</div>
+      <div id="bootSub">һ������������ʮ���� �� ʮ���� �� ɽ������</div>
     </div>
     <div id="bootCard">
       <div id="bootPropName"></div>
       <div id="bootPropNote"></div>
     </div>
     <div id="bootFoot">
-      <button id="bootStart" disabled>进 城</button>
-      <a id="bootPreview" href="?preview=CS_Chuchuan&amp;autoplay=1" aria-label="直接播放新版序章预览">新版序章预览（开发）</a>
-      <div id="bootStep">正在夯地……</div>
+      <button id="bootStart" disabled>�� ��</button>
+      <a id="bootPreview" href="?preview=CS_Chuchuan&amp;autoplay=1" aria-label="ֱ�Ӳ����°�����Ԥ��">�°�����Ԥ����������</a>
+      <div id="bootStep">���ں��ء���</div>
       <div id="bootBar"><i></i></div>
     </div>
   </div>
-  <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
-       出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
+  <!-- ���˵���������ɺ���ڻ���ϣ�Script_Menu �ӹ�������˾�����
+       ��ͼģʽ�� ?menu=0 ����һֱ�ǿյģ����� �ǡ��ǿŰ�ť�վɹ��� ���� ����ð�̽ű��������� -->
   <div id="menu"></div>
   <script type="module" src="./Script_Main.mjs?v=49"></script>
 </body>

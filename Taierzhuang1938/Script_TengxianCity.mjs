@@ -54,7 +54,7 @@ import {
   AddRoadWear, AddStreetLife, AddWattleFence, AddStoneRoller, AddManureHeap,
   AddStalkStack, AddVegetableBeds, AddThreshingFloor, AddGraveMound, AddVillageLife,
 } from "./Script_LivedInProps.mjs";
-import { MarkNoPrepass } from "./Script_Post.mjs";
+import { CreateWaterSurface } from "./Script_Water.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：逻辑名 → 既有烘焙配方 + 调色
@@ -632,6 +632,10 @@ export class TengxianCity {
   BuildMoat(rnd) {
     const s0 = CITY.platformEdge;
     const perSide = 108;
+    // 水面网格的分段数。顶点级 Gerstner 波最短一波 5.4 m，一段濠周（636 m）
+    // 至少要给它 2 个顶点：232 段 ≈ 2.7 m 一格，横向再分 3 带 —— 水面自己的
+    // 密度与岸线条带无关，别拿 perSide 硬套。
+    const waterSegs = 232, waterBands = 3;
     // 四道环线：内岸顶 → 濠底内 → 濠底外 → 外岸顶
     const profile = [
       { off: 0, y: CITY.platformY },
@@ -657,12 +661,16 @@ export class TengxianCity {
         const wIn = MOAT.bankRunInner * ((CITY.platformY - MOAT.waterY) / MOAT.depth);
         const upFrac = (MOAT.waterY - MOAT.bottomY) / (CITY.outerY - MOAT.bottomY);
         const wOut = MOAT.width - MOAT.bankRunOuter * (1 - upFrac);
-        const a = RingPoint(side, t0, s0 + b0 + wIn);
-        const b = RingPoint(side, t1, s0 + b1 + wIn);
-        const c = RingPoint(side, t1, s0 + b1 + wOut);
-        const d = RingPoint(side, t0, s0 + b0 + wOut);
-        waterQuads.push(this.Quad([a[0], MOAT.waterY, a[1]], [b[0], MOAT.waterY, b[1]],
-          [c[0], MOAT.waterY, c[1]], [d[0], MOAT.waterY, d[1]], 6.0));
+        for (let b = 0; b < waterBands; b += 1) {
+          const o0 = wIn + (wOut - wIn) * (b / waterBands);
+          const o1 = wIn + (wOut - wIn) * ((b + 1) / waterBands);
+          const a = RingPoint(side, t0, s0 + b0 + o0);
+          const bb = RingPoint(side, t1, s0 + b1 + o0);
+          const c = RingPoint(side, t1, s0 + b1 + o1);
+          const d = RingPoint(side, t0, s0 + b0 + o1);
+          waterQuads.push(this.Quad([a[0], MOAT.waterY, a[1]], [bb[0], MOAT.waterY, bb[1]],
+            [c[0], MOAT.waterY, c[1]], [d[0], MOAT.waterY, d[1]], 6.0));
+        }
       }
     }
     const bank = new THREE.Mesh(MergeGeometries(strips), this.library.Get("GroundRubble"));
@@ -671,17 +679,12 @@ export class TengxianCity {
     this.scene.add(bank);
     this.meshes.push(bank);
 
-    // 水面是半透明的 —— **建完必须 MarkNoPrepass**，否则深度法线预通道会拿
-    // overrideMaterial 把它一起覆盖掉，SSAO 与体积光的判据跟着废。
-    const waterMat = this.library.Plain("MoatWater", {
-      color: PALETTE.moatWater, roughness: 0.22, metalness: 0.0,
-      transparent: true, opacity: 0.86, depthWrite: false,
+    // 水面 —— Crest 式程序化水面（Script_Water.mjs）：Gerstner 波位移 +
+    // 屏幕空间水深驱动的浅水吸收与岸线泡沫 + 菲涅尔天空反射。
+    // 那边自己负责 MarkNoPrepass 与 skipNormalDepth（半透明大面的管线契约）。
+    const water = CreateWaterSurface({
+      scene: this.scene, geometry: MergeGeometries(waterQuads), preset: "moat", name: "MoatWater",
     });
-    MarkNoPrepass(waterMat);
-    const water = new THREE.Mesh(MergeGeometries(waterQuads), waterMat);
-    water.receiveShadow = false; water.castShadow = false;
-    water.name = "MoatWater";
-    this.scene.add(water);
     this.meshes.push(water);
 
     // 濠上桥四座（明代记为浮桥，1938 年状态无载 —— 做成简易木桥并标推定）
@@ -2051,7 +2054,9 @@ export class TengxianCity {
       });
     }
 
-    // 荆河水面
+    // 荆河水面 —— Crest 式程序化水面（Script_Water.mjs）。原来的整段 60 m
+    // 一张平板喂不起顶点波，按 3.5 m 一格、横向 3 带重铺；总三角量 ~3.5k，
+    // 远景里可忽略。岸线泡沫与深浅由屏幕空间水深驱动，不用烘焙深度属性。
     const riverQuads = [];
     for (let i = 0; i < RIVER_PATH.length - 1; i += 1) {
       const [x0, z0] = RIVER_PATH[i], [x1, z1] = RIVER_PATH[i + 1];
@@ -2059,24 +2064,25 @@ export class TengxianCity {
       const len = Math.hypot(dx, dz);
       const nx = -dz / len, nz = dx / len;
       const hw = OUTSKIRTS.river.width / 2;
-      const steps = Math.max(2, Math.round(len / 60));
+      const steps = Math.max(2, Math.round(len / 3.5));
+      const bands = 3;
       for (let k = 0; k < steps; k += 1) {
         const t0 = k / steps, t1 = (k + 1) / steps;
-        const a = [x0 + dx * t0, z0 + dz * t0], b = [x0 + dx * t1, z0 + dz * t1];
-        riverQuads.push(this.Quad(
-          [a[0] - nx * hw, -3.0, a[1] - nz * hw], [b[0] - nx * hw, -3.0, b[1] - nz * hw],
-          [b[0] + nx * hw, -3.0, b[1] + nz * hw], [a[0] + nx * hw, -3.0, a[1] + nz * hw], 6.0));
+        const ax = x0 + dx * t0, az = z0 + dz * t0;
+        const bx = x0 + dx * t1, bz = z0 + dz * t1;
+        for (let b = 0; b < bands; b += 1) {
+          const f0 = -hw + 2 * hw * (b / bands);
+          const f1 = -hw + 2 * hw * ((b + 1) / bands);
+          riverQuads.push(this.Quad(
+            [ax + nx * f0, -3.0, az + nz * f0], [bx + nx * f0, -3.0, bz + nz * f0],
+            [bx + nx * f1, -3.0, bz + nz * f1], [ax + nx * f1, -3.0, az + nz * f1], 6.0));
+        }
       }
     }
     if (riverQuads.length) {
-      const mat = this.library.Plain("RiverWater", {
-        color: PALETTE.moatWater, roughness: 0.2, transparent: true, opacity: 0.88, depthWrite: false,
+      const river = CreateWaterSurface({
+        scene: this.scene, geometry: MergeGeometries(riverQuads), preset: "river", name: "JingRiver",
       });
-      MarkNoPrepass(mat);
-      const river = new THREE.Mesh(MergeGeometries(riverQuads), mat);
-      river.castShadow = false; river.receiveShadow = false;
-      river.name = "JingRiver";
-      this.scene.add(river);
       this.meshes.push(river);
     }
 

@@ -19,6 +19,7 @@ import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
+import { SetWaterSkyUniforms, UpdateWaterSurfaces } from "./Script_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
@@ -235,6 +236,8 @@ const library = new MaterialLibrary(renderer, {
 });
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);
+// 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
+SetWaterSkyUniforms(sky.uniforms);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
 // 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变
 const gi = GI_ON
@@ -3252,6 +3255,8 @@ function RenderScene(dt) {
   vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height);
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
+  // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
+  UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height);
   // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
   //
   // 事故：AudioEngine.SetListener 全仓库零调用点，于是 WebAudio 的 listener
