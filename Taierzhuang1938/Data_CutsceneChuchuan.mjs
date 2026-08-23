@@ -402,6 +402,60 @@ function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
   ];
 }
 
+/**
+ * 四段有靠背木座椅。旧版把每侧整条长凳做成一根落地实心盒，演员像悬在
+ * 黑色柜台上；分段座板、靠背、腿架与露空座下空间才有列车车厢的轮廓。
+ */
+function CarriageBench(side, label) {
+  const seatX = side * 2.78;
+  const backX = side * 3.48;
+  const props = [];
+  [-5.8, -1.95, 1.95, 5.8].forEach((z, index) => {
+    const id = `${label}${index + 1}`;
+    props.push(
+      { kind: "box", size: [0.94, 0.14, 3.45], pos: [seatX, 0.76, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchSeat${id}` },
+      { kind: "box", size: [0.14, 0.52, 3.45], pos: [backX, 1.10, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchBack${id}` },
+      { kind: "box", size: [0.72, 0.62, 0.12], pos: [seatX, 0.42, z - 1.34], mat: "Steel", color: 0x353330, name: `BenchLeg${id}A` },
+      { kind: "box", size: [0.72, 0.62, 0.12], pos: [seatX, 0.42, z + 1.34], mat: "Steel", color: 0x353330, name: `BenchLeg${id}B` },
+    );
+  });
+  return props;
+}
+
+/**
+ * 一侧窗外的开放式乡野：地面一律水平铺，树、村舍和低土岗是离散物件。
+ * 绝不再用一面 56 m 长、4.3 m 高的竖盒假装远景——那正是“全是遮拦”的根因。
+ */
+function WindowLandscape(side, label) {
+  const x = (distance) => side * distance;
+  return [
+    { kind: "box", size: [5.2, 0.10, 44], pos: [x(6.6), 0.02, 0], mat: "GroundRubble", color: 0x625a4c, name: `TrackBallast${label}` },
+    { kind: "box", size: [14, 0.08, 20], pos: [x(11.5), -0.02, -14], mat: "Ground", color: 0x756d55, name: `FieldNear${label}` },
+    { kind: "box", size: [18, 0.08, 24], pos: [x(17.5), 0.00, 13], mat: "Ground", color: 0x6b674f, name: `FieldFar${label}` },
+    // 两个低土岗只压住地平线下沿；上方约四分之三窗洞始终是开放天空。
+    { kind: "box", size: [0.55, 0.55, 9], pos: [x(27), 0.24, -14], mat: "Ground", color: 0x575947, name: `LowRidge${label}A` },
+    { kind: "box", size: [0.55, 0.42, 7], pos: [x(31), 0.18, 12], mat: "Ground", color: 0x505343, name: `LowRidge${label}B` },
+    // 稀疏村舍和三月无叶树提供山东北部平原的尺度，不连成一堵“景片墙”。
+    { kind: "box", size: [2.8, 1.25, 2.6], pos: [x(18), 0.62, -11], mat: "Adobe", color: 0x796953, name: `Farmhouse${label}A` },
+    { kind: "box", size: [3.3, 0.18, 3.0], pos: [x(18), 1.32, -11], mat: "RoofTile", color: 0x4d4740, name: `FarmhouseRoof${label}A` },
+    { kind: "box", size: [2.2, 1.0, 2.0], pos: [x(23), 0.50, 9], mat: "Adobe", color: 0x74644f, name: `Farmhouse${label}B` },
+    { kind: "box", size: [2.6, 0.16, 2.4], pos: [x(23), 1.08, 9], mat: "RoofTile", color: 0x4b463f, name: `FarmhouseRoof${label}B` },
+    // 正侧面能读清的院屋：双坡瓦顶而不是“方盒上再扣一块桌板”。
+    { kind: "box", size: [3.4, 1.45, 3.2], pos: [x(21), 0.72, -3], mat: "Adobe", color: 0x75644f, name: `Farmhouse${label}C` },
+    { kind: "box", size: [2.05, 0.13, 3.55], pos: [x(20.25), 1.63, -3], rz: side * 0.38, mat: "RoofTile", color: 0x49433c, name: `FarmhouseRoof${label}C1` },
+    { kind: "box", size: [2.05, 0.13, 3.55], pos: [x(21.75), 1.63, -3], rz: side * -0.38, mat: "RoofTile", color: 0x49433c, name: `FarmhouseRoof${label}C2` },
+    { kind: "cyl", size: [0.14, 2.5], pos: [x(15), 1.25, -3], mat: "TreeBark", color: 0x443b32, name: `BareTree${label}A` },
+    { kind: "box", size: [1.7, 0.08, 0.08], pos: [x(15), 2.18, -3], ry: 0.36, mat: "TreeBark", color: 0x443b32, name: `BareBranch${label}A` },
+    { kind: "cyl", size: [0.12, 2.0], pos: [x(20), 1.0, 16], mat: "TreeBark", color: 0x40382f, name: `BareTree${label}B` },
+    { kind: "box", size: [1.35, 0.07, 0.07], pos: [x(20), 1.72, 16], ry: -0.42, mat: "TreeBark", color: 0x40382f, name: `BareBranch${label}B` },
+    { kind: "cyl", size: [0.16, 4.2], pos: [x(16), 2.1, -4], mat: "TreeBark", color: 0x352f29, name: `Poplar${label}C` },
+    { kind: "box", size: [0.08, 1.65, 0.08], pos: [x(16), 3.45, -4.35], rx: -0.5, mat: "TreeBark", color: 0x352f29, name: `PoplarBranch${label}C1` },
+    { kind: "box", size: [0.08, 1.45, 0.08], pos: [x(16), 3.35, -3.7], rx: 0.55, mat: "TreeBark", color: 0x352f29, name: `PoplarBranch${label}C2` },
+    { kind: "box", size: [0.14, 3.8, 0.14], pos: [x(12), 1.90, -9], mat: "WoodBeam", color: 0x3d342b, name: `TelegraphPole${label}` },
+    { kind: "box", size: [1.25, 0.10, 0.10], pos: [x(12), 3.28, -9], mat: "WoodBeam", color: 0x3d342b, name: `TelegraphCrossbar${label}` },
+  ];
+}
+
 const CHUCHUAN_PEOPLE = {
   youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
   rifleman: { name: "擦枪士兵", short: "擦枪士兵", real: false, note: "车厢内可见 NPC；检查发涩枪栓" },
@@ -431,6 +485,9 @@ export const CS_Chuchuan = {
   cameraMode: "headLook",
   headLook: { yaw: [-2.09, 2.09], pitch: [-1.05, 0.96], sensitivityScale: 0.8 },
   walk: { min: [-3.1, -7.55], max: [3.1, 6.7], speed: 2.15, startAt: 13.0 },
+  // 三月鲁南白日带浮尘：压低曝光保住窗外田野和村舍层次；overcast 会把
+  // 窗洞推成纯白，所有乡野道具只剩看不见的浅灰轮廓。
+  sky: "smokyDay",
   ambience: "trainInterior",
   stopMusic: true,
   music: null,
@@ -443,31 +500,34 @@ export const CS_Chuchuan = {
   // 整段都持续移动，而不是只在小站那十八秒挪一下背景。近景快、中景慢、远景最慢，
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
   ambientMotion: [
-    { name: "WindowNearLayer", from: [5.2, 0.25, -18], axis: [0, 0, 1], speed: 4.8, span: 42 },
-    { name: "WindowMidLayer", from: [10.5, 0.5, -21], axis: [0, 0, 1], speed: 2.9, span: 48 },
-    { name: "WindowFarLayer", from: [18, 2.15, -26], axis: [0, 0, 1], speed: 1.25, span: 56 },
-    { name: "WindowNearLayerLeft", from: [-5.2, 0.25, -18], axis: [0, 0, 1], speed: 4.8, span: 42 },
-    { name: "WindowMidLayerLeft", from: [-10.5, 0.5, -21], axis: [0, 0, 1], speed: 2.9, span: 48 },
-    { name: "WindowFarLayerLeft", from: [-18, 2.15, -26], axis: [0, 0, 1], speed: 1.25, span: 56 },
-    // 三根电线杆按快于远景、慢于碎石的速度掠过窗框；这是车厢里最清晰的移动参照物。
-    { name: "DistantPoleA", from: [12, 2.05, -14], axis: [0, 0, 1], speed: 5.8, span: 34 },
-    { name: "DistantPoleB", from: [12, 2.05, -2], axis: [0, 0, 1], speed: 5.8, span: 34 },
-    { name: "DistantPoleC", from: [12, 2.05, 10], axis: [0, 0, 1], speed: 5.8, span: 34 },
-    { name: "DistantSmokeColumn", from: [20, 3.8, -19], axis: [0, 0, 1], speed: 1.7, span: 44 },
+    ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => [
+      { name: `FieldNear${label}`, from: [side * 11.5, -0.02, -24], axis: [0, 0, 1], speed: 4.8, span: 44 },
+      { name: `FieldFar${label}`, from: [side * 17.5, 0, -28], axis: [0, 0, 1], speed: 2.1, span: 52 },
+      { name: `Farmhouse${label}A`, from: [side * 18, 0.62, -28], axis: [0, 0, 1], speed: 2.6, span: 56 },
+      { name: `FarmhouseRoof${label}A`, from: [side * 18, 1.32, -28], axis: [0, 0, 1], speed: 2.6, span: 56 },
+      { name: `Farmhouse${label}C`, from: [side * 21, 0.72, -43], axis: [0, 0, 1], speed: 1.8, span: 60 },
+      { name: `FarmhouseRoof${label}C1`, from: [side * 20.25, 1.63, -43], axis: [0, 0, 1], speed: 1.8, span: 60 },
+      { name: `FarmhouseRoof${label}C2`, from: [side * 21.75, 1.63, -43], axis: [0, 0, 1], speed: 1.8, span: 60 },
+      { name: `BareTree${label}A`, from: [side * 15, 1.25, -20], axis: [0, 0, 1], speed: 3.7, span: 46 },
+      { name: `BareBranch${label}A`, from: [side * 15, 2.18, -20], axis: [0, 0, 1], speed: 3.7, span: 46 },
+      { name: `Poplar${label}C`, from: [side * 16, 2.1, -20], axis: [0, 0, 1], speed: 3.2, span: 48 },
+      { name: `PoplarBranch${label}C1`, from: [side * 16, 3.45, -20.35], axis: [0, 0, 1], speed: 3.2, span: 48 },
+      { name: `PoplarBranch${label}C2`, from: [side * 16, 3.35, -19.7], axis: [0, 0, 1], speed: 3.2, span: 48 },
+      { name: `TelegraphPole${label}`, from: [side * 12, 1.90, -20], axis: [0, 0, 1], speed: 6.2, span: 38 },
+      { name: `TelegraphCrossbar${label}`, from: [side * 12, 3.28, -20], axis: [0, 0, 1], speed: 6.2, span: 38 },
+    ]),
   ],
 
   props: [
     // 封闭车厢：两侧在窗洞处拆成墙段，四边视角均由地板、顶梁、端墙和窗外层封住。
     { kind: "box", size: [8, 0.20, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
     { kind: "box", size: [8, 0.20, 18], pos: [0, 4.2, 0], mat: "CarriageCeilingSteel", roughness: 0.86, metalness: 0.48, name: "CarriageCeiling", inside: true },
-    { kind: "box", size: [0.20, 4.2, 5.0], pos: [-4, 2.1, -6.5], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftRear", inside: true },
-    { kind: "box", size: [0.20, 0.85, 6.0], pos: [-4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowLow", inside: true },
-    { kind: "box", size: [0.20, 1.20, 6.0], pos: [-4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowHigh", inside: true },
-    { kind: "box", size: [0.20, 4.2, 5.0], pos: [-4, 2.1, 6.5], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftFront", inside: true },
-    { kind: "box", size: [0.20, 4.2, 5.0], pos: [4, 2.1, -6.5], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightRear", inside: true },
-    { kind: "box", size: [0.20, 0.85, 6.0], pos: [4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowLow", inside: true },
-    { kind: "box", size: [0.20, 1.20, 6.0], pos: [4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowHigh", inside: true },
-    { kind: "box", size: [0.20, 4.2, 5.0], pos: [4, 2.1, 6.5], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightFront", inside: true },
+    // 贯穿全车的窗带：上下钢板连续，窗间用窄立柱承力。旧版只在正中挖 6 m
+    // 窗洞，玩家从后段转头看见的永远是 5 m 实墙，窗外布景实际上全被挡住。
+    { kind: "box", size: [0.20, 0.85, 17.8], pos: [-4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowLow", inside: true },
+    { kind: "box", size: [0.20, 1.20, 17.8], pos: [-4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowHigh", inside: true },
+    { kind: "box", size: [0.20, 0.85, 17.8], pos: [4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowLow", inside: true },
+    { kind: "box", size: [0.20, 1.20, 17.8], pos: [4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowHigh", inside: true },
     { kind: "box", size: [8, 4.2, 0.20], pos: [0, 2.1, -8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "RearWall", inside: true },
     { kind: "box", size: [2.9, 4.2, 0.20], pos: [-2.55, 2.1, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallLeft", inside: true },
     { kind: "box", size: [2.9, 4.2, 0.20], pos: [2.55, 2.1, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallRight", inside: true },
@@ -484,15 +544,25 @@ export const CS_Chuchuan = {
     { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -0.6], mat: "Steel", color: 0x25292a, name: "RoofRibB" },
     { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 2.2], mat: "Steel", color: 0x25292a, name: "RoofRibC" },
     { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 5.0], mat: "Steel", color: 0x25292a, name: "RoofRibD" },
-    { kind: "box", size: [0.12, 3.5, 0.12], pos: [-3.8, 2.05, -3.15], mat: "Steel", color: 0x777064, name: "WindowFrameLeftRear" },
-    { kind: "box", size: [0.12, 3.5, 0.12], pos: [-3.8, 2.05, 3.15], mat: "Steel", color: 0x777064, name: "WindowFrameLeftFront" },
-    { kind: "box", size: [0.12, 3.5, 0.12], pos: [3.8, 2.05, -3.15], mat: "Steel", color: 0x777064, name: "WindowFrameRightRear" },
-    { kind: "box", size: [0.12, 3.5, 0.12], pos: [3.8, 2.05, 3.15], mat: "Steel", color: 0x777064, name: "WindowFrameRightFront" },
-    { kind: "box", size: [0.22, 0.14, 6.2], pos: [3.75, 3.75, 0], mat: "Steel", color: 0x777064, name: "WindowFrameRightTop" },
-    { kind: "box", size: [0.22, 0.14, 6.2], pos: [-3.75, 3.75, 0], mat: "Steel", color: 0x777064, name: "WindowFrameLeftTop" },
-    // 长凳与两个清晰空位；铺盖、军帽和旧装备是损耗的生活痕迹，不摆成祭坛。
-    { kind: "box", size: [0.72, 0.62, 16], pos: [-2.8, 0.72, 0], mat: "WoodStock", color: 0x5b4634, name: "BenchLeft" },
-    { kind: "box", size: [0.72, 0.62, 16], pos: [2.8, 0.72, 0], mat: "WoodStock", color: 0x5b4634, name: "BenchRight" },
+    ...[-7.2, -5.15, -3.1, -1.03, 1.03, 3.1, 5.15, 7.2].flatMap((z, index) => [
+      { kind: "box", size: [0.12, 2.15, 0.12], pos: [-3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionLeft${index}` },
+      { kind: "box", size: [0.12, 2.15, 0.12], pos: [3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionRight${index}` },
+    ]),
+    { kind: "box", size: [0.22, 0.14, 17.6], pos: [3.75, 3.02, 0], mat: "Steel", color: 0x777064, name: "WindowFrameRightTop" },
+    { kind: "box", size: [0.22, 0.14, 17.6], pos: [-3.75, 3.02, 0], mat: "Steel", color: 0x777064, name: "WindowFrameLeftTop" },
+    // 车厢两侧行李架：薄木条与定距钢托，不用一整面厚板遮窗。
+    { kind: "box", size: [0.58, 0.08, 15.6], pos: [-3.18, 2.94, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackLeft" },
+    { kind: "box", size: [0.58, 0.08, 15.6], pos: [3.18, 2.94, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackRight" },
+    ...[-6, -2, 2, 6].flatMap((z, index) => [
+      { kind: "box", size: [0.72, 0.08, 0.10], pos: [-3.35, 2.82, z], rz: -0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketLeft${index}` },
+      { kind: "box", size: [0.72, 0.08, 0.10], pos: [3.35, 2.82, z], rz: 0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketRight${index}` },
+    ]),
+    // 真正有座板、靠背和腿架的分段长椅；座下透空，轮廓不再像两排黑柜台。
+    ...CarriageBench(-1, "Left"),
+    ...CarriageBench(1, "Right"),
+    // 两块靠端墙的地铺给无座时席地休息，薄垫不侵占中央通道。
+    { kind: "box", size: [1.25, 0.055, 1.65], pos: [-1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5f594d, name: "FloorMatLeft" },
+    { kind: "box", size: [1.25, 0.055, 1.65], pos: [1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5b5549, name: "FloorMatRight" },
     { kind: "box", size: [0.62, 0.18, 1.5], pos: [-2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyLeft" },
     { kind: "box", size: [0.62, 0.18, 1.5], pos: [2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyRight" },
     { kind: "cyl", size: [0.22, 0.12], pos: [2.55, 1.25, 0.25], mat: "SteelHelmet", color: 0x554c40, name: "OldMilitaryCap" },
@@ -502,19 +572,8 @@ export const CS_Chuchuan = {
     { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
     { kind: "box", size: [0.35, 0.08, 0.9], pos: [-2.25, 1.15, -2.55], mat: "ClothNra", color: 0x372d26, name: "ShoeTool" },
     { kind: "box", size: [0.16, 0.16, 0.8], pos: [2.1, 0.65, 2.75], mat: "Steel", color: 0x49443e, name: "MachineGunCase" },
-    // 窗外近／中／远三层铺满左右两扇窗：深暗的远方树线压住天空，近处碎石、
-    // 低田和不断掠过的电线杆提供速度差。这样不论玩家转向哪一边都能读出火车正在跑。
-    { kind: "box", size: [0.20, 0.35, 42], pos: [5.2, 0.25, 0], mat: "GroundRubble", color: 0x6c6558, name: "WindowNearLayer" },
-    { kind: "box", size: [0.25, 1.45, 48], pos: [10.5, 0.72, 0], mat: "Ground", color: 0x5e604d, name: "WindowMidLayer" },
-    { kind: "box", size: [0.32, 4.3, 56], pos: [18, 2.15, 0], mat: "WoodDoor", color: 0x343c33, name: "WindowFarLayer" },
-    { kind: "box", size: [0.20, 0.35, 42], pos: [-5.2, 0.25, 0], mat: "GroundRubble", color: 0x6c6558, name: "WindowNearLayerLeft" },
-    { kind: "box", size: [0.25, 1.45, 48], pos: [-10.5, 0.72, 0], mat: "Ground", color: 0x5e604d, name: "WindowMidLayerLeft" },
-    { kind: "box", size: [0.32, 4.3, 56], pos: [-18, 2.15, 0], mat: "WoodDoor", color: 0x343c33, name: "WindowFarLayerLeft" },
-    { kind: "box", size: [2.5, 0.16, 42], pos: [6.5, 0.12, 0], mat: "GroundRubble", color: 0x4d4942, name: "TrackBallast" },
-    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, -14], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleA" },
-    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, -2], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleB" },
-    { kind: "box", size: [0.16, 4.1, 0.16], pos: [12, 2.05, 10], mat: "WoodBeam", color: 0x382f27, name: "DistantPoleC" },
-    { kind: "cyl", size: [0.32, 2.0], pos: [20, 3.8, -2], mat: "Adobe", color: 0x57483a, name: "DistantSmokeColumn", emissive: 0x201710 },
+    ...WindowLandscape(-1, "Left"),
+    ...WindowLandscape(1, "Right"),
     { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
     { kind: "box", size: [3.2, 1.4, 2.0], pos: [13.5, 1.15, -100], mat: "WoodBeam", color: 0x6b5846, name: "StationShed" },
     { kind: "box", size: [1.8, 0.24, 2.4], pos: [8.4, 1.18, -100], mat: "ClothNra", color: 0xb29a78, name: "SingleStretcher" },
@@ -593,9 +652,6 @@ export const CS_Chuchuan = {
     { n: 13, seconds: 9, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.8, -6], look: [8, 1.9, -0.5] },
       sfx: [{ at: 0.25, name: "trainBrake", volume: 0.62 }, { at: 2.1, name: "stretcherWood", volume: 0.42 }, { at: 4.2, name: "coughLow", volume: 0.32 }],
       propMoves: [
-        { name: "WindowNearLayer", startAt: 0, endAt: 9, from: [5.2, 0.25, -12], to: [5.2, 0.25, 12] },
-        { name: "WindowMidLayer", startAt: 0, endAt: 9, from: [10.5, 0.5, -14], to: [10.5, 0.5, 14] },
-        { name: "WindowFarLayer", startAt: 0, endAt: 9, from: [64, 4.2, -16], to: [64, 4.2, 16] },
         { name: "StationPlatform", startAt: 0, endAt: 9, from: [7.2, 0.45, -0.8], to: [7.2, 0.45, 0] },
         { name: "StationShed", startAt: 0, endAt: 9, from: [13.5, 1.15, -0.8], to: [13.5, 1.15, 0] },
         { name: "SingleStretcher", startAt: 0, endAt: 9, from: [8.4, 1.18, -0.8], to: [8.4, 1.18, 0] },
@@ -604,9 +660,6 @@ export const CS_Chuchuan = {
       ] },
     { n: 14, seconds: 9, focalMm: 50, cameraMode: "headLook", camera: { from: [0, 1.8, -6], look: [8, 1.9, 1.7] },
       propMoves: [
-        { name: "WindowNearLayer", startAt: 0, endAt: 9, from: [5.2, 0.25, 12], to: [5.2, 0.25, 30] },
-        { name: "WindowMidLayer", startAt: 0, endAt: 9, from: [10.5, 0.5, 14], to: [10.5, 0.5, 28] },
-        { name: "WindowFarLayer", startAt: 0, endAt: 9, from: [64, 4.2, 16], to: [64, 4.2, 26] },
         { name: "StationPlatform", startAt: 0, endAt: 9, from: [7.2, 0.45, 0], to: [7.2, 0.45, 1.5] },
         { name: "StationShed", startAt: 0, endAt: 9, from: [13.5, 1.15, 0], to: [13.5, 1.15, 1.5] },
         { name: "SingleStretcher", startAt: 0, endAt: 9, from: [8.4, 1.18, 0], to: [8.4, 1.18, 1.5] },

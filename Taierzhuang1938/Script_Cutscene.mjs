@@ -51,6 +51,7 @@ const TILE_BY_RECIPE = {
   BrickWall: TILE_METERS.brick, BrickWallSooty: TILE_METERS.brick,
   Adobe: TILE_METERS.adobe, RoofTile: TILE_METERS.roof, Stone: TILE_METERS.stone,
   WoodDoor: TILE_METERS.wood, WoodBeam: TILE_METERS.wood, WoodStock: TILE_METERS.wood,
+  CarriageBenchWood: TILE_METERS.wood,
   Sandbag: TILE_METERS.sandbag, Steel: TILE_METERS.steel, SteelHelmet: TILE_METERS.steel,
   ClothNra: TILE_METERS.cloth, ClothIja: TILE_METERS.cloth,
 };
@@ -310,10 +311,10 @@ export class CutsceneDirector {
   AddLook(deltaX = 0, deltaY = 0) {
     if (!this.AllowsLook) return this.Look;
     const scale = this.lookConfig.sensitivityScale * 0.002;
-    // three 的相机默认朝 -Z：正 yaw 会向左、正 pitch 会向下。此前把两条都按
-    // 常见公式正着加，导致右移看左、下移抬头；这里明确按相机坐标系取反/取正。
-    this.lookYaw = ClampHeadLook(this.lookYaw - Number(deltaX || 0) * scale, this.lookConfig.yaw);
-    this.lookPitch = ClampHeadLook(this.lookPitch + Number(deltaY || 0) * scale, this.lookConfig.pitch);
+    // rotateY/rotateX 在 lookAt 后沿相机局部轴叠加。实机符号与上一版测试桩的
+    // 假相机相反：鼠标向右必须给正 yaw，鼠标向下必须给负 pitch。
+    this.lookYaw = ClampHeadLook(this.lookYaw + Number(deltaX || 0) * scale, this.lookConfig.yaw);
+    this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this.lookConfig.pitch);
     return this.Look;
   }
 
@@ -938,12 +939,15 @@ export class CutsceneDirector {
     const config = cut.walk;
     if (!config || this.lookNeutral || this.time < (config.startAt || 0)) { this.walkBob = 0; return; }
     const down = (a, b) => this.walkKeys.has(a) || this.walkKeys.has(b);
-    let x = (down("d", "arrowright") ? 1 : 0) - (down("a", "arrowleft") ? 1 : 0);
-    let z = (down("w", "arrowup") ? 1 : 0) - (down("s", "arrowdown") ? 1 : 0);
-    const moving = x !== 0 || z !== 0;
+    const strafe = (down("d", "arrowright") ? 1 : 0) - (down("a", "arrowleft") ? 1 : 0);
+    const forward = (down("w", "arrowup") ? 1 : 0) - (down("s", "arrowdown") ? 1 : 0);
+    const moving = strafe !== 0 || forward !== 0;
     if (moving) {
-      const length = Math.hypot(x, z);
-      x /= length; z /= length;
+      const length = Math.hypot(strafe, forward);
+      // 车厢的导演镜头统一朝局部 +Z；此时画面右侧是局部 -X。上一版直接把
+      // D 加到 +X，结果左右必反。这里把按键明确换成相机平面的前/右轴。
+      const x = -strafe / length;
+      const z = forward / length;
       const speed = Number(config.speed) || 2;
       const min = config.min || [-3, -7];
       const max = config.max || [3, 7];

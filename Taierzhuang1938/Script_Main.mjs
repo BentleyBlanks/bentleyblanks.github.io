@@ -446,6 +446,11 @@ async function Boot() {
         normal: "./Texture/Texture_StoneNormal.webp?v=1",
         orm: "./Texture/Texture_StoneOrm.webp?v=1",
       }),
+      library.LoadExternalSet("CarriageBenchWood", {
+        albedo: "./Texture/Texture_CarriageBenchWoodBase.webp?v=1",
+        normal: "./Texture/Texture_CarriageBenchWoodNormal.webp?v=1",
+        orm: "./Texture/Texture_CarriageBenchWoodOrm.webp?v=1",
+      }),
     ]);
     await Promise.all([
       library.LoadExternalAlbedo("CarriageWallSteel", "Steel", "./Texture/Texture_CarriageRivetedSteelBase.png?v=1"),

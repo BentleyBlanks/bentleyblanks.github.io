@@ -7,6 +7,7 @@ const cut = {
   id: "TEST_HeadLook", title: "test", seconds: 1,
   ambience: "trainInterior",
   cameraMode: "headLook", headLook: { yaw: [-0.2, 0.2], pitch: [-0.1, 0.1], sensitivityScale: 1 },
+  walk: { min: [-3, -3], max: [3, 3], speed: 2, startAt: 0 },
   cast: [], props: [],
   shots: [{ n: 1, seconds: 1, focalMm: 50, cameraMode: "headLook",
     camera: { from: [0, 1, 4], look: [0, 1, 0] } }],
@@ -43,7 +44,7 @@ const directorSource = fs.readFileSync(new URL("./Script_Cutscene.mjs", import.m
 const classSource = directorSource.slice(directorSource.indexOf("export class CutsceneDirector"), directorSource.indexOf("export default CutsceneDirector"))
   .replace("export class CutsceneDirector", "class CutsceneDirector");
 const Director = new Function("THREE", "MarkNoPrepass", "HashString", "ValueNoise2", "Clamp", "Clamp01", "Lerp", "FovFromFocalMm", "Ease", "ResolveHeadLookConfig", "ClampHeadLook", "ValidateCutscene", `${classSource}; return CutsceneDirector;`)(
-  FakeThree, () => {}, () => 1, () => 0.5, Math.max, (x) => Math.max(0, Math.min(1, x)), (a, b, t) => a + (b - a) * t,
+  FakeThree, () => {}, () => 1, () => 0.5, (x, low, high) => Math.max(low, Math.min(high, x)), (x) => Math.max(0, Math.min(1, x)), (a, b, t) => a + (b - a) * t,
   (f) => 27, () => 0.5, ResolveHeadLookConfig, ClampHeadLook, () => [],
 );
 class FakeCamera {
@@ -63,9 +64,9 @@ const audio = {
 
 const cfg = ResolveHeadLookConfig(cut);
 let yaw = 0, pitch = 0;
-yaw = ClampHeadLook(yaw - 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
-pitch = ClampHeadLook(pitch + (-1000) * cfg.sensitivityScale * 0.002, cfg.pitch);
-assert.deepEqual({ yaw, pitch }, { yaw: -0.2, pitch: -0.1 }, "right/down mouse motion follows the rendered camera axes and clamps");
+yaw = ClampHeadLook(yaw + 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
+pitch = ClampHeadLook(pitch - (-1000) * cfg.sensitivityScale * 0.002, cfg.pitch);
+assert.deepEqual({ yaw, pitch }, { yaw: 0.2, pitch: 0.1 }, "right/up mouse motion follows the rendered camera axes and clamps");
 assert.deepEqual({ yaw: 0, pitch: 0 }, { yaw: 0, pitch: 0 }, "neutral view is deterministic");
 assert.equal(oldCut.cameraMode, undefined, "old cutscene has no headLook mode");
 
@@ -77,10 +78,19 @@ director.onRelease = (c) => finished.push(c?.id);
 const play = director.Play(cut.id);
 assert.equal(director.AllowsLook, true);
 director.AddLook(1000, -1000);
-assert.deepEqual(director.Look, { yaw: -0.2, pitch: -0.1 }, "director look uses the corrected rendered-camera directions");
+assert.deepEqual(director.Look, { yaw: 0.2, pitch: 0.1 }, "director look uses the corrected rendered-camera directions");
 const baselineYaw = director.camera._yaw;
 director.Update(0);
-assert.equal(director.camera._yaw, baselineYaw - 0.2, "director camera plus corrected Look yaw are composed");
+assert.equal(director.camera._yaw, baselineYaw + 0.2, "director camera plus corrected Look yaw are composed");
+director.walkKeys.add("d");
+director._UpdateWalk(cut, 1);
+assert.deepEqual([director.walkOffset.x, director.walkOffset.z], [-2, 0], "D follows camera-right (-X while the carriage camera faces +Z)");
+director.walkKeys.clear();
+director.walkOffset.set(0, 0, 0);
+director.walkKeys.add("w");
+director._UpdateWalk(cut, 1);
+assert.deepEqual([director.walkOffset.x, director.walkOffset.z], [0, 2], "W follows camera-forward (+Z)");
+director.walkKeys.clear();
 director.SetNeutralLook(true);
 assert.deepEqual(director.Look, { yaw: 0, pitch: 0 }, "neutral view resets look");
 director.Update(1.1);

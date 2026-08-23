@@ -92,8 +92,13 @@ if __name__ == "__main__":
     build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
+    # Image-generated, de-lit timber scan authored for the Chuchuan carriage.
+    # Keep this separate from WeaponWoodV2: a rifle stock is varnished and fine-
+    # grained, while troop-car bench boards are broad, dry and heavily abraded.
+    build_if_source("CarriageBenchWood", normal_strength=3.4, metalness=0,
+                    rough_min=178, rough_max=242)
     for stem in (
         "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag",
-        "BrickWallSooty", "Adobe", "Stone",
+        "BrickWallSooty", "Adobe", "Stone", "CarriageBenchWood",
     ):
         export_standalone_metallic_roughness(stem)
