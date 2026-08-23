@@ -960,8 +960,15 @@ async function Boot() {
       Play: (index, opts) => StartLevel(index, opts),
       PlayPrologue: () => StartMenuPrologue(),
       Resume: () => ResumeFromPause(),
-      // 暂停菜单留在下面；关掉设置面板后仍回到暂停层，不会误恢复战斗。
-      Settings: () => editor.TogglePanel(true),
+      // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
+      // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
+      // panelOpen 虽然已经变成 true，玩家看到的仍是毫无反应。记住来源菜单，
+      // 关掉设置后再由 FinishEditorSession 把对应的主菜单或暂停菜单恢复干净。
+      Settings: () => {
+        editorReturnMenuMode = menu && menu.open ? menu.mode : null;
+        if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
+        editor.TogglePanel(true);
+      },
       DebugOptions: () => debugOptions.Get(),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       Crowd: (anchor) => PlaceMenuGarrison(anchor),

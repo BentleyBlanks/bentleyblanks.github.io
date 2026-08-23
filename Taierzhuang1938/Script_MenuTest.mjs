@@ -117,6 +117,41 @@ await Boot();
 }
 
 // ===========================================================================
+// 1a) 主菜单真实点击「设置」：不能只验内部回调，面板必须真的在屏幕上
+// ===========================================================================
+await page.click('.mnItem[data-act="settings"]');
+{
+  const opened = await page.evaluate(() => {
+    const panel = document.querySelector(".edPanel.launcher");
+    const rect = panel?.getBoundingClientRect();
+    return {
+      menu: window.Taierzhuang.Debug.Menu(),
+      editor: window.Taierzhuang.Debug.Editor(),
+      display: panel ? getComputedStyle(panel).display : "missing",
+      width: rect?.width || 0,
+      height: rect?.height || 0,
+    };
+  });
+  Check("主菜单点击设置会显示设置与工具面板",
+    opened.menu.open && opened.menu.mode === "title"
+      && opened.editor.panelOpen && !opened.editor.hidden
+      && opened.display === "flex" && opened.width > 0 && opened.height > 0,
+    JSON.stringify(opened));
+}
+await page.click(".edPanel.launcher .edX");
+{
+  const closed = await page.evaluate(() => ({
+    menu: window.Taierzhuang.Debug.Menu(),
+    editor: window.Taierzhuang.Debug.Editor(),
+    inMenu: window.Taierzhuang.state.menu,
+  }));
+  Check("关闭设置后回到主菜单并重新隐藏开发工具层",
+    closed.menu.open && closed.menu.mode === "title" && closed.inMenu
+      && !closed.editor.panelOpen && closed.editor.hidden,
+    JSON.stringify(closed));
+}
+
+// ===========================================================================
 // 1b) 调试选项：开关在主菜单上可见、实际写入运行时，再返回主菜单
 // ===========================================================================
 {
