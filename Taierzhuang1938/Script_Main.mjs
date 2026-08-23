@@ -921,8 +921,11 @@ async function Boot() {
       // 地图切片即使已重建，编辑器也拿不到 Update，画面就会停在菜单那一片。
       // 场景工具一打开便收起菜单，保留「编辑器暂停玩法」的语义。
       PrepareSceneEditing: () => {
-        editorReturnMenuMode = state.menu && menu ? menu.mode : null;
-        if (state.menu) CloseMenu();
+        // 暂停菜单不会把 state.menu 设为 true（它表示的是“主菜单活场景”），
+        // 但 menu.open 仍然为 true。只看 state.menu 会漏掉“暂停 → 设置 →
+        // 场景/地形”这条路径，让暂停标题和按钮继续盖在编辑器后面。
+        editorReturnMenuMode = menu && menu.open ? menu.mode : null;
+        if (menu && menu.open) CloseMenu();
         ReleasePointerLock();
       },
       FinishEditorSession: () => FinishEditorSession(),

@@ -369,6 +369,38 @@ for (let i = 0; i < 3; i += 1) {
   Check("设置里按 Esc 回到暂停菜单",
     !settingsClosed.editor.panelOpen && settingsClosed.menu.open && settingsClosed.menu.mode === "pause");
 
+  // 实际复现玩家路径：暂停 → 设置 → 场景/地形。场景编辑器接管后，暂停
+  // 菜单必须整层隐藏；关闭工具后再回到原暂停层，不能顺手恢复战斗。
+  await page.evaluate(() => {
+    window.Taierzhuang.Debug.MenuAct("settings");
+    window.Taierzhuang.Debug.OpenEditor("scene");
+  });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(4));
+  const sceneEditorOpen = await page.evaluate(() => ({
+    editor: window.Taierzhuang.Debug.Editor(),
+    menu: window.Taierzhuang.Debug.Menu(),
+    menuDisplay: getComputedStyle(document.getElementById("menu")).display,
+    running: window.Taierzhuang.state.running,
+  }));
+  Check("场景编辑器打开时暂停菜单整层隐藏",
+    sceneEditorOpen.editor.active === "scene" && !sceneEditorOpen.menu.open
+      && sceneEditorOpen.menuDisplay === "none" && !sceneEditorOpen.running,
+    JSON.stringify(sceneEditorOpen));
+  await page.screenshot({ path: path.join(outDir, "Menu_SceneEditorFromPause.png") });
+
+  await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
+  const sceneEditorClosed = await page.evaluate(() => ({
+    editor: window.Taierzhuang.Debug.Editor(),
+    menu: window.Taierzhuang.Debug.Menu(),
+    menuDisplay: getComputedStyle(document.getElementById("menu")).display,
+    running: window.Taierzhuang.state.running,
+  }));
+  Check("关闭场景编辑器后恢复原暂停菜单",
+    !sceneEditorClosed.editor.capturing && sceneEditorClosed.menu.open
+      && sceneEditorClosed.menu.mode === "pause" && sceneEditorClosed.menuDisplay !== "none"
+      && !sceneEditorClosed.running,
+    JSON.stringify(sceneEditorClosed));
+
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
   const resumed = await page.evaluate(() => ({
     running: window.Taierzhuang.state.running, open: window.Taierzhuang.Debug.Menu().open,
