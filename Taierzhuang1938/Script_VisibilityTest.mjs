@@ -73,10 +73,10 @@ try {
     if (!crowd || !actor) return 0;
     crowd.Begin();
     for (let index = 0; index < 480; index += 1) {
-      crowd.Push(actor.kind, actor.root.position, 0, actor.sizeScale ?? 1, 1);
+      crowd.Push(actor.kind, actor.root.position, 0, actor.sizeScale ?? 1, 0, true);
     }
     crowd.End();
-    const count = crowd.Count;
+    const count = crowd.DeadCount;
     T.ai.CullActors(T.camera);       // 把人为容量探针还原成真实战场列表
     return count;
   });
@@ -85,7 +85,18 @@ try {
   const corpses = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const victims = T.ai.soldiers.filter((soldier) => soldier.alive && soldier.actor).slice(0, 30);
-    for (const soldier of victims) soldier.Kill();
+    // 初始 30 帧里可能已经有前一批阵亡者；重新从“仍活着”的列表取样后，必须
+    // 再把这一批明确摆回镜头前。否则旧阵列缺几个人时，slice 会从关卡原出生点
+    // （有些在 x=500 m 外）补满，测试测到的是视锥外出生点，不是尸体保留策略。
+    for (let index = 0; index < victims.length; index += 1) {
+      const soldier = victims[index];
+      const column = index % 10;
+      const row = Math.floor(index / 10);
+      soldier.position.set((column - 4.5) * 2.3, 0, -35 - row * 16);
+      soldier.actor.root.position.copy(soldier.position);
+      if (soldier.body) soldier.body.Teleport(soldier.position.x, soldier.position.y, soldier.position.z);
+      soldier.Kill();
+    }
     // 旧逻辑在 Update 尾部会把超过 26 的最早尸体 Remove 掉。一帧就足以触发；
     // 多推四秒也覆盖尸体刚体落地并被回收后的稳定状态。
     T.StepFrames(5 * 60, 1 / 60, false);

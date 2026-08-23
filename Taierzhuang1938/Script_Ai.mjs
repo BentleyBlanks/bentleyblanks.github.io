@@ -74,6 +74,11 @@ let nextId = 1;
  */
 const ACTOR_DETAIL_ENTER_M = 46;
 const ACTOR_DETAIL_EXIT_M = 56;
+// 尸体没有步态、瞄准或足部 IK 可读，投影缩到这个距离后继续保留完整分件只会
+// 重复提交同一套定格网格。近处仍用真实倒地姿势，稍远处交给同款人物的尸体 LOD；
+// 两档之间留 6 m 迟滞，玩家在边界前后走动时不会反复切换。
+const CORPSE_DETAIL_ENTER_M = 24;
+const CORPSE_DETAIL_EXIT_M = 30;
 const ACTOR_ANIMATION_60HZ_M = 20;
 const ACTOR_ANIMATION_30HZ_M = 32;
 const ACTOR_FOOT_IK_M = 18;
@@ -782,9 +787,15 @@ export class AiDirector {
       if (!s.alive) {
         s.deadTime += dt;
         this.StepCorpse(s, dt);
-        // 镜头外/远景的活人不白算骨架。死亡前 0.9 s 例外：让隐藏的
-        // 精细层也把倒地姿势收完，以后若在近处重新进精细层不会突然“复活”。
-        if (s.actor && (s.actor.root.visible || s.deadTime <= 0.9)) {
+        // 倒地姿势在 0.9 s 时已经收敛，之后只有尸体根节点还会跟着刚体移动；
+        // StepCorpse 上面已经单独同步了 root.position，不需要再把四五十个骨骼／
+        // 分件从头解算一遍。旧条件只要尸体还在视锥内就会永远 Actor.Update：
+        // 中等规模开战十几秒便有十余具近景尸体，每具每帧都重跑一套定格姿势，
+        // 144 Hz 下很快跨过 6.9 ms 的整帧门槛，读数就从 144 直接落到 72。
+        //
+        // 死亡前 0.9 s 仍无条件更新：远景／镜头外的精细层也必须把倒地动作收完，
+        // 否则以后走近、从 LOD 切回完整模型时会突然“复活”成站姿。
+        if (s.actor && s.deadTime <= 0.9) {
           s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
         continue;
@@ -825,14 +836,17 @@ export class AiDirector {
       s.actor.renderDistanceSq = distanceSq;
       s.actor.allowFootIk = distanceSq <= ACTOR_FOOT_IK_M * ACTOR_FOOT_IK_M;
       s.actor.SetShadowEnabled(distanceSq <= ACTOR_SHADOW_M * ACTOR_SHADOW_M);
-      const detailLimit = s.renderLod === "detail" ? ACTOR_DETAIL_EXIT_M : ACTOR_DETAIL_ENTER_M;
+      const settledCorpse = !s.alive && s.deadTime >= 0.9;
+      const detailLimit = settledCorpse
+        ? (s.renderLod === "detail" ? CORPSE_DETAIL_EXIT_M : CORPSE_DETAIL_ENTER_M)
+        : (s.renderLod === "detail" ? ACTOR_DETAIL_EXIT_M : ACTOR_DETAIL_ENTER_M);
       // 纯逻辑测试没有 scene/factory，没有远景层可以接手时必须回退完整 Actor。
       const detailed = !crowd || distanceSq <= detailLimit * detailLimit;
       this._SetDetailedAttached(s.actor, detailed);
       s.renderLod = detailed ? "detail" : "crowd";
       if (!detailed) {
-        const prone = !s.alive ? 1 : Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
-        crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone);
+        const prone = Math.max(s.proneBlend ?? 0, s.stance === 2 ? 1 : 0);
+        crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive);
       }
     }
     if (crowd) crowd.End();

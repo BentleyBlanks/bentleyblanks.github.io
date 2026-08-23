@@ -108,7 +108,40 @@ try {
       T.renderer.info.autoReset = true;
       return metrics;
     };
-    return { toward: Sample(0), away: Sample(Math.PI) };
+    const toward = Sample(0);
+    const away = Sample(Math.PI);
+
+    // 战斗一开始就会留下近景尸体，而本作明确要求尸体保留到本关结束。
+    // 保留画面不等于永远重算定格姿势：倒地动画 0.9 s 收完后，尸体若仍在
+    // 视锥内，旧逻辑会让每具完整 Actor 每帧继续 Update。十具就是一秒六百次
+    // 无效骨架／分件解算，正好会把高刷屏从 144 Hz 推过 6.9 ms 门槛，表现为
+    // “跑几步以后帧率直接减半”。这里把近景与远景尸体各摆一排，同时锁死
+    // 完整 Actor 的定格更新和远景尸体专用合批两条回归。
+    player.yaw = 0;
+    player.pitch = 0;
+    T.StepFrames(2);
+    const corpseVictims = T.ai.soldiers.filter((soldier) => soldier.alive && soldier.actor).slice(0, 20);
+    corpseVictims.forEach((soldier, index) => {
+      const half = Math.ceil(corpseVictims.length / 2);
+      const rowIndex = index % half;
+      const z = index < half ? -20 - (index % 2) * 2 : -38 - (index % 2) * 2;
+      Place(soldier, (rowIndex - (half - 1) / 2) * 2.0, z);
+      soldier.Kill();
+    });
+    T.StepFrames(120);                    // 2 s：倒地动作与尸体刚体都已稳定
+    for (const soldier of corpseVictims) soldier.actor.performanceUpdateCount = 0;
+    T.StepFrames(60);
+    const settledCorpses = {
+      killed: corpseVictims.length,
+      detailed: corpseVictims.filter((soldier) => soldier.renderLod === "detail").length,
+      crowd: corpseVictims.filter((soldier) => soldier.renderLod === "crowd").length,
+      settled: corpseVictims.filter((soldier) => soldier.corpseSettled).length,
+      deadLodInstances: T.ai.crowd?.DeadCount ?? 0,
+      poseUpdates: corpseVictims.reduce(
+        (sum, soldier) => sum + (soldier.actor?.performanceUpdateCount || 0), 0),
+    };
+
+    return { toward, away, settledCorpses };
   });
 } finally {
   await browser.close();
@@ -124,6 +157,8 @@ if (result) {
   console.log(`away    ${Format(result.away)}`);
   console.log(`ratio   CPU ${(result.toward.cpuMs / result.away.cpuMs).toFixed(2)}x | calls `
     + `${(result.toward.drawCalls / result.away.drawCalls).toFixed(2)}x`);
+  console.log(`corpses ${result.settledCorpses.detailed} detail + ${result.settledCorpses.crowd} dead LOD`
+    + ` / ${result.settledCorpses.settled} settled | ${result.settledCorpses.poseUpdates} redundant pose updates`);
 }
 for (const error of errors) console.log(error);
 const failures = [];
@@ -138,6 +173,21 @@ if (result) {
   if (result.toward.drawCalls > 650) failures.push(`朝敌方向 calls 过高 ${result.toward.drawCalls.toFixed(0)} > 650`);
   const callRatio = result.toward.drawCalls / Math.max(1, result.away.drawCalls);
   if (callRatio > 1.35) failures.push(`转向 calls 尖峰 ${callRatio.toFixed(2)}x > 1.35x`);
+  if (result.settledCorpses.killed < 16 || result.settledCorpses.detailed < 6
+      || result.settledCorpses.crowd < 6) {
+    failures.push(`尸体 LOD 取证不足 ${result.settledCorpses.detailed} detail + `
+      + `${result.settledCorpses.crowd} LOD / ${result.settledCorpses.killed}`);
+  }
+  if (result.settledCorpses.settled !== result.settledCorpses.killed) {
+    failures.push(`尸体刚体未稳定 ${result.settledCorpses.settled}/${result.settledCorpses.killed}`);
+  }
+  if (result.settledCorpses.poseUpdates !== 0) {
+    failures.push(`定格尸体仍在重算姿势 ${result.settledCorpses.poseUpdates} 次`);
+  }
+  if (result.settledCorpses.deadLodInstances < result.settledCorpses.crowd) {
+    failures.push(`远景尸体没有全部使用倒地合批 ${result.settledCorpses.deadLodInstances}`
+      + ` < ${result.settledCorpses.crowd}`);
+  }
 }
 for (const failure of failures) console.log(`FAIL ${failure}`);
 process.exit(errors.length || failures.length || !result ? 1 : 0);

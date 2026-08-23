@@ -9,11 +9,13 @@
 // 当前硬红线已提高到 5000 draw calls / 600 万三角面，但远景合批仍是必需的等价 LOD；
 // 它在保持全部人物与尸体可见时使用，不能重新引入人数名额。这里的做法：
 //
-//   1) 每个 kind 烘一份「端着枪站着」的静态姿势，按材质桶合并成几块几何；
+//   1) 每个 kind 烘一份「端着枪站着」和一份「已经倒地」的静态姿势，
+//      按材质桶合并成几块几何；
 //   2) 每块几何配一个 InstancedMesh，容量给到全场兵力；
 //   3) 每帧把"在视锥里、投影尺寸已经读不出关节动作"的人写进实例矩阵。
 //
-// 代价是远景的人**不做动作**（静态姿势 + 朝向 + 卧倒翻转）。这一条能成立的前提是
+// 代价是远景的人**不做动作**（静态姿势 + 朝向；活人的卧倒仍用整体翻转）。这一条
+// 能成立的前提是
 // 距离门槛：60 m 上一个人在 900 px 高的屏幕上只有 26 px，200 m 上 8 px，
 // 400 m 上 4 px —— 那个尺寸下动作是看不出来的，能不能看见**一个人形**才是全部。
 // 门槛以内一律走精细 Actor，别拿静态姿势去糊近处的人。
@@ -36,6 +38,8 @@ const CROWD_CAPACITY = 512;
  */
 const BAKE_STATE = { aim: 0.35, moveSpeed: 0, crouch: 0, prone: 0 };
 const BAKE_STEPS = 6;      // 姿势是弹簧驱动的，推几帧让它收敛到稳态再烘
+const DEAD_BAKE_STATE = { dead: true, dying: 1 };
+const DEAD_BAKE_STEPS = 54; // 倒地动画 0.8 s；多推 0.1 s，确保烘的是完全定格帧
 
 export class ActorCrowd {
   /**
@@ -46,7 +50,7 @@ export class ActorCrowd {
     this.scene = scene;
     this.factory = factory;
     this.capacity = Math.max(8, capacity | 0);
-    this.kinds = new Map();          // kind -> { meshes: InstancedMesh[], count }
+    this.kinds = new Map();          // `${kind}:standing|dead` -> { meshes, count, dead }
     this.disposed = false;
     this._matrix = new THREE.Matrix4();
     this._pos = new THREE.Vector3();
@@ -62,9 +66,11 @@ export class ActorCrowd {
    * 几何一律 **clone 之后**再交给 MergeGeometries —— 它会 dispose 掉入参，
    * 而这些几何是 ActorFactory 按 kind 缓存、全场 Actor 共用的一份。
    */
-  _Bake(kind) {
+  _Bake(kind, dead = false) {
     const actor = this.factory.Create(kind, { seed: 4213 });
-    for (let i = 0; i < BAKE_STEPS; i += 1) actor.Update(1 / 60, BAKE_STATE);
+    const steps = dead ? DEAD_BAKE_STEPS : BAKE_STEPS;
+    const state = dead ? DEAD_BAKE_STATE : BAKE_STATE;
+    for (let i = 0; i < steps; i += 1) actor.Update(1 / 60, state);
     actor.root.updateMatrixWorld(true);
     // root 的 matrixWorld 里带着 ±4% 的身高随机缩放，求逆把它一并除掉：
     // 烘出来的是"标准身高"的模型，个体差交给实例矩阵。
@@ -85,7 +91,7 @@ export class ActorCrowd {
     const meshes = [];
     for (const [material, list] of byMaterial) {
       const mesh = new THREE.InstancedMesh(MergeGeometries(list), material, this.capacity);
-      mesh.name = `Crowd_${kind}`;
+      mesh.name = `Crowd_${kind}_${dead ? "Dead" : "Standing"}`;
       // 自己做视锥剔除（Script_Ai 那边逐人判），而且实例散布在全场，
       // 用一个包围球去剔整批人只会在转身时整批闪掉
       mesh.frustumCulled = false;
@@ -97,16 +103,19 @@ export class ActorCrowd {
       this.scene.add(mesh);
       meshes.push(mesh);
     }
-    return { meshes, count: 0 };
+    return { meshes, count: 0, dead };
   }
 
-  _Kind(kind) {
-    let entry = this.kinds.get(kind);
-    if (!entry) {
-      entry = this._Bake(kind);
-      this.kinds.set(kind, entry);
+  _Kind(kind, dead = false) {
+    const standingKey = `${kind}:standing`;
+    const deadKey = `${kind}:dead`;
+    // 两个姿态成对烘焙。若等到第一具远景尸体出现才临时造 Actor、合并几何，
+    // 修掉每帧慢路径以后反而会留下一次明显的死亡瞬间卡顿。
+    if (!this.kinds.has(standingKey)) {
+      this.kinds.set(standingKey, this._Bake(kind, false));
+      this.kinds.set(deadKey, this._Bake(kind, true));
     }
-    return entry;
+    return this.kinds.get(dead ? deadKey : standingKey);
   }
 
   /** 每帧开始：把计数清零。 */
@@ -120,16 +129,17 @@ export class ActorCrowd {
    * @param {THREE.Vector3} position 脚底位置
    * @param {number} yaw     朝向（弧度）
    * @param {number} scale   身高比例（1 = 标准）
-   * @param {number} prone   0 站 / 1 卧
+   * @param {number} prone   活人姿态：0 站 / 1 卧
+   * @param {boolean} dead   使用预烘焙的倒地姿态
    */
-  Push(kind, position, yaw, scale = 1, prone = 0) {
+  Push(kind, position, yaw, scale = 1, prone = 0, dead = false) {
     if (this.disposed) return;
-    const entry = this._Kind(kind);
+    const entry = this._Kind(kind, dead);
     const index = entry.count;
     if (index >= this.capacity) return;
     // 卧倒：绕 X 转 −80° 再把身子放到接近地面。远景上只需要"横过来的一条"，
     // 真去解卧姿骨骼没有意义（200 m 上人只有 8 px 高）。
-    const lie = Math.min(1, Math.max(0, prone));
+    const lie = dead ? 0 : Math.min(1, Math.max(0, prone));
     this._euler.set(-lie * 1.4, yaw, 0);
     this._quat.setFromEuler(this._euler);
     this._pos.set(position.x, position.y + lie * 0.28 * scale, position.z);
@@ -153,6 +163,13 @@ export class ActorCrowd {
   get Count() {
     let n = 0;
     for (const entry of this.kinds.values()) n += entry.count;
+    return n;
+  }
+
+  /** 本帧使用预烘焙倒地姿态的实例数（性能／可见性回归取证用）。 */
+  get DeadCount() {
+    let n = 0;
+    for (const entry of this.kinds.values()) if (entry.dead) n += entry.count;
     return n;
   }
 
