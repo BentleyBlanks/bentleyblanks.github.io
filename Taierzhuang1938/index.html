@@ -5,22 +5,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#08080a">
-  <meta name="description" content="《滕县 一九三八》——1938 年 3 月 14 日至 18 日，山东滕县。川军第 122 师守城四日的线性关卡 FPS 原型。">
-  <title>滕县 一九三八</title>
+  <meta name="description" content="《滕�?一九三八》—�?938 �?3 �?14 日至 18 日，山东滕县。川军第 122 师守城四日的线性关�?FPS 原型�?>
+  <title>滕县 一九三�?/title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="./Style_Game.css?v=13">
-  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
+  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css �?:root，所以必须排在它后面�?-->
   <link rel="stylesheet" href="./Style_Menu.css?v=3">
-  <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
+  <!-- 编辑器套件的样式。出图模式下整棵 DOM �?display:none，进不了任何一张截图�?-->
   <link rel="stylesheet" href="./Style_Editor.css?v=4">
-  <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
+  <!-- 版本戳必须盖到整张模块图上，不能只盖入口�?
        只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
-       里的旧版，桌面刷新就好、手机 Safari 黏得多，于是只在移动端复现。
-       修法是 import map 把每一个第一方模块重映射到带版本的 URL；
-       版本只写在这一张表里，源码里一律不许自己写 ?v=（同一模块两个 URL = 加载两份）。
-       **新增模块必须登记在这里。** -->
+       里的旧版，桌面刷新就好、手�?Safari 黏得多，于是只在移动端复现�?
+       修法�?import map 把每一个第一方模块重映射到带版本�?URL�?
+       版本只写在这一张表里，源码里一律不许自己写 ?v=（同一模块两个 URL = 加载两份）�?
+       **新增模块必须登记在这里�?* -->
   <script type="importmap">
     {
       "imports": {
@@ -39,7 +39,7 @@
         "./Script_TexBake.mjs": "./Script_TexBake.mjs?v=2",
         "./Script_Materials.mjs": "./Script_Materials.mjs?v=5",
         "./Script_Geo.mjs": "./Script_Geo.mjs?v=1",
-        "./Script_LivedInProps.mjs": "./Script_LivedInProps.mjs?v=1",
+        "./Script_LivedInProps.mjs": "./Script_LivedInProps.mjs?v=2",
         "./Script_MeshLoad.mjs": "./Script_MeshLoad.mjs?v=1",
         "./Script_RiggedModel.mjs": "./Script_RiggedModel.mjs?v=11",
         "./Data_Meshes.mjs": "./Data_Meshes.mjs?v=6",
@@ -48,15 +48,15 @@
         "./Script_Light.mjs": "./Script_Light.mjs?v=3",
         "./Data_GlobalShProbe.mjs": "./Data_GlobalShProbe.mjs?v=1",
         "./Script_Gi.mjs": "./Script_Gi.mjs?v=1",
-        "./Script_World.mjs": "./Script_World.mjs?v=7",
+        "./Script_World.mjs": "./Script_World.mjs?v=8",
         "./Data_Destruction.mjs": "./Data_Destruction.mjs?v=3",
         "./Data_FracturePatterns.mjs": "./Data_FracturePatterns.mjs?v=1",
         "./Script_Destruction.mjs": "./Script_Destruction.mjs?v=4",
         "./Script_JieheHeight.mjs": "./Script_JieheHeight.mjs?v=1",
         "./Script_JieheField.mjs": "./Script_JieheField.mjs?v=1",
         "./Script_TengxianOutfield.mjs": "./Script_TengxianOutfield.mjs?v=4",
-        "./Data_Tengxian.mjs": "./Data_Tengxian.mjs?v=3",
-        "./Script_TengxianCity.mjs": "./Script_TengxianCity.mjs?v=6",
+        "./Data_Tengxian.mjs": "./Data_Tengxian.mjs?v=4",
+        "./Script_TengxianCity.mjs": "./Script_TengxianCity.mjs?v=7",
         "./Script_Navigation.mjs": "./Script_Navigation.mjs?v=2",
         "./Script_Input.mjs": "./Script_Input.mjs?v=3",
         "./Script_Wheel.mjs": "./Script_Wheel.mjs?v=1",
@@ -105,27 +105,27 @@
   <canvas id="view"></canvas>
   <div id="hud"></div>
   <div id="boot">
-    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。
-         转动跑在 worker 里，主线程建关卡卡多久都不影响它。 -->
+    <!-- 加载画面的道具展示台：随机一件游戏内�?TZM 模型，可以拖着转（Script_BootProp）�?
+         转动跑在 worker 里，主线程建关卡卡多久都不影响它�?-->
     <canvas id="bootProp"></canvas>
     <div id="bootVeil"></div>
     <div id="bootHead">
-      <div id="bootTitle">滕县 一九三八</div>
-      <div id="bootSub">一九三八年三月十四日 — 十八日 · 山东滕县</div>
+      <div id="bootTitle">滕县 一九三�?/div>
+      <div id="bootSub">一九三八年三月十四�?�?十八�?· 山东滕县</div>
     </div>
     <div id="bootCard">
       <div id="bootPropName"></div>
       <div id="bootPropNote"></div>
     </div>
     <div id="bootFoot">
-      <button id="bootStart" disabled>进 城</button>
+      <button id="bootStart" disabled>�?�?/button>
       <a id="bootPreview" href="?preview=CS_Chuchuan" aria-label="打开新版序章预览">新版序章预览（开发）</a>
-      <div id="bootStep">正在夯地……</div>
+      <div id="bootStep">正在夯地…�?/div>
       <div id="bootBar"><i></i></div>
     </div>
   </div>
-  <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
-       出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
+  <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）�?
+       出图模式�??menu=0 下它一直是空的，「进 城」那颗按钮照旧管�?—�?三个冒烟脚本都点它�?-->
   <div id="menu"></div>
   <script type="module" src="./Script_Main.mjs?v=39"></script>
 </body>

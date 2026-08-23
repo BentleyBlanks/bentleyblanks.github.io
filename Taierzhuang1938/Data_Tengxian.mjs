@@ -347,6 +347,49 @@ export const EAST_DEFENSE = {
   ],
 };
 
+/**
+ * 东关外农田带（寨墙一线以东、荆河西岸）—— L2/L3 日军反冲击的出发区。
+ *
+ * 史实底子：日方战详记第三中队沿地隙掩蔽接近东寨门；出发区是滕县城郊的
+ * 普通农耕平原 —— 冬小麦返青的麦地、翻耕的裸土、田埂、坟地、行道杨树
+ * 与几处独户农院。**不能生成一块光板**：那既不像鲁南县郊，也让夜袭关卡
+ * 的日军出生点毫无遮蔽。地形起伏、地块、村缘构件全部由这份表驱动
+ * （Script_TengxianCity.BuildEastApproach 消费），坐标除注明外均为推定。
+ */
+export const EAST_FIELD = {
+  bounds: { minX: 548, maxX: 756, minZ: -250, maxZ: 250 },
+  roadZ: -105,
+  // 战术地形：压在濠外原野解析高程上（Script_TengxianCity.OuterHeight）。
+  // ridges：{id, from, to, width, height} —— 距中线 width 处衰减到 0；
+  // lanes ：{id, from, to, inner, outer, depth} —— inner 内全深、outer 外为 0。
+  terrain: {
+    ridges: [
+      // 北岭：东关大街北侧的缓丘，日军在岭后集结，挡住城里沿街的直瞄
+      { id: "NorthRise", from: [556, -168], to: [752, -192], width: 36, height: 2.3 },
+      // 南台：路南坟地所在的高台，比四野高出约一级坎
+      { id: "SouthKnoll", from: [566, 126], to: [700, 146], width: 28, height: 1.6 },
+    ],
+    lanes: [
+      // 大车道南侧的排水沟，与东关大街平行
+      { id: "RoadSideDitch", from: [558, -82], to: [756, -90], inner: 1.4, outer: 6.0, depth: 1.0 },
+      // 南台北麓往荆河去的田间排水沟
+      { id: "FieldDrain", from: [642, -46], to: [694, 100], inner: 1.2, outer: 5.0, depth: 0.85 },
+    ],
+  },
+  // 独户农院：院内地坪找平到 y=0（OUTER_PADS 由城模块按这份表自动登记），
+  // 所以院子构件照旧以 y=0 起砌。
+  farmsteads: [
+    { id: "EastFarmNorth", x: 584, z: -208, w: 23, d: 18 },
+    { id: "EastFarmSouth", x: 594, z: 76, w: 21, d: 17 },
+    { id: "EastFarmFar", x: 668, z: -236, w: 19, d: 16 },
+  ],
+  // 坟地：rows×cols 个坟头成排（鲁南祖坟的排法），四周配侧柏。
+  graves: [
+    { id: "GraveSouth", x: 602, z: 140, rows: 2, cols: 4, spreadX: 13, spreadZ: 7 },
+    { id: "GraveNorth", x: 576, z: -148, rows: 1, cols: 3, spreadX: 9, spreadZ: 5 },
+  ],
+};
+
 /** 西关：电灯厂的烟囱是西关天际线上的关键剪影，且在西城门楼的直瞄射程内。 */
 export const WEST_SUBURB = {
   // 厂房约 30×18 m、烟囱高 22 m（规模为推定；「在西城楼直瞄射程内」为主流记载）。

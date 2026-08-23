@@ -858,6 +858,135 @@ export function AddTree(sink, { x, z, seed = "t", scale = 1, material = "TreeBar
   sink.Solid(x, baseY + h / 2, z, 0.3 * scale, h / 2, 0.3 * scale, "prop");
 }
 
+/**
+ * 侧柏（柏树）：鲁南坟地与寺庙旁的常绿树，三月照旧墨绿 ——
+ * 是无叶季节里唯一成片不透光的竖向剪影，坟地读图信号的一半靠它。
+ * 树冠用三段叠锥，每段沿一个方向歪一点，避免「圣诞树」式的机械对称。
+ */
+export function AddCypress(sink, {
+  x, z, seed = "cypress", scale = 1, height = 0, baseY = 0,
+  material = "Cypress",
+}) {
+  const rnd = Mulberry32(HashString(seed));
+  const h = height > 0 ? height : (4.6 + rnd() * 2.6) * scale;
+  const trunkH = h * 0.16;
+  const trunk = new THREE.CylinderGeometry(0.07 * scale, 0.13 * scale, trunkH, 7);
+  sink.Add("TreeBark", PlaceGeometry(trunk, { x, y: baseY + trunkH / 2, z }));
+  // 三段树冠：下宽上尖，每段的轴都偏出一点、歪出一点
+  const layers = [];
+  const tiers = [
+    { t: 0.10, span: 0.46, r: 0.30 }, { t: 0.42, span: 0.34, r: 0.24 },
+    { t: 0.70, span: 0.26, r: 0.17 },
+  ];
+  for (const tier of tiers) {
+    const coneH = h * tier.span;
+    const cone = new THREE.ConeGeometry(tier.r * scale * (0.9 + rnd() * 0.2), coneH, 9);
+    const pos = cone.attributes.position;
+    // 锥面轻微起伏：把每一列顶点沿径向抖一点，轮廓不再是正多边形
+    for (let i = 0; i < pos.count; i += 1) {
+      const a = Math.atan2(pos.getZ(i), pos.getX(i));
+      if (Math.abs(pos.getY(i)) < coneH / 2 - 0.01) {
+        const wob = 1 + Math.sin(a * 5 + rnd()) * 0.09;
+        pos.setX(i, pos.getX(i) * wob);
+        pos.setZ(i, pos.getZ(i) * wob);
+      }
+    }
+    cone.computeVertexNormals();
+    layers.push(PlaceGeometry(cone, {
+      x: (rnd() - 0.5) * 0.12 * scale, y: h * tier.t + coneH / 2,
+      z: (rnd() - 0.5) * 0.12 * scale, rz: (rnd() - 0.5) * 0.08,
+    }));
+  }
+  sink.Add(material, PlaceGeometry(MergeGeometries(layers), { x, y: baseY, z }));
+  sink.Solid(x, baseY + h / 2, z, 0.32 * scale, h / 2, 0.32 * scale, "prop");
+}
+
+/**
+ * 杨树：直干高挑、净杆到顶、枝条一律朝上 —— 与柳树的横向披挂正好相反。
+ * 鲁南行道树与田间防风带的主力，沿路成行栽。
+ */
+export function AddPoplar(sink, {
+  x, z, seed = "poplar", scale = 1, height = 0, baseY = 0,
+  material = "TreeBark",
+}) {
+  const rnd = Mulberry32(HashString(seed));
+  const h = height > 0 ? height : (8.5 + rnd() * 3.5) * scale;
+  const trunk = new THREE.CylinderGeometry(0.10 * scale, 0.19 * scale, h, 8, 2);
+  // 主干几乎不弯：只给一点点漂移
+  const pos = trunk.attributes.position;
+  for (let i = 0; i < pos.count; i += 1) {
+    const t = (pos.getY(i) + h / 2) / h;
+    pos.setX(i, pos.getX(i) + Math.sin(t * 1.7 + rnd()) * 0.05 * scale * t);
+  }
+  trunk.computeVertexNormals();
+  const uv = trunk.attributes.uv;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 1.6, uv.getY(i) * h / 0.45);
+  sink.Add(material, PlaceGeometry(trunk, { x, y: baseY + h / 2, z }));
+  // 枝条全部聚在顶部 28%，倾角很小（贴着主干往上蹿），二级枝更短更陡
+  const branches = [];
+  const count = 7 + Math.floor(rnd() * 4);
+  for (let i = 0; i < count; i += 1) {
+    const t = 0.72 + rnd() * 0.26;
+    const len = (1.6 + rnd() * 2.0) * scale;
+    const a = rnd() * Math.PI * 2;
+    const tilt = 0.14 + rnd() * 0.30;
+    branches.push(PlaceGeometry(
+      PlaceGeometry(new THREE.CylinderGeometry(0.018 * scale, 0.05 * scale, len, 5),
+        { y: len / 2 }),
+      { y: h * t, ry: a, rz: tilt }));
+    for (let j = 0; j < 2; j += 1) {
+      const sub = (0.30 + rnd() * 0.12) * len;
+      branches.push(PlaceGeometry(PlaceGeometry(
+        new THREE.CylinderGeometry(0.008 * scale, 0.02 * scale, sub, 4),
+        { y: sub / 2, ry: rnd() * Math.PI * 2, rz: 0.25 + rnd() * 0.3 }),
+        { y: h * t, ry: a, rz: tilt }));
+    }
+  }
+  sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: baseY, z }));
+  sink.Solid(x, baseY + h / 2, z, 0.24 * scale, h / 2, 0.24 * scale, "prop");
+}
+
+/**
+ * 果树（修剪过的梨/柿）：鲁南农家院旁一排矮壮果树。
+ * 冬季修剪痕很明显：主杆矮、三四根骨架枝张开成碗口，枝端平齐 —— 一眼是人为的。
+ */
+export function AddOrchardTree(sink, {
+  x, z, seed = "orchard", scale = 1, height = 0, baseY = 0,
+  material = "Willow",
+}) {
+  const rnd = Mulberry32(HashString(seed));
+  const h = height > 0 ? height : (2.9 + rnd() * 1.1) * scale;
+  const boleH = h * 0.45;
+  const trunk = new THREE.CylinderGeometry(0.11 * scale, 0.17 * scale, boleH, 8);
+  sink.Add("TreeBark", PlaceGeometry(trunk, { x, y: baseY + boleH / 2, z }));
+  const branches = [];
+  const arms = 3 + Math.floor(rnd() * 2);
+  for (let i = 0; i < arms; i += 1) {
+    const a = (i / arms) * Math.PI * 2 + rnd() * 0.7;
+    const tilt = 0.62 + rnd() * 0.38;
+    const len = (1.1 + rnd() * 0.7) * scale;
+    branches.push(PlaceGeometry(
+      PlaceGeometry(new THREE.CylinderGeometry(0.03 * scale, 0.08 * scale, len, 6),
+        { y: len / 2 }),
+      { y: boleH, ry: a, rz: tilt }));
+    // 骨架枝中前段再分两根短结果枝（挂点沿骨架枝方向算，别悬在半空）
+    for (let j = 0; j < 2; j += 1) {
+      const sub = (0.4 + rnd() * 0.3) * scale;
+      const f = 0.55 + j * 0.25;
+      branches.push(PlaceGeometry(PlaceGeometry(
+        new THREE.CylinderGeometry(0.014 * scale, 0.03 * scale, sub, 4),
+        { y: sub / 2, ry: rnd() * Math.PI * 2, rz: 0.5 + rnd() * 0.5 }),
+        {
+          x: x - Math.sin(tilt) * Math.cos(a) * len * f,
+          y: baseY + boleH + Math.cos(tilt) * len * f,
+          z: z + Math.sin(tilt) * Math.sin(a) * len * f,
+        }));
+    }
+  }
+  sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: baseY, z }));
+  sink.Solid(x, baseY + boleH / 2, z, 0.22 * scale, boleH / 2, 0.22 * scale, "prop");
+}
+
 /** 电线杆 + 断掉的电话线：镇子有电报电话，线被打断垂下来是很强的战场符号。 */
 export function AddPole(sink, { x, z, seed = "pole", height = 6.5 }) {
   sink.Add("WoodBeam", PlaceGeometry(

@@ -35,20 +35,25 @@ import { Mulberry32, HashString, Clamp, Clamp01, Fbm2, SmoothStep } from "./Scri
 import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
   CORNER_TOWERS, RAMPS, RAMP, DUGOUT, CROSSROAD, STREETS, SIGHT_CORRIDOR,
-  LANDMARKS, CITY_FEATURES, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
+  LANDMARKS, CITY_FEATURES, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, EAST_FIELD,
+  WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
   PALETTE, WALL_TOP_Y,
 } from "./Data_Tengxian.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
   AddChurch, AddPagoda, AddZhaiWall, AddCompound, AddRoomBlock, AddHardMountainRoof,
-  AddTree, AddSandbagEmplacement,
+  AddTree, AddSandbagEmplacement, AddWell,
+  AddCypress, AddPoplar, AddOrchardTree,
 } from "./Script_World.mjs";
 import {
   MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
   MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
-import { AddRoadWear, AddStreetLife } from "./Script_LivedInProps.mjs";
+import {
+  AddRoadWear, AddStreetLife, AddWattleFence, AddStoneRoller, AddManureHeap,
+  AddStalkStack, AddVegetableBeds, AddThreshingFloor, AddGraveMound, AddVillageLife,
+} from "./Script_LivedInProps.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 
 // ---------------------------------------------------------------------------
@@ -105,6 +110,14 @@ const MATERIAL_MAP = {
   // 枪眼白茬：新凿开的砖断口比风化面亮两档，这一圈白是滕县的第一符号
   LoopholeRim: { recipe: "Stone", color: 0xffffff },
   Willow: { recipe: "TreeBark", color: 0xc09a86 },
+  // 东关外农田带：翻耕裸土 / 压实土 / 打谷场硬土，同一张 Ground 底材的三档调色。
+  // 色值压在基底附近偏暗：地块要比四野的原生地面读得出「被人翻过」，
+  // 但发白发亮就成了水泥地（第一版 0xDCCAA4 出图审查抓到）。
+  PloughSoil: { recipe: "Ground", color: 0xc0a87e, roughness: 1.0 },
+  PloughSoilDark: { recipe: "Ground", color: 0x96855f, roughness: 1.0 },
+  YardEarth: { recipe: "Ground", color: 0xb2a17f, roughness: 1.0 },
+  // 侧柏的墨绿：压在树皮底材上读作「冬季常绿的鳞叶」，不是塑料纯色
+  Cypress: { recipe: "TreeBark", color: 0x5e6b49 },
   // 车辆装甲板：喷漆钢（SteelHelmet），**不是**发蓝裸钢。
   // 与 Script_Actor.ActorMaterials 的 armor 一行同色 —— 同一辆车摆进场景
   // 和摆上台架必须是同一个颜色，不然编辑器里调好的东西进游戏变了样。
@@ -121,6 +134,8 @@ const PLAIN_MAP = {
   IronPlate: { color: PALETTE.ironDoor, roughness: 0.62, metalness: 0.5 },
   Charred: { color: PALETTE.charred, roughness: 0.95 },
   Wheat: { color: PALETTE.wheat, roughness: 0.94 },
+  // 麦秸泥的黄褐：坟头枯草与秸秆垛共用（三月坟头是去岁枯草，不是绿草皮）
+  VillageStraw: { color: 0x8a744e, roughness: 0.98 },
   MoatWater: { color: PALETTE.moatWater, roughness: 0.24, metalness: 0.0 },
 };
 
@@ -187,6 +202,22 @@ function PadBlend(x, z) {
     if (v > best) best = v;
   }
   return best;
+}
+
+// 东关外的独户农院（Data_Tengxian.EAST_FIELD.farmsteads）与关厢同理：
+// 院构件以 y=0 起砌，脚下的地必须找平。院子四周各让一圈过渡带。
+for (const farmstead of EAST_FIELD.farmsteads) {
+  OUTER_PADS.push({
+    id: farmstead.id, x: farmstead.x, z: farmstead.z,
+    w: farmstead.w + 16, d: farmstead.d + 16, feather: 12,
+  });
+}
+
+/** 点到线段的最短水平距离（东关外战术地形用）。 */
+function SegmentDistance(px, pz, a, b) {
+  const dx = b[0] - a[0], dz = b[1] - a[1];
+  const t = Clamp01(((px - a[0]) * dx + (pz - a[1]) * dz) / ((dx * dx + dz * dz) || 1));
+  return Math.hypot(px - (a[0] + dx * t), pz - (a[1] + dz * t));
 }
 
 /**
@@ -406,6 +437,9 @@ export class TengxianCity {
     yield { label: "东关：家家有枪眼的院落迷宫", progress: 0.84 };
     this.BuildEastSuburb(rnd);
 
+    yield { label: "东关外：农田、坟地与独户农院", progress: 0.86 };
+    this.BuildEastApproach(rnd);
+
     yield { label: "生活层：门前家什、店铺摊具与路面痕迹", progress: 0.88 };
     this.BuildStreetLife();
 
@@ -552,6 +586,17 @@ export class TengxianCity {
    */
   OuterHeight(x, z) {
     let y = CITY.outerY + (Fbm2(x * 0.0032, z * 0.0032, { octaves: 3, seed: 4211 }) - 0.5) * 1.1;
+    // 东关外农田带的战术地形（Data_Tengxian.EAST_FIELD.terrain）：路北缓岭、
+    // 路南坟台与两条排水沟。L2/L3 的日军反冲击从这片地里发起，出发区不能
+    // 是一块玻璃板 —— 地形本身就是这一带的掩蔽与通视骨架。
+    if (x > 540) {
+      for (const ridge of EAST_FIELD.terrain.ridges) {
+        y += ridge.height * SmoothStep(ridge.width, 0, SegmentDistance(x, z, ridge.from, ridge.to));
+      }
+      for (const lane of EAST_FIELD.terrain.lanes) {
+        y -= lane.depth * SmoothStep(lane.outer, lane.inner, SegmentDistance(x, z, lane.from, lane.to));
+      }
+    }
     // 荆河
     const dr = DistanceToRiver(x, z);
     const halfRiver = OUTSKIRTS.river.width / 2;
@@ -1464,6 +1509,367 @@ export class TengxianCity {
           MakeBox(w * 0.96, 0.14, d * 0.52, TILE_METERS.roof, `${seed}:sr${s}`),
           { x, y: baseY + h + 0.48, z: z + s * d * 0.2, rx: -s * 0.5 }));
       }
+    }
+  }
+
+  // =========================================================================
+  // 东关外农田带（Data_Tengxian.EAST_FIELD）
+  //
+  // 寨墙一线以东到荆河之间是 L2/L3 日军反冲击的出发区。这一带必须同时成立：
+  //   · **地形有起伏** —— 北岭、南台、排水沟全压在 OuterHeight 上；
+  //   · **有农田** —— 返青麦地、翻耕裸土、田埂的镶嵌拼图；
+  //   · **有遮蔽** —— 坟头、侧柏、篱笆、秸秆垛、行道杨、独户农院的院墙。
+  // 全部内容走 sink 合批；碰撞只登记真正改变打法的低障碍（田埂/坟头/篱笆）。
+  // =========================================================================
+
+  /** 把一块地表薄层逐顶点压到濠外解析高程上（与城外层 TerrainSlab 同一思路）。 */
+  DrapeSlab(width, depth, {
+    x, z, ry = 0, topOffset = 0.05, bottomOffset = -0.1,
+    cell = 4.5, tile = TILE_METERS.ground,
+  }) {
+    const nx = Math.max(1, Math.ceil(width / cell));
+    const nz = Math.max(1, Math.ceil(depth / cell));
+    const cols = nx + 1, rows = nz + 1;
+    const positions = [], uvs = [], indices = [];
+    const cos = Math.cos(ry), sin = Math.sin(ry);
+    const WorldPoint = (ix, iz, offset) => {
+      const lx = -width / 2 + width * ix / nx;
+      const lz = -depth / 2 + depth * iz / nz;
+      const wx = x + cos * lx + sin * lz;
+      const wz = z - sin * lx + cos * lz;
+      return [wx, this.OuterHeight(wx, wz) + offset, wz, lx, lz];
+    };
+    for (const offset of [topOffset, bottomOffset]) {
+      for (let iz = 0; iz < rows; iz += 1) {
+        for (let ix = 0; ix < cols; ix += 1) {
+          const [wx, wy, wz, lx, lz] = WorldPoint(ix, iz, offset);
+          positions.push(wx, wy, wz);
+          uvs.push(lx / tile, lz / tile);
+        }
+      }
+    }
+    const layerSize = cols * rows;
+    for (let iz = 0; iz < nz; iz += 1) {
+      for (let ix = 0; ix < nx; ix += 1) {
+        const a = iz * cols + ix, b = a + 1, c = a + cols, d = c + 1;
+        indices.push(a, c, b, b, c, d);
+        indices.push(layerSize + a, layerSize + b, layerSize + c,
+          layerSize + b, layerSize + d, layerSize + c);
+      }
+    }
+    const PushSide = (topA, topB) => {
+      const bottomA = layerSize + topA, bottomB = layerSize + topB;
+      indices.push(topA, bottomA, topB, topB, bottomA, bottomB);
+    };
+    for (let ix = 0; ix < nx; ix += 1) {
+      PushSide(ix, ix + 1);
+      PushSide((rows - 1) * cols + ix + 1, (rows - 1) * cols + ix);
+    }
+    for (let iz = 0; iz < nz; iz += 1) {
+      PushSide((iz + 1) * cols, iz * cols);
+      PushSide(iz * cols + cols - 1, (iz + 1) * cols + cols - 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    const IndexArray = positions.length / 3 > 65535 ? Uint32Array : Uint16Array;
+    geometry.setIndex(new THREE.BufferAttribute(new IndexArray(indices), 1));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  /** 把底面原本在局部 y=0 的构件逐顶点贴到濠外地形；高度与横截面仍保留。 */
+  DrapeGeometry(geometry, { x, z, ry = 0, groundOffset = 0 }) {
+    const placed = PlaceGeometry(geometry, { x, z, ry });
+    const position = placed.attributes.position;
+    for (let i = 0; i < position.count; i += 1) {
+      const wx = position.getX(i), wz = position.getZ(i);
+      position.setY(i, position.getY(i) + this.OuterHeight(wx, wz) + groundOffset);
+    }
+    position.needsUpdate = true;
+    placed.computeVertexNormals();
+    placed.computeBoundingSphere();
+    return placed;
+  }
+
+  /**
+   * 农田带里「不许摆」的位置：大车道、地隙、农院与坟地的让空。
+   * 地块、树木、散件都过这一道 —— 让空不是整格丢掉，是中心点挪出这些矩形。
+   */
+  EastFieldBlocked(x, z) {
+    const f = EAST_FIELD;
+    if (Math.abs(z - f.roadZ) < 9.5) return true;
+    if (Math.abs(x - EAST_SUBURB.gully.x) < EAST_SUBURB.gully.width / 2 + 4) return true;
+    for (const fs of f.farmsteads) {
+      if (Math.abs(x - fs.x) < fs.w / 2 + 5 && Math.abs(z - fs.z) < fs.d / 2 + 5) return true;
+    }
+    for (const g of f.graves) {
+      if (Math.hypot(x - g.x, z - g.z) < Math.max(g.spreadX, g.spreadZ) / 2 + 7) return true;
+    }
+    return false;
+  }
+
+  BuildEastApproach(rnd) {
+    // 切片根本不朝东的关卡（L5/L6）一行几何都不生成
+    if (!this.InBounds(EAST_FIELD.bounds.minX, EAST_FIELD.roadZ, 60)) return;
+    // 大车道出寨门往东的延伸：关厢那条土路不能到 x=540 就断头
+    const roadLen = EAST_FIELD.bounds.maxX - 544;
+    const roadX = 544 + roadLen / 2;
+    this.sink.SetSector(SectorKey(roadX, EAST_FIELD.roadZ));
+    this.sink.Add("DirtRoad", this.DrapeSlab(roadLen, 7.0,
+      { x: roadX, z: EAST_FIELD.roadZ, topOffset: 0.06, bottomOffset: -0.12 }));
+    this.BuildEastFarmFields(rnd);
+    for (const farmstead of EAST_FIELD.farmsteads) {
+      if (!this.InBounds(farmstead.x, farmstead.z, 70)) continue;
+      this.BuildOneFarmstead(farmstead);
+    }
+    for (const graves of EAST_FIELD.graves) {
+      if (!this.InBounds(graves.x, graves.z, 50)) continue;
+      this.BuildOneGravePlot(graves);
+    }
+    this.BuildEastFieldTrees(rnd);
+    this.sink.SetSector("");
+  }
+
+  /** 地块镶嵌：返青麦地 / 翻耕裸土 / 压实旧土，长边取南北向（与界河那套一致）。 */
+  BuildEastFarmFields(rnd) {
+    const b = EAST_FIELD.bounds;
+    const cellW = 26, cellD = 20;
+    for (let gx = b.minX; gx < b.maxX - cellW * 0.6; gx += cellW) {
+      for (let gz = b.minZ; gz < b.maxZ - cellD * 0.6; gz += cellD) {
+        const x = gx + cellW / 2 + (rnd() - 0.5) * 5;
+        const z = gz + cellD / 2 + (rnd() - 0.5) * 4;
+        if (!this.InBounds(x, z, 24)) continue;
+        if (this.EastFieldBlocked(x, z)) continue;
+        const w = cellW * (0.72 + rnd() * 0.24);
+        const d = cellD * (0.70 + rnd() * 0.24);
+        this.sink.SetSector(SectorKey(x, z));
+        const roll = rnd();
+        if (roll < 0.34) {
+          // 新翻的裸土：最亮的一档
+          this.sink.Add("PloughSoil", this.DrapeSlab(w, d, { x, z }));
+        } else if (roll < 0.60) {
+          // 压实的旧地块
+          this.sink.Add("PloughSoilDark", this.DrapeSlab(w, d, { x, z }));
+        } else if (roll < 0.90) {
+          // 返青的冬麦：露土率高，窄行、断续 —— 不是绿毯
+          this.sink.Add("PloughSoilDark", this.DrapeSlab(w, d, { x, z }));
+          const rows = 2 + Math.floor(rnd() * 3);
+          for (let s = 0; s < rows; s += 1) {
+            const sz = (s - (rows - 1) / 2) * (d / (rows + 1)) + (rnd() - 0.5) * 0.9;
+            const spanW = w * (0.45 + rnd() * 0.35);
+            const segs = 2 + Math.floor(rnd() * 2);
+            for (let q = 0; q < segs; q += 1) {
+              if (rnd() < 0.25) continue;
+              this.sink.Add("Wheat", this.DrapeSlab(spanW / segs * 0.72, 0.85,
+                {
+                  x: x + (q - (segs - 1) / 2) * (spanW / segs) * 1.18 + (rnd() - 0.5),
+                  z: z + sz, topOffset: 0.20, bottomOffset: -0.06,
+                }));
+            }
+          }
+        } // 其余留作纯裸地：只有田埂
+        // 田埂：两条长边必给，一条横埂看运气
+        this.AddFieldBalk(x, z - d / 2, w + 0.6, 0);
+        this.AddFieldBalk(x, z + d / 2, w + 0.6, 0);
+        if (rnd() < 0.65) this.AddFieldBalk(x + (rnd() - 0.5) * w * 0.3, z, d, Math.PI / 2);
+      }
+    }
+    // 田里的秸秆垛、粪堆与滚落的碌碡：反冲击出发区的就便掩蔽
+    const propRnd = Mulberry32(HashString("eastFieldProps"));
+    for (let i = 0; i < 16; i += 1) {
+      const x = b.minX + 8 + propRnd() * (b.maxX - b.minX - 16);
+      const z = b.minZ + 8 + propRnd() * (b.maxZ - b.minZ - 16);
+      if (!this.InBounds(x, z, 14)) continue;
+      if (this.EastFieldBlocked(x, z)) continue;
+      this.sink.SetSector(SectorKey(x, z));
+      const kind = i % 3;
+      if (kind === 0) {
+        AddStalkStack(this.sink, {
+          x, z, ry: propRnd() * Math.PI, seed: `efStalk${i}`, scale: 0.9 + propRnd() * 0.3,
+        });
+      } else if (kind === 1) {
+        AddManureHeap(this.sink, { x, z, seed: `efHeap${i}`, scale: 0.9 + propRnd() * 0.4 });
+      } else {
+        AddStoneRoller(this.sink, {
+          x, z, ry: propRnd() * Math.PI, seed: `efRoll${i}`, framed: false,
+        });
+      }
+    }
+  }
+
+  /** 一道田埂：可见面逐顶点贴地，碰撞切段登记（卧倒能藏，站立藏不住）。 */
+  AddFieldBalk(cx, cz, len, ry, h = 0.30) {
+    const gy = this.OuterHeight(cx, cz);
+    const box = MakeBox(len, h, 0.46, TILE_METERS.ground, `efBalk${cx | 0}_${cz | 0}_${len | 0}`);
+    box.translate(0, h / 2 - 0.04, 0);
+    this.sink.Add("PloughSoil", this.DrapeGeometry(box, { x: cx, z: cz, ry, groundOffset: -0.04 }));
+    const cos = Math.cos(ry), sin = Math.sin(ry);
+    const segs = Math.max(1, Math.round(len / 9));
+    for (let i = 0; i < segs; i += 1) {
+      const s = ((i + 0.5) / segs - 0.5) * len;
+      const px = cx + cos * s, pz = cz - sin * s;
+      this.sink.Solid(px, gy + h / 2, pz, len / segs / 2, h / 2, 0.23, "dirt", ry);
+      this.sink.Cover(px, pz, h + 0.16, sin, cos);
+    }
+  }
+
+  /**
+   * 一座独户农院：主屋体块 + 三面院墙 + 南向大门，院里井、菜畦、秸秆垛、
+   * 生活件，院旁打谷场（碌碡、粪堆），田一侧接篱笆，四周围一圈修剪果树。
+   * 地坪由 OUTER_PADS 找平到 y=0，所有构件照旧以 y=0 起砌。
+   */
+  BuildOneFarmstead(fs) {
+    const { x, z, w, d } = fs;
+    const seed = fs.id;
+    this.sink.SetSector(SectorKey(x, z));
+    this.AddSimpleCompoundAt(this.sink, {
+      x, z, w: w * 0.52, d: d * 0.48, seed: `${seed}:house`,
+    }, 0.12, false, 0);
+    const wh = 1.8;
+    const wallMat = HashString(seed) % 100 < 55 ? "Adobe" : "HouseBrick";
+    const wallTile = wallMat === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick;
+    // 北、东、西三面整墙
+    for (const [ox, oz, len, ry] of [
+      [0, -d / 2, w, 0], [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2],
+    ]) {
+      this.sink.Add(wallMat, PlaceGeometry(
+        MakeBox(len, wh, 0.4, wallTile, `${seed}:cw${ox}_${oz}`,
+          wallMat === "Adobe" ? null : BRICK_UV_GRID),
+        { x: x + ox, y: wh / 2, z: z + oz, ry }));
+      this.sink.Solid(x + ox, wh / 2, z + oz,
+        ry === 0 ? len / 2 : 0.2, wh / 2, ry === 0 ? 0.2 : len / 2, "wall");
+    }
+    // 南墙留大门，门两侧砌门柱垛
+    const gateW = 1.8;
+    const segLen = (w - gateW) / 2;
+    for (const s of [-1, 1]) {
+      const sx = x + s * (gateW / 2 + segLen / 2);
+      this.sink.Add(wallMat, PlaceGeometry(
+        MakeBox(segLen, wh, 0.4, wallTile, `${seed}:sw${s}`,
+          wallMat === "Adobe" ? null : BRICK_UV_GRID),
+        { x: sx, y: wh / 2, z: z + d / 2 }));
+      this.sink.Solid(sx, wh / 2, z + d / 2, segLen / 2, wh / 2, 0.2, "wall");
+      this.sink.Add(wallMat, PlaceGeometry(
+        MakeBox(0.52, wh + 0.35, 0.52, wallTile, `${seed}:gp${s}`,
+          wallMat === "Adobe" ? null : BRICK_UV_GRID),
+        { x: x + s * gateW / 2, y: (wh + 0.35) / 2, z: z + d / 2 }));
+      this.sink.Solid(x + s * gateW / 2, (wh + 0.35) / 2, z + d / 2,
+        0.26, (wh + 0.35) / 2, 0.26, "wall");
+    }
+    const yardRnd = Mulberry32(HashString(`${seed}:yard`));
+    AddWell(this.sink, x - w * 0.22, z - d * 0.34);
+    AddVegetableBeds(this.sink, {
+      x: x + w * 0.08, z: z + d * 0.27, ry: 0, y: 0, seed: `${seed}:beds`,
+      rows: 2, rowLength: w * 0.42,
+    });
+    AddVillageLife(this.sink, {
+      x: x + w * 0.16, z: z - d * 0.02, baseY: 0, seed: `${seed}:life`,
+      strawMaterial: "VillageStraw",
+    });
+    AddStalkStack(this.sink, {
+      x: x - w * 0.3, z: z + d * 0.24, ry: yardRnd() * Math.PI,
+      seed: `${seed}:stalks`, scale: 0.95,
+    });
+    // 院旁打谷场：硬土圆场 + 碌碡 + 场边的粪堆
+    const floorR = 4.6;
+    const fx = x + w / 2 + floorR + 2.0, fz = z + d * 0.12;
+    this.sink.SetSector(SectorKey(fx, fz));
+    AddThreshingFloor(this.sink, { x: fx, z: fz, radius: floorR });
+    AddStoneRoller(this.sink, {
+      x: fx + floorR * 0.38, z: fz + floorR * 0.3, ry: yardRnd() * Math.PI,
+      seed: `${seed}:roller`, framed: yardRnd() < 0.7,
+    });
+    AddManureHeap(this.sink, {
+      x: fx - floorR * 0.45, z: fz - floorR * 0.62, seed: `${seed}:heap`,
+    });
+    // 从院墙往田里围的两段枣刺篱笆（留豁口）
+    this.sink.SetSector(SectorKey(x, z));
+    AddWattleFence(this.sink, {
+      x: x - w / 2 - 6.0, z: z - d / 2 - 1.2, ry: 0, length: 9,
+      seed: `${seed}:fenceN`, gaps: [[3.4, 5.6]],
+    });
+    AddWattleFence(this.sink, {
+      x: x + w / 2 + 6.0, z: z + d / 2 + 1.2, ry: 0, length: 8,
+      seed: `${seed}:fenceS`,
+    });
+    // 四周的修剪果树：矮壮、骨架枝张开，冬季一眼是人为剪出来的
+    for (let i = 0; i < 5; i += 1) {
+      const a = (i / 5) * Math.PI * 2 + yardRnd() * 0.9;
+      const tx = x + Math.cos(a) * (w * 0.78 + 3.5);
+      const tz = z + Math.sin(a) * (d * 0.82 + 3.5);
+      if (this.EastFieldBlocked(tx, tz)) continue;
+      AddOrchardTree(this.sink, {
+        x: tx, z: tz, seed: `${seed}:or${i}`, baseY: this.OuterHeight(tx, tz),
+      });
+    }
+  }
+
+  /** 一片祖坟：成排坟头 + 四周成对的侧柏。坟头就是天然散兵坑。 */
+  BuildOneGravePlot(g) {
+    this.sink.SetSector(SectorKey(g.x, g.z));
+    const rnd = Mulberry32(HashString(`${g.id}:graves`));
+    const stepX = g.cols > 1 ? g.spreadX / (g.cols - 1) : 0;
+    const stepZ = g.rows > 1 ? g.spreadZ / (g.rows - 1) : 0;
+    for (let r = 0; r < g.rows; r += 1) {
+      for (let c = 0; c < g.cols; c += 1) {
+        const mx = g.x + (c - (g.cols - 1) / 2) * stepX + (rnd() - 0.5) * 1.3;
+        const mz = g.z + (r - (g.rows - 1) / 2) * stepZ + (rnd() - 0.5) * 1.1;
+        AddGraveMound(this.sink, {
+          x: mx, z: mz, seed: `${g.id}:${r}_${c}`, stone: rnd() < 0.4,
+          scale: 0.9 + rnd() * 0.4,
+        });
+      }
+    }
+    const trees = 3 + Math.floor(rnd() * 3);
+    for (let i = 0; i < trees; i += 1) {
+      const a = (i / trees) * Math.PI * 2 + rnd() * 0.8;
+      const tx = g.x + Math.cos(a) * (g.spreadX / 2 + 3.6);
+      const tz = g.z + Math.sin(a) * (g.spreadZ / 2 + 3.2);
+      AddCypress(this.sink, {
+        x: tx, z: tz, seed: `${g.id}:cy${i}`,
+        height: 4.2 + rnd() * 2.4, baseY: this.OuterHeight(tx, tz),
+      });
+    }
+  }
+
+  /** 行道杨（大车道两侧）、地隙沿线的柳、田野里的孤树。 */
+  BuildEastFieldTrees(rnd) {
+    const f = EAST_FIELD;
+    for (let x = 554; x < f.bounds.maxX - 10; x += 13.5) {
+      for (const side of [-1, 1]) {
+        const tx = x + (rnd() - 0.5) * 3.4;
+        const tz = f.roadZ + side * 8.6 + (rnd() - 0.5) * 1.4;
+        if (!this.InBounds(tx, tz, 30)) continue;
+        if (tx > 540 && this.EastFieldBlocked(tx, tz)) continue;
+        this.sink.SetSector(SectorKey(tx, tz));
+        AddPoplar(this.sink, {
+          x: tx, z: tz, seed: `roadPoplar${x | 0}_${side}`,
+          height: 8.5 + rnd() * 3.5, baseY: this.OuterHeight(tx, tz),
+        });
+      }
+    }
+    // 地隙沿线栽柳：沟边见柳是鲁南平原的定式
+    for (const [wx, wz] of [[551, -198], [550, -64], [552, 36], [550, 148], [548, 214]]) {
+      if (!this.InBounds(wx, wz, 20)) continue;
+      this.sink.SetSector(SectorKey(wx, wz));
+      AddTree(this.sink, {
+        x: wx, z: wz, seed: `gullyWillow${wz}`, material: "Willow",
+        height: 7 + (HashString(`gw${wz}`) % 100) / 100 * 3,
+        baseY: this.OuterHeight(wx, wz),
+      });
+    }
+    for (let i = 0; i < 7; i += 1) {
+      const x = f.bounds.minX + rnd() * (f.bounds.maxX - f.bounds.minX);
+      const z = f.bounds.minZ + rnd() * (f.bounds.maxZ - f.bounds.minZ);
+      if (!this.InBounds(x, z, 16)) continue;
+      if (this.EastFieldBlocked(x, z)) continue;
+      this.sink.SetSector(SectorKey(x, z));
+      AddTree(this.sink, {
+        x, z, seed: `fieldTree${i}`, material: "TreeBark",
+        height: 6.5 + rnd() * 3, baseY: this.OuterHeight(x, z),
+      });
     }
   }
 

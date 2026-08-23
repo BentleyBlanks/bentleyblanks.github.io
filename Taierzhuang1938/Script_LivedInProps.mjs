@@ -352,6 +352,232 @@ export function AddVillageLife(sink, {
   return items;
 }
 
+// ===========================================================================
+// 农田与村缘构件（滕县东关外农田带用，也可复用到任何村落场景）
+//
+// 与上面那层家什的区别：体量更大、更「生产」，全部按可复用的独立函数导出，
+// 由调用方（城模块 / 城外模块）决定往哪儿摆。碰撞只登记真正挡子弹/挡人的：
+// 篱笆、碌碡、秸秆垛、坟头 —— 菜畦、粪堆、打谷场这类贴地件不切碎导航图。
+// ===========================================================================
+
+/**
+ * 枣刺篱笆（wattle fence）：立柱 + 两道横杆 + 斜绑的枝条。
+ * 挡视线不到腰以上、挡腿绰绰有余 —— 战场上它就是「能打穿的矮掩体」，
+ * 每段登记一个 1.1 m 的低碰撞与掩蔽点，缺口由调用方用 gaps 给出。
+ */
+export function AddWattleFence(sink, {
+  x, z, ry = 0, length = 6, y = 0, seed = "fence", gaps = [],
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const postEvery = 1.9;
+  const nPosts = Math.max(2, Math.round(length / postEvery) + 1);
+  let pieces = 0;
+  // gaps 按沿线距离给：[起点, 终点]
+  const inGap = (s) => gaps.some(([a, b]) => s > a - 0.3 && s < b + 0.3);
+  for (let i = 0; i < nPosts; i += 1) {
+    const s = (length / (nPosts - 1)) * i;
+    if (inGap(s)) continue;
+    const p = LocalPoint(x, z, ry, s - length / 2, 0);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.09, 1.12 + rnd() * 0.10, 0.09, TILE_METERS.wood, `${seed}:p${i}`),
+      { x: p.x, y: y + 0.58, z: p.z, ry, rz: (rnd() - 0.5) * 0.08 }));
+    pieces += 1;
+  }
+  // 横杆与枝条按缺口切段
+  const cuts = [...gaps.map(([a, b]) => [a, b]), [length + 5, length + 6]]
+    .sort((a, b) => a[0] - b[0]);
+  let cursor = 0;
+  const spans = [];
+  for (const [a, b] of cuts) {
+    if (a > cursor && Math.min(b, length) - cursor > 0.4) {
+      spans.push([cursor, Math.min(b, length)]);
+    }
+    cursor = Math.max(cursor, b);
+  }
+  for (const [s0, s1] of spans) {
+    const mid = (s0 + s1) / 2;
+    const segLen = s1 - s0;
+    const p = LocalPoint(x, z, ry, mid - length / 2, 0);
+    for (const railY of [0.42, 0.86]) {
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(segLen, 0.06, 0.05, TILE_METERS.wood, `${seed}:r${railY}`),
+        { x: p.x, y: y + railY, z: p.z, ry }));
+      pieces += 1;
+    }
+    // 斜绑的枝条层：读成「编出来的墙面」而不是两根悬空杆
+    const brush = Math.max(2, Math.round(segLen / 0.75));
+    for (let i = 0; i < brush; i += 1) {
+      const bs = s0 + (segLen / brush) * (i + 0.5);
+      const bp = LocalPoint(x, z, ry, bs - length / 2, 0);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.05, 0.95 + rnd() * 0.25, 0.03, TILE_METERS.wood, `${seed}:b${i}`),
+        { x: bp.x, y: y + 0.55, z: bp.z, ry, rx: (rnd() - 0.5) * 0.16,
+          rz: Math.PI / 2 * 0.94 + rnd() * 0.06 }));
+      pieces += 1;
+    }
+    sink.Solid(p.x, y + 0.55, p.z, segLen / 2, 0.55, 0.09, "fence", ry);
+    sink.Cover(p.x, p.z, 1.05, sin, cos);
+  }
+  return pieces;
+}
+
+/** 碌碡（石滚）：打谷场上碾麦子的石辊，卸在架子边或干脆滚倒在地里。 */
+export function AddStoneRoller(sink, {
+  x, z, ry = 0, y = 0, seed = "roller", scale = 1, framed = true,
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  const rollLen = 0.92 * scale, rollR = 0.17 * scale;
+  sink.Add("Stone", PlaceGeometry(
+    new THREE.CylinderGeometry(rollR, rollR, rollLen, 14),
+    { x, y: y + rollR, z, ry, rz: Math.PI / 2 }));
+  let pieces = 1;
+  if (framed) {
+    for (const side of [-1, 1]) {
+      const p = LocalPoint(x, z, ry, side * (rollLen / 2 + 0.04), 0);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.07, 0.52 * scale, 0.10, TILE_METERS.wood, `${seed}:pl${side}`),
+        { x: p.x, y: y + 0.30 * scale, z: p.z, ry }));
+      pieces += 1;
+    }
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.08, 0.07, (0.9 + rnd() * 0.5) * scale, TILE_METERS.wood, `${seed}:shaft`),
+      { x, y: y + 0.50 * scale, z, ry, rx: 0.18 }));
+    pieces += 1;
+  } else {
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(rollLen * 0.7, 0.07, 0.07, TILE_METERS.wood, `${seed}:stub`),
+      { x: x + Math.sin(ry) * 0.3, y: y + rollR * 0.8, z: z + Math.cos(ry) * 0.3, ry }));
+    pieces += 1;
+  }
+  sink.Solid(x, y + 0.24 * scale, z, 0.42 * scale, 0.24 * scale, 0.28 * scale, "prop", ry);
+  return pieces;
+}
+
+/** 粪堆：开春要往地里送的第一批肥。矮圆土堆，不挡人也不挡弹。 */
+export function AddManureHeap(sink, {
+  x, z, y = 0, seed = "heap", scale = 1, material = "PloughSoilDark",
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  const r = (0.9 + rnd() * 0.5) * scale;
+  const heap = new THREE.SphereGeometry(r, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  heap.scale(1, 0.42, 0.86);
+  sink.Add(material, PlaceGeometry(heap, { x, y: y - 0.02, z, ry: rnd() * Math.PI }));
+  // 表面撒几块碎屑把轮廓打破
+  for (let i = 0; i < 4; i += 1) {
+    const a = rnd() * Math.PI * 2, d = rnd() * r * 0.8;
+    sink.Add(material, PlaceGeometry(
+      MakeBox(0.14 + rnd() * 0.16, 0.08, 0.12 + rnd() * 0.14, TILE_METERS.ground,
+        `${seed}:bit${i}`),
+      { x: x + Math.cos(a) * d, y: y + 0.06 + (1 - d / r) * r * 0.34,
+        z: z + Math.sin(a) * d, ry: rnd() * Math.PI }));
+  }
+  return 5;
+}
+
+/**
+ * 秸秆垛：去年秋收剩下的一垛高粱秸/玉米秸，靠 A 字架斜立。
+ * 三月青黄不接，柴火垛是农家院墙外最常见的大件 —— 也是很好的半身遮蔽。
+ */
+export function AddStalkStack(sink, {
+  x, z, ry = 0, y = 0, seed = "stalks", scale = 1, material = "VillageStraw",
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  const w = 1.7 * scale, h = 1.9 * scale;
+  // A 字架：一根脊檩两条腿
+  sink.Add("WoodBeam", PlaceGeometry(
+    MakeBox(w * 1.15, 0.07, 0.07, TILE_METERS.wood, `${seed}:ridge`),
+    { x, y: y + h, z, ry, rz: 0 }));
+  for (const side of [-1, 1]) {
+    const leg = LocalPoint(x, z, ry, 0, side * w * 0.62);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.08, h * 1.25, 0.08, TILE_METERS.wood, `${seed}:leg${side}`),
+      { x: leg.x, y: y + h * 0.5, z: leg.z, ry, rx: side * 0.66 }));
+  }
+  // 斜靠的捆：沿两侧一排细杆，角度略乱
+  let pieces = 3;
+  const perSide = 7;
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < perSide; i += 1) {
+      const lx = (i / (perSide - 1) - 0.5) * w * 0.96;
+      const p = LocalPoint(x, z, ry, lx, side * w * 0.36);
+      sink.Add(material, PlaceGeometry(
+        new THREE.CylinderGeometry(0.035 * scale, 0.05 * scale,
+          h * (1.02 + rnd() * 0.14), 5),
+        { x: p.x, y: y + h * 0.52, z: p.z, ry: ry + (rnd() - 0.5) * 0.2,
+          rx: side * (0.60 + rnd() * 0.10) }));
+      pieces += 1;
+    }
+  }
+  sink.Solid(x, y + h * 0.45, z, w / 2, h * 0.45, 0.42 * scale, "villageStraw", ry);
+  sink.Cover(x, z, h * 0.85, Math.sin(ry), Math.cos(ry));
+  return pieces;
+}
+
+/** 菜畦：开春刚整出来的一畦一畦，有的已经蒙了越冬菠菜的暗绿。贴地件，无碰撞。 */
+export function AddVegetableBeds(sink, {
+  x, z, ry = 0, y = 0, seed = "beds", rows = 4, rowLength = 4.5, material = "PloughSoilDark",
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  let pieces = 0;
+  for (let i = 0; i < rows; i += 1) {
+    const lz = (i - (rows - 1) / 2) * 1.05;
+    const p = LocalPoint(x, z, ry, 0, lz);
+    sink.Add(material, PlaceGeometry(
+      MakeBox(rowLength * (0.86 + rnd() * 0.2), 0.17, 0.72, TILE_METERS.ground,
+        `${seed}:bed${i}`),
+      { x: p.x, y: y + 0.085, z: p.z, ry: ry + (rnd() - 0.5) * 0.03 }));
+    pieces += 1;
+    if (rnd() < 0.45) {
+      // 返青的越冬菜：几条发绿的窄带压在畦面上
+      sink.Add("Wheat", PlaceGeometry(
+        MakeBox(rowLength * 0.6, 0.05, 0.5, TILE_METERS.ground, `${seed}:green${i}`),
+        { x: p.x, y: y + 0.185, z: p.z, ry: ry + (rnd() - 0.5) * 0.04 }));
+      pieces += 1;
+    }
+  }
+  return pieces;
+}
+
+/** 打谷场：碾压得发白的硬土圆场，秋收的心脏，春天闲着 —— 孩子们在这儿跑。 */
+export function AddThreshingFloor(sink, {
+  x, z, y = 0, radius = 4.2, material = "YardEarth",
+} = {}) {
+  const floor = new THREE.CircleGeometry(radius, 26);
+  floor.rotateX(-Math.PI / 2);
+  const uv = floor.attributes.uv;
+  for (let i = 0; i < uv.count; i += 1) {
+    uv.setXY(i, uv.getX(i) * radius * 2 / 2.6, uv.getY(i) * radius * 2 / 2.6);
+  }
+  sink.Add(material, PlaceGeometry(floor, { x, y: y + 0.025, z }));
+  return 1;
+}
+
+/**
+ * 坟头：鲁南平原的坟是地上的小土丘，有的立一块矮石碑。
+ * 一片坟地就是一排天然散兵坑 —— 土丘登记低碰撞与掩蔽点。
+ */
+export function AddGraveMound(sink, {
+  x, z, y = 0, seed = "grave", scale = 1, stone = false, material = "VillageStraw",
+} = {}) {
+  const rnd = Mulberry32(HashString(seed));
+  const r = (0.78 + rnd() * 0.35) * scale;
+  const mound = new THREE.SphereGeometry(r, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  mound.scale(1, 0.44, 0.88);
+  sink.Add(material, PlaceGeometry(mound, { x, y: y - 0.03, z, ry: rnd() * Math.PI }));
+  let pieces = 1;
+  if (stone || rnd() < 0.35) {
+    sink.Add("Stone", PlaceGeometry(
+      MakeBox(0.34 * scale, 0.62 * scale, 0.12, TILE_METERS.stone, `${seed}:stone`),
+      { x: x - Math.sin(rnd() * Math.PI) * r * 0.4, y: y + 0.30 * scale,
+        z: z + r * 0.72, ry: rnd() * 0.3 }));
+    pieces += 1;
+  }
+  sink.Solid(x, y + 0.30 * scale, z, r * 0.82, 0.30 * scale, r * 0.74, "dirt");
+  sink.Cover(x, z, 0.72 * scale, 0, 1);
+  return pieces;
+}
+
 /** 分段车辙、脚迹与修补斑；不会生成一条从城门贯穿到底的机械直线。 */
 export function AddRoadWear(sink, {
   x, z, ry = 0, length = 20, width = 7, baseY = 0, seed = "roadWear",
