@@ -55,8 +55,10 @@ export const VFX_PALETTE = {
   dustPale: LinearOf(0xD8CDB6),     // 逆光边缘
   powderSmoke: LinearOf(0x9A9A96),  // 火药烟
   powderThin: LinearOf(0xC2C2BE),   // 薄火药烟
-  blackSmoke: LinearOf(0x3A3733),   // 木梁/柴油黑烟
-  blackCore: LinearOf(0x1E1C1A),    // 黑烟核心
+  // 真实的黑烟不是纯黑：亮天里仍会被天空散射抬成深灰。纯黑叠在半透明
+  // billboard 上会变成一根吃掉天空与城墙细节的“洞”，而不是烟。
+  blackSmoke: LinearOf(0x625e58),   // 木梁/柴油黑烟的外沿（深灰褐）
+  blackCore: LinearOf(0x393632),    // 黑烟核心（保留重感，不压成纯黑）
   screenSmoke: LinearOf(0xE2E0D8),  // 发烟筒/催泪筒：白—灰白
   soil: LinearOf(0xA89373),         // 裸土
   soilAir: LinearOf(0xC0AE8C),      // 扬尘后的土色
@@ -206,7 +208,11 @@ void main() {
   if (below > 0.0) world.y = iExtra.z + below * 0.34 * exp(-below * 2.2);
 #endif
 
-  float grow = 1.0 - pow(1.0 - t01, 2.0);      // 先猛涨后收敛，烟才有"膨出来"的势
+  // iExtra.x 对普通烟团是“扩散曲线”：0 用默认的 2.0；小于 1 会慢慢
+  // 展开。常驻火灾烟如果沿用爆炸烟的急速膨胀，会在柱顶堆成一颗遮天黑球。
+  // stretch / decal 池各自复用这条属性，受自己的预处理分支约束，不受影响。
+  float growthPower = iExtra.x > 0.0 ? iExtra.x : 2.0;
+  float grow = 1.0 - pow(1.0 - t01, growthPower);
   float size = mix(iSize.x, iSize.y, grow);
   vec2 corner = position.xy;
   vShape = corner;
@@ -1711,6 +1717,9 @@ export class VfxSystem {
       sizeEnd: opts.sizeEnd ?? (kind === "screen" ? 2.4 : 3.0),
       life: opts.life ?? 4.5,
       opacity: opts.opacity ?? 0.42,
+      // 黑烟是持续上升的羽流，不能套爆炸烟“半程已膨到终值”的曲线。
+      // 发烟筒仍略快一些，让贴地扩散读得出来；其余保持原来的默认节奏。
+      growthPower: opts.growthPower ?? (kind === "black" ? 0.82 : kind === "screen" ? 1.35 : 2.0),
       fire: opts.fire ?? 0,
       colorA: opts.colorA || palette[0],
       colorB: opts.colorB || palette[1],
@@ -1916,6 +1925,7 @@ export class VfxSystem {
         s.life = source.life * this._Range(0.75, 1.25);
         s.sizeStart = source.sizeStart;
         s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);
+        s.stretch = source.growthPower;
         s.opacity = source.opacity;
         s.fadeIn = 0.18;
         s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.55);

@@ -1286,11 +1286,12 @@ function SeedSmokeColumns(phase) {
   for (const entry of ranked.slice(0, 3)) {
     const { o } = entry;
     const y = battlefield.GroundHeight(o.x, o.z) + 1.1;
-    // rate 15 而不是拍脑袋的 26：烟池容量 = vfxBudget × 0.30，小规模档只有 660 个，
-    // 三根柱子 × 26/s × 9 s ≈ 700 会把池子占满，爆炸和枪口烟就一个都出不来了
+    // 常驻烟柱是远方失火的方向提示，不是前景遮罩。旧参数（15/s、直径 22 m、
+    // 0.34 alpha）会把三根柱子的烟团叠到近乎不透明，读起来像穿过城墙的黑洞。
+    // 收成稀疏、缓慢扩散的羽流：近处仍有深色核心，顶端则由风和雾自然散掉。
     state.smokeHandles.push(vfx.SmokeSource({ x: o.x, y, z: o.z }, {
-      kind: "black", rate: 15, radius: 1.1, rise: 3.4,
-      sizeStart: 1.2, sizeEnd: 11.0, life: 9.0, opacity: 0.34,
+      kind: "black", rate: 8, radius: 0.75, rise: 3.0,
+      sizeStart: 0.7, sizeEnd: 5.2, life: 7.5, opacity: 0.18, growthPower: 0.78,
       fire: burning ? 0.35 : 0,
     }));
   }
