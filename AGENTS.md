@@ -5,6 +5,7 @@
 **本仓库的主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用**（Claude / Cursor / Codex 各自可能正在其中切分支、留未提交改动）。因此：
 
 - **任何 agent 的任何改动，一律在自己的独立 git worktree 里完成**：读代码可以在主检出，但**编辑、提交、推送、切分支一律不许在主检出进行**。
+- **每次任务必须新建 worktree 并新建分支**：用 `git worktree add -b <新分支>` 一步同时创建独立 worktree 与专属新分支，本会话所有提交都落在该新分支上。**绝不复用已有分支或已有 worktree 目录**（见「目录与分支命名」）。
 - **绝不碰主检出的分支与工作区**：不 `checkout`、不 `switch`、不 `reset`、不 `stash`、不提交别人的脏文件。主检出停在哪个分支就让它停在哪。
 - 若发现自己已误在主检出提交，用 `git reset --soft HEAD~1` 摘除该提交并还原暂存区，再改用 worktree 重做，不得将错就错。
 
@@ -12,7 +13,7 @@
 
 - Worktree 目录与主仓同级，放在 `C:\Users\Bentl\Documents\Program\` 下，格式：
   `bentleyblanks_<AgentName>_<Purpose>_<YYYYMMDD>`
-  - `<AgentName>`：Agent 短名，PascalCase（`Claude`、`Codex`、`Cursor`、`Grok`）。
+  - `<AgentName>`：Agent 短名，PascalCase（`DeepseekHarness`、`Claude`、`Codex`、`Cursor`、`Grok`）。
   - `<Purpose>`：本次目的的简短英文 PascalCase，仅字母数字，禁止空格与连字符（如 `TaihangDemoNightOps`、`GravityTankRoulette`）。
   - `<YYYYMMDD>`：创建当日日期。
   - 路径已存在时不得复用；换新目的或新会话就换新目录名。
@@ -30,7 +31,7 @@ git worktree add -b claude/taihang-demo-night-ops-20260725 $wt origin/master
 
 交付（站点只从 `master` 部署）：
 
-1. 在 worktree 内提交（提交信息用项目前缀，见 Commit Message Format）。
+1. 在 worktree 内提交（提交信息用「Agent 名 + 项目名」前缀，见 Commit Message Format）。
 2. `git fetch origin master`；若 `origin/master` 已前进，先 rebase 到最新再继续。
 3. `git push origin HEAD:master` 快进推送。**禁止 force push**，禁止覆盖其他会话已推送的提交。
 4. 推送后验证线上生效（`curl -sI https://bentleyblanks.github.io/<Page>/`），再向用户报告完成。
@@ -57,34 +58,36 @@ These rules apply to all project-owned files, scripts, functions, and assets in 
 
 ## Commit Message Format
 
-Use the project-prefixed commit subject style shown in the existing Sophia history.
+Every commit subject must start with `<AgentName> <Project>: ` — the committing agent's own name, one space, the project name, a colon, and one following space — then the summary. This keeps every commit attributable to the agent that authored it.
 
-For changes to `sophia-awakening`, commit subjects must use:
+For a DeepseekHarness agent changing `Taierzhuang1938`, commit subjects must use:
 
 ```text
-Sophia: short change summary
+DeepseekHarness Taierzhuang1938: short change summary
 ```
 
 Examples:
 
 ```text
-Sophia: core-loop refactor - deterministic outcomes, 3 levers, option gates
-Sophia: stage-scoped milestone list + center the version tag
-Sophia: purge player-facing T0-T4 residue
+DeepseekHarness Sophia: core-loop refactor - deterministic outcomes, 3 levers, option gates
+DeepseekHarness Sophia: stage-scoped milestone list + center the version tag
+Claude GravityTank: fix roulette symbol weights
 ```
 
 Rules:
 
-- Start with `Sophia:` exactly, including the colon and one following space.
+- Start with `<AgentName> <Project>:` exactly — agent name, one space, project name, colon, one following space.
+  - `<AgentName>`: the committing agent's own name, PascalCase (`DeepseekHarness`, `Claude`, `Codex`, `Cursor`, `Grok`).
+  - `<Project>`: the project prefix being changed (`Sophia`, `GravityTank`, `Taierzhuang1938`, `TaihangDemo`, `TunnelBell1942`, …).
 - Keep the subject concise and action-oriented.
-- Do not use Conventional Commit prefixes such as `feat:` or `fix:` for Sophia changes.
+- Do not use Conventional Commit prefixes such as `feat:` or `fix:`.
 - Do not end the subject with a period.
 - If a commit touches multiple areas, summarize the player-facing or highest-impact change first.
 
 ## GravityTank / GitHub Pages
 
 - Site deploys from **`master` only** (`https://bentleyblanks.github.io/GravityTank/`). Draft PR stacks do not ship.
-- GravityTank commit subjects use `GravityTank: short change summary` (same style as Sophia: prefix + space, no Conventional Commit prefixes, no trailing period).
+- GravityTank commit subjects use `<AgentName> GravityTank: short change summary` (same style: agent name + space + `GravityTank:` + space, no Conventional Commit prefixes, no trailing period).
 - Bump `GravityTank/index.html` cache-bust (`Script_Game.mjs?v=…`) whenever game scripts/assets change for Pages.
 
 ### Small requests: merge to master yourself

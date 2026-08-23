@@ -708,7 +708,7 @@ node TunnelFront1942/Script_PlayCli.mjs run  --level A1 --seed 3 --bot Skilled  
 
 ## 八、交付流程
 
-1. 会话分支 `claude/tunnel-warfare-strategy-demo-1ilbhs`；提交信息 `TunnelFront1942: 摘要`（无句号结尾）。
+1. 会话分支 `claude/tunnel-warfare-strategy-demo-1ilbhs`；提交信息 `<AgentName> TunnelFront1942: 摘要`（无句号结尾）。
 2. 每轮：冒烟全绿 → commit → push 分支 → **快进** `git push origin HEAD:master`（站点只从 master 部署，禁 force）
    → `curl -sI https://bentleyblanks.github.io/TunnelFront1942/` 验证。
 3. 根 `package.json` 挂 `test:tunnelFront1942` 并入总 `test` 链。

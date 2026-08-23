@@ -190,5 +190,5 @@ npm run test:prairieFire1937:browser
 - 提交信息前缀固定：
 
 ```text
-PrairieFire1937: short change summary
+<AgentName> PrairieFire1937: short change summary
 ```

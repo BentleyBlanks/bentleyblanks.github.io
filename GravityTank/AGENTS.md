@@ -3,14 +3,14 @@
 Canonical play URL: `https://bentleyblanks.github.io/GravityTank/`  
 Deploy branch: **`master` only**. Draft PR stacks do **not** ship.
 
-This file is the agent map for GravityTank. Prefer it over dumping `Script_Game.mjs` (~7k lines). Root repo rules (naming, Sophia commits, Pages policy) live in `/AGENTS.md`.
+This file is the agent map for GravityTank. Prefer it over dumping `Script_Game.mjs` (~7k lines). Root repo rules (naming, commit message format, Pages policy) live in `/AGENTS.md`.
 
 ---
 
 ## Ship workflow
 
 1. Create an isolated worktree from current `origin/master`; never edit or switch the shared main checkout.
-2. Commit with `GravityTank: short change summary` (no `feat:`/`fix:`, no trailing period).
+2. Commit with `<AgentName> GravityTank: short change summary` (no `feat:`/`fix:`, no trailing period).
 3. Fetch/rebase current `origin/master`, then fast-forward push `HEAD:master` without force.
 4. Bump cache-bust `Script_Game.mjs?v=…` (and CSS `?v=` if style changed) in `index.html`.
 5. Confirm Pages build / live URL, then remove the clean task worktree and branch.

@@ -59,5 +59,5 @@ node EnemyRearCommand/Script_SmokeTest.mjs
 提交信息：
 
 ```text
-EnemyRearCommand: short change summary
+<AgentName> EnemyRearCommand: short change summary
 ```
