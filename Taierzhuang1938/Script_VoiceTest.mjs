@@ -112,7 +112,7 @@ const PROLOGUE_EXPECTED = [
   ["prologue_rifleman_01", "擦枪士兵", "AudioSfx_PrologueVoiceRifleman_01.mp3", "又卡。"],
   ["prologue_old_wound_02", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_02.mp3", "你少骂两句，它兴许听话点。"],
   ["prologue_old_wound_03", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_03.mp3", "近咯。"],
-  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_03.mp3", "班长（洪亮、逐句升温）：这次你们去啊。晓不晓得，我们出来是做啥子？\n众人（十来人前后错开、坚定高喊）：我们晓得。打日本！\n班长（短促有力）：去死，怕不怕？\n众人（几人先起、其余瞬间压上）：不怕！\n班长（继续逼问）：为啥子不怕？\n众人（自然重叠、满腔热血）：我们要保护我们的国家！\n班长（哽咽一瞬）：好样的。\n班长（洪亮坚决地命令）：都把东西带好。前头就是滕县。"],
+  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_04.mp3", "班长（洪亮、逐句升温）：这次你们去啊。出川，晓不晓得啊？\n众人（十到十二名十七八岁男兵自然错拍、斗志昂扬）：我们晓得。打日本！\n班长（短促有力）：去死，怕不怕？\n众人（两三人先起、其余瞬间压上）：不怕！\n班长（继续逼问）：为啥子不怕？\n众人（年轻声线自然重叠、满腔热血）：我们要保护我们的国家！\n班长（哽咽一瞬）：好样的。\n班长（洪亮坚决地命令）：都把东西带好。前头就是滕县。"],
   ["prologue_external_officer_01", "车外军官", "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", "通信排，下车！线盘背起，搞快！"],
 ];
 const prologue = await page.evaluate(async () => {
