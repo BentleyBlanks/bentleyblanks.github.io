@@ -599,19 +599,28 @@ const FRAG_DEBUG_VIEW = /* glsl */`
       gl_FragColor = vec4(mix(vec3(0.12, 0.012, 0.018), vec3(0.55, 0.03, 0.08), stripe), 1.0);
       return;
     }
-    vec4 sample = texture2D(uSource, vUv);
-    vec3 color = sample.rgb;
+    // 变量名不许叫 sample。three 从 r163 起把所有 ShaderMaterial 都按
+    // GLSL ES 3.00（#version 300 es）编译，而 sample 在 3.00 里是保留字：
+    // 编译直接报 Illegal use of reserved word。整个 pass 编译不过时 three 只在
+    // 控制台留一行 Shader Error，屏幕上这一趟什么都不画 —— 表现就是
+    // 「调试面板每一个视图都是纯黑」，而正式合成链毫发无损，极难往这里想。
+    vec4 texel = texture2D(uSource, vUv);
+    vec3 color = texel.rgb;
     if (uMode < 0.5) {                 // 法线：[-1, 1] -> [0, 1]
       color = color * 0.5 + 0.5;
     } else if (uMode < 1.5) {          // 线性视深：近亮、远暗，80m 对应黑
-      float depth = 1.0 - clamp(sample.a / 80.0, 0.0, 1.0);
+      float depth = 1.0 - clamp(texel.a / 80.0, 0.0, 1.0);
       color = vec3(depth);
     } else if (uMode < 2.5) {          // AO 本来就是可显示的遮蔽量
-      color = vec3(sample.r);
+      color = vec3(texel.r);
     } else if (uMode < 3.5) {          // 距离图集：均值 / 不确定度 = R / G
-      color = vec3(sample.r, sample.g, 0.0);
-    } else {                           // HDR / 辐照度：Reinhard + sRGB
+      color = vec3(texel.r, texel.g, 0.0);
+    } else if (uMode < 4.5) {          // HDR / 辐照度：Reinhard + sRGB
       color = color / (color + vec3(1.0));
+      color = ToSrgb(color);
+    } else {                           // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
+      // 走 Reinhard 会把 0.5 的粗糙度压成 0.33，读数就不准了；
+      // 天空穹没被注入、还是 HDR 亮度，pow 后钳到白 —— 当背景正合适。
       color = ToSrgb(color);
     }
     gl_FragColor = vec4(color, 1.0);
@@ -839,6 +848,11 @@ export class PostPipeline {
    */
   get NormalDepthTexture() { return this.targets.normalDepth.texture; }
 
+  /** 合成 pass 实际采样的那一级泛光靶。调试面板与 uBloom 必须指同一张。 */
+  get BloomTarget() {
+    return this.bloomMips[this.preset.bloomLevels > 1 ? 1 : 0] || null;
+  }
+
   /**
    * 让独立的渲染调试面板选择当前帧最终送往屏幕的中间结果。
    * 这个状态故意不进玩家设置，也不影响正式合成链，只在面板存活期间保留。
@@ -858,15 +872,31 @@ export class PostPipeline {
       case "ao": return { texture: T.ao.texture, mode: 2, unavailable: !this.preset.ssao };
       case "aoBlur": return { texture: T.aoBlur.texture, mode: 2, unavailable: !this.preset.ssao };
       case "hdr": return { texture: T.hdr.texture, mode: 4 };
-      case "bloom": return { texture: this.bloomMips[0]?.texture, mode: 4 };
+      // 送屏的要与合成 pass 真正吃的是同一张（见 uBloom 那一行）：bloomMips[0]
+      // 只是第 0 级的降采样，还没叠上更小几级的 tent 放大，看着比实际泛光弱一大截。
+      case "bloom": return { texture: this.BloomTarget?.texture, mode: 4 };
+      // enabled 为 false 时图集是上一次收敛留下的陈旧内容，或者干脆一片全黑
+      // （画质档从没开过 GI 就是这一种）。这种情况要显式报"不可用"斜纹，
+      // 而不是把一张黑图送到屏幕上 —— 后者跟"渲染坏了"长得一模一样。
       case "giIrradiance": return {
         texture: this.debugGi?.irradiance?.[this.debugGi.pingPong]?.texture,
-        mode: 4, unavailable: !this.debugGi,
+        mode: 4, unavailable: !this.debugGi?.enabled,
       };
       case "giDistance": return {
         texture: this.debugGi?.distanceMoments?.[this.debugGi.pingPong]?.texture,
-        mode: 3, unavailable: !this.debugGi,
+        mode: 3, unavailable: !this.debugGi?.enabled,
       };
+      // 材质通道假彩色：真正的换色发生在材质注入里（Script_Materials 按
+      // uGiDebugView 把该通道当颜色写进 hdr 靶），这里只负责把 hdr 靶
+      // 以 0-1 直通模式送屏。谁设 uGiDebugView：Debug Rendering 面板
+      // （SetView 同步材质 uniform 与这里的视图名）或 ?giView= 直连。
+      // low 档材质没有注入（library.gi 为 null、ProbeVolume 未构造），
+      // 屏幕上会是原样 HDR —— 用 debugGi 缺席当"未注入"的代理，画不可用斜纹。
+      case "baseColor": case "roughness": case "metalness": case "shadow":
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi };
+      // GI 的世界空间视图还要求探针体真的开着，否则取样恒为零、满屏黑
+      case "giWorld": case "giConfidence":
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi?.enabled };
       default: return null;
     }
   }
@@ -1024,7 +1054,7 @@ export class PostPipeline {
     // --- 6) 合成 ---
     const U = this.uniformsComposite;
     U.uHdr.value = T.hdr.texture;
-    U.uBloom.value = this.bloomMips[levels > 1 ? 1 : 0].texture;
+    U.uBloom.value = this.BloomTarget.texture;
     U.uGod.value = T.god.texture;
     U.uNormalDepth.value = T.normalDepth.texture;
     U.uResolution.value.set(this.width, this.height);

@@ -519,6 +519,42 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     r.after ? `${r.after.solids} / ${r.after.fieldColliders}` : "");
 }
 
+// --- 7. 下载来的 .glb 布景：落地、且每一件都有碰撞体 ------------------------
+//
+// 这一条是补 2026-08-25 那个洞的。原来 Script_ExternalProps 只把模型摆进场景，
+// 既不按模型自己的包围盒落地、也不登记碰撞：手推车悬在 59.6 m 的天上、
+// 乡村房屋悬空 7.4 m，而所有人都能从一栋六米四的房子里穿过去。
+// 两条都从运行时取证，不读源码：
+//   · 每件摆件的可见包围盒底面必须贴着它脚下的地面（容差 0.15 m）；
+//   · 每件摆件必须在 field.colliders 里有一只**自己的**盒子（按中心点认领，
+//     不能靠"附近有别的盒子"蒙混过去 —— 旁边有院墙是常态）。
+{
+  const r = await page.evaluate(async () => {
+    const THREE = await import("./vendor/three/build/three.module.js?v=1");
+    const T = window.Taierzhuang, f = T.battlefield;
+    const own = f.externalProps?.colliders || [];
+    const box = new THREE.Box3();
+    const props = [];
+    T.scene.traverse((o) => { if (o.userData?.externalProps) props.push(...o.children); });
+    const bad = [];
+    for (const p of props) {
+      box.setFromObject(p);
+      const ground = f.GroundHeight(p.position.x, p.position.z);
+      const lift = box.min.y - ground;
+      // 认领：中心点落在这只盒子的水平投影里、且高度重合
+      const mine = own.find((b) => Math.abs(b.c[0] - p.position.x) < 2.5
+        && Math.abs(b.c[2] - p.position.z) < 2.5 && f.colliders.includes(b));
+      if (Math.abs(lift) > 0.15 || !mine) {
+        bad.push(`${p.name} 离地${lift.toFixed(2)}m${mine ? "" : " 无碰撞体"}`);
+      }
+    }
+    return { n: props.length, own: own.length, bad };
+  });
+  Check("下载来的布景都落在地面上、且每件都有自己的碰撞体",
+    r.n > 0 && r.bad.length === 0,
+    `${r.n} 件摆件 / ${r.own} 只盒子${r.bad.length ? "；出问题的：" + r.bad.join("、") : ""}`);
+}
+
 await browser.close();
 server.close();
 

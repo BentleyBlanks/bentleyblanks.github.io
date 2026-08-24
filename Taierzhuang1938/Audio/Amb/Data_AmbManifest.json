@@ -237,5 +237,23 @@
       "terms": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
       "via": "https://openspeech.bytedance.com/api/v3/tts/create"
     }
+  },
+  "normalization": {
+    "beds": {
+      "normalizedAt": "2026-08-25",
+      "tool": "Script_AudioNormalize.mjs",
+      "peakCeilingDbfs": -1,
+      "metric": "rmsDbfs",
+      "targetDbfs": -27,
+      "toleranceDb": 0.5
+    },
+    "cues": {
+      "normalizedAt": "2026-08-25",
+      "tool": "Script_AudioNormalize.mjs",
+      "peakCeilingDbfs": -1,
+      "metric": "activeRmsDbfs",
+      "targetDbfs": -25,
+      "toleranceDb": 0.5
+    }
   }
 }

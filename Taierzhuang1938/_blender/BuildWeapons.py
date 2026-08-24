@@ -509,6 +509,38 @@ def BuildMauser96():
 
 
 # ---------------------------------------------------------------------------
+# 外购军用自动手枪 0.222 m（Poly Haven 源缺失时的轻量兜底）
+# ---------------------------------------------------------------------------
+
+def BuildServicePistol():
+    root = Node("root")
+    body = root.Child("body")
+    muzzleZ = -0.176
+    frame = Box(0.030, 0.044, 0.128, bevel=0.003)
+    Transform(frame, y=BORE - 0.010, z=-0.030)
+    body.Add("steel", frame, tile=T_STEEL)
+    slide = Box(0.028, 0.034, 0.154, bevel=0.0025)
+    Transform(slide, y=BORE + 0.014, z=-0.052)
+    body.Add("steel", slide, tile=T_STEEL)
+    body.Add("steel", TubeAlongZ(-0.118, muzzleZ, 0.0063, 0.0063), tile=T_STEEL)
+    grip = LoftZ([
+        Ring(0.030, rx=0.018, rz=0.030, cz=-0.010, power=2.6),
+        Ring(0.006, rx=0.019, rz=0.032, cz=-0.035, power=2.6),
+        Ring(-0.032, rx=0.017, rz=0.030, cz=-0.070, power=2.6),
+    ], 10)
+    Transform(grip, rx=0.16)
+    body.Add("wood", grip, tile=T_WOOD)
+    body.Add("steel", TriggerGuard(-0.005, -0.045, 0.012, drop=0.025, width=0.009), tile=T_STEEL)
+    trigger = Box(0.004, 0.014, 0.007)
+    Transform(trigger, y=-0.002, z=-0.022)
+    body.Add("steel", trigger, tile=T_STEEL)
+    body.Add("steel", FrontSight(muzzleZ + 0.013), tile=T_STEEL)
+    Mounts(body, muzzleZ - 0.006, -0.045, -0.080,
+           magY=BORE - 0.045, magZ=-0.020, both=True)
+    return root
+
+
+# ---------------------------------------------------------------------------
 # 木柄手榴弹 0.22 m
 # ---------------------------------------------------------------------------
 
@@ -656,6 +688,7 @@ WEAPON_BUILDERS = {
     "Zb26": BuildZb26,
     "Type38": BuildType38,
     "Mauser96": BuildMauser96,
+    "ServicePistol": BuildServicePistol,
     "Grenade": BuildGrenade,
     "Dadao": BuildDadao,
 }

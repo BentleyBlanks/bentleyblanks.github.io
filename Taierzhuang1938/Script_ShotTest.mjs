@@ -101,6 +101,11 @@ const GAME_SHOTS = [
   // 师部方向与桥头引道。西关带只在 phase=1 生成（bounds）。
   { name: "Game_Z15_XiguanStreet", query: "shot=1&phase=1&quality=high&scale=medium",
     setup: { x: -405, z: 0, yaw: -Math.PI / 2, pitch: 0.02, quiet: true } },
+  // 护城河水面专项：斜跨东墙濠沟，近岸、深水与城墙倒映必须同时入画。
+  // 这张固定镜头用来抓屏幕空间水深方向写反、全屏泡沫和滚动法线接缝。
+  //（master 侧原名 Z11，与本分支的师部机位撞号，合并时改为 Z16。）
+  { name: "Game_Z16_MoatWater", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 314, z: 165, yaw: -0.73, pitch: -0.46, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

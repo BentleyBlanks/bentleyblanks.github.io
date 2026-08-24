@@ -896,6 +896,7 @@ const BUILDERS = {
   Type38: BuildBoltRifle,
   Zb26: BuildZb26,
   Mauser96: BuildMauser96,
+  ServicePistol: BuildMauser96,
   Grenade: BuildGrenade,
   GrenadeBundle: BuildGrenade,
   Dadao: BuildDadao,
@@ -914,7 +915,7 @@ const BUILDERS = {
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
   "Dadao", "Grenade", "GrenadeBundle",
-  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96",
+  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
 ]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
@@ -965,6 +966,10 @@ const MODEL_FP_TWEAK = {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
     handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
   },
+  ServicePistol: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
+  },
 };
 
 /**
@@ -981,7 +986,11 @@ function BuildFromModel(materials, weapon, key, doc) {
   }
   let built = null;
   try {
-    built = InstantiateModel(doc, { materials: table });
+    // Keep model-node boundaries in the first-person rig.  World actors can
+    // batch by material, but this rig needs the Type 38 `adsNear` child to
+    // remain independently visible so ADS can hide it without losing the
+    // actual sight and barrel.
+    built = InstantiateModel(doc, { materials: table, batch: false });
   } catch (error) {
     console.warn(`[Viewmodel] ${key} 模型实例化失败：${String(error).slice(0, 160)}`);
     return null;
@@ -1005,6 +1014,16 @@ function BuildFromModel(materials, weapon, key, doc) {
   const gripL = Mount("gripL", gripR.clone());
   const sight = Mount("sight", null);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
+  // Imported historical guns normally merge every steel/wood face per
+  // material.  Some assets expose an `adsNear` node for the rear receiver and
+  // stock: those faces cross the camera near plane once the sight is centered,
+  // so retain them at hip but hide them during ADS instead of drawing a clipped
+  // rectangular cross-section across the sight picture.
+  const adsHide = [];
+  const adsNear = built.nodes.get("adsNear");
+  if (adsNear) {
+    adsNear.traverse((child) => { if (child.isMesh) adsHide.push(child); });
+  }
   const isBoltRifle = weapon?.kind === "boltRifle";
   // 导入枪模把整支枪合成了一个网格，没有独立 bolt joint。仍给动作层一个代理节点：
   // 它让栓动链完整跑起来（右手离开握把、抓机柄、整枪受力、抛壳），而不是枪响后
@@ -1040,6 +1059,7 @@ function BuildFromModel(materials, weapon, key, doc) {
       left: { x: gripL.x, y: gripL.y, z: gripL.z, rx: hl[0], ry: hl[1], rz: hl[2] },
     },
     boltHandle,
+    adsHide,
     source: "model",
   };
 }
@@ -1163,6 +1183,9 @@ export class Viewmodel {
     // 开镜带一点点过冲（0.72 阻尼比），到位那一下有"顿"感；再低就晃得看不清准星
     this.adsSpring = new Spring(240, 0.72);
     this.sprintSpring = new Spring(90, 0.95);
+    // 白刃期间把冲刺姿态"静音"的权重（0 = 冲刺姿态照常，1 = 完全按腰射姿态挥）。
+    // 它不是弹簧：这条曲线不许过冲，过冲会让刀在收招时越过腰射姿态弹一下。见 Update。
+    this.meleeSprintMute = 0;
     this.landSpring = new Spring(150, 0.38);
     this.crouchSpring = new Spring(110, 0.9);
     this.equipSpring = new Spring(90, 0.85, 1);
@@ -1780,11 +1803,30 @@ export class Viewmodel {
         this._RestoreAdsHideParts();
       }
     }
-    const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+    const sprintSpringValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+
+    // --- 冲刺姿态的白刃静音 --------------------------------------------------
+    // 冲刺姿态是"把刀压到画面右下角、让出视野"，这条本身没错；错的是挥刀也从那儿起手。
+    // 实测（大刀 Shift+W 冲刺中挥一刀）刀尖的 NDC 轨迹：静止就在 (0.87, −0.54)，
+    // 蓄力顶点冲到 (1.60, −1.09) —— 整条刀弧在画面外走完，玩家只看到手抖了一下。
+    // 所以挥刀期间把冲刺姿态按下去，刀回到腰射姿态劈完，收招后再让它自己压回去。
+    //
+    // 静音的是**姿态**，不是冲刺本身：脚下照跑、体力照扣、步伐晃动（bob/cadence 读的是
+    // 原始 sprint）也照旧。"边跑边挥刀"要的就是这个 —— 停下来才能挥的刀不是大刀。
+    const meleeing = !!(this.action && this.action.kind === "melee");
+    // 起 30 / 落 8：劈砍的蓄力段只有 90 ms，姿态必须在蓄力里就让出来，否则出刀那一下
+    // 还有半个冲刺姿态压着。收招慢一倍，免得刀"啪"地弹回冲刺位置。
+    this.meleeSprintMute += ((meleeing ? 1 : 0) - this.meleeSprintMute)
+      * (1 - Math.exp(-step * (meleeing ? 30 : 8)));
+    const sprintValue = sprintSpringValue * (1 - this.meleeSprintMute);
+
     // 按下 Shift 立刻切走完整肩臂；松开后等冲刺弹簧回到安全区再恢复，避免退出
     // 冲刺的半途姿态仍让上臂穿过相机。旧手模和整臂只会有一套可见。
+    // 这里读的是**静音后**的姿态权重：换手模的理由是冲刺姿态那圈旋转会把上臂扫过近平面，
+    // 姿态被按下去了，理由也就不成立 —— 于是跑动中的那一刀和站着劈是同一套整臂。
     if (this.riggedArms) {
-      this.riggedArms.SetSprintFallback(sprint > 0.03 || sprintValue > 0.08);
+      const holdingSprint = sprint > 0.03 && this.meleeSprintMute < 0.5;
+      this.riggedArms.SetSprintFallback(holdingSprint || sprintValue > 0.08);
     }
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));

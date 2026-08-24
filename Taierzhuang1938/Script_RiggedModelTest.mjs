@@ -54,7 +54,9 @@ function AssertHumanHead(doc, label, height) {
   const halfDepth = Math.max(Math.abs(bounds.min[2]), Math.abs(bounds.max[2]));
   assert.ok(halfWidth <= height * 0.055, `${label} head is too wide: ${(halfWidth * 2).toFixed(3)} m`);
   assert.ok(bounds.max[1] <= height * 0.146, `${label} head is too tall above neck: ${bounds.max[1].toFixed(3)} m`);
-  assert.ok(halfDepth <= height * 0.071, `${label} head is too deep: ${(halfDepth * 2).toFixed(3)} m`);
+  // The featureless NRA face cover closes the former eye/nose opening instead
+  // of leaving an animation-visible cavity; allow its 4 mm protective depth.
+  assert.ok(halfDepth <= height * 0.073, `${label} head is too deep: ${(halfDepth * 2).toFixed(3)} m`);
 }
 
 const arms = ReadGlb("Model_FpsArms.glb");

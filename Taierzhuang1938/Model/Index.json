@@ -96,11 +96,11 @@
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",
-   "triangles": 2721,
+   "triangles": 5633,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 80943,
+   "bytes": 229381,
    "materials": [
     "steel",
     "wood"
@@ -115,14 +115,14 @@
    ],
    "bounds": {
     "min": [
-     -0.02735,
-     -0.12131,
+     -0.02876,
+     -0.1088,
      -0.855
     ],
     "max": [
-     0.02709,
-     0.067,
-     0.25492
+     0.02694,
+     0.06669,
+     0.25633
     ]
    }
   },
@@ -199,10 +199,10 @@
    "category": "weapon",
    "file": "Type38.tzm.json",
    "triangles": 4690,
-   "meshBlocks": 2,
-   "nodes": 7,
+   "meshBlocks": 4,
+   "nodes": 8,
    "joints": 0,
-   "bytes": 166263,
+   "bytes": 168665,
    "materials": [
     "steel",
     "wood"
@@ -259,6 +259,39 @@
      0.02309,
      0.063,
      0.046
+    ]
+   }
+  },
+  {
+   "name": "ServicePistol",
+   "category": "weapon",
+   "file": "ServicePistol.tzm.json",
+   "triangles": 5728,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 257720,
+   "materials": [
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.02209,
+     -0.0187,
+     -0.19208
+    ],
+    "max": [
+     0.02099,
+     0.10966,
+     0.04535
     ]
    }
   },

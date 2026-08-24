@@ -91,6 +91,7 @@ export function InjectIndirectLighting(material, { ssao = null, gi = null, destr
       fragment = fragment
         .replace("#include <common>", `#include <common>
         varying vec3 vGiWorldPos;
+        vec3 gGiDebugColor = vec3(0.0);
 ${GI_SAMPLE_GLSL}`)
         .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
@@ -102,6 +103,22 @@ ${GI_SAMPLE_GLSL}`)
           vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
           // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
           giConfidence *= uGiEnabled;
+          // ?giView= 假彩色取证：1 探针辐照度×0.05 / 2 被替换前的天空 IBL×0.05 /
+          // 3 confidence / 4 gi 与 IBL 的亮度比×0.25（与曝光无关，1.0 的比值显示为 0.25 灰）。
+          // 在 mix 之前抓，末端 <dithering_fragment> 处整帧覆盖输出。
+          if (uGiDebugView > 0.5) {
+            if (uGiDebugView < 1.5) gGiDebugColor = giIrradiance * 0.05;
+            else if (uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
+            else if (uGiDebugView < 3.5) gGiDebugColor = vec3(giConfidence);
+            else if (uGiDebugView < 4.5) {
+              float giDbgL = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
+              float iblDbgL = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+              gGiDebugColor = vec3(giDbgL / iblDbgL * 0.25);
+            }
+            // 5.5 的上界不能省：6-9 是材质通道视图，值在更早的 chunk 里已经抓好，
+            // 这里兜底 else 一接就会把它们全冲成权重和（四个视图一模一样的灰）。
+            else if (uGiDebugView < 5.5) gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
+          }
           if (giConfidence > 0.0) {
             #if defined( RE_IndirectSpecular )
             float giSkyLum = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
@@ -112,7 +129,32 @@ ${GI_SAMPLE_GLSL}`)
             iblIrradiance = mix(iblIrradiance, giIrradiance, giConfidence);
           }
         }
-        #endif`);
+        #endif`)
+        // 材质通道假彩色（6 BaseColor / 7 粗糙度 / 8 金属度 / 9 太阳阴影）。
+        // 前向管线没有延迟渲染的 GBuffer，这些通道只在材质自己的着色器里存在 ——
+        // 想看它们只有一条路：让材质把该通道当颜色写出去。各通道在它诞生的
+        // chunk 之后立刻抓（那时值刚算完、还没被后续光照消费掉）。
+        .replace("#include <color_fragment>", `#include <color_fragment>
+        if (uGiDebugView > 5.5 && uGiDebugView < 6.5) gGiDebugColor = diffuseColor.rgb;`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        if (uGiDebugView > 6.5 && uGiDebugView < 7.5) gGiDebugColor = vec3(roughnessFactor);`)
+        .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
+        if (uGiDebugView > 7.5 && uGiDebugView < 8.5) gGiDebugColor = vec3(metalnessFactor);`)
+        // 太阳阴影因子：白 = 照到，黑 = 挡住。r185 的 getShadow 六参签名。
+        // 不收影的材质（USE_SHADOWMAP 未定义）保持 0 —— 黑 = 没参与收影，也是信息。
+        // 阴影框只有 66 m：框外 getShadow 的 frustumTest 不过、恒返回 1（纯白），
+        // 这个视图顺带能看到阴影覆盖范围的边。
+        .replace("#include <lights_fragment_begin>", `#include <lights_fragment_begin>
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+        if (uGiDebugView > 8.5 && uGiDebugView < 9.5) {
+          gGiDebugColor = vec3(getShadow(directionalShadowMap[0],
+            directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity,
+            directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius,
+            vDirectionalShadowCoord[0]));
+        }
+        #endif`)
+        .replace("#include <dithering_fragment>", `#include <dithering_fragment>
+        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
     }
 
     if (destruction) {

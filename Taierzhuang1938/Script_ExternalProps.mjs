@@ -1,27 +1,98 @@
-// Downloaded, static dressing models for the Tengxian white-box.
+// 滕县白盒里那批**下载来的** .glb 布景（区别于 _blender 出的 .tzm.json 与
+// Script_World / Script_LivedInProps 的程序化几何）。
 //
-// These are deliberately visual-only: collision, navigation and destruction
-// stay owned by the procedural battlefield builders.  That keeps the existing
-// historical building footprints and combat contracts deterministic while
-// making a few close-range spaces feel less repeated.
+// 【2026-08-25 这一轮做的事：把它们从"贴图布景"变成真的场上物体。】
+//
+// 在这之前这一层是明确的"只画不碰"：collision / navigation / destruction 一律
+// 归程序化建造器，理由是"别让一个下载来的装饰网格悄悄改掉 AI 路线"。
+// 这条理由本身没错 —— 错的是它掩盖了三件更基础的事，全部从运行时取证：
+//
+//   · **模型自带的原点不在脚底。** 手推车的包围盒在 y = 59.58…60.76 m，
+//     而摆位只写了 `position.y = groundAt(x, z)` —— 五关的手推车全都悬在
+//     六十米高的天上。乡村房屋悬空 7.4 m，木箱 0.9 m，砖瓦堆 1.0 m。
+//   · **原点在 XZ 上也不居中。** 木箱的几何在 z = +0.59…+1.31，
+//     摆位坐标写的是哪儿，东西就不在哪儿。
+//   · 于是"没有碰撞体"这一条**根本没法单独修**：给一辆天上的车加碰撞盒
+//     只会在天上多一个隐形方块。
+//
+// 所以现在这一层做三件事，顺序不能反：
+//   1. `PrepareAsset` —— 取出该资产的节点（多件共用一个 .glb 时按 spec.node 取），
+//      按它**自己的**包围盒落地并 XZ 居中，原点变成"底面几何中心"；
+//   2. 照旧克隆、上材质、摆位；
+//   3. `AddExternalProps` 顺手吐一份碰撞盒（每件一只**带朝向的**长方体，
+//      与程序化民居登记的粒度一致），由调用方并进 field.colliders。
+//
+// 「别让装饰网格改掉 AI 路线」这条担心仍然成立，只是答案变了：这些摆位是
+// **写死的常量**（下面 PLACEMENTS 一个随机数都没有），照它生成的碰撞盒同样是
+// 常量。确定性没丢，丢的是"看得见摸不着"。
+//
+// 还没改的一条（留给美术定夺，不在这一轮里）：houseRow / housePair 两个模型
+// 自带的尺度偏小 —— 排屋整体高 1.70 m、双栋高 2.96 m，比 1.66 m 的士兵高不了
+// 多少，而 docs/Data_HistoryMaterial.md 记的鲁南民居脊高是 4.0—4.8 m。
+// 等比放大会把 10 m 长的排屋拉到二十几米，会不会撞上旁边的程序化院落要另外量。
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { BuildSink } from "./Script_World.mjs";
 
 const LOADER = new GLTFLoader();
+
+/**
+ * 资产表。
+ *
+ * `tag` 决定三件事，全部照 Data_Destruction 的 TAG_PROFILE 与 Script_Main 的
+ * SURFACE_BY_TAG 走：吃多少火力、打上去出什么屑、出什么声。用的都是**那两张表
+ * 里已经有的 tag**，别为这一层新编一套。
+ *
+ * `solid: false` = 确实不该挡人的那一类。**目前一件都没有** —— 留着这个口子是
+ * 因为下一个下载来的布景很可能是墙上的爬藤或者地上的车辙。
+ * 最小的可堆石块只有 0.22 m 高，照样登记：它在 0.56 m 的跨越判据之下，
+ * 进不了导航图，人一步就迈过去，但子弹打得中、身子穿不过。
+ */
 const ASSETS = Object.freeze({
-  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null },
-  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null },
-  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null },
-  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null },
-  cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam" },
-  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam" },
-  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor" },
-  rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble" },
+  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null, tag: "wall" },
+  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
+  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall" },
+  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade" },
+  cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam", tag: "householdCart" },
+  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam", tag: "fence" },
+  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor", tag: "prop" },
+  rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble" },
+  militaryCrateClosed: {
+    label: "旧式军用木箱（闭合）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
+    node: "MilitaryCrateClosed", material: "WoodDoor", tag: "prop",
+  },
+  militaryCrateOpen: {
+    label: "旧式军用木箱（打开）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
+    node: "MilitaryCrateOpen", material: "WoodDoor", tag: "prop",
+  },
+  stackableStone01: { label: "可堆石块 01", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone01", material: "GroundRubble", tag: "rubble" },
+  stackableStone02: { label: "可堆石块 02", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone02", material: "GroundRubble", tag: "rubble" },
+  stackableStone03: { label: "可堆石块 03", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone03", material: "GroundRubble", tag: "rubble" },
+  stackableStone04: { label: "可堆石块 04", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone04", material: "GroundRubble", tag: "rubble" },
+  stackableStone05: { label: "可堆石块 05", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone05", material: "GroundRubble", tag: "rubble" },
+  stackableStone06: { label: "可堆石块 06", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone06", material: "GroundRubble", tag: "rubble" },
+  stackableStone07: { label: "可堆石块 07", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone07", material: "GroundRubble", tag: "rubble" },
+  deadTreeTrunk01: { label: "无叶枯树干 01", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk01", material: "WoodBeam", tag: "deadTree" },
+  deadTreeTrunk02: { label: "无叶枯树干 02", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk02", material: "WoodBeam", tag: "deadTree" },
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
 // scenery.  All positions are already world coordinates (X east, Z south).
+//
+// 【摆位的一条新规矩，2026-08-25】这些东西从今天起是**实心的**，所以摆位不能
+// 再只按"看着顺眼"来：没有碰撞时它们是透明的，双方隔着它对射毫无影响；
+// 一给碰撞，一栋 10 m 长的排屋就是一堵墙。
+//
+// 取证用三百秒停摆探针（Script_PlayTest 12.14，二·东关头六十秒的全场开火数）：
+// 原样加碰撞 126 → 78；把横在交战轴上的那一栋排屋挪开之后回到 113。
+// 下面两处带注释的摆位就是这么挪的。
+//
+// **但别拿这个数字当旋钮拧。** 三百秒后半段的开火数是混沌的：同一份代码
+// 在改动前三次分别是 65 / 25 / 65；而"挡掉最多火力"的那栋房子（462,-144）
+// 按真实交战连线采样（5907 条）**一条都没挡**，两军最近敌距反而更小。
+// 除了"整堵墙横在轴上"这种量得出机理的情形，剩下的波动是 AI 决策的蝴蝶效应。
+// 判据只认两条讲得出道理的：**不压进既有院墙、不横在目标与目标之间的连线上**。
 const PLACEMENTS = Object.freeze({
   L0_Jiehe: [
     { asset: "fence", x: -88, z: -1362, ry: 0.14 },
@@ -36,14 +107,23 @@ const PLACEMENTS = Object.freeze({
     { asset: "crate", x: -1190, z: -119, ry: -0.15, scale: 0.96 },
     { asset: "fence", x: -1260, z: -104, ry: 0.05 },
     { asset: "rubble", x: -1170, z: -176, ry: -0.31, scale: 0.84 },
+    { asset: "militaryCrateClosed", x: -1186, z: -117, ry: 0.28 },
+    { asset: "stackableStone02", x: -1238, z: -151, ry: 0.7 },
+    { asset: "stackableStone04", x: -1237.5, z: -150.7, ry: -0.2, scale: 0.72 },
+    { asset: "deadTreeTrunk01", x: -1268, z: -183, ry: 0.5 },
   ],
   L2_Dongguan: [
     { asset: "house", x: 462, z: -144, ry: 0.03 },
     { asset: "housePair", x: 428, z: -178, ry: 0.06 },
-    { asset: "houseRow", x: 500, z: -60, ry: -0.12 },
+    // 原来在 (500, -60)：正落在第四个目标圈（500,-65 半径 22）里，10 m 的长边
+    // 又几乎顺着 Z 摆，等于在日军（x≈556）与守军（x≈472）之间横一堵墙。
+    // 往南挪 40 m 到关厢后排，长边照旧顺街，交战轴让出来。
+    { asset: "houseRow", x: 500, z: -100, ry: -0.12 },
     { asset: "cart", x: 485, z: -96, ry: -0.28, scale: 0.9 },
     { asset: "crate", x: 479, z: -94, ry: 0.18, scale: 0.92 },
     { asset: "rubble", x: 504, z: 18, ry: 0.46, scale: 1.05 },
+    { asset: "militaryCrateOpen", x: 477, z: -91, ry: -0.48 },
+    { asset: "stackableStone06", x: 521, z: 12, ry: 0.9, scale: 0.85 },
   ],
   L3_Fanji: [
     { asset: "cart", x: 468, z: -54, ry: 0.16, scale: 0.86 },
@@ -57,6 +137,10 @@ const PLACEMENTS = Object.freeze({
     { asset: "sandbag", x: 252, z: -80, ry: 0.42 },
     { asset: "sandbag", x: 257, z: -76, ry: -0.28, scale: 0.94 },
     { asset: "sandbag", x: 248, z: -85, ry: 0.88, scale: 0.9 },
+    { asset: "stackableStone01", x: 303, z: -65, ry: 0.18 },
+    { asset: "stackableStone03", x: 304, z: -64.7, ry: -0.42, scale: 0.82 },
+    { asset: "stackableStone05", x: 304.3, z: -64.4, ry: 0.62, scale: 0.68 },
+    { asset: "stackableStone07", x: 310, z: -70, ry: -0.3, scale: 0.76 },
   ],
   L5_Shizijie: [
     { asset: "cart", x: 112, z: -38, ry: 0.38, scale: 0.84 },
@@ -64,28 +148,93 @@ const PLACEMENTS = Object.freeze({
     { asset: "houseRow", x: 84, z: -70, ry: 0.22 },
     { asset: "sandbag", x: 100, z: -52, ry: -0.4 },
     { asset: "rubble", x: -66, z: 44, ry: 0.18, scale: 0.92 },
+    { asset: "deadTreeTrunk02", x: -72, z: 51, ry: -0.44, scale: 0.9 },
   ],
   L6_Beimen: [
     { asset: "cart", x: -188, z: -128, ry: 0.18, scale: 0.82 },
     { asset: "crate", x: -184, z: -127, ry: -0.14, scale: 0.84 },
-    { asset: "housePair", x: -224, z: -160, ry: 0.12 },
+    // 原来在 (-224, -160)：压在北门（-322,0）通往城北两个目标（-145,-296 与
+    // 0,-520）的那条对角线上，两条通视一起被这一栋挡掉。往西让 9 m 就都让开了
+    // （空位是扫出来的：不压进既有院墙、也不落在任何一条目标连线上）。
+    { asset: "housePair", x: -232, z: -164, ry: 0.12 },
     { asset: "sandbag", x: -176, z: -118, ry: 0.55 },
     { asset: "rubble", x: -246, z: -36, ry: 0.41, scale: 0.96 },
   ],
 });
 
+// Several catalog entries intentionally share one GLB. Cache by URL so seven
+// stones cost one request and one parsed source scene instead of seven.
 const cache = new Map();
+// 归一化之后的外壳按**资产 id** 缓存 —— 同一个 .glb 里的七块石头各有各的原点，
+// 落地量必须一件一件算，不能跟着 URL 走。
+const prepared = new Map();
 let liveRoot = null;
 
-async function LoadAsset(id) {
-  if (cache.has(id)) return cache.get(id);
+async function LoadSource(id) {
   const spec = ASSETS[id];
+  if (cache.has(spec.url)) return cache.get(spec.url);
   const pending = LOADER.loadAsync(spec.url).catch((error) => {
     console.warn(`[ExternalProps] ${id} 读取失败，跳过该布设：${String(error).slice(0, 180)}`);
     return null;
   });
-  cache.set(id, pending);
+  cache.set(spec.url, pending);
   return pending;
+}
+
+/**
+ * 把该资产的节点搬进一个"底面几何中心即原点"的外壳里，并量出归一化之后的
+ * 包围盒（碰撞盒就照它出）。
+ *
+ * **只做平移，不动缩放。** 缩放是美术尺度问题（见文件头最后一段），
+ * 混在这一趟里改会让"落地"这条修复没法单独验证。
+ *
+ * 量之前必须 `updateMatrixWorld(true)`：glTF 的节点变换是在解析时写进 matrix 的，
+ * 不主动更新的话 setFromObject 量到的是父链没算过的旧值。而共用 .glb 的那几件
+ * 还多一层坑 —— 取出来的子节点身上带着它在源场景里的变换，克隆之后必须清掉，
+ * 否则七块石头会各自带着自己在展示排里的偏移落到关卡里。
+ */
+function PrepareAsset(id, gltf) {
+  if (!gltf) return null;
+  if (prepared.has(id)) return prepared.get(id);
+  const spec = ASSETS[id];
+  gltf.scene.updateMatrixWorld(true);
+  const source = spec.node ? gltf.scene.getObjectByName(spec.node) : gltf.scene;
+  if (!source) {
+    console.warn(`[ExternalProps] ${id} 缺少节点 ${spec.node}，跳过该布设`);
+    prepared.set(id, null);
+    return null;
+  }
+  const node = source.clone(true);
+  node.position.set(0, 0, 0);
+  node.rotation.set(0, 0, 0);
+  node.scale.copy(source.scale);
+  node.updateMatrixWorld(true);
+  const raw = new THREE.Box3().setFromObject(node);
+  const shell = new THREE.Group();
+  shell.name = `${id}_Grounded`;
+  node.position.set(
+    -(raw.min.x + raw.max.x) * 0.5,
+    -raw.min.y,
+    -(raw.min.z + raw.max.z) * 0.5,
+  );
+  shell.add(node);
+  shell.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(shell);
+  const entry = {
+    shell,
+    // 归一化之后：底面贴 y=0、XZ 关于原点对称。半长与中心高度就是碰撞盒的全部参数。
+    half: [(box.max.x - box.min.x) * 0.5, (box.max.y - box.min.y) * 0.5,
+      (box.max.z - box.min.z) * 0.5],
+    centerY: (box.min.y + box.max.y) * 0.5,
+    offset: [(box.min.x + box.max.x) * 0.5, (box.min.z + box.max.z) * 0.5],
+  };
+  prepared.set(id, entry);
+  return entry;
+}
+
+async function LoadAsset(id) {
+  if (prepared.has(id)) return prepared.get(id);
+  return PrepareAsset(id, await LoadSource(id));
 }
 
 function ApplyRuntimeMaterial(root, material) {
@@ -96,10 +245,10 @@ function ApplyRuntimeMaterial(root, material) {
   });
 }
 
-function CloneLoadedAsset(id, gltf, library) {
-  if (!gltf) return null;
-  const prop = gltf.scene.clone(true);
+function CloneLoadedAsset(id, asset, library) {
+  if (!asset) return null;
   const spec = ASSETS[id];
+  const prop = asset.shell.clone(true);
   ApplyRuntimeMaterial(prop, spec.material
     ? library.Get(spec.material, { roughness: 0.9, metalness: 0 }) : null);
   prop.traverse((object) => {
@@ -111,10 +260,33 @@ function CloneLoadedAsset(id, gltf, library) {
   return prop;
 }
 
+/**
+ * 一个摆件的碰撞盒：归一化包围盒 × 摆位缩放，绕 Y 转到摆位朝向。
+ *
+ * 一件一只盒子，与程序化民居登记的粒度一致（`Script_TengxianCity` 里一栋房
+ * 也是一只 `Solid`）。逐子网格出盒会把乡村房屋拆成十七只、把屋里的细节也变成
+ * 隐形障碍，既贵又不对。
+ *
+ * 中心点要**先转再平移** —— 归一化之后 XZ 已经对称，理论上偏移是 0，
+ * 但浮点残差与将来可能出现的偏心模型都靠这一步兜住。
+ */
+function SolidFor(sink, spec, asset, placement) {
+  if (spec.solid === false) return 0;
+  const s = placement.scale || 1;
+  const ry = placement.ry || 0;
+  const [ox, oz] = asset.offset;
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const cx = placement.x + (ox * cos + oz * sin) * s;
+  const cz = placement.z + (-ox * sin + oz * cos) * s;
+  sink.Solid(cx, placement.y + asset.centerY * s, cz,
+    asset.half[0] * s, asset.half[1] * s, asset.half[2] * s, spec.tag, ry);
+  return 1;
+}
+
 /** Dedicated editor catalog; runtime placement coordinates stay private below. */
 export function ExternalPropCatalog() {
   return Object.entries(ASSETS).map(([id, spec]) => ({
-    id, label: spec.label, url: spec.url, material: spec.material,
+    id, label: spec.label, url: spec.url, node: spec.node ?? null, material: spec.material,
   }));
 }
 
@@ -134,14 +306,15 @@ export function ClearExternalProps() {
 /**
  * Add the short list of downloaded props relevant to a built level.
  *
- * Models are cloned from one cached GLB each.  They never add collider boxes:
- * letting an imported decorative mesh silently alter AI paths would make the
- * deterministic map and the authored shell disagree.
+ * 返回的 `colliders` 是**给调用方并进 field.colliders 的**，这一层自己不碰战场
+ * 对象。并完之后调用方必须重刷一次空间散列（`field.BuildCollisionGrid()`），
+ * 否则 AI 找掩体与破坏系统的粗筛里没有这些盒子 —— 物理世界有、粗筛没有，
+ * 是最难认的一类不一致。
  */
 export async function AddExternalProps({ scene, library, phaseId, groundAt }) {
   ClearExternalProps();
   const placements = PLACEMENTS[phaseId] || [];
-  if (!placements.length) return { count: 0, failed: [] };
+  if (!placements.length) return { count: 0, failed: [], colliders: [] };
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
   const loaded = await Promise.all(ids.map(async (id) => [id, await LoadAsset(id)]));
@@ -149,23 +322,27 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt }) {
   const root = new THREE.Group();
   root.name = `ExternalProps_${phaseId}`;
   root.userData.externalProps = true;
+  const sink = new BuildSink();
   const failed = [];
   let count = 0;
 
   for (const placement of placements) {
-    const gltf = models.get(placement.asset);
-    if (!gltf) { failed.push(placement.asset); continue; }
-    const prop = CloneLoadedAsset(placement.asset, gltf, library);
+    const asset = models.get(placement.asset);
+    if (!asset) { failed.push(placement.asset); continue; }
+    const prop = CloneLoadedAsset(placement.asset, asset, library);
+    if (!prop) { failed.push(placement.asset); continue; }
     prop.name = `External_${placement.asset}_${count}`;
-    prop.position.set(placement.x, groundAt(placement.x, placement.z), placement.z);
+    const y = groundAt(placement.x, placement.z);
+    prop.position.set(placement.x, y, placement.z);
     prop.rotation.y = placement.ry || 0;
     prop.scale.setScalar(placement.scale || 1);
     root.add(prop);
+    SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
     count += 1;
   }
   scene.add(root);
   liveRoot = root;
-  return { count, failed };
+  return { count, failed, colliders: sink.colliders };
 }
 
 export function ExternalPropCount(phaseId) {

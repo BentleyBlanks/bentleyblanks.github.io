@@ -97,5 +97,13 @@
   "name": "逐曲授权（见 cues[].source）",
   "terms": "SeedAudio 生成曲受火山引擎服务条款约束；其余曲目按来源页授权",
   "via": "Data_MusicSources.mjs"
+ },
+ "normalization": {
+  "normalizedAt": "2026-08-25",
+  "tool": "Script_AudioNormalize.mjs",
+  "peakCeilingDbfs": -1,
+  "metric": "rmsDbfs",
+  "targetDbfs": -27,
+  "toleranceDb": 0.5
  }
 }

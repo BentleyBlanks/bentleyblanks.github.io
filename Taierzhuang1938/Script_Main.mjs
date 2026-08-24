@@ -31,13 +31,14 @@ import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
-import { Hud, ContextualActionPrompts } from "./Script_Hud.mjs";
+import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
@@ -230,6 +231,8 @@ const graphics = {
 // trace/blend pass。low 档没有配置，仍按原规则不建。
 const GI_ON = GI_QUALITY[QUALITY] != null;
 const giUniforms = MakeGiUniforms();
+// GI 取样端假彩色（?giView=1 探针辐照度 / 2 天空 IBL / 3 confidence），开发取证用
+giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
   destruction: destructionUniforms,
@@ -332,6 +335,7 @@ let story = null;
 let combat = null;
 let destruction = null;
 let interact = null;
+let identify = null;
 let cutscene = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
@@ -652,6 +656,21 @@ async function Boot() {
     },
   });
 
+  // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
+  // 这里只把"从眼位到那个人的胸口有没有被挡死"接回来 —— 与 HasLineOfSight 同一条判据。
+  identify = new IdentifySystem({
+    Clear: (eye, point) => {
+      _idDir.set(point.x - eye.x, point.y - eye.y, point.z - eye.z);
+      const dist = _idDir.length();
+      if (dist < 1e-3) return true;
+      _idDir.multiplyScalar(1 / dist);
+      _idFrom.set(eye.x, eye.y, eye.z);
+      const hit = battlefield.Raycast(_idFrom, _idDir, dist);
+      // 留 0.6 m 余量：擦着人身边的墙角不算挡住（同 HasLineOfSight）。
+      return !hit || hit.t >= dist - 0.6;
+    },
+  });
+
   await nextFrame();
   setStep("就绪", 1.0);
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
@@ -754,6 +773,37 @@ async function Boot() {
         };
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
+      /**
+       * 准心与目标识别的取证口。
+       * 准心那三个数必须一起读：`spreadDeg` 是 Player.SpreadDeg 的真值，
+       * `gap` 是 HUD 真正画出来的缝，`expected` 是按当前视场重算的应画值 ——
+       * 三者对不上就说明准心又在自说自话（这正是 2026-08-25 那次返工的病根）。
+       */
+      Reticle: () => {
+        const weapon = WEAPONS[currentWeapon];
+        const firearm = Number(weapon?.spreadHipDeg) > 0;
+        const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
+        const drawn = hud.CrosshairState();
+        return {
+          ...drawn,
+          armed: firearm,
+          fov: camera.fov,
+          viewportHeight: window.innerHeight,
+          expected: CrosshairGeometry({
+            spreadDeg, fovDeg: camera.fov, viewportHeight: window.innerHeight,
+            sprint: player.sprint, armed: firearm,
+          }).gap,
+          sprint: player.sprint,
+          ads: player.ads,
+        };
+      },
+      Target: () => ({
+        card: hud.TargetState(),
+        detail: DIFFICULTY.targetInfo ?? "basic",
+        entityId: identify.entity?.id ?? null,
+        stats: { ...identify.stats },
+        cone: IDENTIFY.coneDeg,
+      }),
       AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
       // AI 那边的运行时取证口：某个兵此刻的完整状态
       SoldierInfo: (soldier) => ({
@@ -1106,6 +1156,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
   });
   battlefield.externalProps = external;
+  // 下载来的布景也是场上实物（见 Script_ExternalProps 文件头）。它们的碰撞盒是
+  // 建关最后一步才并进来的，所以**空间散列必须重刷** —— BuildSteps 里那一次
+  // BuildCollisionGrid 跑在这之前，不重刷的话 Rapier 里有这些盒子、
+  // 而 AI 找掩体/破坏系统的粗筛 BoxesNear 里没有。
+  if (external.colliders?.length) {
+    battlefield.colliders.push(...external.colliders);
+    if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
+  }
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
   // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
   if (gi) gi.SetWorld(battlefield);
@@ -1365,6 +1423,15 @@ function CountNear(side, radius) {
 
 const _losFrom = new THREE.Vector3();
 const _losDir = new THREE.Vector3();
+/**
+ * 目标识别专用的临时向量。**一只都不许与别处共用** —— 通视钩子是在扫描中途
+ * 被回调的，而 `player.EyePosition` 返回的是 Player 自己的 `_tmp`：
+ * 扫描期间任何一处再读一次眼位，就会把这一轮的原点改掉。所以进来先 copy 一份。
+ */
+const _idFrom = new THREE.Vector3();
+const _idDir = new THREE.Vector3();
+const _idAim = new THREE.Vector3();
+const _idEye = new THREE.Vector3();
 /**
  * 从玩家眼位到某个落点的胸口（+1.3 m）有没有被静态碰撞体挡死。
  *
@@ -2221,6 +2288,7 @@ function ResumeFromPause() {
 function MenuFrame(dt, render = true) {
   state.elapsed += dt;
   state.frame += 1;
+  if (editor) editor.UpdateOverlays(dt);
   menu.Update(dt);
   // 场上那几个守军：只有守军，所以 AI 找不到目标，跑的是「守住 holdZone」那一支。
   // 不推它的话人是几尊定在地上的雕像 —— 比没有人还假。
@@ -2594,12 +2662,22 @@ const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
  * metal 仍然没有来源：全场没有任何一个碰撞盒标成金属（城门是 seed:"gate" 的
  * 木门，不是铁门）。给它编一个 tag 属于改世界几何，不混在这次修复里。
  */
+// 【2026-08-25 再补一次】上面那句"全集"当时就不全，后来更不全：
+// 生活层（Script_LivedInProps）与城外层各自新编了 householdWoodpile /
+// householdCart / streetStall / fence / villageStraw / sandbagEmplacement /
+// fieldBank / dirt 这些 tag，一个都没进这张表 —— 打柴垛出砖灰、打沙袋工事出砖灰、
+// 打土坎（tag 就叫 dirt）也出砖灰。这一轮给生活家什与下载来的布景补碰撞盒时
+// 顺手对齐，键与 Data_Destruction.TAG_PROFILE 保持同一套；以后新加 tag 两边一起加。
 const SURFACE_BY_TAG = {
-  barricade: "sandbag",
+  barricade: "sandbag", sandbagPlug: "sandbag", sandbagEmplacement: "sandbag",
   prop: "wood", balk: "wood", bridge: "wood", platform: "wood",
   floor: "wood", ceiling: "wood", roof: "wood", door: "wood", furniture: "wood",
+  householdWoodpile: "wood", householdCart: "wood", householdBasket: "wood",
+  streetStall: "wood", fence: "wood", deadTree: "wood",
+  villageCart: "wood", villagePost: "wood", villageGate: "wood",
   ramp: "dirt", grave: "dirt", embankment: "dirt", kan: "dirt",
-  wall: "brick", parapet: "brick",
+  dirt: "dirt", fieldBank: "dirt", villageStraw: "dirt",
+  wall: "brick", parapet: "brick", rubble: "brick", householdCrock: "brick",
 };
 
 /** 表面 → 实录命中音。sandbag 与 dirt 共用土声（沙包里装的就是土）。 */
@@ -2693,14 +2771,20 @@ function TryFire(dt) {
   // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
   if (player.Busy || player.InWater) return;
+  // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
+  //
+  // 【2026-08-25】白刃这一支**必须**排在下面两道冲刺闸的前面。
+  // 那两道闸是给枪写的：枪要举平、要压住后坐，冲刺时枪不在肩上所以打不出去。
+  // 刀没有这回事 —— 大刀就是抡起来往前冲的兵器，"边跑边劈"是它唯一的用法。
+  // 排在闸后面的后果是：拿着大刀按住 Shift 冲上去，左键完全没反应
+  // （V 键反倒能挥，因为 V 走 OnAction 不过 TryFire）—— 同一个动作两个键两种结果。
+  if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   // 枪感方子 4：冲刺 → 开火有 0.22 s 的延迟。
   // 实测松开冲刺后视图模型的 sprintSpring 要 771 ms 才回位，
   // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
   // 0.22 s 是「摆回来一大半但还没稳」的点：够短，不至于让人觉得枪卡住了。
   if (player.sprint > 0.35) return;
   if (state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) return;
-  // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
-  if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   if (state.activeSlot === "throwable") {
     if (fireEdge && !state.cooking) BeginCook(state.slots.throwable);
     return;
@@ -2934,6 +3018,9 @@ const _proj = new THREE.Vector3();
 function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
+  // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
+  // 所有分支之前 —— 排进下面任何一条 if 里，都会有一整类帧读不到新数。
+  if (editor) editor.UpdateOverlays(dt);
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
   // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
@@ -3126,11 +3213,7 @@ function Frame(dt, render = true) {
   lights.Update(dt, state.elapsed);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
-  if (gi) {
-    gi.Update(dt, camera.position, lights);
-    // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
-    lights.SetGiActive(gi.uniforms.enabled.value);
-  }
+  // 探针体（gi.Update）不在这里推，它挂在 RenderScene 上 —— 见那里的账。
 
   // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
   // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
@@ -3206,13 +3289,34 @@ function Frame(dt, render = true) {
   });
   // 标准 FPS 规则：准心固定屏幕中心。枪体动画不能拖着 HUD 基准移动；
   // 默认难度下 AimDirection 与 ViewDirection 共轴，开镜时机械瞄具也解到同一中心。
+  // 缝画的是**这一枪真实的散布锥**（player.SpreadDeg），不是手感常数 —— 见 Hud.SetCrosshair。
+  // 大刀与手榴弹没有散布可言，给固定小十字，别拿步枪的锥去骗人。
+  // 判据是 spreadHipDeg（只有枪才有），不是 magazine —— 手榴弹的 magazine 是
+  // "身上还剩几颗"，拿它当"这是一把枪"会让攥着弹的时候画出一个 3° 的假锥。
+  const firearm = Number(weapon?.spreadHipDeg) > 0;
+  const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
   hud.SetCrosshair({
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
       && !state.ordersOpen && !state.cutscene,
-    move: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
+    spreadDeg,
+    fovDeg: camera.fov,
+    viewportHeight: window.innerHeight,
+    armed: firearm,
     sprint: player.sprint,
     ads: player.ads,
+    dt,
   });
+  // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
+  hud.SetTarget(identify.Update(dt, {
+    eye: _idEye.copy(player.EyePosition),
+    dir: player.AimDirection(_idAim),
+    soldiers: ai.soldiers,
+    // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
+    // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
+    detail: player.Alive && !state.ordersOpen && !state.cutscene
+      ? (DIFFICULTY.targetInfo ?? "basic") : false,
+    spreadDeg,
+  }));
   hud.SetSuppression(player.suppression);
   // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
   // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
@@ -3264,6 +3368,20 @@ function Frame(dt, render = true) {
  */
 function RenderScene(dt) {
   const phase = PHASES[state.phaseIndex];
+  // 探针体每帧推一批。**必须挂在这里，不能挂在玩法那条分支上** ——
+  // 出画的路一共四条（玩法 / 过场 / 菜单 / 编辑器），以前只有玩法那条推 GI。
+  // 后果：编辑器一打开玩法就停摆，探针一个都不再收敛，Debug Rendering 面板的
+  // 辐照度图集永远停在 warmed = 0 的全黑上（那不是着色器的问题，是这里没推）；
+  // 过场同理 —— 开场就播过场的关，一整段室内间接光都不收敛。
+  // 摆在 shadowMap.needsUpdate 之前，与它原来在玩法分支里的相对次序一致；
+  // GI 那几趟画的是自己的全屏四边形（那个场景里没有灯），
+  // WebGLShadowMap.render 在 lights.length === 0 时就 return 了，
+  // 不会把 needsUpdate 清掉，这一帧的阴影照常烘。
+  if (gi) {
+    gi.Update(dt, camera.position, lights);
+    // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
+    lights.SetGiActive(gi.uniforms.enabled.value);
+  }
   // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
   // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
   renderer.shadowMap.needsUpdate = true;

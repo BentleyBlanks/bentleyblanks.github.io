@@ -13,7 +13,7 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
   ijaSoldier: "./Model/Model_IjaSoldier.glb?v=8",
-  nraSoldier: "./Model/Model_NraSoldier.glb?v=4",
+  nraSoldier: "./Model/Model_NraSoldier.glb?v=7",
   civilianMale: "./Model/Model_CivilianMale.glb?v=4",
   civilianFemale: "./Model/Model_CivilianFemale.glb?v=4",
 });
@@ -313,15 +313,13 @@ export class SegmentedCharacterSkin {
       thighL: actor.legs.L.thigh, shinL: actor.legs.L.knee, footL: actor.legs.L.ankle,
       thighR: actor.legs.R.thigh, shinR: actor.legs.R.knee, footR: actor.legs.R.ankle,
     };
-    // Imported FBX skin weights are safe for the torso/head, but their rigid
-    // conversion cuts triangles right across wrists, knees and ankles.  Those
-    // seams are exactly where the old runtime body rig already has clean,
-    // pose-tested geometry.  Keep that proven limb chain visible instead of
-    // stretching the imported hands or exposing holes at articulation points.
-    const legacyLimbKeys = new Set([
-      "armL", "foreL", "armR", "foreR",
-      "thighL", "shinL", "footL", "thighR", "shinR", "footR",
-    ]);
+    // The displayed character remains a 13-part rigid rig, but the repaired
+    // Blender segments deliberately overlap at every articulation point.
+    // The NRA Blender asset now supplies overlapping shoulder, elbow, hip,
+    // knee and ankle geometry, plus finished hands and straw sandals.  Keep
+    // those repaired segments visible rather than replacing them with the
+    // older procedural limb chain.
+    const legacyLimbKeys = new Set();
     // 运行时仍使用 13 个刚体关节，兼容现有 normal-depth 预通道；关键区别是
     // 新分段由源 FBX 蒙皮权重和真实 rest bone 枢轴生成，不再按 XYZ 猜身体部位。
     const segments = [];
@@ -336,11 +334,7 @@ export class SegmentedCharacterSkin {
     });
     if (segments.length) {
       this.segmentMode = true;
-      const preservedLimbs = new Set([
-        actor.arms.L.shoulder, actor.arms.L.elbow, actor.arms.R.shoulder, actor.arms.R.elbow,
-        actor.legs.L.thigh, actor.legs.L.knee, actor.legs.L.ankle,
-        actor.legs.R.thigh, actor.legs.R.knee, actor.legs.R.ankle,
-      ]);
+      const preservedLimbs = new Set();
       const hideCoreLegacy = (node) => {
         for (const child of node.children) {
           // A limb joint is a hard stop: traversing from hips through chest

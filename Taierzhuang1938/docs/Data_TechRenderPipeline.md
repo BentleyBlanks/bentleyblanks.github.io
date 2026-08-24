@@ -947,7 +947,9 @@ SH 只有辐照度、没有遮挡，街对面的太阳光会直接漏进屋里 �
 | 背面项 `(dot(dirToProbe, N)*0.5+0.5)²` | 探针在这块面背后就基本不算数 | 墙背面的探针把光带穿过来 |
 | **切比雪夫** | 探针与着色点之间有没有遮挡 | **屋里漏一片天光**，整套白做 |
 
-外加 DDGI 那两条工程细节：法线/视线偏置（把取样点推离表面，免得自遮挡）、以及把极小权重再往下压一档（八个角里混进一个「勉强算数」的会把结果整体带偏）。
+外加 DDGI 那两条工程细节：法线/视线偏置（把取样点推离表面，免得自遮挡）、以及把极小权重再往下压一档（八个角里混进一个「勉强算数」的会把结果整体带偏）。**压制必须落在乘三线性之前**（RTXGI 的 crush 就在那个位置）：格子中央的三线性权重本来只有 1/8 量级，先乘再压等于把所有正常权重一起立方压扁，三线性实质失效，探针之间变成阶跃 —— 界河开阔地上「一格一格跟着人走的分层」就是这么来的。
+
+**距离矩只收「真能挡天空的东西」**（墙、屋顶 —— 顶面离虚拟地面 ≥2.4 m 的盒子）。地面平面与矮障碍（田埂、胸墙、土坎、坟头）只算反弹、不写距离矩：地面对「探针→着色点」不可能是真遮挡（着色点全在平面之上），写进去反而让悬在平面上方几十厘米的探针把整个下半球的均值拉短，16×16 八面体的地平线纹素被污染后，开阔地八个角的权重被整片杀光；矮障碍则是 4 m 格距根本分辨不了，只会产出随体积滚动跳变的假暗斑。
 
 图集里存的是**余弦加权的平均辐射亮度**，取样时乘 π 才是 three 的 `iblIrradiance` 量纲（`getIBLIrradiance()` 返回的就是 `PI * envColor * intensity`）。
 
@@ -1000,9 +1002,14 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 
 正片同样吃 `?gi=0`，画质面板「画质 → 全局光照（探针体）」里有开关与强度。
 
+取样端还有一套假彩色（正片 `?giView=N`，或控制台 `Taierzhuang.library.gi.debugView.value = N`）：
+1 = 探针辐照度×0.05，2 = 被替换前的天空 IBL×0.05，3 = confidence，4 = gi/IBL 亮度比×0.25（与曝光无关，最好用），5 = 权重和×0.5，6 = BaseColor，7 = 粗糙度，8 = 金属度，9 = 太阳阴影因子。控制台还有 `library.gi.chebOff.value = 1` 可以整体旁路切比雪夫做 A/B —— 「画面上哪个通道塌了」用这套看，比拿成图做 diff 快一个数量级。
+
+同一套假彩色也接进了编辑器的 **Debug Rendering** 浮窗（「材质」「光照」两组：BaseColor / 粗糙度 / 金属度 / 太阳阴影 / GI 辐照度 / GI 置信度）：面板负责把材质 uniform 与送屏视图同帧同步，走 hdr 靶的 0-1 直通显示（不过 Reinhard，读数是准的）。前向管线没有 GBuffer，这些通道都是「让材质把该通道当颜色重画一帧」拿到的；low 档材质没有注入，这两组画不可用斜纹。
+
 ### 12.9 已知的近似（都是有意的，别当 bug 修）
 
-- **地面按平面处理**。城内是一块台地，`GroundHeight()` 在体积中心取一次。濠沟斜坡与弹坑的高差（最大约 1 m）在间接光里被忽略。
+- **地面按平面处理**，但平面取体积脚印内的**最低**地面（`ProbeVolume.SampleGroundY`，每次滚动重采样）。曾经取体积中心一点：城内台地没事，界河这种向河槽下降近 2 m 的野外会让整层探针沉到平面之下 —— 朝下的射线打不到平面直接看见天，凹地整片被天光灌成银白，断层正好在地形跌破平面的等值线上。平面放低无光学代价（朗伯地面的出射辐射亮度与距离无关），高于平面的地形起伏仍被忽略。
 - **代理体只有碰撞盒**。没有碰撞盒的东西（薄贴片、旗、烟）对 GI 不存在；反过来，碰撞盒比实际几何体胖的地方，间接光会略偏暗。
 - **反照率按 `tag` 查表**（`GI_ALBEDO`），不是真材质。整座城是青砖 + 夯土 + 土路，色域很窄，这个近似的误差远小于「有没有位置感」的收益。要更准就得让 `BuildSink.Solid()` 记下材质名。
 - **单级 cascade**。体积外（56 m 开外）退回天空 IBL，边缘按 `confidence` 平滑过渡。远景本来就被雾吃掉了。
@@ -1144,6 +1151,8 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 - `Scene.overrideMaterial` 在 r165+ 加了 `material.allowOverride === true` 闸门（module 18102），默认 true —— 意味着 **Sprite / Points / 粒子也会被 override**，几何属性对不上，预通道里蹦出糊在原点的方块，SSAO 直接乱掉。给所有贴片/粒子材质设 `allowOverride = false`，或用 `Layers` 隔离。
 - 预通道覆盖材质忘记 `#include <batching_pars_vertex>` / `<skinning_*>` / `<morph*>` → `InstancedMesh` 的瓦砾全部塌回原点、骨骼角色变成 T-pose 剪影，SSAO 和运动模糊跟着一起废。用 three 的 chunk 拼顶点着色器，别自己写 `projectionMatrix * modelViewMatrix * position`。
 - MRT 必须 `glslVersion: THREE.GLSL3` + 自己写 `layout(location = N) out vec4`。不设的话 three 会注入 `layout(location = 0) out highp vec4 pc_fragColor;` 并 `#define gl_FragColor pc_fragColor`（module 7050），你的第二个 out 要么和它冲突要么永远写不出去。注意 ShaderMaterial 本来就永远是 `#version 300 es`，`varying`/`texture2D` 有兼容 define，所以 chunk 照常可用。
+- ShaderMaterial 的 GLSL 里**不许用 GLSL ES 3.00 的保留字当标识符** —— `sample` 是最容易撞上的一个（`texel`/`texelSample` 都行）。非 Raw 材质永远被前置 `#version 300 es`（module 7039），ESSL 1.00 里能编过的`vec4 sample = texture2D(...)` 到这里直接报 `Illegal use of reserved word`。**编译失败不抛异常**：three 只在控制台打一行 `THREE.WebGLProgram: Shader Error`，那一趟 blit 什么都不画，屏幕留着上一次 clear 的颜色。表现是「某个 pass 恒为纯黑」而其余画面完全正常，极难往着色器上想。同类保留字还有 `filter` / `input` / `output` / `patch` / `resource` / `active` / `common` / `partition`。
+  已发生：`Script_Post.mjs` 的 `FRAG_DEBUG_VIEW` 用了 `sample`，Debug Rendering 面板九个视图全黑，而当时的冒烟只比对 uniform 上的纹理引用，一路全绿。**验一个展示 pass 一定要读回像素**。
 - 自己的 pass 里想采样 `sun.shadow.map.depthTexture`：`PCFShadowMap` 下它的 `compareFunction = LessEqualCompare`，此时它是 shadow 采样器纹理，用 `uniform sampler2D` 绑定是未定义行为（多数驱动返回 0 → 全屏黑雾）。必须声明 `uniform highp sampler2DShadow`，用 `texture(s, vec3(uv, z))` 取。
 - `onBeforeCompile` 改了 shader 却不改 `customProgramCacheKey()`：three 的程序缓存键里含 `material.customProgramCacheKey()`（module 7755），默认返回 `onBeforeCompile.toString()`。两个材质用同一个 onBeforeCompile 函数但注入不同参数（比如不同三平面 scale 走 defines）会共用同一份编译程序 —— 表现为“改了一个材质，另一个也跟着变”。
 - `preserveDrawingBuffer: false`（默认）时 `canvas.toDataURL()` / `toBlob()` 在 rAF 之外调用会得到全黑。截图必须在渲染完成的**同一个 tick 内同步**取；或临时开 `preserveDrawingBuffer: true`（代价是每帧多一次拷贝，别在正式档开）。playwright 无头截图同理 —— 要在 `requestAnimationFrame` 回调里抓。

@@ -43,12 +43,16 @@ def _Src(name):
 # 运行时统一绑 steel/wood 两套 512px authored PBR（见 Data_SourceLicenses.md）。
 SOURCES = {
     "ZhongZheng": {
-        "file": "Model_Kar98k.obj",
+        "file": os.path.join("Model_PolyHavenBoltActionRifle762",
+                             "bolt_action_rifle_7_62_1k.gltf"),
         "lengthM": 1.110,
         "kind": "rifle",
-        "matIndex": {0: "wood", 1: "steel", 2: "steel"},
-        "note": "CC0 Kar98k（OpenGameArt / byzmod3d）→ 中正式。中正式是毛瑟标准型短管，"
-                "剪影与 Kar98k 同族，全长按史实 1.110 m 缩放。",
+        "colorSplit": True,
+        "skip": ("bolt_action_rifle_7_62_scope", "bolt_action_rifle_7_62_wrap",
+                 "bolt_action_rifle_7_62_bullet_54mm"),
+        "note": "CC0 Bolt Action Rifle 7.62（Poly Haven）→ 中正式。去掉现代瞄准镜、"
+                "包布与独立子弹，只保留木托、机匣、枪机、扳机和机械瞄具；"
+                "全长按中正式史实 1.110 m 缩放。",
     },
     "HanYang": {
         "file": os.path.join("Model_Gewehr88", "scene.gltf"),
@@ -74,6 +78,12 @@ SOURCES = {
                        "Sling_BackStock": "wood", "Sling2": "wood"},
         "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
                    "magY": BORE - 0.036, "magZ": -0.060},
+        # The first-person eye sits 140 mm behind the sight.  Keep the rear
+        # receiver and stock as a separately named node so the viewmodel can
+        # hide only that near-plane geometry while aiming; leaving it merged
+        # into the steel/wood body turns its clipped cross-section into a
+        # screen-filling rectangular block.
+        "adsNearZ": -0.112,
         "note": "CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）→ 三八式。"
                 "防尘滑盖、直拉机柄、护翼准星、两道箍与通条齐备；全长按史实 1.276 m。",
     },
@@ -87,6 +97,20 @@ SOURCES = {
         "kind": "pistol",
         "skip": ("Boom", "Reload", "Near"),
         "note": "CC0 Mauser C96（itch.io / Plewr）。Boom 是枪口焰网格，丢掉。",
+    },
+    "ServicePistol": {
+        "file": os.path.join("Model_PolyHavenServicePistol", "service_pistol_1k.gltf"),
+        "lengthM": 0.222,
+        "kind": "pistol",
+        # 页面里的上下两把其实是同一支枪的闭锁 / 空仓挂机状态。实战模型使用
+        # pistol_a（套筒闭合），pistol_b 留作来源参考，不把一支开膛枪塞进枪套。
+        "skip": ("service_pistol_pistol_b", "service_pistol_slide_b",
+                 "service_pistol_hammer_b", "service_pistol_trigger_b",
+                 "service_pistol_magazine_loaded", "service_pistol_magazine_empty",
+                 "service_pistol_bullet"),
+        "noDetails": True,
+        "note": "CC0 Service Pistol（Poly Haven）。保留闭锁状态 A 的枪身、套筒、"
+                "击锤与扳机，移除展示用弹匣、子弹及空仓挂机状态 B；全长 0.222 m。",
     },
 }
 
@@ -570,6 +594,33 @@ def _Mounts(node, length_m, kind, lo, hi, spec):
     node.Child("magazine", t=(0.0, cfg["magY"], cfg["magZ"]))
 
 
+def _SplitAdsNear(bm, cut_z):
+    """Split faces behind ``cut_z`` into an ADS-only hide node.
+
+    Imported rifles arrive as one bmesh per material.  At ADS the camera is
+    intentionally aligned to the sight, so the rear receiver/stock straddles
+    its near plane.  Keeping those faces in the normal body mesh produces a
+    large clipped rectangle.  A face-level split retains the full asset for
+    world/hip views and gives the first-person rig a precise hide target.
+    """
+    body = bm.copy()
+    near = bm.copy()
+    for part, want_near in ((body, False), (near, True)):
+        drop = []
+        for face in part.faces:
+            center_z = sum(vertex.co.z for vertex in face.verts) / len(face.verts)
+            is_near = center_z > cut_z
+            if is_near != want_near:
+                drop.append(face)
+        if drop:
+            bmesh.ops.delete(part, geom=drop, context="FACES")
+        loose = [vertex for vertex in part.verts if not vertex.link_faces]
+        if loose:
+            bmesh.ops.delete(part, geom=loose, context="VERTS")
+        part.normal_update()
+    return body, near
+
+
 def BuildImported(name):
     spec = SOURCES[name]
     path = _Src(spec["file"])
@@ -606,6 +657,22 @@ def BuildImported(name):
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")
+    cut_z = spec.get("adsNearZ")
+    if cut_z is not None:
+        steel, near_steel = _SplitAdsNear(steel, cut_z)
+        if wood is not None:
+            wood, near_wood = _SplitAdsNear(wood, cut_z)
+        else:
+            near_wood = None
+        ads_near = root.Child("adsNear")
+        if near_wood is not None and near_wood.faces:
+            ads_near.Add("wood", near_wood, tile=T_WOOD)
+        elif near_wood is not None:
+            near_wood.free()
+        if near_steel.faces:
+            ads_near.Add("steel", near_steel, tile=T_STEEL)
+        else:
+            near_steel.free()
     if wood is not None:
         body.Add("wood", wood, tile=T_WOOD)
     body.Add("steel", steel, tile=T_STEEL)
