@@ -13,7 +13,7 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
   ijaSoldier: "./Model/Model_IjaSoldier.glb?v=8",
-  nraSoldier: "./Model/Model_NraSoldier.glb?v=4",
+  nraSoldier: "./Model/Model_NraSoldier.glb?v=5",
   civilianMale: "./Model/Model_CivilianMale.glb?v=4",
   civilianFemale: "./Model/Model_CivilianFemale.glb?v=4",
 });
