@@ -364,5 +364,13 @@
       "license": "volcengine"
     }
   },
-  "bakedAt": "2026-08-24"
+  "bakedAt": "2026-08-24",
+  "normalization": {
+    "normalizedAt": "2026-08-25",
+    "tool": "Script_AudioNormalize.mjs",
+    "peakCeilingDbfs": -1,
+    "metric": "activeRmsDbfs",
+    "targetDbfs": -25,
+    "toleranceDb": 0.5
+  }
 }
