@@ -54,7 +54,7 @@ import {
   simulationConfig,
   UpdateEnemyIntel,
 } from "./Script_Rules.mjs";
-import { CreateWorld } from "./Script_World.mjs";
+import { CreateWorld } from "./Script_World.mjs?v=20260824j";
 
 const saveKey = "mountainember1941_campaign_v1";
 const settingKey = "mountainember1941_settings_v1";

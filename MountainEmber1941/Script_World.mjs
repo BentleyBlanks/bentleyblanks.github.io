@@ -25,12 +25,12 @@ const terrainPalette = Object.freeze({
 });
 
 const artAssetPaths = Object.freeze({
-  qinSuqiu: "./Models/Model_OperativeScout.glb",
-  hanShilei: "./Models/Model_OperativeSapper.glb",
-  luLanzhi: "./Models/Model_OperativeMedic.glb",
-  weiShouyi: "./Models/Model_OperativeGunner.glb",
-  enemyRifleman: "./Models/Model_EnemyRifleman.glb",
-  enemyLeader: "./Models/Model_EnemyLeader.glb",
+  qinSuqiu: "./Models/Model_OperativeScout.glb?v=20260824j",
+  hanShilei: "./Models/Model_OperativeSapper.glb?v=20260824j",
+  luLanzhi: "./Models/Model_OperativeMedic.glb?v=20260824j",
+  weiShouyi: "./Models/Model_OperativeGunner.glb?v=20260824j",
+  enemyRifleman: "./Models/Model_EnemyRifleman.glb?v=20260824j",
+  enemyLeader: "./Models/Model_EnemyLeader.glb?v=20260824j",
 });
 
 const environmentArtAssets = Object.freeze({
