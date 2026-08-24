@@ -698,11 +698,61 @@ def AddLimb(name, parent, sideOffset, shoulderHeight, length, material, targetCo
     targetCollection.objects.link(pivotObject)
     pivotObject.parent = parent
     pivotObject.location = (sideOffset, 0.0, shoulderHeight)
-    limbName = name.replace("Pivot", "Mesh")
-    limbScale = (0.13 if isLeg else 0.11, 0.13 if isLeg else 0.11, length)
-    limbObject = AddCylinder(limbName, (sideOffset, 0.0, shoulderHeight - length * 0.52), limbScale[0], length, material, targetCollection, vertices=14)
-    limbObject.parent = pivotObject
-    limbObject.matrix_parent_inverse = pivotObject.matrix_world.inverted()
+
+    # The tactical camera sees an actor at a very oblique angle.  A single long,
+    # bevelled cylinder reads as detached at its shoulder/hip and snaps apart at
+    # the middle once the animation rotates it.  Build one continuous limb around
+    # the same runtime pivot: overlapping upper and lower sleeves/trousers are
+    # covered by a rounded elbow/knee, and the root cap reaches into the torso.
+    # Everything remains under this one pivot so the existing runtime animation
+    # contract (four named pivots and five baked render meshes) is unchanged.
+    limbRadius = 0.13 if isLeg else 0.11
+    jointRadius = 0.168 if isLeg else 0.145
+    upperLength = length * 0.51
+    lowerLength = length * 0.53
+    jointHeight = shoulderHeight - upperLength * 0.94
+
+    def ParentLimbPart(partObject):
+        partObject.parent = pivotObject
+        partObject.matrix_parent_inverse = pivotObject.matrix_world.inverted()
+        return partObject
+
+    ParentLimbPart(AddSphere(
+        name.replace("Pivot", "RootJoint"),
+        (sideOffset, 0.0, shoulderHeight),
+        (jointRadius, jointRadius, jointRadius),
+        material,
+        targetCollection,
+        segments=14,
+        rings=8,
+    ))
+    ParentLimbPart(AddCylinder(
+        name.replace("Pivot", "UpperMesh"),
+        (sideOffset, 0.0, shoulderHeight - upperLength * 0.49),
+        limbRadius,
+        upperLength,
+        material,
+        targetCollection,
+        vertices=14,
+    ))
+    ParentLimbPart(AddSphere(
+        name.replace("Pivot", "MiddleJoint"),
+        (sideOffset, 0.0, jointHeight),
+        (jointRadius, jointRadius, jointRadius),
+        material,
+        targetCollection,
+        segments=14,
+        rings=8,
+    ))
+    ParentLimbPart(AddCylinder(
+        name.replace("Pivot", "LowerMesh"),
+        (sideOffset, 0.0, jointHeight - lowerLength * 0.49),
+        limbRadius * 0.94,
+        lowerLength,
+        material,
+        targetCollection,
+        vertices=14,
+    ))
     if isLeg:
         bootMaterial = MakeMaterial("Material_BootLeather", (0.105, 0.075, 0.048), 0.9)
         bootObject = AddCube(
@@ -713,8 +763,7 @@ def AddLimb(name, parent, sideOffset, shoulderHeight, length, material, targetCo
             targetCollection,
             bevel=0.055,
         )
-        bootObject.parent = pivotObject
-        bootObject.matrix_parent_inverse = pivotObject.matrix_world.inverted()
+        ParentLimbPart(bootObject)
     else:
         skinMaterial = MakeMaterial("Material_CharacterHands", (0.48, 0.34, 0.24), 0.9)
         handObject = AddSphere(
@@ -726,8 +775,7 @@ def AddLimb(name, parent, sideOffset, shoulderHeight, length, material, targetCo
             segments=14,
             rings=8,
         )
-        handObject.parent = pivotObject
-        handObject.matrix_parent_inverse = pivotObject.matrix_world.inverted()
+        ParentLimbPart(handObject)
     return pivotObject
 
 

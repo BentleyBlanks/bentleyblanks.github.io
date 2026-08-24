@@ -785,6 +785,24 @@ function TestStaticPageContract() {
   assert.equal(quarryExtras?.terrainOwnership, "ThreeJsCanonical", "The exported quarry GLB must defer all terrain height to the shared Three.js terrain mesh.");
   assert.equal(quarryExtras?.broadTerrainSlabs, 0, "The exported quarry GLB must certify that it contains no broad terrain slabs.");
   assert.equal(quarryExtras?.landmarkContract, "track|oreCarts|sheds|blockhouse|walls|timberSupports|telephonePoles", "The exported quarry GLB must retain its operation-specific landmark contract.");
+  assert.match(blenderBuildScript, /RootJoint[\s\S]*UpperMesh[\s\S]*MiddleJoint[\s\S]*LowerMesh/, "Character limbs must contain overlapping root, upper, middle-joint, and lower geometry instead of detached single cylinders.");
+  for (const characterFileName of [
+    "Model_OperativeScout.glb",
+    "Model_OperativeSapper.glb",
+    "Model_OperativeMedic.glb",
+    "Model_OperativeGunner.glb",
+    "Model_EnemyRifleman.glb",
+    "Model_EnemyLeader.glb",
+  ]) {
+    const characterGlb = fs.readFileSync(path.join(currentDirectory, "Models", characterFileName));
+    const characterJsonLength = characterGlb.readUInt32LE(12);
+    const characterJson = JSON.parse(characterGlb.subarray(20, 20 + characterJsonLength).toString("utf8").replace(/\0+$/, ""));
+    const characterNodes = characterJson.nodes ?? [];
+    assert.equal(characterNodes.filter((node) => Number.isInteger(node.mesh)).length, 5, `${characterFileName} must retain its body plus four articulated limb render meshes.`);
+    for (const pivotName of ["Arm_L_Pivot", "Arm_R_Pivot", "Leg_L_Pivot", "Leg_R_Pivot"]) {
+      assert.ok(characterNodes.some((node) => node.name?.includes(pivotName)), `${characterFileName} must retain ${pivotName} for runtime animation.`);
+    }
+  }
   assert.match(worldScript, /function ApplyCameraImpact\(kind = "shot", intensity = 0\.5\)/, "The WebGL world must expose bounded camera impacts.");
   assert.match(worldScript, /ApplyCameraImpact,\s*\n\s*HasActiveEffects/, "Camera impact must be part of the public world contract.");
   assert.match(worldScript, /function SpawnImpact\(/, "World feedback must implement a bounded impact-particle effect.");
