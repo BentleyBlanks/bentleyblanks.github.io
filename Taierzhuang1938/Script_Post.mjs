@@ -580,6 +580,43 @@ void main() {
 }
 `;
 
+// 渲染调试页的专用展示 pass。所有中间靶都保持在线性/HDR 空间，不能直接
+// Copy 到屏幕：法线会偏暗、辐照度图集会一片白，深度更是只剩黑。这里按
+// 类型做最小限度的可读化，不改变任何供正式合成使用的纹理。
+const FRAG_DEBUG_VIEW = /* glsl */`
+  uniform sampler2D uSource;
+  uniform float uMode;
+  uniform float uUnavailable;
+  varying vec2 vUv;
+
+  vec3 ToSrgb(vec3 c) {
+    return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2));
+  }
+
+  void main() {
+    if (uUnavailable > 0.5) {
+      float stripe = step(0.5, fract((vUv.x + vUv.y) * 22.0));
+      gl_FragColor = vec4(mix(vec3(0.12, 0.012, 0.018), vec3(0.55, 0.03, 0.08), stripe), 1.0);
+      return;
+    }
+    vec4 sample = texture2D(uSource, vUv);
+    vec3 color = sample.rgb;
+    if (uMode < 0.5) {                 // 法线：[-1, 1] -> [0, 1]
+      color = color * 0.5 + 0.5;
+    } else if (uMode < 1.5) {          // 线性视深：近亮、远暗，80m 对应黑
+      float depth = 1.0 - clamp(sample.a / 80.0, 0.0, 1.0);
+      color = vec3(depth);
+    } else if (uMode < 2.5) {          // AO 本来就是可显示的遮蔽量
+      color = vec3(sample.r);
+    } else if (uMode < 3.5) {          // 距离图集：均值 / 不确定度 = R / G
+      color = vec3(sample.r, sample.g, 0.0);
+    } else {                           // HDR / 辐照度：Reinhard + sRGB
+      color = color / (color + vec3(1.0));
+      color = ToSrgb(color);
+    }
+    gl_FragColor = vec4(color, 1.0);
+  }`;
+
 /**
  * 把一份材质排除在深度法线预通道之外。
  *
@@ -713,6 +750,14 @@ export class PostPipeline {
     };
     this.matFxaa = this._Mat(FRAG_FXAA, this.uniformsFxaa);
 
+    this.uniformsDebug = {
+      uSource: { value: null }, uMode: { value: 4 }, uUnavailable: { value: 0 },
+    };
+    this.matDebug = this._Mat(FRAG_DEBUG_VIEW, this.uniformsDebug);
+    // final 之外的值只在开发用面板明确要求时才生效；正式出图完全不走这里。
+    this.debugView = "final";
+    this.debugGi = null;
+
     this.prevViewProjection = new THREE.Matrix4();
     this.sunWorld = new THREE.Vector3();
     this.hasPrev = false;
@@ -793,6 +838,38 @@ export class PostPipeline {
    * 合成 pass 的雾明写跳过 w = 0 的天空，粒子得自己接上那一半。
    */
   get NormalDepthTexture() { return this.targets.normalDepth.texture; }
+
+  /**
+   * 让独立的渲染调试面板选择当前帧最终送往屏幕的中间结果。
+   * 这个状态故意不进玩家设置，也不影响正式合成链，只在面板存活期间保留。
+   */
+  SetDebugView(view = "final", gi = null) {
+    this.debugView = view || "final";
+    this.debugGi = gi || null;
+  }
+
+  GetDebugView() { return this.debugView; }
+
+  _GetDebugSource() {
+    const T = this.targets;
+    switch (this.debugView) {
+      case "normal": return { texture: T.normalDepth.texture, mode: 0 };
+      case "depth": return { texture: T.normalDepth.texture, mode: 1 };
+      case "ao": return { texture: T.ao.texture, mode: 2, unavailable: !this.preset.ssao };
+      case "aoBlur": return { texture: T.aoBlur.texture, mode: 2, unavailable: !this.preset.ssao };
+      case "hdr": return { texture: T.hdr.texture, mode: 4 };
+      case "bloom": return { texture: this.bloomMips[0]?.texture, mode: 4 };
+      case "giIrradiance": return {
+        texture: this.debugGi?.irradiance?.[this.debugGi.pingPong]?.texture,
+        mode: 4, unavailable: !this.debugGi,
+      };
+      case "giDistance": return {
+        texture: this.debugGi?.distanceMoments?.[this.debugGi.pingPong]?.texture,
+        mode: 3, unavailable: !this.debugGi,
+      };
+      default: return null;
+    }
+  }
 
   /**
    * 收集这一帧要在预通道里整个藏掉的对象（userData.skipNormalDepth === true）。
@@ -997,11 +1074,19 @@ export class PostPipeline {
     U.uPrevViewProjection.value.copy(this.prevViewProjection);
     this._Blit(this.matComposite, T.ldr);
 
-    // --- 7) FXAA + 锐化 -> 屏幕 ---
-    this.uniformsFxaa.uSource.value = T.ldr.texture;
-    this.uniformsFxaa.uTexel.value.set(1 / this.width, 1 / this.height);
-    this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.preset.sharpen;
-    this._Blit(this.matFxaa, null);
+    // --- 7) FXAA + 锐化 -> 屏幕；调试时改为展示指定的中间靶 ---
+    const debug = this._GetDebugSource();
+    if (debug) {
+      this.uniformsDebug.uSource.value = debug.texture || T.ldr.texture;
+      this.uniformsDebug.uMode.value = debug.mode;
+      this.uniformsDebug.uUnavailable.value = debug.unavailable || !debug.texture ? 1 : 0;
+      this._Blit(this.matDebug, null);
+    } else {
+      this.uniformsFxaa.uSource.value = T.ldr.texture;
+      this.uniformsFxaa.uTexel.value.set(1 / this.width, 1 / this.height);
+      this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.preset.sharpen;
+      this._Blit(this.matFxaa, null);
+    }
 
     // 记录本帧 viewProjection，下一帧的运动模糊要用
     this.prevViewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -1012,7 +1097,7 @@ export class PostPipeline {
     for (const rt of Object.values(this.targets)) rt.dispose();
     for (const rt of this.bloomMips) rt.dispose();
     for (const m of [this.matAo, this.matAoBlur, this.matBright, this.matDown,
-      this.matUp, this.matGod, this.matComposite, this.matFxaa, this.normalDepthMaterial]) m.dispose();
+      this.matUp, this.matGod, this.matComposite, this.matFxaa, this.matDebug, this.normalDepthMaterial]) m.dispose();
   }
 }
 

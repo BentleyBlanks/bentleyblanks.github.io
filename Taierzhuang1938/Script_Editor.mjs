@@ -32,6 +32,7 @@ import { SceneEditor } from "./Script_EditorScene.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { TerrainEditor } from "./Script_EditorTerrain.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
+import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -49,6 +50,8 @@ const EDITORS = [
   SceneEditor, PropLibraryEditor, TerrainEditor, DestructionEditor,
 ];
 const ALL = [...SETTINGS, ...EDITORS];
+// 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
+const OVERLAYS = [DebugRenderingEditor];
 
 export class EditorSuite {
   /**
@@ -64,6 +67,7 @@ export class EditorSuite {
     this.shot = !!host.shot;
     this.active = null;
     this.activeId = null;
+    this.overlays = new Map();
     this.panelOpen = false;
     this.entries = new Map();
     // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
@@ -100,6 +104,7 @@ export class EditorSuite {
     return {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
       library: host.library, lights: host.lights, post: host.post, vfx: host.vfx,
+      gi: host.game.gi,
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,
@@ -116,6 +121,7 @@ export class EditorSuite {
         suite.worldEditDocument = data ? JSON.parse(JSON.stringify(data)) : null;
       },
       Close: () => suite.Close(),
+      CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
     };
   }
 
@@ -189,6 +195,7 @@ export class EditorSuite {
       body.appendChild(section);
     }
     Group("设置", SETTINGS);
+    Group("渲染调试（可叠加）", OVERLAYS);
     Group("编辑器", EDITORS);
 
     const off = El("div", "edBtn wide danger", "全部关掉");
@@ -223,7 +230,9 @@ export class EditorSuite {
   }
 
   RefreshStatus() {
-    for (const [id, button] of this.entries) button.classList.toggle("on", id === this.activeId);
+    for (const [id, button] of this.entries) {
+      button.classList.toggle("on", id === this.activeId || this.overlays.has(id));
+    }
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
     // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
@@ -237,9 +246,10 @@ export class EditorSuite {
       if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(silenceBackground);
     }
     if (this.status) {
+      const overlayNote = this.overlays.size ? " · 渲染调试叠加中" : "";
       this.status.textContent = this.active
-        ? `${this.activeId} 接管中 · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}`
-        : "玩法已暂停（面板开着）";
+        ? `${this.activeId} 接管中 · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}${overlayNote}`
+        : `玩法已暂停（面板开着）${overlayNote}`;
     }
     document.body.classList.toggle("edHideHud", !!this.active);
   }
@@ -258,12 +268,43 @@ export class EditorSuite {
   }
 
   Toggle(id) {
+    if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     if (this.activeId === id) this.Close();
     else this.Open(id);
   }
 
+  /** 叠加工具不参与 active 的互斥规则；切换场景/地形等工具时必须留下它。 */
+  ToggleOverlay(id) {
+    if (this.overlays.has(id)) {
+      this.CloseOverlay(id);
+      return null;
+    }
+    const Editor = OVERLAYS.find((editor) => editor.id === id);
+    if (!Editor) return null;
+    const overlay = new Editor(this.editorHost);
+    this.overlays.set(id, overlay);
+    try {
+      overlay.Enter(this.workHost);
+    } catch (error) {
+      console.error(`[Editor] ${id} 打不开：`, error);
+      this.overlays.delete(id);
+      return null;
+    }
+    this.RefreshStatus();
+    return overlay;
+  }
+
+  CloseOverlay(id) {
+    const overlay = this.overlays.get(id);
+    if (!overlay) return;
+    try { overlay.Exit(); } catch (error) { console.error(`[Editor] 关闭 ${id} 出错：`, error); }
+    this.overlays.delete(id);
+    this.RefreshStatus();
+  }
+
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
+    if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     const Editor = ALL.find((e) => e.id === id);
     if (!Editor) return null;
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
@@ -300,6 +341,10 @@ export class EditorSuite {
     this.viewport.enabled = false;
     this.SetHint("");
     this.SetCrosshair(false);
+    // 只有「完全关闭」才收叠加窗。编辑器之间的切换要保留 Debug Rendering。
+    if (!switching) {
+      for (const id of [...this.overlays.keys()]) this.CloseOverlay(id);
+    }
     this.RefreshStatus();
     if (!switching) this.host.game.FinishEditorSession?.();
   }
@@ -374,6 +419,12 @@ export class EditorSuite {
   // -------------------------------------------------------------------------
 
   Update(dt) {
+    for (const [id, overlay] of this.overlays) {
+      try { overlay.Update(dt); } catch (error) {
+        console.error(`[Editor] ${id} 每帧出错，已关掉：`, error);
+        this.CloseOverlay(id);
+      }
+    }
     if (!this.active) return;
     try {
       this.active.Update(dt);

@@ -984,6 +984,8 @@ async function Boot() {
   window.Taierzhuang.Debug.Editor = () => ({
     panelOpen: editor.panelOpen,
     active: editor.ActiveId,
+    debugRendering: editor.overlays.has("debugRendering"),
+    debugView: post.GetDebugView(),
     capturing: editor.Capturing,
     studio: editor.studio.Active,
     fly: editor.flycam.Active,

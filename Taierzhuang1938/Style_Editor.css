@@ -49,6 +49,8 @@
 .edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 76px); }
 .edPanel.work { right: 14px; width: 320px; }
 .edPanel.wide { width: 396px; }
+/* 渲染调试是可叠加浮窗：避开左侧入口与右侧的互斥编辑器，不抢它们的位置。 */
+.edPanel.debugRendering { left: 238px; right: auto; width: 368px; bottom: 18px; }
 
 .edHead {
   flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
@@ -233,5 +235,6 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   .edPanel.launcher { width: 160px; }
   .edPanel.work { width: 250px; }
   .edPanel.wide { width: 280px; }
+  .edPanel.debugRendering { left: 174px; width: min(280px, calc(100% - 188px)); }
   .edControlGrid { grid-template-columns: 1fr; }
 }

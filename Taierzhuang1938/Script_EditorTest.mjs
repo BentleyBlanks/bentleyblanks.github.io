@@ -109,8 +109,8 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 八个编辑器 + 一个「全部关掉」
-Check("面板列出三个设置与八个编辑器入口", afterGear.entries === 12, `按钮数=${afterGear.entries}`);
+// 三个设置 + 一个可叠加渲染调试 + 八个编辑器 + 一个「全部关掉」
+Check("面板列出设置、渲染调试与八个编辑器入口", afterGear.entries === 13, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -125,10 +125,49 @@ Check("面板开着时玩法暂停",
   && paused.before.x === paused.after.x && paused.before.z === paused.after.z,
   `开火 ${paused.before.fire}→${paused.after.fire}`);
 
+// Debug Rendering 是观察工具，不可被互斥编辑器的切换顺手销毁。它要真的把
+// NormalDepth 靶送到屏幕，不能只是 DOM 面板里一串假的状态文字。
+await page.click('[data-editor="debugRendering"]');
+await Step(6);
+const debugRendering = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const panel = T.editor.overlays.get("debugRendering");
+  const visible = {};
+  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance"]) {
+    panel.SetView(view);
+    T.StepFrames(2);
+    const source = T.post._GetDebugSource();
+    const expected = view === "normal" || view === "depth"
+      ? T.post.targets.normalDepth.texture
+      : view === "ao" ? T.post.targets.ao.texture
+        : view === "aoBlur" ? T.post.targets.aoBlur.texture
+          : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
+            : T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
+    visible[view] = source?.texture === expected;
+  }
+  panel.SetView("normal");
+  T.StepFrames(3);
+  return {
+    editor: T.Debug.Editor(),
+    panel: !!document.querySelector(".edPanel.debugRendering"),
+    view: T.post.GetDebugView(),
+    target: !!T.post.targets.normalDepth,
+    visible,
+  };
+});
+Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
+  && debugRendering.panel && debugRendering.view === "normal" && debugRendering.target
+  && Object.values(debugRendering.visible).every(Boolean),
+JSON.stringify(debugRendering));
+
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
 await page.click('[data-editor="scene"]');
 await Step(4);
+const debugOverlayPersists = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
+Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "scene"
+  && debugOverlayPersists.debugRendering && debugOverlayPersists.debugView === "normal",
+JSON.stringify(debugOverlayPersists));
 const sliderFound = await page.locator('.edPanel.work input[type="range"]').count();
 if (sliderFound) await page.click('.edPanel.work input[type="range"]');
 await page.keyboard.down("w");
