@@ -91,6 +91,7 @@ export function InjectIndirectLighting(material, { ssao = null, gi = null, destr
       fragment = fragment
         .replace("#include <common>", `#include <common>
         varying vec3 vGiWorldPos;
+        vec3 gGiDebugColor = vec3(0.0);
 ${GI_SAMPLE_GLSL}`)
         .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
@@ -102,6 +103,20 @@ ${GI_SAMPLE_GLSL}`)
           vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
           // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
           giConfidence *= uGiEnabled;
+          // ?giView= 假彩色取证：1 探针辐照度×0.05 / 2 被替换前的天空 IBL×0.05 /
+          // 3 confidence / 4 gi 与 IBL 的亮度比×0.25（与曝光无关，1.0 的比值显示为 0.25 灰）。
+          // 在 mix 之前抓，末端 <dithering_fragment> 处整帧覆盖输出。
+          if (uGiDebugView > 0.5) {
+            if (uGiDebugView < 1.5) gGiDebugColor = giIrradiance * 0.05;
+            else if (uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
+            else if (uGiDebugView < 3.5) gGiDebugColor = vec3(giConfidence);
+            else if (uGiDebugView < 4.5) {
+              float giDbgL = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
+              float iblDbgL = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+              gGiDebugColor = vec3(giDbgL / iblDbgL * 0.25);
+            }
+            else gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
+          }
           if (giConfidence > 0.0) {
             #if defined( RE_IndirectSpecular )
             float giSkyLum = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
@@ -112,7 +127,9 @@ ${GI_SAMPLE_GLSL}`)
             iblIrradiance = mix(iblIrradiance, giIrradiance, giConfidence);
           }
         }
-        #endif`);
+        #endif`)
+        .replace("#include <dithering_fragment>", `#include <dithering_fragment>
+        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
     }
 
     if (destruction) {

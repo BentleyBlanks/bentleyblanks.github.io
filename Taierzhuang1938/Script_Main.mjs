@@ -230,6 +230,8 @@ const graphics = {
 // trace/blend pass。low 档没有配置，仍按原规则不建。
 const GI_ON = GI_QUALITY[QUALITY] != null;
 const giUniforms = MakeGiUniforms();
+// GI 取样端假彩色（?giView=1 探针辐照度 / 2 天空 IBL / 3 confidence），开发取证用
+giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
   destruction: destructionUniforms,

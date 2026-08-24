@@ -164,6 +164,9 @@ uniform float uGiIntensity;
 uniform float uGiNormalBias;
 uniform float uGiSpecularOcclusion;
 uniform float uGiEnabled;
+uniform float uGiDebugView;
+uniform float uGiChebOff;      // 取证实验开关：1 = 跳过切比雪夫项（只留三线性+背面）
+float gGiDbgWeightSum = 0.0;   // 取证输出：最近一次 GiSampleIrradiance 的权重和
 
 vec3 GiStorageCoord(vec3 grid) {
   return mod(grid + uGiBaseCell, uGiCounts);
@@ -207,21 +210,21 @@ vec3 GiSampleIrradiance(vec3 worldPos, vec3 worldNormal, vec3 worldView, out flo
 
     vec3 probePos = uGiOrigin + grid * uGiSpacing + meta.xyz;
     vec3 tri = mix(1.0 - frac, frac, corner);
-    float w = tri.x * tri.y * tri.z;
 
     vec3 toProbe = probePos - worldPos;
     float toProbeLen = length(toProbe);
     vec3 dirToProbe = toProbeLen > 1e-4 ? toProbe / toProbeLen : worldNormal;
-    // 背面项（DDGI 的 smooth backface）：平方一下，让「勉强在正面」的探针也退下去
+    // 背面项（DDGI 的 smooth backface）：平方一下，让「勉强在正面」的探针也退下去。
+    // 注意 w 从背面项起步，**三线性最后才乘**（见下面 crush 处的说明）。
     float backface = dot(dirToProbe, worldNormal) * 0.5 + 0.5;
-    w *= backface * backface + 0.05;
+    float w = backface * backface + 0.05;
 
     // 切比雪夫可见性
     vec3 fromProbe = biased - probePos;
     float dist = length(fromProbe);
     vec2 moments = texture2D(uGiDistance, GiAtlasUv(storage, fromProbe, uGiDistTexels, uGiDistAtlas)).rg;
     float mean = moments.x;
-    if (dist > mean) {
+    if (dist > mean && uGiChebOff < 0.5) {
       float variance = abs(mean * mean - moments.y);
       float diff = dist - mean;
       float cheb = variance / (variance + diff * diff);
@@ -229,13 +232,18 @@ vec3 GiSampleIrradiance(vec3 worldPos, vec3 worldNormal, vec3 worldView, out flo
     }
 
     w = max(w, 1e-5);
-    // 极小权重再往下压一档：八个角里混进一个「勉强算数」的会把结果整体带偏
+    // 极小权重再往下压一档：八个角里混进一个「勉强算数」的会把结果整体带偏。
+    // 必须压在**乘三线性之前**（RTXGI 的 crush 就是这么放的）：格子中央的三线性
+    // 权重本来只有 1/8 量级，先乘再压会把所有正常权重一起立方压扁 ——
+    // 三线性插值实质失效，探针之间成了阶跃，地面上就是一格一格的「分层」。
     if (w < 0.2) w *= (w * w) / 0.04;
+    w *= max(tri.x * tri.y * tri.z, 1e-3);
 
     sum += texture2D(uGiIrradiance, GiAtlasUv(storage, worldNormal, uGiIrrTexels, uGiIrrAtlas)).rgb * w;
     weightSum += w;
   }
 
+  gGiDbgWeightSum = weightSum;
   if (weightSum <= 1e-6) return vec3(0.0);
   confidence = edge;
   // 图集里存的是余弦加权的**平均辐射亮度**；three 的 iblIrradiance 是 π×L 的量纲
@@ -303,12 +311,19 @@ void main() {
   vec3 bestNormal = vec3(0.0, 1.0, 0.0);
   vec3 bestAlbedo = vec3(0.0);
   bool hit = false;
+  float bestOccluder = 1.0;   // 命中物算不算遮挡（见 RebuildBoxes 的 a 位）；地面恒算
 
   // 地面：城内是一块台地，这里按平面处理（濠沟/弹坑的误差记在文档里）
+  // 地面对「探针→着色点」的可见性**不可能是真遮挡**（着色点全在平面之上），
+  // 但它写进距离矩就成了假遮挡：探针悬在平面上方几十厘米到几米，朝下/掠射
+  // 方向的均值全是到平面的短距离，16×16 的八面体一个纹素 22.5°，地平线纹素
+  // 被下半球的短距离污染 —— 开阔地上八个角的权重被整片杀光，取样退化成
+  // 1e-5 保底权重的混合，色块跟着探针网格滚动。所以地面只算反弹、不算遮挡。
   if (dir.y < -1e-4 && origin.y > uGroundY) {
     float t = (uGroundY - origin.y) / dir.y;
     if (t > 0.001 && t < best) {
       best = t; bestNormal = vec3(0.0, 1.0, 0.0); bestAlbedo = uGroundAlbedo; hit = true;
+      bestOccluder = 0.0;
     }
   }
 
@@ -318,7 +333,9 @@ void main() {
     vec3 bmax = texelFetch(uBoxes, ivec2(1, i), 0).xyz;
     float t; vec3 n;
     if (GiRayBox(origin, invDir, sgn, bmin, bmax, best, t, n)) {
-      best = t; bestNormal = n; bestAlbedo = texelFetch(uBoxes, ivec2(2, i), 0).rgb; hit = true;
+      vec4 boxAlbedo = texelFetch(uBoxes, ivec2(2, i), 0);
+      best = t; bestNormal = n; bestAlbedo = boxAlbedo.rgb; hit = true;
+      bestOccluder = boxAlbedo.a;
     }
   }
 
@@ -359,6 +376,9 @@ void main() {
 
     radiance = bestAlbedo * irradiance * 0.31830988618;   // ÷π：辐照度 → 出射辐射亮度
     best = min(best, uMaxDistance);
+    // 矮障碍：反弹已经算进 radiance，但距离矩按「没挡」写 ——
+    // 否则切比雪夫会拿它在地面上盖出跟着体积走的大块假阴影
+    if (bestOccluder < 0.5) best = uMaxDistance;
   }
 
   gl_FragColor = vec4(radiance, best);
@@ -506,6 +526,13 @@ export function MakeGiUniforms() {
     normalBias: { value: 0.4 },
     specularOcclusion: { value: 0.7 },
     enabled: { value: 0 },
+    // 取样端假彩色（?giView=N，Script_Materials 注入块里读）：
+    // 1 = 探针辐照度  2 = 被替换前的天空 IBL  3 = confidence
+    // 4 = gi/IBL 亮度比  5 = 权重和。
+    // 排查「GI 与体外回退不接」这类问题时，肉眼比 diff 图快得多。
+    debugView: { value: 0 },
+    // 取证实验开关：1 = 取样端跳过切比雪夫项。只做 A/B 定位用，不进正式画面。
+    chebOff: { value: 0 },
   };
 }
 
@@ -526,6 +553,8 @@ export function BindGiUniforms(target, gi) {
   target.uGiNormalBias = gi.normalBias;
   target.uGiSpecularOcclusion = gi.specularOcclusion;
   target.uGiEnabled = gi.enabled;
+  target.uGiDebugView = gi.debugView;
+  target.uGiChebOff = gi.chebOff;
   return target;
 }
 
@@ -857,7 +886,13 @@ export class ProbeVolume {
       const o = i * 12;
       data[o] = b.min[0]; data[o + 1] = b.min[1]; data[o + 2] = b.min[2]; data[o + 3] = 0;
       data[o + 4] = b.max[0]; data[o + 5] = b.max[1]; data[o + 6] = b.max[2]; data[o + 7] = 0;
-      data[o + 8] = albedo[0]; data[o + 9] = albedo[1]; data[o + 10] = albedo[2]; data[o + 11] = 0;
+      // albedo 的 a 位 = 「算不算遮挡」。顶面离虚拟地面不足 2.4 m 的盒子（田埂、
+      // 胸墙、土坎、坟头、杂物）反弹照算、太阳阴影照算，但**不写进距离矩** ——
+      // 这类矮障碍挡不了多少天空半球，而 4 m 格距 + 16×16 的距离图也分辨不了它们，
+      // 切比雪夫只会造出整片随体积滚动跳变的假暗斑（界河「跟着玩家走的分层」）。
+      // 判据用**顶面高度**不用盒子厚度：薄薄一片屋顶板对屋里是货真价实的遮挡。
+      data[o + 8] = albedo[0]; data[o + 9] = albedo[1]; data[o + 10] = albedo[2];
+      data[o + 11] = (b.max[1] - this.groundY) >= 2.4 ? 1 : 0;
     }
     this.boxCount = picked.length;
     this.boxTexture.needsUpdate = true;
