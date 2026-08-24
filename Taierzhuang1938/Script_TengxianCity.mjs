@@ -127,17 +127,23 @@ const MATERIAL_MAP = {
   // ——「照城防示意图补全地标」预留材质名（Phase 0 插桩）——
   // 各工作包只许用这些名字，不许自己往本表加行；调色不合适把目标值写进交付报告，
   // 由主会话统一改。先全部压在既有烘焙配方上，等贴图管线出 webp 后再逐个换。
-  PrisonWall: { recipe: "BrickWallSooty", color: 0xc9cdd3, roughness: 1.0 },
+  // WP-A1 取证：0xc9cdd3 背光面近乎全黑；抬到 0xd6d9de 仍与民居 BrickWall 拉开一档
+  PrisonWall: { recipe: "BrickWallSooty", color: 0xd6d9de, roughness: 1.0 },
   StationBrick: { recipe: "BrickWall", color: 0xdcc9b8, roughness: 1.0 },
   PlatformStone: { recipe: "Stone", color: 0xd9dade, roughness: 1.0 },
   RailSteel: { recipe: "SteelHelmet", color: 0x77726a, roughness: 0.55, metalness: 0.6 },
   RailBallast: { recipe: "GroundRubble", color: 0x9d9a92, roughness: 1.0 },
   SleeperWood: { recipe: "WoodBeam", color: 0x6b5844, roughness: 1.0 },
   ChimneyBrick: { recipe: "BrickWallSooty", color: 0xb99f90, roughness: 1.0 },
-  TemplePlaster: { recipe: "Adobe", color: 0xd9a88e, roughness: 0.96 },
-  ChurchPlaster: { recipe: "Adobe", color: 0xf2ede0, roughness: 0.94 },
+  // WP-A6 的 imagegen 抹灰贴图（LoadExternalSet 覆盖；兜底配方在 Script_TexBake）。
+  // albedo 自带赭黄灰浆的红，乘色必须取近中性 —— 压在 Adobe 上时它读成「新盖的红砖房」。
+  TemplePlaster: { recipe: "TemplePlaster", color: 0xf2ece6, roughness: 0.97 },
+  // 德国教产的浅冷灰白抹面：Adobe 底材是暖黄土坯，乘出来是土黄（WP-A7 取证），改压 Stone
+  ChurchPlaster: { recipe: "Stone", color: 0xf4f2ec, roughness: 0.95 },
   SchoolBrick: { recipe: "BrickWall", color: 0xe2e4e8, roughness: 1.0 },
   AntennaSteel: { recipe: "SteelHelmet", color: 0x5f5c55, roughness: 0.6, metalness: 0.5 },
+  // 师部旗面：语义是旗布不是城楼彩画（PaintRed 蒙尘后偏粉，WP-A5 取证）
+  FlagCloth: { recipe: "ClothNra", color: 0x9a3b32, roughness: 1.0 },
 };
 // 纯色（没有对应烘焙配方的）
 const PLAIN_MAP = {
@@ -1237,10 +1243,8 @@ export class TengxianCity {
     const sink = this.sink;
     const y = CITY.platformY;
     switch (l.kind) {
-      case "yamen":
-        // 大门中心在 (230,-30)，轴线朝南 —— 东门里街东首北侧，唐宋以来同一处
-        AddYamen(sink, { x: l.x, z: l.z, ry: l.ry, w: l.w, d: l.d, seed: "yamen", damage: 0.3 });
-        break;
+      // yamen / church 两个 kind 已迁入注册表（Script_Landmark_Yamen / _ChurchSchool），
+      // 永远走不到这个 switch —— 不留死分支。
       case "paifang":
         AddPaifang(sink, {
           x: l.x, z: l.z, ry: l.ry, span: l.span, seed: l.id, iron: !!l.iron, arch: !!l.arch,
@@ -1251,11 +1255,6 @@ export class TengxianCity {
         break;
       case "squareFort":
         AddSquareFort(sink, { x: l.x, z: l.z, ry: l.ry, w: l.w, d: l.d, seed: l.id, damage: 0.3 });
-        break;
-      case "church":
-        AddChurch(sink, {
-          x: l.x, z: l.z, ry: l.ry, nave: l.nave, towerH: l.towerH, seed: l.id, damage: 0.12,
-        });
         break;
       case "shrine":
         // 王家祠堂：形制无资料，做一进带门楼的四合院

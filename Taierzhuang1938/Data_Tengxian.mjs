@@ -258,7 +258,9 @@ export const LANDMARKS = [
   // 县衙：城内唯一有实物可参照的建筑（旧县衙大堂尚存，2006 年省级文保，典型明代建筑）。
   // 图上县公署位于东北偏中，轴线朝南；占地与精确落点均为推定。
   // 注意：现址的仪门、谯楼门、善国门是 2007 年后复建的仿古建筑，不能照抄细部。
-  { id: "Yamen", kind: "yamen", x: 128, z: -118, ry: 0, w: 62, d: 54 },
+  // damage 0.18：大堂是城内唯一存世至今的实物，战后仍在，破损档应低于街区平均。
+  // 62×54 装不下志载「百一十六间」——取「压缩版县衙」口径，见 PRESUMED.yamenForm。
+  { id: "Yamen", kind: "yamen", x: 128, z: -118, ry: 0, w: 62, d: 54, damage: 0.18 },
   // 西门里街上的三处（位置为主流记载，形制推定）
   // 跨街的牌坊。明间（中间两根柱之间）净宽 = span/3 = 4 m，
   // 正好把 z=0 那条通视轴线让出来 —— 柱子站在街两侧，不站在轴线上。
@@ -276,7 +278,9 @@ export const LANDMARKS = [
   // 十七日才改为「纵使把滕县城化为灰烬也在所不惜」的焦土方针。
   // **形制、规模、有无钟楼一概无资料**，做最保守的单钟塔小堂。
   // v2：照城防示意图移到南城书院小学以东（图上天主堂在南门里大街东侧）。
-  { id: "CatholicChurchInner", kind: "church", x: 36, z: 238, ry: 0, nave: [11, 24], towerH: 16 },
+  // w/d = 含院墙的占地，BlockerRects 靠它让民居格子退开（缺省 18×18 会让民居长进教堂院）。
+  // ry=π：构建器的门脸/钟塔在局部 +z（ry=0 朝南）——翻半圈让入口与钟塔朝北对着火神庙东街。
+  { id: "CatholicChurchInner", kind: "church", x: 36, z: 238, ry: Math.PI, nave: [11, 24], towerH: 16, w: 34, d: 46 },
 ];
 
 /**
@@ -307,7 +311,8 @@ export const CITY_FEATURES = [
   { id: "SouthWestOffice", label: "办事处", kind: "office", x: -140, z: 126, ry: Math.PI, w: 50, d: 44, damage: 0.3, source: "diagram" },
   // —— 南城 ——
   { id: "WenzhongSchool", label: "滕文中学旧址", kind: "school", x: -186, z: 220, ry: Math.PI / 2, w: 66, d: 40, damage: 0.26, source: "diagram" },
-  { id: "ShuyuanPrimarySchool", label: "书院小学", kind: "school", x: -105, z: 238, ry: 0, w: 48, d: 30, damage: 0.24, source: "diagram" },
+  // ry=π：校门朝北对着火神庙东街（z=210 在校址之北）；朝南就是背对全城唯一的临街面。
+  { id: "ShuyuanPrimarySchool", label: "书院小学", kind: "school", x: -105, z: 238, ry: Math.PI, w: 48, d: 30, damage: 0.24, source: "diagram" },
   // 火神庙东街的名字来源；旧数据误标为天主堂（天主堂见 LANDMARKS.CatholicChurchInner）。
   { id: "FireGodTemple", label: "火神庙", kind: "temple", x: 148, z: 182, ry: 0, w: 34, d: 26, damage: 0.28, source: "diagram" },
   { id: "SouthEastSpecialCompound", label: "特务营第2连", kind: "billet", x: 142, z: 247, ry: Math.PI, w: 76, d: 42, damage: 0.35, source: "diagram", notPermanentGarrison: true },
@@ -317,7 +322,7 @@ export const CITY_FEATURES = [
 
 /** 城外地标。南关教堂与城内那座两说并列，各建一处，不合并。 */
 export const OUTER_LANDMARKS = [
-  { id: "CatholicChurchSouth", kind: "church", x: 0, z: 420, ry: 0, nave: [9, 18], towerH: 12 },
+  { id: "CatholicChurchSouth", kind: "church", x: 0, z: 420, ry: 0, nave: [9, 18], towerH: 12, w: 32, d: 40 },
   // 北关教产：弘道院／华北神学院一带。位置、布局、形制均无资料，
   // 只做剪影级远景，不做可进入空间。
   { id: "HongdaoAcademy", kind: "silhouetteCluster", x: -60, z: -420, w: 120, d: 70 },
@@ -564,6 +569,16 @@ export const PRESUMED = [
   { id: "powerPlantSize", value: { w: 30, d: 18, chimneyH: 22 }, unit: "m", note: "电灯厂位置与「在西城楼直瞄射程内」为主流记载，厂房规模与烟囱高度无载" },
   { id: "westSuburbLayout", value: "WEST_SUBURB", note: "津浦铁路在城西，以及西关的车站、通信队、电灯厂、交易所、第122师师部与西关大街的关系为 Notion 城防示意图可见信息；其坐标、尺度和站房形式均为推定" },
   { id: "northSuburbLayout", value: "NORTH_SUBURB", note: "北关坝墙（圩子）、圩门、北关大街与北庙的存在与走向为 Notion 城防示意图可见信息；坐标、圩门数量与坝墙断面全部为推定" },
+  // —— 批次A 地标形制（图上只有图注与位置，以下整族数值全部无载，出处见各 Script_Landmark_*.mjs 头注与 WP 报告）——
+  { id: "jailForm", value: { wall: [4.6, 0.75], detentionWall: 3.8, towerTop: 9.0, gate: [1.3, 2.6], cellBay: 2.2, cellWindow: [0.55, 0.75], sill: 1.55 }, unit: "m", note: "监狱/看守所形制：高墙、转角岗楼、窄开间铁窗、重门。全部为「一眼可辨」的设计推定，无任何史料" },
+  { id: "officeCompoundForm", value: { yardWall: 2.65, gateW: 3.0, pierRise: 1.15, flagpole: [8.6, 7.6], booth: [1.8, 1.6] }, unit: "m", note: "警备队/警察所制式机关院：门垛挂匾大门、门岗亭、旗杆、操练场、告示墙。形制常识推定，无实证" },
+  { id: "yamenForm", value: { wall: 3.2, gate: [4.0, 3.0], qiaolouRidge: 8.6, hallBay: [5, 4.1], platform: 1.0, liufang: "每列4间", screenOffset: 3.3, sideGate: 2.0 }, unit: "m", note: "县公署压缩版口径：志载「公堂吏舍凡百一十六间」，62×54 地块只容四进+两列廊庑；照壁应在街对面、被地块让距压到门前 3.3 m；东侧门为纯玩法。大堂尺寸未取得现存实物测绘，全为推定" },
+  { id: "guildTwoStorey", value: { eave: 6.6, ridge: 8.77 }, unit: "m", note: "商会做成两层临街门脸楼是无史料的读图推定（县城商会有二层门面在鲁南有例，滕县无证）；若考据裁定城内除城楼外一律单层，此楼需整体推翻" },
+  { id: "pawnshopForm", value: { wall: [4.2, 0.6], vaultRidge: 9.15, gate: 1.6, bannerPole: 7.2 }, unit: "m", note: "当典防盗高墙+两层库楼+高杆布幌：北方当铺形制通例，尺寸全为推定" },
+  { id: "hqKitForm", value: { wall: [2.35, 2.05], gate: [2.6, 2.2, 2.0], strongRoom: [11, 8, 8.4], flagpole: [9.0, 7.4, 6.2], unitBoard: [0.34, 1.44] }, unit: "m", note: "师部/团部/驻地套件（含机要库=当铺库楼式两层）：番号木牌为空牌面，驻防关系仍由战斗时段数据决定。全为推定" },
+  { id: "templeForms", value: { yardWall: [2.7, 3.0], hallRidge: 6.4, dachengRidge: 10.05, lingxingSpan: 12, bannerPole: 7.4 }, unit: "m", note: "龙王庙/火神庙/文庙形制：docs 明言「具体位置、形制均无资料」；全按鲁南民间木构尺寸上放一档推定，不照抄任何现存复建物" },
+  { id: "schoolForm", value: { wall: 2.2, gate: 4.1, classroomEave: 3.45, bay: 3.5, window: [1.55, 1.78, 0.85], flagpole: 9.5 }, unit: "m", note: "校门/长教室连排大窗/操场石灰线/旗杆：教室开间与大窗是「教室≠民居」的唯一可辨差别，全为推定；匾额无字（1938年3月字样无资料）" },
+  { id: "churchForms", value: { eave: "5.0+naveW*0.22", slope: "40°", buttress: 0.85, cross: [1.55, 0.92], damageCap: 0.18 }, note: "天主堂：单钟塔小堂的窗/扶壁/塔比例全为推定（不照抄青岛圣弥厄尔一类大堂）；破损上限 0.18 的依据是日方 16 日「外国権益擁護」限制——这一条为信史，其余为推定" },
   { id: "stationForm", value: { w: 34, d: 12 }, unit: "m", note: "滕县站位置为主流记载，1911 年德建为史料，站房形制尺寸全为推定" },
   { id: "railwayX", value: -480, unit: "m", note: "津浦铁路在城西为主流记载；相对西城墙距离按 Notion 城防示意图比例换算，绝对坐标为推定" },
   { id: "hollowForts", value: [[370, 370], [-370, 370]], note: "城外空心炮台 2 座（1908 建）为主流记载，**位置无载**，暂置东南／西南墙外 60 m" },

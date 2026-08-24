@@ -1670,16 +1670,18 @@ export function AddLoopholes(sink, {
   for (let i = 0; i < count; i += 1) {
     const lx = count === 1 ? 0 : -spread / 2 + (spread * i) / (count - 1) + (rnd() - 0.5) * 0.4;
     const y = ys[i % ys.length] + (rnd() - 0.5) * 0.16;
-    const p = L(lx, wallFace);
+    const p = L(lx, wallFace + 0.01);
     // 白茬的边：一圈略大的浅色薄片，压在墙面外一点。
     // 1.85 倍太宽，出图上读成「墙上贴了块白瓷砖／开关面板」；1.45 倍才是凿出来的茬口。
     sink.Add(rim, PlaceGeometry(
       MakeBox(size * 1.45, size * 1.45, 0.05, TILE_METERS.stone, `${seed}:r${i}`),
       { x: p.x, y, z: p.z, ry }));
-    // 洞：缩进白边里 0.12 m 的深色方孔。缩得够深才读作「有进深的洞」而不是「黑贴纸」
-    const q = L(lx, wallFace - 0.12);
+    // 洞：压在白边**前**0.01 m 的深色方孔。旧写法把洞缩进 wallFace-0.12，
+    // 结果凡是半厚 ≥0.08 的墙（即全城所有墙）洞都整个埋进墙体，
+    // 枪眼实拍只剩一块白斑（WP-A1 取证）。深色要可见就必须在白边之前。
+    const q = L(lx, wallFace + 0.02);
     sink.Add("Charred", PlaceGeometry(
-      MakeBox(size, size, 0.16, TILE_METERS.stone, `${seed}:h${i}`),
+      MakeBox(size, size, 0.05, TILE_METERS.stone, `${seed}:h${i}`),
       { x: q.x, y, z: q.z, ry }));
   }
 }

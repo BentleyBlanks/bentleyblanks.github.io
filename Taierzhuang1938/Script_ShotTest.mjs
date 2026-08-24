@@ -83,6 +83,20 @@ const GAME_SHOTS = [
   // 避免和既有东门仰视、东关常规战斗镜头重复。
   { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
+  // ——批次A 之后的四个视觉盲区补口（旧机位没有一张能看到中城师部/北城功能区/庙街/南城）——
+  // 中城师部：当典后街上看 124 师部门脸（门楼+番号木牌+沙袋哨位+旗）。
+  { name: "Game_Z11_DivisionHq", query: "shot=1&phase=5&quality=high&scale=medium",
+    setup: { x: -38, z: -90.5, yaw: Math.PI / 2, pitch: -0.02, quiet: true } },
+  // 庙街：龙王庙街东口隔街看山门（红门脸+起翘屋脊是庙的识别语言）。北城要 phase=4。
+  { name: "Game_Z12_TempleStreet", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 96, z: -144, yaw: 1.0033, pitch: 0.07, quiet: true } },
+  // 北城羁押区：监狱两排牢房之间的甬道——一侧全是铁窗、一侧一个洞都没有（WP-A1 验证机位）。
+  // 注意别摆在警察所与监狱之间的巷口：那条缝会被 PlanBlocks 补上一格民居，第一版机位一脸墙。
+  { name: "Game_Z13_JailQuarter", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 162, z: -196.7, yaw: -1.55, pitch: 0.02, quiet: true } },
+  // 南城：站在火神庙东街街心正看天主堂钟塔（南城唯一高点）。街外 4 m 就是院墙，机位必须压街心。
+  { name: "Game_Z14_SouthChurch", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 36, z: 210, yaw: Math.PI, pitch: 0.06, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

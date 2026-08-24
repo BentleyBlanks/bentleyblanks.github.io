@@ -105,6 +105,12 @@ const TAG_PROFILE = Object.freeze({
   furniture: "wood",
   barricade: "sandbag",
   sandbagPlug: "sandbag",
+  // AddSandbagEmplacement 写死的 tag，此前漏登记 → 沙袋胸墙按砖墙破坏（WP-A2 取证）
+  sandbagEmplacement: "sandbag",
+  // AddWattleFence 的枣刺篱笆，此前漏登记
+  fence: "wood",
+  // 监狱围墙/岗楼：0.75 m 厚的官办高墙，不能和民居隔墙一样好凿（WP-A1）
+  prisonWall: "heavyMasonry",
   grave: "earth",
   kan: "earth",
   embankment: "earth",

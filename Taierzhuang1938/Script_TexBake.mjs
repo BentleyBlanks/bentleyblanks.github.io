@@ -494,4 +494,6 @@ export const RECIPES = {
   GroundRubble: (s) => BakeRubbleGround(s ?? 512, { seed: 719, brickiness: 0.85 }),
   Sandbag: (s) => BakeSandbag(s ?? 256, { seed: 809 }),
   Stone: (s) => BakeStone(s ?? 512, { seed: 907 }),
+  // 庙墙灰浆：ImageGen 的 TemplePlaster PBR 在启动时覆盖此兜底；失败时退回土坯质感。
+  TemplePlaster: (s) => BakeAdobe(s ?? 512, { seed: 223 }),
 };

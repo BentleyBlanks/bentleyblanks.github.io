@@ -14,6 +14,17 @@
 //   只许 import Script_World / Script_Geo / Script_Noise / Script_LivedInProps / three；
 //   **严禁 import Script_TengxianCity（循环依赖）与 Data_Tengxian（尺寸走 f）**。
 //   碰撞：一律经 sink.Solid（tag 见 Data_Destruction.TAG_PROFILE，未注册默认 masonry）。
+//
+// 批次A 用血踩出来的三条坑（后续工作包必读）：
+//   ① 两套局部坐标系相差 180°：`PlaceGeometry(ry)` / `AddDoorReveal` 的局部 +z 在
+//      ry=0 时指世界 +z（南）；而 `AddCompound` / `AddRoomBlock` / `AddFeatureRoom`
+//      内部把「门脸」排在局部 -z ⇒ ry=0 时它们的门开在世界**北**面。
+//      要「坐北朝南对着街」，要么传 ry+π，要么像 A6/A7 那样自己排门脸，两套别混用。
+//   ② `OnStreet` 的街面半宽是 width/2 **+ 1.2 m 退让带**——门口摆件差 0.1 m
+//      压进退让带就整个不生成（A5 的哨位第一版全军覆没）。贴门摆件要写「往里收
+//      几档再试」，不要一票否决。
+//   ③ 每一关只生成 bounds 里那一片城（Data_Battle.TUNING[i].bounds）：
+//      phase=5 只有 x[-325,285] z[-190,140]，北城/南城拍图要用 phase=4。
 
 import { AddRoomBlock } from "./Script_World.mjs";
 import { BuildPrison, BuildDetention } from "./Script_Landmark_Prison.mjs";

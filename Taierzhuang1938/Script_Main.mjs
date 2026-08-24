@@ -457,6 +457,11 @@ async function Boot() {
         normal: "./Texture/Texture_StoneNormal.webp?v=1",
         orm: "./Texture/Texture_StoneOrm.webp?v=1",
       }),
+      library.LoadExternalSet("TemplePlaster", {
+        albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
+        normal: "./Texture/Texture_TemplePlasterNormal.webp?v=1",
+        orm: "./Texture/Texture_TemplePlasterOrm.webp?v=1",
+      }),
       library.LoadExternalSet("CarriageBenchWood", {
         albedo: "./Texture/Texture_CarriageBenchWoodBase.png?v=2",
         normal: "./Texture/Texture_CarriageBenchWoodNormal.png?v=2",
