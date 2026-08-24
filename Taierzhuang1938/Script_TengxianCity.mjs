@@ -41,6 +41,9 @@ import {
 } from "./Data_Tengxian.mjs";
 import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
 import {
+  PickCityBlockArchetype, BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
+} from "./Script_CityBlockKit.mjs";
+import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
   AddChurch, AddPagoda, AddZhaiWall, AddCompound, AddRoomBlock, AddHardMountainRoof,
@@ -184,8 +187,16 @@ export function ResolveTengxianMaterial(name, library) {
  * 这是为了让两个史料数字同时成立的工程解，不是自己发挥。
  */
 const GATE_BULGE = 16;
-function MoatBulge(along) {
-  const a = Math.abs(along);
+// 每条边上城门的沿边坐标（RingPoint/SideAndAlong 的 a 参数系）：
+// 北=x、东=z、南=-x、西=-z。城防示意图的门位是错开的（北 -145/东 -65/南 70/西 0），
+// 旧版 MoatBulge 按 |along|≤26 判「门前」= 假设门在每边正中 —— 于是北门外没有外凸、
+// 没有桥，正前方是 4.8 m 的干壕（WP-C2 取证），四门里只有西门碰巧对上。
+const GATE_ALONG = (() => {
+  const at = (id) => GATES.find((g) => g.id === id);
+  return [at("North").x, at("East").z, -at("South").x, -at("West").z];
+})();
+function MoatBulge(along, side = null) {
+  const a = side == null ? Math.abs(along) : Math.abs(along - GATE_ALONG[side]);
   if (a <= 26) return GATE_BULGE;
   if (a >= 40) return 0;
   return GATE_BULGE * (1 - SmoothStep(26, 40, a));
@@ -528,8 +539,10 @@ export class TengxianCity {
       const strip = [];
       const n = 26;
       for (let i = 0; i < n; i += 1) {
-        const a0 = -44 + (88 * i) / n, a1 = -44 + (88 * (i + 1)) / n;
-        const b0 = MoatBulge(a0), b1 = MoatBulge(a1);
+        // 采样窗口跟着这条边的门走（门不在边正中）
+        const g = GATE_ALONG[side];
+        const a0 = g - 44 + (88 * i) / n, a1 = g - 44 + (88 * (i + 1)) / n;
+        const b0 = MoatBulge(a0, side), b1 = MoatBulge(a1, side);
         if (b0 <= 0.01 && b1 <= 0.01) continue;
         const [x0, z0] = RingPoint(side, 0.5 + a0 / (2 * s), s);
         const [x1, z1] = RingPoint(side, 0.5 + a1 / (2 * s), s);
@@ -575,7 +588,7 @@ export class TengxianCity {
       for (let i = 0; i <= perSide; i += 1) {
         const t = i / perSide;
         const along = -s0 + 2 * s0 * t;
-        const bulge = MoatBulge(along);
+        const bulge = MoatBulge(along, side);
         const inner = MOAT.outerEdge + bulge;
         const col = [];
         for (let r = 0; r <= radialNear + radialFar; r += 1) {
@@ -674,7 +687,7 @@ export class TengxianCity {
     for (let side = 0; side < 4; side += 1) {
       for (let i = 0; i < perSide; i += 1) {
         const t0 = i / perSide, t1 = (i + 1) / perSide;
-        const b0 = MoatBulge(-s0 + 2 * s0 * t0), b1 = MoatBulge(-s0 + 2 * s0 * t1);
+        const b0 = MoatBulge(-s0 + 2 * s0 * t0, side), b1 = MoatBulge(-s0 + 2 * s0 * t1, side);
         for (let k = 0; k < profile.length - 1; k += 1) {
           const p = profile[k], q = profile[k + 1];
           const a = RingPoint(side, t0, s0 + b0 + p.off);
@@ -718,7 +731,10 @@ export class TengxianCity {
       if (!this.InBounds(gate.x * 1.15, gate.z * 1.15, 60)) continue;
       const dirX = gate.outward[0], dirZ = gate.outward[1];
       const rIn = CITY.platformEdge + GATE_BULGE;
-      const cx = dirX * (rIn + MOAT.width / 2), cz = dirZ * (rIn + MOAT.width / 2);
+      // 横向要用门自己的坐标：旧写法 dirX/dirZ 为 0 的那一轴直接归零，
+      // 北门的桥被摆到 (0,-339)、离门 145 m 的旱地上（WP-C2 取证）。
+      const cx = dirX !== 0 ? dirX * (rIn + MOAT.width / 2) : gate.x;
+      const cz = dirZ !== 0 ? dirZ * (rIn + MOAT.width / 2) : gate.z;
       const ry = dirX !== 0 ? Math.PI / 2 : 0;
       this.sink.Add("WoodBeam", PlaceGeometry(
         MakeBox(4.4, 0.32, MOAT.width + 3.0, TILE_METERS.wood, `bridge${gate.id}`),
@@ -738,7 +754,7 @@ export class TengxianCity {
       const side = Math.floor((i / n) * 4) % 4;
       const t = ((i / n) * 4) % 1;
       const along = -CITY.platformEdge + 2 * CITY.platformEdge * t;
-      const [wx, wz] = RingPoint(side, t, CITY.platformEdge + MoatBulge(along) + MOAT.width + 3.4);
+      const [wx, wz] = RingPoint(side, t, CITY.platformEdge + MoatBulge(along, side) + MOAT.width + 3.4);
       if (!this.InBounds(wx, wz, 30)) continue;
       this.farSink.SetSector(SectorKey(wx, wz));
       AddTree(this.farSink, {
@@ -1086,9 +1102,13 @@ export class TengxianCity {
 
   /**
    * 一个地块。三档 LOD：
-   *   detail  完整四合院（院墙 + 正房 + 厢房 + 影壁 + 家什）+ 临街枪眼
-   *   mid     简化院落：一圈墙 + 一座正房 + 屋顶，仍带枪眼（枪眼是滕县的符号，不许省）
-   *   far     体块剪影：一个盒子 + 一片坡顶，不投阴影
+   *   detail  完整院落（院墙 + 正房 + 厢房 + 影壁 + 家什）+ 临街枪眼
+   *   mid     简化院落：一圈墙 + 一到两座体量 + 屋顶，仍带枪眼（枪眼是滕县的符号，不许省）
+   *   far     体块剪影：一到两个盒子 + 坡顶，不投阴影
+   *
+   * 三档都吃 `Script_CityBlockKit` 的同一个 **archetype**（一进院／两进院／土墙院／
+   * L 形院／水井院／临街铺面）。原来这里每一格都调同一个 AddCompound，
+   * 二百多格铺出来是一张复印纸 —— 那就是「大量重复村庄」的来源。
    */
   DamageProfile(value) {
     // 这是生成时的静态战损解释，不是把整城接进实时破坏：
@@ -1097,6 +1117,64 @@ export class TengxianCity {
     if (value < 0.32) return { state: "intact", damage: Math.min(value, 0.24), burnt: false };
     if (value < 0.67) return { state: "damaged", damage: Math.max(0.38, value), burnt: false };
     return { state: "collapsed", damage: Math.max(0.78, value), burnt: true };
+  }
+
+  /**
+   * 这一格贴着哪条街、在街的哪一边。
+   *
+   * 只读 `StreetZones()`（PlanBlocks 已经按同一张表把街雕出去了），
+   * 所以这里不会与雕格逻辑打架 —— 它只回答「这一格临不临街」。
+   * @returns {{zone:object, across:number, gap:number, width:number}|null}
+   */
+  BlockStreet(cell) {
+    let best = null;
+    for (const s of this.StreetZones()) {
+      const along = s.axis === "x" ? cell.x : cell.z;
+      if (along < s.from - 8 || along > s.to + 8) continue;
+      const across = (s.axis === "x" ? cell.z : cell.x) - s.at;
+      const half = (s.axis === "x" ? cell.d : cell.w) / 2;
+      const gap = Math.abs(across) - half - s.half;
+      if (!best || gap < best.gap) {
+        best = { zone: s, across, gap, width: (s.half - 1.2) * 2 };
+      }
+    }
+    // 3.5 m 是「一格院墙贴着街」的容差：巷宽 2 m 的退让带算进来了。
+    return best && best.gap < 3.5 ? best : null;
+  }
+
+  /**
+   * 一格院子盖什么、朝哪边。**只决定格子里的内容，不动 PlanBlocks 的雕格。**
+   *
+   * `ry` 走 Script_CityBlockKit 的局部系：ry=0 即坐北朝南（正房在北、门在南）。
+   * 只有 ShopRow 跟着街转 —— 铺面的脸必须冲着它做生意的那条街。
+   */
+  BlockPlan(cell) {
+    const street = this.BlockStreet(cell);
+    const dCross = Math.hypot(cell.x - CROSSROAD.x, cell.z - CROSSROAD.z);
+    // 「十字街口四角有铺面」是志载；往外沿主街递减，次街上只有零星铺子。
+    // 这一条替代了原来「只有紧贴十字街口的一圈算铺面」的硬判定：
+    // 一条商业主街不该在离街口 30 m 处忽然全变成民居。
+    let shop = !!cell.shop;
+    if (!shop && street) {
+      const p = street.width >= 7
+        ? Clamp(0.60 - dCross / 520, 0.10, 0.60)
+        : Clamp(0.18 - dCross / 900, 0.03, 0.18);
+      shop = ((HashString(`${cell.seed}:shopRoll`) >>> 0) % 1000) / 1000 < p;
+    }
+    const kind = PickCityBlockArchetype({
+      seed: cell.seed, wealth: Clamp01(1 - dCross / 300), shop,
+      w: cell.w, d: cell.d,
+    });
+    let ry = 0;                                   // 坐北朝南
+    if (kind === "ShopRow" && street) {
+      // 局部 +z 必须指向街心：街在北 → ry=π；街在南 → 0；街在西 → −π/2；街在东 → +π/2
+      ry = street.zone.axis === "x"
+        ? (street.across > 0 ? Math.PI : 0)
+        : (street.across > 0 ? -Math.PI / 2 : Math.PI / 2);
+    }
+    // 铺面的「面阔」是沿街那一边：街南北向时把 w/d 换过来
+    const swap = kind === "ShopRow" && street && street.zone.axis === "z";
+    return { kind, ry, w: swap ? cell.d : cell.w, d: swap ? cell.w : cell.d };
   }
 
   BuildBlock(cell, rnd) {
@@ -1111,90 +1189,53 @@ export class TengxianCity {
     const damage = profile.damage;
     const burnt = profile.burnt || (profile.state === "damaged" && seedRnd() < 0.12 + eastness * 0.3);
 
-    if (cell.shop) {
-      // 铺面：临街一长条房，不是内向的四合院 —— 商业街的立面是连着的铺板门
-      const alongX = cell.w >= cell.d;
-      const facing = alongX ? (cell.z > 0 ? Math.PI : 0) : (cell.x > 0 ? -Math.PI / 2 : Math.PI / 2);
-      AddRoomBlock(this.sink, {
-        x: cell.x, z: cell.z, ry: facing,
-        width: (alongX ? cell.w : cell.d) - 1.2, depth: (alongX ? cell.d : cell.w) - 1.2,
-        eaveY: 3.0, ridgeY: 4.7, seed: `${cell.seed}:shop`, damage, burnt, facing: 1, bays: 5,
-      });
-      this.AddStreetLoopholes(this.sink, cell, damage);
-      this.stats.compoundsDetail += 1;
-      return;
-    }
+    // 原型轮换：同一个 kind 贯穿三档 LOD —— 玩家走近时剪影不会变成另一座房子。
+    const plan = this.BlockPlan(cell);
+    const spec = {
+      x: cell.x, z: cell.z, ry: plan.ry, w: plan.w, d: plan.d,
+      seed: cell.seed, damage, burnt, kind: plan.kind,
+    };
+    const lod = { damage, burnt, baseY: CITY.platformY, kind: plan.kind, ry: plan.ry };
+    const lodCell = { x: cell.x, z: cell.z, w: plan.w, d: plan.d, seed: cell.seed };
+
     if (dist < this.detailRadius) {
-      const built = AddCompound(this.sink, {
-        x: cell.x, z: cell.z, ry: 0, width: cell.w, depth: cell.d,
-        seed: cell.seed, damage, burnt,
-      });
-      this.stats.householdProps += built?.householdProps || 0;
-      this.AddStreetLoopholes(this.sink, cell, damage);
+      this.stats.householdProps += BuildCityBlockDetail(this.sink, spec);
+      // 铺面的枪眼掏在山墙上（临街是木排门板），由套件自己摆
+      if (plan.kind !== "ShopRow") this.AddStreetLoopholes(this.sink, cell, damage);
       this.stats.compoundsDetail += 1;
       return;
     }
     if (dist < this.midRadius) {
-      this.AddSimpleCompound(this.sink, cell, damage, burnt);
-      this.AddStreetLoopholes(this.sink, cell, damage);
+      this.AddSimpleCompound(this.sink, lodCell, damage, burnt, lod);
+      if (plan.kind !== "ShopRow") this.AddStreetLoopholes(this.sink, cell, damage);
       this.stats.compoundsMid += 1;
       return;
     }
-    this.AddSilhouetteBlock(cell, damage, burnt);
+    this.AddSilhouetteBlock(lodCell, damage, burnt, lod);
     this.stats.silhouettes += 1;
   }
 
   /**
-   * 简化院落：一圈不切片的院墙 + 一座正房。
+   * 简化院落（中景档）。
+   *
+   * 现在按 `lod.kind` 分四种剖面（单脊 / 倒座+正房双脊 / L / 沿街长排）
+   * 外加土墙院那一档矮而无压顶的院墙，几何住在 Script_CityBlockKit 里。
    * 形制上仍守住鲁南那条最重要的规矩 —— **对外不开窗**，街两侧是连续实墙。
+   *
+   * 注意：**东关那一档走的是 AddSimpleCompoundAt，不是这里**（濠外地坪不为 0）。
+   * 这一轮只去城内的重，东关一个字没动。
    */
-  AddSimpleCompound(sink, cell, damage, burnt) {
-    const { x, z, w, d, seed } = cell;
-    const mat = burnt ? "BrickWallSooty" : (HashString(seed) % 100 < 38 ? "Adobe" : "HouseBrick");
-    const h = 2.0;
-    for (const [ox, oz, len, ry] of [
-      [0, -d / 2, w, 0], [0, d / 2, w, 0],
-      [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2],
-    ]) {
-      sink.Add(mat, PlaceGeometry(
-        MakeBox(len, h, 0.42, mat === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
-          `${seed}:sw${ox}${oz}`, mat === "Adobe" ? null : BRICK_UV_GRID),
-        { x: x + ox, y: CITY.platformY + h / 2, z: z + oz, ry }));
-      sink.Solid(x + ox, CITY.platformY + h / 2, z + oz, len / 2, h / 2, 0.25, "wall", ry);
-    }
-    const bw = w * 0.62, bd = d * 0.42;
-    const eave = 2.6, ridge = 3.9;
-    sink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
-      MakeBox(bw, eave, bd, TILE_METERS.brick, `${seed}:body`, BRICK_UV_GRID),
-      { x, y: CITY.platformY + eave / 2, z: z - d * 0.18 }));
-    sink.Solid(x, CITY.platformY + eave / 2, z - d * 0.18, bw / 2, eave / 2, bd / 2, "wall");
-    AddHardMountainRoof(sink, {
-      x, z: z - d * 0.18, width: bw, depth: bd,
-      eaveY: CITY.platformY + eave, ridgeY: CITY.platformY + ridge,
-      seed: `${seed}:roof`, ruined: damage > 0.72, burnt,
+  AddSimpleCompound(sink, cell, damage, burnt, lod = null) {
+    BuildCityBlockMid(sink, cell, lod || {
+      damage, burnt, baseY: CITY.platformY, kind: "OneEntry", ry: 0,
     });
   }
 
-  /** 远景剪影：一个体块 + 一片坡顶。够读出「灰砖小院的海」就行。 */
-  AddSilhouetteBlock(cell, damage, burnt) {
-    const { x, z, w, d, seed } = cell;
-    const rnd = Mulberry32(HashString(`${seed}:sil`));
-    const h = 2.5 + rnd() * 0.9;
-    const y = CITY.platformY;
-    this.farSink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
-      MakeBox(w * 0.86, h, d * 0.82, TILE_METERS.brick, `${seed}:sil`, BRICK_UV_GRID),
-      { x, y: y + h / 2, z }));
-    this.farSink.Solid(x, y + h / 2, z, w * 0.43, h / 2, d * 0.41, "wall");
-    if (damage < 0.75) {
-      for (const s of [-1, 1]) {
-        this.farSink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w * 0.94, 0.14, d * 0.5, TILE_METERS.roof, `${seed}:sr${s}`),
-          { x, y: y + h + 0.5, z: z + s * d * 0.2, rx: -s * 0.5 }));
-      }
-      this.farSink.Add("RoofTile", PlaceGeometry(
-        MakeBox(w * 0.94, 0.18, 0.32, TILE_METERS.roof, `${seed}:sridge`),
-        { x, y: y + h + 1.02, z }));
-    }
+  /** 远景剪影：体块 + 坡顶。够读出「灰砖小院的海」，但海不能是同一块砖复印二百遍。 */
+  AddSilhouetteBlock(cell, damage, burnt, lod = null) {
+    BuildCityBlockFar(this.farSink, cell, lod || {
+      damage, burnt, baseY: CITY.platformY, kind: "OneEntry", ry: 0,
+    });
   }
 
   /**
@@ -1587,8 +1628,9 @@ export class TengxianCity {
         eaveY: 4.0, ridgeY: 6.6, seed: "eastTempleHall", damage: 0.4, facing: 1, bays: 3,
       });
       for (const s of [-1, 1]) {
+        // ry 指向墙外：+x 面 ry=π/2、-x 面 ry=-π/2（旧值取反，洞掏在了院里侧）
         AddLoopholes(this.sink, {
-          x: t.x + s * t.w / 2, z: t.z, ry: s > 0 ? -Math.PI / 2 : Math.PI / 2,
+          x: t.x + s * t.w / 2, z: t.z, ry: s > 0 ? Math.PI / 2 : -Math.PI / 2,
           ys: [1.1, 1.5], count: 3, spread: t.d * 0.5, seed: `eastTempleLp${s}`, wallFace: 0.26,
         });
       }
@@ -1632,10 +1674,13 @@ export class TengxianCity {
 
   AddSuburbLoopholes(cell, damage) {
     if (damage > 0.85) return;
-    // 东关每一面墙都朝着巷子，四面都掏
+    // 东关每一面墙都朝着巷子，四面都掏。
+    // ry 必须指向**墙外**（AddLoopholes 把白茬与洞压在局部 +z 一侧）：
+    // -z 面 ry=π、+z 面 ry=0、-x 面 ry=-π/2、+x 面 ry=π/2。
+    // 旧值四个全反 —— 整片东关的枪眼都掏在院墙内侧，巷子里一个也看不见（WP-C3 取证）。
     for (const [ox, oz, ry, span] of [
-      [0, -cell.d / 2, 0, cell.w], [0, cell.d / 2, Math.PI, cell.w],
-      [-cell.w / 2, 0, Math.PI / 2, cell.d], [cell.w / 2, 0, -Math.PI / 2, cell.d],
+      [0, -cell.d / 2, Math.PI, cell.w], [0, cell.d / 2, 0, cell.w],
+      [-cell.w / 2, 0, -Math.PI / 2, cell.d], [cell.w / 2, 0, Math.PI / 2, cell.d],
     ]) {
       AddLoopholes(this.sink, {
         x: cell.x + ox, z: cell.z + oz, ry, ys: [1.05, 1.45], count: 2, spread: span * 0.5,
@@ -2165,9 +2210,12 @@ export class TengxianCity {
         + rnd() * (MARCH_GROUND.wheatPatch.maxSize - MARCH_GROUND.wheatPatch.minSize);
       const d = w * (0.55 + rnd() * 0.7);
       // 铁路走廊豁免：水平麦田板在起伏地上会浮到局部地面上方 0.4—0.5 m，
-      // 正好盖住 0.46 m 的道砟面（WP-B1 取证）。西关大街走廊同理。
+      // 正好盖住 0.46 m 的道砟面（WP-B1 取证）。西关大街、北关大街走廊同理。
       if (Math.abs(x - WEST_SUBURB.railway.x) < w / 2 + 14) continue;
       if (Math.abs(z - WEST_SUBURB.westStreet.z) < d / 2 + 8 && x < -320 && x > -500) continue;
+      if (Math.abs(x - NORTH_SUBURB.street.x) < w / 2 + 8 && z > -580 && z < -330) continue;
+      if (Math.abs(x - NORTH_SUBURB.temple.x) < w / 2 + NORTH_SUBURB.temple.w / 2 + 6
+        && Math.abs(z - NORTH_SUBURB.temple.z) < d / 2 + NORTH_SUBURB.temple.d / 2 + 6) continue;
       const y = this.OuterHeight(x, z);
       // 苗高 15—30 cm：盒子 0.3 m 厚、中心压到地面下 0.05，露出地面的只有 10 cm。
       // 原来 0.6 m 厚顶在 +0.36 m，城外任何远景都带一条发绿的「堤坝」（出川过场出图抓到）。
@@ -2277,8 +2325,8 @@ export class TengxianCity {
    */
   GroundHeight(x, z) {
     const m = Math.max(Math.abs(x), Math.abs(z));
-    const [, along] = SideAndAlong(x, z);
-    const bulge = MoatBulge(along);
+    const [side, along] = SideAndAlong(x, z);
+    const bulge = MoatBulge(along, side);
     const inner = CITY.platformEdge + bulge;
     if (m <= inner) return CITY.platformY;
     const outer = inner + MOAT.width;
