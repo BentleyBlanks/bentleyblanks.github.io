@@ -2,9 +2,10 @@
 
 ## Generated Audio / Volcengine
 
-- All future project audio generation must use Volcengine, never Lovart. For dialogue and voice work, call Volcengine directly with model `seed-audio-1.0`.
+- All future project-generated music/BGM, ambience, SFX, dialogue, and voice must use Volcengine, never Lovart. A request to generate, replace, revise, or audition any audio must not invoke Lovart, including when the request explicitly says “music”, “BGM”, “song”, “sound effect”, or “audio”.
+- Use Volcengine directly with model `seed-audio-1.0`. For music, start from `Taierzhuang1938/Script_SeedAudioMusicBake.mjs`; for dialogue, voice, and SFX, use the applicable checked-in SeedAudio baker (such as `Script_VoiceBake.mjs`) or add an equivalent Volcengine baker.
 - Read the credential only from the `VOLCENGINE_API_KEY` environment variable. Never place an API key in source, prompts checked into Git, command output, documentation, commits, or GitHub Actions logs.
-- The canonical direct endpoint is `https://openspeech.bytedance.com/api/v3/tts/create`; use `Script_VoiceBake.mjs` or an equivalent checked-in baker that sends the key through the `X-Api-Key` header at runtime.
+- The canonical direct endpoint is `https://openspeech.bytedance.com/api/v3/tts/create`; every baker must send the key through the `X-Api-Key` header at runtime.
 - When a storyboard marks a dialogue range as continuous, send the complete range in one `text_prompt` request and keep the returned audio as one cue. Do not synthesize lines separately and splice them together.
 
 ## Git Worktree Workflow（强制 · 优先级最高）
