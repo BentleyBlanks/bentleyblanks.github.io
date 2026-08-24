@@ -878,6 +878,13 @@ export class TengxianCity {
       axis: s.axis, at: s.at, half: s.width / 2 + 1.2,
       from: Math.min(s.from, s.to), to: Math.max(s.from, s.to),
     }));
+    // 城外两条关厢街也进退让带：西关大街与北关大街不在 STREETS（它们的路面
+    // 由各自的构建器压 OuterHeight 自建），但 OnStreet 得认识它们 ——
+    // 否则构建器只能各自镜像一份常量来退让（WP-B3 的坑）。
+    const ws = WEST_SUBURB.westStreet;
+    if (ws) zones.push({ axis: "x", at: ws.z, half: ws.width / 2 + 1.2, from: ws.fromX, to: ws.toX });
+    const ns = NORTH_SUBURB.street;
+    if (ns) zones.push({ axis: "z", at: ns.x, half: ns.width / 2 + 1.2, from: ns.fromZ, to: ns.toZ });
     this.streetZones = zones;
     return zones;
   }
@@ -1469,6 +1476,10 @@ export class TengxianCity {
             // 寺院地阵地那一块留给寺庙
             const t = EAST_SUBURB.temple;
             if (Math.abs(x - t.x) < t.w / 2 + 8 && Math.abs(z - t.z) < t.d / 2 + 8) continue;
+            // 东关挂牌院落（第一区公所/731团1营，EAST_SUBURB.features）：
+            // 迷宫格子给它们让位，院落本体由 Script_Landmark_EastSuburb.mjs 落成。
+            if ((EAST_SUBURB.features || []).some((ef) =>
+              Math.abs(x - ef.x) < ef.w / 2 + 6 && Math.abs(z - ef.z) < ef.d / 2 + 6)) continue;
             // 各 LOD 共用轴对齐院墙与枪眼；不只转 detail，避免中远景切换时枪眼漂浮。
             const cell = { x, z, w, d, seed };
             this.sink.SetSector(SectorKey(x, z));
@@ -2054,10 +2065,12 @@ export class TengxianCity {
     // 几何全部住在各自的 Script_Landmark_*.mjs（注册表派发），这里只管派发与分区。
     const westFeatures = [
       ["powerPlant", WEST_SUBURB.powerPlant, 80],
-      ["station", WEST_SUBURB.station, 120],
+      // 车站要一并拿到铁路数据；122师部要拿到西关大街 —— 构建器读 f.railway / f.street，
+      // 不喂就退回文件内的镜像常量（改数据时那两份镜像要同步，见各文件头注）。
+      ["station", { ...WEST_SUBURB.station, railway: WEST_SUBURB.railway }, 120],
       ["communications", WEST_SUBURB.communications, 80],
       ["exchange", WEST_SUBURB.exchange, 60],
-      ["division122", WEST_SUBURB.division122, 60],
+      ["division122", { ...WEST_SUBURB.division122, street: WEST_SUBURB.westStreet }, 60],
     ];
     for (const [kind, spec, radius] of westFeatures) {
       const builder = LANDMARK_BUILDERS[kind];
@@ -2151,6 +2164,10 @@ export class TengxianCity {
       const w = MARCH_GROUND.wheatPatch.minSize
         + rnd() * (MARCH_GROUND.wheatPatch.maxSize - MARCH_GROUND.wheatPatch.minSize);
       const d = w * (0.55 + rnd() * 0.7);
+      // 铁路走廊豁免：水平麦田板在起伏地上会浮到局部地面上方 0.4—0.5 m，
+      // 正好盖住 0.46 m 的道砟面（WP-B1 取证）。西关大街走廊同理。
+      if (Math.abs(x - WEST_SUBURB.railway.x) < w / 2 + 14) continue;
+      if (Math.abs(z - WEST_SUBURB.westStreet.z) < d / 2 + 8 && x < -320 && x > -500) continue;
       const y = this.OuterHeight(x, z);
       // 苗高 15—30 cm：盒子 0.3 m 厚、中心压到地面下 0.05，露出地面的只有 10 cm。
       // 原来 0.6 m 厚顶在 +0.36 m，城外任何远景都带一条发绿的「堤坝」（出川过场出图抓到）。

@@ -432,7 +432,9 @@ export const EAST_FIELD = {
 /** 西关：电灯厂的烟囱是西关天际线上的关键剪影，且在西城门楼的直瞄射程内。 */
 export const WEST_SUBURB = {
   // 西关紧贴西门与津浦铁路：通信队、电灯厂、交易所与车站的相对关系来自城防图；尺度推定。
-  communications: { x: -402, z: -28, w: 30, d: 72 },
+  // z/d v2.1：旧值 (z-28, d72) 南墙压到 z=+8，正好骑在西关大街上 —— 收到南墙 z=-16，
+  // 与街留 13 m（WP-B3/B4 取证）。
+  communications: { x: -402, z: -44, w: 30, d: 56 },
   powerPlant: { x: -408, z: 62, w: 30, d: 18, chimneyH: 22 },
   exchange: { x: -438, z: 116, w: 24, d: 28 },
   // 津浦路滕县站，1911 年竣工、德国承建的北段。三等小站不会有钟楼与大厅。
@@ -441,8 +443,11 @@ export const WEST_SUBURB = {
   railway: { x: -480, fromZ: -900, toZ: 900, gauge: 1.435 },   // 相对城墙位置为推定
   // v2：照城防示意图补齐 —— 第122师师部在西关（濠外、西关大街北侧）；
   // 西关大街 = 西门吊桥外接铁路方向的城外土路。坐标、尺度均为推定。
-  division122: { x: -362, z: -38, w: 40, d: 32 },
-  westStreet: { z: 0, fromX: -470, toX: -328, width: 6, label: "西关大街" },
+  // ry=π：坐北朝南开门对着西关大街（BuildHq/AddCompound 的门脸在局部 -z）。
+  division122: { x: -362, z: -38, ry: Math.PI, w: 40, d: 32 },
+  // toX=-344.5：濠在西门外凸 16 m（GATE_BULGE），外岸 = 318+16+10.5 —— 旧值 -328
+  // 落在濠内马道上，路会铺过护城河（WP-B4 取证）。
+  westStreet: { z: 0, fromX: -470, toX: -344.5, width: 6, label: "西关大街" },
 };
 
 /**
@@ -567,7 +572,9 @@ export const PRESUMED = [
   { id: "gullySection", value: { depth: 3.0, width: 7.5 }, unit: "m", note: "地隙的存在与「可掩蔽接近到寨墙 200 m」为日方实测，断面尺寸无载" },
   { id: "eastSuburbLayout", value: "18×16 m 院落密铺", note: "东关「密集院落、院墙相连」为日方描述，具体地块划分无资料" },
   { id: "powerPlantSize", value: { w: 30, d: 18, chimneyH: 22 }, unit: "m", note: "电灯厂位置与「在西城楼直瞄射程内」为主流记载，厂房规模与烟囱高度无载" },
-  { id: "westSuburbLayout", value: "WEST_SUBURB", note: "津浦铁路在城西，以及西关的车站、通信队、电灯厂、交易所、第122师师部与西关大街的关系为 Notion 城防示意图可见信息；其坐标、尺度和站房形式均为推定" },
+  { id: "westSuburbLayout", value: "WEST_SUBURB", note: "津浦铁路在城西，以及西关的车站、通信队、电灯厂、交易所、第122师师部与西关大街的关系为 Notion 城防示意图可见信息；其坐标、尺度和站房形式均为推定。**整条西关带按图比例整体压缩**：电灯厂—西门实距约 120 m，低于「城楼直瞄 300—600 m」的记载口径 —— 压缩是全图统一的游戏化尺度决定，城楼—电灯厂的直瞄压制关系在场景里仍然成立，不另移坐标" },
+  { id: "xiguanStreetForm", value: { crown: 0.22, shops: "4间+1敞棚", bridgeSteps: 4, hitching: "拴马桩3+石槽" }, unit: "m", note: "西关大街路冠/沿街铺面（排门板+幌子）/桥头引道/师部门前拴马桩：关厢街区形制推定，志载无逐间记载；路冠 0.22 为压住麦垄的临时值，outfield Blocked 豁免生效后可降回 ~0.10" },
+  { id: "stationRailForm", value: { platform: 0.75, ballast: 0.46, clerestory: "高侧窗采光带", masts: "格构天线杆17-20m×4" }, unit: "m", note: "车站站台/道砟断面/电灯厂高侧窗/通讯队天线阵：站房图纸与照片一张未得（docs uncertainties 明列），全部为德建三等小站与县级电灯厂、军用通信院的形制常识推定" },
   { id: "northSuburbLayout", value: "NORTH_SUBURB", note: "北关坝墙（圩子）、圩门、北关大街与北庙的存在与走向为 Notion 城防示意图可见信息；坐标、圩门数量与坝墙断面全部为推定" },
   // —— 批次A 地标形制（图上只有图注与位置，以下整族数值全部无载，出处见各 Script_Landmark_*.mjs 头注与 WP 报告）——
   { id: "jailForm", value: { wall: [4.6, 0.75], detentionWall: 3.8, towerTop: 9.0, gate: [1.3, 2.6], cellBay: 2.2, cellWindow: [0.55, 0.75], sill: 1.55 }, unit: "m", note: "监狱/看守所形制：高墙、转角岗楼、窄开间铁窗、重门。全部为「一眼可辨」的设计推定，无任何史料" },

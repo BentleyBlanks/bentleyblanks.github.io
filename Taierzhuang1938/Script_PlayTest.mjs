@@ -798,6 +798,13 @@ const shotPool = await page.evaluate(() => {
   if (bestYaw === null) return { boxedIn: true };
   T.player.yaw = bestYaw;
   T.player.aimYaw = 0; T.player.pitch = 0; T.player.aimPitch = 0;
+  // **转完向必须推两帧**：子弹从枪口出发，而枪口世界坐标是逐帧跟随的 ——
+  // 不推帧它还停在旧朝向前方 0.8 m 处，从那里沿新方向打出去，与摆在
+  // 视线上的靶子错开 0.8·sin(Δ夹角)；Δ夹角 >~34° 时八发全从靶边掠过
+  //（东关雕出空地后 bestYaw 恰好落到远离旧朝向的方位，双跑复现 none×8）。
+  T.StepFrames(2);
+  T.player.yaw = bestYaw;
+  T.player.aimYaw = 0; T.player.pitch = 0; T.player.aimPitch = 0;
   // 靶子摆在**真正的瞄准射线**上，别拿 player.yaw 现推一条水平前向：
   // TryFire 的命中判定是「到射线的垂距 < 0.45 m」，而胸口在 position.y + 0.95。
   // 拿水平前向摆在 3 m 处，胸口比眼位低 0.65 m，垂距 0.65 > 0.45 —— 八枪全从头顶过去。

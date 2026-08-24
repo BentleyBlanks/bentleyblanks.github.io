@@ -323,21 +323,33 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
     const v = new (Object.getPrototypeOf(T.player.position).constructor)();
     const rows = [];
     const why = { total: 0, dead: 0, noActor: 0, hidden: 0, prone: 0, ok: 0 };
-    for (const s of T.ai.soldiers) {
-      why.total += 1;
-      if (!s.alive) { why.dead += 1; continue; }
-      if (!s.actor) { why.noActor += 1; continue; }
-      if (!s.actor.root.visible) { why.hidden += 1; continue; }
-      if (s.stance === 2) { why.prone += 1; continue; }   // 趴着的人不做脚贴地
-      why.ok += 1;
-      const a = s.actor;
-      a.root.updateWorldMatrix(true, true);
-      for (const tag of ["L", "R"]) {
-        const ankle = a.legs[tag].ankle;
-        v.setFromMatrixPosition(ankle.matrixWorld);
-        const g = T.Debug.Probe(v.x, v.z, s.position.y);
-        rows.push({ err: v.y - g.y, moving: s.moveSpeed > 0.05 });
+    const Sample = () => {
+      for (const s of T.ai.soldiers) {
+        why.total += 1;
+        if (!s.alive) { why.dead += 1; continue; }
+        if (!s.actor) { why.noActor += 1; continue; }
+        if (!s.actor.root.visible) { why.hidden += 1; continue; }
+        if (s.stance === 2) { why.prone += 1; continue; }   // 趴着的人不做脚贴地
+        why.ok += 1;
+        const a = s.actor;
+        a.root.updateWorldMatrix(true, true);
+        for (const tag of ["L", "R"]) {
+          const ankle = a.legs[tag].ankle;
+          v.setFromMatrixPosition(ankle.matrixWorld);
+          const g = T.Debug.Probe(v.x, v.z, s.position.y);
+          rows.push({ err: v.y - g.y, moving: s.moveSpeed > 0.05 });
+        }
       }
+    };
+    // 「站着的人」取决于采样那一瞬有几个人恰好站定 —— 城图重排后 AI 走动更多，
+    // 单瞬采样会薄到 n<4（批次B 集成时抓到 n=2 的假红）。多采几个瞬间累积到够。
+    Sample();
+    for (let round = 0; round < 6 && rows.filter((q) => !q.moving).length < 4; round += 1) {
+      for (let i = 0; i < 24; i += 1) {
+        for (const s of near) T.ai._SetDetailedAttached(s.actor, true);
+        T.StepFrames(1);
+      }
+      Sample();
     }
     const still = rows.filter((q) => !q.moving).map((q) => q.err);
     const all = rows.map((q) => q.err);

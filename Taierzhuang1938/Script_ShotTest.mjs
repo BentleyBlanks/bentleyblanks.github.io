@@ -97,6 +97,10 @@ const GAME_SHOTS = [
   // 南城：站在火神庙东街街心正看天主堂钟塔（南城唯一高点）。街外 4 m 就是院墙，机位必须压街心。
   { name: "Game_Z14_SouthChurch", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 36, z: 210, yaw: Math.PI, pitch: 0.06, quiet: true } },
+  // 西关大街：站在街心往东看怀古门 —— 一张图同时验土路、沿街铺面、通讯队院墙、
+  // 师部方向与桥头引道。西关带只在 phase=1 生成（bounds）。
+  { name: "Game_Z15_XiguanStreet", query: "shot=1&phase=1&quality=high&scale=medium",
+    setup: { x: -405, z: 0, yaw: -Math.PI / 2, pitch: 0.02, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

@@ -479,7 +479,9 @@ const OUTFIELD_SCENES = {
       width: 5.6,
       // 车站 → 电灯厂 → 西门外的那条土路（设计稿：西门外土路自 (-310,0) 向西）
       points: [[-1500, -168], [-1444, -120], [-1440, 40], [-1330, 44], [-1080, 36],
-        [-700, 26], [-470, 12], [-358, 4]],
+        // 大车路在西关外收口：末段交给西关大街（z=0 那条才是城防图上的西门轴线路，
+        // 旧末两点 [-470,12]/[-358,4] 会与它并行重影、还从沿街铺面底下穿过 —— WP-B4 取证）
+        [-700, 26], [-560, 16]],
     }],
     villages: [
       { id: "BeishaheVillage", x: -1276, z: -604, w: 132, d: 78, count: 9, far: true },
@@ -612,6 +614,20 @@ export class TengxianOutfield {
       const pp = WEST_SUBURB.powerPlant, st = WEST_SUBURB.station;
       if (Math.abs(x - pp.x) < pp.w / 2 + 38 + margin && Math.abs(z - pp.z) < pp.d / 2 + 38 + margin) return true;
       if (Math.abs(x - st.x) < st.w / 2 + 42 + margin && Math.abs(z - st.z) < st.d / 2 + 40 + margin) return true;
+      // 批次B 补齐的西关带：通讯队 / 交易所 / 122师部三块垫地，
+      // 以及西关大街走廊与津浦铁路走廊 —— 麦垄/耕地斑/散树/坟头都不许长进来
+      //（WP-B1/B4 取证：麦垄 topOffset 0.18 直接盖住道砟面与路面）。
+      for (const key of ["communications", "exchange", "division122"]) {
+        const w = WEST_SUBURB[key];
+        if (w && Math.abs(x - w.x) < w.w / 2 + 30 + margin
+          && Math.abs(z - w.z) < w.d / 2 + 30 + margin) return true;
+      }
+      const ws = WEST_SUBURB.westStreet;
+      if (ws && z > ws.z - ws.width / 2 - 5 - margin && z < ws.z + ws.width / 2 + 5 + margin
+        && x > -480 - 8 - margin && x < -340 + margin) return true;
+      const rail = WEST_SUBURB.railway;
+      if (rail && Math.abs(x - rail.x) < 9 + margin
+        && z > -340 - margin && z < 340 + margin) return true;
       for (const l of OUTER_LANDMARKS) {
         const r = (l.w ? Math.max(l.w, l.d) / 2 : 30) + 26 + margin;
         if (Math.hypot(x - l.x, z - l.z) < r) return true;
