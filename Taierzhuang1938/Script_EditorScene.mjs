@@ -42,6 +42,16 @@ import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 
 const SAVE_KEY = "tengxian1938_sceneedit_v1";
+// 车厢序章不是一张可玩的战斗切片，不能把它伪装成 L0_界河。
+// 保持这个 id 与 Data_CutsceneChuchuan 的导出一致；真正打开时由主程序跳到
+// 独立预览页，那里才有完整的车厢时间轴与音频装配。
+const PROLOGUE_SCENE_ID = "CS_Chuchuan";
+const PROLOGUE_SCENE = {
+  id: PROLOGUE_SCENE_ID,
+  name: "序章 · 出川（车厢）",
+  tail: "新版序章 · 约 2 分钟",
+  title: "独立车厢序章；不会错误加载为界河战斗场景",
+};
 
 /**
  * 可放置的东西。
@@ -349,13 +359,19 @@ export class SceneEditor {
     this.levelList = ListBox(level, {
       height: 132,
       onPick: (id) => {
+        // 新序章是过场场景，不是 PHASES[0]。以前编辑器只在 PHASES 里查找，
+        // 于是用户点「序章」实际加载的是旧的 L0_界河战斗切片。
+        if (id === PROLOGUE_SCENE_ID) {
+          this.host.game.OpenProloguePreview?.();
+          return;
+        }
         const index = PHASES.findIndex((p) => p.id === id);
         if (index >= 0) this.host.game.JumpToLevel(index);
       },
     });
-    this.levelList.Fill(PHASES.map((p) => ({
+    this.levelList.Fill([PROLOGUE_SCENE, ...PHASES.map((p) => ({
       id: p.id, name: p.label, tail: p.date || "", title: p.brief || "",
-    })));
+    }))]);
     this.levelFacts = Facts(level);
   }
 
@@ -1084,6 +1100,11 @@ export class SceneEditor {
 
   Update(dt) {
     this.host.flycam.Update(dt);
+
+    // RespawnPlayer() 是换关装配的一环，它会 Equip() 后明确把视图模型设为
+    // visible。场景编辑器本身已经接管镜头，不能因此在任意非 L0 关卡露出枪械。
+    // 只在它被重新点亮时归零，避免把这个修复变成每帧无意义的属性写入。
+    if (this.host.viewmodel?.root?.visible) this.host.SetViewmodelVisible(false);
 
     // 关卡切片换过之后：包过的 GroundHeight、放置层的碰撞盒、地形的顶点位移
     // 三样都还挂在**上一份** city 上，得整套搬到新的那一份上去。

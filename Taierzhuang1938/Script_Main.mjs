@@ -923,6 +923,16 @@ async function Boot() {
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
       state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
+      // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
+      // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
+      // query，避免新序章又落到界河战斗切片。
+      OpenProloguePreview: () => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("preview", "CS_Chuchuan");
+        url.searchParams.delete("phase");
+        url.searchParams.delete("menu");
+        window.location.assign(url.toString());
+      },
       // 所有真正的编辑器都从菜单交接出来：主菜单本身有运镜，暂停菜单有
       // 「继续 / 设置 / 调试选项」；两者都不该和编辑器叠在同一张画面上。
       // 同时保留原菜单层，完整退出编辑器后再回去，而不是意外恢复战斗。

@@ -858,6 +858,7 @@ const jumped = await page.evaluate(() => {
     level: T.Debug.Level().id,
     items: active.items.length,
     nodes: active.root.children.length,
+    viewmodelHidden: !T.viewmodel.root.visible,
     patched: !!T.battlefield.__editorBaseGroundHeight,
     solid: T.battlefield.NearbyColliders(12, 12, 6)
       .some((b) => b.tag === "editorPlacement"),
@@ -865,8 +866,9 @@ const jumped = await page.evaluate(() => {
   };
 });
 Check("换关之后放置层与地形跟着搬家",
-  jumped.items === 1 && jumped.nodes === 1 && jumped.patched && jumped.solid && jumped.dented,
-  `到了 ${jumped.level}，碰撞=${jumped.solid} 地形=${jumped.dented}`);
+  jumped.items === 1 && jumped.nodes === 1 && jumped.viewmodelHidden
+    && jumped.patched && jumped.solid && jumped.dented,
+  `到了 ${jumped.level}，枪藏起=${jumped.viewmodelHidden} 碰撞=${jumped.solid} 地形=${jumped.dented}`);
 await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   active.ResetTerrain();
@@ -967,7 +969,9 @@ Check("新版预览点击播放后自动推进且不提前启动旧 L0 AI",
 
 await page.evaluate(() => {
   const T = window.Taierzhuang;
-  T.StepFrames(95 * 60 + 8, 1 / 60, false);
+  // 新版车厢序章总长是 120 s；95 s 是早期短版的陈旧断言，届时还在
+  // 「火车进站」段，自然不可能已交接到终点。
+  T.StepFrames(120 * 60 + 8, 1 / 60, false);
 });
 await page.waitForTimeout(10);
 const previewDone = await page.evaluate(() => {
@@ -1042,11 +1046,23 @@ Check("从主菜单打开场景编辑器会交还菜单相机",
   !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "scene"
     && menuToEditor.capturing, JSON.stringify(menuToEditor));
 
-await page.evaluate(() => {
+const prologueRow = await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
+  let requested = false;
+  // 不在这一条真的重载页面；替身只验证列表项会走独立的新版序章入口，
+  // 而不是误落到 L0_界河。真正预览页的完整起播与收口已在第 9 节验证。
+  active.host.game.OpenProloguePreview = () => { requested = true; };
+  const rows = [...active.levelList.root.children];
+  const prologue = rows.find((row) => row.textContent.includes("序章 · 出川（车厢）"));
+  const beishahe = rows.find((row) => row.textContent.includes("北沙河 · 入城"));
+  prologue?.click();
   // 走 ListBox 行的真实 click，不直接调 JumpToLevel，确保 UI 选关链路也在测试内。
-  active.levelList.root.children[1].click();
+  beishahe?.click();
+  return { requested, present: !!prologue, battleRowPresent: !!beishahe };
 });
+Check("场景编辑器列出新版车厢序章并走独立入口",
+  prologueRow.present && prologueRow.requested && prologueRow.battleRowPresent,
+  JSON.stringify(prologueRow));
 await page.waitForFunction(() => {
   const T = window.Taierzhuang;
   return T.state.ready && T.state.builtPhase === 1 && T.editor.active
@@ -1059,7 +1075,7 @@ const menuSlice = await page.evaluate(() => {
     built: T.state.builtPhase,
     menu: T.state.menu,
     bounds: T.battlefield.bounds,
-    expected: { minX: -1560, maxX: -230, minZ: -470, maxZ: 170 },
+    expected: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
     patched: !!T.battlefield.__editorBaseGroundHeight,
   };
 });
