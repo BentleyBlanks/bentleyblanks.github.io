@@ -1,11 +1,12 @@
 // 《血战台儿庄》模型加载器：读 _blender 出的 .tzm.json，吐一棵 Object3D 层级。
 //
 // 为什么不是 glTF：
-//   vendor 里的 three 只有 build/ 的核心库，**没有 examples/jsm**，也就没有
-//   GLTFLoader。为了读十几个模型把整个 addon 拖进来，代价（体积、和自研管线的
-//   预通道/色彩管理约定打架、以后升级 three 要同步两处）远大于收益。
 //   TZM 只表达四件事：节点层级、局部变换、每节点的网格、材质名 —— 就这四件事，
-//   写它的 Python 不到 400 行，读它的这个文件不到 300 行。
+//   写它的 Python 不到 400 行，读它的这个文件不到 300 行。自研管线的预通道 /
+//   色彩管理约定也不用迁就外部格式。
+//  （历史注：早期 vendor 里只有 three 的 build/ 核心库；后来为外部 GLB 道具、
+//   蒙皮人物与过场引入了 examples/jsm 的 GLTFLoader —— 见 Script_ExternalProps /
+//   Script_RiggedModel / Script_Cutscene。TZM 管线保持独立，两边各管各的。）
 //
 // 三条硬约束（错一条画面立刻出事）：
 //   1) **不许 SkinnedMesh。** 深度法线预通道用 scene.overrideMaterial 覆盖全场，

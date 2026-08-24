@@ -36,9 +36,10 @@ import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
   CORNER_TOWERS, RAMPS, RAMP, DUGOUT, CROSSROAD, STREETS, SIGHT_CORRIDOR,
   LANDMARKS, CITY_FEATURES, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, EAST_FIELD,
-  WEST_SUBURB, OUTSKIRTS, MARCH_GROUND,
+  WEST_SUBURB, NORTH_SUBURB, OUTSKIRTS, MARCH_GROUND,
   PALETTE, WALL_TOP_Y,
 } from "./Data_Tengxian.mjs";
+import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
@@ -123,6 +124,20 @@ const MATERIAL_MAP = {
   // 和摆上台架必须是同一个颜色，不然编辑器里调好的东西进游戏变了样。
   armor: { recipe: "SteelHelmet", color: 0xb9ad86, roughness: 1, metalness: 0.05 },
   track: { recipe: "SteelHelmet", color: 0x8f887c, roughness: 1, metalness: 0.30 },
+  // ——「照城防示意图补全地标」预留材质名（Phase 0 插桩）——
+  // 各工作包只许用这些名字，不许自己往本表加行；调色不合适把目标值写进交付报告，
+  // 由主会话统一改。先全部压在既有烘焙配方上，等贴图管线出 webp 后再逐个换。
+  PrisonWall: { recipe: "BrickWallSooty", color: 0xc9cdd3, roughness: 1.0 },
+  StationBrick: { recipe: "BrickWall", color: 0xdcc9b8, roughness: 1.0 },
+  PlatformStone: { recipe: "Stone", color: 0xd9dade, roughness: 1.0 },
+  RailSteel: { recipe: "SteelHelmet", color: 0x77726a, roughness: 0.55, metalness: 0.6 },
+  RailBallast: { recipe: "GroundRubble", color: 0x9d9a92, roughness: 1.0 },
+  SleeperWood: { recipe: "WoodBeam", color: 0x6b5844, roughness: 1.0 },
+  ChimneyBrick: { recipe: "BrickWallSooty", color: 0xb99f90, roughness: 1.0 },
+  TemplePlaster: { recipe: "Adobe", color: 0xd9a88e, roughness: 0.96 },
+  ChurchPlaster: { recipe: "Adobe", color: 0xf2ede0, roughness: 0.94 },
+  SchoolBrick: { recipe: "BrickWall", color: 0xe2e4e8, roughness: 1.0 },
+  AntennaSteel: { recipe: "SteelHelmet", color: 0x5f5c55, roughness: 0.6, metalness: 0.5 },
 };
 // 纯色（没有对应烘焙配方的）
 const PLAIN_MAP = {
@@ -184,8 +199,13 @@ const OUTER_PADS = [
   { id: "SouthChurch", x: 0, z: 420, w: 52, d: 52, feather: 14 },
   { id: "ShanguoGate", x: 0, z: 900, w: 36, d: 28, feather: 12 },
   { id: "NorthMission", x: -60, z: -420, w: 160, d: 110, feather: 18 },
-  { id: "PowerPlant", x: -700, z: 30, w: 70, d: 48, feather: 16 },
-  { id: "Station", x: -1450, z: 40, w: 80, d: 46, feather: 16 },
+  // 西关带的垫地跟着 WEST_SUBURB 走（旧版曾滞留在 -700/-1450 的废弃坐标上，
+  // 楼站在未垫平的 -1.2 m 原野里 —— 这里的坐标必须与 Data_Tengxian.WEST_SUBURB 同步）。
+  { id: "PowerPlant", x: WEST_SUBURB.powerPlant.x, z: WEST_SUBURB.powerPlant.z, w: WEST_SUBURB.powerPlant.w + 16, d: WEST_SUBURB.powerPlant.d + 16, feather: 16 },
+  { id: "Station", x: WEST_SUBURB.station.x, z: WEST_SUBURB.station.z, w: WEST_SUBURB.station.w + 18, d: WEST_SUBURB.station.d + 18, feather: 16 },
+  { id: "Communications", x: WEST_SUBURB.communications.x, z: WEST_SUBURB.communications.z, w: WEST_SUBURB.communications.w + 16, d: WEST_SUBURB.communications.d + 16, feather: 16 },
+  { id: "Exchange", x: WEST_SUBURB.exchange.x, z: WEST_SUBURB.exchange.z, w: WEST_SUBURB.exchange.w + 16, d: WEST_SUBURB.exchange.d + 16, feather: 14 },
+  { id: "Division122", x: WEST_SUBURB.division122.x, z: WEST_SUBURB.division122.z, w: WEST_SUBURB.division122.w + 16, d: WEST_SUBURB.division122.d + 16, feather: 14 },
   { id: "Pagoda", x: 620, z: 210, w: 38, d: 38, feather: 14 },
   { id: "FortSE", x: 370, z: 370, w: 26, d: 26, feather: 10 },
   { id: "FortSW", x: -370, z: 370, w: 26, d: 26, feather: 10 },
@@ -902,11 +922,14 @@ export class TengxianCity {
         MakeBox(s.axis === "x" ? len : s.width, 0.12, s.axis === "x" ? s.width : len,
           TILE_METERS.ground, `road${s.id}`),
         { x: cx, y: CITY.platformY + 0.05, z: cz }));
-      this.stats.roadMarks += AddRoadWear(this.sink, {
-        x: cx, z: cz, ry: s.axis === "x" ? 0 : Math.PI / 2,
-        length: len, width: s.width, baseY: CITY.platformY + 0.118,
-        seed: `roadWear${s.id}`,
-      });
+      // 巷道（rank:"hutong"）是人走出来的过道：不铺车辙 —— 大车进不了两米巷。
+      if (s.rank !== "hutong") {
+        this.stats.roadMarks += AddRoadWear(this.sink, {
+          x: cx, z: cz, ry: s.axis === "x" ? 0 : Math.PI / 2,
+          length: len, width: s.width, baseY: CITY.platformY + 0.118,
+          seed: `roadWear${s.id}`,
+        });
+      }
     }
     // 十字街口：全城的中心地标，王铭章亲临这里指挥
     this.sink.Add("DirtRoad", PlaceGeometry(
@@ -923,6 +946,8 @@ export class TengxianCity {
    */
   BuildStreetLife() {
     for (const street of STREETS) {
+      // 两米宽的巷子摆不下 26 m 一组的街肩家什 —— 巷道跳过生活层。
+      if (street.rank === "hutong") continue;
       const rnd = Mulberry32(HashString(`streetLife:${street.id}`));
       const from = Math.min(street.from, street.to) + 24;
       const to = Math.max(street.from, street.to) - 24;
@@ -1200,6 +1225,15 @@ export class TengxianCity {
   BuildOneLandmark(l, rnd) {
     this.sink.SetSector(SectorKey(l.x, l.z));
     this.farSink.SetSector(SectorKey(l.x, l.z));
+    // 地标注册表优先（church/yamen 等已迁入 Script_Landmark_*.mjs 专属文件）。
+    const registered = LANDMARK_BUILDERS[l.kind];
+    if (registered) {
+      const profile = this.DamageProfile(l.damage ?? 0.22);
+      registered(this, l, { damage: profile.damage, burnt: profile.burnt, ry: l.ry ?? 0 });
+      this.sink.SetSector("");
+      this.farSink.SetSector("");
+      return;
+    }
     const sink = this.sink;
     const y = CITY.platformY;
     switch (l.kind) {
@@ -1295,6 +1329,16 @@ export class TengxianCity {
       const burnt = profile.burnt;
       const ry = this.FeatureOrientation(f);
       this.sink.SetSector(SectorKey(f.x, f.z));
+      // 地标注册表优先：一个 kind 一个专属构建器文件（Script_Landmark_*.mjs），
+      // 并行制作互不碰共享文件。查不到的 kind 落回下面的通用分支。
+      const custom = LANDMARK_BUILDERS[f.kind];
+      if (custom) {
+        this.farSink.SetSector(SectorKey(f.x, f.z));
+        custom(this, f, { damage, burnt, ry });
+        this.sink.SetSector("");
+        this.farSink.SetSector("");
+        continue;
+      }
       if (f.kind === "compound") {
         AddCompound(this.sink, {
           x: f.x, z: f.z, ry, width: f.w, depth: f.d,
@@ -2007,37 +2051,37 @@ export class TengxianCity {
       this.BuildOneLandmark(l, rnd);
     }
 
-    // 西关电灯厂：烟囱是西关天际线上的关键剪影，距西城门楼约 395 m，
-    // 在城楼机枪的直瞄射程内（300—600 m 为推定）。
-    const pp = WEST_SUBURB.powerPlant;
-    if (this.InBounds(pp.x, pp.z, 80)) {
-      const y = this.OuterHeight(pp.x, pp.z);
-      this.farSink.Add("HouseBrick", PlaceGeometry(
-        MakeBox(pp.w, 7.5, pp.d, TILE_METERS.brick, "powerPlant", BRICK_UV_GRID),
-        { x: pp.x, y: y + 3.75, z: pp.z }));
-      this.farSink.Add("RoofTile", PlaceGeometry(
-        MakeBox(pp.w + 1, 0.7, pp.d + 1, TILE_METERS.roof, "powerPlantRoof"),
-        { x: pp.x, y: y + 7.8, z: pp.z }));
-      const chimney = new THREE.CylinderGeometry(0.9, 1.7, pp.chimneyH, 10);
-      const uv = chimney.attributes.uv;
-      for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * pp.chimneyH / 1.2);
-      this.sink.Add("HouseBrick", PlaceGeometry(chimney,
-        { x: pp.x + pp.w * 0.36, y: y + pp.chimneyH / 2, z: pp.z - pp.d * 0.3 }));
+    // 西关功能带（照城防示意图）：电灯厂 / 车站 / 通讯队 / 交易所 / 第122师师部。
+    // 几何全部住在各自的 Script_Landmark_*.mjs（注册表派发），这里只管派发与分区。
+    const westFeatures = [
+      ["powerPlant", WEST_SUBURB.powerPlant, 80],
+      ["station", WEST_SUBURB.station, 120],
+      ["communications", WEST_SUBURB.communications, 80],
+      ["exchange", WEST_SUBURB.exchange, 60],
+      ["division122", WEST_SUBURB.division122, 60],
+    ];
+    for (const [kind, spec, radius] of westFeatures) {
+      const builder = LANDMARK_BUILDERS[kind];
+      if (!builder || !spec || !this.InBounds(spec.x, spec.z, radius)) continue;
+      this.sink.SetSector(SectorKey(spec.x, spec.z));
+      this.farSink.SetSector(SectorKey(spec.x, spec.z));
+      builder(this, { id: kind, ...spec }, { damage: 0.2, burnt: false, ry: spec.ry ?? 0 });
+      this.sink.SetSector("");
+      this.farSink.SetSector("");
     }
 
-    // 滕县站与津浦铁路：只做剪影，位置与形制全为推定
-    const st = WEST_SUBURB.station;
-    if (this.InBounds(st.x, st.z, 120)) {
-      const y = this.OuterHeight(st.x, st.z);
-      this.farSink.Add("HouseBrick", PlaceGeometry(
-        MakeBox(st.w, 5.2, st.d, TILE_METERS.brick, "station", BRICK_UV_GRID),
-        { x: st.x, y: y + 2.6, z: st.z }));
-      this.farSink.Add("HouseBrick", PlaceGeometry(
-        MakeBox(st.w * 0.3, 3.4, st.d, TILE_METERS.brick, "stationMid", BRICK_UV_GRID),
-        { x: st.x, y: y + 6.9, z: st.z }));
-      this.farSink.Add("RoofTile", PlaceGeometry(
-        MakeBox(st.w + 1.6, 1.4, st.d + 1.8, TILE_METERS.roof, "stationRoof"),
-        { x: st.x, y: y + 5.9, z: st.z }));
+    // 北关：坝墙 / 圩门 / 北庙（Script_Landmark_NorthSuburb.mjs）。
+    if (LANDMARK_BUILDERS.northSuburb
+      && this.InBounds(NORTH_SUBURB.street.x, NORTH_SUBURB.stockade.z, 260)) {
+      this.farSink.SetSector(SectorKey(NORTH_SUBURB.street.x, NORTH_SUBURB.stockade.z));
+      LANDMARK_BUILDERS.northSuburb(this, NORTH_SUBURB, {});
+      this.farSink.SetSector("");
+    }
+
+    // 东关挂牌院落（第一区公所 / 第731团1营，Script_Landmark_EastSuburb.mjs）：
+    // 桩目前为空 —— 要在东关迷宫网格里留位落成，不许直接叠院穿模。
+    if (LANDMARK_BUILDERS.eastSuburbFeatures && EAST_SUBURB.features) {
+      LANDMARK_BUILDERS.eastSuburbFeatures(this, EAST_SUBURB.features, {});
     }
 
     // 城外空心炮台 2 座（1908 建）—— **位置无载**，推定置于东南、西南墙外 60 m

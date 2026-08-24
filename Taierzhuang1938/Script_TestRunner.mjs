@@ -75,6 +75,7 @@ export const testDefs = {
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
   JieheTerrainTest: { file: "Script_JieheTerrainTest.mjs", desc: "界河高度图采样与贴地" },
   TengxianLayoutTest: { file: "Script_TengxianLayoutTest.mjs", desc: "滕县城防、街路与功能区布局（纯 Node）" },
+  TengxianZoneTest: { file: "Script_TengxianZoneTest.mjs", desc: "城内 zone/出生点不被街坊围死（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
@@ -114,7 +115,7 @@ export const tier2 = [
 export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",

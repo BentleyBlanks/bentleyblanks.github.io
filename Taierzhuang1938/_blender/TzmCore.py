@@ -2,11 +2,11 @@
 """《血战台儿庄》Blender 程序化建模内核 —— 建模原语 + 节点树 + TZM 导出。
 
 为什么自己定一个 .tzm.json 而不是 glTF：
-  仓里的 three 只有 vendor/three/build 的核心库，**没有 examples/jsm**，
-  也就没有 GLTFLoader。为了读七把枪把整个 addon 拖进来，代价（体积、维护、
-  和自研管线的 tone mapping / 预通道约定打架）远大于收益。
   自研格式只需要表达四件事：节点层级、每节点局部变换、每节点挂的网格、材质名。
-  这四件事写出来不到 200 行，读它的加载器也不到 200 行。
+  这四件事写出来不到 200 行，读它的加载器也不到 200 行，且不用迁就外部格式的
+  tone mapping / 预通道约定。
+ （历史注：早期仓里只有 vendor/three/build 核心库；后来为外部 GLB 道具、蒙皮
+  人物与过场引入了 examples/jsm 的 GLTFLoader。TZM 管线保持独立，两边各管各的。）
 
 为什么在 Blender 里直接按**游戏坐标系（Y 上、-Z 前）**建模，而不是 Blender
 的 Z 上：

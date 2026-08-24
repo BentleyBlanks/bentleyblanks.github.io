@@ -35,6 +35,7 @@ import {
   AddAlarmTower, AddSquareFort, AddChurch, AddMosque, AddSandbagPlug,
 } from "./Script_World.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
 import { MakeBox, MakeSandbag, MakeInstanced, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
@@ -168,6 +169,46 @@ export const PLACEABLE = [
     }),
   },
 ];
+
+// 「照城防示意图补全地标」的注册表构件（Script_Landmark_*.mjs）。
+// 编辑器里没有城，用 MakeFeatureHost 的平地替身；参数映射：w/d=占地，damage=破损。
+const REGISTRY_PLACEABLE = [
+  ["Prison", "监狱", "prison", { w: 44, d: 36, damage: 0.2 }],
+  ["Detention", "看守所", "detention", { w: 30, d: 26, damage: 0.2 }],
+  ["Garrison", "警备队", "garrison", { w: 46, d: 30, damage: 0.2 }],
+  ["Police", "警察所", "police", { w: 34, d: 28, damage: 0.18 }],
+  ["Guild", "商会", "guild", { w: 40, d: 26, damage: 0.18 }],
+  ["Pawnshop", "当铺", "pawnshop", { w: 34, d: 30, damage: 0.2 }],
+  ["Hq", "指挥部院", "hq", { w: 62, d: 44, damage: 0.16 }],
+  ["Billet", "营连驻地", "billet", { w: 60, d: 40, damage: 0.24 }],
+  ["TempleYard", "庙宇", "temple", { w: 42, d: 30, damage: 0.22 }],
+  ["ConfucianTemple", "文庙", "confucianTemple", { w: 40, d: 34, damage: 0.2 }],
+  ["School", "学校", "school", { w: 48, d: 30, damage: 0.24 }],
+];
+for (const [pid, name, kind, defaults] of REGISTRY_PLACEABLE) {
+  PLACEABLE.push({
+    id: pid, name, cat: "地标", uses: ["ry", "w", "d", "damage"], defaults,
+    build: (sink, it) => LANDMARK_BUILDERS[kind](
+      MakeFeatureHost(sink),
+      { id: `edit${it.seed}`, x: it.x, z: it.z, w: it.w, d: it.d },
+      { damage: it.damage, burnt: false, ry: it.ry }),
+  });
+}
+// 西关两件带专属参数的：车站（h 无用）与电灯厂（h=烟囱高）。
+PLACEABLE.push({
+  id: "Station", name: "车站", cat: "地标", uses: ["ry", "w", "d"], defaults: { w: 34, d: 12 },
+  build: (sink, it) => LANDMARK_BUILDERS.station(
+    MakeFeatureHost(sink), { id: `edit${it.seed}`, x: it.x, z: it.z, w: it.w, d: it.d },
+    { damage: 0.2, burnt: false, ry: it.ry }),
+});
+PLACEABLE.push({
+  id: "PowerPlant", name: "电灯厂", cat: "地标", uses: ["ry", "w", "d", "h"],
+  defaults: { w: 30, d: 18, h: 22 },
+  build: (sink, it) => LANDMARK_BUILDERS.powerPlant(
+    MakeFeatureHost(sink),
+    { id: `edit${it.seed}`, x: it.x, z: it.z, w: it.w, d: it.d, chimneyH: it.h },
+    { damage: 0.2, burnt: false, ry: it.ry }),
+});
 
 /**
  * Model/*.tzm.json 里那几个可以当道具摆的。

@@ -221,7 +221,10 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(60));
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
     const p = T.player;
-    const spot = T.physics.FindFreeSpot(p.position.x + 14, p.position.z - 6, 0.6, 1.9, 26);
+    // 台阶跑道锚在街道中线上（L5 出生点在十字街，中线按规矩永远留空）：
+    // 旧写法 z-6 落在街肩外的院落边缘带，FindFreeSpot 只保证落点无碰撞，
+    // 不保证 +x 方向 5.4 m 跑道无墙 —— 街网照城防图重排后那里真的有院墙了。
+    const spot = T.physics.FindFreeSpot(p.position.x - 40, p.position.z, 0.6, 1.9, 26);
     const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
     const RISE = 0.4, RUN = 0.9, N = 6;
     const handles = [];

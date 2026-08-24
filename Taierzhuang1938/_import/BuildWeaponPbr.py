@@ -98,6 +98,12 @@ if __name__ == "__main__":
     # grained, while troop-car bench boards are broad, dry and heavily abraded.
     build_if_source("CarriageBenchWood", normal_strength=3.4, metalness=0,
                     rough_min=178, rough_max=242)
+    # 「照城防示意图补全地标」预留 stem（Phase 0 插桩）：各工作包用 imagegen 出
+    # _import/Source/Texture_<Stem>Source.png 后，本脚本才会真的构建；没有源图就跳过。
+    build_if_source("StationBrick", normal_strength=3.4, metalness=0, rough_min=160, rough_max=226)
+    build_if_source("PrisonBrick", normal_strength=3.6, metalness=0, rough_min=170, rough_max=232)
+    build_if_source("TemplePlaster", normal_strength=3.0, metalness=0, rough_min=200, rough_max=252)
+    build_if_source("ChurchPlaster", normal_strength=2.6, metalness=0, rough_min=190, rough_max=248)
     for stem in (
         "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
         "BrickWallSooty", "Adobe", "Stone", "CarriageBenchWood",

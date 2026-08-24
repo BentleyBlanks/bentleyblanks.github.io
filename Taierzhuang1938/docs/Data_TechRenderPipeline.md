@@ -1,6 +1,6 @@
 # 台儿庄 FPS：零 addon 的自研 3A 观感渲染管线
 
-> 本文所有 API / 常量 / GLSL 断言，均来自实读 `Taierzhuang1938/vendor/three/build/three.module.js` 与 `three.core.js`（`REVISION = '185'`，版权头 2010-2026），不是凭记忆。`vendor/three/` 下**只有 `build/` 与 `LICENSE`，没有 `examples/jsm`** —— `EffectComposer` / `UnrealBloomPass` / `SSAOPass` / `SMAAPass` / `CSM` 一个都没有，整条链必须手搭。
+> 本文所有 API / 常量 / GLSL 断言，均来自实读 `Taierzhuang1938/vendor/three/build/three.module.js` 与 `three.core.js`（`REVISION = '185'`，版权头 2010-2026），不是凭记忆。后处理链**不用任何 addon** —— `EffectComposer` / `UnrealBloomPass` / `SSAOPass` / `SMAAPass` / `CSM` 一个都没用，整条链手搭。（注：`vendor/three/examples/jsm` 后来为外部 GLB 道具 / 蒙皮人物 / 过场引入了 `GLTFLoader` 等加载器，但渲染管线本体仍零 addon。）
 
 ---
 
