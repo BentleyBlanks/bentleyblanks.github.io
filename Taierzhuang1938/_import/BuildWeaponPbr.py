@@ -89,6 +89,7 @@ if __name__ == "__main__":
     build_if_source("Ground", normal_strength=2.8, metalness=0, rough_min=178, rough_max=244)
     build_if_source("RoofTile", normal_strength=3.0, metalness=0, rough_min=126, rough_max=208)
     build_if_source("Sandbag", normal_strength=1.8, metalness=0, rough_min=208, rough_max=255)
+    build_if_source("WattleFence", normal_strength=3.8, metalness=0, rough_min=192, rough_max=255)
     build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     build_if_source("CarriageBenchWood", normal_strength=3.4, metalness=0,
                     rough_min=178, rough_max=242)
     for stem in (
-        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag",
+        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
         "BrickWallSooty", "Adobe", "Stone", "CarriageBenchWood",
     ):
         export_standalone_metallic_roughness(stem)

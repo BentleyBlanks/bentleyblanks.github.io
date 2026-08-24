@@ -433,9 +433,14 @@ async function Boot() {
         orm: "./Texture/Texture_RoofTileOrm.webp?v=1",
       }),
       library.LoadExternalSet("Sandbag", {
-        albedo: "./Texture/Texture_SandbagBase.webp?v=1",
-        normal: "./Texture/Texture_SandbagNormal.webp?v=1",
-        orm: "./Texture/Texture_SandbagOrm.webp?v=1",
+        albedo: "./Texture/Texture_SandbagBase.webp?v=regen20260824",
+        normal: "./Texture/Texture_SandbagNormal.webp?v=regen20260824",
+        orm: "./Texture/Texture_SandbagOrm.webp?v=regen20260824",
+      }),
+      library.LoadExternalSet("WattleFence", {
+        albedo: "./Texture/Texture_WattleFenceBase.webp?v=regen20260824",
+        normal: "./Texture/Texture_WattleFenceNormal.webp?v=regen20260824",
+        orm: "./Texture/Texture_WattleFenceOrm.webp?v=regen20260824",
       }),
       library.LoadExternalSet("BrickWallSooty", {
         albedo: "./Texture/Texture_BrickWallSootyBase.webp?v=1",

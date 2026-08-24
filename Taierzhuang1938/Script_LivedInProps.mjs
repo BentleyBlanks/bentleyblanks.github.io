@@ -379,7 +379,7 @@ export function AddWattleFence(sink, {
     const s = (length / (nPosts - 1)) * i;
     if (inGap(s)) continue;
     const p = LocalPoint(x, z, ry, s - length / 2, 0);
-    sink.Add("WoodBeam", PlaceGeometry(
+    sink.Add("WattleFence", PlaceGeometry(
       MakeBox(0.09, 1.12 + rnd() * 0.10, 0.09, TILE_METERS.wood, `${seed}:p${i}`),
       { x: p.x, y: y + 0.58, z: p.z, ry, rz: (rnd() - 0.5) * 0.08 }));
     pieces += 1;
@@ -400,7 +400,7 @@ export function AddWattleFence(sink, {
     const segLen = s1 - s0;
     const p = LocalPoint(x, z, ry, mid - length / 2, 0);
     for (const railY of [0.42, 0.86]) {
-      sink.Add("WoodBeam", PlaceGeometry(
+      sink.Add("WattleFence", PlaceGeometry(
         MakeBox(segLen, 0.06, 0.05, TILE_METERS.wood, `${seed}:r${railY}`),
         { x: p.x, y: y + railY, z: p.z, ry }));
       pieces += 1;
@@ -410,7 +410,7 @@ export function AddWattleFence(sink, {
     for (let i = 0; i < brush; i += 1) {
       const bs = s0 + (segLen / brush) * (i + 0.5);
       const bp = LocalPoint(x, z, ry, bs - length / 2, 0);
-      sink.Add("WoodBeam", PlaceGeometry(
+      sink.Add("WattleFence", PlaceGeometry(
         MakeBox(0.05, 0.95 + rnd() * 0.25, 0.03, TILE_METERS.wood, `${seed}:b${i}`),
         { x: bp.x, y: y + 0.55, z: bp.z, ry, rx: (rnd() - 0.5) * 0.16,
           rz: Math.PI / 2 * 0.94 + rnd() * 0.06 }));
