@@ -21,6 +21,7 @@ try {
 
   const result = await page.evaluate(async () => {
     const fail = (message) => { throw new Error(message); };
+    const THREE = await import("/Taierzhuang1938/vendor/three/build/three.module.js");
     const { LIFE_POSE_NAMES, NormalizeLifePose } = await import("/Taierzhuang1938/Script_Actor.mjs");
     const factory = window.Taierzhuang.actorFactory;
     const nearly = (a, b, epsilon = 1e-7) => Math.abs(a - b) <= epsilon;
@@ -52,6 +53,34 @@ try {
     }
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
+
+    // 国军分段 GLB 的两只脚都必须在各自踝枢轴周围以同样的本地范围显示。
+    // 只比较世界坐标会误报：静止站姿故意让两脚前后错开半步。
+    check(actor.meshSource === "rigged" && actor.riggedSkin?.segmentMode,
+      "NRA rigged segment skin is not active");
+    const footOffset = (segmentName, mountName) => {
+      const segment = actor.riggedSkin.segmentMeshes.find((item) => item.name === segmentName);
+      const mount = actor.GetMount(mountName);
+      check(segment && mount, `missing NRA ${segmentName} or ${mountName}`);
+      actor.root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(segment);
+      const ankle = mount.getWorldPosition(new THREE.Vector3());
+      return [
+        box.min.x - ankle.x, box.min.y - ankle.y, box.min.z - ankle.z,
+        box.max.x - ankle.x, box.max.y - ankle.y, box.max.z - ankle.z,
+      ];
+    };
+    const footL = footOffset("Segment_footL", "footL");
+    const footR = footOffset("Segment_footR", "footR");
+    check(footL[1] < -0.01 && footL[4] > 0.01 && footR[1] < -0.01 && footR[4] > 0.01,
+      `NRA feet no longer enclose their ankle pivots: L=${footL} R=${footR}`);
+    const footSymmetry = [
+      footL[0] + footR[3], footL[3] + footR[0], // X 轴镜像
+      footL[1] - footR[1], footL[4] - footR[4], // 高度一致
+      footL[2] - footR[2], footL[5] - footR[5], // 鞋尖同向
+    ];
+    check(footSymmetry.every((value) => Math.abs(value) < 0.004),
+      `NRA left/right foot segment mismatch: L=${footL} R=${footR}`);
 
     const baselineA = factory.Create("nra", { seed: 90212, weapon: null });
     const baselineB = factory.Create("nra", { seed: 90212, weapon: null });

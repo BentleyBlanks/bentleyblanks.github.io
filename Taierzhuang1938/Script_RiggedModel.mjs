@@ -12,10 +12,10 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
-  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=7",
-  nraSoldier: "./Model/Model_NraSoldier.glb?v=3",
-  civilianMale: "./Model/Model_CivilianMale.glb?v=3",
-  civilianFemale: "./Model/Model_CivilianFemale.glb?v=3",
+  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=8",
+  nraSoldier: "./Model/Model_NraSoldier.glb?v=4",
+  civilianMale: "./Model/Model_CivilianMale.glb?v=4",
+  civilianFemale: "./Model/Model_CivilianFemale.glb?v=4",
 });
 
 const LOADER = new GLTFLoader();

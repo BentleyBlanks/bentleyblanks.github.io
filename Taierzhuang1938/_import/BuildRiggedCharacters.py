@@ -115,6 +115,37 @@ def SubdivideAndSmooth(obj, level=1):
     obj.select_set(False)
 
 
+def SmoothCharacterSegment(mesh, angle_degrees=62.0):
+    """Give imported character pieces stable, angle-limited smoothing groups.
+
+    The source FBXs are deliberately low-poly.  Their imported faces arrive as
+    flat faces, which makes every thigh, cheek and boot transition catch light
+    as a hard tile once the character is split into runtime rigid segments.
+    Mark every face smooth, but retain sharp edges where the surface turns more
+    than ``angle_degrees``.  That keeps soles, cuffs and equipment readable
+    while the organic body transitions share interpolated normals.
+
+    Blender 5 stores the equivalent of the old "smooth group" on BMesh faces
+    and edges (rather than ``MeshPolygon.use_smooth`` / ``use_auto_smooth``),
+    so doing it here also keeps the generated GLB portable to the web exporter.
+    """
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.normal_update()
+    limit = math.cos(math.radians(angle_degrees))
+    for face in bm.faces:
+        face.smooth = True
+    for edge in bm.edges:
+        linked = edge.link_faces
+        if len(linked) != 2:
+            edge.smooth = False
+            continue
+        edge.smooth = linked[0].normal.dot(linked[1].normal) >= limit
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+
+
 def NewAction(armature, name, frame_end):
     action = bpy.data.actions.new(name)
     action.use_fake_user = True
@@ -487,6 +518,10 @@ def BuildRigidSegments(body, armature, height, segment_by_bone, pivot_bones, fac
                 vertex.co.y *= scale_y
                 vertex.co.z *= scale_z
             mesh.update()
+        # Do this after all geometric corrections above.  Applying the smooth
+        # groups beforehand loses their loop normals when the head cap updates
+        # the mesh, returning the character to faceted lighting online.
+        SmoothCharacterSegment(mesh)
         obj = bpy.data.objects.new(f"Segment_{segment}", mesh)
         bpy.context.collection.objects.link(obj)
         obj.location = pivot
