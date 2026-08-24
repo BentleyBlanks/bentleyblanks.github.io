@@ -11,9 +11,9 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 const LOADER = new GLTFLoader();
 const ASSETS = Object.freeze({
   house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null },
-  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=1", material: null },
-  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=1", material: null },
-  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=1", material: null },
+  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null },
+  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null },
+  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null },
   cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam" },
   fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam" },
   crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor" },
