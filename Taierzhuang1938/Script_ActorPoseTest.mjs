@@ -122,11 +122,23 @@ try {
     seatTest.Update(0.016, { elapsed: 1.3, sit: 1, seatLift: 0.13 });
     check(Math.abs(seatTest.hips.position.y - hipWithoutSeatLift - 0.13) < 1e-5,
       "seat lift no longer raises the seated hips above the bench");
+    check(seatTest.legs.L.thigh.rotation.x > 1.2 && seatTest.legs.R.thigh.rotation.x > 1.2
+      && seatTest.legs.L.knee.rotation.x < -1.2 && seatTest.legs.R.knee.rotation.x < -1.2,
+    "seated legs no longer keep the bench-clipping standing IK pose");
     seatTest.Update(0.016, { elapsed: 1.3, sit: 0, seatLift: 0.13 });
     check(Math.abs(seatTest.hips.position.y - hipWithoutSeatLift) > 0.05,
       "seat lift leaked into standing pose");
-    for (const item of [actor, armed, baselineA, baselineB, seatTest]) item.Dispose();
-    return "6 states × 3 levels, invalid values, mounts, default regression, armed blend";
+    const seatedArmed = factory.Create("nra", { seed: 90214, weapon: "ZhongZheng" });
+    seatedArmed.Update(0.016, { elapsed: 1.4, sit: 1 });
+    seatedArmed.weaponMount.updateMatrix();
+    const rightGripCenter = new THREE.Vector3().applyMatrix4(seatedArmed.weaponMount.matrix);
+    const leftGripCenter = seatedArmed.weaponGripFront.clone().multiplyScalar(seatedArmed.weaponScale)
+      .applyMatrix4(seatedArmed.weaponMount.matrix);
+    check(seatedArmed.gripR.distanceTo(rightGripCenter) > 0.025
+      && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
+    "seated weapon palms no longer clear the gun centerline");
+    for (const item of [actor, armed, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
+    return "6 states × 3 levels, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

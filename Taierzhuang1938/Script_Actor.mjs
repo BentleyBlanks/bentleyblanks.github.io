@@ -1686,6 +1686,8 @@ export class Actor {
         Clamp(-ik.nx * tilt, -FOOT_IK_TILT, FOOT_IK_TILT));
     }
 
+    if (seated > 0.001) this.PoseSeatedLegs(seated);
+
     // --- 上身：看的方向按 35% / 65% 分给胸和头 ------------------------------
     // 符号约定（三个都栽过跟头，写下来）：人物正面朝 -Z，于是
     //   rotation.x 为**正** = 上身后仰 / 抬头 / 垂下的胳膊腿往**前**摆。
@@ -1786,6 +1788,20 @@ export class Actor {
     v.sub(this.hips.position);
     this.tmpQuat.copy(this.hips.quaternion).invert();
     v.applyQuaternion(this.tmpQuat);
+  }
+
+  /**
+   * 长凳坐姿不是把站姿的落脚 IK 硬压矮：那会让大腿为了够到地板反向折回座面，
+   * 在侧视镜头里穿过小腿和木凳。这里直接给出“膝朝前、胫垂下”的两段折角；
+   * 角度按车厢 0.50 m 座高解出，鞋底仍恰好落在地板上。
+   */
+  PoseSeatedLegs(amount) {
+    for (const tag of ["L", "R"]) {
+      const leg = this.legs[tag];
+      BlendEuler(leg.thigh, 1.27, 0, 0, amount, "XYZ");
+      BlendEuler(leg.knee, -1.27, 0, 0, amount, "XYZ");
+      BlendEuler(leg.ankle, 0, 0, 0, amount, "XYZ");
+    }
   }
 
   /**
@@ -2017,9 +2033,14 @@ export class Actor {
     // 枪上的握点换算到 chest 空间。weaponMount 是 chest 的直接子节点，更新它自己的
     // 局部矩阵就够，不用惊动整棵世界矩阵树；weaponScale 是抵消身高缩放的那一份。
     this.weaponMount.updateMatrix();
-    this.gripR.set(0, 0, 0).applyMatrix4(this.weaponMount.matrix);
-    this.gripL.copy(this.weaponGripFront).multiplyScalar(this.weaponScale)
-      .applyMatrix4(this.weaponMount.matrix);
+    // 坐姿步枪搁在膝上时，简化手掌不能仍以枪械中心线为接触点——画面会变成
+    // 枪管从手心穿出去。两手在枪的局部向下让出 3 cm，读作从下方托住枪身；
+    // 非坐姿不变，保留瞄准、换弹和战斗握把的既有精度。
+    const seatedHandClearance = life.sit * 0.030 * (H / 1.66);
+    this.gripR.set(0, -seatedHandClearance, 0).applyMatrix4(this.weaponMount.matrix);
+    this.gripL.copy(this.weaponGripFront).multiplyScalar(this.weaponScale);
+    this.gripL.y -= seatedHandClearance;
+    this.gripL.applyMatrix4(this.weaponMount.matrix);
 
     if (boltPhase > 0) {
       // 拉栓：右手离开握把 → 摸到拉机柄 → 向后拉 → 推回 → 回握把
