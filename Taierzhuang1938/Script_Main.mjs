@@ -471,6 +471,9 @@ async function Boot() {
         normal: "./Texture/Texture_CarriageCeilingSteelNormal.png?v=2",
         orm: "./Texture/Texture_CarriageCeilingSteelOrm.png?v=2",
       }),
+      // 出川车厢的窗外景片须在进入第一镜前完成加载；不能等 CutsceneDirector
+      // 临时发请求，否则首镜会短暂露出黑色／默认天空的穿帮。
+      library.LoadExternalAlbedo("CarriageLandscape", "Ground", "./Texture/Texture_CarriageShandongLandscapePlate.png?v=1"),
     ]);
   } catch (error) {
     console.warn(`[Main] 外部 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);

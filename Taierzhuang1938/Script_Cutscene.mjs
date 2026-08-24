@@ -650,6 +650,11 @@ export class CutsceneDirector {
         for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * (size[0] / tile), uv.getY(i) * (size[1] / tile));
         uv.needsUpdate = true;
       }
+    } else if (spec.kind === "backdrop") {
+      // 车窗外的景片是竖直的，不可沿用 ground plane 的 -90° 旋转。
+      // 以两张可重叠的长景片循环，远景从窗顶到轨枕全遮住，绝不再露出
+      // 世界默认天空或地平线的接缝。
+      geometry = new THREE.PlaneGeometry(size[0], size[1]);
     } else {
       geometry = new THREE.BoxGeometry(size[0], size[1], size[2] ?? size[0]);
       if (spec.mat && spec.repeat === undefined) {
@@ -659,6 +664,18 @@ export class CutsceneDirector {
     this.ownedGeometries.push(geometry);
 
     let material = null;
+    if (spec.texture) {
+      const texture = new THREE.TextureLoader().load(spec.texture);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = 4;
+      material = new THREE.MeshStandardMaterial({
+        map: texture, color: spec.color ?? 0xffffff, roughness: spec.roughness ?? 0.98,
+        metalness: spec.metalness ?? 0, side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+      });
+      this.ownedMaterials.push(material);
+    }
     if (spec.mat && this.library && typeof this.library.Get === "function") {
       // repeat：贴图在这块几何上铺几遍。Box/Plane 的 UV 是每面 0—1，一张 2 m 的
       // 土路纹理铺满 140 m 的地面就是一片拉丝（出川那张地面的「流水纹」就是它）。
@@ -669,6 +686,7 @@ export class CutsceneDirector {
       // tint，导致车窗外层的深色土野被程序地面贴图冲成一整块发白幕布。
       if (spec.tint !== undefined || spec.color !== undefined) options.color = spec.tint ?? spec.color;
       if (spec.roughness !== undefined) options.roughness = spec.roughness;
+      if (spec.doubleSided) options.side = THREE.DoubleSide;
       try { material = this.library.Get(spec.mat, options); } catch (error) { material = null; }
     }
     if (!material || spec.inside || spec.emissive) {

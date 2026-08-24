@@ -434,18 +434,18 @@ function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
  * 黑色柜台上；分段座板、靠背、腿架与露空座下空间才有列车车厢的轮廓。
  */
 function CarriageBench(side, label) {
-  const seatX = side * 2.78;
-  const backX = side * 3.48;
+  const seatX = side * 1.95;
+  const backX = side * 2.34;
   const props = [];
   [-5.8, -1.95, 1.95, 5.8].forEach((z, index) => {
     const id = `${label}${index + 1}`;
     props.push(
-      // 座面顶标高 0.55 m：与 Actor 的真实坐姿骨盆相接。旧的 0.83 m 座面会
-      // 压到人的胸腹，画面读成「人在椅子前蹲着」而不是坐下。
-      { kind: "box", size: [0.94, 0.12, 3.45], pos: [seatX, 0.49, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchSeat${id}` },
-      { kind: "box", size: [0.14, 0.58, 3.45], pos: [backX, 0.84, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchBack${id}` },
-      { kind: "box", size: [0.72, 0.48, 0.12], pos: [seatX, 0.30, z - 1.34], mat: "Steel", color: 0x515254, name: `BenchLeg${id}A` },
-      { kind: "box", size: [0.72, 0.48, 0.12], pos: [seatX, 0.30, z + 1.34], mat: "Steel", color: 0x515254, name: `BenchLeg${id}B` },
+      // 窄木长凳：0.58 m 座深，够承托坐骨而不吞掉小腿。此前 0.94 m 的宽板
+      // 把腿包进凳面，人物自然会显得“脚从椅子里磨出来”。
+      { kind: "box", size: [0.58, 0.10, 3.45], pos: [seatX, 0.50, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchSeat${id}` },
+      { kind: "box", size: [0.10, 0.64, 3.45], pos: [backX, 0.86, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchBack${id}` },
+      { kind: "box", size: [0.46, 0.48, 0.10], pos: [seatX, 0.27, z - 1.34], mat: "Steel", color: 0x3f4143, name: `BenchLeg${id}A` },
+      { kind: "box", size: [0.46, 0.48, 0.10], pos: [seatX, 0.27, z + 1.34], mat: "Steel", color: 0x3f4143, name: `BenchLeg${id}B` },
     );
   });
   return props;
@@ -456,32 +456,17 @@ function CarriageBench(side, label) {
  * 绝不再用一面 56 m 长、4.3 m 高的竖盒假装远景——那正是“全是遮拦”的根因。
  */
 function WindowLandscape(side, label) {
-  const x = (distance) => side * distance;
+  const x = side * 3.18;
+  const ry = side < 0 ? -Math.PI / 2 : Math.PI / 2;
   return [
-    { kind: "box", size: [5.2, 0.10, 44], pos: [x(6.6), 0.02, 0], mat: "GroundRubble", color: 0x625a4c, name: `TrackBallast${label}` },
-    { kind: "box", size: [14, 0.08, 20], pos: [x(11.5), -0.02, -14], mat: "Ground", color: 0x756d55, name: `FieldNear${label}` },
-    { kind: "box", size: [18, 0.08, 24], pos: [x(17.5), 0.00, 13], mat: "Ground", color: 0x6b674f, name: `FieldFar${label}` },
-    // 两个低土岗只压住地平线下沿；上方约四分之三窗洞始终是开放天空。
-    { kind: "box", size: [0.55, 0.55, 9], pos: [x(27), 0.24, -14], mat: "Ground", color: 0x575947, name: `LowRidge${label}A` },
-    { kind: "box", size: [0.55, 0.42, 7], pos: [x(31), 0.18, 12], mat: "Ground", color: 0x505343, name: `LowRidge${label}B` },
-    // 稀疏村舍和三月无叶树提供山东北部平原的尺度，不连成一堵“景片墙”。
-    { kind: "box", size: [2.8, 1.25, 2.6], pos: [x(18), 0.62, -11], mat: "Adobe", color: 0x796953, name: `Farmhouse${label}A` },
-    { kind: "box", size: [3.3, 0.18, 3.0], pos: [x(18), 1.32, -11], mat: "RoofTile", color: 0x4d4740, name: `FarmhouseRoof${label}A` },
-    { kind: "box", size: [2.2, 1.0, 2.0], pos: [x(23), 0.50, 9], mat: "Adobe", color: 0x74644f, name: `Farmhouse${label}B` },
-    { kind: "box", size: [2.6, 0.16, 2.4], pos: [x(23), 1.08, 9], mat: "RoofTile", color: 0x4b463f, name: `FarmhouseRoof${label}B` },
-    // 正侧面能读清的院屋：双坡瓦顶而不是“方盒上再扣一块桌板”。
-    { kind: "box", size: [3.4, 1.45, 3.2], pos: [x(21), 0.72, -3], mat: "Adobe", color: 0x75644f, name: `Farmhouse${label}C` },
-    { kind: "box", size: [2.05, 0.13, 3.55], pos: [x(20.25), 1.63, -3], rz: side * 0.38, mat: "RoofTile", color: 0x49433c, name: `FarmhouseRoof${label}C1` },
-    { kind: "box", size: [2.05, 0.13, 3.55], pos: [x(21.75), 1.63, -3], rz: side * -0.38, mat: "RoofTile", color: 0x49433c, name: `FarmhouseRoof${label}C2` },
-    { kind: "cyl", size: [0.14, 2.5], pos: [x(15), 1.25, -3], mat: "TreeBark", color: 0x443b32, name: `BareTree${label}A` },
-    { kind: "box", size: [1.7, 0.08, 0.08], pos: [x(15), 2.18, -3], ry: 0.36, mat: "TreeBark", color: 0x443b32, name: `BareBranch${label}A` },
-    { kind: "cyl", size: [0.12, 2.0], pos: [x(20), 1.0, 16], mat: "TreeBark", color: 0x40382f, name: `BareTree${label}B` },
-    { kind: "box", size: [1.35, 0.07, 0.07], pos: [x(20), 1.72, 16], ry: -0.42, mat: "TreeBark", color: 0x40382f, name: `BareBranch${label}B` },
-    { kind: "cyl", size: [0.16, 4.2], pos: [x(16), 2.1, -4], mat: "TreeBark", color: 0x352f29, name: `Poplar${label}C` },
-    { kind: "box", size: [0.08, 1.65, 0.08], pos: [x(16), 3.45, -4.35], rx: -0.5, mat: "TreeBark", color: 0x352f29, name: `PoplarBranch${label}C1` },
-    { kind: "box", size: [0.08, 1.45, 0.08], pos: [x(16), 3.35, -3.7], rx: 0.55, mat: "TreeBark", color: 0x352f29, name: `PoplarBranch${label}C2` },
-    { kind: "box", size: [0.14, 3.8, 0.14], pos: [x(12), 1.90, -9], mat: "WoodBeam", color: 0x3d342b, name: `TelegraphPole${label}` },
-    { kind: "box", size: [1.25, 0.10, 0.10], pos: [x(12), 3.28, -9], mat: "WoodBeam", color: 0x3d342b, name: `TelegraphCrossbar${label}` },
+    // 两张 40 m 景片有 20 m 重叠，循环时任意窗洞背后都有完整画面；景片从
+    // 轨枕到云层覆盖，不借用世界天空／地形，所以没有地平线穿帮的余地。
+    { kind: "backdrop", size: [40, 4.4], pos: [x, 2.20, -40], ry, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: `LandscapePlate${label}A` },
+    { kind: "backdrop", size: [40, 4.4], pos: [x, 2.20, 0], ry, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: `LandscapePlate${label}B` },
+    // 景片前加两层近轨道遮挡，避免画面像贴在玻璃上的单张照片。
+    { kind: "box", size: [0.12, 3.45, 0.12], pos: [side * 3.05, 1.72, -8.2], mat: "WoodBeam", color: 0x43382c, name: `NearPole${label}A` },
+    { kind: "box", size: [0.95, 0.09, 0.09], pos: [side * 3.05, 2.90, -8.2], mat: "WoodBeam", color: 0x43382c, name: `NearPoleCrossbar${label}A` },
+    { kind: "cyl", size: [0.10, 3.0], pos: [side * 3.07, 1.5, 4.6], mat: "TreeBark", color: 0x40372f, name: `NearPoplar${label}B` },
   ];
 }
 
@@ -520,7 +505,7 @@ export const CS_Chuchuan = {
   cameraMode: "headLook",
   headLook: { yaw: [-2.09, 2.09], pitch: [-1.05, 0.96], sensitivityScale: 0.8 },
   // 开场至班长整句口令结束前只允许鼠标自由环视；此后才允许走向车门。
-  walk: { min: [-3.1, -7.55], max: [3.1, 6.7], speed: 2.15, startAt: CHUCHUAN_WALK_START_AT },
+  walk: { min: [-1.20, -7.55], max: [1.20, 6.7], speed: 2.15, startAt: CHUCHUAN_WALK_START_AT },
   // 三月鲁南白日带浮尘：压低曝光保住窗外田野和村舍层次；overcast 会把
   // 窗洞推成纯白，所有乡野道具只剩看不见的浅灰轮廓。
   sky: "smokyDay",
@@ -537,61 +522,47 @@ export const CS_Chuchuan = {
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
   ambientMotion: [
     ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => [
-      { name: `FieldNear${label}`, from: [side * 11.5, -0.02, -24], axis: [0, 0, 1], speed: 4.8, span: 44, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `FieldFar${label}`, from: [side * 17.5, 0, -28], axis: [0, 0, 1], speed: 2.1, span: 52, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `Farmhouse${label}A`, from: [side * 18, 0.62, -28], axis: [0, 0, 1], speed: 2.6, span: 56, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `FarmhouseRoof${label}A`, from: [side * 18, 1.32, -28], axis: [0, 0, 1], speed: 2.6, span: 56, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `Farmhouse${label}C`, from: [side * 21, 0.72, -43], axis: [0, 0, 1], speed: 1.8, span: 60, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `FarmhouseRoof${label}C1`, from: [side * 20.25, 1.63, -43], axis: [0, 0, 1], speed: 1.8, span: 60, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `FarmhouseRoof${label}C2`, from: [side * 21.75, 1.63, -43], axis: [0, 0, 1], speed: 1.8, span: 60, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `BareTree${label}A`, from: [side * 15, 1.25, -20], axis: [0, 0, 1], speed: 3.7, span: 46, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `BareBranch${label}A`, from: [side * 15, 2.18, -20], axis: [0, 0, 1], speed: 3.7, span: 46, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `Poplar${label}C`, from: [side * 16, 2.1, -20], axis: [0, 0, 1], speed: 3.2, span: 48, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `PoplarBranch${label}C1`, from: [side * 16, 3.45, -20.35], axis: [0, 0, 1], speed: 3.2, span: 48, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `PoplarBranch${label}C2`, from: [side * 16, 3.35, -19.7], axis: [0, 0, 1], speed: 3.2, span: 48, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `TelegraphPole${label}`, from: [side * 12, 1.90, -20], axis: [0, 0, 1], speed: 6.2, span: 38, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `TelegraphCrossbar${label}`, from: [side * 12, 3.28, -20], axis: [0, 0, 1], speed: 6.2, span: 38, stopAt: CHUCHUAN_TRAIN_STOP_AT },
+      { name: `LandscapePlate${label}A`, from: [side * 3.18, 2.20, -40], axis: [0, 0, 1], speed: 2.25, span: 40, stopAt: CHUCHUAN_TRAIN_STOP_AT },
+      { name: `LandscapePlate${label}B`, from: [side * 3.18, 2.20, 0], axis: [0, 0, 1], speed: 2.25, span: 40, stopAt: CHUCHUAN_TRAIN_STOP_AT },
+      { name: `NearPole${label}A`, from: [side * 3.05, 1.72, -18], axis: [0, 0, 1], speed: 7.6, span: 36, stopAt: CHUCHUAN_TRAIN_STOP_AT },
+      { name: `NearPoleCrossbar${label}A`, from: [side * 3.05, 2.90, -18], axis: [0, 0, 1], speed: 7.6, span: 36, stopAt: CHUCHUAN_TRAIN_STOP_AT },
+      { name: `NearPoplar${label}B`, from: [side * 3.07, 1.5, -5], axis: [0, 0, 1], speed: 5.1, span: 42, stopAt: CHUCHUAN_TRAIN_STOP_AT },
     ]),
   ],
 
   props: [
-    // 封闭车厢：两侧在窗洞处拆成墙段，四边视角均由地板、顶梁、端墙和窗外层封住。
-    { kind: "box", size: [8, 0.20, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
-    { kind: "box", size: [8, 0.20, 18], pos: [0, 4.2, 0], mat: "CarriageCeilingSteel", roughness: 0.86, metalness: 0.48, name: "CarriageCeiling", inside: true },
-    // 贯穿全车的窗带：上下钢板连续，窗间用窄立柱承力。旧版只在正中挖 6 m
-    // 窗洞，玩家从后段转头看见的永远是 5 m 实墙，窗外布景实际上全被挡住。
-    { kind: "box", size: [0.20, 0.85, 17.8], pos: [-4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowLow", inside: true },
-    { kind: "box", size: [0.20, 1.20, 17.8], pos: [-4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowHigh", inside: true },
-    { kind: "box", size: [0.20, 0.85, 17.8], pos: [4, 0.52, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowLow", inside: true },
-    { kind: "box", size: [0.20, 1.20, 17.8], pos: [4, 3.58, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowHigh", inside: true },
-    { kind: "box", size: [8, 4.2, 0.20], pos: [0, 2.1, -8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "RearWall", inside: true },
-    { kind: "box", size: [2.9, 4.2, 0.20], pos: [-2.55, 2.1, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallLeft", inside: true },
-    { kind: "box", size: [2.9, 4.2, 0.20], pos: [2.55, 2.1, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallRight", inside: true },
-    { kind: "box", size: [8, 1.0, 0.20], pos: [0, 3.7, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallTop", inside: true },
-    { kind: "box", size: [8, 0.55, 0.20], pos: [0, 0.28, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallStep", inside: true },
+    // 1930 年代厢式客／军运车：窄车体、木板内衬、铆接钢骨架和端部滑门；不再是
+    // 宽得像现代地铁的空大厅。中央净过道约 2.4 m，长凳只占靠窗一带。
+    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
+    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", roughness: 0.86, metalness: 0.48, name: "CarriageCeiling", inside: true },
+    { kind: "box", size: [0.16, 0.76, 17.8], pos: [-2.8, 0.47, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
+    { kind: "box", size: [0.16, 0.76, 17.8], pos: [2.8, 0.47, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLow", inside: true },
+    { kind: "box", size: [0.16, 0.82, 17.8], pos: [-2.8, 3.48, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowHigh", inside: true },
+    { kind: "box", size: [0.16, 0.82, 17.8], pos: [2.8, 3.48, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowHigh", inside: true },
+    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "RearWall", inside: true },
+    { kind: "box", size: [1.75, 3.92, 0.18], pos: [-1.92, 1.96, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallLeft", inside: true },
+    { kind: "box", size: [1.75, 3.92, 0.18], pos: [1.92, 1.96, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallRight", inside: true },
+    { kind: "box", size: [5.6, 0.78, 0.18], pos: [0, 3.53, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallTop", inside: true },
+    { kind: "box", size: [5.6, 0.44, 0.18], pos: [0, 0.22, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallStep", inside: true },
     // 三盏有罩灯把铆钉钢板、士兵与窗外相对运动都照出来；没有真实室内光，
     // 车厢再多细节也只会是一团黑。
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampRear" },
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampMid" },
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampRear" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampMid" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
     // 一眼看出「这是车厢」的重复门框与顶梁；不靠文字或镜头解释空间。
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -6.2], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibRear" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -3.4], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibA" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -0.6], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibB" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 2.2], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibC" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 5.0], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibD" },
+    ...[-6.2, -3.4, -0.6, 2.2, 5.0, 7.3].map((z, index) => ({ kind: "box", size: [5.35, 0.16, 0.16], pos: [0, 3.68, z], mat: "CarriageWallSteel", color: 0x6f7374, name: `RoofRib${index}` })),
     ...[-7.2, -5.15, -3.1, -1.03, 1.03, 3.1, 5.15, 7.2].flatMap((z, index) => [
-      { kind: "box", size: [0.12, 2.15, 0.12], pos: [-3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionLeft${index}` },
-      { kind: "box", size: [0.12, 2.15, 0.12], pos: [3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionRight${index}` },
+      { kind: "box", size: [0.10, 2.02, 0.10], pos: [-2.66, 1.93, z], mat: "Steel", color: 0x52565a, name: `WindowMullionLeft${index}` },
+      { kind: "box", size: [0.10, 2.02, 0.10], pos: [2.66, 1.93, z], mat: "Steel", color: 0x52565a, name: `WindowMullionRight${index}` },
     ]),
-    { kind: "box", size: [0.22, 0.14, 17.6], pos: [3.75, 3.02, 0], mat: "Steel", color: 0x777064, name: "WindowFrameRightTop" },
-    { kind: "box", size: [0.22, 0.14, 17.6], pos: [-3.75, 3.02, 0], mat: "Steel", color: 0x777064, name: "WindowFrameLeftTop" },
+    { kind: "box", size: [0.18, 0.12, 17.6], pos: [2.70, 2.89, 0], mat: "Steel", color: 0x686763, name: "WindowFrameRightTop" },
+    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, 2.89, 0], mat: "Steel", color: 0x686763, name: "WindowFrameLeftTop" },
     // 车厢两侧行李架：薄木条与定距钢托，不用一整面厚板遮窗。
-    { kind: "box", size: [0.58, 0.08, 15.6], pos: [-3.18, 2.94, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackLeft" },
-    { kind: "box", size: [0.58, 0.08, 15.6], pos: [3.18, 2.94, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackRight" },
+    { kind: "box", size: [0.42, 0.07, 15.6], pos: [-2.35, 2.83, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackLeft" },
+    { kind: "box", size: [0.42, 0.07, 15.6], pos: [2.35, 2.83, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackRight" },
     ...[-6, -2, 2, 6].flatMap((z, index) => [
-      { kind: "box", size: [0.72, 0.08, 0.10], pos: [-3.35, 2.82, z], rz: -0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketLeft${index}` },
-      { kind: "box", size: [0.72, 0.08, 0.10], pos: [3.35, 2.82, z], rz: 0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketRight${index}` },
+      { kind: "box", size: [0.52, 0.07, 0.09], pos: [-2.48, 2.72, z], rz: -0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketLeft${index}` },
+      { kind: "box", size: [0.52, 0.07, 0.09], pos: [2.48, 2.72, z], rz: 0.45, mat: "Steel", color: 0x343331, name: `LuggageBracketRight${index}` },
     ]),
     // 真正有座板、靠背和腿架的分段长椅；座下透空，轮廓不再像两排黑柜台。
     ...CarriageBench(-1, "Left"),
@@ -599,15 +570,15 @@ export const CS_Chuchuan = {
     // 两块靠端墙的地铺给无座时席地休息，薄垫不侵占中央通道。
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [-1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5f594d, name: "FloorMatLeft" },
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5b5549, name: "FloorMatRight" },
-    { kind: "cyl", size: [0.16, 0.08], pos: [3.02, 0.66, 0.25], mat: "ClothNra", color: 0x8c8270, name: "OldMilitaryCap" },
+    { kind: "cyl", size: [0.16, 0.08], pos: [2.18, 0.66, 0.25], mat: "ClothNra", color: 0x8c8270, name: "OldMilitaryCap" },
     // 这两件旧道具曾是黑色大方块，还摆在过道侧；收小并放回座椅内侧，
     // 用布料 PBR 的可读色保留“有人刚放下背包/药包”的生活信息。
-    { kind: "box", size: [0.42, 0.28, 0.58], pos: [-3.03, 0.72, 0.35], mat: "ClothNra", color: 0x6d685a, name: "OldPack" },
-    { kind: "box", size: [0.34, 0.25, 0.45], pos: [3.03, 0.68, -0.65], mat: "ClothNra", color: 0x766f5f, name: "AmmoBag" },
+    { kind: "box", size: [0.42, 0.28, 0.58], pos: [-2.20, 0.72, 0.35], mat: "ClothNra", color: 0x6d685a, name: "OldPack" },
+    { kind: "box", size: [0.34, 0.25, 0.45], pos: [2.20, 0.68, -0.65], mat: "ClothNra", color: 0x766f5f, name: "AmmoBag" },
     { kind: "cyl", size: [0.28, 0.22], pos: [-1.35, 0.72, -5.2], mat: "WoodStock", color: 0x59402b, name: "PlayerLineSpool" },
     { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
-    { kind: "box", size: [0.24, 0.06, 0.54], pos: [-2.25, 1.15, -2.55], mat: "WoodStock", color: 0x8d6947, name: "ShoeTool" },
-    { kind: "box", size: [0.14, 0.12, 0.56], pos: [3.08, 0.65, 2.75], mat: "ClothNra", color: 0x706858, name: "MachineGunCase" },
+    { kind: "box", size: [0.24, 0.06, 0.54], pos: [-1.55, 1.15, -2.55], mat: "WoodStock", color: 0x8d6947, name: "ShoeTool" },
+    { kind: "box", size: [0.14, 0.12, 0.56], pos: [2.22, 0.65, 2.75], mat: "ClothNra", color: 0x706858, name: "MachineGunCase" },
     ...WindowLandscape(-1, "Left"),
     ...WindowLandscape(1, "Right"),
     { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
@@ -622,39 +593,39 @@ export const CS_Chuchuan = {
   ],
 
   cast: [
-    // 根点在坐骨正下方，必须放到 bench 的 x=±2.78 线上；旧的 ±2.20/0.00
+    // 根点在坐骨正下方，必须放到窄长凳的 x=±1.95 线上；过道绝不作为座位。
     // 让人实际坐在过道或座面内沿，动作再对也看不出“坐在椅子上”。
-    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 100.4, 107.2, 108.9, -0.8, -Math.PI / 2) },
-    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 100.0, 108.9, 110.6, 0.2, Math.PI / 2) },
-    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 100.0, 110.6, 112.3, -0.4, -Math.PI / 2) },
-    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 2.75], {}, 100.0, 112.3, 114.0, 0.8, Math.PI / 2) },
-    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", uniformHex: 0x687382, track: CarLeaderTrack([2.78, CHUCHUAN_CAR_G, 5.45], 114.0, 115.7, 0, Math.PI / 2) },
-    { id: "lineSoldierA", kind: "nra", weapon: null, seed: "chuchuanLineA", uniformHex: 0x6E7684, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -6.25], { checkAmmo: 0.55 }, 100.0, 108.0, 109.7, -1.2, -Math.PI / 2) },
-    { id: "lineSoldierB", kind: "nra", weapon: null, seed: "chuchuanLineB", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -6.25], { warmHands: 1 }, 100.1, 109.7, 111.4, 1.2, Math.PI / 2) },
-    { id: "lineSoldierC", kind: "nra", weapon: "HanYang", seed: "chuchuanLineC", uniformHex: 0x5C6674, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -4.55], { watch: 1 }, 100.0, 111.4, 113.1, -1.0, -Math.PI / 2) },
-    { id: "riflemanB", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleB", uniformHex: 0x8A8778, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -4.55], { sleep: 0.5 }, 100.0, 113.1, 114.8, 1.0, Math.PI / 2) },
-    { id: "riflemanC", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleC", uniformHex: 0x6E7684, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 4.65], { prepare: 0.25 }, 100.2, 107.5, 109.2, -0.6, -Math.PI / 2) },
-    { id: "porter", kind: "nra", weapon: null, seed: "chuchuanPorter", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 4.65], { sit: 0.9 }, 100.3, 109.2, 110.9, 0.6, Math.PI / 2) },
-    { id: "cook", kind: "nra", weapon: null, seed: "chuchuanCook", uniformHex: 0x8A8778, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 6.35], { sit: 0.8 }, 100.5, 110.9, 112.6, -0.2, -Math.PI / 2) },
+    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 100.4, 107.2, 108.9, -0.8, -Math.PI / 2) },
+    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 100.0, 108.9, 110.6, 0.2, Math.PI / 2) },
+    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 100.0, 110.6, 112.3, -0.4, -Math.PI / 2) },
+    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 2.75], {}, 100.0, 112.3, 114.0, 0.8, Math.PI / 2) },
+    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", uniformHex: 0x687382, track: CarLeaderTrack([1.95, CHUCHUAN_CAR_G, 5.45], 114.0, 115.7, 0, Math.PI / 2) },
+    { id: "lineSoldierA", kind: "nra", weapon: null, seed: "chuchuanLineA", uniformHex: 0x6E7684, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -6.25], { checkAmmo: 0.55 }, 100.0, 108.0, 109.7, -1.2, -Math.PI / 2) },
+    { id: "lineSoldierB", kind: "nra", weapon: null, seed: "chuchuanLineB", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -6.25], { warmHands: 1 }, 100.1, 109.7, 111.4, 1.2, Math.PI / 2) },
+    { id: "lineSoldierC", kind: "nra", weapon: "HanYang", seed: "chuchuanLineC", uniformHex: 0x5C6674, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -4.55], { watch: 1 }, 100.0, 111.4, 113.1, -1.0, -Math.PI / 2) },
+    { id: "riflemanB", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleB", uniformHex: 0x8A8778, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -4.55], { sleep: 0.5 }, 100.0, 113.1, 114.8, 1.0, Math.PI / 2) },
+    { id: "riflemanC", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleC", uniformHex: 0x6E7684, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 4.65], { prepare: 0.25 }, 100.2, 107.5, 109.2, -0.6, -Math.PI / 2) },
+    { id: "porter", kind: "nra", weapon: null, seed: "chuchuanPorter", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 4.65], { sit: 0.9 }, 100.3, 109.2, 110.9, 0.6, Math.PI / 2) },
+    { id: "cook", kind: "nra", weapon: null, seed: "chuchuanCook", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 6.35], { sit: 0.8 }, 100.5, 110.9, 112.6, -0.2, -Math.PI / 2) },
     // 这六人只承载车厢密度和静态生活动作，不加对白，不挤占玩家的中间过道。
-    { id: "lineSoldierD", kind: "nra", weapon: null, seed: "chuchuanLineD", uniformHex: 0x747F8C, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -5.45], { sleep: 0.45 }, 100.4, 108.3, 110.0, -1.4, -Math.PI / 2) },
-    { id: "lineSoldierE", kind: "nra", weapon: null, seed: "chuchuanLineE", uniformHex: 0x7F857A, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -5.45], { checkAmmo: 0.45 }, 100.5, 109.0, 110.7, 1.4, Math.PI / 2) },
-    { id: "riflemanD", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleD", uniformHex: 0x687382, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -1.55], { cleanRifle: 0.55 }, 100.6, 110.7, 112.4, -0.9, -Math.PI / 2) },
-    { id: "riflemanE", kind: "nra", weapon: null, seed: "chuchuanRifleE", uniformHex: 0x8A8778, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -1.55], { sleep: 0.6 }, 100.7, 112.4, 114.1, 0.9, Math.PI / 2) },
-    { id: "sapper", kind: "nra", weapon: null, seed: "chuchuanSapper", uniformHex: 0x5C6674, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 1.55], { prepare: 0.18 }, 100.8, 114.1, 115.8, -0.5, -Math.PI / 2) },
-    { id: "medicalOrderly", kind: "nra", weapon: null, seed: "chuchuanMedic", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 1.55], { sit: 0.85 }, 100.9, 115.8, 117.5, 0.5, Math.PI / 2) },
+    { id: "lineSoldierD", kind: "nra", weapon: null, seed: "chuchuanLineD", uniformHex: 0x747F8C, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -5.45], { sleep: 0.45 }, 100.4, 108.3, 110.0, -1.4, -Math.PI / 2) },
+    { id: "lineSoldierE", kind: "nra", weapon: null, seed: "chuchuanLineE", uniformHex: 0x7F857A, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -5.45], { checkAmmo: 0.45 }, 100.5, 109.0, 110.7, 1.4, Math.PI / 2) },
+    { id: "riflemanD", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleD", uniformHex: 0x687382, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -1.55], { cleanRifle: 0.55 }, 100.6, 110.7, 112.4, -0.9, -Math.PI / 2) },
+    { id: "riflemanE", kind: "nra", weapon: null, seed: "chuchuanRifleE", uniformHex: 0x8A8778, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -1.55], { sleep: 0.6 }, 100.7, 112.4, 114.1, 0.9, Math.PI / 2) },
+    { id: "sapper", kind: "nra", weapon: null, seed: "chuchuanSapper", uniformHex: 0x5C6674, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 1.55], { prepare: 0.18 }, 100.8, 114.1, 115.8, -0.5, -Math.PI / 2) },
+    { id: "medicalOrderly", kind: "nra", weapon: null, seed: "chuchuanMedic", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 1.55], { sit: 0.85 }, 100.9, 115.8, 117.5, 0.5, Math.PI / 2) },
     // 补足每段长椅的空位：全员有明确座面抬升与坐姿，不用把人堆进过道充数。
-    { id: "lineSoldierF", kind: "nra", weapon: null, seed: "chuchuanLineF", uniformHex: 0x596878, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -7.10], { sleep: 0.42 }, 100.2, 107.7, 109.4, -1.6, -Math.PI / 2) },
-    { id: "lineSoldierG", kind: "nra", weapon: null, seed: "chuchuanLineG", uniformHex: 0x8C8877, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -7.10], { checkAmmo: 0.5 }, 100.3, 108.4, 110.1, 1.6, Math.PI / 2) },
-    { id: "riflemanF", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleF", uniformHex: 0x697887, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -3.35], { watch: 0.5 }, 100.4, 110.1, 111.8, -1.1, -Math.PI / 2) },
-    { id: "riflemanG", kind: "nra", weapon: null, seed: "chuchuanRifleG", uniformHex: 0x767E75, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -0.55], { warmHands: 0.7 }, 100.5, 111.8, 113.5, 1.1, Math.PI / 2) },
-    { id: "lineSoldierH", kind: "nra", weapon: null, seed: "chuchuanLineH", uniformHex: 0x767F8B, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 0.55], { prepare: 0.12 }, 100.6, 113.5, 115.2, -0.7, -Math.PI / 2) },
-    { id: "lineSoldierI", kind: "nra", weapon: null, seed: "chuchuanLineI", uniformHex: 0x918879, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 3.35], { sleep: 0.48 }, 100.7, 115.2, 116.9, 0.7, Math.PI / 2) },
+    { id: "lineSoldierF", kind: "nra", weapon: null, seed: "chuchuanLineF", uniformHex: 0x596878, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -7.10], { sleep: 0.42 }, 100.2, 107.7, 109.4, -1.6, -Math.PI / 2) },
+    { id: "lineSoldierG", kind: "nra", weapon: null, seed: "chuchuanLineG", uniformHex: 0x8C8877, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -7.10], { checkAmmo: 0.5 }, 100.3, 108.4, 110.1, 1.6, Math.PI / 2) },
+    { id: "riflemanF", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleF", uniformHex: 0x697887, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -3.35], { watch: 0.5 }, 100.4, 110.1, 111.8, -1.1, -Math.PI / 2) },
+    { id: "riflemanG", kind: "nra", weapon: null, seed: "chuchuanRifleG", uniformHex: 0x767E75, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -0.55], { warmHands: 0.7 }, 100.5, 111.8, 113.5, 1.1, Math.PI / 2) },
+    { id: "lineSoldierH", kind: "nra", weapon: null, seed: "chuchuanLineH", uniformHex: 0x767F8B, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 0.55], { prepare: 0.12 }, 100.6, 113.5, 115.2, -0.7, -Math.PI / 2) },
+    { id: "lineSoldierI", kind: "nra", weapon: null, seed: "chuchuanLineI", uniformHex: 0x918879, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 3.35], { sleep: 0.48 }, 100.7, 115.2, 116.9, 0.7, Math.PI / 2) },
     // 车厢末端和门边还有四人站着；车内共二十八人，中央仍留给玩家通行。
-    { id: "standingRearLeft", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingRearLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, -7.35], 100.0, 107.0, 108.7, -1.5, -Math.PI / 2) },
-    { id: "standingRearRight", kind: "nra", weapon: null, seed: "chuchuanStandingRearRight", track: CarStandTrack([2.75, CHUCHUAN_CAR_G, -7.35], 100.2, 108.1, 109.8, 1.5, Math.PI / 2) },
-    { id: "standingDoorLeft", kind: "nra", weapon: null, seed: "chuchuanStandingDoorLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, 7.35], 100.4, 109.2, 110.9, -1.3, -Math.PI / 2) },
-    { id: "standingDoorRight", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingDoorRight", track: CarStandTrack([2.75, CHUCHUAN_CAR_G, 7.35], 100.6, 110.3, 112.0, 1.3, Math.PI / 2) },
+    { id: "standingRearLeft", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingRearLeft", track: CarStandTrack([-2.30, CHUCHUAN_CAR_G, -7.35], 100.0, 107.0, 108.7, -1.5, -Math.PI / 2) },
+    { id: "standingRearRight", kind: "nra", weapon: null, seed: "chuchuanStandingRearRight", track: CarStandTrack([2.30, CHUCHUAN_CAR_G, -7.35], 100.2, 108.1, 109.8, 1.5, Math.PI / 2) },
+    { id: "standingDoorLeft", kind: "nra", weapon: null, seed: "chuchuanStandingDoorLeft", track: CarStandTrack([-2.30, CHUCHUAN_CAR_G, 7.35], 100.4, 109.2, 110.9, -1.3, -Math.PI / 2) },
+    { id: "standingDoorRight", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingDoorRight", track: CarStandTrack([2.30, CHUCHUAN_CAR_G, 7.35], 100.6, 110.3, 112.0, 1.3, Math.PI / 2) },
     { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
     { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
     { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.03, crouch: 0.25 }) },
