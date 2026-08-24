@@ -311,9 +311,10 @@ export class CutsceneDirector {
   AddLook(deltaX = 0, deltaY = 0) {
     if (!this.AllowsLook) return this.Look;
     const scale = this.lookConfig.sensitivityScale * 0.002;
-    // rotateY/rotateX 在 lookAt 后沿相机局部轴叠加。实机符号与上一版测试桩的
-    // 假相机相反：鼠标向右必须给正 yaw，鼠标向下必须给负 pitch。
-    this.lookYaw = ClampHeadLook(this.lookYaw + Number(deltaX || 0) * scale, this.lookConfig.yaw);
+    // Three 的相机在 lookAt 后仍沿局部轴旋转：正 yaw 是画面向左，正 pitch 是
+    // 画面向上。因此标准第一人称输入必须两轴都减 movement，不能只凭 Euler 数值
+    // 的正负猜玩家实际看到的方向。
+    this.lookYaw = ClampHeadLook(this.lookYaw - Number(deltaX || 0) * scale, this.lookConfig.yaw);
     this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this.lookConfig.pitch);
     return this.Look;
   }
@@ -937,7 +938,12 @@ export class CutsceneDirector {
   /** 车厢小空间的受限步行：WASD/方向键可走，但绝不穿过侧墙或关着的车门。 */
   _UpdateWalk(cut, dt) {
     const config = cut.walk;
-    if (!config || this.lookNeutral || this.time < (config.startAt || 0)) { this.walkBob = 0; return; }
+    if (!config || this.lookNeutral || this.time < (config.startAt || 0)) {
+      // 解锁前只屏蔽位移，不吞按键；玩家若正按着 W，班长话音落下后应自然开始走，
+      // 不能逼他松开再按一次。
+      this.walkBob = 0;
+      return;
+    }
     const down = (a, b) => this.walkKeys.has(a) || this.walkKeys.has(b);
     const strafe = (down("d", "arrowright") ? 1 : 0) - (down("a", "arrowleft") ? 1 : 0);
     const forward = (down("w", "arrowup") ? 1 : 0) - (down("s", "arrowdown") ? 1 : 0);

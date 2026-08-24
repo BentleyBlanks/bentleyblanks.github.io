@@ -362,6 +362,10 @@ const CHUCHUAN_CAR_G = 0.13;
 const CHUCHUAN_CAR_RY = Math.PI;
 const CHUCHUAN_PREPARE_AT = 100.0;
 const CHUCHUAN_DOOR_AT = 107.0;
+const CHUCHUAN_WAKE_LINE_AT = 1.1;
+const CHUCHUAN_WAKE_LINE_SECONDS = 3.18;
+// 镜 16 从 100 秒开始；班长把“都醒起，装备拿好”说完之后才交还位移。
+const CHUCHUAN_WALK_START_AT = CHUCHUAN_PREPARE_AT + CHUCHUAN_WAKE_LINE_AT + CHUCHUAN_WAKE_LINE_SECONDS;
 const CHUCHUAN_END = 120.0;
 
 function CarSeatTrack(pos, lifeState, prepareAt, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
@@ -484,7 +488,8 @@ export const CS_Chuchuan = {
   setOrigin: [2400, 0, 2400],
   cameraMode: "headLook",
   headLook: { yaw: [-2.09, 2.09], pitch: [-1.05, 0.96], sensitivityScale: 0.8 },
-  walk: { min: [-3.1, -7.55], max: [3.1, 6.7], speed: 2.15, startAt: 13.0 },
+  // 开场至班长整句口令结束前只允许鼠标自由环视；此后才允许走向车门。
+  walk: { min: [-3.1, -7.55], max: [3.1, 6.7], speed: 2.15, startAt: CHUCHUAN_WALK_START_AT },
   // 三月鲁南白日带浮尘：压低曝光保住窗外田野和村舍层次；overcast 会把
   // 窗洞推成纯白，所有乡野道具只剩看不见的浅灰轮廓。
   sky: "smokyDay",
@@ -675,7 +680,7 @@ export const CS_Chuchuan = {
     { n: 16, seconds: 7, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.6, -6], look: [0, 1.2, 5.2] },
       shakeAt: [{ at: 0.45, seconds: 0.95, amount: 0.82 }],
       sfx: [{ at: 0.45, name: "explosionFar", volume: 0.68 }],
-      lines: [{ at: 1.1, seconds: 3.18, who: "squadLeader", voiceCue: "prologue_squad_leader_02", text: "都醒起，装备拿好。" }] },
+      lines: [{ at: CHUCHUAN_WAKE_LINE_AT, seconds: CHUCHUAN_WAKE_LINE_SECONDS, who: "squadLeader", voiceCue: "prologue_squad_leader_02", text: "都醒起，装备拿好。" }] },
 
     // 107—116 s：先开门、军官命令通信排下车；再切黑给地点卡，顺序与玩家要求一致。
     { n: 17, seconds: 8.9, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.55, 5.5], to: [0, 1.55, 7.0], look: [0, 1.45, 8.0], lookTo: [0, 1.35, 8.6], ease: "easeInOut" },

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { ClampHeadLook, ResolveHeadLookConfig } from "./Script_CutsceneCheck.mjs";
 import { InputRouter } from "./Script_Input.mjs";
+import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
 
 const cut = {
   id: "TEST_HeadLook", title: "test", seconds: 1,
@@ -64,9 +65,9 @@ const audio = {
 
 const cfg = ResolveHeadLookConfig(cut);
 let yaw = 0, pitch = 0;
-yaw = ClampHeadLook(yaw + 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
+yaw = ClampHeadLook(yaw - 1000 * cfg.sensitivityScale * 0.002, cfg.yaw);
 pitch = ClampHeadLook(pitch - (-1000) * cfg.sensitivityScale * 0.002, cfg.pitch);
-assert.deepEqual({ yaw, pitch }, { yaw: 0.2, pitch: 0.1 }, "right/up mouse motion follows the rendered camera axes and clamps");
+assert.deepEqual({ yaw, pitch }, { yaw: -0.2, pitch: 0.1 }, "right/up mouse motion follows the rendered camera axes and clamps");
 assert.deepEqual({ yaw: 0, pitch: 0 }, { yaw: 0, pitch: 0 }, "neutral view is deterministic");
 assert.equal(oldCut.cameraMode, undefined, "old cutscene has no headLook mode");
 
@@ -78,10 +79,10 @@ director.onRelease = (c) => finished.push(c?.id);
 const play = director.Play(cut.id);
 assert.equal(director.AllowsLook, true);
 director.AddLook(1000, -1000);
-assert.deepEqual(director.Look, { yaw: 0.2, pitch: 0.1 }, "director look uses the corrected rendered-camera directions");
+assert.deepEqual(director.Look, { yaw: -0.2, pitch: 0.1 }, "director look uses the corrected rendered-camera directions");
 const baselineYaw = director.camera._yaw;
 director.Update(0);
-assert.equal(director.camera._yaw, baselineYaw + 0.2, "director camera plus corrected Look yaw are composed");
+assert.equal(director.camera._yaw, baselineYaw - 0.2, "director camera plus corrected Look yaw are composed");
 director.walkKeys.add("d");
 director._UpdateWalk(cut, 1);
 assert.deepEqual([director.walkOffset.x, director.walkOffset.z], [-2, 0], "D follows camera-right (-X while the carriage camera faces +Z)");
@@ -115,10 +116,31 @@ assert.equal(oldDirector.camera._yaw, oldYaw, "old cutscene camera behavior is u
 oldDirector.Skip();
 await oldPlay;
 
+const wakeShot = CS_Chuchuan.shots.find((shot) => shot.n === 16);
+const wakeLine = wakeShot.lines.find((line) => line.text === "都醒起，装备拿好。");
+const wakeShotStart = CS_Chuchuan.shots.slice(0, 15).reduce((sum, shot) => sum + shot.seconds, 0);
+const wakeLineEnd = wakeShotStart + wakeLine.at + wakeLine.seconds;
+assert.equal(wakeShotStart, 100, "squad leader wake-up shot starts at the declared prepare time");
+assert.equal(CS_Chuchuan.walk.startAt, wakeLineEnd, "WASD unlocks only after the squad leader finishes the wake-up order");
+
+const timedCut = { ...cut, walk: { ...cut.walk, startAt: wakeLineEnd } };
+const timedDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), table: { [timedCut.id]: timedCut } });
+const timedPlay = timedDirector.Play(timedCut.id);
+timedDirector.time = wakeLineEnd - 0.01;
+timedDirector.walkKeys.add("w");
+timedDirector._UpdateWalk(timedCut, 1);
+assert.deepEqual([timedDirector.walkOffset.x, timedDirector.walkOffset.z], [0, 0], "WASD cannot move before the spoken order ends");
+assert.equal(timedDirector.walkKeys.has("w"), true, "a held movement key remains ready for the unlock frame");
+timedDirector.time = wakeLineEnd;
+timedDirector._UpdateWalk(timedCut, 1);
+assert.deepEqual([timedDirector.walkOffset.x, timedDirector.walkOffset.z], [0, 2], "held WASD moves immediately after the spoken order ends");
+timedDirector.Skip();
+await timedPlay;
+
 const router = new InputRouter();
 const input = { forward: 1, strafe: 1, lean: 1, sprint: true, breathHold: true, fire: true, ads: true };
 router.SetSuppressed(true);
 router.Read(input);
 assert.deepEqual(input, { forward: 0, strafe: 0, lean: 0, sprint: false, breathHold: false, fire: false, ads: false }, "all gameplay axes suppressed");
 router.SetSuppressed(false);
-console.log("Cutscene control tests passed: clamp, director+look, neutral, no-input finish, five-stage skip/idempotence, audio restore, old compatibility, input suppression");
+console.log("Cutscene control tests passed: real camera directions, spoken-order movement gate, neutral, finish/skip, audio restore, old compatibility, input suppression");
