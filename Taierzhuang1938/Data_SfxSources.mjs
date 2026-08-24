@@ -47,6 +47,11 @@ export const SFX_LICENSES = {
     terms: "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
     via: "local://Taierzhuang1938/Script_SfxBake.mjs",
   },
+  volcengine: {
+    name: "Volcengine SeedAudio 1.0",
+    terms: "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+    via: "https://openspeech.bytedance.com/api/v3/tts/create",
+  },
 };
 
 const ARCHIVE = "https://archive.org/download/";
@@ -76,6 +81,15 @@ export const SFX_SOURCES = [
       { cue: "carriageDoorSlide", durS: 1.5 },
       { cue: "stepBallast", durS: 0.65 },
     ],
+  },
+  // 非语音 SeedAudio take 不许混进本地合成器；由 Script_SeedAudioTrainBake.mjs 单独生成。
+  // SfxBake 重烘其它素材时仍登记这一条，避免把已经验收的汽笛从 manifest 漏掉。
+  {
+    id: "PrologueTrainSeedAudio",
+    seedAudio: true,
+    credit: "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
+    license: "volcengine",
+    cuts: [{ cue: "trainWhistle", file: "AudioSfx_TrainWhistle_01.mp3", durS: 4.055 }],
   },
   // === 步枪 ===============================================================
   {

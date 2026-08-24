@@ -71,14 +71,14 @@ const load = await page.evaluate(() => {
     covered: [...a.sampleCues].filter((name) => !name.startsWith("amb.")).sort(),
     errors: a.sfxErrors.slice(0, 6),
     manifestCues: a.sfxManifest ? Object.keys(a.sfxManifest.cues).length : 0,
-    prologueSfx: ["trainBrake", "carriageRattle", "stretcherWood", "coughLow", "gearRustle", "carriageDoorSlide", "stepBallast"]
+    prologueSfx: ["trainBrake", "trainWhistle", "carriageRattle", "stretcherWood", "coughLow", "gearRustle", "carriageDoorSlide", "stepBallast"]
       .filter((name) => !a.sampleCues.has(name)),
     toneHz: a.sfxManifest && a.sfxManifest.cues.bugleTone
       ? a.sfxManifest.cues.bugleTone.toneHz : null,
   };
 });
 
-const RECIPE_COUNT = 40;   // 2026-08-21 序章车厢新增 7 条专用 cue
+const RECIPE_COUNT = 41;   // 2026-08-24 序章车厢新增 SeedAudio 蒸汽机车汽笛
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -92,7 +92,7 @@ if (load.covered.length !== RECIPE_COUNT) {
 if (load.errors.length) Fail(`采样载入报错 ${JSON.stringify(load.errors)}`);
 else Ok("采样载入零报错");
 if (load.prologueSfx.length) Fail(`序章专用音未盖上：${load.prologueSfx.join(" ")}`);
-else Ok("序章 7 条专用音全部盖上");
+else Ok("序章 8 条专用音全部盖上");
 
 const voiceSeek = await page.evaluate(() => {
   const a = window.Taierzhuang.audio;

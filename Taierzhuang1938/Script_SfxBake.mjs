@@ -336,6 +336,21 @@ async function Main() {
 
   let total = 0;
   for (const group of groups) {
+    // SeedAudio 的列车汽笛是已验收的成品，不由这个程序合成或重切；但每次重烘
+    // 其他音效仍必须重新登记它，否则全量 SfxBake 会悄悄把 cue 从 manifest 丢掉。
+    if (group.seedAudio) {
+      for (const cut of group.cuts) {
+        const file = cut.file || `AudioSfx_${Pascal(cut.cue)}_01.mp3`;
+        const out = path.join(OUT_DIR, file);
+        if (!fs.existsSync(out)) {
+          console.error(`  SeedAudio 成品缺失：${file}（先运行 Script_SeedAudioTrainBake.mjs）`);
+          continue;
+        }
+        if (!report) manifest.cues[cut.cue] = { files: [file], seconds: cut.durS, credit: group.credit, license: group.license };
+        console.log(`  SeedAudio · ${cut.cue} ${cut.durS}s`);
+      }
+      continue;
+    }
     const ext = group.generated ? ".wav" : (path.extname(new URL(SourceUrl(group)).pathname) || ".mp3");
     const rawFile = path.join(RAW_DIR, `${group.id}${ext}`);
     if (group.generated) {

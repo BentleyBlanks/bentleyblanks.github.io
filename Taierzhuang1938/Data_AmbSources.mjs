@@ -55,6 +55,11 @@ export const AMB_LICENSES = {
     terms: "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
     via: "local://Taierzhuang1938/Script_AmbBake.mjs",
   },
+  volcengine: {
+    name: "Volcengine SeedAudio 1.0",
+    terms: "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+    via: "https://openspeech.bytedance.com/api/v3/tts/create",
+  },
 };
 
 const ARCHIVE = "https://archive.org/download/";
@@ -65,13 +70,13 @@ export function ArchiveUrl(item, filePath) {
 }
 
 export const AMB_SOURCES = [
-  // 序章车厢床：完全由本地确定性合成器生成，不含外部录音或音乐。
-  // Script_AmbBake.mjs 在缺少 _raw/TrainInteriorGenerated.wav 时按 generator 重建。
+  // 序章车厢床：由 Script_SeedAudioTrainBake.mjs 直连 SeedAudio 1.0 生成。
+  // AmbBake 重烘其它床时只登记这一条，不得用旧的程序合成器覆写。
   {
-    id: "TrainInteriorGenerated",
-    generated: "trainInterior",
-    credit: "Taierzhuang1938 procedural synthesis · 轮轨、车体低频、木结构轻响",
-    license: "generated",
+    id: "TrainInteriorSeedAudio",
+    seedAudio: true,
+    credit: "Volcengine SeedAudio 1.0 · 序章蒸汽列车车厢轮轨环境",
+    license: "volcengine",
     beds: [{ cue: "trainInterior", durS: 30, rms: -25, lp: 9000 }],
   },
   // === 空间层：这地方本身的声音 ===========================================

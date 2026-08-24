@@ -1077,6 +1077,27 @@ const RECIPES = {
     v.wetGain.gain.value = 0.18;
     v.Live(1.15);
   },
+  // 序章蒸汽机车入站汽笛。SeedAudio 采样包存在时会覆盖；此处只保证离线回退可听。
+  trainWhistle(A, v) {
+    const t = v.t, dur = 2.8;
+    const osc = v.Osc("sine", v.F(430));
+    const wobble = v.Osc("sine", 4.1);
+    const wobbleGain = v.Gain(19);
+    wobble.connect(wobbleGain).connect(osc.detune);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.34, 0.10, dur * 0.76, 0.42);
+    osc.connect(g).connect(v.out);
+    v.Start(wobble, t, dur + 0.12);
+    v.Start(osc, t, dur + 0.12);
+    const steam = v.Noise("pink", dur);
+    const band = v.Filter("bandpass", v.F(1450), 0.75);
+    const air = v.Gain(FLOOR);
+    Swell(air.gain, t, 0.07, 0.08, dur * 0.7, 0.34);
+    steam.connect(band).connect(air).connect(v.out);
+    v.Start(steam, t, dur);
+    v.wetGain.gain.value = 0.32;
+    v.Live(3.25);
+  },
   carriageRattle(A, v) {
     const t = v.t;
     Grains(v, t, 6, 0.1, 1200, 4600, 0.07);

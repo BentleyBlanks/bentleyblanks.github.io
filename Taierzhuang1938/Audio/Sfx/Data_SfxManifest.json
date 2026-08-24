@@ -15,6 +15,11 @@
       "name": "Taierzhuang1938 procedural synthesis",
       "terms": "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
       "via": "local://Taierzhuang1938/Script_SfxBake.mjs"
+    },
+    "volcengine": {
+      "name": "Volcengine SeedAudio 1.0",
+      "terms": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+      "via": "https://openspeech.bytedance.com/api/v3/tts/create"
     }
   },
   "cues": {
@@ -349,7 +354,15 @@
       "seconds": 0.65,
       "credit": "Taierzhuang1938 procedural synthesis · 序章车厢专用音",
       "license": "generated"
+    },
+    "trainWhistle": {
+      "files": [
+        "AudioSfx_TrainWhistle_01.mp3"
+      ],
+      "seconds": 4.055,
+      "credit": "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
+      "license": "volcengine"
     }
   },
-  "bakedAt": "2026-08-21"
+  "bakedAt": "2026-08-24"
 }

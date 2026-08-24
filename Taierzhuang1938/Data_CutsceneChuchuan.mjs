@@ -994,7 +994,7 @@ export const CS_Chuchuan = {
     // 0:40—0:56：列车缓缓进入小站。月台从后窗掠进来；担架兵和轻伤员各自
     // 走过窗格，镜头过后仍在画外继续走，不以切镜当作消失。
     { n: 4, seconds: 16, focalMm: 35, cameraMode: "headLook", camera: { from: [1.95, 1.36, 3.42], look: [3.8, 1.52, 2.6] },
-      sfx: [{ at: 0.2, name: "trainBrake", volume: 0.62 }, { at: 3.0, name: "stretcherWood", volume: 0.42 }, { at: 6.0, name: "coughLow", volume: 0.32 }],
+      sfx: [{ at: 0.18, name: "trainWhistle", volume: 0.48 }, { at: 2.3, name: "trainBrake", volume: 0.62 }, { at: 4.7, name: "stretcherWood", volume: 0.42 }, { at: 7.5, name: "coughLow", volume: 0.32 }],
       propMoves: [
         { name: "StationPlatform", startAt: 0, endAt: 16, from: [7.2, 0, -13.2], to: [7.2, 0, 13.2], ease: "linear" },
         { name: "StationStretcher", startAt: 0, endAt: 16, from: [6.85, 1.18, -14.85], to: [6.85, 1.18, 14.85], ease: "linear" },

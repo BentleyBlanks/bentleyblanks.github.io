@@ -1,235 +1,241 @@
 {
- "generated": "Script_AmbBake.mjs",
- "sampleRate": 44100,
- "beds": {
-  "windPlain": {
-   "file": "AudioAmb_WindPlain.mp3",
-   "seconds": 23,
-   "channels": 2
+  "generated": "Script_AmbBake.mjs + Script_SeedAudioTrainBake.mjs",
+  "sampleRate": 44100,
+  "beds": {
+    "windPlain": {
+      "file": "AudioAmb_WindPlain.mp3",
+      "seconds": 23,
+      "channels": 2
+    },
+    "windStreet": {
+      "file": "AudioAmb_WindStreet.mp3",
+      "seconds": 19,
+      "channels": 2
+    },
+    "windNight": {
+      "file": "AudioAmb_WindNight.mp3",
+      "seconds": 31,
+      "channels": 2
+    },
+    "dawnField": {
+      "file": "AudioAmb_DawnField.mp3",
+      "seconds": 29,
+      "channels": 2
+    },
+    "battleFar": {
+      "file": "AudioAmb_BattleFar.mp3",
+      "seconds": 23,
+      "channels": 2
+    },
+    "crowdFar": {
+      "file": "AudioAmb_CrowdFar.mp3",
+      "seconds": 19,
+      "channels": 2
+    },
+    "shellingFar": {
+      "file": "AudioAmb_ShellingFar.mp3",
+      "seconds": 17,
+      "channels": 2
+    },
+    "fireNear": {
+      "file": "AudioAmb_FireNear.mp3",
+      "seconds": 13,
+      "channels": 2
+    },
+    "fireFar": {
+      "file": "AudioAmb_FireFar.mp3",
+      "seconds": 11,
+      "channels": 2
+    },
+    "trainInterior": {
+      "file": "AudioAmb_TrainInterior.mp3",
+      "seconds": 30,
+      "channels": 2
+    }
   },
-  "windStreet": {
-   "file": "AudioAmb_WindStreet.mp3",
-   "seconds": 19,
-   "channels": 2
+  "cues": {
+    "ambCannonFar": {
+      "files": [
+        "AudioAmb_AmbCannonFar_01.mp3",
+        "AudioAmb_AmbCannonFar_02.mp3",
+        "AudioAmb_AmbCannonFar_03.mp3"
+      ],
+      "seconds": 3.4
+    },
+    "ambWhizz": {
+      "files": [
+        "AudioAmb_AmbWhizz_01.mp3",
+        "AudioAmb_AmbWhizz_02.mp3",
+        "AudioAmb_AmbWhizz_03.mp3",
+        "AudioAmb_AmbWhizz_04.mp3"
+      ],
+      "seconds": 0.32
+    },
+    "ambCrow": {
+      "files": [
+        "AudioAmb_AmbCrow_01.mp3",
+        "AudioAmb_AmbCrow_02.mp3",
+        "AudioAmb_AmbCrow_03.mp3"
+      ],
+      "seconds": 1.1
+    },
+    "ambDogFar": {
+      "files": [
+        "AudioAmb_AmbDogFar_01.mp3",
+        "AudioAmb_AmbDogFar_02.mp3",
+        "AudioAmb_AmbDogFar_03.mp3"
+      ],
+      "seconds": 1.3
+    },
+    "ambRooster": {
+      "files": [
+        "AudioAmb_AmbRooster_01.mp3"
+      ],
+      "seconds": 2.4
+    },
+    "ambCreak": {
+      "files": [
+        "AudioAmb_AmbCreak_01.mp3",
+        "AudioAmb_AmbCreak_02.mp3",
+        "AudioAmb_AmbCreak_03.mp3"
+      ],
+      "seconds": 1.8
+    },
+    "ambDebris": {
+      "files": [
+        "AudioAmb_AmbDebris_01.mp3",
+        "AudioAmb_AmbDebris_02.mp3",
+        "AudioAmb_AmbDebris_03.mp3"
+      ],
+      "seconds": 1.2
+    },
+    "ambPlaneFar": {
+      "files": [
+        "AudioAmb_AmbPlaneFar_01.mp3",
+        "AudioAmb_AmbPlaneFar_02.mp3"
+      ],
+      "seconds": 4.5
+    },
+    "ambMoanFar": {
+      "files": [
+        "AudioAmb_AmbMoanFar_01.mp3",
+        "AudioAmb_AmbMoanFar_02.mp3"
+      ],
+      "seconds": 2.6
+    }
   },
-  "windNight": {
-   "file": "AudioAmb_WindNight.mp3",
-   "seconds": 31,
-   "channels": 2
+  "credits": {
+    "windPlain": {
+      "credit": "Systematic Sound · 开阔平原 · 风与深处的低鸣 · Sonniss GDC 2024",
+      "license": "sonniss",
+      "source": "Systematic Sound - General Ambience Series - Rural Countryside 01/AMBRurl_Meadow Open Plane Windy Deep Rumble_SYSO_SYSO011-1.mp3"
+    },
+    "windStreet": {
+      "credit": "Articulated Sounds · 街道强风、枝叶摩擦与吱呀 · Sonniss GDC 2020",
+      "license": "sonniss",
+      "source": "Articulated Sounds - Nature in the City/WEATHER WIND City Street, Wind in Trees, Strong, Foliage Rustle, Gust Wash, Subtle Creaks & Noises, Montreal, Canada, LOOP.mp3"
+    },
+    "windNight": {
+      "credit": "Systematic Sound · 夜间林地，风与枝叶，安静 · Sonniss GDC 2024",
+      "license": "sonniss",
+      "source": "Systematic Sound - General Ambience Series - Nightscapes 01/AMBForst_Nighttime-Woodlands Windy Trees Rustling Quiet_SYSO_SYSO009.mp3"
+    },
+    "dawnField": {
+      "credit": "Fox Audio Post-Production · 乡野白天，公鸡与鸟 · Sonniss GDC 2018",
+      "license": "sonniss",
+      "source": "Fox Audio Post-Production - Countryside – Nature & Field/Amb_Countryside_Day_Rooster_Birds.mp3"
+    },
+    "battleFar": {
+      "credit": "Coll Anderson · 持续交火中的人群 · Sonniss GDC 2015",
+      "license": "sonniss",
+      "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Battle Steady Fighting 03 A.mp3"
+    },
+    "crowdFar": {
+      "credit": "Coll Anderson · 人群骚动的低语 · Sonniss GDC 2015",
+      "license": "sonniss",
+      "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Unrest Murmur 01 A .mp3"
+    },
+    "shellingFar": {
+      "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
+      "license": "sonniss",
+      "source": "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3"
+    },
+    "ambCannonFar": {
+      "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
+      "license": "sonniss",
+      "source": "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3"
+    },
+    "fireNear": {
+      "credit": "Pole Position Production · 房屋大火（近，含爆裂与落屑）· Sonniss GDC 2018",
+      "license": "sonniss",
+      "source": "Pole Position - The Burning House Library/Burning_House_t2_Fire_high_intensity_with_sizzling_and_some_debris_RE50_1.mp3"
+    },
+    "fireFar": {
+      "credit": "Pole Position Production · 房屋大火（弱，噼啪）· Sonniss GDC 2018",
+      "license": "sonniss",
+      "source": "Pole Position - The Burning House Library/Burning_House_t4_Fire_low_intensity_with_crackling_MKH8060.mp3"
+    },
+    "ambWhizz": {
+      "credit": "Pole Position Production · 弹丸掠过、跳弹与音爆 · Sonniss GDC 2017",
+      "license": "sonniss",
+      "source": "Pole Position - The Warfare Library/warfare_t3_mg_whizzes_ricochets_bullet_cracks_M10.mp3"
+    },
+    "ambCrow": {
+      "credit": "Articulated Sounds · 冬季林地，风与渡鸦 · Sonniss GDC 2018",
+      "license": "sonniss",
+      "source": "Articulated Sounds - Winter Forest Ambience/WINTER Forest windy whistling blizzard snow with raven bird croaking, North Laurentian Woods, Canada_LOOP.LR.mp3"
+    },
+    "ambDogFar": {
+      "credit": "Pole Position Production · 犬吠（慢，远）· Sonniss GDC 2019",
+      "license": "sonniss",
+      "source": "Pole Position - Barking Dog/Dog_German_Shepherd_t15_Int_Bark_Slow_Distant_RSM191.mp3"
+    },
+    "ambRooster": {
+      "credit": "Mechanical Wave · 公鸡打鸣 · Sonniss GDC 2024",
+      "license": "sonniss",
+      "source": "Mechanical Wave - Farm Animals/BIRDFowl_Rooster Call-12_MWSFX_FA.mp3"
+    },
+    "ambCreak": {
+      "credit": "Discover Oregon · 风中木料吱呀与断裂 · Sonniss GDC 2018",
+      "license": "sonniss",
+      "source": "Discover Oregon - Wind and Storms/Creaks and Snaps 2017.03.20 - Gentle Tree Creaks.mp3"
+    },
+    "ambDebris": {
+      "credit": "Coll Anderson · 碎砖与玻璃在木头上滑落 · Sonniss GDC 2019",
+      "license": "sonniss",
+      "source": "Coll Anderson - The Battle Crowd Collection Add on/EFX SD FS In Debris With Glass On Wood 06 C.mp3"
+    },
+    "ambPlaneFar": {
+      "credit": "Pole Position Production · 布里斯托尔「布伦海姆」1934（远处通场）· Sonniss GDC 2019",
+      "license": "sonniss",
+      "source": "Pole Position - Bristol Blenheim Mk 1 1934/blenheim_mk_i_t3_ext_distant_medium_fly_bys_end_of_runway_ORTF_MKH8040.mp3"
+    },
+    "ambMoanFar": {
+      "credit": "Coll Anderson · 战斗结束后的呻吟 · Sonniss GDC 2015",
+      "license": "sonniss",
+      "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Battle End Agony Moans 02 A.mp3"
+    },
+    "trainInterior": {
+      "credit": "Volcengine SeedAudio 1.0 · 序章蒸汽列车车厢轮轨环境",
+      "license": "volcengine",
+      "source": "SeedAudio API generated"
+    }
   },
-  "dawnField": {
-   "file": "AudioAmb_DawnField.mp3",
-   "seconds": 29,
-   "channels": 2
-  },
-  "battleFar": {
-   "file": "AudioAmb_BattleFar.mp3",
-   "seconds": 23,
-   "channels": 2
-  },
-  "crowdFar": {
-   "file": "AudioAmb_CrowdFar.mp3",
-   "seconds": 19,
-   "channels": 2
-  },
-  "shellingFar": {
-   "file": "AudioAmb_ShellingFar.mp3",
-   "seconds": 17,
-   "channels": 2
-  },
-  "fireNear": {
-   "file": "AudioAmb_FireNear.mp3",
-   "seconds": 13,
-   "channels": 2
-  },
-  "fireFar": {
-   "file": "AudioAmb_FireFar.mp3",
-   "seconds": 11,
-   "channels": 2
-  },
-  "trainInterior": {
-   "file": "AudioAmb_TrainInterior.mp3",
-   "seconds": 30,
-   "channels": 2
+  "licenses": {
+    "sonniss": {
+      "name": "Sonniss GDC Game Audio Bundle",
+      "terms": "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
+      "via": "https://archive.org/details/sonniss.com-gdc-game-audio-bundles"
+    },
+    "generated": {
+      "name": "Taierzhuang1938 procedural synthesis",
+      "terms": "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
+      "via": "local://Taierzhuang1938/Script_AmbBake.mjs"
+    },
+    "volcengine": {
+      "name": "Volcengine SeedAudio 1.0",
+      "terms": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+      "via": "https://openspeech.bytedance.com/api/v3/tts/create"
+    }
   }
- },
- "cues": {
-  "ambCannonFar": {
-   "files": [
-    "AudioAmb_AmbCannonFar_01.mp3",
-    "AudioAmb_AmbCannonFar_02.mp3",
-    "AudioAmb_AmbCannonFar_03.mp3"
-   ],
-   "seconds": 3.4
-  },
-  "ambWhizz": {
-   "files": [
-    "AudioAmb_AmbWhizz_01.mp3",
-    "AudioAmb_AmbWhizz_02.mp3",
-    "AudioAmb_AmbWhizz_03.mp3",
-    "AudioAmb_AmbWhizz_04.mp3"
-   ],
-   "seconds": 0.32
-  },
-  "ambCrow": {
-   "files": [
-    "AudioAmb_AmbCrow_01.mp3",
-    "AudioAmb_AmbCrow_02.mp3",
-    "AudioAmb_AmbCrow_03.mp3"
-   ],
-   "seconds": 1.1
-  },
-  "ambDogFar": {
-   "files": [
-    "AudioAmb_AmbDogFar_01.mp3",
-    "AudioAmb_AmbDogFar_02.mp3",
-    "AudioAmb_AmbDogFar_03.mp3"
-   ],
-   "seconds": 1.3
-  },
-  "ambRooster": {
-   "files": [
-    "AudioAmb_AmbRooster_01.mp3"
-   ],
-   "seconds": 2.4
-  },
-  "ambCreak": {
-   "files": [
-    "AudioAmb_AmbCreak_01.mp3",
-    "AudioAmb_AmbCreak_02.mp3",
-    "AudioAmb_AmbCreak_03.mp3"
-   ],
-   "seconds": 1.8
-  },
-  "ambDebris": {
-   "files": [
-    "AudioAmb_AmbDebris_01.mp3",
-    "AudioAmb_AmbDebris_02.mp3",
-    "AudioAmb_AmbDebris_03.mp3"
-   ],
-   "seconds": 1.2
-  },
-  "ambPlaneFar": {
-   "files": [
-    "AudioAmb_AmbPlaneFar_01.mp3",
-    "AudioAmb_AmbPlaneFar_02.mp3"
-   ],
-   "seconds": 4.5
-  },
-  "ambMoanFar": {
-   "files": [
-    "AudioAmb_AmbMoanFar_01.mp3",
-    "AudioAmb_AmbMoanFar_02.mp3"
-   ],
-   "seconds": 2.6
-  }
- },
- "credits": {
-  "windPlain": {
-   "credit": "Systematic Sound · 开阔平原 · 风与深处的低鸣 · Sonniss GDC 2024",
-   "license": "sonniss",
-   "source": "Systematic Sound - General Ambience Series - Rural Countryside 01/AMBRurl_Meadow Open Plane Windy Deep Rumble_SYSO_SYSO011-1.mp3"
-  },
-  "windStreet": {
-   "credit": "Articulated Sounds · 街道强风、枝叶摩擦与吱呀 · Sonniss GDC 2020",
-   "license": "sonniss",
-   "source": "Articulated Sounds - Nature in the City/WEATHER WIND City Street, Wind in Trees, Strong, Foliage Rustle, Gust Wash, Subtle Creaks & Noises, Montreal, Canada, LOOP.mp3"
-  },
-  "windNight": {
-   "credit": "Systematic Sound · 夜间林地，风与枝叶，安静 · Sonniss GDC 2024",
-   "license": "sonniss",
-   "source": "Systematic Sound - General Ambience Series - Nightscapes 01/AMBForst_Nighttime-Woodlands Windy Trees Rustling Quiet_SYSO_SYSO009.mp3"
-  },
-  "dawnField": {
-   "credit": "Fox Audio Post-Production · 乡野白天，公鸡与鸟 · Sonniss GDC 2018",
-   "license": "sonniss",
-   "source": "Fox Audio Post-Production - Countryside – Nature & Field/Amb_Countryside_Day_Rooster_Birds.mp3"
-  },
-  "battleFar": {
-   "credit": "Coll Anderson · 持续交火中的人群 · Sonniss GDC 2015",
-   "license": "sonniss",
-   "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Battle Steady Fighting 03 A.mp3"
-  },
-  "crowdFar": {
-   "credit": "Coll Anderson · 人群骚动的低语 · Sonniss GDC 2015",
-   "license": "sonniss",
-   "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Unrest Murmur 01 A .mp3"
-  },
-  "shellingFar": {
-   "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
-   "license": "sonniss",
-   "source": "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3"
-  },
-  "ambCannonFar": {
-   "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
-   "license": "sonniss",
-   "source": "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3"
-  },
-  "fireNear": {
-   "credit": "Pole Position Production · 房屋大火（近，含爆裂与落屑）· Sonniss GDC 2018",
-   "license": "sonniss",
-   "source": "Pole Position - The Burning House Library/Burning_House_t2_Fire_high_intensity_with_sizzling_and_some_debris_RE50_1.mp3"
-  },
-  "fireFar": {
-   "credit": "Pole Position Production · 房屋大火（弱，噼啪）· Sonniss GDC 2018",
-   "license": "sonniss",
-   "source": "Pole Position - The Burning House Library/Burning_House_t4_Fire_low_intensity_with_crackling_MKH8060.mp3"
-  },
-  "ambWhizz": {
-   "credit": "Pole Position Production · 弹丸掠过、跳弹与音爆 · Sonniss GDC 2017",
-   "license": "sonniss",
-   "source": "Pole Position - The Warfare Library/warfare_t3_mg_whizzes_ricochets_bullet_cracks_M10.mp3"
-  },
-  "ambCrow": {
-   "credit": "Articulated Sounds · 冬季林地，风与渡鸦 · Sonniss GDC 2018",
-   "license": "sonniss",
-   "source": "Articulated Sounds - Winter Forest Ambience/WINTER Forest windy whistling blizzard snow with raven bird croaking, North Laurentian Woods, Canada_LOOP.LR.mp3"
-  },
-  "ambDogFar": {
-   "credit": "Pole Position Production · 犬吠（慢，远）· Sonniss GDC 2019",
-   "license": "sonniss",
-   "source": "Pole Position - Barking Dog/Dog_German_Shepherd_t15_Int_Bark_Slow_Distant_RSM191.mp3"
-  },
-  "ambRooster": {
-   "credit": "Mechanical Wave · 公鸡打鸣 · Sonniss GDC 2024",
-   "license": "sonniss",
-   "source": "Mechanical Wave - Farm Animals/BIRDFowl_Rooster Call-12_MWSFX_FA.mp3"
-  },
-  "ambCreak": {
-   "credit": "Discover Oregon · 风中木料吱呀与断裂 · Sonniss GDC 2018",
-   "license": "sonniss",
-   "source": "Discover Oregon - Wind and Storms/Creaks and Snaps 2017.03.20 - Gentle Tree Creaks.mp3"
-  },
-  "ambDebris": {
-   "credit": "Coll Anderson · 碎砖与玻璃在木头上滑落 · Sonniss GDC 2019",
-   "license": "sonniss",
-   "source": "Coll Anderson - The Battle Crowd Collection Add on/EFX SD FS In Debris With Glass On Wood 06 C.mp3"
-  },
-  "ambPlaneFar": {
-   "credit": "Pole Position Production · 布里斯托尔「布伦海姆」1934（远处通场）· Sonniss GDC 2019",
-   "license": "sonniss",
-   "source": "Pole Position - Bristol Blenheim Mk 1 1934/blenheim_mk_i_t3_ext_distant_medium_fly_bys_end_of_runway_ORTF_MKH8040.mp3"
-  },
-  "ambMoanFar": {
-   "credit": "Coll Anderson · 战斗结束后的呻吟 · Sonniss GDC 2015",
-   "license": "sonniss",
-   "source": "Coll Anderson - Battle Crowd/EFX EXT GROUP Battle End Agony Moans 02 A.mp3"
-  },
-  "trainInterior": {
-   "credit": "Taierzhuang1938 procedural synthesis · 轮轨、车体低频、木结构轻响",
-   "license": "generated"
-  }
- },
- "licenses": {
-  "sonniss": {
-   "name": "Sonniss GDC Game Audio Bundle",
-   "terms": "免版税，可用于商业与非商业项目（本表仍逐条记录厂商）",
-   "via": "https://archive.org/details/sonniss.com-gdc-game-audio-bundles"
-  },
-  "generated": {
-   "name": "Taierzhuang1938 procedural synthesis",
-   "terms": "本仓库原创确定性程序合成，无第三方素材或外部许可限制",
-   "via": "local://Taierzhuang1938/Script_AmbBake.mjs"
-  }
- }
 }

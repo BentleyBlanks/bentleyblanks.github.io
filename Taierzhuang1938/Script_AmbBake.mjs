@@ -353,6 +353,25 @@ async function Main() {
   const failures = [];
 
   for (const group of groups) {
+    // 车厢轮轨床由 SeedAudio 单独生成。全量 AmbBake 必须保留其 manifest 记录，
+    // 但绝不能把已验收的 API 成品覆写回早期的程序噪声。
+    if (group.seedAudio) {
+      for (const bed of group.beds || []) {
+        const file = `AudioAmb_${Pascal(bed.cue)}.mp3`;
+        const out = path.join(OUT_DIR, file);
+        if (!fs.existsSync(out)) {
+          console.error(`  SeedAudio 成品缺失：${file}（先运行 Script_SeedAudioTrainBake.mjs）`);
+          failures.push({ id: group.id, stage: "seedAudio", message: `缺少 ${file}` });
+          continue;
+        }
+        if (!report) {
+          manifest.beds[bed.cue] = { file, seconds: bed.durS, channels: 2 };
+          manifest.credits[bed.cue] = { credit: group.credit, license: group.license, source: "SeedAudio API generated" };
+        }
+        console.log(`  SeedAudio · 床 ${bed.cue} ${bed.durS}s`);
+      }
+      continue;
+    }
     const rawFile = path.join(RAW_DIR, group.id + (group.path ? path.extname(group.path) : ".wav"));
     console.log(`\n[${group.id}] ${group.credit}`);
     try {
