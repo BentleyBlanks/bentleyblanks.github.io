@@ -2216,6 +2216,7 @@ function ResumeFromPause() {
 function MenuFrame(dt, render = true) {
   state.elapsed += dt;
   state.frame += 1;
+  if (editor) editor.UpdateOverlays(dt);
   menu.Update(dt);
   // 场上那几个守军：只有守军，所以 AI 找不到目标，跑的是「守住 holdZone」那一支。
   // 不推它的话人是几尊定在地上的雕像 —— 比没有人还假。
@@ -2935,6 +2936,9 @@ const _proj = new THREE.Vector3();
 function Frame(dt, render = true) {
   state.frame += 1;
   state.elapsed += dt;
+  // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
+  // 所有分支之前 —— 排进下面任何一条 if 里，都会有一整类帧读不到新数。
+  if (editor) editor.UpdateOverlays(dt);
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
   // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
@@ -3127,11 +3131,7 @@ function Frame(dt, render = true) {
   lights.Update(dt, state.elapsed);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
-  if (gi) {
-    gi.Update(dt, camera.position, lights);
-    // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
-    lights.SetGiActive(gi.uniforms.enabled.value);
-  }
+  // 探针体（gi.Update）不在这里推，它挂在 RenderScene 上 —— 见那里的账。
 
   // 死亡判定必须放在**所有会造成伤害的系统都跑完之后**，并且用跨帧状态而不是
   // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
@@ -3265,6 +3265,20 @@ function Frame(dt, render = true) {
  */
 function RenderScene(dt) {
   const phase = PHASES[state.phaseIndex];
+  // 探针体每帧推一批。**必须挂在这里，不能挂在玩法那条分支上** ——
+  // 出画的路一共四条（玩法 / 过场 / 菜单 / 编辑器），以前只有玩法那条推 GI。
+  // 后果：编辑器一打开玩法就停摆，探针一个都不再收敛，Debug Rendering 面板的
+  // 辐照度图集永远停在 warmed = 0 的全黑上（那不是着色器的问题，是这里没推）；
+  // 过场同理 —— 开场就播过场的关，一整段室内间接光都不收敛。
+  // 摆在 shadowMap.needsUpdate 之前，与它原来在玩法分支里的相对次序一致；
+  // GI 那几趟画的是自己的全屏四边形（那个场景里没有灯），
+  // WebGLShadowMap.render 在 lights.length === 0 时就 return 了，
+  // 不会把 needsUpdate 清掉，这一帧的阴影照常烘。
+  if (gi) {
+    gi.Update(dt, camera.position, lights);
+    // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
+    lights.SetGiActive(gi.uniforms.enabled.value);
+  }
   // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
   // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
   renderer.shadowMap.needsUpdate = true;

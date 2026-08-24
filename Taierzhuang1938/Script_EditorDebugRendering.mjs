@@ -12,9 +12,25 @@ const VIEWS = [
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。" },
   { id: "ao", label: "AO 原始", group: "AO", note: "SSAO 尚未双边模糊的半分辨率结果。" },
   { id: "aoBlur", label: "AO 模糊", group: "AO", note: "实际注入材质间接光的 AO 结果。" },
-  { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas。" },
-  { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；没有探针体时显示不可用纹。" },
+  { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
+  { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },
 ];
+
+/**
+ * 视图 id -> 它正在显示的那张靶。与 Post._GetDebugSource 是同一张表，
+ * 改一边必须改另一边，否则面板报的尺寸不是屏幕上那张图的尺寸。
+ */
+const VIEW_TARGETS = {
+  final: (post) => post?.targets?.ldr,
+  hdr: (post) => post?.targets?.hdr,
+  bloom: (post) => post?.BloomTarget,
+  normal: (post) => post?.targets?.normalDepth,
+  depth: (post) => post?.targets?.normalDepth,
+  ao: (post) => post?.targets?.ao,
+  aoBlur: (post) => post?.targets?.aoBlur,
+  giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
+  giDistance: (post, gi) => gi?.distanceMoments?.[gi.pingPong],
+};
 
 export class DebugRenderingEditor {
   static id = "debugRendering";
@@ -26,6 +42,10 @@ export class DebugRenderingEditor {
     this.panel = null;
     this.view = "final";
     this.facts = null;
+    // 四组 chips 是四个各自独立的高亮控件，但它们表示的是**同一个**选择。
+    // 不集中同步的话，点了「辐照度图集」之后「最终画面」那一格还亮着 ——
+    // 面板上会同时亮四格，读者根本判断不出当前送屏的是哪一张靶。
+    this.chipGroups = [];
   }
 
   Enter(root) {
@@ -45,14 +65,16 @@ export class DebugRenderingEditor {
     this.panel?.root.remove();
     this.panel = null;
     this.facts = null;
+    this.chipGroups = [];
   }
 
   BuildUi(body) {
+    this.chipGroups = [];
     for (const group of ["输出", "GBuffer", "AO", "GI"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
-      Chips(section, options, this.view, (id) => this.SetView(id));
+      this.chipGroups.push(Chips(section, options, this.view, (id) => this.SetView(id)));
     }
     Note(body,
       "这是前景叠加工具：打开场景、地形、构件或摄影棚编辑器时不会被关闭。"
@@ -64,6 +86,8 @@ export class DebugRenderingEditor {
   SetView(id) {
     if (!VIEWS.some((item) => item.id === id)) id = "final";
     this.view = id;
+    // 每一组都刷一遍：选中的那一组把自己点亮，其余三组一起熄掉。
+    for (const chips of this.chipGroups) chips.Set(id);
     this.host.post?.SetDebugView?.(id, this.host.gi);
   }
 
@@ -72,9 +96,9 @@ export class DebugRenderingEditor {
     const post = this.host.post;
     const gi = this.host.gi;
     const item = VIEWS.find((entry) => entry.id === this.view) || VIEWS[0];
-    const target = this.view.startsWith("gi")
-      ? (this.view === "giIrradiance" ? gi?.irradiance?.[gi.pingPong] : gi?.distanceMoments?.[gi.pingPong])
-      : post?.targets?.[this.view === "normal" || this.view === "depth" ? "normalDepth" : this.view];
+    // 以前这一行按视图 id 直接去 post.targets 里查同名键，于是 final 与 bloom
+    // 恒为"—"（两者都没有同名靶），看着像靶根本没建出来。
+    const target = VIEW_TARGETS[this.view]?.(post, gi) ?? null;
     this.facts.Set("显示", item.label);
     this.facts.Set("说明", item.note);
     this.facts.Set("尺寸", target ? `${target.width} × ${target.height}` : "—", target ? "" : "warn");
