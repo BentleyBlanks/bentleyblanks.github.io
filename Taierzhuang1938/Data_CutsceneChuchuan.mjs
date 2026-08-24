@@ -878,17 +878,17 @@ export const CS_Chuchuan = {
 
     // 1:08—1:30：整段只触发一个 SeedAudio 1.0 复合 cue；其余行只负责逐句字幕。
     { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [0, 1.6, -6], look: [0, 1.65, 5.95] },
-      sfx: [{ at: 16.9, name: "gearRustle", volume: 0.34 }],
+      sfx: [{ at: 19.0, name: "gearRustle", volume: 0.34 }],
       lines: [
-        { at: 0.2, seconds: 3.9, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。晓不晓得，我们出来是做啥子？" },
-        // 下列时点来自热血动员版连续成品的静音边界，不是把八句音频拼起来。
-        { at: 4.8, seconds: 2.1, who: "squad", text: "我们晓得。打日本。" },
-        { at: 7.8, seconds: 0.7, who: "squadLeader", text: "去死，怕不怕？" },
-        { at: 9.2, seconds: 0.7, who: "squad", text: "不怕。" },
-        { at: 10.8, seconds: 0.6, who: "squadLeader", text: "为啥子不怕？" },
-        { at: 11.9, seconds: 2.7, who: "squad", text: "我们要保护我们的国家。" },
-        { at: 16.7, seconds: 0.7, who: "squadLeader", text: "好样的。" },
-        { at: 19.2, seconds: 2.7, who: "squadLeader", text: "都把东西带好。前头就是滕县。" },
+        { at: 0.2, seconds: 4.2, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。晓不晓得，我们出来是做啥子？" },
+        // 下列时点来自十来人自然错拍定稿的真实停顿，不是把八句音频拼起来。
+        { at: 5.3, seconds: 2.6, who: "squad", text: "我们晓得。打日本！" },
+        { at: 8.8, seconds: 0.8, who: "squadLeader", text: "去死，怕不怕？" },
+        { at: 10.3, seconds: 2.4, who: "squad", text: "不怕！" },
+        { at: 13.4, seconds: 1.0, who: "squadLeader", text: "为啥子不怕？" },
+        { at: 14.4, seconds: 3.7, who: "squad", text: "我们要保护我们的国家！" },
+        { at: 18.1, seconds: 0.8, who: "squadLeader", text: "好样的。" },
+        { at: 19.0, seconds: 2.8, who: "squadLeader", text: "都把东西带好。前头就是滕县。" },
       ] },
 
     // 1:30—1:33：短黑地点卡；人物在黑场内起身，不用镜头外瞬移遮演出。

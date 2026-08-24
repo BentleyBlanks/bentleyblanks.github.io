@@ -23,7 +23,7 @@
 - `Script_AmbBake.mjs TrainInteriorGenerated` 生成 30 秒立体声 `AudioAmb_TrainInterior.mp3`，由低频棕噪（车体）、72 Hz 轮轨节奏、290 Hz 木结构共振和高频空气摩擦组成；两端 150 ms 淡入淡出，运行时由 `AmbLayer` 双头交叉淡化。
 - `Script_SfxBake.mjs PrologueTrainGenerated` 用固定 LCG 噪声、衰减正弦和 cue 专属包络生成 `TrainBrake`、`CarriageRattle`、`StretcherWood`、`CoughLow`、`GearRustle`、`CarriageDoorSlide`、`StepBallast`。
 - `Script_VoiceBake.mjs --prologue --force` 只允许直接调用火山引擎 `seed-audio-1.0`。密钥只读 `VOLCENGINE_API_KEY`，不得写入仓库、日志或 GitHub；不得经 Lovart、本机 MiniMax Hub，也不得回退 Qwen、系统朗读或其他模型冒充成品。
-- 1:08—1:30 的班长问答在 `Data_Voice.mjs` 只登记一个 `prologue_motivation_01`：同一个提示词一次生成完整八句与停顿，运行时只触发一次音频；`Data_CutsceneChuchuan.mjs` 的八条 `lines` 只负责逐句字幕。2026-08-24 的热血动员版不再要求“压低、克制、不做煽情演讲”，而是让班长三次发问逐级抬升、全排在“保护我们的国家”处爆发，再用最后一句命令收住并带队出发。
+- 1:08—1:30 的班长问答在 `Data_Voice.mjs` 只登记一个 `prologue_motivation_01`：同一个提示词一次生成完整八句与停顿，运行时只触发一次音频；`Data_CutsceneChuchuan.mjs` 的八条 `lines` 只负责逐句字幕。2026-08-24 的最终热血动员版让班长三次发问逐级抬升，十到十二名弟兄以约 80—250 ms 的自然错拍、抢话和参差尾音回应；“不怕！”保持短促炸裂，但不做机械同步的录音棚合唱，也不堆成百人大场面。
 
 所有对白用四川话；不是只把普通话换几个词，而是由 SeedAudio 1.0 统一输出四川口音与语气。单句 cue 使用 0.45—5.2 s 时长闸，连续动员 cue 使用独立 22.5 s 闸，火山引擎原始 take 的底噪闸为 −48 dB；两者都不套战斗 Bark 的 2.6 s 上限。人工试听仍需确认咬字、角色区分、齐声层次、班长哽咽与方言可信度。未使用英文、女性声线或无声占位。
 
@@ -42,7 +42,7 @@
 | 7 | 擦枪士兵 | `prologue_rifleman_01` | `AudioSfx_PrologueVoiceRifleman_01.mp3` | 0.71 s |
 | 8 | 旧伤士兵 | `prologue_old_wound_02` | `AudioSfx_PrologueVoiceOldWound_02.mp3` | 2.70 s |
 | 9 | 旧伤士兵 | `prologue_old_wound_03` | `AudioSfx_PrologueVoiceOldWound_03.mp3` | 0.48 s |
-| 10 | 班长与众人（连续八句） | `prologue_motivation_01` | `AudioSfx_PrologueVoiceMotivation_02.mp3` | 21.70 s |
+| 10 | 班长与十来名士兵（连续八句） | `prologue_motivation_01` | `AudioSfx_PrologueVoiceMotivation_03.mp3` | 21.75 s |
 | 11 | 车外军官 | `prologue_external_officer_01` | `AudioSfx_PrologueVoiceExternalOfficer_01.mp3` | 3.65 s |
 
 ## 本批验证入口
