@@ -45,9 +45,11 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   try {
     await page.goto(url, { waitUntil: "load", timeout: 120000 });
     await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+    await page.waitForFunction(() => window.Taierzhuang.vfx?.loadedExplosionSprites?.size === 4,
+      { timeout: 30000 });
     await page.evaluate(() => window.Taierzhuang.StepFrames(120));
     await page.waitForTimeout(600);
-    health = await page.evaluate(() => {
+    health = await page.evaluate((testPhase) => {
       const T = window.Taierzhuang;
       const gl = T.renderer.getContext();
       const glError = gl.getError();
@@ -71,12 +73,52 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       // pass。不关掉 autoReset 的话，读到的永远只是最后那一块全屏四边形 = 1。
       T.renderer.info.autoReset = false;
       T.renderer.info.reset();
+      // 四套爆炸图各强制播一片，让所有 grid/混合模式/着色器分支都在 Tier 0 真编译。
+      // 只在第一关做，位置放到镜头前 18 m；后六关仍保持原本的整帧健康取样。
+      if (testPhase === 0) {
+        const forward = T.camera.position.clone();
+        T.camera.getWorldDirection(forward);
+        const blastAt = T.player.position.clone().addScaledVector(forward, 18);
+        blastAt.y += 1.2;
+        const forced = ["legacy", "compact", "fireball", "heavy"];
+        for (let i = 0; i < forced.length; i += 1) {
+          const p = blastAt.clone();
+          p.x += (i - 1.5) * 2.2;
+          T.vfx.Explosion(p, { radius: 2.2, kind: "grenade", spriteVariant: forced[i] });
+        }
+      }
       // 不开 preserveDrawingBuffer，取样必须与渲染在同一个任务里。
       // 走 StepFrames(1) 而不是自己调 post.Render：曝光/雾/泛光/去饱和全在 Frame()
       // 里按当关的天光预设装配，这里再抄一份必然抄漏。抄漏的代价不是"少一点效果"——
       // 夜战预设 exposure 是 3.6，被写死成 0.5 时整帧读出来就是纯黑，
       // 探针报"画面近乎纯色"，测的是测试自己写错的曝光，不是画面。
       T.StepFrames(1);
+      const glErrorAfterVfx = gl.getError();
+
+      const explosionSpritePools = {};
+      const spritePoolNames = {
+        legacy: "spriteLegacy", compact: "spriteCompact",
+        fireball: "spriteFireball", heavy: "spriteHeavy",
+      };
+      for (const [key, poolName] of Object.entries(spritePoolNames)) {
+        const pool = T.vfx.pools[poolName];
+        const image = pool.material.uniforms.uSpriteMap.value.image;
+        explosionSpritePools[key] = {
+          frames: pool.material.uniforms.uSpriteFrames.value,
+          grid: pool.material.uniforms.uSpriteGrid.value.toArray(),
+          width: image?.width || 0,
+          height: image?.height || 0,
+          spawned: pool.cursor,
+        };
+      }
+      const explosionSpriteRouting = {
+        smallLow: T.vfx.SelectExplosionSpriteVariant(4, 0.1),
+        smallHigh: T.vfx.SelectExplosionSpriteVariant(4, 0.9),
+        mediumLow: T.vfx.SelectExplosionSpriteVariant(7, 0.1),
+        mediumHigh: T.vfx.SelectExplosionSpriteVariant(7, 0.9),
+        heavyLow: T.vfx.SelectExplosionSpriteVariant(15, 0.1),
+        heavyHigh: T.vfx.SelectExplosionSpriteVariant(15, 0.9),
+      };
 
       // 深度法线预通道的**天空判据**：w = 线性视深度，0 = 这一路没打到东西。
       // 事故：天空穹的 allowOverride = false 只保证"不被换材质"，它照样会用
@@ -108,6 +150,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       const level = T.Debug.Level ? T.Debug.Level().id : "?";
       return {
         glError,
+        glErrorAfterVfx,
         spread: max - min,
         tones: tones.size,
         programs: T.renderer.info.programs.length,
@@ -138,8 +181,10 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         decalUsesSurfaceClip: decalMaterial.fragmentShader.includes("surfaceTolerance")
           && decalMaterial.fragmentShader.includes("abs(sceneDepth - vViewDepth)"),
         readableIjaMaterials,
+        explosionSpritePools,
+        explosionSpriteRouting,
       };
-    });
+    }, phase);
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
   } catch (error) {
     problems.push(`THROW ${String(error).slice(0, 200)}`);
@@ -150,6 +195,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   if (!health) bad.push("没拿到健康数据");
   else {
     if (health.glError !== 0) bad.push(`GL 错误 ${health.glError}`);
+    if (health.glErrorAfterVfx !== 0) bad.push(`爆炸序列帧 GL 错误 ${health.glErrorAfterVfx}`);
     // 画面不是纯色：黑屏、只剩天空、只剩雾，三种事故都表现为 spread 极小
     if (health.spread < 8) bad.push(`画面近乎纯色 spread=${health.spread}`);
     // 夜战本来就只有很窄的一段动态，阀值得分档
@@ -209,6 +255,31 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
     if (health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
+    const expectedSprites = {
+      legacy: { frames: 16, grid: "4,4", size: 1024 },
+      compact: { frames: 25, grid: "5,5", size: 1024 },
+      fireball: { frames: 64, grid: "8,8", size: 1024 },
+      heavy: { frames: 25, grid: "5,5", size: 2048 },
+    };
+    for (const [key, expected] of Object.entries(expectedSprites)) {
+      const actual = health.explosionSpritePools?.[key];
+      if (!actual || actual.frames !== expected.frames || actual.grid.join(",") !== expected.grid
+        || actual.width !== expected.size || actual.height !== expected.size) {
+        bad.push(`爆炸贴图 ${key} 未按 ${expected.grid}/${expected.frames} 帧加载`
+          + ` actual=${actual ? `${actual.grid}/${actual.frames}/${actual.width}x${actual.height}` : "missing"}`);
+      }
+      if (phase === 0 && !(actual?.spawned > 0)) bad.push(`爆炸贴图 ${key} 未真正生成实例`);
+    }
+    const expectedRouting = {
+      smallLow: "legacy", smallHigh: "compact",
+      mediumLow: "compact", mediumHigh: "fireball",
+      heavyLow: "fireball", heavyHigh: "heavy",
+    };
+    for (const [probe, expected] of Object.entries(expectedRouting)) {
+      if (health.explosionSpriteRouting?.[probe] !== expected) {
+        bad.push(`爆炸威力分档 ${probe}=${health.explosionSpriteRouting?.[probe] ?? "missing"} expected=${expected}`);
+      }
+    }
     const expectedExternalProps = [3, 7, 6, 4, 5, 5, 5][phase];
     if (!health.externalProps || health.externalProps.count !== expectedExternalProps
       || health.externalProps.failed?.length) {

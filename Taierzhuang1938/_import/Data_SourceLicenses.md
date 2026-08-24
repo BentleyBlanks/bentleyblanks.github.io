@@ -83,6 +83,9 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
 | 爆炸火球序列帧 `Texture/Texture_ExplosionFire_01.png` | [Explosion Sheet](https://opengameart.org/content/explosion-sheet) 的 `boom3.png` | [StumpyStrust](https://opengameart.org/users/stumpystrust) | CC0 | 原图未改动（1024×1024，4×4 共 16 帧）。运行时由 `Script_Vfx.mjs` 的火球池按序列帧采样：形状细节来自贴图，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合——台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。贴图加载失败时静默降级回程序化辉光圆片。 |
+| 紧凑爆炸 `Texture/Texture_ExplosionUnityCompact_01.webp` | [Unity Labs Free VFX image sequences and flipbooks](https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks) 的 `Explosion00_5x5.tga` | Unity Labs Paris | CC0 | 1024×1024、5×5 共 25 帧；无损 WebP 转码，保留 Alpha。用于掷弹筒、手榴弹等轻/中型爆炸。 |
+| 持续火球 `Texture/Texture_ExplosionUnityFireBall_02.webp` | 同上页面的 `FireBall02_8x8.tga` | Unity Labs Paris | CC0 | 1024×1024、8×8 共 64 帧；无损 WebP 转码。黑底贴图走 HDR 加性混合，用于中型爆炸的随机火球形制。 |
+| 重炮爆炸 `Texture/Texture_ExplosionUnityHeavy_02.webp` | 同上页面的 `Explosion02HD_5x5.tga` | Unity Labs Paris | CC0 | 2048×2048、5×5 共 25 帧；无损 WebP 转码，保留 Alpha。用于联队炮、师团炮兵与大当量迫击炮。 |
 
 下载命令（原图即运行时文件，未做任何修改）：
 
@@ -90,6 +93,16 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 Invoke-WebRequest -Uri 'https://opengameart.org/sites/default/files/boom3.png' `
   -OutFile 'Taierzhuang1938/Texture/Texture_ExplosionFire_01.png'
 ```
+
+Unity Labs 三个源包的直接下载地址分别是：
+
+- `https://unity3d.com/files/labs/downloads/vfx/assets01/Explosion00/Explosion00-flipbooks.zip`
+- `https://unity3d.com/files/labs/downloads/vfx/assets01/FireBall02/FireBall02-flipbooks.zip`
+- `https://unity3d.com/files/labs/downloads/vfx/assets01/Explosion02HD/Explosion02HD-flipbooks.zip`
+
+运行时不纯随机：`Script_Vfx.mjs` 先用 `radius × kind.flash` 得到实际冲击量，再在相邻
+两档素材间随机。轻型只会抽到旧火球/紧凑爆炸，中型抽紧凑爆炸/持续火球，重型只抽
+持续火球/重炮爆炸；因此连续炮火有变化，但手榴弹不会误播成重炮蘑菇云。
 
 ## 场景布设物（Script_ExternalProps.mjs 运行时加载）
 

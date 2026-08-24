@@ -323,6 +323,7 @@ uniform float uNearFade;
 uniform sampler2D uSpriteMap;    // 序列帧贴图；非 SHAPE_SPRITE 池挂共享的 1×1 白图
 uniform vec2 uSpriteGrid;        // 帧网格（列×行）
 uniform float uSpriteFrames;     // 帧总数
+uniform float uSpriteEmission;   // 自带颜色的 CC0 flipbook：只把高亮火焰抬进 HDR，烟仍保留暗部
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
@@ -399,15 +400,20 @@ void main() {
   // 贴花不老化，vColor 恒等于 colorA（断口色），暗芯色只能从 colorB 单独取
   color = mix(vColor, vColorAlt, hole);
 #elif defined(SHAPE_SPRITE)
-  // 序列帧火球（贴图：CC0 16 帧爆炸序列，来源见 _import/Data_SourceLicenses.md）。
-  // 贴图只给"火"的形状细节，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合：
-  // 台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。
+  // 序列帧火球。旧的 16 帧 CC0 图只提供形状，仍由台儿庄色板着色；Unity Labs
+  // 三套 CC0 flipbook 自带火与烟的颜色，保留原色，并只把亮焰抬进 HDR 泛光。
   float f = min(uSpriteFrames - 1.0, vFrame + floor(vAge01 * uSpriteFrames));
   vec2 cell = vec2(mod(f, uSpriteGrid.x), floor(f / max(uSpriteGrid.x, 1.0)));
   vec2 uv = (p * 0.5 + 0.5 + cell) / uSpriteGrid;
   vec4 tex = texture2D(uSpriteMap, uv);
   mask = tex.a;
+#ifdef SPRITE_AUTHORED_COLOR
+  float authoredLuma = max(tex.r, max(tex.g, tex.b));
+  float flame = smoothstep(0.18, 0.82, authoredLuma);
+  color = tex.rgb * mix(0.78, uSpriteEmission, flame);
+#else
   color = vColor * tex.rgb;
+#endif
 #else
   mask = smoothstep(1.0, 0.1, d);
 #endif
@@ -690,6 +696,7 @@ class ParticlePool {
     if (config.litSurface) defines.LIT_SURFACE = "";
     if (config.bounce) defines.GROUND_BOUNCE = "";
     if (config.aerial) defines.AERIAL = "";
+    if (config.sprite?.authoredColor) defines.SPRITE_AUTHORED_COLOR = "";
 
     const preserveTargetAlpha = !!config.preserveTargetAlpha;
     this.material = new THREE.ShaderMaterial({
@@ -704,6 +711,7 @@ class ParticlePool {
             : shared.uSpriteGrid.value,
         },
         uSpriteFrames: { value: config.sprite ? config.sprite.frames : shared.uSpriteFrames.value },
+        uSpriteEmission: { value: config.sprite?.emission ?? 1 },
       }),
       vertexShader: `${GLSL_VERT_HELPERS}\n${VERT_PARTICLE}`,
       fragmentShader: `${GLSL_NOISE}\n${FRAG_PARTICLE}`,
@@ -1045,6 +1053,48 @@ const EXPLOSION_KINDS = {
   tank: { flash: 1.7, fire: 14, smoke: 18, chunks: 22, sparks: 16, sooty: 0.8, column: 2.2 },
 };
 
+// 四套爆炸序列帧共用同一套粒子 API，但不能共用一个材质：一次炮击的烟尾还没散，
+// 下一颗手榴弹若把 sampler 换掉，屏幕上的旧实例会在半空中瞬间变脸。每套各占原
+// sprite 总预算的四分之一，显存/实例总量不增加，只多三个很便宜的 draw call。
+const EXPLOSION_SPRITE_VARIANTS = Object.freeze({
+  legacy: Object.freeze({
+    pool: "spriteLegacy", path: "./Texture/Texture_ExplosionFire_01.png",
+    grid: [4, 4], frames: 16, authoredColor: false, blending: "additive",
+    emission: 1, aerial: false, fadeOutStart: 0.82,
+    life: [0.40, 0.52], mainSize: [0.55, 1.45], secondarySize: [0.30, 0.85],
+  }),
+  compact: Object.freeze({
+    pool: "spriteCompact", path: "./Texture/Texture_ExplosionUnityCompact_01.webp",
+    grid: [5, 5], frames: 25, authoredColor: true, blending: "normal",
+    emission: 2.6, aerial: true, fadeOutStart: 0.88,
+    life: [0.72, 0.90], mainSize: [0.50, 1.25], secondarySize: [0.28, 0.75],
+  }),
+  fireball: Object.freeze({
+    pool: "spriteFireball", path: "./Texture/Texture_ExplosionUnityFireBall_02.webp",
+    grid: [8, 8], frames: 64, authoredColor: true, blending: "additive",
+    emission: 3.4, aerial: false, fadeOutStart: 0.88,
+    life: [0.55, 0.72], mainSize: [0.45, 1.22], secondarySize: [0.25, 0.70],
+  }),
+  heavy: Object.freeze({
+    pool: "spriteHeavy", path: "./Texture/Texture_ExplosionUnityHeavy_02.webp",
+    grid: [5, 5], frames: 25, authoredColor: true, blending: "normal",
+    emission: 3.0, aerial: true, fadeOutStart: 0.92,
+    life: [1.00, 1.25], mainSize: [0.62, 1.55], secondarySize: [0.35, 0.90],
+  }),
+});
+
+/**
+ * 按实际冲击量挑动画，而不是把手榴弹和师团炮放进同一个纯随机袋。
+ * 每档保留两种邻近形制：连续爆炸不会克隆粘贴，但也不会小炮炸出重炮蘑菇云。
+ */
+export function SelectExplosionSpriteVariant(effectivePower, roll = 0.5) {
+  const power = Math.max(0, Number(effectivePower) || 0);
+  const r = Math.min(0.999999, Math.max(0, Number(roll) || 0));
+  if (power < 5.2) return r < 0.35 ? "legacy" : "compact";
+  if (power < 10) return r < 0.65 ? "compact" : "fireball";
+  return r < 0.18 ? "fireball" : "heavy";
+}
+
 const CASING_SIZES = {
   "7.92": [0.0079, 0.057], "7.7": [0.0077, 0.058],
   "6.5": [0.0065, 0.050], "7.63": [0.0076, 0.025],
@@ -1092,6 +1142,10 @@ export class VfxSystem {
     // mask 恒为 1，形状退化成普通辉光圆片 —— 与旧版程序化火球观感一致，绝不黑屏。
     this.spritePlaceholder = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
     this.spritePlaceholder.needsUpdate = true;
+    // Unity Labs 两张爆炸图走 NormalBlending；白图兜底会变成方形闪光，所以它们在
+    // 贴图未到位时用全透明占位，外层程序化火焰/尘环/烟柱仍照常生成。
+    this.spriteTransparentPlaceholder = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+    this.spriteTransparentPlaceholder.needsUpdate = true;
 
     this.shared = {
       uTime: { value: 0 },
@@ -1124,6 +1178,19 @@ export class VfxSystem {
     };
 
     const cap = (share, floor) => Math.max(floor, Math.round(this.budget * share));
+    const spriteCapacity = cap(POOL_SHARE.sprite / Object.keys(EXPLOSION_SPRITE_VARIANTS).length, 8);
+    const makeSpritePool = (variant) => new ParticlePool(spriteCapacity, {
+      shape: "sprite", orient: "billboard",
+      blending: variant.blending === "normal" ? THREE.NormalBlending : THREE.AdditiveBlending,
+      aerial: variant.aerial, softRange: 0.25, renderOrder: 8,
+      fadeOutStart: variant.fadeOutStart,
+      sprite: {
+        texture: variant.pool === "spriteLegacy"
+          ? this.spritePlaceholder : this.spriteTransparentPlaceholder,
+        grid: variant.grid, frames: variant.frames,
+        authoredColor: variant.authoredColor, emission: variant.emission,
+      },
+    }, this.shared);
     this.pools = {
       // 烟：alpha 混合 + 朗伯着色 + 软粒子，是"体积感"的全部来源。
       // aerial 只给它一个池：加性的火/曳光/枪口焰是 HDR 自发光，大气透视对它们
@@ -1138,13 +1205,12 @@ export class VfxSystem {
         shape: "puff", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.25, renderOrder: 8,
       }, this.shared),
-      // 爆炸火球的序列帧核心：CC0 16 帧序列图（4×4）当形状细节，颜色仍乘色板
-      // 走 HDR 加性。与 fire 共享"火"这档预算（0.08 + 0.08），低画质下两层都减薄。
-      sprite: new ParticlePool(cap(POOL_SHARE.sprite, 24), {
-        shape: "sprite", orient: "billboard", blending: THREE.AdditiveBlending,
-        softRange: 0.25, renderOrder: 8, fadeOutStart: 0.82,
-        sprite: { texture: this.spritePlaceholder, grid: [4, 4], frames: 16 },
-      }, this.shared),
+      // 四套序列帧按当量随机：旧 16 帧、紧凑爆炸、持续火球、重炮爆炸。容量四等分，
+      // 总预算仍是 POOL_SHARE.sprite；NormalBlending 两池能留下黑烟，另两池走 HDR 加性。
+      spriteLegacy: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.legacy),
+      spriteCompact: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.compact),
+      spriteFireball: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.fireball),
+      spriteHeavy: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.heavy),
       // 曳光与火星共用一个"沿速度拉长"的池
       streak: new ParticlePool(cap(POOL_SHARE.streak, 64), {
         shape: "streak", orient: "stretch", blending: THREE.AdditiveBlending,
@@ -1175,27 +1241,26 @@ export class VfxSystem {
     this.dust = null;
     this.dustBox = null;
 
-    // 异步加载爆炸火球序列帧（CC0，来源与许可见 _import/Data_SourceLicenses.md）。
-    // 失败静默留在白图占位 —— 页面绝不因一张贴图报错，爆炸照常走程序化辉光。
-    this.spriteSheet = this.spritePlaceholder;
-    new THREE.TextureLoader().load(
-      new URL("./Texture/Texture_ExplosionFire_01.png", import.meta.url).href,
-      (texture) => {
+    // 四套 CC0 爆炸贴图并行加载，来源与许可见 _import/Data_SourceLicenses.md。
+    // 单张失败只让对应层透明降级，不会拖死页面，程序化火焰/尘环/碎块仍完整存在。
+    this.explosionSpriteTextures = new Map();
+    this.loadedExplosionSprites = new Set();
+    this.lastExplosionSprite = null;
+    const textureLoader = new THREE.TextureLoader();
+    for (const [key, variant] of Object.entries(EXPLOSION_SPRITE_VARIANTS)) {
+      textureLoader.load(new URL(variant.path, import.meta.url).href, (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
-        // 序列图第一行是第一阶段（火星/初爆），最后一行是开花：UV 必须按图面方向
-        // 走（flipY = false），否则火球会倒着播 —— 从大烟球缩回火星。
+        // 所有源图都按左上→右下排帧；沿用旧爆炸图验证过的 UV 方向。
         texture.flipY = false;
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.needsUpdate = true;
-        this.spriteSheet = texture;
-        if (this.pools && this.pools.sprite) {
-          this.pools.sprite.material.uniforms.uSpriteMap.value = texture;
-        }
-      },
-      undefined,
-      () => {},                          // 加载失败：留在 1×1 白图，静默降级
-    );
+        this.explosionSpriteTextures.set(key, texture);
+        this.loadedExplosionSprites.add(key);
+        const pool = this.pools?.[variant.pool];
+        if (pool) pool.material.uniforms.uSpriteMap.value = texture;
+      }, undefined, () => {});
+    }
 
     // 深度法线预通道里必须隐身（见文件头第 2 条）。挂钩子而不是改 Script_Post。
     this.previousSceneHook = scene.onBeforeRender;
@@ -1230,6 +1295,11 @@ export class VfxSystem {
     const w = width || (image && image.width) || this.shared.uResolution.value.x;
     const h = height || (image && image.height) || this.shared.uResolution.value.y;
     this.shared.uResolution.value.set(w, h);
+  }
+
+  /** 编辑器/冒烟测试可传固定 roll 预览分档；实战省略时仍走本系统的确定性随机流。 */
+  SelectExplosionSpriteVariant(effectivePower, roll = this.random()) {
+    return SelectExplosionSpriteVariant(effectivePower, roll);
   }
 
   /**
@@ -1548,11 +1618,22 @@ export class VfxSystem {
    * 爆炸。看起来"有当量"的关键不是火球大小，是**贴地扩散的尘环**：
    * 冲击波沿地面推出去的那一圈灰，才让人相信地面被砸了一下。
    */
-  Explosion(position, { radius = 6, kind = "grenade", groundY = null } = {}) {
+  Explosion(position, {
+    radius = 6, kind = "grenade", groundY = null, spriteVariant = null,
+  } = {}) {
     const profile = EXPLOSION_KINDS[kind] || EXPLOSION_KINDS.grenade;
     const scale = Math.max(0.35, radius / 6);
     // 空炸（打在墙上、屋顶上）时爆点比地面高，碎块得继续往下掉
     const ground = groundY ?? Math.min(position.y - 0.05, this.groundLevel);
+    const effectivePower = radius * profile.flash;
+    const spriteKey = EXPLOSION_SPRITE_VARIANTS[spriteVariant]
+      ? spriteVariant : this.SelectExplosionSpriteVariant(effectivePower);
+    const spriteProfile = EXPLOSION_SPRITE_VARIANTS[spriteKey];
+    const spritePool = this.pools[spriteProfile.pool];
+    this.lastExplosionSprite = {
+      key: spriteKey, effectivePower, radius, kind,
+      loaded: this.loadedExplosionSprites.has(spriteKey),
+    };
 
     // 1) 中心强光：HDR 20+，只活三四帧
     {
@@ -1568,29 +1649,28 @@ export class VfxSystem {
       this.pools.fire.Spawn(s, this.time);
     }
 
-    // 2) 火球：序列帧核心 + 程序化辉光。
-    //    贴图帧（CC0 16 帧，来源见 _import/Data_SourceLicenses.md）给"火"的形状细节，
-    //    puff 给柔软的边和 HDR 泛光；只有贴图会逐帧跳，只有 puff 火就没有纹理。
-    //    起始帧错开，避免几片同帧同形叠成一张硬边卡。
+    // 2) 火球：按冲击量从相邻的两档 CC0 序列帧里随机挑一套，再裹一层程序化辉光。
+    //    一次爆炸内的所有片共用同一套动画，避免火/烟轮廓互相穿帮；下一次爆炸才重抽。
     const spriteCount = Math.max(1,
       Math.min(3, Math.round(profile.fire / 5) * Math.round(this.spawnScale)));
     for (let i = 0; i < spriteCount; i += 1) {
       const s = ResetSpawn();
+      const size = i === 0 ? spriteProfile.mainSize : spriteProfile.secondarySize;
       const spread = i === 0 ? 0 : radius * 0.18;
       s.x = position.x + this._Signed(spread);
       s.y = position.y + this._Range(0, radius * 0.10) + i * radius * 0.06;
       s.z = position.z + this._Signed(spread);
       s.vx = this._Signed(1.1) * scale; s.vy = this._Range(1.4, 3.0) * scale; s.vz = this._Signed(1.1) * scale;
       s.ay = 2.4; s.drag = 2.8;
-      s.life = this._Range(0.40, 0.52);
-      s.sizeStart = radius * (i === 0 ? 0.55 : 0.30);
-      s.sizeEnd = radius * (i === 0 ? 1.45 : 0.85);
+      s.life = this._Range(spriteProfile.life[0], spriteProfile.life[1]);
+      s.sizeStart = radius * size[0];
+      s.sizeEnd = radius * size[1];
       s.opacity = i === 0 ? 0.95 : 0.6; s.fadeIn = 0.04;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.5);
-      s.frame = i === 0 ? 0 : Math.floor(this.random() * 4);
+      s.frame = i === 0 ? 0 : Math.floor(this.random() * Math.min(8, spriteProfile.frames));
       s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
       s.seed = this.random();
-      this.pools.sprite.Spawn(s, this.time);
+      spritePool.Spawn(s, this.time);
     }
 
     // 程序化辉光裹在序列帧外面：向上加速，黄 -> 暗红
@@ -1850,8 +1930,11 @@ export class VfxSystem {
     for (const pool of Object.values(this.pools)) pool.Dispose();
     this.debris.Dispose();
     if (this.dust) this.dust.Dispose();
-    if (this.spriteSheet && this.spriteSheet !== this.spritePlaceholder) this.spriteSheet.dispose();
+    for (const texture of this.explosionSpriteTextures.values()) texture.dispose();
+    this.explosionSpriteTextures.clear();
+    this.loadedExplosionSprites.clear();
     if (this.spritePlaceholder) this.spritePlaceholder.dispose();
+    if (this.spriteTransparentPlaceholder) this.spriteTransparentPlaceholder.dispose();
     this.fallbackDepth.dispose();
     this.smokeSources.clear();
     this.dust = null;
