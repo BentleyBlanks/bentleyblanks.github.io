@@ -199,10 +199,10 @@
    "category": "weapon",
    "file": "Type38.tzm.json",
    "triangles": 4690,
-   "meshBlocks": 2,
-   "nodes": 7,
+   "meshBlocks": 4,
+   "nodes": 8,
    "joints": 0,
-   "bytes": 166263,
+   "bytes": 168665,
    "materials": [
     "steel",
     "wood"

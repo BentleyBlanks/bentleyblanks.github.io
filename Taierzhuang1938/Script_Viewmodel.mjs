@@ -981,7 +981,11 @@ function BuildFromModel(materials, weapon, key, doc) {
   }
   let built = null;
   try {
-    built = InstantiateModel(doc, { materials: table });
+    // Keep model-node boundaries in the first-person rig.  World actors can
+    // batch by material, but this rig needs the Type 38 `adsNear` child to
+    // remain independently visible so ADS can hide it without losing the
+    // actual sight and barrel.
+    built = InstantiateModel(doc, { materials: table, batch: false });
   } catch (error) {
     console.warn(`[Viewmodel] ${key} 模型实例化失败：${String(error).slice(0, 160)}`);
     return null;
@@ -1005,6 +1009,16 @@ function BuildFromModel(materials, weapon, key, doc) {
   const gripL = Mount("gripL", gripR.clone());
   const sight = Mount("sight", null);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
+  // Imported historical guns normally merge every steel/wood face per
+  // material.  Some assets expose an `adsNear` node for the rear receiver and
+  // stock: those faces cross the camera near plane once the sight is centered,
+  // so retain them at hip but hide them during ADS instead of drawing a clipped
+  // rectangular cross-section across the sight picture.
+  const adsHide = [];
+  const adsNear = built.nodes.get("adsNear");
+  if (adsNear) {
+    adsNear.traverse((child) => { if (child.isMesh) adsHide.push(child); });
+  }
   const isBoltRifle = weapon?.kind === "boltRifle";
   // 导入枪模把整支枪合成了一个网格，没有独立 bolt joint。仍给动作层一个代理节点：
   // 它让栓动链完整跑起来（右手离开握把、抓机柄、整枪受力、抛壳），而不是枪响后
@@ -1040,6 +1054,7 @@ function BuildFromModel(materials, weapon, key, doc) {
       left: { x: gripL.x, y: gripL.y, z: gripL.z, rx: hl[0], ry: hl[1], rz: hl[2] },
     },
     boltHandle,
+    adsHide,
     source: "model",
   };
 }

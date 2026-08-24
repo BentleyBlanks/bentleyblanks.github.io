@@ -89,6 +89,7 @@ const report = await page.evaluate(() => {
 
   // 四、全部五支火器必须走 TZM 并保留 sight；三支栓动步枪还要有动作代理。
   const sights = {};
+  let type38AdsNear = null;
   for (const id of ["ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96"]) {
     T.viewmodel.Equip(id);
     T.StepFrames(120);
@@ -99,6 +100,16 @@ const report = await page.evaluate(() => {
       offsetMm: Math.hypot(vm.adsOffset.x, vm.adsOffset.y) * 1000,
       hasBoltAction: !["ZhongZheng", "HanYang", "Type38"].includes(id) || !!vm.rig?.parts?.bolt,
     };
+    if (id === "Type38") {
+      // The imported Arisaka has a dedicated rear receiver/stock node.  It
+      // must remain at hip but be hidden at full ADS, otherwise the camera
+      // near plane cuts it into the screen-filling block reported by players.
+      for (let frame = 0; frame < 48; frame += 1) {
+        vm.Update(1 / 60, { ads: 1, moveSpeed: 0, grounded: true });
+      }
+      const parts = vm.adsHideParts || [];
+      type38AdsNear = { count: parts.length, hidden: parts.filter((part) => !part.visible).length };
+    }
   }
 
   const armSides = [];
@@ -142,6 +153,7 @@ const report = await page.evaluate(() => {
     profiles,
     repeated,
     sights,
+    type38AdsNear,
     armSides,
     sprintAmount,
   };
@@ -178,6 +190,12 @@ Check("五支火器走模型、铁瞄零偏心并保留栓动动作链",
   Object.entries(report.sights)
     .map(([id, entry]) => `${id}: model=${entry.isModel} sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));
+Check("三八式开镜会藏掉近眼机匣，不再被裁成方块",
+  report.type38AdsNear && report.type38AdsNear.count >= 2
+    && report.type38AdsNear.hidden === report.type38AdsNear.count,
+  report.type38AdsNear
+    ? `ADS 近眼网格 ${report.type38AdsNear.hidden}/${report.type38AdsNear.count} 已隐藏`
+    : "缺少三八式 ADS 近眼网格");
 Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
   report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),
   `Shift+W sprint=${report.sprintAmount.toFixed(2)} · material.side=${report.armSides.join(",") || "missing"}`);

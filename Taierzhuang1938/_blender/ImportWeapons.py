@@ -74,6 +74,12 @@ SOURCES = {
                        "Sling_BackStock": "wood", "Sling2": "wood"},
         "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
                    "magY": BORE - 0.036, "magZ": -0.060},
+        # The first-person eye sits 140 mm behind the sight.  Keep the rear
+        # receiver and stock as a separately named node so the viewmodel can
+        # hide only that near-plane geometry while aiming; leaving it merged
+        # into the steel/wood body turns its clipped cross-section into a
+        # screen-filling rectangular block.
+        "adsNearZ": -0.112,
         "note": "CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）→ 三八式。"
                 "防尘滑盖、直拉机柄、护翼准星、两道箍与通条齐备；全长按史实 1.276 m。",
     },
@@ -570,6 +576,33 @@ def _Mounts(node, length_m, kind, lo, hi, spec):
     node.Child("magazine", t=(0.0, cfg["magY"], cfg["magZ"]))
 
 
+def _SplitAdsNear(bm, cut_z):
+    """Split faces behind ``cut_z`` into an ADS-only hide node.
+
+    Imported rifles arrive as one bmesh per material.  At ADS the camera is
+    intentionally aligned to the sight, so the rear receiver/stock straddles
+    its near plane.  Keeping those faces in the normal body mesh produces a
+    large clipped rectangle.  A face-level split retains the full asset for
+    world/hip views and gives the first-person rig a precise hide target.
+    """
+    body = bm.copy()
+    near = bm.copy()
+    for part, want_near in ((body, False), (near, True)):
+        drop = []
+        for face in part.faces:
+            center_z = sum(vertex.co.z for vertex in face.verts) / len(face.verts)
+            is_near = center_z > cut_z
+            if is_near != want_near:
+                drop.append(face)
+        if drop:
+            bmesh.ops.delete(part, geom=drop, context="FACES")
+        loose = [vertex for vertex in part.verts if not vertex.link_faces]
+        if loose:
+            bmesh.ops.delete(part, geom=loose, context="VERTS")
+        part.normal_update()
+    return body, near
+
+
 def BuildImported(name):
     spec = SOURCES[name]
     path = _Src(spec["file"])
@@ -606,6 +639,22 @@ def BuildImported(name):
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")
+    cut_z = spec.get("adsNearZ")
+    if cut_z is not None:
+        steel, near_steel = _SplitAdsNear(steel, cut_z)
+        if wood is not None:
+            wood, near_wood = _SplitAdsNear(wood, cut_z)
+        else:
+            near_wood = None
+        ads_near = root.Child("adsNear")
+        if near_wood is not None and near_wood.faces:
+            ads_near.Add("wood", near_wood, tile=T_WOOD)
+        elif near_wood is not None:
+            near_wood.free()
+        if near_steel.faces:
+            ads_near.Add("steel", near_steel, tile=T_STEEL)
+        else:
+            near_steel.free()
     if wood is not None:
         body.Add("wood", wood, tile=T_WOOD)
     body.Add("steel", steel, tile=T_STEEL)
