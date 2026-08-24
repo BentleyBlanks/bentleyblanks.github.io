@@ -559,6 +559,12 @@ export const COMBAT = {
  * rolloff 0.9）到八十米只剩出厂音量的 4.8%，在几十条枪的底噪里等于没有。
  * 所以改成：体验/标准两档默认**开**，写实档关（那一档只留听觉确认）。
  * 听觉确认（hitConfirm / killConfirm）不挂难度，三档都给 —— 它是这条通道的底线。
+ *
+ * targetInfo（2026-08-25 接上）：准心指着谁 —— 番号/姓名、枪、距离（Script_Identify）。
+ * 同一条理由的另一半：七十米外敌我只有一个剪影，而步枪打得到五百米。
+ *   · "full"  体验档：连血条一起给；
+ *   · "basic" 标准档：两行字，伤情只给"负伤"两个字，不给数字；
+ *   · false   写实档：整条链短路，不扫不投射 —— 那一档本来就没有准心。
  */
 export const FREE_AIM_STEPS = [0, 1.2, 2.0, 3.5];
 
@@ -568,21 +574,21 @@ export const DIFFICULTY_PRESETS = {
     aiAccuracy: 0.70, playerDamage: 0.80, suppressionScale: 0.6,
     bulletGravity: 0.5, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 12, overheat: true, autoSurrender: false,
-    showCrosshair: true, enemyMarkers: true, hitMarker: true,
+    showCrosshair: true, enemyMarkers: true, hitMarker: true, targetInfo: "full",
   },
   standard: {
     id: "standard", label: "标准",
     aiAccuracy: 1.0, playerDamage: 1.0, suppressionScale: 1.0,
     bulletGravity: 1.0, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 8, overheat: true, autoSurrender: false,
-    showCrosshair: true, enemyMarkers: false, hitMarker: true,
+    showCrosshair: true, enemyMarkers: false, hitMarker: true, targetInfo: "basic",
   },
   realistic: {
     id: "realistic", label: "写实",
     aiAccuracy: 1.15, playerDamage: 1.25, suppressionScale: 1.3,
     bulletGravity: 1.0, freeAimDeg: 0, ironSightOffset: 0,
     staminaSeconds: 5, overheat: true, autoSurrender: false,
-    showCrosshair: false, enemyMarkers: false, hitMarker: false,
+    showCrosshair: false, enemyMarkers: false, hitMarker: false, targetInfo: false,
   },
 };
 

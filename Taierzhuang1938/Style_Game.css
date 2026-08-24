@@ -255,7 +255,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    要么完整、要么不在。照抄阵亡卡那条先例（第 173 行），不引入新概念。
    那几秒功能层本来也没有决策价值：玩家站在出生点、目标在正前方、
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
-#hud.staging .hudMarkers, #hud.staging .hudActions { opacity: 0; }
+#hud.staging .hudMarkers, #hud.staging .hudActions,
+#hud.staging .hudTarget { opacity: 0; }
 .hudMarkers { transition: opacity 0.4s ease; }
 
 /* 近弹警告：屏内钉在活手榴弹上，屏外贴边。没有秒数倒计时——引信只用来驱动
@@ -507,29 +508,73 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudCook.on { opacity: 0.9; }
 
-/* 标准 FPS 动态准心：固定屏幕中心；腰射常驻，跑动扩大，开镜隐藏。
+/* 标准 FPS 动态准心：固定屏幕中心；腰射常驻，开镜隐藏。
+   **缝（--gap）是真实散布角投影出来的像素**（见 Script_Hud.CrosshairGeometry），
+   不是手感常数：跑起来它就该撑开到盖住半个人，那才是当时真实的落点范围。
+   线本身要在乱糟糟的砖墙上读得出来 —— 骨白线 + 一圈硬黑描边，
+   靠 box-shadow 铺描边而不是 filter：filter 会把 2 px 的线糊成一团灰。
    枪体动画与后坐可以动，但 HUD 瞄准基准绝不能跟着视图模型漂移。 */
 .hudCrosshair {
   position: absolute; left: 50%; top: 50%; width: 0; height: 0;
-  z-index: 3; opacity: 0; color: rgba(242, 238, 225, 0.96);
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9));
+  z-index: 3; opacity: 0; color: rgba(244, 241, 231, 0.98);
+  --arm: 10px; --thick: 2px;
   transition: opacity 0.08s linear;
 }
-.hudCrosshair.on { opacity: 0.94; }
-.hudCrosshair.sprint { opacity: 0.82; }
+.hudCrosshair.on { opacity: 0.96; }
+.hudCrosshair.sprint { opacity: 0.72; }
 .hudCrosshair .arm, .hudCrosshair .dot {
   position: absolute; display: block; box-sizing: border-box; background: currentColor;
+  box-shadow: 0 0 0 1px rgba(6, 6, 8, 0.72), 0 1px 2px rgba(0, 0, 0, 0.55);
 }
-.hudCrosshair .left, .hudCrosshair .right { top: -1px; width: 8px; height: 2px; }
-.hudCrosshair .left  { right: var(--gap, 5px); }
-.hudCrosshair .right { left:  var(--gap, 5px); }
-.hudCrosshair .up, .hudCrosshair .down { left: -1px; width: 2px; height: 8px; }
-.hudCrosshair .up   { bottom: var(--gap, 5px); }
-.hudCrosshair .down { top:    var(--gap, 5px); }
+.hudCrosshair .left, .hudCrosshair .right {
+  top: calc(var(--thick) / -2); width: var(--arm); height: var(--thick);
+}
+.hudCrosshair .left  { right: var(--gap, 12px); }
+.hudCrosshair .right { left:  var(--gap, 12px); }
+.hudCrosshair .up, .hudCrosshair .down {
+  left: calc(var(--thick) / -2); width: var(--thick); height: var(--arm);
+}
+.hudCrosshair .up   { bottom: var(--gap, 12px); }
+.hudCrosshair .down { top:    var(--gap, 12px); }
 .hudCrosshair .dot {
   left: -1.5px; top: -1.5px; width: 3px; height: 3px; border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.66);
 }
+/* 冲刺时中心点收掉：那一段按下扳机什么也不会发生，不该留一个"这里能打中"的点。 */
+.hudCrosshair.sprint .dot { opacity: 0; }
+/* 指着自己人：整个准心转蓝（见 Script_Hud.SetTarget 的账，只给自己人上色）。 */
+.hudCrosshair.friendly { color: var(--ours); }
+
+/* 目标识别卡：准心正下方，跟着散布让开（--y 由 Script_Hud.SetCrosshair 写）。
+   两行字 —— 番号/姓名 + 枪与距离。血条只有体验档才有（DIFFICULTY.targetInfo）。 */
+.hudTarget {
+  position: absolute; left: 50%; top: 50%; z-index: 3;
+  transform: translate(-50%, 0); margin-top: var(--y, 46px);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 96px; padding: 3px 10px 4px; opacity: 0;
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  text-align: center; white-space: nowrap; pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,10,12,0) 0%, rgba(8,10,12,0.42) 42%, rgba(8,10,12,0) 100%);
+  transition: opacity 0.1s linear;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.92);
+}
+.hudTarget.on { opacity: 1; }
+.hudTarget .tTitle {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: var(--paper);
+}
+.hudTarget .tMeta {
+  font-size: 10px; letter-spacing: 0.08em; color: rgba(230,223,205,0.66);
+  font-variant-numeric: tabular-nums;
+}
+.hudTarget.theirs .tTitle { color: var(--theirs); }
+.hudTarget.ours   .tTitle { color: var(--ours); }
+/* 尸体：不给阵营色，字压暗。它是一条线索（还有枪、还有桥夹），不是一个目标。 */
+.hudTarget.corpse .tTitle { color: rgba(230,223,205,0.62); font-weight: 500; }
+.hudTarget .tBar {
+  width: 62px; height: 2px; margin-top: 1px; background: rgba(12,12,14,0.72);
+}
+.hudTarget .tBar i { display: block; height: 100%; background: currentColor; }
+.hudTarget.theirs .tBar i { background: var(--theirs); }
+.hudTarget.ours   .tBar i { background: var(--ours); }
 
 /* 命中记号 —— 屏幕正中四道短撇。
    它叠在准心上仍必须小、暗、短命，不能盖住跑动和腰射的方向反馈。

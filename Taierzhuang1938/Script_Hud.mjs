@@ -31,6 +31,54 @@ const STANCE_LABELS = {
   prone: "卧倒",
 };
 
+/**
+ * 动态准心的几何常数。**距离单位全是像素，基准是视口高度**（不是宽度）：
+ * 竖直视场是固定的 55°，宽高比一变横向视场就跟着变，按宽度换算会在超宽屏上错。
+ */
+const CROSSHAIR = {
+  /** 四条线的长度与粗细按视口高度缩放，1080p 上是 14 px / 2 px。 */
+  armScale: 0.013, armMin: 9, armMax: 22,
+  /** 散布再小也留这么点缝，不然四条线糊在中心点上认不出是准心。 */
+  gapMin: 5,
+  /** 散布再大也不许超过半屏高的这个比例：越出画面的准心不再传达任何东西。 */
+  gapMaxFrac: 0.34,
+  /**
+   * 冲刺时枪根本没端起来（TryFire 直接挡下开火，松手后还有 0.22 s 延迟），
+   * 散布公式管不到这一段，所以额外撑开：这不是"跑动散布"，是"这把枪现在不能打"。
+   */
+  sprintBloom: 0.6,
+  /** 手榴弹/大刀没有散布可言，给一个固定小十字。 */
+  unarmedGap: 7,
+  /** 张开快、收拢慢（对齐 COD 的手感）：时间常数，秒。 */
+  openTau: 0.05, closeTau: 0.12,
+};
+
+/**
+ * 把**真实散布角**投影成屏幕像素。这是这一版准心的全部立论：
+ * 准心画的圈就是这一枪的落点范围，不是一个装饰性的十字。
+ *
+ * 半角 → 像素：gap = tan(spread/2) / tan(fov/2) × 视口半高。
+ * （spread 是全角，Script_Main 的 TryFire 把它折成 ±spread/2 的偏转。）
+ *
+ * 纯函数，浏览器与纯 Node 冒烟都直接喂数进来验证。
+ */
+export function CrosshairGeometry({
+  spreadDeg = 0, fovDeg = 55, viewportHeight = 900, sprint = 0, armed = true,
+} = {}) {
+  const halfHeight = Math.max(120, Number(viewportHeight) || 900) / 2;
+  const arm = Math.max(CROSSHAIR.armMin,
+    Math.min(CROSSHAIR.armMax, halfHeight * 2 * CROSSHAIR.armScale));
+  const maxGap = halfHeight * CROSSHAIR.gapMaxFrac;
+  if (!armed) {
+    return { gap: CROSSHAIR.unarmedGap, arm, spreadDeg: 0, armed: false, sprint: 0 };
+  }
+  const tanHalfFov = Math.tan(Math.max(1, Number(fovDeg) || 55) * Math.PI / 360);
+  const cone = Math.tan(Math.max(0, Number(spreadDeg) || 0) * Math.PI / 360);
+  const bloom = 1 + Math.min(1, Math.max(0, sprint)) * CROSSHAIR.sprintBloom;
+  const gap = Math.min(maxGap, Math.max(CROSSHAIR.gapMin, cone / tanHalfFov * halfHeight * bloom));
+  return { gap, arm, spreadDeg: Math.max(0, Number(spreadDeg) || 0), armed: true, sprint };
+}
+
 const EQUIPMENT_ICONS = {
   grenade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h7l2 3v7.5A3.5 3.5 0 0 1 14.5 21h-4A3.5 3.5 0 0 1 7 17.5V10l2-3Z"/><path d="M10 7V4h5v3m0-2h3l1-2"/></svg>`,
   bundle: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h3v11H7zM14 8h3v11h-3zM10.5 6h3v14h-3zM8 5V3m8 2V3m-4.5 3V3"/></svg>`,
@@ -130,6 +178,18 @@ export class Hud {
     this.confirms = [];
     this.actionPrompts = [];
     this.actionPromptSignature = "";
+    /**
+     * 准心当前画出来的缝（像素）与它对应的散布角。
+     * 平滑在这里做而不是在 CSS transition 里：散布是每帧都在变的连续量，
+     * transition 会把每一帧当成一次新补间，结果是永远追不上的糊。
+     */
+    this.crosshairGap = CROSSHAIR.gapMin;
+    this.crosshairSpreadDeg = 0;
+    this.crosshairArm = CROSSHAIR.armMin;
+    this.crosshairOn = false;
+    /** 目标识别卡：只在 key 变了才重排 DOM，血条每次直接写宽度。 */
+    this.targetKey = "";
+    this.targetCard = null;
     /** 帧率读数：累计一小段再平均，免得数字每帧乱跳。 */
     this.fpsAccum = 0;
     this.fpsFrames = 0;
@@ -196,13 +256,22 @@ export class Hud {
     this.el.minimap.height = 190;
     this.minimapCtx = this.el.minimap.getContext("2d");
     this.SetMinimapVisible(false);
-    // ER2 式动态准心：腰射时给方向反馈，冲刺时仍保留但明显扩散，开镜交给机械瞄具。
-    // 四条线和中心点常驻，只改 class/CSS 变量，避免每帧重建 DOM。
+    // 动态准心：**四条线的缝就是这一枪的散布角**（见 CrosshairGeometry）。
+    // 站着不动是一个紧十字，跑起来撑成一个明显的框，冲刺再撑一截（那时候压根打不出去），
+    // 开镜交给机械瞄具。四条线和中心点常驻，只改 class/CSS 变量，避免每帧重建 DOM。
     this.el.crosshair = mk("hudCrosshair");
     this.el.crosshair.setAttribute("role", "img");
     this.el.crosshair.setAttribute("aria-label", "腰射准心");
     for (const side of ["left", "right", "up", "down"]) mk(`arm ${side}`, this.el.crosshair, "i");
     mk("dot", this.el.crosshair, "i");
+    // 目标识别卡：准心正下方一行。COD 的名牌读法，但不打数字血量（除体验档的血条）。
+    this.el.target = mk("hudTarget");
+    this.el.target.innerHTML = `<span class="tTitle"></span><span class="tMeta"></span>`
+      + `<span class="tBar"><i></i></span>`;
+    this.el.targetTitle = this.el.target.querySelector(".tTitle");
+    this.el.targetMeta = this.el.target.querySelector(".tMeta");
+    this.el.targetBar = this.el.target.querySelector(".tBar");
+    this.el.target.setAttribute("aria-hidden", "true");
     // 命中记号：屏幕正中四道短撇。**四个 span 常驻，不每次 new** ——
     // 一场仗打几百次命中，每次重建 DOM 会在 GC 上攒出可见的顿。
     this.el.hitmark = mk("hudHitmark");
@@ -243,20 +312,103 @@ export class Hud {
   }
 
   /**
-   * 动态准心规则对齐 ER2 的读法：腰射可见、跑动扩大、铁瞄隐藏。
+   * 动态准心。**它画的不是一个十字，是这一枪的散布锥**。
+   *
+   * 【2026-08-25 推翻上一版】
+   * 上一版的缝是 `5 + move×3 + sprint×10` 像素 —— 一个凭手感拍出来的数，
+   * 和 `Player.SpreadDeg()` 真正决定落点的那个角**没有任何关系**。
+   * 实测 1280×720、第三关的汉阳造：站着不动画 5.0 px、全速冲刺画 18.0 px，
+   * 而同一时刻的真实散布是 3.0° 与 8.4°（折合 18.1 px 与 50.8 px）。
+   * 跑起来时准心比实际落点范围**窄了六成半**，玩家读到的"我还挺准"是 HUD 在骗他。
+   *
+   * 现在缝 = tan(散布/2)/tan(视场/2) × 视口半高，一一对应：
+   * 蹲下、屏息、架起两脚架会收，跑动、压制、带伤、半空会开。
+   * 冲刺再额外撑一截 —— 那一段枪根本端不起来，散布公式管不到（见 CROSSHAIR.sprintBloom）。
+   *
    * 准心永远固定屏幕几何中心。武器摆动只能作为动画反馈，不能拖着 HUD 瞄准基准走。
    */
-  SetCrosshair({ visible = false, move = 0, sprint = 0, ads = 0 } = {}) {
+  SetCrosshair({
+    visible = false, spreadDeg = 0, fovDeg = 55, viewportHeight = 0,
+    sprint = 0, ads = 0, armed = true, dt = 1 / 60,
+  } = {}) {
     const e = this.el.crosshair;
     const sprinting = sprint > 0.35;
     const shown = !!visible && ads < 0.62;
-    const gap = 5 + Math.min(1, Math.max(0, move)) * 3
-      + Math.min(1, Math.max(0, sprint)) * 10;
+    const height = viewportHeight || (typeof window !== "undefined" ? window.innerHeight : 900);
+    const geo = CrosshairGeometry({ spreadDeg, fovDeg, viewportHeight: height, sprint, armed });
+    // 张开快、收拢慢。指数平滑而不是线性追：帧率一变，线性追的速度就变。
+    const tau = geo.gap > this.crosshairGap ? CROSSHAIR.openTau : CROSSHAIR.closeTau;
+    const k = 1 - Math.exp(-Math.max(0, dt) / tau);
+    this.crosshairGap += (geo.gap - this.crosshairGap) * (Number.isFinite(k) ? k : 1);
+    this.crosshairSpreadDeg = geo.spreadDeg;
+    this.crosshairArm = geo.arm;
+    this.crosshairOn = shown;
     e.classList.toggle("on", shown);
     e.classList.toggle("sprint", shown && sprinting);
-    e.style.setProperty("--gap", `${gap.toFixed(1)}px`);
+    e.style.setProperty("--gap", `${this.crosshairGap.toFixed(1)}px`);
+    e.style.setProperty("--arm", `${geo.arm.toFixed(1)}px`);
     e.setAttribute("aria-hidden", String(!shown));
-    e.setAttribute("aria-label", sprinting ? "冲刺扩散准心" : "腰射准心");
+    e.setAttribute("aria-label", sprinting ? "冲刺扩散准心"
+      : `腰射准心 散布 ${geo.spreadDeg.toFixed(1)} 度`);
+    // 识别卡贴着准心下沿走：散布撑大时它跟着让开，不会被四条线压住。
+    this.el.target.style.setProperty("--y", `${(this.crosshairGap + geo.arm + 16).toFixed(1)}px`);
+  }
+
+  /** 准心的运行时真值，给冒烟取证（别去解析 style 字符串）。 */
+  CrosshairState() {
+    return {
+      on: this.crosshairOn,
+      gap: this.crosshairGap,
+      arm: this.crosshairArm,
+      spreadDeg: this.crosshairSpreadDeg,
+    };
+  }
+
+  /**
+   * 目标识别卡（Script_Identify 生成，这里只负责画）。
+   *
+   * 为什么值得有：本作的敌我在七十米外**只有一个剪影**（军装色差在这个雾里读不出来，
+   * 见 docs/Data_VisualReview.md 的账），而玩家手上是一把打得到五百米的步枪。
+   * 没有这一条，"那边那个人是谁"在四十米开外就无解 —— 于是要么不敢打，要么见人就打。
+   * COD 的名牌解决的就是这件事；我们照它的位置（准心正下方）与克制程度（两行字）做，
+   * 血条只在体验档给。写实档整条链关掉（DIFFICULTY.targetInfo = false）。
+   *
+   * @param {object|null} card Script_Identify.TargetCard 的返回值
+   */
+  SetTarget(card) {
+    const e = this.el.target;
+    // 准心指着自己人时整个准心转蓝。**只给自己人上色**：
+    // 敌人也上色的话准心就成了"确认是敌人"的开关，玩家会照着颜色扣扳机；
+    // 而蓝色解决的是另一件事 —— 巷战里六成的人影是自己人，那一枪不该打出去。
+    this.el.crosshair.classList.toggle("friendly", card?.kind === "friend");
+    if (!card) {
+      if (!this.targetKey) return;
+      this.targetKey = "";
+      this.targetCard = null;
+      e.classList.remove("on");
+      e.setAttribute("aria-hidden", "true");
+      return;
+    }
+    // key 相同就只刷会变的两处（距离在 meta 里、血条），不重排 DOM。
+    if (card.key !== this.targetKey) {
+      this.targetKey = card.key;
+      e.className = `hudTarget on ${card.faction === "nra" ? "ours" : "theirs"} ${card.kind}`;
+      this.el.targetTitle.textContent = card.title;
+    }
+    this.targetCard = card;
+    if (this.el.targetMeta.textContent !== card.meta) this.el.targetMeta.textContent = card.meta;
+    const hasBar = Number.isFinite(card.health);
+    this.el.targetBar.style.display = hasBar ? "" : "none";
+    if (hasBar) this.el.targetBar.firstChild.style.width = `${Math.round(card.health * 100)}%`;
+    e.setAttribute("aria-hidden", "false");
+    e.setAttribute("aria-label", `${card.title}，${card.meta}`);
+  }
+
+  /** 识别卡的运行时真值，给冒烟取证。 */
+  TargetState() {
+    return this.targetCard
+      ? { ...this.targetCard, shown: this.el.target.classList.contains("on") }
+      : null;
   }
 
   /** 右下是姿态、弹药和装备；文字状态栏只保留伤情、屏息与命令。 */

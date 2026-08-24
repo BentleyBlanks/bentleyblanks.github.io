@@ -31,13 +31,14 @@ import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
-import { Hud, ContextualActionPrompts } from "./Script_Hud.mjs";
+import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
@@ -334,6 +335,7 @@ let story = null;
 let combat = null;
 let destruction = null;
 let interact = null;
+let identify = null;
 let cutscene = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
@@ -649,6 +651,21 @@ async function Boot() {
     },
   });
 
+  // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
+  // 这里只把"从眼位到那个人的胸口有没有被挡死"接回来 —— 与 HasLineOfSight 同一条判据。
+  identify = new IdentifySystem({
+    Clear: (eye, point) => {
+      _idDir.set(point.x - eye.x, point.y - eye.y, point.z - eye.z);
+      const dist = _idDir.length();
+      if (dist < 1e-3) return true;
+      _idDir.multiplyScalar(1 / dist);
+      _idFrom.set(eye.x, eye.y, eye.z);
+      const hit = battlefield.Raycast(_idFrom, _idDir, dist);
+      // 留 0.6 m 余量：擦着人身边的墙角不算挡住（同 HasLineOfSight）。
+      return !hit || hit.t >= dist - 0.6;
+    },
+  });
+
   await nextFrame();
   setStep("就绪", 1.0);
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
@@ -751,6 +768,37 @@ async function Boot() {
         };
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
+      /**
+       * 准心与目标识别的取证口。
+       * 准心那三个数必须一起读：`spreadDeg` 是 Player.SpreadDeg 的真值，
+       * `gap` 是 HUD 真正画出来的缝，`expected` 是按当前视场重算的应画值 ——
+       * 三者对不上就说明准心又在自说自话（这正是 2026-08-25 那次返工的病根）。
+       */
+      Reticle: () => {
+        const weapon = WEAPONS[currentWeapon];
+        const firearm = Number(weapon?.spreadHipDeg) > 0;
+        const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
+        const drawn = hud.CrosshairState();
+        return {
+          ...drawn,
+          armed: firearm,
+          fov: camera.fov,
+          viewportHeight: window.innerHeight,
+          expected: CrosshairGeometry({
+            spreadDeg, fovDeg: camera.fov, viewportHeight: window.innerHeight,
+            sprint: player.sprint, armed: firearm,
+          }).gap,
+          sprint: player.sprint,
+          ads: player.ads,
+        };
+      },
+      Target: () => ({
+        card: hud.TargetState(),
+        detail: DIFFICULTY.targetInfo ?? "basic",
+        entityId: identify.entity?.id ?? null,
+        stats: { ...identify.stats },
+        cone: IDENTIFY.coneDeg,
+      }),
       AdsOffset: () => ({ x: viewmodel.adsOffset.x, y: viewmodel.adsOffset.y }),
       // AI 那边的运行时取证口：某个兵此刻的完整状态
       SoldierInfo: (soldier) => ({
@@ -1362,6 +1410,15 @@ function CountNear(side, radius) {
 
 const _losFrom = new THREE.Vector3();
 const _losDir = new THREE.Vector3();
+/**
+ * 目标识别专用的临时向量。**一只都不许与别处共用** —— 通视钩子是在扫描中途
+ * 被回调的，而 `player.EyePosition` 返回的是 Player 自己的 `_tmp`：
+ * 扫描期间任何一处再读一次眼位，就会把这一轮的原点改掉。所以进来先 copy 一份。
+ */
+const _idFrom = new THREE.Vector3();
+const _idDir = new THREE.Vector3();
+const _idAim = new THREE.Vector3();
+const _idEye = new THREE.Vector3();
 /**
  * 从玩家眼位到某个落点的胸口（+1.3 m）有没有被静态碰撞体挡死。
  *
@@ -3209,13 +3266,34 @@ function Frame(dt, render = true) {
   });
   // 标准 FPS 规则：准心固定屏幕中心。枪体动画不能拖着 HUD 基准移动；
   // 默认难度下 AimDirection 与 ViewDirection 共轴，开镜时机械瞄具也解到同一中心。
+  // 缝画的是**这一枪真实的散布锥**（player.SpreadDeg），不是手感常数 —— 见 Hud.SetCrosshair。
+  // 大刀与手榴弹没有散布可言，给固定小十字，别拿步枪的锥去骗人。
+  // 判据是 spreadHipDeg（只有枪才有），不是 magazine —— 手榴弹的 magazine 是
+  // "身上还剩几颗"，拿它当"这是一把枪"会让攥着弹的时候画出一个 3° 的假锥。
+  const firearm = Number(weapon?.spreadHipDeg) > 0;
+  const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
   hud.SetCrosshair({
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
       && !state.ordersOpen && !state.cutscene,
-    move: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
+    spreadDeg,
+    fovDeg: camera.fov,
+    viewportHeight: window.innerHeight,
+    armed: firearm,
     sprint: player.sprint,
     ads: player.ads,
+    dt,
   });
+  // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
+  hud.SetTarget(identify.Update(dt, {
+    eye: _idEye.copy(player.EyePosition),
+    dir: player.AimDirection(_idAim),
+    soldiers: ai.soldiers,
+    // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
+    // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
+    detail: player.Alive && !state.ordersOpen && !state.cutscene
+      ? (DIFFICULTY.targetInfo ?? "basic") : false,
+    spreadDeg,
+  }));
   hud.SetSuppression(player.suppression);
   // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
   // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
