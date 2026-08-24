@@ -1003,7 +1003,9 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 正片同样吃 `?gi=0`，画质面板「画质 → 全局光照（探针体）」里有开关与强度。
 
 取样端还有一套假彩色（正片 `?giView=N`，或控制台 `Taierzhuang.library.gi.debugView.value = N`）：
-1 = 探针辐照度×0.05，2 = 被替换前的天空 IBL×0.05，3 = confidence，4 = gi/IBL 亮度比×0.25（与曝光无关，最好用），5 = 权重和×0.5。控制台还有 `library.gi.chebOff.value = 1` 可以整体旁路切比雪夫做 A/B —— 「画面上哪个通道塌了」用这套看，比拿成图做 diff 快一个数量级。
+1 = 探针辐照度×0.05，2 = 被替换前的天空 IBL×0.05，3 = confidence，4 = gi/IBL 亮度比×0.25（与曝光无关，最好用），5 = 权重和×0.5，6 = BaseColor，7 = 粗糙度，8 = 金属度，9 = 太阳阴影因子。控制台还有 `library.gi.chebOff.value = 1` 可以整体旁路切比雪夫做 A/B —— 「画面上哪个通道塌了」用这套看，比拿成图做 diff 快一个数量级。
+
+同一套假彩色也接进了编辑器的 **Debug Rendering** 浮窗（「材质」「光照」两组：BaseColor / 粗糙度 / 金属度 / 太阳阴影 / GI 辐照度 / GI 置信度）：面板负责把材质 uniform 与送屏视图同帧同步，走 hdr 靶的 0-1 直通显示（不过 Reinhard，读数是准的）。前向管线没有 GBuffer，这些通道都是「让材质把该通道当颜色重画一帧」拿到的；low 档材质没有注入，这两组画不可用斜纹。
 
 ### 12.9 已知的近似（都是有意的，别当 bug 修）
 

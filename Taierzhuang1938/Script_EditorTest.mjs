@@ -152,7 +152,14 @@ const debugRendering = await page.evaluate(() => {
   const visible = {};
   const lit = {};
   const chipsOn = {};
-  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance"]) {
+  const matMode = {};
+  // 材质/光照组走的是「材质重画进 hdr 靶」那条路：送屏视图名与材质侧的
+  // 假彩色编号必须一起被 SetView 设置，编号见 Script_EditorDebugRendering。
+  const materialViews = {
+    baseColor: 6, roughness: 7, metalness: 8, shadow: 9, giWorld: 1, giConfidence: 3,
+  };
+  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance",
+    "baseColor", "roughness", "metalness", "shadow", "giWorld", "giConfidence"]) {
     panel.SetView(view);
     T.StepFrames(2);
     const source = T.post._GetDebugSource();
@@ -161,8 +168,10 @@ const debugRendering = await page.evaluate(() => {
       : view === "ao" ? T.post.targets.ao.texture
         : view === "aoBlur" ? T.post.targets.aoBlur.texture
           : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
-            : T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
+            : view === "giDistance" ? T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture
+              : T.post.targets.hdr.texture;
     visible[view] = source?.texture === expected;
+    matMode[view] = T.library.gi ? T.library.gi.debugView.value === (materialViews[view] || 0) : false;
     lit[view] = Brightest();
     // 一次只许亮一格：四组 chips 是四个独立控件，选中态必须集中同步，
     // 否则面板上会同时亮着四个视图，读者判断不出送屏的到底是哪一张。
@@ -174,17 +183,25 @@ const debugRendering = await page.evaluate(() => {
     editor: T.Debug.Editor(),
     panel: !!document.querySelector(".edPanel.debugRendering"),
     view: T.post.GetDebugView(),
+    // 回到非材质视图后，材质侧的假彩色 uniform 必须归零 ——
+    // 留着的话所有材质还在往 hdr 靶里写调试色，正片就毁了。
+    matReset: !T.library.gi || T.library.gi.debugView.value === 0,
     target: !!T.post.targets.normalDepth,
-    visible, lit, chipsOn,
+    visible, lit, chipsOn, matMode,
   };
 });
 Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
   && debugRendering.panel && debugRendering.view === "normal" && debugRendering.target
   && Object.values(debugRendering.visible).every(Boolean),
 JSON.stringify({ ...debugRendering, lit: undefined, chipsOn: undefined }));
+Check("Debug Rendering：材质假彩色编号随视图同步、离开即归零",
+  Object.values(debugRendering.matMode).every(Boolean) && debugRendering.matReset,
+  JSON.stringify({ matMode: debugRendering.matMode, matReset: debugRendering.matReset }));
 // GI 那两张在探针体关着时画的是"不可用"斜纹（也是有颜色的），所以同一条阈值够用。
+// 金属度除外：这一关的世界金属度几乎处处为 0，取景框里没有天空时全屏合法地黑。
 Check("Debug Rendering：每个视图都真的画到了屏幕上（不是黑屏）",
-  Object.values(debugRendering.lit).every((v) => v > 8), JSON.stringify(debugRendering.lit));
+  Object.entries(debugRendering.lit).every(([view, v]) => view === "metalness" || v > 8),
+  JSON.stringify(debugRendering.lit));
 Check("Debug Rendering：四组 chips 只亮当前视图那一格",
   Object.values(debugRendering.chipsOn).every((n) => n === 1), JSON.stringify(debugRendering.chipsOn));
 

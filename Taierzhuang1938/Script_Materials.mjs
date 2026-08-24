@@ -115,7 +115,9 @@ ${GI_SAMPLE_GLSL}`)
               float iblDbgL = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
               gGiDebugColor = vec3(giDbgL / iblDbgL * 0.25);
             }
-            else gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
+            // 5.5 的上界不能省：6-9 是材质通道视图，值在更早的 chunk 里已经抓好，
+            // 这里兜底 else 一接就会把它们全冲成权重和（四个视图一模一样的灰）。
+            else if (uGiDebugView < 5.5) gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
           }
           if (giConfidence > 0.0) {
             #if defined( RE_IndirectSpecular )
@@ -126,6 +128,29 @@ ${GI_SAMPLE_GLSL}`)
             #endif
             iblIrradiance = mix(iblIrradiance, giIrradiance, giConfidence);
           }
+        }
+        #endif`)
+        // 材质通道假彩色（6 BaseColor / 7 粗糙度 / 8 金属度 / 9 太阳阴影）。
+        // 前向管线没有延迟渲染的 GBuffer，这些通道只在材质自己的着色器里存在 ——
+        // 想看它们只有一条路：让材质把该通道当颜色写出去。各通道在它诞生的
+        // chunk 之后立刻抓（那时值刚算完、还没被后续光照消费掉）。
+        .replace("#include <color_fragment>", `#include <color_fragment>
+        if (uGiDebugView > 5.5 && uGiDebugView < 6.5) gGiDebugColor = diffuseColor.rgb;`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        if (uGiDebugView > 6.5 && uGiDebugView < 7.5) gGiDebugColor = vec3(roughnessFactor);`)
+        .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
+        if (uGiDebugView > 7.5 && uGiDebugView < 8.5) gGiDebugColor = vec3(metalnessFactor);`)
+        // 太阳阴影因子：白 = 照到，黑 = 挡住。r185 的 getShadow 六参签名。
+        // 不收影的材质（USE_SHADOWMAP 未定义）保持 0 —— 黑 = 没参与收影，也是信息。
+        // 阴影框只有 66 m：框外 getShadow 的 frustumTest 不过、恒返回 1（纯白），
+        // 这个视图顺带能看到阴影覆盖范围的边。
+        .replace("#include <lights_fragment_begin>", `#include <lights_fragment_begin>
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+        if (uGiDebugView > 8.5 && uGiDebugView < 9.5) {
+          gGiDebugColor = vec3(getShadow(directionalShadowMap[0],
+            directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity,
+            directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius,
+            vDirectionalShadowCoord[0]));
         }
         #endif`)
         .replace("#include <dithering_fragment>", `#include <dithering_fragment>

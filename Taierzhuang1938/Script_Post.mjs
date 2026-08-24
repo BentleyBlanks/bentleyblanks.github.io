@@ -615,8 +615,12 @@ const FRAG_DEBUG_VIEW = /* glsl */`
       color = vec3(texel.r);
     } else if (uMode < 3.5) {          // 距离图集：均值 / 不确定度 = R / G
       color = vec3(texel.r, texel.g, 0.0);
-    } else {                           // HDR / 辐照度：Reinhard + sRGB
+    } else if (uMode < 4.5) {          // HDR / 辐照度：Reinhard + sRGB
       color = color / (color + vec3(1.0));
+      color = ToSrgb(color);
+    } else {                           // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
+      // 走 Reinhard 会把 0.5 的粗糙度压成 0.33，读数就不准了；
+      // 天空穹没被注入、还是 HDR 亮度，pow 后钳到白 —— 当背景正合适。
       color = ToSrgb(color);
     }
     gl_FragColor = vec4(color, 1.0);
@@ -882,6 +886,17 @@ export class PostPipeline {
         texture: this.debugGi?.distanceMoments?.[this.debugGi.pingPong]?.texture,
         mode: 3, unavailable: !this.debugGi?.enabled,
       };
+      // 材质通道假彩色：真正的换色发生在材质注入里（Script_Materials 按
+      // uGiDebugView 把该通道当颜色写进 hdr 靶），这里只负责把 hdr 靶
+      // 以 0-1 直通模式送屏。谁设 uGiDebugView：Debug Rendering 面板
+      // （SetView 同步材质 uniform 与这里的视图名）或 ?giView= 直连。
+      // low 档材质没有注入（library.gi 为 null、ProbeVolume 未构造），
+      // 屏幕上会是原样 HDR —— 用 debugGi 缺席当"未注入"的代理，画不可用斜纹。
+      case "baseColor": case "roughness": case "metalness": case "shadow":
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi };
+      // GI 的世界空间视图还要求探针体真的开着，否则取样恒为零、满屏黑
+      case "giWorld": case "giConfidence":
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi?.enabled };
       default: return null;
     }
   }
