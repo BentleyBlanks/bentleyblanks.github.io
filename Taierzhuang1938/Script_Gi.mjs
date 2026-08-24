@@ -759,6 +759,30 @@ export class ProbeVolume {
     this.SyncUniforms();
   }
 
+  /**
+   * 虚拟地面的高度：体积脚印内**最低**的地面，不是体积中心那一点。
+   *
+   * 平面放低了几乎没有代价 —— 朗伯地面的出射辐射亮度与距离无关，反弹光只是
+   * 「从更低处弹上来」；平面放高了却是结构性翻车：地形凹下去超过一层格距时，
+   * 整层探针落到平面之下，朝下的射线打不到平面（GI_TRACE_FRAG 要求
+   * origin.y > uGroundY），穿过「不存在的地面」直接看到天 —— 凹地里的地面
+   * 整片被天光灌成银白，边界正好画在地形跌破平面的等值线上（界河河滩实拍）。
+   * 城内台地本来就平，最低点 ≈ 中心点，行为不变。
+   */
+  SampleGroundY(fallback = 0) {
+    const world = this.world;
+    if (!world || typeof world.GroundHeight !== "function") return fallback;
+    const s = this.spacing;
+    let min = Infinity;
+    for (let gx = 0; gx <= this.counts.x; gx += 1) {
+      for (let gz = 0; gz <= this.counts.z; gz += 1) {
+        const h = world.GroundHeight(this.origin.x + gx * s, this.origin.z + gz * s);
+        if (h < min) min = h;
+      }
+    }
+    return Number.isFinite(min) ? min : fallback;
+  }
+
   /** 探针在盒子里就往外挤；挤不出去标记作废。返回 [ox, oy, oz, active]。 */
   RelocateProbe(x, y, z, boxes) {
     const pad = 0.2;
@@ -851,9 +875,7 @@ export class ProbeVolume {
 
     this.originCell.set(cellX, cellY, cellZ);
     this.origin.set(cellX * s, cellY * s, cellZ * s);
-    if (this.world && typeof this.world.GroundHeight === "function") {
-      this.groundY = this.world.GroundHeight(focus.x, focus.z);
-    }
+    this.groundY = this.SampleGroundY(this.groundY);
     const boxes = this.RebuildBoxes(new THREE.Vector3(
       this.origin.x + this.counts.x * s * 0.5,
       this.origin.y + this.counts.y * s * 0.5,
