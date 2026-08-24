@@ -296,6 +296,15 @@ export class SegmentedCharacterSkin {
       thighL: actor.legs.L.thigh, shinL: actor.legs.L.knee, footL: actor.legs.L.ankle,
       thighR: actor.legs.R.thigh, shinR: actor.legs.R.knee, footR: actor.legs.R.ankle,
     };
+    // Imported FBX skin weights are safe for the torso/head, but their rigid
+    // conversion cuts triangles right across wrists, knees and ankles.  Those
+    // seams are exactly where the old runtime body rig already has clean,
+    // pose-tested geometry.  Keep that proven limb chain visible instead of
+    // stretching the imported hands or exposing holes at articulation points.
+    const legacyLimbKeys = new Set([
+      "armL", "foreL", "armR", "foreR",
+      "thighL", "shinL", "footL", "thighR", "shinR", "footR",
+    ]);
     // 运行时仍使用 13 个刚体关节，兼容现有 normal-depth 预通道；关键区别是
     // 新分段由源 FBX 蒙皮权重和真实 rest bone 枢轴生成，不再按 XYZ 猜身体部位。
     const segments = [];
@@ -310,24 +319,35 @@ export class SegmentedCharacterSkin {
     });
     if (segments.length) {
       this.segmentMode = true;
-      for (const node of [actor.hips, actor.chest, actor.neck,
+      const preservedLimbs = new Set([
         actor.arms.L.shoulder, actor.arms.L.elbow, actor.arms.R.shoulder, actor.arms.R.elbow,
         actor.legs.L.thigh, actor.legs.L.knee, actor.legs.L.ankle,
-        actor.legs.R.thigh, actor.legs.R.knee, actor.legs.R.ankle]) {
-        // Hands and small head pieces live one level below the old forearm /
-        // neck meshes.  Hiding only direct children left those pieces behind
-        // as floating, skin-coloured fragments once the GLB skin took over.
-        node.traverse((child) => {
-          if (child !== node && child.isMesh) {
+        actor.legs.R.thigh, actor.legs.R.knee, actor.legs.R.ankle,
+      ]);
+      const hideCoreLegacy = (node) => {
+        for (const child of node.children) {
+          // A limb joint is a hard stop: traversing from hips through chest
+          // used to hide every hand and foot even after choosing the fallback.
+          if (preservedLimbs.has(child)) continue;
+          if (child.isMesh) {
             child.visible = false;
             this.legacyMeshes.push(child);
+          } else {
+            hideCoreLegacy(child);
           }
-        });
-      }
+        }
+      };
+      // The imported torso/head replaces this connected core only.  Its
+      // non-joint head pieces are hidden recursively; limb joints are kept.
+      hideCoreLegacy(actor.hips);
       this.root.updateMatrixWorld(true);
       actor.root.updateMatrixWorld(true);
       for (const mesh of segments) {
         const key = mesh.name.split("_")[1];
+        if (legacyLimbKeys.has(key)) {
+          mesh.visible = false;
+          continue;
+        }
         const target = segmentTargets[key];
         if (!target) continue;
         // 构建脚本已把几何烘到目标关节枢轴；attach 保留 GLB 场景根的

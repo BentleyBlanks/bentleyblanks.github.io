@@ -54,14 +54,17 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
-    // 国军分段 GLB 的两只脚都必须在各自踝枢轴周围以同样的本地范围显示。
-    // 只比较世界坐标会误报：静止站姿故意让两脚前后错开半步。
+    // 导入 GLB 只负责躯干与头部；手、膝、脚保留同一套已经过 IK 验证的
+    // 程序化关节几何，不能再被有破洞的刚性 FBX 分段替换。
     check(actor.meshSource === "rigged" && actor.riggedSkin?.segmentMode,
       "NRA rigged segment skin is not active");
-    const footOffset = (segmentName, mountName) => {
-      const segment = actor.riggedSkin.segmentMeshes.find((item) => item.name === segmentName);
+    check(!actor.riggedSkin.segmentMeshes.some((item) => /Segment_(arm|fore|thigh|shin|foot)/.test(item.name)),
+      "rigged limb segment bypass was not applied");
+    const footOffset = (leg, mountName) => {
+      const segment = leg.ankle;
       const mount = actor.GetMount(mountName);
-      check(segment && mount, `missing NRA ${segmentName} or ${mountName}`);
+      check(segment.children.some((item) => item.isMesh && item.visible),
+        `missing visible procedural ${mountName}`);
       actor.root.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(segment);
       const ankle = mount.getWorldPosition(new THREE.Vector3());
@@ -70,10 +73,10 @@ try {
         box.max.x - ankle.x, box.max.y - ankle.y, box.max.z - ankle.z,
       ];
     };
-    const footL = footOffset("Segment_footL", "footL");
-    const footR = footOffset("Segment_footR", "footR");
-    check(footL[1] < -0.01 && footL[4] > 0.01 && footR[1] < -0.01 && footR[4] > 0.01,
-      `NRA feet no longer enclose their ankle pivots: L=${footL} R=${footR}`);
+    const footL = footOffset(actor.legs.L, "footL");
+    const footR = footOffset(actor.legs.R, "footR");
+    check(footL[1] < -0.05 && footL[4] <= 0.01 && footR[1] < -0.05 && footR[4] <= 0.01,
+      `NRA feet no longer sit immediately below their ankle pivots: L=${footL} R=${footR}`);
     const footSymmetry = [
       footL[0] + footR[3], footL[3] + footR[0], // X 轴镜像
       footL[1] - footR[1], footL[4] - footR[4], // 高度一致
