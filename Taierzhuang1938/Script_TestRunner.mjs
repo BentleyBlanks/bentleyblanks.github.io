@@ -72,6 +72,7 @@ export const testDefs = {
   ReticleCalibrationTest: { file: "Script_ReticleCalibrationTest.mjs", desc: "ADS 放大准心校准与退出还原" },
   SprintCrosshairTest: { file: "Script_SprintCrosshairTest.mjs", desc: "冲刺动态准星（真 Shift+W 路径）" },
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
+  SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
   JieheTerrainTest: { file: "Script_JieheTerrainTest.mjs", desc: "界河高度图采样与贴地" },
   TengxianLayoutTest: { file: "Script_TengxianLayoutTest.mjs", desc: "滕县城防、街路与功能区布局（纯 Node）" },
@@ -122,7 +123,8 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest", "SprintViewmodelTest"],
+    tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+      "SprintViewmodelTest", "SprintMeleeTest"],
   },
   ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
   hud: { label: "HUD/交互提示", tests: ["HudPromptTest", "HudPromptBrowserTest"] },

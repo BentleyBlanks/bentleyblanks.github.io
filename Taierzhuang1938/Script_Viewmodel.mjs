@@ -1163,6 +1163,9 @@ export class Viewmodel {
     // 开镜带一点点过冲（0.72 阻尼比），到位那一下有"顿"感；再低就晃得看不清准星
     this.adsSpring = new Spring(240, 0.72);
     this.sprintSpring = new Spring(90, 0.95);
+    // 白刃期间把冲刺姿态"静音"的权重（0 = 冲刺姿态照常，1 = 完全按腰射姿态挥）。
+    // 它不是弹簧：这条曲线不许过冲，过冲会让刀在收招时越过腰射姿态弹一下。见 Update。
+    this.meleeSprintMute = 0;
     this.landSpring = new Spring(150, 0.38);
     this.crouchSpring = new Spring(110, 0.9);
     this.equipSpring = new Spring(90, 0.85, 1);
@@ -1780,11 +1783,30 @@ export class Viewmodel {
         this._RestoreAdsHideParts();
       }
     }
-    const sprintValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+    const sprintSpringValue = this.sprintSpring.Step(step, sprint * (1 - adsInput) * (grounded ? 1 : 0));
+
+    // --- 冲刺姿态的白刃静音 --------------------------------------------------
+    // 冲刺姿态是"把刀压到画面右下角、让出视野"，这条本身没错；错的是挥刀也从那儿起手。
+    // 实测（大刀 Shift+W 冲刺中挥一刀）刀尖的 NDC 轨迹：静止就在 (0.87, −0.54)，
+    // 蓄力顶点冲到 (1.60, −1.09) —— 整条刀弧在画面外走完，玩家只看到手抖了一下。
+    // 所以挥刀期间把冲刺姿态按下去，刀回到腰射姿态劈完，收招后再让它自己压回去。
+    //
+    // 静音的是**姿态**，不是冲刺本身：脚下照跑、体力照扣、步伐晃动（bob/cadence 读的是
+    // 原始 sprint）也照旧。"边跑边挥刀"要的就是这个 —— 停下来才能挥的刀不是大刀。
+    const meleeing = !!(this.action && this.action.kind === "melee");
+    // 起 30 / 落 8：劈砍的蓄力段只有 90 ms，姿态必须在蓄力里就让出来，否则出刀那一下
+    // 还有半个冲刺姿态压着。收招慢一倍，免得刀"啪"地弹回冲刺位置。
+    this.meleeSprintMute += ((meleeing ? 1 : 0) - this.meleeSprintMute)
+      * (1 - Math.exp(-step * (meleeing ? 30 : 8)));
+    const sprintValue = sprintSpringValue * (1 - this.meleeSprintMute);
+
     // 按下 Shift 立刻切走完整肩臂；松开后等冲刺弹簧回到安全区再恢复，避免退出
     // 冲刺的半途姿态仍让上臂穿过相机。旧手模和整臂只会有一套可见。
+    // 这里读的是**静音后**的姿态权重：换手模的理由是冲刺姿态那圈旋转会把上臂扫过近平面，
+    // 姿态被按下去了，理由也就不成立 —— 于是跑动中的那一刀和站着劈是同一套整臂。
     if (this.riggedArms) {
-      this.riggedArms.SetSprintFallback(sprint > 0.03 || sprintValue > 0.08);
+      const holdingSprint = sprint > 0.03 && this.meleeSprintMute < 0.5;
+      this.riggedArms.SetSprintFallback(holdingSprint || sprintValue > 0.08);
     }
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));

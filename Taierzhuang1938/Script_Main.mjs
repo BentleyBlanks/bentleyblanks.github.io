@@ -2688,14 +2688,20 @@ function TryFire(dt) {
   // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
   if (player.Busy || player.InWater) return;
+  // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
+  //
+  // 【2026-08-25】白刃这一支**必须**排在下面两道冲刺闸的前面。
+  // 那两道闸是给枪写的：枪要举平、要压住后坐，冲刺时枪不在肩上所以打不出去。
+  // 刀没有这回事 —— 大刀就是抡起来往前冲的兵器，"边跑边劈"是它唯一的用法。
+  // 排在闸后面的后果是：拿着大刀按住 Shift 冲上去，左键完全没反应
+  // （V 键反倒能挥，因为 V 走 OnAction 不过 TryFire）—— 同一个动作两个键两种结果。
+  if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   // 枪感方子 4：冲刺 → 开火有 0.22 s 的延迟。
   // 实测松开冲刺后视图模型的 sprintSpring 要 771 ms 才回位，
   // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
   // 0.22 s 是「摆回来一大半但还没稳」的点：够短，不至于让人觉得枪卡住了。
   if (player.sprint > 0.35) return;
   if (state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) return;
-  // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
-  if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
   if (state.activeSlot === "throwable") {
     if (fireEdge && !state.cooking) BeginCook(state.slots.throwable);
     return;
