@@ -418,13 +418,23 @@ export class EditorSuite {
   // 每帧
   // -------------------------------------------------------------------------
 
-  Update(dt) {
+  /**
+   * 叠加层的每帧。**与 Update 分开，因为它们的调用条件不一样**：
+   * Update 只在 editor.Capturing 那条分支上跑（玩法停摆时），而叠加层的存在
+   * 意义恰恰是"玩法照跑时也开着"。合在一起的后果是：只开 Debug Rendering、
+   * 不开任何互斥编辑器时，面板里的「当前靶」一行永远是空的 —— 靶在换、
+   * 屏幕在变，读数一个字都不出。所以装配层要在每一条帧路径上调它。
+   */
+  UpdateOverlays(dt) {
     for (const [id, overlay] of this.overlays) {
       try { overlay.Update(dt); } catch (error) {
         console.error(`[Editor] ${id} 每帧出错，已关掉：`, error);
         this.CloseOverlay(id);
       }
     }
+  }
+
+  Update(dt) {
     if (!this.active) return;
     try {
       this.active.Update(dt);

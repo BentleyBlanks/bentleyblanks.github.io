@@ -132,7 +132,26 @@ await Step(6);
 const debugRendering = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const panel = T.editor.overlays.get("debugRendering");
+  // 屏幕真的被写了没有。**只比 uniform 上的纹理引用是不够的** ——
+  // 这一趟的展示 pass 曾经因为一个 GLSL ES 3.00 保留字（变量名叫 sample）整段
+  // 编译不过：uniform 全接对了，three 却什么都不画，九个视图在屏幕上一律纯黑。
+  // 那次事故里下面那张 visible 表全绿，人眼看到的却是黑屏。所以要读回像素。
+  const canvas = document.querySelector("canvas");
+  const probe = document.createElement("canvas");
+  probe.width = 48; probe.height = 30;
+  const ctx = probe.getContext("2d");
+  const Brightest = () => {
+    ctx.drawImage(canvas, 0, 0, probe.width, probe.height);
+    const data = ctx.getImageData(0, 0, probe.width, probe.height).data;
+    let max = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      max = Math.max(max, (data[i] + data[i + 1] + data[i + 2]) / 3);
+    }
+    return Math.round(max);
+  };
   const visible = {};
+  const lit = {};
+  const chipsOn = {};
   for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance"]) {
     panel.SetView(view);
     T.StepFrames(2);
@@ -144,6 +163,10 @@ const debugRendering = await page.evaluate(() => {
           : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
             : T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
     visible[view] = source?.texture === expected;
+    lit[view] = Brightest();
+    // 一次只许亮一格：四组 chips 是四个独立控件，选中态必须集中同步，
+    // 否则面板上会同时亮着四个视图，读者判断不出送屏的到底是哪一张。
+    chipsOn[view] = document.querySelectorAll(".edPanel.debugRendering .edChip.on").length;
   }
   panel.SetView("normal");
   T.StepFrames(3);
@@ -152,13 +175,18 @@ const debugRendering = await page.evaluate(() => {
     panel: !!document.querySelector(".edPanel.debugRendering"),
     view: T.post.GetDebugView(),
     target: !!T.post.targets.normalDepth,
-    visible,
+    visible, lit, chipsOn,
   };
 });
 Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
   && debugRendering.panel && debugRendering.view === "normal" && debugRendering.target
   && Object.values(debugRendering.visible).every(Boolean),
-JSON.stringify(debugRendering));
+JSON.stringify({ ...debugRendering, lit: undefined, chipsOn: undefined }));
+// GI 那两张在探针体关着时画的是"不可用"斜纹（也是有颜色的），所以同一条阈值够用。
+Check("Debug Rendering：每个视图都真的画到了屏幕上（不是黑屏）",
+  Object.values(debugRendering.lit).every((v) => v > 8), JSON.stringify(debugRendering.lit));
+Check("Debug Rendering：四组 chips 只亮当前视图那一格",
+  Object.values(debugRendering.chipsOn).every((n) => n === 1), JSON.stringify(debugRendering.chipsOn));
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
