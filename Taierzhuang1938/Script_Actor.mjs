@@ -224,17 +224,17 @@ const LOD = {
 const KIND_SPEC = {
   nra: {
     height: 1.66, clothRecipe: "ClothNra", clothHex: HEX.nraCloth,
-    headgear: "cap", shoe: "mixed", gear: "nra", defaultWeapon: "ZhongZheng",
+    headgear: "cap", shoe: "strawSandal", gear: "nra", defaultWeapon: "ZhongZheng",
   },
   nraDare: {
     height: 1.68, clothRecipe: "ClothNra", clothHex: HEX.nraCloth,
-    headgear: "cap", shoe: "mixed", gear: "nra", defaultWeapon: "HanYang",
+    headgear: "cap", shoe: "strawSandal", gear: "nra", defaultWeapon: "HanYang",
     dadao: true, grenadeBelt: true, towelOn: true,
   },
-  // 军官：武装带 + 枪套 + 皮鞋、不背枪（过场里的师长/参谋长/长官都用它）
+  // 军官：武装带 + 枪套、不背枪；同一支出川队伍仍穿草鞋
   nraOfficer: {
     height: 1.70, clothRecipe: "ClothNra", clothHex: HEX.nraCloth,
-    headgear: "peakCap", shoe: "boot", gear: "officer", defaultWeapon: null,
+    headgear: "peakCap", shoe: "strawSandal", gear: "officer", defaultWeapon: null,
   },
   ija: {
     height: 1.62, clothRecipe: "ClothIja", clothHex: HEX.ijaCloth,
@@ -554,11 +554,37 @@ function BuildLeg(buckets, d, spec, quality, side, part) {
     }
   } else {
     // 脚：从踝关节铺到地面（footH === ankleY），脚尖朝 -Z
-    Add(buckets, "shoe", Cloth(d.footW, d.footH, d.footLen * 0.86, `ft${side}`),
-      { y: -d.footH * 0.5, z: -d.footLen * 0.2 });
+    if (spec.shoe === "strawSandal") {
+      // 出川川军草鞋：旧版是一整块方鞋楦；这里拆成裸露脚背、薄草底、V 字系带和
+      // 前掌三束草绳。即使正式 TZM 载入失败，贴地过场也不会退回黑布鞋。
+      Add(buckets, "skin", Cloth(d.footW * 0.82, d.footH * 0.70, d.footLen * 0.76, `bare${side}`),
+        { y: -d.footH * 0.55, z: -d.footLen * 0.18 });
+      Add(buckets, "shoe", Cloth(d.footW * 1.05, 0.012 * H, d.footLen * 0.96, `sole${side}`),
+        { y: -d.footH + 0.006 * H, z: -d.footLen * 0.06 });
+      for (const strapSide of [-1, 1]) {
+        Add(buckets, "shoe", Cloth(0.012 * H, 0.008 * H, d.footLen * 0.38,
+          `strap${side}${strapSide}`), {
+          y: -d.footH * 0.12,
+          z: -d.footLen * 0.38,
+          ry: strapSide * 0.38,
+        });
+      }
+      for (const toe of [-1, 0, 1]) {
+        Add(buckets, "shoe", Cloth(d.footW * 0.15, 0.008 * H, d.footLen * 0.15,
+          `toeRope${side}${toe}`), {
+          x: toe * d.footW * 0.43,
+          y: -d.footH * 0.32,
+          z: -d.footLen * 0.69,
+          ry: -toe * 0.05,
+        });
+      }
+    } else {
+      Add(buckets, "shoe", Cloth(d.footW, d.footH, d.footLen * 0.86, `ft${side}`),
+        { y: -d.footH * 0.5, z: -d.footLen * 0.2 });
+    }
     if (spec.shoe === "boot") {
       Add(buckets, "shoe", Cloth(d.footW * 1.04, 0.05 * H, d.footW * 1.12, `boot${side}`), { y: 0.018 * H });
-    } else {
+    } else if (spec.shoe !== "strawSandal") {
       // 草鞋/布鞋：底薄、露脚背，前端翘一点
       Add(buckets, "shoe", Cloth(d.footW * 0.92, 0.012 * H, 0.03 * H, `toe${side}`),
         { y: -d.footH * 0.82, z: -d.footLen * 0.5, rx: 0.22 });
@@ -2728,9 +2754,9 @@ export class ActorFactory {
       AddDistantIjaReadability(accessory, 0.72);
     }
 
-    // 台儿庄是 3—4 月，草鞋与布鞋**混杂**出现，所以这里掷一次骰子
+    // 川军模型锁定为草鞋；日军与平民仍分别使用编上靴、布鞋。
     const shoeHex = spec.shoe === "boot" ? HEX.ijaBoot
-      : (spec.shoe === "clothShoe" || rnd() < 0.45 ? HEX.clothShoe : HEX.strawShoe);
+      : (spec.shoe === "clothShoe" ? HEX.clothShoe : HEX.strawShoe);
 
     return {
       uniform,

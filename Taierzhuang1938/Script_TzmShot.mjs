@@ -64,11 +64,11 @@ const result = await page.evaluate(async ({ id, outDir }) => {
   const Plain = (name, color, roughness, doubleSide) => library.Plain(name, {
     color, roughness, metalness: 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
-  const MaterialsFor = (cloth) => ({
+  const MaterialsFor = (cloth, shoeColor = 0x2B2B2E) => ({
     uniform: library.Get(cloth, { roughness: 1 }),
     accessory: library.Get(cloth, { roughness: 1, repeat: 1.2 }),
     skin: Plain("skin", 0xB4906C, 0.78),
-    shoe: Plain("shoe", 0x2B2B2E, 0.94),
+    shoe: Plain("shoe", shoeColor, 0.94),
     leather: Plain("leather", 0x3A2C22, 0.66),
     towel: Plain("towel", 0xEDE9DF, 0.95),
     red: Plain("red", 0x9E2B22, 0.92),
@@ -93,7 +93,8 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     const entry = MESHES[modelId];
     if (!entry) { out.push({ id: modelId, error: "no entry" }); continue; }
     const model = await LoadModel(MODEL_BASE + entry.file, {
-      materials: MaterialsFor("ClothNra"), mergeMap: MERGE_PROFILES.high,
+      materials: MaterialsFor("ClothNra", modelId === "SoldierNra" ? 0x9E875A : 0x2B2B2E),
+      mergeMap: MERGE_PROFILES.high,
     });
     if (!model) { out.push({ id: modelId, error: "load null" }); continue; }
     model.root.traverse((o) => { o.frustumCulled = false; });
@@ -104,9 +105,9 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     const size = box.getSize(new THREE.Vector3());
     const r = Math.max(size.x, size.y, size.z) * 0.75;
 
-    const Shot = async (name, dirVec) => {
-      camera.position.copy(center).add(new THREE.Vector3(...dirVec).normalize().multiplyScalar(r * 2.0));
-      camera.lookAt(center);
+    const Shot = async (name, dirVec, target = center, distance = r * 2.0) => {
+      camera.position.copy(target).add(new THREE.Vector3(...dirVec).normalize().multiplyScalar(distance));
+      camera.lookAt(target);
       camera.updateProjectionMatrix();
       renderer.render(scene, camera);
       const data = renderer.domElement.toDataURL("image/png");
@@ -115,6 +116,11 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     await Shot("side", [0, 0.25, 1]);      // 站 -Z 看（侧面：车头朝左）
     await Shot("front34", [-1, 0.35, -1]); // 左前 3/4（看得到车头与炮塔）
     await Shot("top", [0.01, 1, 0.01]);    // 俯视
+    if (modelId === "SoldierNra") {
+      const feet = new THREE.Vector3(center.x, box.min.y + 0.10, center.z - 0.05);
+      await Shot("feetFront", [-1, 0.18, -1], feet, 0.42);
+      await Shot("feetSide", [1, 0.14, 0.05], feet, 0.40);
+    }
     scene.remove(model.root);
     for (const mesh of model.meshes) mesh.geometry.dispose();
   }

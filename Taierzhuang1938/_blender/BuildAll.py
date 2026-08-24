@@ -73,8 +73,8 @@ def main():
 
     jobs = []
     jobs.append(("SoldierNra", "soldier", BuildSoldiers.BuildNraSoldier,
-                 "国民革命军第 2 集团军第 31 师步兵：布军帽 + 青天白日帽徽、灰蓝土布军装、"
-                 "斜挎布子弹带（大部分格子瘪着）、绑腿、草鞋或布鞋。无钢盔。"))
+                 "川军第 22 集团军第 122 师步兵：布军帽 + 青天白日帽徽、灰蓝土布军装、"
+                 "斜挎布子弹带（大部分格子瘪着）、绑腿、露趾草鞋。无钢盔。"))
     jobs.append(("SoldierIja", "soldier", BuildSoldiers.BuildIjaSoldier,
                  "日军濑谷支队步兵：立领昭五式 + 步兵红领章、九〇式钢盔（正面五角星）、"
                  "皮弹药盒三只、编上靴 + 脚绊。1938 年 3—4 月无屁帘。"))

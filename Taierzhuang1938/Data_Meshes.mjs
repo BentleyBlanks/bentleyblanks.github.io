@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "8";
+const MESH_REV = "9";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -70,13 +70,13 @@ export const MERGE_PROFILES = {
 export const MESHES = {
   SoldierNra: {
     file: "SoldierNra.tzm.json", category: "soldier",
-    triangles: 1764, meshBlocks: 21, nodes: 29, joints: 13,
+    triangles: 1800, meshBlocks: 23, nodes: 29, joints: 13,
     materials: ["accentA", "accentB", "accessory", "shoe", "skin", "uniform"],
     mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.5187, 1.6747, 0.3215], height: 1.66,
-    draws: { high: 19, medium: 17, low: 16 },
-    note: "第 2 集团军第 31 师步兵。布军帽 + 青天白日帽徽、灰蓝土布军装、"
-      + "斜挎布子弹带（只有靠身三格鼓着）、缠出层叠的绑腿、草鞋或布鞋。**无钢盔。**",
+    span: [0.5187, 1.6747, 0.3484], height: 1.66,
+    draws: { high: 21, medium: 19, low: 18 },
+    note: "川军第 22 集团军第 122 师步兵。布军帽 + 青天白日帽徽、灰蓝土布军装、"
+      + "斜挎布子弹带（只有靠身三格鼓着）、层叠绑腿、露趾草鞋。**无钢盔。**",
   },
   SoldierIja: {
     file: "SoldierIja.tzm.json", category: "soldier",

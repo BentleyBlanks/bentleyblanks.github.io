@@ -65,6 +65,21 @@ for (const name of built.keys()) {
   if (!MESHES[name]) Report(false, `${name}：Index.json 里有，Data_Meshes 里漏登记`);
 }
 
+// 川军脚部的史实造型不能只靠注释约定：左右踝节点必须同时保留裸足皮肤与草鞋
+// 两个材质桶，否则以后重建模型时很容易又合回一整块布鞋/皮鞋而没人察觉。
+const nraPath = path.join(projectDir, "Model", MESHES.SoldierNra.file);
+const nraDoc = JSON.parse(fs.readFileSync(nraPath, "utf8"));
+const StrawSandalMaterials = (nodeName) => {
+  const node = nraDoc.nodes.find((entry) => entry.name === nodeName);
+  return new Set((node?.meshes || []).map((meshIndex) => nraDoc.meshes[meshIndex]?.material));
+};
+const sandalNodesOk = ["ankleL", "ankleR"].every((nodeName) => {
+  const materials = StrawSandalMaterials(nodeName);
+  return materials.has("skin") && materials.has("shoe");
+});
+Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
+  "川军左右脚均为裸足皮肤 + 露趾草鞋双材质");
+
 // ---------------------------------------------------------------------------
 // 第二关：真浏览器
 // ---------------------------------------------------------------------------

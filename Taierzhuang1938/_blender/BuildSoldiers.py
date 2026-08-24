@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""士兵模型：国民革命军第 2 集团军第 31 师 / 日军濑谷支队。
+"""士兵模型：川军第 22 集团军第 122 师 / 日军濑谷支队。
 
 骨架层级与 Script_Actor.mjs 的 Actor 构造函数**逐字对齐**（root > body > hips >
 chest > neck；shoulder/elbow；thigh/knee/ankle），关节局部偏移用同一套
@@ -7,7 +7,7 @@ Dimensions() 比值算出来。这样下游 agent 换模只需要把 AttachBone 
 从 KindGeometry() 换成 LoadModel()，姿态代码一行不用改。
 
 史实红线（docs/Data_HistoryMaterial.md 第三节，不许在这里即兴发挥）：
-  · 中方第 2 集团军：灰蓝土布军装、**布军帽 + 青天白日帽徽**、绑腿、草鞋或布鞋、
+  · 川军第 22 集团军：灰蓝土布军装、**布军帽 + 青天白日帽徽**、绑腿、草鞋、
     布制子弹带斜挎且**大部分格子瘪着**。**绝不给钢盔** —— 那是中央军的。
   · 日方：**立领昭五式** + 步兵红领章 + **九〇式钢盔**（正面黄铜五角星）、
     皮弹药盒三只、编上靴 + 脚绊。**1938 年 3—4 月绝不能有屁帘**。
@@ -18,7 +18,7 @@ Dimensions() 比值算出来。这样下游 agent 换模只需要把 AttachBone 
 
 import math
 
-from TzmCore import (Box, Join, Lathe, Loft, Node, Ring, Strip, Transform, TubeY)
+from TzmCore import (Box, Join, Lathe, Loft, Node, Ring, RibbonYz, Strip, Transform, TubeY)
 
 PI = math.pi
 
@@ -96,7 +96,7 @@ def Pelvis(d):
     ], SEG_BODY)
 
 
-def UpperArm(d, sleeve):
+def UpperArm(d, sleeve, segments=SEG_LIMB):
     """上臂：**有粗细变化的旋转体**，肩头鼓、肘窝收。圆柱一眼假就假在这里。
 
     半径是按**连军装袖子** φ12—13 cm 定的。原来给的 0.052H（φ17.3，袖子一乘
@@ -108,10 +108,10 @@ def UpperArm(d, sleeve):
         Ring(-L * 0.18, r=r * 1.00 * sleeve, power=2.2),
         Ring(-L * 0.62, r=r * 0.84 * sleeve, power=2.2),
         Ring(-L * 1.00, r=r * 0.74, power=2.2),
-    ], SEG_LIMB)
+    ], segments)
 
 
-def ForeArm(d, sleeve, cuff):
+def ForeArm(d, sleeve, cuff, segments=SEG_LIMB):
     """小臂 + 袖口。cuff>0 时袖口鼓出一圈（军装袖口是有翻边的）。"""
     L = d["forearmLen"]
     r = 0.033 * d["height"]
@@ -125,7 +125,7 @@ def ForeArm(d, sleeve, cuff):
         rings.append(Ring(-L * 0.86, r=r * 0.72, power=2.2))
     else:
         rings.append(Ring(-L * 0.88, r=r * 0.66, power=2.2))
-    return Loft(rings, SEG_LIMB)
+    return Loft(rings, segments)
 
 
 def Hand(d, side):
@@ -142,7 +142,7 @@ def Hand(d, side):
     return Join(palm, thumb)
 
 
-def Thigh(d, trouser):
+def Thigh(d, trouser, segments=SEG_LIMB):
     """大腿：军裤是宽松的，上粗下细但**膝上要留一点垮下来的余量**。"""
     L = d["thighLen"]
     r = 0.059 * d["height"]
@@ -151,10 +151,10 @@ def Thigh(d, trouser):
         Ring(-L * 0.30, rx=r * 0.95 * trouser, rz=r * 0.92 * trouser, power=2.5),
         Ring(-L * 0.70, rx=r * 0.80 * trouser, rz=r * 0.80 * trouser, power=2.4),
         Ring(-L * 1.00, rx=r * 0.66, rz=r * 0.68, power=2.4),
-    ], SEG_LIMB)
+    ], segments)
 
 
-def ShinPuttee(d, wraps, tone):
+def ShinPuttee(d, wraps, tone, segments=SEG_LIMB):
     """小腿 + 绑腿。
 
     **绑腿是缠出来的层叠，不是一根管子**：半径沿高度做锯齿（每圈鼓 1.6 mm、
@@ -175,7 +175,7 @@ def ShinPuttee(d, wraps, tone):
         bulge = 1.0 + (0.055 if i % 2 == 0 else -0.012) * tone
         rings.append(Ring(y, r=base * bulge, power=2.35, roll=t * 0.9))
     rings.append(Ring(-L * 1.0, r=ankleR * 0.92, power=2.3))
-    return Loft(rings, SEG_LIMB)
+    return Loft(rings, segments)
 
 
 def Foot(d, toeLift):
@@ -187,6 +187,56 @@ def Foot(d, toeLift):
         Ring(-H * 0.90, rx=W * 1.00, rz=L * 0.44, cz=-L * 0.06, power=3.6),
         Ring(-H, rx=W * 0.90, rz=L * 0.42 - toeLift, cz=-L * 0.07, power=3.6),
     ], SEG_LIMB)
+
+
+def BareFoot(d):
+    """草鞋里露出的脚。
+
+    参考出川老照片：脚背与趾根不被鞋面包住，只有草绳压在皮肤上。这里把旧版
+    一整块“鞋楦”缩成 6 边、4 截面的裸脚，省下来的面数全部留给鞋底和系带。
+    """
+    L, W, H = d["footLen"], d["footW"], d["footH"]
+    # Loft 默认沿 Y；先沿“脚长”放样，再绕 X 转平，才能让脚背是圆顺的长体，
+    # 而不是旧版从踝向鞋头扩张的三角楔。旋转后旧 Y 变成前方 -Z，旧 Z 变成高度 Y。
+    foot = Loft([
+        Ring(-L * 0.20, rx=W * 0.62, rz=H * 0.42, cz=-H * 0.42, power=2.6),
+        Ring(L * 0.08, rx=W * 0.76, rz=H * 0.34, cz=-H * 0.46, power=2.7),
+        Ring(L * 0.55, rx=W * 0.96, rz=H * 0.26, cz=-H * 0.58, power=2.8),
+        Ring(L * 0.80, rx=W * 0.86, rz=H * 0.16, cz=-H * 0.72, power=2.7),
+    ], 6)
+    Transform(foot, rx=-PI * 0.5)
+    return foot
+
+
+def StrawSandal(d):
+    """川军草鞋：薄编底、交叉系带与前掌分束草绳。
+
+    草鞋最重要的不是颜色，而是“薄底 + 露趾 + 绳带”的负空间。两道斜带从前掌
+    收向踝部；鞋头三束短绳把前缘分开，近景低机位能读出参考照片里的草编节奏。
+    """
+    L, W, H = d["footLen"], d["footW"], d["footH"]
+    soleH = 0.012
+    parts = [Loft([
+        Ring(-H, rx=W * 1.02, rz=L * 0.48, cz=-L * 0.06, power=3.6),
+        Ring(-H + soleH, rx=W * 1.00, rz=L * 0.47, cz=-L * 0.06, power=3.6),
+    ], 6, smooth=False)]
+
+    # 从鞋缘斜跨脚背的两根草绳；长轴沿 Z，绕 Y 后形成 V 字。
+    for side in (-1, 1):
+        strap = Box(0.012, 0.010, L * 0.38)
+        Transform(strap, y=-H * 0.12, z=-L * 0.38, ry=side * 0.38)
+        parts.append(strap)
+
+    # 鞋头三束 U 形趾环：从脚背越过趾尖再扣回鞋底前缘，正面不再是三个方块。
+    for i in (-1, 0, 1):
+        toeRope = RibbonYz([
+            (-H * 0.48, -L * 0.56),
+            (-H * 0.42, -L * 0.72),
+            (-H * 0.70, -L * 0.82),
+        ], W * 0.15, 0.009)
+        Transform(toeRope, x=i * W * 0.43)
+        parts.append(toeRope)
+    return Join(*parts)
 
 
 def HeadShape(d):
@@ -245,9 +295,9 @@ def FieldCap(d):
 
 def SunBadgeBlue(d):
     """青天白日帽徽的蓝底。全场唯二的高饱和点之一，直径只有 12 mm ——
-    轮廓压成两段（两端都收到轴上），转出来是 16 个三角的透镜片。
+    轮廓压成两段（两端都收到轴上），转出来是 12 个三角的透镜片。
     帽徽在屏幕上是三个像素，给它 60 个三角是把预算烧在看不见的地方。"""
-    disc = Lathe([(0.0, 0.0), (0.0128, 0.0011), (0.0, 0.0024)], 8, smooth=False)
+    disc = Lathe([(0.0, 0.0), (0.0128, 0.0011), (0.0, 0.0024)], 6, smooth=False)
     Transform(disc, rx=-PI * 0.5)
     Transform(disc, y=d["headH"] * 0.16, z=-d["headD"] * 0.50)
     return disc
@@ -427,19 +477,21 @@ def _Limbs(root, d, spec):
     hips = root["hips"]
     chest = root["chest"]
     sleeve = spec["sleeve"]
+    armSegments = spec.get("armSegments", SEG_LIMB)
+    legSegments = spec.get("legSegments", SEG_LIMB)
 
     for tag, side in (("L", -1), ("R", 1)):
         shoulder = chest.Child(
             "shoulder" + tag,
             t=(side * d["shoulderHalf"], d["shoulderY"] - d["waistY"] - 0.02 * d["height"], 0.0),
             joint=True)
-        shoulder.Add("uniform", UpperArm(d, sleeve), tile="cloth")
+        shoulder.Add("uniform", UpperArm(d, sleeve, armSegments), tile="cloth")
         if spec["shoulderStrap"]:
             # 肩襻：昭五式肩上一条布襻，中方军装没有。加它是为了区分两军的肩部剪影
             shoulder.Child("epaulet" + tag, t=(0.0, 0.012, 0.004))                 .Add("uniform", Box(0.030, 0.008, 0.062, bevel=0.003), tile="cloth")
 
         elbow = shoulder.Child("elbow" + tag, t=(0.0, -d["upperArmLen"], 0.0), joint=True)
-        elbow.Add("uniform", ForeArm(d, sleeve, spec["cuff"]), tile="cloth")
+        elbow.Add("uniform", ForeArm(d, sleeve, spec["cuff"], armSegments), tile="cloth")
         # 手是 elbow 底下的**非关节**子节点。骨架仍与 Script_Actor 一致
         #（没有独立的手关节），但几何挂在一个有名字、有偏移的节点上：
         # 加载器合批时会把它烘回小臂那一桶，而想单独换一只手也找得到。
@@ -449,22 +501,27 @@ def _Limbs(root, d, spec):
 
     for tag, side in (("L", -1), ("R", 1)):
         thigh = hips.Child("thigh" + tag, t=(side * d["hipHalf"], 0.0, 0.0), joint=True)
-        thigh.Add("uniform", Thigh(d, spec["trouser"]), tile="cloth")
+        thigh.Add("uniform", Thigh(d, spec["trouser"], legSegments), tile="cloth")
 
         knee = thigh.Child("knee" + tag, t=(0.0, -d["thighLen"], 0.0), joint=True)
         if spec["legwrap"] == "puttee":
             # 绑腿的层叠单独一块（accessory 桶：色同军装或更浅）
             # 4 层：再多一层只多 32 个三角，但 4 层已经能读出「缠」的节奏
-            knee.Child("puttee" + tag).Add("accessory", ShinPuttee(d, 4, 1.0), tile="cloth")
+            knee.Child("puttee" + tag).Add(
+                "accessory", ShinPuttee(d, 4, 1.0, legSegments), tile="cloth")
         else:
             knee.Child("boot" + tag).Add("leather", MarchingBoot(d), tile="cloth")
 
         ankle = knee.Child("ankle" + tag, t=(0.0, -d["shinLen"], 0.0), joint=True)
-        ankle.Add("shoe", Foot(d, spec["toeLift"]), tile="cloth")
+        if spec.get("footwear") == "strawSandal":
+            ankle.Add("skin", BareFoot(d), tile="cloth")
+            ankle.Add("shoe", StrawSandal(d), tile="cloth")
+        else:
+            ankle.Add("shoe", Foot(d, spec["toeLift"]), tile="cloth")
 
 
 def BuildNraSoldier():
-    """国民革命军第 2 集团军第 31 师士兵。**无钢盔。**"""
+    """川军第 22 集团军第 122 师士兵。草鞋、绑腿，**无钢盔。**"""
     d = Dimensions(1.66)
     root = Node("root")
     body = root.Child("body", t=(0.0, d["hipY"], 0.0))
@@ -494,7 +551,8 @@ def BuildNraSoldier():
 
     _Limbs({"hips": hips, "chest": chest}, d, {
         "sleeve": 1.06, "cuff": 0.012, "trouser": 1.10, "legwrap": "puttee",
-        "toeLift": 0.010, "shoulderStrap": False,
+        "toeLift": 0.010, "footwear": "strawSandal", "armSegments": 6, "legSegments": 7,
+        "shoulderStrap": False,
     })
 
     # 背枪 / 持枪挂点，与 Script_Actor 的 weaponMount 同名同位

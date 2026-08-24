@@ -13,11 +13,11 @@
    "name": "SoldierNra",
    "category": "soldier",
    "file": "SoldierNra.tzm.json",
-   "triangles": 1764,
-   "meshBlocks": 21,
+   "triangles": 1800,
+   "meshBlocks": 23,
    "nodes": 29,
    "joints": 13,
-   "bytes": 58925,
+   "bytes": 65144,
    "materials": [
     "accentA",
     "accentB",
@@ -41,7 +41,7 @@
     "min": [
      -0.25937,
      0.0,
-     -0.17778
+     -0.2047
     ],
     "max": [
      0.25937,
