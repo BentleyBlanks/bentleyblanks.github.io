@@ -1020,16 +1020,23 @@ export class CutsceneDirector {
       entry.mesh.position.copy(entry.base);
       if (entry.baseRot) entry.mesh.rotation.copy(entry.baseRot);
     }
-    // 车窗外的近／中／远景按全局时钟循环移动。局部镜头（如小站）仍可在下面
+    // 车窗外的近／中／远景按全局时钟移动。局部镜头（如小站）仍可在下面
     // 用 propMoves 覆盖，以保证关键叙事经过站台时有精确构图。
     for (const move of cut.ambientMotion || []) {
       const entry = this.props.get(move.name);
       if (!entry || entry.attached || !Array.isArray(move.from) || !Array.isArray(move.axis)) continue;
-      const span = Math.max(0.01, Number(move.span) || 1);
       // 到站后不能让窗外景物继续掠过。用钳住的全局时间而不是把 speed
       // 直接置零，保证停下的那一帧正好接续此前的位置、没有循环层跳变。
       const motionTime = move.stopAt === undefined ? this.time : Math.min(this.time, move.stopAt);
-      const d = ((motionTime * (Number(move.speed) || 0)) % span + span) % span;
+      const distance = motionTime * (Number(move.speed) || 0);
+      // 早期出川序章把每一根电杆按 18 m 回卷；同一根杆和同一棵树每两三秒
+      // 从窗后跳回，哪怕远中近三层速度不同也还是一眼能看出“循环贴图”。
+      // 连续行程的道具由数据预先铺到整段 99 秒的铁路上，永不回卷；驶出窗框后
+      // 仅由相机裁掉。保留 loop 默认值，避免影响其他过场的短循环装饰。
+      const span = Math.max(0.01, Number(move.span) || 1);
+      const d = move.loop === false
+        ? distance
+        : ((distance % span) + span) % span;
       entry.mesh.position.set(
         move.from[0] + move.axis[0] * d,
         move.from[1] + move.axis[1] * d,

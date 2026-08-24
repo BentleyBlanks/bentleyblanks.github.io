@@ -468,6 +468,40 @@ function CarriageLandscapeTree(side, label, id, x, z, height, motion) {
 // ImageGen 远山贴图是近 16:9 构图；保持这个比例拆成连续小片，避免把一张竖构图
 // 横向硬拉成 44 m 的“灰色照片幕布”。
 const DISTANT_HILL_Z = [-60, -48, -36, -24, -12, 0, 12, 24, 36, 48, 60];
+const CHUCHUAN_ROUTE_START_Z = -742;
+const CHUCHUAN_ROUTE_END_Z = 28;
+const CHUCHUAN_POLE_Z = [
+  -731, -706, -684, -659, -631, -608, -581, -557, -532, -505, -479, -454,
+  -428, -403, -378, -353, -329, -305, -281, -258, -233, -207, -184, -160,
+  -137, -113, -90, -67, -44, -21, 3, 27,
+];
+const CHUCHUAN_MID_SCENERY_Z = [-704, -646, -588, -523, -466, -401, -336, -272, -208, -144, -83, -25, 20];
+
+/**
+ * 电报线必须和杆一起是同一段连续铁路，而不是两根杆轮流回卷。横担、瓷绝缘子、
+ * 三根下垂电话线都拆成组件，速度严格共用；窗边看到的是一条接得上的通信线。
+ */
+function CarriageTelegraphPole(side, label, index, z) {
+  const name = `RoutePole${label}${index}`;
+  const x = side * (3.78 + (index % 3) * 0.06);
+  const height = 3.68 + (index % 4) * 0.12;
+  const crossY = height - 0.38;
+  return [
+    { kind: "box", size: [0.14, height, 0.14], pos: [x, height / 2, z], mat: "WoodBeam", color: 0x392e24, noFog: true, name },
+    { kind: "box", size: [1.12, 0.10, 0.10], pos: [x, crossY, z], mat: "WoodBeam", color: 0x392e24, noFog: true, name: `${name}Crossbar` },
+    ...[-0.42, 0, 0.42].map((offset, wire) => ({ kind: "cyl", size: [0.055, 0.12], pos: [x + offset, crossY - 0.11, z], mat: "Steel", color: 0x9a947f, noFog: true, name: `${name}Insulator${wire}` })),
+  ];
+}
+
+function CarriageRouteWires(side, label) {
+  const routeLength = CHUCHUAN_ROUTE_END_Z - CHUCHUAN_ROUTE_START_Z + 82;
+  const centerZ = (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2;
+  const x = side * 3.80;
+  return [-0.42, 0, 0.42].map((offset, wire) => ({
+    kind: "box", size: [0.018, 0.018, routeLength], pos: [x + offset, 3.17 - Math.abs(offset) * 0.10, centerZ],
+    mat: "Steel", color: 0x282522, noFog: true, name: `RouteWire${label}${wire}`,
+  }));
+}
 
 /**
  * 车窗外严格分三层：远山低速、村屋树带中速、路边物件高速。
@@ -483,56 +517,68 @@ function WindowLandscape(side, label) {
     // 最远层：阴云与鲁南低山完整覆盖窗洞后的天空，但离车足够远且移动极慢。
     // 每片维持原图比例、边缘紧接，绝不把一张图横向硬拉成一面景墙。
     ...DISTANT_HILL_Z.map((z, index) => ({ kind: "backdrop", size: [12.0, 6.9], pos: [farX, 3.32, z], ry, mat: "CarriageDistantHills", doubleSided: true, unlit: true, flipX: index % 2 === 1, noFog: true, name: `DistantHills${label}${index}` })),
-    // 中景：低矮村屋与树带。它们是可读的实体，而非覆盖窗的第二张照片。
-    { kind: "box", size: [2.65, 1.42, 3.55], pos: [midX, 0.71, -6], mat: "Adobe", color: 0x8d7c65, noFog: true, name: `MidHouse${label}A` },
-    { kind: "box", size: [2.95, 0.13, 2.10], pos: [midX, 1.52, -6.72], ry: side * 0.16, rz: side * 0.44, mat: "RoofTile", color: 0x625a50, noFog: true, name: `MidHouseRoof${label}A` },
-    { kind: "box", size: [2.72, 1.25, 3.10], pos: [side * 15.4, 0.625, 6], mat: "BrickWall", color: 0x827768, noFog: true, name: `MidHouse${label}B` },
-    { kind: "box", size: [3.05, 0.13, 1.90], pos: [side * 15.4, 1.37, 5.38], ry: -side * 0.12, rz: -side * 0.42, mat: "RoofTile", color: 0x5b554d, noFog: true, name: `MidHouseRoof${label}B` },
-    { kind: "box", size: [0.35, 0.72, 13.0], pos: [side * 12.2, 0.36, -2], mat: "GroundRubble", color: 0x655d50, noFog: true, name: `MidWall${label}A` },
-    ...CarriageLandscapeTree(side, label, "A", side * 11.6, -2, 3.8, "Mid"),
-    ...CarriageLandscapeTree(side, label, "B", side * 14.6, 10, 4.5, "Mid"),
-    // 近景：土堤、树、电杆和横担以接近列车速度掠过，清楚地给出运动方向与纵深。
-    { kind: "box", size: [1.05, 0.58, 16.0], pos: [nearX, 0.20, -8], mat: "GroundRubble", color: 0x5b554a, noFog: true, name: `NearEmbankment${label}A` },
-    { kind: "box", size: [0.13, 3.55, 0.13], pos: [side * 3.82, 1.77, -6], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPole${label}A` },
-    { kind: "box", size: [0.98, 0.09, 0.09], pos: [side * 3.82, 2.98, -6], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPoleCrossbar${label}A` },
-    { kind: "box", size: [0.13, 3.35, 0.13], pos: [side * 3.92, 1.67, 5], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPole${label}B` },
-    { kind: "box", size: [0.94, 0.09, 0.09], pos: [side * 3.92, 2.80, 5], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPoleCrossbar${label}B` },
-    ...CarriageLandscapeTree(side, label, "A", side * 4.55, -2, 4.35, "Near"),
-    ...CarriageLandscapeTree(side, label, "B", side * 4.70, 8, 3.35, "Near"),
+    // 中景：整段行程里的村屋、院墙和树带，不用两个模型环形回卷。
+    ...CHUCHUAN_MID_SCENERY_Z.flatMap((z, index) => {
+      const x = side * (12.4 + (index % 3) * 1.55);
+      const house = index % 3 !== 1;
+      const id = `${label}${index}`;
+      const set = [
+        { kind: "box", size: [0.30, 0.62 + (index % 2) * 0.12, 20 + (index % 3) * 4], pos: [side * 12.0, 0.34, z + 3], mat: "GroundRubble", color: 0x655d50, noFog: true, name: `MidWall${id}` },
+        ...CarriageLandscapeTree(side, label, id, x + side * 0.55, z - 4, 3.45 + (index % 3) * 0.42, `MidRoute`),
+      ];
+      if (house) set.push(
+        { kind: "box", size: [2.35 + (index % 2) * 0.36, 1.20 + (index % 3) * 0.12, 2.85 + (index % 2) * 0.42], pos: [x, 0.64, z], mat: index % 2 ? "BrickWall" : "Adobe", color: index % 2 ? 0x786c5d : 0x8b7963, noFog: true, name: `MidHouse${id}` },
+        { kind: "box", size: [2.78, 0.13, 1.82], pos: [x, 1.37 + (index % 3) * 0.12, z - 0.62], ry: side * 0.12, rz: side * (index % 2 ? -0.40 : 0.40), mat: "RoofTile", color: 0x504a42, noFog: true, name: `MidHouseRoof${id}` },
+      );
+      return set;
+    }),
+    // 近景是一段完整铁路：连续土堤和三根电话线先铺满全程，再由不回卷的杆列接住。
+    { kind: "box", size: [1.05, 0.58, 822], pos: [nearX, 0.20, (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2], mat: "GroundRubble", color: 0x5b554a, noFog: true, name: `RouteEmbankment${label}` },
+    ...CarriageRouteWires(side, label),
+    ...CHUCHUAN_POLE_Z.flatMap((z, index) => CarriageTelegraphPole(side, label, index, z)),
+    ...CHUCHUAN_POLE_Z.filter((_, index) => index % 3 !== 1).flatMap((z, index) => CarriageLandscapeTree(side, label, `Route${index}`, side * (4.45 + (index % 2) * 0.28), z + 8, 3.25 + (index % 3) * 0.52, "NearRoute")),
   ];
   return props;
 }
 
 /** 和 WindowLandscape 一一对应：同一棵树的干、两根枝共享速度，不能在窗外散架。 */
 function WindowLandscapeMotion(side, label) {
-  const Move = (name, from, speed, span) => ({ name, from, axis: [0, 0, 1], speed, span, stopAt: CHUCHUAN_TRAIN_STOP_AT });
+  const Move = (name, from, speed) => ({ name, from, axis: [0, 0, 1], speed, loop: false, stopAt: CHUCHUAN_TRAIN_STOP_AT });
   const TreeMoves = (motion, id, x, z, height, speed, span) => {
     const name = `${motion}Tree${label}${id}`;
     return [
-      Move(name, [x, height / 2, z], speed, span),
-      Move(`${name}BranchA`, [x + side * 0.18, height * 0.70, z - 0.30], speed, span),
-      Move(`${name}BranchB`, [x + side * 0.18, height * 0.78, z + 0.32], speed, span),
+      Move(name, [x, height / 2, z], speed),
+      Move(`${name}BranchA`, [x + side * 0.18, height * 0.70, z - 0.30], speed),
+      Move(`${name}BranchB`, [x + side * 0.18, height * 0.78, z + 0.32], speed),
     ];
   };
   return [
     // 远山：每片维持 16:9，慢到接近静止；它只是距离参照，不是近景假墙。
-    ...DISTANT_HILL_Z.map((z, index) => Move(`DistantHills${label}${index}`, [side * 26, 3.32, z], 0.16, 12)),
-    // 中景：村屋、院墙、树带清楚地慢于路旁树与电杆。
-    Move(`MidHouse${label}A`, [side * 13.5, 0.71, -6], 1.05, 24),
-    Move(`MidHouseRoof${label}A`, [side * 13.5, 1.52, -6.72], 1.05, 24),
-    Move(`MidHouse${label}B`, [side * 15.4, 0.625, 6], 1.05, 24),
-    Move(`MidHouseRoof${label}B`, [side * 15.4, 1.37, 5.38], 1.05, 24),
-    Move(`MidWall${label}A`, [side * 12.2, 0.36, -2], 1.05, 24),
-    ...TreeMoves("Mid", "A", side * 11.6, -2, 3.8, 1.05, 24),
-    ...TreeMoves("Mid", "B", side * 14.6, 10, 4.5, 1.05, 24),
-    // 近景：两组电杆、两棵树和土堤以明显更快的速度冲过窗框。
-    Move(`NearEmbankment${label}A`, [side * 4.35, 0.20, -8], 6.35, 24),
-    Move(`NearPole${label}A`, [side * 3.82, 1.77, -6], 7.20, 18),
-    Move(`NearPoleCrossbar${label}A`, [side * 3.82, 2.98, -6], 7.20, 18),
-    Move(`NearPole${label}B`, [side * 3.92, 1.67, 5], 7.20, 18),
-    Move(`NearPoleCrossbar${label}B`, [side * 3.92, 2.80, 5], 7.20, 18),
-    ...TreeMoves("Near", "A", side * 4.55, -2, 4.35, 5.65, 18),
-    ...TreeMoves("Near", "B", side * 4.70, 8, 3.35, 5.65, 18),
+    ...DISTANT_HILL_Z.map((z, index) => Move(`DistantHills${label}${index}`, [side * 26, 3.32, z], 0.16)),
+    // 中景：连续村庄比路边杆慢，且每块房、墙、树都有自己的里程，不存在回跳点。
+    ...CHUCHUAN_MID_SCENERY_Z.flatMap((z, index) => {
+      const id = `${label}${index}`;
+      const x = side * (12.4 + (index % 3) * 1.55);
+      const house = index % 3 !== 1;
+      return [
+        Move(`MidWall${id}`, [side * 12.0, 0.34, z + 3], 1.05),
+        ...TreeMoves("MidRoute", id, x + side * 0.55, z - 4, 3.45 + (index % 3) * 0.42, 1.05),
+        ...(house ? [Move(`MidHouse${id}`, [x, 0.64, z], 1.05), Move(`MidHouseRoof${id}`, [x, 1.37 + (index % 3) * 0.12, z - 0.62], 1.05)] : []),
+      ];
+    }),
+    Move(`RouteEmbankment${label}`, [side * 4.35, 0.20, (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2], 6.35),
+    ...[-0.42, 0, 0.42].map((offset, wire) => Move(`RouteWire${label}${wire}`, [side * 3.80 + offset, 3.17 - Math.abs(offset) * 0.10, (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2], 7.20)),
+    ...CHUCHUAN_POLE_Z.flatMap((z, index) => {
+      const name = `RoutePole${label}${index}`;
+      const x = side * (3.78 + (index % 3) * 0.06);
+      const height = 3.68 + (index % 4) * 0.12;
+      const crossY = height - 0.38;
+      return [
+        Move(name, [x, height / 2, z], 7.20), Move(`${name}Crossbar`, [x, crossY, z], 7.20),
+        ...[-0.42, 0, 0.42].map((offset, wire) => Move(`${name}Insulator${wire}`, [x + offset, crossY - 0.11, z], 7.20)),
+      ];
+    }),
+    ...CHUCHUAN_POLE_Z.filter((_, index) => index % 3 !== 1).flatMap((z, index) => TreeMoves("NearRoute", `Route${index}`, side * (4.45 + (index % 2) * 0.28), z + 8, 3.25 + (index % 3) * 0.52, 5.65)),
   ];
 }
 
@@ -594,15 +640,17 @@ export const CS_Chuchuan = {
     // 1930 年代厢式客／军运车：窄车体、木板内衬、铆接钢骨架和端部滑门；不再是
     // 宽得像现代地铁的空大厅。中央净过道约 2.4 m，长凳只占靠窗一带。
     { kind: "box", size: [5.6, 0.18, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
-    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", roughness: 0.86, metalness: 0.48, name: "CarriageCeiling", inside: true },
-    { kind: "box", size: [0.16, 0.76, 17.8], pos: [-2.8, 0.47, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
-    { kind: "box", size: [0.16, 0.76, 17.8], pos: [2.8, 0.47, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLow", inside: true },
-    { kind: "box", size: [0.16, 0.82, 17.8], pos: [-2.8, 3.48, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallLeftWindowHigh", inside: true },
-    { kind: "box", size: [0.16, 0.82, 17.8], pos: [2.8, 3.48, 0], mat: "CarriageWallSteel", roughness: 0.82, metalness: 0.58, name: "WallRightWindowHigh", inside: true },
-    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "RearWall", inside: true },
-    { kind: "box", size: [1.75, 3.92, 0.18], pos: [-1.92, 1.96, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallLeft", inside: true },
-    { kind: "box", size: [1.75, 3.92, 0.18], pos: [1.92, 1.96, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallRight", inside: true },
-    { kind: "box", size: [5.6, 0.78, 0.18], pos: [0, 3.53, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallTop", inside: true },
+    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", color: 0x665f55, roughness: 0.91, metalness: 0.34, name: "CarriageCeiling", inside: true },
+    // 军运车不是整面玻璃幕墙：下半木板抬高、上半钢板压低，留下的是一排窄窗。
+    // 每格又有脏油布半帘与厚窗框，窗外只从小口漏进来，不能再像现代通透观景车。
+    { kind: "box", size: [0.16, 1.28, 17.8], pos: [-2.8, 0.64, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
+    { kind: "box", size: [0.16, 1.28, 17.8], pos: [2.8, 0.64, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLow", inside: true },
+    { kind: "box", size: [0.16, 1.10, 17.8], pos: [-2.8, 3.37, 0], mat: "CarriageWallSteel", color: 0x554f47, roughness: 0.92, metalness: 0.28, name: "WallLeftWindowHigh", inside: true },
+    { kind: "box", size: [0.16, 1.10, 17.8], pos: [2.8, 3.37, 0], mat: "CarriageWallSteel", color: 0x554f47, roughness: 0.92, metalness: 0.28, name: "WallRightWindowHigh", inside: true },
+    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "RearWall", inside: true },
+    { kind: "box", size: [1.75, 3.92, 0.18], pos: [-1.92, 1.96, 8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "DoorWallLeft", inside: true },
+    { kind: "box", size: [1.75, 3.92, 0.18], pos: [1.92, 1.96, 8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "DoorWallRight", inside: true },
+    { kind: "box", size: [5.6, 0.78, 0.18], pos: [0, 3.53, 8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "DoorWallTop", inside: true },
     { kind: "box", size: [5.6, 0.44, 0.18], pos: [0, 0.22, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallStep", inside: true },
     // 三盏有罩灯把铆钉钢板、士兵与窗外相对运动都照出来；没有真实室内光，
     // 车厢再多细节也只会是一团黑。
@@ -611,12 +659,29 @@ export const CS_Chuchuan = {
     { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
     // 一眼看出「这是车厢」的重复门框与顶梁；不靠文字或镜头解释空间。
     ...[-6.2, -3.4, -0.6, 2.2, 5.0, 7.3].map((z, index) => ({ kind: "box", size: [5.35, 0.16, 0.16], pos: [0, 3.68, z], mat: "CarriageWallSteel", color: 0x6f7374, name: `RoofRib${index}` })),
-    ...[-7.2, -5.15, -3.1, -1.03, 1.03, 3.1, 5.15, 7.2].flatMap((z, index) => [
-      { kind: "box", size: [0.10, 2.02, 0.10], pos: [-2.66, 1.93, z], mat: "Steel", color: 0x52565a, name: `WindowMullionLeft${index}` },
-      { kind: "box", size: [0.10, 2.02, 0.10], pos: [2.66, 1.93, z], mat: "Steel", color: 0x52565a, name: `WindowMullionRight${index}` },
+    { kind: "box", size: [0.22, 0.13, 17.6], pos: [-2.70, 1.27, 0], mat: "Steel", color: 0x4e4b45, name: "WindowSillLeft" },
+    { kind: "box", size: [0.22, 0.13, 17.6], pos: [2.70, 1.27, 0], mat: "Steel", color: 0x4e4b45, name: "WindowSillRight" },
+    ...[-7.2, -5.75, -4.3, -2.85, -1.4, 0.05, 1.5, 2.95, 4.4, 5.85, 7.2].flatMap((z, index) => [
+      { kind: "box", size: [0.12, 1.62, 0.12], pos: [-2.66, 2.02, z], mat: "Steel", color: 0x464544, name: `WindowMullionLeft${index}` },
+      { kind: "box", size: [0.12, 1.62, 0.12], pos: [2.66, 2.02, z], mat: "Steel", color: 0x464544, name: `WindowMullionRight${index}` },
+      // 油布卷帘/木百叶压住大半扇：天光只能从 0.3–0.4 m 的窄缝漏进来，
+      // 既读得出列车在走，也绝不会再像整面通透玻璃。
+      ...(index % 2 === 0 ? [
+        { kind: "box", size: [0.08, 1.34, 0.98], pos: [-2.69, 2.03, z + 0.20], mat: "ClothNra", color: 0x3e3c35, name: `WindowShadeLeft${index}` },
+        { kind: "box", size: [0.08, 1.34, 0.98], pos: [2.69, 2.03, z - 0.20], mat: "ClothNra", color: 0x3e3c35, name: `WindowShadeRight${index}` },
+      ] : [
+        { kind: "box", size: [0.08, 1.34, 0.96], pos: [-2.69, 2.03, z - 0.20], mat: "CarriageBenchWood", color: 0x463a2d, name: `WindowShutterLeft${index}` },
+        { kind: "box", size: [0.08, 1.34, 0.96], pos: [2.69, 2.03, z + 0.20], mat: "CarriageBenchWood", color: 0x463a2d, name: `WindowShutterRight${index}` },
+      ]),
     ]),
-    { kind: "box", size: [0.18, 0.12, 17.6], pos: [2.70, 2.89, 0], mat: "Steel", color: 0x686763, name: "WindowFrameRightTop" },
-    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, 2.89, 0], mat: "Steel", color: 0x686763, name: "WindowFrameLeftTop" },
+    { kind: "box", size: [0.18, 0.12, 17.6], pos: [2.70, 2.80, 0], mat: "Steel", color: 0x575550, name: "WindowFrameRightTop" },
+    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, 2.80, 0], mat: "Steel", color: 0x575550, name: "WindowFrameLeftTop" },
+    // 漏雨和煤烟留下的不规则补漆/锈蚀；每一块都很小，避免把内壁刷成舞台布景，
+    // 但跨过走道时能明确看出这节车并不新，也并不干净。
+    ...[-6.65, -4.75, -2.25, 0.65, 3.15, 5.75].flatMap((z, index) => [
+      { kind: "box", size: [0.035, 0.34 + (index % 2) * 0.16, 0.48 + (index % 3) * 0.12], pos: [-2.69, 3.21, z], mat: "Steel", color: index % 2 ? 0x3b2c24 : 0x4a382a, roughness: 1, name: `RustPatchLeft${index}` },
+      { kind: "box", size: [0.035, 0.28 + (index % 3) * 0.12, 0.42 + (index % 2) * 0.16], pos: [2.69, 3.28, z + 0.42], mat: "Steel", color: index % 2 ? 0x3b2c24 : 0x4a382a, roughness: 1, name: `RustPatchRight${index}` },
+    ]),
     // 车厢两侧行李架：薄木条与定距钢托，不用一整面厚板遮窗。
     { kind: "box", size: [0.42, 0.07, 15.6], pos: [-2.35, 2.83, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackLeft" },
     { kind: "box", size: [0.42, 0.07, 15.6], pos: [2.35, 2.83, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "LuggageRackRight" },
@@ -635,6 +700,18 @@ export const CS_Chuchuan = {
     // 用布料 PBR 的可读色保留“有人刚放下背包/药包”的生活信息。
     { kind: "box", size: [0.42, 0.28, 0.58], pos: [-2.20, 0.72, 0.35], mat: "ClothNra", color: 0x6d685a, name: "OldPack" },
     { kind: "box", size: [0.34, 0.25, 0.45], pos: [2.20, 0.68, -0.65], mat: "ClothNra", color: 0x766f5f, name: "AmmoBag" },
+    // 布设不再只剩两个背包：水壶、饭盒、绑腿、线盘、油布包、伤员药盒与工具袋
+    // 依附在座椅/行李架边，不侵占中央过道，也让每段车厢有被长期使用过的痕迹。
+    { kind: "cyl", size: [0.10, 0.32], pos: [-2.28, 1.05, -6.55], mat: "Steel", color: 0x3f4640, name: "CanteenRear" },
+    { kind: "box", size: [0.36, 0.16, 0.48], pos: [2.18, 1.05, -5.55], mat: "Steel", color: 0x555047, name: "MessTinRear" },
+    { kind: "cyl", size: [0.18, 0.58], pos: [-2.18, 2.96, -4.15], mat: "ClothNra", color: 0x5b574c, name: "BlanketRollLeft" },
+    { kind: "cyl", size: [0.18, 0.54], pos: [2.18, 2.96, -3.15], mat: "ClothNra", color: 0x686052, name: "BlanketRollRight" },
+    { kind: "box", size: [0.58, 0.22, 0.36], pos: [-2.18, 2.96, -0.85], mat: "ClothNra", color: 0x514a3e, name: "OilclothBundle" },
+    { kind: "box", size: [0.42, 0.28, 0.30], pos: [2.18, 2.96, 1.15], mat: "WoodStock", color: 0x72543b, name: "SignalToolBox" },
+    { kind: "cyl", size: [0.20, 0.42], pos: [-2.18, 2.96, 3.65], mat: "WoodStock", color: 0x583b24, name: "SpareLineSpool" },
+    { kind: "box", size: [0.36, 0.14, 0.48], pos: [2.18, 2.96, 5.35], mat: "ClothNra", color: 0x6d6554, name: "BandageRoll" },
+    { kind: "box", size: [0.18, 0.08, 0.70], pos: [-2.15, 0.72, 6.35], mat: "WoodStock", color: 0x6a4e35, name: "ShoeRepairBoard" },
+    { kind: "box", size: [0.30, 0.22, 0.42], pos: [2.16, 0.72, 6.55], mat: "ClothNra", color: 0x514d43, name: "MedicPouch" },
     { kind: "cyl", size: [0.28, 0.22], pos: [-1.35, 0.72, -5.2], mat: "WoodStock", color: 0x59402b, name: "PlayerLineSpool" },
     { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
     { kind: "box", size: [0.24, 0.06, 0.54], pos: [-1.55, 1.15, -2.55], mat: "WoodStock", color: 0x8d6947, name: "ShoeTool" },
@@ -647,6 +724,12 @@ export const CS_Chuchuan = {
     { kind: "box", size: [0.16, 0.6, 1.95], pos: [7.75, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleA" },
     { kind: "box", size: [0.16, 0.6, 1.95], pos: [9.05, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleB" },
     { kind: "box", size: [2.2, 2.6, 0.12], pos: [0, 1.65, 8.85], mat: "Steel", color: 0x49433b, name: "CarriageDoor" },
+    // 滑门的横向旧木条、门闩和补片压在钢门上；远看先读到“装过人和物的军运车”，
+    // 近看能看出门曾被拆修，而不是一块没有信息的纯黑矩形。
+    ...[-0.86, -0.43, 0, 0.43, 0.86].map((y, index) => ({ kind: "box", size: [1.98, 0.12, 0.05], pos: [0, 1.65 + y, 8.77], mat: "CarriageBenchWood", color: index % 2 ? 0x4f4030 : 0x5a4936, name: `DoorPlank${index}` })),
+    { kind: "box", size: [0.14, 1.96, 0.06], pos: [-0.78, 1.65, 8.76], mat: "Steel", color: 0x302d29, name: "DoorBraceLeft" },
+    { kind: "box", size: [0.14, 1.96, 0.06], pos: [0.78, 1.65, 8.76], mat: "Steel", color: 0x302d29, name: "DoorBraceRight" },
+    { kind: "box", size: [0.72, 0.10, 0.12], pos: [0.15, 1.62, 8.70], mat: "Steel", color: 0x242321, name: "DoorLatch" },
     { kind: "box", size: [2.2, 0.16, 1.1], pos: [0, 0.1, 9.5], mat: "GroundRubble", color: 0x575047, name: "DoorStepBallast" },
     { kind: "box", size: [18, 0.12, 18], pos: [0, -0.08, 18], mat: "GroundRubble", color: 0x5f5a51, name: "OutsideBallast" },
     { kind: "cyl", size: [0.25, 1.6], pos: [5.8, 0.85, 11.5], mat: "WoodStock", color: 0x634d37, name: "DoorMarkerPost" },
