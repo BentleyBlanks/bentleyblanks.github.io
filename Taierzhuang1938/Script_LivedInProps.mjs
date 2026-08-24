@@ -2,7 +2,15 @@
 //
 // 这层只负责可复用的小型几何与确定性组合，不知道城池、道路或关卡边界。
 // 调用方决定“哪里能摆”，这里决定“摆什么、怎么组合”。全部走 BuildSink 合批，
-// 不为每只篮子/板凳增加 draw call；大车与货摊登记粗碰撞，小件不切碎导航图。
+// 不为每只篮子/板凳增加 draw call。
+//
+// 【2026-08-25】原来只有大车、货摊、柴垛、草垛、篱笆、碌碡、坟头登记碰撞，
+// 缸、篮、板凳、条案、晾衣架、梯子、木箱七件是纯视觉的 —— 人从缸里穿过去、
+// 子弹打在条案上不出木屑。改法是全部补上，而**不必担心把导航图切碎**：
+// NavGrid.Refresh 与 AiDirector.Blocked 都只认"盒顶高出地面 0.56 m 以上"的盒子
+// （见 Script_Navigation 文件头），板凳 0.54 m、木箱 0.43 m、篮 0.42 m 一律在
+// 判据之下 —— 它们挡子弹、挡穿模，不挡路。真的过腰的那几件（缸 0.77 m、
+// 条案 0.73 m、晾衣架立柱、梯子）本来就该挡路。
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
@@ -26,6 +34,9 @@ function AddJar(sink, { x, z, y = 0, ry = 0, seed = "jar", scale = 1 }) {
   rim.rotateX(Math.PI / 2);
   sink.Add("HouseholdCeramic", PlaceGeometry(rim,
     { x, y: y + 0.77 * scale, z, ry: ry + (HashString(seed) % 17) * 0.03 }));
+  // 水缸/米缸是齐腰的实心陶器，过腰（0.77 m）所以也挡路 —— 它本来就摆在墙根。
+  sink.Solid(x, y + 0.385 * scale, z, 0.30 * scale, 0.385 * scale, 0.30 * scale,
+    "householdCrock", ry);
   return 1;
 }
 
@@ -40,6 +51,9 @@ function AddBasket(sink, { x, z, y = 0, ry = 0, seed = "basket", scale = 1 }) {
       MakeBox(0.04 * scale, 0.46 * scale, 0.04 * scale, TILE_METERS.wood, `${seed}:handle`),
       { x, y: y + 0.55 * scale, z, ry, rz: 0.72 }));
   }
+  // 提篮只有 0.42 m 高，在 0.56 m 的跨越判据之下：挡子弹不挡路。
+  sink.Solid(x, y + 0.21 * scale, z, 0.30 * scale, 0.21 * scale, 0.30 * scale,
+    "householdBasket", ry);
   return 1;
 }
 
@@ -53,6 +67,9 @@ function AddBench(sink, { x, z, y = 0, ry = 0, seed = "bench", scale = 1 }) {
       MakeBox(0.10 * scale, 0.46 * scale, 0.24 * scale, TILE_METERS.wood, `${seed}:leg${side}`),
       { x: leg.x, y: y + 0.23 * scale, z: leg.z, ry }));
   }
+  // 板凳面 0.54 m —— 刚好在跨越判据之下，人一步就迈上去，不进导航图。
+  sink.Solid(x, y + 0.27 * scale, z, 0.68 * scale, 0.27 * scale, 0.17 * scale,
+    "furniture", ry);
   return 1;
 }
 
@@ -67,6 +84,9 @@ function AddLowTable(sink, { x, z, y = 0, ry = 0, seed = "table", scale = 1 }) {
         `${seed}:leg${sideX}${sideZ}`),
       { x: leg.x, y: y + 0.32 * scale, z: leg.z, ry }));
   }
+  // 条案面 0.73 m，过腰，进导航图（绕过去，不是从上面走过去）。
+  sink.Solid(x, y + 0.36 * scale, z, 0.53 * scale, 0.36 * scale, 0.36 * scale,
+    "furniture", ry);
   const stool = LocalPoint(x, z, ry, 0.82 * scale, 0.18 * scale);
   AddBench(sink, { x: stool.x, z: stool.z, y, ry: ry + Math.PI / 2,
     seed: `${seed}:stool`, scale: 0.52 * scale });
@@ -103,6 +123,10 @@ function AddDryingRack(sink, { x, z, y = 0, ry = 0, seed = "rack", scale = 1 }) 
     sink.Add("WoodBeam", PlaceGeometry(
       MakeBox(0.10 * scale, 1.85 * scale, 0.10 * scale, TILE_METERS.wood, `${seed}:post${side}`),
       { x: p.x, y: y + 0.925 * scale, z: p.z, ry }));
+    // 只登记两根立柱。1.72 m 那根横杆与晾着的布**不给碰撞** —— 它在头顶高度，
+    // 给了就是一道看不见的横梁把人拦在院子中间；晾衣架的门是从两柱之间过的。
+    sink.Solid(p.x, y + 0.925 * scale, p.z, 0.06 * scale, 0.925 * scale, 0.06 * scale,
+      "prop", ry);
   }
   sink.Add("WoodBeam", PlaceGeometry(
     MakeBox(2.05 * scale, 0.09 * scale, 0.09 * scale, TILE_METERS.wood, `${seed}:bar`),
@@ -131,6 +155,11 @@ function AddLadder(sink, { x, z, y = 0, ry = 0, seed = "ladder", scale = 1 }) {
       MakeBox(0.68 * scale, 0.06 * scale, 0.06 * scale, TILE_METERS.wood, `${seed}:rung${i}`),
       { x: p.x, y: y + (0.30 + i * 0.31) * scale, z: p.z, ry, rx: -0.16 }));
   }
+  // 斜靠的梯子按一块竖板登记（1.03 m 中心、2.06 m 高）。碰撞盒不跟着 rx 倾角走：
+  // Solid 只吃绕 Y 的朝向，而这 0.16 rad 换算成盒子边界只差 0.16 m，
+  // 不值得为它把整套盒子改成任意旋转。
+  sink.Solid(x, y + 1.03 * scale, z, 0.34 * scale, 1.03 * scale, 0.18 * scale,
+    "prop", ry);
   return 1;
 }
 
@@ -140,9 +169,13 @@ function AddCrates(sink, { x, z, y = 0, ry = 0, seed = "crates", count = 3, scal
     const size = (0.42 + rnd() * 0.18) * scale;
     const p = LocalPoint(x, z, ry, (i - (count - 1) / 2) * 0.44 * scale,
       (rnd() - 0.5) * 0.34 * scale);
+    const boxRy = ry + (rnd() - 0.5) * 0.24;
     sink.Add("WoodDoor", PlaceGeometry(
       MakeBox(size, size * 0.72, size, TILE_METERS.wood, `${seed}:${i}`),
-      { x: p.x, y: y + size * 0.36, z: p.z, ry: ry + (rnd() - 0.5) * 0.24 }));
+      { x: p.x, y: y + size * 0.36, z: p.z, ry: boxRy }));
+    // 一箱一只盒。最高 0.43 m，仍在跨越判据之下。
+    sink.Solid(p.x, y + size * 0.36, p.z, size * 0.5, size * 0.36, size * 0.5,
+      "prop", boxRy);
   }
   return count;
 }

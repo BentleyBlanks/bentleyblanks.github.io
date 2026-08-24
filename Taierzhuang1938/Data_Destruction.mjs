@@ -108,6 +108,21 @@ const TAG_PROFILE = Object.freeze({
   grave: "earth",
   kan: "earth",
   embankment: "earth",
+  // 【2026-08-25 补齐】下面这些 tag 场上一直在用，却从来没进过这张表，
+  // 于是全部落到 `masonry` 默认档 —— 柴垛、货摊、木栅栏、沙袋工事按砖墙算血量，
+  // 而 Script_Main 的 SURFACE_BY_TAG 同样漏了它们，打上去还出砖灰。
+  // 一次对齐：这张表管吃多少火力，那张表管出什么屑，两边的键必须是同一套。
+  householdWoodpile: "wood",
+  householdCart: "wood",
+  householdCrock: "lightMasonry",   // 陶缸：脆，但不是木头
+  householdBasket: "wood",          // 荆条筐
+  streetStall: "wood",
+  fence: "wood",                    // 枣刺篱笆
+  sandbagEmplacement: "sandbag",
+  rubble: "lightMasonry",           // 下载来的砖瓦堆、可堆石块
+  deadTree: "wood",                 // 枯树干
+  dirt: "earth",
+  fieldBank: "earth",
 });
 
 /** 未登记的新布景默认可破坏；只有显式承重 tag 才能豁免。 */

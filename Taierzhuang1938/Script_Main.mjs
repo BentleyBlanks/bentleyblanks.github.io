@@ -1151,6 +1151,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
   });
   battlefield.externalProps = external;
+  // 下载来的布景也是场上实物（见 Script_ExternalProps 文件头）。它们的碰撞盒是
+  // 建关最后一步才并进来的，所以**空间散列必须重刷** —— BuildSteps 里那一次
+  // BuildCollisionGrid 跑在这之前，不重刷的话 Rapier 里有这些盒子、
+  // 而 AI 找掩体/破坏系统的粗筛 BoxesNear 里没有。
+  if (external.colliders?.length) {
+    battlefield.colliders.push(...external.colliders);
+    if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
+  }
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
   // 上一关的盒子留着，新一关的射线会打在一座已经不存在的城上。
   if (gi) gi.SetWorld(battlefield);
@@ -2649,12 +2657,22 @@ const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
  * metal 仍然没有来源：全场没有任何一个碰撞盒标成金属（城门是 seed:"gate" 的
  * 木门，不是铁门）。给它编一个 tag 属于改世界几何，不混在这次修复里。
  */
+// 【2026-08-25 再补一次】上面那句"全集"当时就不全，后来更不全：
+// 生活层（Script_LivedInProps）与城外层各自新编了 householdWoodpile /
+// householdCart / streetStall / fence / villageStraw / sandbagEmplacement /
+// fieldBank / dirt 这些 tag，一个都没进这张表 —— 打柴垛出砖灰、打沙袋工事出砖灰、
+// 打土坎（tag 就叫 dirt）也出砖灰。这一轮给生活家什与下载来的布景补碰撞盒时
+// 顺手对齐，键与 Data_Destruction.TAG_PROFILE 保持同一套；以后新加 tag 两边一起加。
 const SURFACE_BY_TAG = {
-  barricade: "sandbag",
+  barricade: "sandbag", sandbagPlug: "sandbag", sandbagEmplacement: "sandbag",
   prop: "wood", balk: "wood", bridge: "wood", platform: "wood",
   floor: "wood", ceiling: "wood", roof: "wood", door: "wood", furniture: "wood",
+  householdWoodpile: "wood", householdCart: "wood", householdBasket: "wood",
+  streetStall: "wood", fence: "wood", deadTree: "wood",
+  villageCart: "wood", villagePost: "wood", villageGate: "wood",
   ramp: "dirt", grave: "dirt", embankment: "dirt", kan: "dirt",
-  wall: "brick", parapet: "brick",
+  dirt: "dirt", fieldBank: "dirt", villageStraw: "dirt",
+  wall: "brick", parapet: "brick", rubble: "brick", householdCrock: "brick",
 };
 
 /** 表面 → 实录命中音。sandbag 与 dirt 共用土声（沙包里装的就是土）。 */
