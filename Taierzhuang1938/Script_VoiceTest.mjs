@@ -112,7 +112,7 @@ const PROLOGUE_EXPECTED = [
   ["prologue_rifleman_01", "擦枪士兵", "AudioSfx_PrologueVoiceRifleman_01.mp3", "又卡。"],
   ["prologue_old_wound_02", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_02.mp3", "你少骂两句，它兴许听话点。"],
   ["prologue_old_wound_03", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_03.mp3", "近咯。"],
-  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_01.mp3", "班长：这次你们去啊。晓不晓得，我们出来是做啥子？\n众人（先后，低声）：我们晓得。打日本。\n班长：去死，怕不怕？\n众人（齐声，低沉）：不怕。\n班长：为啥子不怕？\n众人（齐声，更沉）：我们要保护我们的国家。\n班长（哽咽了一下，点点头）：好样的。\n班长（过了一会儿，恢复平常语气）：都把东西带好。前头就是滕县。"],
+  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_02.mp3", "班长：这次你们去啊。晓不晓得，我们出来是做啥子？\n众人（先后，低声）：我们晓得。打日本。\n班长：去死，怕不怕？\n众人（齐声，低沉）：不怕。\n班长：为啥子不怕？\n众人（齐声，更沉）：我们要保护我们的国家。\n班长（哽咽了一下，点点头）：好样的。\n班长（收住哽咽，重新提起全车气势，以坚决的出发命令口吻）：都把东西带好。前头就是滕县。"],
   ["prologue_external_officer_01", "车外军官", "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", "通信排，下车！线盘背起，搞快！"],
 ];
 const prologue = await page.evaluate(async () => {

@@ -782,15 +782,15 @@ export const CS_Chuchuan = {
     { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [0, 1.6, -6], look: [1.95, 1.65, 5.45] },
       sfx: [{ at: 16.9, name: "gearRustle", volume: 0.34 }],
       lines: [
-        { at: 0.2, seconds: 3.5, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。晓不晓得，我们出来是做啥子？" },
-        // 下列时点来自火山引擎一次生成的连续成品静音边界，不是把八句音频拼起来。
-        { at: 3.9, seconds: 1.9, who: "squad", text: "我们晓得。打日本。" },
-        { at: 6.8, seconds: 0.8, who: "squadLeader", text: "去死，怕不怕？" },
-        { at: 8.0, seconds: 0.7, who: "squad", text: "不怕。" },
-        { at: 9.1, seconds: 0.8, who: "squadLeader", text: "为啥子不怕？" },
-        { at: 10.1, seconds: 2.8, who: "squad", text: "我们要保护我们的国家。" },
-        { at: 14.2, seconds: 1.3, who: "squadLeader", text: "好样的。" },
-        { at: 16.9, seconds: 3.4, who: "squadLeader", text: "都把东西带好。前头就是滕县。" },
+        { at: 0.2, seconds: 3.9, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。晓不晓得，我们出来是做啥子？" },
+        // 下列时点来自热血动员版连续成品的静音边界，不是把八句音频拼起来。
+        { at: 4.8, seconds: 2.1, who: "squad", text: "我们晓得。打日本。" },
+        { at: 7.8, seconds: 0.7, who: "squadLeader", text: "去死，怕不怕？" },
+        { at: 9.2, seconds: 0.7, who: "squad", text: "不怕。" },
+        { at: 10.8, seconds: 0.6, who: "squadLeader", text: "为啥子不怕？" },
+        { at: 11.9, seconds: 2.7, who: "squad", text: "我们要保护我们的国家。" },
+        { at: 16.7, seconds: 0.7, who: "squadLeader", text: "好样的。" },
+        { at: 19.2, seconds: 2.7, who: "squadLeader", text: "都把东西带好。前头就是滕县。" },
       ] },
 
     // 1:30—1:33：短黑地点卡；人物在黑场内起身，不用镜头外瞬移遮演出。
