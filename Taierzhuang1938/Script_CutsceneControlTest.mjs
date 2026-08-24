@@ -132,13 +132,15 @@ const doorShotStart = CS_Chuchuan.shots.slice(0, 7).reduce((sum, shot) => sum + 
 assert.equal(locationShotStart, 90, "the Tengxian location card begins immediately after the exchange");
 assert.equal(doorShotStart, 93, "the carriage door opens after the short location card");
 const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
-const leaderSit = squadLeader.track.find((frame) => frame.state?.sit === 1 && frame.t > 60);
-const leaderStand = squadLeader.track.find((frame) => frame.state?.sit === 0);
-assert.ok(leaderSit && leaderStand, "squad leader has explicit seated and standing keyframes");
-assert.ok(leaderSit.t >= CS_Chuchuan.ambientMotion[0].stopAt,
-  "train must stop before the squad leader begins rising");
-assert.ok(leaderStand.t <= motivationStart,
-  "squad leader must finish rising before the exchange begins");
+const interiorCrowd = CS_Chuchuan.cast.filter((actor) => actor.id !== "stretcherBearerA" && actor.id !== "stretcherBearerB"
+  && actor.id !== "lightWounded" && actor.id !== "externalOfficer");
+assert.equal(interiorCrowd.length, 64, "the carriage must remain at the approved full load of 64 people");
+assert.ok(squadLeader.track.every((frame) => frame.state?.sit !== 1),
+  "squad leader remains standing at the rear of the carriage instead of disappearing into a seat");
+assert.ok(Math.abs(squadLeader.track[0].pos[0]) < 0.1 && squadLeader.track[0].pos[2] > 5.5,
+  "squad leader starts visibly at the far end of the carriage");
+assert.ok(squadLeader.track.some((frame) => frame.t <= motivationStart && frame.state?.prepare > 0),
+  "rear squad leader must be ready before the exchange begins");
 for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" && item.track?.[0]?.state?.sit === 1)) {
   const stop = actor.track.find((frame) => frame.state?.prepare > 0 && frame.state?.sit === 1);
   const ready = actor.track.find((frame) => frame.state?.prepare >= 0.99 && frame.state?.sit !== 1 && !frame.state?.hidden);

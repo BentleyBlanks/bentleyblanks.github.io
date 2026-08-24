@@ -366,6 +366,10 @@ const CHUCHUAN_DOOR_AT = 93.0;
 const CHUCHUAN_TRAIN_STOP_AT = 56.0;
 const CHUCHUAN_SEAT_LIFT = 0.13;
 const CHUCHUAN_END = 102.0;
+// 参考滇越铁路的新闻照片：车厢不是留出宽过道的“展示间”，而是满载、有人坐也有人
+// 扶着行李架站着。五名有台词的重点人物之外，车内固定保持 64 人，避免后续分镜改写
+// 又把群众层删回五个人。
+const CHUCHUAN_INTERIOR_TARGET = 64;
 
 function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
   const stopAt = 56.8 + stopDelay;
@@ -386,22 +390,80 @@ function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingR
   ];
 }
 
-/** 班长专用：第二声炮后完整起身，环视车厢，再完成一整段动员问答。 */
-function CarLeaderTrack(pos, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
-  const standAt = 65.9;
-  const standDoneAt = CHUCHUAN_MOTIVATION_AT;
+/**
+ * 班长从头就立在镜头正对的车厢末端，面向满车人检查弹药；他不是被坐席和人群吞掉的第五个
+ * 同质化乘客。第二声炮后只需收起手里的弹匣、正身说话，动员时始终可见。
+ */
+function CarRearLeaderTrack(pos, exitAt, exitEnd, exitX, facingRy = 0) {
   return [
-    { t: 0, pos, ry: facingRy, state: { sit: 1, checkAmmo: 1, seatLift: CHUCHUAN_SEAT_LIFT } },
-    { t: standAt, pos, ry: facingRy, state: { sit: 1, checkAmmo: 0.15, seatLift: CHUCHUAN_SEAT_LIFT } },
-    { t: standDoneAt, pos, ry: facingRy, state: { sit: 0, prepare: 0.22, moveSpeed: 0 } },
-    { t: 83.6, pos, ry: facingRy, state: { sit: 0, prepare: 0.34, moveSpeed: 0 } },
-    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { sit: 0, prepare: 0.72, moveSpeed: 0 } },
+    { t: 0, pos, ry: facingRy, state: { checkAmmo: 0.85, moveSpeed: 0 } },
+    { t: 56.8, pos, ry: facingRy, state: { checkAmmo: 0.22, prepare: 0.10, moveSpeed: 0 } },
+    { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { prepare: 0.28, moveSpeed: 0 } },
+    { t: 83.6, pos, ry: facingRy, state: { prepare: 0.42, moveSpeed: 0 } },
+    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { prepare: 0.74, moveSpeed: 0 } },
     { t: 94.5, pos, ry: facingRy, state: { hidden: true, prepare: 1 } },
     { t: 94.8, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { hidden: true, prepare: 1 } },
     { t: exitAt, pos: [exitX, CHUCHUAN_CAR_G, 7.4], ry: facingRy, state: { prepare: 1, moveSpeed: 0.62 } },
     { t: exitEnd, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true, prepare: 1, moveSpeed: 0.62 } },
     { t: CHUCHUAN_END, pos: [exitX, CHUCHUAN_CAR_G, 11.8], ry: facingRy, state: { hidden: true } },
   ];
+}
+
+/** 站在车厢中央的兵保持满载姿态；黑场地点卡内才随排撤下，不在开门镜里凭空闪走。 */
+function CarStandTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
+  const stopAt = 56.8 + stopDelay;
+  const { sit: _sit, ...standingLife } = lifeState || {};
+  return [
+    { t: 0, pos, ry: facingRy, state: { ...standingLife, moveSpeed: 0 } },
+    { t: stopAt, pos, ry: facingRy, state: { ...standingLife, prepare: 0.10, moveSpeed: 0 } },
+    { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { prepare: 0.18, moveSpeed: 0 } },
+    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { prepare: 0.58, moveSpeed: 0 } },
+    { t: 90.8, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
+    { t: 94.5, pos, ry: facingRy, state: { hidden: true, prepare: 1 } },
+    { t: CHUCHUAN_END, pos, ry: facingRy, state: { hidden: true } },
+  ];
+}
+
+const CHUCHUAN_CROWD_UNIFORMS = [0x5C6674, 0x687382, 0x747F8C, 0x7F857A, 0x828A93, 0x8A8778, 0x767E75, 0x918879];
+const CHUCHUAN_CROWD_LIFE = [
+  { sleep: 0.38 }, { warmHands: 0.62 }, { checkAmmo: 0.46 }, { watch: 0.44 },
+  { checkAmmo: 0.18 }, { cleanRifle: 0.34 }, { sit: 0.82 }, { repairShoe: 0.28 },
+];
+
+/**
+ * 64 名车内人群：20 人挤在八段长凳上，39 人夹在通道和行李架下站着，再加后端班长。
+ * 这是特写演员之外的“原始新闻图注”式背景层——高密度、非整齐阅兵列队、有人打盹、
+ * 有人护枪、有人背向镜头。人数被常量和校验锁死，不能再被精简时悄悄削掉。
+ */
+function CreateCarriageCrowdCast() {
+  const crowd = [];
+  const seatZ = [-7.05, -6.05, -5.05, -4.05, -3.25, -1.30, -0.36, 0.56, 1.48, 3.42];
+  for (const side of [-1, 1]) {
+    seatZ.forEach((z, index) => {
+      const id = `crowdSeat${side < 0 ? "L" : "R"}${index + 1}`;
+      const n = crowd.length;
+      crowd.push({
+        id, kind: "nra", weapon: n % 3 === 0 ? null : "HanYang", seed: `chuchuan${id}`,
+        uniformHex: CHUCHUAN_CROWD_UNIFORMS[n % CHUCHUAN_CROWD_UNIFORMS.length],
+        track: CarSeatTrack([side * 1.95, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[n % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.52, 95.2 + (n % 5) * 0.3, 97 + (n % 5) * 0.3, side * (0.35 + (n % 4) * 0.30), side < 0 ? -Math.PI / 2 : Math.PI / 2),
+      });
+    });
+  }
+  const standingZ = [-7.15, -5.78, -4.41, -3.04, -1.67, -0.30, 1.07, 2.44, 3.81, 5.18, 6.55];
+  for (const z of standingZ) {
+    // 中央留一条视线/挪身缝，不是现代宽过道；班长站在缝尽头仍能被整车看见。
+    for (const x of [-1.20, -0.72, 0.72, 1.20]) {
+      if (crowd.length >= CHUCHUAN_INTERIOR_TARGET - 5) break;
+      const n = crowd.length;
+      const id = `crowdStand${n + 1}`;
+      crowd.push({
+        id, kind: "nra", weapon: n % 3 === 1 ? null : "HanYang", seed: `chuchuan${id}`,
+        uniformHex: CHUCHUAN_CROWD_UNIFORMS[n % CHUCHUAN_CROWD_UNIFORMS.length],
+        track: CarStandTrack([x, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[(n + 3) % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.48, z < 0 ? 0 : Math.PI),
+      });
+    }
+  }
+  return crowd;
 }
 
 function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
@@ -577,7 +639,7 @@ const CHUCHUAN_PEOPLE = {
   oldWound: { name: "旧伤士兵", short: "旧伤士兵", real: false, note: "车厢内可见 NPC；腿缠旧绷带，靠墙休息" },
   machineGunner: { name: "机枪手", short: "机枪手", real: false, note: "车厢内可见 NPC；机枪放在脚边" },
   squadLeader: { name: "班长", short: "班长", real: false, note: "车厢内可见 NPC；检查弹药并完成动员问答" },
-  squad: { name: "众人", short: "众人", real: false, note: "五名车厢士兵的先后应答与唯一一次齐声" },
+  squad: { name: "众人", short: "众人", real: false, note: "满载 64 人车厢的先后应答与唯一一次齐声" },
   stretcherBearerA: { name: "担架兵甲", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
   stretcherBearerB: { name: "担架兵乙", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
   lightWounded: { name: "轻伤员", short: "轻伤员", real: false, note: "小站窗外可走轻伤员" },
@@ -605,7 +667,7 @@ export const CS_Chuchuan = {
   suppress: { movement: true, weapon: true, crosshair: true, combatHud: true },
   objective: "转头观察车厢。",
   handoff: { task: "跟随通信排。", once: true },
-  why: "1937 年川军徒步出川抗战，1938 年 3 月第 122 师抵达滕县；观察者在固定座位看见长期作战后的疲惫、损耗与习惯性准备。",
+  why: "1937 年川军徒步出川抗战，1938 年 3 月第 122 师抵达滕县；观察者在固定座位看见满载军运车里的疲惫、损耗与习惯性准备。",
   // 整段都持续移动，而不是只在小站那十八秒挪一下背景。近景快、中景慢、远景最慢，
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
   ambientMotion: [
@@ -719,12 +781,14 @@ export const CS_Chuchuan = {
   ],
 
   cast: [
-    // 五名重点士兵严格对应新分镜；玩家本人是固定座位上的无脸通信兵。
+    // 五名重点士兵承接台词；其余 59 人不是背景板，而是满载军运车的连续人群层。
     { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 0.0, 95.3, 96.6, -0.7, -Math.PI / 2) },
     { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 1.0, 95.5, 96.8, 0.5, Math.PI / 2) },
     { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 1.8, 95.7, 97.0, -0.5, -Math.PI / 2) },
     { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 2.75], {}, 2.6, 95.1, 96.4, 0.7, Math.PI / 2) },
-    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", uniformHex: 0x687382, track: CarLeaderTrack([1.95, CHUCHUAN_CAR_G, 5.45], 94.9, 96.2, 0, Math.PI / 2) },
+    // 班长固定在车厢末端站着、面对全车，视线一转就能找到他；不再被塞回右侧座椅。
+    { id: "squadLeader", kind: "nra", weapon: "HanYang", seed: "chuchuanLeader", uniformHex: 0x4f5a61, track: CarRearLeaderTrack([0, CHUCHUAN_CAR_G, 5.95], 94.9, 96.2, 0, Math.PI) },
+    ...CreateCarriageCrowdCast(),
     { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
     { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
     { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.03, crouch: 0.25 }) },
@@ -779,7 +843,7 @@ export const CS_Chuchuan = {
       lines: [{ at: 2.0, seconds: 1.6, who: "oldWound", voiceCue: "prologue_old_wound_03", text: "近咯。" }] },
 
     // 1:08—1:30：整段只触发一个 SeedAudio 1.0 复合 cue；其余行只负责逐句字幕。
-    { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [0, 1.6, -6], look: [1.95, 1.65, 5.45] },
+    { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [0, 1.6, -6], look: [0, 1.65, 5.95] },
       sfx: [{ at: 16.9, name: "gearRustle", volume: 0.34 }],
       lines: [
         { at: 0.2, seconds: 3.9, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。晓不晓得，我们出来是做啥子？" },
