@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Generated Audio / Volcengine
+
+- All future project audio generation must use Volcengine, never Lovart. For dialogue and voice work, call Volcengine directly with model `seed-audio-1.0`.
+- Read the credential only from the `VOLCENGINE_API_KEY` environment variable. Never place an API key in source, prompts checked into Git, command output, documentation, commits, or GitHub Actions logs.
+- The canonical direct endpoint is `https://openspeech.bytedance.com/api/v3/tts/create`; use `Script_VoiceBake.mjs` or an equivalent checked-in baker that sends the key through the `X-Api-Key` header at runtime.
+- When a storyboard marks a dialogue range as continuous, send the complete range in one `text_prompt` request and keep the returned audio as one cue. Do not synthesize lines separately and splice them together.
+
 ## Git Worktree Workflow（强制 · 优先级最高）
 
 **本仓库的主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用**（Claude / Cursor / Codex 各自可能正在其中切分支、留未提交改动）。因此：

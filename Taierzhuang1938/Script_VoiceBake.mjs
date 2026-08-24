@@ -1,13 +1,13 @@
-// 战场口令的配音烘焙：Data_Voice 的文本 → 本机 MiniMax Hub → Audio/vo_*.mp3。
+// 战场口令的配音烘焙：Data_Voice 的文本 → 火山引擎 SeedAudio 1.0 → Audio/*.mp3。
 //
 //   node Taierzhuang1938/Script_VoiceBake.mjs --missing        # 只烘没有音频的
 //   node Taierzhuang1938/Script_VoiceBake.mjs spot_tank ...    # 指定 key
 //   node Taierzhuang1938/Script_VoiceBake.mjs --all --force    # 全部重烘
 //   node Taierzhuang1938/Script_VoiceBake.mjs --dry            # 只打要烘哪些，不花钱
-//   ... --from-workspace                                       # 用上次生成的 wav 重转码
+//   ... --from-workspace                                       # 用系统临时目录里的上次原始音频重转码
 //   node Taierzhuang1938/Script_VoiceBake.mjs --normalize      # 只统一响度，不重新生成
 //   node Taierzhuang1938/Script_VoiceBake.mjs --clean <key>…   # 只为降底噪重摇，不如旧的就留旧的
-//   node Taierzhuang1938/Script_VoiceBake.mjs --prologue --force # Seed 不可用时自动回退本地 Qwen
+//   node Taierzhuang1938/Script_VoiceBake.mjs --prologue --force # 序章只允许 SeedAudio 1.0
 //
 // 烘完把实测时长写回 Data_Voice.mjs 的 dur 字段；战斗 Bark 断言 0.3—2.6 s，序章对白独立 0.45—4.8 s。
 //
@@ -15,20 +15,16 @@
 // 整套声库是 seed-audio-1.0 出的。改几句就换引擎的话，同一个班里会有两种音质，
 // 比句子本身不好听更出戏。**要改就整批换，不要混着来。**
 //
-// ## 这个模型没有方言参数
-// 川味只能从**文本本身的方言词汇与语法**里读出来（见 Data_Voice 文件头的设计笔记）。
-// 参数这一栏能管的只有音高与语速 —— 而这两个恰恰决定了「急不急」：
-//   · pitch 往上抬 = 嗓子尖 = 听着轻快。**报敌情的句子最怕这个**：
-//     新兵那句「战车」原本 pitch +2，喊出来像小孩看见花车游行。
-//   · speed 往上提 = 急。报警句一律 1.1—1.15，督战句留在 1.0（班长要沉住气）。
-// **不要把 speed 提到 1.35 以上** —— 实测那个档位模型频繁只吐半句。
+// ## 方言、角色与语气都写进提示词
+// 火山引擎这条 SeedAudio 1.0 接口固定用原速、原调、原响度；四川话、年龄、声线和
+// 情绪都在 SeedAudioPrompt 里约束。单句过长只在后期用 atempo 收紧，不换调。
 //
 // ## 三道闸（都是用户听出来之后补的）
 //   1. **响度统一**（有声段 RMS 拉到同一档）。这一批声音在游戏里的音量应该只由
 //      距离与遮挡决定 —— 文件本身有响有闷的话，玩家会以为「那个人离得远」，
 //      其实只是那一条烘得轻。**别拿 loudnorm 量**：EBU R128 的积分响度要 3 秒以上
 //      才可靠，这批全是 0.8—2.5 秒的喊话，量出来的数字自相矛盾（归一化之后反而更散）。
-//   2. **底噪闸**（≤ -55 dB）。seedaudio 偶尔会自带一层环境音（风声/房间声），
+//   2. **底噪闸**（≤ -48 dB）。SeedAudio 偶尔会自带一层环境音（风声/房间声），
 //      同一句话重生成一次就没有了 —— 所以是「重试」而不是「降噪」：
 //      降噪会把喊话的齿音一起削掉。实测「找掩护！躲到起！」那条底噪高到 -18.7 dB，
 //      比人声只低 17 dB，听起来像在另一个场景里录的。
@@ -38,6 +34,7 @@
 //      docs/Data_AudioAssets.md）。
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -45,9 +42,12 @@ import { VOICE_LINES } from "./Data_Voice.mjs";
 import { ArchiveUrl } from "./Data_SfxSources.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const GATEWAY = process.env.MINIMAX_GATEWAY || "http://127.0.0.1:8001";
+const VOLCENGINE_URL = "https://openspeech.bytedance.com/api/v3/tts/create";
+const VOLCENGINE_MODEL = "seed-audio-1.0";
+const VOLCENGINE_TIMEOUT_MS = 360_000;
 const FFMPEG = process.env.FFMPEG || "ffmpeg";
 const AUDIO_DIR = path.join(HERE, "Audio");
+const RAW_DIR = path.join(os.tmpdir(), "Taierzhuang1938SeedAudio");
 const VOICE_TABLE = path.join(HERE, "Data_Voice.mjs");
 const UA = "TaierzhuangVoiceBake/1.0 (https://bentleyblanks.github.io)";
 
@@ -58,31 +58,18 @@ const UA = "TaierzhuangVoiceBake/1.0 (https://bentleyblanks.github.io)";
 const TARGET_RMS = -16.1;     // dBFS，取现有 31 条的中位数，改动面最小
 const PEAK_CEIL = -1.0;       // dBFS，抬音量不许把峰顶撞上去
 const RMS_TOL = 0.4;          // 差这么点就别动了，省一代重编码
-const FLOOR_MAX = -55;        // 底噪上限（dB），超了就重试
+const FLOOR_MAX = -48;        // 火山引擎 SeedAudio 1.0 的底噪上限（dB），超了就重试
 const TRIES = 3;
-
-/**
- * 每句的合成参数。pitch 是**这一句该用多高的嗓子**，speed 是**多急**。
- * 缺省按 role 取；行里写了就以行为准（Data_Voice 的 pitch / speed 字段）。
- * 值一律是字符串 —— 传数字网关报 `value?.trim is not a function`。
- */
-const ROLE_DEFAULT = {
-  班长: { pitch: -2, speed: 1.0 },
-  老兵: { pitch: -4, speed: 1.0 },
-  普通兵: { pitch: 0, speed: 1.0 },
-  新兵: { pitch: 0, speed: 1.1 },
-};
 
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const dry = args.includes("--dry");
-const reuse = args.includes("--from-workspace");   // 拿上次生成的 wav 重转码，不花积分
+const reuse = args.includes("--from-workspace");   // 拿系统临时目录里的原始 MP3 重转码，不再发请求
 const normalizeOnly = args.includes("--normalize");
 // --clean：只为降底噪重摇 take，**新的不如旧的就留旧的**。
 // 模型的底噪是每次生成随机的：不做这道比较，一次「清理」可能把好好的一条换成更脏的
 // （实测 spot_gap 从 -43 dB 被换成 -32.7 dB）。文本改过的行别用这个模式 —— 旧文件念的是旧词。
 const cleanOnly = args.includes("--clean");
-const qwenOnly = args.includes("--qwen");
 const picks = args.filter((a) => !a.startsWith("--"));
 const Has = (line) => fs.existsSync(path.join(AUDIO_DIR, line.file));
 
@@ -201,13 +188,86 @@ function Denoise(file) {
   return { floor: Math.round(after * 10) / 10, applied: true };
 }
 
-/** --from-workspace：拿上一次生成留在工作区的 wav 重新转码，不再花积分。 */
-function WorkspaceTake(dir, key) {
-  const files = fs.readdirSync(dir)
-    .filter((f) => f.startsWith(`tzvoice_${key}`) && /\.(wav|mp3)$/i.test(f))
-    .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
-    .sort((a, b) => b.t - a.t);
-  return files.length ? path.join(dir, files[0].f) : null;
+/** --from-workspace：拿上一次火山引擎响应里解出的原始 MP3 重转码，不再发请求。 */
+function WorkspaceTake(key) {
+  const file = path.join(RAW_DIR, `AudioRaw_${key}.mp3`);
+  return fs.existsSync(file) ? file : null;
+}
+
+const PROLOGUE_ROLE_PROMPTS = {
+  "年轻传令兵": "十八九岁的四川男兵，嗓音年轻偏亮但已有长途行军后的疲惫；说话直率、带一点想家的憨气，川味自然，不卖弄方言。",
+  "旧伤士兵": "四十岁上下的四川老兵，男中低音，嗓子略哑，慢而省力；见过伤亡，语气平静克制，不故作沧桑。",
+  "机枪手": "三十岁上下的四川男兵，嗓音厚实、稳，嘴上爱打趣，底色是照应年轻人的老练和善意。",
+  "擦枪士兵": "二十多岁的四川男兵，声音偏低而干，正被发涩的枪栓惹烦；只短促嘟囔，不喊叫。",
+  "车外军官": "三十五岁上下的四川男性基层军官，中低音有穿透力；隔着车门发命令，急而清楚，不表演式咆哮。",
+};
+
+function SeedAudioPrompt(line) {
+  if (line.promptMode === "continuousScene") {
+    return [
+      "生成一条完整、连续、不可拆分的22秒中文对白音频。1938年3月，一列停下来的军用车厢内，五名川军士兵用自然四川话低声交谈。",
+      "只输出干净对白：不要音乐、不要旁白、不要念角色名或括号说明、不要额外台词，也不要添加火车声、炮声、脚步或其他环境音。",
+      "班长固定为三十五岁左右四川男性，低沉稳重的男中音，疲惫但有威信，不做煽情演讲；四名回应者是不同年龄的四川男兵，声音彼此可分。",
+      "全段必须像同一空间里一次真实问答，人物声线、距离、混响与情绪连续一致。前半压低声音，齐声回应要厚、克制而整齐；班长说“好样的”前轻微哽咽一下，停一拍后恢复日常命令口吻。",
+      "严格按下列顺序和原文说完，并让最后一句在22秒内自然收住：",
+      line.text,
+    ].join("\n");
+  }
+  if (line.prologue) {
+    const character = PROLOGUE_ROLE_PROMPTS[line.role] || "四川男性军人，嗓音自然、克制，符合1938年长期行军后的疲惫状态。";
+    return [
+      "生成一条单句、干净、孤立的中文男性对白配音。",
+      "使用自然四川话口音，不能说成普通话腔，也不要夸张模仿或喜剧化。",
+      character,
+      "不要音乐、不要旁白、不要环境声、不要音效、不要念角色名；开口前后只留极短静音。",
+      `只说这一句原文：“${line.text}”`,
+    ].join("\n");
+  }
+  return [
+    "生成一条单句、干净、孤立的战场男性口令配音。严格使用台词本身的语言，不要改词。",
+    `角色：${line.role || "士兵"}。语气短促、可信，不舞台化。`,
+    "不要音乐、不要旁白、不要环境声、不要音效、不要念角色名；开口前后只留极短静音。",
+    `只说这一句原文：“${line.text}”`,
+  ].join("\n");
+}
+
+async function GenerateSeedAudio(line, rawFile) {
+  const apiKey = process.env.VOLCENGINE_API_KEY;
+  if (!apiKey) throw new Error("缺少 VOLCENGINE_API_KEY；密钥只能通过环境变量提供，禁止写进仓库。");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VOLCENGINE_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(VOLCENGINE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+      body: JSON.stringify({
+        model: VOLCENGINE_MODEL,
+        text_prompt: SeedAudioPrompt(line),
+        audio_config: { format: "mp3", sample_rate: 48000, pitch_rate: 0, speech_rate: 0, loudness_rate: 0 },
+        watermark: {},
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error(`火山引擎请求超过 ${VOLCENGINE_TIMEOUT_MS / 1000}s`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  const rawBody = await response.text();
+  if (!response.ok) throw new Error(`火山引擎 HTTP ${response.status}：${rawBody.slice(0, 240)}`);
+  let payload;
+  try { payload = JSON.parse(rawBody); }
+  catch { throw new Error(`火山引擎返回了非 JSON 响应（${rawBody.length} bytes）`); }
+  if (!payload.audio || typeof payload.audio !== "string") {
+    throw new Error(`火山引擎没有返回 audio：${String(payload.message || payload.error || "未知错误").slice(0, 240)}`);
+  }
+  const audio = Buffer.from(payload.audio, "base64");
+  if (audio.length < 2048) throw new Error(`火山引擎返回的音频过小（${audio.length} bytes）`);
+  fs.mkdirSync(path.dirname(rawFile), { recursive: true });
+  fs.writeFileSync(rawFile, audio);
+  return { duration: Number(payload.duration) || 0, originalDuration: Number(payload.original_duration) || 0 };
 }
 
 function WriteDurations(durations) {
@@ -219,58 +279,6 @@ function WriteDurations(durations) {
     table = table.replace(re, (m, head) => head + dur.toFixed(2));
   }
   fs.writeFileSync(VOICE_TABLE, table);
-}
-
-/**
- * 仅服务序章的离线回退。Seed Audio 是正式首选；网关没有启动时，Qwen 用冻结的
- * 原创角色参考逐角色克隆，避免退回 Windows 系统朗读声。QWEN_PYTHON 必须指向
- * 安装 qwen_tts 的本机环境，保持模型与项目文件分离。
- */
-function BakePrologueWithQwen(qwenLines) {
-  const python = process.env.QWEN_PYTHON;
-  if (!python) throw new Error("Seed Audio 网关不可用，且未设置 QWEN_PYTHON（本地 Qwen3-TTS Python 路径）");
-  const script = path.join(HERE, "Script_PrologueVoiceBakeQwen.py");
-  const result = spawnSync(python, [script, "--force", ...qwenLines.flatMap((line) => ["--key", line.key])], {
-    cwd: HERE, encoding: "utf8", stdio: "inherit",
-  });
-  if (result.status !== 0) throw new Error(`Qwen 序章配音生成失败（退出码 ${result.status ?? "未知"}）`);
-  const durations = new Map(qwenLines.map((line) => [line.key, Math.round(Duration(path.join(AUDIO_DIR, line.file)) * 100) / 100]));
-  if ([...durations.values()].some((dur) => dur <= 0)) throw new Error("Qwen 生成后有序章文件无法读取时长");
-  WriteDurations(durations);
-  console.log(`\nQwen 回退完成 ${qwenLines.length} 条，时长已写回 Data_Voice.mjs`);
-}
-
-/** Windows 离线中文生成链：System.Speech 的男性 Kangkang，不联网、不上传台词。 */
-function SystemSpeechTake(line, dst) {
-  const wav = dst + ".system.wav";
-  const voice = line.systemSpeech.voice || "Microsoft Kangkang";
-  const rate = Number(line.systemSpeech.rate || 0);
-  const quote = (s) => String(s).replace(/'/g, "''");
-  const script = [
-    "Add-Type -AssemblyName System.Speech",
-    "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer",
-    `$s.SelectVoice('${quote(voice)}')`,
-    `$s.Rate = ${Math.max(-10, Math.min(10, rate))}`,
-    "$s.Volume = 100",
-    `$s.SetOutputToWaveFile('${quote(wav)}')`,
-    `$s.Speak('${quote(line.text)}')`,
-    "$s.Dispose()",
-  ].join(";");
-  const encoded = Buffer.from(script, "utf16le").toString("base64");
-  const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], { encoding: "utf8" });
-  if (r.status !== 0 || !fs.existsSync(wav)) return { error: (r.stderr || r.stdout || "System.Speech 生成失败").slice(-240) };
-  // rubberband 以保时移调区分角色；formant=preserved 防止 ±2 半音变成卡通声。
-  const semitones = Number(line.systemSpeech.pitchSemitones || 0);
-  const pitch = Math.pow(2, semitones / 12);
-  const pitchFx = Math.abs(semitones) > 0.01
-    ? `rubberband=pitch=${pitch.toFixed(5)}:tempo=1:formant=preserved`
-    : "";
-  const pre = [pitchFx, "afftdn=nr=16:nf=-45", "agate=threshold=-35dB:ratio=8:attack=5:release=80"]
-    .filter(Boolean).join(",");
-  const out = Encode(wav, dst, { maxDur: line.prologue ? 4.7 : 2.45,
-    maxTempo: line.prologue ? 1.6 : 2.6, preFilter: pre });
-  fs.rmSync(wav, { force: true });
-  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -321,45 +329,13 @@ if (dry) {
   process.exit(0);
 }
 
-const qwenLines = lines.filter((line) => line.qwenVoice);
-if (qwenOnly) {
-  if (qwenLines.length !== lines.length) throw new Error("--qwen 只支持序章 qwenVoice 条目，不可混入战斗 Bark");
-  BakePrologueWithQwen(qwenLines);
-  process.exit(0);
-}
-
-const needsGateway = lines.some((l) => !l.sample);
-let workspace = { dir: AUDIO_DIR };
-if (needsGateway) {
-  try {
-    const response = await fetch(`${GATEWAY}/api/workspace`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    workspace = await response.json();
-  } catch (error) {
-    if (qwenLines.length === lines.length) {
-      console.warn(`Seed Audio 网关不可用（${error.message}），回退本地 Qwen3-TTS。`);
-      BakePrologueWithQwen(qwenLines);
-      process.exit(0);
-    }
-    throw error;
-  }
-}
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
+fs.mkdirSync(RAW_DIR, { recursive: true });
 
 const durations = new Map();
 let ok = 0;
 for (const line of lines) {
   const dst = path.join(AUDIO_DIR, line.file);
-
-  // 仅保留旧文件的重烘兼容分支；新版序章不再定义 systemSpeech，走 Seed / Qwen。
-  if (line.systemSpeech) {
-    const enc = SystemSpeechTake(line, dst);
-    if (enc.error) { console.warn(`  ✗ ${line.key} System.Speech：${enc.error}`); continue; }
-    durations.set(line.key, enc.dur);
-    ok += 1;
-    console.log(`  ✓ ${line.key.padEnd(28)} ${line.role}  ${enc.dur.toFixed(2)}s  底噪 ${enc.floor}dB  [System.Speech/${line.systemSpeech.voice}]  ${line.text}`);
-    continue;
-  }
 
   // --- 实录行：从免版税素材库下载，不走 TTS ---------------------------------
   if (line.sample) {
@@ -394,13 +370,6 @@ for (const line of lines) {
   }
 
   // --- TTS 行：底噪不过关就重试（seedaudio 偶尔自带一层环境音）--------------
-  const preset = ROLE_DEFAULT[line.role] || ROLE_DEFAULT.普通兵;
-  const pitch = line.pitch ?? preset.pitch;
-  const speed = line.speed ?? preset.speed;
-  const body = {
-    backend: "seedaudio", prompt: line.text, filename: `tzvoice_${line.key}`,
-    params: { speed: String(speed), volume: "1", pitch: String(pitch), sample_rate: "32000" },
-  };
   let best = null;
   const keep = dst + ".best.mp3";
   // --clean：先把现有文件收进候选，新 take 干不过它就原样留着
@@ -412,17 +381,22 @@ for (const line of lines) {
   for (let attempt = 1; attempt <= (reuse ? 1 : TRIES); attempt += 1) {
     let src;
     if (reuse) {
-      src = WorkspaceTake(workspace.dir, line.key);
-      if (!src) { console.warn(`  ✗ ${line.key} — 工作区里没有上一次生成的 wav`); break; }
+      src = WorkspaceTake(line.key);
+      if (!src) { console.warn(`  ✗ ${line.key} — 系统临时目录里没有上一次火山引擎原始音频`); break; }
     } else {
-      const res = await fetch(`${GATEWAY}/api/generate/speech`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
-      const out = await res.json();
-      if (!out.ok) { console.warn(`  ✗ ${line.key} — ${out.user_message || out.error}`); break; }
-      src = path.join(workspace.dir, out.path);
+      src = path.join(RAW_DIR, `AudioRaw_${line.key}.mp3`);
+      try {
+        const result = await GenerateSeedAudio(line, src);
+        console.log(`    ↳ 火山引擎 ${VOLCENGINE_MODEL} 原始时长 ${result.originalDuration || result.duration || "?"}s`);
+      } catch (error) {
+        console.warn(`  ✗ ${line.key} — ${error.message}`);
+        break;
+      }
     }
-    const enc = Encode(src, dst);
+    const encodeOptions = line.promptMode === "continuousScene"
+      ? { maxDur: 22.0, maxTempo: 1.25 }
+      : (line.prologue ? { maxDur: 5.0, maxTempo: 1.35 } : undefined);
+    const enc = Encode(src, dst, encodeOptions);
     if (enc.error) { console.warn(`  ✗ ${line.key} ffmpeg：${enc.error}`); break; }
     // **留最干净那一条**：不留的话盘上是最后一次的结果，而日志报的是最好的一次，
     // 两者对不上 —— 这种「日志说没事、听起来有事」的偏差最难查。
@@ -447,8 +421,7 @@ for (const line of lines) {
   }
   durations.set(line.key, best.dur);
   ok += 1;
-  console.log(`  ✓ ${line.key.padEnd(16)} ${String(line.role).padEnd(4)} pitch ${String(pitch).padStart(2)}`
-    + ` speed ${speed}  ${best.dur.toFixed(2)}s  底噪 ${best.floor}dB`
+  console.log(`  ✓ ${line.key.padEnd(16)} ${String(line.role).padEnd(4)} ${best.dur.toFixed(2)}s  底噪 ${best.floor}dB`
     + (best.tempo > 1 ? `（原 ${best.raw.toFixed(2)}s，atempo ${best.tempo.toFixed(2)}）` : "")
     + `  ${line.text}`);
 }

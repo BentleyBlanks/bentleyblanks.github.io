@@ -116,42 +116,36 @@ assert.equal(oldDirector.camera._yaw, oldYaw, "old cutscene camera behavior is u
 oldDirector.Skip();
 await oldPlay;
 
-const wakeShot = CS_Chuchuan.shots.find((shot) => shot.n === 16);
-const wakeLine = wakeShot.lines.find((line) => line.who === "squadLeader"
-  && line.text === "通信排，下车！线盘背起，搞快！");
-const wakeShotStart = CS_Chuchuan.shots.slice(0, 15).reduce((sum, shot) => sum + shot.seconds, 0);
-const wakeLineEnd = wakeShotStart + wakeLine.at + wakeLine.seconds;
-assert.equal(wakeShotStart, 100, "squad leader stand-up shot starts at the declared prepare time");
-assert.equal(CS_Chuchuan.walk.startAt, wakeLineEnd, "WASD unlocks only after the squad leader finishes the disembark order");
-const doorShotStart = CS_Chuchuan.shots.slice(0, 16).reduce((sum, shot) => sum + shot.seconds, 0);
+const motivationShot = CS_Chuchuan.shots.find((shot) => shot.n === 6);
+const motivationStart = CS_Chuchuan.shots.slice(0, 5).reduce((sum, shot) => sum + shot.seconds, 0);
+const motivationEnd = motivationStart + motivationShot.seconds;
+assert.equal(motivationStart, 68, "the continuous squad-leader exchange starts at 1:08");
+assert.equal(motivationEnd, 90, "the continuous squad-leader exchange ends at 1:30");
+assert.equal(motivationShot.lines.length, 8, "the motivation exchange preserves all eight authored lines");
+assert.equal(motivationShot.lines.filter((line) => line.voiceCue).length, 1,
+  "the 1:08—1:30 exchange triggers one continuous audio file instead of eight isolated clips");
+assert.equal(motivationShot.lines[0].voiceCue, "prologue_motivation_01");
+assert.equal(CS_Chuchuan.walk, undefined, "the observer cannot walk around the carriage");
+assert.equal(CS_Chuchuan.suppress.movement, true, "gameplay movement stays suppressed for the whole prologue");
+const locationShotStart = CS_Chuchuan.shots.slice(0, 6).reduce((sum, shot) => sum + shot.seconds, 0);
+const doorShotStart = CS_Chuchuan.shots.slice(0, 7).reduce((sum, shot) => sum + shot.seconds, 0);
+assert.equal(locationShotStart, 90, "the Tengxian location card begins immediately after the exchange");
+assert.equal(doorShotStart, 93, "the carriage door opens after the short location card");
 const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
-const leaderSit = squadLeader.track.find((frame) => frame.state?.sit === 1 && frame.t > 90);
+const leaderSit = squadLeader.track.find((frame) => frame.state?.sit === 1 && frame.t > 60);
 const leaderStand = squadLeader.track.find((frame) => frame.state?.sit === 0);
 assert.ok(leaderSit && leaderStand, "squad leader has explicit seated and standing keyframes");
 assert.ok(leaderSit.t >= CS_Chuchuan.ambientMotion[0].stopAt,
   "train must stop before the squad leader begins rising");
-assert.ok(leaderStand.t <= wakeShotStart + wakeLine.at,
-  "squad leader must finish rising before the disembark order begins");
-assert.ok(wakeLineEnd <= doorShotStart,
-  "the carriage door cannot open before the squad leader finishes the order");
+assert.ok(leaderStand.t <= motivationStart,
+  "squad leader must finish rising before the exchange begins");
 for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" && item.track?.[0]?.state?.sit === 1)) {
+  const stop = actor.track.find((frame) => frame.state?.prepare > 0 && frame.state?.sit === 1);
   const ready = actor.track.find((frame) => frame.state?.prepare >= 0.99 && frame.state?.sit !== 1 && !frame.state?.hidden);
-  assert.ok(ready?.t >= wakeLineEnd, `${actor.id} rose before the squad leader completed the order`);
+  assert.ok(stop?.t >= 56 && stop?.t <= motivationStart, `${actor.id} did not stop work between the two cannon beats`);
+  assert.ok(ready?.t >= locationShotStart && ready?.t <= doorShotStart,
+    `${actor.id} must rise during the location card, after the exchange and before the door opens`);
 }
-
-const timedCut = { ...cut, walk: { ...cut.walk, startAt: wakeLineEnd } };
-const timedDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), table: { [timedCut.id]: timedCut } });
-const timedPlay = timedDirector.Play(timedCut.id);
-timedDirector.time = wakeLineEnd - 0.01;
-timedDirector.walkKeys.add("w");
-timedDirector._UpdateWalk(timedCut, 1);
-assert.deepEqual([timedDirector.walkOffset.x, timedDirector.walkOffset.z], [0, 0], "WASD cannot move before the spoken order ends");
-assert.equal(timedDirector.walkKeys.has("w"), true, "a held movement key remains ready for the unlock frame");
-timedDirector.time = wakeLineEnd;
-timedDirector._UpdateWalk(timedCut, 1);
-assert.deepEqual([timedDirector.walkOffset.x, timedDirector.walkOffset.z], [0, 2], "held WASD moves immediately after the spoken order ends");
-timedDirector.Skip();
-await timedPlay;
 
 const router = new InputRouter();
 const input = { forward: 1, strafe: 1, lean: 1, sprint: true, breathHold: true, fire: true, ads: true };
@@ -159,4 +153,4 @@ router.SetSuppressed(true);
 router.Read(input);
 assert.deepEqual(input, { forward: 0, strafe: 0, lean: 0, sprint: false, breathHold: false, fire: false, ads: false }, "all gameplay axes suppressed");
 router.SetSuppressed(false);
-console.log("Cutscene control tests passed: real camera directions, spoken-order movement gate, neutral, finish/skip, audio restore, old compatibility, input suppression");
+console.log("Cutscene control tests passed: real camera directions, fixed observer, continuous motivation cue, neutral, finish/skip, audio restore, old compatibility, input suppression");

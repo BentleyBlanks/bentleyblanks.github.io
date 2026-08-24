@@ -123,14 +123,14 @@ export function LintCutscene(cut) {
     for (const sub of shot.subs || []) {
       const need = MinReadSeconds(sub.text);
       const have = sub.seconds || 3.0;
-      if (have + 0.05 < need) warnings.push(`${cut.id} 镜${shot.n} 字幕「${String(sub.text).slice(0, 14)}…」只给了 ${have}s，按字数至少 ${need.toFixed(1)}s`);
+      if (!shot.timingLocked && have + 0.05 < need) warnings.push(`${cut.id} 镜${shot.n} 字幕「${String(sub.text).slice(0, 14)}…」只给了 ${have}s，按字数至少 ${need.toFixed(1)}s`);
       if (sub.at + have > shot.seconds + 0.05) warnings.push(`${cut.id} 镜${shot.n} 字幕「${String(sub.text).slice(0, 14)}…」到 ${(sub.at + have).toFixed(1)}s 才消失，可本镜只有 ${shot.seconds}s（会被下一镜截断）`);
       if (String(sub.text).length > 34) warnings.push(`${cut.id} 镜${shot.n} 字幕超过 34 字（${String(sub.text).length}），拆成两条`);
     }
     for (const line of shot.lines || []) {
       const need = MinReadSeconds(line.text);
       const have = line.seconds || 3.0;
-      if (have + 0.05 < need) warnings.push(`${cut.id} 镜${shot.n} 台词「${String(line.text).slice(0, 14)}…」只给了 ${have}s，按字数至少 ${need.toFixed(1)}s`);
+      if (!shot.timingLocked && have + 0.05 < need) warnings.push(`${cut.id} 镜${shot.n} 台词「${String(line.text).slice(0, 14)}…」只给了 ${have}s，按字数至少 ${need.toFixed(1)}s`);
       if (String(line.text).length > 26) warnings.push(`${cut.id} 镜${shot.n} 台词超过 26 字（${String(line.text).length}），拆成两句`);
     }
     // 同一镜里多句台词重叠：后一句会把前一句顶掉

@@ -70,13 +70,13 @@
         "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=9",
         "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=7",
         "./Script_Audio.mjs": "./Script_Audio.mjs?v=4",
-        "./Data_Voice.mjs": "./Data_Voice.mjs?v=2",
+        "./Data_Voice.mjs": "./Data_Voice.mjs?v=3",
         "./Script_Hud.mjs": "./Script_Hud.mjs?v=11",
         "./Script_Story.mjs": "./Script_Story.mjs?v=1",
         "./Script_TengxianField.mjs": "./Script_TengxianField.mjs?v=1",
         "./Script_Cutscene.mjs": "./Script_Cutscene.mjs?v=12",
         "./Data_TengxianScript.mjs": "./Data_TengxianScript.mjs?v=3",
-        "./Data_CutsceneChuchuan.mjs": "./Data_CutsceneChuchuan.mjs?v=10",
+        "./Data_CutsceneChuchuan.mjs": "./Data_CutsceneChuchuan.mjs?v=11",
         "./Script_Combat.mjs": "./Script_Combat.mjs?v=3",
         "./Data_Weapons.mjs": "./Data_Weapons.mjs?v=3",
         "./Data_Battle.mjs": "./Data_Battle.mjs?v=9",
@@ -108,27 +108,27 @@
   <canvas id="view"></canvas>
   <div id="hud"></div>
   <div id="boot">
-    <!-- 鍔犺浇鐢婚潰鐨勯亾鍏峰睍绀哄彴锛氶殢鏈轰竴浠舵父鎴忓唴鐨?TZM 妯″瀷锛屽彲浠ユ嫋鐫€杞紙Script_BootProp锛夈€?
-         杞姩璺戝湪 worker 閲岋紝涓荤嚎绋嬪缓鍏冲崱鍗″涔呴兘涓嶅奖鍝嶅畠銆?-->
+    <!-- 加载画面的道具展示台：随机一件游戏内的 TZM 模型，可以拖着转（Script_BootProp）。
+         转动跑在 worker 里，主线程建关卡卡多久都不影响它。 -->
     <canvas id="bootProp"></canvas>
     <div id="bootVeil"></div>
     <div id="bootHead">
-      <div id="bootTitle">婊曞幙 涓€涔濅笁鍏?/div>
-      <div id="bootSub">涓€涔濅笁鍏勾涓夋湀鍗佸洓鏃?鈥?鍗佸叓鏃?路 灞变笢婊曞幙</div>
+      <div id="bootTitle">滕县 一九三八</div>
+      <div id="bootSub">一九三八年三月十四日 — 十八日 · 山东滕县</div>
     </div>
     <div id="bootCard">
       <div id="bootPropName"></div>
       <div id="bootPropNote"></div>
     </div>
     <div id="bootFoot">
-      <button id="bootStart" disabled>杩?鍩?/button>
-      <a id="bootPreview" href="?preview=CS_Chuchuan&amp;autoplay=1" aria-label="鐩存帴鎾斁鏂扮増搴忕珷棰勮">鏂扮増搴忕珷棰勮锛堝紑鍙戯級</a>
-      <div id="bootStep">姝ｅ湪澶湴鈥︹€?/div>
+      <button id="bootStart" disabled>进 城</button>
+      <a id="bootPreview" href="?preview=CS_Chuchuan&amp;autoplay=1" aria-label="直接播放新版序章预览">新版序章预览（开发）</a>
+      <div id="bootStep">正在夯地……</div>
       <div id="bootBar"><i></i></div>
     </div>
   </div>
-  <!-- 涓昏彍鍗曘€傚姞杞藉畬鎴愬悗鐩栧湪娲诲満鏅笂锛圫cript_Menu 鎺ョ鐩告満璺戣繍闀滐級銆?
-       鍑哄浘妯″紡涓??menu=0 涓嬪畠涓€鐩存槸绌虹殑锛屻€岃繘 鍩庛€嶉偅棰楁寜閽収鏃х鐢?鈥斺€?涓変釜鍐掔儫鑴氭湰閮界偣瀹冦€?-->
+  <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
+       出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
   <script type="module" src="./Script_Main.mjs?v=48"></script>
 </body>

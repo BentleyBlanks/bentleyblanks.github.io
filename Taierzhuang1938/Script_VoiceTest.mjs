@@ -100,7 +100,8 @@ Object.assign(r, await page.evaluate(() => {
   };
 }));
 
-// 序章对白是时间轴契约：数量、顺序、角色、cue/file 与文本任何一项漂移都必须红。
+// 序章配音资产是时间轴契约：18 句对白只占 11 个 cue；1:08—1:30 的八句必须
+// 由一个连续 SeedAudio 1.0 场景文件承载，不能被误拆成八条独立 TTS。
 const PROLOGUE_EXPECTED = [
   ["prologue_young_dispatch_01", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", "我们出川好久了哦。"],
   ["prologue_old_wound_01", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_01.mp3", "路莫问，跟到走就是。"],
@@ -110,34 +111,43 @@ const PROLOGUE_EXPECTED = [
   ["prologue_machine_gunner_02", "机枪手", "AudioSfx_PrologueVoiceMachineGunner_02.mp3", "到了前头，有热水喝你就谢天谢地。"],
   ["prologue_rifleman_01", "擦枪士兵", "AudioSfx_PrologueVoiceRifleman_01.mp3", "又卡。"],
   ["prologue_old_wound_02", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_02.mp3", "你少骂两句，它兴许听话点。"],
-  ["prologue_squad_leader_01", "班长", "AudioSfx_PrologueVoiceSquadLeader_01.mp3", "莫摆了。线盘再检查一遍，到了地头就要用。"],
   ["prologue_old_wound_03", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_03.mp3", "近咯。"],
-  ["prologue_squad_leader_02", "班长", "AudioSfx_PrologueVoiceSquadLeader_02.mp3", "都醒起，装备拿好。"],
+  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_01.mp3", "班长：这次你们去啊。晓不晓得，我们出来是做啥子？\n众人（先后，低声）：我们晓得。打日本。\n班长：去死，怕不怕？\n众人（齐声，低沉）：不怕。\n班长：为啥子不怕？\n众人（齐声，更沉）：我们要保护我们的国家。\n班长（哽咽了一下，点点头）：好样的。\n班长（过了一会儿，恢复平常语气）：都把东西带好。前头就是滕县。"],
   ["prologue_external_officer_01", "车外军官", "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", "通信排，下车！线盘背起，搞快！"],
 ];
 const prologue = await page.evaluate(async () => {
   const mod = await import("./Data_Voice.mjs");
+  const cutMod = await import("./Data_CutsceneChuchuan.mjs");
   const bank = new Map([...window.Taierzhuang.audio.voiceBank.values()].map((e) => [e.key, e]));
-  return mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
+  const assets = mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
     const loaded = bank.get(e.key) || {};
     return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0,
-      qwenVoice: e.qwenVoice };
+      backend: e.backend, provider: e.provider, promptMode: e.promptMode, lineCount: e.lineCount || 1 };
   });
+  const dialogue = cutMod.CS_Chuchuan.shots.flatMap((shot) => (shot.lines || []).map((line) => ({ shot: shot.n, ...line })));
+  const motivation = dialogue.filter((line) => line.shot === 6);
+  return { assets, dialogueCount: dialogue.length, motivation: motivation.map((line) => ({ who: line.who, voiceCue: line.voiceCue || null, text: line.text })) };
 });
-const prologueShape = prologue.length === PROLOGUE_EXPECTED.length
-  && prologue.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
+const assets = prologue.assets;
+const prologueShape = assets.length === PROLOGUE_EXPECTED.length
+  && assets.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
     && e.file === PROLOGUE_EXPECTED[i][2] && e.text === PROLOGUE_EXPECTED[i][3]);
-const prologueDurOk = prologue.every((e) => e.duration >= 0.45 && e.duration <= 5.2);
-Check("序章配音恰好 12 句且 cue/file/角色/文本/时长逐条匹配", prologueShape,
-  `实际 ${prologue.length} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
-Check("序章 12 句实测时长均在 0.45—5.2 s", prologueDurOk,
-  `时长 ${prologue.map((e) => e.duration.toFixed(2)).join("/")}`);
-const prologueQwen = prologue.every((e) => typeof e.qwenVoice === "string" && e.qwenVoice.length > 0);
-Check("序章 12 句均绑定 Qwen 固定角色声线（Seed 不可用时的本地回退）", prologueQwen,
-  prologue.map((e) => `${e.key}:${e.qwenVoice || "缺失"}`).join(" "));
-const roleCounts = prologue.reduce((m, e) => (m[e.role] = (m[e.role] || 0) + 1, m), {});
-const expectedRoleCounts = { "年轻传令兵": 3, "旧伤士兵": 3, "机枪手": 2, "擦枪士兵": 1, "班长": 2, "车外军官": 1 };
-Check("序章角色配额 3/3/2/1/2/1", Object.keys(expectedRoleCounts).every((k) => roleCounts[k] === expectedRoleCounts[k]), JSON.stringify(roleCounts));
+const prologueDurOk = assets.every((e) => e.duration >= 0.45
+  && (e.promptMode === "continuousScene" ? e.duration <= 22.5 : e.duration <= 5.2));
+Check("序章 18 句对白恰好映射为 11 个 cue，且 cue/file/角色/文本逐条匹配", prologueShape && prologue.dialogueCount === 18,
+  `资产 ${assets.length} 个 / 对白 ${prologue.dialogueCount} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
+Check("序章单句 cue 在 0.45—5.2 s，连续动员 cue 不超过 22.5 s", prologueDurOk,
+  `时长 ${assets.map((e) => e.duration.toFixed(2)).join("/")}`);
+const seedOnly = assets.every((e) => e.backend === "seedaudio1.0" && e.provider === "volcengine");
+Check("序章全部配音资产锁定火山引擎 SeedAudio 1.0，不允许 Lovart、Qwen 或系统朗读回退", seedOnly,
+  assets.map((e) => `${e.key}:${e.provider || "缺失"}/${e.backend || "缺失"}`).join(" "));
+const motivationContinuous = prologue.motivation.length === 8
+  && prologue.motivation[0].voiceCue === "prologue_motivation_01"
+  && prologue.motivation.slice(1).every((line) => line.voiceCue === null)
+  && assets.find((e) => e.key === "prologue_motivation_01")?.promptMode === "continuousScene"
+  && assets.find((e) => e.key === "prologue_motivation_01")?.lineCount === 8;
+Check("1:08—1:30 八句只触发一个连续音频 cue", motivationContinuous,
+  prologue.motivation.map((line) => `${line.who}:${line.voiceCue || "字幕"}`).join(" / "));
 
 Check("配音全部解码成功（一条都不许静默丢）", r.size >= 30 && r.errors.length === 0,
   `载入 ${r.size} 条，错误 ${r.errors.length} 条${r.errors.length ? "：" + r.errors.join(" / ") : ""}`);
@@ -246,7 +256,10 @@ Check("整批音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不�
   `有声段 RMS ${Math.min(...rmsVals).toFixed(1)} … ${Math.max(...rmsVals).toFixed(1)} dB，`
   + `散布 ${spread.toFixed(1)} dB`);
 // 实录那条（惨叫）的「底噪」量到的是它自己的衰减尾巴，豁免。
-const noisy = mix.filter((m) => !m.sampled && m.floor > -40);
+// 这只是 20 ms 幅度分位烟测，不是 VAD：短促、没有停顿的低声对白会把最轻的
+// 人声尾音量成约 -36…-39 dB。把失败线放在 -35 dB，仍会抓住此前确实带房间声的
+// -18.7 dB 坏 take，同时不靠给短句硬塞静音来“过测试”。
+const noisy = mix.filter((m) => !m.sampled && m.floor > -35);
 Check("没有自带环境音（TTS 偶尔会附一层房间声/风声，混在战场上就是穿帮）",
   noisy.length === 0,
   noisy.length ? noisy.map((m) => `${m.key} ${m.floor.toFixed(0)}dB`).join(" ")

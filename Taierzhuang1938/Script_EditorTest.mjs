@@ -941,7 +941,7 @@ Check("出图模式下编辑器不可见但 API 还在",
 // ---------------------------------------------------------------------------
 const previewHref = await page.getAttribute("#bootPreview", "href").catch(() => null);
 Check("开发入口明确指向新版序章预览",
-  previewHref === "?preview=CS_Chuchuan", `href=${previewHref}`);
+  previewHref === "?preview=CS_Chuchuan&autoplay=1", `href=${previewHref}`);
 
 async function PreviewPage(query = "?preview=CS_Chuchuan") {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/${query}`,
@@ -969,9 +969,8 @@ Check("新版预览点击播放后自动推进且不提前启动旧 L0 AI",
 
 await page.evaluate(() => {
   const T = window.Taierzhuang;
-  // 新版车厢序章总长是 120 s；95 s 是早期短版的陈旧断言，届时还在
-  // 「火车进站」段，自然不可能已交接到终点。
-  T.StepFrames(120 * 60 + 8, 1 / 60, false);
+  // Notion 2026-08-24 定稿总长 102 s；最后 12 s 是地点卡、开门与自动下车。
+  T.StepFrames(102 * 60 + 8, 1 / 60, false);
 });
 await page.waitForTimeout(10);
 const previewDone = await page.evaluate(() => {

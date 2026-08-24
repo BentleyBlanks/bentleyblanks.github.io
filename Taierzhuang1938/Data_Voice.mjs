@@ -3,14 +3,13 @@
 // 玩家演的是川军第 22 集团军第 41 军 122 师的一名基层士兵。这批口令因此是
 // **四川话**，不是普通话 —— 上一版全员标准普通话，那是「电视剧腔」的主要来源。
 //
-// ## 川味从哪来：文本，不是参数
-// 配音用字节的 seed-audio-1.0（本机 MiniMax Hub 网关）。**它没有方言参数** ——
-// 口音是从「文本本身的方言词汇与语法」里读出来的。所以这批文本怎么写，
-// 直接决定有没有川味；参数那一栏能做的只有音高与语速。
+// ## 川味从哪来：文本与角色提示
+// 配音统一由 Script_VoiceBake.mjs 直连火山引擎 seed-audio-1.0；不经 Lovart，
+// 也不经本机 MiniMax Hub。口音由四川话文本骨架与固定角色提示共同约束，不能只靠
+// 换几个方言词。火山引擎密钥只从 VOLCENGINE_API_KEY 环境变量读取，绝不进仓库。
 //
-// 生成参数：speed "1" / volume "1" / sample_rate "32000"，pitch 按角色分
-// （班长 -2 ｜ 老兵 -4 ｜ 普通兵 0 ｜ 新兵 +2）。
-// **不要把 speed 提上去** —— 实测 1.35 时模型频繁只吐半句。要提速走后期 atempo。
+// API 固定请求 48 kHz MP3，speech/pitch/loudness rate 保持 0；句长超出镜头时才在
+// 后期用 atempo 无损变调地收紧。角色差异写进提示词，不靠整批机械升降调。
 //
 // ## 改写的原则（三稿竞写 + 三视角评审 + 合稿定的）
 // 堆词表没有用。巴适、要得、莫得、瓜娃子、安逸 —— 光换词、语法还是普通话骨架，
@@ -106,20 +105,20 @@
 export const VOICE_BASE = "Audio/";
 
 export const VOICE_LINES = [
-  // ===== 序章｜出川（12 句，按过场时间轴固定顺序） ============================
-  // Seed Audio 是首选；本机网关不可用时，按 qwenVoice 走 Qwen3-TTS 的固定原创角色声线。
-  { key: "prologue_young_dispatch_01", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", dur: 1.38, role: "年轻传令兵", pitch: 0, prologue: true, qwenVoice: "YoungDispatch", text: "我们出川好久了哦。" },
-  { key: "prologue_old_wound_01", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_01.mp3", dur: 3.29, role: "旧伤士兵", pitch: -2, prologue: true, qwenVoice: "OldWound", text: "路莫问，跟到走就是。" },
-  { key: "prologue_young_dispatch_02", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_02.mp3", dur: 2.70, role: "年轻传令兵", pitch: 0, prologue: true, qwenVoice: "YoungDispatch", text: "我都忘了屋头腊肉是啥味道了。" },
-  { key: "prologue_machine_gunner_01", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_01.mp3", dur: 1.75, role: "机枪手", pitch: -1, prologue: true, qwenVoice: "MachineGunner", text: "你娃儿还惦记腊肉。" },
-  { key: "prologue_young_dispatch_03", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_03.mp3", dur: 1.91, role: "年轻传令兵", pitch: 0, prologue: true, qwenVoice: "YoungDispatch", text: "不惦记吃的惦记啥子嘛。" },
-  { key: "prologue_machine_gunner_02", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_02.mp3", dur: 3.62, role: "机枪手", pitch: -1, prologue: true, qwenVoice: "MachineGunner", text: "到了前头，有热水喝你就谢天谢地。" },
-  { key: "prologue_rifleman_01", kind: "prologue", file: "AudioSfx_PrologueVoiceRifleman_01.mp3", dur: 2.01, role: "擦枪士兵", pitch: 0, prologue: true, qwenVoice: "Rifleman", text: "又卡。" },
-  { key: "prologue_old_wound_02", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_02.mp3", dur: 3.70, role: "旧伤士兵", pitch: -2, prologue: true, qwenVoice: "OldWound", text: "你少骂两句，它兴许听话点。" },
-  { key: "prologue_squad_leader_01", kind: "prologue", file: "AudioSfx_PrologueVoiceSquadLeader_01.mp3", dur: 4.96, role: "班长", pitch: -2, prologue: true, qwenVoice: "SquadLeader", text: "莫摆了。线盘再检查一遍，到了地头就要用。" },
-  { key: "prologue_old_wound_03", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_03.mp3", dur: 1.08, role: "旧伤士兵", pitch: -2, prologue: true, qwenVoice: "OldWound", text: "近咯。" },
-  { key: "prologue_squad_leader_02", kind: "prologue", file: "AudioSfx_PrologueVoiceSquadLeader_02.mp3", dur: 2.68, role: "班长", pitch: -2, prologue: true, qwenVoice: "SquadLeader", text: "都醒起，装备拿好。" },
-  { key: "prologue_external_officer_01", kind: "prologue", file: "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", dur: 3.67, role: "车外军官", pitch: -1, prologue: true, qwenVoice: "ExternalOfficer", text: "通信排，下车！线盘背起，搞快！" },
+  // ===== 序章｜出川（18 句对白／11 个 cue，按过场时间轴固定顺序） =============
+  // 新序章全部锁定 SeedAudio 1.0 与四川话。1:08—1:30 必须作为一个连续场景一次生成，
+  // 不能拆成八条独立 TTS；text 保存完整提示词台词，字幕分句在 Data_CutsceneChuchuan。
+  { key: "prologue_young_dispatch_01", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", dur: 2.07, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "我们出川好久了哦。" },
+  { key: "prologue_old_wound_01", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_01.mp3", dur: 2.88, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "路莫问，跟到走就是。" },
+  { key: "prologue_young_dispatch_02", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_02.mp3", dur: 3.12, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "我都忘了屋头腊肉是啥味道了。" },
+  { key: "prologue_machine_gunner_01", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_01.mp3", dur: 1.62, role: "机枪手", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "你娃儿还惦记腊肉。" },
+  { key: "prologue_young_dispatch_03", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_03.mp3", dur: 2.12, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "不惦记吃的惦记啥子嘛。" },
+  { key: "prologue_machine_gunner_02", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_02.mp3", dur: 3.16, role: "机枪手", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "到了前头，有热水喝你就谢天谢地。" },
+  { key: "prologue_rifleman_01", kind: "prologue", file: "AudioSfx_PrologueVoiceRifleman_01.mp3", dur: 0.71, role: "擦枪士兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "又卡。" },
+  { key: "prologue_old_wound_02", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_02.mp3", dur: 2.70, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "你少骂两句，它兴许听话点。" },
+  { key: "prologue_old_wound_03", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_03.mp3", dur: 0.48, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "近咯。" },
+  { key: "prologue_motivation_01", kind: "prologue", file: "AudioSfx_PrologueVoiceMotivation_01.mp3", dur: 19.44, role: "班长与众人", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "continuousScene", lineCount: 8, text: "班长：这次你们去啊。晓不晓得，我们出来是做啥子？\n众人（先后，低声）：我们晓得。打日本。\n班长：去死，怕不怕？\n众人（齐声，低沉）：不怕。\n班长：为啥子不怕？\n众人（齐声，更沉）：我们要保护我们的国家。\n班长（哽咽了一下，点点头）：好样的。\n班长（过了一会儿，恢复平常语气）：都把东西带好。前头就是滕县。" },
+  { key: "prologue_external_officer_01", kind: "prologue", file: "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", dur: 3.65, role: "车外军官", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "通信排，下车！线盘背起，搞快！" },
 
   { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
   { key: "rally_charge",    kind: "rally",  file: "vo_rally_charge.mp3",   dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
@@ -205,8 +204,8 @@ export const VOICE_LINES = [
   // 两级 afftdn 频域降噪也只压到 −32；再往下压就开始吃气声了。
   //
   // 正解是**重摇一条干净的**（memory 里那条「TTS 自带环境音要重摇」）。
-  // 摇的时候本机 MiniMax Hub 连不上（连接被拒），所以先摘。
-  // Hub 恢复后：拿 lines_ija.json 里这一条重生成，底噪 ≤−45 再放回来，
+  // 当时的旧网关连不上（连接被拒），所以先摘。
+  // 以后直接用 Script_VoiceBake.mjs 走火山引擎重生成，底噪 ≤−45 再放回来，
   // 文本一个字都不用改。spot 类还剩 4 条，短期不会复读。
   { key: "ija_spot_mg",         kind: "spot",   file: "vo_ija_spot_mg.mp3",      dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
   { key: "ija_spot_shina",      kind: "spot",   file: "vo_ija_spot_shina.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },

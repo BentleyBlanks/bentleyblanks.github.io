@@ -1549,7 +1549,7 @@ export const AMBIENCE_PRESETS = {
   silence: { space: "street", layers: [], events: [], fallbackWind: 0 },
 
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
-  // 而是同一床上的明确事件 cue；LUNA-04 在 0:50—1:08 触发 trainBrake 一次。
+  // 而是同一床上的明确事件 cue；新版 102 秒序章在 0:40—0:56 触发 trainBrake 一次。
   trainInterior: {
     space: "street", fallbackWind: 0,
     layers: [{ bed: "trainInterior", gain: 0.82, seg: 12 }],
