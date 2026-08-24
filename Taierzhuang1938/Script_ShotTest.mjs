@@ -83,6 +83,10 @@ const GAME_SHOTS = [
   // 避免和既有东门仰视、东关常规战斗镜头重复。
   { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
+  // 护城河水面专项：斜跨东墙濠沟，近岸、深水与城墙倒映必须同时入画。
+  // 这张固定镜头用来抓屏幕空间水深方向写反、全屏泡沫和滚动法线接缝。
+  { name: "Game_Z11_MoatWater", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 314, z: 165, yaw: -0.73, pitch: -0.46, quiet: true } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };

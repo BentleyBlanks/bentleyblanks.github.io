@@ -50,6 +50,52 @@ const sharedUniforms = {
   uResolution: { value: new THREE.Vector2(1, 1) },
 };
 
+// Crest 用可平铺法线贴图承载高频细浪。这里不引入来源不明的外部资产：启动时
+// 一次性烘一张严格周期的 128² DataTexture，片元阶段只需 4 次纹理采样，替掉旧版
+// 每像素十余次 value-noise。纹理的频率都是整数，所以四边导数也连续，不会露接缝。
+let waterNormalTexture = null;
+function GetWaterNormalTexture() {
+  if (waterNormalTexture) return waterNormalTexture;
+  const size = 128;
+  const data = new Uint8Array(size * size * 4);
+  const components = [
+    [1, 2, 0.90, 0.3], [2, -3, 0.55, 1.7], [4, 1, 0.34, 3.1],
+    [-3, 5, 0.24, 4.6], [7, 4, 0.15, 2.2], [9, -6, 0.10, 5.4],
+  ];
+  const heightAt = (ix, iy) => {
+    const x = ((ix % size) + size) % size / size;
+    const y = ((iy % size) + size) % size / size;
+    let height = 0;
+    for (const [fx, fy, amplitude, phase] of components) {
+      height += Math.sin((fx * x + fy * y) * Math.PI * 2 + phase) * amplitude;
+    }
+    return height;
+  };
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const height = heightAt(x, y);
+      const dx = (heightAt(x + 1, y) - heightAt(x - 1, y)) * 2.8;
+      const dz = (heightAt(x, y + 1) - heightAt(x, y - 1)) * 2.8;
+      const invLength = 1 / Math.hypot(dx, 1, dz);
+      const offset = (y * size + x) * 4;
+      data[offset] = Math.round((-dx * invLength * 0.5 + 0.5) * 255);
+      data[offset + 1] = Math.round((-dz * invLength * 0.5 + 0.5) * 255);
+      data[offset + 2] = Math.round((invLength * 0.5 + 0.5) * 255);
+      data[offset + 3] = Math.round((height * 0.20 + 0.5) * 255);
+    }
+  }
+  waterNormalTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  waterNormalTexture.name = "Texture_WaterNormals";
+  waterNormalTexture.wrapS = THREE.RepeatWrapping;
+  waterNormalTexture.wrapT = THREE.RepeatWrapping;
+  waterNormalTexture.magFilter = THREE.LinearFilter;
+  waterNormalTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  waterNormalTexture.generateMipmaps = true;
+  waterNormalTexture.colorSpace = THREE.NoColorSpace;
+  waterNormalTexture.needsUpdate = true;
+  return waterNormalTexture;
+}
+
 /** 借 SkyDome 的 uniform（Script_Main 在建完天空后调一次）。 */
 let skyUniformsRef = null;
 export function SetWaterSkyUniforms(skyUniforms) { skyUniformsRef = skyUniforms; }
@@ -109,6 +155,7 @@ uniform float uTime;
 uniform float uAmpScale;
 uniform float uChop;
 uniform vec2 uFlow;
+uniform float uTimeScale;
 
 varying vec3 vWorldPos;
 varying vec3 vWaveNormal;
@@ -120,7 +167,8 @@ __WAVE_TABLE__
 
 void main() {
   vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  vec2 advected = worldPos.xz - uFlow * uTime;
+  float waterTime = uTime * uTimeScale;
+  vec2 advected = worldPos.xz - uFlow * waterTime;
 
   vec3 disp = vec3(0.0);
   vec3 n = vec3(0.0, 1.0, 0.0);
@@ -132,7 +180,7 @@ void main() {
     float k = WAVE_K(i);
     float w = WAVE_W(i);
     float amp = WAVE_AMP(i) * uAmpScale;
-    float phase = k * dot(dir, advected) - w * uTime;
+    float phase = k * dot(dir, advected) - w * waterTime;
     float s = sin(phase), c = cos(phase);
     // 水平位移系数取常数 chop（不做 GPU Gems 那套 Q 归一化）：
     // 这里的浪是厘米级装饰，横向摆动按振幅同量级给一点就够，归一化反而算出过冲。
@@ -140,9 +188,11 @@ void main() {
     disp.x += q * amp * dir.x * c;
     disp.z += q * amp * dir.y * c;
     disp.y += amp * s;
-    n.x -= dir.x * w * amp * c;
-    n.z -= dir.y * w * amp * c;
-    n.y -= q * w * amp * s;
+    // 空间导数必须乘波数 k；旧版误乘了角频率 w，长波法线被放大约五倍，
+    // 水面会像皱铝箔一样乱闪。w 只管相位随时间推进。
+    n.x -= dir.x * k * amp * c;
+    n.z -= dir.y * k * amp * c;
+    n.y -= q * k * amp * s;
     sharp += (s * 0.5 + 0.5) * (amp * k);
     weightSum += amp * k;
   }
@@ -160,8 +210,11 @@ void main() {
 const WATER_FRAG = /* glsl */`
 uniform float uTime;
 uniform sampler2D uSceneDepth;
+uniform sampler2D uNormalMap;
 uniform float uDepthValid;
 uniform vec2 uResolution;
+uniform vec2 uFlow;
+uniform float uTimeScale;
 
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
@@ -182,47 +235,57 @@ varying vec3 vWaveNormal;
 varying float vSharpness;
 varying float vViewZ;
 
-float Hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+// Crest 的 flow normal 双相采样：一相回卷时另一相权重最大，长时间流动不会在
+// UV 重置点跳一下。对护城河给极慢风纹，对荆河则沿 uFlow 顺流。
+vec4 SampleFlowNormal(vec2 uv, vec2 flow, float cycle) {
+  float phase0 = fract(cycle);
+  float phase1 = fract(cycle + 0.5);
+  float blend = abs(phase0 * 2.0 - 1.0);
+  vec4 sample0 = texture2D(uNormalMap, uv - flow * phase0);
+  vec4 sample1 = texture2D(uNormalMap, uv - flow * phase1);
+  return mix(sample0, sample1, blend);
 }
 
-float VNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(Hash21(i), Hash21(i + vec2(1.0, 0.0)), u.x),
-             mix(Hash21(i + vec2(0.0, 1.0)), Hash21(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-
-float VNoiseFbm(vec2 p) {
-  return VNoise(p) * 0.62 + VNoise(p * 2.13 + 17.7) * 0.38;
-}
-
-// 细节涟漪的梯度（中心差分）。两层反向滚动叠出干涉，距离拉远整体淡出防闪烁。
-vec2 DetailGradient(vec2 p) {
-  float e = 0.30;
-  float h = VNoiseFbm(p);
-  return vec2(VNoiseFbm(p + vec2(e, 0.0)) - h, VNoiseFbm(p + vec2(0.0, e)) - h) / e;
+float BehindSurfaceDepth(vec2 uv, float surfaceZ) {
+  vec2 texel = 1.0 / max(uResolution, vec2(1.0));
+  float best = 10000.0;
+  float d = texture2D(uSceneDepth, uv).w;
+  if (d > surfaceZ + 0.001) best = min(best, d - surfaceZ);
+  d = texture2D(uSceneDepth, uv + vec2(texel.x, 0.0)).w;
+  if (d > surfaceZ + 0.001) best = min(best, d - surfaceZ);
+  d = texture2D(uSceneDepth, uv - vec2(texel.x, 0.0)).w;
+  if (d > surfaceZ + 0.001) best = min(best, d - surfaceZ);
+  d = texture2D(uSceneDepth, uv + vec2(0.0, texel.y)).w;
+  if (d > surfaceZ + 0.001) best = min(best, d - surfaceZ);
+  d = texture2D(uSceneDepth, uv - vec2(0.0, texel.y)).w;
+  if (d > surfaceZ + 0.001) best = min(best, d - surfaceZ);
+  return best > 9999.0 ? 30.0 : best;
 }
 
 void main() {
   vec3 V = normalize(cameraPosition - vWorldPos);
   float dist = length(cameraPosition - vWorldPos);
+  float waterTime = uTime * uTimeScale;
 
-  // --- 法线：Gerstner 解析法线 + 两层滚动细节 ---
+  // --- 法线：Gerstner 解析法线 + 两档可平铺流动法线 ---
   float detailFade = uDetailStrength * (1.0 - smoothstep(35.0, 150.0, dist));
-  vec2 g1 = DetailGradient(vWorldPos.xz * 1.05 + vec2(uTime * 0.55, uTime * 0.31));
-  vec2 g2 = DetailGradient(vWorldPos.xz * 2.55 - vec2(uTime * 0.43, uTime * 0.61));
-  vec2 grad = (g1 * 0.62 + g2 * 0.38) * detailFade;
-  vec3 N = normalize(vWaveNormal + vec3(-grad.x, 0.0, -grad.y));
+  vec2 flowDirection = length(uFlow) > 0.01 ? normalize(uFlow) : normalize(vec2(0.72, 0.28));
+  vec4 detail0 = SampleFlowNormal(vWorldPos.xz * 0.115, flowDirection * 0.42,
+    waterTime * 0.070);
+  vec2 rotated = vec2(vWorldPos.x - vWorldPos.z, vWorldPos.x + vWorldPos.z);
+  vec4 detail1 = SampleFlowNormal(rotated * 0.245, -flowDirection.yx * 0.36,
+    waterTime * 0.105 + 0.37);
+  vec2 grad = ((detail0.rg * 2.0 - 1.0) * 0.66 + (detail1.rg * 2.0 - 1.0) * 0.34)
+    * detailFade;
+  vec3 N = normalize(vWaveNormal + vec3(grad.x, 0.0, grad.y));
   // 远处把波浪整体拍平：厘米级浪在两百米外只剩闪烁噪声
   N = normalize(mix(N, vec3(0.0, 1.0, 0.0), smoothstep(180.0, 420.0, dist) * 0.5));
 
   // --- 屏幕空间水深（Crest 的 sea-floor depth 思路，深度来源换成本作的预通道）---
   vec2 suv = gl_FragCoord.xy / max(uResolution, vec2(1.0));
-  float sceneZ = texture2D(uSceneDepth, suv).w;
-  float rayDepth = sceneZ <= 0.001 ? 30.0 : max(vViewZ - sceneZ, 0.0);
+  // rtNormalDepth.w 与 vViewZ 都是从相机向前递增的正数：河床在水面后方，
+  // 所以必须 sceneZ - vViewZ。旧版写反后，整条河都被判成 0 深岸线。
+  float rayDepth = BehindSurfaceDepth(suv, vViewZ);
   if (uDepthValid < 0.5) rayDepth = 30.0;   // 深度源没接上（探针页/首帧）：按深水渲染
   // 视差深度换算成竖直水深：视线越平，同样的视差对应越深的水柱
   float depth = rayDepth * clamp(abs(V.y), 0.22, 1.0);
@@ -234,17 +297,19 @@ void main() {
   // --- 水体：浅水吸收（浑浊的鲁南河水，不是加勒比海）---
   float absorb = exp(-depth * uAbsorb);
   vec3 body = mix(uDeepColor, uShallowColor, absorb) * irradiance;
+  float shallow = 1.0 - smoothstep(0.18, 1.8, depth);
+  float caustic = pow(clamp(1.0 - abs(detail0.a - detail1.a) * 3.2, 0.0, 1.0), 7.0);
+  body += uSunColor * caustic * shallow * sunUp * 0.035;
 
   // --- 泡沫：岸线带 + 浪尖 ---
-  float n1 = VNoiseFbm(vWorldPos.xz * 0.9 + uTime * 0.22);
-  float band = sin(depth * 14.0 - uTime * 2.6 + n1 * 4.5) * 0.5 + 0.5;
-  float shore = (1.0 - smoothstep(0.0, uFoamWidth * (0.55 + 0.9 * n1), depth))
-    * (0.55 + 0.45 * band)
-    + (1.0 - smoothstep(0.0, 0.07, depth)) * 0.65;   // 贴岸一条恒亮的湿线
-  float crest = smoothstep(0.62, 0.92, vSharpness + (n1 - 0.5) * 0.24);
-  float foamTex = smoothstep(0.40, 0.78,
-    VNoiseFbm(vWorldPos.xz * 2.3 + vec2(uTime * 0.14, uTime * 0.10)) * 0.75 + (shore + crest) * 0.30);
-  float foam = clamp((shore * 0.9 + crest * 0.75) * foamTex * uFoamStrength, 0.0, 1.0);
+  float foamNoise = clamp(detail0.a * 0.64 + detail1.a * 0.36, 0.0, 1.0);
+  float band = sin(depth * 15.0 - waterTime * 1.8 + foamNoise * 5.0) * 0.5 + 0.5;
+  float shoreMask = 1.0 - smoothstep(0.025, uFoamWidth * (0.72 + foamNoise * 0.55), depth);
+  float shore = shoreMask * (0.34 + 0.66 * band)
+    + (1.0 - smoothstep(0.018, 0.085, depth)) * 0.62;
+  float crest = smoothstep(0.66, 0.94, vSharpness + (foamNoise - 0.5) * 0.20);
+  float foamTex = smoothstep(0.43, 0.67, foamNoise + (shore + crest) * 0.16);
+  float foam = clamp((shore * 0.92 + crest * 0.60) * foamTex * uFoamStrength, 0.0, 1.0);
 
   // --- 反射与高光 ---
   vec3 R = reflect(-V, N);
@@ -252,13 +317,16 @@ void main() {
   vec3 refl = mix(uHorizon, uZenith, pow(clamp(up, 0.0, 1.0), 0.42));
   refl = mix(refl, uGround, smoothstep(0.02, -0.08, up));
   float sunDot = max(dot(R, normalize(uSunDirection)), 0.0);
-  vec3 spec = uSunColor * (pow(sunDot, 640.0) * 2.1 + pow(sunDot, 48.0) * 0.20);
+  vec3 spec = uSunColor * (pow(sunDot, 420.0) * 1.9 + pow(sunDot, 42.0) * 0.18);
 
   float fresnel = 0.022 + 0.978 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
   // --- 合成 ---
-  vec3 col = mix(body, refl, fresnel) + spec * (0.35 + 0.65 * fresnel);
-  col = mix(col, uFoamColor * irradiance * 0.95 + spec * 0.12, foam);
+  vec3 scatter = uSunColor * pow(max(dot(V, -normalize(uSunDirection)), 0.0), 3.0)
+    * shallow * (1.0 - fresnel) * 0.045;
+  vec3 col = mix(body, refl, fresnel) + spec * (0.35 + 0.65 * fresnel) + scatter;
+  float foamLight = 0.74 + 0.26 * max(dot(N, normalize(uSunDirection)), 0.0);
+  col = mix(col, uFoamColor * irradiance * foamLight + spec * 0.10, foam);
 
   float alpha = mix(0.52, 0.94, 1.0 - absorb);
   alpha = clamp(max(alpha, foam * 0.96) + fresnel * 0.10, 0.0, 0.97);
@@ -297,14 +365,22 @@ function GetWaterMaterial(presetName, flowKey) {
   const preset = WATER_PRESETS[presetName];
   if (!preset) throw new Error(`未知水面预设：${presetName}`);
   const skyU = skyUniformsRef;
+  const fallbackSkyUniforms = {
+    uZenith: { value: new THREE.Vector3(1.9, 2.35, 3.2) },
+    uHorizon: { value: new THREE.Vector3(2.4, 2.46, 2.62) },
+    uGround: { value: new THREE.Vector3(0.58, 0.52, 0.42) },
+    uSunDirection: { value: new THREE.Vector3(0.2, 0.78, -0.59).normalize() },
+    uSunColor: { value: new THREE.Vector3(1.0, 0.92, 0.78) },
+  };
   const material = new THREE.ShaderMaterial({
     uniforms: {
       ...sharedUniforms,
+      uNormalMap: { value: GetWaterNormalTexture() },
       // 借天空 uniform 的同一批对象：换时段预设，水面的反射与光色跟着变
       ...(skyU ? {
         uZenith: skyU.uZenith, uHorizon: skyU.uHorizon, uGround: skyU.uGround,
         uSunDirection: skyU.uSunDirection, uSunColor: skyU.uSunColor,
-      } : {}),
+      } : fallbackSkyUniforms),
       uShallowColor: { value: LinearColor(preset.shallowColor) },
       uDeepColor: { value: LinearColor(preset.deepColor) },
       uFoamColor: { value: LinearColor(preset.foamColor) },
@@ -314,6 +390,7 @@ function GetWaterMaterial(presetName, flowKey) {
       uDetailStrength: { value: preset.detailStrength },
       uAmpScale: { value: 1 },
       uChop: { value: preset.chop },
+      uTimeScale: { value: preset.timeScale },
       uFlow: { value: new THREE.Vector2(
         flowKey ? Number(flowKey.split("_")[0]) : preset.flow[0],
         flowKey ? Number(flowKey.split("_")[1]) : preset.flow[1]) },
@@ -329,15 +406,6 @@ function GetWaterMaterial(presetName, flowKey) {
   // 大面积半透明面：既不换材质进预通道（allowOverride），也整只藏出预通道
   //（skipNormalDepth 由 PostPipeline._CollectSkipped 读）—— 见文件头管线契约。
   MarkNoPrepass(material);
-  if (!skyU) {
-    // 天空 uniform 还没接（纯工具链场景）：退到一套中性白天值，别让反射全黑。
-    const U = material.uniforms;
-    U.uZenith.value = new THREE.Vector3(1.9, 2.35, 3.2);
-    U.uHorizon.value = new THREE.Vector3(2.4, 2.46, 2.62);
-    U.uGround.value = new THREE.Vector3(0.58, 0.52, 0.42);
-    U.uSunDirection.value = new THREE.Vector3(0.2, 0.78, -0.59).normalize();
-    U.uSunColor.value = new THREE.Vector3(1.0, 0.92, 0.78);
-  }
   materialCache.set(key, material);
   return material;
 }
