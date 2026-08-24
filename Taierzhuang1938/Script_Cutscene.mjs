@@ -627,6 +627,15 @@ export class CutsceneDirector {
         // KIND_SPEC 里的 defaultWeapon（中正式），于是「王铭章手里是望远镜不是枪」
         // 和「每三人里有一人空着手」这两条都当场作废 —— 后者是史实点，不是美术偏好。
         if ("weapon" in spec && typeof actor.SetWeapon === "function") actor.SetWeapon(spec.weapon || null);
+        // 第一人称过场仍使用完整 Actor 身体和同一套坐/走动画；只把头部网格隐藏，
+        // 避免相机在眼位附近看见自己的脸内壁。胸、臂、腿、装具都继续可见，
+        // 所以低头时玩家明确是一名普通士兵，而不是悬空摄影机。
+        if (spec.firstPerson && actor.neck && typeof actor.neck.traverse === "function") {
+          actor.neck.traverse((node) => {
+            if (node && node.isMesh) node.visible = false;
+          });
+          actor.firstPerson = true;
+        }
         // 独立车厢没有接进正片地形的 groundProbe；让它去采远处 L0 的高度会把
         // 脚踝拉进钢地板。车厢地板是平的，按数据给 root 的脚底高度即可。
         actor.allowFootIk = false;
@@ -1006,6 +1015,22 @@ export class CutsceneDirector {
       this.camera.rotateZ(n(0.61, 23.5) * 0.030 * amount);
       this.camera.translateY(n(1.31, 41.3) * 0.020 * amount);
       this.camera.translateX(n(1.13, 57.9) * 0.016 * amount);
+    }
+
+    // 第一人称编排步行的确定性脚步起伏。它只服务导演写死的出门路径，和 WASD 的
+    // walkBob 分开：纵向每步抬落、横向轻微换重心，最后一段按 fadeOut 停稳。
+    const gait = cam.walkBob;
+    if (gait) {
+      const frequency = Math.max(0.1, Number(gait.frequency) || 1.8);
+      const amplitude = Math.max(0, Number(gait.amount) || 0.018);
+      const fadeIn = Math.max(0, Number(gait.fadeIn) || 0);
+      const fadeOut = Math.max(0, Number(gait.fadeOut) || 0);
+      let blend = 1;
+      if (fadeIn > 0) blend *= Clamp01(local / fadeIn);
+      if (fadeOut > 0) blend *= Clamp01((shot.seconds - local) / fadeOut);
+      const phase = this.time * frequency * Math.PI * 2;
+      this.camera.translateY(Math.abs(Math.sin(phase)) * amplitude * blend);
+      this.camera.translateX(Math.sin(phase * 0.5) * amplitude * 0.45 * blend);
     }
 
     // 导演机位完成后再叠加玩家 Look；不修改 from/to/look 时间轴，也不让 Look

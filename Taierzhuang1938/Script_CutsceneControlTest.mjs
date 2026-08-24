@@ -168,12 +168,28 @@ assert.equal(motivationShot.lines.length, 8, "the motivation exchange preserves 
 assert.equal(motivationShot.lines.filter((line) => line.voiceCue).length, 1,
   "the 1:08—1:30 exchange triggers one continuous audio file instead of eight isolated clips");
 assert.equal(motivationShot.lines[0].voiceCue, "prologue_motivation_01");
-assert.equal(CS_Chuchuan.walk, undefined, "the observer cannot walk around the carriage");
+assert.equal(CS_Chuchuan.walk, undefined, "gameplay WASD cannot detach the player from the authored seated/exit path");
 assert.equal(CS_Chuchuan.suppress.movement, true, "gameplay movement stays suppressed for the whole prologue");
 const locationShotStart = CS_Chuchuan.shots.slice(0, 6).reduce((sum, shot) => sum + shot.seconds, 0);
 const doorShotStart = CS_Chuchuan.shots.slice(0, 7).reduce((sum, shot) => sum + shot.seconds, 0);
 assert.equal(locationShotStart, 90, "the Tengxian location card begins immediately after the exchange");
 assert.equal(doorShotStart, 93, "the carriage door opens after the short location card");
+assert.equal(CS_Chuchuan.seconds, 105, "the side-door walk has enough authored time to reach and stop on the platform");
+assert.equal(CS_Chuchuan.shots.length, 11, "the exit is split into aisle, threshold, steps, and platform beats");
+assert.ok(CS_Chuchuan.headLook.pitch[0] <= -1.3 && CS_Chuchuan.headLook.pitch[1] >= 1.1,
+  "the seated soldier can look down at his body and raise his view toward the luggage racks");
+const playerSoldier = CS_Chuchuan.cast.find((actor) => actor.id === "playerSoldier");
+assert.equal(playerSoldier?.firstPerson, true, "the camera belongs to an ordinary actor body, not a detached observer");
+assert.equal(playerSoldier?.track[0]?.state?.sit, 1, "the player begins seated on the bench");
+assert.ok(playerSoldier.track.every((frame) => !frame.state?.hidden), "the player is never hidden or teleported during disembarkation");
+assert.ok(playerSoldier.track.some((frame) => frame.t === 101 && frame.pos[0] > 5 && frame.pos[1] >= 0.58),
+  "the player crosses the side threshold and reaches the raised station platform");
+assert.ok(playerSoldier.track.at(-1).pos[2] > 7 && playerSoldier.track.at(-1).state?.moveSpeed === 0,
+  "the player walks along the platform and comes to a real stop");
+const seatedShot = CS_Chuchuan.shots.find((shot) => shot.n === 3);
+assert.deepEqual([seatedShot.camera.from[0], seatedShot.camera.from[2]],
+  [playerSoldier.track[0].pos[0], playerSoldier.track[0].pos[2]],
+  "the opening camera is physically located on the player's occupied bench seat");
 const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
 const interiorCrowd = CS_Chuchuan.cast.filter((actor) => actor.id !== "stretcherBearerA" && actor.id !== "stretcherBearerB"
   && actor.id !== "lightWounded" && actor.id !== "externalOfficer");
@@ -206,6 +222,32 @@ for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" 
 const stationModel = CS_Chuchuan.props.find((prop) => prop.name === "StationPlatform");
 assert.equal(stationModel?.kind, "model", "the station beat uses the authored 1930s platform model, not the old two-box placeholder");
 assert.equal(stationModel?.url, "./Model/Model_ChuchuanStationPlatform.glb?v=1");
+const sideDoor = CS_Chuchuan.props.find((prop) => prop.name === "CarriageDoor");
+assert.ok(sideDoor?.pos[0] > 2.7 && sideDoor?.pos[2] > 5,
+  "the carriage door is cut into the platform-facing side wall, not the front or rear end wall");
+assert.ok(sideDoor.size[0] < sideDoor.size[2], "the sliding door lies in the X-facing side wall");
+assert.ok(CS_Chuchuan.props.some((prop) => prop.name === "FrontWall"), "the carriage end is a closed wall");
+assert.ok(CS_Chuchuan.props.some((prop) => prop.name === "SideDoorStepInner")
+  && CS_Chuchuan.props.some((prop) => prop.name === "SideDoorStepOuter"),
+"two physical footboards bridge the carriage floor to the platform");
+const personalEffects = CS_Chuchuan.props.filter((prop) => /^(RackPack|Bedroll|BenchPack|Canteen)/.test(prop.name));
+assert.ok(personalEffects.length >= 55, "the carriage contains dense, repeated personal luggage rather than a few token bags");
+const exitShots = CS_Chuchuan.shots.filter((shot) => shot.n >= 8);
+assert.ok(exitShots.every((shot) => shot.camera.walkBob?.amount > 0),
+  "the authored exit path includes deterministic first-person walking animation");
+assert.ok(exitShots.at(-1).camera.walkBob?.fadeOut > 0, "the final platform walk eases to a stable stop");
+assert.ok(exitShots.every((shot) => shot.propMoves.some((move) => move.name === "StationPlatform")),
+  "the authored platform stays under the side door throughout the complete exit walk");
+const openingDoorParts = new Set(exitShots[0].propMoves.map((move) => move.name));
+assert.ok(["CarriageDoor", "DoorPlank0", "DoorPlank4", "DoorBraceLeft", "DoorBraceRight", "DoorLatch"]
+  .every((name) => openingDoorParts.has(name)), "door skin, planks, braces, and latch slide as one assembly");
+for (const actor of ["youngDispatch", "rifleman", "oldWound", "machineGunner", "squadLeader"]
+  .map((id) => CS_Chuchuan.cast.find((item) => item.id === id))) {
+  assert.ok(actor.track.every((frame) => frame.t < doorShotStart || !frame.state?.hidden),
+    `${actor.id} must queue and walk through the visible side door instead of vanishing at the old car end`);
+  assert.ok(actor.track.some((frame) => frame.pos[0] >= 4.65 && frame.pos[1] >= 0.58),
+    `${actor.id} must reach the same station platform as the player`);
+}
 for (const actor of CS_Chuchuan.cast.filter((item) => ["stretcherBearerA", "stretcherBearerB", "lightWounded"].includes(item.id))) {
   const walkingExit = actor.track.find((frame) => frame.t === 63);
   const hiddenExit = actor.track.find((frame) => frame.t === 64);
@@ -220,4 +262,4 @@ router.SetSuppressed(true);
 router.Read(input);
 assert.deepEqual(input, { forward: 0, strafe: 0, lean: 0, sprint: false, breathHold: false, fire: false, ads: false }, "all gameplay axes suppressed");
 router.SetSuppressed(false);
-console.log("Cutscene control tests passed: real camera directions, fixed observer, continuous motivation cue, neutral, finish/skip, audio restore, old compatibility, input suppression");
+console.log("Cutscene control tests passed: seated first-person soldier, full mouse pitch, side-door/platform walk, cohesive door assembly, luggage density, camera directions, finish/skip, audio restore, old compatibility, input suppression");
