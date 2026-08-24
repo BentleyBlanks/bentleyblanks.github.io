@@ -90,3 +90,17 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 Invoke-WebRequest -Uri 'https://opengameart.org/sites/default/files/boom3.png' `
   -OutFile 'Taierzhuang1938/Texture/Texture_ExplosionFire_01.png'
 ```
+
+## 场景布设物（Script_ExternalProps.mjs 运行时加载）
+
+以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs），在 Blender 里
+统一贴图降采样到 1024、烘焙变换并把包围盒底部对齐原点后直接导出为运行时文件。
+它们是纯视觉布设（不参与碰撞/导航），运行时由 `Script_ExternalProps.mjs` 按关卡摆放。
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
+|---|---|---|---|---|
+| 民居排屋 `Model_AsianHouseRow.glb` | [Asian House Pack - Low Poly](https://sketchfab.com/3d-models/asian-house-pack-low-poly-70f36c58345440fe8e7b6168854881e7) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 四栋一排的低模民居。贴图 2048→1024，底部对齐原点。 |
+| 民居双栋 `Model_AsianHousePair.glb` | [Asian House - Two Pack](https://sketchfab.com/3d-models/asian-house-two-pack-2aa7bfde643145a3a6aa3a85b06afcd2) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 两栋组合。贴图 2048→1024，底部对齐原点。 |
+| 沙袋 `Model_Sandbag.glb` | [Sandbag Low Poly Realist](https://sketchfab.com/3d-models/sandbag-low-poly-realist-7d52600a15c747749d845d9f906045cf) | [Islide](https://sketchfab.com/Islide) | CC-BY-4.0 | 单体沙袋，缩放到 0.6 m 长；贴图 2048→1024，底部对齐原点。 |
+
+CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。

@@ -11,6 +11,9 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 const LOADER = new GLTFLoader();
 const ASSETS = Object.freeze({
   house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null },
+  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=1", material: null },
+  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=1", material: null },
+  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=1", material: null },
   cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam" },
   fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam" },
   crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor" },
@@ -27,6 +30,8 @@ const PLACEMENTS = Object.freeze({
   ],
   L1_Beishahe: [
     { asset: "house", x: -1224, z: -164, ry: 0.04 },
+    { asset: "houseRow", x: -1152, z: -208, ry: -0.1 },
+    { asset: "sandbag", x: -1210, z: -140, ry: 0.35 },
     { asset: "cart", x: -1192, z: -121, ry: 0.22 },
     { asset: "crate", x: -1190, z: -119, ry: -0.15, scale: 0.96 },
     { asset: "fence", x: -1260, z: -104, ry: 0.05 },
@@ -34,6 +39,8 @@ const PLACEMENTS = Object.freeze({
   ],
   L2_Dongguan: [
     { asset: "house", x: 462, z: -144, ry: 0.03 },
+    { asset: "housePair", x: 428, z: -178, ry: 0.06 },
+    { asset: "houseRow", x: 500, z: -60, ry: -0.12 },
     { asset: "cart", x: 485, z: -96, ry: -0.28, scale: 0.9 },
     { asset: "crate", x: 479, z: -94, ry: 0.18, scale: 0.92 },
     { asset: "rubble", x: 504, z: 18, ry: 0.46, scale: 1.05 },
@@ -41,20 +48,28 @@ const PLACEMENTS = Object.freeze({
   L3_Fanji: [
     { asset: "cart", x: 468, z: -54, ry: 0.16, scale: 0.86 },
     { asset: "crate", x: 471, z: -52, ry: -0.22, scale: 0.88 },
+    { asset: "housePair", x: 508, z: -30, ry: -0.08 },
     { asset: "rubble", x: 516, z: 14, ry: 0.32, scale: 1.0 },
   ],
   L4_Chengqiang: [
     { asset: "rubble", x: 307, z: -67, ry: 0.52, scale: 1.18 },
     { asset: "crate", x: 260, z: -89, ry: -0.18, scale: 0.92 },
+    { asset: "sandbag", x: 252, z: -80, ry: 0.42 },
+    { asset: "sandbag", x: 257, z: -76, ry: -0.28, scale: 0.94 },
+    { asset: "sandbag", x: 248, z: -85, ry: 0.88, scale: 0.9 },
   ],
   L5_Shizijie: [
     { asset: "cart", x: 112, z: -38, ry: 0.38, scale: 0.84 },
     { asset: "crate", x: 116, z: -36, ry: -0.22, scale: 0.86 },
+    { asset: "houseRow", x: 84, z: -70, ry: 0.22 },
+    { asset: "sandbag", x: 100, z: -52, ry: -0.4 },
     { asset: "rubble", x: -66, z: 44, ry: 0.18, scale: 0.92 },
   ],
   L6_Beimen: [
     { asset: "cart", x: -188, z: -128, ry: 0.18, scale: 0.82 },
     { asset: "crate", x: -184, z: -127, ry: -0.14, scale: 0.84 },
+    { asset: "housePair", x: -224, z: -160, ry: 0.12 },
+    { asset: "sandbag", x: -176, z: -118, ry: 0.55 },
     { asset: "rubble", x: -246, z: -36, ry: 0.41, scale: 0.96 },
   ],
 });
