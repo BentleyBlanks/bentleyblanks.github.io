@@ -417,10 +417,12 @@ function CarriageBench(side, label) {
   [-5.8, -1.95, 1.95, 5.8].forEach((z, index) => {
     const id = `${label}${index + 1}`;
     props.push(
-      { kind: "box", size: [0.94, 0.14, 3.45], pos: [seatX, 0.76, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchSeat${id}` },
-      { kind: "box", size: [0.14, 0.52, 3.45], pos: [backX, 1.10, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchBack${id}` },
-      { kind: "box", size: [0.72, 0.62, 0.12], pos: [seatX, 0.42, z - 1.34], mat: "Steel", color: 0x353330, name: `BenchLeg${id}A` },
-      { kind: "box", size: [0.72, 0.62, 0.12], pos: [seatX, 0.42, z + 1.34], mat: "Steel", color: 0x353330, name: `BenchLeg${id}B` },
+      // 座面顶标高 0.55 m：与 Actor 的真实坐姿骨盆相接。旧的 0.83 m 座面会
+      // 压到人的胸腹，画面读成「人在椅子前蹲着」而不是坐下。
+      { kind: "box", size: [0.94, 0.12, 3.45], pos: [seatX, 0.49, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchSeat${id}` },
+      { kind: "box", size: [0.14, 0.58, 3.45], pos: [backX, 0.84, z], mat: "CarriageBenchWood", roughness: 0.94, metalness: 0, name: `BenchBack${id}` },
+      { kind: "box", size: [0.72, 0.48, 0.12], pos: [seatX, 0.30, z - 1.34], mat: "Steel", color: 0x515254, name: `BenchLeg${id}A` },
+      { kind: "box", size: [0.72, 0.48, 0.12], pos: [seatX, 0.30, z + 1.34], mat: "Steel", color: 0x515254, name: `BenchLeg${id}B` },
     );
   });
   return props;
@@ -473,6 +475,12 @@ const CHUCHUAN_PEOPLE = {
   riflemanC: { name: "步枪兵丙", short: "步枪兵", real: false, note: "车厢内可见战友；整理绑腿" },
   porter: { name: "担架兵", short: "担架兵", real: false, note: "车厢内可见战友；靠着担架杆休息" },
   cook: { name: "炊事兵", short: "炊事兵", real: false, note: "车厢内可见战友；护着水壶" },
+  lineSoldierD: { name: "通信兵丁", short: "通信兵", real: false, note: "车厢内可见通信排成员；靠着背包打盹" },
+  lineSoldierE: { name: "通信兵戊", short: "通信兵", real: false, note: "车厢内可见通信排成员；默默理顺电话线" },
+  riflemanD: { name: "步枪兵丁", short: "步枪兵", real: false, note: "车厢内可见战友；把步枪横放在膝头" },
+  riflemanE: { name: "步枪兵戊", short: "步枪兵", real: false, note: "车厢内可见战友；靠窗合眼休息" },
+  sapper: { name: "工兵", short: "工兵", real: false, note: "车厢内可见战友；护着工具袋" },
+  medicalOrderly: { name: "卫生兵", short: "卫生兵", real: false, note: "车厢内可见战友；把药包抱在怀里" },
   stretcherBearerA: { name: "担架兵甲", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
   stretcherBearerB: { name: "担架兵乙", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
   lightWounded: { name: "轻伤员", short: "轻伤员", real: false, note: "小站窗外可走轻伤员" },
@@ -540,15 +548,15 @@ export const CS_Chuchuan = {
     { kind: "box", size: [8, 0.55, 0.20], pos: [0, 0.28, 8.9], mat: "CarriageWallSteel", roughness: 0.62, metalness: 0.9, name: "DoorWallStep", inside: true },
     // 三盏有罩灯把铆钉钢板、士兵与窗外相对运动都照出来；没有真实室内光，
     // 车厢再多细节也只会是一团黑。
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.15, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampRear" },
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.15, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampMid" },
-    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.15, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
+    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampRear" },
+    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampMid" },
+    { kind: "cyl", size: [0.16, 0.22], pos: [0, 3.72, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 2.1, distance: 7.2, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
     // 一眼看出「这是车厢」的重复门框与顶梁；不靠文字或镜头解释空间。
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -6.2], mat: "Steel", color: 0x25292a, name: "RoofRibRear" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -3.4], mat: "Steel", color: 0x25292a, name: "RoofRibA" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -0.6], mat: "Steel", color: 0x25292a, name: "RoofRibB" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 2.2], mat: "Steel", color: 0x25292a, name: "RoofRibC" },
-    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 5.0], mat: "Steel", color: 0x25292a, name: "RoofRibD" },
+    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -6.2], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibRear" },
+    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -3.4], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibA" },
+    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, -0.6], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibB" },
+    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 2.2], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibC" },
+    { kind: "box", size: [7.75, 0.20, 0.22], pos: [0, 3.82, 5.0], mat: "CarriageWallSteel", color: 0x9aa5aa, name: "RoofRibD" },
     ...[-7.2, -5.15, -3.1, -1.03, 1.03, 3.1, 5.15, 7.2].flatMap((z, index) => [
       { kind: "box", size: [0.12, 2.15, 0.12], pos: [-3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionLeft${index}` },
       { kind: "box", size: [0.12, 2.15, 0.12], pos: [3.8, 1.98, z], mat: "Steel", color: 0x6e685f, name: `WindowMullionRight${index}` },
@@ -568,15 +576,15 @@ export const CS_Chuchuan = {
     // 两块靠端墙的地铺给无座时席地休息，薄垫不侵占中央通道。
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [-1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5f594d, name: "FloorMatLeft" },
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5b5549, name: "FloorMatRight" },
-    { kind: "box", size: [0.62, 0.18, 1.5], pos: [-2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyLeft" },
-    { kind: "box", size: [0.62, 0.18, 1.5], pos: [2.8, 1.10, 0.1], mat: "ClothNra", color: 0x70685a, name: "BlanketEmptyRight" },
-    { kind: "cyl", size: [0.22, 0.12], pos: [2.55, 1.25, 0.25], mat: "SteelHelmet", color: 0x554c40, name: "OldMilitaryCap" },
-    { kind: "box", size: [0.65, 0.5, 0.85], pos: [-2.2, 1.0, 0.35], mat: "ClothNra", color: 0x403a33, name: "OldPack" },
-    { kind: "box", size: [0.45, 0.4, 0.6], pos: [2.15, 1.0, -0.65], mat: "ClothNra", color: 0x3f3931, name: "AmmoBag" },
+    { kind: "cyl", size: [0.16, 0.08], pos: [3.02, 0.66, 0.25], mat: "ClothNra", color: 0x8c8270, name: "OldMilitaryCap" },
+    // 这两件旧道具曾是黑色大方块，还摆在过道侧；收小并放回座椅内侧，
+    // 用布料 PBR 的可读色保留“有人刚放下背包/药包”的生活信息。
+    { kind: "box", size: [0.42, 0.28, 0.58], pos: [-3.03, 0.72, 0.35], mat: "ClothNra", color: 0x6d685a, name: "OldPack" },
+    { kind: "box", size: [0.34, 0.25, 0.45], pos: [3.03, 0.68, -0.65], mat: "ClothNra", color: 0x766f5f, name: "AmmoBag" },
     { kind: "cyl", size: [0.28, 0.22], pos: [-1.35, 0.72, -5.2], mat: "WoodStock", color: 0x59402b, name: "PlayerLineSpool" },
     { kind: "cyl", size: [0.09, 0.7], pos: [-1.35, 0.85, -5.2], mat: "Steel", color: 0x827668, name: "PlayerLineSpoolAxle" },
-    { kind: "box", size: [0.35, 0.08, 0.9], pos: [-2.25, 1.15, -2.55], mat: "ClothNra", color: 0x372d26, name: "ShoeTool" },
-    { kind: "box", size: [0.16, 0.16, 0.8], pos: [2.1, 0.65, 2.75], mat: "Steel", color: 0x49443e, name: "MachineGunCase" },
+    { kind: "box", size: [0.24, 0.06, 0.54], pos: [-2.25, 1.15, -2.55], mat: "WoodStock", color: 0x8d6947, name: "ShoeTool" },
+    { kind: "box", size: [0.14, 0.12, 0.56], pos: [3.08, 0.65, 2.75], mat: "ClothNra", color: 0x706858, name: "MachineGunCase" },
     ...WindowLandscape(-1, "Left"),
     ...WindowLandscape(1, "Right"),
     { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
@@ -591,19 +599,28 @@ export const CS_Chuchuan = {
   ],
 
   cast: [
-    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-2.2, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 100.4, 107.2, 108.9, -0.8, -Math.PI / 2) },
-    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", track: CarSeatTrack([2.2, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 100.0, 108.9, 110.6, 0.2, Math.PI / 2) },
-    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", track: CarSeatTrack([-2.2, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 100.0, 110.6, 112.3, -0.4, -Math.PI / 2) },
-    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", track: CarSeatTrack([2.2, CHUCHUAN_CAR_G, 2.75], {}, 100.0, 112.3, 114.0, 0.8, Math.PI / 2) },
-    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", track: CarSeatTrack([0, CHUCHUAN_CAR_G, 5.45], { checkAmmo: 1 }, 101.0, 114.0, 115.7, 0, Math.PI) },
-    { id: "lineSoldierA", kind: "nra", weapon: null, seed: "chuchuanLineA", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, -6.25], { checkAmmo: 0.55 }, 100.0, 108.0, 109.7, -1.2, -Math.PI / 2) },
-    { id: "lineSoldierB", kind: "nra", weapon: null, seed: "chuchuanLineB", track: CarSeatTrack([2.75, CHUCHUAN_CAR_G, -6.25], { warmHands: 1 }, 100.1, 109.7, 111.4, 1.2, Math.PI / 2) },
-    { id: "lineSoldierC", kind: "nra", weapon: "HanYang", seed: "chuchuanLineC", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, -4.55], { watch: 1 }, 100.0, 111.4, 113.1, -1.0, -Math.PI / 2) },
-    { id: "riflemanB", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleB", track: CarSeatTrack([2.75, CHUCHUAN_CAR_G, -4.55], { sleep: 0.5 }, 100.0, 113.1, 114.8, 1.0, Math.PI / 2) },
-    { id: "riflemanC", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleC", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, 4.65], { prepare: 0.25 }, 100.2, 107.5, 109.2, -0.6, -Math.PI / 2) },
-    { id: "porter", kind: "nra", weapon: null, seed: "chuchuanPorter", track: CarSeatTrack([2.75, CHUCHUAN_CAR_G, 4.65], { sit: 0.9 }, 100.3, 109.2, 110.9, 0.6, Math.PI / 2) },
-    { id: "cook", kind: "nra", weapon: null, seed: "chuchuanCook", track: CarSeatTrack([-2.75, CHUCHUAN_CAR_G, 6.35], { sit: 0.8 }, 100.5, 110.9, 112.6, -0.2, -Math.PI / 2) },
-    // 车厢末端和门边还有四人站着；总共十六人，仍保留中间一条可走的过道。
+    // 根点在坐骨正下方，必须放到 bench 的 x=±2.78 线上；旧的 ±2.20/0.00
+    // 让人实际坐在过道或座面内沿，动作再对也看不出“坐在椅子上”。
+    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 100.4, 107.2, 108.9, -0.8, -Math.PI / 2) },
+    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 100.0, 108.9, 110.6, 0.2, Math.PI / 2) },
+    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 100.0, 110.6, 112.3, -0.4, -Math.PI / 2) },
+    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 2.75], {}, 100.0, 112.3, 114.0, 0.8, Math.PI / 2) },
+    { id: "squadLeader", kind: "nra", weapon: null, seed: "chuchuanLeader", uniformHex: 0x687382, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 5.45], { checkAmmo: 1 }, 101.0, 114.0, 115.7, 0, Math.PI / 2) },
+    { id: "lineSoldierA", kind: "nra", weapon: null, seed: "chuchuanLineA", uniformHex: 0x6E7684, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -6.25], { checkAmmo: 0.55 }, 100.0, 108.0, 109.7, -1.2, -Math.PI / 2) },
+    { id: "lineSoldierB", kind: "nra", weapon: null, seed: "chuchuanLineB", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -6.25], { warmHands: 1 }, 100.1, 109.7, 111.4, 1.2, Math.PI / 2) },
+    { id: "lineSoldierC", kind: "nra", weapon: "HanYang", seed: "chuchuanLineC", uniformHex: 0x5C6674, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -4.55], { watch: 1 }, 100.0, 111.4, 113.1, -1.0, -Math.PI / 2) },
+    { id: "riflemanB", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleB", uniformHex: 0x8A8778, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -4.55], { sleep: 0.5 }, 100.0, 113.1, 114.8, 1.0, Math.PI / 2) },
+    { id: "riflemanC", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleC", uniformHex: 0x6E7684, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 4.65], { prepare: 0.25 }, 100.2, 107.5, 109.2, -0.6, -Math.PI / 2) },
+    { id: "porter", kind: "nra", weapon: null, seed: "chuchuanPorter", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 4.65], { sit: 0.9 }, 100.3, 109.2, 110.9, 0.6, Math.PI / 2) },
+    { id: "cook", kind: "nra", weapon: null, seed: "chuchuanCook", uniformHex: 0x8A8778, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 6.35], { sit: 0.8 }, 100.5, 110.9, 112.6, -0.2, -Math.PI / 2) },
+    // 这六人只承载车厢密度和静态生活动作，不加对白，不挤占玩家的中间过道。
+    { id: "lineSoldierD", kind: "nra", weapon: null, seed: "chuchuanLineD", uniformHex: 0x747F8C, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -5.45], { sleep: 0.45 }, 100.4, 108.3, 110.0, -1.4, -Math.PI / 2) },
+    { id: "lineSoldierE", kind: "nra", weapon: null, seed: "chuchuanLineE", uniformHex: 0x7F857A, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -5.45], { checkAmmo: 0.45 }, 100.5, 109.0, 110.7, 1.4, Math.PI / 2) },
+    { id: "riflemanD", kind: "nra", weapon: "HanYang", seed: "chuchuanRifleD", uniformHex: 0x687382, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, -1.55], { cleanRifle: 0.55 }, 100.6, 110.7, 112.4, -0.9, -Math.PI / 2) },
+    { id: "riflemanE", kind: "nra", weapon: null, seed: "chuchuanRifleE", uniformHex: 0x8A8778, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, -1.55], { sleep: 0.6 }, 100.7, 112.4, 114.1, 0.9, Math.PI / 2) },
+    { id: "sapper", kind: "nra", weapon: null, seed: "chuchuanSapper", uniformHex: 0x5C6674, track: CarSeatTrack([-2.78, CHUCHUAN_CAR_G, 1.55], { prepare: 0.18 }, 100.8, 114.1, 115.8, -0.5, -Math.PI / 2) },
+    { id: "medicalOrderly", kind: "nra", weapon: null, seed: "chuchuanMedic", uniformHex: 0x828A93, track: CarSeatTrack([2.78, CHUCHUAN_CAR_G, 1.55], { sit: 0.85 }, 100.9, 115.8, 117.5, 0.5, Math.PI / 2) },
+    // 车厢末端和门边还有四人站着；车内共二十二人，仍保留中间一条可走的过道。
     { id: "standingRearLeft", kind: "nra", weapon: "HanYang", seed: "chuchuanStandingRearLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, -7.35], 100.0, 107.0, 108.7, -1.5, -Math.PI / 2) },
     { id: "standingRearRight", kind: "nra", weapon: null, seed: "chuchuanStandingRearRight", track: CarStandTrack([2.75, CHUCHUAN_CAR_G, -7.35], 100.2, 108.1, 109.8, 1.5, Math.PI / 2) },
     { id: "standingDoorLeft", kind: "nra", weapon: null, seed: "chuchuanStandingDoorLeft", track: CarStandTrack([-2.75, CHUCHUAN_CAR_G, 7.35], 100.4, 109.2, 110.9, -1.3, -Math.PI / 2) },

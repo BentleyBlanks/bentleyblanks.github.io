@@ -268,6 +268,23 @@ function ActorSources(actor) {
   };
 }
 
+/**
+ * 导入角色的 GLB 原来保留一套无贴图的 Main / Black / Grey 纯色材质：在车厢的
+ * 侧逆光下它们会压成数块纯黑矩形，既吃掉坐姿轮廓，也让每个人像同一套占位模型。
+ * 显示层仍由源模型决定，材质统一交还 ActorFactory 的 PBR 桶，才能和程序化角色、
+ * 武器共享布料起伏、粗糙度和 per-actor 军装色差。
+ */
+function ActorPbrMaterial(actor, sourceMaterial, segmentName = "") {
+  const source = String(sourceMaterial?.name || "").toLowerCase();
+  const segment = String(segmentName).toLowerCase();
+  const materials = actor.materials || {};
+  if (/skin|face/.test(source)) return materials.skin || sourceMaterial;
+  if (/foot|shoe|boot/.test(segment)) return materials.shoe || materials.accessory || sourceMaterial;
+  if (/black|leather|belt|gear/.test(source)) return materials.accessory || materials.uniform || sourceMaterial;
+  // Main / Grey / Helmet 都是国军的布军装与军帽，不应再走无纹理的纯色 GLB 材质。
+  return materials.uniform || sourceMaterial;
+}
+
 /** Downloaded character mesh driven by the game's authoritative 13-joint rig. */
 export class SegmentedCharacterSkin {
   constructor(gltf, actor) {
@@ -369,7 +386,9 @@ export class SegmentedCharacterSkin {
           if (part.isMesh) {
             part.castShadow = true;
             part.receiveShadow = true;
-            const materials = Array.isArray(part.material) ? part.material : [part.material];
+            const sourceMaterials = Array.isArray(part.material) ? part.material : [part.material];
+            const materials = sourceMaterials.map((material) => ActorPbrMaterial(actor, material, mesh.name));
+            part.material = Array.isArray(part.material) ? materials : materials[0];
             for (const material of materials) {
               if (!material) continue;
               // All character atlases are fully opaque. Defend the runtime

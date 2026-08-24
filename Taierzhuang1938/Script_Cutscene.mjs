@@ -545,7 +545,10 @@ export class CutsceneDirector {
       for (const spec of cut.cast || []) {
         let actor = null;
         try {
-          actor = this.actorFactory.Create(spec.kind || "nra", { seed: spec.seed || spec.id });
+          actor = this.actorFactory.Create(spec.kind || "nra", {
+            seed: spec.seed || spec.id,
+            uniformHex: spec.uniformHex,
+          });
         } catch (error) {
           console.warn(`[Cutscene] ${cut.id}: 造 ${spec.id} 失败 —— ${String(error).slice(0, 160)}`);
           continue;

@@ -1104,7 +1104,7 @@ export class Actor {
     const build = factory.KindGeometry(kind);
     const d = build.dims;
     this.dims = d;
-    this.materials = factory.ActorMaterials(kind, rnd);
+    this.materials = factory.ActorMaterials(kind, rnd, options);
     // "box" = Blender 模型没读到，退回了程序化方块几何。别把这个字段藏起来：
     // 换模最容易的失败方式就是**静默**退回，画面看着还行、其实一个模型都没用上。
     this.meshSource = build.source;
@@ -2668,11 +2668,14 @@ export class ActorFactory {
    * 一个人的一整套材质。军装从 3—5 档色变里按 seed 抽一档 —— 史料原话是
    * 「同一个连队深浅不一」，一个班全是同一个灰就假了。
    */
-  ActorMaterials(kind, rnd) {
+  ActorMaterials(kind, rnd, options = {}) {
     const spec = KIND_SPEC[kind];
     const lib = this.library;
     const recipe = spec.clothRecipe;
-    const clothHex = spec.clothHex[Math.min(spec.clothHex.length - 1, Math.floor(rnd() * spec.clothHex.length))];
+    const seededClothHex = spec.clothHex[Math.min(spec.clothHex.length - 1, Math.floor(rnd() * spec.clothHex.length))];
+    // 绝大多数战场角色继续由 seed 抽军装深浅；过场人群可以显式指定档位，
+    // 这样同一车厢不会因为碰巧抽到同色而变成一排复制人。
+    const clothHex = Number.isFinite(options.uniformHex) ? options.uniformHex : seededClothHex;
     const skinHex = HEX.skin[Math.min(HEX.skin.length - 1, Math.floor(rnd() * HEX.skin.length))];
     const webHex = HEX.nraWebbing[Math.min(HEX.nraWebbing.length - 1, Math.floor(rnd() * HEX.nraWebbing.length))];
 

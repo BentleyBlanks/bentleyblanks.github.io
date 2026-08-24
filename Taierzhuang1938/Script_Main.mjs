@@ -450,15 +450,27 @@ async function Boot() {
         orm: "./Texture/Texture_StoneOrm.webp?v=1",
       }),
       library.LoadExternalSet("CarriageBenchWood", {
-        albedo: "./Texture/Texture_CarriageBenchWoodBase.webp?v=1",
-        normal: "./Texture/Texture_CarriageBenchWoodNormal.webp?v=1",
-        orm: "./Texture/Texture_CarriageBenchWoodOrm.webp?v=1",
+        albedo: "./Texture/Texture_CarriageBenchWoodBase.png?v=2",
+        normal: "./Texture/Texture_CarriageBenchWoodNormal.png?v=2",
+        orm: "./Texture/Texture_CarriageBenchWoodOrm.png?v=2",
       }),
     ]);
     await Promise.all([
-      library.LoadExternalAlbedo("CarriageWallSteel", "Steel", "./Texture/Texture_CarriageRivetedSteelBase.png?v=1"),
-      library.LoadExternalAlbedo("CarriageFloorSteel", "Steel", "./Texture/Texture_CarriageTreadSteelBase.png?v=1"),
-      library.LoadExternalAlbedo("CarriageCeilingSteel", "Steel", "./Texture/Texture_CarriageCeilingSteelBase.png?v=1"),
+      library.LoadExternalSet("CarriageWallSteel", {
+        albedo: "./Texture/Texture_CarriageWallSteelBase.png?v=2",
+        normal: "./Texture/Texture_CarriageWallSteelNormal.png?v=2",
+        orm: "./Texture/Texture_CarriageWallSteelOrm.png?v=2",
+      }),
+      library.LoadExternalSet("CarriageFloorSteel", {
+        albedo: "./Texture/Texture_CarriageFloorSteelBase.png?v=2",
+        normal: "./Texture/Texture_CarriageFloorSteelNormal.png?v=2",
+        orm: "./Texture/Texture_CarriageFloorSteelOrm.png?v=2",
+      }),
+      library.LoadExternalSet("CarriageCeilingSteel", {
+        albedo: "./Texture/Texture_CarriageCeilingSteelBase.png?v=2",
+        normal: "./Texture/Texture_CarriageCeilingSteelNormal.png?v=2",
+        orm: "./Texture/Texture_CarriageCeilingSteelOrm.png?v=2",
+      }),
     ]);
   } catch (error) {
     console.warn(`[Main] 外部 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
