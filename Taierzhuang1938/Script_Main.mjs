@@ -89,6 +89,9 @@ const SHOT = params.get("shot");                 // 出图模式：不进指针�
 // 硬接到旧界河。稳定入口固定为 ?preview=CS_Chuchuan；其它 query 仍走正片。
 const PREVIEW_ID = params.get("preview") === "CS_Chuchuan" ? "CS_Chuchuan" : null;
 const PREVIEW = !!PREVIEW_ID;
+// 从主页面的「新版序章预览」链接进入时直接开播，不能再让玩家在加载完成后
+// 面对第二颗同义按钮。保留不带 autoplay 的地址作为审片/音频解锁回退入口。
+const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -1017,6 +1020,7 @@ async function Boot() {
   }
 
   if (SHOT) StartRun();
+  else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
 }
 
 // ---------------------------------------------------------------------------
@@ -1920,7 +1924,7 @@ function ShowPreviewTerminal(task) {
  * 开战；片尾只显示一次「跟随通信排。」并停住。这样在《断线》完成前，
  * 新内容可以独立审片而不会制造一个假的玩法接缝。
  */
-function StartPreview() {
+function StartPreview({ unlockAudio = true } = {}) {
   if (!PREVIEW_ID || !cutscene || state.previewPlaying || state.previewDone) return false;
   state.menu = false;
   state.running = false;
@@ -1930,7 +1934,9 @@ function StartPreview() {
   // WebAudio 必须在真人手势内解锁。预览页保留一次「播放序章」点击，
   // 点击后两分钟时间轴仍完全自动推进；直接在 Boot() 尾部自动起播会让
   // Chrome / Safari 把上下文留在 suspended，结果是画面正常而全段静音。
-  audio.Unlock();
+  // 顶层页面跳转不会保留原链接点击的 WebAudio user activation。自动播放的
+  // 入口优先保证画面立刻进入；玩家第一次在画面内点击时仍会照常解锁音频。
+  if (unlockAudio) audio.Unlock();
   ReleasePointerLock();
   if (ai) ai.Dispose();
   ShowBoot(false);
@@ -1983,6 +1989,11 @@ function StartRun() {
   RequestPointerLock();
 }
 bootStart.addEventListener("click", PREVIEW ? StartPreview : StartRun);
+// URL 跳转后的自动开播没有可继承的用户手势；下一次在画面内点按时补解锁，
+// 让序章不因音频策略停在加载页，也不要求玩家额外回去点启动按钮。
+if (PREVIEW_AUTOPLAY) {
+  document.addEventListener("pointerdown", () => audio.Unlock(), { once: true });
+}
 
 // ---------------------------------------------------------------------------
 // 主菜单：开机进这里，游戏中按 Esc 也回这里
