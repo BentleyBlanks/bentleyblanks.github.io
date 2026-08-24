@@ -466,12 +466,36 @@ function CreateCarriageCrowdCast() {
   return crowd;
 }
 
-function StationRailTrack(start, end, state = { moveSpeed: 0.03 }) {
+/**
+ * 小站从车窗后掠过的里程。站台模型本身在镜 4 用同一条 26.4 m 位移经过；
+ * 人物在它上面另走几步，因而不会在 0:56 的镜头切换点一起被 hidden 掉。
+ */
+const CHUCHUAN_STATION_ENTER_AT = 40;
+const CHUCHUAN_STATION_PASS_AT = 56;
+const CHUCHUAN_STATION_START_Z = -13.2;
+const CHUCHUAN_STATION_END_Z = 13.2;
+
+function StationPlatformZ(time) {
+  const k = Math.max(0, Math.min(1, (time - CHUCHUAN_STATION_ENTER_AT)
+    / (CHUCHUAN_STATION_PASS_AT - CHUCHUAN_STATION_ENTER_AT)));
+  return CHUCHUAN_STATION_START_Z + (CHUCHUAN_STATION_END_Z - CHUCHUAN_STATION_START_Z) * k;
+}
+
+/**
+ * 站台上的人先随车站掠过，再自己沿月台走出车窗范围。最后的 hidden 帧放在
+ * 画外，不能再把三人同时切掉；ry=π 保证他们真的朝 +Z 走，而不是倒着滑。
+ */
+function StationRailTrack(x, platformOffset, walkDistance, state = { moveSpeed: 0.16 }) {
+  const posAt = (time, walking) => [x, 0.58, StationPlatformZ(time) + platformOffset + walking];
+  // travelSpeed 是世界坐标中的合速度（车站掠过 + 人自己走）；moveSpeed 仍只管步态。
+  const passingState = { ...state, travelSpeed: (CHUCHUAN_STATION_END_Z - CHUCHUAN_STATION_START_Z + walkDistance) / 16 };
+  const exitState = { ...state, travelSpeed: 3.6 / 7 };
   return [
-    { t: 0, pos: start, ry: 0, state: { hidden: true } },
-    { t: 40, pos: start, ry: 0, state },
-    { t: 56, pos: end, ry: 0, state },
-    { t: 57, pos: end, ry: 0, state: { hidden: true } },
+    { t: 0, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: { hidden: true } },
+    { t: CHUCHUAN_STATION_ENTER_AT, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: passingState },
+    { t: CHUCHUAN_STATION_PASS_AT, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance), ry: Math.PI, state: exitState },
+    { t: 63, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance + 3.6), ry: Math.PI, state: exitState },
+    { t: 64, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance + 4.4), ry: Math.PI, state: { hidden: true } },
   ];
 }
 
@@ -758,11 +782,13 @@ export const CS_Chuchuan = {
     ...WindowLandscape(1, "Right"),
     ...ExitWindowFill(-1, "Left"),
     ...ExitWindowFill(1, "Right"),
-    { kind: "box", size: [5.5, 0.35, 10], pos: [7.2, 0.45, -100], mat: "WoodStock", color: 0x5b4a3b, name: "StationPlatform" },
-    { kind: "box", size: [3.2, 1.4, 2.0], pos: [13.5, 1.15, -100], mat: "WoodBeam", color: 0x6b5846, name: "StationShed" },
-    { kind: "box", size: [1.8, 0.24, 2.4], pos: [8.4, 1.18, -100], mat: "ClothNra", color: 0xb29a78, name: "SingleStretcher" },
-    { kind: "box", size: [0.16, 0.6, 1.95], pos: [7.75, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleA" },
-    { kind: "box", size: [0.16, 0.6, 1.95], pos: [9.05, 0.98, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StretcherPoleB" },
+    // Blender MCP 自制：1930 年代津浦线小站的石基高月台、木雨棚、候车屋、
+    // 站牌、木凳、货箱、行李车和水鹤。它只当演出视觉布景，不改变关卡碰撞。
+    { kind: "model", url: "./Model/Model_ChuchuanStationPlatform.glb?v=1", pos: [7.2, 0, -100], name: "StationPlatform" },
+    // 一副担架随两名担架兵穿过月台；它和站台的位移同源，不能留成窗口中的静止盒子。
+    { kind: "box", size: [1.25, 0.15, 2.15], pos: [6.85, 1.18, -100], mat: "ClothNra", color: 0xb29a78, name: "StationStretcher" },
+    { kind: "box", size: [0.13, 0.10, 2.34], pos: [6.22, 1.04, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StationStretcherPoleA" },
+    { kind: "box", size: [0.13, 0.10, 2.34], pos: [7.48, 1.04, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StationStretcherPoleB" },
     { kind: "box", size: [2.2, 2.6, 0.12], pos: [0, 1.65, 8.85], mat: "Steel", color: 0x49433b, name: "CarriageDoor" },
     // 滑门的横向旧木条、门闩和补片压在钢门上；远看先读到“装过人和物的军运车”，
     // 近看能看出门曾被拆修，而不是一块没有信息的纯黑矩形。
@@ -789,9 +815,9 @@ export const CS_Chuchuan = {
     // 班长固定在车厢末端站着、面对全车，视线一转就能找到他；不再被塞回右侧座椅。
     { id: "squadLeader", kind: "nra", weapon: "HanYang", seed: "chuchuanLeader", uniformHex: 0x4f5a61, track: CarRearLeaderTrack([0, CHUCHUAN_CAR_G, 5.95], 94.9, 96.2, 0, Math.PI) },
     ...CreateCarriageCrowdCast(),
-    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack([6.1, 0.58, -0.8], [6.1, 0.58, 1.5]) },
-    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack([7.6, 0.58, -0.8], [7.6, 0.58, 1.5]) },
-    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack([10.2, 0.58, -0.8], [10.2, 0.58, 1.5], { moveSpeed: 0.03, crouch: 0.25 }) },
+    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack(6.1, -1.65, 3.3) },
+    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack(7.6, -1.65, 3.3) },
+    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack(9.15, -6.4, 2.2, { moveSpeed: 0.11, crouch: 0.25 }) },
     { id: "externalOfficer", kind: "nra", weapon: null, seed: "chuchuanOfficer", track: [
       { t: 0, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: true } },
       { t: CHUCHUAN_DOOR_AT, pos: [2.5, CHUCHUAN_CAR_G, 10.2], ry: Math.PI, state: { hidden: false, moveSpeed: 0 } },
@@ -825,15 +851,15 @@ export const CS_Chuchuan = {
         { at: 24.9, seconds: 4.0, who: "oldWound", voiceCue: "prologue_old_wound_02", text: "你少骂两句，它兴许听话点。" },
       ] },
 
-    // 0:40—0:56：小站只通过一次；一副担架、三名伤员相关 NPC 与远处烟柱。
+    // 0:40—0:56：列车缓缓进入小站。月台从后窗掠进来；担架兵和轻伤员各自
+    // 走过窗格，镜头过后仍在画外继续走，不以切镜当作消失。
     { n: 4, seconds: 16, focalMm: 35, cameraMode: "headLook", camera: { from: [0, 1.8, -6], look: [8, 1.9, 0.8] },
       sfx: [{ at: 0.2, name: "trainBrake", volume: 0.62 }, { at: 3.0, name: "stretcherWood", volume: 0.42 }, { at: 6.0, name: "coughLow", volume: 0.32 }],
       propMoves: [
-        { name: "StationPlatform", startAt: 0, endAt: 16, from: [7.2, 0.45, -0.8], to: [7.2, 0.45, 1.5] },
-        { name: "StationShed", startAt: 0, endAt: 16, from: [13.5, 1.15, -0.8], to: [13.5, 1.15, 1.5] },
-        { name: "SingleStretcher", startAt: 0, endAt: 16, from: [8.4, 1.18, -0.8], to: [8.4, 1.18, 1.5] },
-        { name: "StretcherPoleA", startAt: 0, endAt: 16, from: [7.75, 0.98, -0.8], to: [7.75, 0.98, 1.5] },
-        { name: "StretcherPoleB", startAt: 0, endAt: 16, from: [9.05, 0.98, -0.8], to: [9.05, 0.98, 1.5] },
+        { name: "StationPlatform", startAt: 0, endAt: 16, from: [7.2, 0, -13.2], to: [7.2, 0, 13.2], ease: "linear" },
+        { name: "StationStretcher", startAt: 0, endAt: 16, from: [6.85, 1.18, -14.85], to: [6.85, 1.18, 14.85], ease: "linear" },
+        { name: "StationStretcherPoleA", startAt: 0, endAt: 16, from: [6.22, 1.04, -14.85], to: [6.22, 1.04, 14.85], ease: "linear" },
+        { name: "StationStretcherPoleB", startAt: 0, endAt: 16, from: [7.48, 1.04, -14.85], to: [7.48, 1.04, 14.85], ease: "linear" },
       ] },
 
     // 0:56—1:08：恰好两次远炮；第二声更近，五人先后停手，旧伤兵睁眼。

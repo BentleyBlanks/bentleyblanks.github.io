@@ -38,6 +38,7 @@
 // 需要的接口只有三个：Create(kind,{seed}) → { root, Update(dt,state), SetWeapon(id), Dispose() }。
 
 import * as THREE from "three";
+import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 // Lerp 在 Script_Noise 里没导出，导出的名字是 Mix —— 别自己再写一个线性插值，
 // 两份实现迟早会有一份被改。
@@ -45,6 +46,10 @@ import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_N
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
 import { SampleJieheHeight } from "./Script_JieheHeight.mjs";
+
+// 过场里的少量静态模型（例如出川的小站）走独立 loader：它们只是演出布景，
+// 不进碰撞、导航或战场的确定性数据。
+const CUTSCENE_MODEL_LOADER = new GLTFLoader();
 
 /** 各材质配方一张贴图铺几米（与城里的 AddWall / MakeBox 同一套数）。 */
 const TILE_BY_RECIPE = {
@@ -686,7 +691,35 @@ export class CutsceneDirector {
     return null;
   }
 
+  _MakeModelProp(spec) {
+    const group = new THREE.Group();
+    group.name = spec.name || "modelProp";
+    group.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
+    if (spec.rx) group.rotation.x = spec.rx;
+    if (spec.ry) group.rotation.y = spec.ry;
+    if (spec.rz) group.rotation.z = spec.rz;
+    if (spec.scale) group.scale.setScalar(spec.scale);
+
+    CUTSCENE_MODEL_LOADER.load(spec.url, (gltf) => {
+      // 跳过/结束时 setRoot 已移出场景就不再补挂模型，避免异步回调把旧布景复活。
+      if (!group.parent) return;
+      gltf.scene.traverse((object) => {
+        if (!object.isMesh) return;
+        object.castShadow = spec.castShadow === undefined ? true : !!spec.castShadow;
+        object.receiveShadow = spec.receiveShadow === undefined ? true : !!spec.receiveShadow;
+        if (object.geometry) this.ownedGeometries.push(object.geometry);
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.filter(Boolean).forEach((material) => this.ownedMaterials.push(material));
+      });
+      group.add(gltf.scene);
+    }, undefined, (error) => {
+      console.warn(`[Cutscene] ${this.cut?.id || "unknown"}: 读取 ${spec.name || "model"} 失败 —— ${String(error).slice(0, 160)}`);
+    });
+    return group;
+  }
+
   _MakeProp(spec) {
+    if (spec.kind === "model") return this._MakeModelProp(spec);
     const size = spec.size || [1, 1, 1];
     let geometry = null;
     // 贴图按**世界尺寸**铺：一张 Ground 是 2.6 m、一张砖是 1.2 m。Box/Plane 的 UV

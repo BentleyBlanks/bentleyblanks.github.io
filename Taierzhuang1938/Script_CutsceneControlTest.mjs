@@ -149,6 +149,17 @@ for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" 
     `${actor.id} must rise during the location card, after the exchange and before the door opens`);
 }
 
+const stationModel = CS_Chuchuan.props.find((prop) => prop.name === "StationPlatform");
+assert.equal(stationModel?.kind, "model", "the station beat uses the authored 1930s platform model, not the old two-box placeholder");
+assert.equal(stationModel?.url, "./Model/Model_ChuchuanStationPlatform.glb?v=1");
+for (const actor of CS_Chuchuan.cast.filter((item) => ["stretcherBearerA", "stretcherBearerB", "lightWounded"].includes(item.id))) {
+  const walkingExit = actor.track.find((frame) => frame.t === 63);
+  const hiddenExit = actor.track.find((frame) => frame.t === 64);
+  assert.equal(walkingExit?.state?.hidden, undefined, `${actor.id} must keep walking after the station shot ends`);
+  assert.equal(hiddenExit?.state?.hidden, true, `${actor.id} only hides after leaving the window's visible run`);
+  assert.equal(actor.track.find((frame) => frame.t === 56)?.ry, Math.PI, `${actor.id} walks forward along the platform`);
+}
+
 const router = new InputRouter();
 const input = { forward: 1, strafe: 1, lean: 1, sprint: true, breathHold: true, fire: true, ads: true };
 router.SetSuppressed(true);

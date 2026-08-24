@@ -141,7 +141,9 @@ export function LintCutscene(cut) {
     }
     at += shot.seconds;
   }
-  // 轨道滑步：两帧之间的水平速度要 ≈ moveSpeed×4.2（容差 ±35%），换场（hidden）那一段不算
+  // 轨道滑步：两帧之间的水平速度要 ≈ moveSpeed×4.2（容差 ±35%），换场（hidden）那一段不算。
+  // 如果角色随移动布景经过，travelSpeed 记录世界坐标合速度；moveSpeed 仍保持本地步态，
+  // 因而站台不会把慢走动画误报成滑步。
   for (const actor of cut.cast || []) {
     const track = actor.track || [];
     for (let i = 1; i < track.length; i += 1) {
@@ -151,7 +153,8 @@ export function LintCutscene(cut) {
       const dist = Math.hypot(b.pos[0] - a.pos[0], b.pos[2] - a.pos[2]);
       const speed = dist / dt;
       const ms = ((a.state && a.state.moveSpeed) || 0);
-      const want = ms * 4.2;
+      const travel = Number((a.state && a.state.travelSpeed));
+      const want = Number.isFinite(travel) ? travel : ms * 4.2;
       if (speed > 4.6) warnings.push(`${cut.id}: ${actor.id} 第 ${i} 帧 ${speed.toFixed(1)} m/s —— 人不会这么快，是不是忘了插 hidden 帧`);
       else if (want > 0.05 && Math.abs(speed - want) > want * 0.35 + 0.05) warnings.push(`${cut.id}: ${actor.id} 第 ${i} 帧轨道 ${speed.toFixed(2)} m/s 但 moveSpeed ${ms} ↔ ${want.toFixed(2)} m/s（滑步/踏步）`);
       else if (want < 0.05 && speed > 0.25) warnings.push(`${cut.id}: ${actor.id} 第 ${i} 帧 moveSpeed 0 却在动（${speed.toFixed(2)} m/s，会像被拖着走）`);
