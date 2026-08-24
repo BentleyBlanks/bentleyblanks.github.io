@@ -305,7 +305,7 @@ node Taierzhuang1938/Script_AmbBake.mjs --recut       # 不下载，只重切
 
 ---
 
-# 音乐：从四条合成配方换成五段实录（生成）
+# 音乐：从四条合成配方换成九段授权／生成曲
 
 ## 为什么整套删掉，而且不留合成兜底
 
@@ -324,11 +324,11 @@ node Taierzhuang1938/Script_AmbBake.mjs --recut       # 不下载，只重切
 
 ## 素材从哪来
 
-Sonniss 那十几个免版税包里**一件中国乐器都没有**（检索过 erhu / guzheng /
-pipa / dizi / suona / 独奏弦乐，只有几条上海街头环境），所以走生成：
-本机 MiniMax Hub 的网关 `POST 127.0.0.1:8001/api/generate/music`，
-`minimax_music` / `is_instrumental`，一次 20 credits，回来 80—420 秒。
-提示词逐条记在 `Data_MusicSources.mjs`。
+已试听确认的六段保留授权来源；不合适的夜间、战后和城墙三段改用火山引擎
+`seed-audio-1.0`。`Script_SeedAudioMusicBake.mjs` 通过本项目账户直连
+`https://openspeech.bytedance.com/api/v3/tts/create`，密钥只读环境变量
+`VOLCENGINE_API_KEY`，原始 take 只留在系统临时目录。提示词与用途逐条记在
+`Data_MusicSources.mjs`，最终来源也写入 `Data_MusicManifest.json`。
 
 | cue | 用在哪 | level |
 | --- | --- | --- |
@@ -337,26 +337,25 @@ pipa / dizi / suona / 独奏弦乐，只有几条上海街头环境），所以�
 | `tension` | 夜里入城 | 0.38 |
 | `charge` | 夺回东关门、北门突围 | 0.60 |
 | `aftermath` | 结局 | 0.62 |
+| `wallPressure` | 城墙攻防，压在枪炮声下 | 0.24 |
 
-成品 5 段 / 1.8 MB，在 `Audio/Music/`，清单 `Data_MusicManifest.json`。
+成品 9 段，在 `Audio/Music/`，清单 `Data_MusicManifest.json`。
 
 ## 提示词的三条经验
 
-* **否定式提示只对「乐器」有效，对「结构」无效。** 「free rhythm」
-  「long silences between phrases」「no tempo」这类基本被忽略，模型总会给一条
-  有律动的骨架；但「no drums / no synthesizer / no vocals」是听的。
-* **想要稀疏，别写 sparse，写编制。** 「一条持续低音 + 一支笛子偶尔进来一个长音，
-  别的什么都没有」比「extremely sparse」管用得多 —— `menu` 重生成一次就为这个，
-  第二版的静默占比高出一大截。
-* **「solo erhu，长弓，无拨弦」两次都没做到**，回来的都是弹拨音色。
-  这是目前最大的一处「说了没照做」，记在这儿，**别再花钱重试同一句**。
+* **先写场景里的声音关系，再写乐器。** 夜间曲让脚步和警戒声优先；战后曲不许
+  写成悼念表演；城墙曲只承托远炮与石墙压力，不能另起一段英雄旋律。
+* **反向约束必须具体。** 明确排除人声、鼓点、锣、唢呐、流行和弦与现代合成器，
+  避免生成结果滑向宣传进行曲或影视预告片。
+* **把生成 take 烘成固定时长。** SeedAudio 的 take 不作为直接部署文件；脚本以
+  `-stream_loop` 延展、削高低频、统一电平，并首尾淡化后才交给运行时 `LoopLayer`
+  交叉循环。
 
 ## 切段与播放
 
-生成回来的是一整首有起承转合的曲子，游戏里要的是一段能一直循环下去的。
-按 mood 自动挑窗口：`sparse` 挑「峰值比中位高得多、起音最少」的一段（独奏、
-菜单、结局），`steady` 挑「电平最平稳」的一段（要垫在枪炮底下、不能有起伏的）。
-两种打分都只看包络 —— 能算的才作数。
+外部授权曲由 `Script_MusicBake.mjs` 切取稳定段；三段 SeedAudio 曲由
+`Script_SeedAudioMusicBake.mjs` 从原始 take 烘成固定循环长度。两条链路都只把
+最终 MP3 放进仓库，生成原始文件不进 Git。
 
 播放复用环境床那个 `LoopLayer`，只是把随机起播点关掉（曲子必须从头放），
 首尾各留 3.2 秒交叉淡，循环点因此听不出来。切 cue 是**交叉**不是硬切：
@@ -364,8 +363,9 @@ pipa / dizi / suona / 独奏弦乐，只有几条上海街头环境），所以�
 
 ```bash
 node Taierzhuang1938/Script_MusicBake.mjs           # 切（原曲要在 Audio/Music/_raw/）
-node Taierzhuang1938/Script_MusicBake.mjs --gen     # 缺的先去本机网关生成（要 Hub 开着）
-node Taierzhuang1938/Script_MusicBake.mjs --report  # 只打候选段落表
+node Taierzhuang1938/Script_MusicBake.mjs --fetch   # 下载登记的外部授权曲
+node Taierzhuang1938/Script_SeedAudioMusicBake.mjs --dry
+node Taierzhuang1938/Script_SeedAudioMusicBake.mjs --force
 ```
 
 ## 这两层的验收

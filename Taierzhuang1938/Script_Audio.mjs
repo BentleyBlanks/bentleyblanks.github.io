@@ -1419,7 +1419,7 @@ export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
 export const SFX_PACK_VERSION = "4";
-export const MUSIC_PACK_VERSION = "3";
+export const MUSIC_PACK_VERSION = "4";
 
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
 const SAMPLE_BURST = {
@@ -1701,7 +1701,8 @@ export const AMBIENCE_PRESETS = {
 
 /**
  * 音乐。**九段生成 / CC0 下载曲**，一段一个 cue，提示词、来源与选段规则见
- * Data_MusicSources.mjs，成品在 Audio/Music/，由 Script_MusicBake.mjs 烘。
+ * Data_MusicSources.mjs，成品在 Audio/Music/，由 Script_MusicBake.mjs 或
+ * Script_SeedAudioMusicBake.mjs 烘。
  *
  * 上一版这里是四条 WebAudio 配方（低音提琴式持续音 + 简化铜管 + 独奏弦 + 军鼓），
  * 音高按 D 小调五声骨架排。整套删掉了，**没有留合成兜底**：

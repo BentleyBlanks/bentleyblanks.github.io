@@ -1,5 +1,5 @@
 {
- "generated": "Script_MusicBake.mjs",
+ "generated": "Script_MusicBake.mjs + Script_SeedAudioMusicBake.mjs",
  "sampleRate": 44100,
  "cues": {
   "menu": {
@@ -24,7 +24,13 @@
   },
   "tension": {
    "file": "AudioMusic_Night.mp3",
-   "seconds": 52
+   "seconds": 51.931,
+   "source": {
+    "title": "Volcengine SeedAudio 1.0 · 夜间潜行低弦配乐",
+    "author": "Volcengine SeedAudio 1.0",
+    "license": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+    "page": "https://openspeech.bytedance.com/api/v3/tts/create"
+   }
   },
   "charge": {
    "file": "AudioMusic_Charge.mp3",
@@ -38,7 +44,13 @@
   },
   "aftermath": {
    "file": "AudioMusic_Aftermath.mp3",
-   "seconds": 50
+   "seconds": 49.977,
+   "source": {
+    "title": "Volcengine SeedAudio 1.0 · 战后黎明二胡与洞箫余波",
+    "author": "Volcengine SeedAudio 1.0",
+    "license": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+    "page": "https://openspeech.bytedance.com/api/v3/tts/create"
+   }
   },
   "fieldLament": {
    "file": "AudioMusic_FieldLament.mp3",
@@ -52,12 +64,12 @@
   },
   "wallPressure": {
    "file": "AudioMusic_WallPressure.mp3",
-   "seconds": 44,
+   "seconds": 43.954,
    "source": {
-    "title": "War Theme (version 2)",
-    "author": "Spring Spring",
-    "license": "CC0 1.0",
-    "page": "https://opengameart.org/content/war-theme"
+    "title": "Volcengine SeedAudio 1.0 · 城墙火力压迫低鼓与低弦",
+    "author": "Volcengine SeedAudio 1.0",
+    "license": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
+    "page": "https://openspeech.bytedance.com/api/v3/tts/create"
    }
   },
   "streetDistress": {
@@ -83,7 +95,7 @@
  },
  "license": {
   "name": "逐曲授权（见 cues[].source）",
-  "terms": "生成曲随项目使用；Kevin MacLeod 曲目为 CC BY 4.0；CC0 曲目按来源页授权",
+  "terms": "SeedAudio 生成曲受火山引擎服务条款约束；其余曲目按来源页授权",
   "via": "Data_MusicSources.mjs"
  }
 }
