@@ -117,11 +117,27 @@ oldDirector.Skip();
 await oldPlay;
 
 const wakeShot = CS_Chuchuan.shots.find((shot) => shot.n === 16);
-const wakeLine = wakeShot.lines.find((line) => line.text === "都醒起，装备拿好。");
+const wakeLine = wakeShot.lines.find((line) => line.who === "squadLeader"
+  && line.text === "通信排，下车！线盘背起，搞快！");
 const wakeShotStart = CS_Chuchuan.shots.slice(0, 15).reduce((sum, shot) => sum + shot.seconds, 0);
 const wakeLineEnd = wakeShotStart + wakeLine.at + wakeLine.seconds;
-assert.equal(wakeShotStart, 100, "squad leader wake-up shot starts at the declared prepare time");
-assert.equal(CS_Chuchuan.walk.startAt, wakeLineEnd, "WASD unlocks only after the squad leader finishes the wake-up order");
+assert.equal(wakeShotStart, 100, "squad leader stand-up shot starts at the declared prepare time");
+assert.equal(CS_Chuchuan.walk.startAt, wakeLineEnd, "WASD unlocks only after the squad leader finishes the disembark order");
+const doorShotStart = CS_Chuchuan.shots.slice(0, 16).reduce((sum, shot) => sum + shot.seconds, 0);
+const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
+const leaderSit = squadLeader.track.find((frame) => frame.state?.sit === 1 && frame.t > 90);
+const leaderStand = squadLeader.track.find((frame) => frame.state?.sit === 0);
+assert.ok(leaderSit && leaderStand, "squad leader has explicit seated and standing keyframes");
+assert.ok(leaderSit.t >= CS_Chuchuan.ambientMotion[0].stopAt,
+  "train must stop before the squad leader begins rising");
+assert.ok(leaderStand.t <= wakeShotStart + wakeLine.at,
+  "squad leader must finish rising before the disembark order begins");
+assert.ok(wakeLineEnd <= doorShotStart,
+  "the carriage door cannot open before the squad leader finishes the order");
+for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" && item.track?.[0]?.state?.sit === 1)) {
+  const ready = actor.track.find((frame) => frame.state?.prepare >= 0.99 && frame.state?.sit !== 1 && !frame.state?.hidden);
+  assert.ok(ready?.t >= wakeLineEnd, `${actor.id} rose before the squad leader completed the order`);
+}
 
 const timedCut = { ...cut, walk: { ...cut.walk, startAt: wakeLineEnd } };
 const timedDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), table: { [timedCut.id]: timedCut } });

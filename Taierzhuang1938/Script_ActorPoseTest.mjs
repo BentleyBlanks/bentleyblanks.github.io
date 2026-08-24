@@ -116,7 +116,16 @@ try {
     });
     check(armed.lifePose.cleanRifle === 1 && Number.isFinite(armed.GetMount("weaponMount").position.y),
       "armed blend failed");
-    for (const item of [actor, armed, baselineA, baselineB]) item.Dispose();
+    const seatTest = factory.Create("nra", { seed: 90213, weapon: null });
+    seatTest.Update(0.016, { elapsed: 1.3, sit: 1 });
+    const hipWithoutSeatLift = seatTest.hips.position.y;
+    seatTest.Update(0.016, { elapsed: 1.3, sit: 1, seatLift: 0.13 });
+    check(Math.abs(seatTest.hips.position.y - hipWithoutSeatLift - 0.13) < 1e-5,
+      "seat lift no longer raises the seated hips above the bench");
+    seatTest.Update(0.016, { elapsed: 1.3, sit: 0, seatLift: 0.13 });
+    check(Math.abs(seatTest.hips.position.y - hipWithoutSeatLift) > 0.05,
+      "seat lift leaked into standing pose");
+    for (const item of [actor, armed, baselineA, baselineB, seatTest]) item.Dispose();
     return "6 states × 3 levels, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);

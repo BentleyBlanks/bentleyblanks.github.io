@@ -1493,6 +1493,10 @@ export class Actor {
     // 坐姿/靠墙睡的胯落到长凳高度；其它生活动作也给一点下沉，组合时不会漂浮。
     const seated = Math.max(sit, sleep, repairShoe * 0.72, checkAmmo * 0.42, cleanRifle * 0.32)
       * (1 - prone);
+    // 车厢座面比一般场景的地面高。只抬骨盆、不抬 root，腿 IK 仍把鞋底
+    // 固定在地板上，避免“把整个角色抬高”后双脚悬空；这个量必须在解腿前
+    // 写入 hips，才能让大腿真的从座面上方落下，而非视觉上穿过座板。
+    const seatLift = seated > 0.001 ? Clamp(Number(s.seatLift) || 0, 0, 0.28) : 0;
     const seatedDrop = seated * (d.hipY - d.thighLen - 0.045 * H) / d.hipY;
     const stanceDrop = Math.max(crouch * 0.34, kneelDrop, seatedDrop) + prone * 0.60 + dying * 0.30;
     const breath = Math.sin(elapsed * this.breathRate * Math.PI * 2 + this.idlePhase);
@@ -1526,7 +1530,8 @@ export class Actor {
     // 蹲下时胯要**往后坐**。只压高度不后坐的话，膝盖为了补上腿长会整个顶到脚尖
     // 前面去 —— 重心落在脚后跟外，真人这么蹲要仰面摔过去，画面上读作「融化的人」。
     // 后坐 6% 身高 + 下面把落脚点往前挪一点，重心才回到两脚之间。
-    this.hips.position.set(0, -stanceDrop * d.hipY + bob - STAND_SETTLE * H, crouch * 0.060 * H);
+    this.hips.position.set(0, -stanceDrop * d.hipY + bob - STAND_SETTLE * H + seatLift,
+      crouch * 0.060 * H);
     // 走起来胯要摆、上身反向拧一点，不然像块板子在平移。
     // 用 cos 不用 sin：相位 0 是左脚**最前**（支撑相起点），骨盆这时也该拧到头，
     // 写成 sin 的话摆胯比迈腿慢四分之一个周期，看着像在扭秧歌。

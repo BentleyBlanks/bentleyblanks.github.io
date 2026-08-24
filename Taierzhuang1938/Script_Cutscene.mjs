@@ -980,7 +980,10 @@ export class CutsceneDirector {
       const entry = this.props.get(move.name);
       if (!entry || entry.attached || !Array.isArray(move.from) || !Array.isArray(move.axis)) continue;
       const span = Math.max(0.01, Number(move.span) || 1);
-      const d = ((this.time * (Number(move.speed) || 0)) % span + span) % span;
+      // 到站后不能让窗外景物继续掠过。用钳住的全局时间而不是把 speed
+      // 直接置零，保证停下的那一帧正好接续此前的位置、没有循环层跳变。
+      const motionTime = move.stopAt === undefined ? this.time : Math.min(this.time, move.stopAt);
+      const d = ((motionTime * (Number(move.speed) || 0)) % span + span) % span;
       entry.mesh.position.set(
         move.from[0] + move.axis[0] * d,
         move.from[1] + move.axis[1] * d,
