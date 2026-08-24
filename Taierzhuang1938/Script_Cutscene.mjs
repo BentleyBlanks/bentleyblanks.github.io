@@ -44,6 +44,7 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
+import { SampleJieheHeight } from "./Script_JieheHeight.mjs";
 
 /** 各材质配方一张贴图铺几米（与城里的 AddWall / MakeBox 同一套数）。 */
 const TILE_BY_RECIPE = {
@@ -55,6 +56,64 @@ const TILE_BY_RECIPE = {
   Sandbag: TILE_METERS.sandbag, Steel: TILE_METERS.steel, SteelHelmet: TILE_METERS.steel,
   ClothNra: TILE_METERS.cloth, ClothIja: TILE_METERS.cloth,
 };
+
+/**
+ * 车厢外的远景地面：顶点直接取项目已下载并校验过的 SRTM 高程采样。
+ * 这不是图片、不是竖直遮挡板；从任意车窗角度看都是真实水平地形和自然天际线。
+ */
+function BuildHeightTerrainGeometry(terrain) {
+  const side = terrain.side < 0 ? -1 : 1;
+  const columns = Math.max(2, Math.floor(terrain.columns || 40));
+  const rows = Math.max(2, Math.floor(terrain.rows || 56));
+  const near = Math.max(3, Number(terrain.near) || 4);
+  const far = Math.max(near + 1, Number(terrain.far) || 100);
+  const minZ = Number(terrain.minZ) || -80;
+  const maxZ = Number(terrain.maxZ) || 80;
+  const [sourceMinX, sourceMaxX, sourceMinZ, sourceMaxZ] = terrain.sourceBounds || [-1250, 1250, -2200, -380];
+  const [referenceX, referenceZ] = terrain.sourceReference || [0, -1470];
+  const referenceY = SampleJieheHeight(referenceX, referenceZ);
+  const baseY = Number(terrain.baseY) || 0;
+  const count = columns * rows;
+  const positions = new Float32Array(count * 3);
+  const uvs = new Float32Array(count * 2);
+  for (let col = 0; col < columns; col += 1) {
+    const u = col / (columns - 1);
+    const localX = side * (near + (far - near) * u);
+    const sampleX = sourceMinX + (sourceMaxX - sourceMinX) * u;
+    for (let row = 0; row < rows; row += 1) {
+      const v = row / (rows - 1);
+      const index = col * rows + row;
+      const localZ = minZ + (maxZ - minZ) * v;
+      const sampleZ = sourceMinZ + (sourceMaxZ - sourceMinZ) * v;
+      positions[index * 3] = localX;
+      positions[index * 3 + 1] = baseY + SampleJieheHeight(sampleX, sampleZ) - referenceY;
+      positions[index * 3 + 2] = localZ;
+      uvs[index * 2] = localX / TILE_METERS.ground;
+      uvs[index * 2 + 1] = localZ / TILE_METERS.ground;
+    }
+  }
+  const indices = new Uint16Array((columns - 1) * (rows - 1) * 6);
+  let cursor = 0;
+  for (let col = 0; col < columns - 1; col += 1) {
+    for (let row = 0; row < rows - 1; row += 1) {
+      const a = col * rows + row, b = a + 1, c = (col + 1) * rows + row, d = c + 1;
+      if (side > 0) {
+        indices[cursor] = a; indices[cursor + 1] = b; indices[cursor + 2] = c;
+        indices[cursor + 3] = b; indices[cursor + 4] = d; indices[cursor + 5] = c;
+      } else {
+        indices[cursor] = a; indices[cursor + 1] = c; indices[cursor + 2] = b;
+        indices[cursor + 3] = b; indices[cursor + 4] = c; indices[cursor + 5] = d;
+      }
+      cursor += 6;
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeVertexNormals();
+  return geometry;
+}
 
 // ---------------------------------------------------------------------------
 // 镜头数学
@@ -650,6 +709,8 @@ export class CutsceneDirector {
         for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * (size[0] / tile), uv.getY(i) * (size[1] / tile));
         uv.needsUpdate = true;
       }
+    } else if (spec.kind === "heightTerrain") {
+      geometry = BuildHeightTerrainGeometry(spec.terrain || {});
     } else if (spec.kind === "backdrop") {
       // 车窗外的远山层是竖直的，不可沿用 ground plane 的 -90° 旋转。
       // 它只承担最远层云山并盖住世界默认天空／地平线；近中景仍由独立实体构成。
@@ -704,36 +765,6 @@ export class CutsceneDirector {
       material = base;
       this.ownedMaterials.push(base);
     }
-    // 带有画面自身光照的远山景片不能复用 Ground 的法线／粗糙度图；否则一张
-    // 低山照片会被程序化石粒法线压成雪白的横纹。unlit 保留已预载的 albedo，
-    // 但以无光照材质原样画出它。
-    if (spec.unlit && material) {
-      let map = material.map || null;
-      // 相邻山片交替镜像：一片的右缘和下一片的左缘来自同一条像素边，
-      // 这样能连续铺开一张非全景原图，而不会露出一格一格的贴图接缝。
-      if (map && spec.flipX) {
-        map = map.clone();
-        map.wrapS = THREE.RepeatWrapping;
-        map.repeat.x = -1;
-        map.offset.x = 1;
-        map.needsUpdate = true;
-      }
-      const flat = new THREE.MeshBasicMaterial({
-        map, color: spec.color ?? 0xffffff,
-        side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
-      });
-      material = flat;
-      this.ownedMaterials.push(flat);
-    }
-    // 车厢外的分层景物用独立世界尺度摆放。场景雾若照常套到 13–26 m 的小模型上，
-    // 会把远山、村屋全部漂成一片白，反而重新露出“没有窗外”的穿帮。仅数据明确标记
-    // noFog 的物件关掉雾，其他战场道具仍保持原有雾效。
-    if (spec.noFog && material) {
-      material = material.clone();
-      material.fog = false;
-      this.ownedMaterials.push(material);
-    }
-
     const mesh = new THREE.Mesh(geometry, material);
     // 自发光只是**让自己亮**，照不亮旁边的东西（没有 GI）。
     // 「台灯是唯一光源」「油灯」「门缝一条光」这三处要真的照亮屋子，
@@ -753,8 +784,8 @@ export class CutsceneDirector {
     if (spec.rx) mesh.rotation.x = spec.rx;
     if (spec.ry) mesh.rotation.y = spec.ry;
     if (spec.rz) mesh.rotation.z = spec.rz;   // 挂钟指针、斜靠的东西都要它
-    mesh.castShadow = !spec.inside;
-    mesh.receiveShadow = true;
+    mesh.castShadow = spec.castShadow === undefined ? !spec.inside : !!spec.castShadow;
+    mesh.receiveShadow = spec.receiveShadow === undefined ? true : !!spec.receiveShadow;
     mesh.name = spec.name || "prop";
     return mesh;
   }

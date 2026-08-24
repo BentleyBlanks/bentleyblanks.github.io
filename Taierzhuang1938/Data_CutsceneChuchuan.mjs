@@ -456,18 +456,15 @@ function CarriageLandscapeTree(side, label, id, x, z, height, motion) {
   const name = `${motion}Tree${label}${id}`;
   const branch = (suffix, y, rx, rz) => ({
     kind: "box", size: [0.055, 0.055, 1.25], pos: [x + side * 0.18, y, z + rz],
-    rx, ry: side * 0.34, mat: "TreeBark", color: 0x4d4439, noFog: true, name: `${name}${suffix}`,
+    rx, ry: side * 0.34, mat: "TreeBark", color: 0x4d4439, name: `${name}${suffix}`,
   });
   return [
-    { kind: "cyl", size: [0.105, height], pos: [x, height / 2, z], mat: "TreeBark", color: 0x4d4439, noFog: true, name },
+    { kind: "cyl", size: [0.105, height], pos: [x, height / 2, z], mat: "TreeBark", color: 0x4d4439, name },
     branch("BranchA", height * 0.70, side * 0.54, -0.30),
     branch("BranchB", height * 0.78, -side * 0.43, 0.32),
   ];
 }
 
-// ImageGen 远山贴图是近 16:9 构图；保持这个比例拆成连续小片，避免把一张竖构图
-// 横向硬拉成 44 m 的“灰色照片幕布”。
-const DISTANT_HILL_Z = [-60, -48, -36, -24, -12, 0, 12, 24, 36, 48, 60];
 const CHUCHUAN_ROUTE_START_Z = -742;
 const CHUCHUAN_ROUTE_END_Z = 28;
 const CHUCHUAN_POLE_Z = [
@@ -502,21 +499,19 @@ function CarriageRouteWires(side, label) {
     mat: "Steel", color: 0x282522, noFog: true, name: `RouteWire${label}${wire}`,
   }));
 }
-
 /**
- * 车窗外严格分三层：远山低速、村屋树带中速、路边物件高速。
- * 远山景片只放在 26 m 外，负责遮住世界默认天空／地平线；贴近窗户的全是实体楼、树、
- * 电杆与土堤，因而不可能再出现“整张图片贴满所有窗”的假景效果。
+ * 车窗外：远景是真实 SRTM 高程采样生成的实体网格，绝不使用天空／山脉图片贴片；
+ * 中景是村屋与树带，近景是电杆、秃杨、土堤。只有近、中景随列车掠过。
  */
 function WindowLandscape(side, label) {
-  const farX = side * 26;
   const midX = side * 13.5;
   const nearX = side * 4.35;
-  const ry = side < 0 ? -Math.PI / 2 : Math.PI / 2;
-  const props = [
-    // 最远层：阴云与鲁南低山完整覆盖窗洞后的天空，但离车足够远且移动极慢。
-    // 每片维持原图比例、边缘紧接，绝不把一张图横向硬拉成一面景墙。
-    ...DISTANT_HILL_Z.map((z, index) => ({ kind: "backdrop", size: [12.0, 6.9], pos: [farX, 3.32, z], ry, mat: "CarriageDistantHills", doubleSided: true, unlit: true, flipX: index % 2 === 1, noFog: true, name: `DistantHills${label}${index}` })),
+  return [
+    // 最远层是真实 SRTM 高程网格：保留米制横纵比例，不放任何山景图片贴片。
+    { kind: "heightTerrain", pos: [0, 0, 0], mat: "Ground", castShadow: false, name: `FarTerrain${label}`, terrain: {
+      side, near: 4.0, far: 2500.0, minZ: -910.0, maxZ: 910.0, columns: 88, rows: 72,
+      sourceBounds: [-1250, 1250, -2200, -380], sourceReference: [0, -1470], baseY: 0,
+    } },
     // 中景：整段行程里的村屋、院墙和树带，不用两个模型环形回卷。
     ...CHUCHUAN_MID_SCENERY_Z.flatMap((z, index) => {
       const x = side * (12.4 + (index % 3) * 1.55);
@@ -538,7 +533,6 @@ function WindowLandscape(side, label) {
     ...CHUCHUAN_POLE_Z.flatMap((z, index) => CarriageTelegraphPole(side, label, index, z)),
     ...CHUCHUAN_POLE_Z.filter((_, index) => index % 3 !== 1).flatMap((z, index) => CarriageLandscapeTree(side, label, `Route${index}`, side * (4.45 + (index % 2) * 0.28), z + 8, 3.25 + (index % 3) * 0.52, "NearRoute")),
   ];
-  return props;
 }
 
 /** 和 WindowLandscape 一一对应：同一棵树的干、两根枝共享速度，不能在窗外散架。 */
@@ -553,8 +547,6 @@ function WindowLandscapeMotion(side, label) {
     ];
   };
   return [
-    // 远山：每片维持 16:9，慢到接近静止；它只是距离参照，不是近景假墙。
-    ...DISTANT_HILL_Z.map((z, index) => Move(`DistantHills${label}${index}`, [side * 26, 3.32, z], 0.16)),
     // 中景：连续村庄比路边杆慢，且每块房、墙、树都有自己的里程，不存在回跳点。
     ...CHUCHUAN_MID_SCENERY_Z.flatMap((z, index) => {
       const id = `${label}${index}`;
@@ -625,7 +617,7 @@ export const CS_Chuchuan = {
   stopMusic: true,
   music: null,
   fadeIn: 0.35,
-  cameraFar: 120,
+  cameraFar: 2800,
   suppress: { movement: false, weapon: true, crosshair: true, combatHud: true },
   objective: "在车厢里走走，看看通信排。",
   handoff: { task: "跟随通信排。", once: true },
