@@ -612,6 +612,8 @@ export class CutsceneDirector {
           actor = this.actorFactory.Create(spec.kind || "nra", {
             seed: spec.seed || spec.id,
             uniformHex: spec.uniformHex,
+            trouserHex: spec.trouserHex,
+            accessoryHex: spec.accessoryHex,
           });
         } catch (error) {
           console.warn(`[Cutscene] ${cut.id}: 造 ${spec.id} 失败 —— ${String(error).slice(0, 160)}`);

@@ -1140,7 +1140,10 @@ export class Actor {
       const tag = side < 0 ? "L" : "R";
       // 程序化几何左右腿共用一份（thigh / foot），模型是左右各一份（绑腿的结在外侧、
       // 靴筒的褶不对称）。两种都要能接上，所以按 side 先找、找不到再退回共用的那份。
-      const thigh = AttachBone(this.hips, build.bones[`thigh${tag}`] || build.bones.thigh, this.materials,
+      // 上衣和裤子可以各自着色。只替换大腿的 uniform 桶，绑腿仍沿用装具色，
+      // 因而既能读出不同裤色，也不会把小腿所有布料刷成一整块。
+      const legMaterials = { ...this.materials, uniform: this.materials.trouser };
+      const thigh = AttachBone(this.hips, build.bones[`thigh${tag}`] || build.bones.thigh, legMaterials,
         new THREE.Vector3(side * d.hipHalf, 0, 0));
       const knee = AttachBone(thigh, build.bones[`shin${tag}`], this.materials,
         new THREE.Vector3(0, -d.thighLen, 0));
@@ -2682,7 +2685,7 @@ export class ActorFactory {
     // 这样同一车厢不会因为碰巧抽到同色而变成一排复制人。
     const clothHex = Number.isFinite(options.uniformHex) ? options.uniformHex : seededClothHex;
     const skinHex = HEX.skin[Math.min(HEX.skin.length - 1, Math.floor(rnd() * HEX.skin.length))];
-    const webHex = HEX.nraWebbing[Math.min(HEX.nraWebbing.length - 1, Math.floor(rnd() * HEX.nraWebbing.length))];
+    const seededWebHex = HEX.nraWebbing[Math.min(HEX.nraWebbing.length - 1, Math.floor(rnd() * HEX.nraWebbing.length))];
 
     // tintId 这个字段 Get() 根本不看，它只是为了进 Get 的缓存键：
     // Get 用 JSON.stringify(options) 做键，而 THREE.Color.toJSON() 返回 getHex()，
@@ -2691,7 +2694,11 @@ export class ActorFactory {
       () => lib.Get(recipe, { color: TintTo(recipe, clothHex), tintId: `u${clothHex}`, roughness: 1 }));
 
     // 绑腿「色同军装或更浅」；日方就是同色布脚绊。中方这一桶还兼着子弹带与干粮袋。
-    const accessoryHex = spec.gear === "nra" ? webHex : (spec.gear === "ija" ? clothHex : HEX.nraPuttee);
+    const accessoryHex = Number.isFinite(options.accessoryHex) ? options.accessoryHex
+      : (spec.gear === "nra" ? seededWebHex : (spec.gear === "ija" ? clothHex : HEX.nraPuttee));
+    const trouserHex = Number.isFinite(options.trouserHex) ? options.trouserHex : clothHex;
+    const trouser = this.Material(`trouser:${recipe}:${trouserHex}`,
+      () => lib.Get(recipe, { color: TintTo(recipe, trouserHex), tintId: `t${trouserHex}`, roughness: 1 }));
     const accessory = this.Material(`acc:${recipe}:${accessoryHex}`,
       () => lib.Get(recipe, { color: TintTo(recipe, accessoryHex), tintId: `a${accessoryHex}`, roughness: 1 }));
 
@@ -2706,6 +2713,7 @@ export class ActorFactory {
 
     return {
       uniform,
+      trouser,
       accessory,
       shoe: this.Material(`shoe:${shoeHex}`,
         () => lib.Plain(`shoe${shoeHex}`, { color: shoeHex, roughness: 0.94, metalness: 0 })),

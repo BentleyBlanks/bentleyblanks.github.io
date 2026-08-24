@@ -134,7 +134,18 @@ assert.equal(doorShotStart, 93, "the carriage door opens after the short locatio
 const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
 const interiorCrowd = CS_Chuchuan.cast.filter((actor) => actor.id !== "stretcherBearerA" && actor.id !== "stretcherBearerB"
   && actor.id !== "lightWounded" && actor.id !== "externalOfficer");
-assert.equal(interiorCrowd.length, 64, "the carriage must remain at the approved full load of 64 people");
+const seatedInterior = interiorCrowd.filter((actor) => actor.track?.[0]?.state?.sit === 1);
+const standingBackground = interiorCrowd.filter((actor) => actor.id.startsWith("crowdStand"));
+assert.equal(interiorCrowd.length, 31, "the carriage keeps all seated passengers while leaving its aisle usable");
+assert.equal(seatedInterior.length, 24, "every carriage seat is occupied, including the four focal soldiers");
+assert.equal(standingBackground.length, 6, "only six scattered background passengers stand by the sides and doors");
+assert.ok(standingBackground.every((actor) => Math.abs(actor.track[0].pos[0]) > 1),
+  "standing background passengers stay clear of the center aisle");
+const crowdAppearances = interiorCrowd.filter((actor) => actor.id.startsWith("crowd"));
+assert.ok(new Set(crowdAppearances.map((actor) => actor.uniformHex)).size > 4,
+  "crowd tops use several deterministic colors");
+assert.ok(new Set(crowdAppearances.map((actor) => actor.trouserHex)).size > 4,
+  "crowd trousers use several deterministic colors");
 assert.ok(squadLeader.track.every((frame) => frame.state?.sit !== 1),
   "squad leader remains standing at the rear of the carriage instead of disappearing into a seat");
 assert.ok(Math.abs(squadLeader.track[0].pos[0]) < 0.1 && squadLeader.track[0].pos[2] > 5.5,

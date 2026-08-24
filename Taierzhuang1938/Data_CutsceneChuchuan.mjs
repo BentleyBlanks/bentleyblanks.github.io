@@ -366,10 +366,9 @@ const CHUCHUAN_DOOR_AT = 93.0;
 const CHUCHUAN_TRAIN_STOP_AT = 56.0;
 const CHUCHUAN_SEAT_LIFT = 0.13;
 const CHUCHUAN_END = 102.0;
-// 参考滇越铁路的新闻照片：车厢不是留出宽过道的“展示间”，而是满载、有人坐也有人
-// 扶着行李架站着。五名有台词的重点人物之外，车内固定保持 64 人，避免后续分镜改写
-// 又把群众层删回五个人。
-const CHUCHUAN_INTERIOR_TARGET = 64;
+// 参考滇越铁路的新闻照片：车厢座位坐满，过道则留给上下车和整理行李；只有少数人
+// 靠着侧壁、车门或行李架站着。五名有台词的重点人物之外，人群仍是稳定的背景层，
+// 但不把车厢排成挤满人的展示间。
 
 function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
   const stopAt = 56.8 + stopDelay;
@@ -409,7 +408,7 @@ function CarRearLeaderTrack(pos, exitAt, exitEnd, exitX, facingRy = 0) {
   ];
 }
 
-/** 站在车厢中央的兵保持满载姿态；黑场地点卡内才随排撤下，不在开门镜里凭空闪走。 */
+/** 靠侧壁、行李架或车门站着的兵保持原位；黑场地点卡内才随排撤下，不在开门镜里凭空闪走。 */
 function CarStandTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
   const stopAt = 56.8 + stopDelay;
   const { sit: _sit, ...standingLife } = lifeState || {};
@@ -425,15 +424,25 @@ function CarStandTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
 }
 
 const CHUCHUAN_CROWD_UNIFORMS = [0x5C6674, 0x687382, 0x747F8C, 0x7F857A, 0x828A93, 0x8A8778, 0x767E75, 0x918879];
+const CHUCHUAN_CROWD_TROUSERS = [0x41484D, 0x4C5660, 0x565C5E, 0x625F54, 0x3D4547, 0x626A69, 0x50585E];
+const CHUCHUAN_CROWD_WEBBING = [0x8C8467, 0x7B7660, 0x6F6A55, 0x746D58];
 const CHUCHUAN_CROWD_LIFE = [
   { sleep: 0.38 }, { warmHands: 0.62 }, { checkAmmo: 0.46 }, { watch: 0.44 },
   { checkAmmo: 0.18 }, { cleanRifle: 0.34 }, { sit: 0.82 }, { repairShoe: 0.28 },
 ];
 
+/** 以序号稳定分配上衣、长裤和装具，重播、截图与存档都不会因随机数变色。 */
+function CrowdAppearance(n) {
+  return {
+    uniformHex: CHUCHUAN_CROWD_UNIFORMS[n % CHUCHUAN_CROWD_UNIFORMS.length],
+    trouserHex: CHUCHUAN_CROWD_TROUSERS[(n * 3 + 1) % CHUCHUAN_CROWD_TROUSERS.length],
+    accessoryHex: CHUCHUAN_CROWD_WEBBING[(n * 5 + 2) % CHUCHUAN_CROWD_WEBBING.length],
+  };
+}
+
 /**
- * 64 名车内人群：20 人挤在八段长凳上，39 人夹在通道和行李架下站着，再加后端班长。
- * 这是特写演员之外的“原始新闻图注”式背景层——高密度、非整齐阅兵列队、有人打盹、
- * 有人护枪、有人背向镜头。人数被常量和校验锁死，不能再被精简时悄悄削掉。
+ * 车厢的座位全部坐满：两侧各十名背景乘客、再加四名重点人物。过道只留六名零星
+ * 站客，分别靠侧壁、行李架和远端车门，既有满载感也能看清班长与车门方向。
  */
 function CreateCarriageCrowdCast() {
   const crowd = [];
@@ -444,25 +453,24 @@ function CreateCarriageCrowdCast() {
       const n = crowd.length;
       crowd.push({
         id, kind: "nra", weapon: n % 3 === 0 ? null : "HanYang", seed: `chuchuan${id}`,
-        uniformHex: CHUCHUAN_CROWD_UNIFORMS[n % CHUCHUAN_CROWD_UNIFORMS.length],
+        ...CrowdAppearance(n),
         track: CarSeatTrack([side * 1.95, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[n % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.52, 95.2 + (n % 5) * 0.3, 97 + (n % 5) * 0.3, side * (0.35 + (n % 4) * 0.30), side < 0 ? -Math.PI / 2 : Math.PI / 2),
       });
     });
   }
-  const standingZ = [-7.15, -5.78, -4.41, -3.04, -1.67, -0.30, 1.07, 2.44, 3.81, 5.18, 6.55];
-  for (const z of standingZ) {
-    // 中央留一条视线/挪身缝，不是现代宽过道；班长站在缝尽头仍能被整车看见。
-    for (const x of [-1.20, -0.72, 0.72, 1.20]) {
-      if (crowd.length >= CHUCHUAN_INTERIOR_TARGET - 5) break;
-      const n = crowd.length;
-      const id = `crowdStand${n + 1}`;
-      crowd.push({
-        id, kind: "nra", weapon: n % 3 === 1 ? null : "HanYang", seed: `chuchuan${id}`,
-        uniformHex: CHUCHUAN_CROWD_UNIFORMS[n % CHUCHUAN_CROWD_UNIFORMS.length],
-        track: CarStandTrack([x, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[(n + 3) % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.48, z < 0 ? 0 : Math.PI),
-      });
-    }
-  }
+  const standingPlaces = [
+    [-1.22, -6.68, 0], [1.20, -4.42, Math.PI], [-1.17, -0.28, 0],
+    [1.22, 2.38, Math.PI], [-1.20, 5.05, 0], [1.16, 6.58, Math.PI],
+  ];
+  standingPlaces.forEach(([x, z, ry], index) => {
+    const n = crowd.length;
+    const id = `crowdStand${index + 1}`;
+    crowd.push({
+      id, kind: "nra", weapon: n % 3 === 1 ? null : "HanYang", seed: `chuchuan${id}`,
+      ...CrowdAppearance(n),
+      track: CarStandTrack([x, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[(n + 3) % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.48, ry),
+    });
+  });
   return crowd;
 }
 
