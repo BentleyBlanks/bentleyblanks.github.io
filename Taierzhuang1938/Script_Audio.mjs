@@ -214,12 +214,16 @@ function Glide(param, t, from, to, seconds) {
 // 节点没人 disconnect，几分钟就泄漏满了（Chrome 不会替你收还在 connect 的节点）。
 // ===========================================================================
 class Voice {
-  constructor(engine, startTime, pitch, rng) {
+  constructor(engine, startTime, pitch, rng, offset = 0) {
     this.engine = engine;
     this.ctx = engine.ctx;
     this.t = startTime;
     this.pitch = pitch;
     this.rng = rng;
+    // Timeline seek 只对采样源有“从中间开始”的语义。合成配方照常从头构造，
+    // 外部人声配方在 Start() 时显式消费这份偏移。
+    this.offset = Math.max(0, Number(offset) || 0);
+    this.duration = 0;
     this.nodes = [];
     this.life = 0.6;          // 秒；配方可以往上抬
     this.out = null;          // 由 Play 建好后塞进来
@@ -292,9 +296,9 @@ class Voice {
   }
 
   /** 启动一个源节点（Osc / BufferSource），并把 voice 寿命推到它之后。 */
-  Start(node, at, duration) {
+  Start(node, at, duration, offset = node.__offset || 0) {
     const t = at ?? this.t;
-    if (node.buffer) node.start(t, node.__offset || 0, duration ?? node.__dur ?? node.buffer.duration);
+    if (node.buffer) node.start(t, offset, duration ?? node.__dur ?? Math.max(0.01, node.buffer.duration - offset));
     else node.start(t);
     const stop = t + (duration ?? node.__dur ?? 1);
     if (node.stop) node.stop(stop + 0.02);
@@ -2146,7 +2150,10 @@ export class AudioEngine {
           // 只有 6 个标准普通话音色，靠 ±4% 的变调把一个班喊出不同的人来。
           src.playbackRate.value = v.pitch;
           src.connect(v.out);
-          v.Start(src, v.t, buf.duration / Math.max(0.1, v.pitch));
+          const offset = Math.min(Math.max(0, v.offset || 0), Math.max(0, buf.duration - 0.01));
+          const duration = Math.max(0.01, (buf.duration - offset) / Math.max(0.1, v.pitch));
+          v.duration = duration;
+          v.Start(src, v.t, duration, offset);
         };
         MIX_GAIN[name] = e.gain ?? 1;
         NODE_COST[name] = 2;
@@ -2488,7 +2495,7 @@ export class AudioEngine {
   /** 某个 cue 被请求过多少次。取证专用（见 this.playRequests 的抬头）。 */
   RequestedCount(name) { return this.playRequests.get(name) || 0; }
 
-  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, pan = 0, burst = null, priority = false,
+  Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0 } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
@@ -2549,7 +2556,7 @@ export class AudioEngine {
     const t = now + Math.max(0, delay) + 0.005;   // 留 5 ms 调度余量，免得首音被吃
     // 种子 = 名字哈希 ^ 播放序号：确定性，但同一个音效每次不一样。
     const rng = Mulberry32((HashString(name) ^ Math.imul(this.playCounter += 1, 2654435761)) >>> 0);
-    const v = new Voice(this, t, pitch, rng);
+    const v = new Voice(this, t, pitch, rng, offset);
     v.burst = burst ?? BURST_DEFAULT[name] ?? null;
 
     // 源 gain（干声起点）。混音表在这儿乘进去，配方里不必关心整体平衡。
@@ -2620,6 +2627,16 @@ export class AudioEngine {
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.ReleaseVoice(v, v.life);
     return v;
+  }
+
+  /** Timeline 拖动前掐掉上一播放头，避免旧对白与目标时间的对白叠在一起。 */
+  StopVoice(voice) {
+    if (!voice || !Array.isArray(voice.nodes)) return false;
+    for (const node of voice.nodes) {
+      try { if (typeof node.stop === "function") node.stop(); } catch (error) { /* 已经自然结束 */ }
+    }
+    this.FreeVoice(voice);
+    return true;
   }
 
   /** 到点断开所有节点并归还预算。**唯一的防泄漏出口**。 */

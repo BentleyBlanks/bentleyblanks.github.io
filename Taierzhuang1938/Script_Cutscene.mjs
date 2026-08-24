@@ -332,6 +332,9 @@ export class CutsceneDirector {
     this.cardHold = 0;
     this.savedCamera = null;
     this.savedAudio = null;
+    // Timeline seek 会主动终止旧播放头，再从目标时间重建仍在持续的对白。
+    // 不留这本账，快速拖动几次就会叠出好几个人声。
+    this.activeCueVoices = new Set();
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.lookNeutral = false;
@@ -526,6 +529,7 @@ export class CutsceneDirector {
   Skip() {
     if (!this.playing || this.skipped) return;
     this.skipped = true;
+    this.StopCueAudio();
     const card = this._SkipCardOf(this.cut);
     this._TeardownSet();
     this._ClearText();
@@ -978,7 +982,9 @@ export class CutsceneDirector {
     // 远平面：正片按关给（L5 收到 400 m 是为了压 draw call），但过场常要拍
     // 几百米外的城墙剪影 —— 远处的大布景会在远平面上被硬切出一个断头。
     // shot.cameraFar / cut.cameraFar 给了就用它，播完 _RestoreCamera 还原。
-    const wantFar = shot.cameraFar ?? (this.cut && this.cut.cameraFar);
+    const wantFar = shot.cameraFar ?? (this.cut && this.cut.cameraFar) ?? this.savedCamera?.far;
+    // shot A 的 cameraFar 不能泄漏进 shot B。以前只在“有覆盖值”时写，切到没写
+    // cameraFar 的下一镜仍沿用上一镜，远景会忽然被裁掉或深度精度骤降。
     if (wantFar && this.camera.far !== wantFar) this.camera.far = wantFar;
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(target);
@@ -1198,12 +1204,54 @@ export class CutsceneDirector {
     return Number(entry?.duration) > 0 ? Number(entry.duration) : 0;
   }
 
-  _PlayVoice(cue) {
+  _PlayVoice(cue, offset = 0) {
     if (!cue || !this.audio || typeof this.audio.Play !== "function") return 0;
     const name = String(cue).startsWith("voice.") ? String(cue) : `voice.${cue}`;
-    const voice = this.audio.Play(name, { volume: 1, priority: true });
+    const voice = this.audio.Play(name, { volume: 1, priority: true, offset });
+    if (voice) this.activeCueVoices.add(voice);
     // 缺声库时 Play 会稳定地返回 null；字幕仍按数据时长显示，不阻塞过场。
     return voice && Number(voice.duration) > 0 ? Number(voice.duration) : this._VoiceDuration(String(cue).replace(/^voice\./, ""));
+  }
+
+  /** 终止当前过场自己发出的播放头；环境床与游戏的其他声音不碰。 */
+  StopCueAudio() {
+    for (const voice of this.activeCueVoices) {
+      if (this.audio && typeof this.audio.StopVoice === "function") this.audio.StopVoice(voice);
+      else if (voice && Array.isArray(voice.nodes)) {
+        for (const node of voice.nodes) {
+          try { if (typeof node.stop === "function") node.stop(); } catch (error) { /* 已结束 */ }
+        }
+      }
+    }
+    this.activeCueVoices.clear();
+  }
+
+  /**
+   * Timeline 静音快进到目标后，从目标采样点重建仍在持续的人声。
+   * 短促 SFX 不倒放、不补放；它们没有连续时间语义，跳过就应当跳过。
+   */
+  SyncCueAudioAtTime() {
+    if (!this.playing || !this.cut || !this.audio) return 0;
+    this.StopCueAudio();
+    let shotStart = 0;
+    let resumed = 0;
+    const seen = new Set();
+    for (const shot of this.cut.shots || []) {
+      for (const cue of [...(shot.subs || []), ...(shot.lines || [])]) {
+        const voiceCue = cue.voiceCue ?? cue.voice ?? null;
+        if (!voiceCue) continue;
+        const at = shotStart + (Number(cue.at) || 0);
+        const offset = this.time - at;
+        const duration = this._VoiceDuration(String(voiceCue).replace(/^voice\./, ""));
+        const identity = `${voiceCue}:${at}`;
+        if (seen.has(identity) || !(duration > 0) || offset < 0 || offset >= duration) continue;
+        seen.add(identity);
+        this._PlayVoice(voiceCue, offset);
+        resumed += 1;
+      }
+      shotStart += shot.seconds || 0;
+    }
+    return resumed;
   }
 
   _FireCues(cut, shot, shotStart, local) {
@@ -1242,7 +1290,8 @@ export class CutsceneDirector {
       if (this.fired.has(id) || !crossed(sfx.at)) return;
       this.fired.add(id);
       if (this.audio && typeof this.audio.Play === "function") {
-        this.audio.Play(sfx.name, { volume: sfx.volume ?? 0.5 });
+        const voice = this.audio.Play(sfx.name, { volume: sfx.volume ?? 0.5 });
+        if (voice) this.activeCueVoices.add(voice);
       }
     });
   }
@@ -1336,6 +1385,8 @@ export class CutsceneDirector {
 
   _Finish(silent) {
     if (!this.playing && !this.cut) return;
+    if (silent) this.StopCueAudio();
+    else this.activeCueVoices.clear();
     this.playing = false;
     this.cardTime = -1;
     this._TeardownSet();

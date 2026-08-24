@@ -128,6 +128,7 @@ export class TimelineEditor {
     check.appendChild(this.logBox);
     Note(check, "分镜秒数之和必须等于声明时长；对不上 Play() 会直接抛错 —— "
       + "这类改动在画面上看不出来，只表现为字幕来不及读完。", true);
+    Note(check, "按住 Alt 可临时释放鼠标：序章自由视线暂停响应，松开后继续审片。", true);
   }
 
   // -------------------------------------------------------------------------
@@ -199,6 +200,7 @@ export class TimelineEditor {
   Stop() {
     const director = this.director;
     this.playing = false;
+    director?.StopCueAudio?.();
     if (director && director.Playing) {
       // Skip 之后还有一张补卡要读；编辑器要的是「立刻停」，所以再推一大步把它收掉
       director.Skip();
@@ -207,12 +209,14 @@ export class TimelineEditor {
     this.pending = null;
   }
 
-  /** 拖到 t 秒：从头重放一遍再静音快进。 */
+  /** 拖到 t 秒：从头重放一遍再静音快进，并从目标采样点接回仍在持续的对白。 */
   Seek(seconds) {
     const director = this.director;
     const cut = CUTSCENES[this.cutId];
     if (!director || !cut) return;
+    const wasPlaying = this.playing;
     const target = Math.max(0, Math.min(cut.seconds - 0.01, seconds));
+    director.StopCueAudio?.();
     if (director.Playing) { director.Skip(); director.Update(99); }
     const audio = director.audio;
     director.audio = null;                 // 快进期间不许出声（一整场的枪声会同时炸开）
@@ -229,12 +233,25 @@ export class TimelineEditor {
     } finally {
       director.audio = audio;
     }
-    this.playing = false;
+    director.SyncCueAudioAtTime?.();
+    // 播放中点时间轴会继续走；暂停时点时间轴仍保持暂停，符合常见剪辑器手感。
+    this.playing = wasPlaying;
+    // 不等下一帧才更新当前镜。快速连续点“下一镜”时，下一次点击必须立刻读到
+    // 刚跳到的镜号，否则每次都会重复跳同一镜。
+    this.Update(0);
   }
 
   StepShot(delta) {
     const cut = CUTSCENES[this.cutId];
-    const index = Math.max(0, Math.min(cut.shots.length - 1, this.shotIndex + delta));
+    const currentTime = this.director?.Playing ? this.director.Time : 0;
+    let currentIndex = 0;
+    let cursor = 0;
+    for (let i = 0; i < cut.shots.length; i += 1) {
+      currentIndex = i;
+      if (currentTime < cursor + cut.shots[i].seconds) break;
+      cursor += cut.shots[i].seconds;
+    }
+    const index = Math.max(0, Math.min(cut.shots.length - 1, currentIndex + delta));
     let at = 0;
     for (let i = 0; i < index; i += 1) at += cut.shots[i].seconds;
     this.Seek(at + 0.001);

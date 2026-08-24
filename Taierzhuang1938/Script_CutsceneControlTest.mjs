@@ -17,6 +17,18 @@ const oldCut = {
   id: "TEST_Old", title: "old", seconds: 1, cast: [], props: [],
   shots: [{ n: 1, seconds: 1, focalMm: 50, camera: { from: [0, 1, 4], look: [0, 1, 0] } }],
 };
+const switchCut = {
+  id: "TEST_Switch", title: "switch", seconds: 2, cast: [], props: [],
+  shots: [
+    { n: 1, seconds: 1, focalMm: 50, cameraFar: 640, camera: { from: [0, 1, 4], look: [0, 1, 0] } },
+    { n: 2, seconds: 1, focalMm: 50, camera: { from: [1, 1, 4], look: [0, 1, 0] } },
+  ],
+};
+const seekCut = {
+  id: "TEST_Seek", title: "seek", seconds: 3, cast: [], props: [],
+  shots: [{ n: 1, seconds: 3, focalMm: 50, camera: { from: [0, 1, 4], look: [0, 1, 0] },
+    lines: [{ at: 0.2, seconds: 2, voiceCue: "seek_voice", text: "seek" }] }],
+};
 
 assert.deepEqual(ResolveHeadLookConfig(cut).yaw, [-0.2, 0.2]);
 assert.equal(ClampHeadLook(4, [-1, 1]), 1, "yaw clamp upper boundary");
@@ -115,6 +127,37 @@ oldDirector.Update(0);
 assert.equal(oldDirector.camera._yaw, oldYaw, "old cutscene camera behavior is unchanged");
 oldDirector.Skip();
 await oldPlay;
+
+const switchCamera = new FakeCamera();
+const switchDirector = new Director({ camera: switchCamera, scene: new FakeScene(), table: { [switchCut.id]: switchCut } });
+const switchPlay = switchDirector.Play(switchCut.id);
+switchDirector.Update(0.5);
+assert.equal(switchCamera.far, 640, "shot cameraFar applies inside the authored shot");
+switchDirector.Update(0.6);
+assert.equal(switchCamera.far, 100, "the next shot restores the saved far plane instead of inheriting the prior shot");
+switchDirector.Skip();
+await switchPlay;
+
+const seekAudio = {
+  voiceBank: new Map([["seek_voice", { duration: 2 }]]), plays: [], stops: 0,
+  Play(name, opts) {
+    this.plays.push({ name, offset: opts.offset || 0 });
+    return { nodes: [], duration: Math.max(0, 2 - (opts.offset || 0)) };
+  },
+  StopVoice() { this.stops += 1; },
+};
+const seekDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), audio: seekAudio,
+  table: { [seekCut.id]: seekCut } });
+const seekPlay = seekDirector.Play(seekCut.id);
+const attachedAudio = seekDirector.audio;
+seekDirector.audio = null;
+seekDirector.Update(1.2);
+seekDirector.audio = attachedAudio;
+assert.equal(seekDirector.SyncCueAudioAtTime(), 1, "seek rebuilds the voice active at the target time");
+assert.deepEqual(seekAudio.plays.at(-1), { name: "voice.seek_voice", offset: 1 },
+  "seeked voice starts from its matching sample offset");
+seekDirector.Skip();
+await seekPlay;
 
 const motivationShot = CS_Chuchuan.shots.find((shot) => shot.n === 6);
 const motivationStart = CS_Chuchuan.shots.slice(0, 5).reduce((sum, shot) => sum + shot.seconds, 0);

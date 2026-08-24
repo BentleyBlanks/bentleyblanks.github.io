@@ -888,6 +888,7 @@ async function Boot() {
         element: PointerLocked() ? "canvas" : null,
         fake: FAKE_POINTER_LOCK,
         browserLocked: document.pointerLockElement !== null,
+        mouseFree: altMouseFree,
       }),
       ReleasePointerLock,
       // 模拟浏览器吞掉 Esc、只抛 pointerlockchange 的真实路径；菜单冒烟锁死这条回归。
@@ -1835,6 +1836,9 @@ const keys = new Set();
  */
 const FAKE_POINTER_LOCK = !!(SHOT || navigator.webdriver);
 let fakeLocked = false;
+// Timeline / 序章审片：Alt 按住期间鼠标归用户，导演自由视线也暂停吃 movement。
+// 单纯 exitPointerLock 不够，真实浏览器里先前 pending 的 request 仍可能稍后成功。
+let altMouseFree = false;
 // 自己主动交还指针锁（过场、菜单、失焦）不等于玩家按 Esc。
 // 真浏览器会吞掉锁内的 Esc 键，只留下 pointerlockchange，所以必须记住解锁来源。
 let intentionalPointerUnlock = false;
@@ -1854,7 +1858,7 @@ function PointerLocked() {
  * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
  */
 function RequestPointerLock() {
-  if (SHOT) return;
+  if (SHOT || altMouseFree || (editor && editor.Capturing)) return;
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
     return;
@@ -1899,6 +1903,8 @@ function ReleasePointerLock() {
 function OnPointerLockChange() {
   // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
   if (PointerLocked()) {
+    // Alt 或编辑器已接管时，晚到的异步 requestPointerLock 也必须立即退回去。
+    if (altMouseFree || (editor && editor.Capturing)) { ReleasePointerLock(); return; }
     intentionalPointerUnlock = false;
     return;
   }
@@ -2281,7 +2287,22 @@ const router = new InputRouter({
 });
 router.Bind(document);
 
+document.addEventListener("keydown", (event) => {
+  if (event.code !== "AltLeft" && event.code !== "AltRight") return;
+  altMouseFree = true;
+  ReleasePointerLock();
+  event.preventDefault();
+});
+document.addEventListener("keyup", (event) => {
+  if (event.code !== "AltLeft" && event.code !== "AltRight") return;
+  altMouseFree = false;
+  // Timeline 里松 Alt 后仍要能点面板；普通玩法则恢复原来的锁定手感。
+  if (state.running && !state.menu && !state.cutscene && !(editor && editor.Capturing)) RequestPointerLock();
+  event.preventDefault();
+});
+
 document.addEventListener("mousemove", (e) => {
+  if (altMouseFree) return;
   // headLook 是过场唯一开放的连续输入；不要求玩家锁住指针，避免 Esc 被浏览器吞掉。
   if (cutscene && cutscene.Playing) {
     if (cutscene.AllowsLook) cutscene.AddLook(e.movementX, e.movementY);
@@ -3339,6 +3360,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 // ---------------------------------------------------------------------------
 document.addEventListener("pointerlockchange", OnPointerLockChange);
 window.addEventListener("blur", () => {
+  altMouseFree = false;
   ReleasePointerLock();
   // 预览没有玩家控制权；失焦时直接走一次与 Esc 相同的收口路径，避免
   // 标签页隐藏后留下一个永远占着相机/字幕层的 Promise。

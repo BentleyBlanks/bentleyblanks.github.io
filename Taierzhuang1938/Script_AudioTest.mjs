@@ -56,6 +56,10 @@ await page.waitForFunction(
   () => { const a = window.Taierzhuang.audio; return a.sfxReady || a.sfxErrors.length > 0; },
   { timeout: 60000 },
 ).catch(() => {});
+await page.waitForFunction(
+  () => { const a = window.Taierzhuang.audio; return a.voicesReady || a.voiceErrors.length > 0; },
+  { timeout: 60000 },
+).catch(() => {});
 
 const load = await page.evaluate(() => {
   const a = window.Taierzhuang.audio;
@@ -89,6 +93,26 @@ if (load.errors.length) Fail(`采样载入报错 ${JSON.stringify(load.errors)}`
 else Ok("采样载入零报错");
 if (load.prologueSfx.length) Fail(`序章专用音未盖上：${load.prologueSfx.join(" ")}`);
 else Ok("序章 7 条专用音全部盖上");
+
+const voiceSeek = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  const key = "prologue_young_dispatch_01";
+  const entry = a.voiceBank.get(key);
+  if (!entry) return null;
+  const name = `voice.${key}`;
+  a.lastPlayAt.delete(name);
+  const voice = a.Play(name, { priority: true, volume: 0.01, offset: 0.5 });
+  if (!voice) return { full: entry.duration, voice: null };
+  const out = { full: entry.duration, offset: voice.offset, duration: voice.duration };
+  a.StopVoice(voice);
+  return out;
+});
+if (!voiceSeek || voiceSeek.duration === undefined) {
+  Fail(`序章人声无法做采样跳转：${JSON.stringify(voiceSeek)}`);
+} else if (Math.abs(voiceSeek.offset - 0.5) > 0.001
+    || Math.abs(voiceSeek.duration - (voiceSeek.full - 0.5)) > 0.05) {
+  Fail(`人声采样偏移不对：${JSON.stringify(voiceSeek)}`);
+} else Ok("序章人声可从 Timeline 目标采样点起播");
 
 // 军号是「一个音 + playbackRate 排动机」，基频量错了整段跑调 ——
 // 495.5 Hz 是 Last Post 那个持续音的实测值（G 号的 B4）。

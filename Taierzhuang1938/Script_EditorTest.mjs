@@ -480,7 +480,7 @@ await Step(10);
 const timeline = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
-  const out = { id: editor.ActiveId, cuts: [] };
+  const out = { id: editor.ActiveId, cuts: [], audioSeek: null, rapidShot: null };
   const ids = ["CS_Chuchuan", "CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
   for (const id of ids) {
     active.SelectCut(id);
@@ -494,14 +494,75 @@ const timeline = await page.evaluate(() => {
     });
     active.Stop();
   }
+  // 静音快进后，目标时刻仍在持续的对白应从对应采样点接回，而不是从头播或没声。
+  active.SelectCut("CS_Chuchuan");
+  const audio = window.Taierzhuang.audio;
+  const originalPlay = audio.Play;
+  const originalStopVoice = audio.StopVoice;
+  const originalVoice = audio.voiceBank.get("prologue_young_dispatch_01");
+  const calls = [];
+  audio.voiceBank.set("prologue_young_dispatch_01", { ...(originalVoice || {}), duration: 4 });
+  audio.Play = function(name, opts = {}) {
+    calls.push({ name, offset: Number(opts.offset || 0) });
+    return { nodes: [], duration: Math.max(0, 4 - Number(opts.offset || 0)) };
+  };
+  audio.StopVoice = () => true;
+  try {
+    active.Seek(9.2);
+    out.audioSeek = calls.findLast((entry) => entry.name === "voice.prologue_young_dispatch_01") || null;
+  } finally {
+    active.Stop();
+    audio.Play = originalPlay;
+    audio.StopVoice = originalStopVoice;
+    if (originalVoice) audio.voiceBank.set("prologue_young_dispatch_01", originalVoice);
+    else audio.voiceBank.delete("prologue_young_dispatch_01");
+  }
+
+  // 连点三次必须连过三镜；不能依赖下一帧才更新的 UI shotIndex。
+  active.Seek(0.1);
+  active.StepShot(1);
+  active.StepShot(1);
+  active.StepShot(1);
+  out.rapidShot = { shot: active.shotIndex, time: window.Taierzhuang.cutscene.Time };
+  active.Stop();
   return out;
 });
 Check("Timeline 打开", timeline.id === "timeline");
 const seekOk = timeline.cuts.every((c) => c.playing && Math.abs(c.time - 6.0) < 0.4);
 Check("六场（含新版与 Legacy）都能拖到 6.0 s", seekOk,
   timeline.cuts.map((c) => `${c.id}=${c.time}`).join(" "));
+Check("Timeline 跳转会同步到对白采样位置",
+  timeline.audioSeek?.name === "voice.prologue_young_dispatch_01"
+    && Math.abs(timeline.audioSeek.offset - 0.6) < 0.05,
+  JSON.stringify(timeline.audioSeek));
+Check("快速连续切镜不会重复卡在同一镜", timeline.rapidShot?.shot === 3,
+  JSON.stringify(timeline.rapidShot));
 const stopped = await page.evaluate(() => window.Taierzhuang.cutscene.Playing);
 Check("停下来之后过场不再占着相机", stopped === false);
+
+// 序章 headLook 即使没有指针锁也会吃 mousemove；Alt 必须临时把鼠标完整还出来。
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.SelectCut("CS_Chuchuan");
+  active.Seek(9.2);
+  window.Taierzhuang.cutscene.SetNeutralLook(false);
+});
+await page.keyboard.down("Alt");
+const altMouse = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const before = { ...T.cutscene.Look };
+  const event = new MouseEvent("mousemove", { bubbles: true });
+  Object.defineProperty(event, "movementX", { value: 120 });
+  Object.defineProperty(event, "movementY", { value: -80 });
+  document.dispatchEvent(event);
+  return { before, after: { ...T.cutscene.Look }, lock: T.Debug.PointerLock() };
+});
+await page.keyboard.up("Alt");
+Check("Timeline 按住 Alt 会释放鼠标并暂停序章视线",
+  altMouse.lock.mouseFree && !altMouse.lock.locked
+    && altMouse.before.yaw === altMouse.after.yaw && altMouse.before.pitch === altMouse.after.pitch,
+  JSON.stringify(altMouse));
+await page.evaluate(() => window.Taierzhuang.editor.active.Stop());
 
 // ---------------------------------------------------------------------------
 // 6) 拆分后的场景关卡编辑器
