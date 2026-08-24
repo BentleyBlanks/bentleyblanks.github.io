@@ -651,9 +651,8 @@ export class CutsceneDirector {
         uv.needsUpdate = true;
       }
     } else if (spec.kind === "backdrop") {
-      // 车窗外的景片是竖直的，不可沿用 ground plane 的 -90° 旋转。
-      // 以两张可重叠的长景片循环，远景从窗顶到轨枕全遮住，绝不再露出
-      // 世界默认天空或地平线的接缝。
+      // 车窗外的远山层是竖直的，不可沿用 ground plane 的 -90° 旋转。
+      // 它只承担最远层云山并盖住世界默认天空／地平线；近中景仍由独立实体构成。
       geometry = new THREE.PlaneGeometry(size[0], size[1]);
     } else {
       geometry = new THREE.BoxGeometry(size[0], size[1], size[2] ?? size[0]);
@@ -704,6 +703,35 @@ export class CutsceneDirector {
       if (spec.inside) base.side = THREE.BackSide;
       material = base;
       this.ownedMaterials.push(base);
+    }
+    // 带有画面自身光照的远山景片不能复用 Ground 的法线／粗糙度图；否则一张
+    // 低山照片会被程序化石粒法线压成雪白的横纹。unlit 保留已预载的 albedo，
+    // 但以无光照材质原样画出它。
+    if (spec.unlit && material) {
+      let map = material.map || null;
+      // 相邻山片交替镜像：一片的右缘和下一片的左缘来自同一条像素边，
+      // 这样能连续铺开一张非全景原图，而不会露出一格一格的贴图接缝。
+      if (map && spec.flipX) {
+        map = map.clone();
+        map.wrapS = THREE.RepeatWrapping;
+        map.repeat.x = -1;
+        map.offset.x = 1;
+        map.needsUpdate = true;
+      }
+      const flat = new THREE.MeshBasicMaterial({
+        map, color: spec.color ?? 0xffffff,
+        side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+      });
+      material = flat;
+      this.ownedMaterials.push(flat);
+    }
+    // 车厢外的分层景物用独立世界尺度摆放。场景雾若照常套到 13–26 m 的小模型上，
+    // 会把远山、村屋全部漂成一片白，反而重新露出“没有窗外”的穿帮。仅数据明确标记
+    // noFog 的物件关掉雾，其他战场道具仍保持原有雾效。
+    if (spec.noFog && material) {
+      material = material.clone();
+      material.fog = false;
+      this.ownedMaterials.push(material);
     }
 
     const mesh = new THREE.Mesh(geometry, material);

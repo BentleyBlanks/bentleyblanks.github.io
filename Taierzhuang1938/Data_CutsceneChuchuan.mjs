@@ -451,22 +451,88 @@ function CarriageBench(side, label) {
   return props;
 }
 
+/** 一棵窗外掠过的三月秃杨：干与枝分开，近景不会再读成一根孤零零的柱子。 */
+function CarriageLandscapeTree(side, label, id, x, z, height, motion) {
+  const name = `${motion}Tree${label}${id}`;
+  const branch = (suffix, y, rx, rz) => ({
+    kind: "box", size: [0.055, 0.055, 1.25], pos: [x + side * 0.18, y, z + rz],
+    rx, ry: side * 0.34, mat: "TreeBark", color: 0x4d4439, noFog: true, name: `${name}${suffix}`,
+  });
+  return [
+    { kind: "cyl", size: [0.105, height], pos: [x, height / 2, z], mat: "TreeBark", color: 0x4d4439, noFog: true, name },
+    branch("BranchA", height * 0.70, side * 0.54, -0.30),
+    branch("BranchB", height * 0.78, -side * 0.43, 0.32),
+  ];
+}
+
+// ImageGen 远山贴图是近 16:9 构图；保持这个比例拆成连续小片，避免把一张竖构图
+// 横向硬拉成 44 m 的“灰色照片幕布”。
+const DISTANT_HILL_Z = [-60, -48, -36, -24, -12, 0, 12, 24, 36, 48, 60];
+
 /**
- * 一侧窗外的开放式乡野：地面一律水平铺，树、村舍和低土岗是离散物件。
- * 绝不再用一面 56 m 长、4.3 m 高的竖盒假装远景——那正是“全是遮拦”的根因。
+ * 车窗外严格分三层：远山低速、村屋树带中速、路边物件高速。
+ * 远山景片只放在 26 m 外，负责遮住世界默认天空／地平线；贴近窗户的全是实体楼、树、
+ * 电杆与土堤，因而不可能再出现“整张图片贴满所有窗”的假景效果。
  */
 function WindowLandscape(side, label) {
-  const x = side * 3.18;
+  const farX = side * 26;
+  const midX = side * 13.5;
+  const nearX = side * 4.35;
   const ry = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+  const props = [
+    // 最远层：阴云与鲁南低山完整覆盖窗洞后的天空，但离车足够远且移动极慢。
+    // 每片维持原图比例、边缘紧接，绝不把一张图横向硬拉成一面景墙。
+    ...DISTANT_HILL_Z.map((z, index) => ({ kind: "backdrop", size: [12.0, 6.9], pos: [farX, 3.32, z], ry, mat: "CarriageDistantHills", doubleSided: true, unlit: true, flipX: index % 2 === 1, noFog: true, name: `DistantHills${label}${index}` })),
+    // 中景：低矮村屋与树带。它们是可读的实体，而非覆盖窗的第二张照片。
+    { kind: "box", size: [2.65, 1.42, 3.55], pos: [midX, 0.71, -6], mat: "Adobe", color: 0x8d7c65, noFog: true, name: `MidHouse${label}A` },
+    { kind: "box", size: [2.95, 0.13, 2.10], pos: [midX, 1.52, -6.72], ry: side * 0.16, rz: side * 0.44, mat: "RoofTile", color: 0x625a50, noFog: true, name: `MidHouseRoof${label}A` },
+    { kind: "box", size: [2.72, 1.25, 3.10], pos: [side * 15.4, 0.625, 6], mat: "BrickWall", color: 0x827768, noFog: true, name: `MidHouse${label}B` },
+    { kind: "box", size: [3.05, 0.13, 1.90], pos: [side * 15.4, 1.37, 5.38], ry: -side * 0.12, rz: -side * 0.42, mat: "RoofTile", color: 0x5b554d, noFog: true, name: `MidHouseRoof${label}B` },
+    { kind: "box", size: [0.35, 0.72, 13.0], pos: [side * 12.2, 0.36, -2], mat: "GroundRubble", color: 0x655d50, noFog: true, name: `MidWall${label}A` },
+    ...CarriageLandscapeTree(side, label, "A", side * 11.6, -2, 3.8, "Mid"),
+    ...CarriageLandscapeTree(side, label, "B", side * 14.6, 10, 4.5, "Mid"),
+    // 近景：土堤、树、电杆和横担以接近列车速度掠过，清楚地给出运动方向与纵深。
+    { kind: "box", size: [1.05, 0.58, 16.0], pos: [nearX, 0.20, -8], mat: "GroundRubble", color: 0x5b554a, noFog: true, name: `NearEmbankment${label}A` },
+    { kind: "box", size: [0.13, 3.55, 0.13], pos: [side * 3.82, 1.77, -6], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPole${label}A` },
+    { kind: "box", size: [0.98, 0.09, 0.09], pos: [side * 3.82, 2.98, -6], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPoleCrossbar${label}A` },
+    { kind: "box", size: [0.13, 3.35, 0.13], pos: [side * 3.92, 1.67, 5], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPole${label}B` },
+    { kind: "box", size: [0.94, 0.09, 0.09], pos: [side * 3.92, 2.80, 5], mat: "WoodBeam", color: 0x44382c, noFog: true, name: `NearPoleCrossbar${label}B` },
+    ...CarriageLandscapeTree(side, label, "A", side * 4.55, -2, 4.35, "Near"),
+    ...CarriageLandscapeTree(side, label, "B", side * 4.70, 8, 3.35, "Near"),
+  ];
+  return props;
+}
+
+/** 和 WindowLandscape 一一对应：同一棵树的干、两根枝共享速度，不能在窗外散架。 */
+function WindowLandscapeMotion(side, label) {
+  const Move = (name, from, speed, span) => ({ name, from, axis: [0, 0, 1], speed, span, stopAt: CHUCHUAN_TRAIN_STOP_AT });
+  const TreeMoves = (motion, id, x, z, height, speed, span) => {
+    const name = `${motion}Tree${label}${id}`;
+    return [
+      Move(name, [x, height / 2, z], speed, span),
+      Move(`${name}BranchA`, [x + side * 0.18, height * 0.70, z - 0.30], speed, span),
+      Move(`${name}BranchB`, [x + side * 0.18, height * 0.78, z + 0.32], speed, span),
+    ];
+  };
   return [
-    // 两张 40 m 景片有 20 m 重叠，循环时任意窗洞背后都有完整画面；景片从
-    // 轨枕到云层覆盖，不借用世界天空／地形，所以没有地平线穿帮的余地。
-    { kind: "backdrop", size: [40, 4.4], pos: [x, 2.20, -40], ry, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: `LandscapePlate${label}A` },
-    { kind: "backdrop", size: [40, 4.4], pos: [x, 2.20, 0], ry, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: `LandscapePlate${label}B` },
-    // 景片前加两层近轨道遮挡，避免画面像贴在玻璃上的单张照片。
-    { kind: "box", size: [0.12, 3.45, 0.12], pos: [side * 3.05, 1.72, -8.2], mat: "WoodBeam", color: 0x43382c, name: `NearPole${label}A` },
-    { kind: "box", size: [0.95, 0.09, 0.09], pos: [side * 3.05, 2.90, -8.2], mat: "WoodBeam", color: 0x43382c, name: `NearPoleCrossbar${label}A` },
-    { kind: "cyl", size: [0.10, 3.0], pos: [side * 3.07, 1.5, 4.6], mat: "TreeBark", color: 0x40372f, name: `NearPoplar${label}B` },
+    // 远山：每片维持 16:9，慢到接近静止；它只是距离参照，不是近景假墙。
+    ...DISTANT_HILL_Z.map((z, index) => Move(`DistantHills${label}${index}`, [side * 26, 3.32, z], 0.16, 12)),
+    // 中景：村屋、院墙、树带清楚地慢于路旁树与电杆。
+    Move(`MidHouse${label}A`, [side * 13.5, 0.71, -6], 1.05, 24),
+    Move(`MidHouseRoof${label}A`, [side * 13.5, 1.52, -6.72], 1.05, 24),
+    Move(`MidHouse${label}B`, [side * 15.4, 0.625, 6], 1.05, 24),
+    Move(`MidHouseRoof${label}B`, [side * 15.4, 1.37, 5.38], 1.05, 24),
+    Move(`MidWall${label}A`, [side * 12.2, 0.36, -2], 1.05, 24),
+    ...TreeMoves("Mid", "A", side * 11.6, -2, 3.8, 1.05, 24),
+    ...TreeMoves("Mid", "B", side * 14.6, 10, 4.5, 1.05, 24),
+    // 近景：两组电杆、两棵树和土堤以明显更快的速度冲过窗框。
+    Move(`NearEmbankment${label}A`, [side * 4.35, 0.20, -8], 6.35, 24),
+    Move(`NearPole${label}A`, [side * 3.82, 1.77, -6], 7.20, 18),
+    Move(`NearPoleCrossbar${label}A`, [side * 3.82, 2.98, -6], 7.20, 18),
+    Move(`NearPole${label}B`, [side * 3.92, 1.67, 5], 7.20, 18),
+    Move(`NearPoleCrossbar${label}B`, [side * 3.92, 2.80, 5], 7.20, 18),
+    ...TreeMoves("Near", "A", side * 4.55, -2, 4.35, 5.65, 18),
+    ...TreeMoves("Near", "B", side * 4.70, 8, 3.35, 5.65, 18),
   ];
 }
 
@@ -521,13 +587,7 @@ export const CS_Chuchuan = {
   // 整段都持续移动，而不是只在小站那十八秒挪一下背景。近景快、中景慢、远景最慢，
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
   ambientMotion: [
-    ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => [
-      { name: `LandscapePlate${label}A`, from: [side * 3.18, 2.20, -40], axis: [0, 0, 1], speed: 2.25, span: 40, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `LandscapePlate${label}B`, from: [side * 3.18, 2.20, 0], axis: [0, 0, 1], speed: 2.25, span: 40, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `NearPole${label}A`, from: [side * 3.05, 1.72, -18], axis: [0, 0, 1], speed: 7.6, span: 36, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `NearPoleCrossbar${label}A`, from: [side * 3.05, 2.90, -18], axis: [0, 0, 1], speed: 7.6, span: 36, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-      { name: `NearPoplar${label}B`, from: [side * 3.07, 1.5, -5], axis: [0, 0, 1], speed: 5.1, span: 42, stopAt: CHUCHUAN_TRAIN_STOP_AT },
-    ]),
+    ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => WindowLandscapeMotion(side, label)),
   ],
 
   props: [
