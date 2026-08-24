@@ -28,6 +28,7 @@ export const AMMO = {
   Arisaka65: { label: "六五", caliber: "6.5×50mm", muzzle: 762 },
   Arisaka77: { label: "七七", caliber: "7.7×58mm", muzzle: 800 },
   Mauser763: { label: "驳壳", caliber: "7.63×25mm", muzzle: 425 },
+  Service9: { label: "九毫米", caliber: "9×19mm", muzzle: 350 },
 };
 
 /**
@@ -104,6 +105,22 @@ export const WEAPONS = {
     swayScale: 0.75, adsTimeS: 0.18, adsFovScale: 0.86,
     spreadHipDeg: 3.4, spreadAdsDeg: 0.9,
     note: "敢死队标配「一支长枪、一支短枪」里的短枪。近战自动火力全靠它。",
+  },
+  ServicePistol: {
+    id: "ServicePistol",
+    name: "军用手枪",
+    fullName: "外购九毫米军用自动手枪",
+    side: "nra",
+    kind: "pistol",
+    ammo: "Service9",
+    lengthM: 0.222, massKg: 0.98,
+    magazine: 8, reloadKind: "boxMag",
+    damage: 38, headMultiplier: 2.2, effectiveRangeM: 50,
+    fireIntervalS: 0.18, reloadTimeS: 2.2,
+    recoil: { pitch: 1.35, yaw: 0.72, kick: 0.027, recoverS: 0.12, recoverFrac: 1.0 },
+    swayScale: 0.72, adsTimeS: 0.17, adsFovScale: 0.86,
+    spreadHipDeg: 3.2, spreadAdsDeg: 0.82,
+    note: "少量外购军用自动手枪；不把 Poly Haven 的通用外形冒认成某一特定制式。",
   },
   Grenade: {
     id: "Grenade",
@@ -248,9 +265,9 @@ export const LOADOUTS = {
   L3_WhiteTowel: { primary: "HanYang", secondary: "Mauser96", melee: "Dadao",
     throwables: { Grenade: 8 }, spareClips: 3,
     note: "敢死队标准携行：一支长枪、一支短枪、肩背大刀、腰间挂满手榴弹。" },
-  L4_LastFiveMinutes: { primary: "HanYang", secondary: "Mauser96", melee: "Dadao",
+  L4_LastFiveMinutes: { primary: "HanYang", secondary: "ServicePistol", melee: "Dadao",
     throwables: { Grenade: 4 }, spareClips: 2, scavenge: true,
-    note: "打到这儿，子弹得从倒下的人身上取。" },
+    note: "打到这儿，子弹得从倒下的人身上取；短枪换成捡来的外购九毫米手枪。" },
   L5_Morning: { primary: null, secondary: null, melee: null, throwables: {}, spareClips: 0 },
 };
 

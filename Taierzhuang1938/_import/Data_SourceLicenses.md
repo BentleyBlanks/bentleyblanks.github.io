@@ -27,10 +27,11 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
-| 中正式 `ZhongZheng` | `Source/Model_Kar98k.obj` | [byzmod3d](https://opengameart.org/content/low-poly-weapon-pack) | CC0 | 中正式是毛瑟标准型短管，剪影与 Kar98k 同族。全长按史实 1.110 m 缩放。 |
+| 中正式 `ZhongZheng` | `Source/Model_PolyHavenBoltActionRifle762/bolt_action_rifle_7_62_1k.gltf` | [Poly Haven — Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62) | CC0 | 取其老式毛瑟系栓动步枪主体，删除现代瞄准镜、缠布和独立子弹；保留木/钢分桶，全长按史实 1.110 m 缩放。 |
 | 汉阳造 `HanYang` | `Source/Model_Gewehr88/scene.gltf` | [TastyTony](https://sketchfab.com/TastyTony) | CC-BY-4.0 | 汉阳八八式的母型就是 Gewehr 88：**整长套筒、曼利夏漏夹弹仓与露出式通条**都是模型自带的，不再用 Kar98k 拉长加假套筒。全长按史实 1.250 m。 |
 | 三八式 `Type38` | `Source/Model_Type38Arisaka/scene.gltf` | [Snijboer](https://sketchfab.com/Snijboer) | CC-BY-4.0 | 三八式：防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条。全长按史实 1.276 m。 |
 | 驳壳枪 `Mauser96` | `Source/Model_MauserC96.glb` | [Plewr](https://plewr.itch.io/mauser-c96-low-poly) | CC0 | 毛瑟 C96。丢掉名为 Boom 的枪口焰网格。 |
+| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，压到 5728 三角。原驳壳枪仍保留给既有关卡。 |
 
 许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，
 文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
@@ -117,3 +118,18 @@ Unity Labs 三个源包的直接下载地址分别是：
 | 沙袋 `Model_Sandbag.glb` | [Sandbag Low Poly Realist](https://sketchfab.com/3d-models/sandbag-low-poly-realist-7d52600a15c747749d845d9f906045cf) | [Islide](https://sketchfab.com/Islide) | CC-BY-4.0 | 单体沙袋，缩放到 0.6 m 长；贴图 2048→1024，底部对齐原点。 |
 
 CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。
+
+### Poly Haven CC0 构件
+
+以下模型经 `Script_PolyHavenFetch.py` 从 Poly Haven 公开 API 下载，再由
+`Script_ExternalAssetBake.py` 强力减面、清除高分贴图、逐构件底部归零；运行时复用
+项目已有材质。同组变体打进一个 GLB，`Script_ExternalProps.mjs` 按 URL 只加载一次。
+
+| 运行时文件 / 构件 | Poly Haven 来源 | 处理后预算 |
+|---|---|---|
+| `Model_MilitaryCrateSet.glb`：闭合、打开军箱 | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | 2 × 2400 三角，247 KB |
+| `Model_StackableStoneSet.glb`：7 种可堆石块 | [Namaqualand Stones 01](https://polyhaven.com/a/namaqualand_stones_01)、[Stone 01](https://polyhaven.com/a/stone_01)、[Rock 07](https://polyhaven.com/a/rock_07) | 每块 899–999 三角；整包 194 KB |
+| `Model_DeadTreeTrunkSet.glb`：2 种无叶枯树干 | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk)、[Dead Tree Trunk 02](https://polyhaven.com/a/dead_tree_trunk_02) | 2 × 2400 三角，164 KB |
+
+以上 Poly Haven 资源均为 [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)，
+许可副本保存在各自 `Source/Model_PolyHaven*/License_PolyHavenCc0.txt` 中。

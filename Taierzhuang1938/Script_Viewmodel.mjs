@@ -896,6 +896,7 @@ const BUILDERS = {
   Type38: BuildBoltRifle,
   Zb26: BuildZb26,
   Mauser96: BuildMauser96,
+  ServicePistol: BuildMauser96,
   Grenade: BuildGrenade,
   GrenadeBundle: BuildGrenade,
   Dadao: BuildDadao,
@@ -914,7 +915,7 @@ const BUILDERS = {
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
   "Dadao", "Grenade", "GrenadeBundle",
-  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96",
+  "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
 ]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
@@ -962,6 +963,10 @@ const MODEL_FP_TWEAK = {
     handRot: { right: [0.10, 0, -1.50], left: [0.20, 0.28, 1.32] },
   },
   Mauser96: {
+    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+    handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
+  },
+  ServicePistol: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
     handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
   },

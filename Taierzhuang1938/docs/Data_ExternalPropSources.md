@@ -23,3 +23,17 @@ The house model is an occasional generic Chinese townscape landmark only; the
 white-box's principal 1938 southern-Shandong domestic architecture, wall
 footprints, collision and destruction remain the evidence-noted procedural
 system in `Script_TengxianCity.mjs` and `Script_TengxianOutfield.mjs`.
+
+## Poly Haven CC0 additions
+
+| Runtime asset | Source | Runtime treatment |
+|---|---|---|
+| `Model_MilitaryCrateSet.glb` | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Closed and open variants; 2,400 triangles each. |
+| `Model_StackableStoneSet.glb` | [Namaqualand Stones 01](https://polyhaven.com/a/namaqualand_stones_01), [Stone 01](https://polyhaven.com/a/stone_01), [Rock 07](https://polyhaven.com/a/rock_07) | Seven independently selectable, ground-ready variants; 899–999 triangles each. |
+| `Model_DeadTreeTrunkSet.glb` | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk), [Dead Tree Trunk 02](https://polyhaven.com/a/dead_tree_trunk_02) | Two independently selectable leafless trunks; 2,400 triangles each. |
+
+These assets are [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
+`_import/Script_PolyHavenFetch.py` records and verifies the upstream 1K glTF
+sources. `_import/Script_ExternalAssetBake.py` strips downloaded textures,
+decimates the meshes, and places every component on a centered ground origin.
+The runtime reuses existing game materials and caches each shared GLB once.

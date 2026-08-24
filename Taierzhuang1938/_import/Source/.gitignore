@@ -14,3 +14,10 @@ Texture_*Source.png
 
 # Sketchfab 源包的贴图不进仓库（导入管线只用几何，Steel/Wood 共享 PBR 在 Texture/）
 Model_*/textures/
+
+# Poly Haven's rifle uses one atlas for both steel and wood.  The importer
+# samples this 1K diffuse map once to split material buckets; normals/ORM are
+# not needed by the generated TZM and remain ignored.
+!Model_PolyHavenBoltActionRifle762/textures/
+Model_PolyHavenBoltActionRifle762/textures/*
+!Model_PolyHavenBoltActionRifle762/textures/bolt_action_rifle_7_62_diff_1k.jpg
