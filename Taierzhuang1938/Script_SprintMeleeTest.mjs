@@ -48,38 +48,36 @@ await page.evaluate(() => {
   };
 });
 
-/** 挥一刀：先把移动状态稳住，再走左键，然后逐帧记刀身位置。 */
+/**
+ * 挥一刀：先把移动状态稳住，再走左键，然后逐帧记刀身位置。
+ *
+ * 整个采样循环必须在**同一个 page.evaluate 里同步跑完**。分成一帧一次往返的话，
+ * 每次往返的真实时间里页面自己的 rAF 会照常推进动画，采样点就落在随机相位上 ——
+ * 实测同一份代码 swept 在 2.0 与 2.4 之间跳，阈值型断言变成抛硬币。
+ * 同步循环期间 rAF 回调根本没机会插进来，StepFrames 是唯一的时间来源，dt 恒为 1/60。
+ */
 async function Swing(sprinting) {
-  await page.evaluate((on) => {
+  return page.evaluate((on) => {
     const T = window.Taierzhuang;
     T.Debug.Key("ShiftLeft", !!on);
     T.Debug.Key("KeyW", !!on);
     T.StepFrames(90);              // 冲刺弹簧与体力都到稳态
-  }, sprinting);
-  const fired = await page.evaluate(() => {
-    const T = window.Taierzhuang;
     T.Debug.Fire();                // 左键全链：input.fire -> TryFire -> DoMelee
-    return { action: T.viewmodel.action?.kind ?? null, sprint: T.player.sprint };
-  });
-  const track = [];
-  for (let i = 0; i < 18; i += 1) {
-    track.push(await page.evaluate(() => {
-      const T = window.Taierzhuang;
+    const fired = { action: T.viewmodel.action?.kind ?? null, sprint: T.player.sprint };
+    const track = [];
+    for (let i = 0; i < 34; i += 1) {
       T.StepFrames(1);
-      return {
+      track.push({
         t: T.viewmodel.action?.t ?? -1,
         speed: T.player.velocity.length(),
         ...window.__bladeNdc(),
-      };
-    }));
-  }
-  await page.evaluate(() => {
-    const T = window.Taierzhuang;
+      });
+    }
     T.Debug.Key("ShiftLeft", false);
     T.Debug.Key("KeyW", false);
     T.StepFrames(120);             // 收招 + 冲刺姿态回位，两次挥刀互不污染
-  });
-  return { fired, track };
+    return { fired, track };
+  }, sprinting);
 }
 
 const stand = await Swing(false);
@@ -110,8 +108,10 @@ const checks = [
   ["确实在冲刺（不是被减速吃掉的假冲刺）", run.fired.sprint > 0.95],
   ["挥刀不打断跑动", runSpeed > 4.5],
   ["站姿这一刀大半在画面里（基准）", standIn >= 0.6],
-  ["冲刺这一刀在画面里的比例不低于站姿", runIn >= standIn - 0.12],
-  ["冲刺刀弧的横扫幅度与站姿同量级", Swept(run) > Swept(stand) * 0.8],
+  // 采样确定性了（见 Swing 的注释），所以阈值可以卡紧：实测两条一模一样，
+  // 留 0.05 / 0.9 的余量只是给浮点和未来的小改动。
+  ["冲刺这一刀在画面里的比例不低于站姿", runIn >= standIn - 0.05],
+  ["冲刺刀弧的横扫幅度与站姿同量级", Swept(run) > Swept(stand) * 0.9],
   ["收招后冲刺静音归零（姿态还给冲刺）", muteBack < 0.02],
   ["无控制台报错", errors.length === 0],
 ];
