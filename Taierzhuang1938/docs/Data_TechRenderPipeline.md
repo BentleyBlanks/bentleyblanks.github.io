@@ -1134,6 +1134,93 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 
 ---
 
+## G-Buffer 与屏幕空间三件套（SSGI / SSR / 接触阴影）
+
+**主场景仍然是前向着色的。** 这一层加的是"G-Buffer + 屏幕空间 pass + 延迟合并"，
+不是完整的延迟着色 —— 分界线写在下面，别把它当成已经延迟了。
+
+### G-Buffer（`Script_Post.mjs`，MRT `count: 3`）
+
+| 附件 | 格式 | 内容 |
+|---|---|---|
+| 0 | RGBA16F | xyz = 视空间法线，w = 线性视深度（米）。**与旧的 `normalDepth` 逐位相同** |
+| 1 | RGBA8 | rgb = 线性 albedo，a = roughness |
+| 2 | RGBA8 | r = metalness（gb 留给以后的 material id / 自发光） |
+
+逐附件的 `type` 是建完 RT 之后单独改的 —— `setupRenderTarget` 按 `textures[i].type`
+逐张分配（module 内 `utils.convert(texture.type)` 在逐纹理的循环里）。三张全开半浮点
+的话 1920×1080 光这一组就要 50 MB。
+
+**填 G-Buffer 的方式从 `scene.overrideMaterial` 改成了逐物体换材质。** 原因只有一条：
+覆盖材质拿不到每个物体自己的贴图，也就写不出 albedo。现在给每份
+`MeshStandardMaterial` 造一份 `glslVersion: GLSL3` 的影子材质（`MakeGBufferVariant`），
+在 `#include <normal_fragment_maps>` 之后直接写三个附件然后 `return` —— 三平面、
+实例化、骨骼、形变、破坏裁切全都由 three 自己的 chunk 处理，一行都不用重写。
+
+三条必须一起做对，否则静默出错：
+
+- **`customProgramCacheKey` 必须给。** 默认实现返回 `onBeforeCompile.toString()`，
+  而所有影子材质的钩子是同一段闭包源码 —— 不加区分度就会和原材质抢同一份编译结果。
+  给对了之后 77 份影子材质只占 59 个 program（实测）。
+- **`clone()` 是按值拷贝。** 原材质在运行时改 roughness / 颜色 / 透明度，影子材质
+  不会跟着动。必须每帧同步（`SyncGBufferVariant`）。这条踩过：把全场磨成镜面之后
+  SSR 覆盖率纹丝不动（1.8% → 1.8%），因为 G-Buffer 里的 roughness 还是建好那一刻的旧值。
+  同步里换 program 的字段（`map` / `flatShading` / `vertexColors` / `alphaTest`）
+  只在**真的变了**的时候置 `needsUpdate`，否则每帧重编译。
+- **尾巴上的 chunk 要剪。** GLSL3 下 three 不再注入 `#define gl_FragColor pc_fragColor`，
+  `opaque_fragment` / `tonemapping_fragment` / `colorspace_fragment` / `fog_fragment` /
+  `premultiplied_alpha_fragment` / `dithering_fragment` 哪怕在 `return` 之后是死代码，
+  也照样编译不过。
+
+`MarkNoPrepass`（`allowOverride = false`）现在**真的**把物体挡在 G-Buffer 外面了。
+以前它只做到"不被换材质"，物体照样用自己的着色器画进预通道 —— 烟、贴片、枪口焰
+往法线通道里写的是**颜色**，往深度里写的是**不透明度**。
+
+### 三个 pass
+
+都是同一个骨架：从 G-Buffer 重建视空间位置 → 朝某个方向步进 → 用重投影后的 uv 查深度。
+
+| pass | 方向 | 命中后取什么 | 分辨率 | 画质档 |
+|---|---|---|---|---|
+| 接触阴影 | 太阳 | 可见度（0.42 m，12 步） | 全分辨率 | medium 起 |
+| SSGI | 法线半球 6 条 | 那一点的 HDR 颜色（一次弹跳，3.2 m） | 半分辨率 | high 起 |
+| SSR | 视线的反射 | 那一点的 HDR 颜色（26 m，24 步） | 半分辨率 | high 起 |
+
+写这三个 pass 时踩过、值得记住的：
+
+- **步长递增就必须归一化总长。** `maxDist / steps` 当步长再逐步放大，12 步会走出
+  1.07 m 而不是调用方以为的 0.42 m —— 接触阴影拉成一米长的假影子。
+- **命中的厚度上限要跟着当前步长走。** 固定厚度配递增步长，射线会直接从薄墙里穿过去：
+  第 i 步还在墙前，第 i+1 步已经在墙后一大截，两次都不算命中。判据要写成
+  "这一段里穿过了表面"（`diff < max(thickness, segment * 1.6)`）。
+- **法线抬起量按深度缓冲自己的精度定，别想当然放大。** 附件 0 的深度是半浮点、
+  单位是米，30 m 处能分辨约 3 cm。抬 12 cm 的话，比 12 cm 矮的遮挡物（沙包边、
+  砖块、台阶）会被整个跳过 —— 而那正是接触阴影要补的东西。
+- **屏幕外与天空只能判"没撞上"。** 判成"挡住了"的话，镜头一转画面边缘会出现
+  一条跟着转的黑边。
+- SSR 只做锐反射（`roughness > 0.55` 直接放弃）：粗糙反射需要按 roughness 预滤过的
+  颜色金字塔，这条链上没有。半吊子的粗糙 SSR 比没有更难看。
+
+### 延迟合并，以及它现在还**不是**什么
+
+`FRAG_DEFERRED` 逐像素把三样合回画面，**不逐物体**。这是与旧的 AO / 探针体 GI
+的区别：那两样走的是 `InjectIndirectLighting` 的 `onBeforeCompile`，按物体分叉，
+每加一种材质就要再接一次线。
+
+**还没做的（下一阶段）：** 太阳的直接光仍由 three 在前向 pass 里算，没有搬进延迟着色。
+后果是接触阴影只能用**减法近似** —— 按 G-Buffer 重估一份"无阴影的太阳直接光"，
+再按遮蔽量减掉，减的量钳在当前像素亮度的 70% 以内（这一钳同时挡住"像素本来就在
+阴影图里所以不该再减"和"减成负数"两件事）。真正的解法是把太阳连同阴影图一起搬进
+延迟着色 pass；`sun.shadow.map.depthTexture` 在 PCF 下必须按 `sampler2DShadow` 绑定
+（见「坑」里那一条）。搬完之后 AO 与探针体 GI 也可以一起从逐物体注入里退休。
+
+### 开销
+
+swiftshader（纯软件光栅）上单开每一项约 +30%，三项全开约 +45%。**这是软件光栅的数字，
+只能当相对上界看** —— 这三个 pass 全是填充率型的，真实 GPU 上的比例会低得多。
+落到实机之前请自己 profile 一遍再定画质档的开关。
+
+
 ## 坑
 
 - 【本仓库现役 bug】`renderer.shadowMap.type = THREE.PCFSoftShadowMap` 在 r185 = 硬阴影。源码 `shadowMapTypeDefines` 只有 `PCFShadowMap→SHADOWMAP_TYPE_PCF` 和 `VSMShadowMap→SHADOWMAP_TYPE_VSM` 两个 key，`PCFSoftShadowMap`(=2) 落到 `|| 'SHADOWMAP_TYPE_BASIC'`；且 `WebGLShadowMap` 只在 `type === PCFShadowMap` 时设 `compareFunction = LessEqualCompare` + `LinearFilter`，否则是 `NearestFilter` + 无比较。`Script_Probe.mjs:26` 正踩这条 —— 改成 `THREE.PCFShadowMap` 即可拿到硬件 PCF + Vogel 5 抽样。

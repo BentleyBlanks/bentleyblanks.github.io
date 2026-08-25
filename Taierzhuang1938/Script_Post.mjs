@@ -49,10 +49,39 @@ float Hash12(vec2 p) {
 `;
 
 // ---------------------------------------------------------------------------
-// 深度法线预通道用的覆盖材质
-// 用 three 的 chunk 拼，USE_INSTANCING / 形变这些分支交给它自己处理，
-// 不然实例化的瓦砾在预通道里全部塌到原点，AO 就是一片乱码。
+// G-Buffer
+//
+// 三张附件，MRT 一趟写完。屏幕空间的 GI / 反射 / 接触阴影全靠它吃饭 ——
+// 只有法线和深度是喂不饱它们的：SSGI 要 albedo 才知道这一点该反弹出什么颜色，
+// SSR 要 roughness / metalness 才知道该不该反射、反射得多锐。
+//
+//   0  RGBA16F   xyz = 视空间法线，w = 线性视深度   ← 与旧的 normalDepth 逐位相同
+//   1  RGBA8     rgb = 线性 albedo，a = roughness
+//   2  RGBA8     r   = metalness（gb 留给以后的 material id / 自发光）
+//
+// 附件 0 的布局**不许动**：粒子的软粒子判据、合成 pass 的雾、水面、SSAO 全在读它。
+// 换句话说这次是往上加通道，不是改格式 —— 旧消费者一行都不用改。
+//
+// three 的 RenderTarget 用 count 开 MRT，逐附件的 type 可以在建完之后单独改
+// （setupRenderTarget 是按 textures[i].type 逐张分配的），所以 0 走半浮点、
+// 1/2 走 8 位，省下三分之二的带宽。
 // ---------------------------------------------------------------------------
+
+/** MRT 的三个出口。写进任何要进 G-Buffer 的着色器里，顺序与附件顺序一致。 */
+export const GBUFFER_OUTPUTS_GLSL = /* glsl */`
+layout(location = 0) out vec4 gNormalDepth;
+layout(location = 1) out vec4 gAlbedoRough;
+layout(location = 2) out vec4 gMaterial;
+`;
+
+/**
+ * 非 Standard 材质的兜底 G-Buffer 材质（水面之外的自定义 ShaderMaterial、
+ * 没有 PBR 参数的东西）。几何法线与真实视深度是对的，albedo 给中性灰、
+ * roughness 给 1、metalness 给 0 —— SSGI 在这些像素上不会染色，SSR 不会反射。
+ *
+ * 用 three 的 chunk 拼，USE_INSTANCING / 形变这些分支交给它自己处理，
+ * 不然实例化的瓦砾在预通道里全部塌到原点，AO 就是一片乱码。
+ */
 function MakeNormalDepthMaterial(destruction = null) {
   const uniforms = { uFar: { value: 500 } };
   const damageEnabled = { value: 0 };
@@ -91,21 +120,125 @@ function MakeNormalDepthMaterial(destruction = null) {
       uniform float uFar;
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      ${GBUFFER_OUTPUTS_GLSL}
       ${destruction ? `varying vec3 vDamageWorldPos;
 ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
       void main() {
         ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
-        gl_FragColor = vec4(n, vViewDepth);
+        gNormalDepth = vec4(n, vViewDepth);
+        gAlbedoRough = vec4(0.5, 0.5, 0.5, 1.0);
+        gMaterial = vec4(0.0, 0.0, 0.0, 1.0);
       }
     `,
+    glslVersion: THREE.GLSL3,
     side: THREE.FrontSide,
   });
   // BuildSink 的静态网格会在自己的 onBeforeRender/onAfterRender 里只为这一 draw
   // 打开裁切。演员、枪、碎片共用 overrideMaterial，但不会被破口 OBB 切掉。
   if (destruction) material.userData.damageObjectEnabled = damageEnabled;
   return material;
+}
+
+// three 的 meshphysical 片元着色器尾巴上这几段全是围着 gl_FragColor 转的。
+// GLSL3 下 three 不再注入 `#define gl_FragColor pc_fragColor`（module 7050），
+// 于是**哪怕它们在 return 之后是死代码，也照样编译不过**。整段剪掉。
+const GBUFFER_STRIPPED_CHUNKS = [
+  "opaque_fragment", "tonemapping_fragment", "colorspace_fragment",
+  "fog_fragment", "premultiplied_alpha_fragment", "dithering_fragment",
+];
+
+/**
+ * 把 three 自己的 meshphysical 片元着色器改写成 G-Buffer 写入。
+ *
+ * 插在 `<normal_fragment_maps>` 之后 —— 那一行跑完，这四样东西刚好都在手里，
+ * 且都是 three 自己算的（法线贴图、三平面、顶点色、alpha test 全已生效）：
+ *   diffuseColor.rgb  线性 albedo
+ *   roughnessFactor / metalnessFactor
+ *   normal            视空间、已归一化、背面已翻转
+ *   vViewPosition.z   正的视深度（顶点里写的是 -mvPosition.xyz）
+ * 拿到就 return，后面整条光照链一步都不跑 —— G-Buffer 不需要着色。
+ *
+ * 这样做而不是自己手写一个 G-Buffer 着色器，是因为「自己手写」等于把三平面、
+ * 实例化、骨骼、形变、破坏裁切全部再实现一遍，而且每加一种材质就要再对一次。
+ */
+function PatchFragmentToGBuffer(fragment) {
+  let out = fragment
+    .replace("#include <common>", `#include <common>
+${GBUFFER_OUTPUTS_GLSL}`)
+    .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+    {
+      gNormalDepth = vec4(normalize(normal), vViewPosition.z);
+      gAlbedoRough = vec4(diffuseColor.rgb, roughnessFactor);
+      gMaterial = vec4(metalnessFactor, 0.0, 0.0, 1.0);
+      return;
+    }`);
+  for (const chunk of GBUFFER_STRIPPED_CHUNKS) out = out.split(`#include <${chunk}>`).join("");
+  return out;
+}
+
+/**
+ * 给一份 MeshStandardMaterial 造它的 G-Buffer 影子材质。
+ *
+ * clone() 出来的那份与原材质**共享贴图与 uniform 对象**，所以不会多占显存，
+ * 也不会出现「原材质换了贴图，G-Buffer 还在画旧的」。
+ *
+ * 原材质自己的 onBeforeCompile 要先跑：破坏系统的破口裁切就挂在那里，
+ * 不跑的话炸出来的洞在 G-Buffer 上是补着的 —— 反射和 SSGI 会照着一堵
+ * 已经不存在的墙去算。AO / GI 的注入跑不跑无所谓（G-Buffer 不着色），
+ * 但它们与破坏裁切共用同一个钩子，只能一起跑。
+ *
+ * customProgramCacheKey：**必须给**。three 的默认实现返回
+ * `onBeforeCompile.toString()`（module 7755），而这里每份影子材质的钩子都是
+ * 同一段闭包源码 —— 不加区分度的话，G-Buffer 材质会和原材质抢同一份编译结果。
+ */
+function MakeGBufferVariant(source) {
+  const variant = source.clone();
+  variant.glslVersion = THREE.GLSL3;
+  // 影子材质不写颜色缓冲以外的状态，也不该被雾/色调映射碰。
+  variant.fog = false;
+  variant.toneMapped = false;
+  variant.userData = { ...source.userData, gbufferSourceUuid: source.uuid };
+  const sourceHook = source.onBeforeCompile;
+  variant.onBeforeCompile = function (shader, renderer) {
+    if (typeof sourceHook === "function") sourceHook.call(this, shader, renderer);
+    shader.fragmentShader = PatchFragmentToGBuffer(shader.fragmentShader);
+  };
+  const sourceKey = typeof source.customProgramCacheKey === "function"
+    ? source.customProgramCacheKey() : "";
+  variant.customProgramCacheKey = () => `gbuffer|${sourceKey}|${
+    typeof sourceHook === "function" ? sourceHook.toString() : ""}`;
+  return variant;
+}
+
+/** 能进 G-Buffer 拿到完整 PBR 参数的，只有 three 的标准/物理材质。 */
+function IsStandardLike(material) {
+  return !!(material && (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial));
+}
+
+// 换了会换 program permutation 的字段。**只在真的变了的时候** needsUpdate ——
+// 每帧无条件置一次的话 three 会每帧重编译，info.programs 无限增长，
+// 帧率掉到个位数（Data_TechRenderPipeline 的「坑」里记着这一条）。
+const GBUFFER_PROGRAM_KEYS = [
+  "alphaTest", "flatShading", "vertexColors",
+  "map", "normalMap", "roughnessMap", "metalnessMap", "alphaMap",
+];
+// 每帧照抄一遍的标量。clone() 是**按值**拷的，不同步的话原材质在运行时改了
+// roughness / 颜色 / 透明度，G-Buffer 还停在建好那一刻的旧值 ——
+// 表现就是「材质明明改了，SSR 和 SSGI 当没看见」。
+const GBUFFER_SYNCED_SCALARS = ["roughness", "metalness", "opacity", "side", "visible"];
+
+function SyncGBufferVariant(variant, source) {
+  for (const key of GBUFFER_SYNCED_SCALARS) variant[key] = source[key];
+  if (variant.color && source.color) variant.color.copy(source.color);
+  if (variant.normalScale && source.normalScale) variant.normalScale.copy(source.normalScale);
+  let recompile = false;
+  for (const key of GBUFFER_PROGRAM_KEYS) {
+    if (variant[key] !== source[key]) { variant[key] = source[key]; recompile = true; }
+  }
+  if (recompile) variant.needsUpdate = true;
+  return variant;
 }
 
 // ---------------------------------------------------------------------------
@@ -615,9 +748,15 @@ const FRAG_DEBUG_VIEW = /* glsl */`
       color = vec3(texel.r);
     } else if (uMode < 3.5) {          // 距离图集：均值 / 不确定度 = R / G
       color = vec3(texel.r, texel.g, 0.0);
-    } else {                           // HDR / 辐照度：Reinhard + sRGB
+    } else if (uMode < 4.5) {          // HDR / 辐照度 / SSGI：Reinhard + sRGB
       color = color / (color + vec3(1.0));
       color = ToSrgb(color);
+    } else if (uMode < 5.5) {          // albedo：G-Buffer 里存的是线性值
+      color = ToSrgb(color);
+    } else if (uMode < 6.5) {          // roughness 打包在 albedo 的 alpha 里
+      color = vec3(texel.a);
+    } else {                           // SSR：rgb 是反射色，a 是置信度
+      color = ToSrgb((color * texel.a) / (color * texel.a + vec3(1.0)));
     }
     gl_FragColor = vec4(color, 1.0);
   }`;
@@ -646,13 +785,331 @@ export function MarkNoPrepass(material) {
   return material;
 }
 
+// ssgi / ssr / contact 三个开关是**画质档的事，不是玩家开关**：它们各要一趟
+// 屏幕空间射线步进，low 档的机器跑不动。screenSpaceScale 是 SSGI/SSR 的分辨率
+// 比例（接触阴影永远全分辨率，理由见 SetSize）。
+// ---------------------------------------------------------------------------
+// 屏幕空间三件套：接触阴影 / SSGI / SSR
+//
+// 三个 pass 长得很像，都是「从 G-Buffer 重建视空间位置 → 朝某个方向步进 →
+// 用重投影后的 uv 去查 G-Buffer 深度，看有没有被挡」。区别只在方向怎么来、
+// 撞上之后拿什么：
+//   接触阴影  方向 = 太阳，撞上就是挡住了，输出可见度
+//   SSGI     方向 = 法线半球里的随机方向，撞上就取那一点的 HDR 颜色（一次弹跳）
+//   SSR      方向 = 视线关于法线的反射，撞上就取那一点的 HDR 颜色
+//
+// 三条共同的硬伤，写的时候必须一起处理，漏一条画面立刻脏：
+//   1) 屏幕外与天空（depth <= 0）没有信息，只能判"没撞上"，不能判"挡住了"，
+//      否则镜头一转，画面边缘会出现一条跟着转的黑边。
+//   2) 深度比较要给厚度容差：G-Buffer 只有一层，射线从一面墙**背后**穿过时
+//      深度也满足"比记录值大"，不给容差就会在墙背后凭空多出一片假遮挡。
+//   3) 每帧换随机相位（uFrame），再配一次深度感知的模糊。不换的话固定图案
+//      会在墙面上结成一层网格。
+// ---------------------------------------------------------------------------
+
+/** 三个 pass 共用的重建/重投影。视空间右手系，-Z 朝前，深度取正。 */
+const GLSL_SCREEN_RAY = /* glsl */`
+uniform sampler2D uGNormalDepth;
+uniform vec2 uProjScale;      // (1/tan(fov/2)/aspect, 1/tan(fov/2))
+uniform float uFrame;
+
+vec3 ViewPos(vec2 uv, float depth) {
+  vec2 ndc = uv * 2.0 - 1.0;
+  return vec3(ndc.x / uProjScale.x, ndc.y / uProjScale.y, -1.0) * depth;
+}
+
+vec2 ViewToUv(vec3 p) {
+  float z = max(1e-4, -p.z);
+  return vec2(p.x * uProjScale.x / z, p.y * uProjScale.y / z) * 0.5 + 0.5;
+}
+
+float DepthAt(vec2 uv) { return texture2D(uGNormalDepth, uv).w; }
+
+/**
+ * 步进一条视空间射线，返回撞击点的 uv；没撞上返回 (-1, -1)。
+ * 步长按 1.0 → 1.6^n 递增：近处要密（接触带就在几厘米内），远处要疏
+ * （不然一条 3 米的射线要走上百步）。
+ */
+const float MARCH_GROWTH = 0.28;
+
+vec2 MarchRay(vec3 origin, vec3 dir, float maxDist, int steps, float thickness, float jitter) {
+  float n = float(steps);
+  // 步长递增（1, 1.28, 1.56, ...），但**总长度必须正好收在 maxDist 上**。
+  // 直接拿 maxDist/steps 当步长再往上递增是错的：12 步会走出 1.07 m，
+  // 而调用方以为只走了 0.42 m —— 接触阴影会拉成一米长的假影子，
+  // SSR 会反射到根本够不到的地方。等差级数求和一次归一化掉。
+  float step0 = maxDist / (n + MARCH_GROWTH * n * (n - 1.0) * 0.5);
+  float t = step0 * (0.35 + 0.65 * jitter);
+  for (int i = 0; i < 32; i++) {
+    if (i >= steps) break;
+    float segment = step0 * (1.0 + float(i) * MARCH_GROWTH);
+    vec3 p = origin + dir * t;
+    vec2 uv = ViewToUv(p);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec2(-1.0);
+    float sceneDepth = DepthAt(uv);
+    // 天空/没写过的像素没有信息：只能算没撞上，绝不能算挡住
+    if (sceneDepth > 0.0) {
+      float diff = -p.z - sceneDepth;
+      // 下限不能是 0：掠射角上射线起点抬得再高也可能落在自己身后一点点，
+      // 判成"撞上了"就是全屏一层自阴影脏点。容差跟着深度走，远处一个像素
+      // 覆盖的世界尺寸大得多。
+      float minDiff = 0.006 + sceneDepth * 0.0025;
+      // 上限要**跟着当前步长走**。固定厚度 + 递增步长 = 射线直接从墙里穿过去：
+      // 第 i 步还在墙前面（diff < 0），第 i+1 步已经在墙后面一大截（diff > 厚度），
+      // 两次都不算命中。SSR 在远处大面积失效正是这一条 —— 表现为
+      // "地面明明该反射，却什么都没有"。判据改成"这一段里穿过了表面"。
+      if (diff > minDiff && diff < max(thickness, segment * 1.6)) return uv;
+    }
+    t += segment;
+  }
+  return vec2(-1.0);
+}
+`;
+
+// --- 接触阴影 ---------------------------------------------------------------
+// 阴影图那张 2048 在 62 米的框里，一个纹素约 3 厘米；沙包压地、枪托抵墙、
+// 人脚踩土这些「贴着」的接触带全在一个纹素以内，阴影图根本分辨不出来，
+// 表现就是物体像浮在地上。这一趟只补那最后几十厘米。
+const FRAG_CONTACT_SHADOW = /* glsl */`
+uniform vec3 uSunViewDir;     // 视空间、从表面指向太阳、已归一化
+uniform float uMaxDistance;
+uniform float uThickness;
+uniform float uStrength;
+varying vec2 vUv;
+${GLSL_COMMON}
+${GLSL_SCREEN_RAY}
+
+void main() {
+  vec4 nd = texture2D(uGNormalDepth, vUv);
+  float depth = nd.w;
+  // 天空 = 全亮。远处也直接放过：接触阴影是几十厘米的效果，
+  // 八十米外那几十厘米还不到一个像素，白花射线。
+  if (depth <= 0.0 || depth > 80.0) { gl_FragColor = vec4(1.0); return; }
+  vec3 normal = normalize(nd.xyz);
+  float ndl = dot(normal, uSunViewDir);
+  // 背光面本来就没有直接光，接触阴影再压一遍就是纯脏
+  if (ndl <= 0.02) { gl_FragColor = vec4(1.0); return; }
+
+  vec3 origin = ViewPos(vUv, depth);
+  // 沿法线抬起一点再出发：不抬的话射线第一步就打在自己身上，整屏发黑。
+  // 抬的量按**深度缓冲自己的精度**来定，不能想当然地放大：附件 0 的深度是
+  // 半浮点、单位是米，30 m 处能分辨约 3 cm。原来写的 depth*0.0035 在 30 m 上
+  // 抬了 12 cm —— 比 12 cm 矮的遮挡物（沙包边、砖块、台阶）整个被射线跳过，
+  // 接触阴影几乎不出现。这正是这一趟本来要补的那种遮挡。
+  origin += normal * (0.006 + depth * 0.0012);
+  float jitter = Ign(gl_FragCoord.xy + uFrame * 7.113);
+  vec2 hit = MarchRay(origin, uSunViewDir, uMaxDistance, 12, uThickness, jitter);
+  float visible = hit.x < 0.0 ? 1.0 : (1.0 - uStrength);
+  gl_FragColor = vec4(visible, visible, visible, 1.0);
+}
+`;
+
+// --- SSGI：一次漫反射弹跳 ---------------------------------------------------
+// 采的是**这一帧已经着完色的 HDR 靶**，所以拿到的是"那一点最终亮成什么样"，
+// 一次弹跳该有的颜色渗透（红砖墙把暖色渗到地上）就出来了。
+// 探针体（Script_Gi）给的是低频的大范围间接光，这一趟补的是它给不了的
+// 高频近场：墙根、门洞、掩体内侧那一圈。两者是加法关系，不是二选一。
+const FRAG_SSGI = /* glsl */`
+uniform sampler2D uColor;
+uniform float uRadius;
+uniform float uIntensity;
+varying vec2 vUv;
+${GLSL_COMMON}
+${GLSL_SCREEN_RAY}
+
+const int RAYS = 6;
+
+void main() {
+  vec4 nd = texture2D(uGNormalDepth, vUv);
+  float depth = nd.w;
+  if (depth <= 0.0 || depth > 120.0) { gl_FragColor = vec4(0.0); return; }
+  vec3 normal = normalize(nd.xyz);
+  vec3 origin = ViewPos(vUv, depth) + normal * (0.02 + depth * 0.004);
+
+  // 逐像素旋转的余弦半球。金色角 2.399963 让 6 条射线在方位角上铺得最开。
+  float rnd = Ign(gl_FragCoord.xy + uFrame * 3.9271);
+  vec3 up = abs(normal.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+  vec3 tangent = normalize(cross(up, normal));
+  vec3 bitangent = cross(normal, tangent);
+
+  vec3 sum = vec3(0.0);
+  float weight = 0.0;
+  for (int i = 0; i < RAYS; i++) {
+    float a = (float(i) + rnd) * 2.3999632;
+    float r = sqrt((float(i) + 0.5 + rnd) / float(RAYS));   // 余弦分布
+    vec3 dir = normalize(tangent * (r * cos(a)) + bitangent * (r * sin(a))
+      + normal * sqrt(max(0.0, 1.0 - r * r)));
+    float cosine = max(0.0, dot(dir, normal));
+    weight += cosine;
+    vec2 hit = MarchRay(origin, dir, uRadius, 10, uRadius * 0.5, rnd);
+    if (hit.x < 0.0) continue;                     // 没撞上 = 看到天，天光归探针体管
+    vec3 radiance = texture2D(uColor, hit).rgb;
+    // 撞击点的法线要背对射线，否则那是一面朝外的墙，我们看到的是它的背面
+    vec3 hitNormal = normalize(texture2D(uGNormalDepth, hit).xyz);
+    float facing = max(0.0, -dot(hitNormal, dir));
+    sum += radiance * cosine * facing;
+  }
+  gl_FragColor = vec4(sum / max(0.001, weight) * uIntensity, 1.0);
+}
+`;
+
+// --- SSR --------------------------------------------------------------------
+// 只做锐反射：粗糙面的反射需要一整套按 roughness 预滤过的颜色金字塔，
+// 这条链上没有。所以 roughness 一过阈值就直接放弃，交回 IBL ——
+// 半吊子的粗糙 SSR 比没有更难看（一片抖动的噪点）。
+const FRAG_SSR = /* glsl */`
+uniform sampler2D uColor;
+uniform sampler2D uGAlbedoRough;
+uniform sampler2D uGMaterial;
+uniform float uMaxDistance;
+uniform float uMaxRoughness;
+uniform float uIntensity;
+varying vec2 vUv;
+${GLSL_COMMON}
+${GLSL_SCREEN_RAY}
+
+void main() {
+  vec4 nd = texture2D(uGNormalDepth, vUv);
+  float depth = nd.w;
+  if (depth <= 0.0 || depth > 200.0) { gl_FragColor = vec4(0.0); return; }
+  float roughness = texture2D(uGAlbedoRough, vUv).a;
+  float metalness = texture2D(uGMaterial, vUv).r;
+  // 粗糙度权重：0 → 满，uMaxRoughness → 0，中间平滑过渡
+  float roughWeight = 1.0 - smoothstep(uMaxRoughness * 0.45, uMaxRoughness, roughness);
+  if (roughWeight <= 0.001) { gl_FragColor = vec4(0.0); return; }
+
+  vec3 normal = normalize(nd.xyz);
+  vec3 origin = ViewPos(vUv, depth);
+  vec3 viewDir = normalize(origin);            // 相机在原点，所以位置就是方向
+  vec3 dir = reflect(viewDir, normal);
+
+  float jitter = Ign(gl_FragCoord.xy + uFrame * 11.317);
+  vec3 start = origin + normal * (0.02 + depth * 0.004);
+  vec2 hit = MarchRay(start, dir, uMaxDistance, 24, max(0.35, depth * 0.06), jitter);
+  if (hit.x < 0.0) { gl_FragColor = vec4(0.0); return; }
+
+  vec3 radiance = texture2D(uColor, hit).rgb;
+  // 反射到屏幕边缘要淡出，否则镜头一转，反射会沿着画面边界被硬切掉
+  vec2 edge = smoothstep(vec2(0.0), vec2(0.12), hit) * (1.0 - smoothstep(vec2(0.88), vec2(1.0), hit));
+  float fade = edge.x * edge.y;
+  // 菲涅尔：正对着看的面几乎不反射，掠射角才反射。金属全程都反射。
+  float fresnel = pow(1.0 - max(0.0, dot(-viewDir, normal)), 5.0);
+  float strength = mix(fresnel, 1.0, metalness) * roughWeight * fade * uIntensity;
+  gl_FragColor = vec4(radiance, clamp(strength, 0.0, 1.0));
+}
+`;
+
+// --- 深度感知的横向/纵向模糊（SSGI 与 SSR 共用）-----------------------------
+// 普通高斯会把墙角另一侧的颜色糊过来（漏光）。跨过深度断层就不取。
+const FRAG_SS_BLUR = /* glsl */`
+uniform sampler2D uSource;
+uniform vec2 uTexel;
+uniform vec2 uDirection;
+varying vec2 vUv;
+${GLSL_SCREEN_RAY}
+
+void main() {
+  float centerDepth = DepthAt(vUv);
+  vec4 sum = texture2D(uSource, vUv);
+  float weight = 1.0;
+  for (int i = 1; i <= 3; i++) {
+    vec2 offset = uDirection * uTexel * float(i);
+    for (int side = 0; side < 2; side++) {
+      vec2 uv = side == 0 ? vUv + offset : vUv - offset;
+      float d = DepthAt(uv);
+      // 容差跟着深度走：远处一个像素本来就跨更多米
+      if (centerDepth > 0.0 && abs(d - centerDepth) > 0.06 + centerDepth * 0.02) continue;
+      float w = 1.0 / (1.0 + float(i));
+      sum += texture2D(uSource, uv) * w;
+      weight += w;
+    }
+  }
+  gl_FragColor = sum / weight;
+}
+`;
+
+// --- 延迟合并 ---------------------------------------------------------------
+// 这一趟是「屏幕空间的结果怎么回到画面上」，**逐像素做，不逐物体做**。
+// 旧的 AO / 探针体 GI 走的是另一条路：onBeforeCompile 把它们注进每一份
+// MeshStandardMaterial（Script_Materials 的 InjectIndirectLighting）。
+// 那条路的问题不是效果，是**它按物体分叉** —— 每加一种材质就要再接一次线，
+// 而屏幕空间的量本来就与物体无关。这里的三样全部在 G-Buffer 上一次算完。
+//
+// 接触阴影的减法说明（这是本阶段唯一的近似，写在这里免得以后当成 bug 查）：
+// 主场景仍然是**前向**着色的，太阳的直接光已经烘进 HDR 靶，没法再取出来。
+// 所以这里按 G-Buffer 重新估一份"没有阴影时的太阳直接光"，再按接触阴影的
+// 遮蔽量把它从 HDR 里减掉；减的量钳在当前像素亮度的 uContactMaxCut 以内 ——
+// 这一钳同时挡住两件事：像素本来就在阴影图的阴影里（HDR 很暗，于是几乎不减，
+// 不会二次变黑），以及减成负数。真正的解法是把太阳也搬进延迟着色，
+// 那要连同阴影图一起搬，是下一阶段的事。
+const FRAG_DEFERRED = /* glsl */`
+uniform sampler2D uHdr;
+uniform sampler2D uGAlbedoRough;
+uniform sampler2D uGMaterial;
+uniform sampler2D uSsgi;
+uniform sampler2D uSsr;
+uniform sampler2D uContact;
+uniform vec3 uSunViewDir;
+uniform vec3 uSunColor;
+uniform float uSsgiEnabled;
+uniform float uSsrEnabled;
+uniform float uContactEnabled;
+uniform float uContactMaxCut;
+varying vec2 vUv;
+${GLSL_COMMON}
+${GLSL_SCREEN_RAY}
+
+void main() {
+  vec3 color = texture2D(uHdr, vUv).rgb;
+  vec4 nd = texture2D(uGNormalDepth, vUv);
+  float depth = nd.w;
+  // 天空不参与：它不在 G-Buffer 里，三样都无从谈起
+  if (depth <= 0.0) { gl_FragColor = vec4(color, 1.0); return; }
+
+  vec3 normal = normalize(nd.xyz);
+  vec4 albedoRough = texture2D(uGAlbedoRough, vUv);
+  vec3 albedo = albedoRough.rgb;
+  float metalness = texture2D(uGMaterial, vUv).r;
+
+  if (uContactEnabled > 0.5) {
+    float visible = texture2D(uContact, vUv).r;
+    if (visible < 0.999) {
+      float ndl = max(0.0, dot(normal, uSunViewDir));
+      // 金属没有漫反射项，接触阴影在它上面几乎看不出来，这里一并按能量算
+      vec3 sunDirect = albedo * (1.0 - metalness) * uSunColor * ndl * 0.3183099;
+      vec3 cut = min(sunDirect, color * uContactMaxCut) * (1.0 - visible);
+      color = max(vec3(0.0), color - cut);
+    }
+  }
+
+  if (uSsgiEnabled > 0.5) {
+    // 弹跳过来的辐射度要乘接收面自己的 albedo —— 少了这一步，
+    // 黑色的柏油路会和白墙一样把光反出去。
+    color += texture2D(uSsgi, vUv).rgb * albedo;
+  }
+
+  if (uSsrEnabled > 0.5) {
+    vec4 ssr = texture2D(uSsr, vUv);
+    color = mix(color, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
+  }
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
 const QUALITY_PRESETS = {
-  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14 },
-  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18 },
+  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14,
+    ssgi: false, ssr: false, contact: false, screenSpaceScale: 0.5 },
+  // medium 只留接触阴影：三件套里它最便宜（12 步、只走 0.42 m），
+  // 视觉回报却最直接 —— 没有它，所有东西看着都像浮在地上。
+  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18,
+    ssgi: false, ssr: false, contact: true,  screenSpaceScale: 0.5 },
   // high 已有最后一趟 FXAA + 锐化。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家。
-  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.75, sharpen: 0.22 },
-  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22 },
+  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.75, sharpen: 0.22,
+    ssgi: true,  ssr: true,  contact: true,  screenSpaceScale: 0.5 },
+  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22,
+    ssgi: true,  ssr: true,  contact: true,  screenSpaceScale: 0.75 },
 };
 
 export class PostPipeline {
@@ -674,7 +1131,7 @@ export class PostPipeline {
     this.hdrCapable = hasFloatRt;
 
     this.normalDepthMaterial = MakeNormalDepthMaterial(destruction);
-    this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
+    this._skipScratch = [];            // _RenderGBuffer 里藏起来的对象，复用，别每帧 new
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.quadMesh.frustumCulled = false;
@@ -696,6 +1153,57 @@ export class PostPipeline {
       uDirection: { value: new THREE.Vector2(1, 0) },
     };
     this.matAoBlur = this._Mat(FRAG_AO_BLUR, this.uniformsAoBlur);
+
+    // --- 屏幕空间三件套 ---
+    // uSunViewDir 是**视空间**的太阳方向：射线要在视空间里步进，每帧由 Render
+    // 用当前相机把世界方向转过来。传世界方向的话镜头一转，接触阴影就会整片乱走。
+    this.uniformsContact = {
+      uGNormalDepth: { value: null }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFrame: { value: 0 }, uSunViewDir: { value: new THREE.Vector3(0, 1, 0) },
+      uMaxDistance: { value: 0.42 }, uThickness: { value: 0.30 }, uStrength: { value: 0.72 },
+    };
+    this.matContact = this._Mat(FRAG_CONTACT_SHADOW, this.uniformsContact);
+
+    this.uniformsSsgi = {
+      uGNormalDepth: { value: null }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFrame: { value: 0 }, uColor: { value: null },
+      uRadius: { value: 3.2 }, uIntensity: { value: 0.85 },
+    };
+    this.matSsgi = this._Mat(FRAG_SSGI, this.uniformsSsgi);
+
+    this.uniformsSsr = {
+      uGNormalDepth: { value: null }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFrame: { value: 0 }, uColor: { value: null },
+      uGAlbedoRough: { value: null }, uGMaterial: { value: null },
+      uMaxDistance: { value: 26.0 }, uMaxRoughness: { value: 0.55 }, uIntensity: { value: 1.0 },
+    };
+    this.matSsr = this._Mat(FRAG_SSR, this.uniformsSsr);
+
+    this.uniformsSsBlur = {
+      uGNormalDepth: { value: null }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFrame: { value: 0 }, uSource: { value: null },
+      uTexel: { value: new THREE.Vector2() }, uDirection: { value: new THREE.Vector2(1, 0) },
+    };
+    this.matSsBlur = this._Mat(FRAG_SS_BLUR, this.uniformsSsBlur);
+
+    this.uniformsDeferred = {
+      uGNormalDepth: { value: null }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFrame: { value: 0 },
+      uHdr: { value: null }, uGAlbedoRough: { value: null }, uGMaterial: { value: null },
+      uSsgi: { value: null }, uSsr: { value: null }, uContact: { value: null },
+      uSunViewDir: { value: new THREE.Vector3(0, 1, 0) },
+      uSunColor: { value: new THREE.Vector3(1, 1, 1) },
+      uSsgiEnabled: { value: 0 }, uSsrEnabled: { value: 0 }, uContactEnabled: { value: 0 },
+      // 最多从一个像素上减掉它自身亮度的 70%。见 FRAG_DEFERRED 顶上的说明。
+      uContactMaxCut: { value: 0.70 },
+    };
+    this.matDeferred = this._Mat(FRAG_DEFERRED, this.uniformsDeferred);
+
+    // G-Buffer 影子材质的缓存：键是原材质，值是它的影子。
+    // 用 Map 而不是挂在 userData 上，是为了 Dispose 时能一次全放掉。
+    this.gbufferVariants = new Map();
+    this._swapScratch = [];
+    this._sunView = new THREE.Vector3();
 
     this.uniformsBright = {
       uSource: { value: null }, uNormalDepth: { value: null },
@@ -795,6 +1303,39 @@ export class PostPipeline {
     return rt;
   }
 
+  /**
+   * G-Buffer 的 MRT 靶。逐附件设 type：附件 0 的 w 是**米为单位的线性视深度**，
+   * 8 位存不下（1/255 米 ≈ 4 mm 的量化，接触阴影的射线会在自己身上打中自己）；
+   * 附件 1/2 全是 0..1 的物理参数，8 位绰绰有余。三张全开半浮点的话，
+   * 1920×1080 光这一组就要 50 MB，超宽屏更离谱。
+   */
+  _MakeGBufferRt(w, h) {
+    const rt = new THREE.WebGLRenderTarget(Math.max(1, w | 0), Math.max(1, h | 0), {
+      type: this.hdrType,
+      format: THREE.RGBAFormat,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.LinearFilter,
+      generateMipmaps: false,
+      depthBuffer: true,
+      stencilBuffer: false,
+      samples: 0,
+      count: 3,
+    });
+    const types = [this.hdrType, THREE.UnsignedByteType, THREE.UnsignedByteType];
+    const names = ["gbufferNormalDepth", "gbufferAlbedoRough", "gbufferMaterial"];
+    rt.textures.forEach((texture, i) => {
+      texture.type = types[i];
+      texture.name = names[i];
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+    });
+    return rt;
+  }
+
   SetSize(width, height) {
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
@@ -804,7 +1345,17 @@ export class PostPipeline {
     this.targets = {};
     this.bloomMips = [];
 
-    this.targets.normalDepth = this._MakeRt(w, h, { depthBuffer: true, minFilter: THREE.NearestFilter });
+    this.targets.gbuffer = this._MakeGBufferRt(w, h);
+    // 屏幕空间三件套走半分辨率：它们都是低频量（弹跳光、粗糙反射、接触暗带），
+    // 全分辨率只是把噪声画得更清楚，帧率却按像素数线性掉。
+    const sw = Math.max(2, Math.round(w * this.preset.screenSpaceScale));
+    const sh = Math.max(2, Math.round(h * this.preset.screenSpaceScale));
+    this.targets.ssgi = this._MakeRt(sw, sh);
+    this.targets.ssgiTmp = this._MakeRt(sw, sh);
+    this.targets.ssr = this._MakeRt(sw, sh);
+    this.targets.ssrTmp = this._MakeRt(sw, sh);
+    // 接触阴影是高频的（贴着物体根部那一条），降分辨率会糊成一片灰，走全分辨率。
+    this.targets.contact = this._MakeRt(w, h, { type: THREE.UnsignedByteType });
     this.targets.hdr = this._MakeRt(w, h, { depthBuffer: true, samples: this.preset.msaa });
     const aw = Math.max(2, Math.round(w * this.preset.aoScale));
     const ah = Math.max(2, Math.round(h * this.preset.aoScale));
@@ -821,6 +1372,9 @@ export class PostPipeline {
     godW = Math.max(2, Math.round(godW * godScale));
     godH = Math.max(2, Math.round(godH * godScale));
     this.targets.god = this._MakeRt(godW, godH);
+    // 延迟合并的输出。合并 pass 要同时读 HDR 和写结果，不能是同一张靶，
+    // 所以必须多一张；泛光与合成从这一刻起吃的都是它（SSR/SSGI 要进泛光）。
+    this.targets.lit = this._MakeRt(w, h);
     this.targets.ldr = this._MakeRt(w, h, { type: THREE.UnsignedByteType });
 
     let mw = w >> 1, mh = h >> 1;
@@ -842,7 +1396,18 @@ export class PostPipeline {
    * 粒子层要它做软粒子，也要它判断"这一像素背后是不是天空"——
    * 合成 pass 的雾明写跳过 w = 0 的天空，粒子得自己接上那一半。
    */
-  get NormalDepthTexture() { return this.targets.normalDepth.texture; }
+  get NormalDepthTexture() { return this.targets.gbuffer.textures[0]; }
+
+  /** G-Buffer 附件 1：rgb = 线性 albedo，a = roughness。 */
+  get GBufferAlbedoTexture() { return this.targets.gbuffer.textures[1]; }
+
+  /** G-Buffer 附件 2：r = metalness。 */
+  get GBufferMaterialTexture() { return this.targets.gbuffer.textures[2]; }
+
+  /** 这一帧屏幕空间三件套里真正跑了的那些。 */
+  get ScreenSpaceActive() {
+    return !!(this.preset.ssgi || this.preset.ssr || this.preset.contact);
+  }
 
   /** 合成 pass 实际采样的那一级泛光靶。调试面板与 uBloom 必须指同一张。 */
   get BloomTarget() {
@@ -863,11 +1428,18 @@ export class PostPipeline {
   _GetDebugSource() {
     const T = this.targets;
     switch (this.debugView) {
-      case "normal": return { texture: T.normalDepth.texture, mode: 0 };
-      case "depth": return { texture: T.normalDepth.texture, mode: 1 };
+      case "normal": return { texture: T.gbuffer.textures[0], mode: 0 };
+      case "depth": return { texture: T.gbuffer.textures[0], mode: 1 };
       case "ao": return { texture: T.ao.texture, mode: 2, unavailable: !this.preset.ssao };
       case "aoBlur": return { texture: T.aoBlur.texture, mode: 2, unavailable: !this.preset.ssao };
       case "hdr": return { texture: T.hdr.texture, mode: 4 };
+      case "lit": return { texture: this.ScreenSpaceActive ? T.lit.texture : T.hdr.texture, mode: 4 };
+      case "albedo": return { texture: T.gbuffer.textures[1], mode: 5 };
+      case "roughness": return { texture: T.gbuffer.textures[1], mode: 6 };
+      case "metalness": return { texture: T.gbuffer.textures[2], mode: 2 };
+      case "ssgi": return { texture: T.ssgi.texture, mode: 4, unavailable: !this.preset.ssgi };
+      case "ssr": return { texture: T.ssr.texture, mode: 7, unavailable: !this.preset.ssr };
+      case "contact": return { texture: T.contact.texture, mode: 2, unavailable: !this.preset.contact };
       // 送屏的要与合成 pass 真正吃的是同一张（见 uBloom 那一行）：bloomMips[0]
       // 只是第 0 级的降采样，还没叠上更小几级的 tent 放大，看着比实际泛光弱一大截。
       case "bloom": return { texture: this.BloomTarget?.texture, mode: 4 };
@@ -887,20 +1459,205 @@ export class PostPipeline {
   }
 
   /**
-   * 收集这一帧要在预通道里整个藏掉的对象（userData.skipNormalDepth === true）。
+   * 一份材质对应的 G-Buffer 影子材质。null = 这个物体不进 G-Buffer。
    *
-   * 每帧遍历一次场景图：这一趟本来就要被渲染器自己遍历好几遍，多一次几十微秒，
-   * 换来的是"挂上去就生效"——缓存一份列表的话，换关重建场景那一帧必然是脏的，
-   * 而这个 bug 的表现（天上一个黑洞）恰恰要花一小时才定位得到。
-   * 只收当前可见的：本来就藏着的对象不该被这里"帮忙"打开。
+   * 三条分流，理由都在下面：
+   *   · Standard / Physical  → 完整影子材质，albedo / roughness / metalness 全有
+   *   · allowOverride === false 或 transparent → 不进
+   *   · 其余不透明的自定义材质 → 兜底材质（几何法线 + 真深度 + 中性 albedo）
+   *
+   * 第二条是这次唯一改变旧行为的地方，而且是把旧行为改**对**：
+   * MarkNoPrepass 的文档写的是"把一份材质排除在预通道之外"，但它只做到了
+   * "不被换材质"，物体照样会拿自己的着色器画进预通道 —— 于是烟、贴片、枪口焰
+   * 往法线通道里写的是它们的**颜色**，往深度里写的是**不透明度**。
+   * 现在真的排除掉了。顺带：Sprite / Points 的几何属性对不上兜底材质的顶点
+   * 着色器，硬套的话会在原点糊出一堆方块，所以它们只能是"不进"，不能是兜底。
    */
-  _CollectSkipped(scene) {
-    const list = this._skipScratch;
-    list.length = 0;
+  _GBufferMaterialFor(material) {
+    if (!material) return null;
+    if (IsStandardLike(material)) {
+      let variant = this.gbufferVariants.get(material);
+      if (!variant) {
+        variant = MakeGBufferVariant(material);
+        this.gbufferVariants.set(material, variant);
+      }
+      return SyncGBufferVariant(variant, material);
+    }
+    if (material.allowOverride === false || material.transparent === true) return null;
+    return this.normalDepthMaterial;
+  }
+
+  /**
+   * G-Buffer 预通道。
+   *
+   * 以前这里用的是 scene.overrideMaterial —— 一句话换全场，代价是**拿不到
+   * 每个物体自己的贴图**：覆盖材质根本不知道这面墙的 albedo 贴图是哪一张。
+   * 没有 albedo 就没有 SSGI（弹跳的颜色从哪来），没有 roughness / metalness
+   * 就没有 SSR（该不该反射、反射多锐）。所以改成逐物体换材质。
+   *
+   * 换出去的那份要原样换回来：这一趟结束之后马上就是前向主场景，
+   * 换漏一个物体，它这一帧就是用 G-Buffer 材质画到屏幕上的（一团纯色）。
+   * 用一个复用的扁平数组存 [object, material, ...]，每帧零分配。
+   */
+  _RenderGBuffer(scene, camera) {
+    // skipNormalDepth 的账（这一条是好几个"远景不对劲"的共同根因）：
+    // 天空穹曾经用自己那套着色器写进这张靶 —— xyz 是天空颜色（当法线用是纯垃圾），
+    // w 是它的不透明度 1.0，于是整片天空在下游看起来像"一米外有东西"。
+    // 后果一路传下去：SSAO 拿天空色当法线算遮蔽；合成 pass 的雾判据
+    // `nd.w > 0.0` 对天空成立（只是雾量≈0，蒙混过关）；而粒子层用
+    // `nd.w > 0.001` 判断"背景是不是天空"时全判反 —— 软粒子把天空前的烟
+    // 整片抹掉，二百米外的黑烟柱就成了天上一个越长越大的黑洞。
+    // 每帧重新收而不缓存列表：换关重建场景那一帧，缓存必然是脏的。
+    const renderer = this.renderer;
+    const swapped = this._swapScratch;
+    swapped.length = 0;
+    const hidden = this._skipScratch;
+    hidden.length = 0;
+
+    // 一次遍历同时做两件事：收 skipNormalDepth 的、换材质。
+    // 分两次遍历的话，这棵树每帧要多走一遍几千个节点。
     scene.traverse((object) => {
-      if (object.visible && object.userData && object.userData.skipNormalDepth) list.push(object);
+      if (!object.visible) return;
+      if (object.userData && object.userData.skipNormalDepth) {
+        object.visible = false;
+        hidden.push(object);
+        return;
+      }
+      const material = object.material;
+      if (!material) return;
+      if (Array.isArray(material)) {
+        // 多材质网格：整只按第一份的规矩处理。分材质换的话要维护一张
+        // 数组缓存，而这个项目里多材质网格只有导入模型那几只。
+        const variant = this._GBufferMaterialFor(material[0]);
+        if (variant === null) { object.visible = false; hidden.push(object); return; }
+        swapped.push(object, material);
+        object.material = variant;
+        return;
+      }
+      const variant = this._GBufferMaterialFor(material);
+      if (variant === null) { object.visible = false; hidden.push(object); return; }
+      swapped.push(object, material);
+      object.material = variant;
     });
-    return list;
+
+    const prevBackground = scene.background;
+    scene.background = null;
+    renderer.setRenderTarget(this.targets.gbuffer);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, true, false);
+    renderer.render(scene, camera);
+    scene.background = prevBackground;
+
+    for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
+    for (const object of hidden) object.visible = true;
+    swapped.length = 0;
+    hidden.length = 0;
+  }
+
+  /**
+   * 屏幕空间三件套 + 延迟合并。返回下游（泛光 / 合成）该采的那张靶：
+   * 三件套一个都没开时原样返回 HDR 靶，一次多余的拷贝都不做。
+   *
+   * 顺序是有讲究的：接触阴影 → SSGI → SSR → 合并。
+   * SSGI 和 SSR 采的都是**还没被接触阴影修过的** HDR ——
+   * 让它们采修过的那份要多一趟全屏拷贝，而接触阴影只影响几十厘米的接触带，
+   * 反弹光与反射里那点差别看不出来。这是有意的取舍，不是漏了。
+   */
+  _RenderScreenSpace(camera, options) {
+    const T = this.targets;
+    const P = this.preset;
+    if (!this.ScreenSpaceActive) return T.hdr.texture;
+
+    const frame = this.frame;
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+    const projScaleY = 1 / tanHalf;
+    const projScaleX = projScaleY / camera.aspect;
+    const gNormalDepth = T.gbuffer.textures[0];
+    const gAlbedoRough = T.gbuffer.textures[1];
+    const gMaterial = T.gbuffer.textures[2];
+
+    // 世界方向 → 视空间方向。只转方向不转位置，所以用 matrixWorldInverse 的
+    // 旋转部分（transformDirection 正是干这个的，且不受相机平移影响）。
+    const sunView = this._sunView;
+    if (options.sunDirection) {
+      sunView.copy(options.sunDirection).transformDirection(camera.matrixWorldInverse).normalize();
+    } else {
+      sunView.set(0, 1, 0);
+    }
+
+    const contactOn = !!P.contact && !!options.sunDirection;
+    if (contactOn) {
+      const U = this.uniformsContact;
+      U.uGNormalDepth.value = gNormalDepth;
+      U.uProjScale.value.set(projScaleX, projScaleY);
+      U.uFrame.value = frame;
+      U.uSunViewDir.value.copy(sunView);
+      U.uMaxDistance.value = options.contactDistance ?? 0.42;
+      U.uThickness.value = options.contactThickness ?? 0.30;
+      U.uStrength.value = options.contactStrength ?? 0.72;
+      this._Blit(this.matContact, T.contact);
+    }
+
+    const ssgiOn = !!P.ssgi;
+    if (ssgiOn) {
+      const U = this.uniformsSsgi;
+      U.uGNormalDepth.value = gNormalDepth;
+      U.uProjScale.value.set(projScaleX, projScaleY);
+      U.uFrame.value = frame;
+      U.uColor.value = T.hdr.texture;
+      U.uRadius.value = options.ssgiRadius ?? 3.2;
+      U.uIntensity.value = options.ssgi ?? 0.85;
+      this._Blit(this.matSsgi, T.ssgi);
+      this._BlurScreenSpace(T.ssgi, T.ssgiTmp, gNormalDepth, projScaleX, projScaleY);
+    }
+
+    const ssrOn = !!P.ssr;
+    if (ssrOn) {
+      const U = this.uniformsSsr;
+      U.uGNormalDepth.value = gNormalDepth;
+      U.uProjScale.value.set(projScaleX, projScaleY);
+      U.uFrame.value = frame;
+      U.uColor.value = T.hdr.texture;
+      U.uGAlbedoRough.value = gAlbedoRough;
+      U.uGMaterial.value = gMaterial;
+      U.uMaxDistance.value = options.ssrDistance ?? 26.0;
+      U.uMaxRoughness.value = options.ssrMaxRoughness ?? 0.55;
+      U.uIntensity.value = options.ssr ?? 1.0;
+      this._Blit(this.matSsr, T.ssr);
+      this._BlurScreenSpace(T.ssr, T.ssrTmp, gNormalDepth, projScaleX, projScaleY);
+    }
+
+    const U = this.uniformsDeferred;
+    U.uGNormalDepth.value = gNormalDepth;
+    U.uProjScale.value.set(projScaleX, projScaleY);
+    U.uFrame.value = frame;
+    U.uHdr.value = T.hdr.texture;
+    U.uGAlbedoRough.value = gAlbedoRough;
+    U.uGMaterial.value = gMaterial;
+    U.uSsgi.value = T.ssgi.texture;
+    U.uSsr.value = T.ssr.texture;
+    U.uContact.value = T.contact.texture;
+    U.uSunViewDir.value.copy(sunView);
+    if (options.sunColor) U.uSunColor.value.fromArray(options.sunColor);
+    U.uSsgiEnabled.value = ssgiOn ? 1 : 0;
+    U.uSsrEnabled.value = ssrOn ? 1 : 0;
+    U.uContactEnabled.value = contactOn ? 1 : 0;
+    this._Blit(this.matDeferred, T.lit);
+    return T.lit.texture;
+  }
+
+  /** 深度感知的两趟可分离模糊，就地做完（结果回到 target）。 */
+  _BlurScreenSpace(target, scratch, gNormalDepth, projScaleX, projScaleY) {
+    const U = this.uniformsSsBlur;
+    U.uGNormalDepth.value = gNormalDepth;
+    U.uProjScale.value.set(projScaleX, projScaleY);
+    U.uTexel.value.set(1 / target.width, 1 / target.height);
+    U.uSource.value = target.texture;
+    U.uDirection.value.set(1, 0);
+    this._Blit(this.matSsBlur, scratch);
+    U.uSource.value = scratch.texture;
+    U.uDirection.value.set(0, 1);
+    this._Blit(this.matSsBlur, target);
   }
 
   _Blit(material, target) {
@@ -925,7 +1682,7 @@ export class PostPipeline {
     const projScaleY = 1 / tanHalf;
     const projScaleX = projScaleY / camera.aspect;
 
-    // --- 1) 深度法线预通道 ---
+    // --- 1) G-Buffer 预通道 ---
     //
     // 事故（这一条是好几个"远景不对劲"的共同根因）：allowOverride = false 只保证
     // **不被换材质**，它照样会被画进这一趟。天空穹正是这样用自己那套着色器
@@ -937,23 +1694,11 @@ export class PostPipeline {
     // 整片抹掉（clamp((1.0 − 186)/0.45) = 0），大气透视也补不上去，
     // 二百米外的黑烟柱就成了天上一个越长越大的黑洞。
     // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
-    const skipped = this._CollectSkipped(scene);
-    for (const object of skipped) object.visible = false;
-    const prevBackground = scene.background;
-    const prevOverride = scene.overrideMaterial;
-    scene.background = null;
-    scene.overrideMaterial = this.normalDepthMaterial;
-    renderer.setRenderTarget(T.normalDepth);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear(true, true, false);
-    renderer.render(scene, camera);
-    scene.overrideMaterial = prevOverride;
-    scene.background = prevBackground;
-    for (const object of skipped) object.visible = true;
+    this._RenderGBuffer(scene, camera);
 
     // --- 2) SSAO ---
     if (this.preset.ssao) {
-      this.uniformsAo.uNormalDepth.value = T.normalDepth.texture;
+      this.uniformsAo.uNormalDepth.value = T.gbuffer.textures[0];
       this.uniformsAo.uResolution.value.set(T.ao.width, T.ao.height);
       this.uniformsAo.uProjection.value.copy(camera.projectionMatrix);
       this.uniformsAo.uProjScale.value.set(projScaleX, projScaleY);
@@ -981,6 +1726,16 @@ export class PostPipeline {
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
 
+    // --- 3.5) 屏幕空间三件套 + 延迟合并 ---
+    //
+    // 全部排在主场景**之后**：SSGI 和 SSR 都要采"这一点最终亮成什么样"，
+    // 那份信息只有着完色的 HDR 靶里才有。排在前面就只能采上一帧，
+    // 镜头一动整片反射会拖影。
+    //
+    // 太阳方向要转到视空间：射线在视空间里步进（G-Buffer 的法线和位置都是
+    // 视空间的）。传世界方向的话，镜头一转接触阴影会整片跟着乱走。
+    const litSource = this._RenderScreenSpace(camera, options);
+
     // 在亮部提取前就算好这帧会不会跑太阳拖影，因为亮部图的 alpha
     // 只在这种情况下需要顺手打包天空遮挡。旧版到第 5 pass 才投影太阳，
     // 亮部 pass 无法知道是否值得多读一张深度图。
@@ -1001,8 +1756,8 @@ export class PostPipeline {
     if (!godActive) godStrength = 0;
 
     // --- 4) 泛光 ---
-    this.uniformsBright.uSource.value = T.hdr.texture;
-    this.uniformsBright.uNormalDepth.value = T.normalDepth.texture;
+    this.uniformsBright.uSource.value = litSource;
+    this.uniformsBright.uNormalDepth.value = T.gbuffer.textures[0];
     this.uniformsBright.uPackSky.value = godActive ? 1 : 0;
     this.uniformsBright.uThreshold.value = options.bloomThreshold ?? 1.18;
     this._Blit(this.matBright, T.bright);
@@ -1038,10 +1793,10 @@ export class PostPipeline {
 
     // --- 6) 合成 ---
     const U = this.uniformsComposite;
-    U.uHdr.value = T.hdr.texture;
+    U.uHdr.value = litSource;
     U.uBloom.value = this.BloomTarget.texture;
     U.uGod.value = T.god.texture;
-    U.uNormalDepth.value = T.normalDepth.texture;
+    U.uNormalDepth.value = T.gbuffer.textures[0];
     U.uResolution.value.set(this.width, this.height);
     U.uExposure.value = options.exposure ?? 1.0;
     U.uBloomStrength.value = options.bloom ?? 0.5;
@@ -1112,7 +1867,12 @@ export class PostPipeline {
     for (const rt of Object.values(this.targets)) rt.dispose();
     for (const rt of this.bloomMips) rt.dispose();
     for (const m of [this.matAo, this.matAoBlur, this.matBright, this.matDown,
-      this.matUp, this.matGod, this.matComposite, this.matFxaa, this.matDebug, this.normalDepthMaterial]) m.dispose();
+      this.matUp, this.matGod, this.matComposite, this.matFxaa, this.matDebug,
+      this.matContact, this.matSsgi, this.matSsr, this.matSsBlur, this.matDeferred,
+      this.normalDepthMaterial]) m.dispose();
+    // 影子材质与原材质**共享贴图**，dispose() 只放它自己那份程序，不会连累原材质。
+    for (const variant of this.gbufferVariants.values()) variant.dispose();
+    this.gbufferVariants.clear();
   }
 }
 

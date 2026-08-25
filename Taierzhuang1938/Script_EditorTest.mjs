@@ -149,23 +149,32 @@ const debugRendering = await page.evaluate(() => {
     }
     return Math.round(max);
   };
+  const gi = T.editor.host.game.gi;
+  const EXPECTED = {
+    normal: () => T.post.targets.gbuffer.textures[0],
+    depth: () => T.post.targets.gbuffer.textures[0],
+    albedo: () => T.post.targets.gbuffer.textures[1],
+    roughness: () => T.post.targets.gbuffer.textures[1],
+    metalness: () => T.post.targets.gbuffer.textures[2],
+    ao: () => T.post.targets.ao.texture,
+    aoBlur: () => T.post.targets.aoBlur.texture,
+    ssgi: () => T.post.targets.ssgi.texture,
+    ssr: () => T.post.targets.ssr.texture,
+    contact: () => T.post.targets.contact.texture,
+    giIrradiance: () => gi.irradiance[gi.pingPong].texture,
+    giDistance: () => gi.distanceMoments[gi.pingPong].texture,
+  };
   const visible = {};
   const lit = {};
   const chipsOn = {};
-  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance"]) {
+  for (const view of Object.keys(EXPECTED)) {
     panel.SetView(view);
     T.StepFrames(2);
     const source = T.post._GetDebugSource();
-    const expected = view === "normal" || view === "depth"
-      ? T.post.targets.normalDepth.texture
-      : view === "ao" ? T.post.targets.ao.texture
-        : view === "aoBlur" ? T.post.targets.aoBlur.texture
-          : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
-            : T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
-    visible[view] = source?.texture === expected;
+    visible[view] = source?.texture === EXPECTED[view]();
     lit[view] = Brightest();
-    // 一次只许亮一格：四组 chips 是四个独立控件，选中态必须集中同步，
-    // 否则面板上会同时亮着四个视图，读者判断不出送屏的到底是哪一张。
+    // 一次只许亮一格：五组 chips 是五个独立控件，选中态必须集中同步，
+    // 否则面板上会同时亮着好几个视图，读者判断不出送屏的到底是哪一张。
     chipsOn[view] = document.querySelectorAll(".edPanel.debugRendering .edChip.on").length;
   }
   panel.SetView("normal");
@@ -174,19 +183,52 @@ const debugRendering = await page.evaluate(() => {
     editor: T.Debug.Editor(),
     panel: !!document.querySelector(".edPanel.debugRendering"),
     view: T.post.GetDebugView(),
-    target: !!T.post.targets.normalDepth,
+    target: !!T.post.targets.gbuffer,
     visible, lit, chipsOn,
   };
 });
-Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
+Check("Debug Rendering：G-Buffer 与屏幕空间靶都已接入后处理", debugRendering.editor.debugRendering
   && debugRendering.panel && debugRendering.view === "normal" && debugRendering.target
   && Object.values(debugRendering.visible).every(Boolean),
 JSON.stringify({ ...debugRendering, lit: undefined, chipsOn: undefined }));
-// GI 那两张在探针体关着时画的是"不可用"斜纹（也是有颜色的），所以同一条阈值够用。
+// 关着的 pass（探针体、以及画质档没开的屏幕空间项）画的是"不可用"斜纹，
+// 也是有颜色的，所以同一条阈值够用。真正要挡住的是"整趟 pass 没画"那种纯黑
+// —— 展示着色器曾经因为一个 GLSL ES 3.00 保留字整段编译不过，屏幕上一片死黑。
 Check("Debug Rendering：每个视图都真的画到了屏幕上（不是黑屏）",
   Object.values(debugRendering.lit).every((v) => v > 8), JSON.stringify(debugRendering.lit));
-Check("Debug Rendering：四组 chips 只亮当前视图那一格",
+Check("Debug Rendering：五组 chips 只亮当前视图那一格",
   Object.values(debugRendering.chipsOn).every((n) => n === 1), JSON.stringify(debugRendering.chipsOn));
+
+// G-Buffer 的取证：albedo 附件必须是**真的基础色**，不能整屏是兜底材质那片
+// 中性灰 —— 后者说明逐物体换材质那一步没生效（影子材质没建出来或没换上），
+// 于是 SSGI 拿不到颜色、SSR 拿不到 roughness，三件套全部退化成空跑。
+const gbuffer = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const rt = T.post.targets.gbuffer;
+  const buf = new Uint8Array(rt.width * rt.height * 4);
+  T.renderer.readRenderTargetPixels(rt, 0, 0, rt.width, rt.height, buf, 0, 1);
+  let written = 0, fallbackGrey = 0, roughSpread = 0;
+  let minRough = 255, maxRough = 0;
+  for (let i = 0; i < buf.length; i += 4) {
+    if (buf[i] === 0 && buf[i + 1] === 0 && buf[i + 2] === 0) continue;
+    written += 1;
+    if (buf[i] === 128 && buf[i + 1] === 128 && buf[i + 2] === 128) fallbackGrey += 1;
+    minRough = Math.min(minRough, buf[i + 3]);
+    maxRough = Math.max(maxRough, buf[i + 3]);
+  }
+  roughSpread = maxRough - minRough;
+  return {
+    attachments: rt.textures.length,
+    variants: T.post.gbufferVariants.size,
+    writtenPct: +(100 * written / (buf.length / 4)).toFixed(1),
+    fallbackPct: written ? +(100 * fallbackGrey / written).toFixed(1) : 100,
+    roughSpread,
+  };
+});
+Check("G-Buffer：三张附件、albedo 是真基础色而不是兜底灰",
+  gbuffer.attachments === 3 && gbuffer.variants > 0
+  && gbuffer.writtenPct > 20 && gbuffer.fallbackPct < 50 && gbuffer.roughSpread > 20,
+JSON.stringify(gbuffer));
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。

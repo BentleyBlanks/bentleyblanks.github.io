@@ -84,7 +84,9 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       // "一米外有实体"。后果是天空前的烟被软粒子整片抹掉（(1−186)/0.45 → 0）、
       // 大气透视也补不上，二百米外的黑烟柱在天上留下一个越长越大的黑洞。
       // 这里直接从靶上取证：只看 alpha 的半浮点位模式是不是 0，不必解码。
-      const nd = T.post.targets.normalDepth;
+      // G-Buffer 附件 0 就是原来那张 normalDepth，逐位相同（见 Script_Post 的
+      // G-Buffer 注释块）。readRenderTargetPixels 不给 textureIndex 时读的正是附件 0。
+      const nd = T.post.targets.gbuffer;
       const raw = new Uint16Array(nd.width * nd.height * 4);
       T.renderer.readRenderTargetPixels(nd, 0, 0, nd.width, nd.height, raw);
       let skyTexels = 0, geoTexels = 0;
