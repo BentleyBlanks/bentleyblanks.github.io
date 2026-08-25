@@ -130,10 +130,17 @@ assert.match(TargetCard(MakeSoldier({ weaponId: "Type92Hmg", weapon: { kind: "hm
 assert.match(TargetCard(MakeSoldier({ tacticalRole: "leader" }), 12).title, /分队长/);
 
 // 自己人给姓名（这是巷战里不误伤的唯一依据），敌人不给。
+// 自己人那一行是**岁数 + 距离**，不报枪：他拿什么枪既不改变我要做的事，也不改变他能做的事。
 const mate = MakeSoldier({ id: 9, side: "nra", weaponId: "HanYang" });
 assert.equal(TargetCard(mate, 12).title, "李长顺");
 assert.equal(TargetCard(mate, 12).kind, "friend");
-assert.match(TargetCard(mate, 12).meta, /^汉阳造 · 12m$/);
+assert.match(TargetCard(mate, 12).meta, /^19 岁 · 12m$/);
+assert.doesNotMatch(TargetCard(mate, 12).meta, /汉阳造/, "自己人卡片不报枪");
+assert.match(TargetCard(MakeSoldier({ id: 9, side: "nra", towel: true }), 12).meta,
+  /^敢死队 · 19 岁 · 12m$/);
+// 岁数缺了就整段不出现，不留一个空的 "岁"。
+assert.match(TargetCard(MakeSoldier({ id: 9, side: "nra", identity: { name: "王二" } }), 12).meta,
+  /^12m$/);
 
 // 锥外的人不认：30 m 上偏 4 m 已经远超 2.4° 锥（1.26 m）与 2.2 m 上限。
 assert.equal(new IdentifySystem().Update(0.016,
@@ -184,7 +191,9 @@ const mixed = new IdentifySystem().Update(0.016,
 assert.equal(mixed.key, "s4", "活人排在尸体前面");
 const onlyCorpse = new IdentifySystem().Update(0.016, { eye, dir: down, soldiers: [corpse] });
 assert.equal(onlyCorpse.title, "阵亡 李长顺");
-assert.match(onlyCorpse.meta, /四川三台 · 汉阳造 2 桥夹 · 8m/);
+// 地上那具是个物件了：籍贯、岁数、距离，不报他的枪（能不能捡由 F 的提示语说）。
+assert.match(onlyCorpse.meta, /^四川三台 · 19 岁 · 8m$/);
+assert.doesNotMatch(onlyCorpse.meta, /汉阳造|桥夹/, "尸体卡片不报缴获");
 const farCorpse = MakeSoldier({ id: 5, alive: false, z: -60 });
 const farDir = (() => {
   const dy = 0.30 - eye.y, dz = -60;

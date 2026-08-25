@@ -73,11 +73,26 @@ function Meters(dist) {
 }
 
 /**
+ * 年龄。**只有自己人给**，而且它是自己人那张卡上唯一的"内容"。
+ *
+ * 为什么把枪换成岁数：准心压在弟兄身上时，玩家要读的从来不是"他拿的什么枪"——
+ * 那既不改变他要做的事（不打他），也不改变他能做的事。而这支部队是川军，
+ * MakeSoldierIdentity 抽出来的是 17—34 岁，队伍里三成不到二十。
+ * 「十八岁 · 12m」把"我在替谁挡这一枪"这件事说清楚，而"汉阳造 · 12m"什么也没说。
+ * 日军不给：他的岁数玩家不该知道，那是准心不该越过的一条线。
+ */
+function Years(identity) {
+  const age = Math.round(Number(identity?.age));
+  return Number.isFinite(age) && age > 0 ? `${age} 岁` : "";
+}
+
+/**
  * 把一个目标做成 HUD 直接能画的卡片。纯函数。
  *
  * detail：
  *   "full"  —— 体验档：连血条一起给。
- *   "basic" —— 标准档：番号、兵种、枪、距离；伤情只给"负伤"两个字，不给数字。
+ *   "basic" —— 标准档：敌人给兵种与枪，自己人给姓名与岁数，一律带距离；
+ *                伤情只给"负伤"两个字，不给数字。
  *   false   —— 写实档：这一层根本不跑（见 IdentifySystem.Update）。
  */
 export function TargetCard(entity, dist, detail = "basic") {
@@ -97,18 +112,16 @@ export function TargetCard(entity, dist, detail = "basic") {
   }
 
   const identity = entity.identity || {};
-  const weapon = WeaponName(entity.weaponId);
   const faction = entity.side === "nra" ? "nra" : "ija";
 
   if (!entity.alive) {
     // 阵亡的人仍然有名有姓 —— 这一版唯一一处把"这是谁"写在战场上的地方
     // 就是阵亡卡，尸体沿用同一套读法。日方不给姓名（玩家不该认得他们）。
-    const loot = entity.drop && !entity.drop.taken
-      ? `${WeaponName(entity.drop.weaponId)}${entity.drop.clips > 0 ? ` ${entity.drop.clips} 桥夹` : ""}`
-      : "";
+    // 地上那具已经是个物件了，所以**不报他的枪**：能不能捡由 F 的提示语在两米内说，
+    // 这里只留他是谁、哪里人、多大、有多远（见 Years 的账）。
     const bits = faction === "nra"
-      ? [identity.origin, loot, Meters(dist)]
-      : [loot, Meters(dist)];
+      ? [identity.origin, Years(identity), Meters(dist)]
+      : [Meters(dist)];
     return {
       key: `s${entity.id}`,
       faction,
@@ -122,7 +135,8 @@ export function TargetCard(entity, dist, detail = "basic") {
 
   const wounded = Number(entity.health) <= 55;
   if (faction === "nra") {
-    const bits = [entity.towel ? "敢死队" : "", weapon, Meters(dist)];
+    // 自己人这一行**不报枪**，报岁数（见 Years 的账）。
+    const bits = [entity.towel ? "敢死队" : "", Years(identity), Meters(dist)];
     if (detail !== "full" && wounded) bits.push("负伤");
     return {
       key: `s${entity.id}`,
@@ -135,7 +149,8 @@ export function TargetCard(entity, dist, detail = "basic") {
     };
   }
 
-  const bits = [weapon, Meters(dist)];
+  // 活着的日军**留着枪**：那是"他现在能对我做什么"，与自己人那一行是两件事。
+  const bits = [WeaponName(entity.weaponId), Meters(dist)].filter(Boolean);
   if (detail !== "full" && wounded) bits.push("负伤");
   return {
     key: `s${entity.id}`,

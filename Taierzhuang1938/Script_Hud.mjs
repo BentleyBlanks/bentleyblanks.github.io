@@ -379,6 +379,8 @@ export class Hud {
    * 见 docs/Data_VisualReview.md 的账），而玩家手上是一把打得到五百米的步枪。
    * 没有这一条，"那边那个人是谁"在四十米开外就无解 —— 于是要么不敢打，要么见人就打。
    * COD 的名牌解决的就是这件事；我们照它的位置（准心正下方）与克制程度（两行字）做，
+   * 但**不照它的底板**：它那条暗带在我们这幅灰土加雾的画面上是最像 UI 的东西
+   * （见 Style_Game.css .hudTarget），这里只有字。
    * 血条只在体验档给。写实档整条链关掉（DIFFICULTY.targetInfo = false）。
    *
    * @param {object|null} card Script_Identify.TargetCard 的返回值
