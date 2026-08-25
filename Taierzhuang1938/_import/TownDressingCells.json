@@ -276,8 +276,8 @@
   {
    "id": "PeoplesBookshop",
    "kind": "shop",
-   "x": -108,
-   "z": 132,
+   "x": -9.8,
+   "z": 40,
    "ry": -1.5707963267948966,
    "w": 12,
    "d": 9
@@ -475,10 +475,10 @@
   {
    "id": "EastDistrictOffice",
    "label": "第二区公所",
-   "kind": "compound",
+   "kind": "districtOffice",
    "x": 218,
    "z": 12,
-   "ry": -1.5707963267948966,
+   "ry": 1.5707963267948966,
    "w": 50,
    "d": 74,
    "damage": 0.28,
@@ -761,7 +761,7 @@
     {
      "id": "Rampway",
      "x": 288,
-     "z": -65,
+     "z": -85,
      "radius": 16
     },
     {
@@ -3689,8 +3689,8 @@
    "d": 20.88,
    "seed": "blk4_5",
    "shop": false,
-   "kind": "WellYard",
-   "ry": 0,
+   "kind": "ShopRow",
+   "ry": 1.5708,
    "damage": 0.207,
    "state": "intact",
    "burnt": false,
@@ -4403,14 +4403,32 @@
   },
   {
    "x": -103.67,
-   "z": 113.73,
+   "z": 114.4,
    "w": 14.67,
-   "d": 19.54,
+   "d": 20.88,
    "seed": "blk6_17",
    "shop": false,
    "kind": "OneEntry",
    "ry": 0,
    "damage": 0.206,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -103.67,
+   "z": 137.28,
+   "w": 14.67,
+   "d": 20.88,
+   "seed": "blk6_18",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
    "state": "intact",
    "burnt": false,
    "tiers": {
@@ -5212,7 +5230,7 @@
    "seed": "blk9_13",
    "shop": true,
    "kind": "ShopRow",
-   "ry": 0,
+   "ry": 3.1416,
    "damage": 0.223,
    "state": "intact",
    "burnt": false,
@@ -5819,7 +5837,7 @@
    "seed": "blk11_13",
    "shop": true,
    "kind": "ShopRow",
-   "ry": 0,
+   "ry": 3.1416,
    "damage": 0.38,
    "state": "damaged",
    "burnt": true,
@@ -6188,8 +6206,8 @@
    "d": 8.88,
    "seed": "blk12_15",
    "shop": false,
-   "kind": "AdobeYard",
-   "ry": 0,
+   "kind": "ShopRow",
+   "ry": 1.5708,
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
@@ -6206,8 +6224,8 @@
    "d": 8.26,
    "seed": "blk12_16",
    "shop": false,
-   "kind": "OneEntry",
-   "ry": 0,
+   "kind": "ShopRow",
+   "ry": 1.5708,
    "damage": 0.38,
    "state": "damaged",
    "burnt": false,
@@ -6277,8 +6295,8 @@
    "d": 20.88,
    "seed": "blk12_20",
    "shop": false,
-   "kind": "TwoEntry",
-   "ry": 0,
+   "kind": "ShopRow",
+   "ry": 1.5708,
    "damage": 0.38,
    "state": "damaged",
    "burnt": true,
@@ -6456,7 +6474,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -6805,7 +6823,7 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -7105,7 +7123,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L6_Beimen": "far"
    }
   },
@@ -7122,7 +7140,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -7284,7 +7302,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
+    "L4_Chengqiang": "far",
     "L5_Shizijie": "mid",
     "L6_Beimen": "far"
    }
@@ -7508,8 +7526,8 @@
    "d": 20.88,
    "seed": "blk16_10",
    "shop": false,
-   "kind": "WellYard",
-   "ry": 0,
+   "kind": "ShopRow",
+   "ry": 3.1416,
    "damage": 0.464,
    "state": "damaged",
    "burnt": true,
@@ -7727,7 +7745,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L6_Beimen": "far"
    }
   },
@@ -7851,7 +7869,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
+    "L4_Chengqiang": "detail",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -7863,7 +7881,7 @@
    "d": 8.38,
    "seed": "blk17_9",
    "shop": false,
-   "kind": "OneEntry",
+   "kind": "ShopRow",
    "ry": 0,
    "damage": 0.606,
    "state": "damaged",
@@ -7887,7 +7905,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "detail",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -8148,7 +8166,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L6_Beimen": "far"
    }
   },
@@ -8217,7 +8235,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
+    "L4_Chengqiang": "detail",
     "L5_Shizijie": "detail",
     "L6_Beimen": "far"
    }
@@ -8446,7 +8464,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L6_Beimen": "far"
    }
   },
@@ -8541,7 +8559,7 @@
    "tiers": {
     "L2_Dongguan": "mid",
     "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
+    "L4_Chengqiang": "detail",
     "L5_Shizijie": "mid",
     "L6_Beimen": "far"
    }
@@ -8701,7 +8719,7 @@
    "tiers": {
     "L2_Dongguan": "far",
     "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "mid",
     "L6_Beimen": "far"
    }
@@ -8892,7 +8910,7 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
+    "L4_Chengqiang": "mid",
     "L6_Beimen": "far"
    }
   },
@@ -8967,7 +8985,7 @@
    "tiers": {
     "L2_Dongguan": "mid",
     "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
+    "L4_Chengqiang": "detail",
     "L5_Shizijie": "mid",
     "L6_Beimen": "far"
    }
@@ -9147,7 +9165,7 @@
    "tiers": {
     "L2_Dongguan": "mid",
     "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
+    "L4_Chengqiang": "mid",
     "L5_Shizijie": "mid",
     "L6_Beimen": "far"
    }

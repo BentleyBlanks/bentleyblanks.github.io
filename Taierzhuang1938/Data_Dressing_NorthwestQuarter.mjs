@@ -82,7 +82,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk3_1：垫在树干下头的石头" },
 
   // blk4_2 一进院（-163.43,-226.68）damage 0.04：院心西侧正在装车。
-  { asset: "cart", x: -166.83, z: -224.98, ry: 0.18,
+  { asset: "cart", x: -166.76, z: -224.69, ry: 0.18,
     note: "blk4_2 一进院院心：手推车停在影壁西边，正在往上码东西" },
   { asset: "marketBox01", x: -165.33, z: -223.88, ry: 0.5,
     note: "blk4_2：等着上车的小箱" },
@@ -106,9 +106,9 @@ export const PLACEMENTS = Object.freeze([
 
   // --- 片区中段：铁牌坊、当典后街、龙王庙街一带 ---------------------------
   // blk4_5 井院（-163.75,-160.16）：铁牌坊（-145,-160）斜对面的巷口井院。
-  { asset: "cart", x: -170.6, z: -156.26, ry: 0.08, scale: 0.9,
+  { asset: "cart", x: -168.18, z: -157.17, ry: 0.08, scale: 0.9,
     note: "blk4_5 铁牌坊斜对面的井院：手推车停在井台西边，车斗已经空了一趟" },
-  { asset: "marketCrate01", x: -169.35, z: -154.46, ry: 0.6,
+  { asset: "marketCrate01", x: -169.88, z: -154.33, ry: 0.6,
     note: "blk4_5：卸下来还没搬进屋的板条箱" },
 
   // blk7_6 土墙院（-81.71,-134.07）：龙王庙街北，后院那半是柴院。
@@ -141,8 +141,6 @@ export const PLACEMENTS = Object.freeze([
     note: "blk4_9 土墙院后院柴院：矮墙以南装了一半的手推车，车横着好装" },
   { asset: "marketCrate03", x: -164.83, z: -63.04, ry: 0.5,
     note: "blk4_9：等着上车的板条箱" },
-  { asset: "marketBox01", x: -164.13, z: -62.34, ry: -0.7,
-    note: "blk4_9：板条箱旁边摞着的小木箱" },
 
   // blk5_10 一进院（-136.19,-45.76）damage 0.22：西门大街北，正在装车。
   { asset: "cart", x: -141.5, z: -44.4, ry: 1.6,
@@ -210,9 +208,9 @@ export const PLACEMENTS = Object.freeze([
     note: "blk0_8 土墙院：架子底下的木盆，昨晚洗的衣裳" },
 
   // blk1_0 一进院（-245.14,-274.56）damage 0.02：全片最完整的一户。
-  { asset: "clayLiddedJar", x: -235.77, z: -279.96, ry: 0.25,
+  { asset: "clayLiddedJar", x: -235.57, z: -279.18, ry: 0.25,
     note: "blk1_0 一进院：檐下一溜咸菜坛的头一只，盖压得严实" },
-  { asset: "clayLuggedJar", x: -235.33, z: -281.02, ry: -0.45,
+  { asset: "clayLuggedJar", x: -234.63, z: -281.41, ry: -0.45,
     note: "blk1_0 一进院：并排的第二只带耳陶罐" },
   { asset: "stackableStone01", x: -235.98, z: -278.82, ry: 0.6,
     note: "blk1_0 一进院：压坛的石头，年年就那一块" },
@@ -231,7 +229,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk1_5 土墙院院心：那张粗木桌，天暖了就搬出来吃饭" },
   { asset: "longBench", x: -246.11, z: -158.05, ry: 0.08,
     note: "blk1_5 院心：桌子南边的长条凳" },
-  { asset: "phChineseWoodStool", x: -247.66, z: -159.3, ry: -0.5,
+  { asset: "phChineseWoodStool", x: -247.19, z: -159.01, ry: -0.5,
     note: "blk1_5 院心：桌角一只方凳，另一只不知让谁搬走了" },
 
   // blk1_7 L 形院（-245.14,-114.40）damage 0.14：近西城根，还养着牲口的一户。
@@ -276,9 +274,9 @@ export const PLACEMENTS = Object.freeze([
   // 突围暗线的写法 —— 门道边一只捆好的箱笼，车轮备着，车还没借到。
   { asset: "marketBox02", x: -190.66, z: -198.78, ry: 0.3,
     note: "blk3_3 一进院门道边：捆好的箱笼，绳扣打的是活结，一拽就开" },
-  { asset: "marketRiceSack02", x: -191.86, z: -199.38, ry: -0.4,
+  { asset: "marketRiceSack02", x: -192.13, z: -199.24, ry: -0.4,
     note: "blk3_3 一进院：压在箱笼边的粮袋" },
-  { asset: "ryCartWheel", x: -190.06, z: -200.13, ry: 1.5,
+  { asset: "ryCartWheel", x: -190.84, z: -199.93, ry: 1.5,
     note: "blk3_3 一进院：备下的大车轮，车还在别家院里没推回来" },
 
   // blk3_6 一进院（-190.67,-133.92）damage 0.17。
@@ -301,17 +299,15 @@ export const PLACEMENTS = Object.freeze([
     note: "blk4_4 铺面后院：酒坛 —— 这家铺子是卖散酒的" },
 
   // blk4_6 一进院（-166.00,-137.28）w 18 damage 0.10：院心一桌，门道一灯。
-  { asset: "phRoughWoodTable", x: -165.93, z: -136.85, ry: -0.12,
-    note: "blk4_6 一进院院心：粗木桌，饭还没吃完就听见北面的枪响" },
   { asset: "phChineseWoodStool", x: -167.15, z: -136.42, ry: 0.5,
     note: "blk4_6 院心：桌边翻倒过又扶起来的方凳" },
   { asset: "clothLantern", x: -166.2, z: -129.92, ry: 0.25,
     note: "blk4_6 一进院门道旁：布灯笼，夜里给出北门的人照路" },
 
   // blk4_7 L 形院（-166.52,-114.40）damage 0.17。
-  { asset: "ryDryingRack", x: -173.32, z: -114.46, ry: 0.08,
+  { asset: "ryDryingRack", x: -173.94, z: -116.41, ry: 0.08,
     note: "blk4_7 L 形院：厢房西边的晾晒木架，杆上还留着晾靛青布勒出的印子" },
-  { asset: "phWoodenWashTub", x: -172.64, z: -112.88, ry: -0.6,
+  { asset: "phWoodenWashTub", x: -172.92, z: -115.92, ry: -0.6,
     note: "blk4_7 L 形院：架下的木盆" },
 
   // blk4_11 L 形院（-163.43,-22.88）damage 0.18：西门大街北的第一排。
@@ -386,7 +382,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk6_6 龙王庙街南的土墙院：劈柴墩，墩上还搭着一段没劈开的木头" },
   { asset: "phWoodAxe", x: -110.8, z: -131.1, ry: 0.8,
     note: "blk6_6 土墙院：斧子" },
-  { asset: "phFirewoodBranches", x: -112.41, z: -129.1, ry: -0.5,
+  { asset: "phFirewoodBranches", x: -110.86, z: -129.13, ry: -0.5,
     note: "blk6_6 土墙院：劈好的柴枝，还没码上垛" },
 
   // blk6_7 两进院（-105.67,-114.40）damage 0.12：当典（-136,-116）东邻。
@@ -472,7 +468,7 @@ export const PLACEMENTS = Object.freeze([
   // blk9_7 一进院（-27.24,-114.40）damage 0.18：本片最靠十字街的一列。
   { asset: "phRoughWoodTable", x: -27.19, z: -113.97, ry: 0.15,
     note: "blk9_7 一进院院心：粗木桌 —— 离十字街两百步，这一户还照常在院里吃饭" },
-  { asset: "longBench", x: -26.86, z: -112.29, ry: 0.1,
+  { asset: "longBench", x: -27.13, z: -112.15, ry: 0.1,
     note: "blk9_7 院心：桌边的长条凳" },
 
   // blk9_8 窄条土墙院（-27.24,-97.83）d 8.3 damage 0.24：第 727 团的人从这儿过。

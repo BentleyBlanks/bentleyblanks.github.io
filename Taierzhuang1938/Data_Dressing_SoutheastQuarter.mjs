@@ -80,7 +80,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk19_12 十米宽的窄土院：过冬的柴码在隔墙以南" },
   { asset: "clayWideJar", x: 252.08, z: 5.6, ry: 1.4,
     note: "blk19_12：柴垛边一只豁了口的坛子，歪着还立得住" },
-  { asset: "phFirewoodBranches", x: 253.78, z: 6.3, ry: -0.6,
+  { asset: "phFirewoodBranches", x: 254.25, z: 6.59, ry: -0.6,
     note: "blk19_12：散落的树枝——柴还没劈完" },
 
   // blk20_14 (272.38, 45.76) 土墙院 · 损：隔墙以南是柴院。柴垛与劈柴墩子还是
@@ -109,11 +109,11 @@ export const PLACEMENTS = Object.freeze([
 
   // blk19_15 (245.14, 68.64) 一进院 · 损：东墙这一列少见的齐整户 —— 桌摆得正、
   // 笸箩没收，饭是吃到一半跑的警报。凳子歪着，是起身起得急。
-  { asset: "phRoughWoodTable", x: 243.74, z: 71.64, ry: 0.15,
+  { asset: "phRoughWoodTable", x: 243.04, z: 72.03, ry: 0.15,
     note: "blk19_15 还算齐整的一户：院当中一张粗木桌，还摆得正" },
   { asset: "phLowWoodStool", x: 242.14, z: 72.54, ry: 0.9,
     note: "blk19_15：桌西一只小板凳，凳面歪着——起身起得急" },
-  { asset: "phWickerTray", x: 243.94, z: 70.04, ry: 0.3,
+  { asset: "phWickerTray", x: 244.41, z: 70.33, ry: 0.3,
     note: "blk19_15：桌北那只笸箩没收，饭是吃到一半跑的警报" },
 
   // blk20_16 (272.38, 91.52) 一进院 · 损 · 烧过：整院过了火，可磨盘砸不坏，
@@ -148,7 +148,7 @@ export const PLACEMENTS = Object.freeze([
   // 条凳被撞得与磨盘成了直角。
   { asset: "stoneMillWheel", x: 241.94, z: 118, ry: -0.2,
     note: "blk19_17 L 形院：菜畦边的石磨盘，位置一点没挪" },
-  { asset: "longBench", x: 244.24, z: 119.4, ry: 1.5,
+  { asset: "longBench", x: 243.95, z: 119.47, ry: 1.5,
     note: "blk19_17：磨边的条凳被撞得横过来，与磨盘成直角" },
   { asset: "clayWideJar", x: 240.24, z: 119.9, ry: 0.6,
     note: "blk19_17：磨盘西侧一只宽口坛，接磨下来的面用的" },
@@ -243,7 +243,7 @@ export const PLACEMENTS = Object.freeze([
 
   // blk18_22 (217.9, 228.18) 土墙院 · 损：南院墙塌了一段，砖瓦堆在隔墙南边的
   // 空地上，边上还有一块掀出来的墙石。
-  { asset: "rubble", x: 214.5, z: 233.78, ry: -0.35, scale: 1.05 },
+  { asset: "rubble", x: 214.91, z: 233.09, ry: -0.35, scale: 1.05 },
   { asset: "stackableStone06", x: 216.4, z: 234.48, ry: 0.62, scale: 1.15 },
 
   // blk17_22 (193.64, 228.18) L 形院 · 损 · 烧过：这一户整院过了火，
@@ -286,7 +286,7 @@ export const PLACEMENTS = Object.freeze([
   // blk14_24 (108.95, 278.5) L 形院 · 损：家什码到院门口就再没回来。
   { asset: "winnowingBasket", x: 110.55, z: 281.1, ry: 0.2,
     note: "blk14_24：家什码到院门口就再没回来——最上头那只簸箕" },
-  { asset: "wovenBasket", x: 112.1, z: 281.9, ry: -0.4,
+  { asset: "wovenBasket", x: 112.39, z: 281.99, ry: -0.4,
     note: "blk14_24：柳条筐挨着簸箕，朝向差了小半圈" },
   { asset: "clayLiddedJar", x: 109.15, z: 282.1, ry: 0.8,
     note: "blk14_24：一口带盖的坛子搁在最里，盖捆过绳" },
@@ -303,7 +303,7 @@ export const PLACEMENTS = Object.freeze([
   // blk13_23 (84.77, 251.68) 土墙院 · 损：柴院里的日子，柴码得齐。
   { asset: "firewoodPile", x: 81.77, z: 256.68, ry: 0.25,
     note: "blk13_23 柴院里的日子：一垛劈好的柴，码得齐" },
-  { asset: "wovenBasket", x: 83.77, z: 257.08, ry: -0.8,
+  { asset: "wovenBasket", x: 83.29, z: 257.34, ry: -0.8,
     note: "blk13_23：挑柴的筐撂在垛边" },
   { asset: "ryFarmHoe", x: 86.17, z: 256.28, ry: 1.4,
     note: "blk13_23：一把锄头靠在后院墙根" },

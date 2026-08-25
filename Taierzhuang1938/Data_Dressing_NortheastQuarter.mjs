@@ -59,9 +59,9 @@ export const PLACEMENTS = Object.freeze([
     note: "blk13_10：滚开的第二块墙石" },
 
   // blk13_5 L 形院。龙王庙街北的一户，院心的货翻了。
-  { asset: "marketCrate03", x: 85.0, z: -155.5, ry: 0.9, scale: 1.0,
+  { asset: "marketCrate03", x: 85.38, z: -155.1, ry: 0.9, scale: 1.0,
     note: "blk13_5 L 形院院心：掀翻的板条箱" },
-  { asset: "marketCrate01", x: 85.9, z: -156.2, ry: -0.25, scale: 0.95,
+  { asset: "marketCrate01", x: 86.17, z: -155.19, ry: -0.25, scale: 0.95,
     note: "blk13_5：跟着倒下的第二只板条箱" },
 
   // blk14_4 水井院（intact）。半公共的井台，西边空场上一根待劈的树干。
@@ -91,9 +91,9 @@ export const PLACEMENTS = Object.freeze([
     note: "blk17_7：砖堆边滚开的一块墙石" },
 
   // blk18_7 土墙院（烧过）。从火里抢出来的东西堆在东墙根。
-  { asset: "crate", x: 227.4, z: -122.3, ry: 0.22, scale: 1.0,
+  { asset: "crate", x: 228.71, z: -119, ry: 0.22, scale: 1.0,
     note: "blk18_7 烧过的土墙院东墙根：从火里抢出来的木箱" },
-  { asset: "marketRiceSack02", x: 226.5, z: -121.4, ry: -0.5, scale: 1.0,
+  { asset: "marketRiceSack02", x: 226.87, z: -118.64, ry: -0.5, scale: 1.0,
     note: "blk18_7：跟着抢出来的一口米袋" },
 
   // blk17_8 水井院（烧过）。井台东边翻倒的手推车，货撒在一边。
@@ -121,12 +121,10 @@ export const PLACEMENTS = Object.freeze([
   // 整合验收挪位：原 (279.3,-6.2) 在 L5/L6 的中/远景档里被合并体块吞进 2.86 m ——
   // 中/远景正房比近景大一圈（西北包同款教训）。这格骑在 z=0 的片区线上，
   // 只能挪进东墙根、中景体块（x≤281）以东的窄带。
-  { asset: "rubble", x: 282.7, z: -4.6, ry: 0.35, scale: 1.0,
+  { asset: "rubble", x: 282.29, z: -2.85, ry: 0.35, scale: 1.0,
     note: "blk20_12 东城根塌到底的院子：靠东院墙的一摊砖瓦" },
-  { asset: "stackableStone05", x: 281.5, z: -5.2, ry: -0.6, scale: 1.0,
+  { asset: "stackableStone05", x: 281.14, z: -4.06, ry: -0.6, scale: 1.0,
     note: "blk20_12：塌墙里掀出来的大石块" },
-  { asset: "stackableStone02", x: 281.9, z: -7.3, ry: 0.9, scale: 0.9,
-    note: "blk20_12：滚到东院墙根的墙石" },
 
   // ---- 城北：警备队西邻的井院（L4 中景） --------------------------------
   { asset: "marketRiceSack01", x: 208.4, z: -248.6, ry: 0.3, scale: 1.05,
@@ -214,12 +212,8 @@ export const PLACEMENTS = Object.freeze([
     note: "blk11_6 土墙院正房檐下：带盖的竹篮" },
 
   // blk13_7 OneEntry（挨过炮、烧过）：火过之后，院里只剩石与陶。
-  { asset: "stoneMillWheel", x: 91.4, z: -122.74, ry: -1.171,
+  { asset: "stoneMillWheel", x: 90.9, z: -118.72, ry: -1.171,
     note: "blk13_7 烧过的一进院：火里没烧掉的石磨盘" },
-  { asset: "clayWideJar", x: 91.24, z: -121.56, ry: -2.071,
-    note: "blk13_7 烧过的一进院：滚到磨盘边的阔口陶坛" },
-  { asset: "stackableStone05", x: 91.3, z: -123.8, ry: -0.871,
-    note: "blk13_7 烧过的一进院：塌墙里掀出来的大石块" },
 
   // blk13_6 LCourtyard（挨过炮、烧过）：火场里剩下的一口陶缸与掀落的墙石。
   { asset: "clayRoundVat", x: 70.4, z: -131.4, ry: 1.871,
@@ -242,11 +236,11 @@ export const PLACEMENTS = Object.freeze([
     note: "blk10_5 土墙院东角：磨盘边的笸箩" },
 
   // blk10_4 OneEntry（齐整）：檐下一口接雨的水缸，斗笠搁在缸沿上。
-  { asset: "clayWaterVat", x: 9.88, z: -192.28, ry: 0, scale: 1.05,
+  { asset: "clayWaterVat", x: 10.36, z: -192.54, ry: 0, scale: 1.05,
     note: "blk10_4 一进院正房檐下：正房檐下接雨的水缸" },
   { asset: "bambooHat", x: 10.54, z: -191.94, ry: 0.5,
     note: "blk10_4 一进院正房檐下：搁在缸边的斗笠" },
-  { asset: "phWoodenBucket", x: 9.18, z: -192.02, ry: -0.4,
+  { asset: "phWoodenBucket", x: 10.23, z: -192.02, ry: -0.4,
     note: "blk10_4 一进院正房檐下：打水的木桶" },
 
   // blk11_5 OneEntry（挨过炮）：墙根码着的柴垛。
@@ -256,11 +250,11 @@ export const PLACEMENTS = Object.freeze([
     note: "blk11_5 窄院东墙根：散在柴垛旁的柴枝" },
 
   // blk11_3 AdobeYard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
-  { asset: "clayRoundVat", x: 15.82, z: -215.16, ry: 0.2,
+  { asset: "clayRoundVat", x: 16.65, z: -210.43, ry: 0.2,
     note: "blk11_3 土墙院正房山墙下：灶间外墙根的圆腹陶缸" },
-  { asset: "clayLiddedJar", x: 16.62, z: -215.06, ry: -0.3,
+  { asset: "clayLiddedJar", x: 15.5, z: -214.4, ry: -0.3,
     note: "blk11_3 土墙院正房山墙下：并排的有盖陶坛（腌的咸菜）" },
-  { asset: "clayWideJar", x: 17.34, z: -215.12, ry: 0.5,
+  { asset: "clayWideJar", x: 18.17, z: -210.39, ry: 0.5,
     note: "blk11_3 土墙院正房山墙下：队尾的阔口陶坛" },
 
   // blk14_10 AdobeYard（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴已经码起来了。
@@ -272,11 +266,11 @@ export const PLACEMENTS = Object.freeze([
     note: "blk14_10 土墙院西墙根：码起来的柴垛" },
 
   // blk14_11 LCourtyard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
-  { asset: "clayRoundVat", x: 97.53, z: -32.12, ry: 0.2,
+  { asset: "clayRoundVat", x: 97.26, z: -31.11, ry: 0.2,
     note: "blk14_11 L 形院正房檐下：灶间外墙根的圆腹陶缸" },
-  { asset: "clayLiddedJar", x: 98.33, z: -32.02, ry: -0.3,
+  { asset: "clayLiddedJar", x: 97.2, z: -32.03, ry: -0.3,
     note: "blk14_11 L 形院正房檐下：并排的有盖陶坛（腌的咸菜）" },
-  { asset: "clayWideJar", x: 99.05, z: -32.08, ry: 0.5,
+  { asset: "clayWideJar", x: 97.25, z: -30.12, ry: 0.5,
     note: "blk14_11 L 形院正房檐下：队尾的阔口陶坛" },
 
   // blk14_5 OneEntry（挨过炮）：院里晒粮晾衣的木架，笸箩摊在架下。
@@ -332,9 +326,9 @@ export const PLACEMENTS = Object.freeze([
     note: "blk16_9 窄院门道里：撂在凳边的斗笠" },
 
   // blk16_10 WellYard（挨过炮、烧过）：井台边洗衣的木盆与两只水桶。
-  { asset: "phWoodenWashTub", x: 154.99, z: -50.52, ry: 2.021, scale: 1.05,
+  { asset: "phWoodenWashTub", x: 155.34, z: -49.27, ry: 2.021, scale: 1.05,
     note: "blk16_10 烧过的井院：井台边洗衣的木盆" },
-  { asset: "phWoodenBucket", x: 155.05, z: -51.28, ry: 1.321,
+  { asset: "phWoodenBucket", x: 155.06, z: -49.98, ry: 1.321,
     note: "blk16_10 烧过的井院：打水的木桶" },
   { asset: "ryWaterBucket", x: 155.35, z: -49.93, ry: 2.621,
     note: "blk16_10 烧过的井院：另一只木水桶" },
@@ -350,7 +344,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk17_5 两进院前院：孩子坐的那只小板凳" },
 
   // blk17_9 OneEntry（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴还没码。
-  { asset: "ryChoppingBlock", x: 179.55, z: -76.38, ry: 1.321,
+  { asset: "ryChoppingBlock", x: 179.26, z: -76.31, ry: 1.321,
     note: "blk17_9 窄院西墙根：墙根的劈柴墩" },
   { asset: "phWoodAxe", x: 179.87, z: -76.9, ry: 2.771,
     note: "blk17_9 窄院西墙根：撂在墩边的木柄斧" },
@@ -390,13 +384,13 @@ export const PLACEMENTS = Object.freeze([
     note: "blk19_8 L 形院正房檐下：打水的木桶" },
 
   // blk19_6 AdobeYard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮 —— 四口，是户人多的人家。
-  { asset: "clayRoundVat", x: 233.72, z: -146.52, ry: 0.15,
+  { asset: "clayRoundVat", x: 234.68, z: -141.26, ry: 0.15,
     note: "blk19_6 土墙院灶间外：灶间外墙根的圆腹陶缸" },
-  { asset: "clayLiddedJar", x: 234.5, z: -146.44, ry: -0.35,
+  { asset: "clayLiddedJar", x: 235.43, z: -141.48, ry: -0.35,
     note: "blk19_6 土墙院灶间外：并排的有盖陶坛（腌的咸菜）" },
-  { asset: "clayWideJar", x: 235.2, z: -146.5, ry: 0.45,
+  { asset: "clayWideJar", x: 236.29, z: -141.29, ry: 0.45,
     note: "blk19_6 土墙院灶间外：第三口阔口陶坛" },
-  { asset: "clayLuggedJar", x: 235.88, z: -146.36, ry: -0.2,
+  { asset: "clayLuggedJar", x: 236.61, z: -141.57, ry: -0.2,
     note: "blk19_6 土墙院灶间外：队尾的带耳陶罐" },
 
   // blk20_8 TwoEntry（挨过炮）：炮震歪的陶罐与滚了一地的墙石。

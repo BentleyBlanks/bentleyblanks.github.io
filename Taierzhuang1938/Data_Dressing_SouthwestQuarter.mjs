@@ -21,9 +21,9 @@ export const REGION = Object.freeze({
 // 一侧，这一层只贴墙根与门道旁补，不往院心里挤。
 export const PLACEMENTS = Object.freeze([
   // ── 十字街西南角的小铺户（blk9_13, ShopRow）：货在后院不在店里 ──
-  { asset: "marketCrate02", x: -37.33, z: 19.02, ry: 0.22,
+  { asset: "marketCrate02", x: -37.2, z: 19.55, ry: 0.22,
     note: "十字街西南角铺户后院：西墙根码起来的板条箱，掌柜把存货从铺面挪进后院" },
-  { asset: "marketCrate04", x: -37.43, z: 18.02, ry: -0.35, scale: 0.95,
+  { asset: "marketCrate04", x: -37.81, z: 19.63, ry: -0.35, scale: 0.95,
     note: "同一户：紧挨着的另一只板条箱，先搬进来的那一批" },
   { asset: "marketBox02", x: -36.43, z: 19.72, ry: 0.48, scale: 0.9,
     note: "同一户：还没捆绳的一只木箱，搁在库房与后院门之间的过道边" },
@@ -31,7 +31,7 @@ export const PLACEMENTS = Object.freeze([
   // ── blk8_13（一进院）：麦子收进院 ──
   { asset: "marketRiceSack01", x: -59.08, z: 25.82, ry: 0.31,
     note: "十字街西南的一进院：影壁西侧靠院墙码的粮袋，围城第三天把存粮全搬进了院" },
-  { asset: "marketRiceSack02", x: -59.98, z: 25.32, ry: -0.52, scale: 0.95,
+  { asset: "marketRiceSack02", x: -59.84, z: 25.59, ry: -0.52, scale: 0.95,
     note: "同一户：第二只粮袋，口朝里立着防潮" },
   { asset: "marketBox01", x: -58.38, z: 24.92, ry: 0.17,
     note: "同一户：粮袋边上一只小木箱，装的是零碎细软" },
@@ -161,7 +161,7 @@ export const PLACEMENTS = Object.freeze([
     note: "同一户：斧子撂在墩子边上——劈到一半，城头响了" },
 
   // ── blk1_14（OneEntry）：王家祠堂东邻：晾晒架空着 ──
-  { asset: "ryDryingRack", x: -234.09, z: 46.85, ry: 0.05,
+  { asset: "ryDryingRack", x: -234.5, z: 48.6, ry: 0.05,
     note: "王家祠堂东邻：院里的晾晒木架，被褥昨天就收进屋了，架子空着" },
   { asset: "winnowingBasket", x: -233.43, z: 48.48, ry: 1.51,
     note: "同一户：簸箕靠着架子腿立着，簸完的那点麦子已经装了袋" },
@@ -331,9 +331,9 @@ export const PLACEMENTS = Object.freeze([
     note: "同一户：震翻在砖堆边的一口阔口坛，坛里的菜撒了一地" },
 
   // ── blk1_18（LCourtyard）：城西 L 形院：车推到了院里 ──
-  { asset: "cart", x: -234.27, z: 139.27, ry: 0.55, scale: 0.94,
+  { asset: "cart", x: -234.79, z: 142.78, ry: 0.55, scale: 0.94,
     note: "城西 L 形院：手推车推到东墙根，车辕朝着院门那一头" },
-  { asset: "crate", x: -233.44, z: 141.09, ry: -0.31,
+  { asset: "crate", x: -233.45, z: 141.89, ry: -0.31,
     note: "同一户：还没搬上车的一只木箱，撂在车后半步" },
 
   // ── blk2_18（AdobeYard）：土墙院：水缸挪到墙根 ──
