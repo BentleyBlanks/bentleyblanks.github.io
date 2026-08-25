@@ -107,7 +107,7 @@ export const testDefs = {
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
   DeathViewTest: { file: "Script_DeathViewTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "阵亡镜头出图（人工审）" },
-  // 出图已按 URL 参数组分批（36 张只建 18 次城），实测 ~6.5 分钟；
+  // 出图已按 URL 参数组分批（并入西郊机位后 45 张只建 19 次城），实测 ~6.5 分钟；
   // 上限从 30 分钟降到 15 分钟，保持与旧口径相同的 ~2.5 倍裕量。
   ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 15 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
 };

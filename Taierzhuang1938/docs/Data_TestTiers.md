@@ -90,7 +90,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | menu | MenuTest、BootPropTest |
 | editor | EditorTest、DestructionEditorTest |
 | cutscene | CutsceneControl、ActorPose |
-| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → WestDistrictCoverage → WestStation → DressingProbe；另提示相关 Tier 2 |
+| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |
 
 改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。
