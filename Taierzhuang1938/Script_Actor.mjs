@@ -2136,11 +2136,11 @@ export class Actor {
     // 都横飘着一根穿过邻座的枪管。现在起点和终点的偏航都近乎 0，中途枪身只在
     // **自己的矢状面**里从朝上扫到朝下，绝不会横过去指人。
     //
-    // 顺带记一笔：出川那把 ZB26 在数据里的 id 拼成了 "ZB26"（WEAPONS 表里是 "Zb26"），
-    // 查不到 → weaponData 为 null → kind 落到函数开头的默认值 boltRifle。所以机枪手
-    // **是**走这条坐姿/提枪分支的，只是走的是「未登记武器」那条路（枪的外形也退化成
-    // 普通步枪，弹匣与两脚架都没建出来）。改 id 要动 Data_CutsceneChuchuan，不在本轮
-    // 范围内；即便改对了，lmg 也在下面的白名单里，这段仍然成立。
+    // 顺带记一笔：出川那把 ZB26 的 id 曾拼成 "ZB26"（WEAPONS 表里是 "Zb26"），查不到
+    // → weaponData 为 null → kind 落到默认 boltRifle，枪的外形退化成普通步枪（上插
+    // 弹匣、提把、两脚架全没建出来）。Data_CutsceneChuchuan 已改成 "Zb26"，机枪手
+    // 现在按 lmg 走这条坐姿/提枪分支。0.271 这个数对它照样成立：BuildWeapon 里
+    // boltRifle 和 lmg 共用 buttZ 0.255 + 底板半厚 0.016，枪长不同只改枪口那头。
     const seatRest = lifePose ? lifePose.sit : 0;
     const ready = lifePose ? lifePose.prepare : 0;
     const holdOk = (kind === "boltRifle" || kind === "lmg")
@@ -2168,7 +2168,14 @@ export class Actor {
       const lean = 0.28;
       // 坐姿：放在**右腿外侧**。两条大腿之间只有 5 cm 的缝，一把机匣就有 8 cm 宽，
       // 硬塞进去是穿模；放在小腿后面又会被自己的胫骨挡掉整根枪。
-      POSE_E.set(Math.PI * 0.5 + lean, 0.06, -0.10, "XYZ");
+      // lmg 多滚四分之一圈（绕枪管自身轴）：捷克式的两脚架长在枪口端，竖起来时
+      // 停在一米高的位置横着伸。不滚，两条腿扎进长凳靠背上的铺盖卷；滚半圈，
+      // 换成木提把（离地 0.57 m）整个埋进座板 —— 枪就靠在屁股旁边，凳面在
+      // 提把的半径以内，朝凳背或朝过道的水平方向都躲不开凳子（t=20 机枪手
+      // 侧拍取证，两个方向各埋过一次）。滚 −π/2 是唯一贴着长凳**平行**走的
+      // 方向：两脚架顺着凳子伸向无人那头，弹匣与提把转向玩家一侧的空座位。
+      // 纯滚转不动枪管的指向，上面「起身过渡只在矢状面里扫」的保证不受影响。
+      POSE_E.set(Math.PI * 0.5 + lean, 0.06, kind === "lmg" ? -Math.PI * 0.5 - 0.10 : -0.10, "XYZ");
       REST_Q.setFromEuler(POSE_E);
       const floorY = -(this.body.position.y + this.hips.position.y + this.chest.position.y);
       const buttToGrip = 0.271 * this.weaponScale * Math.cos(lean);
