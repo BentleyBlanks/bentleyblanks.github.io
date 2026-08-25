@@ -43,6 +43,9 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 // Lerp 在 Script_Noise 里没导出，导出的名字是 Mix —— 别自己再写一个线性插值，
 // 两份实现迟早会有一份被改。
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
+// 台词层是 COD 式的叠放堆栈（同屏最多三条、进退场自绘补间），不是一个槽。
+// 见 Script_Subtitle.mjs 顶部；**别把它退回单槽**，新序章镜 6 的问答就是被单槽吃掉的。
+import { SubtitleStack } from "./Script_Subtitle.mjs";
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
 import { SampleJieheHeight } from "./Script_JieheHeight.mjs";
@@ -238,11 +241,16 @@ const CSS = `
 .csSub.small{font-size:clamp(12px,1.05vw,17px);color:#b9b1a1;line-height:1.75}
 .csSubNote{display:block;font-size:.74em;color:#9b9384;margin-top:.3em;line-height:1.7}
 .csTier{font-size:.66em;color:#8a8172;margin-right:.5em;vertical-align:.15em;letter-spacing:.08em}
+/* 台词层：一摞 .sbtLine（见 Script_Subtitle.mjs）。宿主只定位置与对齐，
+   每条的纵向摞放与透明度由堆栈逐帧写 transform/opacity —— 这里不要写 transition，
+   写了就会和自绘补间打架（而且手动步进的出图管线上根本走不动）。 */
 .csLine{position:absolute;left:8%;right:8%;bottom:${BAR_RATIO * 100 + 4}%;text-align:center}
-.csLineText{color:#f0e6d0;font-size:clamp(16px,1.7vw,28px);line-height:1.6;
+.csLine .sbtLine{color:#f0e6d0;font-size:clamp(16px,1.7vw,28px);line-height:1.6;
   text-shadow:0 2px 6px #000,0 0 2px #000}
-.csWho{color:#c7b184;margin-right:.6em}
-.csOff{font-style:italic;color:#d9cfb8}
+/* 说话人：颜色逐角色定（堆栈写在行内），这里只把它加重一档，叠放时一眼分得开谁在说 */
+.csLine .sbtWho{font-weight:600;letter-spacing:.03em}
+.csLine .sbtLine.off{font-style:italic;color:#d9cfb8}
+.csLine .sbtLine.narr{color:#ded5c0;font-style:italic}
 .csSkip{position:absolute;right:2.4%;bottom:${BAR_RATIO * 100 + 1.4}%;
   color:#6f6a5e;font-size:12px;letter-spacing:.18em}
 .csCard{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;
@@ -477,7 +485,12 @@ export class CutsceneDirector {
     this.walkKeys = new Set();
     this._released = false;
     this.subSlots = [];               // { text, tier, small, big, note, until }
-    this.lineSlot = null;
+    /**
+     * 台词层。**一摞，不是一个槽** —— 同屏最多三条，说完还挂 SUBTITLE_TUNING.hold 秒，
+     * 所以一问一答会叠在一起而不是互相顶掉（新序章镜 6 的动员问答就靠这个才读得完）。
+     * 没有 document 时它退化成纯模型，Node 断言照跑。
+     */
+    this.lines = new SubtitleStack({ doc: this.doc, host: this.dom ? this.dom.line : null, skin: "cs", rowPx: 34 });
     this.shakeSeed = 1;
     this.blackAlpha = 0;
     // 播过的东西，给自检与「跳过卡」用；不清空，一场一场累加。
@@ -588,7 +601,7 @@ export class CutsceneDirector {
     this.skipped = false;
     this.fired.clear();
     this.subSlots.length = 0;
-    this.lineSlot = null;
+    this.lines.Clear();
     this.cardTime = -1;
     this.headLook = cut.cameraMode === "headLook"
       || (cut.shots || []).some((shot) => shot.cameraMode === "headLook" || shot.camera?.cameraMode === "headLook");
@@ -1549,13 +1562,15 @@ export class CutsceneDirector {
       const who = line.who ? CAST[line.who] : null;
       const voiceCue = line.voiceCue ?? line.voice ?? null;
       const voiceDuration = this._PlayVoice(voiceCue);
-      this.lineSlot = {
+      // 数据写的秒数只是**下限之一**：堆栈还会拿字数算可读下限、再加留白，
+      // 所以 0.6 s 的「不怕！」在屏幕上挂得住，也来得及被下一句摞上去。
+      this.lines.Push({
         who: who ? (who.short || who.name) : "",
+        whoId: line.who || "",
         text: line.text, off: !!line.off, tier: line.tier,
-        left: Math.max(line.seconds || 3.0, voiceDuration),
-      };
+        seconds: Math.max(line.seconds || 3.0, voiceDuration),
+      });
       this.log.push({ cut: cut.id, shot: shot.n, kind: "line", who: line.who, tier: line.tier, text: line.text });
-      this._RenderLine();
     });
 
     (shot.sfx || []).forEach((sfx, i) => {
@@ -1579,10 +1594,11 @@ export class CutsceneDirector {
     if (this.subSlots.length !== before) dirty = true;
     if (dirty) this._RenderSubs();
 
-    if (this.lineSlot) {
-      this.lineSlot.left -= dt;
-      if (this.lineSlot.left <= 0) { this.lineSlot = null; this._RenderLine(); }
-    }
+    // 黑场字卡（章名/日期/地点）上不许压着对白：上一镜的最后一句本来会带着
+    // 留白跨过切点，压在「山东·滕县／1938年3月」那张卡上。切进黑卡就让它们退场，
+    // 走的是正常的退场补间，不是硬砍。
+    if (this.curShot && (this.curShot.black || this.curShot.titleCard)) this.lines.FadeAll();
+    this.lines.Update(dt);
   }
 
   _RenderSubs() {
@@ -1597,17 +1613,9 @@ export class CutsceneDirector {
     }).join("");
   }
 
-  _RenderLine() {
-    if (!this.dom) return;
-    if (!this.lineSlot) { this.dom.line.innerHTML = ""; return; }
-    const l = this.lineSlot;
-    const who = l.who ? `<span class="csWho">${l.who}${l.off ? "（画外）" : ""}：</span>` : "";
-    this.dom.line.innerHTML = `<div class="csLineText${l.off ? " csOff" : ""}">${who}${l.text}</div>`;
-  }
-
   _ClearText() {
     this.subSlots.length = 0;
-    this.lineSlot = null;
+    this.lines.Clear();
     if (this.dom) { this.dom.subs.innerHTML = ""; this.dom.line.innerHTML = ""; }
   }
 

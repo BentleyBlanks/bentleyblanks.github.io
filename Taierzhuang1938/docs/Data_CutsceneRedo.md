@@ -328,3 +328,37 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 - **`spec.texture` 通道无法平铺**：`_MakeProp` 只在有 `spec.mat` 时重算 UV，`repeat` 也只转给
   材质库；TextureLoader 默认 ClampToEdge，一张图会被拉满整面。自定义可平铺贴图必须进材质库
   （LoadExternalSet），引擎侧的活。
+
+## 1.10 对话字幕：COD 式叠放（2026-08-25）
+
+台词层从「一个槽」改成「一摞」，实现在 `Script_Subtitle.mjs`（`SubtitleStack`），
+过场与战场 HUD 共用同一份。旋钮全在 `SUBTITLE_TUNING`。
+
+**为什么**：旧实现里 `director.lineSlot` 是单值，下一句直接覆盖上一句。
+新序章镜 6（1:08—1:30 的班长动员问答）是一问一答、四句只给 0.6—0.9 s，
+出图在 t=78.8 s 上只剩「班长：为啥子不怕？」一行 —— 前一句「不怕！」连一帧都没留下，
+玩家永远只读到半场对话。
+
+**现在的行为**（照 COD）：
+
+| | |
+|---|---|
+| 叠放 | 同屏最多 `SUBTITLE_TUNING.max`（3）条，**最新的在最下面**，旧的被推上去 |
+| 留白 | 一句挂 `max(数据 seconds, 可读下限) + hold`（0.9 s）；`MinReadSeconds` 是唯一定义，`Script_CutsceneCheck` 从它取 |
+| 满了 | 挤掉**最旧的一条**，走正常退场补间，不是当帧删掉 |
+| 定色 | 名字的颜色逐角色（`SpeakerTone`），登记在 `TONE_BY_ID`；没登记的按 `HashString` 落进调色板 |
+| 黑卡 | 切进 `black`/`titleCard` 的镜就让在场对白退场 —— 留白不许压在地点卡/章名卡上 |
+
+**两条不许违反的**：
+
+1. **补间自己算，不要 CSS transition/animation。** 每帧的位移与透明度由
+   `Update(dt)` 按**游戏时钟**写 style.transform / style.opacity。
+   `Script_CutsceneShot` 是手动步进的（一口气 `StepFrames(n)` 推到第 t 秒再截图），
+   CSS 过渡走墙上时钟，在那一口气里一帧都没走，截出来的字幕会永远停在「刚进场」的透明度上。
+   宿主的 CSS（`.csLine` / `.hudSubtitle`）里因此也**不许**再写 transition。
+2. **`SubtitleStack` 要注入进 CutsceneControlTest 的 `new Function` 名单**。
+   类体被单独切出来跑，模块作用域在那个 eval 里看不见；漏了就是 `new Director` 当场
+   ReferenceError（和 `CutsceneDirector.LIFE` 必须挂类上是同一条坑）。
+
+数据侧什么都不用改：`shot.lines` 的字段一个没动，`seconds` 仍然是数据写的那个数
+（它现在只是显示时长的**下限之一**，语音时长与自动口型/转头照旧按它算）。

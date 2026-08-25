@@ -1942,7 +1942,7 @@ function OnPlayerDown() {
   if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
   if (state.nraPool > 0 && state.nraPool / (state.phasePoolNra || 1) < REINFORCE.lastDitchAt) {
-    hud.Say("团长", REINFORCE.lastDitchLine, 6);
+    hud.Say("团长", REINFORCE.lastDitchLine, 6, "", "zhang");
   }
 }
 
@@ -2479,7 +2479,7 @@ function IssueOrderByKey(key) {
   const aimPoint = AimPoint(60);
   const n = ai.IssueOrder(order.id, player.position, aimPoint);
   state.order = order.label;
-  if (n > 0) hud.Say("你", `${order.label}！`, 2.2);
+  if (n > 0) hud.Say("你", `${order.label}！`, 2.2, "", "player");
 }
 
 function ReadKeys() {
@@ -2712,7 +2712,7 @@ function CallMortar() {
   const target = AimPoint(160);
   const r = combat.CallMortar(target);
   if (r.ok) {
-    hud.Say("你", `迫击炮，坐标——`, 2.6);
+    hud.Say("你", `迫击炮，坐标——`, 2.6, "", "player");
     hud.Hint(`炮弹在路上（还剩 ${r.left} 发）`, 4);
   } else {
     hud.Hint(r.reason, 2.4);

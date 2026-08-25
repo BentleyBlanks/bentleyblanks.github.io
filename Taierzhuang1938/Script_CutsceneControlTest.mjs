@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { ClampHeadLook, ResolveHeadLookConfig } from "./Script_CutsceneCheck.mjs";
 import { InputRouter } from "./Script_Input.mjs";
+import { SubtitleStack, SUBTITLE_TUNING } from "./Script_Subtitle.mjs";
 import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
 
 const cut = {
@@ -56,9 +57,12 @@ const FakeThree = {
 const directorSource = fs.readFileSync(new URL("./Script_Cutscene.mjs", import.meta.url), "utf8");
 const classSource = directorSource.slice(directorSource.indexOf("export class CutsceneDirector"), directorSource.indexOf("export default CutsceneDirector"))
   .replace("export class CutsceneDirector", "class CutsceneDirector");
-const Director = new Function("THREE", "MarkNoPrepass", "HashString", "ValueNoise2", "Clamp", "Clamp01", "Lerp", "FovFromFocalMm", "Ease", "ResolveHeadLookConfig", "ClampHeadLook", "ValidateCutscene", `${classSource}; return CutsceneDirector;`)(
+// 注入名单里的每一项都是 Script_Cutscene.mjs 的模块层符号：类体被单独切出来跑，
+// 模块作用域在这个 eval 里一个都看不见（详见 Script_Cutscene.mjs 类顶部那段注释）。
+// SubtitleStack 是台词层的堆栈，构造函数里就要用，漏了就是 new Director 当场 ReferenceError。
+const Director = new Function("THREE", "MarkNoPrepass", "HashString", "ValueNoise2", "Clamp", "Clamp01", "Lerp", "FovFromFocalMm", "Ease", "ResolveHeadLookConfig", "ClampHeadLook", "ValidateCutscene", "SubtitleStack", `${classSource}; return CutsceneDirector;`)(
   FakeThree, () => {}, () => 1, () => 0.5, (x, low, high) => Math.max(low, Math.min(high, x)), (x) => Math.max(0, Math.min(1, x)), (a, b, t) => a + (b - a) * t,
-  (f) => 27, () => 0.5, ResolveHeadLookConfig, ClampHeadLook, () => [],
+  (f) => 27, () => 0.5, ResolveHeadLookConfig, ClampHeadLook, () => [], SubtitleStack,
 );
 class FakeCamera {
   constructor() { this.position = new Vec3(0, 1, 4); this.quaternion = new Quat(); this.rotation = new Euler(); this.fov = 60; this.near = 0.03; this.far = 100; this._yaw = 0; this._pitch = 0; }
@@ -262,10 +266,81 @@ for (const actor of CS_Chuchuan.cast.filter((item) => ["stretcherBearerA", "stre
   assert.equal(actor.track.find((frame) => frame.t === 56)?.ry, Math.PI, `${actor.id} walks forward along the platform`);
 }
 
+// ---------------------------------------------------------------------------
+// 台词层是 COD 式的一摞，不是一个槽
+//
+// 回归的对象是新序章镜 6（1:08—1:30 的班长动员问答）：八句里有四句只给了 0.6—0.9 s，
+// 一问一答隔 0.9—1.3 s。旧的单槽实现下，答句一出现问句就整条消失 ——
+// 出图在 t=78.8 s 上只有「班长：为啥子不怕？」一行，前一句「不怕！」已经没了。
+// 这里用真数据的时点在导演上重放那一段，断言同屏读得到两句以上。
+// ---------------------------------------------------------------------------
+const exchange = CS_Chuchuan.shots.find((shot) => shot.n === 6);
+const stackCut = {
+  id: "TEST_Stack", title: "stack", seconds: exchange.seconds, cast: [], props: [],
+  shots: [{ n: 1, seconds: exchange.seconds, focalMm: 50, camera: { from: [0, 1, 4], look: [0, 1, 0] },
+    lines: exchange.lines.map((line) => ({ at: line.at, seconds: line.seconds, text: line.text })) }],
+};
+const stackDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), table: { [stackCut.id]: stackCut } });
+const stackPlay = stackDirector.Play(stackCut.id);
+const StepTo = (target) => {
+  while (stackDirector.Time < target - 1e-6) stackDirector.Update(Math.min(1 / 60, target - stackDirector.Time));
+};
+StepTo(9.0);
+assert.equal(stackDirector.lines.Lines.filter((line) => !line.leaving).length, 1,
+  "before the answer comes in, only the question is live");
+// 9.7 s 的「不怕！」压上来时，8.4 s 的问句还在（0.6 s 的数据时长 + 可读下限 + 留白）
+StepTo(10.0);
+const duringAnswer = stackDirector.lines.Lines;
+assert.equal(duringAnswer.length, 2, "the question is still readable when the answer arrives");
+assert.deepEqual(duringAnswer.map((line) => line.text), ["去死，怕不怕？", "不怕！"],
+  "the stack keeps script order, oldest first");
+assert.equal(duringAnswer.at(-1).offset, 0, "the newest line sits on the bottom row, where the eye already is");
+assert.ok(duringAnswer[0].offset > 0, "the earlier line is pushed up by exactly one row, not overwritten");
+// 上限：四句挤在 11.5 s 上，最旧的一条要开始退场而不是被直接删掉（删了就没有过渡）
+StepTo(11.6);
+const crowded = stackDirector.lines.Lines;
+assert.equal(crowded.filter((line) => !line.leaving).length, SUBTITLE_TUNING.max,
+  "no more than SUBTITLE_TUNING.max lines stay live at once");
+assert.ok(crowded.some((line) => line.leaving && line.alpha > 0),
+  "an evicted line fades out over the authored transition instead of vanishing between frames");
+// 进退场是自绘补间：同一句在相邻两帧上透明度必须不同，而且与墙上时钟无关
+stackDirector.lines.Clear();
+stackDirector.lines.Push({ who: "班长", whoId: "squadLeader", text: "好样的。", seconds: 0.6 });
+assert.equal(stackDirector.lines.Lines[0].alpha, 0, "a line starts fully transparent");
+stackDirector.Update(1 / 60);
+const firstFrame = stackDirector.lines.Lines[0].alpha;
+stackDirector.Update(1 / 60);
+const secondFrame = stackDirector.lines.Lines[0].alpha;
+assert.ok(firstFrame > 0 && secondFrame > firstFrame && secondFrame < 1,
+  `the fade-in is driven by the game clock (${firstFrame} → ${secondFrame})`);
+stackDirector.Skip();
+await stackPlay;
+assert.equal(stackDirector.lines.Lines.length, 0, "skipping clears the stack");
+
+// 黑场字卡上不许压着上一镜的对白：镜 6 最后一句 21.8 s 收，镜 7 是地点卡。
+const cardCut = {
+  id: "TEST_Card", title: "card", seconds: 4, cast: [], props: [],
+  shots: [
+    { n: 1, seconds: 2, focalMm: 50, camera: { from: [0, 1, 4], look: [0, 1, 0] },
+      lines: [{ at: 0.1, seconds: 1.5, text: "都把东西带好。前头就是滕县。" }] },
+    { n: 2, seconds: 2, focalMm: 50, black: true, titleCard: true, camera: { from: [0, 1, 4], look: [0, 1, 0] },
+      subs: [{ at: 0, seconds: 2, title: true, date: true, text: "山东·滕县／1938年3月" }] },
+  ],
+};
+const cardDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(), table: { [cardCut.id]: cardCut } });
+const cardPlay = cardDirector.Play(cardCut.id);
+while (cardDirector.Time < 1.9) cardDirector.Update(1 / 60);
+assert.equal(cardDirector.lines.Lines.filter((line) => !line.leaving).length, 1,
+  "the closing line of the shot is still up while its own shot runs");
+while (cardDirector.Time < 2.6) cardDirector.Update(1 / 60);
+assert.equal(cardDirector.lines.Lines.length, 0, "dialogue is gone before the black location card is readable");
+cardDirector.Skip();
+await cardPlay;
+
 const router = new InputRouter();
 const input = { forward: 1, strafe: 1, lean: 1, sprint: true, breathHold: true, fire: true, ads: true };
 router.SetSuppressed(true);
 router.Read(input);
 assert.deepEqual(input, { forward: 0, strafe: 0, lean: 0, sprint: false, breathHold: false, fire: false, ads: false }, "all gameplay axes suppressed");
 router.SetSuppressed(false);
-console.log("Cutscene control tests passed: seated first-person soldier, full mouse pitch, side-door/platform walk, cohesive door assembly, luggage density, camera directions, finish/skip, audio restore, old compatibility, input suppression");
+console.log("Cutscene control tests passed: seated first-person soldier, full mouse pitch, side-door/platform walk, cohesive door assembly, luggage density, camera directions, stacked dialogue subtitles, finish/skip, audio restore, old compatibility, input suppression");

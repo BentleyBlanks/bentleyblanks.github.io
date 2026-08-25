@@ -159,15 +159,19 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .equipment b { font: 600 11px/1 "Cascadia Mono", Consolas, monospace; }
 .equipment.empty { opacity: 0.27; }
 
-/* 字幕 */
+/* 字幕：一摞 .sbtLine（见 Script_Subtitle.mjs），最新的一条在最下面。
+   这里只定位置、宽度和字号；纵向摞放与进退场的透明度由堆栈**按游戏时钟自绘**，
+   所以**不要在这儿写 transition** —— 写了会和自绘补间抢同一个属性。
+   宿主必须给死宽度（不是 max-width）：子元素是 absolute + left/right:0，
+   宽度靠父盒子撑，max-width 撑不出来。 */
 .hudSubtitle {
   position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
-  max-width: 56%; text-align: center; opacity: 0;
-  transition: opacity 0.3s ease; font-size: 16px;
+  width: 56%; text-align: center; font-size: 16px;
 }
-.hudSubtitle.on { opacity: 1; }
-.hudSubtitle .who { color: var(--warn); margin-right: 10px; }
-.hudSubtitle .narr { color: var(--dim); font-style: italic; }
+/* 说话人的颜色**不在这里定**：那是逐角色的，由堆栈按 SpeakerTone 写在行内
+   （叠放时颜色比名字更快分得开谁在说）。这儿只管字距。 */
+.hudSubtitle .sbtWho { margin-right: 10px; }
+.hudSubtitle .sbtLine.narr { color: var(--dim); font-style: italic; }
 
 .hudHint {
   position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%);
@@ -323,7 +327,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .combatStance svg { width: 31px; height: 31px; }
   .ammoCurrent { font-size: 27px; }
   .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 94px); max-width: 230px; }
-  .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
+  .hudSubtitle { bottom: 78px; width: calc(100vw - 42px); font-size: 14px; }
   .hudHint { bottom: 50px; }
 }
 
@@ -487,9 +491,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   margin-top: 12px; font-size: 13px; color: var(--dim); letter-spacing: 0.22em;
 }
 
-/* 喊话：比普通台词重一档 */
-.hudSubtitle.shout .txt { font-weight: 600; letter-spacing: 0.04em; }
-.hudSubtitle.shout .who { color: #e8c07a; }
+/* 喊话：比普通台词重一档。名字的颜色不在这里定 —— 那是逐角色的，见 SpeakerTone。 */
+.hudSubtitle .sbtLine.shout .sbtText { font-weight: 600; letter-spacing: 0.04em; }
 
 /* 尾声：一行一行浮出来。不打歼敌数 —— 那是宣传口径。 */
 .hudEpilogue {

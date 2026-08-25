@@ -8,6 +8,9 @@
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
 import { REINFORCE } from "./Data_Battle.mjs";
+// 字幕层与过场共用同一摞（COD 式叠放 + 自绘补间）。战场上一样会有两个人抢着说话 ——
+// 班长喊完、连长接上，旧的做法是后一句把前一句直接顶掉。见 Script_Subtitle.mjs。
+import { SubtitleStack } from "./Script_Subtitle.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -167,7 +170,17 @@ export class Hud {
     this.Build();
     this.noteQueue = [];
     this.noteTimer = 0;
-    this.subtitleTimer = 0;
+    /**
+     * 字幕：**一摞，不是一行**。同屏最多三条，说完还挂一段留白，
+     * 所以「石墙那边的人退下来了」和紧跟着的目标播报会摞着显示而不是互相顶掉。
+     * 排布与进退场补间全在 Script_Subtitle 里按游戏时钟自绘，这里只管推句子。
+     */
+    this.subtitles = new SubtitleStack({
+      doc: this.el.subtitle?.ownerDocument || null,
+      host: this.el.subtitle || null,
+      skin: "hud",
+      rowPx: 24,
+    });
     this.titleTimer = 0;
     this.hintTimer = 0;
     this.briefTimer = 0;
@@ -570,12 +583,17 @@ export class Hud {
     }
   }
 
-  Say(speaker, text, seconds = 3.6, variant = "") {
-    this.el.subtitle.innerHTML = speaker
-      ? `<span class="who">${speaker}</span><span class="txt">${text}</span>`
-      : `<span class="txt narr">${text}</span>`;
-    this.el.subtitle.className = `hudSubtitle on${variant ? " " + variant : ""}`;
-    this.subtitleTimer = seconds;
+  /**
+   * 说一句。`speaker` 为空是旁白（不打名字、走斜体）。
+   * `seconds` 只是下限之一：堆栈还会按字数算可读下限并加一段留白，
+   * 所以短句不会一闪而过，长句也不会被下一句掐掉。
+   * `speakerId` 给的话按角色定色（CAST 的键）；不给就拿显示名当键，同名同色。
+   */
+  Say(speaker, text, seconds = 3.6, variant = "", speakerId = "") {
+    this.subtitles.Push({
+      who: speaker || "", whoId: speakerId || speaker || "",
+      text: String(text ?? ""), seconds, variant,
+    });
     // 留一份纯文本给通关冒烟断言用 —— 靠解析 innerHTML 判断"台词有没有出现过"
     // 一改样式就会碎，而这条断言是剧本层唯一的回归保护。
     this.spoken.push(String(text));
@@ -926,10 +944,7 @@ export class Hud {
         this.el.hitmark.style.opacity = "0";
       }
     }
-    if (this.subtitleTimer > 0) {
-      this.subtitleTimer -= dt;
-      if (this.subtitleTimer <= 0) this.el.subtitle.classList.remove("on");
-    }
+    this.subtitles.Update(dt);
     if (this.titleTimer > 0) {
       this.titleTimer -= dt;
       if (this.titleTimer <= 0) this.el.title.classList.remove("on");

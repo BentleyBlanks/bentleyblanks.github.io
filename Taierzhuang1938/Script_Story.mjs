@@ -254,12 +254,14 @@ export class StoryDirector {
         this.hud.Title(beat.text, beat.sub || "");
         this.sinceLast = 0;
         break;
+      // 把 CAST 的键一起递下去：字幕层按**角色**定名字的颜色，不按显示名 ——
+      // 「班长」这个短名在七关里换过人，按显示名定色会让两个人共用一个颜色。
       case "line":
-        this.hud.Say(speaker, beat.text, 4.2);
+        this.hud.Say(speaker, beat.text, 4.2, "", beat.who || "");
         this.sinceLast = 0;
         break;
       case "shout":
-        this.hud.Say(speaker, beat.text, 3.4, "shout");
+        this.hud.Say(speaker, beat.text, 3.4, "shout", beat.who || "");
         this.sinceLast = 0;
         if (this.audio) this.audio.Play("whistle", { volume: 0.35 });
         break;

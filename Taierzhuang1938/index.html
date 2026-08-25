@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=15">
+  <link rel="stylesheet" href="./Style_Game.css?v=16">
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=3">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
@@ -73,10 +73,11 @@
         "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=9",
         "./Script_Audio.mjs": "./Script_Audio.mjs?v=7",
         "./Data_Voice.mjs": "./Data_Voice.mjs?v=6",
-        "./Script_Hud.mjs": "./Script_Hud.mjs?v=14",
-        "./Script_Story.mjs": "./Script_Story.mjs?v=1",
+        "./Script_Subtitle.mjs": "./Script_Subtitle.mjs?v=1",
+        "./Script_Hud.mjs": "./Script_Hud.mjs?v=15",
+        "./Script_Story.mjs": "./Script_Story.mjs?v=2",
         "./Script_TengxianField.mjs": "./Script_TengxianField.mjs?v=2",
-        "./Script_Cutscene.mjs": "./Script_Cutscene.mjs?v=16",
+        "./Script_Cutscene.mjs": "./Script_Cutscene.mjs?v=17",
         "./Data_TengxianScript.mjs": "./Data_TengxianScript.mjs?v=3",
         "./Data_CutsceneChuchuan.mjs": "./Data_CutsceneChuchuan.mjs?v=17",
         "./Data_CutsceneBeimenBreakout.mjs": "./Data_CutsceneBeimenBreakout.mjs?v=1",
@@ -90,7 +91,7 @@
         "./Data_Dressing_SoutheastQuarter.mjs": "./Data_Dressing_SoutheastQuarter.mjs?v=1",
         "./Data_Dressing_SouthwestQuarter.mjs": "./Data_Dressing_SouthwestQuarter.mjs?v=1",
         "./Script_CityBlockKit.mjs": "./Script_CityBlockKit.mjs?v=1",
-        "./Script_CutsceneCheck.mjs": "./Script_CutsceneCheck.mjs?v=1",
+        "./Script_CutsceneCheck.mjs": "./Script_CutsceneCheck.mjs?v=2",
         "./Script_LandmarkRegistry.mjs": "./Script_LandmarkRegistry.mjs?v=1",
         "./Script_Landmark_ChurchSchool.mjs": "./Script_Landmark_ChurchSchool.mjs?v=1",
         "./Script_Landmark_Commerce.mjs": "./Script_Landmark_Commerce.mjs?v=1",
@@ -166,6 +167,6 @@
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=60"></script>
+  <script type="module" src="./Script_Main.mjs?v=61"></script>
 </body>
 </html>

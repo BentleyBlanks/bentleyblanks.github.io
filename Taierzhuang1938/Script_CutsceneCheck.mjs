@@ -11,11 +11,15 @@
 //             命令行打印出来，Play() 不管。
 
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
+import { MinReadSeconds as StackMinReadSeconds } from "./Script_Subtitle.mjs";
 
-/** 字幕/台词的最短可读时长：每个汉字 0.22 s + 1.2 s（docs/Data_CutsceneRedo.md §1.4）。 */
+/**
+ * 字幕/台词的最短可读时长：每个汉字 0.22 s + 1.2 s（docs/Data_CutsceneRedo.md §1.4）。
+ * 定义在 Script_Subtitle.SUBTITLE_TUNING 里 —— 运行时的字幕层照那个数挂时长，
+ * 这里的软错也照那个数报，两边不许各写一份系数。
+ */
 export function MinReadSeconds(text) {
-  const chars = String(text || "").replace(/\s+/g, "").length;
-  return chars * 0.22 + 1.2;
+  return StackMinReadSeconds(text);
 }
 
 export function ResolveHeadLookConfig(cut, shot = null) {
