@@ -30,6 +30,7 @@ import { LoadRiggedAssets, SegmentedCharacterSkin } from "./Script_RiggedModel.m
 import {
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
   WEAPON_MESH_VARIANTS, WeaponMeshId,
+  BAYONET_MESH_BY_WEAPON,
 } from "./Data_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
@@ -2792,6 +2793,7 @@ export class ActorFactory {
       ...Object.values(SOLDIER_MESH_BY_KIND),
       ...Object.values(WEAPON_MESH_BY_ID),
       ...Object.values(WEAPON_MESH_VARIANTS).flat(),
+      ...Object.values(BAYONET_MESH_BY_WEAPON),
     ]);
     const ids = [...wanted].filter((id) => MESHES[id]);
     this.meshLoading = (async () => {
@@ -3108,6 +3110,35 @@ export class ActorFactory {
     const muzzle = Mount("muzzle");
     const gripFront = Mount("gripL")
       || (upright ? new THREE.Vector3(0, 0.12, 0) : new THREE.Vector3(0, -0.012, -0.30));
+
+    // 可上刺刀的枪（bayonet: true）在人物手里**常态带刀**：滕县攻防的白刃密度
+    // 就是这么高，AI 冲锋态（bayonetFixed）不用再临时换几何。只在 high 档并：
+    // medium/low 的观看距离读不出那一条刀，白花两千三角。
+    // 刀的 socket 挂点（枪口环中心）对到枪的 muzzle 上，环再往后坐 12 mm。
+    if (data?.bayonet && this.quality === "high" && muzzle) {
+      const bayonetId = BAYONET_MESH_BY_WEAPON[weaponId];
+      const bayonetBuilt = bayonetId && this.meshDocs.has(bayonetId)
+        ? this._InstantiateMesh(bayonetId) : null;
+      if (bayonetBuilt) {
+        const socketNode = bayonetBuilt.nodes.get("socket");
+        const socket = socketNode
+          ? new THREE.Vector3().setFromMatrixPosition(socketNode.matrixWorld)
+          : new THREE.Vector3();
+        const dx = muzzle.x - socket.x;
+        const dy = muzzle.y - socket.y;
+        const dz = muzzle.z - socket.z + 0.012;
+        bayonetBuilt.root.traverse((child) => {
+          if (!child.isMesh || !child.geometry) return;
+          const bucket = (child.material && child.material.name) || "steel";
+          child.geometry.translate(dx, dy, dz);
+          if (geometries.has(bucket)) {
+            geometries.set(bucket, MergeGeometries([geometries.get(bucket), child.geometry]));
+          } else {
+            geometries.set(bucket, child.geometry);
+          }
+        });
+      }
+    }
     // 拉栓的抓握点：模型没有这个挂点（栓在钢件里烘死了），沿用规范坐标系里的常量。
     // 枪机在膛线轴稍上、机匣右侧一点 —— 这两个数是按 BuildWeaponGeometry 定的。
     const bolt = kind === "pistol"

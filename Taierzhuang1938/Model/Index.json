@@ -391,6 +391,98 @@
    }
   },
   {
+   "name": "BayonetZhongZheng",
+   "category": "weapon",
+   "file": "BayonetZhongZheng.tzm.json",
+   "triangles": 2218,
+   "meshBlocks": 2,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 92734,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.01638,
+     -0.02578,
+     -0.428
+    ],
+    "max": [
+     0.01651,
+     0.03419,
+     0.14353
+    ]
+   }
+  },
+  {
+   "name": "BayonetHanYang",
+   "category": "weapon",
+   "file": "BayonetHanYang.tzm.json",
+   "triangles": 2198,
+   "meshBlocks": 2,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 91607,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.01396,
+     -0.02541,
+     -0.39505
+    ],
+    "max": [
+     0.0156,
+     0.03419,
+     0.12138
+    ]
+   }
+  },
+  {
+   "name": "BayonetType38",
+   "category": "weapon",
+   "file": "BayonetType38.tzm.json",
+   "triangles": 1344,
+   "meshBlocks": 1,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 57896,
+   "materials": [
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.00549,
+     -0.02863,
+     -0.4
+    ],
+    "max": [
+     0.0048,
+     0.0239,
+     0.114
+    ]
+   }
+  },
+  {
    "name": "Dougong",
    "category": "prop",
    "file": "Dougong.tzm.json",
@@ -733,7 +825,7 @@
    "meshBlocks": 5,
    "nodes": 6,
    "joints": 1,
-   "bytes": 39234,
+   "bytes": 39124,
    "materials": [
     "armor",
     "steel",

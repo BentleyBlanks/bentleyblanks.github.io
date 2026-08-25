@@ -177,6 +177,35 @@ export const MESHES = {
       + "一模一样的刀反倒不像 1938。圆盘吞口、束节木柄、刃线较直的一路。",
   },
 
+  // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----
+  BayonetZhongZheng: {
+    file: "BayonetZhongZheng.tzm.json", category: "weapon",
+    triangles: 2218, meshBlocks: 2, nodes: 4, joints: 0,
+    materials: ["steel", "wood"], mounts: ["socket", "tip"],
+    span: [0.03289, 0.05997, 0.57153], lengthM: 0.572, bladeM: 0.428,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "HY1935 刺刀（中正式）。CC-BY Seitengewehr 84/98 底模（Sketchfab / "
+      + "PL_historyfan_K），程序化补枪口环与木柄片，刃拉长到史实 428 mm。",
+  },
+  BayonetHanYang: {
+    file: "BayonetHanYang.tzm.json", category: "weapon",
+    triangles: 2198, meshBlocks: 2, nodes: 4, joints: 0,
+    materials: ["steel", "wood"], mounts: ["socket", "tip"],
+    span: [0.02956, 0.0596, 0.51643], lengthM: 0.517, bladeM: 0.395,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "汉阳造配刀（八八式系）。与 HY1935 同一 CC-BY 底模，刃 395 mm。",
+  },
+  BayonetType38: {
+    file: "BayonetType38.tzm.json", category: "weapon",
+    triangles: 1344, meshBlocks: 1, nodes: 4, joints: 0,
+    materials: ["steel"], mounts: ["socket", "tip"],
+    span: [0.01029, 0.05254, 0.514], lengthM: 0.514, bladeM: 0.400,
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "三十年式刺刀（三八式）。CC-BY Ps1 Arisaka T30 Bayonet（Sketchfab / "
+      + "Swordmanck）：钩形护手与枪口环自带；丢掉刀鞘与腰带。全钢（后期批次样式），"
+      + "PSX 漫反射整体偏棕，色分桶会误判成木，见 ImportBayonets 注释。",
+  },
+
   Type89Launcher: {
     file: "Type89Launcher.tzm.json", category: "weapon",
     triangles: 318, meshBlocks: 2, nodes: 7, joints: 0,
@@ -351,6 +380,17 @@ export function WeaponMeshId(weaponId, variant = 0) {
   if (list && variant > 0 && variant < list.length) return list[variant];
   return WEAPON_MESH_BY_ID[weaponId];
 }
+
+/**
+ * 可装刺刀的枪 → 刺刀模型 id。运行时把刺刀模型的 socket 挂点（枪口环中心）
+ * 对到枪的 muzzle 挂点上：环套枪口、刃沿枪管前伸、柄贴刺刀座。
+ * 哪些枪能上刺刀由 Data_Weapons 的 bayonet: true 说了算，这里只管配哪把刀。
+ */
+export const BAYONET_MESH_BY_WEAPON = {
+  ZhongZheng: "BayonetZhongZheng",
+  HanYang: "BayonetHanYang",
+  Type38: "BayonetType38",
+};
 
 /** 人物 kind（Script_Actor 的 KIND_SPEC 键）→ 模型 id。 */
 export const SOLDIER_MESH_BY_KIND = {

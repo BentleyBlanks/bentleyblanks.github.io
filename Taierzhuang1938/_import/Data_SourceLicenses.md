@@ -37,6 +37,16 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，
 文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
 
+## 刺刀（2026-08-25，经本机 BlenderMCP 下载；构建器 `_blender/ImportBayonets.py`）
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
+|---|---|---|---|---|
+| HY1935 刺刀 `BayonetZhongZheng` / 汉阳造配刀 `BayonetHanYang` | `Source/Model_Seitengewehr8498/scene.gltf` | [PL_historyfan_K](https://sketchfab.com/PL_historyfan_K) | CC-BY-4.0 | Seitengewehr 84/98（毛瑟系刀形）作底。license-safe 史实修形：S84/98 无枪口环而 HY1935/汉阳式有 —— 程序化补环与环箍；木柄片按 C96 握片先例程序化贴上；柄段等比、**刃只沿 Z 拉长**到 428 / 395 mm，全长 572 / 517 mm。源包 4K 贴图已剥离（管线绑共享 512px PBR）。 |
+| 三十年式刺刀 `BayonetType38` | `Source/Model_Type30Bayonet/scene.gltf` | [Swordmanck](https://sketchfab.com/Swordmanck) | CC-BY-4.0 | Type 30 刺刀：钩形护手 + 枪口环是模型自带的；丢掉刀鞘与腰带对象。全钢处理（PSX 漫反射整体偏棕，色分桶会把整刀误判成木；三十年式本有全钢柄批次）。刃 400 mm、全长 514 mm，上枪后全长 1.663 m 与 Data_Weapons.bayonetTotalM 对上。 |
+
+刺刀是**独立 TZM**（不焊进枪模，枪的全长断言不动），运行时按 `socket`
+挂点（枪口环中心）扣到枪的 muzzle 挂点。设计口径见 `docs/Data_Bayonet.md`。
+
 ## 战车（同样经本机 BlenderMCP 下载）
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |

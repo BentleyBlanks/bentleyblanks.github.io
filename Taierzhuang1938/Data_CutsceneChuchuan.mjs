@@ -371,24 +371,315 @@ const CHUCHUAN_END = 105.0;
 const CHUCHUAN_SIDE_DOOR_Z = 5.7;
 const CHUCHUAN_PLATFORM_Y = 0.58;
 
-// ── 窗带的高度（本场画面里最要紧的四个数）──────────────────────────────────
-// 坐姿眼高 1.36。旧版窗洞是 1.28—2.82：窗台只比眼睛低 8 cm，视线几乎贴着窗台走，
-// 从座位上望出去只剩天，田野、土堤、电杆全在视线以下 —— 「火车在开」这条信息
-// 就是这么丢的。真车厢的窗台在坐姿眼高下面 40—50 cm，人是**往下看**出去的。
-const CHUCHUAN_WINDOW_LOW = 0.90;    // 窗台顶面（下半木板到此为止）
-const CHUCHUAN_WINDOW_HIGH = 2.55;   // 窗头（上半钢板从此开始）
-const CHUCHUAN_WINDOW_MID = (CHUCHUAN_WINDOW_LOW + CHUCHUAN_WINDOW_HIGH) / 2;
-const CHUCHUAN_WINDOW_SPAN = CHUCHUAN_WINDOW_HIGH - CHUCHUAN_WINDOW_LOW;
-
 // ── 长凳分段与坐席 ────────────────────────────────────────────────────────
 // 凳段中心 [-5.8,-1.95,1.95,5.8]、每段长 3.45 → 段内可坐区间是 ±1.725，段间有缝。
 // 坐着的人在 z 向占 ±0.24，所以坐席必须落在 ±1.35 以内；旧表里 -4.05 / -0.36
 // 正压在段缝上，半个屁股悬空。每段均分三个坐席，全部落在安全区里。
 const CHUCHUAN_BENCH_Z = [-5.8, -1.95, 1.95, 5.8];
+const CHUCHUAN_BENCH_PITCH = 3.85;   // 凳段中心间距（-5.8→-1.95→1.95→5.8）
 const CHUCHUAN_SEAT_PITCH = 1.25;
+
+// ── 车窗：1930 年代军运车的离散小窗，不是整条玻璃带 ─────────────────────────
+// 上一轮是 0.90—2.55 一条通长玻璃带 + 细竖框：从座位望出去像现代观景车，
+// 一整面车壁只剩两条窄边。这一轮照滇越／津浦线老照片里的三等车／代客车厢重做，
+// 结构而不只是数字：
+//   · 净宽 0.72、净高 0.90（窗台 1.05、窗头 1.95）—— 坐着的人半身在窗里；
+//   · 窗与窗之间是 1.205 m 的**实心木衬板墙墩**，整面车壁以墙为主、窗是挖出来的洞；
+//   · 窗心节距 1.925 m ＝ 凳段节距 3.85 的一半：**一段凳配两扇窗**。一段凳坐三个人，
+//     一段一扇窗会疏成闷罐车、一人一扇又密回观景车，取中间那一档；
+//   · 整列窗心锚在**玩家座位 z=3.42** 上 —— 镜 3/5 朝 −x、镜 4 朝 +x 的两条视线
+//     必须各自正对一扇窗的正中（见 shots 里 look 的注）。
+//   · 玻璃不建几何：老照片里三等车的窗多半是空的或半开，且窗内挂一块透明板
+//     只会在背光面上多出一块反光死板。窗洞里看到的就是窗外。
+const CHUCHUAN_WINDOW_LOW = 1.05;    // 窗台顶面（下半木衬板到此为止）
+const CHUCHUAN_WINDOW_HIGH = 1.95;   // 窗头（上半墙板从此开始）
+const CHUCHUAN_WINDOW_MID = (CHUCHUAN_WINDOW_LOW + CHUCHUAN_WINDOW_HIGH) / 2;
+const CHUCHUAN_WINDOW_SPAN = CHUCHUAN_WINDOW_HIGH - CHUCHUAN_WINDOW_LOW;
+const CHUCHUAN_WINDOW_WIDTH = 0.72;
+const CHUCHUAN_WINDOW_PITCH = CHUCHUAN_BENCH_PITCH / 2;
+const CHUCHUAN_WALL_X = 2.80;        // 内壁板中心（厚 0.16 → 2.72—2.88）
+const CHUCHUAN_WALL_END = 8.90;      // 内壁前后端
+const CHUCHUAN_CAR_HEIGHT = 3.92;    // 内顶（CarriageCeiling 中心）
+// 侧门洞（含门框外沿）：右壁这一段既没有窗也没有墙。
+const CHUCHUAN_DOOR_GAP = [4.40, 7.00];
+/** 窗心（左壁通长八扇；右壁被侧门吃掉一扇，门前那面 1.9 m 短墙上单开一扇 7.90）。 */
+const CHUCHUAN_WINDOW_Z_LEFT = [-6.205, -4.28, -2.355, -0.43, 1.495, 3.42, 5.345, 7.27];
+const CHUCHUAN_WINDOW_Z_RIGHT = [-6.205, -4.28, -2.355, -0.43, 1.495, 3.42, 7.90];
+/** 卷到窗头的油布帘挂在哪几扇。右壁 1.495 / 3.42 两扇一律不挂 —— 镜 4 的小站视线走这里。 */
+const CHUCHUAN_WINDOW_SHADE_LEFT = [-6.205, -2.355, 1.495, 5.345];
+const CHUCHUAN_WINDOW_SHADE_RIGHT = [-4.28, -0.43, 7.90];
+/** 半落下的帘（遮住窗口上沿 0.34 m）：一排窗不能齐刷刷一模一样。 */
+const CHUCHUAN_WINDOW_HALF_SHADE_LEFT = [-4.28, 7.27];
+/** 窗口天光补光挂在哪几扇窗心（左右各五处，见 props 里的灯光注）。 */
+const CHUCHUAN_WINDOW_LIGHT_LEFT = [-6.205, -3.3, -0.43, 2.5, 5.345];
+const CHUCHUAN_WINDOW_LIGHT_RIGHT = [-6.205, -3.3, -0.43, 2.5, 5.90];
+
+/**
+ * 一侧车壁在 z 上被切成几段：左壁通长，右壁被侧门洞切成前后两段。
+ * 内壁两段各往门框里**多伸 0.08 m**（伸到门框中心 4.48 / 6.92）：墙端面与门框端面
+ * 正好共面时，inside:true 的墙用 BackSide 渲染，端盖会和门框在同一平面上打架 ——
+ * 上一轮 t=20 yaw+2.09 的图里门框左边那一撮竖着的「毛边」就是它。伸进门框里就没有共面。
+ */
+function CarriageWallRuns(side) {
+  const end = CHUCHUAN_WALL_END;
+  return side < 0 ? [[-end, end]] : [[-end, 4.48], [6.92, end]];
+}
+
+/**
+ * 一侧车壁的全部内表面：下墙板、上墙板、**窗间实墙墩**、每扇窗的厚木框
+ *（窗台／过梁／两侧立框）与四角钢件，外加部分窗卷起的油布帘、少数半落下的帘。
+ *
+ * 墙板与墙墩一律 `inside:true` —— 相机在车厢里，只有 BackSide 才看得见内壁。
+ * 框、帘、钢角是实心小件，用默认 FrontSide（从两边看都成立）。
+ * **一件都不用 mat:"Steel"**：库里 Steel 的 metalness≈1，而 _MakeProp 不把 metalness
+ * 转给 library.Get()，金属在封闭车厢里没有可反射的环境，一律渲成纯黑（docs §1.9）。
+ * 上一轮那一排「细黑竖框」就是这么来的。窗框走木衬，钢角走无贴图平涂。
+ */
+function CarriageSideWall(side, label) {
+  const x = side * CHUCHUAN_WALL_X;
+  const windows = side < 0 ? CHUCHUAN_WINDOW_Z_LEFT : CHUCHUAN_WINDOW_Z_RIGHT;
+  const shades = side < 0 ? CHUCHUAN_WINDOW_SHADE_LEFT : CHUCHUAN_WINDOW_SHADE_RIGHT;
+  const halfShades = side < 0 ? CHUCHUAN_WINDOW_HALF_SHADE_LEFT : [];
+  const w = CHUCHUAN_WINDOW_WIDTH;
+  const props = [];
+  CarriageWallRuns(side).forEach(([z0, z1], run) => {
+    const len = z1 - z0, mid = (z0 + z1) / 2;
+    props.push(
+      { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, len], pos: [x, CHUCHUAN_WINDOW_LOW / 2, mid],
+        mat: "CarriageBenchWood", color: 0xc0b098, roughness: 0.96, inside: true, name: `Wall${label}Low${run}` },
+      // 窗头以上原来是 mat:"Adobe"：在出图里是一条又宽又亮的橙褐夯土带，糊在车厢
+      // 上半幅，怎么看都是土屋不是车厢。改成同一张车厢木衬（压暗一档），
+      // 整面车壁从地板到顶梁是一种材料，才读得出「木板包起来的车厢」。
+      { kind: "box", size: [0.16, CHUCHUAN_CAR_HEIGHT - CHUCHUAN_WINDOW_HIGH, len],
+        pos: [x, (CHUCHUAN_CAR_HEIGHT + CHUCHUAN_WINDOW_HIGH) / 2, mid],
+        mat: "CarriageBenchWood", color: 0x9a8e7a, roughness: 0.96, inside: true, name: `Wall${label}High${run}` },
+    );
+    // 窗带里凡是没开洞的地方全部填成木衬板墙墩 —— 这一句是「小窗」与「玻璃带」的分界。
+    const inRun = windows.filter((z) => z > z0 && z < z1).sort((a, b) => a - b);
+    let cursor = z0;
+    const Pier = (a, b, tag) => {
+      if (b - a < 0.03) return;
+      props.push({ kind: "box", size: [0.16, CHUCHUAN_WINDOW_SPAN, b - a], pos: [x, CHUCHUAN_WINDOW_MID, (a + b) / 2],
+        mat: "CarriageBenchWood", color: 0xc0b098, roughness: 0.96, inside: true, name: `WallPier${label}${tag}` });
+    };
+    inRun.forEach((z, i) => { Pier(cursor, z - w / 2, `${run}_${i}`); cursor = z + w / 2; });
+    Pier(cursor, z1, `${run}End`);
+  });
+  windows.forEach((z, index) => {
+    const tag = `${label}${index}`;
+    props.push(
+      // 窗台：厚木条，往车厢里探出 0.14 —— 坐着的人手肘搭得上，也把窗口的下沿做实
+      { kind: "box", size: [0.24, 0.13, w + 0.30], pos: [side * 2.64, CHUCHUAN_WINDOW_LOW - 0.065, z],
+        mat: "CarriageBenchWood", color: 0x8a7150, roughness: 0.95, name: `WindowSill${tag}` },
+      // 过梁
+      { kind: "box", size: [0.20, 0.12, w + 0.30], pos: [side * 2.66, CHUCHUAN_WINDOW_HIGH + 0.06, z],
+        mat: "CarriageBenchWood", color: 0x7d6647, roughness: 0.95, name: `WindowHead${tag}` },
+      // 两侧立框
+      ...[-1, 1].map((s, j) => ({
+        kind: "box", size: [0.18, CHUCHUAN_WINDOW_SPAN + 0.24, 0.15],
+        pos: [side * 2.66, CHUCHUAN_WINDOW_MID, z + s * (w / 2 + 0.075)],
+        mat: "CarriageBenchWood", color: 0x7d6647, roughness: 0.95, name: `WindowJamb${tag}${j ? "B" : "A"}`,
+      })),
+      // 四角钢件（无贴图平涂，见上面为什么不用 Steel）
+      ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sy, sz], j) => ({
+        kind: "box", size: [0.17, 0.085, 0.17], mat: "WoodBeam", color: 0x6b6459, roughness: 0.85,
+        pos: [side * 2.62, CHUCHUAN_WINDOW_MID + sy * (CHUCHUAN_WINDOW_SPAN / 2 + 0.05), z + sz * (w / 2 + 0.02)],
+        name: `WindowCorner${tag}${j}`,
+      })),
+    );
+    if (shades.includes(z)) {
+      props.push({ kind: "cyl", size: [0.085, w - 0.04], pos: [side * 2.60, CHUCHUAN_WINDOW_HIGH - 0.115, z],
+        rx: Math.PI / 2, mat: "ClothNra", color: 0xa2977a, roughness: 1, name: `WindowShade${tag}` });
+    }
+    if (halfShades.includes(z)) {
+      props.push({ kind: "box", size: [0.05, 0.34, w - 0.04], pos: [side * 2.62, CHUCHUAN_WINDOW_HIGH - 0.17, z],
+        mat: "ClothNra", color: 0x9d9276, roughness: 1, name: `WindowHalfShade${tag}` });
+    }
+  });
+  return props;
+}
 // 参考滇越铁路的新闻照片：车厢座位坐满，过道则留给上下车和整理行李；只有少数人
 // 靠着侧壁、车门或行李架站着。五名有台词的重点人物之外，人群仍是稳定的背景层，
 // 但不把车厢排成挤满人的展示间。
+
+// ── 车厢外壳 ──────────────────────────────────────────────────────────────
+// 内壁全是 inside:true（BackSide）：相机在车厢里时它们成立，**从月台回望却是透明的**。
+// 上一轮 t=103 yaw−2.09 的取证图里，站在月台上看回去整节车不存在，只剩一排悬空的
+// 长凳和坐着的人 —— 这一层外壳就是补这个洞。
+//
+// 三条硬约束：
+//   1. 外皮离内壁 ≥0.02 m（内壁外表面 2.88 → 外皮 2.92—3.06），不共面、不闪烁；
+//   2. **castShadow:false**。内壁 inside:true 时引擎默认就不投影，整节车此前几乎不
+//      投影；外壳一旦投影，56° 的太阳会把一大片阴影甩到月台沿上（sky 预设里
+//      特意把太阳抬到 56° 就是为了让车影停在月台沿以内），画面直接变天；
+//   3. 外皮的窗洞必须**比内壁的窗洞大一圈**（z 各放 0.10、上下各放 0.09），
+//      否则从座位斜着往外看时，外皮的墙墩会在窗口里切出一条读不懂的暗边。
+const CHUCHUAN_SHELL_X = 2.99;          // 外皮板中心（厚 0.14 → 2.92—3.06）
+const CHUCHUAN_SHELL_BOTTOM = -0.15;    // 裙板下沿（钻进道砟里一点）
+const CHUCHUAN_SHELL_TOP = 4.01;        // 与内顶板上表面齐平
+const CHUCHUAN_SHELL_END = 9.10;        // 端头外皮
+const CHUCHUAN_SHELL_WIN_HALF = CHUCHUAN_WINDOW_WIDTH / 2 + 0.10;
+const CHUCHUAN_SHELL_WIN_LOW = CHUCHUAN_WINDOW_LOW - 0.09;
+const CHUCHUAN_SHELL_WIN_HIGH = CHUCHUAN_WINDOW_HIGH + 0.09;
+const CHUCHUAN_SHELL_DOOR_TOP = 3.02;
+// 外板色：太阳在 −x，所以**朝月台的这一面整场背光**，只吃 SH 探针 0.85 + 环境 0.46。
+// 底色必须比印象中的「深色军运车」浅一档，落到画面里才是深棕；直接刷 0x4a423a
+// 在背光面上就是一块纯黑板（门板用 mat:"Steel" 的那次教训同理，docs §1.9）。
+// ★ 这三个数踩过两次坑，改之前先看这一段：
+//   · CarriageBenchWood 的**贴图本身很暗**（平均反照率 ≈0.25）。朝月台这一面整场
+//     背光，只吃 SH 0.85 + 环境 0.46；上一轮把 tint 压到 0x6f7266，实拍就是**一块纯黑板**。
+//     所以外板的 tint 必须往**亮**里给（0xa8 一档），落到画面里才是「深棕带绿的旧车帮」。
+//   · 反过来，铆条/腰带/铁件是**无贴图平涂**，同样的 sRGB 数值在画面里比带贴图的板亮
+//     一大截 —— 上一轮 0x5a5d54 的铆条在黑板上读成三条灰白横带（t=104 yaw−1.5 取证）。
+//     平涂件一律再压两档，才是「深色板上的黑铁箍」。
+const CHUCHUAN_SHELL_PLANK = 0x99907f;
+const CHUCHUAN_SHELL_STRAP = 0x6f685c;
+const CHUCHUAN_SHELL_IRON = 0x5e584d;
+
+/** 一侧外皮在 z 上被切成几段（与内壁同口径：左壁通长，右壁被侧门洞切开）。 */
+function CarriageShellRuns(side) {
+  const end = CHUCHUAN_SHELL_END;
+  return side < 0 ? [[-end, end]] : [[-end, CHUCHUAN_DOOR_GAP[0]], [CHUCHUAN_DOOR_GAP[1], end]];
+}
+
+/** 一侧外皮：裙板、窗下墙、窗间墙墩、窗上墙、每扇窗的雨檐、竖木条与两道腰带。 */
+function CarriageShellSide(side, label) {
+  const x = side * CHUCHUAN_SHELL_X;
+  const windows = side < 0 ? CHUCHUAN_WINDOW_Z_LEFT : CHUCHUAN_WINDOW_Z_RIGHT;
+  const props = [];
+  const Panel = (y0, y1, z0, z1, tag, color = CHUCHUAN_SHELL_PLANK) => {
+    if (y1 - y0 < 0.02 || z1 - z0 < 0.02) return;
+    props.push({
+      kind: "box", size: [0.14, y1 - y0, z1 - z0], pos: [x, (y0 + y1) / 2, (z0 + z1) / 2],
+      mat: "CarriageBenchWood", color, roughness: 0.97, castShadow: false,
+      name: `Shell${label}${tag}`,
+    });
+  };
+  CarriageShellRuns(side).forEach(([z0, z1], run) => {
+    Panel(CHUCHUAN_SHELL_BOTTOM, CHUCHUAN_SHELL_WIN_LOW, z0, z1, `Low${run}`);
+    Panel(CHUCHUAN_SHELL_WIN_HIGH, CHUCHUAN_SHELL_TOP, z0, z1, `High${run}`);
+    const inRun = windows.filter((z) => z > z0 && z < z1).sort((a, b) => a - b);
+    let cursor = z0;
+    inRun.forEach((z, i) => {
+      Panel(CHUCHUAN_SHELL_WIN_LOW, CHUCHUAN_SHELL_WIN_HIGH, cursor, z - CHUCHUAN_SHELL_WIN_HALF, `Pier${run}_${i}`);
+      cursor = z + CHUCHUAN_SHELL_WIN_HALF;
+    });
+    Panel(CHUCHUAN_SHELL_WIN_LOW, CHUCHUAN_SHELL_WIN_HIGH, cursor, z1, `Pier${run}End`);
+    // 两道腰带（车帮上下缘的钢箍）与竖木条：外皮不能是一块没有尺度的大板。
+    [CHUCHUAN_SHELL_WIN_LOW - 0.16, CHUCHUAN_SHELL_WIN_HIGH + 0.16].forEach((y, i) => {
+      props.push({
+        kind: "box", size: [0.09, 0.14, z1 - z0], pos: [side * 3.08, y, (z0 + z1) / 2],
+        mat: "WoodBeam", color: CHUCHUAN_SHELL_STRAP, roughness: 0.9, castShadow: false,
+        name: `ShellBelt${label}${run}_${i}`,
+      });
+    });
+  });
+  // 竖木条按窗间墙墩的中心排，读作「板缝上的压条」
+  const battens = [];
+  CarriageShellRuns(side).forEach(([z0, z1]) => {
+    const inRun = windows.filter((z) => z > z0 && z < z1).sort((a, b) => a - b);
+    let cursor = z0;
+    inRun.forEach((z) => { battens.push((cursor + z - CHUCHUAN_SHELL_WIN_HALF) / 2); cursor = z + CHUCHUAN_SHELL_WIN_HALF; });
+    battens.push((cursor + z1) / 2);
+  });
+  battens.forEach((z, i) => props.push({
+    kind: "box", size: [0.07, CHUCHUAN_SHELL_TOP - CHUCHUAN_SHELL_BOTTOM - 0.10, 0.15],
+    pos: [side * 3.07, (CHUCHUAN_SHELL_TOP + CHUCHUAN_SHELL_BOTTOM) / 2, z],
+    mat: "WoodBeam", color: CHUCHUAN_SHELL_STRAP, roughness: 0.92, castShadow: false, name: `ShellBatten${label}${i}`,
+  }));
+  // 门楣：侧门洞只开到 3.02 m，它上面那 1 m 仍是车帮，不补就是个通到车顶的大豁口
+  if (side > 0) {
+    Panel(CHUCHUAN_SHELL_DOOR_TOP, CHUCHUAN_SHELL_TOP, CHUCHUAN_DOOR_GAP[0], CHUCHUAN_DOOR_GAP[1], "DoorHead");
+    props.push({
+      kind: "box", size: [0.09, 0.16, CHUCHUAN_DOOR_GAP[1] - CHUCHUAN_DOOR_GAP[0]],
+      pos: [side * 3.08, CHUCHUAN_SHELL_DOOR_TOP - 0.08, (CHUCHUAN_DOOR_GAP[0] + CHUCHUAN_DOOR_GAP[1]) / 2],
+      mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.9, castShadow: false, name: `Shell${label}DoorLintel`,
+    });
+  }
+  // 每扇窗一条薄雨檐，外面看得出「这里开了个洞」
+  windows.forEach((z, i) => props.push({
+    kind: "box", size: [0.20, 0.07, CHUCHUAN_WINDOW_WIDTH + 0.44], pos: [side * 3.08, CHUCHUAN_SHELL_WIN_HIGH + 0.05, z],
+    mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.9, castShadow: false, name: `ShellWindowHood${label}${i}`,
+  }));
+  return props;
+}
+
+/** 车顶、端头、底架、门轨与外侧门板 —— 从月台上能看见的全部车体轮廓。 */
+function CarriageShellFrame() {
+  const half = CHUCHUAN_SHELL_END;
+  const props = [
+    // ── 车顶：一层大板 + 抬高的中脊（老照片里的「气窗顶」轮廓），不做真弧面 ────
+    { kind: "box", size: [6.34, 0.16, 18.70], pos: [0, 4.09, 0], mat: "RoofTile", color: 0x6f675c, roughness: 0.97, castShadow: false, name: "ShellRoof" },
+    { kind: "box", size: [4.10, 0.22, 18.10], pos: [0, 4.26, 0], mat: "RoofTile", color: 0x766e62, roughness: 0.97, castShadow: false, name: "ShellRoofCrown" },
+    { kind: "box", size: [2.30, 0.14, 17.60], pos: [0, 4.42, 0], mat: "RoofTile", color: 0x7d7466, roughness: 0.97, castShadow: false, name: "ShellRoofRidge" },
+    ...[-1, 1].map((side) => ({
+      kind: "box", size: [0.16, 0.16, 18.70], pos: [side * 3.17, 4.02, 0],
+      mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.9, castShadow: false, name: `ShellEave${side < 0 ? "Left" : "Right"}`,
+    })),
+    ...[-5.2, 0.4, 5.6].map((z, i) => ({
+      kind: "cyl", size: [0.17, 0.34], pos: [0, 4.60, z],
+      mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false, name: `ShellRoofVent${i}`,
+    })),
+    // ── 两端头 ────────────────────────────────────────────────────────────
+    ...[-1, 1].map((end) => ({
+      kind: "box", size: [6.12, CHUCHUAN_SHELL_TOP - CHUCHUAN_SHELL_BOTTOM, 0.14],
+      pos: [0, (CHUCHUAN_SHELL_TOP + CHUCHUAN_SHELL_BOTTOM) / 2, end * (half - 0.07)],
+      mat: "CarriageBenchWood", color: 0x968e7c, roughness: 0.97, castShadow: false,
+      name: `ShellEnd${end < 0 ? "Rear" : "Front"}`,
+    })),
+    // 端头的爬梯与手闸轮：一眼看出这是一节货/军运车，不是一个盒子
+    ...[-1, 1].flatMap((end) => [
+      ...[-0.34, 0.34].map((dx, i) => ({
+        kind: "box", size: [0.08, 3.10, 0.08], pos: [dx, 1.45, end * (half + 0.06)],
+        mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false,
+        name: `ShellLadderRail${end < 0 ? "Rear" : "Front"}${i}`,
+      })),
+      ...[0.55, 1.10, 1.65, 2.20, 2.75].map((y, i) => ({
+        kind: "box", size: [0.80, 0.06, 0.06], pos: [0, y, end * (half + 0.06)],
+        mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false,
+        name: `ShellLadderRung${end < 0 ? "Rear" : "Front"}${i}`,
+      })),
+      { kind: "cyl", size: [0.34, 0.05], pos: [-1.70, 3.05, end * (half + 0.10)], rx: Math.PI / 2,
+        mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false,
+        name: `ShellBrakeWheel${end < 0 ? "Rear" : "Front"}` },
+    ]),
+    // ── 底架：车身与道砟之间的一道深色梁，没有它车帮直接插进地里 ──────────────
+    ...[-1, 1].map((side) => ({
+      kind: "box", size: [0.24, 0.40, 18.40], pos: [side * 3.04, -0.06, 0],
+      mat: "WoodBeam", color: 0x6a6156, roughness: 0.95, castShadow: false,
+      name: `ShellSolebar${side < 0 ? "Left" : "Right"}`,
+    })),
+    ...[-1, 1].flatMap((side) => [-7.4, -3.7, 0, 3.7, 7.4].map((z, i) => ({
+      kind: "box", size: [0.30, 0.44, 0.22], pos: [side * 3.02, -0.08, z],
+      mat: "WoodBeam", color: 0x5c554b, roughness: 0.95, castShadow: false,
+      name: `ShellSoleRib${side < 0 ? "L" : "R"}${i}`,
+    }))),
+    // ── 侧门的外挂门轨与门号板 ────────────────────────────────────────────
+    { kind: "box", size: [0.16, 0.13, 5.60], pos: [3.14, 3.12, 6.60], mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false, name: "ShellDoorTrack" },
+    { kind: "box", size: [0.06, 0.44, 0.86], pos: [3.10, 2.30, 2.10], mat: "WoodBeam", color: 0xb4a98f, roughness: 0.95, castShadow: false, name: "ShellNumberPlate" },
+    { kind: "box", size: [0.05, 0.30, 0.62], pos: [3.12, 2.30, 2.10], mat: "WoodBeam", color: 0x4c463c, roughness: 0.95, castShadow: false, name: "ShellNumberPlateInk" },
+  ];
+  return props;
+}
+
+/**
+ * 外挂的滑门板：和内侧门板走**同一条** propMoves（SideDoorMoves 里一并列出），
+ * 开门后停在门洞前方的外皮上，从月台看回去门是「拉开靠在车帮上」而不是凭空消失。
+ * 下沿 0.26 是踏板顶（0.24）以上 —— 关着时不许穿进内踏板。
+ */
+function CarriageShellDoor() {
+  return [
+    { kind: "box", size: [0.12, 2.76, 2.60], pos: [3.14, 1.64, CHUCHUAN_SIDE_DOOR_Z], mat: "CarriageBenchWood", color: 0x958d7b, roughness: 0.97, castShadow: false, name: "CarriageDoorOuter" },
+    ...[-0.98, -0.33, 0.32, 0.97].map((y, i) => ({
+      kind: "box", size: [0.06, 0.15, 2.46], pos: [3.21, 1.64 + y, CHUCHUAN_SIDE_DOOR_Z],
+      mat: "WoodBeam", color: CHUCHUAN_SHELL_STRAP, roughness: 0.9, castShadow: false, name: `DoorOuterStrap${i}`,
+    })),
+    ...[-0.9, 0.9].map((dz, i) => ({
+      kind: "box", size: [0.10, 0.26, 0.14], pos: [3.15, 3.10, CHUCHUAN_SIDE_DOOR_Z + dz],
+      mat: "WoodBeam", color: CHUCHUAN_SHELL_IRON, roughness: 0.85, castShadow: false, name: `DoorOuterHanger${i}`,
+    })),
+  ];
+}
 
 function TrackMoveState(from, to, seconds, extra = {}) {
   const speed = Math.hypot(to[0] - from[0], to[2] - from[2]) / Math.max(0.001, seconds);
@@ -723,6 +1014,14 @@ const CHUCHUAN_STATION_PARTS = [
   // 压到旧漆的米灰，外面再套一圈深木边框，读作「一块挂了很久的站牌」。
   { name: "StationSignFrame", kind: "box", size: [0.08, 0.62, 2.06], pos: [1.62, 2.26, 5.0], mat: "WoodStock", color: 0x7c674a, repeat: 1 },
   { name: "StationSignBoard", kind: "box", size: [0.10, 0.48, 1.86], pos: [1.58, 2.26, 5.0], color: 0x938d78 },
+  // 站名：三块深色方块当字。空白站牌是 docs §1.9 记的遗留项，而 t=100 下车第一眼
+  // 正对着它 —— 一块什么都没有的米白板比没有站牌还扎眼。方块贴在朝月台的那一面
+  // （局部 x=1.52，板面 1.53），用 mat 而不是平涂：无贴图的平涂在这个天光下会被
+  // 抬成浅灰，字反而比板还亮。
+  ...[-0.52, 0.0, 0.52].map((dz, i) => ({
+    name: `StationSignGlyph${i}`, kind: "box", size: [0.05, 0.27, 0.27], pos: [1.52, 2.27, 5.0 + dz],
+    mat: "WoodBeam", color: 0x6b6357, roughness: 0.95,
+  })),
   // ── 月台家什：候车长凳两条、三只货箱、一副行李车板 ─────────────────────
   ...[2.2, -6.0].map((dz, i) => ([
     { name: `StationBenchSeat${i}`, kind: "box", size: [0.48, 0.09, 1.70], pos: [1.95, 1.02, dz], mat: "WoodStock", color: 0xc0a882, repeat: 1 },
@@ -845,6 +1144,11 @@ function SideDoorMoves() {
     Move("DoorBraceLeft", [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z - 0.78]),
     Move("DoorBraceRight", [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z + 0.78]),
     Move("DoorLatch", [2.60, 1.62, CHUCHUAN_SIDE_DOOR_Z + 0.15]),
+    // 外挂门板与它的压条、吊耳：和内侧门板同一条滑轨、同一段时间，
+    // 否则开门时车外看是一扇门留在原地、车内看是另一扇门滑走了。
+    Move("CarriageDoorOuter", [3.14, 1.64, CHUCHUAN_SIDE_DOOR_Z]),
+    ...[-0.98, -0.33, 0.32, 0.97].map((y, index) => Move(`DoorOuterStrap${index}`, [3.21, 1.64 + y, CHUCHUAN_SIDE_DOOR_Z])),
+    ...[-0.9, 0.9].map((dz, index) => Move(`DoorOuterHanger${index}`, [3.15, 3.10, CHUCHUAN_SIDE_DOOR_Z + dz])),
   ];
 }
 
@@ -922,6 +1226,45 @@ function CarriageTelegraphPole(side, label, index, z) {
   ];
 }
 
+// ── 路肩护路桩（只铺左侧）─────────────────────────────────────────────────
+// 为什么加：窗从 1.65 m 高的通带缩成 0.72 m 宽的小洞之后，**一根电杆在窗里只停
+// 留 0.14 s** —— 窗锥推到杆列那个距离（离眼 5.73 m）只有 0.87 m 宽，而杆距 24 m、
+// 层速 7.2 m/s；座位机位同时能看到三扇窗，加起来也只有一成时间窗里有东西。
+// 出图 t=20/t=35 的窗里就是一片白天，「火车在开」这条信息又要丢一次。
+// 桩距 8.5 m 之后每 1.2 s 就有一根扫过，窗框里永远有速度。
+// **只铺左侧**：镜 3/5/6 合计 66 s 全都朝 −x 看；而右侧路肩的 x 区间正好压在小站
+// 月台上（4.4—10.4），右边铺桩会在镜 4 里从站台里穿出来。
+const CHUCHUAN_STAKE_X = -4.16;      // 土堤面上（堤 3.82—4.88），不与电杆(3.78—3.90)、路边树(4.45—4.73)打架
+const CHUCHUAN_STAKE_BASE = 0.49;    // 土堤顶面
+const CHUCHUAN_STAKE_SPEED = 6.9;
+const CHUCHUAN_STAKE_Z = (() => {
+  const list = [];
+  for (let z = CHUCHUAN_ROUTE_START_Z + 4; z <= CHUCHUAN_ROUTE_END_Z; z += 8.5) list.push(Number(z.toFixed(2)));
+  return list;
+})();
+
+function CarriageRouteStakes() {
+  return CHUCHUAN_STAKE_Z.map((z, index) => {
+    const height = 1.55 + (index % 3) * 0.18;
+    return {
+      kind: "box", size: [0.12, height, 0.12], rz: ((index % 5) - 2) * 0.035,
+      pos: [CHUCHUAN_STAKE_X, CHUCHUAN_STAKE_BASE + height / 2, z],
+      mat: "WoodBeam", color: index % 4 ? 0x4a3f31 : 0x574a3a, noFog: true,
+      castShadow: false, name: `RouteStake${index}`,
+    };
+  });
+}
+
+function CarriageRouteStakeMotion() {
+  return CHUCHUAN_STAKE_Z.map((z, index) => {
+    const height = 1.55 + (index % 3) * 0.18;
+    return {
+      name: `RouteStake${index}`, from: [CHUCHUAN_STAKE_X, CHUCHUAN_STAKE_BASE + height / 2, z],
+      axis: [0, 0, 1], speed: CHUCHUAN_STAKE_SPEED, loop: false, stopAt: CHUCHUAN_TRAIN_STOP_AT,
+    };
+  });
+}
+
 function CarriageRouteWires(side, label) {
   const routeLength = CHUCHUAN_ROUTE_END_Z - CHUCHUAN_ROUTE_START_Z + 82;
   const centerZ = (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2;
@@ -963,6 +1306,8 @@ function WindowLandscape(side, label) {
     { kind: "box", size: [1.05, 0.58, 822], pos: [nearX, 0.20, (CHUCHUAN_ROUTE_START_Z + CHUCHUAN_ROUTE_END_Z) / 2], mat: "GroundRubble", color: 0x5b554a, noFog: true, name: `RouteEmbankment${label}` },
     ...CarriageRouteWires(side, label),
     ...CHUCHUAN_POLE_Z.flatMap((z, index) => CarriageTelegraphPole(side, label, index, z)),
+    // 路肩护路桩：只在左侧，理由见 CHUCHUAN_STAKE_X 上面那一段
+    ...(side < 0 ? CarriageRouteStakes() : []),
     ...CHUCHUAN_POLE_Z.filter((_, index) => index % 3 !== 1).flatMap((z, index) => CarriageLandscapeTree(side, label, `Route${index}`, side * (4.45 + (index % 2) * 0.28), z + 8, 3.25 + (index % 3) * 0.52, "NearRoute")),
   ];
 }
@@ -1003,6 +1348,7 @@ function WindowLandscapeMotion(side, label) {
       ];
     }),
     ...CHUCHUAN_POLE_Z.filter((_, index) => index % 3 !== 1).flatMap((z, index) => TreeMoves("NearRoute", `Route${index}`, side * (4.45 + (index % 2) * 0.28), z + 8, 3.25 + (index % 3) * 0.52, 5.65)),
+    ...(side < 0 ? CarriageRouteStakeMotion() : []),
   ];
 }
 
@@ -1014,6 +1360,340 @@ function WindowLandscapeMotion(side, label) {
 //   MeshStandardMaterial({color: 0x8a8274})：一块无贴图的米白板子。
 //   「窗外一片纯白、整套移动景观一件都看不见」就是这十六块板子干的，删掉。
 //   下车后回头看车厢侧窗，看见的是对侧窗外的真景（土堤、电杆、田野），不是虚空。
+
+// ---------------------------------------------------------------------------
+// 门外的鲁南三月 —— 真几何，没有照片贴片
+// ---------------------------------------------------------------------------
+//
+// ★ 这里原来是 `DoorOutsideBackdrop`：一块 46×24 m 的照片板钉在 x=34，玩家下车后
+//   整个门外就是这张照片 —— 底边一条硬切的地平线、走两步没有任何视差、抬头是
+//   一堵二十四米高的「村子」。用户原话「太丑了直接干掉」。删掉之后 +x 方向必须
+//   真的有东西可看，所以把月台外 17—115 m 铺成实体的村落、田块、土路与树行；
+//   再远交给已有的 SRTM 实体网格 FarTerrainRight 与雾。
+//
+// ★ **可见区从 x≈17.5 才开始**：月台面 0.58 m 高、外沿在 x=10.4，而地面在
+//   x=13 一带已经掉到 −1.9；从月台（眼高 2.14）与门口（眼高 1.73）望出去，
+//   x 10.4—17 这一条正好被月台外沿挡住。所以新静景一律从 x≥17.5 起摆 ——
+//   顺带也就完全避开了行车段窗外的运动层（MidHouse/MidWall 停在 x 12.0—15.5）。
+//
+// ★ **地面不是平的**。FarTerrainRight 是 88×72 的粗网格（列距 28.69 m、行距
+//   25.63 m），渲染出来的地面就是这些顶点之间的线性插值，而且从铁路一侧一路
+//   往下掉：(x=4,z=13) 处 −1.23，到 x=61 已经是 −6.57。把村舍按 y=0 摆下去
+//   会整片浮在半空。CHUCHUAN_FIELD_H 就是那片网格的顶点高度（列 0—4 × 行 33—41），
+//   FieldY 双线性插值，门外每一件道具都按它落地。
+//   **地形一改这张表要重采**：按 BuildHeightTerrainGeometry 的映射
+//   （sampleX = −1250 + 2500·(x−4)/2496、sampleZ = z − 1290）跑 SampleJieheHeight，
+//   再减去 SampleJieheHeight(0, −1470)。
+const CHUCHUAN_FIELD_COL_X = [4.00, 32.69, 61.38, 90.07, 118.76];
+const CHUCHUAN_FIELD_ROW_Z = [-64.08, -38.45, -12.82, 12.82, 38.45, 64.08, 89.72, 115.35, 140.99];
+const CHUCHUAN_FIELD_H = [
+  [-2.452, -4.894, -7.510, -7.996, -7.692],
+  [-2.011, -3.482, -6.591, -7.933, -7.692],
+  [-1.635, -3.454, -6.574, -7.100, -6.952],
+  [-1.230, -3.305, -6.574, -7.000, -6.067],
+  [-1.623, -3.471, -5.676, -6.864, -4.827],
+  [-2.452, -3.458, -4.215, -5.427, -3.656],
+  [-3.186, -3.049, -2.866, -2.853, -2.989],
+  [-3.949, -3.222, -2.146, -2.083, -2.954],
+  [-3.138, -3.019, -2.146, -2.083, -2.954],
+];
+
+/** 门外那片真地面在 (x,z) 处的高度（双线性，超出表格就夹到边界）。 */
+function FieldY(x, z) {
+  const Axis = (list, v) => {
+    if (v <= list[0]) return [0, 0];
+    if (v >= list[list.length - 1]) return [list.length - 2, 1];
+    let i = 0;
+    while (i < list.length - 2 && v > list[i + 1]) i += 1;
+    return [i, (v - list[i]) / (list[i + 1] - list[i])];
+  };
+  const [ci, cf] = Axis(CHUCHUAN_FIELD_COL_X, x);
+  const [ri, rf] = Axis(CHUCHUAN_FIELD_ROW_Z, z);
+  const near = CHUCHUAN_FIELD_H[ri][ci] * (1 - cf) + CHUCHUAN_FIELD_H[ri][ci + 1] * cf;
+  const far = CHUCHUAN_FIELD_H[ri + 1][ci] * (1 - cf) + CHUCHUAN_FIELD_H[ri + 1][ci + 1] * cf;
+  return near * (1 - rf) + far * rf;
+}
+
+/**
+ * 一条贴地的带状物（土路、田埂、水沟）：按**两端的真实地面高度**定位与定倾角，
+ * 所以任凭平原怎么斜都不会一头埋一头翘。
+ * ry 把局部 +x 转到 (dx,dz) 上（three 的 Ry：(1,0,0)→(cos,0,−sin)，故 ry=atan2(−dz,dx)）；
+ * 欧拉序 XYZ 下 rz 先在物体空间生效再被 ry 转走，正好是「沿路的纵坡」。
+ */
+function FieldStrip(name, x0, z0, x1, z1, options = {}) {
+  const width = options.width ?? 3.2;
+  const thick = options.thick ?? 0.16;
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  const y0 = FieldY(x0, z0), y1 = FieldY(x1, z1);
+  return {
+    kind: "box", size: [len, thick, width],
+    pos: [(x0 + x1) / 2, (y0 + y1) / 2 + (options.lift ?? 0.02), (z0 + z1) / 2],
+    ry: Math.atan2(-(z1 - z0), x1 - x0),
+    rz: Math.asin(Math.max(-0.4, Math.min(0.4, (y1 - y0) / len))),
+    mat: options.mat ?? "GroundRubble", color: options.color ?? 0x9a8e79,
+    roughness: 0.99, castShadow: false, name,
+  };
+}
+
+/**
+ * 一块田：薄板贴着地面铺，倾角取本地梯度（田块 ≤26 m，而地形网格 28.7 m 一格，
+ * 所以一块田基本落在同一格里，斜率对得上）。厚 0.34 是留的余量 —— 板宁可切进
+ * 土里，也不许在下坡那一头翘起来露出一条黑缝。
+ */
+function FieldPlot(name, x, z, sizeX, sizeZ, color, mat = "Ground") {
+  const gx = (FieldY(x + 6, z) - FieldY(x - 6, z)) / 12;
+  const gz = (FieldY(x, z + 6) - FieldY(x, z - 6)) / 12;
+  const Tilt = (g) => Math.asin(Math.max(-0.4, Math.min(0.4, g)));
+  return {
+    kind: "box", size: [sizeX, 0.34, sizeZ], pos: [x, FieldY(x, z) - 0.06, z],
+    rx: -Tilt(gz), rz: Tilt(gx), mat, color, roughness: 0.99, castShadow: false, name,
+  };
+}
+
+/**
+ * 一座鲁南民房：墙身（土坯或砖）+ 两坡瓦顶 + 屋脊 + 一道深色门洞。
+ * 局部 **x 是进深、z 是面宽**，屋脊沿 z 走：欧拉序 XYZ 里 rz 先在物体空间生效
+ * 再被 ry 转走，所以两坡的倾角必须给 rz，屋脊才会跟着朝向一起转。
+ * 房子是水平砌的（不跟地面倾角走），底边整体埋进土里 0.3 m，坡地上不会翘角。
+ */
+function FieldHouse(name, x, z, options = {}) {
+  const depth = options.depth ?? 4.6;      // 进深（局部 x）
+  const width = options.width ?? 6.4;      // 面宽（局部 z）
+  const wallH = options.wallH ?? 2.5;
+  const ry = options.ry ?? 0;
+  const pitch = options.pitch ?? 0.38;
+  const eave = 0.42;
+  const base = FieldY(x, z) - 0.30;
+  const run = depth / 2 + eave;
+  const slab = run / Math.cos(pitch);
+  const ridgeY = wallH + run * Math.tan(pitch);
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const At = (ox, oy, oz) => [x + ox * cos + oz * sin, base + oy, z - ox * sin + oz * cos];
+  const brick = options.brick === true;
+  const props = [
+    { kind: "box", size: [depth, wallH, width], pos: At(0, wallH / 2, 0), ry,
+      mat: brick ? "BrickWall" : "Adobe", color: options.wallColor ?? (brick ? 0x8a7d6c : 0x968772),
+      roughness: 0.98, castShadow: false, name },
+    ...[-1, 1].map((s, i) => ({
+      kind: "box", size: [slab, 0.17, width + 0.78],
+      pos: At(s * run / 2, (wallH + ridgeY) / 2, 0), ry, rz: -s * pitch,
+      mat: "RoofTile", color: options.roofColor ?? 0x5d564c, roughness: 0.97, castShadow: false,
+      name: `${name}Roof${i}`,
+    })),
+    { kind: "box", size: [0.42, 0.22, width + 0.5], pos: At(0, ridgeY + 0.06, 0), ry,
+      mat: "RoofTile", color: 0x4f4941, roughness: 0.97, castShadow: false, name: `${name}Ridge` },
+    // 一道深色门洞：远景里房子有没有「门」，是它读成民居还是读成箱子的分界
+    { kind: "box", size: [0.10, 1.55, 0.92], pos: At(-depth / 2 - 0.04, 0.78, options.doorZ ?? 0.6), ry,
+      color: 0x3c352c, roughness: 0.98, castShadow: false, name: `${name}Door` },
+  ];
+  if (options.chimney) {
+    props.push({ kind: "box", size: [0.42, 0.85, 0.42], pos: At(0, ridgeY + 0.5, width / 2 - 0.9), ry,
+      mat: "BrickWall", color: 0x6f6355, roughness: 0.98, castShadow: false, name: `${name}Chimney` });
+  }
+  return props;
+}
+
+/** 一段院墙／篱笆：水平砌，两端按地面高度取平均，长度 ≤16 m 时坡地上看不出来。 */
+function FieldWall(name, x0, z0, x1, z1, options = {}) {
+  const height = options.height ?? 1.75;
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  const y0 = FieldY(x0, z0), y1 = FieldY(x1, z1);
+  return {
+    kind: "box", size: [len, height, options.thick ?? 0.34],
+    pos: [(x0 + x1) / 2, (y0 + y1) / 2 + height / 2 - 0.28, (z0 + z1) / 2],
+    ry: Math.atan2(-(z1 - z0), x1 - x0),
+    rz: Math.asin(Math.max(-0.4, Math.min(0.4, (y1 - y0) / len))),
+    mat: options.mat ?? "Adobe", color: options.color ?? 0x8e806c,
+    roughness: 0.98, castShadow: false, name,
+  };
+}
+
+/**
+ * 一棵三月的秃树。名字一律 Field 开头，和窗外掠过的 CarriageLandscapeTree
+ * （Mid…/NearRoute… ，挂在 ambientMotion 上）分开，绝不互相顶名。
+ * 枝是「沿局部 X 的细长盒 + rx/ry」：方向 = Rx(rx)·Ry(ry)·(1,0,0)，
+ * 抬升量 = sin(ry)·sin(rx)，所以 rx 的符号跟 sin(ry) 走，枝梢一律朝上翘。
+ */
+function FieldTree(name, x, z, height, spin, branches = 5, twigs = true) {
+  const base = FieldY(x, z);
+  // 0x4b4237 在背光的平原上直接读成纯黑棍 —— 三根黑直棍插在天上就是电视天线，
+  // 不是三月的树（上一轮 t=97/103 实拍）。抬到 0x776a58 之后是「灰褐色的枯枝」。
+  const color = 0x776a58;
+  const Dir = (rx, ry) => [Math.cos(ry), Math.sin(ry) * Math.sin(rx), -Math.sin(ry) * Math.cos(rx)];
+  const props = [{
+    kind: "cyl", size: [0.135, height], pos: [x, base + height / 2 - 0.12, z],
+    mat: "TreeBark", color, roughness: 0.98, castShadow: false, name,
+  }];
+  for (let i = 0; i < branches; i += 1) {
+    const ry = spin + (i * 2 * Math.PI) / branches + (i % 2) * 0.31;
+    const lift = 0.78 + (i % 3) * 0.22;
+    const rx = (Math.sin(ry) >= 0 ? 1 : -1) * lift;
+    const len = 1.25 + (i % 3) * 0.34;
+    const dir = Dir(rx, ry);
+    const rootY = base + height - 0.55 - i * 0.30;
+    const end = [x + dir[0] * len, rootY + dir[1] * len, z + dir[2] * len];
+    props.push({
+      kind: "box", size: [len, 0.085, 0.085], rx, ry,
+      pos: [x + dir[0] * len / 2, rootY + dir[1] * len / 2, z + dir[2] * len / 2],
+      mat: "TreeBark", color, roughness: 0.98, castShadow: false, name: `${name}B${i}`,
+    });
+    // 第二级细枝：没有它，一根主枝就是一根直棍，整棵树读成天线。
+    if (!twigs) continue;
+    [[-0.52, 0.26, 0.66], [0.47, -0.16, 0.54]].forEach(([da, dl, tlen], j) => {
+      const ry2 = ry + da;
+      const rx2 = (Math.sin(ry2) >= 0 ? 1 : -1) * Math.min(1.25, Math.max(0.35, lift + dl));
+      const d2 = Dir(rx2, ry2);
+      props.push({
+        kind: "box", size: [tlen, 0.05, 0.05], rx: rx2, ry: ry2,
+        pos: [end[0] + d2[0] * tlen / 2, end[1] + d2[1] * tlen / 2, end[2] + d2[2] * tlen / 2],
+        mat: "TreeBark", color, roughness: 0.98, castShadow: false, name: `${name}B${i}${j ? "b" : "a"}`,
+      });
+    });
+  }
+  return props;
+}
+
+/** 柴垛：一大一小两个圆柱，编织质感的 WattleFence 在三十米外正好读成秸秆。 */
+function FieldStack(name, x, z, radius = 1.35) {
+  const base = FieldY(x, z);
+  return [
+    { kind: "cyl", size: [radius, 1.55], pos: [x, base + 0.72, z], mat: "WattleFence", color: 0xa08a5c, roughness: 0.99, castShadow: false, name },
+    { kind: "cyl", size: [radius * 0.62, 0.95], pos: [x, base + 1.86, z], mat: "WattleFence", color: 0xa8925f, roughness: 0.99, castShadow: false, name: `${name}Top` },
+  ];
+}
+
+/**
+ * 门外全部静景。**一件都不进 ambientMotion**：这是停在滕县小站外面的地，
+ * 不是行车段窗外掠过的景，名字也全部以 Field 开头，不与运动层重名。
+ */
+function DoorOutsideField() {
+  const props = [];
+
+  // ── 土路 ────────────────────────────────────────────────────────────────
+  // 一条沿铁路的大路（x≈20，从月台外沿刚好露出来那条线开始），一条拐进村子的岔路。
+  props.push(
+    FieldStrip("FieldLaneMain0", 19.6, -62, 20.4, -24, { width: 3.6 }),
+    FieldStrip("FieldLaneMain1", 20.4, -24, 20.1, 12, { width: 3.6 }),
+    FieldStrip("FieldLaneMain2", 20.1, 12, 21.2, 46, { width: 3.5 }),
+    FieldStrip("FieldLaneMain3", 21.2, 46, 20.6, 78, { width: 3.4 }),
+    FieldStrip("FieldLaneVillage0", 20.8, 15.5, 27.5, 13.0, { width: 2.9 }),
+    FieldStrip("FieldLaneVillage1", 27.5, 13.0, 34.5, 15.5, { width: 2.7 }),
+    FieldStrip("FieldLaneVillage2", 34.5, 15.5, 44.0, 12.0, { width: 2.5 }),
+    FieldStrip("FieldLaneFar0", 24.0, -20.0, 46.0, -30.0, { width: 2.6 }),
+    FieldStrip("FieldLaneFar1", 46.0, -30.0, 66.0, -28.0, { width: 2.4 }),
+  );
+
+  // ── 田块：麦茬地、翻耕地、返青的冬麦，靠色阶而不是靠贴图分块 ────────────────
+  // 色阶要拉开：翻耕地压到 0x5f5648、麦茬地抬到 0xc4b58f，中间是返青的冬麦
+  //（0x76805e）。上一轮那一组全挤在 0x8d—0xa7 之间，隔着雾根本分不出块。
+  [
+    ["FieldPlotNear0", 22.5, -30.0, 12, 22, 0xc4b58f],
+    ["FieldPlotNear1", 23.5, 2.0, 11, 20, 0x5f5648],
+    ["FieldPlotNear2", 23.0, 34.0, 12, 22, 0x7a7d66],
+    ["FieldPlotA", 30.0, -44.0, 20, 22, 0xb6a884],
+    ["FieldPlotB", 30.5, -8.0, 18, 20, 0x6b6250],
+    ["FieldPlotC", 33.0, 36.0, 22, 22, 0xc0b18c],
+    ["FieldPlotD", 48.0, -50.0, 24, 24, 0x635a4a],
+    ["FieldPlotE", 52.0, 2.0, 24, 26, 0xb1a382],
+    ["FieldPlotF", 54.0, 40.0, 24, 24, 0x7a7d66],
+    ["FieldPlotG", 78.0, -14.0, 26, 26, 0xa89b7c],
+    ["FieldPlotH", 80.0, 34.0, 26, 26, 0x655d4d],
+    ["FieldPlotI", 104.0, 8.0, 26, 26, 0x9d9279],
+  ].forEach(([name, x, z, sx, sz, color]) => props.push(FieldPlot(name, x, z, sx, sz, color)));
+
+  // ── 田埂：横平竖直但疏密不均，才像分给一户户的地，不像方格纸 ───────────────
+  [
+    [17.8, -58, 46.0, -54], [17.8, -30, 52.0, -34], [17.8, 30, 40.0, 32],
+    [23.0, 52, 62.0, 56], [40.0, -12, 74.0, -18], [46.0, 44, 84.0, 40],
+    [62.0, 8, 96.0, 4], [66.0, -46, 98.0, -44],
+  ].forEach(([x0, z0, x1, z1], i) => props.push(
+    FieldStrip(`FieldRidgeX${i}`, x0, z0, x1, z1, { width: 0.62, thick: 0.40, lift: 0.11, color: 0x7f7461 })));
+  [
+    [18.4, -60, 18.9, -18], [24.5, -56, 24.9, -22], [36.0, -52, 36.6, -14],
+    [50.0, -46, 50.6, -8], [43.0, 20, 43.6, 56], [58.0, 16, 58.6, 52],
+    [30.0, 36, 30.5, 66], [72.0, -40, 72.6, 2], [88.0, -10, 88.6, 30],
+  ].forEach(([x0, z0, x1, z1], i) => props.push(
+    FieldStrip(`FieldRidgeZ${i}`, x0, z0, x1, z1, { width: 0.58, thick: 0.38, lift: 0.10, color: 0x7a7060 })));
+
+  // ── 主村落：一簇挤在一起的院子（x 25—40），外围三两间散户 ────────────────
+  //    朝向按 ry 错开，没有两间房是平行的；砖房只有一间（村里最好的那一户）。
+  props.push(
+    ...FieldHouse("FieldHouseA", 27.0, 6.0, { depth: 5.0, width: 7.6, wallH: 2.6, ry: 0.07, chimney: true }),
+    ...FieldHouse("FieldHouseB", 30.6, 15.2, { depth: 4.6, width: 6.4, wallH: 2.4, ry: 1.44 }),
+    ...FieldHouse("FieldHouseC", 26.4, 21.4, { depth: 4.2, width: 5.6, wallH: 2.3, ry: -0.19, roofColor: 0x655c50 }),
+    ...FieldHouse("FieldHouseD", 35.8, 3.4, { depth: 5.2, width: 8.2, wallH: 2.8, ry: 0.21, brick: true, chimney: true }),
+    ...FieldHouse("FieldHouseE", 38.2, 18.0, { depth: 4.4, width: 6.0, wallH: 2.4, ry: 1.27 }),
+    ...FieldHouse("FieldHouseF", 33.2, 27.0, { depth: 4.0, width: 5.2, wallH: 2.2, ry: -0.32, roofColor: 0x6a6154 }),
+    ...FieldHouse("FieldHouseG", 45.6, -6.2, { depth: 4.6, width: 6.2, wallH: 2.4, ry: 0.44 }),
+    ...FieldHouse("FieldHouseH", 47.4, 27.6, { depth: 4.0, width: 5.4, wallH: 2.3, ry: -0.56 }),
+    ...FieldHouse("FieldHouseI", 22.4, -15.0, { depth: 3.6, width: 4.6, wallH: 2.1, ry: 0.31, roofColor: 0x6d6455 }),
+    // 远处第二个村子（x 64—78）：只给轮廓，雾会吃掉一半
+    ...FieldHouse("FieldHouseJ", 66.0, -30.0, { depth: 5.0, width: 7.0, wallH: 2.6, ry: 0.16 }),
+    ...FieldHouse("FieldHouseK", 71.6, -22.2, { depth: 4.4, width: 6.0, wallH: 2.4, ry: 1.36 }),
+    ...FieldHouse("FieldHouseL", 76.2, -31.6, { depth: 4.0, width: 5.4, wallH: 2.3, ry: -0.26 }),
+    // 更远的两间：给地平线上留一点人烟，不让远景只剩一条土色
+    ...FieldHouse("FieldHouseM", 98.0, 40.0, { depth: 4.6, width: 6.4, wallH: 2.5, ry: 0.52 }),
+    ...FieldHouse("FieldHouseN", 105.5, 47.5, { depth: 4.2, width: 5.6, wallH: 2.3, ry: -0.21 }),
+  );
+
+  // ── 院墙与篱笆：把散着的房子箍成院子，村落才有边界 ────────────────────────
+  props.push(
+    // 院墙从月台望过去正好侧着看：一整段 16.5 m 的墙会在地平线上拉出一条又长又直的
+    // 暗线（t=97 实拍像一道栅栏）。断成两截、中间让出一个 2 m 的院门口。
+    FieldWall("FieldYardA0", 24.3, 2.0, 24.5, 9.4, { height: 1.85 }),
+    FieldWall("FieldYardA0b", 24.5, 11.4, 24.6, 18.5, { height: 1.7 }),
+    FieldWall("FieldYardA1", 24.3, 2.0, 31.5, 0.8, { height: 1.75 }),
+    FieldWall("FieldYardA2", 24.6, 18.5, 29.4, 19.4, { height: 1.6 }),
+    FieldWall("FieldYardB0", 40.6, -1.5, 41.0, 8.6, { height: 1.9, mat: "BrickWall", color: 0x8b7e6d }),
+    FieldWall("FieldYardB1", 33.0, -1.8, 40.6, -1.5, { height: 1.8, mat: "BrickWall", color: 0x8b7e6d }),
+    FieldWall("FieldYardC0", 35.4, 24.0, 43.0, 25.2, { height: 1.5, color: 0x8a7c69 }),
+    FieldWall("FieldYardD0", 63.0, -35.0, 74.0, -34.0, { height: 1.7 }),
+    FieldWall("FieldFence0", 28.0, 31.0, 35.4, 32.4, { height: 1.15, thick: 0.22, mat: "WattleFence", color: 0x9c8963 }),
+    FieldWall("FieldFence1", 20.6, 22.0, 24.4, 23.4, { height: 1.05, thick: 0.20, mat: "WattleFence", color: 0x998760 }),
+  );
+
+  // ── 生活痕迹：柴垛、井台、打谷场、石碾、坟包 ─────────────────────────────
+  props.push(
+    ...FieldStack("FieldStackA", 29.4, 10.2, 1.35),
+    ...FieldStack("FieldStackB", 33.6, 22.0, 1.15),
+    ...FieldStack("FieldStackC", 43.6, 5.0, 1.25),
+    ...FieldStack("FieldStackD", 68.8, -26.0, 1.30),
+    ...FieldStack("FieldStackE", 22.6, -11.0, 1.05),
+  );
+  const wellY = FieldY(31.4, 9.0);
+  props.push(
+    { kind: "cyl", size: [0.82, 0.62], pos: [31.4, wellY + 0.24, 9.0], mat: "Stone", color: 0x8b8171, roughness: 0.99, castShadow: false, name: "FieldWellRing" },
+    ...[-0.78, 0.78].map((dz, i) => ({
+      kind: "box", size: [0.14, 2.10, 0.14], pos: [31.4, wellY + 1.05, 9.0 + dz],
+      mat: "WoodBeam", color: 0x4d4133, roughness: 0.98, castShadow: false, name: `FieldWellPost${i}`,
+    })),
+    { kind: "box", size: [0.16, 0.16, 1.90], pos: [31.4, wellY + 2.02, 9.0], mat: "WoodBeam", color: 0x4d4133, roughness: 0.98, castShadow: false, name: "FieldWellBeam" },
+    // 打谷场：一块碾平的空地 + 一只石碾
+    FieldPlot("FieldThreshingFloor", 37.0, 11.4, 11, 10, 0xb3a68a, "Ground"),
+    { kind: "cyl", size: [0.55, 1.05], pos: [37.6, FieldY(37.6, 11.0) + 0.5, 11.0], rx: Math.PI / 2, mat: "Stone", color: 0x9a9080, roughness: 0.99, castShadow: false, name: "FieldStoneRoller" },
+  );
+  [[24.8, -34.0, 1.15], [26.6, -37.5, 0.95], [56.0, 22.0, 1.05]].forEach(([x, z, r], i) => props.push({
+    kind: "cyl", size: [r, 0.85], pos: [x, FieldY(x, z) + 0.28, z], mat: "Ground", color: 0x8a7f69,
+    roughness: 0.99, castShadow: false, name: `FieldGraveMound${i}`,
+  }));
+
+  // ── 秃树：路边一行、村口一丛、远处两点 ──────────────────────────────────
+  // 上一轮把路边树排在 x≈18（离下车点只有 12 m）、高 7.4—8.6 m：出图里两棵黑棍
+  // 顶到画顶，像插在月台边的电线杆。现在退到 x 22—26 并压到 5.6—7.2 m，
+  // 高个子只留给三十米外的那几棵。
+  [
+    ["FieldRoadTree0", 22.6, -33.0, 6.4, 0.4, 5, true], ["FieldRoadTree1", 23.2, -13.0, 6.9, 1.9, 5, true],
+    ["FieldRoadTree2", 22.9, 5.5, 5.8, 3.4, 5, true], ["FieldRoadTree3", 23.4, 25.0, 6.6, 5.0, 5, true],
+    ["FieldRoadTree4", 24.0, 45.0, 6.2, 2.4, 5, true], ["FieldRoadTree5", 23.1, 63.0, 6.8, 0.9, 4, true],
+    ["FieldVillageTree0", 28.6, 12.6, 7.4, 1.2, 5, true], ["FieldVillageTree1", 34.4, 7.4, 6.8, 4.2, 5, true],
+    ["FieldVillageTree2", 42.4, 21.0, 7.2, 2.7, 5, true], ["FieldVillageTree3", 30.6, 30.6, 6.4, 5.6, 4, true],
+    ["FieldFarTree0", 60.0, -18.0, 8.0, 1.6, 4, true], ["FieldFarTree1", 64.5, -36.0, 7.4, 3.9, 4, false],
+    ["FieldFarTree2", 79.0, 12.0, 8.6, 0.6, 3, false], ["FieldFarTree3", 92.0, -22.0, 7.8, 2.9, 3, false],
+    ["FieldFarTree4", 101.0, 34.0, 8.2, 4.6, 3, false],
+  ].forEach(([name, x, z, h, spin, branches, twigs]) => props.push(...FieldTree(name, x, z, h, spin, branches, twigs)));
+
+  return props;
+}
 
 const CHUCHUAN_PEOPLE = {
   youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
@@ -1069,16 +1749,12 @@ export const CS_Chuchuan = {
     // 宽得像现代地铁的空大厅。中央净过道约 2.4 m，长凳只占靠窗一带。
     { kind: "box", size: [5.6, 0.18, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
     { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", color: 0x8a8377, roughness: 0.91, metalness: 0.34, name: "CarriageCeiling", inside: true },
-    // 军运车不是整面玻璃幕墙：下半木板 + 上半钢板，中间留一条窄窗带。
-    // 窗带高度是本场最要紧的四个数（见文件头 CHUCHUAN_WINDOW_LOW/HIGH）：
-    // 0.90—2.55，坐姿眼高 1.36 比窗台高 0.46 m，人是**往下看**出去的，
-    // 土堤、电杆、田野才进得了画；旧版 1.28—2.82 让视线贴着窗台走，只看得见天。
-    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 17.8], pos: [-2.8, CHUCHUAN_WINDOW_LOW / 2, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
-    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 13.35], pos: [2.8, CHUCHUAN_WINDOW_LOW / 2, -2.23], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowRear", inside: true },
-    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 1.90], pos: [2.8, CHUCHUAN_WINDOW_LOW / 2, 7.95], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowFront", inside: true },
-    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 17.8], pos: [-2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, 0], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallLeftWindowHigh", inside: true },
-    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 13.35], pos: [2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, -2.23], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallRightWindowHighRear", inside: true },
-    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 1.90], pos: [2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, 7.95], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallRightWindowHighFront", inside: true },
+    // 两侧车壁：下墙板 + 上墙板 + 窗间实墙墩 + 离散小窗的木框、钢角与油布帘，
+    // 全部由 CarriageSideWall 按同一组常量生成（见文件头「车窗」一节）。
+    // 军运车不是整面玻璃幕墙，也不是一条通长窗带：净宽 0.72、净高 0.90 的窗洞
+    // 之间隔着 1.2 m 实墙，窗心节距 1.925 m ＝ 半个凳段，整列锚在玩家座位 z=3.42。
+    ...CarriageSideWall(-1, "Left"),
+    ...CarriageSideWall(1, "Right"),
     { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageBenchWood", color: 0x9c8f76, roughness: 0.95, name: "RearWall", inside: true },
     { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, 8.9], mat: "CarriageBenchWood", color: 0x9c8f76, roughness: 0.95, name: "FrontWall", inside: true },
     // ── 车厢内的光 ─────────────────────────────────────────────────────────
@@ -1088,17 +1764,23 @@ export const CS_Chuchuan = {
     //     只剩 sRGB 40 上下，等于没开。抬到 7.5 / 11 / 1.15。
     //   · 六盏「窗口天光」冷色补光挂在窗带内侧（x=±2.18、y=2.05），模拟从窗洞
     //     漫进来的天光：它们才是车厢里读得出军装色与木纹的原因。
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampRear" },
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampMid" },
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampFront" },
-    ...[[-1, -6.0], [-1, -0.6], [-1, 4.8], [1, -6.0], [1, -0.6], [1, 3.4]].map(([side, z], index) => ({
-      // 行李架托铁：本体贴在窗头**以上**的钢板上（挂在窗洞里会在亮窗上留一颗黑点，
-      // 上一轮出图 t=20 左窗中间那块小黑方就是它），真正的作用是挂一盏窗口天光。
-      kind: "box", size: [0.07, 0.09, 0.16], pos: [side * 2.30, CHUCHUAN_WINDOW_HIGH + 0.18, z],
-      mat: "Steel", color: 0x4a4740,
-      light: { color: 0xb4c9e0, intensity: 11.0, distance: 9.5, decay: 1.10, offsetY: -0.55 },
-      name: `WindowDaylight${side < 0 ? "L" : "R"}${index}`,
-    })),
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 10.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampRear" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 10.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampMid" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 10.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampFront" },
+    ...[[-1, CHUCHUAN_WINDOW_LIGHT_LEFT], [1, CHUCHUAN_WINDOW_LIGHT_RIGHT]].flatMap(([side, list]) =>
+      list.map((z, index) => ({
+        // 行李架下的一根拉杆，真正的作用是挂一盏「窗口天光」冷色补光。
+        // ★ 位置比强度还要紧：decay 1.1 的点光在 0.4 m 处的辐照度是 2 m 处的六倍。
+        //   贴在墙板上（x=±2.30、灯心落到窗心 1.50）时，门框、墙墩、窗框这些
+        //   离灯 0.3—0.8 m 的面全部**烧成惨白**——t=20 yaw+2.09 的门框整片过曝，
+        //   连 0x37 的深灰门板都渲成浅灰（用纯品红/纯绿逐件取证过）。
+        //   现在把灯挪到过道一侧、抬到行李架下（x=±2.02、y=2.33）：离最近的墙面
+        //   1.1 m 以上，同一档强度不再烧任何一个面，中距离的漫射反而更匀。
+        kind: "box", size: [0.09, 0.07, 0.14], pos: [side * 2.02, 2.58, z],
+        mat: "WoodBeam", color: 0x6b6459, roughness: 0.9,
+        light: { color: 0xb4c9e0, intensity: 8.5, distance: 10.5, decay: 1.15, offsetY: -0.25 },
+        name: `WindowDaylight${side < 0 ? "L" : "R"}${index}`,
+      }))),
     // ── 端墙上的东西 ───────────────────────────────────────────────────────
     // 镜 6 整整 22 秒对着车厢末端，端墙不能是一块什么都没有的板子。
     // 顺带记一笔：这两面墙原来用 CarriageWallSteel，实测渲成**纯黑**（射线取证
@@ -1125,38 +1807,8 @@ export const CS_Chuchuan = {
     })),
     // 一眼看出「这是车厢」的重复门框与顶梁；不靠文字或镜头解释空间。
     ...[-6.2, -3.4, -0.6, 2.2, 5.0, 7.3].map((z, index) => ({ kind: "box", size: [5.35, 0.16, 0.16], pos: [0, 3.68, z], mat: "CarriageBenchWood", color: 0x8f887a, name: `RoofRib${index}` })),
-    { kind: "box", size: [0.22, 0.13, 17.6], pos: [-2.70, CHUCHUAN_WINDOW_LOW - 0.03, 0], mat: "Steel", color: 0x5b574f, name: "WindowSillLeft" },
-    { kind: "box", size: [0.22, 0.13, 13.25], pos: [2.70, CHUCHUAN_WINDOW_LOW - 0.03, -2.28], mat: "Steel", color: 0x5b574f, name: "WindowSillRightRear" },
-    { kind: "box", size: [0.22, 0.13, 1.75], pos: [2.70, CHUCHUAN_WINDOW_LOW - 0.03, 8.02], mat: "Steel", color: 0x5b574f, name: "WindowSillRightFront" },
-    // 窗帘重做。旧版每格一块 1.34×0.98 的深色板（ClothNra 0x3e3c35 / 木色 0x463a2d），
-    // 1.45 m 的窗格被挡掉 68%，出图里读成一排黑板子，小站段整幅画几乎全黑。
-    // 现在是：油布帘**卷到窗头**只剩一卷（0.34 高，占窗高 20%），木百叶**收到窗格边**
-    // 只剩一叶（0.30 宽，占窗格 21%），颜色也从近黑抬到能读出布纹/木纹的中调。
-    // 右侧 z∈[0.7, 3.6] 一段（小站段镜 4 的视轴）**一件都不挂**，站台那边留连续净视野。
-    ...[-7.2, -5.75, -4.3, -2.85, -1.4, 0.05, 1.5, 2.95, 4.4, 5.85, 7.2].flatMap((z, index) => {
-      const even = index % 2 === 0;
-      const Dress = (side, tag) => {
-        const x = side * 2.69;
-        return even
-          ? { kind: "cyl", size: [0.10, 0.94], pos: [x, CHUCHUAN_WINDOW_HIGH - 0.16, z + side * 0.20], rx: Math.PI / 2, mat: "ClothNra", color: 0xa2977a, roughness: 1, name: `WindowShade${tag}${index}` }
-          : { kind: "box", size: [0.06, CHUCHUAN_WINDOW_SPAN - 0.10, 0.30], pos: [x, CHUCHUAN_WINDOW_MID, z - side * 0.56], mat: "CarriageBenchWood", color: 0x7a6244, name: `WindowShutter${tag}${index}` };
-      };
-      const left = [
-        { kind: "box", size: [0.12, CHUCHUAN_WINDOW_SPAN + 0.10, 0.12], pos: [-2.66, CHUCHUAN_WINDOW_MID, z], mat: "Steel", color: 0x53514c, name: `WindowMullionLeft${index}` },
-        Dress(-1, "Left"),
-      ];
-      // 正式侧门占掉右侧三格；这些窗框、卷帘和百叶不能再浮在门洞中间。
-      if (z >= 4.35 && z <= 7.25) return left;
-      const right = [
-        { kind: "box", size: [0.12, CHUCHUAN_WINDOW_SPAN + 0.10, 0.12], pos: [2.66, CHUCHUAN_WINDOW_MID, z], mat: "Steel", color: 0x53514c, name: `WindowMullionRight${index}` },
-      ];
-      // 小站段（镜 4 看 (3.8,1.52,2.6)）正对的两格：只留竖框，帘和百叶都不挂。
-      if (!(z > 0.6 && z < 3.6)) right.push(Dress(1, "Right"));
-      return [...left, ...right];
-    }),
-    { kind: "box", size: [0.18, 0.12, 13.25], pos: [2.70, CHUCHUAN_WINDOW_HIGH + 0.06, -2.28], mat: "Steel", color: 0x64615a, name: "WindowFrameRightTopRear" },
-    { kind: "box", size: [0.18, 0.12, 1.75], pos: [2.70, CHUCHUAN_WINDOW_HIGH + 0.06, 8.02], mat: "Steel", color: 0x64615a, name: "WindowFrameRightTopFront" },
-    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, CHUCHUAN_WINDOW_HIGH + 0.06, 0], mat: "Steel", color: 0x64615a, name: "WindowFrameLeftTop" },
+    // 窗台、过梁、立框、四角钢件、卷帘全部随窗生成（见 CarriageSideWall）——
+    // 旧版那三条通长窗台 + 一排 mat:"Steel" 细竖框已经随玻璃带一起拆掉。
     // 漏雨和煤烟留下的不规则补漆/锈蚀；每一块都很小，避免把内壁刷成舞台布景，
     // 但跨过走道时能明确看出这节车并不新，也并不干净。
     ...[-6.65, -4.75, -2.25, 0.65, 3.15, 5.75].flatMap((z, index) => [
@@ -1210,40 +1862,45 @@ export const CS_Chuchuan = {
     // 车门在靠站台的右侧，不在车厢端墙。门板、木条、门闩共用同一条 +Z 滑轨。
     // 门板、门框、门槛、踏板一律不用 mat:"Steel"：库里的 Steel 金属度接近 1，
     // 而 _MakeProp 不转 metalness，金属没有漫反射 —— 从月台那一侧（背光面）看，
-    // 整扇门是一块纯黑（t=100 yaw−2.09 取证）。改成灰泥板面，读作刷过漆的铁门。
-    { kind: "box", size: [0.12, 2.6, 2.2], pos: [2.75, 1.65, CHUCHUAN_SIDE_DOOR_Z], color: 0x6f6a60, name: "CarriageDoor" },
+    // 整扇门是一块纯黑（t=100 yaw−2.09 取证）。走无贴图平涂，读作刷过漆的铁门。
+    // **色号要按平涂的口径给**：无贴图的面在这套光照下比带贴图的面亮一倍，
+    // 旧值 0x6f6a60/0x615d55 在 t=20 yaw+2.09 里是一整块惨白的板（比木壁还亮）。
+    // 一律压到 0x33—0x40 这一档，落到画面里才是中灰的铁门。
+    { kind: "box", size: [0.12, 2.6, 2.2], pos: [2.75, 1.65, CHUCHUAN_SIDE_DOOR_Z], color: 0x37342f, roughness: 0.9, name: "CarriageDoor" },
     // 滑门的横向旧木条、门闩和补片压在钢门上；远看先读到“装过人和物的军运车”，
     // 近看能看出门曾被拆修，而不是一块没有信息的纯黑矩形。
     ...[-0.86, -0.43, 0, 0.43, 0.86].map((y, index) => ({ kind: "box", size: [0.05, 0.12, 1.98], pos: [2.67, 1.65 + y, CHUCHUAN_SIDE_DOOR_Z], mat: "CarriageBenchWood", color: index % 2 ? 0x7a6448 : 0x87714f, name: `DoorPlank${index}` })),
     { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z - 0.78], mat: "Steel", color: 0x504b43, name: "DoorBraceLeft" },
     { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z + 0.78], mat: "Steel", color: 0x504b43, name: "DoorBraceRight" },
     { kind: "box", size: [0.12, 0.10, 0.72], pos: [2.60, 1.62, CHUCHUAN_SIDE_DOOR_Z + 0.15], mat: "Steel", color: 0x413d37, name: "DoorLatch" },
-    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 4.48], color: 0x615d55, name: "SideDoorFrameRear" },
-    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 6.92], color: 0x615d55, name: "SideDoorFrameFront" },
-    { kind: "box", size: [0.22, 0.18, 2.60], pos: [2.70, 3.06, CHUCHUAN_SIDE_DOOR_Z], color: 0x615d55, name: "SideDoorFrameTop" },
-    { kind: "box", size: [0.40, 0.12, 2.20], pos: [2.86, 0.09, CHUCHUAN_SIDE_DOOR_Z], color: 0x615d55, name: "SideDoorThreshold" },
+    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 4.48], color: 0x33302b, roughness: 0.9, name: "SideDoorFrameRear" },
+    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 6.92], color: 0x33302b, roughness: 0.9, name: "SideDoorFrameFront" },
+    { kind: "box", size: [0.22, 0.18, 2.60], pos: [2.70, 3.06, CHUCHUAN_SIDE_DOOR_Z], color: 0x33302b, roughness: 0.9, name: "SideDoorFrameTop" },
+    { kind: "box", size: [0.40, 0.12, 2.20], pos: [2.86, 0.09, CHUCHUAN_SIDE_DOOR_Z], color: 0x33302b, roughness: 0.9, name: "SideDoorThreshold" },
     // 两级固定踏板把车地板接到石基月台，镜头和演员都真正踩完这段高差。
-    { kind: "box", size: [1.25, 0.12, 1.75], pos: [3.48, 0.18, CHUCHUAN_SIDE_DOOR_Z], color: 0x74705f, name: "SideDoorStepInner" },
-    { kind: "box", size: [0.72, 0.12, 1.75], pos: [4.30, 0.42, CHUCHUAN_SIDE_DOOR_Z], color: 0x74705f, name: "SideDoorStepOuter" },
+    { kind: "box", size: [1.25, 0.12, 1.75], pos: [3.48, 0.18, CHUCHUAN_SIDE_DOOR_Z], color: 0x403c34, roughness: 0.9, name: "SideDoorStepInner" },
+    { kind: "box", size: [0.72, 0.12, 1.75], pos: [4.30, 0.42, CHUCHUAN_SIDE_DOOR_Z], color: 0x403c34, roughness: 0.9, name: "SideDoorStepOuter" },
+    // ── 车厢外壳 ───────────────────────────────────────────────────────────
+    // 内壁全是 inside:true（BackSide），站到月台上回望**整节车是透明的**：
+    // 上一轮 t=103 yaw−2.09 那张图里只剩一排悬空的长凳和坐着的人。外壳补的就是它。
+    // 外皮离内壁 0.04 m、窗洞比内壁的窗洞四周各放 0.09—0.10 m，castShadow 一律 false
+    // （见 CarriageShellSide 的注：一投影就把 56° 太阳下的月台沿整片压黑）。
+    ...CarriageShellSide(-1, "Left"),
+    ...CarriageShellSide(1, "Right"),
+    ...CarriageShellFrame(),
+    ...CarriageShellDoor(),
     // 车与月台之间的道砟：只铺车下到月台石基那一条，宽 7 m、长 64 m。
     // 旧版是 32×32 一大块，边缘正好落在下车视野里；月台以外的地面交给
     // WindowLandscape 的 SRTM 实体网格（它从 x=4 一直铺到 2500 m）。
     { kind: "box", size: [7.0, 0.12, 64], pos: [3.6, -0.07, 6], mat: "GroundRubble", color: 0x574f45, name: "OutsideBallast" },
-    // 门外远景景片：换成真的有内容的一张 —— Texture_CarriageShandongLandscapePlate.png
-    // （鲁南冬末的秃杨、电杆、石头房、远丘，本来就为这一场画的）。原来写的
-    // mat:"CarriageLandscape" 在材质库里根本不存在，Get() 抛错后静默退回
-    // 0x8a8274 的无贴图米白，出图里门外就是一片白虚空。走 spec.texture 通道，
-    // 不经材质库，所以不会再静默退化。
-    // 三面围合：正面 26 m 外，两侧把 head-look 的余角封死；景片底边压到地平线以下。
-    // castShadow:false 是硬要求：24 m 高的景片在 56° 太阳下会往 +x+z 投出十六米长的
-    // 影子，侧景片正好把正面景片的一段刷成一块无光的深蓝板（t=48 那块「深蓝虚空」
-    // 射线取证就是它）。景片是画的，不该投影也不该收影。
-    { kind: "backdrop", size: [46, 24.0], pos: [34, 10.4, CHUCHUAN_SIDE_DOOR_Z], ry: -Math.PI / 2, texture: "./Texture/Texture_CarriageShandongLandscapePlate.png", doubleSided: true, roughness: 1, castShadow: false, receiveShadow: false, name: "DoorOutsideBackdrop" },
-    // 两侧景片删掉了：doubleSided 的贴片，可见面的法线永远朝着相机，所以只有
-    // 「太阳在相机背后」时才受光。正面景片（法线 −x、太阳也在 −x）成立，
-    // 两块侧景片（法线 ±z、太阳在 −z）必然背光 —— 出图里就是两块深蓝死板
-    // (t=20 yaw±2.09 各撞到一块)。侧向的封闭交给 FarTerrain 那张 SRTM 实体网格
-    //（x 4—2500 m、z ±910 m）与天空穹，它们是真几何，从哪个角度看都成立。
+    // ★ 门外**没有任何景片**。这里原来钉着 DoorOutsideBackdrop（46×24 m 的照片板，
+    //   钉在 x=34）：下车后整个门外就是那张照片，底边一条硬切的地平线、走两步没有
+    //   任何视差、抬头是一堵二十四米高的「村子」。整块删掉，换成 DoorOutsideField()
+    //   的实体村落、田块、土路、柴垛与秃树行（x 17.5—115 m，全部按 FieldY 落到真
+    //   地面上）；再远交给 FarTerrainRight 那张 SRTM 实体网格（x 4—2500 m、
+    //   z ±910 m）与雾。侧向的封闭同样由这张网格与天空穹负责 —— 都是真几何，
+    //   从哪个角度看都成立，下车后走那几步是真的会有视差的。
+    ...DoorOutsideField(),
     // 站在月台上抬头能看见的电报线终点：一根落在月台北端的木杆，
     // 让窗外那三根电线有个收头，不再在半空断掉。
     { kind: "box", size: [0.16, 4.60, 0.16], pos: [4.05, 2.30, 26.0], mat: "WoodBeam", color: 0x3b3026, noFog: true, name: "PlatformPole" },
