@@ -84,9 +84,9 @@ function DustBlend(hex, amount, dust = 0x8A8076) {
 
 const MATERIAL_MAP = {
   // 城墙一套
-  CityBrick: { recipe: "BrickWall", color: 0xdde4ee, roughness: 1.0 },
-  CityBrickWorn: { recipe: "BrickWallSooty", color: 0xe6eaf0 },
-  CityBrickPatch: { recipe: "BrickWallSooty", color: 0xcad0d8, roughness: 1.0 },
+  CityBrick: { recipe: "CityWallBrickPbr", color: 0xf4f7fb, roughness: 1.0 },
+  CityBrickWorn: { recipe: "CityWallBrickPbr", color: 0xe7eaee, roughness: 1.0 },
+  CityBrickPatch: { recipe: "CityWallBrickPbr", color: 0xd8dce1, roughness: 1.0 },
   // 城门是玩家会从内外两面近看的四个主地标，单独吃 imagegen PBR：手工大青砖、
   // 褪色木构和筒瓦的尺度都比全城合批底材更大。GateBrickWorn 复用同图压暗，
   // 供券脸与局部修补保持砖缝连续而不另增采样器。
@@ -95,9 +95,9 @@ const MATERIAL_MAP = {
   GatePaintRed: { recipe: "GatePaintedWood", color: 0xb76f62, roughness: 1.0, normalScale: 0.72 },
   GatePaintGreen: { recipe: "GatePaintedWood", color: 0x769083, roughness: 1.0, normalScale: 0.72 },
   GateRoofTile: { recipe: "GateRoofTile", color: 0xc7cdd2, roughness: 1.0, normalScale: 0.88 },
-  Ashlar: { recipe: "Stone", color: 0xf4f6ff },
-  WallPaving: { recipe: "Stone", color: 0xd4d8df, roughness: 1.0 },
-  RammedEarth: { recipe: "Adobe", color: 0xf0dcb4 },
+  Ashlar: { recipe: "CityWallStonePbr", color: 0xf6f8fc, roughness: 1.0 },
+  WallPaving: { recipe: "CityWallStonePbr", color: 0xd6dbe2, roughness: 1.0 },
+  RammedEarth: { recipe: "CityWallCorePbr", color: 0xe8cfaa, roughness: 1.0 },
   ZhaiEarth: { recipe: "Adobe", color: 0xe8d8ae },
   // 民居一套（鲁南：青砖 + 淡色过墙石交织，平原段大量土坯 + 麦秸泥）
   BrickWall: { recipe: "BrickWall", color: 0xe8ecf2 },

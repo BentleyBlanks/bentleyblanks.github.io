@@ -90,6 +90,14 @@ const GAME_SHOTS = [
     setup: { x: 350, z: 15, yaw: Math.PI / 2, pitch: 0.12, quiet: true } },
   { name: "Game_Z19_SouthWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 285, z: 350, yaw: 0, pitch: 0.12, quiet: true } },
+  // 完整墙段的两张材质/建模近景：一张锁补砖与灰青砖 PBR，一张锁石框泄水嘴、
+  // 压顶和勒脚，防止后续优化只顾缺口、把其余 2.4 km 墙身退回光滑灰盒。
+  { name: "Game_Z20_SouthWallRepairPbr", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower", hideMenu: true,
+      cam: { from: [-214, 6.2, 330], look: [-214, 4.2, 308], focalMm: 65 } } },
+  { name: "Game_Z21_SouthWallDrainPbr", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower", hideMenu: true,
+      cam: { from: [-116, 8.7, 331], look: [-116, 8.7, 308], focalMm: 70 } } },
   // ——批次A 之后的四个视觉盲区补口（旧机位没有一张能看到中城师部/北城功能区/庙街/南城）——
   // 中城师部：当典后街上看 124 师部门脸（门楼+番号木牌+沙袋哨位+旗）。
   { name: "Game_Z11_DivisionHq", query: "shot=1&phase=5&quality=high&scale=medium",
@@ -168,6 +176,7 @@ async function Shoot(pageName, url, globalName, setup = null) {
           shot.lookTo = pose.cam.lookTo || pose.cam.look;
           if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
           game.menu.ApplyShot(0);
+          if (pose.hideMenu) document.getElementById("menu").style.display = "none";
           game.StepFrames(12);
           return;
         }

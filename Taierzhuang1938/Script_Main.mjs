@@ -429,6 +429,21 @@ async function Boot() {
         normal: "./Texture/Texture_BrickWallNormal.webp?v=1",
         orm: "./Texture/Texture_BrickWallOrm.webp?v=1",
       }),
+      library.LoadExternalSet("CityWallBrickPbr", {
+        albedo: "./Texture/Texture_CityWallBrickBase.webp?v=1",
+        normal: "./Texture/Texture_CityWallBrickNormal.webp?v=1",
+        orm: "./Texture/Texture_CityWallBrickOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("CityWallCorePbr", {
+        albedo: "./Texture/Texture_CityWallCoreBase.webp?v=1",
+        normal: "./Texture/Texture_CityWallCoreNormal.webp?v=1",
+        orm: "./Texture/Texture_CityWallCoreOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("CityWallStonePbr", {
+        albedo: "./Texture/Texture_CityWallStoneBase.webp?v=1",
+        normal: "./Texture/Texture_CityWallStoneNormal.webp?v=1",
+        orm: "./Texture/Texture_CityWallStoneOrm.webp?v=1",
+      }),
       library.LoadExternalSet("Ground", {
         albedo: "./Texture/Texture_GroundBase.webp?v=1",
         normal: "./Texture/Texture_GroundNormal.webp?v=1",

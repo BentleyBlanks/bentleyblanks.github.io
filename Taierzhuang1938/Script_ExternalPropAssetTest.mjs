@@ -27,6 +27,7 @@ function InspectNodes(fileName, maxBytes) {
     let triangles = 0;
     let minY = Infinity;
     let maxSpan = 0;
+    let hasUv = true;
     for (const primitive of mesh.primitives) {
       const positions = json.accessors[primitive.attributes.POSITION];
       const indexCount = primitive.indices == null
@@ -34,8 +35,9 @@ function InspectNodes(fileName, maxBytes) {
       triangles += indexCount / 3;
       minY = Math.min(minY, positions.min[1]);
       maxSpan = Math.max(maxSpan, ...positions.max.map((value, axis) => value - positions.min[axis]));
+      hasUv = hasUv && primitive.attributes.TEXCOORD_0 != null;
     }
-    result.set(node.name, { triangles, minY, maxSpan });
+    result.set(node.name, { triangles, minY, maxSpan, hasUv });
   }
   return { bytes: bytes.length, nodes: result };
 }
@@ -80,23 +82,50 @@ for (const [name, spec] of battlefield.nodes) {
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
 
-const breach = InspectNodes("Model_CityWallBreachPack.glb", 650_000);
+const breach = InspectNodes("Model_CityWallBreachPack.glb", 900_000);
 for (const name of ["CityWallBreachShoulderLeft", "CityWallBreachShoulderRight"]) {
   const spec = breach.nodes.get(name);
   assert.ok(spec, `${name} node exists`);
-  assert.ok(spec.triangles <= 220, `${name} triangle budget`);
+  assert.ok(spec.triangles <= 1400, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
   assert.ok(spec.maxSpan > 10.7 && spec.maxSpan < 11.1, `${name} matches the 11.5 m wall scale`);
+  assert.ok(spec.hasUv, `${name} exposes UVs for authored wall PBR`);
 }
 const breachFan = breach.nodes.get("CityWallBreachDebrisFan");
-assert.ok(breachFan && breachFan.triangles <= 4200, "breach rubble fan triangle budget");
+assert.ok(breachFan && breachFan.triangles <= 5700, "breach rubble fan triangle budget");
 assert.equal(breachFan.minY, 0, "breach rubble fan is ground-ready");
 assert.ok(breachFan.maxSpan > 17 && breachFan.maxSpan < 18.5,
   "breach rubble fan spans both wall faces without becoming a whole battlefield");
 for (const name of ["CityWallBreachBrickCluster01", "CityWallBreachBrickCluster02"]) {
   const spec = breach.nodes.get(name);
-  assert.ok(spec && spec.triangles <= 1000, `${name} triangle budget`);
+  assert.ok(spec && spec.triangles <= 1400, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
+  assert.ok(spec.hasUv, `${name} exposes UVs for authored wall PBR`);
+}
+
+const wallDetail = InspectNodes("Model_CityWallDetailPack.glb", 525_000);
+const wallDetailNames = [
+  "CityWallRepairPatchLarge", "CityWallRepairPatchSmall", "CityWallDrainSpout",
+  "CityWallRootSpall", "CityWallCopingBrokenRun", "CityWallShellScar",
+  "CityWallCoreExposurePatch",
+];
+assert.deepEqual([...wallDetail.nodes.keys()], wallDetailNames,
+  "seven independently placeable intact-wall detail modules");
+for (const name of wallDetailNames) {
+  const spec = wallDetail.nodes.get(name);
+  assert.ok(spec.triangles <= 2800, `${name} triangle budget`);
+  assert.equal(spec.minY, 0, `${name} is offset-ready from wall base`);
+  assert.ok(spec.hasUv, `${name} exposes UVs for authored wall PBR`);
+}
+
+for (const material of ["Brick", "Core", "Stone"]) {
+  for (const channel of ["Base", "Normal", "Orm"]) {
+    const fileName = `Texture_CityWall${material}${channel}.webp`;
+    const bytes = fs.readFileSync(path.join(root, "Texture", fileName));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", `${fileName}: RIFF header`);
+    assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP", `${fileName}: WebP payload`);
+    assert.ok(bytes.length > 50_000 && bytes.length < 550_000, `${fileName}: useful compressed size`);
+  }
 }
 for (const name of ["CityWallBreachCoping01", "CityWallBreachCoping02"]) {
   const spec = breach.nodes.get(name);
@@ -131,10 +160,21 @@ for (const id of [
   "cityWallBreachShoulderLeft", "cityWallBreachShoulderRight", "cityWallBreachDebrisFan",
   "cityWallBreachBrickCluster01", "cityWallBreachBrickCluster02",
   "cityWallBreachCoping01", "cityWallBreachCoping02",
+  ...wallDetailNames.map((name) => name[0].toLowerCase() + name.slice(1)),
 ]) assert.match(runtime, new RegExp(`\\b${id}\\b`), `${id} is registered in the component library`);
 assert.match(runtime, /cache\.set\(spec\.url, pending\)/, "shared GLBs cache by URL");
 assert.match(runtime, /if \(spec\.materialMap\)/, "multi-material packs rebind game recipes");
+assert.match(runtime, /placement\.yOffset \|\| 0/, "wall-mounted props preserve vertical offsets");
+
+const main = fs.readFileSync(path.join(root, "Script_Main.mjs"), "utf8");
+for (const material of ["Brick", "Core", "Stone"]) {
+  for (const channel of ["Base", "Normal", "Orm"]) {
+    assert.match(main, new RegExp(`Texture_CityWall${material}${channel}\\.webp`),
+      `runtime loads CityWall ${material} ${channel}`);
+  }
+}
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`
   + ` breach=${breach.bytes}`
+  + ` wallDetail=${wallDetail.bytes}`
   + ` handcart=${handcart.bytes} market=${market.bytes}`);

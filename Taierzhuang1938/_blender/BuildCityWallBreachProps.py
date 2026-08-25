@@ -48,6 +48,48 @@ def GroundMesh(obj):
     obj.data.update()
 
 
+def AddBox(name, size, location, material, collection, rotation=(0, 0, 0), bevel=0.03):
+    bpy.ops.mesh.primitive_cube_add(
+        location=location, scale=tuple(value * 0.5 for value in size))
+    obj = bpy.context.object
+    obj.name = name
+    Relink(obj, collection)
+    obj.rotation_euler = rotation
+    obj.data.materials.append(material)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if bevel > 0:
+        modifier = obj.modifiers.new("ChippedEdge", "BEVEL")
+        modifier.width = bevel
+        modifier.segments = 1
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+    return obj
+
+
+def JoinAsset(parts, name, role):
+    bpy.ops.object.select_all(action="DESELECT")
+    for part in parts:
+        part.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    root = parts[0]
+    root.name = name
+    root.data.name = name + "Mesh"
+    GroundMesh(root)
+    root["asset_role"] = role
+    return root
+
+
+def SmartUv(obj):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(58), island_margin=0.015)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
 def CreateShoulder(name, profile, collection, materials, mirror=False):
     depth = 7.6
     points = [(-x if mirror else x, z) for x, z in profile]
@@ -75,24 +117,51 @@ def CreateShoulder(name, profile, collection, materials, mirror=False):
     bevel = obj.modifiers.new("BrokenEdgeBevel", "BEVEL")
     bevel.width = 0.10
     bevel.segments = 1
-    obj["asset_role"] = "jagged exposed rammed-earth breach shoulder"
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=bevel.name)
+    parts = [obj]
 
-    sign = -1 if name.endswith("Left") else 1
+    # The opening-facing scarp is not a smooth slab: compacted-earth lifts run
+    # through the full wall depth and broken facing bricks remain as teeth on
+    # both skins.  These relief pieces are what make the 7.6 m thickness read.
+    sign = 1 if name.endswith("Left") else -1
+    lift_profile = [
+        (2.0, 3.62), (3.7, 3.26), (5.3, 2.62),
+        (6.9, 1.82), (8.3, 0.88), (9.45, 0.18),
+    ]
+    for index, (z, edge) in enumerate(lift_profile, 1):
+        parts.append(AddBox(f"{name}_EarthLift_{index:02d}",
+            (0.16, depth * 0.93, 0.12), (sign * edge, 0, z),
+            materials["RammedEarth"], collection,
+            rotation=(0, 0, sign * (0.02 if index % 2 else -0.018)), bevel=0.025))
+
+    randomizer = random.Random(19380317 + (0 if name.endswith("Left") else 1))
+    tooth_profile = [(1.25, 3.72), (2.35, 3.58), (3.55, 3.30), (4.65, 2.92),
+        (5.75, 2.42), (6.85, 1.86), (7.85, 1.18), (8.75, 0.54)]
+    for face in (-1, 1):
+        for index, (z, edge) in enumerate(tooth_profile, 1):
+            sx = randomizer.uniform(0.36, 0.62)
+            sy = randomizer.uniform(0.22, 0.38)
+            sz = randomizer.uniform(0.19, 0.31)
+            parts.append(AddBox(f"{name}_BrickTooth_{face:+d}_{index:02d}",
+                (sx, sy, sz),
+                (sign * (edge - randomizer.uniform(-0.08, 0.12)),
+                    face * (depth * 0.5 - sy * 0.48), z + randomizer.uniform(-0.12, 0.12)),
+                materials["CityBrickWorn"], collection,
+                rotation=(randomizer.uniform(-0.16, 0.16), randomizer.uniform(-0.10, 0.10),
+                    sign * randomizer.uniform(-0.22, 0.22)), bevel=0.035))
+
     stones = [
         (sign * 2.75, -3.25, 1.15, 0.80, 0.42, 0.18),
         (sign * 3.15, 2.95, 0.90, 0.70, 0.35, -0.11),
         (sign * 1.95, 3.30, 0.75, 0.65, 0.28, 0.27),
     ]
     for index, (x, y, size_x, size_y, size_z, yaw) in enumerate(stones, 1):
-        bpy.ops.mesh.primitive_cube_add(
-            location=(x, y, size_z / 2), scale=(size_x / 2, size_y / 2, size_z / 2))
-        stone = bpy.context.object
-        stone.name = f"{name}_Ashlar_{index:02d}"
-        Relink(stone, collection)
-        stone.data.materials.append(materials["Ashlar"])
-        stone.rotation_euler[2] = yaw
-        stone.parent = obj
-    return obj
+        parts.append(AddBox(f"{name}_Ashlar_{index:02d}",
+            (size_x, size_y, size_z), (x, y, size_z / 2), materials["Ashlar"], collection,
+            rotation=(0, 0, yaw), bevel=0.055))
+    return JoinAsset(parts, name,
+        "jagged breach shoulder with full-depth earth lifts and broken brick teeth")
 
 
 def CreateDebris(name, seed, width, depth, count, collection, materials,
@@ -167,6 +236,7 @@ def CreateCoping(name, length, collection, material):
 
 
 def Build():
+    original_meshes = set(bpy.data.meshes)
     old = bpy.data.collections.get(COLLECTION_NAME)
     if old:
         for obj in list(old.objects):
@@ -187,14 +257,18 @@ def Build():
     # The left shoulder has its low torn edge on +X, toward the opening.
     CreateShoulder("CityWallBreachShoulderLeft", profile, collection, materials, mirror=True)
     CreateShoulder("CityWallBreachShoulderRight", profile, collection, materials, mirror=False)
-    CreateDebris("CityWallBreachDebrisFan", 19380317, 16.0, 17.0, 92,
-        collection, materials, corridor=3.8, peak=1.8)
-    CreateDebris("CityWallBreachBrickCluster01", 1220317, 4.8, 3.6, 20,
+    CreateDebris("CityWallBreachDebrisFan", 19380317, 16.8, 17.4, 126,
+        collection, materials, corridor=4.0, peak=1.9)
+    CreateDebris("CityWallBreachBrickCluster01", 1220317, 5.2, 3.8, 28,
         collection, materials, peak=0.85)
-    CreateDebris("CityWallBreachBrickCluster02", 4100317, 5.4, 4.0, 22,
+    CreateDebris("CityWallBreachBrickCluster02", 4100317, 5.8, 4.2, 30,
         collection, materials, peak=1.0)
     CreateCoping("CityWallBreachCoping01", 3.4, collection, materials["Ashlar"])
     CreateCoping("CityWallBreachCoping02", 2.6, collection, materials["Ashlar"])
+
+    for obj in list(collection.objects):
+        if obj.type == "MESH":
+            SmartUv(obj)
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in collection.objects:
@@ -208,6 +282,9 @@ def Build():
     for obj in list(collection.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.data.collections.remove(collection)
+    for mesh in list(bpy.data.meshes):
+        if mesh not in original_meshes and mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
     for name, (material, created) in material_pairs.items():
         if created and material.users == 0:
             bpy.data.materials.remove(material)

@@ -478,6 +478,12 @@ export const RECIPES = {
   BrickWall: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 101, rowsPerTile: 20 }),
   BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
+  // 滕县城墙的三套 ImageGen PBR 在启动时覆盖这些同步兜底。独立命名避免把
+  // 民居青砖、土坯房和普通院落条石一起换成军事城墙尺度的纹理。
+  CityWallBrickPbr: (s) => BakeBrickWall((s ?? 512) * 2,
+    { seed: 181, rowsPerTile: 22, damage: 0.42, sootiness: 0.32 }),
+  CityWallCorePbr: (s) => BakeAdobe(s ?? 512, { seed: 229 }),
+  CityWallStonePbr: (s) => BakeStone(s ?? 512, { seed: 929 }),
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
   // 四座滕县城门的专属近景材质。外部 imagegen PBR 加载失败时仍用这些
   // 对齐尺度的程序化底材启动，不能让地标因为一张图 404 阻断整关。

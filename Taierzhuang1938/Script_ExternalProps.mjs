@@ -46,7 +46,8 @@ const LOADER = new GLTFLoader();
 
 const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=1";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
-const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=1";
+const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
+const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
 
 function BattlefieldAsset(label, node, material, tag = "prop", solid = true) {
   return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid };
@@ -103,6 +104,32 @@ const CITY_WALL_BREACH_ASSETS = Object.freeze({
     "城墙缺口 · 坠落压顶石 01", "CityWallBreachCoping01"),
   cityWallBreachCoping02: CityWallBreachAsset(
     "城墙缺口 · 坠落压顶石 02", "CityWallBreachCoping02"),
+});
+
+function CityWallDetailAsset(label, node) {
+  // 全部贴附在既有城墙碰撞面上，只增加近景轮廓与材质层次；登记盒体会在墙外
+  // 平白造出隐形台阶，也会让子弹在装饰层上提前命中。
+  return {
+    label, url: CITY_WALL_DETAIL_URL, node, materialMap: true,
+    tag: "wallDetail", solid: false,
+  };
+}
+
+const CITY_WALL_DETAIL_ASSETS = Object.freeze({
+  cityWallRepairPatchLarge: CityWallDetailAsset(
+    "城墙细节 · 大片补砖", "CityWallRepairPatchLarge"),
+  cityWallRepairPatchSmall: CityWallDetailAsset(
+    "城墙细节 · 小片补砖", "CityWallRepairPatchSmall"),
+  cityWallDrainSpout: CityWallDetailAsset(
+    "城墙细节 · 石框泄水嘴", "CityWallDrainSpout"),
+  cityWallRootSpall: CityWallDetailAsset(
+    "城墙细节 · 勒脚剥落", "CityWallRootSpall"),
+  cityWallCopingBrokenRun: CityWallDetailAsset(
+    "城墙细节 · 破损压顶", "CityWallCopingBrokenRun"),
+  cityWallShellScar: CityWallDetailAsset(
+    "城墙细节 · 炮弹着痕", "CityWallShellScar"),
+  cityWallCoreExposurePatch: CityWallDetailAsset(
+    "城墙细节 · 小面积露芯", "CityWallCoreExposurePatch"),
 });
 
 function MarketStorage(label, node, material = "WoodDoor") {
@@ -169,6 +196,7 @@ const ASSETS = Object.freeze({
   marketCrate04: MarketStorage("市场板条箱 04", "MarketCrate04"),
   ...BATTLEFIELD_ASSETS,
   ...CITY_WALL_BREACH_ASSETS,
+  ...CITY_WALL_DETAIL_ASSETS,
   ...PackAssets(HW_PACK, HW_ASSETS),
   ...PackAssets(RY_PACK, RY_ASSETS),
   ...PackAssets(CL_PACK, CL_ASSETS),
@@ -255,6 +283,37 @@ const PLACEMENTS = Object.freeze({
     { asset: "cityWallBreachBrickCluster02", x: 297.5, z: 298.0, ry: -0.74, scale: 0.94 },
     { asset: "cityWallBreachCoping01", x: 276.0, z: 297.8, ry: 0.34 },
     { asset: "cityWallBreachCoping02", x: 294.8, z: 312.2, ry: -0.48 },
+
+    // 完整墙段也要有真实建模层。四面墙各布一组补砖、泄水嘴、勒脚剥落、
+    // 破压顶与弹着疤；yOffset 从墙基起量，不把贴墙件错误吸到地面。
+    // 南墙（避开 x=70 城门与 x=285 缺口）
+    { asset: "cityWallRepairPatchLarge", x: -214, z: 309.45, ry: 0, yOffset: 3.1 },
+    { asset: "cityWallDrainSpout", x: -116, z: 308.35, ry: 0, yOffset: 8.25 },
+    { asset: "cityWallShellScar", x: -20, z: 309.05, ry: 0, yOffset: 4.7 },
+    { asset: "cityWallCoreExposurePatch", x: 156, z: 309.0, ry: 0, yOffset: 5.2 },
+    { asset: "cityWallRootSpall", x: 220, z: 310.05, ry: 0 },
+    { asset: "cityWallCopingBrokenRun", x: -254, z: 307.55, ry: 0, yOffset: 11.46 },
+    // 北墙（避开 x=-145 城门）
+    { asset: "cityWallRepairPatchSmall", x: -244, z: -308.7, ry: Math.PI, yOffset: 6.6 },
+    { asset: "cityWallShellScar", x: -52, z: -309.15, ry: Math.PI, yOffset: 4.0 },
+    { asset: "cityWallDrainSpout", x: 48, z: -308.25, ry: Math.PI, yOffset: 8.35 },
+    { asset: "cityWallRepairPatchLarge", x: 154, z: -309.45, ry: Math.PI, yOffset: 2.7 },
+    { asset: "cityWallRootSpall", x: 236, z: -310.05, ry: Math.PI },
+    { asset: "cityWallCopingBrokenRun", x: 266, z: -307.55, ry: Math.PI, yOffset: 11.46 },
+    // 东墙（避开 z=-65 城门、z=-15 缺口与马面）
+    { asset: "cityWallRootSpall", x: 310.05, z: -242, ry: Math.PI / 2 },
+    { asset: "cityWallRepairPatchSmall", x: 308.7, z: -174, ry: Math.PI / 2, yOffset: 6.2 },
+    { asset: "cityWallDrainSpout", x: 308.3, z: 66, ry: Math.PI / 2, yOffset: 8.3 },
+    { asset: "cityWallShellScar", x: 309.1, z: 142, ry: Math.PI / 2, yOffset: 4.4 },
+    { asset: "cityWallCoreExposurePatch", x: 308.85, z: 224, ry: Math.PI / 2, yOffset: 5.5 },
+    { asset: "cityWallCopingBrokenRun", x: 307.55, z: 266, ry: Math.PI / 2, yOffset: 11.46 },
+    // 西墙（避开 z=0 城门）
+    { asset: "cityWallRepairPatchLarge", x: -309.45, z: -226, ry: -Math.PI / 2, yOffset: 3.0 },
+    { asset: "cityWallDrainSpout", x: -308.35, z: -126, ry: -Math.PI / 2, yOffset: 8.2 },
+    { asset: "cityWallShellScar", x: -309.0, z: 74, ry: -Math.PI / 2, yOffset: 5.1 },
+    { asset: "cityWallRepairPatchSmall", x: -308.65, z: 152, ry: -Math.PI / 2, yOffset: 6.7 },
+    { asset: "cityWallRootSpall", x: -310.05, z: 226, ry: -Math.PI / 2 },
+    { asset: "cityWallCopingBrokenRun", x: -307.55, z: 272, ry: -Math.PI / 2, yOffset: 11.46 },
 
     { asset: "rubble", x: 307, z: -67, ry: 0.52, scale: 1.18 },
     { asset: "crate", x: 260, z: -89, ry: -0.18, scale: 0.92 },
@@ -488,7 +547,7 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   for (const placement of placements) {
     const asset = models.get(placement.asset);
     if (!asset) { failed.push(placement.asset); continue; }
-    const y = groundAt(placement.x, placement.z);
+    const y = groundAt(placement.x, placement.z) + (placement.yOffset || 0);
     SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
     const scale = placement.scale || 1;
     const maxDim = Math.max(asset.half[0], asset.half[1], asset.half[2]) * 2 * scale;
