@@ -14,7 +14,9 @@
 // 世界坐标：X 向东，Z 向南，城心为原点。城墙中心线 ±305；四门位置按城防示意图略作错位。
 
 import { LEVELS } from "./Data_TengxianScript.mjs";
-import { CITY, GATES, EAST_SUBURB, WEST_SUBURB, LANDMARKS, CROSSROAD } from "./Data_Tengxian.mjs";
+import {
+  CITY, GATES, EAST_SUBURB, EAST_FIELD, WEST_SUBURB, LANDMARKS, CROSSROAD,
+} from "./Data_Tengxian.mjs";
 
 const GATE = (id) => GATES.find((gate) => gate.id === id);
 
@@ -217,7 +219,9 @@ const TUNING = {
     // 西界必须越过津浦路与西关全部生活布设（最西一件 x=-502.6）：这一关也是
     // 编辑器核对整座城防外轮廓的总览切片，旧 minX=-360 只剩西城门外一小截空地，
     // 车站、通信队、电灯厂、交易所和西关大街因此在俯视验收里整片消失。
-    bounds: { minX: -520, maxX: 620, minZ: -360, maxZ: 400 },
+    // 俯瞰验收要把「城内 → 东门 → 东关 → 农田/远端农院」一次收全；
+    // 额外 24 m 留给 EastFarmFar 的屋檐、院墙和生活道具，不让边缘件被裁半。
+    bounds: { minX: -520, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -360, maxZ: 400 },
     zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
     spawn: { x: 276, z: GATE("East").z, ry: Math.PI / 2 },
     ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],

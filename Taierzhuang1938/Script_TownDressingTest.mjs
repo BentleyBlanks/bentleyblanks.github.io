@@ -28,6 +28,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { EAST_SUBURB } from "./Data_Tengxian.mjs";
+import { PHASES } from "./Data_Battle.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(
@@ -55,7 +57,7 @@ const FORBIDDEN_IN_CITY = new Set([
 const CAPS = { quarter: 150, street: 130, defense: 90, outfield: 220 };
 // 城外的主路净空带（西关的铁路/站台不在此表——那一包靠探针与截图兜）
 const OUTFIELD_ROADS = [
-  { id: "EastGateRoad", axis: "x", at: -65, from: 310, to: 620, half: 4.2 },
+  { id: "EastGateRoad", axis: "x", at: -65, from: 310, to: 756, half: 4.2 },
   { id: "NorthRoad", axis: "z", at: -145, from: -640, to: -310, half: 4.0 },
   { id: "JieheRoad", axis: "z", at: 0, from: -1620, to: -900, half: 4.5 },
 ];
@@ -102,6 +104,10 @@ const blockerRects = [
   }),
   ...data.cityFeatures.map((f) => {
     const hw = (f.w || 16) / 2 + 2, hd = (f.d || 16) / 2 + 2;
+    return { id: f.id, minX: f.x - hw, maxX: f.x + hw, minZ: f.z - hd, maxZ: f.z + hd };
+  }),
+  ...EAST_SUBURB.features.map((f) => {
+    const hw = f.w / 2 + 2, hd = f.d / 2 + 2;
     return { id: f.id, minX: f.x - hw, maxX: f.x + hw, minZ: f.z - hd, maxZ: f.z + hd };
   }),
 ];
@@ -253,6 +259,21 @@ for (const { file, region, placements } of regions) {
   });
   if (farOnly) notes.push(`${file}: ${farOnly} 件落在城内三关全为 far 档的格子里 —— `
     + "玩家路线不经过，建议挪到 detail/mid 格。");
+}
+
+// 城外包不许只在数据文件里“存在”：每一件都必须至少进入一个实际关卡切片。
+// 这条专门防回 EastFarmFar 已布设、但 L2/L3/L4 的 maxX 全部在它西边的情况。
+for (const { file, region, placements } of regions) {
+  if (region.kind !== "outfield") continue;
+  for (let index = 0; index < placements.length; index += 1) {
+    const p = placements[index];
+    checks += 1;
+    const visibleInPhase = PHASES.some((phase) => p.x >= phase.bounds.minX && p.x <= phase.bounds.maxX
+      && p.z >= phase.bounds.minZ && p.z <= phase.bounds.maxZ);
+    if (!visibleInPhase) {
+      fail(`${file}[${index}] ${p.asset}@(${p.x},${p.z}): 没有任何关卡切片会生成这件城外布设。`);
+    }
+  }
 }
 
 for (let i = 0; i < everything.length; i += 1) {

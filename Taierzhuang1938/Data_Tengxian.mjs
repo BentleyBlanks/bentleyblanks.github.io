@@ -352,7 +352,7 @@ export const EAST_SUBURB = {
   roadZ: -65,
   lane: { min: 1.5, max: 2.5 },                              // 巷宽（推定）
   // 东关寨墙：日方实测高 2 m、顶宽 0.4 m —— 极薄，一炮一个口。
-  zhaiWall: { enabled: false, x: 540, fromZ: -235, toZ: 220, height: 2.0, topWidth: 0.4, baseWidth: 0.9 },
+  zhaiWall: { enabled: true, x: 540, fromZ: -235, toZ: 220, height: 2.0, topWidth: 0.4, baseWidth: 0.9 },
   // 东寨门：砖券洞，宽 3 m（宽度推定）。1938-03-16 14:00 被 105 mm 榴弹第一发命中打毁。
   zhaiGate: { x: 540, z: -65, width: 3.0, height: 3.4 },
   // 日方称之为「敌之有力据点」的寺院地阵地。位置为日方要图，形制推定。
@@ -531,7 +531,9 @@ export const LEVEL_BOUNDS = {
   L1Approach: { minX: -1600, maxX: 400, minZ: -900, maxZ: 200 },
   L2EastSuburb: { minX: 300, maxX: 600, minZ: -220, maxZ: 220 },
   L3EastNight: { minX: 300, maxX: 600, minZ: -220, maxZ: 220 },
-  L4Wall: { minX: -100, maxX: 620, minZ: -100, maxZ: 420 },
+  // L4 是编辑器「俯瞰全城」的验收切片：东侧必须一直收到东关外农田带尽头，
+  // 否则 EastFarmFar 与荆河前沿明明有数据，却会在俯视图里被 x=620 静默裁掉。
+  L4Wall: { minX: -100, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -100, maxZ: 420 },
   L5Crossroad: { minX: -340, maxX: 340, minZ: -340, maxZ: 340 },
   L6Breakout: { minX: -340, maxX: 340, minZ: -700, maxZ: 340 },
   Whole: { minX: -1100, maxX: 1100, minZ: -1100, maxZ: 1100 },
