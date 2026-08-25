@@ -33,7 +33,7 @@ import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs"
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
-import { WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 
 const DEG = Math.PI / 180;
@@ -1353,10 +1353,11 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
-  Equip(weaponId) {
+  Equip(weaponId, variant = 0) {
     this._ClearRig();
     this.ironSightOffsetOverride = null;
     this.weaponId = weaponId || null;
+    this.weaponVariant = Number.isInteger(variant) && variant > 0 ? variant : 0;
     this.weapon = weaponId ? WEAPONS[weaponId] || null : null;
     this.action = null;
     this.boltOpen = false;
@@ -1374,7 +1375,7 @@ export class Viewmodel {
 
     // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
     // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
-    const meshId = MODEL_FP.has(weaponId) ? WEAPON_MESH_BY_ID[weaponId] : null;
+    const meshId = MODEL_FP.has(weaponId) ? WeaponMeshId(weaponId, this.weaponVariant) : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
     if (!this.rig) {

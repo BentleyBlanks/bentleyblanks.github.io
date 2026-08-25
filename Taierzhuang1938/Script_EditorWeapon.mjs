@@ -110,7 +110,8 @@ export class WeaponEditor {
     if (this.host.viewmodel) {
       // 还回玩家手里那一把：不还的话退出编辑器之后玩家举着刚才预览的枪
       this.host.SetViewmodelVisible(true);
-      if (this.host.playerWeaponId) this.host.viewmodel.Equip(this.host.playerWeaponId);
+      if (this.host.playerWeaponId) this.host.viewmodel.Equip(
+        this.host.playerWeaponId, this.host.playerWeaponVariant ?? 0);
     }
     this.host.SetCrosshair(false);
     if (this.panel) this.panel.root.remove();
@@ -371,7 +372,8 @@ export class WeaponEditor {
     this.host.SetViewmodelVisible(this.mode === "fp");
 
     if (this.mode === "fp") {
-      if (this.host.viewmodel) this.host.viewmodel.Equip(IsViewmodel(this.weaponId) ? this.weaponId : null);
+      if (this.host.viewmodel) this.host.viewmodel.Equip(
+        IsViewmodel(this.weaponId) ? this.weaponId : null, this.weaponVariant);
       const saved = this.calibrationByWeapon.get(this.weaponId);
       if (saved && this.host.viewmodel) this.host.viewmodel.SetIronSightOffsetPixels(saved.x, saved.y);
       // 第一人称的枪挂在相机上，展台上什么也不放；镜头退到一个看得见枪的距离。

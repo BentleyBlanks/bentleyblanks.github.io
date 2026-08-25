@@ -49,8 +49,9 @@ import { AddTrimProps } from "./Script_TrimProps.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
+import { WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
-import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
+import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
@@ -311,6 +312,8 @@ const state = {
   // 给的那一支长枪，大刀只在按 V 时凭空出现一下（硬编码 fallback，背包里根本没刀）。
   // 现在四个槽是真的：1 长枪 / 2 驳壳枪 / 3 大刀 / 4 投掷物，滚轮循环。
   slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
+  // 外观变体随槽位走。大刀拾取后必须保留尸体上那一把，不能在玩家手里变样。
+  weaponVariants: { primary: 0, secondary: 0, melee: 0, throwable: 0 },
   activeSlot: "primary",
   // --- 刺刀 -----------------------------------------------------------------
   // 长枪上有没有装着刺刀（X 键装/卸；只对 Data_Weapons 里 bayonet: true 的枪有意义）。
@@ -322,7 +325,8 @@ const state = {
   mags: { primary: { ammo: 0, clips: 0 }, secondary: { ammo: 0, clips: 0 } },
   loadoutId: null,
   fireMode: "auto",           // 仅捷克式可切（0 键）
-  pickedUp: null,             // 最近一次从尸体上捡到的枪（取证用）
+  pickedUp: null,             // 最近一次从尸体上捡到的武器（取证用）
+  pickedUpVariant: 0,
   lastShot: null,             // 最后一发的弹道取证：起点、落点、下坠、枪口视差
 };
 
@@ -702,9 +706,12 @@ async function Boot() {
   // F 通用交互。槽位与弹仓的账在装配层手里（state.slots / state.mags），
   // 所以规则在 Script_Interact，改状态的那三下通过 hooks 交回这里。
   interact = new InteractSystem({ ai, audio, hud }, {
-    HasPrimary: () => !!state.slots.primary,
+    HasWeapon: (weaponId) => {
+      const slot = WEAPONS[weaponId]?.kind === "melee" ? "melee" : "primary";
+      return !!state.slots[slot];
+    },
     SpareClips: () => state.clips,
-    TakeWeapon: (weaponId, clips) => PickUpWeapon(weaponId, clips),
+    TakeWeapon: (weaponId, clips, soldier, weaponVariant) => PickUpWeapon(weaponId, clips, weaponVariant),
     GiveClip: () => {
       if (state.clips <= 1) return false;
       state.clips -= 1;
@@ -769,7 +776,8 @@ async function Boot() {
       },
       Slots: () => ({
         active: state.activeSlot, weapon: currentWeapon, loadout: state.loadoutId,
-        slots: { ...state.slots }, viewmodel: viewmodel.weaponId,
+        slots: { ...state.slots }, variants: { ...state.weaponVariants },
+        viewmodel: viewmodel.weaponId, viewmodelVariant: viewmodel.weaponVariant,
         fireMode: state.fireMode, bipod: player.bipod, ads: player.ads,
       }),
       LastShot: () => (state.lastShot ? { ...state.lastShot } : null),
@@ -829,7 +837,7 @@ async function Boot() {
         return {
           kind: c ? c.kind : null, label: c ? c.label : null,
           pickups: interact.pickups, handouts: interact.handouts,
-          pickedUp: state.pickedUp, weapon: currentWeapon,
+          pickedUp: state.pickedUp, pickedUpVariant: state.pickedUpVariant ?? 0, weapon: currentWeapon,
         };
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
@@ -1090,6 +1098,7 @@ async function Boot() {
       get battlefield() { return battlefield; },
       get player() { return player; },
       get currentWeapon() { return currentWeapon; },
+      get currentWeaponVariant() { return SlotWeaponVariant(state.activeSlot); },
     },
   });
   window.Taierzhuang.editor = editor;
@@ -1818,6 +1827,11 @@ function RespawnPlayer(initial = false) {
   state.slots.primary = primary;
   state.slots.secondary = secondary;
   state.slots.melee = disarmed ? null : (loadout?.melee || null);
+  state.weaponVariants.primary = 0;
+  state.weaponVariants.secondary = 0;
+  // 每位接替者按自己的固定种子抽一把大刀；同一人换槽、死亡掉落和拾取后都不变。
+  state.weaponVariants.melee = RandomWeaponVariant(state.slots.melee, `player:${seed}`);
+  state.weaponVariants.throwable = 0;
   const throwables = loadout?.throwables || {};
   // disarmed 是「脱离战斗」那一关：武器栏**整个**是空的，手榴弹也没有。
   // 不写这一条的话 `?? 4` 那个兜底会把四颗手榴弹塞回去 ——
@@ -1850,7 +1864,7 @@ function RespawnPlayer(initial = false) {
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
-  viewmodel.Equip(currentWeapon);
+  viewmodel.Equip(currentWeapon, SlotWeaponVariant(state.activeSlot));
   SyncBayonet();
   viewmodel.root.visible = true;
   hud.SetWeaponName(currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
@@ -1870,6 +1884,27 @@ function SlotWeaponId(slot) {
   return state.slots[slot];
 }
 
+/** 槽里的外观编号。没有变体或槽位为空时一律回主式样。 */
+function SlotWeaponVariant(slot) {
+  const weaponId = SlotWeaponId(slot);
+  return WeaponVariantFor(weaponId, state.weaponVariants[slot]);
+}
+
+/** 武器变体的唯一归一化口，变体表扩容后旧存档值也不会越界。 */
+function WeaponVariantFor(weaponId, value = 0) {
+  const variants = WEAPON_MESH_VARIANTS[weaponId];
+  if (!variants || variants.length < 2) return 0;
+  const n = Number.isInteger(value) ? value : 0;
+  return n >= 0 && n < variants.length ? n : 0;
+}
+
+/** 新角色的式样也必须稳定：重生、换槽或截图复跑都不能悄悄换刀。 */
+function RandomWeaponVariant(weaponId, seedText) {
+  const variants = WEAPON_MESH_VARIANTS[weaponId];
+  if (!variants || variants.length < 2) return 0;
+  return HashString(`${seedText}|${weaponId}`) % variants.length;
+}
+
 /** 换槽。长枪/短枪各记各的弹仓 —— 切回来不该是满的。 */
 function SwitchSlot(slot) {
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
@@ -1887,7 +1922,7 @@ function SwitchSlot(slot) {
   player.bipod = false;                            // 换枪就把两脚架收了
   state.fireMode = "auto";
   state.meleeCharge = null;                        // 换手就把蓄着的那一下松掉
-  viewmodel.Equip(currentWeapon);
+  viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
   SyncBayonet();                                   // 切回长枪时刺刀还在枪上
   hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   return true;
@@ -2704,32 +2739,33 @@ function UpdateContextualActionPrompts() {
 }
 
 /**
- * 捡枪。捡到的枪进 1 号槽（长枪位）—— 杂牌部队换枪就是这么换的：
- * 手上这支打坏了就捡地上那支，`L2_RoomWar` 那条注释说的就是这件事。
- * 缴获日械没有备弹（clips = 0），只有枪里那几发。
+ * 拾取武器。枪进 1 号槽，大刀进 3 号槽；两者都替换同类槽位，
+ * 并把尸体上的外观变体一并带走。缴获日械没有备弹（clips = 0），
+ * 只有枪里那几发。
  */
-function PickUpWeapon(weaponId, clips) {
+function PickUpWeapon(weaponId, clips, variant = 0) {
   if (!player?.Alive || !WEAPONS[weaponId]) return false;
-  const magazine = WEAPONS[weaponId].magazine ?? 5;
-  // 本来就没有长枪的时候，捡到的枪要**直接到手上**。
-  // 第一关的目标之一就是「找一支枪（从倒下的人身上捡）」——
-  // 捡完还得自己按 1 才拿得出来的话，那一条目标在玩家眼里就是没生效。
-  // 判据是"原来 primary 是空的"，不是"当前槽是 primary"：
-  // 空着手的时候当前槽是投掷物或大刀（见 RespawnPlayer 的选槽逻辑）。
-  const hadNoRifle = !state.slots.primary;
-  state.slots.primary = weaponId;
-  state.mags.primary = { ammo: magazine, clips };
+  const weapon = WEAPONS[weaponId];
+  const slot = weapon.kind === "melee" ? "melee" : "primary";
+  const hadNoWeapon = !state.slots[slot];
+  state.slots[slot] = weaponId;
+  state.weaponVariants[slot] = WeaponVariantFor(weaponId, variant);
+  if (slot === "primary") state.mags.primary = { ammo: weapon.magazine ?? 5, clips };
   state.pickedUp = weaponId;
+  state.pickedUpVariant = state.weaponVariants[slot];
   // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
-  state.bayonetFixed = false;
-  if (hadNoRifle) state.activeSlot = "primary";
-  if (state.activeSlot === "primary") {
+  if (slot === "primary") state.bayonetFixed = false;
+  // 第一关的目标之一就是「找一支枪（从倒下的人身上捡）」—— 捡完还得自己按
+  // 1 才拿得出来的话，目标在玩家眼里就是没生效。大刀同理：空着 3 号槽时捡到就到手。
+  if (hadNoWeapon) state.activeSlot = slot;
+  if (state.activeSlot === slot) {
     currentWeapon = weaponId;
-    state.ammo = magazine;
-    state.clips = clips;
+    const mag = state.mags[slot];
+    state.ammo = mag ? mag.ammo : 0;
+    state.clips = mag ? mag.clips : 0;
     player.bipod = false;
     state.fireMode = "auto";
-    viewmodel.Equip(currentWeapon);
+    viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
     SyncBayonet();
     hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   }

@@ -1250,7 +1250,10 @@ export class Actor {
     // 背后的大刀 / 腰间的手榴弹：挂在 chest 上，跟着上身一起晃
     if (build.bones.officerGear) AttachBone(this.chest, build.bones.officerGear, this.materials, null);
     if (build.bones.hairBack) AttachBone(this.neck, build.bones.hairBack, this.materials, null);
-    if (build.bones.dadao) AttachBone(this.chest, build.bones.dadao, this.materials, null);
+    // 敢死队背刀也走同一份大刀模型变体表。原来的程序化背刀只留作模型缺席时的
+    // 兜底，这样 NPC、玩家第一人称和尸体掉落看到的是同一把 A/B 式样。
+    this.dadaoVariant = spec.dadao ? this._WeaponVariant("Dadao") : 0;
+    if (build.bones.dadao) this._MountBackDadao(build.bones.dadao, d);
     if (build.bones.grenades) AttachBone(this.chest, build.bones.grenades, this.materials, null);
 
     // 持枪挂点：据枪时它就是「枪托贴肩」那个位姿，两只手再 IK 过去
@@ -1352,6 +1355,34 @@ export class Actor {
     const list = WEAPON_MESH_VARIANTS[weaponId];
     if (!list || list.length < 2) return 0;
     return HashString(`${this.seed}|${weaponId}`) % list.length;
+  }
+
+  /**
+   * 把持刀模型斜挂到背上。武器规范系的刀尖指向 -Z；旋到背部后刀柄露左肩、
+   * 刀尖落右腰，和旧背法一致。模型读不到才挂原来的程序化骨块。
+   */
+  _MountBackDadao(fallback, d) {
+    const built = this.factory.WeaponGeometry("Dadao", this.dadaoVariant);
+    if (!built?.geometries?.size) {
+      this.backDadao = AttachBone(this.chest, fallback, this.materials, null);
+      return this.backDadao;
+    }
+    const group = new THREE.Group();
+    group.name = `BackDadao_${this.dadaoVariant}`;
+    for (const [key, geometry] of built.geometries) {
+      const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    // root 受人物身高缩放，背刀和手持刀一样抵消它，保持史实 0.900 m。
+    group.scale.setScalar(this.weaponScale);
+    group.position.set(-0.12 * d.height, d.shoulderY - d.waistY - 0.02 * d.height,
+      d.chestDepth + 0.025 * d.height);
+    group.rotation.set(-1.25, -Math.PI * 0.5, 0.06, "YXZ");
+    this.chest.add(group);
+    this.backDadao = group;
+    return group;
   }
 
   /** 换手持模型。几何在工厂里按 id 缓存，这里只换 Group。 */

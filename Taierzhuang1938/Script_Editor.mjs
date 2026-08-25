@@ -114,6 +114,7 @@ export class EditorSuite {
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
       hideInStudio: host.viewmodel ? [host.viewmodel.root] : [],
       get playerWeaponId() { return host.game.currentWeapon; },
+      get playerWeaponVariant() { return host.game.currentWeaponVariant ?? 0; },
       SetViewmodelVisible: (on) => { if (host.viewmodel) host.viewmodel.root.visible = !!on; },
       SetHint: (text) => suite.SetHint(text),
       SetCrosshair: (on, mode = "") => suite.SetCrosshair(on, mode),

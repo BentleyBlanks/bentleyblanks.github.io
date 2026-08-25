@@ -1748,6 +1748,34 @@ Check("缴获日械只有枪里那五发（六五口径我们没有补给）",
   !pickup.none && pickup.ammo.ammo === 5 && pickup.ammo.clips === 0,
   `ammo=${pickup.ammo.ammo} 桥夹=${pickup.ammo.clips}`);
 
+// 13.5b F 拾刀：大刀也必须是尸体上的真实装备，并且带走同一外观变体。
+const dadaoPickup = await page.evaluate(() => {
+  const T = window.Taierzhuang, D = T.Debug;
+  const victim = T.ai.soldiers.find((s2) => s2.alive && s2.side === "nra");
+  if (!victim) return { none: true };
+  victim.weaponId = "Dadao";
+  victim.actor?.SetWeapon("Dadao");
+  victim.position.set(T.player.position.x + 1.0, T.player.position.y, T.player.position.z);
+  T.state.slots.melee = null;
+  T.state.weaponVariants.melee = 0;
+  victim.Kill();
+  // 明确选第二式样，验证掉落数据而不是哈希刚好抽到哪一把。
+  victim.drop.weaponVariant = 1;
+  T.StepFrames(2);
+  const before = D.Interact();
+  D.Key("KeyF");
+  T.StepFrames(4);
+  return { before, after: D.Interact(), slots: D.Slots() };
+});
+Check("按 F 能从尸体上拾起大刀，并保留第二式样",
+  !dadaoPickup.none && dadaoPickup.before.kind === "pickup"
+  && dadaoPickup.after.pickedUp === "Dadao" && dadaoPickup.after.pickedUpVariant === 1
+  && dadaoPickup.slots.active === "melee" && dadaoPickup.slots.slots.melee === "Dadao"
+  && dadaoPickup.slots.variants.melee === 1 && dadaoPickup.slots.viewmodel === "Dadao"
+  && dadaoPickup.slots.viewmodelVariant === 1,
+  dadaoPickup.none ? "场上没有可用于掉落的大刀兵"
+    : `${dadaoPickup.before.label} -> 3号槽 ${dadaoPickup.slots.slots.melee} 式样 ${dadaoPickup.slots.variants.melee}`);
+
 // 13.6 F 分弹药给打光了的弟兄
 const handout = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;

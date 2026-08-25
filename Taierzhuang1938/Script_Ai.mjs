@@ -285,6 +285,9 @@ export class Soldier {
     // 枪里那五发。这既是史实，也正好是"捡枪"不至于破坏弹药经济的天然闸门。
     this.drop = {
       weaponId: this.weaponId,
+      // 武器外观也属于这具尸体的战利品。大刀不是两把数值不同的武器，
+      // 但捡走 A 式后不该无缘无故变成 B 式。
+      weaponVariant: this.actor?.weaponVariant ?? 0,
       clips: this.side === "ija" ? 0 : Math.floor(this.rnd() * 3),
       taken: false,
     };

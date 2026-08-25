@@ -157,7 +157,7 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   const T = window.Taierzhuang;
   const editor = T.editor.active;
   editor.SetMode("fp");
-  editor.SetWeapon(w.id);
+  editor.SetWeapon(w.id, w.variant || 0);
   T.StepFrames(30);                     // 让开镜/换枪的弹簧稳下来
 
   const src = document.getElementById("view");
@@ -188,10 +188,6 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
 let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
   : WEAPONS;
-// 第一人称永远走 WEAPON_MESH_BY_ID（也就是 variant 0）：玩家手里那把不换式样。
-// 不摘掉的话 --fp 会给变体拍出一张和主式样**一模一样**的图，看图的人会以为
-// 第一人称也换了刀。
-if (firstPerson) list = list.filter((w) => !w.variant);
 for (const entry of list) {
   const dataUrl = firstPerson ? await FpSheet(entry) : await Sheet(entry);
   const file = path.join(outDir,

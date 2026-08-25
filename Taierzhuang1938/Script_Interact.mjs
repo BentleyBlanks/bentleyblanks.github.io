@@ -25,8 +25,8 @@ export class InteractSystem {
   /**
    * @param {object} ctx { ai, audio, hud }
    * @param {object} hooks
-   *   TakeWeapon(weaponId, clips, soldier) -> boolean   捡起一支枪（装配层改槽位与弹仓）
-   *   HasPrimary() -> boolean                           玩家是否已经有长枪（决定“拾起/换上”）
+   *   TakeWeapon(weaponId, clips, soldier, weaponVariant) -> boolean  捡起一件武器（装配层改槽位与弹仓）
+   *   HasWeapon(weaponId) -> boolean                    玩家是否已有同类槽位（决定“拾起/换上”）
    *   SpareClips() -> number                            玩家手上还有几个桥夹
    *   GiveClip(soldier) -> boolean                      分一个桥夹给弟兄
    */
@@ -53,7 +53,11 @@ export class InteractSystem {
         // 尸体：身上有没有还没被拿走的东西
         if (!s.drop || s.drop.taken || d > CORPSE_REACH_M) continue;
         const name = WEAPONS[s.drop.weaponId]?.name || "枪";
-        const verb = this.hooks.HasPrimary?.() ? "换上" : "拾起";
+        // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
+        // 才能让大刀按 3 号槽而不是拿长枪槽判断“拾起/换上”。
+        const hasWeapon = this.hooks.HasWeapon
+          ? this.hooks.HasWeapon(s.drop.weaponId) : this.hooks.HasPrimary?.();
+        const verb = hasWeapon ? "换上" : "拾起";
         if (d < bestDist) {
           bestDist = d;
           best = { kind: "pickup", soldier: s, label: `${verb} ${name}`, dist: d };
@@ -78,11 +82,16 @@ export class InteractSystem {
     if (!candidate) return null;
     if (candidate.kind === "pickup") {
       const drop = candidate.soldier.drop;
-      if (!this.hooks.TakeWeapon?.(drop.weaponId, drop.clips, candidate.soldier)) return null;
+      if (!this.hooks.TakeWeapon?.(drop.weaponId, drop.clips, candidate.soldier,
+        drop.weaponVariant ?? 0)) return null;
       drop.taken = true;
       this.pickups += 1;
       const w = WEAPONS[drop.weaponId];
       this.ctx.audio?.Play("magIn", { volume: 0.6 });
+      if (w?.kind === "melee") {
+        this.ctx.hud?.Hint(`拾起${w.name}，放进 3 号近战槽`, 2.8);
+        return candidate;
+      }
       // 缴获日械只有枪里那五发 —— 这句提示是这条规则唯一的说明书，别删
       this.ctx.hud?.Hint(drop.clips > 0
         ? `捡了一支${w?.name || "枪"}，还有 ${drop.clips} 个桥夹`
