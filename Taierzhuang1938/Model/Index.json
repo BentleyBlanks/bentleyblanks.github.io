@@ -330,15 +330,14 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Dadao.tzm.json",
-   "triangles": 624,
-   "meshBlocks": 3,
+   "triangles": 4688,
+   "meshBlocks": 2,
    "nodes": 5,
    "joints": 0,
-   "bytes": 27132,
+   "bytes": 232049,
    "materials": [
-    "blade",
-    "grip",
-    "red"
+    "steel",
+    "wood"
    ],
    "mounts": [
     "root",
@@ -348,13 +347,45 @@
    ],
    "bounds": {
     "min": [
-     -0.008,
-     -0.079,
-     -0.624
+     -0.01161,
+     -0.05797,
+     -0.62913
     ],
     "max": [
-     0.008,
-     0.027,
+     0.0116,
+     0.05264,
+     0.26972
+    ]
+   }
+  },
+  {
+   "name": "DadaoAlt",
+   "category": "weapon",
+   "file": "DadaoAlt.tzm.json",
+   "triangles": 2797,
+   "meshBlocks": 2,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 117820,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.02868,
+     -0.1056,
+     -0.62817
+    ],
+    "max": [
+     0.02868,
+     0.05193,
      0.27
     ]
    }

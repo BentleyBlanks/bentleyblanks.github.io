@@ -32,6 +32,7 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 | 三八式 `Type38` | `Source/Model_Type38Arisaka/scene.gltf` | [Snijboer](https://sketchfab.com/Snijboer) | CC-BY-4.0 | 三八式：防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条。全长按史实 1.276 m。 |
 | 驳壳枪 `Mauser96` | `Source/Model_MauserC96.glb` | [Plewr](https://plewr.itch.io/mauser-c96-low-poly) | CC0 | 毛瑟 C96。丢掉名为 Boom 的枪口焰网格。 |
 | 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，压到 5728 三角。原驳壳枪仍保留给既有关卡。 |
+| 大刀第二式样 `DadaoAlt` | `Source/Model_SketchfabDadao/scene.gltf` | [Trector](https://sketchfab.com/trector) | CC-BY-4.0 | 大刀的**外观变体**，没有独立武器数值。圆盘吞口、束节木柄、刃线较直的一路，与主式样的环首宽刃刀刻意不同型。许可原文在 `Source/Model_SketchfabDadao/license.txt`。 |
 
 许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，
 文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
@@ -56,7 +57,33 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
   （试过 type 11 light machine、nambu machine gun、type 92 heavy machine gun、
   japanese ww2 weapon/machine 等词条），保留运行时程序化兜底几何
   （歪把子的左上方敞口方斗特征已做进兜底）。
-- 手榴弹、大刀、八九式重掷弹筒：程序化模型已按史料特征建好，无免费源可替换。
+- 手榴弹、八九式重掷弹筒：程序化模型已按史料特征建好，无免费源可替换。
+
+## 大刀（付费源，**不随仓库分发**）
+
+| 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
+|---|---|---|---|---|
+| 大刀 `Dadao` | `<SourceAssets>/Weapons/CgmolDadao/Model_CgmolDadao.fbx` | [逍姚子不逍遥 — PBR 次世代二十九军战刀](https://www.cgmol.com/model/3/88472.html)（摩尔网 CGMOL） | 付费购买，页面版权声明「不限用途」 | 二十九军/西北军那一路的制式：宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环。全长按史实 0.900 m，刃宽 55→88 mm、刀背 5.7 mm。 |
+
+**这份源模不进公开仓库。** bentleyblanks.github.io 是公开站点；买来的原始文件
+只授权用在成品里，不等于可以把 FBX 本身当素材再分发。仓库里只有它派生出的
+`Model/Dadao.tzm.json`（已按 6000 三角预算重算、丢弃源包 4K 贴图、改绑本作
+共享 steel/wood PBR）。做法与本文件末尾 Vefects 素材那条一致。
+
+源模存放位置按下面顺序解析（`ImportWeapons._ExternalRoot()`）：
+
+1. 环境变量 `TZ1938_SOURCE_ASSETS`，直接指向存放 `CgmolDadao/` 的那一级
+   （也就是 `<某处>/Taierzhuang1938SourceAssets/Weapons`）；
+2. 从 `_blender/` 逐级向上找同名兄弟目录 `Taierzhuang1938SourceAssets/Weapons`
+   （主仓库与 `.claude/worktrees/` 下的工作树都能命中）。
+
+**找不到源就自动退回程序化几何**：`ImportWeapons.BuilderFor("Dadao")` 返回 None，
+`BuildAll` 改用 `BuildWeapons.BuildDadao`。没有这份素材的人 clone 下来照样能跑通
+构建，只是重建出的刀会退回旧式样 —— 仓库里已提交的 `Dadao.tzm.json` 是用付费源
+建的那一版，别拿没有源的机器去覆盖它。
+
+本机原始下载包另存于
+`C:\Users\Bentl\OneDrive\AI\Models\211555_556082_7op5ujvchqffnj3\`（含 4K 贴图与 .blend）。
 
 CC0 不强制署名；表里的作者与链接是为了以后还能找回源文件。
 

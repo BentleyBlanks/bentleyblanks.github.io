@@ -691,4 +691,8 @@ WEAPON_BUILDERS = {
     "ServicePistol": BuildServicePistol,
     "Grenade": BuildGrenade,
     "Dadao": BuildDadao,
+    # 大刀的第二种式样：只是**外观变体**，没有自己的武器数值（仍读 Data_Weapons.Dadao）。
+    # 正常走 ImportWeapons.SOURCES["DadaoAlt"] 的外部源；源不在就退回同一把程序化
+    # 大刀 —— 变体退化成"两个人拿同一把"，玩法一点不受影响。
+    "DadaoAlt": BuildDadao,
 }

@@ -76,6 +76,7 @@ export class WeaponEditor {
     this.panel = null;
     this.cameraMode = "studio";
     this.weaponId = "ZhongZheng";
+    this.weaponVariant = 0;
     this.mode = "bench";        // bench | held | fp
     this.spin = true;
     this.time = 0;
@@ -204,8 +205,14 @@ export class WeaponEditor {
     this.UpdateCalibrationView();
   }
 
-  SetWeapon(id) {
+  /**
+   * 选一把枪。`variant` 是**外观变体**序号（见 Data_Meshes.WEAPON_MESH_VARIANTS），
+   * 目前只有大刀有第二式样；出图脚本靠它把两把刀都拍一遍，
+   * 不然变体模型没有自己的 Data_Weapons 条目，台架上永远看不到。
+   */
+  SetWeapon(id, variant = 0) {
     this.weaponId = id;
+    this.weaponVariant = variant | 0;
     this.Rebuild();
     this.RefreshCard();
     this.RefreshCalibrationUi();
@@ -412,7 +419,7 @@ export class WeaponEditor {
       this.studio.ApplyCamera();
       return;
     }
-    const built = factory.WeaponGeometry(this.weaponId);
+    const built = factory.WeaponGeometry(this.weaponId, this.weaponVariant | 0);
     const group = new THREE.Group();
     for (const [key, geometry] of built.geometries) {
       const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);

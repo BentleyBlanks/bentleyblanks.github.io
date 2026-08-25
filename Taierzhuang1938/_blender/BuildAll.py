@@ -36,7 +36,7 @@ BUDGET = {"soldier": 1800, "weapon": 6000, "prop": 400, "vehicle": 1600}
 WEAPON_LENGTH = {
     "ZhongZheng": 1.110, "HanYang": 1.250, "Zb26": 1.165, "Type38": 1.276,
     "Mauser96": 0.288, "ServicePistol": 0.222,
-    "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
+    "Grenade": 0.220, "Dadao": 0.900, "DadaoAlt": 0.900, "Type89Launcher": 0.413,
 }
 LENGTH_TOLERANCE = 0.020
 

@@ -154,12 +154,15 @@ export const WEAPONS = {
     fullName: "西北军大刀",
     side: "nra",
     kind: "melee",
-    lengthM: 0.90, bladeM: 0.624, massKg: 2.0,
+    lengthM: 0.90, bladeM: 0.625, massKg: 2.0,
     damage: 260, headMultiplier: 1.0,
     // 大刀不该像抡钝器一样拖：短蓄力后整刀在半秒内劈完，命中窗口仍由 Combat 管。
     swingTimeS: 0.50, reachM: 2.05,
     silent: true,
-    note: "参考右侧实物：短吞口、木握片、柄尾开圆孔。斜挎背在身后，右手过左肩抽出。",
+    note: "二十九军战刀式样：宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环。"
+      + "斜挎背在身后，右手过左肩抽出。AI 士兵按 seed 抽两种式样之一"
+      + "（大刀是各县铁匠各打各的，见 Data_Meshes.WEAPON_MESH_VARIANTS）；"
+      + "玩家第一人称固定是这一式。",
   },
 
   // --- 日方 -----------------------------------------------------------------

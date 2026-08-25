@@ -29,6 +29,7 @@ import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets, SegmentedCharacterSkin } from "./Script_RiggedModel.mjs";
 import {
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
+  WEAPON_MESH_VARIANTS, WeaponMeshId,
 } from "./Data_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
@@ -1342,6 +1343,16 @@ export class Actor {
     this.Update(0, { moveSpeed: 0, aim: 0, elapsed: 0 });
   }
 
+  /**
+   * 这个人拿哪一种式样。按自己的 seed 稳定抽 —— 同一个人每次 SetWeapon
+   * 都得抽到同一把，不然换个姿势刀就变了。用的哈希与军装色变同源。
+   */
+  _WeaponVariant(weaponId) {
+    const list = WEAPON_MESH_VARIANTS[weaponId];
+    if (!list || list.length < 2) return 0;
+    return HashString(`${this.seed}|${weaponId}`) % list.length;
+  }
+
   /** 换手持模型。几何在工厂里按 id 缓存，这里只换 Group。 */
   SetWeapon(weaponId) {
     if (this.weaponGroup) {
@@ -1350,9 +1361,10 @@ export class Actor {
     }
     this.weaponId = weaponId || null;
     this.weaponData = weaponId ? WEAPONS[weaponId] || null : null;
+    this.weaponVariant = weaponId ? this._WeaponVariant(weaponId) : 0;
     this.partsRevision += 1;
     if (!weaponId) { this.weaponTwoHanded = false; return this; }
-    const built = this.factory.WeaponGeometry(weaponId);
+    const built = this.factory.WeaponGeometry(weaponId, this.weaponVariant);
     const group = new THREE.Group();
     for (const [key, geometry] of built.geometries) {
       const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
@@ -2754,7 +2766,9 @@ export class ActorFactory {
     this.quality = quality === "low" || quality === "medium" ? quality : "high";
     this.batcher = null;             // 人物合批层，见 SetBatcher
     this.kindCache = new Map();      // kind -> { dims, bones }
-    this.weaponCache = new Map();    // weaponId|quality -> { geometries, muzzle, ... }
+    // weaponId|variant|quality -> { geometries, muzzle, ... }
+    // 键的格式**别在外面自己拼**，读 source 走 WeaponSource()。
+    this.weaponCache = new Map();
     this.materialCache = new Map();
     this.meshDocs = new Map();       // 模型 id -> 解码好的 TZM 文档
     this.meshLoading = null;
@@ -2777,6 +2791,7 @@ export class ActorFactory {
     const wanted = new Set([
       ...Object.values(SOLDIER_MESH_BY_KIND),
       ...Object.values(WEAPON_MESH_BY_ID),
+      ...Object.values(WEAPON_MESH_VARIANTS).flat(),
     ]);
     const ids = [...wanted].filter((id) => MESHES[id]);
     this.meshLoading = (async () => {
@@ -3029,19 +3044,33 @@ export class ActorFactory {
    * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
    * 所以 Actor.SetWeapon 一行都不用改。
    */
-  WeaponGeometry(weaponId) {
-    const key = `${weaponId}|${this.quality}`;
+  WeaponGeometry(weaponId, variant = 0) {
+    const key = `${weaponId}|${variant}|${this.quality}`;
     let built = this.weaponCache.get(key);
     if (!built) {
-      built = this._ModelWeaponGeometry(weaponId) || BuildWeaponGeometry(weaponId, this.quality);
+      built = this._ModelWeaponGeometry(weaponId, variant)
+        || BuildWeaponGeometry(weaponId, this.quality);
       this.weaponCache.set(key, built);
     }
     return built;
   }
 
+  /**
+   * 这把枪最终走的是模型还是程序化方块。给测试与编辑器读用。
+   *
+   * 有这个口子是因为**缓存键的格式不该外泄**：它曾经是 `id|quality`，
+   * 加了外观变体之后变成 `id|variant|quality`，而 PlayTest 当时直接
+   * `weaponCache.get("HanYang|high")` 自己拼键 —— 键一改它就查不到，
+   * 于是把一把好好的模型枪报成"退回方块"，红得毫无道理。
+   */
+  WeaponSource(weaponId, variant = 0) {
+    const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}`);
+    return built ? built.source : null;
+  }
+
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
-  _ModelWeaponGeometry(weaponId) {
-    const id = WEAPON_MESH_BY_ID[weaponId];
+  _ModelWeaponGeometry(weaponId, variant = 0) {
+    const id = WeaponMeshId(weaponId, variant);
     if (!id || !this.meshDocs.has(id)) return null;
     const data = WEAPONS[weaponId];
     const built = this._InstantiateMesh(id);
