@@ -22,7 +22,36 @@
 // 门内还有一道二门 —— 进出要过两次门，这是监狱与办公院落的分界。
 //
 // 铁栅一律用几何做（三根方料），不动 tzm 贴图管线。
+//
+// ---------------------------------------------------------------------------
+// 第二轮（WP-D2）：内部空间与攒尖顶
+// ---------------------------------------------------------------------------
+// 第一轮交出来的是一座「只能绕着走」的监狱：围墙、岗楼、铁窗全对，但每一间
+// 屋子都是实心的 —— 牢房排屋整排登记成**一个**碰撞盒，值房是通用办公房。
+// 这一轮补三件事，口径如下：
+//
+//   ① 一进值房（西侧那一块）改成**牢头值房**：门半开、屋里有桌案、锁具架、名牌墙。
+//      三件都是「这是管人的屋子」的物证 —— 桌案上是册子不是饭碗，
+//      架子上挂的是锁与镣不是农具，墙上钉的是一格一格的名牌不是年画。
+//   ② 两排牢房里**靠甬道口的那一间**（后排 rowB 的西头一间）改成可进：
+//      碰撞盒从「一整排实心」拆成「实心段 + 隔墙 + 这一间的四壁」，
+//      门半开，屋里是通铺木板、瓦罐、草席。其余牢房照旧封闭 —— 一间就够了，
+//      玩家进过一间之后，剩下十几樘同样的铁窗后面是什么，他自己会补完。
+//   ③ 岗楼的四坡顶从「四块斜板」换成真攒尖（WP-A1 遗留 5）：四条垂脊交于一点，
+//      顶角没有能看见天光的缝。用四棱锥（ConeGeometry radialSegments=4）做，
+//      面数反而比四块板少 —— 板是六面体，锥面是三角形。
+//   ④ 看守所押房同样开一间（同一套 openCell 参数）。
+//
+// 岗楼**仍然不可上人**：本作没有爬梯系统（Data_Ladder/PlanClimb 是另一套），
+// 内侧那架木梯是形制交代不是可攀爬体。
+//
+// 内部空间的三条硬约束（共用任务书「内部空间契约」）：
+//   · 门洞必可走 —— 门板一律不登记碰撞，碰撞留在门洞两侧的填墙上；
+//   · 家具一律走 sink 几何（合批 + 破坏一致），材质只用已登记名，tag 只用 prop/furniture；
+//   · 内部没有独立光源，靠门窗洞采光 —— 所以可进的那一间**必须**把窗洞里那块
+//     深色挡板去掉（封闭牢房才留挡板，它读作「里面是暗的」；可进的屋里再留就是一堵黑墙）。
 
+import * as THREE from "three";
 import {
   AddLoopholes, AddDoorReveal, AddRoomBlock, AddWell,
 } from "./Script_World.mjs";
@@ -57,9 +86,31 @@ const CELL = {
   winW: 0.55,
   winH: 0.75,
   sill: 1.55,             // 窗台高：站在牢里够不着的高度
-  doorW: 0.92,
+  // 牢门净宽 1.0 m：仍比民居屋门 1.25 窄一档（「一个人侧身进去」的形制），
+  // 但玩家胶囊直径 0.68（STANCE.stand.radius 0.34），0.92 只剩 0.12 m/侧 ——
+  // 一扇「可进」的门不能让人卡在门框上（WP-D2 洪水填充实测）。
+  doorW: 1.0,
   doorH: 1.95,
 };
+
+// 内部空间（全部 PRESUMED，依据见报告 WP_D2.md）
+const ROOM = {
+  wallT: 0.42,            // 牢房隔墙／端墙厚（同排屋外墙）
+  partT: 0.30,            // 一间与一间之间的隔墙：比外墙薄一档
+  bunkH: 0.44,            // 通铺木板铺面高（比板凳 0.48 略低，是「铺」不是「床」）
+  bunkD: 1.95,            // 通铺进深：躺下 1.8 m + 一点富余
+  deskH: 0.78,            // 牢头桌案面高（民居条案 0.73，办公桌案略高）
+  ceilingY: 0.16,         // 顶棚（苇箔）离檐口的下沉量
+};
+
+/** 圆锥／圆柱面的 UV 按世界米数重算：默认 0..1 会把瓦垄拉成一整片。 */
+function ScaleRadialUv(geometry, uScale, vScale) {
+  const uv = geometry.attributes.uv;
+  if (!uv) return geometry;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * uScale, uv.getY(i) * vScale);
+  uv.needsUpdate = true;
+  return geometry;
+}
 
 /** 局部坐标 → 世界。+x 沿面阔，+z 指向大门那一面（与 PlaceGeometry 的 ry 同一套右手系）。 */
 function Frame(x0, z0, ry) {
@@ -123,6 +174,78 @@ function AddSlabWall(sink, {
 }
 
 // ---------------------------------------------------------------------------
+// 真攒尖顶
+// ---------------------------------------------------------------------------
+/**
+ * 攒尖顶（四角）。四条垂脊交于**一个**顶点，所以顶角不会有缝。
+ *
+ * 为什么不接着用四块斜板（`AddAlarmTower` / 第一版岗楼的做法）：
+ * 四块板互相搭不上，顶上永远留一个约 0.3 m 的方口；远景看不出，
+ * 近景（WP-A1 的 `A1_JailTowerSE`）能从那个口里看见天。而正四棱锥
+ * 天生就是闭合的 —— 而且**更省**：一块斜板是六面体 12 个三角，
+ * 一整个锥体连底面才 8 个。
+ *
+ * 檐口另加一圈 0.14 m 的瓦厚（fascia）：没有它，屋面在檐口收成一条刀刃，
+ * 逆光下岗楼顶会读成一张纸片。
+ *
+ * @param {object} spec x,z 中轴；y 檐口标高；side 瞭望间边长；height 举高
+ */
+function AddHipRoof(sink, {
+  x, y, z, ry, side, height, seed, mat = "RoofTile", overhang = 0.42, knob = true,
+}) {
+  const rFace = side / 2 + overhang;         // 檐口到中轴（正四棱锥的内切半径）
+  const r = rFace * Math.SQRT2;              // 角点半径（转 45° 后角在对角线上）
+  const uSpan = (rFace * 8) / TILE_METERS.roof;
+
+  const fascia = new THREE.CylinderGeometry(r, r, 0.14, 4, 1, true);
+  ScaleRadialUv(fascia, uSpan, 0.14 / TILE_METERS.roof);
+  sink.Add(mat, PlaceGeometry(fascia, { x, y: y + 0.07, z, ry: ry + Math.PI / 4 }));
+
+  const cone = new THREE.ConeGeometry(r, height, 4, 1, false);
+  ScaleRadialUv(cone, uSpan, Math.hypot(rFace, height) / TILE_METERS.roof);
+  sink.Add(mat, PlaceGeometry(cone, { x, y: y + 0.14 + height / 2, z, ry: ry + Math.PI / 4 }));
+
+  // 宝顶：攒尖的收头。没有它顶点太尖，读成帐篷不是瓦顶
+  if (knob) {
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(0.30, 0.28, 0.30, TILE_METERS.roof, `${seed}:knob`),
+      { x, y: y + 0.14 + height + 0.10, z, ry: ry + Math.PI / 4 }));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 半开的门板
+// ---------------------------------------------------------------------------
+/**
+ * 一扇半开的门板。**不登记碰撞** —— 门洞必须能走，碰撞留在门洞两侧的填墙上。
+ *
+ * 「可进的屋子」在出图里靠的不是碰撞，是这一扇板：门板贴在洞里 = 关着，
+ * 门板斜插进屋里 = 开着。两者的碰撞完全一样，读法天差地别。
+ *
+ * @param {object} spec hinge -1/+1 门轴在洞口的哪一侧；swing -1/+1 往局部 ±z 开
+ */
+function AddOpenLeaf(sink, {
+  L, ry, lx, lz, openW, openH, seed, hinge = 1, swing = -1, angle = 1.12,
+  thick = 0.11, bands = 2, mat = "WoodDoor",
+}) {
+  const leafW = openW - 0.06;
+  const leafH = openH - 0.06;
+  const dx = -hinge * Math.cos(angle);
+  const dz = swing * Math.sin(angle);
+  const p = L(lx + hinge * (openW / 2) + dx * (leafW / 2), lz + dz * (leafW / 2));
+  // 局部 +x 在多转 θ 之后指向 (cosθ, -sinθ)，要它指向 (dx,dz) 就得 θ = -atan2(dz,dx)
+  const leafRy = ry - Math.atan2(dz, dx);
+  sink.Add(mat, PlaceGeometry(
+    MakeBox(leafW, leafH, thick, TILE_METERS.wood, `${seed}:leaf`),
+    { x: p.x, y: leafH / 2 + 0.06, z: p.z, ry: leafRy }));
+  for (let i = 0; i < bands; i += 1) {
+    sink.Add("IronPlate", PlaceGeometry(
+      MakeBox(leafW * 0.94, 0.10, thick + 0.05, TILE_METERS.wood, `${seed}:band${i}`),
+      { x: p.x, y: 0.5 + i * (leafH * 0.46), z: p.z, ry: leafRy }));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 岗楼
 // ---------------------------------------------------------------------------
 /**
@@ -158,16 +281,12 @@ function AddGuardTower(sink, {
     shaftS / 2 + 0.3, "prisonWall", ry);
   sink.Solid(p.x, cabMid, p.z, cabS / 2, cabH / 2, cabS / 2, "prisonWall", ry);
 
-  // 四坡小顶：四片斜瓦围一圈（同 AddAlarmTower 的做法，四块板读得出攒尖）
-  for (let k = 0; k < 4; k += 1) {
-    const a = (k * Math.PI) / 2;
-    sink.Add(tileMat, PlaceGeometry(
-      MakeBox(cabS * 1.45, 0.12, cabS * 0.72, TILE_METERS.roof, `${seed}:rf${k}`),
-      {
-        x: p.x + Math.sin(ry + a) * cabS * 0.30, y: roofY + 0.42,
-        z: p.z + Math.cos(ry + a) * cabS * 0.30, ry: ry + a, rx: 0.62,
-      }));
-  }
+  // 攒尖小顶（WP-D2 换掉第一版的四块斜板，顶角不再有缝）。
+  // 举高 1.15 m：与旧版四块板的最高点（≈ +1.07 m）齐平，天际线不变。
+  AddHipRoof(sink, {
+    x: p.x, y: roofY, z: p.z, ry, side: cabS, height: 1.15,
+    seed: `${seed}:hip`, mat: tileMat, overhang: 0.44,
+  });
 
   // 枪眼：瞭望间四面各两个，砖身朝外两面各一个
   for (let k = 0; k < 4; k += 1) {
@@ -316,11 +435,15 @@ function AddHeavyGate(sink, {
 /**
  * 窄开间牢房排屋。**三面完全无窗**，只有朝院的一面开一排等高等大的铁窗。
  *
+ * `openCell` 指定**一扇牢门的开间号**，那一间（从这扇门往两边到隔壁牢门的中线为止）
+ * 会被掏成可进的屋子：门半开、窗洞不再堵深色挡板、整排的实心碰撞盒拆成
+ * 「实心段 + 隔墙 + 这一间的四壁」。传 -1 就是第一轮的行为：整排实心、全部封闭。
+ *
  * @param {object} spec facing +1 = 铁窗那面朝局部 +z；-1 = 朝局部 -z
  */
 function AddCellRow(sink, {
   L, ry, lx, lz, width, depth, seed, damage = 0, facing = 1,
-  mat = "PrisonWall", tileMat = "RoofTile", doorEvery = 5,
+  mat = "PrisonWall", tileMat = "RoofTile", doorEvery = 5, openCell = -1,
 }) {
   const bays = Math.max(3, Math.round(width / CELL.bay));
   const bayW = width / bays;
@@ -331,6 +454,10 @@ function AddCellRow(sink, {
   const frontZ = lz + facing * halfD;
   const backZ = lz - facing * halfD;
   const faceOut = Dir(ry, 0, facing);
+  // 可进的那一间横跨的开间号：从这扇门往两边各摊到与隔壁牢门的中线
+  const hasOpen = openCell >= 0 && openCell < bays;
+  const openA = hasOpen ? Math.max(0, openCell - 2) : 1;
+  const openB = hasOpen ? Math.min(bays - 1, openCell + doorEvery - 3) : -1;
 
   // --- 背立面与两山：连续实墙，一个洞都没有（这一条比铁窗更能说明是牢房）---
   sink.Add(mat, PlaceGeometry(
@@ -352,6 +479,7 @@ function AddCellRow(sink, {
   for (let b = 0; b < bays; b += 1) {
     const off = -width / 2 + bayW * (b + 0.5);
     const isDoor = b % doorEvery === 2;
+    const inOpen = b >= openA && b <= openB;
     const p = L(lx + off, frontZ);
     if (isDoor) {
       // 牢门：两侧填墙 + 木过梁 + 门槛 + 一扇厚门板
@@ -373,6 +501,19 @@ function AddCellRow(sink, {
       sink.Add("Stone", PlaceGeometry(
         MakeBox(CELL.doorW + 0.34, 0.14, 0.42, TILE_METERS.stone, `${seed}:dsl${b}`),
         { x: sillP.x, y: 0.07, z: sillP.z, ry }));
+      if (b === openCell) {
+        // 可进的那一间：门半开（板斜插进屋里），门道做出进深
+        AddOpenLeaf(sink, {
+          L, ry, lx: lx + off, lz: frontZ, openW: CELL.doorW, openH: CELL.doorH,
+          seed: `${seed}:od${b}`, hinge: 1, swing: -facing, angle: 1.25,
+        });
+        AddDoorReveal(sink, {
+          x: p.x, z: p.z, ry: ry + (facing > 0 ? Math.PI : 0),
+          openW: CELL.doorW, openH: CELL.doorH, depth: t + 0.9,
+          seed: `${seed}:orv${b}`, paving: "Stone", sill: "Stone",
+        });
+        continue;
+      }
       const leafP = L(lx + off, frontZ + facing * (t / 2 - 0.02));
       sink.Add("WoodDoor", PlaceGeometry(
         MakeBox(CELL.doorW - 0.05, CELL.doorH - 0.06, 0.11, TILE_METERS.wood, `${seed}:dd${b}`),
@@ -397,11 +538,15 @@ function AddCellRow(sink, {
         MakeBox(pierW, CELL.winH, t, TILE_METERS.brick, `${seed}:pi${b}${s}`, BRICK_UV_GRID),
         { x: q.x, y: CELL.sill + CELL.winH / 2, z: q.z, ry }));
     }
-    // 洞里的暗：一块深色挡板退到墙厚里侧（同 AddDugout 的做法，读作"里面是暗的"）
-    const backP = L(lx + off, frontZ - facing * (t / 2 + 0.06));
-    sink.Add("Charred", PlaceGeometry(
-      MakeBox(CELL.winW + 0.06, CELL.winH + 0.04, 0.1, TILE_METERS.stone, `${seed}:wd${b}`),
-      { x: backP.x, y: CELL.sill + CELL.winH / 2, z: backP.z, ry }));
+    // 洞里的暗：一块深色挡板退到墙厚里侧（同 AddDugout 的做法，读作"里面是暗的"）。
+    // 可进的那一间**不能**有这块板 —— 屋里没有独立光源，全靠这几个窗洞进光，
+    // 堵上就是站在屋里对着一堵黑墙（共用任务书「内部空间契约」第四条）。
+    if (!inOpen) {
+      const backP = L(lx + off, frontZ - facing * (t / 2 + 0.06));
+      sink.Add("Charred", PlaceGeometry(
+        MakeBox(CELL.winW + 0.06, CELL.winH + 0.04, 0.1, TILE_METERS.stone, `${seed}:wd${b}`),
+        { x: backP.x, y: CELL.sill + CELL.winH / 2, z: backP.z, ry }));
+    }
     // 三根竖铁栅（几何做，不动 tzm 贴图管线）
     const barP = L(lx + off, frontZ + facing * (t / 2 + 0.01));
     for (let i = 0; i < 3; i += 1) {
@@ -448,7 +593,59 @@ function AddCellRow(sink, {
   }
 
   const c = L(lx, lz);
-  sink.Solid(c.x, eave / 2, c.z, width / 2 + 0.2, eave / 2, halfD, "wall", ry);
+  if (!hasOpen) {
+    // 全封闭：整排一个实心盒（第一轮的行为，最省 collider）
+    sink.Solid(c.x, eave / 2, c.z, width / 2 + 0.2, eave / 2, halfD, "wall", ry);
+  } else {
+    // 掏空一间：碰撞拆成「背墙 + 两山 + 这一间以外的实心段 + 隔墙 + 这一间的正立面」。
+    // 每一块都比整排那一个盒子小，但加起来还是把除这一间以外的地方全填死。
+    const bp = L(lx, backZ);
+    sink.Solid(bp.x, eave / 2, bp.z, width / 2 + 0.2, eave / 2, t / 2 + 0.1, "wall", ry);
+    for (const s of [-1, 1]) {
+      const p = L(lx + s * (width / 2), lz);
+      sink.Solid(p.x, eave / 2, p.z, t / 2 + 0.1, eave / 2, halfD, "wall", ry);
+    }
+    const edgeA = -width / 2 + bayW * openA;
+    const edgeB = -width / 2 + bayW * (openB + 1);
+    for (const [x0, x1] of [[-width / 2 - 0.2, edgeA], [edgeB, width / 2 + 0.2]]) {
+      if (x1 - x0 <= 0.4) continue;                     // 只剩端墙那一点，端墙自己已经登记了
+      const p = L(lx + (x0 + x1) / 2, lz);
+      sink.Solid(p.x, eave / 2, p.z, (x1 - x0) / 2, eave / 2, halfD, "wall", ry);
+    }
+    // 隔墙：把这一间与隔壁隔开。撞到排屋端头时不用做 —— 那里本来就是山墙
+    for (const [edge, inner, need] of [
+      [edgeA, 1, openA > 0], [edgeB, -1, openB < bays - 1],
+    ]) {
+      if (!need) continue;
+      const p = L(lx + edge, lz);
+      sink.Add(mat, PlaceGeometry(
+        MakeBox(ROOM.partT, eave, depth - t, TILE_METERS.brick, `${seed}:pt${inner}`, BRICK_UV_GRID),
+        { x: p.x, y: eave / 2, z: p.z, ry }));
+      sink.Solid(p.x, eave / 2, p.z, ROOM.partT / 2, eave / 2, (depth - t) / 2, "wall", ry);
+    }
+    // 这一间的正立面：窗间墙整开间实心，牢门只有两侧填墙实心 —— 门洞留空
+    for (let b = openA; b <= openB; b += 1) {
+      const off = -width / 2 + bayW * (b + 0.5);
+      if (b === openCell) {
+        const fill = (bayW - CELL.doorW) / 2;
+        for (const s of [-1, 1]) {
+          const q = L(lx + off + s * (CELL.doorW / 2 + fill / 2), frontZ);
+          sink.Solid(q.x, eave / 2, q.z, fill / 2, eave / 2, t / 2 + 0.1, "wall", ry);
+        }
+      } else {
+        const q = L(lx + off, frontZ);
+        sink.Solid(q.x, eave / 2, q.z, bayW / 2, eave / 2, t / 2 + 0.1, "wall", ry);
+      }
+    }
+    AddCellInterior(sink, {
+      L, ry, seed: `${seed}:in`,
+      x0: lx + edgeA + (openA > 0 ? ROOM.partT / 2 : t / 2),
+      x1: lx + edgeB - (openB < bays - 1 ? ROOM.partT / 2 : t / 2),
+      zBack: backZ + facing * (t / 2),
+      zFront: frontZ - facing * (t / 2),
+      facing, eave,
+    });
+  }
   const fc = L(lx, frontZ);
   sink.Cover(fc.x, fc.z, eave, faceOut[0], faceOut[1]);
   void damage;
@@ -482,6 +679,295 @@ function AddInnerGate(sink, {
     x: c.x, z: c.z, ry: ry + (axis === "x" ? Math.PI : -Math.PI / 2),
     openW, openH, depth: thick + 0.9, seed: `${seed}:rv`, paving: "Stone", sill: "Stone",
   });
+}
+
+// ---------------------------------------------------------------------------
+// 内部陈设
+// ---------------------------------------------------------------------------
+/** 瓦罐／水缸。屋里唯一的圆东西 —— 一屋子直线里有一件圆的，屋子才不像模型。 */
+function AddCrock(sink, { L, ry, lx, lz, seed, scale = 1, tag = "prop" }) {
+  const p = L(lx, lz);
+  const body = new THREE.CylinderGeometry(0.23 * scale, 0.29 * scale, 0.44 * scale, 10);
+  ScaleRadialUv(body, 1.6, 0.5);
+  sink.Add("HouseholdCeramic", PlaceGeometry(body, { x: p.x, y: 0.22 * scale, z: p.z, ry }));
+  const neck = new THREE.CylinderGeometry(0.15 * scale, 0.23 * scale, 0.15 * scale, 10);
+  ScaleRadialUv(neck, 1.6, 0.2);
+  sink.Add("HouseholdCeramic", PlaceGeometry(neck,
+    { x: p.x, y: 0.51 * scale, z: p.z, ry: ry + (HashString(seed) % 13) * 0.05 }));
+  sink.Solid(p.x, 0.29 * scale, p.z, 0.26 * scale, 0.29 * scale, 0.26 * scale, tag, ry);
+}
+
+/**
+ * 顶棚（苇箔）+ 三根梁。
+ *
+ * 两条不显眼但一错就穿帮的规矩：
+ *   ① 顶棚要**盖过墙头**（w/d 传外皮尺寸而不是净空），否则战损削低的那几片墙
+ *      会从顶棚外侧露出天光 —— 屋里抬头看见一排白牙（第一版实拍就是这样）；
+ *   ② 梁在顶棚**底下**，不是上面。苇箔是搭在梁上的。
+ */
+function AddCeiling(sink, { L, ry, xc, zc, w, d, y, seed }) {
+  const p = L(xc, zc);
+  sink.Add("Wicker", PlaceGeometry(
+    MakeBox(w, 0.05, d, TILE_METERS.cloth, `${seed}:cl`),
+    { x: p.x, y, z: p.z, ry }));
+  for (let i = 0; i < 3; i += 1) {
+    const q = L(xc + (i - 1) * (w / 3.4), zc);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.14, 0.16, d * 0.99, TILE_METERS.wood, `${seed}:bm${i}`),
+      { x: q.x, y: y - 0.11, z: q.z, ry }));
+  }
+}
+
+/**
+ * 可进的那一间牢房：通铺木板 + 草席 + 瓦罐 + 一地烂草。
+ *
+ * 陈设的口径是「**没有一件是私产**」：铺是公家的板，席是发的，罐是公用的，
+ * 除此之外一件属于个人的东西都没有 —— 这一条比铁窗更能说明这里关的是人。
+ * 所以不摆箱笼、不摆碗筷、不摆衣物，也不摆稻草人式的「生活感」。
+ */
+function AddCellInterior(sink, { L, ry, seed, x0, x1, zBack, zFront, facing, eave, wallT = 0.42 }) {
+  const wIn = x1 - x0;
+  const dIn = Math.abs(zFront - zBack);
+  if (wIn < 1.4 || dIn < 1.4) return;
+  const xc = (x0 + x1) / 2;
+  const zc = (zBack + zFront) / 2;
+  const rnd = Mulberry32(HashString(`${seed}:cell`));
+
+  // 夯土地坪：不铺的话屋里露出的是院外那层带草的地面
+  const fp = L(xc, zc);
+  sink.Add("YardEarth", PlaceGeometry(
+    MakeBox(wIn, 0.08, dIn, TILE_METERS.ground, `${seed}:floor`),
+    { x: fp.x, y: 0.0, z: fp.z, ry }));
+  AddCeiling(sink, {
+    L, ry, xc, zc, w: wIn + wallT, d: dIn + wallT,
+    y: eave - ROOM.ceilingY, seed: `${seed}:ceil`,
+  });
+
+  // --- 通铺：砖墩 + 两根托梁 + 一排木板，顺背墙一通到底 ---
+  const bunkLen = Math.max(1.6, wIn - 0.5);
+  const bunkZ = zBack + facing * (ROOM.bunkD / 2);
+  const piers = Math.max(2, Math.round(bunkLen / 2.6));
+  for (let i = 0; i <= piers; i += 1) {
+    for (const s of [-1, 1]) {
+      const px = xc - bunkLen / 2 + (bunkLen * i) / piers;
+      const pz = bunkZ + facing * s * (ROOM.bunkD / 2 - 0.28);
+      const q = L(Clamp(px, xc - bunkLen / 2 + 0.16, xc + bunkLen / 2 - 0.16), pz);
+      sink.Add("PrisonWall", PlaceGeometry(
+        MakeBox(0.32, ROOM.bunkH - 0.09, 0.3, TILE_METERS.brick, `${seed}:pier${i}${s}`, BRICK_UV_GRID),
+        { x: q.x, y: (ROOM.bunkH - 0.09) / 2, z: q.z, ry }));
+    }
+  }
+  for (const s of [-1, 1]) {
+    const q = L(xc, bunkZ + facing * s * (ROOM.bunkD / 2 - 0.28));
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(bunkLen, 0.09, 0.14, TILE_METERS.wood, `${seed}:bear${s}`),
+      { x: q.x, y: ROOM.bunkH - 0.045, z: q.z, ry }));
+  }
+  const planks = Math.max(3, Math.round(bunkLen / 0.55));
+  for (let i = 0; i < planks; i += 1) {
+    const px = xc - bunkLen / 2 + (bunkLen / planks) * (i + 0.5);
+    const q = L(px, bunkZ);
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox((bunkLen / planks) * 0.93, 0.05, ROOM.bunkD, TILE_METERS.wood, `${seed}:pk${i}`),
+      { x: q.x, y: ROOM.bunkH + 0.025, z: q.z, ry: ry + (rnd() - 0.5) * 0.012 }));
+  }
+  sink.Solid(L(xc, bunkZ).x, ROOM.bunkH / 2, L(xc, bunkZ).z,
+    bunkLen / 2, ROOM.bunkH / 2, ROOM.bunkD / 2, "furniture", ry);
+
+  // --- 草席：铺开的几张 + 卷起来靠墙的一卷 ---
+  // 席面走 VillageStraw（枯草的黄褐）。三个都试过，这是最不坏的一个：
+  //   · Wicker 压在 Sandbag 配方上，近景是**发亮的橙木板**，与身下的铺板分不开；
+  //   · HouseholdCloth（ClothNra）实拍偏冷灰，一床草席读成一床铁皮；
+  //   · VillageStraw 是纯色无贴图，室内直射下发白 —— 但「浅黄的席 / 深褐的板」
+  //     这一层对比是对的。调色目标见报告（建议压到 0x6f5c3c）。
+  const mats = Math.max(2, Math.min(4, Math.round(bunkLen / 3.0)));
+  for (let i = 0; i < mats; i += 1) {
+    const px = xc - bunkLen / 2 + (bunkLen / mats) * (i + 0.5) + (rnd() - 0.5) * 0.2;
+    const q = L(px, bunkZ + facing * (rnd() - 0.5) * 0.18);
+    sink.Add("VillageStraw", PlaceGeometry(
+      MakeBox(0.86, 0.035, 1.72, TILE_METERS.cloth, `${seed}:mat${i}`),
+      { x: q.x, y: ROOM.bunkH + 0.07, z: q.z, ry: ry + (rnd() - 0.5) * 0.09 }));
+  }
+  const roll = new THREE.CylinderGeometry(0.12, 0.12, 1.66, 8);
+  ScaleRadialUv(roll, 1.2, 1.5);
+  const rp = L(xc + bunkLen / 2 - 0.35, bunkZ);
+  sink.Add("VillageStraw", PlaceGeometry(roll,
+    { x: rp.x, y: ROOM.bunkH + 0.14, z: rp.z, ry, rz: Math.PI / 2 }));
+
+  // --- 瓦罐：一只水罐一只便桶，摆在离铺最远的那个角 ---
+  AddCrock(sink, { L, ry, lx: x1 - 0.5, lz: zFront - facing * 0.55, seed: `${seed}:cr0` });
+  AddCrock(sink, { L, ry, lx: x1 - 1.05, lz: zFront - facing * 0.45, seed: `${seed}:cr1`, scale: 0.78 });
+
+  // --- 地上的烂草：从铺上掉下来的那点，别铺满，三五处就够 ---
+  for (let i = 0; i < 5; i += 1) {
+    const px = x0 + 0.5 + rnd() * Math.max(0.2, wIn - 1.0);
+    const pz = zBack + facing * (ROOM.bunkD + 0.25 + rnd() * Math.max(0.2, dIn - ROOM.bunkD - 0.6));
+    const q = L(px, pz);
+    sink.Add("VillageStraw", PlaceGeometry(
+      MakeBox(0.34 + rnd() * 0.3, 0.03, 0.22 + rnd() * 0.24, TILE_METERS.cloth, `${seed}:st${i}`),
+      { x: q.x, y: 0.05, z: q.z, ry: ry + rnd() * 3.1 }));
+  }
+}
+
+/**
+ * 牢头值房内部：桌案、锁具架、名牌墙。
+ *
+ * 这三件是 WP-A1 遗留 6 点名的。为什么偏偏是它们：值房与民居厢房的外壳一模一样
+ * （同样的砖、同样的三开间、同样的格子窗），**只有屋里的东西能分开这两件事**。
+ * 桌案上是册子不是饭碗；架子上挂的是锁与镣不是农具；墙上钉的是一格一格的名牌
+ * 不是年画 —— 名牌墙尤其重要，它把「关着多少人」这个数量摆在墙上。
+ *
+ * @param {object} spec cx,cz 屋子中心（局部）；w,d 面阔进深；doorLx 门洞局部 x
+ */
+function AddDutyInterior(sink, {
+  L, ry, cx, cz, w, d, eave, doorLx, seed, wallT = 0.36, facing = 1,
+}) {
+  // 净空 = 外皮 − **一个**墙厚（AddRoomBlock 的墙以 ±w/2 为中线、厚 wallT）。
+  // 第一版按两个墙厚算，屋里所有靠墙的东西都离墙 0.18 m 浮着 —— 名牌墙成了一块
+  // 飘在半空的板，钉在上面的名牌全被自己的底板挡掉。
+  const wIn = w - wallT;
+  const dIn = d - wallT;
+  if (wIn < 2.5 || dIn < 2.5) return;
+  const rnd = Mulberry32(HashString(`${seed}:duty`));
+  const zBack = cz - facing * (dIn / 2);          // 背墙内表面（门在 +facing 那一面）
+  const zFront = cz + facing * (dIn / 2);
+
+  const fp = L(cx, cz);
+  sink.Add("YardEarth", PlaceGeometry(
+    MakeBox(wIn, 0.08, dIn, TILE_METERS.ground, `${seed}:floor`),
+    { x: fp.x, y: 0.0, z: fp.z, ry }));
+  AddCeiling(sink, {
+    L, ry, xc: cx, zc: cz, w: wIn + wallT, d: dIn + wallT,
+    y: eave - 0.30, seed: `${seed}:ceil`,
+  });
+
+  // --- ① 牢头桌案：正对门口，背靠名牌墙 ---
+  const deskX = cx + Clamp(doorLx - cx, -wIn / 2 + 1.2, wIn / 2 - 1.2);
+  const deskZ = zBack + facing * 1.15;
+  const dp = L(deskX, deskZ);
+  sink.Add("WoodDoor", PlaceGeometry(
+    MakeBox(1.62, 0.07, 0.74, TILE_METERS.wood, `${seed}:top`),
+    { x: dp.x, y: ROOM.deskH, z: dp.z, ry }));
+  sink.Add("WoodDoor", PlaceGeometry(
+    MakeBox(1.5, 0.22, 0.05, TILE_METERS.wood, `${seed}:apron`),
+    { x: L(deskX, deskZ + facing * 0.34).x, y: ROOM.deskH - 0.21,
+      z: L(deskX, deskZ + facing * 0.34).z, ry }));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const q = L(deskX + sx * 0.72, deskZ + sz * 0.29);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.09, ROOM.deskH - 0.04, 0.09, TILE_METERS.wood, `${seed}:leg${sx}${sz}`),
+      { x: q.x, y: (ROOM.deskH - 0.04) / 2, z: q.z, ry }));
+  }
+  sink.Solid(dp.x, ROOM.deskH / 2, dp.z, 0.81, ROOM.deskH / 2, 0.37, "furniture", ry);
+  // 案上：两摞册子 + 一方砚 + 一盏油灯。摆得偏一侧，中间空出写字的地方
+  for (let i = 0; i < 2; i += 1) {
+    const q = L(deskX - 0.52 + i * 0.30, deskZ - facing * 0.08);
+    sink.Add("HouseholdCloth", PlaceGeometry(
+      MakeBox(0.24, 0.07 + i * 0.04, 0.32, TILE_METERS.cloth, `${seed}:book${i}`),
+      { x: q.x, y: ROOM.deskH + 0.04 + (0.07 + i * 0.04) / 2, z: q.z, ry: ry + (rnd() - 0.5) * 0.2 }));
+  }
+  const inkP = L(deskX + 0.42, deskZ - facing * 0.1);
+  sink.Add("Charred", PlaceGeometry(
+    MakeBox(0.17, 0.04, 0.13, TILE_METERS.stone, `${seed}:ink`),
+    { x: inkP.x, y: ROOM.deskH + 0.055, z: inkP.z, ry }));
+  const lampP = L(deskX + 0.66, deskZ + facing * 0.12);
+  sink.Add("IronPlate", PlaceGeometry(
+    MakeBox(0.13, 0.05, 0.13, TILE_METERS.wood, `${seed}:lampbase`),
+    { x: lampP.x, y: ROOM.deskH + 0.06, z: lampP.z, ry }));
+  sink.Add("IronPlate", PlaceGeometry(
+    MakeBox(0.06, 0.16, 0.06, TILE_METERS.wood, `${seed}:lampstem`),
+    { x: lampP.x, y: ROOM.deskH + 0.16, z: lampP.z, ry }));
+  // 条凳：在案子里侧（牢头坐着面朝门）
+  const benchP = L(deskX, deskZ - facing * 0.62);
+  sink.Add("WoodDoor", PlaceGeometry(
+    MakeBox(1.1, 0.1, 0.3, TILE_METERS.wood, `${seed}:benchseat`),
+    { x: benchP.x, y: 0.46, z: benchP.z, ry }));
+  for (const s of [-1, 1]) {
+    const q = L(deskX + s * 0.42, deskZ - facing * 0.62);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.09, 0.41, 0.22, TILE_METERS.wood, `${seed}:benchleg${s}`),
+      { x: q.x, y: 0.205, z: q.z, ry }));
+  }
+
+  // --- ② 锁具架：贴一侧山墙，两根立柱 + 两道横杆 + 挂着的锁与镣 ---
+  const rackX = cx - wIn / 2 + 0.22;
+  const rackZ = cz - facing * 0.2;
+  // 架子后面钉一块深色板：铁器与青砖都是冷灰，不垫底板近景根本分不出来
+  const backP = L(rackX - 0.10, rackZ);
+  sink.Add("WoodBeam", PlaceGeometry(
+    MakeBox(0.05, 1.30, 1.92, TILE_METERS.wood, `${seed}:rback`),
+    { x: backP.x, y: 1.50, z: backP.z, ry }));
+  for (const s of [-1, 1]) {
+    const q = L(rackX, rackZ + s * 0.88);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.10, 1.96, 0.10, TILE_METERS.wood, `${seed}:rp${s}`),
+      { x: q.x, y: 0.98, z: q.z, ry }));
+    sink.Solid(q.x, 0.98, q.z, 0.08, 0.98, 0.08, "furniture", ry);
+  }
+  for (let i = 0; i < 2; i += 1) {
+    const q = L(rackX, rackZ);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.08, 0.08, 1.84, TILE_METERS.wood, `${seed}:rb${i}`),
+      { x: q.x, y: 1.22 + i * 0.56, z: q.z, ry }));
+  }
+  // 挂着的铁锁：上下两排交错，够密才读得出「一屋子的锁」
+  for (let i = 0; i < 8; i += 1) {
+    const q = L(rackX + 0.09, rackZ - 0.78 + i * 0.22);
+    const row = i % 2;
+    sink.Add("IronPlate", PlaceGeometry(
+      MakeBox(0.13, 0.22, 0.16, TILE_METERS.wood, `${seed}:lock${i}`),
+      { x: q.x, y: 1.22 + row * 0.56 - 0.18, z: q.z, ry }));
+  }
+  // 两副脚镣：环 + 链，挂在上排横杆上
+  for (let i = 0; i < 2; i += 1) {
+    const ring = new THREE.TorusGeometry(0.13, 0.028, 4, 8);
+    ring.rotateY(Math.PI / 2);
+    const q = L(rackX + 0.10, rackZ + 0.44 + i * 0.34);
+    sink.Add("IronPlate", PlaceGeometry(ring, { x: q.x, y: 1.60, z: q.z, ry }));
+    sink.Add("IronPlate", PlaceGeometry(
+      MakeBox(0.05, 0.34, 0.05, TILE_METERS.wood, `${seed}:chain${i}`),
+      { x: q.x, y: 1.42, z: q.z, ry }));
+  }
+
+  // --- ③ 名牌墙：钉在背墙上的一块底板 + 一格一格的木牌（缺几块、歪几块）---
+  // 底板贴墙、名牌钉在底板**朝屋里**那一面（+facing）—— 方向弄反就整面墙空白
+  const boardW = Math.min(2.9, wIn - 1.0);
+  const bp = L(deskX, zBack + facing * 0.03);
+  sink.Add("WoodBeam", PlaceGeometry(
+    MakeBox(boardW, 1.18, 0.06, TILE_METERS.wood, `${seed}:board`),
+    { x: bp.x, y: 1.66, z: bp.z, ry }));
+  const cols = Math.max(5, Math.round(boardW / 0.30));
+  for (let r = 0; r < 3; r += 1) {
+    for (let cIdx = 0; cIdx < cols; cIdx += 1) {
+      if (rnd() < 0.14) continue;                       // 空出来的那几格：人不在了
+      const q = L(deskX - boardW / 2 + (boardW / cols) * (cIdx + 0.5),
+        zBack + facing * 0.085);
+      // 名牌走 HouseholdCloth（浅暖色）而不是木色：木牌钉在木底板上，
+      // 近景是一整片木头，「一格一格」这层意思就没了 —— 要的是深底浅牌的对比
+      sink.Add("HouseholdCloth", PlaceGeometry(
+        MakeBox((boardW / cols) * 0.58, 0.22, 0.02, TILE_METERS.cloth, `${seed}:tag${r}${cIdx}`),
+        { x: q.x, y: 2.08 - r * 0.38, z: q.z, ry, rz: rnd() < 0.16 ? (rnd() - 0.5) * 0.55 : 0 }));
+    }
+  }
+
+  // 屋角一只水罐：值房也是有人整天坐着的地方
+  AddCrock(sink, { L, ry, lx: cx + wIn / 2 - 0.45, lz: zBack + facing * 0.5, seed: `${seed}:crock` });
+  void zFront;
+}
+
+/**
+ * `AddRoomBlock` 的门板是它内部 `rnd() < 0.55` 抽出来的：抽中就在 1.25 m 的门洞里
+ * 糊上两扇 0.60 m 的板，**视觉上完全堵死**（碰撞照旧是通的 —— 人穿板而过）。
+ * 牢头值房要读作「可进」，所以在这里挑一个抽不中的 seed，再自己摆一扇半开的门板。
+ * 换 seed 只改砖面 UV 噪声与山墙口眼的有无，形制尺寸一个字不变。
+ *
+ * 正解是让 `AddRoomBlock` 收一个 `doorLeaf` 参数，但那是共享文件 —— 见报告。
+ */
+function SeedWithoutDoorLeaves(base) {
+  for (const suffix of ["", "a", "b", "c", "d", "e", "f", "g", "h"]) {
+    if (Mulberry32(HashString(`${base}${suffix}:rb`))() >= 0.55) return `${base}${suffix}`;
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -549,14 +1035,33 @@ export function BuildPrison(host, f, ctx) {
   const dutyD = 5.0;
   const dutyW = Math.min(11, Math.max(6, hw - 6));
   const septumZ = dutyZ - dutyD / 2;
+  const dutyBays = Math.max(2, Math.round(dutyW / 3.4));   // 值房是办公用房，开间照民居 3.0—3.6
+  const dutyEave = 2.75;
   for (const s of [-1, 1]) {
-    const p = L(s * (2.6 + dutyW / 2), septumZ);
+    const dutyLx = s * (2.6 + dutyW / 2);
+    const p = L(dutyLx, septumZ);
+    // 西边那一块是**牢头值房**（门半开、屋里有陈设）；东边那一块照旧是关着门的办公房。
+    // 两块外壳完全一样 —— 一开一闭本身就是「哪一间有人」的交代。
+    const open = s < 0;
     AddRoomBlock(sink, {
       x: p.x, z: p.z, ry, width: dutyW, depth: dutyD,
-      eaveY: 2.75, ridgeY: 2.75 + dutyD * 0.5 * 0.5,
-      seed: `${seed}:duty${s}`, damage, burnt, facing: -1,
-      bays: Math.max(2, Math.round(dutyW / 3.4)),      // 值房是办公用房，开间照民居 3.0—3.6
+      eaveY: dutyEave, ridgeY: dutyEave + dutyD * 0.5 * 0.5,
+      seed: `${seed}:duty${s}`,
+      doorLeaf: open ? "none" : "random",   // 共享文件已支持，替代挑 seed 的绕法
+      damage, burnt, facing: -1, bays: dutyBays,
     });
+    if (open) {
+      // AddRoomBlock 的门在明间：局部 x 与本文件同向，局部 -z 面（= 这里的 +z）朝前院
+      const doorLx = dutyLx - dutyW / 2 + (dutyW / dutyBays) * (Math.floor(dutyBays / 2) + 0.5);
+      AddOpenLeaf(sink, {
+        L, ry, lx: doorLx, lz: septumZ + dutyD / 2, openW: 1.25, openH: 2.0,
+        seed: `${seed}:dutyleaf`, hinge: 1, swing: -1, angle: 1.18, thick: 0.06, bands: 0,
+      });
+      AddDutyInterior(sink, {
+        L, ry, cx: dutyLx, cz: septumZ, w: dutyW, d: dutyD, eave: dutyEave,
+        doorLx, seed: `${seed}:dutyin`, facing: 1,
+      });
+    }
     const flankStart = 2.6 + dutyW;
     const flankLen = hw - flankStart;
     if (flankLen > 0.6) {
@@ -594,9 +1099,11 @@ export function BuildPrison(host, f, ctx) {
     L, ry, lx: 0, lz: rowAZ, width: cellW, depth: cellD,
     seed: `${seed}:rowA`, damage, facing: 1, mat, tileMat,
   });
+  // 后排西头那一间开着 —— 它的门正对甬道口（甬道从两排的端头绕进来），
+  // 是玩家从放风院一路走进来第一个能推开的门。其余牢房照旧全封闭。
   AddCellRow(sink, {
     L, ry, lx: 0, lz: rowBZ, width: cellW, depth: cellD,
-    seed: `${seed}:rowB`, damage, facing: 1, mat, tileMat,
+    seed: `${seed}:rowB`, damage, facing: 1, mat, tileMat, openCell: 2,
   });
 
   // --- 后院：伙房／杂房 + 一口井 ---
@@ -686,9 +1193,11 @@ export function BuildDetention(host, f, ctx) {
   const cellW = Math.min(f.w - 7.0, 22);
   const cellD = 5.6;
   const cellZ = -hd + 3.4 + cellD / 2;
+  // 押房也开一间（西头那一间，门正对院子）：看守所是「关几天等发落」的地方，
+  // 一间开着、其余闭着，正好是它与监狱的分别 —— 监狱那间开在甬道深处，这间开在院里。
   AddCellRow(sink, {
     L, ry, lx: 0, lz: cellZ, width: cellW, depth: cellD,
-    seed: `${seed}:cells`, damage, facing: 1, mat, tileMat, doorEvery: 4,
+    seed: `${seed}:cells`, damage, facing: 1, mat, tileMat, doorEvery: 4, openCell: 2,
   });
   const yp = L(0, cellZ + cellD / 2 + 2.2);
   AddYardWear(sink, { x: yp.x, z: yp.z, ry, baseY: 0, seed: `${seed}:yard`, radius: 3.2 });

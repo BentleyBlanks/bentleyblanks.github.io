@@ -41,7 +41,8 @@ import {
 } from "./Data_Tengxian.mjs";
 import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
 import {
-  PickCityBlockArchetype, BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
+  PickCityBlockArchetype, PickDuplex,
+  BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
 } from "./Script_CityBlockKit.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
@@ -154,8 +155,8 @@ const PLAIN_MAP = {
   // 色板给的已经是褪色值，但纯色材质没有纹理、读起来仍然太新。
   // 再往「蒙尘」(#8A8076) 里混三成半：1938 年的城楼彩画是严重褪色 + 蒙尘 + 局部剥落。
   PaintRed: { color: DustBlend(PALETTE.paintRed, 0.35), roughness: 0.92 },
-  // 官署朱漆档：0.35 蒙尘在县署门匾/檐柱上读成土黄（WP-A3 取证），官修建筑褪得轻一档
-  PaintRedOfficial: { color: DustBlend(PALETTE.paintRed, 0.20), roughness: 0.92 },
+  // 官署朱漆档：0.35 蒙尘读土黄（WP-A3）、0.20 在祠堂柱/匾上读三文鱼粉（WP-D6）——压到 0.12
+  PaintRedOfficial: { color: DustBlend(PALETTE.paintRed, 0.12), roughness: 0.92 },
   PaintGreen: { color: DustBlend(PALETTE.paintGreen, 0.35), roughness: 0.94 },
   IronPlate: { color: PALETTE.ironDoor, roughness: 0.62, metalness: 0.5 },
   Charred: { color: PALETTE.charred, roughness: 0.95 },
@@ -363,11 +364,12 @@ export class TengxianCity {
   constructor(scene, library, {
     quality = "high", seed = 19380317, foci = [[0, 0]],
     detailRadius = 100, midRadius = 210, bounds = null, breaches = true,
-    farGroundRings = 5,
+    farGroundRings = 5, levelId = null,
   } = {}) {
     this.scene = scene;
     this.library = library;
     this.quality = quality;
+    this.levelId = levelId;          // 地标构建器按关卡分档（16日庇护/17日焦土之类）用
     this.seed = seed;
     this.foci = foci;
     this.detailRadius = detailRadius;
@@ -1128,7 +1130,7 @@ export class TengxianCity {
    * 所以这里不会与雕格逻辑打架 —— 它只回答「这一格临不临街」。
    * @returns {{zone:object, across:number, gap:number, width:number}|null}
    */
-  BlockStreet(cell) {
+  BlockStreet(cell, preferWide = false) {
     let best = null;
     for (const s of this.StreetZones()) {
       const along = s.axis === "x" ? cell.x : cell.z;
@@ -1136,30 +1138,50 @@ export class TengxianCity {
       const across = (s.axis === "x" ? cell.z : cell.x) - s.at;
       const half = (s.axis === "x" ? cell.d : cell.w) / 2;
       const gap = Math.abs(across) - half - s.half;
-      if (!best || gap < best.gap) {
-        best = { zone: s, across, gap, width: (s.half - 1.2) * 2 };
-      }
+      // 3.5 m 是「一格院墙贴着街」的容差：巷宽 2 m 的退让带算进来了。
+      if (gap >= 3.5) continue;
+      const cand = { zone: s, across, gap, width: (s.half - 1.2) * 2 };
+      if (!best) { best = cand; continue; }
+      // `preferWide`（铺面用）：门脸要冲**最宽**的那条街，不是最近的那条。
+      // 一格同时贴着一条 9 m 主街与一条 2 m 巷时，按「最近」选会把整排
+      // 门脸转去对着巷子 —— 从主街上走过去只看得见一排后檐墙（D7 实测踩到）。
+      if (preferWide) {
+        const better = cand.width > best.width + 0.5
+          || (Math.abs(cand.width - best.width) <= 0.5 && cand.gap < best.gap);
+        if (better) best = cand;
+      } else if (cand.gap < best.gap) best = cand;
     }
-    // 3.5 m 是「一格院墙贴着街」的容差：巷宽 2 m 的退让带算进来了。
-    return best && best.gap < 3.5 ? best : null;
+    return best;
   }
 
   /**
-   * 一格院子盖什么、朝哪边。**只决定格子里的内容，不动 PlanBlocks 的雕格。**
+   * 一格院子盖什么、朝哪边、住一户还是两户。
+   * **只决定格子里的内容，不动 PlanBlocks 的雕格。**
    *
    * `ry` 走 Script_CityBlockKit 的局部系：ry=0 即坐北朝南（正房在北、门在南）。
    * 只有 ShopRow 跟着街转 —— 铺面的脸必须冲着它做生意的那条街。
+   *
+   * D7 加的一件：`duplex`（"ew" / "ns" / null）—— 够大的一格按 seed 切成
+   * **两户共山墙小院**。判定住在 `PickDuplex` 里，三档 LOD 共用同一个答案。
+   * 让位语义（街／十字口／地标／上城道／顺城街／视线走廊）仍然全部在
+   * `PlanBlocks` 里，一个字符没有动：两户是在**活下来的那一格里面**分的。
    */
   BlockPlan(cell) {
+    // `street` = 最近的一条（判临不临街）；`wide` = 贴着的最宽的一条
+    // （判是不是主街临街面、门脸冲哪边）。一格同时贴主街与巷子时两者不是同一条。
     const street = this.BlockStreet(cell);
+    const wide = this.BlockStreet(cell, true) || street;
     const dCross = Math.hypot(cell.x - CROSSROAD.x, cell.z - CROSSROAD.z);
     // 「十字街口四角有铺面」是志载；往外沿主街递减，次街上只有零星铺子。
     // 这一条替代了原来「只有紧贴十字街口的一圈算铺面」的硬判定：
     // 一条商业主街不该在离街口 30 m 处忽然全变成民居。
+    //
+    // D7 把主街（宽 ≥ 7 m）那一档从 0.60 提到 0.75：一条县城主街的临街面
+    // 本来就**几乎全是铺面**，住家的院门要退到巷子里去。次街不动。
     let shop = !!cell.shop;
-    if (!shop && street) {
-      const p = street.width >= 7
-        ? Clamp(0.60 - dCross / 520, 0.10, 0.60)
+    if (!shop && wide) {
+      const p = wide.width >= 7
+        ? Clamp(0.75 - dCross / 600, 0.18, 0.75)
         : Clamp(0.18 - dCross / 900, 0.03, 0.18);
       shop = ((HashString(`${cell.seed}:shopRoll`) >>> 0) % 1000) / 1000 < p;
     }
@@ -1168,15 +1190,28 @@ export class TengxianCity {
       w: cell.w, d: cell.d,
     });
     let ry = 0;                                   // 坐北朝南
-    if (kind === "ShopRow" && street) {
+    let faceAxis = null, across = 0;
+    if (kind === "ShopRow") {
+      if (wide) { faceAxis = wide.zone.axis; across = wide.across; }
+      else {
+        // 十字街口四角那四格：`PlanBlocks` 直接判成铺面，但街口自己把格子推开了，
+        // 它们离两条街的街心都超过 `BlockStreet` 的 3.5 m 容差 ⇒ street 为 null。
+        // C1 那一版于是让这四格一律 ry=0 —— **门脸冲南，与十字街口背对背**
+        // （志载「十字街口四角有铺面」，背对着街口的铺子不是铺子）。D7 修掉：
+        // 冲离得更近的那一条街，也就是把门脸转向街口。
+        const dx = cell.x - CROSSROAD.x, dz = cell.z - CROSSROAD.z;
+        if (Math.abs(dz) <= Math.abs(dx)) { faceAxis = "x"; across = dz; }
+        else { faceAxis = "z"; across = dx; }
+      }
       // 局部 +z 必须指向街心：街在北 → ry=π；街在南 → 0；街在西 → −π/2；街在东 → +π/2
-      ry = street.zone.axis === "x"
-        ? (street.across > 0 ? Math.PI : 0)
-        : (street.across > 0 ? -Math.PI / 2 : Math.PI / 2);
+      ry = faceAxis === "x"
+        ? (across > 0 ? Math.PI : 0)
+        : (across > 0 ? -Math.PI / 2 : Math.PI / 2);
     }
     // 铺面的「面阔」是沿街那一边：街南北向时把 w/d 换过来
-    const swap = kind === "ShopRow" && street && street.zone.axis === "z";
-    return { kind, ry, w: swap ? cell.d : cell.w, d: swap ? cell.w : cell.d };
+    const swap = kind === "ShopRow" && faceAxis === "z";
+    const w = swap ? cell.d : cell.w, d = swap ? cell.w : cell.d;
+    return { kind, ry, w, d, duplex: PickDuplex({ seed: cell.seed, kind, w, d }) };
   }
 
   BuildBlock(cell, rnd) {
@@ -1195,9 +1230,12 @@ export class TengxianCity {
     const plan = this.BlockPlan(cell);
     const spec = {
       x: cell.x, z: cell.z, ry: plan.ry, w: plan.w, d: plan.d,
-      seed: cell.seed, damage, burnt, kind: plan.kind,
+      seed: cell.seed, damage, burnt, kind: plan.kind, duplex: plan.duplex,
     };
-    const lod = { damage, burnt, baseY: CITY.platformY, kind: plan.kind, ry: plan.ry };
+    const lod = {
+      damage, burnt, baseY: CITY.platformY,
+      kind: plan.kind, ry: plan.ry, duplex: plan.duplex,
+    };
     const lodCell = { x: cell.x, z: cell.z, w: plan.w, d: plan.d, seed: cell.seed };
 
     if (dist < this.detailRadius) {
@@ -1285,7 +1323,9 @@ export class TengxianCity {
     const registered = LANDMARK_BUILDERS[l.kind];
     if (registered) {
       const profile = this.DamageProfile(l.damage ?? 0.22);
-      registered(this, l, { damage: profile.damage, burnt: profile.burnt, ry: l.ry ?? 0 });
+      registered(this, l, {
+        damage: profile.damage, burnt: profile.burnt, ry: l.ry ?? 0, levelId: this.levelId,
+      });
       this.sink.SetSector("");
       this.farSink.SetSector("");
       return;
@@ -1364,7 +1404,7 @@ export class TengxianCity {
       const custom = LANDMARK_BUILDERS[f.kind];
       if (custom) {
         this.farSink.SetSector(SectorKey(f.x, f.z));
-        custom(this, f, { damage, burnt, ry });
+        custom(this, f, { damage, burnt, ry, levelId: this.levelId });
         this.sink.SetSector("");
         this.farSink.SetSector("");
         continue;
@@ -2091,7 +2131,7 @@ export class TengxianCity {
       if (!builder || !spec || !this.InBounds(spec.x, spec.z, radius)) continue;
       this.sink.SetSector(SectorKey(spec.x, spec.z));
       this.farSink.SetSector(SectorKey(spec.x, spec.z));
-      builder(this, { id: kind, ...spec }, { damage: 0.2, burnt: false, ry: spec.ry ?? 0 });
+      builder(this, { id: kind, ...spec }, { damage: 0.2, burnt: false, ry: spec.ry ?? 0, levelId: this.levelId });
       this.sink.SetSector("");
       this.farSink.SetSector("");
     }

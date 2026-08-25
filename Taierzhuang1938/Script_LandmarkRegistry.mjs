@@ -10,7 +10,8 @@
 //             host.sink / host.farSink（BuildSink）、host.OnStreet(x,z,hx,hz)、
 //             host.AddFeatureRoom(f, ry, lx, lz, w, d, spec)、host.OuterHeight(x,z)
 //     f    —— Data_Tengxian 里的那一条数据（x/z/w/d/ry/id/label…），尺寸不许另起炉灶
-//     ctx  —— { damage, burnt, ry }：破损档位与朝向都已算好
+//     ctx  —— { damage, burnt, ry, levelId }：破损档位与朝向已算好；
+//              levelId 供按关卡分档（如天主堂 16 日庇护 / 17 日焦土），编辑器替身下为 null
 //   只许 import Script_World / Script_Geo / Script_Noise / Script_LivedInProps / three；
 //   **严禁 import Script_TengxianCity（循环依赖）与 Data_Tengxian（尺寸走 f）**。
 //   碰撞：一律经 sink.Solid（tag 见 Data_Destruction.TAG_PROFILE，未注册默认 masonry）。

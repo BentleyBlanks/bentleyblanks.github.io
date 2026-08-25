@@ -65,7 +65,7 @@ export class TengxianField {
     // 序·界河也曾经走这条路，但 24 圈仍然是 42 m 一格 —— 刻不出 38 m 的河槽。
     // 那一关现在是独立场景（Script_JieheField），不再经过这里。
     this.city = new TengxianCity(scene, library, {
-      quality, seed, foci, detailRadius, midRadius, bounds,
+      quality, seed, foci, detailRadius, midRadius, bounds, levelId,
       farGroundRings: HasOutfield(levelId) ? 24 : 5,
     });
     /**

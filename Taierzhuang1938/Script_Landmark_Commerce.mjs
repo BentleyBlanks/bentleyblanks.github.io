@@ -1,4 +1,10 @@
-// 商会 + 当典（当铺）+ 办事处 —— 商用公建三件。工作包 A4 专属文件。
+// 商会 + 当典（当铺）+ 办事处 —— 商用公建三件。工作包 A4 / D5 专属文件。
+//
+// 【第二轮 D5】三件事，都在下面各自的位置有详注：
+//   ① 商会穿堂门道旁那一间开成**能进去的铺面**（排门板卸两块当门 + 柜台/货架/算盘案/幌子杆内头）；
+//   ② 腰檐挑出 1.6 → 1.0 m，把门匾从檐影里放出来（A4 遗留 4 的二选一）；
+//   ③ 当典墙头碎瓷第三版：压扁 + 斜置 + 抽签间距，顺手减 22% 面（A4 遗留 3）。
+// 当典库楼与办事处**一个字没动**。
 // 契约见 Script_LandmarkRegistry.mjs 头注：Build<Kind>(host, f, ctx)，尺寸一律从 f 读。
 //
 // 三件东西各自要在 Z8 俯瞰里**一眼跟民居网格分开**，靠的是三种不同的读图信号：
@@ -43,8 +49,8 @@ function SiteFrame(f, ry) {
 }
 
 /** 一块摆好位置的方料。楼层、腰檐、门额这些不落地的构件只能这么砌（AddWall 恒从 y=0 起）。 */
-function Slab(sink, material, p, y, w, h, d, ry, seed, { rx = 0, tile = TILE_METERS.brick } = {}) {
-  sink.Add(material, PlaceGeometry(MakeBox(w, h, d, tile, seed), { x: p.x, y, z: p.z, ry, rx }));
+function Slab(sink, material, p, y, w, h, d, ry, seed, { rx = 0, rz = 0, tile = TILE_METERS.brick } = {}) {
+  sink.Add(material, PlaceGeometry(MakeBox(w, h, d, tile, seed), { x: p.x, y, z: p.z, ry, rx, rz }));
 }
 
 /** 不落地构件的碰撞：AddWall/AddRoomBlock 自带 Solid，自砌的方料要自己登记。 */
@@ -105,6 +111,254 @@ function Room(host, f, ry, lx, lz, spec) {
 }
 
 // ---------------------------------------------------------------------------
+// 商会临街铺面（第二轮 WP-D5）——「穿堂门道旁的一间能走进去」
+//
+// 白天的铺面就是把排门板卸下几块：本包做成一间七块板的铺子，**卸中间两块当门**，
+// 里头是柜台（L 形）+ 两组货架 + 算盘案，幌子杆从门洞上沿穿出去挑到街面上。
+//
+// 三条硬约束（WP_Common「内部空间契约」）：
+//   · **门洞必可走**：前檐的碰撞不再是"一开间一整条"，而是按卸板留出的净宽
+//     切成左右两段，中间那 1.12 m 真的空着（探针沿轴线 0—1.8 m 采样零阻挡）；
+//   · **家具全走 sink**：合批 + 可破坏 + 只用本包已有的材质名，不新起几何通道；
+//   · **内部没有独立光源**：所以门头那一段不砌砖，改成透光的木棂亮子 ——
+//     店堂靠"门洞 + 亮子"两个口采光，暗是效果，全黑是 bug。
+//
+// 尺寸推定（无史料，列进交付报告的 PRESUMED 表）：排门板七块／块宽 0.56 m、
+// 板高 2.75 m；店堂进深 5.6 m；柜台高 0.95 m；货架四层／层距 0.5 m。
+// ---------------------------------------------------------------------------
+
+const SHOP = Object.freeze({
+  depth: 5.6,        // 店堂进深（前檐墙心 → 后板壁心）
+  boards: 7,         // 一开间排门板的块数
+  openAt: 2,         // 从局部 -x 数起卸下第 3、4 块
+  openCount: 2,
+  partT: 0.12,       // 板壁厚
+  boardTop: 2.75,    // 排门板顶（= 其它开间门头板的底）
+  counterH: 0.95,
+});
+
+/** 卸板口在开间局部坐标里的左右端点。前脸与内部两处都要用同一份，别各算各的。 */
+function ShopOpening(panelW) {
+  const bw = panelW / SHOP.boards;
+  const a = -panelW / 2 + bw * SHOP.openAt;
+  return { bw, a, b: a + bw * SHOP.openCount, cx: a + (bw * SHOP.openCount) / 2 };
+}
+
+/** 一组木货架：两根立柱 + 若干层隔板 + 层上的货。背靠板壁摆，along 说的是"长边顺哪个轴"。 */
+function AddShopShelf(sink, At, ry, seed, o) {
+  const wood = { tile: TILE_METERS.wood };
+  const rnd = Mulberry32(HashString(seed));
+  const alongU = o.along === "u";
+  const half = o.len / 2;
+  const dx = alongU ? o.len : o.depth;
+  const dz = alongU ? o.depth : o.len;
+  for (const s of [-1, 1]) {
+    const p = alongU ? At(o.u + s * (half - 0.05), o.lz) : At(o.u, o.lz + s * (half - 0.05));
+    Slab(sink, "WoodBeam", p, 1.07, alongU ? 0.1 : o.depth, 2.14, alongU ? o.depth : 0.1, ry,
+      `${seed}:up${s}`, wood);
+  }
+  for (let i = 0; i < o.tiers; i += 1) {
+    const y = 0.44 + i * 0.5;
+    Slab(sink, "WoodDoor", At(o.u, o.lz), y, dx - 0.03, 0.05, dz - 0.03, ry, `${seed}:tier${i}`, wood);
+    if (!o.goods) continue;
+    for (let k = 0; k < 3; k += 1) {
+      const off = (-0.3 + k * 0.3) * o.len;
+      const p = alongU ? At(o.u + off, o.lz) : At(o.u, o.lz + off);
+      const pick = Math.floor(rnd() * 3);
+      const h = 0.16 + rnd() * 0.12;
+      const w = 0.22 + rnd() * 0.1;
+      // 绸布卷 / 木匣 / 荆条篓：三样都是商会铺子该有的，材质全是院里已经在用的
+      const mat = pick === 0 ? "HouseholdCloth" : (pick === 1 ? "WoodDoor" : "Wicker");
+      Slab(sink, mat, p, y + 0.025 + h / 2, alongU ? w : o.depth * 0.62,
+        h, alongU ? o.depth * 0.62 : w, ry, `${seed}:g${i}${k}`,
+        { tile: pick === 0 ? TILE_METERS.cloth : TILE_METERS.wood });
+    }
+  }
+  const p = At(o.u, o.lz);
+  sink.Solid(p.x, 1.07, p.z, dx / 2, 1.07, dz / 2, "furniture", ry);
+}
+
+/**
+ * 临街那一间的前脸：石门槛槽 + 五块排门板 + 卸掉的两块留出的门洞 + 门头亮子。
+ * 碰撞在这里分段，是"能不能进去"的唯一决定点。
+ */
+function AddShopFront(sink, S, ry, seed, ctx, g) {
+  const { lx, panelW, floor1, hd } = g;
+  const { bw, a, b, cx } = ShopOpening(panelW);
+  const top = SHOP.boardTop;
+  const face = hd - 0.22;
+  const wallMat = ctx.burnt ? "BrickWallSooty" : "BrickWall";
+  const wood = { tile: TILE_METERS.wood };
+
+  // 上下槽：排门板卡在石槛与木上槛之间。门洞那一段不铺石槛（门槛石由 AddDoorReveal 出）
+  for (const [x0, x1, tag] of [[-panelW / 2 - 0.11, a, "L"], [b, panelW / 2 + 0.11, "R"]]) {
+    Slab(sink, "Stone", S.At(lx + (x0 + x1) / 2, hd + 0.02), 0.06, x1 - x0, 0.12, 0.38, ry,
+      `${seed}:shopSill${tag}`, { tile: TILE_METERS.stone });
+  }
+  Slab(sink, "WoodBeam", S.At(lx, hd + 0.02), top + 0.1, panelW + 0.22, 0.18, 0.34, ry,
+    `${seed}:shopHead`, wood);
+
+  // 排门板：卸掉中间两块，剩下五块连缝立楞
+  for (let i = 0; i < SHOP.boards; i += 1) {
+    if (i >= SHOP.openAt && i < SHOP.openAt + SHOP.openCount) continue;
+    const bx = lx - panelW / 2 + bw * (i + 0.5);
+    Slab(sink, "WoodDoor", S.At(bx, hd + 0.02), (top + 0.12) / 2, bw - 0.025, top - 0.12, 0.1, ry,
+      `${seed}:board${i}`, wood);
+    Slab(sink, "WoodBeam", S.At(bx + bw / 2 - 0.01, hd + 0.08), (top + 0.12) / 2, 0.05, top - 0.12, 0.06, ry,
+      `${seed}:boardJ${i}`, wood);
+  }
+
+  // 门头：卸板口上方**不砌砖**，改一樘木棂亮子 —— 店堂唯一的第二个采光口
+  for (const [x0, x1, tag] of [[-panelW / 2, a, "L"], [b, panelW / 2, "R"]]) {
+    if (x1 - x0 < 0.06) continue;
+    Slab(sink, wallMat, S.At(lx + (x0 + x1) / 2, face), (top + floor1) / 2, x1 - x0, floor1 - top, 0.44, ry,
+      `${seed}:shopTran${tag}`);
+  }
+  const lightW = b - a;
+  for (const [y, h, d] of [[top + 0.07, 0.1, 0.22], [floor1 - 0.07, 0.1, 0.22]]) {
+    Slab(sink, "WoodBeam", S.At(lx + cx, face), y, lightW, h, d, ry, `${seed}:shopLt${y}`, wood);
+  }
+  for (let m = 0; m < 5; m += 1) {
+    Slab(sink, "WoodBeam", S.At(lx + cx + (-0.36 + m * 0.18) * lightW, face), (top + floor1) / 2,
+      0.055, floor1 - top, 0.16, ry, `${seed}:shopLtM${m}`, wood);
+  }
+
+  // 碰撞：左右两段实心，中间那 1.12 m 真的空着。这一行就是"门洞可走"的全部
+  for (const [x0, x1] of [[-panelW / 2 - 0.26, a], [b, panelW / 2 + 0.26]]) {
+    const p = S.At(lx + (x0 + x1) / 2, face);
+    sink.Solid(p.x, floor1 / 2, p.z, (x1 - x0) / 2, floor1 / 2, 0.24, "wall", ry);
+    sink.Cover(p.x, p.z, floor1, S.sin, S.cos);
+  }
+
+  const doorAt = S.At(lx + cx, hd);
+  AddDoorReveal(sink, {
+    x: doorAt.x, z: doorAt.z, ry, openW: lightW, openH: top,
+    depth: SHOP.depth - 0.9, seed: `${seed}:shopRv`, paving: "HouseholdCeramic",
+  });
+}
+
+/** 店堂内部：板壁围出一间、楼板压顶，柜台 + 两组货架 + 算盘案 + 幌子杆内头。 */
+function AddShopRoom(sink, S, ry, seed, ctx, g) {
+  const { lx, bayW, panelW, floor1, hd } = g;
+  const wood = { tile: TILE_METERS.wood };
+  const stone = { tile: TILE_METERS.stone };
+  const t = SHOP.partT;
+  const innerFace = hd - 0.44;                    // 前檐墙内皮（墙心 hd-0.22、厚 0.44）
+  const backLz = hd - SHOP.depth;
+  const midLz = (innerFace + backLz) / 2;
+  const len = innerFace - backLz;
+  const uHalf = bayW / 2;
+  const At = (u, lz) => S.At(lx + u, lz);
+  const intact = ctx.damage < 0.55;
+
+  // --- 壳：墁地 + 两道板壁 + 后板壁 + 楼板（楼板底 3.31 m，悬在头顶不进导航图）---
+  // 地面用 HouseholdCeramic（Stone 配方 + 砖色）而不是 Stone：第一版拿 Stone 铺地，
+  // 白得发光的一块地板把"进了屋"的暗对比整个吃掉 —— 屋里比街上还亮就不叫屋里。
+  Slab(sink, "HouseholdCeramic", At(0, midLz), 0, bayW - t, 0.12, len, ry, `${seed}:shopFloor`, stone);
+  for (const side of [-1, 1]) {
+    const p = At(side * uHalf, midLz);
+    Slab(sink, "WoodDoor", p, floor1 / 2, t, floor1, len, ry, `${seed}:shopPart${side}`, wood);
+    sink.Solid(p.x, floor1 / 2, p.z, t / 2, floor1 / 2, len / 2, "wall", ry);
+  }
+  const back = At(0, backLz);
+  Slab(sink, "WoodDoor", back, floor1 / 2, bayW, floor1, t, ry, `${seed}:shopBack`, wood);
+  sink.Solid(back.x, floor1 / 2, back.z, bayW / 2, floor1 / 2, t / 2, "wall", ry);
+  const ceil = At(0, midLz);
+  Slab(sink, "WoodDoor", ceil, floor1 - 0.07, bayW - t, 0.14, len, ry, `${seed}:shopCeil`, wood);
+  sink.Solid(ceil.x, floor1 - 0.07, ceil.z, (bayW - t) / 2, 0.07, len / 2, "wall", ry);
+  for (let i = 0; i < 3; i += 1) {
+    Slab(sink, "WoodBeam", At(0, backLz + len * (0.22 + i * 0.28)), floor1 - 0.25, bayW - t, 0.18, 0.14, ry,
+      `${seed}:shopJoist${i}`, wood);
+  }
+
+  // --- 柜台：L 形，长边平行街面、回头段贴东板壁。掌柜站里头，客人只到台外 ---
+  const cLz = innerFace - 2.4;
+  const cu0 = -0.2, cu1 = uHalf - 0.06;
+  const cCx = (cu0 + cu1) / 2, cLen = cu1 - cu0;
+  Slab(sink, "WoodDoor", At(cCx, cLz), SHOP.counterH, cLen, 0.1, 0.66, ry, `${seed}:cntTop`, wood);
+  Slab(sink, "WoodDoor", At(cCx, cLz - 0.03), (SHOP.counterH + 0.06) / 2, cLen - 0.08, SHOP.counterH - 0.2, 0.5, ry,
+    `${seed}:cntBody`, wood);
+  Slab(sink, "Stone", At(cCx, cLz), 0.11, cLen, 0.2, 0.58, ry, `${seed}:cntPlinth`, stone);
+  const cp = At(cCx, cLz);
+  sink.Solid(cp.x, SHOP.counterH / 2, cp.z, cLen / 2, SHOP.counterH / 2, 0.33, "furniture", ry);
+
+  const rU = uHalf - 0.39;
+  const rLz0 = backLz + 0.55, rLz1 = cLz;
+  const rCz = (rLz0 + rLz1) / 2, rLen = rLz1 - rLz0;
+  Slab(sink, "WoodDoor", At(rU, rCz), SHOP.counterH, 0.66, 0.1, rLen, ry, `${seed}:cntTopR`, wood);
+  Slab(sink, "WoodDoor", At(rU - 0.03, rCz), (SHOP.counterH + 0.06) / 2, 0.5, SHOP.counterH - 0.2, rLen - 0.08, ry,
+    `${seed}:cntBodyR`, wood);
+  const rp = At(rU, rCz);
+  sink.Solid(rp.x, SHOP.counterH / 2, rp.z, 0.33, SHOP.counterH / 2, rLen / 2, "furniture", ry);
+
+  // --- 货架两组：一组贴西板壁（顺进深），一组贴后板壁（顺面阔）---
+  AddShopShelf(sink, At, ry, `${seed}:shelfW`, {
+    u: -(uHalf - 0.22), lz: backLz + 2.9, len: 2.2, depth: 0.42,
+    along: "z", tiers: 4, goods: intact,
+  });
+  AddShopShelf(sink, At, ry, `${seed}:shelfN`, {
+    u: -uHalf * 0.4, lz: backLz + 0.28, len: 2.4, depth: 0.42,
+    along: "u", tiers: 4, goods: intact,
+  });
+
+  // --- 算盘案：柜台里头一张小条案，案上一把算盘 + 一摞账簿，旁边一只矮凳 ---
+  const dU = 0.85, dLz = backLz + 1.45;
+  Slab(sink, "WoodDoor", At(dU, dLz), 0.72, 1.15, 0.1, 0.66, ry, `${seed}:deskTop`, wood);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    Slab(sink, "WoodBeam", At(dU + sx * 0.5, dLz + sz * 0.26), 0.34, 0.08, 0.68, 0.08, ry,
+      `${seed}:deskLeg${sx}${sz}`, wood);
+  }
+  const dp = At(dU, dLz);
+  sink.Solid(dp.x, 0.39, dp.z, 0.6, 0.39, 0.36, "furniture", ry);
+  if (intact) {
+    const ab = At(dU - 0.2, dLz + 0.02);
+    Slab(sink, "WoodBeam", ab, 0.795, 0.44, 0.045, 0.27, ry, `${seed}:abFrame`, wood);
+    Slab(sink, "WoodDoor", At(dU - 0.2, dLz + 0.07), 0.805, 0.4, 0.055, 0.07, ry, `${seed}:abBeadUp`, wood);
+    Slab(sink, "WoodDoor", At(dU - 0.2, dLz - 0.04), 0.805, 0.4, 0.055, 0.12, ry, `${seed}:abBeadLo`, wood);
+    Slab(sink, "WoodDoor", At(dU + 0.34, dLz - 0.05), 0.79, 0.27, 0.06, 0.34, ry, `${seed}:ledger`, wood);
+  }
+  const sU = dU, sLz = backLz + 0.8;
+  Slab(sink, "WoodDoor", At(sU, sLz), 0.47, 0.5, 0.09, 0.34, ry, `${seed}:stoolTop`, wood);
+  for (const s of [-1, 1]) {
+    Slab(sink, "WoodBeam", At(sU + s * 0.18, sLz), 0.22, 0.08, 0.44, 0.26, ry, `${seed}:stoolLeg${s}`, wood);
+  }
+  const sp = At(sU, sLz);
+  sink.Solid(sp.x, 0.235, sp.z, 0.27, 0.235, 0.19, "furniture", ry);
+
+  // --- 门内的两件小东西：卸下来的两块门板靠在墙根，门边一条候客的板凳 ---
+  if (intact) {
+    for (let i = 0; i < 2; i += 1) {
+      Slab(sink, "WoodDoor", At(0.62 + i * 0.42, innerFace - 0.16 - i * 0.07), 1.36,
+        panelW / SHOP.boards - 0.03, 2.6, 0.09, ry, `${seed}:offBoard${i}`,
+        { tile: TILE_METERS.wood, rz: (i === 0 ? 1 : -1) * 0.045 });
+    }
+  }
+  const bU = -(uHalf - 0.28), bLz = innerFace - 0.55;
+  Slab(sink, "WoodDoor", At(bU, bLz), 0.48, 0.34, 0.1, 0.75, ry, `${seed}:benchTop`, wood);
+  for (const s of [-1, 1]) {
+    Slab(sink, "WoodBeam", At(bU, bLz + s * 0.28), 0.23, 0.24, 0.46, 0.09, ry, `${seed}:benchLeg${s}`, wood);
+  }
+  const bp = At(bU, bLz);
+  sink.Solid(bp.x, 0.24, bp.z, 0.18, 0.24, 0.4, "furniture", ry);
+
+  // --- 幌子杆：内头在店堂里挑在楼栅下，杆身从门洞上沿穿出去 1.9 m 挑到街上。
+  // 幌面吊在挑杆**外端的横挑上、偏出门洞一侧** —— 当典那边踩过的坑：
+  // 一整幅幌吊在门正中，招牌把它要标的那扇门盖死了。
+  const { cx } = ShopOpening(panelW);
+  const poleIn = innerFace - 2.2, poleOut = hd + 1.9;
+  const poleY = 2.6;
+  Slab(sink, "WoodBeam", At(cx, (poleIn + poleOut) / 2), poleY, 0.1, 0.1, poleOut - poleIn, ry,
+    `${seed}:hzPole`, wood);
+  Slab(sink, "WoodBeam", At(cx, poleIn + 0.12), poleY + 0.36, 0.07, 0.62, 0.07, ry, `${seed}:hzTie`, wood);
+  Slab(sink, "WoodBeam", At(cx, innerFace - 0.2), poleY - 0.14, 0.24, 0.14, 0.32, ry, `${seed}:hzBracket`, wood);
+  if (ctx.damage < 0.62) {
+    Slab(sink, "WoodBeam", At(cx - 0.53, poleOut - 0.06), poleY, 1.06, 0.07, 0.07, ry, `${seed}:hzArm`, wood);
+    Slab(sink, "HouseholdCloth", At(cx - 0.99, poleOut - 0.06), 1.98, 0.52, 1.15, 0.05, ry,
+      `${seed}:hzBanner`, { tile: TILE_METERS.cloth });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 商会 —— 临街两层门脸楼 + 后进会所院
 // ---------------------------------------------------------------------------
 
@@ -131,6 +385,7 @@ export function BuildGuild(host, f, ctx) {
   const bayW = f.w / bays;
   const passBay = (bays - 1) / 2;
   const passHalf = 1.55;                                      // 穿堂门道净宽 3.1 m
+  const shopBay = passBay + 1;                                // 门道旁的这一间开成铺面（D5）
 
   // --- 一层：木柱 + 排门板铺面，正中一条穿堂门道 ---
   for (let i = 1; i < bays; i += 1) {
@@ -148,12 +403,36 @@ export function BuildGuild(host, f, ctx) {
       const lintel = S.At(lx, face);
       Slab(sink, "WoodBeam", lintel, 3.16, passHalf * 2 + 0.9, 0.32, 0.62, ry,
         `${seed}:passLin`, { tile: TILE_METERS.wood });
-      Slab(sink, "WoodDoor", S.At(lx, hd + 0.12), 3.02, panelW * 1.35, 0.86, 0.14, ry,
-        `${seed}:plaque`, { tile: TILE_METERS.wood });
+      // 门匾（D5 改）：**石匾** + 一圈木匾框，位置不动（匾的形制位置就是门额上）。
+      //
+      // 为什么不是"外移"也不是"靠收檐"：A4 遗留 4 说匾"被腰檐整块挡在阴影里"，
+      // 拿同一机位量了两版（scratchpad/D5_FreeCam.mjs 的 D5_Guild_Plaque 探针）——
+      // 腰檐挑出 1.6 与 1.0，匾面平均亮度**都是 88.9**：这面墙这一档太阳根本不投挑檐影，
+      // 那条诊断不成立。匾读不出来是**对比度**：木匾 88.9，同高度旁边的青砖 119.4，
+      // 而门道那一圈（木柱、排门板、木过梁）全是同一族木色，匾就陷在里头。
+      // 会馆/公所的门额本来就常嵌石匾 —— 换石头 + 深色匾框之后匾面 185.1，
+      // 比青砖亮出一档，从街上一眼跳出来。（数与机位见 WP_D5 报告第二节。）
+      const plaqueW = panelW * 1.35, plaqueH = 0.86;
+      Slab(sink, "Stone", S.At(lx, hd + 0.12), 3.02, plaqueW, plaqueH, 0.14, ry,
+        `${seed}:plaque`, { tile: TILE_METERS.stone });
+      for (const s of [-1, 1]) {
+        Slab(sink, "WoodBeam", S.At(lx, hd + 0.17), 3.02 + s * (plaqueH / 2 + 0.05),
+          plaqueW + 0.2, 0.1, 0.1, ry, `${seed}:plqH${s}`, { tile: TILE_METERS.wood });
+        Slab(sink, "WoodBeam", S.At(lx + s * (plaqueW / 2 + 0.05), hd + 0.17), 3.02,
+          0.1, plaqueH + 0.2, 0.1, ry, `${seed}:plqV${s}`, { tile: TILE_METERS.wood });
+      }
       AddDoorReveal(sink, {
         x: lintel.x, z: lintel.z, ry, openW: passHalf * 2, openH: 3.0,
         depth: frontD + 0.6, seed: `${seed}:passRv`,
       });
+      continue;
+    }
+    if (b === shopBay) {
+      // 门道旁的这一间是"卸了两块板的铺面"：前脸自己一套（无槛墙、门头改亮子），
+      // 碰撞分段留门洞，内部另由 AddShopRoom 砌
+      const g = { lx, bayW, panelW, floor1, hd };
+      AddShopFront(sink, S, ry, seed, ctx, g);
+      AddShopRoom(sink, S, ry, seed, ctx, g);
       continue;
     }
     // 槛墙 0.85 → 排门板 0.85—2.75 → 门头板 2.75—3.45
@@ -171,12 +450,20 @@ export function BuildGuild(host, f, ctx) {
   }
 
   // --- 腰檐：一层与二层之间挑出街面的一道瓦檐。两层楼的读图信号有一半在这条线上 ---
+  //
+  // 【D5 改】挑出 1.6 → **1.0 m**（A4 遗留 4 的二选一，选的是"收檐"不是"外移匾"）。
+  // 理由：门匾的形制位置就是门额上、檐子底下，把匾外移到檐口线就从"匾"变成了
+  // "挑出来的招牌"，那是另一种构件（当典门口那两根幌杆才是招牌）；而 1.0 m 出檐
+  // 仍是民居出檐 0.45 的两倍多，腰檐那条横线该读得出来的照旧读得出来，
+  // 门口那一档进深阴影也不再把整个铺面口糊死。
+  // **但要说清楚：收檐并没有让匾变亮**（两版实测都是 88.9）——
+  // 匾真正的毛病与它无关，见下面 plaque 那一段的注。
   for (let i = 0; i <= 4; i += 1) {
     const lx = -hw + (f.w / 4) * i;
-    Slab(sink, "WoodBeam", S.At(lx, hd + 0.35), floor1 + 0.12, 0.16, 0.16, 1.3, ry,
+    Slab(sink, "WoodBeam", S.At(lx, hd + 0.16), floor1 + 0.12, 0.16, 0.16, 0.82, ry,
       `${seed}:brk${i}`, { tile: TILE_METERS.wood });
   }
-  Slab(sink, tileMat, S.At(0, hd + 0.62), floor1 + 0.42, f.w + 0.5, 0.12, 1.6, ry,
+  Slab(sink, tileMat, S.At(0, hd + 0.32), floor1 + 0.42, f.w + 0.5, 0.12, 1.0, ry,
     `${seed}:waist`, { rx: -0.42, tile: TILE_METERS.roof });
 
   // --- 二层：槛墙 + 一排格子窗 + 檐下墙 ---
@@ -284,24 +571,36 @@ export function BuildPawnshop(host, f, ctx) {
   });
 
   // 墙头碎瓷：临街一面与两山靠街的一段插满碎瓷片。远看是压顶上一条毛边，近看才知道是防爬的。
-  // 尺寸必须**小而密**（0.09×0.18×0.34 / 0.5 m 一片）：第一版做成 0.13×0.24 / 0.75 m 一片，
-  // 十几米外直接读成城墙垛口 —— 当铺墙上长出一排雉堞，那是完全另一种建筑。
+  //
+  // 三版了，记一下每一版死在哪，别再回头：
+  //   v1  0.13×0.24 / 0.75 m 一片 —— 十几米外读成城墙垛口（当铺墙上长出雉堞，完全另一种建筑）；
+  //   v2  0.09×0.18×0.34 / 0.5 m 一片 —— 不再是垛口，但 12 m 内仍读成一排"小方块"：
+  //       毛病在**厚**（0.09 的方棱在近处就是块砖）和**齐**（全部竖直、全部同向、等距）；
+  //   v3（本版）压扁 0.09→0.045、放矮 0.17—0.24→0.10—0.20、明显斜置（|rz| 0.35—0.85 而不是
+  //       ±0.45 的小抖动）、再给每片一个 ±0.35 rad 的偏航，让它不与压顶平行；
+  //       间距从等距 0.5 改成 0.44—0.66 抽签 + 12% 空位。
+  //       "碎瓷"的读图信号是**参差的薄片反光**，不是密排的小体块。
+  // 减面：片数 92 → 72（-22%，1104 → 864 三角，scratchpad/D5_Shards.mjs 实测）。
+  // 不上 instancing（这一面墙就一处，
+  // 一只 InstancedMesh 反而多一个 draw call），也不动共享的 MakeBox / 材质表。
+  const Shard = (p, w, h, d, s, opts) => {
+    sink.Add("Stone", PlaceGeometry(MakeBox(w, h, d, TILE_METERS.stone, s),
+      { x: p.x, y: wallH + 0.05 + h / 2, z: p.z, ry: ry + (rnd() - 0.5) * 0.7, ...opts }));
+  };
   if (ctx.damage < 0.4) {
-    for (let i = 0; ; i += 1) {
-      const lx = -hw + 0.4 + i * 0.5;
-      if (lx > hw - 0.4) break;
+    for (let lx = -hw + 0.4; lx <= hw - 0.4; lx += 0.44 + rnd() * 0.22) {
       if (Math.abs(lx) < gateOpen / 2 + 0.4) continue;
-      const p = S.At(lx, hd);
-      sink.Add("Stone", PlaceGeometry(
-        MakeBox(0.09, 0.17 + rnd() * 0.07, 0.34, TILE_METERS.stone, `${seed}:shard${i}`),
-        { x: p.x, y: wallH + 0.16, z: p.z, ry, rz: (rnd() - 0.5) * 0.9 }));
+      if (rnd() < 0.12) continue;                       // 空位：压顶上的碎瓷本来就不连续
+      const lean = (rnd() < 0.5 ? -1 : 1) * (0.35 + rnd() * 0.5);
+      Shard(S.At(lx, hd), 0.045, 0.10 + rnd() * 0.10, 0.26, `${seed}:shard${lx.toFixed(2)}`,
+        { rz: lean });
     }
     for (const side of [-1, 1]) {
-      for (let i = 0; i < 17; i += 1) {
-        const p = S.At(side * hw, hd - 0.5 - i * 0.5);
-        sink.Add("Stone", PlaceGeometry(
-          MakeBox(0.34, 0.17 + rnd() * 0.07, 0.09, TILE_METERS.stone, `${seed}:shard${side}${i}`),
-          { x: p.x, y: wallH + 0.16, z: p.z, ry, rx: (rnd() - 0.5) * 0.9 }));
+      for (let lz = hd - 0.5; lz > hd - 8.4; lz -= 0.44 + rnd() * 0.22) {
+        if (rnd() < 0.12) continue;
+        const lean = (rnd() < 0.5 ? -1 : 1) * (0.35 + rnd() * 0.5);
+        Shard(S.At(side * hw, lz), 0.26, 0.10 + rnd() * 0.10, 0.045,
+          `${seed}:shard${side}${lz.toFixed(2)}`, { rx: lean });
       }
     }
   }

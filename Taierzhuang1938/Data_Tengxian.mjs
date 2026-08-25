@@ -271,8 +271,9 @@ export const LANDMARKS = [
   { id: "SquareFort", kind: "squareFort", x: -145, z: -255, ry: 0, w: 32, d: 32 },
   // 铁牌坊，坐东朝西（朝向为主流记载）
   { id: "IronPaifang", kind: "paifang", x: -145, z: -160, ry: 0, span: 7, iron: true },
-  // 南门里街西侧，1931 年中共滕县特支驻地
-  { id: "PeoplesBookshop", kind: "shop", x: -108, z: 132, ry: -Math.PI / 2, w: 12, d: 9 },
+  // 南门里街西侧，1931 年中共滕县特支驻地。v2.1：旧点 (-108,132) 在街网重排后
+  // 前不着村后不着店 —— 挪回南门里大街北段西路肩，门脸贴街（WP-D6 取证）。
+  { id: "PeoplesBookshop", kind: "shop", x: -9.8, z: 40, ry: -Math.PI / 2, w: 12, d: 9 },
   // 城内西北的德国天主堂。日方战详报「城内外国建築物」指的就是它 ——
   // 日军接到「保护外国权益」的命令，十六日因此不敢彻底破坏城内建筑，
   // 十七日才改为「纵使把滕县城化为灰烬也在所不惜」的焦土方针。
@@ -307,7 +308,8 @@ export const CITY_FEATURES = [
   { id: "CentralCompound124", label: "第124师师部", kind: "hq", x: -58, z: -55, ry: 0, w: 94, d: 54, damage: 0.14, source: "diagram", notPermanentGarrison: true },
   { id: "CentralCompound127", label: "第127师师部", kind: "hq", x: -72, z: 56, ry: Math.PI, w: 94, d: 48, damage: 0.18, source: "diagram", notPermanentGarrison: true },
   { id: "WestSpecialCompound", label: "特务营第1连", kind: "billet", x: -225, z: -50, ry: Math.PI / 2, w: 52, d: 62, damage: 0.26, source: "diagram", notPermanentGarrison: true },
-  { id: "EastDistrictOffice", label: "第二区公所", kind: "districtOffice", x: 218, z: 12, ry: -Math.PI / 2, w: 50, d: 74, damage: 0.28, source: "diagram" },
+  // ry=+π/2：门朝西对着关岳庙街（旧值 -π/2 把大门连同告示墙开进东侧民居迷宫，WP-D6 取证）
+  { id: "EastDistrictOffice", label: "第二区公所", kind: "districtOffice", x: 218, z: 12, ry: Math.PI / 2, w: 50, d: 74, damage: 0.28, source: "diagram" },
   { id: "SouthWestOffice", label: "办事处", kind: "office", x: -140, z: 126, ry: Math.PI, w: 50, d: 44, damage: 0.3, source: "diagram" },
   // —— 南城 ——
   { id: "WenzhongSchool", label: "滕文中学旧址", kind: "school", x: -186, z: 220, ry: Math.PI / 2, w: 66, d: 40, damage: 0.26, source: "diagram" },
@@ -579,7 +581,9 @@ export const PRESUMED = [
   // —— 批次A 地标形制（图上只有图注与位置，以下整族数值全部无载，出处见各 Script_Landmark_*.mjs 头注与 WP 报告）——
   { id: "jailForm", value: { wall: [4.6, 0.75], detentionWall: 3.8, towerTop: 9.0, gate: [1.3, 2.6], cellBay: 2.2, cellWindow: [0.55, 0.75], sill: 1.55 }, unit: "m", note: "监狱/看守所形制：高墙、转角岗楼、窄开间铁窗、重门。全部为「一眼可辨」的设计推定，无任何史料" },
   { id: "officeCompoundForm", value: { yardWall: 2.65, gateW: 3.0, pierRise: 1.15, flagpole: [8.6, 7.6], booth: [1.8, 1.6] }, unit: "m", note: "警备队/警察所制式机关院：门垛挂匾大门、门岗亭、旗杆、操练场、告示墙。形制常识推定，无实证" },
-  { id: "yamenForm", value: { wall: 3.2, gate: [4.0, 3.0], qiaolouRidge: 8.6, hallBay: [5, 4.1], platform: 1.0, liufang: "每列4间", screenOffset: 3.3, sideGate: 2.0 }, unit: "m", note: "县公署压缩版口径：志载「公堂吏舍凡百一十六间」，62×54 地块只容四进+两列廊庑；照壁应在街对面、被地块让距压到门前 3.3 m；东侧门为纯玩法。大堂尺寸未取得现存实物测绘，全为推定" },
+  { id: "yamenForm", value: { wall: 3.2, gate: [4.0, 3.0], qiaolouRidge: 8.6, hallBay: [5, 4.1], platform: 1.0, liufang: "每列4间", screenOffset: 3.3, sideGate: 2.0 }, unit: "m", note: "县公署压缩版口径：志载「公堂吏舍凡百一十六间」，62×54 地块只容四进+两列廊庑；照壁应在街对面、被地块让距压到门前 3.3 m；东侧门为纯玩法。大堂尺寸未取得现存实物测绘，全为推定。**内部口径（第二轮定）：只有大堂可进**，二堂/幕厅/六房保持空壳——同密度铺满会奔 40k 三角" },
+  { id: "interiorForms", value: ["师部作战室", "监狱值房+一间牢房", "县署大堂", "天主堂中厅", "书院小学教室", "商会铺面"], note: "第二轮可进入内部的家具陈设（地图桌/公案/长椅/课桌/柜台…）形制全部为民国常识推定，单处 ≤4k 三角；内部无独立光源，靠门窗采光" },
+  { id: "miscForms", value: { fort: "圆形空心炮台 r≈6 环廊+顶台", shrine: "享堂+龛位", bookshop: "排门板+后暗间", pagoda1938: "塔刹毁/顶层塌/挑檐脱落", hongdao: "剪影群+小钟塔" }, note: "第二轮占位升级：空心炮台 1908 制式为主流记载、圆形为推定；龙泉塔战损态为主流记载；祠堂/书店/弘道院形制全为推定" },
   { id: "guildTwoStorey", value: { eave: 6.6, ridge: 8.77 }, unit: "m", note: "商会做成两层临街门脸楼是无史料的读图推定（县城商会有二层门面在鲁南有例，滕县无证）；若考据裁定城内除城楼外一律单层，此楼需整体推翻" },
   { id: "pawnshopForm", value: { wall: [4.2, 0.6], vaultRidge: 9.15, gate: 1.6, bannerPole: 7.2 }, unit: "m", note: "当典防盗高墙+两层库楼+高杆布幌：北方当铺形制通例，尺寸全为推定" },
   { id: "hqKitForm", value: { wall: [2.35, 2.05], gate: [2.6, 2.2, 2.0], strongRoom: [11, 8, 8.4], flagpole: [9.0, 7.4, 6.2], unitBoard: [0.34, 1.44] }, unit: "m", note: "师部/团部/驻地套件（含机要库=当铺库楼式两层）：番号木牌为空牌面，驻防关系仍由战斗时段数据决定。全为推定" },

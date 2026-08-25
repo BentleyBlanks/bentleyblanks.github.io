@@ -19,14 +19,20 @@
 // 玩法约束：大门 → 仪门 → 月台踏跺 → 大堂明间是一条连续可走的轴线；
 //   仪门两侧另开东西角门，东院墙前院段再开一道侧门，巷战有三个进院口。
 //
-// 材质预算：BrickWall / Stone / RoofTile / WoodBeam / WoodDoor / PaintRed 六种
+// 材质预算：BrickWall / Stone / RoofTile / WoodBeam / WoodDoor / PaintRedOfficial 六种
 //   （burnt 档才会把砖换成 BrickWallSooty，本地标的 damage=0.22 落不到那一档）。
+//   朱漆一律走 **PaintRedOfficial**（DustBlend 0.20）而不是通用 PaintRed（0.35）：
+//   0.35 蒙尘在门匾/檐柱上读成土黄（WP-A3 取证），官修建筑褪得轻一档。桶数不变。
+//
+// 第二轮 WP-D3 增补：大堂堂内（方砖墁地 + 公案 + 案后屏风 + 两侧肃静回避牌架）、
+//   前檐四间隔扇的井字棂条、朱漆换官署档。堂内是本作第一处「进得去的室内」：
+//   无独立光源，全靠明间这一个 3.7 m 的洞采光 —— 越往里越暗是效果不是 bug。
 
 import {
   AddWall, AddRoomBlock, AddHardMountainRoof, AddDoorReveal,
 } from "./Script_World.mjs";
 import {
-  MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
+  MakeBox, PlaceGeometry, MergeGeometries, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import { Clamp } from "./Script_Noise.mjs";
 
@@ -71,6 +77,145 @@ export function BuildYamen(host, f, ctx) {
       ruin: damage * 0.5, seed: `${seed}:${key}`, plinth: "Stone", cope,
       tile: TILE_METERS.brick,
     });
+  };
+
+  /**
+   * 一堆小料合并成一件再摆（棂条 / 家具零件都走这里，一件家具 = 一个 piece）。
+   * parts 里每一条是 { w,h,d, lx,dy,ds, rot }，lx/ds 是相对锚点的**局部**偏移。
+   * 注意局部 z 与几何 z 反号：A(lx,s) 的 +s 指北，而 PlaceGeometry 的几何 +z 指南。
+   */
+  const Merged = (mat, key, lx, s, y, parts, opt = {}) => {
+    const { tile = TILE_METERS.wood, rot = 0 } = opt;
+    const geos = parts.map((q, i) => PlaceGeometry(
+      MakeBox(q.w, q.h, q.d, q.tile ?? tile, `${seed}:${key}:${i}`),
+      { x: q.lx ?? 0, y: q.dy ?? 0, z: -(q.ds ?? 0), ry: q.rot ?? 0 }));
+    const p = A(lx, s);
+    sink.Add(mat, PlaceGeometry(MergeGeometries(geos), { x: p.x, y, z: p.z, ry: ry + rot }));
+  };
+
+  /** 一间隔扇的井字棂条。贴在隔扇板外皮 —— 板本身仍是那张 WoodDoor 面片。 */
+  const LatticeBay = (key, lx, s, centerY, pw, ph) => {
+    const parts = [];
+    const half = ph / 2;
+    const yKun = -half + 0.95;                         // 裙板顶（抹头一）
+    const yTao = -half + 1.25;                         // 绦环板顶（抹头二）
+    for (let k = 1; k <= 3; k += 1) {                  // 三根抹边 → 四扇
+      parts.push({ w: 0.08, h: ph, d: 0.08, lx: -pw / 2 + (k * pw) / 4 });
+    }
+    parts.push({ w: pw, h: 0.09, d: 0.08, dy: yKun });
+    parts.push({ w: pw, h: 0.09, d: 0.08, dy: yTao });
+    const coreH = half - yTao;                         // 隔心净高
+    const coreY = (yTao + half) / 2;
+    for (let k = 0; k < 6; k += 1) {                   // 竖棂六根
+      parts.push({ w: 0.06, h: coreH, d: 0.07, lx: -pw / 2 + (pw * (k + 1)) / 7, dy: coreY });
+    }
+    for (let k = 1; k <= 2; k += 1) {                  // 横棂两道 → 井字
+      parts.push({ w: pw, h: 0.06, d: 0.07, dy: yTao + (coreH * k) / 3 });
+    }
+    Merged("WoodBeam", key, lx, s, centerY, parts);
+  };
+
+  /**
+   * 大堂堂内。玩法上这是「明间进得去」之后眼睛要落到的东西：
+   *   方砖墁地 → 公案（案桌 + 官帽椅）→ 案后屏风 → 两侧肃静 / 回避牌架。
+   * 牌一律**净牌无字**（字牌要 decal 管线，本包不做，见报告遗留）。
+   * 家具全部经 sink 走合批与破坏；碰撞一律 prop，不挡从明间到公案前的轴线。
+   */
+  const BuildHallInterior = ({ frontS, hallW, hallD, sHall, platH }) => {
+    const floorY = platH;                              // 台基面 = 堂内地面
+    const inS0 = frontS + 0.28;                        // 前檐柱内皮
+    const inS1 = sHall + hallD / 2 - 0.5;              // 后墙内皮
+    const inW = hallW - 1.0;                           // 两山内皮之间
+    const inD = inS1 - inS0;
+
+    // 方砖墁地：**青砖**一张底板 + 一层灰缝分格。两处出图取证换来的口径：
+    //   ① 底板必须走砖不走石 —— 第一版用 Stone 铺，堂内地面比外面的月台还白，
+    //      读成打磨过的洋灰地；
+    //   ② 底板的 UV 格与缝距必须**同一个数**（二尺方砖 0.62 m）。第二版底板 0.45、
+    //      缝 0.95，小砖纹与大方格互相打架，读成瓷砖。
+    const PAVER = 0.62;
+    Box(brick, "hallFloor", 0, (inS0 + inS1) / 2, floorY + 0.03, inW, 0.06, inD,
+      { tile: PAVER });
+    {
+      const seams = [];
+      const nx = Math.max(2, Math.round(inW / PAVER));
+      const nz = Math.max(2, Math.round(inD / PAVER));
+      for (let k = 1; k < nx; k += 1) {
+        seams.push({ w: 0.03, h: 0.02, d: inD, lx: -inW / 2 + (inW * k) / nx });
+      }
+      for (let k = 1; k < nz; k += 1) {
+        seams.push({ w: inW, h: 0.02, d: 0.03, ds: -inD / 2 + (inD * k) / nz });
+      }
+      Merged("Stone", "hallSeam", 0, (inS0 + inS1) / 2, floorY + 0.068, seams,
+        { tile: TILE_METERS.stone });
+    }
+
+    // 暖阁台：公案坐的一层矮台。0.22 m 在引擎 0.55 自动抬腿之内，走 villageFoundation
+    // （＝可踩的地面），探针按台阶忽略它，不算挡路。
+    const sDais = inS1 - 1.55;
+    const daisH = 0.22;
+    Box("Stone", "hallDais", 0, sDais, floorY + daisH / 2, 5.4, daisH, 3.0,
+      { tile: TILE_METERS.stone, tag: "villageFoundation" });
+    const topY = floorY + daisH;
+
+    // 公案：案身裹红案衣（朱漆档），案面木色；案上一副签筒 + 一块惊堂木。
+    const sDesk = sDais - 0.55;
+    Box("PaintRedOfficial", "deskBody", 0, sDesk, topY + 0.40, 1.90, 0.80, 0.74,
+      { tile: TILE_METERS.wood, tag: "prop" });
+    Merged("WoodBeam", "deskTop", 0, sDesk, topY, [
+      { w: 2.02, h: 0.10, d: 0.82, dy: 0.05 },                           // 案下木托泥
+      { w: 2.14, h: 0.09, d: 0.92, dy: 0.84 },                           // 案面
+      { w: 0.13, h: 0.22, d: 0.13, lx: -0.72, dy: 0.99 },                // 令签筒
+      { w: 0.13, h: 0.22, d: 0.13, lx: 0.72, dy: 0.99 },                 // 火签筒
+      { w: 0.19, h: 0.06, d: 0.09, lx: -0.05, dy: 0.91, ds: -0.22 },     // 惊堂木
+    ]);
+    // 官帽椅：座 + 靠背 + 两侧腿板 + 搭脑；背上搭一块红椅帔。
+    // 靠背必须比案面高出大半米 —— 第一版搭脑只高出案面 0.3 m，从堂前看整把椅子
+    // 被案身吃掉了（出图取证）。
+    const sChair = sDesk + 0.86;
+    Merged("WoodBeam", "chair", 0, sChair, topY, [
+      { w: 0.66, h: 0.08, d: 0.60, dy: 0.48 },                           // 座面
+      { w: 0.08, h: 0.48, d: 0.54, lx: -0.29, dy: 0.24 },                // 左腿板
+      { w: 0.08, h: 0.48, d: 0.54, lx: 0.29, dy: 0.24 },                 // 右腿板
+      { w: 0.66, h: 0.98, d: 0.07, dy: 1.00, ds: 0.27 },                 // 靠背
+      { w: 0.82, h: 0.10, d: 0.13, dy: 1.56, ds: 0.27 },                 // 搭脑
+    ]);
+    Box("PaintRedOfficial", "chairDrape", 0, sChair + 0.22, topY + 1.02, 0.60, 0.90, 0.03,
+      { tile: TILE_METERS.wood });
+
+    // 案后屏风：两墩夹两柱，中间一块素屏心（海水朝日图要贴图，本包不做）
+    const sScreen = Math.min(inS1 - 0.45, sChair + 0.75);
+    Merged("WoodBeam", "screenFrame", 0, sScreen, topY, [
+      { w: 0.16, h: 2.90, d: 0.20, lx: -1.80, dy: 1.45 },
+      { w: 0.16, h: 2.90, d: 0.20, lx: 1.80, dy: 1.45 },
+      { w: 3.92, h: 0.24, d: 0.24, dy: 2.78 },
+      { w: 3.60, h: 0.14, d: 0.16, dy: 0.30 },
+    ]);
+    Box("WoodDoor", "screenPanel", 0, sScreen, topY + 1.52, 3.44, 2.20, 0.08,
+      { tile: TILE_METERS.wood });
+    for (const s2 of [-1, 1]) {
+      Box("Stone", `screenFoot${s2}`, s2 * 1.80, sScreen, floorY + 0.16, 0.52, 0.32, 0.64,
+        { tile: TILE_METERS.stone });
+    }
+
+    // 肃静 / 回避牌架：明间两侧各一副，净牌无字。架子靠边站（|lx| ≈ 5.2），
+    // 离明间那条 3.7 m 的洞还有两米多，不会挡从月台直入公案前的走线。
+    const sRack = inS0 + Math.max(1.4, inD * 0.30);
+    for (const s2 of [-1, 1]) {
+      Box("Stone", `rackBase${s2}`, s2 * 5.2, sRack, floorY + 0.11, 1.50, 0.22, 0.52,
+        { tile: TILE_METERS.stone, tag: "prop" });
+      Merged("WoodBeam", `rack${s2}`, s2 * 5.2, sRack, floorY + 0.22, [
+        { w: 0.12, h: 2.05, d: 0.12, lx: -0.66, dy: 1.02 },
+        { w: 0.12, h: 2.05, d: 0.12, lx: 0.66, dy: 1.02 },
+        { w: 1.44, h: 0.10, d: 0.10, dy: 1.98 },
+        { w: 0.07, h: 0.86, d: 0.07, lx: -0.36, dy: 0.43 },              // 牌杆
+        { w: 0.07, h: 0.86, d: 0.07, lx: 0.36, dy: 0.43 },
+      ]);
+      for (const s3 of [-1, 1]) {                                        // 两面净牌
+        Box("WoodDoor", `rackBoard${s2}${s3}`, s2 * 5.2 + s3 * 0.36, sRack,
+          floorY + 0.22 + 1.36, 0.44, 1.14, 0.06, { tile: TILE_METERS.wood });
+      }
+    }
   };
 
   // ---------------------------------------------------------------------
@@ -174,7 +319,7 @@ export function BuildYamen(host, f, ctx) {
     Box(brick, "gateUpper", 0, sGate, doorH + 0.38 + (gateEave - doorH - 0.38) / 2,
       gateOpen + 0.7, gateEave - doorH - 0.38, gateD * 0.8, { grid: BRICK_UV_GRID });
     // 门匾（褪色朱漆）：街上认出这是县公署的唯一一件字牌
-    Box("PaintRed", "gatePlaque", 0, -0.12, 3.72, 2.9, 0.9, 0.14, { tile: TILE_METERS.wood });
+    Box("PaintRedOfficial", "gatePlaque", 0, -0.12, 3.72, 2.9, 0.9, 0.14, { tile: TILE_METERS.wood });
     const gateMouth = A(0, 0);
     AddDoorReveal(sink, {
       x: gateMouth.x, z: gateMouth.z, ry: ry + Math.PI,
@@ -330,21 +475,30 @@ export function BuildYamen(host, f, ctx) {
     // 前檐六柱五间：明间（中间一间）敞开，其余四间槛墙 + 隔扇
     const bayW = hallW / 5;
     for (let i = 0; i <= 5; i += 1) {
-      Box("PaintRed", `hallCol${i}`, -hallW / 2 + i * bayW, frontS, wallMidY,
+      Box("PaintRedOfficial", `hallCol${i}`, -hallW / 2 + i * bayW, frontS, wallMidY,
         0.42, hallWallH, 0.42, { tile: TILE_METERS.wood, tag: "prop" });
     }
+    const panelW = bayW - 0.5;
+    const panelH = 2.7;
+    const panelY = platH + 0.9 + panelH / 2;           // 隔扇中心（槛墙 0.9 之上）
     for (let b = 0; b < 5; b += 1) {
       if (b === 2) continue;                           // 明间是入口，留空
       const lx = -hallW / 2 + (b + 0.5) * bayW;
-      Box(brick, `hallSill${b}`, lx, frontS, platH + 0.45, bayW - 0.5, 0.9, 0.34,
+      Box(brick, `hallSill${b}`, lx, frontS, platH + 0.45, panelW, 0.9, 0.34,
         { grid: BRICK_UV_GRID, tag: "wall" });
-      Box("WoodDoor", `hallLattice${b}`, lx, frontS, platH + 0.9 + 1.35,
-        bayW - 0.5, 2.7, 0.1, { tile: TILE_METERS.wood });
+      Box("WoodDoor", `hallLattice${b}`, lx, frontS, panelY,
+        panelW, panelH, 0.1, { tile: TILE_METERS.wood });
+      // 井字棂条（A3 遗留 3）：一间约 156 三角，四间合计 ~620。
+      // 竖向三根抹边把一间分成四扇；两道抹头分出裙板 / 绦环板 / 隔心；
+      // 只有隔心那一段做井字格，裙板不做（明清隔扇的裙板本来就是素板）。
+      LatticeBay(`hallLat${b}`, lx, frontS - 0.10, panelY, panelW, panelH);
     }
-    Box("PaintRed", "hallArchitrave", 0, frontS, eaveY - 0.42, hallW, 0.5, 0.44,
+    Box("PaintRedOfficial", "hallArchitrave", 0, frontS, eaveY - 0.42, hallW, 0.5, 0.44,
       { tile: TILE_METERS.wood });
-    Box("PaintRed", "hallPlaque", 0, frontS - 0.3, eaveY - 1.35, 3.0, 1.0, 0.14,
+    Box("PaintRedOfficial", "hallPlaque", 0, frontS - 0.3, eaveY - 1.35, 3.0, 1.0, 0.14,
       { tile: TILE_METERS.wood });
+
+    BuildHallInterior({ frontS, hallW, hallD, sHall, platH, seed });
 
     const hallCenter = A(0, sHall);
     AddHardMountainRoof(sink, {
