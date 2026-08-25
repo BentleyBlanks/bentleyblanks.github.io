@@ -1,9 +1,18 @@
 # -*- coding: utf-8 -*-
 """Direct client for Tencent Cloud 混元生3D (ai3d), bypassing WorkBuddy entirely.
 
+腾讯云给了两套鉴权，能力范围不一样，脚本两套都支持并自动选：
+
+  compat  「使用OpenAI方式接入」签发的 sk- 开头 API KEY。只能做 3D 生成，
+          打 api.ai3d.cloud.tencent.com，鉴权是一个头。上手最简单。
+  tc3     控制台 > 访问管理签发的 SecretId/SecretKey 一对。打
+          ai3d.tencentcloudapi.com，TC3-HMAC-SHA256 签名。绑骨蒙皮、
+          文生动作、智能拓扑那些增值接口只有这条路能走。
+
 Credentials come from the environment and are never written to disk or printed:
 
-    TENCENTCLOUD_SECRET_ID      # 控制台 > 访问管理 > API 密钥管理
+    HUNYUAN3D_API_KEY           # compat：sk- 开头，「创建API KEY」页面签发
+    TENCENTCLOUD_SECRET_ID      # tc3：控制台 > 访问管理 > API 密钥管理
     TENCENTCLOUD_SECRET_KEY
 
 Every submit prints its credit cost before spending anything, and `--dry-run`
@@ -55,6 +64,14 @@ SERVICE = "ai3d"
 VERSION = "2025-05-13"
 REGION = "ap-guangzhou"
 ROOT = Path(__file__).resolve().parent / "Source" / "Hunyuan3D"
+
+# OpenAI 兼容接入。只覆盖专业版生成，字段名与 TC3 那套一致，所以同一个
+# body 两条路都能发。
+COMPAT_BASE = "https://api.ai3d.cloud.tencent.com/v1/ai3d"
+COMPAT_PATH = {
+    "SubmitHunyuanTo3DProJob": "submit",
+    "QueryHunyuanTo3DProJob": "query",
+}
 
 # 积分消耗，抄自官方计费页；后付费 0.12 元/积分，1000 积分资源包 0.1 元/积分。
 # 只用来在提交前把账算给人看，服务端才是权威。
@@ -204,6 +221,86 @@ def Call(action: str, body: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# OpenAI 兼容接入
+# ---------------------------------------------------------------------------
+
+def CompatKey() -> str:
+    key = os.environ.get("HUNYUAN3D_API_KEY", "").strip()
+    if not key:
+        raise SystemExit(
+            "缺少 HUNYUAN3D_API_KEY。在控制台「使用OpenAI方式接入」里点『创建API KEY』签发，\n"
+            "然后设成用户级环境变量（Win+R -> sysdm.cpl -> 高级 -> 环境变量 -> 用户变量 -> 新建）：\n"
+            "  变量名 HUNYUAN3D_API_KEY   变量值 sk-...\n"
+            "设完重开终端。"
+        )
+    return key
+
+
+def CallCompat(action: str, body: dict) -> dict:
+    path = COMPAT_PATH.get(action)
+    if path is None:
+        raise SystemExit(
+            f"{action} 不在 OpenAI 兼容接口的覆盖范围内（它只做专业版3D生成）。\n"
+            f"绑骨蒙皮 / 文生动作 / 智能拓扑这些增值接口要用 TC3 那套：\n"
+            f"  控制台 > 访问管理 > API 密钥管理 建一对 SecretId/SecretKey，\n"
+            f"  设成 TENCENTCLOUD_SECRET_ID / TENCENTCLOUD_SECRET_KEY，再加 --auth tc3。"
+        )
+    request = Request(
+        f"{COMPAT_BASE}/{path}",
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            # 文档示例是裸 key，不带 Bearer 前缀。
+            "Authorization": CompatKey(),
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=180) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", "replace")
+        hint = ""
+        if error.code in (401, 403):
+            hint = "\n提示：API KEY 无效或已撤销，去控制台重新签发。"
+        elif error.code == 429:
+            hint = "\n提示：并发或额度限制。默认只给 1 个并发。"
+        raise SystemExit(f"HTTP {error.code} from {path}: {detail}{hint}")
+
+    # 兼容接口的错误包装形态未见于文档，两种常见形状都认一下。
+    inner = result.get("Response", result)
+    if isinstance(inner, dict) and "Error" in inner:
+        error = inner["Error"]
+        raise SystemExit(
+            f"{action} 失败 [{error.get('Code', '')}] {error.get('Message', '')}"
+        )
+    return inner
+
+
+def ResolveMode(requested: str | None, action: str) -> str:
+    """没显式指定时按手头有什么密钥选，两个都有就优先能力更全的 tc3。"""
+    if requested and requested != "auto":
+        return requested
+    has_tc3 = bool(os.environ.get("TENCENTCLOUD_SECRET_ID", "").strip())
+    has_compat = bool(os.environ.get("HUNYUAN3D_API_KEY", "").strip())
+    if action not in COMPAT_PATH:
+        return "tc3"
+    if has_tc3:
+        return "tc3"
+    if has_compat:
+        return "compat"
+    raise SystemExit(
+        "没找到任何密钥。二选一：\n"
+        "  HUNYUAN3D_API_KEY                                （OpenAI 方式接入，只能做3D生成）\n"
+        "  TENCENTCLOUD_SECRET_ID + TENCENTCLOUD_SECRET_KEY （完整接口，含绑骨/动作）"
+    )
+
+
+def Invoke(action: str, body: dict, mode: str) -> dict:
+    return CallCompat(action, body) if mode == "compat" else Call(action, body)
+
+
+# ---------------------------------------------------------------------------
 # 计费预览
 # ---------------------------------------------------------------------------
 
@@ -249,11 +346,12 @@ def JobStatus(result: dict) -> str:
         return str(code)
 
 
-def Poll(query_action: str, job_id: str, interval: int, budget: int) -> dict:
+def Poll(query_action: str, job_id: str, interval: int, budget: int,
+         mode: str = "tc3") -> dict:
     """轮询到终态。字段名各接口不完全一致，所以只认状态语义不认具体字段。"""
     deadline = time.time() + budget
     while True:
-        result = Call(query_action, {"JobId": job_id})
+        result = Invoke(query_action, {"JobId": job_id}, mode)
         status = JobStatus(result)
         if status in ("DONE", "SUCCESS", "SUCCEED", "FINISH", "FINISHED"):
             return result
@@ -344,13 +442,15 @@ def SaveResult(slug: str, action: str, body: dict, job_id: str,
     return outdir
 
 
-def Run(action: str, body: dict, slug: str, args) -> None:
+def Run(action: str, body: dict, slug: str, args, mode: str | None = None) -> None:
+    mode = mode or ResolveMode(getattr(args, "auth", None), action)
     credits = ReportCost(action, body)
     if args.dry_run:
-        print(json.dumps({"Action": action, "Body": body}, ensure_ascii=False, indent=2))
+        print(json.dumps({"Auth": mode, "Action": action, "Body": body},
+                         ensure_ascii=False, indent=2))
         return
 
-    submit = Call(action, body)
+    submit = Invoke(action, body, mode)
     job_id = submit.get("JobId")
     if not job_id:
         print(json.dumps(submit, ensure_ascii=False, indent=2))
@@ -362,7 +462,7 @@ def Run(action: str, body: dict, slug: str, args) -> None:
         print(json.dumps({"job_id": job_id, "type": kind}, ensure_ascii=False))
         return
 
-    result = Poll(QUERY_ACTION[kind][1], job_id, args.poll_interval, args.max_wait)
+    result = Poll(QUERY_ACTION[kind][1], job_id, args.poll_interval, args.max_wait, mode)
     outdir = SaveResult(slug, action, body, job_id, credits, result)
     print(json.dumps({"job_id": job_id, "dir": str(outdir)}, ensure_ascii=False))
 
@@ -384,25 +484,43 @@ def CmdCheck(args) -> None:
     能走到「参数错误」说明签名、开通状态、网络都是通的；停在鉴权错误说明密钥或
     权限有问题。任务没被创建，所以不计费。
     """
-    Credentials()
+    mode = ResolveMode(args.auth, "QueryHunyuanTo3DProJob")
+    if mode == "compat":
+        CompatKey()
+        print("[check] 模式 compat（OpenAI 方式接入）——只能做3D生成", file=sys.stderr)
+    else:
+        Credentials()
+        print("[check] 模式 tc3（SecretId/SecretKey）——全部接口可用", file=sys.stderr)
     print("[check] 密钥已从环境变量读到（不回显）", file=sys.stderr)
+
     try:
-        Call("QueryHunyuanTo3DProJob", {"JobId": "connectivity-probe"})
+        Invoke("QueryHunyuanTo3DProJob", {"JobId": "connectivity-probe"}, mode)
         print("[check] 通了", file=sys.stderr)
     except SystemExit as error:
         text = str(error)
-        if "AuthFailure" in text or "UnauthorizedOperation" in text:
+        if any(k in text for k in ("AuthFailure", "UnauthorizedOperation", "HTTP 401", "HTTP 403")):
             raise
-        print(f"[check] 签名与服务开通正常（服务端按预期拒绝了探测任务）\n        {text}",
+        print(f"[check] 鉴权与服务开通正常（服务端按预期拒绝了探测任务）\n        {text}",
               file=sys.stderr)
 
 
 def CmdGen(args) -> None:
+    action = "SubmitHunyuanTo3DRapidJob" if args.rapid else "SubmitHunyuanTo3DProJob"
+    mode = ResolveMode(args.auth, action)
+
     body: dict = {}
     if args.prompt:
         body["Prompt"] = args.prompt
     if args.image:
-        body["ImageBase64"] = ReadImageBase64(Path(args.image))
+        path = Path(args.image)
+        payload = ReadImageBase64(path)
+        if mode == "compat":
+            # 兼容接口收 data URI，不收裸 base64。
+            suffix = path.suffix.lower().lstrip(".") or "png"
+            mime = "jpeg" if suffix in ("jpg", "jpeg") else suffix
+            body["ImageUrl"] = f"data:image/{mime};base64,{payload}"
+        else:
+            body["ImageBase64"] = payload
     if args.image_url:
         body["ImageUrl"] = args.image_url
     if not body:
@@ -423,9 +541,10 @@ def CmdGen(args) -> None:
     # FaceCount 单独收 10 积分，减面交给 Blender，所以默认不发这个字段。
     if args.face_count is not None:
         body["FaceCount"] = args.face_count
+    if args.model:
+        body["Model"] = args.model
 
-    action = "SubmitHunyuanTo3DRapidJob" if args.rapid else "SubmitHunyuanTo3DProJob"
-    Run(action, body, args.slug, args)
+    Run(action, body, args.slug, args, mode)
 
 
 def CmdRig(args) -> None:
@@ -468,7 +587,8 @@ def CmdStatus(args) -> None:
     if args.type not in QUERY_ACTION:
         raise SystemExit(f"--type 取值：{', '.join(QUERY_ACTION)}")
     submit_action, query_action = QUERY_ACTION[args.type]
-    result = Call(query_action, {"JobId": args.job_id})
+    mode = ResolveMode(args.auth, query_action)
+    result = Invoke(query_action, {"JobId": args.job_id}, mode)
     status = JobStatus(result)
     print(f"[status] {status}", file=sys.stderr)
     if status in ("DONE", "SUCCESS", "SUCCEED", "FINISH", "FINISHED") and args.slug:
@@ -492,15 +612,22 @@ def BuildParser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    def Auth(p):
+        p.add_argument("--auth", choices=["auto", "compat", "tc3"], default="auto",
+                       help="compat=OpenAI方式接入的 sk- key；tc3=SecretId/SecretKey。"
+                            "默认按环境变量自动选，两个都有时优先 tc3")
+
     def Common(p, need_slug=True):
         if need_slug:
             p.add_argument("--slug", required=True, help="产物目录名 Source/Hunyuan3D/<slug>/")
+        Auth(p)
         p.add_argument("--dry-run", action="store_true", help="只打印请求体和费用，不提交")
         p.add_argument("--no-poll", action="store_true", help="提交后立刻返回 JobId")
         p.add_argument("--poll-interval", type=int, default=10)
         p.add_argument("--max-wait", type=int, default=900, help="轮询预算秒数")
 
     p_check = sub.add_parser("check", help="密钥/开通状态自检，不花积分")
+    Auth(p_check)
     p_check.set_defaults(func=CmdCheck)
 
     p_gen = sub.add_parser("gen", help="文生3D / 图生3D")
@@ -514,6 +641,8 @@ def BuildParser() -> argparse.ArgumentParser:
     p_gen.add_argument("--polygon-type", choices=["triangle", "quadrilateral"])
     p_gen.add_argument("--result-format", choices=["STL", "USDZ", "FBX"], help="额外格式（+5 积分）")
     p_gen.add_argument("--face-count", type=int, help="指定面数会 +10 积分，默认不发")
+    p_gen.add_argument("--model", choices=["3.0", "3.1"],
+                       help="模型版本，默认服务端定（3.1 不支持 LowPoly / Sketch）")
     p_gen.add_argument("--rapid", action="store_true", help="走极速版（15 积分）")
     Common(p_gen)
     p_gen.set_defaults(func=CmdGen)
@@ -539,6 +668,7 @@ def BuildParser() -> argparse.ArgumentParser:
     p_status.add_argument("job_id")
     p_status.add_argument("--type", required=True, choices=sorted(QUERY_ACTION))
     p_status.add_argument("--slug", help="给了就把产物下载到这个目录")
+    Auth(p_status)
     p_status.set_defaults(func=CmdStatus)
 
     p_raw = sub.add_parser("raw", help="任意 Action + JSON body")
