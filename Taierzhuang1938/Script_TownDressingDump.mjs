@@ -24,8 +24,12 @@ const rootDir = path.resolve(projectDir, "..");
 const outFile = path.join(projectDir, "_import", "TownDressingCells.json");
 
 // --- GLB 尺寸：只读 JSON chunk 的 accessor min/max，不启动 three。 ---------
-// 注意这是**忽略节点平移**的近似（烘焙脚本已把每件落地居中，平移只剩展示排
+// 注意这是**忽略节点变换**的近似（烘焙脚本已把每件落地居中，平移只剩展示排
 // 的偏移，量尺寸够用）；校验器在此之上另加余量。
+// 已知失真：靠**节点缩放**定尺寸的老整包资产（fence = Model_WoodFence，
+// accessor 原始尺寸 29×284×147 m，运行时由节点 scale 缩到 2.1 m）在这张表里
+// 是坏数 —— 运行时 PrepareAsset 走真实包围盒不受影响，但布设包别拿这张表
+// 给 fence 定余量（西关包实测后弃用了它）。三个下载包的件全部烘到顶点上，无此问题。
 function GlbNodeDims(fileName) {
   const bytes = fs.readFileSync(path.join(projectDir, "Model", fileName));
   const jsonLength = bytes.readUInt32LE(12);

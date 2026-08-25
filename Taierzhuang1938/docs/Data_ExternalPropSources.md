@@ -54,17 +54,20 @@ per-item attribution in `Data_ExternalAssets_ChineseLife.mjs`),
 
 ## Walled-town per-household dressing (2026-08-25)
 
-Beyond the per-level `PLACEMENTS`, the walled town carries a second placement
-layer: `Script_TownDressing.mjs` merges six region files
-(`Data_Dressing_{Northeast,Southeast,Northwest,Southwest}Quarter/MainStreets/Defenses.mjs`,
-229 placements) that dress courtyards, shopfront shoulders, and the wall-ring
-defenses with these external props. Those placements are registered once in
+Beyond the per-level `PLACEMENTS`, the town and its surroundings carry a second
+placement layer: `Script_TownDressing.mjs` merges ten region files — four city
+quarters, the commercial streets, the wall-ring defenses, and four outfield
+regions (east/west/north suburbs, Jiehe villages) — about 1,300 placements in
+total after the 2026-08-25 density round. Placements are registered once in
 world coordinates and filtered by each level's `TUNING.bounds`, so the same
 rice sack appears at the same spot in every level that generates that part of
-the city. Tooling: `Script_TownDressingDump.mjs` exports the city's household
+the map; visuals stream around the camera by size class
+(`Script_PropStreaming.mjs`) while collision stays fully registered at level
+build. Tooling: `Script_TownDressingDump.mjs` exports the city's household
 census (`_import/TownDressingCells.json`), `Script_TownDressingTest.mjs`
-enforces the placement rules, and `Script_DressingShot.mjs` shoots arbitrary
-ground/top views for self-checks.
+enforces the placement rules, `Script_DressingProbeTest.mjs` cross-checks every
+placement against each level's own LOD collision truth, and
+`Script_DressingShot.mjs` shoots arbitrary ground/top views for self-checks.
 
 ## Poly Haven CC0 additions
 

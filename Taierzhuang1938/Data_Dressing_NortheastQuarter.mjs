@@ -133,4 +133,304 @@ export const PLACEMENTS = Object.freeze([
     note: "blk18_1 北关井院：城破前最后一批没运走的公粮" },
   { asset: "marketBox02", x: 207.6, z: -249.4, ry: -0.5, scale: 1.0,
     note: "blk18_1：粮袋边上的公家木箱" },
+
+  // ==========================================================================
+  // 【第二轮加密：把这一片摆成真的住过人】
+  //
+  // 上面那三十六件讲的是「装到一半、人没回来」——车、箱、粮袋，是**离开**的痕迹。
+  // 下面这一百零二件讲的是**住着**：檐下接雨的水缸、灶间外一溜腌菜的陶瓮、
+  // 院角平放的磨盘、墙根的劈柴墩与斧、院心那张吃饭的粗木桌。一户一件事，
+  // 不是均匀撒豆子 —— 同一组东西彼此有用处上的关系（缸配桶、墩配斧、桌配凳），
+  // 摆在那户人家真会用它的地方（缸在正房檐下、柴在墙根、桌在院心）。
+  //
+  // 选点全部走引擎真值：L4/L5/L6 三关各建一次，把候选件与**该关自己 LOD 档**
+  // 建出来的程序化碰撞盒做 SAT，间隙不足 0.20 m 的落点一概不要 —— 中/远景的
+  // 合并体块比近景正房大一圈（blk20_12 那条挪位注释就是这个坑），只按近景选点
+  // 必在另一关埋进墙里。院门、二门、巷口一律不占：碰撞不流送，堵死就是真堵死。
+  //
+  // damage 对齐照旧：intact 的院子东西齐整；damaged 的歪着、墙石滚在旁边；
+  // collapsed / burnt 的只剩石与陶（陶器打碎归破坏系统，这里摆完整件 + 散石）。
+  // 井院不摆水缸与井台 —— 那两样程序化的井院自己有。
+  // ==========================================================================
+
+  // blk11_11 ShopRow（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
+  { asset: "clayRoundVat", x: 17.8, z: -31.22, ry: 0.2,
+    note: "blk11_11 临街铺面后院（挨过炮）：灶间外墙根的圆腹陶缸" },
+  { asset: "clayLiddedJar", x: 18.6, z: -31.12, ry: -0.3,
+    note: "blk11_11 临街铺面后院（挨过炮）：并排的有盖陶坛（腌的咸菜）" },
+  { asset: "clayWideJar", x: 19.32, z: -31.18, ry: 0.5,
+    note: "blk11_11 临街铺面后院（挨过炮）：队尾的阔口陶坛" },
+
+  // blk12_10 OneEntry（齐整）：檐下一口接雨的水缸，桶与盆搁在缸边。
+  { asset: "clayWaterVat", x: 58, z: -46.6, ry: 0,
+    note: "blk12_10 一进院正房檐下：正房檐下接雨的水缸" },
+  { asset: "ryWaterBucket", x: 58.74, z: -46.3, ry: 0.4,
+    note: "blk12_10 一进院正房檐下：缸边打水的木桶" },
+  { asset: "phWoodenWashTub", x: 57.14, z: -46.36, ry: -0.3,
+    note: "blk12_10 一进院正房檐下：撂在缸旁的木盆" },
+
+  // blk13_12 LCourtyard（齐整）：院心一张粗木桌配一条长凳。
+  { asset: "phRoughWoodTable", x: 92.4, z: -1.14, ry: 3.24,
+    note: "blk13_12 L 形院院心：院心树荫下的粗木桌" },
+  { asset: "longBench", x: 92.37, z: -2.36, ry: 3.04,
+    note: "blk13_12 L 形院院心：桌前的木条凳" },
+
+  // blk12_9 OneEntry（挨过炮）：墙根码着的柴垛。
+  { asset: "ryFirewoodStack", x: 43.11, z: -76.97, ry: 1.321,
+    note: "blk12_9 窄院西墙根：墙根码着的柴垛" },
+  { asset: "phFirewoodBranches", x: 43.65, z: -77.92, ry: 1.721,
+    note: "blk12_9 窄院西墙根：散在柴垛旁的柴枝" },
+
+  // blk13_9 AdobeYard（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴还没码。
+  { asset: "ryChoppingBlock", x: 92.79, z: -77.88, ry: -1.821,
+    note: "blk13_9 土墙窄院东墙根：墙根的劈柴墩" },
+  { asset: "phWoodAxe", x: 92.47, z: -77.36, ry: -0.371,
+    note: "blk13_9 土墙窄院东墙根：撂在墩边的木柄斧" },
+  { asset: "phFirewoodBranches", x: 92.87, z: -76.46, ry: -1.271,
+    note: "blk13_9 土墙窄院东墙根：还没码起来的柴枝" },
+
+  // blk13_8 TwoEntry（挨过炮）：院角一方平放的石磨盘，簸箕靠着墙立。
+  { asset: "stoneMillWheel", x: 91.35, z: -100.13, ry: -1.151,
+    note: "blk13_8 两进院后院东角：院角平放的石磨盘" },
+  { asset: "winnowingBasket", x: 91.92, z: -98.99, ry: -1.401,
+    note: "blk13_8 两进院后院东角：靠墙立着的簸箕" },
+  { asset: "wovenBasket", x: 91.15, z: -101.09, ry: -1.851,
+    note: "blk13_8 两进院后院东角：磨盘边的笸箩" },
+
+  // blk12_7 OneEntry（挨过炮）：农具顺墙撂着，簸箕立在旁边 —— 这家还在种城外那几亩地。
+  { asset: "winnowingBasket", x: 59.06, z: -117.64, ry: 1.571,
+    note: "blk12_7 窄院西墙根：靠墙立着的簸箕" },
+  { asset: "phIronSpade", x: 59.58, z: -118.56, ry: 3.142,
+    note: "blk12_7 窄院西墙根：顺墙撂下的铁锹" },
+  { asset: "ryFarmHoe", x: 59.66, z: -116.34, ry: 3.142,
+    note: "blk12_7 窄院西墙根：扔在墙根的锄头" },
+
+  // blk11_6 AdobeYard（齐整）：摊开晾东西的笸箩与带盖竹篮。
+  { asset: "phWickerTray", x: 16.12, z: -140.1, ry: 0.3,
+    note: "blk11_6 土墙院正房檐下：晾东西的竹编浅筐" },
+  { asset: "wovenBasket", x: 16.86, z: -139.82, ry: -0.4,
+    note: "blk11_6 土墙院正房檐下：旁边的笸箩" },
+  { asset: "phWickerBasketLidded", x: 15.44, z: -139.78, ry: 0.7,
+    note: "blk11_6 土墙院正房檐下：带盖的竹篮" },
+
+  // blk13_7 OneEntry（挨过炮、烧过）：火过之后，院里只剩石与陶。
+  { asset: "stoneMillWheel", x: 91.4, z: -122.74, ry: -1.171,
+    note: "blk13_7 烧过的一进院：火里没烧掉的石磨盘" },
+  { asset: "clayWideJar", x: 91.24, z: -121.56, ry: -2.071,
+    note: "blk13_7 烧过的一进院：滚到磨盘边的阔口陶坛" },
+  { asset: "stackableStone05", x: 91.3, z: -123.8, ry: -0.871,
+    note: "blk13_7 烧过的一进院：塌墙里掀出来的大石块" },
+
+  // blk13_6 LCourtyard（挨过炮、烧过）：火场里剩下的一口陶缸与掀落的墙石。
+  { asset: "clayRoundVat", x: 70.4, z: -131.4, ry: 1.871,
+    note: "blk13_6 烧过的 L 形院：火场里剩下的圆腹陶缸" },
+  { asset: "stackableStone02", x: 70.74, z: -132.34, ry: 0.971, scale: 0.95,
+    note: "blk13_6 烧过的 L 形院：掀下来的过墙石" },
+  { asset: "stackableStone04", x: 70.44, z: -133.08, ry: 2.371, scale: 0.9,
+    note: "blk13_6 烧过的 L 形院：滚开的第二块墙石" },
+
+  // blk10_3 AdobeYard（齐整）：院心一张粗木桌配一条长凳。
+  { asset: "phRoughWoodTable", x: 1.18, z: -205.86, ry: 0.1,
+    note: "blk10_3 土墙院院心：院心树荫下的粗木桌" },
+  { asset: "longBench", x: 1.22, z: -204.64, ry: -0.1,
+    note: "blk10_3 土墙院院心：桌前的木条凳" },
+
+  // blk10_5 AdobeYard（齐整）：院角一方平放的石磨盘。
+  { asset: "stoneMillWheel", x: 11.18, z: -169.4, ry: -1.321,
+    note: "blk10_5 土墙院东角：院角平放的石磨盘" },
+  { asset: "wovenBasket", x: 11.08, z: -168.4, ry: -1.921,
+    note: "blk10_5 土墙院东角：磨盘边的笸箩" },
+
+  // blk10_4 OneEntry（齐整）：檐下一口接雨的水缸，斗笠搁在缸沿上。
+  { asset: "clayWaterVat", x: 9.88, z: -192.28, ry: 0, scale: 1.05,
+    note: "blk10_4 一进院正房檐下：正房檐下接雨的水缸" },
+  { asset: "bambooHat", x: 10.54, z: -191.94, ry: 0.5,
+    note: "blk10_4 一进院正房檐下：搁在缸边的斗笠" },
+  { asset: "phWoodenBucket", x: 9.18, z: -192.02, ry: -0.4,
+    note: "blk10_4 一进院正房檐下：打水的木桶" },
+
+  // blk11_5 OneEntry（挨过炮）：墙根码着的柴垛。
+  { asset: "ryFirewoodStack", x: 25.67, z: -161, ry: -1.571,
+    note: "blk11_5 窄院东墙根：墙根码着的柴垛" },
+  { asset: "phFirewoodBranches", x: 25.38, z: -159.94, ry: -1.171,
+    note: "blk11_5 窄院东墙根：散在柴垛旁的柴枝" },
+
+  // blk11_3 AdobeYard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
+  { asset: "clayRoundVat", x: 15.82, z: -215.16, ry: 0.2,
+    note: "blk11_3 土墙院正房山墙下：灶间外墙根的圆腹陶缸" },
+  { asset: "clayLiddedJar", x: 16.62, z: -215.06, ry: -0.3,
+    note: "blk11_3 土墙院正房山墙下：并排的有盖陶坛（腌的咸菜）" },
+  { asset: "clayWideJar", x: 17.34, z: -215.12, ry: 0.5,
+    note: "blk11_3 土墙院正房山墙下：队尾的阔口陶坛" },
+
+  // blk14_10 AdobeYard（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴已经码起来了。
+  { asset: "ryChoppingBlock", x: 97.83, z: -54.7, ry: 1.771,
+    note: "blk14_10 土墙院西墙根：墙根的劈柴墩" },
+  { asset: "phWoodAxe", x: 98.13, z: -55.26, ry: 2.471,
+    note: "blk14_10 土墙院西墙根：撂在墩边的木柄斧" },
+  { asset: "ryFirewoodStack", x: 97.59, z: -53.52, ry: 1.571,
+    note: "blk14_10 土墙院西墙根：码起来的柴垛" },
+
+  // blk14_11 LCourtyard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
+  { asset: "clayRoundVat", x: 97.53, z: -32.12, ry: 0.2,
+    note: "blk14_11 L 形院正房檐下：灶间外墙根的圆腹陶缸" },
+  { asset: "clayLiddedJar", x: 98.33, z: -32.02, ry: -0.3,
+    note: "blk14_11 L 形院正房檐下：并排的有盖陶坛（腌的咸菜）" },
+  { asset: "clayWideJar", x: 99.05, z: -32.08, ry: 0.5,
+    note: "blk14_11 L 形院正房檐下：队尾的阔口陶坛" },
+
+  // blk14_5 OneEntry（挨过炮）：院里晒粮晾衣的木架，笸箩摊在架下。
+  // 晾架转 90°：它是一片 0.195 m 厚的框架，脊向对着人就是一块立着的黑板
+  // （实拍拿到过这一张）。改成东西向，从正房与院门两头看都是「两柱两横杆」。
+  { asset: "ryDryingRack", x: 108.93, z: -160.1, ry: 1.571,
+    note: "blk14_5 一进院院心：院里晒粮晾衣的木架，杆子东西向搭着" },
+  { asset: "wovenBasket", x: 109.85, z: -159.22, ry: -0.3,
+    note: "blk14_5 一进院院心：架下的笸箩" },
+  { asset: "phWickerTray", x: 108.09, z: -159.38, ry: 0.6,
+    note: "blk14_5 一进院院心：摊在架边的竹编浅筐" },
+
+  // blk15_10 TwoEntry（挨过炮）：院角一方平放的石磨盘，簸箕靠着墙立。
+  { asset: "stoneMillWheel", x: 125.03, z: -54.1, ry: 1.871,
+    note: "blk15_10 两进院后院西角：院角平放的石磨盘" },
+  { asset: "winnowingBasket", x: 124.59, z: -55.3, ry: 1.621,
+    note: "blk15_10 两进院后院西角：靠墙立着的簸箕" },
+  { asset: "wovenBasket", x: 125.12, z: -53.12, ry: 1.171,
+    note: "blk15_10 两进院后院西角：磨盘边的笸箩" },
+
+  // blk15_5 LCourtyard（挨过炮）：院心桌凳齐着 —— 三月天暖，这家人在院里吃饭。
+  { asset: "phRoughWoodTable", x: 136.17, z: -159.8, ry: 0.12,
+    note: "blk15_5 L 形院院心：院心树荫下的粗木桌" },
+  { asset: "longBench", x: 136.23, z: -158.56, ry: -0.08,
+    note: "blk15_5 L 形院院心：桌前的木条凳" },
+  { asset: "phChineseWoodStool", x: 134.93, z: -159.28, ry: 0.5,
+    note: "blk15_5 L 形院院心：拉到桌角的中式方凳" },
+  { asset: "phLowWoodStool", x: 137.29, z: -159.22, ry: -0.6,
+    note: "blk15_5 L 形院院心：孩子坐的那只小板凳" },
+
+  // blk15_3 AdobeYard（挨过炮）：农具顺墙撂着，簸箕立在旁边 —— 这家还在种城外那几亩地。
+  { asset: "winnowingBasket", x: 134.74, z: -207.34, ry: -1.691,
+    note: "blk15_3 土墙窄院东墙根：靠墙立着的簸箕" },
+  { asset: "phIronSpade", x: 134.11, z: -206.49, ry: -0.12,
+    note: "blk15_3 土墙窄院东墙根：顺墙撂下的铁锹" },
+  { asset: "ryFarmHoe", x: 134.3, z: -208.71, ry: -0.12,
+    note: "blk15_3 土墙窄院东墙根：扔在墙根的锄头" },
+
+  // blk16_5 AdobeYard（挨过炮）：檐下一口接雨的水缸，桶与盆搁在缸边。
+  { asset: "clayWaterVat", x: 152.61, z: -168.8, ry: 0,
+    note: "blk16_5 土墙院正房檐下：正房檐下接雨的水缸" },
+  { asset: "ryWaterBucket", x: 153.35, z: -168.5, ry: 0.4,
+    note: "blk16_5 土墙院正房檐下：缸边打水的木桶" },
+  { asset: "phWoodenWashTub", x: 151.75, z: -168.56, ry: -0.3,
+    note: "blk16_5 土墙院正房檐下：撂在缸旁的木盆" },
+
+  // blk16_9 OneEntry（挨过炮）：门道边搁着的布灯笼与一只方凳。
+  { asset: "clothLantern", x: 152.61, z: -72.34, ry: -2.942,
+    note: "blk16_9 窄院门道里：门道边搁在地上的布灯笼" },
+  { asset: "ryYardStool", x: 151.83, z: -72.48, ry: -3.442,
+    note: "blk16_9 窄院门道里：门边的木方凳" },
+  { asset: "bambooHat", x: 153.27, z: -72.52, ry: -2.542,
+    note: "blk16_9 窄院门道里：撂在凳边的斗笠" },
+
+  // blk16_10 WellYard（挨过炮、烧过）：井台边洗衣的木盆与两只水桶。
+  { asset: "phWoodenWashTub", x: 154.99, z: -50.52, ry: 2.021, scale: 1.05,
+    note: "blk16_10 烧过的井院：井台边洗衣的木盆" },
+  { asset: "phWoodenBucket", x: 155.05, z: -51.28, ry: 1.321,
+    note: "blk16_10 烧过的井院：打水的木桶" },
+  { asset: "ryWaterBucket", x: 155.35, z: -49.93, ry: 2.621,
+    note: "blk16_10 烧过的井院：另一只木水桶" },
+
+  // blk17_5 TwoEntry（挨过炮）：院心桌凳齐着 —— 三月天暖，这家人在院里吃饭。
+  { asset: "phRoughWoodTable", x: 192.15, z: -159.8, ry: 1.72,
+    note: "blk17_5 两进院前院：院心树荫下的粗木桌" },
+  { asset: "longBench", x: 193.39, z: -159.9, ry: 1.52,
+    note: "blk17_5 两进院前院：桌前的木条凳" },
+  { asset: "phChineseWoodStool", x: 192.71, z: -158.58, ry: 2.1,
+    note: "blk17_5 两进院前院：拉到桌角的中式方凳" },
+  { asset: "phLowWoodStool", x: 192.7, z: -160.94, ry: 1,
+    note: "blk17_5 两进院前院：孩子坐的那只小板凳" },
+
+  // blk17_9 OneEntry（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴还没码。
+  { asset: "ryChoppingBlock", x: 179.55, z: -76.38, ry: 1.321,
+    note: "blk17_9 窄院西墙根：墙根的劈柴墩" },
+  { asset: "phWoodAxe", x: 179.87, z: -76.9, ry: 2.771,
+    note: "blk17_9 窄院西墙根：撂在墩边的木柄斧" },
+  { asset: "phFirewoodBranches", x: 179.47, z: -77.8, ry: 1.871,
+    note: "blk17_9 窄院西墙根：还没码起来的柴枝" },
+
+  // blk17_10 ShopRow（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮。
+  { asset: "clayRoundVat", x: 180.75, z: -47.2, ry: 1.771,
+    note: "blk17_10 铺面后院：灶间外墙根的圆腹陶缸" },
+  { asset: "clayLiddedJar", x: 180.85, z: -48, ry: 1.271,
+    note: "blk17_10 铺面后院：并排的有盖陶坛（腌的咸菜）" },
+  { asset: "clayWideJar", x: 180.79, z: -48.72, ry: 2.071,
+    note: "blk17_10 铺面后院：队尾的阔口陶坛" },
+
+  // blk18_10 OneEntry（挨过炮）：院角一方平放的石磨盘，簸箕靠着墙立。
+  { asset: "stoneMillWheel", x: 229.03, z: -54.37, ry: -1.151,
+    note: "blk18_10 一进院东角：院角平放的石磨盘" },
+  { asset: "winnowingBasket", x: 229.6, z: -53.23, ry: -1.401,
+    note: "blk18_10 一进院东角：靠墙立着的簸箕" },
+  { asset: "wovenBasket", x: 228.83, z: -55.33, ry: -1.851,
+    note: "blk18_10 一进院东角：磨盘边的笸箩" },
+
+  // blk18_6 OneEntry（挨过炮）：厢房廊下的一条长木凳。
+  { asset: "ryYardBench", x: 228.93, z: -145.91, ry: 0.12,
+    note: "blk18_6 一进院西厢廊下：廊下的长条木凳" },
+  { asset: "phLowWoodStool", x: 227.98, z: -145.7, ry: -1.051,
+    note: "blk18_6 一进院西厢廊下：凳边的小板凳" },
+  { asset: "phWickerTray", x: 228.34, z: -146.87, ry: -1.951,
+    note: "blk18_6 一进院西厢廊下：摊在地上的竹编浅筐" },
+
+  // blk19_8 LCourtyard（挨过炮）：檐下一口接雨的水缸，斗笠搁在缸沿上。
+  { asset: "clayWaterVat", x: 234.02, z: -100.76, ry: 0, scale: 1.05,
+    note: "blk19_8 L 形院正房檐下：正房檐下接雨的水缸" },
+  { asset: "bambooHat", x: 234.68, z: -100.42, ry: 0.5,
+    note: "blk19_8 L 形院正房檐下：搁在缸边的斗笠" },
+  { asset: "phWoodenBucket", x: 233.32, z: -100.5, ry: -0.4,
+    note: "blk19_8 L 形院正房檐下：打水的木桶" },
+
+  // blk19_6 AdobeYard（挨过炮）：灶间外的墙根排着一溜腌菜的陶瓮 —— 四口，是户人多的人家。
+  { asset: "clayRoundVat", x: 233.72, z: -146.52, ry: 0.15,
+    note: "blk19_6 土墙院灶间外：灶间外墙根的圆腹陶缸" },
+  { asset: "clayLiddedJar", x: 234.5, z: -146.44, ry: -0.35,
+    note: "blk19_6 土墙院灶间外：并排的有盖陶坛（腌的咸菜）" },
+  { asset: "clayWideJar", x: 235.2, z: -146.5, ry: 0.45,
+    note: "blk19_6 土墙院灶间外：第三口阔口陶坛" },
+  { asset: "clayLuggedJar", x: 235.88, z: -146.36, ry: -0.2,
+    note: "blk19_6 土墙院灶间外：队尾的带耳陶罐" },
+
+  // blk20_8 TwoEntry（挨过炮）：炮震歪的陶罐与滚了一地的墙石。
+  { asset: "clayLuggedJar", x: 283.57, z: -100.41, ry: -0.221,
+    note: "blk20_8 两进院后院（挨过炮）：震歪的带耳陶罐" },
+  { asset: "stackableStone03", x: 283.47, z: -99.48, ry: -2.221, scale: 0.95,
+    note: "blk20_8 两进院后院（挨过炮）：从院墙上掀下来的墙石" },
+  { asset: "wovenBasket", x: 283.11, z: -101.14, ry: 0.079,
+    note: "blk20_8 两进院后院（挨过炮）：滚到一边的笸箩" },
+
+  // blk20_7 LCourtyard（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴已经码起来了。
+  { asset: "ryChoppingBlock", x: 283.46, z: -122.44, ry: -1.371,
+    note: "blk20_7 L 形院东墙根：墙根的劈柴墩" },
+  { asset: "phWoodAxe", x: 283.16, z: -121.88, ry: -0.671,
+    note: "blk20_7 L 形院东墙根：撂在墩边的木柄斧" },
+  { asset: "ryFirewoodStack", x: 283.7, z: -123.62, ry: -1.571,
+    note: "blk20_7 L 形院东墙根：码起来的柴垛" },
+
+  // blk20_1 AdobeYard（塌到底、烧过）：塌到底的院子，剩一方磨盘、几块碎石。
+  { asset: "stoneMillWheel", x: 283.54, z: -260.32, ry: -1.021,
+    note: "blk20_1 北关塌到底的土墙院：塌到底的院子里只剩这方石磨盘" },
+  { asset: "stackableStone06", x: 283.46, z: -259.2, ry: -2.271,
+    note: "blk20_1 北关塌到底的土墙院：半截碎墙石" },
+  { asset: "clayLiddedJar", x: 283.38, z: -261.26, ry: -1.171,
+    note: "blk20_1 北关塌到底的土墙院：埋在土里的有盖陶坛" },
+
+  // blk19_11 AdobeYard（挨过炮）：墙根码着的柴垛。
+  { asset: "ryFirewoodStack", x: 248.25, z: -25.81, ry: 1.451,
+    note: "blk19_11 东城根窄院西墙根：墙根码着的柴垛" },
+  { asset: "phFirewoodBranches", x: 248.66, z: -26.83, ry: 1.851,
+    note: "blk19_11 东城根窄院西墙根：散在柴垛旁的柴枝" },
+
+  // blk16_8 AdobeYard（挨过炮）：整整一大垛劈好的柴顺着西院墙码到底 ——
+  // 全片区只有这一垛这么大，是「烧柴烧得起」的那一户。
+  { asset: "firewoodPile", x: 164.39, z: -94.76, ry: 1.571, scale: 0.95,
+    note: "blk16_8 土墙院西墙根：顺墙码到底的一大垛劈柴" },
 ]);
