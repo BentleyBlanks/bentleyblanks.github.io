@@ -423,8 +423,15 @@ export class TengxianCity {
      * 的一段。另一处在东墙（正对东关的主攻方向）。缺口宽度为推定。
      */
     this.breaches = {
-      South: [{ at: 285, width: 20, floor: 0.2 }],
-      East: [{ at: 70, width: 17, floor: 0.24 }],
+      // floor 是残砖最高点占墙高比例；压到一步可跨越，才是贯通缺口而不是矮墙。
+      // 左右幂次故意不同，配合约一米细分与 Blender 断肩形成非对称 V 形轮廓。
+      South: [{ at: 285, width: 26, floor: 0.025, leftPower: 1.18, rightPower: 1.58,
+        detailLen: 1.05, phase: 0.8 }],
+      // 东门洞局部 at=65、最近马面中心 at=50.8；破口移到北肩 at=15。
+      // 旧 at=70 被城门台盖住，试过的 at=40 又被马面盖住，实拍都只看见完整砖墙。
+      East: [{ at: EAST_DEFENSE.breachWallAt, width: EAST_DEFENSE.breachWidth,
+        floor: 0.035, leftPower: 1.46, rightPower: 1.20,
+        detailLen: 1.05, phase: 2.1 }],
       North: [], West: [],
     };
   }

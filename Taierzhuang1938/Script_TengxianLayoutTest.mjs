@@ -8,7 +8,7 @@
 
 import {
   CITY, MOAT, GATES, CROSSROAD, STREETS, SIGHT_CORRIDOR,
-  CITY_FEATURES, EAST_SUBURB, PRESUMED,
+  CITY_FEATURES, EAST_SUBURB, EAST_DEFENSE, BASTIONS, RAMPS, PRESUMED,
 } from "./Data_Tengxian.mjs";
 
 const EPSILON = 0.01;
@@ -215,6 +215,19 @@ if (eastGate && eastStreet) {
   check(nearlyEqual(EAST_SUBURB.roadZ, eastGate.z) && nearlyEqual(eastStreet.at, eastGate.z),
     "East-suburb road and EastGateStreet must be collinear with the east gate.");
 }
+const eastGateWallAt = eastGate ? -eastGate.z : 0;
+const eastBreachHalf = EAST_DEFENSE.breachWidth / 2;
+check(Math.abs(EAST_DEFENSE.breachWallAt - eastGateWallAt) > eastBreachHalf + 11,
+  "East-wall breach must not overlap the 22 m east-gate opening.");
+const eastBastions = BASTIONS.filter((bastion) => bastion.side === "East");
+check(eastBastions.every((bastion) => Math.abs(bastion.at - EAST_DEFENSE.breachWallAt)
+  > eastBreachHalf + 4), "East-wall breach must not be covered by a full-height bastion.");
+const eastRamps = RAMPS.filter((ramp) => ramp.side === "East");
+check(eastRamps.every((ramp) => Math.abs(ramp.at - EAST_DEFENSE.breachWallAt)
+  > eastBreachHalf + 12), "East-wall breach must stay clear of the only east-wall ramp.");
+check(EAST_DEFENSE.grenadePositions.every((position) =>
+  Math.abs(position.wallAt - EAST_DEFENSE.breachWallAt) <= 16),
+"East-wall grenade positions must flank the actual breach rather than the obsolete gate overlap.");
 check(EAST_SUBURB.bounds.minX > MOAT.outerEdge,
   "East-suburb residences must start outside the moat, never on the moat or inside the city.");
 const usableEastWidth = EAST_SUBURB.bounds.maxX - EAST_SUBURB.bounds.minX;

@@ -83,6 +83,12 @@ const GAME_SHOTS = [
   // 避免和既有东门仰视、东关常规战斗镜头重复。
   { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
+  // 两个缺口各留一张城外正面照：必须同时看见非对称 V 形断肩、黄褐夯土芯、
+  // 墙体真实厚度、内外瓦砾扇与中央通行槽，防止以后又退回规则凹槽。
+  { name: "Game_Z18_EastWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 350, z: 15, yaw: Math.PI / 2, pitch: 0.12, quiet: true } },
+  { name: "Game_Z19_SouthWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: 285, z: 350, yaw: 0, pitch: 0.12, quiet: true } },
   // ——批次A 之后的四个视觉盲区补口（旧机位没有一张能看到中城师部/北城功能区/庙街/南城）——
   // 中城师部：当典后街上看 124 师部门脸（门楼+番号木牌+沙袋哨位+旗）。
   { name: "Game_Z11_DivisionHq", query: "shot=1&phase=5&quality=high&scale=medium",

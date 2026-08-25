@@ -1141,20 +1141,46 @@ export function AddCityWall(sink, {
     let h = height;
     for (const b of breaches) {
       const half = b.width / 2;
+      const signed = (lx - b.at) / half;
       const d = Math.abs(lx - b.at);
       if (d >= half) continue;
-      // 缺口剖面：中间塌到 floor（默认 0.22），往两边按 1.6 次幂长回去 —— 平底的缺口一眼假
+      // 缺口剖面：中间压到可跨越的残砖高度，左右肩用不同幂次长回墙顶，再叠两档
+      // 确定性崩边。参考图里的破口不是对称抛物线，更不是三块八米宽的楼梯盒。
       const t = d / half;
-      const floor = b.floor ?? 0.22;
-      h = Math.min(h, height * (floor + (1 - floor) * Math.pow(t, 1.6)));
+      const floor = b.floor ?? 0.04;
+      const power = signed < 0 ? (b.leftPower ?? 1.28) : (b.rightPower ?? 1.52);
+      const shoulder = floor + (1 - floor) * Math.pow(t, power);
+      const phase = b.phase ?? 0;
+      const chip = (Math.sin((lx - b.at) * 1.71 + phase) * 0.055
+        + Math.sin((lx - b.at) * 3.83 + phase * 0.63) * 0.026)
+        * (0.35 + t * 0.65) * (1 - Math.pow(t, 5));
+      h = Math.min(h, height * Clamp(shoulder + chip, floor, 1));
     }
     return baseY + h;
   };
 
-  const slices = Math.max(2, Math.round(length / sliceLen));
-  const segLen = length / slices;
-  for (let i = 0; i < slices; i += 1) {
-    const lx = -length / 2 + segLen * (i + 0.5);
+  // 完整墙仍按约八米合批；只在破口及其两肩细分到约一米。这样不会把整圈城墙
+  // 的几何量翻八倍，却能让 17—26 m 的破口真正出现十几级不规则断肩。
+  const coarseSlices = Math.max(2, Math.round(length / sliceLen));
+  const coarseLen = length / coarseSlices;
+  const segments = [];
+  for (let coarse = 0; coarse < coarseSlices; coarse += 1) {
+    const coarseStart = -length / 2 + coarseLen * coarse;
+    const coarseCenter = coarseStart + coarseLen / 2;
+    const nearby = breaches.filter((b) => Math.abs(coarseCenter - b.at) < b.width / 2 + coarseLen);
+    const targetLen = nearby.length
+      ? Math.min(...nearby.map((b) => b.detailLen ?? 1.15)) : coarseLen;
+    const subdivisions = Math.max(1, Math.ceil(coarseLen / targetLen));
+    const segmentLength = coarseLen / subdivisions;
+    for (let sub = 0; sub < subdivisions; sub += 1) {
+      segments.push({
+        lx: coarseStart + segmentLength * (sub + 0.5),
+        segLen: segmentLength,
+      });
+    }
+  }
+  for (let i = 0; i < segments.length; i += 1) {
+    const { lx, segLen } = segments[i];
     const crest = crestAt(lx);
     if (crest === null) continue;
     const intact = crest >= top - 0.05;
@@ -1203,9 +1229,6 @@ export function AddCityWall(sink, {
           MakeBox(segLen * 0.96, coreTop - crest, w, TILE_METERS.adobe, `${seed}:core${i}`),
           { x: p.x, y: (crest + coreTop) / 2, z: p.z, ry }));
       }
-      // 缺口脚下的砖土堆：没有它，缺口读作被橡皮擦掉的一块
-      const foot = L(lx, widthAt(baseY) / 2 + 1.6);
-      sink.props.push({ kind: "breachSpill", x: foot.x, z: foot.z, radius: segLen * 0.9, seed: `${seed}:sp${i}` });
     }
 
     if (intact) {
@@ -1291,6 +1314,17 @@ export function AddCityWall(sink, {
       sink.Solid(p.x, (lowTop + top) / 2, p.z,
         segLen / 2, (top - lowTop) / 2, topWidth / 2, "cityWall", ry);
     }
+  }
+
+  // 一处缺口只生成一片程序化散砖底层；大轮廓、断肩和双向坍塌扇由 Blender Prop
+  // 负责。若跟着细分片逐段撒，一处破口会膨胀到数百块散砖，反而糊掉通行口。
+  for (let index = 0; index < breaches.length; index += 1) {
+    const breach = breaches[index];
+    const foot = L(breach.at, widthAt(baseY) / 2 + 1.8);
+    sink.props.push({
+      kind: "breachSpill", x: foot.x, z: foot.z,
+      radius: Math.max(4.8, breach.width * 0.34), seed: `${seed}:sp${index}`,
+    });
   }
 
   // 女墙与垛口。周期沿整段墙连续算，切片边界上不会错半个垛口

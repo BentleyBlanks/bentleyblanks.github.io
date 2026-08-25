@@ -80,6 +80,30 @@ for (const [name, spec] of battlefield.nodes) {
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
 
+const breach = InspectNodes("Model_CityWallBreachPack.glb", 650_000);
+for (const name of ["CityWallBreachShoulderLeft", "CityWallBreachShoulderRight"]) {
+  const spec = breach.nodes.get(name);
+  assert.ok(spec, `${name} node exists`);
+  assert.ok(spec.triangles <= 220, `${name} triangle budget`);
+  assert.equal(spec.minY, 0, `${name} is ground-ready`);
+  assert.ok(spec.maxSpan > 10.7 && spec.maxSpan < 11.1, `${name} matches the 11.5 m wall scale`);
+}
+const breachFan = breach.nodes.get("CityWallBreachDebrisFan");
+assert.ok(breachFan && breachFan.triangles <= 4200, "breach rubble fan triangle budget");
+assert.equal(breachFan.minY, 0, "breach rubble fan is ground-ready");
+assert.ok(breachFan.maxSpan > 17 && breachFan.maxSpan < 18.5,
+  "breach rubble fan spans both wall faces without becoming a whole battlefield");
+for (const name of ["CityWallBreachBrickCluster01", "CityWallBreachBrickCluster02"]) {
+  const spec = breach.nodes.get(name);
+  assert.ok(spec && spec.triangles <= 1000, `${name} triangle budget`);
+  assert.equal(spec.minY, 0, `${name} is ground-ready`);
+}
+for (const name of ["CityWallBreachCoping01", "CityWallBreachCoping02"]) {
+  const spec = breach.nodes.get(name);
+  assert.ok(spec && spec.triangles <= 60, `${name} triangle budget`);
+  assert.equal(spec.minY, 0, `${name} is ground-ready`);
+}
+
 const handcart = InspectNodes("Model_Handcart.glb");
 assert.deepEqual([...handcart.nodes.keys()], ["MarketHandcart"]);
 const handcartSpec = handcart.nodes.get("MarketHandcart");
@@ -104,9 +128,13 @@ for (const id of [
   ...Array.from({ length: 3 }, (_, index) => `marketBox${String(index + 1).padStart(2, "0")}`),
   ...Array.from({ length: 4 }, (_, index) => `marketCrate${String(index + 1).padStart(2, "0")}`),
   ...Array.from(battlefield.nodes.keys(), (name) => name[0].toLowerCase() + name.slice(1)),
+  "cityWallBreachShoulderLeft", "cityWallBreachShoulderRight", "cityWallBreachDebrisFan",
+  "cityWallBreachBrickCluster01", "cityWallBreachBrickCluster02",
+  "cityWallBreachCoping01", "cityWallBreachCoping02",
 ]) assert.match(runtime, new RegExp(`\\b${id}\\b`), `${id} is registered in the component library`);
 assert.match(runtime, /cache\.set\(spec\.url, pending\)/, "shared GLBs cache by URL");
 assert.match(runtime, /if \(spec\.materialMap\)/, "multi-material packs rebind game recipes");
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`
+  + ` breach=${breach.bytes}`
   + ` handcart=${handcart.bytes} market=${market.bytes}`);

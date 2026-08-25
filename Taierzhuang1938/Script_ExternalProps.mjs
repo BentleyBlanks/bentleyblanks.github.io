@@ -46,6 +46,7 @@ const LOADER = new GLTFLoader();
 
 const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=1";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
+const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=1";
 
 function BattlefieldAsset(label, node, material, tag = "prop", solid = true) {
   return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid };
@@ -76,6 +77,32 @@ const BATTLEFIELD_ASSETS = Object.freeze({
   battlefieldSandbag03: BattlefieldAsset("战场包 · 沙袋 03", "BattlefieldSandbag03", null, "barricade"),
   battlefieldGroundPlane: BattlefieldAsset("战场包 · 地面片", "BattlefieldGroundPlane", null, "rubble", false),
   battlefieldRock: BattlefieldAsset("战场包 · 岩石", "BattlefieldRock", null, "rubble"),
+});
+
+function CityWallBreachAsset(label, node) {
+  // 破口主体仍由程序化城墙提供碰撞；这些模块跨在既有墙盒与通行口两侧，只负责
+  // 不规则断面和瓦砾轮廓，重复登记一个大 AABB 会把中央净宽重新封死。
+  return {
+    label, url: CITY_WALL_BREACH_URL, node, materialMap: true,
+    tag: "rubble", solid: false,
+  };
+}
+
+const CITY_WALL_BREACH_ASSETS = Object.freeze({
+  cityWallBreachShoulderLeft: CityWallBreachAsset(
+    "城墙缺口 · 左断肩", "CityWallBreachShoulderLeft"),
+  cityWallBreachShoulderRight: CityWallBreachAsset(
+    "城墙缺口 · 右断肩", "CityWallBreachShoulderRight"),
+  cityWallBreachDebrisFan: CityWallBreachAsset(
+    "城墙缺口 · 双向瓦砾扇", "CityWallBreachDebrisFan"),
+  cityWallBreachBrickCluster01: CityWallBreachAsset(
+    "城墙缺口 · 残砖簇 01", "CityWallBreachBrickCluster01"),
+  cityWallBreachBrickCluster02: CityWallBreachAsset(
+    "城墙缺口 · 残砖簇 02", "CityWallBreachBrickCluster02"),
+  cityWallBreachCoping01: CityWallBreachAsset(
+    "城墙缺口 · 坠落压顶石 01", "CityWallBreachCoping01"),
+  cityWallBreachCoping02: CityWallBreachAsset(
+    "城墙缺口 · 坠落压顶石 02", "CityWallBreachCoping02"),
 });
 
 function MarketStorage(label, node, material = "WoodDoor") {
@@ -141,6 +168,7 @@ const ASSETS = Object.freeze({
   marketCrate03: MarketStorage("市场板条箱 03", "MarketCrate03"),
   marketCrate04: MarketStorage("市场板条箱 04", "MarketCrate04"),
   ...BATTLEFIELD_ASSETS,
+  ...CITY_WALL_BREACH_ASSETS,
   ...PackAssets(HW_PACK, HW_ASSETS),
   ...PackAssets(RY_PACK, RY_ASSETS),
   ...PackAssets(CL_PACK, CL_ASSETS),
@@ -208,6 +236,26 @@ const PLACEMENTS = Object.freeze({
     { asset: "marketBox01", x: 471.8, z: -49.5, ry: -0.16 },
   ],
   L4_Chengqiang: [
+    // 东墙缺口（世界 305,-15）：两只断肩把墙皮、夯土芯和真实墙厚连成 V 形，
+    // 瓦砾扇跨墙内外但中间留 3.8 m 净槽，玩家与补位 AI 仍沿缺口通过。
+    { asset: "cityWallBreachShoulderLeft", x: 305, z: -7.5, ry: Math.PI / 2 },
+    { asset: "cityWallBreachShoulderRight", x: 305, z: -22.5, ry: Math.PI / 2 },
+    { asset: "cityWallBreachDebrisFan", x: 305, z: -15, ry: Math.PI / 2 },
+    { asset: "cityWallBreachBrickCluster01", x: 312.8, z: -5.8, ry: 1.08, scale: 0.92 },
+    { asset: "cityWallBreachBrickCluster02", x: 298.2, z: -25.5, ry: -0.62, scale: 0.86 },
+    { asset: "cityWallBreachCoping01", x: 312.4, z: -21.4, ry: 1.86 },
+    { asset: "cityWallBreachCoping02", x: 298.0, z: -6.8, ry: 0.72 },
+
+    // 南墙缺口（世界 285,305）：参考手绘把靠东南角的炮击口做得更宽、更不对称。
+    // 内外各有坍塌扇，断下来的压顶石落在两肩，不把 L4 的目标轴横向封死。
+    { asset: "cityWallBreachShoulderLeft", x: 275.4, z: 305, ry: 0 },
+    { asset: "cityWallBreachShoulderRight", x: 294.6, z: 305, ry: 0 },
+    { asset: "cityWallBreachDebrisFan", x: 285, z: 305, ry: 0, scale: 1.08 },
+    { asset: "cityWallBreachBrickCluster01", x: 273.2, z: 313.0, ry: 0.42, scale: 1.05 },
+    { asset: "cityWallBreachBrickCluster02", x: 297.5, z: 298.0, ry: -0.74, scale: 0.94 },
+    { asset: "cityWallBreachCoping01", x: 276.0, z: 297.8, ry: 0.34 },
+    { asset: "cityWallBreachCoping02", x: 294.8, z: 312.2, ry: -0.48 },
+
     { asset: "rubble", x: 307, z: -67, ry: 0.52, scale: 1.18 },
     { asset: "crate", x: 260, z: -89, ry: -0.18, scale: 0.92 },
     { asset: "sandbag", x: 252, z: -80, ry: 0.42 },

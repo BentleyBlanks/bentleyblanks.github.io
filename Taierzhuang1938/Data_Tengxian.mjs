@@ -377,17 +377,19 @@ export const EAST_SUBURB = {
  * worldZ = -wallAt，避免在不同切片里重复手写绝对坐标。
  */
 export const EAST_DEFENSE = {
-  breachWallAt: 65,
+  // 与东门洞（局部 at=65）及最近马面（at=50.8）分开，避免完整构筑物盖住炮击口。
+  breachWallAt: 15,
+  breachWidth: 22,
   grenadePositions: [
-    { id: "BreachNorthGrenade", wallAt: 86, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
-    { id: "BreachSouthGrenade", wallAt: 44, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachNorthGrenade", wallAt: 30, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
+    { id: "BreachSouthGrenade", wallAt: 0, inward: 5, length: 7.2, depth: 2.6, ry: Math.PI / 2 },
   ],
-  crossfirePosition: { id: "BreachMachineGun", wallAt: 65, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
+  crossfirePosition: { id: "BreachMachineGun", wallAt: 15, inward: 3.3, length: 9.6, depth: 3.0, ry: Math.PI / 2 },
   reserveCourtyard: { id: "EastReserveCourtyard", x: 390, z: -124, length: 11.0, depth: 3.2, ry: 0 },
   rubblePiles: [
-    { id: "BreachNorthRubble", wallAt: 90, inward: 0.5, radius: 8.5 },
-    { id: "BreachSouthRubble", wallAt: 40, inward: 0.5, radius: 8.5 },
-    { id: "BreachApronRubble", wallAt: 65, inward: -5.0, radius: 7.0 },
+    { id: "BreachNorthRubble", wallAt: 30, inward: 0.5, radius: 8.5 },
+    { id: "BreachSouthRubble", wallAt: 0, inward: 0.5, radius: 8.5 },
+    { id: "BreachApronRubble", wallAt: 15, inward: -5.0, radius: 7.0 },
   ],
 };
 
