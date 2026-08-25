@@ -1,7 +1,7 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
 > 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
-> 最后登记核对：2026-08-24，35/35 个 `Script_*Test.mjs` 已登记，另含高度图 verify。
+> 最后登记核对：2026-08-26，47/47 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
 
 ## 一、目标与纪律
 
@@ -65,6 +65,7 @@ npm 会以当前 worktree 的 `package.json` 为项目根，不会切回共享�
 | BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线 |
 | PlayTest | 真浏览器端到端通关，130 条运行时断言 |
 | TestRunnerTest | 分级选择、Git 映射、历史基线、登记完整性 |
+| ModuleGraphTest | 从入口递归走模块图与 index.html import map 对账：新模块必登记、源码禁自写 ?v=（纯 Node） |
 | HudPromptTest | HUD 提示纯逻辑 |
 | RiggedModelTest | `.tzm.json` 绑定模型数据 |
 | FractureBakeTest | 预破碎离线数据 |

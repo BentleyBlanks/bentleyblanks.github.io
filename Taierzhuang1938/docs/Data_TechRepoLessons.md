@@ -189,7 +189,7 @@ function AD(param, t, peak, attack, decay) {
 
 **(g) 采样是盖在合成之上的一层** —— `:364-437`：清单拉不到、解码失败、某个 cue 还没烘出来，`Sfx()` 自动落回合成。且**每个 cue 存的是数组不是单个 buffer**——"每一两秒就要响一次的音只有一个样本，循环起来就是机关枪"，随机挑变体 + 轻微变速变调。
 
-### 2.8 缓存戳与 import map（★必抄，FPS 还没 index.html）
+### 2.8 缓存戳与 import map（★已照抄：`Script_ModuleGraphTest.mjs`，Tier 0）
 
 `TunnelLight1943/index.html:19-31` 记着一次真实事故（2026-08-07，手机上报「刨子推不动」）：`Script_Main.js` 带 `?v=157` 拿到新版，它 import 的 `Script_Core.mjs` 是裸 URL，手机上照旧吃缓存里的旧版 —— **新壳配旧芯**。桌面一刷新就好，手机 Safari 的模块缓存黏得多，所以只在移动端复现。
 
@@ -204,6 +204,10 @@ for (const m of src.matchAll(/(?:from|import\()\s*["']\.\/([A-Za-z0-9_]+\.m?js)[
 ```
 
 （注意字符类里必须有 `0-9`，否则走不到 `Data_ScriptC1.mjs` 这种带数字的文件。）
+
+台儿庄版（`Script_ModuleGraphTest.mjs`，2026-08-26）字符类里还得有 `/`：
+`Script_JieheHeight.mjs` 真的从子目录 import `Heightmap/Data_TaierzhuangHeightmap.mjs`，
+只认平铺文件名的正则走不到它——首轮对账就是这么漏出第 8 个未登记模块的。
 
 ### 2.9 命令行工作台（★强烈推荐，FPS 只有 Probe/ShotTest 雏形）
 
