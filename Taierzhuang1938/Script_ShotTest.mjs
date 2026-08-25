@@ -2,6 +2,9 @@
 // 视觉审查 agent 的唯一输入来源 —— 所以必须**可复现**：固定视口、固定帧数、
 // 不用 Math.random 的画面抖动。
 //
+// 出图按「同一 URL 参数组」分批：同组只 goto 一次（建一次城十几秒），
+// 组内靠页内 API 挪相机连拍，规矩见下面 GroupShots 的注释。
+//
 // 用法：
 //   node Taierzhuang1938/Script_ShotTest.mjs [输出目录] [--probe] [--only=名字]
 // 默认输出到 Taierzhuang1938/_shots/（已 gitignore）。
@@ -181,110 +184,195 @@ page.on("console", (message) => {
   problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
 });
 
-async function Shoot(pageName, url, globalName, setup = null) {
-  problems.length = 0;
-  await page.goto(url, { waitUntil: "load", timeout: 90000 });
-  await page.waitForFunction((g) => window[g] !== undefined, globalName, { timeout: 90000 });
-  // 先让加载/烘焙走完，再推进固定帧数把时序相关效果（火焰闪烁、运动模糊历史）稳住
-  // 先推逻辑帧把战场跑活（AI 铺开、粒子起来），再让 rAF 真渲染若干帧。
-  // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。
-  await page.evaluate((g) => window[g].StepFrames(240), globalName);
-  await page.waitForTimeout(700);
-  if (setup) {
-    await page.evaluate(({ g, pose }) => {
-      const game = window[g];
-      if (pose.editorMapLabels) {
-        document.getElementById("bootStart")?.click();
-        game.StepFrames(36);
-        game.Debug.OpenEditor("scene");
-        const editor = game.editor.active;
-        editor.LoadMapReferences();
-        editor.TopDown();
-        game.StepFrames(24);
-        return;
+// ---------------------------------------------------------------------------
+// 按「必须重启页面」的参数组分批（抄 Script_SamplePointShot 的批处理纪律：
+// 一关只建一次城，关内连着拍完再换关 —— 建一次城十几秒，逐张重开页面全是纯等待）。
+//
+// 分组键 = 页面文件 + 完整 query 串：phase/quality/scale/ads/fire… 任何一个
+// 参数不同都会换 URL，也就自动换页面。宁可多分组不可错合并。
+// 同键之内还有三条强制拆组的规矩：
+//   · 无 setup 的镜头拍的是「该页面的默认相机」（出生机位/主菜单），
+//     只能当一组的第一张 —— 前面有人挪过相机它就拍错了；
+//   · quiet 会把 AI 冻死（coolUntil = 1e9，页面内不可逆），
+//     所以非 quiet 的实机镜头不能排在 quiet 镜头后面；
+//   · editorMapLabels 会点 bootStart 并打开场景编辑器，页面状态被污染且不可逆，
+//     这种镜头必须独占一组 —— 它前后都不许有别的镜头。
+// ---------------------------------------------------------------------------
+function GroupShots(shots, pageFile, globalName) {
+  const groups = [];
+  const byKey = new Map();
+  for (const shot of shots) {
+    const key = `${pageFile}?${shot.query}`;
+    let group = byKey.get(key);
+    const exclusive = !!shot.setup?.editorMapLabels;
+    const needsFresh = !group
+      || exclusive
+      || group.exclusive
+      || (!shot.setup && group.shots.length > 0)
+      || (shot.setup && !shot.setup.menuShot && !shot.setup.quiet && group.hadQuiet);
+    if (needsFresh) {
+      group = { pageFile, query: shot.query, globalName, shots: [], hadQuiet: false, exclusive };
+      groups.push(group);
+      byKey.set(key, group);
+    }
+    group.shots.push(shot);
+    if (shot.setup?.quiet) group.hadQuiet = true;
+  }
+  return groups;
+}
+
+// 同组第二张起的稳定档：抄 Script_SamplePointShot 的 SETTLE（45 帧 + 220 ms）。
+// 首张仍走全额预热（240 帧 + 700 ms + 60 帧 + 500 ms），语义与逐张冷启动时一致。
+const SETTLE_FRAMES = 45;
+const SETTLE_WAIT_MS = 220;
+
+async function ApplySetup(globalName, setup) {
+  await page.evaluate(({ g, pose }) => {
+    const game = window[g];
+    // 编辑器语义层验收：点开机、开场景编辑器、装地图参考、转俯拍。
+    // 这条路把页面状态改得回不了头 —— GroupShots 已保证它独占一组。
+    if (pose.editorMapLabels) {
+      document.getElementById("bootStart")?.click();
+      game.StepFrames(36);
+      game.Debug.OpenEditor("scene");
+      const editor = game.editor.active;
+      editor.LoadMapReferences();
+      editor.TopDown();
+      game.StepFrames(24);
+      return;
+    }
+    if (pose.menuShot) {
+      const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
+      if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
+      game.menu.shotIndex = index;
+      game.menu.shotTime = 0;
+      // 菜单 UI 的显隐要**每张都显式摆一遍**：同页面连拍时，上一张的 hideMenu
+      // 会把 #menu 关掉，这一张不摆回来就与冷启动版不同画。
+      const menuElement = document.getElementById("menu");
+      if (menuElement) menuElement.style.display = pose.hideMenu ? "none" : "";
+      // cam.up / cam.far 改的是 camera 本体，同页连拍会带到下一张。
+      // 第一次进来先记住页面原值；之后每张都从原值摆起 —— 冷启动语义就是
+      // 「每张都面对页面原始相机状态」。far 沿用 master 的 Math.max 口径。
+      if (!game.__shotTestCamBase) {
+        game.__shotTestCamBase = { up: game.camera.up.toArray(), far: game.camera.far };
       }
-      if (pose.sky && game.Debug?.ApplySky) game.Debug.ApplySky(pose.sky);
-      if (pose.menuShot) {
-        const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
-        if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
-        game.menu.shotIndex = index;
-        game.menu.shotTime = 0;
-        // cam：借菜单的推轨系统架一个**表里没有**的机位。
-        // 玩家的相机贴地，菜单机位是这一关唯一能把镜头抬到屋面之上的口子；
-        // 屋顶类的回归只能从那儿拍。改的是这一份 shots 的副本，不落回 Data_Menu。
-        if (pose.cam) {
-          const shot = game.menu.shots[index];
-          shot.from = pose.cam.from;
-          shot.to = pose.cam.to || pose.cam.from;
-          shot.look = pose.cam.look;
-          shot.lookTo = pose.cam.lookTo || pose.cam.look;
-          if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
-          if (pose.cam.up) game.camera.up.fromArray(pose.cam.up);
-          if (pose.cam.far) {
-            game.camera.far = Math.max(game.camera.far, pose.cam.far);
-            game.camera.updateProjectionMatrix();
-          }
-          game.menu.ApplyShot(0);
-          if (pose.hideMenu) document.getElementById("menu").style.display = "none";
-          game.StepFrames(12);
-          return;
-        }
-        game.menu.ApplyShot(0.45);
+      game.camera.up.fromArray(pose.cam?.up || game.__shotTestCamBase.up);
+      game.camera.far = pose.cam?.far
+        ? Math.max(game.__shotTestCamBase.far, pose.cam.far)
+        : game.__shotTestCamBase.far;
+      game.camera.updateProjectionMatrix();
+      // cam：借菜单的推轨系统架一个**表里没有**的机位。
+      // 玩家的相机贴地，菜单机位是这一关唯一能把镜头抬到屋面之上的口子；
+      // 屋顶类的回归只能从那儿拍。改的是这一份 shots 的副本，不落回 Data_Menu。
+      if (pose.cam) {
+        const shot = game.menu.shots[index];
+        shot.from = pose.cam.from;
+        shot.to = pose.cam.to || pose.cam.from;
+        shot.look = pose.cam.look;
+        shot.lookTo = pose.cam.lookTo || pose.cam.look;
+        if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
+        game.menu.ApplyShot(0);
         game.StepFrames(12);
         return;
       }
-      game.player.Spawn(pose.x, pose.z, pose.yaw);
-      game.player.pitch = pose.pitch || 0;
-      if (pose.quiet) {
-        // 环境审查不是战斗审查：保留士兵和战场烟火，但让他们暂时不能开枪。
-        // Spawn 会先清一次受伤状态；这里再冻结 AI，保证后续帧不会重新染红画面。
-        game.player.health = 100;
-        game.player.bleeding = 0;
-        game.player.hitFlash = 0;
-        game.player.hitMarks.length = 0;
-        if (game.ai) for (const soldier of game.ai.soldiers) {
-          soldier.coolUntil = 1e9;
-          soldier.fireTimer = 0;
-        }
-      }
+      game.menu.ApplyShot(0.45);
       game.StepFrames(12);
-    }, { g: globalName, pose: setup });
-  }
-  await page.evaluate((g) => window[g].StepFrames(60), globalName);
-  if (setup?.quiet) await page.evaluate((g) => {
+      return;
+    }
+    game.player.Spawn(pose.x, pose.z, pose.yaw);
+    game.player.pitch = pose.pitch || 0;
+    if (pose.quiet) {
+      // 环境审查不是战斗审查：保留士兵和战场烟火，但让他们暂时不能开枪。
+      // Spawn 会先清一次受伤状态；这里再冻结 AI，保证后续帧不会重新染红画面。
+      game.player.health = 100;
+      game.player.bleeding = 0;
+      game.player.hitFlash = 0;
+      game.player.hitMarks.length = 0;
+      if (game.ai) for (const soldier of game.ai.soldiers) {
+        soldier.coolUntil = 1e9;
+        soldier.fireTimer = 0;
+      }
+    }
+    game.StepFrames(12);
+  }, { g: globalName, pose: setup });
+}
+
+/** 拍一张（页面已就位）。first=true 走全额预热尾段，否则走 SETTLE 档。 */
+async function ShootOne(shot, globalName, first) {
+  if (shot.setup) await ApplySetup(globalName, shot.setup);
+  await page.evaluate(({ g, frames }) => window[g].StepFrames(frames),
+    { g: globalName, frames: first ? 60 : SETTLE_FRAMES });
+  if (shot.setup?.quiet) await page.evaluate((g) => {
     const game = window[g];
     game.player.health = 100;
     game.player.bleeding = 0;
     game.player.hitFlash = 0;
     game.player.hitMarks.length = 0;
   }, globalName);
-  await page.waitForTimeout(500);
-  const file = path.join(outDir, `${pageName}.png`);
+  await page.waitForTimeout(first ? 500 : SETTLE_WAIT_MS);
+  const file = path.join(outDir, `${shot.name}.png`);
   await page.screenshot({ path: file });
   const stat = fs.statSync(file);
   const status = problems.length ? "ERR" : "ok";
-  console.log(`${status.padEnd(4)} ${pageName.padEnd(24)} ${(stat.size / 1024).toFixed(0)}KB  ${file}`);
+  console.log(`${status.padEnd(4)} ${shot.name.padEnd(24)} ${(stat.size / 1024).toFixed(0)}KB  ${file}`);
   if (problems.length) for (const p of problems.slice(0, 4)) console.log(`      ${p}`);
-  return problems.length === 0;
+  const ok = problems.length === 0;
+  // 报错逐张归属：这一张已经交完差，别把账挂到下一张头上。
+  problems.length = 0;
+  return ok;
+}
+
+async function ShootGroup(group) {
+  problems.length = 0;
+  const url = `http://127.0.0.1:${port}/${group.pageFile}?${group.query}`;
+  if (group.shots.length > 1) console.log(`--- ${group.query}（${group.shots.length} 张同页连拍）---`);
+  try {
+    await page.goto(url, { waitUntil: "load", timeout: 90000 });
+    await page.waitForFunction((g) => window[g] !== undefined, group.globalName, { timeout: 90000 });
+    // 先让加载/烘焙走完，再推进固定帧数把时序相关效果（火焰闪烁、运动模糊历史）稳住
+    // 先推逻辑帧把战场跑活（AI 铺开、粒子起来），再让 rAF 真渲染若干帧。
+    // 推逻辑帧 != 推渲染帧：镜头缓动、材质淡出、光照换挡全在渲染侧。
+    await page.evaluate((g) => window[g].StepFrames(240), group.globalName);
+    await page.waitForTimeout(700);
+  } catch (error) {
+    for (const shot of group.shots) console.log(`ERR  ${shot.name.padEnd(24)} ${String(error).slice(0, 160)}`);
+    return false;
+  }
+  let ok = true;
+  let appliedSky = null;
+  for (let index = 0; index < group.shots.length; index += 1) {
+    const shot = group.shots[index];
+    try {
+      // 天光覆盖（setup.sky）：同页连拍要照 Script_SamplePointShot 的规矩，
+      // 换镜头时套上/还原 —— 不还原的话上一张的天光会串到这一张。
+      const wantSky = shot.setup?.sky || null;
+      if (wantSky !== appliedSky) {
+        await page.evaluate(({ g, name }) => {
+          const debug = window[g].Debug;
+          if (name) debug?.ApplySky?.(name);
+          else debug?.RestoreSky?.();
+        }, { g: group.globalName, name: wantSky });
+        appliedSky = wantSky;
+      }
+      ok = (await ShootOne(shot, group.globalName, index === 0)) && ok;
+    } catch (error) {
+      console.log(`ERR  ${shot.name.padEnd(24)} ${String(error).slice(0, 160)}`);
+      ok = false;
+    }
+  }
+  return ok;
 }
 
 let allOk = true;
 const probeList = only ? PROBE_SHOTS.filter((s) => only.includes(s.name)) : PROBE_SHOTS;
-for (const shot of probeList) {
-  const url = `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?${shot.query}`;
-  allOk = (await Shoot(shot.name, url, "Probe")) && allOk;
+for (const group of GroupShots(probeList, "Taierzhuang1938/Probe.html", "Probe")) {
+  allOk = (await ShootGroup(group)) && allOk;
 }
 
 if (!probeOnly && fs.existsSync(path.join(projectDir, "index.html"))) {
   const gameList = only ? GAME_SHOTS.filter((s) => only.includes(s.name)) : GAME_SHOTS;
-  for (const shot of gameList) {
-    const url = `http://127.0.0.1:${port}/Taierzhuang1938/?${shot.query}`;
-    try {
-      allOk = (await Shoot(shot.name, url, "Taierzhuang", shot.setup || null)) && allOk;
-    } catch (error) {
-      console.log(`ERR  ${shot.name.padEnd(24)} ${String(error).slice(0, 160)}`);
-      allOk = false;
-    }
+  for (const group of GroupShots(gameList, "Taierzhuang1938/", "Taierzhuang")) {
+    allOk = (await ShootGroup(group)) && allOk;
   }
 }
 
