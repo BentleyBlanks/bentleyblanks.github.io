@@ -43,6 +43,7 @@ import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
 import {
   PickCityBlockArchetype, PickDuplex,
   BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
+  AddFarRoof, AddRoofChimney,
 } from "./Script_CityBlockKit.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
@@ -53,7 +54,7 @@ import {
 } from "./Script_World.mjs";
 import {
   MakeBox, MakeSandbag, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
-  MakeInstanced, TILE_METERS, BRICK_UV_GRID,
+  MakeInstanced, TILE_METERS, BRICK_UV_GRID, RoofSlopeLayout,
 } from "./Script_Geo.mjs";
 import {
   AddRoadWear, AddStreetLife, AddWattleFence, AddStoneRoller, AddManureHeap,
@@ -344,6 +345,14 @@ function DistanceToRiver(x, z) {
   return best;
 }
 
+/** 东关那一档的坡度：檐口 2.6、脊 3.9 是这一片的既定尺寸，从它反解出坡角。 */
+const SUBURB_ROOF_PITCH = (depth) => Math.atan2(1.3, depth / 2);
+
+/** 东关屋面的剖面（给烟囱定落点用；几何本体仍由 AddHardMountainRoof 出）。 */
+function SuburbRoofLayout(width, depth, baseY) {
+  return RoofSlopeLayout(width, depth, baseY + 2.6, SUBURB_ROOF_PITCH(depth), 0.45);
+}
+
 /**
  * 上城道从坡脚到墙顶要占多长。城墙与坡道两边都得算这个数（一个开宇墙的口、
  * 一个铺台阶），各写一份必然对不上，所以抽出来。
@@ -400,6 +409,7 @@ export class TengxianCity {
     this.covers = [];
     this.grid = new Map();
     this.gridSize = 12;
+    this.cells = [];                      // 城内院落格子表（BuildSteps 填，布设工具读）
     this.stats = {
       compoundsDetail: 0, compoundsMid: 0, silhouettes: 0,
       householdProps: 0, streetClusters: 0, streetProps: 0, roadMarks: 0,
@@ -463,6 +473,9 @@ export class TengxianCity {
 
     // --- 城内院落 ---
     const cells = this.PlanBlocks(rnd);
+    // 留一份格子表给布设工具（Script_TownDressingDump 按每家每户取院子；
+    // BuildBlock 会把 kind / ry / damage / state 补写回每个 cell）。
+    this.cells = cells;
     let done = 0;
     for (const cell of cells) {
       this.BuildBlock(cell, rnd);
@@ -1238,6 +1251,14 @@ export class TengxianCity {
       kind: plan.kind, ry: plan.ry, duplex: plan.duplex,
     };
     const lodCell = { x: cell.x, z: cell.z, w: plan.w, d: plan.d, seed: cell.seed };
+    // 布设工具要按院找家什：把这一格最终盖成什么写回 cell（w/d 保持雕格矩形，
+    // 不跟 ShopRow 的面阔交换走 —— 摆件的包含判定认的是格子，不是构件朝向）。
+    cell.kind = plan.kind;
+    cell.ry = plan.ry;
+    cell.damage = damage;
+    cell.state = profile.state;
+    cell.burnt = burnt;
+    cell.tier = dist < this.detailRadius ? "detail" : dist < this.midRadius ? "mid" : "far";
 
     if (dist < this.detailRadius) {
       this.stats.householdProps += BuildCityBlockDetail(this.sink, spec);
@@ -1468,7 +1489,9 @@ export class TengxianCity {
     void rnd;
   }
 
-  // （旧 AddCluster 远景剪影群已迁入 Script_Landmark_Misc.BuildSilhouetteCluster）
+  // （旧 AddCluster 远景剪影群已迁入 Script_Landmark_Misc.BuildSilhouetteCluster；
+  //  master 侧给它加的 AddFarRoof 两坡顶改良已被 D6 的整体重写覆盖 —— 若要再抬一档，
+  //  Misc 的 BuildSilhouetteCluster 可以直接改用 AddFarRoof。）
 
   // =========================================================================
   // 东关 —— 本战真正的主战场
@@ -1725,24 +1748,55 @@ export class TengxianCity {
       eaveY: baseY + 2.6, ridgeY: baseY + 3.9, seed: `${seed}:roof`,
       ruined: damage > 0.74, burnt,
     });
+    // 三家一支的烟囱。关厢是本战的主战场，也是主菜单「关厢院落」那一机位
+    // 唯一的内容 —— 一片纯瓦面上冒出来的几支砖烟囱是这片房子还有人住的证据。
+    if (damage <= 0.74) {
+      AddRoofChimney(sink, {
+        x, z: z - d * 0.16, ry: 0, depth: bd, seed: `${seed}:roof`,
+        mat, tile: TILE_METERS.brick, grid: BRICK_UV_GRID,
+        tileMat: burnt ? "BrickWallSooty" : "RoofTile",
+        roof: SuburbRoofLayout(bw, bd, baseY),
+      });
+    }
     void saved;
   }
 
+  /**
+   * 东关远景一格。剖面照抄 AddSimpleCompoundAt（院墙一圈 + 一座正房），
+   * 只是不切片、不掏枪眼 —— 走近时读到的必须是同一座院子。
+   *
+   * 旧版是「一块 w*0.88 × d*0.84 的实心大饼 + 两片写死 rx: ±0.5 的板」，
+   * 与城内远景档同一个错：板的位移方向与 rx 配反（倒 V），倾角又与进深无关，
+   * 于是俯瞰整片关厢是一层悬空交叉的玻璃片。坡顶现在走 AddFarRoof。
+   */
   AddSilhouetteAt(cell, damage, burnt, baseY) {
     const { x, z, w, d, seed } = cell;
-    const rnd = Mulberry32(HashString(`${seed}:sil`));
-    const h = 2.5 + rnd() * 0.8;
-    this.farSink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
-      MakeBox(w * 0.88, h, d * 0.84, TILE_METERS.brick, `${seed}:sil`, BRICK_UV_GRID),
-      { x, y: baseY + h / 2, z }));
-    this.farSink.Solid(x, baseY + h / 2, z, w * 0.44, h / 2, d * 0.42, "wall");
-    if (damage < 0.8) {
-      for (const s of [-1, 1]) {
-        this.farSink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w * 0.96, 0.14, d * 0.52, TILE_METERS.roof, `${seed}:sr${s}`),
-          { x, y: baseY + h + 0.48, z: z + s * d * 0.2, rx: -s * 0.5 }));
-      }
+    const adobe = !burnt && HashString(seed) % 100 < 42;
+    const mat = burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick");
+    const tile = adobe ? TILE_METERS.adobe : TILE_METERS.brick;
+    const grid = adobe ? null : BRICK_UV_GRID;
+    const h = 2.0;
+    for (const [ox, oz, len, ry] of [
+      [0, -d / 2, w, 0], [0, d / 2, w, 0],
+      [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2],
+    ]) {
+      this.farSink.Add(mat, PlaceGeometry(
+        MakeBox(len, h, 0.42, tile, `${seed}:sw${ox}${oz}`, grid),
+        { x: x + ox, y: baseY + h / 2, z: z + oz, ry }));
+      this.farSink.Solid(x + ox, baseY + h / 2, z + oz, len / 2, h / 2, 0.21, "wall", ry);
     }
+    const bw = w * 0.62, bd = d * 0.44, bz = z - d * 0.16;
+    this.farSink.Add(mat, PlaceGeometry(
+      MakeBox(bw, 2.6, bd, tile, `${seed}:body`, grid),
+      { x, y: baseY + 1.3, z: bz }));
+    this.farSink.Solid(x, baseY + 1.3, bz, bw / 2, 1.3, bd / 2, "wall");
+    // 坡度取东关中景那一条（檐 2.6 / 脊 3.9），比城内的 27.5° 平一档 ——
+    // 远景要跟着自己的中景，不然玩家走近时整片关厢的屋脊会集体掉一截。
+    AddFarRoof(this.farSink, {
+      x, z: bz, ry: 0, width: bw, depth: bd, eaveY: baseY + 2.6,
+      seed: `${seed}:roof`, burnt, mat, adobe, gable: true, chimney: true,
+      ruined: damage > 0.74, pitch: SUBURB_ROOF_PITCH(bd),
+    });
   }
 
   // =========================================================================

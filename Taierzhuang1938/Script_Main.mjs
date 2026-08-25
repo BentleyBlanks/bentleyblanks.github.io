@@ -1164,7 +1164,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     await yieldFrame();
   }
   const external = await AddExternalProps({
-    scene, library, phaseId: phase.id,
+    scene, library, phaseId: phase.id, bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
   });
   battlefield.externalProps = external;

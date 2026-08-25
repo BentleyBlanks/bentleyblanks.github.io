@@ -76,7 +76,10 @@ import {
   MOAT, MARCH_GROUND, WEST_SUBURB, EAST_SUBURB, OUTSKIRTS, OUTER_LANDMARKS,
 } from "./Data_Tengxian.mjs";
 import { BuildSink, AddTree } from "./Script_World.mjs";
-import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
+import {
+  MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
+  RoofSlopeLayout, RoofSlabY,
+} from "./Script_Geo.mjs";
 import { AddVillageLife } from "./Script_LivedInProps.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { JIEHE_RIVER, JieheRiverCenterZ } from "./Script_JieheHeight.mjs";
@@ -147,41 +150,15 @@ export const VILLAGE_BUILDING_ARCHETYPES = Object.freeze([
 ]);
 
 /**
- * 一座硬山顶的确定性剖面。局部 +X 是开间/屋脊方向，局部 +Z 是朝南的进深。
- * 两片坡面都从 z=0 的正脊向前后檐下降；把这条关系集中在一个函数里，避免
- * 厢房旋转 90° 后又把宽/深交换一次，出现玩家指出的“楼顶做反了”。
+ * 硬山顶剖面。**实现已经搬到 Script_Geo.RoofSlopeLayout** —— 城内院落的远景档
+ * 当初没有这个函数可用，自己写了一版把坡面 rx 的正负号写反的坡顶（俯瞰是一片
+ * 悬空交叉的板）。剖面收在几何层之后，城内城外共用同一份，不会再各错一次。
+ * 这里保留村屋自己的名字，出图脚本与 JieheTerrainTest 按这个名字取。
  */
-export function VillageRoofLayout(width, depth, eaveY, pitch = 0.47, overhang = 0.45) {
-  const halfRun = depth / 2 + overhang;
-  const ridgeY = eaveY + depth / 2 * Math.tan(pitch);
-  const outerY = eaveY - overhang * Math.tan(pitch);
-  const slopeLength = halfRun / Math.cos(pitch);
-  return {
-    ridgeY,
-    outerY,
-    ridgeLength: width + overhang * 2,
-    halves: [-1, 1].map((side) => ({
-      side,
-      localZ: side * halfRun / 2,
-      centerY: (ridgeY + outerY) / 2,
-      rotationX: side * pitch,
-      width: width + overhang * 2,
-      depth: slopeLength,
-      // These are the two local endpoints of the *actual rotated slab*.
-      // Keeping them with the layout makes it impossible for callers/tests to
-      // confuse a pretty scalar ridgeY with a visually inverted V-shaped roof.
-      localRidgeZ: -side * slopeLength / 2,
-      localEaveZ: side * slopeLength / 2,
-      slabRidgeY: ridgeY,
-      slabEaveY: outerY,
-    })),
-  };
-}
+export const VillageRoofLayout = RoofSlopeLayout;
 
-/** Height of a rotated roof slab at one of its local-Z coordinates. */
-export function VillageRoofSlabY(half, localZ) {
-  return half.centerY - Math.sin(half.rotationX) * localZ;
-}
+/** 一片已转好的坡面在其局部 Z 处的高度。 */
+export const VillageRoofSlabY = RoofSlabY;
 
 /**
  * 村屋损毁档位。断壁残垣不是贴一层灰：同一种原型按种子分四档，

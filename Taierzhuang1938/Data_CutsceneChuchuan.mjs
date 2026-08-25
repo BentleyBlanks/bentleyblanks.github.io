@@ -358,7 +358,9 @@ export const CS_ChuchuanLegacy = {
 // 车厢坐标是独立局部系；不绑定界河高度图。这里只写数据，不 import three。
 // ---------------------------------------------------------------------------
 
-const CHUCHUAN_CAR_G = 0.13;
+// 车厢钢地板：CarriageFloor 中心 y=0、厚 0.18 → 顶面 0.09。演员的 pos.y 就是脚底，
+// 写 0.13 时全车人悬空 4 cm（低头看自己的脚会看见一条缝）。
+const CHUCHUAN_CAR_G = 0.09;
 const CHUCHUAN_CAR_RY = Math.PI;
 const CHUCHUAN_MOTIVATION_AT = 68.0;
 const CHUCHUAN_GEAR_AT = 87.4;
@@ -368,6 +370,22 @@ const CHUCHUAN_SEAT_LIFT = 0.13;
 const CHUCHUAN_END = 105.0;
 const CHUCHUAN_SIDE_DOOR_Z = 5.7;
 const CHUCHUAN_PLATFORM_Y = 0.58;
+
+// ── 窗带的高度（本场画面里最要紧的四个数）──────────────────────────────────
+// 坐姿眼高 1.36。旧版窗洞是 1.28—2.82：窗台只比眼睛低 8 cm，视线几乎贴着窗台走，
+// 从座位上望出去只剩天，田野、土堤、电杆全在视线以下 —— 「火车在开」这条信息
+// 就是这么丢的。真车厢的窗台在坐姿眼高下面 40—50 cm，人是**往下看**出去的。
+const CHUCHUAN_WINDOW_LOW = 0.90;    // 窗台顶面（下半木板到此为止）
+const CHUCHUAN_WINDOW_HIGH = 2.55;   // 窗头（上半钢板从此开始）
+const CHUCHUAN_WINDOW_MID = (CHUCHUAN_WINDOW_LOW + CHUCHUAN_WINDOW_HIGH) / 2;
+const CHUCHUAN_WINDOW_SPAN = CHUCHUAN_WINDOW_HIGH - CHUCHUAN_WINDOW_LOW;
+
+// ── 长凳分段与坐席 ────────────────────────────────────────────────────────
+// 凳段中心 [-5.8,-1.95,1.95,5.8]、每段长 3.45 → 段内可坐区间是 ±1.725，段间有缝。
+// 坐着的人在 z 向占 ±0.24，所以坐席必须落在 ±1.35 以内；旧表里 -4.05 / -0.36
+// 正压在段缝上，半个屁股悬空。每段均分三个坐席，全部落在安全区里。
+const CHUCHUAN_BENCH_Z = [-5.8, -1.95, 1.95, 5.8];
+const CHUCHUAN_SEAT_PITCH = 1.25;
 // 参考滇越铁路的新闻照片：车厢座位坐满，过道则留给上下车和整理行李；只有少数人
 // 靠着侧壁、车门或行李架站着。五名有台词的重点人物之外，人群仍是稳定的背景层，
 // 但不把车厢排成挤满人的展示间。
@@ -377,20 +395,39 @@ function TrackMoveState(from, to, seconds, extra = {}) {
   return { prepare: 1, moveSpeed: speed / 4.2, travelSpeed: speed, ...extra };
 }
 
-function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingRy = CHUCHUAN_CAR_RY) {
+/**
+ * 一名坐席乘客的全程轨道。
+ *
+ * ── 下车段的排序（本轮重排的核心）────────────────────────────────────────
+ * 旧版让全车人从 95.2 s 起就往过道里走，而玩家的相机 93—101 s 正好沿同一条过道、
+ * 同一扇门出去：出图里 t=94 相机贴着别人的帽顶、t=100 直接从排队的人身体里穿过去。
+ * 现在的口径是 **玩家先走、人群明显错后**：
+ *   · 93—98.5 s 相机在过道里，这段时间**没有一个人离座**（只是站起来靠在自己座位前）；
+ *   · 98.8 s 起按「离门远近」依次离座（queueOrder 0 最近门），每人错开 0.8 s；
+ *   · 排到门口、跨门槛、下踏板的落点全部往 −z 一侧散开，避开玩家最后停的
+ *     (6.8, 7.4)；镜 11 回头仍能看见战友一个接一个从门里下来。
+ * queueOrder 大的人在 105 s 内根本轮不到，就一直站在过道里排着 —— 这是对的，
+ * 一节车 30 个人不可能十秒钟走空。
+ */
+function CarSeatTrack(pos, lifeState, stopDelay, queueOrder, exitX, facingRy = CHUCHUAN_CAR_RY) {
   const stopAt = 56.8 + stopDelay;
   const side = Math.sign(pos[0]) || 1;
-  const aisleX = side * 0.72;
-  const aisleAt = exitEnd;
-  const queueAt = aisleAt + Math.max(0.45, Math.abs(CHUCHUAN_SIDE_DOOR_Z - pos[2]) / 1.45);
-  const thresholdAt = queueAt + 1.35;
-  const platformAt = thresholdAt + 1.05;
-  const outsideAt = platformAt + 1.4;
+  const aisleX = side * 0.74;
+  // 起立点：站在自己座位**前面**的空地上。写回 x=±1.95 的话人是站在凳面里的
+  //（凳段 x 跨 1.66—2.24），小腿整条埋进座板。
+  const standPos = [side * 1.28, CHUCHUAN_CAR_G, pos[2]];
+  const exitAt = 98.8 + queueOrder * 0.8;
+  const aisleAt = exitAt + 1.0;
   const aislePos = [aisleX, CHUCHUAN_CAR_G, pos[2]];
-  const queuePos = [aisleX, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z];
-  const thresholdPos = [3.25, 0.18, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.08];
-  const platformPos = [4.65, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.12];
-  const outsidePos = [5.85, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.34];
+  const queuePos = [aisleX, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z - 0.5];
+  const queueAt = aisleAt + Math.max(0.5, Math.abs(queuePos[2] - pos[2]) / 1.7);
+  const thresholdPos = [3.30, 0.24, CHUCHUAN_SIDE_DOOR_Z - 0.1];
+  const thresholdAt = queueAt + 1.0;
+  const platformPos = [4.80, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z - 0.35 - Math.abs(exitX) * 0.5];
+  const platformAt = thresholdAt + 0.95;
+  const outsidePos = [5.70 + Math.abs(exitX) * 0.35, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z - 1.7 - Math.abs(exitX) * 1.1];
+  const outsideAt = platformAt + 1.3;
+  const tail = Math.max(CHUCHUAN_END, outsideAt + 0.1);
   return [
     { t: 0, pos, ry: facingRy, state: { ...lifeState, sit: 1, seatLift: CHUCHUAN_SEAT_LIFT } },
     { t: stopAt, pos, ry: facingRy, state: { ...lifeState, sit: 1, seatLift: CHUCHUAN_SEAT_LIFT } },
@@ -399,16 +436,18 @@ function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingR
     { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.16 } },
     // “好样的”之后默默把随身物件收好；地点卡期间才起身。
     { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.55 } },
-    { t: 90.8, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    { t: CHUCHUAN_DOOR_AT, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    { t: exitAt, pos, ry: facingRy, state: TrackMoveState(pos, aislePos, aisleAt - exitAt) },
+    { t: 90.8, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.8 } },
+    // 门一开就起身，但只是离座站到自己座位前；过道让给先走的玩家。
+    { t: CHUCHUAN_DOOR_AT - 0.7, pos, ry: facingRy, state: TrackMoveState(pos, standPos, 0.7, { prepare: 1 }) },
+    { t: CHUCHUAN_DOOR_AT, pos: standPos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
+    { t: exitAt, pos: standPos, ry: facingRy, state: TrackMoveState(standPos, aislePos, aisleAt - exitAt) },
     // 从自己的座位进过道、沿过道走到侧门、跨踏板登上月台；不再黑场瞬移到车尾。
-    { t: aisleAt, pos: aislePos, ry: facingRy, state: TrackMoveState(aislePos, queuePos, queueAt - aisleAt) },
+    { t: aisleAt, pos: aislePos, ry: Math.PI, state: TrackMoveState(aislePos, queuePos, queueAt - aisleAt) },
     { t: queueAt, pos: queuePos, ry: Math.PI, state: TrackMoveState(queuePos, thresholdPos, thresholdAt - queueAt) },
     { t: thresholdAt, pos: thresholdPos, ry: -Math.PI / 2, state: TrackMoveState(thresholdPos, platformPos, platformAt - thresholdAt) },
     { t: platformAt, pos: platformPos, ry: -Math.PI / 2, state: TrackMoveState(platformPos, outsidePos, outsideAt - platformAt) },
     { t: outsideAt, pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
-    { t: Math.max(CHUCHUAN_END, outsideAt), pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
+    { t: tail, pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
   ];
 }
 
@@ -416,23 +455,39 @@ function CarSeatTrack(pos, lifeState, stopDelay, exitAt, exitEnd, exitX, facingR
  * 班长从头就立在镜头正对的车厢末端，面向满车人检查弹药；他不是被坐席和人群吞掉的第五个
  * 同质化乘客。第二声炮后只需收起手里的弹匣、正身说话，动员时始终可见。
  */
-function CarRearLeaderTrack(pos, exitAt, exitEnd, exitX, facingRy = 0) {
-  const queuePos = [0.55, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z];
-  const thresholdPos = [3.25, 0.18, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.08];
-  const platformPos = [4.65, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.12];
-  const outsidePos = [5.55, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + exitX * 0.34];
+/**
+ * 班长下车段重排：旧版让他 94.9 s 起沿过道→门→月台走，落点 (5.55, 5.7) 正是
+ * 玩家镜 10 末尾的机位 (5.20, 5.7) 与镜 11 起点 —— t=100 那张图里相机整个穿在
+ * 他身体里。现在他**先于玩家一步下车、随即让开到月台前方**：跨门槛比相机早 2 s，
+ * 99 s 就离开门口，101 s 前走到 (7.5, 11.0) 站定回身。玩家镜 11 停稳时他在
+ * 正前方四米、和车外军官一左一右，画面里终于有人。
+ */
+// facingRy 1.35（YawFacing 口径：朝 −x 略偏 −z）＝ 班长侧身对着整节车说话。
+// 原来写 Math.PI 是朝 +z、也就是背对全车对着端墙；改成 0 又变成 22 秒正脸怼镜头
+//（脸是光板，施工单明说不许）。1.35 从玩家座位看过去是 3/4 背影，正是分镜要的。
+function CarRearLeaderTrack(pos, facingRy = 0) {
+  const doorPos = [1.90, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z - 0.10];
+  const thresholdPos = [3.30, 0.24, CHUCHUAN_SIDE_DOOR_Z];
+  const platformPos = [4.85, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + 0.6];
+  const standPos = [7.20, CHUCHUAN_PLATFORM_Y, 12.4];
   return [
     { t: 0, pos, ry: facingRy, state: { checkAmmo: 0.85, moveSpeed: 0 } },
     { t: 56.8, pos, ry: facingRy, state: { checkAmmo: 0.22, prepare: 0.10, moveSpeed: 0 } },
     { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { prepare: 0.28, moveSpeed: 0 } },
     { t: 83.6, pos, ry: facingRy, state: { prepare: 0.42, moveSpeed: 0 } },
     { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { prepare: 0.74, moveSpeed: 0 } },
+    // 门开满（93.0 起滑 2 s）之后他才动，94.6—95.8 走到门边、95.8—96.9 跨门槛。
+    // 93.0 就起步的话，t=94 相机的视线扫掠点正好压在他身上（实测 1.6 m 一个后脑勺
+    // 糊满全幅）；等到 94.6 再走，那一刻他还在 2.6 m 外、离视轴 45°。
+    // ry 全部按 YawFacing = atan2(-dx,-dz) 逐段给：原来整段保持 π／−π/2，
+    // 人是横着平移过去的。
     { t: CHUCHUAN_DOOR_AT, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    { t: exitAt, pos, ry: facingRy, state: TrackMoveState(pos, queuePos, exitEnd - exitAt) },
-    { t: exitEnd, pos: queuePos, ry: Math.PI, state: TrackMoveState(queuePos, thresholdPos, 1.45) },
-    { t: exitEnd + 1.45, pos: thresholdPos, ry: -Math.PI / 2, state: TrackMoveState(thresholdPos, platformPos, 1.10) },
-    { t: exitEnd + 2.55, pos: platformPos, ry: -Math.PI / 2, state: TrackMoveState(platformPos, outsidePos, CHUCHUAN_END - exitEnd - 2.55) },
-    { t: CHUCHUAN_END, pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
+    { t: 94.6, pos, ry: -1.388, state: TrackMoveState(pos, doorPos, 1.2, { prepare: 1 }) },
+    { t: 95.8, pos: doorPos, ry: -1.642, state: TrackMoveState(doorPos, thresholdPos, 1.1, { prepare: 1 }) },
+    { t: 96.9, pos: thresholdPos, ry: -1.941, state: TrackMoveState(thresholdPos, platformPos, 1.0, { prepare: 1 }) },
+    { t: 97.9, pos: platformPos, ry: -2.772, state: TrackMoveState(platformPos, standPos, 3.3, { prepare: 1 }) },
+    { t: 101.2, pos: standPos, ry: -0.75, state: { prepare: 1, moveSpeed: 0 } },
+    { t: CHUCHUAN_END, pos: standPos, ry: -0.75, state: { prepare: 1, moveSpeed: 0 } },
   ];
 }
 
@@ -451,11 +506,36 @@ function CarStandTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
   ];
 }
 
+/**
+ * 玩家身体与相机必须走**同一条曲线**。
+ *
+ * 镜 8—11 的相机是 ease:"easeInOut"，而演员轨道两帧之间只会线性插值 ——
+ * 于是镜 8 的中段相机落后身体 0.2 m，第一人称相机正好停在自己脑袋后面：
+ * t=94 那张图整幅被自己的帽子和后脑勺糊住。（顺带查实：firstPerson 现在
+ * **没有**真的把头藏掉，见 engineRequests；所以这 0.2 m 直接可见。）
+ * 这里按 EASINGS.easeInOut 逐段采样，身体永远和相机同相位。
+ */
+function EaseInOut(k) { return k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k); }
+
+function EasedWalk(from, to, t0, t1, extra = {}, steps = 6) {
+  const frames = [];
+  for (let i = 0; i < steps; i += 1) {
+    const k0 = i / steps, k1 = (i + 1) / steps;
+    const e0 = EaseInOut(k0), e1 = EaseInOut(k1);
+    const p0 = [0, 1, 2].map((a) => from[a] + (to[a] - from[a]) * e0);
+    const p1 = [0, 1, 2].map((a) => from[a] + (to[a] - from[a]) * e1);
+    frames.push({ t: t0 + (t1 - t0) * k0, pos: p0, state: TrackMoveState(p0, p1, (t1 - t0) / steps, extra) });
+  }
+  return frames;
+}
+
 /** 玩家不是悬空的摄影机：他有一具普通士兵身体，先坐在右侧长凳，再完整走侧门下车。 */
 function PlayerSoldierTrack() {
   const seat = [1.95, CHUCHUAN_CAR_G, 3.42];
   const aisle = [0.70, CHUCHUAN_CAR_G, 5.30];
-  const threshold = [3.35, 0.18, CHUCHUAN_SIDE_DOOR_Z];
+  // 踏板高度按道具实测：门槛顶 0.15、内踏板顶 0.24、外踏板顶 0.48、月台面 0.58。
+  // 旧值 0.18 让脚陷进内踏板 6 cm。
+  const threshold = [3.35, 0.24, CHUCHUAN_SIDE_DOOR_Z];
   const platform = [5.20, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z];
   const standing = [6.80, CHUCHUAN_PLATFORM_Y, 7.40];
   return [
@@ -464,11 +544,11 @@ function PlayerSoldierTrack() {
     { t: CHUCHUAN_MOTIVATION_AT, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.16 } },
     { t: CHUCHUAN_GEAR_AT, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.55 } },
     { t: 90.8, pos: seat, ry: Math.PI / 2, state: { prepare: 1, moveSpeed: 0 } },
-    { t: 93.0, pos: seat, ry: Math.PI / 2, state: TrackMoveState(seat, aisle, 2.5) },
-    { t: 95.5, pos: aisle, ry: 2.55, state: TrackMoveState(aisle, threshold, 3.0) },
-    { t: 98.5, pos: threshold, ry: -Math.PI / 2, state: TrackMoveState(threshold, platform, 2.5) },
-    { t: 101.0, pos: platform, ry: -Math.PI / 2, state: TrackMoveState(platform, standing, 4.0) },
-    { t: CHUCHUAN_END, pos: standing, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
+    ...EasedWalk(seat, aisle, 93.0, 95.5).map((f) => ({ ...f, ry: 2.55 })),
+    ...EasedWalk(aisle, threshold, 95.5, 98.5).map((f) => ({ ...f, ry: -Math.PI / 2 })),
+    ...EasedWalk(threshold, platform, 98.5, 101.0).map((f) => ({ ...f, ry: -Math.PI / 2 })),
+    ...EasedWalk(platform, standing, 101.0, 105.0).map((f) => ({ ...f, ry: -1.0 })),
+    { t: CHUCHUAN_END, pos: standing, ry: 0, state: { prepare: 1, moveSpeed: 0 } },
   ];
 }
 
@@ -490,28 +570,48 @@ function CrowdAppearance(n) {
 }
 
 /**
- * 车厢的座位全部坐满：两侧各十名背景乘客、再加四名重点人物。过道只留六名零星
- * 站客，分别靠侧壁、行李架和远端车门，既有满载感也能看清班长与车门方向。
+ * 车厢的坐席按**凳段**排，不再按等距的一串 z。
+ * 凳段中心 [-5.8,-1.95,1.95,5.8]、每段 3.45 长，段与段之间是空的；旧表里
+ * -4.05 与 -0.36 正落在段缝上，出图里那两个人半个屁股悬在凳段外。
+ * 现在每段只排三个坐席，全部落在段中心 ±1.35 以内（坐姿 z 向占 ±0.24，
+ * 离段端至少留 0.4 m）：
+ *   段 -5.8 → -7.05 / -5.80 / -4.55
+ *   段 -1.95 → -3.35 / -2.55（重点 NPC）/ -0.75
+ *   段  1.95 →  0.75 / 1.90 / 2.50—2.75（重点 NPC）/ 3.42（玩家，右侧）
+ *   段  5.8 →  4.55 / 5.80 / 7.05（右侧被侧门占掉，没有这一段）
+ * 重点 NPC 的 z 一律不动（-2.55 / 2.75），只把背景乘客让开。
  */
+const CHUCHUAN_CROWD_SEAT_Z = {
+  "-1": [-7.05, -5.80, -4.55, -3.35, -0.75, 0.75, 1.90, 4.55, 5.80, 7.05],
+  "1": [-7.05, -5.80, -4.55, -3.35, -0.75, 0.75],
+};
+
 function CreateCarriageCrowdCast() {
   const crowd = [];
-  const seatZ = [-7.05, -6.05, -5.05, -4.05, -3.25, -1.30, -0.36, 0.56, 1.48, 3.42];
+  // 下车顺序按「离侧门多远」排：门口的人先动，车厢深处的人在 105 s 内还轮不到，
+  // 就一直站在过道里排队 —— 一节三十人的车不可能十秒钟走空。
+  const seats = [];
   for (const side of [-1, 1]) {
-    seatZ.forEach((z, index) => {
-      // 右侧最后一个座位留给玩家本人；镜头低头能看到自己的军装、腿和装备。
-      if (side > 0 && z === 3.42) return;
-      const id = `crowdSeat${side < 0 ? "L" : "R"}${index + 1}`;
-      const n = crowd.length;
-      crowd.push({
-        id, kind: "nra", weapon: n % 3 === 0 ? null : "HanYang", seed: `chuchuan${id}`,
-        ...CrowdAppearance(n),
-        track: CarSeatTrack([side * 1.95, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[n % CHUCHUAN_CROWD_LIFE.length], (n % 7) * 0.52, 95.2 + (n % 5) * 0.3, 97 + (n % 5) * 0.3, side * (0.35 + (n % 4) * 0.30), side < 0 ? -Math.PI / 2 : Math.PI / 2),
-      });
-    });
+    for (const z of CHUCHUAN_CROWD_SEAT_Z[String(side)]) seats.push({ side, z });
   }
+  seats.sort((a, b) => Math.abs(CHUCHUAN_SIDE_DOOR_Z - a.z) - Math.abs(CHUCHUAN_SIDE_DOOR_Z - b.z));
+  seats.forEach(({ side, z }, order) => {
+    const id = `crowdSeat${side < 0 ? "L" : "R"}${String(Math.round((z + 8) * 10)).padStart(3, "0")}`;
+    const n = crowd.length;
+    crowd.push({
+      id, kind: "nra", weapon: n % 3 === 0 ? null : "HanYang", seed: `chuchuan${id}`,
+      ...CrowdAppearance(n),
+      track: CarSeatTrack([side * 1.95, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[n % CHUCHUAN_CROWD_LIFE.length],
+        (n % 7) * 0.52, order, side * (0.35 + (order % 4) * 0.30), side < 0 ? -Math.PI / 2 : Math.PI / 2),
+    });
+  });
+  // 站客靠在**凳段之间的空档**前，不站在别人的腿上；x 从 ±1.2 挪到 ±1.35，
+  // 把 |x|<1.0 的净过道整条让给玩家的相机（93—98.5 s 它正沿过道走向车门）。
+  // 右侧 z≈3.9 那一位删掉：他离玩家座位 (1.95,3.42) 只有 0.7 m，镜 8 第一帧
+  // 就是一张贴脸的帽顶。
   const standingPlaces = [
-    [-1.22, -6.68, 0], [1.20, -4.42, Math.PI], [-1.17, -0.28, 0],
-    [1.22, 2.38, Math.PI], [-1.20, 5.05, 0], [1.16, 7.55, Math.PI],
+    [-1.35, -7.90, 0], [1.38, -3.87, Math.PI], [-1.30, 0.00, 0],
+    [1.34, 8.40, Math.PI], [-1.35, 3.87, 0], [-1.35, 6.90, 0],
   ];
   standingPlaces.forEach(([x, z, ry], index) => {
     const n = crowd.length;
@@ -525,19 +625,33 @@ function CreateCarriageCrowdCast() {
   return crowd;
 }
 
-/**
- * 小站从车窗后掠过的里程。站台模型本身在镜 4 用同一条 26.4 m 位移经过；
- * 人物在它上面另走几步，因而不会在 0:56 的镜头切换点一起被 hidden 掉。
- */
-const CHUCHUAN_STATION_ENTER_AT = 40;
-const CHUCHUAN_STATION_PASS_AT = 56;
-const CHUCHUAN_STATION_START_Z = -13.2;
-const CHUCHUAN_STATION_END_Z = 13.2;
+// ---------------------------------------------------------------------------
+// 小站（自建盒子布景，不再挂 Model_ChuchuanStationPlatform.glb）
+// ---------------------------------------------------------------------------
+//
+// ★ 为什么不用那个 glb：它的「上」是 **−Z**、长轴是 **+Y**（Blender 侧导出时没做
+//   Z-up→Y-up 转换），直接进 three（Y-up）后整座月台**立成一块 36 m 高的板子**。
+//   t=45／t=50.5 窗外那块浅灰大板、t=97 门外那面白墙，就是这块立起来的月台。
+//   而且它内部还自相矛盾：站房、雨棚顶、横梁、站牌按「上=−Z」建，雨棚柱、水鹤柱、
+//   灯柱、凳腿却按「上=+Y」建 —— 无论整体怎么旋转都会有一半零件躺下。
+//   模型不归本文件管（改它要重跑 Blender 管线），所以这里改用盒子搭一座同规格的
+//   小站：石基高月台、木雨棚、候车屋、站牌、长凳、货箱、水鹤。engineRequests 里
+//   写清楚模型要怎么修。
+//
+// ★ 掠过与定位用**同一条**里程：整座站台由 ambientMotion 沿 +z 匀速推，
+//   stopAt=56 停住，停下的位置正好是侧门外 (z = CHUCHUAN_SIDE_DOOR_Z)。
+//   旧版是镜 4 用 propMoves 推到 +13.2、镜 5 又用 hold 钉回 +5.7 —— 切镜那一帧
+//   站台整体倒跳 7.5 m，玩家扭头看右窗就穿帮。现在结构上不可能跳：
+//   只有一条速度、一个终点，镜头切换与它无关。
+const CHUCHUAN_STATION_X = 7.4;                     // 月台中心 x（宽 6.0 → 4.4—10.4）
+const CHUCHUAN_STATION_SPEED = 1.65;                // m/s：16 s 掠过 26.4 m，与旧版同速
+const CHUCHUAN_STATION_STOP_Z = CHUCHUAN_SIDE_DOOR_Z;
+const CHUCHUAN_STATION_FROM_Z = CHUCHUAN_STATION_STOP_Z - CHUCHUAN_STATION_SPEED * CHUCHUAN_TRAIN_STOP_AT;
+const CHUCHUAN_STATION_ENTER_AT = 39;               // 站台前端进入右窗视野的时刻
 
 function StationPlatformZ(time) {
-  const k = Math.max(0, Math.min(1, (time - CHUCHUAN_STATION_ENTER_AT)
-    / (CHUCHUAN_STATION_PASS_AT - CHUCHUAN_STATION_ENTER_AT)));
-  return CHUCHUAN_STATION_START_Z + (CHUCHUAN_STATION_END_Z - CHUCHUAN_STATION_START_Z) * k;
+  const t = Math.max(0, Math.min(CHUCHUAN_TRAIN_STOP_AT, time));
+  return CHUCHUAN_STATION_FROM_Z + CHUCHUAN_STATION_SPEED * t;
 }
 
 /**
@@ -545,17 +659,119 @@ function StationPlatformZ(time) {
  * 画外，不能再把三人同时切掉；ry=π 保证他们真的朝 +Z 走，而不是倒着滑。
  */
 function StationRailTrack(x, platformOffset, walkDistance, state = { moveSpeed: 0.16 }) {
-  const posAt = (time, walking) => [x, 0.58, StationPlatformZ(time) + platformOffset + walking];
+  const posAt = (time, walking) => [x, CHUCHUAN_PLATFORM_Y, StationPlatformZ(time) + platformOffset + walking];
+  const passSpan = CHUCHUAN_TRAIN_STOP_AT - CHUCHUAN_STATION_ENTER_AT;
   // travelSpeed 是世界坐标中的合速度（车站掠过 + 人自己走）；moveSpeed 仍只管步态。
-  const passingState = { ...state, travelSpeed: (CHUCHUAN_STATION_END_Z - CHUCHUAN_STATION_START_Z + walkDistance) / 16 };
+  const passingState = { ...state, travelSpeed: (CHUCHUAN_STATION_SPEED * passSpan + walkDistance) / passSpan };
   const exitState = { ...state, travelSpeed: 3.6 / 7 };
   return [
     { t: 0, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: { hidden: true } },
     { t: CHUCHUAN_STATION_ENTER_AT, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: passingState },
-    { t: CHUCHUAN_STATION_PASS_AT, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance), ry: Math.PI, state: exitState },
-    { t: 63, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance + 3.6), ry: Math.PI, state: exitState },
-    { t: 64, pos: posAt(CHUCHUAN_STATION_PASS_AT, walkDistance + 4.4), ry: Math.PI, state: { hidden: true } },
+    { t: CHUCHUAN_TRAIN_STOP_AT, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance), ry: Math.PI, state: exitState },
+    { t: 63, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance + 3.6), ry: Math.PI, state: exitState },
+    { t: 64, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance + 4.4), ry: Math.PI, state: { hidden: true } },
   ];
+}
+
+/**
+ * 小站零件表。pos 是**相对月台中心**的局部坐标（x 相对 CHUCHUAN_STATION_X、
+ * z 相对当时的站台里程），StationProps／StationMotion 各用一次，名字天然一一对应。
+ * 高度基准：石基 0—0.48、木面板顶 0.58（= CHUCHUAN_PLATFORM_Y，演员就踩这里）。
+ */
+const CHUCHUAN_STATION_PARTS = [
+  // ── 月台本体：石基 + 木面板 + 靠车一侧的条石沿 ──────────────────────────
+  { name: "StationBase", kind: "box", size: [6.0, 0.48, 40], pos: [0, 0.24, 0], mat: "Stone", color: 0x827866, roughness: 0.98 },
+  { name: "StationDeck", kind: "box", size: [5.7, 0.10, 39.4], pos: [0, 0.53, 0], mat: "WoodBeam", color: 0x8a7f6c, roughness: 0.97 },
+  { name: "StationEdge", kind: "box", size: [0.36, 0.20, 40], pos: [-2.86, 0.48, 0], mat: "Stone", color: 0x857b6d, roughness: 0.98 },
+  // 月台面上每隔 4 m 一道木缝，长月台才不是一整块没有尺度的板
+  ...[-16, -12, -8, -4, 0, 4, 8, 12, 16].map((dz, i) => ({
+    name: `StationDeckJoint${i}`, kind: "box", size: [5.6, 0.03, 0.07], pos: [0, 0.585, dz],
+    mat: "WoodBeam", color: 0x4c443a,
+  })),
+  // ── 木雨棚：柱子立在**月台靠车的边沿**（局部 x=−2.55，世界 4.85）而不是月台
+  //    正中。旧摆位 x=5.5 恰好挡在玩家下车的走线上：t=100 那张图整幅被一根柱子
+  //    劈成两半。柱距也避开 dz=0（正对车门）与 dz=1.7（玩家最后停的位置）。
+  //    雨棚顶 castShadow:false —— 它一投影就把整段月台（连人带站牌带长凳）压成
+  //    一片黑，而柱与梁的细影仍留着，地面不会平得没有信息。
+  ...[-9.6, -6.0, -2.4, 4.8, 8.4, 12.0].map((dz, i) => ({
+    name: `StationCanopyPost${i}`, kind: "box", size: [0.20, 2.74, 0.20], pos: [-2.55, 1.95, dz],
+    mat: "WoodStock", color: 0xc2a679, repeat: [1, 3],
+  })),
+  ...[-9.6, -2.4, 8.4].map((dz, i) => ({
+    name: `StationCanopyRear${i}`, kind: "box", size: [0.18, 2.98, 0.18], pos: [2.20, 2.07, dz],
+    mat: "WoodStock", color: 0xc2a679, repeat: [1, 3],
+  })),
+  { name: "StationCanopyBeam", kind: "box", size: [0.24, 0.22, 27.0], pos: [-2.55, 3.43, 1.0], mat: "WoodStock", color: 0xac9068, repeat: [1, 18] },
+  { name: "StationCanopyRearBeam", kind: "box", size: [0.20, 0.20, 27.0], pos: [2.20, 3.66, 1.0], mat: "WoodStock", color: 0xac9068, repeat: [1, 18] },
+  { name: "StationCanopyRoof", kind: "box", size: [5.30, 0.16, 27.6], pos: [-0.175, 3.65, 1.0], rz: 0.0463, mat: "RoofTile", color: 0xc6bcac, castShadow: false },
+  // ── 候车屋：砖房 + 瓦顶 + 木门 + 两扇窗（门窗朝月台，玩家下车正对它）────
+  { name: "StationOffice", kind: "box", size: [2.50, 2.90, 5.60], pos: [1.75, 2.03, 13.4], mat: "BrickWall", color: 0x8d8171, roughness: 0.98 },
+  { name: "StationOfficeRoof", kind: "box", size: [3.05, 0.24, 6.20], pos: [1.75, 3.60, 13.4], mat: "RoofTile", color: 0x6d6357 },
+  { name: "StationOfficeDoor", kind: "box", size: [0.10, 1.92, 1.06], pos: [0.46, 1.54, 13.4], mat: "WoodStock", color: 0xa5865c, repeat: 1 },
+  ...[11.6, 15.2].map((dz, i) => ([
+    // 玻璃用深色低粗糙：0x99a2a4 在低日直射下整块过曝成白灯箱（t=45 实拍）。
+    { name: `StationOfficeWindow${i}`, kind: "box", size: [0.10, 0.72, 0.86], pos: [0.46, 2.02, dz], color: 0x2e363c, roughness: 0.25 },
+    { name: `StationOfficeWindowSill${i}`, kind: "box", size: [0.16, 0.09, 1.02], pos: [0.45, 1.62, dz], mat: "Stone", color: 0xa39985 },
+  ])).flat(),
+  { name: "StationOfficeChimney", kind: "box", size: [0.40, 0.90, 0.40], pos: [2.30, 4.10, 11.9], mat: "BrickWall", color: 0x77685a },
+  // ── 站牌：两根木柱 + 一块白底站名板，摆在玩家下车后正前方 6 m ───────────
+  ...[-0.9, 0.9].map((d, i) => ({
+    name: `StationSignPost${i}`, kind: "box", size: [0.10, 1.84, 0.10], pos: [1.60, 1.50, 5.0 + d],
+    mat: "WoodStock", color: 0xb49874, repeat: [1, 2],
+  })),
+  // 站名板：白底不能刷到 0xd6 —— 出图里是一块比天还亮的空白板。
+  // 压到旧漆的米灰，外面再套一圈深木边框，读作「一块挂了很久的站牌」。
+  { name: "StationSignFrame", kind: "box", size: [0.08, 0.62, 2.06], pos: [1.62, 2.26, 5.0], mat: "WoodStock", color: 0x7c674a, repeat: 1 },
+  { name: "StationSignBoard", kind: "box", size: [0.10, 0.48, 1.86], pos: [1.58, 2.26, 5.0], color: 0x938d78 },
+  // ── 月台家什：候车长凳两条、三只货箱、一副行李车板 ─────────────────────
+  ...[2.2, -6.0].map((dz, i) => ([
+    { name: `StationBenchSeat${i}`, kind: "box", size: [0.48, 0.09, 1.70], pos: [1.95, 1.02, dz], mat: "WoodStock", color: 0xc0a882, repeat: 1 },
+    { name: `StationBenchBack${i}`, kind: "box", size: [0.10, 0.56, 1.70], pos: [2.18, 1.32, dz], mat: "WoodStock", color: 0xc0a882, repeat: 1 },
+    { name: `StationBenchLegA${i}`, kind: "box", size: [0.42, 0.44, 0.09], pos: [1.98, 0.80, dz - 0.72], mat: "WoodStock", color: 0x9a8360, repeat: 1 },
+    { name: `StationBenchLegB${i}`, kind: "box", size: [0.42, 0.44, 0.09], pos: [1.98, 0.80, dz + 0.72], mat: "WoodStock", color: 0x9a8360, repeat: 1 },
+  ])).flat(),
+  ...[[1.7, -2.4, 0], [2.25, -1.85, 0.34], [1.55, -1.30, 0]].map(([dx, dz, lift], i) => ({
+    name: `StationCrate${i}`, kind: "box", size: [0.62, 0.55, 0.62], pos: [dx, 0.86 + lift, dz],
+    mat: "WoodStock", color: 0xb59a6c,
+  })),
+  // ── 水鹤：立在月台北端（玩家背后），是「这是一座加水的小站」的读点 ───────
+  { name: "StationCraneMast", kind: "cyl", size: [0.17, 3.20], pos: [-2.45, 2.18, -11.5], mat: "Steel", color: 0x3d3a35 },
+  { name: "StationCraneArm", kind: "box", size: [1.90, 0.15, 0.15], pos: [-3.35, 3.62, -11.5], mat: "Steel", color: 0x3d3a35 },
+  { name: "StationCraneSpout", kind: "cyl", size: [0.12, 0.85], pos: [-4.25, 3.16, -11.5], mat: "Steel", color: 0x45413a },
+  // 月台尽头的货棚与三棵秃杨：把 +z 方向那一片只剩雾的空地填上真几何。
+  { name: "StationGoodsShed", kind: "box", size: [3.20, 2.40, 6.00], pos: [1.30, 1.78, 26.0], mat: "Adobe", color: 0x8a8072 },
+  { name: "StationGoodsShedRoof", kind: "box", size: [3.80, 0.22, 6.60], pos: [1.30, 3.09, 26.0], mat: "RoofTile", color: 0x7d7264 },
+  ...[24.0, 33.0, 42.0].map((dz, i) => ([
+    { name: `StationPoplar${i}`, kind: "cyl", size: [0.13, 8.4], pos: [-4.6, 4.2, dz], mat: "TreeBark", color: 0x6a5f4e },
+    { name: `StationPoplarBranchA${i}`, kind: "box", size: [0.06, 2.6, 0.06], pos: [-4.9, 6.6, dz + 0.2], rz: 0.42, mat: "TreeBark", color: 0x6a5f4e },
+    { name: `StationPoplarBranchB${i}`, kind: "box", size: [0.06, 2.4, 0.06], pos: [-4.3, 7.0, dz - 0.2], rz: -0.36, mat: "TreeBark", color: 0x6a5f4e },
+  ])).flat(),
+  // ── 站台灯：三月上午不点，但灯罩与铁杆是月台轮廓的一部分 ─────────────────
+  // 雨棚下五盏吊灯，挂在**雨棚正中**（局部 x=−0.40）。抬头（pitch +1.15）时
+  // 雨棚底面朝下、吃不到任何天光，不给灯就是一整幅纯黑；挂在靠车一侧（−2.10）
+  // 又只照亮一半，站房那半边仍是黑板（t=100 画左那块）。顶面颜色也一并抬亮。
+  ...[-9.0, -4.0, 0.0, 5.0, 10.0].map((dz, i) => ([
+    { name: `StationLampStem${i}`, kind: "cyl", size: [0.05, 0.34], pos: [-0.40, 3.34, dz], mat: "Steel", color: 0x3b3833 },
+    { name: `StationLampShade${i}`, kind: "cyl", size: [0.22, 0.16], pos: [-0.40, 3.09, dz], mat: "Steel", color: 0x6d675c,
+      emissive: 0x30200c, light: { color: 0xffd7a4, intensity: 10.5, distance: 12.0, decay: 1.10, offsetY: -0.14 } },
+  ])).flat(),
+];
+
+/** 建站台的 props（初始摆在 t=0 的里程上；真正的位置由 ambientMotion 每帧给）。 */
+function StationProps() {
+  return CHUCHUAN_STATION_PARTS.map((part) => ({
+    ...part,
+    pos: [CHUCHUAN_STATION_X + part.pos[0], part.pos[1], StationPlatformZ(0) + part.pos[2]],
+  }));
+}
+
+/** 和 StationProps 一一对应的匀速位移：一条速度、一个终点，切镜不会跳。 */
+function StationMotion() {
+  return CHUCHUAN_STATION_PARTS.map((part) => ({
+    name: part.name,
+    from: [CHUCHUAN_STATION_X + part.pos[0], part.pos[1], CHUCHUAN_STATION_FROM_Z + part.pos[2]],
+    axis: [0, 0, 1], speed: CHUCHUAN_STATION_SPEED, loop: false, stopAt: CHUCHUAN_TRAIN_STOP_AT,
+  }));
 }
 
 /**
@@ -638,10 +854,34 @@ function SideDoorHoldOpenMoves() {
   }));
 }
 
-const STATION_AT_SIDE_DOOR = Object.freeze({
-  name: "StationPlatform", startAt: 0, endAt: 0.01,
-  from: [7.2, 0, CHUCHUAN_SIDE_DOOR_Z], to: [7.2, 0, CHUCHUAN_SIDE_DOOR_Z], ease: "hold",
-});
+// 担架随两名担架兵一起掠过：速度是「站台里程 + 他们自己沿月台走的 3.3 m」的合速度，
+// 与 StationRailTrack 用的是同一组数，所以担架永远在两人中间，不会掉队或抢跑。
+const CHUCHUAN_STRETCHER_OFFSET = 10.0;
+const CHUCHUAN_STRETCHER_WALK = 3.3;
+const CHUCHUAN_STRETCHER_PASS = CHUCHUAN_TRAIN_STOP_AT - CHUCHUAN_STATION_ENTER_AT;
+const CHUCHUAN_STRETCHER_SPEED = CHUCHUAN_STATION_SPEED + CHUCHUAN_STRETCHER_WALK / CHUCHUAN_STRETCHER_PASS;
+const CHUCHUAN_STRETCHER_FROM_Z = CHUCHUAN_STATION_FROM_Z + CHUCHUAN_STRETCHER_OFFSET
+  - CHUCHUAN_STRETCHER_WALK * CHUCHUAN_STATION_ENTER_AT / CHUCHUAN_STRETCHER_PASS;
+
+const CHUCHUAN_STRETCHER_PARTS = [
+  { name: "StationStretcher", kind: "box", size: [1.25, 0.15, 2.15], pos: [6.85, 1.22], mat: "ClothNra", color: 0xb29a78 },
+  { name: "StationStretcherPoleA", kind: "box", size: [0.13, 0.10, 2.34], pos: [6.22, 1.08], mat: "WoodStock", color: 0x8a6b4c },
+  { name: "StationStretcherPoleB", kind: "box", size: [0.13, 0.10, 2.34], pos: [7.48, 1.08], mat: "WoodStock", color: 0x8a6b4c },
+];
+
+function StretcherProps() {
+  return CHUCHUAN_STRETCHER_PARTS.map((part) => ({
+    kind: part.kind, size: part.size, mat: part.mat, color: part.color, name: part.name,
+    pos: [part.pos[0], part.pos[1], CHUCHUAN_STRETCHER_FROM_Z],
+  }));
+}
+
+function StretcherMotion() {
+  return CHUCHUAN_STRETCHER_PARTS.map((part) => ({
+    name: part.name, from: [part.pos[0], part.pos[1], CHUCHUAN_STRETCHER_FROM_Z],
+    axis: [0, 0, 1], speed: CHUCHUAN_STRETCHER_SPEED, loop: false, stopAt: CHUCHUAN_TRAIN_STOP_AT,
+  }));
+}
 
 /** 一棵窗外掠过的三月秃杨：干与枝分开，近景不会再读成一根孤零零的柱子。 */
 function CarriageLandscapeTree(side, label, id, x, z, height, motion) {
@@ -660,9 +900,9 @@ function CarriageLandscapeTree(side, label, id, x, z, height, motion) {
 const CHUCHUAN_ROUTE_START_Z = -742;
 const CHUCHUAN_ROUTE_END_Z = 28;
 const CHUCHUAN_POLE_Z = [
-  -731, -706, -684, -659, -631, -608, -581, -557, -532, -505, -479, -454,
-  -428, -403, -378, -353, -329, -305, -281, -258, -233, -207, -184, -160,
-  -137, -113, -90, -67, -44, -21, 3, 27,
+  -734.0, -709.0, -687.0, -662.0, -634.0, -611.0, -584.0, -560.0, -535.0, -508.0, -482.0, -457.0,
+  -431.0, -406.0, -381.0, -356.0, -332.0, -308.0, -284.0, -261.0, -236.0, -210.0, -187.0, -163.0,
+  -140.0, -116.0, -93.0, -70.0, -47.0, -24.0, 0.0, 24.0,
 ];
 const CHUCHUAN_MID_SCENERY_Z = [-704, -646, -588, -523, -466, -401, -336, -272, -208, -144, -83, -25, 20];
 
@@ -766,18 +1006,14 @@ function WindowLandscapeMotion(side, label) {
   ];
 }
 
-/**
- * 下车镜把两张长移动景片移出门洞视锥后，玩家仍可回头看车厢侧窗。每个窗洞
- * 后面各垫一张短景片：平时被移动层遮住，最后一镜只填自己的窗，不会形成走廊墙。
- */
-function ExitWindowFill(side, label) {
-  const x = side * 3.24;
-  const ry = side < 0 ? -Math.PI / 2 : Math.PI / 2;
-  return [-7.2, -5.15, -3.1, -1.03, 1.03, 3.1, 5.15, 7.2].map((z, index) => ({
-    kind: "backdrop", size: [2.30, 4.4], pos: [x, 2.20, z], ry,
-    mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: `ExitWindowFill${label}${index}`,
-  }));
-}
+// ★ 这里原来有 ExitWindowFill()：每侧八张 2.3×4.4 的竖景片钉在 x=±3.24，
+//   也就是**窗外 0.44 m**。它比土堤(4.35)、电杆(3.78)、电线(3.80)、村舍(12.4)、
+//   SRTM 远山全都近，等于在每一扇窗外贴了一堵不透光的墙 —— 而它用的材质名
+//   「CarriageLandscape」根本没在材质库里登记（Script_TexBake 的 RECIPES 与
+//   Script_Main 的 LoadExternalSet 都没有），Get() 抛错后引擎静默退回
+//   MeshStandardMaterial({color: 0x8a8274})：一块无贴图的米白板子。
+//   「窗外一片纯白、整套移动景观一件都看不见」就是这十六块板子干的，删掉。
+//   下车后回头看车厢侧窗，看见的是对侧窗外的真景（土堤、电杆、田野），不是虚空。
 
 const CHUCHUAN_PEOPLE = {
   youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
@@ -803,9 +1039,12 @@ export const CS_Chuchuan = {
   headLook: { yaw: [-2.09, 2.09], pitch: [-1.32, 1.15], sensitivityScale: 0.8 },
   // 玩家是通信排里没有特殊身份的一名普通士兵：坐在右侧长凳，鼠标可完整低头抬头，
   // 地点卡内随大家起身，最后以第一人称走正式侧门、踏板和月台。
-  // 三月鲁南白日带浮尘：压低曝光保住窗外田野和村舍层次；overcast 会把
-  // 窗洞推成纯白，所有乡野道具只剩看不见的浅灰轮廓。
-  sky: "smokyDay",
+  // 天空换成本场专属的 chuchuanDay（Script_Sky 里新增的一档，正片七关一律不用）：
+  // smokyDay 的 horizon 2.40 / envIntensity 1.05 在这一场的实测结果是
+  // 「窗户纯白过曝、车厢内接近纯黑」——天地比不是太小是太大。新档把天压下来、
+  // 把环境光与 SH／ambient 抬上去、把雾砍掉一半，车厢内读得出军装与木纹，
+  // 窗外读得出田野与掠过的电杆。
+  sky: "chuchuanDay",
   ambience: "trainInterior",
   stopMusic: true,
   music: null,
@@ -817,55 +1056,107 @@ export const CS_Chuchuan = {
   why: "1937 年川军徒步出川抗战，1938 年 3 月第 122 师抵达滕县；玩家作为通信排普通一兵，从自己的座位看见满载军运车里的疲惫、损耗与习惯性准备，并随队从侧门登上月台。",
   // 整段都持续移动，而不是只在小站那十八秒挪一下背景。近景快、中景慢、远景最慢，
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
+  // 小站也走同一条 ambientMotion（速度 1.65 m/s、stopAt 56 s、终点正好是侧门外），
+  // 不再是「镜 4 用 propMoves 推到 +13.2、镜 5 再 hold 回 +5.7」那种切镜倒跳 7.5 m 的写法。
   ambientMotion: [
     ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => WindowLandscapeMotion(side, label)),
+    ...StationMotion(),
+    ...StretcherMotion(),
   ],
 
   props: [
     // 1930 年代厢式客／军运车：窄车体、木板内衬、铆接钢骨架和靠站台侧滑门；不再是
     // 宽得像现代地铁的空大厅。中央净过道约 2.4 m，长凳只占靠窗一带。
     { kind: "box", size: [5.6, 0.18, 18], pos: [0, 0, 0], mat: "CarriageFloorSteel", roughness: 0.9, metalness: 0.42, name: "CarriageFloor" },
-    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", color: 0x665f55, roughness: 0.91, metalness: 0.34, name: "CarriageCeiling", inside: true },
-    // 军运车不是整面玻璃幕墙：下半木板抬高、上半钢板压低，留下的是一排窄窗。
-    // 每格又有脏油布半帘与厚窗框，窗外只从小口漏进来，不能再像现代通透观景车。
-    { kind: "box", size: [0.16, 1.28, 17.8], pos: [-2.8, 0.64, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
-    { kind: "box", size: [0.16, 1.28, 13.35], pos: [2.8, 0.64, -2.23], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowRear", inside: true },
-    { kind: "box", size: [0.16, 1.28, 1.90], pos: [2.8, 0.64, 7.95], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowFront", inside: true },
-    { kind: "box", size: [0.16, 1.10, 17.8], pos: [-2.8, 3.37, 0], mat: "CarriageWallSteel", color: 0x554f47, roughness: 0.92, metalness: 0.28, name: "WallLeftWindowHigh", inside: true },
-    { kind: "box", size: [0.16, 1.10, 13.35], pos: [2.8, 3.37, -2.23], mat: "CarriageWallSteel", color: 0x554f47, roughness: 0.92, metalness: 0.28, name: "WallRightWindowHighRear", inside: true },
-    { kind: "box", size: [0.16, 1.10, 1.90], pos: [2.8, 3.37, 7.95], mat: "CarriageWallSteel", color: 0x554f47, roughness: 0.92, metalness: 0.28, name: "WallRightWindowHighFront", inside: true },
-    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "RearWall", inside: true },
-    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, 8.9], mat: "CarriageWallSteel", color: 0x504a42, roughness: 0.88, metalness: 0.38, name: "FrontWall", inside: true },
-    // 三盏有罩灯把铆钉钢板、士兵与窗外相对运动都照出来；没有真实室内光，
-    // 车厢再多细节也只会是一团黑。
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampRear" },
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampMid" },
-    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x35200d, light: { color: 0xffc985, intensity: 1.8, distance: 6.0, decay: 1.65, offsetY: -0.2 }, name: "CarriageLampFront" },
+    { kind: "box", size: [5.6, 0.18, 18], pos: [0, 3.92, 0], mat: "CarriageCeilingSteel", color: 0x8a8377, roughness: 0.91, metalness: 0.34, name: "CarriageCeiling", inside: true },
+    // 军运车不是整面玻璃幕墙：下半木板 + 上半钢板，中间留一条窄窗带。
+    // 窗带高度是本场最要紧的四个数（见文件头 CHUCHUAN_WINDOW_LOW/HIGH）：
+    // 0.90—2.55，坐姿眼高 1.36 比窗台高 0.46 m，人是**往下看**出去的，
+    // 土堤、电杆、田野才进得了画；旧版 1.28—2.82 让视线贴着窗台走，只看得见天。
+    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 17.8], pos: [-2.8, CHUCHUAN_WINDOW_LOW / 2, 0], mat: "CarriageBenchWood", roughness: 0.96, name: "WallLeftWoodLow", inside: true },
+    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 13.35], pos: [2.8, CHUCHUAN_WINDOW_LOW / 2, -2.23], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowRear", inside: true },
+    { kind: "box", size: [0.16, CHUCHUAN_WINDOW_LOW, 1.90], pos: [2.8, CHUCHUAN_WINDOW_LOW / 2, 7.95], mat: "CarriageBenchWood", roughness: 0.96, name: "WallRightWoodLowFront", inside: true },
+    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 17.8], pos: [-2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, 0], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallLeftWindowHigh", inside: true },
+    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 13.35], pos: [2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, -2.23], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallRightWindowHighRear", inside: true },
+    { kind: "box", size: [0.16, 3.92 - CHUCHUAN_WINDOW_HIGH, 1.90], pos: [2.8, (3.92 + CHUCHUAN_WINDOW_HIGH) / 2, 7.95], mat: "Adobe", color: 0x8d8779, roughness: 0.95, name: "WallRightWindowHighFront", inside: true },
+    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, -8.9], mat: "CarriageBenchWood", color: 0x9c8f76, roughness: 0.95, name: "RearWall", inside: true },
+    { kind: "box", size: [5.6, 3.92, 0.18], pos: [0, 1.96, 8.9], mat: "CarriageBenchWood", color: 0x9c8f76, roughness: 0.95, name: "FrontWall", inside: true },
+    // ── 车厢内的光 ─────────────────────────────────────────────────────────
+    // 白天车厢的主光来自窗，不来自顶灯；但引擎没有窗口光传输（IBL 照不进
+    // inside 盒子，平行光被顶棚挡住），所以两件事都得手动摆：
+    //   · 顶灯三盏：原来 intensity 1.8 / distance 6 / decay 1.65 —— 1.5 m 外
+    //     只剩 sRGB 40 上下，等于没开。抬到 7.5 / 11 / 1.15。
+    //   · 六盏「窗口天光」冷色补光挂在窗带内侧（x=±2.18、y=2.05），模拟从窗洞
+    //     漫进来的天光：它们才是车厢里读得出军装色与木纹的原因。
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, -4.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampRear" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 0.6], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampMid" },
+    { kind: "cyl", size: [0.14, 0.20], pos: [0, 3.48, 5.8], mat: "Steel", color: 0xc49d63, emissive: 0x4a2c12, light: { color: 0xffc985, intensity: 9.5, distance: 12.0, decay: 1.12, offsetY: -0.24 }, name: "CarriageLampFront" },
+    ...[[-1, -6.0], [-1, -0.6], [-1, 4.8], [1, -6.0], [1, -0.6], [1, 3.4]].map(([side, z], index) => ({
+      // 行李架托铁：本体贴在窗头**以上**的钢板上（挂在窗洞里会在亮窗上留一颗黑点，
+      // 上一轮出图 t=20 左窗中间那块小黑方就是它），真正的作用是挂一盏窗口天光。
+      kind: "box", size: [0.07, 0.09, 0.16], pos: [side * 2.30, CHUCHUAN_WINDOW_HIGH + 0.18, z],
+      mat: "Steel", color: 0x4a4740,
+      light: { color: 0xb4c9e0, intensity: 11.0, distance: 9.5, decay: 1.10, offsetY: -0.55 },
+      name: `WindowDaylight${side < 0 ? "L" : "R"}${index}`,
+    })),
+    // ── 端墙上的东西 ───────────────────────────────────────────────────────
+    // 镜 6 整整 22 秒对着车厢末端，端墙不能是一块什么都没有的板子。
+    // 顺带记一笔：这两面墙原来用 CarriageWallSteel，实测渲成**纯黑**（射线取证
+    // material.metalness = 1）—— Script_Cutscene._MakeProp 只把 repeat/color/
+    // roughness/side 转给 library.Get()，metalness 没转，而 Get 的默认是 1，
+    // 再乘 CarriageWallSteel 的 ORM 金属通道。金属没有漫反射，车厢里又没有可反射的
+    // 环境（GI 在封闭盒子里天空可见度≈0），于是端墙、窗上钢板一律是黑的。
+    // 贴图与引擎都不归本文件，只能换配方：端墙走木衬板、窗上带走灰泥板面。
+    ...[-1, 1].map((end) => ({
+      kind: "box", size: [1.06, 2.10, 0.09], pos: [0.55 * end, 1.14, end * 8.80],
+      mat: "WoodStock", color: 0xac8b5e, repeat: 1, name: `EndDoor${end < 0 ? "Rear" : "Front"}`,
+    })),
+    ...[-1, 1].map((end) => ({
+      kind: "box", size: [1.26, 0.10, 0.07], pos: [0.55 * end, 2.24, end * 8.78],
+      mat: "Adobe", color: 0x9e978b, name: `EndDoorLintel${end < 0 ? "Rear" : "Front"}`,
+    })),
+    ...[-1, 1].map((end) => ({
+      kind: "box", size: [0.86, 0.34, 0.06], pos: [-1.30 * end, 2.36, end * 8.78],
+      mat: "Adobe", color: 0x9a948a, name: `EndVent${end < 0 ? "Rear" : "Front"}`,
+    })),
+    ...[-1, 1].map((end) => ({
+      kind: "box", size: [0.58, 0.44, 0.05], pos: [-1.30 * end, 1.62, end * 8.78],
+      mat: "ClothNra", color: 0xb9b19a, name: `EndNotice${end < 0 ? "Rear" : "Front"}`,
+    })),
     // 一眼看出「这是车厢」的重复门框与顶梁；不靠文字或镜头解释空间。
-    ...[-6.2, -3.4, -0.6, 2.2, 5.0, 7.3].map((z, index) => ({ kind: "box", size: [5.35, 0.16, 0.16], pos: [0, 3.68, z], mat: "CarriageWallSteel", color: 0x6f7374, name: `RoofRib${index}` })),
-    { kind: "box", size: [0.22, 0.13, 17.6], pos: [-2.70, 1.27, 0], mat: "Steel", color: 0x4e4b45, name: "WindowSillLeft" },
-    { kind: "box", size: [0.22, 0.13, 13.25], pos: [2.70, 1.27, -2.28], mat: "Steel", color: 0x4e4b45, name: "WindowSillRightRear" },
-    { kind: "box", size: [0.22, 0.13, 1.75], pos: [2.70, 1.27, 8.02], mat: "Steel", color: 0x4e4b45, name: "WindowSillRightFront" },
+    ...[-6.2, -3.4, -0.6, 2.2, 5.0, 7.3].map((z, index) => ({ kind: "box", size: [5.35, 0.16, 0.16], pos: [0, 3.68, z], mat: "CarriageBenchWood", color: 0x8f887a, name: `RoofRib${index}` })),
+    { kind: "box", size: [0.22, 0.13, 17.6], pos: [-2.70, CHUCHUAN_WINDOW_LOW - 0.03, 0], mat: "Steel", color: 0x5b574f, name: "WindowSillLeft" },
+    { kind: "box", size: [0.22, 0.13, 13.25], pos: [2.70, CHUCHUAN_WINDOW_LOW - 0.03, -2.28], mat: "Steel", color: 0x5b574f, name: "WindowSillRightRear" },
+    { kind: "box", size: [0.22, 0.13, 1.75], pos: [2.70, CHUCHUAN_WINDOW_LOW - 0.03, 8.02], mat: "Steel", color: 0x5b574f, name: "WindowSillRightFront" },
+    // 窗帘重做。旧版每格一块 1.34×0.98 的深色板（ClothNra 0x3e3c35 / 木色 0x463a2d），
+    // 1.45 m 的窗格被挡掉 68%，出图里读成一排黑板子，小站段整幅画几乎全黑。
+    // 现在是：油布帘**卷到窗头**只剩一卷（0.34 高，占窗高 20%），木百叶**收到窗格边**
+    // 只剩一叶（0.30 宽，占窗格 21%），颜色也从近黑抬到能读出布纹/木纹的中调。
+    // 右侧 z∈[0.7, 3.6] 一段（小站段镜 4 的视轴）**一件都不挂**，站台那边留连续净视野。
     ...[-7.2, -5.75, -4.3, -2.85, -1.4, 0.05, 1.5, 2.95, 4.4, 5.85, 7.2].flatMap((z, index) => {
       const even = index % 2 === 0;
+      const Dress = (side, tag) => {
+        const x = side * 2.69;
+        return even
+          ? { kind: "cyl", size: [0.10, 0.94], pos: [x, CHUCHUAN_WINDOW_HIGH - 0.16, z + side * 0.20], rx: Math.PI / 2, mat: "ClothNra", color: 0xa2977a, roughness: 1, name: `WindowShade${tag}${index}` }
+          : { kind: "box", size: [0.06, CHUCHUAN_WINDOW_SPAN - 0.10, 0.30], pos: [x, CHUCHUAN_WINDOW_MID, z - side * 0.56], mat: "CarriageBenchWood", color: 0x7a6244, name: `WindowShutter${tag}${index}` };
+      };
       const left = [
-        { kind: "box", size: [0.12, 1.62, 0.12], pos: [-2.66, 2.02, z], mat: "Steel", color: 0x464544, name: `WindowMullionLeft${index}` },
-        even
-          ? { kind: "box", size: [0.08, 1.34, 0.98], pos: [-2.69, 2.03, z + 0.20], mat: "ClothNra", color: 0x3e3c35, name: `WindowShadeLeft${index}` }
-          : { kind: "box", size: [0.08, 1.34, 0.96], pos: [-2.69, 2.03, z - 0.20], mat: "CarriageBenchWood", color: 0x463a2d, name: `WindowShutterLeft${index}` },
+        { kind: "box", size: [0.12, CHUCHUAN_WINDOW_SPAN + 0.10, 0.12], pos: [-2.66, CHUCHUAN_WINDOW_MID, z], mat: "Steel", color: 0x53514c, name: `WindowMullionLeft${index}` },
+        Dress(-1, "Left"),
       ];
       // 正式侧门占掉右侧三格；这些窗框、卷帘和百叶不能再浮在门洞中间。
       if (z >= 4.35 && z <= 7.25) return left;
-      return [...left,
-        { kind: "box", size: [0.12, 1.62, 0.12], pos: [2.66, 2.02, z], mat: "Steel", color: 0x464544, name: `WindowMullionRight${index}` },
-        even
-          ? { kind: "box", size: [0.08, 1.34, 0.98], pos: [2.69, 2.03, z - 0.20], mat: "ClothNra", color: 0x3e3c35, name: `WindowShadeRight${index}` }
-          : { kind: "box", size: [0.08, 1.34, 0.96], pos: [2.69, 2.03, z + 0.20], mat: "CarriageBenchWood", color: 0x463a2d, name: `WindowShutterRight${index}` },
+      const right = [
+        { kind: "box", size: [0.12, CHUCHUAN_WINDOW_SPAN + 0.10, 0.12], pos: [2.66, CHUCHUAN_WINDOW_MID, z], mat: "Steel", color: 0x53514c, name: `WindowMullionRight${index}` },
       ];
+      // 小站段（镜 4 看 (3.8,1.52,2.6)）正对的两格：只留竖框，帘和百叶都不挂。
+      if (!(z > 0.6 && z < 3.6)) right.push(Dress(1, "Right"));
+      return [...left, ...right];
     }),
-    { kind: "box", size: [0.18, 0.12, 13.25], pos: [2.70, 2.80, -2.28], mat: "Steel", color: 0x575550, name: "WindowFrameRightTopRear" },
-    { kind: "box", size: [0.18, 0.12, 1.75], pos: [2.70, 2.80, 8.02], mat: "Steel", color: 0x575550, name: "WindowFrameRightTopFront" },
-    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, 2.80, 0], mat: "Steel", color: 0x575550, name: "WindowFrameLeftTop" },
+    { kind: "box", size: [0.18, 0.12, 13.25], pos: [2.70, CHUCHUAN_WINDOW_HIGH + 0.06, -2.28], mat: "Steel", color: 0x64615a, name: "WindowFrameRightTopRear" },
+    { kind: "box", size: [0.18, 0.12, 1.75], pos: [2.70, CHUCHUAN_WINDOW_HIGH + 0.06, 8.02], mat: "Steel", color: 0x64615a, name: "WindowFrameRightTopFront" },
+    { kind: "box", size: [0.18, 0.12, 17.6], pos: [-2.70, CHUCHUAN_WINDOW_HIGH + 0.06, 0], mat: "Steel", color: 0x64615a, name: "WindowFrameLeftTop" },
     // 漏雨和煤烟留下的不规则补漆/锈蚀；每一块都很小，避免把内壁刷成舞台布景，
     // 但跨过走道时能明确看出这节车并不新，也并不干净。
     ...[-6.65, -4.75, -2.25, 0.65, 3.15, 5.75].flatMap((z, index) => [
@@ -910,37 +1201,55 @@ export const CS_Chuchuan = {
     { kind: "box", size: [0.14, 0.12, 0.56], pos: [2.22, 0.65, 2.75], mat: "ClothNra", color: 0x706858, name: "MachineGunCase" },
     ...WindowLandscape(-1, "Left"),
     ...WindowLandscape(1, "Right"),
-    ...ExitWindowFill(-1, "Left"),
-    ...ExitWindowFill(1, "Right"),
-    // Blender MCP 自制：1930 年代津浦线小站的石基高月台、木雨棚、候车屋、
-    // 站牌、木凳、货箱、行李车和水鹤。它只当演出视觉布景，不改变关卡碰撞。
-    { kind: "model", url: "./Model/Model_ChuchuanStationPlatform.glb?v=1", pos: [7.2, 0, -100], name: "StationPlatform" },
-    // 一副担架随两名担架兵穿过月台；它和站台的位移同源，不能留成窗口中的静止盒子。
-    { kind: "box", size: [1.25, 0.15, 2.15], pos: [6.85, 1.18, -100], mat: "ClothNra", color: 0xb29a78, name: "StationStretcher" },
-    { kind: "box", size: [0.13, 0.10, 2.34], pos: [6.22, 1.04, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StationStretcherPoleA" },
-    { kind: "box", size: [0.13, 0.10, 2.34], pos: [7.48, 1.04, -100], mat: "WoodStock", color: 0x8a6b4c, name: "StationStretcherPoleB" },
+    // 1930 年代津浦线小站：石基高月台、木雨棚、候车屋、站牌、长凳、货箱、水鹤。
+    // 自建盒子，不再挂 Model_ChuchuanStationPlatform.glb（那个 glb 的「上」是 −Z、
+    // 长轴是 +Y，直接进 three 会立成一块 36 m 高的板 —— 见 CHUCHUAN_STATION_PARTS 注）。
+    ...StationProps(),
+    // 一副担架随两名担架兵穿过月台；它和担架兵用同一组里程数，不会掉队。
+    ...StretcherProps(),
     // 车门在靠站台的右侧，不在车厢端墙。门板、木条、门闩共用同一条 +Z 滑轨。
-    { kind: "box", size: [0.12, 2.6, 2.2], pos: [2.75, 1.65, CHUCHUAN_SIDE_DOOR_Z], mat: "Steel", color: 0x49433b, name: "CarriageDoor" },
+    // 门板、门框、门槛、踏板一律不用 mat:"Steel"：库里的 Steel 金属度接近 1，
+    // 而 _MakeProp 不转 metalness，金属没有漫反射 —— 从月台那一侧（背光面）看，
+    // 整扇门是一块纯黑（t=100 yaw−2.09 取证）。改成灰泥板面，读作刷过漆的铁门。
+    { kind: "box", size: [0.12, 2.6, 2.2], pos: [2.75, 1.65, CHUCHUAN_SIDE_DOOR_Z], color: 0x6f6a60, name: "CarriageDoor" },
     // 滑门的横向旧木条、门闩和补片压在钢门上；远看先读到“装过人和物的军运车”，
     // 近看能看出门曾被拆修，而不是一块没有信息的纯黑矩形。
-    ...[-0.86, -0.43, 0, 0.43, 0.86].map((y, index) => ({ kind: "box", size: [0.05, 0.12, 1.98], pos: [2.67, 1.65 + y, CHUCHUAN_SIDE_DOOR_Z], mat: "CarriageBenchWood", color: index % 2 ? 0x4f4030 : 0x5a4936, name: `DoorPlank${index}` })),
-    { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z - 0.78], mat: "Steel", color: 0x302d29, name: "DoorBraceLeft" },
-    { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z + 0.78], mat: "Steel", color: 0x302d29, name: "DoorBraceRight" },
-    { kind: "box", size: [0.12, 0.10, 0.72], pos: [2.60, 1.62, CHUCHUAN_SIDE_DOOR_Z + 0.15], mat: "Steel", color: 0x242321, name: "DoorLatch" },
-    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 4.48], mat: "Steel", color: 0x3b3935, name: "SideDoorFrameRear" },
-    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 6.92], mat: "Steel", color: 0x3b3935, name: "SideDoorFrameFront" },
-    { kind: "box", size: [0.22, 0.18, 2.60], pos: [2.70, 3.06, CHUCHUAN_SIDE_DOOR_Z], mat: "Steel", color: 0x3b3935, name: "SideDoorFrameTop" },
-    { kind: "box", size: [0.40, 0.12, 2.20], pos: [2.86, 0.09, CHUCHUAN_SIDE_DOOR_Z], mat: "Steel", color: 0x3b3935, name: "SideDoorThreshold" },
+    ...[-0.86, -0.43, 0, 0.43, 0.86].map((y, index) => ({ kind: "box", size: [0.05, 0.12, 1.98], pos: [2.67, 1.65 + y, CHUCHUAN_SIDE_DOOR_Z], mat: "CarriageBenchWood", color: index % 2 ? 0x7a6448 : 0x87714f, name: `DoorPlank${index}` })),
+    { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z - 0.78], mat: "Steel", color: 0x504b43, name: "DoorBraceLeft" },
+    { kind: "box", size: [0.06, 1.96, 0.14], pos: [2.66, 1.65, CHUCHUAN_SIDE_DOOR_Z + 0.78], mat: "Steel", color: 0x504b43, name: "DoorBraceRight" },
+    { kind: "box", size: [0.12, 0.10, 0.72], pos: [2.60, 1.62, CHUCHUAN_SIDE_DOOR_Z + 0.15], mat: "Steel", color: 0x413d37, name: "DoorLatch" },
+    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 4.48], color: 0x615d55, name: "SideDoorFrameRear" },
+    { kind: "box", size: [0.22, 3.12, 0.16], pos: [2.70, 1.56, 6.92], color: 0x615d55, name: "SideDoorFrameFront" },
+    { kind: "box", size: [0.22, 0.18, 2.60], pos: [2.70, 3.06, CHUCHUAN_SIDE_DOOR_Z], color: 0x615d55, name: "SideDoorFrameTop" },
+    { kind: "box", size: [0.40, 0.12, 2.20], pos: [2.86, 0.09, CHUCHUAN_SIDE_DOOR_Z], color: 0x615d55, name: "SideDoorThreshold" },
     // 两级固定踏板把车地板接到石基月台，镜头和演员都真正踩完这段高差。
-    { kind: "box", size: [1.25, 0.12, 1.75], pos: [3.48, 0.18, CHUCHUAN_SIDE_DOOR_Z], mat: "Steel", color: 0x4d4a43, name: "SideDoorStepInner" },
-    { kind: "box", size: [0.72, 0.12, 1.75], pos: [4.30, 0.42, CHUCHUAN_SIDE_DOOR_Z], mat: "Steel", color: 0x4d4a43, name: "SideDoorStepOuter" },
-    { kind: "box", size: [32, 0.12, 32], pos: [10, -0.08, CHUCHUAN_SIDE_DOOR_Z], mat: "GroundRubble", color: 0x5f5a51, name: "OutsideBallast" },
-    // 开门后的三面远景围合在 16 m 外：正面景片保持原图宽高比，两侧景片把
-    // head-look 的余角也封住。景片底边压到道砟以下，避免门槛尽头露白线。
-    { kind: "backdrop", size: [32, 16.45], pos: [31, 7.2, CHUCHUAN_SIDE_DOOR_Z], ry: -Math.PI / 2, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: "DoorOutsideBackdrop" },
-    { kind: "backdrop", size: [32, 16.45], pos: [15, 7.2, -10.3], mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: "DoorOutsideBackdropLeft" },
-    { kind: "backdrop", size: [32, 16.45], pos: [15, 7.2, 21.7], ry: Math.PI, mat: "CarriageLandscape", doubleSided: true, roughness: 1, name: "DoorOutsideBackdropRight" },
-    { kind: "cyl", size: [0.25, 1.6], pos: [6.2, 1.38, 9.5], mat: "WoodStock", color: 0x634d37, name: "DoorMarkerPost" },
+    { kind: "box", size: [1.25, 0.12, 1.75], pos: [3.48, 0.18, CHUCHUAN_SIDE_DOOR_Z], color: 0x74705f, name: "SideDoorStepInner" },
+    { kind: "box", size: [0.72, 0.12, 1.75], pos: [4.30, 0.42, CHUCHUAN_SIDE_DOOR_Z], color: 0x74705f, name: "SideDoorStepOuter" },
+    // 车与月台之间的道砟：只铺车下到月台石基那一条，宽 7 m、长 64 m。
+    // 旧版是 32×32 一大块，边缘正好落在下车视野里；月台以外的地面交给
+    // WindowLandscape 的 SRTM 实体网格（它从 x=4 一直铺到 2500 m）。
+    { kind: "box", size: [7.0, 0.12, 64], pos: [3.6, -0.07, 6], mat: "GroundRubble", color: 0x574f45, name: "OutsideBallast" },
+    // 门外远景景片：换成真的有内容的一张 —— Texture_CarriageShandongLandscapePlate.png
+    // （鲁南冬末的秃杨、电杆、石头房、远丘，本来就为这一场画的）。原来写的
+    // mat:"CarriageLandscape" 在材质库里根本不存在，Get() 抛错后静默退回
+    // 0x8a8274 的无贴图米白，出图里门外就是一片白虚空。走 spec.texture 通道，
+    // 不经材质库，所以不会再静默退化。
+    // 三面围合：正面 26 m 外，两侧把 head-look 的余角封死；景片底边压到地平线以下。
+    // castShadow:false 是硬要求：24 m 高的景片在 56° 太阳下会往 +x+z 投出十六米长的
+    // 影子，侧景片正好把正面景片的一段刷成一块无光的深蓝板（t=48 那块「深蓝虚空」
+    // 射线取证就是它）。景片是画的，不该投影也不该收影。
+    { kind: "backdrop", size: [46, 24.0], pos: [34, 10.4, CHUCHUAN_SIDE_DOOR_Z], ry: -Math.PI / 2, texture: "./Texture/Texture_CarriageShandongLandscapePlate.png", doubleSided: true, roughness: 1, castShadow: false, receiveShadow: false, name: "DoorOutsideBackdrop" },
+    // 两侧景片删掉了：doubleSided 的贴片，可见面的法线永远朝着相机，所以只有
+    // 「太阳在相机背后」时才受光。正面景片（法线 −x、太阳也在 −x）成立，
+    // 两块侧景片（法线 ±z、太阳在 −z）必然背光 —— 出图里就是两块深蓝死板
+    // (t=20 yaw±2.09 各撞到一块)。侧向的封闭交给 FarTerrain 那张 SRTM 实体网格
+    //（x 4—2500 m、z ±910 m）与天空穹，它们是真几何，从哪个角度看都成立。
+    // 站在月台上抬头能看见的电报线终点：一根落在月台北端的木杆，
+    // 让窗外那三根电线有个收头，不再在半空断掉。
+    { kind: "box", size: [0.16, 4.60, 0.16], pos: [4.05, 2.30, 26.0], mat: "WoodBeam", color: 0x3b3026, noFog: true, name: "PlatformPole" },
+    { kind: "box", size: [1.24, 0.11, 0.11], pos: [4.05, 4.22, 26.0], mat: "WoodBeam", color: 0x3b3026, noFog: true, name: "PlatformPoleCrossbar" },
+    ...[-0.42, 0, 0.42].map((offset, wire) => ({
+      kind: "cyl", size: [0.06, 0.13], pos: [4.05 + offset, 4.11, 26.0], mat: "Steel", color: 0x9a947f, noFog: true, name: `PlatformPoleInsulator${wire}` })),
   ],
 
   cast: [
@@ -948,20 +1257,28 @@ export const CS_Chuchuan = {
     // 低头仍能看见胸前装具、双臂、裤腿和脚。
     { id: "playerSoldier", kind: "nra", weapon: null, seed: "chuchuanPlayer", firstPerson: true, uniformHex: 0x66717d, trouserHex: 0x4c555d, accessoryHex: 0x77705b, track: PlayerSoldierTrack() },
     // 五名重点士兵承接台词；其余乘客不是背景板，而是满载军运车的连续人群层。
-    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 0.0, 95.3, 96.6, -0.7, -Math.PI / 2) },
-    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 1.0, 95.5, 96.8, 0.5, Math.PI / 2) },
-    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 1.8, 95.7, 97.0, -0.5, -Math.PI / 2) },
-    { id: "machineGunner", kind: "nra", weapon: "ZB26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 2.75], {}, 2.6, 95.1, 96.4, 0.7, Math.PI / 2) },
+    // 四人的座位语义不动（谁在哪、对坐关系照旧）；只把下车顺序排到玩家后面 ——
+    // queueOrder 12—15 意味着他们 105 s 内还在过道里排队，不会跟相机抢门。
+    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 0.0, 13, -0.7, -Math.PI / 2) },
+    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 1.0, 14, 0.5, Math.PI / 2) },
+    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 1.8, 11, -0.5, -Math.PI / 2) },
+    { id: "machineGunner", kind: "nra", weapon: "Zb26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 2.50], {}, 2.6, 12, 0.7, Math.PI / 2) },
     // 班长固定在车厢末端站着、面对全车，视线一转就能找到他；不再被塞回右侧座椅。
-    { id: "squadLeader", kind: "nra", weapon: "HanYang", seed: "chuchuanLeader", uniformHex: 0x4f5a61, track: CarRearLeaderTrack([0, CHUCHUAN_CAR_G, 5.95], 94.9, 96.2, 0, Math.PI) },
+    { id: "squadLeader", kind: "nra", weapon: "HanYang", seed: "chuchuanLeader", uniformHex: 0x4f5a61, track: CarRearLeaderTrack([0, CHUCHUAN_CAR_G, 5.95], 1.35) },
     ...CreateCarriageCrowdCast(),
-    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack(6.1, -1.65, 3.3) },
-    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack(7.6, -1.65, 3.3) },
-    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack(9.15, -6.4, 2.2, { moveSpeed: 0.11, crouch: 0.25 }) },
+    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack(6.1, CHUCHUAN_STRETCHER_OFFSET, CHUCHUAN_STRETCHER_WALK) },
+    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack(7.6, CHUCHUAN_STRETCHER_OFFSET, CHUCHUAN_STRETCHER_WALK) },
+    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack(9.15, 6.5, 2.2, { moveSpeed: 0.11, crouch: 0.25 }) },
+    // 车外军官：先站在门外正对车门喊话（镜 8 从车里往外看就是他），
+    // 99—100.6 s 让开到月台前方并转身回望，镜 11 玩家停稳时他和班长一左一右
+    // 站在画面里 —— 旧版把他钉在 (5.9, 8.0) 面朝 +x（背对下车的人），
+    // 而且正好卡在玩家的落脚点旁边。
     { id: "externalOfficer", kind: "nra", weapon: null, seed: "chuchuanOfficer", track: [
-      { t: 0, pos: [5.9, CHUCHUAN_PLATFORM_Y, 8.0], ry: Math.PI / 2, state: { hidden: true } },
-      { t: CHUCHUAN_DOOR_AT, pos: [5.9, CHUCHUAN_PLATFORM_Y, 8.0], ry: Math.PI / 2, state: { hidden: false, moveSpeed: 0 } },
-      { t: CHUCHUAN_END, pos: [5.9, CHUCHUAN_PLATFORM_Y, 8.0], ry: Math.PI / 2, state: { hidden: false, moveSpeed: 0 } },
+      { t: 0, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: Math.PI / 2, state: { hidden: true } },
+      { t: CHUCHUAN_DOOR_AT - 0.4, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: Math.PI / 2, state: { hidden: false, moveSpeed: 0 } },
+      { t: 98.0, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: -3.025, state: TrackMoveState([5.35, 0, 6.90], [5.90, 0, 11.60], 3.2, { prepare: 0.3 }) },
+      { t: 101.2, pos: [5.90, CHUCHUAN_PLATFORM_Y, 11.60], ry: 0.85, state: { prepare: 0.3, moveSpeed: 0 } },
+      { t: CHUCHUAN_END, pos: [5.90, CHUCHUAN_PLATFORM_Y, 11.60], ry: 0.85, state: { prepare: 0.3, moveSpeed: 0 } },
     ] },
   ],
 
@@ -993,26 +1310,25 @@ export const CS_Chuchuan = {
 
     // 0:40—0:56：列车缓缓进入小站。月台从后窗掠进来；担架兵和轻伤员各自
     // 走过窗格，镜头过后仍在画外继续走，不以切镜当作消失。
-    { n: 4, seconds: 16, focalMm: 35, cameraMode: "headLook", camera: { from: [1.95, 1.36, 3.42], look: [3.8, 1.52, 2.6] },
+    // look 从 (3.8,1.52,2.6) 改成 (3.8,1.24,4.02)：旧视轴正对 z=2.95 那根窗竖框
+    //（0.85 m 外的一根 0.12 m 立柱 = 画面正中 8° 宽的一条黑带），而且抬着看，
+    // 只看得见天。新视轴穿 z≈2.95—4.48 那一格窗的中心、并往下压 —— 月台面、
+    // 担架兵与轻伤员都落在画里。
+    { n: 4, seconds: 16, focalMm: 35, cameraMode: "headLook", camera: { from: [1.95, 1.36, 3.42], look: [3.8, 1.26, 3.38] },
       sfx: [{ at: 0.18, name: "trainWhistle", volume: 0.48 }, { at: 2.3, name: "trainBrake", volume: 0.62 }, { at: 4.7, name: "stretcherWood", volume: 0.42 }, { at: 7.5, name: "coughLow", volume: 0.32 }],
-      propMoves: [
-        { name: "StationPlatform", startAt: 0, endAt: 16, from: [7.2, 0, -13.2], to: [7.2, 0, 13.2], ease: "linear" },
-        { name: "StationStretcher", startAt: 0, endAt: 16, from: [6.85, 1.18, -14.85], to: [6.85, 1.18, 14.85], ease: "linear" },
-        { name: "StationStretcherPoleA", startAt: 0, endAt: 16, from: [6.22, 1.04, -14.85], to: [6.22, 1.04, 14.85], ease: "linear" },
-        { name: "StationStretcherPoleB", startAt: 0, endAt: 16, from: [7.48, 1.04, -14.85], to: [7.48, 1.04, 14.85], ease: "linear" },
-      ] },
+      // 站台与担架不再在这里用 propMoves 推：整座小站由 cut.ambientMotion 沿一条
+      // 匀速里程走到侧门外并 stopAt=56 停住，切镜与它无关，结构上不会倒跳。
+    },
 
     // 0:56—1:08：恰好两次远炮；第二声更近，五人先后停手，旧伤兵睁眼。
     { n: 5, seconds: 12, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [1.95, 1.36, 3.42], look: [-0.4, 1.28, 3.42] },
       shakeAt: [{ at: 0.6, seconds: 0.7, amount: 0.42 }, { at: 7.0, seconds: 0.95, amount: 0.82 }],
       sfx: [{ at: 0.6, name: "amb.cannonFar", volume: 0.48 }, { at: 7.0, name: "explosionFar", volume: 0.68 }],
-      propMoves: [STATION_AT_SIDE_DOOR],
       lines: [{ at: 2.0, seconds: 1.6, who: "oldWound", voiceCue: "prologue_old_wound_03", text: "近咯。" }] },
 
     // 1:08—1:30：整段只触发一个 SeedAudio 1.0 复合 cue；其余行只负责逐句字幕。
     { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [1.95, 1.36, 3.42], look: [0, 1.58, 5.95] },
       sfx: [{ at: 18.1, name: "gearRustle", volume: 0.34 }],
-      propMoves: [STATION_AT_SIDE_DOOR],
       lines: [
         { at: 0.2, seconds: 4.1, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。出川，晓不晓得啊？" },
         // 下列时点来自十七八岁年轻士兵自然错拍定稿的真实停顿，不是把八句音频拼起来。
@@ -1032,28 +1348,28 @@ export const CS_Chuchuan = {
 
     // 1:33—1:35.5：玩家已随大家起身，侧门整组沿车壁滑开；先从座位走进过道。
     { n: 8, seconds: 2.5, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [1.95, 1.63, 3.42], to: [0.70, 1.62, 5.30], look: [0.3, 1.48, 5.45], lookTo: [3.4, 1.45, 5.70], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeIn: 0.45 } },
+      camera: { from: [1.95, 1.65, 3.42], to: [0.70, 1.65, 5.30], look: [0.3, 1.52, 5.45], lookTo: [3.4, 1.52, 5.70], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeIn: 0.45 } },
       sfx: [{ at: 0.1, name: "carriageDoorSlide", volume: 0.7 }],
-      propMoves: [STATION_AT_SIDE_DOOR, ...SideDoorMoves()],
+      propMoves: [...SideDoorMoves()],
       lines: [{ at: 0.6, seconds: 4.0, who: "externalOfficer", voiceCue: "prologue_external_officer_01", text: "通信排，下车！线盘背起，搞快！" }] },
 
     // 1:35.5—1:38.5：沿过道走到门框，镜头不再穿端墙或从车尾离开。
     { n: 9, seconds: 3, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [0.70, 1.62, 5.30], to: [3.35, 1.53, 5.70], look: [3.2, 1.48, 5.70], lookTo: [5.4, 1.65, 5.70], ease: "easeInOut", walkBob: { amount: 0.020, frequency: 1.85 } },
+      camera: { from: [0.70, 1.65, 5.30], to: [3.35, 1.80, 5.70], look: [3.2, 1.62, 5.70], lookTo: [5.4, 1.80, 5.70], ease: "easeInOut", walkBob: { amount: 0.020, frequency: 1.85 } },
       sfx: [{ at: 0.5, name: "stepBallast", volume: 0.38 }, { at: 2.0, name: "stepBallast", volume: 0.42 }],
-      propMoves: [STATION_AT_SIDE_DOOR, ...SideDoorHoldOpenMoves()] },
+      propMoves: [...SideDoorHoldOpenMoves()] },
 
     // 1:38.5—1:41：跨门槛和两级踏板，脚下高度真实接到石基月台。
     { n: 10, seconds: 2.5, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [3.35, 1.53, 5.70], to: [5.20, 2.05, 5.70], look: [5.2, 1.70, 5.70], lookTo: [7.2, 1.90, 5.90], ease: "easeInOut", walkBob: { amount: 0.024, frequency: 1.65 } },
+      camera: { from: [3.35, 1.80, 5.70], to: [5.20, 2.14, 5.70], look: [5.2, 1.92, 5.70], lookTo: [6.6, 2.00, 9.50], ease: "easeInOut", walkBob: { amount: 0.024, frequency: 1.65 } },
       sfx: [{ at: 0.35, name: "stepBallast", volume: 0.48 }, { at: 1.45, name: "stepBallast", volume: 0.50 }],
-      propMoves: [STATION_AT_SIDE_DOOR, ...SideDoorHoldOpenMoves()] },
+      propMoves: [...SideDoorHoldOpenMoves()] },
 
     // 1:41—1:45：登上站台后再沿站台走几步、停稳，身后的战友仍从同一扇门排队下来。
     { n: 11, seconds: 4, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [5.20, 2.05, 5.70], to: [6.80, 2.05, 7.40], look: [7.0, 1.95, 7.6], lookTo: [6.8, 1.90, 10.4], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeOut: 1.35 } },
+      camera: { from: [5.20, 2.14, 5.70], to: [6.80, 2.14, 7.40], look: [6.7, 2.04, 9.6], lookTo: [6.8, 1.96, 12.6], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeOut: 1.35 } },
       sfx: [{ at: 0.6, name: "stepBallast", volume: 0.46 }, { at: 2.0, name: "stepBallast", volume: 0.42 }],
-      propMoves: [STATION_AT_SIDE_DOOR, ...SideDoorHoldOpenMoves()] },
+      propMoves: [...SideDoorHoldOpenMoves()] },
   ],
 
   skipCard: {

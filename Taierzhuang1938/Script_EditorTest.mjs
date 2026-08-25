@@ -1,4 +1,4 @@
-// 《滕县 一九三八》编辑器套件冒烟：真浏览器里把八个编辑器一个个打开、用一遍、关掉。
+// 《滕县 一九三八》编辑器套件冒烟：真浏览器里把九个编辑器一个个打开、用一遍、关掉。
 //
 // 为什么要有这一层：编辑器是**唯一会去动运行时状态**的一批代码 ——
 // 藏世界、换相机、包 GroundHeight、往 city.colliders 里塞盒子、给 viewmodel 换枪。
@@ -109,8 +109,8 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 一个可叠加渲染调试 + 八个编辑器 + 一个「全部关掉」
-Check("面板列出设置、渲染调试与八个编辑器入口", afterGear.entries === 13, `按钮数=${afterGear.entries}`);
+// 三个设置 + 一个可叠加渲染调试 + 九个编辑器 + 一个「全部关掉」
+Check("面板列出设置、渲染调试与九个编辑器入口", afterGear.entries === 14, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -479,7 +479,48 @@ Check("第一人称换回正片镜头、台架换回 85 mm",
 Check("车辆条目按完整关节树建落地台架", weapon.tankOk);
 
 // ---------------------------------------------------------------------------
-// 4) 音效音乐编辑器
+// 4) 特效预览编辑器
+// ---------------------------------------------------------------------------
+await page.click('[data-editor="vfx"]');
+await Step(90);
+const vfxEditor = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const active = T.editor.active;
+  const gl = T.renderer.getContext();
+  const continuous = {
+    handle: active.handle,
+    smokeSpawned: T.vfx.pools.sourceSmoke.cursor,
+    fireSpawned: T.vfx.pools.sourceFire.cursor,
+    smokeAlive: T.vfx.pools.sourceSmoke.deathTime.some((time) => time > T.vfx.time),
+    fireAlive: T.vfx.pools.sourceFire.deathTime.some((time) => time > T.vfx.time),
+  };
+  active.effectId = "ExplosionGrenade";
+  active.Play();
+  T.StepFrames(8);
+  const instant = T.vfx.lastExplosionSprite;
+  return {
+    id: T.editor.ActiveId,
+    studio: T.editor.studio.Active,
+    vfxVisible: T.vfx.root.visible,
+    masks: T.vfx.loadedVefectsMasks.size,
+    continuous,
+    instant,
+    playButton: !!active.panel.root.querySelector('[data-vfx-action="play"]'),
+    glError: gl.getError(),
+  };
+});
+Check("特效预览编辑器打开正片同源摄影棚",
+  vfxEditor.id === "vfx" && vfxEditor.studio && vfxEditor.vfxVisible && vfxEditor.playButton,
+  JSON.stringify(vfxEditor));
+Check("Vefects 常驻烟火在预览器真实发射",
+  vfxEditor.masks === 5 && vfxEditor.continuous.handle > 0
+    && vfxEditor.continuous.smokeAlive && vfxEditor.continuous.fireAlive,
+  JSON.stringify(vfxEditor.continuous));
+Check("特效预览器可重播瞬时爆炸且 shader 无 GL 错误",
+  !!vfxEditor.instant && vfxEditor.glError === 0, JSON.stringify(vfxEditor.instant));
+
+// ---------------------------------------------------------------------------
+// 5) 音效音乐编辑器
 // ---------------------------------------------------------------------------
 await page.click('[data-editor="audio"]');
 await Step(10);
@@ -557,7 +598,7 @@ Check("每个配方都有分类与说明", undescribed.length === 0,
   undescribed.length ? `漏了：${undescribed.join(", ")}` : "");
 
 // ---------------------------------------------------------------------------
-// 5) Timeline 编辑器
+// 6) Timeline 编辑器
 // ---------------------------------------------------------------------------
 await page.click('[data-editor="timeline"]');
 await Step(10);
@@ -649,7 +690,7 @@ Check("Timeline 按住 Alt 会释放鼠标并暂停序章视线",
 await page.evaluate(() => window.Taierzhuang.editor.active.Stop());
 
 // ---------------------------------------------------------------------------
-// 6) 拆分后的场景关卡编辑器
+// 7) 拆分后的场景关卡编辑器
 // ---------------------------------------------------------------------------
 await page.click('[data-editor="scene"]');
 await Step(15);
@@ -701,6 +742,19 @@ const scene = await page.evaluate(() => {
   active.Import(json, false);
   out.roundTrip = `${cleared} → ${active.items.length}`;
 
+  // 特效与构件共用落点和 JSON，但不创建假碰撞盒；编辑器接管期间仍要推进烟火。
+  active.SetPalette("Effect_FireSmall");
+  active.Place(12, -18);
+  T.StepFrames(45);
+  out.effect = {
+    category: active.panel.root.textContent.includes("特效"),
+    handles: active.effectHandles.length,
+    source: T.vfx.smokeSources.has(active.effectHandles[0]),
+    json: active.Serialize().items.some((item) => item.type === "Effect_FireSmall"),
+    emitted: T.vfx.pools.sourceSmoke.cursor + T.vfx.pools.sourceFire.cursor > 0,
+  };
+  active.DeleteSelected();
+
   return out;
 });
 Check("场景编辑器进自由飞行", scene.id === "scene" && scene.fly);
@@ -716,6 +770,9 @@ Check("放置的构件进场景且带碰撞盒",
   `盒子 +${scene.colliderGain}，附近 ${scene.nearby}`);
 Check("沙包路障（props 通道）真的建出来了", scene.barMeshes > 0, `网格 ${scene.barMeshes}`);
 Check("场景存取往返", scene.roundTrip === "0 → 2", scene.roundTrip);
+Check("场景关卡可布设、预览并序列化特效",
+  scene.effect.category && scene.effect.handles === 1 && scene.effect.source
+    && scene.effect.json && scene.effect.emitted, JSON.stringify(scene.effect));
 
 // ---------------------------------------------------------------------------
 // 6b) 场景关卡编辑器的真鼠标落点

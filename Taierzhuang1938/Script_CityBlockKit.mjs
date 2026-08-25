@@ -70,6 +70,7 @@ import {
 } from "./Script_World.mjs";
 import {
   MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
+  RoofSlopeLayout, RoofSlabY,
 } from "./Script_Geo.mjs";
 import {
   AddCourtyardLife, AddYardWear, AddStalkStack, AddManureHeap,
@@ -77,8 +78,10 @@ import {
 } from "./Script_LivedInProps.mjs";
 
 const DEG = Math.PI / 180;
-/** 硬山坡度 26°—29°：脊高 = 檐口 + 半进深 × tan(27.5°)。 */
-const PITCH = Math.tan(27.5 * DEG);
+/** 硬山坡度 26°—29°。 */
+const PITCH_RAD = 27.5 * DEG;
+/** 脊高 = 檐口 + 半进深 × tan(27.5°)。 */
+const PITCH = Math.tan(PITCH_RAD);
 
 /**
  * 六种原型。`kind` 决定形制与材质味道；**住一户还是两户是另一个维度**
@@ -1252,16 +1255,28 @@ const MID_PROFILE = {
 
 function MidBody(sink, {
   x, z, ry, width, depth, eave, seed, burnt, damage, baseY, rafters = false,
+  chimney = false,
 }) {
   const mat = burnt ? "BrickWallSooty" : "HouseBrick";
   sink.Add(mat, PlaceGeometry(
     MakeBox(width, eave, depth, TILE_METERS.brick, `${seed}:body`, BRICK_UV_GRID),
     { x, y: baseY + eave / 2, z, ry }));
   sink.Solid(x, baseY + eave / 2, z, width / 2, eave / 2, depth / 2, "wall", ry);
+  const ruined = damage > 0.72;
   AddHardMountainRoof(sink, {
     x, z, width, depth, ry, eaveY: baseY + eave, ridgeY: baseY + eave + depth * 0.5 * PITCH,
-    seed: `${seed}:roof`, ruined: damage > 0.72, burnt, rafters,
+    seed: `${seed}:roof`, ruined, burnt, rafters,
   });
+  // AddHardMountainRoof 与 RoofSlopeLayout 是同一条剖面公式（脊高 = 檐 + 半进深×tan），
+  // 所以烟囱按后者算落点不会浮在瓦面上方。
+  if (chimney && !ruined) {
+    AddRoofChimney(sink, {
+      x, z, ry, depth, seed: `${seed}:roof`, mat, tile: TILE_METERS.brick,
+      grid: BRICK_UV_GRID, overhang: 0.45,
+      roof: RoofSlopeLayout(width, depth, baseY + eave, PITCH_RAD, 0.45),
+      tileMat: burnt ? "BrickWallSooty" : "RoofTile",
+    });
+  }
 }
 
 /**
@@ -1278,20 +1293,12 @@ export function BuildCityBlockMid(sink, cell, {
   const mir = MirrorOf(seed);
   const F = Frame(x, z, ry);
 
-  // 院墙一圈（不切片：中景不值得一段一段地做残墙）
+  // 院墙一圈（不切片：中景不值得一段一段地做残墙）。
+  // 门口与远景档共用同一件 SimpleYardWall：原来中景这一圈是**闭合的方框**，
+  // 于是走近的过程是「远处有门 → 中景门没了 → 走到跟前门又回来」。
+  const gateAt = mir * w * 0.26;
   if (profile !== "row") {
-    for (const [ox, oz, len, rot] of [
-      [0, -d / 2, w, 0], [0, d / 2, w, 0],
-      [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2],
-    ]) {
-      const [px, pz] = F(ox, oz);
-      sink.Add(mat, PlaceGeometry(
-        MakeBox(len, h, 0.42, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
-          `${seed}:sw${ox}${oz}`, adobe ? null : BRICK_UV_GRID),
-        { x: px, y: baseY + h / 2, z: pz, ry: ry + rot }));
-      sink.Solid(px, baseY + h / 2, pz, len / 2, h / 2, 0.25,
-        adobe ? "villageCourtyard" : "wall", ry + rot);
-    }
+    SimpleYardWall(sink, { x, z, ry, w, d, h, baseY, seed, adobe, burnt, gateAt });
   }
 
   if (profile === "row") {
@@ -1312,8 +1319,10 @@ export function BuildCityBlockMid(sink, cell, {
       const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
       const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
       const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
+      // 椽子与烟囱都只给临街的头一间：远景档按同一个 `${seed}:u${u}` 挑烟囱，
+      // 两档要是各挑各的间，走近的过程就是「烟囱换了一间」。
       MidBody(sink, { x: ux, z: uz, ry, width: uw - 0.34, depth: unitD, eave,
-        rafters: u === 0, seed: `${seed}:u${u}`, burnt, damage, baseY });
+        rafters: u === 0, seed: `${seed}:u${u}`, burnt, damage, baseY, chimney: u === 0 });
       cursor += uw;
     }
     const [yx, yz] = F(0, -d / 2 + 3.2);
@@ -1321,9 +1330,11 @@ export function BuildCityBlockMid(sink, cell, {
       seed: `${seed}:store`, burnt, damage, baseY });
     return;
   }
-  // 中景这一档最值钱的一笔就是这棵树：150 m 外没人数得清椽子，
+  // 这一档最值钱的一笔就是院里那棵树：150 m 外没人数得清椽子，
   // 但一片瓦楞里探出来的枯枝一眼就把网格打散（detail 档同一判定、同一位置）。
-  YardTree(sink, { x, z, ry, w, d, seed, kind, duplex }, duplex ? 24 : 34, false, baseY);
+  // 影壁与麦秸垛同理，且与远景档同一处落点。院里那棵树的落点由 duplex 决定
+  //（YardLife 内部转交 YardTree）：两户的一格里，东南角那块地已经被第二户占了。
+  YardLife(sink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt, duplex });
 
   // 一格两户：中景必须同步出两条脊，否则从城墙上俯瞰是一户、走近变两户 ——
   // 那正是「房子在眼前变形」。这一档只交代脊线，门洞留给 detail 档。
@@ -1339,7 +1350,8 @@ export function BuildCityBlockMid(sink, cell, {
       const hw = Math.min(span - 0.6, 10.6);
       const [bx, bz] = F(mir * (edge + s * hw / 2), hz);
       MidBody(sink, { x: bx, z: bz, ry, width: hw, depth: houseD, rafters: s < 0,
-        eave: eave + (s > 0 ? 0.12 : 0), seed: `${seed}:h${s}`, burnt, damage, baseY });
+        eave: eave + (s > 0 ? 0.12 : 0), seed: `${seed}:h${s}`, burnt, damage, baseY,
+        chimney: s < 0 });
     }
     // 共山墙：中缝里那道高过檐口的墙，从空中把两条脊切成两段
     const [fx, fz] = F(mir * split, -d / 2 + (houseD + 0.55) / 2);
@@ -1362,7 +1374,8 @@ export function BuildCityBlockMid(sink, cell, {
     const houseD = Math.min(4.8, d * 0.30);
     const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
     MidBody(sink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
-      rafters: true, eave: adobe ? 2.4 : 2.54, seed: `${seed}:north`, burnt, damage, baseY });
+      rafters: true, eave: adobe ? 2.4 : 2.54, seed: `${seed}:north`, burnt, damage, baseY,
+      chimney: true });
     const sW = Math.min(w - 4.6, 9.6);
     const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
     MidBody(sink, { x: sx2, z: sz2, ry, width: sW, depth: houseD, rafters: false,
@@ -1384,7 +1397,7 @@ export function BuildCityBlockMid(sink, cell, {
   // 正房这一座留椽子（中景的近端 100 m 上，檐口那条锯齿阴影还看得见），
   // 配楼一律不留 —— 那是纯浪费。
   MidBody(sink, { x: nx, z: nz, ry, width: mainW, depth: mainD, rafters: true,
-    eave: adobe ? 2.4 : 2.6, seed: `${seed}:main`, burnt, damage, baseY });
+    eave: adobe ? 2.4 : 2.6, seed: `${seed}:main`, burnt, damage, baseY, chimney: true });
 
   if (profile === "double") {
     // 倒座：南边再来一条平行的脊
@@ -1409,92 +1422,238 @@ export function BuildCityBlockMid(sink, cell, {
 // ---------------------------------------------------------------------------
 // 远景档（far）：体块剪影
 //
-// 够读出「灰砖小院的海」就行，但**海不能是同一块砖复印二百遍**：
-// 按 kind 给四种平面 —— 单块 / 双平行 / L / 长排，脊向也跟着变。
-// 每格 4—7 个盒子，整体开销与原来的 4 个盒子同一量级。
+// 这一档与中景读**同一座房子**：同一个 kind、同一圈院墙、正房在同一个位置，
+// 只是省掉椽子、门窗、家什与残墙切片。它不是「另一种建筑」，是同一座的低配版。
+//
+// 改前不是这样，而且错得很显眼（玩家实拍的那张俯瞰图就是它）：
+//   · 一格院子 = **一块 21×16 m、高 2.5 m 的实心大饼**，没有院墙、没有进深比例，
+//     俯瞰是一片摊开的砖色板，跟走近之后看见的四合院不是同一座房子；
+//   · 板上那两片「坡顶」按 `rx: ±0.5` 写死、位移方向又与 rx 配反 ——
+//     (一) 坡朝外翘、中间那条「正脊」反倒是最低点（倒 V）；
+//     (二) 倾角与进深无关：16 m 进深的院子上，两片板一头扎进地里、一头翘到
+//          脊上方两米多，于是整城俯瞰是一片悬空交叉的玻璃片。
+// 坡顶剖面现在统一走 Script_Geo.RoofSlopeLayout（城外村屋踩过同一个坑，
+// 那边的注释记着玩家原话「楼顶做反了」；两边共用一份剖面，不会再各错一次）。
+//
+// 预算：一格从 ~4 个盒子涨到 ~20 个（≈300 三角）。远景档不投阴影；材质桶只多出
+// VillageStraw（麦秸垛）、Willow（院里的枯枝树）与 WoodBeam（塌顶的焦梁）三个，
+// 都已在城内材质表里登记。所以涨的是三角形，不是 draw call
+// （实测四·城墙关 calls 1110→1167、tris 3.54M→3.68M，红线是 5000 / 600 万）。
 // ---------------------------------------------------------------------------
 
-function FarBlock(farSink, { x, z, ry, w, d, h, y, seed, burnt, roof = true, mat = "HouseBrick" }) {
-  const adobe = mat === "Adobe";
-  farSink.Add(burnt ? "BrickWallSooty" : mat, PlaceGeometry(
-    MakeBox(w, h, d, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
-      `${seed}:b`, adobe ? null : BRICK_UV_GRID),
-    { x, y: y + h / 2, z, ry }));
-  farSink.Solid(x, y + h / 2, z, w / 2, h / 2, d / 2, "wall", ry);
-  if (!roof) return;
-  for (const s of [-1, 1]) {
-    farSink.Add("RoofTile", PlaceGeometry(
-      MakeBox(w * 1.08, 0.14, d * 0.6, TILE_METERS.roof, `${seed}:r${s}`),
-      { x: x + Math.sin(ry) * s * d * 0.24, y: y + h + 0.34,
-        z: z + Math.cos(ry) * s * d * 0.24, ry, rx: -s * 0.5 }));
-  }
-  farSink.Add("RoofTile", PlaceGeometry(
-    MakeBox(w * 1.08, 0.18, 0.32, TILE_METERS.roof, `${seed}:rdg`),
-    { x, y: y + h + 0.72, z, ry }));
-}
-
+/** 远景剖面表：与 MID_PROFILE 一一对应，两档读同一座房子。 */
 const FAR_PROFILE = {
   OneEntry: "single",
   TwoEntry: "double",
-  AdobeYard: "flat",
+  AdobeYard: "adobe",
   LCourtyard: "ell",
   WellYard: "single",
   ShopRow: "row",
 };
+
+/**
+ * 远景坡顶：两片坡 + 正脊 + 每坡两条瓦垄，正房另加两端山墙与偶尔一支烟囱。
+ *
+ * 瓦垄那两条窄带是**俯瞰这一档最值钱的一笔**：两百米外，一片纯色的板与一片
+ * 有横向分缝的瓦，是「塑料」与「小青瓦」的区别，而它只要四个盒子。
+ */
+export function AddFarRoof(sink, {
+  x, z, ry, width, depth, eaveY, seed, burnt, mat, adobe = false,
+  gable = false, chimney = false, ruined = false, pitch = PITCH_RAD,
+}) {
+  const F = Frame(x, z, ry);
+  if (ruined) {
+    // 塌顶：三根横在山墙之间的焦梁。远景不必更多，但**必须有东西** ——
+    // 什么都不摆的话，打烂的院子在俯瞰上是一个没有盖的空盒子。
+    for (let i = 0; i < 3; i += 1) {
+      const [bx, bz] = F(-width / 2 + width * (i + 0.5) / 3, 0);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.16, 0.14, depth * 0.86, TILE_METERS.wood, `${seed}:bm${i}`),
+        { x: bx, y: eaveY - 0.16, z: bz, ry, rz: (i - 1) * 0.05 }));
+    }
+    return;
+  }
+  const tileMat = burnt ? "BrickWallSooty" : "RoofTile";
+  const roof = RoofSlopeLayout(width, depth, eaveY, pitch, 0.34);
+  for (const half of roof.halves) {
+    const [px, pz] = F(0, half.localZ);
+    sink.Add(tileMat, PlaceGeometry(
+      MakeBox(half.width, 0.15, half.depth, TILE_METERS.roof, `${seed}:s${half.side}`),
+      { x: px, y: half.centerY, z: pz, ry, rx: half.rotationX }));
+    for (let i = 1; i <= 2; i += 1) {
+      const slabZ = half.localRidgeZ
+        + (half.localEaveZ - half.localRidgeZ) * (i / 3);
+      const [cx, cz] = F(0, half.localZ + slabZ * Math.cos(half.rotationX));
+      sink.Add(tileMat, PlaceGeometry(
+        MakeBox(half.width, 0.05, 0.085, TILE_METERS.roof, `${seed}:c${half.side}${i}`),
+        { x: cx, y: RoofSlabY(half, slabZ) + 0.10, z: cz, ry, rx: half.rotationX }));
+    }
+  }
+  sink.Add(tileMat, PlaceGeometry(
+    MakeBox(roof.ridgeLength, 0.20, 0.26, TILE_METERS.roof, `${seed}:ridge`),
+    { x, y: roof.ridgeY + 0.07, z, ry }));
+
+  const tile = adobe ? TILE_METERS.adobe : TILE_METERS.brick;
+  const grid = adobe ? null : BRICK_UV_GRID;
+  if (gable) {
+    // 硬山两端高出坡面的山墙 —— 「硬山」二字的由来，也是俯瞰上让屋面**收边**
+    // 的那一笔：没有它，两片瓦在山墙处是两条悬空的板边。三段够读出三角。
+    const rise = roof.ridgeY - eaveY;
+    const steps = 3;
+    for (const end of [-1, 1]) {
+      const parts = [];
+      for (let i = 0; i < steps; i += 1) {
+        const segD = depth / steps;
+        const lz = -depth / 2 + segD * (i + 0.5);
+        const hh = Math.max(0.12, rise * (1 - Math.abs(lz) / (depth / 2)));
+        parts.push(PlaceGeometry(
+          MakeBox(0.26, hh, segD * 1.04, tile, `${seed}:gb${end}${i}`, grid),
+          { x: 0, y: hh / 2, z: lz }));
+      }
+      const [gx, gz] = F(end * (width / 2 + 0.09), 0);
+      sink.Add(mat, PlaceGeometry(MergeGeometries(parts), { x: gx, y: eaveY, z: gz, ry }));
+    }
+  }
+  if (chimney) {
+    AddRoofChimney(sink, {
+      x, z, ry, depth, roof, seed, mat, tileMat, tile, grid, overhang: 0.34,
+    });
+  }
+}
+
+/**
+ * 屋面上的一支烟囱。**刻意稀疏**：三家有一支就够说明「这城里还住着人」，
+ * 家家都有反而像现代小区（城外村屋那一套是同一条规矩、同一个 %3）。
+ * 中景与远景共用，落点只由 seed 决定 —— 走近时烟囱不许换坡面。
+ */
+export function AddRoofChimney(sink, {
+  x, z, ry, depth, roof, seed, mat, tileMat = "RoofTile", tile, grid, overhang = 0.45,
+}) {
+  if ((HashString(`${seed}:chimney`) >>> 0) % 3 !== 0) return;
+  const F = Frame(x, z, ry);
+  const side = (HashString(`${seed}:chimSide`) >>> 0) % 2 ? -1 : 1;
+  const lz = side * depth * 0.2;
+  const [px, pz] = F(((HashString(`${seed}:chimX`) >>> 0) % 11 - 5) * 0.12, lz);
+  const roofY = roof.ridgeY
+    - Math.abs(lz) * (roof.ridgeY - roof.outerY) / (depth / 2 + overhang);
+  sink.Add(mat, PlaceGeometry(
+    MakeBox(0.46, 0.74, 0.46, tile, `${seed}:chim`, grid),
+    { x: px, y: roofY + 0.37, z: pz, ry }));
+  sink.Add(tileMat, PlaceGeometry(
+    MakeBox(0.60, 0.09, 0.60, TILE_METERS.roof, `${seed}:chimCap`),
+    { x: px, y: roofY + 0.78, z: pz, ry }));
+}
+
+/** 远景一座房：墙体 + 坡顶。参数与 MidBody 同名同义，方便两档对照着改。 */
+function FarBody(sink, {
+  x, z, ry, width, depth, eave, baseY, seed, burnt, damage = 0,
+  adobe = false, gable = false, chimney = false,
+}) {
+  const mat = burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick");
+  sink.Add(mat, PlaceGeometry(
+    MakeBox(width, eave, depth, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+      `${seed}:body`, adobe ? null : BRICK_UV_GRID),
+    { x, y: baseY + eave / 2, z, ry }));
+  sink.Solid(x, baseY + eave / 2, z, width / 2, eave / 2, depth / 2, "wall", ry);
+  // 屋顶那一层的种子必须与中景的 `${seed}:roof` 一模一样：烟囱是按种子 %3 挑的，
+  // 两档要是各算各的哈希，走近的过程就是「远处有烟囱，近了没有」。
+  AddFarRoof(sink, {
+    x, z, ry, width, depth, eaveY: baseY + eave, seed: `${seed}:roof`,
+    burnt, mat, adobe, gable, chimney, ruined: damage > 0.72,
+  });
+}
+
+/**
+ * 院墙一圈（**中景与远景共用**）。南面（局部 +z）留一个门口 + 两根门墩。
+ *
+ * 这个豁口是形制，不是装饰：「门多开在东南角」在俯瞰上就是这一个缺口。
+ * 没有它，二百个院子是二百个闭合的方框 —— 那正是「大量重复村庄」的观感来源。
+ * 用整段盒子，不走 AddWall 的切片：远景不值得为一段院墙切二十片。
+ */
+function SimpleYardWall(sink, { x, z, ry, w, d, h, baseY, seed, adobe, burnt, gateAt }) {
+  const mat = burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick");
+  const tile = adobe ? TILE_METERS.adobe : TILE_METERS.brick;
+  const grid = adobe ? null : BRICK_UV_GRID;
+  const F = Frame(x, z, ry);
+  const openW = 1.7;
+  const Seg = (lx, lz, len, rot, id) => {
+    if (len < 0.4) return;
+    const [px, pz] = F(lx, lz);
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(len, h, 0.42, tile, `${seed}:yw${id}`, grid),
+      { x: px, y: baseY + h / 2, z: pz, ry: ry + rot }));
+    sink.Solid(px, baseY + h / 2, pz, len / 2, h / 2, 0.21,
+      adobe ? "villageCourtyard" : "wall", ry + rot);
+  };
+  Seg(0, -d / 2, w, 0, "n");
+  Seg(-w / 2, 0, d, Math.PI / 2, "w");
+  Seg(w / 2, 0, d, Math.PI / 2, "e");
+  // 南墙分两段让出门口
+  const leftLen = gateAt - openW / 2 + w / 2;
+  const rightLen = w / 2 - (gateAt + openW / 2);
+  Seg(-w / 2 + leftLen / 2, d / 2, leftLen, 0, "s0");
+  Seg(w / 2 - rightLen / 2, d / 2, rightLen, 0, "s1");
+  for (const side of [-1, 1]) {
+    const [px, pz] = F(gateAt + side * (openW / 2 + 0.22), d / 2);
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(0.44, h + 0.5, 0.52, tile, `${seed}:pier${side}`, grid),
+      { x: px, y: baseY + (h + 0.5) / 2, z: pz, ry }));
+  }
+}
+
+/**
+ * 院里那点活气（**中景与远景共用**，同一种子同一位置 —— 走近时不许挪窝）。
+ * 只留**从空中读得出来**的三样：影壁（门内那一堵短墙）、麦秸垛、院角一棵枯枝树。
+ *
+ * 反重复最管用的仍然是树：二百个院子的屋脊再怎么换原型也还是一片瓦，
+ * 一棵探出院墙的枯枝立刻把网格打散（中景/近景是同一处位置、同一个判定）。
+ */
+function YardLife(sink, {
+  x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt = false, duplex = null,
+  // 两户的一格里院子小一半，树也就稀一档（落点由 YardTree 按 duplex 另算）。
+  treeChance = duplex ? 24 : 34,
+}) {
+  const F = Frame(x, z, ry);
+  if (damage < 0.72) {
+    // 尺寸与落点抄近景档的 ScreenWall（2.4 × 1.9，门内 2 m），走近时不挪窝。
+    // 材质走 HouseBrick 而不是 ScreenWall 那边的 BrickWall：远景 sink 里没有
+    // BrickWall 这个桶，为一堵影壁多开一个桶就是每个扇区多一次 draw call。
+    const [sx, sz] = F(gateAt, d / 2 - 2.0);
+    sink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
+      MakeBox(2.4, 1.9, 0.30, TILE_METERS.brick, `${seed}:screen`, BRICK_UV_GRID),
+      { x: sx, y: baseY + 0.95, z: sz, ry }));
+  }
+  if ((HashString(`${seed}:stack`) >>> 0) % 100 < 46) {
+    const mir = MirrorOf(seed);
+    const [px, pz] = F(-mir * (w / 2 - 2.4), d * 0.12);
+    const r = 1.15 + ((HashString(`${seed}:stackR`) >>> 0) % 100) / 100 * 0.4;
+    sink.Add("VillageStraw", PlaceGeometry(
+      new THREE.CylinderGeometry(r * 0.18, r, 1.75, 5),
+      { x: px, y: baseY + 0.87, z: pz, ry }));
+    sink.Solid(px, baseY + 0.6, pz, r * 0.8, 0.6, r * 0.8, "villageStraw", ry);
+  }
+  YardTree(sink, { x, z, ry, w, d, seed, kind, duplex }, treeChance, false, baseY);
+}
 
 /** 远景一格。cell = {x,z,w,d,seed}。 */
 export function BuildCityBlockFar(farSink, cell, {
   damage = 0, burnt = false, baseY = 0, kind = "OneEntry", ry = 0, duplex = null,
 } = {}) {
   const { x, z, w, d, seed } = cell;
-  const rnd = Mulberry32(HashString(`${seed}:sil`));
   const profile = FAR_PROFILE[kind] || "single";
+  const adobe = profile === "adobe";
   const mir = MirrorOf(seed);
   const F = Frame(x, z, ry);
-  const roof = damage < 0.75;
-  const h = 2.5 + rnd() * 0.9;
-  const farMat = profile === "flat" ? "Adobe" : "HouseBrick";
 
-  // 一格两户：远景也得是两块。三档同一个答案 —— 二百米外看见两条脊，
-  // 走到跟前才不会变成一户（LOD 之间换形是这套东西最容易穿帮的地方）。
-  //
-  // **两块必须严丝合缝地贴着，并且合起来正好占满改前那一块**
-  // `w*0.86 × d*0.78` 的实心体。第一版给两块各留了几十厘米的缝，结果远景档
-  // 每一格中间多出一条一米宽、贯通南北的**新缝隙** —— 远景档没有院墙，
-  // 这些体块本身就是障碍物，凭空多出来的缝会被导航当成通路。
-  // 两条脊靠**高度差**读出来，不靠中间的缝。
-  if (duplex === "ew") {
-    const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
-    const a0 = -w * 0.43, b1 = w * 0.43;
-    const cut = Clamp(split * 0.5, a0 + 4.0, b1 - 4.0);
-    for (const s of [-1, 1]) {
-      const lo = s < 0 ? a0 : cut, hi = s < 0 ? cut : b1;
-      if (hi - lo < 3.0) continue;
-      const [bx, bz] = F(mir * ((lo + hi) / 2), -d * 0.04);
-      FarBlock(farSink, { x: bx, z: bz, ry, w: hi - lo, d: d * 0.78,
-        h: h + (s > 0 ? 0.22 : 0), y: baseY, seed: `${seed}:h${s}`, burnt, roof, mat: farMat });
-    }
-    return;
-  }
-  if (duplex === "ns") {
-    // 前后两户：同样把改前那一块从中间切开，两块贴着（南块矮一档读出是两户）
-    const z0 = -d * 0.43, z1 = d * 0.35, zc = d * 0.02;
-    const [nx2, nz2] = F(0, (z0 + zc) / 2);
-    FarBlock(farSink, { x: nx2, z: nz2, ry, w: w * 0.86, d: zc - z0, h,
-      y: baseY, seed: `${seed}:n2`, burnt, roof, mat: farMat });
-    const [sx2, sz2] = F(0, (zc + z1) / 2);
-    FarBlock(farSink, { x: sx2, z: sz2, ry, w: w * 0.86, d: z1 - zc, h: h - 0.26,
-      y: baseY, seed: `${seed}:s2`, burnt, roof, mat: farMat });
-    return;
-  }
-
-  // 一格的**体量**要与改前那一块 w*0.86 × d*0.82 的实心块大致相当：
-  // 远景这一档读的是「一片连着的灰砖小院」，块与块之间空出大片地皮就成了村落。
-  // 所以多体量的剖面都按「合起来仍填满这一格」配，只是脊线走向不同。
   if (profile === "row") {
-    // 连排：沿街 2—3 段高低错开的剪影（detail/mid 都是这个断法，三档同形）
-    // 总宽仍是改前那一块的 w*0.92 —— 只是从中间切成 2—3 段，不多占也不少占
-    const rowW = w * 0.92;
+    // 铺面连排：沿街 2—3 段**参差**的浅进深脊 + 后院库房，没有院墙 ——
+    // 断法、间宽、进深、檐高全部与中景同一条公式（三档同形：从城墙上看是
+    // 高低错开的一条房带，走近仍是那 2—3 间，不许 LOD 换形）。
+    //
+    // 与中景只差一处：**各间贴着出，不留 0.34 m 的间缝**。远景档这些体块本身
+    // 就是障碍物，凭空多出来的一条贯通的缝会被导航当成通路（第一版就是这么漏的）；
+    // 参差靠檐口高差、进深差与两端山墙读出来，不靠中间那道缝。
+    const rowD = 6.0, rowW = Math.min(w - 1.2, 22);
     const units = rowW >= 15.5 && ((HashString(`${seed}:units`) >>> 0) % 10) < 6 ? 3 : 2;
     const spans = [];
     let acc = 0;
@@ -1505,44 +1664,108 @@ export function BuildCityBlockFar(farSink, cell, {
     let cursor = -rowW / 2;
     for (let u = 0; u < units; u += 1) {
       const uw = rowW * spans[u] / acc;
-      const lift = ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
-      const [ux, uz] = F(cursor + uw / 2, d * 0.22);
-      // 各间贴着（同上：远景档不许凭空多出缝），高低差读出「连排」
-      FarBlock(farSink, { x: ux, z: uz, ry, w: uw, d: d * 0.44, h: h + 0.16 + lift,
-        y: baseY, seed: `${seed}:u${u}`, burnt, roof });
+      const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
+      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+      const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
+      FarBody(farSink, { x: ux, z: uz, ry, width: uw, depth: unitD, eave,
+        baseY, seed: `${seed}:u${u}`, burnt, damage, gable: true, chimney: u === 0 });
       cursor += uw;
     }
-    const [sx, sz] = F(0, -d * 0.26);
-    FarBlock(farSink, { x: sx, z: sz, ry, w: w * 0.6, d: d * 0.32, h: h - 0.35,
-      y: baseY, seed: `${seed}:store`, burnt, roof });
+    const [yx, yz] = F(0, -d / 2 + 3.2);
+    FarBody(farSink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0, eave: 2.3,
+      baseY, seed: `${seed}:store`, burnt, damage });
     return;
   }
-  if (profile === "flat") {
-    // 土墙院：矮一档、进深浅一档 —— 远处一片发黄发暗的方块，与青砖院拉开
-    const [mx, mz] = F(0, -d * 0.04);
-    FarBlock(farSink, { x: mx, z: mz, ry, w: w * 0.8, d: d * 0.7, h: h - 0.5,
-      y: baseY, seed: `${seed}:m`, burnt, roof, mat: "Adobe" });
+
+  // 院墙与中景同一条高度公式：走近时墙不许长高一截。
+  const h = adobe ? 1.85 : 2.0 + ((HashString(seed) % 7) / 7) * 0.28;
+  // 门开在东南角（巽位）；反格的院子整个平面镜像，门就落到西南角。
+  const gateAt = mir * w * 0.26;
+  SimpleYardWall(farSink, { x, z, ry, w, d, h, baseY, seed, adobe, burnt, gateAt });
+  YardLife(farSink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt, duplex });
+
+  // 一格两户：远景也得是两条脊。三档同一个答案 —— 二百米外看见两户，
+  // 走到跟前才不会变成一户（LOD 之间换形是这套东西最容易穿帮的地方）。
+  // 正房的落点、进深、檐高与中景逐项对齐，屋面种子也同名（烟囱不许换坡面）。
+  if (duplex === "ew") {
+    // 东西对分：两座正房同脊并排。**两块严丝合缝地顶在中缝上，不留缝** ——
+    // 远景档这些体块本身就是障碍物，凭空多出来的一条贯通南北的缝会被导航当成通路
+    //（第一版给两块各留了几十厘米，每格中间就多出一条一米宽的假巷子）。
+    // 两户靠 0.15 m 的檐口高差 + 中缝上背靠背的两堵山墙读出来，不靠那道缝。
+    const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
+    const houseD = Math.min(4.8, d * 0.30);
+    const hz = -d / 2 + 0.65 + houseD / 2;
+    const eave = adobe ? 2.38 : 2.52;
+    const leftIn = -w / 2 + 0.55, rightIn = w / 2 - 0.55;
+    const cut = Clamp(split, leftIn + 5.2, rightIn - 5.2);
+    for (const s of [-1, 1]) {
+      // 与中景同一条量法：从中缝这条边往外量，所以两档的**外侧**山墙落在同一处，
+      // 差的只是中缝里那 0.62 m（中景在那儿立一道共山墙，远景直接顶死）。
+      const span = s < 0 ? (cut - leftIn) : (rightIn - cut);
+      if (span < 5.2) continue;
+      const hw = Math.min(span, 11.2);
+      const [bx, bz] = F(mir * (cut + s * hw / 2), hz);
+      FarBody(farSink, { x: bx, z: bz, ry, width: hw, depth: houseD,
+        eave: eave + (s > 0 ? 0.15 : 0), baseY, seed: `${seed}:h${s}`, burnt, damage,
+        adobe, gable: true, chimney: s < 0 });
+    }
+    // 中缝那道院墙：房带以南把院子分成两家（与中景 `${seed}:midw` 同一处）
+    const yardLen = d - houseD - 0.55;
+    const [mx2, mz2] = F(mir * split, -d / 2 + houseD + 0.55 + yardLen / 2);
+    farSink.Add(burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick"), PlaceGeometry(
+      MakeBox(0.34, h, yardLen, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:midw`, adobe ? null : BRICK_UV_GRID),
+      { x: mx2, y: baseY + h / 2, z: mz2, ry }));
+    farSink.Solid(mx2, baseY + h / 2, mz2, 0.17, h / 2, yardLen / 2,
+      adobe ? "villageCourtyard" : "wall", ry);
     return;
   }
+  if (duplex === "ns") {
+    // 南北对分：北户贴北墙，南户的后墙贴着中间那道隔墙 —— 前后两块，
+    // 南块矮一档（檐口 −0.08）读出是两户；两块之间是两家的院子，不是缝。
+    const zSplit = -d / 2 + Math.max(9.2, d * 0.45);
+    const houseD = Math.min(4.8, d * 0.30);
+    const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
+    FarBody(farSink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
+      eave: adobe ? 2.4 : 2.54, baseY, seed: `${seed}:north`, burnt, damage,
+      adobe, gable: true, chimney: true });
+    const sW = Math.min(w - 4.6, 9.6);
+    const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
+    FarBody(farSink, { x: sx2, z: sz2, ry, width: sW, depth: houseD,
+      eave: adobe ? 2.36 : 2.46, baseY, seed: `${seed}:south`, burnt, damage,
+      adobe, gable: true });
+    // 中间那道隔墙（两户共用）：俯瞰上把院子切成前后两块
+    const [pwx, pwz] = F(0, zSplit);
+    farSink.Add(burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick"), PlaceGeometry(
+      MakeBox(w, h + 0.1, 0.36, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:party`, adobe ? null : BRICK_UV_GRID),
+      { x: pwx, y: baseY + (h + 0.1) / 2, z: pwz, ry }));
+    farSink.Solid(pwx, baseY + (h + 0.1) / 2, pwz, w / 2, (h + 0.1) / 2, 0.18,
+      adobe ? "villageCourtyard" : "wall", ry);
+    return;
+  }
+
+  const mainW = w * (adobe ? 0.5 : 0.6);
+  const mainD = d * (profile === "double" ? 0.32 : 0.40);
+  const [nx, nz] = F(mir * w * 0.04, -d / 2 + 0.6 + mainD / 2);
+  FarBody(farSink, { x: nx, z: nz, ry, width: mainW, depth: mainD,
+    eave: adobe ? 2.4 : 2.6, baseY, seed: `${seed}:main`, burnt, damage,
+    adobe, gable: true, chimney: true });
+
   if (profile === "double") {
-    const [nx, nz] = F(0, -d * 0.22);
-    FarBlock(farSink, { x: nx, z: nz, ry, w: w * 0.86, d: d * 0.38, h,
-      y: baseY, seed: `${seed}:n`, burnt, roof });
-    const [fx, fz] = F(-mir * w * 0.08, d * 0.26);
-    FarBlock(farSink, { x: fx, z: fz, ry, w: w * 0.62, d: d * 0.3, h: h - 0.4,
-      y: baseY, seed: `${seed}:s`, burnt, roof });
-    return;
+    const [fx, fz] = F(-mir * w * 0.16, d / 2 - 0.5 - 3.9 / 2);
+    FarBody(farSink, { x: fx, z: fz, ry, width: w * 0.44, depth: 3.9, eave: 2.38,
+      baseY, seed: `${seed}:front`, burnt, damage, adobe });
+  } else if (profile === "ell") {
+    const wingLen = d * 0.46;
+    const [ex, ez] = F(-mir * (w / 2 - 0.6 - 3.8 / 2), -d / 2 + 0.6 + wingLen / 2);
+    FarBody(farSink, { x: ex, z: ez, ry: ry + Math.PI / 2, width: wingLen, depth: 3.8,
+      eave: 2.32, baseY, seed: `${seed}:wing`, burnt, damage, adobe });
+  } else if (adobe) {
+    // 土墙院：后院一条矮隔墙（俯瞰上把院子切成两块，与砖院的整院拉开）
+    const [lx, lz] = F(0, d * 0.16);
+    farSink.Add(burnt ? "BrickWallSooty" : "Adobe", PlaceGeometry(
+      MakeBox(w - 1.2, 1.1, 0.34, TILE_METERS.adobe, `${seed}:low`),
+      { x: lx, y: baseY + 0.55, z: lz, ry }));
   }
-  if (profile === "ell") {
-    const [nx, nz] = F(mir * w * 0.2, -d * 0.02);
-    FarBlock(farSink, { x: nx, z: nz, ry, w: w * 0.5, d: d * 0.78, h,
-      y: baseY, seed: `${seed}:n`, burnt, roof });
-    const [ex, ez] = F(-mir * w * 0.26, -d * 0.2);
-    FarBlock(farSink, { x: ex, z: ez, ry: ry + Math.PI / 2, w: d * 0.42, d: w * 0.36,
-      h: h - 0.3, y: baseY, seed: `${seed}:e`, burnt, roof });
-    return;
-  }
-  const [mx, mz] = F(0, -d * 0.04);
-  FarBlock(farSink, { x: mx, z: mz, ry, w: w * 0.86, d: d * 0.78, h,
-    y: baseY, seed: `${seed}:m`, burnt, roof });
 }

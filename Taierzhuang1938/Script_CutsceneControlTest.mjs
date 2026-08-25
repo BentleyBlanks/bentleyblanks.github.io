@@ -195,8 +195,8 @@ const interiorCrowd = CS_Chuchuan.cast.filter((actor) => actor.id !== "stretcher
   && actor.id !== "lightWounded" && actor.id !== "externalOfficer");
 const seatedInterior = interiorCrowd.filter((actor) => actor.track?.[0]?.state?.sit === 1);
 const standingBackground = interiorCrowd.filter((actor) => actor.id.startsWith("crowdStand"));
-assert.equal(interiorCrowd.length, 31, "the carriage keeps all seated passengers while leaving its aisle usable");
-assert.equal(seatedInterior.length, 24, "every carriage seat is occupied, including the four focal soldiers");
+assert.equal(interiorCrowd.length, 28, "the carriage keeps all seated passengers while leaving its aisle usable");
+assert.equal(seatedInterior.length, 21, "every bench segment seats riders mid-segment, including the four focal soldiers");
 assert.equal(standingBackground.length, 6, "only six scattered background passengers stand by the sides and doors");
 assert.ok(standingBackground.every((actor) => Math.abs(actor.track[0].pos[0]) > 1),
   "standing background passengers stay clear of the center aisle");
@@ -219,9 +219,17 @@ for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" 
     `${actor.id} must rise during the location card, after the exchange and before the door opens`);
 }
 
-const stationModel = CS_Chuchuan.props.find((prop) => prop.name === "StationPlatform");
-assert.equal(stationModel?.kind, "model", "the station beat uses the authored 1930s platform model, not the old two-box placeholder");
-assert.equal(stationModel?.url, "./Model/Model_ChuchuanStationPlatform.glb?v=1");
+assert.ok(!CS_Chuchuan.props.some((prop) => prop.kind === "model"),
+  "the broken-axis station glb stays out of the set until the Blender pipeline is rerun (see engineRequests)");
+const stationParts = CS_Chuchuan.props.filter((prop) => /^Station(?!Stretcher)/.test(prop.name || ""));
+assert.ok(stationParts.length >= 40, "the station beat is dressed as a full authored set: platform, canopy, office, sign, benches, crane");
+const stationBaseMove = (CS_Chuchuan.ambientMotion || []).find((move) => move.name === "StationBase");
+assert.equal(stationBaseMove?.stopAt, 56, "the station rides one uniform ambientMotion mileage and halts with the train");
+assert.ok(Math.abs(stationBaseMove.from[2] + stationBaseMove.speed * stationBaseMove.stopAt - 5.7) < 0.05,
+  "the single mileage ends with the platform under the side door, so no shot cut can teleport the station");
+const stationMoveNames = new Set((CS_Chuchuan.ambientMotion || []).map((move) => move.name));
+assert.ok(stationParts.every((part) => stationMoveNames.has(part.name)),
+  "every station part shares the same mileage move, so the set cannot shear apart mid-pass");
 const sideDoor = CS_Chuchuan.props.find((prop) => prop.name === "CarriageDoor");
 assert.ok(sideDoor?.pos[0] > 2.7 && sideDoor?.pos[2] > 5,
   "the carriage door is cut into the platform-facing side wall, not the front or rear end wall");
@@ -236,8 +244,6 @@ const exitShots = CS_Chuchuan.shots.filter((shot) => shot.n >= 8);
 assert.ok(exitShots.every((shot) => shot.camera.walkBob?.amount > 0),
   "the authored exit path includes deterministic first-person walking animation");
 assert.ok(exitShots.at(-1).camera.walkBob?.fadeOut > 0, "the final platform walk eases to a stable stop");
-assert.ok(exitShots.every((shot) => shot.propMoves.some((move) => move.name === "StationPlatform")),
-  "the authored platform stays under the side door throughout the complete exit walk");
 const openingDoorParts = new Set(exitShots[0].propMoves.map((move) => move.name));
 assert.ok(["CarriageDoor", "DoorPlank0", "DoorPlank4", "DoorBraceLeft", "DoorBraceRight", "DoorLatch"]
   .every((name) => openingDoorParts.has(name)), "door skin, planks, braces, and latch slide as one assembly");

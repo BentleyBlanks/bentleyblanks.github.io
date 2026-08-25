@@ -52,6 +52,48 @@ export function NormalizeLifePose(input = {}) {
   return out;
 }
 
+// 第二批生活动作。**故意不并进 LIFE_POSE_NAMES**：那张表是对外的姿态契约，
+// 已经有测试逐条断言它的内容与顺序（Script_ActorPoseTest）。这两个动作在数据里
+// 早就写着了（Data_CutsceneChuchuan 的 CHUCHUAN_CROWD_LIFE 有 warmHands / watch），
+// 只是引擎一直把它们过滤掉 —— 于是「搓手的人」和「看窗外的人」在画面上等于普通坐姿，
+// 一动不动。这里补上通路，名字与取值规则和上面那张表完全一致。
+export const LIFE_POSE_EXTRA_NAMES = Object.freeze(["warmHands", "watch"]);
+
+export function NormalizeLifeExtra(input = {}) {
+  const source = input && typeof input === "object" && input.lifePose
+    && typeof input.lifePose === "object" ? input.lifePose : input;
+  const out = {};
+  for (const name of LIFE_POSE_EXTRA_NAMES) out[name] = Finite01(source && source[name]);
+  return out;
+}
+
+// 待机活化的公共节拍器。**没有一个随机数**：相位只来自个体的 idlePhase，
+// 所以同一秒重放永远得到同一帧（截图审查的前提）。
+//
+// Wave：连续正弦；Pulse：每 period 秒来一下、宽 width 秒的半正弦脉冲。
+// 「每 8—15 秒挪一次重心」这种事必须用 Pulse 而不是低频正弦 —— 正弦是全程都在动，
+// 看上去是一车人在慢慢摇；脉冲是「停很久，动一下」，那才是人坐着的样子。
+const Wave = (t, hz, phase) => Math.sin(t * hz * Math.PI * 2 + phase);
+function Pulse(t, period, width, phase01) {
+  const p = Math.max(0.5, period);
+  const k = ((t / p + phase01) % 1 + 1) % 1;
+  const w = Math.min(0.9, Math.max(0.02, width / p));
+  return k < w ? Math.sin((k / w) * Math.PI) : 0;
+}
+
+// 「这个生活动作是不是意味着他坐下了」。
+//
+// **坐不是连续量**：一个人要么坐下了要么站着，没有「坐了三成」这回事。可
+// repairShoe / checkAmmo / cleanRifle 这些动作在数据里大量是零头（群演的
+// 0.18—0.46 只是「这人手上有活儿」的意思），直接按系数并进坐姿量的话，
+// 站着的人会拿到三成坐姿：骨盆按比例掉下去、大腿按同一比例折到 45°，
+// 出图上就是**站着蹲马步、屁股悬在凳面上方**（序章 t=20 过道里那位）。
+// 所以隐含坐姿要过一道判定闸：动作强度过半才认为他真坐下了。
+// 显式的 sit 不走这道闸 —— 那是导演直接说「坐」，写多少就是多少。
+function ImpliedSeat(amount, weight) {
+  return SmoothStep(0.45, 0.85, amount) * weight;
+}
+
 // ---------------------------------------------------------------------------
 // 色板：全部抄自 docs/Data_HistoryMaterial.md 第三节，别在这里即兴发挥。
 // ---------------------------------------------------------------------------
@@ -1274,7 +1316,11 @@ export class Actor {
     this.prevFireSequence = 0;
     this.ragdollState = null;
     this.disposed = false;
-    this.lifePose = NormalizeLifePose();
+    this.lifePose = Object.assign(NormalizeLifePose(), NormalizeLifeExtra());
+    // 坐姿竖枪 / 起身提枪的混合量：PoseWeapon 算出来，PoseArms 拿它们决定
+    // 右手搭在枪身的哪一段、左手上不上枪。
+    this.seatWeaponBlend = 0;
+    this.carryWeaponBlend = 0;
 
     this.grenadeGroup = null;           // 投弹时才建，见 EnsureGrenade
     this.grenadeThrown = false;         // 脱手门闩：一次脉冲只飞一颗
@@ -1437,9 +1483,16 @@ export class Actor {
     const kneel = Clamp01(s.kneel ?? 0);
     const reach = Clamp01(s.reach ?? 0);
     const binoculars = Clamp01(s.binoculars ?? 0);
-    const lifePose = NormalizeLifePose(s);
+    // 基础六项走对外契约，warmHands / watch 走扩展表；合成一个对象往下传，
+    // 姿态层不必知道这两张表是分开的（PoseWeapon / PoseArms 的签名一个都没变）。
+    const lifePose = Object.assign(NormalizeLifePose(s), NormalizeLifeExtra(s));
     this.lifePose = lifePose;
     const sit = lifePose.sit;
+    const warmHands = lifePose.warmHands;
+    const watchOut = lifePose.watch;
+    // 说话：0—1，由导演层按台词窗口喂进来（Script_Cutscene 自动合成，数据不必写）。
+    // 战斗姿态一律吃掉它 —— 中弹的人不做点头手势。
+    const talking = Clamp01(s.talking ?? 0);
     const repairShoe = lifePose.repairShoe;
     const cleanRifle = lifePose.cleanRifle;
     const sleep = lifePose.sleep;
@@ -1519,9 +1572,12 @@ export class Actor {
     // 会把膝盖解到前下方贴地。kneel 与 crouch 同时给时跪说了算。
     const kneelHipY = d.thighLen + 0.07 * H;
     const kneelDrop = kneel * (d.hipY - kneelHipY) / d.hipY;
-    // 坐姿/靠墙睡的胯落到长凳高度；其它生活动作也给一点下沉，组合时不会漂浮。
-    const seated = Math.max(sit, sleep, repairShoe * 0.72, checkAmmo * 0.42, cleanRifle * 0.32)
-      * (1 - prone);
+    // 坐姿/靠墙睡的胯落到长凳高度；其它生活动作只有**真做到位**才算他坐下了
+    // （见 ImpliedSeat 的注释：零头一律当站着，否则站客会半蹲着悬在凳面上方）。
+    // sit 走 max 的第一项，所以 sit=1 时无论叠了多少 cleanRifle / repairShoe，
+    // 坐姿量都是满的 —— 骨盆一定坐实凳面。
+    const seated = Math.max(sit, ImpliedSeat(sleep, 1), ImpliedSeat(repairShoe, 0.72),
+      ImpliedSeat(checkAmmo, 0.42), ImpliedSeat(cleanRifle, 0.32)) * (1 - prone);
     // 车厢座面比一般场景的地面高。只抬骨盆、不抬 root，腿 IK 仍把鞋底
     // 固定在地板上，避免“把整个角色抬高”后双脚悬空；这个量必须在解腿前
     // 写入 hips，才能让大腿真的从座面上方落下，而非视觉上穿过座板。
@@ -1554,6 +1610,29 @@ export class Actor {
     const bob = Math.sqrt(Math.max(0, legSpan * legSpan - support * support)) - (d.hipY - d.ankleY)
       + (moveSpeed > 0.02 ? 0 : breath * 0.004 * H);
 
+    // --- 待机活化的闸门与节拍 ----------------------------------------------
+    //
+    // 「坐三十秒一动不动」在画面上读作「这是一排模型」，不是「一车累坏了的兵」；
+    // 可整车人同时晃又更假 —— 那是广播体操。所以两条规矩：
+    //   1) 相位只来自个体 idlePhase，**零随机数**（截图审查要能逐帧复现）；
+    //   2) 大动作走 Pulse（停很久、动一下），不走低频正弦（正弦是全程都在飘）。
+    //
+    // 闸门把一切战斗姿态挡在外面：据枪、投弹、劈砍、中弹、濒死、倒地、匍匐、
+    // 跪、伸手、举镜、走动、刚开过枪、腾空的人都不该有闲来无事的重心挪移。
+    // 数据侧想彻底关掉就给 `idleLife:false`。
+    const lifeCombat = Math.max(aim, throwing, melee, hurt, dying, prone, kneel, reach, binoculars);
+    const lifeGate = (s.idleLife === false || s.dead) ? 0
+      : Clamp01(1 - lifeCombat * 3) * Clamp01(1 - moveSpeed * 14) * Clamp01(1 - crouch * 1.8)
+        * Clamp01(1 - this.recoil * 3) * (grounded ? 1 : 0) * (boltPhase > 0 ? 0 : 1);
+    // 个体错开用的 0—1 种子：直接从 idlePhase 折出来，不再多摇一次随机数
+    // （多摇一次会把后面所有人的身高/呼吸/摆幅全部改掉，等于推翻既有全部截图）。
+    const seed01 = (this.idlePhase / (Math.PI * 2)) % 1;
+    const shiftDir = this.idlePhase > Math.PI ? -1 : 1;
+    // 每 8—15 秒挪一次重心，一次 2.6 s；周期与相位都按个体错开
+    const shiftPulse = Pulse(elapsed, 8 + seed01 * 7, 2.6, seed01 * 0.83) * lifeGate;
+    // 常驻微摆：厘米级，远看是「活的」，近看不晃
+    const lifeDrift = Wave(elapsed, 0.11, this.idlePhase * 1.3) * lifeGate;
+
     this.body.position.set(0, d.hipY - airborne * 0.025 * H, 0);
     this.body.rotation.set(jumpRise * -0.07 + jumpFall * 0.09, 0, 0);
     // 蹲下时胯要**往后坐**。只压高度不后坐的话，膝盖为了补上腿长会整个顶到脚尖
@@ -1566,6 +1645,15 @@ export class Actor {
     // 写成 sin 的话摆胯比迈腿慢四分之一个周期，看着像在扭秧歌。
     const gaitSwing = Math.cos(this.gaitPhase * Math.PI * 2) * moveSpeed;
     this.hips.rotation.set(0, -gaitSwing * 0.14, gaitSwing * 0.05 + idleSway * 0.006);
+    // 挪重心：胯横移一点点 + 骨盆侧倾。**必须写在腿 IK 之前** —— 落脚点是在
+    // root 空间给的、由 RootToHips 每帧换算，胯先动腿才会自己重新解，脚才留得住；
+    // 解完腿再动胯就是整个人连脚一起平移（滑步）。
+    if (lifeGate > 0.001) {
+      this.hips.position.x += (shiftPulse * 0.012 * shiftDir + lifeDrift * 0.004) * H;
+      this.hips.position.z += shiftPulse * 0.005 * H * (sit > 0.4 ? 1 : 0.4);
+      this.hips.rotation.z += shiftPulse * 0.038 * shiftDir + lifeDrift * 0.010;
+      this.hips.rotation.y += shiftPulse * 0.05 * shiftDir;
+    }
 
     // --- 腿：落脚点 IK -----------------------------------------------------
     // 目标是**踝关节**（两段骨头的末端），所以站立时是 y = ankleY 而不是 0；
@@ -1742,8 +1830,45 @@ export class Actor {
     this.neck.rotation.x += -sleep * 0.82 - repairShoe * 0.24 - checkAmmo * 0.30
       - cleanRifle * 0.10 + prepare * 0.46;
     this.neck.rotation.y += sleep * 0.10 - repairShoe * 0.07 + prepare * 0.06;
+    // 搓手是低头往手上呵气的姿势；看窗外是抬一点头（手的部分在 PoseArms）
+    this.neck.rotation.x += -warmHands * 0.20 + watchOut * 0.05;
+    this.chest.rotation.x -= warmHands * 0.10;
     this.hips.position.z += seated * 0.060 * H;
     this.body.rotation.x += sleep * 0.32;
+
+    // --- 待机活化：各生活动作自己的慢周期 ----------------------------------
+    // 全是 elapsed + idlePhase 的确定性函数，同一秒重放必然同一帧。
+    if (lifeGate > 0.001) {
+      // 正在听人说话（lookYaw 被导演层拉住）或自己在说话时，闲逛式的头部动作要让位。
+      const attentive = Clamp01(Math.abs(lookYaw) * 1.2 + talking);
+      // 搓手：一来一回，肩胸跟着轻轻一送一收
+      const rub = Wave(elapsed, 1.15, this.idlePhase * 1.7);
+      this.chest.rotation.x -= warmHands * rub * 0.028 * lifeGate;
+      this.neck.rotation.x -= warmHands * rub * 0.045 * lifeGate;
+      // 看窗外：头慢慢转过去、停几秒、再转回来。11—17 s 一次，不是节拍器。
+      const gaze = Pulse(elapsed, 11 + seed01 * 6, 5.4, seed01 * 0.41 + 0.2) * (1 - attentive);
+      this.neck.rotation.y += watchOut * gaze * 0.58 * shiftDir * lifeGate;
+      this.neck.rotation.x += watchOut * gaze * 0.12 * lifeGate;
+      this.chest.rotation.y += watchOut * gaze * 0.13 * shiftDir * lifeGate;
+      // 查弹药：翻看的节奏 —— 举到眼前看一眼再放回腰间
+      const inspect = Pulse(elapsed, 6.5 + seed01 * 3, 2.4, seed01 * 0.67);
+      this.neck.rotation.x += checkAmmo * inspect * 0.24 * lifeGate;
+      // 补鞋：一下一下地扎线，1.5—2.0 s 一针（上身跟着一顿）
+      const stitch = Pulse(elapsed, 1.55 + seed01 * 0.45, 0.55, seed01 * 0.29);
+      this.chest.rotation.x -= repairShoe * stitch * 0.055 * lifeGate;
+      this.neck.rotation.x -= repairShoe * stitch * 0.05 * lifeGate;
+      // 擦枪：手上的往复在 PoseArms，这里只给上身一点点跟随
+      const wipeLean = Wave(elapsed, 0.63, this.idlePhase * 2.2);
+      this.chest.rotation.y += cleanRifle * wipeLean * 0.035 * lifeGate;
+      // 普通坐姿/站姿：挪重心那一下顺带转个头、耸一下肩线。
+      // 正在看着说话的人（lookYaw 被导演层拉住）或者自己正在说话时不许乱瞟 ——
+      // 一个人盯着班长听训的时候不会忽然扭头看窗外，那读作「他没在听」。
+      this.neck.rotation.y += shiftPulse * 0.26 * shiftDir * (1 - attentive);
+      this.neck.rotation.x += shiftPulse * 0.05;
+      this.chest.rotation.y += shiftPulse * 0.11 * shiftDir * (1 - attentive);
+      this.chest.rotation.z += lifeDrift * 0.012;
+      this.neck.rotation.z -= lifeDrift * 0.014;
+    }
 
     // --- 覆盖姿势：卧倒 ------------------------------------------------------
     // **必须排在持枪与手臂之前。** PoseWeapon 是靠「减掉上身累积的旋转」把枪口
@@ -1775,7 +1900,22 @@ export class Actor {
     this.PoseWeapon(weaponAim, moveSpeed, lookPitch, lookYaw, boltPhase, throwing, melee,
       breath, idleSway, prone, bayonet, lifePose);
     this.PoseArms(weaponAim, moveSpeed, boltPhase, throwing, melee, hurt, prone, reach, binoculars,
-      lifePose);
+      lifePose, elapsed);
+
+    // --- 说话 ---------------------------------------------------------------
+    // **排在 PoseWeapon / PoseArms 之后**：手已经 IK 到枪上的握点（chest 空间），
+    // 这时再动胸和头，枪、手、上身是整体一起动的，接触点一个都不会脱开。
+    // 反过来先动胸再摆枪，那点起伏就会被 PoseWeapon 的「减掉上身旋转」抵消掉，
+    // 说话的人身上一动不动 —— 这正是这次要修的毛病。
+    const talk = talking * Clamp01(1 - Math.max(aim, throwing, melee, prone, hurt, dying) * 2.5)
+      * (s.dead ? 0 : 1);
+    if (talk > 0.002) {
+      // 导演在数据里显式给了头的朝向时，说话只留「活着的抖动」，不改朝向 ——
+      // 最后一电/王铭章那几场的镜头是按「不给脸」算过角度的，引擎不许把脸转过去。
+      const headAuthority = (!s.lookAuto && Number.isFinite(s.lookYaw)
+        && Math.abs(s.lookYaw) > 1e-3) ? 0.3 : 1;
+      this.PoseTalk(talk, elapsed, lifePose, moveSpeed, headAuthority, weaponAim, boltPhase);
+    }
 
     // 手里的手榴弹：抡过 0.66 就脱手。**要一个门闩**，不能只比大小 ——
     // throwing 是个 0→1→0 的脉冲，光比数值的话，回收段再次路过 0.66 以下，
@@ -1852,10 +1992,22 @@ export class Actor {
 
     // 低姿持枪：枪口朝前下约 17°，右手在右腰前。
     // 跑起来枪要往身侧收、枪口压低，不然满屏都是横在胸前的枪管。
+    //
+    // 【2026-08-25 把握把整体往前下方推了一档】旧值把右手握点放在 chest 局部
+    // (0.115, 0.075, −0.135)，离右肩只有 0.31 m，而一条胳膊有 0.53 m。两段 IK 遇到
+    // 「目标离肩太近」只能把肘往外甩，而手臂的 roll 是按握枪定的（肘尖朝身后），
+    // 于是肘直接甩进背心、小臂横穿胸腔 —— 序章 t=45 那张站姿群众「两条小臂不见了」
+    // 就是这么来的，不是模型破了。把握点推到 0.40 m 外，肘角回到 80° 左右，
+    // 小臂从胸前**外面**过去。枪身也顺带离开躯干 10 cm，不再有「步枪横穿手臂」的帧。
+    // 【2026-08-25 第二次，往回收 3 cm】−0.245 把肘角开到 82°，小臂确实从胸前外面
+    // 过去了，但代价是整把枪连着两只手一起端到身前 25 cm —— 月台那张（t=104）读作
+    // 「端着长矛探雷」。把 z 收到 −0.212、y 抬到 0.040：肩到握把 0.368 m，肘角 88°，
+    // 离出问题的那一档（0.299 m / 68°）还差一大截，可枪身整体回到身侧。
+    // 再往回收就要重新犯小臂穿胸的毛病了，**这两个数是有下界的，别继续往回调**。
     const running = moveSpeed > 0.55;
-    const restPx = (running ? 0.145 : 0.115) * k;
-    const restPy = (running ? 0.030 : 0.075) * k;
-    const restPz = (running ? -0.060 : -0.135) * k;
+    const restPx = (running ? 0.150 : 0.132) * k;
+    const restPy = (running ? -0.010 : 0.040) * k;
+    const restPz = (running ? -0.185 : -0.212) * k;
     const restRx = running ? -0.55 : -0.30;
     const restRy = running ? 0.50 : 0.34;
     const restRz = running ? 0.30 : 0.16;
@@ -1935,68 +2087,251 @@ export class Actor {
     OFF_Q.setFromEuler(POSE_E);
     mount.quaternion.multiply(OFF_Q);
 
-    // 擦枪时把枪压到膝前，保持枪身成为一条清晰的横向剪影；手臂会在 PoseArms
-    // 里沿这条枪移动。cleanRifle=0 时完全不执行，旧战斗动作不受影响。
+    // 擦枪。**先分清「真在擦」还是「枪抱在怀里」** ——
+    //
+    // 数据里 cleanRifle 有两种写法：rifleman 写 1（他就是那个在擦枪的人），
+    // 群演写 0.34（意思只是「这人手上有活儿」，与 checkAmmo:0.18 同一个量级）。
+    // 旧式对两者一视同仁，按 clean 线性把枪往膝前那条横线上拉。0.34 的结果是
+    // 一米二五的步枪斜横出去、枪口正好戳在邻座身上（序章 t=20 长凳那一排）。
+    //
+    // 现在零头走「斜抱怀里」：枪托在右胯、枪身斜挎到左肩前、枪口朝前上方，
+    // 剪影是一条贴着身体的斜线，既不占过道也不指人；过了半程才逐渐倒成真正的
+    // 横放擦拭。两个目标之间是同一条插值链，中间不会经过第三种姿势。
     const clean = lifePose ? lifePose.cleanRifle : 0;
+    const wipe = SmoothStep(0.45, 0.95, clean);          // 真的动手擦
     if (clean > 0.001 && !throwing && !melee && !prone) {
-      // 枪身沿 -Z；绕 Y 约 66° 后横跨膝前，擦布/机匣的接触线才读得出来。
-      POSE_E.set(0.15, -1.15, 0.06, "XYZ");
+      const cradle = Math.max(SmoothStep(0, 0.45, clean), wipe);   // 抱枪到位程度
+      // 抱：(1.00, 0.32, 0.36) 的枪身朝左前上方；擦：(0.15,−1.15,0.06) 绕 Y 约 66°
+      // 横跨膝前，擦布/机匣的接触线才读得出来。
+      POSE_E.set(Lerp(1.00, 0.15, wipe), Lerp(0.32, -1.15, wipe), Lerp(0.36, 0.06, wipe), "XYZ");
       OFF_Q.setFromEuler(POSE_E);
-      mount.quaternion.slerp(OFF_Q, SmoothStep(0, 1, clean));
-      mount.position.x = Lerp(mount.position.x, 0.050 * k, clean);
-      mount.position.y = Lerp(mount.position.y, -0.030 * k, clean);
-      mount.position.z = Lerp(mount.position.z, -0.115 * k, clean);
+      mount.quaternion.slerp(OFF_Q, cradle);
+      mount.position.x = Lerp(mount.position.x, Lerp(0.115, 0.050, wipe) * k, cradle);
+      mount.position.y = Lerp(mount.position.y, Lerp(-0.035, -0.030, wipe) * k, cradle);
+      mount.position.z = Lerp(mount.position.z, Lerp(-0.135, -0.115, wipe) * k, cradle);
       // 擦布碰到机匣时有短促卡顿，不另造时间轴；确定性相位来自个体 idlePhase。
-      mount.rotation.z += Math.sin(this.time * 3.8 + this.idlePhase) * 0.045 * clean;
+      // 只在真擦的时候抖 —— 抱着枪的人手上没有往复。
+      mount.rotation.z += Math.sin(this.time * 3.8 + this.idlePhase) * 0.045 * wipe;
     }
+
+    // --- 不打仗的时候枪放哪：坐着拄在脚边 ↔ 起身提在身侧，**一条连续的路** ---
+    //
+    // 坐姿（sit）：枪托拄在两脚之间的地板上、枪口朝上往身后倒 16°、枪身斜靠肩窝。
+    //   旧版坐姿沿用低姿持枪那一组数，于是一米二五的步枪横在膝盖前面，一头悬空、
+    //   枪身从手心里穿出去（序章车厢里每一张座位镜都能看到）。真人坐长凳就是把枪
+    //   拄在脚边 —— 这个剪影还顺手解决了「枪占着过道」的问题。
+    //   高度是**解出来的不是估出来的**：枪托底板离握把 0.271 m（buttZ 0.255 + 底板
+    //   半厚 0.016），所以握把必须落在「地板 + 0.271 m」。地板在 chest 局部的高度
+    //   由这一帧真实的 body/hips/chest 位移反推 —— 脚下的地面被 foot IK 抬高或压低时
+    //   枪托跟着走，不会插进地板也不会浮在半空。
+    //
+    // 起身（prepare）：枪提到右胯外侧、枪口朝前下 40°，也就是行进间的「提枪」。
+    //   为什么不是枪口垂直朝下：手垂在胯外侧时离地只有 0.80 m 上下，而握把到枪口
+    //   有 0.9 m —— 垂直朝下的枪是拖在地上的。40° 让枪口停在离地 0.19—0.22 m
+    //   （实测：车厢地板上 0.22 / 月台上 0.19），这才是真提得起来的角度。
+    //
+    // **这两个姿势必须互相插值，不能各自往低姿持枪那组数上叠。**
+    // 旧式是 seatWeapon 随 sit 从 1 掉到 0、枪就一路滑回低姿持枪（枪身绕 Y 转了
+    // 0.34 rad 指向右前方），于是 90.8—92.3 s 整车人起立的那一秒半里，每个人胸前
+    // 都横飘着一根穿过邻座的枪管。现在起点和终点的偏航都近乎 0，中途枪身只在
+    // **自己的矢状面**里从朝上扫到朝下，绝不会横过去指人。
+    //
+    // 顺带记一笔：出川那把 ZB26 在数据里的 id 拼成了 "ZB26"（WEAPONS 表里是 "Zb26"），
+    // 查不到 → weaponData 为 null → kind 落到函数开头的默认值 boltRifle。所以机枪手
+    // **是**走这条坐姿/提枪分支的，只是走的是「未登记武器」那条路（枪的外形也退化成
+    // 普通步枪，弹匣与两脚架都没建出来）。改 id 要动 Data_CutsceneChuchuan，不在本轮
+    // 范围内；即便改对了，lmg 也在下面的白名单里，这段仍然成立。
+    const seatRest = lifePose ? lifePose.sit : 0;
+    const ready = lifePose ? lifePose.prepare : 0;
+    const holdOk = (kind === "boltRifle" || kind === "lmg")
+      ? (1 - SmoothStep(0, 0.35, aim)) * (1 - Clamp01(throwing * 3)) * (1 - Clamp01(melee * 3))
+        * (1 - Clamp01(prone * 3)) * (1 - Clamp01(boltPhase * 4)) * (1 - wipe)
+      : 0;
+    const seatWeapon = holdOk * Clamp01((seatRest - 0.35) / 0.25);
+    // 站着的人**只要导演给了生活动作，就不是在战斗待命** —— 补鞋、打盹、搓手、
+    // 看窗外、准备下车，这些人手里的枪都该垂在身侧，而不是端在胸前。车厢过道里
+    // 端着的枪一定会横过邻座（t=20 / t=76 那几根穿过别人身体的枪管就是这么来的）。
+    //
+    // checkAmmo **故意不在这张表里**：它自己有一套手的说法（右手去腰间弹药带、
+    // 左手仍托枪），把枪扔到身侧的话右手一走，枪就没人拿了。
+    // cleanRifle 也不在：擦枪/抱枪由上面那段专门处理，已经乘进 holdOk 的 (1−wipe)。
+    const lifeCue = lifePose
+      ? Math.max(ready, seatRest, lifePose.sleep, lifePose.repairShoe,
+        lifePose.warmHands || 0, lifePose.watch || 0)
+      : 0;
+    const carryWeapon = holdOk * SmoothStep(0.08, 0.35, lifeCue);
+    const hold = Math.max(seatWeapon, carryWeapon);
+    if (hold > 0.001) {
+      // blend 1 = 全坐姿拄枪，0 = 全起身提枪。sit 掉下去的同时 prepare 已经满了，
+      // 所以 hold 全程接近 1：枪不会在过渡里松回低姿持枪，只是就地转个方向。
+      const blend = Clamp01(seatWeapon / Math.max(1e-4, hold));
+      const lean = 0.28;
+      // 坐姿：放在**右腿外侧**。两条大腿之间只有 5 cm 的缝，一把机匣就有 8 cm 宽，
+      // 硬塞进去是穿模；放在小腿后面又会被自己的胫骨挡掉整根枪。
+      POSE_E.set(Math.PI * 0.5 + lean, 0.06, -0.10, "XYZ");
+      REST_Q.setFromEuler(POSE_E);
+      const floorY = -(this.body.position.y + this.hips.position.y + this.chest.position.y);
+      const buttToGrip = 0.271 * this.weaponScale * Math.cos(lean);
+      POSE_A.set(0.215 * k, floorY + buttToGrip, -0.305 * k);
+      // 提枪：手垂在右胯外侧，枪口朝前下并略微外撇，枪身贴着右腿外面过去。
+      POSE_E.set(-0.695, -0.12, 0.22, "XYZ");
+      OFF_Q.setFromEuler(POSE_E);
+      POSE_B.set(0.155 * k, -0.155 * k, -0.055 * k);
+      OFF_Q.slerp(REST_Q, blend);
+      POSE_B.lerp(POSE_A, blend);
+      mount.quaternion.slerp(OFF_Q, hold);
+      mount.position.lerp(POSE_B, hold);
+      this.seatWeaponBlend = seatWeapon;
+      this.carryWeaponBlend = carryWeapon;
+    } else { this.seatWeaponBlend = 0; this.carryWeaponBlend = 0; }
   }
 
   /**
    * 手臂。有枪就两只手 IK 到枪上的握点（**先摆枪、手再跟过去**），
    * 空手才走自由摆臂。反过来做的话手永远对不上枪。
    */
-  PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB) {
-    const action = Math.max(repairShoe, sleep, checkAmmo, prepare);
+  PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB,
+    sit = 0, warmHands = 0, elapsed = 0) {
+    const action = Math.max(repairShoe, sleep, checkAmmo, prepare, sit, warmHands);
     if (action <= 0.001) return;
+    // 接触量比强度**要陡**：数据里写 warmHands:0.62 的意思是「这个人在搓手」，
+    // 不是「手停在垂手与搓手中间那个谁也认不出的地方」。线性混合的结果实测是
+    // 两只手停在肚子里（62% 的路走完，手还没伸出躯干）。强度仍然管幅度与快慢，
+    // 只有「手到没到位」这一项按 1.45 倍提前收口。
+    const contact = (amount) => Clamp01(amount * 1.45);
     const solveBlended = (arm, target, amount, roll) => {
-      if (amount <= 0.001) return;
+      const w = contact(amount);
+      if (w <= 0.001) return;
       REST_Q.copy(arm.shoulder.quaternion);
       OFF_Q.copy(arm.elbow.quaternion);
       SolveTwoBone(arm.shoulder, arm.elbow, target, lenA, lenB, roll);
-      arm.shoulder.quaternion.slerp(REST_Q, 1 - amount);
-      arm.elbow.quaternion.slerp(OFF_Q, 1 - amount);
+      arm.shoulder.quaternion.slerp(REST_Q, 1 - w);
+      arm.elbow.quaternion.slerp(OFF_Q, 1 - w);
     };
-    // 坐在车厢长凳上补鞋：双手落到膝前同一小块区域，手臂形成可读的低头剪影。
+    // 【够得着的范围】肩在 chest 局部 y=+0.20H，整条胳膊只有 0.32H，所以手最低
+    // 只能到 y≈−0.12H，而且越往前伸能下得越少。旧值 (−0.205H, −0.205H) 离肩 0.45H，
+    // 两段 IK 够不着就把胳膊钳成一根直棍指过去 —— 出图上「补鞋/查弹药」那两个人
+    // 的肘完全不弯，像两根撑杆。下面这几组点都压回了包线里，肘才有角度。
+    const phase = this.idlePhase;
+    // 普通坐姿：两手搭在大腿上（不是垂在身侧往后飘）。任何更具体的动作都盖过它。
+    const plainSit = Clamp01(sit - Math.max(repairShoe, sleep, checkAmmo, prepare, warmHands));
+    if (plainSit > 0.001) {
+      const lean = Wave(elapsed, 0.09, phase * 1.5) * 0.012;
+      POSE_A.set(0.085 * H, (-0.070 + lean) * H, -0.115 * H);
+      POSE_B.set(-0.085 * H, (-0.070 - lean) * H, -0.115 * H);
+      solveBlended(this.arms.R, POSE_A, plainSit, Math.PI * 1.10);
+      solveBlended(this.arms.L, POSE_B, plainSit, Math.PI * 0.90);
+    }
+    // 搓手：两手在腹前合到一起来回蹭。往复是**这个动作的全部读数** ——
+    // 不动的话它和「两手交叠坐着」没有区别。1.15 Hz，相位来自个体 idlePhase。
+    if (warmHands > 0.001) {
+      const rub = Wave(elapsed, 1.15, phase * 1.7);
+      POSE_A.set((0.040 + rub * 0.020) * H, (-0.020 + rub * 0.008) * H, -0.150 * H);
+      POSE_B.set((-0.030 + rub * 0.020) * H, (-0.028 - rub * 0.008) * H, -0.155 * H);
+      solveBlended(this.arms.R, POSE_A, warmHands, Math.PI * 1.14);
+      solveBlended(this.arms.L, POSE_B, warmHands, Math.PI * 0.86);
+    }
+    // 坐在车厢长凳上补鞋：双手捧着鞋停在膝上方、一下一下扎线（针脚 1.5—2.0 s 一下）。
     if (repairShoe > 0.001) {
-      POSE_A.set(0.090 * H, -0.205 * H, -0.205 * H);
-      POSE_B.set(-0.045 * H, -0.195 * H, -0.215 * H);
+      const stitch = Pulse(elapsed, 1.55 + ((phase / (Math.PI * 2)) % 1) * 0.45, 0.55,
+        ((phase / (Math.PI * 2)) % 1) * 0.29);
+      POSE_A.set((0.075 + stitch * 0.070) * H, (-0.022 + stitch * 0.070) * H,
+        (-0.160 - stitch * 0.018) * H);
+      POSE_B.set(-0.035 * H, -0.030 * H, -0.168 * H);
       solveBlended(this.arms.R, POSE_A, repairShoe, Math.PI * 1.12);
       solveBlended(this.arms.L, POSE_B, repairShoe, Math.PI * 0.88);
     }
-    // 查弹药：右手去腰腹，左手留在胸前，动作不会误读成敬礼或招手。
+    // 查弹药：右手在腰腹的弹药带上摸出一板，举到眼前看一眼再放回去（6.5—9.5 s 一轮）。
     if (checkAmmo > 0.001) {
-      POSE_A.set(0.145 * H, -0.105 * H, -0.120 * H);
-      POSE_B.set(-0.105 * H, 0.025 * H, -0.165 * H);
+      const inspect = Pulse(elapsed, 6.5 + ((phase / (Math.PI * 2)) % 1) * 3, 2.4,
+        ((phase / (Math.PI * 2)) % 1) * 0.67);
+      POSE_A.set(0.115 * H, (-0.045 + inspect * 0.16) * H, (-0.150 - inspect * 0.045) * H);
+      POSE_B.set(-0.095 * H, 0.010 * H, -0.155 * H);
       solveBlended(this.arms.R, POSE_A, checkAmmo, Math.PI * 1.06);
       solveBlended(this.arms.L, POSE_B, checkAmmo, Math.PI * 0.94);
     }
-    // 靠墙睡：手臂收在腹前；prepare 会把它们稳定地放回身侧并停止游移。
+    // 靠墙睡：两手交叠在腹前。**肘必须正着屈** —— 旧值 −0.85 把小臂折到身后，
+    // 于是两条小臂整个埋进躯干里（t=45 那张站姿群众「小臂不见了」）。
     if (sleep > 0.001) {
-      BlendEuler(this.arms.L.shoulder, 0.24, 0, -0.18, sleep);
-      BlendEuler(this.arms.R.shoulder, 0.24, 0, 0.18, sleep);
-      BlendEuler(this.arms.L.elbow, -0.85, 0, 0, sleep);
-      BlendEuler(this.arms.R.elbow, -0.85, 0, 0, sleep);
+      BlendEuler(this.arms.L.shoulder, 0.20, 0, -0.20, sleep);
+      BlendEuler(this.arms.R.shoulder, 0.20, 0, 0.20, sleep);
+      BlendEuler(this.arms.L.elbow, 1.05, 0, 0, sleep);
+      BlendEuler(this.arms.R.elbow, 1.05, 0, 0, sleep);
     }
+    // 炮后准备：手放回身侧、停止游移。同样把肘的符号改正（原来是 −0.30 = 过伸）。
     if (prepare > 0.001) {
-      BlendEuler(this.arms.L.shoulder, 0.08, 0, -0.12, prepare);
-      BlendEuler(this.arms.R.shoulder, 0.08, 0, 0.12, prepare);
-      BlendEuler(this.arms.L.elbow, -0.30, 0, 0, prepare);
-      BlendEuler(this.arms.R.elbow, -0.30, 0, 0, prepare);
+      BlendEuler(this.arms.L.shoulder, 0.06, 0, -0.15, prepare);
+      BlendEuler(this.arms.R.shoulder, 0.06, 0, 0.15, prepare);
+      BlendEuler(this.arms.L.elbow, 0.26, 0, 0, prepare);
+      BlendEuler(this.arms.R.elbow, 0.26, 0, 0, prepare);
     }
   }
 
+  /**
+   * 说话。
+   *
+   * 输入只有一个 0—1 的 `talk`（台词窗口，导演层按 line.at…at+seconds 自动合成，
+   * 数据文件一个字都不用改）。这里回答的是「一个正在说话的人身上有什么在动」：
+   *
+   *   头   两条不同频率的正弦叠出点头（1.9 Hz 主 + 3.1 Hz 副）。**必须叠两条** ——
+   *        单一正弦是节拍器，人看得出来那是机器在数拍子；两条无理数比的频率叠起来
+   *        才不重复。侧倾与微转各一条，幅度比点头小。
+   *   胸   随点头一起的起伏 + 轻微的左右送肩：说话是**上半身**的事，只动脖子
+   *        像个提线木偶。
+   *   手   空闲那只手打小手势（抬小臂、肘一开一合）。哪只手空闲由 lifePose 与
+   *        持枪状态算：补鞋/擦枪/搓手/睡着两只手都占着，就只剩头颈；端着枪的人
+   *        右手在握把上，那就用左手。
+   *
+   * 幅度基准：35 mm 焦距、2—3 m 外，头顶到下巴约 120 px。点头峰值 6.6°，
+   * 帽檐尖端因此走 7—8 px；小臂手势的手走 10 cm 上下，约 60 px。看得出来，
+   * 又不至于变成话剧。
+   *
+   * 全部相位来自 elapsed + idlePhase，**没有随机数**：同一秒重放同一帧。
+   */
+  PoseTalk(talk, elapsed, lifePose, moveSpeed, headAuthority = 1, aim = 0, boltPhase = 0) {
+    const p = this.idlePhase;
+    const life = lifePose || NormalizeLifePose();
+    const nod = Wave(elapsed, 1.9, p) * 0.62 + Wave(elapsed, 3.1, p * 1.7) * 0.38;
+    const turn = Wave(elapsed, 1.15, p * 2.3) * 0.70 + Wave(elapsed, 0.62, p * 0.6) * 0.30;
+    const tilt = Wave(elapsed, 0.83, p * 1.31);
+    // 打瞌睡的人嘟囔一句，幅度要减半；不减的话「旧伤兵」会在睡姿上猛点头
+    const headScale = talk * (1 - life.sleep * 0.55);
+    this.neck.rotation.x += headScale * nod * 0.115;
+    this.neck.rotation.y += headScale * turn * 0.105 * headAuthority;
+    this.neck.rotation.z += headScale * tilt * 0.075;
+    this.chest.rotation.x -= talk * (0.5 + 0.5 * Wave(elapsed, 1.9, p)) * 0.030;
+    this.chest.rotation.y += talk * Wave(elapsed, 0.71, p * 1.9) * 0.045 * headAuthority;
+
+    // --- 空闲那只手的小手势 -------------------------------------------------
+    // 「占着」= 这只手正在干别的事。两只手都占着就只留头颈（补鞋的人不会腾出手比划）。
+    const busyBoth = Math.max(life.repairShoe, life.cleanRifle, life.sleep,
+      life.warmHands || 0, life.prepare * 0.45);
+    let busyR = busyBoth;
+    let busyL = busyBoth;
+    if (life.checkAmmo > 0.001) busyR = Math.max(busyR, life.checkAmmo);
+    if (this.weaponGroup) {
+      // 端着枪：右手锁在握把上；左手在护木上，说话时可以松开来比划。
+      busyR = 1;
+      busyL = Math.max(busyL, 0.55);
+    }
+    const tag = busyR <= busyL ? "R" : "L";
+    const free = 1 - (tag === "R" ? busyR : busyL);
+    // 走动的人两条胳膊都在摆步态，别再往上叠手势；据枪/拉栓时也不比划。
+    const gesture = talk * free * Clamp01(1 - moveSpeed * 8)
+      * (1 - SmoothStep(0, 0.3, aim)) * (boltPhase > 0 ? 0 : 1);
+    if (gesture <= 0.002) return;
+    const arm = this.arms[tag];
+    const side = tag === "L" ? -1 : 1;
+    const g = 0.5 + 0.5 * Wave(elapsed, 0.72, p * 1.4);
+    const g2 = 0.5 + 0.5 * Wave(elapsed, 1.05, p * 2.1);
+    // 肘正着屈（见 PoseArms 里那条符号注释）：0.80—1.35 rad 是「小臂抬到腰胸之间」。
+    BlendEuler(arm.shoulder, 0.14 + g * 0.30, side * (g2 - 0.5) * 0.26,
+      side * (0.18 + g2 * 0.16), gesture);
+    BlendEuler(arm.elbow, 0.80 + g * 0.55, 0, 0, gesture);
+  }
+
   PoseArms(aim, moveSpeed, boltPhase, throwing, melee, hurt, prone = 0, reach = 0, binoculars = 0,
-    lifePose = null) {
+    lifePose = null, elapsed = 0) {
     const d = this.dims;
     const H = d.height;
     const L = this.arms.L, R = this.arms.R;
@@ -2007,14 +2342,19 @@ export class Actor {
     const sleep = life.sleep;
     const checkAmmo = life.checkAmmo;
     const prepare = life.prepare;
+    const warmHands = life.warmHands || 0;
 
     if (!this.weaponGroup) {
       // 空手摆臂。同样用 cos 与步态同相：相位 0 左腿在前，左臂就该在后。
       const swing = Math.cos(this.gaitPhase * Math.PI * 2) * (0.15 + moveSpeed * 0.7);
       L.shoulder.rotation.set(-swing, 0, -0.13 - moveSpeed * 0.06);
       R.shoulder.rotation.set(swing, 0, 0.13 + moveSpeed * 0.06);
-      L.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
-      R.elbow.rotation.set(-0.28 - moveSpeed * 0.55, 0, 0);
+      // 肘的符号：**正 = 屈（小臂往前折），负 = 过伸（小臂往身后折）**。
+      // 手写姿势里没有 roll，肩和肘的 X 是直接相加的，所以负值就是把小臂折到身后 ——
+      // 从侧面是反关节，从正面是「小臂不见了」（它折进了躯干）。IK 那条路不受影响：
+      // SolveTwoBone 先绕臂轴滚了约 π 再折，负号在那边正好是往前屈。
+      L.elbow.rotation.set(0.20 + moveSpeed * 0.62, 0, 0);
+      R.elbow.rotation.set(0.20 + moveSpeed * 0.62, 0, 0);
       // 空手的两个过场手势（符号：shoulder.x 正 = 胳膊往前抬；elbow.x 负 = 肘屈）。
       //   reach      双手往前下方伸（够桌面、电键、土袋、扶人）；叠 melee 当一下一下地扒/拽
       //   binoculars 双手举到眼前（望远镜）
@@ -2051,7 +2391,8 @@ export class Actor {
         }
       }
       if (prone <= 0.001) {
-        this.PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB);
+        this.PoseLifeArmsNoWeapon(repairShoe, sleep, checkAmmo, prepare, H, lenA, lenB,
+          life.sit, warmHands, elapsed);
       }
       return;
     }
@@ -2067,6 +2408,17 @@ export class Actor {
     this.gripL.copy(this.weaponGripFront).multiplyScalar(this.weaponScale);
     this.gripL.y -= seatedHandClearance;
     this.gripL.applyMatrix4(this.weaponMount.matrix);
+
+    // 枪竖着拄在脚边时（PoseWeapon 的坐姿分支），握把落在地板上方 27 cm ——
+    // 那个高度胳膊根本够不着（肩到腕只有 0.32H，最低能到 chest 局部 −0.12H）。
+    // 右手搭在枪身上、位置放低（膝盖高度那一段），左手不上枪：两只手都去够一根
+    // 立在右腿外侧的枪，左小臂必然横穿胸口。左手在下面单独放到左腿上。
+    const seatHold = this.seatWeaponBlend || 0;
+    const carryHold = this.carryWeaponBlend || 0;
+    if (seatHold > 0.001) {
+      POSE_A.set(0.048, -0.022, -0.29).applyMatrix4(this.weaponMount.matrix);
+      this.gripR.lerp(POSE_A, seatHold);
+    }
 
     if (boltPhase > 0) {
       // 拉栓：右手离开握把 → 摸到拉机柄 → 向后拉 → 推回 → 回握把
@@ -2128,13 +2480,20 @@ export class Actor {
     }
     if (checkAmmo > 0.001 && !throwing && !melee && !prone) {
       // chest 局部：右手在腰腹弹药带，左手仍托枪，头部低头由 Update 处理。
-      POSE_A.set(0.14 * H, 0.10 * H, -0.28 * H);
+      // 加上「摸出来举到眼前看一眼再放回去」的慢周期，否则手就一直按在弹药带上不动。
+      const inspect = Pulse(elapsed, 6.5 + ((this.idlePhase / (Math.PI * 2)) % 1) * 3, 2.4,
+        ((this.idlePhase / (Math.PI * 2)) % 1) * 0.67);
+      POSE_A.set(0.14 * H, (0.10 + inspect * 0.16) * H, (-0.28 - inspect * 0.05) * H);
       this.gripR.lerp(POSE_A, checkAmmo);
     }
     if (prepare > 0.001 && !throwing && !melee && !prone) {
       // 炮后抬头准备：不再做擦枪/查弹的手部游移，双手回到稳定托枪点。
-      this.gripR.lerp(this.weaponMount.position, prepare * 0.35);
-      if (leftFollows) this.gripL.lerp(this.weaponMount.position, prepare * 0.20);
+      // 枪竖着拄在脚边时不能往握把收 —— 那个点在地板上方 27 cm，胳膊够不着，
+      // 硬拉过去就是两条直棍指着地板（旧版「炮后准备」那个交叉在胸前的怪姿势）。
+      // 提枪时同理：右手本来就在握把上，而左手要垂在身侧，往握把收就是横过胸口。
+      const settle = prepare * (1 - Math.max(seatHold, carryHold));
+      this.gripR.lerp(this.weaponMount.position, settle * 0.35);
+      if (leftFollows) this.gripL.lerp(this.weaponMount.position, settle * 0.20);
     }
 
     // 左手够不着护木前段就**沿着枪身往回滑**，别让它悬在枪外面。
@@ -2160,15 +2519,41 @@ export class Actor {
       }
     }
 
+    // 坐着拄枪 / 起身提枪时左手都不上枪。**必须排在上面那段沿枪轴回滑之后** ——
+    // 回滑是拿 gripR→gripL 当枪轴算的，先把左手挪走会让它顺着「右手到左腿」那条
+    // 假枪轴滑，手就落到膝盖外面去了。
+    //   坐着：左手搭在左腿上。
+    //   提枪：左手**自然垂在身侧**。一根竖在右胯外侧的枪，两只手都去够它的话，
+    //         左小臂必然横穿胸口（就是过道里那些「抱着枪打结」的帧）。
+    //         −0.110H 是肩到腕 0.32H 的极限位，胳膊几乎伸直 —— 这正是垂手的读数。
+    const handsOff = Math.max(seatHold, carryHold);
+    if (handsOff > 0.001) {
+      // 两个落点之间按与 PoseWeapon 完全相同的 blend 过渡（大腿 → 身侧），
+      // 不能按谁大谁赢来选：起立那一秒半里 seatHold 从 1 掉到 0 而 carryHold 一直是 1，
+      // 取胜者的写法会在两者相交的那一帧把左手瞬移 19 cm。
+      const blend = Clamp01(seatHold / Math.max(1e-4, handsOff));
+      POSE_A.set(Lerp(-0.115, -0.085, blend) * H, Lerp(-0.110, -0.070, blend) * H,
+        Lerp(-0.015, -0.115, blend) * H);
+      this.gripL.lerp(POSE_A, handsOff);
+    }
+
     // 肘往哪边弯：roll≈π 是往后，再各加一点让肘尖向外张开。
     // 这几个数是对着截图调出来的，不是算出来的 —— 改之前先存一张对比图。
     //
     // 卧姿要整整转半圈：roll 绕的是肩→手那根轴，站着的时候肘尖朝身后（chest 的
     // +Z），而趴下之后 chest 的 +Z 是**朝天**的 —— 照抄站姿就成了「两肘朝天举枪」。
     // 差半圈才是两肘撑地，而两肘撑地正是卧姿据枪唯一的支点。
+    //
+    // 左手越过身体中线（低姿持枪时它被回滑拉到右腰的握把附近）就把 roll 往 π/2 收：
+    // roll 0.80π 的肘尖是「往后又往外」，手在右腰、肘还往后 —— 肘尖正好落进左侧
+    // 肋骨里，小臂从胸腔里穿过去（t=45 站姿群众那两条不见了的小臂）。
+    // 收到 π/2 时肘尖纯朝外，胳膊从胸口**外面**绕过去。
+    // 据枪、投弹、劈砍、卧倒一律不参与：那几套是逐帧对着截图调过的，不许被这条改写。
+    const crossL = Clamp01((this.gripL.x + 0.02 * H) / (0.14 * H)) * (1 - prone)
+      * (1 - SmoothStep(0, 0.45, aim)) * (1 - Clamp01(throwing * 3)) * (1 - Clamp01(melee * 3));
     const proneRoll = prone * Math.PI;
     const rollR = Math.PI * (1.16 - aim * 0.10) + hurt * 0.2 - proneRoll;
-    const rollL = Math.PI * (0.80 + aim * 0.06) - hurt * 0.2 + proneRoll;
+    const rollL = Math.PI * (0.80 + aim * 0.06 - crossL * 0.42) - hurt * 0.2 + proneRoll;
     SolveTwoBone(R.shoulder, R.elbow, this.gripR, lenA, lenB, rollR);
     if (leftFollows) {
       SolveTwoBone(L.shoulder, L.elbow, this.gripL, lenA, lenB, rollL);
