@@ -44,7 +44,7 @@ import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_Chin
 
 const LOADER = new GLTFLoader();
 
-const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=1";
+const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=2";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
@@ -156,7 +156,7 @@ function PackAssets(pack, table) {
 }
 
 const ASSETS = Object.freeze({
-  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null, tag: "wall" },
+  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=2", material: null, tag: "wall" },
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall" },
   sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade" },

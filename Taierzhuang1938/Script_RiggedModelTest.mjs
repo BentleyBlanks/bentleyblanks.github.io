@@ -35,6 +35,19 @@ function AssertOpaqueMaterials(doc, label) {
   }
 }
 
+function AssertTexturedMaterialsHaveNormals(doc, label) {
+  for (const material of doc.materials || []) {
+    if (material.pbrMetallicRoughness?.baseColorTexture == null) continue;
+    assert.ok(material.normalTexture, `${label} material ${material.name} keeps a tangent-space normal texture`);
+    const texture = doc.textures?.[material.normalTexture.index];
+    const image = doc.images?.[texture?.source];
+    assert.ok(image?.bufferView != null, `${label} material ${material.name} embeds its normal image`);
+    assert.match(image.mimeType ?? "", /^image\/(?:jpeg|png)$/, `${label} material ${material.name} normal MIME`);
+    assert.ok(material.normalTexture.scale > 0 && material.normalTexture.scale <= 1,
+      `${label} material ${material.name} uses restrained normal strength`);
+  }
+}
+
 function SegmentBounds(doc, name) {
   const node = (doc.nodes || []).find((candidate) => candidate.name === name);
   assert.ok(node, `missing ${name}`);
@@ -61,6 +74,7 @@ function AssertHumanHead(doc, label, height) {
 
 const arms = ReadGlb("Model_FpsArms.glb");
 const armNames = Names(arms);
+AssertTexturedMaterialsHaveNormals(arms, "FPS arms");
 assert.ok((arms.skins || []).length >= 1, "FPS arms keep a skin");
 assert.ok((arms.textures || []).length >= 1, "FPS arms keep an albedo texture");
 for (const bone of ["shoulder.r", "bicep.r", "forearm.r", "wrist.r", "finger_index3.r",
@@ -71,6 +85,7 @@ const soldier = ReadGlb("Model_IjaSoldier.glb");
 const soldierNames = Names(soldier);
 const soldierAnimations = Animations(soldier);
 AssertOpaqueMaterials(soldier, "IJA soldier");
+AssertTexturedMaterialsHaveNormals(soldier, "IJA soldier");
 assert.ok((soldier.skins || []).length >= 1, "IJA source skin remains in GLB");
 assert.ok((soldier.textures || []).length >= 1, "IJA uniform texture remains in GLB");
 for (const bone of ["Hips", "Spine2", "Head", "LeftHand", "RightFoot"])

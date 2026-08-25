@@ -12,8 +12,8 @@ import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.j
 import { HashString } from "./Script_Noise.mjs";
 
 const URLS = Object.freeze({
-  fpsArms: "./Model/Model_FpsArms.glb?v=1",
-  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=8",
+  fpsArms: "./Model/Model_FpsArms.glb?v=2",
+  ijaSoldier: "./Model/Model_IjaSoldier.glb?v=9",
   nraSoldier: "./Model/Model_NraSoldier.glb?v=7",
   civilianMale: "./Model/Model_CivilianMale.glb?v=4",
   civilianFemale: "./Model/Model_CivilianFemale.glb?v=4",

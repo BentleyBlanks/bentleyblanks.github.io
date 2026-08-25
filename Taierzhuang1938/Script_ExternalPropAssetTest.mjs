@@ -39,7 +39,20 @@ function InspectNodes(fileName, maxBytes) {
     }
     result.set(node.name, { triangles, minY, maxSpan, hasUv });
   }
-  return { bytes: bytes.length, nodes: result };
+  return { bytes: bytes.length, json, nodes: result };
+}
+
+function AssertTexturedMaterialsHaveNormals(json, label) {
+  for (const material of json.materials ?? []) {
+    if (material.pbrMetallicRoughness?.baseColorTexture == null) continue;
+    assert.ok(material.normalTexture, `${label} material ${material.name} keeps a tangent-space normal texture`);
+    const texture = json.textures?.[material.normalTexture.index];
+    const image = json.images?.[texture?.source];
+    assert.ok(image?.bufferView != null, `${label} material ${material.name} embeds its normal image`);
+    assert.match(image.mimeType ?? "", /^image\/(?:jpeg|png)$/, `${label} material ${material.name} normal MIME`);
+    assert.ok(material.normalTexture.scale > 0 && material.normalTexture.scale <= 1,
+      `${label} material ${material.name} uses restrained normal strength`);
+  }
 }
 
 const crates = InspectNodes("Model_MilitaryCrateSet.glb");
@@ -75,12 +88,16 @@ assert.ok(courtyardSpec.triangles <= 5500, "courtyard triangle budget");
 assert.equal(courtyardSpec.minY, 0, "courtyard is ground-ready");
 assert.ok(courtyardSpec.maxSpan > 11 && courtyardSpec.maxSpan < 12, "courtyard scale is plausible");
 
-const battlefield = InspectNodes("Model_BattlefieldPack.glb", 3_200_000);
+const battlefield = InspectNodes("Model_BattlefieldPack.glb", 4_100_000);
 assert.equal(battlefield.nodes.size, 24, "all 24 battlefield components are independent nodes");
+AssertTexturedMaterialsHaveNormals(battlefield.json, "battlefield pack");
 for (const [name, spec] of battlefield.nodes) {
   assert.ok(spec.triangles <= 3500, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
+
+const ruralHouse = ReadGlb("Model_ChineseRuralHouse.glb", 5_500_000);
+AssertTexturedMaterialsHaveNormals(ruralHouse.json, "Chinese rural house");
 
 const breach = InspectNodes("Model_CityWallBreachPack.glb", 900_000);
 for (const name of ["CityWallBreachShoulderLeft", "CityWallBreachShoulderRight"]) {
@@ -175,6 +192,7 @@ for (const material of ["Brick", "Core", "Stone"]) {
 }
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`
+  + ` ruralHouse=${ruralHouse.bytes.length}`
   + ` breach=${breach.bytes}`
   + ` wallDetail=${wallDetail.bytes}`
   + ` handcart=${handcart.bytes} market=${market.bytes}`);
