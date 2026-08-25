@@ -225,6 +225,82 @@ const gbuffer = await page.evaluate(() => {
     roughSpread,
   };
 });
+// 面板上的开关与滑杆必须**真的**作用到管线上，而且退出时一样不留。
+// 滑杆特别容易做成摆设：三件套的 uniform 是 Render() 每帧从 options 重写的，
+// 面板直接改 uniform 的话下一帧就被冲掉 —— 拖着有反应，画面纹丝不动。
+const debugControls = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const post = T.post;
+  const Btn = (label) => [...document.querySelectorAll(".edPanel.debugRendering .edBtn")]
+    .find((b) => b.textContent.trim() === label);
+  const SliderInput = (label) => [...document.querySelectorAll(".edPanel.debugRendering .edRow")]
+    .find((r) => r.querySelector(".l")?.textContent === label)?.querySelector("input[type=range]");
+
+  const before = { ssao: post.preset.ssao, ssr: post.preset.ssr, contact: post.preset.contact };
+
+  // 滑杆 → debugOverrides → uniform
+  const strength = SliderInput("Contact Strength");
+  const factory = post.uniformsContact.uStrength.value;
+  strength.value = "0.13";
+  strength.dispatchEvent(new Event("input", { bubbles: true }));
+  T.StepFrames(2);
+  const slider = {
+    // 别拿写死的数去比：input[type=range] 会把值吸附到 step 网格上
+    // （step=0.02 时 0.13 会变成 0.14），断言会因为一个与被测行为无关的
+    // 舍入而变红。要验的是"滑杆读数 === 真正送进 uniform 的值，且确实
+    // 离开了出厂值"。
+    factory,
+    onSlider: parseFloat(strength.value),
+    stored: post.debugOverrides.contactStrength,
+    reachedUniform: post.uniformsContact.uStrength.value,
+  };
+
+  // 开关 → preset；关掉的那一项，它的滑杆要压暗
+  Btn("Contact Shadow").click();
+  T.StepFrames(2);
+  const toggled = {
+    preset: post.preset.contact,
+    dimmed: SliderInput("Contact Strength").closest(".edRow").classList.contains("dim"),
+  };
+  Btn("Contact Shadow").click();
+
+  // Reset 只撤参数，不动开关
+  Btn("Reset Parameters").click();
+  T.StepFrames(2);
+  const afterReset = Object.keys(post.debugOverrides).length;
+
+  // 退出必须把开关与覆盖全部还回去（编辑器套件的通用规矩）
+  Btn("SSAO").click();
+  Btn("SSR").click();
+  const s2 = SliderInput("Contact Strength");
+  s2.value = "0.2"; s2.dispatchEvent(new Event("input", { bubbles: true }));
+  T.StepFrames(2);
+  const dirty = { ssao: post.preset.ssao, ssr: post.preset.ssr,
+    overrides: Object.keys(post.debugOverrides).length };
+  T.editor.CloseOverlay("debugRendering");
+  T.StepFrames(2);
+  const after = { ssao: post.preset.ssao, ssr: post.preset.ssr,
+    overrides: Object.keys(post.debugOverrides).length, debugView: post.GetDebugView() };
+  T.Debug.OpenEditor("debugRendering");
+  T.StepFrames(2);
+  return { slider, toggled, afterReset, before, dirty, after };
+});
+Check("Debug Rendering：滑杆真的走到了 uniform 上（不是摆设）",
+  Math.abs(debugControls.slider.stored - debugControls.slider.onSlider) < 1e-6
+  && Math.abs(debugControls.slider.reachedUniform - debugControls.slider.onSlider) < 1e-6
+  && Math.abs(debugControls.slider.reachedUniform - debugControls.slider.factory) > 1e-6,
+JSON.stringify(debugControls.slider));
+Check("Debug Rendering：pass 开关改的是 preset，关掉时对应滑杆压暗",
+  debugControls.toggled.preset === false && debugControls.toggled.dimmed === true,
+JSON.stringify(debugControls.toggled));
+Check("Debug Rendering：Reset 撤掉全部参数覆盖", debugControls.afterReset === 0,
+  `剩余覆盖=${debugControls.afterReset}`);
+Check("Debug Rendering：关闭浮窗把开关、参数与送屏视图全部还回去",
+  debugControls.dirty.ssao !== debugControls.before.ssao && debugControls.dirty.overrides > 0
+  && debugControls.after.ssao === debugControls.before.ssao && debugControls.after.ssr === debugControls.before.ssr
+  && debugControls.after.overrides === 0 && debugControls.after.debugView === "final",
+JSON.stringify(debugControls));
+
 Check("G-Buffer：三张附件、albedo 是真基础色而不是兜底灰",
   gbuffer.attachments === 3 && gbuffer.variants > 0
   && gbuffer.writtenPct > 20 && gbuffer.fallbackPct < 50 && gbuffer.roughSpread > 20,

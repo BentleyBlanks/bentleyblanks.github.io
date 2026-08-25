@@ -1199,6 +1199,13 @@ export class PostPipeline {
     };
     this.matDeferred = this._Mat(FRAG_DEFERRED, this.uniformsDeferred);
 
+    // 渲染调试面板的参数覆盖层。**只有面板会写它**，玩法与画质设置一概不碰。
+    // 存在的理由：三件套的参数是 Render() 每帧从 options 重新写进 uniform 的，
+    // 面板直接改 uniform 的话下一帧就被冲掉 —— 滑杆看着能拖，画面纹丝不动。
+    // 值为 undefined = 这一项没被覆盖，走调用方的 options 或出厂默认。
+    this.debugOverrides = Object.create(null);
+    this._aoCleared = false;
+
     // G-Buffer 影子材质的缓存：键是原材质，值是它的影子。
     // 用 Map 而不是挂在 userData 上，是为了 Dispose 时能一次全放掉。
     this.gbufferVariants = new Map();
@@ -1404,6 +1411,27 @@ export class PostPipeline {
   /** G-Buffer 附件 2：r = metalness。 */
   get GBufferMaterialTexture() { return this.targets.gbuffer.textures[2]; }
 
+  /**
+   * 一个可调参数的最终取值：调试面板的覆盖 > 调用方传的 options > 出厂默认。
+   * 三级而不是两级，是为了让面板可以"改回不覆盖"（删掉键即可），
+   * 而不是被迫记住调用方原来传的是什么。
+   */
+  _Param(key, options, fallback) {
+    const override = this.debugOverrides[key];
+    if (override !== undefined) return override;
+    const passed = options ? options[key] : undefined;
+    return passed !== undefined ? passed : fallback;
+  }
+
+  /** 调试面板专用：设一项覆盖；value 传 undefined 就是撤销这一项。 */
+  SetDebugOverride(key, value) {
+    if (value === undefined) delete this.debugOverrides[key];
+    else this.debugOverrides[key] = value;
+  }
+
+  /** 调试面板专用：撤销全部覆盖，回到调用方/出厂参数。 */
+  ClearDebugOverrides() { this.debugOverrides = Object.create(null); }
+
   /** 这一帧屏幕空间三件套里真正跑了的那些。 */
   get ScreenSpaceActive() {
     return !!(this.preset.ssgi || this.preset.ssr || this.preset.contact);
@@ -1592,9 +1620,9 @@ export class PostPipeline {
       U.uProjScale.value.set(projScaleX, projScaleY);
       U.uFrame.value = frame;
       U.uSunViewDir.value.copy(sunView);
-      U.uMaxDistance.value = options.contactDistance ?? 0.42;
-      U.uThickness.value = options.contactThickness ?? 0.30;
-      U.uStrength.value = options.contactStrength ?? 0.72;
+      U.uMaxDistance.value = this._Param("contactDistance", options, 0.42);
+      U.uThickness.value = this._Param("contactThickness", options, 0.30);
+      U.uStrength.value = this._Param("contactStrength", options, 0.72);
       this._Blit(this.matContact, T.contact);
     }
 
@@ -1605,8 +1633,8 @@ export class PostPipeline {
       U.uProjScale.value.set(projScaleX, projScaleY);
       U.uFrame.value = frame;
       U.uColor.value = T.hdr.texture;
-      U.uRadius.value = options.ssgiRadius ?? 3.2;
-      U.uIntensity.value = options.ssgi ?? 0.85;
+      U.uRadius.value = this._Param("ssgiRadius", options, 3.2);
+      U.uIntensity.value = this._Param("ssgiIntensity", options, 0.85);
       this._Blit(this.matSsgi, T.ssgi);
       this._BlurScreenSpace(T.ssgi, T.ssgiTmp, gNormalDepth, projScaleX, projScaleY);
     }
@@ -1620,9 +1648,9 @@ export class PostPipeline {
       U.uColor.value = T.hdr.texture;
       U.uGAlbedoRough.value = gAlbedoRough;
       U.uGMaterial.value = gMaterial;
-      U.uMaxDistance.value = options.ssrDistance ?? 26.0;
-      U.uMaxRoughness.value = options.ssrMaxRoughness ?? 0.55;
-      U.uIntensity.value = options.ssr ?? 1.0;
+      U.uMaxDistance.value = this._Param("ssrDistance", options, 26.0);
+      U.uMaxRoughness.value = this._Param("ssrMaxRoughness", options, 0.55);
+      U.uIntensity.value = this._Param("ssrIntensity", options, 1.0);
       this._Blit(this.matSsr, T.ssr);
       this._BlurScreenSpace(T.ssr, T.ssrTmp, gNormalDepth, projScaleX, projScaleY);
     }
@@ -1718,6 +1746,15 @@ export class PostPipeline {
       this.uniformsAoBlur.uAo.value = T.aoTmp.texture;
       this.uniformsAoBlur.uDirection.value.set(0, 1);
       this._Blit(this.matAoBlur, T.aoBlur);
+      this._aoCleared = false;
+    } else if (!this._aoCleared) {
+      // 关掉 SSAO 必须把 AO 靶刷成全白（1 = 完全不遮蔽）。只是不跑这两趟的话，
+      // 材质那边仍在采**上一次算出来的那张图** —— 表现就是"AO 已经关了，
+      // 墙角那圈暗带还钉在原地"。调试面板能实时开关 SSAO 之后这条才暴露出来。
+      renderer.setRenderTarget(T.aoBlur);
+      renderer.setClearColor(0xffffff, 1);
+      renderer.clear(true, false, false);
+      this._aoCleared = true;
     }
 
     // --- 3) 主场景（HDR，AO 已在材质里注入）---

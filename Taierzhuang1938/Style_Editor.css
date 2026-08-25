@@ -14,6 +14,16 @@
 }
 #edRoot.off { display: none; }
 
+/* 压暗，不是隐藏。用在"这一项现在没用"的控件上：对应的 pass 关着时，
+   滑杆拖了也不会有任何效果，但把它藏起来会让人以为面板少了东西。
+   注意别用 .off —— 那个类只在 #edRoot 上有意义（整棵 DOM display:none）。 */
+#edRoot .dim { opacity: 0.34; }
+#edRoot .edRow.dim input { pointer-events: none; }
+
+/* 渲染调试面板的参数名比别处长（"SSR Max Roughness"、"Contact Thickness"），
+   82px 的通用标签列会把它们折成两行，一排滑杆看着高低不齐。只放宽这一个面板。 */
+#edRoot .edPanel.debugRendering .edRow > .l { flex-basis: 118px; }
+
 /* 数字一律等宽：调参时读数跳动会让人以为值在抖 */
 #edRoot .num, #edRoot input[type="number"], #edRoot .edVal, #edRoot .edMono {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;

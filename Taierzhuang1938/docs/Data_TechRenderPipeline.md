@@ -1214,6 +1214,33 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 延迟着色 pass；`sun.shadow.map.depthTexture` 在 PCF 下必须按 `sampler2DShadow` 绑定
 （见「坑」里那一条）。搬完之后 AO 与探针体 GI 也可以一起从逐物体注入里退休。
 
+### Debug Rendering 面板
+
+`Script_EditorDebugRendering.mjs`。文案一律英文 —— 这是给程序看的调试口，标签就是
+pass 与靶的名字，翻译过来反而对不上 `Script_Post` 里的变量名和 RenderDoc 里的抓帧。
+
+- **视图**：Output（Final / Lit / HDR / Bloom）、GBuffer（Normal / Depth / Albedo /
+  Roughness / Metalness）、AO、Screen Space（SSGI / SSR / Contact Shadow）、Probe GI。
+  五组 chips 表示的是**同一个**选择，`SetView` 必须把五组一起刷，否则面板上会同时
+  亮好几格。
+- **Passes**：SSAO / SSGI / SSR / Contact Shadow / Probe Volume 的实时开关。
+- **Parameters**：八个滑杆（强度、半径、距离、粗糙度上限、接触阴影的强度/距离/厚度）。
+
+两条实现上的账：
+
+- **滑杆不能直接写 uniform。** 三件套的 uniform 是 `Render()` 每帧从 `options`
+  重新写进去的，面板直接改的话下一帧就被冲掉 —— 拖着有反应，画面纹丝不动。
+  所以管线上开了一层 `PostPipeline.debugOverrides`，取值优先级是
+  **面板覆盖 > 调用方 options > 出厂默认**（`_Param`）。
+- **退出必须还干净**（编辑器套件的通用规矩）。面板改的是 `preset` 的开关、探针体的
+  `enabled` 和参数覆盖，三样都在 `Exit()` 里还回去。探针体关掉时要照抄
+  `ApplyGraphics` 的三步（`enabled=false` / `blend=0` / `SyncUniforms`），
+  只写 `enabled` 的话材质那边会继续按上一次的 blend 采一张不再更新的图集。
+
+面板能实时开关 SSAO 之后才暴露出来的一条：**关掉 SSAO 必须把 AO 靶刷成全白**
+（1 = 完全不遮蔽）。只是不跑那两趟 pass 的话，材质仍在采上一次算出来的那张图，
+表现是"AO 已经关了，墙角那圈暗带还钉在原地"。
+
 ### 开销
 
 swiftshader（纯软件光栅）上单开每一项约 +30%，三项全开约 +45%。**这是软件光栅的数字，

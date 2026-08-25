@@ -5,7 +5,7 @@
 // 面板文案一律英文：这是给程序看的渲染调试口，标签就是 pass 与靶的名字，
 // 翻译过来反而对不上 Script_Post 里的变量名与 RenderDoc 里的抓帧。
 
-import { Panel, Section, Chips, Facts, Note } from "./Script_EditorUi.mjs";
+import { Panel, Section, Chips, Facts, Note, Toggle, Slider, Button } from "./Script_EditorUi.mjs";
 
 const VIEWS = [
   { id: "final", label: "Final", group: "Output", note: "Composite + FXAA, exactly what ships to the screen." },
@@ -31,6 +31,30 @@ const VIEWS = [
 ];
 
 const GROUPS = ["Output", "GBuffer", "AO", "Screen Space", "Probe GI"];
+
+/**
+ * 面板上的滑杆。key 就是 PostPipeline.debugOverrides 的键 ——
+ * 面板不直接写 uniform：三件套的 uniform 是 Render() 每帧从 options 重新写的，
+ * 直接改下一帧就被冲掉（滑杆看着能拖，画面纹丝不动）。
+ */
+const SLIDERS = [
+  { key: "ssgiIntensity", label: "SSGI Intensity", min: 0, max: 2.5, step: 0.05, def: 0.85, needs: "ssgi" },
+  { key: "ssgiRadius", label: "SSGI Radius (m)", min: 0.5, max: 12, step: 0.1, def: 3.2, needs: "ssgi" },
+  { key: "ssrIntensity", label: "SSR Intensity", min: 0, max: 2, step: 0.05, def: 1.0, needs: "ssr" },
+  { key: "ssrDistance", label: "SSR Distance (m)", min: 2, max: 80, step: 1, def: 26.0, needs: "ssr" },
+  { key: "ssrMaxRoughness", label: "SSR Max Roughness", min: 0.05, max: 1, step: 0.01, def: 0.55, needs: "ssr" },
+  { key: "contactStrength", label: "Contact Strength", min: 0, max: 1, step: 0.02, def: 0.72, needs: "contact" },
+  { key: "contactDistance", label: "Contact Distance (m)", min: 0.05, max: 2.5, step: 0.01, def: 0.42, needs: "contact" },
+  { key: "contactThickness", label: "Contact Thickness (m)", min: 0.05, max: 1.2, step: 0.01, def: 0.30, needs: "contact" },
+];
+
+/** preset 上的开关。面板改的是这一份 PostPipeline 自己的副本，不动出厂表。 */
+const PASS_TOGGLES = [
+  { key: "ssao", label: "SSAO" },
+  { key: "ssgi", label: "SSGI" },
+  { key: "ssr", label: "SSR" },
+  { key: "contact", label: "Contact Shadow" },
+];
 
 /**
  * 视图 id -> 它正在显示的那张靶。与 Post._GetDebugSource 是同一张表，
@@ -69,6 +93,12 @@ export class DebugRenderingEditor {
     // 不集中同步的话，点了 SSR 之后 Final 那一格还亮着 —— 面板上会同时亮好几格，
     // 读者根本判断不出当前送屏的是哪一张靶。
     this.chipGroups = [];
+    this.toggles = new Map();
+    this.sliders = new Map();
+    // 退出必须还干净：这是编辑器套件的通用规矩（见 Script_Editor 文件头）。
+    // 面板改的是 preset 的开关与探针体的 enabled，两样都是运行时状态，
+    // 留在那儿的话玩家会带着一份"某人调试时随手关掉的 SSAO"继续玩下去。
+    this.restore = null;
   }
 
   Enter(root) {
@@ -77,6 +107,11 @@ export class DebugRenderingEditor {
       variant: "work debugRendering", onClose: () => this.host.CloseDebugRendering(),
     });
     root.appendChild(this.panel.root);
+    const preset = this.host.post?.preset;
+    this.restore = {
+      passes: preset ? Object.fromEntries(PASS_TOGGLES.map((t) => [t.key, preset[t.key]])) : {},
+      giEnabled: this.host.gi ? this.host.gi.enabled : null,
+    };
     this.BuildUi(this.panel.body);
     this.SetView(this.host.post?.GetDebugView?.() || "final");
     return this;
@@ -85,10 +120,38 @@ export class DebugRenderingEditor {
   Exit() {
     // 退出这个浮窗，必须立即归还正常屏幕输出；不能把上一次的法线图带回游戏。
     this.host.post?.SetDebugView?.("final");
+    // 参数覆盖与 pass 开关一并还回去，一样都不能留。
+    this.host.post?.ClearDebugOverrides?.();
+    const preset = this.host.post?.preset;
+    if (preset && this.restore) {
+      for (const [key, value] of Object.entries(this.restore.passes)) preset[key] = value;
+    }
+    if (this.host.gi && this.restore && this.restore.giEnabled !== null) {
+      this.SetProbeVolume(this.restore.giEnabled);
+    }
     this.panel?.root.remove();
     this.panel = null;
     this.facts = null;
     this.chipGroups = [];
+    this.toggles.clear();
+    this.sliders.clear();
+    this.restore = null;
+  }
+
+  /**
+   * 探针体的开关。不能只写 gi.enabled —— 关掉时还要把淡入量清零并同步 uniform，
+   * 否则材质那边继续按上一次的 blend 采一张不再更新的图集
+   * （Script_Main 的 ApplyGraphics 走的就是这三步，这里照抄）。
+   */
+  SetProbeVolume(on) {
+    const gi = this.host.gi;
+    if (!gi) return;
+    gi.enabled = !!on;
+    if (!gi.enabled) {
+      gi.blend = 0;
+      gi.SyncUniforms?.();
+      this.host.lights?.SetGiActive?.(0);
+    }
   }
 
   BuildUi(body) {
@@ -99,12 +162,54 @@ export class DebugRenderingEditor {
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
       this.chipGroups.push(Chips(section, options, this.view, (id) => this.SetView(id)));
     }
+    // --- 开关 ---
+    // 视图只能看，看不出"这一项到底贡献了多少"。要回答那个问题只能开一下关一下。
+    const passes = Section(body, "Passes");
+    for (const spec of PASS_TOGGLES) {
+      const post = this.host.post;
+      const toggle = Toggle(passes, spec.label, !!post?.preset?.[spec.key], (on) => {
+        if (post?.preset) post.preset[spec.key] = on;
+        this.RefreshSliderRows();
+      });
+      this.toggles.set(spec.key, toggle);
+    }
+    const probe = Toggle(passes, "Probe Volume (GI)", !!this.host.gi?.enabled, (on) => {
+      this.SetProbeVolume(on);
+    });
+    this.toggles.set("probeVolume", probe);
+    if (!this.host.gi) probe.root.classList.add("dim");
+
+    // --- 参数 ---
+    const params = Section(body, "Parameters");
+    for (const spec of SLIDERS) {
+      const slider = Slider(params, {
+        label: spec.label, min: spec.min, max: spec.max, step: spec.step, value: spec.def,
+        onInput: (v) => this.host.post?.SetDebugOverride?.(spec.key, v),
+      });
+      this.sliders.set(spec.key, slider);
+    }
+    Button(params, "Reset Parameters", () => {
+      this.host.post?.ClearDebugOverrides?.();
+      for (const spec of SLIDERS) this.sliders.get(spec.key)?.Set(spec.def);
+    }, { wide: true });
+    this.RefreshSliderRows();
+
     Note(body,
       "Foreground overlay: it survives opening the scene, terrain, prop or studio editors. "
-      + "Screen-space GI / reflection / contact shadow are quality-preset gated (SSGI is high and up) "
-      + "and are combined deferred, off the G-Buffer, not injected per object.", true);
+      + "Toggles and sliders here are live and session-only - everything is restored when this panel closes. "
+      + "Screen-space GI / reflection / contact shadow run off the G-Buffer and are combined deferred, "
+      + "per pixel, not injected per object.", true);
     const stat = Section(body, "Current Target");
     this.facts = Facts(stat);
+  }
+
+  /** 某项 pass 关着的时候，把它的滑杆压暗 —— 拖了也不会有任何效果。 */
+  RefreshSliderRows() {
+    const preset = this.host.post?.preset;
+    for (const spec of SLIDERS) {
+      const row = this.sliders.get(spec.key)?.root;
+      if (row) row.classList.toggle("dim", !preset?.[spec.needs]);
+    }
   }
 
   SetView(id) {
@@ -125,6 +230,11 @@ export class DebugRenderingEditor {
     // 恒为 "-"（两者都没有同名靶），看着像靶根本没建出来。
     const target = VIEW_TARGETS[this.view]?.(post, gi) ?? null;
     const On = (flag) => (flag ? "on" : "off");
+    // 画质面板（或别的代码）可能在这个浮窗开着的时候改了同一批开关。
+    // 不回读的话，面板上的按钮会和真实状态对不上 —— 而这个面板存在的意义
+    // 恰恰是"告诉你现在真的开着什么"。
+    for (const spec of PASS_TOGGLES) this.toggles.get(spec.key)?.Set(!!preset?.[spec.key]);
+    this.toggles.get("probeVolume")?.Set(!!gi?.enabled);
     this.facts.Set("View", item.label);
     this.facts.Set("Note", item.note);
     this.facts.Set("Size", target ? `${target.width} x ${target.height}` : "-", target ? "" : "warn");
@@ -134,6 +244,7 @@ export class DebugRenderingEditor {
     this.facts.Set("SSR", On(preset?.ssr), preset?.ssr ? "good" : "warn");
     this.facts.Set("Contact Shadow", On(preset?.contact), preset?.contact ? "good" : "warn");
     this.facts.Set("GBuffer Variants", post?.gbufferVariants?.size ?? 0);
+    this.facts.Set("Overridden Params", Object.keys(post?.debugOverrides ?? {}).length);
     this.facts.Set("Probe Volume",
       gi ? (gi.enabled ? `on - ${gi.warmed}/${gi.probeCount} warmed` : "built, currently off") : "not built at this quality",
       gi?.enabled ? "good" : "warn");
