@@ -42,6 +42,7 @@ import {
 import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
 import {
   PickCityBlockArchetype, BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
+  AddFarRoof, AddRoofChimney,
 } from "./Script_CityBlockKit.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
@@ -52,7 +53,7 @@ import {
 } from "./Script_World.mjs";
 import {
   MakeBox, MakeSandbag, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
-  MakeInstanced, TILE_METERS, BRICK_UV_GRID,
+  MakeInstanced, TILE_METERS, BRICK_UV_GRID, RoofSlopeLayout,
 } from "./Script_Geo.mjs";
 import {
   AddRoadWear, AddStreetLife, AddWattleFence, AddStoneRoller, AddManureHeap,
@@ -338,6 +339,14 @@ function DistanceToRiver(x, z) {
     if (d < best) best = d;
   }
   return best;
+}
+
+/** 东关那一档的坡度：檐口 2.6、脊 3.9 是这一片的既定尺寸，从它反解出坡角。 */
+const SUBURB_ROOF_PITCH = (depth) => Math.atan2(1.3, depth / 2);
+
+/** 东关屋面的剖面（给烟囱定落点用；几何本体仍由 AddHardMountainRoof 出）。 */
+function SuburbRoofLayout(width, depth, baseY) {
+  return RoofSlopeLayout(width, depth, baseY + 2.6, SUBURB_ROOF_PITCH(depth), 0.45);
 }
 
 /**
@@ -1451,12 +1460,16 @@ export class TengxianCity {
       const x = l.x + (rnd() - 0.5) * l.w;
       const z = l.z + (rnd() - 0.5) * l.d;
       const w = 14 + rnd() * 12, d = 9 + rnd() * 6, h = 6.5 + rnd() * 2.4;   // 两层西式校舍
+      const baseY = this.OuterHeight(x, z);
       this.farSink.Add("HouseBrick", PlaceGeometry(
         MakeBox(w, h, d, TILE_METERS.brick, `${l.id}:${i}`, BRICK_UV_GRID),
-        { x, y: this.OuterHeight(x, z) + h / 2, z }));
-      this.farSink.Add("RoofTile", PlaceGeometry(
-        MakeBox(w + 0.8, 0.9, d + 0.8, TILE_METERS.roof, `${l.id}:r${i}`),
-        { x, y: this.OuterHeight(x, z) + h + 0.45, z }));
+        { x, y: baseY + h / 2, z }));
+      // 旧版顶上盖的是一块 0.9 m 厚的平板 —— 西式校舍也是两坡瓦顶，
+      // 一块平板在北关的天际线上只会读成一个盒子。
+      AddFarRoof(this.farSink, {
+        x, z, ry: 0, width: w, depth: d, eaveY: baseY + h,
+        seed: `${l.id}:r${i}`, burnt: false, mat: "HouseBrick", gable: true,
+      });
     }
   }
 
@@ -1715,24 +1728,55 @@ export class TengxianCity {
       eaveY: baseY + 2.6, ridgeY: baseY + 3.9, seed: `${seed}:roof`,
       ruined: damage > 0.74, burnt,
     });
+    // 三家一支的烟囱。关厢是本战的主战场，也是主菜单「关厢院落」那一机位
+    // 唯一的内容 —— 一片纯瓦面上冒出来的几支砖烟囱是这片房子还有人住的证据。
+    if (damage <= 0.74) {
+      AddRoofChimney(sink, {
+        x, z: z - d * 0.16, ry: 0, depth: bd, seed: `${seed}:roof`,
+        mat, tile: TILE_METERS.brick, grid: BRICK_UV_GRID,
+        tileMat: burnt ? "BrickWallSooty" : "RoofTile",
+        roof: SuburbRoofLayout(bw, bd, baseY),
+      });
+    }
     void saved;
   }
 
+  /**
+   * 东关远景一格。剖面照抄 AddSimpleCompoundAt（院墙一圈 + 一座正房），
+   * 只是不切片、不掏枪眼 —— 走近时读到的必须是同一座院子。
+   *
+   * 旧版是「一块 w*0.88 × d*0.84 的实心大饼 + 两片写死 rx: ±0.5 的板」，
+   * 与城内远景档同一个错：板的位移方向与 rx 配反（倒 V），倾角又与进深无关，
+   * 于是俯瞰整片关厢是一层悬空交叉的玻璃片。坡顶现在走 AddFarRoof。
+   */
   AddSilhouetteAt(cell, damage, burnt, baseY) {
     const { x, z, w, d, seed } = cell;
-    const rnd = Mulberry32(HashString(`${seed}:sil`));
-    const h = 2.5 + rnd() * 0.8;
-    this.farSink.Add(burnt ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
-      MakeBox(w * 0.88, h, d * 0.84, TILE_METERS.brick, `${seed}:sil`, BRICK_UV_GRID),
-      { x, y: baseY + h / 2, z }));
-    this.farSink.Solid(x, baseY + h / 2, z, w * 0.44, h / 2, d * 0.42, "wall");
-    if (damage < 0.8) {
-      for (const s of [-1, 1]) {
-        this.farSink.Add("RoofTile", PlaceGeometry(
-          MakeBox(w * 0.96, 0.14, d * 0.52, TILE_METERS.roof, `${seed}:sr${s}`),
-          { x, y: baseY + h + 0.48, z: z + s * d * 0.2, rx: -s * 0.5 }));
-      }
+    const adobe = !burnt && HashString(seed) % 100 < 42;
+    const mat = burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick");
+    const tile = adobe ? TILE_METERS.adobe : TILE_METERS.brick;
+    const grid = adobe ? null : BRICK_UV_GRID;
+    const h = 2.0;
+    for (const [ox, oz, len, ry] of [
+      [0, -d / 2, w, 0], [0, d / 2, w, 0],
+      [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2],
+    ]) {
+      this.farSink.Add(mat, PlaceGeometry(
+        MakeBox(len, h, 0.42, tile, `${seed}:sw${ox}${oz}`, grid),
+        { x: x + ox, y: baseY + h / 2, z: z + oz, ry }));
+      this.farSink.Solid(x + ox, baseY + h / 2, z + oz, len / 2, h / 2, 0.21, "wall", ry);
     }
+    const bw = w * 0.62, bd = d * 0.44, bz = z - d * 0.16;
+    this.farSink.Add(mat, PlaceGeometry(
+      MakeBox(bw, 2.6, bd, tile, `${seed}:body`, grid),
+      { x, y: baseY + 1.3, z: bz }));
+    this.farSink.Solid(x, baseY + 1.3, bz, bw / 2, 1.3, bd / 2, "wall");
+    // 坡度取东关中景那一条（檐 2.6 / 脊 3.9），比城内的 27.5° 平一档 ——
+    // 远景要跟着自己的中景，不然玩家走近时整片关厢的屋脊会集体掉一截。
+    AddFarRoof(this.farSink, {
+      x, z: bz, ry: 0, width: bw, depth: bd, eaveY: baseY + 2.6,
+      seed: `${seed}:roof`, burnt, mat, adobe, gable: true, chimney: true,
+      ruined: damage > 0.74, pitch: SUBURB_ROOF_PITCH(bd),
+    });
   }
 
   // =========================================================================

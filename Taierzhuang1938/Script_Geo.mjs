@@ -213,6 +213,59 @@ export function PlaceGeometry(geometry, { x = 0, y = 0, z = 0, ry = 0, rx = 0, r
 }
 
 /**
+ * 一座硬山两坡顶的确定性剖面。**局部 +X 是开间（正脊方向），局部 +Z 是进深**；
+ * 两片坡面都自 z=0 的正脊向前后檐**下降**。
+ *
+ * 为什么要有这个函数：坡面是「一块薄板绕自己的 x 轴转一个角度、再挪到半进深处」，
+ * 位移方向与 rx 的正负号必须配对。配反了不会报错，只会得到一个**倒 V** ——
+ * 两片瓦朝外翘起来、中间那条「正脊」反倒是最低点。城外村屋踩过一次（玩家原话
+ * 「楼顶做反了」），城内院落的远景档又独立踩了第二次：那一版写死 `rx: ±0.5`、
+ * 位移写成 `+s*d*0.24`，于是俯瞰整城是一片悬空交叉的板。
+ * 现在剖面只此一份，谁盖坡顶都从这里取，别再各自猜宽/深与正负号。
+ *
+ * 用法（ry 是建筑朝向；局部→世界的换算用调用方自己的 Frame/VillagePoint）：
+ *   const roof = RoofSlopeLayout(width, depth, eaveY);
+ *   for (const half of roof.halves) {
+ *     const [px, pz] = Frame(0, half.localZ);
+ *     sink.Add("RoofTile", PlaceGeometry(
+ *       MakeBox(half.width, 0.16, half.depth, TILE_METERS.roof, seed),
+ *       { x: px, y: half.centerY, z: pz, ry, rx: half.rotationX }));
+ *   }
+ *
+ * @param pitch 坡度（弧度）。默认 0.47 ≈ 27°，落在鲁南小青瓦 26°—29° 的区间里。
+ */
+export function RoofSlopeLayout(width, depth, eaveY, pitch = 0.47, overhang = 0.45) {
+  const halfRun = depth / 2 + overhang;
+  const ridgeY = eaveY + depth / 2 * Math.tan(pitch);
+  const outerY = eaveY - overhang * Math.tan(pitch);
+  const slopeLength = halfRun / Math.cos(pitch);
+  return {
+    ridgeY,
+    outerY,
+    ridgeLength: width + overhang * 2,
+    halves: [-1, 1].map((side) => ({
+      side,
+      localZ: side * halfRun / 2,
+      centerY: (ridgeY + outerY) / 2,
+      rotationX: side * pitch,
+      width: width + overhang * 2,
+      depth: slopeLength,
+      // 这两个是**转过之后那块板**的两个局部端点。把它们跟剖面放在一起，
+      // 调用方与测试就不可能拿一个好看的标量 ridgeY 去证明一个倒 V 的屋顶。
+      localRidgeZ: -side * slopeLength / 2,
+      localEaveZ: side * slopeLength / 2,
+      slabRidgeY: ridgeY,
+      slabEaveY: outerY,
+    })),
+  };
+}
+
+/** 一片已转好的坡面在其局部 Z 处的高度。 */
+export function RoofSlabY(half, localZ) {
+  return half.centerY - Math.sin(half.rotationX) * localZ;
+}
+
+/**
  * 瓦砾堆：一堆随机旋转的碎块，用 InstancedMesh 铺。
  * 街上没有碎砖 = 没打过仗。这是画面"有故事"的最便宜来源。
  */
