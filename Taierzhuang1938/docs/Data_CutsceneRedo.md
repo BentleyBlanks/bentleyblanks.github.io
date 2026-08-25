@@ -320,3 +320,11 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 - **遗留打磨候选**：门外月台到景片之间约 24 m 中景只有 SRTM 平原（有地平线不空但素）；
   正面景片 z≈28.7 的边界在个别下车视角可见接缝；擦枪(cleanRifle=1)横枪枪口
   仍会越过 0.7 m 外的邻座（几何解不开，要么挪人要么站着擦）；站牌是空白板。
+
+- **无贴图平涂的面比带贴图的面亮一倍以上**（2026-08-25 外壳轮实测）：同样 sRGB 色号，
+  `color`-only 的箱子渲近白，带 `mat` 的正常。外壳/装饰件一律给 mat（WoodBeam 即可），
+  必须平涂时色号往暗里再压两档。反向同理：`CarriageBenchWood` 贴图均值反照率约 0.25，
+  背光面 tint 要往亮里给。
+- **`spec.texture` 通道无法平铺**：`_MakeProp` 只在有 `spec.mat` 时重算 UV，`repeat` 也只转给
+  材质库；TextureLoader 默认 ClampToEdge，一张图会被拉满整面。自定义可平铺贴图必须进材质库
+  （LoadExternalSet），引擎侧的活。

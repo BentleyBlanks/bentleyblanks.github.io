@@ -90,12 +90,11 @@ try {
     };
     const { offset: footL, ankleY: ankleL } = footOffset(actor.legs.L, "footL");
     const { offset: footR, ankleY: ankleR } = footOffset(actor.legs.R, "footR");
-    // 已知资产缺陷：Model_NraSoldier.glb 的脚部几何从未烘到地面，鞋底悬空
-    // 约 0.08 m（Codex surgical/refined 各版皆然，常规视角看不出）。这里只锁
-    // 「不再恶化、不沉地、不脱离踝」，资产修好后应把 0.085 收紧到 0.02。
+    // 2026-08-25 资产修复后鞋底烘在世界 0.010 m（对齐 Ija 的 0.009）；
+    // 这里锁「贴地不悬空、不沉地、不脱离踝」。
     const soleL = ankleL + footL[1];
     const soleR = ankleR + footR[1];
-    check(soleL > -0.02 && soleL < 0.085 && soleR > -0.02 && soleR < 0.085,
+    check(soleL > -0.02 && soleL < 0.02 && soleR > -0.02 && soleR < 0.02,
       `NRA soles drifted from the ground plane: L=${soleL} R=${soleR}`);
     check(footL[1] < -0.005 && footL[4] <= 0.2 && footR[1] < -0.005 && footR[4] <= 0.2,
       `NRA feet detached from their ankle pivots: L=${footL} R=${footR}`);
