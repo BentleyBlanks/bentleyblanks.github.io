@@ -596,18 +596,8 @@ function WestStreet(host, ctx, street) {
     fromX: street.fromX, toX: roadEast, z: z0, width: street.width, seed,
   });
 
-  for (const s of SHOPS) {
-    const z = z0 + s.side * (half + 1.4 + s.d / 2);
-    Shopfront(host, {
-      x: s.lx, z, ry: s.side < 0 ? 0 : Math.PI,
-      width: s.w, depth: s.d, seed: `${seed}:shop${s.lx}`,
-      damage: ctx.damage ?? 0.2, straw: s.straw, openBay: s.open,
-    });
-  }
-  OpenShed(host, {
-    x: -463, z: z0 - (half + 1.6 + 2.1), ry: 0, width: 6.0, depth: 4.2,
-    seed: `${seed}:shed`,
-  });
+  // 沿街四个矩形现在由 Data_WestSuburbBlocks 生成完整铺院；这里只保留道路和
+  // 街边生活件，避免旧版四间点状小铺与新街坊重复穿插。
 
   // 街边家什：两处，一处在道口一簇铺子中间，一处在师部门口对面
   for (const [lx, side, commerce] of [[-440, -1, true], [-368, 1, true]]) {

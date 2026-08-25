@@ -205,12 +205,12 @@ function AddRailYard(host, L, block, common) {
   for (const x of [-1.18, 1.18]) {
     const p = L(x, d * 0.31);
     AddBox(host, "AntennaSteel", { x: p.x, y: common.baseY + 0.06, z: p.z, w: 0.10,
-      h: 0.10, d: Clamp(d * 0.28, 3.4, 7), ry, seed: `${common.seed}:rail${x}`, tile: TILE_METERS.steel });
+      h: 0.10, d: Clamp(d * 0.28, 3.4, 7), ry: common.ry, seed: `${common.seed}:rail${x}`, tile: TILE_METERS.steel });
   }
   for (let i = 0; i < 6; i += 1) {
     const p = L(0, d * 0.19 + i * 0.72);
     AddBox(host, "WoodBeam", { x: p.x, y: common.baseY + 0.02, z: p.z, w: 3.1, h: 0.10, d: 0.16,
-      ry, seed: `${common.seed}:tie${i}`, tile: TILE_METERS.wood });
+      ry: common.ry, seed: `${common.seed}:tie${i}`, tile: TILE_METERS.wood });
   }
   AddCrates(host, L, { ...common, lx: w * 0.26, lz: d * 0.18, count: 4, seed: `${common.seed}:cargo` });
 }

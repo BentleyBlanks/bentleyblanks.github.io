@@ -280,15 +280,15 @@ export const SAMPLE_POINTS = [
     x: -458, z: -36, aim: [-458, -82], pitch: 0.03,
     note: "1911 年德国承建的津浦路北段三等小站：清水砖墙、石质窗套、陡坡瓦屋面。" },
   { id: "West_PowerPlant", label: "电灯厂", group: "WestSuburb", phase: 1, sky: "smokyDay",
-    x: -408, z: 20, aim: [-408, 62], pitch: 0.12,
+    x: -410, z: 20, aim: [-410, 69], pitch: 0.12,
     note: "22 m 的烟囱是西关天际线上的关键剪影，pitch 要抬到能收进烟囱顶。" },
   { id: "West_Communications", label: "通信队", group: "WestSuburb", phase: 1, sky: "smokyDay",
-    x: -402, z: 0, aim: [-402, -44], pitch: 0.02 },
+    x: -410.5, z: -4, aim: [-410.5, -85], pitch: 0.06 },
   { id: "West_Division122", label: "第122师师部（西关）", group: "WestSuburb", phase: 1, sky: "smokyDay",
-    x: -362, z: 0, aim: [-362, -38], pitch: 0.02,
+    x: -366, z: -4, aim: [-366, -85], pitch: 0.06,
     note: "坐北朝南开门对着西关大街。" },
   { id: "West_Exchange", label: "交易所", group: "WestSuburb", phase: 1, sky: "smokyDay",
-    x: -438, z: 84, aim: [-438, 116], pitch: 0.02 },
+    x: -410, z: 96, aim: [-410, 132], pitch: 0.04 },
 
   // =========================================================================
   // 北关 —— 只在 phase 6 生成（夜），同样整组覆盖成白天

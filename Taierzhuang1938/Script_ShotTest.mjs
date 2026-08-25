@@ -104,6 +104,19 @@ const GAME_SHOTS = [
   { name: "Game_Z21_SouthWallDrainPbr", query: "phase=4&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower", hideMenu: true,
       cam: { from: [-116, 8.7, 331], look: [-116, 8.7, 308], focalMm: 70 } } },
+  // 西关整块街区回归：高空正俯视必须能读出铁路—十五个无名框—五个具名框—
+  // 城壕的连续关系；三个地面机位分别锁车站、通讯院、厂区/交易所的体量。
+  { name: "Game_Z22_WestBlocksOverview", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower", hideMenu: true, sky: "chuchuanDay",
+      cam: { from: [-410, 650, 15], look: [-410, 0, 15], focalMm: 24, far: 1800 } } },
+  { name: "Game_Z23_WestStation", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: -421, z: -82, yaw: Math.PI / 2, pitch: 0.06, quiet: true } },
+  { name: "Game_Z24_WestCommunications", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: -410, z: -4.0, yaw: 0, pitch: 0.12, quiet: true } },
+  { name: "Game_Z25_WestPowerExchange", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: -410, z: 4.0, yaw: Math.PI, pitch: 0.10, quiet: true } },
+  { name: "Game_Z26_WestExchange", query: "shot=1&phase=4&quality=high&scale=medium",
+    setup: { x: -410, z: 166, yaw: 0, pitch: 0.06, quiet: true } },
   // ——批次A 之后的四个视觉盲区补口（旧机位没有一张能看到中城师部/北城功能区/庙街/南城）——
   // 中城师部：当典后街上看 124 师部门脸（门楼+番号木牌+沙袋哨位+旗）。
   { name: "Game_Z11_DivisionHq", query: "shot=1&phase=5&quality=high&scale=medium",
@@ -190,6 +203,7 @@ async function Shoot(pageName, url, globalName, setup = null) {
         game.StepFrames(24);
         return;
       }
+      if (pose.sky && game.Debug?.ApplySky) game.Debug.ApplySky(pose.sky);
       if (pose.menuShot) {
         const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
         if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
@@ -206,6 +220,10 @@ async function Shoot(pageName, url, globalName, setup = null) {
           shot.lookTo = pose.cam.lookTo || pose.cam.look;
           if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
           if (pose.cam.up) game.camera.up.fromArray(pose.cam.up);
+          if (pose.cam.far) {
+            game.camera.far = Math.max(game.camera.far, pose.cam.far);
+            game.camera.updateProjectionMatrix();
+          }
           game.menu.ApplyShot(0);
           if (pose.hideMenu) document.getElementById("menu").style.display = "none";
           game.StepFrames(12);

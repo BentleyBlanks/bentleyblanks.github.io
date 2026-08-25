@@ -616,6 +616,25 @@ export function BuildCommunications(host, f, ctx) {
     }
   }
 
+  // --- 长框两端的附属房 ---
+  // 城防图把通讯队画成一整块南北向长院。主机房和天线只占中段的话，俯视仍像
+  // “大空框里放了两个点”；北端补器材库，南端补值班宿舍，使整块用地成立。
+  if (f.d >= 100) {
+    for (const spec of [
+      { lz: -58, width: Math.min(34, f.w - 8), depth: 9.0, bays: 7, tag: "northStore" },
+      { lz: 40, width: Math.min(31, f.w - 10), depth: 8.2, bays: 7, tag: "southBillet" },
+    ]) {
+      const p = L(0, spec.lz);
+      if (host.OnStreet(p.x, p.z, spec.width / 2, spec.depth / 2)) continue;
+      AddBrickRow(sink, {
+        x: p.x, z: p.z, ry, width: spec.width, depth: spec.depth,
+        eaveY: 2.9, ridgeY: 4.45, seed: `${seed}:${spec.tag}`,
+        damage: damage * 0.8, burnt, bays: spec.bays, openRatio: 0.34,
+        doorBays: [1, 5], doorH: 2.2, sillY: 1.1, winH: 1.25, bars: false,
+      });
+    }
+  }
+
   // --- 院内杆路：沿东墙一列明线电杆，出院沿西关大街东去（向城门方向）---
   const poleLx = 13.2;
   const inYard = [-13, 3, 20];
@@ -684,9 +703,8 @@ export function BuildCommunications(host, f, ctx) {
     sink.Solid(L(-9.2, lzS - 9.7).x, 0.35, L(-9.2, lzS - 9.7).z, 3.7, 0.35, 0.6, "prop", ry);
   }
 
-  // 通信院是这段街带的唯一派发入口；在此一次性补齐南侧的关厢铺院，
-  // 保持 station → communications → powerPlant → exchange 的带状读法而不重复占地。
-  AddXiguanStreetBelt(host, ctx);
+  // 南侧关厢铺院现由 Data_WestSuburbBlocks 的整框生成器统一覆盖。这里不再追加
+  // 四间 5 m 深的点状小铺，避免和完整街坊重叠。
 }
 
 // ===========================================================================

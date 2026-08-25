@@ -40,6 +40,8 @@ import {
   PALETTE, WALL_TOP_Y,
 } from "./Data_Tengxian.mjs";
 import { LANDMARK_BUILDERS } from "./Script_LandmarkRegistry.mjs";
+import { WEST_SUBURB_BLOCKS, WEST_SUBURB_ALL_BLOCKS } from "./Data_WestSuburbBlocks.mjs";
+import { BuildWestSuburbBlocks } from "./Script_WestSuburbBlocks.mjs";
 import {
   PickCityBlockArchetype, PickDuplex,
   BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
@@ -241,6 +243,15 @@ const OUTER_PADS = [
   { id: "FortSE", x: 370, z: 370, w: 26, d: 26, feather: 10 },
   { id: "FortSW", x: -370, z: 370, w: 26, d: 26, feather: 10 },
 ];
+
+// 城防图里的无名矩形也是完整建筑用地。通用 block kit 会在这些框里生成院墙和
+// 多栋房，脚下必须和其它关厢院落一样找平，不能让长院两端悬在起伏农田上。
+for (const block of WEST_SUBURB_BLOCKS) {
+  OUTER_PADS.push({
+    id: block.id, x: block.x, z: block.z,
+    w: block.w + 8, d: block.d + 8, feather: 10,
+  });
+}
 
 function PadBlend(x, z) {
   let best = 0;
@@ -2137,6 +2148,20 @@ export class TengxianCity {
       this.farSink.SetSector("");
     }
 
+    // 示意图每个无名框都是一整块街坊，不是点状地标。逐框生成可归因的院墙、
+    // 2--6 栋房和作业院；具名五框仍由上面的专用 builder 建，避免重叠。
+    for (const block of WEST_SUBURB_BLOCKS) {
+      const radius = Math.hypot(block.w, block.d) / 2 + 12;
+      if (!this.InBounds(block.x, block.z, radius)) continue;
+      this.sink.SetSector(SectorKey(block.x, block.z));
+      BuildWestSuburbBlocks(this, [block], {
+        damage: block.damage ?? 0.12,
+        groundAt: (x, z) => this.OuterHeight(x, z),
+        levelId: this.levelId,
+      });
+      this.sink.SetSector("");
+    }
+
     // 北关：坝墙 / 圩门 / 北庙（Script_Landmark_NorthSuburb.mjs）。
     if (LANDMARK_BUILDERS.northSuburb
       && this.InBounds(NORTH_SUBURB.street.x, NORTH_SUBURB.stockade.z, 260)) {
@@ -2220,6 +2245,10 @@ export class TengxianCity {
       if (Math.abs(x - NORTH_SUBURB.street.x) < w / 2 + 8 && z > -580 && z < -330) continue;
       if (Math.abs(x - NORTH_SUBURB.temple.x) < w / 2 + NORTH_SUBURB.temple.w / 2 + 6
         && Math.abs(z - NORTH_SUBURB.temple.z) < d / 2 + NORTH_SUBURB.temple.d / 2 + 6) continue;
+      if (WEST_SUBURB_ALL_BLOCKS.some((block) => (
+        Math.abs(x - block.x) < w / 2 + block.w / 2 + 6
+        && Math.abs(z - block.z) < d / 2 + block.d / 2 + 6
+      ))) continue;
       const y = this.OuterHeight(x, z);
       // 苗高 15—30 cm：盒子 0.3 m 厚、中心压到地面下 0.05，露出地面的只有 10 cm。
       // 原来 0.6 m 厚顶在 +0.36 m，城外任何远景都带一条发绿的「堤坝」（出川过场出图抓到）。
@@ -2243,6 +2272,10 @@ export class TengxianCity {
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (!this.InBounds(x, z, 60)) continue;
       if (Math.max(Math.abs(x), Math.abs(z)) < MOAT.outerEdge + 12) continue;
+      if (WEST_SUBURB_ALL_BLOCKS.some((block) => (
+        Math.abs(x - block.x) < block.w / 2 + 6
+        && Math.abs(z - block.z) < block.d / 2 + 6
+      ))) continue;
       this.farSink.SetSector(SectorKey(x, z));
       AddTree(this.farSink, {
         x, z, seed: `tree${i}`, scale: 0.95, material: "Willow",

@@ -78,6 +78,7 @@ export const testDefs = {
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
   WestDistrictCoverageTest: { file: "Script_WestDistrictCoverageTest.mjs", desc: "L4 总览完整生成西关 5 地标与 137 件布设" },
+  WestSuburbBlocksTest: { file: "Script_WestSuburbBlocksTest.mjs", desc: "西关 20 个示意图矩形整块覆盖、净空与院落几何" },
   WestStationTest: { file: "Script_WestStationTest.mjs", desc: "津浦路滕县站构件、信号与货运作业物冒烟" },
   // 一直躺在仓库里没登记（TestRunnerTest 的「登记完整性」为此常红）。
   DressingProbeTest: { file: "Script_DressingProbeTest.mjs", timeoutMs: 12 * 60 * 1000, desc: "七关布设外部构件的重叠/浮空探针（真浏览器）" },
@@ -147,11 +148,11 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest"] },
+  editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest"] },
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestStationTest", "DressingProbeTest"],
+    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {

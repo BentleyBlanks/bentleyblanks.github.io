@@ -5,7 +5,12 @@
 
 import assert from "node:assert/strict";
 import { PHASES } from "./Data_Battle.mjs";
-import { WEST_SUBURB_BLOCKS, WEST_SUBURB_CLEARANCES } from "./Data_WestSuburbBlocks.mjs";
+import {
+  WEST_SUBURB_BLOCKS,
+  WEST_SUBURB_NAMED_BLOCKS,
+  WEST_SUBURB_ALL_BLOCKS,
+  WEST_SUBURB_CLEARANCES,
+} from "./Data_WestSuburbBlocks.mjs";
 import { BuildWestSuburbBlocks } from "./Script_WestSuburbBlocks.mjs";
 
 const overview = PHASES.find((phase) => phase.id === "L4_Chengqiang");
@@ -89,11 +94,16 @@ function HasLandmark(block, landmark) {
 }
 
 assert.ok(Array.isArray(WEST_SUBURB_BLOCKS), "WEST_SUBURB_BLOCKS must be an array");
+assert.ok(Array.isArray(WEST_SUBURB_NAMED_BLOCKS), "WEST_SUBURB_NAMED_BLOCKS must be an array");
+assert.ok(Array.isArray(WEST_SUBURB_ALL_BLOCKS), "WEST_SUBURB_ALL_BLOCKS must be an array");
 assert.ok(WEST_SUBURB_BLOCKS.length >= MIN_BLOCKS,
-  `west suburb needs at least ${MIN_BLOCKS} authored rectangular blocks`);
+  `west suburb needs at least ${MIN_BLOCKS} unnamed authored rectangular blocks`);
+assert.equal(WEST_SUBURB_ALL_BLOCKS.length,
+  WEST_SUBURB_BLOCKS.length + WEST_SUBURB_NAMED_BLOCKS.length,
+  "all-block registry must include named and unnamed diagram rectangles exactly once");
 
 const blockIds = new Set();
-for (const block of WEST_SUBURB_BLOCKS) {
+for (const block of WEST_SUBURB_ALL_BLOCKS) {
   assert.ok(block && typeof block === "object", "every west-suburb block must be an object");
   assert.equal(typeof block.id, "string", "every west-suburb block needs a string id");
   assert.ok(block.id.length > 0, "west-suburb block ids cannot be empty");
@@ -106,16 +116,35 @@ for (const block of WEST_SUBURB_BLOCKS) {
   assert.ok(IsInside(rect, bounds), `${block.id} footprint must sit wholly inside L4_Chengqiang`);
 }
 
+for (let i = 0; i < WEST_SUBURB_ALL_BLOCKS.length; i += 1) {
+  for (let j = i + 1; j < WEST_SUBURB_ALL_BLOCKS.length; j += 1) {
+    const a = WEST_SUBURB_ALL_BLOCKS[i], b = WEST_SUBURB_ALL_BLOCKS[j];
+    assert.ok(!Overlaps(BlockRect(a), BlockRect(b)),
+      `${a.id} and ${b.id} must remain separate diagram rectangles with an alley between them`);
+  }
+}
+
 for (const landmark of REQUIRED_LANDMARKS) {
-  assert.ok(WEST_SUBURB_BLOCKS.some((block) => HasLandmark(block, landmark)),
+  assert.ok(WEST_SUBURB_NAMED_BLOCKS.some((block) => HasLandmark(block, landmark)),
     `${landmark} needs a corresponding or explicitly associated west-suburb block`);
+}
+
+// 具名长框不能再退回“小地标摆在大空框中央”。车站因站台有意贴轨是例外；其余
+// 专用 builder 的数据 footprint 必须落在框内，且至少覆盖框面积的 40%。
+for (const block of WEST_SUBURB_NAMED_BLOCKS) {
+  if (block.landmark === "station") continue;
+  assert.ok(block.source, `${block.id} needs its dedicated landmark source footprint`);
+  const sourceRect = BlockRect({ id: `${block.id}.source`, ...block.source });
+  assert.ok(IsInside(sourceRect, BlockRect(block)), `${block.id} source must sit inside its full diagram block`);
+  const ratio = (block.source.w * block.source.d) / (block.w * block.d);
+  assert.ok(ratio >= 0.40, `${block.id} dedicated model footprint must cover at least 40% of its diagram block`);
 }
 
 assert.ok(WEST_SUBURB_CLEARANCES && typeof WEST_SUBURB_CLEARANCES === "object",
   "WEST_SUBURB_CLEARANCES is required to protect the west-suburb circulation and defenses");
 for (const clearanceName of REQUIRED_CLEARANCES) {
   const clearanceRects = RectFromClearance(WEST_SUBURB_CLEARANCES[clearanceName], clearanceName);
-  for (const block of WEST_SUBURB_BLOCKS) {
+  for (const block of WEST_SUBURB_ALL_BLOCKS) {
     const footprint = BlockRect(block);
     assert.ok(!clearanceRects.some((clearance) => Overlaps(footprint, clearance)),
       `${block.id} footprint must not enter ${clearanceName} clearance`);
