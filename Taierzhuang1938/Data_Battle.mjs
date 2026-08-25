@@ -97,7 +97,8 @@ export const ZONES = {
 
   // --- 四 · 城墙 ---
   // 上城道：RAMPS 里东门旁那一条，沿墙内侧爬。坐标是墙内侧顺城街上的落脚点。
-  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z, radius: 16 },
+  // -20：上城道脚已沿爬升方向让开门洞 20 m（RAMPS v2.1），路标跟着脚走
+  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z - 20, radius: 16 },
   Rampart: { id: "Rampart", name: "东南角望楼", x: 294, z: 288, radius: 22 },
   SouthWall: { id: "SouthWall", name: "南城墙", x: 150, z: 296, radius: 26 },
   SouthBreach: { id: "SouthBreach", name: "南墙缺口", x: 285, z: 296, radius: 18 },

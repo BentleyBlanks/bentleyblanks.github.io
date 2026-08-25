@@ -19,7 +19,8 @@ import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { MENU, CREDITS, PRESUMED_STAGING } from "./Data_TengxianScript.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
 import {
-  CITY, GATES, MOAT, EAST_SUBURB, WEST_SUBURB, OUTSKIRTS, OUTER_LANDMARKS, PRESUMED,
+  CITY, GATES, MOAT, EAST_SUBURB, WEST_SUBURB, OUTSKIRTS,
+  CITY_FEATURES, LANDMARKS, OUTER_LANDMARKS, PRESUMED,
 } from "./Data_Tengxian.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -147,15 +148,36 @@ function BuildMap(phase) {
     x: Px(eb.minX), y: Pz(eb.minZ),
     width: Px(eb.maxX) - Px(eb.minX), height: Pz(eb.maxZ) - Pz(eb.minZ),
   }, g);
+  // 挂牌地标。坐标一律从 Data_Tengxian 现算，图上不留第二份坐标。
+  // 每条多带 [dx, dy, anchor] —— 那是**排版**参数不是地理数据：城在图上只有八十像素，
+  // 城内四个点里监狱与警备队相距 58 m（图上 7.8 px），西关的通讯队与 122 师部相距
+  // 40 m（5.5 px），一律用默认的「右下 5,3」就叠成一团糊字。
+  const Feature = (id) => CITY_FEATURES.find((f) => f.id === id);
   const dots = [
-    [WEST_SUBURB.powerPlant.x, WEST_SUBURB.powerPlant.z, "电灯厂"],
-    [WEST_SUBURB.station.x, WEST_SUBURB.station.z, "车站"],
+    // 西关：铁路一侧从北到南 —— 车站、通讯队、122 师部、电灯厂
+    [WEST_SUBURB.station.x, WEST_SUBURB.station.z, "车站", -5, -5, "end"],
+    [WEST_SUBURB.communications.x, WEST_SUBURB.communications.z, "通讯队", -5, 2, "end"],
+    [WEST_SUBURB.division122.x, WEST_SUBURB.division122.z, "122师部", -11, 9, "end"],
+    [WEST_SUBURB.powerPlant.x, WEST_SUBURB.powerPlant.z, "电灯厂", -5, 8, "end"],
   ];
+  // 城内：北城的文庙／警备队／监狱，南城的天主堂（后者在 LANDMARKS 不在 CITY_FEATURES）
+  for (const [id, name, dx, dy, anchor] of [
+    ["ConfucianTemple", "文庙", -5, 2, "end"],
+    ["GarrisonHQ", "警备队", -5, -1, "end"],
+    ["CountyJail", "监狱", 5, 6, "start"],
+  ]) {
+    const f = Feature(id);
+    if (f) dots.push([f.x, f.z, name, dx, dy, anchor]);
+  }
+  const church = LANDMARKS.find((l) => l.id === "CatholicChurchInner");
+  if (church) dots.push([church.x, church.z, "天主堂", 5, 3, "start"]);
   const pagoda = OUTER_LANDMARKS.find((l) => l.id === "LongquanPagoda");
-  if (pagoda) dots.push([pagoda.x, pagoda.z, "龙泉塔"]);
-  for (const [x, z, name] of dots) {
+  if (pagoda) dots.push([pagoda.x, pagoda.z, "龙泉塔", 5, 3, "start"]);
+  for (const [x, z, name, dx = 5, dy = 3, anchor = "start"] of dots) {
     SvgEl("circle", { class: "mnMapDot", cx: Px(x), cy: Pz(z), r: 1.8 }, g);
-    SvgEl("text", { class: "mnMapLabel", x: Px(x) + 5, y: Pz(z) + 3 }, g).textContent = name;
+    SvgEl("text", {
+      class: "mnMapLabel", x: Px(x) + dx, y: Pz(z) + dy, "text-anchor": anchor,
+    }, g).textContent = name;
   }
 
   // --- 选中的这一关：切片框 + 路标链 --------------------------------------

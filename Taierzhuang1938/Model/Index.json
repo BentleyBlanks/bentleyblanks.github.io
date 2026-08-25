@@ -476,6 +476,156 @@
    }
   },
   {
+   "name": "SemaphoreSignal",
+   "category": "prop",
+   "file": "SemaphoreSignal.tzm.json",
+   "triangles": 244,
+   "meshBlocks": 3,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 11590,
+   "materials": [
+    "Stone",
+    "WoodDoor",
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.23,
+     0.0,
+     -0.23
+    ],
+    "max": [
+     1.13,
+     5.16,
+     0.23
+    ]
+   }
+  },
+  {
+   "name": "StationLamp",
+   "category": "prop",
+   "file": "StationLamp.tzm.json",
+   "triangles": 142,
+   "meshBlocks": 3,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 6305,
+   "materials": [
+    "RoofTile",
+    "Stone",
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.3,
+     0.0,
+     -0.28662
+    ],
+    "max": [
+     0.3,
+     3.2,
+     0.28662
+    ]
+   }
+  },
+  {
+   "name": "ChurchTracery",
+   "category": "prop",
+   "file": "ChurchTracery.tzm.json",
+   "triangles": 192,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 7566,
+   "materials": [
+    "Stone"
+   ],
+   "mounts": [
+    "root",
+    "sillCenter"
+   ],
+   "bounds": {
+    "min": [
+     -0.605,
+     0.0,
+     -0.035
+    ],
+    "max": [
+     0.605,
+     3.07429,
+     0.035
+    ]
+   }
+  },
+  {
+   "name": "CellDoorIron",
+   "category": "prop",
+   "file": "CellDoorIron.tzm.json",
+   "triangles": 204,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 8561,
+   "materials": [
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "doorFace"
+   ],
+   "bounds": {
+    "min": [
+     -0.4725,
+     0.18,
+     -0.0155
+    ],
+    "max": [
+     0.45,
+     1.7,
+     0.067
+    ]
+   }
+  },
+  {
+   "name": "CrossingSign",
+   "category": "prop",
+   "file": "CrossingSign.tzm.json",
+   "triangles": 68,
+   "meshBlocks": 2,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 3879,
+   "materials": [
+    "Stone",
+    "WoodDoor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.5374,
+     0.0,
+     -0.17
+    ],
+    "max": [
+     0.5374,
+     2.5574,
+     0.17
+    ]
+   }
+  },
+  {
    "name": "Type89Launcher",
    "category": "weapon",
    "file": "Type89Launcher.tzm.json",

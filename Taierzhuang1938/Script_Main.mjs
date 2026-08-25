@@ -46,6 +46,7 @@ import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps } from "./Script_TrimProps.mjs";
+import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -392,7 +393,7 @@ async function Boot() {
 
   setStep("烘贴图……", 0.02);
   let baked = 0;
-  const total = 16;
+  const total = Object.keys(RECIPES).length;
   for (const name of library.PrepareSteps()) {
     baked += 1;
     setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
@@ -461,6 +462,16 @@ async function Boot() {
         albedo: "./Texture/Texture_StoneBase.webp?v=1",
         normal: "./Texture/Texture_StoneNormal.webp?v=1",
         orm: "./Texture/Texture_StoneOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("StationBrick", {
+        albedo: "./Texture/Texture_StationBrickBase.webp?v=e2",
+        normal: "./Texture/Texture_StationBrickNormal.webp?v=e2",
+        orm: "./Texture/Texture_StationBrickOrm.webp?v=e2",
+      }),
+      library.LoadExternalSet("PrisonBrick", {
+        albedo: "./Texture/Texture_PrisonBrickBase.webp?v=e2",
+        normal: "./Texture/Texture_PrisonBrickNormal.webp?v=e2",
+        orm: "./Texture/Texture_PrisonBrickOrm.webp?v=e2",
       }),
       library.LoadExternalSet("TemplePlaster", {
         albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",

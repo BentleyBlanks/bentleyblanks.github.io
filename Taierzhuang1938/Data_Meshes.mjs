@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "10";
+const MESH_REV = "11";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -120,7 +120,10 @@ export const MESHES = {
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",
-    triangles: 4690, meshBlocks: 2, nodes: 7, joints: 0,
+    // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
+    // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
+    // WP-E1 照 Model/Index.json 补正（数字来自构建期实测，不是猜的）。
+    triangles: 4690, meshBlocks: 4, nodes: 8, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.09814, 0.19667, 1.27562], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
@@ -224,6 +227,64 @@ export const MESHES = {
     span: [0.360, 0.630, 0.480],
     draws: { high: 1, medium: 1, low: 1 },
     note: "门墩石（抱鼓石）。方座 + 横轴鼓面 + 六颗鼓钉。原点在地面。",
+  },
+
+  // ——— 场景饰件（WP-E1）：由 Script_TrimProps.mjs 摆进战斗关卡 ———
+  // 这一族与上面四件同为 category=prop（同一条 ≤400 三角预算），区别只在用法：
+  // 门楼四件是给 Script_World 复用的建筑构件，这五件是**成列摆的场景饰件**，
+  // 落点写死在 Script_TrimProps.TRIM_PLACEMENTS 里。
+  // 材质名受两头夹：既要在 _blender/TzmCore.MATERIAL_NAMES 白名单里，又要
+  // ResolveTengxianMaterial 认得。交集只有 Stone / WoodBeam / WoodDoor / RoofTile /
+  // armor / track，所以铁活一律借 track（哑光暗灰熟铁）、漆钢借 armor。
+  SemaphoreSignal: {
+    file: "SemaphoreSignal.tzm.json", category: "prop",
+    triangles: 244, meshBlocks: 3, nodes: 3, joints: 0,
+    materials: ["Stone", "WoodDoor", "armor"], mounts: ["foot"],
+    span: [1.36, 5.16, 0.46],
+    draws: { high: 3, medium: 3, low: 3 },
+    note: "津浦路臂板信号机（下臂式）。混凝土基墩 + 5.2 m 收分方杆 + 七级梯挂 + "
+      + "木臂板 + 配重杆与拉杆。原点在基墩底面（＝地面）。臂板固定在「进站」位，"
+      + "不做转动 —— 饰件层没有逐帧驱动。",
+  },
+  StationLamp: {
+    file: "StationLamp.tzm.json", category: "prop",
+    triangles: 142, meshBlocks: 3, nodes: 3, joints: 0,
+    materials: ["RoofTile", "Stone", "armor"], mounts: ["foot"],
+    span: [0.6, 3.2, 0.57324],
+    draws: { high: 3, medium: 3, low: 3 },
+    note: "站台灯 3.2 m。铸铁灯柱 + 10 段搪瓷灯罩 + 磨砂灯泡。原点在柱底（＝站台面）。"
+      + "**不带光源** —— 一盏灯一个 light 就是一遍 shadow pass，六盏就没了。",
+  },
+  ChurchTracery: {
+    file: "ChurchTracery.tzm.json", category: "prop",
+    triangles: 192, meshBlocks: 1, nodes: 3, joints: 0,
+    materials: ["Stone"], mounts: ["sillCenter"],
+    span: [1.21, 3.07429, 0.07],
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "天主堂尖券窗花。净宽 1.50 / 窗高 2.60 / 券高 0.89，对着 "
+      + "Script_Landmark_ChurchSchool 城内那座（檐口 7.42 m）的窗洞算死；"
+      + "别的尺寸靠 TRIM_PLACEMENTS 的 scale 缩。券头圆窗心是真旋转体，不是多边形拼的。"
+      + "原点在窗台中点，厚度对称于墙心。",
+  },
+  CellDoorIron: {
+    file: "CellDoorIron.tzm.json", category: "prop",
+    triangles: 204, meshBlocks: 1, nodes: 3, joints: 0,
+    materials: ["track"], mounts: ["doorFace"],
+    span: [0.9225, 1.52, 0.0825],
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "牢门五金。两道包铁（y=0.26 / 1.62）+ 合页轴 + 竖铁 + 锁盒 + 锁鼻 + 挂锁 + "
+      + "四颗门钉，按 CELL.doorW=1.0 / doorH=1.95 配。**刻意避开** A1 程序化门板上"
+      + "已有的两道箍（y=0.55 / 1.41）——这件是补全那副五金，不是盖住它。"
+      + "原点在门板外表面、门扇底边中点，几何全部 z ≥ 0（朝门外）。",
+  },
+  CrossingSign: {
+    file: "CrossingSign.tzm.json", category: "prop",
+    triangles: 68, meshBlocks: 2, nodes: 3, joints: 0,
+    materials: ["Stone", "WoodDoor"], mounts: ["foot"],
+    span: [1.0748, 2.5574, 0.34],
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "铁路道口斜十字标。木杆 + 白灰斜十字牌 + 一块空警示牌（**不刻字**："
+      + "1938 年三月津浦路道口标的字样无资料，同 B1 的站牌口径）。原点在石基底面。",
   },
 };
 

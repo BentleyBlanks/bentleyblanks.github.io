@@ -829,12 +829,25 @@ function NorthTemple(host, t, ctx) {
     const lx = -hallW / 2 + bayW * (b + 0.5);
     const p = At(lx, frontLz);
     if (b === 1) {
-      // 明间板门：关着。开着在出图上就是一块纯黑（殿内没有内景）
+      // 明间板门：**两扇都朝里敞开**（第一版是关着的，理由是「开着就是一块纯黑」——
+      // 现在殿里有神台香案了，理由不成立，关着反而把内景整个封死）。
+      // 每扇绕自己的外沿转 78°，贴在明间两侧的檐柱上；门板本来就不登记 Solid，
+      // 明间那一档也不登记墙（else 分支才登记）—— 所以这道门是真能走进去的。
+      const leafW = bayW * 0.44, swing = 1.36;
       for (const s of [-1, 1]) {
-        const dp = At(lx + s * (bayW * 0.23), frontLz - 0.16);
-        Put(sink, "WoodDoor", [bayW * 0.44, openH, 0.08], TILE_METERS.wood,
-          `${seed}:hleaf${s}`, { x: dp.x, y: floorY + openH / 2, z: dp.z, ry });
+        const hingeLx = lx + s * (bayW / 2 - 0.17);
+        const dx = -s * Math.cos(swing), dz = -Math.sin(swing);
+        const dp = At(hingeLx + dx * leafW * 0.5, frontLz + dz * leafW * 0.5 - 0.05);
+        Put(sink, "WoodDoor", [leafW, openH, 0.08], TILE_METERS.wood,
+          `${seed}:hleaf${s}`, {
+            x: dp.x, y: floorY + openH / 2, z: dp.z, ry: ry + Math.atan2(-dz, dx),
+          });
       }
+      // 高门槛：庙门的门槛是形制，也顺手把「进殿」这件事说清楚。
+      // 0.22 m 低于 autostep 0.55，抬腿过得去。
+      const sillp = At(lx, frontLz + 0.02);
+      Put(sink, "Stone", [bayW - 0.34, 0.22, 0.26], TILE_METERS.stone,
+        `${seed}:hthr`, { x: sillp.x, y: floorY + 0.11, z: sillp.z, ry });
       Put(sink, "HouseBrick", [bayW - 0.4, hEave - openH, 0.38], TILE_METERS.brick,
         `${seed}:hover`, { x: p.x, y: floorY + openH + (hEave - openH) / 2, z: p.z, ry });
     } else {
@@ -842,14 +855,17 @@ function NorthTemple(host, t, ctx) {
       Put(sink, "HouseBrick", [bayW - 0.42, sillH, 0.38], TILE_METERS.brick,
         `${seed}:hsill${b}`, { x: p.x, y: floorY + sillH / 2, z: p.z, ry });
       const winH = hEave - sillH - 0.5;
-      const wp = At(lx, frontLz - 0.20);
-      Put(sink, "WoodBeam", [bayW - 0.42, winH, 0.06], TILE_METERS.wood,
-        `${seed}:hpane${b}`, { x: wp.x, y: floorY + sillH + winH / 2, z: wp.z, ry });
+      // **窗背板拆了**：第一版在直棂后面钉了一块通长的木板，因为殿里是空的、
+      // 开着就是一个黑洞。现在殿里有东西，这两樘次间窗是大殿唯一的侧光来源
+      // （明间门朝南，进深 6.6 m 的殿光只到一半）—— 板一拆，光就进来了。
+      // 拆板的同时把直棂加密：5 根棂子间距 0.7 m，读作「一个洞插了几根棍」，
+      // 不是直棂窗；0.135 m 一根才是。
+      const barN = Math.max(8, Math.round((bayW - 0.66) / 0.135));
       const bars = [];
-      for (let m = 0; m < 5; m += 1) {
+      for (let m = 0; m < barN; m += 1) {
         bars.push(PlaceGeometry(
-          MakeBox(0.06, winH, 0.08, TILE_METERS.wood, `${seed}:hbar${b}${m}`),
-          { x: (m / 4 - 0.5) * (bayW - 0.66) }));
+          MakeBox(0.055, winH, 0.075, TILE_METERS.wood, `${seed}:hbar${b}${m}`),
+          { x: (m / (barN - 1) - 0.5) * (bayW - 0.66) }));
       }
       sink.Add("WoodBeam", PlaceGeometry(MergeGeometries(bars),
         { x: p.x, y: floorY + sillH + winH / 2, z: p.z, ry }));
@@ -880,6 +896,136 @@ function NorthTemple(host, t, ctx) {
   }
   Put(sink, "RoofTile", [hRoofW, 0.24, 0.40], TILE_METERS.roof,
     `${seed}:hridge`, { x: hc.x, y: floorY + hEave + hRise + 0.08, z: hc.z, ry });
+
+  // --- 殿内：神台 / 香案 / 签筒 ---
+  //
+  // **村庙一档的朴素**，和外面是同一条尺子：没有藻井、没有彩画、没有斗拱，
+  // 神台是砖砌的不是须弥座，案是素木不是雕花供桌，唯一的一点亮色是台前那幅红帷幔
+  // （PaintRed 已经是庙这个分区里的桶，山门抱框与檐柱都用它 —— 屋里的红不多花一个 draw call）。
+  //
+  // **不做神像**：一尊泥塑是人形件，属于饰件轮不属于场景轮；而且滕县这座庙供的是谁
+  // 无载。台上摆三方**净几何木牌位**（不刻字，与山门石匾、A7 匾额同一口径）——
+  // 牌位本来就是鲁南村庙的常见做法，比猜一尊像稳。
+  {
+    const backIn = hallLz - hallD / 2 + 0.40;      // 后檐墙内皮
+    const frontIn = frontLz - 0.19;               // 前檐槛墙内皮
+    const rich = damage < 0.62;
+
+    // 方砖墁地（用 HouseBrick：庙的墙已经是这个桶，殿里不另开地面材质）
+    {
+      const p = At(0, (backIn + frontIn) / 2);
+      Put(sink, "HouseBrick", [hallW - 0.1, 0.07, frontIn - backIn], TILE_METERS.brick,
+        `${seed}:hfloor`, { x: p.x, y: floorY + 0.035, z: p.z, ry });
+    }
+    // 两道梁：三开间小殿抬头看得见的就是这两根
+    for (const s of [-1, 1]) {
+      const p = At(0, hallLz + s * (hallD / 5));
+      Put(sink, "WoodBeam", [hallW - 0.2, 0.24, 0.20], TILE_METERS.wood,
+        `${seed}:hbeam${s}`, { x: p.x, y: floorY + hEave - 0.22, z: p.z, ry });
+    }
+
+    // --- 神台：靠后墙一道砖砌台 + 石台面 ---
+    const altW = Math.min(hallW * 0.55, 6.2), altD = 1.15, altH = 0.92;
+    const altLz = backIn + altD / 2;
+    {
+      const p = At(0, altLz);
+      Put(sink, "HouseBrick", [altW, altH, altD], TILE_METERS.brick,
+        `${seed}:altar`, { x: p.x, y: floorY + altH / 2, z: p.z, ry }, BRICK_UV_GRID);
+      Put(sink, "Stone", [altW + 0.18, 0.08, altD + 0.12], TILE_METERS.stone,
+        `${seed}:altartop`, { x: p.x, y: floorY + altH + 0.04, z: p.z, ry });
+      sink.Solid(p.x, floorY + (altH + 0.1) / 2, p.z, (altW + 0.26) / 2, (altH + 0.1) / 2,
+        (altD + 0.16) / 2, "villageFoundation", ry);
+      sink.Cover(p.x, p.z, floorY + altH, 0, 1);
+      if (rich) {
+        // 红桌围 + 横楣：庙里唯一的一块颜色。
+        // **只挂上半截**（0.50 m），下面留砖台露出来 —— 第一版从台面一路挂到地，
+        // 6 m × 0.74 m 的一整片 PaintRed 在近景里读成一堵粉墙，不是一块布。
+        const f = At(0, altLz + altD / 2 + 0.04);
+        Put(sink, "PaintRed", [altW - 0.1, 0.50, 0.05], TILE_METERS.wood,
+          `${seed}:valance`, { x: f.x, y: floorY + altH - 0.32, z: f.z, ry });
+        Put(sink, "PaintRed", [altW + 0.2, 0.15, 0.10], TILE_METERS.wood,
+          `${seed}:pelmet`, { x: f.x, y: floorY + altH - 0.04, z: f.z, ry });
+      }
+    }
+    // 台上三方牌位（中间高、两边低），净牌不刻字
+    if (rich) {
+      const topY = floorY + altH + 0.08;
+      // 供器：两只素瓷碗夹中间那方牌位、两端一对木花瓶。
+      // 不为好看 —— 6 m 长的石台面上只摆三块小牌位，近景里是一条空白的白板。
+      for (const s of [-1, 1]) {
+        const b = At(s * 0.78, altLz + 0.16);
+        Put(sink, "Stone", [0.20, 0.13, 0.20], TILE_METERS.stone,
+          `${seed}:bowl${s}`, { x: b.x, y: topY + 0.065, z: b.z, ry });
+        const v = At(s * 2.35, altLz - 0.02);
+        Put(sink, "WoodBeam", [0.13, 0.30, 0.13], TILE_METERS.wood,
+          `${seed}:vase${s}`, { x: v.x, y: topY + 0.15, z: v.z, ry });
+      }
+      for (const [lx, hgt, wid] of [[-1.6, 0.42, 0.20], [0, 0.58, 0.25], [1.6, 0.42, 0.20]]) {
+        const p = At(lx, altLz - 0.05);
+        Put(sink, "Stone", [wid + 0.12, 0.09, 0.17], TILE_METERS.stone,
+          `${seed}:tbase${lx}`, { x: p.x, y: topY + 0.045, z: p.z, ry });
+        Put(sink, "WoodDoor", [wid, hgt, 0.05], TILE_METERS.wood,
+          `${seed}:tablet${lx}`, { x: p.x, y: topY + 0.09 + hgt / 2, z: p.z, ry });
+      }
+    }
+
+    // --- 香案：素木一张，摆在神台前一步 ---
+    const tabLz = altLz + altD / 2 + 0.85;
+    const tabW = 1.85, tabD = 0.74, tabH = 0.84;
+    {
+      const p = At(0, tabLz);
+      Put(sink, "WoodBeam", [tabW, 0.08, tabD], TILE_METERS.wood,
+        `${seed}:tabtop`, { x: p.x, y: floorY + tabH, z: p.z, ry });
+      const ap = At(0, tabLz + tabD / 2 - 0.04);
+      Put(sink, "WoodBeam", [tabW - 0.1, 0.14, 0.05], TILE_METERS.wood,
+        `${seed}:tabapron`, { x: ap.x, y: floorY + tabH - 0.15, z: ap.z, ry });
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const q = At(sx * (tabW / 2 - 0.13), tabLz + sz * (tabD / 2 - 0.12));
+          Put(sink, "WoodBeam", [0.09, tabH - 0.04, 0.09], TILE_METERS.wood,
+            `${seed}:tableg${sx}${sz}`, { x: q.x, y: floorY + (tabH - 0.04) / 2, z: q.z, ry });
+        }
+      }
+      sink.Solid(p.x, floorY + tabH / 2, p.z, tabW / 2, tabH / 2, tabD / 2, "furniture", ry);
+    }
+    if (rich) {
+      const deck = floorY + tabH + 0.04;
+      // 香炉：石的（村庙买不起铜的），炉里插三炷香
+      const cp = At(0, tabLz - 0.04);
+      Put(sink, "Stone", [0.38, 0.24, 0.30], TILE_METERS.stone,
+        `${seed}:censer`, { x: cp.x, y: deck + 0.12, z: cp.z, ry });
+      for (let i = 0; i < 3; i += 1) {
+        const q = At((i - 1) * 0.07, tabLz - 0.04);
+        Put(sink, "WoodBeam", [0.02, 0.36, 0.02], TILE_METERS.wood,
+          `${seed}:josh${i}`, { x: q.x, y: deck + 0.40, z: q.z, ry, rz: (i - 1) * 0.09 });
+      }
+      // 烛台一对
+      for (const s of [-1, 1]) {
+        const q = At(s * 0.66, tabLz - 0.02);
+        Put(sink, "Stone", [0.10, 0.26, 0.10], TILE_METERS.stone,
+          `${seed}:cand${s}`, { x: q.x, y: deck + 0.13, z: q.z, ry });
+      }
+      // --- 签筒：一只竹筒 + 一把签，签头散开 ---
+      // 求签是村庙唯一「玩家看得懂在干什么」的物件，也是这一档庙的功能证据。
+      // 筒粗一档、签短一档、扇开小一档：第一版 6 根 0.018 的细签扇到 ±0.34 rad，
+      // 近景里挤成一个黑锥子，看不出是签。
+      const sp = At(0.44, tabLz + 0.14);
+      Put(sink, "WoodBeam", [0.19, 0.30, 0.19], TILE_METERS.wood,
+        `${seed}:lotpot`, { x: sp.x, y: deck + 0.15, z: sp.z, ry });
+      for (let i = 0; i < 5; i += 1) {
+        const t = (i / 4 - 0.5);
+        const q = At(0.44 + t * 0.13, tabLz + 0.14 + (i % 2 ? 0.045 : -0.045));
+        Put(sink, "WoodBeam", [0.026, 0.26, 0.026], TILE_METERS.wood,
+          `${seed}:lot${i}`, { x: q.x, y: deck + 0.38, z: q.z, ry, rz: t * 0.20 });
+      }
+      // 蒲团一对：草编的，摆在案前
+      for (const s of [-1, 1]) {
+        const q = At(s * 0.62, tabLz + 0.95);
+        Put(sink, "VillageStraw", [0.52, 0.11, 0.52], TILE_METERS.ground,
+          `${seed}:mat${s}`, { x: q.x, y: floorY + 0.11, z: q.z, ry: ry + rnd() * 0.4 });
+      }
+    }
+  }
 
   // --- 甬路：山门 → 大殿。俯瞰时这条亮线把庙院从野地里拉出来 ---
   const pathFrom = gateLz - gateDepth / 2 - 0.3, pathTo = hallLz + podD / 2;

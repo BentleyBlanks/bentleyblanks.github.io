@@ -195,11 +195,14 @@ export const CORNER_TOWERS = [
  */
 // dir：坡自 at 起沿哪个方向爬。**必须背离城门** —— 朝着城门爬的话坡身会压进
 // z=0（或 x=0）那条不许有任何遮挡的视线走廊里。
+// v2.1：at 从「正压门轴」改为「门位沿爬升方向让开 20 m」——旧值四条马道的第一级
+// 石阶全都横在门洞里侧（北门实测把 3.8 m 净宽堵掉一半，L6 出北门的主路，WP-E4 取证）。
+// BuildRamps 的映射：北 x=-at、东 z=-at、西 z=+at、南 x=+at；爬升方向 = Δat=dir。
 export const RAMPS = [
-  { side: "East", at: 65, dir: 1, seed: "rampE" },
-  { side: "West", at: 0, dir: -1, seed: "rampW" },
-  { side: "South", at: 70, dir: 1, seed: "rampS" },
-  { side: "North", at: 145, dir: -1, seed: "rampN" },
+  { side: "East", at: 85, dir: 1, seed: "rampE" },     // 门 z=-65 → 脚 z=-85
+  { side: "West", at: -20, dir: -1, seed: "rampW" },   // 门 z=0 → 脚 z=-20
+  { side: "South", at: 90, dir: 1, seed: "rampS" },    // 门 x=70 → 脚 x=90
+  { side: "North", at: 125, dir: -1, seed: "rampN" },  // 门 x=-145 → 脚 x=-125
 ];
 export const RAMP = { width: 2.4, run: 1.0, landingAt: 13, landingRun: 2.0 };
 

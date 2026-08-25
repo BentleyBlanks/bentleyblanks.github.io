@@ -131,9 +131,10 @@ const MATERIAL_MAP = {
   // ——「照城防示意图补全地标」预留材质名（Phase 0 插桩）——
   // 各工作包只许用这些名字，不许自己往本表加行；调色不合适把目标值写进交付报告，
   // 由主会话统一改。先全部压在既有烘焙配方上，等贴图管线出 webp 后再逐个换。
-  // WP-A1 取证：0xc9cdd3 背光面近乎全黑；抬到 0xd6d9de 仍与民居 BrickWall 拉开一档
-  PrisonWall: { recipe: "BrickWallSooty", color: 0xd6d9de, roughness: 1.0 },
-  StationBrick: { recipe: "BrickWall", color: 0xdcc9b8, roughness: 1.0 },
+  // WP-E2：换专属 PrisonBrick 贴图（A/B 取证 0xf2f4f8 近白微冷——乘色只顶明度，冷调交给天光）
+  PrisonWall: { recipe: "PrisonBrick", color: 0xf2f4f8, roughness: 1.0 },
+  // WP-E2：德建机制红砖专属贴图（暖近白乘色带一档浮尘）
+  StationBrick: { recipe: "StationBrick", color: 0xe6ded4, roughness: 1.0 },
   PlatformStone: { recipe: "Stone", color: 0xd9dade, roughness: 1.0 },
   RailSteel: { recipe: "SteelHelmet", color: 0x77726a, roughness: 0.55, metalness: 0.6 },
   RailBallast: { recipe: "GroundRubble", color: 0x9d9a92, roughness: 1.0 },

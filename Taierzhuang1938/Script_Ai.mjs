@@ -258,6 +258,12 @@ export class Soldier {
     // 看得见攻方，这张图就极好打」。这里给防守单位一条硬规矩：
     // 一旦被派去守某个占领区，除非死亡，否则不许离开该区半径。
     this.holdZone = null;
+    /**
+     * 这个人占的那个**固定战位**的名字（重机枪位之类），没占就是 null。
+     * 与 squadId 分开存：squadId 在 Spawn 里会因为满员而被改名成 `..._1/_2`，
+     * 拿它当战位标识会认不出「这挺机枪已经有人了」。见 AiDirector.Spawn。
+     */
+    this.emplacementId = null;
     this.muzzle = new THREE.Vector3();
     this.lastFire = -99;
     // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
@@ -393,6 +399,28 @@ export class AiDirector {
 
   Spawn(side, x, z, options = {}) {
     if (this.aliveCount >= this.maxAlive) return null;
+    /**
+     * 阵地火力是**战位**，不是可以反复填的补充兵：一挺九二式就是一挺。
+     *
+     * 取证（phase=2 / quality=medium / scale=medium，三百秒不动手）：装配层每三秒
+     * 补一次兵，而重机枪那一段没有存量检查 —— 三百秒后 70 人上限里 **39 个**是
+     * `order="hold"` 的重机枪手，堆在 (541,-78) / (561,-75) / (563,-68) 等四五个点上，
+     * 全部 spd=0、tgt=false、最近的敌人 52–113 m 外，一枪没开。人口预算被它们吃光，
+     * 真正要打的攻方步兵（ijaTarget 40）与守军（nraTarget 29）根本挤不进来，
+     * 于是每 20 s 的开火数一路衰减成 46/18/14/51/14/12/12/3/3/0/2/2/0/0/0。
+     *
+     * 判据用 `WEAPONS[...].emplaced`（Data_Weapons 里早就写着、一直没人读的那个字段），
+     * 不用 squadId 的字符串前缀 —— 前缀是装配层的命名习惯，改个名字这条闸门就没了。
+     * 战位空出来（枪手阵亡）之后下一次补兵会重新填人，这正是「重新架枪」该有的样子。
+     *
+     * 为什么修在这里而不是修在撒兵的地方：AiDirector 是人口预算与编队的唯一主人，
+     * 撒兵路径有五条（守点、补兵、近身班组、玩家重生、软约束重设目标），
+     * 任何一条把同一个战位再填一次，这个洞就还在。
+     */
+    const emplacementId = (options.squadId && WEAPONS[options.weapon]?.emplaced)
+      ? `${side}_${options.squadId}` : null;
+    if (emplacementId && this.soldiers.some((candidate) => candidate.alive
+      && candidate.emplacementId === emplacementId)) return null;
     const w = this.insideWalls;
     if (w) { x = Clamp(x, w.minX, w.maxX); z = Clamp(z, w.minZ, w.maxZ); }
     // 走不到的口袋里不许生人：三个占领点的圆心在封闭院落里，守军撒进去之后
@@ -437,6 +465,8 @@ export class AiDirector {
     const slotSpec = SQUAD_SLOTS[slot];
     soldier.squadId = assignedSquadId || `${side}_${Math.floor(serial / SQUAD_SIZE)}`;
     soldier.squadSlot = slot;
+    // 战位登记必须用**改名前**的那个 id（assignedSquadId 可能已被改成 `..._1`）
+    soldier.emplacementId = emplacementId;
     // 真正的轻机枪手永远承担掩护，不会因为出生序号恰好落在突击位就抱着机枪冲刺。
     soldier.tacticalRole = soldier.weapon.rpm ? "support" : slotSpec.role;
     soldier.position.y = y;
