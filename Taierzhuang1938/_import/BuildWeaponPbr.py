@@ -93,6 +93,15 @@ if __name__ == "__main__":
     build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
+    # Dedicated gate surfaces.  These stay separate from the city-wide brick and
+    # roof recipes because the four gate complexes are the closest, most often
+    # framed landmarks: they need larger handmade units and stronger age cues
+    # without making every house and kilometre of curtain wall equally noisy.
+    build_if_source("GateBrick", normal_strength=4.1, metalness=0, rough_min=174, rough_max=238)
+    build_if_source("GatePaintedWood", normal_strength=3.8, metalness=0,
+                    rough_min=184, rough_max=246)
+    build_if_source("GateRoofTile", normal_strength=4.0, metalness=0,
+                    rough_min=158, rough_max=226)
     # Image-generated, de-lit timber scan authored for the Chuchuan carriage.
     # Keep this separate from WeaponWoodV2: a rifle stock is varnished and fine-
     # grained, while troop-car bench boards are broad, dry and heavily abraded.
@@ -106,6 +115,7 @@ if __name__ == "__main__":
     build_if_source("ChurchPlaster", normal_strength=2.6, metalness=0, rough_min=190, rough_max=248)
     for stem in (
         "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
-        "BrickWallSooty", "Adobe", "Stone", "CarriageBenchWood",
+        "BrickWallSooty", "Adobe", "Stone", "GateBrick", "GatePaintedWood",
+        "GateRoofTile", "CarriageBenchWood",
     ):
         export_standalone_metallic_roughness(stem)

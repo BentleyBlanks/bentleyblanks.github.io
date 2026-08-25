@@ -479,6 +479,13 @@ export const RECIPES = {
   BrickWallSooty: (s) => BakeBrickWall((s ?? 512) * 2, { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   RoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 307 }),
+  // 四座滕县城门的专属近景材质。外部 imagegen PBR 加载失败时仍用这些
+  // 对齐尺度的程序化底材启动，不能让地标因为一张图 404 阻断整关。
+  GateBrick: (s) => BakeBrickWall((s ?? 512) * 2, {
+    seed: 331, rowsPerTile: 14, damage: 0.56, sootiness: 0.34,
+  }),
+  GatePaintedWood: (s) => BakeWood(s ?? 512, { seed: 347, planks: 5 }),
+  GateRoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 353, ridges: 11 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),
   WoodBeam: (s) => BakeWood(s ?? 256, { seed: 419, planks: 1, weathered: 0.7 }),
   // ImageGen 的枣刺篱笆 PBR 在启动时覆盖此兜底；失败时篱笆仍保持粗糙旧木质感。

@@ -444,6 +444,21 @@ async function Boot() {
         normal: "./Texture/Texture_RoofTileNormal.webp?v=1",
         orm: "./Texture/Texture_RoofTileOrm.webp?v=1",
       }),
+      library.LoadExternalSet("GateBrick", {
+        albedo: "./Texture/Texture_GateBrickBase.webp?v=gate20260826",
+        normal: "./Texture/Texture_GateBrickNormal.webp?v=gate20260826",
+        orm: "./Texture/Texture_GateBrickOrm.webp?v=gate20260826",
+      }),
+      library.LoadExternalSet("GatePaintedWood", {
+        albedo: "./Texture/Texture_GatePaintedWoodBase.webp?v=gate20260826",
+        normal: "./Texture/Texture_GatePaintedWoodNormal.webp?v=gate20260826",
+        orm: "./Texture/Texture_GatePaintedWoodOrm.webp?v=gate20260826",
+      }),
+      library.LoadExternalSet("GateRoofTile", {
+        albedo: "./Texture/Texture_GateRoofTileBase.webp?v=gate20260826",
+        normal: "./Texture/Texture_GateRoofTileNormal.webp?v=gate20260826",
+        orm: "./Texture/Texture_GateRoofTileOrm.webp?v=gate20260826",
+      }),
       library.LoadExternalSet("Sandbag", {
         albedo: "./Texture/Texture_SandbagBase.webp?v=regen20260824",
         normal: "./Texture/Texture_SandbagNormal.webp?v=regen20260824",

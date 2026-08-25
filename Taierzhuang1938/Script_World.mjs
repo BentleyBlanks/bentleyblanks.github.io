@@ -1730,6 +1730,45 @@ export function AddLoopholes(sink, {
 }
 
 /**
+ * 一块放射形券砖。旧城门用几层横盒阶梯逼近半圆，近看会露出明显锯齿；这里把
+ * 每一块券石做成真正的环形楔块并沿门道进深挤出，正面、背面与券洞内壁都连续。
+ */
+function MakeGateVoussoir(innerR, outerR, a0, a1, depth, tile, seed) {
+  const positions = [];
+  const uvs = [];
+  const seedOffset = (HashString(seed) % 977) / 977 * 2.5;
+  const point = (radius, angle, z) => [Math.cos(angle) * radius, Math.sin(angle) * radius, z];
+  const pushVertex = (p, sideUv = false) => {
+    positions.push(p[0], p[1], p[2]);
+    uvs.push(
+      (sideUv ? p[2] : p[0]) / tile + seedOffset,
+      p[1] / tile + seedOffset * 0.37,
+    );
+  };
+  const pushQuad = (a, b, c, d, sideUv = false) => {
+    for (const p of [a, b, c, a, c, d]) pushVertex(p, sideUv);
+  };
+  const z0 = -depth / 2, z1 = depth / 2;
+  const i0 = point(innerR, a0, z1), i1 = point(innerR, a1, z1);
+  const o0 = point(outerR, a0, z1), o1 = point(outerR, a1, z1);
+  const bi0 = point(innerR, a0, z0), bi1 = point(innerR, a1, z0);
+  const bo0 = point(outerR, a0, z0), bo1 = point(outerR, a1, z0);
+  pushQuad(o0, o1, i1, i0);                    // 外立面
+  pushQuad(bo1, bo0, bi0, bi1);                // 内立面
+  pushQuad(i0, i1, bi1, bi0, true);            // 券洞内壁
+  pushQuad(o1, o0, bo0, bo1, true);            // 外缘
+  pushQuad(o0, i0, bi0, bo0, true);            // 两条灰缝侧面
+  pushQuad(i1, o1, bo1, bi1, true);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  geometry.userData.gateVoussoir = { innerR, outerR, a0, a1, depth };
+  return geometry;
+}
+
+/**
  * 城门 —— 内外二门 + **半圆形瓮城** + 重檐亭阁式城楼。
  *
  * 志载：「城门皆有内外两门，外门呈半圆形称关门，两门之间俗称瓮城，
@@ -1757,6 +1796,21 @@ export function AddGateComplex(sink, spec) {
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
   const top = baseY + wallHeight;
   const widthAt = (y) => baseWidth + (topWidth - baseWidth) * ((y - baseY) / wallHeight);
+  const AddArchRing = ({ width, springY, depth, lz = 0, tag, segments = 17 }) => {
+    const innerR = width / 2;
+    const outerR = innerR + 0.48;
+    const mortarGap = 0.014;
+    const center = L(0, lz);
+    for (let i = 0; i < segments; i += 1) {
+      const a0 = (Math.PI * i) / segments + mortarGap;
+      const a1 = (Math.PI * (i + 1)) / segments - mortarGap;
+      sink.Add("GateBrickWorn", PlaceGeometry(
+        MakeGateVoussoir(innerR, outerR, a0, a1, depth, TILE_METERS.brick,
+          `${seed}:${tag}:${i}`),
+        { x: center.x, y: springY, z: center.z, ry }));
+    }
+    return outerR;
+  };
 
   // --- 门洞两侧的墙墩（就是城墙本身，只是在这一段里绕开门洞）---
   const pierW = (blockWidth - innerW) / 2;
@@ -1765,31 +1819,18 @@ export function AddGateComplex(sink, spec) {
     AddCityWall(sink, {
       ...L(lx, 0), ry, length: pierW, baseY, seed: `${seed}:pier${s}`,
       height: wallHeight, parapet, topWidth, baseWidth, plinth, sliceLen: 4.5,
-      merlons: true, innerParapet: true,
+      merlons: true, innerParapet: true, brick: "GateBrick",
     });
   }
   // --- 门洞上方的墙体 ---
-  const archTop = baseY + innerH + innerW / 2;
+  const innerArchOuterR = innerW / 2 + 0.48;
+  const archTop = baseY + innerH + innerArchOuterR;
   const above = L(0, 0);
-  sink.Add("CityBrick", PlaceGeometry(
+  sink.Add("GateBrick", PlaceGeometry(
     MakeBox(innerW + 0.1, top - archTop, widthAt((archTop + top) / 2), TILE_METERS.brick,
       `${seed}:above`, BRICK_UV_GRID),
     { x: above.x, y: (archTop + top) / 2, z: above.z, ry }));
-  // 券顶：五皮砖砌出半圆券，方门洞一眼假
-  for (let k = 0; k < 5; k += 1) {
-    const t0 = k / 5, t1 = (k + 1) / 5;
-    const y0 = baseY + innerH + (innerW / 2) * t0;
-    const y1 = baseY + innerH + (innerW / 2) * t1;
-    const halfW = (innerW / 2) * Math.cos(Math.asin(Math.min(1, (t0 + t1) / 2)));
-    const w = innerW - halfW * 2;
-    for (const s of [-1, 1]) {
-      const p = L(s * (halfW + w / 4), 0);
-      sink.Add("CityBrick", PlaceGeometry(
-        MakeBox(Math.max(0.08, w / 2), y1 - y0, widthAt(y0), TILE_METERS.brick,
-          `${seed}:arch${k}${s}`, BRICK_UV_GRID),
-        { x: p.x, y: (y0 + y1) / 2, z: p.z, ry }));
-    }
-  }
+  AddArchRing({ width: innerW, springY: baseY + innerH, depth: baseWidth + 0.12, tag: "innerArch" });
   // 门道墁地
   const pave = L(0, 0);
   sink.Add("Ashlar", PlaceGeometry(
@@ -1808,9 +1849,33 @@ export function AddGateComplex(sink, spec) {
   if (blocked === "none" || blocked === "partial") {
     for (const s of [-1, 1]) {
       const p = L(s * innerW / 4, -baseWidth / 2 + 0.35);
-      sink.Add("IronPlate", PlaceGeometry(
+      const leafRy = ry + s * 0.5;
+      sink.Add("GatePaintRed", PlaceGeometry(
         MakeBox(innerW / 2 - 0.06, innerH - 0.1, 0.14, TILE_METERS.wood, `${seed}:leaf${s}`),
-        { x: p.x, y: baseY + (innerH - 0.1) / 2, z: p.z, ry: ry + s * 0.5 }));
+        { x: p.x, y: baseY + (innerH - 0.1) / 2, z: p.z, ry: leafRy }));
+      // 三道横向熟铁门箍与铸钉。细节跟门扇一起转，开门时不会悬在原来的平面上。
+      const leafCos = Math.cos(leafRy), leafSin = Math.sin(leafRy);
+      const leafPoint = (lx, y) => ({
+        x: p.x + leafCos * lx + leafSin * 0.09,
+        y,
+        z: p.z - leafSin * lx + leafCos * 0.09,
+      });
+      for (let band = 0; band < 3; band += 1) {
+        const q = leafPoint(0, baseY + 0.95 + band * 1.55);
+        sink.Add("IronPlate", PlaceGeometry(
+          MakeBox(innerW / 2 - 0.16, 0.13, 0.055, TILE_METERS.wood,
+            `${seed}:leafBand${s}${band}`),
+          { x: q.x, y: q.y, z: q.z, ry: leafRy }));
+      }
+      for (let row = 0; row < 4; row += 1) {
+        for (let col = 0; col < 4; col += 1) {
+          const lx = -(innerW / 4 - 0.18) + (innerW / 2 - 0.36) * col / 3;
+          const q = leafPoint(lx, baseY + 0.62 + row * 1.24);
+          sink.Add("IronPlate", PlaceGeometry(
+            new THREE.CylinderGeometry(0.045, 0.052, 0.055, 8),
+            { x: q.x, y: q.y, z: q.z, rx: Math.PI / 2, ry: leafRy }));
+        }
+      }
     }
   }
 
@@ -1821,6 +1886,18 @@ export function AddGateComplex(sink, spec) {
       openW: innerW, openH: innerH, depth: baseWidth,
       mode: blocked, slitWidth,
     });
+    if (blocked === "full") {
+      // 南、北两门封死后在袋墙背面再加两根交叉木撑；从门洞缝隙能读出这是临战
+      // 封堵，不是程序生成的一堵规则沙包墙。
+      for (const s of [-1, 1]) {
+        sink.Add("WoodBeam", PlaceGeometry(
+          MakeBeamBetween(
+            [-innerW * 0.43, 0.72, -baseWidth * 0.18],
+            [innerW * 0.43, innerH - 0.62, -baseWidth * 0.18],
+            0.18, TILE_METERS.wood, `${seed}:brace${s}`),
+          { x, y: baseY, z, ry: ry + (s < 0 ? Math.PI : 0) }));
+      }
+    }
   }
 
   // --- 半圆瓮城 ---
@@ -1842,12 +1919,12 @@ export function AddGateComplex(sink, spec) {
     sink.Add("Ashlar", PlaceGeometry(
       MakeBox(chord, plinth, barbicanT + 0.2, TILE_METERS.stone, `${seed}:bp${i}`),
       { x: p.x, y: baseY + plinth / 2, z: p.z, ry: ry + am }));
-    sink.Add("CityBrick", PlaceGeometry(
+    sink.Add("GateBrick", PlaceGeometry(
       MakeBox(chord, barbicanH - plinth, barbicanT, TILE_METERS.brick, `${seed}:bb${i}`, BRICK_UV_GRID),
       { x: p.x, y: baseY + plinth + (barbicanH - plinth) / 2, z: p.z, ry: ry + am }));
     // 垛口
     if (i % 2 === 0) {
-      sink.Add("CityBrick", PlaceGeometry(
+      sink.Add("GateBrick", PlaceGeometry(
         MakeBox(chord * 0.62, parapet, 0.5, TILE_METERS.brick, `${seed}:bm${i}`, BRICK_UV_GRID),
         {
           x: p.x + Math.sin(ry + am) * (barbicanT / 2 - 0.25),
@@ -1866,35 +1943,50 @@ export function AddGateComplex(sink, spec) {
     const oPierW = 2 * (rMid * Math.sin(halfGateAngle)) - outerW / 2;
     for (const s of [-1, 1]) {
       const q = L(s * (outerW / 2 + oPierW / 2), lz);
-      sink.Add("CityBrick", PlaceGeometry(
+      sink.Add("GateBrick", PlaceGeometry(
         MakeBox(oPierW, barbicanH, barbicanT, TILE_METERS.brick, `${seed}:op${s}`, BRICK_UV_GRID),
         { x: q.x, y: baseY + barbicanH / 2, z: q.z, ry }));
       sink.Solid(q.x, baseY + barbicanH / 2, q.z, oPierW / 2, barbicanH / 2, barbicanT / 2, "cityWall", ry);
     }
-    const oArch = baseY + outerH + outerW / 2;
-    sink.Add("CityBrick", PlaceGeometry(
+    const outerArchOuterR = outerW / 2 + 0.48;
+    const oArch = baseY + outerH + outerArchOuterR;
+    sink.Add("GateBrick", PlaceGeometry(
       MakeBox(outerW + 0.1, barbicanH - (oArch - baseY), barbicanT, TILE_METERS.brick,
         `${seed}:oa`, BRICK_UV_GRID),
       { x: p.x, y: (oArch + baseY + barbicanH) / 2, z: p.z, ry }));
-    for (let k = 0; k < 4; k += 1) {
-      const t = (k + 0.5) / 4;
-      const y0 = baseY + outerH + (outerW / 2) * (k / 4);
-      const y1 = baseY + outerH + (outerW / 2) * ((k + 1) / 4);
-      const halfW = (outerW / 2) * Math.cos(Math.asin(t));
-      for (const s of [-1, 1]) {
-        const q = L(s * (halfW + (outerW / 2 - halfW) / 2), lz);
-        sink.Add("CityBrick", PlaceGeometry(
-          MakeBox(Math.max(0.06, outerW / 2 - halfW), y1 - y0, barbicanT, TILE_METERS.brick,
-            `${seed}:oar${k}${s}`, BRICK_UV_GRID),
-          { x: q.x, y: (y0 + y1) / 2, z: q.z, ry }));
-      }
-    }
+    AddArchRing({
+      width: outerW, springY: baseY + outerH, depth: barbicanT + 0.12,
+      lz, tag: "outerArch", segments: 15,
+    });
     if (plaqueOuter) {
       const q = L(0, lz + barbicanT / 2 - 0.1);
       sink.Add("Ashlar", PlaceGeometry(
         MakeBox(2.0, 0.66, 0.14, TILE_METERS.stone, `${seed}:oplq`),
         { x: q.x, y: baseY + outerH + 0.7, z: q.z, ry }));
     }
+  }
+
+  // 瓮城门道里两道浅车辙与门脚碎砖：读出几十年车马磨损和战时匆忙封门。
+  // 所有碎砖都退到门轴两侧 2.5 m 以外，西门历史机枪通视轴保持净空。
+  const yardCenterZ = foot + rMid * 0.52;
+  for (const lx of [-0.78, 0.78]) {
+    const p = L(lx, yardCenterZ);
+    sink.Add("RoadWear", PlaceGeometry(
+      MakeBox(0.28, 0.025, rMid * 1.18, TILE_METERS.ground, `${seed}:rut${lx}`),
+      { x: p.x, y: baseY + 0.095, z: p.z, ry }));
+  }
+  const debrisRnd = Mulberry32(HashString(`${seed}:gateDebris`));
+  for (let i = 0; i < 14; i += 1) {
+    const side = i % 2 ? -1 : 1;
+    const lx = side * (2.5 + debrisRnd() * 3.4);
+    const lz = foot + 1.5 + debrisRnd() * (rMid * 1.25);
+    const p = L(lx, lz);
+    sink.Add(i % 4 === 0 ? "Ashlar" : "GateBrickWorn", PlaceGeometry(
+      MakeBox(0.18 + debrisRnd() * 0.25, 0.10 + debrisRnd() * 0.18,
+        0.22 + debrisRnd() * 0.34, TILE_METERS.brick, `${seed}:debris${i}`),
+      { x: p.x, y: baseY + 0.08 + debrisRnd() * 0.09, z: p.z,
+        ry: ry + (debrisRnd() - 0.5) * 1.4,
+        rx: (debrisRnd() - 0.5) * 0.22, rz: (debrisRnd() - 0.5) * 0.18 }));
   }
 
   // --- 城楼（重檐亭阁式，坐在内门之上）---
@@ -1912,7 +2004,7 @@ export function AddGateComplex(sink, spec) {
     sink.Add("Ashlar", PlaceGeometry(
       MakeBox(sidework.width, plinth, sidework.out + 2.0, TILE_METERS.stone, `${seed}:sw0`),
       { x: p.x, y: baseY + plinth / 2, z: p.z, ry }));
-    sink.Add("CityBrick", PlaceGeometry(
+    sink.Add("GateBrick", PlaceGeometry(
       MakeBox(sidework.width, h - plinth, sidework.out + 2.0, TILE_METERS.brick, `${seed}:sw1`, BRICK_UV_GRID),
       { x: p.x, y: baseY + plinth + (h - plinth) / 2, z: p.z, ry }));
     sink.Solid(p.x, baseY + h / 2, p.z, sidework.width / 2, h / 2, (sidework.out + 2) / 2, "cityWall", ry);
@@ -1927,7 +2019,7 @@ export function AddGateComplex(sink, spec) {
     // 台顶垛口
     for (let i = 0; i < 5; i += 2) {
       const q = L(lx - sidework.width / 2 + (i + 0.5) * (sidework.width / 5), foot + sidework.out);
-      sink.Add("CityBrick", PlaceGeometry(
+      sink.Add("GateBrick", PlaceGeometry(
         MakeBox(1.0, parapet, 0.5, TILE_METERS.brick, `${seed}:swm${i}`, BRICK_UV_GRID),
         { x: q.x, y: baseY + h + parapet / 2, z: q.z, ry }));
       sink.Cover(q.x, q.z, baseY + h + parapet, sin, cos);
@@ -2156,7 +2248,7 @@ export function AddGateTower(sink, {
   sink.Solid(x, baseY + terraceH / 2 - 0.6, z, terraceW / 2, terraceH / 2 + 0.6, terraceD / 2, "tower", ry);
   const deck = baseY + terraceH;
 
-  // --- 石围栏：望柱 + 栏板 ---
+  // --- 石围栏：望柱 + 通透寻杖栏杆 ---
   const railH = 0.95;
   const posts = 9;
   // walkGap：墙顶走道从月台上穿过去的那一段（净宽 5 m 的墙顶 + 一点余量）。
@@ -2182,23 +2274,50 @@ export function AddGateTower(sink, {
     if (alongX) {
       const p = L(0, s * off);
       sink.Add("Ashlar", PlaceGeometry(
-        MakeBox(len, railH * 0.62, 0.14, TILE_METERS.stone, `${seed}:rail${side}`),
-        { x: p.x, y: deck + railH * 0.34, z: p.z, ry }));
+        MakeBox(len, 0.14, 0.14, TILE_METERS.stone, `${seed}:railBase${side}`),
+        { x: p.x, y: deck + 0.18, z: p.z, ry }));
       sink.Add("Ashlar", PlaceGeometry(
         MakeBox(len, 0.15, 0.24, TILE_METERS.stone, `${seed}:railCap${side}`),
         { x: p.x, y: deck + railH - 0.08, z: p.z, ry }));
+      const balusters = Math.max(4, Math.round(len / 0.72));
+      for (let i = 0; i <= balusters; i += 1) {
+        const t = -len / 2 + len * i / balusters;
+        const q = L(t, s * off);
+        sink.Add("Ashlar", PlaceGeometry(
+          new THREE.CylinderGeometry(0.055, 0.075, railH - 0.30, 7),
+          { x: q.x, y: deck + 0.18 + (railH - 0.30) / 2, z: q.z, ry }));
+      }
     } else {
       for (const half of [-1, 1]) {
         const segLen = len / 2 - walkGap;
         if (segLen < 0.4) continue;
         const p = L(s * off, half * (walkGap + segLen / 2));
         sink.Add("Ashlar", PlaceGeometry(
-          MakeBox(0.14, railH * 0.62, segLen, TILE_METERS.stone, `${seed}:rail${side}${half}`),
-          { x: p.x, y: deck + railH * 0.34, z: p.z, ry }));
+          MakeBox(0.14, 0.14, segLen, TILE_METERS.stone, `${seed}:railBase${side}${half}`),
+          { x: p.x, y: deck + 0.18, z: p.z, ry }));
         sink.Add("Ashlar", PlaceGeometry(
           MakeBox(0.24, 0.15, segLen, TILE_METERS.stone, `${seed}:railCap${side}${half}`),
           { x: p.x, y: deck + railH - 0.08, z: p.z, ry }));
+        const balusters = Math.max(2, Math.round(segLen / 0.72));
+        for (let i = 0; i <= balusters; i += 1) {
+          const localZ = half * (walkGap + segLen * i / balusters);
+          const q = L(s * off, localZ);
+          sink.Add("Ashlar", PlaceGeometry(
+            new THREE.CylinderGeometry(0.055, 0.075, railH - 0.30, 7),
+            { x: q.x, y: deck + 0.18 + (railH - 0.30) / 2, z: q.z, ry }));
+        }
       }
+    }
+  }
+
+  // 月台四角泄水石槽。伸出围栏的短挑嘴把雨水导离砖墙，也给大块月台盒子一个
+  // 可读的排水逻辑；位置避开墙顶通道。
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const p = L(sx * (terraceW / 2 - 0.65), sz * (terraceD / 2 + 0.18));
+      sink.Add("Ashlar", PlaceGeometry(
+        MakeBox(0.30, 0.16, 0.82, TILE_METERS.stone, `${seed}:scupper${sx}${sz}`),
+        { x: p.x, y: deck - 0.04, z: p.z, ry }));
     }
   }
 
@@ -2212,22 +2331,25 @@ export function AddGateTower(sink, {
       const lx = -bodyW / 2 + (bodyW * cx) / 3;
       const lz = -bodyD / 2 + bodyD * cz;
       const p = L(lx, lz);
-      sink.Add("PaintRed", PlaceGeometry(
-        MakeBox(0.34, columnH, 0.34, TILE_METERS.wood, `${seed}:col${cx}${cz}`),
+      sink.Add("GatePaintRed", PlaceGeometry(
+        new THREE.CylinderGeometry(0.18, 0.215, columnH, 12),
         { x: p.x, y: floor + columnH / 2, z: p.z, ry }));
+      sink.Add("Ashlar", PlaceGeometry(
+        new THREE.CylinderGeometry(0.29, 0.34, 0.22, 12),
+        { x: p.x, y: floor + 0.11, z: p.z, ry }));
     }
   }
   // 额枋（彩画那一条）：褪色的青绿 + 一条红
   for (const s of [-1, 1]) {
     const p = L(0, s * bodyD / 2);
-    sink.Add("PaintGreen", PlaceGeometry(
+    sink.Add("GatePaintGreen", PlaceGeometry(
       MakeBox(bodyW + 0.5, 0.42, 0.3, TILE_METERS.wood, `${seed}:arc${s}`),
       { x: p.x, y: floor + columnH - 0.3, z: p.z, ry }));
-    sink.Add("PaintRed", PlaceGeometry(
+    sink.Add("GatePaintRed", PlaceGeometry(
       MakeBox(bodyW + 0.5, 0.18, 0.34, TILE_METERS.wood, `${seed}:arcr${s}`),
       { x: p.x, y: floor + columnH - 0.66, z: p.z, ry }));
     const q = L(s * bodyW / 2, 0);
-    sink.Add("PaintGreen", PlaceGeometry(
+    sink.Add("GatePaintGreen", PlaceGeometry(
       MakeBox(0.3, 0.42, bodyD + 0.5, TILE_METERS.wood, `${seed}:arcx${s}`),
       { x: q.x, y: floor + columnH - 0.3, z: q.z, ry }));
   }
@@ -2235,7 +2357,7 @@ export function AddGateTower(sink, {
   // 与墙垂直的那两面各留一个门洞：墙顶走道从楼里穿过去。
   for (const s of [-1, 1]) {
     const p = L(0, s * (bodyD / 2 - 0.05));
-    sink.Add("CityBrick", PlaceGeometry(
+    sink.Add("GateBrick", PlaceGeometry(
       MakeBox(bodyW, 1.15, 0.28, TILE_METERS.brick, `${seed}:sill${s}`, BRICK_UV_GRID),
       { x: p.x, y: floor + 0.58, z: p.z, ry }));
     sink.Solid(p.x, floor + 0.58, p.z, bodyW / 2, 0.58, 0.2, "tower", ry);
@@ -2243,7 +2365,7 @@ export function AddGateTower(sink, {
       const segLen = bodyD / 2 - walkGap;
       if (segLen < 0.4) continue;
       const q = L(s * (bodyW / 2 - 0.05), half * (walkGap + segLen / 2));
-      sink.Add("CityBrick", PlaceGeometry(
+      sink.Add("GateBrick", PlaceGeometry(
         MakeBox(0.28, 1.15, segLen, TILE_METERS.brick, `${seed}:sillx${s}${half}`, BRICK_UV_GRID),
         { x: q.x, y: floor + 0.58, z: q.z, ry }));
       sink.Solid(q.x, floor + 0.58, q.z, 0.2, 0.58, segLen / 2, "tower", ry);
@@ -2257,25 +2379,25 @@ export function AddGateTower(sink, {
     const frameT = 0.12;
     for (const side of [-1, 1]) {
       const p = L(lx + side * w / 2, lz);
-      sink.Add("PaintRed", PlaceGeometry(
+      sink.Add("GatePaintRed", PlaceGeometry(
         MakeBox(frameT, h, 0.14, TILE_METERS.wood, `${seed}:${tag}:jamb${side}`),
         { x: p.x, y: y0 + h / 2, z: p.z, ry }));
     }
     for (const side of [0, 1]) {
       const p = L(lx, lz);
-      sink.Add("PaintGreen", PlaceGeometry(
+      sink.Add("GatePaintGreen", PlaceGeometry(
         MakeBox(w, frameT, 0.16, TILE_METERS.wood, `${seed}:${tag}:rail${side}`),
         { x: p.x, y: y0 + side * h, z: p.z, ry }));
     }
     for (let i = 1; i <= vertical; i += 1) {
       const p = L(lx - w / 2 + (w * i) / (vertical + 1), lz);
-      sink.Add("PaintGreen", PlaceGeometry(
+      sink.Add("GatePaintGreen", PlaceGeometry(
         MakeBox(0.065, h - frameT * 2, 0.11, TILE_METERS.wood, `${seed}:${tag}:v${i}`),
         { x: p.x, y: y0 + h / 2, z: p.z, ry }));
     }
     for (let i = 1; i <= horizontal; i += 1) {
       const p = L(lx, lz);
-      sink.Add("PaintGreen", PlaceGeometry(
+      sink.Add("GatePaintGreen", PlaceGeometry(
         MakeBox(w - frameT * 2, 0.065, 0.11, TILE_METERS.wood, `${seed}:${tag}:h${i}`),
         { x: p.x, y: y0 + (h * i) / (horizontal + 1), z: p.z, ry }));
     }
@@ -2293,13 +2415,13 @@ export function AddGateTower(sink, {
     // 明间门框：门洞本身保持全空，既有纵深，也不偷改唯一四条上城道的通行性。
     for (const jamb of [-1, 1]) {
       const p = L(jamb * 1.17, face * (bodyD / 2 - 0.10));
-      sink.Add("PaintRed", PlaceGeometry(
+      sink.Add("GatePaintRed", PlaceGeometry(
         MakeBox(0.16, lowerScreenH, 0.18, TILE_METERS.wood,
           `${seed}:doorJamb${face}${jamb}`),
         { x: p.x, y: lowerScreenY + lowerScreenH / 2, z: p.z, ry }));
     }
     const head = L(0, face * (bodyD / 2 - 0.10));
-    sink.Add("PaintGreen", PlaceGeometry(
+    sink.Add("GatePaintGreen", PlaceGeometry(
       MakeBox(2.5, 0.20, 0.20, TILE_METERS.wood, `${seed}:doorHead${face}`),
       { x: head.x, y: lowerScreenY + lowerScreenH - 0.10, z: head.z, ry }));
   }
@@ -2310,17 +2432,17 @@ export function AddGateTower(sink, {
       for (let i = 0; i < xCount; i += 1) {
         const lx = -w / 2 + (w * i) / Math.max(1, xCount - 1);
         const p = L(lx, side * d / 2);
-        sink.Add("PaintGreen", PlaceGeometry(
+        sink.Add("GatePaintGreen", PlaceGeometry(
           MakeBox(0.62, 0.22, 0.96, TILE_METERS.wood, `${seed}:${tag}dg${side}${i}`),
           { x: p.x, y: y - 0.20, z: p.z, ry }));
-        sink.Add("PaintRed", PlaceGeometry(
+        sink.Add("GatePaintRed", PlaceGeometry(
           MakeBox(0.38, 0.34, 0.54, TILE_METERS.wood, `${seed}:${tag}blk${side}${i}`),
           { x: p.x, y: y - 0.43, z: p.z, ry }));
       }
       for (let i = 1; i < 3; i += 1) {
         const lz = -d / 2 + (d * i) / 3;
         const p = L(side * w / 2, lz);
-        sink.Add("PaintGreen", PlaceGeometry(
+        sink.Add("GatePaintGreen", PlaceGeometry(
           MakeBox(0.96, 0.22, 0.62, TILE_METERS.wood, `${seed}:${tag}sideDg${side}${i}`),
           { x: p.x, y: y - 0.20, z: p.z, ry }));
       }
@@ -2342,7 +2464,7 @@ export function AddGateTower(sink, {
     const PlaceLocal = (material, geometry) => sink.Add(material,
       PlaceGeometry(geometry, { x, y: yEave, z, ry }));
 
-    PlaceLocal("TubeTile", MakeGateRoofShell(w, d, {
+    PlaceLocal("GateRoofTile", MakeGateRoofShell(w, d, {
       eaveOut, rise, cornerLift, thickness: 0.15, seed: `${seed}:${tag}:shell`,
     }));
 
@@ -2351,11 +2473,11 @@ export function AddGateTower(sink, {
     for (const side of [-1, 1]) {
       for (let i = 0; i < cuts.length - 1; i += 1) {
         const a = cuts[i], b = cuts[i + 1];
-        PlaceLocal("PaintGreen", MakeBeamBetween(
+        PlaceLocal("GatePaintGreen", MakeBeamBetween(
           [a, EaveY(a) - 0.17, side * halfD], [b, EaveY(b) - 0.17, side * halfD],
           0.18, TILE_METERS.wood, `${seed}:${tag}:fascia${side}${i}`));
       }
-      PlaceLocal("PaintRed", MakeBeamBetween(
+      PlaceLocal("GatePaintRed", MakeBeamBetween(
         [side * halfW, EaveY(halfW) - 0.23, -halfD],
         [side * halfW, EaveY(halfW) - 0.23, halfD],
         0.16, TILE_METERS.wood, `${seed}:${tag}:sideFascia${side}`));
@@ -2367,19 +2489,19 @@ export function AddGateTower(sink, {
       for (let i = 0; i <= tileRows; i += 1) {
         const lx = -halfW + (halfW * 2 * i) / tileRows;
         const ridgeX = Math.max(-ridgeHalf, Math.min(ridgeHalf, lx));
-        PlaceLocal("TubeTile", MakeBeamBetween(
+        PlaceLocal("GateRoofTile", MakeBeamBetween(
           [lx, EaveY(lx) + 0.08, side * halfD], [ridgeX, rise + 0.08, 0],
           0.075 * detailScale, TILE_METERS.roof, `${seed}:${tag}:tile${side}${i}`));
       }
     }
 
     // 正脊、四条戗脊与脊端吻兽，合起来把原来最明显的「交叉板」轮廓彻底换掉。
-    PlaceLocal("TubeTile", MakeBeamBetween(
+    PlaceLocal("GateRoofTile", MakeBeamBetween(
       [-ridgeHalf - 0.36, rise + 0.14, 0], [ridgeHalf + 0.36, rise + 0.14, 0],
       0.34 * detailScale, TILE_METERS.roof, `${seed}:${tag}:mainRidge`));
     for (const sideX of [-1, 1]) {
       for (const sideZ of [-1, 1]) {
-        PlaceLocal("TubeTile", MakeBeamBetween(
+        PlaceLocal("GateRoofTile", MakeBeamBetween(
           [sideX * ridgeHalf, rise + 0.11, 0],
           [sideX * halfW, EaveY(halfW) + 0.11, sideZ * halfD],
           0.22 * detailScale, TILE_METERS.roof, `${seed}:${tag}:hip${sideX}${sideZ}`));
@@ -2387,17 +2509,17 @@ export function AddGateTower(sink, {
           const bx = sideX * (ridgeHalf + (halfW - ridgeHalf) * t);
           const bz = sideZ * halfD * t;
           const by = rise * (1 - t) + EaveY(halfW) * t + 0.25;
-          PlaceLocal("TubeTile", PlaceGeometry(
+          PlaceLocal("GateRoofTile", PlaceGeometry(
             MakeBox(0.22 * detailScale, 0.30 * detailScale, 0.22 * detailScale,
               TILE_METERS.roof, `${seed}:${tag}:beast${sideX}${sideZ}${t}`),
             { x: bx, y: by, z: bz }));
         }
       }
-      PlaceLocal("TubeTile", PlaceGeometry(
+      PlaceLocal("GateRoofTile", PlaceGeometry(
         MakeBox(0.44 * detailScale, 0.72 * detailScale, 0.42 * detailScale,
           TILE_METERS.roof, `${seed}:${tag}:chiwen${sideX}`),
         { x: sideX * (ridgeHalf + 0.24), y: rise + 0.44, z: 0 }));
-      PlaceLocal("TubeTile", PlaceGeometry(
+      PlaceLocal("GateRoofTile", PlaceGeometry(
         MakeBox(0.36 * detailScale, 0.20 * detailScale, 0.62 * detailScale,
           TILE_METERS.roof, `${seed}:${tag}:chiwenNose${sideX}`),
         { x: sideX * (ridgeHalf + 0.42), y: rise + 0.57, z: 0 }));
@@ -2414,17 +2536,20 @@ export function AddGateTower(sink, {
       const lx = -upW / 2 + (upW * cx) / 3;
       const lz = -upD / 2 + upD * cz;
       const p = L(lx, lz);
-      sink.Add("PaintRed", PlaceGeometry(
-        MakeBox(0.28, upperH, 0.28, TILE_METERS.wood, `${seed}:ucol${cx}${cz}`),
+      sink.Add("GatePaintRed", PlaceGeometry(
+        new THREE.CylinderGeometry(0.145, 0.175, upperH, 10),
         { x: p.x, y: upFloor + upperH / 2, z: p.z, ry }));
+      sink.Add("Ashlar", PlaceGeometry(
+        new THREE.CylinderGeometry(0.23, 0.26, 0.16, 10),
+        { x: p.x, y: upFloor + 0.08, z: p.z, ry }));
     }
   }
   for (const s of [-1, 1]) {
     const p = L(0, s * upD / 2);
-    sink.Add("PaintGreen", PlaceGeometry(
+    sink.Add("GatePaintGreen", PlaceGeometry(
       MakeBox(upW + 0.4, 0.34, 0.26, TILE_METERS.wood, `${seed}:uarc${s}`),
       { x: p.x, y: upFloor + upperH - 0.25, z: p.z, ry }));
-    sink.Add("CityBrick", PlaceGeometry(
+    sink.Add("GateBrick", PlaceGeometry(
       MakeBox(upW, 0.9, 0.24, TILE_METERS.brick, `${seed}:usill${s}`, BRICK_UV_GRID),
       { x: p.x, y: upFloor + 0.45, z: p.z, ry }));
   }

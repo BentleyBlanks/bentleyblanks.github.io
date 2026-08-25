@@ -57,7 +57,8 @@ const GAME_SHOTS = [
   // 城楼专项回归：东门外仰看宗鲁门。菜单长焦能验轮廓，这一张负责验屋面不穿插、
   // 檐下斗拱和月台石栏在近景也确实存在，防止以后又退化成四块交叉板。
   { name: "Game_Z3_GateTower", query: "shot=1&phase=4&quality=high&scale=medium",
-    setup: { x: 360, z: 0, yaw: Math.PI / 2, pitch: 0.22 } },
+    // 东门轴在 z=-65；旧 z=0 拍到的只是门南侧一堵墙，城楼从未进画。
+    setup: { x: 360, z: -65, yaw: Math.PI / 2, pitch: 0.22, quiet: true } },
   // 生活层专项：冻结敌军开火，避免中弹红闪把路肩家什、车辙和院落细节染没。
   { name: "Game_Z4_CityLife", query: "shot=1&phase=5&quality=high&scale=medium",
     // CentralEastStreet 只延伸到 x=75；旧 x=88 在城图重排后会落进院墙。
