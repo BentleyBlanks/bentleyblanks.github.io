@@ -128,6 +128,7 @@ ACTION_ICONS.action = ACTION_ICONS.interact;
  */
 export function ContextualActionPrompts({
   interaction = null, bleeding = 0, bandages = 0, slots = {},
+  bayonet = null, ammoEmpty = false,
 } = {}) {
   const prompts = [];
   if (interaction?.label) {
@@ -135,6 +136,13 @@ export function ContextualActionPrompts({
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
     prompts.push({ keys: "B", label: "包扎止血", kind: "bandage" });
+  }
+  // 空枪时先教"这一下还能捅出去"，再教装填 —— 白刃是贴脸时唯一来得及的选项
+  if (ammoEmpty) {
+    prompts.push({ keys: "左键", label: "白刃（按住蓄力劈刺）", kind: "melee" });
+  }
+  if (bayonet) {
+    prompts.push({ keys: "X", label: bayonet.fixed ? "收刺刀" : "上刺刀", kind: "bayonet" });
   }
   const firearms = [
     ["primary", "1", "长枪"],

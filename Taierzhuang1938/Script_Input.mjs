@@ -36,7 +36,10 @@ export const CONTROL_GUIDE = [
       { keys: "1 / 2 / 3 / 4", label: "长枪 / 短枪 / 大刀 / 投掷物" },
       { keys: "滚轮", label: "循环切换已有武器" },
       { keys: "R / 0", label: "装填 / 切换射击模式" },
-      { keys: "T / V", label: "架两脚架 / 白刃" },
+      { keys: "T", label: "架两脚架" },
+      { keys: "V", label: "白刃：点按挥砍，按住蓄力劈刺" },
+      { keys: "X", label: "装 / 卸刺刀（可装刺刀的枪）" },
+      { keys: "空枪左键", label: "没子弹时点左键直接白刃" },
       { keys: "G / H", label: "投手榴弹 / 集束手榴弹" },
       { keys: "F", label: "拾枪、换枪或给战友分弹" },
       { keys: "B", label: "有绷带且流血时包扎止血" },
@@ -93,7 +96,11 @@ export const KEYMAP = [
   // --- 动词 -----------------------------------------------------------------
   { code: "KeyR", action: "reload", mode: "press", context: "any" },
   { code: "KeyT", action: "bipod", mode: "press", context: "any" },
-  { code: "KeyV", action: "melee", mode: "press", context: "any" },
+  // 白刃是**按住蓄力**的：点按挥砍，按住 0.3 s 以上松手是劈刺。
+  // 所以 V 走 holdAction（下发 down/up 两个边沿），不再是单次 press。
+  { code: "KeyV", action: "melee", mode: "holdAction", context: "any" },
+  // 装 / 卸刺刀。只有 Data_Weapons 里 bayonet: true 的枪吃这个键。
+  { code: "KeyX", action: "bayonet", mode: "press", context: "any" },
   { code: "KeyB", action: "bandage", mode: "press", context: "any" },
   // F 是最拥挤的一个键，语义按上下文分流（拾枪拾弹 / 分弹药 / 将来的救人拖人）。
   // **它不再是"叫炮"** —— 叫炮进了 Tab 轮盘的第 8 格。

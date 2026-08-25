@@ -32,6 +32,27 @@ export const AMMO = {
 };
 
 /**
+ * 持枪白刃的口径（大刀不走这张表，它有自己的 swingTimeS / damage）。
+ *
+ * 两个动作按**蓄力**区分：点按是挥砍（快、浅、砍不死一个满血兵），
+ * 按住超过 chargeMinS 再松手是劈刺（慢、深、一下放倒一个 100 血的步兵）。
+ * 没上刺刀（或这支枪装不了刺刀）时同一对输入退化成枪托横扫 / 蓄力重砸。
+ *
+ * damage 参照系：AI 步兵 health = 100（Script_Ai），日军拼刺对玩家的基准也是
+ * 110（TryBayonet）。所以劈刺基伤 105 = 「劈刺见血封喉」，挥砍 90 = 两下，
+ * 枪托 60 = 三下 —— 白刃的层级感全靠这三个数拉开，别调平。
+ * thrust 的 reach 在 Combat 里还要加上这支枪的 bayonetLengthM（臂展 + 刀长）。
+ */
+export const GUN_MELEE = {
+  bash: { damage: 60, reachM: 1.55, timeS: 0.50, arcDot: 0.55 },
+  slash: { damage: 90, reachM: 1.85, timeS: 0.55, arcDot: 0.50 },
+  thrust: { damage: 105, chargedBonus: 70, reachM: 1.70, timeS: 0.62, arcDot: 0.78 },
+  // 按住多久算「蓄力劈刺」；蓄满（chargeMaxS）后 power = 1，不再涨
+  chargeMinS: 0.30,
+  chargeMaxS: 0.85,
+};
+
+/**
  * 武器表。
  * 几何尺寸单位为米，用于第一人称模型与人物手持模型的实际比例。
  * damage 是"命中躯干"的基准，Rules 层再按部位与距离修正。
@@ -54,7 +75,8 @@ export const WEAPONS = {
     recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
     swayScale: 1.0, adsTimeS: 0.28, adsFovScale: 0.72,
     spreadHipDeg: 2.6, spreadAdsDeg: 0.18,
-    bayonet: true, bayonetLengthM: 0.395,
+    // HY1935 刺刀：全长约 572 mm、刃长约 428 mm —— 比汉阳造的 395 mm 长一截
+    bayonet: true, bayonetLengthM: 0.428,
     note: "枪口初速 810 m/s，瞄准基线 503.5 mm。装填是桥夹压入，不是一发一发塞。",
   },
   HanYang: {

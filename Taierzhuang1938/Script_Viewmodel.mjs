@@ -28,12 +28,12 @@
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
-import { WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 
 const DEG = Math.PI / 180;
@@ -1199,6 +1199,9 @@ export class Viewmodel {
     this.weapon = null;
     this.rig = null;
     this.action = null;
+    // 刺刀是否装在枪上。逻辑归 Main 的 state 管，这里只是渲染侧镜像：
+    // Equip 重建 rig 后靠它恢复可见性，深度预算也按它给刀身留量。
+    this.bayonetFixed = false;
     this.adsSuppress = 1;      // 拉栓/装填时枪离开瞄准线的程度，相机 FOV 也读它
     this.bobPhase = 0;
     this.elapsed = 0;
@@ -1416,6 +1419,21 @@ export class Viewmodel {
     this.recoilPitchSpring = SpringFromRecover(recover, 0.52);
     this.recoilYawSpring = SpringFromRecover(recover * 1.2, 0.6);
 
+    // 上刺刀：独立的 Bayonet*.tzm 按 socket 挂点扣到枪口。手搭兜底 rig 自带
+    // 盒状刺刀件（parts.bayonet 非空）就不重复挂；导入枪模默认没有（BuildFromModel
+    // 里 bayonet: null），从这里补上真模型。
+    if (!this.rig.parts.bayonet && this.weapon.bayonet) {
+      const prop = this._BuildBayonetProp(weaponId);
+      if (prop) {
+        this.rig.group.add(prop);
+        this.rig.parts.bayonet = prop;
+      }
+    }
+    // 刺刀可见性跟着装配状态走（换枪重建 rig，可见性得重新种一遍）
+    if (this.rig.parts.bayonet) {
+      this.rig.parts.bayonet.visible = this.bayonetFixed && !!this.weapon.bayonet;
+    }
+
     // 姿态表
     const kind = PoseKindOf(this.weapon);
     this.hipPose = { ...HIP_POSES[kind] };
@@ -1570,7 +1588,13 @@ export class Viewmodel {
     if (this.rig) {
       // 最深点 = 腰射姿态下的枪口（开镜时枪会往回收，只会更浅）
       deepest = Math.abs(this.hipPose.pz + this.rig.muzzle.z) + 0.04;
-      if (this.rig.parts.bayonet) deepest += 0.02;
+      if (this.rig.parts.bayonet) {
+        // 上了刺刀整支枪长出一截刀身，深度预算得把它算进去（否则刀尖天天插墙）；
+        // 没上时只留 2 cm 余量给动作里的亮刀瞬间
+        deepest += this.bayonetFixed && this.weapon?.bayonet
+          ? (this.weapon.bayonetLengthM || 0.4) * 0.85
+          : 0.02;
+      }
     }
     const scale = Clamp(this.depthBudget / Math.max(0.2, deepest * stretch), 0.55, 1.0);
     this.compensation.set(scale, scale, scale * stretch);
@@ -1589,6 +1613,40 @@ export class Viewmodel {
     const vmFov = Clamp(this.fov * (worldFov / this.worldFovBase), 8, 120);
     const k = Math.tan(vmFov * 0.5 * DEG) / Math.tan(worldFov * 0.5 * DEG);
     return Clamp(1 / Math.max(0.2, k), 0.7, 1.45);
+  }
+
+  /**
+   * 实例化这支枪的刺刀模型（Bayonet*.tzm），按 socket 挂点摆到枪口上。
+   * socket 是枪口环中心：环套住枪口（再往后坐 12 mm，环箍贴枪口帽），
+   * 刃沿枪管前伸、柄贴护木下的刺刀座 —— 三个关系一次到位，不用逐枪调表。
+   */
+  _BuildBayonetProp(weaponId) {
+    const meshId = BAYONET_MESH_BY_WEAPON[weaponId];
+    const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
+    if (!doc || !this.rig || !this.rig.muzzle) return null;
+    const table = {};
+    for (const [meshName, vmName] of Object.entries(VM_MATERIAL_BY_MESH)) {
+      if (this.materials[vmName]) table[meshName] = this.materials[vmName];
+    }
+    let built = null;
+    try {
+      built = InstantiateModel(doc, { materials: table, batch: false });
+    } catch (error) {
+      console.warn(`[Viewmodel] ${meshId} 实例化失败：${String(error).slice(0, 160)}`);
+      return null;
+    }
+    const group = new THREE.Group();
+    group.name = `VmBayonet_${weaponId}`;
+    group.add(built.root);
+    group.updateMatrixWorld(true);
+    const socketNode = built.nodes.get("socket");
+    const socket = socketNode
+      ? new THREE.Vector3().setFromMatrixPosition(socketNode.matrixWorld)
+      : new THREE.Vector3();
+    const muzzle = this.rig.muzzle;
+    group.position.set(muzzle.x - socket.x, muzzle.y - socket.y,
+      muzzle.z - socket.z + 0.012);
+    return group;
   }
 
   _ClearRig() {
@@ -1688,16 +1746,73 @@ export class Viewmodel {
     return true;
   }
 
-  /** 近战：有刺刀的枪突刺，大刀劈砍，其余用枪托/枪管砸。 */
-  TriggerMelee() {
+  /**
+   * 白刃出招。mode：
+   *   "slash"  大刀劈砍（melee 类武器）
+   *   "cut"    上了刺刀的枪：挥砍（点按，快而浅）
+   *   "thrust" 上了刺刀的枪：蓄力劈刺（按住松手），power 0..1 决定突刺深度
+   *   "bash"   没上刺刀：枪托砸（蓄力只加 power）
+   * 不传 mode 按持械状态推：大刀→slash，已上刺刀→thrust，否则→bash
+   * （兼容既有调用）。从 meleeWind（蓄力）切入是合法转换，不算 Busy。
+   */
+  TriggerMelee(mode = null, power = 1) {
     if (!this.weapon || !this.rig) return false;
-    if (this.IsBusy()) return false;
+    const winding = !!(this.action && this.action.kind === "meleeWind");
+    if (!winding && this.IsBusy()) return false;
     const isBlade = this.weapon.kind === "melee";
-    const duration = isBlade ? (this.weapon.swingTimeS || 0.62) : 0.55;
-    this._StartAction("melee", duration);
-    this.action.melee = isBlade ? "slash" : (this.weapon.bayonet ? "thrust" : "bash");
-    if (this.rig.parts.bayonet) this.rig.parts.bayonet.visible = true;
+    const fixed = this.bayonetFixed && !!this.weapon.bayonet;
+    if (!mode) mode = isBlade ? "slash" : (fixed ? "thrust" : "bash");
+    const spec = GUN_MELEE[mode === "cut" ? "slash" : mode];
+    const duration = isBlade ? (this.weapon.swingTimeS || 0.62) : (spec?.timeS || 0.55);
+    const a = this._StartAction("melee", duration);
+    a.melee = mode;
+    a.power = Clamp01(power);
+    // 蓄力段已经把「后拉」演完了，出招直接从爆发段接上，不再抬一次手
+    if (winding) a.t = mode === "thrust" ? 0.22 : 0.14;
     return true;
+  }
+
+  /**
+   * 白刃蓄力：按住（V 或空枪左键）那一段的持续姿态。
+   * 松手时调用方按住了多久决定挥砍还是劈刺，再走 TriggerMelee(mode, power)。
+   * 大刀不蓄力（swingTimeS 里自带 90 ms 短蓄），投掷物走 cook，不进这里。
+   */
+  BeginMeleeCharge() {
+    if (!this.weapon || !this.rig) return false;
+    if (this.weapon.kind === "melee" || this.weapon.kind === "throwable") return false;
+    if (this.IsBusy()) return false;
+    const a = this._StartAction("meleeWind", GUN_MELEE.chargeMaxS);
+    a.fixed = this.bayonetFixed && !!this.weapon.bayonet;
+    return true;
+  }
+
+  /** 取消蓄力（换枪、死亡、菜单）。不出招，姿态自然回位。 */
+  CancelMeleeCharge() {
+    if (this.action && this.action.kind === "meleeWind") this.action = null;
+  }
+
+  /**
+   * 装/卸刺刀。fix = 目标状态。逻辑状态立刻翻（深度预算、后续出招按新状态走），
+   * 可见性等动画中段左手真的够到枪口那一下再翻，"咔哒"才落在点上。
+   */
+  TriggerFixBayonet(fix) {
+    if (!this.weapon || !this.rig || !this.weapon.bayonet) return false;
+    if (!this.rig.parts.bayonet) return false;
+    if (this.IsBusy()) return false;
+    const a = this._StartAction("fixBayonet", 0.95);
+    a.fix = !!fix;
+    this.bayonetFixed = !!fix;
+    this._RecomputeCompensation(this._lastWorldFov || 60);
+    return true;
+  }
+
+  /** 直接同步刺刀状态（换枪/重生时用；带动画的路径走 TriggerFixBayonet）。 */
+  SetBayonetFixed(fixed) {
+    this.bayonetFixed = !!fixed;
+    if (this.rig && this.rig.parts.bayonet) {
+      this.rig.parts.bayonet.visible = this.bayonetFixed && !!(this.weapon && this.weapon.bayonet);
+    }
+    this._RecomputeCompensation(this._lastWorldFov || 60);
   }
 
   /** 投弹。power 0..1 是蓄力（只影响出手速度与摆幅，不影响时长）。 */
@@ -1717,7 +1832,9 @@ export class Viewmodel {
 
   IsBusy() {
     if (!this.action) return false;
-    return this.action.kind === "bolt" || this.action.kind === "reload" || this.action.kind === "melee";
+    return this.action.kind === "bolt" || this.action.kind === "reload"
+      || this.action.kind === "melee" || this.action.kind === "meleeWind"
+      || this.action.kind === "fixBayonet";
   }
 
   /** 枪口世界坐标。注意要反解掉 FOV/深度压缩，否则弹道会从"缩小后的假位置"射出。 */
@@ -1813,7 +1930,9 @@ export class Viewmodel {
     //
     // 静音的是**姿态**，不是冲刺本身：脚下照跑、体力照扣、步伐晃动（bob/cadence 读的是
     // 原始 sprint）也照旧。"边跑边挥刀"要的就是这个 —— 停下来才能挥的刀不是大刀。
-    const meleeing = !!(this.action && this.action.kind === "melee");
+    // 蓄力（meleeWind）与装刺刀也算白刃期：这两段同样不能从冲刺姿态起手
+    const meleeing = !!(this.action && (this.action.kind === "melee"
+      || this.action.kind === "meleeWind" || this.action.kind === "fixBayonet"));
     // 起 30 / 落 8：劈砍的蓄力段只有 90 ms，姿态必须在蓄力里就让出来，否则出刀那一下
     // 还有半个冲刺姿态压着。收招慢一倍，免得刀"啪"地弹回冲刺位置。
     this.meleeSprintMute += ((meleeing ? 1 : 0) - this.meleeSprintMute)
@@ -1964,14 +2083,18 @@ export class Viewmodel {
     if (!this.action || !this.rig) return;
     const a = this.action;
     a.t += dt / a.duration;
-    if (a.t >= 1) {
+    if (a.kind === "meleeWind") {
+      a.t = Math.min(a.t, 1);      // 蓄力顶满就停住，出招由松手驱动，不自动结束
+    } else if (a.t >= 1) {
       this._EndAction(a);
       return;
     }
     switch (a.kind) {
       case "bolt": this._AnimBolt(a.t, this.pendingHoldOpen); break;
       case "reload": this._AnimReload(a.t, a.reloadKind); break;
-      case "melee": this._AnimMelee(a.t, a.melee); break;
+      case "melee": this._AnimMelee(a.t, a.melee, a.power); break;
+      case "meleeWind": this._AnimMeleeWind(a.t, a.fixed); break;
+      case "fixBayonet": this._AnimFixBayonet(a.t, a); break;
       case "throw": this._AnimThrow(a.t, a.power, a.offhand); break;
       default: break;
     }
@@ -1992,7 +2115,14 @@ export class Viewmodel {
       this.pendingHoldOpen = false;
       this.clipProp.visible = false;
     }
-    if (a.kind === "melee" && this.rig.parts.bayonet) this.rig.parts.bayonet.visible = false;
+    // 收招只把**没装配**的刺刀收回去；上了刺刀的枪收招后刀还在枪上
+    if (a.kind === "melee" && this.rig.parts.bayonet && !this.bayonetFixed) {
+      this.rig.parts.bayonet.visible = false;
+    }
+    // 动画被打断（换枪等）也得落在目标状态上，不能停在半装半卸
+    if (a.kind === "fixBayonet" && this.rig.parts.bayonet) {
+      this.rig.parts.bayonet.visible = !!a.fix && !!(this.weapon && this.weapon.bayonet);
+    }
     if (a.kind === "throw") this.offhandGrenade.visible = false;
     this.action = null;
     if (this.onActionEnd) this.onActionEnd(a.kind);
@@ -2190,8 +2320,53 @@ export class Viewmodel {
     this.handRight.group.position.y = this.handBase.right.y + off * 0.12;
   }
 
-  /** 近战：刺刀突刺 / 大刀劈砍 / 枪托砸。 */
-  _AnimMelee(t, mode) {
+  /**
+   * 白刃蓄力（按住那段）的持续姿态：枪往右后收、刀尖微抬，蓄满带一点绷着的抖。
+   * fixed=true 的终点 ≈ thrust 的 pull 顶点、否则 ≈ bash 的后抡预备 ——
+   * 松手接 _AnimMelee 时衔接在同一姿态附近，不跳帧。
+   */
+  _AnimMeleeWind(t, fixed) {
+    const pull = Ease.Out(Ease.Seg(t, 0.00, 0.35));
+    const deep = Ease.InOut(Ease.Seg(t, 0.35, 1.00));
+    const w = pull * (0.85 + 0.35 * deep);
+    // 蓄满后的抖：幅度很小、频率高 —— 是"绷着"，不是"晃"
+    const shake = deep * 0.004 * Math.sin(this.elapsed * 34);
+    if (fixed) {
+      this.actionPivot.position.set(-0.06 * w + shake, 0.03 * w, 0.11 * w);
+      this.actionPivot.rotation.set(0.10 * w + shake * 2, 0.16 * w, -0.10 * w, "YXZ");
+    } else {
+      this.actionPivot.position.set(-0.10 * w + shake, 0.04 * w, 0.06 * w);
+      this.actionPivot.rotation.set(0.12 * w, -0.30 * w, 0.30 * w + shake * 2, "YXZ");
+    }
+  }
+
+  /**
+   * 装/卸刺刀：枪抬到胸前偏左侧立起来，左手离开护木去枪口按/拔，
+   * 中段（t=0.52，左手贴到枪口时）翻可见性 —— "咔哒"就落在那一下。
+   */
+  _AnimFixBayonet(t, a) {
+    const raise = Ease.InOut(Ease.Seg(t, 0.00, 0.25)) - Ease.InOut(Ease.Seg(t, 0.78, 1.00));
+    // 装上那一下整枪轻轻一沉（卸下没有）
+    const settle = a.fix ? Ease.Pulse(Ease.Seg(t, 0.52, 0.72)) : 0;
+    this.actionPivot.position.set(-0.030 * raise, 0.030 * raise - 0.012 * settle, 0.070 * raise);
+    this.actionPivot.rotation.set(0.32 * raise + 0.05 * settle, 0.26 * raise, -0.35 * raise, "YXZ");
+
+    // 左手：0.20—0.50 伸向枪口，0.60—0.85 收回护木
+    const reach = Ease.InOut(Ease.Seg(t, 0.20, 0.50)) - Ease.InOut(Ease.Seg(t, 0.60, 0.85));
+    const muzzle = this.rig.muzzle;
+    this._tmpVec.set(muzzle.x - 0.010, muzzle.y - 0.020, muzzle.z + 0.100);
+    this.handLeft.group.position.lerpVectors(this.handBase.left, this._tmpVec, reach);
+
+    if (t >= 0.52 && !a.applied) {
+      a.applied = true;
+      if (this.rig.parts.bayonet) {
+        this.rig.parts.bayonet.visible = !!a.fix && !!(this.weapon && this.weapon.bayonet);
+      }
+    }
+  }
+
+  /** 近战：刺刀劈刺（thrust）/ 刺刀挥砍（cut）/ 大刀劈砍（slash）/ 枪托砸（bash）。 */
+  _AnimMelee(t, mode, power = 1) {
     if (mode === "slash") {
       // 大刀：只蓄 90 ms，随后约 110 ms 内完成爆发斜劈。旧版 0.62 s 的
       // 前 24% 都在慢慢举、后 50% 又在慢慢回，真正的走刀只有约 160 ms，读起来
@@ -2220,18 +2395,38 @@ export class Viewmodel {
         -0.35 * wind - 1.25 * chop, "YXZ");
       return;
     }
+    if (mode === "cut") {
+      // 上了刺刀的枪：挥砍。刀刃从右上抡向左下的一道短弧 —— 幅度比大刀小
+      // （枪沉、双手握持点分得开，抡不出 175°），但爆发段同样短促。
+      const windUp = Ease.Out(Ease.Seg(t, 0.00, 0.16));
+      const release = Ease.In(Ease.Seg(t, 0.16, 0.42));
+      const recover = Ease.Out(Ease.Seg(t, 0.46, 0.88));
+      const wind = windUp - release;
+      const chop = release - recover;
+      this.swingPivot.rotation.set(-0.50 * wind + 0.90 * chop, -0.16 * wind - 0.55 * chop,
+        0.10 * wind + 0.30 * chop, "YXZ");
+      this.actionPivot.position.set(
+        0.045 * wind - 0.120 * chop,
+        0.040 * wind - 0.150 * chop,
+        0.050 * wind - 0.160 * chop);
+      this.actionPivot.rotation.set(
+        -0.10 * wind + 0.22 * chop,
+        0.10 * wind + 0.28 * chop,
+        -0.20 * wind - 0.55 * chop, "YXZ");
+      return;
+    }
     if (mode === "thrust") {
-      // 拼刺：先后撤蓄力再直捅出去。刺刀只在这一下亮出来（平时收起，见 BuildBoltRifle 注释）
+      // 拼刺：先后撤蓄力再直捅出去。蓄力越足（power）捅得越深。
       const pull = Ease.Out(Ease.Seg(t, 0.00, 0.22));
       const push = Ease.In(Ease.Seg(t, 0.22, 0.45));
       const back = Ease.Out(Ease.Seg(t, 0.50, 1.00));
-      const reach = push - back;
+      const reach = (push - back) * Mix(0.80, 1.25, Clamp01(power));
       this.actionPivot.position.set(-0.06 * pull + 0.05 * reach, 0.03 * pull + 0.02 * reach, 0.11 * pull - 0.34 * reach);
       this.actionPivot.rotation.set(0.10 * pull - 0.06 * reach, 0.16 * pull - 0.14 * reach, -0.10 * pull, "YXZ");
       return;
     }
-    // 枪托砸：短促的横向弧线
-    const hit = Ease.Pulse(t);
+    // 枪托砸：短促的横向弧线。蓄力只放大力道，不拖时间
+    const hit = Ease.Pulse(t) * Mix(0.85, 1.25, Clamp01(power));
     this.actionPivot.position.set(-0.16 * hit, 0.06 * hit, -0.12 * hit);
     this.actionPivot.rotation.set(0.20 * hit, -0.70 * hit, 0.55 * hit, "YXZ");
   }
