@@ -93,6 +93,11 @@ const GAME_SHOTS = [
   // 避免和既有东门仰视、东关常规战斗镜头重复。
   { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
+  // 城防图总验收：北向上、东向右的近正交鸟瞰。必须一张图同时读出四门错位、
+  // 环濠、主次街层级、城内功能院落与东西/北关；菜单与战斗 HUD 全部隐藏。
+  { name: "Game_Z23_CityDefensePlan", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower", hideMenu: true, sky: "chuchuanDay",
+      cam: { from: [0, 560, 1], look: [0, 0, -1], focalMm: 12.5 } } },
   // 两个缺口各留一张城外正面照：必须同时看见非对称 V 形断肩、黄褐夯土芯、
   // 墙体真实厚度、内外瓦砾扇与中央通行槽，防止以后又退回规则凹槽。
   { name: "Game_Z18_EastWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
@@ -229,6 +234,7 @@ const SETTLE_WAIT_MS = 220;
 async function ApplySetup(globalName, setup) {
   await page.evaluate(({ g, pose }) => {
     const game = window[g];
+    if (pose.sky && game.Debug?.ApplySky) game.Debug.ApplySky(pose.sky);
     // 编辑器语义层验收：点开机、开场景编辑器、装地图参考、转俯拍。
     // 这条路把页面状态改得回不了头 —— GroupShots 已保证它独占一组。
     if (pose.editorMapLabels) {

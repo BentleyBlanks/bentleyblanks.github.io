@@ -8,7 +8,8 @@
 
 import {
   CITY, MOAT, GATES, CROSSROAD, STREETS, SIGHT_CORRIDOR,
-  CITY_FEATURES, EAST_SUBURB, EAST_FIELD, EAST_DEFENSE, LEVEL_BOUNDS, BASTIONS, RAMPS, PRESUMED,
+  CITY_FEATURES, CITY_BLOCK_PROFILES, CITY_BLOCK_ZONES, STREET_LIFE_RESERVES,
+  EAST_SUBURB, EAST_FIELD, EAST_DEFENSE, LEVEL_BOUNDS, BASTIONS, RAMPS, PRESUMED,
 } from "./Data_Tengxian.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 
@@ -104,6 +105,11 @@ function overlapArea(a, b) {
   return width * depth;
 }
 
+function pointInBounds(x, z, bounds) {
+  return x >= bounds.minX - EPSILON && x <= bounds.maxX + EPSILON
+    && z >= bounds.minZ - EPSILON && z <= bounds.maxZ + EPSILON;
+}
+
 function streetForGate(gate) {
   const gateStreet = STREETS.find((street) => street.id === `${gate.id}GateStreet`);
   check(!!gateStreet, `${gate.id} gate needs a named ${gate.id}GateStreet.`);
@@ -162,15 +168,69 @@ for (const feature of CITY_FEATURES) {
   check(!corridorOverlap, `${feature.id} intrudes on the west-gate sight corridor.`);
 }
 
-// 道路层级：门里主街 > 城内次街 > 东关巷，防止示意图退化为同宽棋盘格。
-const secondaryStreets = STREETS.filter((street) => !mainStreets.includes(street));
-const narrowestMain = Math.min(...mainStreets.map((street) => street.width));
+// 道路层级：主街 > 次街 > 胡同，名称和宽度都要锁住，避免示意图退化为同宽棋盘格。
+const streetsByRank = (rank) => STREETS.filter((street) => street.rank === rank);
+const rankedMain = streetsByRank("main");
+const secondaryStreets = streetsByRank("secondary");
+const hutongs = streetsByRank("hutong");
+const narrowestMain = Math.min(...rankedMain.map((street) => street.width));
 const widestSecondary = Math.max(...secondaryStreets.map((street) => street.width));
+const widestHutong = Math.max(...hutongs.map((street) => street.width));
+check(rankedMain.length >= 4, "Layout needs explicitly ranked gate/main streets.");
 check(secondaryStreets.length > 0, "Layout needs named secondary streets in addition to gate streets.");
-check(narrowestMain > widestSecondary,
-  `Primary streets (${narrowestMain} m minimum) must be wider than secondary streets (${widestSecondary} m maximum).`);
+check(hutongs.length > 0, "Layout needs explicitly ranked hutongs below secondary streets.");
+check(narrowestMain > widestSecondary && widestSecondary > widestHutong,
+  `Street hierarchy must be main > secondary > hutong; got ${narrowestMain}/${widestSecondary}/${widestHutong} m.`);
 check(widestSecondary > EAST_SUBURB.lane.max,
   `Secondary streets (${widestSecondary} m) must be wider than east-suburb lanes (${EAST_SUBURB.lane.max} m).`);
+
+// 街坊分区：北／中／南公共院落是图纸的组织骨架，分区必须覆盖内城且不回退到同一地块尺度。
+const innerLimitForZones = CITY.wallCenter - CITY.wallBaseWidth / 2 - CITY.innerRingWidth;
+const zoneIds = new Set();
+const groupZones = new Map();
+for (const zone of CITY_BLOCK_ZONES) {
+  check(!zoneIds.has(zone.id), `Duplicate city block zone id: ${zone.id}.`);
+  zoneIds.add(zone.id);
+  check(!!CITY_BLOCK_PROFILES[zone.profile], `${zone.id} references missing profile ${zone.profile}.`);
+  check(zone.bounds.minX >= -innerLimitForZones && zone.bounds.maxX <= innerLimitForZones
+    && zone.bounds.minZ >= -innerLimitForZones && zone.bounds.maxZ <= innerLimitForZones,
+  `${zone.id} must stay within the wall-ring street.`);
+  if (!groupZones.has(zone.group)) groupZones.set(zone.group, []);
+  groupZones.get(zone.group).push(zone);
+}
+for (const group of ["NorthPublicCourtyards", "CentralPublicCourtyards", "SouthPublicCourtyards"]) {
+  check((groupZones.get(group) || []).length >= 2, `${group} needs multiple readable city blocks.`);
+}
+for (let x = -innerLimitForZones + 7; x < innerLimitForZones; x += 19) {
+  for (let z = -innerLimitForZones + 7; z < innerLimitForZones; z += 19) {
+    check(CITY_BLOCK_ZONES.some((zone) => pointInBounds(x, z, zone.bounds)),
+      `City block zones leave uncovered interior sample at (${x}, ${z}).`);
+  }
+}
+const profileList = Object.values(CITY_BLOCK_PROFILES);
+const parcelShapes = new Set(profileList.map((profile) => profile.parcel.join("x")));
+const densityValues = new Set(profileList.map((profile) =>
+  (10000 / ((profile.parcel[0] + profile.lane) * (profile.parcel[1] + profile.lane))).toFixed(3)));
+check(parcelShapes.size >= 4, "City block profiles need materially varied parcel sizes/orientations.");
+check(densityValues.size >= 4, "City block profiles need materially varied parcel densities.");
+check(profileList.every((profile) => profile.scale[0] < profile.scale[1] && profile.stagger > 0),
+  "Every city block profile must produce deterministic scale variation and row offset.");
+for (const reserve of STREET_LIFE_RESERVES) {
+  check(STREETS.some((street) => streetTouchesRect(street, reserve.bounds)),
+    `${reserve.id} must stay attached to a named street rather than becoming a stray vacant lot.`);
+}
+const listedFeatureIds = CITY_BLOCK_ZONES.flatMap((zone) => zone.featureIds);
+check(new Set(listedFeatureIds).size === CITY_FEATURES.length
+  && listedFeatureIds.length === CITY_FEATURES.length,
+"Every public feature must belong to exactly one north/central/south city-block group.");
+for (const zone of CITY_BLOCK_ZONES) {
+  for (const featureId of zone.featureIds) {
+    const feature = CITY_FEATURES.find((candidate) => candidate.id === featureId);
+    check(!!feature, `${zone.id} lists an unknown public feature ${featureId}.`);
+    if (feature) check(pointInBounds(feature.x, feature.z, zone.bounds),
+      `${featureId} must remain in its declared ${zone.group} zone.`);
+  }
+}
 
 // 图中公共院落必须留在内城、互不大面积压盖，并不许覆盖道路。
 const innerLimit = CITY.wallCenter - CITY.wallBaseWidth / 2 - CITY.innerRingWidth;
@@ -231,6 +291,20 @@ check(EAST_DEFENSE.grenadePositions.every((position) =>
 "East-wall grenade positions must flank the actual breach rather than the obsolete gate overlap.");
 check(EAST_SUBURB.bounds.minX > MOAT.outerEdge,
   "East-suburb residences must start outside the moat, never on the moat or inside the city.");
+const eastMapBlocks = EAST_SUBURB.mapBlocks || [];
+const eastMapLanes = EAST_SUBURB.mapLanes || [];
+check(eastMapBlocks.length === 13,
+  `East suburb must preserve the diagram's 13 closed frames; got ${eastMapBlocks.length}.`);
+check(new Set(eastMapBlocks.map((block) => block.id)).size === eastMapBlocks.length,
+  "Every diagram-derived east-suburb frame needs a unique id.");
+const eastGroups = new Map();
+for (const block of eastMapBlocks) eastGroups.set(block.sourceGroup,
+  (eastGroups.get(block.sourceGroup) || 0) + 1);
+check(eastGroups.get("northEast") === 5 && eastGroups.get("core") === 6
+  && eastGroups.get("southEast") === 2,
+"East-suburb frame groups must remain 5 north-east + 6 core + 2 south-east.");
+check(eastMapLanes.length === 3 && eastMapLanes.some((lane) => lane.id === "EastGuangStreet"),
+  "East suburb needs the diagram's central road and two cross-lanes between closed frames.");
 const usableEastWidth = EAST_SUBURB.bounds.maxX - EAST_SUBURB.bounds.minX;
 const usableEastDepth = EAST_SUBURB.bounds.maxZ - EAST_SUBURB.bounds.minZ;
 const minimumHomes = Math.floor(usableEastWidth / 20) * Math.floor(usableEastDepth / 18);
@@ -260,7 +334,7 @@ for (const feature of EAST_SUBURB.features) {
 
 // 一切从示意图落到数值的关系都必须显式登记为推定，免得后续文案误报为测绘事实。
 const presumedIds = new Set(PRESUMED.map((item) => item.id));
-for (const id of ["streetWidths", "crossroadPosition", "streetTopology", "gateOffsets", "cityFeatureLayout", "eastSuburbLayout"]) {
+for (const id of ["streetWidths", "streetParcelClearance", "streetLifeReserves", "crossroadPosition", "streetTopology", "cityBlockZones", "gateOffsets", "cityFeatureLayout", "eastSuburbLayout"]) {
   check(presumedIds.has(id), `PRESUMED must record the layout assumption: ${id}.`);
 }
 

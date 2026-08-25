@@ -214,33 +214,74 @@ export const DUGOUT = { spacing: 40, width: 1.2, height: 1.6, depth: 3.0 };
  * **街巷宽度全部为推定，无任何实测数据。**
  */
 // 生成器、碰撞与菜单都以原点绘制十字街口；不得再把数据路标偏到 z=20。
-export const CROSSROAD = { x: 0, z: 0, size: 30 };
+export const CROSSROAD = { x: 0, z: 0, size: 30, parcelClearance: 6 };
+
+/** 民居地块退到路肩生活层之外；路面净宽与住宅退让分开记录，均为推定。 */
+export const STREET_PARCEL_CLEARANCE = { main: 3.6, secondary: 2.2, hutong: 0.8 };
+
+/**
+ * 现有街肩生活组需要的局部公共空地。它们从街坊可建地中扣除，而不是把静态
+ * 车、酒坛或门板塞回民居院墙里；尺寸均为布设兼容性的推定，不是道路实测。
+ */
+export const STREET_LIFE_RESERVES = [
+  { id: "WestGateStreetLifeReserve", bounds: { minX: -190, maxX: -169, minZ: -28, maxZ: -8 } },
+  { id: "KuiwenEastStreetLifeReserve", bounds: { minX: 191, maxX: 205, minZ: 67, maxZ: 79 } },
+];
 
 export const STREETS = [
   // 主街骨架：四门契约（*GateStreet 命名 + 连门）与十字口双主轴，测试锁死不可动。
-  { id: "WestGateStreet", axis: "x", at: 0, from: -305, to: 0, width: 9, label: "西门大街" },
-  { id: "CentralEastStreet", axis: "x", at: 0, from: 0, to: 75, width: 8, label: "十字街" },
-  { id: "EastGateStreet", axis: "x", at: -65, from: 52, to: 300, width: 9, label: "东门大街" },
-  { id: "EastGateLink", axis: "z", at: 52, from: -65, to: 0, width: 6, label: "县署前街" },
+  { id: "WestGateStreet", axis: "x", at: 0, from: -305, to: 0, width: 9, rank: "main", label: "西门大街" },
+  { id: "CentralEastStreet", axis: "x", at: 0, from: 0, to: 75, width: 8, rank: "main", label: "十字街" },
+  { id: "EastGateStreet", axis: "x", at: -65, from: 52, to: 300, width: 9, rank: "main", label: "东门大街" },
+  { id: "EastGateLink", axis: "z", at: 52, from: -65, to: 0, width: 6, rank: "main", label: "县署前街" },
   // 城防示意图：门里为北门大街，北关大街在城外（见 NORTH_SUBURB.street）。
-  { id: "NorthGateStreet", axis: "z", at: -145, from: -300, to: -145, width: 7, label: "北门大街" },
-  { id: "CentralNorthStreet", axis: "z", at: 0, from: -145, to: 0, width: 7, label: "北门大街南段" },
-  { id: "CentralSouthStreet", axis: "z", at: 0, from: 0, to: 66, width: 7, label: "南门里大街北段" },
-  { id: "SouthGateLink", axis: "x", at: 66, from: 0, to: 70, width: 6, label: "南门里大街转折" },
-  { id: "SouthGateStreet", axis: "z", at: 70, from: 66, to: 300, width: 8, label: "南门里大街" },
+  { id: "NorthGateStreet", axis: "z", at: -145, from: -300, to: -145, width: 7, rank: "main", label: "北门大街" },
+  { id: "CentralNorthStreet", axis: "z", at: 0, from: -145, to: 0, width: 7, rank: "main", label: "北门大街南段" },
+  { id: "CentralSouthStreet", axis: "z", at: 0, from: 0, to: 66, width: 7, rank: "main", label: "南门里大街北段" },
+  { id: "SouthGateLink", axis: "x", at: 66, from: 0, to: 70, width: 6, rank: "main", label: "南门里大街转折" },
+  { id: "SouthGateStreet", axis: "z", at: 70, from: 66, to: 300, width: 8, rank: "main", label: "南门里大街" },
   // 次街 v2 —— 照城防示意图重排：新增顺兴街/后门大街/当典后街/奎文街，
   // 关西店街、董文炳街两个无出处街名分别归位为图上的关岳庙街、奎文东街。
-  { id: "LongwangTempleStreet", axis: "x", at: -145, from: -145, to: 88, width: 5, label: "龙王庙街" },
-  { id: "HoumenStreet", axis: "z", at: -75, from: -260, to: -149, width: 5, label: "后门大街" },
-  { id: "ShunxingStreet", axis: "z", at: -185, from: -90, to: 122, width: 5, label: "顺兴街" },
-  { id: "DangdianBackStreet", axis: "x", at: -90, from: -185, to: 52, width: 5, label: "当典后街" },
-  { id: "DangdianEastStreet", axis: "x", at: 90, from: -185, to: 150, width: 5, label: "当典东街" },
-  { id: "GuanyueTempleStreet", axis: "z", at: 150, from: -65, to: 122, width: 5, label: "关岳庙街" },
-  { id: "KuiwenStreet", axis: "z", at: 118, from: 86, to: 210, width: 5, label: "奎文街" },
-  { id: "KuiwenEastStreet", axis: "z", at: 192, from: 66, to: 210, width: 5, label: "奎文东街" },
-  { id: "FireGodTempleEastStreet", axis: "x", at: 210, from: -145, to: 192, width: 5, label: "火神庙东街" },
+  { id: "LongwangTempleStreet", axis: "x", at: -145, from: -145, to: 88, width: 5, rank: "secondary", label: "龙王庙街" },
+  { id: "HoumenStreet", axis: "z", at: -75, from: -260, to: -149, width: 5, rank: "secondary", label: "后门大街" },
+  { id: "ShunxingStreet", axis: "z", at: -185, from: -90, to: 122, width: 5, rank: "secondary", label: "顺兴街" },
+  { id: "DangdianBackStreet", axis: "x", at: -90, from: -185, to: 52, width: 5, rank: "secondary", label: "当典后街" },
+  { id: "DangdianEastStreet", axis: "x", at: 90, from: -185, to: 150, width: 5, rank: "secondary", label: "当典东街" },
+  { id: "GuanyueTempleStreet", axis: "z", at: 150, from: -65, to: 122, width: 5, rank: "secondary", label: "关岳庙街" },
+  { id: "KuiwenStreet", axis: "z", at: 118, from: 86, to: 210, width: 5, rank: "secondary", label: "奎文街" },
+  { id: "KuiwenEastStreet", axis: "z", at: 192, from: 66, to: 210, width: 5, rank: "secondary", label: "奎文东街" },
+  { id: "FireGodTempleEastStreet", axis: "x", at: 210, from: -145, to: 192, width: 5, rank: "secondary", label: "火神庙东街" },
   // 巷道：rank:"hutong" —— 照常在街坊网格里雕出通道，但路面不铺车辙、不摆街肩生活层。
   { id: "MiaojiaHutong", axis: "x", at: -255, from: -248, to: -165, width: 2, rank: "hutong", label: "苗家胡同" },
+];
+
+/**
+ * 城内民居不是一张均匀棋盘。城防示意图先给出道路与公共院落，余下的住宅才
+ * 依街坊分区填入；每个 profile 的地块尺度、退巷、错缝与收缩范围均为推定。
+ * profile.parcel 是未收缩的最大院落尺度；实际院子按 scale 确定性缩小，保留
+ * 不等宽的胡同和院墙缝。这样只改数据就能调密度，不会在生成器里散落坐标常数。
+ */
+export const CITY_BLOCK_PROFILES = {
+  NorthCourtyard: { parcel: [24, 22], lane: 2.4, scale: [0.78, 0.96], stagger: 0.26 },
+  NorthService: { parcel: [25, 40], lane: 2.0, scale: [0.76, 0.92], stagger: 0.16 },
+  CentralMarket: { parcel: [22, 24], lane: 1.7, scale: [0.82, 0.98], stagger: 0.38 },
+  CentralDefensive: { parcel: [22, 23], lane: 2.2, scale: [0.72, 0.93], stagger: 0.18 },
+  SouthAcademy: { parcel: [28, 24], lane: 2.6, scale: [0.74, 0.94], stagger: 0.32 },
+  SouthCourtyard: { parcel: [25, 30], lane: 2.1, scale: [0.76, 0.95], stagger: 0.22 },
+};
+
+/**
+ * 北／中／南三组公共院落及其间的民居街坊。bounds 覆盖完整内城，随后由
+ * STREETS、CITY_FEATURES、LANDMARKS、上城道与顺城街共同裁切；featureIds
+ * 只用于把示意图上的功能组团锁在所属区，绝不解释为永久驻防。
+ */
+export const CITY_BLOCK_ZONES = [
+  { id: "NorthWestQuarter", group: "NorthPublicCourtyards", profile: "NorthCourtyard", bounds: { minX: -286, maxX: 0, minZ: -286, maxZ: -100 }, featureIds: ["NorthCompound727", "ConfucianTemple", "NorthWestCourtyard", "RegimentHQ", "PawnShop"] },
+  { id: "NorthEastQuarter", group: "NorthPublicCourtyards", profile: "NorthService", bounds: { minX: 0, maxX: 286, minZ: -286, maxZ: -100 }, featureIds: ["GarrisonHQ", "CountyJail", "CountyPrison", "DragonKingTemple", "PoliceStation", "CommerceGuild"] },
+  { id: "CentralWestQuarter", group: "CentralPublicCourtyards", profile: "CentralDefensive", bounds: { minX: -286, maxX: 0, minZ: -100, maxZ: 105 }, featureIds: ["CentralCompound124", "CentralCompound127", "WestSpecialCompound"] },
+  { id: "CentralEastQuarter", group: "CentralPublicCourtyards", profile: "CentralMarket", bounds: { minX: 0, maxX: 286, minZ: -100, maxZ: 105 }, featureIds: ["EastDistrictOffice"] },
+  { id: "SouthWestQuarter", group: "SouthPublicCourtyards", profile: "SouthAcademy", bounds: { minX: -286, maxX: 0, minZ: 105, maxZ: 286 }, featureIds: ["SouthWestOffice", "WenzhongSchool", "ShuyuanPrimarySchool", "SouthWestBlock"] },
+  { id: "SouthEastQuarter", group: "SouthPublicCourtyards", profile: "SouthCourtyard", bounds: { minX: 0, maxX: 286, minZ: 105, maxZ: 286 }, featureIds: ["FireGodTemple", "SouthEastSpecialCompound", "SouthEastBlock"] },
 ];
 
 /**
@@ -625,9 +666,12 @@ export const PRESUMED = [
   { id: "rampLength", value: 28, unit: "m", note: "上城道每门旁一条、宽 2.4 m 为主流记载；坡长、级高、中间转折平台全为推定" },
   { id: "dugoutSize", value: { width: 1.2, height: 1.6, depth: 3.0, spacing: 40 }, unit: "m", note: "墙脚防空洞存在为主流记载，尺寸与间距无载" },
   { id: "streetWidths", value: { west: 9, east: 9, south: 8, north: 7, secondary: 5, lane: 2.0 }, unit: "m", note: "**街巷宽度全部为推定，无任何实测数据**" },
+  { id: "streetParcelClearance", value: { main: 3.6, secondary: 2.2, hutong: 0.8, crossroad: 6 }, unit: "m", note: "住宅退到路肩生活层与十字街公共空地之外的距离；用于避免民居地块吞掉道路边界，均为推定" },
+  { id: "streetLifeReserves", value: "STREET_LIFE_RESERVES", note: "西门大街和奎文东街两处街肩生活组的局部公共空地；静态布设兼容范围为推定，不表达历史测绘尺度" },
   { id: "crossroadPosition", value: [0, 0], unit: "m", note: "十字街口以城心为原点；为与生成器、碰撞和菜单统一，已取消旧数据 z=20 的无依据偏移" },
   { id: "crossroadSize", value: 30, unit: "m", note: "十字街口的开阔尺寸，无载" },
   { id: "streetTopology", value: "STREETS", note: "v2 全网照 Notion 城防示意图重排：西门/东门/北门/南门里大街 + 龙王庙街、后门大街、顺兴街、当典后街、当典东街、关岳庙街、奎文街、奎文东街、火神庙东街、苗家胡同；具体米制坐标、转折点与街宽均为推定" },
+  { id: "cityBlockZones", value: "CITY_BLOCK_ZONES + CITY_BLOCK_PROFILES", note: "城内北／中／南公共院落组团、街坊边界、住宅地块尺度、密度、错缝和巷宽均由城防示意图的相对关系推定；道路与功能院落先行，住宅仅填其余可用地。并非地籍或实测街区图。" },
   { id: "gateOffsets", value: { eastZ: -65, westZ: 0, northX: -145, southX: 70 }, unit: "m", note: "东、南、北门错位关系据 Notion 城防示意图按约 600 m 方城比例换算；西门固定在十字街 z=0 直瞄轴上，优先服从战斗史料硬约束" },
   { id: "yamenFootprint", value: [62, 54], unit: "m", note: "县公署/旧县衙位于城内东北偏中、轴线朝南为图示与主流记载；白盒占地尺寸无载" },
   { id: "cityFeatureLayout", value: "CITY_FEATURES", note: "v2 主要公共院落（含监狱、看守所、警备队、团部、文庙、当典、火神庙）的相对位置、白盒占地、类型均由 Notion 城防示意图转写，除图中文字外一律为推定；图中番号只作 1938 年 3 月态势标签，不表示永久驻防" },
@@ -637,7 +681,7 @@ export const PRESUMED = [
   { id: "pagodaForm", value: { tiers: 9, climbY: 30 }, note: "八角九级为各家一致；密檐式／楼阁式两说互斥，高度三说，始建年代四说互斥。1938 年塔刹已毁、顶层倾塌为主流记载，日方观测班登高 30 m 为一手史料" },
   { id: "zhaiGateWidth", value: 3.0, unit: "m", note: "东寨门宽。寨墙高 2 m 顶宽 0.4 m 为日方实测，门洞尺寸无载" },
   { id: "gullySection", value: { depth: 3.0, width: 7.5 }, unit: "m", note: "地隙的存在与「可掩蔽接近到寨墙 200 m」为日方实测，断面尺寸无载" },
-  { id: "eastSuburbLayout", value: "18×16 m 院落密铺", note: "东关「密集院落、院墙相连」为日方描述，具体地块划分无资料" },
+  { id: "eastSuburbLayout", value: "EAST_SUBURB.mapBlocks + mapLanes", note: "东关「密集院落、院墙相连」为日方描述；十三个闭合图框、三条框间道路及框内房列由城防示意图逐框数字化，坐标和细分尺度均为推定，不是地籍测绘" },
   { id: "powerPlantSize", value: { w: 30, d: 18, chimneyH: 22 }, unit: "m", note: "电灯厂位置与「在西城楼直瞄射程内」为主流记载，厂房规模与烟囱高度无载" },
   { id: "westSuburbLayout", value: "WEST_SUBURB", note: "津浦铁路在城西，以及西关的车站、通信队、电灯厂、交易所、第122师师部与西关大街的关系为 Notion 城防示意图可见信息；其坐标、尺度和站房形式均为推定。**整条西关带按图比例整体压缩**：电灯厂—西门实距约 120 m，低于「城楼直瞄 300—600 m」的记载口径 —— 压缩是全图统一的游戏化尺度决定，城楼—电灯厂的直瞄压制关系在场景里仍然成立，不另移坐标" },
   { id: "xiguanStreetForm", value: { crown: 0.22, shops: "4间+1敞棚", bridgeSteps: 4, hitching: "拴马桩3+石槽" }, unit: "m", note: "西关大街路冠/沿街铺面（排门板+幌子）/桥头引道/师部门前拴马桩：关厢街区形制推定，志载无逐间记载；路冠 0.22 为压住麦垄的临时值，outfield Blocked 豁免生效后可降回 ~0.10" },

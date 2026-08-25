@@ -35,6 +35,7 @@ import { Mulberry32, HashString, Clamp, Clamp01, Fbm2, SmoothStep } from "./Scri
 import {
   CITY, MOAT, GATES, BARBICAN, WALL_SIDES, BASTION, BASTIONS,
   CORNER_TOWERS, RAMPS, RAMP, DUGOUT, CROSSROAD, STREETS, SIGHT_CORRIDOR,
+  CITY_BLOCK_PROFILES, CITY_BLOCK_ZONES, STREET_PARCEL_CLEARANCE, STREET_LIFE_RESERVES,
   LANDMARKS, CITY_FEATURES, OUTER_LANDMARKS, EAST_SUBURB, EAST_DEFENSE, EAST_FIELD,
   WEST_SUBURB, NORTH_SUBURB, OUTSKIRTS, MARCH_GROUND,
   PALETTE, WALL_TOP_Y,
@@ -936,7 +937,7 @@ export class TengxianCity {
   StreetZones() {
     if (this.streetZones) return this.streetZones;
     const zones = STREETS.map((s) => ({
-      axis: s.axis, at: s.at, half: s.width / 2 + 1.2,
+      axis: s.axis, at: s.at, rank: s.rank, half: s.width / 2 + 1.2,
       from: Math.min(s.from, s.to), to: Math.max(s.from, s.to),
     }));
     // 城外两条关厢街也进退让带：西关大街与北关大街不在 STREETS（它们的路面
@@ -961,11 +962,15 @@ export class TengxianCity {
 
   /** 街道是有限线段；给街坊规划用的矩形还包含两侧退让，不能把短街误切成贯城空带。 */
   StreetRects() {
-    return this.StreetZones().map((street) => (street.axis === "x" ? {
-      minX: street.from, maxX: street.to, minZ: street.at - street.half, maxZ: street.at + street.half,
+    return this.StreetZones().map((street) => {
+      const clearance = STREET_PARCEL_CLEARANCE[street.rank] ?? 0;
+      const half = street.half + clearance;
+      return street.axis === "x" ? {
+      minX: street.from, maxX: street.to, minZ: street.at - half, maxZ: street.at + half,
     } : {
-      minX: street.at - street.half, maxX: street.at + street.half, minZ: street.from, maxZ: street.to,
-    }));
+      minX: street.at - half, maxX: street.at + half, minZ: street.from, maxZ: street.to,
+    };
+    });
   }
 
   /**
@@ -1061,28 +1066,31 @@ export class TengxianCity {
   }
 
   /**
-   * 城内地块划分：按 28×24 m 的格子铺院落，挖掉街、十字街口、地标、上城道、
-   * 顺城街与那条不许挡的视线走廊。
-   * 巷宽 2 m —— 与院落尺寸一样，**全部为推定**（无任何实测数据）。
+   * 城内地块划分：先按北／中／南街坊分区的 profile 生成不等尺度院子，再挖掉
+   * 道路、十字街口、功能院落、上城道与顺城街。道路和公共院落是示意图骨架，
+   * 民居只能填剩余空间，不能反过来把整座城铺成均匀棋盘。
    */
-  PlanBlocks(rnd) {
-    const inner = CITY.wallCenter - CITY.wallBaseWidth / 2 - CITY.innerRingWidth;   // 286
-    // 以稳定的小院基准格覆盖全城，再只裁掉真正与其相交的**有限街段**。
-    // 不能先把每一条短街无限延长来切 bands：新街网里东门联络街、文庙街都只有
-    // 一段，延长后会在整座城留下几十米宽的假空场。
+  PlanBlocks() {
     const cells = [];
-    // 东关资料给出的 1.5—2.5 m 巷宽也是本城民巷唯一有明确范围的尺度；
-    // 城内不再另造一个看似精确的“2 m”常数。
-    const lane = (EAST_SUBURB.lane.min + EAST_SUBURB.lane.max) / 2;
-    const nx = Math.max(1, Math.round((inner * 2) / 27));
-    const nz = Math.max(1, Math.round((inner * 2) / 23));
-    const cw = (inner * 2) / nx - lane;
-    const cd = (inner * 2) / nz - lane;
     const streetRects = this.StreetRects();
-    for (let i = 0; i < nx; i += 1) {
-      for (let j = 0; j < nz; j += 1) {
-        const x = -inner + (inner * 2 * (i + 0.5)) / nx;
-        const z = -inner + (inner * 2 * (j + 0.5)) / nz;
+    for (const zone of CITY_BLOCK_ZONES) {
+      const profile = CITY_BLOCK_PROFILES[zone.profile];
+      if (!profile) throw new Error(`Unknown Tengxian block profile: ${zone.profile}`);
+      const { minX, maxX, minZ, maxZ } = zone.bounds;
+      const [parcelW, parcelD] = profile.parcel;
+      const stepX = parcelW + profile.lane, stepZ = parcelD + profile.lane;
+      const cols = Math.ceil((maxX - minX) / stepX);
+      const rows = Math.ceil((maxZ - minZ) / stepZ);
+      for (let j = 0; j < rows; j += 1) {
+        const rowOffset = (j % 2) * stepX * profile.stagger;
+        for (let i = 0; i < cols; i += 1) {
+          const scaleX = (HashString(`${zone.id}:${i}:${j}:scale`) >>> 0) / 0xffffffff;
+          const scaleZ = (HashString(`${zone.id}:${i}:${j}:depth`) >>> 0) / 0xffffffff;
+          const cw = parcelW * (profile.scale[0] + (profile.scale[1] - profile.scale[0]) * scaleX);
+          const cd = parcelD * (profile.scale[0] + (profile.scale[1] - profile.scale[0]) * scaleZ);
+          const x = minX + profile.lane / 2 + cw / 2 + i * stepX + rowOffset;
+          const z = minZ + profile.lane / 2 + cd / 2 + j * stepZ;
+          if (x - cw / 2 < minX || x + cw / 2 > maxX || z - cd / 2 < minZ || z + cd / 2 > maxZ) continue;
         if (!this.InBounds(x, z, 20)) continue;
         if (this.HitsRamp(x, z, cw / 2, cd / 2)) continue;
         const cell = { x0: x - cw / 2, x1: x + cw / 2, z0: z - cd / 2, z1: z + cd / 2 };
@@ -1106,8 +1114,9 @@ export class TengxianCity {
             || cell.z0 < cross.minZ + 3 || cell.z1 > cross.maxZ - 3);
         cells.push({
           x: cx, z: cz, w: cell.x1 - cell.x0, d: cell.z1 - cell.z0,
-          seed: `blk${i}_${j}`, shop,
+          seed: `blk${zone.id}_${i}_${j}`, shop, zone: zone.id, group: zone.group,
         });
+      }
       }
     }
     return cells;
@@ -1116,7 +1125,8 @@ export class TengxianCity {
   /** 院子不许占的矩形：十字街口、四角铺面、各处地标。 */
   BlockerRects() {
     if (this.blockerRects) return this.blockerRects;
-    const list = [this.CrossroadRect()];
+    const list = [this.CrossroadRect(CROSSROAD.parcelClearance || 0)];
+    for (const reserve of STREET_LIFE_RESERVES) list.push(reserve.bounds);
     for (const l of LANDMARKS) {
       const lw = (l.w || l.span || 12) / 2 + 3, ld = (l.d || l.span || 12) / 2 + 3;
       list.push({ minX: l.x - lw, maxX: l.x + lw, minZ: l.z - ld, maxZ: l.z + ld });

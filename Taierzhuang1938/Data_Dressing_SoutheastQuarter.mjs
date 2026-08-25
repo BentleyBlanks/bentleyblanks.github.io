@@ -4,6 +4,8 @@
 // Script_TownDressing.mjs 文件头。摆位全部走世界坐标（X 向东，Z 向南），
 // 落地/碰撞由 Script_ExternalProps 统一处理。
 // 自验：node Taierzhuang1938/Script_TownDressingTest.mjs
+// 布局 v3 注：note 里的 blk##_# 保留为迁移前的叙事户号，不再等同于当前生成格 seed；
+// 同户道具已整体迁入新的非均质院落，户内相对关系不变。
 //
 // 【这一片是什么地方】日军从东、南两面攻城，南墙缺口在 (285,296)、东南角
 // 望楼在 (294,288)。东南片就压在这两处的背后，是全城挨炮弹最多的街坊 ——
@@ -61,274 +63,274 @@ export const PLACEMENTS = Object.freeze([
 
   // blk20_12 (272.38, 0) L 形院 · 塌 · 烧过：正房垮了半边，院里那棵老槐烧成一截
   // 焦干横在菜畦上，塌下来的墙石顺着倒向散了一路。
-  { asset: "deadTreeTrunk01", x: 267.88, z: 3.4, ry: 2.35, scale: 0.95 },
-  { asset: "stackableStone03", x: 270.58, z: 5.6, ry: -0.7, scale: 1.05 },
-  { asset: "stackableStone06", x: 271.28, z: 6.1, ry: 0.95, scale: 0.85 },
+  { asset: "deadTreeTrunk01", x: 267.7, z: 18.14, ry: 2.35, scale: 0.95 },
+  { asset: "stackableStone03", x: 270.4, z: 20.34, ry: -0.7, scale: 1.05 },
+  { asset: "stackableStone06", x: 271.1, z: 20.84, ry: 0.95, scale: 0.85 },
 
   // blk20_13 (272.38, 22.88) 一进院 · 损：车推到院当中就没走成，
   // 装好的一只木箱翻在车边上 —— 这一户是「跑到一半」的样子。
-  { asset: "cart", x: 268.78, z: 24.48, ry: 0.34, scale: 0.95 },
-  { asset: "crate", x: 270.48, z: 25.18, ry: -0.52, scale: 1.0 },
+  { asset: "cart", x: 178.78, z: 41.23, ry: 0.34, scale: 0.95 },
+  { asset: "crate", x: 180.48, z: 41.93, ry: -0.52, scale: 1.0 },
 
   // blk19_13 (252.38, 22.88) 窄条一进院 · 损 · 烧过：只有六米宽的小院，
   // 两袋米搬到影壁跟前就撂下了，人没回来。
-  { asset: "marketRiceSack01", x: 250.78, z: 28.08, ry: 0.24, scale: 1.0 },
-  { asset: "marketRiceSack02", x: 251.88, z: 28.78, ry: -0.72, scale: 0.95 },
+  { asset: "marketRiceSack01", x: 163.05, z: 45.5, ry: 0.24, scale: 1.0 },
+  { asset: "marketRiceSack02", x: 164.15, z: 46.2, ry: -0.72, scale: 0.95 },
 
   // blk19_12 (252.38, 0) 十米宽的窄土墙院 · 损：柴还没劈完，人先走了。
-  { asset: "ryFirewoodStack", x: 249.13, z: 4.5, ry: 0.3,
+  { asset: "ryFirewoodStack", x: 248.79, z: 21.21, ry: 0.3,
     note: "blk19_12 十米宽的窄土院：过冬的柴码在隔墙以南" },
-  { asset: "clayWideJar", x: 252.08, z: 5.6, ry: 1.4,
+  { asset: "clayWideJar", x: 251.74, z: 22.31, ry: 1.4,
     note: "blk19_12：柴垛边一只豁了口的坛子，歪着还立得住" },
-  { asset: "phFirewoodBranches", x: 254.25, z: 6.59, ry: -0.6,
+  { asset: "phFirewoodBranches", x: 253.91, z: 23.3, ry: -0.6,
     note: "blk19_12：散落的树枝——柴还没劈完" },
 
   // blk20_14 (272.38, 45.76) 土墙院 · 损：隔墙以南是柴院。柴垛与劈柴墩子还是
   // 天天用的那个距离，东边的水缸却给震歪了 —— 一步之内两种时态。
-  { asset: "firewoodPile", x: 267.38, z: 51.36, ry: 0.3,
+  { asset: "firewoodPile", x: 251.68, z: 44.31, ry: 0.3,
     note: "blk20_14 土墙院隔墙以南的柴院：劈好的柴还码着，人是从这院里跑的" },
-  { asset: "ryChoppingBlock", x: 269.58, z: 50.96, ry: -0.42,
+  { asset: "ryChoppingBlock", x: 253.88, z: 43.91, ry: -0.42,
     note: "blk20_14 柴院：劈柴墩子在柴垛边上，位置一步远，是天天用的距离" },
-  { asset: "clayWaterVat", x: 275.48, z: 50.76, ry: 0.95,
+  { asset: "clayWaterVat", x: 259.78, z: 43.71, ry: 0.95,
     note: "blk20_14 柴院东侧：水缸给震歪了，缸口朝东南——朝着炮来的方向" },
-  { asset: "clayWideJar", x: 277.38, z: 51.86, ry: -1.25,
+  { asset: "clayWideJar", x: 261.68, z: 44.81, ry: -1.25,
     note: "blk20_14：歪缸旁边那只咸菜坛一点没事，摆得比缸还正" },
 
   // blk19_14 (252.38, 45.76) 窄土墙院 · 损：最沉的两口瓮搬不动，留下了。
-  { asset: "clayRoundVat", x: 250.98, z: 50.36, ry: 0.5,
+  { asset: "clayRoundVat", x: 246.14, z: 70.95, ry: 0.5,
     note: "blk19_14 窄土院：最沉的两口瓮搬不动，留在了柴院里" },
-  { asset: "clayLuggedJar", x: 253.08, z: 50.16, ry: -1.0,
+  { asset: "clayLuggedJar", x: 248.24, z: 70.75, ry: -1.0,
     note: "blk19_14：小一号的带耳坛子摆在瓮旁边，耳朝外——本来是要拴绳挑走的" },
-  { asset: "wovenBasket", x: 254.38, z: 51.76, ry: 0.8,
+  { asset: "wovenBasket", x: 249.54, z: 72.35, ry: 0.8,
     note: "blk19_14：一只空筐撂在院门里" },
 
   // blk20_15 (272.38, 68.64) 水井院 · 塌 · 烧过：井台还在，西边半堵院墙成了
   // 一堆砖瓦，碎石滚到井台外头。
-  { asset: "rubble", x: 265.88, z: 73.64, ry: 0.4, scale: 1.1 },
-  { asset: "stackableStone05", x: 264.18, z: 71.84, ry: -1.1, scale: 1.0 },
+  { asset: "rubble", x: 264.65, z: 70.66, ry: 0.4, scale: 1.1 },
+  { asset: "stackableStone05", x: 262.95, z: 68.86, ry: -1.1, scale: 1.0 },
 
   // blk19_15 (245.14, 68.64) 一进院 · 损：东墙这一列少见的齐整户 —— 桌摆得正、
   // 笸箩没收，饭是吃到一半跑的警报。凳子歪着，是起身起得急。
-  { asset: "phRoughWoodTable", x: 243.04, z: 72.03, ry: 0.15,
+  { asset: "phRoughWoodTable", x: 221.94, z: 68.52, ry: 0.15,
     note: "blk19_15 还算齐整的一户：院当中一张粗木桌，还摆得正" },
-  { asset: "phLowWoodStool", x: 242.14, z: 72.54, ry: 0.9,
+  { asset: "phLowWoodStool", x: 221.04, z: 69.03, ry: 0.9,
     note: "blk19_15：桌西一只小板凳，凳面歪着——起身起得急" },
-  { asset: "phWickerTray", x: 244.41, z: 70.33, ry: 0.3,
+  { asset: "phWickerTray", x: 223.31, z: 66.82, ry: 0.3,
     note: "blk19_15：桌北那只笸箩没收，饭是吃到一半跑的警报" },
 
   // blk20_16 (272.38, 91.52) 一进院 · 损 · 烧过：整院过了火，可磨盘砸不坏，
   // 还在院心的老位置；推磨时坐的条凳被踢到一边，笸箩摔在凳外。
-  { asset: "stoneMillWheel", x: 272.98, z: 94.72, ry: 0.25,
+  { asset: "stoneMillWheel", x: 258.39, z: 94.08, ry: 0.25,
     note: "blk20_16 烧过的一进院：磨盘还在院心原位——塌了顶也砸不坏它" },
-  { asset: "longBench", x: 275.18, z: 95.92, ry: 1.38,
+  { asset: "longBench", x: 260.59, z: 95.28, ry: 1.38,
     note: "blk20_16：推磨时坐的条凳被踢到一边，横着朝东，与磨盘不成一条线" },
-  { asset: "winnowingBasket", x: 276.18, z: 97.32, ry: -0.85,
+  { asset: "winnowingBasket", x: 261.59, z: 96.68, ry: -0.85,
     note: "blk20_16：簸箕摔在条凳外侧，口朝下" },
-  { asset: "wovenBasket", x: 273.88, z: 97.52, ry: 0.55,
+  { asset: "wovenBasket", x: 259.29, z: 96.88, ry: 0.55,
     note: "blk20_16：另一只柳条筐滚到院门那一头" },
 
   // blk19_16 (245.14, 91.52) 土墙院 · 损：柴院被翻过一遍。
-  { asset: "ryFirewoodPit", x: 247.74, z: 95.77, ry: 0.4,
+  { asset: "ryFirewoodPit", x: 235.24, z: 96.36, ry: 0.4,
     note: "blk19_16 柴院被翻过一遍：柴堆散了架" },
-  { asset: "ryChoppingBlock", x: 249.74, z: 97.47, ry: -1.3,
+  { asset: "ryChoppingBlock", x: 237.24, z: 98.06, ry: -1.3,
     note: "blk19_16：劈柴墩子滚到一边，横着" },
-  { asset: "ryIronSpade", x: 246.14, z: 97.32, ry: 0.7,
+  { asset: "ryIronSpade", x: 233.64, z: 97.91, ry: 0.7,
     note: "blk19_16：铁锹插在柴堆与院门之间的土里" },
 
   // blk20_17 (272.38, 114.4) L 形院 · 损 · 烧过：大水缸倒在院心，
   // 边上那只加了盖的坛子火没烧到，盖还盖着。
-  { asset: "clayRoundVat", x: 269.38, z: 117, ry: 1.9,
+  { asset: "clayRoundVat", x: 251.72, z: 120.83, ry: 1.9,
     note: "blk20_17 整院过火的 L 形院：大水缸倒在院心，缸口横着" },
-  { asset: "clayLiddedJar", x: 270.98, z: 118, ry: -0.3,
+  { asset: "clayLiddedJar", x: 253.32, z: 121.83, ry: -0.3,
     note: "blk20_17：倒缸边上一只加盖的坛子，盖还盖着——火没烧到它" },
-  { asset: "rubble", x: 274.58, z: 119.8, ry: 0.62,
+  { asset: "rubble", x: 256.92, z: 123.63, ry: 0.62,
     note: "blk20_17：东厢房塌下来的砖瓦堆在院子南半边" },
 
   // blk19_17 (245.14, 114.4) L 形院 · 损：菜畦边的石磨一点没挪，
   // 条凳被撞得与磨盘成了直角。
-  { asset: "stoneMillWheel", x: 241.94, z: 118, ry: -0.2,
+  { asset: "stoneMillWheel", x: 224.76, z: 123.68, ry: -0.2,
     note: "blk19_17 L 形院：菜畦边的石磨盘，位置一点没挪" },
-  { asset: "longBench", x: 243.95, z: 119.47, ry: 1.5,
+  { asset: "longBench", x: 226.77, z: 125.15, ry: 1.5,
     note: "blk19_17：磨边的条凳被撞得横过来，与磨盘成直角" },
-  { asset: "clayWideJar", x: 240.24, z: 119.9, ry: 0.6,
+  { asset: "clayWideJar", x: 223.06, z: 125.58, ry: 0.6,
     note: "blk19_17：磨盘西侧一只宽口坛，接磨下来的面用的" },
 
   // blk20_18 (272.38, 137.28) 一进院 · 损：这一户还住着人 —— 晾衣裳的架子支着、
   // 木桶在架脚下、斗笠扣在地上，出门的人没戴走。
-  { asset: "ryDryingRack", x: 268.38, z: 140.68, ry: 0.12,
+  { asset: "ryDryingRack", x: 230.67, z: 153.03, ry: 0.12,
     note: "blk20_18 还住着人的一户：晾衣裳的架子支在院心西边，架上空了" },
-  { asset: "phWoodenBucket", x: 270.08, z: 141.88, ry: 0.42,
+  { asset: "phWoodenBucket", x: 232.37, z: 154.23, ry: 0.42,
     note: "blk20_18：洗衣裳的木桶撂在架子脚下" },
-  { asset: "bambooHat", x: 270.88, z: 140.38, ry: 0,
+  { asset: "bambooHat", x: 233.17, z: 152.73, ry: 0,
     note: "blk20_18：一顶斗笠扣在地上——出门的人没戴走" },
 
   // blk19_18 (245.14, 137.28) 土墙院 · 损 · 烧过：麦秸垛烧成一摊，磨盘照旧。
-  { asset: "stoneMillWheel", x: 246.74, z: 139.68, ry: 0.9,
+  { asset: "stoneMillWheel", x: 115.69, z: 44.58, ry: 0.9,
     note: "blk19_18 过了火的土院：麦秸垛烧成一摊，磨盘照旧" },
-  { asset: "stackableStone06", x: 248.29, z: 139.93, ry: 1.1,
+  { asset: "stackableStone06", x: 117.24, z: 44.83, ry: 1.1,
     note: "blk19_18：崩下来的一块过墙石落在磨盘东边" },
 
   // blk20_19 (272.38, 160.16) 水井院 · 损 · 烧过：挑水挑到一半。
   // 两只桶朝向不一致 —— 是撂下，不是放下。
-  { asset: "ryWaterBucket", x: 267.78, z: 164.76, ry: 0.5,
+  { asset: "ryWaterBucket", x: 256.28, z: 156.09, ry: 0.5,
     note: "blk20_19 井院：挑水挑到一半，两只桶撂在井台西边" },
-  { asset: "phWoodenBucket", x: 266.33, z: 165.66, ry: -0.72,
+  { asset: "phWoodenBucket", x: 254.83, z: 156.99, ry: -0.72,
     note: "blk20_19：另一只桶翻在旁边，两只桶朝向不一致——是撂下不是放下" },
-  { asset: "phWoodenWashTub", x: 268.88, z: 166.46, ry: 1.1,
+  { asset: "phWoodenWashTub", x: 257.38, z: 157.79, ry: 1.1,
     note: "blk20_19：洗衣盆还搁在井台边的老地方" },
 
   // blk19_19 (245.14, 160.16) 土墙院 · **塌** · 烧过：全片唯一塌到底的一户。
-  { asset: "rubble", x: 243.14, z: 162.06, ry: 0.5,
+  { asset: "rubble", x: 225.38, z: 185.07, ry: 0.5,
     note: "blk19_19 全片唯一塌到底的土院：院墙整段塌进院里" },
-  { asset: "stackableStone01", x: 245.54, z: 162.26, ry: -0.8,
+  { asset: "stackableStone01", x: 227.78, z: 185.27, ry: -0.8,
     note: "blk19_19：砖瓦里滚出来的一块碱脚石" },
-  { asset: "clayLiddedJar", x: 247.04, z: 161.46, ry: 1.2,
+  { asset: "clayLiddedJar", x: 229.28, z: 184.47, ry: 1.2,
     note: "blk19_19：砖瓦堆外沿压着一只加盖的坛子——盖还在，人不在了" },
 
   // blk20_20 (272.38, 183.04) 土墙院 · 损 · 烧过：城根土院，牲口牵走了石槽还在。
   // 全片只有这一处摆草料与石槽 —— 城里不是村子。
-  { asset: "ryFeedTrough", x: 276.78, z: 188.24, ry: 0.2,
+  { asset: "ryFeedTrough", x: 260.67, z: 188.03, ry: 0.2,
     note: "blk20_20 城根土院：牲口早牵走了，石槽还在后院墙根" },
-  { asset: "ryHayStack", x: 278.68, z: 189.44, ry: -0.5,
+  { asset: "ryHayStack", x: 262.57, z: 189.23, ry: -0.5,
     note: "blk20_20：槽边一垛草料被炮弹掀翻了半边" },
-  { asset: "ryFarmHoe", x: 274.78, z: 187.49, ry: 1.2,
+  { asset: "ryFarmHoe", x: 258.67, z: 187.28, ry: 1.2,
     note: "blk20_20：一把锄头扔在草料与院心之间" },
 
   // blk19_20 (245.14, 183.04) 土墙院 · 损 · 烧过：守军借这院子往南墙中转。
-  { asset: "militaryCrateClosed", x: 243.14, z: 187.14, ry: 0.4,
+  { asset: "militaryCrateClosed", x: 134.23, z: 44.28, ry: 0.4,
     note: "blk19_20 南墙里第二排：守军借这院子中转，一只封着的军用木箱" },
-  { asset: "militaryCrateOpen", x: 244.64, z: 187.64, ry: -0.5,
+  { asset: "militaryCrateOpen", x: 135.73, z: 44.78, ry: -0.5,
     note: "blk19_20：开着的那只已经空了，箱盖朝西南——朝城头去的方向" },
 
   // blk20_21 (272.38, 205.92) 水井院 · 损 · 烧过：搬空了一半的家 ——
   // 两口瓮搬到井台东边就没再动，朝向差得很远。
-  { asset: "clayWaterVat", x: 276.98, z: 209.32, ry: 0.8,
+  { asset: "clayWaterVat", x: 238.95, z: 217.58, ry: 0.8,
     note: "blk20_21 井院：两口瓮搬到井台东边就没再动——搬空了一半的家" },
-  { asset: "clayRoundVat", x: 278.28, z: 210.62, ry: -1.15,
+  { asset: "clayRoundVat", x: 240.25, z: 218.88, ry: -1.15,
     note: "blk20_21：第二口瓮歪着，两口的朝向差得很远" },
-  { asset: "phIronSpade", x: 279.08, z: 212.02, ry: -0.3,
+  { asset: "phIronSpade", x: 241.05, z: 220.28, ry: -0.3,
     note: "blk20_21：一把铁锹斜插在院墙根" },
 
   // blk20_22 (272.38, 228.18) 土墙院 · 塌 · 烧过：隔墙以南的柴院被一发炮弹掀了，
   // 三块过墙石甩成一小片 —— 东南角这一带最典型的一户。
-  { asset: "stackableStone01", x: 274.58, z: 233.98, ry: 0.18, scale: 1.1 },
-  { asset: "stackableStone04", x: 275.38, z: 233.58, ry: -0.95, scale: 1.0 },
-  { asset: "stackableStone07", x: 273.78, z: 234.78, ry: 1.4, scale: 0.95 },
+  { asset: "stackableStone01", x: 209.63, z: 158.01, ry: 0.18, scale: 1.1 },
+  { asset: "stackableStone04", x: 210.43, z: 157.61, ry: -0.95, scale: 1.0 },
+  { asset: "stackableStone07", x: 208.83, z: 158.81, ry: 1.4, scale: 0.95 },
 
   // blk20_23 (276.5, 251.68) L 形院 · 塌 · 烧过：院里的树被炸断，
   // 粗的那一截压在院心，断口朝着东南望楼的方向。
-  { asset: "deadTreeTrunk02", x: 274.5, z: 255.68, ry: 1.1, scale: 0.85 },
-  { asset: "stackableStone02", x: 276.9, z: 254.28, ry: -0.35, scale: 1.15 },
+  { asset: "deadTreeTrunk02", x: 175.86, z: 154.94, ry: 1.1, scale: 0.85 },
+  { asset: "stackableStone02", x: 178.26, z: 153.54, ry: -0.35, scale: 1.15 },
 
   // blk20_24 (276.5, 274.56) L 形院 · 损：全城最靠近南墙缺口的一户，
   // 逃难车卡在磨盘和厢房之间，车上的箱子还没解绳。
-  { asset: "cart", x: 277.1, z: 279.16, ry: -0.62, scale: 0.9 },
-  { asset: "marketBox02", x: 278.5, z: 277.76, ry: 0.5, scale: 1.0 },
-  { asset: "clayWaterVat", x: 273.5, z: 278.16, ry: 1.0,
+  { asset: "cart", x: 262.12, z: 219.92, ry: -0.62, scale: 0.9 },
+  { asset: "marketBox02", x: 263.52, z: 218.52, ry: 0.5, scale: 1.0 },
+  { asset: "clayWaterVat", x: 258.52, z: 218.92, ry: 1.0,
     note: "blk20_24 离南墙缺口最近的一户：逃难车旁的水缸没搬走，歪着" },
-  { asset: "winnowingBasket", x: 272.05, z: 278.86, ry: -0.7,
+  { asset: "winnowingBasket", x: 257.07, z: 219.62, ry: -0.7,
     note: "blk20_24：一只簸箕掉在缸与厢房之间" },
 
   // ——— 南墙内侧一行（四·城墙关 detail：沿南墙往西推的一段）———
 
   // blk19_22 (245.14, 228.18) 水井院 · 损 · 烧过：两袋粮堆在井台东边，
   // 是准备往城里挑、挑到一半撂下的。
-  { asset: "marketRiceSack02", x: 252.34, z: 232.78, ry: 0.3, scale: 1.0 },
-  { asset: "marketRiceSack01", x: 251.44, z: 233.58, ry: -0.85, scale: 0.95 },
+  { asset: "marketRiceSack02", x: 113.23, z: 70.34, ry: 0.3, scale: 1.0 },
+  { asset: "marketRiceSack01", x: 112.33, z: 71.14, ry: -0.85, scale: 0.95 },
 
   // blk19_21 (245.14, 205.92) 两进院 · 损：前院里翻倒散落的板条箱与方箱，
   // 二门那道墙挡着，东西是从倒座那边扒出来的。
-  { asset: "marketCrate03", x: 243.74, z: 209.52, ry: 0.9, scale: 1.05 },
-  { asset: "marketBox01", x: 244.84, z: 210.22, ry: -0.35, scale: 1.0 },
+  { asset: "marketCrate03", x: 92.47, z: 122.47, ry: 0.9, scale: 1.05 },
+  { asset: "marketBox01", x: 93.57, z: 123.17, ry: -0.35, scale: 1.0 },
 
   // blk18_22 (217.9, 228.18) 土墙院 · 损：南院墙塌了一段，砖瓦堆在隔墙南边的
   // 空地上，边上还有一块掀出来的墙石。
-  { asset: "rubble", x: 214.91, z: 233.09, ry: -0.35, scale: 1.05 },
-  { asset: "stackableStone06", x: 216.4, z: 234.48, ry: 0.62, scale: 1.15 },
+  { asset: "rubble", x: 127.19, z: 155.45, ry: -0.35, scale: 1.05 },
+  { asset: "stackableStone06", x: 128.68, z: 156.84, ry: 0.62, scale: 1.15 },
 
   // blk17_22 (193.64, 228.18) L 形院 · 损 · 烧过：这一户整院过了火，
   // 院里剩一根烧焦的树干和一块崩下来的碱脚石。
-  { asset: "deadTreeTrunk01", x: 189.04, z: 232.58, ry: 2.05, scale: 1.0 },
-  { asset: "stackableStone03", x: 191.04, z: 234.18, ry: -0.5, scale: 1.1 },
+  { asset: "deadTreeTrunk01", x: 148.07, z: 155.97, ry: 2.05, scale: 1.0 },
+  { asset: "stackableStone03", x: 150.07, z: 157.57, ry: -0.5, scale: 1.1 },
 
   // blk17_23 (188.00, 251.68) 八米宽的窄土院 · 损：窄到只能沿墙根一溜摆，
   // 两口瓮的口沿差着一个身位，中间夹一只挑水桶。
-  { asset: "clayWaterVat", x: 186.8, z: 257.68, ry: 0.4,
+  { asset: "clayWaterVat", x: 204.51, z: 189.07, ry: 0.4,
     note: "blk17_23 八米宽的窄土院：两口瓮沿墙根一溜摆着" },
-  { asset: "clayWideJar", x: 188.2, z: 258.78, ry: -0.9,
+  { asset: "clayWideJar", x: 205.91, z: 190.17, ry: -0.9,
     note: "blk17_23：第二口在下首，两口口沿差着一个身位" },
-  { asset: "phWoodenBucket", x: 189.6, z: 257.88, ry: 0.6,
+  { asset: "phWoodenBucket", x: 207.31, z: 189.27, ry: 0.6,
     note: "blk17_23：夹在两口瓮中间的挑水桶" },
 
   // blk17_24 (188.00, 274.56) 窄土院 · 损 · 烧过：贴着南墙、过了火，
   // 磨盘是这院里唯一没变的东西。
-  { asset: "stoneMillWheel", x: 187.9, z: 276.51, ry: 0.6,
+  { asset: "stoneMillWheel", x: 206.64, z: 216.38, ry: 0.6,
     note: "blk17_24 贴南墙、过了火的窄院：磨盘是这院里唯一没变的东西" },
-  { asset: "stackableStone03", x: 190.6, z: 279.36, ry: -0.5,
+  { asset: "stackableStone03", x: 209.34, z: 219.23, ry: -0.5,
     note: "blk17_24：南院墙崩下来的过墙石落在磨盘南边" },
-  { asset: "stackableStone06", x: 186.8, z: 279.56, ry: 1.0,
+  { asset: "stackableStone06", x: 205.54, z: 219.43, ry: 1.0,
     note: "blk17_24：第二块石头甩得远些，散着不成堆" },
 
   // blk16_24 (163.43, 278.5) 浅进深一进院 · 损：贴着南墙的一户，
   // 守军从这院里往墙上搬弹药，撂下两只军用木箱，开着的那只已经空了。
-  { asset: "militaryCrateOpen", x: 159.83, z: 280.9, ry: 0.42, scale: 1.0 },
-  { asset: "militaryCrateClosed", x: 160.93, z: 280.4, ry: -0.28, scale: 1.05 },
+  { asset: "militaryCrateOpen", x: 14.63, z: 152.7, ry: 0.42, scale: 1.0 },
+  { asset: "militaryCrateClosed", x: 15.73, z: 152.2, ry: -0.28, scale: 1.05 },
 
   // blk15_24 (136.19, 278.5) 浅进深一进院 · 损：同一条中转链上的下一户 ——
   // 自家的长条凳被拖来当桌子使，箱边一摊散弹。
-  { asset: "militaryCrateOpen", x: 134.19, z: 280.9, ry: 0.3,
+  { asset: "militaryCrateOpen", x: 175.21, z: 184.67, ry: 0.3,
     note: "blk15_24 南墙根下的一户：守军拿他家院子当弹药中转，箱盖开着" },
-  { asset: "battlefieldCartridgeScatter", x: 135.79, z: 281.9, ry: -0.6,
+  { asset: "battlefieldCartridgeScatter", x: 176.81, z: 185.67, ry: -0.6,
     note: "blk15_24：箱边一摊散弹——在自家院里装弹上墙" },
-  { asset: "longBench", x: 138.24, z: 282.05, ry: 1.4,
+  { asset: "longBench", x: 179.26, z: 185.82, ry: 1.4,
     note: "blk15_24：这家的长条凳被拖来当桌子使，横在箱子东边" },
 
   // blk14_24 (108.95, 278.5) L 形院 · 损：家什码到院门口就再没回来。
-  { asset: "winnowingBasket", x: 110.55, z: 281.1, ry: 0.2,
+  { asset: "winnowingBasket", x: 39.72, z: 184.81, ry: 0.2,
     note: "blk14_24：家什码到院门口就再没回来——最上头那只簸箕" },
-  { asset: "wovenBasket", x: 112.39, z: 281.99, ry: -0.4,
+  { asset: "wovenBasket", x: 41.56, z: 185.7, ry: -0.4,
     note: "blk14_24：柳条筐挨着簸箕，朝向差了小半圈" },
-  { asset: "clayLiddedJar", x: 109.15, z: 282.1, ry: 0.8,
+  { asset: "clayLiddedJar", x: 38.32, z: 185.81, ry: 0.8,
     note: "blk14_24：一口带盖的坛子搁在最里，盖捆过绳" },
 
   // blk13_22 (84.77, 228.8) 土墙院 · 损：这一户天黑还点着灯 ——
   // 挂灯笼踩的那张矮凳还在，灯笼掉在地上，是整的。
-  { asset: "clothLantern", x: 86.97, z: 235, ry: 0.4,
+  { asset: "clothLantern", x: 101.33, z: 157.57, ry: 0.4,
     note: "blk13_22：门内影壁边挂过的布灯笼掉在地上，还是整的" },
-  { asset: "phLowWoodStool", x: 85.77, z: 234, ry: -0.6,
+  { asset: "phLowWoodStool", x: 100.13, z: 156.57, ry: -0.6,
     note: "blk13_22：灯笼旁一张矮凳——踩着它挂的灯" },
-  { asset: "phWoodenBucket", x: 88.17, z: 233.8, ry: 0.9,
+  { asset: "phWoodenBucket", x: 102.53, z: 156.37, ry: 0.9,
     note: "blk13_22：凳边一只木桶，桶口朝院门" },
 
   // blk13_23 (84.77, 251.68) 土墙院 · 损：柴院里的日子，柴码得齐。
-  { asset: "firewoodPile", x: 81.77, z: 256.68, ry: 0.25,
+  { asset: "firewoodPile", x: 88.18, z: 252.1, ry: 0.25,
     note: "blk13_23 柴院里的日子：一垛劈好的柴，码得齐" },
-  { asset: "wovenBasket", x: 83.29, z: 257.34, ry: -0.8,
+  { asset: "wovenBasket", x: 89.7, z: 252.76, ry: -0.8,
     note: "blk13_23：挑柴的筐撂在垛边" },
-  { asset: "ryFarmHoe", x: 86.17, z: 256.28, ry: 1.4,
+  { asset: "ryFarmHoe", x: 92.58, z: 251.7, ry: 1.4,
     note: "blk13_23：一把锄头靠在后院墙根" },
 
   // blk13_24 (84.77, 274.56) 一进院 · 损：南门里大街东侧，
   // 大水缸给弹片削掉半边，缸边的坛子与花盆一点没碎。
-  { asset: "clayWaterVat", x: 82.37, z: 277.56, ry: 1.25,
+  { asset: "clayWaterVat", x: 5.63, z: 251.66, ry: 1.25,
     note: "blk13_24 南门里大街东侧：院里那口大水缸给弹片削掉半边" },
-  { asset: "clayLuggedJar", x: 83.97, z: 278.76, ry: -0.3,
+  { asset: "clayLuggedJar", x: 7.23, z: 252.86, ry: -0.3,
     note: "blk13_24：缸边的带耳坛子一点没碎，摆得端端正正" },
-  { asset: "phClayFlowerPot", x: 83.07, z: 280.16, ry: 0,
+  { asset: "phClayFlowerPot", x: 6.33, z: 254.26, ry: 0,
     note: "blk13_24：坛子外侧一只小花盆——这户人家从前是养花的" },
 
   // blk12_24 (53.33, 275) 水井院 · 损：南门里大街东侧的一户，
   // 手推车横在井台西边，一只木箱撂在车尾。
-  { asset: "cart", x: 58.53, z: 276.6, ry: 1.28, scale: 0.95 },
-  { asset: "crate", x: 57.13, z: 277.6, ry: -0.2, scale: 1.0 },
+  { asset: "cart", x: 49.9, z: 151.41, ry: 1.28, scale: 0.95 },
+  { asset: "crate", x: 48.5, z: 152.41, ry: -0.2, scale: 1.0 },
 
   // blk11_24 (27.24, 275) 土墙院 · **完好**：南墙西段少见的一户。
   // 这一组是全片的对照锚 —— 东西都是「摆的」不是「撂的」，朝向一致。
-  { asset: "clothLantern", x: 25.24, z: 279, ry: 0,
+  { asset: "clothLantern", x: 8.6, z: 188.01, ry: 0,
     note: "blk11_24 南墙西段少见的完好一户：布灯笼收下来搁在隔墙根，还没破" },
-  { asset: "ryYardBench", x: 24.54, z: 280.5, ry: 0.05,
+  { asset: "ryYardBench", x: 7.9, z: 189.51, ry: 0.05,
     note: "blk11_24：条凳顺着西院墙摆正——对照组，这一户的东西都是摆的不是撂的" },
-  { asset: "clayWaterVat", x: 26.84, z: 280.4, ry: 0.1,
+  { asset: "clayWaterVat", x: 10.2, z: 189.41, ry: 0.1,
     note: "blk11_24：水缸端端正正立在院心，缸口朝天" },
 
   // ——— 城中片（四·城墙关的中景第二三排：从城头俯看是一片瓦，
@@ -336,105 +338,105 @@ export const PLACEMENTS = Object.freeze([
 
   // blk18_21 (217.9, 205.92) 一进院 · 损：往南墙运东西的路上一户，
   // 军箱与这家自己的柴垛挤在一个院里。
-  { asset: "militaryCrateClosed", x: 220.5, z: 209.32, ry: -0.35,
+  { asset: "militaryCrateClosed", x: 207.62, z: 121.65, ry: -0.35,
     note: "blk18_21 往南墙运东西的路上一户：封着的军用木箱撂在院里" },
-  { asset: "ryFirewoodStack", x: 218.9, z: 211.12, ry: 0.8,
+  { asset: "ryFirewoodStack", x: 206.02, z: 123.45, ry: 0.8,
     note: "blk18_21：这家自己的柴垛还在，跟军箱挤在一个院里" },
 
   // blk18_20 (217.9, 183.04) 土墙院 · 损：石磨在隔墙以南的老位置。
-  { asset: "stoneMillWheel", x: 216.1, z: 187.74, ry: 0.4,
+  { asset: "stoneMillWheel", x: 173.08, z: 122.83, ry: 0.4,
     note: "blk18_20 土墙院柴院：石磨在隔墙以南的老位置" },
-  { asset: "longBench", x: 213.9, z: 189.04, ry: 1.2,
+  { asset: "longBench", x: 170.88, z: 124.13, ry: 1.2,
     note: "blk18_20：磨边的条凳翻着朝东，跟磨盘的朝向对不上" },
 
   // blk18_18 (217.9, 137.28) L 形院 · 损：菜畦边浇菜的圆瓮。
-  { asset: "clayRoundVat", x: 219.1, z: 140.88, ry: 0.6,
+  { asset: "clayRoundVat", x: 210.16, z: 95.77, ry: 0.6,
     note: "blk18_18 L 形院菜畦边：一口圆瓮，浇菜用的" },
-  { asset: "winnowingBasket", x: 220.8, z: 142.08, ry: -1.1,
+  { asset: "winnowingBasket", x: 211.86, z: 96.97, ry: -1.1,
     note: "blk18_18：瓮边一只簸箕摔翻了" },
 
   // blk18_17 (217.9, 114.4) 土墙院 · 损 · 烧过。
-  { asset: "stoneMillWheel", x: 219.5, z: 118.65, ry: -0.4,
+  { asset: "stoneMillWheel", x: 182.53, z: 95.86, ry: -0.4,
     note: "blk18_17 过火的土院：磨盘还在，麦秸垛没了" },
-  { asset: "stackableStone04", x: 221.2, z: 119.4, ry: 0.8,
+  { asset: "stackableStone04", x: 184.23, z: 96.61, ry: 0.8,
     note: "blk18_17：磨盘外侧一块崩下来的碱脚石" },
 
   // blk18_15 (217.9, 68.64) 一进院 · 损：木料压着没散，是还没动过的一户。
-  { asset: "ryTimberStack", x: 215.7, z: 72.24, ry: 0.2,
+  { asset: "ryTimberStack", x: 174.23, z: 69.44, ry: 0.2,
     note: "blk18_15：院里晾着的一摞木料，压着没散" },
-  { asset: "ryChoppingBlock", x: 217.4, z: 73.44, ry: -0.7,
+  { asset: "ryChoppingBlock", x: 175.93, z: 70.64, ry: -0.7,
     note: "blk18_15：木料旁的劈柴墩子" },
 
   // blk17_20 (183.17, 183.04) 十米宽的窄一进院 · 损：坛子只能贴东院墙摆。
-  { asset: "clayWideJar", x: 184.77, z: 186.44, ry: 0.5,
+  { asset: "clayWideJar", x: 129.25, z: 122.2, ry: 0.5,
     note: "blk17_20 十米宽的窄院：坛子只能贴着东院墙一溜摆" },
-  { asset: "clayLuggedJar", x: 185.97, z: 187.64, ry: -0.8,
+  { asset: "clayLuggedJar", x: 130.45, z: 123.4, ry: -0.8,
     note: "blk17_20：下首那只带耳坛，两只间距不匀" },
 
   // blk16_17 (164.87, 114.4) 水井院 · 损：井台西边的桶与盆。
-  { asset: "ryWaterBucket", x: 160.87, z: 118.8, ry: 0.4,
+  { asset: "ryWaterBucket", x: 159.84, z: 95.02, ry: 0.4,
     note: "blk16_17 井院：井台西边两只水桶" },
-  { asset: "phWoodenWashTub", x: 159.37, z: 119.8, ry: -0.6,
+  { asset: "phWoodenWashTub", x: 158.34, z: 96.02, ry: -0.6,
     note: "blk16_17：桶外侧一只洗衣盆，盆沿翘着" },
 
   // blk16_13 (164.87, 22.88) 两进院 · 损：前院里一摞从倒座扒出来的酒坛。
-  { asset: "wineJarCluster", x: 162.87, z: 24.88, ry: 0.4,
+  { asset: "wineJarCluster", x: 175.18, z: 16.38, ry: 0.4,
     note: "blk16_13 两进院前院：从倒座扒出来的一摞酒坛" },
-  { asset: "clayLiddedJar", x: 164.47, z: 26.08, ry: -0.7,
+  { asset: "clayLiddedJar", x: 176.78, z: 17.58, ry: -0.7,
     note: "blk16_13：酒坛边一只加盖的坛子" },
 
   // blk15_15 (134.94, 68.64) 一进院 · 损：磨道踩得比别处实。
-  { asset: "stoneMillWheel", x: 133.34, z: 72.44, ry: 0.5,
+  { asset: "stoneMillWheel", x: 126.84, z: 69.24, ry: 0.5,
     note: "blk15_15：院里那盘磨，磨道踩得比别处实" },
-  { asset: "phLowWoodStool", x: 131.84, z: 73.44, ry: -1.0,
+  { asset: "phLowWoodStool", x: 125.34, z: 70.24, ry: -1.0,
     note: "blk15_15：磨边的小凳翻着" },
 
   // blk15_12 (134.94, 0) 两进院 · 损 · 烧过：前院那张粗木桌被撞得转了向。
-  { asset: "phRoughWoodTable", x: 133.34, z: 2.2, ry: 1.35,
+  { asset: "phRoughWoodTable", x: 128.01, z: 16.75, ry: 1.35,
     note: "blk15_12 烧过的两进院：前院里那张粗木桌被撞得转了向" },
-  { asset: "phChineseWoodStool", x: 131.84, z: 3.4, ry: -0.6,
+  { asset: "phChineseWoodStool", x: 126.51, z: 17.95, ry: -0.6,
     note: "blk15_12：桌边一只方凳，离桌远了一步" },
 
   // blk12_17 (53.33, 114.4) 两进院 · 损：水缸摆在二门以南。
-  { asset: "clayRoundVat", x: 51.53, z: 117, ry: 0.7,
+  { asset: "clayRoundVat", x: 37.13, z: 122.74, ry: 0.7,
     note: "blk12_17 两进院前院：水缸摆在二门以南" },
-  { asset: "clayLiddedJar", x: 50.03, z: 118, ry: -0.4,
+  { asset: "clayLiddedJar", x: 35.63, z: 123.74, ry: -0.4,
     note: "blk12_17：缸边一只咸菜坛" },
 
   // ——— 十字街东南的三户（五·十字街关 detail 档；离炮火远一档的对照组）———
 
   // blk11_13 (27.93, 22.88) 临街铺面 · 损 · 烧过：铺子后院的货翻了一地，
   // 两只板条箱一只侧翻一只倒扣 —— 烧过的铺子读得出「抢过一次」。
-  { asset: "marketCrate01", x: 24.93, z: 21.48, ry: 1.35, scale: 1.05 },
-  { asset: "marketCrate04", x: 23.73, z: 22.48, ry: -0.9, scale: 1.0 },
+  { asset: "marketCrate01", x: 31.69, z: 15.84, ry: 1.35, scale: 1.05 },
+  { asset: "marketCrate04", x: 30.49, z: 16.84, ry: -0.9, scale: 1.0 },
 
   // blk11_14 (27.24, 45.76) 两进院 · 完好：全片区少见的没挨炸的一户，
   // 前院里两只货箱码得方方正正、朝向一致 —— 与东墙根那些散摊子成对比。
-  { asset: "marketBox03", x: 25.04, z: 49.26, ry: 0.1, scale: 1.0 },
-  { asset: "marketBox01", x: 24.34, z: 50.26, ry: 0.12, scale: 1.0 },
+  { asset: "marketBox03", x: 17.93, z: 42.73, ry: 0.1, scale: 1.0 },
+  { asset: "marketBox01", x: 17.23, z: 43.73, ry: 0.12, scale: 1.0 },
 
   // blk13_13 (81.71, 22.88) 两进院 · 损：倒座的山墙塌了半面，
   // 砖瓦堆在前院，一块碎石滚到二门跟前。
-  { asset: "rubble", x: 78.91, z: 26.28, ry: 0.55, scale: 1.0 },
-  { asset: "stackableStone07", x: 80.51, z: 27.48, ry: -0.8, scale: 1.1 },
+  { asset: "rubble", x: 80.2, z: 17.24, ry: 0.55, scale: 1.0 },
+  { asset: "stackableStone07", x: 81.8, z: 18.44, ry: -0.8, scale: 1.1 },
 
   // ——— 临街铺面的后院（两格 ry=-1.5708，铺面朝西临南门里大街）———
   // 这两格没有院墙：中/远景档是「一条沿街长脊 + 一间后院库房」，
   // 两者之间那块 7 m 的空当就是铺子的后院，左右由邻院的院墙夹着。
 
   // blk13_15 (84.77, 68.64) 铺面排屋 · 损：铺子的货本来就堆在后院。
-  { asset: "wineJarCluster", x: 83.27, z: 70.64, ry: 0.3,
+  { asset: "wineJarCluster", x: 84.32, z: 67.59, ry: 0.3,
     note: "blk13_15 铺子后院（铺面朝西临南门里大街）：一摞酒坛码在排门后头——铺子的货在后院" },
-  { asset: "clayWideJar", x: 84.37, z: 72.04, ry: -0.8,
+  { asset: "clayWideJar", x: 85.42, z: 68.99, ry: -0.8,
     note: "blk13_15 后院：散着的一只宽口坛，跟酒坛不成一列" },
-  { asset: "longBench", x: 82.77, z: 68.84, ry: 1.57,
+  { asset: "longBench", x: 83.82, z: 65.79, ry: 1.57,
     note: "blk13_15 后院：一条长凳顺着铺面的后檐墙摆，是卸货时垫货的" },
 
   // blk13_20 (84.77, 183.04) 铺面排屋 · 损：这一家的后院被扒过。
-  { asset: "marketCrate02", x: 83.17, z: 184.24, ry: 1.4,
+  { asset: "marketCrate02", x: 90.73, z: 183.88, ry: 1.4,
     note: "blk13_20 另一家铺子的后院被扒过：板条箱翻在库房与铺面之间" },
-  { asset: "marketBox02", x: 84.57, z: 185.64, ry: -0.9,
+  { asset: "marketBox02", x: 92.13, z: 185.28, ry: -0.9,
     note: "blk13_20 后院：方箱倒扣，跟板条箱差着一个大角度" },
-  { asset: "winnowingBasket", x: 82.37, z: 182.44, ry: 0.5,
+  { asset: "winnowingBasket", x: 89.93, z: 182.08, ry: 0.5,
     note: "blk13_20 后院：一只簸箕滚到库房墙根" },
 ]);

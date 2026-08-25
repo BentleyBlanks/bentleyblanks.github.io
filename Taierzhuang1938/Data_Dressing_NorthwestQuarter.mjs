@@ -4,6 +4,8 @@
 // Script_TownDressing.mjs 文件头。摆位全部走世界坐标（X 向东，Z 向南），
 // 落地/碰撞由 Script_ExternalProps 统一处理。
 // 自验：node Taierzhuang1938/Script_TownDressingTest.mjs
+// 布局 v3 注：note 里的 blk##_# 保留为迁移前的叙事户号，不再等同于当前生成格 seed；
+// 同户道具已整体迁入新的非均质院落，户内相对关系不变。
 //
 // 【这一片在讲什么】1938 年 3 月 17 日。西北片离东关、南关两个主攻方向最远，
 // 全片 91 格院子一律 intact、damage ≤ 0.24 —— 这里是全城生活痕迹最完整的一角，
@@ -62,104 +64,104 @@ export const PLACEMENTS = Object.freeze([
   // --- 北门大街西侧，紧贴望阙门（-145,-305）的头两排 ---------------------
   // blk3_0 井院（-190.67,-274.56）：几户共用的井台在南，车停在西墙根。
   // 这一户收拾停当了 —— 车装好，只等天黑往北门走。
-  { asset: "cart", x: -198.87, z: -270.96, ry: 0.1, scale: 0.95,
+  { asset: "cart", x: -202.69, z: -279.25, ry: 0.1, scale: 0.95,
     note: "blk3_0 井院西墙根：装好家当的手推车，车辕顺墙朝北，等天黑出北门" },
-  { asset: "marketRiceSack01", x: -196.97, z: -268.96, ry: 0.4,
+  { asset: "marketRiceSack01", x: -200.79, z: -277.25, ry: 0.4,
     note: "blk3_0 井院：还没往车上码的一袋粮，搁在井台西边" },
-  { asset: "marketBox02", x: -198.07, z: -268.16, ry: -0.55,
+  { asset: "marketBox02", x: -201.89, z: -276.45, ry: -0.55,
     note: "blk3_0 井院：跟粮袋放一处的箱笼，盖子已经捆好" },
 
   // blk4_0 一进院（-163.43,-280）d10：全片离北门最近的一户，院子只有十米进深。
-  { asset: "marketRiceSack01", x: -153.83, z: -280.7, ry: 0.35,
+  { asset: "marketRiceSack01", x: -166.07, z: -276.04, ry: 0.35,
     note: "blk4_0 离北门最近的一户：粮袋码在东墙根，扛起来就能走" },
-  { asset: "marketBox02", x: -154.83, z: -279.3, ry: -0.6,
+  { asset: "marketBox02", x: -166.7, z: -275.16, ry: -0.6,
     note: "blk4_0 东墙根：粮袋旁边一只箱笼" },
 
   // blk3_1 土墙院（-190.67,-247.02）damage 0.02：全片最完整的一户之一。
-  { asset: "deadTreeTrunk01", x: -199.77, z: -248.82, ry: 1.62, scale: 0.85,
+  { asset: "deadTreeTrunk01", x: -196.74, z: -248.26, ry: 1.62, scale: 0.85,
     note: "blk3_1 土墙院：正房西山墙外放倒的老树，三月无叶，还没劈成柴" },
-  { asset: "stackableStone01", x: -198.87, z: -250.42, ry: -0.6,
+  { asset: "stackableStone01", x: -195.92, z: -249.72, ry: -0.6,
     note: "blk3_1：垫在树干下头的石头" },
 
   // blk4_2 一进院（-163.43,-226.68）damage 0.04：院心西侧正在装车。
-  { asset: "cart", x: -166.76, z: -224.69, ry: 0.18,
+  { asset: "cart", x: -171.2, z: -224.55, ry: 0.18,
     note: "blk4_2 一进院院心：手推车停在影壁西边，正在往上码东西" },
-  { asset: "marketBox01", x: -165.33, z: -223.88, ry: 0.5,
+  { asset: "marketBox01", x: -169.77, z: -223.74, ry: 0.5,
     note: "blk4_2：等着上车的小箱" },
-  { asset: "marketCrate02", x: -166.03, z: -223.18, ry: -0.3,
+  { asset: "marketCrate02", x: -170.47, z: -223.04, ry: -0.3,
     note: "blk4_2：跟小箱叠在一处的板条箱" },
 
   // blk9_2 土墙院（-27.24,-223.18）：第 727 团 1 营（-20,-250）驻地南邻，
   // damage 0.23 —— 兵借了老乡的院子堆弹药，全片只有这两只军箱。
-  { asset: "militaryCrateClosed", x: -36.94, z: -224.68, ry: 0.35,
+  { asset: "militaryCrateClosed", x: -45.45, z: -224.26, ry: 0.35,
     note: "blk9_2 民院西墙根：第727团1营借院子堆的军箱之一" },
-  { asset: "militaryCrateClosed", x: -37.64, z: -224.08, ry: -0.22,
+  { asset: "militaryCrateClosed", x: -46.09, z: -223.71, ry: -0.22,
     note: "blk9_2：跟前一只并排的军箱，箱盖钉着没开" },
 
   // blk4_3 一进院（-163.43,-205.92）：北门大街西侧第三排，院里那棵老树倒了。
-  { asset: "deadTreeTrunk02", x: -169.93, z: -203.82, ry: 0.22, scale: 0.75,
+  { asset: "deadTreeTrunk02", x: -169.47, z: -200.59, ry: 0.22, scale: 0.75,
     note: "blk4_3 一进院院心西侧：三月里放倒的老树，粗一截还横在院里" },
-  { asset: "stackableStone06", x: -167.03, z: -203.32, ry: -0.35,
+  { asset: "stackableStone06", x: -166.57, z: -200.09, ry: -0.35,
     note: "blk4_3：树旁一块当凳子坐的石头" },
-  { asset: "crate", x: -167.73, z: -202.52, ry: 0.55, scale: 0.9,
+  { asset: "crate", x: -167.27, z: -199.29, ry: 0.55, scale: 0.9,
     note: "blk4_3：搬出来晒的木箱，箱面朝上" },
 
   // --- 片区中段：铁牌坊、当典后街、龙王庙街一带 ---------------------------
   // blk4_5 井院（-163.75,-160.16）：铁牌坊（-145,-160）斜对面的巷口井院。
-  { asset: "cart", x: -168.18, z: -157.17, ry: 0.08, scale: 0.9,
+  { asset: "cart", x: -171.59, z: -173.34, ry: 0.08, scale: 0.9,
     note: "blk4_5 铁牌坊斜对面的井院：手推车停在井台西边，车斗已经空了一趟" },
-  { asset: "marketCrate01", x: -169.88, z: -154.33, ry: 0.6,
+  { asset: "marketCrate01", x: -173.29, z: -170.5, ry: 0.6,
     note: "blk4_5：卸下来还没搬进屋的板条箱" },
 
   // blk7_6 土墙院（-81.71,-134.07）：龙王庙街北，后院那半是柴院。
-  { asset: "marketRiceSack01", x: -84.71, z: -129.47, ry: 0.35,
+  { asset: "marketRiceSack01", x: -93.42, z: -174.02, ry: 0.35,
     note: "blk7_6 土墙院后院：矮墙以南的柴院里码着的粮袋" },
-  { asset: "marketRiceSack02", x: -83.91, z: -128.87, ry: -0.5,
+  { asset: "marketRiceSack02", x: -92.62, z: -173.42, ry: -0.5,
     note: "blk7_6 柴院：跟前一袋靠在一起的第二袋粮" },
 
   // blk9_6 土墙院（-27.24,-134.07）damage 0.20：靠十字街这一侧，情景开始乱。
-  { asset: "rubble", x: -36.44, z: -137.67, ry: 0.62, scale: 0.9,
+  { asset: "rubble", x: -45.61, z: -132.77, ry: 0.62, scale: 0.9,
     note: "blk9_6 靠东侧的一户：正房西山墙被流弹削了一角，砖瓦塌在墙根" },
-  { asset: "stackableStone07", x: -35.14, z: -138.67, ry: -0.4, scale: 0.95,
+  { asset: "stackableStone07", x: -44.39, z: -133.7, ry: -0.4, scale: 0.95,
     note: "blk9_6：从塌角里滚出来的一块过墙石" },
 
   // blk3_7 L 形院（-190.67,-114.4）damage 0.05：苗家胡同院落东邻，家当收拢齐了。
-  { asset: "marketBox03", x: -192.87, z: -110.4, ry: 0.3,
+  { asset: "marketBox03", x: -204.31, z: -87.95, ry: 0.3,
     note: "blk3_7 L 形院门内空场：收拢成摞的箱笼，最大的一只在底下" },
-  { asset: "marketRiceSack01", x: -193.67, z: -109.5, ry: 0.65,
+  { asset: "marketRiceSack01", x: -205.11, z: -87.05, ry: 0.65,
     note: "blk3_7：压在箱笼旁边的粮袋" },
 
   // --- 西门大街以北、西城根一带 -----------------------------------------
   // blk1_8 土墙院（-245.14,-93.48）damage 0.21：特务营第 1 连（-225,-50）北邻。
-  { asset: "rubble", x: -235.74, z: -98.28, ry: 0.5, scale: 0.85,
+  { asset: "rubble", x: -244.35, z: -95.73, ry: 0.5, scale: 0.85,
     note: "blk1_8 土墙院：正房东山墙外一堆砖瓦，流弹打塌的一角" },
-  { asset: "stackableStone01", x: -236.84, z: -99.48, ry: -0.6,
+  { asset: "stackableStone01", x: -245.22, z: -96.67, ry: -0.6,
     note: "blk1_8：砖瓦堆边上滚出来的碱脚石" },
 
   // blk4_9 土墙院（-163.43,-68.64）：西门大街北第二排，后院柴院里在装车。
-  { asset: "cart", x: -167.03, z: -62.04, ry: 1.55, scale: 0.9,
+  { asset: "cart", x: -175.39, z: -57.85, ry: 1.55, scale: 0.9,
     note: "blk4_9 土墙院后院柴院：矮墙以南装了一半的手推车，车横着好装" },
-  { asset: "marketCrate03", x: -164.83, z: -63.04, ry: 0.5,
+  { asset: "marketCrate03", x: -173.19, z: -58.85, ry: 0.5,
     note: "blk4_9：等着上车的板条箱" },
 
   // blk5_10 一进院（-136.19,-45.76）damage 0.22：西门大街北，正在装车。
-  { asset: "cart", x: -141.5, z: -44.4, ry: 1.6,
+  { asset: "cart", x: -135.18, z: -36.69, ry: 1.6,
     note: "blk5_10 一进院院心：手推车横在院里，车辕朝东，正装着家当" },
-  { asset: "marketRiceSack01", x: -139.6, z: -42.9, ry: 0.4,
+  { asset: "marketRiceSack01", x: -133.28, z: -35.19, ry: 0.4,
     note: "blk5_10：车边地上摊着的一袋粮" },
 
   // blk0_10 L 形院（-272.38,-45.76）damage 0.01：全片最完整的一户（王家祠堂北）。
-  { asset: "deadTreeTrunk01", x: -267.5, z: -40.5, ry: 1.35,
+  { asset: "deadTreeTrunk01", x: -270.94, z: -34.05, ry: 1.35,
     note: "blk0_10 西城根最完整的一户：院里那棵老树三月放倒，横在菜畦东边" },
-  { asset: "stackableStone05", x: -266.3, z: -38.6, ry: 0.4, scale: 1.05,
+  { asset: "stackableStone05", x: -269.74, z: -32.15, ry: 0.4, scale: 1.05,
     note: "blk0_10：锯树时垫的石头，还搁在树梢那头" },
-  { asset: "stackableStone02", x: -265.7, z: -39.3, ry: -0.7, scale: 0.95,
+  { asset: "stackableStone02", x: -269.14, z: -32.85, ry: -0.7, scale: 0.95,
     note: "blk0_10：跟前一块凑一堆的小石头" },
 
   // blk0_11 一进院（-272.38,-22.88）：西门大街北侧第一排，粮袋码在门道旁。
-  { asset: "marketRiceSack01", x: -276.38, z: -14.88, ry: 0.3,
+  { asset: "marketRiceSack01", x: -274.86, z: -10.66, ry: 0.3,
     note: "blk0_11 门内影壁西侧：码齐的粮袋，这一户还没定走不走" },
-  { asset: "marketRiceSack02", x: -275.58, z: -14.48, ry: -0.45,
+  { asset: "marketRiceSack02", x: -274.29, z: -10.38, ry: -0.45,
     note: "blk0_11：压在前一袋上的第二袋粮" },
 
   // =========================================================================
@@ -171,71 +173,71 @@ export const PLACEMENTS = Object.freeze([
 
   // blk0_0 井院（-272.38,-274.56）damage 0.03。L6 中景档：中景正房进深 0.4 d，
   // 南墙落在 local z ≈ -1.5，所以这口缸真是压着檐口放的（净距 0.30 m）。
-  { asset: "clayWaterVat", x: -272.42, z: -275.27, ry: 0.2,
+  { asset: "clayWaterVat", x: -274.79, z: -276.57, ry: 0.2,
     note: "blk0_0 西城根井院：正房檐下那口水缸，昨儿刚从井台挑满" },
-  { asset: "ryWaterBucket", x: -271.27, z: -275.32, ry: -0.5,
+  { asset: "ryWaterBucket", x: -273.64, z: -276.62, ry: -0.5,
     note: "blk0_0 井院：缸边搁着的木桶，桶绳还搭在缸沿上" },
 
   // blk0_2 土墙院（-272.38,-228.80）damage 0.20：贴西城墙的农户，牲口早牵走了。
-  { asset: "ryHayStack", x: -281.01, z: -232.1, ry: 0.3,
+  { asset: "ryHayStack", x: -282.09, z: -228.47, ry: 0.3,
     note: "blk0_2 西城根土院：西墙根的秸秆垛，冬里的草料还没喂完" },
-  { asset: "ryFeedTrough", x: -282.55, z: -231.54, ry: 1.55,
+  { asset: "ryFeedTrough", x: -283.61, z: -227.92, ry: 1.55,
     note: "blk0_2 西城根土院：草垛边的木食槽，槽底还剩一层碎秸秆" },
-  { asset: "ryFarmHoe", x: -282.18, z: -233.41, ry: -0.8,
+  { asset: "ryFarmHoe", x: -283.25, z: -229.76, ry: -0.8,
     note: "blk0_2 西城根土院：顺手扔在槽边的锄头" },
 
   // blk0_5 一进院（-272.38,-160.16）damage 0.15：磨面这一摊在东墙根。
-  { asset: "stoneMillWheel", x: -263.23, z: -160.23, ry: 0.15,
+  { asset: "stoneMillWheel", x: -258.74, z: -153.08, ry: 0.15,
     note: "blk0_5 西城根一进院：东墙根的石磨盘，磨眼里还剩半把糠" },
-  { asset: "wovenBasket", x: -262.58, z: -158.98, ry: -0.4,
+  { asset: "wovenBasket", x: -258.12, z: -151.88, ry: -0.4,
     note: "blk0_5 一进院：磨盘边的笸箩，接面用的" },
-  { asset: "winnowingBasket", x: -264.49, z: -159.69, ry: 1.2,
+  { asset: "winnowingBasket", x: -259.95, z: -152.56, ry: 1.2,
     note: "blk0_5 一进院：簸箕靠着墙立起来，扇面朝外" },
 
   // blk0_7 两进院（-272.38,-114.40）damage 0.08：全片仅三户两进院之一，
   // 后院墙根那堆酒坛是这一片唯一的殷实痕迹。
-  { asset: "wineJarCluster", x: -262.79, z: -119.88, ry: 0.35,
+  { asset: "wineJarCluster", x: -265.63, z: -133.58, ry: 0.35,
     note: "blk0_7 西城根两进院：后院墙根的酒坛，这一户在西关有个小酒坊" },
-  { asset: "clayWideJar", x: -261.91, z: -120.95, ry: -0.6,
+  { asset: "clayWideJar", x: -264.84, z: -134.55, ry: -0.6,
     note: "blk0_7 两进院后院：阔口坛，坛口蒙的布还系着" },
-  { asset: "phWickerTray", x: -261.84, z: -119.08, ry: 0.5,
+  { asset: "phWickerTray", x: -264.78, z: -132.86, ry: 0.5,
     note: "blk0_7 两进院后院：压在坛盖上的竹编浅筐" },
 
   // blk0_8 土墙院（-272.38,-91.52）damage 0.09：程序化院落没给这户晾杆，补一副。
-  { asset: "ryDryingRack", x: -281.52, z: -91.58, ry: 0.05,
+  { asset: "ryDryingRack", x: -283.23, z: -90.03, ry: 0.05,
     note: "blk0_8 西城根土院：院子西头的晾晒木架，两根横杆都空着，布一早收进屋了" },
-  { asset: "phWoodenWashTub", x: -279.94, z: -92.25, ry: 0.6,
+  { asset: "phWoodenWashTub", x: -281.86, z: -90.61, ry: 0.6,
     note: "blk0_8 土墙院：架子底下的木盆，昨晚洗的衣裳" },
 
   // blk1_0 一进院（-245.14,-274.56）damage 0.02：全片最完整的一户。
-  { asset: "clayLiddedJar", x: -235.57, z: -279.18, ry: 0.25,
+  { asset: "clayLiddedJar", x: -240.24, z: -277.01, ry: 0.25,
     note: "blk1_0 一进院：檐下一溜咸菜坛的头一只，盖压得严实" },
-  { asset: "clayLuggedJar", x: -234.63, z: -281.41, ry: -0.45,
+  { asset: "clayLuggedJar", x: -239.42, z: -278.97, ry: -0.45,
     note: "blk1_0 一进院：并排的第二只带耳陶罐" },
-  { asset: "stackableStone01", x: -235.98, z: -278.82, ry: 0.6,
+  { asset: "stackableStone01", x: -240.61, z: -276.7, ry: 0.6,
     note: "blk1_0 一进院：压坛的石头，年年就那一块" },
 
   // blk1_2 L 形院（-245.14,-228.80）damage 0.17：劈柴这一摊摆在西墙根。
-  { asset: "ryChoppingBlock", x: -253.7, z: -224.98, ry: 0.3,
+  { asset: "ryChoppingBlock", x: -256.42, z: -223.95, ry: 0.3,
     note: "blk1_2 L 形院：西墙根的劈柴墩，墩面砍出一圈豁口" },
-  { asset: "phWoodAxe", x: -254.76, z: -224.54, ry: -0.9,
+  { asset: "phWoodAxe", x: -257.35, z: -223.56, ry: -0.9,
     note: "blk1_2 L 形院：斧子撂在墩子边上，没插回去" },
-  { asset: "phFirewoodBranches", x: -252.61, z: -225.99, ry: 0.5,
+  { asset: "phFirewoodBranches", x: -255.46, z: -224.83, ry: 0.5,
     note: "blk1_2 L 形院：劈开的柴枝还散着，没码成垛" },
 
   // blk1_5 土墙院（-246.38,-160.16）damage 0.16：院心一桌两凳 —— 这一轮
   // 想立起来的就是这个情景：三月中旬鲁南的白天已经能在院里吃饭了。
-  { asset: "phRoughWoodTable", x: -246.44, z: -159.73, ry: 0.1,
+  { asset: "phRoughWoodTable", x: -243.33, z: -153.03, ry: 0.1,
     note: "blk1_5 土墙院院心：那张粗木桌，天暖了就搬出来吃饭" },
-  { asset: "longBench", x: -246.11, z: -158.05, ry: 0.08,
+  { asset: "longBench", x: -243, z: -151.35, ry: 0.08,
     note: "blk1_5 院心：桌子南边的长条凳" },
-  { asset: "phChineseWoodStool", x: -247.19, z: -159.01, ry: -0.5,
+  { asset: "phChineseWoodStool", x: -244.08, z: -152.31, ry: -0.5,
     note: "blk1_5 院心：桌角一只方凳，另一只不知让谁搬走了" },
 
   // blk1_7 L 形院（-245.14,-114.40）damage 0.14：近西城根，还养着牲口的一户。
-  { asset: "ryHayStack", x: -254.67, z: -117.7, ry: -0.2,
+  { asset: "ryHayStack", x: -256.07, z: -130.78, ry: -0.2,
     note: "blk1_7 近西城根的 L 形院：秸秆垛，垛顶压着几块碎瓦防风" },
-  { asset: "phIronSpade", x: -255.91, z: -118.49, ry: 0.7,
+  { asset: "phIronSpade", x: -257.15, z: -131.47, ry: 0.7,
     note: "blk1_7 L 形院：铁锹丢在垛边" },
 
   // ---- 二、苗家胡同与当典后街之间（x ≈ -218 / -190）----
@@ -243,48 +245,48 @@ export const PLACEMENTS = Object.freeze([
   // 下面这几户都完整落在巷南/巷北的院格里，离巷心最近的一件 9.6 m。
 
   // blk2_1 窄条院（-217.90,-247.02）d 11.6 damage 0.09：苗家胡同以南的一排。
-  { asset: "clothLantern", x: -210.32, z: -243.85, ry: 0.2,
+  { asset: "clothLantern", x: -206.59, z: -243.42, ry: 0.2,
     note: "blk2_1 苗家胡同以南的窄条院：门道边的布灯笼，昨夜取下来搁在墙头下" },
-  { asset: "bambooHat", x: -210.54, z: -242.72, ry: -0.6,
+  { asset: "bambooHat", x: -206.81, z: -242.29, ry: -0.6,
     note: "blk2_1 窄条院：灯笼旁边一顶斗笠" },
 
   // blk2_6 一进院（-217.90,-133.92）d 14.2 damage 0.11。
-  { asset: "clayWaterVat", x: -217.94, z: -133.97, ry: -0.25,
+  { asset: "clayWaterVat", x: -228.28, z: -92, ry: -0.25,
     note: "blk2_6 一进院：正房檐下的水缸，缸沿豁了一小块" },
-  { asset: "phWoodenBucket", x: -219.02, z: -133.55, ry: 0.55,
+  { asset: "phWoodenBucket", x: -229.36, z: -91.58, ry: 0.55,
     note: "blk2_6 一进院：缸边的木水桶" },
 
   // blk2_7 土墙院（-217.90,-114.40）damage 0.23：本列最靠东、也最乱的一户。
-  { asset: "phFirewoodBranches", x: -225.52, z: -108.59, ry: 0.4,
+  { asset: "phFirewoodBranches", x: -229.74, z: -122.59, ry: 0.4,
     note: "blk2_7 土墙院：柴枝散在院里没人码 —— 这一户 damage 0.23，是本列最乱的" },
-  { asset: "longBench", x: -226.52, z: -110.04, ry: 1.5,
+  { asset: "longBench", x: -230.69, z: -123.97, ry: 1.5,
     note: "blk2_7 土墙院：翻倒过又扶起来的条凳，横在柴堆边" },
-  { asset: "ryWaterBucket", x: -226.54, z: -107.96, ry: -0.3,
+  { asset: "ryWaterBucket", x: -230.71, z: -121.99, ry: -0.3,
     note: "blk2_7 土墙院：滚到一边的木桶" },
 
   // blk3_2 井院（-190.67,-228.80）damage 0.24：几户共用的井台在院南。
-  { asset: "ryWaterBucket", x: -190.61, z: -225.06, ry: 0.3,
+  { asset: "ryWaterBucket", x: -196.05, z: -223.24, ry: 0.3,
     note: "blk3_2 井院：井台北边打水的木桶，这口井是四户共用的" },
-  { asset: "phWoodenWashTub", x: -191.03, z: -223.98, ry: -0.5,
+  { asset: "phWoodenWashTub", x: -196.47, z: -222.16, ry: -0.5,
     note: "blk3_2 井院：井边的木盆，早上刚淘过米" },
-  { asset: "wovenBasket", x: -190.17, z: -226.12, ry: 0.8,
+  { asset: "wovenBasket", x: -195.61, z: -224.3, ry: 0.8,
     note: "blk3_2 井院：搁在盆边的笸箩" },
 
   // blk3_3 一进院（-190.67,-205.92）damage 0.19：北门大街西侧第二排，
   // 突围暗线的写法 —— 门道边一只捆好的箱笼，车轮备着，车还没借到。
-  { asset: "marketBox02", x: -190.66, z: -198.78, ry: 0.3,
+  { asset: "marketBox02", x: -190.15, z: -194.44, ry: 0.3,
     note: "blk3_3 一进院门道边：捆好的箱笼，绳扣打的是活结，一拽就开" },
-  { asset: "marketRiceSack02", x: -192.13, z: -199.24, ry: -0.4,
+  { asset: "marketRiceSack02", x: -191.62, z: -194.9, ry: -0.4,
     note: "blk3_3 一进院：压在箱笼边的粮袋" },
-  { asset: "ryCartWheel", x: -190.84, z: -199.93, ry: 1.5,
+  { asset: "ryCartWheel", x: -190.33, z: -195.59, ry: 1.5,
     note: "blk3_3 一进院：备下的大车轮，车还在别家院里没推回来" },
 
   // blk3_6 一进院（-190.67,-133.92）damage 0.17。
-  { asset: "stoneMillWheel", x: -181.52, z: -133.78, ry: -0.2,
+  { asset: "stoneMillWheel", x: -158.99, z: -128.58, ry: -0.2,
     note: "blk3_6 一进院：东墙根的石磨盘，磨杆早拆下来当柴烧了" },
-  { asset: "winnowingBasket", x: -182.78, z: -133.24, ry: 1.4,
+  { asset: "winnowingBasket", x: -160.25, z: -128.04, ry: 1.4,
     note: "blk3_6 一进院：簸箕立在磨盘北边靠着墙" },
-  { asset: "phWickerTray", x: -180.58, z: -134.79, ry: 0.4,
+  { asset: "phWickerTray", x: -158.05, z: -129.59, ry: 0.4,
     note: "blk3_6 一进院：磨盘上摊着的竹编浅筐" },
 
   // ---- 三、北门大街两侧（x ≈ -163 / -136 / -109）----
@@ -293,111 +295,111 @@ export const PLACEMENTS = Object.freeze([
   // x -132..-54 那条上一轮的稀疏带，从这里开始一路补到第四段。
 
   // blk4_4 临街铺面（-162.90,-183.04）ry π/2 damage 0.23：本片唯一的 ShopRow。
-  { asset: "shopPlaque", x: -168.33, z: -183, ry: 0.1,
+  { asset: "shopPlaque", x: -219.73, z: -201.85, ry: 0.1,
     note: "blk4_4 临街铺面后院：卸下来靠墙的铺面门板，开春本要重漆" },
-  { asset: "wineJarCluster", x: -167.03, z: -183.25, ry: -0.4,
+  { asset: "wineJarCluster", x: -218.43, z: -202.1, ry: -0.4,
     note: "blk4_4 铺面后院：酒坛 —— 这家铺子是卖散酒的" },
 
   // blk4_6 一进院（-166.00,-137.28）w 18 damage 0.10：院心一桌，门道一灯。
-  { asset: "phChineseWoodStool", x: -167.15, z: -136.42, ry: 0.5,
+  { asset: "phChineseWoodStool", x: -163.97, z: -152.76, ry: 0.5,
     note: "blk4_6 院心：桌边翻倒过又扶起来的方凳" },
-  { asset: "clothLantern", x: -166.2, z: -129.92, ry: 0.25,
+  { asset: "clothLantern", x: -163.02, z: -146.26, ry: 0.25,
     note: "blk4_6 一进院门道旁：布灯笼，夜里给出北门的人照路" },
 
   // blk4_7 L 形院（-166.52,-114.40）damage 0.17。
-  { asset: "ryDryingRack", x: -173.94, z: -116.41, ry: 0.08,
+  { asset: "ryDryingRack", x: -157.87, z: -67.25, ry: 0.08,
     note: "blk4_7 L 形院：厢房西边的晾晒木架，杆上还留着晾靛青布勒出的印子" },
-  { asset: "phWoodenWashTub", x: -172.92, z: -115.92, ry: -0.6,
+  { asset: "phWoodenWashTub", x: -156.88, z: -66.78, ry: -0.6,
     note: "blk4_7 L 形院：架下的木盆" },
 
   // blk4_11 L 形院（-163.43,-22.88）damage 0.18：西门大街北的第一排。
-  { asset: "clayLiddedJar", x: -154.36, z: -22.88, ry: 0.3,
+  { asset: "clayLiddedJar", x: -144.13, z: -16.3, ry: 0.3,
     note: "blk4_11 西门大街北的 L 形院：菜畦东头的咸菜坛" },
-  { asset: "stackableStone02", x: -155.42, z: -22.44, ry: -0.5,
+  { asset: "stackableStone02", x: -144.97, z: -15.95, ry: -0.5,
     note: "blk4_11 L 形院：压坛石" },
 
   // blk5_2 土墙院（-132.15,-226.68）damage 0.14：柴这一摊码得最齐的一户。
-  { asset: "ryFirewoodStack", x: -137.68, z: -222.78, ry: 0.25,
+  { asset: "ryFirewoodStack", x: -134.28, z: -196.71, ry: 0.25,
     note: "blk5_2 土墙院：码齐的柴垛，够烧到清明" },
-  { asset: "ryChoppingBlock", x: -137.74, z: -224.94, ry: -0.4,
+  { asset: "ryChoppingBlock", x: -134.33, z: -198.45, ry: -0.4,
     note: "blk5_2 土墙院：柴垛边的劈柴墩" },
-  { asset: "phWoodAxe", x: -138.65, z: -223.75, ry: 0.9,
+  { asset: "phWoodAxe", x: -135.06, z: -197.49, ry: 0.9,
     note: "blk5_2 土墙院：斧子还撂在墩边的地上" },
 
   // blk5_3 一进院（-132.15,-205.92）damage 0.09。L6 是近景档、L5 是中景档，
   // 两档正房进深差着四米 —— 这口缸放在两档都读得通的那条线上。
-  { asset: "clayWaterVat", x: -132.22, z: -206.63, ry: 0.15,
+  { asset: "clayWaterVat", x: -109.46, z: -200.73, ry: 0.15,
     note: "blk5_3 一进院：正房前那口水缸，缸底压着半块砖找平" },
-  { asset: "ryWaterBucket", x: -132.27, z: -205.48, ry: -0.55,
+  { asset: "ryWaterBucket", x: -109.51, z: -199.58, ry: -0.55,
     note: "blk5_3 一进院：缸边的木桶" },
 
   // blk5_5 窄院（-130.54,-160.16）w 13.9 damage 0.13：铁牌坊（-145,-160）正东。
-  { asset: "wovenBasket", x: -125.58, z: -160.18, ry: 0.4,
+  { asset: "wovenBasket", x: -126.93, z: -156.21, ry: 0.4,
     note: "blk5_5 铁牌坊正东的窄院：东墙根的笸箩，晒着去年的红薯干" },
-  { asset: "bambooHat", x: -126.67, z: -160.52, ry: -0.3,
+  { asset: "bambooHat", x: -127.91, z: -156.51, ry: -0.3,
     note: "blk5_5 窄院：笸箩旁一顶斗笠" },
-  { asset: "phLowWoodStool", x: -126.13, z: -161.18, ry: 0.6,
+  { asset: "phLowWoodStool", x: -127.43, z: -157.11, ry: 0.6,
     note: "blk5_5 窄院：坐着择菜的小板凳" },
 
   // blk5_9 L 形院（-136.19,-68.64）damage 0.24：西门大街北，也在等天黑。
-  { asset: "ryCartWheel", x: -128.53, z: -62.4, ry: 0.2,
+  { asset: "ryCartWheel", x: -117.96, z: -56.98, ry: 0.2,
     note: "blk5_9 西门大街北的 L 形院：备下的大车轮靠在门道边" },
-  { asset: "marketBox01", x: -128.18, z: -61.15, ry: -0.45,
+  { asset: "marketBox01", x: -117.61, z: -55.73, ry: -0.45,
     note: "blk5_9 L 形院：轮子边码着的小木箱" },
-  { asset: "marketRiceSack01", x: -129.73, z: -63.15, ry: 0.5,
+  { asset: "marketRiceSack01", x: -119.16, z: -57.73, ry: 0.5,
     note: "blk5_9 L 形院：压在木箱上的粮袋" },
 
   // blk5_11 L 形院（-136.19,-22.88）damage 0.06：本片东半最完整的一户。
-  { asset: "phRoughWoodTable", x: -136.14, z: -22.45, ry: 0.08,
+  { asset: "phRoughWoodTable", x: -126.61, z: -16.22, ry: 0.08,
     note: "blk5_11 L 形院院心：粗木桌，桌面被日头晒得发白" },
-  { asset: "longBench", x: -134.46, z: -22.12, ry: -0.05,
+  { asset: "longBench", x: -124.93, z: -15.89, ry: -0.05,
     note: "blk5_11 院心：桌边的长条凳" },
-  { asset: "phWoodLantern", x: -135.72, z: -23.53, ry: 0.4,
+  { asset: "phWoodLantern", x: -126.19, z: -17.3, ry: 0.4,
     note: "blk5_11 院心：桌角搁着的木框风灯，夜里端进屋" },
 
   // blk6_0 土墙院（-108.95,-274.56）damage 0.14：北门大街东侧头一排。
-  { asset: "ryDryingRack", x: -118.09, z: -274.63, ry: 0.1,
+  { asset: "ryDryingRack", x: -123.33, z: -276.09, ry: 0.1,
     note: "blk6_0 北门大街东侧的土墙院：晾晒木架，昨天的衣裳早收干净了" },
-  { asset: "phWoodenWashTub", x: -118.16, z: -276.34, ry: 0.5,
+  { asset: "phWoodenWashTub", x: -123.39, z: -277.7, ry: 0.5,
     note: "blk6_0 土墙院：架下的木盆" },
 
   // blk6_4 L 形院（-108.95,-183.04）damage 0.14。
-  { asset: "stoneMillWheel", x: -99.8, z: -183.11, ry: 0.25,
+  { asset: "stoneMillWheel", x: -106.08, z: -178.91, ry: 0.25,
     note: "blk6_4 L 形院：东墙根的石磨盘" },
-  { asset: "phWickerTray", x: -101.11, z: -183.52, ry: -0.4,
+  { asset: "phWickerTray", x: -107.39, z: -179.32, ry: -0.4,
     note: "blk6_4 L 形院：磨盘上摊着的竹编浅筐" },
-  { asset: "winnowingBasket", x: -99.26, z: -184.37, ry: 1.35,
+  { asset: "winnowingBasket", x: -105.54, z: -180.17, ry: 1.35,
     note: "blk6_4 L 形院：簸箕靠墙立着" },
 
   // blk6_5 一进院（-108.95,-160.16）damage 0.24：铁牌坊东，檐下一溜坛子。
-  { asset: "clayLiddedJar", x: -99.58, z: -165.86, ry: -0.3,
+  { asset: "clayLiddedJar", x: -101.21, z: -161.04, ry: -0.3,
     note: "blk6_5 一进院：檐下的咸菜坛" },
-  { asset: "clayLuggedJar", x: -99.14, z: -166.92, ry: 0.55,
+  { asset: "clayLuggedJar", x: -100.88, z: -161.82, ry: 0.55,
     note: "blk6_5 一进院：并排的带耳陶罐" },
-  { asset: "stackableStone01", x: -98.44, z: -166.07, ry: -0.65,
+  { asset: "stackableStone01", x: -100.37, z: -161.19, ry: -0.65,
     note: "blk6_5 一进院：压坛石" },
 
   // blk6_6 土墙院（-105.67,-134.07）damage 0.14：龙王庙街（z=-145）南侧一排。
-  { asset: "ryChoppingBlock", x: -111.25, z: -130.04, ry: 0.35,
+  { asset: "ryChoppingBlock", x: -95.23, z: -125.26, ry: 0.35,
     note: "blk6_6 龙王庙街南的土墙院：劈柴墩，墩上还搭着一段没劈开的木头" },
-  { asset: "phWoodAxe", x: -110.8, z: -131.1, ry: 0.8,
+  { asset: "phWoodAxe", x: -94.78, z: -126.32, ry: 0.8,
     note: "blk6_6 土墙院：斧子" },
-  { asset: "phFirewoodBranches", x: -110.86, z: -129.13, ry: -0.5,
+  { asset: "phFirewoodBranches", x: -94.84, z: -124.35, ry: -0.5,
     note: "blk6_6 土墙院：劈好的柴枝，还没码上垛" },
 
   // blk6_7 两进院（-105.67,-114.40）damage 0.12：当典（-136,-116）东邻。
-  { asset: "phRoughWoodTable", x: -105.64, z: -114.12, ry: 0.05,
+  { asset: "phRoughWoodTable", x: -110.3, z: -128.88, ry: 0.05,
     note: "blk6_7 两进院前院：粗木桌 —— 这一户是全片少见的两进院，当典东邻" },
-  { asset: "phChineseWoodStool", x: -105.21, z: -115.34, ry: -0.4,
+  { asset: "phChineseWoodStool", x: -109.87, z: -130.1, ry: -0.4,
     note: "blk6_7 两进院前院：桌边的方凳" },
-  { asset: "phClayFlowerPot", x: -104.57, z: -113.66, ry: 0.3,
+  { asset: "phClayFlowerPot", x: -109.23, z: -128.42, ry: 0.3,
     note: "blk6_7 两进院前院：桌角一只素陶瓦盆，种的葱" },
 
   // blk6_10 窄院（-115.29,-45.76）w 12.6 damage 0.18：这一格只有十二米半面阔，
   // 缸只放得下正房西山墙外那道窄缝里。
-  { asset: "clayWaterVat", x: -119.34, z: -50.07, ry: -0.15,
+  { asset: "clayWaterVat", x: -105.56, z: -17.88, ry: -0.15,
     note: "blk6_10 窄院：正房西山墙外的水缸，院子窄，只这一处放得下" },
-  { asset: "phWoodenBucket", x: -120.43, z: -50.4, ry: 0.45,
+  { asset: "phWoodenBucket", x: -106.65, z: -18.21, ry: 0.45,
     note: "blk6_10 窄院：缸边的木水桶" },
 
   // ---- 四、后门大街到十字街之间（x ≈ -82 / -54 / -27）----
@@ -405,75 +407,75 @@ export const PLACEMENTS = Object.freeze([
   // 但没有一户塌到不能住 —— 这是西北片与东关、南关最大的差别。
 
   // blk7_0 L 形院（-81.71,-274.56）damage 0.15：后门大街（x=-75）西邻的头一排。
-  { asset: "marketBox03", x: -81.75, z: -267.47, ry: 0.25,
+  { asset: "marketBox03", x: -90.75, z: -270.32, ry: 0.25,
     note: "blk7_0 后门大街西的 L 形院：门内摞齐的箱笼，最大的一只压在底下" },
-  { asset: "marketRiceSack01", x: -83.2, z: -267.13, ry: -0.5,
+  { asset: "marketRiceSack01", x: -92.2, z: -269.98, ry: -0.5,
     note: "blk7_0 L 形院：箱笼边的粮袋" },
-  { asset: "clothLantern", x: -80.58, z: -267.65, ry: 0.4,
+  { asset: "clothLantern", x: -89.58, z: -270.5, ry: 0.4,
     note: "blk7_0 L 形院：门道边的布灯笼，就等天黑" },
 
   // blk7_4 土墙院（-86.52,-183.04）damage 0.24。
-  { asset: "ryFirewoodStack", x: -91.86, z: -178.55, ry: 0.3,
+  { asset: "ryFirewoodStack", x: -64.96, z: -218.55, ry: 0.3,
     note: "blk7_4 土墙院：西墙根的柴垛" },
-  { asset: "phIronSpade", x: -91.88, z: -180.08, ry: -0.85,
+  { asset: "phIronSpade", x: -64.98, z: -219.94, ry: -0.85,
     note: "blk7_4 土墙院：铁锹靠在柴垛边" },
 
   // blk7_5 一进院（-86.52,-160.16）damage 0.20。
-  { asset: "clayRoundVat", x: -86.51, z: -160.82, ry: 0.2,
+  { asset: "clayRoundVat", x: -87.16, z: -201.83, ry: 0.2,
     note: "blk7_5 一进院：正房前的圆腹陶缸，腌着一冬的萝卜" },
-  { asset: "phWoodenWashTub", x: -87.78, z: -160.89, ry: -0.45,
+  { asset: "phWoodenWashTub", x: -88.43, z: -201.9, ry: -0.45,
     note: "blk7_5 一进院：缸边的木盆" },
 
   // blk7_7 L 形院（-81.71,-114.40）damage 0.22。
-  { asset: "ryDryingRack", x: -89.5, z: -113.41, ry: -0.06,
+  { asset: "ryDryingRack", x: -91.5, z: -157.91, ry: -0.06,
     note: "blk7_7 L 形院：晾晒木架，两根横杆空着，这一户走得急" },
-  { asset: "wovenBasket", x: -88.71, z: -114.87, ry: 0.5,
+  { asset: "wovenBasket", x: -91.22, z: -158.74, ry: 0.5,
     note: "blk7_7 L 形院：架下的笸箩" },
 
   // blk7_11 一进院（-81.71,-18.22）d 11.6 damage 0.16：西门大街北的窄条。
-  { asset: "bambooHat", x: -72.4, z: -18.87, ry: 0.3,
+  { asset: "bambooHat", x: -72.59, z: -16.72, ry: 0.3,
     note: "blk7_11 西门大街北的一进院：东墙根挂过的斗笠，掉在地上" },
-  { asset: "ryFarmHoe", x: -71.1, z: -19.52, ry: -0.7,
+  { asset: "ryFarmHoe", x: -71.75, z: -17.14, ry: -0.7,
     note: "blk7_11 一进院：锄头 —— 城里这几户也各有城外的两亩地" },
-  { asset: "phLowWoodStool", x: -72.61, z: -19.98, ry: 0.5,
+  { asset: "phLowWoodStool", x: -72.73, z: -17.44, ry: 0.5,
     note: "blk7_11 一进院：小板凳" },
 
   // blk8_3 土墙院（-54.48,-205.92）damage 0.21。
-  { asset: "stoneMillWheel", x: -45.33, z: -205.99, ry: -0.25,
+  { asset: "stoneMillWheel", x: -48.44, z: -202.47, ry: -0.25,
     note: "blk8_3 土墙院：石磨盘，磨道上的土还是新翻的" },
-  { asset: "winnowingBasket", x: -46.59, z: -205.45, ry: 1.3,
+  { asset: "winnowingBasket", x: -49.65, z: -201.95, ry: 1.3,
     note: "blk8_3 土墙院：簸箕靠墙立着" },
 
   // blk8_6 一进院（-54.48,-134.07）damage 0.24：本片东侧最重的一户，
   // 也只是西山墙塌了一角 —— 坛子都没碎。
-  { asset: "rubble", x: -63.9, z: -133.75, ry: 0.45, scale: 0.85,
+  { asset: "rubble", x: -71.51, z: -128.22, ry: 0.45, scale: 0.85,
     note: "blk8_6 一进院：西山墙塌下来的砖瓦，damage 0.24 是本片顶格" },
-  { asset: "stackableStone07", x: -64.82, z: -132.13, ry: -0.35,
+  { asset: "stackableStone07", x: -72.38, z: -126.69, ry: -0.35,
     note: "blk8_6 一进院：从塌角滚出来的过墙石" },
-  { asset: "clayWideJar", x: -65.01, z: -135.31, ry: 0.7,
+  { asset: "clayWideJar", x: -72.56, z: -129.69, ry: 0.7,
     note: "blk8_6 一进院：被砖砸歪的阔口坛 —— 坛没碎，还立着" },
 
   // blk8_8 窄条院（-54.48,-97.83）d 8.3 damage 0.14：当典后街（z=-90）北。
-  { asset: "clayWaterVat", x: -54.52, z: -97.18, ry: 0.3,
+  { asset: "clayWaterVat", x: -30.31, z: -202.65, ry: 0.3,
     note: "blk8_8 当典后街北的窄条院：正房檐前的水缸" },
-  { asset: "ryWaterBucket", x: -53.37, z: -97.23, ry: -0.4,
+  { asset: "ryWaterBucket", x: -29.16, z: -202.7, ry: -0.4,
     note: "blk8_8 窄条院：缸边的木桶" },
 
   // blk8_11 一进院（-54.48,-18.22）d 11.6 damage 0.24：西门大街北。
-  { asset: "ryTimberStack", x: -44.65, z: -19.25, ry: 0.1,
+  { asset: "ryTimberStack", x: -44.61, z: -17.17, ry: 0.1,
     note: "blk8_11 西门大街北的一进院：东墙根的木料堆，本是开春要翻修厢房的" },
-  { asset: "phSmithHammer", x: -45.68, z: -20.13, ry: -0.6,
+  { asset: "phSmithHammer", x: -45.48, z: -17.92, ry: -0.6,
     note: "blk8_11 一进院：撂在木料上的铁锤" },
 
   // blk9_7 一进院（-27.24,-114.40）damage 0.18：本片最靠十字街的一列。
-  { asset: "phRoughWoodTable", x: -27.19, z: -113.97, ry: 0.15,
+  { asset: "phRoughWoodTable", x: -65, z: -176.98, ry: 0.15,
     note: "blk9_7 一进院院心：粗木桌 —— 离十字街两百步，这一户还照常在院里吃饭" },
-  { asset: "longBench", x: -27.13, z: -112.15, ry: 0.1,
+  { asset: "longBench", x: -64.94, z: -175.16, ry: 0.1,
     note: "blk9_7 院心：桌边的长条凳" },
 
   // blk9_8 窄条土墙院（-27.24,-97.83）d 8.3 damage 0.24：第 727 团的人从这儿过。
-  { asset: "marketCrate02", x: -18.08, z: -97.89, ry: 0.3,
+  { asset: "marketCrate02", x: -23.28, z: -16.56, ry: 0.3,
     note: "blk9_8 窄条土墙院：队伍路过时卸下的板条箱，箱盖还没钉上" },
-  { asset: "phFirewoodBranches", x: -18.21, z: -99.36, ry: -0.5,
+  { asset: "phFirewoodBranches", x: -23.38, z: -17.7, ry: -0.5,
     note: "blk9_8 窄条土墙院：箱边散着的柴枝，是这家的" },
 ]);

@@ -6,11 +6,12 @@
 
 - 西侧纵向津浦铁路，内侧依次为滕县站、通信队、电力厂、交易所、第122师师部（西关大街北侧）和西关街区。
 - 城墙与护城壕围合县城，四门严格按示意图的错位关系布置：北门偏西、南门偏东、东门位于东墙偏北、西门位于西墙中段。
-- 城内道路（STREETS v2，全部照城防示意图转写）：西门大街、十字街、东门大街、县署前街、北门大街（含南段）、南门里大街（三段链）、龙王庙街、后门大街、顺兴街、当典后街、当典东街、关岳庙街、奎文街、奎文东街、火神庙东街，另有 `rank:"hutong"` 的苗家胡同。四条门里主街须接至对应城门；十字街至少汇合两条主街；主街宽于次街、次街宽于东关巷；巷道只雕通道，不铺车辙、不摆街肩家什。
+- 城内道路（STREETS v2，全部照城防示意图转写）：西门大街、十字街、东门大街、县署前街、北门大街（含南段）、南门里大街（三段链）、龙王庙街、后门大街、顺兴街、当典后街、当典东街、关岳庙街、奎文街、奎文东街、火神庙东街，另有 `rank:"hutong"` 的苗家胡同。四条门里主街须接至对应城门；十字街至少汇合两条主街；数据显式标为 `main`、`secondary`、`hutong` 三层，且宽度严格为主街 > 次街 > 胡同；胡同只雕通道，不铺车辙、不摆街肩家什。
+- 城内住宅用 `CITY_BLOCK_ZONES` + `CITY_BLOCK_PROFILES` 填充，而不是一张贯穿全城的等距格网：北／中／南三组公共院落各有两块以上街坊分区，分别使用长短、朝向、密度、错缝和收缩范围不同的院落 profile。道路、十字街口、功能院落、地标、四条上城道与顺城街先占位，住宅地块只在剩余空间生成，因而不得压街、压院或切断上墙通路。上述地籍式边界和所有米制地块参数都是推定，不作实测陈述。
 - 西门、 西门大街、十字街口与 `SIGHT_CORRIDOR` 必须同线，且城楼至街口之间保留 `clearHalfWidth` 的净空。功能院落、牌坊、街垒和家什均不得压入。
 - 城内功能院落按图落位（CITY_FEATURES v2）：第727团1营、文庙、苗家胡同院落、警备队、监狱、看守所、团部、龙王庙、警察所、商会、当典、县公署、第124师师部、第127师师部、特务营1连、第二区公所、办事处、滕文中学旧址、书院小学、火神庙、特务营2连；天主堂在南城（LANDMARKS）。城外东关另有第一区公所与第731团1营（EAST_SUBURB.features），北关有坝墙、圩门与北庙（NORTH_SUBURB）。它们是可辨认的**功能区/建筑节点**，不是永久驻防：图上的部队番号不得被解释为常驻兵力、编制或刷兵点。
-- 每一座 `CITY_FEATURES` 建筑必须完全留在内城（避开顺城街和城墙）、不覆盖任何道路，也不得与另一公共建筑严重重叠。类别和占地须分组可读，不能退化为同尺寸方盒。
-- 东关是东城墙外侧的长条密集街区，沿东门大街和城墙平行展开；它不是另造一圈独立寨墙。东门大街、东关道路、东门须同线；住宅带从护城河外开始，并必须保留足够的院落网格密度。
+- 每一座 `CITY_FEATURES` 建筑必须完全留在内城（避开顺城街和城墙）、不覆盖任何道路，也不得与另一公共建筑严重重叠。`CITY_BLOCK_ZONES.featureIds` 将每座功能建筑恰好归到北／中／南一个公共院落组团；类别和占地须分组可读，不能退化为同尺寸方盒。
+- 东关是东城墙外侧的长条密集街区，沿东门大街和城墙平行展开；它不是另造一圈独立寨墙。东门大街、东关道路、东门须同线；住宅带从护城河外开始，并由 `EAST_SUBURB.mapBlocks` 逐框复现示意图中的 13 个闭合院区，`mapLanes` 只走图框之间，禁止退化为等距棋盘或贯穿院区的规则车道。
 
 ## 破坏状态
 
@@ -28,10 +29,10 @@
 node Taierzhuang1938/Script_TengxianLayoutTest.mjs
 node --check Taierzhuang1938/Script_TengxianLayoutTest.mjs
 node --check Taierzhuang1938/Script_ShotTest.mjs
-node Taierzhuang1938/Script_ShotTest.mjs Taierzhuang1938/_shots_city_layout --only=Game_Z8_CityLayout,Game_Z9_EastGateStreet,Game_Z10_BreachIntoCity
+node Taierzhuang1938/Script_ShotTest.mjs Taierzhuang1938/_shots_city_layout --only=Game_Z8_CityLayout,Game_Z9_EastGateStreet,Game_Z10_BreachIntoCity,Game_Z22_CityDefensePlan
 ```
 
-`Script_TengxianLayoutTest.mjs` 只导入 `Data_Tengxian.mjs`，适合在不启动 Three.js 的情况下锁住图纸关系。新增固定图分别检验城内道路与公共院落、东门—东关街道连续性、以及从东墙缺口朝城内的防区纵深；均可用 `--only=名称` 单独重出。
+`Script_TengxianLayoutTest.mjs` 只导入 `Data_Tengxian.mjs`，适合在不启动 Three.js 的情况下锁住图纸关系：它验四门道路链、西门通视、道路三级宽度、街坊分区覆盖与非均匀 profile、北／中／南三大公共院落组团、东关四条狭长带，以及功能院落不压街。新增固定图分别检验城内道路与公共院落、东门—东关街道连续性、从东墙缺口朝城内的防区纵深；`Game_Z22_CityDefensePlan` 是无 UI、北向上的总验收鸟瞰，均可用 `--only=名称` 单独重出。
 
 ## 文件
 
