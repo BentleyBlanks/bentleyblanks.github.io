@@ -505,6 +505,115 @@ function TicketOffice(sink, {
 // 车站
 // ===========================================================================
 
+/**
+ * 月台南端的行包与行车家什。
+ *
+ * 站房、月台、正线本身已经把「铁路」讲清楚；这一组不另起一栋推定建筑，
+ * 只补上 1938 年小站每天都会留下的可读痕迹：两架机械臂板信号机、货门外的
+ * 装卸木台、待运木箱和两辆手推行李车。俯瞰时，信号臂和木台把长条月台的用途
+ * 钉死；走到地面，箱垛、轮子和吊钩又给人一个能相信的尺度。
+ */
+function StationOperations(sink, {
+  L, ry, y0, yB, railX, stationZ, westFace, seed,
+}) {
+  // --- 机械臂板信号机 ---
+  // 两端各一架，设在站台以外、正线东侧。臂板朝南北伸出，远看是两根高杆
+  // 加一条横臂；近看补上配重和梯档，避免读成电线杆。它们不挡正线或月台通路。
+  for (const [i, offsetZ] of [-40, 40].entries()) {
+    const z = stationZ + offsetZ;
+    const x = railX + 2.15;
+    const baseY = y0 + 0.42;
+    Slab(sink, "RailSteel", {
+      x, y: baseY + 2.35, z, w: 0.16, h: 4.70, d: 0.16,
+      seed: `${seed}:signal${i}:mast`, tile: TILE_METERS.steel,
+    });
+    // 基脚的石墩让细杆在俯瞰图上有一个明确的落点。
+    Slab(sink, STONE, {
+      x, y: baseY + 0.12, z, w: 0.64, h: 0.24, d: 0.64,
+      seed: `${seed}:signal${i}:foot`,
+    });
+    const direction = i === 0 ? 1 : -1;
+    Slab(sink, "WoodDoor", {
+      x, y: baseY + 4.35, z: z + direction * 0.74, w: 0.12, h: 0.24, d: 1.52,
+      ry, seed: `${seed}:signal${i}:arm`, tile: TILE_METERS.wood,
+    });
+    Slab(sink, "RailSteel", {
+      x, y: baseY + 3.88, z: z - direction * 0.16, w: 0.28, h: 0.28, d: 0.28,
+      seed: `${seed}:signal${i}:counterweight`, tile: TILE_METERS.steel,
+    });
+    for (let rung = 0; rung < 5; rung += 1) {
+      Slab(sink, "RailSteel", {
+        x, y: baseY + 0.95 + rung * 0.56, z, w: 0.48, h: 0.055, d: 0.07,
+        seed: `${seed}:signal${i}:rung${rung}`, tile: TILE_METERS.steel,
+      });
+    }
+    sink.Solid(x, baseY + 2.1, z, 0.16, 2.1, 0.16, "villagePost");
+  }
+
+  // --- 南翼货门外的低木装卸台 ---
+  // 放在既有货门旁、靠站台边，给月台留下穿行线；不用再造一间没有资料支持的
+  // 货栈，也让玩家从地面看得出南翼不是第二间候车室。
+  const apronLx = westFace - 2.45;
+  const apronLz = -12.4;
+  const apron = L(apronLx, apronLz);
+  Slab(sink, "WoodBeam", {
+    x: apron.x, y: yB + 0.10, z: apron.z, w: 2.45, h: 0.16, d: 6.8, ry,
+    seed: `${seed}:freight:apron`, tile: TILE_METERS.wood,
+  });
+  for (const offset of [-2.75, -1.38, 0, 1.38, 2.75]) {
+    const p = L(apronLx, apronLz + offset);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 0.22, z: p.z, w: 2.68, h: 0.09, d: 0.12, ry,
+      seed: `${seed}:freight:plank${Math.round((offset + 3) * 10)}`, tile: TILE_METERS.wood,
+    });
+  }
+
+  const Crate = (index, lx, lz, w, h, d) => {
+    const p = L(lx, lz);
+    Slab(sink, "WoodDoor", {
+      x: p.x, y: yB + 0.16 + h / 2, z: p.z, w, h, d, ry,
+      seed: `${seed}:freight:crate${index}`, tile: TILE_METERS.wood,
+    });
+    // 两条压箱木：在顶视图把箱子读成货箱而不是随手一块木板。
+    for (const side of [-1, 1]) {
+      const band = L(lx + side * (w / 2 + 0.025), lz);
+      Slab(sink, "WoodBeam", {
+        x: band.x, y: yB + 0.16 + h / 2, z: band.z, w: 0.07, h: h + 0.05, d: d + 0.08, ry,
+        seed: `${seed}:freight:crate${index}:band${side}`, tile: TILE_METERS.wood,
+      });
+    }
+    sink.Solid(p.x, yB + 0.16 + h / 2, p.z, w / 2, h / 2, d / 2, "furniture", ry);
+  };
+  Crate(0, apronLx, apronLz - 1.62, 0.92, 0.86, 1.08);
+  Crate(1, apronLx - 0.72, apronLz + 0.28, 0.78, 0.64, 0.86);
+  Crate(2, apronLx + 0.78, apronLz + 1.54, 0.72, 1.22, 0.76);
+
+  // --- 两辆行李手推车 ---
+  // 车停在箱垛北边，避开货门与主站厅的门轴。木台 + 钢轮 + 把手足够形成
+  // 小尺度的作业语义，且只复用本文件已在用的材质批次。
+  for (const [i, lz] of [-7.8, -5.6].entries()) {
+    const lx = westFace - 2.25;
+    const p = L(lx, lz);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 0.42, z: p.z, w: 1.16, h: 0.12, d: 0.72, ry,
+      seed: `${seed}:cart${i}:bed`, tile: TILE_METERS.wood,
+    });
+    for (const side of [-1, 1]) {
+      const wheel = L(lx + side * 0.42, lz - 0.23);
+      Slab(sink, "RailSteel", {
+        x: wheel.x, y: yB + 0.22, z: wheel.z, w: 0.18, h: 0.34, d: 0.12, ry,
+        seed: `${seed}:cart${i}:wheel${side}`, tile: TILE_METERS.steel,
+      });
+    }
+    const handle = L(lx, lz + 0.64);
+    Slab(sink, "WoodBeam", {
+      x: handle.x, y: yB + 0.72, z: handle.z, w: 0.12, h: 0.12, d: 0.88, ry,
+      rx: 0.54, seed: `${seed}:cart${i}:handle`, tile: TILE_METERS.wood,
+    });
+    sink.Solid(p.x, yB + 0.28, p.z, 0.58, 0.28, 0.36, "furniture", ry);
+  }
+}
+
 export function BuildStation(host, f, ctx) {
   const sink = host.sink;
   const ry = ctx.ry || 0;
@@ -993,6 +1102,10 @@ export function BuildStation(host, f, ctx) {
   // --- 售票房内部（北翼）---
   TicketOffice(sink, {
     L, ry, yB, DX, eaveY: wingEave, seed, damage, rnd,
+  });
+
+  StationOperations(sink, {
+    L, ry, y0, yB, railX, stationZ: f.z, westFace, seed,
   });
 
   BuildRailway(host, f, ctx, rw);

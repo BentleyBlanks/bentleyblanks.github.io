@@ -302,6 +302,121 @@ function AddBrickRow(sink, {
 }
 
 /**
+ * 西关大街南侧的一间低矮关厢铺院。
+ *
+ * 这不是另一个可探索地标：沿街的关厢该读成一条连续的生活/货运带，而不是
+ * 车站、通信院和师部之间漂着几只互不相干的方盒。因它站在 OUTER_PADS 之外，
+ * 不能调用从 y=0 起砌的 AddWall / AddHardMountainRoof；四角取高并把石台埋入
+ * 地形，才不会在铁路西侧的起伏里悬空。前脸面对北边的西关大街，排门均关闭，
+ * 明确它是撤退时上了门板的铺院，不承诺每一间都可进入。
+ */
+function AddXiguanBeltCompound(host, {
+  x, z, width, depth = 5.4, seed, damage = 0.2, straw = false,
+}) {
+  const sink = host.sink;
+  const ry = Math.PI; // 局部 +z 指向世界北方，正面朝西关大街。
+  const L = MakeFrame(x, z, ry);
+  let baseY = -Infinity;
+  for (const lx of [-width / 2, width / 2]) {
+    for (const lz of [-depth / 2, depth / 2]) {
+      const p = L(lx, lz);
+      baseY = Math.max(baseY, host.OuterHeight(p.x, p.z));
+    }
+  }
+
+  const floorY = baseY + 0.26;
+  const eaveY = 2.58;
+  const rise = depth * 0.25;
+  const wallT = 0.38;
+  const bays = Math.max(3, Math.round(width / 3.3));
+  const bayW = width / bays;
+  const wallMat = damage > 0.62 ? "BrickWallSooty" : "BrickWall";
+
+  // 低石台把建筑钉进自然地面；两侧/后墙形成一个明确的、有围护的店院体量。
+  sink.Add("Stone", PlaceGeometry(
+    MakeBox(width + 0.72, 0.74, depth + 0.82, TILE_METERS.stone, `${seed}:podium`),
+    { x, y: floorY - 0.37, z, ry }));
+  sink.Solid(x, floorY - 0.37, z, (width + 0.72) / 2, 0.37, (depth + 0.82) / 2,
+    "villageFoundation", ry);
+
+  const back = L(0, -depth / 2 + wallT / 2);
+  sink.Add(wallMat, PlaceGeometry(
+    MakeBox(width, eaveY, wallT, TILE_METERS.brick, `${seed}:back`, BRICK_UV_GRID),
+    { x: back.x, y: floorY + eaveY / 2, z: back.z, ry }));
+  sink.Solid(back.x, floorY + eaveY / 2, back.z, width / 2, eaveY / 2, wallT / 2, "wall", ry);
+  for (const side of [-1, 1]) {
+    const p = L(side * (width / 2 - wallT / 2), 0);
+    sink.Add(wallMat, PlaceGeometry(
+      MakeBox(wallT, eaveY, depth, TILE_METERS.brick, `${seed}:end${side}`, BRICK_UV_GRID),
+      { x: p.x, y: floorY + eaveY / 2, z: p.z, ry }));
+    sink.Solid(p.x, floorY + eaveY / 2, p.z, wallT / 2, eaveY / 2, depth / 2, "wall", ry);
+  }
+
+  // 前檐是排门而不是普通住宅门窗：一眼能读出西关的关门铺子。
+  const frontLz = depth / 2 - 0.12;
+  for (let i = 0; i <= bays; i += 1) {
+    const p = L(-width / 2 + i * bayW, frontLz);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.16, eaveY, 0.16, TILE_METERS.wood, `${seed}:post${i}`),
+      { x: p.x, y: floorY + eaveY / 2, z: p.z, ry }));
+    sink.Solid(p.x, floorY + eaveY / 2, p.z, 0.12, eaveY / 2, 0.12, "villagePost", ry);
+  }
+  const lintel = L(0, frontLz);
+  sink.Add("WoodBeam", PlaceGeometry(
+    MakeBox(width + 0.22, 0.22, 0.20, TILE_METERS.wood, `${seed}:lintel`),
+    { x: lintel.x, y: floorY + eaveY - 0.11, z: lintel.z, ry }));
+  for (let b = 0; b < bays; b += 1) {
+    const p = L(-width / 2 + (b + 0.5) * bayW, frontLz - 0.035);
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(bayW - 0.24, eaveY - 0.30, 0.07, TILE_METERS.wood, `${seed}:shutter${b}`),
+      { x: p.x, y: floorY + (eaveY - 0.30) / 2, z: p.z, ry }));
+    sink.Solid(p.x, floorY + (eaveY - 0.30) / 2, p.z, (bayW - 0.24) / 2,
+      (eaveY - 0.30) / 2, 0.08, "door", ry);
+  }
+
+  // 一块无字招牌与硬山小瓦顶：可读成店，不虚构店名或住户。
+  const sign = L(width / 2 - 0.46, depth / 2 + 0.40);
+  sink.Add("WoodDoor", PlaceGeometry(
+    MakeBox(0.42, 1.02, 0.06, TILE_METERS.wood, `${seed}:sign`),
+    { x: sign.x, y: floorY + eaveY - 0.82, z: sign.z, ry }));
+  const roofMat = straw ? "VillageStraw" : "RoofTile";
+  const slope = Math.hypot(depth / 2, rise);
+  const angle = Math.atan2(rise, depth / 2);
+  for (const side of [-1, 1]) {
+    const p = L(0, side * depth / 4);
+    sink.Add(roofMat, PlaceGeometry(
+      MakeBox(width + 0.78, straw ? 0.20 : 0.12, slope + 0.42,
+        straw ? TILE_METERS.ground : TILE_METERS.roof, `${seed}:roof${side}`),
+      { x: p.x, y: floorY + eaveY + rise / 2, z: p.z, ry, rx: side * angle }));
+  }
+  sink.Add(roofMat, PlaceGeometry(
+    MakeBox(width + 0.82, straw ? 0.23 : 0.17, 0.32,
+      straw ? TILE_METERS.ground : TILE_METERS.roof, `${seed}:ridge`),
+    { x, y: floorY + eaveY + rise + 0.06, z, ry }));
+
+  // 后院只用矮围墙收口：俯瞰能看见连续院落，但不额外制造可进入的任务空间。
+  const yardBack = L(0, -depth / 2 - 2.15);
+  sink.Add(wallMat, PlaceGeometry(
+    MakeBox(width + 0.3, 1.18, 0.28, TILE_METERS.brick, `${seed}:yardBack`, BRICK_UV_GRID),
+    { x: yardBack.x, y: floorY + 0.59, z: yardBack.z, ry }));
+  sink.Solid(yardBack.x, floorY + 0.59, yardBack.z, (width + 0.3) / 2, 0.59, 0.14, "wall", ry);
+}
+
+/** 连续的西关街带由通信院这一段统一生成，避免分散 landmark 彼此重复占地。 */
+function AddXiguanStreetBelt(host, ctx) {
+  const damage = ctx.damage ?? 0.2;
+  const compounds = [
+    { x: -458, z: 10.7, width: 13.0, straw: true },
+    { x: -442, z: 10.7, width: 14.0, straw: false },
+    { x: -424, z: 10.7, width: 15.0, straw: false },
+    { x: -406, z: 10.7, width: 13.0, straw: true },
+  ];
+  compounds.forEach((spec, index) => AddXiguanBeltCompound(host, {
+    ...spec, damage, seed: `west:belt:${index}`,
+  }));
+}
+
+/**
  * 院墙；南面（局部 +z，正面）三种收法：
  *   "gate" 留净宽 gateW 的口子（门楼由 AddYardGate 另建）
  *   "wall" 一堵到底
@@ -568,6 +683,10 @@ export function BuildCommunications(host, f, ctx) {
     }
     sink.Solid(L(-9.2, lzS - 9.7).x, 0.35, L(-9.2, lzS - 9.7).z, 3.7, 0.35, 0.6, "prop", ry);
   }
+
+  // 通信院是这段街带的唯一派发入口；在此一次性补齐南侧的关厢铺院，
+  // 保持 station → communications → powerPlant → exchange 的带状读法而不重复占地。
+  AddXiguanStreetBelt(host, ctx);
 }
 
 // ===========================================================================

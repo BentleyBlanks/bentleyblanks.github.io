@@ -76,6 +76,8 @@ export const testDefs = {
   AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "开镜视野：五支枪的瞄准点不许被枪身糊住" },
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
+  WestDistrictCoverageTest: { file: "Script_WestDistrictCoverageTest.mjs", desc: "L4 总览完整生成西关 5 地标与 137 件布设" },
+  WestStationTest: { file: "Script_WestStationTest.mjs", desc: "津浦路滕县站构件、信号与货运作业物冒烟" },
   // 一直躺在仓库里没登记（TestRunnerTest 的「登记完整性」为此常红）。
   DressingProbeTest: { file: "Script_DressingProbeTest.mjs", timeoutMs: 12 * 60 * 1000, desc: "七关布设外部构件的重叠/浮空探针（真浏览器）" },
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
@@ -141,11 +143,11 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest"] },
+  editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest"] },
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "DressingProbeTest"],
+    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "WestDistrictCoverageTest", "WestStationTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -166,7 +168,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 
@@ -318,7 +320,7 @@ export function InferDomains(files) {
       matched = true;
     }
     if (leaf === "Data_Battle.mjs") {
-      for (const name of ["combat", "ai"]) found.add(name);
+      for (const name of ["combat", "ai", "editor", "render"]) found.add(name);
       matched = true;
     }
     if (/^(Data_Tengxian|Script_TengxianCity|Script_TengxianLayoutTest)\.mjs$/.test(leaf)) {

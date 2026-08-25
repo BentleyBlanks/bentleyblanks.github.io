@@ -214,7 +214,10 @@ const TUNING = {
   L4_Chengqiang: {
     // 城墙关卡要能验证四条上城道和完整的城防图外轮廓，因此生成四面墙；
     // 东南主战区仍由 spawn 与 zones 控制，不靠裁掉北墙来省几百个三角形。
-    bounds: { minX: -360, maxX: 620, minZ: -360, maxZ: 400 },
+    // 西界必须越过津浦路与西关全部生活布设（最西一件 x=-502.6）：这一关也是
+    // 编辑器核对整座城防外轮廓的总览切片，旧 minX=-360 只剩西城门外一小截空地，
+    // 车站、通信队、电灯厂、交易所和西关大街因此在俯视验收里整片消失。
+    bounds: { minX: -520, maxX: 620, minZ: -360, maxZ: 400 },
     zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
     spawn: { x: 276, z: GATE("East").z, ry: Math.PI / 2 },
     ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],

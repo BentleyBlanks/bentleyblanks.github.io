@@ -233,8 +233,39 @@ Check("调过滑杆后 WASD 仍控制编辑器飞行",
   sliderKeyboard.found
     ? `焦点=${sliderKeyboard.focused} 按下=${sliderKeyboard.heldAfterDown} 松开=${sliderKeyboard.released}`
     : "未找到滑杆");
+
+// 「俯瞰当前切片」必须把四角真的装进视锥。旧版只按最长边抬高，镜头还斜着看，
+// 更要命的是沿用战斗 far=400：相机飞到六百多米后整片西关都被远平面裁掉。
+const topDown = await page.evaluate(async () => {
+  const THREE = await import("./vendor/three/build/three.module.js");
+  const T = window.Taierzhuang;
+  const beforeFar = T.camera.far;
+  T.editor.active.TopDown();
+  T.StepFrames(3);
+  const camera = T.camera;
+  camera.updateMatrixWorld(true);
+  const matrix = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(matrix);
+  const bounds = T.editor.host.game.battlefield.bounds;
+  const corners = [
+    [bounds.minX, bounds.minZ], [bounds.maxX, bounds.minZ],
+    [bounds.maxX, bounds.maxZ], [bounds.minX, bounds.maxZ],
+  ];
+  return {
+    beforeFar,
+    far: camera.far,
+    height: camera.position.y,
+    allCornersVisible: corners.every(([x, z]) => frustum.containsPoint(new THREE.Vector3(x, 0, z))),
+  };
+});
+Check("俯瞰当前切片：四角都在视锥且编辑器临时放远 far",
+  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far > topDown.beforeFar,
+  JSON.stringify(topDown));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 await Step(3);
+const restoredTopDownFar = await page.evaluate(() => window.Taierzhuang.camera.far);
+Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.beforeFar,
+  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}`);
 
 // ---------------------------------------------------------------------------
 // 1b) 暂停要连**声音**一起停

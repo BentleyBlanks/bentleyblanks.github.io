@@ -442,7 +442,7 @@ export class SceneEditor {
     ButtonRow(cam, [
       { label: "回到玩家", onClick: () => this.GoToPlayer() },
       { label: "把玩家挪来", onClick: () => this.BringPlayer() },
-      { label: "俯瞰全城", onClick: () => this.TopDown() },
+      { label: "俯瞰当前切片", onClick: () => this.TopDown() },
     ]);
   }
 
@@ -633,10 +633,30 @@ export class SceneEditor {
     const bounds = this.field ? this.field.bounds : { minX: -300, maxX: 300, minZ: -300, maxZ: 300 };
     const cx = (bounds.minX + bounds.maxX) / 2;
     const cz = (bounds.minZ + bounds.maxZ) / 2;
-    const span = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
-    camera.position.set(cx, span * 0.75 + 60, cz + span * 0.35);
+    const halfWidth = (bounds.maxX - bounds.minX) / 2;
+    const halfDepth = (bounds.maxZ - bounds.minZ) / 2;
+    // 不是拿最大边长拍脑袋抬高：横向能装多少还取决于画布宽高比与当前 FOV。
+    // 留 12% 边缘余量，面板盖住一侧画布时城界也不会被按钮压掉。
+    const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+    const tanHalfFov = Math.max(0.08, Math.tan(halfFov));
+    const aspect = Math.max(0.5, camera.aspect || 16 / 9);
+    const height = Math.max(80,
+      halfDepth * 1.12 / tanHalfFov,
+      halfWidth * 1.12 / (tanHalfFov * aspect));
+    // FlyCam 下一帧会按 pitch 重写 quaternion，所以这里把相机放到与 -1.5 rad
+    // 俯角完全对应的位置：看向的仍是切片中心，不再像旧版那样把中心推到画面下沿。
+    const pitch = -1.5;
+    const zOffset = height / Math.tan(-pitch);
+    camera.position.set(cx, height, cz + zOffset);
     this.host.flycam.yaw = 0;
-    this.host.flycam.pitch = -0.9;
+    this.host.flycam.pitch = pitch;
+    camera.rotation.set(pitch, 0, 0, "YXZ");
+    // 战斗远平面只有 400/620 m；俯瞰相机常在一公里上下，不临时放远就会把
+    // 已生成的西关整片视锥剔除。FlyCam.Close 会原样恢复进入编辑器前的 far。
+    const cornerDistance = Math.hypot(height, halfWidth, halfDepth);
+    camera.far = Math.max(camera.far, cornerDistance * 1.18);
+    camera.updateProjectionMatrix();
+    this.host.SetHint("已俯瞰当前关卡切片 · 退出编辑器后恢复战斗相机");
   }
 
   // -------------------------------------------------------------------------
