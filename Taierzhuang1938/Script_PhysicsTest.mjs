@@ -534,18 +534,28 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const T = window.Taierzhuang, f = T.battlefield;
     const own = f.externalProps?.colliders || [];
     const box = new THREE.Box3();
-    const props = [];
-    T.scene.traverse((o) => { if (o.userData?.externalProps) props.push(...o.children); });
+    // 2026-08-26 实例化改造后，live 件不再是 externalProps 根下的克隆 Group，
+    // 从流送器的取证口拿：克隆件给 Object3D（照旧量包围盒），实例化件给
+    // 登记时按「合并几何包围盒 × 摆位矩阵」算好的世界底面 —— 合并时局部变换
+    // 烘错了这里照样红。
+    const props = f.externalStreamer ? f.externalStreamer.LiveProps() : [];
     const bad = [];
     for (const p of props) {
-      box.setFromObject(p);
-      const ground = f.GroundHeight(p.position.x, p.position.z);
-      const lift = box.min.y - ground;
+      let name, x, z, minY;
+      if (p.object) {
+        box.setFromObject(p.object);
+        name = p.object.name; x = p.object.position.x; z = p.object.position.z;
+        minY = box.min.y;
+      } else {
+        name = p.name; x = p.x; z = p.z; minY = p.minY;
+      }
+      const ground = f.GroundHeight(x, z);
+      const lift = minY - ground;
       // 认领：中心点落在这只盒子的水平投影里、且高度重合
-      const mine = own.find((b) => Math.abs(b.c[0] - p.position.x) < 2.5
-        && Math.abs(b.c[2] - p.position.z) < 2.5 && f.colliders.includes(b));
+      const mine = own.find((b) => Math.abs(b.c[0] - x) < 2.5
+        && Math.abs(b.c[2] - z) < 2.5 && f.colliders.includes(b));
       if (Math.abs(lift) > 0.15 || !mine) {
-        bad.push(`${p.name} 离地${lift.toFixed(2)}m${mine ? "" : " 无碰撞体"}`);
+        bad.push(`${name} 离地${lift.toFixed(2)}m${mine ? "" : " 无碰撞体"}`);
       }
     }
     return { n: props.length, own: own.length, bad };

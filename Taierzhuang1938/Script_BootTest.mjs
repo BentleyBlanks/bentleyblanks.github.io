@@ -187,7 +187,8 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         level,
         environment: T.Debug.Environment ? T.Debug.Environment() : null,
         externalProps: T.battlefield?.externalProps || null,
-        // 流送稳态：live 是当前克隆数，registered 是全部登记数（碰撞永远全量）
+        // 流送稳态：live 是当前在场件数（实例化 batched + 克隆 clones），
+        // registered 是全部登记数（碰撞永远全量）
         externalStreaming: T.battlefield?.externalStreamer
           ? T.battlefield.externalStreamer.Stats() : null,
         wallCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckWallCorridor
@@ -329,13 +330,19 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
         + ` expected=${expectedExternalProps} failed=${health.externalProps?.failed?.join(",") || "none"}`);
     }
-    // 流送自洽：登记数必须等于摆位数，live 不得超过登记数。
+    // 流送自洽（实例化语义，2026-08-26）：登记数必须等于摆位数，live 不得超过
+    // 登记数；live = 实例化件(batched) + 克隆件(clones)，桶里的实例总数必须
+    // 等于 live 实例化件摊开的 parts 数，且容量预留不许被打穿（overflow=0）。
     // live 可以为 0（如一·西关带的摆位离出生点七百米），不做下限断言。
     if (health.externalProps?.count > 0) {
       const s = health.externalStreaming;
-      if (!s || s.registered !== health.externalProps.count || s.live > s.registered) {
+      const batchOk = s && s.clones + s.batched === s.live
+        && (!s.batch || (s.batch.instances === s.parts && s.batch.overflow === 0));
+      if (!s || s.registered !== health.externalProps.count || s.live > s.registered || !batchOk) {
         bad.push(`流送不自洽 registered=${s?.registered ?? "?"} live=${s?.live ?? "?"}`
-          + ` count=${health.externalProps.count}`);
+          + ` batched=${s?.batched ?? "?"} clones=${s?.clones ?? "?"}`
+          + ` instances=${s?.batch?.instances ?? "?"} parts=${s?.parts ?? "?"}`
+          + ` overflow=${s?.batch?.overflow ?? "?"} count=${health.externalProps.count}`);
       }
     }
   }

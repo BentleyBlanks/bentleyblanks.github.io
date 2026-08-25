@@ -39,9 +39,6 @@ const playTestExpectedFailures = [
   "头六十秒全场开火 > 200",
   // 姿态这条在纯 master 上红、合并树上绿 —— 判定抖动，先留在基线里。
   "姿态决定被发现的距离：60 m 上站着的看得见、趴着的看不见，30 m 上趴着的照样看得见",
-  // 「场上的人用的是 Blender 模型，不是退回的方块」与「单人 draw call 在预算内（≤26）」
-  // 2026-08-25 转绿，已从基线摘除：士兵从 GLB 分段皮换回程序化 tzm 模型之后
-  // meshSource 就是 model，逐人的网格数也回到预算里（见 docs/Data_CutsceneRedo.md §1.10 B）。
   "Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
 ];
 
@@ -80,7 +77,6 @@ export const testDefs = {
   WestDistrictCoverageTest: { file: "Script_WestDistrictCoverageTest.mjs", desc: "L4 总览完整生成西关 5 地标与 137 件布设" },
   WestSuburbBlocksTest: { file: "Script_WestSuburbBlocksTest.mjs", desc: "西关 20 个示意图矩形整块覆盖、净空与院落几何" },
   WestStationTest: { file: "Script_WestStationTest.mjs", desc: "津浦路滕县站构件、信号与货运作业物冒烟" },
-  // 一直躺在仓库里没登记（TestRunnerTest 的「登记完整性」为此常红）。
   DressingProbeTest: { file: "Script_DressingProbeTest.mjs", timeoutMs: 12 * 60 * 1000, desc: "七关布设外部构件的重叠/浮空探针（真浏览器）" },
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
@@ -100,13 +96,16 @@ export const testDefs = {
   EditorTest: { file: "Script_EditorTest.mjs", desc: "编辑器套件（phase=5 十字街）44+ 项" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
+  PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
   DeathViewTest: { file: "Script_DeathViewTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "阵亡镜头出图（人工审）" },
-  ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 30 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
+  // 出图已按 URL 参数组分批（36 张只建 18 次城），实测 ~6.5 分钟；
+  // 上限从 30 分钟降到 15 分钟，保持与旧口径相同的 ~2.5 倍裕量。
+  ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 15 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
 };
 
 export const tier0 = [
@@ -152,7 +151,7 @@ export const domains = {
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
+    tests: ["ActorBatchTest", "PropInstancingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -173,7 +172,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 

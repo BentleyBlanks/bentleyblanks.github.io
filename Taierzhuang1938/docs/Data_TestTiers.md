@@ -1,7 +1,7 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
 > 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
-> 最后登记核对：2026-08-26，47/47 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
+> 最后登记核对：2026-08-26，48/48 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
 
 ## 一、目标与纪律
 
@@ -43,7 +43,10 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
 `--strict-baseline` 把 PlayTest 的历史红也计为失败。
 
 可以直接在 worktree 中运行上述 `node` 命令，也可以使用仓库的 npm scripts。
-npm 会以当前 worktree 的 `package.json` 为项目根，不会切回共享主检出。
+npm 会以**向上找到的第一个** `package.json` 为项目根：worktree 根签出了 package.json
+时就是 worktree 自己（安全）；没签出、或在子目录里敲时会一路爬回共享主检出，测的是
+另一棵树。拿不准就先跑 `npm prefix` 看一眼，或干脆直接 `node`（详见
+`Data_TechRepoLessons.md` §3.0，2026-08-18 有一轮白跑的实案）。
 
 ## 三、输出、超时与退出码
 
@@ -87,7 +90,7 @@ npm 会以当前 worktree 的 `package.json` 为项目根，不会切回共享�
 | menu | MenuTest、BootPropTest |
 | editor | EditorTest、DestructionEditorTest |
 | cutscene | CutsceneControl、ActorPose |
-| render | ActorBatchTest；另提示相关 Tier 2 |
+| render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → WestDistrictCoverage → WestStation → DressingProbe；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |
 
 改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。

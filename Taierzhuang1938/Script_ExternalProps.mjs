@@ -18,7 +18,11 @@
 // 所以现在这一层做三件事，顺序不能反：
 //   1. `PrepareAsset` —— 取出该资产的节点（多件共用一个 .glb 时按 spec.node 取），
 //      按它**自己的**包围盒落地并 XZ 居中，原点变成"底面几何中心"；
-//   2. 照旧克隆、上材质、摆位；
+//   2. 上材质、摆位。正片摆位自 2026-08-26 起走 GPU instancing：
+//      `InstancedFormFor` 把 shell 按运行时材质合并成「每资产每材质一份几何」，
+//      流送半径内的件是 PropBatcher 桶里的实例矩阵（Script_PropBatch），
+//      不再逐件 clone；`CloneLoadedAsset` 保留给编辑器摄影棚、无实例化形态的
+//      个别件与测试开关对比；
 //   3. `AddExternalProps` 顺手吐一份碰撞盒（每件一只**带朝向的**长方体，
 //      与程序化民居登记的粒度一致），由调用方并进 field.colliders。
 //
@@ -36,6 +40,8 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { BuildSink } from "./Script_World.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 import { PropStreamer } from "./Script_PropStreaming.mjs";
+import { PropBatcher } from "./Script_PropBatch.mjs";
+import { MergeGeometries } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 // 并行下载工作包各交一份目录片段（PACK.url + 无 url 的 ASSETS 表），此处接线。
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
@@ -465,6 +471,80 @@ function CloneLoadedAsset(id, asset, library) {
 }
 
 /**
+ * 该资产的实例化形态：shell 里的子网格按**运行时材质**分桶，逐桶把「子网格
+ * 相对 shell 根的局部变换」烘进顶点后合并成一份几何 —— 与 clone 摆出来的
+ * 世界位置逐像素一致（摆位矩阵 × 烘好的局部顶点 = 摆位矩阵 × 局部矩阵 × 顶点）。
+ * 多材质件（materialMap）产出 2—5 个桶，单材质件 1 个。
+ *
+ * 按资产懒建并缓存在 prepared 条目上（材质来自全程序唯一的 MaterialLibrary，
+ * 跨关不变）；编辑器摄影棚（InstantiateExternalProp）照旧走 clone，不吃这份。
+ *
+ * 回不去实例化、返回 null 走克隆老路的几类（逐条都有理由）：
+ *   · 子网格保留 GLB 自带材质（spec 无 material/materialMap）**且**几何带
+ *     uv1+/color 等额外属性：MergeGeometries 只搬 position/normal/uv，
+ *     丢通道会改画面（排屋 houseRow/housePair 的 GLB 材质用 TEXCOORD_1/2）。
+ *     库材质只采样 uv0，所以换库材质的件丢这些通道无损；
+ *   · 蒙皮/数组材质/镜像变换（负行列式会翻绕序）：都不该出现在布设件里，
+ *     真出现时宁可慢也不能画错。
+ */
+function InstancedFormFor(id, asset, library) {
+  if (!asset) return null;
+  if (asset.instanced !== undefined) return asset.instanced;
+  const spec = ASSETS[id];
+  const keepsNativeMaterial = !spec.materialMap && !spec.material;
+  asset.shell.updateMatrixWorld(true);
+  const byMaterial = new Map();
+  let ok = true;
+  asset.shell.traverse((object) => {
+    if (!ok || !object.isMesh) return;
+    if (object.isSkinnedMesh || object.isInstancedMesh || Array.isArray(object.material)) {
+      ok = false;
+      return;
+    }
+    const source = object.geometry;
+    if (!source?.attributes?.position || object.matrixWorld.determinant() < 0) {
+      ok = false;
+      return;
+    }
+    if (keepsNativeMaterial) {
+      for (const name of Object.keys(source.attributes)) {
+        if (name !== "position" && name !== "normal" && name !== "uv") { ok = false; return; }
+      }
+    }
+    const material = spec.materialMap
+      ? RuntimeMaterialFor(object.material.name.replace(/\.\d{3}$/, ""), library)
+      : (spec.material ? RuntimeMaterialFor(spec.material, library) : object.material);
+    // 挑出要合并的三个属性各拷一份（InterleavedBufferAttribute.clone() 会
+    // 顺手解交织），再把相对 shell 根的变换烘进去 —— shell 自己是单位阵，
+    // matrixWorld 就是那份局部变换。
+    const geometry = new THREE.BufferGeometry();
+    for (const name of ["position", "normal", "uv"]) {
+      const attribute = source.attributes[name];
+      if (attribute) geometry.setAttribute(name, attribute.clone());
+    }
+    if (source.index) geometry.setIndex(source.index.clone());
+    geometry.applyMatrix4(object.matrixWorld);
+    let list = byMaterial.get(material);
+    if (!list) { list = []; byMaterial.set(material, list); }
+    list.push(geometry);
+  });
+  if (!ok || byMaterial.size === 0) {
+    asset.instanced = null;
+    return null;
+  }
+  const parts = [];
+  let geoMinY = Infinity;
+  for (const [material, list] of byMaterial) {
+    const geometry = MergeGeometries(list);
+    geometry.computeBoundingBox();
+    geoMinY = Math.min(geoMinY, geometry.boundingBox.min.y);
+    parts.push({ geometry, material });
+  }
+  asset.instanced = { parts, geoMinY };
+  return asset.instanced;
+}
+
+/**
  * 一个摆件的碰撞盒：归一化包围盒 × 摆位缩放，绕 Y 转到摆位朝向。
  *
  * 一件一只盒子，与程序化民居登记的粒度一致（`Script_TengxianCity` 里一栋房
@@ -538,10 +618,15 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   root.userData.externalProps = true;
   const sink = new BuildSink();
   // 【流送分工，2026-08-25】碰撞照旧在这里**全量**登记（AI/破坏/子弹的世界
-  // 不许随玩家位置变形）；克隆改由 PropStreamer 按「尺寸→半径」在焦点附近
+  // 不许随玩家位置变形）；画面由 PropStreamer 按「尺寸→半径」在焦点附近
   // 按需生成/回收（规矩见 Script_PropStreaming 文件头）。
-  const streamer = new PropStreamer(root);
+  // 【实例化，2026-08-26】有实例化形态的件登记 {bucket, matrix} 进 PropBatcher
+  // 的桶（每资产 × 每材质一只 InstancedMesh）；make() 闭包保留，既是没有实例化
+  // 形态那几件的执行体，也是 SetInstancing 开关对比的回退路。
+  const batcher = new PropBatcher(root);
+  const streamer = new PropStreamer(root, batcher);
   const failed = [];
+  const euler = new THREE.Euler(0, 0, 0);
   let count = 0;
 
   for (const placement of placements) {
@@ -553,8 +638,31 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
     const maxDim = Math.max(asset.half[0], asset.half[1], asset.half[2]) * 2 * scale;
     const index = count;
     const id = placement.asset;
+    const form = InstancedFormFor(id, asset, library);
+    let parts = null;
+    let probe = null;
+    if (form) {
+      // 摆位矩阵与 clone 路径的 position/rotation.y/scale.setScalar 一字不差：
+      // compose(T, R_y, S) 就是 three 从那三样合成 matrix 的同一公式。
+      const matrix = new THREE.Matrix4().compose(
+        new THREE.Vector3(placement.x, y, placement.z),
+        new THREE.Quaternion().setFromEuler(euler.set(0, placement.ry || 0, 0)),
+        new THREE.Vector3(scale, scale, scale),
+      );
+      parts = form.parts.map((part) => ({
+        bucket: batcher.BucketFor(part.geometry, part.material),
+        matrix,
+      }));
+      for (const part of parts) batcher.Reserve(part.bucket, 1);
+      // 底面只随 Y 旋转与等比缩放变换：世界 minY = y + 局部 minY × scale。
+      probe = {
+        name: `External_${id}_${index}`,
+        x: placement.x, y, z: placement.z,
+        minY: y + form.geoMinY * scale,
+      };
+    }
     streamer.Register({
-      x: placement.x, z: placement.z, maxDim, label: id,
+      x: placement.x, z: placement.z, maxDim, label: id, parts, probe,
       make: () => {
         const prop = CloneLoadedAsset(id, asset, library);
         if (!prop) return null;
@@ -567,6 +675,8 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
     });
     count += 1;
   }
+  // 容量已按本关注册数算齐，桶网格一次建到位（转身/流送不再碰 GPU buffer 分配）。
+  batcher.Finalize();
   scene.add(root);
   liveRoot = root;
   liveStreamer = streamer;

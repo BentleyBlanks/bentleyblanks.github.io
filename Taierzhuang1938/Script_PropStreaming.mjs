@@ -19,6 +19,14 @@
 //
 // 【预算】每帧最多 spawn/despawn 各 budget 件（默认 8）：一口气进城不掉帧，
 // 排队几帧内清空。spawn 按「离焦点最近优先」，先看见眼前的。
+//
+// 【实例化，2026-08-26】距离扫描/迟滞/预算这套骨架不变，变的是 spawn/despawn
+// 的执行体：有实例化形态（entry.parts）的件不再克隆 Object3D，而是把
+// {bucket, matrix} 加进/移出 PropBatcher 的桶并标脏，每帧末 Flush 一次性
+// 重写脏桶的实例表（见 Script_PropBatch 文件头）。没有实例化形态的件
+// （如仍用 GLB 自带多套 UV 材质的排屋）照旧走 make() 克隆。
+// SetInstancing(false) 是测试钩子：把 live 的实例化件当场换回克隆，
+// 同一帧内做逐像素开关对比（跨进程重跑对不齐，同 Script_ActorBatchTest）。
 
 const HYSTERESIS = 24;
 
@@ -30,21 +38,34 @@ export function LoadRadiusFor(maxDim) {
 }
 
 export class PropStreamer {
-  constructor(root) {
-    this.root = root;         // 克隆挂在这个组下（ExternalProps 的 liveRoot）
+  /**
+   * @param root    克隆/批次网格挂在这个组下（ExternalProps 的 liveRoot）
+   * @param batcher 可选的 PropBatcher；不给就全部走 make() 克隆（老路）
+   */
+  constructor(root, batcher = null) {
+    this.root = root;
+    this.batcher = batcher;
     this.entries = [];
     this.live = 0;
     this.spawned = 0;         // 累计，测试用
+    this.instancing = true;   // 测试钩子 SetInstancing 用；正片永远 true
   }
 
-  /** make: () => Object3D（已摆好位置/朝向/缩放的克隆）。 */
-  Register({ x, z, maxDim, make, label = "" }) {
+  /**
+   * make:  () => Object3D（已摆好位置/朝向/缩放的克隆；实例化件的回退与
+   *        开关对比也用它）。
+   * parts: [{ bucket, matrix }]，实例化形态；给了它 spawn 就不走 make。
+   * probe: 测试探针（Script_PhysicsTest 用）：{ name, x, y, z, minY }，
+   *        minY 是按合并几何包围盒 × 摆位矩阵算的世界底面。
+   */
+  Register({ x, z, maxDim, make, label = "", parts = null, probe = null }) {
     const rIn = LoadRadiusFor(maxDim);
     const rOut = rIn + HYSTERESIS;
     this.entries.push({
-      x, z, make, label,
+      x, z, make, label, parts, probe,
       r2in: rIn * rIn, r2out: rOut * rOut,
-      object: null,
+      object: null,      // 克隆路径的 live 标志兼句柄
+      batched: false,    // 实例化路径的 live 标志
     });
   }
 
@@ -58,11 +79,9 @@ export class PropStreamer {
     for (const entry of this.entries) {
       const dx = entry.x - x, dz = entry.z - z;
       const d2 = dx * dx + dz * dz;
-      if (entry.object) {
+      if (entry.object || entry.batched) {
         if (d2 > entry.r2out && despawned < budget) {
-          // 克隆的几何/材质都与常驻的资产外壳共享，摘下来就完事，不 dispose。
-          this.root.remove(entry.object);
-          entry.object = null;
+          this._Despawn(entry);
           this.live -= 1;
           despawned += 1;
         }
@@ -75,9 +94,7 @@ export class PropStreamer {
       const n = Math.min(budget, wanted.length);
       for (let i = 0; i < n; i += 1) {
         const entry = wanted[i][1];
-        entry.object = entry.make();
-        if (entry.object) {
-          this.root.add(entry.object);
+        if (this._Spawn(entry)) {
           this.live += 1;
           this.spawned += 1;
         } else {
@@ -86,6 +103,8 @@ export class PropStreamer {
         }
       }
     }
+    // 每帧末把脏桶的实例表一次重写（没有脏桶时只是扫一遍标志位）。
+    if (this.batcher) this.batcher.Flush();
     return { live: this.live, pending: Math.max(0, wanted.length - budget) };
   }
 
@@ -100,16 +119,84 @@ export class PropStreamer {
     return this.live;
   }
 
+  /**
+   * 测试钩子：同一帧内把 live 的实例化件换成克隆（off）或换回实例（on），
+   * 供逐像素开关对比与 draw call 对比。克隆路径的件不受影响。
+   */
+  SetInstancing(on) {
+    const next = !!on;
+    if (this.instancing === next) return this;
+    this.instancing = next;
+    for (const entry of this.entries) {
+      if (!entry.parts) continue;
+      if (!(entry.object || entry.batched)) continue;
+      this._Despawn(entry);
+      if (!this._Spawn(entry)) {
+        this.live -= 1;
+        entry.r2in = -1;
+      }
+    }
+    if (this.batcher) this.batcher.Flush();
+    return this;
+  }
+
+  /**
+   * 当前 live 件的取证口（Script_PhysicsTest 的落地/碰撞认领断言用）。
+   * 克隆件直接交出 Object3D（按老口径量包围盒）；实例化件交出登记时算好的
+   * probe（名字、摆位、按合并几何包围盒 × 矩阵得出的世界底面 minY）。
+   */
+  LiveProps() {
+    const out = [];
+    for (const entry of this.entries) {
+      if (entry.object) out.push({ object: entry.object });
+      else if (entry.batched && entry.probe) out.push({ ...entry.probe });
+    }
+    return out;
+  }
+
   Stats() {
-    return { registered: this.entries.length, live: this.live, spawned: this.spawned };
+    let clones = 0, batched = 0, parts = 0;
+    for (const entry of this.entries) {
+      if (entry.object) clones += 1;
+      else if (entry.batched) { batched += 1; parts += entry.parts.length; }
+    }
+    return {
+      registered: this.entries.length, live: this.live, spawned: this.spawned,
+      clones, batched, parts,
+      batch: this.batcher ? this.batcher.Stats() : null,
+    };
   }
 
   Dispose() {
-    for (const entry of this.entries) {
-      if (entry.object) this.root.remove(entry.object);
-      entry.object = null;
-    }
+    for (const entry of this.entries) this._Despawn(entry);
     this.entries.length = 0;
     this.live = 0;
+    if (this.batcher) this.batcher.Dispose();
+  }
+
+  // -------------------------------------------------------------------------
+
+  _Spawn(entry) {
+    if (entry.parts && this.batcher && this.instancing) {
+      for (const part of entry.parts) this.batcher.Spawn(part);
+      entry.batched = true;
+      return true;
+    }
+    entry.object = entry.make ? entry.make() : null;
+    if (!entry.object) return false;
+    this.root.add(entry.object);
+    return true;
+  }
+
+  _Despawn(entry) {
+    if (entry.object) {
+      // 克隆的几何/材质都与常驻的资产外壳共享，摘下来就完事，不 dispose。
+      this.root.remove(entry.object);
+      entry.object = null;
+    }
+    if (entry.batched) {
+      for (const part of entry.parts) this.batcher.Despawn(part);
+      entry.batched = false;
+    }
   }
 }
