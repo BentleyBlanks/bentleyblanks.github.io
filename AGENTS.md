@@ -153,6 +153,8 @@ Rules:
 
 ## Taierzhuang1938 / 序章高度图
 
+- **改 Taierzhuang1938 任何模块前先读 `Taierzhuang1938/AGENTS.md`**：系统→文件路由表、
+  12 条硬规矩（缓存戳、BuildSink、开机红线、坐标契约等）、常用命令与 docs 导读都在那份里。
 - `L0_Jiehe` 的地面唯一入口是 `Taierzhuang1938/Script_JieheHeight.mjs`：真实 SRTM DEM
   叠加战术土岗、排水沟和界河河槽。渲染、角色、AI、弹道与布设必须共用
   `SampleJieheHeight(x,z)` / 注入的 `groundAt`，禁止另写高度公式或硬编码绝对 `y`。

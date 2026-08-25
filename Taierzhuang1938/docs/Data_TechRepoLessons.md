@@ -223,9 +223,7 @@ FPS 版本的等价物大概是：`where`、`probe <关卡> --at x,y,z --look ya
 
 ### 3.0 先说最重要的一条操作纪律
 
-**worktree 里不能用 `npm run`。** `TunnelLight1943/CLAUDE.md:178-183` 原文（2026-08-18 白跑了一整轮换来的）：
-
-> `npm run` 会把 cwd 换到装着 package.json 的**主仓库**，于是 `npm run test:tunnelLight1943` 测的是主仓库那份签出，跟你改的这份没关系——**全绿也说明不了任何事**。worktree 里直接 `node` 调脚本，node_modules 靠模块解析往上走就能找到主仓库那份。
+**worktree 里默认直接 `node` 调脚本，想用 `npm run` 先验 `npm prefix`。** 机制说清楚（2026-08-26 实测补记）：`npm run` 把 cwd 切到**从当前目录向上找到的第一个 package.json** 所在目录。worktree 根签出了 package.json 时（本仓库现在的常态），`npm prefix` 就是 worktree 根，`npm run` 测的就是你这份签出，是安全的；但 worktree 没签出 package.json、或你人在子目录里敲时，npm 会一路爬到**主仓库**，测的是另一棵树——**全绿也说明不了任何事**。`TunnelLight1943/CLAUDE.md:178-183` 记的 2026-08-18 白跑一整轮就是这么来的（`docs/Data_TestTiers.md` 说"npm 以 worktree 为项目根"描述的是前一种情形，两篇并不矛盾，条件不同）。判据一条：**跑 `npm prefix`，输出不是你的 worktree 根就别用 npm run**。直接 `node` 调脚本永远没有这个坑，node_modules 靠模块解析往上走就能找到主仓库那份。
 
 配套两条（`docs/Cli.md:61-62`）：
 - **在 worktree 里干活必须在 worktree 根目录跑 `shot`**——它照当前工作目录那份仓库起服务，在主仓库路径下敲拍到的是旧代码**且不报错**（表现是"加的东西一样没出现"）。

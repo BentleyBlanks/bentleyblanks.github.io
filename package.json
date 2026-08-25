@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942 && npm run test:tunnelLight1943 && npm run test:reedSignal1942",
+    "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942 && npm run test:tunnelLight1943 && npm run test:reedSignal1942 && npm run test:taierzhuang1938:smoke",
     "test:reedSignal1942": "node ReedSignal1942/Script_SmokeTest.mjs",
     "test:reedSignal1942:browser": "node ReedSignal1942/Script_RenderHealthTest.mjs",
     "test:tunnelLight1943": "node TunnelLight1943/Script_SmokeTest.mjs && node TunnelLight1943/Script_SceneAudit.mjs --quiet",
@@ -16,6 +16,7 @@
     "bake:taierzhuang1938:sfx": "node Taierzhuang1938/Script_SfxBake.mjs",
     "bake:taierzhuang1938:amb": "node Taierzhuang1938/Script_AmbBake.mjs",
     "bake:taierzhuang1938:music": "node Taierzhuang1938/Script_MusicBake.mjs",
+    "test:taierzhuang1938:smoke": "node Taierzhuang1938/Script_TestRunnerTest.mjs",
     "test:taierzhuang1938": "node Taierzhuang1938/Script_TestRunner.mjs --tier=0",
     "test:taierzhuang1938:changed": "node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master",
     "test:taierzhuang1938:t1": "node Taierzhuang1938/Script_TestRunner.mjs --tier=1",

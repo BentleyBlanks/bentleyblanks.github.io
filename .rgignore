@@ -1,0 +1,9 @@
+# ripgrep 默认排除项（不影响 git，只影响 rg / 各类基于 ripgrep 的搜索工具）。
+#
+# 为什么：vendor 里是第三方构建产物，其中 rapier.module.mjs 是 2.86MB 的**单行**文件，
+# 任何一次 grep 命中都会把整个文件灌进搜索结果；three 的 build 也有 1.5MB 级文件，
+# 搜 texture/render/Material 这类词时 vendor 噪音占一半到九成。
+#
+# 确实要搜 vendor（比如查 three 内部实现）时用 `rg -u` 绕过，或直接 Read 具体文件。
+vendor/
+*.min.js
