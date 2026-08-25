@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "12";
+const MESH_REV = "13";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -111,12 +111,13 @@ export const MESHES = {
   },
   Zb26: {
     file: "Zb26.tzm.json", category: "weapon",
-    triangles: 884, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 896, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.17050, 0.37276, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
     note: "ZB-26 轻机枪。**弹匣从上方插**（直的，不是布伦那种弯的）、枪管上提把、"
-      + "前段两脚架张开、带散热环的枪管。",
+      + "前段两脚架张开、带散热环的枪管。**瞄具整条左偏 20 mm** —— 弹匣占着正上方，"
+      + "瞄准线走正中就是穿过弹匣（2026-08-25 修，见 _blender/BuildWeapons.BuildZb26）。",
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",

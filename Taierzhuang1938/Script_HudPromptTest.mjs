@@ -74,8 +74,8 @@ const Expect = (spreadDeg) =>
 // 中正式腰射 2.6°：19.6 px。改口径就该改这个数，改不动说明准心没接上散布。
 assert.ok(Math.abs(Gap(2.6) - Expect(2.6)) < 0.01, `2.6° -> ${Gap(2.6).toFixed(2)}px`);
 assert.ok(Math.abs(Gap(2.6) - 19.61) < 0.05, `2.6° 应是 19.6 px，实得 ${Gap(2.6).toFixed(2)}`);
-// 跑起来（散布 ×2.8）缝也跟着涨 —— 这一条就是这次返工的全部诉求。
-assert.ok(Gap(2.6 * 2.8) > Gap(2.6) * 2.7, "跑动散布撑开准心");
+// 跑起来（散布 ×1.85，见 Player.SpreadDeg）缝也跟着涨 —— 这一条是这次返工的全部诉求。
+assert.ok(Gap(2.6 * 1.85) > Gap(2.6) * 1.8, "跑动散布撑开准心");
 // 蹲下/屏息把散布收小，缝跟着收。
 assert.ok(Gap(2.6 * 0.66) < Gap(2.6) * 0.7, "蹲下收窄准心");
 // 视场变窄（开镜过渡/屏息）时同一个角占更多像素。
@@ -84,7 +84,7 @@ assert.ok(Gap(2.6, { fovDeg: 40 }) > Gap(2.6), "窄视场上同一散布画得�
 const tall = CrosshairGeometry({ spreadDeg: 2.6, fovDeg: 55, viewportHeight: 1800 }).gap;
 assert.ok(Math.abs(tall - Gap(2.6) * 2) < 0.01, "缝随视口高度等比缩放");
 // 冲刺再撑一截（那一段根本打不出去），中心点由 CSS 收掉。
-assert.ok(Gap(7.3, { sprint: 1 }) > Gap(7.3) * 1.5, "冲刺额外扩散");
+assert.ok(Gap(5.6, { sprint: 1 }) > Gap(5.6) * 1.4, "冲刺额外扩散");
 // 散布为 0 也要留一条缝，否则四条线糊成一个点。
 assert.ok(Gap(0) >= 5 && Gap(0) < 6, "零散布仍留最小缝");
 // 再大的散布也不许越出半屏高的 34%。

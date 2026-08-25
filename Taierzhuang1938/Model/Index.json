@@ -164,11 +164,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Zb26.tzm.json",
-   "triangles": 884,
+   "triangles": 896,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 29775,
+   "bytes": 30289,
    "materials": [
     "steel",
     "wood"
@@ -398,7 +398,7 @@
    "meshBlocks": 2,
    "nodes": 4,
    "joints": 0,
-   "bytes": 92734,
+   "bytes": 92735,
    "materials": [
     "steel",
     "wood"

@@ -87,6 +87,10 @@ SOURCES = {
         "colorSplit": True,
         "skip": ("bolt_action_rifle_7_62_scope", "bolt_action_rifle_7_62_wrap",
                  "bolt_action_rifle_7_62_bullet_54mm"),
+        # 照门挂点 = 第一人称的瞄准线（见 _Mounts）。这一支换过模型源，数是照新几何量的：
+        # 等开镜姿态收敛后，瞄准点上半窗 0.055→149、0.060→820、0.066→115、0.072→0。
+        # （不是单调的：不同高度切到的是机匣桥、照门座、枪机三样不同的东西。）
+        "mounts": {"sightY": 0.072},
         "note": "CC0 Bolt Action Rifle 7.62（Poly Haven）→ 中正式。去掉现代瞄准镜、"
                 "包布与独立子弹，只保留木托、机匣、枪机、扳机和机械瞄具；"
                 "全长按中正式史实 1.110 m 缩放。",
@@ -98,6 +102,7 @@ SOURCES = {
         "matName": {"Material": "wood", "Material.004": "steel", "Material.005": "steel",
                     "Material.006": "steel", "Material.007": "steel"},
         "noDetails": True,
+        # 汉阳造不用抬：等开镜姿态收敛之后实测，0.055—0.076 每一档瞄准点都是干净的。
         "mounts": {"muzzleZ": -1.003, "gripZ": -0.418, "sightZ": -0.160,
                    "magY": BORE - 0.050, "magZ": -0.040},
         "note": "CC-BY Gewehr 88（Sketchfab / TastyTony）→ 汉阳八八式。整长套筒、"
@@ -113,6 +118,7 @@ SOURCES = {
         # 背带条按木色桶走（皮革/帆布读作棕件，别读成蓝钢条）。
         "nameBucket": {"All_Wood": "wood", "Sling_Front": "wood",
                        "Sling_BackStock": "wood", "Sling2": "wood"},
+        # 三八式也不用抬（它之前单独修过 adsNearZ，瞄准点本来就干净）。
         "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
                    "magY": BORE - 0.036, "magZ": -0.060},
         # The first-person eye sits 140 mm behind the sight.  Keep the rear
@@ -133,6 +139,9 @@ SOURCES = {
         "lengthM": 0.288,
         "kind": "pistol",
         "skip": ("Boom", "Reload", "Near"),
+        # C96 的照门在机匣顶后端，通用值 0.055 整个落在机匣里：等姿态收敛后实测
+        # 瞄准点上半窗 820/820 全是钢，0.060 起归零。取 0.062 留 2 mm 余量。
+        "mounts": {"sightY": 0.062},
         "note": "CC0 Mauser C96（itch.io / Plewr）。Boom 是枪口焰网格，丢掉。",
     },
     "Dadao": {
@@ -699,7 +708,16 @@ def _TipY(steel, lo, hi):
 
 def _Mounts(node, length_m, kind, lo, hi, spec, steel=None):
     """挂空节点。默认值沿用历史枪模的通用配方；spec["mounts"] 里的键可逐项覆盖
-    （muzzleZ / gripZ / sightZ / magY / magZ），与程序化 BuildWeapons.Mounts 对齐。"""
+    （muzzleZ / gripZ / sightX / sightY / sightZ / magY / magZ），
+    与程序化 BuildWeapons.Mounts 对齐。
+
+    **sightX / sightY 必须逐枪量，别信默认值**（2026-08-25）。第一人称开镜是把
+    sight 挂点解到屏幕正中，于是它就是玩家的瞄准线；而通用值 BORE+0.020 只是
+    "膛线上方 20 mm" 的一句猜测，跟每支模型照门实际在哪没有关系。
+    量法：真开镜、抬头对着天光，数屏幕正中 41×41 里有多少像素是枪
+    （Script_AdsSightTest.mjs 干的就是这件事）。改前实测：
+    中正式 1528、驳壳枪 1209、汉阳造 136、三八式 42（唯一及格的，之前单独修过）。
+    **换了模型源就要重量一次** —— 这些数是量某一份几何量出来的，不是通用常数。"""
     if kind == "melee":
         # 刀只有三个挂点：刀尖 + 双手。sight / magazine 对冷兵器没有意义，不挂。
         # gripR/gripL 的 z 抄程序化大刀（吞口之后 30 mm 与 155 mm），
@@ -719,16 +737,18 @@ def _Mounts(node, length_m, kind, lo, hi, spec, steel=None):
     if kind == "rifle":
         defaults = {"muzzleZ": muzzle_z, "gripZ": muzzle_z * 0.58,
                     "sightZ": -0.165 * (length_m / 1.110),
-                    "magY": BORE - 0.045, "magZ": -0.055}
+                    "magY": BORE - 0.045, "magZ": -0.055,
+                    "sightX": 0.0, "sightY": BORE + 0.020}
     else:
         defaults = {"muzzleZ": muzzle_z, "gripZ": -0.055,
-                    "sightZ": -0.078, "magY": BORE - 0.040, "magZ": -0.062}
+                    "sightZ": -0.078, "magY": BORE - 0.040, "magZ": -0.062,
+                    "sightX": 0.0, "sightY": BORE + 0.020}
     cfg = dict(defaults)
     cfg.update(spec.get("mounts") or {})
     node.Child("muzzle", t=(0.0, BORE, cfg["muzzleZ"]))
     node.Child("gripR", t=(0.0, 0.0, 0.0))
     node.Child("gripL", t=(0.0, -0.012, cfg["gripZ"]))
-    node.Child("sight", t=(0.0, BORE + 0.020, cfg["sightZ"]))
+    node.Child("sight", t=(cfg["sightX"], cfg["sightY"], cfg["sightZ"]))
     node.Child("magazine", t=(0.0, cfg["magY"], cfg["magZ"]))
 
 
