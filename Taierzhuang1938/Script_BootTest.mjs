@@ -187,6 +187,9 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         level,
         environment: T.Debug.Environment ? T.Debug.Environment() : null,
         externalProps: T.battlefield?.externalProps || null,
+        // 流送稳态：live 是当前克隆数，registered 是全部登记数（碰撞永远全量）
+        externalStreaming: T.battlefield?.externalStreamer
+          ? T.battlefield.externalStreamer.Stats() : null,
         wallCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckWallCorridor
           ? T.battlefield.CheckWallCorridor() : null,
         sightCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckSightCorridor
@@ -325,6 +328,15 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       || health.externalProps.failed?.length) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
         + ` expected=${expectedExternalProps} failed=${health.externalProps?.failed?.join(",") || "none"}`);
+    }
+    // 流送自洽：登记数必须等于摆位数，live 不得超过登记数。
+    // live 可以为 0（如一·西关带的摆位离出生点七百米），不做下限断言。
+    if (health.externalProps?.count > 0) {
+      const s = health.externalStreaming;
+      if (!s || s.registered !== health.externalProps.count || s.live > s.registered) {
+        bad.push(`流送不自洽 registered=${s?.registered ?? "?"} live=${s?.live ?? "?"}`
+          + ` count=${health.externalProps.count}`);
+      }
     }
   }
   const ok = bad.length === 0;

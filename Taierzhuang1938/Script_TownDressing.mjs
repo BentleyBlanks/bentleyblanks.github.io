@@ -21,6 +21,10 @@ import { REGION as NW_REGION, PLACEMENTS as NW } from "./Data_Dressing_Northwest
 import { REGION as SW_REGION, PLACEMENTS as SW } from "./Data_Dressing_SouthwestQuarter.mjs";
 import { REGION as MS_REGION, PLACEMENTS as MS } from "./Data_Dressing_MainStreets.mjs";
 import { REGION as DF_REGION, PLACEMENTS as DF } from "./Data_Dressing_Defenses.mjs";
+import { REGION as ES_REGION, PLACEMENTS as ES } from "./Data_Dressing_EastSuburb.mjs";
+import { REGION as WS_REGION, PLACEMENTS as WS } from "./Data_Dressing_WestSuburb.mjs";
+import { REGION as NS_REGION, PLACEMENTS as NS } from "./Data_Dressing_NorthSuburb.mjs";
+import { REGION as JV_REGION, PLACEMENTS as JV } from "./Data_Dressing_JieheVillages.mjs";
 
 export const TOWN_DRESSING_REGIONS = Object.freeze([
   { region: NE_REGION, placements: NE },
@@ -29,6 +33,10 @@ export const TOWN_DRESSING_REGIONS = Object.freeze([
   { region: SW_REGION, placements: SW },
   { region: MS_REGION, placements: MS },
   { region: DF_REGION, placements: DF },
+  { region: ES_REGION, placements: ES },
+  { region: WS_REGION, placements: WS },
+  { region: NS_REGION, placements: NS },
+  { region: JV_REGION, placements: JV },
 ]);
 
 export const TOWN_DRESSING = Object.freeze(

@@ -1155,7 +1155,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     scene, library, phaseId: phase.id, bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
   });
-  battlefield.externalProps = external;
+  // streamer 单独挂：externalProps 会被测试整个 evaluate 出去序列化，
+  // 里面不能有 three 对象。
+  battlefield.externalProps = {
+    count: external.count, failed: external.failed, colliders: external.colliders,
+  };
+  battlefield.externalStreamer = external.streamer;
+  // 先在出生点收敛一次：进关第一帧就该看见眼前的家什，而不是看着它们冒出来。
+  external.streamer?.ForceSync(phase.spawn.x, phase.spawn.z);
   // 下载来的布景也是场上实物（见 Script_ExternalProps 文件头）。它们的碰撞盒是
   // 建关最后一步才并进来的，所以**空间散列必须重刷** —— BuildSteps 里那一次
   // BuildCollisionGrid 跑在这之前，不重刷的话 Rapier 里有这些盒子、
@@ -2290,6 +2297,10 @@ function MenuFrame(dt, render = true) {
   state.frame += 1;
   if (editor) editor.UpdateOverlays(dt);
   menu.Update(dt);
+  // 菜单运镜也要喂流送：Z8 那类俯拍机位悬在城另一头，不喂的话拍到的是空城。
+  if (battlefield?.externalStreamer) {
+    battlefield.externalStreamer.Update(camera.position.x, camera.position.z);
+  }
   // 场上那几个守军：只有守军，所以 AI 找不到目标，跑的是「守住 holdZone」那一支。
   // 不推它的话人是几尊定在地上的雕像 —— 比没有人还假。
   if (ai && ai.soldiers.length) ai.Update(dt, camera);
@@ -3021,6 +3032,11 @@ function Frame(dt, render = true) {
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
   // 所有分支之前 —— 排进下面任何一条 if 里，都会有一整类帧读不到新数。
   if (editor) editor.UpdateOverlays(dt);
+  // 外部道具流送：跟着**相机**走（游戏里相机就在玩家头上；过场里跟运镜走，
+  // 布景才不会在长焦端消失）。必须排在所有 return 分支之前。
+  if (battlefield?.externalStreamer) {
+    battlefield.externalStreamer.Update(camera.position.x, camera.position.z);
+  }
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
   // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。

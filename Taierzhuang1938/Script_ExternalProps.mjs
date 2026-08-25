@@ -35,6 +35,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { BuildSink } from "./Script_World.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
+import { PropStreamer } from "./Script_PropStreaming.mjs";
 
 const LOADER = new GLTFLoader();
 
@@ -229,6 +230,7 @@ const cache = new Map();
 // 落地量必须一件一件算，不能跟着 URL 走。
 const prepared = new Map();
 let liveRoot = null;
+let liveStreamer = null;
 
 async function LoadSource(id) {
   const spec = ASSETS[id];
@@ -380,6 +382,7 @@ export async function InstantiateExternalProp(id, library) {
 
 /** Remove the previous level's visual-only props before its scene is disposed. */
 export function ClearExternalProps() {
+  if (liveStreamer) { liveStreamer.Dispose(); liveStreamer = null; }
   if (!liveRoot) return;
   liveRoot.parent?.remove(liveRoot);
   liveRoot = null;
@@ -398,7 +401,7 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   // 两层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
   // 城内每户布设（Script_TownDressing）。后者跨关共位 —— 城是同一座城。
   const placements = [...(PLACEMENTS[phaseId] || []), ...TownDressingFor(bounds)];
-  if (!placements.length) return { count: 0, failed: [], colliders: [] };
+  if (!placements.length) return { count: 0, failed: [], colliders: [], streamer: null };
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
   const loaded = await Promise.all(ids.map(async (id) => [id, await LoadAsset(id)]));
@@ -407,26 +410,40 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   root.name = `ExternalProps_${phaseId}`;
   root.userData.externalProps = true;
   const sink = new BuildSink();
+  // 【流送分工，2026-08-25】碰撞照旧在这里**全量**登记（AI/破坏/子弹的世界
+  // 不许随玩家位置变形）；克隆改由 PropStreamer 按「尺寸→半径」在焦点附近
+  // 按需生成/回收（规矩见 Script_PropStreaming 文件头）。
+  const streamer = new PropStreamer(root);
   const failed = [];
   let count = 0;
 
   for (const placement of placements) {
     const asset = models.get(placement.asset);
     if (!asset) { failed.push(placement.asset); continue; }
-    const prop = CloneLoadedAsset(placement.asset, asset, library);
-    if (!prop) { failed.push(placement.asset); continue; }
-    prop.name = `External_${placement.asset}_${count}`;
     const y = groundAt(placement.x, placement.z);
-    prop.position.set(placement.x, y, placement.z);
-    prop.rotation.y = placement.ry || 0;
-    prop.scale.setScalar(placement.scale || 1);
-    root.add(prop);
     SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
+    const scale = placement.scale || 1;
+    const maxDim = Math.max(asset.half[0], asset.half[1], asset.half[2]) * 2 * scale;
+    const index = count;
+    const id = placement.asset;
+    streamer.Register({
+      x: placement.x, z: placement.z, maxDim, label: id,
+      make: () => {
+        const prop = CloneLoadedAsset(id, asset, library);
+        if (!prop) return null;
+        prop.name = `External_${id}_${index}`;
+        prop.position.set(placement.x, y, placement.z);
+        prop.rotation.y = placement.ry || 0;
+        prop.scale.setScalar(scale);
+        return prop;
+      },
+    });
     count += 1;
   }
   scene.add(root);
   liveRoot = root;
-  return { count, failed, colliders: sink.colliders };
+  liveStreamer = streamer;
+  return { count, failed, colliders: sink.colliders, streamer };
 }
 
 export function ExternalPropCount(phaseId, bounds) {

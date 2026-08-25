@@ -40,13 +40,25 @@ const REGION_FILES = [
   "./Data_Dressing_SouthwestQuarter.mjs",
   "./Data_Dressing_MainStreets.mjs",
   "./Data_Dressing_Defenses.mjs",
+  "./Data_Dressing_EastSuburb.mjs",
+  "./Data_Dressing_WestSuburb.mjs",
+  "./Data_Dressing_NorthSuburb.mjs",
+  "./Data_Dressing_JieheVillages.mjs",
 ];
 
 const FORBIDDEN_IN_CITY = new Set([
   "house", "houseRow", "housePair", "courtyardHouse",
   "battlefieldPillbox", "battlefieldTrenchEarthwork", "battlefieldGroundPlane",
 ]);
-const CAPS = { quarter: 40, street: 48, defense: 48 };
+// 上限（2026-08-25 起放宽）：视觉走流送后，件数的真正预算是「焦点附近同时活着
+// 多少」+ 碰撞表规模，不再是全量 draw call。局部密度另有 45 m 邻域闸（规则 11）。
+const CAPS = { quarter: 150, street: 130, defense: 90, outfield: 220 };
+// 城外的主路净空带（西关的铁路/站台不在此表——那一包靠探针与截图兜）
+const OUTFIELD_ROADS = [
+  { id: "EastGateRoad", axis: "x", at: -65, from: 310, to: 620, half: 4.2 },
+  { id: "NorthRoad", axis: "z", at: -145, from: -640, to: -310, half: 4.0 },
+  { id: "JieheRoad", axis: "z", at: 0, from: -1620, to: -900, half: 4.5 },
+];
 
 const failures = [];
 const notes = [];
@@ -104,6 +116,7 @@ const segmentsByPhase = data.phases.map((phase) => {
   return { id: phase.id, bounds: phase.bounds, segments };
 });
 
+const cellLoad = new Map();   // 每格院子里摆了几件（规则 12：单院 ≤ 8）
 const regions = [];
 for (const file of REGION_FILES) {
   const module = await import(file);
@@ -138,7 +151,8 @@ for (const { file, region, placements } of regions) {
     const solid = spec.solid !== false;
     everything.push({ x: p.x, z: p.z, r, file, index, label });
 
-    if (Math.max(Math.abs(p.x), Math.abs(p.z)) > 298) fail(`${label}: 出了城墙（规则 3）。`);
+    if (region.kind !== "outfield"
+      && Math.max(Math.abs(p.x), Math.abs(p.z)) > 298) fail(`${label}: 出了城墙（规则 3）。`);
     if (Math.abs(p.x) <= 21 && Math.abs(p.z) <= 21) fail(`${label}: 压十字街口净空（规则 4）。`);
     if (solid && p.x >= -305 && p.x <= 2 && Math.abs(p.z) <= 5.35) {
       fail(`${label}: 压西门通视走廊（规则 5）。`);
@@ -188,6 +202,7 @@ for (const { file, region, placements } of regions) {
       if (!home) {
         fail(`${label}: 没有完整落进任何一格院子（含 0.55 m 院墙退让，规则 9）。`);
       } else {
+        cellLoad.set(home.seed, (cellLoad.get(home.seed) || 0) + 1);
         const tiers = Object.entries(home.tiers)
           .filter(([id]) => cityPhaseIds.has(id)).map(([, tier]) => tier);
         if (tiers.length && tiers.every((tier) => tier === "far")) farOnly += 1;
@@ -214,6 +229,26 @@ for (const { file, region, placements } of regions) {
           fail(`${label}: 城防包的件不在顺城街带/门里/缺口一带（规则 9）。`);
         }
       }
+      if (region.kind === "outfield") {
+        if (p.x < region.bounds.minX || p.x > region.bounds.maxX
+          || p.z < region.bounds.minZ || p.z > region.bounds.maxZ) {
+          fail(`${label}: 出了本区 ${region.id} 的范围（规则 9）。`);
+        }
+        // 城圈（含濠）不归城外包 —— 界河那一片 z ≤ -900 自然不受此限
+        if (Math.max(Math.abs(p.x), Math.abs(p.z)) <= 311 && p.z > -640) {
+          fail(`${label}: 城外包的件进了城圈/濠内（规则 9）。`);
+        }
+        if (solid) {
+          for (const road of OUTFIELD_ROADS) {
+            const along = road.axis === "x" ? p.x : p.z;
+            const across = (road.axis === "x" ? p.z : p.x) - road.at;
+            if (along >= road.from && along <= road.to
+              && Math.abs(across) < road.half + Math.min(r, 1.0)) {
+              fail(`${label}: 压了城外主路 ${road.id} 的净空带（规则 9）。`);
+            }
+          }
+        }
+      }
     }
   });
   if (farOnly) notes.push(`${file}: ${farOnly} 件落在城内三关全为 far 档的格子里 —— `
@@ -238,6 +273,30 @@ for (const entry of everything) {
       if (Math.hypot(entry.x - base.x, entry.z - base.z) < 1.5) {
         fail(`${entry.label} 与原有摆位 ${base.asset}@(${base.x},${base.z}) 叠桩（规则 10）。`);
       }
+    }
+  }
+}
+
+// 规则 12：一格院子最多 8 件 —— 院里还得留人走动的地方。
+for (const [seed, load] of cellLoad) {
+  checks += 1;
+  if (load > 8) fail(`院子 ${seed} 里摆了 ${load} 件（规则 12，单院上限 8）。`);
+}
+
+// 规则 11：局部密度闸。视觉有流送兜底，但 45 m 邻域里超过 90 件就不是
+// 「生活气息」而是仓库了 —— 流送的稳态 live 数也是按这一档预估的。
+{
+  let flagged = 0;
+  for (const entry of everything) {
+    let near = 0;
+    for (const other of everything) {
+      const dx = entry.x - other.x, dz = entry.z - other.z;
+      if (dx * dx + dz * dz < 45 * 45) near += 1;
+    }
+    checks += 1;
+    if (near > 90 && flagged < 8) {
+      fail(`${entry.label}: 45 m 邻域内挤了 ${near} 件（规则 11，上限 90）。`);
+      flagged += 1;
     }
   }
 }
