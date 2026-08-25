@@ -61,6 +61,7 @@
   },
   "homepage": "https://github.com/BentleyBlanks/bentleyblanks.github.io#readme",
   "devDependencies": {
-    "playwright-core": "^1.62.1"
+    "playwright-core": "^1.62.1",
+    "three": "^0.185.0"
   }
 }
