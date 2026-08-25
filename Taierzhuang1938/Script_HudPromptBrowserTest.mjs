@@ -80,10 +80,13 @@ try {
       on: document.querySelector(".hudActions")?.classList.contains("on"),
     };
   });
-  assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind), ["bandage", "switchWeapon"]);
+  // 刺刀那一条是刺刀系统那一批加的（X 上/收刺刀），这份期望当时漏了跟着改，
+  // 于是这条测试从那时起一直是红的 —— 2026-08-26 补上。
+  assert.deepEqual(prompts.prompts.map((prompt) => prompt.kind),
+    ["bandage", "bayonet", "switchWeapon"]);
   assert.equal(prompts.on, true);
-  assert.deepEqual(prompts.rows, ["B", "1 / 2"]);
-  assert.equal(prompts.icons, 2);
+  assert.deepEqual(prompts.rows, ["B", "X", "1 / 2"]);
+  assert.equal(prompts.icons, 3);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
   const combatHud = await page.evaluate(() => {
@@ -133,9 +136,13 @@ try {
     T.player.bleeding = 0;
     T.player.bandages = 0;
     T.state.slots.secondary = null;
+    // 手里那支枪也得换成装不了刺刀的（捷克式），否则「X 上刺刀」是**该在**的 ——
+    // 这一段验的是"条件没了提示就没了"，不是"提示可以凭空消失"。
+    T.interact.hooks.TakeWeapon("Zb26", 2);
     for (const soldier of T.ai.soldiers) {
       if (!soldier.alive && soldier.drop) soldier.drop.taken = true;
     }
+    T.state.slots.secondary = null;
     T.StepFrames(12);
     return { prompts: T.Debug.Prompts(), on: document.querySelector(".hudActions")?.classList.contains("on") };
   });

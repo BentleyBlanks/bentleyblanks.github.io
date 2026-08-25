@@ -12,17 +12,29 @@
 // 锥角至少与当前散布同宽：散布撑大到 7° 时准心画的就是 7°，
 // 那么落在那个圈里的人本来就都是这一枪可能打到的人，识别范围与准心必须是同一件事。
 
-import { WEAPONS } from "./Data_Weapons.mjs";
-
 export const IDENTIFY = {
   /**
-   * 识别距离上限。**这个数由雾定，不由步枪射程定。**
-   * 后期雾是 fog = 1 − exp(−d × density)，density 按天光预设 0.0125—0.021；
-   * 130 m 上已经吃掉八成对比（0.0150 档 fog = 0.86），再远玩家自己在画面上
-   * 根本读不出那儿有个人 —— 名牌不许告诉玩家他看不见的东西，那是透视挂不是 HUD。
-   * （中正式打得到 500 m，所以这一条与"打得到多远"无关，别拿射程来改它。）
+   * 识别距离上限。**这个数由眼睛定，不由步枪射程定。**
+   *
+   * 【2026-08-26 从 130 收到 60】用户实拍反馈：野外一个 95 m 外的日军也报出了
+   * 「日军 步兵 · 三八式」——「怎么会有这么远的也能看到是什么东西？不合理」。
+   * 这条成立：95 m 上那个人在屏幕上只有十几个像素高，雾又吃掉八成对比
+   * （fog = 1 − exp(−d × density)，0.0150 档在 95 m 上是 0.76），
+   * 玩家自己看到的只是一个人影 —— 名牌把"那儿有个人影"变成"那是个三八式步枪兵"，
+   * 那不是 HUD，那是透视挂。
+   *
+   * 60 m 这个数对着 Script_Actor 顶部那本账定：70 m 上雾已经把敌我的反照率差
+   * 吃到噪声水平（|韦伯| 0.020—0.035），也就是**再往外玩家连敌我都分不出**。
+   * 所以识别只在"你还看得见一个人形、但读不出他是谁"的那一段里帮忙，
+   * 越过这一段就什么也不说。（中正式打得到 500 m，别拿射程来改它。）
    */
-  rangeM: 130,
+  rangeM: 60,
+  /**
+   * 报得出军衔与番号的距离。再往外只报阵营与距离。
+   * 30 m 上一个人占屏幕约 55 px 高，肩章领章是能分辨的量级；
+   * 60 m 上只剩 27 px，那时候还报出"军曹·步兵第63联队"就是在编。
+   */
+  detailRangeM: 30,
   /** 识别锥全角（度）。散布比它宽时按散布走。 */
   coneDeg: 2.4,
   /** 角度锥在远处的上限，免得一百米外一整条战线都算"指着"。 */
@@ -55,17 +67,36 @@ const BODY_HALF_W = 0.45;
 /** 阵营显示名。中方一律"川军"—— 第 2 集团军的川军番号在阵亡卡里另有交代。 */
 const FACTION_LABEL = { nra: "川军", ija: "日军" };
 
-/** 日军兵种：按他手里那支枪读，不是按内部战术槽位读。 */
-function IjaRole(soldier) {
-  if (soldier.weaponId === "Type92Hmg") return "重机枪组";
-  if (soldier.weaponId === "Type89Launcher") return "掷弹筒";
-  if (soldier.weapon?.kind === "lmg") return "机枪手";
-  if (soldier.tacticalRole === "leader") return "分队长";
-  return "步兵";
+/**
+ * 日军军衔。**1938 年没有"兵长"** —— 那一级是 1940 年才加的，别往表里填。
+ * 这一版用得到的自下而上是：二等兵 → 一等兵 → 上等兵 → 伍长 → 军曹。
+ *
+ * 挂在战术角色与手里那件家伙上：分队长是军曹，重机枪组长按伍长算，
+ * 轻机枪手（歪把子）通常是上等兵，其余按出生序号在二等兵/一等兵之间分。
+ */
+function IjaRank(soldier) {
+  if (soldier.weaponId === "Type92Hmg") return "伍长";
+  if (soldier.weaponId === "Type89Launcher") return "上等兵";
+  if (soldier.weapon?.kind === "lmg") return "上等兵";
+  if (soldier.tacticalRole === "leader") return "军曹";
+  return (Number(soldier.id) % 3 === 0) ? "一等兵" : "二等兵";
 }
 
-function WeaponName(weaponId) {
-  return WEAPONS[weaponId]?.name || "";
+/**
+ * 部队番号。滕县这一仗打进来的是第 10 师团**濑谷支队**，
+ * 步兵骨干是步兵第 63 联队与步兵第 10 联队（见 docs/Data_HistoryMaterial.md 第二节）。
+ * 重机枪按联队直属的机关枪中队报。
+ *
+ * 为什么报番号而不报枪：玩家真正要读的是"对面是哪一支、成建制到什么程度"，
+ * 而"他拿的是三八式"这件事在这个战场上是废话 —— 日军步兵人手一支三八式。
+ */
+const IJA_REGIMENTS = ["步兵第63联队", "步兵第10联队"];
+
+function IjaUnit(soldier) {
+  if (soldier.weaponId === "Type92Hmg") return "机关枪中队";
+  if (soldier.weaponId === "Type89Launcher") return "掷弹筒分队";
+  // 按 id 定死，不随帧变：同一个人每次指到他都该是同一支部队。
+  return IJA_REGIMENTS[Math.abs(Number(soldier.id) || 0) % IJA_REGIMENTS.length];
 }
 
 function Meters(dist) {
@@ -91,9 +122,13 @@ function Years(identity) {
  *
  * detail：
  *   "full"  —— 体验档：连血条一起给。
- *   "basic" —— 标准档：敌人给兵种与枪，自己人给姓名与岁数，一律带距离；
+ *   "basic" —— 标准档：敌人给军衔与番号，自己人给姓名与岁数，一律带距离；
  *                伤情只给"负伤"两个字，不给数字。
  *   false   —— 写实档：这一层根本不跑（见 IdentifySystem.Update）。
+ *
+ * **远近分两级**（2026-08-26）：超过 IDENTIFY.detailRangeM 只报阵营与距离。
+ * 军衔要看领章、番号要看人认得出这支部队，三十米外这两样都读不出来 ——
+ * 那一段玩家真正需要、也真正读得到的只有一件事：**那是敌是友**。
  */
 export function TargetCard(entity, dist, detail = "basic") {
   if (!entity) return null;
@@ -134,6 +169,19 @@ export function TargetCard(entity, dist, detail = "basic") {
   }
 
   const wounded = Number(entity.health) <= 55;
+  if (dist > IDENTIFY.detailRangeM) {
+    // 远处：只认得出敌我，认不出是谁。血条也不给 —— 三十米外看不出他伤没伤。
+    return {
+      key: `s${entity.id}`,
+      faction,
+      kind: faction === "nra" ? "friend" : "enemy",
+      title: FACTION_LABEL[faction],
+      meta: Meters(dist),
+      health: null,
+      dead: false,
+      distant: true,
+    };
+  }
   if (faction === "nra") {
     // 自己人这一行**不报枪**，报岁数（见 Years 的账）。
     const bits = [entity.towel ? "敢死队" : "", Years(identity), Meters(dist)];
@@ -149,14 +197,15 @@ export function TargetCard(entity, dist, detail = "basic") {
     };
   }
 
-  // 活着的日军**留着枪**：那是"他现在能对我做什么"，与自己人那一行是两件事。
-  const bits = [WeaponName(entity.weaponId), Meters(dist)].filter(Boolean);
+  // 活着的日军：**军衔 + 部队番号**，不报他手里那支枪 ——
+  // 日军步兵人手一支三八式，报枪等于没报；番号才是"对面是哪一支"。
+  const bits = [IjaUnit(entity), Meters(dist)].filter(Boolean);
   if (detail !== "full" && wounded) bits.push("负伤");
   return {
     key: `s${entity.id}`,
     faction,
     kind: "enemy",
-    title: `${FACTION_LABEL.ija} ${IjaRole(entity)}`,
+    title: `${FACTION_LABEL.ija} ${IjaRank(entity)}`,
     meta: bits.filter(Boolean).join(" · "),
     health: detail === "full" ? Math.max(0, Math.min(1, Number(entity.health) / 100)) : null,
     dead: false,

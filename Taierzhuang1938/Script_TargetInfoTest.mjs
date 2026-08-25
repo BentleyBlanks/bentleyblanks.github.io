@@ -112,8 +112,12 @@ try {
 
     enemy.weaponId = "Type38";
     enemy.weapon = T.Debug.Weapons ? T.Debug.Weapons().Type38 : enemy.weapon;
-    Put(enemy, 30);
+    Put(enemy, 22);
     const onEnemy = { ...Read(), id: enemy.id };
+
+    // 出了 detailRangeM（30 m）只报阵营与距离，军衔与番号都收掉。
+    Put(enemy, 45);
+    const distant = Read();
 
     // 距离随人动：同一个人挪到 12 m，卡片上的米数必须跟着变。
     Put(enemy, 12);
@@ -128,7 +132,7 @@ try {
 
     // 自己人：给姓名、蓝色、准心也转蓝（巷战里不误伤全靠这一条）。
     Face();
-    Put(enemy, 200);                       // 敌人挪到雾外，别来抢锥
+    Put(enemy, 200);                       // 敌人挪到识别范围外，别来抢锥
     Put(mate, 14);
     const eyeNow = T.player.EyePosition;
     const onMate = {
@@ -151,9 +155,9 @@ try {
     difficulty.targetInfo = "basic";
     mate.health = 100;
 
-    // 雾外不认：130 m 上限（IDENTIFY.rangeM）。
+    // 太远不认：60 m 上限（IDENTIFY.rangeM）。用户实拍到的 95 m 就落在这一档。
     Face();
-    Put(mate, 170);
+    Put(mate, 95);
     T.StepFrames(45);
     const tooFar = Read();
 
@@ -178,6 +182,34 @@ try {
       walled = { ...Read(), wallAt: hit.t };
     }
 
+    // 地形挡得住吗：把人埋到地表下面 3 m，再瞄他的躯干。
+    // 这条射线上**没有任何碰撞盒**，只有解析地表 —— 不带 TERRAIN_RAY 的射线会
+    // 一路穿过去，卡片照出。用户实拍到的「隔着一道土坎也报出日军」就是这个漏洞。
+    Face();
+    let buried = null;
+    {
+      const eye2 = T.player.EyePosition.clone();
+      const yaw = clearYaw ?? 0;
+      const x = eye2.x - Math.sin(yaw) * 20;
+      const z = eye2.z - Math.cos(yaw) * 20;
+      const gy = T.battlefield.GroundHeight(x, z);
+      mate.position.set(x, gy - 3, z);
+      mate.body?.Teleport(x, gy - 3, z);
+      T.player.pitch = Math.atan2((gy - 3 + 0.95) - eye2.y, 20);
+      T.player.aimYaw = 0;
+      T.player.aimPitch = 0;
+      T.StepFrames(45);
+      const V2 = T.player.position.constructor;
+      const dir = T.player.AimDirection(new V2());
+      const withTerrain = T.battlefield.Raycast(T.player.EyePosition, dir, 20, { terrain: true });
+      const boxesOnly = T.battlefield.Raycast(T.player.EyePosition, dir, 20);
+      buried = {
+        ...Read(),
+        terrainBlocks: !!withTerrain && withTerrain.t < 19.4,
+        boxesBlock: !!boxesOnly && boxesOnly.t < 19.4,
+      };
+    }
+
     // 写实档：整条链短路（不投射线、没有卡片）。
     Face();
     Put(mate, 12);
@@ -189,8 +221,8 @@ try {
     const restored = Read();
 
     return {
-      clearYaw, onEnemy, closer, justLost, lost, onMate,
-      basicWounded, fullBar, tooFar, walled, realistic, restored,
+      clearYaw, onEnemy, distant, closer, justLost, lost, onMate,
+      basicWounded, fullBar, tooFar, walled, buried, realistic, restored,
     };
   });
 
@@ -198,10 +230,16 @@ try {
   await page.screenshot({ path: screenshotPath });
   console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
 
-  Check("准心指着日军：番号 + 兵种 + 枪 + 距离",
-    !!report.onEnemy?.on && /^日军 /.test(report.onEnemy.title)
-    && /三八式 · 30m/.test(report.onEnemy.meta) && report.onEnemy.entityId === report.onEnemy.id,
+  Check("准心指着日军：军衔 + 部队番号 + 距离，不报枪",
+    !!report.onEnemy?.on && /^日军 (二等兵|一等兵|上等兵|伍长|军曹)$/.test(report.onEnemy.title)
+    && /^(步兵第(63|10)联队|机关枪中队|掷弹筒分队) · 22m$/.test(report.onEnemy.meta)
+    && !/三八式|十一年式|九二式/.test(report.onEnemy.meta)
+    && report.onEnemy.entityId === report.onEnemy.id,
     `${report.onEnemy?.title} / ${report.onEnemy?.meta}`);
+  Check("出了三十米只报阵营与距离（军衔番号都读不出来了）",
+    report.distant?.on === true && report.distant.title === "日军"
+    && /^45m$/.test(report.distant.meta),
+    `${report.distant?.title} / ${report.distant?.meta}`);
   Check("敌方用敌色、不带血条（标准档）",
     /theirs/.test(report.onEnemy?.cls || "") && report.onEnemy?.bar === false
     && report.onEnemy?.friendlyReticle === false, report.onEnemy?.cls);
@@ -222,7 +260,11 @@ try {
     report.basicWounded?.bar === false && /负伤/.test(report.basicWounded?.meta || "")
     && report.fullBar?.bar === true && report.fullBar?.detail === "full",
     `${report.basicWounded?.meta} / bar=${report.fullBar?.bar}`);
-  Check("雾外（>130 m）不认", report.tooFar?.on === false, report.tooFar?.meta);
+  Check("九十五米外一律不认（>60 m）", report.tooFar?.on === false, report.tooFar?.meta);
+  Check("地形挡得住：埋在土里的人不认（名牌不穿土坡）",
+    report.buried?.on === false && report.buried?.terrainBlocks === true
+    && report.buried?.boxesBlock === false,
+    `卡片=${report.buried?.on} 地表挡=${report.buried?.terrainBlocks} 碰撞盒挡=${report.buried?.boxesBlock}`);
   Check("墙后的人不认（名牌不穿墙）",
     report.walled ? report.walled.on === false : false,
     report.walled ? `墙在 ${report.walled.wallAt?.toFixed?.(1)} m` : "没找到合适的墙");

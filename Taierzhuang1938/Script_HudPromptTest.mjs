@@ -111,23 +111,42 @@ const MakeSoldier = (over = {}) => ({
 const eye = { x: 0, y: 1.62, z: 0 };
 const ahead = { x: 0, y: 0, z: -1 };                 // 玩家默认朝 -Z
 
-const enemy = MakeSoldier({ id: 7 });
+const enemy = MakeSoldier({ id: 7, z: -18 });
 const idAll = new IdentifySystem();
 const card = idAll.Update(0.016, { eye, dir: ahead, soldiers: [enemy] });
-assert.equal(card.title, "日军 步兵");
-assert.equal(card.meta, "三八式 · 30m");
+// 日军这一行是**军衔 + 部队番号**，不报枪：日军步兵人手一支三八式，报枪等于没报。
+assert.equal(card.title, "日军 二等兵");
+assert.equal(card.meta, "步兵第10联队 · 18m");   // id 7 → 第 10 联队（按 id 定死）
 assert.equal(card.faction, "ija");
 assert.equal(card.health, null, "标准档不给血条");
+assert.doesNotMatch(card.meta, /三八式/, "不报日军手里那支枪");
 
 // 体验档才给血条；标准档只用"负伤"两个字，不外泄数字。
-assert.equal(TargetCard(MakeSoldier({ health: 40 }), 30, "full").health, 0.4);
-assert.match(TargetCard(MakeSoldier({ health: 40 }), 30, "basic").meta, /负伤/);
-assert.doesNotMatch(TargetCard(MakeSoldier({ health: 90 }), 30, "basic").meta, /负伤/);
+assert.equal(TargetCard(MakeSoldier({ health: 40 }), 20, "full").health, 0.4);
+assert.match(TargetCard(MakeSoldier({ health: 40 }), 20, "basic").meta, /负伤/);
+assert.doesNotMatch(TargetCard(MakeSoldier({ health: 90 }), 20, "basic").meta, /负伤/);
 
-// 兵种按他手里那支枪读
-assert.match(TargetCard(MakeSoldier({ weaponId: "Type11", weapon: { kind: "lmg" } }), 12).title, /机枪手/);
-assert.match(TargetCard(MakeSoldier({ weaponId: "Type92Hmg", weapon: { kind: "hmg" } }), 12).title, /重机枪组/);
-assert.match(TargetCard(MakeSoldier({ tacticalRole: "leader" }), 12).title, /分队长/);
+// 军衔按战术角色与手里那件家伙给。**1938 年没有"兵长"**（1940 年才加的一级）。
+assert.match(TargetCard(MakeSoldier({ weaponId: "Type11", weapon: { kind: "lmg" } }), 12).title, /上等兵/);
+assert.match(TargetCard(MakeSoldier({ weaponId: "Type92Hmg", weapon: { kind: "hmg" } }), 12).title, /伍长/);
+assert.match(TargetCard(MakeSoldier({ tacticalRole: "leader" }), 12).title, /军曹/);
+for (const id of [1, 2, 3, 4, 5, 6]) {
+  assert.doesNotMatch(TargetCard(MakeSoldier({ id }), 12).title, /兵长/, "1938 年没有兵长这一级");
+}
+// 番号是滕县这一仗真打进来的那两支（濑谷支队的步兵骨干），而且按 id 定死不随帧变。
+assert.match(TargetCard(MakeSoldier({ id: 2 }), 12).meta, /^步兵第(63|10)联队 · 12m$/);
+assert.equal(TargetCard(MakeSoldier({ id: 2 }), 12).meta, TargetCard(MakeSoldier({ id: 2 }), 12).meta);
+assert.match(TargetCard(MakeSoldier({ weaponId: "Type92Hmg", weapon: { kind: "hmg" } }), 12).meta, /^机关枪中队/);
+
+// 出了 detailRangeM 就只报阵营与距离：军衔要看领章、番号要认得出部队，三十米外读不出来。
+const far = TargetCard(MakeSoldier({ id: 7 }), 45);
+assert.equal(far.title, "日军");
+assert.equal(far.meta, "45m");
+assert.equal(far.distant, true);
+assert.equal(far.kind, "enemy", "远处也要保住敌我色");
+assert.equal(TargetCard(MakeSoldier({ side: "nra" }), 45).title, "川军");
+assert.equal(TargetCard(MakeSoldier({ side: "nra" }), 45).kind, "friend", "远处的自己人仍然让准心转蓝");
+assert.equal(TargetCard(MakeSoldier({ health: 40 }), 45, "full").health, null, "三十米外看不出他伤没伤");
 
 // 自己人给姓名（这是巷战里不误伤的唯一依据），敌人不给。
 // 自己人那一行是**岁数 + 距离**，不报枪：他拿什么枪既不改变我要做的事，也不改变他能做的事。
@@ -160,10 +179,12 @@ assert.equal(new IdentifySystem().Update(0.016,
 assert.ok(new IdentifySystem().Update(0.016,
   { eye, dir: ahead, soldiers: [MakeSoldier({ x: 1.6 })], spreadDeg: 8 }), "散布撑大后同一个人进锥");
 
-// 雾外的人不认（130 m 上限，见 IDENTIFY.rangeM 的账）。
+// 太远的人不认（60 m 上限，见 IDENTIFY.rangeM 的账：七十米上雾已经把敌我差
+// 吃到噪声水平，那一段玩家自己都分不出敌我，名牌更不该替他分）。
 assert.equal(new IdentifySystem().Update(0.016,
-  { eye, dir: ahead, soldiers: [MakeSoldier({ z: -160 })] }), null);
-assert.ok(IDENTIFY.rangeM <= 140, "识别距离必须留在雾还读得出人的范围内");
+  { eye, dir: ahead, soldiers: [MakeSoldier({ z: -95 })] }), null, "九十五米外一律不认");
+assert.ok(IDENTIFY.rangeM <= 70, "识别距离必须留在雾还读得出人的范围内");
+assert.ok(IDENTIFY.detailRangeM < IDENTIFY.rangeM, "详细档必须严格短于识别上限");
 
 // 被墙挡死就不认 —— 名牌不许穿墙。
 const blocked = new IdentifySystem({ Clear: () => false });
@@ -222,4 +243,4 @@ assert.equal(armour.title, "八九式中战车");
 assert.equal(armour.meta, "装甲 17mm · 40m");
 assert.equal(TargetCard(tank, 40, "full").health, 0.55);
 
-console.log("ok  目标识别：兵种/姓名/距离、锥宽随散布、穿墙与雾外一律不认");
+console.log("ok  目标识别：军衔/番号/姓名/距离、远近分级、锥宽随散布、穿墙与太远一律不认");

@@ -728,7 +728,11 @@ async function Boot() {
       if (dist < 1e-3) return true;
       _idDir.multiplyScalar(1 / dist);
       _idFrom.set(eye.x, eye.y, eye.z);
-      const hit = battlefield.Raycast(_idFrom, _idDir, dist);
+      // **TERRAIN_RAY 不能漏**：不带这个标志的射线只跟碰撞盒求交，
+      // 解析地表（土岗、河堤、路基、田埂）一律穿过去 —— 与弹道那条是同一个坑
+      // （见 MarchBullet 那行的账）。用户实拍到的「隔着一道土坎也报出日军」
+      // 就是这么来的：墙挡得住，土坡挡不住。
+      const hit = battlefield.Raycast(_idFrom, _idDir, dist, TERRAIN_RAY);
       // 留 0.6 m 余量：擦着人身边的墙角不算挡住（同 HasLineOfSight）。
       return !hit || hit.t >= dist - 0.6;
     },

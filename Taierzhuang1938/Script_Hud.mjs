@@ -195,8 +195,9 @@ export class Hud {
     this.crosshairSpreadDeg = 0;
     this.crosshairArm = CROSSHAIR.armMin;
     this.crosshairOn = false;
-    /** 目标识别卡：只在 key 变了才重排 DOM，血条每次直接写宽度。 */
+    /** 目标识别卡：class 只在阵营/种类变了才重写，两行字按内容比对（见 SetTarget）。 */
     this.targetKey = "";
+    this.targetShape = "";
     this.targetCard = null;
     /** 帧率读数：累计一小段再平均，免得数字每帧乱跳。 */
     this.fpsAccum = 0;
@@ -394,18 +395,24 @@ export class Hud {
     if (!card) {
       if (!this.targetKey) return;
       this.targetKey = "";
+      this.targetShape = "";
       this.targetCard = null;
       e.classList.remove("on");
       e.setAttribute("aria-hidden", "true");
       return;
     }
-    // key 相同就只刷会变的两处（距离在 meta 里、血条），不重排 DOM。
-    if (card.key !== this.targetKey) {
+    // class 只在阵营/种类真的变了才重写；**两行字一律按内容比对**。
+    // 早先这里把标题也绑在 key 上（"同一个人就不用重画"），结果同一个人走远、
+    // 卡片从「日军 二等兵」降级成「日军」时，标题是上一档的残留 ——
+    // 远近分级刚上线就被这一行吃掉了（Script_TargetInfoTest 那条断言逮到的）。
+    const shape = `${card.faction}|${card.kind}`;
+    if (card.key !== this.targetKey || shape !== this.targetShape) {
       this.targetKey = card.key;
+      this.targetShape = shape;
       e.className = `hudTarget on ${card.faction === "nra" ? "ours" : "theirs"} ${card.kind}`;
-      this.el.targetTitle.textContent = card.title;
     }
     this.targetCard = card;
+    if (this.el.targetTitle.textContent !== card.title) this.el.targetTitle.textContent = card.title;
     if (this.el.targetMeta.textContent !== card.meta) this.el.targetMeta.textContent = card.meta;
     const hasBar = Number.isFinite(card.health);
     this.el.targetBar.style.display = hasBar ? "" : "none";
