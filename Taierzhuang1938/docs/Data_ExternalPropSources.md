@@ -36,9 +36,22 @@ The three source packages and their generated Sketchfab credit text are retained
 under `_import/Source/Model_Sketchfab*/`. `_import/Script_SketchfabPackBake.py`
 removes the original high-resolution textures, decimates meshes, grounds every
 component, and binds the runtime's shared material recipes. The courtyard is
-placed once in `L0_Jiehe`; all 24 battlefield pieces remain available in the
-component library for later level dressing without forcing the whole pack into
-normal gameplay downloads.
+placed once in `L0_Jiehe`; the battlefield pieces are used by the walled-town
+defense dressing (see below).
+
+## Walled-town per-household dressing (2026-08-25)
+
+Beyond the per-level `PLACEMENTS`, the walled town carries a second placement
+layer: `Script_TownDressing.mjs` merges six region files
+(`Data_Dressing_{Northeast,Southeast,Northwest,Southwest}Quarter/MainStreets/Defenses.mjs`,
+229 placements) that dress courtyards, shopfront shoulders, and the wall-ring
+defenses with these external props. Those placements are registered once in
+world coordinates and filtered by each level's `TUNING.bounds`, so the same
+rice sack appears at the same spot in every level that generates that part of
+the city. Tooling: `Script_TownDressingDump.mjs` exports the city's household
+census (`_import/TownDressingCells.json`), `Script_TownDressingTest.mjs`
+enforces the placement rules, and `Script_DressingShot.mjs` shoots arbitrary
+ground/top views for self-checks.
 
 ## Poly Haven CC0 additions
 

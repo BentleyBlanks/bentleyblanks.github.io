@@ -144,11 +144,14 @@ for (const cell of dump.cells) {
   }
 }
 
-// 缺口的世界坐标（南墙沿 x、东墙沿 z；墙面在 ±CITY.wallCenter）
+// 缺口的世界坐标。沿墙局部 at → 世界要走 WALL_SIDES 的旋转（HitsRamp 同款
+// `rz = side.z − sin(ry)·lx`）：South x=+at、West z=+at，但 **East z=−at、
+// North x=−at** —— 东门 at=65 → z=−65 可反证。第一版把 East 写成 +at，
+// 是城防工作包实拍取证抓出来的（(305,70) 那面墙完好无损）。
 const breachPoints = [
   ...dump.breaches.South.map((b) => ({ wall: "South", x: b.at, z: CITY.wallCenter, width: b.width })),
-  ...dump.breaches.East.map((b) => ({ wall: "East", x: CITY.wallCenter, z: b.at, width: b.width })),
-  ...dump.breaches.North.map((b) => ({ wall: "North", x: b.at, z: -CITY.wallCenter, width: b.width })),
+  ...dump.breaches.East.map((b) => ({ wall: "East", x: CITY.wallCenter, z: -b.at, width: b.width })),
+  ...dump.breaches.North.map((b) => ({ wall: "North", x: -b.at, z: -CITY.wallCenter, width: b.width })),
   ...dump.breaches.West.map((b) => ({ wall: "West", x: -CITY.wallCenter, z: b.at, width: b.width })),
 ];
 
