@@ -37,6 +37,44 @@ import { BuildSink } from "./Script_World.mjs";
 
 const LOADER = new GLTFLoader();
 
+const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=1";
+const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
+
+function BattlefieldAsset(label, node, material, tag = "prop", solid = true) {
+  return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid };
+}
+
+const BATTLEFIELD_ASSETS = Object.freeze({
+  battlefieldBarbedWire01: BattlefieldAsset("战场包 · 铁丝网 01", "BattlefieldBarbedWire01", null, "fence"),
+  battlefieldBarbedWire02: BattlefieldAsset("战场包 · 铁丝网 02", "BattlefieldBarbedWire02", null, "fence"),
+  battlefieldBeamObstacle01: BattlefieldAsset("战场包 · 木梁障碍 01", "BattlefieldBeamObstacle01", null, "barricade"),
+  battlefieldBeamObstacle02: BattlefieldAsset("战场包 · 木梁障碍 02", "BattlefieldBeamObstacle02", null, "barricade"),
+  battlefieldSupplyBox: BattlefieldAsset("战场包 · 补给箱", "BattlefieldSupplyBox", null),
+  battlefieldCanvasCover01: BattlefieldAsset("战场包 · 掩布 01", "BattlefieldCanvasCover01", null),
+  battlefieldCompartmentCrate: BattlefieldAsset("战场包 · 分格弹药箱", "BattlefieldCompartmentCrate", null),
+  battlefieldShellStack: BattlefieldAsset("战场包 · 炮弹堆", "BattlefieldShellStack", null),
+  battlefieldGrenadeStack: BattlefieldAsset("战场包 · 手榴弹堆", "BattlefieldGrenadeStack", null),
+  battlefieldCartridgeScatter: BattlefieldAsset("战场包 · 散落弹药", "BattlefieldCartridgeScatter", null),
+  battlefieldCanvasCover02: BattlefieldAsset("战场包 · 掩布 02", "BattlefieldCanvasCover02", null),
+  battlefieldHedgehog: BattlefieldAsset("战场包 · 拒马", "BattlefieldHedgehog", null, "barricade"),
+  battlefieldOpenBin: BattlefieldAsset("战场包 · 敞口容器", "BattlefieldOpenBin", null),
+  battlefieldGroundSheet: BattlefieldAsset("战场包 · 地面帆布", "BattlefieldGroundSheet", null, "prop", false),
+  battlefieldTimberBeam: BattlefieldAsset("战场包 · 木梁", "BattlefieldTimberBeam", null),
+  battlefieldMetalPole: BattlefieldAsset("战场包 · 金属杆", "BattlefieldMetalPole", null),
+  battlefieldPillbox: BattlefieldAsset("战场包 · 碉堡", "BattlefieldPillbox", null, "wall"),
+  battlefieldLadder: BattlefieldAsset("战场包 · 梯子", "BattlefieldLadder", null),
+  battlefieldTrenchEarthwork: BattlefieldAsset("战场包 · 战壕地形", "BattlefieldTrenchEarthwork", null, "rubble", false),
+  battlefieldSandbag01: BattlefieldAsset("战场包 · 沙袋 01", "BattlefieldSandbag01", null, "barricade"),
+  battlefieldSandbag02: BattlefieldAsset("战场包 · 沙袋 02", "BattlefieldSandbag02", null, "barricade"),
+  battlefieldSandbag03: BattlefieldAsset("战场包 · 沙袋 03", "BattlefieldSandbag03", null, "barricade"),
+  battlefieldGroundPlane: BattlefieldAsset("战场包 · 地面片", "BattlefieldGroundPlane", null, "rubble", false),
+  battlefieldRock: BattlefieldAsset("战场包 · 岩石", "BattlefieldRock", null, "rubble"),
+});
+
+function MarketStorage(label, node, material = "WoodDoor") {
+  return { label, url: MARKET_STORAGE_URL, node, material, tag: "prop" };
+}
+
 /**
  * 资产表。
  *
@@ -54,7 +92,7 @@ const ASSETS = Object.freeze({
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall" },
   sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade" },
-  cart: { label: "木制手推车", url: "./Model/Model_Handcart.glb?v=1", material: "WoodBeam", tag: "householdCart" },
+  cart: { label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2", materialMap: true, tag: "householdCart" },
   fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam", tag: "fence" },
   crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor", tag: "prop" },
   rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble" },
@@ -75,6 +113,20 @@ const ASSETS = Object.freeze({
   stackableStone07: { label: "可堆石块 07", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone07", material: "GroundRubble", tag: "rubble" },
   deadTreeTrunk01: { label: "无叶枯树干 01", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk01", material: "WoodBeam", tag: "deadTree" },
   deadTreeTrunk02: { label: "无叶枯树干 02", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk02", material: "WoodBeam", tag: "deadTree" },
+  courtyardHouse: {
+    label: "中式四合院", url: "./Model/Model_AncientChineseCourtyardHouse.glb?v=1",
+    node: "AncientChineseCourtyardHouse", materialMap: true, tag: "wall",
+  },
+  marketRiceSack01: MarketStorage("市场米袋 01", "MarketRiceSack01", "Sandbag"),
+  marketRiceSack02: MarketStorage("市场米袋 02", "MarketRiceSack02", "Sandbag"),
+  marketBox01: MarketStorage("市场木箱 01", "MarketBox01"),
+  marketBox02: MarketStorage("市场木箱 02", "MarketBox02"),
+  marketBox03: MarketStorage("市场木箱 03", "MarketBox03"),
+  marketCrate01: MarketStorage("市场板条箱 01", "MarketCrate01"),
+  marketCrate02: MarketStorage("市场板条箱 02", "MarketCrate02"),
+  marketCrate03: MarketStorage("市场板条箱 03", "MarketCrate03"),
+  marketCrate04: MarketStorage("市场板条箱 04", "MarketCrate04"),
+  ...BATTLEFIELD_ASSETS,
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
@@ -98,6 +150,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "fence", x: -88, z: -1362, ry: 0.14 },
     { asset: "fence", x: 76, z: -1336, ry: -0.22 },
     { asset: "rubble", x: -32, z: -1300, ry: 0.48, scale: 0.78 },
+    { asset: "courtyardHouse", x: 128, z: -1352, ry: -0.08, scale: 0.92 },
   ],
   L1_Beishahe: [
     { asset: "house", x: -1224, z: -164, ry: 0.04 },
@@ -134,6 +187,8 @@ const PLACEMENTS = Object.freeze({
     { asset: "crate", x: 471, z: -52, ry: -0.22, scale: 0.88 },
     { asset: "housePair", x: 508, z: -30, ry: -0.08 },
     { asset: "rubble", x: 516, z: 14, ry: 0.32, scale: 1.0 },
+    { asset: "marketRiceSack01", x: 473, z: -50, ry: 0.38 },
+    { asset: "marketBox01", x: 471.8, z: -49.5, ry: -0.16 },
   ],
   L4_Chengqiang: [
     { asset: "rubble", x: 307, z: -67, ry: 0.52, scale: 1.18 },
@@ -241,8 +296,24 @@ async function LoadAsset(id) {
   return PrepareAsset(id, await LoadSource(id));
 }
 
-function ApplyRuntimeMaterial(root, material) {
-  if (!material) return;
+function ApplyRuntimeMaterial(root, spec, library) {
+  if (spec.materialMap) {
+    const bind = (source) => {
+      const name = source.name.replace(/\.\d{3}$/, "");
+      return library.Get(name, {
+        roughness: name === "Steel" ? 0.72 : 0.9,
+        metalness: name === "Steel" ? 0.55 : 0,
+      });
+    };
+    root.traverse((object) => {
+      if (!object.isMesh) return;
+      object.material = Array.isArray(object.material)
+        ? object.material.map(bind) : bind(object.material);
+    });
+    return;
+  }
+  if (!spec.material) return;
+  const material = library.Get(spec.material, { roughness: 0.9, metalness: 0 });
   root.traverse((object) => {
     if (!object.isMesh) return;
     object.material = material;
@@ -253,8 +324,7 @@ function CloneLoadedAsset(id, asset, library) {
   if (!asset) return null;
   const spec = ASSETS[id];
   const prop = asset.shell.clone(true);
-  ApplyRuntimeMaterial(prop, spec.material
-    ? library.Get(spec.material, { roughness: 0.9, metalness: 0 }) : null);
+  ApplyRuntimeMaterial(prop, spec, library);
   prop.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = true;
@@ -290,7 +360,8 @@ function SolidFor(sink, spec, asset, placement) {
 /** Dedicated editor catalog; runtime placement coordinates stay private below. */
 export function ExternalPropCatalog() {
   return Object.entries(ASSETS).map(([id, spec]) => ({
-    id, label: spec.label, url: spec.url, node: spec.node ?? null, material: spec.material,
+    id, label: spec.label, url: spec.url, node: spec.node ?? null,
+    material: spec.material, materialMap: !!spec.materialMap, tag: spec.tag,
   }));
 }
 

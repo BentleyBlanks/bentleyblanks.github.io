@@ -107,17 +107,22 @@ Unity Labs 三个源包的直接下载地址分别是：
 
 ## 场景布设物（Script_ExternalProps.mjs 运行时加载）
 
-以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs），在 Blender 里
-统一贴图降采样到 1024、烘焙变换并把包围盒底部对齐原点后直接导出为运行时文件。
-它们是纯视觉布设（不参与碰撞/导航），运行时由 `Script_ExternalProps.mjs` 按关卡摆放。
+以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs）。旧三件资产在 Blender
+里统一贴图降采样到 1024；新场景包则清除源高分贴图、强力减面、逐构件底部归零，并在
+运行时绑定本作共享材质。关卡摆放与构件库预览都由 `Script_ExternalProps.mjs` 负责。
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
 | 民居排屋 `Model_AsianHouseRow.glb` | [Asian House Pack - Low Poly](https://sketchfab.com/3d-models/asian-house-pack-low-poly-70f36c58345440fe8e7b6168854881e7) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 四栋一排的低模民居。贴图 2048→1024，底部对齐原点。 |
 | 民居双栋 `Model_AsianHousePair.glb` | [Asian House - Two Pack](https://sketchfab.com/3d-models/asian-house-two-pack-2aa7bfde643145a3a6aa3a85b06afcd2) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 两栋组合。贴图 2048→1024，底部对齐原点。 |
 | 沙袋 `Model_Sandbag.glb` | [Sandbag Low Poly Realist](https://sketchfab.com/3d-models/sandbag-low-poly-realist-7d52600a15c747749d845d9f906045cf) | [Islide](https://sketchfab.com/Islide) | CC-BY-4.0 | 单体沙袋，缩放到 0.6 m 长；贴图 2048→1024，底部对齐原点。 |
+| 中式四合院 `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb) | CC-BY-4.0 | 作为序章单处地标；减至 5,500 三角，使用共享夯土和屋瓦材质。 |
+| 战场构件 `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya) | CC-BY-4.0 | 拆成 24 个可独立选择节点并全部注册进构件库；战壕 3,500 三角，其余单件不超过 1,519 三角。 |
+| 手推车和市场储物 `Model_Handcart.glb`、`Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew) | CC-BY-4.0 | 新手推车替换旧模型，减至 4,200 三角；另拆出 2 种米袋、3 种木箱、4 种板条箱，单件不超过 900 三角。 |
 
 CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。
+新三包的原始 `scene.gltf` / `scene.bin`、Sketchfab 自动生成署名和许可副本保存在
+`Source/Model_Sketchfab*/`；`Script_SketchfabPackBake.py` 可重建四份运行时 GLB。
 
 ### Poly Haven CC0 构件
 

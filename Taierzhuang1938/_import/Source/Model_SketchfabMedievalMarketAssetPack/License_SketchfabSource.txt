@@ -1,0 +1,5 @@
+Sketchfab model: https://sketchfab.com/3d-models/006ffc4ac5f34a1782f567b07e6605f2
+Title: Medieval Market Asset Pack
+Author: vmatthew (https://sketchfab.com/vmatthew)
+License: CC Attribution (http://creativecommons.org/licenses/by/4.0/)
+Downloaded through the authenticated Sketchfab API; modified for Taierzhuang1938 runtime performance.

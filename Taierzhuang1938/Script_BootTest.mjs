@@ -280,7 +280,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         bad.push(`爆炸威力分档 ${probe}=${health.explosionSpriteRouting?.[probe] ?? "missing"} expected=${expected}`);
       }
     }
-    const expectedExternalProps = [3, 11, 8, 4, 9, 6, 5][phase];
+    const expectedExternalProps = [4, 11, 8, 6, 9, 6, 5][phase];
     if (!health.externalProps || health.externalProps.count !== expectedExternalProps
       || health.externalProps.failed?.length) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
