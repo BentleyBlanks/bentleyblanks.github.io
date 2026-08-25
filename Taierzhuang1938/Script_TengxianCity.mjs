@@ -404,6 +404,7 @@ export class TengxianCity {
     this.covers = [];
     this.grid = new Map();
     this.gridSize = 12;
+    this.cells = [];                      // 城内院落格子表（BuildSteps 填，布设工具读）
     this.stats = {
       compoundsDetail: 0, compoundsMid: 0, silhouettes: 0,
       householdProps: 0, streetClusters: 0, streetProps: 0, roadMarks: 0,
@@ -467,6 +468,9 @@ export class TengxianCity {
 
     // --- 城内院落 ---
     const cells = this.PlanBlocks(rnd);
+    // 留一份格子表给布设工具（Script_TownDressingDump 按每家每户取院子；
+    // BuildBlock 会把 kind / ry / damage / state 补写回每个 cell）。
+    this.cells = cells;
     let done = 0;
     for (const cell of cells) {
       this.BuildBlock(cell, rnd);
@@ -1206,6 +1210,14 @@ export class TengxianCity {
     };
     const lod = { damage, burnt, baseY: CITY.platformY, kind: plan.kind, ry: plan.ry };
     const lodCell = { x: cell.x, z: cell.z, w: plan.w, d: plan.d, seed: cell.seed };
+    // 布设工具要按院找家什：把这一格最终盖成什么写回 cell（w/d 保持雕格矩形，
+    // 不跟 ShopRow 的面阔交换走 —— 摆件的包含判定认的是格子，不是构件朝向）。
+    cell.kind = plan.kind;
+    cell.ry = plan.ry;
+    cell.damage = damage;
+    cell.state = profile.state;
+    cell.burnt = burnt;
+    cell.tier = dist < this.detailRadius ? "detail" : dist < this.midRadius ? "mid" : "far";
 
     if (dist < this.detailRadius) {
       this.stats.householdProps += BuildCityBlockDetail(this.sink, spec);

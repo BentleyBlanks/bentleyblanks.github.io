@@ -34,6 +34,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { BuildSink } from "./Script_World.mjs";
+import { TownDressingFor } from "./Script_TownDressing.mjs";
 
 const LOADER = new GLTFLoader();
 
@@ -362,7 +363,13 @@ export function ExternalPropCatalog() {
   return Object.entries(ASSETS).map(([id, spec]) => ({
     id, label: spec.label, url: spec.url, node: spec.node ?? null,
     material: spec.material, materialMap: !!spec.materialMap, tag: spec.tag,
+    solid: spec.solid !== false,
   }));
+}
+
+/** 布设工具/测试用的只读口子：按关卡写死的那几组原始摆位。 */
+export function BasePlacements() {
+  return PLACEMENTS;
 }
 
 /** Clone one runtime prop for the component-library studio without placing it in a level. */
@@ -386,9 +393,11 @@ export function ClearExternalProps() {
  * 否则 AI 找掩体与破坏系统的粗筛里没有这些盒子 —— 物理世界有、粗筛没有，
  * 是最难认的一类不一致。
  */
-export async function AddExternalProps({ scene, library, phaseId, groundAt }) {
+export async function AddExternalProps({ scene, library, phaseId, groundAt, bounds }) {
   ClearExternalProps();
-  const placements = PLACEMENTS[phaseId] || [];
+  // 两层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
+  // 城内每户布设（Script_TownDressing）。后者跨关共位 —— 城是同一座城。
+  const placements = [...(PLACEMENTS[phaseId] || []), ...TownDressingFor(bounds)];
   if (!placements.length) return { count: 0, failed: [], colliders: [] };
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
@@ -420,6 +429,6 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt }) {
   return { count, failed, colliders: sink.colliders };
 }
 
-export function ExternalPropCount(phaseId) {
-  return (PLACEMENTS[phaseId] || []).length;
+export function ExternalPropCount(phaseId, bounds) {
+  return (PLACEMENTS[phaseId] || []).length + TownDressingFor(bounds).length;
 }

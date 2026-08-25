@@ -312,7 +312,15 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         bad.push(`爆炸威力分档 ${probe}=${health.explosionSpriteRouting?.[probe] ?? "missing"} expected=${expected}`);
       }
     }
-    const expectedExternalProps = [4, 11, 8, 6, 9, 6, 5][phase];
+    // 期望值从模块自己算（按关写死那几组 + 按 bounds 过滤的城内每户布设），
+    // 不再手抄一张会漂移的常数表。
+    const expectedExternalProps = await page.evaluate(async (phaseIndex) => {
+      const [{ ExternalPropCount }, { PHASES }] = await Promise.all([
+        import("./Script_ExternalProps.mjs"), import("./Data_Battle.mjs"),
+      ]);
+      const p = PHASES[phaseIndex];
+      return ExternalPropCount(p.id, p.bounds);
+    }, phase);
     if (!health.externalProps || health.externalProps.count !== expectedExternalProps
       || health.externalProps.failed?.length) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`

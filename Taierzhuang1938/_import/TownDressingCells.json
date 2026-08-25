@@ -1,0 +1,8867 @@
+{
+ "note": "由 Script_TownDressingDump.mjs 生成；城布局改动后必须重跑刷新。 cells 是 PlanBlocks+BuildBlock 的最终结果（世界坐标，X 东 Z 南）。",
+ "city": {
+  "wallCenter": 305,
+  "wallBaseWidth": 10,
+  "innerRingWidth": 14,
+  "platformY": 0,
+  "innerLimit": 286
+ },
+ "crossroad": {
+  "x": 0,
+  "z": 0,
+  "size": 30
+ },
+ "sightCorridor": {
+  "fromX": -305,
+  "toX": 0,
+  "atZ": 0,
+  "clearHalfWidth": 4.5,
+  "eyeY": 1.65
+ },
+ "gates": [
+  {
+   "id": "East",
+   "name": "宗鲁门",
+   "x": 305,
+   "z": -65
+  },
+  {
+   "id": "West",
+   "name": "怀古门",
+   "x": -305,
+   "z": 0
+  },
+  {
+   "id": "South",
+   "name": "迎薰门",
+   "x": 70,
+   "z": 305
+  },
+  {
+   "id": "North",
+   "name": "望阙门",
+   "x": -145,
+   "z": -305
+  }
+ ],
+ "streets": [
+  {
+   "id": "WestGateStreet",
+   "axis": "x",
+   "at": 0,
+   "from": -305,
+   "to": 0,
+   "width": 9,
+   "label": "西门大街"
+  },
+  {
+   "id": "CentralEastStreet",
+   "axis": "x",
+   "at": 0,
+   "from": 0,
+   "to": 75,
+   "width": 8,
+   "label": "十字街"
+  },
+  {
+   "id": "EastGateStreet",
+   "axis": "x",
+   "at": -65,
+   "from": 52,
+   "to": 300,
+   "width": 9,
+   "label": "东门大街"
+  },
+  {
+   "id": "EastGateLink",
+   "axis": "z",
+   "at": 52,
+   "from": -65,
+   "to": 0,
+   "width": 6,
+   "label": "县署前街"
+  },
+  {
+   "id": "NorthGateStreet",
+   "axis": "z",
+   "at": -145,
+   "from": -300,
+   "to": -145,
+   "width": 7,
+   "label": "北门大街"
+  },
+  {
+   "id": "CentralNorthStreet",
+   "axis": "z",
+   "at": 0,
+   "from": -145,
+   "to": 0,
+   "width": 7,
+   "label": "北门大街南段"
+  },
+  {
+   "id": "CentralSouthStreet",
+   "axis": "z",
+   "at": 0,
+   "from": 0,
+   "to": 66,
+   "width": 7,
+   "label": "南门里大街北段"
+  },
+  {
+   "id": "SouthGateLink",
+   "axis": "x",
+   "at": 66,
+   "from": 0,
+   "to": 70,
+   "width": 6,
+   "label": "南门里大街转折"
+  },
+  {
+   "id": "SouthGateStreet",
+   "axis": "z",
+   "at": 70,
+   "from": 66,
+   "to": 300,
+   "width": 8,
+   "label": "南门里大街"
+  },
+  {
+   "id": "LongwangTempleStreet",
+   "axis": "x",
+   "at": -145,
+   "from": -145,
+   "to": 88,
+   "width": 5,
+   "label": "龙王庙街"
+  },
+  {
+   "id": "HoumenStreet",
+   "axis": "z",
+   "at": -75,
+   "from": -260,
+   "to": -149,
+   "width": 5,
+   "label": "后门大街"
+  },
+  {
+   "id": "ShunxingStreet",
+   "axis": "z",
+   "at": -185,
+   "from": -90,
+   "to": 122,
+   "width": 5,
+   "label": "顺兴街"
+  },
+  {
+   "id": "DangdianBackStreet",
+   "axis": "x",
+   "at": -90,
+   "from": -185,
+   "to": 52,
+   "width": 5,
+   "label": "当典后街"
+  },
+  {
+   "id": "DangdianEastStreet",
+   "axis": "x",
+   "at": 90,
+   "from": -185,
+   "to": 150,
+   "width": 5,
+   "label": "当典东街"
+  },
+  {
+   "id": "GuanyueTempleStreet",
+   "axis": "z",
+   "at": 150,
+   "from": -65,
+   "to": 122,
+   "width": 5,
+   "label": "关岳庙街"
+  },
+  {
+   "id": "KuiwenStreet",
+   "axis": "z",
+   "at": 118,
+   "from": 86,
+   "to": 210,
+   "width": 5,
+   "label": "奎文街"
+  },
+  {
+   "id": "KuiwenEastStreet",
+   "axis": "z",
+   "at": 192,
+   "from": 66,
+   "to": 210,
+   "width": 5,
+   "label": "奎文东街"
+  },
+  {
+   "id": "FireGodTempleEastStreet",
+   "axis": "x",
+   "at": 210,
+   "from": -145,
+   "to": 192,
+   "width": 5,
+   "label": "火神庙东街"
+  },
+  {
+   "id": "MiaojiaHutong",
+   "axis": "x",
+   "at": -255,
+   "from": -248,
+   "to": -165,
+   "width": 2,
+   "rank": "hutong",
+   "label": "苗家胡同"
+  }
+ ],
+ "landmarks": [
+  {
+   "id": "Yamen",
+   "kind": "yamen",
+   "x": 128,
+   "z": -118,
+   "ry": 0,
+   "w": 62,
+   "d": 54,
+   "damage": 0.18
+  },
+  {
+   "id": "LongPaifang",
+   "kind": "paifang",
+   "x": -120,
+   "z": 0,
+   "ry": 1.5707963267948966,
+   "span": 12
+  },
+  {
+   "id": "AlarmTower",
+   "kind": "alarmTower",
+   "x": -205,
+   "z": -12,
+   "ry": 0,
+   "height": 9
+  },
+  {
+   "id": "WangShrine",
+   "kind": "shrine",
+   "x": -250,
+   "z": 28,
+   "ry": 0,
+   "w": 26,
+   "d": 22
+  },
+  {
+   "id": "SquareFort",
+   "kind": "squareFort",
+   "x": -145,
+   "z": -255,
+   "ry": 0,
+   "w": 32,
+   "d": 32
+  },
+  {
+   "id": "IronPaifang",
+   "kind": "paifang",
+   "x": -145,
+   "z": -160,
+   "ry": 0,
+   "span": 7,
+   "iron": true
+  },
+  {
+   "id": "PeoplesBookshop",
+   "kind": "shop",
+   "x": -108,
+   "z": 132,
+   "ry": -1.5707963267948966,
+   "w": 12,
+   "d": 9
+  },
+  {
+   "id": "CatholicChurchInner",
+   "kind": "church",
+   "x": 36,
+   "z": 238,
+   "ry": 3.141592653589793,
+   "nave": [
+    11,
+    24
+   ],
+   "towerH": 16,
+   "w": 34,
+   "d": 46
+  }
+ ],
+ "cityFeatures": [
+  {
+   "id": "NorthCompound727",
+   "label": "第727团1营",
+   "kind": "billet",
+   "x": -20,
+   "z": -250,
+   "ry": 3.141592653589793,
+   "w": 80,
+   "d": 36,
+   "damage": 0.18,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "ConfucianTemple",
+   "label": "文庙",
+   "kind": "confucianTemple",
+   "x": -100,
+   "z": -230,
+   "ry": 0,
+   "w": 40,
+   "d": 34,
+   "damage": 0.2,
+   "source": "diagram"
+  },
+  {
+   "id": "NorthWestCourtyard",
+   "label": "苗家胡同院落",
+   "kind": "compound",
+   "x": -205,
+   "z": -166,
+   "ry": 1.5707963267948966,
+   "w": 52,
+   "d": 42,
+   "damage": 0.22,
+   "source": "diagram"
+  },
+  {
+   "id": "GarrisonHQ",
+   "label": "警备队",
+   "kind": "garrison",
+   "x": 150,
+   "z": -250,
+   "ry": 3.141592653589793,
+   "w": 46,
+   "d": 30,
+   "damage": 0.2,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "CountyJail",
+   "label": "监狱",
+   "kind": "prison",
+   "x": 162,
+   "z": -192,
+   "ry": 0,
+   "w": 44,
+   "d": 36,
+   "damage": 0.2,
+   "source": "diagram"
+  },
+  {
+   "id": "CountyPrison",
+   "label": "看守所",
+   "kind": "detention",
+   "x": 224,
+   "z": -192,
+   "ry": -1.5707963267948966,
+   "w": 30,
+   "d": 26,
+   "damage": 0.2,
+   "source": "diagram"
+  },
+  {
+   "id": "RegimentHQ",
+   "label": "团部",
+   "kind": "hq",
+   "x": -38,
+   "z": -176,
+   "ry": 0,
+   "w": 38,
+   "d": 30,
+   "damage": 0.16,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "DragonKingTemple",
+   "label": "龙王庙",
+   "kind": "temple",
+   "x": 52,
+   "z": -172,
+   "ry": 0,
+   "w": 42,
+   "d": 30,
+   "damage": 0.22,
+   "source": "diagram"
+  },
+  {
+   "id": "PoliceStation",
+   "label": "警察所",
+   "kind": "police",
+   "x": 104,
+   "z": -216,
+   "ry": 1.5707963267948966,
+   "w": 34,
+   "d": 28,
+   "damage": 0.18,
+   "source": "diagram"
+  },
+  {
+   "id": "CommerceGuild",
+   "label": "商会",
+   "kind": "guild",
+   "x": 34,
+   "z": -116,
+   "ry": 3.141592653589793,
+   "w": 40,
+   "d": 26,
+   "damage": 0.18,
+   "source": "diagram"
+  },
+  {
+   "id": "PawnShop",
+   "label": "当典",
+   "kind": "pawnshop",
+   "x": -136,
+   "z": -116,
+   "ry": 0,
+   "w": 34,
+   "d": 30,
+   "damage": 0.2,
+   "source": "diagram"
+  },
+  {
+   "id": "CentralCompound124",
+   "label": "第124师师部",
+   "kind": "hq",
+   "x": -58,
+   "z": -55,
+   "ry": 0,
+   "w": 94,
+   "d": 54,
+   "damage": 0.14,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "CentralCompound127",
+   "label": "第127师师部",
+   "kind": "hq",
+   "x": -72,
+   "z": 56,
+   "ry": 3.141592653589793,
+   "w": 94,
+   "d": 48,
+   "damage": 0.18,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "WestSpecialCompound",
+   "label": "特务营第1连",
+   "kind": "billet",
+   "x": -225,
+   "z": -50,
+   "ry": 1.5707963267948966,
+   "w": 52,
+   "d": 62,
+   "damage": 0.26,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "EastDistrictOffice",
+   "label": "第二区公所",
+   "kind": "compound",
+   "x": 218,
+   "z": 12,
+   "ry": -1.5707963267948966,
+   "w": 50,
+   "d": 74,
+   "damage": 0.28,
+   "source": "diagram"
+  },
+  {
+   "id": "SouthWestOffice",
+   "label": "办事处",
+   "kind": "office",
+   "x": -140,
+   "z": 126,
+   "ry": 3.141592653589793,
+   "w": 50,
+   "d": 44,
+   "damage": 0.3,
+   "source": "diagram"
+  },
+  {
+   "id": "WenzhongSchool",
+   "label": "滕文中学旧址",
+   "kind": "school",
+   "x": -186,
+   "z": 220,
+   "ry": 1.5707963267948966,
+   "w": 66,
+   "d": 40,
+   "damage": 0.26,
+   "source": "diagram"
+  },
+  {
+   "id": "ShuyuanPrimarySchool",
+   "label": "书院小学",
+   "kind": "school",
+   "x": -105,
+   "z": 238,
+   "ry": 3.141592653589793,
+   "w": 48,
+   "d": 30,
+   "damage": 0.24,
+   "source": "diagram"
+  },
+  {
+   "id": "FireGodTemple",
+   "label": "火神庙",
+   "kind": "temple",
+   "x": 148,
+   "z": 182,
+   "ry": 0,
+   "w": 34,
+   "d": 26,
+   "damage": 0.28,
+   "source": "diagram"
+  },
+  {
+   "id": "SouthEastSpecialCompound",
+   "label": "特务营第2连",
+   "kind": "billet",
+   "x": 142,
+   "z": 247,
+   "ry": 3.141592653589793,
+   "w": 76,
+   "d": 42,
+   "damage": 0.35,
+   "source": "diagram",
+   "notPermanentGarrison": true
+  },
+  {
+   "id": "SouthWestBlock",
+   "kind": "compound",
+   "x": -245,
+   "z": 260,
+   "ry": 0,
+   "w": 72,
+   "d": 34,
+   "damage": 0.32
+  },
+  {
+   "id": "SouthEastBlock",
+   "kind": "compound",
+   "x": 230,
+   "z": 260,
+   "ry": 3.141592653589793,
+   "w": 68,
+   "d": 36,
+   "damage": 0.36
+  }
+ ],
+ "breaches": [
+  {
+   "wall": "South",
+   "x": 285,
+   "z": 305,
+   "width": 20
+  },
+  {
+   "wall": "East",
+   "x": 305,
+   "z": 70,
+   "width": 17
+  }
+ ],
+ "phases": [
+  {
+   "id": "L0_Jiehe",
+   "bounds": {
+    "minX": -620,
+    "maxX": 620,
+    "minZ": -1620,
+    "maxZ": -900
+   },
+   "spawn": {
+    "x": 0,
+    "z": -1470
+   },
+   "zones": [
+    {
+     "id": "Approach",
+     "x": 0,
+     "z": -1420,
+     "radius": 34
+    },
+    {
+     "id": "Kan",
+     "x": 0,
+     "z": -1255,
+     "radius": 30
+    },
+    {
+     "id": "Beishahe",
+     "x": 0,
+     "z": -1000,
+     "radius": 34
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L1_Beishahe",
+   "bounds": {
+    "minX": -620,
+    "maxX": -230,
+    "minZ": -250,
+    "maxZ": 210
+   },
+   "spawn": {
+    "x": -480,
+    "z": -205
+   },
+   "zones": [
+    {
+     "id": "SecondLine",
+     "x": -480,
+     "z": -180,
+     "radius": 34
+    },
+    {
+     "id": "Dawn",
+     "x": -480,
+     "z": -130,
+     "radius": 30
+    },
+    {
+     "id": "XiguanStation",
+     "x": -458,
+     "z": -82,
+     "radius": 42
+    },
+    {
+     "id": "PowerPlant",
+     "x": -408,
+     "z": 62,
+     "radius": 34
+    },
+    {
+     "id": "WestGate",
+     "x": -330,
+     "z": 0,
+     "radius": 26
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L2_Dongguan",
+   "bounds": {
+    "minX": 250,
+    "maxX": 620,
+    "minZ": -240,
+    "maxZ": 240
+   },
+   "spawn": {
+    "x": 432,
+    "z": -65
+   },
+   "zones": [
+    {
+     "id": "ZhaiGate",
+     "x": 480,
+     "z": -65,
+     "radius": 20
+    },
+    {
+     "id": "Courtyard",
+     "x": 462,
+     "z": -19,
+     "radius": 26
+    },
+    {
+     "id": "Temple",
+     "x": 414,
+     "z": -176,
+     "radius": 26
+    },
+    {
+     "id": "Breach",
+     "x": 500,
+     "z": -65,
+     "radius": 22
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L3_Fanji",
+   "bounds": {
+    "minX": 250,
+    "maxX": 600,
+    "minZ": -200,
+    "maxZ": 170
+   },
+   "spawn": {
+    "x": 456.6,
+    "z": -128
+   },
+   "zones": [
+    {
+     "id": "Temple",
+     "x": 414,
+     "z": -176,
+     "radius": 26
+    },
+    {
+     "id": "Lane",
+     "x": 478,
+     "z": -89,
+     "radius": 22
+    },
+    {
+     "id": "GateRetake",
+     "x": 516,
+     "z": -65,
+     "radius": 20
+    },
+    {
+     "id": "EastGateIn",
+     "x": 296,
+     "z": -65,
+     "radius": 24
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L4_Chengqiang",
+   "bounds": {
+    "minX": -360,
+    "maxX": 620,
+    "minZ": -360,
+    "maxZ": 400
+   },
+   "spawn": {
+    "x": 276,
+    "z": -65
+   },
+   "zones": [
+    {
+     "id": "Rampway",
+     "x": 288,
+     "z": -65,
+     "radius": 16
+    },
+    {
+     "id": "Rampart",
+     "x": 294,
+     "z": 288,
+     "radius": 22
+    },
+    {
+     "id": "SouthWall",
+     "x": 150,
+     "z": 296,
+     "radius": 26
+    },
+    {
+     "id": "SouthBreach",
+     "x": 285,
+     "z": 296,
+     "radius": 18
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L5_Shizijie",
+   "bounds": {
+    "minX": -325,
+    "maxX": 285,
+    "minZ": -190,
+    "maxZ": 140
+   },
+   "spawn": {
+    "x": 62,
+    "z": 0
+   },
+   "zones": [
+    {
+     "id": "Crossroad",
+     "x": 0,
+     "z": 0,
+     "radius": 20
+    },
+    {
+     "id": "Yamen",
+     "x": 128,
+     "z": -118,
+     "radius": 32
+    },
+    {
+     "id": "WestStreet",
+     "x": -160,
+     "z": 0,
+     "radius": 24
+    },
+    {
+     "id": "WestGateInner",
+     "x": -278,
+     "z": 0,
+     "radius": 20
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "L6_Beimen",
+   "bounds": {
+    "minX": -360,
+    "maxX": 340,
+    "minZ": -640,
+    "maxZ": 200
+   },
+   "spawn": {
+    "x": -286,
+    "z": 0
+   },
+   "zones": [
+    {
+     "id": "WestBarbican",
+     "x": -322,
+     "z": 0,
+     "radius": 16
+    },
+    {
+     "id": "NorthStreet",
+     "x": -145,
+     "z": -160,
+     "radius": 24
+    },
+    {
+     "id": "NorthGate",
+     "x": -145,
+     "z": -296,
+     "radius": 20
+    },
+    {
+     "id": "WheatField",
+     "x": 0,
+     "z": -520,
+     "radius": 46
+    }
+   ],
+   "detailRadius": 70,
+   "midRadius": 170
+  }
+ ],
+ "assetDims": {
+  "house": {
+   "dims": [
+    4.225,
+    6.397,
+    6.671
+   ],
+   "triangles": 29406,
+   "meshes": 17,
+   "solid": true,
+   "tag": "wall",
+   "union": true
+  },
+  "houseRow": {
+   "dims": [
+    1.514,
+    1.327,
+    2.38
+   ],
+   "triangles": 3442,
+   "meshes": 6,
+   "solid": true,
+   "tag": "wall",
+   "union": true
+  },
+  "housePair": {
+   "dims": [
+    2.799,
+    2.663,
+    4.785
+   ],
+   "triangles": 1840,
+   "meshes": 4,
+   "solid": true,
+   "tag": "wall",
+   "union": true
+  },
+  "sandbag": {
+   "dims": [
+    0.467,
+    0.253,
+    0.837
+   ],
+   "triangles": 712,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade",
+   "union": true
+  },
+  "cart": {
+   "dims": [
+    1.891,
+    1.142,
+    2.45
+   ],
+   "triangles": 4200,
+   "meshes": 2,
+   "solid": true,
+   "tag": "householdCart",
+   "union": true
+  },
+  "fence": {
+   "dims": [
+    29.2,
+    284.543,
+    146.979
+   ],
+   "triangles": 298,
+   "meshes": 1,
+   "solid": true,
+   "tag": "fence",
+   "union": true
+  },
+  "crate": {
+   "dims": [
+    0.644,
+    0.644,
+    0.644
+   ],
+   "triangles": 268,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop",
+   "union": true
+  },
+  "rubble": {
+   "dims": [
+    1.805,
+    0.31,
+    2
+   ],
+   "triangles": 5488,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble",
+   "union": true
+  },
+  "militaryCrateClosed": {
+   "dims": [
+    0.816,
+    0.3,
+    0.538
+   ],
+   "triangles": 2400,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "militaryCrateOpen": {
+   "dims": [
+    0.814,
+    0.3,
+    0.98
+   ],
+   "triangles": 2400,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "stackableStone01": {
+   "dims": [
+    0.45,
+    0.22,
+    0.372
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone02": {
+   "dims": [
+    0.55,
+    0.31,
+    0.292
+   ],
+   "triangles": 899,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone03": {
+   "dims": [
+    0.5,
+    0.274,
+    0.483
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone04": {
+   "dims": [
+    0.4,
+    0.128,
+    0.287
+   ],
+   "triangles": 899,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone05": {
+   "dims": [
+    0.6,
+    0.407,
+    0.596
+   ],
+   "triangles": 899,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone06": {
+   "dims": [
+    0.65,
+    0.32,
+    0.396
+   ],
+   "triangles": 999,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stackableStone07": {
+   "dims": [
+    0.396,
+    0.335,
+    0.75
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "deadTreeTrunk01": {
+   "dims": [
+    3.048,
+    0.291,
+    0.274
+   ],
+   "triangles": 2400,
+   "meshes": 1,
+   "solid": true,
+   "tag": "deadTree"
+  },
+  "deadTreeTrunk02": {
+   "dims": [
+    4.051,
+    1.056,
+    1.047
+   ],
+   "triangles": 2400,
+   "meshes": 1,
+   "solid": true,
+   "tag": "deadTree"
+  },
+  "courtyardHouse": {
+   "dims": [
+    11.846,
+    7.551,
+    11.029
+   ],
+   "triangles": 5500,
+   "meshes": 2,
+   "solid": true,
+   "tag": "wall"
+  },
+  "marketRiceSack01": {
+   "dims": [
+    0.75,
+    0.567,
+    0.728
+   ],
+   "triangles": 784,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketRiceSack02": {
+   "dims": [
+    0.587,
+    0.78,
+    0.766
+   ],
+   "triangles": 602,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketBox01": {
+   "dims": [
+    0.55,
+    0.446,
+    0.55
+   ],
+   "triangles": 132,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketBox02": {
+   "dims": [
+    0.75,
+    0.673,
+    0.75
+   ],
+   "triangles": 132,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketBox03": {
+   "dims": [
+    0.95,
+    0.806,
+    0.95
+   ],
+   "triangles": 132,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketCrate01": {
+   "dims": [
+    0.493,
+    0.376,
+    0.75
+   ],
+   "triangles": 256,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketCrate02": {
+   "dims": [
+    0.548,
+    0.402,
+    0.75
+   ],
+   "triangles": 256,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketCrate03": {
+   "dims": [
+    0.723,
+    0.347,
+    0.75
+   ],
+   "triangles": 256,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "marketCrate04": {
+   "dims": [
+    0.482,
+    0.381,
+    0.75
+   ],
+   "triangles": 256,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldBarbedWire01": {
+   "dims": [
+    3.062,
+    0.697,
+    0.713
+   ],
+   "triangles": 80,
+   "meshes": 1,
+   "solid": true,
+   "tag": "fence"
+  },
+  "battlefieldBarbedWire02": {
+   "dims": [
+    3.062,
+    0.697,
+    0.713
+   ],
+   "triangles": 80,
+   "meshes": 1,
+   "solid": true,
+   "tag": "fence"
+  },
+  "battlefieldBeamObstacle01": {
+   "dims": [
+    1.964,
+    1.987,
+    1.692
+   ],
+   "triangles": 36,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldBeamObstacle02": {
+   "dims": [
+    1.522,
+    1.551,
+    1.573
+   ],
+   "triangles": 36,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldSupplyBox": {
+   "dims": [
+    1.315,
+    0.794,
+    1.315
+   ],
+   "triangles": 12,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldCanvasCover01": {
+   "dims": [
+    1.666,
+    0.413,
+    1.594
+   ],
+   "triangles": 799,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldCompartmentCrate": {
+   "dims": [
+    1.622,
+    0.586,
+    1.044
+   ],
+   "triangles": 132,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldShellStack": {
+   "dims": [
+    1.531,
+    0.594,
+    0.65
+   ],
+   "triangles": 1200,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldGrenadeStack": {
+   "dims": [
+    1.479,
+    0.546,
+    0.246
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldCartridgeScatter": {
+   "dims": [
+    1.303,
+    0.37,
+    0.049
+   ],
+   "triangles": 699,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldCanvasCover02": {
+   "dims": [
+    1.875,
+    0.331,
+    1.241
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldHedgehog": {
+   "dims": [
+    1.445,
+    1.444,
+    1.681
+   ],
+   "triangles": 180,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldOpenBin": {
+   "dims": [
+    1.911,
+    1.713,
+    1.911
+   ],
+   "triangles": 352,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldGroundSheet": {
+   "dims": [
+    1.577,
+    0.065,
+    1.577
+   ],
+   "triangles": 128,
+   "meshes": 1,
+   "solid": false,
+   "tag": "prop"
+  },
+  "battlefieldTimberBeam": {
+   "dims": [
+    3.165,
+    0.323,
+    0.305
+   ],
+   "triangles": 112,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldMetalPole": {
+   "dims": [
+    3.47,
+    0.317,
+    0.333
+   ],
+   "triangles": 36,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldPillbox": {
+   "dims": [
+    8.218,
+    4.521,
+    7.845
+   ],
+   "triangles": 1519,
+   "meshes": 1,
+   "solid": true,
+   "tag": "wall"
+  },
+  "battlefieldLadder": {
+   "dims": [
+    0.521,
+    2.187,
+    0.57
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "battlefieldTrenchEarthwork": {
+   "dims": [
+    60.085,
+    1.252,
+    12.834
+   ],
+   "triangles": 3500,
+   "meshes": 1,
+   "solid": false,
+   "tag": "rubble"
+  },
+  "battlefieldSandbag01": {
+   "dims": [
+    1.926,
+    0.426,
+    0.866
+   ],
+   "triangles": 572,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldSandbag02": {
+   "dims": [
+    2.017,
+    0.426,
+    1.303
+   ],
+   "triangles": 572,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldSandbag03": {
+   "dims": [
+    1.883,
+    0.533,
+    0.936
+   ],
+   "triangles": 572,
+   "meshes": 1,
+   "solid": true,
+   "tag": "barricade"
+  },
+  "battlefieldGroundPlane": {
+   "dims": [
+    60.081,
+    0,
+    42.723
+   ],
+   "triangles": 133,
+   "meshes": 1,
+   "solid": false,
+   "tag": "rubble"
+  },
+  "battlefieldRock": {
+   "dims": [
+    0.622,
+    0.287,
+    0.519
+   ],
+   "triangles": 140,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  }
+ },
+ "basePlacements": {
+  "L0_Jiehe": [
+   {
+    "asset": "fence",
+    "x": -88,
+    "z": -1362,
+    "ry": 0.14
+   },
+   {
+    "asset": "fence",
+    "x": 76,
+    "z": -1336,
+    "ry": -0.22
+   },
+   {
+    "asset": "rubble",
+    "x": -32,
+    "z": -1300,
+    "ry": 0.48,
+    "scale": 0.78
+   },
+   {
+    "asset": "courtyardHouse",
+    "x": 128,
+    "z": -1352,
+    "ry": -0.08,
+    "scale": 0.92
+   }
+  ],
+  "L1_Beishahe": [
+   {
+    "asset": "house",
+    "x": -1224,
+    "z": -164,
+    "ry": 0.04
+   },
+   {
+    "asset": "houseRow",
+    "x": -1152,
+    "z": -208,
+    "ry": -0.1
+   },
+   {
+    "asset": "sandbag",
+    "x": -1210,
+    "z": -140,
+    "ry": 0.35
+   },
+   {
+    "asset": "cart",
+    "x": -1192,
+    "z": -121,
+    "ry": 0.22
+   },
+   {
+    "asset": "crate",
+    "x": -1190,
+    "z": -119,
+    "ry": -0.15,
+    "scale": 0.96
+   },
+   {
+    "asset": "fence",
+    "x": -1260,
+    "z": -104,
+    "ry": 0.05
+   },
+   {
+    "asset": "rubble",
+    "x": -1170,
+    "z": -176,
+    "ry": -0.31,
+    "scale": 0.84
+   },
+   {
+    "asset": "militaryCrateClosed",
+    "x": -1186,
+    "z": -117,
+    "ry": 0.28
+   },
+   {
+    "asset": "stackableStone02",
+    "x": -1238,
+    "z": -151,
+    "ry": 0.7
+   },
+   {
+    "asset": "stackableStone04",
+    "x": -1237.5,
+    "z": -150.7,
+    "ry": -0.2,
+    "scale": 0.72
+   },
+   {
+    "asset": "deadTreeTrunk01",
+    "x": -1268,
+    "z": -183,
+    "ry": 0.5
+   }
+  ],
+  "L2_Dongguan": [
+   {
+    "asset": "house",
+    "x": 462,
+    "z": -144,
+    "ry": 0.03
+   },
+   {
+    "asset": "housePair",
+    "x": 428,
+    "z": -178,
+    "ry": 0.06
+   },
+   {
+    "asset": "houseRow",
+    "x": 518,
+    "z": -100,
+    "ry": -0.12
+   },
+   {
+    "asset": "cart",
+    "x": 485,
+    "z": -96,
+    "ry": -0.28,
+    "scale": 0.9
+   },
+   {
+    "asset": "crate",
+    "x": 479,
+    "z": -94,
+    "ry": 0.18,
+    "scale": 0.92
+   },
+   {
+    "asset": "rubble",
+    "x": 504,
+    "z": 18,
+    "ry": 0.46,
+    "scale": 1.05
+   },
+   {
+    "asset": "militaryCrateOpen",
+    "x": 477,
+    "z": -91,
+    "ry": -0.48
+   },
+   {
+    "asset": "stackableStone06",
+    "x": 521,
+    "z": 12,
+    "ry": 0.9,
+    "scale": 0.85
+   }
+  ],
+  "L3_Fanji": [
+   {
+    "asset": "cart",
+    "x": 468,
+    "z": -54,
+    "ry": 0.16,
+    "scale": 0.86
+   },
+   {
+    "asset": "crate",
+    "x": 471,
+    "z": -52,
+    "ry": -0.22,
+    "scale": 0.88
+   },
+   {
+    "asset": "housePair",
+    "x": 508,
+    "z": -30,
+    "ry": -0.08
+   },
+   {
+    "asset": "rubble",
+    "x": 516,
+    "z": 14,
+    "ry": 0.32,
+    "scale": 1
+   },
+   {
+    "asset": "marketRiceSack01",
+    "x": 473,
+    "z": -50,
+    "ry": 0.38
+   },
+   {
+    "asset": "marketBox01",
+    "x": 471.8,
+    "z": -49.5,
+    "ry": -0.16
+   }
+  ],
+  "L4_Chengqiang": [
+   {
+    "asset": "rubble",
+    "x": 307,
+    "z": -67,
+    "ry": 0.52,
+    "scale": 1.18
+   },
+   {
+    "asset": "crate",
+    "x": 260,
+    "z": -89,
+    "ry": -0.18,
+    "scale": 0.92
+   },
+   {
+    "asset": "sandbag",
+    "x": 252,
+    "z": -80,
+    "ry": 0.42
+   },
+   {
+    "asset": "sandbag",
+    "x": 257,
+    "z": -76,
+    "ry": -0.28,
+    "scale": 0.94
+   },
+   {
+    "asset": "sandbag",
+    "x": 248,
+    "z": -85,
+    "ry": 0.88,
+    "scale": 0.9
+   },
+   {
+    "asset": "stackableStone01",
+    "x": 303,
+    "z": -65,
+    "ry": 0.18
+   },
+   {
+    "asset": "stackableStone03",
+    "x": 304,
+    "z": -64.7,
+    "ry": -0.42,
+    "scale": 0.82
+   },
+   {
+    "asset": "stackableStone05",
+    "x": 304.3,
+    "z": -64.4,
+    "ry": 0.62,
+    "scale": 0.68
+   },
+   {
+    "asset": "stackableStone07",
+    "x": 310,
+    "z": -70,
+    "ry": -0.3,
+    "scale": 0.76
+   }
+  ],
+  "L5_Shizijie": [
+   {
+    "asset": "cart",
+    "x": 112,
+    "z": -38,
+    "ry": 0.38,
+    "scale": 0.84
+   },
+   {
+    "asset": "crate",
+    "x": 116,
+    "z": -36,
+    "ry": -0.22,
+    "scale": 0.86
+   },
+   {
+    "asset": "houseRow",
+    "x": 84,
+    "z": -70,
+    "ry": 0.22
+   },
+   {
+    "asset": "sandbag",
+    "x": 100,
+    "z": -52,
+    "ry": -0.4
+   },
+   {
+    "asset": "rubble",
+    "x": -66,
+    "z": 44,
+    "ry": 0.18,
+    "scale": 0.92
+   },
+   {
+    "asset": "deadTreeTrunk02",
+    "x": -72,
+    "z": 51,
+    "ry": -0.44,
+    "scale": 0.9
+   }
+  ],
+  "L6_Beimen": [
+   {
+    "asset": "cart",
+    "x": -188,
+    "z": -128,
+    "ry": 0.18,
+    "scale": 0.82
+   },
+   {
+    "asset": "crate",
+    "x": -184,
+    "z": -127,
+    "ry": -0.14,
+    "scale": 0.84
+   },
+   {
+    "asset": "housePair",
+    "x": -232,
+    "z": -164,
+    "ry": 0.12
+   },
+   {
+    "asset": "sandbag",
+    "x": -176,
+    "z": -118,
+    "ry": 0.55
+   },
+   {
+    "asset": "rubble",
+    "x": -246,
+    "z": -36,
+    "ry": 0.41,
+    "scale": 0.96
+   }
+  ]
+ },
+ "cells": [
+  {
+   "x": -272.38,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_0",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.032,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.021,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.203,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_3",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.19,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.033,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.155,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.094,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_7",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.082,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.09,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_9",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.165,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_10",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.009,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_11",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.097,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -276,
+   "z": 22.88,
+   "w": 18,
+   "d": 20.88,
+   "seed": "blk0_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.01,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -276,
+   "z": 45.76,
+   "w": 18,
+   "d": 20.88,
+   "seed": "blk0_14",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.151,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.216,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.168,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_18",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.078,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.154,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_20",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.063,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk0_21",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.185,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -272.38,
+   "z": 228.68,
+   "w": 25.24,
+   "d": 20.64,
+   "seed": "blk0_22",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.116,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.023,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -247.02,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk1_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.212,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_2",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.168,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.157,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -246.38,
+   "z": -183.04,
+   "w": 22.76,
+   "d": 20.88,
+   "seed": "blk1_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.186,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -246.38,
+   "z": -160.16,
+   "w": 22.76,
+   "d": 20.88,
+   "seed": "blk1_5",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.164,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -246.38,
+   "z": -137.28,
+   "w": 22.76,
+   "d": 20.88,
+   "seed": "blk1_6",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.209,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.142,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": -93.48,
+   "w": 25.24,
+   "d": 16.96,
+   "seed": "blk1_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.215,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 49.6,
+   "w": 25.24,
+   "d": 13.2,
+   "seed": "blk1_14",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.129,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "detail",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_15",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.125,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.143,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_17",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.05,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_18",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.219,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_19",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.147,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_20",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.043,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk1_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.112,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -245.14,
+   "z": 228.68,
+   "w": 25.24,
+   "d": 20.64,
+   "seed": "blk1_22",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.033,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.197,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -247.02,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk2_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.086,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_2",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.196,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.211,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -133.92,
+   "w": 25.24,
+   "d": 14.16,
+   "seed": "blk2_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.106,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_7",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.232,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": -93.48,
+   "w": 25.24,
+   "d": 16.96,
+   "seed": "blk2_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.22,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_13",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.049,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_14",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.101,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_15",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.227,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_16",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.024,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_17",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_18",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.178,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.128,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "mid",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -217.9,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk2_20",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.19,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L1_Beishahe": "far",
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_0",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -247.02,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk3_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.02,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_2",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.188,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -133.92,
+   "w": 25.24,
+   "d": 14.16,
+   "seed": "blk3_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.165,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.048,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": -93.48,
+   "w": 14.59,
+   "d": 16.96,
+   "seed": "blk3_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.116,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": 22.88,
+   "w": 14.59,
+   "d": 20.88,
+   "seed": "blk3_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.15,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": 45.76,
+   "w": 14.59,
+   "d": 20.88,
+   "seed": "blk3_14",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.122,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": 68.64,
+   "w": 14.59,
+   "d": 20.88,
+   "seed": "blk3_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.159,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": 91.52,
+   "w": 14.59,
+   "d": 20.88,
+   "seed": "blk3_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.155,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -195.99,
+   "z": 114.4,
+   "w": 14.59,
+   "d": 20.88,
+   "seed": "blk3_17",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.129,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_18",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.236,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.187,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_20",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": 253.06,
+   "w": 25.24,
+   "d": 18.12,
+   "seed": "blk3_23",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.041,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -190.67,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk3_24",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.142,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -280,
+   "w": 25.24,
+   "d": 10,
+   "seed": "blk4_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.087,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -226.68,
+   "w": 25.24,
+   "d": 16.64,
+   "seed": "blk4_2",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.042,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.153,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -162.9,
+   "z": -183.04,
+   "w": 24.19,
+   "d": 20.88,
+   "seed": "blk4_4",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 1.5708,
+   "damage": 0.225,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -163.75,
+   "z": -160.16,
+   "w": 22.5,
+   "d": 20.88,
+   "seed": "blk4_5",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.207,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -166,
+   "z": -137.28,
+   "w": 18,
+   "d": 20.88,
+   "seed": "blk4_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.104,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -166.52,
+   "z": -114.4,
+   "w": 19.05,
+   "d": 20.88,
+   "seed": "blk4_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.17,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_9",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.159,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_10",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.076,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_11",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.179,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_13",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.16,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_14",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.187,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_15",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.127,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 161.3,
+   "w": 25.24,
+   "d": 18.6,
+   "seed": "blk4_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.048,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_20",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.226,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 253.06,
+   "w": 25.24,
+   "d": 18.12,
+   "seed": "blk4_23",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.153,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -163.43,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk4_24",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.161,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -131.94,
+   "z": -280,
+   "w": 16.73,
+   "d": 10,
+   "seed": "blk5_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -132.15,
+   "z": -226.68,
+   "w": 16.3,
+   "d": 16.64,
+   "seed": "blk5_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.137,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -132.15,
+   "z": -205.92,
+   "w": 16.3,
+   "d": 20.88,
+   "seed": "blk5_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.092,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -131.94,
+   "z": -183.04,
+   "w": 16.73,
+   "d": 20.88,
+   "seed": "blk5_4",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": -1.5708,
+   "damage": 0.081,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -130.54,
+   "z": -160.16,
+   "w": 13.93,
+   "d": 20.88,
+   "seed": "blk5_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.128,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": -68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_9",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_10",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.216,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_11",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.064,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_13",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.205,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_14",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.224,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_15",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.165,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 161.3,
+   "w": 25.24,
+   "d": 18.6,
+   "seed": "blk5_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.186,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_20",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk5_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.096,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -140.9,
+   "z": 228.8,
+   "w": 15.81,
+   "d": 20.88,
+   "seed": "blk5_22",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.219,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -140.9,
+   "z": 251.68,
+   "w": 15.81,
+   "d": 20.88,
+   "seed": "blk5_23",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.183,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -136.19,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk5_24",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.062,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk6_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.136,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -256.56,
+   "w": 25.24,
+   "d": 11.12,
+   "seed": "blk6_1",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -202.24,
+   "w": 25.24,
+   "d": 13.52,
+   "seed": "blk6_3",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.137,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk6_4",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.138,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk6_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -105.67,
+   "z": -134.07,
+   "w": 18.67,
+   "d": 14.46,
+   "seed": "blk6_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.142,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -105.67,
+   "z": -114.4,
+   "w": 18.67,
+   "d": 20.88,
+   "seed": "blk6_7",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.122,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -115.29,
+   "z": -68.64,
+   "w": 12.57,
+   "d": 20.88,
+   "seed": "blk6_9",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.209,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -115.29,
+   "z": -45.76,
+   "w": 12.57,
+   "d": 20.88,
+   "seed": "blk6_10",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.177,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": -18.22,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk6_11",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": 20.22,
+   "w": 25.24,
+   "d": 15.56,
+   "seed": "blk6_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.132,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -103.67,
+   "z": 113.73,
+   "w": 14.67,
+   "d": 19.54,
+   "seed": "blk6_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.206,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": 161.3,
+   "w": 25.24,
+   "d": 18.6,
+   "seed": "blk6_19",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk6_20",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.201,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk6_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -108.95,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk6_24",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.069,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_0",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.152,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -86.52,
+   "z": -256.56,
+   "w": 15.63,
+   "d": 11.12,
+   "seed": "blk7_1",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -86.52,
+   "z": -202.24,
+   "w": 15.63,
+   "d": 13.52,
+   "seed": "blk7_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -86.52,
+   "z": -183.04,
+   "w": 15.63,
+   "d": 20.88,
+   "seed": "blk7_4",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -86.52,
+   "z": -160.16,
+   "w": 15.63,
+   "d": 20.88,
+   "seed": "blk7_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.202,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": -134.07,
+   "w": 25.24,
+   "d": 14.46,
+   "seed": "blk7_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.196,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "detail"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.22,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": -97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk7_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.191,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": -18.22,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk7_11",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.164,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 20.22,
+   "w": 25.24,
+   "d": 15.56,
+   "seed": "blk7_13",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.159,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk7_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_17",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.237,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_18",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_20",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk7_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.196,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -81.71,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk7_24",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.186,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk8_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -223.18,
+   "w": 25.24,
+   "d": 9.64,
+   "seed": "blk8_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.17,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_3",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.21,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -134.07,
+   "w": 25.24,
+   "d": 14.46,
+   "seed": "blk8_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_7",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.184,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk8_8",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.135,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": -18.22,
+   "w": 25.24,
+   "d": 11.56,
+   "seed": "blk8_11",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 20.22,
+   "w": 25.24,
+   "d": 15.56,
+   "seed": "blk8_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk8_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_18",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.123,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.119,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_20",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.221,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk8_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.151,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_22",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_23",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": -54.48,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk8_24",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk9_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -223.18,
+   "w": 25.24,
+   "d": 9.64,
+   "seed": "blk9_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.229,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_3",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.239,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -134.07,
+   "w": 25.24,
+   "d": 14.46,
+   "seed": "blk9_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.199,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_7",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.185,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": -97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk9_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": -27.93,
+   "z": -18.22,
+   "w": 23.86,
+   "d": 11.56,
+   "seed": "blk9_11",
+   "shop": true,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.93,
+   "z": 20.22,
+   "w": 23.86,
+   "d": 15.56,
+   "seed": "blk9_13",
+   "shop": true,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.223,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk9_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_17",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.227,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_18",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_20",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk9_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_22",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_23",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.219,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": -27.24,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk9_24",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": -278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk10_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.234,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": -223.18,
+   "w": 25.24,
+   "d": 9.64,
+   "seed": "blk10_2",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_3",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": -183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.189,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_5",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.158,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": 74.64,
+   "w": 25.24,
+   "d": 8.88,
+   "seed": "blk10_15",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.388,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk10_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.405,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_18",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_19",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_20",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk10_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 0,
+   "z": 228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_22",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.17,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": 251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_23",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": 0,
+   "z": 274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk10_24",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": -278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk11_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 31.93,
+   "z": -251.68,
+   "w": 15.86,
+   "d": 20.88,
+   "seed": "blk11_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 31.93,
+   "z": -228.8,
+   "w": 15.86,
+   "d": 20.88,
+   "seed": "blk11_2",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_3",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.382,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 20.81,
+   "z": -183.04,
+   "w": 12.38,
+   "d": 20.88,
+   "seed": "blk11_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.407,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 20.81,
+   "z": -160.16,
+   "w": 12.38,
+   "d": 20.88,
+   "seed": "blk11_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.398,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "mid"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": -137.15,
+   "w": 25.24,
+   "d": 8.3,
+   "seed": "blk11_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.221,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": -68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_9",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_10",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.93,
+   "z": -22.88,
+   "w": 23.86,
+   "d": 20.88,
+   "seed": "blk11_11",
+   "shop": true,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.93,
+   "z": 22.88,
+   "w": 23.86,
+   "d": 20.88,
+   "seed": "blk11_13",
+   "shop": true,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_14",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 74.64,
+   "w": 25.24,
+   "d": 8.88,
+   "seed": "blk11_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 97.83,
+   "w": 25.24,
+   "d": 8.26,
+   "seed": "blk11_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_17",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.407,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_18",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.405,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_19",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk11_20",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 200.89,
+   "w": 25.24,
+   "d": 10.82,
+   "seed": "blk11_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 27.24,
+   "z": 275,
+   "w": 25.24,
+   "d": 20,
+   "seed": "blk11_24",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.237,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_0",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.448,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_2",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_3",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.441,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -137.15,
+   "w": 25.24,
+   "d": 8.3,
+   "seed": "blk12_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.438,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 62.55,
+   "z": -114.4,
+   "w": 9.1,
+   "d": 20.88,
+   "seed": "blk12_7",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.433,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk12_9",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 61.65,
+   "z": -45.76,
+   "w": 10.9,
+   "d": 20.88,
+   "seed": "blk12_10",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 61.65,
+   "z": -22.88,
+   "w": 10.9,
+   "d": 20.88,
+   "seed": "blk12_11",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_13",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.453,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 54.48,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk12_14",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 74.64,
+   "w": 22.94,
+   "d": 8.88,
+   "seed": "blk12_15",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 97.83,
+   "w": 22.94,
+   "d": 8.26,
+   "seed": "blk12_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 114.4,
+   "w": 22.94,
+   "d": 20.88,
+   "seed": "blk12_17",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.449,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 137.28,
+   "w": 22.94,
+   "d": 20.88,
+   "seed": "blk12_18",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.459,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 160.16,
+   "w": 22.94,
+   "d": 20.88,
+   "seed": "blk12_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 183.04,
+   "w": 22.94,
+   "d": 20.88,
+   "seed": "blk12_20",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 200.89,
+   "w": 22.94,
+   "d": 10.82,
+   "seed": "blk12_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 53.33,
+   "z": 275,
+   "w": 22.94,
+   "d": 20,
+   "seed": "blk12_24",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.431,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.407,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.383,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 76.05,
+   "z": -228.8,
+   "w": 13.9,
+   "d": 20.88,
+   "seed": "blk13_2",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 76.05,
+   "z": -205.92,
+   "w": 13.9,
+   "d": 20.88,
+   "seed": "blk13_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.46,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 85.67,
+   "z": -183.04,
+   "w": 17.33,
+   "d": 20.88,
+   "seed": "blk13_4",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.488,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 85.67,
+   "z": -160.16,
+   "w": 17.33,
+   "d": 20.88,
+   "seed": "blk13_5",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.05,
+   "z": -134.07,
+   "w": 23.9,
+   "d": 14.46,
+   "seed": "blk13_6",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.442,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.05,
+   "z": -114.4,
+   "w": 23.9,
+   "d": 20.88,
+   "seed": "blk13_7",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.459,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.05,
+   "z": -91.52,
+   "w": 23.9,
+   "d": 20.88,
+   "seed": "blk13_8",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk13_9",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.475,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_10",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.451,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_11",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.67,
+   "z": 0,
+   "w": 19.33,
+   "d": 20.88,
+   "seed": "blk13_12",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_13",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 81.71,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk13_14",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.416,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 68.64,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_15",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": -1.5708,
+   "damage": 0.477,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 97.83,
+   "w": 19.13,
+   "d": 8.26,
+   "seed": "blk13_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.421,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 114.4,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_17",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.482,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 137.28,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_18",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.393,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 160.16,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_19",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 183.04,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_20",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": -1.5708,
+   "damage": 0.389,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 200.89,
+   "w": 19.13,
+   "d": 10.82,
+   "seed": "blk13_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.402,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 228.8,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_22",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.391,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 251.68,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_23",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.457,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 84.77,
+   "z": 274.56,
+   "w": 19.13,
+   "d": 20.88,
+   "seed": "blk13_24",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.432,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_1",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.393,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_4",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_5",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk14_9",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_10",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.442,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_11",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.463,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": 0,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_12",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_13",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_14",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.482,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk14_15",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.488,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 97.83,
+   "w": 17.97,
+   "d": 8.26,
+   "seed": "blk14_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 114.4,
+   "w": 17.97,
+   "d": 20.88,
+   "seed": "blk14_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.419,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 137.28,
+   "w": 17.97,
+   "d": 20.88,
+   "seed": "blk14_18",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 160.16,
+   "w": 17.97,
+   "d": 20.88,
+   "seed": "blk14_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 183.04,
+   "w": 17.97,
+   "d": 20.88,
+   "seed": "blk14_20",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 105.32,
+   "z": 200.89,
+   "w": 17.97,
+   "d": 10.82,
+   "seed": "blk14_21",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 108.95,
+   "z": 278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk14_24",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.426,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": -277,
+   "w": 25.24,
+   "d": 16,
+   "seed": "blk15_0",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.431,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.9,
+   "z": -224.68,
+   "w": 23.81,
+   "d": 12.64,
+   "seed": "blk15_2",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 130.5,
+   "z": -205.92,
+   "w": 11,
+   "d": 20.88,
+   "seed": "blk15_3",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.418,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 129.79,
+   "z": -183.04,
+   "w": 12.43,
+   "d": 20.88,
+   "seed": "blk15_4",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.388,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": -159.86,
+   "w": 25.24,
+   "d": 20.28,
+   "seed": "blk15_5",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.52,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk15_9",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.552,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": -45.76,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_10",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.419,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": -22.88,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_11",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 0,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_12",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.529,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 22.88,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.461,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 45.76,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_14",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 68.64,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.483,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 97.83,
+   "w": 22.73,
+   "d": 8.26,
+   "seed": "blk15_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.24,
+   "state": "intact",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 134.94,
+   "z": 114.4,
+   "w": 22.73,
+   "d": 20.88,
+   "seed": "blk15_17",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.483,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk15_18",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": 157.36,
+   "w": 25.24,
+   "d": 15.28,
+   "seed": "blk15_19",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 136.19,
+   "z": 278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk15_24",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": -277,
+   "w": 25.24,
+   "d": 16,
+   "seed": "blk16_0",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.413,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": -224.68,
+   "w": 25.24,
+   "d": 12.64,
+   "seed": "blk16_2",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.424,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": -159.86,
+   "w": 25.24,
+   "d": 20.28,
+   "seed": "blk16_5",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.586,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 169.52,
+   "z": -137.28,
+   "w": 13.05,
+   "d": 20.88,
+   "seed": "blk16_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.513,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 169.52,
+   "z": -114.4,
+   "w": 13.05,
+   "d": 20.88,
+   "seed": "blk16_7",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 169.52,
+   "z": -91.52,
+   "w": 13.05,
+   "d": 20.88,
+   "seed": "blk16_8",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.553,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk16_9",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": -45.76,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_10",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.464,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": -22.88,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_11",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": -1.5708,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 0,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_12",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.456,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 22.88,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_13",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.457,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 45.76,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_14",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 68.64,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.457,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 91.52,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.441,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 164.87,
+   "z": 114.4,
+   "w": 22.35,
+   "d": 20.88,
+   "seed": "blk16_17",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.568,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk16_18",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": 157.36,
+   "w": 25.24,
+   "d": 15.28,
+   "seed": "blk16_19",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.503,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 163.43,
+   "z": 278.5,
+   "w": 25.24,
+   "d": 13,
+   "seed": "blk16_24",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.43,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_0",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.498,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_1",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.585,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.429,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 195.64,
+   "z": -205.92,
+   "w": 15.29,
+   "d": 20.88,
+   "seed": "blk17_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.515,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 195.64,
+   "z": -183.04,
+   "w": 15.29,
+   "d": 20.88,
+   "seed": "blk17_4",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.513,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -159.86,
+   "w": 25.24,
+   "d": 20.28,
+   "seed": "blk17_5",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.391,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_6",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.557,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.589,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_8",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.425,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk17_9",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.606,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 190.67,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk17_10",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 3.1416,
+   "damage": 0.403,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.52,
+   "z": -22.88,
+   "w": 10.95,
+   "d": 20.88,
+   "seed": "blk17_11",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.433,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.52,
+   "z": 0,
+   "w": 10.95,
+   "d": 20.88,
+   "seed": "blk17_12",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.4,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.52,
+   "z": 22.88,
+   "w": 10.95,
+   "d": 20.88,
+   "seed": "blk17_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.613,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.52,
+   "z": 45.76,
+   "w": 10.95,
+   "d": 20.88,
+   "seed": "blk17_14",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.417,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 68.64,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.471,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 91.52,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.522,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 114.4,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_17",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.582,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 137.28,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_18",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.415,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 160.16,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.491,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 183.04,
+   "w": 10.25,
+   "d": 20.88,
+   "seed": "blk17_20",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.404,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 183.17,
+   "z": 200.89,
+   "w": 10.25,
+   "d": 10.82,
+   "seed": "blk17_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.38,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 193.64,
+   "z": 228.18,
+   "w": 19.29,
+   "d": 19.64,
+   "seed": "blk17_22",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.602,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 188,
+   "z": 251.68,
+   "w": 8,
+   "d": 20.88,
+   "seed": "blk17_23",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.459,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 188,
+   "z": 274.56,
+   "w": 8,
+   "d": 20.88,
+   "seed": "blk17_24",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.581,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_0",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.49,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_1",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.43,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.476,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_5",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.461,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_6",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.567,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_7",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.626,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_8",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.569,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk18_9",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.534,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_10",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.604,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.638,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.507,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_17",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.551,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_18",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.536,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_19",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.455,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_20",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.586,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk18_21",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.572,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 217.9,
+   "z": 228.18,
+   "w": 25.24,
+   "d": 19.64,
+   "seed": "blk18_22",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.496,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_0",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.607,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_2",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.548,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 250.38,
+   "z": -205.92,
+   "w": 14.76,
+   "d": 20.88,
+   "seed": "blk19_3",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.59,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 250.38,
+   "z": -183.04,
+   "w": 14.76,
+   "d": 20.88,
+   "seed": "blk19_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.5,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_5",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.668,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_6",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.621,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.605,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_8",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.573,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk19_9",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.569,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_10",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.488,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 252.38,
+   "z": -22.88,
+   "w": 10.76,
+   "d": 20.88,
+   "seed": "blk19_11",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.657,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 252.38,
+   "z": 0,
+   "w": 10.76,
+   "d": 20.88,
+   "seed": "blk19_12",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.476,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 252.38,
+   "z": 22.88,
+   "w": 10.76,
+   "d": 20.88,
+   "seed": "blk19_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.569,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 252.38,
+   "z": 45.76,
+   "w": 10.76,
+   "d": 20.88,
+   "seed": "blk19_14",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.639,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_15",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.54,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_16",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.535,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_17",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.646,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_18",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.481,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_19",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "far",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_20",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.509,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "far",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk19_21",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.591,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L4_Chengqiang": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 245.14,
+   "z": 228.18,
+   "w": 25.24,
+   "d": 19.64,
+   "seed": "blk19_22",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.644,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -274.56,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_0",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.623,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -251.68,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_1",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -228.8,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_2",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.534,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_3",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.512,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_4",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.639,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_5",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.606,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_6",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.539,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_7",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.543,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_8",
+   "shop": false,
+   "kind": "TwoEntry",
+   "ry": 0,
+   "damage": 0.62,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -74.89,
+   "w": 25.24,
+   "d": 8.38,
+   "seed": "blk20_9",
+   "shop": false,
+   "kind": "ShopRow",
+   "ry": 0,
+   "damage": 0.591,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_10",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.643,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": -22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_11",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.585,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 0,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_12",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 22.88,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_13",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.542,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "detail",
+    "L4_Chengqiang": "detail",
+    "L5_Shizijie": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 45.76,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_14",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.659,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 68.64,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_15",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "mid",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 91.52,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_16",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.627,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 114.4,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_17",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.516,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 137.28,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_18",
+   "shop": false,
+   "kind": "OneEntry",
+   "ry": 0,
+   "damage": 0.62,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "mid",
+    "L4_Chengqiang": "mid",
+    "L5_Shizijie": "far",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 160.16,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_19",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.651,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "far",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 183.04,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_20",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.588,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L3_Fanji": "far",
+    "L4_Chengqiang": "mid",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 205.92,
+   "w": 25.24,
+   "d": 20.88,
+   "seed": "blk20_21",
+   "shop": false,
+   "kind": "WellYard",
+   "ry": 0,
+   "damage": 0.509,
+   "state": "damaged",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L4_Chengqiang": "detail",
+    "L6_Beimen": "far"
+   }
+  },
+  {
+   "x": 272.38,
+   "z": 228.18,
+   "w": 25.24,
+   "d": 19.64,
+   "seed": "blk20_22",
+   "shop": false,
+   "kind": "AdobeYard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 276.5,
+   "z": 251.68,
+   "w": 17,
+   "d": 20.88,
+   "seed": "blk20_23",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.78,
+   "state": "collapsed",
+   "burnt": true,
+   "tiers": {
+    "L2_Dongguan": "far",
+    "L4_Chengqiang": "detail"
+   }
+  },
+  {
+   "x": 276.5,
+   "z": 274.56,
+   "w": 17,
+   "d": 20.88,
+   "seed": "blk20_24",
+   "shop": false,
+   "kind": "LCourtyard",
+   "ry": 0,
+   "damage": 0.647,
+   "state": "damaged",
+   "burnt": false,
+   "tiers": {
+    "L4_Chengqiang": "detail"
+   }
+  }
+ ]
+}
