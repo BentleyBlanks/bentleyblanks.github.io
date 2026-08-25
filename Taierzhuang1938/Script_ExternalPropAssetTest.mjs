@@ -42,17 +42,74 @@ function InspectNodes(fileName, maxBytes) {
   return { bytes: bytes.length, json, nodes: result };
 }
 
-function AssertTexturedMaterialsHaveNormals(json, label) {
+function ReadJpegSize(bytes, label) {
+  assert.deepEqual([...bytes.subarray(0, 3)], [0xff, 0xd8, 0xff], `${label}: JPEG header`);
+  const startOfFrame = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+  for (let offset = 2; offset + 8 < bytes.length;) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    offset += 2;
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const segmentLength = bytes.readUInt16BE(offset);
+    assert.ok(segmentLength >= 2 && offset + segmentLength <= bytes.length, `${label}: valid JPEG segment`);
+    if (startOfFrame.has(marker)) {
+      return { height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
+    }
+    offset += segmentLength;
+  }
+  assert.fail(`${label}: JPEG dimensions`);
+}
+
+function AssertTextureImage(json, textureInfo, label, glbFileName) {
+  const texture = json.textures?.[textureInfo?.index];
+  const image = json.images?.[texture?.source];
+  assert.ok(image, `${label}: texture image exists`);
+  if (image.bufferView != null) {
+    assert.match(image.mimeType ?? "", /^image\/(?:jpeg|png)$/, `${label}: embedded image MIME`);
+    return;
+  }
+  assert.match(image.uri ?? "", /^\.\.\/Texture\/Texture_[A-Za-z0-9_]+\.jpg$/, `${label}: local texture URI`);
+  const imagePath = path.resolve(root, "Model", image.uri);
+  assert.ok(imagePath.startsWith(path.join(root, "Texture") + path.sep), `${label}: texture stays in asset directory`);
+  const imageBytes = fs.readFileSync(imagePath);
+  assert.ok(imageBytes.length > 250_000 && imageBytes.length < 1_000_000, `${label}: useful compressed size`);
+  assert.deepEqual(ReadJpegSize(imageBytes, label), { width: 1024, height: 1024 }, `${label}: runtime dimensions`);
+  assert.equal(glbFileName, "Model_ChineseRuralHouse.glb", `${label}: external GLB images are intentionally scoped`);
+}
+
+function AssertTexturedMaterialsHaveNormals(json, label, glbFileName) {
   for (const material of json.materials ?? []) {
     if (material.pbrMetallicRoughness?.baseColorTexture == null) continue;
     assert.ok(material.normalTexture, `${label} material ${material.name} keeps a tangent-space normal texture`);
-    const texture = json.textures?.[material.normalTexture.index];
-    const image = json.images?.[texture?.source];
-    assert.ok(image?.bufferView != null, `${label} material ${material.name} embeds its normal image`);
-    assert.match(image.mimeType ?? "", /^image\/(?:jpeg|png)$/, `${label} material ${material.name} normal MIME`);
-    assert.ok(material.normalTexture.scale > 0 && material.normalTexture.scale <= 1,
+    AssertTextureImage(json, material.pbrMetallicRoughness.baseColorTexture,
+      `${label} material ${material.name} BaseColor`, glbFileName);
+    AssertTextureImage(json, material.normalTexture,
+      `${label} material ${material.name} Normal`, glbFileName);
+    const normalScale = material.normalTexture.scale ?? 1;
+    assert.ok(normalScale > 0 && normalScale <= 1,
       `${label} material ${material.name} uses restrained normal strength`);
   }
+}
+
+function AssertAllUsedMaterialsHavePbrMaps(json, label, expectedCount, glbFileName) {
+  const usedMaterials = new Set();
+  for (const mesh of json.meshes ?? []) {
+    for (const primitive of mesh.primitives ?? []) {
+      if (primitive.material != null) usedMaterials.add(primitive.material);
+    }
+  }
+  assert.equal(usedMaterials.size, expectedCount, `${label} used material count`);
+  for (const materialIndex of usedMaterials) {
+    const material = json.materials?.[materialIndex];
+    assert.ok(material?.pbrMetallicRoughness?.baseColorTexture,
+      `${label} used material ${materialIndex} ${material?.name} has BaseColor`);
+    assert.ok(material?.normalTexture,
+      `${label} used material ${materialIndex} ${material?.name} has Normal`);
+  }
+  AssertTexturedMaterialsHaveNormals(json, label, glbFileName);
 }
 
 const crates = InspectNodes("Model_MilitaryCrateSet.glb");
@@ -90,14 +147,23 @@ assert.ok(courtyardSpec.maxSpan > 11 && courtyardSpec.maxSpan < 12, "courtyard s
 
 const battlefield = InspectNodes("Model_BattlefieldPack.glb", 4_100_000);
 assert.equal(battlefield.nodes.size, 24, "all 24 battlefield components are independent nodes");
-AssertTexturedMaterialsHaveNormals(battlefield.json, "battlefield pack");
+AssertTexturedMaterialsHaveNormals(battlefield.json, "battlefield pack", "Model_BattlefieldPack.glb");
 for (const [name, spec] of battlefield.nodes) {
   assert.ok(spec.triangles <= 3500, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
 
 const ruralHouse = ReadGlb("Model_ChineseRuralHouse.glb", 5_500_000);
-AssertTexturedMaterialsHaveNormals(ruralHouse.json, "Chinese rural house");
+AssertAllUsedMaterialsHavePbrMaps(ruralHouse.json, "Chinese rural house", 11, "Model_ChineseRuralHouse.glb");
+
+for (const [fileName, label, materialCount, maxBytes] of [
+  ["Model_AsianHouseRow.glb", "Asian house row", 6, 4_800_000],
+  ["Model_AsianHousePair.glb", "Asian house pair", 4, 4_600_000],
+  ["Model_Sandbag.glb", "sandbag", 1, 4_400_000],
+]) {
+  const originalMaterialModel = ReadGlb(fileName, maxBytes);
+  AssertAllUsedMaterialsHavePbrMaps(originalMaterialModel.json, label, materialCount, fileName);
+}
 
 const breach = InspectNodes("Model_CityWallBreachPack.glb", 900_000);
 for (const name of ["CityWallBreachShoulderLeft", "CityWallBreachShoulderRight"]) {
