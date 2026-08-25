@@ -2918,13 +2918,24 @@ export class ActorFactory {
     return this;
   }
 
-  /** 同步克隆已经预读好的人物显示层；Actor 创建链保持同步。 */
+  /**
+   * 同步克隆已经预读好的人物显示层；Actor 创建链保持同步。
+   *
+   * ★ **士兵（nra* / ija*）不走这条路**。SegmentedCharacterSkin 把 13 个刚体分段
+   * 原样挂到关节上，分段之间没有交叠余量，也没有 HealBucket 那一层修补：
+   * 肩、肘、腕、胯、膝、踝一转就开缝，手掌与小腿整段飘在空中。而 NRA 那个
+   * GLB 本身还是个人偶——躯干是一张立着的薄板、没有脖子、没有肩、脚是两团
+   * 光脚趾（见 Model/Texture_NraSoldierRefined*QA.png）。程序化 tzm 模型
+   * （Model/SoldierNra.tzm.json、SoldierIja.tzm.json）是照这套 13 关节骨架
+   * 建的，关节自带交叠、有绑腿有布鞋有立领，才是这两种兵该显示的样子。
+   * 顺带一提：日军因为 Script_RiggedModel 里一处 HashString 未导入，长期是
+   * 抛错退回 tzm 的——线上看着正常的那批日本兵，走的就是现在这条路。
+   * 百姓没有 tzm 模型，仍旧用 GLB。
+   */
   CreateRiggedSkin(actor) {
     if (!actor || !this.riggedAssets) return null;
     let asset = null;
-    if (actor.kind.startsWith("ija")) asset = this.riggedAssets.ijaSoldier;
-    else if (actor.kind.startsWith("nra")) asset = this.riggedAssets.nraSoldier;
-    else if (actor.kind === "civilian") {
+    if (actor.kind === "civilian") {
       asset = (HashString(actor.seed) & 1) === 0
         ? this.riggedAssets.civilianMale : this.riggedAssets.civilianFemale;
     }

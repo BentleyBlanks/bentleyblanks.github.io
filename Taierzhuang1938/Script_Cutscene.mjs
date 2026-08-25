@@ -45,7 +45,7 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
-import { SampleJieheHeight } from "./Script_JieheHeight.mjs";
+import { FarLandY, ReliefHeight, FarmlandTint } from "./Script_FarLand.mjs";
 
 // 过场里的少量静态模型（例如出川的小站）走独立 loader：它们只是演出布景，
 // 不进碰撞、导航或战场的确定性数据。
@@ -63,8 +63,12 @@ const TILE_BY_RECIPE = {
 };
 
 /**
- * 车厢外的远景地面：顶点直接取项目已下载并校验过的 SRTM 高程采样。
+ * 车厢外的远景地面：顶点直接取项目已下载并校验过的 SRTM 高程采样，再叠一层
+ * `terrain.relief`（缓坡＋山脊＋山头，见 Script_FarLand）。
  * 这不是图片、不是竖直遮挡板；从任意车窗角度看都是真实水平地形和自然天际线。
+ *
+ * `terrain.farmland` 给了就顺带烘一条顶点色：远处平原被切成一块块颜色不同的
+ * 农田。它是**顶点色**不是新几何 —— 一张网格、一次 draw call，而且天生贴地。
  */
 function BuildHeightTerrainGeometry(terrain) {
   const side = terrain.side < 0 ? -1 : 1;
@@ -74,30 +78,36 @@ function BuildHeightTerrainGeometry(terrain) {
   const far = Math.max(near + 1, Number(terrain.far) || 100);
   const minZ = Number(terrain.minZ) || -80;
   const maxZ = Number(terrain.maxZ) || 80;
-  const [sourceMinX, sourceMaxX, sourceMinZ, sourceMaxZ] = terrain.sourceBounds || [-1250, 1250, -2200, -380];
-  const [referenceX, referenceZ] = terrain.sourceReference || [0, -1470];
-  const referenceY = SampleJieheHeight(referenceX, referenceZ);
-  const baseY = Number(terrain.baseY) || 0;
   const count = columns * rows;
   const positions = new Float32Array(count * 3);
   const uvs = new Float32Array(count * 2);
+  const colors = terrain.farmland ? new Float32Array(count * 3) : null;
+  const tint = [1, 1, 1];
   for (let col = 0; col < columns; col += 1) {
     const u = col / (columns - 1);
     const localX = side * (near + (far - near) * u);
-    const sampleX = sourceMinX + (sourceMaxX - sourceMinX) * u;
     for (let row = 0; row < rows; row += 1) {
       const v = row / (rows - 1);
       const index = col * rows + row;
       const localZ = minZ + (maxZ - minZ) * v;
-      const sampleZ = sourceMinZ + (sourceMaxZ - sourceMinZ) * v;
       positions[index * 3] = localX;
-      positions[index * 3 + 1] = baseY + SampleJieheHeight(sampleX, sampleZ) - referenceY;
+      positions[index * 3 + 1] = FarLandY(localX, localZ, terrain);
       positions[index * 3 + 2] = localZ;
       uvs[index * 2] = localX / TILE_METERS.ground;
       uvs[index * 2 + 1] = localZ / TILE_METERS.ground;
+      if (colors) {
+        FarmlandTint(localX, localZ, terrain.farmland, ReliefHeight(localX, localZ, terrain.relief), tint);
+        colors[index * 3] = tint[0];
+        colors[index * 3 + 1] = tint[1];
+        colors[index * 3 + 2] = tint[2];
+      }
     }
   }
-  const indices = new Uint16Array((columns - 1) * (rows - 1) * 6);
+  // 顶点数过了 65535 就得换 32 位索引 —— 继续用 Uint16 不会报错，只会把远处的
+  // 三角形接到近处的顶点上，整张网格拧成一团（远景网格现在是 102×142=14484，
+  // 离这条线还远，但列/行数是数据侧随手就能调大的）。
+  const IndexArray = columns * rows > 65535 ? Uint32Array : Uint16Array;
+  const indices = new IndexArray((columns - 1) * (rows - 1) * 6);
   let cursor = 0;
   for (let col = 0; col < columns - 1; col += 1) {
     for (let row = 0; row < rows - 1; row += 1) {
@@ -115,6 +125,7 @@ function BuildHeightTerrainGeometry(terrain) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  if (colors) geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeVertexNormals();
   return geometry;
@@ -946,6 +957,20 @@ export class CutsceneDirector {
       if (spec.inside) base.side = THREE.BackSide;
       material = base;
       this.ownedMaterials.push(base);
+    }
+    if (geometry.getAttribute && geometry.getAttribute("color") && !material.vertexColors) {
+      // 农田马赛克烘在顶点色里。库里的材质是**共享**的，直接开 vertexColors
+      // 会让全场每一块用同一配方的地都去读一条不存在的 color 属性（渲染成纯黑）。
+      const tinted = material.clone();
+      // Material.copy() 不带 onBeforeCompile / customProgramCacheKey —— 它们是
+      // MaterialLibrary 用 InjectIndirectLighting 挂上去的实例属性。不手动搬过来，
+      // 这一大片地就是全场唯一吃不到 SSAO/GI 的面，明暗跟旁边的道具对不上。
+      tinted.onBeforeCompile = material.onBeforeCompile;
+      tinted.customProgramCacheKey = material.customProgramCacheKey;
+      tinted.vertexColors = true;
+      tinted.needsUpdate = true;
+      material = tinted;
+      this.ownedMaterials.push(tinted);
     }
     const mesh = new THREE.Mesh(geometry, material);
     // 自发光只是**让自己亮**，照不亮旁边的东西（没有 GI）。

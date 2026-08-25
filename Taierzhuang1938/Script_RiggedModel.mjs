@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { CCDIKSolver } from "./vendor/three/examples/jsm/animation/CCDIKSolver.js";
+import { HashString } from "./Script_Noise.mjs";
 
 const URLS = Object.freeze({
   fpsArms: "./Model/Model_FpsArms.glb?v=1",
@@ -285,7 +286,15 @@ function ActorPbrMaterial(actor, sourceMaterial, segmentName = "") {
   return materials.uniform || sourceMaterial;
 }
 
-/** Downloaded character mesh driven by the game's authoritative 13-joint rig. */
+/**
+ * Downloaded character mesh driven by the game's authoritative 13-joint rig.
+ *
+ * ★ **士兵（nra* / ija*）已经不走这条路了**，只剩百姓在用。原因是这套分段是
+ *   「把 13 块刚体原样挂到关节上」，块与块之间没有交叠余量，也没有 tzm 那条
+ *   HealBucket 修补：肩、肘、腕、胯、膝、踝一转就开缝，手掌与小腿整段飘在
+ *   空中。切换点在 ActorFactory.CreateRiggedSkin（Script_Actor.mjs），那里
+ *   写着完整的取舍理由。百姓没有 tzm 模型，所以仍旧用它。
+ */
 export class SegmentedCharacterSkin {
   constructor(gltf, actor) {
     this.actor = actor;

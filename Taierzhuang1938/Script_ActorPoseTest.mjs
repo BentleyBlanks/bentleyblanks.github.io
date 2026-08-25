@@ -54,16 +54,24 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
-    // 修复后的 Blender 资产提供全身 13 个刚体分段：四肢在肩/肘/胯/膝/踝处
-    // 有意重叠，并自带完整的手与草鞋。运行时应整套保留（旧程序化四肢链只作
-    // 缺分段时的回退），缺任何一段都会静默露出断肢或隐形肢体。
-    check(actor.meshSource === "rigged" && actor.riggedSkin?.segmentMode,
-      "NRA rigged segment skin is not active");
-    const segmentKeys = new Set(actor.riggedSkin.segmentMeshes
-      .filter((item) => item.visible).map((item) => item.name.split("_")[1]));
-    for (const key of ["hips", "chest", "neck", "armL", "foreL", "armR", "foreR",
-      "thighL", "shinL", "footL", "thighR", "shinR", "footR"]) {
-      check(segmentKeys.has(key), `rigged segment ${key} is missing or hidden`);
+    // 士兵一律用程序化 tzm 模型（Model/SoldierNra.tzm.json），**不许**再退回
+    // Model_NraSoldier.glb 那套 13 个刚体分段：那套分段之间没有交叠余量，
+    // 肩/肘/腕/胯/膝/踝一转就开缝，手掌与小腿整段飘在空中，躯干还是一张薄板。
+    // 判据写成「meshSource 是 model 且 13 根骨头下面都挂着可见几何」——
+    // 换回 GLB 皮会把这些几何整片藏起来，这一条立刻红。
+    check(actor.meshSource === "model" && !actor.riggedSkin,
+      `NRA should use the procedural tzm model, got ${actor.meshSource}`);
+    const jointNodes = {
+      hips: actor.hips, chest: actor.chest, neck: actor.neck,
+      armL: actor.arms.L.shoulder, foreL: actor.arms.L.elbow,
+      armR: actor.arms.R.shoulder, foreR: actor.arms.R.elbow,
+      thighL: actor.legs.L.thigh, shinL: actor.legs.L.knee, footL: actor.legs.L.ankle,
+      thighR: actor.legs.R.thigh, shinR: actor.legs.R.knee, footR: actor.legs.R.ankle,
+    };
+    for (const [key, node] of Object.entries(jointNodes)) {
+      let visible = 0;
+      for (const child of node.children) if (child.isMesh && child.visible) visible += 1;
+      check(visible > 0, `joint ${key} has no visible geometry`);
     }
     const footOffset = (leg, mountName) => {
       const segment = leg.ankle;
@@ -159,7 +167,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     for (const item of [actor, armed, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "6 states × 3 levels, 13 rigged segments, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
+    return "6 states × 3 levels, tzm 模型 13 关节几何, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

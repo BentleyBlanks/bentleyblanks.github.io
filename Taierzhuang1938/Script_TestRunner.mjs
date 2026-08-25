@@ -39,8 +39,9 @@ const playTestExpectedFailures = [
   "头六十秒全场开火 > 200",
   // 姿态这条在纯 master 上红、合并树上绿 —— 判定抖动，先留在基线里。
   "姿态决定被发现的距离：60 m 上站着的看得见、趴着的看不见，30 m 上趴着的照样看得见",
-  "场上的人用的是 Blender 模型，不是退回的方块",
-  "单人 draw call 在预算内（≤26）",
+  // 「场上的人用的是 Blender 模型，不是退回的方块」与「单人 draw call 在预算内（≤26）」
+  // 2026-08-25 转绿，已从基线摘除：士兵从 GLB 分段皮换回程序化 tzm 模型之后
+  // meshSource 就是 model，逐人的网格数也回到预算里（见 docs/Data_CutsceneRedo.md §1.10 B）。
   "Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
 ];
 
@@ -75,6 +76,8 @@ export const testDefs = {
   AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "开镜视野：五支枪的瞄准点不许被枪身糊住" },
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
+  // 一直躺在仓库里没登记（TestRunnerTest 的「登记完整性」为此常红）。
+  DressingProbeTest: { file: "Script_DressingProbeTest.mjs", timeoutMs: 12 * 60 * 1000, desc: "七关布设外部构件的重叠/浮空探针（真浏览器）" },
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
@@ -142,7 +145,7 @@ export const domains = {
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest"],
+    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {

@@ -1,6 +1,9 @@
 // 《滕县 1938》过场分镜 —— 出川（开场）（CS_Chuchuan）。
 //
-// **纯数据，不许 import three**。被 Data_TengxianScript.mjs 汇总进 CUTSCENES，
+// **纯数据，不许 import three**。（Script_FarLand / Script_Noise 是纯算术模块，
+// 不碰 three；引进来是为了让村舍、树行与地形网格问同一个高度函数 ——
+// 以前这里手抄了一张 5×9 的高度表，地形一动那张表就悄悄过期。）
+// 被 Data_TengxianScript.mjs 汇总进 CUTSCENES，
 // Script_Cutscene.mjs 是唯一消费者；字段说明见 Data_TengxianScript.mjs「过场」一节
 // 与 docs/Data_CutsceneRedo.md（§1 引擎契约、§2.1 本场施工单）。
 //
@@ -28,6 +31,9 @@
 //   · [minor] 日期卡改「滕县以北 界河」，交代界河在哪、为什么没进城先在界河打。
 //   · 总长 46.4 → 42.0 s：黑卡与实景逐镜压到字幕可读下限之上（0.22×字＋1.2 全满足），
 //     被压掉的从句（打通津浦路／第十师团／几经转调／无钢盔）一句不丢，全在 skipCard。
+
+import { FarGridY } from "./Script_FarLand.mjs";
+import { Mulberry32, HashString } from "./Script_Noise.mjs";
 
 // ---------------------------------------------------------------------------
 // 布景基准（全部推定，登记在 presumed）
@@ -1274,19 +1280,137 @@ function CarriageRouteWires(side, label) {
     mat: "Steel", color: 0x282522, noFog: true, name: `RouteWire${label}${wire}`,
   }));
 }
+// ---------------------------------------------------------------------------
+// 远景大地 —— 一张网格铺到 2.9 km，起伏、农田与村庄都长在它上面
+// ---------------------------------------------------------------------------
+//
+// ★ 为什么要重做：上一版这张网格只有真实 SRTM 高程。鲁南这一带是黄泛平原，
+//   2.5 km 内总落差不到 8 m —— 采出来的天际线就是一条直线，再被 0.0068 的雾
+//   在 250 m 外压成 80%，窗外与门外剩下的就是**一块灰白板子**。用户原话
+//   「我要的是真实的远景」「起伏的地形你要做出来」「加出来各种远处的村庄、农田」。
+//
+// ★ 三件事一起改，缺一件都还是板子：
+//   1. **起伏**（CHUCHUAN_RELIEF）：真 DEM 打底，再叠缓坡 + 四道山脊 + 山头。
+//      **离铁路 130 m 以内恒等于 0**，所以月台、门外田块、土路那一片一厘米没动。
+//   2. **农田**（CHUCHUAN_FARMLAND）：150—1500 m 的平原按地块上顶点色，
+//      返青冬麦／麦茬／翻耕黑土一块块分开；山坡上自动退回自然地色。
+//   3. **村庄**（FarCountryside）：十个真几何村落 + 树行，全部按 FarGridY 落在
+//      **画出来的那张网格**上（不是连续函数：网格列距 29 m，两者差得出半米）。
+//   雾也必须跟着松（Script_Sky 的 chuchuanDay），否则前两条全被白掉。
+//
+// ★ 网格范围从 x 2500 → 2901.66、z ±910 → ±1807.18。两个数都是
+//   **照旧的格距整数倍**（列距 28.6897、行距 25.6338）加出来的 ——
+//   旧的每一个格点仍然落在新网格上，近景带的地面高度逐点不变。
+//   sourceBounds 跟着改成同样的 1:1 偏移映射（sampleX = |x| − 1254、
+//   sampleZ = z − 1290），DEM 采的还是原来那一片。
+
+/** 起伏：缓坡 + 山脊 + 山头。x 有符号（负 = 左窗外的西侧），单位米。 */
+const CHUCHUAN_RELIEF = {
+  // 车厢 140 m 以内一律 0：门外那片田、土路、柴垛离车厢最远 116.9 m（实测），
+  // 全部落在这条线以内，落地高度一厘米不动。
+  fadeIn: [140, 320],
+  // 路基走廊：离铁路 30 m 以内不起伏、130 m 才吃满。路基、电线杆、护路桩与
+  // 中景村舍是沿 z 铺到 −742 m 的**定高**道具，脚下的地一鼓就把它们埋了。
+  corridor: [30, 130],
+  // 缓坡：四层正交波。**中距那一层（λ≈265 m、amp 5）是关键**：
+  // 眼高只有 1.9 m 的时候，两百米外的平地在画面上压成二十来个像素的一条带，
+  // 农田色差再大也读不出来。只有把地皮鼓起来、把坡面转向观众，那块地才有
+  // 面积可看。波长不许低于 150 m —— 网格列距 28.7 m，再短就只剩五个采样点，
+  // 地形会抖成锯齿。
+  rolls: [
+    { amp: 3.4, lx: 1020, lz: 760, phase: 0.55 },
+    { amp: 5.0, lx: 265, lz: 205, phase: 1.15 },
+    { amp: 1.9, lx: 430, lz: 330, phase: 2.35 },
+    { amp: 1.1, lx: 186, lz: 152, phase: 4.60 },
+  ],
+  // 四道大致平行于铁路的山脊，越远越高：西边（左窗）与东边（月台外）各一套，
+  // 数值不对称 —— DEM 按 |x| 采样天生左右镜像，全靠这一层把两侧分开
+  ridges: [
+    { from: [-330, -1900], to: [-430, 1900], width: 210, height: 6.5, rough: 0.5, seed: 11 },
+    { from: [-780, -1900], to: [-1010, 1900], width: 300, height: 19, seed: 23 },
+    { from: [-1520, -1900], to: [-1760, 1900], width: 380, height: 40, seed: 37 },
+    { from: [-2250, -1900], to: [-2600, 1900], width: 640, height: 100, rough: 0.42, seed: 41 },
+    { from: [420, -1900], to: [520, 1900], width: 200, height: 7.0, rough: 0.5, seed: 53 },
+    { from: [900, -1900], to: [1120, 1900], width: 320, height: 24, seed: 67 },
+    { from: [1600, -1900], to: [1850, 1900], width: 400, height: 50, seed: 71 },
+    { from: [2300, -1900], to: [2650, 1900], width: 660, height: 108, rough: 0.42, seed: 83 },
+  ],
+  // 山头：把上面那几条线打断成一座座山，否则天际线是四条等高的长堤
+  peaks: [
+    { at: [-1600, -720], radius: 330, height: 26 },
+    { at: [-1700, 480], radius: 300, height: 18 },
+    { at: [-2320, -1100], radius: 420, height: 44 },
+    { at: [-2450, 260], radius: 480, height: 58 },
+    { at: [-2380, 1200], radius: 400, height: 32 },
+    { at: [1660, -980], radius: 340, height: 30 },
+    { at: [1760, 300], radius: 320, height: 23 },
+    { at: [1700, 1150], radius: 300, height: 19 },
+    { at: [2380, -600], radius: 520, height: 62 },
+    { at: [2500, 700], radius: 480, height: 50 },
+    { at: [2330, 1500], radius: 420, height: 36 },
+  ],
+};
+
 /**
- * 车窗外：远景是真实 SRTM 高程采样生成的实体网格，绝不使用天空／山脉图片贴片；
- * 中景是村屋与树带，近景是电杆、秃杨、土堤。只有近、中景随列车掠过。
+ * 农田马赛克（顶点色，乘在 Ground 贴图上）。色阶要真的拉得开：上一轮门外那组
+ * 田块全挤在 0x8d—0xa7 之间，隔着雾根本分不出块（见 DoorOutsideField 的注）。
+ */
+const CHUCHUAN_FARMLAND = {
+  // from 60（**到车厢的直线距离**，不是 |x|）：顶点色不动几何，门外那批手摆的
+  // 田块盒子是压在它上面的，所以马赛克可以一直铺到脚底下 —— 上一版从 125 起，
+  // 结果画面里离得最近、占面积最大的那一片反而是没有地块的素土。
+  // corridor：道砟与路基那 10—40 m 一条不种地。
+  from: 60, to: 1600, blend: 60, strength: 1.0, grain: 0.14, corridor: [10, 40],
+  angle: 0.24, cellX: 104, cellZ: 152, jitter: 0.34, seed: 19380314,
+  // hillFrom 16：庄稼是种到低丘上去的。5 m 就换成山坡色的话，中距那几道
+  // 五到十米的鼓包全变成灰绿的荒坡，农田刚好被剥在看得最清楚的那一段。
+  hillFrom: 16, hillTo: 45, hillCell: 210, hillStrength: 1.0,
+  // 色阶必须拉到接近 3:1。三四百米外已经吃掉三四成雾，1.9:1 的色差落到画面上
+  // 只剩十来级灰阶 —— 实测那一版远处平原是一整片均匀的 110 灰。
+  // 色相也要拉开，不只是明度。用极端色（红/蓝/绿）做过一次对照实拍：顶点色这条
+  // 通路是通的，地块边界也确实铺满了半个画面 —— 那一版看着是「一片米黄沙丘」，
+  // 纯粹是因为七个色号的色度差不到一档，落到 26% 去饱和的雾里就只剩明度差。
+  palette: [
+    [0.36, 0.60, 0.24],   // 返青的冬麦（最绿）
+    [1.20, 1.02, 0.66],   // 去年的麦茬（最亮）
+    [0.40, 0.30, 0.22],   // 刚翻过的黑土（最暗）
+    [0.96, 0.76, 0.46],   // 休耕的黄土
+    [0.44, 0.66, 0.30],   // 另一茬冬麦
+    [1.05, 0.96, 0.72],   // 打过场的白地
+    [0.48, 0.36, 0.26],   // 刚耙过的湿土
+  ],
+  // 山坡：灰绿的灌木与荒草，压得比平原暗 —— 山是靠比平原暗才从雾里立起来的
+  hillPalette: [
+    [0.46, 0.50, 0.38],
+    [0.37, 0.42, 0.33],
+    [0.55, 0.55, 0.43],
+    [0.31, 0.35, 0.30],
+  ],
+};
+
+/** 两侧共用的地形规格（side 由各自的道具补上）。落地查询也问它。 */
+const CHUCHUAN_TERRAIN = {
+  near: 4.0, far: 2901.66, minZ: -1807.18, maxZ: 1807.18, columns: 102, rows: 142,
+  sourceBounds: [-1250, 1647.66, -3097.18, 517.18], sourceReference: [0, -1470], baseY: 0,
+  relief: CHUCHUAN_RELIEF, farmland: CHUCHUAN_FARMLAND,
+};
+
+/**
+ * 车窗外：远景是真实 SRTM 高程采样 + 起伏叠加生成的实体网格，绝不使用天空／
+ * 山脉图片贴片；中景是村屋与树带，近景是电杆、秃杨、土堤。只有近、中景随列车掠过。
  */
 function WindowLandscape(side, label) {
   const midX = side * 13.5;
   const nearX = side * 4.35;
   return [
-    // 最远层是真实 SRTM 高程网格：保留米制横纵比例，不放任何山景图片贴片。
-    { kind: "heightTerrain", pos: [0, 0, 0], mat: "Ground", castShadow: false, name: `FarTerrain${label}`, terrain: {
-      side, near: 4.0, far: 2500.0, minZ: -910.0, maxZ: 910.0, columns: 88, rows: 72,
-      sourceBounds: [-1250, 1250, -2200, -380], sourceReference: [0, -1470], baseY: 0,
-    } },
+    // 最远层是真实高程网格 + 起伏 + 农田顶点色：不放任何山景图片贴片。
+    // ★ color 不许留空。库里的 Ground 在 1.0 白 tint 下、被 56° 太阳正照的水平面上
+    //   渲成近白：雾一松，从月台望出去整片平原是一块过曝的白纸，农田顶点色的
+    //   色差全被压没（同一张贴图，道砟给的是 0x574f45、门外田块给的是
+    //   0x5f—0xc4，这一片却一直是 0xffffff）。0x9d9581 把它压回门外那批田块的
+    //   同一档，农田马赛克与村舍的明暗这才读得出来。
+    { kind: "heightTerrain", pos: [0, 0, 0], mat: "Ground", color: 0x9d9581, castShadow: false,
+      name: `FarTerrain${label}`, terrain: { ...CHUCHUAN_TERRAIN, side } },
     // 中景：整段行程里的村屋、院墙和树带，不用两个模型环形回卷。
     ...CHUCHUAN_MID_SCENERY_Z.flatMap((z, index) => {
       const x = side * (12.4 + (index % 3) * 1.55);
@@ -1376,42 +1500,21 @@ function WindowLandscapeMotion(side, label) {
 //   x 10.4—17 这一条正好被月台外沿挡住。所以新静景一律从 x≥17.5 起摆 ——
 //   顺带也就完全避开了行车段窗外的运动层（MidHouse/MidWall 停在 x 12.0—15.5）。
 //
-// ★ **地面不是平的**。FarTerrainRight 是 88×72 的粗网格（列距 28.69 m、行距
+// ★ **地面不是平的**。FarTerrainRight 是 102×142 的粗网格（列距 28.69 m、行距
 //   25.63 m），渲染出来的地面就是这些顶点之间的线性插值，而且从铁路一侧一路
 //   往下掉：(x=4,z=13) 处 −1.23，到 x=61 已经是 −6.57。把村舍按 y=0 摆下去
-//   会整片浮在半空。CHUCHUAN_FIELD_H 就是那片网格的顶点高度（列 0—4 × 行 33—41），
-//   FieldY 双线性插值，门外每一件道具都按它落地。
-//   **地形一改这张表要重采**：按 BuildHeightTerrainGeometry 的映射
-//   （sampleX = −1250 + 2500·(x−4)/2496、sampleZ = z − 1290）跑 SampleJieheHeight，
-//   再减去 SampleJieheHeight(0, −1470)。
-const CHUCHUAN_FIELD_COL_X = [4.00, 32.69, 61.38, 90.07, 118.76];
-const CHUCHUAN_FIELD_ROW_Z = [-64.08, -38.45, -12.82, 12.82, 38.45, 64.08, 89.72, 115.35, 140.99];
-const CHUCHUAN_FIELD_H = [
-  [-2.452, -4.894, -7.510, -7.996, -7.692],
-  [-2.011, -3.482, -6.591, -7.933, -7.692],
-  [-1.635, -3.454, -6.574, -7.100, -6.952],
-  [-1.230, -3.305, -6.574, -7.000, -6.067],
-  [-1.623, -3.471, -5.676, -6.864, -4.827],
-  [-2.452, -3.458, -4.215, -5.427, -3.656],
-  [-3.186, -3.049, -2.866, -2.853, -2.989],
-  [-3.949, -3.222, -2.146, -2.083, -2.954],
-  [-3.138, -3.019, -2.146, -2.083, -2.954],
-];
+//   会整片浮在半空。
+//
+//   这里原来手抄了一张 5×9 的高度表（CHUCHUAN_FIELD_H，列 0—4 × 行 33—41），
+//   还附了一段「地形一改这张表要重采」的说明 —— 也就是说，那张表迟早会悄悄
+//   过期，而过期的症状是整片道具浮空，肉眼很难在出图里一眼抓到。现在直接问
+//   Script_FarLand 的 FarGridY：它按同一套格点做同一套双线性，**在旧表覆盖的
+//   那一片逐点等于旧表**（已验证，最大差 1 mm），出了表格范围还能继续用，
+//   远景村庄因此可以复用下面全部 Field* 生成器。
 
-/** 门外那片真地面在 (x,z) 处的高度（双线性，超出表格就夹到边界）。 */
+/** 门外那片真地面在 (x,z) 处的高度 —— 就是**画出来的那张网格**的高度。 */
 function FieldY(x, z) {
-  const Axis = (list, v) => {
-    if (v <= list[0]) return [0, 0];
-    if (v >= list[list.length - 1]) return [list.length - 2, 1];
-    let i = 0;
-    while (i < list.length - 2 && v > list[i + 1]) i += 1;
-    return [i, (v - list[i]) / (list[i + 1] - list[i])];
-  };
-  const [ci, cf] = Axis(CHUCHUAN_FIELD_COL_X, x);
-  const [ri, rf] = Axis(CHUCHUAN_FIELD_ROW_Z, z);
-  const near = CHUCHUAN_FIELD_H[ri][ci] * (1 - cf) + CHUCHUAN_FIELD_H[ri][ci + 1] * cf;
-  const far = CHUCHUAN_FIELD_H[ri + 1][ci] * (1 - cf) + CHUCHUAN_FIELD_H[ri + 1][ci + 1] * cf;
-  return near * (1 - rf) + far * rf;
+  return FarGridY(x, z, CHUCHUAN_TERRAIN);
 }
 
 /**
@@ -1463,7 +1566,10 @@ function FieldHouse(name, x, z, options = {}) {
   const ry = options.ry ?? 0;
   const pitch = options.pitch ?? 0.38;
   const eave = 0.42;
-  const base = FieldY(x, z) - 0.30;
+  // 底边整体埋进土里。0.30 是门外那批近景房的值（脚下几乎是平的）；远景村子
+  // 一栋 9 m 宽的房子横跨中距缓坡（最陡约 12%）时，下坡那个角会悬空半米，
+  // 所以 FarVillage 传 1.1 —— 几百米外多埋的那点看不出来，悬空看得出来。
+  const base = FieldY(x, z) - (options.sink ?? 0.30);
   const run = depth / 2 + eave;
   const slab = run / Math.cos(pitch);
   const ridgeY = wallH + run * Math.tan(pitch);
@@ -1482,10 +1588,13 @@ function FieldHouse(name, x, z, options = {}) {
     })),
     { kind: "box", size: [0.42, 0.22, width + 0.5], pos: At(0, ridgeY + 0.06, 0), ry,
       mat: "RoofTile", color: 0x4f4941, roughness: 0.97, castShadow: false, name: `${name}Ridge` },
-    // 一道深色门洞：远景里房子有没有「门」，是它读成民居还是读成箱子的分界
-    { kind: "box", size: [0.10, 1.55, 0.92], pos: At(-depth / 2 - 0.04, 0.78, options.doorZ ?? 0.6), ry,
-      color: 0x3c352c, roughness: 0.98, castShadow: false, name: `${name}Door` },
   ];
+  // 一道深色门洞：远景里房子有没有「门」，是它读成民居还是读成箱子的分界。
+  // 200 m 外它只有一个像素宽，纯属白交的 draw call —— far 的房子不给。
+  if (!options.far) {
+    props.push({ kind: "box", size: [0.10, 1.55, 0.92], pos: At(-depth / 2 - 0.04, 0.78, options.doorZ ?? 0.6), ry,
+      color: 0x3c352c, roughness: 0.98, castShadow: false, name: `${name}Door` });
+  }
   if (options.chimney) {
     props.push({ kind: "box", size: [0.42, 0.85, 0.42], pos: At(0, ridgeY + 0.5, width / 2 - 0.9), ry,
       mat: "BrickWall", color: 0x6f6355, roughness: 0.98, castShadow: false, name: `${name}Chimney` });
@@ -1695,6 +1804,246 @@ function DoorOutsideField() {
   return props;
 }
 
+// ---------------------------------------------------------------------------
+// 远处的村庄与树行（150—1200 m）—— 真几何，一件贴片都没有
+// ---------------------------------------------------------------------------
+//
+// 门外那片 DoorOutsideField 只铺到 x=115：再往外原来什么都没有，全靠地形网格
+// 一片素土 + 雾。加这一层的理由是**尺度阶梯**：人眼判断「远」靠的是一层比一层
+// 小的已知物件（近处的柴垛 → 三十米的秃树 → 二百米的村舍 → 六百米的树行 →
+// 天边的山），少了中间几档，两公里和二十米看上去一样远。
+//
+// 三条纪律：
+//   · 一律 **static**：不进 ambientMotion。三百米外的村子在 56 秒里位移不到一度，
+//     给它挂里程只会带来「村子在地上滑」的风险；「火车在开」由近景电杆、护路桩
+//     与中景村舍那三层负责，那三层本来就够。
+//   · 一律按 **FieldY（= 画出来的那张网格）** 落地，不按连续函数 —— 网格列距
+//     28.7 m，两者差得出半米，按连续函数摆就是半个村子悬空。
+//   · 一律 `castShadow: false`：56° 太阳下每一件都会往月台方向拖一条长影，
+//     几百件叠起来能把整片平原压暗一档（外壳轮实测过同样的坑）。
+
+/**
+ * 三月的秃树，远景版：一根干 + 两根斜上的主枝，三个网格。近景那棵是 FieldTree（16 个）。
+ *
+ * ★ 枝的角度是从**竖直**量的（tilt 0.42—0.72 rad ≈ 24°—41°）。上一版按「从水平
+ *   抬起」写，两根枝几乎横着长，一排远景树在画面里全读成电线杆的横担 ——
+ *   而真正的电杆就在同一片地里，两者混在一起谁也认不出来（实拍 t=50 抓到的）。
+ *   欧拉序 XYZ：Ry(ry)·Rx(rx)·(0,0,1)，取 rx = tilt − π/2 时纵向分量 = cos(tilt)。
+ */
+function FarTree(name, x, z, height, spin) {
+  const base = FieldY(x, z);
+  const color = 0x776a58;
+  const trunkH = height * 0.80;
+  const topY = base + trunkH;
+  return [
+    { kind: "cyl", size: [0.13, trunkH], pos: [x, base + trunkH / 2, z],
+      mat: "TreeBark", color, roughness: 0.98, castShadow: false, name },
+    ...[0, 1].map((i) => {
+      const ry = spin + i * 2.4;
+      const tilt = 0.42 + i * 0.30;
+      // 枝要**短而粗**。0.46 高的细枝在四百米外和电杆横担同宽同长，一排树读成
+      // 一排无线电桅杆（实拍 t=103 抓到的）；0.26 之后才是「一根细干顶着一小团
+      // 枝」——三月的秃杨在这个距离上本来就只有这么点信息量。
+      const len = height * (0.26 - i * 0.06);
+      const dir = [Math.sin(ry) * Math.sin(tilt), Math.cos(tilt), Math.cos(ry) * Math.sin(tilt)];
+      return {
+        kind: "box", size: [0.15, 0.15, len],
+        pos: [x + dir[0] * len / 2, topY + dir[1] * len / 2 - 0.25, z + dir[2] * len / 2],
+        rx: tilt - Math.PI / 2, ry, mat: "TreeBark", color, roughness: 0.98, castShadow: false,
+        name: `${name}B${i}`,
+      };
+    }),
+  ];
+}
+
+/**
+ * 把村子的锚点吸到附近**最平的一块地**上（±120 m 内扫 25 m 一格）。
+ *
+ * 村址是照可见度手挑的，挑的时候不知道那一点落在山脊的哪个坡上；实测有一个村子
+ * 正好压在东侧山脊 20.5% 的坡面上，一栋九米宽的房子四角就差两米三 —— 上坡那角
+ * 连墙带檐一起没进土里。锚点自己去找平地之后，起伏参数以后再改，村子会跟着重新
+ * 落位，不用回来手挪坐标。
+ */
+function FlatAnchor(x, z, reach = 120, step = 25) {
+  const Slope = (px, pz) => Math.hypot(
+    (FieldY(px + 20, pz) - FieldY(px - 20, pz)) / 40,
+    (FieldY(px, pz + 20) - FieldY(px, pz - 20)) / 40);
+  let best = [x, z], bestScore = Infinity;
+  for (let dx = -reach; dx <= reach; dx += step) {
+    for (let dz = -reach; dz <= reach; dz += step) {
+      // 离原址越远罚得越多：这是「就近找平」，不是「满地图找最平」
+      const score = Slope(x + dx, z + dz) + Math.hypot(dx, dz) * 0.00035;
+      if (score < bestScore) { bestScore = score; best = [x + dx, z + dz]; }
+    }
+  }
+  return best;
+}
+
+/**
+ * 房子底边该埋多深：**按脚印四角里最低的那一角定**，加 0.35 m 余量。
+ *
+ * 一栋 9 m 宽的房子横跨中距缓坡（最陡约 12%）时，四角之间差得出一米。给一个
+ * 固定的埋深，要么下坡那角悬空半米（远景里是一条亮缝），要么把上坡那角连墙
+ * 带檐一起吞掉。照最低角埋就两头都不犯：下坡角永远踩在土里，上坡角切进坡里
+ * —— 那正是坡地上盖房子本来的样子。
+ */
+function FootprintSink(x, z, depth, width, ry) {
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  let lowest = Infinity;
+  for (const ex of [-1, 1]) {
+    for (const ez of [-1, 1]) {
+      const ox = ex * depth / 2, oz = ez * width / 2;
+      lowest = Math.min(lowest, FieldY(x + cos * ox + sin * oz, z - sin * ox + cos * oz));
+    }
+  }
+  return Math.max(0.3, FieldY(x, z) - lowest + 0.35);
+}
+
+/**
+ * 一座村子：两三排坐北朝南的院子、一段院墙、几株树、一个打麦场。
+ * 全部按 seed 稳定生成 —— 出图是逐轮比对的，村子每次重载都换个样就没法审。
+ */
+function FarVillage(id, cx, cz, options = {}) {
+  const rnd = Mulberry32(HashString(`chuchuanFarVillage|${id}`));
+  const houses = options.houses ?? 8;
+  const rows = houses > 9 ? 3 : 2;
+  const perRow = Math.ceil(houses / rows);
+  const rowGap = 17 + rnd() * 5;          // 两排院子之间是一条巷子
+  const bayGap = 12.5 + rnd() * 3;        // 同一排里两户之间
+  const spin = (rnd() - 0.5) * 0.5;       // 整个村子的朝向
+  const cos = Math.cos(spin), sin = Math.sin(spin);
+  // 村子的局部坐标 (a 沿排, b 跨排) → 世界 (x,z)
+  const At = (a, b) => [cx + a * sin + b * cos, cz + a * cos - b * sin];
+  const props = [];
+  let made = 0;
+  for (let row = 0; row < rows && made < houses; row += 1) {
+    const b = (row - (rows - 1) / 2) * rowGap;
+    for (let bay = 0; bay < perRow && made < houses; bay += 1) {
+      const a = (bay - (perRow - 1) / 2) * bayGap + (rnd() - 0.5) * 3.2;
+      const [hx, hz] = At(a, b + (rnd() - 0.5) * 2.4);
+      const depth = 4.4 + rnd() * 1.6;
+      const width = 6.0 + rnd() * 3.4;
+      const houseRy = spin + (rnd() - 0.5) * 0.16;
+      props.push(...FieldHouse(`${id}House${made}`, hx, hz, {
+        far: true, sink: FootprintSink(hx, hz, depth, width, houseRy),
+        depth,
+        width,
+        wallH: 2.35 + rnd() * 0.6,
+        ry: houseRy,
+        pitch: 0.34 + rnd() * 0.08,
+        brick: rnd() < 0.34,
+        wallColor: rnd() < 0.5 ? 0x8f8069 : 0x9a8b73,
+        roofColor: rnd() < 0.5 ? 0x585047 : 0x625950,
+      }));
+      made += 1;
+    }
+  }
+  // 村口的院墙：两段，把村子的下沿收住，不让房子一排排飘在田里
+  const wallB = ((rows - 1) / 2) * rowGap + 9.5;
+  for (const [i, sign] of [-1, 1].entries()) {
+    const half = (perRow * bayGap) / 2 - 4;
+    const [ax, az] = At(-half, wallB * sign);
+    const [bx, bz] = At(half, wallB * sign);
+    props.push(FieldWall(`${id}Wall${i}`, ax, az, bx, bz, {
+      height: 1.85 + rnd() * 0.4, thick: 0.5, color: sign < 0 ? 0x8b7d69 : 0x958872,
+    }));
+  }
+  // 打麦场：村边一块压实的空地，远景里是一块比田亮的浅色圆
+  const [tx, tz] = At((perRow * bayGap) / 2 + 11, -wallB * 0.4);
+  props.push({
+    kind: "cyl", size: [8.5 + rnd() * 3, 0.30], pos: [tx, FieldY(tx, tz) + 0.02, tz],
+    mat: "Ground", color: 0xbfb493, roughness: 0.99, castShadow: false, name: `${id}Threshing`,
+  });
+  props.push(...FarStack(`${id}Stack0`, tx + 5.5, tz + 4.5, 1.9));
+  props.push(...FarStack(`${id}Stack1`, tx - 4.0, tz - 6.0, 1.5));
+  // 树：村子四周一圈，鲁南的村子从远处看就是「一团树里露出几片瓦」
+  const treeCount = options.trees ?? (5 + Math.floor(rnd() * 4));
+  for (let i = 0; i < treeCount; i += 1) {
+    const angle = (i / treeCount) * Math.PI * 2 + rnd() * 0.7;
+    const radius = (perRow * bayGap) / 2 + 4 + rnd() * 12;
+    const [px, pz] = [cx + Math.cos(angle) * radius, cz + Math.sin(angle) * radius * 0.7];
+    props.push(...FarTree(`${id}Tree${i}`, px, pz, 8.5 + rnd() * 4.5, rnd() * 6.28));
+  }
+  return props;
+}
+
+/** 打麦场边的秸秆垛：远景版只要两个圆柱。 */
+function FarStack(name, x, z, radius) {
+  const base = FieldY(x, z);
+  return [
+    { kind: "cyl", size: [radius, 2.1], pos: [x, base + 1.0, z], mat: "WattleFence", color: 0xa08a5c, roughness: 0.99, castShadow: false, name },
+    { kind: "cyl", size: [radius * 0.58, 1.3], pos: [x, base + 2.6, z], mat: "WattleFence", color: 0xa8925f, roughness: 0.99, castShadow: false, name: `${name}Top` },
+  ];
+}
+
+/** 一条田边的树行（防风林）：距离感的第四档，比村子远、比山近。 */
+function FarTreeRow(id, x0, z0, x1, z1, count, height = 9.5) {
+  const props = [];
+  for (let i = 0; i < count; i += 1) {
+    const t = count === 1 ? 0.5 : i / (count - 1);
+    const x = x0 + (x1 - x0) * t;
+    const z = z0 + (z1 - z0) * t;
+    const wobble = ((HashString(`${id}|${i}`) % 1000) / 1000 - 0.5);
+    props.push(...FarTree(`${id}T${i}`, x + wobble * 3.5, z + wobble * 4.5,
+      height + wobble * 3.0, (HashString(`${id}s|${i}`) % 628) / 100));
+  }
+  return props;
+}
+
+/**
+ * 远处的村庄与树行。西侧（左窗外，镜 3/5/6 合计 50 s 都朝那边）与东侧
+ * （月台外，下车后正对）各五个村子，距离拉成 150→1200 m 的阶梯。
+ */
+function FarCountryside() {
+  const villages = [
+    // 西侧：左窗外
+    ["FvW1", -188, -318, 6], ["FvW2", -256, 214, 9], ["FvW3", -402, -612, 8],
+    ["FvW4", -598, 470, 11], ["FvW5", -915, -128, 8], ["FvW6", -1180, 742, 7],
+    // 东侧：门外与月台外（避开 x≤115 的门外静景与 x 4.4—10.4 的月台）
+    ["FvE1", 198, 336, 6], ["FvE2", 286, -262, 9], ["FvE3", 452, 92, 8],
+    ["FvE4", 640, -648, 8], ["FvE5", 828, 528, 11], ["FvE6", 1160, -196, 7],
+    // 沿铁路方向（x 小、z 大）：镜 10/11 下车后正好朝 +z 看，那条楔形里必须有村子，
+    // 否则最后两镜的远景又是一条空线
+    ["FvT1", 86, 452, 7], ["FvT2", -104, 628, 8], ["FvT3", 112, -574, 7],
+    ["FvT4", -78, -806, 6], ["FvT5", 148, 918, 8], ["FvT6", -166, -1064, 7],
+  ];
+  const props = [];
+  for (const [id, x, z, houses] of villages) {
+    const [ax, az] = FlatAnchor(x, z);
+    props.push(...FarVillage(id, ax, az, { houses }));
+  }
+  // 树行沿着田界与土路走，不许穿过村子
+  const rows = [
+    ["FtrW1", -150, 96, -150, 300, 9], ["FtrW2", -330, -120, -330, 96, 9],
+    ["FtrW3", -470, 140, -700, 176, 10], ["FtrW4", -700, -420, -700, -180, 10],
+    ["FtrW5", -1020, 210, -1020, 470, 9], ["FtrW6", -560, -880, -900, -840, 10],
+    ["FtrE1", 160, -80, 160, 140, 9], ["FtrE2", 360, 340, 360, 560, 9],
+    ["FtrE3", 520, -420, 760, -400, 10], ["FtrE4", 760, 120, 760, 380, 10],
+    ["FtrE5", 1020, -520, 1020, -280, 9], ["FtrE6", 980, 640, 1280, 690, 10],
+    ["FtrT1", 48, 210, 48, 400, 9], ["FtrT2", -56, -308, -56, -128, 8],
+    ["FtrT3", 62, -260, 62, -80, 8], ["FtrT4", -60, 250, -60, 430, 9],
+    // 120—400 m 这一档最要紧：地面在这个距离上还有面积，树是唯一能给它标出
+    // 「一块一块的地」的竖向物件（地块色差在这个高度只能压成几像素的一条带）
+    ["FtrN1", 132, -150, 132, 60, 9], ["FtrN2", -138, -60, -138, 150, 9],
+    ["FtrN3", 186, -420, 300, -400, 9], ["FtrN4", -196, 330, -320, 350, 9],
+    ["FtrN5", 244, 120, 244, 300, 8], ["FtrN6", -262, -280, -262, -100, 8],
+    ["FtrN7", 122, 470, 240, 500, 9], ["FtrN8", -128, -470, -250, -440, 9],
+    ["FtrN9", 330, -140, 330, 40, 8], ["FtrN10", -352, 60, -352, 240, 8],
+    ["FtrN11", 400, 420, 520, 450, 8], ["FtrN12", -420, -600, -540, -570, 8],
+  ];
+  for (const [id, x0, z0, x1, z1, count] of rows) props.push(...FarTreeRow(id, x0, z0, x1, z1, count));
+  // 田里的散生树：地块拐角、坟头、井台边各一棵。按 hash 撒，避开路基走廊。
+  for (let i = 0; i < 64; i += 1) {
+    const h = HashString(`chuchuanScatterTree|${i}`);
+    const side = i % 2 ? 1 : -1;
+    const x = side * (118 + ((h >>> 3) % 620));
+    const z = ((h >>> 11) % 1700) - 850;
+    if (Math.abs(x) < 118) continue;
+    props.push(...FarTree(`FstTree${i}`, x, z, 8.0 + ((h >>> 19) % 500) / 100, ((h >>> 23) % 628) / 100));
+  }
+  return props;
+}
+
 const CHUCHUAN_PEOPLE = {
   youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
   rifleman: { name: "擦枪士兵", short: "擦枪士兵", real: false, note: "车厢内可见 NPC；检查发涩枪栓" },
@@ -1729,7 +2078,9 @@ export const CS_Chuchuan = {
   stopMusic: true,
   music: null,
   fadeIn: 0.35,
-  cameraFar: 2800,
+  // 远景网格铺到 x 2901.66 / z ±1807.18，最远角在 3.4 km 外；2800 会把东侧那道
+  // 山脊从半山腰切掉一块。
+  cameraFar: 3500,
   suppress: { movement: true, weapon: true, crosshair: true, combatHud: true },
   objective: "坐在长凳上转头观察车厢，停车后随队下车。",
   handoff: { task: "跟随通信排。", once: true },
@@ -1901,6 +2252,10 @@ export const CS_Chuchuan = {
     //   z ±910 m）与雾。侧向的封闭同样由这张网格与天空穹负责 —— 都是真几何，
     //   从哪个角度看都成立，下车后走那几步是真的会有视差的。
     ...DoorOutsideField(),
+    // 再往外：150—1200 m 的十二个村子与十二条树行（真几何，见 FarCountryside 注）。
+    // 它们和门外静景一样按 FieldY 落在网格上，两侧都有 —— 左窗外那五个村子
+    // 承担镜 3/5/6 合计 50 s 的窗景，东侧那六个是下车后正对的那一面。
+    ...FarCountryside(),
     // 站在月台上抬头能看见的电报线终点：一根落在月台北端的木杆，
     // 让窗外那三根电线有个收头，不再在半空断掉。
     { kind: "box", size: [0.16, 4.60, 0.16], pos: [4.05, 2.30, 26.0], mat: "WoodBeam", color: 0x3b3026, noFog: true, name: "PlatformPole" },

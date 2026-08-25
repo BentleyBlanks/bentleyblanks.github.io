@@ -328,3 +328,72 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 - **`spec.texture` 通道无法平铺**：`_MakeProp` 只在有 `spec.mat` 时重算 UV，`repeat` 也只转给
   材质库；TextureLoader 默认 ClampToEdge，一张图会被拉满整面。自定义可平铺贴图必须进材质库
   （LoadExternalSet），引擎侧的活。
+
+## 1.10 出川远景大修（2026-08-25）：起伏地形 + 农田 + 村庄，与士兵换回 tzm 模型
+
+用户原话：「新的序章，我要的是真实的远景！比如远景的起伏的地形你要做出来，你可以用
+地形+Mesh 去做，还要加出来各种远处的村庄、农田什么的」「人物的模型胸口、手臂怎么都
+这样了……都不想一个人类了，而且手脚的关节全都是断开的」。两件事各有一个单一根因。
+
+### A. 远景：三件事一起改，缺一件仍然是一块白板
+
+| 层 | 在哪 | 要点 |
+|---|---|---|
+| 高度函数 | **新模块 `Script_FarLand.mjs`**（纯 JS，不 import three） | `FarLandY` = 真实 SRTM 基底 + `ReliefHeight`（缓坡 rolls + 线状 ridges + 山头 peaks）。网格顶点、村舍落地、树行落地**全部问这一个函数** |
+| 网格 | `Script_Cutscene.BuildHeightTerrainGeometry` | `terrain.relief` 叠起伏；`terrain.farmland` 烘一条顶点色（一张网格、一次 draw call、天生贴地）。材质要 `clone()` 后再开 `vertexColors` —— 库里的材质是共享的 |
+| 数据 | `Data_CutsceneChuchuan.CHUCHUAN_TERRAIN / _RELIEF / _FARMLAND / FarCountryside()` | 网格铺到 x 2901.66 / z ±1807.18；十八个村子、二十八条树行、六十四棵散生树，全部 `FieldY` 落地、全部 static |
+| 雾 | `Script_Sky.SKY_PRESETS.chuchuanDay` | density 0.0068 → **0.0011**、max 0.80 → 0.86、falloff 22 → **520**、desat 0.40 → 0.26 |
+
+**四条踩过的坑，改这场之前先读：**
+
+1. **雾不松，上面三件事一件也看不见。** 0.0068 时 250 m 就吃满 max —— 远景从两百米起
+   就是一块均匀的灰白板。这是「远景是白的」的头号原因，不是地形没做。
+2. **`falloff` 是高度衰减，不是距离衰减。** 22 m 的半衰高度意味着一座 100 m 的山
+   `hFall≈0.01`：山脚在雾里、山顶纤毫毕现，山会像贴在天上的黑纸片。这个尺度上的空气
+   透视是**按距离**走的，falloff 要放到几百米去近似关掉它。
+3. **淡入闸不能只按 |x| 走。** 只按离铁路的横向距离淡入的话，沿铁路那一条楔形
+   （x 小、z 大）永远是平的 —— 而下车后镜 10/11 正好朝那边看。现在是两道闸：
+   `fadeIn` 按**到车厢的直线距离**（既有门外布设最远 116.9 m，闸设在 140 m），
+   `corridor` 按**离铁路的横向距离**（路基、电杆、护路桩、中景村舍是沿 z 铺到
+   −742 m 的定高道具，脚下的地一鼓就把它们埋了）。
+4. **地形网格的 `color` 不许留空。** 库里的 Ground 在 1.0 白 tint 下被 56° 太阳正照，
+   渲成近白；农田顶点色的色差全被压没。压到 `0x9d9581`（门外那批田块的同一档）才读得出。
+   另外：**田块之间的差别一半在色相上**，只拉明度不拉色相，落到去饱和的雾里就只剩
+   一片米黄沙丘（用极端红/蓝/绿palette 做过一次对照实拍确认顶点色通路是通的）。
+
+**村子落在坡上这件事有两道自动闸**（起伏参数以后再动，不用回来手挪村址）：
+`FlatAnchor` 把每个村址就近吸到 ±120 m 内最平的一块地（实测把最陡的一个村子从
+20.5% 的坡面挪到 6.5%）；`FootprintSink` 按房子脚印**四角里最低的那一角**定埋深，
+下坡角永远踩在土里、上坡角切进坡里 —— 给固定埋深的话，一栋 9 m 宽的房子横跨
+12% 的坡就会有一个角悬空半米，在远景里是一条亮缝。校验：`FloatCheck` 那类脚本
+（`_shots/tools/`，已 gitignore）现在报「悬空 > 0.35 m 的角点：0 / 708」。
+
+**另一条结构性收益**：`FieldY` 从「手抄的 5×9 高度表 + 一段『地形一改这张表要重采』的
+说明」换成 `FarGridY(x, z, CHUCHUAN_TERRAIN)`。它按同一套格点做同一套双线性，在旧表
+覆盖的那一片逐点等于旧表（实测最大差 1.3 cm），出了范围还能继续用 —— 远景村庄因此
+可以直接复用门外那套 `FieldHouse / FieldWall / FieldTree / FieldStack` 生成器。
+
+**代价**：远景 1992 件道具，实测 +456 draw call、+2.5 ms/帧（2653→3109 calls，
+20.4→23.4 ms @1600×900 high）。红线是 5000 calls / 600 万三角，都在里面。
+
+### B. 人物：士兵不再用 `Model_*Soldier.glb` 的 13 块刚体分段
+
+`SegmentedCharacterSkin` 把 13 块刚体**原样**挂到关节上，块与块之间没有交叠余量，
+也没有 tzm 那条 `HealBucket` 修补：肩、肘、腕、胯、膝、踝一转就开缝，手掌与小腿整段
+飘在空中。而 `Model_NraSoldier.glb` 本身还是个人偶 —— 躯干是一张立着的薄板、没有脖子、
+没有肩、脚是两团光脚趾（见 `Model/Texture_NraSoldierRefined*QA.png`）。
+
+现在 `ActorFactory.CreateRiggedSkin` 只给**百姓**返回 GLB 皮；`nra*` / `ija*` 一律走
+程序化 tzm 模型（`Model/SoldierNra.tzm.json`、`SoldierIja.tzm.json`），那套是照这副
+13 关节骨架建的，关节自带交叠、有绑腿有布鞋有立领。
+
+顺带修掉一个长期潜伏的 bug：`Script_RiggedModel.mjs` 用了 `HashString` 却没 import，
+于是**每一个日军**在实例化分段皮时抛 `ReferenceError` 静默退回 tzm —— 线上看着正常的
+那批日本兵，走的一直是现在这条路。import 补上了，路由改在 `CreateRiggedSkin`。
+
+`Script_ActorPoseTest` 的断言跟着从「13 个分段在不在」换成「meshSource 是 model 且
+13 根骨头下面都挂着可见几何」；鞋底贴地（±0.02 m）与左右对称那几条原样保留 ——
+tzm 模型直接通过，而 GLB 那版全员悬空约 8 cm。
+
+**遗留**：草鞋 + 露趾的脚在顺光下仍是画面下缘最亮的一块（`HEX.strawShoe` 已压过一档，
+再压会影响七关全部川军，没动）；百姓的 GLB 分段仍有小腿脱节，没在这一轮里处理。
