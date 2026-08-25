@@ -57,9 +57,26 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 // 25 m 上、把目标焊死成玩家，然后**走真的 TryFire**：命中率、部位掷骰、
 // 伤害缩放、TakeHit、流血、红闪，一条都不绕过去。唯一被替换掉的是
 // "多久开一枪"（用武器表算的周期直接推时间），因为那一段是计时器，不是规则。
+//
+// 骰盅是测试自己的：TryFire 的命中/部位掷骰全走 s.rnd，这里每局把它换成
+// **固定种子**的 Mulberry32（种子 = opt.seed × 射手序号）。士兵的原生流
+// 播种在出生那一刻，测到第几局取决于前面消耗了多少 —— 同一份代码 3 跑 2 红、
+// 中位数在 8.4—11 s 之间漂，就是那么来的。换成按局播种之后，同一组参数
+// 永远掷出同一串骰，新旧口径还共用同一组骰序（配对采样），比值量的只是
+// 伤害表的差，不再混进骰运的差。
 // ===========================================================================
 await page.evaluate(() => {
   const T = window.Taierzhuang;
+  const Mulberry32 = (seed) => {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
   window.Range = {
     /**
      * @param {object} opt { shooters, distance, stance, seconds, patch }
@@ -96,6 +113,9 @@ await page.evaluate(() => {
         s.yaw = Math.atan2(-(player.position.x - s.position.x),
           -(player.position.z - s.position.z));
         s.playerLockAt = opt.fresh ? ai.time : -999;   // fresh=首发必偏那一发
+        // 按局播种（见上面"骰盅"那段）。同一个 opt.seed 永远掷同一串骰。
+        s.rnd = Mulberry32((Math.imul((opt.seed ?? 1) + 1, 2654435761)
+          ^ Math.imul(i + 1, 0x9E3779B1)) >>> 0);
       });
 
       // 一发的周期 = 拉栓/射速 + AI 的瞄准时间（TryFire 里那两条门槛）
@@ -139,14 +159,15 @@ await page.evaluate(() => {
 });
 
 /**
- * 同一组参数跑 n 次取中位数：命中是掷骰，单次样本说明不了任何事。
- * 15 次是实测定的下限 —— 9 次时同一份代码两趟能读出 9.3 s 与 12.8 s，
- * 那个跨度比要测的效果本身还大，断言会随机变红。
+ * 同一组参数跑 n 局取中位数，第 i 局发种子 i：一局一串固定骰序，
+ * 中位数量的是 n 串**不同但认死**的骰序 —— 统计意义还在，数字却每次执行
+ * 都一模一样。（此前用士兵出生时播的那条流，15 局也压不住：同一份代码
+ * 3 跑 2 红，中位数在 8.4—11 s 之间漂，比值断言 1.31—1.72 跨着阈值摇。）
  */
 async function Median(opt, n = 15) {
   const runs = [];
   for (let i = 0; i < n; i += 1) {
-    runs.push(await page.evaluate((o) => window.Range.Run(o), opt));
+    runs.push(await page.evaluate((o) => window.Range.Run(o), { ...opt, seed: i }));
   }
   const ttks = runs.map((r) => r.ttk).filter((t) => t > 0).sort((a, b) => a - b);
   return {
