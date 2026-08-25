@@ -103,11 +103,17 @@ ${GI_SAMPLE_GLSL}`)
           vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
           // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
           giConfidence *= uGiEnabled;
-          // ?giView= 假彩色取证：1 探针辐照度×0.05 / 2 被替换前的天空 IBL×0.05 /
-          // 3 confidence / 4 gi 与 IBL 的亮度比×0.25（与曝光无关，1.0 的比值显示为 0.25 灰）。
+          // ?giView= 假彩色取证：1 材质最终采用的间接辐照度×0.05 /
+          // 2 被替换前的天空 IBL×0.05 / 3 confidence /
+          // 4 原始探针 GI 与 IBL 的亮度比×0.25（与曝光无关，1.0 的比值显示为 0.25 灰）。
           // 在 mix 之前抓，末端 <dithering_fragment> 处整帧覆盖输出。
           if (uGiDebugView > 0.5) {
-            if (uGiDebugView < 1.5) gGiDebugColor = giIrradiance * 0.05;
+            // 正片在探针体外（confidence=0）会回退到天空 IBL。这里以前只画
+            // giIrradiance，体积边界外便整片纯黑，误报成“远处没有 GI”。调试图
+            // 必须复现下面实际写回 iblIrradiance 的同一条 mix，才能显示真实结果。
+            if (uGiDebugView < 1.5) {
+              gGiDebugColor = mix(iblIrradiance, giIrradiance, giConfidence) * 0.05;
+            }
             else if (uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
             else if (uGiDebugView < 3.5) gGiDebugColor = vec3(giConfidence);
             else if (uGiDebugView < 4.5) {

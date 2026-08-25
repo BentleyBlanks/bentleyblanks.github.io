@@ -16,7 +16,7 @@ const VIEWS = [
   { id: "roughness", label: "粗糙度", group: "材质", note: "ORM 采样后的 roughnessFactor；白 = 糙、黑 = 光。" },
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
-  { id: "giWorld", label: "GI 辐照度", group: "光照", note: "探针体在着色点取到的间接漫反射（×0.05）；探针体没开时显示不可用斜纹。" },
+  { id: "giWorld", label: "GI 辐照度", group: "光照", note: "材质最终采用的间接辐照度（×0.05）；探针体外按正式渲染回退到天空 IBL，不应为黑。" },
   { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
   { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },

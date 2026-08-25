@@ -527,8 +527,8 @@ export function MakeGiUniforms() {
     specularOcclusion: { value: 0.7 },
     enabled: { value: 0 },
     // 取样端假彩色（?giView=N 或 Debug Rendering 面板，Script_Materials 注入块里读）：
-    // 1 = 探针辐照度  2 = 被替换前的天空 IBL  3 = confidence
-    // 4 = gi/IBL 亮度比  5 = 权重和
+    // 1 = 最终间接辐照度（探针体外回退 IBL）  2 = 被替换前的天空 IBL
+    // 3 = confidence  4 = 原始探针 gi/IBL 亮度比  5 = 权重和
     // 6 = BaseColor  7 = 粗糙度  8 = 金属度  9 = 太阳阴影因子。
     // 排查「GI 与体外回退不接」这类问题时，肉眼比 diff 图快得多。
     debugView: { value: 0 },
