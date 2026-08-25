@@ -87,6 +87,8 @@ export const testDefs = {
   TargetInfoTest: { file: "Script_TargetInfoTest.mjs", desc: "准心目标识别：番号/姓名/距离、穿墙与雾外不认" },
   JieheTerrainTest: { file: "Script_JieheTerrainTest.mjs", desc: "界河高度图采样与贴地" },
   TengxianLayoutTest: { file: "Script_TengxianLayoutTest.mjs", desc: "滕县城防、街路与功能区布局（纯 Node）" },
+  EastSuburbBlocksTest: { file: "Script_EastSuburbBlocksTest.mjs", desc: "布防图东侧 13 个整框地块、命名院区与框间道路（纯 Node）" },
+  EastSuburbNavTest: { file: "Script_EastSuburbNavTest.mjs", desc: "扩展东关切片四个路标的真导航连通率" },
   TengxianZoneTest: { file: "Script_TengxianZoneTest.mjs", desc: "城内 zone/出生点不被街坊围死（纯 Node）" },
   SamplePointTest: { file: "Script_SamplePointTest.mjs", desc: "县城采样点覆盖率与位姿口径（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
@@ -149,7 +151,7 @@ export const domains = {
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "WestDistrictCoverageTest", "WestStationTest", "DressingProbeTest"],
+    tests: ["ActorBatchTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestStationTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -325,7 +327,7 @@ export function InferDomains(files) {
       for (const name of ["combat", "ai", "editor", "render"]) found.add(name);
       matched = true;
     }
-    if (/^(Data_Tengxian|Script_TengxianCity|Script_TengxianLayoutTest)\.mjs$/.test(leaf)) {
+    if (/^(Data_Tengxian|Script_TengxianCity|Script_TengxianLayoutTest|Script_EastSuburbBlocksTest|Script_Landmark_EastMapBlocks)\.mjs$/.test(leaf)) {
       for (const name of ["terrain", "editor", "render"]) found.add(name);
       matched = true;
     }

@@ -45,6 +45,7 @@ import {
   BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
   AddFarRoof, AddRoofChimney,
 } from "./Script_CityBlockKit.mjs";
+import { BuildEastMapBlocks } from "./Script_Landmark_EastMapBlocks.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
@@ -1526,106 +1527,36 @@ export class TengxianCity {
    */
   BuildEastSuburb(rnd) {
     const b = EAST_SUBURB.bounds;
-    const startX = Math.max(b.minX, MOAT.outerEdge + GATE_BULGE + 6);
-    const lane = EAST_SUBURB.lane;
-    const eastGateStreet = STREETS.find((street) => street.id === "EastGateStreet");
-    const mainRoadWidth = eastGateStreet.width;
-    // 三条南北巷由东门大街接入。它们没有车辙，只有压实土和枪眼相对的墙：
-    // 是穿院、转移和逐屋争夺的“可读路径”，不是把整片东关切成棋盘。
-    const laneFractions = [0.27, 0.56, 0.81];
-    const sideLanes = laneFractions.map((fraction, index) => ({
-      axis: "z", at: startX + (b.maxX - startX) * fraction,
-      half: [lane.min, (lane.min + lane.max) / 2, lane.max][index] / 2,
-      from: b.minZ, to: b.maxZ,
-    }));
-    const bandsX = SplitBands(startX, b.maxX, sideLanes);
-    const mainRoad = { axis: "x", at: b.roadZ, half: mainRoadWidth / 2, from: startX, to: b.maxX };
-    const bandsZ = SplitBands(b.minZ, b.maxZ, [mainRoad]);
-    // 数量只决定把资料边界里的地块切几份；所有实际间隙宽度均来自 EAST_SUBURB.lane。
-    const targetColumnSpan = (b.maxX - startX) / 10;
-    const targetRowSpan = (b.maxZ - b.minZ) / 24;
-    for (let bi = 0; bi < bandsX.length; bi += 1) {
-      const bx = bandsX[bi];
-      const nx = Math.max(1, Math.round((bx[1] - bx[0]) / targetColumnSpan));
-      for (let bj = 0; bj < bandsZ.length; bj += 1) {
-        const bz = bandsZ[bj];
-        const nz = Math.max(1, Math.round((bz[1] - bz[0]) / targetRowSpan));
-        for (let i = 0; i < nx; i += 1) {
-          for (let j = 0; j < nz; j += 1) {
-            const seed = `east${bi}_${bj}_${i}_${j}`;
-            const cellRnd = Mulberry32(HashString(seed));
-            const gapX = lane.min + (lane.max - lane.min) * cellRnd();
-            const gapZ = lane.min + (lane.max - lane.min) * cellRnd();
-            const x = bx[0] + ((bx[1] - bx[0]) * (i + 0.5)) / nx;
-            const z = bz[0] + ((bz[1] - bz[0]) * (j + 0.5)) / nz;
-            const w = (bx[1] - bx[0]) / nx - gapX;
-            const d = (bz[1] - bz[0]) / nz - gapZ;
-            if (w < lane.max * 3 || d < lane.max * 3) continue;
-            if (!this.InBounds(x, z, 16)) continue;
-            // 寺院地阵地那一块留给寺庙
-            const t = EAST_SUBURB.temple;
-            if (Math.abs(x - t.x) < t.w / 2 + 8 && Math.abs(z - t.z) < t.d / 2 + 8) continue;
-            // 东关挂牌院落（第一区公所/731团1营，EAST_SUBURB.features）：
-            // 迷宫格子给它们让位，院落本体由 Script_Landmark_EastSuburb.mjs 落成。
-            if ((EAST_SUBURB.features || []).some((ef) =>
-              Math.abs(x - ef.x) < ef.w / 2 + 6 && Math.abs(z - ef.z) < ef.d / 2 + 6)) continue;
-            // 各 LOD 共用轴对齐院墙与枪眼；不只转 detail，避免中远景切换时枪眼漂浮。
-            const cell = { x, z, w, d, seed };
-            this.sink.SetSector(SectorKey(x, z));
-            this.farSink.SetSector(SectorKey(x, z));
-            const dist = this.FocusDistance(x, z);
-            const rawDamage = Clamp(0.3 + (1 - (x - startX) / (b.maxX - startX)) * 0.35
-              + (cellRnd() - 0.5) * 0.24, 0, 0.95);
-            const profile = this.DamageProfile(rawDamage);
-            const dmg = profile.damage;
-            // 东关的地坪在濠外，标高 0 附近
-            if (dist < this.detailRadius) {
-              const built = AddCompound(this.sink, {
-                x, z, ry: 0, width: cell.w, depth: cell.d, seed: cell.seed,
-                damage: dmg, burnt: profile.burnt,
-              });
-              this.stats.householdProps += built?.householdProps || 0;
-              this.AddSuburbLoopholes(cell, dmg);
-              this.stats.compoundsDetail += 1;
-            } else if (dist < this.midRadius) {
-              this.AddSimpleCompoundAt(this.sink, cell, dmg, profile.burnt, 0);
-              this.AddSuburbLoopholes(cell, dmg);
-              this.stats.compoundsMid += 1;
-            } else {
-              this.AddSilhouetteAt(cell, dmg, profile.burnt, 0);
-              this.stats.silhouettes += 1;
-            }
-          }
-        }
-      }
-    }
-    this.sink.SetSector("");
-    this.farSink.SetSector("");
+    // 布防图的每个闭合框是一整块院区，不是“允许随机撒房”的提示范围。
+    // 这里直接消费 13 个手工框；挂牌框只留位，随后由专属构建器落成。
+    BuildEastMapBlocks(this, EAST_SUBURB.mapBlocks || [], {
+      namedMode: "reserve",
+      canPlace: (cell) => cell.id !== "NorthEastTemple"
+        && this.InBounds(cell.x, cell.z, Math.max(cell.w, cell.d) / 2 + 8),
+    });
 
-    for (let i = 0; i < sideLanes.length; i += 1) {
-      const alley = sideLanes[i];
-      const length = alley.to - alley.from;
+    // 图上真正可读的东关巷路只处在整框之间：中间南北向东关大街，及上下两条
+    // 横向接巷。取消旧版三条贯穿式车道，避免从第一区和 731 营院内切过去。
+    const mapLanes = EAST_SUBURB.mapLanes || [];
+    for (const alley of mapLanes) {
+      if (!this.InBounds(alley.x, alley.z, Math.max(alley.w, alley.d) / 2)) continue;
       this.sink.Add("DirtRoad", PlaceGeometry(
-        MakeBox(alley.half * 2, 0.075, length, TILE_METERS.ground, `eastAlley${i}`),
-        { x: alley.at, y: 0.038, z: (alley.from + alley.to) / 2 }));
+        MakeBox(alley.w, 0.075, alley.d, TILE_METERS.ground, alley.id),
+        { x: alley.x, y: 0.038, z: alley.z }));
     }
 
-    // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件；院落仍为中心留出净路。
-    const eastRoadLength = b.maxX - startX;
-    const eastRoadX = startX + eastRoadLength / 2;
-    const eastRoadZ = b.roadZ;
-    if (this.InBounds(eastRoadX, eastRoadZ, eastRoadLength / 2)) {
-      this.sink.Add("DirtRoad", PlaceGeometry(
-        MakeBox(eastRoadLength, 0.12, mainRoadWidth, TILE_METERS.ground, "eastSuburbRoad"),
-        { x: eastRoadX, y: 0.05, z: eastRoadZ }));
+    // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件。
+    const eastRoad = mapLanes.find((lane) => lane.id === "EastGuangStreet");
+    if (eastRoad && this.InBounds(eastRoad.x, eastRoad.z, eastRoad.d / 2)) {
       this.stats.roadMarks += AddRoadWear(this.sink, {
-        x: eastRoadX, z: eastRoadZ, ry: 0, length: eastRoadLength, width: mainRoadWidth,
+        x: eastRoad.x, z: eastRoad.z, ry: Math.PI / 2,
+        length: eastRoad.d, width: eastRoad.w,
         baseY: 0.118, seed: "eastSuburbRoadWear",
       });
       const streetRnd = Mulberry32(HashString("eastSuburbStreetLife"));
       let cluster = 0;
-      for (let px = startX + 20; px < b.maxX - 18; px += 25) {
-        const pz = eastRoadZ + (cluster % 2 ? 1 : -1) * 3.9;
+      for (let pz = eastRoad.z - eastRoad.d / 2 + 24; pz < eastRoad.z + eastRoad.d / 2 - 24; pz += 28) {
+        const px = eastRoad.x + (cluster % 2 ? 1 : -1) * 5.8;
         cluster += 1;
         if (!this.InBounds(px, pz, 5)) continue;
         const temple = EAST_SUBURB.temple;
@@ -1633,8 +1564,8 @@ export class TengxianCity {
           && Math.abs(pz - temple.z) < temple.d / 2 + 8) continue;
         this.sink.SetSector(SectorKey(px, pz));
         const count = AddStreetLife(this.sink, {
-          x: px + (streetRnd() - 0.5) * 5, z: pz, ry: 0, baseY: 0.13,
-          seed: `eastSuburbStreet:${cluster}`, commerce: px < startX + 100,
+          x: px, z: pz + (streetRnd() - 0.5) * 5, ry: Math.PI / 2, baseY: 0.13,
+          seed: `eastSuburbStreet:${cluster}`, commerce: Math.abs(pz) < 180,
         });
         this.stats.streetClusters += 1;
         this.stats.streetProps += count;

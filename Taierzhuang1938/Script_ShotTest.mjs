@@ -80,6 +80,12 @@ const GAME_SHOTS = [
   // 防止东关生成成与城门脱节的一块独立布景。
   { name: "Game_Z9_EastGateStreet", query: "quality=high&scale=medium",
     setup: { menuShot: "EastGate" } },
+  // 城防图东侧逐框验收：一个镜头同时收进核心 6 框与东北/东南延伸，
+  // 用屋顶占地轮廓检查“每个闭合框都是整块模型区”，不是零散地标。
+  { name: "Game_Z22_EastDefenseBlocks", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "EastGate", hideMenu: true, cam: {
+      from: [445, 540, 0], look: [445, 0, 0], up: [0, 0, -1], focalMm: 18,
+    } } },
   // 防区空间关系：站在东墙炮击缺口向城内看，验缺口后的街、掩体与城内纵深，
   // 避免和既有东门仰视、东关常规战斗镜头重复。
   { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
@@ -199,6 +205,7 @@ async function Shoot(pageName, url, globalName, setup = null) {
           shot.look = pose.cam.look;
           shot.lookTo = pose.cam.lookTo || pose.cam.look;
           if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
+          if (pose.cam.up) game.camera.up.fromArray(pose.cam.up);
           game.menu.ApplyShot(0);
           if (pose.hideMenu) document.getElementById("menu").style.display = "none";
           game.StepFrames(12);

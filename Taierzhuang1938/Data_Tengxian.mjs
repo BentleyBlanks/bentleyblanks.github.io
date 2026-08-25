@@ -348,7 +348,9 @@ export const OUTER_LANDMARKS = [
  * 东关不是一堵坚固的墙，是一片可以被打穿的、家家有枪眼的院落迷宫。
  */
 export const EAST_SUBURB = {
-  bounds: { minX: 334, maxX: 540, minZ: -235, maxZ: 220 },   // 与城防图东关外侧的长条街区对应
+  // 城防图右侧的 13 个闭合框都属于这一套“东侧图框地块”。bounds 同时承担
+  // 城外通用麦田的避让范围；核心寨墙仍只使用下方 zhaiWall 自己的范围。
+  bounds: { minX: 334, maxX: 540, minZ: -490, maxZ: 415 },
   roadZ: -65,
   lane: { min: 1.5, max: 2.5 },                              // 巷宽（推定）
   // 东关寨墙：日方实测高 2 m、顶宽 0.4 m —— 极薄，一炮一个口。
@@ -356,15 +358,69 @@ export const EAST_SUBURB = {
   // 东寨门：砖券洞，宽 3 m（宽度推定）。1938-03-16 14:00 被 105 mm 榴弹第一发命中打毁。
   zhaiGate: { x: 540, z: -65, width: 3.0, height: 3.4 },
   // 日方称之为「敌之有力据点」的寺院地阵地。位置为日方要图，形制推定。
-  temple: { x: 414, z: -176, w: 26, d: 22 },
+  temple: { x: 427, z: -465, w: 44, d: 45 },
   // 地隙：河西岸与外城之间的南北向冲沟，日军沿此沟可掩蔽接近到寨墙 200 m 处
   // 而不暴露（存在与作用为日方实测；具体断面尺寸推定）。
   gully: { x: 555, fromZ: -200, toZ: 220, depth: 3.0, width: 7.5 },
-  // v2：城防示意图上的东关挂牌院落（第一区公所、第731团1营）。
-  // 位置照图在东关大街两侧、迷宫网格之内；坐标尺寸为推定。
+  // 城防图的框不是地标锚点，而是整块院区。挂牌院落保留独立构建器，尺寸取
+  // 对应多边形的完整包围盒；mapBlocks 里的同 id 条目负责留出同一整块框域。
   features: [
-    { id: "FirstDistrictOffice", label: "第一区", x: 366, z: -28, w: 38, d: 44 },
-    { id: "Battalion731", label: "第731团1营", x: 458, z: -108, w: 56, d: 40 },
+    { id: "FirstDistrictOffice", label: "第一区公所", x: 368, z: -58.5, w: 42, d: 63 },
+    { id: "Battalion731", label: "第731团1营营部", x: 476, z: -58.5, w: 41, d: 65 },
+  ],
+  mapLanes: [
+    { id: "EastGuangStreet", label: "东关大街", x: 449, z: 22, w: 10, d: 536 },
+    { id: "EastNorthCrossLane", x: 443, z: -110, w: 194, d: 12 },
+    { id: "EastSouthCrossLane", x: 443, z: 121, w: 194, d: 10 },
+  ],
+  // 1938 城防图右侧闭合框逐框数字化。sourceGroup 用于验收计数；polygon 为
+  // 图框外轮廓，rows 是框内实际院落/房列，不允许生成器在框外补规则网格。
+  mapBlocks: [
+    { id: "NorthEastTemple", sourceGroup: "northEast", kind: "courtyard", x: 427, z: -465, w: 44, d: 45, damage: 0.18 },
+    { id: "NorthEastCentralFrame", sourceGroup: "northEast", kind: "residentialRow", x: 379.5, z: -379, w: 61, d: 70, damage: 0.22,
+      grid: { cols: 4, rows: 5, gapX: 1, gapZ: 1, kindCycle: ["residentialRow", "courtyard", "residential"] } },
+    { id: "NorthEastLargeFrame", sourceGroup: "northEast", kind: "residential", x: 487, z: -368.5, w: 68, d: 147, damage: 0.2,
+      polygon: [{ x: 453, z: -442 }, { x: 521, z: -442 }, { x: 521, z: -295 }, { x: 453, z: -295 }], cellSpan: 12 },
+    { id: "NorthEastLowerWestFrame", sourceGroup: "northEast", kind: "shop", x: 377.5, z: -309.5, w: 83, d: 53, damage: 0.25,
+      grid: { cols: 5, rows: 4, gapX: 1, gapZ: 1, kindCycle: ["shop", "courtyard", "residential"] } },
+    { id: "NorthEastLowerEastFrame", sourceGroup: "northEast", kind: "storage", x: 494.5, z: -278, w: 83, d: 16, damage: 0.24,
+      grid: { cols: 7, rows: 1, gapX: 1, gapZ: 0, kindCycle: ["storage", "shop"] } },
+
+    { id: "EastNorthWestCompound", sourceGroup: "core", kind: "residential", x: 382, z: -181, w: 72, d: 122, damage: 0.34,
+      grid: { cols: 5, rows: 8, gapX: 1, gapZ: 1, kindCycle: ["residential", "courtyard", "shop", "residentialRow"] } },
+    { id: "EastNorthEastNotchedCompound", sourceGroup: "core", kind: "residential", x: 492, z: -187.5, w: 68, d: 117, damage: 0.3,
+      polygon: [{ x: 458, z: -246 }, { x: 489, z: -246 }, { x: 489, z: -196 }, { x: 526, z: -196 }, { x: 526, z: -167 }, { x: 489, z: -167 }, { x: 489, z: -129 }, { x: 458, z: -129 }], cellSpan: 12 },
+    { id: "FirstDistrictOffice", sourceGroup: "core", label: "第一区", kind: "districtOffice", x: 390.5, z: 7.5, w: 89, d: 197, damage: 0.42,
+      polygon: [{ x: 346, z: -91 }, { x: 435, z: -91 }, { x: 435, z: 106 }, { x: 394, z: 101 }, { x: 348, z: 79 }],
+      rows: [
+        { id: "FirstDistrictOffice", x: 368, z: -58.5, w: 42, d: 63, kind: "districtOffice" },
+        { id: "FirstDistrictNorthEastA", x: 412.5, z: -74.5, w: 43, d: 31, kind: "residentialRow" },
+        { id: "FirstDistrictNorthEastB", x: 412.5, z: -42.5, w: 43, d: 31, kind: "courtyard" },
+        { id: "FirstDistrictRowA", count: 4, axis: "x", span: 87, depth: 31, gap: 1, offset: -17, kind: "shop" },
+        { id: "FirstDistrictRowB", count: 4, axis: "x", span: 87, depth: 31, gap: 1, offset: 15, kind: "residential" },
+        { id: "FirstDistrictRowC", count: 4, axis: "x", span: 87, depth: 31, gap: 1, offset: 47, kind: "courtyard" },
+        { id: "FirstDistrictRowD", count: 4, axis: "x", span: 87, depth: 31, gap: 1, offset: 79, kind: "residentialRow" },
+      ] },
+    { id: "Battalion731", sourceGroup: "core", label: "第731团1营", kind: "battalion", x: 497.5, z: 9, w: 85, d: 202, damage: 0.34,
+      polygon: [{ x: 455, z: -92 }, { x: 540, z: -92 }, { x: 540, z: 110 }, { x: 499, z: 102 }, { x: 455, z: 84 }],
+      rows: [
+        { id: "Battalion731", x: 476, z: -58.5, w: 41, d: 65, kind: "battalion" },
+        { id: "Battalion731NorthEastA", x: 519, z: -75, w: 41, d: 32, kind: "storage" },
+        { id: "Battalion731NorthEastB", x: 519, z: -41.5, w: 41, d: 32, kind: "residentialRow" },
+        { id: "Battalion731RowA", count: 4, axis: "x", span: 83, depth: 32, gap: 1, offset: -16.5, kind: "courtyard" },
+        { id: "Battalion731RowB", count: 4, axis: "x", span: 83, depth: 32, gap: 1, offset: 16.5, kind: "residential" },
+        { id: "Battalion731RowC", count: 4, axis: "x", span: 83, depth: 32, gap: 1, offset: 49.5, kind: "storage" },
+        { id: "Battalion731RowD", count: 4, axis: "x", span: 83, depth: 32, gap: 1, offset: 82.5, kind: "residentialRow" },
+      ] },
+    { id: "EastSouthWestLongCompound", sourceGroup: "core", kind: "residential", x: 394, z: 213, w: 96, d: 157, damage: 0.31,
+      grid: { cols: 6, rows: 10, gapX: 1, gapZ: 1, kindCycle: ["residentialRow", "courtyard", "shop", "residential"] } },
+    { id: "EastSouthEastLongCompound", sourceGroup: "core", kind: "storage", x: 498, z: 213, w: 81, d: 158, damage: 0.28,
+      grid: { cols: 5, rows: 10, gapX: 1, gapZ: 1, kindCycle: ["storage", "residential", "courtyard"] } },
+
+    { id: "SouthEastOuterWestFrame", sourceGroup: "southEast", kind: "outlyingCompound", x: 367.5, z: 370.5, w: 63, d: 85, damage: 0.16,
+      grid: { cols: 4, rows: 6, gapX: 1, gapZ: 1, kindCycle: ["outlyingCompound", "residential"] } },
+    { id: "SouthEastOuterEastFrame", sourceGroup: "southEast", kind: "outlyingCompound", x: 447.5, z: 365, w: 63, d: 62, damage: 0.14,
+      grid: { cols: 4, rows: 5, gapX: 1, gapZ: 1, kindCycle: ["storage", "outlyingCompound", "residential"] } },
   ],
 };
 
@@ -533,7 +589,7 @@ export const LEVEL_BOUNDS = {
   L3EastNight: { minX: 300, maxX: 600, minZ: -220, maxZ: 220 },
   // L4 是编辑器「俯瞰全城」的验收切片：东侧必须一直收到东关外农田带尽头，
   // 否则 EastFarmFar 与荆河前沿明明有数据，却会在俯视图里被 x=620 静默裁掉。
-  L4Wall: { minX: -100, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -100, maxZ: 420 },
+  L4Wall: { minX: -100, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -520, maxZ: 500 },
   L5Crossroad: { minX: -340, maxX: 340, minZ: -340, maxZ: 340 },
   L6Breakout: { minX: -340, maxX: 340, minZ: -700, maxZ: 340 },
   Whole: { minX: -1100, maxX: 1100, minZ: -1100, maxZ: 1100 },

@@ -176,7 +176,9 @@ const TUNING = {
     },
   },
   L2_Dongguan: {
-    bounds: { minX: 250, maxX: 620, minZ: -240, maxZ: 240 },
+    // 寺院地按布防图位于东北延伸框；切片必须把完整东侧 13 框一起纳入，
+    // 否则 Temple 路标会在关卡外、北部五框也只在总览里存在。
+    bounds: { minX: 250, maxX: 620, minZ: -520, maxZ: 420 },
     zones: ["ZhaiGate", "Courtyard", "Temple", "Breach"],
     // 东门大街的清路中央，避开两侧门前家什；朝东正对东关门与缺口。
     spawn: { x: 432, z: EAST_SUBURB.roadZ, ry: -Math.PI / 2 },
@@ -192,12 +194,12 @@ const TUNING = {
     },
   },
   L3_Fanji: {
-    // 比 L2 窄一条：保留寺院地至东门的北段巷网，南端的关厢从不去。
+    // 比 L2 只裁掉南部延伸：保留布防图东北寺院地至东门的完整北段巷网。
     // **调 draw call 优先调 bounds，不是调 detailRadius** ——
     // 实测把 detailRadius 从 100 压到 62，三角形掉了 24% 而 calls 反而涨了：
     // 院落从 detail 掉到 silhouette 之后进的是**按扇区分批**的远景 sink，
     // 扇区多一个就多一批。少生成才是少 draw call，降细节不是。
-    bounds: { minX: 250, maxX: 600, minZ: -200, maxZ: 170 },
+    bounds: { minX: 250, maxX: 600, minZ: -520, maxZ: 170 },
     zones: ["Temple", "Lane", "GateRetake", "EastGateIn"],
     // 出生点要**出**寺院的屋檐：原来站在 (414,-76)，正压在寺院地那座
     // 26×22 m 房子的檐下，出图上是一条横贯全屏的黑带（屋顶的背面）。
