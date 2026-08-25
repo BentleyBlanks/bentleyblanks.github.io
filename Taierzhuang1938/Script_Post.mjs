@@ -766,6 +766,7 @@ export class PostPipeline {
     // final 之外的值只在开发用面板明确要求时才生效；正式出图完全不走这里。
     this.debugView = "final";
     this.debugGi = null;
+    this.debugInjected = false;
 
     this.prevViewProjection = new THREE.Matrix4();
     this.sunWorld = new THREE.Vector3();
@@ -857,9 +858,13 @@ export class PostPipeline {
    * 让独立的渲染调试面板选择当前帧最终送往屏幕的中间结果。
    * 这个状态故意不进玩家设置，也不影响正式合成链，只在面板存活期间保留。
    */
-  SetDebugView(view = "final", gi = null) {
+  SetDebugView(view = "final", gi = null, injected = null) {
     this.debugView = view || "final";
     this.debugGi = gi || null;
+    // 材质假彩色的可用性看「材质注了没有」（library.gi 那包 uniforms），
+    // 不看 ProbeVolume：GI 出厂默认关时探针体不构造，但调试层照样编在材质里。
+    // 不传第三参的旧调用点退回老代理（有探针体 = 注入过）。
+    this.debugInjected = injected == null ? !!gi : !!injected;
   }
 
   GetDebugView() { return this.debugView; }
@@ -890,13 +895,17 @@ export class PostPipeline {
       // uGiDebugView 把该通道当颜色写进 hdr 靶），这里只负责把 hdr 靶
       // 以 0-1 直通模式送屏。谁设 uGiDebugView：Debug Rendering 面板
       // （SetView 同步材质 uniform 与这里的视图名）或 ?giView= 直连。
-      // low 档材质没有注入（library.gi 为 null、ProbeVolume 未构造），
-      // 屏幕上会是原样 HDR —— 用 debugGi 缺席当"未注入"的代理，画不可用斜纹。
+      // 可用性看 debugInjected（材质里有没有调试层）：low 档材质没有注入，
+      // 屏幕上会是原样 HDR，画不可用斜纹。GI 出厂默认关（2026-08-26 起）时
+      // ProbeVolume 不构造，但调试层照样编在材质里 —— 这些视图必须照常能用，
+      // 所以不能再拿 debugGi 缺席当"未注入"的代理。
       case "baseColor": case "roughness": case "metalness": case "shadow":
-        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi };
-      // GI 的世界空间视图还要求探针体真的开着，否则取样恒为零、满屏黑
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugInjected };
+      // GI 的世界空间视图同理只要求材质注入过：探针体关着时 giWorld 显示的
+      // 是材质**实际在用**的间接辐照度（天空 IBL 回退），giConfidence 恒 0
+      // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
       case "giWorld": case "giConfidence":
-        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugGi?.enabled };
+        return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugInjected };
       default: return null;
     }
   }

@@ -42,6 +42,13 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
  *          再加一份就是双份；而 iblIrradiance 本身没有位置概念，正是要被换掉的那个。
  *          镜面那一路（radiance）留给 IBL，但按 GI/天空的亮度比做一次遮蔽 ——
  *          否则屋里的金属件照样反着一片亮天。
+ *
+ * GI 注入分两层，**编译期**按 `gi.sampling` 二选一（cache key 里也带着它）：
+ *   采样层 —— GI_SAMPLE_GLSL + 图集 uniforms + uGiEnabled 分支，只在探针体打开时
+ *            编进去。即使 uGiEnabled 恒为 0 这坨代码也占着采样器与寄存器，
+ *            实测整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest，RTX 4070 SUPER）；
+ *   调试层 —— uGiDebugView / gGiDebugColor / 材质通道视图 6-9 / 末端整帧覆盖。
+ *            GI 关着也要在：?giView 与 Debug Rendering 面板不依赖探针体。
  */
 export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
   material.userData.ssaoUniforms = ssao;
@@ -70,7 +77,7 @@ export function InjectIndirectLighting(material, { ssao = null, gi = null, destr
         }`);
     }
 
-    if (gi) {
+    if (gi && gi.sampling !== false) {
       BindGiUniforms(shader.uniforms, gi);
       // 世界坐标要自己传：three 的 worldPosition 只在开了阴影/envMap 时才有，
       // 靠它等于把 GI 的生死系在别的开关上。实例化/骨骼的矩阵顺序照抄 <project_vertex>。
@@ -161,6 +168,39 @@ ${GI_SAMPLE_GLSL}`)
         #endif`)
         .replace("#include <dithering_fragment>", `#include <dithering_fragment>
         if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
+    } else if (gi) {
+      // 调试视图基建（无探针采样版）。视图语义按「GI 关闭时材质实际在用什么」走：
+      //   1/2 = 天空 IBL×0.05 —— 采样层没编进来，材质实际采用的间接辐照度**就是**
+      //         iblIrradiance，所以视图 1 与视图 2 在这个档位是同一张图；
+      //   3/4/5 = 黑 —— confidence / 亮度比 / 权重和都是探针量，没有探针 = 0，
+      //         黑不是坏视图，是准确信息（画面里没有探针 GI）；
+      //   6-9 材质通道与采样版逐字节相同。
+      shader.uniforms.uGiDebugView = gi.debugView;
+      fragment = fragment
+        .replace("#include <common>", `#include <common>
+        uniform float uGiDebugView;
+        vec3 gGiDebugColor = vec3(0.0);`)
+        .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
+        #if defined( RE_IndirectDiffuse )
+        if (uGiDebugView > 0.5 && uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
+        #endif`)
+        .replace("#include <color_fragment>", `#include <color_fragment>
+        if (uGiDebugView > 5.5 && uGiDebugView < 6.5) gGiDebugColor = diffuseColor.rgb;`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        if (uGiDebugView > 6.5 && uGiDebugView < 7.5) gGiDebugColor = vec3(roughnessFactor);`)
+        .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
+        if (uGiDebugView > 7.5 && uGiDebugView < 8.5) gGiDebugColor = vec3(metalnessFactor);`)
+        .replace("#include <lights_fragment_begin>", `#include <lights_fragment_begin>
+        #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+        if (uGiDebugView > 8.5 && uGiDebugView < 9.5) {
+          gGiDebugColor = vec3(getShadow(directionalShadowMap[0],
+            directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity,
+            directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius,
+            vDirectionalShadowCoord[0]));
+        }
+        #endif`)
+        .replace("#include <dithering_fragment>", `#include <dithering_fragment>
+        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
     }
 
     if (destruction) {
@@ -192,8 +232,11 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`)
     shader.vertexShader = vertex;
     shader.fragmentShader = fragment;
   };
-  // 缓存键必须跟着注入组合走：两种组合共用一份编译结果 = 有的材质拿不到 GI
-  material.customProgramCacheKey = () => `indirect:${ssao ? 1 : 0}${gi ? 1 : 0}${destruction ? 1 : 0}`;
+  // 缓存键必须跟着注入组合走：两种组合共用一份编译结果 = 有的材质拿不到 GI。
+  // GI 位是三态（0 无 / 1 只有调试层 / 2 带探针采样），且**每次编译现读** ——
+  // 运行时翻转 gi.sampling 再 needsUpdate，就能拿到另一套程序而不撞缓存。
+  material.customProgramCacheKey = () =>
+    `indirect:${ssao ? 1 : 0}${gi ? (gi.sampling !== false ? 2 : 1) : 0}${destruction ? 1 : 0}`;
   return material;
 }
 

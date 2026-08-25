@@ -230,12 +230,18 @@ const graphics = {
   gi: params.get("gi") === "1", giStrength: 1,
   fov: BASE_FOV,
 };
-// 探针体（GI）。保留构造与材质入口，才能从画质面板即时打开；默认不更新、不出
-// trace/blend pass。low 档没有配置，仍按原规则不建。
+// 探针体（GI）。默认关到底：ProbeVolume 不构造（省掉图集/靶与每帧 Update），
+// 材质也**不编入**探针采样代码 —— GI_SAMPLE_GLSL 占着采样器与寄存器，
+// 即使 uGiEnabled 恒为 0 也让整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest 实测）。
+// ?gi=1 或画质面板打开时，由 ApplyGraphics 惰性构造 + 材质重编译（同阴影开关先例）。
+// low 档没有 GI 配置，连调试视图基建也不注入（Debug Rendering 的材质/光照组不可用）。
 const GI_ON = GI_QUALITY[QUALITY] != null;
 const giUniforms = MakeGiUniforms();
-// GI 取样端假彩色（?giView=1 探针辐照度 / 2 天空 IBL / 3 confidence），开发取证用
+// GI 取样端假彩色（?giView=1 探针辐照度 / 2 天空 IBL / 3 confidence），开发取证用。
+// GI 关着也可用：材质仍带调试视图基建，1/2 显示实际在用的天空 IBL、3/4/5 显示 0。
 giUniforms.debugView.value = parseFloat(params.get("giView") || "0") || 0;
+// 编译期开关：false = 材质不含探针采样代码（进了 cache key，翻转要整场重编译）
+giUniforms.sampling = GI_ON && graphics.gi;
 const library = new MaterialLibrary(renderer, {
   textureSize: QUALITY === "low" ? 256 : 512, ssao, gi: GI_ON ? giUniforms : null,
   destruction: destructionUniforms,
@@ -245,11 +251,12 @@ scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66 });
-// 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变
-const gi = GI_ON
+// 天空 uniform 借给探针体：漏空的射线问的是同一片天，换预设两边同时变。
+// let 不是 const：默认关不构造，运行时打开由 ApplyGraphics 惰性补建。
+let gi = (GI_ON && graphics.gi)
   ? new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms })
   : null;
-if (gi) gi.enabled = graphics.gi;
+if (gi) gi.enabled = true;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
 
@@ -749,10 +756,14 @@ async function Boot() {
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
   state.phaseMinutes = PHASES.map((p) => p.minutes);
   window.Taierzhuang = {
-    renderer, scene, camera, post, sky, lights, library, gi,
+    // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
+    // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
+    renderer, scene, camera, post, sky, lights, library, get gi() { return gi; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     story, combat, destruction, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
+    // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
+    graphics, ApplyGraphics,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
       Reload, DoMelee, CallMortar, EndBattle,
@@ -1073,7 +1084,8 @@ async function Boot() {
     ReleasePointerLock,
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
-      state, PHASES, JumpToLevel, graphics, ApplyGraphics, gi,
+      // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
+      state, PHASES, JumpToLevel, graphics, ApplyGraphics, get gi() { return gi; },
       // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
       // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
       // query，避免新序章又落到界河战斗切片。
@@ -3808,11 +3820,37 @@ function ApplyGraphics() {
       else material.needsUpdate = true;
     });
   }
-  if (gi) {
-    gi.enabled = !!graphics.gi;
-    if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
-    const preset = SKY_PRESETS[PHASES[state.phaseIndex].sky];
-    if (preset) gi.ApplyPreset(preset, graphics.giStrength);
+  // GI 开关是三件事（low 档没有 GI 配置，三件都不做）：
+  //  1) 惰性构造 —— 出厂默认关，boot 不建 ProbeVolume；第一次打开才建，
+  //     并补挂当前战场的碰撞盒表（boot 早期 battlefield 还没有时，
+  //     EnterLevel 的 gi.SetWorld(battlefield) 会接上）。
+  //  2) 材质重编译 —— 探针采样代码是**编译期**的（giUniforms.sampling 进了
+  //     cache key），只翻标志不重编译的话画面还跑着旧程序。与上面阴影开关
+  //     同一个先例，代价同样是一次性的几百毫秒。库缓存里暂不在场的材质也要标：
+  //     它们换关会被挂回来，而 three 不会为没 needsUpdate 的材质重查 cache key。
+  //  3) 运行态开关 —— 关闭要立刻退回 Global SH 基线（blend 清零 + SetGiActive(0)）。
+  if (GI_ON) {
+    const wantGi = !!graphics.gi;
+    if (wantGi && !gi) {
+      gi = new ProbeVolume(renderer, { quality: QUALITY, skyUniforms: sky.uniforms, uniforms: giUniforms });
+      if (battlefield) gi.SetWorld(battlefield);
+    }
+    if (giUniforms.sampling !== wantGi) {
+      giUniforms.sampling = wantGi;
+      const Recompile = (material) => { if (material) material.needsUpdate = true; };
+      scene.traverse((object) => {
+        const material = object.material;
+        if (Array.isArray(material)) material.forEach(Recompile); else Recompile(material);
+      });
+      for (const material of library.materials.values()) Recompile(material);
+      for (const material of library.staticMaterials.values()) Recompile(material);
+    }
+    if (gi) {
+      gi.enabled = wantGi;
+      if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
+      const preset = SKY_PRESETS[PHASES[state.phaseIndex].sky];
+      if (preset) gi.ApplyPreset(preset, graphics.giStrength);
+    }
   }
   if (graphics.shadowSize && lights.sun.shadow.mapSize.x !== graphics.shadowSize) {
     lights.sun.shadow.mapSize.set(graphics.shadowSize, graphics.shadowSize);

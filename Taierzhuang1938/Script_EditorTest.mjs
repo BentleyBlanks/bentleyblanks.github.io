@@ -73,7 +73,10 @@ async function CanvasDrag(x, y, steps = 12) {
 // 这不是这一趟改出来的（这个文件之前停在 phase 0，第一条取证就抛
 // `T.battlefield.city is undefined`，整个冒烟根本没跑到地形那一段）。
 // 界河要不要支持地形笔刷是另一件事，别混在这里。
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0`,
+// gi=1：GI 出厂默认关（2026-08-26 起探针体不构造）。Debug Rendering 那一节要
+// 直接掏 gi.irradiance / gi.distanceMoments 验图集送屏，考的是「GI 开着」的面板，
+// 所以显式强开 —— 默认关状态下的调试视图契约由 Script_GiTest 管。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0&gi=1`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
 

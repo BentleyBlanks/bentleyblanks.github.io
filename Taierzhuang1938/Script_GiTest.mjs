@@ -11,6 +11,12 @@
 //   4. 有效探针占比合理 —— 全被判死（重定位失败）等于 GI 没上；
 //   5. gi=1 与 gi=0 两张图**必须不一样**。一样就说明注入没生效。
 //
+// 2026-08-26 起 GI 出厂默认关（间接光走天空 IBL/Global SH + AmbientLight），
+// GI 本体的考卷显式带 ?gi=1。默认档另有两条反向契约：
+//   6. gi=0 编译出的程序**不含** GI 采样函数（GI_SAMPLE_GLSL 是编译期剔除的，
+//      混回来就是把 ~2.7 ms/帧 的着色器成本偷偷带回默认档）；
+//   7. gi=0 材质仍带调试视图基建，且 giView=1 显示实际在用的天空 IBL、不是黑。
+//
 // 用法：node Taierzhuang1938/Script_GiTest.mjs
 // 退出码即成败。
 
@@ -50,15 +56,20 @@ const materialSource = await readFile(path.join(projectDir, "Script_Materials.mj
 Check(materialSource.includes(
   "gGiDebugColor = mix(iblIrradiance, giIrradiance, giConfidence) * 0.05;"),
 "GI 辐照度视图在探针体外回退天空 IBL");
+// GI 关闭档（采样层没编进来）：视图 1/2 必须显示材质实际在用的天空 IBL —— 那
+// 就是此时的间接光本体；画成黑等于把「默认关」误报成「间接光坏了」。
+Check(materialSource.includes(
+  "if (uGiDebugView > 0.5 && uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;"),
+"GI 关闭档的辐照度/IBL 视图显示实际在用的天空 IBL");
 
 /** 跑一遍探针页，推够帧数让图集收敛，回收一批可断言的数值。 */
-async function Run(query) {
+async function Run(query, frames = 400) {
   problems.length = 0;
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?${query}`,
     { waitUntil: "load", timeout: 90000 });
   await page.waitForFunction(() => window.Probe !== undefined, null, { timeout: 90000 });
-  // 探针体一帧只更新十几个，980 个要扫满一遍；给足 400 帧再看
-  await page.evaluate(() => window.Probe.StepFrames(400));
+  // 探针体一帧只更新十几个，980 个要扫满一遍；默认给足 400 帧再看
+  await page.evaluate((count) => window.Probe.StepFrames(count), frames);
   await page.waitForTimeout(400);
   return page.evaluate(() => {
     const probe = window.Probe;
@@ -142,6 +153,57 @@ if (withGi.gi) {
 
 const withoutGi = await Run("scene=street&preset=smokyDay&quality=high&gi=0");
 Check(problems.length === 0, "关掉 GI 的探针页无报错", problems.slice(0, 3).join(" | "));
+Check(!withoutGi.gi, "gi=0 不构造 ProbeVolume（默认档不掏构建与每帧更新的钱）");
+
+// 反向契约：默认档（gi=0，与正片出厂态同构）编译出的程序**不许**含探针采样
+// 函数 —— GI_SAMPLE_GLSL 即使 uGiEnabled 恒 0 也占寄存器（~2.7 ms/帧）。
+// 同时调试视图基建必须还在，否则 ?giView / Debug Rendering 面板在默认档全瞎。
+const shaderScan = await page.evaluate(() => {
+  const probe = window.Probe;
+  const gl = probe.renderer.getContext();
+  const programs = probe.renderer.info.programs || [];
+  let sampling = 0, debugInfra = 0;
+  for (const entry of programs) {
+    let hasSampling = false, hasDebug = false;
+    for (const shader of gl.getAttachedShaders(entry.program) || []) {
+      const source = gl.getShaderSource(shader) || "";
+      if (source.includes("GiSampleIrradiance")) hasSampling = true;
+      if (source.includes("gGiDebugColor")) hasDebug = true;
+    }
+    if (hasSampling) sampling += 1;
+    if (hasDebug) debugInfra += 1;
+  }
+  return { total: programs.length, sampling, debugInfra };
+});
+console.log(`     gi=0 程序 ${shaderScan.total} 个：含采样 ${shaderScan.sampling}`
+  + `、含调试基建 ${shaderScan.debugInfra}`);
+Check(shaderScan.sampling === 0, "gi=0 编译出的程序不含 GI 采样代码",
+  `${shaderScan.sampling}/${shaderScan.total} 个程序混进了 GiSampleIrradiance`);
+Check(shaderScan.debugInfra > 0, "gi=0 材质仍带调试视图基建（?giView 可用）");
+
+// giView=1 在 GI 关闭档显示「材质实际采用的间接辐照度」= 天空 IBL×0.05。
+// 只看画面下半（街面为主，天空不算数）：全黑就是把默认关误画成了间接光失效。
+const debugView = await page.evaluate(() => {
+  const probe = window.Probe;
+  probe.library.gi.debugView.value = 1;
+  probe.StepFrames(2);
+  const small = document.createElement("canvas");
+  small.width = 32; small.height = 18;
+  const ctx = small.getContext("2d");
+  ctx.drawImage(probe.renderer.domElement, 0, 0, 32, 18);
+  const pixels = ctx.getImageData(0, 0, 32, 18).data;
+  const luma = [];
+  for (let i = 0; i < pixels.length; i += 4) {
+    luma.push(0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]);
+  }
+  probe.library.gi.debugView.value = 0;
+  probe.StepFrames(1);
+  const bottom = luma.slice(32 * 10);
+  return { bottomMean: bottom.reduce((a, b) => a + b, 0) / bottom.length };
+});
+Check(debugView.bottomMean > 1, "gi=0 的 giView=1 视图非黑（显示实际在用的天空 IBL）",
+  `下半均值=${debugView.bottomMean.toFixed(2)}`);
+Check(problems.length === 0, "gi=0 的调试视图无报错", problems.slice(0, 3).join(" | "));
 
 // 逐块比较：GI 一上，街两侧的墙必须**分出明暗**，不能只是整体亮度平移一档
 let changed = 0;

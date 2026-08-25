@@ -17,7 +17,7 @@ const VIEWS = [
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
   { id: "giWorld", label: "GI 辐照度", group: "光照", note: "材质最终采用的间接辐照度（×0.05）；探针体外按正式渲染回退到天空 IBL，不应为黑。" },
-  { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。" },
+  { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。探针体关着（出厂默认）时恒 0，全黑是准确信息。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
   { id: "giDistance", label: "距离图集", group: "GI", note: "实时探针体的 R/G 距离矩；探针体没开时显示不可用斜纹。" },
 ];
@@ -119,7 +119,9 @@ export class DebugRenderingEditor {
     // post 决定拿哪张靶、按哪种口径显示。只设一边就是「面板亮着、画面没变」。
     const pack = this.host.library?.gi;
     if (pack) pack.debugView.value = MATERIAL_VIEW_MODES[id] || 0;
-    this.host.post?.SetDebugView?.(id, this.host.gi);
+    // 第三参 = 材质注了调试层没有：GI 出厂默认关时探针体（host.gi）是 null，
+    // 但材质/光照组的假彩色照样可用 —— 可用性要看 library.gi，不看探针体。
+    this.host.post?.SetDebugView?.(id, this.host.gi, !!pack);
   }
 
   Update() {
@@ -134,7 +136,7 @@ export class DebugRenderingEditor {
     this.facts.Set("说明", item.note);
     this.facts.Set("尺寸", target ? `${target.width} × ${target.height}` : "—", target ? "" : "warn");
     this.facts.Set("SSAO", post?.preset?.ssao ? "启用" : "当前画质档关闭", post?.preset?.ssao ? "good" : "warn");
-    this.facts.Set("GI 探针体", gi ? (gi.enabled ? `启用 · ${gi.warmed}/${gi.probeCount}` : "已构造，当前关闭") : "当前画质档未构造", gi?.enabled ? "good" : "warn");
+    this.facts.Set("GI 探针体", gi ? (gi.enabled ? `启用 · ${gi.warmed}/${gi.probeCount}` : "已构造，当前关闭") : "未构造（出厂默认关，画质 → 全局光照里打开）", gi?.enabled ? "good" : "warn");
     // 材质/光照组的两个前置条件：材质注入过（low 档没有）、阴影真的开着
     const injected = !!this.host.library?.gi;
     this.facts.Set("材质假彩色", injected ? "已注入" : "low 档未注入，材质/光照组不可用", injected ? "good" : "warn");

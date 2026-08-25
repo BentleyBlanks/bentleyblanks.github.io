@@ -1,6 +1,7 @@
 // 《滕县 一九三八》整帧 CPU / GPU 剖析。
 //
-// 固定用玩家问题里的 3394×1348 / high，在最重的东关分别消融 GI、SSAO、阴影、
+// 固定用玩家问题里的 3394×1348 / high，在最重的东关分别消融 GI（出厂默认关，
+// 这里反向强制打开：走设置面板同一条路，惰性构造探针体 + 材质重编译）、SSAO、
 // 强制 4×MSAA 与内部渲染分辨率。GPU 时间来自 EXT_disjoint_timer_query_webgl2，
 // CPU submit 是主线程把一帧提交给驱动所花的时间，wall 是提交后 gl.finish 的总墙钟。
 //
@@ -118,6 +119,7 @@ try {
       restores.push(() => { object[key] = original; });
     };
     Wrap(T.ai, "Update", "ai");
+    // GI 默认关时 T.gi 是 null（探针体没构造），这一桶如实记 0.00
     Wrap(T.gi, "Update", "gi");
     Wrap(T.scene, "updateMatrixWorld", "sceneMatrix");
     Wrap(T.actorBatch, "Update", "actorBatch");
@@ -131,9 +133,33 @@ try {
     const rows = [];
     rows.push(await Sample("baseline"));
 
-    if (T.gi) T.gi.enabled = false;
-    rows.push(await Sample("no GI"));
-    if (T.gi) T.gi.enabled = true;
+    // GI 出厂默认关：baseline 里连采样代码都没编进材质。消融方向反过来 ——
+    // 强制打开，走设置面板同一条路（惰性构造 ProbeVolume + 材质重编译），
+    // 既持续追踪 GI 的真实成本，也顺手回归了运行时「关 → 开」这条链。
+    const giScrollMs = [];
+    if (T.graphics && T.ApplyGraphics) {
+      T.graphics.gi = true;
+      T.ApplyGraphics();
+      // 重编译一次全场材质 + 980 探针按 12/帧扫满一遍 + 半秒淡入：
+      // 150 帧后量到的才是收敛后的稳态，不是半温的图集
+      T.StepFrames(150);
+      rows.push(await Sample("GI forced on"));
+      // “经常顿一下”还可能来自探针体每跨 4 m 滚动一格。按 0.25 m 模拟移动，
+      // 既覆盖普通帧也覆盖跨格帧，单列最大值，别让中位数把尖峰藏掉。
+      if (T.gi) {
+        const focus = T.camera.position.clone();
+        for (let step = 0; step < 96; step += 1) {
+          focus.x += 0.25;
+          const started = performance.now();
+          T.gi.Scroll(focus);
+          giScrollMs.push(performance.now() - started);
+        }
+      }
+      // 退回出厂默认（材质再编译回无采样版），后面的消融都在默认档上量
+      T.graphics.gi = false;
+      T.ApplyGraphics();
+      T.StepFrames(10);
+    }
 
     const oldSsao = T.post.preset.ssao;
     T.post.preset.ssao = false;
@@ -151,23 +177,10 @@ try {
     rows.push(await Sample("70% scale"));
     T.post.SetSize(3394, 1348);
 
-    // 真正的纯玩法主线程：不出画、GI 也关掉，避免它的五个 GL pass 混进来。
+    // 真正的纯玩法主线程：不出画。GI 默认已关（上面消融完退回默认档），
+    // 再保险性地按住 enabled，避免它的五个 GL pass 混进来。
     if (T.gi) T.gi.enabled = false;
     rows.push(await Sample("logic only", false));
-
-    // “经常顿一下”还可能来自探针体每跨 4 m 滚动一格。按 0.25 m 模拟移动，
-    // 既覆盖普通帧也覆盖跨格帧，单列最大值，别让中位数把尖峰藏掉。
-    const giScrollMs = [];
-    if (T.gi) {
-      T.gi.enabled = true;
-      const focus = T.camera.position.clone();
-      for (let step = 0; step < 96; step += 1) {
-        focus.x += 0.25;
-        const started = performance.now();
-        T.gi.Scroll(focus);
-        giScrollMs.push(performance.now() - started);
-      }
-    }
 
     return {
       rendererName,

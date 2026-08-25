@@ -45,7 +45,10 @@ const ssao = {
   strength: { value: 0.78 },
 };
 const giUniforms = MakeGiUniforms();
-const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giEnabled ? giUniforms : null });
+// 与正片同一套双层注入：gi=0 时材质只留调试视图基建（探针采样代码编译期剔除），
+// 与正片出厂默认档完全同构 —— GiTest 的「默认材质不含采样代码」就在这页上验。
+giUniforms.sampling = giEnabled;
+const library = new MaterialLibrary(renderer, { textureSize: 512, ssao, gi: giUniforms });
 
 const sky = new SkyDome(renderer);
 scene.add(sky.mesh);

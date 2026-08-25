@@ -1000,7 +1000,7 @@ Probe.html?scene=street&preset=smokyDay&gi=0            # 关
 Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 = 该探针埋在几何体里、已作废）
 ```
 
-正片同样吃 `?gi=0`，画质面板「画质 → 全局光照（探针体）」里有开关与强度。
+正片**出厂默认关**（见 12.10），`?gi=1` 强开；画质面板「画质 → 全局光照（实时探针体）」里有开关与强度。
 
 取样端还有一套假彩色（正片 `?giView=N`，或控制台 `Taierzhuang.library.gi.debugView.value = N`）：
 1 = **材质最终采用的间接辐照度**×0.05（探针体内混合探针 GI，体外按正式渲染回退天空 IBL），2 = 被替换前的天空 IBL×0.05，3 = confidence，4 = 原始探针 gi/IBL 亮度比×0.25（与曝光无关，最好用），5 = 权重和×0.5，6 = BaseColor，7 = 粗糙度，8 = 金属度，9 = 太阳阴影因子。控制台还有 `library.gi.chebOff.value = 1` 可以整体旁路切比雪夫做 A/B —— 「画面上哪个通道塌了」用这套看，比拿成图做 diff 快一个数量级。原始探针值在体积外本来就是 0，不能拿它冒充最终照明，否则会把正常的体外回退误画成整片黑。
@@ -1014,6 +1014,38 @@ Probe.html?scene=street&preset=smokyDay&gi=1&giDebug=1  # 画探针球（紫色 
 - **反照率按 `tag` 查表**（`GI_ALBEDO`），不是真材质。整座城是青砖 + 夯土 + 土路，色域很窄，这个近似的误差远小于「有没有位置感」的收益。要更准就得让 `BuildSink.Solid()` 记下材质名。
 - **单级 cascade**。体积外（56 m 开外）退回天空 IBL，边缘按 `confidence` 平滑过渡。远景本来就被雾吃掉了。
 - **动态物体不写进 GI**。士兵、载具不参与反弹（它们只是 GI 的接收者）。
+
+### 12.10 2026-08-26 起：出厂默认关，间接光走 ambient 基线
+
+**决定**：探针体 GI 各画质档出厂默认全关。默认间接光 = 天空 IBL（PMREM 漫反射 +
+镜面）+ Global SH Probe + 冷灰蓝 `AmbientLight`（`LightRig`，`SetGiActive(0)` 的
+那一档）—— 就是 12.6 表里「GI 上之前」的原始分工，不需要任何新代码。
+
+**原因**：FrameProfileTest 实测（RTX 4070 SUPER，3394×1348 high，东关）
+baseline 11.1 ms vs 无 GI 8.4 ms，差 ~2.7 ms，且 CPU 分项里 `gi=0.00` ——
+成本全在 GPU/着色器侧。当前的瓶颈是 CPU 提交（见文末「CPU 提交量」那轮账），
+先把这份 GPU/着色器钱省下来。大头不是那五个 GI pass（12.7 已证明它们在噪声以内），
+是 **GI_SAMPLE_GLSL 编进全部材质**的代价：即使 `uGiEnabled` 恒 0，那 24 次
+纹理取样的代码也占着采样器与寄存器压着 occupancy。
+
+**所以「关」是编译期的**（`Script_Materials.InjectIndirectLighting` 拆成两层）：
+
+- 采样层（GI_SAMPLE_GLSL + 图集 uniforms + `uGiEnabled` 分支）只在 GI 打开时编进材质；
+  关闭档材质里**不存在**探针采样代码，`ProbeVolume` 也不构造（不建图集/靶、不跑每帧 Update）。
+- 调试层（`uGiDebugView` / 视图 1-9 / 末端整帧覆盖）关闭档仍在：`?giView` 与
+  Debug Rendering 面板照常可用。语义按「材质实际在用什么」走 —— 视图 1/2 显示
+  天空 IBL×0.05（此时的间接光本体，两图相同），3/4/5 显示 0（黑 = 没有探针 GI，
+  是准确信息），6-9（材质通道）与打开档逐字节相同。
+- 开关进了 `customProgramCacheKey`（三态：无 / 只调试层 / 带采样），坑见「坑」一节 ——
+  少了它两种档位会共用同一份编译缓存。
+
+**怎么重新开**：`?gi=1` 强开（boot 即构造探针体、材质带采样代码），或画质面板
+「全局光照（实时探针体）」开关 —— 运行时打开走 `ApplyGraphics`：惰性构造
+`ProbeVolume` + 整场材质重编译（编译期开关翻转，同「阴影开关」先例，一次性几百毫秒）。
+玩家 localStorage 里已存的 `gi:true` 继续被尊重（`ApplySavedSettings` 装回来时
+走同一条 ApplyGraphics 路），改的只是出厂默认。回归口：`Script_GiTest.mjs`
+（`?gi=1` 考 GI 本体；另有反向契约 —— 默认档编译出的程序不许含 `GiSampleIrradiance`），
+成本追踪：`Script_FrameProfileTest.mjs` 的「GI forced on」消融。
 
 ---
 

@@ -534,6 +534,12 @@ export function MakeGiUniforms() {
     debugView: { value: 0 },
     // 取证实验开关：1 = 取样端跳过切比雪夫项。只做 A/B 定位用，不进正式画面。
     chebOff: { value: 0 },
+    // **不是 uniform**，是编译期开关：false = 材质只注入调试视图基建，
+    // GI_SAMPLE_GLSL 整个不编进去（Script_Materials 的 onBeforeCompile 与
+    // customProgramCacheKey 都现读它）。正片 boot 按 graphics.gi 摆；
+    // 运行时翻转后必须把材质全部 needsUpdate 重编译才生效。
+    // BindGiUniforms 按名拷贝，不会把这个布尔漏进任何 shader.uniforms。
+    sampling: true,
   };
 }
 
