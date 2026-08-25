@@ -107,17 +107,22 @@ Unity Labs 三个源包的直接下载地址分别是：
 
 ## 场景布设物（Script_ExternalProps.mjs 运行时加载）
 
-以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs），在 Blender 里
-统一贴图降采样到 1024、烘焙变换并把包围盒底部对齐原点后直接导出为运行时文件。
-它们是纯视觉布设（不参与碰撞/导航），运行时由 `Script_ExternalProps.mjs` 按关卡摆放。
+以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs）。旧三件资产在 Blender
+里统一贴图降采样到 1024；新场景包则清除源高分贴图、强力减面、逐构件底部归零，并在
+运行时绑定本作共享材质。关卡摆放与构件库预览都由 `Script_ExternalProps.mjs` 负责。
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
 | 民居排屋 `Model_AsianHouseRow.glb` | [Asian House Pack - Low Poly](https://sketchfab.com/3d-models/asian-house-pack-low-poly-70f36c58345440fe8e7b6168854881e7) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 四栋一排的低模民居。贴图 2048→1024，底部对齐原点。 |
 | 民居双栋 `Model_AsianHousePair.glb` | [Asian House - Two Pack](https://sketchfab.com/3d-models/asian-house-two-pack-2aa7bfde643145a3a6aa3a85b06afcd2) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 两栋组合。贴图 2048→1024，底部对齐原点。 |
 | 沙袋 `Model_Sandbag.glb` | [Sandbag Low Poly Realist](https://sketchfab.com/3d-models/sandbag-low-poly-realist-7d52600a15c747749d845d9f906045cf) | [Islide](https://sketchfab.com/Islide) | CC-BY-4.0 | 单体沙袋，缩放到 0.6 m 长；贴图 2048→1024，底部对齐原点。 |
+| 中式四合院 `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb) | CC-BY-4.0 | 作为序章单处地标；减至 5,500 三角，使用共享夯土和屋瓦材质。 |
+| 战场构件 `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya) | CC-BY-4.0 | 拆成 24 个可独立选择节点并全部注册进构件库；战壕 3,500 三角，其余单件不超过 1,519 三角。 |
+| 手推车和市场储物 `Model_Handcart.glb`、`Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew) | CC-BY-4.0 | 新手推车替换旧模型，减至 4,200 三角；另拆出 2 种米袋、3 种木箱、4 种板条箱，单件不超过 900 三角。 |
 
 CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。
+新三包的原始 `scene.gltf` / `scene.bin`、Sketchfab 自动生成署名和许可副本保存在
+`Source/Model_Sketchfab*/`；`Script_SketchfabPackBake.py` 可重建四份运行时 GLB。
 
 ### Poly Haven CC0 构件
 
@@ -133,3 +138,14 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 以上 Poly Haven 资源均为 [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)，
 许可副本保存在各自 `Source/Model_PolyHaven*/License_PolyHavenCc0.txt` 中。
+
+## 特效轮廓纹理（常驻烟雾与燃烧）
+
+| 游戏内资产 | 来源 | 作者 / 页面声明 | 处理方式 |
+|---|---|---|---|
+| `Texture/Texture_VefectsFireMask_01.webp`、`Texture_VefectsGroundFireMask_01.webp`、`Texture_VefectsSmokeMask_01.webp`、`Texture_VefectsNoise_03.webp`、`Texture_VefectsNoise_08.webp` | [Free Fire VFX - Unity](https://vefects.itch.io/free-fire-vfx-unity) 的 `Vefects_VFX_Free_Fire_SRP_Final_01.unitypackage` | Vefects - Realtime VFX for Games；发布页标为免费游戏资产，但没有另附 CC0 / CC-BY 文本，因此不得写成 CC0 | 从 Unity 包中保留原灰度轮廓与噪声，无损转 WebP。`Script_Vfx.mjs` 将轮廓 + 滚动噪声用于常驻烟源、柱状火和贴地火；异步加载失败则回退原程序化烟火。完整源包、15 个 prefab、未使用的灰烬/尘土/渐变纹理及联系表保存在本机 `C:\Users\Bentl\Documents\Program\Taierzhuang1938SourceAssets\Vfx\VefectsFreeFire\`，不把未用素材塞进站点。 |
+
+用户同时选中的 Compositing Academy **Free VFX Fire Elements** 免费档未并入本公开仓库：
+该档仅允许个人非商业成品，并明确禁止在 Git repositories / project files 中分发原素材或
+修改素材。它还需要以邮箱完成 `$0` 订单，当前既未代填用户身份，也未把受限素材下载或提交。
+若未来改为符合其条款的私有素材发布链路，再由合法取得的下载包接入；在此之前不参与运行时。

@@ -106,6 +106,15 @@ const GAME_SHOTS = [
   //（master 侧原名 Z11，与本分支的师部机位撞号，合并时改为 Z16。）
   { name: "Game_Z16_MoatWater", query: "shot=1&phase=4&quality=high&scale=medium",
     setup: { x: 314, z: 165, yaw: -0.73, pitch: -0.46, quiet: true } },
+  // 民居屋面专项：屋脊高度俯瞰城内院落，中景与远景两档必须同框。
+  // 这一张是补一个**只有从屋面之上才暴露**的盲区：远景档的坡顶曾经是
+  // 「两片朝外翘的板 + 一条比它们都低的正脊」（倒 V），一格院子是一块 21×16 m
+  // 的实心大饼 —— 地面机位一辈子拍不到，玩家一进主菜单的关厢机位就看见了。
+  // 验收点：① 每座房的正脊是屋面最高处；② 瓦面压在墙上、不悬空、不互相穿插；
+  // ③ 远景那一片与近处的中景院落是同一种房子（院墙 + 门口 + 正房）。
+  { name: "Game_Z17_BlockRoofs", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower",
+      cam: { from: [140, 26, 150], look: [-60, 3, 40], focalMm: 42 } } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };
@@ -141,6 +150,20 @@ async function Shoot(pageName, url, globalName, setup = null) {
         if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);
         game.menu.shotIndex = index;
         game.menu.shotTime = 0;
+        // cam：借菜单的推轨系统架一个**表里没有**的机位。
+        // 玩家的相机贴地，菜单机位是这一关唯一能把镜头抬到屋面之上的口子；
+        // 屋顶类的回归只能从那儿拍。改的是这一份 shots 的副本，不落回 Data_Menu。
+        if (pose.cam) {
+          const shot = game.menu.shots[index];
+          shot.from = pose.cam.from;
+          shot.to = pose.cam.to || pose.cam.from;
+          shot.look = pose.cam.look;
+          shot.lookTo = pose.cam.lookTo || pose.cam.look;
+          if (pose.cam.focalMm) shot.focalMm = pose.cam.focalMm;
+          game.menu.ApplyShot(0);
+          game.StepFrames(12);
+          return;
+        }
         game.menu.ApplyShot(0.45);
         game.StepFrames(12);
         return;

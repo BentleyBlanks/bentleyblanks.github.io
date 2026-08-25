@@ -41,6 +41,7 @@ import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { PHASES } from "./Data_Battle.mjs";
+import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
 const SAVE_KEY = "tengxian1938_sceneedit_v1";
 // 车厢序章不是一张可玩的战斗切片，不能把它伪装成 L0_界河。
@@ -230,7 +231,14 @@ for (const id of MODEL_PLACEABLE) {
   });
 }
 
-export const PLACEABLE_CATEGORIES = ["景观", "院落小件", "工事", "建筑", "地标", "模型"];
+for (const [id, effect] of Object.entries(SCENE_EFFECTS)) {
+  PLACEABLE.push({
+    id: `Effect_${id}`, name: effect.name, cat: "特效", effect: id,
+    uses: ["scale", "h"], defaults: { scale: 1, h: 0 }, note: effect.note,
+  });
+}
+
+export const PLACEABLE_CATEGORIES = ["景观", "院落小件", "工事", "建筑", "地标", "模型", "特效"];
 
 /** 笔刷的落差场：中间满、边缘平滑到 0（余弦），不是硬圆盘。 */
 function BrushFalloff(distance, radius) {
@@ -305,6 +313,8 @@ export class SceneEditor {
     this.colliderTag = "editorPlacement";
     /** 摆件在物理世界里的碰撞体句柄（RebuildAll 加、DropColliders 撤）。 */
     this.physicsHandles = [];
+    /** 场景 JSON 布设出来的持续特效句柄；ClearBuilt 必须与几何一起撤。 */
+    this.effectHandles = [];
     /**
      * 上面那些句柄属于**哪一个**物理世界。
      * 句柄是索引，换关之后世界整个换了一份，拿旧索引去新世界里删
@@ -513,8 +523,8 @@ export class SceneEditor {
   FillPalette() {
     const items = PLACEABLE.filter((p) => p.cat === this.cat);
     this.palette.Fill(items.map((p) => ({
-      id: p.id, name: p.name, tail: p.model ? "tzm" : "程序化",
-      title: p.model && MESHES[p.model] ? MESHES[p.model].note : "",
+      id: p.id, name: p.name, tail: p.effect ? "vfx" : p.model ? "tzm" : "程序化",
+      title: p.effect ? p.note : p.model && MESHES[p.model] ? MESHES[p.model].note : "",
     })));
     if (items.length && !items.some((p) => p.id === this.paletteId)) this.SetPalette(items[0].id);
     this.palette.Select(this.paletteId);
@@ -786,6 +796,8 @@ export class SceneEditor {
 
   /** 把本层建过的东西全拆掉（几何是我们自己合批出来的，必须 dispose）。 */
   ClearBuilt() {
+    for (const handle of this.effectHandles) this.host.vfx?.RemoveSceneEffect(handle);
+    this.effectHandles.length = 0;
     for (let i = this.root.children.length - 1; i >= 0; i -= 1) this.root.remove(this.root.children[i]);
     for (const geometry of this.ownedGeometries) geometry.dispose();
     this.ownedGeometries.length = 0;
@@ -839,6 +851,14 @@ export class SceneEditor {
       const entry = this.Entry(item.type);
       if (!entry) continue;
       const groundY = field ? field.GroundHeight(item.x, item.z) : 0;
+      if (entry.effect) {
+        const handle = this.host.vfx?.SceneEffect(
+          { x: item.x, y: groundY + (item.h || 0), z: item.z },
+          entry.effect, { scale: item.scale || 1 });
+        if (handle) this.effectHandles.push(handle);
+        item.node = null;
+        continue;
+      }
       const node = new THREE.Group();
       node.name = `Placed_${item.type}_${item.id}`;
       node.position.y = groundY;
@@ -1141,6 +1161,12 @@ export class SceneEditor {
 
   Update(dt) {
     this.host.flycam.Update(dt);
+    // Main 在编辑器接管期间会暂停 VfxSystem；有已布设特效时由本工具推进它，
+    // 否则“放下去了”但烟火永远停在第一帧。
+    if (this.effectHandles.length && this.host.vfx) {
+      const step = Math.max(0, Math.min(0.1, dt || 0));
+      this.host.vfx.Update(step, this.host.camera, this.host.vfx.time + step);
+    }
 
     // RespawnPlayer() 是换关装配的一环，它会 Equip() 后明确把视图模型设为
     // visible。场景编辑器本身已经接管镜头，不能因此在任意非 L0 关卡露出枪械。
