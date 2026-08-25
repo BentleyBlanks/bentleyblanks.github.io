@@ -154,6 +154,8 @@ const PLAIN_MAP = {
   // 色板给的已经是褪色值，但纯色材质没有纹理、读起来仍然太新。
   // 再往「蒙尘」(#8A8076) 里混三成半：1938 年的城楼彩画是严重褪色 + 蒙尘 + 局部剥落。
   PaintRed: { color: DustBlend(PALETTE.paintRed, 0.35), roughness: 0.92 },
+  // 官署朱漆档：0.35 蒙尘在县署门匾/檐柱上读成土黄（WP-A3 取证），官修建筑褪得轻一档
+  PaintRedOfficial: { color: DustBlend(PALETTE.paintRed, 0.20), roughness: 0.92 },
   PaintGreen: { color: DustBlend(PALETTE.paintGreen, 0.35), roughness: 0.94 },
   IronPlate: { color: PALETTE.ironDoor, roughness: 0.62, metalness: 0.5 },
   Charred: { color: PALETTE.charred, roughness: 0.95 },
@@ -1301,27 +1303,8 @@ export class TengxianCity {
       case "alarmTower":
         AddAlarmTower(sink, { x: l.x, z: l.z, ry: l.ry, height: l.height, seed: l.id });
         break;
-      case "squareFort":
-        AddSquareFort(sink, { x: l.x, z: l.z, ry: l.ry, w: l.w, d: l.d, seed: l.id, damage: 0.3 });
-        break;
-      case "shrine":
-        // 王家祠堂：形制无资料，做一进带门楼的四合院
-        AddCompound(sink, {
-          x: l.x, z: l.z, ry: l.ry, width: l.w, depth: l.d, seed: l.id, damage: 0.28,
-        });
-        break;
-      case "shop":
-        AddRoomBlock(sink, {
-          x: l.x, z: l.z, ry: l.ry, width: l.w, depth: l.d,
-          eaveY: 3.2, ridgeY: 5.0, seed: l.id, damage: 0.3, facing: 1, bays: 3,
-        });
-        break;
-      case "pagoda":
-        AddPagoda(sink, { x: l.x, z: l.z, tiers: l.tiers, seed: l.id, baseY: 0 });
-        break;
-      case "silhouetteCluster":
-        this.AddCluster(l);
-        break;
+      // squareFort / shrine / shop / pagoda / silhouetteCluster 已迁入注册表
+      //（Script_Landmark_Misc.mjs），永远走不到这里。
       default:
         break;
     }
@@ -1444,21 +1427,7 @@ export class TengxianCity {
     void rnd;
   }
 
-  /** 远景剪影群（北关的弘道院／华北神学院一带：位置布局形制均无资料，只做远景）。 */
-  AddCluster(l) {
-    const rnd = Mulberry32(HashString(l.id));
-    for (let i = 0; i < 7; i += 1) {
-      const x = l.x + (rnd() - 0.5) * l.w;
-      const z = l.z + (rnd() - 0.5) * l.d;
-      const w = 14 + rnd() * 12, d = 9 + rnd() * 6, h = 6.5 + rnd() * 2.4;   // 两层西式校舍
-      this.farSink.Add("HouseBrick", PlaceGeometry(
-        MakeBox(w, h, d, TILE_METERS.brick, `${l.id}:${i}`, BRICK_UV_GRID),
-        { x, y: this.OuterHeight(x, z) + h / 2, z }));
-      this.farSink.Add("RoofTile", PlaceGeometry(
-        MakeBox(w + 0.8, 0.9, d + 0.8, TILE_METERS.roof, `${l.id}:r${i}`),
-        { x, y: this.OuterHeight(x, z) + h + 0.45, z }));
-    }
-  }
+  // （旧 AddCluster 远景剪影群已迁入 Script_Landmark_Misc.BuildSilhouetteCluster）
 
   // =========================================================================
   // 东关 —— 本战真正的主战场
@@ -2141,18 +2110,12 @@ export class TengxianCity {
       LANDMARK_BUILDERS.eastSuburbFeatures(this, EAST_SUBURB.features, {});
     }
 
-    // 城外空心炮台 2 座（1908 建）—— **位置无载**，推定置于东南、西南墙外 60 m
+    // 城外空心炮台 2 座（1908 建）—— 几何在 Script_Landmark_Misc.BuildHollowFort
     for (const f of OUTSKIRTS.hollowForts) {
       if (!this.InBounds(f.x, f.z, 40)) continue;
-      const y = this.OuterHeight(f.x, f.z);
-      this.sink.Add("HouseBrick", PlaceGeometry(
-        MakeBox(11, 4.2, 11, TILE_METERS.brick, `fort${f.x}`, BRICK_UV_GRID),
-        { x: f.x, y: y + 2.1, z: f.z }));
-      this.sink.Solid(f.x, y + 2.1, f.z, 5.5, 2.1, 5.5, "wall");
-      AddLoopholes(this.sink, {
-        x: f.x, z: f.z - 5.5, ry: Math.PI, ys: [1.6, 2.8], count: 3, spread: 6,
-        seed: `fortLp${f.x}`, wallFace: 0.2, size: 0.34,
-      });
+      this.sink.SetSector(SectorKey(f.x, f.z));
+      LANDMARK_BUILDERS.hollowFort(this, { id: `fort${f.x}`, x: f.x, z: f.z }, {});
+      this.sink.SetSector("");
     }
 
     // 荆河水面 —— Crest 式程序化水面（Script_Water.mjs）。原来的整段 60 m

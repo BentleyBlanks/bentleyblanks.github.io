@@ -307,7 +307,7 @@ export const CITY_FEATURES = [
   { id: "CentralCompound124", label: "第124师师部", kind: "hq", x: -58, z: -55, ry: 0, w: 94, d: 54, damage: 0.14, source: "diagram", notPermanentGarrison: true },
   { id: "CentralCompound127", label: "第127师师部", kind: "hq", x: -72, z: 56, ry: Math.PI, w: 94, d: 48, damage: 0.18, source: "diagram", notPermanentGarrison: true },
   { id: "WestSpecialCompound", label: "特务营第1连", kind: "billet", x: -225, z: -50, ry: Math.PI / 2, w: 52, d: 62, damage: 0.26, source: "diagram", notPermanentGarrison: true },
-  { id: "EastDistrictOffice", label: "第二区公所", kind: "compound", x: 218, z: 12, ry: -Math.PI / 2, w: 50, d: 74, damage: 0.28, source: "diagram" },
+  { id: "EastDistrictOffice", label: "第二区公所", kind: "districtOffice", x: 218, z: 12, ry: -Math.PI / 2, w: 50, d: 74, damage: 0.28, source: "diagram" },
   { id: "SouthWestOffice", label: "办事处", kind: "office", x: -140, z: 126, ry: Math.PI, w: 50, d: 44, damage: 0.3, source: "diagram" },
   // —— 南城 ——
   { id: "WenzhongSchool", label: "滕文中学旧址", kind: "school", x: -186, z: 220, ry: Math.PI / 2, w: 66, d: 40, damage: 0.26, source: "diagram" },

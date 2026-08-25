@@ -45,6 +45,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
+import { AddTrimProps } from "./Script_TrimProps.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -1162,6 +1163,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 而 AI 找掩体/破坏系统的粗筛 BoxesNear 里没有。
   if (external.colliders?.length) {
     battlefield.colliders.push(...external.colliders);
+    if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
+  }
+  // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
+  // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
+  const trim = await AddTrimProps({ scene, library, phaseId: phase.id });
+  battlefield.trimProps = trim;
+  if (trim.colliders?.length) {
+    battlefield.colliders.push(...trim.colliders);
     if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
   }
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——

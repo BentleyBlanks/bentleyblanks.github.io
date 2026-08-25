@@ -40,6 +40,10 @@ import { BuildCommunications, BuildExchange } from "./Script_Landmark_WestSuburb
 import { BuildDivision122 } from "./Script_Landmark_Division122.mjs";
 import { BuildNorthSuburb } from "./Script_Landmark_NorthSuburb.mjs";
 import { BuildEastSuburbFeatures } from "./Script_Landmark_EastSuburb.mjs";
+import {
+  BuildDistrictOffice, BuildShrine, BuildShop, BuildPagodaLandmark,
+  BuildSquareFortLandmark, BuildSilhouetteCluster, BuildHollowFort,
+} from "./Script_Landmark_Misc.mjs";
 
 export const LANDMARK_BUILDERS = Object.freeze({
   // 城内（CITY_FEATURES / LANDMARKS 的 kind）
@@ -66,6 +70,14 @@ export const LANDMARK_BUILDERS = Object.freeze({
   // 城外北关 / 东关（整块数据派发）
   northSuburb: BuildNorthSuburb,
   eastSuburbFeatures: BuildEastSuburbFeatures,
+  // 第二轮 D6 杂项占位升级（Script_Landmark_Misc.mjs）
+  districtOffice: BuildDistrictOffice,
+  shrine: BuildShrine,
+  shop: BuildShop,
+  pagoda: BuildPagodaLandmark,
+  squareFort: BuildSquareFortLandmark,
+  silhouetteCluster: BuildSilhouetteCluster,
+  hollowFort: BuildHollowFort,
 });
 
 /**
