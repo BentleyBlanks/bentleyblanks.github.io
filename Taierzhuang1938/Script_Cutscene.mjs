@@ -276,6 +276,134 @@ function TierTag(tier) {
 // ---------------------------------------------------------------------------
 
 export class CutsceneDirector {
+  // -------------------------------------------------------------------------
+  // 说话与听 —— 导演层自动合成，数据文件一个字都不用写
+  //
+  // 为什么不让数据逐条写关键帧：一场 102 s 的车厢戏有二十句台词、三十几个演员，
+  // 逐句给「谁动嘴、谁转头」是七百条关键帧，写不完也维护不了；而这件事本来就
+  // **从 shot.lines 推得出来**：谁在说、说到第几秒、旁边坐着谁。引擎自己算。
+  //
+  // **这一整套必须挂在类身上，不能写成模块级常量/函数。**
+  // Script_CutsceneControlTest 用 new Function 把 `export class CutsceneDirector`
+  // 到 `export default` 之间的源码单独切出来跑，模块作用域里的东西在那个 eval
+  // 里一个都看不见 —— 写成 const 就是 Play() 一进门 ReferenceError。
+  // （这条注释是写给下一个想把它们"整理"回模块顶部的人的。）
+  // -------------------------------------------------------------------------
+
+  /** 全部旋钮。改数不用翻代码，也不用改数据。 */
+  static LIFE = Object.freeze({
+    talkMin: 1.0,       // 一句台词至少驱动多久（「不怕！」只有 0.6 s，太短看不出动作）
+    talkFade: 0.28,     // 说话姿态的缓入/缓出秒数
+    listenNear: 5.0,    // 这个半径内的人满幅转头
+    listenFar: 7.0,     // 到这里衰减为 0（车厢对角两个座位是 5.3 m，要留余量）
+    listenRise: 0.45,   // 转头用多久转到位
+    listenHold: 0.9,    // 话说完后还看着说话者多久（再叠个体错开 0—0.7 s）
+    listenFall: 0.9,    // 缓缓转回来用多久
+    yawMin: 0.55,       // 每人转头幅度上限的下界（rad，约 31°）
+    yawSpan: 0.35,      // 上限的个体浮动（最多约 52°）
+    pitchMax: 0.32,     // 抬头/低头的上限
+    chorusTalk: 0.5,    // 群体应答时每个人的说话幅度打几折
+    chorusRadius: 9.0,  // 群体应答按「离带头那个人多远」挑人
+  });
+
+  /** 0—1 的说话包络：at 起缓入，end 后缓出。**闭式函数，不积分**（见 _ApplyActors）。 */
+  static TalkEnvelope(t, at, end, delay = 0) {
+    const fadeMax = CutsceneDirector.LIFE.talkFade;
+    const a = at + delay;
+    const b = end + delay;
+    const fade = Math.min(fadeMax, (b - a) * 0.5);
+    if (t <= a || t >= b + fade) return 0;
+    if (t < a + fade) return Clamp01((t - a) / fade);
+    if (t > b) return 1 - Clamp01((t - b) / fade);
+    return 1;
+  }
+
+  /** 转头的包络：起始延迟 → 转到位 → 保持到话说完之后 → 缓缓转回。 */
+  static ListenEnvelope(t, at, end, delay, hold) {
+    const L = CutsceneDirector.LIFE;
+    const a = at + delay;
+    const b = end + hold;
+    if (t <= a || t >= b + L.listenFall) return 0;
+    if (t < a + L.listenRise) return Clamp01((t - a) / L.listenRise);
+    if (t > b) return 1 - Clamp01((t - b) / L.listenFall);
+    return 1;
+  }
+
+  /**
+   * 把全场台词摊平成一条「谁在什么时候说话」的时间轴（Play 时算一次）。
+   *
+   * `who` 不在 cast 里的（出川那场的 `squad`）是**群体台词**：它没有对应的演员，
+   * 挂到时间轴上**前一个具名说话者**身上 —— 也就是「班长问、全车答」里的班长。
+   * 群众的表现因此是「朝班长应答」，而不是三十几张嘴对着空气一起动。
+   */
+  static BuildLineTimeline(cut) {
+    const castIds = new Set((cut.cast || []).map((c) => c.id));
+    const out = [];
+    let start = 0;
+    for (const shot of cut.shots || []) {
+      for (const line of shot.lines || []) {
+        const at = start + (Number(line.at) || 0);
+        const span = Math.max(Number(line.seconds) || 0, CutsceneDirector.LIFE.talkMin);
+        out.push({ who: line.who || null, at, end: at + span, off: !!line.off, shot: shot.n });
+      }
+      start += shot.seconds || 0;
+    }
+    out.sort((a, b) => a.at - b.at);
+    let lastNamed = null;
+    for (const line of out) {
+      if (line.who && castIds.has(line.who)) {
+        lastNamed = line.who; line.chorus = false; line.target = line.who;
+      } else { line.chorus = true; line.target = lastNamed; }
+    }
+    return out;
+  }
+
+  /** 这个演员的轨道有没有**显式**写过 lookYaw / lookPitch。写过就是导演在管他的头，引擎不插手。 */
+  static SpecDeclaresLook(spec) {
+    if (spec.__csDeclaresLook === undefined) {
+      spec.__csDeclaresLook = (spec.track || []).some((key) => {
+        const s = key && key.state;
+        return !!s && (Number.isFinite(s.lookYaw) || Number.isFinite(s.lookPitch));
+      });
+    }
+    return spec.__csDeclaresLook;
+  }
+
+  /**
+   * 这个演员这一刻头大概在哪个高度（世界 y）。转头要算俯仰，就得知道两个头差多少。
+   *
+   * 只读 actor.dims / actor.height —— 本模块**不 import Script_Actor**（见文件头），
+   * 拿不到就退回「脚下 + 0.93 身高」，转头照样成立，只是俯仰略糙。
+   */
+  static ActorHeadY(actor, sample) {
+    const d = actor && actor.dims;
+    const s = sample.state || {};
+    const foot = sample.pos[1];
+    if (!d) return foot + (actor && actor.height ? actor.height * 0.93 : 1.5);
+    // 与 Script_Actor 的 `seated` 同一口径：隐含坐姿要动作过半才算数
+    // （零头不算坐下，否则站客的头高会被按比例压低，俯仰就朝着一个不存在的
+    // 「半蹲的人」去算）。这两处的阈值必须一起改。
+    const implied = (amount, weight) => {
+      const x = Clamp01(((amount || 0) - 0.45) / 0.40);
+      return x * x * (3 - 2 * x) * weight;
+    };
+    const seated = Math.max(s.sit || 0, implied(s.sleep, 1), implied(s.repairShoe, 0.72),
+      implied(s.checkAmmo, 0.42), implied(s.cleanRifle, 0.32));
+    const drop = seated * (d.hipY - d.thighLen - 0.045 * d.height);
+    const lift = seated > 0.001 ? Clamp(Number(s.seatLift) || 0, 0, 0.28) : 0;
+    const crouchDrop = Clamp01(s.crouch || 0) * 0.34 * d.hipY;
+    const scale = actor.sizeScale || 1;
+    return foot + (d.headCenterY - Math.max(drop, crouchDrop)) * scale + lift * scale;
+  }
+
+  /** 把角度折回 [−π, π]。转头算的是「相对自己朝向差多少」，不折就会绕远路。 */
+  static WrapAngle(a) {
+    let v = a;
+    while (v > Math.PI) v -= Math.PI * 2;
+    while (v < -Math.PI) v += Math.PI * 2;
+    return v;
+  }
+
   /**
    * @param {object} host
    *   camera        THREE.PerspectiveCamera —— 过场期间被完全接管，播完还原
@@ -324,6 +452,9 @@ export class CutsceneDirector {
     this.setRoot = null;
     this.actors = new Map();          // id -> { actor, spec }
     this.props = new Map();           // name -> { mesh, base }
+    this.lineTimeline = [];           // Play() 时摊平的台词时间轴（说话/转头都查它）
+    this._actorFrame = [];            // 每帧复用的采样缓冲，别在 60 Hz 的路径上造垃圾
+    this._actorFrameById = new Map();
     this.ownedGeometries = [];
     this.ownedMaterials = [];
     this.flashPool = [];
@@ -473,6 +604,9 @@ export class CutsceneDirector {
     // fadeIn：从黑场淡入（开场过场用）。没写就是硬切进第一镜。
     this.blackAlpha = cut.fadeIn ? 1 : 0;
     this.shakeSeed = HashString(`shake:${id}`);
+    // 台词时间轴：谁在什么时候说话。_ApplyActors 每帧查它来合成说话与转头，
+    // 数据文件因此一个字都不用改（旋钮见类顶部的 static LIFE）。
+    this.lineTimeline = CutsceneDirector.BuildLineTimeline(cut);
     this.playing = true;
 
     this._SaveCamera();
@@ -913,6 +1047,8 @@ export class CutsceneDirector {
     }
     this.actors.clear();
     this.props.clear();
+    this._actorFrame.length = 0;
+    this._actorFrameById.clear();
     this.flashPool.length = 0;
     if (this.gunsight) { this.scene.remove(this.gunsight); this.gunsight = null; }
     for (const g of this.ownedGeometries) g.dispose();
@@ -1068,16 +1204,128 @@ export class CutsceneDirector {
     return { x: p.x, y: p.y, z: p.z };
   }
 
+  /**
+   * 摆人。两遍：
+   *   一遍把所有人放到位并记下头的高度 —— 听者要转头看说话的人，得先知道他在哪；
+   *   二遍算每个人的 `talking` 与自动 `lookYaw/lookPitch`，再喂给 Actor.Update。
+   *
+   * **全部是 this.time 的闭式函数，不逐帧积分。** 出图脚本用 StepFrames 手动推时钟、
+   * 而且可以从任意时刻抓帧；只要有一个量是「上一帧的状态 × 衰减」，同一秒抓两次
+   * 就会得到两张不同的图，视觉审查立刻失去比较的基准。相位一律来自演员的 idlePhase，
+   * 这里不摇任何随机数（文件头第 2 条）。
+   */
   _ApplyActors(cut, dt) {
+    const L = CutsceneDirector.LIFE;
+    const now = this.time;
+    const frame = this._actorFrame || (this._actorFrame = []);
+    frame.length = 0;
+    const byId = this._actorFrameById || (this._actorFrameById = new Map());
+    byId.clear();
+
     for (const { actor, spec } of this.actors.values()) {
-      const sample = SampleTrack(spec.track, this.time);
+      const sample = SampleTrack(spec.track, now);
       if (sample.hidden || !sample.pos) { actor.root.visible = false; continue; }
       actor.root.visible = true;
       actor.root.position.set(sample.pos[0], sample.pos[1], sample.pos[2]);
       actor.root.rotation.y = sample.ry;
-      const state = { ...sample.state, elapsed: this.time };
+      const state = { ...sample.state, elapsed: now };
       delete state.hidden;
-      actor.Update(dt, state);
+      const item = {
+        actor, spec, state,
+        x: sample.pos[0], z: sample.pos[2], ry: sample.ry || 0,
+        headY: CutsceneDirector.ActorHeadY(actor, sample),
+        // 个体错开的三个 0—1 种子。用 idlePhase 折出来，不另摇随机数。
+        seed: ((actor.idlePhase || 0) / (Math.PI * 2)) % 1,
+      };
+      item.seed2 = (item.seed * 7.13) % 1;
+      item.seed3 = (item.seed * 3.77) % 1;
+      item.talk = 0;
+      item.listen = null;
+      frame.push(item);
+      byId.set(spec.id, item);
+    }
+
+    const timeline = this.lineTimeline;
+    if (timeline && timeline.length) {
+      for (const line of timeline) {
+        // 画外音（off:true）不驱动任何人：说话的人根本不在画面里，
+        // 让他在别处点头是白费的，让全车朝他转头则是错的。
+        if (line.off || !line.target) continue;
+        if (now <= line.at - 0.05 || now >= line.end + L.listenHold + 1.8) continue;
+        const speaker = byId.get(line.target);
+        if (!speaker) continue;
+
+        if (!line.chorus) {
+          // 具名台词：说话的那个人自己动
+          speaker.talk = Math.max(speaker.talk, CutsceneDirector.TalkEnvelope(now, line.at, line.end));
+        }
+
+        for (const item of frame) {
+          if (item === speaker) continue;
+          const dx = speaker.x - item.x;
+          const dz = speaker.z - item.z;
+          const flat = Math.hypot(dx, dz);
+          const s = item.state;
+          const still = (s.moveSpeed || 0) < 0.05;
+          const awake = (s.sleep || 0) <= 0.5;
+          const calm = !s.dead && (s.hurt || 0) < 0.05 && (s.dying || 0) < 0.05
+            && (s.aim || 0) < 0.05 && (s.melee || 0) < 0.05 && (s.throwing || 0) < 0.05
+            && (s.prone || 0) < 0.05;
+
+          if (line.chorus) {
+            // 群体应答：车厢里坐着/站着的人先后开口，幅度打五折、按 idlePhase 错开。
+            // 「先后」是这一段的全部读数 —— 一起张嘴是合唱团，不是一车兵。
+            if (!still || !awake || !calm || flat > L.chorusRadius) continue;
+            const delay = item.seed2 * 0.55;
+            item.talk = Math.max(item.talk,
+              CutsceneDirector.TalkEnvelope(now, line.at, line.end, delay) * L.chorusTalk);
+          }
+
+          // 转头看说话的人。数据显式管着这个人的头就不插手（其余四场全是这种）。
+          if (!still || !awake || !calm || CutsceneDirector.SpecDeclaresLook(item.spec)) continue;
+          if (flat > L.listenFar) continue;
+          const near = 1 - Clamp01((flat - L.listenNear) / Math.max(1e-3, L.listenFar - L.listenNear));
+          if (near <= 0.001) continue;
+          const delay = 0.10 + item.seed * 0.30;
+          const hold = L.listenHold + item.seed3 * 0.7;
+          const env = CutsceneDirector.ListenEnvelope(now, line.at, line.end, delay, hold) * near;
+          if (env <= 0.001) continue;
+          // 符号：Actor 正面是局部 −Z，总偏航 = atan2(−dx, −dz)；lookYaw 是相对
+          // root 朝向的**增量**（chest 吃 0.35、neck 吃 0.65，加起来正好是它）。
+          const want = CutsceneDirector.WrapAngle(Math.atan2(-dx, -dz) - item.ry);
+          const cap = L.yawMin + item.seed3 * L.yawSpan;
+          // lookPitch 正 = 抬头（docs/Data_CutsceneRedo.md §1.8 那条写死的规矩）
+          const rise = Math.atan2(speaker.headY - item.headY, Math.max(0.35, flat));
+          const yaw = Clamp(want, -cap, cap) * env;
+          const pitch = Clamp(rise, -L.pitchMax, L.pitchMax) * env;
+          // 换人说话时是**交叉淡入**，不是「谁的包络大谁赢」。
+          // 时间轴按 at 升序，所以 item.listen 里一定是更早的那一句：让新的一句
+          // 按自己的包络压过去，旧的一句留 (1−env) 的余韵。
+          //
+          // 取最大值那一版在这里栽过：上一句刚说完、余韵还有 0.3，新的一句才
+          // 刚起（0.2），于是余韵赢了 —— 而余韵指向的往往正是「不用转头」的
+          // 那个方向（对面座位），画面上就是「新说话的人没人理」。
+          const prev = item.listen;
+          item.listen = prev ? {
+            env: Math.max(env, prev.env * (1 - env)),
+            yaw: yaw + prev.yaw * (1 - env),
+            pitch: pitch + prev.pitch * (1 - env),
+          } : { env, yaw, pitch };
+        }
+      }
+    }
+
+    for (const item of frame) {
+      const state = item.state;
+      if (item.talk > 0.001) state.talking = item.talk;
+      if (item.listen) {
+        state.lookYaw = item.listen.yaw;
+        state.lookPitch = item.listen.pitch;
+        // 告诉 Actor 这份朝向是引擎合成的，不是导演写的 —— 说话的头部微动
+        // 因此仍可满幅叠上去（导演写死的朝向则只留抖动，不许被改朝向）。
+        state.lookAuto = true;
+      }
+      item.actor.Update(dt, state);
     }
   }
 
