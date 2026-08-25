@@ -239,6 +239,28 @@ function AddDrillGround(sink, f, ry, o) {
   }
 }
 
+/**
+ * 机关院的队列场边线。原来只有三团浅色磨损，从高空看会和普通院心混在一起；
+ * 这里补一圈条石边与三道列队线，仍是院内实际铺地，不改变院落占地或通行。
+ */
+function AddInspectionCourt(sink, f, ry, o) {
+  const width = Math.min(o.width, f.w - 8);
+  const depth = Math.min(o.depth, f.d - 10);
+  const strip = 0.24;
+  const Put = (lx, lz, w, d, tag) => {
+    const p = LocalTo(f, ry, lx, lz);
+    sink.Add("Stone", PlaceGeometry(
+      MakeBox(w, 0.07, d, TILE_METERS.stone, `${o.seed}:${tag}`),
+      { x: p.x, y: 0.025, z: p.z, ry }));
+  };
+  Put(o.lx, o.lz - depth / 2, width, strip, "n");
+  Put(o.lx, o.lz + depth / 2, width, strip, "s");
+  Put(o.lx - width / 2, o.lz, strip, depth, "w");
+  Put(o.lx + width / 2, o.lz, strip, depth, "e");
+  // 三道短横线是整队站位，不是现代球场标线；间距按一步半取 1.35 m。
+  for (let i = -1; i <= 1; i += 1) Put(o.lx, o.lz + i * 1.35, width * 0.58, 0.16, `rank${i}`);
+}
+
 // ---------------------------------------------------------------------------
 // 警备队（GarrisonHQ 46×30，北城根，南邻监狱）
 // ---------------------------------------------------------------------------
@@ -300,6 +322,9 @@ export function BuildGarrison(host, f, ctx) {
   // --- 院内：旗杆 + 操练小场 ---
   AddFlagPole(sink, f, ry, { lx: 0, lz: hd - 9.2, seed: `${seed}:flag` });
   AddDrillGround(sink, f, ry, { lx: 0, lz: hd - 12.4, radius: 5.6, seed: `${seed}:drill` });
+  AddInspectionCourt(sink, f, ry, {
+    lx: 0, lz: hd - 12.2, width: 13.2, depth: 7.8, seed: `${seed}:court`,
+  });
 
   // --- 值房（后排大房，警备队的营房兼办公）---
   host.AddFeatureRoom(f, ry, 0, -f.d * 0.28, f.w * 0.62, f.d * 0.26, {
@@ -373,6 +398,9 @@ export function BuildPolice(host, f, ctx) {
   // 院心：旗杆 + 操练小场
   AddFlagPole(sink, f, ry, { lx: -1.2, lz: hd - frontD - 3.6, height: 7.6, seed: `${seed}:flag` });
   AddDrillGround(sink, f, ry, { lx: -1.2, lz: hd - frontD - 6.4, radius: 4.4, seed: `${seed}:drill` });
+  AddInspectionCourt(sink, f, ry, {
+    lx: -1.2, lz: hd - frontD - 6.3, width: 9.4, depth: 6.2, seed: `${seed}:court`,
+  });
 
   // 后翼：沿旧版保留的那一条较矮的后排房，改为朝院子开门窗
   host.AddFeatureRoom(f, ry, 0, -f.d * 0.30, f.w * 0.52, f.d * 0.20, {

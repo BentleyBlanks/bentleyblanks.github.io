@@ -24,7 +24,7 @@
 
 import * as THREE from "three";
 import {
-  Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note, ListBox, TextArea, El,
+  Panel, Section, Row, Slider, Chips, Toggle, ButtonRow, Facts, Note, ListBox, TextArea, El,
   CameraProjectionControls,
 } from "./Script_EditorUi.mjs";
 import { PickWorld, ScreenRay } from "./Script_EditorStage.mjs";
@@ -41,9 +41,11 @@ import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { PHASES } from "./Data_Battle.mjs";
+import { CITY_FEATURES, LANDMARKS, STREETS } from "./Data_Tengxian.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
 const SAVE_KEY = "tengxian1938_sceneedit_v1";
+const MAX_MAP_MARKERS = 96;
 // 车厢序章不是一张可玩的战斗切片，不能把它伪装成 L0_界河。
 // 保持这个 id 与 Data_CutsceneChuchuan 的导出一致；真正打开时由主程序跳到
 // 独立预览页，那里才有完整的车厢时间轴与音频装配。
@@ -54,6 +56,187 @@ const PROLOGUE_SCENE = {
   tail: "新版序章 · 约 2 分钟",
   title: "独立车厢序章；不会错误加载为界河战斗场景",
 };
+
+const LANDMARK_LABELS = Object.freeze({
+  Yamen: "县公署",
+  WangShrine: "王家祠",
+  AlarmTower: "警报楼",
+  SquareFort: "方形炮楼院",
+  PeoplesBookshop: "人民书店旧址",
+  CatholicChurchInner: "天主堂",
+});
+
+function Finite(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function Limit(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * 旧存档也要能安全读回：标记不是 DOM，名字只进入 CanvasTexture；坐标与尺寸则限在
+ * 编辑器能实际看见/操作的范围，避免一份坏 JSON 造出几万米宽的透明面。
+ */
+export function NormalizeMapMarker(raw, fallbackId = 1) {
+  const kind = raw && raw.kind === "road" ? "road" : "region";
+  const rawRy = Finite(raw && raw.ry);
+  const text = String(raw && raw.text != null ? raw.text : "未命名")
+    .replace(/[\r\n\t]+/g, " ").trim().slice(0, 40) || "未命名";
+  return {
+    id: Math.max(1, Math.round(Finite(raw && raw.id, fallbackId))),
+    kind,
+    text,
+    x: Limit(Finite(raw && raw.x), -2500, 2500),
+    z: Limit(Finite(raw && raw.z), -2500, 2500),
+    ry: ((rawRy % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2),
+    w: Limit(Math.abs(Finite(raw && raw.w, kind === "road" ? 60 : 40)), 2, 800),
+    d: Limit(Math.abs(Finite(raw && raw.d, kind === "road" ? 6 : 30)), 1, 500),
+    source: raw && raw.source === "map" ? "map" : "custom",
+    sourceId: raw && raw.sourceId ? String(raw.sourceId) : null,
+  };
+}
+
+/**
+ * 把 Data_Tengxian 的同一份图纸变成编辑器参考标记。这里不抄坐标：公共院落和街道
+ * 每次都从 CITY_FEATURES / LANDMARKS / STREETS 现算，图纸移动后标记不会留在旧位置。
+ */
+export function MapReferenceMarkers() {
+  const markers = [];
+  for (const feature of CITY_FEATURES) {
+    if (!feature.label) continue;
+    markers.push({
+      kind: "region", text: feature.label, x: feature.x, z: feature.z,
+      ry: feature.ry || 0, w: feature.w, d: feature.d,
+      source: "map", sourceId: `feature:${feature.id}`,
+    });
+  }
+  for (const landmark of LANDMARKS) {
+    const text = landmark.label || LANDMARK_LABELS[landmark.id];
+    if (!text || landmark.kind === "paifang") continue;
+    markers.push({
+      kind: "region", text, x: landmark.x, z: landmark.z,
+      ry: landmark.ry || 0, w: landmark.w || landmark.span || 18,
+      d: landmark.d || landmark.span || 18,
+      source: "map", sourceId: `landmark:${landmark.id}`,
+    });
+  }
+  for (const street of STREETS) {
+    const along = (street.from + street.to) / 2;
+    markers.push({
+      kind: "road", text: street.label, source: "map", sourceId: `street:${street.id}`,
+      x: street.axis === "x" ? along : street.at,
+      z: street.axis === "x" ? street.at : along,
+      ry: street.axis === "x" ? 0 : Math.PI / 2,
+      w: Math.abs(street.to - street.from), d: street.width,
+    });
+  }
+  return markers;
+}
+
+function RoundedRect(ctx, x, y, w, h, radius) {
+  const r = Math.min(radius, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** 编辑器专用世界文字：范围线在地面，中文牌始终朝相机；不进碰撞和玩法场景。 */
+export function BuildMapMarkerVisual(marker, {
+  ownedGeometries = [], ownedMaterials = [], ownedTextures = [],
+} = {}) {
+  const group = new THREE.Group();
+  group.name = `MapMarker_${marker.kind}_${marker.id}`;
+  group.rotation.y = marker.ry || 0;
+  const color = marker.kind === "road" ? 0x75a9c6 : 0xe0b062;
+  const fill = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: marker.kind === "road" ? 0.16 : 0.06,
+    depthWrite: false, side: THREE.DoubleSide,
+  });
+  const line = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false,
+  });
+  MarkNoPrepass(fill);
+  MarkNoPrepass(line);
+  ownedMaterials.push(fill, line);
+
+  const MakeBar = (w, d, x, z) => {
+    const geometry = new THREE.BoxGeometry(w, 0.06, d);
+    const mesh = new THREE.Mesh(geometry, line);
+    mesh.position.set(x, 0.09, z);
+    mesh.renderOrder = 890;
+    group.add(mesh);
+    ownedGeometries.push(geometry);
+  };
+  const planeGeometry = new THREE.PlaneGeometry(marker.w, marker.d);
+  const plane = new THREE.Mesh(planeGeometry, fill);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = 0.06;
+  plane.renderOrder = 888;
+  group.add(plane);
+  ownedGeometries.push(planeGeometry);
+  if (marker.kind === "road") {
+    MakeBar(marker.w, Math.min(0.42, marker.d * 0.16), 0, 0);
+    MakeBar(0.34, marker.d + 0.8, -marker.w / 2, 0);
+    MakeBar(0.34, marker.d + 0.8, marker.w / 2, 0);
+  } else {
+    const edge = Limit(Math.min(marker.w, marker.d) * 0.025, 0.28, 0.72);
+    MakeBar(marker.w + edge, edge, 0, -marker.d / 2);
+    MakeBar(marker.w + edge, edge, 0, marker.d / 2);
+    MakeBar(edge, marker.d + edge, -marker.w / 2, 0);
+    MakeBar(edge, marker.d + edge, marker.w / 2, 0);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  RoundedRect(ctx, 18, 18, 988, 220, 24);
+  ctx.fillStyle = "rgba(12, 13, 13, 0.88)";
+  ctx.fill();
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = marker.kind === "road" ? "#75a9c6" : "#e0b062";
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = marker.kind === "road" ? "#a7cee1" : "#f0cc8b";
+  ctx.font = "600 38px 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif";
+  ctx.fillText(marker.kind === "road" ? "道路" : "区域", 512, 67);
+  let fontSize = 92;
+  do {
+    ctx.font = `700 ${fontSize}px 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif`;
+    if (ctx.measureText(marker.text).width <= 900) break;
+    fontSize -= 6;
+  } while (fontSize > 42);
+  ctx.fillStyle = "#f5f0e5";
+  ctx.fillText(marker.text, 512, 158);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  const material = new THREE.SpriteMaterial({
+    map: texture, transparent: true, depthTest: false, depthWrite: false, fog: false,
+  });
+  MarkNoPrepass(material);
+  const sprite = new THREE.Sprite(material);
+  sprite.name = `MapMarkerText_${marker.id}`;
+  sprite.center.set(0.5, 0);
+  const textWidth = Limit(marker.text.length * 3.8 + 13, 18, marker.kind === "road" ? 52 : 44);
+  sprite.scale.set(textWidth, textWidth * 0.25, 1);
+  sprite.position.y = marker.kind === "road" ? 5.0 : 7.5;
+  sprite.renderOrder = 900;
+  group.add(sprite);
+  ownedMaterials.push(material);
+  ownedTextures.push(texture);
+  return group;
+}
 
 /**
  * 可放置的东西。
@@ -300,9 +483,14 @@ export class SceneEditor {
     this.items = [];
     this.nextId = 1;
     this.selected = null;
+    this.markers = [];
+    this.nextMarkerId = 1;
+    this.selectedMarker = null;
+    this.markerDraft = { kind: "region", text: "未命名区域", ry: 0, w: 40, d: 30 };
+    this.markersVisible = true;
     this.paletteId = PLACEABLE[0].id;
     this.cat = "景观";
-    this.mode = "look";         // look | place | move | terrain
+    this.mode = "look";         // look | place | mark | move | terrain
     // 半径的下限是被网格分辨率定死的：城内台地 636 m 铺 116×116，约 5.5 m 一格。
     // 半径 8 只圈得到三四个顶点，刷出来是几个尖，不是坑。14 起步才有形。
     this.brush = { radius: 14, strength: 0.6, kind: "raise" };
@@ -310,6 +498,8 @@ export class SceneEditor {
     this.root = new THREE.Group();
     this.root.name = "EditorScenePlacements";
     this.ownedGeometries = [];
+    this.ownedMaterials = [];
+    this.ownedTextures = [];
     this.colliderTag = "editorPlacement";
     /** 摆件在物理世界里的碰撞体句柄（RebuildAll 加、DropColliders 撤）。 */
     this.physicsHandles = [];
@@ -399,8 +589,9 @@ export class SceneEditor {
 
   BuildUi(body) {
     this.BuildLevelUi(body);
-    this.BuildCameraUi(body, ["look", "place", "move"]);
+    this.BuildCameraUi(body, ["look", "place", "mark", "move"]);
     this.BuildPlacementUi(body);
+    this.BuildMarkerUi(body);
     this.BuildStorageUi(body);
     this.BuildStatsUi(body);
   }
@@ -429,9 +620,9 @@ export class SceneEditor {
   BuildCameraUi(body, modes = ["look"]) {
     const cam = Section(body, "相机");
     const labels = {
-      look: "看", place: "放置", move: "挪动所选", terrain: "地形笔刷",
+      look: "看", place: "放置", mark: "文本标记", move: "挪动所选", terrain: "地形笔刷",
     };
-    Chips(cam, modes.map((value) => ({ value, label: labels[value] || value })),
+    this.modeChips = Chips(cam, modes.map((value) => ({ value, label: labels[value] || value })),
       this.mode, (v) => this.SetMode(v));
     Slider(cam, {
       label: "飞行速度", min: 1, max: 80, step: 1, value: 14,
@@ -458,7 +649,11 @@ export class SceneEditor {
     const list = Section(body, "已放置");
     this.placedList = ListBox(list, {
       height: 120,
-      onPick: (id) => { this.selected = this.items.find((it) => String(it.id) === String(id)) || null; },
+      onPick: (id) => {
+        this.selected = this.items.find((it) => String(it.id) === String(id)) || null;
+        this.selectedMarker = null;
+        this.RefreshMarkerUi();
+      },
     });
     ButtonRow(list, [
       { label: "撤销最后一个", onClick: () => this.Undo() },
@@ -468,6 +663,83 @@ export class SceneEditor {
     const solid = El("div", "edBtns");
     list.appendChild(solid);
     this.solidToggle = Toggle(solid, "碰撞盒生效", true, () => this.RebuildAll());
+  }
+
+  BuildMarkerUi(body) {
+    const mark = Section(body, "文本标记");
+    this.markerKindChips = Chips(mark, [
+      { value: "region", label: "区域" },
+      { value: "road", label: "道路" },
+    ], this.markerDraft.kind, (kind) => {
+      this.markerDraft.kind = kind;
+      if (this.selectedMarker) {
+        this.selectedMarker.kind = kind;
+        this.RebuildAll();
+      }
+    });
+    this.markerText = El("input");
+    this.markerText.type = "text";
+    this.markerText.maxLength = 40;
+    this.markerText.placeholder = "如：滕文中学旧址 / 火神庙东街";
+    this.markerText.value = this.markerDraft.text;
+    for (const type of ["keydown", "keyup", "keypress"]) {
+      this.markerText.addEventListener(type, (event) => event.stopPropagation());
+    }
+    this.markerText.addEventListener("input", () => {
+      this.markerDraft.text = this.markerText.value;
+      if (this.selectedMarker) {
+        this.selectedMarker.text = this.markerText.value.trim().slice(0, 40) || "未命名";
+        this.RebuildAll();
+      }
+    });
+    Row(mark, "名称", this.markerText);
+    const UpdateNumber = (key, value) => {
+      this.markerDraft[key] = value;
+      if (this.selectedMarker) {
+        this.selectedMarker[key] = value;
+        this.RebuildAll();
+      }
+    };
+    this.markerWidth = Slider(mark, {
+      label: "长度 / 宽", min: 2, max: 320, step: 1, value: this.markerDraft.w,
+      format: (value) => `${value.toFixed(0)} m`, onInput: (value) => UpdateNumber("w", value),
+    });
+    this.markerDepth = Slider(mark, {
+      label: "深度 / 路宽", min: 1, max: 160, step: 1, value: this.markerDraft.d,
+      format: (value) => `${value.toFixed(0)} m`, onInput: (value) => UpdateNumber("d", value),
+    });
+    this.markerRotation = Slider(mark, {
+      label: "朝向", min: 0, max: Math.PI * 2, step: 0.02, value: this.markerDraft.ry,
+      format: (value) => `${(value * 180 / Math.PI).toFixed(0)}°`,
+      onInput: (value) => UpdateNumber("ry", value),
+    });
+    ButtonRow(mark, [
+      { label: "下一次点击放标记", onClick: () => this.ArmMarker() },
+      { label: "载入滕县图纸标记", onClick: () => this.LoadMapReferences() },
+    ]);
+    const list = El("div", "b");
+    mark.appendChild(list);
+    this.markerList = ListBox(list, {
+      height: 132,
+      onPick: (id) => {
+        this.selectedMarker = this.markers.find((marker) => String(marker.id) === String(id)) || null;
+        this.selected = null;
+        this.RefreshMarkerUi();
+      },
+    });
+    ButtonRow(mark, [
+      { label: "删除所选标记", onClick: () => this.DeleteSelectedMarker(), cls: "danger" },
+      { label: "清空标记", onClick: () => this.ClearMarkers(), cls: "danger" },
+    ]);
+    const toggles = El("div", "edBtns");
+    mark.appendChild(toggles);
+    this.markerToggle = Toggle(toggles, "视口显示", this.markersVisible, (value) => {
+      this.markersVisible = value;
+      this.RebuildAll();
+    });
+    Note(mark, "区域标记画出占地框，道路标记画出带宽与走向；两者随场景 JSON 存取。"
+      + "“载入滕县图纸标记”直接读取 Data_Tengxian，不另抄一份坐标。", true);
+    this.RefreshMarkerUi();
   }
 
   BuildTerrainUi(body) {
@@ -509,7 +781,9 @@ export class SceneEditor {
       { label: "导出到框里", onClick: () => { this.io.value = JSON.stringify(this.Serialize()); } },
       { label: "从框里导入", onClick: () => this.Import(this.io.value) },
     ]);
-    this.io = TextArea(io, { rows: 3, placeholder: "{ \"v\":1, \"items\":[…], \"terrain\":[…] }" });
+    this.io = TextArea(io, {
+      rows: 3, placeholder: "{ \"v\":2, \"items\":[…], \"markers\":[…], \"terrain\":[…] }",
+    });
     this.ioNote = Note(io, `本地存档键：${SAVE_KEY}`);
   }
 
@@ -584,13 +858,15 @@ export class SceneEditor {
       return;
     }
     this.mode = mode;
+    if (this.modeChips) this.modeChips.Set(mode);
     // 屏幕正中那个十字**不能用** —— 拾取走的是鼠标位置，两者压根不是一个点，
     // 画着它反而让人对着十字点。落点改用世界里那个环（RefreshGizmo）。
     this.host.SetCrosshair(false);
     const text = {
       look: "左键拖转视角 · WASD+QE 飞 · 滚轮调速",
       place: "左键点地面放一个（黄环就是落点）；右键拖转视角",
-      move: "先在「已放置」里选一个，再左键点目标位置",
+      mark: "左键点地面放下区域/道路文字标记；右键拖转视角",
+      move: "先选一个构件或文字标记，再左键点目标位置",
       terrain: "左键按住涂（这时候左键不转视角）；Shift 反向；右键拖转视角",
     }[mode];
     this.modeHint = text;
@@ -656,6 +932,7 @@ export class SceneEditor {
     const cornerDistance = Math.hypot(height, halfWidth, halfDepth);
     camera.far = Math.max(camera.far, cornerDistance * 1.18);
     camera.updateProjectionMatrix();
+    if (this.projectionControls) this.projectionControls.far.Set(camera.far);
     this.host.SetHint("已俯瞰当前关卡切片 · 退出编辑器后恢复战斗相机");
   }
 
@@ -705,8 +982,10 @@ export class SceneEditor {
     const hit = this.Pick(event);
     if (!hit) { this.host.SetHint("准心在地平线以上：那个方向上没有地面"); return; }
     if (this.mode === "place") this.Place(hit.x, hit.z);
-    else if (this.mode === "move" && this.selected) {
-      this.selected.x = hit.x; this.selected.z = hit.z;
+    else if (this.mode === "mark") this.PlaceMarker(hit.x, hit.z);
+    else if (this.mode === "move" && (this.selected || this.selectedMarker)) {
+      const target = this.selectedMarker || this.selected;
+      target.x = hit.x; target.z = hit.z;
       this.RebuildAll();
     }
   }
@@ -768,7 +1047,9 @@ export class SceneEditor {
     // 而屏幕上没有任何东西告诉你这件事。
     this.host.SetHint(hit ? this.modeHint : "准心在地平线以上 —— 那个方向上没有地面，往下压一点");
     if (!hit) return;
-    const radius = this.mode === "terrain" ? this.brush.radius : 0.9;
+    const radius = this.mode === "terrain" ? this.brush.radius
+      : this.mode === "mark" ? Math.max(1.5, Math.min(this.markerDraft.w, this.markerDraft.d) * 0.12)
+        : 0.9;
     this.gizmo.group.position.set(hit.x, hit.y + 0.02, hit.z);
     this.gizmo.ring.scale.setScalar(radius);
     this.gizmo.pin.visible = this.mode !== "terrain";
@@ -777,6 +1058,83 @@ export class SceneEditor {
   // -------------------------------------------------------------------------
   // 放置
   // -------------------------------------------------------------------------
+
+  ArmMarker() {
+    const text = String(this.markerText ? this.markerText.value : this.markerDraft.text).trim();
+    if (!text) {
+      this.host.SetHint("先填写区域名或道路名");
+      return;
+    }
+    this.markerDraft.text = text.slice(0, 40);
+    this.SetMode("mark");
+  }
+
+  PlaceMarker(x, z) {
+    if (this.markers.length >= MAX_MAP_MARKERS) {
+      this.host.SetHint(`标记已到上限（${MAX_MAP_MARKERS} 个），请先删除或导出整理`);
+      return;
+    }
+    const marker = NormalizeMapMarker({
+      ...this.markerDraft, id: this.nextMarkerId, x, z, source: "custom",
+    }, this.nextMarkerId);
+    this.nextMarkerId += 1;
+    this.markers.push(marker);
+    this.selectedMarker = marker;
+    this.selected = null;
+    this.RebuildAll();
+    this.RefreshMarkerUi();
+  }
+
+  LoadMapReferences() {
+    const custom = this.markers.filter((marker) => marker.source !== "map").slice(0, MAX_MAP_MARKERS);
+    let id = custom.reduce((max, marker) => Math.max(max, marker.id || 0), 0) + 1;
+    const room = Math.max(0, MAX_MAP_MARKERS - custom.length);
+    const reference = MapReferenceMarkers().slice(0, room)
+      .map((marker) => NormalizeMapMarker({ ...marker, id: id++ }, id));
+    this.markers = [...custom, ...reference];
+    this.nextMarkerId = id;
+    this.selectedMarker = null;
+    this.RebuildAll();
+    this.RefreshMarkerUi();
+    this.host.SetHint(`已从图纸载入 ${reference.length} 个公共院落 / 道路标记`);
+  }
+
+  DeleteSelectedMarker() {
+    if (!this.selectedMarker) return;
+    this.markers = this.markers.filter((marker) => marker !== this.selectedMarker);
+    this.selectedMarker = null;
+    this.RebuildAll();
+    this.RefreshMarkerUi();
+  }
+
+  ClearMarkers() {
+    this.markers = [];
+    this.selectedMarker = null;
+    this.nextMarkerId = 1;
+    this.RebuildAll();
+    this.RefreshMarkerUi();
+  }
+
+  RefreshMarkerUi() {
+    if (this.markerList) {
+      this.markerList.Fill(this.markers.map((marker) => ({
+        id: String(marker.id), name: marker.text,
+        tail: `${marker.kind === "road" ? "道路" : "区域"} · ${marker.x.toFixed(0)}, ${marker.z.toFixed(0)}`,
+        title: marker.source === "map" ? `图纸：${marker.sourceId}` : "自定义标记",
+      })));
+      if (this.selectedMarker) this.markerList.Select(String(this.selectedMarker.id));
+    }
+    const marker = this.selectedMarker;
+    if (!marker) return;
+    this.markerDraft = {
+      kind: marker.kind, text: marker.text, ry: marker.ry, w: marker.w, d: marker.d,
+    };
+    if (this.markerText) this.markerText.value = marker.text;
+    if (this.markerKindChips) this.markerKindChips.Set(marker.kind);
+    if (this.markerWidth) this.markerWidth.Set(marker.w);
+    if (this.markerDepth) this.markerDepth.Set(marker.d);
+    if (this.markerRotation) this.markerRotation.Set(marker.ry);
+  }
 
   Place(x, z) {
     const entry = this.Entry(this.paletteId);
@@ -792,6 +1150,7 @@ export class SceneEditor {
     }
     this.items.push(item);
     this.selected = item;
+    this.selectedMarker = null;
     this.RebuildAll();
   }
 
@@ -820,7 +1179,11 @@ export class SceneEditor {
     this.effectHandles.length = 0;
     for (let i = this.root.children.length - 1; i >= 0; i -= 1) this.root.remove(this.root.children[i]);
     for (const geometry of this.ownedGeometries) geometry.dispose();
+    for (const material of this.ownedMaterials) material.dispose();
+    for (const texture of this.ownedTextures) texture.dispose();
     this.ownedGeometries.length = 0;
+    this.ownedMaterials.length = 0;
+    this.ownedTextures.length = 0;
     this.DropColliders();
   }
 
@@ -897,6 +1260,21 @@ export class SceneEditor {
       this.root.add(node);
       item.node = node;
     }
+    if (this.markersVisible) {
+      for (const marker of this.markers) {
+        const groundY = field ? field.GroundHeight(marker.x, marker.z) : 0;
+        const node = BuildMapMarkerVisual(marker, {
+          ownedGeometries: this.ownedGeometries,
+          ownedMaterials: this.ownedMaterials,
+          ownedTextures: this.ownedTextures,
+        });
+        node.position.set(marker.x, groundY, marker.z);
+        this.root.add(node);
+        marker.node = node;
+      }
+    } else {
+      for (const marker of this.markers) marker.node = null;
+    }
     const host = this.ColliderHost();
     if (colliders.length && host) {
       host.colliders.push(...colliders);
@@ -912,6 +1290,7 @@ export class SceneEditor {
       }
     }
     this.RefreshPlacedList();
+    this.RefreshMarkerUi();
     this.groundedObjectsDirty = false;
   }
 
@@ -928,7 +1307,10 @@ export class SceneEditor {
     for (const item of this.items) {
       if (item.node) item.node.position.y = field.GroundHeight(item.x, item.z);
     }
-    if (!this.items.length) { this.groundedObjectsDirty = false; return; }
+    for (const marker of this.markers) {
+      if (marker.node) marker.node.position.y = field.GroundHeight(marker.x, marker.z);
+    }
+    if (!this.items.length && !this.markers.length) { this.groundedObjectsDirty = false; return; }
     if (rebuildColliders) this.RebuildAll();
     else this.groundedObjectsDirty = true;
   }
@@ -1109,10 +1491,15 @@ export class SceneEditor {
 
   Serialize() {
     return {
-      v: 1,
+      v: 2,
       level: PHASES[this.host.game.state.phaseIndex] ? PHASES[this.host.game.state.phaseIndex].id : null,
       items: this.items.map((it) => {
         const copy = { ...it };
+        delete copy.node;
+        return copy;
+      }),
+      markers: this.markers.map((marker) => {
+        const copy = { ...marker };
         delete copy.node;
         return copy;
       }),
@@ -1125,7 +1512,8 @@ export class SceneEditor {
       const data = this.Serialize();
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
       this.host.SetWorldEditDocument?.(data);
-      this.ioNote.textContent = `已存：${this.items.length} 个构件 / ${this.terrainOps.length} 笔地形`;
+      this.ioNote.textContent = `已存：${this.items.length} 个构件 / ${this.markers.length} 个标记 / `
+        + `${this.terrainOps.length} 笔地形`;
     } catch (error) {
       this.ioNote.textContent = `存不进去：${String(error).slice(0, 80)}`;
     }
@@ -1161,6 +1549,12 @@ export class SceneEditor {
     this.items = data.items.map((it) => ({ ...it }));
     this.nextId = this.items.reduce((a, it) => Math.max(a, (it.id || 0) + 1), 1);
     this.selected = null;
+    const rawMarkers = Array.isArray(data.markers) ? data.markers.slice(0, MAX_MAP_MARKERS) : [];
+    // 外部 JSON 可以有重复 id；列表以 id 为键，导入时统一重编号才能保证“点中的
+    // 那一行”就是后续改名/移动的那个对象。
+    this.markers = rawMarkers.map((marker, index) => NormalizeMapMarker({ ...marker, id: index + 1 }, index + 1));
+    this.nextMarkerId = this.markers.length + 1;
+    this.selectedMarker = null;
     this.RebuildAll();
     if (terrain) {
       for (const op of data.terrain || []) {
@@ -1170,8 +1564,11 @@ export class SceneEditor {
       this.SyncGroundedObjects(true);
     }
     if (this.ioNote) {
-      this.ioNote.textContent = `读回：${this.items.length} 个构件 / ${this.terrainOps.length} 笔地形`
-        + (data.level ? `（存的是 ${data.level}）` : "");
+      this.ioNote.textContent = `读回：${this.items.length} 个构件 / ${this.markers.length} 个标记 / `
+        + `${this.terrainOps.length} 笔地形`
+        + (data.level ? `（存的是 ${data.level}）` : "")
+        + (Array.isArray(data.markers) && data.markers.length > MAX_MAP_MARKERS
+          ? `；标记超过上限，只读入前 ${MAX_MAP_MARKERS} 个` : "");
     }
   }
 
@@ -1277,14 +1674,18 @@ export class SceneEditor {
       this.measure.triangles > 6000000 ? "bad" : "good");
     f.Set("城的网格", field ? field.meshes.length : 0);
     f.Set("碰撞盒", field ? (field.city ? field.city.colliders : field.colliders || []).length : 0);
-    f.Set("放置 / 地形", `${this.items.length} 个 / ${this.terrainOps.length} 笔`);
+    f.Set("构件 / 标记 / 地形", `${this.items.length} 个 / ${this.markers.length} 个 / `
+      + `${this.terrainOps.length} 笔`);
     if (this.mode === "terrain") {
       f.Set("笔刷动到顶点", this.lastTouched == null ? "—" : this.lastTouched,
         this.lastTouched === 0 ? "bad" : "good");
     }
-    f.Set("选中", this.selected
-      ? `${(this.Entry(this.selected.type) || {}).name} @ ${this.selected.x.toFixed(1)}, ${this.selected.z.toFixed(1)}`
-      : "（无）");
+    f.Set("选中", this.selectedMarker
+      ? `${this.selectedMarker.kind === "road" ? "道路" : "区域"}「${this.selectedMarker.text}」 @ `
+        + `${this.selectedMarker.x.toFixed(1)}, ${this.selectedMarker.z.toFixed(1)}`
+      : this.selected
+        ? `${(this.Entry(this.selected.type) || {}).name} @ ${this.selected.x.toFixed(1)}, ${this.selected.z.toFixed(1)}`
+        : "（无）");
   }
 }
 

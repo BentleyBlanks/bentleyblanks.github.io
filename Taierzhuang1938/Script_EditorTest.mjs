@@ -733,6 +733,8 @@ const scene = await page.evaluate(() => {
   out.sections = [...active.panel.root.querySelectorAll(".edSection > .h")]
     .map((node) => node.textContent);
   out.originalProjection = [editor.flycam.saved.fov, editor.flycam.saved.far];
+  active.TopDown();
+  out.topDownFar = T.camera.far;
   const SetSlider = (control, value) => {
     const input = control.root.querySelector("input");
     input.value = String(value);
@@ -766,12 +768,62 @@ const scene = await page.evaluate(() => {
   const bar = active.items[active.items.length - 1];
   out.barMeshes = bar.node ? bar.node.children.length : 0;
 
-  // 存取：导出 → 清空 → 导入，构件数要能回来
+  // 文本标记是独立语义层：区域有占地框，道路有带宽/走向，两者都画中文世界牌。
+  active.markerDraft = { kind: "region", text: "滕文中学旧址", ry: Math.PI / 2, w: 66, d: 40 };
+  active.PlaceMarker(-186, 220);
+  active.markerDraft = { kind: "road", text: "火神庙东街", ry: 0, w: 337, d: 5 };
+  active.PlaceMarker(23.5, 210);
+  let markerSprites = 0;
+  active.root.traverse((node) => { if (node.isSprite && node.name.startsWith("MapMarkerText_")) markerSprites += 1; });
+  out.markers = {
+    count: active.markers.length,
+    kinds: active.markers.map((marker) => marker.kind).sort().join(","),
+    sprites: markerSprites,
+    chinese: active.Serialize().markers.map((marker) => marker.text).join(" / "),
+  };
+
+  // 存取：本地保存/读回与 JSON 导出/导入都必须同时带回构件和中文标记。
   const json = JSON.stringify(active.Serialize());
+  active.Save();
   active.ClearAll();
-  const cleared = active.items.length;
+  active.ClearMarkers();
+  active.Restore(false);
+  out.localRoundTrip = `${active.items.length} / ${active.markers.length}`;
+  active.ClearAll();
+  active.ClearMarkers();
+  const cleared = `${active.items.length} / ${active.markers.length}`;
   active.Import(json, false);
-  out.roundTrip = `${cleared} → ${active.items.length}`;
+  out.roundTrip = `${cleared} → ${active.items.length} / ${active.markers.length}`;
+
+  // 一键图纸标记必须来自正式数据：两校和警察所是区域，火神庙东街是道路。
+  active.LoadMapReferences();
+  out.mapReferences = {
+    count: active.markers.filter((marker) => marker.source === "map").length,
+    custom: active.markers.filter((marker) => marker.source === "custom").length,
+    customText: active.markers.filter((marker) => marker.source === "custom")
+      .map((marker) => marker.text).join(" / "),
+    school: active.markers.some((marker) => marker.sourceId === "feature:WenzhongSchool"
+      && marker.text === "滕文中学旧址" && marker.w === 66 && marker.d === 40),
+    police: active.markers.some((marker) => marker.sourceId === "feature:PoliceStation"
+      && marker.text === "警察所"),
+    road: active.markers.some((marker) => marker.sourceId === "street:FireGodTempleEastStreet"
+      && marker.kind === "road" && marker.text === "火神庙东街"),
+  };
+  active.Import(json, false);
+
+  // v1 没有 markers；升级后必须安全读成空层，再恢复本轮文档继续后面的测试。
+  active.Import('{"v":1,"items":[],"terrain":[]}', false);
+  out.legacyMarkers = active.markers.length;
+  const many = Array.from({ length: 200 }, (_, index) => ({
+    id: 7, kind: index % 2 ? "road" : "region", text: `标记${index}`,
+    x: index, z: -index, w: 30, d: 8,
+  }));
+  active.Import(JSON.stringify({ v: 2, items: [], markers: many, terrain: [] }), false);
+  out.markerImportGuard = {
+    count: active.markers.length,
+    uniqueIds: new Set(active.markers.map((marker) => marker.id)).size,
+  };
+  active.Import(json, false);
 
   // 特效与构件共用落点和 JSON，但不创建假碰撞盒；编辑器接管期间仍要推进烟火。
   active.SetPalette("Effect_FireSmall");
@@ -791,16 +843,34 @@ const scene = await page.evaluate(() => {
 Check("场景编辑器进自由飞行", scene.id === "scene" && scene.fly);
 Check("场景编辑器只保留关卡与布设职责",
   scene.sections.includes("关卡切片") && scene.sections.includes("构件库")
-    && scene.sections.includes("已放置") && !scene.sections.includes("地形笔刷"),
+    && scene.sections.includes("已放置") && scene.sections.includes("文本标记")
+    && !scene.sections.includes("地形笔刷"),
   scene.sections.join(" / "));
 Check("场景编辑器不再能编辑地形", scene.terrainBlocked);
 Check("场景相机可调 FOV 与远裁剪面",
   scene.projection[0] === 68 && scene.projection[1] === 1500, scene.projection.join(" / "));
+Check("俯瞰全城会自动扩远裁剪面",
+  scene.topDownFar > scene.originalProjection[1],
+  `${scene.originalProjection[1].toFixed(0)} → ${scene.topDownFar.toFixed(0)} m`);
 Check("放置的构件进场景且带碰撞盒",
   scene.items === 1 && scene.nodes >= 1 && scene.colliderGain > 0 && scene.nearby > 0,
   `盒子 +${scene.colliderGain}，附近 ${scene.nearby}`);
 Check("沙包路障（props 通道）真的建出来了", scene.barMeshes > 0, `网格 ${scene.barMeshes}`);
-Check("场景存取往返", scene.roundTrip === "0 → 2", scene.roundTrip);
+Check("区域/道路标记会生成中文世界牌并进入 JSON",
+  scene.markers.count === 2 && scene.markers.kinds === "region,road"
+    && scene.markers.sprites === 2 && scene.markers.chinese.includes("滕文中学旧址")
+    && scene.markers.chinese.includes("火神庙东街"), JSON.stringify(scene.markers));
+Check("场景本地存档会带回构件与标记", scene.localRoundTrip === "2 / 2", scene.localRoundTrip);
+Check("场景 JSON 存取往返", scene.roundTrip === "0 / 0 → 2 / 2", scene.roundTrip);
+Check("编辑器从 Data_Tengxian 载入院落与道路图纸标记",
+  scene.mapReferences.count >= 35 && scene.mapReferences.school
+    && scene.mapReferences.police && scene.mapReferences.road
+    && scene.mapReferences.custom === 2 && scene.mapReferences.customText.includes("滕文中学旧址")
+    && scene.mapReferences.customText.includes("火神庙东街"), JSON.stringify(scene.mapReferences));
+Check("旧版 v1 场景文档按空标记层兼容", scene.legacyMarkers === 0, scene.legacyMarkers);
+Check("外部 JSON 标记有数量上限且重复 id 会重编号",
+  scene.markerImportGuard.count === 96 && scene.markerImportGuard.uniqueIds === 96,
+  JSON.stringify(scene.markerImportGuard));
 Check("场景关卡可布设、预览并序列化特效",
   scene.effect.category && scene.effect.handles === 1 && scene.effect.source
     && scene.effect.json && scene.effect.emitted, JSON.stringify(scene.effect));
@@ -937,6 +1007,9 @@ const terrainLift = await page.evaluate(() => {
     supportsTerrain: active.supportsTerrain,
     mode: active.mode,
     items: active.items.length,
+    markers: active.markers.length,
+    markerText: active.markers.map((marker) => marker.text).join(" / "),
+    markerNodes: active.markers.filter((marker) => marker.node && marker.node.parent).length,
     before,
     afterGround: T.battlefield.GroundHeight(60, 60),
     afterObjectY: item.node.position.y,
@@ -956,7 +1029,10 @@ const liftedCollider = await page.evaluate(() => {
 });
 Check("地形编辑器独立接管地形并接到场景构件文档",
   terrainLift.id === "terrain" && terrainLift.supportsTerrain
-    && terrainLift.mode === "terrain" && terrainLift.items === 1, JSON.stringify(terrainLift));
+    && terrainLift.mode === "terrain" && terrainLift.items === 1
+    && terrainLift.markers === 2 && terrainLift.markerNodes === 2
+    && terrainLift.markerText.includes("滕文中学旧址") && terrainLift.markerText.includes("火神庙东街"),
+  JSON.stringify(terrainLift));
 Check("地形编辑器只暴露地形职责",
   terrainLift.sections.includes("地形笔刷") && terrainLift.sections.includes("关卡切片")
     && !terrainLift.sections.includes("构件库") && !terrainLift.sections.includes("已放置"),
@@ -978,7 +1054,11 @@ Check("地形相机可调 FOV 与远裁剪面",
 Check("切换到地形前恢复构件库相机参数",
   JSON.stringify(terrainLift.originalProjection) === JSON.stringify(scene.originalProjection),
   `${props.projection.join("/")} → ${terrainLift.originalProjection.join("/")}`);
-await page.evaluate(() => window.Taierzhuang.editor.active.ResetTerrain());
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.ResetTerrain();
+  active.ClearMarkers();
+});
 
 // 先飞到城内台地上空：**只有那张网格够密**（636 m 铺 116×116，约 5.5 m 一格）。
 // 城外那张是绕城的方环，700 m 以外每两百米才一个顶点，笔刷在那儿是改不动网格的。

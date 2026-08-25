@@ -130,6 +130,20 @@ const GAME_SHOTS = [
   { name: "Game_Z17_BlockRoofs", query: "phase=4&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower",
       cam: { from: [140, 26, 150], look: [-60, 3, 40], focalMm: 42 } } },
+  // 南城学校群俯视：同框验收滕文中学两进教室、书院小学一进教室，以及各自
+  // 校门—操场—教室的连续铺地轴线。必须用 phase=4，L5 的切片不生成南城。
+  { name: "Game_Z20_SouthSchools", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower",
+      cam: { from: [-140, 155, 330], look: [-140, 0, 220], focalMm: 48 } } },
+  // 编辑器语义层全城验收：一键从 Data_Tengxian 读取公共院落和十九段街路，
+  // 区域画琥珀框、道路画蓝色带，中文牌必须在俯瞰相机里可读。
+  { name: "Game_Z21_EditorMapLabels", query: "phase=4&quality=high&scale=medium&menu=0",
+    setup: { editorMapLabels: true } },
+  // 东北治安与羁押组团俯视：警察所、警备队、监狱和看守所同框，重点看机关院
+  // 石框列队场、门房/旗杆和监狱高墙，不让四处再淹没在普通民居屋顶里。
+  { name: "Game_Z22_PoliceQuarter", query: "phase=4&quality=high&scale=medium",
+    setup: { menuShot: "SouthEastTower",
+      cam: { from: [160, 125, -95], look: [160, 0, -210], focalMm: 50 } } },
 ];
 
 const VIEWPORT = { width: 1600, height: 900 };
@@ -160,6 +174,16 @@ async function Shoot(pageName, url, globalName, setup = null) {
   if (setup) {
     await page.evaluate(({ g, pose }) => {
       const game = window[g];
+      if (pose.editorMapLabels) {
+        document.getElementById("bootStart")?.click();
+        game.StepFrames(36);
+        game.Debug.OpenEditor("scene");
+        const editor = game.editor.active;
+        editor.LoadMapReferences();
+        editor.TopDown();
+        game.StepFrames(24);
+        return;
+      }
       if (pose.menuShot) {
         const index = game.menu.shots.findIndex((shot) => shot.id === pose.menuShot);
         if (index < 0) throw new Error(`找不到菜单机位 ${pose.menuShot}`);

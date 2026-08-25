@@ -1142,6 +1142,26 @@ export function BuildSchool(host, f, ctx) {
       interior: n === built.length - 1,
     });
   }
+  // 教室排前的连续条石甬路 + 校门到操场的中轴路。旧版只有房子和一根旗杆，
+  // 高空俯视时校园的 66×40 / 48×30 占地会被普通院落屋顶吞掉；这两组真实铺地
+  // 把完整校园平面连成一体，又不会增加碰撞或虚构现代操场设施。
+  for (const { i } of built) {
+    const path = L(0, rows[i] + rowD / 2 + 0.72);
+    sink.Add("WallPaving", PlaceGeometry(
+      MakeBox(rowW * 0.92, 0.08, 1.15, TILE_METERS.stone, `${seed}:classPath${i}`),
+      { x: path.x, y: 0.025, z: path.z, ry }));
+  }
+  if (built.length) {
+    const from = d / 2 - 1.35;
+    const to = rows[built[built.length - 1].i] + rowD / 2 + 1.2;
+    const length = Math.abs(from - to);
+    if (length > 2.0) {
+      const path = L(0, (from + to) / 2);
+      sink.Add("WallPaving", PlaceGeometry(
+        MakeBox(2.05, 0.09, length, TILE_METERS.stone, `${seed}:axisPath`),
+        { x: path.x, y: 0.03, z: path.z, ry }));
+    }
+  }
   // 二门：把两进隔开的一道横墙，当中留可走门洞
   if (innerGateLz != null) {
     const openW2 = 3.0;
