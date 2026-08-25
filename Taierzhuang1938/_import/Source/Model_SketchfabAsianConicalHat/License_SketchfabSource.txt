@@ -1,0 +1,7 @@
+title:   Asian Conical Hat
+author:  MushyDay (MushyDay)
+license: CC Attribution
+uid:     4eed68df8fb84284a91f42a6c6e4569c
+page:    https://sketchfab.com/3d-models/asian-conical-hat-4eed68df8fb84284a91f42a6c6e4569c
+source:  3234 faces / 1641 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

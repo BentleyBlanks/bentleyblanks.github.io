@@ -1,0 +1,7 @@
+title:   chinese signboard
+author:  Bharath (sneeky)
+license: CC Attribution
+uid:     d413ef470a42432ba30ece881e6c76a3
+page:    https://sketchfab.com/3d-models/chinese-signboard-d413ef470a42432ba30ece881e6c76a3
+source:  316 faces / 200 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

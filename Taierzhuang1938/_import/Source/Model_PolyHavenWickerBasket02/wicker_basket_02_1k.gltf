@@ -1,0 +1,248 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v4.1.63",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "wicker_basket_02_base"
+    },
+    {
+      "mesh": 1,
+      "name": "wicker_basket_02_lid",
+      "rotation": [
+        0.3215941786766052,
+        0.670600950717926,
+        -0.40621256828308105,
+        0.5309076905250549
+      ],
+      "translation": [
+        0.14905740320682526,
+        0.0994185134768486,
+        -0.03513522446155548
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "wicker_basket_02",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "mesh.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "wicker_basket_02_nor_gl",
+      "uri": "textures/wicker_basket_02_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wicker_basket_02_diff",
+      "uri": "textures/wicker_basket_02_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wicker_basket_02_rough",
+      "uri": "textures/wicker_basket_02_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 6465,
+      "max": [
+        0.10435400903224945,
+        0.20016027987003326,
+        0.10918553918600082
+      ],
+      "min": [
+        -0.10757288336753845,
+        -0.0002975759853143245,
+        -0.10714860260486603
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 6465,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 6465,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 34014,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 3706,
+      "max": [
+        0.10801897197961807,
+        0.05059736222028732,
+        0.10282550007104874
+      ],
+      "min": [
+        -0.12219585478305817,
+        -0.02078302577137947,
+        -0.10601591318845749
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 3706,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 3706,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 19536,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 77580,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 77580,
+      "byteOffset": 77580,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 51720,
+      "byteOffset": 155160,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 68028,
+      "byteOffset": 206880,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 44472,
+      "byteOffset": 274908,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 44472,
+      "byteOffset": 319380,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 29648,
+      "byteOffset": 363852,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 39072,
+      "byteOffset": 393500,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 432572,
+      "uri": "wicker_basket_02.bin"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+title:   Winnow
+author:  KOREA HERITAGE SERVICE [KHS] (KHS_Asset)
+license: CC Attribution
+uid:     e29fd48add3d471ab0bf25e9ae1213d5
+page:    https://sketchfab.com/3d-models/winnow-e29fd48add3d471ab0bf25e9ae1213d5
+source:  4996 faces / 2491 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

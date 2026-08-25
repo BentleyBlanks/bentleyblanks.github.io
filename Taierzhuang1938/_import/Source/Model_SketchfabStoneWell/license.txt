@@ -1,0 +1,11 @@
+Model Information:
+* title:	Stone well
+* source:	https://sketchfab.com/3d-models/stone-well-885951c7fc0646f4bb5b136475ee2f6c
+* author:	Lyskilde (https://sketchfab.com/longtail)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Stone well" (https://sketchfab.com/3d-models/stone-well-885951c7fc0646f4bb5b136475ee2f6c) by Lyskilde (https://sketchfab.com/longtail) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

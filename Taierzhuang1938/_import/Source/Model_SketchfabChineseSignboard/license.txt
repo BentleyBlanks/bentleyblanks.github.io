@@ -1,0 +1,11 @@
+Model Information:
+* title:	chinese signboard
+* source:	https://sketchfab.com/3d-models/chinese-signboard-d413ef470a42432ba30ece881e6c76a3
+* author:	Bharath (https://sketchfab.com/sneeky)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "chinese signboard" (https://sketchfab.com/3d-models/chinese-signboard-d413ef470a42432ba30ece881e6c76a3) by Bharath (https://sketchfab.com/sneeky) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

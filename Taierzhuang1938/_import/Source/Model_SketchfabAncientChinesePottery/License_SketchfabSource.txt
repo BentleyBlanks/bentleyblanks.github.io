@@ -1,0 +1,7 @@
+title:   Ancient Chinese Pottery | DAE Villages
+author:  Joan Tieu (JoanTieu)
+license: CC Attribution
+uid:     04337ff5619b435eaeb606a563e9b481
+page:    https://sketchfab.com/3d-models/ancient-chinese-pottery-dae-villages-04337ff5619b435eaeb606a563e9b481
+source:  53333 faces / 32778 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

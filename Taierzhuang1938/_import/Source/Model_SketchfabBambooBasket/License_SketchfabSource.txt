@@ -1,0 +1,7 @@
+title:   Bamboo_Basket
+author:  KOREA HERITAGE SERVICE [KHS] (KHS_Asset)
+license: CC Attribution
+uid:     6c7e1244d46c457fb6f3d6194663073b
+page:    https://sketchfab.com/3d-models/bamboo-basket-6c7e1244d46c457fb6f3d6194663073b
+source:  1088 faces / 546 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

@@ -1,0 +1,7 @@
+title:   Stone well
+author:  Lyskilde (longtail)
+license: CC Attribution
+uid:     885951c7fc0646f4bb5b136475ee2f6c
+page:    https://sketchfab.com/3d-models/stone-well-885951c7fc0646f4bb5b136475ee2f6c
+source:  7888 faces / 4126 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

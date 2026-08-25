@@ -1,0 +1,7 @@
+title:   Stone Mill Wheel
+author:  dukat.andrej (dukat.andrej)
+license: CC Attribution
+uid:     c4731bab20764f5eb874daf3ff07fcb5
+page:    https://sketchfab.com/3d-models/stone-mill-wheel-c4731bab20764f5eb874daf3ff07fcb5
+source:  976 faces / 490 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

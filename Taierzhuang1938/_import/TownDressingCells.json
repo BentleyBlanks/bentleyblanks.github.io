@@ -1460,6 +1460,501 @@
    "meshes": 1,
    "solid": true,
    "tag": "rubble"
+  },
+  "phWoodenBucket": {
+   "dims": [
+    0.297,
+    0.46,
+    0.284
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phWoodenWashTub": {
+   "dims": [
+    0.613,
+    0.353,
+    0.613
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phClayJarLidded": {
+   "dims": [
+    0.58,
+    0.333,
+    0.443
+   ],
+   "triangles": 800,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phClayFlowerPot": {
+   "dims": [
+    0.267,
+    0.222,
+    0.265
+   ],
+   "triangles": 500,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phWickerTray": {
+   "dims": [
+    0.52,
+    0.161,
+    0.398
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phWickerBasketLidded": {
+   "dims": [
+    0.46,
+    0.267,
+    0.335
+   ],
+   "triangles": 1000,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phChineseWoodStool": {
+   "dims": [
+    0.494,
+    0.52,
+    0.418
+   ],
+   "triangles": 1000,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phLowWoodStool": {
+   "dims": [
+    0.34,
+    0.233,
+    0.235
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phRoughWoodTable": {
+   "dims": [
+    1.134,
+    0.8,
+    0.706
+   ],
+   "triangles": 196,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phWoodAxe": {
+   "dims": [
+    0.224,
+    0.051,
+    0.7
+   ],
+   "triangles": 499,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phSmithHammer": {
+   "dims": [
+    0.112,
+    0.027,
+    0.34
+   ],
+   "triangles": 399,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phIronSpade": {
+   "dims": [
+    0.169,
+    0.046,
+    1.101
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phFirewoodBranches": {
+   "dims": [
+    0.896,
+    0.286,
+    1.1
+   ],
+   "triangles": 1200,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "phWoodLantern": {
+   "dims": [
+    0.174,
+    0.42,
+    0.182
+   ],
+   "triangles": 900,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryVillageWell": {
+   "dims": [
+    1.509,
+    0.95,
+    1.727
+   ],
+   "triangles": 1200,
+   "meshes": 2,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryWaterBucket": {
+   "dims": [
+    0.255,
+    0.34,
+    0.255
+   ],
+   "triangles": 68,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryCeramicVat": {
+   "dims": [
+    0.62,
+    0.514,
+    0.537
+   ],
+   "triangles": 72,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "ryFirewoodPit": {
+   "dims": [
+    1.15,
+    0.317,
+    1.025
+   ],
+   "triangles": 600,
+   "meshes": 2,
+   "solid": true,
+   "tag": "householdWoodpile"
+  },
+  "ryHayStack": {
+   "dims": [
+    0.847,
+    1.25,
+    0.874
+   ],
+   "triangles": 488,
+   "meshes": 1,
+   "solid": true,
+   "tag": "villageStraw"
+  },
+  "ryFirewoodStack": {
+   "dims": [
+    0.688,
+    0.561,
+    1.15
+   ],
+   "triangles": 184,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdWoodpile"
+  },
+  "ryChoppingBlock": {
+   "dims": [
+    0.62,
+    0.398,
+    0.716
+   ],
+   "triangles": 56,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryTimberStack": {
+   "dims": [
+    0.894,
+    0.224,
+    1.5
+   ],
+   "triangles": 72,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryFarmHoe": {
+   "dims": [
+    0.547,
+    0.458,
+    1.55
+   ],
+   "triangles": 58,
+   "meshes": 2,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryIronSpade": {
+   "dims": [
+    0.361,
+    1.15,
+    0.179
+   ],
+   "triangles": 148,
+   "meshes": 2,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryFeedTrough": {
+   "dims": [
+    1.1,
+    0.39,
+    0.953
+   ],
+   "triangles": 68,
+   "meshes": 2,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryCartWheel": {
+   "dims": [
+    0.543,
+    1.1,
+    1.065
+   ],
+   "triangles": 192,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryYardBench": {
+   "dims": [
+    0.443,
+    0.384,
+    1.6
+   ],
+   "triangles": 180,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryYardStool": {
+   "dims": [
+    0.507,
+    0.44,
+    0.507
+   ],
+   "triangles": 180,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "ryDryingRack": {
+   "dims": [
+    0.195,
+    1.95,
+    1.95
+   ],
+   "triangles": 40,
+   "meshes": 1,
+   "solid": true,
+   "tag": "fence"
+  },
+  "clayWaterVat": {
+   "dims": [
+    0.663,
+    0.9,
+    0.663
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "clayRoundVat": {
+   "dims": [
+    0.75,
+    0.74,
+    0.75
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "clayLuggedJar": {
+   "dims": [
+    0.566,
+    0.52,
+    0.454
+   ],
+   "triangles": 550,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "clayLiddedJar": {
+   "dims": [
+    0.58,
+    0.62,
+    0.58
+   ],
+   "triangles": 500,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "clayWideJar": {
+   "dims": [
+    0.649,
+    0.5,
+    0.678
+   ],
+   "triangles": 500,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "wineJarCluster": {
+   "dims": [
+    0.687,
+    0.55,
+    1.016
+   ],
+   "triangles": 650,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdCrock"
+  },
+  "firewoodPile": {
+   "dims": [
+    1.511,
+    0.62,
+    1.722
+   ],
+   "triangles": 1200,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdWoodpile"
+  },
+  "longBench": {
+   "dims": [
+    1.208,
+    0.42,
+    0.872
+   ],
+   "triangles": 242,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "woodPlatformBench": {
+   "dims": [
+    1.62,
+    0.316,
+    1.532
+   ],
+   "triangles": 700,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "winnowingBasket": {
+   "dims": [
+    0.626,
+    0.78,
+    0.204
+   ],
+   "triangles": 600,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdBasket"
+  },
+  "wovenBasket": {
+   "dims": [
+    0.54,
+    0.233,
+    0.518
+   ],
+   "triangles": 500,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdBasket"
+  },
+  "bambooHat": {
+   "dims": [
+    0.46,
+    0.204,
+    0.46
+   ],
+   "triangles": 450,
+   "meshes": 1,
+   "solid": true,
+   "tag": "householdBasket"
+  },
+  "clothLantern": {
+   "dims": [
+    0.288,
+    0.52,
+    0.293
+   ],
+   "triangles": 600,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "shopPlaque": {
+   "dims": [
+    0.814,
+    1.15,
+    0.08
+   ],
+   "triangles": 316,
+   "meshes": 1,
+   "solid": true,
+   "tag": "prop"
+  },
+  "stoneWellCurb": {
+   "dims": [
+    1.018,
+    0.72,
+    1.017
+   ],
+   "triangles": 699,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
+  },
+  "stoneMillWheel": {
+   "dims": [
+    1.04,
+    0.261,
+    1.037
+   ],
+   "triangles": 699,
+   "meshes": 1,
+   "solid": true,
+   "tag": "rubble"
   }
  },
  "basePlacements": {

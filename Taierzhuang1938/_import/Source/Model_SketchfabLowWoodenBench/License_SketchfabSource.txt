@@ -1,0 +1,7 @@
+title:   Low_Wooden_Bench
+author:  KOREA HERITAGE SERVICE [KHS] (KHS_Asset)
+license: CC Attribution
+uid:     38ca1b292f454d6285fe4b024fa06469
+page:    https://sketchfab.com/3d-models/low-wooden-bench-38ca1b292f454d6285fe4b024fa06469
+source:  1252 faces / 680 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

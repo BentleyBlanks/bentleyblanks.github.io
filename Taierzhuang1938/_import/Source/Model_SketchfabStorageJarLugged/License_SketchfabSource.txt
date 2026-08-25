@@ -1,0 +1,7 @@
+title:   Jar
+author:  KOREA HERITAGE SERVICE [KHS] (KHS_Asset)
+license: CC Attribution
+uid:     d00a1cb787314ffb9c5bd9c830e67b94
+page:    https://sketchfab.com/3d-models/jar-d00a1cb787314ffb9c5bd9c830e67b94
+source:  1088 faces / 542 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

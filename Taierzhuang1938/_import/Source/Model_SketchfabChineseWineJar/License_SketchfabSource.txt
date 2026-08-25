@@ -1,0 +1,7 @@
+title:   Chinese wine jar lowpoly prop
+author:  Khyoocumber (Khyoocumber)
+license: CC Attribution
+uid:     f930b224837145a39b89c95349dd2720
+page:    https://sketchfab.com/3d-models/chinese-wine-jar-lowpoly-prop-f930b224837145a39b89c95349dd2720
+source:  650 faces / 355 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

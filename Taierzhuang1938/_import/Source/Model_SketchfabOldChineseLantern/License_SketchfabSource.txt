@@ -1,0 +1,7 @@
+title:   Old Chinese Lantern - lowpoly for free download
+author:  Scritta (scritta)
+license: CC Attribution
+uid:     73b1e60901e6494fb0cb39affca6f850
+page:    https://sketchfab.com/3d-models/old-chinese-lantern-lowpoly-for-free-download-73b1e60901e6494fb0cb39affca6f850
+source:  976 faces / 508 vertices (as published)
+use:     Taierzhuang1938 Model_ChineseLifeSet.glb (decimated, source textures dropped)

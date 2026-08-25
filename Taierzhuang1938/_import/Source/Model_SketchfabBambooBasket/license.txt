@@ -1,0 +1,11 @@
+Model Information:
+* title:	Bamboo_Basket
+* source:	https://sketchfab.com/3d-models/bamboo-basket-6c7e1244d46c457fb6f3d6194663073b
+* author:	National Heritage Administration (https://sketchfab.com/NHA_Asset)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Bamboo_Basket" (https://sketchfab.com/3d-models/bamboo-basket-6c7e1244d46c457fb6f3d6194663073b) by National Heritage Administration (https://sketchfab.com/NHA_Asset) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

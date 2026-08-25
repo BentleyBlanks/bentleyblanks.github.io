@@ -139,6 +139,14 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 以上 Poly Haven 资源均为 [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)，
 许可副本保存在各自 `Source/Model_PolyHaven*/License_PolyHavenCc0.txt` 中。
 
+## 生活布设三包（2026-08-25 密度轮新增）
+
+| 运行时文件 | 来源 | 许可 | 处理后预算 |
+|---|---|---|---|
+| `Model_ChineseLifeSet.glb`：16 件中式生活件（水缸/陶瓮/酒坛/石磨盘/石井台/条凳/凉床/簸箕/笸箩/斗笠/布灯笼/铺面门板/柴垛） | Sketchfab 13 个源模型，作者：KOREA HERITAGE SERVICE (KHS_Asset)、Joan Tieu、Khyoocumber、MushyDay、Scritta、Bharath (sneeky)、Lyskilde (longtail)、dukat.andrej；UID 与逐件对应记录在 `Data_ExternalAssets_ChineseLife.mjs` 文件头与 `Source/Model_Sketchfab*/License_SketchfabSource.txt` | CC-BY-4.0 | 9,606 三角，429 KB，无贴图 |
+| `Model_HouseholdWareSet.glb`：14 件家什容器（木桶/木盆/陶罐/花盆/笸箩/提篮/凳/粗木桌/斧锤锹/柴枝/风灯） | Poly Haven（slug 清单在 `Data_ExternalAssets_HouseholdWare.mjs`；`Source/Model_PolyHaven*/`） | CC0 1.0 | 10,594 三角，537 KB，无贴图 |
+| `Model_RuralYardSet.glb`：15 件村居农具（井圈/柴堆/草垛/劈柴墩/石槽/陶盆/水桶/锄/锹/木料/车轮/条凳/方凳/晾杆） | Kenney（Nature / Survival / Graveyard / Fantasy Town Kit）与 Quaternius（Medieval Village），URL+sha256 在 `_import/Source/*/Source_RuralYard.json` | CC0 1.0 | 3,606 三角，254 KB，无贴图 |
+
 ## 特效轮廓纹理（常驻烟雾与燃烧）
 
 | 游戏内资产 | 来源 | 作者 / 页面声明 | 处理方式 |

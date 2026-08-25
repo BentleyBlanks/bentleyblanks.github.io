@@ -1,0 +1,3 @@
+Poly Haven asset: https://polyhaven.com/a/wicker_basket_01
+License: CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/)
+Downloaded through https://api.polyhaven.com/ and modified for Taierzhuang1938 runtime performance.

@@ -36,6 +36,11 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { BuildSink } from "./Script_World.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 import { PropStreamer } from "./Script_PropStreaming.mjs";
+import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+// 并行下载工作包各交一份目录片段（PACK.url + 无 url 的 ASSETS 表），此处接线。
+import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
+import { PACK as RY_PACK, ASSETS as RY_ASSETS } from "./Data_ExternalAssets_RuralYard.mjs";
+import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
 
 const LOADER = new GLTFLoader();
 
@@ -89,6 +94,13 @@ function MarketStorage(label, node, material = "WoodDoor") {
  * 最小的可堆石块只有 0.22 m 高，照样登记：它在 0.56 m 的跨越判据之下，
  * 进不了导航图，人一步就迈过去，但子弹打得中、身子穿不过。
  */
+/** 资产包片段 → 总表条目（补上包级 url）。 */
+function PackAssets(pack, table) {
+  const out = {};
+  for (const [id, spec] of Object.entries(table)) out[id] = { ...spec, url: pack.url };
+  return out;
+}
+
 const ASSETS = Object.freeze({
   house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=1", material: null, tag: "wall" },
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
@@ -129,6 +141,9 @@ const ASSETS = Object.freeze({
   marketCrate03: MarketStorage("市场板条箱 03", "MarketCrate03"),
   marketCrate04: MarketStorage("市场板条箱 04", "MarketCrate04"),
   ...BATTLEFIELD_ASSETS,
+  ...PackAssets(HW_PACK, HW_ASSETS),
+  ...PackAssets(RY_PACK, RY_ASSETS),
+  ...PackAssets(CL_PACK, CL_ASSETS),
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
@@ -299,15 +314,20 @@ async function LoadAsset(id) {
   return PrepareAsset(id, await LoadSource(id));
 }
 
+// 材质名 → 材质。语义名（HouseholdCeramic / Wicker 这类 Script_TengxianCity
+// MATERIALS 表里的行）走 ResolveTengxianMaterial 拿到配方+调色；直接写配方名的
+// 老条目同样过那张表（表里有同名行，取的是城里同一档参数 —— 外部件与程序化
+// 民居本来就该同色）。Steel 保留这层自己的粗糙度/金属度，表里没有它的行。
+// 【为什么必须过表】library.Get 对没烘焙的名字直接抛「材质未烘焙」——
+// PolyHaven 包第一次用 HouseholdCeramic 时是整关炸掉才发现的。
+function RuntimeMaterialFor(name, library) {
+  if (name === "Steel") return library.Get("Steel", { roughness: 0.72, metalness: 0.55 });
+  return ResolveTengxianMaterial(name, library);
+}
+
 function ApplyRuntimeMaterial(root, spec, library) {
   if (spec.materialMap) {
-    const bind = (source) => {
-      const name = source.name.replace(/\.\d{3}$/, "");
-      return library.Get(name, {
-        roughness: name === "Steel" ? 0.72 : 0.9,
-        metalness: name === "Steel" ? 0.55 : 0,
-      });
-    };
+    const bind = (source) => RuntimeMaterialFor(source.name.replace(/\.\d{3}$/, ""), library);
     root.traverse((object) => {
       if (!object.isMesh) return;
       object.material = Array.isArray(object.material)
@@ -316,7 +336,7 @@ function ApplyRuntimeMaterial(root, spec, library) {
     return;
   }
   if (!spec.material) return;
-  const material = library.Get(spec.material, { roughness: 0.9, metalness: 0 });
+  const material = RuntimeMaterialFor(spec.material, library);
   root.traverse((object) => {
     if (!object.isMesh) return;
     object.material = material;

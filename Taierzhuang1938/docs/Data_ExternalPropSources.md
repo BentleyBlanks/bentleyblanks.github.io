@@ -39,6 +39,19 @@ component, and binds the runtime's shared material recipes. The courtyard is
 placed once in `L0_Jiehe`; the battlefield pieces are used by the walled-town
 defense dressing (see below).
 
+## Life-dressing packs (2026-08-25 density round)
+
+Three parallel acquisition packages extended the catalog to 98 entries:
+`Model_ChineseLifeSet.glb` (16 Chinese household pieces, Sketchfab CC-BY-4.0,
+per-item attribution in `Data_ExternalAssets_ChineseLife.mjs`),
+`Model_HouseholdWareSet.glb` (14 Poly Haven CC0 containers and tools,
+`Data_ExternalAssets_HouseholdWare.mjs`), and `Model_RuralYardSet.glb`
+(15 Kenney/Quaternius CC0 farmstead pieces,
+`Data_ExternalAssets_RuralYard.mjs`). Full license ledger:
+`_import/Data_SourceLicenses.md`. Semantic material names
+(HouseholdCeramic/Wicker/HouseholdCloth…) now resolve through
+`ResolveTengxianMaterial`, so external props share the town's exact tints.
+
 ## Walled-town per-household dressing (2026-08-25)
 
 Beyond the per-level `PLACEMENTS`, the walled town carries a second placement
