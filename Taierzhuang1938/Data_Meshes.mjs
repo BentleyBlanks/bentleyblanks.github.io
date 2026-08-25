@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "10";
+const MESH_REV = "13";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -111,16 +111,20 @@ export const MESHES = {
   },
   Zb26: {
     file: "Zb26.tzm.json", category: "weapon",
-    triangles: 884, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 896, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.17050, 0.37276, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
     note: "ZB-26 轻机枪。**弹匣从上方插**（直的，不是布伦那种弯的）、枪管上提把、"
-      + "前段两脚架张开、带散热环的枪管。",
+      + "前段两脚架张开、带散热环的枪管。**瞄具整条左偏 20 mm** —— 弹匣占着正上方，"
+      + "瞄准线走正中就是穿过弹匣（2026-08-25 修，见 _blender/BuildWeapons.BuildZb26）。",
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",
-    triangles: 4690, meshBlocks: 2, nodes: 7, joints: 0,
+    // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
+    // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
+    // WP-E1 照 Model/Index.json 补正（数字来自构建期实测，不是猜的）。
+    triangles: 4690, meshBlocks: 4, nodes: 8, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.09814, 0.19667, 1.27562], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
@@ -155,12 +159,52 @@ export const MESHES = {
   },
   Dadao: {
     file: "Dadao.tzm.json", category: "weapon",
-    triangles: 624, meshBlocks: 3, nodes: 5, joints: 0,
-    materials: ["blade", "grip", "red"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.0160, 0.1060, 0.8940], lengthM: 0.900, bladeM: 0.624,
-    draws: { high: 3, medium: 3, low: 3 },
-    note: "参考右侧实物的大刀。刀身宽 40→67 mm、前宽后窄、刃线外鼓，刀背末段斜切"
-      + "并保留钝口；短吞口后接带圆孔全茎柄与木握片。刀身使用干净高金属度 PBR 材质。",
+    triangles: 4688, meshBlocks: 2, nodes: 5, joints: 0,
+    materials: ["steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
+    span: [0.0232, 0.1106, 0.8988], lengthM: 0.900, bladeM: 0.625,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "二十九军战刀式样（CGMOL 付费源，见 _import/Data_SourceLicenses.md）。"
+      + "刀身 55→88 mm、刃线外鼓上翘、刀背 5.7 mm 厚，圆盘卡扣 + 缠柄 + 柄尾大铁环。"
+      + "换掉了原来那把 40→67 mm 的程序化刀 —— 旧刀没护手没铁环，剪影读起来是把菜刀。",
+  },
+  DadaoAlt: {
+    file: "DadaoAlt.tzm.json", category: "weapon",
+    triangles: 2797, meshBlocks: 2, nodes: 5, joints: 0,
+    materials: ["steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
+    span: [0.0574, 0.1575, 0.8982], lengthM: 0.900, bladeM: 0.624,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "大刀的第二种式样（CC-BY Sketchfab / Trector）。**只是外观变体**，"
+      + "数值仍读 Data_Weapons.Dadao：大刀是各地铁匠各打各的，一个班人手一把"
+      + "一模一样的刀反倒不像 1938。圆盘吞口、束节木柄、刃线较直的一路。",
+  },
+
+  // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----
+  BayonetZhongZheng: {
+    file: "BayonetZhongZheng.tzm.json", category: "weapon",
+    triangles: 2218, meshBlocks: 2, nodes: 4, joints: 0,
+    materials: ["steel", "wood"], mounts: ["socket", "tip"],
+    span: [0.03289, 0.05997, 0.57153], lengthM: 0.572, bladeM: 0.428,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "HY1935 刺刀（中正式）。CC-BY Seitengewehr 84/98 底模（Sketchfab / "
+      + "PL_historyfan_K），程序化补枪口环与木柄片，刃拉长到史实 428 mm。",
+  },
+  BayonetHanYang: {
+    file: "BayonetHanYang.tzm.json", category: "weapon",
+    triangles: 2198, meshBlocks: 2, nodes: 4, joints: 0,
+    materials: ["steel", "wood"], mounts: ["socket", "tip"],
+    span: [0.02956, 0.0596, 0.51643], lengthM: 0.517, bladeM: 0.395,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "汉阳造配刀（八八式系）。与 HY1935 同一 CC-BY 底模，刃 395 mm。",
+  },
+  BayonetType38: {
+    file: "BayonetType38.tzm.json", category: "weapon",
+    triangles: 1344, meshBlocks: 1, nodes: 4, joints: 0,
+    materials: ["steel"], mounts: ["socket", "tip"],
+    span: [0.01029, 0.05254, 0.514], lengthM: 0.514, bladeM: 0.400,
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "三十年式刺刀（三八式）。CC-BY Ps1 Arisaka T30 Bayonet（Sketchfab / "
+      + "Swordmanck）：钩形护手与枪口环自带；丢掉刀鞘与腰带。全钢（后期批次样式），"
+      + "PSX 漫反射整体偏棕，色分桶会误判成木，见 ImportBayonets 注释。",
   },
 
   Type89Launcher: {
@@ -225,6 +269,64 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 },
     note: "门墩石（抱鼓石）。方座 + 横轴鼓面 + 六颗鼓钉。原点在地面。",
   },
+
+  // ——— 场景饰件（WP-E1）：由 Script_TrimProps.mjs 摆进战斗关卡 ———
+  // 这一族与上面四件同为 category=prop（同一条 ≤400 三角预算），区别只在用法：
+  // 门楼四件是给 Script_World 复用的建筑构件，这五件是**成列摆的场景饰件**，
+  // 落点写死在 Script_TrimProps.TRIM_PLACEMENTS 里。
+  // 材质名受两头夹：既要在 _blender/TzmCore.MATERIAL_NAMES 白名单里，又要
+  // ResolveTengxianMaterial 认得。交集只有 Stone / WoodBeam / WoodDoor / RoofTile /
+  // armor / track，所以铁活一律借 track（哑光暗灰熟铁）、漆钢借 armor。
+  SemaphoreSignal: {
+    file: "SemaphoreSignal.tzm.json", category: "prop",
+    triangles: 244, meshBlocks: 3, nodes: 3, joints: 0,
+    materials: ["Stone", "WoodDoor", "armor"], mounts: ["foot"],
+    span: [1.36, 5.16, 0.46],
+    draws: { high: 3, medium: 3, low: 3 },
+    note: "津浦路臂板信号机（下臂式）。混凝土基墩 + 5.2 m 收分方杆 + 七级梯挂 + "
+      + "木臂板 + 配重杆与拉杆。原点在基墩底面（＝地面）。臂板固定在「进站」位，"
+      + "不做转动 —— 饰件层没有逐帧驱动。",
+  },
+  StationLamp: {
+    file: "StationLamp.tzm.json", category: "prop",
+    triangles: 142, meshBlocks: 3, nodes: 3, joints: 0,
+    materials: ["RoofTile", "Stone", "armor"], mounts: ["foot"],
+    span: [0.6, 3.2, 0.57324],
+    draws: { high: 3, medium: 3, low: 3 },
+    note: "站台灯 3.2 m。铸铁灯柱 + 10 段搪瓷灯罩 + 磨砂灯泡。原点在柱底（＝站台面）。"
+      + "**不带光源** —— 一盏灯一个 light 就是一遍 shadow pass，六盏就没了。",
+  },
+  ChurchTracery: {
+    file: "ChurchTracery.tzm.json", category: "prop",
+    triangles: 192, meshBlocks: 1, nodes: 3, joints: 0,
+    materials: ["Stone"], mounts: ["sillCenter"],
+    span: [1.21, 3.07429, 0.07],
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "天主堂尖券窗花。净宽 1.50 / 窗高 2.60 / 券高 0.89，对着 "
+      + "Script_Landmark_ChurchSchool 城内那座（檐口 7.42 m）的窗洞算死；"
+      + "别的尺寸靠 TRIM_PLACEMENTS 的 scale 缩。券头圆窗心是真旋转体，不是多边形拼的。"
+      + "原点在窗台中点，厚度对称于墙心。",
+  },
+  CellDoorIron: {
+    file: "CellDoorIron.tzm.json", category: "prop",
+    triangles: 204, meshBlocks: 1, nodes: 3, joints: 0,
+    materials: ["track"], mounts: ["doorFace"],
+    span: [0.9225, 1.52, 0.0825],
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "牢门五金。两道包铁（y=0.26 / 1.62）+ 合页轴 + 竖铁 + 锁盒 + 锁鼻 + 挂锁 + "
+      + "四颗门钉，按 CELL.doorW=1.0 / doorH=1.95 配。**刻意避开** A1 程序化门板上"
+      + "已有的两道箍（y=0.55 / 1.41）——这件是补全那副五金，不是盖住它。"
+      + "原点在门板外表面、门扇底边中点，几何全部 z ≥ 0（朝门外）。",
+  },
+  CrossingSign: {
+    file: "CrossingSign.tzm.json", category: "prop",
+    triangles: 68, meshBlocks: 2, nodes: 3, joints: 0,
+    materials: ["Stone", "WoodDoor"], mounts: ["foot"],
+    span: [1.0748, 2.5574, 0.34],
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "铁路道口斜十字标。木杆 + 白灰斜十字牌 + 一块空警示牌（**不刻字**："
+      + "1938 年三月津浦路道口标的字样无资料，同 B1 的站牌口径）。原点在石基底面。",
+  },
 };
 
 /** 取一个模型的 url。id 不认识时返回 null（调用方退回程序化几何）。 */
@@ -252,6 +354,43 @@ export const WEAPON_MESH_BY_ID = {
   // 两辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
   Type89Launcher: "Type89Launcher",
   Type89Tank: "Type89Tank", Type94Tankette: "Type94Tankette",
+};
+
+/**
+ * 武器 id → 可换用的外观变体模型（**只换模型，不换任何数值**）。
+ *
+ * 只有大刀有：它不是兵工厂的制式货，是各县铁匠照各自习惯打的，一个班里
+ * 人手一把一模一样的刀反倒露馅。AI 士兵按自己的 seed 稳定抽一把；
+ * 玩家手里的第一人称永远走 `WEAPON_MESH_BY_ID`（也就是数组第 0 项），
+ * 免得同一场战斗里自己的刀会变。
+ *
+ * 第 0 项必须与 `WEAPON_MESH_BY_ID` 一致。
+ */
+export const WEAPON_MESH_VARIANTS = {
+  Dadao: ["Dadao", "DadaoAlt"],
+};
+
+/**
+ * 武器 id + 变体序号 → 模型 id。没登记变体、或者序号越界，都退回主模型。
+ *
+ * 变体的模型文件缺席（比如构建机上没有大刀第二式样的源）也不会白屏：
+ * `Script_Actor._ModelWeaponGeometry` 里 `meshDocs.has(id)` 落空就退回程序化几何。
+ */
+export function WeaponMeshId(weaponId, variant = 0) {
+  const list = WEAPON_MESH_VARIANTS[weaponId];
+  if (list && variant > 0 && variant < list.length) return list[variant];
+  return WEAPON_MESH_BY_ID[weaponId];
+}
+
+/**
+ * 可装刺刀的枪 → 刺刀模型 id。运行时把刺刀模型的 socket 挂点（枪口环中心）
+ * 对到枪的 muzzle 挂点上：环套枪口、刃沿枪管前伸、柄贴刺刀座。
+ * 哪些枪能上刺刀由 Data_Weapons 的 bayonet: true 说了算，这里只管配哪把刀。
+ */
+export const BAYONET_MESH_BY_WEAPON = {
+  ZhongZheng: "BayonetZhongZheng",
+  HanYang: "BayonetHanYang",
+  Type38: "BayonetType38",
 };
 
 /** 人物 kind（Script_Actor 的 KIND_SPEC 键）→ 模型 id。 */

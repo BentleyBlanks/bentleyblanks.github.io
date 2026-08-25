@@ -372,6 +372,9 @@ export function AddRoomBlock(sink, spec) {
   const {
     x, z, ry, width, depth, eaveY, ridgeY, seed, damage = 0, burnt = false,
     facing = 1, bays = 3, roofRafters = true,
+    // 门板："random" 抽签（旧行为）｜"shut" 恒关｜"none" 恒开。
+    // 可进入的屋子必须传 "none"：抽中关门时门板无碰撞，人穿板而过（WP-D2 取证）。
+    doorLeaf = "random",
   } = spec;
   const rnd = Mulberry32(HashString(`${seed}:rb`));
   const wallMat = burnt ? "BrickWallSooty" : "BrickWall";
@@ -390,9 +393,11 @@ export function AddRoomBlock(sink, spec) {
     const f = faces[i];
     const [fx, fz] = L(f.lx, f.lz);
     if (!f.open) {
+      // ruin 只作用在山墙（i>=2）：檐墙的墙头顶着 eaveY 起坡的屋面，
+      // 被 ruin 削低后墙头与瓦面之间是一排刺眼的天光条（WP-D1 取证 §5-3）。
       AddWall(sink, wallMat, {
         x: fx, z: fz, length: f.len, height: eaveY, thickness: 0.36,
-        ry: ry + f.rot, ruin: damage * 0.85, seed: `${seed}:f${i}`,
+        ry: ry + f.rot, ruin: i >= 2 ? damage * 0.85 : 0, seed: `${seed}:f${i}`,
         plinth: "Stone",
       });
       // 山墙顶上的小「口眼」（通风口）——两山墙才有
@@ -416,9 +421,10 @@ export function AddRoomBlock(sink, spec) {
       for (const s2 of [-1, 1]) {
         const off = s2 * (bayW / 2 - pierW / 2);
         const [px, pz] = L(lx + off * Math.cos(f.rot), lz2 + off * -Math.sin(f.rot));
+        // 墙垛也在檐口线上，同理不吃 ruin（战损仍由山墙/屋面/塌房表达）
         AddWall(sink, wallMat, {
           x: px, z: pz, length: pierW, height: eaveY, thickness: 0.36,
-          ry: ry + f.rot, ruin: damage * 0.8, seed: `${seed}:p${i}${b}${s2}`, plinth: "Stone",
+          ry: ry + f.rot, ruin: 0, seed: `${seed}:p${i}${b}${s2}`, plinth: "Stone",
         });
       }
       if (isDoor) {
@@ -426,10 +432,9 @@ export function AddRoomBlock(sink, spec) {
         // 门上过梁 + 门板
         sink.Add("WoodBeam", PlaceGeometry(MakeBox(1.45, 0.18, 0.4, TILE_METERS.wood, `${seed}:lt${b}`),
           { x: bx, y: doorH + 0.09, z: bz, ry: ry + f.rot }));
-        AddWall(sink, wallMat, {
-          x: bx, z: bz, length: 1.25, height: eaveY - doorH - 0.18, thickness: 0.36,
-          ry: ry + f.rot, ruin: damage * 0.7, seed: `${seed}:ab${b}`, solid: false,
-        });
+        // （此处原有一句忘删的 AddWall：AddWall 的每片墙从 y=0 起砌，本该在门楣以上的
+        //  那段墙被它砌在了门洞下半截 —— 全城每一栋房的门都被 1.1 m 的
+        //  「有渲染无碰撞」砖墙堵住，WP-D1 取证后删除。真正的门楣上墙是下面这块。）
         // 上半段墙要垫高
         if (damage < 0.5) {
           sink.Add(wallMat, PlaceGeometry(
@@ -442,7 +447,11 @@ export function AddRoomBlock(sink, spec) {
           x: bx, z: bz, ry: ry + f.rot + (f.lz >= 0 ? 0 : Math.PI),
           openW: 1.25, openH: doorH, depth: 1.5, seed: `${seed}:rv${b}`,
         });
-        if (rnd() < 0.55) {
+        // 抽签照旧消耗一次 rnd —— doorLeaf 非 random 时也要保持随机流不变，
+        // 否则同 seed 的房子在别处（山墙口眼等）会整体换样。
+        const leafRoll = rnd();
+        const leafShut = doorLeaf === "shut" || (doorLeaf === "random" && leafRoll < 0.55);
+        if (leafShut) {
           for (const s3 of [-1, 1]) {
             sink.Add("WoodDoor", PlaceGeometry(
               MakeBox(0.60, doorH, 0.05, TILE_METERS.wood, `${seed}:dr${b}${s3}`),

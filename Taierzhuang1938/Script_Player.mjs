@@ -964,14 +964,25 @@ export class PlayerController {
     return sway;
   }
 
-  /** 当前散布（度）。没有准星，但散布仍然决定子弹落点。 */
+  /**
+   * 当前散布（度）。**准心画的就是它**（Script_Hud.CrosshairGeometry），
+   * 所以这里每改一个系数，屏幕上那个圈就跟着变 —— 两者不许再分家。
+   *
+   * 【2026-08-25 调走动那一项】原来是 ×2.8（`1 + min(1,v/3)×1.8`），
+   * 而站姿速度就是 3.05 m/s，等于**一迈步就直接吃满**：汉阳造 3.0° → 8.4°，
+   * 25 m 上落点散在 ±1.8 m，画到 900p 上是 63 px 的一个大框。
+   * 用户实跑的判断是"跑动的时候准心还是大了点"，这条成立：战地/COD 的腰射
+   * 跑动惩罚大约是 +50%~90%，不是 +180%。现在收到 ×1.85（汉阳造 5.6° / 42 px），
+   * 跑起来仍然明显打不准，但不再是"整个屏幕都是准心"。
+   * **这一改同时改的是真实落点**，不是只把 HUD 画小 —— 准心不许再骗人。
+   */
   SpreadDeg(weapon) {
     if (!weapon) return 4;
     const base = this.ads > 0.5 ? (weapon.spreadAdsDeg ?? 0.2) : (weapon.spreadHipDeg ?? 3);
     let s = base * STANCE[this.stance].spread;
     s *= 1 + this.suppression * 1.3;
     s *= this.ArmPenalty() * 0.6 + 0.4;
-    s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3) * 1.8;
+    s *= 1 + Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / 3) * 0.85;
     if (!this.grounded) s *= 2.4;                    // 半空开火可以，但绝不是稳定射击姿态
     if (this.breathHold) s *= 0.55;
     if (this.bipod) s *= 0.35;

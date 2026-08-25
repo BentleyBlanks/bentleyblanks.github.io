@@ -9,6 +9,13 @@
 // 按 seed 稳定选型。**街道/十字口/地标/上城道/顺城街/视线走廊的雕格逻辑
 // （PlanBlocks）一行都没有动** —— 变的只是同一个格子里盖什么。
 //
+// 第二轮（D7）在此之上加了两件，都仍然只改「格子里盖什么」：
+//   ① **一格两户**：够大的一格按 seed 切成两户共山墙小院（`PickDuplex` / `BuildDuplex`），
+//      东西对分或南北对分，各自有门。全城 395 格 → 502 户（+27%）。
+//   ② **连排铺面**：一格铺面不再是一整间大铺子，而是 2—3 间门脸相接、
+//      檐口与进深参差的独立铺面（`ShopUnit`）。
+// 两件都**三档 LOD 同形**：远景两条脊 / 参差长排，走近了才是两个门洞 / 三间门脸。
+//
 // ---------------------------------------------------------------------------
 // 一、局部坐标系（**先读这一段，不然朝向必错**）
 //
@@ -76,6 +83,11 @@ const PITCH_RAD = 27.5 * DEG;
 /** 脊高 = 檐口 + 半进深 × tan(27.5°)。 */
 const PITCH = Math.tan(PITCH_RAD);
 
+/**
+ * 六种原型。`kind` 决定形制与材质味道；**住一户还是两户是另一个维度**
+ * （`PickDuplex` 返回的 "ew"/"ns"/null），不占 kind 的位置 ——
+ * 两户小院既可以是青砖的也可以是土坯的，那是同一件事的两个自变量。
+ */
 export const CITY_BLOCK_ARCHETYPES = Object.freeze([
   "OneEntry",     // 一进四合院（原行为，只把朝向转正）
   "TwoEntry",     // 两进院：倒座 + 二门 + 正房 + 东厢
@@ -111,18 +123,30 @@ function TileFor(material) {
 }
 
 /**
- * 一段中间开豁口的墙。院门、二门、后院矮墙共用。
+ * 一段开若干豁口的墙。院门、二门、后院矮墙、**一格两户的双院门**共用。
  * 豁口按**沿墙方向的局部偏移** at 定位；沿墙方向 = 本地 x 轴绕 ry+rot。
+ *
+ * `gaps: [{at, openW}, …]` 开多个口（D7 的两户共山墙小院：南墙上两家各一个门）；
+ * 不传就退回单口的 `at` / `openW`。多口时会按位置排序、合并重叠的口 ——
+ * 两个门挨得太近（分家分得偏）时不许生出一段负长度的墙，那会在墙上留一条穿帮缝。
  */
 function GapWall(sink, {
   x, z, ry, length, height, thickness, material, seed, ruin = 0,
-  openW = 1.5, at = 0, plinth = null, cope = true, tag = "wall",
+  openW = 1.5, at = 0, gaps = null, plinth = null, cope = true, tag = "wall",
 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
-  const segments = [
-    { c: (-length / 2 + (at - openW / 2)) / 2, len: at - openW / 2 - (-length / 2) },
-    { c: ((at + openW / 2) + length / 2) / 2, len: length / 2 - (at + openW / 2) },
-  ];
+  const holes = (gaps && gaps.length ? gaps : [{ at, openW }])
+    .map((g) => ({ a: g.at - g.openW / 2, b: g.at + g.openW / 2 }))
+    .sort((p, q) => p.a - q.a);
+  const segments = [];
+  let cursor = -length / 2;
+  for (const h of holes) {
+    const a = Clamp(h.a, -length / 2, length / 2);
+    const b = Clamp(h.b, -length / 2, length / 2);
+    if (a > cursor) segments.push({ c: (cursor + a) / 2, len: a - cursor });
+    cursor = Math.max(cursor, b);
+  }
+  segments.push({ c: (cursor + length / 2) / 2, len: length / 2 - cursor });
   for (let i = 0; i < segments.length; i += 1) {
     const s = segments[i];
     if (s.len < 0.35) continue;                     // 豁口顶到墙角：那一段干脆没有
@@ -138,12 +162,14 @@ function GapWall(sink, {
 
 /**
  * 院墙一圈。`gate` = { offset, openW } 时在**南面**（局部 +z）开门洞，其余三面实墙。
+ * `gates` = [{offset,openW}, …] 开多个（一格两户：南墙上两家各一个门 / 北户的夹道口）。
  * 门楼由调用方决定（砖院上门楼，土墙院只有木门框）。
  */
 function WallRing(sink, {
   x, z, ry, w, d, seed, damage = 0, material = "BrickWall", height = 2.1,
-  thickness = 0.35, plinth = null, cope = true, gate = null, tag = "wall",
+  thickness = 0.35, plinth = null, cope = true, gate = null, gates = null, tag = "wall",
 }) {
+  const gateList = (gates && gates.length) ? gates : (gate ? [gate] : null);
   const F = Frame(x, z, ry);
   const tile = TileFor(material);
   const sides = [
@@ -154,11 +180,12 @@ function WallRing(sink, {
   ];
   for (const s of sides) {
     const [wx, wz] = F(s.lx, s.lz);
-    if (gate && s.id === "s") {
+    if (gateList && s.id === "s") {
       GapWall(sink, {
         x: wx, z: wz, ry, length: s.len, height, thickness, material,
         seed: `${seed}:ring${s.id}`, ruin: damage * 0.7,
-        openW: gate.openW, at: gate.offset, plinth, cope, tag,
+        gaps: gateList.map((g) => ({ at: g.offset, openW: g.openW })),
+        plinth, cope, tag,
       });
       continue;
     }
@@ -362,6 +389,36 @@ export function PickCityBlockArchetype({ seed, wealth = 0.5, shop = false, w: cw
     if (roll <= 0) return kind;
   }
   return "OneEntry";
+}
+
+/**
+ * 这一格是一户还是两户（D7）。
+ *
+ * 判定必须**三档 LOD 共用同一个答案**，所以走 HashString 而不是随机数：
+ * 玩家从城墙上看见两条脊、走近了就得看见两个门。
+ *
+ * 谁不分家：
+ *   · `ShopRow` —— 铺面本来就是沿街一条排屋，分家的是**间**不是院（见 §连排铺面）；
+ *   · `TwoEntry` —— 两进院是这一格里最阔的一户，分了就没有「两进」这回事了；
+ *   · `WellYard` —— 井台占掉南边四米半，它的整个识别语言就是那口半公共的井。
+ * 剩下的一进院 / 土墙院 / L 形院按 ~55% 分成两户，全城约四成的格子变两户。
+ *
+ * 尺寸门槛（两户要排下两座正房 + 两个院子；被街裁窄的条子一律仍是一户）：
+ *   · 东西对分：面阔 ≥ 17.5（两个 ≥7.7 m 的半边，够两开间正房）、进深 ≥ 12.5；
+ *   · 南北对分：进深 ≥ 18（北户 9.2 + 南户 8.8）、面阔 ≥ 17（还要让出 2.8 m 夹道）。
+ * 两样都够格时七成走东西对分 —— 东西对分两家都直接临街，是县城里更常见的分法。
+ * 全城 395 格里 288 格过得了东西对分的门槛，剩下的都是被街切成条的窄格。
+ *
+ * @returns {"ew"|"ns"|null}
+ */
+export function PickDuplex({ seed, kind, w, d, chance = 55 }) {
+  if (kind === "ShopRow" || kind === "TwoEntry" || kind === "WellYard") return null;
+  const ew = w >= 17.5 && d >= 12.5;
+  const ns = d >= 18 && w >= 17;
+  if (!ew && !ns) return null;
+  if (((HashString(`${seed}:duplex`) >>> 0) % 100) >= chance) return null;
+  if (ew && ns) return ((HashString(`${seed}:duplexAxis`) >>> 0) % 10) < 7 ? "ew" : "ns";
+  return ew ? "ew" : "ns";
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +720,243 @@ function BuildWellYard(sink, o) {
   return props;
 }
 
+// ---------------------------------------------------------------------------
+// 一格两户（D7）
+//
+// WP-C1 的遗留 #1：一格 25 × 21 m 的宅基上只站着一到两座房，院子仍然空 ——
+// 真实县城这块地住两三户。这一节把「一格 = 一户」放开成「一格 = 两户共山墙小院」。
+//
+// **雕格让位语义一行没有动**：街／十字口／地标／上城道／顺城街／视线走廊仍由
+// `PlanBlocks` 原样裁切，两户是在**活下来的那一格里面**分的（`BlockPlan` 只多返回
+// 一个 `duplex` 字段），所以不会有任何一户挤进街面或地标的退让带。
+//
+// 两种分法（都是鲁南县城的常态，见 docs/Data_TengxianCity.md §4.6「一进院落为主」）：
+//
+//   · `"ew"` 东西对分 —— **字面意义的共山墙**：两座正房同进深、同一条脊线并排，
+//     两堵硬山山墙在中间贴在一起，中缝再压一道通到南墙的隔墙。两家的门都开在
+//     自家院子的东南角，于是南墙上并排两个门洞 —— 这是从街上一眼读出「这是两户」
+//     的唯一证据，不许省。
+//   · `"ns"` 南北对分 —— 南户临街、北户走**夹道**：南墙上除院门外另开一个 2 m 的
+//     夹道口，一条 2.8 m 净宽的夹道贴着西（或东）山墙通到中间那道隔墙，
+//     北户的门就开在隔墙上。南户正房的后墙**就是**那道隔墙（共墙不共山墙）。
+//     夹道必须真能走 —— 内部空间契约：门洞必可走。
+//
+// 为什么不给两户各盖一圈院墙：那是四堵墙贴着四堵墙，既贵又假。
+// 真的分家是**共一道墙**，这也正好把两户的成本压到接近单户。
+// ---------------------------------------------------------------------------
+
+/** 一段直墙 + 碰撞 + Cover。院墙/隔墙/夹道墙共用（比 GapWall 少一层豁口逻辑）。 */
+function StraightWall(sink, {
+  x, z, ry, length, height, thickness, material, seed, ruin = 0,
+  plinth = null, cope = true, tag = "wall",
+}) {
+  if (length < 0.35) return;
+  AddWall(sink, material, {
+    x, z, length, height, thickness, ry, ruin, seed,
+    tile: TileFor(material), plinth, cope, solid: false,
+  });
+  sink.Solid(x, height / 2, z, length / 2, height / 2, thickness / 2, tag, ry);
+  sink.Cover(x, z, height * (1 - ruin * 0.5), Math.sin(ry), Math.cos(ry));
+}
+
+/**
+ * 灶棚：贴着院墙的一间单坡小披厦（两个盒子，约 24 三角）。
+ *
+ * 两户挤一格之后院子小了，正房之外再塞厢房必然穿模；但一户人家总得有个
+ * 做饭的地方 —— 灶棚是把「这里住着人」交代清楚的**最便宜**的一件。
+ */
+function CookShed(sink, { x, z, ry, seed, width = 2.4, depth = 1.9, material }) {
+  const h = 1.95;
+  sink.Add(material, PlaceGeometry(
+    MakeBox(width, h, depth, TileFor(material), `${seed}:shed`), { x, y: h / 2, z, ry }));
+  sink.Solid(x, h / 2, z, width / 2, h / 2, depth / 2, "villageCourtyard", ry);
+  sink.Add("RoofTile", PlaceGeometry(
+    MakeBox(width + 0.3, 0.1, depth + 0.5, TILE_METERS.roof, `${seed}:shedRoof`),
+    { x, y: h + 0.18, z, ry, rx: 0.26 }));
+}
+
+/**
+ * 两户共山墙小院。`o.duplex` = "ew"（东西对分）/ "ns"（南北对分）。
+ * `o.kind` 只用来决定材质味道（AdobeYard → 土坯），形制走本函数。
+ * @returns {number} 家什件数
+ */
+function BuildDuplex(sink, o) {
+  const { x, z, ry, seed, damage, burnt } = o;
+  const w = o.w, d = o.d;
+  const rnd = Mulberry32(HashString(`${seed}:duplex`));
+  const F = Frame(x, z, ry);
+  const adobe = o.kind === "AdobeYard";
+  const wallMat = burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "BrickWall");
+  const ringH = adobe ? 1.84 + rnd() * 0.2 : 2.10 + rnd() * 0.26;
+  const ringT = adobe ? 0.42 : 0.35;
+  const plinth = adobe ? null : "CrossStone";
+  const ringTag = adobe ? "villageCourtyard" : "wall";
+  const S = MirrorOf(seed);                        // +1 正格，−1 整个平面左右镜像
+  const houseD = Math.min(4.5 + rnd() * 0.6, d * 0.30);
+  let props = 0;
+
+  if (o.duplex === "ns") {
+    // ---- 南北对分：南户临街，北户走夹道 ----
+    const zSplit = -d / 2 + Math.max(9.2, d * 0.45);
+    const laneW = 2.8;                             // 夹道净宽（人走得过去，大车过不去）
+    const laneWallX = -w / 2 + 0.35 + laneW;       // 夹道与南户院子之间那道墙
+    const laneMid = -w / 2 + 0.35 + laneW / 2;
+    const southGate = w / 2 - 2.5 - rnd() * 0.7;   // 南户的门：自家院子的东南角
+    WallRing(sink, {
+      x, z, ry, w, d, seed: `${seed}:ring`, damage, material: wallMat, height: ringH,
+      thickness: ringT, plinth, cope: !adobe, tag: ringTag,
+      gates: [
+        { offset: S * southGate, openW: 1.4 },
+        { offset: S * laneMid, openW: 2.0 },       // 夹道口：北户从这里进
+      ],
+    });
+    const [sgx, sgz] = F(S * southGate, d / 2);
+    PlainGate(sink, { x: sgx, z: sgz, ry, seed: `${seed}:gs`, damage, openW: 1.4 });
+    // 夹道墙：从南墙一直到中间那道隔墙
+    const laneLen = d / 2 - zSplit;
+    const [lwx, lwz] = F(S * laneWallX, zSplit + laneLen / 2);
+    StraightWall(sink, {
+      x: lwx, z: lwz, ry: ry + Math.PI / 2, length: laneLen, height: ringH, thickness: 0.32,
+      material: wallMat, seed: `${seed}:lane`, ruin: damage * 0.7,
+      plinth, cope: !adobe, tag: ringTag,
+    });
+    // 中间那道隔墙（两户共用）：北户的门开在夹道那一端
+    const [pwx, pwz] = F(0, zSplit);
+    GapWall(sink, {
+      x: pwx, z: pwz, ry, length: w, height: ringH + 0.1, thickness: 0.36, material: wallMat,
+      seed: `${seed}:party`, ruin: damage * 0.55,
+      gaps: [{ at: S * laneMid, openW: 1.4 }], plinth, cope: !adobe, tag: ringTag,
+    });
+    const [ngx, ngz] = F(S * laneMid, zSplit);
+    PlainGate(sink, { x: ngx, z: ngz, ry, seed: `${seed}:gn`, damage, openW: 1.4 });
+
+    // 北户正房（贴北墙，坐北朝南）
+    const nW = Math.min(w - 2.6, 10.4);
+    const [nx, nz] = F(S * w * 0.04, -d / 2 + 0.65 + houseD / 2);
+    HouseOf(sink, adobe, {
+      x: nx, z: nz, ry, width: nW, depth: houseD, eaveY: 2.46 + rnd() * 0.2,
+      seed: `${seed}:north`, damage, burnt, facing: 1,
+    });
+    // 南户正房：后墙就贴着那道隔墙，门朝南开进自家院子
+    const sSpanFrom = laneWallX + 0.5, sSpanTo = w / 2 - 0.55;
+    const sW = Math.min(sSpanTo - sSpanFrom, 9.6);
+    if (sW > 5.0) {
+      const [sx, sz] = F(S * (sSpanTo - sW / 2), zSplit + 0.28 + houseD / 2);
+      HouseOf(sink, adobe, {
+        x: sx, z: sz, ry, width: sW, depth: houseD, eaveY: 2.42 + rnd() * 0.2,
+        seed: `${seed}:south`, damage: Clamp(damage + rnd() * 0.12, 0, 1), burnt,
+        facing: 1,
+      });
+    }
+    // 两家的院子（北户在隔墙以北、南户在正房以南）
+    const [ncx, ncz] = F(S * w * 0.02, -d / 2 + 0.65 + houseD + 1.9);
+    props += AddCourtyardLife(sink, {
+      x: ncx, z: ncz, ry, baseY: 0, seed: `${seed}:nlife`,
+      width: Math.max(5, w - 5.5), depth: Math.max(3.2, zSplit - (-d / 2 + houseD) - 2.4), damage,
+    });
+    const [scx, scz] = F(S * (sSpanTo - 3.0), zSplit + 0.28 + houseD + 2.1);
+    props += AddYardWear(sink, { x: scx, z: scz, ry, seed: `${seed}:swear`, radius: 2.6 });
+    const [vx, vz] = F(S * (laneWallX + 2.2), d / 2 - 5.6);
+    props += AddVegetableBeds(sink, { x: vx, z: vz, ry, seed: `${seed}:beds`, rows: 2, rowLength: 3.0 });
+    // 灶棚贴夹道墙那一侧 —— 南户的院门在另一头的东南角，别堵在门口
+    const [kx, kz] = F(S * (laneWallX + 1.8), d / 2 - 2.2);
+    CookShed(sink, { x: kx, z: kz, ry, seed: `${seed}:shed`, material: wallMat });
+    if (rnd() < 0.55) { AddWaterVat(sink, ...F(S * w * 0.30, -d / 2 + houseD + 1.4), `${seed}:vat`); props += 1; }
+    return props;
+  }
+
+  // ---- 东西对分：两座正房同脊并排，中间一道共山墙 ----
+  const split = (rnd() - 0.5) * w * 0.12;          // 分家分不匀：中缝不在正中
+  const leftIn = -w / 2 + 0.55, rightIn = w / 2 - 0.55;
+  const spanA = (split - 0.62) - leftIn;           // 西户（局部 −x 那一半）
+  const spanB = rightIn - (split + 0.62);
+  const gateA = split - 0.62 - 1.35;               // 西户的门：自家院子的东南角
+  const gateB = rightIn - 1.9 - rnd() * 0.6;
+  WallRing(sink, {
+    x, z, ry, w, d, seed: `${seed}:ring`, damage, material: wallMat, height: ringH,
+    thickness: ringT, plinth, cope: !adobe, tag: ringTag,
+    gates: [{ offset: S * gateA, openW: 1.35 }, { offset: S * gateB, openW: 1.35 }],
+  });
+  const [gax, gaz] = F(S * gateA, d / 2);
+  PlainGate(sink, { x: gax, z: gaz, ry, seed: `${seed}:ga`, damage, openW: 1.35 });
+  const [gbx, gbz] = F(S * gateB, d / 2);
+  PlainGate(sink, { x: gbx, z: gbz, ry, seed: `${seed}:gb`, damage, openW: 1.35 });
+
+  // 共山墙：房带那一段高过檐口（两堵硬山山墙中缝里的那道墙），院子那一段落回院墙高
+  const fin = houseD + 0.55;
+  const eaveA = 2.44 + rnd() * 0.18;
+  const eaveB = eaveA + (rnd() - 0.5) * 0.24;      // 两家不同年月盖的：脊线错一档
+  const [f1x, f1z] = F(S * split, -d / 2 + fin / 2);
+  StraightWall(sink, {
+    x: f1x, z: f1z, ry: ry + Math.PI / 2, length: fin,
+    height: Math.max(eaveA, eaveB) + 0.85, thickness: 0.40, material: wallMat,
+    seed: `${seed}:fin`, ruin: damage * 0.5, plinth, cope: !adobe, tag: ringTag,
+  });
+  const yardLen = d - fin;
+  const [f2x, f2z] = F(S * split, -d / 2 + fin + yardLen / 2);
+  StraightWall(sink, {
+    x: f2x, z: f2z, ry: ry + Math.PI / 2, length: yardLen, height: ringH, thickness: 0.34,
+    material: wallMat, seed: `${seed}:mid`, ruin: damage * 0.6, plinth, cope: !adobe, tag: ringTag,
+  });
+
+  // 两座正房：同进深、同一条脊线，山墙在中缝贴到一起
+  const houseZ = -d / 2 + 0.65 + houseD / 2;
+  const halves = [
+    { span: spanA, edge: split - 0.62, dir: -1, eave: eaveA, tag: "a", gate: gateA },
+    { span: spanB, edge: split + 0.62, dir: 1, eave: eaveB, tag: "b", gate: gateB },
+  ];
+  for (const h of halves) {
+    if (h.span < 5.2) continue;                    // 这一半窄到盖不下正房：留成空院
+    const hw = Math.min(h.span - 0.6, 10.6);
+    // 正房的山墙要顶到中缝：把这一半靠中缝的那条边当基准往外量
+    const houseX = h.edge + h.dir * (hw / 2);
+    const [hx, hz] = F(S * houseX, houseZ);
+    HouseOf(sink, adobe, {
+      x: hx, z: hz, ry, width: hw, depth: houseD, eaveY: h.eave,
+      seed: `${seed}:${h.tag}`, damage: Clamp(damage + (h.tag === "b" ? rnd() * 0.14 : 0), 0, 1),
+      burnt, facing: 1,
+    });
+    // 院子：影壁（砖院才有）+ 一点家什 + 灶棚
+    if (!adobe && damage < 0.7) {
+      ScreenWall(sink, { x, z, ry, seed: `${seed}:${h.tag}`, damage, at: S * h.gate, d });
+    }
+    const yardMid = -d / 2 + houseD + 1.2 + (d - houseD - 2.4) * 0.45;
+    const [cx2, cz2] = F(S * (h.edge + h.dir * (h.span * 0.5)), yardMid);
+    props += AddCourtyardLife(sink, {
+      x: cx2, z: cz2, ry, baseY: 0, seed: `${seed}:${h.tag}life`,
+      width: Math.max(4.5, h.span - 2.0), depth: Math.max(3.4, d - houseD - 4.4), damage,
+    });
+    // 灶棚摆在**院门对面**那个墙角：西户的门在中缝一侧 ⇒ 灶棚贴外墙；
+    // 东户的门在外墙一侧 ⇒ 灶棚贴中缝。第一版两家都贴外墙，东户的灶棚
+    // 正好压在自家门口，从门洞进来先撞棚子。
+    const shedX = h.tag === "a" ? h.edge + h.dir * (h.span - 1.6) : h.edge + h.dir * 1.6;
+    const [kx, kz] = F(S * shedX, d / 2 - 2.3);
+    CookShed(sink, { x: kx, z: kz, ry, seed: `${seed}:${h.tag}shed`, material: wallMat });
+  }
+  if (rnd() < 0.5 && spanA > 5.2) {
+    const [stx, stz] = F(S * (split - 0.62 - spanA * 0.4), d / 2 - 3.2);
+    props += AddStalkStack(sink, { x: stx, z: stz, ry, seed: `${seed}:stalk`, scale: 0.8 });
+  }
+  return props;
+}
+
+/** 砖房走 AddRoomBlock，土坯房走 AdobeHouse —— 两户小院两种材质都要用得上。 */
+function HouseOf(sink, adobe, o) {
+  if (adobe) {
+    AdobeHouse(sink, {
+      x: o.x, z: o.z, ry: o.ry, width: o.width, depth: o.depth, eaveY: o.eaveY,
+      seed: o.seed, damage: o.damage, burnt: o.burnt, facing: o.facing,
+    });
+    return;
+  }
+  AddRoomBlock(sink, {
+    x: o.x, z: o.z, ry: o.ry, width: o.width, depth: o.depth,
+    eaveY: o.eaveY, ridgeY: o.eaveY + o.depth * 0.5 * PITCH,
+    seed: o.seed, damage: o.damage, burnt: o.burnt,
+    facing: o.facing > 0 ? -1 : 1, bays: o.width > 8.4 ? 3 : 2,
+  });
+}
+
 /**
  * 临街铺面排屋。
  *
@@ -676,33 +970,31 @@ function BuildWellYard(sink, o) {
  * depth: cell.d-1.2)` 盖 —— 一间 24×20 m 的单跨房，脊只比檐高 1.7 m，
  * 等于一块 20 m 进深的平板。铺面本来就是**沿街一条浅进深的排屋**。
  */
-function BuildShopRow(sink, o) {
-  const { x, z, ry, seed, damage, burnt } = o;
-  const rnd = Mulberry32(HashString(`${seed}:shop`));
-  const w = o.w, d = o.d;                          // w 沿街、d 垂直于街
-  const F = Frame(x, z, ry);
-  const mat = burnt ? "BrickWallSooty" : "BrickWall";
-  const mir = MirrorOf(seed);
-  const rowD = Math.min(6.0, d - 2.0);             // 进深 6 m：一间铺面 + 后柜
-  const rowW = Math.min(w - 1.4, 22);
-  const bays = Math.max(3, Math.round(rowW / 3.4));
-  const bayW = rowW / bays;
-  const eave = 2.72 + rnd() * 0.16;                // 铺面比住家高一档（挂幌子）
-  const ridge = eave + rowD * 0.5 * PITCH;
-  const [rx, rz] = F(0, d / 2 - 0.5 - rowD / 2);
-  const RF = Frame(rx, rz, ry);
+/**
+ * 一间铺面（连排里的一间）。门脸在局部 +z，前檐线由调用方对齐。
+ *
+ * 一间 = 台明 + 后檐墙 + 两山墙 + 檐柱 + 排门板 + 硬山瓦顶 + 一根幌子杆。
+ * 两间挨着盖时，各自的硬山山墙在中缝贴到一起 —— **那道并起来的砖垛就是
+ * 「连排」二字在街上唯一的证据**，所以每一间都留自己的山墙，不共用。
+ */
+function ShopUnit(sink, {
+  x, z, ry, width, depth, eave, seed, damage, burnt, mat, podiumH,
+  openBay = -1, sign = true,
+}) {
+  const rnd = Mulberry32(HashString(`${seed}:unit`));
+  const RF = Frame(x, z, ry);
   const collapsed = damage > 0.66;
+  const bays = Math.max(2, Math.round(width / 3.3));
+  const bayW = width / bays;
 
-  // 台明：铺面地坪高出街面一档，散水与门槛都从这里起
   sink.Add("CrossStone", PlaceGeometry(
-    MakeBox(rowW + 0.7, 0.28, rowD + 0.5, TILE_METERS.stone, `${seed}:podium`),
-    { x: rx, y: 0.14, z: rz, ry }));
+    MakeBox(width + 0.5, podiumH, depth + 0.5, TILE_METERS.stone, `${seed}:podium`),
+    { x, y: podiumH / 2, z, ry }));
 
-  // 后檐墙 + 两山墙（对外不开窗）
   const closed = [
-    { lx: 0, lz: -rowD / 2, len: rowW, rot: 0 },
-    { lx: -rowW / 2, lz: 0, len: rowD, rot: Math.PI / 2 },
-    { lx: rowW / 2, lz: 0, len: rowD, rot: Math.PI / 2 },
+    { lx: 0, lz: -depth / 2, len: width, rot: 0 },
+    { lx: -width / 2, lz: 0, len: depth, rot: Math.PI / 2 },
+    { lx: width / 2, lz: 0, len: depth, rot: Math.PI / 2 },
   ];
   for (let i = 0; i < closed.length; i += 1) {
     const c = closed[i];
@@ -713,42 +1005,39 @@ function BuildShopRow(sink, o) {
     });
   }
 
-  // 临街立面：柱 + 排门板。一间卸了板（能走进去，不摆碰撞）。
-  const openBay = HashString(`${seed}:openbay`) % bays;
   for (let b = 0; b <= bays; b += 1) {
-    const lx = -rowW / 2 + b * bayW;
-    const [px, pz] = RF(lx, rowD / 2 - 0.12);
+    const lx = -width / 2 + b * bayW;
+    const [px, pz] = RF(lx, depth / 2 - 0.12);
     sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.24, eave, 0.24, TILE_METERS.wood, `${seed}:col${b}`),
       { x: px, y: eave / 2, z: pz, ry }));
     sink.Solid(px, eave / 2, pz, 0.13, eave / 2, 0.13, "villagePost", ry);
   }
-  const [fx, fz] = RF(0, rowD / 2 - 0.12);
-  sink.Add("WoodBeam", PlaceGeometry(MakeBox(rowW + 0.3, 0.26, 0.3, TILE_METERS.wood, `${seed}:archi`),
+  const [fx, fz] = RF(0, depth / 2 - 0.12);
+  sink.Add("WoodBeam", PlaceGeometry(MakeBox(width + 0.3, 0.26, 0.3, TILE_METERS.wood, `${seed}:archi`),
     { x: fx, y: eave - 0.13, z: fz, ry }));
   for (let b = 0; b < bays; b += 1) {
-    const lx = -rowW / 2 + (b + 0.5) * bayW;
-    const [bx, bz] = RF(lx, rowD / 2 - 0.12);
+    const lx = -width / 2 + (b + 0.5) * bayW;
+    const [bx, bz] = RF(lx, depth / 2 - 0.12);
     if (b === openBay && !collapsed) {
-      // 卸了板的那一间：只剩门槛石与斜靠柱子的两扇板
+      // 卸了板的那一间：只剩门槛石与斜靠柱子的两扇板（不摆碰撞，玩家走得进去）
       sink.Add("CrossStone", PlaceGeometry(
         MakeBox(bayW - 0.4, 0.16, 0.5, TILE_METERS.stone, `${seed}:sill${b}`),
-        { x: bx, y: 0.30, z: bz, ry }));
+        { x: bx, y: podiumH + 0.02, z: bz, ry }));
       for (const s of [-1, 1]) {
         const ox = lx + s * (bayW / 2 - 0.36);
-        const [dx, dz] = RF(ox, rowD / 2 - 0.34);
+        const [dx, dz] = RF(ox, depth / 2 - 0.34);
         sink.Add("WoodDoor", PlaceGeometry(
           MakeBox(0.44, eave - 0.5, 0.06, TILE_METERS.wood, `${seed}:leaned${b}${s}`),
           { x: dx, y: 0.28 + (eave - 0.5) / 2, z: dz, ry, rx: s * 0.12 }));
       }
       continue;
     }
-    // 上了板的间：一排竖门板 + 上槛
     const panels = Math.max(4, Math.round((bayW - 0.3) / 0.42));
     const panelW = (bayW - 0.3) / panels;
     for (let p = 0; p < panels; p += 1) {
       if (damage > 0.45 && ((p + b) % 4 === 0)) continue;       // 打烂的铺子缺几块板
       const ox = lx - (bayW - 0.3) / 2 + (p + 0.5) * panelW;
-      const [dx, dz] = RF(ox, rowD / 2 - 0.14);
+      const [dx, dz] = RF(ox, depth / 2 - 0.14);
       sink.Add("WoodDoor", PlaceGeometry(
         MakeBox(panelW * 0.94, eave - 0.34, 0.07, TILE_METERS.wood, `${seed}:panel${b}${p}`),
         { x: dx, y: 0.28 + (eave - 0.34) / 2, z: dz, ry }));
@@ -757,35 +1046,86 @@ function BuildShopRow(sink, o) {
   }
 
   AddHardMountainRoof(sink, {
-    x: rx, z: rz, width: rowW, depth: rowD, eaveY: eave, ridgeY: ridge, ry,
+    x, z, width, depth, eaveY: eave, ridgeY: eave + depth * 0.5 * PITCH, ry,
     seed: `${seed}:roof`, ruined: collapsed, burnt, rafters: true,
   });
 
-  // 枪眼掏在**两侧山墙**上，不在临街立面 —— 铺面临街那一面是木排门板，
-  // 掏不了枪眼。「家家临街墙上有新掏的枪眼」是滕县巷战的第一视觉符号，
+  // 幌子：檐下挑一根杆，杆头一块净几何木牌（不写字）。一间一根 ——
+  // 一条街上高低错落的一排幌子，比一间铺子挂两根有用得多。
+  if (sign && !collapsed) {
+    const lx = (rnd() - 0.5) * width * 0.5;
+    const [hx, hz] = RF(lx, depth / 2 + 0.34);
+    sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.08, 0.08, 1.0, TILE_METERS.wood, `${seed}:pole`),
+      { x: hx, y: eave - 0.34, z: hz, ry }));
+    const [sx2, sz2] = RF(lx, depth / 2 + 0.78);
+    sink.Add("WoodDoor", PlaceGeometry(MakeBox(0.42, 0.95, 0.05, TILE_METERS.wood, `${seed}:sign`),
+      { x: sx2, y: eave - 0.92, z: sz2, ry }));
+  }
+}
+
+function BuildShopRow(sink, o) {
+  const { x, z, ry, seed, damage, burnt } = o;
+  const rnd = Mulberry32(HashString(`${seed}:shop`));
+  const w = o.w, d = o.d;                          // w 沿街、d 垂直于街
+  const F = Frame(x, z, ry);
+  const mat = burnt ? "BrickWallSooty" : "BrickWall";
+  const mir = MirrorOf(seed);
+  const rowD = Math.min(6.0, d - 2.0);             // 进深 6 m：一间铺面 + 后柜
+  const rowW = Math.min(w - 1.4, 22);
+  const collapsed = damage > 0.66;
+
+  // ---- 连排：一格不是一间大铺子，而是 2—3 间门脸相接的铺面（D7）----
+  //
+  // 改前一格是**一整间** rowW 宽的铺子：一条 22 m 长的檐口、一条通到底的脊、
+  // 一排均分的开间。县城的商业街不是这样 —— 它是「三间门面的杂货铺挨着
+  // 两间门面的粮行挨着一间药铺」，每家自己的台明、自己的檐口高度、
+  // 自己的山墙、自己的幌子。这一节把那条长檐口打断成 2—3 段。
+  //
+  // 前檐线**必须齐**（门脸相接，街面才是一条直的立面），参差只发生在
+  // 檐口高度、进深与台明高度上 —— 那是各家先后翻盖出来的高低。
+  const units = rowW >= 15.5 && ((HashString(`${seed}:units`) >>> 0) % 10) < 6 ? 3 : 2;
+  const frontZ = d / 2 - 0.5;                      // 各间共用的前檐线
+  const spans = [];
+  let acc = 0;
+  for (let u = 0; u < units; u += 1) {
+    // 各家门面宽不等：0.8—1.25 倍均分（分家、买卖、翻盖出来的参差）
+    const bias = 0.8 + ((HashString(`${seed}:span${u}`) >>> 0) % 100) / 100 * 0.45;
+    spans.push(bias); acc += bias;
+  }
+  const openUnit = (HashString(`${seed}:openunit`) >>> 0) % units;
+  let cursor = -rowW / 2;
+  let maxDepth = 0;
+  for (let u = 0; u < units; u += 1) {
+    const uw = rowW * spans[u] / acc;
+    const unitW = uw - 0.34;                       // 让出中缝：两家的硬山山墙在那里贴到一起
+    const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
+    const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+    const podiumH = 0.22 + ((HashString(`${seed}:up${u}`) >>> 0) % 100) / 100 * 0.12;
+    const [ux, uz] = F(cursor + uw / 2, frontZ - unitD / 2);
+    const bays = Math.max(2, Math.round(unitW / 3.3));
+    ShopUnit(sink, {
+      x: ux, z: uz, ry, width: unitW, depth: unitD, eave, podiumH, mat, burnt,
+      seed: `${seed}:u${u}`, damage: Clamp(damage + (u === 1 ? rnd() * 0.14 : 0), 0, 1),
+      openBay: u === openUnit ? (HashString(`${seed}:openbay`) >>> 0) % bays : -1,
+    });
+    maxDepth = Math.max(maxDepth, unitD);
+    cursor += uw;
+  }
+
+  // 枪眼掏在**整条连排两端的山墙**上，不在临街立面 —— 铺面临街那一面是木排
+  // 门板，掏不了枪眼。「家家临街墙上有新掏的枪眼」是滕县巷战的第一视觉符号，
   // 换了原型也不许丢；调用方对 ShopRow 会跳过通用的 AddStreetLoopholes。
   if (damage < 0.8) {
     for (const s of [-1, 1]) {
-      const [lpx, lpz] = RF(s * (rowW / 2 + 0.16), 0);
+      const [lpx, lpz] = F(s * (rowW / 2 + 0.16), frontZ - maxDepth / 2);
       AddLoopholes(sink, {
         x: lpx, z: lpz, ry: ry + s * Math.PI / 2, ys: [1.08, 1.45], count: 2,
-        spread: rowD * 0.5, seed: `${seed}:lp${s}`, wallFace: 0.24,
+        spread: maxDepth * 0.5, seed: `${seed}:lp${s}`, wallFace: 0.24,
       });
     }
   }
-
-  // 幌子：檐下挑一根杆，杆头一块净几何木牌（不写字）
+  // 檐下踩实的一条地：铺面门前是全城被踩得最实的地方
   if (!collapsed) {
-    for (let k = 0; k < 2; k += 1) {
-      const lx = (k === 0 ? -1 : 1) * rowW * (0.20 + rnd() * 0.1);
-      const [hx, hz] = RF(lx, rowD / 2 + 0.34);
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.08, 0.08, 1.0, TILE_METERS.wood, `${seed}:pole${k}`),
-        { x: hx, y: eave - 0.34, z: hz, ry }));
-      const [sx2, sz2] = RF(lx, rowD / 2 + 0.78);
-      sink.Add("WoodDoor", PlaceGeometry(MakeBox(0.42, 0.95, 0.05, TILE_METERS.wood, `${seed}:sign${k}`),
-        { x: sx2, y: eave - 0.92, z: sz2, ry }));
-    }
-    // 檐下踩实的一条地：铺面门前是全城被踩得最实的地方
     const [ax, az] = F(0, d / 2 - 0.2);
     AddYardWear(sink, { x: ax, z: az, ry, seed: `${seed}:tread`, radius: rowW * 0.42 });
   }
@@ -836,9 +1176,10 @@ const DETAIL_BUILDERS = {
  * @returns {number} 生成的家什件数（喂 stats.householdProps）
  */
 export function BuildCityBlockDetail(sink, spec) {
-  const build = DETAIL_BUILDERS[spec.kind] || BuildOneEntry;
+  // 两户的一格走 BuildDuplex；`kind` 仍然管材质味道（土坯 / 青砖）。
+  const build = spec.duplex ? BuildDuplex : (DETAIL_BUILDERS[spec.kind] || BuildOneEntry);
   let props = build(sink, spec) || 0;
-  props += YardTree(sink, spec, 42);
+  props += YardTree(sink, spec, spec.duplex ? 30 : 42);
   return props;
 }
 
@@ -847,11 +1188,18 @@ export function BuildCityBlockDetail(sink, spec) {
  * 走近的过程里树不许换地方，也不许凭空长出来。
  * @returns {number} 0 或 1
  */
-function YardTree(sink, { x, z, ry, w, d, seed, kind }, chance, near = true, baseY = 0) {
+function YardTree(sink, { x, z, ry, w, d, seed, kind, duplex }, chance, near = true, baseY = 0) {
   if (kind === "ShopRow" || w <= 13 || d <= 11) return 0;
   if (((HashString(`${seed}:yardTree`) >>> 0) % 100) >= chance) return 0;
   const mir = MirrorOf(seed);
-  const [tx, tz] = Frame(x, z, ry)(mir * (w / 2 - 2.5), d / 2 - 2.7);
+  // 两户的一格：东南角那块地已经被第二户的门与灶棚占了，树要另找地方 ——
+  // 东西对分退到另一侧的院角；南北对分**必须离开夹道**（第一版把树种在
+  // 2.8 m 的夹道正中，连人带碰撞盒把北户唯一的通路堵死了）。
+  const [tx, tz] = duplex === "ns"
+    ? Frame(x, z, ry)(mir * (w / 2 - 7.0), d / 2 - 3.0)
+    : duplex
+      ? Frame(x, z, ry)(-mir * (w / 2 - 2.6), d / 2 - 5.2)
+      : Frame(x, z, ry)(mir * (w / 2 - 2.5), d / 2 - 2.7);
   const height = 4.6 + ((HashString(`${seed}:th`) >>> 0) % 100) / 100 * 1.8;
   if (near) AddTree(sink, { x: tx, z: tz, seed: `${seed}:tree`, material: "Willow", height });
   else SparseTree(sink, { x: tx, z: tz, seed: `${seed}:tree`, height, baseY });
@@ -935,7 +1283,7 @@ function MidBody(sink, {
  * 中景一格。签名与原 AddSimpleCompound 一致（cell = {x,z,w,d,seed}）。
  */
 export function BuildCityBlockMid(sink, cell, {
-  damage = 0, burnt = false, baseY = 0, kind = "OneEntry", ry = 0,
+  damage = 0, burnt = false, baseY = 0, kind = "OneEntry", ry = 0, duplex = null,
 } = {}) {
   const { x, z, w, d, seed } = cell;
   const profile = MID_PROFILE[kind] || "single";
@@ -954,11 +1302,29 @@ export function BuildCityBlockMid(sink, cell, {
   }
 
   if (profile === "row") {
-    // 铺面排屋：一条沿街的浅进深长脊，没有院墙 —— 俯瞰上是一条连着的房带
+    // 铺面连排：沿街 2—3 段**参差**的浅进深脊，没有院墙 —— 俯瞰上是一条
+    // 高低错开的房带。detail 档已经把长檐口打断成 2—3 间，中景不跟着断的话，
+    // 从城墙上看是一条整的长脊、走近变三间，那就是 LOD 换形。
     const rowD = 6.0, rowW = Math.min(w - 1.2, 22);
-    const [rx, rz] = F(0, d / 2 - 0.5 - rowD / 2);
-    MidBody(sink, { x: rx, z: rz, ry, width: rowW, depth: rowD, eave: 2.72, rafters: true,
-      seed: `${seed}:row`, burnt, damage, baseY, chimney: true });
+    const units = rowW >= 15.5 && ((HashString(`${seed}:units`) >>> 0) % 10) < 6 ? 3 : 2;
+    const spans = [];
+    let acc = 0;
+    for (let u = 0; u < units; u += 1) {
+      const bias = 0.8 + ((HashString(`${seed}:span${u}`) >>> 0) % 100) / 100 * 0.45;
+      spans.push(bias); acc += bias;
+    }
+    let cursor = -rowW / 2;
+    for (let u = 0; u < units; u += 1) {
+      const uw = rowW * spans[u] / acc;
+      const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
+      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+      const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
+      // 椽子与烟囱都只给临街的头一间：远景档按同一个 `${seed}:u${u}` 挑烟囱，
+      // 两档要是各挑各的间，走近的过程就是「烟囱换了一间」。
+      MidBody(sink, { x: ux, z: uz, ry, width: uw - 0.34, depth: unitD, eave,
+        rafters: u === 0, seed: `${seed}:u${u}`, burnt, damage, baseY, chimney: u === 0 });
+      cursor += uw;
+    }
     const [yx, yz] = F(0, -d / 2 + 3.2);
     MidBody(sink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0, eave: 2.3,
       seed: `${seed}:store`, burnt, damage, baseY });
@@ -966,8 +1332,64 @@ export function BuildCityBlockMid(sink, cell, {
   }
   // 这一档最值钱的一笔就是院里那棵树：150 m 外没人数得清椽子，
   // 但一片瓦楞里探出来的枯枝一眼就把网格打散（detail 档同一判定、同一位置）。
-  // 影壁与麦秸垛同理，且与远景档同一处落点。
-  YardLife(sink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt });
+  // 影壁与麦秸垛同理，且与远景档同一处落点。院里那棵树的落点由 duplex 决定
+  //（YardLife 内部转交 YardTree）：两户的一格里，东南角那块地已经被第二户占了。
+  YardLife(sink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt, duplex });
+
+  // 一格两户：中景必须同步出两条脊，否则从城墙上俯瞰是一户、走近变两户 ——
+  // 那正是「房子在眼前变形」。这一档只交代脊线，门洞留给 detail 档。
+  if (duplex === "ew") {
+    const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
+    const houseD = Math.min(4.8, d * 0.30);
+    const hz = -d / 2 + 0.65 + houseD / 2;
+    const eave = adobe ? 2.38 : 2.52;
+    for (const s of [-1, 1]) {
+      const edge = split + s * 0.62;
+      const span = s < 0 ? (edge - (-w / 2 + 0.55)) : ((w / 2 - 0.55) - edge);
+      if (span < 5.2) continue;
+      const hw = Math.min(span - 0.6, 10.6);
+      const [bx, bz] = F(mir * (edge + s * hw / 2), hz);
+      MidBody(sink, { x: bx, z: bz, ry, width: hw, depth: houseD, rafters: s < 0,
+        eave: eave + (s > 0 ? 0.12 : 0), seed: `${seed}:h${s}`, burnt, damage, baseY,
+        chimney: s < 0 });
+    }
+    // 共山墙：中缝里那道高过檐口的墙，从空中把两条脊切成两段
+    const [fx, fz] = F(mir * split, -d / 2 + (houseD + 0.55) / 2);
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(0.4, eave + 0.95, houseD + 0.55, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:fin`, adobe ? null : BRICK_UV_GRID),
+      { x: fx, y: baseY + (eave + 0.95) / 2, z: fz, ry }));
+    sink.Solid(fx, baseY + (eave + 0.95) / 2, fz, 0.2, (eave + 0.95) / 2, (houseD + 0.55) / 2, "wall", ry);
+    const [mx2, mz2] = F(mir * split, -d / 2 + houseD + 0.55 + (d - houseD - 0.55) / 2);
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(0.34, h, d - houseD - 0.55, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:midw`, adobe ? null : BRICK_UV_GRID),
+      { x: mx2, y: baseY + h / 2, z: mz2, ry }));
+    sink.Solid(mx2, baseY + h / 2, mz2, 0.17, h / 2, (d - houseD - 0.55) / 2,
+      adobe ? "villageCourtyard" : "wall", ry);
+    return;
+  }
+  if (duplex === "ns") {
+    const zSplit = -d / 2 + Math.max(9.2, d * 0.45);
+    const houseD = Math.min(4.8, d * 0.30);
+    const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
+    MidBody(sink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
+      rafters: true, eave: adobe ? 2.4 : 2.54, seed: `${seed}:north`, burnt, damage, baseY,
+      chimney: true });
+    const sW = Math.min(w - 4.6, 9.6);
+    const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
+    MidBody(sink, { x: sx2, z: sz2, ry, width: sW, depth: houseD, rafters: false,
+      eave: adobe ? 2.36 : 2.46, seed: `${seed}:south`, burnt, damage, baseY });
+    // 中间那道隔墙（两户共用）+ 夹道墙：俯瞰上把院子切成前后两块
+    const [pwx, pwz] = F(0, zSplit);
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(w, h + 0.1, 0.36, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:party`, adobe ? null : BRICK_UV_GRID),
+      { x: pwx, y: baseY + (h + 0.1) / 2, z: pwz, ry }));
+    sink.Solid(pwx, baseY + (h + 0.1) / 2, pwz, w / 2, (h + 0.1) / 2, 0.18,
+      adobe ? "villageCourtyard" : "wall", ry);
+    return;
+  }
 
   const mainW = w * (adobe ? 0.5 : 0.6);
   const mainD = d * (profile === "double" ? 0.32 : 0.40);
@@ -1187,7 +1609,9 @@ function SimpleYardWall(sink, { x, z, ry, w, d, h, baseY, seed, adobe, burnt, ga
  * 一棵探出院墙的枯枝立刻把网格打散（中景/近景是同一处位置、同一个判定）。
  */
 function YardLife(sink, {
-  x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt = false, treeChance = 34,
+  x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt = false, duplex = null,
+  // 两户的一格里院子小一半，树也就稀一档（落点由 YardTree 按 duplex 另算）。
+  treeChance = duplex ? 24 : 34,
 }) {
   const F = Frame(x, z, ry);
   if (damage < 0.72) {
@@ -1208,12 +1632,12 @@ function YardLife(sink, {
       { x: px, y: baseY + 0.87, z: pz, ry }));
     sink.Solid(px, baseY + 0.6, pz, r * 0.8, 0.6, r * 0.8, "villageStraw", ry);
   }
-  YardTree(sink, { x, z, ry, w, d, seed, kind }, treeChance, false, baseY);
+  YardTree(sink, { x, z, ry, w, d, seed, kind, duplex }, treeChance, false, baseY);
 }
 
 /** 远景一格。cell = {x,z,w,d,seed}。 */
 export function BuildCityBlockFar(farSink, cell, {
-  damage = 0, burnt = false, baseY = 0, kind = "OneEntry", ry = 0,
+  damage = 0, burnt = false, baseY = 0, kind = "OneEntry", ry = 0, duplex = null,
 } = {}) {
   const { x, z, w, d, seed } = cell;
   const profile = FAR_PROFILE[kind] || "single";
@@ -1222,11 +1646,31 @@ export function BuildCityBlockFar(farSink, cell, {
   const F = Frame(x, z, ry);
 
   if (profile === "row") {
-    // 铺面排屋：一条沿街的浅进深长脊 + 后院库房，没有院墙（与中景同一剖面）
+    // 铺面连排：沿街 2—3 段**参差**的浅进深脊 + 后院库房，没有院墙 ——
+    // 断法、间宽、进深、檐高全部与中景同一条公式（三档同形：从城墙上看是
+    // 高低错开的一条房带，走近仍是那 2—3 间，不许 LOD 换形）。
+    //
+    // 与中景只差一处：**各间贴着出，不留 0.34 m 的间缝**。远景档这些体块本身
+    // 就是障碍物，凭空多出来的一条贯通的缝会被导航当成通路（第一版就是这么漏的）；
+    // 参差靠檐口高差、进深差与两端山墙读出来，不靠中间那道缝。
     const rowD = 6.0, rowW = Math.min(w - 1.2, 22);
-    const [rx, rz] = F(0, d / 2 - 0.5 - rowD / 2);
-    FarBody(farSink, { x: rx, z: rz, ry, width: rowW, depth: rowD, eave: 2.72,
-      baseY, seed: `${seed}:row`, burnt, damage, gable: true, chimney: true });
+    const units = rowW >= 15.5 && ((HashString(`${seed}:units`) >>> 0) % 10) < 6 ? 3 : 2;
+    const spans = [];
+    let acc = 0;
+    for (let u = 0; u < units; u += 1) {
+      const bias = 0.8 + ((HashString(`${seed}:span${u}`) >>> 0) % 100) / 100 * 0.45;
+      spans.push(bias); acc += bias;
+    }
+    let cursor = -rowW / 2;
+    for (let u = 0; u < units; u += 1) {
+      const uw = rowW * spans[u] / acc;
+      const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
+      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+      const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
+      FarBody(farSink, { x: ux, z: uz, ry, width: uw, depth: unitD, eave,
+        baseY, seed: `${seed}:u${u}`, burnt, damage, gable: true, chimney: u === 0 });
+      cursor += uw;
+    }
     const [yx, yz] = F(0, -d / 2 + 3.2);
     FarBody(farSink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0, eave: 2.3,
       baseY, seed: `${seed}:store`, burnt, damage });
@@ -1238,7 +1682,68 @@ export function BuildCityBlockFar(farSink, cell, {
   // 门开在东南角（巽位）；反格的院子整个平面镜像，门就落到西南角。
   const gateAt = mir * w * 0.26;
   SimpleYardWall(farSink, { x, z, ry, w, d, h, baseY, seed, adobe, burnt, gateAt });
-  YardLife(farSink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt });
+  YardLife(farSink, { x, z, ry, w, d, seed, kind, baseY, gateAt, damage, burnt, duplex });
+
+  // 一格两户：远景也得是两条脊。三档同一个答案 —— 二百米外看见两户，
+  // 走到跟前才不会变成一户（LOD 之间换形是这套东西最容易穿帮的地方）。
+  // 正房的落点、进深、檐高与中景逐项对齐，屋面种子也同名（烟囱不许换坡面）。
+  if (duplex === "ew") {
+    // 东西对分：两座正房同脊并排。**两块严丝合缝地顶在中缝上，不留缝** ——
+    // 远景档这些体块本身就是障碍物，凭空多出来的一条贯通南北的缝会被导航当成通路
+    //（第一版给两块各留了几十厘米，每格中间就多出一条一米宽的假巷子）。
+    // 两户靠 0.15 m 的檐口高差 + 中缝上背靠背的两堵山墙读出来，不靠那道缝。
+    const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
+    const houseD = Math.min(4.8, d * 0.30);
+    const hz = -d / 2 + 0.65 + houseD / 2;
+    const eave = adobe ? 2.38 : 2.52;
+    const leftIn = -w / 2 + 0.55, rightIn = w / 2 - 0.55;
+    const cut = Clamp(split, leftIn + 5.2, rightIn - 5.2);
+    for (const s of [-1, 1]) {
+      // 与中景同一条量法：从中缝这条边往外量，所以两档的**外侧**山墙落在同一处，
+      // 差的只是中缝里那 0.62 m（中景在那儿立一道共山墙，远景直接顶死）。
+      const span = s < 0 ? (cut - leftIn) : (rightIn - cut);
+      if (span < 5.2) continue;
+      const hw = Math.min(span, 11.2);
+      const [bx, bz] = F(mir * (cut + s * hw / 2), hz);
+      FarBody(farSink, { x: bx, z: bz, ry, width: hw, depth: houseD,
+        eave: eave + (s > 0 ? 0.15 : 0), baseY, seed: `${seed}:h${s}`, burnt, damage,
+        adobe, gable: true, chimney: s < 0 });
+    }
+    // 中缝那道院墙：房带以南把院子分成两家（与中景 `${seed}:midw` 同一处）
+    const yardLen = d - houseD - 0.55;
+    const [mx2, mz2] = F(mir * split, -d / 2 + houseD + 0.55 + yardLen / 2);
+    farSink.Add(burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick"), PlaceGeometry(
+      MakeBox(0.34, h, yardLen, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:midw`, adobe ? null : BRICK_UV_GRID),
+      { x: mx2, y: baseY + h / 2, z: mz2, ry }));
+    farSink.Solid(mx2, baseY + h / 2, mz2, 0.17, h / 2, yardLen / 2,
+      adobe ? "villageCourtyard" : "wall", ry);
+    return;
+  }
+  if (duplex === "ns") {
+    // 南北对分：北户贴北墙，南户的后墙贴着中间那道隔墙 —— 前后两块，
+    // 南块矮一档（檐口 −0.08）读出是两户；两块之间是两家的院子，不是缝。
+    const zSplit = -d / 2 + Math.max(9.2, d * 0.45);
+    const houseD = Math.min(4.8, d * 0.30);
+    const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
+    FarBody(farSink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
+      eave: adobe ? 2.4 : 2.54, baseY, seed: `${seed}:north`, burnt, damage,
+      adobe, gable: true, chimney: true });
+    const sW = Math.min(w - 4.6, 9.6);
+    const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
+    FarBody(farSink, { x: sx2, z: sz2, ry, width: sW, depth: houseD,
+      eave: adobe ? 2.36 : 2.46, baseY, seed: `${seed}:south`, burnt, damage,
+      adobe, gable: true });
+    // 中间那道隔墙（两户共用）：俯瞰上把院子切成前后两块
+    const [pwx, pwz] = F(0, zSplit);
+    farSink.Add(burnt ? "BrickWallSooty" : (adobe ? "Adobe" : "HouseBrick"), PlaceGeometry(
+      MakeBox(w, h + 0.1, 0.36, adobe ? TILE_METERS.adobe : TILE_METERS.brick,
+        `${seed}:party`, adobe ? null : BRICK_UV_GRID),
+      { x: pwx, y: baseY + (h + 0.1) / 2, z: pwz, ry }));
+    farSink.Solid(pwx, baseY + (h + 0.1) / 2, pwz, w / 2, (h + 0.1) / 2, 0.18,
+      adobe ? "villageCourtyard" : "wall", ry);
+    return;
+  }
 
   const mainW = w * (adobe ? 0.5 : 0.6);
   const mainD = d * (profile === "double" ? 0.32 : 0.40);

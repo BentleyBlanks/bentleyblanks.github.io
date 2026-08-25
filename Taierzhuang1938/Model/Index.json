@@ -164,11 +164,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Zb26.tzm.json",
-   "triangles": 884,
+   "triangles": 896,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 29775,
+   "bytes": 30289,
    "materials": [
     "steel",
     "wood"
@@ -330,15 +330,14 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Dadao.tzm.json",
-   "triangles": 624,
-   "meshBlocks": 3,
+   "triangles": 4688,
+   "meshBlocks": 2,
    "nodes": 5,
    "joints": 0,
-   "bytes": 27132,
+   "bytes": 232049,
    "materials": [
-    "blade",
-    "grip",
-    "red"
+    "steel",
+    "wood"
    ],
    "mounts": [
     "root",
@@ -348,14 +347,138 @@
    ],
    "bounds": {
     "min": [
-     -0.008,
-     -0.079,
-     -0.624
+     -0.01161,
+     -0.05797,
+     -0.62913
     ],
     "max": [
-     0.008,
-     0.027,
+     0.0116,
+     0.05264,
+     0.26972
+    ]
+   }
+  },
+  {
+   "name": "DadaoAlt",
+   "category": "weapon",
+   "file": "DadaoAlt.tzm.json",
+   "triangles": 2797,
+   "meshBlocks": 2,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 117820,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.02868,
+     -0.1056,
+     -0.62817
+    ],
+    "max": [
+     0.02868,
+     0.05193,
      0.27
+    ]
+   }
+  },
+  {
+   "name": "BayonetZhongZheng",
+   "category": "weapon",
+   "file": "BayonetZhongZheng.tzm.json",
+   "triangles": 2218,
+   "meshBlocks": 2,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 92735,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.01638,
+     -0.02578,
+     -0.428
+    ],
+    "max": [
+     0.01651,
+     0.03419,
+     0.14353
+    ]
+   }
+  },
+  {
+   "name": "BayonetHanYang",
+   "category": "weapon",
+   "file": "BayonetHanYang.tzm.json",
+   "triangles": 2198,
+   "meshBlocks": 2,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 91607,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.01396,
+     -0.02541,
+     -0.39505
+    ],
+    "max": [
+     0.0156,
+     0.03419,
+     0.12138
+    ]
+   }
+  },
+  {
+   "name": "BayonetType38",
+   "category": "weapon",
+   "file": "BayonetType38.tzm.json",
+   "triangles": 1344,
+   "meshBlocks": 1,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 57896,
+   "materials": [
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.00549,
+     -0.02863,
+     -0.4
+    ],
+    "max": [
+     0.0048,
+     0.0239,
+     0.114
     ]
    }
   },
@@ -476,6 +599,156 @@
    }
   },
   {
+   "name": "SemaphoreSignal",
+   "category": "prop",
+   "file": "SemaphoreSignal.tzm.json",
+   "triangles": 244,
+   "meshBlocks": 3,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 11590,
+   "materials": [
+    "Stone",
+    "WoodDoor",
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.23,
+     0.0,
+     -0.23
+    ],
+    "max": [
+     1.13,
+     5.16,
+     0.23
+    ]
+   }
+  },
+  {
+   "name": "StationLamp",
+   "category": "prop",
+   "file": "StationLamp.tzm.json",
+   "triangles": 142,
+   "meshBlocks": 3,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 6305,
+   "materials": [
+    "RoofTile",
+    "Stone",
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.3,
+     0.0,
+     -0.28662
+    ],
+    "max": [
+     0.3,
+     3.2,
+     0.28662
+    ]
+   }
+  },
+  {
+   "name": "ChurchTracery",
+   "category": "prop",
+   "file": "ChurchTracery.tzm.json",
+   "triangles": 192,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 7566,
+   "materials": [
+    "Stone"
+   ],
+   "mounts": [
+    "root",
+    "sillCenter"
+   ],
+   "bounds": {
+    "min": [
+     -0.605,
+     0.0,
+     -0.035
+    ],
+    "max": [
+     0.605,
+     3.07429,
+     0.035
+    ]
+   }
+  },
+  {
+   "name": "CellDoorIron",
+   "category": "prop",
+   "file": "CellDoorIron.tzm.json",
+   "triangles": 204,
+   "meshBlocks": 1,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 8561,
+   "materials": [
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "doorFace"
+   ],
+   "bounds": {
+    "min": [
+     -0.4725,
+     0.18,
+     -0.0155
+    ],
+    "max": [
+     0.45,
+     1.7,
+     0.067
+    ]
+   }
+  },
+  {
+   "name": "CrossingSign",
+   "category": "prop",
+   "file": "CrossingSign.tzm.json",
+   "triangles": 68,
+   "meshBlocks": 2,
+   "nodes": 3,
+   "joints": 0,
+   "bytes": 3879,
+   "materials": [
+    "Stone",
+    "WoodDoor"
+   ],
+   "mounts": [
+    "root",
+    "foot"
+   ],
+   "bounds": {
+    "min": [
+     -0.5374,
+     0.0,
+     -0.17
+    ],
+    "max": [
+     0.5374,
+     2.5574,
+     0.17
+    ]
+   }
+  },
+  {
    "name": "Type89Launcher",
    "category": "weapon",
    "file": "Type89Launcher.tzm.json",
@@ -552,7 +825,7 @@
    "meshBlocks": 5,
    "nodes": 6,
    "joints": 1,
-   "bytes": 39234,
+   "bytes": 39124,
    "materials": [
     "armor",
     "steel",

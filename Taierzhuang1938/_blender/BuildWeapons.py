@@ -67,15 +67,23 @@ def TubeAlongZ(z0, z1, r0, r1, segments=SEG, power=2.0, cap=True, smooth=True, y
                  segments, capStart=cap, capEnd=cap, smooth=smooth)
 
 
-def Mounts(node, muzzleZ, gripFrontZ, sightZ, magY=-0.02, magZ=-0.06, both=True):
+def Mounts(node, muzzleZ, gripFrontZ, sightZ, magY=-0.02, magZ=-0.06, both=True,
+           sightX=0.0, sightY=BORE + 0.020):
     """挂空节点。视图模型拿 muzzle 出枪焰、拿 gripL 摆左手、拿 sight 对准星，
-    人物 IK 拿 gripR/gripL 解两只手。**位置错了不是模型难看，是枪焰飘在空中。**"""
+    人物 IK 拿 gripR/gripL 解两只手。**位置错了不是模型难看，是枪焰飘在空中。**
+
+    sightX / sightY 必须逐枪给（2026-08-25 加的）：第一人称开镜是把 sight 挂点
+    **解到屏幕正中**，于是这个点就是玩家的瞄准线。原来它一律是 (0, BORE+0.020)，
+    等于假设每支枪的照门都在膛线上方 20 mm、且正中 —— 实测五支枪里四支
+    因此把机匣/照门座/弹匣顶在瞄准线上（对着天光量正中 41×41：中正式
+    1528/1681 是钢，捷克式 1681/1681）。捷克式尤其错得离谱：它的瞄具
+    **本来就是左偏的**，因为弹匣从正上方插进来。"""
     node.Child("muzzle", t=(0.0, BORE, muzzleZ))
     node.Child("gripR", t=(0.0, 0.0, 0.0))
     if both:
         node.Child("gripL", t=(0.0, -0.012, gripFrontZ))
     if sightZ is not None:
-        node.Child("sight", t=(0.0, BORE + 0.020, sightZ))
+        node.Child("sight", t=(sightX, sightY, sightZ))
         node.Child("magazine", t=(0.0, magY, magZ))
 
 
@@ -146,28 +154,46 @@ def BoltHandle(z, bend=0.55, knob=0.011):
     return Join(arm, ball)
 
 
-def LadderSight(z, y=BORE + 0.010):
-    """立框式表尺：底座 + 竖起来的标尺板。照门位置直接决定 sight 挂点。
-    底座压低 3 mm 让它真骑在枪管上（原来只搭着 1 mm，是共面闪烁的常客）。"""
+def LadderSight(z, y=BORE + 0.010, x=0.0, folded=False):
+    """立框式表尺：底座 + 标尺板。照门位置直接决定 sight 挂点。
+    底座压低 3 mm 让它真骑在枪管上（原来只搭着 1 mm，是共面闪烁的常客）。
+
+    folded=True 是**倒下的标尺板**（战斗表尺位）：板子朝后趴在底座上，
+    整个组件的顶面收在底座高度。竖起来的板子是一块 26 mm 高的实心料，
+    第一人称开镜时它正好糊在瞄准线上 —— 真枪那块板上有缺口，我们这块没有，
+    所以在第一人称里它只会挡视线。x 给左偏瞄具用（捷克式）。"""
     base = Box(0.024, 0.012, 0.052, bevel=0.002)
-    Transform(base, y=y, z=z)
+    Transform(base, x=x, y=y, z=z)
     leaf = Box(0.019, 0.026, 0.004)
-    Transform(leaf, y=y + 0.012, z=z + 0.020, rx=-0.22)
+    if folded:
+        # 板子放平：绕 X 转 90°，贴着底座顶面朝后躺，顶面压在底座顶之下。
+        Transform(leaf, x=x, y=y + 0.003, z=z + 0.014, rx=-1.5708)
+    else:
+        Transform(leaf, x=x, y=y + 0.012, z=z + 0.020, rx=-0.22)
     return Join(base, leaf)
 
 
-def FrontSight(z, hooded=False):
-    """准星座（+ 三八式那种护翼）。座子要坐进枪管里 4 mm，别停在管壁上。"""
+def FrontSight(z, hooded=False, postX=0.0, postY=BORE + 0.010):
+    """准星座（+ 三八式那种护翼）。座子要坐进枪管里 4 mm，别停在管壁上。
+
+    postX / postY 只挪**准星本身**，不挪抱箍：抱箍是套在枪管上的一圈，
+    跟着准星挪就会飘在枪管旁边。捷克式的准星在左边（瞄具整条左偏）。"""
     post = Box(0.004, 0.016, 0.006)
-    Transform(post, y=BORE + 0.010, z=z)
+    Transform(post, x=postX, y=postY, z=z)
     band = LoftZ([Ring(z + 0.012, rx=0.011, rz=0.011, cz=BORE, power=2.0),
                   Ring(z - 0.012, rx=0.011, rz=0.011, cz=BORE, power=2.0)],
                  6, capStart=False, capEnd=False, smooth=False)
     parts = [post, band]
+    if abs(postX) > 0.004:
+        # 准星偏出枪管之后必须有一条托臂把它接回抱箍上，否则准星是飘着的
+        # （BuildAll 的实体审计会直接判失败，画面上就是一根悬空的小铁片）。
+        arm = Box(abs(postX) + 0.014, 0.006, 0.010)
+        Transform(arm, x=postX / 2.0, y=BORE + 0.009, z=z)
+        parts.append(arm)
     if hooded:
         for s in (-1, 1):
             wing = Box(0.003, 0.020, 0.008)
-            Transform(wing, x=s * 0.008, y=BORE + 0.014, z=z)
+            Transform(wing, x=postX + s * 0.008, y=postY + 0.004, z=z)
             parts.append(wing)
     return Join(*parts)
 
@@ -379,10 +405,21 @@ def BuildZb26():
     Transform(yoke, y=BORE - 0.010, z=muzzleZ + 0.155)
     body.Add("steel", yoke, tile=T_STEEL)
 
-    body.Add("steel", LadderSight(-0.205, y=BORE + 0.014), tile=T_STEEL)
-    body.Add("steel", FrontSight(muzzleZ + 0.028), tile=T_STEEL)
+    # **瞄具整条左偏 20 mm。** 这是 ZB-26 一眼可辨的第三处特征，也是它必须的：
+    # 20 发弹匣从**正上方**插进机匣，瞄准线走正中就是穿过弹匣。
+    # 改前实测：第一人称开镜对着天光，屏幕正中 41×41 像素 **1681/1681 全是钢**，
+    # 也就是端起来什么都看不见。程序化备用 rig（Script_Viewmodel.BuildZb26）
+    # 早就写着 sightX = -0.030，出货的这份 Blender 模型一直是 0。
+    # 20 mm 是折中：够让瞄准线擦过弹匣（半宽 14 mm）左缘，又让表尺底座
+    # （宽 24 mm）仍有 12 mm 压在机匣（半宽 20 mm）上，不会判成飘着的零件。
+    # 瞄准线定在 y = BORE + 0.023（0.058）：机匣顶 0.056、表尺底座顶 0.055、
+    # 倒下的标尺板顶 0.054 全在它下面，准星尖正好顶到它 —— 这才是一副能用的照门/准星。
+    sightX = -0.020
+    body.Add("steel", LadderSight(-0.205, y=BORE + 0.014, x=sightX, folded=True), tile=T_STEEL)
+    body.Add("steel", FrontSight(muzzleZ + 0.028, postX=sightX, postY=BORE + 0.015), tile=T_STEEL)
 
-    Mounts(body, muzzleZ - 0.010, -0.470, -0.205, magY=BORE + 0.120, magZ=-0.118)
+    Mounts(body, muzzleZ - 0.010, -0.470, -0.205, magY=BORE + 0.120, magZ=-0.118,
+           sightX=sightX, sightY=BORE + 0.023)
     return root
 
 
@@ -691,4 +728,8 @@ WEAPON_BUILDERS = {
     "ServicePistol": BuildServicePistol,
     "Grenade": BuildGrenade,
     "Dadao": BuildDadao,
+    # 大刀的第二种式样：只是**外观变体**，没有自己的武器数值（仍读 Data_Weapons.Dadao）。
+    # 正常走 ImportWeapons.SOURCES["DadaoAlt"] 的外部源；源不在就退回同一把程序化
+    # 大刀 —— 变体退化成"两个人拿同一把"，玩法一点不受影响。
+    "DadaoAlt": BuildDadao,
 }

@@ -196,12 +196,16 @@ for (let i = 0; i < CITY_FEATURES.length; i += 1) {
 // 功能分组用建筑类型和尺度读取，避免把所有院落盖成同一种、同一尺寸的方盒。
 const kinds = new Set(CITY_FEATURES.map((feature) => feature.kind));
 const footprints = new Set(CITY_FEATURES.map((feature) => `${feature.w}x${feature.d}`));
+// 「compound 家族要有尺度层次」这条断言写于师部/官署/营部还都挤在 kind="compound"
+// 里的时代；v2 之后指挥部/机关/羁押各有专属 kind，通用 compound 只剩零散街坊块。
+// 断言随之改口径：院落式 kind 家族（compound/hq/billet/office/districtOffice）合并统计。
+const courtyardKinds = new Set(["compound", "hq", "billet", "office", "districtOffice"]);
 const compoundFootprints = new Set(CITY_FEATURES
-  .filter((feature) => feature.kind === "compound")
+  .filter((feature) => courtyardKinds.has(feature.kind))
   .map((feature) => `${feature.w}x${feature.d}`));
 check(kinds.size >= 4, `Public buildings need at least four kinds; got ${[...kinds].join(", ")}.`);
 check(footprints.size >= 8, "Public buildings need materially varied footprints, not one repeated block.");
-check(compoundFootprints.size >= 4, "Compound group needs varied scales for headquarters, offices, and battalion yards.");
+check(compoundFootprints.size >= 4, "Courtyard-family kinds need varied scales for headquarters, offices, and battalion yards.");
 
 // 东关：东门大街从门洞连续进入濠外住宅带；住宅带在濠外，且有足够网格余量形成密集街区。
 const eastGate = GATES.find((gate) => gate.id === "East");

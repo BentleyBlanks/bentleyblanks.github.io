@@ -109,8 +109,8 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 一个可叠加渲染调试 + 九个编辑器 + 一个「全部关掉」
-Check("面板列出设置、渲染调试与九个编辑器入口", afterGear.entries === 14, `按钮数=${afterGear.entries}`);
+// 三个设置 + 一个可叠加渲染调试 + 十个编辑器 + 一个「全部关掉」
+Check("面板列出设置、渲染调试与十个编辑器入口", afterGear.entries === 15, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -1291,6 +1291,69 @@ const returnedToMenu = await page.evaluate(() => ({
 }));
 Check("关闭场景编辑器后回到原菜单层", returnedToMenu.menu && returnedToMenu.visible,
   JSON.stringify(returnedToMenu));
+
+// ===========================================================================
+// 11) 采样点编辑器：装位姿 → 取当前相机回写 → 导出 → 关掉把相机还干净
+// ---------------------------------------------------------------------------
+// 出图脚本（Script_SamplePointShot）走的就是这条 ApplyPointById，所以这一节
+// 同时是「记录基线拍出来的画面对不对」的守卫：位姿在这里装错，八十多张图全错。
+await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("samplePoints"));
+await Step(6);
+const sample = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const tool = T.editor.active;
+  // 换切片要十几秒；冒烟只挑本切片里的点位，不让面板去切关。
+  tool.followPhase = false;
+  const saved = { fov: T.editor.flycam.saved.fov, far: T.editor.flycam.saved.far };
+  const point = tool.Points().find((p) => p.phase === T.state.builtPhase);
+  const pose = tool.ApplyPointById(point.id);
+  const applied = {
+    x: +T.camera.position.x.toFixed(2), y: +T.camera.position.y.toFixed(2),
+    z: +T.camera.position.z.toFixed(2), yaw: +T.editor.flycam.yaw.toFixed(4),
+  };
+  // 「取当前相机」：先把镜头挪开，再摁回写，看点位是不是真的跟着镜头走
+  T.camera.position.x += 7;
+  T.editor.flycam.yaw = 1.234;
+  tool.CaptureFromCamera();
+  const after = tool.Points().find((p) => p.id === point.id);
+  tool.Export("json");
+  let exported = null;
+  try { exported = JSON.parse(tool.io.value); } catch (error) { exported = null; }
+  return {
+    id: point.id, count: tool.Points().length, pose, applied, saved,
+    captured: { x: after.x, yaw: after.yaw },
+    exported: Array.isArray(exported) ? exported.length : -1,
+    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")]
+      .map((node) => node.textContent),
+  };
+});
+Check("采样点编辑器把表里的位姿原样装到相机上",
+  sample.count > 40 && sample.applied.x === +sample.pose.x.toFixed(2)
+    && sample.applied.z === +sample.pose.z.toFixed(2)
+    && Math.abs(sample.applied.y - sample.pose.y) < 0.01
+    && Math.abs(sample.applied.yaw - sample.pose.yaw) < 0.001,
+  JSON.stringify({ id: sample.id, count: sample.count, applied: sample.applied }));
+Check("「取当前相机」把飞到的位置与朝向写回点位",
+  Math.abs(sample.captured.x - (sample.pose.x + 7)) < 0.02
+    && Math.abs(sample.captured.yaw - 1.234) < 0.001, JSON.stringify(sample.captured));
+Check("采样点编辑器导出的 JSON 是完整一份点位表",
+  sample.exported === sample.count, `导出 ${sample.exported} / 表内 ${sample.count}`);
+Check("采样点编辑器面板分节齐全",
+  ["点位", "位姿", "增删", "取证", "导出 / 导入"].every((h) => sample.sections.includes(h)),
+  sample.sections.join(" / "));
+await page.evaluate(() => window.Taierzhuang.editor.Close());
+await Step(4);
+const sampleRestored = await page.evaluate(() => ({
+  active: window.Taierzhuang.editor.ActiveId,
+  fov: window.Taierzhuang.camera.fov,
+  far: window.Taierzhuang.camera.far,
+  fly: window.Taierzhuang.editor.flycam.Active,
+}));
+Check("关闭采样点编辑器后相机投影还原",
+  !sampleRestored.active && !sampleRestored.fly
+    && Math.abs(sampleRestored.fov - sample.saved.fov) < 0.01
+    && Math.abs(sampleRestored.far - sample.saved.far) < 0.01,
+  JSON.stringify(sampleRestored));
 
 // ===========================================================================
 await browser.close();

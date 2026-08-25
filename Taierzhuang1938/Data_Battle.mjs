@@ -97,7 +97,8 @@ export const ZONES = {
 
   // --- 四 · 城墙 ---
   // 上城道：RAMPS 里东门旁那一条，沿墙内侧爬。坐标是墙内侧顺城街上的落脚点。
-  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z, radius: 16 },
+  // -20：上城道脚已沿爬升方向让开门洞 20 m（RAMPS v2.1），路标跟着脚走
+  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z - 20, radius: 16 },
   Rampart: { id: "Rampart", name: "东南角望楼", x: 294, z: 288, radius: 22 },
   SouthWall: { id: "SouthWall", name: "南城墙", x: 150, z: 296, radius: 26 },
   SouthBreach: { id: "SouthBreach", name: "南墙缺口", x: 285, z: 296, radius: 18 },
@@ -560,7 +561,8 @@ export const COMBAT = {
  * 所以改成：体验/标准两档默认**开**，写实档关（那一档只留听觉确认）。
  * 听觉确认（hitConfirm / killConfirm）不挂难度，三档都给 —— 它是这条通道的底线。
  *
- * targetInfo（2026-08-25 接上）：准心指着谁 —— 番号/姓名、枪、距离（Script_Identify）。
+ * targetInfo（2026-08-25 接上）：准心指着谁（Script_Identify）——
+ * 敌人给番号/兵种 + 枪 + 距离，自己人给姓名 + 岁数 + 距离（枪对自己人是没用的信息）。
  * 同一条理由的另一半：七十米外敌我只有一个剪影，而步枪打得到五百米。
  *   · "full"  体验档：连血条一起给；
  *   · "basic" 标准档：两行字，伤情只给"负伤"两个字，不给数字；

@@ -216,6 +216,46 @@ export const SKY_PRESETS = {
       desat: 0.50, flatten: 0.15 },
     exposure: 0.46, godStrength: 0.28, bloom: 0.34, saturation: 0.90, contrast: 1.07,
   },
+  // 出川序章（CS_Chuchuan）专用。**只有这一场引用它**，正片七关一律不用 ——
+  // 加这一档而不是改 smokyDay，就是因为 smokyDay 被七关共用，动不得。
+  //
+  // 这一场的画面难点和外景关卡正相反：主体在一节封闭车厢**里面**，窗洞是唯一的光口。
+  // 沿用 smokyDay 时实测是「窗户纯白过曝、车厢内接近纯黑」的两极 —— 天地比不是太小，
+  // 是太大。四个数各管一件事：
+  //   · horizon/zenith 从 2.40/2.35 压到 1.52/1.45：窗洞不再是一块没有层次的白板，
+  //     窗外的土堤、电杆、村舍才有机会落在可读的曝光段里；
+  //   · envIntensity 1.05 → 1.70、shProbeIntensity 0.34 → 0.62、ambientIntensity
+  //     0.16 → 0.30：车厢内壁吃不到直射，全部亮度来自这三项（点光只补窗口与顶灯），
+  //     smokyDay 那三档的值等于把车厢刷黑；
+  //   · fog density 0.0145 → 0.0068：60—300 m 的田野与村舍不再被雾一口吃光；
+  //   · bloom 0.34 → 0.16：窗框边缘不再糊出一圈白光晕（过曝的观感一半来自它）。
+  // 太阳仰角 44°、方位 232°：从车厢右后方（月台那一侧）打进来，右窗一带有光斑、
+  // 左侧留在阴影里，车厢内部才有明暗分离而不是一块均匀的灰。
+  chuchuanDay: {
+    // 仰角 56°（三月末鲁南正午上限 57.4°，仍是史实窗口内）不是为了「亮」，是为了
+    // **让列车自己的影子落不到月台上**：车厢顶梁 3.76 m 高、离月台沿 1.6 m，
+    // 44° 时影子推到 x≈5.5，把月台边、雨棚柱、下车的人全罩进阴影里（实测 t=47/50
+    // 那两根柱子黑得读不出是木头）。56° 时影子只到 x≈4.7，正好停在月台沿以内。
+    sunElevation: 56, sunAzimuth: 232,
+    // horizon 从 1.52 压到 1.30：窗洞是全场唯一的高光区，1.52 时是一块没有层次的
+    // 纯白；1.30 之后掠过的电杆、村舍在天上还剩得住轮廓。压掉的那部分间接光
+    // 由 envIntensity 1.70→1.85 补回来，车厢内亮度不变。
+    zenith: [0.95, 1.12, 1.48], horizon: [1.30, 1.31, 1.34], ground: [0.52, 0.47, 0.39],
+    sunColor: [1.0, 0.94, 0.82], sunIntensity: 64, sunSize: 0.000012, glow: 0.95, glowSpread: 12,
+    smoke: 0.34, smokeColor: [1.05, 1.03, 0.99], smokeHeight: 0.10, stars: 0.0,
+    lightColor: 0xffe8cc, lightIntensity: 6.6,
+    envIntensity: 1.85,
+    // 这两项在本场比 envIntensity 还关键：车厢内壁、雨棚下的月台、背光的柱子与站牌
+    // 全都吃不到直射，只能靠 Global SH + AmbientLight 托底。smokyDay 的 0.34/0.16
+    // 在这一场等于把它们全刷成黑。抬到 0.85/0.46 之后背光面仍比受光面暗一大截，
+    // 但读得出材质。
+    shProbeIntensity: 0.85,
+    ambientIntensity: 0.46,
+    fog: { density: 0.0068, falloff: 22, max: 0.80,
+      sky: [0.68, 0.67, 0.64], ground: [0.40, 0.40, 0.41], sunGain: 0.18,
+      desat: 0.40, flatten: 0.10 },
+    exposure: 0.56, godStrength: 0.18, bloom: 0.16, saturation: 0.92, contrast: 1.06,
+  },
   // 阴天：鲁南三四月多西南风、浮尘大，天是一块均匀的亮。
   // 这一档没有硬阴影，形体感全靠 AO 与环境光——最难做，也最能看出管线水平。
   overcast: {

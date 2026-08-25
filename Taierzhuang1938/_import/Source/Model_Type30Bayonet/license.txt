@@ -1,0 +1,11 @@
+Model Information:
+* title:	Ps1 Arisaka T30 Bayonet
+* source:	https://sketchfab.com/3d-models/ps1-arisaka-t30-bayonet-7e602410773d4a9b8ca1d5c523d06b13
+* author:	swordmanck (https://sketchfab.com/Swordmanck)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Ps1 Arisaka T30 Bayonet" (https://sketchfab.com/3d-models/ps1-arisaka-t30-bayonet-7e602410773d4a9b8ca1d5c523d06b13) by swordmanck (https://sketchfab.com/Swordmanck) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -24,6 +24,7 @@ import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
 import ImportWeapons                 # noqa: E402
+import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
@@ -36,7 +37,10 @@ BUDGET = {"soldier": 1800, "weapon": 6000, "prop": 400, "vehicle": 1600}
 WEAPON_LENGTH = {
     "ZhongZheng": 1.110, "HanYang": 1.250, "Zb26": 1.165, "Type38": 1.276,
     "Mauser96": 0.288, "ServicePistol": 0.222,
-    "Grenade": 0.220, "Dadao": 0.900, "Type89Launcher": 0.413,
+    "Grenade": 0.220, "Dadao": 0.900, "DadaoAlt": 0.900, "Type89Launcher": 0.413,
+    # 刺刀是独立模型（挂 socket 到枪口，见 ImportBayonets.py 抬头）。
+    # 全长同样是史实数：HY1935 572 mm / 汉阳式 517 mm / 三十年式 514 mm。
+    "BayonetZhongZheng": 0.572, "BayonetHanYang": 0.517, "BayonetType38": 0.514,
 }
 LENGTH_TOLERANCE = 0.020
 
@@ -82,6 +86,10 @@ def main():
     for name, builder in BuildWeapons.WEAPON_BUILDERS.items():
         imported = ImportWeapons.BuilderFor(name)
         jobs.append((name, "weapon", imported or builder, ""))
+    for name in ImportBayonets.SOURCES:
+        builder = ImportBayonets.BuilderFor(name)
+        if builder:
+            jobs.append((name, "weapon", builder, ImportBayonets.SOURCES[name]["note"]))
     for name, builder in BuildProps.PROP_BUILDERS.items():
         jobs.append((name, "prop", builder, ""))
     jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,

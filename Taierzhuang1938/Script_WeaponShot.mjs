@@ -43,6 +43,9 @@ const WEAPONS = [
   { id: "Mauser96", len: 0.288, closeAt: -0.03 },
   { id: "Grenade", len: 0.22, upright: true },
   { id: "Dadao", len: 0.90, upright: true },
+  // 大刀的第二式样。它没有自己的 Data_Weapons 条目（只是外观变体），
+  // 所以靠 variant 序号选，出图文件名另起 shotId 免得覆盖上面那张。
+  { id: "Dadao", variant: 1, shotId: "DadaoAlt", len: 0.90, upright: true },
 ];
 
 const VIEWPORT = { width: 1280, height: 720 };
@@ -78,7 +81,7 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   const editor = T.editor.active;
   editor.spin = false;
   editor.SetMode("bench");
-  editor.SetWeapon(w.id);
+  editor.SetWeapon(w.id, w.variant || 0);
   T.StepFrames(2);
 
   // 纯色对照：把台架上每块网格的材质换成同色系的无贴图 PBR。
@@ -182,11 +185,17 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   return sheet.toDataURL("image/png");
 }, { w: entry });
 
-const list = only ? WEAPONS.filter((w) => only.includes(w.id)) : WEAPONS;
+let list = only
+  ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
+  : WEAPONS;
+// 第一人称永远走 WEAPON_MESH_BY_ID（也就是 variant 0）：玩家手里那把不换式样。
+// 不摘掉的话 --fp 会给变体拍出一张和主式样**一模一样**的图，看图的人会以为
+// 第一人称也换了刀。
+if (firstPerson) list = list.filter((w) => !w.variant);
 for (const entry of list) {
   const dataUrl = firstPerson ? await FpSheet(entry) : await Sheet(entry);
   const file = path.join(outDir,
-    `Weapon_${entry.id}${firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}.png`);
+    `Weapon_${entry.shotId || entry.id}${firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}.png`);
   fs.writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
   console.log(`ok   ${path.basename(file)}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }

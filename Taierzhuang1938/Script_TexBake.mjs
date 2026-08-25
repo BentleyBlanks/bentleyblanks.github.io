@@ -496,4 +496,8 @@ export const RECIPES = {
   Stone: (s) => BakeStone(s ?? 512, { seed: 907 }),
   // 庙墙灰浆：ImageGen 的 TemplePlaster PBR 在启动时覆盖此兜底；失败时退回土坯质感。
   TemplePlaster: (s) => BakeAdobe(s ?? 512, { seed: 223 }),
+  // 车站红砖 / 监狱青砖：同上，外部 webp 开机覆盖；兜底只保证「加载失败不丢材质」，
+  // 故意不上 BrickWall 那档双倍分辨率（反正会被顶掉，白烤）。
+  StationBrick: (s) => BakeBrickWall(s ?? 512, { seed: 163, rowsPerTile: 16 }),
+  PrisonBrick: (s) => BakeBrickWall(s ?? 512, { seed: 149, rowsPerTile: 18 }),
 };

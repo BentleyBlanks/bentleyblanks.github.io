@@ -45,8 +45,10 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
+import { AddTrimProps } from "./Script_TrimProps.mjs";
+import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
-import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD } from "./Data_Weapons.mjs";
+import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 
@@ -310,6 +312,12 @@ const state = {
   // 现在四个槽是真的：1 长枪 / 2 驳壳枪 / 3 大刀 / 4 投掷物，滚轮循环。
   slots: { primary: null, secondary: null, melee: null, throwable: "Grenade" },
   activeSlot: "primary",
+  // --- 刺刀 -----------------------------------------------------------------
+  // 长枪上有没有装着刺刀（X 键装/卸；只对 Data_Weapons 里 bayonet: true 的枪有意义）。
+  // 换到短枪再换回来状态保留；捡新枪、换关重置。
+  bayonetFixed: false,
+  // 白刃蓄力（V 或空枪左键按住中）：{ t 已按住秒数, source: "key"|"mouse" }
+  meleeCharge: null,
   // 每支枪各记各的弹仓 —— 换回来不该是满的
   mags: { primary: { ammo: 0, clips: 0 }, secondary: { ammo: 0, clips: 0 } },
   loadoutId: null,
@@ -391,7 +399,7 @@ async function Boot() {
 
   setStep("烘贴图……", 0.02);
   let baked = 0;
-  const total = 16;
+  const total = Object.keys(RECIPES).length;
   for (const name of library.PrepareSteps()) {
     baked += 1;
     setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
@@ -460,6 +468,16 @@ async function Boot() {
         albedo: "./Texture/Texture_StoneBase.webp?v=1",
         normal: "./Texture/Texture_StoneNormal.webp?v=1",
         orm: "./Texture/Texture_StoneOrm.webp?v=1",
+      }),
+      library.LoadExternalSet("StationBrick", {
+        albedo: "./Texture/Texture_StationBrickBase.webp?v=e2",
+        normal: "./Texture/Texture_StationBrickNormal.webp?v=e2",
+        orm: "./Texture/Texture_StationBrickOrm.webp?v=e2",
+      }),
+      library.LoadExternalSet("PrisonBrick", {
+        albedo: "./Texture/Texture_PrisonBrickBase.webp?v=e2",
+        normal: "./Texture/Texture_PrisonBrickNormal.webp?v=e2",
+        orm: "./Texture/Texture_PrisonBrickOrm.webp?v=e2",
       }),
       library.LoadExternalSet("TemplePlaster", {
         albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
@@ -594,6 +612,28 @@ async function Boot() {
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
+  /**
+   * 换天光。套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，
+   * 少一件就是「天是夜的、地是白天的」。过场（cut.sky）与采样点出图
+   *（夜战关里的关厢建筑要按白天记录）走的是同一条，不许各写一份。
+   */
+  function ApplySkyPreset(name) {
+    if (!SKY_PRESETS[name]) return false;
+    cutsceneSky = name;
+    const preset = sky.Apply(name);
+    sky.BakeEnvironment(scene);
+    lights.ApplyPreset(preset, sky.sunDirection);
+    return true;
+  }
+  /** 还原成本关自己的天光。 */
+  function RestoreLevelSky() {
+    if (!cutsceneSky) return;
+    cutsceneSky = null;
+    const preset = sky.Apply(PHASES[state.phaseIndex].sky);
+    sky.BakeEnvironment(scene);
+    lights.ApplyPreset(preset, sky.sunDirection);
+  }
+
   // 过场导演。onCapture/onRelease 是夺走与交还玩家控制权的钩子：
   // 过场期间 Frame() 只跑 director.Update 与渲染，玩法一律停摆
   //（不停的话玩家会在看电影的时候被打死，而且指针锁还在，鼠标会转动相机）。
@@ -619,22 +659,8 @@ async function Boot() {
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
     // 套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，少一件就是
     // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
-    applySky: (name) => {
-      if (!SKY_PRESETS[name]) return false;
-      cutsceneSky = name;
-      const preset = sky.Apply(name);
-      sky.BakeEnvironment(scene);
-      lights.ApplyPreset(preset, sky.sunDirection);
-      return true;
-    },
-    restoreSky: () => {
-      if (!cutsceneSky) return;
-      cutsceneSky = null;
-      const phase = PHASES[state.phaseIndex];
-      const preset = sky.Apply(phase.sky);
-      sky.BakeEnvironment(scene);
-      lights.ApplyPreset(preset, sky.sunDirection);
-    },
+    applySky: (name) => ApplySkyPreset(name),
+    restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
@@ -703,6 +729,10 @@ async function Boot() {
         const Send = (type) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
         if (down === undefined) { Send("keydown"); Send("keyup"); return; }
         Send(down ? "keydown" : "keyup");
+      },
+      // 按住/松开鼠标键（白刃蓄力等按住型输入要用；Fire 那条只覆盖单帧点击）
+      Mouse: (button = 0, down = true) => {
+        document.dispatchEvent(new MouseEvent(down ? "mousedown" : "mouseup", { button, bubbles: true }));
       },
       Wheel: (delta) => {
         document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
@@ -1048,6 +1078,18 @@ async function Boot() {
       && document.getElementById("edRoot").classList.contains("off"),
   });
 
+  // --- 采样点：县城固定机位的出图口 ----------------------------------------
+  // Script_SamplePointShot 不自己算机位，而是开采样点编辑器、逐点调它。
+  // 面板里预览到的与出图出来的必须是同一份位姿；两边各算一遍迟早会分叉。
+  const SampleTool = () => (editor.ActiveId === "samplePoints"
+    ? editor.active : editor.Open("samplePoints"));
+  window.Taierzhuang.Debug.SamplePoints = () => SampleTool()?.Points() || null;
+  window.Taierzhuang.Debug.SamplePoint = (id) => SampleTool()?.ApplyPointById(id) || null;
+  // 天光覆盖：夜战关（1/3/6）里的关厢建筑必须按白天记录，否则那一张图上
+  // 只有黑色轮廓。与过场换天光同一条通道（三件一起换）。
+  window.Taierzhuang.Debug.ApplySky = (name) => ApplySkyPreset(name);
+  window.Taierzhuang.Debug.RestoreSky = () => { RestoreLevelSky(); };
+
   // --- 主菜单 --------------------------------------------------------------
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
@@ -1169,6 +1211,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 而 AI 找掩体/破坏系统的粗筛 BoxesNear 里没有。
   if (external.colliders?.length) {
     battlefield.colliders.push(...external.colliders);
+    if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
+  }
+  // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
+  // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
+  const trim = await AddTrimProps({ scene, library, phaseId: phase.id });
+  battlefield.trimProps = trim;
+  if (trim.colliders?.length) {
+    battlefield.colliders.push(...trim.colliders);
     if (typeof battlefield.BuildCollisionGrid === "function") battlefield.BuildCollisionGrid();
   }
   // 探针体的代理几何体就是物理那张 AABB 表。**换关必须重接** ——
@@ -1765,9 +1815,13 @@ function RespawnPlayer(initial = false) {
   state.clips = state.mags.primary.clips;
   state.fireMode = "auto";
   player.bipod = false;
+  // 换关领新枪：刺刀从收着开始（上刺刀是玩家的一个决定，不是默认状态）
+  state.bayonetFixed = false;
+  state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
   viewmodel.Equip(currentWeapon);
+  SyncBayonet();
   viewmodel.root.visible = true;
   hud.SetWeaponName(currentWeapon ? (WEAPONS[currentWeapon]?.name || "步枪") : "赤手");
   ApplyDebugOptions();
@@ -1802,7 +1856,9 @@ function SwitchSlot(slot) {
   state.clips = mag ? mag.clips : 0;
   player.bipod = false;                            // 换枪就把两脚架收了
   state.fireMode = "auto";
+  state.meleeCharge = null;                        // 换手就把蓄着的那一下松掉
   viewmodel.Equip(currentWeapon);
+  SyncBayonet();                                   // 切回长枪时刺刀还在枪上
   hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   return true;
 }
@@ -2338,7 +2394,12 @@ const router = new InputRouter({
       case "crouch": input.crouchPressed = true; return;
       case "prone": input.pronePressed = true; return;
       case "reload": Reload(); return;
-      case "melee": DoMelee(); return;
+      // V 是 holdAction：按下开始蓄力，松手按蓄了多久决定挥砍还是劈刺。
+      // 大刀/投掷物在 BeginMeleeCharge 里直接落回一次性出招（它们不蓄力）。
+      case "melee":
+        if (detail.down) BeginMeleeCharge("key"); else ReleaseMeleeCharge();
+        return;
+      case "bayonet": ToggleBayonet(); return;
       case "bandage":
         if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 });
         return;
@@ -2487,16 +2548,83 @@ function ReleaseCook() {
   state.cook = 0;
 }
 
-/** 白刃。大刀是近身补充兵器 —— 这是最后一手，不是第一手。 */
+/**
+ * 白刃（一次性出招那条路）：大刀槽的左键、以及大刀/投掷物在手时按 V。
+ * 持枪的白刃不走这里 —— 那条是蓄力链（BeginMeleeCharge / ReleaseMeleeCharge）。
+ */
 function DoMelee() {
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   viewmodel.TriggerMelee();
-  const weaponId = WEAPONS[currentWeapon]?.bayonet ? currentWeapon : "Dadao";
-  const result = combat.Melee(weaponId === currentWeapon ? currentWeapon : "Dadao",
-    player.position.clone(), player.AimDirection(_aimDir).clone());
+  const weapon = WEAPONS[currentWeapon];
+  const useGun = !!(weapon?.bayonet && state.bayonetFixed);
+  const result = combat.Melee(useGun ? currentWeapon : "Dadao",
+    player.position.clone(), player.AimDirection(_aimDir).clone(),
+    useGun ? { mode: "thrust", power: 0.5 } : {});
   // 同上：不在这里扣票，阵亡事件已经扣过了
   if (result) ConfirmHit(result.died);
   return !!result;
+}
+
+/**
+ * 白刃蓄力入口。source: "key"（V 按下）| "mouse"（空枪左键按下）。
+ * 大刀不蓄力（swingTimeS 里自带 90 ms 短蓄）、投掷物没有蓄劈的道理 ——
+ * 这两类按下那一刻直接出招。
+ */
+function BeginMeleeCharge(source) {
+  if (!player?.Alive || state.meleeCharge) return false;
+  const weapon = WEAPONS[currentWeapon];
+  if (!weapon || weapon.kind === "melee" || weapon.kind === "throwable") return DoMelee();
+  if (viewmodel.IsBusy?.()) return false;
+  if (!viewmodel.BeginMeleeCharge?.()) return false;
+  state.meleeCharge = { t: 0, source };
+  return true;
+}
+
+/** 松手出招：按住不足 chargeMinS 是挥砍（cut），够了是劈刺（thrust）。 */
+function ReleaseMeleeCharge() {
+  const charge = state.meleeCharge;
+  if (!charge) return false;
+  state.meleeCharge = null;
+  if (!player?.Alive) { viewmodel.CancelMeleeCharge?.(); return false; }
+  const weapon = WEAPONS[currentWeapon];
+  const fixed = !!(weapon?.bayonet && state.bayonetFixed);
+  const charged = charge.t >= GUN_MELEE.chargeMinS;
+  const power = charged ? Clamp01(charge.t / GUN_MELEE.chargeMaxS) : 0;
+  // 没上刺刀：不管蓄多久都是枪托砸，蓄力只加力道 —— 拿枪管抡劈是要炸膛的
+  const mode = fixed ? (charged ? "thrust" : "cut") : "bash";
+  return DoMeleeAttack(mode, power);
+}
+
+/** 持枪白刃出招：判定与动画吃同一份 mode/power。 */
+function DoMeleeAttack(mode, power) {
+  viewmodel.TriggerMelee(mode, power);
+  const result = combat.Melee(currentWeapon, player.position.clone(),
+    player.AimDirection(_aimDir).clone(), { mode, power });
+  if (result) ConfirmHit(result.died);
+  return !!result;
+}
+
+/** 装/卸刺刀（X）。只对 Data_Weapons 里 bayonet: true 的枪有意义。 */
+function ToggleBayonet() {
+  if (!player?.Alive || !viewmodel) return false;
+  const weapon = WEAPONS[currentWeapon];
+  if (!weapon?.bayonet) {
+    hud.Hint(weapon?.kind === "melee" ? "大刀本身就是白刃" : "这支枪装不了刺刀", 2.0);
+    return false;
+  }
+  if (viewmodel.IsBusy?.() || state.meleeCharge) return false;
+  const next = !state.bayonetFixed;
+  if (!viewmodel.TriggerFixBayonet?.(next)) return false;
+  state.bayonetFixed = next;
+  // "咔哒"落在动画中段左手贴到枪口那一下（0.95 s × 0.52 ≈ 0.49）
+  audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1, delay: 0.48 });
+  hud.Hint(next ? "上刺刀" : "收刺刀", 1.6);
+  return true;
+}
+
+/** 换枪/重生后把刺刀状态种回视图模型（Equip 会整棵重建 rig，可见性得重种）。 */
+function SyncBayonet() {
+  viewmodel.SetBayonetFixed?.(state.bayonetFixed && !!WEAPONS[currentWeapon]?.bayonet);
 }
 
 /**
@@ -2533,11 +2661,15 @@ function UpdateContextualActionPrompts() {
     return;
   }
   const interaction = interact?.Query(player) || null;
+  const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   hud.SetActionPrompts(ContextualActionPrompts({
     interaction,
     bleeding: player.bleeding,
     bandages: player.bandages,
     slots: state.slots,
+    bayonet: gunInHand && WEAPONS[currentWeapon]?.bayonet
+      ? { fixed: state.bayonetFixed } : null,
+    ammoEmpty: gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
   }));
 }
 
@@ -2558,6 +2690,8 @@ function PickUpWeapon(weaponId, clips) {
   state.slots.primary = weaponId;
   state.mags.primary = { ammo: magazine, clips };
   state.pickedUp = weaponId;
+  // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
+  state.bayonetFixed = false;
   if (hadNoRifle) state.activeSlot = "primary";
   if (state.activeSlot === "primary") {
     currentWeapon = weaponId;
@@ -2566,6 +2700,7 @@ function PickUpWeapon(weaponId, clips) {
     player.bipod = false;
     state.fireMode = "auto";
     viewmodel.Equip(currentWeapon);
+    SyncBayonet();
     hud.SetWeaponName(WEAPONS[currentWeapon]?.name || "");
   }
   return true;
@@ -2790,6 +2925,22 @@ function TryFire(dt) {
   // 排在闸后面的后果是：拿着大刀按住 Shift 冲上去，左键完全没反应
   // （V 键反倒能挥，因为 V 走 OnAction 不过 TryFire）—— 同一个动作两个键两种结果。
   if (state.activeSlot === "melee") { if (fireEdge) DoMelee(); return; }
+  // 【刺刀】空枪的左键是白刃，不是一声干壳。贴脸打空最后一发之后再按左键，
+  // 玩家要的是"捅出去"，不是听声"咔"再去想 R 在哪。蓄力链与 V 完全同一条：
+  // 按下开始蓄，松手出招（松手判在 Frame 里，见 meleeCharge 步进）。
+  // 这一支同样必须排在冲刺闸前面 —— 拼刺冲锋本来就是端着枪跑着捅的。
+  if ((state.activeSlot === "primary" || state.activeSlot === "secondary")
+      && state.ammo <= 0 && !debugOptions.Enabled("infiniteAmmo")
+      && WEAPONS[currentWeapon]?.magazine) {
+    if (fireEdge && !state.meleeCharge) {
+      // 空膛的"咔"保留：它是第二条弹药信息通道（见下方那段账），现在作为
+      // 白刃起手的一部分响 —— 击针落空、随即人把枪抡起来。
+      audio.Play("bolt", { volume: 0.34, pitch: 1.55 });
+      BeginMeleeCharge("mouse");
+      if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
+    }
+    return;
+  }
   // 枪感方子 4：冲刺 → 开火有 0.22 s 的延迟。
   // 实测松开冲刺后视图模型的 sprintSpring 要 771 ms 才回位，
   // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
@@ -2808,21 +2959,9 @@ function TryFire(dt) {
   if (input.ads && player.ads < 0.9) return;
   // 单发模式（仅捷克式）：一次按下只出一发
   if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
-  if (state.ammo <= 0 && !infiniteAmmo) {
-    // 空仓那一下：栓停在后面，得自己压桥夹。HUD 虽然会变红，但空膛的“咔”
-    // 仍必须听得出来，玩家不该在交火时只能盯着右下角判断。
-    //
-    // 【2026-08-20】原来空膛和每发之后的拉栓**是同一个 cue**，只差音量 0.50 vs 0.42 ——
-    // 闭着眼睛分不出「这是在拉栓」还是「这是空了」。声音必须独立于 HUD 成为
-    // 第二条弹药信息通道。
-    // 没有独立的空击实录，就用 pitch 把它拉开：击针落在空膛是**又轻又高又短**的一记，
-    // 拉栓是「哐啷」两下的重机械声。pitch 1.55 把频心抬上去、整声缩到 65%，
-    // 音量再降到 0.34 —— 两者在时长、频心、响度三个维度上同时分开，不靠音量那 8% 硬撑。
-    audio.Play("bolt", { volume: 0.34, pitch: 1.55 });
-    fireCooldown = 0.35;
-    if (state.clips > 0) hud.Hint("按 R 压弹", 2.2);
-    return;
-  }
+  // 空仓的分支已经上移到冲刺闸前面（空枪左键 = 白刃那一支）。空膛"咔"的三维
+  // 分离账（pitch 1.55 / 音量 0.34 / 时长 65%，与拉栓在时长、频心、响度上同时
+  // 分开）也搬过去了 —— 它现在是白刃起手的第一声。走到这里 ammo 一定 > 0。
   if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
   else state.ammo -= 1;
   state.playerShots += 1;
@@ -3051,6 +3190,11 @@ function Frame(dt, render = true) {
   // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
   if (editor && editor.Capturing) {
     editor.Update(dt);
+    // 阴影框跟着**编辑器相机**走。与过场那一条同一笔账：编辑器的自由飞行
+    // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
+    // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
+    camera.getWorldDirection(_forward);
+    lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;
   }
@@ -3118,6 +3262,13 @@ function Frame(dt, render = true) {
   if (player.Alive) TryFire(dt);
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
   if (state.activeSlot === "throwable" && state.cooking && !input.fire) ReleaseCook();
+  // 白刃蓄力步进。鼠标那条的"松手"在这里判（键盘那条走 OnAction 的 up 边沿）；
+  // 蓄力中死了就取消 —— 尸体不出招。
+  if (state.meleeCharge) {
+    state.meleeCharge.t += dt;
+    if (!player.Alive) { state.meleeCharge = null; viewmodel.CancelMeleeCharge?.(); }
+    else if (state.meleeCharge.source === "mouse" && !input.fire) ReleaseMeleeCharge();
+  }
 
   // 开镜时相机 FOV 收缩 —— 铁瞄的"贴脸"感来自这一下。
   // 屏息再收 6%：ER2 屏息时视野有一点点放大，这是"憋住那一口气把注意力收拢"的

@@ -46,7 +46,7 @@ const CROSSHAIR = {
    * 冲刺时枪根本没端起来（TryFire 直接挡下开火，松手后还有 0.22 s 延迟），
    * 散布公式管不到这一段，所以额外撑开：这不是"跑动散布"，是"这把枪现在不能打"。
    */
-  sprintBloom: 0.6,
+  sprintBloom: 0.5,
   /** 手榴弹/大刀没有散布可言，给一个固定小十字。 */
   unarmedGap: 7,
   /** 张开快、收拢慢（对齐 COD 的手感）：时间常数，秒。 */
@@ -128,6 +128,7 @@ ACTION_ICONS.action = ACTION_ICONS.interact;
  */
 export function ContextualActionPrompts({
   interaction = null, bleeding = 0, bandages = 0, slots = {},
+  bayonet = null, ammoEmpty = false,
 } = {}) {
   const prompts = [];
   if (interaction?.label) {
@@ -135,6 +136,13 @@ export function ContextualActionPrompts({
   }
   if (Number(bleeding) > 0 && Number(bandages) > 0) {
     prompts.push({ keys: "B", label: "包扎止血", kind: "bandage" });
+  }
+  // 空枪时先教"这一下还能捅出去"，再教装填 —— 白刃是贴脸时唯一来得及的选项
+  if (ammoEmpty) {
+    prompts.push({ keys: "左键", label: "白刃（按住蓄力劈刺）", kind: "melee" });
+  }
+  if (bayonet) {
+    prompts.push({ keys: "X", label: bayonet.fixed ? "收刺刀" : "上刺刀", kind: "bayonet" });
   }
   const firearms = [
     ["primary", "1", "长枪"],
@@ -371,6 +379,8 @@ export class Hud {
    * 见 docs/Data_VisualReview.md 的账），而玩家手上是一把打得到五百米的步枪。
    * 没有这一条，"那边那个人是谁"在四十米开外就无解 —— 于是要么不敢打，要么见人就打。
    * COD 的名牌解决的就是这件事；我们照它的位置（准心正下方）与克制程度（两行字）做，
+   * 但**不照它的底板**：它那条暗带在我们这幅灰土加雾的画面上是最像 UI 的东西
+   * （见 Style_Game.css .hudTarget），这里只有字。
    * 血条只在体验档给。写实档整条链关掉（DIFFICULTY.targetInfo = false）。
    *
    * @param {object|null} card Script_Identify.TargetCard 的返回值

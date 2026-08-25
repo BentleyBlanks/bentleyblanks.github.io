@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""把外部免费枪模（OBJ / glTF）收进武器规范系，再交给 WriteTzm。
+"""把外部枪模 / 冷兵器模（OBJ / glTF / FBX）收进武器规范系，再交给 WriteTzm。
 
 坐标系与 BuildWeapons.py 一致：右手握把 = 原点、枪管沿 -Z、膛线轴 y = +0.035。
 步枪还把枪托底板放到 z = +0.255；驳壳枪按原程序化模型，击锤后端约 z = +0.046。
+冷兵器（kind="melee"）没有膛线轴：刀尖沿 -Z、柄尾放到 z = +0.270，
+`muzzle` 挂点是**刀尖**（近战判定读它），y 跟着刀身的弯度走。
 
 外部模型保留几何与材质分区。运行时给 steel/wood 分区绑定 512px authored PBR；
 源包自带的 2K/4K 图不直接进 Pages，避免每把枪重复背一套大图。
@@ -23,12 +25,47 @@ SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
 BORE = 0.035
 BUTT_Z = 0.255
 PISTOL_REAR_Z = 0.046
+MELEE_REAR_Z = 0.270
 T_STEEL = "gunSteel"
 T_WOOD = "gunWood"
 BUDGET = 6000
 
 
-def _Src(name):
+def _ExternalRoot():
+    """付费素材的存放处 —— **不在仓库里**。
+
+    bentleyblanks.github.io 是公开站点，买来的原始模型文件不随仓库分发；
+    仓库里只留它派生出的 `Model/*.tzm.json`（已重预算、丢源贴图、改绑共享 PBR）。
+    做法沿用 Vefects 素材的先例，登记在 `_import/Data_SourceLicenses.md`。
+
+    解析顺序：环境变量 `TZ1938_SOURCE_ASSETS` → 从本文件向上找同名兄弟目录
+    （主仓库和 .claude/worktrees 下的工作树都能命中）。找不到就返回 None，
+    `BuilderFor` 随之返回 None，构建自动退回程序化几何 —— 没买素材的人
+    clone 下来照样跑得通。
+    """
+    env = os.getenv("TZ1938_SOURCE_ASSETS")
+    if env and os.path.isdir(env):
+        return env
+    node = HERE
+    while True:
+        parent = os.path.dirname(node)
+        if parent == node:
+            return None
+        candidate = os.path.join(parent, "Taierzhuang1938SourceAssets", "Weapons")
+        if os.path.isdir(candidate):
+            return candidate
+        node = parent
+
+
+def _Src(name, external=False):
+    if external:
+        root = _ExternalRoot()
+        if root:
+            return os.path.join(root, name)
+        # 素材库不在这台机器上：返回一个**必然不存在**的路径，让 BuilderFor 的
+        # os.path.isfile 落空、自动退回程序化几何。抛异常会把整条 BuildAll 打断，
+        # 而"没有付费素材"是完全正常的状态，不该是错误。
+        return os.path.join(SRC, "__external_missing__", name)
     return os.path.join(SRC, name)
 
 
@@ -50,6 +87,10 @@ SOURCES = {
         "colorSplit": True,
         "skip": ("bolt_action_rifle_7_62_scope", "bolt_action_rifle_7_62_wrap",
                  "bolt_action_rifle_7_62_bullet_54mm"),
+        # 照门挂点 = 第一人称的瞄准线（见 _Mounts）。这一支换过模型源，数是照新几何量的：
+        # 等开镜姿态收敛后，瞄准点上半窗 0.055→149、0.060→820、0.066→115、0.072→0。
+        # （不是单调的：不同高度切到的是机匣桥、照门座、枪机三样不同的东西。）
+        "mounts": {"sightY": 0.072},
         "note": "CC0 Bolt Action Rifle 7.62（Poly Haven）→ 中正式。去掉现代瞄准镜、"
                 "包布与独立子弹，只保留木托、机匣、枪机、扳机和机械瞄具；"
                 "全长按中正式史实 1.110 m 缩放。",
@@ -61,6 +102,7 @@ SOURCES = {
         "matName": {"Material": "wood", "Material.004": "steel", "Material.005": "steel",
                     "Material.006": "steel", "Material.007": "steel"},
         "noDetails": True,
+        # 汉阳造不用抬：等开镜姿态收敛之后实测，0.055—0.076 每一档瞄准点都是干净的。
         "mounts": {"muzzleZ": -1.003, "gripZ": -0.418, "sightZ": -0.160,
                    "magY": BORE - 0.050, "magZ": -0.040},
         "note": "CC-BY Gewehr 88（Sketchfab / TastyTony）→ 汉阳八八式。整长套筒、"
@@ -76,6 +118,7 @@ SOURCES = {
         # 背带条按木色桶走（皮革/帆布读作棕件，别读成蓝钢条）。
         "nameBucket": {"All_Wood": "wood", "Sling_Front": "wood",
                        "Sling_BackStock": "wood", "Sling2": "wood"},
+        # 三八式也不用抬（它之前单独修过 adsNearZ，瞄准点本来就干净）。
         "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
                    "magY": BORE - 0.036, "magZ": -0.060},
         # The first-person eye sits 140 mm behind the sight.  Keep the rear
@@ -96,7 +139,42 @@ SOURCES = {
         "lengthM": 0.288,
         "kind": "pistol",
         "skip": ("Boom", "Reload", "Near"),
+        # C96 的照门在机匣顶后端，通用值 0.055 整个落在机匣里：等姿态收敛后实测
+        # 瞄准点上半窗 820/820 全是钢，0.060 起归零。取 0.062 留 2 mm 余量。
+        "mounts": {"sightY": 0.062},
         "note": "CC0 Mauser C96（itch.io / Plewr）。Boom 是枪口焰网格，丢掉。",
+    },
+    "Dadao": {
+        # **付费素材，源文件不在仓库里**（见 _ExternalRoot 与 Data_SourceLicenses.md）。
+        # 没有这份源就自动退回 BuildWeapons.BuildDadao 的程序化几何。
+        "external": True,
+        "file": os.path.join("CgmolDadao", "Model_CgmolDadao.fbx"),
+        "lengthM": 0.900,
+        "kind": "melee",
+        # 整刀一个材质（材质.002），靠部件名分桶：刀片 / 卡扣 / 圆环 / U 是钢，
+        # 只有刀把走木。源包的 4K Base_color/Normal/Roughness 一律不用，
+        # 运行时统一绑 steel/wood 两套 512px 共享 PBR。
+        "nameBucket": {"刀把": "wood"},
+        "noDetails": True,
+        # 源模整件 smooth，靠 4K 法线贴图撑硬表面；我们不带那张图，
+        # 不重设 smooth 的话刀背棱和护手边会被抹平成一根糊掉的黑影。
+        "autoSmooth": 32.0,
+        "note": "CGMOL 付费「PBR 次世代二十九军战刀」（作者 逍姚子不逍遥，版权：不限用途）"
+                "→ 大刀。宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环，"
+                "正是二十九军/西北军那一路的制式；全长按史实 0.900 m。",
+    },
+    "DadaoAlt": {
+        # 大刀的第二种式样，**只是外观变体**：大刀是各地铁匠按各自习惯打的，
+        # 一个班里人手一把一模一样的刀反倒不像 1938。数值仍走 Data_Weapons.Dadao。
+        "file": os.path.join("Model_SketchfabDadao", "scene.gltf"),
+        "lengthM": 0.900,
+        "kind": "melee",
+        # 拆件名是俄文转写：Lezvie=刀身 / Stik=吞口 / Garda=护手 / Rukoiat=柄。
+        "nameBucket": {"Rukoiat": "wood"},
+        "noDetails": True,
+        "autoSmooth": 32.0,
+        "note": "CC-BY-4.0 Dadao（Sketchfab / Trector）→ 大刀第二式样。"
+                "圆盘吞口、束节木柄、刃线较直的一路；全长同样按 0.900 m。",
     },
     "ServicePistol": {
         "file": os.path.join("Model_PolyHavenServicePistol", "service_pistol_1k.gltf"),
@@ -121,6 +199,8 @@ def _ImportFile(path):
         bpy.ops.wm.obj_import(filepath=path)
     elif ext in (".glb", ".gltf"):
         bpy.ops.import_scene.gltf(filepath=path)
+    elif ext == ".fbx":
+        bpy.ops.import_scene.fbx(filepath=path)
     else:
         raise ValueError("不支持的枪模格式：%s" % path)
 
@@ -365,16 +445,28 @@ def _Place(bms, steel, wood, length_m, kind):
     _Xform(bms, Matrix.Diagonal((length_m / current, length_m / current, length_m / current, 1.0)))
     lo, hi = _Aabb(bms)
 
-    rear_z = BUTT_Z if kind == "rifle" else PISTOL_REAR_Z
+    if kind == "melee":
+        rear_z = MELEE_REAR_Z
+    elif kind == "rifle":
+        rear_z = BUTT_Z
+    else:
+        rear_z = PISTOL_REAR_Z
     shift_z = rear_z - hi.z
 
-    barrel_y = BORE
-    if steel is not None and steel.verts:
-        muzzle_cut = lo.z + (hi.z - lo.z) * 0.12
-        ys = [v.co.y for v in steel.verts if v.co.z < muzzle_cut]
-        if ys:
-            barrel_y = sum(ys) / len(ys)
-    shift_y = BORE - barrel_y
+    if kind == "melee":
+        # 刀没有膛线轴，对齐的是**握把**：柄心落在 y=0，gripR/gripL 才不会悬在
+        # 刀身外面。刀身自己的下沉弯度原样保留 —— 刀尖因此低于握把轴线，
+        # `muzzle` 挂点跟着量出来的刀尖走，不硬钉回 0。
+        grip = wood if (wood is not None and wood.verts) else steel
+        shift_y = -sum(v.co.y for v in grip.verts) / len(grip.verts)
+    else:
+        barrel_y = BORE
+        if steel is not None and steel.verts:
+            muzzle_cut = lo.z + (hi.z - lo.z) * 0.12
+            ys = [v.co.y for v in steel.verts if v.co.z < muzzle_cut]
+            if ys:
+                barrel_y = sum(ys) / len(ys)
+        shift_y = BORE - barrel_y
     shift_x = -0.5 * (lo.x + hi.x)
     _Xform(bms, Matrix.Translation((shift_x, shift_y, shift_z)))
 
@@ -480,6 +572,32 @@ def _DecimateToBudget(bms, budget=BUDGET):
     return replaced
 
 
+def _AutoSmooth(bms, limit_deg):
+    """按夹角重设逐面 smooth 标志 —— 来源模常常整件都是 smooth。
+
+    源模靠自带的 4K 法线贴图撑硬表面细节，而本管线**丢掉源贴图**、只绑共享
+    steel/wood PBR；继承过来的全 smooth 于是把刀背棱、护手边、刀尖斜切全部
+    抹平：`TzmCore._ExtractLoops` 会把相邻 smooth 面的法线一并累加，刀身
+    读起来就是一根糊掉的黑影，而不是"背厚刃薄"的楔子。
+
+    TZM 只有逐面的 smooth，没有逐边锐边，所以判据是"**任何一条边**超过阈值
+    这个面就转 flat"。阈值走 spec 的 autoSmooth，不开就不动 —— 已经调好的
+    几把枪不跟着变字节。
+    """
+    limit = math.radians(limit_deg)
+    for bm in bms:
+        bm.normal_update()
+        for face in bm.faces:
+            sharp = False
+            for edge in face.edges:
+                if len(edge.link_faces) != 2:
+                    continue
+                if edge.calc_face_angle(0.0) > limit:
+                    sharp = True
+                    break
+            face.smooth = not sharp
+
+
 def _BevelForFirstPerson(bms):
     """Give hard-surface imports a real highlight roll instead of razor edges."""
     for bm in bms:
@@ -574,23 +692,63 @@ def _AddHistoricalDetails(name, steel, wood, length_m):
     return steel, wood
 
 
-def _Mounts(node, length_m, kind, lo, hi, spec):
+def _TipY(steel, lo, hi):
+    """量刀尖所在的高度：取最前 4% 那一段刀身顶点的平均 y。
+
+    大刀的刃线是外鼓弧、刀背末段斜切，刀尖**不在握把轴线上**（程序化那把是
+    y = -0.068）。近战判定和第一人称深度预算都读 `muzzle`，钉回 0 会让判定
+    点浮在刀背上方，看起来砍到了其实没碰到。
+    """
+    if steel is None or not steel.verts:
+        return 0.0
+    cut = lo.z + (hi.z - lo.z) * 0.04
+    ys = [v.co.y for v in steel.verts if v.co.z < cut]
+    return sum(ys) / len(ys) if ys else 0.0
+
+
+def _Mounts(node, length_m, kind, lo, hi, spec, steel=None):
     """挂空节点。默认值沿用历史枪模的通用配方；spec["mounts"] 里的键可逐项覆盖
-    （muzzleZ / gripZ / sightZ / magY / magZ），与程序化 BuildWeapons.Mounts 对齐。"""
+    （muzzleZ / gripZ / sightX / sightY / sightZ / magY / magZ），
+    与程序化 BuildWeapons.Mounts 对齐。
+
+    **sightX / sightY 必须逐枪量，别信默认值**（2026-08-25）。第一人称开镜是把
+    sight 挂点解到屏幕正中，于是它就是玩家的瞄准线；而通用值 BORE+0.020 只是
+    "膛线上方 20 mm" 的一句猜测，跟每支模型照门实际在哪没有关系。
+    量法：真开镜、抬头对着天光，数屏幕正中 41×41 里有多少像素是枪
+    （Script_AdsSightTest.mjs 干的就是这件事）。改前实测：
+    中正式 1528、驳壳枪 1209、汉阳造 136、三八式 42（唯一及格的，之前单独修过）。
+    **换了模型源就要重量一次** —— 这些数是量某一份几何量出来的，不是通用常数。"""
+    if kind == "melee":
+        # 刀只有三个挂点：刀尖 + 双手。sight / magazine 对冷兵器没有意义，不挂。
+        # gripR/gripL 的 z 抄程序化大刀（吞口之后 30 mm 与 155 mm），
+        # 拳头不啃进护手，双手间距也够抡。
+        defaults = {"muzzleZ": lo.z + 0.004, "gripRZ": 0.030, "gripLZ": 0.155}
+        cfg = dict(defaults)
+        cfg.update(spec.get("mounts") or {})
+        muzzle_y = cfg.get("muzzleY")
+        if muzzle_y is None:
+            muzzle_y = _TipY(steel, lo, hi)
+        node.Child("muzzle", t=(0.0, muzzle_y, cfg["muzzleZ"]))
+        node.Child("gripR", t=(0.0, 0.0, cfg["gripRZ"]))
+        node.Child("gripL", t=(0.0, 0.0, cfg["gripLZ"]))
+        return
+
     muzzle_z = lo.z - 0.006
     if kind == "rifle":
         defaults = {"muzzleZ": muzzle_z, "gripZ": muzzle_z * 0.58,
                     "sightZ": -0.165 * (length_m / 1.110),
-                    "magY": BORE - 0.045, "magZ": -0.055}
+                    "magY": BORE - 0.045, "magZ": -0.055,
+                    "sightX": 0.0, "sightY": BORE + 0.020}
     else:
         defaults = {"muzzleZ": muzzle_z, "gripZ": -0.055,
-                    "sightZ": -0.078, "magY": BORE - 0.040, "magZ": -0.062}
+                    "sightZ": -0.078, "magY": BORE - 0.040, "magZ": -0.062,
+                    "sightX": 0.0, "sightY": BORE + 0.020}
     cfg = dict(defaults)
     cfg.update(spec.get("mounts") or {})
     node.Child("muzzle", t=(0.0, BORE, cfg["muzzleZ"]))
     node.Child("gripR", t=(0.0, 0.0, 0.0))
     node.Child("gripL", t=(0.0, -0.012, cfg["gripZ"]))
-    node.Child("sight", t=(0.0, BORE + 0.020, cfg["sightZ"]))
+    node.Child("sight", t=(cfg["sightX"], cfg["sightY"], cfg["sightZ"]))
     node.Child("magazine", t=(0.0, cfg["magY"], cfg["magZ"]))
 
 
@@ -623,7 +781,7 @@ def _SplitAdsNear(bm, cut_z):
 
 def BuildImported(name):
     spec = SOURCES[name]
-    path = _Src(spec["file"])
+    path = _Src(spec["file"], spec.get("external", False))
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -639,7 +797,10 @@ def BuildImported(name):
     bms = [bm for bm in (steel, wood) if bm is not None]
     _AlignLongAxisToZ(bms, spec.get("roll", 1.0))
     _FlipIfStockIsForward(bms, wood)
-    _FlipIfGripIsAbove(bms, wood, steel)
+    if spec["kind"] != "melee":
+        # 刀的木件是握把，本来就骑在刀身轴线上，没有"握把该在膛线下方"这回事；
+        # 让这条启发式跑，它会绕 Z 转 180° 把刃口翻上天。刃口朝向交给 roll。
+        _FlipIfGripIsAbove(bms, wood, steel)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
     if not spec.get("noBevel"):
         _BevelForFirstPerson(bms)
@@ -654,6 +815,9 @@ def BuildImported(name):
         steel = decimated[0]
         wood = decimated[1] if len(decimated) > 1 else None
         bms = [bm for bm in (steel, wood) if bm is not None]
+    if spec.get("autoSmooth"):
+        # 放在减面之后：减面会重排拓扑，先标好的 smooth 标志会被揉乱。
+        _AutoSmooth(bms, spec["autoSmooth"])
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")
@@ -676,7 +840,7 @@ def BuildImported(name):
     if wood is not None:
         body.Add("wood", wood, tile=T_WOOD)
     body.Add("steel", steel, tile=T_STEEL)
-    _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec)
+    _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec, steel)
     return root
 
 
@@ -684,7 +848,7 @@ def BuilderFor(name):
     spec = SOURCES.get(name)
     if not spec:
         return None
-    if not os.path.isfile(_Src(spec["file"])):
+    if not os.path.isfile(_Src(spec["file"], spec.get("external", False))):
         return None
 
     def _Build():

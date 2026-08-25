@@ -255,6 +255,252 @@ function Quoin(sink, { L, lx, lz, sx, sz, y0, y1, ry, seed, block = 0.66, course
   }
 }
 
+// ---------------------------------------------------------------------------
+// 内部与站台家什（第二轮批次 E）
+//
+// 三条纪律照「内部空间契约」：家什全走 sink 几何（合批 + 破坏一致）、
+// 材质只用本文件已经在用的那 10 个名字（不新增一个 draw call）、
+// 内部没有独立光源 —— 售票房的光从北翼那六扇真洞窗与隔墙上的售票口进来。
+// ---------------------------------------------------------------------------
+
+/** 站台长椅一条：三根腿 + 座板 + 靠背，背贴站房外墙。 */
+function PlatformBench(sink, { L, ry, yB, lx, lz, seed }) {
+  const seat = L(lx, lz);
+  Slab(sink, "WoodBeam", {
+    x: seat.x, y: yB + 0.45, z: seat.z, w: 0.52, h: 0.07, d: 1.80, ry,
+    seed: `${seed}:seat`, tile: TILE_METERS.wood,
+  });
+  for (const s of [-1, 0, 1]) {
+    const p = L(lx, lz + s * 0.76);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 0.21, z: p.z, w: 0.46, h: 0.42, d: 0.10, ry,
+      seed: `${seed}:leg${s}`, tile: TILE_METERS.wood,
+    });
+  }
+  // 靠背贴着墙那一侧（局部 +x 方向就是站房）
+  const back = L(lx + 0.30, lz);
+  Slab(sink, "WoodBeam", {
+    x: back.x, y: yB + 0.76, z: back.z, w: 0.07, h: 0.44, d: 1.80, ry,
+    seed: `${seed}:back`, tile: TILE_METERS.wood,
+  });
+  sink.Solid(seat.x, yB + 0.26, seat.z, 0.3, 0.26, 0.9, "furniture", ry);
+}
+
+/**
+ * 站名牌：两根柱夹一面**净牌**（1938 年三月的字样无资料，与 A7 的匾额同一口径）。
+ * 牌面加一圈木框 —— 没有框的一块板在出图上读作「靠着两根杆的门板」，
+ * 有了框才读作牌子。牌位定在雨棚下、南端车头停靠的那一段（三等小站的常规位置）。
+ */
+function StationNameBoard(sink, { L, ry, yB, lx, lz, seed }) {
+  const boardY = yB + 1.86, halfZ = 0.78, halfY = 0.38;
+  for (const s of [-1, 1]) {
+    const p = L(lx, lz + s * halfZ);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.18, z: p.z, w: 0.12, h: 2.36, d: 0.12, ry,
+      seed: `${seed}:post${s}`, tile: TILE_METERS.wood,
+    });
+    sink.Solid(p.x, yB + 1.18, p.z, 0.1, 1.18, 0.1, "villagePost", ry);
+    // 柱头斜撑（短一档：0.88 m 的撑子在出图上和牌面连成一个 A 字）
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.34, z: p.z - s * 0.22, w: 0.07, h: 0.07, d: 0.62, ry,
+      rx: s * 0.78, seed: `${seed}:brace${s}`, tile: TILE_METERS.wood,
+    });
+  }
+  const c = L(lx, lz);
+  Slab(sink, "WoodDoor", {
+    x: c.x, y: boardY, z: c.z, w: 0.06, h: halfY * 2, d: halfZ * 2 - 0.06, ry,
+    seed: `${seed}:panel`, tile: TILE_METERS.wood,
+  });
+  for (const s of [-1, 1]) {
+    const h = L(lx - 0.03, lz);
+    Slab(sink, "WoodBeam", {
+      x: h.x, y: boardY + s * (halfY + 0.04), z: h.z, w: 0.09, h: 0.09, d: halfZ * 2 + 0.12, ry,
+      seed: `${seed}:rail${s}`, tile: TILE_METERS.wood,
+    });
+    const v = L(lx - 0.03, lz + s * (halfZ + 0.02));
+    Slab(sink, "WoodBeam", {
+      x: v.x, y: boardY, z: v.z, w: 0.09, h: halfY * 2 + 0.16, d: 0.09, ry,
+      seed: `${seed}:stile${s}`, tile: TILE_METERS.wood,
+    });
+  }
+}
+
+/**
+ * 售票房（北翼，局部 z∈[6,17]）内部。
+ *
+ * 进来的路只有一条：镇子侧或站台侧的大门 → 站厅 → 隔墙上那道 1.3 m 的门。
+ * 三等小站的售票房本来就不朝站台开门（票从窗口递出去，人不进来），
+ * 所以「只能穿过站厅进」不是漏做，是形制。
+ *
+ * 售票口的位置与尺寸不许另起炉灶：它就是隔墙 Band 里 `{ c:-2.2, w:0.9 }`
+ * 那个洞（y∈[yB+1.05, yB+1.9]），台面是已经在那儿的 `:counter` 那块木板。
+ */
+function TicketOffice(sink, {
+  L, ry, yB, DX, eaveY, seed, damage, rnd,
+}) {
+  const winLx = -2.2;                    // 售票口在隔墙上的局部 x（与 Facade 的 gaps 对齐）
+  const partLz = 6, endLz = 17;
+  const inA = partLz + 0.25, inB = endLz - 0.5;
+
+  // --- 两道木梁：屋里抬头有个交代（与站厅同一族做法）---
+  for (const lz of [inA + 2.4, inB - 2.4]) {
+    const p = L(0, lz);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: eaveY - 0.22, z: p.z, w: DX, h: 0.24, d: 0.20, ry,
+      seed: `${seed}:tk:tie${Math.round(lz)}`, tile: TILE_METERS.wood,
+    });
+  }
+
+  // --- 票窗格栅 ---
+  // 栅下留 0.14 m 的递票缝（台面顶 yB+1.16，栅脚 yB+1.30）——
+  // **这条缝是「售票窗」与「墙上一个方洞」的全部区别**，别把栅条砌到底。
+  const gy0 = yB + 1.30, gy1 = yB + 1.88;
+  for (const s of [-1, 1]) {
+    const p = L(winLx + s * 0.50, partLz);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.475, z: p.z, w: 0.10, h: 0.85, d: 0.46, ry,
+      seed: `${seed}:tk:jamb${s}`, tile: TILE_METERS.wood,
+    });
+  }
+  {
+    const p = L(winLx, partLz);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.94, z: p.z, w: 1.10, h: 0.10, d: 0.46, ry,
+      seed: `${seed}:tk:head`, tile: TILE_METERS.wood,
+    });
+  }
+  if (damage < 0.5) {
+    for (let i = 0; i < 5; i += 1) {
+      const p = L(winLx - 0.36 + i * 0.18, partLz);
+      Slab(sink, "WoodBeam", {
+        x: p.x, y: (gy0 + gy1) / 2, z: p.z, w: 0.05, h: gy1 - gy0, d: 0.11, ry,
+        seed: `${seed}:tk:bar${i}`, tile: TILE_METERS.wood,
+      });
+    }
+  }
+
+  // --- 售票柜台：靠隔墙、正对售票口，掌柜背对北翼的窗子坐着 ---
+  const cLz = partLz + 0.54, cW = 2.7;
+  {
+    const p = L(winLx, cLz);
+    Slab(sink, STONE, {
+      x: p.x, y: yB + 0.09, z: p.z, w: cW + 0.14, h: 0.18, d: 0.72, ry,
+      seed: `${seed}:tk:cplinth`,
+    });
+    Slab(sink, "WoodDoor", {
+      x: p.x, y: yB + 0.57, z: p.z, w: cW, h: 0.78, d: 0.62, ry,
+      seed: `${seed}:tk:cbody`, tile: TILE_METERS.wood,
+    });
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.00, z: p.z, w: cW + 0.18, h: 0.09, d: 0.80, ry,
+      seed: `${seed}:tk:ctop`, tile: TILE_METERS.wood,
+    });
+    sink.Solid(p.x, yB + 0.52, p.z, (cW + 0.18) / 2, 0.52, 0.4, "furniture", ry);
+  }
+  // 票柜：一格一种票的鸽笼柜，摆在柜台一头（避开售票口那 0.9 m）
+  {
+    const p = L(winLx - 0.98, cLz - 0.06);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 1.40, z: p.z, w: 0.64, h: 0.70, d: 0.32, ry,
+      seed: `${seed}:tk:rack`, tile: TILE_METERS.wood,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      const q = L(winLx - 0.98, cLz - 0.22);
+      Slab(sink, "WoodDoor", {
+        x: q.x, y: yB + 1.14 + i * 0.24, z: q.z, w: 0.58, h: 0.03, d: 0.03, ry,
+        seed: `${seed}:tk:rk${i}`, tile: TILE_METERS.wood,
+      });
+    }
+  }
+  // 掌柜的高凳 + 台面上一摞票据
+  {
+    const p = L(winLx + 0.2, cLz + 0.92);
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 0.62, z: p.z, w: 0.36, h: 0.06, d: 0.36, ry,
+      seed: `${seed}:tk:stool`, tile: TILE_METERS.wood,
+    });
+    for (const s of [-1, 1]) {
+      const q = L(winLx + 0.2 + s * 0.13, cLz + 0.92);
+      Slab(sink, "WoodBeam", {
+        x: q.x, y: yB + 0.30, z: q.z, w: 0.06, h: 0.60, d: 0.30, ry,
+        seed: `${seed}:tk:sl${s}`, tile: TILE_METERS.wood,
+      });
+    }
+    if (damage < 0.55) {
+      const d = L(winLx + 0.95, cLz - 0.02);
+      Slab(sink, "WoodDoor", {
+        x: d.x, y: yB + 1.09, z: d.z, w: 0.30, h: 0.09, d: 0.24, ry,
+        seed: `${seed}:tk:ledger`, tile: TILE_METERS.wood,
+      });
+    }
+  }
+
+  // --- 行李秤位：台秤 + 砝码 + 等着过秤的行李 ---
+  // 三等小站没有独立的行李房柜台，行李在售票口这一侧过秤挂签。
+  const sLx = 3.0, sLz = 9.8;
+  {
+    // **秤台压得很扁**：第一版底盘 0.14 + 台面 0.07 摞起来，箱子往上一放
+    // 出图上读成「两只木箱叠在一起」（本包实拍抓到的）。磅秤的读图信号是
+    // 「一块贴地的铁台 + 一根立柱 + 柱头挑出来的秤杆」，台越薄越像秤。
+    const p = L(sLx, sLz);
+    Slab(sink, "RailSteel", {
+      x: p.x, y: yB + 0.045, z: p.z, w: 1.12, h: 0.09, d: 0.92, ry,
+      seed: `${seed}:tk:scbase`, tile: TILE_METERS.steel,
+    });
+    Slab(sink, "WoodBeam", {
+      x: p.x, y: yB + 0.115, z: p.z, w: 0.96, h: 0.05, d: 0.76, ry,
+      seed: `${seed}:tk:scdeck`, tile: TILE_METERS.wood,
+    });
+    const col = L(sLx + 0.48, sLz);
+    Slab(sink, "RailSteel", {
+      x: col.x, y: yB + 0.72, z: col.z, w: 0.14, h: 1.22, d: 0.14, ry,
+      seed: `${seed}:tk:sccol`, tile: TILE_METERS.steel,
+    });
+    // 柱头的秤杆匣 + 挑出来的秤杆 + 游砣：三件合起来才认得出是磅秤
+    Slab(sink, "RailSteel", {
+      x: col.x, y: yB + 1.40, z: col.z, w: 0.22, h: 0.34, d: 0.30, ry,
+      seed: `${seed}:tk:schead`, tile: TILE_METERS.steel,
+    });
+    const beam = L(sLx + 0.48, sLz + 0.52);
+    Slab(sink, "RailSteel", {
+      x: beam.x, y: yB + 1.50, z: beam.z, w: 0.05, h: 0.05, d: 0.94, ry,
+      seed: `${seed}:tk:scbeam`, tile: TILE_METERS.steel,
+    });
+    const poise = L(sLx + 0.48, sLz + 0.74);
+    Slab(sink, "RailSteel", {
+      x: poise.x, y: yB + 1.43, z: poise.z, w: 0.09, h: 0.16, d: 0.09, ry,
+      seed: `${seed}:tk:scpoise`, tile: TILE_METERS.steel,
+    });
+    sink.Solid(p.x, yB + 0.09, p.z, 0.56, 0.09, 0.46, "furniture", ry);
+    // 砝码三只：摆在立柱外侧的地上（挡在秤台后面就等于没做）
+    for (let i = 0; i < 3; i += 1) {
+      const q = L(sLx + 0.92, sLz - 0.72 + i * 0.24);
+      Slab(sink, "RailSteel", {
+        x: q.x, y: yB + 0.09, z: q.z, w: 0.14, h: 0.18, d: 0.14, ry,
+        seed: `${seed}:tk:wt${i}`, tile: TILE_METERS.steel,
+      });
+    }
+  }
+  // 行李：秤上一只木箱，脚边两只（damage 高时只剩一只 —— 东西都拿走了）
+  {
+    const on = L(sLx - 0.10, sLz + 0.04);
+    Slab(sink, "WoodDoor", {
+      x: on.x, y: yB + 0.37, z: on.z, w: 0.62, h: 0.46, d: 0.48,
+      ry: ry + 0.12, seed: `${seed}:tk:bag0`, tile: TILE_METERS.wood,
+    });
+    const cases = damage > 0.45 ? 1 : 2;
+    for (let i = 0; i < cases; i += 1) {
+      const q = L(sLx - 1.35 - i * 0.1, sLz + 1.15 + i * 0.78);
+      const h = 0.40 + rnd() * 0.14;
+      Slab(sink, "WoodDoor", {
+        x: q.x, y: yB + h / 2, z: q.z, w: 0.66, h, d: 0.52,
+        ry: ry + (rnd() - 0.5) * 0.5, seed: `${seed}:tk:bag${i + 1}`, tile: TILE_METERS.wood,
+      });
+      sink.Solid(q.x, yB + h / 2, q.z, 0.35, h / 2, 0.3, "prop", ry);
+    }
+  }
+}
+
 // ===========================================================================
 // 车站
 // ===========================================================================
@@ -337,6 +583,16 @@ export function BuildStation(host, f, ctx) {
       });
       sink.Solid(px, y0 + h / 2, f.z, 0.23, h / 2, 1.8, "villageFoundation");
     }
+    // 室内砖墁地（站厅 + 两翼一块铺到底）。
+    //
+    // 站台、基座、门槛全是 PlatformStone（0xd9dade），白天整片亮到过曝 ——
+    // 站厅的地板与站台是同一块石头，站在屋里与站在露天一个亮度，「进了屋」
+    // 这件事在画面上根本不成立（第一版内景实拍：站厅地面一片死白）。
+    // 铺一层 StationBrick 就够了：不新起地面材质，这一片分区里不多一个 draw call。
+    Slab(sink, BRICK, {
+      x: f.x, y: yB - 0.005, z: f.z, w: DX - 1.04, h: 0.08, d: LZ - 1.04, ry,
+      seed: `${seed}:ifloor`, tile: TILE_METERS.brick, grid: BRICK_UV_GRID,
+    });
   }
 
   // --- 墙体 ---
@@ -547,9 +803,13 @@ export function BuildStation(host, f, ctx) {
       seed: `${seed}:part${s}`,
     });
     if (isTicket) {
+      // 售票口的台面：**要伸出墙面**。第一版做成 0.62 厚（= 隔墙厚 + 一点点）、
+      // 顶面 yB+1.07 正好贴着洞口下沿 yB+1.05 —— 从站厅那边看根本看不见它，
+      // 洞口下半截直接望进售票房的地面。伸出两侧各 0.28 m、顶面抬到 yB+1.16 之后，
+      // 它才是「递票的那块板」。
       const tp = L(-2.2, lz);
       Slab(sink, "WoodBeam", {
-        x: tp.x, y: yB + 1.02, z: tp.z, w: 1.2, h: 0.1, d: 0.62, ry,
+        x: tp.x, y: yB + 1.10, z: tp.z, w: 1.32, h: 0.12, d: 0.96, ry,
         seed: `${seed}:counter`, tile: TILE_METERS.wood,
       });
     }
@@ -639,18 +899,18 @@ export function BuildStation(host, f, ctx) {
       x: fp.x, y: headY2 + 0.02, z: fp.z, w: 0.1, h: 0.24, d: deckLen, ry,
       seed: `${seed}:fascia`, tile: TILE_METERS.wood,
     });
-    // 站牌：站台上一块木牌（1938 年三月的字样无资料，只做牌面不刻字）
-    const sp = L(postLx + 1.6, -run / 2 + 3.0);
-    for (const s of [-1, 1]) {
-      const q = L(postLx + 1.6, -run / 2 + 3.0 + s * 0.55);
-      Slab(sink, "WoodBeam", {
-        x: q.x, y: yB + 1.05, z: q.z, w: 0.1, h: 2.1, d: 0.1, ry,
-        seed: `${seed}:signp${s}`, tile: TILE_METERS.wood,
-      });
-    }
-    Slab(sink, "WoodDoor", {
-      x: sp.x, y: yB + 1.75, z: sp.z, w: 0.08, h: 0.62, d: 1.35, ry,
-      seed: `${seed}:sign`, tile: TILE_METERS.wood,
+    // 站名牌位：雨棚下南段（车头停靠的那一截），净牌不刻字
+    StationNameBoard(sink, {
+      L, ry, yB, lx: postLx + 1.6, lz: -run / 2 + 3.0, seed: `${seed}:name`,
+    });
+  }
+
+  // --- 站台长椅两条：背贴站房西墙，避开中段大门与南翼货门 ---
+  // 站台上除了雨棚柱子没有任何等车的人可以落脚的地方 —— 长椅是「这是月台
+  // 不是一条石头堤」最便宜的一句话。座面 0.45 m 高，靠背贴墙不占站台净宽。
+  for (const lz of [-6.0, 4.2]) {
+    PlatformBench(sink, {
+      L, ry, yB, lx: westFace - 0.40, lz, seed: `${seed}:bench${Math.round(lz)}`,
     });
   }
 
@@ -663,22 +923,77 @@ export function BuildStation(host, f, ctx) {
     });
   }
 
-  // --- 站厅里的两条长凳（进得去的房间要有里头的东西）---
+  // --- 站厅里的两条长凳 ---
+  //
+  // **靠南隔墙横着摆，不在门轴上。** 第一版把两条凳子顺着进深摆在 lx=±3.6、
+  // lz∈[-2.8, 0.4] —— 两道大门都在 lz=0，于是从镇子侧或站台侧进门走两米就
+  // 撞在凳子上（本包探针实测 tag=furniture）。候车室的长凳本来也是靠墙排的：
+  // 现在贴南隔墙（行李房那道），中间留 2.2 m 让开南翼货房的门与穿堂的路。
   for (const s of [-1, 1]) {
-    const p = L(s * 3.6, -1.2);
+    const p = L(s * 2.6, -5.15);
     Slab(sink, "WoodBeam", {
-      x: p.x, y: yB + 0.44, z: p.z, w: 0.5, h: 0.1, d: 3.2, ry,
+      x: p.x, y: yB + 0.45, z: p.z, w: 3.0, h: 0.09, d: 0.50, ry,
       seed: `${seed}:bench${s}`, tile: TILE_METERS.wood,
     });
     for (const k of [-1, 1]) {
-      const q = L(s * 3.6, -1.2 + k * 1.35);
+      const q = L(s * 2.6 + k * 1.28, -5.15);
       Slab(sink, "WoodBeam", {
-        x: q.x, y: yB + 0.2, z: q.z, w: 0.42, h: 0.4, d: 0.12, ry,
+        x: q.x, y: yB + 0.21, z: q.z, w: 0.12, h: 0.42, d: 0.44, ry,
         seed: `${seed}:bl${s}${k}`, tile: TILE_METERS.wood,
       });
     }
-    sink.Solid(p.x, yB + 0.25, p.z, 0.25, 0.25, 1.6, "furniture", ry);
+    // 靠背贴隔墙
+    const b = L(s * 2.6, -5.42);
+    Slab(sink, "WoodBeam", {
+      x: b.x, y: yB + 0.76, z: b.z, w: 3.0, h: 0.44, d: 0.07, ry,
+      seed: `${seed}:bb${s}`, tile: TILE_METERS.wood,
+    });
+    sink.Solid(p.x, yB + 0.25, p.z, 1.5, 0.25, 0.28, "furniture", ry);
   }
+
+  // --- 站厅的铸铁炉：屋脊上那根烟囱到今天为止没有下文 ---
+  // 烟囱是 B1 就摆好的（中段脊上 +1.6 m），可站厅里没有任何烧火的东西，
+  // 从屋里抬头看是「一根没有炉子的烟囱」。炉身 + 一节竖管 + 一节横管接到
+  // 烟囱正下方（L(0, 3.2)），三只盒子把这条线补上。
+  // 炉子摆在东北角（lx=4.4）——**不许摆在门轴上**：两道大门都在 lz=0，
+  // 炉身半径 0.32 m 摆在 lx≈2 就把穿堂的路堵掉一半（长凳那一条同理）。
+  {
+    const st = L(4.4, 3.2);
+    Slab(sink, "RailSteel", {
+      x: st.x, y: yB + 0.37, z: st.z, w: 0.56, h: 0.74, d: 0.56, ry,
+      seed: `${seed}:stove`, tile: TILE_METERS.steel,
+    });
+    Slab(sink, "RailSteel", {
+      x: st.x, y: yB + 0.79, z: st.z, w: 0.66, h: 0.10, d: 0.66, ry,
+      seed: `${seed}:stovetop`, tile: TILE_METERS.steel,
+    });
+    sink.Solid(st.x, yB + 0.42, st.z, 0.32, 0.42, 0.32, "furniture", ry);
+    Slab(sink, "RailSteel", {
+      x: st.x, y: yB + 1.62, z: st.z, w: 0.13, h: 1.56, d: 0.13, ry,
+      seed: `${seed}:flue0`, tile: TILE_METERS.steel,
+    });
+    const run = L(2.2, 3.2);
+    Slab(sink, "RailSteel", {
+      x: run.x, y: yB + 2.45, z: run.z, w: 4.4, h: 0.13, d: 0.13, ry,
+      seed: `${seed}:flue1`, tile: TILE_METERS.steel,
+    });
+    const up = L(0, 3.2);
+    Slab(sink, "RailSteel", {
+      x: up.x, y: (yB + 2.45 + midEave) / 2, z: up.z, w: 0.13, h: midEave - yB - 2.45, d: 0.13, ry,
+      seed: `${seed}:flue2`, tile: TILE_METERS.steel,
+    });
+    // 煤斗
+    const coal = L(4.45, 4.35);
+    Slab(sink, "WoodDoor", {
+      x: coal.x, y: yB + 0.19, z: coal.z, w: 0.42, h: 0.38, d: 0.36, ry: ry + 0.2,
+      seed: `${seed}:coal`, tile: TILE_METERS.wood,
+    });
+  }
+
+  // --- 售票房内部（北翼）---
+  TicketOffice(sink, {
+    L, ry, yB, DX, eaveY: wingEave, seed, damage, rnd,
+  });
 
   BuildRailway(host, f, ctx, rw);
 }

@@ -57,6 +57,8 @@ try {
         meta: e.querySelector(".tMeta").textContent,
         aria: e.getAttribute("aria-label"),
         bar: getComputedStyle(e.querySelector(".tBar")).display !== "none",
+        // 底板撤了：卡片自己不许再画任何背景（见 Style_Game.css .hudTarget 的账）。
+        plate: `${style.backgroundImage} ${style.backgroundColor}`,
         entityId: evidence.entityId,
         detail: evidence.detail,
         rays: evidence.stats.rays,
@@ -130,7 +132,7 @@ try {
     Put(mate, 14);
     const eyeNow = T.player.EyePosition;
     const onMate = {
-      ...Read(), id: mate.id, name: mate.identity.name, alive: mate.alive,
+      ...Read(), id: mate.id, name: mate.identity.name, age: mate.identity.age, alive: mate.alive,
       dist: Math.hypot(mate.position.x - eyeNow.x, mate.position.z - eyeNow.z),
       candidates: T.Debug.Target().stats.candidates,
       rays: T.Debug.Target().stats.rays,
@@ -211,6 +213,11 @@ try {
     report.onMate?.on && report.onMate.title === report.onMate.name
     && /ours/.test(report.onMate.cls) && report.onMate.friendlyReticle === true,
     `${report.onMate?.title} / ${report.onMate?.cls}`);
+  Check("自己人那一行是岁数 + 距离，不报枪",
+    new RegExp(`^${report.onMate?.age} 岁 · [0-9]+m$`).test(report.onMate?.meta || ""),
+    `${report.onMate?.meta}（${report.onMate?.age} 岁）`);
+  Check("识别卡没有底板（不画背景，只靠描边扛读性）",
+    /^none rgba\(0, 0, 0, 0\)$/.test(report.onMate?.plate || ""), report.onMate?.plate);
   Check("标准档只给「负伤」两个字，体验档才给血条",
     report.basicWounded?.bar === false && /负伤/.test(report.basicWounded?.meta || "")
     && report.fullBar?.bar === true && report.fullBar?.detail === "full",

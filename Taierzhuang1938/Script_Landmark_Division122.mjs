@@ -352,6 +352,177 @@ function Shopfront(host, {
     x: apron.x, z: apron.z, ry, baseY: host.OuterHeight(apron.x, apron.z) + 0.02,
     seed: `${seed}:apron`, radius: Math.min(width * 0.42, 3.2),
   });
+
+  // --- 店堂：卸了板的那一间进得去，里头得有东西（B4 遗留 3）---
+  if (openBay >= 0) {
+    ShopRoom(sink, {
+      At, ry, floorY, eave, width, depth, bayW, openBay, seed, damage, rnd,
+    });
+  }
+}
+
+/**
+ * 店堂内部：砖墁地 + 两道梁 + 柜台（L 形）+ 后墙货架 + 货 + 一只水缸。
+ *
+ * 这一间原来是「玩家能走进去、里面除了地面和土坯后墙什么都没有」（WP-B4 遗留 3）。
+ * 关厢铺面的店堂只需要三样东西就成立：**齐胸的柜台**（把客与掌柜分开）、
+ * **后墙一排货架**（把「铺子」与「屋子」分开）、以及一条**进得去的道**。
+ *
+ * 三条硬约束：
+ *   ① 柜台一律排在门口净宽之外 ——「卸板口 ±0.95 m」是进门那条道，不许摆东西；
+ *      柜台与山墙之间再留 0.85 m，掌柜得从那头绕进柜台里。
+ *   ② 材质只用这条街已经有的桶（HouseholdCeramic / Wicker / HouseholdCloth 都是
+ *      AddStreetLife 已经在这个分区里开过的）—— 内部再漂亮也不值一个新 draw call。
+ *   ③ 内部没有独立光源：光从卸板口那 ~2.8 m 宽、到檐口通高的洞进来。
+ *      地面用 HouseholdCeramic 而不是 Stone —— 白得发光的地板会把「进了屋」
+ *      那一档暗对比整个吃掉（WP-D5 实拍取证）。
+ */
+function ShopRoom(sink, {
+  At, ry, floorY, eave, width, depth, bayW, openBay, seed, damage, rnd,
+}) {
+  const inHalfX = width / 2 - 0.40;          // 山墙内皮
+  const backLz = -depth / 2 + 0.40;          // 后檐墙内皮
+  const frontLz = depth / 2 - 0.30;          // 排门板内皮
+  const openLx = -width / 2 + bayW * (openBay + 0.5);
+
+  // --- 砖墁地 ---
+  {
+    const p = At(0, (backLz + frontLz) / 2);
+    sink.Add("HouseholdCeramic", PlaceGeometry(
+      MakeBox(inHalfX * 2, 0.07, frontLz - backLz, TILE_METERS.brick, `${seed}:floor`),
+      { x: p.x, y: floorY + 0.035, z: p.z, ry }));
+  }
+  // --- 两道梁：抬头看见的是梁不是屋面板底 ---
+  for (const s of [-1, 1]) {
+    const p = At(0, s * depth * 0.17);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(width - 0.5, 0.20, 0.18, TILE_METERS.wood, `${seed}:tie${s}`),
+      { x: p.x, y: floorY + eave - 0.18, z: p.z, ry }));
+  }
+
+  // --- 柜台：挑门口那一侧空间大的那边摆，另一头留 0.85 m 让掌柜绕进去 ---
+  const LANE = 0.95, WALL_GAP = 0.85;
+  const leftEnd = openLx - LANE, rightStart = openLx + LANE;
+  const useLeft = (leftEnd - (-inHalfX + WALL_GAP)) >= ((inHalfX - WALL_GAP) - rightStart);
+  const cA = useLeft ? -inHalfX + WALL_GAP : rightStart;
+  const cB = useLeft ? leftEnd : inHalfX - WALL_GAP;
+  const cLen = Math.min(cB - cA, 3.4);
+  const cCx = useLeft ? cB - cLen / 2 : cA + cLen / 2;
+  const cLz = frontLz - 1.95;
+  const HALF_D = 0.31;
+  if (cLen > 1.2) {
+    const p = At(cCx, cLz);
+    sink.Add("Stone", PlaceGeometry(
+      MakeBox(cLen + 0.1, 0.16, 0.64, TILE_METERS.stone, `${seed}:cplinth`),
+      { x: p.x, y: floorY + 0.08, z: p.z, ry }));
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(cLen, 0.72, 0.56, TILE_METERS.wood, `${seed}:cbody`),
+      { x: p.x, y: floorY + 0.52, z: p.z, ry }));
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(cLen + 0.16, 0.08, 0.72, TILE_METERS.wood, `${seed}:ctop`),
+      { x: p.x, y: floorY + 0.92, z: p.z, ry }));
+    sink.Solid(p.x, floorY + 0.48, p.z, (cLen + 0.16) / 2, 0.48, HALF_D, "furniture", ry);
+    // 回头段：贴门口那一头往里折，围出掌柜位
+    const retX = useLeft ? cB - 0.28 : cA + 0.28;
+    const retLz = cLz - 0.28 - 0.62;
+    const q = At(retX, retLz);
+    sink.Add("WoodDoor", PlaceGeometry(
+      MakeBox(0.56, 0.72, 1.24, TILE_METERS.wood, `${seed}:cret`),
+      { x: q.x, y: floorY + 0.52, z: q.z, ry }));
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.72, 0.08, 1.24, TILE_METERS.wood, `${seed}:crettop`),
+      { x: q.x, y: floorY + 0.92, z: q.z, ry }));
+    sink.Solid(q.x, floorY + 0.48, q.z, 0.36, 0.48, 0.62, "furniture", ry);
+    // 台面上一杆秤与一只钱笸箩
+    if (damage < 0.55) {
+      const s1 = At(cCx + cLen * 0.28, cLz + 0.02);
+      sink.Add("Wicker", PlaceGeometry(
+        MakeBox(0.34, 0.13, 0.34, TILE_METERS.wood, `${seed}:tray`),
+        { x: s1.x, y: floorY + 1.03, z: s1.z, ry: ry + 0.3 }));
+      const s2 = At(cCx - cLen * 0.30, cLz - 0.04);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(1.05, 0.045, 0.045, TILE_METERS.wood, `${seed}:steel`),
+        { x: s2.x, y: floorY + 0.99, z: s2.z, ry: ry + 0.14 }));
+    }
+  }
+
+  // --- 后墙货架：四层，架在柜台正对面 ---
+  const shLen = Math.min(cLen + 0.8, inHalfX * 2 - 0.9);
+  const shLz = backLz + 0.23;
+  const shTop = Math.min(eave - 0.42, 2.18);
+  if (shLen > 1.2) {
+    for (const s of [-1, 1]) {
+      const p = At(cCx + s * (shLen / 2 - 0.05), shLz);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.09, shTop, 0.44, TILE_METERS.wood, `${seed}:shup${s}`),
+        { x: p.x, y: floorY + shTop / 2, z: p.z, ry }));
+    }
+    const tiers = 4;
+    for (let i = 0; i < tiers; i += 1) {
+      const y = floorY + 0.34 + i * ((shTop - 0.42) / (tiers - 1));
+      const p = At(cCx, shLz);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(shLen, 0.05, 0.44, TILE_METERS.wood, `${seed}:sh${i}`),
+        { x: p.x, y, z: p.z, ry }));
+      if (damage > 0.55) continue;                 // 抢空了的铺子只剩空架子
+      // 货：陶罐 / 荆条篓 / 木匣 / 布卷各一族，一层摆两三件
+      const n = 2 + (i % 2);
+      for (let k = 0; k < n; k += 1) {
+        const lx = cCx + (-shLen / 2 + shLen * ((k + 0.5) / n)) + (rnd() - 0.5) * 0.22;
+        const g = At(lx, shLz - 0.02);
+        const pick = Math.floor(rnd() * 4);
+        if (pick === 0) {
+          sink.Add("HouseholdCeramic", PlaceGeometry(
+            MakeBox(0.26, 0.30, 0.26, TILE_METERS.stone, `${seed}:g${i}${k}`),
+            { x: g.x, y: y + 0.175, z: g.z, ry: ry + rnd() }));
+        } else if (pick === 1) {
+          sink.Add("Wicker", PlaceGeometry(
+            MakeBox(0.36, 0.26, 0.34, TILE_METERS.wood, `${seed}:g${i}${k}`),
+            { x: g.x, y: y + 0.155, z: g.z, ry: ry + rnd() * 0.6 }));
+        } else if (pick === 2) {
+          sink.Add("WoodDoor", PlaceGeometry(
+            MakeBox(0.42, 0.22, 0.30, TILE_METERS.wood, `${seed}:g${i}${k}`),
+            { x: g.x, y: y + 0.135, z: g.z, ry: ry + (rnd() - 0.5) * 0.3 }));
+        } else {
+          sink.Add("HouseholdCloth", PlaceGeometry(
+            MakeBox(0.50, 0.17, 0.17, TILE_METERS.wood, `${seed}:g${i}${k}`),
+            { x: g.x, y: y + 0.11, z: g.z, ry: ry + (rnd() - 0.5) * 0.2 }));
+        }
+      }
+    }
+    const sc = At(cCx, shLz);
+    sink.Solid(sc.x, floorY + shTop / 2, sc.z, shLen / 2, shTop / 2, 0.22, "furniture", ry);
+  }
+
+  // --- 墙角一只水缸 + 卸下来的两块门板靠在山墙内侧 ---
+  {
+    const cornerX = (useLeft ? 1 : -1) * (inHalfX - 0.55);
+    const v = At(cornerX, backLz + 0.62);
+    sink.Add("HouseholdCeramic", PlaceGeometry(
+      MakeBox(0.68, 0.82, 0.68, TILE_METERS.stone, `${seed}:vat`),
+      { x: v.x, y: floorY + 0.41, z: v.z, ry: ry + 0.4 }));
+    sink.Solid(v.x, floorY + 0.41, v.z, 0.36, 0.41, 0.36, "prop", ry);
+    for (let i = 0; i < 2; i += 1) {
+      const b = At(cornerX + (useLeft ? -0.28 : 0.28) - (useLeft ? 1 : -1) * i * 0.09,
+        backLz + 2.1 + i * 0.35);
+      sink.Add("WoodDoor", PlaceGeometry(
+        MakeBox(0.06, eave - 0.42, 0.52, TILE_METERS.wood, `${seed}:lean${i}`),
+        { x: b.x, y: floorY + (eave - 0.42) / 2, z: b.z, ry, rz: (useLeft ? 1 : -1) * 0.12 }));
+    }
+    // 门里一条候客板凳，**贴山墙顺进深摆**（横着摆会伸进卸板口那条道，
+    // 而门口净宽是这一间唯一的入口 —— 不摆碰撞也不该在视觉上把门堵上）
+    const benchX = cornerX + (useLeft ? 0.27 : -0.27);
+    const bench = At(benchX, frontLz - 1.25);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.34, 0.07, 1.35, TILE_METERS.wood, `${seed}:bench`),
+      { x: bench.x, y: floorY + 0.42, z: bench.z, ry }));
+    for (const s of [-1, 1]) {
+      const q = At(benchX, frontLz - 1.25 + s * 0.52);
+      sink.Add("WoodBeam", PlaceGeometry(
+        MakeBox(0.28, 0.40, 0.08, TILE_METERS.wood, `${seed}:bl${s}`),
+        { x: q.x, y: floorY + 0.20, z: q.z, ry }));
+    }
+  }
 }
 
 /**

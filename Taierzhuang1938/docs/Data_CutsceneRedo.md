@@ -296,3 +296,35 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 
 - 各场只改自己的 `Data_Cutscene<Name>.mjs`。**不许改** Script_Cutscene.mjs / Script_Main.mjs / Script_Actor.mjs / Data_TengxianScript.mjs；引擎缺什么在报告里写，别自己动。
 - 交付物：改好的数据文件 + 每镜至少一张出图（路径列在报告里）+ 一张 3—6 行的自评（哪一镜还不满意、为什么、建议引擎加什么）。
+
+## 1.9 出川场景/人物大修轮发现的引擎坑（2026-08-25，改过场前先读）
+
+- **材质名写错不报错**：`library.Get()` 抛错后 `_MakeProp` 静默退回米白
+  MeshStandardMaterial。「窗外一片白」的根因就是 16 块景片用了不存在的
+  `CarriageLandscape`。用新材质名前先在 Script_TexBake.RECIPES / LoadExternalSet 里核对。
+- **`_MakeProp` 不把 `metalness` 转给 `library.Get()`**，而材质库默认 metalness=1：
+  所有 `mat:"Steel"/"CarriageWallSteel"` 的大面在室内盒子里渲成纯黑（金属无漫反射）。
+  室内大面别用钢材质，改木衬/灰泥/无贴图平涂绕开。
+- **`spec.noFog` 是 no-op**：Script_Cutscene 里没有任何消费者，数据里写了不生效。
+- **`Model_ChuchuanStationPlatform.glb` 轴向是坏的**：整体「上」= −Z、长轴 = +Y，
+  且内部一半零件按 +Y 建——怎么旋转都有一半躺下。重跑 Blender 管线前别挂它；
+  现用盒子自建小站顶替（Data_CutsceneChuchuan 的 CHUCHUAN_STATION_PARTS）。
+- **出图脚本两个陷阱**：`--times` 只给一两个时刻时大贴图（>2 MB）可能没解码完，
+  景片渲成黑板，审查请跑完整时刻序列；不同 yaw/pitch 轮次的出图**同名覆盖**，
+  每轮拍完先改名再拍下一轮。
+- **过场人物活化是引擎自动的**（Script_Cutscene 扫 shot.lines 注入 talking /
+  听者转头 / 众人应答；Script_Actor 的 lifePose 待机微动作），数据不用写。
+  旋钮在 `CutsceneDirector.LIFE`；这套系统必须挂在类身上——CutsceneControlTest
+  用 new Function 切类源码单跑，模块级 const 在那个 eval 里看不见。
+  数据钩子：`state.idleLife:false` 让某人绝对静止。
+- **遗留打磨候选**：门外月台到景片之间约 24 m 中景只有 SRTM 平原（有地平线不空但素）；
+  正面景片 z≈28.7 的边界在个别下车视角可见接缝；擦枪(cleanRifle=1)横枪枪口
+  仍会越过 0.7 m 外的邻座（几何解不开，要么挪人要么站着擦）；站牌是空白板。
+
+- **无贴图平涂的面比带贴图的面亮一倍以上**（2026-08-25 外壳轮实测）：同样 sRGB 色号，
+  `color`-only 的箱子渲近白，带 `mat` 的正常。外壳/装饰件一律给 mat（WoodBeam 即可），
+  必须平涂时色号往暗里再压两档。反向同理：`CarriageBenchWood` 贴图均值反照率约 0.25，
+  背光面 tint 要往亮里给。
+- **`spec.texture` 通道无法平铺**：`_MakeProp` 只在有 `spec.mat` 时重算 UV，`repeat` 也只转给
+  材质库；TextureLoader 默认 ClampToEdge，一张图会被拉满整面。自定义可平铺贴图必须进材质库
+  （LoadExternalSet），引擎侧的活。

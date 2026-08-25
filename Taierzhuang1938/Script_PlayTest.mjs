@@ -1945,8 +1945,10 @@ const mesh = await page.evaluate(() => {
     eyesAhead: a ? a.eyes.position.z < 0 : false,      // 视线挂点必须在脸那一侧（-Z）
     hasMount: !!(a && a.weaponMount),
     weapon: a ? a.weaponId : null,
+    // 走工厂的 WeaponSource，不自己拼缓存键 —— 键的格式变过一次（加了外观变体），
+    // 自己拼的那版当场把模型枪误报成"退回方块"。
     weaponSource: a && a.weaponId
-      ? (f.weaponCache.get(`${a.weaponId}|${f.quality}`) || {}).source || "box" : null,
+      ? f.WeaponSource(a.weaponId, a.weaponVariant | 0) || "box" : null,
     muzzleZ: a && a.weaponGroup ? a.weaponMuzzle.z : null,
     draws,
     tris,

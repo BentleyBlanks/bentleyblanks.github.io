@@ -15,7 +15,7 @@
 //     它是玩家躲在院子里时的持续压力源，也是"原地不动就是靶子"这条规则的来源。
 
 import * as THREE from "three";
-import { WEAPONS } from "./Data_Weapons.mjs";
+import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { SUPPORT, COMBAT } from "./Data_Battle.mjs";
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 
@@ -142,10 +142,33 @@ export class CombatSystem {
     p.body = null;
   }
 
-  /** 白刃：正前方一个扇形，够着谁算谁。大刀比刺刀短一点但伤害高。 */
-  Melee(weaponId, fromPosition, direction) {
+  /**
+   * 白刃：正前方一个扇形，够着谁算谁。
+   *
+   * 大刀走武器表自己的 damage/reachM（260 / 2.05，一刀流）。
+   * 持枪白刃走 GUN_MELEE 三档：
+   *   bash   枪托砸（没上刺刀）    60 伤，三下
+   *   cut    刺刀挥砍（点按）      90 伤，两下，扇面宽
+   *   thrust 蓄力劈刺（按住松手）  105 + 70·power，一下放倒；扇面窄、
+   *          但臂展加上这支枪的 bayonetLengthM —— 三八式那半米刀长在这里兑现
+   * @param {object} [opts] { mode: "slash"|"cut"|"thrust"|"bash", power: 0..1 }
+   */
+  Melee(weaponId, fromPosition, direction, opts = {}) {
     const weapon = WEAPONS[weaponId] || WEAPONS.Dadao;
-    const reach = weapon.reachM ?? 2.0;
+    const isBlade = weapon.kind === "melee";
+    const mode = opts.mode || (isBlade ? "slash" : (weapon.bayonet ? "thrust" : "bash"));
+    const power = Clamp01(opts.power ?? 1);
+    let reach, damage, arcDot;
+    if (isBlade || mode === "slash") {
+      reach = weapon.reachM ?? 2.0;
+      damage = weapon.damage;
+      arcDot = 0.5;
+    } else {
+      const spec = GUN_MELEE[mode === "cut" ? "slash" : mode] || GUN_MELEE.bash;
+      reach = spec.reachM + (mode === "thrust" ? (weapon.bayonetLengthM || 0) : 0);
+      damage = spec.damage + (mode === "thrust" ? (spec.chargedBonus || 0) * power : 0);
+      arcDot = spec.arcDot ?? 0.5;
+    }
     const ai = this.host.ai;
     let hit = null, best = 1e9;
     for (const s of ai.soldiers) {
@@ -154,21 +177,25 @@ export class CombatSystem {
       rel.y = 0;
       const dist = rel.length();
       if (dist > reach) continue;
-      // 只砍身前 120° 那一片
-      if (rel.normalize().dot(this.tmpB.set(direction.x, 0, direction.z).normalize()) < 0.5) continue;
+      if (rel.normalize().dot(this.tmpB.set(direction.x, 0, direction.z).normalize()) < arcDot) continue;
       if (dist < best) { best = dist; hit = s; }
     }
+    // 出手的风声：劈刺沉、挥砍利。命中与否都有，先响风再见血
+    const bladed = isBlade || mode === "cut" || mode === "thrust";
+    if (this.host.audio) {
+      this.host.audio.Play("dadaoSwing",
+        { volume: mode === "thrust" ? 0.75 : 0.6, pitch: mode === "thrust" ? 0.85 : 1.1 });
+    }
     if (hit) {
-      const died = hit.TakeHit(weapon.damage, "torso", direction);
+      const died = hit.TakeHit(damage, "torso", direction);
       const at = hit.position.clone(); at.y += 1.0;
       if (this.host.vfx) this.host.vfx.Blood(at, direction, died ? 1 : 0.6);
       if (this.host.audio) {
-        this.host.audio.Play(weaponId === "Dadao" ? "dadaoHit" : "bayonetHit",
+        this.host.audio.Play(bladed ? (isBlade ? "dadaoHit" : "bayonetHit") : "bodyFall",
           { position: at, volume: 0.9 });
       }
-      return { hit, died };
+      return { hit, died, mode };
     }
-    if (this.host.audio) this.host.audio.Play("dadaoSwing", { volume: 0.6 });
     return null;
   }
 
