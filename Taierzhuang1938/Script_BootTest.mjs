@@ -47,6 +47,8 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
     await page.waitForFunction(() => window.Taierzhuang.vfx?.loadedExplosionSprites?.size === 4,
       { timeout: 30000 });
+    await page.waitForFunction(() => window.Taierzhuang.vfx?.loadedVefectsMasks?.size === 5,
+      { timeout: 30000 });
     await page.evaluate(() => window.Taierzhuang.StepFrames(120));
     await page.waitForTimeout(600);
     health = await page.evaluate((testPhase) => {
@@ -86,6 +88,15 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
           p.x += (i - 1.5) * 2.2;
           T.vfx.Explosion(p, { radius: 2.2, kind: "grenade", spriteVariant: forced[i] });
         }
+        // 常驻场景源强制播一组，让三条 authored-mask shader 分支都在 Tier 0 真编译。
+        const sceneEffects = ["FireMedium", "GroundFire", "SmokeBlack"];
+        const handles = sceneEffects.map((id, index) => T.vfx.SceneEffect(
+          { x: blastAt.x + (index - 1) * 2.5, y: blastAt.y - 1.1, z: blastAt.z },
+          id, { scale: 0.7 }));
+        // 只灌一次发射器，不在 renderer.info.autoReset=false 时多渲染几十帧；
+        // 否则性能读数会把 24 帧 draw call/三角形累加起来，形成测试自己的假红。
+        T.vfx._UpdateSmokeSources(1);
+        for (const handle of handles) T.vfx.RemoveSceneEffect(handle);
       }
       // 不开 preserveDrawingBuffer，取样必须与渲染在同一个任务里。
       // 走 StepFrames(1) 而不是自己调 post.Render：曝光/雾/泛光/去饱和全在 Frame()
@@ -119,6 +130,17 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         heavyLow: T.vfx.SelectExplosionSpriteVariant(15, 0.1),
         heavyHigh: T.vfx.SelectExplosionSpriteVariant(15, 0.9),
       };
+      const authoredSourcePools = {};
+      for (const poolName of ["sourceSmoke", "sourceFire", "sourceGroundFire"]) {
+        const pool = T.vfx.pools[poolName];
+        authoredSourcePools[poolName] = {
+          masked: "SHAPE_MASKED" in pool.material.defines,
+          fire: "MASKED_FIRE" in pool.material.defines,
+          width: pool.material.uniforms.uMaskMap.value.image?.width || 0,
+          noiseWrap: pool.material.uniforms.uMaskNoiseMap.value.wrapS,
+          spawned: pool.cursor,
+        };
+      }
 
       // 深度法线预通道的**天空判据**：w = 线性视深度，0 = 这一路没打到东西。
       // 事故：天空穹的 allowOverride = false 只保证"不被换材质"，它照样会用
@@ -183,6 +205,8 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         readableIjaMaterials,
         explosionSpritePools,
         explosionSpriteRouting,
+        authoredSourcePools,
+        loadedVefectsMasks: T.vfx.loadedVefectsMasks.size,
       };
     }, phase);
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
@@ -196,6 +220,14 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   else {
     if (health.glError !== 0) bad.push(`GL 错误 ${health.glError}`);
     if (health.glErrorAfterVfx !== 0) bad.push(`爆炸序列帧 GL 错误 ${health.glErrorAfterVfx}`);
+    if (health.loadedVefectsMasks !== 5) bad.push(`Vefects 纹理只载入 ${health.loadedVefectsMasks}/5`);
+    const authored = health.authoredSourcePools || {};
+    if (!authored.sourceSmoke?.masked || authored.sourceSmoke?.fire
+      || !authored.sourceFire?.masked || !authored.sourceFire?.fire
+      || !authored.sourceGroundFire?.masked || !authored.sourceGroundFire?.fire
+      || Object.values(authored).some((pool) => pool.width <= 1)) {
+      bad.push(`Vefects authored pool 接线不完整 ${JSON.stringify(authored)}`);
+    }
     // 画面不是纯色：黑屏、只剩天空、只剩雾，三种事故都表现为 spread 极小
     if (health.spread < 8) bad.push(`画面近乎纯色 spread=${health.spread}`);
     // 夜战本来就只有很窄的一段动态，阀值得分档

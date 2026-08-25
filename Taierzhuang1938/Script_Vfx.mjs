@@ -106,9 +106,54 @@ const BUOYANT_DRAG = 0.55;
 
 // 池容量分配（占总预算的比例）。烟最费，因为它活得久、片子大。
 const POOL_SHARE = {
-  smoke: 0.30, fire: 0.08, streak: 0.14, debris: 0.10,
-  dust: 0.16, star: 0.03, ring: 0.02, decal: 0.09, sprite: 0.08,
+  smoke: 0.22, fire: 0.05, sourceSmoke: 0.08, sourceFire: 0.03,
+  streak: 0.14, debris: 0.10, dust: 0.16, star: 0.03,
+  ring: 0.02, decal: 0.09, sprite: 0.08,
 };
+
+const VEFECTS_MASKS = {
+  fire: "./Texture/Texture_VefectsFireMask_01.webp",
+  groundFire: "./Texture/Texture_VefectsGroundFireMask_01.webp",
+  smoke: "./Texture/Texture_VefectsSmokeMask_01.webp",
+  noise: "./Texture/Texture_VefectsNoise_03.webp",
+  detailNoise: "./Texture/Texture_VefectsNoise_08.webp",
+};
+
+/** 可供关卡编辑器与独立预览器布设的持续场景特效。 */
+export const SCENE_EFFECTS = Object.freeze({
+  FireSmall: {
+    name: "小型燃烧", note: "木箱、杂物与小片残火",
+    options: { kind: "black", rate: 5, radius: 0.28, rise: 1.3, sizeStart: 0.30, sizeEnd: 2.0, life: 4.2, opacity: 0.20, fire: 0.55, fireShape: "column" },
+  },
+  FireMedium: {
+    name: "中型燃烧", note: "街边火堆与局部建筑失火",
+    options: { kind: "black", rate: 8, radius: 0.55, rise: 2.1, sizeStart: 0.48, sizeEnd: 3.8, life: 6.2, opacity: 0.22, fire: 0.85, fireShape: "column" },
+  },
+  GroundFire: {
+    name: "贴地火带", note: "油料、木梁或瓦砾上的低矮火焰",
+    options: { kind: "black", rate: 4, radius: 0.85, rise: 1.0, sizeStart: 0.25, sizeEnd: 1.8, life: 3.5, opacity: 0.16, fire: 0.75, fireShape: "ground" },
+  },
+  SmokeWhite: {
+    name: "白灰烟", note: "灰烬、湿料与轻烟",
+    options: { kind: "dust", rate: 8, radius: 0.42, rise: 1.7, sizeStart: 0.42, sizeEnd: 3.4, life: 5.2, opacity: 0.24, fire: 0 },
+  },
+  SmokeBlack: {
+    name: "黑烟柱", note: "远景失火与持续燃烧",
+    options: { kind: "black", rate: 10, radius: 0.70, rise: 3.0, sizeStart: 0.58, sizeEnd: 5.8, life: 8.0, opacity: 0.22, growthPower: 0.90, turbulence: 0.30, fire: 0 },
+  },
+  BurningWreck: {
+    name: "燃烧残骸", note: "车辆、器材与大型瓦砾",
+    options: { kind: "black", rate: 9, radius: 0.72, rise: 2.6, sizeStart: 0.50, sizeEnd: 4.8, life: 7.0, opacity: 0.23, turbulence: 0.24, fire: 0.9, fireShape: "ground" },
+  },
+  BurningHouse: {
+    name: "燃烧房屋", note: "更宽、更高的建筑火场",
+    options: { kind: "black", rate: 13, radius: 1.25, rise: 3.5, sizeStart: 0.70, sizeEnd: 7.2, life: 9.0, opacity: 0.21, turbulence: 0.32, fire: 1.2, fireShape: "column" },
+  },
+  SmokeScreen: {
+    name: "发烟筒烟幕", note: "贴地铺开的白灰烟幕",
+    options: { kind: "screen", rate: 12, radius: 0.50, rise: 0.35, sizeStart: 0.45, sizeEnd: 2.8, life: 5.0, opacity: 0.30, fire: 0 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // 共用 GLSL
@@ -324,6 +369,11 @@ uniform sampler2D uSpriteMap;    // 序列帧贴图；非 SHAPE_SPRITE 池挂共
 uniform vec2 uSpriteGrid;        // 帧网格（列×行）
 uniform float uSpriteFrames;     // 帧总数
 uniform float uSpriteEmission;   // 自带颜色的 CC0 flipbook：只把高亮火焰抬进 HDR，烟仍保留暗部
+uniform sampler2D uMaskMap;      // Vefects 火/烟轮廓；只给常驻场景源使用
+uniform sampler2D uMaskNoiseMap; // Vefects 流动噪声；UV 平移与侵蚀共用
+uniform sampler2D uMaskNoiseDetailMap;
+uniform float uMaskEmission;
+uniform float uTime;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
@@ -413,6 +463,22 @@ void main() {
   color = tex.rgb * mix(0.78, uSpriteEmission, flame);
 #else
   color = vColor * tex.rgb;
+#endif
+#elif defined(SHAPE_MASKED)
+  // Vefects 的火/烟包不是 flipbook，而是轮廓贴图 + 两层流动噪声。把相同的
+  // 组合搬进实例粒子池：贴图负责真实的卷边，实例弹道负责上升、风与寿命。
+  vec2 uv = p * 0.5 + 0.5;
+  vec2 drift = vec2(vSeed * 7.31, vSeed * 3.17);
+  float flow = texture2D(uMaskNoiseMap,
+    uv * 1.85 + drift + vec2(uTime * 0.09, -uTime * 0.16)).r;
+  vec2 warpedUv = uv + vec2(flow - 0.5, 0.5 - flow) * 0.10;
+  float authored = texture2D(uMaskMap, warpedUv).r;
+  float erosion = texture2D(uMaskNoiseDetailMap,
+    warpedUv * 2.7 + drift.yx + vec2(-uTime * 0.12, uTime * 0.21)).r;
+  mask = authored * smoothstep(0.08, 0.58, authored + erosion * 0.46 - vAge01 * 0.22);
+#ifdef MASKED_FIRE
+  float heat = smoothstep(0.14, 0.82, authored * (0.72 + erosion * 0.58));
+  color = mix(vColorAlt, vColor, heat) * mix(0.72, uMaskEmission, heat);
 #endif
 #else
   mask = smoothstep(1.0, 0.1, d);
@@ -697,6 +763,7 @@ class ParticlePool {
     if (config.bounce) defines.GROUND_BOUNCE = "";
     if (config.aerial) defines.AERIAL = "";
     if (config.sprite?.authoredColor) defines.SPRITE_AUTHORED_COLOR = "";
+    if (config.mask?.fire) defines.MASKED_FIRE = "";
 
     const preserveTargetAlpha = !!config.preserveTargetAlpha;
     this.material = new THREE.ShaderMaterial({
@@ -712,6 +779,10 @@ class ParticlePool {
         },
         uSpriteFrames: { value: config.sprite ? config.sprite.frames : shared.uSpriteFrames.value },
         uSpriteEmission: { value: config.sprite?.emission ?? 1 },
+        uMaskMap: { value: config.mask?.texture ?? shared.uMaskMap.value },
+        uMaskNoiseMap: { value: config.mask?.noise ?? shared.uMaskNoiseMap.value },
+        uMaskNoiseDetailMap: { value: config.mask?.detailNoise ?? shared.uMaskNoiseDetailMap.value },
+        uMaskEmission: { value: config.mask?.emission ?? 1 },
       }),
       vertexShader: `${GLSL_VERT_HELPERS}\n${VERT_PARTICLE}`,
       fragmentShader: `${GLSL_NOISE}\n${FRAG_PARTICLE}`,
@@ -1146,6 +1217,9 @@ export class VfxSystem {
     // 贴图未到位时用全透明占位，外层程序化火焰/尘环/烟柱仍照常生成。
     this.spriteTransparentPlaceholder = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
     this.spriteTransparentPlaceholder.needsUpdate = true;
+    this.maskTransparentPlaceholder = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+    this.maskTransparentPlaceholder.colorSpace = THREE.NoColorSpace;
+    this.maskTransparentPlaceholder.needsUpdate = true;
 
     this.shared = {
       uTime: { value: 0 },
@@ -1159,6 +1233,9 @@ export class VfxSystem {
       uSpriteMap: { value: this.spritePlaceholder },
       uSpriteGrid: { value: new THREE.Vector2(1, 1) },
       uSpriteFrames: { value: 1 },
+      uMaskMap: { value: this.maskTransparentPlaceholder },
+      uMaskNoiseMap: { value: this.spritePlaceholder },
+      uMaskNoiseDetailMap: { value: this.spritePlaceholder },
       uSunDirection: { value: new THREE.Vector3(0.32, 0.62, -0.72).normalize() },
       // 默认值对齐 LightRig 的 smokyDay：平行光 5.4，漫反射出射亮度约 I/π ≈ 1.7。
       // 这里给小了的话，碎块和烟会比同一场景里的 PBR 物体暗一大截，一眼假。
@@ -1204,6 +1281,22 @@ export class VfxSystem {
       fire: new ParticlePool(cap(POOL_SHARE.fire, 64), {
         shape: "puff", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.25, renderOrder: 8,
+      }, this.shared),
+      // Vefects 原作轮廓 + 流动噪声：只接常驻场景源。
+      sourceSmoke: new ParticlePool(cap(POOL_SHARE.sourceSmoke, 48), {
+        shape: "masked", orient: "billboard", blending: THREE.NormalBlending,
+        lit: true, aerial: true, softRange: 0.45, renderOrder: 6,
+        mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder },
+      }, this.shared),
+      sourceFire: new ParticlePool(cap(POOL_SHARE.sourceFire * 0.5, 16), {
+        shape: "masked", orient: "billboard", blending: THREE.AdditiveBlending,
+        softRange: 0.22, renderOrder: 8,
+        mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder, fire: true, emission: 4.6 },
+      }, this.shared),
+      sourceGroundFire: new ParticlePool(cap(POOL_SHARE.sourceFire * 0.5, 16), {
+        shape: "masked", orient: "billboard", blending: THREE.AdditiveBlending,
+        softRange: 0.18, renderOrder: 8,
+        mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder, fire: true, emission: 4.2 },
       }, this.shared),
       // 四套序列帧按当量随机：旧 16 帧、紧凑爆炸、持续火球、重炮爆炸。容量四等分，
       // 总预算仍是 POOL_SHARE.sprite；NormalBlending 两池能留下黑烟，另两池走 HDR 加性。
@@ -1259,6 +1352,33 @@ export class VfxSystem {
         this.loadedExplosionSprites.add(key);
         const pool = this.pools?.[variant.pool];
         if (pool) pool.material.uniforms.uSpriteMap.value = texture;
+      }, undefined, () => {});
+    }
+
+    // 第 2 套 Vefects 免费火焰包；仓库只带正片实际依赖的 5 张转换纹理。
+    this.vefectsTextures = new Map();
+    this.loadedVefectsMasks = new Set();
+    for (const [key, path] of Object.entries(VEFECTS_MASKS)) {
+      textureLoader.load(new URL(path, import.meta.url).href, (texture) => {
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.flipY = false;
+        const noise = key === "noise" || key === "detailNoise";
+        texture.wrapS = noise ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+        texture.wrapT = noise ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+        texture.needsUpdate = true;
+        this.vefectsTextures.set(key, texture);
+        this.loadedVefectsMasks.add(key);
+        const noiseTexture = this.vefectsTextures.get("noise") || this.vefectsTextures.get("detailNoise");
+        const detailNoiseTexture = this.vefectsTextures.get("detailNoise") || noiseTexture;
+        if (noiseTexture && detailNoiseTexture) {
+          for (const poolName of ["sourceSmoke", "sourceFire", "sourceGroundFire"]) {
+            this.pools[poolName].material.uniforms.uMaskNoiseMap.value = noiseTexture;
+            this.pools[poolName].material.uniforms.uMaskNoiseDetailMap.value = detailNoiseTexture;
+          }
+        }
+        if (key === "smoke") this.pools.sourceSmoke.material.uniforms.uMaskMap.value = texture;
+        if (key === "fire") this.pools.sourceFire.material.uniforms.uMaskMap.value = texture;
+        if (key === "groundFire") this.pools.sourceGroundFire.material.uniforms.uMaskMap.value = texture;
       }, undefined, () => {});
     }
 
@@ -1821,6 +1941,7 @@ export class VfxSystem {
       growthPower: opts.growthPower ?? (kind === "black" ? 0.82 : kind === "screen" ? 1.35 : 2.0),
       turbulence: opts.turbulence ?? (kind === "black" ? 0.28 : 0),
       fire: opts.fire ?? 0,
+      fireShape: opts.fireShape === "column" ? "column" : "ground",
       colorA: opts.colorA || palette[0],
       colorB: opts.colorB || palette[1],
       groundHug: kind === "screen",
@@ -1831,6 +1952,22 @@ export class VfxSystem {
   }
 
   RemoveSmokeSource(handle) { this.smokeSources.delete(handle); }
+
+  /** 按统一目录创建可序列化的场景持续特效。 */
+  SceneEffect(position, id, { scale = 1 } = {}) {
+    const effect = SCENE_EFFECTS[id];
+    if (!effect) return 0;
+    const size = Math.max(0.15, Number.isFinite(scale) ? scale : 1);
+    const options = { ...effect.options };
+    for (const key of ["radius", "sizeStart", "sizeEnd"]) {
+      if (options[key] != null) options[key] *= size;
+    }
+    if (options.rate != null) options.rate *= Math.max(0.45, size);
+    if (options.fire != null) options.fire *= Math.sqrt(size);
+    return this.SmokeSource(position, options);
+  }
+
+  RemoveSceneEffect(handle) { this.RemoveSmokeSource(handle); }
 
   /**
    * 空气里的浮尘。只保留很淡的环境层；方向性太阳拖影由后处理负责。
@@ -1933,8 +2070,12 @@ export class VfxSystem {
     for (const texture of this.explosionSpriteTextures.values()) texture.dispose();
     this.explosionSpriteTextures.clear();
     this.loadedExplosionSprites.clear();
+    for (const texture of this.vefectsTextures.values()) texture.dispose();
+    this.vefectsTextures.clear();
+    this.loadedVefectsMasks.clear();
     if (this.spritePlaceholder) this.spritePlaceholder.dispose();
     if (this.spriteTransparentPlaceholder) this.spriteTransparentPlaceholder.dispose();
+    if (this.maskTransparentPlaceholder) this.maskTransparentPlaceholder.dispose();
     this.fallbackDepth.dispose();
     this.smokeSources.clear();
     this.dust = null;
@@ -2037,7 +2178,9 @@ export class VfxSystem {
         s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.55);
         s.colorA = source.colorA; s.colorB = source.colorB;
         s.seed = this.random();
-        this.pools.smoke.Spawn(s, this.time);
+        const useAuthoredSmoke = this.loadedVefectsMasks.has("smoke")
+          && (this.loadedVefectsMasks.has("noise") || this.loadedVefectsMasks.has("detailNoise"));
+        (useAuthoredSmoke ? this.pools.sourceSmoke : this.pools.smoke).Spawn(s, this.time);
       }
       if (source.fire > 0) {
         source.fireAccumulator += source.fire * 22 * dt * this.spawnScale;
@@ -2062,7 +2205,11 @@ export class VfxSystem {
           s.flicker = this._Range(6, 11);                 // 火苗要抖
           s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
           s.seed = this.random();
-          this.pools.fire.Spawn(s, this.time);
+          const firePoolName = source.fireShape === "column" ? "sourceFire" : "sourceGroundFire";
+          const fireMask = source.fireShape === "column" ? "fire" : "groundFire";
+          const useAuthoredFire = this.loadedVefectsMasks.has(fireMask)
+            && (this.loadedVefectsMasks.has("noise") || this.loadedVefectsMasks.has("detailNoise"));
+          (useAuthoredFire ? this.pools[firePoolName] : this.pools.fire).Spawn(s, this.time);
         }
       }
     }

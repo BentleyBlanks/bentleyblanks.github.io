@@ -1,7 +1,7 @@
 // 编辑器套件的外壳：右上角那个齿轮 + 一张「各编辑器入口开关」的面板 + 调度。
 //
 // ## 一次只开一个
-// 八个编辑器里有七个要**接管相机**（摄影棚 / 过场 / 自由飞行），
+// 九个编辑器里有八个要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
 // 所以入口面板是一排开关，但语义是「换到这一个」：开新的自动关旧的。
 // 这条写在面板上，不让人猜。
@@ -26,6 +26,7 @@ import { El } from "./Script_EditorUi.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { WeaponEditor } from "./Script_EditorWeapon.mjs";
+import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
@@ -46,7 +47,7 @@ import {
  */
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
-  ActorEditor, WeaponEditor, AudioEditor, TimelineEditor,
+  ActorEditor, WeaponEditor, VfxEditor, AudioEditor, TimelineEditor,
   SceneEditor, PropLibraryEditor, TerrainEditor, DestructionEditor,
 ];
 const ALL = [...SETTINGS, ...EDITORS];

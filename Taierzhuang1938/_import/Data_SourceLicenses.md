@@ -138,3 +138,14 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 以上 Poly Haven 资源均为 [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)，
 许可副本保存在各自 `Source/Model_PolyHaven*/License_PolyHavenCc0.txt` 中。
+
+## 特效轮廓纹理（常驻烟雾与燃烧）
+
+| 游戏内资产 | 来源 | 作者 / 页面声明 | 处理方式 |
+|---|---|---|---|
+| `Texture/Texture_VefectsFireMask_01.webp`、`Texture_VefectsGroundFireMask_01.webp`、`Texture_VefectsSmokeMask_01.webp`、`Texture_VefectsNoise_03.webp`、`Texture_VefectsNoise_08.webp` | [Free Fire VFX - Unity](https://vefects.itch.io/free-fire-vfx-unity) 的 `Vefects_VFX_Free_Fire_SRP_Final_01.unitypackage` | Vefects - Realtime VFX for Games；发布页标为免费游戏资产，但没有另附 CC0 / CC-BY 文本，因此不得写成 CC0 | 从 Unity 包中保留原灰度轮廓与噪声，无损转 WebP。`Script_Vfx.mjs` 将轮廓 + 滚动噪声用于常驻烟源、柱状火和贴地火；异步加载失败则回退原程序化烟火。完整源包、15 个 prefab、未使用的灰烬/尘土/渐变纹理及联系表保存在本机 `C:\Users\Bentl\Documents\Program\Taierzhuang1938SourceAssets\Vfx\VefectsFreeFire\`，不把未用素材塞进站点。 |
+
+用户同时选中的 Compositing Academy **Free VFX Fire Elements** 免费档未并入本公开仓库：
+该档仅允许个人非商业成品，并明确禁止在 Git repositories / project files 中分发原素材或
+修改素材。它还需要以邮箱完成 `$0` 订单，当前既未代填用户身份，也未把受限素材下载或提交。
+若未来改为符合其条款的私有素材发布链路，再由合法取得的下载包接入；在此之前不参与运行时。
