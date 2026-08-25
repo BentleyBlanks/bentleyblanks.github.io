@@ -612,6 +612,28 @@ async function Boot() {
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
+  /**
+   * 换天光。套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，
+   * 少一件就是「天是夜的、地是白天的」。过场（cut.sky）与采样点出图
+   *（夜战关里的关厢建筑要按白天记录）走的是同一条，不许各写一份。
+   */
+  function ApplySkyPreset(name) {
+    if (!SKY_PRESETS[name]) return false;
+    cutsceneSky = name;
+    const preset = sky.Apply(name);
+    sky.BakeEnvironment(scene);
+    lights.ApplyPreset(preset, sky.sunDirection);
+    return true;
+  }
+  /** 还原成本关自己的天光。 */
+  function RestoreLevelSky() {
+    if (!cutsceneSky) return;
+    cutsceneSky = null;
+    const preset = sky.Apply(PHASES[state.phaseIndex].sky);
+    sky.BakeEnvironment(scene);
+    lights.ApplyPreset(preset, sky.sunDirection);
+  }
+
   // 过场导演。onCapture/onRelease 是夺走与交还玩家控制权的钩子：
   // 过场期间 Frame() 只跑 director.Update 与渲染，玩法一律停摆
   //（不停的话玩家会在看电影的时候被打死，而且指针锁还在，鼠标会转动相机）。
@@ -637,22 +659,8 @@ async function Boot() {
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
     // 套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，少一件就是
     // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
-    applySky: (name) => {
-      if (!SKY_PRESETS[name]) return false;
-      cutsceneSky = name;
-      const preset = sky.Apply(name);
-      sky.BakeEnvironment(scene);
-      lights.ApplyPreset(preset, sky.sunDirection);
-      return true;
-    },
-    restoreSky: () => {
-      if (!cutsceneSky) return;
-      cutsceneSky = null;
-      const phase = PHASES[state.phaseIndex];
-      const preset = sky.Apply(phase.sky);
-      sky.BakeEnvironment(scene);
-      lights.ApplyPreset(preset, sky.sunDirection);
-    },
+    applySky: (name) => ApplySkyPreset(name),
+    restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
@@ -1069,6 +1077,18 @@ async function Boot() {
     hidden: !!document.getElementById("edRoot")
       && document.getElementById("edRoot").classList.contains("off"),
   });
+
+  // --- 采样点：县城固定机位的出图口 ----------------------------------------
+  // Script_SamplePointShot 不自己算机位，而是开采样点编辑器、逐点调它。
+  // 面板里预览到的与出图出来的必须是同一份位姿；两边各算一遍迟早会分叉。
+  const SampleTool = () => (editor.ActiveId === "samplePoints"
+    ? editor.active : editor.Open("samplePoints"));
+  window.Taierzhuang.Debug.SamplePoints = () => SampleTool()?.Points() || null;
+  window.Taierzhuang.Debug.SamplePoint = (id) => SampleTool()?.ApplyPointById(id) || null;
+  // 天光覆盖：夜战关（1/3/6）里的关厢建筑必须按白天记录，否则那一张图上
+  // 只有黑色轮廓。与过场换天光同一条通道（三件一起换）。
+  window.Taierzhuang.Debug.ApplySky = (name) => ApplySkyPreset(name);
+  window.Taierzhuang.Debug.RestoreSky = () => { RestoreLevelSky(); };
 
   // --- 主菜单 --------------------------------------------------------------
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
@@ -3154,6 +3174,11 @@ function Frame(dt, render = true) {
   // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
   if (editor && editor.Capturing) {
     editor.Update(dt);
+    // 阴影框跟着**编辑器相机**走。与过场那一条同一笔账：编辑器的自由飞行
+    // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
+    // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
+    camera.getWorldDirection(_forward);
+    lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;
   }
