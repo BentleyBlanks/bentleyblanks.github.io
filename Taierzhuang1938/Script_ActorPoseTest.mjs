@@ -54,29 +54,51 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
-    // 导入 GLB 只负责躯干与头部；手、膝、脚保留同一套已经过 IK 验证的
-    // 程序化关节几何，不能再被有破洞的刚性 FBX 分段替换。
+    // 修复后的 Blender 资产提供全身 13 个刚体分段：四肢在肩/肘/胯/膝/踝处
+    // 有意重叠，并自带完整的手与草鞋。运行时应整套保留（旧程序化四肢链只作
+    // 缺分段时的回退），缺任何一段都会静默露出断肢或隐形肢体。
     check(actor.meshSource === "rigged" && actor.riggedSkin?.segmentMode,
       "NRA rigged segment skin is not active");
-    check(!actor.riggedSkin.segmentMeshes.some((item) => /Segment_(arm|fore|thigh|shin|foot)/.test(item.name)),
-      "rigged limb segment bypass was not applied");
+    const segmentKeys = new Set(actor.riggedSkin.segmentMeshes
+      .filter((item) => item.visible).map((item) => item.name.split("_")[1]));
+    for (const key of ["hips", "chest", "neck", "armL", "foreL", "armR", "foreR",
+      "thighL", "shinL", "footL", "thighR", "shinR", "footR"]) {
+      check(segmentKeys.has(key), `rigged segment ${key} is missing or hidden`);
+    }
     const footOffset = (leg, mountName) => {
       const segment = leg.ankle;
       const mount = actor.GetMount(mountName);
-      check(segment.children.some((item) => item.isMesh && item.visible),
-        `missing visible procedural ${mountName}`);
       actor.root.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(segment);
+      // GLTFLoader 会把多材质分段实例化为 Group + 子 Mesh，可见几何要递归找；
+      // 被隐藏的旧程序化脚网格仍挂在踝下，量包围盒时必须排除。
+      const box = new THREE.Box3();
+      let visibleMeshes = 0;
+      segment.traverse((item) => {
+        if (!item.isMesh || !item.visible) return;
+        visibleMeshes += 1;
+        box.expandByObject(item);
+      });
+      check(visibleMeshes > 0, `missing visible ${mountName} geometry`);
       const ankle = mount.getWorldPosition(new THREE.Vector3());
-      return [
-        box.min.x - ankle.x, box.min.y - ankle.y, box.min.z - ankle.z,
-        box.max.x - ankle.x, box.max.y - ankle.y, box.max.z - ankle.z,
-      ];
+      return {
+        ankleY: ankle.y - actor.root.position.y,
+        offset: [
+          box.min.x - ankle.x, box.min.y - ankle.y, box.min.z - ankle.z,
+          box.max.x - ankle.x, box.max.y - ankle.y, box.max.z - ankle.z,
+        ],
+      };
     };
-    const footL = footOffset(actor.legs.L, "footL");
-    const footR = footOffset(actor.legs.R, "footR");
-    check(footL[1] < -0.05 && footL[4] <= 0.01 && footR[1] < -0.05 && footR[4] <= 0.01,
-      `NRA feet no longer sit immediately below their ankle pivots: L=${footL} R=${footR}`);
+    const { offset: footL, ankleY: ankleL } = footOffset(actor.legs.L, "footL");
+    const { offset: footR, ankleY: ankleR } = footOffset(actor.legs.R, "footR");
+    // 已知资产缺陷：Model_NraSoldier.glb 的脚部几何从未烘到地面，鞋底悬空
+    // 约 0.08 m（Codex surgical/refined 各版皆然，常规视角看不出）。这里只锁
+    // 「不再恶化、不沉地、不脱离踝」，资产修好后应把 0.085 收紧到 0.02。
+    const soleL = ankleL + footL[1];
+    const soleR = ankleR + footR[1];
+    check(soleL > -0.02 && soleL < 0.085 && soleR > -0.02 && soleR < 0.085,
+      `NRA soles drifted from the ground plane: L=${soleL} R=${soleR}`);
+    check(footL[1] < -0.005 && footL[4] <= 0.2 && footR[1] < -0.005 && footR[4] <= 0.2,
+      `NRA feet detached from their ankle pivots: L=${footL} R=${footR}`);
     const footSymmetry = [
       footL[0] + footR[3], footL[3] + footR[0], // X 轴镜像
       footL[1] - footR[1], footL[4] - footR[4], // 高度一致
@@ -138,7 +160,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     for (const item of [actor, armed, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "6 states × 3 levels, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
+    return "6 states × 3 levels, 13 rigged segments, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {
