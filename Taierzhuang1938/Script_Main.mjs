@@ -90,6 +90,11 @@ function MakeLevelBounds(bounds) {
   };
 }
 
+// 执行到这一行 = 一百五十多个文件的模块图整张拉齐了。告诉 index.html 的开机守望
+// 别再按「模块没到」处理，后面真正的启动失败由文件末尾 Boot().catch 自己亮牌。
+window.__bootMainAlive = true;
+window.__bootGuardDismiss?.();
+
 const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
@@ -4126,6 +4131,8 @@ window.addEventListener("resize", ApplyGraphics);
 
 Boot().catch((error) => {
   bootStep.textContent = "启动失败：" + error.message;
+  // 交给开机守望补一颗「重试」按钮（老缓存里的 index.html 可能还没有守望，所以带 ?.）
+  window.__bootGuardFail?.(error.message, false);
   console.error(error);
   throw error;
 });

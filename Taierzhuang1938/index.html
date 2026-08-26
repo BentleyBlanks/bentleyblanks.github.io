@@ -7,14 +7,6 @@
   <meta name="theme-color" content="#08080a">
   <meta name="description" content="《滕县 一九三八》——1938 年 3 月 14 日至 18 日，山东滕县。川军第 122 师守城四日的线性关卡 FPS 原型。">
   <title>滕县 一九三八</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="./Style_Game.css?v=15">
-  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
-  <link rel="stylesheet" href="./Style_Menu.css?v=3">
-  <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
-  <link rel="stylesheet" href="./Style_Editor.css?v=6">
   <!-- 版本戳必须盖到整张模块图上，不能只盖入口。
        只给入口盖戳的后果是「新壳配旧芯」：入口拿到新版，它 import 的模块吃缓存
        里的旧版，桌面刷新就好、手机 Safari 黏得多，于是只在移动端复现。
@@ -155,6 +147,37 @@
       }
     }
   </script>
+  <!-- 照 importmap 全表下发 modulepreload：模块图有好几层深，浏览器要先拿到父模块
+       才能发现子模块的 import —— 到 GitHub Pages 一层就是一秒多 RTT，实测
+       （2026-08-26 OnlineStallAudit）坏网络下 120 秒只到 96 个请求、后几层最后十几秒
+       才刚被发现，页面看着就像死在「正在夯地……」。这里让全部模块一口气并行开拉，
+       深度不再乘 RTT。importmap 是唯一登记表（新增模块必须登记，见上），
+       这段照表读，不许再手写第二份清单。
+       连同 importmap 一起，这两段必须排在所有样式表**前面**：pending 的样式表会
+       卡住后面内联脚本的执行，Google Fonts 挂住（墙内常态）就等于把下发一起拖死。 -->
+  <script>
+    {
+      const map = JSON.parse(document.querySelector('script[type="importmap"]').textContent);
+      for (const url of new Set(Object.values(map.imports))) {
+        const link = document.createElement("link");
+        link.rel = "modulepreload";
+        link.href = url;
+        document.head.appendChild(link);
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts 走异步换装（media=print 先不参与渲染，到货再换 all）：
+       它是唯一的外网样式表，同步写法会在它挂住时把首屏和内联脚本一起卡死；
+       异步写法下先用后备字体开机，字体到了自然换上（display=swap 本来就是这个观感）。 -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
+        media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="./Style_Game.css?v=15">
+  <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
+  <link rel="stylesheet" href="./Style_Menu.css?v=3">
+  <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
+  <link rel="stylesheet" href="./Style_Editor.css?v=6">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -182,6 +205,69 @@
   <!-- 主菜单。加载完成后盖在活场景上（Script_Menu 接管相机跑运镜）。
        出图模式与 ?menu=0 下它一直是空的，「进 城」那颗按钮照旧管用 —— 三个冒烟脚本都点它。 -->
   <div id="menu"></div>
-  <script type="module" src="./Script_Main.mjs?v=75"></script>
+  <!-- 开机守望（非模块脚本，模块图挂了它照样活着）。
+       Script_Main 的模块图有一百五十多个文件，线上开一次机就是 150+ 个请求：
+       任何一个没拉下来，整张图一行都不会执行 —— 页面无声钉死在「正在夯地……」，
+       控制台有错、玩家看不见。这里兜三类死法：
+       ① 模块脚本加载失败（刷新后最常见，多半是瞬断）→ 无声自动重刷一次，再断才亮明牌；
+       ② 顶层抛异常（WebGL 上下文建不出来是刷新后的常客，也按瞬态处理）；
+       ③ 模块图迟迟不到（慢网和断连分不清）→ 只亮牌给「重试」，不自动刷。
+       进了游戏（#boot.gone）以后这里一概不插手。必须排在主模块 script 前面，
+       不然接不到它的 error 事件。 -->
+  <script>
+    (() => {
+      const AUTO_KEY = "tzBootAutoRetried";
+      const BootVisible = () => {
+        const boot = document.getElementById("boot");
+        return !!boot && !boot.classList.contains("gone");
+      };
+      // 隐私模式下 sessionStorage 会抛；读不到就当「已经重试过」，宁可不自动刷。
+      const Store = {
+        get: () => { try { return sessionStorage.getItem(AUTO_KEY); } catch { return "1"; } },
+        set: () => { try { sessionStorage.setItem(AUTO_KEY, "1"); } catch {} },
+        clear: () => { try { sessionStorage.removeItem(AUTO_KEY); } catch {} },
+      };
+      let shown = false;
+      const Fail = (reason, transient) => {
+        if (!BootVisible()) return;
+        if (transient && !Store.get()) { Store.set(); location.reload(); return; }
+        const step = document.getElementById("bootStep");
+        if (!step) return;
+        if (!shown) step.textContent = "启动失败：" + reason;
+        shown = true;
+        if (document.getElementById("bootRetry")) return;
+        const button = document.createElement("button");
+        button.id = "bootRetry";
+        button.textContent = "重 试";
+        button.style.cssText = "pointer-events:auto;cursor:pointer;"
+          + "border:1px solid rgba(230,223,205,0.3);background:rgba(10,10,9,0.5);"
+          + "color:#e6dfcd;font:inherit;font-size:13px;letter-spacing:0.2em;padding:6px 26px;";
+        button.onclick = () => { Store.clear(); location.reload(); };
+        step.after(button);
+      };
+      window.__bootGuardFail = Fail;
+      window.__bootGuardDismiss = () => {
+        Store.clear();
+        shown = false;
+        const button = document.getElementById("bootRetry");
+        if (button) button.remove();
+      };
+      window.addEventListener("error", (event) => {
+        const target = event.target;
+        // 资源型：模块图里任何一个文件拉不下来，error 落在 <script> 元素上。
+        // 样式与字体（LINK）失败不致命，不接手。
+        if (target && target.tagName === "SCRIPT") {
+          const file = String(target.src || "").split("/").pop().split("?")[0];
+          Fail(`脚本没拉下来（${file || "未知文件"}），多半是网络瞬断`, true);
+          return;
+        }
+        if (event.message) Fail(event.message, /webgl/i.test(event.message));
+      }, true);
+      setTimeout(() => {
+        if (!window.__bootMainAlive) Fail("主程序迟迟没跑起来，网络可能断了（可以再等等，或点重试）", false);
+      }, 25000);
+    })();
+  </script>
+  <script type="module" src="./Script_Main.mjs?v=76"></script>
 </body>
 </html>
