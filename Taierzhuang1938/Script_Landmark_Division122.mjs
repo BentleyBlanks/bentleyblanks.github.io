@@ -27,11 +27,11 @@
 //      街的东端必须停在濠外岸，再往东是桥与马道（城模块自己建的）。
 //      数据里 westStreet.toX=-328 落在濠内的马道上，照抄会把土路铺过护城河。
 
-import * as THREE from "three";
 import { MakeBox, PlaceGeometry, TILE_METERS, MergeGeometries } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { AddRoadWear, AddYardWear, AddStreetLife, AddStalkStack } from "./Script_LivedInProps.mjs";
 import { BuildHq } from "./Script_Landmark_Headquarters.mjs";
+import { BuildRoadRibbon } from "./Script_RoadSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 兜底常量
@@ -77,26 +77,11 @@ function Frame(x, z, ry) {
 }
 
 /**
- * 一片四边形。土路铺成**贴着地形的带子**而不是一块块方板：
- * 濠外原野有 ±0.55 m 的起伏，加上电灯厂/通信队/师部脚下那几块垫地的过渡带
- * （1.2 m 的高差摊在 14—16 m 上），一段一段的平板会在过渡带里读成台阶。
- * vertical=true 的那几片是路肩的裙边（UV 按「沿线 × 高度」投，免得被拉成条）。
+ * 土路铺成**贴着地形的带子**而不是一块块方板：濠外原野有 ±0.55 m 的起伏，
+ * 加上电灯厂/通信队/师部脚下那几块垫地的过渡带（1.2 m 的高差摊在 14—16 m 上），
+ * 一段一段的平板会在过渡带里读成台阶。带子本体现在由共享的样条道路层出
+ * （Script_RoadSpline.BuildRoadRibbon），本文件原来手拼 Quad 的那份实现已删。
  */
-function Quad(a, b, c, d, tile = TILE_METERS.ground, vertical = false) {
-  const g = new THREE.BufferGeometry();
-  const pts = [a, b, c, a, c, d];
-  const pos = new Float32Array(18);
-  const uv = new Float32Array(12);
-  for (let i = 0; i < 6; i += 1) {
-    pos[i * 3] = pts[i][0]; pos[i * 3 + 1] = pts[i][1]; pos[i * 3 + 2] = pts[i][2];
-    uv[i * 2] = pts[i][0] / tile;
-    uv[i * 2 + 1] = (vertical ? pts[i][1] : pts[i][2]) / tile;
-  }
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  g.computeVertexNormals();
-  return g;
-}
 
 // ---------------------------------------------------------------------------
 // 西关大街
@@ -118,48 +103,18 @@ function Quad(a, b, c, d, tile = TILE_METERS.ground, vertical = false) {
 const ROAD_CROWN = 0.22;
 
 function RoadRibbon(host, { fromX, toX, z, width, seed }) {
-  const half = width / 2;
   const span = toX - fromX;
-  const steps = Math.max(2, Math.round(span / 4));
-  const top = [], skirt = [];
-  let prev = null;
-  for (let i = 0; i <= steps; i += 1) {
-    const x = fromX + (span * i) / steps;
-    const y = host.OuterHeight(x, z) + ROAD_CROWN;
-    const node = { x, y };
-    if (prev) {
-      // 顶点顺序决定法线朝向 —— **写反了整条路是隐形的**（背面剔除掉，
-      // 出图上只剩车辙浮在田里，第一版就是这么丢了一条街）。
-      // 这一圈按 +z→-z 排，叉积朝上；裙边按左右换向，法线一律朝路外。
-      top.push(Quad(
-        [prev.x, prev.y, z + half], [x, node.y, z + half],
-        [x, node.y, z - half], [prev.x, prev.y, z - half]));
-      for (const s of [-1, 1]) {
-        const zs = z + s * half;
-        const corners = s < 0
-          ? [[prev.x, prev.y, zs], [x, node.y, zs],
-            [x, node.y - 0.65, zs], [prev.x, prev.y - 0.65, zs]]
-          : [[x, node.y, zs], [prev.x, prev.y, zs],
-            [prev.x, prev.y - 0.65, zs], [x, node.y - 0.65, zs]];
-        skirt.push(Quad(corners[0], corners[1], corners[2], corners[3],
-          TILE_METERS.ground, true));
-      }
-    }
-    prev = node;
-  }
-  host.sink.Add("DirtRoad", MergeGeometries(top));
-  host.sink.Add("DirtRoad", MergeGeometries(skirt));
-  // 路基的碰撞：贴地的地面板本来都不登记碰撞（走的是解析地形），但这条路
-  // 垫了 0.22 m，不登记的话人是**踩在路面以下**走的，车辙比脚面还高。
-  // 每 10 m 一个盒子（盒顶 = 路面），0.22 < 0.56 的自动抬腿档，
-  // 既不绊人也不会在导航图上刷出一条死带。
-  const solidEvery = 10.5;
-  const solids = Math.max(1, Math.round(span / solidEvery));
-  for (let i = 0; i < solids; i += 1) {
-    const cx = fromX + (span * (i + 0.5)) / solids;
-    const cy = host.OuterHeight(cx, z) + ROAD_CROWN;
-    host.sink.Solid(cx, cy - 0.24, z, (span / solids) / 2, 0.24, half, "embankment");
-  }
+  // 路面 + 裙边 + 路基碰撞全走共享的样条条带（Script_RoadSpline）。
+  // 碰撞盒长 = 采样步长 4 m（北关大街 0.79 m 直坎的账，共享层写死了这条）。
+  BuildRoadRibbon(host.sink, {
+    points: [[fromX, z], [toX, z]], width, material: "DirtRoad",
+    groundAt: (x, zz) => host.OuterHeight(x, zz),
+    crown: ROAD_CROWN, skirtDrop: 0.65, step: 4, seed,
+    colliders: { tag: "embankment", thickness: 0.24 },
+    // 东端顶着护城河：中心还在岸上时路肩已悬在濠上（濠沿在瓮城处是斜的），
+    // 自动断水把这几段裙边掐掉，剩下的交给桥头引道。编辑器替身没有 WaterAt。
+    cutWhere: (x, zz) => host.WaterAt?.(x, zz) === true,
+  });
   // 车辙、脚迹与修补斑：分四段各按本段的地高摆，一段一个 baseY
   const chunks = 4;
   for (let c = 0; c < chunks; c += 1) {

@@ -110,8 +110,25 @@ git worktree add -b claude/taihang-demo-night-ops-20260725 $wt origin/master
 1. 在 worktree 内提交（提交信息用「Agent 名 + 项目名」前缀，见 Commit Message Format）。
 2. `git fetch origin master`；若 `origin/master` 已前进，先 rebase 到最新再继续。
 3. `git push origin HEAD:master` 快进推送。**禁止 force push**，禁止覆盖其他会话已推送的提交。
-4. 推送后验证线上生效（`curl -sI https://bentleyblanks.github.io/<Page>/`），再向用户报告完成。
-5. 确认本任务没有未提交内容后，`git worktree remove <path>` 清理本会话 worktree 与任务分支。
+4. **推完 master，顺手把主检出也同步到最新**（见下条）。
+5. 推送后验证线上生效（`curl -sI https://bentleyblanks.github.io/<Page>/`），再向用户报告完成。
+6. 确认本任务没有未提交内容后，`git worktree remove <path>` 清理本会话 worktree 与任务分支。
+
+### 推完 master 要把主检出也 pull 到最新
+
+**谁最后更新了 `master`，谁负责把主检出同步过去。**
+
+```powershell
+git -C C:\Users\Bentl\Documents\Program\bentleyblanks.github.io pull --ff-only origin master
+```
+
+为什么：**本地预览默认服务的就是主检出那棵树**（`scripts/Script_LocalPreview.mjs` 服务自己所在的检出）。代码推上去了、主检出还停在旧提交，用户开预览看到的就是旧版——症状是「我明明让你加了这个功能，怎么面板上没有」，而人已经在照着一份过期的界面提问了。这一条踩过一次：TAA 开关推上 master 后主检出落后四个提交，用户在预览里翻不到那一栏。
+
+守着它的规矩（**不许为了同步去动主检出的分支状态**，与上面「绝不碰主检出」一致）：
+
+- 只在主检出**当前就在 `master`、且工作区干净**时才 pull，并且只用 `--ff-only`。
+- 主检出停在别人的分支上、或有未提交改动 → **不要 checkout、不要 stash、不要强来**，如实告诉用户主检出被占着、让他自己决定。
+- 用户自己起的预览服可能服的是另一棵树（worktree 也能挂到相邻端口）；报告时说清楚你同步的是哪一棵，页面顶部那行写的才是他正在看的那棵。
 
 ### 主检出被占用时的应急路径
 

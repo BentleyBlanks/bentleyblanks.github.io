@@ -62,8 +62,12 @@ async function Swing(sprinting) {
     T.Debug.Key("ShiftLeft", !!on);
     T.Debug.Key("KeyW", !!on);
     T.StepFrames(90);              // 冲刺弹簧与体力都到稳态
+    // 挥刀**之前**的速度是这条测试的前置条件，不是结论：sprint 是按键弹簧，
+    // 人顶在墙上它照样充到 1。不单独记一笔的话，"出生点前方被院墙堵死"会
+    // 伪装成"挥刀打断了跑动"红出来 —— 2026-08-27 就白查了一轮。
+    const beforeSpeed = T.player.velocity.length();
     T.Debug.Fire();                // 左键全链：input.fire -> TryFire -> DoMelee
-    const fired = { action: T.viewmodel.action?.kind ?? null, sprint: T.player.sprint };
+    const fired = { action: T.viewmodel.action?.kind ?? null, sprint: T.player.sprint, beforeSpeed };
     const track = [];
     for (let i = 0; i < 34; i += 1) {
       T.StepFrames(1);
@@ -106,6 +110,7 @@ const checks = [
   ["站姿左键挥得出刀（基准）", stand.fired.action === "melee"],
   ["冲刺中左键挥得出刀", run.fired.action === "melee"],
   ["确实在冲刺（不是被减速吃掉的假冲刺）", run.fired.sprint > 0.95],
+  ["挥刀前就跑起来了（出生点前方是空地）", run.fired.beforeSpeed > 4.5],
   ["挥刀不打断跑动", runSpeed > 4.5],
   ["站姿这一刀大半在画面里（基准）", standIn >= 0.6],
   // 采样确定性了（见 Swing 的注释），所以阈值可以卡紧：实测两条一模一样，

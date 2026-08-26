@@ -28,6 +28,7 @@
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
+import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
@@ -807,7 +808,9 @@ function AddGrenadeBody(steel, key, x = 0, y = 0, z = -0.055) {
 }
 
 /** 木柄手榴弹：铸铁弹体 φ58×90 + 木柄 φ29×128，全长 220 mm（考据值）。 */
-function BuildGrenadeProp(materials, key) {
+function BuildGrenadeProp(materials, key, grenadeAsset = null) {
+  const imported = CloneGrenadeAsset(grenadeAsset, { firstPerson: true });
+  if (imported) return imported;
   const steel = [];
   const wood = [];
   AddGrenadeBody(steel, key);
@@ -820,9 +823,9 @@ function BuildGrenadeProp(materials, key) {
   return group;
 }
 
-function BuildGrenade(materials, weapon, key) {
+function BuildGrenade(materials, weapon, key, grenadeAsset = null) {
   const group = new THREE.Group();
-  const prop = BuildGrenadeProp(materials, key);
+  const prop = BuildGrenadeProp(materials, key, grenadeAsset);
   // 握在木柄中段，弹体朝前上方
   prop.position.set(0, 0.02, -0.02);
   prop.rotation.set(-0.35, 0, 0);
@@ -967,10 +970,12 @@ const BUILDERS = {
 // （中正式 / 汉阳造 / 三八式）、捷克式、驳壳枪都有一个会动的枪机：每打一发，
 // bolt 这个 Group 要后拉 boltTravel、从 ejectAt 抛一枚壳出去，三八式还要滑开防尘盖。
 // 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
-// 大刀 / 手榴弹没有可动件，换过去零损失。中正式 / 汉阳造 / 驳壳枪走导入的
+// 大刀没有可动件，换过去零损失。普通手榴弹改走 Script_GrenadeAsset 的 CC-BY
+// GLB（加载失败才退回 BuildGrenade 的程序化形），不能再被旧 Grenade.tzm 覆盖。
+// 中正式 / 汉阳造 / 驳壳枪走导入的
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
-  "Dadao", "Grenade",
+  "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
 ]);
 
@@ -1213,12 +1218,13 @@ export class Viewmodel {
    */
   constructor(library, {
     fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel", meshDocs = null,
-    riggedAssets = null,
+    riggedAssets = null, grenadeAsset = null,
   } = {}) {
     this.library = library;
     // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
     // 不再自己 fetch —— 同一个模型解码两次是白花的内存与开机时间）。
     this.meshDocs = meshDocs;
+    this.grenadeAsset = grenadeAsset;
     this.rigSource = "box";
     this.materials = BuildMaterials(library);
     this.fov = fov;
@@ -1348,7 +1354,7 @@ export class Viewmodel {
     this.debris = this._BuildDebrisPool(6);
 
     // --- 手榴弹（副手投弹用，平时藏着）---------------------------------------
-    this.offhandGrenade = BuildGrenadeProp(this.materials, "offhand");
+    this.offhandGrenade = BuildGrenadeProp(this.materials, "offhand", this.grenadeAsset);
     this.offhandGrenade.visible = false;
     this.handLeft.group.add(this.offhandGrenade);
     this.offhandGrenade.position.set(0, 0.01, 0.0);
@@ -1479,7 +1485,7 @@ export class Viewmodel {
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
     if (!this.rig) {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
-      this.rig = builder(this.materials, this.weapon, weaponId);
+      this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
     }
     this.rigSource = this.rig.source === "model" ? "model" : "box";
     this.swingPivot.add(this.rig.group);

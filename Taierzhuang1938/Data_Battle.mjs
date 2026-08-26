@@ -181,7 +181,12 @@ const TUNING = {
     bounds: { minX: 250, maxX: 620, minZ: -520, maxZ: 420 },
     zones: ["ZhaiGate", "Courtyard", "Temple", "Breach"],
     // 东门大街的清路中央，避开两侧门前家什；朝东正对东关门与缺口。
-    spawn: { x: 432, z: EAST_SUBURB.roadZ, ry: -Math.PI / 2 },
+    // 【2026-08-27】原来在 x=432：城防图东侧重建（Data_Tengxian 的
+    // FirstDistrictNorthEastA/B 两排）把第一区公所那两块院区一直铺到 x=434，
+    // 于是这个出生点落进了院子里 —— 人贴着院墙东面 1.8 m，开局满屏是砖，
+    // 按 W 走不出一米。和 L3 那次「站在寺院檐下」是同一类事故（见下一关注释）。
+    // 挪到院区东墙外 12 m 的东门大街上，仍在东关大街路口以西、路标圈外。
+    spawn: { x: 446, z: EAST_SUBURB.roadZ, ry: -Math.PI / 2 },
     ijaPressure: 1.5, ijaSpawn: ["east"], ijaSupport: ["launcher", "hmg", "artillery"],
     // 日军战详报：工兵逐间爆破民房打通墙体；联队炮四门在土城子西侧，
     // 重机枪沿河西岸配置。没有战车或装甲车参加滕县攻城。

@@ -42,10 +42,23 @@ const VAULT_BASE_S = 0.45;         // 方案给的位移曲线时长（矮物）
  * 4.65 m/s 配 19.6 m/s² 重力：净抬高约 0.55 m、完整滞空约 0.47 s。
  * 这个量级与 Easy Red 2 那种背着装备的步兵感一致，也低于自动翻越的 0.6 m 判据，
  * 所以按 Space 时仍然是「能翻就翻，不能翻才跳」，不会用原地跳取代院墙动作。
+ *
+ * **助跑加成**：上面那组数是**站着起跳**的数。原先起跳只写死竖直速度，水平速度原样
+ * 带走 —— 意味着跳跃对位移的净贡献是 0（跳 0.47 s 走过的距离，和不跳继续跑一模一样），
+ * 而且弧线跟速度完全无关，跑得越快这个小驼峰在画面上越不起眼，实测「跑起来跳和站着跳
+ * 看不出区别」就是这么来的。现在按助跑速度给一点竖直与水平加成：站着跳分毫不变，
+ * 冲刺跳抬高约 0.68 m、滞空约 0.53 s、空中位移从 2.45 m 到约 3.1 m。
+ * 加成仍然压在自动翻越之下的量级（0.68 m 只比 0.60 m 的翻越判据高一点，且 Space 永远
+ * 先探翻越），兔子跳照旧由冷却、落地硬直与随助跑变贵的体力挡住。
  */
 const GRAVITY_MPS2 = 19.6;
 const JUMP_SPEED_MPS = 4.65;
+const JUMP_RUN_MIN_MPS = 1.80;     // 助跑加成的起算速度：慢步以下当站着跳
+const JUMP_RUN_FULL_MPS = 5.25;    // 满加成速度：站姿冲刺（3.05 × 1.72）
+const JUMP_RUN_RISE = 0.11;        // 满助跑的竖直加成 → 抬高 0.55 → 0.68 m
+const JUMP_RUN_PUSH = 0.16;        // 满助跑的蹬地水平加成
 const JUMP_STAMINA = 0.08;
+const JUMP_RUN_STAMINA = 0.5;      // 满助跑再贵一半：0.08 → 0.12
 const JUMP_COYOTE_S = 0.10;
 const JUMP_BUFFER_S = 0.12;
 const JUMP_COOLDOWN_S = 0.24;
@@ -113,6 +126,7 @@ export class PlayerController {
     this.jump = {
       count: 0, coyote: JUMP_COYOTE_S, buffer: 0, cooldown: 0,
       airTime: 0, landSerial: 0, landImpact: 0,
+      runK: 0,                                  // 上一次起跳吃到的助跑加成（取证用）
     };
 
     // --- 下水 ---------------------------------------------------------------
@@ -242,6 +256,7 @@ export class PlayerController {
     this.jump.cooldown = 0;
     this.jump.airTime = 0;
     this.jump.landImpact = 0;
+    this.jump.runK = 0;
     this.waterDepth = 0;
   }
 
@@ -360,23 +375,44 @@ export class PlayerController {
       return false;
     }
     this.stance = "stand";
-    this.velocity.y = JUMP_SPEED_MPS;
+    // 助跑加成：0（站着/慢步）→ 1（站姿冲刺）。fastMove 之类的超速一律按满档，
+    // 不再往上叠 —— 调试速度不该顺手变成一个能上房的跳。
+    const planar = Math.hypot(this.velocity.x, this.velocity.z);
+    const runK = Clamp01((planar - JUMP_RUN_MIN_MPS) / (JUMP_RUN_FULL_MPS - JUMP_RUN_MIN_MPS));
+    this.velocity.y = JUMP_SPEED_MPS * (1 + JUMP_RUN_RISE * runK);
+    if (runK > 0 && planar > 1e-3) {
+      const push = 1 + JUMP_RUN_PUSH * runK;
+      this.velocity.x *= push;
+      this.velocity.z *= push;
+    }
+    this.jump.runK = runK;
     this.grounded = false;
     this.jump.coyote = 0;
     this.jump.buffer = 0;
     this.jump.cooldown = JUMP_COOLDOWN_S;
     this.jump.airTime = 0;
     this.jump.count += 1;
-    this.stamina = Clamp01(this.stamina - JUMP_STAMINA);
+    this.stamina = Clamp01(this.stamina - JUMP_STAMINA * (1 + JUMP_RUN_STAMINA * runK));
     this.ads = Math.min(this.ads, 0.2);             // 起跳先把枪从照门上摘下来
     this.wantAds = false;
     return true;
   }
 
-  /** 翻越途中的一帧：位移曲线走完就落地。期间禁开火、禁转身（视角只轻微下压）。 */
-  _StepVault(dt) {
+  /**
+   * 翻越途中的一帧：位移曲线走完就落地。期间禁开火、身体走写死的曲线，
+   * **但视线照转** —— 一按空格人贴着矮墙就进翻越，画面会僵住半秒；玩家那半秒
+   * 里推鼠标什么都不发生，读出来就是"起跳的时候镜头转不动"。翻的是身体不是脖子。
+   */
+  _StepVault(dt, input) {
     const v = this.vault;
     v.t += dt;
+    // 只有相机直跟这一条：自由瞄准/后坐回落都跟着 Update 一起跳过了，
+    // 翻墙那半秒本来也不该有据枪微调。
+    if (input) {
+      const sens = (input.sensitivity ?? 1) * 0.0022;
+      this.yaw += -(input.lookX || 0) * sens;
+      this.pitch = Clamp(this.pitch + -(input.lookY || 0) * sens, -1.35, 1.35);
+    }
     const k = Clamp01(v.t / v.duration);
     const arc = Math.sin(Math.PI * k);
     const from = this._vaultFrom, to = this._vaultTo;
@@ -408,7 +444,7 @@ export class PlayerController {
       return;
     }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
-    if (this.vault.active) return this._StepVault(dt);
+    if (this.vault.active) return this._StepVault(dt, input);
 
     this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
     if (this.jump.buffer > 0) {
@@ -463,7 +499,11 @@ export class PlayerController {
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * 0.72));
     const walking = Math.hypot(input.forward || 0, input.strafe || 0) > 0.05;
-    if (walking) {
+    // 腾空时同样按「相机直跟」走。原来只看 forward/strafe：原地按空格跳起来时两者
+    // 都是 0，鼠标位移就全落进那 2° 的自由瞄准锥里 —— 屏幕上就是「一跳起来镜头
+    // 转不动了」，落地才突然接上。人在半空本来也谈不上据枪微调，这一段没有存在意义。
+    const directLook = walking || !this.grounded;
+    if (directLook) {
       this.yaw += dx;
       this.pitch += dy;
       const recentre = 1 - Math.exp(-dt * 18);
@@ -491,7 +531,7 @@ export class PlayerController {
     // 归位延后 0.10 s 起、再用 0.12 s 拉满。手在动的时候不归位，
     // 于是鼠标位移 1:1 全额落在枪口方向（yaw + aimYaw）上：
     // 边界以内动的是枪、边界以外动的是视线，但**总瞄准角与鼠标永远是 1:1**。
-    const looking = walking || Math.abs(dx) + Math.abs(dy) > 1e-6;
+    const looking = directLook || Math.abs(dx) + Math.abs(dy) > 1e-6;
     this.lookIdle = looking ? 0 : this.lookIdle + dt;
     const settle = Clamp01((this.lookIdle - 0.10) / 0.12);
     if (settle > 0) {
@@ -595,7 +635,12 @@ export class PlayerController {
     if ((input.forward || 0) < 0) speed *= 0.72;
 
     const desired = wish.multiplyScalar(speed);
-    const accel = this.grounded ? 14 : 3;
+    // 空中不许**加速**到助跑之上（accel 3 只够小幅修正方向），但也不能把蹬地那一下
+    // 的动量当阻力擦掉 —— 半空里比目标速度快的时候收敛慢一档，否则 0.5 s 的滞空
+    // 会把 16% 的助跑加成磨掉近八成，加了等于没加。
+    const overRun = !this.grounded
+      && Math.hypot(this.velocity.x, this.velocity.z) > Math.hypot(desired.x, desired.z) + 0.05;
+    const accel = this.grounded ? 14 : (overRun ? 1 : 3);
     this.velocity.x += (desired.x - this.velocity.x) * Clamp01(dt * accel);
     this.velocity.z += (desired.z - this.velocity.z) * Clamp01(dt * accel);
     const wasGrounded = this.grounded;

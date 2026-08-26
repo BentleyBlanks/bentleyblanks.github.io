@@ -413,11 +413,22 @@ def SaveResult(slug: str, action: str, body: dict, job_id: str,
         Download(url, outdir / name)
         saved.append({"file": name, "url": url})
 
-    # Prompt/图片可能含创作意图，留档；Base64 太大只记长度。
-    recorded = dict(body)
-    for field in ("ImageBase64", "FileBase64", "Base64"):
-        if field in recorded:
-            recorded[field] = f"<base64 {len(recorded[field])} chars>"
+    # Prompt/图片可能含创作意图，留档；Base64 太大只记长度。多视图的 Base64
+    # 藏在列表和嵌套字典里，因此递归清理，避免 Meta.json 膨胀到几十 MB。
+    def RedactBase64(node):
+        if isinstance(node, dict):
+            return {
+                key: (f"<base64 {len(value)} chars>"
+                      if key in ("ImageBase64", "ViewImageBase64", "FileBase64", "Base64")
+                      and isinstance(value, str)
+                      else RedactBase64(value))
+                for key, value in node.items()
+            }
+        if isinstance(node, list):
+            return [RedactBase64(value) for value in node]
+        return node
+
+    recorded = RedactBase64(body)
 
     meta = {
         "source": "腾讯混元生3D (ai3d)",
@@ -478,6 +489,31 @@ def ReadImageBase64(path: Path) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+def ReadMultiViewFiles(items: list[str]) -> list[dict]:
+    """把 ``left=path.png`` / ``back=path.png`` 转成官方多视图结构。"""
+    allowedViews = {"left", "right", "back", "top", "bottom", "left_front", "right_front"}
+    views = []
+    seenViews = set()
+    for item in items:
+        if "=" not in item:
+            raise SystemExit(f"多视角参数必须是 view=path：{item}")
+        viewType, fileName = item.split("=", 1)
+        viewType = viewType.strip().lower()
+        if viewType not in allowedViews:
+            raise SystemExit(f"不支持的多视角 {viewType}；可选：{', '.join(sorted(allowedViews))}")
+        if viewType in seenViews:
+            raise SystemExit(f"多视角重复：{viewType}")
+        imagePath = Path(fileName)
+        if not imagePath.is_file():
+            raise SystemExit(f"多视角图片不存在：{imagePath}")
+        views.append({
+            "ViewType": viewType,
+            "ViewImageBase64": ReadImageBase64(imagePath),
+        })
+        seenViews.add(viewType)
+    return views
+
+
 def CmdCheck(args) -> None:
     """不花积分的连通性自检：故意打一个必然被参数校验拦下的请求。
 
@@ -528,6 +564,8 @@ def CmdGen(args) -> None:
 
     if args.multi_view:
         body["MultiViewImages"] = json.loads(args.multi_view)
+    elif args.multiViewFiles:
+        body["MultiViewImages"] = ReadMultiViewFiles(args.multiViewFiles)
     if args.pbr:
         body["EnablePBR"] = True
     if args.geometry:
@@ -634,7 +672,12 @@ def BuildParser() -> argparse.ArgumentParser:
     p_gen.add_argument("--prompt", help="文本描述，≤1024 字符")
     p_gen.add_argument("--image", help="本地图片，走 Base64（≤6MB）")
     p_gen.add_argument("--image-url", help="公网图片 URL（≤8MB）")
-    p_gen.add_argument("--multi-view", help='多视角 JSON，如 [{"ViewType":"back","ViewImageUrl":"..."}]（+10 积分）')
+    multiViewGroup = p_gen.add_mutually_exclusive_group()
+    multiViewGroup.add_argument("--multi-view", help='多视角 JSON，如 [{"ViewType":"back","ViewImageUrl":"..."}]（+10 积分）')
+    multiViewGroup.add_argument(
+        "--multi-view-files", dest="multiViewFiles", nargs="+",
+        help="本地多视角图片，如 left=side.png back=back.png（+10 积分）",
+    )
     p_gen.add_argument("--pbr", action="store_true", help="EnablePBR（+10 积分）")
     p_gen.add_argument("--geometry", action="store_true", help="白模，15 积分")
     p_gen.add_argument("--generate-type", choices=["Normal", "LowPoly", "Geometry", "Sketch"])

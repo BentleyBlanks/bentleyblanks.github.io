@@ -113,8 +113,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 一个可叠加渲染调试 + 十个编辑器 + 一个「全部关掉」
-Check("面板列出设置、渲染调试与十个编辑器入口", afterGear.entries === 15, `按钮数=${afterGear.entries}`);
+// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十一个编辑器（含道路样条）
+// + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
+Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 17, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -408,6 +409,10 @@ Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
   taaToggle.found && taaToggle.firstFrameHistory === false
   && taaToggle.on.settled === true && taaToggle.saved === true,
   `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
+// 画质面板整版留一张图：断言只能证明「DOM 里有这个按钮」，证明不了它在版面上
+// 排到哪儿、黄字有没有把面板撑得读不下去。这一栏就是因为「设置里翻不到」才补的，
+// 留张图下一轮直接看。
+await page.screenshot({ path: path.join(projectDir, "_shots", "editor_graphics_panel.png") });
 
 await page.click('[data-editor="sound"]');
 await Step(6);

@@ -99,25 +99,40 @@ const result = await page.evaluate(async () => {
   // 为什么要量像素而不是量 visible：这条链上"visible = true"曾经全绿了很久，
   // 而玩家在画面上一个刺刀都看不到 —— 刀顺着枪管指出去，整条藏在枪管剪影后面
   // （实测腰射 1 px、开镜 0、冲刺 0、劈刺 0）。口径与取证见 docs/Data_Bayonet.md
-  // 「上了刺刀就换持枪法」。量法：把刀件涂成纯红、depthTest 照常（枪该挡还挡），
-  // 数屏幕上剩多少红像素，就是刀真正读得出的面积。
+  // 「上了刺刀就换持枪法」。量法：把刀件涂成纯色、depthTest 照常（枪该挡还挡），
+  // 数屏幕上刀真正占住的面积。
+  //
+  // 【2026-08-27 换量法】原来是绝对色键：涂纯红，数 r>140 且 g<70 且 b<70 的像素。
+  // 那个阈值是**照着当时的背景标的** —— 二关出生点那阵子正贴着一堵砖墙，
+  // 画面全暗，纯红出画就是纯红。出生点挪回街上（Data_Battle 的 L2 spawn，同日）
+  // 之后背景是亮天与土路，泛光往刀上糊了一层，最红的像素变成 (171,74,89)：
+  // 刀清清楚楚在画面里，色键却一个都不认，报 0 px。**色键量的是调色，不是刀。**
+  // 现在改成两拍作差：同一姿态先涂绿拍一张、再涂红拍一张，数"红绿优势翻过来"
+  // 的像素。背景两拍完全一样，作差自动消掉；曝光、泛光、色调、TAA 一并消掉。
   {
     const THREE = await import("./vendor/three/build/three.module.js");
     const src = document.getElementById("view");
     const bay = T.viewmodel.rig.parts.bayonet;
     const swapped = [];
     bay.traverse((n) => { if (n.isMesh) swapped.push([n, n.material]); });
-    const red = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    for (const [n] of swapped) n.material = red;
-    T.StepFrames(6);
     const c = document.createElement("canvas");
     c.width = src.width; c.height = src.height;
     const ctx = c.getContext("2d");
-    ctx.drawImage(src, 0, 0);
-    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    // 红优势 = r − g。刀占住的像素两拍之间会从"绿压红"翻成"红压绿"，
+    // 摆幅接近满量程；背景像素两拍一模一样，差值恒为 0。
+    const Shot = (hex) => {
+      const paint = new THREE.MeshBasicMaterial({ color: hex });
+      for (const [n] of swapped) n.material = paint;
+      T.StepFrames(6);                     // TAA 收敛（相机与姿态都不动）
+      ctx.drawImage(src, 0, 0);
+      return ctx.getImageData(0, 0, c.width, c.height).data;
+    };
+    const green = Shot(0x00ff00);
+    const red = Shot(0xff0000);
     let seen = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 140 && data[i + 1] < 70 && data[i + 2] < 70) seen += 1;
+    for (let i = 0; i < red.length; i += 4) {
+      const swing = (red[i] - red[i + 1]) - (green[i] - green[i + 1]);
+      if (swing > 60) seen += 1;
     }
     for (const [n, m] of swapped) n.material = m;
     T.StepFrames(2);
