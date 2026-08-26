@@ -150,6 +150,11 @@
 .mnLvMark.done { color: var(--ours, #9dc0e4); }
 .mnProloguePreview { border-bottom: 1px solid rgba(224, 176, 98, 0.22); }
 .mnProloguePreview .mnLvMark { color: var(--warn, #e0b062); }
+/* 沙盒（玩法测试靶场）：与七关同一张列表，但一条分隔线划开 ——
+   它不属于正片，不该看起来像第八关。 */
+.mnSandboxLevel { margin-top: 6px; border-top: 1px solid rgba(224, 176, 98, 0.22); }
+.mnSandboxLevel .mnLvNo { color: rgba(230, 223, 205, 0.42); }
+.mnSandboxLevel .mnLvMark { color: var(--warn, #e0b062); }
 
 .mnBrief {
   flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 24px 26px;
