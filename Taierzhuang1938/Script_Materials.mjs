@@ -14,6 +14,13 @@ import {
   BindDestructionUniforms, DestructionShaderGlsl,
 } from "./Script_Destruction.mjs";
 
+/**
+ * 1×1 透明 GIF。给一张挂死的 `<img>` 换上它 = 当场放弃原来那条连接，
+ * 而且不产生新请求。**别改成 `img.src = ""`** —— 空串按 HTML 规范会解析成
+ * 页面自己的 URL，等于顺手再下一遍 index.html。
+ */
+const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 /** 把一张烘焙结果的某个通道包成 DataTexture。 */
 function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } = {}) {
   const texture = new THREE.DataTexture(bytes, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
@@ -314,26 +321,71 @@ export class MaterialLibrary {
     }
   }
 
+  /** 一张下好的图 → 一张按本库约定配好的贴图。外部图三条路共用。 */
+  _WrapTexture(image, srgb) {
+    const texture = new THREE.Texture(image);
+    texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = this.anisotropy;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  /**
+   * 下一张外部贴图。**必须带超时。**
+   *
+   * `<img>` 的加载没有超时这回事：连接一旦挂住（不是 404、不是 reset，就是
+   * 单纯不回数据），它既不发 load 也不发 error，那个 Promise 永远悬着。
+   * 开机时这一步要一口气下 72 张图 / 35 MB，只要其中**一张**挂住，Boot 里的
+   * Promise.all 就再也不 settle —— 加载画面停在"加载 PBR 材质……"、进度条钉在
+   * 24%，而展示台在 worker 里照转不误，整个页面看上去还活着。用 playwright
+   * 把任意一张 hold 住，百分之百复现。
+   *
+   * 超时之后把 src 换成 BLANK_PIXEL，让浏览器松开那条连接：同域只有六个并发
+   * 名额，后面建关卡还要用。走 ImageLoader 而不是 TextureLoader 就是为了拿到
+   * 这个 img 元素 —— TextureLoader 只在成功回调里才把 image 挂到 texture 上。
+   */
+  _LoadExternalImage(url, srgb, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      let image = null;
+      let settled = false;
+      const Settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(value);
+      };
+      const timer = setTimeout(() => {
+        if (image) image.src = BLANK_PIXEL;
+        Settle(reject, new Error(`${url} 超时 ${timeoutMs} ms`));
+      }, timeoutMs);
+      image = new THREE.ImageLoader().load(
+        url,
+        (loaded) => Settle(resolve, this._WrapTexture(loaded, srgb)),
+        undefined,
+        () => Settle(reject, new Error(`${url} 读不到`)),
+      );
+    });
+  }
+
   /**
    * Replace one procedural recipe with authored PBR images.  Weapon materials use
    * this after the cheap procedural fallback has been baked, so a missing image
    * never blocks boot and Pages can still run from a partially warmed cache.
+   *
+   * 三张图有一张读不到 / 超时就整套不换，抛给调用方 —— 只换一半（比如有 albedo
+   * 没 normal）比全部退回程序化更难看。调用方按套接住，别让一套拖垮其它套。
    */
-  async LoadExternalSet(name, { albedo, normal, orm }) {
-    const loader = new THREE.TextureLoader();
-    const Load = async (url, srgb) => {
-      const texture = await loader.loadAsync(url);
-      texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.generateMipmaps = true;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.anisotropy = this.anisotropy;
-      texture.needsUpdate = true;
-      return texture;
-    };
-    const loaded = await Promise.all([Load(albedo, true), Load(normal, false), Load(orm, false)]);
+  async LoadExternalSet(name, { albedo, normal, orm }, { timeoutMs = 30000 } = {}) {
+    const loaded = await Promise.all([
+      this._LoadExternalImage(albedo, true, timeoutMs),
+      this._LoadExternalImage(normal, false, timeoutMs),
+      this._LoadExternalImage(orm, false, timeoutMs),
+    ]);
     this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: loaded[2] });
     // LoadExternalSet runs before actors are built. Clear anyway so editor hot reloads
     // cannot retain a material that still points at the procedural fallback.
@@ -346,19 +398,10 @@ export class MaterialLibrary {
    * normal + ORM。这样车厢可以有专属的铆钉钢板／防滑钢板，同时不把
    * PBR 降级成一张无粗糙度、无金属度的彩色贴图。
    */
-  async LoadExternalAlbedo(name, fallbackName, albedo) {
+  async LoadExternalAlbedo(name, fallbackName, albedo, { timeoutMs = 30000 } = {}) {
     const fallback = this.baked.get(fallbackName);
     if (!fallback) throw new Error(`材质未烘焙：${fallbackName}`);
-    const loader = new THREE.TextureLoader();
-    const texture = await loader.loadAsync(albedo);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.generateMipmaps = true;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = this.anisotropy;
-    texture.needsUpdate = true;
+    const texture = await this._LoadExternalImage(albedo, true, timeoutMs);
     this.baked.set(name, { albedo: texture, normal: fallback.normal, orm: fallback.orm });
     this.materials.clear();
     return name;

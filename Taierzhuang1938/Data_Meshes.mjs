@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "13";
+const MESH_REV = "14";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -142,9 +142,9 @@ export const MESHES = {
   },
   ServicePistol: {
     file: "ServicePistol.tzm.json", category: "weapon",
-    triangles: 5728, meshBlocks: 1, nodes: 7, joints: 0,
+    triangles: 4679, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["steel"], mounts: WEAPON_MOUNTS,
-    span: [0.04308, 0.12836, 0.23743], lengthM: 0.222,
+    span: [0.03186, 0.12953, 0.22201], lengthM: 0.222,
     draws: { high: 1, medium: 1, low: 1 },
     note: "外购九毫米军用手枪。几何来自 Poly Haven CC0 Service Pistol；"
       + "使用闭锁状态 A，移除展示用弹匣、子弹和空仓挂机状态 B。",
@@ -198,9 +198,9 @@ export const MESHES = {
   },
   BayonetType38: {
     file: "BayonetType38.tzm.json", category: "weapon",
-    triangles: 1344, meshBlocks: 1, nodes: 4, joints: 0,
+    triangles: 1338, meshBlocks: 1, nodes: 4, joints: 0,
     materials: ["steel"], mounts: ["socket", "tip"],
-    span: [0.01029, 0.05254, 0.514], lengthM: 0.514, bladeM: 0.400,
+    span: [0.01029, 0.05253, 0.514], lengthM: 0.514, bladeM: 0.400,
     draws: { high: 1, medium: 1, low: 1 },
     note: "三十年式刺刀（三八式）。CC-BY Ps1 Arisaka T30 Bayonet（Sketchfab / "
       + "Swordmanck）：钩形护手与枪口环自带；丢掉刀鞘与腰带。全钢（后期批次样式），"

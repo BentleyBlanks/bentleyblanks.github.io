@@ -31,7 +31,7 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 | 汉阳造 `HanYang` | `Source/Model_Gewehr88/scene.gltf` | [TastyTony](https://sketchfab.com/TastyTony) | CC-BY-4.0 | 汉阳八八式的母型就是 Gewehr 88：**整长套筒、曼利夏漏夹弹仓与露出式通条**都是模型自带的，不再用 Kar98k 拉长加假套筒。全长按史实 1.250 m。 |
 | 三八式 `Type38` | `Source/Model_Type38Arisaka/scene.gltf` | [Snijboer](https://sketchfab.com/Snijboer) | CC-BY-4.0 | 三八式：防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条。全长按史实 1.276 m。 |
 | 驳壳枪 `Mauser96` | `Source/Model_MauserC96.glb` | [Plewr](https://plewr.itch.io/mauser-c96-low-poly) | CC0 | 毛瑟 C96。丢掉名为 Boom 的枪口焰网格。 |
-| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，压到 5728 三角。原驳壳枪仍保留给既有关卡。 |
+| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，压到 4679 三角。原驳壳枪仍保留给既有关卡。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），所以 `_Collect` 里那个写死的绝对焊接距离只在它身上是真的焊 —— 见 ImportWeapons._WeldDistance。 |
 | 大刀第二式样 `DadaoAlt` | `Source/Model_SketchfabDadao/scene.gltf` | [Trector](https://sketchfab.com/trector) | CC-BY-4.0 | 大刀的**外观变体**，没有独立武器数值。圆盘吞口、束节木柄、刃线较直的一路，与主式样的环首宽刃刀刻意不同型。许可原文在 `Source/Model_SketchfabDadao/license.txt`。 |
 
 许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，

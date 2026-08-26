@@ -417,139 +417,150 @@ async function Boot() {
     await nextFrame();
   }
 
+  /**
+   * 外部 PBR 贴图。二十五套、七十二张图、三十五 MB —— 开机路径上最大的一块网络。
+   *
+   * **不许再写成一个大 Promise.all。** 图片元素的加载没有超时这回事：一条连接
+   * 挂住了就既不 load 也不 error，那张图的 Promise 永远悬着，整个 Promise.all
+   * 跟着永远不 settle —— 加载画面停在「加载 PBR 材质……」、进度条钉在四分之一，
+   * 而展示台在 worker 里照转，页面看上去完全正常。（playwright 里把任意一张
+   * hold 住，一次就复现。）旧写法还有第二个毛病：一个 try 罩着全部二十五套，
+   * 任何一张图 404 都会让**其余二十四套**一起退回程序化 PBR。
+   *
+   * 现在改成：逐套下、逐套接错、每张图带超时（Script_Materials._LoadExternalImage），
+   * 六条道并行 —— 同域本来也只有六个 HTTP/1.1 并发名额，一口气推七十二张只是
+   * 让它们互相排队，还把三十五 MB 的解码压在同一瞬间。步骤文字带上 N/25，
+   * 卡住的时候一眼能看出停在第几套。
+   */
+  const PBR_SETS = [
+    { name: "Steel",
+      albedo: "./Texture/Texture_WeaponSteelV2Base.webp?v=1",
+      normal: "./Texture/Texture_WeaponSteelV2Normal.webp?v=1",
+      orm: "./Texture/Texture_WeaponSteelV2Orm.webp?v=1" },
+    { name: "WoodStock",
+      albedo: "./Texture/Texture_WeaponWoodV2Base.webp?v=1",
+      normal: "./Texture/Texture_WeaponWoodV2Normal.webp?v=1",
+      orm: "./Texture/Texture_WeaponWoodV2Orm.webp?v=1" },
+    { name: "TreeBark",
+      albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",
+      normal: "./Texture/Texture_TreeBarkNormal.webp?v=1",
+      orm: "./Texture/Texture_TreeBarkOrm.webp?v=1" },
+    { name: "BrickWall",
+      albedo: "./Texture/Texture_BrickWallBase.webp?v=1",
+      normal: "./Texture/Texture_BrickWallNormal.webp?v=1",
+      orm: "./Texture/Texture_BrickWallOrm.webp?v=1" },
+    { name: "CityWallBrickPbr",
+      albedo: "./Texture/Texture_CityWallBrickBase.webp?v=1",
+      normal: "./Texture/Texture_CityWallBrickNormal.webp?v=1",
+      orm: "./Texture/Texture_CityWallBrickOrm.webp?v=1" },
+    { name: "CityWallCorePbr",
+      albedo: "./Texture/Texture_CityWallCoreBase.webp?v=1",
+      normal: "./Texture/Texture_CityWallCoreNormal.webp?v=1",
+      orm: "./Texture/Texture_CityWallCoreOrm.webp?v=1" },
+    { name: "CityWallStonePbr",
+      albedo: "./Texture/Texture_CityWallStoneBase.webp?v=1",
+      normal: "./Texture/Texture_CityWallStoneNormal.webp?v=1",
+      orm: "./Texture/Texture_CityWallStoneOrm.webp?v=1" },
+    { name: "Ground",
+      albedo: "./Texture/Texture_GroundBase.webp?v=1",
+      normal: "./Texture/Texture_GroundNormal.webp?v=1",
+      orm: "./Texture/Texture_GroundOrm.webp?v=1" },
+    { name: "GroundRubble",
+      albedo: "./Texture/Texture_GroundBase.webp?v=1",
+      normal: "./Texture/Texture_GroundNormal.webp?v=1",
+      orm: "./Texture/Texture_GroundOrm.webp?v=1" },
+    { name: "RoofTile",
+      albedo: "./Texture/Texture_RoofTileBase.webp?v=1",
+      normal: "./Texture/Texture_RoofTileNormal.webp?v=1",
+      orm: "./Texture/Texture_RoofTileOrm.webp?v=1" },
+    { name: "GateBrick",
+      albedo: "./Texture/Texture_GateBrickBase.webp?v=gate20260826",
+      normal: "./Texture/Texture_GateBrickNormal.webp?v=gate20260826",
+      orm: "./Texture/Texture_GateBrickOrm.webp?v=gate20260826" },
+    { name: "GatePaintedWood",
+      albedo: "./Texture/Texture_GatePaintedWoodBase.webp?v=gate20260826",
+      normal: "./Texture/Texture_GatePaintedWoodNormal.webp?v=gate20260826",
+      orm: "./Texture/Texture_GatePaintedWoodOrm.webp?v=gate20260826" },
+    { name: "GateRoofTile",
+      albedo: "./Texture/Texture_GateRoofTileBase.webp?v=gate20260826",
+      normal: "./Texture/Texture_GateRoofTileNormal.webp?v=gate20260826",
+      orm: "./Texture/Texture_GateRoofTileOrm.webp?v=gate20260826" },
+    { name: "Sandbag",
+      albedo: "./Texture/Texture_SandbagBase.webp?v=regen20260824",
+      normal: "./Texture/Texture_SandbagNormal.webp?v=regen20260824",
+      orm: "./Texture/Texture_SandbagOrm.webp?v=regen20260824" },
+    { name: "WattleFence",
+      albedo: "./Texture/Texture_WattleFenceBase.webp?v=regen20260824",
+      normal: "./Texture/Texture_WattleFenceNormal.webp?v=regen20260824",
+      orm: "./Texture/Texture_WattleFenceOrm.webp?v=regen20260824" },
+    { name: "BrickWallSooty",
+      albedo: "./Texture/Texture_BrickWallSootyBase.webp?v=1",
+      normal: "./Texture/Texture_BrickWallSootyNormal.webp?v=1",
+      orm: "./Texture/Texture_BrickWallSootyOrm.webp?v=1" },
+    { name: "Adobe",
+      albedo: "./Texture/Texture_AdobeBase.webp?v=1",
+      normal: "./Texture/Texture_AdobeNormal.webp?v=1",
+      orm: "./Texture/Texture_AdobeOrm.webp?v=1" },
+    { name: "Stone",
+      albedo: "./Texture/Texture_StoneBase.webp?v=1",
+      normal: "./Texture/Texture_StoneNormal.webp?v=1",
+      orm: "./Texture/Texture_StoneOrm.webp?v=1" },
+    { name: "StationBrick",
+      albedo: "./Texture/Texture_StationBrickBase.webp?v=e2",
+      normal: "./Texture/Texture_StationBrickNormal.webp?v=e2",
+      orm: "./Texture/Texture_StationBrickOrm.webp?v=e2" },
+    { name: "PrisonBrick",
+      albedo: "./Texture/Texture_PrisonBrickBase.webp?v=e2",
+      normal: "./Texture/Texture_PrisonBrickNormal.webp?v=e2",
+      orm: "./Texture/Texture_PrisonBrickOrm.webp?v=e2" },
+    { name: "TemplePlaster",
+      albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
+      normal: "./Texture/Texture_TemplePlasterNormal.webp?v=1",
+      orm: "./Texture/Texture_TemplePlasterOrm.webp?v=1" },
+    { name: "CarriageBenchWood",
+      albedo: "./Texture/Texture_CarriageBenchWoodBase.png?v=2",
+      normal: "./Texture/Texture_CarriageBenchWoodNormal.png?v=2",
+      orm: "./Texture/Texture_CarriageBenchWoodOrm.png?v=2" },
+    { name: "CarriageWallSteel",
+      albedo: "./Texture/Texture_CarriageWallSteelBase.png?v=2",
+      normal: "./Texture/Texture_CarriageWallSteelNormal.png?v=2",
+      orm: "./Texture/Texture_CarriageWallSteelOrm.png?v=2" },
+    { name: "CarriageFloorSteel",
+      albedo: "./Texture/Texture_CarriageFloorSteelBase.png?v=2",
+      normal: "./Texture/Texture_CarriageFloorSteelNormal.png?v=2",
+      orm: "./Texture/Texture_CarriageFloorSteelOrm.png?v=2" },
+    { name: "CarriageCeilingSteel",
+      albedo: "./Texture/Texture_CarriageCeilingSteelBase.png?v=2",
+      normal: "./Texture/Texture_CarriageCeilingSteelNormal.png?v=2",
+      orm: "./Texture/Texture_CarriageCeilingSteelOrm.png?v=2" },
+  ];
+  const PBR_LANES = 6;
+
   setStep("加载 PBR 材质……", 0.242);
-  try {
-    await Promise.all([
-      library.LoadExternalSet("Steel", {
-        albedo: "./Texture/Texture_WeaponSteelV2Base.webp?v=1",
-        normal: "./Texture/Texture_WeaponSteelV2Normal.webp?v=1",
-        orm: "./Texture/Texture_WeaponSteelV2Orm.webp?v=1",
-      }),
-      library.LoadExternalSet("WoodStock", {
-        albedo: "./Texture/Texture_WeaponWoodV2Base.webp?v=1",
-        normal: "./Texture/Texture_WeaponWoodV2Normal.webp?v=1",
-        orm: "./Texture/Texture_WeaponWoodV2Orm.webp?v=1",
-      }),
-      library.LoadExternalSet("TreeBark", {
-        albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",
-        normal: "./Texture/Texture_TreeBarkNormal.webp?v=1",
-        orm: "./Texture/Texture_TreeBarkOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("BrickWall", {
-        albedo: "./Texture/Texture_BrickWallBase.webp?v=1",
-        normal: "./Texture/Texture_BrickWallNormal.webp?v=1",
-        orm: "./Texture/Texture_BrickWallOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("CityWallBrickPbr", {
-        albedo: "./Texture/Texture_CityWallBrickBase.webp?v=1",
-        normal: "./Texture/Texture_CityWallBrickNormal.webp?v=1",
-        orm: "./Texture/Texture_CityWallBrickOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("CityWallCorePbr", {
-        albedo: "./Texture/Texture_CityWallCoreBase.webp?v=1",
-        normal: "./Texture/Texture_CityWallCoreNormal.webp?v=1",
-        orm: "./Texture/Texture_CityWallCoreOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("CityWallStonePbr", {
-        albedo: "./Texture/Texture_CityWallStoneBase.webp?v=1",
-        normal: "./Texture/Texture_CityWallStoneNormal.webp?v=1",
-        orm: "./Texture/Texture_CityWallStoneOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("Ground", {
-        albedo: "./Texture/Texture_GroundBase.webp?v=1",
-        normal: "./Texture/Texture_GroundNormal.webp?v=1",
-        orm: "./Texture/Texture_GroundOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("GroundRubble", {
-        albedo: "./Texture/Texture_GroundBase.webp?v=1",
-        normal: "./Texture/Texture_GroundNormal.webp?v=1",
-        orm: "./Texture/Texture_GroundOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("RoofTile", {
-        albedo: "./Texture/Texture_RoofTileBase.webp?v=1",
-        normal: "./Texture/Texture_RoofTileNormal.webp?v=1",
-        orm: "./Texture/Texture_RoofTileOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("GateBrick", {
-        albedo: "./Texture/Texture_GateBrickBase.webp?v=gate20260826",
-        normal: "./Texture/Texture_GateBrickNormal.webp?v=gate20260826",
-        orm: "./Texture/Texture_GateBrickOrm.webp?v=gate20260826",
-      }),
-      library.LoadExternalSet("GatePaintedWood", {
-        albedo: "./Texture/Texture_GatePaintedWoodBase.webp?v=gate20260826",
-        normal: "./Texture/Texture_GatePaintedWoodNormal.webp?v=gate20260826",
-        orm: "./Texture/Texture_GatePaintedWoodOrm.webp?v=gate20260826",
-      }),
-      library.LoadExternalSet("GateRoofTile", {
-        albedo: "./Texture/Texture_GateRoofTileBase.webp?v=gate20260826",
-        normal: "./Texture/Texture_GateRoofTileNormal.webp?v=gate20260826",
-        orm: "./Texture/Texture_GateRoofTileOrm.webp?v=gate20260826",
-      }),
-      library.LoadExternalSet("Sandbag", {
-        albedo: "./Texture/Texture_SandbagBase.webp?v=regen20260824",
-        normal: "./Texture/Texture_SandbagNormal.webp?v=regen20260824",
-        orm: "./Texture/Texture_SandbagOrm.webp?v=regen20260824",
-      }),
-      library.LoadExternalSet("WattleFence", {
-        albedo: "./Texture/Texture_WattleFenceBase.webp?v=regen20260824",
-        normal: "./Texture/Texture_WattleFenceNormal.webp?v=regen20260824",
-        orm: "./Texture/Texture_WattleFenceOrm.webp?v=regen20260824",
-      }),
-      library.LoadExternalSet("BrickWallSooty", {
-        albedo: "./Texture/Texture_BrickWallSootyBase.webp?v=1",
-        normal: "./Texture/Texture_BrickWallSootyNormal.webp?v=1",
-        orm: "./Texture/Texture_BrickWallSootyOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("Adobe", {
-        albedo: "./Texture/Texture_AdobeBase.webp?v=1",
-        normal: "./Texture/Texture_AdobeNormal.webp?v=1",
-        orm: "./Texture/Texture_AdobeOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("Stone", {
-        albedo: "./Texture/Texture_StoneBase.webp?v=1",
-        normal: "./Texture/Texture_StoneNormal.webp?v=1",
-        orm: "./Texture/Texture_StoneOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("StationBrick", {
-        albedo: "./Texture/Texture_StationBrickBase.webp?v=e2",
-        normal: "./Texture/Texture_StationBrickNormal.webp?v=e2",
-        orm: "./Texture/Texture_StationBrickOrm.webp?v=e2",
-      }),
-      library.LoadExternalSet("PrisonBrick", {
-        albedo: "./Texture/Texture_PrisonBrickBase.webp?v=e2",
-        normal: "./Texture/Texture_PrisonBrickNormal.webp?v=e2",
-        orm: "./Texture/Texture_PrisonBrickOrm.webp?v=e2",
-      }),
-      library.LoadExternalSet("TemplePlaster", {
-        albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
-        normal: "./Texture/Texture_TemplePlasterNormal.webp?v=1",
-        orm: "./Texture/Texture_TemplePlasterOrm.webp?v=1",
-      }),
-      library.LoadExternalSet("CarriageBenchWood", {
-        albedo: "./Texture/Texture_CarriageBenchWoodBase.png?v=2",
-        normal: "./Texture/Texture_CarriageBenchWoodNormal.png?v=2",
-        orm: "./Texture/Texture_CarriageBenchWoodOrm.png?v=2",
-      }),
-    ]);
-    await Promise.all([
-      library.LoadExternalSet("CarriageWallSteel", {
-        albedo: "./Texture/Texture_CarriageWallSteelBase.png?v=2",
-        normal: "./Texture/Texture_CarriageWallSteelNormal.png?v=2",
-        orm: "./Texture/Texture_CarriageWallSteelOrm.png?v=2",
-      }),
-      library.LoadExternalSet("CarriageFloorSteel", {
-        albedo: "./Texture/Texture_CarriageFloorSteelBase.png?v=2",
-        normal: "./Texture/Texture_CarriageFloorSteelNormal.png?v=2",
-        orm: "./Texture/Texture_CarriageFloorSteelOrm.png?v=2",
-      }),
-      library.LoadExternalSet("CarriageCeilingSteel", {
-        albedo: "./Texture/Texture_CarriageCeilingSteelBase.png?v=2",
-        normal: "./Texture/Texture_CarriageCeilingSteelNormal.png?v=2",
-        orm: "./Texture/Texture_CarriageCeilingSteelOrm.png?v=2",
-      }),
-    ]);
-  } catch (error) {
-    console.warn(`[Main] 外部 PBR 贴图加载失败，继续用程序化 PBR：${String(error).slice(0, 180)}`);
+  const pbrQueue = PBR_SETS.slice();
+  const pbrFailed = [];
+  let pbrDone = 0;
+  const RunPbrLane = async () => {
+    for (;;) {
+      const set = pbrQueue.shift();
+      if (!set) return;
+      try {
+        await library.LoadExternalSet(set.name, set);
+      } catch (error) {
+        // 这一套退回程序化 PBR，别的套不受影响。
+        pbrFailed.push(set.name);
+        console.warn(`[Main] 外部 PBR「${set.name}」没读到，退回程序化：`
+          + String(error).slice(0, 160));
+      }
+      pbrDone += 1;
+      setStep(`加载 PBR 材质 ${pbrDone}/${PBR_SETS.length}`,
+        0.242 + 0.003 * (pbrDone / PBR_SETS.length));
+    }
+  };
+  await Promise.all(Array.from({ length: PBR_LANES }, RunPbrLane));
+  if (pbrFailed.length) {
+    console.warn(`[Main] 共 ${pbrFailed.length}/${PBR_SETS.length} 套外部 PBR 走了程序化退路：`
+      + pbrFailed.join("、"));
   }
 
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——

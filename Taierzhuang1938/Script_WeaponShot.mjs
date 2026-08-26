@@ -41,6 +41,9 @@ const WEAPONS = [
   { id: "Type38", len: 1.276 },
   { id: "Zb26", len: 1.165 },
   { id: "Mauser96", len: 0.288, closeAt: -0.03 },
+  // 外购九毫米。**这一支曾经漏在名单外**，于是它在加载画面上碎成一堆尖片、
+  // 枪口挂点长在握把底下，谁都没看见 —— 名单漏一把，等于那把枪没人验收。
+  { id: "ServicePistol", len: 0.222, closeAt: -0.02 },
   { id: "Grenade", len: 0.22, upright: true },
   { id: "Dadao", len: 0.90, upright: true },
   // 大刀的第二式样。它没有自己的 Data_Weapons 条目（只是外观变体），

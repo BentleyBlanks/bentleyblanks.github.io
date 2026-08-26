@@ -187,6 +187,11 @@ SOURCES = {
                  "service_pistol_magazine_loaded", "service_pistol_magazine_empty",
                  "service_pistol_bullet"),
         "noDetails": True,
+        # 不倒角。这支源模 7556 三角、预算 6000，本来就要减面；`_BevelForFirstPerson`
+        # 会先把它涨到两万面，逼得减面比例掉到 0.28 —— 倒角出来的那圈高光当场
+        # 被压成碎片，还顺手在枪口前戳出 16 mm 的尖刺。Poly Haven 这一支的
+        # 硬表面转折自带真倒角，不需要再补一遍。
+        "noBevel": True,
         "note": "CC0 Service Pistol（Poly Haven）。保留闭锁状态 A 的枪身、套筒、"
                 "击锤与扳机，移除展示用弹匣、子弹及空仓挂机状态 B；全长 0.222 m。",
     },
@@ -319,6 +324,25 @@ def _SplitByColor(part, image):
     return steel, wood
 
 
+def _WeldDistance(diagonal):
+    """收料时的焊接距离。**按模型自己的尺度取，不许写死一个绝对值。**
+
+    源模的单位五花八门 —— 三八式进来是 4747 单位长、大刀第二式样 2100、大刀 5.07、
+    驳壳枪 6.75、汉阳造 3.02；真按米作者化的只有 Poly Haven 那两支（中正式 1.25、
+    手枪 0.22）与三十年式刺刀（0.54）。统一缩放到史实全长是 `_Place` 的事，
+    发生在这一步之后。所以同一个 1.5 mm 对四千单位长的模型等于「一点都不焊」，
+    对 0.222 m 的手枪却是把 8224 个顶点焊成 2008 个：套筒、击锤、扳机、准星
+    全糊进机匣，后面的倒角再把这坨糊涂几何炸成两万面、减面又把它压回六千 ——
+    加载画面上那把认不出来的枪就是这么来的。
+
+    取对角线的 0.15%（一米长的枪 = 1.5 mm，与历史值一致）。保留 1.5 的绝对上限，
+    是为了让单位巨大的那几支一字节不变：它们今天拿到的就是「不焊」。真受影响的
+    只有两支米制的小件 —— 手枪（这次要修的）与三十年式刺刀（收料面数不变，
+    只多留下四个原本被并掉的接缝顶点；倒角跟着改了拓扑，成品 1344 → 1338 三角）。
+    """
+    return min(0.0015, max(1e-6, diagonal) * 0.0015)
+
+
 def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False):
     """把场景里的网格按 steel/wood 收成两个 bmesh。跳过 skip 里的对象名。"""
     skip = {s.lower() for s in skip}
@@ -371,11 +395,14 @@ def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_spl
     for material, parts in buckets.items():
         if not parts:
             continue
-        joined = Join(*parts)
-        # 导入模常有「枪管正好贴在机匣前脸」的共面缝，焊 1.5 mm 让审计当成一整块
-        bmesh.ops.remove_doubles(joined, verts=joined.verts[:], dist=0.0015)
+        out[material] = Join(*parts)
+    # 导入模常有「枪管正好贴在机匣前脸」的共面缝，焊掉让审计当成一整块。
+    # 距离对全部材质桶取同一个值（钢件和木件是同一把枪，不该有两套公差）。
+    lo, hi = _Aabb(list(out.values()))
+    dist = _WeldDistance((hi - lo).length)
+    for joined in out.values():
+        bmesh.ops.remove_doubles(joined, verts=joined.verts[:], dist=dist)
         joined.normal_update()
-        out[material] = joined
     return out
 
 
@@ -422,6 +449,53 @@ def _FlipIfGripIsAbove(bms, wood, steel):
     wood_y = sum(v.co.y for v in wood.verts) / len(wood.verts)
     steel_y = sum(v.co.y for v in steel.verts) / len(steel.verts)
     if wood_y > steel_y:
+        _Xform(bms, Matrix.Rotation(math.pi, 4, "Z"))
+
+
+def _SlabStats(bms, z0, z1):
+    """z0..z1 这一薄片的横截面外框面积与平均高度。判「哪头是枪口」用。"""
+    lo_x = lo_y = 1e9
+    hi_x = hi_y = -1e9
+    total_y = 0.0
+    count = 0
+    for bm in bms:
+        for vert in bm.verts:
+            if z0 <= vert.co.z <= z1:
+                lo_x = min(lo_x, vert.co.x); hi_x = max(hi_x, vert.co.x)
+                lo_y = min(lo_y, vert.co.y); hi_y = max(hi_y, vert.co.y)
+                total_y += vert.co.y
+                count += 1
+    if not count:
+        return 0.0, 0.0
+    return (hi_x - lo_x) * (hi_y - lo_y), total_y / count
+
+
+def _OrientAllSteelFirearm(bms, slab=0.12):
+    """没有木件的枪靠几何定向。
+
+    `_FlipIfStockIsForward` / `_FlipIfGripIsAbove` 两条都拿木料当路标 ——
+    枪托在 +Z、握把在膛线下方。Poly Haven 那支全钢手枪一块木头也没有，两条
+    全走空，于是它在规范系里枪口朝 +Z、握把朝上，整整差一个绕 X 的 180°：
+    `muzzle` 挂点落到握把底下，开火时枪焰从握把里喷、刺刀往后长。
+
+    换两条不看材质的判据（对任何枪都成立，冷兵器除外，所以只在 kind != melee 调）：
+      · 两端各取 12% 的薄片，横截面小的那头是枪管，它必须在 -Z；
+      · 定完前后，枪口那片的中心必须**高于**全模中心 —— 膛线在上、握把在下。
+    """
+    lo, hi = _Aabb(bms)
+    span = hi.z - lo.z
+    if span <= 1e-6:
+        return
+    front_area, _ = _SlabStats(bms, lo.z, lo.z + span * slab)
+    back_area, _ = _SlabStats(bms, hi.z - span * slab, hi.z)
+    if front_area > back_area:
+        _Xform(bms, Matrix.Rotation(math.pi, 4, "Y"))
+
+    lo, hi = _Aabb(bms)
+    span = hi.z - lo.z
+    _, muzzle_y = _SlabStats(bms, lo.z, lo.z + span * slab)
+    _, whole_y = _SlabStats(bms, lo.z, hi.z)
+    if muzzle_y < whole_y:
         _Xform(bms, Matrix.Rotation(math.pi, 4, "Z"))
 
 
@@ -801,6 +875,9 @@ def BuildImported(name):
         # 刀的木件是握把，本来就骑在刀身轴线上，没有"握把该在膛线下方"这回事；
         # 让这条启发式跑，它会绕 Z 转 180° 把刃口翻上天。刃口朝向交给 roll。
         _FlipIfGripIsAbove(bms, wood, steel)
+        if wood is None or not wood.verts:
+            # 全钢枪：上面两条定向都拿不到路标，换几何判据。
+            _OrientAllSteelFirearm(bms)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
     if not spec.get("noBevel"):
         _BevelForFirstPerson(bms)

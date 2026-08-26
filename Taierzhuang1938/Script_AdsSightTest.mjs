@@ -32,7 +32,9 @@ import { ServeRoot } from "./Script_DevServer.mjs";
  * 而那种情况上半窗必然一起黑。改前实测上半窗：中正式 820/820 全黑。
  */
 const BLOCKED_LIMIT = 60;
-const GUNS = ["ZhongZheng", "HanYang", "Zb26", "Mauser96", "Type38"];
+// 手枪也在里面。ServicePistol 也走模型第一人称（MODEL_FP），第四关是它当副武器，
+// 玩家会右键把它举到眼前 —— 换了几何就得重量一次瞄准线，这是这条闸的原话。
+const GUNS = ["ZhongZheng", "HanYang", "Zb26", "Mauser96", "Type38", "ServicePistol"];
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");

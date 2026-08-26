@@ -58,6 +58,11 @@ export const testDefs = {
     expectedFailures: playTestExpectedFailures,
     desc: "真浏览器端到端通关，130 条断言，跨模块安全网",
   },
+  BootStallTest: {
+    file: "Script_BootStallTest.mjs",
+    timeoutMs: 5 * 60 * 1000,
+    desc: "一张贴图挂死不许把开机吊在「加载 PBR 材质」上",
+  },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
@@ -114,6 +119,7 @@ export const testDefs = {
 
 export const tier0 = [
   "BootTest",
+  "BootStallTest",
   "PlayTest",
   "TestRunnerTest",
   "ModuleGraphTest",

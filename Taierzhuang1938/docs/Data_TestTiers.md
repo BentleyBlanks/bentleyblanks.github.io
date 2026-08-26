@@ -66,6 +66,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | 测试 | 守什么 |
 |---|---|
 | BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线 |
+| BootStallTest | 一张外部贴图挂死（连接不回数据）不许把开机吊在「加载 PBR 材质」上；只有那一套走程序化退路 |
 | PlayTest | 真浏览器端到端通关，130 条运行时断言 |
 | TestRunnerTest | 分级选择、Git 映射、历史基线、登记完整性 |
 | ModuleGraphTest | 从入口递归走模块图与 index.html import map 对账：新模块必登记、源码禁自写 ?v=（纯 Node） |
