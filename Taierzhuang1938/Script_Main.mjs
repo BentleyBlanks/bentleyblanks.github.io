@@ -189,6 +189,13 @@ bootProp?.Show();
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
+// three 默认 checkShaderErrors = true：每个 program **第一次被用到**时同步去取
+// getProgramInfoLog / getShaderInfoLog。那是一次强制同步 —— 驱动必须把还在后台
+// 并行编译的着色器全部编完才能回答，KHR_parallel_shader_compile 白装了。
+// 这一局要链五十来个 program，开机路径上是笔实打实的账。
+// 出图/自检模式（?shot，冒烟测试走的就是它）保留检查：那条路要的是"坏了立刻红"，
+// 不是快；玩家那条路要的是快，编译真出错在别处也看得见（画面直接不对）。
+renderer.debug.checkShaderErrors = !!SHOT;
 renderer.shadowMap.enabled = true;
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
@@ -444,15 +451,6 @@ async function Boot() {
     bootBar.style.width = `${Math.round(progress * 100)}%`;
   };
 
-  setStep("烘贴图……", 0.02);
-  let baked = 0;
-  const total = Object.keys(RECIPES).length;
-  for (const name of library.PrepareSteps()) {
-    baked += 1;
-    setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
-    await NextFrame();
-  }
-
   /**
    * 外部 PBR 贴图。二十八套、八十二张图、约三十八 MB —— 开机路径上最大的一块网络。
    *
@@ -601,6 +599,32 @@ async function Boot() {
    */
   const PBR_LANES = 12;
 
+  /**
+   * 二十九张程序化配方里有二十四张**开机就会被上面那张表整套顶掉**
+   * （`LoadExternalSet` 直接 `baked.set(name, 下载来的三张)`）。烘完再扔＝白烧 CPU：
+   * 实测占开机 8.4 s 里的大头（Adobe 1.24 s、RoofTile 1.24 s、BrickWall 0.97 s…）。
+   *
+   * 所以开机只烘外部图不覆盖的那几张（ClothNra / ClothIja / SteelHelmet，以及
+   * `fallback` 那一路要拿来当 ORM 底材的 WoodBeam / WoodDoor —— 少烘一张，
+   * 手推车和木箱就没有粗糙度可继承了）。被跳过的那些**等外部那套真读失败了再补烘**，
+   * 见下面 catch 里的那一行：一套几百毫秒，而读失败本来就是异常路径。
+   *
+   * 别把这里改成"全烘一遍保平安"：那正是这段代码要删掉的东西。
+   */
+  const pbrOverridden = new Set(PBR_SETS.map((set) => set.name));
+  for (const set of PBR_SETS) if (set.fallback) pbrOverridden.delete(set.fallback);
+  const bakeNames = Object.keys(RECIPES).filter((name) => !pbrOverridden.has(name));
+
+  setStep("烘贴图……", 0.02);
+  let baked = 0;
+  const total = bakeNames.length;
+  for (const name of library.PrepareSteps(bakeNames)) {
+    baked += 1;
+    setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
+    await NextFrame();
+  }
+
+
   setStep("加载 PBR 材质……", 0.242);
   const pbrQueue = PBR_SETS.slice();
   const pbrFailed = [];
@@ -613,7 +637,9 @@ async function Boot() {
         if (set.fallback) await library.LoadExternalBaseNormal(set.name, set.fallback, set);
         else await library.LoadExternalSet(set.name, set);
       } catch (error) {
-        // 这一套退回程序化 PBR，别的套不受影响。
+        // 这一套退回程序化 PBR，别的套不受影响。开机时它被跳过了（见 bakeNames
+        // 那段账），现在才补烘 —— 生成器只有一项，一口气抽干就是同步烘完一张。
+        for (const _ of library.PrepareSteps([set.name])) { /* 烘一张 */ }
         pbrFailed.push(set.name);
         console.warn(`[Main] 外部 PBR「${set.name}」没读到，退回程序化：`
           + String(error).slice(0, 160));
