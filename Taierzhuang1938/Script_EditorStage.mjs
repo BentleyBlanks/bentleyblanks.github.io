@@ -387,7 +387,10 @@ export function PickWorld(field, origin, direction, { maxDist = 400, solids = tr
   }
   if (field && field.GroundHeight) {
     const limit = best ? Math.min(maxDist, best.distance) : maxDist;
-    const steps = 90;
+    // 步数跟着射程走：俯瞰机位把 maxDist 放到远裁剪面级别（上千米）后，固定 90 步
+    // 的采样间距会被拉大到几十米，跨过矮墙/濠沟时变号区间整个被跳过去。
+    // 保持 ≈7 m 一步的密度；高程查询是解析式，四百来次也远比对三角求交便宜。
+    const steps = Math.min(420, Math.max(90, Math.ceil(limit / 7)));
     const Gap = (t) => {
       _point.copy(origin).addScaledVector(direction, t);
       return _point.y - field.GroundHeight(_point.x, _point.z);

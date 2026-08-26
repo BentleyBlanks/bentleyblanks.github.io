@@ -227,6 +227,22 @@
   text-shadow: 0 1px 2px #000;
 }
 
+/* 布防图名牌：场景编辑器的屏幕空间名字层（世界牌在俯瞰机位小得看不见，名字直接投屏幕）。
+   z-index:-1：名牌层挂在 workHost（最后一个兄弟）里，不压下去会盖住左侧入口面板的按钮；
+   #edRoot 自带 z-index:40 的堆叠上下文，-1 只会沉到全部编辑器 UI 之下，不会沉到画布后面。 */
+.edMapHud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
+.edMapLabel {
+  position: absolute; transform: translate(-50%, -100%);
+  font: 600 12px/1.35 "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  color: #f0cc8b; padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  background: rgba(10, 10, 9, 0.62); border: 1px solid rgba(224, 176, 98, 0.4);
+  text-shadow: 0 1px 2px #000;
+}
+.edMapLabel.road { color: #a7cee1; border-color: rgba(117, 169, 198, 0.45); }
+/* 布防图参考名（没进文档的）：虚线框区分「图纸上的」与「你放下的」 */
+.edMapLabel.ref { opacity: 0.82; border-style: dashed; }
+.edMapLabel.sel { color: #fff; border-color: var(--warn, #e0b062); background: rgba(58, 42, 18, 0.88); }
+
 /* 编辑器接管时把 HUD 收起来（过场自己的 .csRoot 必须留着 —— Timeline 要看它） */
 body.edHideHud #hud > [class^="hud"] { display: none !important; }
 

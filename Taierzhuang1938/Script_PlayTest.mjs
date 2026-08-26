@@ -885,6 +885,13 @@ const hitFeedback = await page.evaluate(() => {
   Ready(); D.Fire();
   const afterHit = D.Hits();
   const hitShot = D.LastShot();
+  // 【2026-08-26】等拉栓的这两秒里，靶子是站在空地上、suppression=1 不还手的独兵，
+  // 自家 NRA 会把它当真靶打 —— 实测 120 帧里友军能磨掉两三百血（首枪后余 326）。
+  // 磨死了的话第二枪打的是尸体：TryFire 的 _marchTargets 只收活人，子弹直接穿过去，
+  // ConfirmHit 根本不会被调用 —— 断言红的却是「击杀没回执」。这就是 08-25 转绿后
+  // 又被场景/布设类提交（改了友军站位与射界）反复翻红的原因：它是条零余量的竞态。
+  // 所以等待期把血垫到打不死，第二枪前再压回 1。友军命中不走 ConfirmHit，不会多发 cue。
+  target.health = 1e9;
   T.StepFrames(120);                        // 拉栓那一下过去，IsBusy 才放行下一枪
   target.health = 1;                        // 一枪必死
   Ready(); D.Fire();
@@ -1858,6 +1865,11 @@ const covert = await page.evaluate(() => {
   for (const s2 of near) {
     s2.position.copy(T.player.position);
     s2.holdZone = null; s2.stance = 0; s2.order = "advance";
+    // 【2026-08-26】血垫到打不死：五个人被摆在玩家脚下的开阔地上趴八秒，敌火照打
+    //（实测干净开局八秒后五人余血只剩 6~29）。死在起立窗口里的兵 stance 永远停在 2，
+    // 断言红的却是「姿态传染坏了」。与 11.6 击杀回执同一类零余量竞态，同一个修法 ——
+    // 传染逻辑本身照测不误，只把「谁被流弹打死」这个环境变量拿掉。
+    s2.health = 1e9;
   }
   T.player.stance = "prone";
   const n = T.ai.IssueOrder("covert", T.player.position, null);
