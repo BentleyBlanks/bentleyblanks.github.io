@@ -9,6 +9,7 @@
 // 用法：node Taierzhuang1938/Script_EditorTest.mjs
 // 退出码即成败。
 
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -828,6 +829,47 @@ const scene = await page.evaluate(() => {
   };
   active.Import(json, false);
 
+  // 名牌 HUD：布防图名字必须不点任何按钮就直接读得到（DOM 层，不是世界牌）。
+  // 机位定死、逐点直上直下拍，避免整城视角下名牌互相挤掉造成断言抖动。
+  const Labels = () => [...active.hudLayer.querySelectorAll(".edMapLabel")];
+  const Named = (text) => Labels().filter((el) => el.textContent === text);
+  const LookDownAt = (x, z, height) => {
+    T.camera.position.set(x, height, z);
+    T.camera.rotation.set(-Math.PI / 2, 0, 0, "YXZ");
+    editor.flycam.yaw = 0;
+    editor.flycam.pitch = -Math.PI / 2;
+    T.camera.updateMatrixWorld();
+    active.UpdateHudLabels();
+  };
+  LookDownAt(104, -216, 250);              // 警察所正上方：图纸参考名（虚线 ref 样式）
+  out.hud = {
+    layerInDom: !!active.hudLayer && active.hudLayer.isConnected,
+    police: Named("警察所").length,
+    policeRef: Named("警察所").every((el) => el.classList.contains("ref")),
+  };
+  LookDownAt(-186, 220, 250);              // 自放标记与同址图纸名：只留一张、算文档的
+  out.hud.custom = Named("滕文中学旧址").length === 1
+    && !Named("滕文中学旧址")[0].classList.contains("ref");
+  LookDownAt(0, 0, 700);                   // 整城俯瞰：名牌要成片出现（挤掉的不算）
+  out.hud.cityCount = Labels().length;
+  active.LoadMapReferences();
+  LookDownAt(104, -216, 250);              // 载入图纸标记后：同名不双份，且已转正为文档标记
+  out.hudDedup = {
+    police: Named("警察所").length,
+    policeNowDoc: Named("警察所").every((el) => !el.classList.contains("ref")),
+  };
+  active.hudNamesVisible = false;
+  active.UpdateHudLabels();
+  out.hudOff = Labels().length;
+  active.hudNamesVisible = true;
+  active.Import(json, false);
+
+  // 俯瞰拾取回归：700 m 机位下画面边缘的射线要走 900 m 上下才碰到地。
+  // 旧的 600 m 定值在这儿必然空手而归，表现就是「标记怎么点都放不下」。
+  LookDownAt(0, 0, 700);
+  const pick = active.Pick({ clientX: 200, clientY: 150 });
+  out.overviewPick = pick ? { kind: pick.kind, distance: Math.round(pick.distance) } : null;
+
   // 特效与构件共用落点和 JSON，但不创建假碰撞盒；编辑器接管期间仍要推进烟火。
   active.SetPalette("Effect_FireSmall");
   active.Place(12, -18);
@@ -871,12 +913,59 @@ Check("编辑器从 Data_Tengxian 载入院落与道路图纸标记",
     && scene.mapReferences.custom === 2 && scene.mapReferences.customText.includes("滕文中学旧址")
     && scene.mapReferences.customText.includes("火神庙东街"), JSON.stringify(scene.mapReferences));
 Check("旧版 v1 场景文档按空标记层兼容", scene.legacyMarkers === 0, scene.legacyMarkers);
+Check("布防图名牌 HUD 不点按钮就直接显示（图纸参考名走 ref 样式）",
+  scene.hud.layerInDom && scene.hud.police === 1 && scene.hud.policeRef
+    && scene.hud.custom && scene.hud.cityCount >= 25, JSON.stringify(scene.hud));
+Check("载入图纸标记后名牌按 sourceId 去重且转正为文档标记",
+  scene.hudDedup.police === 1 && scene.hudDedup.policeNowDoc, JSON.stringify(scene.hudDedup));
+Check("名牌 HUD 开关会清空名牌层", scene.hudOff === 0, String(scene.hudOff));
+Check("俯瞰机位的拾取能超过旧 600 m 射程落到地面",
+  scene.overviewPick && scene.overviewPick.distance > 600
+    && scene.overviewPick.distance < 1500,
+  JSON.stringify(scene.overviewPick));
 Check("外部 JSON 标记有数量上限且重复 id 会重编号",
   scene.markerImportGuard.count === 96 && scene.markerImportGuard.uniqueIds === 96,
   JSON.stringify(scene.markerImportGuard));
 Check("场景关卡可布设、预览并序列化特效",
   scene.effect.category && scene.effect.handles === 1 && scene.effect.source
     && scene.effect.json && scene.effect.emitted, JSON.stringify(scene.effect));
+
+// ---------------------------------------------------------------------------
+// 6a+) 名牌 HUD 的每帧驱动 + 俯瞰下的真鼠标放标记
+//
+// 用户报的原话是「文本标记怎么都没有生效」，成因有二，都只在俯瞰机位下复现：
+//   · 拾取射程定值 600 m，TopDown 机位五六百米起步，画面边缘的射线量程先用完 ——
+//     内部直调 PlaceMarker 是复现不出来的，必须走真鼠标；
+//   · 世界牌是定死的世界尺寸，五百米高空看只剩几个像素 —— 名字改走屏幕空间 HUD。
+// 上面那节验的是 UpdateHudLabels 手动调用；这里验 Update() 每帧真的在驱动它。
+// ---------------------------------------------------------------------------
+await page.evaluate(() => window.Taierzhuang.editor.active.TopDown());
+await Step(8);
+const hudLive = await page.evaluate(() =>
+  window.Taierzhuang.editor.active.hudLayer.querySelectorAll(".edMapLabel").length);
+Check("名牌 HUD 由每帧 Update 驱动（俯瞰下自动成片出现）", hudLive >= 10, String(hudLive));
+
+const markersBefore = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.SetMode("mark");
+  return active.markers.length;
+});
+await CanvasClick(320, 210);
+const markByMouse = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  const marker = active.markers[active.markers.length - 1];
+  return {
+    count: active.markers.length,
+    at: marker ? `${Math.round(marker.x)}, ${Math.round(marker.z)}` : null,
+  };
+});
+Check("俯瞰机位下真鼠标能放下文本标记（旧 600 m 射程在这儿必失败）",
+  markByMouse.count === markersBefore + 1, JSON.stringify(markByMouse));
+// 名牌 HUD 的视觉验收产物（_shots 已 gitignore）；顺手把试放的标记撤掉 ——
+// 后面地形抬升那节按「恰好两个标记」取证。
+await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
+await page.screenshot({ path: path.join(projectDir, "_shots", "editor_marker_hud.png") });
+await page.evaluate(() => window.Taierzhuang.editor.active.DeleteSelectedMarker());
 
 // ---------------------------------------------------------------------------
 // 6b) 场景关卡编辑器的真鼠标落点

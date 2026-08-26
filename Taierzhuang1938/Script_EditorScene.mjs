@@ -66,6 +66,10 @@ const LANDMARK_LABELS = Object.freeze({
   CatholicChurchInner: "天主堂",
 });
 
+// 名牌 HUD 每帧要投影上百个点，临时量放模块级免得逐帧新建。
+const _hudView = new THREE.Matrix4();
+const _hudPoint = new THREE.Vector3();
+
 function Finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -488,6 +492,11 @@ export class SceneEditor {
     this.selectedMarker = null;
     this.markerDraft = { kind: "region", text: "未命名区域", ry: 0, w: 40, d: 30 };
     this.markersVisible = true;
+    // 布防图名牌走屏幕空间 HUD（DOM），不走世界牌：世界牌在俯瞰机位下只有几个
+    // 像素高，「看整张布防图」这个最常用的姿势里等于什么都没显示。
+    this.hudNamesVisible = true;
+    this.hudLayer = null;
+    this.hudReference = null;   // MapReferenceMarkers() 的缓存 —— 图纸是静态数据，算一次就够
     this.paletteId = PLACEABLE[0].id;
     this.cat = "景观";
     this.mode = "look";         // look | place | mark | move | terrain
@@ -544,6 +553,9 @@ export class SceneEditor {
     this.host.scene.add(this.root);
     this.host.flycam.Open();
     this.host.SetViewmodelVisible(false);
+    // 名牌层放在最前面：面板、提示条都是后来的兄弟节点，天然压在名牌上面。
+    this.hudLayer = El("div", "edMapHud");
+    root.insertBefore(this.hudLayer, root.firstChild);
     this.panel = Panel({
       title: this.constructor.panelTitle || this.constructor.label,
       sub: this.constructor.panelSub || "WASD+QE 飞",
@@ -569,6 +581,8 @@ export class SceneEditor {
     this.host.renderer.info.autoReset = true;
     this.host.flycam.Close();
     this.host.SetViewmodelVisible(true);
+    if (this.hudLayer) this.hudLayer.remove();
+    this.hudLayer = null;
     if (this.panel) this.panel.root.remove();
     this.panel = null;
   }
@@ -737,8 +751,14 @@ export class SceneEditor {
       this.markersVisible = value;
       this.RebuildAll();
     });
+    this.hudToggle = Toggle(toggles, "名牌 HUD", this.hudNamesVisible, (value) => {
+      this.hudNamesVisible = value;
+      this.UpdateHudLabels();
+    });
     Note(mark, "区域标记画出占地框，道路标记画出带宽与走向；两者随场景 JSON 存取。"
       + "“载入滕县图纸标记”直接读取 Data_Tengxian，不另抄一份坐标。", true);
+    Note(mark, "「名牌 HUD」把布防图（Data_Tengxian）与已放标记的名字直接投在屏幕上，"
+      + "任何机位高度都读得清；「视口显示」管的是近处才看得见的世界牌与占地框。");
     this.RefreshMarkerUi();
   }
 
@@ -943,7 +963,11 @@ export class SceneEditor {
   Pick(event) {
     const camera = this.host.camera;
     const direction = ScreenRay(camera, this.host.canvas, event.clientX, event.clientY);
-    return PickWorld(this.field, camera.position, direction, { maxDist: 600 });
+    // 射程必须盖住俯瞰机位。TopDown 常在五六百米高，600 m 定值只够到画面正中一小片：
+    // 边缘一点就报「没有地面」，其实是射线量程先用完了 —— 表现为「标记怎么点都放不下」。
+    return PickWorld(this.field, camera.position, direction, {
+      maxDist: Math.max(600, camera.far),
+    });
   }
 
   /**
@@ -1134,6 +1158,89 @@ export class SceneEditor {
     if (this.markerWidth) this.markerWidth.Set(marker.w);
     if (this.markerDepth) this.markerDepth.Set(marker.d);
     if (this.markerRotation) this.markerRotation.Set(marker.ry);
+  }
+
+  /**
+   * 布防图名牌：屏幕空间 HUD。
+   *
+   * 为什么不用世界牌解决：CanvasTexture Sprite 是定死的世界尺寸（十几到五十米宽），
+   * 在 500 m 俯瞰机位下只剩几个像素 ——「看整张布防图」时等于什么都没显示，
+   * 用户的原话是「文本标记怎么都没有生效」。名字要随时读得清就得走 DOM：
+   * 每帧把**文档里的标记 + Data_Tengxian 布防图参考名**投到屏幕坐标上。
+   * 参考名按 sourceId 与文档去重，「载入滕县图纸标记」之后不会出双份；
+   * 近的先占屏幕，挤在一起的只留最近那张（选中的标记永远保留）。
+   */
+  UpdateHudLabels() {
+    const layer = this.hudLayer;
+    if (!layer) return;
+    if (!this.hudNamesVisible) {
+      if (layer.childElementCount) layer.replaceChildren();
+      return;
+    }
+    const camera = this.host.camera;
+    const canvas = this.host.canvas;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (!width || !height) return;
+    const field = this.field;
+
+    const entries = [];
+    const seen = new Set();
+    for (const marker of this.markers) {
+      entries.push({ text: marker.text, kind: marker.kind, x: marker.x, z: marker.z, marker });
+      if (marker.sourceId) seen.add(marker.sourceId);
+    }
+    if (!this.hudReference) this.hudReference = MapReferenceMarkers();
+    for (const ref of this.hudReference) {
+      if (seen.has(ref.sourceId)) continue;
+      entries.push({ text: ref.text, kind: ref.kind, x: ref.x, z: ref.z, ref: true });
+    }
+
+    // Update() 跑在渲染之前，camera.matrixWorldInverse 还是上一帧的 ——
+    // 拿它投影，飞得快时名牌整层拖影。自己求逆才是本帧机位。
+    camera.updateMatrixWorld();
+    _hudView.copy(camera.matrixWorld).invert();
+    const projected = [];
+    for (const entry of entries) {
+      const groundY = field ? field.GroundHeight(entry.x, entry.z) : 0;
+      _hudPoint.set(entry.x, groundY + 2.2, entry.z).applyMatrix4(_hudView);
+      if (_hudPoint.z > -1) continue;              // 相机身后 / 贴脸的不投
+      const depth = -_hudPoint.z;
+      _hudPoint.applyMatrix4(camera.projectionMatrix);
+      if (Math.abs(_hudPoint.x) > 1.04 || Math.abs(_hudPoint.y) > 1.04) continue;
+      projected.push({
+        entry, depth,
+        sx: (_hudPoint.x * 0.5 + 0.5) * width,
+        sy: (0.5 - _hudPoint.y * 0.5) * height,
+      });
+    }
+    projected.sort((a, b) => a.depth - b.depth);
+    const placed = [];
+    let used = 0;
+    for (const item of projected) {
+      const w = Math.min(300, item.entry.text.length * 13 + 16);
+      const x0 = item.sx - w / 2, x1 = item.sx + w / 2;
+      const y0 = item.sy - 20, y1 = item.sy;
+      let clash = false;
+      for (const rect of placed) {
+        if (x0 < rect[2] && x1 > rect[0] && y0 < rect[3] && y1 > rect[1]) { clash = true; break; }
+      }
+      const isSelected = item.entry.marker && item.entry.marker === this.selectedMarker;
+      if (clash && !isSelected) continue;
+      placed.push([x0, y0, x1, y1]);
+      let el = layer.children[used];
+      if (!el) { el = El("div", "edMapLabel"); layer.appendChild(el); }
+      used += 1;
+      const cls = "edMapLabel"
+        + (item.entry.kind === "road" ? " road" : "")
+        + (item.entry.ref ? " ref" : "")
+        + (isSelected ? " sel" : "");
+      if (el.className !== cls) el.className = cls;
+      if (el.textContent !== item.entry.text) el.textContent = item.entry.text;
+      el.style.left = `${item.sx.toFixed(1)}px`;
+      el.style.top = `${item.sy.toFixed(1)}px`;
+    }
+    while (layer.childElementCount > used) layer.lastChild.remove();
   }
 
   Place(x, z) {
@@ -1626,6 +1733,7 @@ export class SceneEditor {
     }
 
     this.RefreshGizmo();
+    this.UpdateHudLabels();
 
     if (this.normalsTimer > 0) {
       this.normalsTimer -= dt;
