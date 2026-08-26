@@ -22,8 +22,9 @@
 // 一张场 460 KB（Int16），缓存 12 张。格子取 1 m 不是保守：2 m 一格时
 // 新关帝庙的门洞会被栅格化封死（连通率 0.1%），1 m 才通。
 // BFS 是**跨帧摊的**（2026-08-27）：一张 5.3 ms 的场同帧算完就是一根 5—10 ms 的
-// CPU 突刺（FrameProfiler 抓到的「偶尔掉到 52 fps」一半是它），现在每帧只扩
-// cellBudgetPerFrame 个格子（≈1 ms），没算完的键返回 null、调用方直奔目标几帧。
+// CPU 突刺（FrameProfiler 抓到的「偶尔掉到 52 fps」一半是它），现在每帧最多花
+// pumpBudgetMs 毫秒（默认 0.8，机器无关的硬顶），没算完的键返回 null、
+// 调用方直奔目标几帧。
 //
 // 没有 Math.random、没有外部资源、没有 three 依赖 —— 这个文件是纯算术。
 
@@ -39,7 +40,7 @@ export class NavGrid {
    *   stepOver 能跨过去的高度（同 Blocked 的 0.56）
    */
   constructor(battlefield, { cell = 1.0, margin = 0.15, stepOver = 0.56,
-    fieldCache = 32, quantiseM = 16, cellBudgetPerFrame = 26000 } = {}) {
+    fieldCache = 32, quantiseM = 16, pumpBudgetMs = 0.8 } = {}) {
     const b = battlefield.bounds;
     this.cell = cell;
     this.minX = b.minX;
@@ -56,13 +57,15 @@ export class NavGrid {
     this.fieldMisses = 0;         // 缓存抖动会让每帧都重算 BFS，必须能量得到
     this.fieldStarved = 0;        // 这一帧的 BFS 预算用完、只好退回直奔目标的次数
     this.quantiseM = quantiseM;
-    // 预算的单位是**格子扩展数**，不是张数。旧口径「每帧最多 2 张 BFS」的实测账：
-    // 一张 5.3 ms，两张同帧就是 ~10.6 ms 挂在 ai 桶上 —— 60 Hz 的 16.7 ms 预算
-    // 直接被吃穿，FrameProfiler 抓到的「帧率偶尔掉到 52」的突刺一半是它。
-    // 现在一张场跨若干帧摊完（~26000 格 ≈ 1 ms/帧），没算完的键照旧返回 null，
-    // 消费方本来就有「退回直奔目标」的路（Steer 返回 false），差这几帧没人看得出来。
-    this.cellBudgetPerFrame = cellBudgetPerFrame;
-    this.budget = cellBudgetPerFrame;
+    // 预算的单位是**毫秒**，不是张数也不是格数。演进两步，都是 FrameProfiler 量出来的：
+    //   · 旧口径「每帧最多 2 张 BFS」：一张 5.3 ms，两张同帧 ~10.6 ms 挂在 ai 桶，
+    //     60 Hz 的 16.7 ms 直接被吃穿 ——「帧率偶尔掉到 52」的主凶；
+    //   · 中间版按格数（26000 格/帧）：格数换算毫秒跟机器走，慢机上实测 max 4.2 ms，
+    //     突刺只是变小没有变没。现在 _Pump 每 1024 次扩展看一次表，超时就停，
+    //     花多少时间是**硬顶**。没算完的键照旧返回 null，消费方本来就有
+    //     「退回直奔目标」的路（Steer 返回 false），差这几帧没人看得出来。
+    this.pumpBudgetMs = pumpBudgetMs;
+    this.pumpSpentMs = 0;         // 本帧已经花在 _Pump 上的毫秒
     this.pending = null;          // 正在跨帧摊的那张场：{ key, dist, head, tail }
     this.distPool = [];           // 被 LRU 挤掉的 Int16Array 回收复用（一张 460 KB）
     this.queue = new Int32Array(this.width * this.height);
@@ -110,7 +113,7 @@ export class NavGrid {
     this.fieldCache.clear();
     // 半路上的那张场基于旧的 blocked 位图，作废；dist 池照留（网格尺寸没变）。
     this.pending = null;
-    this.budget = this.cellBudgetPerFrame;
+    this.pumpSpentMs = 0;
     this._BuildComponents();
     this.revisions += 1;
     return true;
@@ -160,9 +163,9 @@ export class NavGrid {
     this.componentCount = next;
   }
 
-  /** 每帧开头调一次：重置格子预算，并把跨帧摊的那张场推进一步。AiDirector.Update 负责调。 */
+  /** 每帧开头调一次：重置毫秒预算，并把跨帧摊的那张场推进一步。AiDirector.Update 负责调。 */
   BeginFrame() {
-    this.budget = this.cellBudgetPerFrame;
+    this.pumpSpentMs = 0;
     if (this.pending) this._Pump(false);
   }
 
@@ -258,7 +261,7 @@ export class NavGrid {
       if (!force) { this.fieldStarved += 1; return null; }
       this._Pump(true);
     }
-    if (!force && this.budget <= 0) { this.fieldStarved += 1; return null; }
+    if (!force && this.pumpSpentMs >= this.pumpBudgetMs) { this.fieldStarved += 1; return null; }
     const start = this._NearestMain(gx, gz);
     if (start < 0) return null;
     // Int16 够用：最长的一条路也就七百来格，而 Int32 会让每张场的内存翻一倍。
@@ -272,21 +275,29 @@ export class NavGrid {
   }
 
   /**
-   * 把正在摊的那张场往前推。budget 花的是本帧的格子预算；unbounded（force）
-   * 一口气干完。算完进 LRU 缓存并返回 field，没算完返回 null。
+   * 把正在摊的那张场往前推。非 force 路径花的是本帧的毫秒预算（每 1024 次扩展
+   * 看一次表，超时就停）；unbounded（force）一口气干完。
+   * 算完进 LRU 缓存并返回 field，没算完返回 null。
    */
   _Pump(unbounded) {
     const pending = this.pending;
     if (!pending) return null;
+    if (!unbounded && this.pumpSpentMs >= this.pumpBudgetMs) return null;
     const dist = pending.dist;
     const queue = this.queue;
     const width = this.width, height = this.height;
     const blocked = this.blocked;
     let head = pending.head, tail = pending.tail;
-    let left = unbounded ? Infinity : this.budget;
-    while (head < tail && left > 0) {
+    const started = performance.now();
+    const deadline = unbounded ? Infinity
+      : started + (this.pumpBudgetMs - this.pumpSpentMs);
+    let sinceCheck = 0;
+    while (head < tail) {
+      if ((sinceCheck += 1) >= 1024) {
+        sinceCheck = 0;
+        if (performance.now() >= deadline) break;
+      }
       const cur = queue[head++];
-      left -= 1;
       const cx = cur % width, cz = (cur - cx) / width;
       const nd = dist[cur] + 1;
       for (const [ox, oz] of NEIGHBOURS) {
@@ -302,7 +313,7 @@ export class NavGrid {
     }
     pending.head = head;
     pending.tail = tail;
-    if (!unbounded) this.budget = left;
+    if (!unbounded) this.pumpSpentMs += performance.now() - started;
     if (head < tail) return null;                       // 这一帧的份摊完了，下帧继续
     this.pending = null;
     const field = { dist, key: pending.key };

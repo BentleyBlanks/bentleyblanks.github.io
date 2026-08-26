@@ -98,21 +98,28 @@ function AddClerestoryWall(sink, L, ry, {
       sink.Add(brick, PlaceGeometry(
         MakeBox(openW, upH, WALL_T, TILE_METERS.brick, `${seed}:dup${k}`, BRICK_UV_GRID),
         { x: p.x, y: doorH + 0.2 + upH / 2, z: p.z, ry }));
+      // 门楣以上这块砖要有碰撞（底面 2.75 m，高过 1.6 m 净空线，门口照旧走得通）
+      sink.Solid(p.x, doorH + 0.2 + upH / 2, p.z, openW / 2, upH / 2, WALL_T / 2, "wall", ry);
       sink.Add("Stone", PlaceGeometry(
         MakeBox(doorW + 0.7, 0.14, 0.95, TILE_METERS.stone, `${seed}:dstep${k}`),
         { x: out.x, y: 0.07, z: out.z, ry }));
       continue;
     }
 
-    // 窗台以下 / 窗券以上的两条砖带
+    // 窗台以下 / 窗券以上的两条砖带。
+    // 这两条**过去一只碰撞盒都没有**：碰撞只登记在砖墩上，于是墩与墩之间
+    // 从地坪到檐口整整一格是空的 —— 人直接从厂房外墙走进去，子弹也照穿。
+    // 窗带那一段（窗台到窗券）才是真洞，别的都得砌实。
     sink.Add(brick, PlaceGeometry(
       MakeBox(openW, sillY, WALL_T, TILE_METERS.brick, `${seed}:sb${k}`, BRICK_UV_GRID),
       { x: p.x, y: sillY / 2, z: p.z, ry }));
+    sink.Solid(p.x, sillY / 2, p.z, openW / 2, sillY / 2, WALL_T / 2, "wall", ry);
     const upH = eave - headY - 0.18;
     if (upH > 0.1) {
       sink.Add(brick, PlaceGeometry(
         MakeBox(openW, upH, WALL_T, TILE_METERS.brick, `${seed}:hb${k}`, BRICK_UV_GRID),
         { x: p.x, y: headY + 0.18 + upH / 2, z: p.z, ry }));
+      sink.Solid(p.x, headY + 0.18 + upH / 2, p.z, openW / 2, upH / 2, WALL_T / 2, "wall", ry);
     }
     // 洞里的暗：厂房是个封闭大空间，没有内衬就一眼看穿到对面天空
     sink.Add("Charred", PlaceGeometry(

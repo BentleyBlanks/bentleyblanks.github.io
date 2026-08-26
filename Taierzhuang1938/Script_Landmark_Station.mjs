@@ -32,6 +32,9 @@
 
 import { MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
+// 只借这一个纯碰撞工具：它按「沿墙 = 局部 x、墙厚 = 局部 z」登记，
+// 与本文件 Band() 的摆法完全一致（上面那条禁令针对的是 AddCompound 那三个门脸函数）。
+import { SolidWithOpenings } from "./Script_World.mjs";
 
 /** Data_Tengxian.WEST_SUBURB.railway 的镜像（主会话改数据时要同步这里）。 */
 const RAILWAY = { x: -480, gauge: 1.435, fromZ: -330, toZ: 330, crossings: [0] };
@@ -716,7 +719,6 @@ export function BuildStation(host, f, ctx) {
     const len = lz1 - lz0;
     const cz = (lz0 + lz1) / 2;
     const p = L(lxSign * wallCx, cz);
-    const wins = openings.filter((o) => o.type === "win");
     const doors = openings.filter((o) => o.type === "door");
     const rel = (o) => o.c - cz;
     // 洞口以下：整条实墙（门洞落地，窗洞不落地）
@@ -777,18 +779,20 @@ export function BuildStation(host, f, ctx) {
         });
       }
     }
-    // 碰撞：门洞两侧分段登记（门头上的过梁不登记，否则导航把门口判成墙）
-    let cursor = lz0;
-    const spans = [];
-    for (const o of doors.sort((a, b) => a.c - b.c)) {
-      if (o.c - o.w / 2 > cursor) spans.push([cursor, o.c - o.w / 2]);
-      cursor = o.c + o.w / 2;
-    }
-    if (cursor < lz1) spans.push([cursor, lz1]);
-    for (const [a, b] of spans) {
-      const q = L(lxSign * wallCx, (a + b) / 2);
-      sink.Solid(q.x, (yB + top) / 2, q.z, T / 2, (top - yB) / 2, (b - a) / 2, "wall", ry);
-    }
+    // 碰撞：**跟着上面那几条 Band 走** —— 砌了砖的地方才有盒子。
+    // 旧版只按门洞分段、且通高一只盒，于是每一扇石套窗都是「看得见的洞 +
+    // 摸得着的墙」：站在站台上朝窗口扔手榴弹，弹回脸上（玩家实测报的就是这里）。
+    // 门楣以上、窗楣以上这几条带照旧登记 —— 它们的底面高过 1.6 m，
+    // NavGrid 与 AiDirector.Blocked 都跳过，门口不会被判成死路。
+    SolidWithOpenings(sink, {
+      x: p.x, z: p.z, ry: zWallRy, length: len, y0: yB, y1: top + 0.45, thickness: T,
+      openings: openings.map((o) => ({
+        c: rel(o),
+        w: o.w,
+        y0: o.type === "door" ? yB : (o.up ? upSill : sillY),
+        y1: o.type === "door" ? doorHead : (o.up ? upHead : headY),
+      })),
+    });
     sink.Cover(p.x, p.z, top - y0, lxSign * Math.cos(ry), -lxSign * Math.sin(ry));
   };
 
@@ -871,7 +875,11 @@ export function BuildStation(host, f, ctx) {
       L, lz, width: DX, eaveY: wingEave, ridgeY: wingRidge, thickness: T, ry,
       seed: `${seed}:end${s}`,
     });
-    sink.Solid(p.x, (yB + wingEave) / 2, p.z, DX / 2, (wingEave - yB) / 2, T / 2, "wall", ry);
+    // 两端山墙的碰撞同样让开那两扇窗（同 Facade 的理由）
+    SolidWithOpenings(sink, {
+      x: p.x, z: p.z, ry, length: DX, y0: yB, y1: wingEave, thickness: T,
+      openings: openings.map((o) => ({ c: o.c, w: o.w, y0: sillY, y1: headY })),
+    });
     // 四角石转角
     for (const sx of [-1, 1]) {
       Quoin(sink, {

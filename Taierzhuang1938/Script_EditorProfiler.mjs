@@ -1,14 +1,16 @@
-// 性能剖析面板：编辑器「渲染调试（可叠加）」组的叠加工具，不接管相机、不暂停玩法。
+// Profiler：编辑器「渲染调试（可叠加）」组的叠加工具，不接管相机、不暂停玩法。
 //
-// 真正的读数界面是一个 **window.open 的独立窗口**：游戏拿着指针锁的时候页面内
-// 面板既点不到也挡画面，独立窗口可以拖到第二块屏上边玩边看，掉帧发生的那一刻
-// 图上就有现场。窗口没有自己的脚本 —— 所有 DOM 更新由本 overlay 的 Update(dt)
-// 从游戏侧推过去（editor.UpdateOverlays 在每一条帧路径上都会调它）。
+// 设置面板里就是一颗开关，**没有页面内面板**（用户点名去掉的）：唯一的读数界面
+// 是 window.open 的独立窗口 —— 游戏拿着指针锁的时候页面内面板既点不到也挡画面，
+// 独立窗口可以拖到第二块屏上边玩边看，掉帧发生的那一刻图上就有现场。
+// 窗口没有自己的脚本 —— 所有 DOM 更新由本 overlay 的 Update(dt) 从游戏侧推过去
+//（editor.UpdateOverlays 在每一条帧路径上都会调它）。弹窗被拦截时 Enter 直接抛错，
+// ToggleOverlay 会收掉这次开启（开关弹回），不留一个「开着却什么都看不见」的状态。
 //
 // 计时内核在 Script_Profiler（Enter 时 Enable、Exit 时 Disable，钩子全还原）。
-// 页面内留一块小面板：开关窗口、显示 FPS 摘要 —— 弹窗被拦截时它是唯一读数。
-
-import { Panel, Section, Facts, Note, ButtonRow } from "./Script_EditorUi.mjs";
+// 自身开销记在「编辑器叠加层」桶里（图上标了「含本面板」）：条图每 3 帧一画、
+// 表格 0.5 s 一刷、取证/事件 1 s 一刷（用 buckets:false 的便宜汇总）——
+// 用户实测过一次 max 10 ms 的自刷新突刺，节流与便宜路径就是冲它去的。
 
 /** CPU 桶的显示名与顺序（B/E 标记在 Script_Main 的 Frame / RenderScene）。 */
 const CPU_LABELS = [
@@ -81,16 +83,14 @@ const POPUP_CSS = `
 
 export class ProfilerEditor {
   static id = "profiler";
-  static label = "性能剖析（独立窗口）";
-  static hint = "整帧 / CPU 逐系统 / GPU 逐 pass 耗时，掉帧现场取证；玩法照跑";
+  static label = "Profiler";
+  static hint = "独立窗口：整帧 / CPU 逐系统 / GPU 逐 pass 耗时，掉帧现场取证；玩法照跑";
   // 关掉设置面板（回去打仗）不收这个叠加层 —— 量的就是战斗中的帧。
-  // 停它：面板里再点一次，或直接关它的独立窗口（Update 会跟着自我关闭）。
+  // 停它：面板里再点一次开关，或直接关它的独立窗口（Update 会跟着自我关闭）。
   static keepOnClose = true;
 
   constructor(host) {
     this.host = host;
-    this.panel = null;
-    this.facts = null;
     this.win = null;
     this.doc = null;
     this.ui = null;          // 独立窗口里的节点引用
@@ -99,23 +99,14 @@ export class ProfilerEditor {
     this._slowAcc = 0;
   }
 
-  Enter(root) {
+  Enter() {
     this.host.profiler?.Enable();
-    this.panel = Panel({
-      title: "性能剖析", sub: "Script_Profiler",
-      variant: "work", onClose: () => this.host.CloseProfiler(),
-    });
-    root.appendChild(this.panel.root);
-    const body = this.panel.body;
-    const section = Section(body, "独立窗口");
-    ButtonRow(section, [
-      { label: "打开 / 重开窗口", onClick: () => this.OpenWindow() },
-    ]);
-    Note(section, "读数在独立窗口里（可拖到第二块屏、进游戏拿着指针锁也在刷新）。"
-      + "被弹窗拦截就点上面那颗按钮重开。关掉本面板即停止计时并还原全部钩子。");
-    const stat = Section(body, "摘要");
-    this.facts = Facts(stat);
     this.OpenWindow();
+    if (!this.win) {
+      // 抛出去让 ToggleOverlay 收掉这次开启（开关弹回），别留一个瞎的 Profiler
+      this.host.profiler?.Disable();
+      throw new Error("Profiler 独立窗口被浏览器弹窗拦截，放行后再开");
+    }
     return this;
   }
 
@@ -125,9 +116,6 @@ export class ProfilerEditor {
     this.win = null;
     this.doc = null;
     this.ui = null;
-    this.panel?.root.remove();
-    this.panel = null;
-    this.facts = null;
   }
 
   // -------------------------------------------------------------------------
@@ -259,25 +247,17 @@ export class ProfilerEditor {
     const profiler = this.host.profiler;
     if (!profiler || !profiler.on) return;
     // 用户直接把独立窗口叉掉 = 「不剖析了」：跟着把叠加层整个关掉，钩子全还原。
-    // （窗口从没开起来过 —— 被弹窗拦截 —— 不算：那时页面内面板是唯一读数。）
     if (this.win && this.win.closed) { this.host.CloseProfiler(); return; }
-    // 玩法进行中（设置面板收着）把页面内小面板也收掉，别挡准星；读数在独立窗口。
-    if (this.panel) {
-      const show = this.host.launcherOpen !== false;
-      this.panel.root.style.display = show ? "" : "none";
-    }
+    if (!this.ui) return;
     this._frame += 1;
-    const winAlive = this.win && !this.win.closed && this.ui;
-    if (winAlive && this._frame % 3 === 0) this.DrawGraph(profiler);
+    if (this._frame % 3 === 0) this.DrawGraph(profiler);
     this._tableAcc += dt;
-    if (this._tableAcc >= 0.25) {
+    if (this._tableAcc >= 0.5) {
       this._tableAcc = 0;
-      const summary = profiler.Summary(2);
-      if (winAlive) this.RefreshTables(summary);
-      this.RefreshFacts(summary, winAlive);
+      this.RefreshTables(profiler.Summary(2));
     }
     this._slowAcc += dt;
-    if (winAlive && this._slowAcc >= 0.5) {
+    if (this._slowAcc >= 1.0) {
       this._slowAcc = 0;
       this.RefreshSlow(profiler);
     }
@@ -420,7 +400,9 @@ export class ProfilerEditor {
 
   RefreshSlow(profiler) {
     const ui = this.ui;
-    const summary = profiler.Summary(10);
+    // buckets:false —— 取证栏只要 worst 记录本体与事件计数，逐桶的分位数统计
+    // 是这条便宜路径省掉的大头（10 秒窗口 × 二十几个桶的排序，1 秒一次也嫌多）。
+    const summary = profiler.Summary(10, { buckets: false });
     const F = (value) => value.toFixed(2);
     const worst = summary.worst;
     if (worst) {
@@ -458,17 +440,6 @@ export class ProfilerEditor {
         : "（此浏览器无 performance.memory）");
   }
 
-  RefreshFacts(summary, winAlive) {
-    if (!this.facts) return;
-    const F = (value) => value.toFixed(2);
-    this.facts.Set("独立窗口", winAlive ? "已打开" : "没开着（被拦截或被关了）",
-      winAlive ? "good" : "warn");
-    this.facts.Set("帧率", summary.fps ? `${summary.fps.toFixed(0)} fps` : "—");
-    this.facts.Set("整帧", `${F(summary.frame.avg)} / p95 ${F(summary.frame.p95)} ms`);
-    this.facts.Set("主线程", `${F(summary.cpuTotal.avg)} ms`);
-    this.facts.Set("GPU", summary.gpuFrames ? `${F(summary.gpuTotal.avg)} ms`
-      : (summary.timerAvailable ? "等待查询…" : "计时不可用"), summary.timerAvailable ? "" : "warn");
-  }
 }
 
 export default ProfilerEditor;

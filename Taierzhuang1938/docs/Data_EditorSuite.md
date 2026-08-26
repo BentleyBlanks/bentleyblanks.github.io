@@ -227,25 +227,30 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 进入时抓取“视觉 + 碰撞 + 耐久 + 导航”快照；按 R、点「复原预览」或退出时都会
 完整恢复。只清 shader 破口不算复原，因为那会留下看不见但可穿行的物理洞。
 
-### 性能剖析 `Script_EditorProfiler.mjs`（叠加层，独立窗口）
+### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
 与 Debug Rendering 同在「渲染调试（可叠加）」组，不接管相机、不暂停玩法 ——
-它量的就是战斗中的帧。点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`）
-并弹一个 `window.open` 独立窗口：帧时间条图、CPU 主线程逐系统（B/E 标记打在
+它量的就是战斗中的帧。面板里就是一颗开关（**没有页面内面板**，用户点名去掉的）：
+点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`）并弹一个
+`window.open` 独立窗口：帧时间条图、CPU 主线程逐系统（B/E 标记打在
 `Script_Main` 的 Frame/RenderScene 里）、GPU 逐 pass（EXT_disjoint_timer_query_webgl2
 分段计时，阴影烘焙靠包一层 `shadowMap.render` 从预通道里拆出来）、最近 10 秒最差
 一帧的桶归因、GC/长任务/堆分配速率，以及「导出快照 JSON」。
 
-三条特殊行为，改的时候别破坏：
+四条特殊行为，改的时候别破坏：
 
 - **`static keepOnClose = true`**：关设置面板（回去打仗）不收它 —— 主用例就是
-  边玩边记。停它：面板里再点一次，或直接叉掉独立窗口（Update 检测 `win.closed`
-  自我关闭）。玩法进行中页面内小面板自动收起（读 `host.launcherOpen`）。
+  边玩边记。停它：面板里再点一次开关，或直接叉掉独立窗口（Update 检测
+  `win.closed` 自我关闭）。弹窗被拦截时 Enter 抛错、开关弹回，不留瞎状态。
 - **钩子必须成对还原**：Enable 会把 `renderer.info.autoReset` 改成手动、包
   `shadowMap.render`、把自己挂到 `post.profiler`；Exit/Disable 一样不落地还回去。
   守着它的：`Script_ProfilerTest`（render 域）。
 - **GPU 查询结果晚几帧到**（ANGLE/D3D11 连 `gl.finish` 都不算数），`_Poll` 每帧收、
   挂回历史记录；headless 是 SwiftShader，GPU 数字只证明接线，不许当性能结论。
+- **自身开销记在「编辑器叠加层（含本面板）」桶里**，用户看得见：条图每 3 帧一画、
+  表格 0.5 s、取证/事件 1 s（走 `Summary(10, {buckets:false})` 便宜路径）。
+  用户实测过一次 10 ms 的自刷新突刺，节流与便宜路径就是冲它去的 —— 改刷新
+  频率前先看这一桶有没有涨回去。
 
 「CPU 分线程」的诚实口径：玩法期间没有 worker（加载台的旋转 worker 只活在开机），
 逻辑与渲染提交全在主线程；GPU 进程按 pass 列出；WebAudio 在浏览器音频线程，页面

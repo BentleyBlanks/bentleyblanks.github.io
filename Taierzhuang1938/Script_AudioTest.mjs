@@ -452,6 +452,25 @@ else if (shell.rifle < 1) Fail(`Debug.Fire 三次一枪都没打出去（ammo ${
 else if (shell.drop < 1) Fail(`打出 ${shell.rifle} 枪，一次弹壳落地都没要`);
 else Ok(`抛壳走 shellDrop（${shell.variants} 变体 / ${shell.seconds}s），开三枪零记迫击炮`);
 
+// 白刃三音：2026-08-26 从 Sonniss 顶包换成人工选定的 SeedAudio take。
+// 两种回归都是静默的 ——「全量 SfxBake 把 cue 写回借来的顶包」与「挥空掉回一个变体」，
+// 前者听感变回不对的兵器，后者连砍两下复读，都过得了上面「41/41 盖住」那条。
+const melee = await page.evaluate(() => {
+  const cues = window.Taierzhuang.audio.sfxManifest?.cues || {};
+  const pick = (name) => ({
+    variants: cues[name]?.files?.length || 0,
+    seconds: cues[name]?.seconds || 0,
+    license: cues[name]?.license || "",
+  });
+  return { swing: pick("dadaoSwing"), dadao: pick("dadaoHit"), bayonet: pick("bayonetHit") };
+});
+const borrowed = Object.entries(melee).filter(([, v]) => v.license !== "volcengine");
+if (borrowed.length) Fail(`白刃音又变回顶包：${borrowed.map(([k, v]) => `${k}=${v.license || "缺"}`).join(" ")}`);
+else if (melee.swing.variants < 3) Fail(`dadaoSwing 只有 ${melee.swing.variants} 个变体（白刃是连续动作，连砍会复读）`);
+else if (melee.swing.seconds > 0.8) Fail(`dadaoSwing 长达 ${melee.swing.seconds}s —— 挥空音没有那么长，多半是切点跑了`);
+else Ok(`白刃三音走 SeedAudio（挥空 ${melee.swing.variants} 变体 / ${melee.swing.seconds}s、`
+  + `砍中 ${melee.dadao.seconds}s、刺中 ${melee.bayonet.seconds}s）`);
+
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 
 await browser.close();

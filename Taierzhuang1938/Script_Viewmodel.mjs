@@ -1158,6 +1158,41 @@ const HIP_POSES = {
   melee: { px: 0.235, py: -0.195, pz: -0.520, rx: 0.720, ry: -0.620, rz: 1.540 },
 };
 
+// 上刺刀那套动作用到的几个数（口径见 docs/Data_Bayonet.md「动画」一节）。
+//
+// SHEATH_HAND：左手离开护木、下探取刀那一下的手位（枪局部坐标，原点是右手握把）。
+//   **不能真摆到腰上**：整副手臂是挂在枪身下面的（没有躯干可参照），把手位摆到
+//   腰的高度就等于摆到相机前 20 cm —— 出图上是一只手糊满半个屏幕、腕子还被近裁面
+//   切开。所以这一下只是"从护木上松开、往下沉一截"，落点仍在枪的前下方。
+// BAYONET_SLIDE_Z：**左手到不了枪口，所以最后一段由刀自己走。**
+//   实测这副手臂 bicep→forearm→wrist 一共 0.624 m，而枪口离左肩 1.0 m 上下。
+//   试过把左肩再往枪口送（送 0.08 m 就够手摸到枪口了），代价是蒙皮把肩到大臂
+//   那一段拉出一片鱼鳍横在画面左边缘 —— 这副手臂没有躯干，肩一挪就露馅。
+//   于是口径定成：手推到伸得到的最前面（枪管中段），刀从那儿沿枪管滑进枪口环，
+//   读起来是"手把刀往枪口一推、咔哒一声扣住"。别再去挪肩，出图会告诉你为什么。
+// BAYONET_CARRY：上了刺刀之后改端"刺杀预备"（只加在腰射姿态上）。
+//
+//   **这一条是"上了刺刀枪却一点变化都没有"的解，而且它必须给这么大。**
+//   刀是顺着枪管指出去的，而腰射时枪管几乎就顺着视线方向 —— 半米长的刀在屏幕上
+//   被自己的枪管挡得一干二净。逐档量过（涂红刀件数可见像素，见 docs/Data_Bayonet.md
+//   「为什么姿态要动这么大」）：腰射 1 px、开镜 0、冲刺 0、劈刺出招 0 —— 也就是说
+//   在**任何**姿态下玩家都看不见自己上了刺刀。而这条曲线不是线性的，是一道坎：
+//     ry 0.15→7 px，0.30→4，0.45→23，0.52→26，**0.55→91，0.60→224**
+//   —— 刀身要么整条藏在枪管剪影后面，要么整条露出来，中间没有"露一半"这一档。
+//   所以给不到 0.55 就等于没给。抬高枪口（rx）同理：0.20→12、0.30 配 0.55→239。
+//
+//   这也正是端着刺刀的兵真实的持枪法：刺杀预备是把枪斜端在身前、枪口朝左上，
+//   不是端平了顺着自己的视线。**代价**是枪口离准心远了：腰射时枪口在准心左上约
+//   250 px。这是自觉的取舍 —— 上不上刺刀是玩家自己按 X 决定的，
+//   而开镜姿态一个数都没动（照门落屏幕正中那条恒等式还是恒等式）。
+//   出招那一下（melee）会把这份姿态压掉大半，枪重新对着准心捅出去。
+const SHEATH_HAND = new THREE.Vector3(0.010, -0.150, -0.470);
+// 刀扣上去的最后一段行程（米，沿枪管往前滑）。
+const BAYONET_SLIDE_Z = 0.145;
+const BAYONET_CARRY = { px: -0.015, py: 0.016, pz: 0.035, rx: 0.275, ry: 0.575, rz: 0.100 };
+// 出招时把"刺杀预备"压掉多少（0 = 完全压平）。留一点点斜度，收招回位才不生硬。
+const BAYONET_CARRY_STRIKE = 0.22;
+
 function PoseKindOf(weapon) {
   if (!weapon) return "rifle";
   if (weapon.kind === "lmg" || weapon.kind === "hmg") return "lmg";
@@ -1258,6 +1293,13 @@ export class Viewmodel {
     // 刺刀是否装在枪上。逻辑归 Main 的 state 管，这里只是渲染侧镜像：
     // Equip 重建 rig 后靠它恢复可见性，深度预算也按它给刀身留量。
     this.bayonetFixed = false;
+    // 刀件的静止变换（装上之后它就该老实待在枪口环上）。装/卸动画会把它拿到
+    // 左手上走一段，每帧归位靠这一份，见 _ResetAnimatedParts。
+    this.bayonetHome = null;
+    // 上刺刀持枪姿态的权重（0 没刀 / 1 上着刀）。用指数逼近而不是弹簧：
+    // 这条曲线不许过冲，过冲会让枪在装完那一下往回甩一眼可见的一下。
+    this.bayonetCarry = 0;
+    this.carryOverride = null;   // 装/卸动画期间由 _AnimFixBayonet 每帧写
     this.adsSuppress = 1;      // 拉栓/装填时枪离开瞄准线的程度，相机 FOV 也读它
     this.bobPhase = 0;
     this.elapsed = 0;
@@ -1320,6 +1362,7 @@ export class Viewmodel {
     this._geometries = new Set();
     this._tmpVec = new THREE.Vector3();
     this._tmpVec2 = new THREE.Vector3();
+    this._tmpVec3 = new THREE.Vector3();
     this._tmpQuat = new THREE.Quaternion();
   }
 
@@ -1489,6 +1532,12 @@ export class Viewmodel {
     // 刺刀可见性跟着装配状态走（换枪重建 rig，可见性得重新种一遍）
     if (this.rig.parts.bayonet) {
       this.rig.parts.bayonet.visible = this.bayonetFixed && !!this.weapon.bayonet;
+      this.bayonetHome = {
+        position: this.rig.parts.bayonet.position.clone(),
+        rotation: this.rig.parts.bayonet.rotation.clone(),
+      };
+    } else {
+      this.bayonetHome = null;
     }
 
     // 姿态表
@@ -2091,8 +2140,26 @@ export class Viewmodel {
     this.recoilPivot.rotation.set(rPitch, rYaw, rYaw * 0.85, "YXZ");
 
     // --- 姿态插值：腰射 → 开镜 → 冲刺 ---------------------------------------
+    // 上了刺刀先给腰射姿态加一份"端刺刀"的增量（见 BAYONET_CARRY 的抬头）。
+    // 只加在腰射上：开镜姿态是解出来让照门落在屏幕正中的，动一个数就歪。
+    // 出招那一下压平（见 BAYONET_CARRY_STRIKE）：斜端着的枪要先摆正才谈得上
+    // "照着准心捅出去"。蓄力段不压 —— 那一段本来就是把枪往后拉的预备姿态。
+    const striking = !!(this.action && this.action.kind === "melee");
+    // 装/卸刺刀那 0.95 s 里不走这条：那段动画自己就在转枪（ry 0.34），
+    // 再叠一份 0.575 等于把枪甩出画面左上角。那段由动画自己给权重（carryOverride），
+    // 末段与抬枪交接，读起来正好是"扣上刀之后把枪端稳"。
+    const fixing = !!(this.action && this.action.kind === "fixBayonet");
+    const carryTarget = this.bayonetFixed && this.weapon && this.weapon.bayonet && !fixing
+      ? (striking ? BAYONET_CARRY_STRIKE : 1) : 0;
+    // 装/卸刺刀期间由动画自己说了算（this.carryOverride）：那 0.95 s 里枪本来就在
+    // 转，交给指数逼近会先回一趟腰射姿态再斜端起来，画面上是明显的一下回弹。
+    if (fixing && this.carryOverride != null) this.bayonetCarry = this.carryOverride;
+    this.bayonetCarry += (carryTarget - this.bayonetCarry) * (1 - Math.exp(-step * 7));
     if (this.rig) {
-      const pose = this._MixPose(this.hipPose, this.adsPose, ads);
+      const hip = this.bayonetCarry > 1e-3
+        ? this._AddPose(this.hipPose, BAYONET_CARRY, this.bayonetCarry)
+        : this.hipPose;
+      const pose = this._MixPose(hip, this.adsPose, ads);
       const finalPose = this._MixPose(pose, this.sprintPose, Clamp01(sprintValue));
       this.weaponMount.position.set(finalPose.px, finalPose.py, finalPose.pz);
       this.weaponMount.rotation.set(finalPose.rx, finalPose.ry, finalPose.rz, "YXZ");
@@ -2109,6 +2176,14 @@ export class Viewmodel {
     this._StepFlash(step);
     this._StepDebris(step);
     if (this.riggedArms) this.riggedArms.Update(step);
+  }
+
+  /** 姿态 + 增量×权重。上刺刀的"端刺刀"姿态就是这么叠上去的。 */
+  _AddPose(a, delta, w) {
+    return {
+      px: a.px + delta.px * w, py: a.py + delta.py * w, pz: a.pz + delta.pz * w,
+      rx: a.rx + delta.rx * w, ry: a.ry + delta.ry * w, rz: a.rz + delta.rz * w,
+    };
   }
 
   _MixPose(a, b, t) {
@@ -2190,6 +2265,7 @@ export class Viewmodel {
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
     this.swingPivot.rotation.set(0, 0, 0);
+    this.carryOverride = null;   // 装/卸刺刀动画每帧自己写，见 _AnimFixBayonet
     if (!this.rig) return;
     this.handRight.group.position.copy(this.handBase.right);
     this.handRight.group.rotation.copy(this.handBaseRot.right);
@@ -2201,6 +2277,12 @@ export class Viewmodel {
     if (cover && !this.boltOpen) cover.position.z = 0;
     const mag = this.rig.parts.magazine;
     if (mag) { mag.position.set(0, 0, 0); mag.visible = true; }
+    // 刀件：装/卸刺刀那一段会把它挪走，其余任何一帧都必须是静止值
+    const bayonet = this.rig.parts.bayonet;
+    if (bayonet && this.bayonetHome) {
+      bayonet.position.copy(this.bayonetHome.position);
+      bayonet.rotation.copy(this.bayonetHome.rotation);
+    }
     if (!this.action || this.action.kind !== "reload") this.clipProp.visible = false;
   }
 
@@ -2398,27 +2480,71 @@ export class Viewmodel {
   }
 
   /**
-   * 装/卸刺刀：枪抬到胸前偏左侧立起来，左手离开护木去枪口按/拔，
-   * 中段（t=0.52，左手贴到枪口时）翻可见性 —— "咔哒"就落在那一下。
+   * 装/卸刺刀。**一整套双手动作**，不是"枪自己抬一下"：
+   *
+   *   0.00—0.22  枪往回带、枪口抬起转向左前 —— 把要装的那一头转到看得见的位置
+   *   0.10—0.46  左手离开护木往下一沉（取刀）
+   *   0.34—0.58  左手沿枪身往前推；刀沿枪管滑进枪口环，0.58 到位（"咔哒"在这一帧）
+   *   0.56—0.76  左手在枪身上按实一下（整枪跟着轻轻一沉；卸刀没有这一下）
+   *   0.58—1.00  抬枪退场、"刺杀预备"进场，两条曲线叠着走，中间不回腰射
+   *
+   * 卸刀是同一条时间轴反过来读：手推上去、0.52 起把刀往后拔、0.80 收起不见。
+   *
+   * 手为什么不摸到枪口：见 BAYONET_SLIDE_Z 的抬头 —— 胳膊就是不够长，
+   * 而把肩挪过去会在画面左边缘拉出一片鱼鳍。最后那一段交给刀自己走。
    */
   _AnimFixBayonet(t, a) {
-    const raise = Ease.InOut(Ease.Seg(t, 0.00, 0.25)) - Ease.InOut(Ease.Seg(t, 0.78, 1.00));
-    // 装上那一下整枪轻轻一沉（卸下没有）
-    const settle = a.fix ? Ease.Pulse(Ease.Seg(t, 0.52, 0.72)) : 0;
-    this.actionPivot.position.set(-0.030 * raise, 0.030 * raise - 0.012 * settle, 0.070 * raise);
-    this.actionPivot.rotation.set(0.32 * raise + 0.05 * settle, 0.26 * raise, -0.35 * raise, "YXZ");
+    const fix = !!a.fix;
+    const bayonet = this.rig.parts.bayonet;
 
-    // 左手：0.20—0.50 伸向枪口，0.60—0.85 收回护木
-    const reach = Ease.InOut(Ease.Seg(t, 0.20, 0.50)) - Ease.InOut(Ease.Seg(t, 0.60, 0.85));
+    // --- 枪：端回胸前、枪口转向左前 -----------------------------------------
+    const raise = Ease.InOut(Ease.Seg(t, 0.00, 0.22)) - Ease.InOut(Ease.Seg(t, 0.70, 1.00));
+    // 末段把"刺杀预备"接上：抬枪在 0.70—1.00 退场，端刺刀姿态在 0.58—1.00 进场，
+    // 两条曲线叠着走，枪从"举在面前上刀"直接转进"斜端着"，中间不回腰射。
+    this.carryOverride = fix
+      ? Ease.InOut(Ease.Seg(t, 0.58, 1.00))
+      : 1 - Ease.InOut(Ease.Seg(t, 0.00, 0.34));
+    // 扣上那一下整枪一沉（卸刀是往外拔，没有这一沉）
+    const settle = fix ? Ease.Pulse(Ease.Seg(t, 0.56, 0.76)) : 0;
+    this.actionPivot.position.set(-0.030 * raise, 0.042 * raise - 0.014 * settle, 0.090 * raise);
+    // ry > 0 把枪口扫向画面左侧：枪身横过来，玩家才看得见自己在枪口上装东西。
+    // 0.34 是上限附近 —— 再大枪口就撞出画面左上角（0.42 那一版实拍是飞出去的）。
+    this.actionPivot.rotation.set(0.22 * raise + 0.05 * settle, 0.34 * raise,
+      -0.24 * raise, "YXZ");
+
+    // --- 左手：护木 → 下沉取刀 → 枪管前段 ----------------------------------
+    const dip = Ease.InOut(Ease.Seg(t, 0.10, 0.32)) - Ease.InOut(Ease.Seg(t, 0.32, 0.48));
+    const mount = Ease.InOut(Ease.Seg(t, 0.34, 0.56)) - Ease.InOut(Ease.Seg(t, 0.68, 0.92));
     const muzzle = this.rig.muzzle;
-    this._tmpVec.set(muzzle.x - 0.010, muzzle.y - 0.020, muzzle.z + 0.100);
-    this.handLeft.group.position.lerpVectors(this.handBase.left, this._tmpVec, reach);
+    // 目标摆在枪口后方 0.19 m。手其实到不了这儿（胳膊差着 0.3 m，见
+    // BAYONET_SLIDE_Z 的抬头），IK 会把它停在伸得到的最前面 —— 这正是要的：
+    // 手推到枪管前段，刀从那儿自己滑进枪口环。
+    const hold = this._tmpVec2.set(muzzle.x - 0.048, muzzle.y - 0.042, muzzle.z + 0.190);
+    const hand = this._tmpVec.copy(this.handBase.left);
+    hand.lerp(SHEATH_HAND, dip);          // 先松开、往下沉一截（取刀）
+    hand.lerp(hold, mount);               // 再沿枪身往前推
+    this.handLeft.group.position.copy(hand);
+    // 手腕跟着翻：探刀时手心向下，扣刀时虎口朝枪口
+    this.handLeft.group.rotation.set(
+      this.handBaseRot.left.x + 0.55 * dip - 0.30 * mount,
+      this.handBaseRot.left.y - 0.35 * dip + 0.45 * mount,
+      this.handBaseRot.left.z + 0.40 * dip + 0.20 * mount, "YXZ");
 
-    if (t >= 0.52 && !a.applied) {
-      a.applied = true;
-      if (this.rig.parts.bayonet) {
-        this.rig.parts.bayonet.visible = !!a.fix && !!(this.weapon && this.weapon.bayonet);
-      }
+    // --- 刀：沿枪管滑上枪口环 / 拔下来 --------------------------------------
+    if (bayonet && this.bayonetHome) {
+      // slide = 1 刀还在后面（手推的位置），0 已经扣进枪口环
+      const slide = fix
+        ? 1 - Ease.Out(Ease.Seg(t, 0.44, 0.58))       // 装：0.58 到位，"咔哒"
+        : Ease.In(Ease.Seg(t, 0.52, 0.72));           // 卸：往后拔出来
+      const show = fix ? t >= 0.42 : t < 0.80;
+      bayonet.visible = show && !!(this.weapon && this.weapon.bayonet);
+      bayonet.position.set(this.bayonetHome.position.x,
+        this.bayonetHome.position.y - 0.004 * slide,
+        this.bayonetHome.position.z + BAYONET_SLIDE_Z * slide);
+      // 滑上去的时候刀身略歪一点，到位那一下正过来（"咔哒"卡进环里的感觉）
+      bayonet.rotation.set(this.bayonetHome.rotation.x - 0.05 * slide,
+        this.bayonetHome.rotation.y + 0.06 * slide,
+        this.bayonetHome.rotation.z + 0.04 * slide, "YXZ");
     }
   }
 

@@ -28,7 +28,7 @@ await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&qualit
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
-const result = await page.evaluate(() => {
+const result = await page.evaluate(async () => {
   const T = window.Taierzhuang;
   const out = {};
   T.player.health = 100;
@@ -94,6 +94,36 @@ const result = await page.evaluate(() => {
   out.mouseKilled = !second.alive;
   T.StepFrames(80);
 
+  // --- 4.5) 画面闸：上了刺刀，刀在腰射姿态下必须真的看得见 -------------------
+  //
+  // 为什么要量像素而不是量 visible：这条链上"visible = true"曾经全绿了很久，
+  // 而玩家在画面上一个刺刀都看不到 —— 刀顺着枪管指出去，整条藏在枪管剪影后面
+  // （实测腰射 1 px、开镜 0、冲刺 0、劈刺 0）。口径与取证见 docs/Data_Bayonet.md
+  // 「上了刺刀就换持枪法」。量法：把刀件涂成纯红、depthTest 照常（枪该挡还挡），
+  // 数屏幕上剩多少红像素，就是刀真正读得出的面积。
+  {
+    const THREE = await import("./vendor/three/build/three.module.js");
+    const src = document.getElementById("view");
+    const bay = T.viewmodel.rig.parts.bayonet;
+    const swapped = [];
+    bay.traverse((n) => { if (n.isMesh) swapped.push([n, n.material]); });
+    const red = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    for (const [n] of swapped) n.material = red;
+    T.StepFrames(6);
+    const c = document.createElement("canvas");
+    c.width = src.width; c.height = src.height;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(src, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    let seen = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 140 && data[i + 1] < 70 && data[i + 2] < 70) seen += 1;
+    }
+    for (const [n, m] of swapped) n.material = m;
+    T.StepFrames(2);
+    out.bladePixels = seen;
+  }
+
   // --- 5) 换到短枪再换回来：刺刀还装着；X 对不可装刺刀的枪不生效 -------------
   T.Debug.Key("Digit4");                   // 投掷物槽（第二关没有短枪）
   T.StepFrames(20);
@@ -125,6 +155,8 @@ const checks = [
   ["空枪左键按住进入蓄力", result.mouseCharge === true],
   ["空枪松手出招且是劈刺", result.mouseMode === "thrust"],
   ["空枪白刃也放得倒人", result.mouseKilled === true],
+  [`上刺刀后刀身在画面上读得出（腰射 ${result.bladePixels} px ≥ 60）`,
+    result.bladePixels >= 60],
   ["换枪往返后刺刀还装着", result.keptAcrossSwitch === true && result.backVisible === true],
   ["X 再按一次卸下且刀收起", !result.unfixed.state && !result.unfixed.visible],
   ["无控制台报错", errors.length === 0],
