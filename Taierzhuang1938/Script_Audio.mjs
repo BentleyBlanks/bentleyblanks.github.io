@@ -1422,6 +1422,77 @@ export const SFX_PACK_VERSION = "7";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
+// ---- 采样取数：并发闸 + 重试 ----------------------------------------------
+//
+// 三个包是**一解锁就同时开拉**的：70 条人声 + 41 条音效 + 10 条环境床 + 9 段音乐，
+// 一百三十来个请求一口气全甩出去。这在本地预览下不总是安全的 —— 同一台机器上
+// 往往还有别的 agent 在跑重活，突发里被掐掉几条连接是常事。而这里每一条失败都是
+// **静默**的：吞掉、计数、退回合成，表现只是「怎么听着还是那套合成音」。
+//
+// 两道保险：
+//   · 并发闸 8 条 —— 把突发摊平。本地盘上总时长基本不变（瓶颈从来不是并发度）。
+//   · 失败重试两次 —— 一次抖动不该让**整包**退回合成：清单读不到就是全包皆输。
+//
+// 还有一条同样要紧：把**解析后的绝对 URL** 写进错误里。载不到时最该知道的是
+// 「它到底去要了哪个地址」——多 agent 并行时最常见的原因就是浏览器指在了别人
+// 那棵树上，而那种错光看「70 条读不到」是永远查不出来的。
+const AUDIO_FETCH_LIMIT = 8;
+// 整包最多自动拉几轮（每轮内部每个文件还各自重试 2 次）。
+const PACK_ATTEMPTS = 2;
+let audioFetchLive = 0;
+const audioFetchWaiting = [];
+
+function AudioFetchAcquire() {
+  if (audioFetchLive < AUDIO_FETCH_LIMIT) { audioFetchLive += 1; return Promise.resolve(); }
+  return new Promise((resolve) => audioFetchWaiting.push(resolve));
+}
+
+function AudioFetchRelease() {
+  const next = audioFetchWaiting.shift();
+  if (next) next();                 // 名额直接交棒，不回落计数，否则会超发
+  else audioFetchLive -= 1;
+}
+
+/** 把相对路径解析成绝对 URL，只用来写错误信息。 */
+export function AudioAssetUrl(url) {
+  try {
+    const here = (typeof location !== "undefined" && location.href) ? location.href : "http://127.0.0.1/";
+    return new URL(url, here).href;
+  } catch { return url; }
+}
+
+/**
+ * 取一份音频资产（ArrayBuffer），带并发闸与重试。
+ * 失败时抛出的异常里带绝对 URL —— 上层一律把它原样计进 *Errors。
+ */
+export async function FetchAudioAsset(url, retries = 2) {
+  let last = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    await AudioFetchAcquire();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.arrayBuffer();
+    } catch (err) {
+      last = err;
+    } finally {
+      AudioFetchRelease();
+    }
+    // 退避 40 / 160 ms：突发掐连接那种失败重来一次就够，等太久会把开局拖长。
+    if (attempt < retries) {
+      const wait = 40 * (attempt + 1) * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+  throw new Error(`${(last && last.message) || "取不到"} @ ${AudioAssetUrl(url)}`);
+}
+
+/** 同上，但拿的是 JSON 清单。 */
+export async function FetchAudioJson(url, retries = 2) {
+  const buf = await FetchAudioAsset(url, retries);
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(buf)));
+}
+
 /** 连发武器的射速（秒/发），与合成版 GunAuto 用的是同一组史实数字。 */
 const SAMPLE_BURST = {
   zb26: 60 / 500,      // 捷克式 500 rpm
@@ -2043,36 +2114,68 @@ export class AudioEngine {
     // 解锁前设过的环境/音乐是「挂起」状态，这里补跑一次。
     if (this.ambiencePreset && this.ambiencePreset !== "silence") this.Ambience(this.ambiencePreset);
     if (this.musicCue) this.Music(this.musicCue);
-    // 人声采样在这儿载入而不是在构造里：解锁之前根本没有 AudioContext，
+    // 三个包在这儿载入而不是在构造里：解锁之前根本没有 AudioContext，
     // decodeAudioData 无处可去。放在手势之后也顺带避免了"页面一开就拉 300 KB"。
-    // 失败不影响任何其他功能 —— 没有配音的战场仍然是能打的战场。
-    if (!this.voicesReady && !this.voiceLoading) {
+    this.LoadPacks();
+  }
+
+  /**
+   * 拉三个实录包。四份并行，各自失败各自算 —— 没有配音的战场仍然是能打的战场。
+   * 拆出来单开一个方法是为了 ReloadPacks 能重跑同一段：载不到的时候，
+   * 「再试一次」比「重开一局」便宜得多。
+   */
+  LoadPacks() {
+    if (!this.ctx || this.disposed) return;
+    // 失败之后允许**再自动试一次**（下一次手势时），到 PACK_ATTEMPTS 为止。
+    // 不设上限的话，服真的挂了会变成"每点一下就重拉一百三十个请求"；
+    // 一次都不再试的话，开局那一下网络抖动就永久把整局摁在合成音上。
+    this.packAttempts = this.packAttempts || { voice: 0, sfx: 0, amb: 0, music: 0 };
+    const a = this.packAttempts;
+    if (!this.voicesReady && !this.voiceLoading && a.voice < PACK_ATTEMPTS) {
       this.voiceLoading = true;
-      this.LoadVoices(VOICE_BASE, VOICE_LINES).catch(() => {});
+      a.voice += 1;
+      this.LoadVoices(VOICE_BASE, VOICE_LINES).catch(() => {}).then(() => { this.voiceLoading = false; });
     }
     // 实录音效同理：解锁之后才有 ctx 可以 decode。约 350 KB，与人声并行拉。
-    if (!this.sfxReady && !this.sfxLoading) {
+    if (!this.sfxReady && !this.sfxLoading && a.sfx < PACK_ATTEMPTS) {
       this.sfxLoading = true;
-      this.LoadSfxPack(SFX_BASE).catch(() => {});
+      a.sfx += 1;
+      this.LoadSfxPack(SFX_BASE).catch(() => {}).then(() => { this.sfxLoading = false; });
     }
     // 环境床约 1.2 MB，是三个包里最大的一份，但**必须和别的并行拉**：
     // 串在音效后面的话，开局头十几秒是一片死寂，那正是玩家第一次听这个游戏的时候。
-    if (!this.ambReady && !this.ambLoading) {
+    if (!this.ambReady && !this.ambLoading && a.amb < PACK_ATTEMPTS) {
       this.ambLoading = true;
+      a.amb += 1;
       this.LoadAmbPack(AMB_BASE).then((n) => {
         // 载完时如果已经在某一档环境里了，就地重开一次 —— 否则这一关自始至终
         // 都在用合成兜底的那层风，玩家听不到刚下载完的那 1.2 MB。
         if (n > 0 && this.ambiencePreset && this.ambiencePreset !== "silence") this.Ambience(this.ambiencePreset);
-      }).catch(() => {});
+      }).catch(() => {}).then(() => { this.ambLoading = false; });
     }
     // 音乐 1.8 MB，最后拉。同样要在载完后补一次 —— 否则「进城前」那段
     // 永远赶不上开机那一刻。
-    if (!this.musicReady && !this.musicLoading) {
+    if (!this.musicReady && !this.musicLoading && a.music < PACK_ATTEMPTS) {
       this.musicLoading = true;
+      a.music += 1;
       this.LoadMusicPack(MUSIC_BASE).then((n) => {
         if (n > 0 && this.musicCue) this.Music(this.musicCue);
-      }).catch(() => {});
+      }).catch(() => {}).then(() => { this.musicLoading = false; });
     }
+  }
+
+  /**
+   * 清掉上一轮的报错重拉一遍（编辑器「引擎」栏那个按钮）。
+   * 载不到的第一嫌疑是「浏览器指在了别的树上 / 预览服被别的 agent 顶掉了」，
+   * 那种情况换个服再点一下就好，不必重开一局。
+   */
+  ReloadPacks() {
+    this.packAttempts = { voice: 0, sfx: 0, amb: 0, music: 0 };
+    this.voiceErrors = [];
+    this.sfxErrors = [];
+    this.ambErrors = [];
+    this.musicErrors = [];
+    this.LoadPacks();
   }
 
   get Ready() {
@@ -2176,14 +2279,13 @@ export class AudioEngine {
    */
   async LoadVoices(base, entries) {
     if (!this.ctx || this.disposed || !Array.isArray(entries)) return 0;
-    this.voiceErrors = this.voiceErrors || [];
+    this.voiceErrors = [];
     let ok = 0;
     await Promise.all(entries.map(async (e) => {
       try {
         // 声库资产覆写同名 MP3 时也必须换 URL，否则玩家只会听到浏览器缓存里的旧 take。
-        const res = await fetch(`${base}${e.file}?v=20260822qwenprologue`);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+        const bytes = await FetchAudioAsset(`${base}${e.file}?v=20260822qwenprologue`);
+        const buf = await this.ctx.decodeAudioData(bytes);
         const name = "voice." + e.key;
         RECIPES[name] = (A, v) => {
           const src = v.Own(A.ctx.createBufferSource());
@@ -2227,11 +2329,10 @@ export class AudioEngine {
    */
   async LoadSfxPack(base = SFX_BASE) {
     if (!this.ctx || this.disposed) return 0;
+    this.sfxErrors = [];
     let manifest = null;
     try {
-      const res = await fetch(base + "Data_SfxManifest.json?v=" + SFX_PACK_VERSION);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      manifest = await res.json();
+      manifest = await FetchAudioJson(base + "Data_SfxManifest.json?v=" + SFX_PACK_VERSION);
     } catch (err) {
       this.sfxErrors.push({ file: "Data_SfxManifest.json", message: err && err.message });
       return 0;
@@ -2243,9 +2344,7 @@ export class AudioEngine {
       const files = entry.files || (entry.file ? [entry.file] : []);
       try {
         const buffers = await Promise.all(files.map(async (file) => {
-          const res = await fetch(base + file + "?v=" + SFX_PACK_VERSION);
-          if (!res.ok) throw new Error(file + " HTTP " + res.status);
-          return this.ctx.decodeAudioData(await res.arrayBuffer());
+          return this.ctx.decodeAudioData(await FetchAudioAsset(base + file + "?v=" + SFX_PACK_VERSION));
         }));
         if (!buffers.length) throw new Error("清单里没有文件");
         if (cue === "bugleTone") {
@@ -2288,11 +2387,10 @@ export class AudioEngine {
    */
   async LoadAmbPack(base = AMB_BASE) {
     if (!this.ctx || this.disposed) return 0;
+    this.ambErrors = [];
     let manifest = null;
     try {
-      const res = await fetch(base + "Data_AmbManifest.json?v=" + AMB_PACK_VERSION);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      manifest = await res.json();
+      manifest = await FetchAudioJson(base + "Data_AmbManifest.json?v=" + AMB_PACK_VERSION);
     } catch (err) {
       this.ambErrors.push({ file: "Data_AmbManifest.json", message: err && err.message });
       return 0;
@@ -2303,9 +2401,8 @@ export class AudioEngine {
     const beds = Object.entries(manifest.beds || {});
     await Promise.all(beds.map(async ([bed, entry]) => {
       try {
-        const res = await fetch(base + entry.file + "?v=" + AMB_PACK_VERSION);
-        if (!res.ok) throw new Error(entry.file + " HTTP " + res.status);
-        const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+        const bytes = await FetchAudioAsset(base + entry.file + "?v=" + AMB_PACK_VERSION);
+        const buf = await this.ctx.decodeAudioData(bytes);
         this.ambBuffers.set(bed, buf);
         ok += 1;
       } catch (err) {
@@ -2318,9 +2415,7 @@ export class AudioEngine {
       const files = entry.files || (entry.file ? [entry.file] : []);
       try {
         const buffers = await Promise.all(files.map(async (file) => {
-          const res = await fetch(base + file + "?v=" + AMB_PACK_VERSION);
-          if (!res.ok) throw new Error(file + " HTTP " + res.status);
-          return this.ctx.decodeAudioData(await res.arrayBuffer());
+          return this.ctx.decodeAudioData(await FetchAudioAsset(base + file + "?v=" + AMB_PACK_VERSION));
         }));
         if (!buffers.length) throw new Error("清单里没有文件");
         const name = "amb." + cue.replace(/^amb/, "").replace(/^./, (c) => c.toLowerCase());
@@ -2351,11 +2446,10 @@ export class AudioEngine {
    */
   async LoadMusicPack(base = MUSIC_BASE) {
     if (!this.ctx || this.disposed) return 0;
+    this.musicErrors = [];
     let manifest = null;
     try {
-      const res = await fetch(base + "Data_MusicManifest.json?v=" + MUSIC_PACK_VERSION);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      manifest = await res.json();
+      manifest = await FetchAudioJson(base + "Data_MusicManifest.json?v=" + MUSIC_PACK_VERSION);
     } catch (err) {
       this.musicErrors.push({ file: "Data_MusicManifest.json", message: err && err.message });
       return 0;
@@ -2363,9 +2457,8 @@ export class AudioEngine {
     let ok = 0;
     await Promise.all(Object.entries(manifest.cues || {}).map(async ([cue, entry]) => {
       try {
-        const res = await fetch(base + entry.file + "?v=" + MUSIC_PACK_VERSION);
-        if (!res.ok) throw new Error(entry.file + " HTTP " + res.status);
-        this.musicBuffers.set(cue, await this.ctx.decodeAudioData(await res.arrayBuffer()));
+        const bytes = await FetchAudioAsset(base + entry.file + "?v=" + MUSIC_PACK_VERSION);
+        this.musicBuffers.set(cue, await this.ctx.decodeAudioData(bytes));
         ok += 1;
       } catch (err) {
         this.musicErrors.push({ file: entry.file || cue, message: err && err.message });

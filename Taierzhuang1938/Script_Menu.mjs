@@ -3,6 +3,8 @@
 // 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的那张地图），
 // 一切「真的去做点什么」都通过 host 回调交回装配层（Script_Main）：
 //   host.Play(index, opts)   进某一关
+//   host.PlaySandbox()       进选章末尾那条沙盒（玩法测试靶场，重载页面）
+//   host.ExitSandbox()       从靶场退回正片
 //   host.Resume()            从暂停回到游戏
 //   host.SliceIndex()        现在建好的是哪一关的切片（决定用哪一组机位）
 //   host.Unlock()            第一次点击时解锁音频（浏览器要用户手势）
@@ -220,7 +222,10 @@ export class MainMenu {
    *   root         DOM 容器（#menu）
    *   camera       THREE.PerspectiveCamera —— 只在 title 态被接管，暂停态不碰
    *   phases       Data_Battle.PHASES
+   *   sandbox      可选：选章末尾那条沙盒条目（Data_Range.RANGE_PHASE）
+   *   sandboxMode  这一局本身是否跑在沙盒里（?range=1）
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
+   *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
    *   Resume()     暂停态的「继续」
    *   Settings()   暂停态的「设置」
    *   DebugOptions() / SetDebugOption(id, on) 调试选项的读取与写入
@@ -233,6 +238,17 @@ export class MainMenu {
     this.root = host.root;
     this.camera = host.camera;
     this.phases = host.phases || [];
+    /**
+     * 选章末尾那一条**沙盒条目**（玩法测试靶场，`Data_Range.RANGE_PHASE`）。
+     * 它与七关并排摆在同一张列表上，但**不进 `this.phases`** —— 进度、「继续」、
+     * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
+     * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
+     */
+    this.sandbox = host.sandbox || null;
+    /** 列表上真正排出来的条目 = 七关 + 可选的沙盒条目。键盘上下也按它走。 */
+    this.entries = this.sandbox ? [...this.phases, this.sandbox] : [...this.phases];
+    /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
+    this.sandboxMode = !!host.sandboxMode;
 
     this.open = false;
     /** live = 开机菜单（接管相机、跑运镜）；暂停态是 false（世界冻在原地）。 */
@@ -251,6 +267,9 @@ export class MainMenu {
 
     this.el = {};
     this.Build();
+    // 建完先藏起来。以前构造完必定紧跟一次 Open()，所以这一行不写也看不出来；
+    // 靶场里菜单只当暂停层用（开机不 Open），不藏就是一屏标题盖在场地上。
+    this.root.classList.add("off");
     this.BindInput();
   }
 
@@ -319,8 +338,22 @@ export class MainMenu {
     ];
   }
 
-  /** 暂停态：继续、设置与退出路径都留在同一层。 */
+  /**
+   * 暂停态：继续、设置与退出路径都留在同一层。
+   *
+   * 靶场里**不给「选章」与「主菜单」**：靶场是整表替换（PHASE_TABLE 只有它一关），
+   * 换关与回主菜单都必须重载页面，摆一颗当场换不了关的按钮只会骗人。
+   * 那两条合成一条「退出靶场」——重载回正片，落在主菜单上。
+   */
   PauseItems() {
+    if (this.sandboxMode) {
+      return [
+        { id: "resume", label: "继续", hint: "回到靶场" },
+        { id: "settings", label: "设置", hint: "操作、画面与声音" },
+        { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
+        { id: "exitSandbox", label: "退出靶场", hint: "重载回正片，回到主菜单" },
+      ];
+    }
     return [
       { id: "resume", label: "继续", hint: "回到这一关" },
       { id: "settings", label: "设置", hint: "操作、画面与声音" },
@@ -388,12 +421,14 @@ export class MainMenu {
     prologue.addEventListener("click", () => this.host.PlayPrologue?.());
     this.el.levelList.appendChild(prologue);
 
-    this.levelEls = this.phases.map((phase, i) => {
+    this.levelEls = this.entries.map((phase, i) => {
       const b = document.createElement("button");
-      b.className = "mnLevel";
+      b.className = phase.sandbox ? "mnLevel mnSandboxLevel" : "mnLevel";
       b.dataset.i = String(i);
-      // 关号取标题里的那个序数字（「二 · 东关」-> 「二」），名字取后半
-      const [no, ...rest] = phase.label.split("·");
+      // 关号取标题里的那个序数字（「二 · 东关」-> 「二」），名字取后半。
+      // 沙盒条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的关号列。
+      const [no, ...rest] = phase.sandbox
+        ? ["靶", phase.label] : phase.label.split("·");
       const mkSpan = (cls, text) => {
         const s = document.createElement("span");
         s.className = cls;
@@ -403,7 +438,8 @@ export class MainMenu {
       };
       mkSpan("mnLvNo", no.trim());
       mkSpan("mnLvName", (rest.join("·") || phase.label).trim());
-      mkSpan("mnLvDate", phase.date);
+      // 副行给日期；沙盒没有日期（它的 date 是「测试靶场」，跟名字重了），给 place
+      mkSpan("mnLvDate", phase.sandbox ? phase.place : phase.date);
       mkSpan("mnLvMark", "");
       b.addEventListener("mouseenter", () => this.SelectLevel(i));
       b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
@@ -553,17 +589,18 @@ export class MainMenu {
   }
 
   SelectLevel(i) {
-    this.selected = Clamp(i, 0, this.phases.length - 1);
+    this.selected = Clamp(i, 0, this.entries.length - 1);
     const progress = Progress.Read();
     this.levelEls.forEach((el, k) => {
       el.classList.toggle("on", k === this.selected);
       const mark = el.querySelector(".mnLvMark");
-      const done = progress.cleared.includes(this.phases[k].id);
+      if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
+      const done = progress.cleared.includes(this.entries[k].id);
       mark.textContent = done ? "已通过" : (k === progress.furthest ? "下一关" : "");
       mark.className = `mnLvMark${done ? " done" : ""}`;
     });
 
-    const phase = this.phases[this.selected];
+    const phase = this.entries[this.selected];
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -574,15 +611,21 @@ export class MainMenu {
     };
     mk("mnBriefTitle").textContent = phase.label;
     mk("mnBriefPlace").textContent = phase.place;
-    mk("mnBriefDate").textContent = phase.date;
+    if (!phase.sandbox) mk("mnBriefDate").textContent = phase.date;   // 沙盒没有史实日期
     const meta = mk("mnBriefMeta");
-    for (const text of [`约 ${phase.minutes} 分钟`,
-      `城里还站着的人 ${phase.nraPool}`, `路标 ${phase.zones.length}`]) {
+    // 沙盒没有时限也没有兵员池（都是 9999 的占位数），拿工位数与携行说事才有信息。
+    const metaTexts = phase.sandbox
+      ? ["不计时 · 不计进度", `工位 ${phase.zones.length}`, "木桩兵自动复位"]
+      : [`约 ${phase.minutes} 分钟`,
+        `城里还站着的人 ${phase.nraPool}`, `路标 ${phase.zones.length}`];
+    for (const text of metaTexts) {
       const s = document.createElement("span");
       s.textContent = text;
       meta.appendChild(s);
     }
-    brief.appendChild(BuildMap(phase));
+    // 那张全图画的是滕县城（框写死在 MAP 里）；靶场在 (1400, 1400)，落在框外，
+    // 画出来是一张空图外加一个贴边的切片框 —— 沙盒条目干脆不给图。
+    if (!phase.sandbox) brief.appendChild(BuildMap(phase));
     const lines = mk("mnBriefLines");
     for (const line of phase.brief || []) {
       const p = document.createElement("p");
@@ -599,6 +642,11 @@ export class MainMenu {
     if (phase.mechanic) {
       mk("mnBriefHead").textContent = "本关机制";
       mk("mnMechanic").textContent = phase.mechanic;
+    }
+    // 靶场的携行是写死的（loadoutOverride），是真人进去最先要知道的一条。
+    if (phase.sandbox && phase.loadoutOverride?.note) {
+      mk("mnBriefHead").textContent = "携行";
+      mk("mnMechanic").textContent = phase.loadoutOverride.note;
     }
     const go = mk("mnGo", "button");
     go.textContent = `进入 · ${phase.label}`;
@@ -623,6 +671,7 @@ export class MainMenu {
       case "debug": this.Show("debug"); return;
       case "resume": this.host.Resume?.(); return;
       case "settings": this.host.Settings?.(); return;
+      case "exitSandbox": this.host.ExitSandbox?.(); return;
       case "title": this.ToTitle(); return;
       default: break;
     }
@@ -631,9 +680,15 @@ export class MainMenu {
   /**
    * 进一关。**选章默认不播过场**：那条是「挑一关来打」的入口，
    * 每次都先看三十八秒的出川会把它变成看片入口。战役入口才播（Activate）。
+   *
+   * 沙盒条目走另一条路：靶场是**整表替换**（PHASE_TABLE 只剩它一关），
+   * 当场换不过去，只能重载页面 —— 交给 host.PlaySandbox。
    */
   Play(index, opts = {}) {
     if (this.busy) return;
+    if (this.entries[index]?.sandbox) { this.host.PlaySandbox?.(); return; }
+    // 已经在靶场里了：正片那七关同样换不过去，先退回正片再说。
+    if (this.sandboxMode) { this.host.ExitSandbox?.(); return; }
     this.busy = true;
     this.host.Unlock?.();
     Promise.resolve(this.host.Play(index, { cutscenes: false, ...opts }))

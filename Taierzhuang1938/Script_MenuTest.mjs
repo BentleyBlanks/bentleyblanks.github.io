@@ -228,13 +228,16 @@ for (let i = 0; i < 3; i += 1) {
   const panel = await page.evaluate(() => ({
     levels: [...document.querySelectorAll("#menu .mnLevel")].length,
     prologue: document.querySelector("#menu .mnProloguePreview")?.textContent || "",
+    sandbox: document.querySelector("#menu .mnSandboxLevel")?.textContent || "",
     map: !!document.querySelector("#menu .mnMap"),
     zones: document.querySelectorAll("#menu .mnMapZone").length,
     title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  Check("选章列出临时序章入口与七关", panel.levels === 8 && panel.prologue.includes("出川"), `levels=${panel.levels} prologue=${panel.prologue}`);
+  Check("选章列出临时序章入口、七关与靶场",
+    panel.levels === 9 && panel.prologue.includes("出川") && panel.sandbox.includes("玩法测试靶场"),
+    `levels=${panel.levels} prologue=${panel.prologue} sandbox=${panel.sandbox}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
   Check("简报有标题、目标清单与进入按钮",
@@ -621,6 +624,90 @@ for (let i = 0; i < 3; i += 1) {
   await page.waitForTimeout(300);
   const started = await page.evaluate(() => window.Taierzhuang.state.running);
   Check("?menu=0 下点「进 城」能进游戏", started);
+}
+
+// ===========================================================================
+// 7.5) 选章末尾那条沙盒：靶场
+//
+// 靶场不在 PHASES 里，进出都是**重载页面**（PHASE_TABLE 在 ?range=1 下整表替换）。
+// 所以这一节要验的是三段：简报（不画那张滕县全图）、进得去（真到了靶场）、
+// 退得出（暂停里那条「退出靶场」把 range 摘掉、回到主菜单）。
+// ===========================================================================
+{
+  await Boot();
+  const brief = await page.evaluate(() => {
+    window.Taierzhuang.Debug.MenuShow("levels");
+    const menu = window.Taierzhuang.menu;
+    menu.SelectLevel(menu.entries.length - 1);
+    return {
+      selected: window.Taierzhuang.Debug.Menu().selected,
+      title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
+      mark: document.querySelector("#menu .mnSandboxLevel .mnLvMark")?.textContent || "",
+      no: document.querySelector("#menu .mnSandboxLevel .mnLvNo")?.textContent || "",
+      map: !!document.querySelector("#menu .mnMap"),
+      objectives: document.querySelectorAll("#menu .mnObjectives li").length,
+      go: document.querySelector("#menu .mnGo")?.textContent || "",
+    };
+  });
+  Check("靶场条目排在七关之后，标「沙盒」",
+    brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七关 0..6，沙盒是第 7 条
+    `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
+  Check("靶场简报有标题、工位清单与进入按钮，且**不画**那张滕县全图",
+    brief.title === "玩法测试靶场" && brief.objectives >= 3
+      && brief.go.includes("玩法测试靶场") && !brief.map,
+    `${brief.title} / 工位 ${brief.objectives} / ${brief.go} / map=${brief.map}`);
+  await page.screenshot({ path: path.join(outDir, "Menu_Levels_Range.png") });
+
+  // 点「进入」——这一下是整页重载，等新页面把 Debug.Range 挂出来
+  await page.click("#menu .mnGo");
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.Range !== undefined,
+    null, { timeout: 240000 });
+  const entered = await page.evaluate(() => ({
+    range: new URL(location.href).searchParams.get("range"),
+    level: window.Taierzhuang.Debug.Level().id,
+    stations: window.Taierzhuang.Debug.Range.State().stations.length,
+    menu: !!window.Taierzhuang.menu,
+    menuOpen: window.Taierzhuang.Debug.Menu().open,
+    rootOff: document.getElementById("menu").classList.contains("off"),
+    bootStart: !document.getElementById("bootStart").disabled,
+  }));
+  Check("从选章进得去靶场（?range=1，场上是靶场那一关）",
+    entered.range === "1" && entered.level === "Range" && entered.stations === 3,
+    `range=${entered.range} level=${entered.level} stations=${entered.stations}`);
+  Check("靶场里菜单只建不开（开机不许一屏标题盖在场地上）",
+    entered.menu && !entered.menuOpen && entered.rootOff && entered.bootStart,
+    JSON.stringify(entered));
+
+  // 进游戏，再按 Esc 看暂停菜单换没换成沙盒那一套
+  await page.click("#bootStart");
+  await page.waitForTimeout(400);
+  const paused = await page.evaluate(() => {
+    window.Taierzhuang.Debug.Pause();
+    return {
+      items: window.Taierzhuang.Debug.Menu().items,
+      labels: [...document.querySelectorAll("#menu .mnItemLabel")].map((e) => e.textContent),
+    };
+  });
+  Check("靶场的暂停菜单是「继续/设置/调试选项/退出靶场」（不给当场换不了的选章与主菜单）",
+    paused.items.join(",") === "resume,settings,debug,exitSandbox"
+      && paused.labels.includes("退出靶场"),
+    paused.items.join(" / "));
+
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
+  await page.waitForFunction(
+    () => window.Taierzhuang?.Debug?.Menu !== undefined
+      && window.Taierzhuang.Debug.Range === undefined,
+    null, { timeout: 240000 });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+  const back = await page.evaluate(() => ({
+    range: new URL(location.href).searchParams.get("range"),
+    open: window.Taierzhuang.Debug.Menu().open,
+    mode: window.Taierzhuang.Debug.Menu().mode,
+    level: window.Taierzhuang.Debug.Level().id,
+  }));
+  Check("「退出靶场」摘掉 range，回到主菜单",
+    back.range === null && back.open && back.mode === "title" && back.level !== "Range",
+    `range=${back.range} mode=${back.mode} level=${back.level}`);
 }
 
 // ===========================================================================

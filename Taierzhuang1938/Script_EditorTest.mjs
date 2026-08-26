@@ -408,6 +408,10 @@ Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
   taaToggle.found && taaToggle.firstFrameHistory === false
   && taaToggle.on.settled === true && taaToggle.saved === true,
   `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
+// 画质面板整版留一张图：断言只能证明「DOM 里有这个按钮」，证明不了它在版面上
+// 排到哪儿、黄字有没有把面板撑得读不下去。这一栏就是因为「设置里翻不到」才补的，
+// 留张图下一轮直接看。
+await page.screenshot({ path: path.join(projectDir, "_shots", "editor_graphics_panel.png") });
 
 await page.click('[data-editor="sound"]');
 await Step(6);

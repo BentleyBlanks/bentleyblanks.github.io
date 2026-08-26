@@ -5,6 +5,17 @@
 
 ## 入口
 
+真人的正门是**选章列表最下面那一条**（七关之后，隔一条分隔线，标「沙盒」）：
+简报照读 `RANGE_PHASE`（三个工位、本关机制、携行），但**不画那张滕县全图** ——
+靶场在 (1400, 1400)，落在全图那个写死的框外面。点「进入」是**整页重载**到
+`?range=1`：靶场是整表替换（见下一节），当场换不过去。
+
+进去之后 Esc 是暂停，那一层换成沙盒专用的四项：继续 / 设置 / 调试选项 /
+**退出靶场**（重载摘掉 `range`，回到主菜单）。不给「选章」与「主菜单」——
+在靶场里那两颗按钮当场换不了关，摆着只会骗人。
+
+记地址的两条老路照旧：
+
 ```
 http://127.0.0.1:8171/Taierzhuang1938/?range=1            # 真人：进页面点「进 城」拿指针锁
 http://127.0.0.1:8171/Taierzhuang1938/?shot=1&range=1     # agent：不进指针锁，StepFrames 驱动
@@ -20,7 +31,9 @@ node Taierzhuang1938/Script_RangeTest.mjs --shot           # 附带按工位各�
 
 ## 架构：整表替换，不进正片
 
-- 靶场**不在 `Data_Battle.PHASES` 里**。`Script_Main` 在 `?range=1` 时把关卡表整表换成
+- 靶场**不在 `Data_Battle.PHASES` 里**（选章列表上那一条也不进 —— 菜单把它单摆在
+  `MainMenu.sandbox` 里，进度、「继续」、「下一关」与默认选中关一概只按七关数）。
+  `Script_Main` 在 `?range=1` 时把关卡表整表换成
   `[Data_Range.RANGE_PHASE]`（`PHASE_TABLE`），所有 `PHASE_TABLE[state.phaseIndex]`
   的消费者一个都不用学「这一关不算数」；七关口径（BootTest / 菜单 / 进度 / 通关冒烟）
   一概不知道靶场存在。
