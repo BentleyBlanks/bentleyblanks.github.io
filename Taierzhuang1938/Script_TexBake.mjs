@@ -336,9 +336,23 @@ export function BakeSteel(size = 256, { seed = 6, base = [58, 60, 64], rust = 0.
     const micro = TileableFbm2(u * 150, v * 150, 150, { octaves: 2, seed: seed + 3 });
     const brush = TileableFbm2(u * 220, v * 6, 220, { octaves: 2, seed: seed + 11 });   // 顺枪管的拉丝
     const dent = TileableFbm2(u * 12, v * 12, 12, { octaves: 4, seed: seed + 23 });
-    const w = Worley2(u * 14, v * 14, seed + 91, 14);
-    const rustPatch = Clamp01(SmoothStep(0.34, 0.06, w.f1) * (dent * 1.4) * rust * 2.2);
-    const rustCol = [116, 62, 34];
+    // 【2026-08-26 锈斑重做：原来那版在钢盔上是一顶红麻子】
+    // 老写法是 SmoothStep(0.34, 0.06, w.f1) —— Worley 的单元本来就均匀铺满平面，
+    // 拿到单元中心的距离当遮罩，等于**每个单元中心画一个圆点**，而且每个单元
+    // 都画。钢盔一格贴图 0.35 m、14 个单元，落到盔顶就是 2.5 cm 间距的等距橙点，
+    // 实拍出来是九〇式铁帽长了一头红痘。锈不长成这样，改成两层：
+    //   1) 低频斑块 patch 先决定"哪一片起锈"——大半个表面根本进不了这一层，
+    //      锈于是成片、有大有小，而不是一个单元一颗；
+    //   2) 单元只负责把斑块边缘咬碎，而且取**单元交界**（f2−f1）不取单元中心，
+    //      锈是从划痕、卷边、磕碰爬开的，不是从一个个圆心长出来的。
+    // 颜色也从 (116,62,34) 那种新鲜铁锈的橙压到暗红褐：战场上的钢盔蒙着土，
+    // 高饱和的橙在这条曝光下会跳成全场最亮的一块。
+    const patch = TileableFbm2(u * 6, v * 6, 6, { octaves: 4, seed: seed + 61 });
+    const w = Worley2(u * 18, v * 18, seed + 91, 18);
+    const crumb = 0.42 + SmoothStep(0.34, 0.02, w.f2 - w.f1) * 0.58;
+    const rustPatch = Clamp01(
+      SmoothStep(0.55, 0.80, patch) * crumb * (0.45 + dent * 1.1) * rust * 2.2);
+    const rustCol = [92, 58, 42];
     const col = [0, 0, 0];
     for (let c = 0; c < 3; c += 1) {
       col[c] = base[c] * (0.82 + micro * 0.3 + (brush - 0.5) * 0.16);

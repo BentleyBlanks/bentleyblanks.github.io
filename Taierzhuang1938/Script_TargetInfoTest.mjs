@@ -87,14 +87,39 @@ try {
       T.StepFrames(3);
     };
 
-    // 先找一条 40 m 内没有遮挡的射界（滕县城内多半正贴着一堵墙站着）。
+    // 先找一条射界（滕县城内多半正贴着一堵墙站着）。
+    //
+    // 【2026-08-26 这条探针原来是假的，两条红都由它来】原来是一条**水平的、
+    // 不带地形的** 40 m 射线：`Raycast(eye, {x,0,z}, 40)`。它和识别层真正问的问题
+    // 是两回事 —— 识别层问的是「从眼位到**趴在地上那个人的胸口**，带着地形，通不通」。
+    // 差出来的两样都致命：① 只验到 40 m，而下面 `Put(enemy, 45)` 把人摆到 45 m，
+    // 40—45 m 那一段没人验过；② 水平射线不下坡，而 45 m 外的胸口比眼位低一米多，
+    // 那条斜线会擦过路基、田埂、矮墙 —— 解析地表还根本不在无地形射线的求交对象里。
+    // 于是 45 m 那个人被挡住 → Pick 返回 null → **卡片按 holdS 保留上一帧的 22 m**，
+    // 断言读到的就是「出了三十米还在报军衔番号」，看起来像分级坏了，其实是没摆好。
+    //
+    // 现在按识别层的真判据验：同一条 TERRAIN_RAY、同一条 0.6 m 余量，
+    // 而且**把这一组会用到的每个距离都验一遍**（12 / 14 / 22 / 45 m）。
     const probe = new V();
+    const SightClear = (yaw, metres) => {
+      const eye = T.player.EyePosition;
+      const x = eye.x - Math.sin(yaw) * metres;
+      const z = eye.z - Math.cos(yaw) * metres;
+      const chest = T.battlefield.GroundHeight(x, z) + 0.95;   // CAPSULE[0].y，站姿躯干
+      probe.set(x - eye.x, chest - eye.y, z - eye.z);
+      const dist = probe.length();
+      probe.multiplyScalar(1 / dist);
+      const hit = T.battlefield.Raycast(eye.clone(), probe, dist, { terrain: true });
+      return !hit || hit.t >= dist - 0.6;
+    };
+    const SIGHT_METRES = [12, 14, 22, 45];
     let clearYaw = null;
-    for (let k = 0; k < 48 && clearYaw === null; k += 1) {
-      const y = (k / 48) * Math.PI * 2;
-      probe.set(-Math.sin(y), 0, -Math.cos(y));
-      if (!T.battlefield.Raycast(T.player.EyePosition, probe, 40)) clearYaw = y;
+    for (let k = 0; k < 96 && clearYaw === null; k += 1) {
+      const y = (k / 96) * Math.PI * 2;
+      if (SIGHT_METRES.every((m) => SightClear(y, m))) clearYaw = y;
     }
+    // 一条都找不到就明说，别退回 0 让整组断言读成"分级坏了"。
+    const clearYawFound = clearYaw !== null;
     // 每一组断言开始前都回到这条验过的射界：中途转过身之后再摆人，
     // 人会被摆进墙里，整组读数都会退化成"被挡住"。
     const Face = () => {
@@ -116,8 +141,10 @@ try {
     const onEnemy = { ...Read(), id: enemy.id };
 
     // 出了 detailRangeM（30 m）只报阵营与距离，军衔与番号都收掉。
+    // sightClear 一起记下来：这条红回来的时候，先看它是"分级坏了"还是"人被挡住了"
+    // —— 挡住时卡片会按 holdS 停在上一档的读数上，两者在屏幕上长得一模一样。
     Put(enemy, 45);
-    const distant = Read();
+    const distant = { ...Read(), sightClear: SightClear(T.player.yaw, 45) };
 
     // 距离随人动：同一个人挪到 12 m，卡片上的米数必须跟着变。
     Put(enemy, 12);
@@ -216,12 +243,18 @@ try {
     difficulty.targetInfo = false;
     T.StepFrames(45);
     const realistic = Read();
+    // 【2026-08-26】restored 原来是「把档位调回来 + 走三帧」就直接读。
+    // 那三帧之前**已经走了 45 帧（0.75 s）** —— 这一段里 mate 是活的 AI，
+    // 他会走开：0.75 s 够挪出两三米，而 12 m 上那个锥才半米宽。
+    // 于是 restored.rays = 0（锥里根本没人）、卡片不亮，断言把「他走了」
+    // 读成了「档位调回来也不认人」。所以读之前把他**重新摆回准心底下**：
+    // 这一条要证的是"档位调回 basic 之后这条链活过来"，不是"AI 会不会站着不动"。
     difficulty.targetInfo = "basic";
-    T.StepFrames(3);
+    Put(mate, 12);                     // 内含 StepFrames(3)
     const restored = Read();
 
     return {
-      clearYaw, onEnemy, distant, closer, justLost, lost, onMate,
+      clearYaw, clearYawFound, onEnemy, distant, closer, justLost, lost, onMate,
       basicWounded, fullBar, tooFar, walled, buried, realistic, restored,
     };
   });
@@ -236,10 +269,14 @@ try {
     && !/三八式|十一年式|九二式/.test(report.onEnemy.meta)
     && report.onEnemy.entityId === report.onEnemy.id,
     `${report.onEnemy?.title} / ${report.onEnemy?.meta}`);
+  Check("找得到一条 45 m 通视的射界（这一组的前提）",
+    report.clearYawFound === true,
+    report.clearYawFound ? `yaw=${report.clearYaw?.toFixed?.(2)}` : "48 个方位没有一条通到 45 m");
   Check("出了三十米只报阵营与距离（军衔番号都读不出来了）",
     report.distant?.on === true && report.distant.title === "日军"
     && /^45m$/.test(report.distant.meta),
-    `${report.distant?.title} / ${report.distant?.meta}`);
+    `${report.distant?.title} / ${report.distant?.meta}`
+    + `（45 m 通视=${report.distant?.sightClear}）`);
   Check("敌方用敌色、不带血条（标准档）",
     /theirs/.test(report.onEnemy?.cls || "") && report.onEnemy?.bar === false
     && report.onEnemy?.friendlyReticle === false, report.onEnemy?.cls);
@@ -271,7 +308,8 @@ try {
   Check("写实档整条链关掉：不投射线、没有卡片",
     report.realistic?.on === false && report.realistic?.rays === 0
     && report.restored?.on === true,
-    `realistic rays=${report.realistic?.rays}`);
+    `realistic on=${report.realistic?.on} rays=${report.realistic?.rays}`
+    + ` / 调回 basic 后 on=${report.restored?.on} rays=${report.restored?.rays}`);
   Check("页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } finally {
   await browser.close();
