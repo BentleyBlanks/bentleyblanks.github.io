@@ -67,6 +67,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import {
   AddWall, AddRoomBlock, AddHardMountainRoof, AddCompound, AddGatehouse,
   AddDoorReveal, AddWell, AddMillstone, AddWaterVat, AddLoopholes, AddTree,
+  SolidWithOpenings,
 } from "./Script_World.mjs";
 import {
   MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
@@ -256,9 +257,13 @@ function AdobeHouse(sink, {
     sink.Add("WoodBeam", PlaceGeometry(
       MakeBox(1.5, 0.18, 0.42, TILE_METERS.wood, `${seed}:lintel`),
       { x: ox, y: doorH + 0.09, z: oz, ry }));
+    const aboveH = Math.max(0.12, eaveY - doorH - 0.18);
     sink.Add(wallMat, PlaceGeometry(
-      MakeBox(1.2, Math.max(0.12, eaveY - doorH - 0.18), 0.38, TILE_METERS.adobe, `${seed}:above`),
-      { x: ox, y: doorH + 0.18 + Math.max(0.12, eaveY - doorH - 0.18) / 2, z: oz, ry }));
+      MakeBox(1.2, aboveH, 0.38, TILE_METERS.adobe, `${seed}:above`),
+      { x: ox, y: doorH + 0.18 + aboveH / 2, z: oz, ry }));
+    // 门楣以上这块土坯也要有碰撞：GapWall 是按通高掏的口子，不补这一只盒
+    // 就等于门头上开了一扇「有渲染无碰撞」的窗。底面 2.13 m，不挡人。
+    sink.Solid(ox, doorH + 0.18 + aboveH / 2, oz, 0.6, aboveH / 2, 0.19, "wall", ry);
     AddDoorReveal(sink, {
       x: ox, z: oz, ry: ry + (facing > 0 ? Math.PI : 0), openW: 1.2, openH: doorH,
       depth: 1.3, seed: `${seed}:rv`, paving: "CrossStone", sill: "CrossStone",
@@ -1034,15 +1039,26 @@ function ShopUnit(sink, {
     }
     const panels = Math.max(4, Math.round((bayW - 0.3) / 0.42));
     const panelW = (bayW - 0.3) / panels;
+    const gone = [];
     for (let p = 0; p < panels; p += 1) {
-      if (damage > 0.45 && ((p + b) % 4 === 0)) continue;       // 打烂的铺子缺几块板
+      if (damage > 0.45 && ((p + b) % 4 === 0)) { gone.push(p); continue; }   // 打烂的铺子缺几块板
       const ox = lx - (bayW - 0.3) / 2 + (p + 0.5) * panelW;
       const [dx, dz] = RF(ox, depth / 2 - 0.14);
       sink.Add("WoodDoor", PlaceGeometry(
         MakeBox(panelW * 0.94, eave - 0.34, 0.07, TILE_METERS.wood, `${seed}:panel${b}${p}`),
         { x: dx, y: 0.28 + (eave - 0.34) / 2, z: dz, ry }));
     }
-    sink.Solid(bx, eave / 2, bz, bayW / 2, eave / 2, 0.12, "door", ry);
+    // 碰撞跟着板走：缺了板的那几格是真洞，看得见就该扔得进去
+    if (!gone.length) {
+      sink.Solid(bx, eave / 2, bz, bayW / 2, eave / 2, 0.12, "door", ry);
+    } else {
+      SolidWithOpenings(sink, {
+        x: bx, z: bz, ry, length: bayW, y0: 0, y1: eave, thickness: 0.24, tag: "door",
+        openings: gone.map((p) => ({
+          c: -(bayW - 0.3) / 2 + (p + 0.5) * panelW, w: panelW, y0: 0, y1: eave,
+        })),
+      });
+    }
   }
 
   AddHardMountainRoof(sink, {

@@ -1,4 +1,4 @@
-// 《血战台儿庄》灯光装置：太阳（含跟随式阴影框）、Global SH Probe、环境底色、火光池、枪口闪光。
+// 《血战台儿庄》灯光装置：太阳（含跟随式阴影框）、Global SH Probe、环境底色、特效点光池。
 //
 // 阴影是"3A 与网页 demo"的第一道分水岭。要点：
 //  - 平行光的正交阴影框必须**跟着玩家走**并且尽量小：框开到 500 米，2048 的图
@@ -12,6 +12,10 @@ import * as THREE from "three";
 import { GLOBAL_SH_PROBE_COEFFICIENTS } from "./Data_GlobalShProbe.mjs";
 
 const SHADOW_SIZE = { low: 1024, medium: 2048, high: 4096, ultra: 4096 };
+const EFFECT_LIGHT_COUNT = { low: 2, medium: 4, high: 6, ultra: 6 };
+const MAX_EXPLOSION_ENVELOPES = 12;
+
+function Clamp01(value) { return Math.max(0, Math.min(1, value)); }
 
 export class LightRig {
   constructor(scene, { quality = "high", shadowExtent = 62 } = {}) {
@@ -46,22 +50,38 @@ export class LightRig {
     this.ambientBase = this.ambient.intensity;
     this.giFill = 1;
 
+    // 持续火焰与爆炸共用一组固定预算的物理 PointLight。逻辑源可以多于灯槽；每帧按
+    // 镜头处贡献排序，只把最有用的几盏送进 three 的前向 PBR pass。这样炮击齐射不会
+    // 无上限加 NUM_POINT_LIGHTS，也不会为了“有灯/没灯”反复重编译整座城的材质。
+    //
+    // 灯从出生到销毁都保持 visible=true，闲置只把 intensity 归零。three 会把 visible
+    // 点光数量编进 shader；切 visible 会让第一颗手榴弹那一帧刚好撞上 shader 重编译。
     this.fireLights = [];
-    this.fireStates = [];
-    for (let i = 0; i < 6; i += 1) {
+    const effectLightCount = EFFECT_LIGHT_COUNT[quality] ?? EFFECT_LIGHT_COUNT.high;
+    for (let i = 0; i < effectLightCount; i += 1) {
       const light = new THREE.PointLight(0xff7a2a, 0, 24, 2);
+      light.name = `VfxPointLight${i + 1}`;
       light.castShadow = false;
-      light.visible = false;
+      light.visible = true;
       scene.add(light);
       this.fireLights.push(light);
-      this.fireStates.push({ active: false, base: 0, seed: i * 37.13, radius: 18 });
     }
+    this.fireSources = new Map();
+    this.nextFireHandle = 1;
+    this.explosionEnvelopes = [];
+    this.nextExplosionId = 1;
+    this.effectFocus = new THREE.Vector3();
+    this.hasEffectFocus = false;
 
     // 枪口闪光：一盏，抢用。开火那一帧亮 2 帧就灭 —— 长亮就成手电筒了。
     this.muzzle = new THREE.PointLight(0xffd9a0, 0, 22, 2);
-    this.muzzle.visible = false;
+    this.muzzle.name = "VfxMuzzleLight";
+    this.muzzle.visible = true;
+    this.muzzle.castShadow = false;
     scene.add(this.muzzle);
-    this.muzzleTimer = 0;
+    this.muzzleAge = 1;
+    this.muzzleDuration = 0.055;
+    this.muzzleBase = 0;
 
     this.sunDirection = new THREE.Vector3(0, 1, 0);
   }
@@ -130,65 +150,170 @@ export class LightRig {
     cam.updateProjectionMatrix();
   }
 
-  /** 点一处火：返回句柄，可以再关掉。位置固定的火（着火的房子、燃烧的战车）。 */
+  /** 点一处火：返回逻辑句柄，可以再关掉。位置固定的火（着火的房子、燃烧的战车）。 */
   AddFire(position, { intensity = 6, radius = 20, color = 0xff7a2a } = {}) {
-    const index = this.fireStates.findIndex((s) => !s.active);
-    if (index < 0) return -1;
-    const light = this.fireLights[index];
-    light.position.copy(position);
-    light.color.setHex(color);
-    light.distance = radius;
-    light.visible = true;
-    this.fireStates[index].active = true;
-    this.fireStates[index].base = intensity;
-    this.fireStates[index].radius = radius;
-    return index;
+    const handle = this.nextFireHandle;
+    this.nextFireHandle += 1;
+    this.fireSources.set(handle, {
+      handle,
+      position: new THREE.Vector3(position.x, position.y, position.z),
+      color: new THREE.Color(color),
+      base: Math.max(0, Number(intensity) || 0),
+      radius: Math.max(1, Number(radius) || 20),
+      seed: handle * 37.13,
+      currentIntensity: 0,
+      score: 0,
+      priority: 1,
+    });
+    return handle;
   }
 
   RemoveFire(handle) {
-    if (handle < 0 || handle >= this.fireStates.length) return;
-    this.fireStates[handle].active = false;
-    this.fireLights[handle].visible = false;
-    this.fireLights[handle].intensity = 0;
+    this.fireSources.delete(handle);
   }
 
   ClearFires() {
-    for (let i = 0; i < this.fireStates.length; i += 1) this.RemoveFire(i);
+    this.fireSources.clear();
+  }
+
+  /**
+   * 爆炸的白热核 → 橙红火球光包络。粒子负责看见火球，这里负责把同一拍亮度泼到
+   * 地面、墙面、人物和瓦砾上。多发爆炸各自保留包络，再由固定灯池挑最重要的几盏。
+   */
+  FlashExplosion(position, {
+    intensity = 64, radius = 24, duration = 0.62,
+    coreColor = 0xfff1d2, fireColor = 0xff7626,
+  } = {}) {
+    if (this.explosionEnvelopes.length >= MAX_EXPLOSION_ENVELOPES) {
+      // 炮击极端密集时丢掉最老的光包络；粒子和伤害照常，灯的 GPU 预算不膨胀。
+      this.explosionEnvelopes.sort((a, b) => (b.age / b.duration) - (a.age / a.duration));
+      this.explosionEnvelopes.shift();
+    }
+    const envelope = {
+      id: this.nextExplosionId,
+      position: new THREE.Vector3(position.x, position.y, position.z),
+      coreColor: new THREE.Color(coreColor),
+      fireColor: new THREE.Color(fireColor),
+      currentColor: new THREE.Color(coreColor),
+      base: Math.max(0, Number(intensity) || 0),
+      radius: Math.max(1, Number(radius) || 24),
+      duration: Math.max(0.08, Number(duration) || 0.62),
+      age: 0,
+      currentIntensity: Math.max(0, Number(intensity) || 0),
+      currentRadius: Math.max(1, Number(radius) || 24) * 0.55,
+      score: 0,
+      priority: 1.35,
+    };
+    this.nextExplosionId += 1;
+    this.explosionEnvelopes.push(envelope);
+    return envelope.id;
   }
 
   /** 开火：闪一下。position 用枪口世界坐标。 */
-  FlashMuzzle(position, intensity = 26) {
+  FlashMuzzle(position, intensity = 26, { duration = 0.055, color = 0xffd9a0 } = {}) {
     this.muzzle.position.copy(position);
-    this.muzzle.intensity = intensity;
-    this.muzzle.visible = true;
-    this.muzzleTimer = 0.055;
+    this.muzzle.color.setHex(color);
+    this.muzzleBase = Math.max(0, Number(intensity) || 0);
+    this.muzzle.intensity = this.muzzleBase;
+    this.muzzleDuration = Math.max(0.025, Number(duration) || 0.055);
+    this.muzzleAge = 0;
   }
 
-  Update(dt, elapsed) {
-    // 火焰闪烁：两个不同频率的正弦叠一点噪声。单频率会看出规律的"呼吸"
-    for (let i = 0; i < this.fireStates.length; i += 1) {
-      const state = this.fireStates[i];
-      if (!state.active) continue;
+  _ScoreEffect(state, radius, focus) {
+    if (!focus) return state.currentIntensity * state.priority;
+    const dx = state.position.x - focus.x;
+    const dy = state.position.y - focus.y;
+    const dz = state.position.z - focus.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    // 灯圈内不降权；灯圈外按距离平方降权。爆炸的 priority 只负责在近似同贡献时
+    // 抢过远处常驻火，不会让镜头背后的炮火挤掉眼前正在烧的房子。
+    const outside = Math.max(0, distance - radius) / Math.max(1, radius);
+    return state.currentIntensity * state.priority / (1 + outside * outside);
+  }
+
+  Update(dt, elapsed, focus = null) {
+    const step = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.1)) : 0;
+    if (focus) {
+      this.effectFocus.copy(focus);
+      this.hasEffectFocus = true;
+    }
+    const scoringFocus = this.hasEffectFocus ? this.effectFocus : null;
+    const candidates = [];
+
+    // 火焰闪烁：两个不同频率的正弦叠一点噪声。单频率会看出规律的"呼吸"。
+    for (const state of this.fireSources.values()) {
       const t = elapsed * 1.0 + state.seed;
       const flicker = 0.72
         + 0.18 * Math.sin(t * 7.3)
         + 0.10 * Math.sin(t * 17.9 + 1.7)
         + 0.08 * Math.sin(t * 31.1 + 3.1);
-      this.fireLights[i].intensity = state.base * Math.max(0.28, flicker);
+      state.currentIntensity = state.base * Math.max(0.28, flicker);
+      state.currentRadius = state.radius;
+      state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
+      candidates.push(state);
     }
-    if (this.muzzleTimer > 0) {
-      this.muzzleTimer -= dt;
-      if (this.muzzleTimer <= 0) {
-        this.muzzle.visible = false;
-        this.muzzle.intensity = 0;
-      } else {
-        this.muzzle.intensity *= 0.55;
+
+    for (let i = this.explosionEnvelopes.length - 1; i >= 0; i -= 1) {
+      const state = this.explosionEnvelopes[i];
+      state.age += step;
+      const t = Clamp01(state.age / state.duration);
+      if (t >= 1) {
+        this.explosionEnvelopes.splice(i, 1);
+        continue;
       }
+      // 极短的白热峰 + 稍长的火球余辉。两项都按秒算，30/60/120 fps 下同一时刻同亮度。
+      const flash = 0.62 * Math.exp(-8 * t);
+      const fire = 0.38 * (1 - t) * (1 - t);
+      state.currentIntensity = state.base * (flash + fire);
+      state.currentRadius = state.radius * (0.55 + 0.45 * Clamp01(t / 0.22));
+      const warm = 1 - Math.exp(-12 * t);
+      state.currentColor.copy(state.coreColor).lerp(state.fireColor, warm);
+      state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
+      candidates.push(state);
     }
+
+    candidates.sort((a, b) => b.score - a.score
+      || (a.handle ?? a.id ?? 0) - (b.handle ?? b.id ?? 0));
+    for (let i = 0; i < this.fireLights.length; i += 1) {
+      const light = this.fireLights[i];
+      const state = candidates[i];
+      if (!state) {
+        light.intensity = 0;
+        continue;
+      }
+      light.position.copy(state.position);
+      light.color.copy(state.currentColor || state.color);
+      light.distance = state.currentRadius;
+      light.intensity = state.currentIntensity;
+    }
+
+    if (this.muzzleAge < this.muzzleDuration) {
+      this.muzzleAge += step;
+      const t = Clamp01(this.muzzleAge / this.muzzleDuration);
+      this.muzzle.intensity = this.muzzleBase * (1 - t) * (1 - t);
+    } else {
+      this.muzzle.intensity = 0;
+    }
+  }
+
+  /** 浏览器测试与渲染调试面板取证，不参与玩法。 */
+  GetEffectLightState() {
+    return {
+      budget: this.fireLights.length,
+      persistent: this.fireSources.size,
+      explosions: this.explosionEnvelopes.length,
+      active: this.fireLights.filter((light) => light.intensity > 0).map((light) => ({
+        color: light.color.getHex(), intensity: light.intensity, radius: light.distance,
+        position: light.position.toArray(),
+      })),
+      muzzle: this.muzzle.intensity,
+    };
   }
 
   Dispose() {
     this.scene.remove(this.sun, this.sun.target, this.globalProbe, this.ambient, this.muzzle);
     for (const l of this.fireLights) this.scene.remove(l);
+    this.fireSources.clear();
+    this.explosionEnvelopes.length = 0;
   }
 }

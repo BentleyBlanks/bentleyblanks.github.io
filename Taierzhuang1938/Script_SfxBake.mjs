@@ -336,18 +336,24 @@ async function Main() {
 
   let total = 0;
   for (const group of groups) {
-    // SeedAudio 的列车汽笛是已验收的成品，不由这个程序合成或重切；但每次重烘
-    // 其他音效仍必须重新登记它，否则全量 SfxBake 会悄悄把 cue 从 manifest 丢掉。
+    // SeedAudio 那几条（序章汽笛、白刃三音）是**人工试听选定**的成品，不由这个程序
+    // 合成或重切；但每次重烘其他音效仍必须重新登记它们，否则全量 SfxBake 会悄悄把
+    // cue 从 manifest 丢掉。一个 cue 可以挂多个变体文件（挥空就是三条）。
     if (group.seedAudio) {
       for (const cut of group.cuts) {
-        const file = cut.file || `AudioSfx_${Pascal(cut.cue)}_01.mp3`;
-        const out = path.join(OUT_DIR, file);
-        if (!fs.existsSync(out)) {
-          console.error(`  SeedAudio 成品缺失：${file}（先运行 Script_SeedAudioTrainBake.mjs）`);
+        const files = cut.files || [cut.file || `AudioSfx_${Pascal(cut.cue)}_01.mp3`];
+        const missing = files.filter((f) => !fs.existsSync(path.join(OUT_DIR, f)));
+        if (missing.length) {
+          console.error(`  SeedAudio 成品缺失：${missing.join(" ")}`
+            + (group.bake ? `（先运行 ${group.bake}）` : ""));
           continue;
         }
-        if (!report) manifest.cues[cut.cue] = { files: [file], seconds: cut.durS, credit: group.credit, license: group.license };
-        console.log(`  SeedAudio · ${cut.cue} ${cut.durS}s`);
+        if (!report) {
+          manifest.cues[cut.cue] = { files, seconds: cut.durS,
+            credit: cut.credit || group.credit, license: group.license };
+        }
+        console.log(`  SeedAudio · ${cut.cue} ${cut.durS}s`
+          + (files.length > 1 ? `（${files.length} 变体）` : ""));
       }
       continue;
     }

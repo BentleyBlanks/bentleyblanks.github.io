@@ -41,7 +41,7 @@
 import * as THREE from "three";
 import {
   AddWall, AddRoomBlock, AddHardMountainRoof, AddDoorReveal,
-  AddLoopholes, AddCypress, AddSquareFort,
+  AddLoopholes, AddCypress, AddSquareFort, SolidWithOpenings,
 } from "./Script_World.mjs";
 import {
   MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
@@ -464,7 +464,12 @@ function BuildOfficeHall(host, f, ry, o) {
       Slab(sink, "WoodBeam", S.At(lx, front - t + 0.03), floorY + 1.6 + s * 0.62, winW, 0.08, 0.1, ry,
         `${seed}:wr${b}${s}`, { tile: TILE_METERS.wood });
     }
-    SolidSlab(sink, p, floorY + eaveY / 2, bayW / 2, eaveY / 2, t / 2, ry);
+    // 碰撞让开格子窗那一段：槛墙（0—0.95）与檐下墙（2.25—檐口）各一条带，
+    // 中间那一格是真洞 —— 手榴弹要能扔进办公厅去（旧版整开间通高一只盒）。
+    SolidWithOpenings(sink, {
+      x: p.x, z: p.z, ry, length: bayW, y0: floorY, y1: floorY + eaveY, thickness: t,
+      openings: [{ c: 0, w: bayW - 0.88, y0: floorY + 0.95, y1: floorY + 2.25 }],
+    });
     sink.Cover(p.x, p.z, floorY + eaveY, S.sin, S.cos);
   }
   // 三处门洞的门槛与门道墁地（台明抬高 0.45，不能用 AddDoorReveal）

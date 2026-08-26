@@ -8,6 +8,57 @@
 - The canonical direct endpoint is `https://openspeech.bytedance.com/api/v3/tts/create`; every baker must send the key through the `X-Api-Key` header at runtime.
 - When a storyboard marks a dialogue range as continuous, send the complete range in one `text_prompt` request and keep the returned audio as one cue. Do not synthesize lines separately and splice them together.
 
+## Generated Images / 生图（三级回退，顺序固定）
+
+任何「画 / 生成图片 / 出概念图 / 做海报、图标、贴图、分镜」的请求，**一律按这个顺序走，
+不许跳级**。只有上一级真的失败（报错、超时、卡在待确认、跑完没落文件）才降到下一级；
+降级了要在回复里说清楚降到第几级、为什么。**这一节只管图**——音频照旧走上面
+「Generated Audio / Volcengine」那一节，与这三级无关。
+
+### 1）Codex CLI 内置 imagegen（默认，先走这条）
+
+```bash
+codex exec -m gpt-5.6-sol --skip-git-repo-check -s workspace-write -C "<工作目录>" -c model_reasoning_effort="low" -o "<log.txt>" "<任务>"
+```
+
+- 提示词里**必须写死**：只许用内置的 `image_gen__imagegen` 工具，不许用 Lovart skill、
+  不许用 `generate_image_gpt_image_2`。不写死的话 codex 会自己挑到 Lovart 那条付费路径，
+  停在 `pending_confirmation` 等确认——**退出码仍然是 0，但没有图**。
+- 提示词里给**绝对输出路径**，并要求它只回这个路径。一张约 2—4 分钟。
+- `-m gpt-5.6-sol` 不能省：全局默认 `gpt-5.6-terra` 长期 `Selected model is at capacity`。
+- `-C` 指到**非 git 目录**（比如临时出图目录）不带 `--skip-git-repo-check` 会一秒退出：
+  `Not inside a trusted directory and --skip-git-repo-check was not specified.`，退出码 1。
+  配 `-s workspace-write` 把它的写权限圈在那个目录里。
+- stderr 恒有噪音（models cache 缺字段、MCP token 失效、刷新模型列表超时），不代表失败；
+  只看退出码和最后一条回复。
+- 命令**以 `codex` 开头单条写**，别用 `$d="..."; codex ...` 复合语句（匹配不上权限前缀规则）。
+
+### 2）Lovart（第 1 级失败了才用）
+
+用户级 skill，绝对路径，任何仓库任何 cwd 都能跑：
+
+```bash
+PYTHONUTF8=1 python "C:/Users/Bentl/.claude/skills/lovart/scripts/agent_skill.py" <子命令>
+```
+
+- `python3` 在 Windows 是 Store 别名会失败；不带 `PYTHONUTF8=1` 读带中文的
+  `~/.lovart/state.json` 会 GBK 解码炸掉，所有子命令一起挂。
+- **按张计费**，别当默认路径刷。
+- 报 `Project ... does not exist` 是服务端项目失效，`create-project` + `project-add` 重建，
+  不是鉴权问题。
+
+### 3）即梦 CLI + Seedream 5.0 Pro（前两级都失败才用）
+
+```bash
+dreamina text2image --prompt="<提示词>" --model_version=5.0Pro --resolution_type=2k --ratio=16:9 --poll=180
+```
+
+- 模型名写死 `5.0Pro`（不是 `5.0 Pro`、不是 `5.0-Pro`）；只有它同时支持 1k/2k/4k。
+- `--resolution_type` 是必填；`--width/--height` 要成对给，且与 `--ratio` 互斥。
+- 异步任务：`--poll` 等不到就 `dreamina query_result --submit_id=<id>`，
+  `dreamina list_task` 复查；余额看 `dreamina user_credit`。
+- 同样计费。
+
 ## Git Worktree Workflow（强制 · 优先级最高）
 
 **本仓库的主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用**（Claude / Cursor / Codex 各自可能正在其中切分支、留未提交改动）。因此：

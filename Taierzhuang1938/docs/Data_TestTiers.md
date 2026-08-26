@@ -1,7 +1,7 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
 > 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
-> 最后登记核对：2026-08-26，48/48 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
+> 最后登记核对：2026-08-26，56/56 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
 
 ## 一、目标与纪律
 
@@ -12,7 +12,7 @@
 3. **Tier 2 低频人工审查**：性能实测与出图不被 `--changed` 自动触发，只给出建议。
 
 `Script_PlayTest.mjs` 是跨模块整机安全网，但领域专项仍负责它够不到的深度，
-例如伤害口径重放、整墙碰撞扫掠、AI 决策和编辑器数据契约。
+例如伤害口径重放、整墙碰撞扫掠、碰撞盒与几何对账、AI 决策和编辑器数据契约。
 
 ## 二、推荐命令
 
@@ -90,7 +90,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | 领域 | 自动探针 |
 |---|---|
 | terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
-| physics | Physics → Jump → Destruction → FractureBake |
+| physics | Physics → Collider → Jump → Destruction → FractureBake |
 | combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel |
 | ai | AiBehavior、Visibility |
 | hud | HudPrompt、HudPromptBrowser |

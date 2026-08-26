@@ -161,28 +161,29 @@
     },
     "dadaoSwing": {
       "files": [
-        "AudioSfx_DadaoSwing_01.mp3"
+        "AudioSfx_DadaoSwing_01.mp3",
+        "AudioSfx_DadaoSwing_02.mp3",
+        "AudioSfx_DadaoSwing_03.mp3"
       ],
-      "seconds": 0.5,
-      "credit": "David Dumais Audio · 大型冷兵器挥空 · Sonniss GDC 2023",
-      "license": "sonniss"
+      "seconds": 0.55,
+      "credit": "Volcengine SeedAudio 1.0 · 大刀挥空（三变体：木质厚实 / 长嘶 / 刃嘶明亮）",
+      "license": "volcengine"
     },
     "dadaoHit": {
       "files": [
-        "AudioSfx_DadaoHit_01.mp3",
-        "AudioSfx_DadaoHit_02.mp3"
+        "AudioSfx_DadaoHit_01.mp3"
       ],
-      "seconds": 0.8,
-      "credit": "Justsoundeffects · 双手斧入肉 · Sonniss GDC 2024",
-      "license": "sonniss"
+      "seconds": 0.669,
+      "credit": "Volcengine SeedAudio 1.0 · 大刀砍入人体",
+      "license": "volcengine"
     },
     "bayonetHit": {
       "files": [
         "AudioSfx_BayonetHit_01.mp3"
       ],
-      "seconds": 0.7,
-      "credit": "PMSFX · 利刃刺入 · Sonniss GDC 2019",
-      "license": "sonniss"
+      "seconds": 1.369,
+      "credit": "Volcengine SeedAudio 1.0 · 刺刀刺入拔出",
+      "license": "volcengine"
     },
     "impactBrick": {
       "files": [
@@ -364,7 +365,7 @@
       "license": "volcengine"
     }
   },
-  "bakedAt": "2026-08-24",
+  "bakedAt": "2026-08-26",
   "normalization": {
     "normalizedAt": "2026-08-25",
     "tool": "Script_AudioNormalize.mjs",

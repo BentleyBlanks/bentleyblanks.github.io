@@ -1177,11 +1177,14 @@ const TMP_C = new THREE.Vector3();
 
 // ---------------------------------------------------------------------------
 export class VfxSystem {
-  constructor(scene, library, { quality = "high", maxParticles = 4000 } = {}) {
+  constructor(scene, library, { quality = "high", maxParticles = 4000, lights = null } = {}) {
     this.scene = scene;
     // 材质库这里用不上：粒子全部走自定义 ShaderMaterial（PBR 材质进不了加性混合，
     // 也吃不起 SSAO 注入）。留着引用是给以后"贴图版弹孔贴花"用的。
     this.library = library;
+    // 粒子与光必须共用同一个生命周期入口。过去调用方在 Combat 里拿枪口灯假扮爆炸
+    // 灯，编辑器/过场/直接调用 Vfx 时全漏；持续火源则一盏灯都没有。
+    this.lights = lights;
     this.quality = QUALITY_PRESETS[quality] ? quality : "high";
     this.preset = QUALITY_PRESETS[this.quality];
     this.budget = Math.max(200, Math.round(maxParticles * this.preset.budget));
@@ -1519,6 +1522,10 @@ export class VfxSystem {
       wispCount,
       life: profile.life,
     };
+    if (this.lights) {
+      const intensity = 24 * scale * Math.max(0.65, Math.min(1.6, profile.size / 0.29));
+      this.lights.FlashMuzzle(position, intensity, { duration: profile.life * 1.12 });
+    }
 
     for (let i = 0; i < profile.spikes; i += 1) {
       const s = ResetSpawn();
@@ -1755,6 +1762,21 @@ export class VfxSystem {
       loaded: this.loadedExplosionSprites.has(spriteKey),
     };
 
+    // 点光与火球共用 sprite 形制的寿命：紧凑爆炸亮得短，重炮火团则能把附近墙面
+    // 多照几拍。强度沿用原来 Combat 的 radius×9 量级，但半径与颜色终于跟当量一起变。
+    if (this.lights) {
+      const spriteLife = (spriteProfile.life[0] + spriteProfile.life[1]) * 0.5;
+      const lightProfile = {
+        intensity: Math.max(38, Math.min(180, radius * (8.2 + profile.flash * 1.8))),
+        radius: Math.max(14, Math.min(52, radius * (2.7 + profile.flash * 0.5))),
+        duration: Math.max(0.34, Math.min(1.0, spriteLife * 0.78)),
+        coreColor: 0xfff1d2,
+        fireColor: profile.sooty >= 0.7 ? 0xff641d : 0xff7a26,
+      };
+      this.lights.FlashExplosion(position, lightProfile);
+      this.lastExplosionSprite.light = lightProfile;
+    }
+
     // 1) 中心强光：HDR 20+，只活三四帧
     {
       const s = ResetSpawn();
@@ -1926,7 +1948,7 @@ export class VfxSystem {
       : kind === "screen"
         ? [VFX_PALETTE.screenSmoke, VFX_PALETTE.powderThin]   // 发烟筒：白灰，贴地翻滚
         : [VFX_PALETTE.dustDense, VFX_PALETTE.dust];
-    this.smokeSources.set(id, {
+    const source = {
       position: new THREE.Vector3(position.x, position.y, position.z),
       rate: (opts.rate ?? 10) * this.spawnScale,
       radius: opts.radius ?? 0.35,
@@ -1947,11 +1969,51 @@ export class VfxSystem {
       groundHug: kind === "screen",
       accumulator: 0,
       fireAccumulator: 0,
-    });
+      lightHandle: -1,
+      lightProfile: null,
+    };
+    if (source.fire > 0 && opts.light !== false && this.lights) {
+      const fireScale = Math.max(0, Number(source.fire) || 0);
+      const lightPosition = source.position.clone();
+      lightPosition.y += opts.lightHeight
+        ?? Math.max(0.38, Math.min(1.8, source.sizeStart * 1.4 + fireScale * 0.35));
+      const lightIntensity = opts.lightIntensity
+        ?? Math.max(4, Math.min(28,
+          3 + 12 * fireScale * Math.sqrt(Math.max(0.25, source.radius))));
+      const lightRadius = opts.lightRadius
+        ?? Math.max(10, Math.min(34, 8 + source.radius * 8 + fireScale * 8));
+      const lightColor = opts.lightColor
+        ?? (source.fireShape === "column" ? 0xff8a2a : 0xff681c);
+      source.lightProfile = {
+        position: lightPosition, intensity: lightIntensity, radius: lightRadius, color: lightColor,
+      };
+      this.AttachSourceLight(source);
+    }
+    this.smokeSources.set(id, source);
     return id;
   }
 
-  RemoveSmokeSource(handle) { this.smokeSources.delete(handle); }
+  /** 特效编辑器隔离正片火场时使用；逻辑烟源与粒子状态不动，只摘/挂直接光。 */
+  AttachSourceLight(source) {
+    if (!source || source.lightHandle >= 0 || !source.lightProfile || !this.lights) {
+      return source?.lightHandle ?? -1;
+    }
+    const profile = source.lightProfile;
+    source.lightHandle = this.lights.AddFire(profile.position, profile);
+    return source.lightHandle;
+  }
+
+  DetachSourceLight(source) {
+    if (!source || source.lightHandle < 0 || !this.lights) return;
+    this.lights.RemoveFire(source.lightHandle);
+    source.lightHandle = -1;
+  }
+
+  RemoveSmokeSource(handle) {
+    const source = this.smokeSources.get(handle);
+    this.DetachSourceLight(source);
+    this.smokeSources.delete(handle);
+  }
 
   /** 按统一目录创建可序列化的场景持续特效。 */
   SceneEffect(position, id, { scale = 1 } = {}) {
@@ -2077,6 +2139,9 @@ export class VfxSystem {
     if (this.spriteTransparentPlaceholder) this.spriteTransparentPlaceholder.dispose();
     if (this.maskTransparentPlaceholder) this.maskTransparentPlaceholder.dispose();
     this.fallbackDepth.dispose();
+    for (const source of this.smokeSources.values()) {
+      this.DetachSourceLight(source);
+    }
     this.smokeSources.clear();
     this.dust = null;
   }

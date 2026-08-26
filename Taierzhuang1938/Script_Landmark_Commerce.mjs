@@ -24,6 +24,7 @@ import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import {
   AddWall, AddRoomBlock, AddHardMountainRoof, AddDoorReveal, AddGatehouse, AddWell,
+  SolidWithOpenings,
 } from "./Script_World.mjs";
 import { AddCourtyardLife, AddYardWear } from "./Script_LivedInProps.mjs";
 
@@ -484,8 +485,25 @@ export function BuildGuild(host, f, ctx) {
         `${seed}:wm${b}${m}`, { tile: TILE_METERS.wood });
     }
   }
-  // 二层整墙横跨门道上方：碰撞盒抬到 3.45 m 以上，人从楼下穿堂走过去
-  SolidSlab(sink, S.At(0, face), (floor1 + eave2) / 2, hw, (eave2 - floor1) / 2, 0.24, ry);
+  // 二层整墙横跨门道上方：碰撞盒抬到 3.45 m 以上，人从楼下穿堂走过去。
+  // 4.45—5.75 那一条是**真的没砌砖**（槛墙与檐下墙之间只有几根木棂），
+  // 所以碰撞也要在墩子之间让开 —— 不然从街上朝二层窗扔手榴弹会弹回来。
+  {
+    const winY0 = 4.45, winY1 = 5.75, pierW = 0.85;
+    const wins = [];
+    let cur = -hw;
+    for (let i = 1; i < bays; i += 1) {
+      const a = -hw + bayW * i - pierW / 2;
+      if (a > cur) wins.push({ c: (cur + a) / 2, w: a - cur, y0: winY0, y1: winY1 });
+      cur = -hw + bayW * i + pierW / 2;
+    }
+    if (hw > cur) wins.push({ c: (cur + hw) / 2, w: hw - cur, y0: winY0, y1: winY1 });
+    const up = S.At(0, face);
+    SolidWithOpenings(sink, {
+      x: up.x, z: up.z, ry, length: f.w,
+      y0: floor1, y1: eave2, thickness: 0.48, openings: wins,
+    });
+  }
 
   // --- 楼的后墙（门道在这里也要留口）+ 两山（由硬山山墙兼作，另补碰撞） ---
   const backSeg = (f.w - passHalf * 2) / 2;
