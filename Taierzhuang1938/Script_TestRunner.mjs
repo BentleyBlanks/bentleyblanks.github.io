@@ -189,7 +189,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 

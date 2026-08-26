@@ -720,7 +720,9 @@ async function Boot() {
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
   setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
-  vfx = new VfxSystem(scene, library, { quality: QUALITY, maxParticles: SCALE.vfxBudget });
+  vfx = new VfxSystem(scene, library, {
+    quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
+  });
   // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
   // 换关时由 EnterLevel 重新按新切片调一次，别每帧调。
@@ -2735,7 +2737,7 @@ function MenuFrame(dt, render = true) {
   if (vfx) vfx.Update(dt, camera, state.elapsed);
   if (sky) sky.Update(state.elapsed);
   if (lights) {
-    lights.Update(dt, state.elapsed);
+    lights.Update(dt, state.elapsed, camera.position);
     camera.getWorldDirection(_forward);
     lights.UpdateShadowFrustum(camera.position, _forward);
   }
@@ -3377,7 +3379,6 @@ function TryFire(dt) {
   audio.Play("shellDrop", {
     volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
   });
-  lights.FlashMuzzle(_muzzle, 24);
   // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
@@ -3570,6 +3571,9 @@ function Frame(dt, render = true) {
     // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
     // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
     camera.getWorldDirection(_forward);
+    // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
+    // 墙地仍旧不亮，退出编辑器才突然补算一大步。
+    lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;
@@ -3584,7 +3588,7 @@ function Frame(dt, render = true) {
     // 阴影框要跟着**过场相机**走，不能留在玩家脚下：独立布景在两千米外，
     // 阴影框留在城里等于整场布景没有阴影（看上去就是「人浮在地上」）。
     sky.Update(state.elapsed);
-    lights.Update(dt, state.elapsed);
+    lights.Update(dt, state.elapsed, camera.position);
     if (vfx) vfx.Update(dt, camera, state.elapsed);
     camera.getWorldDirection(_forward);
     lights.UpdateShadowFrustum(camera.position, _forward);
@@ -3771,7 +3775,7 @@ function Frame(dt, render = true) {
   // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
   if (state.cooking) state.cook += dt;
   sky.Update(state.elapsed);
-  lights.Update(dt, state.elapsed);
+  lights.Update(dt, state.elapsed, camera.position);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
   // 探针体（gi.Update）不在这里推，它挂在 RenderScene 上 —— 见那里的账。
