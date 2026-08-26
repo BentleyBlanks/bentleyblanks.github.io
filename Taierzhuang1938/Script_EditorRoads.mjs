@@ -304,6 +304,13 @@ export class RoadEditor {
     return Number.isFinite(y) ? y : 0;
   }
 
+  /** 这个 xz 在不在水面上（宿主的 WaterDepth 口径：桥面上不算水）。 */
+  WaterAt(x, z) {
+    const field = this.host.game.battlefield;
+    if (!field || !field.WaterDepth || !field.GroundHeight) return false;
+    return field.WaterDepth(x, z, field.GroundHeight(x, z)) > 0.05;
+  }
+
   /** 相机射线打到解析地形上（步进 + 二分；没有网格 raycast，地形是解析式的）。 */
   GroundHit(event) {
     const rect = this.host.canvas.getBoundingClientRect();
@@ -452,7 +459,8 @@ export class RoadEditor {
         Solid: () => {}, SetSector: () => {},
       };
       const path = MakeRoadPath(route.points);
-      const groundAt = (x, z) => this.GroundAt(x, z) + 0.02;
+      // 抬 0.04 盖在现路上；深度上的错开靠 polygonOffset（见下），不靠这点高差
+      const groundAt = (x, z) => this.GroundAt(x, z) + 0.04;
       try {
         if (route.kind === "railway") {
           const crown = MakeCrownProfile(path, {
@@ -467,14 +475,20 @@ export class RoadEditor {
             path, width: route.width, groundAt,
             crown: route.crown ?? 0.05, skirtDrop: route.skirt ?? 0.5,
             step: 4, chunkLen: 1e9, seed: `preview:${route.key}`,
+            // 与游戏侧同一条自动断水规则：预览不许把裙边垂进护城河/河槽
+            cutWhere: (x, z) => this.WaterAt(x, z),
           });
         }
       } catch (error) {
         console.warn("[RoadEditor] 预览生成失败：", error);
       }
+      // 预览与现路几乎共面：不开 polygonOffset 的话，稍远一点深度精度就不够，
+      // 两层互咬出锯齿条纹（实拍取证过）。深度不回写 —— 预览是叠加层，
+      // 不该遮挡后画的标记与中心线。
       const material = new THREE.MeshStandardMaterial({
         color: KIND_COLOR[route.kind] || 0xd8c49a, roughness: 1.0,
-        transparent: true, opacity: 0.85,
+        transparent: true, opacity: 0.85, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
       });
       for (const geometry of geoms) {
         const mesh = new THREE.Mesh(geometry, material);

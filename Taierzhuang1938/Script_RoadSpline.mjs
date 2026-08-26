@@ -27,9 +27,9 @@
 import * as THREE from "three";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { MakeRoadPath, GapsToRuns, SampleRun } from "./Script_RoadPath.mjs";
+import { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps } from "./Script_RoadPath.mjs";
 
-export { MakeRoadPath, GapsToRuns, SampleRun };
+export { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps };
 
 // ---------------------------------------------------------------------------
 // 条带累加器
@@ -111,15 +111,29 @@ class StripAccum {
  *                 （不登记的话人踩在路面以下走，车辙比脚面还高）
  *   inRegion      (x,z)=>bool，块级取舍（切片外不生成）
  *   sectorKey     (x,z)=>string，分区合批
+ *   cutWhere      (x,z)=>bool，**自动断开**（护城河/河槽等）。按中心 + 两路肩
+ *                 三点判 —— 濠岸是斜线时中心还在岸上、路肩已经悬在水面上；
+ *                 判中的连续段各向外扩 cutMargin 挖成缺口。
  */
 export function BuildRoadRibbon(sink, {
   points = null, path = null, width, material = "DirtRoad", groundAt,
   crown = 0.045, skirtDrop = 0.65, step = 4, gaps = [],
   widthJitter = 0, seed = "road", tile = TILE_METERS.ground,
   colliders = null, inRegion = null, sectorKey = null, chunkLen = 60,
+  cutWhere = null, cutMargin = 2,
 }) {
   const p = path || MakeRoadPath(points);
-  const runs = GapsToRuns(p.length, gaps);
+  let allGaps = gaps;
+  if (cutWhere) {
+    const half = width / 2;
+    const wet = (x, z, tx, tz) => {
+      if (cutWhere(x, z)) return true;
+      const nx = tz, nz = -tx;
+      return cutWhere(x + nx * half, z + nz * half) || cutWhere(x - nx * half, z - nz * half);
+    };
+    allGaps = gaps.concat(PredicateGaps(p, wet, { step, margin: cutMargin }));
+  }
+  const runs = GapsToRuns(p.length, allGaps);
   const rnd = Mulberry32(HashString(String(seed)));
   const stats = { length: 0, chunks: 0, colliders: 0 };
   // 低频宽度抖动：24 m 一档线性混合（逐样本独立抖会变成锯齿边）

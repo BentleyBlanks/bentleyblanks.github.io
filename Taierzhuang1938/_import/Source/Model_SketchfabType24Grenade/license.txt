@@ -1,0 +1,11 @@
+Model Information:
+* title:	Stick Grenade Type 24 (Stielhandgranate)
+* source:	https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4
+* author:	KleenStudio (https://sketchfab.com/brandonh111121)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Stick Grenade Type 24 (Stielhandgranate)" (https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4) by KleenStudio (https://sketchfab.com/brandonh111121) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

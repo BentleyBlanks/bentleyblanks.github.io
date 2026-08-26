@@ -111,6 +111,9 @@ function RoadRibbon(host, { fromX, toX, z, width, seed }) {
     groundAt: (x, zz) => host.OuterHeight(x, zz),
     crown: ROAD_CROWN, skirtDrop: 0.65, step: 4, seed,
     colliders: { tag: "embankment", thickness: 0.24 },
+    // 东端顶着护城河：中心还在岸上时路肩已悬在濠上（濠沿在瓮城处是斜的），
+    // 自动断水把这几段裙边掐掉，剩下的交给桥头引道。编辑器替身没有 WaterAt。
+    cutWhere: (x, zz) => host.WaterAt?.(x, zz) === true,
   });
   // 车辙、脚迹与修补斑：分四段各按本段的地高摆，一段一个 baseY
   const chunks = 4;

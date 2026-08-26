@@ -39,6 +39,7 @@ import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mj
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
+import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -125,6 +126,16 @@ const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
+// 第一人称手臂：**默认走旧的程序化手模**，导入的整臂要显式 ?arms=rig 才上。
+//
+// 那副 WRAD 整臂（Model_FpsArms.glb）的几何与 IK 现在是对的（肩挂在相机稳定的
+// 锚点上、解析两骨 IK 带极向量、按 socket 骨头握持，回归口 Script_FpsArmTest），
+// 但**它长得不对**：整条胳膊是光膀子的裸皮，没有军装袖子、没有绑腿式护腕，
+// 一双真实尺寸的手在这套"枪举在身前"的视图模型里要么占掉大半个屏幕、要么
+// 一半埋进枪托。同一帧对照（_shots/Arms_Compare2.png 的做法）里，旧手模的
+// 蓝布袖口 + 收锥手指明显更像 1938 年那支穿军装的手。
+// 所以这条路留着（改姿态/换成带袖子的资产就能一句话打开），但不是默认。
+const RIGGED_ARMS = params.get("arms") === "rig";
 const SHOT_ADS = !!(SHOT && params.get("ads"));
 const SHOT_FIRE = !!(SHOT && params.get("fire"));
 /**
@@ -730,6 +741,7 @@ async function Boot() {
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
   setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
+  const grenadeAsset = await LoadGrenadeAsset();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -748,7 +760,8 @@ async function Boot() {
     fov: 52,
     depthBudget: 1.22,
     meshDocs: actorFactory.meshDocs,
-    riggedAssets: actorFactory.riggedAssets,
+    riggedAssets: RIGGED_ARMS ? actorFactory.riggedAssets : null,
+    grenadeAsset,
   });
   camera.add(viewmodel.root);
   scene.add(camera);
@@ -841,7 +854,7 @@ async function Boot() {
     restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction, grenadeAsset,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),

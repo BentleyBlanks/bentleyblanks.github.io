@@ -320,6 +320,8 @@ function RoadRibbon(host, { x, fromZ, toZ, width, seed }) {
     groundAt: (xx, zz) => host.OuterHeight(xx, zz),
     crown: ROAD_CROWN, skirtDrop: 0.65, step: 4, seed,
     colliders: { tag: "embankment", thickness: 0.24 },
+    // 南端顶着护城河岸：自动断水（数据万一铺过头也不会把裙边垂进濠里）
+    cutWhere: (xx, zz) => host.WaterAt?.(xx, zz) === true,
   });
   // 车辙、脚迹：分段各按本段地高给 baseY
   const chunks = Math.max(2, Math.round(span / 60));

@@ -18,6 +18,7 @@ import * as THREE from "three";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { SUPPORT, COMBAT } from "./Data_Battle.mjs";
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
+import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 
 const GRAVITY = 19.6;
 
@@ -59,6 +60,7 @@ export class CombatSystem {
     this.mortarInFlight = [];
     this.tmp = new THREE.Vector3();
     this.tmpB = new THREE.Vector3();
+    this.grenadeAsset = host.grenadeAsset || null;
 
     // 投掷物的视觉：普通弹与七枚一束的集束弹共用池化外壳。投弹是最常用的动作，
     // 每次 new Mesh 会在半个小时的战斗里攒出上千个几何体。
@@ -72,7 +74,9 @@ export class CombatSystem {
     for (let i = 0; i < 12; i += 1) {
       const group = new THREE.Group();
       const regular = new THREE.Group();
-      regular.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
+      const importedGrenade = CloneGrenadeAsset(this.grenadeAsset);
+      if (importedGrenade) regular.add(importedGrenade);
+      else regular.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
       const bundle = new THREE.Group();
       bundle.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
       // 一根带柄弹 + 六枚去柄弹，正是 Data_Weapons 记录的七枚集束外观。
