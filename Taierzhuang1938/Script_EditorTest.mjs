@@ -362,6 +362,46 @@ Check("画质面板：设置落盘",
   !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
   gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");
 
+// TAA 开关：**点真按钮**，不是直接改 gfx.taa 再调 Apply。
+// 面板上的开关如果没接上回调（或者接错了那一位），直接改字段的测法一样是绿的，
+// 而玩家点了没反应 —— 这一栏加进来的起因正是「设置里根本没有 TAA」。
+const taaToggle = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  // Toggle 建的是 div.edBtn 不是 <button>（Script_EditorUi.Toggle），
+  // 按标签选而不是按位置选：面板加一栏就不该让这条测试挪窝。
+  const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
+    .find((b) => (b.textContent || "").includes("TAA"));
+  const button = Btn();
+  if (!button) return { found: false };
+  const boot = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
+  button.click();
+  T.StepFrames(3);
+  const off = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
+  Btn().click();
+  // 重开的第一帧必须没有历史可混：关着的那几帧没人写历史靶，
+  // 里面躺的是关掉之前那一张，混上去就是一层脏东西。
+  const firstFrameHistory = T.post.hasTaaHistory;
+  T.StepFrames(6);
+  const on = {
+    taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa,
+    settled: T.post.hasTaaHistory,
+  };
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  return { found: true, boot, off, on, firstFrameHistory, saved: saved ? saved.taa : null };
+});
+Check("画质面板：TAA 开关点得动，管线状态与历史靶跟着走",
+  taaToggle.found && taaToggle.boot.taa === true && taaToggle.off.taa === false
+  && taaToggle.off.targets === false && taaToggle.on.taa === true && taaToggle.on.targets === true,
+  taaToggle.found
+    ? `开机=${taaToggle.boot.taa} → 关=${taaToggle.off.taa}/靶${taaToggle.off.targets}`
+      + ` → 开=${taaToggle.on.taa}/靶${taaToggle.on.targets}`
+    : "面板上找不到 TAA 开关");
+Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
+  taaToggle.found && taaToggle.firstFrameHistory === false
+  && taaToggle.on.settled === true && taaToggle.saved === true,
+  `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
+
 await page.click('[data-editor="sound"]');
 await Step(6);
 const snd = await page.evaluate(() => {

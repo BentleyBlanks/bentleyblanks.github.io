@@ -842,9 +842,11 @@ export function MarkNoPrepass(material) {
 }
 
 const QUALITY_PRESETS = {
-  // 抗锯齿分工：taa 是 medium 及以上的默认（UE 的默认 AA 也是 TAA），
-  // FXAA 只在 taa 关着时兜底。low 不给 TAA：两张全分辨率 RGBA16F 历史靶
+  // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），
+  // FXAA 只在 taa 关着时兜底。low 出厂不开：两张全分辨率 RGBA16F 历史靶
   // 在集显上是实打实的带宽，low 档的定位就是"能跑"。
+  // 但这一位只是默认值不是上限 —— 画质面板可以运行时开关（SetTaaEnabled），
+  // low 档玩家想要也给得了，靶到那时候才建。
   low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14, taa: false },
   medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18, taa: true },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
@@ -928,8 +930,12 @@ export class PostPipeline {
       uProjScale: { value: new THREE.Vector2(1, 1) },
     };
     this.matTaa = this._Mat(FRAG_TAA, this.uniformsTaa);
+    // 出厂值来自画质档，但**运行时状态是这一位**（画质面板走 SetTaaEnabled 改它）。
+    // 历史靶按它建，不按 preset 建 —— 否则 low 档打开开关也没有靶可写。
+    this.taaEnabled = !!this.preset.taa;
     this.taaFlip = false;
     this.hasTaaHistory = false;
+    this.taaWasActive = false;
     // 抖动前投影矩阵第三列 x/y 的原值，主场景画完立刻还原
     this.savedProj8 = 0;
     this.savedProj9 = 0;
@@ -1044,12 +1050,13 @@ export class PostPipeline {
     this.targets.ldr = this._MakeRt(w, h, { type: THREE.UnsignedByteType });
     // TAA 历史乒乓：全分辨率 HDR。尺寸一变历史就作废（uv 对不上位），
     // taaFlip/hasTaaHistory 在下面统一清。
-    if (this.preset.taa) {
+    if (this.taaEnabled) {
       this.targets.taaA = this._MakeRt(w, h);
       this.targets.taaB = this._MakeRt(w, h);
     }
     this.taaFlip = false;
     this.hasTaaHistory = false;
+    this.taaWasActive = false;
 
     let mw = w >> 1, mh = h >> 1;
     for (let i = 0; i < this.preset.bloomLevels; i += 1) {
@@ -1059,6 +1066,37 @@ export class PostPipeline {
       this.bloomMips.push(this._MakeRt(mw, mh));
     }
     this.hasPrev = false;
+  }
+
+  /**
+   * 运行时开关 TAA（画质面板用）。
+   *
+   * 与画质档不同，这一项**可以热切** —— 它不像 MSAA 采样数 / AO 靶比例 / 泛光级数
+   * 那样进了建靶参数，只是多两张全分辨率历史靶。所以走 GI 那条惰性构造的先例：
+   * 出厂关着的档（low）根本不建靶，玩家真打开时才建，关掉立刻还显存。
+   *
+   * 关掉再打开必须丢历史：TAA 关着的那几十帧没人往历史靶里写，里面躺的是
+   * 上一次关掉前那一帧。不清的话重新打开的第一帧会跟一张几十秒前的画面混合 ——
+   * 邻域裁剪能把它压回去，但那一帧仍会看见一层脏东西。
+   */
+  SetTaaEnabled(on) {
+    const want = !!on;
+    if (want === this.taaEnabled) return;
+    this.taaEnabled = want;
+    if (want) {
+      if (!this.targets.taaA) {
+        this.targets.taaA = this._MakeRt(this.width, this.height);
+        this.targets.taaB = this._MakeRt(this.width, this.height);
+      }
+    } else if (this.targets.taaA) {
+      this.targets.taaA.dispose();
+      this.targets.taaB.dispose();
+      delete this.targets.taaA;
+      delete this.targets.taaB;
+    }
+    this.taaFlip = false;
+    this.hasTaaHistory = false;
+    this.taaWasActive = false;
   }
 
   /**
@@ -1193,7 +1231,12 @@ export class PostPipeline {
     // 预通道与主场景同用这份矩阵（深度与颜色必须同一套抖动，SSAO 拷的投影
     // 矩阵也是它，自洽）；主场景画完立刻还原，太阳投影、prevViewProjection
     // 与运动模糊拿到的都是干净矩阵。
-    const taaActive = !!(this.preset.taa && this.targets.taaA) && options.taa !== false;
+    // options.taa === false 是**逐次调用**的escape hatch（A/B 像素对比测试用），
+    // 与面板那一位（taaEnabled）是两回事：前者不动状态，只是这一趟不跑。
+    const taaActive = !!(this.taaEnabled && this.targets.taaA) && options.taa !== false;
+    // 中断过一趟就丢历史：那几帧没人写历史靶，里面是中断前的旧画面。
+    if (!taaActive && this.taaWasActive) this.hasTaaHistory = false;
+    this.taaWasActive = taaActive;
     let jitterX = 0, jitterY = 0;
     if (taaActive) {
       const jitter = TAA_JITTER[frame % TAA_SAMPLES];

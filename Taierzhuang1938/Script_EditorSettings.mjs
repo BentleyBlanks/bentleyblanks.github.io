@@ -147,6 +147,22 @@ export class GraphicsSettings {
       + "「间接光强度」是整份间接漫反射的倍率：探针体内与体积外回退的天空 IBL 一起乘，"
       + "所以调大只是整体变亮，不会在体积边界上留下一圈跟着人走的色差。", true);
 
+    const aa = Section(body, "抗锯齿");
+    const aaRow = document.createElement("div");
+    aaRow.className = "edBtns";
+    aa.appendChild(aaRow);
+    Toggle(aaRow, "TAA（时域抗锯齿）", gfx.taa !== false, (on) => {
+      gfx.taa = on;
+      this.Apply();
+    });
+    Note(aa, "照搬 UE 的缺省方案：Halton 八相位子像素抖动 + 邻域裁剪的历史累积，"
+      + "跑在泛光之前的线性 HDR 域。开着时最后一趟的 FXAA 自动让位 —— 两层叠加"
+      + "只会把画面糊软一层，而锐化两种路子都保留。");
+    Note(aa, "关掉退回 FXAA：单帧的边缘模糊，便宜、绝不拖影，但细长边（屋脊、电线、"
+      + "枪管）在移动时会爬。TAA 反过来 —— 静止与移动都稳，代价是两张全分辨率历史靶"
+      + "与快速横移时动体边缘略软。出厂 low 档关、medium 及以上开；这一栏可以热切，"
+      + "不像画质档要重开页面。", true);
+
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
     godBox.className = "edBtns";
@@ -209,6 +225,9 @@ export class GraphicsSettings {
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
+    // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
+    // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
+    gfx.taa = this.host.post ? !!this.host.post.preset.taa : true;
     this.Apply();
     if (this.panel) {
       this.panel.body.innerHTML = "";
@@ -234,6 +253,9 @@ export class GraphicsSettings {
       f.Set("合成靶", `${this.host.post.width} × ${this.host.post.height}`);
       f.Set("画质档", this.host.post.quality);
       f.Set("HDR", this.host.post.hdrCapable ? "可用" : "退回 8 位");
+      // 读的是**管线的实际状态**不是设置里那一位：历史靶没建起来时这里会照实说
+      // FXAA，而不是跟着开关喊 TAA。
+      f.Set("抗锯齿", this.host.post.taaEnabled ? "TAA（FXAA 已让位）" : "FXAA");
     }
     void post;
     const canvas = this.host.canvas;
