@@ -21,3 +21,13 @@ node scripts/Script_LocalPreview.mjs --no-open      # 起服；去掉 --no-open 
 - `node scripts/Script_LocalPreview.mjs --help` 有全部参数；`--shortcut` 在桌面放一个双击就起服的入口。
 
 **先本地看满意，再推一次 master。** 不要每改一版推一次去线上看。
+
+## 3. 推完 master，把主检出也 pull 到最新
+
+预览服务的是**主检出那棵树**。代码推上去了、主检出还停在旧提交，用户刷新看到的仍是旧版 —— 表现成「我让你加的东西怎么没有」，而他其实在照着一份过期界面提问。
+
+```powershell
+git -C C:\Users\Bentl\Documents\Program\bentleyblanks.github.io pull --ff-only origin master
+```
+
+只在主检出**当前就在 `master` 且工作区干净**时这么做，且只用 `--ff-only`。停在别人分支上或有未提交改动就**别强来**（不 checkout、不 stash），如实说主检出被占着。完整条款见 AGENTS.md「推完 master 要把主检出也 pull 到最新」。
