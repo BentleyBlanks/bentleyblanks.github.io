@@ -319,10 +319,12 @@ export class FrameProfiler {
 
   /**
    * 最近 seconds 秒的聚合：帧率、整帧/CPU/GPU 分项的 avg/p95/max、事件计数、
-   * 以及窗口内间隔最长的那一帧（掉帧取证的主角）。
-   * 间隔超过 250 ms 的帧按「页面被切走/暂停」处理，不进帧率统计但保留在 worst 里。
+   * 以及窗口内最差的那一帧（掉帧取证的主角）。
+   * 间隔超过 250 ms 的帧按「页面被切走/暂停」处理，不进帧率统计也不进 worst。
+   * options.buckets = false 走便宜路径：跳过逐桶/逐 pass 的分位数统计
+   * （面板的取证栏每秒刷一次，只要 worst 记录本体与事件计数）。
    */
-  Summary(seconds = 2) {
+  Summary(seconds = 2, { buckets = true } = {}) {
     const cutoff = this._lastRaf - seconds * 1000;
     const rows = [];
     for (let i = this.history.length - 1; i >= 0; i -= 1) {
@@ -355,6 +357,7 @@ export class FrameProfiler {
     };
     const BucketStats = (field) => {
       const out = {};
+      if (!buckets) return out;
       for (const key of CollectKeys(field)) {
         out[key] = Percentiles(rows.map((row) => (row[field] && row[field][key]) || 0));
       }
@@ -362,13 +365,16 @@ export class FrameProfiler {
     };
     const gpuRows = rows.filter((row) => row.gpu);
     const gpu = {};
-    for (const key of CollectKeys("gpu")) {
-      gpu[key] = Percentiles(gpuRows.map((row) => row.gpu[key] || 0));
+    if (buckets) {
+      for (const key of CollectKeys("gpu")) {
+        gpu[key] = Percentiles(gpuRows.map((row) => row.gpu[key] || 0));
+      }
     }
     let worst = null;
     for (const row of live) {
-      // 只在「活着的帧」里挑：切后台/StepFrames 批间的几秒空档不是掉帧，
-      // 让它霸占取证栏会把真正的坏帧全挡住。
+      // 只在「活着的帧」里挑（切后台/StepFrames 批间的空档不是掉帧），并且要挑
+      // 有我们自己工作量的帧（cpuMs ≈ 0 的间隔大帧是浏览器没调度我们，没账可归）。
+      if (row.cpuMs < 0.2) continue;
       if (!worst || row.interval > worst.interval) worst = row;
     }
     let gcCount = 0;

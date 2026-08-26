@@ -122,10 +122,11 @@ node Taierzhuang1938/Script_ActorPoseShot.mjs                   # 人物姿态�
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 ```
 
-**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ 性能剖析」，弹独立窗口，
+**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ Profiler」开关，弹独立窗口，
 玩法照跑：CPU 逐系统 / GPU 逐 pass / 掉帧取证 / GC，可导出快照 JSON。
-内核 `Script_Profiler.mjs`、面板 `Script_EditorProfiler.mjs`，账在
-`docs/Data_EditorSuite.md` 对应小节；回归口 `Script_ProfilerTest`（render 域）。
+没有页面内面板（用户点名去掉的）。内核 `Script_Profiler.mjs`、面板
+`Script_EditorProfiler.mjs`，账在 `docs/Data_EditorSuite.md` 对应小节；
+回归口 `Script_ProfilerTest`（render 域）。
 
 调试页 `Probe.html`（`Script_Probe.mjs`）：材质 / 光照 / 后处理单独摆出来看，
 URL 参数选 preset / quality / scene / gi。
