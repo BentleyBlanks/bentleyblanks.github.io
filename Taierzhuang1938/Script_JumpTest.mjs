@@ -27,7 +27,10 @@ try {
 
   const jump = await page.evaluate(() => {
     const T = window.Taierzhuang, D = T.Debug;
+    // Spawn 之后必须先落定再取基准高度：FindFreeSpot 只保证"站得下"，胶囊仍可能被
+    // 物理世界往上顶几米（实测这一点会把 y0 记成腾空中的高度，抬高读出 8.4 m）。
     T.player.Spawn(0, 60, 0);
+    T.StepFrames(20);
     T.player.stamina = 1;
     const y0 = T.player.position.y;
     const count0 = D.Jump().count;
@@ -68,6 +71,7 @@ try {
   const prone = await page.evaluate(() => {
     const T = window.Taierzhuang, D = T.Debug;
     T.player.Spawn(0, 60, 0);
+    T.StepFrames(20);
     T.player.stance = "prone";
     const count0 = D.Jump().count;
     const y0 = T.player.position.y;
@@ -76,6 +80,53 @@ try {
   });
   Check("卧姿不能原地弹起", prone.added === 0 && prone.rise < 0.02,
     `跳跃 +${prone.added} / 抬高 ${prone.rise.toFixed(3)} m`);
+
+  // 助跑加成：跑起来跳必须**明显**比走着跳远、比走着跳高。
+  // 加成之前空中水平位移只是"速度 × 固定滞空"，冲刺跳与走路跳之比恒等于速度比
+  // （1.72），弧线一模一样 —— 玩家的原话是"跑快了跳也没区别"。
+  const run = await page.evaluate(() => {
+    const T = window.Taierzhuang, D = T.Debug;
+    const Once = (sprint) => {
+      T.player.Spawn(0, 60, 0);
+      T.StepFrames(20);
+      T.player.stamina = 1;
+      T.player.yaw = 0;
+      D.Key("KeyW", true);
+      if (sprint) D.Key("ShiftLeft", true);
+      T.StepFrames(90);                                  // 跑到匀速
+      const speed = Math.hypot(T.player.velocity.x, T.player.velocity.z);
+      const y0 = T.player.position.y;
+      let prev = { x: T.player.position.x, z: T.player.position.z };
+      D.Key("Space");
+      let dist = 0, rise = 0, air = 0, started = false;
+      for (let i = 0; i < 90; i += 1) {
+        T.StepFrames(1);
+        const p = T.player.position;
+        if (!D.Jump().grounded) {
+          started = true;
+          air += 1 / 60;
+          dist += Math.hypot(p.x - prev.x, p.z - prev.z);
+          rise = Math.max(rise, p.y - y0);
+        } else if (started) break;
+        prev = { x: p.x, z: p.z };
+      }
+      D.Key("KeyW", false);
+      if (sprint) D.Key("ShiftLeft", false);
+      T.StepFrames(30);
+      return { speed, dist, rise, air, runK: D.Jump().runK };
+    };
+    return { walk: Once(false), sprint: Once(true) };
+  });
+  Check("助跑跳明显比走着跳远",
+    run.sprint.dist > run.walk.dist * 1.85 && run.sprint.rise > run.walk.rise + 0.04
+      && run.sprint.runK > 0.9,
+    `走 ${run.walk.dist.toFixed(2)} m / 冲刺 ${run.sprint.dist.toFixed(2)} m`
+      + `（${(run.sprint.dist / run.walk.dist).toFixed(2)}×，速度比 ${(run.sprint.speed / run.walk.speed).toFixed(2)}×）`
+      + ` / 抬高 ${run.walk.rise.toFixed(2)}→${run.sprint.rise.toFixed(2)} m`
+      + ` / 滞空 ${run.walk.air.toFixed(2)}→${run.sprint.air.toFixed(2)} s`);
+  Check("助跑加成压在自动翻越判据附近，不许变成跑酷",
+    run.sprint.rise < 0.75 && run.sprint.air < 0.62,
+    `冲刺跳抬高 ${run.sprint.rise.toFixed(3)} m / 滞空 ${run.sprint.air.toFixed(3)} s`);
 
   const vault = await page.evaluate(() => {
     const T = window.Taierzhuang, D = T.Debug, bf = T.battlefield;

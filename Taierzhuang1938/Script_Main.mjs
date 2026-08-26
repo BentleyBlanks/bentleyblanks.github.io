@@ -968,7 +968,7 @@ async function Boot() {
         count: player.jump.count, grounded: player.grounded,
         y: player.position.y, velocityY: player.velocity.y,
         airTime: player.jump.airTime, landSerial: player.jump.landSerial,
-        landImpact: player.jump.landImpact,
+        landImpact: player.jump.landImpact, runK: player.jump.runK,
         viewY: viewmodel.statePivot.position.y,
         viewPitch: viewmodel.statePivot.rotation.x,
       }),
