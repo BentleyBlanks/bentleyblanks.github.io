@@ -87,6 +87,7 @@ export const SFX_SOURCES = [
   {
     id: "PrologueTrainSeedAudio",
     seedAudio: true,
+    bake: "Script_SeedAudioTrainBake.mjs",
     credit: "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
     license: "volcengine",
     cuts: [{ cue: "trainWhistle", file: "AudioSfx_TrainWhistle_01.mp3", durS: 4.055 }],
@@ -276,32 +277,34 @@ export const SFX_SOURCES = [
   },
 
   // === 白刃 ===============================================================
+  // 三条全部换成火山引擎 SeedAudio 的 take（2026-08-26 人工试听选定），原来的
+  // Sonniss 顶包（David Dumais 的大型冷兵器挥空 / Justsoundeffects 的双手斧入肉 /
+  // PMSFX 的利刃刺入）已下架 —— 顶包的问题不在录得好不好，在**兵器不对**：
+  // 斧子入肉比大刀钝、西式利刃刺入比三八式刺刀细，白刃是这场仗的招牌动作，
+  // 借来的音站不住。挥空那条尤其顶不住，试听两轮都被打回来。
+  //
+  // 成品由 Script_SeedAudioMeleeBake.mjs 单独烘（take 是人工选的，不能靠重掷复现，
+  // 所以缺 take 时它宁可报错也不覆盖成品）。这里仍然登记，避免全量 SfxBake 把
+  // 这三个 cue 从 manifest 漏掉 —— 与序章汽笛同一个理由。
   {
-    id: "SwingLarge",
-    item: "sonniss-gdc-2023-game-audio-bundle-normalized",
-    path: "David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Swing 3 Large 03_DDUMAIS_NONE.mp3",
-    credit: "David Dumais Audio · 大型冷兵器挥空 · Sonniss GDC 2023",
-    license: "sonniss",
-    // 挥空与劈中必须听得出区别，不然玩家不知道砍没砍到。
-    cuts: [{ cue: "dadaoSwing", tail: 0.5, gain: 0.8, whole: true }],
-  },
-  {
-    id: "AxeFlesh",
-    item: "sonniss-gdc-2024-game-audio-bundle-normalized",
-    path: "Justsoundeffects - Melee Weapons/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.mp3",
-    credit: "Justsoundeffects · 双手斧入肉 · Sonniss GDC 2024",
-    license: "sonniss",
-    // 大刀是砍不是刺：钝重的入肉声带一点骨头的脆响，双手斧是最接近的一类。
-    cuts: [{ cue: "dadaoHit", tail: 0.8, gain: 0.92, variants: 2, decay: [0.08, 1.0] }],
-  },
-  {
-    id: "CleanStab",
-    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
-    path: "PMSFX - BLOODBATH/PM_BB_CLEAN_STABS_20.mp3",
-    credit: "PMSFX · 利刃刺入 · Sonniss GDC 2019",
-    license: "sonniss",
-    // 刺刀：刺入 + 拔出，比劈砍短促。
-    cuts: [{ cue: "bayonetHit", tail: 0.7, gain: 0.9, whole: true }],
+    id: "MeleeSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioMeleeBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · 白刃三音",
+    license: "volcengine",
+    cuts: [
+      // 挥空给三个变体：白刃是连续动作，一个样本反复响两下就露馅。
+      // 三条性格不同（木质厚实 / 长嘶 / 刃嘶明亮），随机轮着出。
+      {
+        cue: "dadaoSwing", durS: 0.55,
+        files: ["AudioSfx_DadaoSwing_01.mp3", "AudioSfx_DadaoSwing_02.mp3", "AudioSfx_DadaoSwing_03.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 大刀挥空（三变体：木质厚实 / 长嘶 / 刃嘶明亮）",
+      },
+      { cue: "dadaoHit", durS: 0.669, file: "AudioSfx_DadaoHit_01.mp3",
+        credit: "Volcengine SeedAudio 1.0 · 大刀砍入人体" },
+      { cue: "bayonetHit", durS: 1.369, file: "AudioSfx_BayonetHit_01.mp3",
+        credit: "Volcengine SeedAudio 1.0 · 刺刀刺入拔出" },
+    ],
   },
 
   // === 命中 ===============================================================

@@ -143,9 +143,9 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `shellIncoming` | 1 | 2.00 s | 16.2 KB | Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020 |
 | `shellImpact` | 1 | 2.80 s | 22.5 KB | Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015 |
 | `launcherPop` | 1 | 0.90 s | 7.6 KB | Bluezone Corporation · 榴弹发射 · Sonniss GDC 2023 |
-| `dadaoSwing` | 1 | 0.50 s | 4.5 KB | David Dumais Audio · 大型冷兵器挥空 · Sonniss GDC 2023 |
-| `dadaoHit` | 2 | 0.80 s | 13.6 KB | Justsoundeffects · 双手斧入肉 · Sonniss GDC 2024 |
-| `bayonetHit` | 1 | 0.70 s | 6.0 KB | PMSFX · 利刃刺入 · Sonniss GDC 2019 |
+| `dadaoSwing` | 3 | 0.55 s | 11.1 KB | Volcengine SeedAudio 1.0 · 大刀挥空（木质厚实 / 长嘶 / 刃嘶明亮）|
+| `dadaoHit` | 1 | 0.67 s | 5.8 KB | Volcengine SeedAudio 1.0 · 大刀砍入人体 |
+| `bayonetHit` | 1 | 1.37 s | 11.3 KB | Volcengine SeedAudio 1.0 · 刺刀刺入拔出 |
 | `impactBrick` | 3 | 0.33 s | 12.2 KB | Gamemaster Audio · 弹着砖石 · GDC 2017 ／ PMSFX · 青砖碎裂 · GDC 2020 |
 | `impactDirt` | 1 | 0.42 s | 3.9 KB | PMSFX · 弹着夯土 · Sonniss GDC 2020 |
 | `impactWood` | 2 | 0.45 s | 8.7 KB | Double Trouble Audio · 木料受击（软/硬两条）· Sonniss GDC 2017 |
@@ -161,6 +161,41 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 
 变体多的那几条不是随便给的：**每秒都在响的音必须多变体**（脚步、弹着砖、
 中弹闷哼、步枪），一个固定样本循环起来就是机关枪。
+
+### 白刃三音为什么是生成的，不是实录的
+
+其余全部是实录，只有白刃这三条走火山引擎 SeedAudio 生成（2026-08-26 换掉）。
+原因不是 Sonniss 里没有冷兵器音，是**兵器不对**：斧子入肉比大刀钝、西式利刃刺入
+比三八式刺刀细，而白刃是这场仗的招牌动作，借来的音站不住。挥空那条尤其顶不住，
+人工试听两轮才定。
+
+提示词有一条反直觉的经验：**挥空音里一个字都不能提「大刀」**。直接说大刀，模型
+两次都塌成两个极端 —— 要么全是 7 kHz 的嘶嘶（像喷气罐），要么全是 300 Hz 以下的
+低吼（像一阵闷风）。有效的写法是描述拟音师真会做的事（竹竿 / 木棍抽过空气），
+再补三句硬约束：点名中频、给时长、给包络（「由弱迅速涨到最强再立刻消失」）。
+验收看两个数：`120 Hz–2 kHz 能量占比 ≥ 60 %`，包络是**一道弓形**（只有一个峰）。
+
+挥空给三个变体是因为它是**连续动作**：连砍两下用同一个样本立刻露馅。
+砍中目前只有一个变体（人工选定的那条），连砍时靠 `SampleRecipe` 的逐发 ±3 %
+变调撑着；真觉得复读再补第二条。
+
+音量对齐的是**响度不是峰值**。这几条 take 从模型出来就比库里其它音「实」得多
+（波峰因数 13—17 dB，实录冲击音是 19—27），按峰值归一会比 Sonniss 那批**响 13 dB**，
+白刃一出手就盖住整场枪声，而 `SAMPLE_MIX` 里那几个数是照旧素材调的。所以烘焙时把每条
+压到全库中位响度 −28.5 dBFS，再留一道 −6 dBFS 的峰值保险 —— 五条落在 −28.4—−28.6，
+`SAMPLE_MIX` 一个数都不用动。另有一个坑：72 kbps 单声道编宽带噪声，**解出来的 RMS 会比
+编码前高 2—3 dB**，所以要量成品自己再补一刀，不能只量编码前。
+
+烘焙走 `Script_SeedAudioMeleeBake.mjs`，与 `Script_SfxBake.mjs` 分开：
+**take 是人工试听选出来的，重掷不可复现**，所以它默认不调接口，只拿
+`Audio/Sfx/_raw/SeedAudioMelee_*.mp3` 重新转码；take 缺失时宁可报错也不覆盖成品。
+`--force` 才重新生成，会换掉已验收的音。take 另有一份归档在
+`OneDrive\Sync\饮河\FPS\音频提取\刀具相关\`。
+
+```bash
+node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs --dry
+node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs
+```
 
 ## 冲锋号是特例：只借音色，不借号谱
 

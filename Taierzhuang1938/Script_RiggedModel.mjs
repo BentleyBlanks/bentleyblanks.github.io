@@ -58,9 +58,38 @@ export async function LoadRiggedAssets() {
   return loadPromise;
 }
 
+// 标定左肩前送时给胳膊留的余量：目标是"肩到左手握点 = 臂长 × 这个系数"。
+// 留三成弯量而不是一成：CCDIK 五次迭代并不会把胳膊真的拉直，
+// 实测 0.94 那一版残差 0.076 m（手看着还是虚握的），0.70 压到 0.015 m。
+const ARM_SLACK = 0.70;
+// 前送上限。再多蒙皮就在画面左边缘拉出一片鱼鳍（这副手臂没有躯干可参照）。
+const MAX_LEAD = 0.40;
+
+/**
+ * 骨骼名归一化。
+ *
+ * **这是"第一人称没有手"的病根。** GLB 里的骨头叫 `wrist_ik.l`（Blender 的
+ * 左右后缀），而 three 的 GLTFLoader 读进来会走 `PropertyBinding.sanitizeNodeName`
+ * ——点号是动画轨道名的分隔符，于是被**删掉**：场景里那根骨头叫 `wrist_ikl`。
+ * 按原名 `wrist_ik.l` 查一律落空，而落空**不报错**：IK 求解器根本没建起来
+ * （`iks` 空数组），`wrists/targets` 也是 null，`_PlaceTarget`/`_OrientWrist`
+ * 第一行就 return。整副手臂于是停在绑定姿势、挂在视野下沿之外一动不动；
+ * 而 `Attach()` 已经把旧的程序化手藏了 —— 画面上就是"一支枪浮在半空，没有手"，
+ * 任何动作（拉栓、装填、上刺刀）都只有枪在动。
+ *
+ * 所以认人一律按"小写 + 去掉所有非字母数字"来：`wrist_ik.l` 与 `wrist_ikl`
+ * 归一化后都是 `wristikl`，导出管线怎么改名都还认得出。
+ */
+function NormalizeBoneName(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function FindByName(root, name) {
+  const wanted = NormalizeBoneName(name);
   let found = null;
-  root.traverse((object) => { if (!found && object.name === name) found = object; });
+  root.traverse((object) => {
+    if (!found && NormalizeBoneName(object.name) === wanted) found = object;
+  });
   return found;
 }
 
@@ -82,7 +111,12 @@ export class FpsArmRig {
     this.root = CloneSkeleton(gltf.scene);
     this.root.name = "RiggedFpsArms";
     this.root.userData.skipNormalDepth = true;
-    this.root.position.set(0, -0.075, 0.34);
+    // 肩根在枪局部坐标里的落点。整副手臂挂在 rig.group 下面，所以肩膀是跟着枪走的，
+    // 手能摸到枪身上多远就由这个数（加 _CalibrateLeftLead 现算的左肩前送）决定。
+    // 想临时把它往枪口再挪一截的念头别起：蒙皮会在画面边缘拉出一片鱼鳍，
+    // 账记在 Script_Viewmodel 的 BAYONET_SLIDE_Z 抬头里。
+    this.baseOffset = new THREE.Vector3(0, -0.075, 0.34);
+    this.root.position.copy(this.baseOffset);
     this.mesh = FirstSkinnedMesh(this.root);
     this.mixer = gltf.animations.length ? new THREE.AnimationMixer(this.root) : null;
     if (this.mixer) this.mixer.clipAction(gltf.animations[0]).play();
@@ -93,6 +127,7 @@ export class FpsArmRig {
     this.targets = {};
     this.calibration = {};
     this.sprintFallback = false;
+    this.leftLead = 0;              // 左肩前送量，逐枪现算，见 _CalibrateLeftLead
     this.tmpPosition = new THREE.Vector3();
     this.tmpQuaternion = new THREE.Quaternion();
     this.tmpQuaternion2 = new THREE.Quaternion();
@@ -109,6 +144,15 @@ export class FpsArmRig {
           if (!material) continue;
           material.side = THREE.FrontSide;
           material.shadowSide = THREE.FrontSide;
+          // 这副手臂的皮肤贴图本来就偏亮（albedo 近乎白），照进滕县这片阴天的
+          // 天光里直接过曝成一块死白 —— 手臂一旦真的显示出来（IK 修好之前它压根
+          // 没画在屏幕上），第一眼看到的就是两条发光的胳膊。压两处：
+          // 反射率乘一层晒过的肤色，环境反射收到四成（皮肤不是抛光金属）。
+          if (material.isMeshStandardMaterial) {
+            material.color.multiplyScalar(0.62);
+            material.envMapIntensity = 0.40;
+            material.roughness = Math.max(material.roughness, 0.85);
+          }
           material.needsUpdate = true;
         }
         object.frustumCulled = false;
@@ -119,20 +163,41 @@ export class FpsArmRig {
   }
 
   _BuildSolver() {
+    this.report = { bones: 0, chains: 0, missing: [] };
     if (!this.mesh || !this.mesh.skeleton) return;
     const bones = this.mesh.skeleton.bones;
-    const index = (name) => bones.findIndex((bone) => bone.name === name);
+    // 归一化名 -> 序号。见 NormalizeBoneName 的抬头：直接按 `wrist.l` 查是查不到的。
+    const byName = new Map();
+    bones.forEach((bone, i) => {
+      const key = NormalizeBoneName(bone.name);
+      if (!byName.has(key)) byName.set(key, i);
+    });
+    const index = (name) => (byName.has(NormalizeBoneName(name)) ? byName.get(NormalizeBoneName(name)) : -1);
+    this.report.bones = bones.length;
     const iks = [];
     for (const side of ["r", "l"]) {
-      const target = index(`wrist_ik.${side}`);
-      const effector = index(`wrist.${side}`);
-      const forearm = index(`forearm.${side}`);
-      const bicep = index(`bicep.${side}`);
-      this.targets[side] = bones[target] || FindByName(this.root, `wrist_ik.${side}`);
-      this.wrists[side] = bones[effector] || FindByName(this.root, `wrist.${side}`);
+      const names = {
+        target: `wrist_ik.${side}`, effector: `wrist.${side}`,
+        forearm: `forearm.${side}`, bicep: `bicep.${side}`,
+      };
+      const target = index(names.target);
+      const effector = index(names.effector);
+      const forearm = index(names.forearm);
+      const bicep = index(names.bicep);
+      this.targets[side] = bones[target] || FindByName(this.root, names.target);
+      this.wrists[side] = bones[effector] || FindByName(this.root, names.effector);
+      for (const [key, value] of Object.entries({ target, effector, forearm, bicep })) {
+        if (value < 0) this.report.missing.push(names[key]);
+      }
       if ([target, effector, forearm, bicep].every((value) => value >= 0)) {
         iks.push({ target, effector, links: [{ index: forearm }, { index: bicep }], iteration: 5 });
       }
+    }
+    this.report.chains = iks.length;
+    // 缺骨头 = 那条胳膊不会动。以前这里静默降级，于是"没有手"这件事在画面上
+    // 摆了很久也没人看见 —— 现在它至少要在控制台喊一声。
+    if (this.report.missing.length) {
+      console.warn(`[RiggedModel] 手臂骨骼没对上，IK 不会跑：${this.report.missing.join(", ")}`);
     }
     if (iks.length) this.solver = new CCDIKSolver(this.mesh, iks);
   }
@@ -145,9 +210,12 @@ export class FpsArmRig {
     this.sprintFallback = false;
     this.root.visible = true;
     rigGroup.add(this.root);
-    this.root.position.set(0, -0.075, 0.34);
+    this.root.position.copy(this.baseOffset);
     this.root.rotation.set(0, 0, 0);
     this.root.updateWorldMatrix(true, true);
+    this.shoulderLeft = FindByName(this.root, "shoulder.l");
+    this.shoulderHome = this.shoulderLeft ? this.shoulderLeft.position.clone() : null;
+    this._CalibrateLeftLead(rigGroup, handLeft);
     for (const side of ["r", "l"]) {
       const wrist = this.wrists[side];
       const hand = this.hands[side];
@@ -157,6 +225,36 @@ export class FpsArmRig {
       this.calibration[side] = handQ.invert().multiply(wristQ);
     }
     this.Update(0);
+  }
+
+  /**
+   * 左肩要往枪口送多远：**每支枪现算**，不写死。
+   *
+   * 左手的握点是逐枪给的（`rig.hands.left`，护木上），三八式比汉阳造还长 —— 写死
+   * 一个数就会顾此失彼：按汉阳造调好的 0.34 m 拿到三八式上仍然差一截，左臂又绷成
+   * 一根直棍、在画面左边缘拉出一片鱼鳍。所以这里量着算：
+   *   送的量 = 肩到左手握点的距离 − 这条胳膊长度 × ARM_SLACK（留两成弯，别绷直）
+   * 迭代三次收敛（送了肩之后距离会变），上限 MAX_LEAD —— 再多蒙皮就露馅。
+   */
+  _CalibrateLeftLead(rigGroup, handLeft) {
+    this.leftLead = 0;
+    const shoulder = this.shoulderLeft;
+    if (!shoulder || !handLeft) return;
+    const bones = ["bicep.l", "forearm.l", "wrist.l"].map((n) => FindByName(this.root, n));
+    if (bones.some((b) => !b)) return;
+    rigGroup.updateMatrixWorld(true);
+    const at = (obj) => obj.getWorldPosition(new THREE.Vector3());
+    const armLen = at(bones[0]).distanceTo(at(bones[1])) + at(bones[1]).distanceTo(at(bones[2]));
+    const target = at(handLeft);
+    for (let i = 0; i < 3; i += 1) {
+      this._LeadLeftShoulder();
+      const need = at(shoulder).distanceTo(target) - armLen * ARM_SLACK;
+      if (need <= 0.002) break;
+      this.leftLead = Math.min(MAX_LEAD, this.leftLead + need);
+    }
+    this._LeadLeftShoulder();
+    this.report.leftLead = +this.leftLead.toFixed(3);
+    this.report.armLen = +armLen.toFixed(3);
   }
 
   /**
@@ -179,6 +277,34 @@ export class FpsArmRig {
     this.hands = null;
     this.sprintFallback = false;
     this.root.visible = true;
+  }
+
+  /**
+   * 左肩前送（一次性标定，跟着 Attach 走）。
+   *
+   * 量出来的事实：这副手臂 bicep→forearm→wrist 一共 0.624 m，而左手的握点在
+   * 护木上、离左肩 **0.795 m** —— 差 0.17 m，IK 永远够不着。够不着不会报错，
+   * 只会把胳膊绷成一根指着护木的直棍、手停在半空张着五指（"手不握枪"就是这么来的）。
+   * 右手没这问题：握把离右肩 0.417 m，正好。
+   *
+   * 解法不是把左手往枪托挪（那样左手就不在护木上了，握法就错了），而是把**左肩**
+   * 往前送 —— 端枪的人本来就是斜着站、左肩在前的。肩在画面外，送多少没人看得见，
+   * 看得见的是左手实实在在扣在护木上。
+   */
+  _LeadLeftShoulder() {
+    const shoulder = this.shoulderLeft;
+    const rigGroup = this.root.parent;
+    if (!shoulder || !shoulder.parent || !rigGroup || !this.shoulderHome) return;
+    // 每帧都从"动画给的那个位置"重新算：GripIdle 这条 clip 自带 shoulder 的位移轨，
+    // 只在 Attach 时改一次会被混合器第一帧就抹掉（这一版返工就是从这儿开始的）。
+    shoulder.position.copy(this.shoulderHome);
+    shoulder.updateWorldMatrix(true, false);
+    const world = shoulder.getWorldPosition(this.tmpPosition);
+    const local = rigGroup.worldToLocal(world.clone());
+    local.z -= this.leftLead || 0;
+    rigGroup.localToWorld(local);
+    shoulder.position.copy(shoulder.parent.worldToLocal(local));
+    shoulder.updateMatrixWorld(true);
   }
 
   _PlaceTarget(side) {
@@ -207,6 +333,7 @@ export class FpsArmRig {
     if (!this.root.parent || !this.hands) return;
     if (this.mixer) this.mixer.update(Math.max(0, dt));
     this.root.updateWorldMatrix(true, true);
+    this._LeadLeftShoulder();
     this._PlaceTarget("r");
     this._PlaceTarget("l");
     if (this.solver) this.solver.update();
