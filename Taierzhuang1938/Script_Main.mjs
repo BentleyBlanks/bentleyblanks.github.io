@@ -47,6 +47,7 @@ import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
+import { FrameProfiler } from "./Script_Profiler.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps } from "./Script_TrimProps.mjs";
@@ -265,6 +266,10 @@ const ssao = {
   // 「错位之后还想看见点什么」硬抬起来的补偿值，退回正常量级
   strength: { value: SSAO_BASE },
 };
+
+// 运行时性能剖析器。构造免费、常态休眠（Enable 由编辑器「性能剖析」叠加层调）；
+// Frame/RenderScene 里的 B/E/Gpu* 标记在它关着时只是一次布尔检查。
+const profiler = new FrameProfiler(renderer, { post });
 
 /**
  * 画质旋钮。
@@ -878,7 +883,7 @@ async function Boot() {
   window.Taierzhuang = {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
-    renderer, scene, camera, post, sky, lights, library, get gi() { return gi; },
+    renderer, scene, camera, post, sky, lights, library, profiler, get gi() { return gi; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     story, combat, destruction, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
@@ -1291,7 +1296,7 @@ async function Boot() {
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = new EditorSuite({
     renderer, scene, camera, canvas, library, lights, post, vfx,
-    actorFactory, viewmodel, audio, cutscene, destruction,
+    actorFactory, viewmodel, audio, cutscene, destruction, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
@@ -1524,7 +1529,14 @@ function MakeNavGrid(field) {
   const w = field.bounds.maxX - field.bounds.minX;
   const h = field.bounds.maxZ - field.bounds.minZ;
   const cell = (w * h > 900000) ? 2.0 : 1.0;
-  return new NavGrid(field, { cell });
+  const grid = new NavGrid(field, { cell });
+  // 路标的距离场在**建关时**同步预热（force 绕过逐帧预算）：BFS 现在是跨帧摊的，
+  // 不预热的话开场前几秒每个班都要各等自己那张场，兵先直奔一段墙才拐弯。
+  // 一张 ~5 ms、七八个路标共几十毫秒，摊在十几秒的建关里没有存在感。
+  for (const objective of field.objectives || []) {
+    grid.FieldFor(objective.x, objective.z, true);
+  }
+  return grid;
 }
 
 /** 浮尘只罩玩家附近那一片：切片最大的一关跨两公里，按整片铺会摊薄到看不见。 */
@@ -3522,11 +3534,15 @@ function Frame(dt, render = true) {
   state.elapsed += dt;
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
   // 所有分支之前 —— 排进下面任何一条 if 里，都会有一整类帧读不到新数。
+  profiler.B("overlay");
   if (editor) editor.UpdateOverlays(dt);
+  profiler.E("overlay");
   // 外部道具流送：跟着**相机**走（游戏里相机就在玩家头上；过场里跟运镜走，
   // 布景才不会在长焦端消失）。必须排在所有 return 分支之前。
   if (battlefield?.externalStreamer) {
+    profiler.B("streamer");
     battlefield.externalStreamer.Update(camera.position.x, camera.position.z);
+    profiler.E("streamer");
   }
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
@@ -3578,11 +3594,15 @@ function Frame(dt, render = true) {
     }
   }
 
+  profiler.B("input");
   const firePrev = input.fire;
   ReadKeys();
   EnsureDebugInventory();
   fireEdge = input.fire && !firePrev;
+  profiler.E("input");
+  profiler.B("player");
   player.Update(dt, input, WEAPONS[currentWeapon]);
+  profiler.E("player");
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false;
 
@@ -3609,7 +3629,11 @@ function Frame(dt, render = true) {
 
   // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
   // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。
-  if (state.frame % 6 === 0) UpdateContextualActionPrompts();
+  if (state.frame % 6 === 0) {
+    profiler.B("hud");
+    UpdateContextualActionPrompts();
+    profiler.E("hud");
+  }
 
   if (player.Alive) TryFire(dt);
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
@@ -3692,6 +3716,7 @@ function Frame(dt, render = true) {
   lastViewPitch = viewPitch;
   lastLookDeltaYaw = dYaw;
 
+  profiler.B("viewmodel");
   viewmodel.Update(dt, {
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
@@ -3706,6 +3731,7 @@ function Frame(dt, render = true) {
     // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
     lowAmmo: state.ammo <= 1,
   });
+  profiler.E("viewmodel");
 
   // 友军倒下：叙事层要靠它触发「他倒了我上，我倒了你上」那几句。
   // 用计数差而不是回调 —— AiDirector 没有死亡事件，加一个回调等于改它的契约，
@@ -3714,17 +3740,25 @@ function Frame(dt, render = true) {
   if (state.prevAllies > 0 && alliesNow < state.prevAllies && story) story.Signal("allyDown");
   state.prevAllies = alliesNow;
 
+  profiler.B("ai");
   ai.Update(dt, camera);
+  profiler.E("ai");
   // 物理步进排在**人都走完之后、特效与投掷物之前**：
   // 玩家与 AI 是运动学体，它们这一帧的位移要先写进刚体，引擎再把碰撞体同步过去；
   // 手雷是动态刚体，它读的就是同步之后的那份位置。顺序反了会差一帧，
   // 表现为「手雷从刚跑过去的人身上穿过去」。
+  profiler.B("physics");
   if (physics) physics.Step(dt);
+  profiler.E("physics");
+  profiler.B("vfx");
   vfx.Update(dt, camera, state.elapsed);
+  profiler.E("vfx");
+  profiler.B("combat");
   combat.Update(dt, { phase: PHASE_TABLE[state.phaseIndex] });
   // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
   // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
   if (destruction) destruction.Update(player.position, dt);
+  profiler.E("combat");
 
   // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
   if (state.cooking) state.cook += dt;
@@ -3741,6 +3775,7 @@ function Frame(dt, render = true) {
   if (state.playerAliveLast && !player.Alive) OnPlayerDown();
   state.playerAliveLast = player.Alive;
 
+  profiler.B("story");
   const contested = UpdateObjectives(dt);
 
   // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
@@ -3767,6 +3802,7 @@ function Frame(dt, render = true) {
     pool: state.nraPool,
   });
   if (story.ObjectiveText) state.storyObjective = story.ObjectiveText;
+  profiler.E("story");
 
   // --- 结束条件 ---
   // **这座城没有"守住"这个结局。** 三月十七日它陷落，十八日午前肃清完毕，
@@ -3787,11 +3823,14 @@ function Frame(dt, render = true) {
   state.spawnAccumulator += dt;
   if (state.spawnAccumulator > 3) {
     state.spawnAccumulator = 0;
+    profiler.B("spawn");
     if (RANGE) MaintainRangeTargets();
     else SeedSoldiers(phase);
+    profiler.E("spawn");
   }
 
   // --- HUD ---
+  profiler.B("hud");
   hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
     state.nraPool, null);
   hud.SetState({
@@ -3878,6 +3917,7 @@ function Frame(dt, render = true) {
     player, objectives: battlefield.objectives, soldiers: ai.soldiers, bounds: battlefield.bounds,
   });
   hud.Update(dt);
+  profiler.E("hud");
 
   // --- 渲染 ---
   if (!render) return;
@@ -3891,6 +3931,9 @@ function Frame(dt, render = true) {
  */
 function RenderScene(dt) {
   const phase = PHASE_TABLE[state.phaseIndex];
+  // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
+  // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。
+  profiler.GpuFrameStart();
   // 探针体每帧推一批。**必须挂在这里，不能挂在玩法那条分支上** ——
   // 出画的路一共四条（玩法 / 过场 / 菜单 / 编辑器），以前只有玩法那条推 GI。
   // 后果：编辑器一打开玩法就停摆，探针一个都不再收敛，Debug Rendering 面板的
@@ -3901,9 +3944,13 @@ function RenderScene(dt) {
   // WebGLShadowMap.render 在 lights.length === 0 时就 return 了，
   // 不会把 needsUpdate 清掉，这一帧的阴影照常烘。
   if (gi) {
+    profiler.B("gi");
+    profiler.GpuPush("gi");
     gi.Update(dt, camera.position, lights);
     // Global SH 基线按探针体的淡入量退让：两边都开就是双份天光，屋里会亮得像在院子里
     lights.SetGiActive(gi.uniforms.enabled.value);
+    profiler.GpuPop();
+    profiler.E("gi");
   }
   // 这一帧的阴影图在下面第一次 renderer.render 时烘，烘完 three 自己把
   // needsUpdate 清掉（autoUpdate 已在渲染器那里关掉，见那一行的账）。
@@ -3948,14 +3995,19 @@ function RenderScene(dt) {
   audio.SetListener(camera);
   // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
   // 必须排在天空穹跟位、相机 updateWorldMatrix 之后 —— 它们改的是这一帧的位姿。
+  profiler.B("matrix");
   scene.updateMatrixWorld();
+  profiler.E("matrix");
   // 人物合批的实例矩阵读的就是刚算完的那份 matrixWorld，所以必须排在这后面。
+  profiler.B("actorBatch");
   if (actorBatch) actorBatch.Update(camera);
+  profiler.E("actorBatch");
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
   // mask 与生平卡随后由浏览器叠上去。死亡最初 0.32 秒渐入，和 UI 遮罩同步。
   const deathDof = player && !player.Alive ? Clamp01(player.deadTime / 0.32) : 0;
+  profiler.B("post");
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
@@ -3975,6 +4027,8 @@ function RenderScene(dt) {
     dofRange: 2.8,
     dofMaxPx: 11.0,
   });
+  profiler.E("post");
+  profiler.GpuFrameEnd();
 }
 
 /**
@@ -4001,10 +4055,12 @@ function EndBattle(outcome) {
  */
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
   for (let i = 0; i < count; i += 1) {
+    profiler.BeginFrame(performance.now());
     // 编辑器接管时必须压过主菜单。否则从菜单打开场景编辑器后，
     // StepFrames 只会推进菜单运镜，换切片后编辑器无法把地形/碰撞层接到新场景。
     if (!(editor && editor.Capturing) && state.menu && menu && menu.live) MenuFrame(dt, render);
     else Frame(dt, render);
+    profiler.EndFrame();
   }
 }
 
@@ -4050,6 +4106,12 @@ function Loop(now) {
   // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
   // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
   if (MANUAL_STEP) return;
+  // 剖析帧边界包在分支外面：LoopStep 的三条早退路径（菜单帧 / 停摆）也各是一帧。
+  profiler.BeginFrame(now);
+  LoopStep(dt);
+  profiler.EndFrame();
+}
+function LoopStep(dt) {
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   // 编辑器与菜单都要独占相机；编辑器优先，以便能从菜单里的设置入口直接编辑切片。
