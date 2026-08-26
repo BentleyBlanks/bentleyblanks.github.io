@@ -2958,8 +2958,9 @@ function ToggleBayonet() {
   const next = !state.bayonetFixed;
   if (!viewmodel.TriggerFixBayonet?.(next)) return false;
   state.bayonetFixed = next;
-  // "咔哒"落在动画中段左手贴到枪口那一下（0.95 s × 0.52 ≈ 0.49）
-  audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1, delay: 0.48 });
+  // "咔哒"落在刀滑进枪口环那一帧（装 0.95 s × 0.58 ≈ 0.55，卸在 0.52 起拔）
+  audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1,
+    delay: next ? 0.55 : 0.50 });
   hud.Hint(next ? "上刺刀" : "收刺刀", 1.6);
   return true;
 }
@@ -3070,6 +3071,9 @@ let lastLandSerial = 0;
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
+// 弹道起点允许离瞄准轴多远（米）。腰射常态是 0.193 m，这个上限只在"上刺刀之后
+// 枪斜端起来"那一档兜底，见开火里那段注释。
+const MAX_MUZZLE_PARALLAX_M = 0.22;
 const _hitPoint = new THREE.Vector3();
 const _bulletPos = new THREE.Vector3();
 const _bulletVel = new THREE.Vector3();
@@ -3374,7 +3378,17 @@ function TryFire(dt) {
   const eye = player.EyePosition;
   _rel.set(from.x - eye.x, from.y - eye.y, from.z - eye.z);
   const along = _rel.dot(_aimDir);
-  const muzzleOffset = _rel.addScaledVector(_aimDir, -along).length();
+  _rel.addScaledVector(_aimDir, -along);          // 现在 _rel 就是那条垂距向量
+  let muzzleOffset = _rel.length();
+  // 上刺刀之后的"刺杀预备"是**视觉**姿态（Script_Viewmodel.BAYONET_CARRY：把枪
+  // 斜端在身前，刀身才读得出来）。视觉可以斜，弹道不该跟着斜：实测垂距会从
+  // 0.19 m 涨到 0.43 m，而贴脸腰射时那多出来的 0.24 m 就是"明明对着人却打空"。
+  // 所以垂距只保留到上限，超出的部分把起点拉回瞄准轴 —— 枪焰、曳光仍从真枪口出，
+  // 玩家看不出差别，手感上"上了刺刀就打不准"这条不存在。
+  if (muzzleOffset > MAX_MUZZLE_PARALLAX_M) {
+    from.addScaledVector(_rel, -(1 - MAX_MUZZLE_PARALLAX_M / muzzleOffset));
+    muzzleOffset = MAX_MUZZLE_PARALLAX_M;
+  }
 
   _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
