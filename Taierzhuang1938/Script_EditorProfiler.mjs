@@ -39,6 +39,7 @@ const GPU_LABELS = [
   ["prepass", "深度法线预通道"],
   ["ssao", "SSAO + 双边模糊"],
   ["main", "主场景"],
+  ["taa", "TAA 时域解算"],
   ["bloom", "泛光"],
   ["god", "体积光"],
   ["composite", "合成"],

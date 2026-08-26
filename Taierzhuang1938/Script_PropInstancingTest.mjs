@@ -67,6 +67,8 @@ for (const phase of PHASES) {
     const height = gl.drawingBufferHeight;
     const Draw = () => {
       // 后期里的时序项（抖动、颗粒、运动模糊）全部钉死，只留几何与着色。
+      // TAA 也是时序项而且**有状态**：每画一次都会翻历史乒乓，第二次 Draw
+      // 混合的历史是第一次的输出 —— 同一帧号也不再逐像素相等，必须关。
       T.post.frame = 1000;
       T.scene.updateMatrixWorld();
       T.actorBatch.Update(T.camera);
@@ -77,6 +79,7 @@ for (const phase of PHASES) {
         sunDirection: T.sky.sunDirection, exposure: 0.5, bloom: 0.6, godStrength: 0.3,
         saturation: 1, contrast: 1, grain: 0, vignette: 0.42, damage: 0,
         motionBlur: 0, dofStrength: 0, dofFocus: 1.5, dofRange: 2.8, dofMaxPx: 11,
+        taa: false,
       });
       const pixels = new Uint8Array(width * height * 4);
       T.renderer.setRenderTarget(null);

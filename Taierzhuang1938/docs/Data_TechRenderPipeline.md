@@ -580,33 +580,42 @@ void main() {
 }
 ```
 
-### 7.2 TAA：可行，但成本在**正确性**不在性能
-- **Jitter**：`camera.setViewOffset(w, h, (halton.x-0.5), (halton.y-0.5), w, h)`，Halton(2,3) 8–16 相位。渲染完 `camera.clearViewOffset()`。注意 jitter 会污染 SSAO 的深度重建 —— SSAO 用**未 jitter** 的投影参数即可（误差 <1px，肉眼不可见）。
-- **速度缓冲**：MRT slot1 已产出。摄影机-only 的速度可以从深度反投影算，但**任何会动的物体（人物、旗帜、烟）必须写真速度**，否则鬼影拖成一条。
-- **重投影 + neighborhood clamp**（YCoCg 空间的 variance clipping 最稳）：
+### 7.2 TAA（已实装，UE 缺省方案；medium 及以上默认开，FXAA 退为兜底）
 
-```glsl
-vec3 RGB2YCoCg(vec3 c){ return vec3(0.25*c.r+0.5*c.g+0.25*c.b, 0.5*c.r-0.5*c.b, -0.25*c.r+0.5*c.g-0.25*c.b); }
-vec3 YCoCg2RGB(vec3 c){ return vec3(c.x+c.y-c.z, c.x+c.z, c.x-c.y-c.z); }
+实装在 `Script_Post.mjs` 的 `FRAG_TAA` + `Render()` 第 0/3.5 段，方案与参数照搬
+UE 的缺省 Temporal AA（Karis SIGGRAPH 2014 + TemporalAA.usf 出厂 CVar），
+数值一律看常量名，不在这里抄数：
 
-vec2 vel = texture(uVelocity, vUv).xy;
-vec3 cur = RGB2YCoCg(texture(uCurrent, vUv).rgb);
-vec3 his = RGB2YCoCg(texture(uHistory, vUv - vel).rgb);
-
-vec3 m1 = vec3(0.0), m2 = vec3(0.0);
-for (int y=-1; y<=1; ++y) for (int x=-1; x<=1; ++x) {
-  vec3 s = RGB2YCoCg(texture(uCurrent, vUv + vec2(x,y)*uTexel).rgb);
-  m1 += s; m2 += s*s;
-}
-vec3 mu = m1/9.0, sigma = sqrt(max(m2/9.0 - mu*mu, 0.0));
-vec3 lo = mu - 1.25*sigma, hi = mu + 1.25*sigma;
-his = clamp(his, lo, hi);
-
-float blend = mix(0.12, 1.0, clamp(length(vel)*40.0, 0.0, 1.0)); // 快动时更信当前帧
-bool valid = all(greaterThanEqual(vUv - vel, vec2(0.0))) && all(lessThanEqual(vUv - vel, vec2(1.0)));
-oColor = vec4(YCoCg2RGB(valid ? mix(his, cur, blend) : cur), 1.0);
-```
-- **代价**：+2 个 RGBA16F 历史 RT（23MB）、+0.4~0.7ms、+一整套"鬼影 bug"。**建议默认关，作为 high/ultra 档的可选项**；FXAA+MSAA4x 已经能覆盖 90% 的观感需求，而 TAA 出鬼影是"看一眼就掉档"的负分项。
+- **抖动**：Halton(2,3) 相位数 `TAA_SAMPLES`（对应 `r.TemporalAASamples`）。
+  不走 `setViewOffset`（每帧两次全量重算投影矩阵），直接偏置
+  `projectionMatrix.elements[8]/[9]` 并在主场景画完立刻还原 ——
+  预通道 / SSAO / 主场景吃同一份抖动矩阵（深度与颜色必须同套抖动才自洽），
+  太阳投影、`prevViewProjection`、运动模糊拿到的都是干净矩阵。
+- **当前帧滤波**：3×3 邻域按 Blackman-Harris 3.3 的高斯拟合
+  （`TAA_FILTER_GAUSSIAN_K`）围绕本帧子像素位置重定心；权重只依赖 jitter，
+  每帧 CPU 算九个数喂 uniform。
+- **速度**：无逐物体速度缓冲（§1 帧图里的 MRT velocity 从未实装），
+  由深度反投影从相机运动推出，与合成 pass 的运动模糊同一套近似；
+  取 3×3 **最近片元**做 dilation（UE 的 closest-fragment velocity）。
+  动的人物/碎片靠邻域裁剪兜底 —— 表现是它们边缘时域累积浅一些，不是鬼影。
+- **历史**：Catmull-Rom 5-tap（Jimenez 9→5）重采样，抵消逐帧双线性的累积糊；
+  YCoCg 空间 AABB 裁剪，3×3 大盒与十字小盒对折（UE 的 rounded box）。
+- **混合**：当前帧权重 `TAA_CURRENT_FRAME_WEIGHT`（对应
+  `r.TemporalAACurrentFrameWeight`），快动时向 0.2 抬
+  （UE: `lerp(w, 0.2, saturate(velocityPx/40))`）；混合在 Karis tonemap 域
+  （`c/(1+luma)`）做，防火光 firefly 帧间闪；NaN 杀手防历史污染。
+- **位置**：主场景之后、泛光之前的线性 HDR 域（与 UE 一致；§1 帧图把 TAA
+  画在 sRGB 之后是设计期的旧稿，以实装为准）。泛光 / 雾 / 运动模糊 / DOF
+  吃的都是解算后的画面。TAA 开着时最后一趟的 FXAA 用 `uFxaa` 关掉，
+  锐化保留（UE 对应 Tonemapper Sharpen）。
+- **档位**：`QUALITY_PRESETS` 的 `taa` 位 —— medium/high/ultra 开、low 关
+  （两张全分辨率 RGBA16F 历史靶对集显是实打实的带宽）。ultra 的 4×MSAA
+  保留：是给 TAA 喂更干净的几何边，叠加不冲突，只是贵。
+- **镜头硬切**：`PostPipeline.NotifyCameraCut()` 丢历史；不调也只是切换
+  瞬间一帧轻微溶解（邻域裁剪一两帧内压回去），语义对应 UE 的 camera cut。
+- **决定论**：抖动与历史全由 frameIndex 驱动，`StepFrames` 推同样多帧
+  画面逐像素可复现 —— 截图审查流程不受影响，但对比截图前要让历史滚够
+  一个相位周期（≥ `TAA_SAMPLES` 帧），半收敛的图不算数。
 
 ---
 

@@ -1,5 +1,8 @@
 // 后处理暗部保真回归：用受控 HDR 灰阶直接喂 Composite，防止对比度分级
 // 又在线性域把有信息的暗部硬裁成纯黑。
+// 附带 TAA 基本盘：high 档 taa 必须在跑（历史滚起来）、抖动矩阵帧末必须还原、
+// 解算输出不许是全黑/NaN 靶 —— 这三条断言分别对着"TAA 静默没跑"、
+// "抖动泄漏进太阳投影与运动模糊"、"历史被 NaN 污染"三种最难肉眼定位的坏法。
 //
 // 用法：node Taierzhuang1938/Script_PostTest.mjs
 // 退出码即成败。
@@ -26,12 +29,35 @@ page.on("console", (message) => {
 });
 
 let result = null;
+let taa = null;
 try {
   await page.goto(
     `http://127.0.0.1:${port}/Taierzhuang1938/Probe.html?quality=high&preset=smokyDay&scene=materials&gi=0`,
     { waitUntil: "load", timeout: 120000 },
   );
   await page.waitForFunction(() => window.Probe?.state?.ready, null, { timeout: 180000 });
+  // TAA 基本盘要先测：后面的暗部测试会劫持 composite 的 uniforms，
+  // 虽然下一真帧会自愈，但在同一次取证里别赌顺序。
+  taa = await page.evaluate(() => {
+    const P = window.Probe;
+    const post = P.post;
+    // 滚超过一个 Halton 周期（8 帧），历史真的在乒乓里转起来
+    P.StepFrames(12);
+    const e = P.camera.projectionMatrix.elements;
+    const rgba = new Uint8Array(4);
+    P.renderer.readRenderTargetPixels(post.targets.ldr,
+      Math.floor(post.width / 2), Math.floor(post.height / 2), 1, 1, rgba);
+    return {
+      presetOn: !!post.preset.taa,
+      historyRolling: !!post.hasTaaHistory && !!post.targets.taaA && !!post.targets.taaB,
+      // 帧末抖动必须还原：对称视锥这两项精确为 0，残留就是泄漏
+      projClean: e[8] === 0 && e[9] === 0,
+      fxaaOff: post.uniformsFxaa.uFxaa.value === 0,
+      // 中心像素非纯黑：TAA→composite 整条链在出画（NaN 污染/全黑靶都过不了）
+      center: Array.from(rgba),
+      glError: P.renderer.getContext().getError(),
+    };
+  });
   result = await page.evaluate(async () => {
     const THREE = await import("./vendor/three/build/three.module.js");
     const P = window.Probe;
@@ -98,5 +124,8 @@ server.close();
 const visibleShadow = result && Math.min(...result.rgba.slice(0, 3)) >= 6;
 const ok = problems.length === 0 && result?.glError === 0 && visibleShadow;
 console.log(`${ok ? "ok  " : "FAIL"} Composite 感知域对比保留暗部`, result || "无结果");
+const taaOk = taa && taa.presetOn && taa.historyRolling && taa.projClean
+  && taa.fxaaOff && taa.glError === 0 && Math.max(...taa.center.slice(0, 3)) > 0;
+console.log(`${taaOk ? "ok  " : "FAIL"} TAA 历史滚动 + 抖动还原 + 出画非黑`, taa || "无结果");
 for (const problem of problems) console.log(`FAIL ${problem}`);
-if (!ok) process.exit(1);
+if (!ok || !taaOk) process.exit(1);

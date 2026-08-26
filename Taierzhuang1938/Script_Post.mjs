@@ -7,15 +7,20 @@
 //
 // 帧结构：
 //   1) 深度法线预通道  -> rtNormalDepth (RGBA16F: xyz=视空间法线, w=线性深度)
+//      TAA 开着时本帧投影矩阵带 Halton(2,3) 子像素抖动，预通道与主场景同一份
 //   2) SSAO + 双边模糊 -> rtAoBlur (半分辨率)
 //   3) 主场景 (MSAA)   -> rtHdr    (RGBA16F, AO 由 onBeforeCompile 注入到间接光)
-//   4) 亮部提取 + 逐级降/升采样(tent) -> 泛光
-//   5) 太阳拖影 fallback（屏幕空间方向性模糊，太阳在屏内才跑）
-//   6) 合成：运动模糊 -> 曝光 -> ACES -> 调色 -> 暗角 -> 色差 -> 颗粒 -> sRGB
-//   7) FXAA + 锐化 -> 屏幕
+//   4) TAA 时域解算    -> rtTaaA/B 乒乓（UE 缺省方案，账在 FRAG_TAA 头注；
+//      跑在 tonemap 之前的线性 HDR 上，与 UE 的位置一致，泛光/雾/运动模糊
+//      吃的都是解算后的画面）
+//   5) 亮部提取 + 逐级降/升采样(tent) -> 泛光
+//   6) 太阳拖影 fallback（屏幕空间方向性模糊，太阳在屏内才跑）
+//   7) 合成：运动模糊 -> 曝光 -> ACES -> 调色 -> 暗角 -> 色差 -> 颗粒 -> sRGB
+//   8) TAA 关时 FXAA；一律 + 锐化 -> 屏幕（TAA 开时 FXAA 跳过，再跑只会糊）
 //
 // 决定论：颗粒/抖动全部用 frameIndex 驱动，不用 Math.random —— 视觉审查靠逐轮
-// 截图比对，画面自己在抖的话根本判断不了"这一版比上一版好"。
+// 截图比对，画面自己在抖的话根本判断不了"这一版比上一版好"。TAA 的抖动序列
+// 与历史累积同样由 frameIndex 驱动：StepFrames 推同样多帧，画面逐像素可复现。
 
 import * as THREE from "three";
 import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
@@ -327,6 +332,171 @@ void main() {
 }
 `;
 
+// --- TAA：UE 缺省方案照搬 ----------------------------------------------------
+// 方案与参数对齐 UE 的缺省 Temporal AA（Karis, SIGGRAPH 2014 "High Quality
+// Temporal Supersampling" + TemporalAA.usf 的出厂 CVar）：
+//   r.TemporalAASamples = 8               → Halton(2,3) 八相位子像素抖动
+//   r.TemporalAACurrentFrameWeight = 0.04 → 当前帧权重 0.04，历史占 0.96
+//   当前帧 3x3 用 Blackman-Harris 3.3 滤波重定心（高斯拟合 exp(-2.29 r²)，
+//     权重只依赖本帧抖动，CPU 算好九个数喂 uniform）
+//   历史用 Catmull-Rom 5-tap 重采样（双线性会把几十帧重投影抹成油画）
+//   邻域裁剪在 YCoCg 空间做 AABB（3x3 大盒与十字小盒对折 = UE 的 rounded box）
+//   速度取 3x3 最近片元（closest-fragment dilation），快动时权重向 0.2 抬
+//     （UE: lerp(w, 0.2, saturate(velocityPx / 40))）
+//   混合在 Karis tonemap 域（c / (1 + luma)）做，防高亮 firefly 帧间闪
+// 与 UE 的差别只有一处：没有逐物体速度缓冲，速度全部由深度反投影从相机运动
+// 推出 —— 与合成 pass 的运动模糊同一套近似。动的人物/碎片靠邻域裁剪兜底，
+// 表现是它们边缘的时域累积浅一些，不是拖出鬼影。
+const TAA_SAMPLES = 8;
+const TAA_CURRENT_FRAME_WEIGHT = 0.04;
+const TAA_FILTER_GAUSSIAN_K = 2.29;
+
+function Halton(index, base) {
+  let f = 1, r = 0, i = index;
+  while (i > 0) { f /= base; r += f * (i % base); i = Math.floor(i / base); }
+  return r;
+}
+// 与 UE 一致从 1 起数（index 0 是 0，落在像素角上，八点分布会缺一角）
+const TAA_JITTER = [];
+for (let i = 1; i <= TAA_SAMPLES; i += 1) {
+  TAA_JITTER.push([Halton(i, 2) - 0.5, Halton(i, 3) - 0.5]);
+}
+// 与 FRAG_TAA 里 TAPS 的次序必须一致（滤波权重按下标对位）
+const TAA_OFFSETS = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [0, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1],
+];
+
+const FRAG_TAA = /* glsl */`
+uniform sampler2D uCurrent;
+uniform sampler2D uHistory;
+uniform sampler2D uNormalDepth;
+uniform vec2 uTexel;
+uniform vec2 uResolution;
+uniform float uWeights[9];       // Blackman-Harris 重定心权重，CPU 已归一
+uniform float uCurrentWeight;    // UE r.TemporalAACurrentFrameWeight
+uniform float uHasHistory;
+uniform mat4 uInvView;
+uniform mat4 uPrevViewProjection;
+uniform vec2 uProjScale;
+varying vec2 vUv;
+${GLSL_COMMON}
+
+const vec2 TAPS[9] = vec2[9](
+  vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0),
+  vec2(-1.0,  0.0), vec2(0.0,  0.0), vec2(1.0,  0.0),
+  vec2(-1.0,  1.0), vec2(0.0,  1.0), vec2(1.0,  1.0));
+
+// Karis tonemap 域：混合前把 HDR 压进 [0,1)。不压的话一个 40.0 的火光
+// firefly 会把邻域盒撑到天上，历史裁剪失效，表现是高亮点逐帧闪。
+vec3 TonemapWeight(vec3 c) { return c / (1.0 + Luma(c)); }
+vec3 TonemapUnweight(vec3 c) { return c / max(1.0 - Luma(c), 1e-4); }
+
+vec3 RgbToYcocg(vec3 c) {
+  return vec3(0.25 * c.r + 0.5 * c.g + 0.25 * c.b,
+              0.5 * c.r - 0.5 * c.b,
+             -0.25 * c.r + 0.5 * c.g - 0.25 * c.b);
+}
+vec3 YcocgToRgb(vec3 c) {
+  return max(vec3(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z), vec3(0.0));
+}
+
+vec3 ViewPos(vec2 uv, float depth) {
+  vec2 ndc = uv * 2.0 - 1.0;
+  return vec3(ndc.x / uProjScale.x, ndc.y / uProjScale.y, -1.0) * depth;
+}
+
+// Catmull-Rom 5-tap（Jimenez 的 9→5 优化）：负瓣双三次抵消重投影
+// 反复双线性插值的累积模糊。角上四个权重最小的 tap 省掉，误差不可见。
+vec3 SampleHistory(vec2 uv) {
+  vec2 samplePos = uv * uResolution;
+  vec2 tc1 = floor(samplePos - 0.5) + 0.5;
+  vec2 f = samplePos - tc1;
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-0.5 + 0.5 * f);
+  vec2 w12 = w1 + w2;
+  vec2 p0 = (tc1 - 1.0) * uTexel;
+  vec2 p3 = (tc1 + 2.0) * uTexel;
+  vec2 p12 = (tc1 + w2 / w12) * uTexel;
+  vec3 acc = texture2D(uHistory, vec2(p12.x, p0.y)).rgb * (w12.x * w0.y)
+           + texture2D(uHistory, vec2(p0.x, p12.y)).rgb * (w0.x * w12.y)
+           + texture2D(uHistory, vec2(p12.x, p12.y)).rgb * (w12.x * w12.y)
+           + texture2D(uHistory, vec2(p3.x, p12.y)).rgb * (w3.x * w12.y)
+           + texture2D(uHistory, vec2(p12.x, p3.y)).rgb * (w12.x * w3.y);
+  float wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y
+             + w3.x * w12.y + w12.x * w3.y;
+  return max(acc / wsum, vec3(0.0));
+}
+
+void main() {
+  // --- 1) 3x3 邻域一趟拿三样：滤波后的当前帧、YCoCg 包围盒、最近深度 ---
+  vec3 filtered = vec3(0.0);
+  vec3 boxMin = vec3(1e5), boxMax = vec3(-1e5);
+  vec3 crossMin = vec3(1e5), crossMax = vec3(-1e5);
+  float closestDepth = 1e9;
+  vec2 closestOffset = vec2(0.0);
+  for (int i = 0; i < 9; i++) {
+    vec2 offset = TAPS[i] * uTexel;
+    vec3 c = RgbToYcocg(TonemapWeight(texture2D(uCurrent, vUv + offset).rgb));
+    filtered += c * uWeights[i];
+    boxMin = min(boxMin, c);
+    boxMax = max(boxMax, c);
+    if (TAPS[i].x == 0.0 || TAPS[i].y == 0.0) {
+      crossMin = min(crossMin, c);
+      crossMax = max(crossMax, c);
+    }
+    float d = texture2D(uNormalDepth, vUv + offset).w;
+    // 天空（w=0）当远处理：大深度下重投影退化成纯旋转视差，正是天该有的
+    if (d <= 0.0) d = 400.0;
+    if (d < closestDepth) { closestDepth = d; closestOffset = offset; }
+  }
+  // 3x3 大盒对斜边太松（鬼影漏过去），十字小盒太紧（细节闪），
+  // 对折是 UE 的 rounded AABB，两头都稳
+  boxMin = 0.5 * (boxMin + crossMin);
+  boxMax = 0.5 * (boxMax + crossMax);
+
+  // --- 2) 速度：最近片元的相机重投影（closest-fragment dilation）---
+  // 取邻域里最近的片元算速度再套给本像素：物体轮廓外一圈像素本属于背景，
+  // 不膨胀的话轮廓在镜头平移时会挂一圈背景速度的毛边。
+  vec2 uvClosest = vUv + closestOffset;
+  vec3 viewPos = ViewPos(uvClosest, closestDepth);
+  vec4 world = uInvView * vec4(viewPos, 1.0);
+  vec4 prevClip = uPrevViewProjection * world;
+  vec2 prevUvClosest = (prevClip.xy / max(abs(prevClip.w), 1e-4)) * 0.5 + 0.5;
+  vec2 velocity = uvClosest - prevUvClosest;
+  vec2 prevUv = vUv - velocity;
+
+  bool offscreen = prevUv.x < 0.0 || prevUv.x > 1.0
+                || prevUv.y < 0.0 || prevUv.y > 1.0;
+  if (uHasHistory < 0.5 || offscreen || prevClip.w <= 0.0) {
+    gl_FragColor = vec4(TonemapUnweight(YcocgToRgb(filtered)), 1.0);
+    return;
+  }
+
+  // --- 3) 历史：Catmull-Rom 采样 → 裁进邻域盒（防遮挡变化的鬼影）---
+  vec3 history = RgbToYcocg(TonemapWeight(SampleHistory(prevUv)));
+  vec3 center = 0.5 * (boxMax + boxMin);
+  vec3 extent = 0.5 * (boxMax - boxMin) + 1e-5;
+  vec3 dir = history - center;
+  float t = min(min(extent.x / max(abs(dir.x), 1e-6),
+                    extent.y / max(abs(dir.y), 1e-6)),
+                    extent.z / max(abs(dir.z), 1e-6));
+  history = center + dir * clamp(t, 0.0, 1.0);
+
+  // --- 4) 混合：静止 0.04（UE 缺省），快动向 0.2 抬减少拖尾 ---
+  float velocityPx = length(velocity * uResolution);
+  float w = mix(uCurrentWeight, 0.2, clamp(velocityPx / 40.0, 0.0, 1.0));
+  vec3 blended = mix(history, filtered, w);
+  vec3 result = TonemapUnweight(YcocgToRgb(blended));
+  // NaN 杀手（UE 同款）：历史里一旦混进 NaN 会永久驻留且逐帧扩散一圈
+  if (any(isnan(result))) result = TonemapUnweight(YcocgToRgb(filtered));
+  gl_FragColor = vec4(result, 1.0);
+}
+`;
+
 // --- 合成 -------------------------------------------------------------------
 const FRAG_COMPOSITE = /* glsl */`
 uniform sampler2D uHdr;
@@ -562,6 +732,7 @@ const FRAG_FXAA = /* glsl */`
 uniform sampler2D uSource;
 uniform vec2 uTexel;
 uniform float uSharpen;
+uniform float uFxaa;   // TAA 开着时置 0：几何锯齿已在时域上解决，FXAA 只会再糊一层
 varying vec2 vUv;
 ${GLSL_COMMON}
 
@@ -572,21 +743,24 @@ void main() {
   vec3 rgbSE = texture2D(uSource, vUv + vec2( 1.0,  1.0) * uTexel).rgb;
   vec3 rgbM  = texture2D(uSource, vUv).rgb;
 
-  float lNW = Luma(rgbNW), lNE = Luma(rgbNE), lSW = Luma(rgbSW), lSE = Luma(rgbSE), lM = Luma(rgbM);
-  float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
-  float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+  vec3 aa = rgbM;
+  if (uFxaa > 0.5) {
+    float lNW = Luma(rgbNW), lNE = Luma(rgbNE), lSW = Luma(rgbSW), lSE = Luma(rgbSE), lM = Luma(rgbM);
+    float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
+    float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
 
-  vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
-  float dirReduce = max((lNW + lNE + lSW + lSE) * 0.25 * 0.0625, 0.0078125);
-  float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
-  dir = clamp(dir * rcpDirMin, vec2(-8.0), vec2(8.0)) * uTexel;
+    vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
+    float dirReduce = max((lNW + lNE + lSW + lSE) * 0.25 * 0.0625, 0.0078125);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = clamp(dir * rcpDirMin, vec2(-8.0), vec2(8.0)) * uTexel;
 
-  vec3 rgbA = 0.5 * (texture2D(uSource, vUv + dir * (1.0 / 3.0 - 0.5)).rgb
-                   + texture2D(uSource, vUv + dir * (2.0 / 3.0 - 0.5)).rgb);
-  vec3 rgbB = rgbA * 0.5 + 0.25 * (texture2D(uSource, vUv + dir * -0.5).rgb
-                                 + texture2D(uSource, vUv + dir * 0.5).rgb);
-  float lB = Luma(rgbB);
-  vec3 aa = (lB < lMin || lB > lMax) ? rgbA : rgbB;
+    vec3 rgbA = 0.5 * (texture2D(uSource, vUv + dir * (1.0 / 3.0 - 0.5)).rgb
+                     + texture2D(uSource, vUv + dir * (2.0 / 3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (texture2D(uSource, vUv + dir * -0.5).rgb
+                                   + texture2D(uSource, vUv + dir * 0.5).rgb);
+    float lB = Luma(rgbB);
+    aa = (lB < lMin || lB > lMax) ? rgbA : rgbB;
+  }
 
   // 轻锐化（CAS 的思路简化版）：抗锯齿之后画面必然发肉，补回一点边缘
   if (uSharpen > 0.0) {
@@ -668,12 +842,16 @@ export function MarkNoPrepass(material) {
 }
 
 const QUALITY_PRESETS = {
-  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14 },
-  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18 },
-  // high 已有最后一趟 FXAA + 锐化。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
-  // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家。
-  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.75, sharpen: 0.22 },
-  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22 },
+  // 抗锯齿分工：taa 是 medium 及以上的默认（UE 的默认 AA 也是 TAA），
+  // FXAA 只在 taa 关着时兜底。low 不给 TAA：两张全分辨率 RGBA16F 历史靶
+  // 在集显上是实打实的带宽，low 档的定位就是"能跑"。
+  low:    { ssao: false, bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false, aoScale: 0.5, sharpen: 0.14, taa: false },
+  medium: { ssao: true,  bloomLevels: 5, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.6, sharpen: 0.18, taa: true },
+  // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
+  // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
+  // （ultra 是 MSAA 喂更干净的几何边给 TAA，两层叠加不冲突，只是贵）。
+  high:   { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 0, motionBlur: true,  aoScale: 0.75, sharpen: 0.22, taa: true },
+  ultra:  { ssao: true,  bloomLevels: 6, godrays: true,  msaa: 4, motionBlur: true,  aoScale: 1.0, sharpen: 0.22, taa: true },
 };
 
 export class PostPipeline {
@@ -739,6 +917,23 @@ export class PostPipeline {
     };
     this.matGod = this._Mat(FRAG_GODRAYS, this.uniformsGod);
 
+    this.uniformsTaa = {
+      uCurrent: { value: null }, uHistory: { value: null }, uNormalDepth: { value: null },
+      uTexel: { value: new THREE.Vector2() }, uResolution: { value: new THREE.Vector2() },
+      uWeights: { value: new Array(9).fill(1 / 9) },
+      uCurrentWeight: { value: TAA_CURRENT_FRAME_WEIGHT },
+      uHasHistory: { value: 0 },
+      uInvView: { value: new THREE.Matrix4() },
+      uPrevViewProjection: { value: new THREE.Matrix4() },
+      uProjScale: { value: new THREE.Vector2(1, 1) },
+    };
+    this.matTaa = this._Mat(FRAG_TAA, this.uniformsTaa);
+    this.taaFlip = false;
+    this.hasTaaHistory = false;
+    // 抖动前投影矩阵第三列 x/y 的原值，主场景画完立刻还原
+    this.savedProj8 = 0;
+    this.savedProj9 = 0;
+
     this.uniformsComposite = {
       uHdr: { value: null }, uBloom: { value: null }, uGod: { value: null },
       uNormalDepth: { value: null }, uResolution: { value: new THREE.Vector2() },
@@ -772,7 +967,7 @@ export class PostPipeline {
 
     this.uniformsFxaa = {
       uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
-      uSharpen: { value: this.preset.sharpen },
+      uSharpen: { value: this.preset.sharpen }, uFxaa: { value: 1 },
     };
     this.matFxaa = this._Mat(FRAG_FXAA, this.uniformsFxaa);
 
@@ -847,6 +1042,14 @@ export class PostPipeline {
     godH = Math.max(2, Math.round(godH * godScale));
     this.targets.god = this._MakeRt(godW, godH);
     this.targets.ldr = this._MakeRt(w, h, { type: THREE.UnsignedByteType });
+    // TAA 历史乒乓：全分辨率 HDR。尺寸一变历史就作废（uv 对不上位），
+    // taaFlip/hasTaaHistory 在下面统一清。
+    if (this.preset.taa) {
+      this.targets.taaA = this._MakeRt(w, h);
+      this.targets.taaB = this._MakeRt(w, h);
+    }
+    this.taaFlip = false;
+    this.hasTaaHistory = false;
 
     let mw = w >> 1, mh = h >> 1;
     for (let i = 0; i < this.preset.bloomLevels; i += 1) {
@@ -855,6 +1058,17 @@ export class PostPipeline {
       // 升采样要往回叠，每一级都得有一份"已有内容"的副本
       this.bloomMips.push(this._MakeRt(mw, mh));
     }
+    this.hasPrev = false;
+  }
+
+  /**
+   * 镜头硬切（过场换机位、菜单进关这类瞬移）时调：丢掉 TAA 历史与
+   * 运动模糊的上一帧矩阵。不调也不会坏 —— 邻域裁剪会在一两帧内把
+   * 错误历史压回去，只是切换瞬间有一帧轻微的溶解感；UE 对应的是
+   * camera cut 标记，语义相同。
+   */
+  NotifyCameraCut() {
+    this.hasTaaHistory = false;
     this.hasPrev = false;
   }
 
@@ -973,6 +1187,25 @@ export class PostPipeline {
     const projScaleY = 1 / tanHalf;
     const projScaleX = projScaleY / camera.aspect;
 
+    // --- 0) TAA 子像素抖动：Halton(2,3) 八相位（UE r.TemporalAASamples=8）---
+    // 直接改投影矩阵第三列的 x/y：e[8] 加 δ 会让 NDC 平移 -δ（透视除法 w=-z），
+    // 即整幅画面平移 -jitter 像素 —— 等价于本帧采样点落在"像素中心 + jitter"。
+    // 预通道与主场景同用这份矩阵（深度与颜色必须同一套抖动，SSAO 拷的投影
+    // 矩阵也是它，自洽）；主场景画完立刻还原，太阳投影、prevViewProjection
+    // 与运动模糊拿到的都是干净矩阵。
+    const taaActive = !!(this.preset.taa && this.targets.taaA) && options.taa !== false;
+    let jitterX = 0, jitterY = 0;
+    if (taaActive) {
+      const jitter = TAA_JITTER[frame % TAA_SAMPLES];
+      jitterX = jitter[0];
+      jitterY = jitter[1];
+      const pe = camera.projectionMatrix.elements;
+      this.savedProj8 = pe[8];
+      this.savedProj9 = pe[9];
+      pe[8] += (jitterX * 2) / this.width;
+      pe[9] += (jitterY * 2) / this.height;
+    }
+
     // --- 1) 深度法线预通道 ---
     //
     // 事故（这一条是好几个"远景不对劲"的共同根因）：allowOverride = false 只保证
@@ -1035,6 +1268,46 @@ export class PostPipeline {
     renderer.render(scene, camera);
     if (P) P.GpuPop();
 
+    // --- 3.5) TAA 时域解算：从这里起下游全部吃解算后的画面 ---
+    let sceneColor = T.hdr;
+    if (taaActive) {
+      const pe = camera.projectionMatrix.elements;
+      pe[8] = this.savedProj8;
+      pe[9] = this.savedProj9;
+
+      if (P) P.GpuPush("taa");
+      const read = this.taaFlip ? T.taaB : T.taaA;
+      const write = this.taaFlip ? T.taaA : T.taaB;
+      const UT = this.uniformsTaa;
+      UT.uCurrent.value = T.hdr.texture;
+      UT.uHistory.value = read.texture;
+      UT.uNormalDepth.value = T.normalDepth.texture;
+      UT.uTexel.value.set(1 / this.width, 1 / this.height);
+      UT.uResolution.value.set(this.width, this.height);
+      UT.uProjScale.value.set(projScaleX, projScaleY);
+      UT.uInvView.value.copy(camera.matrixWorld);
+      UT.uPrevViewProjection.value.copy(this.prevViewProjection);
+      UT.uHasHistory.value = this.hasTaaHistory && this.hasPrev ? 1 : 0;
+      // 当前帧 3x3 滤波权重：Blackman-Harris 3.3 的高斯拟合 exp(-2.29 r²)，
+      // 围绕本帧子像素采样位置（offset + jitter）重定心。权重只依赖 jitter，
+      // 每帧在 CPU 上算九个数，比在着色器里逐像素跑九次 exp 便宜。
+      const weights = UT.uWeights.value;
+      let weightSum = 0;
+      for (let i = 0; i < 9; i += 1) {
+        const dx = TAA_OFFSETS[i][0] + jitterX;
+        const dy = TAA_OFFSETS[i][1] + jitterY;
+        const w = Math.exp(-TAA_FILTER_GAUSSIAN_K * (dx * dx + dy * dy));
+        weights[i] = w;
+        weightSum += w;
+      }
+      for (let i = 0; i < 9; i += 1) weights[i] /= weightSum;
+      this._Blit(this.matTaa, write);
+      this.taaFlip = !this.taaFlip;
+      this.hasTaaHistory = true;
+      sceneColor = write;
+      if (P) P.GpuPop();
+    }
+
     // 在亮部提取前就算好这帧会不会跑太阳拖影，因为亮部图的 alpha
     // 只在这种情况下需要顺手打包天空遮挡。旧版到第 5 pass 才投影太阳，
     // 亮部 pass 无法知道是否值得多读一张深度图。
@@ -1056,7 +1329,7 @@ export class PostPipeline {
 
     // --- 4) 泛光 ---
     if (P) P.GpuPush("bloom");
-    this.uniformsBright.uSource.value = T.hdr.texture;
+    this.uniformsBright.uSource.value = sceneColor.texture;
     this.uniformsBright.uNormalDepth.value = T.normalDepth.texture;
     this.uniformsBright.uPackSky.value = godActive ? 1 : 0;
     this.uniformsBright.uThreshold.value = options.bloomThreshold ?? 1.18;
@@ -1097,7 +1370,7 @@ export class PostPipeline {
     // --- 6) 合成 ---
     if (P) P.GpuPush("composite");
     const U = this.uniformsComposite;
-    U.uHdr.value = T.hdr.texture;
+    U.uHdr.value = sceneColor.texture;
     U.uBloom.value = this.BloomTarget.texture;
     U.uGod.value = T.god.texture;
     U.uNormalDepth.value = T.normalDepth.texture;
@@ -1161,6 +1434,7 @@ export class PostPipeline {
       this.uniformsFxaa.uSource.value = T.ldr.texture;
       this.uniformsFxaa.uTexel.value.set(1 / this.width, 1 / this.height);
       this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.preset.sharpen;
+      this.uniformsFxaa.uFxaa.value = taaActive ? 0 : 1;
       this._Blit(this.matFxaa, null);
     }
     if (P) P.GpuPop();
@@ -1174,7 +1448,8 @@ export class PostPipeline {
     for (const rt of Object.values(this.targets)) rt.dispose();
     for (const rt of this.bloomMips) rt.dispose();
     for (const m of [this.matAo, this.matAoBlur, this.matBright, this.matDown,
-      this.matUp, this.matGod, this.matComposite, this.matFxaa, this.matDebug, this.normalDepthMaterial]) m.dispose();
+      this.matUp, this.matGod, this.matTaa, this.matComposite, this.matFxaa,
+      this.matDebug, this.normalDepthMaterial]) m.dispose();
   }
 }
 
