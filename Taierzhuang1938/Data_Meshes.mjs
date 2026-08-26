@@ -53,10 +53,15 @@ export const VEHICLE_MOUNTS_TANKETTE = ["gunMuzzle", "towHook", "hullFront"];
  */
 export const MERGE_PROFILES = {
   high: null,
-  medium: { accentA: "uniform", accentB: "uniform" },
+  // trouser 只有百姓在用（士兵那两个模型没有这个桶，这一行对它们是空操作）。
+  // 并进军装在**胯**那一根骨头上是真省一个：裤腰与袄下摆都挂在 hips 上。
+  medium: { accentA: "uniform", accentB: "uniform", trouser: "uniform" },
   low: {
     accentA: "uniform", accentB: "uniform", accessory: "uniform",
     shoe: "uniform", leather: "uniform", red: "uniform", towel: "uniform",
+    // 百姓的裤子与头发。裤子并进军装在**胯**那一根骨头上是真省一个 draw call
+    //（裤腰与袄下摆都挂在 hips 上）；士兵不用这两个桶，这两行对它们是空操作。
+    trouser: "uniform", hair: "uniform",
   },
 };
 
@@ -87,6 +92,34 @@ export const MESHES = {
     draws: { high: 19, medium: 18, low: 17 },
     note: "濑谷支队步兵。立领昭五式 + 步兵红领章、九〇式钢盔（外翻盔沿 + 正面五角星）、"
       + "皮弹药盒三只、编上靴 + 脚绊。**1938 年 3—4 月无屁帘。**",
+  },
+
+  // 百姓。两个模型是**同一个 kind 的两个分身**（男/女由 seed 定，见 Script_Actor
+  // 的 KIND_SPEC.civilian.variants）。两个都建在 1.60 m 上，女性矮的那 4.5% 走
+  // 运行时的整体缩放 —— 加载器的 scale = KIND_SPEC.height / MESHES.height 会把
+  // 烘死在模型里的身高差直接除回去，所以身高差不能烘进模型。
+  CivilianMale: {
+    file: "CivilianMale.tzm.json", category: "soldier",
+    triangles: 1726, meshBlocks: 26, nodes: 33, joints: 13,
+    materials: ["accessory", "hair", "shoe", "skin", "trouser", "uniform"],
+    mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
+    span: [0.494, 1.604, 0.3024], height: 1.60,
+    draws: { high: 24, medium: 23, low: 16 },
+    note: "鲁南男性平民。对襟夹袄 + 中式小立领 + 布盘扣、腰里一条布带、"
+      + "裤脚扎腿带（**不是绑腿** —— 绑腿缠到膝下，扎腿带只在踝上两道）、"
+      + "千层底黑布鞋、包头布。**身上没有任何军用装具**，头上那块布也**不是白的**"
+      + "（白毛巾是敢死队的标志，见 Script_Actor 的 towelHead）。",
+  },
+  CivilianFemale: {
+    file: "CivilianFemale.tzm.json", category: "soldier",
+    triangles: 1536, meshBlocks: 24, nodes: 31, joints: 13,
+    materials: ["accessory", "hair", "shoe", "skin", "trouser", "uniform"],
+    mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
+    span: [0.4853, 1.6029, 0.2762], height: 1.60,
+    draws: { high: 23, medium: 22, low: 16 },
+    note: "鲁南女性平民。大襟褂（衣襟从领口斜扣到左腋下 —— 这条斜线是三十米外"
+      + "唯一读得出的女装标志）、肥裤扎脚、包头巾 + 颈后裹着的纂儿、千层底布鞋。"
+      + "**不扎腰带**（那是男装），**身上没有任何军用装具。**",
   },
 
   ZhongZheng: {
@@ -397,4 +430,14 @@ export const BAYONET_MESH_BY_WEAPON = {
 export const SOLDIER_MESH_BY_KIND = {
   nra: "SoldierNra", nraDare: "SoldierNra", nraOfficer: "SoldierNra",
   ija: "SoldierIja", ijaOfficer: "SoldierIja",
+  civilian: "CivilianMale",
+};
+
+/**
+ * 同一个 kind 底下的模型分身。目前只有百姓分男女 —— 分身名由 Script_Actor
+ * 按 seed 抽（KIND_SPEC.civilian.variants），抽不到就退回 SOLDIER_MESH_BY_KIND。
+ * 分身**不是新 kind**：AI、伤害、误伤判定全都只认 "civilian" 这一个 kind。
+ */
+export const ACTOR_MESH_BY_VARIANT = {
+  civilian: { male: "CivilianMale", female: "CivilianFemale" },
 };

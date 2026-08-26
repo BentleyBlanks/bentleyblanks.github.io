@@ -93,6 +93,88 @@
    }
   },
   {
+   "name": "CivilianMale",
+   "category": "soldier",
+   "file": "CivilianMale.tzm.json",
+   "triangles": 1726,
+   "meshBlocks": 26,
+   "nodes": 33,
+   "joints": 13,
+   "bytes": 62109,
+   "materials": [
+    "accessory",
+    "hair",
+    "shoe",
+    "skin",
+    "trouser",
+    "uniform"
+   ],
+   "mounts": [
+    "root",
+    "body",
+    "eyes",
+    "gripL",
+    "gripR",
+    "weaponMount",
+    "slingBack",
+    "kneeL",
+    "kneeR"
+   ],
+   "bounds": {
+    "min": [
+     -0.244,
+     0.0,
+     -0.15602
+    ],
+    "max": [
+     0.25,
+     1.60398,
+     0.1464
+    ]
+   }
+  },
+  {
+   "name": "CivilianFemale",
+   "category": "soldier",
+   "file": "CivilianFemale.tzm.json",
+   "triangles": 1536,
+   "meshBlocks": 24,
+   "nodes": 31,
+   "joints": 13,
+   "bytes": 53463,
+   "materials": [
+    "accessory",
+    "hair",
+    "shoe",
+    "skin",
+    "trouser",
+    "uniform"
+   ],
+   "mounts": [
+    "root",
+    "body",
+    "eyes",
+    "gripL",
+    "gripR",
+    "weaponMount",
+    "slingBack",
+    "kneeL",
+    "kneeR"
+   ],
+   "bounds": {
+    "min": [
+     -0.23982,
+     0.0,
+     -0.13811
+    ],
+    "max": [
+     0.24543,
+     1.60293,
+     0.13811
+    ]
+   }
+  },
+  {
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",

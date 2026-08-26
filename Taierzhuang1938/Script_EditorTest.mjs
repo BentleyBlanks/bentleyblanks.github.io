@@ -433,18 +433,23 @@ const actor = await page.evaluate(() => {
   active.Rebuild();
   window.Taierzhuang.StepFrames(10);
   const five = active.actors.length;
+  // 六种人物全部走程序化 tzm 模型（GLB 分段皮 2026-08-26 已经拆掉），
+  // 这里查的还是同一件事：每个人身上的网格都得是不透明、写深度、进法线预通道的。
+  // 判据从「有 riggedSkin 且是 segmentMode」改成「meshSource 是 model 且几何本身合规」——
+  // 静默退回方块几何（meshSource === "box"）也会让这一条红。
   const rigidShadingSolid = active.actors.every((previewActor) => {
-    const skin = previewActor.riggedSkin;
-    if (!skin || !skin.segmentMode) return false;
+    if (previewActor.meshSource !== "model") return false;
     let solid = true;
-    for (const segment of skin.segmentMeshes) segment.traverse((object) => {
-      if (!object.isMesh) return;
+    let meshes = 0;
+    previewActor.root.traverse((object) => {
+      if (!object.isMesh || !object.visible) return;
+      meshes += 1;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       solid = solid && object.userData.skipNormalDepth !== true
         && materials.every((material) => material && !material.transparent
           && material.opacity === 1 && material.depthWrite && material.depthTest);
     });
-    return solid;
+    return solid && meshes > 0;
   });
   active.lineup = false;
   active.SetClip("dead");
@@ -466,7 +471,7 @@ Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${act
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
 // KINDS 现在含川军、敢死队、军官、日军、日军军官、百姓，共六种。
 Check("单人 / 六种人物对比", actor.one === 1 && actor.five === 6, `${actor.one} → ${actor.five}`);
-Check("刚体人物头帽是不透明且写入深度/法线", actor.rigidShadingSolid);
+Check("六种人物都用 tzm 模型，且不透明/写深度法线", actor.rigidShadingSolid);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 

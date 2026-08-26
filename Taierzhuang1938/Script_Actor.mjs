@@ -26,8 +26,9 @@ import { Mulberry32, HashString, Clamp, Clamp01, SmoothStep } from "./Script_Noi
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
-import { LoadRiggedAssets, SegmentedCharacterSkin } from "./Script_RiggedModel.mjs";
+import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
 import {
+  ACTOR_MESH_BY_VARIANT,
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
   WEAPON_MESH_VARIANTS, WeaponMeshId,
   BAYONET_MESH_BY_WEAPON,
@@ -291,6 +292,12 @@ const KIND_SPEC = {
   civilian: {
     height: 1.60, clothRecipe: "ClothNra", clothHex: HEX.civilCloth,
     headgear: "wrap", shoe: "clothShoe", gear: "none", defaultWeapon: null,
+    // 男女两个模型（Model/CivilianMale|Female.tzm.json），按 seed 抽。
+    // 值是整体缩放：**身高差只能走缩放**，不能给两套 Dimensions ——
+    // 关节偏移必须与 _blender 里烘死的那一套逐字一致，改比值就开缝。
+    // 1.03 / 0.958 落在 1.65 m / 1.53 m，是 1930 年代华北成年男女的平均身高；
+    // 两个模型都建在 1.60 m 上，差值全在这两个数里。
+    variants: { male: 1.03, female: 0.958 },
   },
 };
 
@@ -1166,12 +1173,21 @@ export class Actor {
     this.quality = factory.quality;
     this.rank = options.rank ?? 0;
 
+    // 同一个 kind 的模型分身（目前只有百姓分男女）。**不是新 kind** ——
+    // AI、伤害、误伤判定都只认 kind，分身纯粹是显示层的事。用 seed 抽，
+    // 所以同一个人重开一局还是同一个人。
+    const variantNames = spec.variants ? Object.keys(spec.variants) : null;
+    this.variant = variantNames
+      ? variantNames[HashString(`${seedText}|variant`) % variantNames.length]
+      : null;
+
     // 身高 ±4% 的个体差走整体缩放，手持武器再乘 1/scale 抵消 —— 枪长是史实数据
-    this.sizeScale = 1 + (rnd() - 0.5) * 0.08;
+    this.sizeScale = (1 + (rnd() - 0.5) * 0.08)
+      * (this.variant ? spec.variants[this.variant] : 1);
     this.weaponScale = 1 / this.sizeScale;
     this.height = spec.height * this.sizeScale;
 
-    const build = factory.KindGeometry(kind);
+    const build = factory.KindGeometry(kind, this.variant);
     const d = build.dims;
     this.dims = d;
     this.materials = factory.ActorMaterials(kind, rnd, options);
@@ -1333,16 +1349,6 @@ export class Actor {
     this.gripR = new THREE.Vector3();
     this.gripL = new THREE.Vector3();
     this.tmpQuat = new THREE.Quaternion();
-
-    // 日军、国军与百姓都换成已下载的角色 GLB。旧 13 关节层级仍在下面跑，
-    // 枪口、握点、AI 与既有动作时序全部不动；显示层只跟随这些已验证关节。
-    // 任一模型读取失败时这里是 null，对应角色的旧程序化几何自动保持可见。
-    this.riggedSkin = factory.CreateRiggedSkin(this);
-    if (this.riggedSkin) {
-      this.meshSource = "rigged";
-      this.usingModel = true;
-      this.partsRevision += 1;
-    }
 
     this.Update(0, { moveSpeed: 0, aim: 0, elapsed: 0 });
   }
@@ -1582,7 +1588,6 @@ export class Actor {
     if (this.ragdollState) {
       this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
       this.PoseRagdoll(this.ragdollState, dying);
-      if (this.riggedSkin) this.riggedSkin.Update();
       return;
     }
 
@@ -1987,7 +1992,6 @@ export class Actor {
       this.chest.rotation.x -= dying * 0.45;
       this.neck.rotation.x -= dying * 0.30;          // 头也垂下去
     }
-    if (this.riggedSkin) this.riggedSkin.Update();
   }
 
   /** 把 root 空间的落脚点换算进 hips 的父子链（body 与 hips 都可能有旋转/位移）。 */
@@ -2774,11 +2778,9 @@ export class Actor {
   Dispose() {
     if (this.disposed) return;
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
-    if (this.riggedSkin) this.riggedSkin.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
     this.root.clear();
     this.weaponGroup = null;
-    this.riggedSkin = null;
     this.disposed = true;
   }
 }
@@ -2822,6 +2824,7 @@ export class ActorFactory {
     if (this.meshLoading) return this.meshLoading;
     const wanted = new Set([
       ...Object.values(SOLDIER_MESH_BY_KIND),
+      ...Object.values(ACTOR_MESH_BY_VARIANT).flatMap((byVariant) => Object.values(byVariant)),
       ...Object.values(WEAPON_MESH_BY_ID),
       ...Object.values(WEAPON_MESH_VARIANTS).flat(),
       ...Object.values(BAYONET_MESH_BY_WEAPON),
@@ -2897,8 +2900,9 @@ export class ActorFactory {
   }
 
   /** 用模型搭一个 kind 的骨头表。任何一环对不上就返回 null，调用方退回方块几何。 */
-  _ModelKindGeometry(kind, spec, dims) {
-    const id = SOLDIER_MESH_BY_KIND[kind];
+  _ModelKindGeometry(kind, spec, dims, variant) {
+    const byVariant = ACTOR_MESH_BY_VARIANT[kind];
+    const id = (variant && byVariant && byVariant[variant]) || SOLDIER_MESH_BY_KIND[kind];
     if (!id || !this.meshDocs.has(id)) return null;
     const built = this._InstantiateMesh(id);
     if (!built) return null;
@@ -2950,48 +2954,23 @@ export class ActorFactory {
   }
 
   /**
-   * 同步克隆已经预读好的人物显示层；Actor 创建链保持同步。
-   *
-   * ★ **士兵（nra* / ija*）不走这条路**。SegmentedCharacterSkin 把 13 个刚体分段
-   * 原样挂到关节上，分段之间没有交叠余量，也没有 HealBucket 那一层修补：
-   * 肩、肘、腕、胯、膝、踝一转就开缝，手掌与小腿整段飘在空中。而 NRA 那个
-   * GLB 本身还是个人偶——躯干是一张立着的薄板、没有脖子、没有肩、脚是两团
-   * 光脚趾（见 Model/Texture_NraSoldierRefined*QA.png）。程序化 tzm 模型
-   * （Model/SoldierNra.tzm.json、SoldierIja.tzm.json）是照这套 13 关节骨架
-   * 建的，关节自带交叠、有绑腿有布鞋有立领，才是这两种兵该显示的样子。
-   * 顺带一提：日军因为 Script_RiggedModel 里一处 HashString 未导入，长期是
-   * 抛错退回 tzm 的——线上看着正常的那批日本兵，走的就是现在这条路。
-   * 百姓没有 tzm 模型，仍旧用 GLB。
-   */
-  CreateRiggedSkin(actor) {
-    if (!actor || !this.riggedAssets) return null;
-    let asset = null;
-    if (actor.kind === "civilian") {
-      asset = (HashString(actor.seed) & 1) === 0
-        ? this.riggedAssets.civilianMale : this.riggedAssets.civilianFemale;
-    }
-    if (!asset) return null;
-    try {
-      return new SegmentedCharacterSkin(asset, actor);
-    } catch (error) {
-      console.warn(`[Actor] ${actor.kind} 人物模型实例化失败，退回旧几何：${String(error).slice(0, 180)}`);
-      return null;
-    }
-  }
-
-  /**
    * 按 kind 缓存整套骨骼几何：24 个人各自合并六十来个盒子会卡出一个肉眼可见的顿。
    *
    * 两条路：先试 Blender 出的模型，读不到就退回程序化方块几何。
+   * **五个 kind 全都有 tzm 模型了**（士兵 2026-08-25、百姓 2026-08-26），
+   * 方块几何只是模型 404 时的兜底 —— 它不该在正常一局里被走到，
+   * 所以 meshSource 这个字段一直露在外面，别把它藏起来。
    * **不许在这里 await** —— 它在 Actor 构造函数里被调，异步化会让"造一个人"
    * 变成异步操作，AI 那边一整条生成链都要跟着改。预读走 PreloadMeshes()。
    */
-  KindGeometry(kind) {
-    const cached = this.kindCache.get(kind);
+  KindGeometry(kind, variant = null) {
+    // 分身（百姓男/女）各缓存一份：几何不同，但 dims 与关节偏移是同一套。
+    const cacheKey = variant ? `${kind}|${variant}` : kind;
+    const cached = this.kindCache.get(cacheKey);
     if (cached) return cached;
     const spec = KIND_SPEC[kind];
     const dims = Dimensions(spec.height);
-    const fromModel = this._ModelKindGeometry(kind, spec, dims);
+    const fromModel = this._ModelKindGeometry(kind, spec, dims, variant);
     const entry = fromModel
       ? { dims, bones: fromModel.bones, mounts: fromModel.mounts, source: "model", meshId: fromModel.meshId }
       : { dims, bones: this._BoxKindGeometry(spec, dims), mounts: null, source: "box", meshId: null };
@@ -3000,7 +2979,7 @@ export class ActorFactory {
     this._AttachExtraBones(entry.bones, spec, dims);
     entry.meshCount = Object.values(entry.bones)
       .reduce((sum, bone) => sum + (bone ? bone.size : 0), 0);
-    this.kindCache.set(kind, entry);
+    this.kindCache.set(cacheKey, entry);
     return entry;
   }
 
@@ -3031,7 +3010,9 @@ export class ActorFactory {
     if (spec.gear === "officer") bones.officerGear = make((b) => BuildGear(b, dims, spec, quality));
     // 后脑勺：头是一颗肤色球 + 帽子，帽檐以下的后脑与脸同色，背影镜从后面看像正脸
     //（五场过场的复审全都抓到这条）。给一块深色的发盖，正面看不见它。
-    if (spec.headgear !== "helmet") {
+    // **只补军帽这两种**：钢盔本来就包到后脑；百姓（wrap）的头发是建在模型里的
+    //（男的短发一层、女的包头巾 + 纂儿），再补一块就是两层头发顶在一起。
+    if (spec.headgear === "cap" || spec.headgear === "peakCap") {
       bones.hairBack = make((b) => {
         // 尺寸按模型量的（头：宽 0.169、深 0.189、帽檐底在脖子关节上约 0.118 m）。
         // 覆盖整个后半球、一路盖到下颌角 —— 只盖到耳根的话深色带下面又露出一段

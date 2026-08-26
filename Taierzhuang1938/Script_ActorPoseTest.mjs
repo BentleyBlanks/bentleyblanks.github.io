@@ -54,12 +54,12 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
-    // 士兵一律用程序化 tzm 模型（Model/SoldierNra.tzm.json），**不许**再退回
-    // Model_NraSoldier.glb 那套 13 个刚体分段：那套分段之间没有交叠余量，
-    // 肩/肘/腕/胯/膝/踝一转就开缝，手掌与小腿整段飘在空中，躯干还是一张薄板。
+    // 五个 kind 一律用程序化 tzm 模型，**不许**再退回 Model_*Soldier.glb /
+    // Model_Civilian*.glb 那套 13 个刚体分段：那套分段之间没有交叠余量，
+    // 肩/肘/腕/胯/膝/踝一转就开缝，躯干还是一张薄板，百姓那两个更是连脚都没有。
     // 判据写成「meshSource 是 model 且 13 根骨头下面都挂着可见几何」——
     // 换回 GLB 皮会把这些几何整片藏起来，这一条立刻红。
-    check(actor.meshSource === "model" && !actor.riggedSkin,
+    check(actor.meshSource === "model",
       `NRA should use the procedural tzm model, got ${actor.meshSource}`);
     const jointNodes = {
       hips: actor.hips, chest: actor.chest, neck: actor.neck,
@@ -114,6 +114,49 @@ try {
     check(footSymmetry.every((value) => Math.abs(value) < 0.004),
       `NRA left/right foot segment mismatch: L=${footL} R=${footR}`);
 
+    // 百姓：男女两个分身各查一遍。这个 kind 是最后一个从 GLB 搬过来的
+    //（2026-08-26），而它原来的毛病恰恰是「脚整个不存在、人陷在地下 11 cm」，
+    // 所以鞋底那一条对它比对士兵更要紧。
+    const civilianVariants = new Map();
+    for (let seed = 7000; seed < 7040 && civilianVariants.size < 2; seed += 1) {
+      const one = factory.Create("civilian", { seed });
+      if (!civilianVariants.has(one.variant)) civilianVariants.set(one.variant, one);
+      else one.Dispose();
+    }
+    check(civilianVariants.size === 2 && civilianVariants.has("male") && civilianVariants.has("female"),
+      `civilian variants missing: ${[...civilianVariants.keys()].join(",")}`);
+    for (const [variant, civilian] of civilianVariants) {
+      check(civilian.meshSource === "model",
+        `civilian ${variant} fell back to ${civilian.meshSource} instead of the tzm model`);
+      civilian.root.updateMatrixWorld(true);
+      const joints = {
+        hips: civilian.hips, chest: civilian.chest, neck: civilian.neck,
+        armL: civilian.arms.L.shoulder, foreL: civilian.arms.L.elbow,
+        armR: civilian.arms.R.shoulder, foreR: civilian.arms.R.elbow,
+        thighL: civilian.legs.L.thigh, shinL: civilian.legs.L.knee, footL: civilian.legs.L.ankle,
+        thighR: civilian.legs.R.thigh, shinR: civilian.legs.R.knee, footR: civilian.legs.R.ankle,
+      };
+      for (const [key, node] of Object.entries(joints)) {
+        let visible = 0;
+        for (const child of node.children) if (child.isMesh && child.visible) visible += 1;
+        check(visible > 0, `civilian ${variant} joint ${key} has no visible geometry`);
+      }
+      // 鞋底贴地：旧 GLB 百姓的腿到脚踝就断了，包围盒下沿在地面下 0.11 m。
+      const box = new THREE.Box3();
+      civilian.root.traverse((node) => { if (node.isMesh && node.visible) box.expandByObject(node); });
+      const sole = box.min.y - civilian.root.position.y;
+      check(sole > -0.02 && sole < 0.02, `civilian ${variant} sole off the ground: ${sole}`);
+      // 男女不是同一个模型、也不是同一个个头
+      check(civilian.usingModel && civilian.height > 1.4 && civilian.height < 1.75,
+        `civilian ${variant} height out of range: ${civilian.height}`);
+    }
+    // 两个分身必须真的取到两个不同的 tzm 文档。只比身高是不够的：
+    // 个体差 ±4% 会让男女的身高区间叠上，同一个模型也可能"看着不一样高"。
+    check(factory.KindGeometry("civilian", "male").meshId === "CivilianMale"
+      && factory.KindGeometry("civilian", "female").meshId === "CivilianFemale",
+    "civilian variants resolve to the wrong tzm models");
+    for (const civilian of civilianVariants.values()) civilian.Dispose();
+
     const baselineA = factory.Create("nra", { seed: 90212, weapon: null });
     const baselineB = factory.Create("nra", { seed: 90212, weapon: null });
     const state = { moveSpeed: 0, elapsed: 0.25 };
@@ -167,7 +210,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     for (const item of [actor, armed, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "6 states × 3 levels, tzm 模型 13 关节几何, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
+    return "6 states × 3 levels, tzm 模型 13 关节几何, 百姓男女分身, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

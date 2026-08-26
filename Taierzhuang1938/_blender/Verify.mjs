@@ -181,6 +181,10 @@ const result = await page.evaluate(async () => {
   const MaterialsFor = (cloth) => ({
     uniform: library.Get(cloth, { roughness: 1 }),
     accessory: library.Get(cloth, { roughness: 1, repeat: 1.2 }),
+    // 百姓那两个模型用的两桶。**必须给** —— 加载器认不出材质名会静默并进
+    // uniform，那样量到的 draw call 比运行时少，清单里的 draws 就永远对不上。
+    trouser: library.Get(cloth, { roughness: 1, repeat: 1.1 }),
+    hair: Plain("hair", 0x26211b, 0.96),
     skin: Plain("skin", 0xB4906C, 0.78),
     shoe: Plain("shoe", 0x2B2B2E, 0.94),
     leather: Plain("leather", 0x3A2C22, 0.66),

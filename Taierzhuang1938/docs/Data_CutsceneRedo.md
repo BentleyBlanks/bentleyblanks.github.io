@@ -396,4 +396,45 @@ node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_Chuchuan --times=60 --yaw=
 tzm 模型直接通过，而 GLB 那版全员悬空约 8 cm。
 
 **遗留**：草鞋 + 露趾的脚在顺光下仍是画面下缘最亮的一块（`HEX.strawShoe` 已压过一档，
-再压会影响七关全部川军，没动）；百姓的 GLB 分段仍有小腿脱节，没在这一轮里处理。
+再压会影响七关全部川军，没动）。
+
+### B2. 百姓也搬走了，`SegmentedCharacterSkin` 整条路已经删除（2026-08-26）
+
+上一节留下的「百姓的 GLB 分段仍有小腿脱节」比记的还严重：`Model_CivilianMale/Female.glb`
+**根本没有脚** —— 裤管到踝就断了，实拍量到人踩在地面下 11 cm；躯干是七八块互不相连的
+平板叠着，头是个方盒加一片浮在上面的帽板，胳膊是两根裸露的肉色管子（1938 年 3—4 月
+鲁南春寒，光膀子本身就不对）。
+
+现在百姓也走程序化 tzm：`Model/CivilianMale.tzm.json`（1726 三角）与
+`CivilianFemale.tzm.json`（1536 三角），建模脚本 `_blender/BuildCivilians.py`。
+骨架、关节偏移、四肢装配**全部复用 `BuildSoldiers.Limbs`** —— 运行时只有一套 13 关节
+骨架，抄第二份关节表迟早会漂；那个函数因此多了三个 spec 钩子
+（`legMaterial` / `shinParts` / `footParts`），军民差异全走它们。
+
+穿的（史实红线写在 `BuildCivilians.py` 抬头，别在代码里即兴发挥）：
+- 男：对襟夹袄 + 中式小立领 + 布盘扣、腰里一条布带、裤脚**扎腿带**、千层底黑布鞋、包头布。
+- 女：**大襟**（衣襟从领口斜扣到左腋下 —— 三十米外唯一读得出的女装标志）、肥裤扎脚、
+  包头巾 + 颈后裹着的纂儿、千层底布鞋、不扎腰带。
+- 两个都**不带任何军用装具**。头上那块布**不许是白的**：白毛巾是敢死队的标志
+  （`Script_Actor` 的 `towelHead`），给百姓也扎一条白的等于把那条战场识别信息作废。
+
+男女是**同一个 kind 的两个分身**，不是两个 kind —— AI、伤害、误伤判定只认 `"civilian"`。
+分身由 seed 抽（`KIND_SPEC.civilian.variants`），值是**整体缩放**（男 1.03 / 女 0.958，
+落在 1.65 m / 1.53 m）：两个模型都建在 1.60 m 上，身高差不能烘进模型 ——
+加载器的 `scale = KIND_SPEC.height / MESHES.height` 会把它直接除回去。
+几何层面女性只改截面（肩窄一档、腰胯宽一档、褂子长一截），**关节位置一个不动**。
+
+因此 `SegmentedCharacterSkin`、`ActorFactory.CreateRiggedSkin`、`Actor.riggedSkin`
+以及四个人物 GLB 的预读全部删掉了（`Script_RiggedModel.mjs` 只剩第一人称手臂那一段，
+启动时少下 4.3 MB）。四个 `.glb` 文件还留在 `Model/` 下，但没有任何代码路径读它们。
+
+**建模过程中值得记下来的三处翻车**（都只有真截图看得见，包围盒/三角数全是绿的）：
+1. `sleeve` / `trouser` 是乘在**管子半径**上的，别拿它表达「棉衣厚」：1.16 的袖子
+   = 直径 15 cm 的胳膊，6 边放样下就是两块贴在身侧的板子。
+2. 裤管的膝口半径要**对齐大腿下口**。`BuildSoldiers.Thigh` 的最后一圈是
+   `0.66×0.059H` 而且**不吃 `trouser` 倍数**；照 `0.052H×1.14` 起头就宽了三分之一，
+   膝盖凭空多出一圈台阶。
+3. 帽子顶上那两圈必须**盖过 `HeadShape` 的 0.52 HH 顶点**，否则头皮从帽尖钻出一块。
+
+`Script_ActorPoseTest` 加了百姓男女两个分身的用例（取到不同 tzm、13 根骨头都有可见
+几何、鞋底 ±0.02 m 贴地）；`Script_RiggedModelTest` 缩到只守第一人称手臂那一个 GLB。

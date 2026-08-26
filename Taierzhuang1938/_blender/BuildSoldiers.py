@@ -471,9 +471,19 @@ def MarchingBoot(d):
 # 组装
 # ---------------------------------------------------------------------------
 
-def _Limbs(root, d, spec):
+def Limbs(root, d, spec):
     """四肢 + 手脚。左右各一套，几何镜像用 sx=-1 会翻绕向，所以这里
-    重新生成而不是镜像 —— 多几行代码换一个不会背面剔除翻掉的模型。"""
+    重新生成而不是镜像 —— 多几行代码换一个不会背面剔除翻掉的模型。
+
+    **百姓（BuildCivilians）也走这一个函数。** 关节偏移
+    （肩 shoulderHalf / 肘 upperArmLen / 胯 hipHalf / 膝 thighLen / 踝 shinLen）
+    必须与 Script_Actor 的 Actor 构造函数逐字一致，抄第二份迟早会漂 ——
+    所以军民共用这一份，差异全部走 spec：
+      legMaterial  大腿那一桶的材质名（军装 uniform / 百姓 trouser）
+      shinParts    小腿段自建：[(节点名前缀, 材质, fn(d, segments))]，
+                   给了就不走 legwrap 那两支
+      footParts    踝下自建：[(材质, fn(d))]，给了就不走 footwear 那两支
+    """
     hips = root["hips"]
     chest = root["chest"]
     sleeve = spec["sleeve"]
@@ -501,10 +511,14 @@ def _Limbs(root, d, spec):
 
     for tag, side in (("L", -1), ("R", 1)):
         thigh = hips.Child("thigh" + tag, t=(side * d["hipHalf"], 0.0, 0.0), joint=True)
-        thigh.Add("uniform", Thigh(d, spec["trouser"], legSegments), tile="cloth")
+        thigh.Add(spec.get("legMaterial", "uniform"),
+                  Thigh(d, spec["trouser"], legSegments), tile="cloth")
 
         knee = thigh.Child("knee" + tag, t=(0.0, -d["thighLen"], 0.0), joint=True)
-        if spec["legwrap"] == "puttee":
+        if spec.get("shinParts"):
+            for name, material, build in spec["shinParts"]:
+                knee.Child(name + tag).Add(material, build(d, legSegments), tile="cloth")
+        elif spec["legwrap"] == "puttee":
             # 绑腿的层叠单独一块（accessory 桶：色同军装或更浅）
             # 4 层：再多一层只多 32 个三角，但 4 层已经能读出「缠」的节奏
             knee.Child("puttee" + tag).Add(
@@ -513,7 +527,10 @@ def _Limbs(root, d, spec):
             knee.Child("boot" + tag).Add("leather", MarchingBoot(d), tile="cloth")
 
         ankle = knee.Child("ankle" + tag, t=(0.0, -d["shinLen"], 0.0), joint=True)
-        if spec.get("footwear") == "strawSandal":
+        if spec.get("footParts"):
+            for material, build in spec["footParts"]:
+                ankle.Add(material, build(d), tile="cloth")
+        elif spec.get("footwear") == "strawSandal":
             ankle.Add("skin", BareFoot(d), tile="cloth")
             ankle.Add("shoe", StrawSandal(d), tile="cloth")
         else:
@@ -549,7 +566,7 @@ def BuildNraSoldier():
     # 视线挂点：给瞄准/看向用
     head.Child("eyes", t=(0.0, d["headH"] * 0.05, -d["headD"] * 0.42))
 
-    _Limbs({"hips": hips, "chest": chest}, d, {
+    Limbs({"hips": hips, "chest": chest}, d, {
         "sleeve": 1.06, "cuff": 0.012, "trouser": 1.10, "legwrap": "puttee",
         "toeLift": 0.010, "footwear": "strawSandal", "armSegments": 6, "legSegments": 7,
         "shoulderStrap": False,
@@ -589,7 +606,7 @@ def BuildIjaSoldier():
     helmet.Child("helmetStar").Add("accentB", HelmetStar(d), tile="steel")
     head.Child("eyes", t=(0.0, d["headH"] * 0.02, -d["headD"] * 0.42))
 
-    _Limbs({"hips": hips, "chest": chest}, d, {
+    Limbs({"hips": hips, "chest": chest}, d, {
         "sleeve": 1.02, "cuff": 0.0, "trouser": 1.04, "legwrap": "boot",
         "toeLift": 0.006, "shoulderStrap": True,
     })
