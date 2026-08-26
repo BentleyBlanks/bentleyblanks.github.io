@@ -37,7 +37,7 @@ await page.goto(
   { waitUntil: "load", timeout: 180000 },
 );
 await page.waitForFunction(() => window.Taierzhuang?.destruction && window.Taierzhuang?.editor,
-  { timeout: 240000 });
+  null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(20));
 
 const gameplayGate = await page.evaluate(() => window.Taierzhuang.Debug.Destruction());

@@ -32,7 +32,7 @@ let result = null;
 try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=high&scale=small`,
     { waitUntil: "load", timeout: 180000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 300000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 300000 });
   result = await page.evaluate(async () => {
     const T = window.Taierzhuang;
     const gl = T.renderer.getContext();

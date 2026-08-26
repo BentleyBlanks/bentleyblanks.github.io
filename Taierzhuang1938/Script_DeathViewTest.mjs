@@ -29,7 +29,7 @@ try {
   const port = server.address().port;
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=5&quality=medium&scale=small`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang?.state?.ready, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
   const result = await page.evaluate(() => {
     const T = window.Taierzhuang;

@@ -56,6 +56,12 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 - `Ctrl+C`、终止信号和超时会清理当前测试及其浏览器子进程。
 - `PASS`：测试全绿；`BASELINE`：只有已登记历史红；`FAIL`：新增红、崩溃或超时。
 - 默认只要没有 `FAIL` 就返回 0；`--strict-baseline` 下历史红也返回 1。
+- **测试内部的等待另算**：`page.waitForFunction(fn, arg?, options?)` 的第二格是
+  传给页面函数的实参，不是 options。写成 `waitForFunction(fn, { timeout: 180000 })`
+  超时会静静落回 playwright 默认的 30 秒——快机器上照样全绿，慢机器或
+  `quality=high` 的大关才随机炸成「Timeout 30000ms exceeded」，看着还像被测功能坏了。
+  必须补 `null` 占位：`waitForFunction(fn, null, { timeout: 180000 })`。
+  `TestRunnerTest` 会扫全部 `Script_*.mjs` 把漏写的挑出来（2026-08-26 一次修了 55 处）。
 
 2026-08-24 在 master `5c0781b9` 上完整实测：BootTest 92.7 秒、PlayTest
 610.5 秒、Tier 0 合计 703.7 秒；同日其他两轮曾达到 887.9 与 996.7 秒。

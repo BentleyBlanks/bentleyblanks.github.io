@@ -76,7 +76,7 @@ page.on("console", (message) => {
 // 出图要的是台架那一帧，不是菜单的运镜。
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=high&scale=small&phase=0&menu=0`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("weapon"));
 await page.evaluate(() => window.Taierzhuang.StepFrames(10));

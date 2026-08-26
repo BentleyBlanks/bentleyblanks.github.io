@@ -44,11 +44,11 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   let health = null;
   try {
     await page.goto(url, { waitUntil: "load", timeout: 120000 });
-    await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+    await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
     await page.waitForFunction(() => window.Taierzhuang.vfx?.loadedExplosionSprites?.size === 4,
-      { timeout: 30000 });
+      null, { timeout: 30000 });
     await page.waitForFunction(() => window.Taierzhuang.vfx?.loadedVefectsMasks?.size === 5,
-      { timeout: 30000 });
+      null, { timeout: 30000 });
     await page.evaluate(() => window.Taierzhuang.StepFrames(120));
     await page.waitForTimeout(600);
     health = await page.evaluate((testPhase) => {

@@ -21,7 +21,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&poseShot=1&phase=0&quality=high`, {
     waitUntil: "load", timeout: 120000,
   });
-  await page.waitForFunction(() => window.Taierzhuang?.actorFactory, { timeout: 300000 });
+  await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
   await page.evaluate(async () => {
     const T = window.Taierzhuang;
     const THREE = await import("/Taierzhuang1938/vendor/three/build/three.module.js");

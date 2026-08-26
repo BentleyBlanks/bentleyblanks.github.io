@@ -44,7 +44,7 @@ const Fail = (msg) => { console.log(`FAIL ${msg}`); failed += 1; };
 const Ok = (msg) => console.log(`ok   ${msg}`);
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small`, { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
 
 // 真点一下：AudioContext 要用户手势才 resume。page.evaluate 不算手势，
 // page.mouse.click 发的是 trusted 事件，算。
@@ -54,11 +54,11 @@ await page.evaluate(() => window.Taierzhuang.audio.Unlock());
 // 采样包是异步 fetch + decode 的，等它落地（或者等到确定失败）
 await page.waitForFunction(
   () => { const a = window.Taierzhuang.audio; return a.sfxReady || a.sfxErrors.length > 0; },
-  { timeout: 60000 },
+  null, { timeout: 60000 },
 ).catch(() => {});
 await page.waitForFunction(
   () => { const a = window.Taierzhuang.audio; return a.voicesReady || a.voiceErrors.length > 0; },
-  { timeout: 60000 },
+  null, { timeout: 60000 },
 ).catch(() => {});
 
 const load = await page.evaluate(() => {
@@ -179,7 +179,7 @@ if (burst.manyLife - burst.oneLife < 1.0) {
 // ---------------------------------------------------------------------------
 await page.waitForFunction(
   () => { const a = window.Taierzhuang.audio; return (a.ambReady && a.musicReady) || a.ambErrors.length > 0 || a.musicErrors.length > 0; },
-  { timeout: 60000 },
+  null, { timeout: 60000 },
 ).catch(() => {});
 
 const packs = await page.evaluate(async () => {

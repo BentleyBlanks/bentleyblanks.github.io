@@ -79,7 +79,7 @@ async function CanvasDrag(x, y, steps = 12) {
 // 所以显式强开 —— 默认关状态下的调试视图契约由 Script_GiTest 管。
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0&gi=1`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 
 // ---------------------------------------------------------------------------
 // 1) 齿轮与入口面板
@@ -1259,7 +1259,7 @@ await page.evaluate(() => {
 });
 await page.waitForFunction(
   () => window.Taierzhuang.state.ready && window.Taierzhuang.Debug.Level().index === 1,
-  { timeout: 240000 });
+  null, { timeout: 240000 });
 await Step(20);
 const jumped = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -1335,7 +1335,7 @@ Check("关掉编辑器之后仗接着打", resumed.after > resumed.before,
 // ---------------------------------------------------------------------------
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await Step(10);
 const shot = await page.evaluate(() => ({
   hidden: window.Taierzhuang.Debug.Editor().hidden,
@@ -1357,10 +1357,10 @@ async function PreviewPage(query = "?preview=CS_Chuchuan") {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/${query}`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined
-    && window.Taierzhuang.state.ready, { timeout: 240000 });
+    && window.Taierzhuang.state.ready, null, { timeout: 240000 });
   await page.click("#bootStart");
   await page.waitForFunction(() => window.Taierzhuang.Debug.Preview().playing,
-    { timeout: 30000 });
+    null, { timeout: 30000 });
 }
 
 await PreviewPage();
@@ -1439,7 +1439,7 @@ Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurr
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined
-  && window.Taierzhuang.state.ready && window.Taierzhuang.state.menu, { timeout: 240000 });
+  && window.Taierzhuang.state.ready && window.Taierzhuang.state.menu, null, { timeout: 240000 });
 const menuToEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
   // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，场景工具必须先收起它。
@@ -1476,7 +1476,7 @@ await page.waitForFunction(() => {
   const T = window.Taierzhuang;
   return T.state.ready && T.state.builtPhase === 1 && T.editor.active
     && T.editor.active.groundPatched === T.battlefield;
-}, { timeout: 240000 });
+}, null, { timeout: 240000 });
 const menuSlice = await page.evaluate(() => {
   const T = window.Taierzhuang;
   return {

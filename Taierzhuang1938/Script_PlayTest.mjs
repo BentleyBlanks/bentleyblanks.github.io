@@ -47,7 +47,7 @@ function Check(name, ok, detail = "") {
 async function Boot(phase = 0, scale = "small") {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=medium&scale=${scale}`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 }
 
@@ -92,7 +92,7 @@ Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined
-  && window.Taierzhuang.state.ready, { timeout: 240000 });
+  && window.Taierzhuang.state.ready, null, { timeout: 240000 });
 await page.click("#bootStart");
 await page.waitForTimeout(250);
 const defaultIntro = await page.evaluate(() => ({
@@ -123,7 +123,7 @@ await page.evaluate(() => {
   // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.click("#bootStart");
   await page.waitForTimeout(400);
 
@@ -2048,7 +2048,7 @@ Check("模型读不到时退回程序化方块几何，且不抛",
 {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&ads=1&phase=0&quality=medium&scale=small`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
   const ads = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const out = [];
@@ -2098,7 +2098,7 @@ Stage("14 指针锁");
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&menu=0&intro=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined && window.Taierzhuang.state.ready,
-    { timeout: 180000 });
+    null, { timeout: 180000 });
   const ReadLock = () => page.evaluate(() => window.Taierzhuang.Debug.PointerLock());
   const rows = [];
   for (const how of ["escape", "blur", "pagehide", "hidden"]) {

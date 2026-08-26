@@ -57,8 +57,8 @@ const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=m
 
 async function Boot(query = "") {
   await page.goto(Url(query), { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
-  await page.waitForFunction(() => window.Taierzhuang.Debug.Menu !== undefined, { timeout: 60000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang.Debug.Menu !== undefined, null, { timeout: 60000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 }
 
@@ -275,7 +275,7 @@ for (let i = 0; i < 3; i += 1) {
 
   // Esc 跳过，别在冒烟里干等三十八秒
   await page.keyboard.press("Escape");
-  await page.waitForFunction(() => window.Taierzhuang.state.running === true, { timeout: 180000 })
+  await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 })
     .catch(() => {});
   const done = await page.evaluate(() => ({
     running: window.Taierzhuang.state.running,
@@ -298,7 +298,7 @@ for (let i = 0; i < 3; i += 1) {
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuPlay(2));
-  await page.waitForFunction(() => window.Taierzhuang.state.running === true, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(60));
   const inGame = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -475,7 +475,7 @@ for (let i = 0; i < 3; i += 1) {
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuPlay(2));
-  await page.waitForFunction(() => window.Taierzhuang.state.running === true, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 });
   await page.keyboard.press("Backquote");
   const option = await page.evaluate(() => ({
     panelOpen: window.Taierzhuang.Debug.Editor().panelOpen,
@@ -531,7 +531,7 @@ for (let i = 0; i < 3; i += 1) {
 // ===========================================================================
 {
   await page.goto(Url("&menu=0&phase=0"), { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   const bypass = await page.evaluate(() => ({
     menu: !!window.Taierzhuang.menu,
     inMenu: window.Taierzhuang.state.menu,

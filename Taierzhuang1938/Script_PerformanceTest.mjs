@@ -28,7 +28,7 @@ let result = null;
 try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   result = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.StepFrames(60);

@@ -17,7 +17,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?poseTest=1`, {
     waitUntil: "load", timeout: 120000,
   });
-  await page.waitForFunction(() => window.Taierzhuang?.actorFactory, { timeout: 300000 });
+  await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
 
   const result = await page.evaluate(async () => {
     const fail = (message) => { throw new Error(message); };

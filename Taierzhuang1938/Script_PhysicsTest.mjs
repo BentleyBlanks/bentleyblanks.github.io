@@ -42,7 +42,7 @@ function Check(name, ok, detail) {
 const PHASE = 5;
 const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${PHASE}&quality=low&scale=small`;
 await page.goto(url, { waitUntil: "load", timeout: 180000 });
-await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(60));
 
 // --- 1. 静态几何真的灌进物理世界了 -----------------------------------------

@@ -18,7 +18,7 @@ try {
     `http://127.0.0.1:${port}/Taierzhuang1938/?phase=3&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 },
   );
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
 
   const controls = await page.evaluate(() => {
     const T = window.Taierzhuang;

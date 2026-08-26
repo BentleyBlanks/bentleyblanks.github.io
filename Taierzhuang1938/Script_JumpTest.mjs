@@ -22,7 +22,7 @@ try {
   const port = server.address().port;
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=0&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
   const jump = await page.evaluate(() => {

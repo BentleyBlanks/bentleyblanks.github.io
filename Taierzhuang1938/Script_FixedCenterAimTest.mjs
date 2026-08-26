@@ -18,7 +18,7 @@ page.on("console", (message) => { if (message.type() === "error") errors.push(me
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
-await page.waitForFunction(() => window.Taierzhuang?.state?.ready, { timeout: 180000 });
+await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
 const report = await page.evaluate(() => {
   const T = window.Taierzhuang;

@@ -50,7 +50,7 @@ for (const phase of PHASES) {
   });
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 300000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 300000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(120));
 
   const result = await page.evaluate(() => {

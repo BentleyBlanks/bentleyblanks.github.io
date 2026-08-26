@@ -45,7 +45,7 @@ try {
   });
 
   await page.waitForFunction(() => document.getElementById("bootStep")?.textContent === "就绪",
-    { timeout: 240000, polling: 200 });
+    null, { timeout: 240000, polling: 200 });
 
   const lag = (await worker.evaluate(() => self.__lag)).sort((a, b) => b - a);
   const stalls = lag.filter((v) => v > 60).length;

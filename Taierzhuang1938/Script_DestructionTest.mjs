@@ -32,7 +32,7 @@ function Check(name, ok, detail = "") {
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=5&quality=low&scale=small`,
   { waitUntil: "load", timeout: 180000 });
-await page.waitForFunction(() => window.Taierzhuang?.destruction, { timeout: 240000 });
+await page.waitForFunction(() => window.Taierzhuang?.destruction, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
 // 1. 七关共用的 BuildSink 已把承重语义写进运行时碰撞记录。

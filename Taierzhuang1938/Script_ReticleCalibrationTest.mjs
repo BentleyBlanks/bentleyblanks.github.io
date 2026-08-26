@@ -29,7 +29,7 @@ function Check(name, ok, detail = "") {
 try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, { timeout: 240000 });
+  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.click("#bootStart");
   const result = await page.evaluate(() => {
     const T = window.Taierzhuang;
