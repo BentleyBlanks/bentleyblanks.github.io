@@ -1418,7 +1418,7 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
-export const SFX_PACK_VERSION = "6";
+export const SFX_PACK_VERSION = "7";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -1493,6 +1493,17 @@ const AMB_AIR = {   // → Play 的 airCut
 };
 
 /**
+ * 原样播放的 cue：**按顺序轮**着出，且**不做逐发变调**。
+ *
+ * 默认那套（随机挑变体 + ±3% 变调）是给「每秒都在响、且没人挑过」的音准备的 ——
+ * 脚步、弹着、连发枪声，靠随机与失谐把复读感盖过去。白刃这三条不是那种音：
+ * 变体是**人工一条条试听选定**的，要的就是它们本来的样子。变调会把选中的音色
+ * 拧走（±3% 对 0.2 秒的破风声是听得出来的），随机挑则会「连出两次同一条」，
+ * 恰恰是选三条想避免的事。
+ */
+const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit"]);
+
+/**
  * 把一组 AudioBuffer 包成配方。
  * 走 RECIPES 而不是另开一条播放路径 —— 去重、预算闸、Panner、空气低通、
  * 混响 send、距离湿度加成这一整套原封不动地免费复用（与人声采样同一个理由）。
@@ -1500,16 +1511,24 @@ const AMB_AIR = {   // → Play 的 airCut
 function SampleRecipe(buffers, name) {
   const interval = SAMPLE_BURST[name] || 0;
   const wet = SAMPLE_WET[name];
+  const cycle = SAMPLE_CYCLE.has(name);
+  let turn = 0;                      // 轮播游标；重载音效包时随配方一起重建
   return (A, v) => {
     const shots = interval ? Clamp(v.burst ?? 1, 1, 14) : 1;
     for (let i = 0; i < shots; i += 1) {
-      const buf = buffers.length === 1
-        ? buffers[0]
-        : buffers[Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length))];
+      let buf;
+      if (cycle) {
+        buf = buffers[turn];
+        turn = (turn + 1) % buffers.length;
+      } else {
+        buf = buffers.length === 1
+          ? buffers[0]
+          : buffers[Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length))];
+      }
       const src = v.Own(A.ctx.createBufferSource());
       src.buffer = buf;
-      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。
-      const rate = v.pitch * (0.97 + v.rng() * 0.06);
+      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条不掺。
+      const rate = cycle ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
       src.playbackRate.value = rate;
       src.connect(v.out);
       v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
