@@ -128,8 +128,7 @@ export class GraphicsSettings {
       { value: 0, label: "出厂" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
-    Note(perf, "开关阴影要重编译一次全场材质（几百毫秒的卡顿），因为它是编译期的 "
-      + "#define。只改标志位不重编译的话，画面会留着一层永不更新的假阴影。", true);
+    Note(perf, "阴影是编译期 #define：开关它要重编译全场材质，卡几百毫秒。", true);
 
     const giBox = Section(body, "全局光照（实时探针体）");
     const giRow = document.createElement("div");
@@ -141,11 +140,23 @@ export class GraphicsSettings {
       format: (v) => `×${v.toFixed(2)}`,
       onInput: (v) => { gfx.giStrength = v; this.Apply(); },
     });
-    Note(giBox, "默认使用下载的通用 Global SH Probe + 冷灰蓝 AmbientColor：没有实时 GI pass，"
-      + "但仍保留有方向的室外补光。打开后才启用半实时辐照度探针；它一帧重算十几个探针，"
-      + "走一步或换时段要一两秒收敛。low 画质档不建探针体，这一栏对它无效。"
-      + "「间接光强度」是整份间接漫反射的倍率：探针体内与体积外回退的天空 IBL 一起乘，"
-      + "所以调大只是整体变亮，不会在体积边界上留下一圈跟着人走的色差。", true);
+    Note(giBox, "默认：通用 SH Probe + 冷灰蓝环境光，无实时 GI pass。打开才启用半实时探针，"
+      + "走动或换时段要一两秒收敛（low 档不建探针体，此栏无效）。"
+      + "「间接光强度」是整份间接漫反射的倍率，只整体变亮。", true);
+
+    const aa = Section(body, "抗锯齿");
+    const aaRow = document.createElement("div");
+    aaRow.className = "edBtns";
+    aa.appendChild(aaRow);
+    Toggle(aaRow, "TAA（时域抗锯齿）", gfx.taa !== false, (on) => {
+      gfx.taa = on;
+      this.Apply();
+    });
+    Note(aa, "照搬 UE 的缺省方案：Halton 八相位子像素抖动 + 邻域裁剪的历史累积，"
+      + "跑在泛光之前的线性 HDR 域。开着时最后一趟的 FXAA 自动让位 —— 两层叠加"
+      + "只会把画面糊软一层，而锐化两种路子都保留。");
+    Note(aa, "关掉退回 FXAA：便宜不拖影，但细长边（屋脊、电线、枪管）移动时会爬。"
+      + "出厂 low 档关、medium 及以上开，可热切。", true);
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
@@ -153,9 +164,7 @@ export class GraphicsSettings {
     post.appendChild(godBox);
     Toggle(godBox, "体积光（临时默认关）", gfx.godEnabled === true,
       (on) => { gfx.godEnabled = on; this.Save(); });
-    Note(post, "体积光近期在观察它对帧率的影响，出厂先关着。这是整个 pass 的总闸："
-      + "关掉时径向模糊那一趟直接不跑，比把强度拉到 0 更省。打开后强度用下面"
-      + "「体积光」那根倍率调。", true);
+    Note(post, "出厂关着（在看它对帧率的影响）。这是总闸：关掉连径向模糊都不跑，比强度拉 0 更省。", true);
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
       format: (v) => `×${v.toFixed(2)}`,
@@ -209,6 +218,9 @@ export class GraphicsSettings {
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
+    // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
+    // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
+    gfx.taa = this.host.post ? !!this.host.post.preset.taa : true;
     this.Apply();
     if (this.panel) {
       this.panel.body.innerHTML = "";
@@ -234,6 +246,9 @@ export class GraphicsSettings {
       f.Set("合成靶", `${this.host.post.width} × ${this.host.post.height}`);
       f.Set("画质档", this.host.post.quality);
       f.Set("HDR", this.host.post.hdrCapable ? "可用" : "退回 8 位");
+      // 读的是**管线的实际状态**不是设置里那一位：历史靶没建起来时这里会照实说
+      // FXAA，而不是跟着开关喊 TAA。
+      f.Set("抗锯齿", this.host.post.taaEnabled ? "TAA（FXAA 已让位）" : "FXAA");
     }
     void post;
     const canvas = this.host.canvas;
@@ -326,9 +341,8 @@ export class AudioSettings {
       if (on) audio.SetPaused(true); else audio.SetPaused(false);
       this.Save();
     });
-    Note(opts, "「暂停时静音背景」修的是这条：暂停只让 Frame() 提前返回，"
-      + "**一点也拦不住声音** —— 环境床是几条自己在跑的实录循环 + 一个 400 ms 的调度器，"
-      + "玩法停了它照样每隔几百毫秒撒一发远处的枪声。", true);
+    Note(opts, "暂停只让 Frame() 提前返回，**拦不住声音**（环境床是自跑的循环 + 400 ms 调度器）；"
+      + "「暂停时静音背景」修的就是这条。", true);
 
     ButtonRow(opts, [
       { label: "静音", onClick: () => { audio.SetMasterVolume(0); this.Rebuild(); } },

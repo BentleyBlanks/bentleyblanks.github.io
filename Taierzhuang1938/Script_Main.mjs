@@ -132,7 +132,13 @@ const SHOT_FIRE = !!(SHOT && params.get("fire"));
  * 三个冒烟脚本（PlayTest / EditorTest / VoiceTest）点的都是 #bootStart 那颗按钮，
  * 出图脚本连点都不点，直接 StepFrames。菜单只服务真人。
  */
-const MENU_ON = !SHOT && !PREVIEW && !RANGE && params.get("menu") !== "0";
+const MENU_ON = !SHOT && !PREVIEW && params.get("menu") !== "0";
+/**
+ * 开机要不要**打开**主菜单。靶场（?range=1）里菜单照建不误 —— Esc 暂停、设置、
+ * 调试选项与「退出靶场」都挂在它上面 —— 但开机不开：靶场是「进页面就是这片场地」，
+ * 而且菜单的运镜机位表（MENU_SHOTS）按正片关卡 id 分组，靶场那一片根本没有机位。
+ */
+const MENU_AT_BOOT = MENU_ON && !RANGE;
 /**
  * 开机建哪一片切片。
  * 给了 ?phase= 就听它的（出图、冒烟、调机位都靠这条）；
@@ -143,7 +149,7 @@ const PHASE_PARAM = params.get("phase");
 const MENU_SLICE = Math.max(0, PHASE_TABLE.findIndex((p) => p.id === MENU_SCENE.slice));
 const START_PHASE = PHASE_PARAM !== null
   ? Math.max(0, Math.min(PHASE_TABLE.length - 1, parseInt(PHASE_PARAM, 10)))
-  : (MENU_ON ? MENU_SLICE : 0);
+  : (MENU_AT_BOOT ? MENU_SLICE : 0);
 
 const canvas = document.getElementById("view");
 const hudRoot = document.getElementById("hud");
@@ -288,6 +294,10 @@ const graphics = {
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
+  // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
+  // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
+  taa: post.taaEnabled,
   // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
   // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
   godEnabled: false,
@@ -1301,7 +1311,7 @@ async function Boot() {
     actorFactory, viewmodel, audio, cutscene, destruction, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
-    ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
+    ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, get gi() { return gi; },
@@ -1375,6 +1385,14 @@ async function Boot() {
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
       PlayPrologue: () => StartMenuPrologue(),
+      // 靶场：菜单里当一条「特殊关卡」摆着，但进出都是**重载页面**。
+      // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
+      // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
+      // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
+      sandbox: RANGE_PHASE,
+      sandboxMode: RANGE,
+      PlaySandbox: () => GoToUrlWithRange(true),
+      ExitSandbox: () => GoToUrlWithRange(false),
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
@@ -1410,7 +1428,8 @@ async function Boot() {
     window.Taierzhuang.Debug.ResetProgress = () => { Progress.Reset(); };
     window.Taierzhuang.Debug.DebugOptions = () => debugOptions.Get();
     window.Taierzhuang.Debug.SetDebugOption = (id, enabled) => SetDebugOption(id, enabled);
-    OpenMenu();
+    // 靶场里菜单只当暂停层用（Esc 才现身），开机不接管相机 —— 见 MENU_AT_BOOT。
+    if (MENU_AT_BOOT) OpenMenu();
   }
 
   if (SHOT) StartRun();
@@ -1435,6 +1454,23 @@ async function Boot() {
  */
 const WORLD_CLASSES = { [JIEHE_LEVEL_ID]: JieheField, [RANGE_LEVEL_ID]: RangeField };
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
+
+/**
+ * 进／出玩法测试靶场：改 `?range=1` 再重载。
+ *
+ * 顺带清掉三个会把上一趟状态带过去的 query：`phase`（靶场只有一关，带过去会被
+ * 夹成 0；从靶场退出时又会把玩家按到某一关的切片上）、`preview`（新序章预览与
+ * 靶场是互斥的两条旁路）、`menu=0`（进去就没有暂停菜单，也就没有退出靶场的路）。
+ * 与编辑器那条 OpenProloguePreview 同一个套路。
+ */
+function GoToUrlWithRange(on) {
+  const url = new URL(window.location.href);
+  if (on) url.searchParams.set("range", "1"); else url.searchParams.delete("range");
+  url.searchParams.delete("phase");
+  url.searchParams.delete("preview");
+  url.searchParams.delete("menu");
+  window.location.assign(url.toString());
+}
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
@@ -2483,7 +2519,7 @@ function StartMenuPrologue() {
   ReleasePointerLock();
   RunCutscene("CS_Chuchuan")
     .catch((error) => console.error("[Main] 序章预览失败", error))
-    .finally(() => { if (MENU_ON) OpenMenu(); });
+    .finally(() => { if (MENU_AT_BOOT) OpenMenu(); });
   return true;
 }
 
@@ -4171,6 +4207,9 @@ function ApplyGraphics() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   post.SetSize(Math.round(window.innerWidth * scale), Math.round(window.innerHeight * scale));
+  // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
+  // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
+  post.SetTaaEnabled(graphics.taa !== false);
 
   const wantShadow = !!graphics.shadows;
   if (renderer.shadowMap.enabled !== wantShadow) {

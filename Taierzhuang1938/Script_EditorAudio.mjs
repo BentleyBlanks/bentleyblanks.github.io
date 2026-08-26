@@ -81,6 +81,14 @@ const VOICE_KIND = {
   rally: "鼓动 / 督战", spot: "报敌情", warn: "警告", ammo: "弹药", hurt: "负伤", move: "机动",
 };
 
+// 第一条报错原样摊开：`文件：原因 @ 绝对URL`。截断只为不把面板撑爆，
+// 但**绝对 URL 那一段要留住** —— 它才是查「为什么读不到」唯一有用的信息。
+function FirstError(list) {
+  const e = list[0] || {};
+  const msg = String(e.message || "未知原因");
+  return `${e.file || "?"}：${msg.length > 180 ? msg.slice(0, 180) + "…" : msg}`;
+}
+
 export class AudioEditor {
   static id = "audio";
   static label = "音效音乐";
@@ -147,6 +155,13 @@ export class AudioEditor {
   BuildUi(body) {
     const state = Section(body, "引擎");
     this.engineFacts = Facts(state);
+    // 采样载不到时最要紧的两件事：**它去要的是哪个地址**（多 agent 并行时
+    // 十有八九是浏览器指在了别人那棵树上），和**能不能就地再试一次**。
+    Button(state, "↻ 重拉采样包", () => {
+      if (!this.audio) return;
+      this.audio.Unlock();
+      this.audio.ReloadPacks();
+    });
 
     const sfx = Section(body, "音效配方");
     Chips(sfx, CATEGORIES, this.category, (v) => { this.category = v; this.FillSounds(); });
@@ -226,8 +241,7 @@ export class AudioEditor {
         if (this.audio) this.audio.Bark(kind, { priority: true, seed: Math.floor(Math.random() * 1000) });
       });
     }
-    this.voiceNote = Note(voice, "带「事件句」标记的三条有前提条件（战车/飞机/无枪），"
-      + "只能由知道前提的调用方点名喊 —— 随机抽中就是穿帮。", true);
+    this.voiceNote = Note(voice, "「事件句」三条有前提（战车/飞机/无枪），只能点名喊，随机抽中即穿帮。", true);
 
     const quiz = Section(body, "盲听指认");
     ButtonRow(quiz, [
@@ -437,11 +451,13 @@ export class AudioEditor {
     if (sampled !== this.lastSampled) { this.lastSampled = sampled; this.FillSounds(); }
     if (audio.sfxErrors && audio.sfxErrors.length) {
       f.Set("采样缺失", `${audio.sfxErrors.length} 条读不到（已退回合成）`, "bad");
+      f.Set("采样报错", FirstError(audio.sfxErrors), "bad");
     }
     f.Set("人声", audio.voicesReady ? `${audio.voiceBank.size} / ${VOICE_LINES.length} 条已载入`
       : "载入中 / 不可用", audio.voicesReady ? "good" : "warn");
     if (audio.voiceErrors && audio.voiceErrors.length) {
       f.Set("人声缺失", `${audio.voiceErrors.length} 条读不到`, "bad");
+      f.Set("人声报错", FirstError(audio.voiceErrors), "bad");
     }
     if (this.ambFacts) {
       const beds = audio.ambBuffers ? audio.ambBuffers.size : 0;
@@ -452,6 +468,7 @@ export class AudioEditor {
       this.ambFacts.Set("床素材", beds ? `${beds} 条已载入` : "载入中 / 不可用", beds ? "good" : "warn");
       if (audio.ambErrors && audio.ambErrors.length) {
         this.ambFacts.Set("环境缺失", `${audio.ambErrors.length} 条读不到`, "bad");
+        this.ambFacts.Set("环境报错", FirstError(audio.ambErrors), "bad");
       }
       this.ambFacts.Set("空间", audio.space || "—");
       for (const [name, btn] of this.ambButtons) {
@@ -465,6 +482,7 @@ export class AudioEditor {
         : "载入中 / 不可用（没有音乐）", audio.musicReady ? "good" : "warn");
       if (audio.musicErrors && audio.musicErrors.length) {
         this.musicFacts.Set("音乐缺失", `${audio.musicErrors.length} 段读不到`, "bad");
+        this.musicFacts.Set("音乐报错", FirstError(audio.musicErrors), "bad");
       }
       for (const [cue, btn] of this.musicButtons) {
         btn.classList.toggle("on", audio.musicCue === cue && !!audio.musicLayer && !audio.paused);

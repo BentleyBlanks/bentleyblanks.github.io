@@ -483,7 +483,9 @@ const cycle = await page.evaluate(async () => {
   // 同帧齐射有 22 ms 去重窗，六次要拉开放。
   for (let i = 0; i < 6; i += 1) { a.Play("dadaoSwing"); await sleep(60); }
   a.ctx.createBufferSource = orig;
-  return made.filter((s) => s.buffer).map((s) => ({
+  // 只数**一次性**源：环境床与音乐是循环源，它们在这半秒里刚好载完补起播的话
+  // 会混进来，把「播六次抓到几个」变成抛硬币。
+  return made.filter((s) => s.buffer && !s.loop).map((s) => ({
     durMs: Math.round(s.buffer.duration * 1000),
     rate: Number(s.playbackRate.value.toFixed(4)),
   }));

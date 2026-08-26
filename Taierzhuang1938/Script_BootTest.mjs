@@ -42,6 +42,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   problems.length = 0;
   const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=high&scale=small`;
   let health = null;
+  let spawnRun = null;
   try {
     await page.goto(url, { waitUntil: "load", timeout: 120000 });
     await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
@@ -227,6 +228,35 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       };
     }, phase);
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
+    // 出生点前方得有路。
+    //
+    // 2026-08-27：城防图东侧重建（Data_Tengxian 的 FirstDistrictNorthEastA/B）
+    // 把第一区公所那两块院区一直铺到 x=434，正好盖住 L2 的出生点 —— 人贴着
+    // 院墙东面 1.8 m 开局，满屏是砖，按 W 一米都走不出去。整整一天没人发现，
+    // 因为红出来的是两条冲刺专项（准心没撑开 / 挥刀"打断"了跑动），
+    // 症状离病灶隔着两层。开机冒烟每关都已经建好城、摆好人，
+    // 顺手往前跑一秒半是这里最便宜的一道闸。
+    //
+    // 判据用「跑了多远」不用「有没有撞上」：路口的拒马、门前的家什都可以挡，
+    // 挡在**三米开外**就不影响开局。满速冲刺一秒半是 7 米出头。
+    spawnRun = await page.evaluate(() => {
+      const T = window.Taierzhuang;
+      const P = T.player;
+      P.health = 100;                     // 前面 120 帧里挨过枪也不算数
+      P.spawnGrace = 99;
+      const from = P.position.clone();
+      T.Debug.Key("ShiftLeft", true);
+      T.Debug.Key("KeyW", true);
+      T.StepFrames(90);
+      const out = {
+        ran: +Math.hypot(P.position.x - from.x, P.position.z - from.z).toFixed(2),
+        speed: +Math.hypot(P.velocity.x, P.velocity.z).toFixed(2),
+        from: [+from.x.toFixed(1), +from.z.toFixed(1)],
+      };
+      T.Debug.Key("ShiftLeft", false);
+      T.Debug.Key("KeyW", false);
+      return out;
+    });
   } catch (error) {
     problems.push(`THROW ${String(error).slice(0, 200)}`);
   }
@@ -234,7 +264,12 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   const bad = [];
   if (problems.length) bad.push(`${problems.length} 个报错`);
   if (!health) bad.push("没拿到健康数据");
-  else {
+  if (!spawnRun) {
+    bad.push("没拿到出生点通行数据");
+  } else if (spawnRun.ran < 3) {
+    bad.push(`出生点被堵死：从 (${spawnRun.from}) 朝正前方冲刺 1.5 s 只走了 ${spawnRun.ran} m`);
+  }
+  if (health) {
     if (health.glError !== 0) bad.push(`GL 错误 ${health.glError}`);
     if (health.glErrorAfterVfx !== 0) bad.push(`爆炸序列帧 GL 错误 ${health.glErrorAfterVfx}`);
     if (health.loadedVefectsMasks !== 5) bad.push(`Vefects 纹理只载入 ${health.loadedVefectsMasks}/5`);
@@ -398,6 +433,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
           + ` householdProps=${health.environment?.city?.householdProps ?? "?"}`
           + ` roadMarks=${health.environment?.city?.roadMarks ?? "?"}` : "")
       : "(no health)")
+    + (spawnRun ? ` spawnRun=${spawnRun.ran}m` : "")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));
   for (const p of problems.slice(0, 4)) console.log(`       ${p}`);
 }
