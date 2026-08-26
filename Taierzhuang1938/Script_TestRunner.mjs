@@ -72,6 +72,11 @@ export const testDefs = {
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
   PhysicsTest: { file: "Script_PhysicsTest.mjs", desc: "真浏览器撞墙：碰撞扫掠" },
+  ColliderTest: {
+    file: "Script_ColliderTest.mjs",
+    timeoutMs: 14 * 60 * 1000,
+    desc: "碰撞盒对账：摸得着的墙必须看得见（窗洞不许被堵死、砌体不许没盒子）",
+  },
   JumpTest: { file: "Script_JumpTest.mjs", desc: "跳跃/落点手感" },
   DestructionTest: { file: "Script_DestructionTest.mjs", desc: "墙体破坏状态机" },
   AiBehaviorTest: { file: "Script_AiBehaviorTest.mjs", desc: "AI 行为决策深度探针" },
@@ -149,7 +154,7 @@ export const domains = {
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
-    tests: ["PhysicsTest", "JumpTest", "DestructionTest", "FractureBakeTest"],
+    tests: ["PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest"],
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
@@ -177,7 +182,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
-  { domain: "physics", pattern: /(Physics|Player|Navigation|Movement|Jump|Destruction|Fracture|Battlefield|Outfield)/i },
+  { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range)/i },
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
