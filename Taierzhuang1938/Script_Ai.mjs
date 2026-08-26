@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT, NAME_POOL, DIFFICULTY } from "./Data_Battle.mjs";
+import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 
 const STATE = {
@@ -252,14 +253,15 @@ export class Soldier {
     this.chargeUntil = -99;      // 玩家下"上刺刀"之后这道命令的有效期
     this.flankUntil = -99;       // 绕行命令的有效期，到点或超时就转 advance
     this.covertUntil = -99;      // 潜行命令的有效期：跟班长同姿态且不开枪
-    // 翻越。院墙 2 m、窗台 0.9 m，而 Blocked() 的自动抬腿只到 0.56 m ——
+    // 翻越。院墙 2 m、窗台 0.9 m，而 Blocked() 的自动抬腿只到 TRAVERSAL.stepMax ——
     // 不给 AI 开这一条的话，玩家翻墙抄到院子里，追他的人只能绕门洞，
     // 这个动词就变成了单方面的作弊。
     this.vaultT = -1;            // >= 0 表示正在翻
-    this.vaultDuration = 0.5;
+    this.vaultDuration = TRAVERSAL.vaultBaseS;
+    this.vaultKind = "vault";    // vault=腰高跨过 / mantle=肩高撑上去（Data_Traversal）
     this.vaultFrom = null;
     this.vaultTo = null;
-    this.vaultApex = 0;
+    this.vaultApexY = 0;
     // 尸体上的家当。ER2 的拾取靠它，L4_LastFiveMinutes 那句"子弹得从倒下的人身上取"
     // 以前是一条死注释 —— 死人身上什么都没有。
     this.drop = null;
@@ -1512,7 +1514,8 @@ export class AiDirector {
   /**
    * AI 侧的翻越。玩家能翻墙进院，追他的人只能绕门洞的话，这个动词就是单方面作弊。
    *
-   * 判据跟玩家那份一致：正前方顶面在 0.6—2.25 m 之间、落点站得下。
+   * 判据跟玩家那份一致 —— 两边读同一张 `Data_Traversal.TRAVERSAL`：
+   * 正前方顶面落在通行阶梯里（腰高翻越 / 肩高攀爬）、落点站得下，高过硬顶就绕路。
    * 不同的是 AI 不做物理，所以位移曲线直接改 position，落地高度问 StandHeight。
    *
    * @param {number} nx,nz 当前想走的方向（已归一化）
@@ -1524,26 +1527,37 @@ export class AiDirector {
     const probeX = s.position.x + nx * 0.7;
     const probeZ = s.position.z + nz * 0.7;
     let top = -Infinity;
+    let wall = false;
     for (const b of bf.NearbyColliders(probeX, probeZ, 1.0)) {
       if (probeX < b.min[0] - 0.35 || probeX > b.max[0] + 0.35) continue;
       if (probeZ < b.min[2] - 0.35 || probeZ > b.max[2] + 0.35) continue;
-      const rel = b.max[1] - feet;
-      if (rel < 0.56 || rel > 2.25) continue;
       if (b.min[1] > feet + 1.0) continue;
+      const rel = b.max[1] - feet;
+      if (rel > TRAVERSAL.mantleMax) {            // 高过硬顶 = 一堵真墙，绕路去
+        // 判死只认**正挡在探针点上**的那一只盒（同玩家那份的理由）
+        if (b.min[1] <= feet + TRAVERSAL.vaultMin
+          && probeX > b.min[0] - 0.15 && probeX < b.max[0] + 0.15
+          && probeZ > b.min[2] - 0.15 && probeZ < b.max[2] + 0.15) wall = true;
+        continue;
+      }
+      if (rel < TRAVERSAL.vaultMin) continue;
       if (b.max[1] > top) top = b.max[1];
     }
-    if (!Number.isFinite(top)) return false;
-    const landX = s.position.x + nx * 1.7;
-    const landZ = s.position.z + nz * 1.7;
+    if (wall || !Number.isFinite(top)) return false;
+    const plan = TraversalPlan(top - feet);
+    if (!plan) return false;
+    const landX = s.position.x + nx * plan.reach;
+    const landZ = s.position.z + nz * plan.reach;
     const landY = bf.StandHeight(landX, landZ, top);
     if (landY > top + 0.05) return false;
     if (this.Blocked(landX, landZ, landY)) return false;
     s.state = STATE.VAULT;
     s.vaultT = 0;
-    s.vaultDuration = 0.55 + Math.max(0, top - feet - 0.56) * 0.16;
+    s.vaultKind = plan.kind;
+    s.vaultDuration = plan.duration;
     s.vaultFrom = { x: s.position.x, y: feet, z: s.position.z };
     s.vaultTo = { x: landX, y: landY, z: landZ };
-    s.vaultApex = top + 0.3;
+    s.vaultApexY = Math.max(top + plan.apexOver, feet, landY);
     s.stuckTime = 0;
     s.detourTime = 0;
     this.vaultCount += 1;
@@ -1554,11 +1568,12 @@ export class AiDirector {
   StepVault(s, dt) {
     s.vaultT += dt;
     const k = Clamp01(s.vaultT / s.vaultDuration);
+    const c = TraversalCurve(s.vaultKind, k);
     const from = s.vaultFrom, to = s.vaultTo;
-    s.position.x = from.x + (to.x - from.x) * k;
-    s.position.z = from.z + (to.z - from.z) * k;
-    const base = from.y + (to.y - from.y) * k;
-    s.position.y = base + Math.max(0, s.vaultApex - Math.max(from.y, to.y)) * Math.sin(Math.PI * k);
+    s.position.x = from.x + (to.x - from.x) * c.h;
+    s.position.z = from.z + (to.z - from.z) * c.h;
+    // 与玩家同一条曲线：起点 →（爬）→ 顶点 →（掉）→ 落点
+    s.position.y = from.y + (s.vaultApexY - from.y) * c.up - (s.vaultApexY - to.y) * c.down;
     s.moveSpeed = 1;
     s.yaw = Math.atan2(-(to.x - from.x), -(to.z - from.z));
     if (k >= 1) {
@@ -1578,7 +1593,7 @@ export class AiDirector {
         moveSpeed: 1, aim: 0, crouch: 0, prone: 0, firing: false,
         grounded: false,
         verticalVelocity: Math.cos(Math.PI * k) * Math.PI
-          * Math.max(0, s.vaultApex - Math.max(from.y, to.y)) / s.vaultDuration,
+          * Math.max(0, s.vaultApexY - Math.max(from.y, to.y)) / s.vaultDuration,
         elapsed: this.time, lookYaw: 0, lookPitch: 0,
       });
     }
@@ -1787,7 +1802,7 @@ export class AiDirector {
       if (x < b.min[0] - 0.35 || x > b.max[0] + 0.35) continue;
       if (z < b.min[2] - 0.35 || z > b.max[2] + 0.35) continue;
       if (y + 1.6 < b.min[1] || y > b.max[1]) continue;
-      if (b.max[1] - y < 0.56) continue;             // 矮的东西能跨过去
+      if (b.max[1] - y < TRAVERSAL.stepMax) continue;  // 矮的东西自动抬腿跨过去
       return true;
     }
     return false;

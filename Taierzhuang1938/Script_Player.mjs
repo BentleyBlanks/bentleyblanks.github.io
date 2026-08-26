@@ -18,38 +18,32 @@
 import * as THREE from "three";
 import { Clamp, Clamp01, Mulberry32 } from "./Script_Noise.mjs";
 import { DIFFICULTY, COMBAT } from "./Data_Battle.mjs";
+import { TRAVERSAL, TraversalPlan, TraversalCurve } from "./Data_Traversal.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * 翻越的尺寸。
+ * 翻越 / 攀爬的尺寸**不在这个文件里** —— 在 `Data_Traversal.TRAVERSAL`。
  *
- * 上限**不是**方案里写的 1.9 m，是 2.25 m，这一条是照着场景实测改的：
- * 这座城里 0.6—1.9 m 之间的碰撞盒基本只有街垒和影壁，而真正把巷战堵死的
- * 是四合院的院墙 —— `AddCompound` 建的是 2.0—2.5 m（`Script_World` 顶上那条
- * 形制注释原话：「院墙 2.0—2.5 m（成年人踮脚能扒）」）。
- * 卡在 1.9 就等于这个动词只对装饰物生效，"翻窗进院、翻墙抄后路"照样不存在。
- * 取 2.25 之后一半以上的院墙进得去，剩下的高墙仍然要走门洞 —— 那是对的：
- * 墙高一点就该翻不过去，这是"扒墙头"不是撑杆跳。
+ * 那张表是玩家、AI、物理层自动抬腿三边共用的通行高度阶梯（膝高自动跨过、
+ * 腰高翻越、肩高攀爬、2 m 以上一律不可通过），改判据一律去改那一张表。
+ * 为什么是这四档、上一版 2.25 m 的账怎么算的，全在那个文件的头注里。
  */
-const VAULT_MIN_M = 0.60;          // 比这矮的引擎自己抬腿就过去了（autostep 0.55 m）
-const VAULT_MAX_M = 2.25;
-const VAULT_REACH_M = 1.62;        // 落点离起跳点多远：院墙厚 0.35，这个距离能落到墙另一面
-const VAULT_BASE_S = 0.45;         // 方案给的位移曲线时长（矮物）；越高翻得越慢
 
 /**
  * 跳跃不是跑酷动词，是越沟、上瓦砾、脱离低矮卡点的最后半步。
  * 4.65 m/s 配 19.6 m/s² 重力：净抬高约 0.55 m、完整滞空约 0.47 s。
- * 这个量级与 Easy Red 2 那种背着装备的步兵感一致，也低于自动翻越的 0.6 m 判据，
- * 所以按 Space 时仍然是「能翻就翻，不能翻才跳」，不会用原地跳取代院墙动作。
+ * 这个量级与 Easy Red 2 那种背着装备的步兵感一致，也低于 `TRAVERSAL.vaultMin`，
+ * 所以按 Space 时仍然是「能翻就翻、能爬就爬，都不行才跳」——
+ * 跳跃跳不上任何一件该走翻越/攀爬的东西，这是通行阶梯的地基。
  *
  * **助跑加成**：上面那组数是**站着起跳**的数。原先起跳只写死竖直速度，水平速度原样
  * 带走 —— 意味着跳跃对位移的净贡献是 0（跳 0.47 s 走过的距离，和不跳继续跑一模一样），
  * 而且弧线跟速度完全无关，跑得越快这个小驼峰在画面上越不起眼，实测「跑起来跳和站着跳
  * 看不出区别」就是这么来的。现在按助跑速度给一点竖直与水平加成：站着跳分毫不变，
  * 冲刺跳抬高约 0.68 m、滞空约 0.53 s、空中位移从 2.45 m 到约 3.1 m。
- * 加成仍然压在自动翻越之下的量级（0.68 m 只比 0.60 m 的翻越判据高一点，且 Space 永远
- * 先探翻越），兔子跳照旧由冷却、落地硬直与随助跑变贵的体力挡住。
+ * 加成的天花板是 `TRAVERSAL.jumpRiseMax`（0.72 m），仍压在 vaultMin 之下；
+ * 兔子跳照旧由冷却、落地硬直与随助跑变贵的体力挡住。
  */
 const GRAVITY_MPS2 = 19.6;
 const JUMP_SPEED_MPS = 4.65;
@@ -111,14 +105,19 @@ export class PlayerController {
     this.bipod = false;
     this.fastCrawl = false;                     // 卧姿按住 Shift：更快也更响
 
-    // --- 翻越 ---------------------------------------------------------------
-    // 这座城是一进一进的四合院，院墙 2 m、窗台 0.9 m，而自动抬腿只到 0.56 m ——
+    // --- 翻越 / 攀爬 ---------------------------------------------------------
+    // 这座城是一进一进的四合院，院墙 2 m、窗台 0.9 m，而自动抬腿只到 stepMax ——
     // 也就是说在这一批之前，所有院墙、所有窗台都是死墙，玩家只能走门洞。
     // 「室战墙战」这四个字要成立，先得能翻进院子。
-    this.vault = { active: false, t: 0, duration: VAULT_BASE_S, apex: 0 };
+    // 两个动词共用一套状态：kind 决定时长、曲线、体力与相机下压（Data_Traversal）。
+    this.vault = {
+      active: false, t: 0, duration: TRAVERSAL.vaultBaseS, kind: "vault",
+      apexY: 0, dip: TRAVERSAL.vaultDipRad, rise: 0,
+    };
     this._vaultFrom = new THREE.Vector3();
     this._vaultTo = new THREE.Vector3();
     this.vaultCount = 0;                        // 翻过几次（运行时取证用）
+    this.mantleCount = 0;                       // 其中"撑上去"的那一档有几次
 
     // --- 跳跃 ---------------------------------------------------------------
     // coyote / buffer 都很短，只用来消掉 60 Hz 输入与落地帧之间的偶然误差；
@@ -299,13 +298,15 @@ export class PlayerController {
    *   lookX, lookY, ads, lean, breathHold}
    */
   /**
-   * 翻越。朝前探一次：前方 0.6 m 有个顶面在 0.6—2.25 m 之间的东西，
-   * 而且顶面往前落得下脚，就播一段位移曲线翻过去。
+   * 翻越 / 攀爬。朝前探一次：前方 0.6 m 有个顶面落在通行阶梯里的东西
+   *（`TRAVERSAL.vaultMin` 到 `mantleMax`），而且顶面往前落得下脚，
+   * 就按那一档播位移曲线过去。腰高走"翻越"（快、荡过去），
+   * 肩高走"攀爬"（慢、撑上去），高过 `mantleMax` 一律不许过 —— 那是墙，去找门洞。
    *
-   * 这条只负责翻越探测；同一个 Space 在探测失败后会由装配层转入受限跳跃。
+   * 这条只负责探测；同一个 Space 在探测失败后会由装配层转入受限跳跃。
    * 必须先探翻越再跳，否则人会先离地，院墙动作反而永远触发不了。
    *
-   * @returns {boolean} 真的进入翻越动作没有
+   * @returns {false|"vault"|"mantle"} 进了哪一档动作；没进就是 false
    */
   TryVault() {
     if (!this.alive || this.vault.active || !this.grounded) return false;
@@ -315,24 +316,40 @@ export class PlayerController {
     const probeZ = this.position.z + fz * 0.6;
     const r = this.radius;
 
-    // 1) 前面有没有能翻的东西
+    // 1) 前面有没有过得去的东西。同一次扫描顺手认一件事：正前方那堵墙**高过上限**
+    //    的话直接判死 —— 通行阶梯的硬顶是关卡设计的承诺，不许用别处的矮台阶绕开。
     let top = -Infinity;
+    let wall = false;
     const near = this.world.NearbyColliders
       ? this.world.NearbyColliders(probeX, probeZ, r + 1.2)
       : this.world.colliders;
     for (const box of near) {
       if (probeX + r < box.min[0] || probeX - r > box.max[0]) continue;
       if (probeZ + r < box.min[2] || probeZ - r > box.max[2]) continue;
-      const rel = box.max[1] - feet;
-      if (rel < VAULT_MIN_M || rel > VAULT_MAX_M) continue;
       if (box.min[1] > feet + 1.0) continue;                 // 悬在头顶的檐口不是墙头
+      const rel = box.max[1] - feet;
+      if (rel > TRAVERSAL.mantleMax) {
+        // 从脚下一直长到上限之上 = 一堵真墙。两条限定，免得误伤：
+        //   · 半空里的横梁不算（min 要低到腰以下）；
+        //   · **必须挡在正前方**——判死用的是探针点本身（±0.15 m），不是那圈
+        //     半径 r 的光晕。否则"巷子里正对着一堵齐腰街垒、旁边贴着一栋房"
+        //     会因为房子蹭到光晕而连翻越都不给。斜着切进来的高墙仍由落点检查兜住。
+        if (box.min[1] <= feet + TRAVERSAL.vaultMin
+          && probeX > box.min[0] - 0.15 && probeX < box.max[0] + 0.15
+          && probeZ > box.min[2] - 0.15 && probeZ < box.max[2] + 0.15) wall = true;
+        continue;
+      }
+      if (rel < TRAVERSAL.vaultMin) continue;
       if (box.max[1] > top) top = box.max[1];
     }
-    if (!Number.isFinite(top)) return false;
+    if (wall || !Number.isFinite(top)) return false;
+    const plan = TraversalPlan(top - feet);
+    if (!plan) return false;
+    if (this.stamina < plan.stamina) return false;           // 喘不上气就扒不动墙头
 
     // 2) 顶面往前落得下脚吗（方案的"顶面往前 0.7 m 无遮挡"，这里按落点整体查）
-    const landX = this.position.x + fx * VAULT_REACH_M;
-    const landZ = this.position.z + fz * VAULT_REACH_M;
+    const landX = this.position.x + fx * plan.reach;
+    const landZ = this.position.z + fz * plan.reach;
     let landY = this.world.GroundHeight(landX, landZ);
     const landNear = this.world.NearbyColliders
       ? this.world.NearbyColliders(landX, landZ, r + 0.6)
@@ -350,16 +367,21 @@ export class PlayerController {
 
     this._vaultFrom.copy(this.position);
     this._vaultTo.set(landX, landY, landZ);
-    const rise = top - feet;
     this.vault.active = true;
     this.vault.t = 0;
-    // 越高翻得越慢：0.6 m 是 0.45 s（方案给的数），2.25 m 要 0.75 s
-    this.vault.duration = VAULT_BASE_S + Math.max(0, rise - VAULT_MIN_M) * 0.18;
-    this.vault.apex = top + 0.30;
+    this.vault.kind = plan.kind;
+    this.vault.rise = top - feet;
+    this.vault.duration = plan.duration;
+    this.vault.dip = plan.dip;
+    // 顶点：翻越荡到墙头之上一点，攀爬只贴着墙头蹭过去。
+    // 起点/落点比它还高时以高者为准，免得曲线往回倒。
+    this.vault.apexY = Math.max(top + plan.apexOver, feet, landY);
     this.velocity.set(0, 0, 0);
     this.stance = "stand";                                   // 蹲着趴着翻不过去，先站起来
+    this.stamina = Clamp01(this.stamina - plan.stamina);
     this.vaultCount += 1;
-    return true;
+    if (plan.kind === "mantle") this.mantleCount += 1;
+    return plan.kind;
   }
 
   /**
@@ -414,12 +436,14 @@ export class PlayerController {
       this.pitch = Clamp(this.pitch + -(input.lookY || 0) * sens, -1.35, 1.35);
     }
     const k = Clamp01(v.t / v.duration);
-    const arc = Math.sin(Math.PI * k);
+    const c = TraversalCurve(v.kind, k);
     const from = this._vaultFrom, to = this._vaultTo;
-    this.position.x = from.x + (to.x - from.x) * k;
-    this.position.z = from.z + (to.z - from.z) * k;
-    const base = from.y + (to.y - from.y) * k;
-    this.position.y = base + Math.max(0, v.apex - Math.max(from.y, to.y)) * arc;
+    this.position.x = from.x + (to.x - from.x) * c.h;
+    this.position.z = from.z + (to.z - from.z) * c.h;
+    // 起点 →（爬）→ 顶点 →（掉）→ 落点。两段分开走，k=1 才会**精确**落在落点上；
+    // 老写法是"线性基线 + 一条正弦驼峰"，上下对称、水平匀速 —— 那条曲线读出来
+    // 就是用户说的「像是没有重力」。
+    this.position.y = from.y + (v.apexY - from.y) * c.up - (v.apexY - to.y) * c.down;
     this.grounded = false;
     // 眼高照常收敛，不然翻越途中视线会僵在起跳那一刻
     const target = STANCE[this.stance];
@@ -770,8 +794,26 @@ export class PlayerController {
       body.Teleport(this.position.x, this.position.y, this.position.z);
       return;
     }
+    const yBefore = this.position.y;
     const moved = body.Move(step.x, step.y, step.z);
     this.position.set(moved.x, moved.y, moved.z);
+    // **半空里不许白拿高度。**
+    //
+    // 这是"靠近墙壁跳跃高度非常高、像是没有重力"的直接病根：上升途中贴着墙，
+    // 角色控制器会把碰撞解算里那点自动抬腿/沿棱角上蹭的竖直分量一并给你，
+    // 实测同一次起跳：空地抬高 0.513 m，贴着院墙 0.78 m —— 高出五成。
+    // 抬腿是**脚踩在地上**才有的动作；人在上升段，能给的高度只有速度乘 dt。
+    // 下落段不钳：那时候被台面接住正是落地，钳了就穿地。
+    if (this.velocity.y > 0 && this.position.y > yBefore + step.y + 1e-4) {
+      // 但地面永远优先：解析地表把人从地里顶出来那一下不算"白拿"，
+      // 钳过头会把上坡起跳的人按回地面以下。
+      const ground = this.world.GroundHeight(this.position.x, this.position.z);
+      const capped = Math.max(ground, yBefore + step.y);
+      if (this.position.y > capped) {
+        this.position.y = capped;
+        body.Teleport(this.position.x, this.position.y, this.position.z);
+      }
+    }
     // Rapier 在离地首帧仍可能把脚底旧接触报成 grounded（实测会把 4.65 m/s 的
     // 起跳在第一帧清零，只抬高 7 cm）。明确向上运动时，脚底接触不能算落地；
     // 只有到达顶点开始下落以后，控制器的 grounded 才重新有裁决权。
@@ -816,7 +858,7 @@ export class PlayerController {
     // 翻越途中视角轻微下压：手撑上墙头的那一下人是低着头的。
     // 只改相机不改 this.pitch —— 动 pitch 的话翻完枪口会歪着，玩家得自己抬回来
     const vaultDip = this.vault.active
-      ? Math.sin(Math.PI * Clamp01(this.vault.t / this.vault.duration)) * 0.16 : 0;
+      ? Math.sin(Math.PI * Clamp01(this.vault.t / this.vault.duration)) * this.vault.dip : 0;
     cam.rotation.x = this.pitch - vaultDip;
     // 受压制时画面轻微抖动 —— 不是特效，是"被按在地上抬不起头"的触感
     const shake = this.suppression * 0.012;

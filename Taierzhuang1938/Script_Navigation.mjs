@@ -28,6 +28,8 @@
 //
 // 没有 Math.random、没有外部资源、没有 three 依赖 —— 这个文件是纯算术。
 
+import { TRAVERSAL } from "./Data_Traversal.mjs";
+
 const NEIGHBOURS = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
   [1, 1], [1, -1], [-1, 1], [-1, -1],
@@ -37,9 +39,9 @@ export class NavGrid {
   /**
    * @param {object} battlefield 需要 bounds / colliders / GroundHeight
    * @param {object} options cell 格边长（米）；margin 与 AI 的 Blocked() 保持一致；
-   *   stepOver 能跨过去的高度（同 Blocked 的 0.56）
+   *   stepOver 能跨过去的高度（通行阶梯第一档 TRAVERSAL.stepMax，与 Blocked 同源）
    */
-  constructor(battlefield, { cell = 1.0, margin = 0.15, stepOver = 0.56,
+  constructor(battlefield, { cell = 1.0, margin = 0.15, stepOver = TRAVERSAL.stepMax,
     fieldCache = 32, quantiseM = 16, pumpBudgetMs = 0.8 } = {}) {
     const b = battlefield.bounds;
     this.cell = cell;
@@ -86,7 +88,7 @@ export class NavGrid {
     const stepOver = this.stepOver;
     this.blocked.fill(0);
     // 栅格化。不逐格去查碰撞盒（那要几万次空间散列），而是反过来把每个盒子刷进格子里。
-    // 「挡不挡路」的判据照抄 AiDirector.Blocked：盒顶比地面高出 0.56 m 以上才算墙，
+    // 「挡不挡路」的判据照抄 AiDirector.Blocked：盒顶比地面高出 stepOver 以上才算墙，
     // 矮的东西（沙袋边、门槛、瓦砾）能跨过去，不许把街面刷成死路。
     for (const box of battlefield.colliders) {
       if (!box || box.destroyed) continue;

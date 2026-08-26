@@ -1582,12 +1582,15 @@ Check("没有第五条上墙的路（摘掉马道之后墙顶一段都淌不到�
 const vault = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   const bf = T.battlefield;
+  const TR = D.Traversal();
   const cands = [];
   for (const b of bf.colliders) {
     const w = b.max[0] - b.min[0], d = b.max[2] - b.min[2];
     const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
     const h = b.max[1] - bf.GroundHeight(cx, cz);
-    if (h < 1.0 || h > 2.2) continue;                 // 院墙那一档（自动抬腿到不了）
+    // 院墙那一档：自动抬腿到不了，但还在通行阶梯的硬顶之下（Data_Traversal）。
+    // 高过 mantleMax 的墙**本来就该翻不过去**，拿它算成功率是在给规范挑刺。
+    if (h < 1.0 || h > TR.mantleMax) continue;
     const thinX = w < 0.6 && d > 2, thinZ = d < 0.6 && w > 2;
     if (!thinX && !thinZ) continue;
     cands.push({ cx, cz, thinX, h, tag: b.tag });

@@ -33,6 +33,7 @@
 
 import * as THREE from "three";
 import RAPIER from "./vendor/rapier/build/rapier.module.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
 
 /** Rapier 的 wasm 是异步装载的。整个进程只装一次。 */
 let initPromise = null;
@@ -135,12 +136,12 @@ export class PhysicsWorld {
     this.recordByHandle = new Map();
 
     this.controller = this.world.createCharacterController(0.02);
-    // 自动上台阶：0.55 m 是原来那条「矮于 0.56 m 的东西不当墙」的规矩，
-    // 马道的八级台阶、门槛、瓦砾堆全靠它。minWidth 给 0.15 —— 太大的话
-    // 窄台阶（马道每级踏面 0.3 m）会被判成「站不下」而爬不上去。
-    /** 自动抬腿的高度上限。0.55 m 是原来那条「矮于 0.56 m 的东西不当墙」的规矩，
-     * 再高就归翻越那个动词管（Script_Player.VAULT_MIN_M = 0.60）。 */
-    this.autostepMax = 0.55;
+    // 自动上台阶：马道的八级台阶、门槛、瓦砾堆全靠它。
+    // minWidth 给 0.15 —— 太大的话窄台阶（马道每级踏面 0.3 m）会被判成
+    //「站不下」而爬不上去。
+    /** 自动抬腿的高度上限。**数在 `Data_Traversal.TRAVERSAL.stepMax`** ——
+     * 通行高度阶梯的第一档，再高就归翻越/攀爬那两个动词管（同一张表）。 */
+    this.autostepMax = TRAVERSAL.stepMax;
     this.controller.enableAutostep(this.autostepMax, 0.15, true);
     // 贴地吸附：走下坡与下台阶时脚不离地，不然人会一路小跳。
     this.controller.enableSnapToGround(0.45);
@@ -386,6 +387,7 @@ export class PhysicsWorld {
     let y = this.groundAt(x, z);
     let normal = this.TerrainNormal(x, z);
     let tag = "terrain";
+    let buried = false;                       // 探针起点就埋在实体里 = 前面那东西比探针高
     if (!this.disposed) {
       this._ray.origin.x = x; this._ray.origin.y = startY; this._ray.origin.z = z;
       this._ray.dir.x = 0; this._ray.dir.y = -1; this._ray.dir.z = 0;
@@ -402,9 +404,15 @@ export class PhysicsWorld {
           const rec = this.recordByHandle.get(hit.collider.handle);
           tag = (rec && rec.tag) || "solid";
         }
+      } else if (hit) {
+        // toi≈0：起点埋在实体里。高度读数按上面那条退回解析地表（用它会得出
+        // 「脚离地 0.6 m」这种假读数），但**这件事本身要报出去** —— 对
+        // `_StepAheadIsLowEnough` 来说，"探针高度处还是实心的"正是"这堵墙比
+        // 探针还高"的证据，退回地表会让它把三米高的墙读成平地，然后一路蹭上去。
+        buried = true;
       }
     }
-    return { y, normal, tag };
+    return { y, normal, tag, buried };
   }
 
   /**
@@ -714,10 +722,14 @@ export class CharacterBody {
     const hasPhysicsGround = this.grounded;
 
     // 被挡住了？按 AUTOSTEP_PROBE_M 再解一次，看看是不是一级抬得上去的台阶。
-    // 只在**站在地上且几乎没走动**时才试，所以正常行走一帧只解一次。
+    // 只在**站在地上、几乎没走动、而且没在往上走**时才试：
+    //   · 站在地上 —— 抬腿是脚踩着地才有的动作；
+    //   · dy <= 0  —— 起跳/上升途中贴着墙也会满足"被挡住"，借到的那一下抬腿
+    //     会直接叠在跳跃高度上（贴墙跳比空地跳高一大截，就是这么来的）。
+    // 所以正常行走一帧只解一次，跳跃全程一次都不解。
     const wantH = Math.hypot(dx, dz);
     const gotH = Math.hypot(mx, mz);
-    if (wasGrounded && wantH > 1e-6 && wantH < AUTOSTEP_PROBE_M && gotH < wantH * 0.5
+    if (wasGrounded && dy <= 0 && wantH > 1e-6 && wantH < AUTOSTEP_PROBE_M && gotH < wantH * 0.5
       && this._StepAheadIsLowEnough(dx / wantH, dz / wantH)) {
       const k = AUTOSTEP_PROBE_M / wantH;
       cc.computeColliderMovement(this.collider, { x: dx * k, y: dy, z: dz * k }, FLAGS, IG_CHARACTER);
@@ -726,7 +738,8 @@ export class CharacterBody {
         const got2 = Math.hypot(m2.x, m2.z);
         // 水平按本来该走的那一步缩回去：借的是"抬腿"，不是"走得更快"
         const scale = got2 > 1e-6 ? Math.min(1, wantH / got2) : 0;
-        mx = m2.x * scale; my = m2.y; mz = m2.z * scale;
+        // 竖直也封顶：借的是**一级台阶**，不是沿着墙面一点点往上蹭。
+        mx = m2.x * scale; my = Math.min(m2.y, dy + pw.autostepMax); mz = m2.z * scale;
         this.hitCount = cc.numComputedCollisions();
       }
     }
@@ -778,6 +791,12 @@ export class CharacterBody {
     const z = this.position.z + nz * reach;
     const limit = pw.autostepMax;
     const g = pw.GroundProbe(x, z, this.position.y, limit + 0.08, 1.2);
+    // 探针起点（脚底 + limit + 0.08）还在实体里 = 前面那东西高过上限。
+    // 这一条以前漏了：射线起点埋在墙里时 GroundProbe 退回解析地表，
+    // 于是三米高的院墙被读成"前面是平地"，探一步照解 —— 这一段能不能真把人蹭上去
+    // 取决于墙面附近有没有棱角可借，属于"看运气"的那一类。高过 limit 的东西
+    // 归翻越/攀爬管，这里不该给它任何机会。
+    if (g.buried) return false;
     return g.y - this.position.y <= limit;
   }
 

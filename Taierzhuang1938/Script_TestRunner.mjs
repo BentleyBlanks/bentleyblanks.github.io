@@ -193,9 +193,9 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
-  { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
+  { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range)/i },
-  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle)/i },
+  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },

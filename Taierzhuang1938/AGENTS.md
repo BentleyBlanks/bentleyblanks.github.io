@@ -8,7 +8,7 @@
 （`Data_Battle.mjs` 头注），正片是滕县七关，**每关只建一片切片、换关拆掉重建**
 （`Script_Main.mjs` 头注）。一批老文件头还写着《血战台儿庄》，别被名字骗。
 
-规模：173 个 `Script_*.mjs` + 35 个 `Data_*.mjs` 平铺在根目录，约十万行；`docs/` 38 篇分册。
+规模：175 个 `Script_*.mjs` + 38 个 `Data_*.mjs` 平铺在根目录，约十万行；`docs/` 39 篇分册。
 本文件只放**硬规矩 + 路由表 + docs 导读**；细则、判据、事故过程在 `docs/` 与各文件头注。
 **这个仓库的文件头注释是第一手文档**：为什么存在、架构取舍、踩过的坑都在头注里，
 先读头注再读函数体。
@@ -244,6 +244,15 @@ URL 参数选 preset / quality / scene / gi。
   斜墙的 AABB 包围盒把 20 m 斜墙登记成 14×14 实心方块）。
 - 回归口 `Script_PhysicsTest.mjs`；先读 `docs/Data_TechPhysics.md`。
 
+### 通行 / 跳跃 / 翻越 / 攀爬
+- `Data_Traversal.mjs` —— **通行高度阶梯**（膝高自动跨过 / 腰高翻越 / 肩高攀爬 /
+  再高一律不可通过）。玩家、AI、autostep、导航图四处**共读这一张表**，
+  判据不许各写各的；跳跃的净抬高压在 `vaultMin` 之下，所以跳不上任何该翻越的东西。
+- 消费者：`Script_Player.TryVault` / `Script_Ai.TryVault` / `PhysicsWorld.autostepMax` /
+  `NavGrid.stepOver`；取证口 `Debug.Traversal()` 与 `Debug.Vault()`。
+- 回归口 `Script_JumpTest.mjs`（14 条，判据现取 `Debug.Traversal()`，断言里不抄数）。
+- 先读：`docs/Data_Traversal.md`。
+
 ### 破坏
 - `Script_Destruction.mjs` —— 统一场景破坏：离线预破碎 + 运行时代理；
   一次爆炸只重建一次拓扑；主体照旧分区合批守 draw call。
@@ -302,12 +311,13 @@ URL 参数选 preset / quality / scene / gi。
   `Heightmap/`、`BgmReview/`、`_import/`（外部资产取源/烘焙）、`_blender/`（Blender 管线）、
   `_shots/`（出图产物，gitignore）、`vendor/`（three + rapier，别 grep 进去）。
 
-## docs/ 导读（38 篇：先分清「现状」与「留档」）
+## docs/ 导读（39 篇：先分清「现状」与「留档」）
 
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（81 KB，渲染管线唯一现状文档）、`Data_TechPhysics.md`、
   `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`。
 - `Data_MissionDesign.md` —— **关卡层宪法**：线性剧情关，优先级高于之前的 ER2 占点结构。
+- `Data_Traversal.md` —— **通行高度阶梯**（多高的东西过得去；跳跃/翻越/攀爬的规范）。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（常设审查项，每轮都跑）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`（关卡与过场设计书）、

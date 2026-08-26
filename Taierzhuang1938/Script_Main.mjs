@@ -57,6 +57,7 @@ import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
@@ -983,9 +984,12 @@ async function Boot() {
       // 翻越：翻过几次、此刻在不在半空、脚下多高（上墙要靠这个高度取证）
       Vault: () => ({
         count: player.vaultCount, active: player.vault.active,
+        kind: player.vault.kind, rise: player.vault.rise, mantles: player.mantleCount,
         y: player.position.y, x: player.position.x, z: player.position.z,
         aiVaults: ai.vaultCount,
       }),
+      /** 通行高度阶梯（Data_Traversal）。测试按它取判据，别在断言里抄数。 */
+      Traversal: () => ({ ...TRAVERSAL }),
       // 跳跃：起跳次数、滞空/落地边沿与视图模型动作位移。
       Jump: () => ({
         count: player.jump.count, grounded: player.grounded,
@@ -3061,14 +3065,17 @@ function SyncBayonet() {
 }
 
 /**
- * Space 的场景动作：能翻越就翻越，否则尝试一次受限跳跃。
+ * Space 的场景动作：按通行高度阶梯（Data_Traversal）挑动词 ——
+ * 腰高翻越、肩高攀爬，都够不着才落到受限跳跃；高过硬顶的墙一个动词都不给。
  * 顺序不能反——院墙前若先给竖直速度，翻越探测就会因为已经离地而失败。
  */
 function DoTraverse() {
   if (!player?.Alive || viewmodel.IsBusy?.()) return false;
-  if (player.TryVault()) {
-    audio.Play("footstepRubble", { volume: 0.7 });
-    return "vault";
+  const traverse = player.TryVault();
+  if (traverse) {
+    // 攀爬慢、贴着墙磨上去，声音也该更闷更长一点
+    audio.Play("footstepRubble", { volume: traverse === "mantle" ? 0.85 : 0.7 });
+    return traverse;
   }
   if (!player.TryJump()) return false;
   audio.Play("footstepDirt", { volume: 0.34 });
