@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node scripts/Script_LocalPreview.mjs",
     "preview": "node scripts/Script_LocalPreview.mjs",
     "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942 && npm run test:tunnelBell1942 && npm run test:tunnelLight1943 && npm run test:reedSignal1942 && npm run test:taierzhuang1938:smoke",
     "test:reedSignal1942": "node ReedSignal1942/Script_SmokeTest.mjs",

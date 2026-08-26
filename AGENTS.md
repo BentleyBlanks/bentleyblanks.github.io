@@ -8,11 +8,14 @@
 node scripts/Script_LocalPreview.mjs        # 服务本脚本所在的那棵树，默认 8080
 ```
 
+**零 npm 依赖**（只用 node 内置模块），所以新克隆的仓库不必 `npm i` 就能起；有 node 就够。等价入口：`npm start` / `npm run preview`（但见下面 worktree 那条）、Claude Code 里 `preview_start({ name: "preview" })`（配置在受版本控制的 `.claude/launch.json`，固定连 8080）、`node scripts/Script_LocalPreview.mjs --shortcut` 在桌面放一个双击就起服的入口（Win/mac/Linux 都认）。`--help` 列全部参数。
+
 - 索引页 `http://127.0.0.1:8080/__preview/`：按最近改动排序列出所有带 `index.html` 的页面，带筛选框；下面一块能把任意 worktree 一键挂到相邻端口（8081、8082…），每棵树独占一个端口，页面里的绝对路径照旧成立。
 - 路径与线上完全一致（`/Taierzhuang1938/…`），一律 `no-store`，改完刷新即生效；支持 Range（mp4/长 BGM 能拖进度条），MIME 表覆盖 `.mjs/.wasm/.glb/.pck`。
 - 刻意**不**发 COOP/COEP：本地能跑而线上跑不了的东西，本地预览就白做了。
-- 桌面快捷方式：`powershell -ExecutionPolicy Bypass -File scripts\Script_CreateDesktopShortcut.ps1`（从哪份检出跑就绑哪份检出；`-Name` 可另起名字）。双击起服，关掉黑窗口即停服，重复双击不会抢端口。
-- **worktree 里不要用 `npm run preview`** —— npm 会把 cwd 换到主检出，你测的是另一棵树。直接 `node scripts/Script_LocalPreview.mjs`。
+- 桌面快捷方式：`node scripts/Script_LocalPreview.mjs --shortcut`（从哪份检出跑就绑哪份检出）。双击起服，关掉黑窗口即停服，重复双击不会抢端口。Windows 侧实现是 `scripts/Script_CreateDesktopShortcut.ps1`，也可以直接调它并用 `-Name` 另起名字，这样主检出和某棵 worktree 可以各有一个。
+- **多 agent 并行时注意端口**：8080 被别人占着会自动往上让（8081、8082…），且只有当那份实例服的**正是同一棵树**时才复用——不会把你指到别人的代码上。索引页顶部一行写明当前根目录，验收前扫一眼。要确定性就显式指定端口：`node scripts/Script_LocalPreview.mjs 8090`。
+- **worktree 里不要用 `npm run preview` / `npm start`** —— npm 会把 cwd 换到主检出，你测的是另一棵树。直接 `node scripts/Script_LocalPreview.mjs`。
 
 ## Generated Audio / Volcengine
 

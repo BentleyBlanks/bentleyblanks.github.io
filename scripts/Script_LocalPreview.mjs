@@ -400,8 +400,61 @@ function OpenBrowser(url) {
   } catch { /* 开不起来就算了，命令行里有 URL */ }
 }
 
+// 在桌面放一个双击就起服的入口。三个平台各自的做法都塞在这里，是为了让
+// 「换台机器怎么装」只剩一条命令 —— 别人不该先去搞清楚该跑哪个 .ps1。
+function CreateShortcut(rootDir) {
+  const home = os.homedir();
+  const desktop = [path.join(home, "Desktop"), path.join(home, "桌面")].find((dir) => fs.existsSync(dir)) || home;
+  const label = `本地预览 ${path.basename(rootDir)}`;
+
+  if (process.platform === "win32") {
+    // Windows 侧交给 PowerShell：.lnk 只能通过 WScript.Shell COM 生成。
+    // 那个 .ps1 用 $PSScriptRoot 定位，所以从哪份检出跑就绑哪份检出。
+    const script = path.join(rootDir, "scripts", "Script_CreateDesktopShortcut.ps1");
+    // 让 PowerShell 只回机器可读的 ASCII 键值，人话在这边打：node 的
+    // console.log 在 Windows 上走 WriteConsoleW，不吃控制台代码页那一套，
+    // 而 PowerShell 的中文输出转一手就是乱码。
+    const out = execFileSync("powershell",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Name", label],
+      { encoding: "utf8" });
+    const link = /^SHORTCUT_PATH=(.*)$/m.exec(out)?.[1]?.trim();
+    console.log(`快捷方式已创建：${link || path.join(desktop, label + ".lnk")}`);
+    console.log(`  服务的树：${rootDir}`);
+    return;
+  }
+
+  if (process.platform === "darwin") {
+    const file = path.join(desktop, `${label}.command`);
+    fs.writeFileSync(file, `#!/bin/sh\ncd "${rootDir}"\nexec node scripts/Script_LocalPreview.mjs "$@"\n`);
+    fs.chmodSync(file, 0o755);
+    console.log(`快捷方式已创建：${file}`);
+    return;
+  }
+
+  const file = path.join(desktop, "BlanksLocalPreview.desktop");
+  fs.writeFileSync(file, [
+    "[Desktop Entry]", "Type=Application", `Name=${label}`,
+    `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")}`,
+    `Path=${rootDir}`, `Icon=${path.join(rootDir, "favicon.ico")}`, "Terminal=true", "",
+  ].join("\n"));
+  fs.chmodSync(file, 0o755);
+  console.log(`快捷方式已创建：${file}`);
+}
+
+const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127.0.0.1 上。零 npm 依赖，只要有 node。
+
+  node scripts/Script_LocalPreview.mjs              服务本脚本所在的那棵树，默认 8080
+  node scripts/Script_LocalPreview.mjs 8090         换端口（占用了就自动往上让）
+  node scripts/Script_LocalPreview.mjs --shortcut   在桌面放一个双击就起服的快捷方式，然后退出
+  node scripts/Script_LocalPreview.mjs --lan        同时监听局域网（手机上验收）
+  node scripts/Script_LocalPreview.mjs --no-open    不自动开浏览器（跑测试/给 agent 用）
+  node scripts/Script_LocalPreview.mjs --root=<dir> 指定要服务的目录
+
+索引页在 http://127.0.0.1:<port>/__preview/ ：列出所有页面，并能把任意 worktree 挂到相邻端口。`;
+
 async function Main() {
   const args = process.argv.slice(2);
+  if (args.includes("--help") || args.includes("-h")) { console.log(HELP); return; }
   const lan = args.includes("--lan");
   const noOpen = args.includes("--no-open");
   const rootArg = args.find((a) => a.startsWith("--root="));
@@ -410,13 +463,22 @@ async function Main() {
   const basePort = Number(portArg || process.env.PREVIEW_PORT || 8080);
   const host = lan ? "0.0.0.0" : "127.0.0.1";
 
-  // 已经有一份在跑就别再起一份：直接把浏览器指过去。双击快捷方式两次
-  // 不该变成两个服抢端口。
+  if (args.includes("--shortcut")) { CreateShortcut(rootDir); return; }
+
+  // 端口上已经有一份、而且服的**正是这棵树**，就别再起一份：直接把浏览器
+  // 指过去。双击快捷方式两次不该变成两个服抢端口。
+  //
+  // 「正是这棵树」这个条件不能省：多个 agent 各在自己 worktree 里起预览时，
+  // 8080 很可能被别人的树占着，无脑复用等于把浏览器指到别人的代码上，
+  // 而且看起来一切正常 —— 这种错最难发现。根不一样就往上让一个端口。
   const existing = await ProbeExisting(basePort);
-  if (existing) {
+  if (existing && path.resolve(existing.root) === rootDir) {
     console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
     if (!noOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
     return;
+  }
+  if (existing) {
+    console.log(`:${basePort} 上是另一棵树（${existing.root}），本次往后让一个端口。`);
   }
 
   const context = { port: basePort, basePort, host, lanUrls: [] };
@@ -436,6 +498,7 @@ async function Main() {
   console.log(`  根目录        :  ${rootDir}`);
   for (const url of context.lanUrls) console.log(`  局域网        :  ${url}/__preview/`);
   console.log(`  停服          :  关掉这个窗口，或按 Ctrl+C`);
+  console.log(`  放桌面快捷方式:  node scripts/Script_LocalPreview.mjs --shortcut`);
   console.log("");
   if (!noOpen) OpenBrowser(`http://127.0.0.1:${port}/__preview/`);
 }
