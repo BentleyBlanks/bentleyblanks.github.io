@@ -502,6 +502,31 @@ export const EAST_DEFENSE = {
 export const EAST_FIELD = {
   bounds: { minX: 548, maxX: 756, minZ: -250, maxZ: 250 },
   roadZ: -65,
+  // 农田不再用一张等距棋盘铺满：北、中、南三带顺着各自的排水方向分块，
+  // 长边与条播方向交替，俯看才像历年归并出来的真实小农地界。
+  // 具体田块尺度与耕作间距均无测绘资料，统一登记为推定值。
+  fieldPattern: {
+    bands: [
+      { id: "NorthFields", minZ: -250, maxZ: -98, cell: [34, 22], rowAxis: "x" },
+      { id: "MiddleFields", minZ: -48, maxZ: 82, cell: [22, 34], rowAxis: "z" },
+      { id: "SouthFields", minZ: 96, maxZ: 250, cell: [30, 26], rowAxis: "x" },
+    ],
+    cellJitter: [4.6, 3.8],
+    plotFill: [0.76, 0.93],
+    wheatShare: 0.34,
+    darkSoilShare: 0.28,
+    bareSoilShare: 0.25,
+    stubbleChance: 0.24,
+    furrow: { spacing: 1.35, width: 0.32, height: 0.075, endInset: 0.8 },
+    wheat: {
+      rowSpacing: 0.48, plantSpacing: 0.62, dropout: 0.32,
+      height: [0.16, 0.28], width: [0.035, 0.065], edgeInset: 0.55,
+    },
+    stubble: {
+      rowSpacing: 0.90, plantSpacing: 0.95, dropout: 0.42,
+      height: [0.08, 0.16], width: [0.045, 0.075], edgeInset: 0.75,
+    },
+  },
   // 战术地形：压在濠外原野解析高程上（Script_TengxianCity.OuterHeight）。
   // ridges：{id, from, to, width, height} —— 距中线 width 处衰减到 0；
   // lanes ：{id, from, to, inner, outer, depth} —— inner 内全深、outer 外为 0。
@@ -705,6 +730,7 @@ export const PRESUMED = [
   { id: "houseDims", value: { eave: [2.4, 2.8], ridge: [3.5, 4.2], courtWall: [1.8, 2.2] }, unit: "m", note: "鲁南民居形制为主流记载，具体高度为推定" },
   { id: "loopholeSize", value: 0.24, unit: "m", note: "家家掏枪眼、新掏边缘发白为日方一手史料反复点名，孔径与分布密度无载" },
   { id: "wheatPatch", value: { count: 46 }, note: "冬小麦贴地返青、露土率高为日方写景図一手图像证据，田块划分为推定" },
+  { id: "eastFieldPattern", value: "EAST_FIELD.fieldPattern", unit: "m", note: "东关外三带田块的尺度、长边方向、犁垄间距、条播株距与残茬密度均为场景美术推定；只有三月冬小麦返青、苗高 15—30 cm、露土率高有日方一手图像证据" },
 ];
 
 /** 按 id 查推定条目，给 UI 的「这是推定值」角标用。 */

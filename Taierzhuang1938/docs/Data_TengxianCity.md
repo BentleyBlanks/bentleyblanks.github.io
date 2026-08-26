@@ -395,6 +395,12 @@
 
 > **别做成绿意盎然的江南春天。滕县 3 月是灰褐的、干的、树是骨架状的。**
 
+实现口径：东关外农田由 `EAST_FIELD.fieldPattern` 分成三条不同耕作方向的田带；
+厘米级碎土使用 `Texture_PloughedSoilBase.webp` 与 `Texture_PloughedSoilNormal.webp`
+（2026-08-26 由内置 ImageGen 生成的可平铺 PBR 源），沟垄、田埂、返青麦簇和残茬则由
+`Script_TengxianCity.BuildEastFarmFields` 生成真实几何并进入 `BuildSink` 合批。贴图不承担
+大尺度高度，避免从俯视镜头看成立、到第一人称却仍是一张平板。
+
 ---
 
 ## 七、影像与实测资料（本节回答「有没有照片」）

@@ -324,6 +324,22 @@ if (l4) {
 }
 check(LEVEL_BOUNDS.L4Wall.maxX >= eastCoverageEdge,
   "Data_Tengxian LEVEL_BOUNDS.L4Wall must stay in sync with the full east-district coverage.");
+const fieldPattern = EAST_FIELD.fieldPattern;
+check(fieldPattern.bands.length === 3,
+  "East field needs three differently oriented cultivation bands instead of one uniform checkerboard.");
+check(new Set(fieldPattern.bands.map((band) => band.rowAxis)).size >= 2,
+  "East-field cultivation bands must alternate row direction.");
+for (let i = 0; i < fieldPattern.bands.length; i += 1) {
+  const band = fieldPattern.bands[i];
+  check(band.minZ >= EAST_FIELD.bounds.minZ && band.maxZ <= EAST_FIELD.bounds.maxZ
+    && band.minZ < band.maxZ, `${band.id} must stay inside EAST_FIELD bounds.`);
+  if (i > 0) check(fieldPattern.bands[i - 1].maxZ <= band.minZ,
+    `${band.id} must not overlap the previous cultivation band.`);
+}
+check(fieldPattern.wheat.height[0] >= 0.15 && fieldPattern.wheat.height[1] <= 0.30,
+  "East-field winter wheat must remain within the documented 15-30 cm March height.");
+check(fieldPattern.wheat.dropout >= 0.18,
+  "East-field wheat rows must retain visibly broken, high-soil-exposure planting.");
 for (const feature of EAST_SUBURB.features) {
   check(feature.x - feature.w / 2 >= EAST_SUBURB.bounds.minX
     && feature.x + feature.w / 2 <= EAST_SUBURB.bounds.maxX
@@ -334,7 +350,7 @@ for (const feature of EAST_SUBURB.features) {
 
 // 一切从示意图落到数值的关系都必须显式登记为推定，免得后续文案误报为测绘事实。
 const presumedIds = new Set(PRESUMED.map((item) => item.id));
-for (const id of ["streetWidths", "streetParcelClearance", "streetLifeReserves", "crossroadPosition", "streetTopology", "cityBlockZones", "gateOffsets", "cityFeatureLayout", "eastSuburbLayout"]) {
+for (const id of ["streetWidths", "streetParcelClearance", "streetLifeReserves", "crossroadPosition", "streetTopology", "cityBlockZones", "gateOffsets", "cityFeatureLayout", "eastSuburbLayout", "eastFieldPattern"]) {
   check(presumedIds.has(id), `PRESUMED must record the layout assumption: ${id}.`);
 }
 

@@ -132,11 +132,10 @@ const MATERIAL_MAP = {
   // 枪眼白茬：新凿开的砖断口比风化面亮两档，这一圈白是滕县的第一符号
   LoopholeRim: { recipe: "Stone", color: 0xffffff },
   Willow: { recipe: "TreeBark", color: 0xc09a86 },
-  // 东关外农田带：翻耕裸土 / 压实土 / 打谷场硬土，同一张 Ground 底材的三档调色。
-  // 色值压在基底附近偏暗：地块要比四野的原生地面读得出「被人翻过」，
-  // 但发白发亮就成了水泥地（第一版 0xDCCAA4 出图审查抓到）。
-  PloughSoil: { recipe: "Ground", color: 0xc0a87e, roughness: 1.0 },
-  PloughSoilDark: { recipe: "Ground", color: 0x96855f, roughness: 1.0 },
+  // 东关外农田带：翻耕裸土 / 压实土使用专属 PloughedSoil PBR，打谷场仍走 Ground。
+  // Base color 自带褐土色，乘色只做轻微冷暖分档；压得太暗会把犁沟读成木条。
+  PloughSoil: { recipe: "PloughedSoil", color: 0xf0e5d4, roughness: 1.0, normalScale: 0.72 },
+  PloughSoilDark: { recipe: "PloughedSoil", color: 0xc9bba2, roughness: 1.0, normalScale: 0.86 },
   YardEarth: { recipe: "Ground", color: 0xb2a17f, roughness: 1.0 },
   // 侧柏的墨绿：压在树皮底材上读作「冬季常绿的鳞叶」，不是塑料纯色
   Cypress: { recipe: "TreeBark", color: 0x5e6b49 },
@@ -179,6 +178,8 @@ const PLAIN_MAP = {
   IronPlate: { color: PALETTE.ironDoor, roughness: 0.62, metalness: 0.5 },
   Charred: { color: PALETTE.charred, roughness: 0.95 },
   Wheat: { color: PALETTE.wheat, roughness: 0.94 },
+  WheatLight: { color: 0x718251, roughness: 0.96 },
+  FieldStubble: { color: 0x8d774f, roughness: 0.98 },
   // 麦秸泥的黄褐：坟头枯草与秸秆垛共用（三月坟头是去岁枯草，不是绿草皮）
   VillageStraw: { color: 0x8a744e, roughness: 0.98 },
   MoatWater: { color: PALETTE.moatWater, roughness: 0.24, metalness: 0.0 },
@@ -1890,48 +1891,49 @@ export class TengxianCity {
     this.sink.SetSector("");
   }
 
-  /** 地块镶嵌：返青麦地 / 翻耕裸土 / 压实旧土，长边取南北向（与界河那套一致）。 */
+  /** 地块镶嵌：返青麦地 / 翻耕裸土 / 压实旧土，三带交替长边与条播方向。 */
   BuildEastFarmFields(rnd) {
     const b = EAST_FIELD.bounds;
-    const cellW = 26, cellD = 20;
-    for (let gx = b.minX; gx < b.maxX - cellW * 0.6; gx += cellW) {
-      for (let gz = b.minZ; gz < b.maxZ - cellD * 0.6; gz += cellD) {
-        const x = gx + cellW / 2 + (rnd() - 0.5) * 5;
-        const z = gz + cellD / 2 + (rnd() - 0.5) * 4;
-        if (!this.InBounds(x, z, 24)) continue;
-        if (this.EastFieldBlocked(x, z)) continue;
-        const w = cellW * (0.72 + rnd() * 0.24);
-        const d = cellD * (0.70 + rnd() * 0.24);
-        this.sink.SetSector(SectorKey(x, z));
-        const roll = rnd();
-        if (roll < 0.34) {
-          // 新翻的裸土：最亮的一档
-          this.sink.Add("PloughSoil", this.DrapeSlab(w, d, { x, z }));
-        } else if (roll < 0.60) {
-          // 压实的旧地块
-          this.sink.Add("PloughSoilDark", this.DrapeSlab(w, d, { x, z }));
-        } else if (roll < 0.90) {
-          // 返青的冬麦：露土率高，窄行、断续 —— 不是绿毯
-          this.sink.Add("PloughSoilDark", this.DrapeSlab(w, d, { x, z }));
-          const rows = 2 + Math.floor(rnd() * 3);
-          for (let s = 0; s < rows; s += 1) {
-            const sz = (s - (rows - 1) / 2) * (d / (rows + 1)) + (rnd() - 0.5) * 0.9;
-            const spanW = w * (0.45 + rnd() * 0.35);
-            const segs = 2 + Math.floor(rnd() * 2);
-            for (let q = 0; q < segs; q += 1) {
-              if (rnd() < 0.25) continue;
-              this.sink.Add("Wheat", this.DrapeSlab(spanW / segs * 0.72, 0.85,
-                {
-                  x: x + (q - (segs - 1) / 2) * (spanW / segs) * 1.18 + (rnd() - 0.5),
-                  z: z + sz, topOffset: 0.20, bottomOffset: -0.06,
-                }));
-            }
+    const pattern = EAST_FIELD.fieldPattern;
+    for (const band of pattern.bands) {
+      const [cellW, cellD] = band.cell;
+      for (let gx = b.minX; gx < b.maxX - cellW * 0.6; gx += cellW) {
+        for (let gz = band.minZ; gz < band.maxZ - cellD * 0.6; gz += cellD) {
+          const x = gx + cellW / 2 + (rnd() - 0.5) * pattern.cellJitter[0];
+          const z = gz + cellD / 2 + (rnd() - 0.5) * pattern.cellJitter[1];
+          if (!this.InBounds(x, z, 24)) continue;
+          if (this.EastFieldBlocked(x, z)) continue;
+          const w = cellW * (pattern.plotFill[0] + rnd() * (pattern.plotFill[1] - pattern.plotFill[0]));
+          const d = cellD * (pattern.plotFill[0] + rnd() * (pattern.plotFill[1] - pattern.plotFill[0]));
+          this.sink.SetSector(SectorKey(x, z));
+          const roll = rnd();
+          const wheat = roll < pattern.wheatShare;
+          const dark = roll < pattern.wheatShare + pattern.darkSoilShare;
+          const dressed = roll < pattern.wheatShare + pattern.darkSoilShare + pattern.bareSoilShare;
+          if (dressed) {
+            this.sink.Add(dark ? "PloughSoilDark" : "PloughSoil", this.DrapeSlab(w, d, {
+              x, z, topOffset: 0.025, bottomOffset: -0.015,
+            }));
           }
-        } // 其余留作纯裸地：只有田埂
-        // 田埂：两条长边必给，一条横埂看运气
-        this.AddFieldBalk(x, z - d / 2, w + 0.6, 0);
-        this.AddFieldBalk(x, z + d / 2, w + 0.6, 0);
-        if (rnd() < 0.65) this.AddFieldBalk(x + (rnd() - 0.5) * w * 0.3, z, d, Math.PI / 2);
+          // 贴图负责厘米级土块，真实几何负责八九厘米高的沟垄；低角度看田地不再是一张板。
+          this.AddCultivationRows(x, z, w, d, band.rowAxis, rnd);
+          if (wheat) {
+            this.AddFieldPlants(x, z, w, d, band.rowAxis, rnd, pattern.wheat,
+              rnd() < 0.34 ? "WheatLight" : "Wheat");
+          } else if (rnd() < pattern.stubbleChance) {
+            this.AddFieldPlants(x, z, w, d, band.rowAxis, rnd, pattern.stubble, "FieldStubble");
+          }
+          // 长边田埂跟随本带的排水方向；中带转九十度，打破整片棋盘的机械感。
+          if (band.rowAxis === "x") {
+            this.AddFieldBalk(x, z - d / 2, w + 0.6, 0);
+            this.AddFieldBalk(x, z + d / 2, w + 0.6, 0);
+            if (rnd() < 0.58) this.AddFieldBalk(x + (rnd() - 0.5) * w * 0.3, z, d, Math.PI / 2);
+          } else {
+            this.AddFieldBalk(x - w / 2, z, d + 0.6, Math.PI / 2);
+            this.AddFieldBalk(x + w / 2, z, d + 0.6, Math.PI / 2);
+            if (rnd() < 0.58) this.AddFieldBalk(x, z + (rnd() - 0.5) * d * 0.3, w, 0);
+          }
+        }
       }
     }
     // 田里的秸秆垛、粪堆与滚落的碌碡：反冲击出发区的就便掩蔽
@@ -1957,10 +1959,100 @@ export class TengxianCity {
     }
   }
 
+  /** 一块地里的浅犁垄：形体贴地、按行合批，近看由 PBR 土块接住厘米级细节。 */
+  AddCultivationRows(x, z, w, d, axis, rnd) {
+    const f = EAST_FIELD.fieldPattern.furrow;
+    const along = axis === "x" ? w : d;
+    const across = axis === "x" ? d : w;
+    const ry = axis === "x" ? 0 : Math.PI / 2;
+    for (let offset = -across / 2 + f.spacing / 2;
+      offset < across / 2 - f.spacing / 3; offset += f.spacing) {
+      if (rnd() < 0.07) continue;
+      const rowLen = Math.max(f.spacing, along - f.endInset * (1.7 + rnd() * 0.8));
+      const alongJitter = (rnd() - 0.5) * f.endInset;
+      const crossJitter = (rnd() - 0.5) * f.width;
+      const cx = axis === "x" ? x + alongJitter : x + offset + crossJitter;
+      const cz = axis === "x" ? z + offset + crossJitter : z + alongJitter;
+      const ridge = MakeBox(rowLen, f.height, f.width, TILE_METERS.ground,
+        `eastFurrow:${Math.round(cx)}:${Math.round(cz)}`);
+      const ridgePosition = ridge.attributes.position;
+      for (let i = 0; i < ridgePosition.count; i += 1) {
+        if (ridgePosition.getY(i) > 0) ridgePosition.setZ(i, ridgePosition.getZ(i) * 0.34);
+      }
+      ridgePosition.needsUpdate = true;
+      ridge.computeVertexNormals();
+      ridge.translate(0, f.height / 2, 0);
+      this.sink.Add("PloughSoil", this.DrapeGeometry(ridge, {
+        x: cx, z: cz, ry, groundOffset: -f.height * 0.46,
+      }));
+    }
+  }
+
+  /**
+   * 条播麦苗／残茬的竖向轮廓。每簇是三片相交的双面三角叶，整块地最终仍只进
+   * 一个 BuildSink 材质桶；不生成几千只 Mesh，也不把返青麦做成绿色地砖。
+   */
+  AddFieldPlants(x, z, w, d, axis, rnd, spec, material) {
+    const along = axis === "x" ? w : d;
+    const across = axis === "x" ? d : w;
+    const positions = [];
+    const uvs = [];
+    const PushTriangle = (a, b, c) => {
+      positions.push(...a, ...b, ...c);
+      uvs.push(0, 0, 1, 0, 0.5, 1);
+    };
+    const PushBlade = (wx, wz, baseY, height, halfWidth, angle, lean) => {
+      const dx = Math.cos(angle) * halfWidth;
+      const dz = Math.sin(angle) * halfWidth;
+      const tip = [wx + Math.cos(angle + Math.PI / 2) * lean, baseY + height,
+        wz + Math.sin(angle + Math.PI / 2) * lean];
+      const a = [wx - dx, baseY, wz - dz];
+      const b = [wx + dx, baseY, wz + dz];
+      PushTriangle(a, b, tip);
+      PushTriangle(b, a, tip);
+    };
+    for (let cross = -across / 2 + spec.edgeInset;
+      cross <= across / 2 - spec.edgeInset; cross += spec.rowSpacing) {
+      const brokenStart = (rnd() - 0.5) * spec.plantSpacing * 2.2;
+      for (let step = -along / 2 + spec.edgeInset + brokenStart;
+        step <= along / 2 - spec.edgeInset; step += spec.plantSpacing) {
+        if (rnd() < spec.dropout) continue;
+        const alongJitter = (rnd() - 0.5) * spec.plantSpacing * 0.42;
+        const crossJitter = (rnd() - 0.5) * spec.rowSpacing * 0.18;
+        const wx = axis === "x" ? x + step + alongJitter : x + cross + crossJitter;
+        const wz = axis === "x" ? z + cross + crossJitter : z + step + alongJitter;
+        if (this.EastFieldBlocked(wx, wz)) continue;
+        const height = spec.height[0] + rnd() * (spec.height[1] - spec.height[0]);
+        const width = spec.width[0] + rnd() * (spec.width[1] - spec.width[0]);
+        const baseY = this.OuterHeight(wx, wz) + height * 0.05;
+        const angle = rnd() * Math.PI;
+        PushBlade(wx, wz, baseY, height, width / 2, angle, (rnd() - 0.5) * width * 0.45);
+        PushBlade(wx, wz, baseY, height * (0.82 + rnd() * 0.14), width * 0.42,
+          angle + Math.PI / 2, (rnd() - 0.5) * width * 0.32);
+        PushBlade(wx + Math.cos(angle) * width * 0.34, wz + Math.sin(angle) * width * 0.34,
+          baseY, height * (0.72 + rnd() * 0.20), width * 0.34,
+          angle + Math.PI / 4, (rnd() - 0.5) * width * 0.28);
+      }
+    }
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    this.sink.Add(material, geometry);
+  }
+
   /** 一道田埂：可见面逐顶点贴地，碰撞切段登记（卧倒能藏，站立藏不住）。 */
   AddFieldBalk(cx, cz, len, ry, h = 0.30) {
     const gy = this.OuterHeight(cx, cz);
     const box = MakeBox(len, h, 0.46, TILE_METERS.ground, `efBalk${cx | 0}_${cz | 0}_${len | 0}`);
+    const boxPosition = box.attributes.position;
+    for (let i = 0; i < boxPosition.count; i += 1) {
+      if (boxPosition.getY(i) > 0) boxPosition.setZ(i, boxPosition.getZ(i) * 0.42);
+    }
+    boxPosition.needsUpdate = true;
+    box.computeVertexNormals();
     box.translate(0, h / 2 - 0.04, 0);
     this.sink.Add("PloughSoil", this.DrapeGeometry(box, { x: cx, z: cz, ry, groundOffset: -0.04 }));
     const cos = Math.cos(ry), sin = Math.sin(ry);

@@ -512,6 +512,9 @@ export const RECIPES = {
   Steel: (s) => BakeSteel(s ?? 256, { seed: 601 }),
   SteelHelmet: (s) => BakeSteel(s ?? 256, { seed: 617, base: [64, 66, 60], polish: 0.2, rust: 0.35 }),
   Ground: (s) => BakeRubbleGround(s ?? 512, { seed: 701 }),
+  // 东门外翻耕土的 ImageGen BaseColor + Normal 会在启动时覆盖；404 时仍保留
+  // 同尺度的干燥碎土 PBR，避免新材质名让整关建场失败。
+  PloughedSoil: (s) => BakeRubbleGround(s ?? 512, { seed: 709, brickiness: 0.08 }),
   GroundRubble: (s) => BakeRubbleGround(s ?? 512, { seed: 719, brickiness: 0.85 }),
   Sandbag: (s) => BakeSandbag(s ?? 256, { seed: 809 }),
   Stone: (s) => BakeStone(s ?? 512, { seed: 907 }),

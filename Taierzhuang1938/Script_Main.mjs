@@ -475,6 +475,12 @@ async function Boot() {
       albedo: "./Texture/Texture_GroundBase.webp?v=1",
       normal: "./Texture/Texture_GroundNormal.webp?v=1",
       orm: "./Texture/Texture_GroundOrm.webp?v=1" },
+    // 东门外翻耕地：ImageGen 专属土壤 albedo + 对位 normal；干土继续复用
+    // 已校验的 Ground ORM（非金属、全粗糙）。图片缺失时 RECIPES 同名项兜底。
+    { name: "PloughedSoil",
+      albedo: "./Texture/Texture_PloughedSoilBase.webp?v=eastfield20260826",
+      normal: "./Texture/Texture_PloughedSoilNormal.webp?v=eastfield20260826",
+      orm: "./Texture/Texture_GroundOrm.webp?v=1" },
     { name: "GroundRubble",
       albedo: "./Texture/Texture_GroundBase.webp?v=1",
       normal: "./Texture/Texture_GroundNormal.webp?v=1",
