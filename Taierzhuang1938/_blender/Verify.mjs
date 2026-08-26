@@ -80,6 +80,40 @@ const sandalNodesOk = ["ankleL", "ankleR"].every((nodeName) => {
 Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
   "川军左右脚均为裸足皮肤 + 露趾草鞋双材质");
 
+// CGMOL 大刀靠原模型的 UV atlas 才能正确读取专用法线/粗糙度。退回盒投影时
+// UV 会跑到 -20..20；只看三角数与包围盒完全发现不了，必须锁定这里。
+const dadaoPath = path.join(projectDir, "Model", MESHES.Dadao.file);
+const dadaoDoc = JSON.parse(fs.readFileSync(dadaoPath, "utf8"));
+const dadaoMaterials = new Set(dadaoDoc.meshes.map((mesh) => mesh.material));
+const dadaoUvAuthored = dadaoDoc.meshes.every((mesh) => {
+  const uvMax = mesh.uvMin.map((value, axis) => value + mesh.uvScale[axis] * 65535);
+  return mesh.uvMin.every((value) => value >= -0.01)
+    && uvMax.every((value) => value <= 1.01);
+});
+Report(dadaoMaterials.size === 1 && dadaoMaterials.has("dadao") && dadaoUvAuthored,
+  "CGMOL 大刀保留 0–1 源 UV，并使用单一 dadao 材质桶");
+
+// FBX 刀片 751 个角里有 543 个自定义分裂法线，不等同于 Blender 按 smooth
+// 重算的顶点法线。导入时若经 BMesh 丢掉它们，法线贴图的切线基底就会错，刀面
+// 在 Debug Rendering 里重新出现大块三角明暗。量化后的同位置多法线点不少于
+// 100 个，既锁住逐角法线，也会抓住枪械通用补倒角再次改坏原拓扑的回归。
+const dadaoSplitNormalPositions = dadaoDoc.meshes.reduce((total, mesh) => {
+  const positions = Buffer.from(mesh.pos, "base64");
+  const normals = Buffer.from(mesh.nrm, "base64");
+  const byPosition = new Map();
+  for (let i = 0; i < mesh.count; i += 1) {
+    const position = `${positions.readUInt16LE(i * 6)},${positions.readUInt16LE(i * 6 + 2)},`
+      + `${positions.readUInt16LE(i * 6 + 4)}`;
+    const normal = `${normals.readInt8(i * 3)},${normals.readInt8(i * 3 + 1)},`
+      + `${normals.readInt8(i * 3 + 2)}`;
+    if (!byPosition.has(position)) byPosition.set(position, new Set());
+    byPosition.get(position).add(normal);
+  }
+  return total + [...byPosition.values()].filter((values) => values.size > 1).length;
+}, 0);
+Report(dadaoSplitNormalPositions >= 100,
+  `CGMOL 大刀保留 FBX 逐角法线（同位置多法线点 ${dadaoSplitNormalPositions}）`);
+
 // ---------------------------------------------------------------------------
 // 第二关：真浏览器
 // ---------------------------------------------------------------------------
@@ -135,6 +169,11 @@ const result = await page.evaluate(async () => {
   const library = new MaterialLibrary(renderer, { textureSize: 128 });
   for (const _ of library.PrepareSteps(["ClothNra", "ClothIja", "Steel", "SteelHelmet",
     "WoodStock", "Stone", "WoodBeam", "WoodDoor", "RoofTile"])) { /* 逐配方烘 */ }
+  await library.LoadExternalSet("DadaoPbr", {
+    albedo: "./Texture/Texture_DadaoBase.webp",
+    normal: "./Texture/Texture_DadaoNormal.webp",
+    orm: "./Texture/Texture_DadaoOrm.webp",
+  });
 
   const Plain = (name, color, roughness, doubleSide) => library.Plain(name, {
     color, roughness, metalness: 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
@@ -153,6 +192,7 @@ const result = await page.evaluate(async () => {
     steel: library.Get("Steel", { roughness: 0.62, metalness: 0.9 }),
     blade: library.Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: library.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
+    dadao: library.Get("DadaoPbr", { roughness: 1, metalness: 1, normalScale: 1 }),
     wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
     Stone: library.Get("Stone", { roughness: 0.92, metalness: 0 }),
     WoodBeam: library.Get("WoodBeam", { roughness: 0.9, metalness: 0 }),

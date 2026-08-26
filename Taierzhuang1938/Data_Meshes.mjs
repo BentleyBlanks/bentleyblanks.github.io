@@ -16,7 +16,7 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "14";
+const MESH_REV = "15";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -159,13 +159,13 @@ export const MESHES = {
   },
   Dadao: {
     file: "Dadao.tzm.json", category: "weapon",
-    triangles: 4688, meshBlocks: 2, nodes: 5, joints: 0,
-    materials: ["steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
+    triangles: 4199, meshBlocks: 1, nodes: 5, joints: 0,
+    materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
     span: [0.0232, 0.1106, 0.8988], lengthM: 0.900, bladeM: 0.625,
-    draws: { high: 2, medium: 2, low: 2 },
+    draws: { high: 1, medium: 1, low: 1 },
     note: "二十九军战刀式样（CGMOL 付费源，见 _import/Data_SourceLicenses.md）。"
       + "刀身 55→88 mm、刃线外鼓上翘、刀背 5.7 mm 厚，圆盘卡扣 + 缠柄 + 柄尾大铁环。"
-      + "换掉了原来那把 40→67 mm 的程序化刀 —— 旧刀没护手没铁环，剪影读起来是把菜刀。",
+      + "保留原 UV、逐角法线与压缩后的专用 PBR，不再套用枪械共享钢/木材质。",
   },
   DadaoAlt: {
     file: "DadaoAlt.tzm.json", category: "weapon",

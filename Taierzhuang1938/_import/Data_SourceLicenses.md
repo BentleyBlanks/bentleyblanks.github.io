@@ -77,8 +77,10 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 
 **这份源模不进公开仓库。** bentleyblanks.github.io 是公开站点；买来的原始文件
 只授权用在成品里，不等于可以把 FBX 本身当素材再分发。仓库里只有它派生出的
-`Model/Dadao.tzm.json`（已按 6000 三角预算重算、丢弃源包 4K 贴图、改绑本作
-共享 steel/wood PBR）。做法与本文件末尾 Vefects 素材那条一致。
+`Model/Dadao.tzm.json`（已按 6000 三角预算重算）和从源包压制的 1K 成品 PBR
+`Texture/Texture_Dadao{Base,Normal,Orm}.webp`。原始 4K PNG、FBX 与 .blend 都不分发；
+成品贴图保留原 UV，ORM 遵循 R=AO、G=roughness、B=metalness。做法与本文件末尾
+Vefects 素材那条一致。
 
 源模存放位置按下面顺序解析（`ImportWeapons._ExternalRoot()`）：
 
@@ -86,6 +88,9 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
    （也就是 `<某处>/Taierzhuang1938SourceAssets/Weapons`）；
 2. 从 `_blender/` 逐级向上找同名兄弟目录 `Taierzhuang1938SourceAssets/Weapons`
    （主仓库与 `.claude/worktrees/` 下的工作树都能命中）。
+
+`CgmolDadao/` 内的可重建源包含 `Model_CgmolDadao.fbx` 与 `tex/None_*.png`；
+`_import/Script_BakeDadaoPbr.py` 只读取这份外部源并写出上述 1K 成品图。
 
 **找不到源就自动退回程序化几何**：`ImportWeapons.BuilderFor("Dadao")` 返回 None，
 `BuildAll` 改用 `BuildWeapons.BuildDadao`。没有这份素材的人 clone 下来照样能跑通

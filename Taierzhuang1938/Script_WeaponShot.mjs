@@ -11,6 +11,7 @@
 //
 // 用法：
 //   node Taierzhuang1938/Script_WeaponShot.mjs [输出目录] [--only=Zb26,Type38] [--flat] [--fp]
+//        [--debug=normal|baseColor|roughness|metalness]
 //   --flat 换成无贴图纯色材质出一份对照 —— 「贴图到底有没有比纯色强」只能这么比。
 //   --fp   拍第一人称那一份（腰射 / 开镜 / 开火 / 拉栓）。第一人称与台架是**两套
 //          几何**（见 Script_EditorWeapon 抬头），台架改好了不等于手里那把也对。
@@ -30,6 +31,10 @@ const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.slice(7).split(",") : null;
 const flat = args.includes("--flat");
 const firstPerson = args.includes("--fp");
+const debugArg = args.find((a) => a.startsWith("--debug="));
+const debugView = debugArg ? debugArg.slice(8) : "final";
+const DEBUG_MODES = { final: 0, normal: 0, baseColor: 6, roughness: 7, metalness: 8 };
+if (!(debugView in DEBUG_MODES)) throw new Error(`未知 Debug Rendering 通道：${debugView}`);
 fs.mkdirSync(outDir, { recursive: true });
 
 // 台架把枪绕 Y 转了 90°，所以**枪管轴 = 世界 X、枪口在 -X**；
@@ -192,9 +197,15 @@ let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
   : WEAPONS;
 for (const entry of list) {
+  await page.evaluate(({ view, materialMode }) => {
+    const T = window.Taierzhuang;
+    if (T.library?.gi) T.library.gi.debugView.value = materialMode;
+    T.post.SetDebugView(view, T.gi, !!T.library?.gi);
+  }, { view: debugView, materialMode: DEBUG_MODES[debugView] });
   const dataUrl = firstPerson ? await FpSheet(entry) : await Sheet(entry);
   const file = path.join(outDir,
-    `Weapon_${entry.shotId || entry.id}${firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}.png`);
+    `Weapon_${entry.shotId || entry.id}${firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}`
+    + `${debugView === "final" ? "" : `_Debug${debugView[0].toUpperCase()}${debugView.slice(1)}`}.png`);
   fs.writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
   console.log(`ok   ${path.basename(file)}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }

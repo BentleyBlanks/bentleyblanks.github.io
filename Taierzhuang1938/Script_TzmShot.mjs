@@ -78,6 +78,7 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     steel: library.Get("Steel", { roughness: 0.62, metalness: 0.9 }),
     blade: Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
+    dadao: Plain("DadaoPbrFallback", { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
     wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
     armor: library.Get("SteelHelmet", { roughness: 1, metalness: 0.05 }),
     track: library.Get("SteelHelmet", { roughness: 1, metalness: 0.30 }),

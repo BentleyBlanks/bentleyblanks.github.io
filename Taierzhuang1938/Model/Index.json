@@ -330,14 +330,13 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Dadao.tzm.json",
-   "triangles": 4688,
-   "meshBlocks": 2,
+   "triangles": 4199,
+   "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 232049,
+   "bytes": 81756,
    "materials": [
-    "steel",
-    "wood"
+    "dadao"
    ],
    "mounts": [
     "root",

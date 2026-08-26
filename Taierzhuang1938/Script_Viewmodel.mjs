@@ -269,6 +269,9 @@ function BuildMaterials(library) {
     // 由几何棱线与环境光写出钢感，不再靠脏纹理冒充细节。
     blade: library.Plain("VmDadaoBlade", { color: 0x929aa2, roughness: 0.30, metalness: 0.96 }),
     grip: library.Plain("VmDadaoGrip", { color: 0x8f7c61, roughness: 0.76, metalness: 0 }),
+    dadao: SafeMaterial(library, "DadaoPbr",
+      { repeat: 1, roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 },
+      { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
     wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.32 },
@@ -920,7 +923,7 @@ const MODEL_FP = new Set([
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
 const VM_MATERIAL_BY_MESH = {
-  steel: "steel", blade: "blade", grip: "grip", wood: "wood", accessory: "cloth", red: "redCloth",
+  steel: "steel", blade: "blade", grip: "grip", dadao: "dadao", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
 };

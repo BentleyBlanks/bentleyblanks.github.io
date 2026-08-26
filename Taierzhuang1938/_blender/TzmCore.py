@@ -66,7 +66,7 @@ TILE_METERS["track"] = 0.30
 # 别等到运行时才发现半个人是黑的。
 MATERIAL_NAMES = {
     "uniform", "accessory", "shoe", "skin", "helmet", "steel", "blade", "grip", "wood",
-    "leather", "towel", "red", "accentA", "accentB",
+    "leather", "towel", "red", "accentA", "accentB", "dadao",
     # 车辆装甲板（喷漆钢，不是裸钢）与履带 —— 见 Script_Actor.ActorMaterials
     "armor", "track",
     # 建筑构件用的是 MaterialLibrary 的配方名，加载器同样直接透传
@@ -76,6 +76,7 @@ MATERIAL_NAMES = {
 # Node.Add 的翻面体检报告：`节点/材质 ×块数`。BuildAll 每建完一个模型打一次并清空。
 # 空的才是正常状态 —— 有内容说明某个建模原语的绕向写反了。
 FLIPPED = []
+AUTHORED_NORMAL_LAYER = "TzmAuthoredNormal"
 
 
 # ---------------------------------------------------------------------------
@@ -347,6 +348,22 @@ def RibbonYz(points, width, thick, smooth=False):
     return bm
 
 
+def TransformMatrix(bm, matrix):
+    """变换几何，并同步变换导入模型携带的逐角法线。"""
+    authored = bm.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
+    if authored is not None:
+        normal_matrix = matrix.to_3x3().inverted().transposed()
+        for face in bm.faces:
+            for loop in face.loops:
+                normal = normal_matrix @ Vector(loop[authored])
+                if normal.length > 1e-9:
+                    normal.normalize()
+                loop[authored] = normal
+    bmesh.ops.transform(bm, matrix=matrix, verts=bm.verts[:])
+    bm.normal_update()
+    return bm
+
+
 def Transform(bm, x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0, sx=1.0, sy=1.0, sz=1.0):
     """就地变换一个 bmesh。顺序：缩放 → ZYX 欧拉 → 平移。"""
     m = (Matrix.Translation((x, y, z))
@@ -354,24 +371,39 @@ def Transform(bm, x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0, sx=1.0, sy=1.0, s
          @ Matrix.Rotation(ry, 4, "Y")
          @ Matrix.Rotation(rx, 4, "X")
          @ Matrix.Diagonal((sx, sy, sz, 1.0)))
-    bmesh.ops.transform(bm, matrix=m, verts=bm.verts[:])
-    bm.normal_update()
-    return bm
+    return TransformMatrix(bm, m)
 
 
 def Join(*meshes):
     """把若干 bmesh 并成一个（不做焊接：不同零件焊在一起会把法线拉花）。"""
     out = bmesh.new()
+    out_uv = None
+    out_authored_normal = None
     for src in meshes:
         if src is None:
             continue
         src.verts.index_update()
+        src_uv = src.loops.layers.uv.active
+        src_authored_normal = src.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
+        if src_uv is not None and out_uv is None:
+            # Imported assets may carry an authored UV atlas. Most TZM models still
+            # use deterministic box projection, but preserve the layer for the few
+            # source-authored PBR assets that explicitly request it.
+            out_uv = out.loops.layers.uv.new("UVMap")
+        if src_authored_normal is not None and out_authored_normal is None:
+            out_authored_normal = out.loops.layers.float_vector.new(AUTHORED_NORMAL_LAYER)
         remap = {v.index: out.verts.new(v.co) for v in src.verts}
         out.verts.index_update()
         for f in src.faces:
             try:
                 nf = out.faces.new([remap[v.index] for v in f.verts])
                 nf.smooth = f.smooth
+                if src_uv is not None and out_uv is not None:
+                    for src_loop, out_loop in zip(f.loops, nf.loops):
+                        out_loop[out_uv].uv = src_loop[src_uv].uv
+                if src_authored_normal is not None and out_authored_normal is not None:
+                    for src_loop, out_loop in zip(f.loops, nf.loops):
+                        out_loop[out_authored_normal] = src_loop[src_authored_normal]
             except ValueError:
                 pass    # 重复面：直接丢，别让整条管线炸在一块看不见的皮上
         src.free()
@@ -480,7 +512,11 @@ class Node:
         healed = OrientOutward(bm)
         if healed:
             FLIPPED.append("%s/%s ×%d" % (self.name, material, healed))
-        self.parts.append((material, bm, TILE_METERS.get(tile, 1.0) if isinstance(tile, str) else float(tile)))
+        if tile == "sourceUv":
+            tile_value = None
+        else:
+            tile_value = TILE_METERS.get(tile, 1.0) if isinstance(tile, str) else float(tile)
+        self.parts.append((material, bm, tile_value))
         return self
 
     def Walk(self):
@@ -520,7 +556,11 @@ def _ExtractLoops(bm, tile):
                 smooth_normals[v.index] = acc
             acc += f.normal * max(weight, 1e-9)
 
-    inv_tile = 1.0 / max(tile, 1e-6)
+    source_uv = bm.loops.layers.uv.active if tile is None else None
+    authored_normal = bm.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
+    if tile is None and source_uv is None:
+        raise ValueError("sourceUv 网格没有活动 UV 层")
+    inv_tile = 0.0 if tile is None else 1.0 / max(tile, 1e-6)
     out = []
     for f in bm.faces:
         fn = f.normal.copy()
@@ -532,7 +572,10 @@ def _ExtractLoops(bm, tile):
         ax = max(range(3), key=lambda i: abs(fn[i]))
         for loop in f.loops:
             v = loop.vert
-            if f.smooth and v.index in smooth_normals:
+            if authored_normal is not None and Vector(loop[authored_normal]).length > 1e-9:
+                n = Vector(loop[authored_normal])
+                n.normalize()
+            elif f.smooth and v.index in smooth_normals:
                 n = smooth_normals[v.index].copy()
                 if n.length < 1e-9:
                     n = fn.copy()
@@ -540,7 +583,10 @@ def _ExtractLoops(bm, tile):
             else:
                 n = fn
             co = v.co
-            if ax == 0:
+            if source_uv is not None:
+                authored = loop[source_uv].uv
+                uv = (authored.x, authored.y)
+            elif ax == 0:
                 uv = (co.z * inv_tile, co.y * inv_tile)
             elif ax == 1:
                 uv = (co.x * inv_tile, co.z * inv_tile)

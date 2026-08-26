@@ -17,7 +17,9 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-from TzmCore import Box, Decimate, Join, Node, Transform
+from TzmCore import (
+    AUTHORED_NORMAL_LAYER, Box, Decimate, Join, Node, Transform, TransformMatrix,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
@@ -151,14 +153,18 @@ SOURCES = {
         "file": os.path.join("CgmolDadao", "Model_CgmolDadao.fbx"),
         "lengthM": 0.900,
         "kind": "melee",
-        # 整刀一个材质（材质.002），靠部件名分桶：刀片 / 卡扣 / 圆环 / U 是钢，
-        # 只有刀把走木。源包的 4K Base_color/Normal/Roughness 一律不用，
-        # 运行时统一绑 steel/wood 两套 512px 共享 PBR。
+        # 整刀一个材质（材质.002），靠部件名分桶只为减面时保住细小握柄零件。
+        # 写 TZM 时两桶重新并回专用 dadao 材质，并保留源 UV；运行时绑定从原包
+        # 4K 贴图压成的 1K PBR。大刀的刀脊、刃口与缠柄都靠这套专用法线，不能
+        # 再绑枪械共享的平铺钢/木纹。
         "nameBucket": {"刀把": "wood"},
         "noDetails": True,
-        # 源模整件 smooth，靠 4K 法线贴图撑硬表面；我们不带那张图，
-        # 不重设 smooth 的话刀背棱和护手边会被抹平成一根糊掉的黑影。
-        "autoSmooth": 32.0,
+        # 原包已经有完整的刃口/刀脊/护手倒角。枪械通用补倒角会再次切拓扑，
+        # 不但徒增三角，还会把 FBX 的逐角法线插值坏。
+        "noBevel": True,
+        "sourcePbr": True,
+        # 保留源模的 smooth 法线：专用法线贴图就是按这套切线基底烘焙的。
+        # 这里若再按角度强制打硬边，刀面会被切成大块三角明暗。
         "note": "CGMOL 付费「PBR 次世代二十九军战刀」（作者 逍姚子不逍遥，版权：不限用途）"
                 "→ 大刀。宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环，"
                 "正是二十九军/西北军那一路的制式；全长按史实 0.900 m。",
@@ -343,7 +349,8 @@ def _WeldDistance(diagonal):
     return min(0.0015, max(1e-6, diagonal) * 0.0015)
 
 
-def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False):
+def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False,
+             source_normals=False):
     """把场景里的网格按 steel/wood 收成两个 bmesh。跳过 skip 里的对象名。"""
     skip = {s.lower() for s in skip}
     buckets = {"steel": [], "wood": []}
@@ -358,7 +365,14 @@ def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_spl
         mesh = evaluated.to_mesh()
         raw = bmesh.new()
         raw.from_mesh(mesh)
-        bmesh.ops.transform(raw, matrix=evaluated.matrix_world, verts=raw.verts[:])
+        if source_normals:
+            authored = raw.loops.layers.float_vector.new(AUTHORED_NORMAL_LAYER)
+            raw.faces.ensure_lookup_table()
+            for polygon in mesh.polygons:
+                face = raw.faces[polygon.index]
+                for loop, loop_index in zip(face.loops, polygon.loop_indices):
+                    loop[authored] = mesh.corner_normals[loop_index].vector
+        TransformMatrix(raw, evaluated.matrix_world)
         evaluated.to_mesh_clear()
         raw.faces.ensure_lookup_table()
         forced = _ObjectBucket(obj, name_bucket)
@@ -418,8 +432,7 @@ def _Aabb(bms):
 
 def _Xform(bms, matrix):
     for bm in bms:
-        bmesh.ops.transform(bm, matrix=matrix, verts=bm.verts[:])
-        bm.normal_update()
+        TransformMatrix(bm, matrix)
 
 
 def _AlignLongAxisToZ(bms, roll=1.0):
@@ -863,7 +876,8 @@ def BuildImported(name):
     buckets = _Collect(spec.get("matIndex"), spec.get("skip", ()),
                        name_bucket=spec.get("nameBucket"),
                        mat_name=spec.get("matName"),
-                       color_split=spec.get("colorSplit", False))
+                       color_split=spec.get("colorSplit", False),
+                       source_normals=spec.get("sourcePbr", False))
     if "steel" not in buckets:
         raise RuntimeError("%s 导入后没有钢件" % name)
     wood = buckets.get("wood")
@@ -914,9 +928,16 @@ def BuildImported(name):
             ads_near.Add("steel", near_steel, tile=T_STEEL)
         else:
             near_steel.free()
-    if wood is not None:
-        body.Add("wood", wood, tile=T_WOOD)
-    body.Add("steel", steel, tile=T_STEEL)
+    if spec.get("sourcePbr"):
+        # 原包是一张完整 UV atlas：钢件和缠柄必须采样同一套贴图。材质桶合成
+        # 一个 draw call，但仍让减面阶段按部件分开，避免小圆环先被大刀面吃掉预算。
+        if wood is not None:
+            body.Add("dadao", wood, tile="sourceUv")
+        body.Add("dadao", steel, tile="sourceUv")
+    else:
+        if wood is not None:
+            body.Add("wood", wood, tile=T_WOOD)
+        body.Add("steel", steel, tile=T_STEEL)
     _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec, steel)
     return root
 

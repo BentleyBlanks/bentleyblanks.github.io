@@ -59,6 +59,9 @@ const PALETTE = {
   blade: { color: 0x9aa0a6, roughness: 0.22, metalness: 0.95 },
   wood: { color: 0x6a4b30, roughness: 0.72, metalness: 0.0 },
   grip: { color: 0x503524, roughness: 0.7, metalness: 0.0 },
+  // Dadao normally gets replaced by its authored PBR set before LoadModel.
+  // Keep a sane fallback for offline/partial-cache loading instead of neutral grey.
+  dadao: { color: 0x77736f, roughness: 0.58, metalness: 0.72 },
   red: { color: 0x8e2f27, roughness: 0.66, metalness: 0.0 },
   armor: { color: 0x555c4a, roughness: 0.66, metalness: 0.35 },
   track: { color: 0x3b3d3c, roughness: 0.85, metalness: 0.5 },
@@ -73,7 +76,7 @@ const DEFAULT_MATERIAL = { color: 0x7c7669, roughness: 0.75, metalness: 0.05 };
 /** 材质按需现造并缓存。用 Proxy 是为了让 InstantiateModel 拿任何键都有东西可用。 */
 function MaterialBank() {
   const made = new Map();
-  return new Proxy({}, {
+  const materials = new Proxy({}, {
     get(_target, key) {
       if (typeof key !== "string") return undefined;
       if (!made.has(key)) {
@@ -83,6 +86,55 @@ function MaterialBank() {
       return made.get(key);
     },
     has() { return true; },
+  });
+  return {
+    materials,
+    set(key, material) {
+      made.get(key)?.dispose?.();
+      made.set(key, material);
+    },
+    dispose() {
+      for (const material of made.values()) material.dispose?.();
+      made.clear();
+    },
+  };
+}
+
+async function LoadBitmapTexture(url, { srgb = false } = {}) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`PBR ${url} HTTP ${response.status}`);
+  const bitmap = await createImageBitmap(await response.blob());
+  const texture = new THREE.Texture(bitmap);
+  texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+async function LoadDadaoMaterial() {
+  const [albedo, normal, orm] = await Promise.all([
+    LoadBitmapTexture("./Texture/Texture_DadaoBase.webp?v=1", { srgb: true }),
+    LoadBitmapTexture("./Texture/Texture_DadaoNormal.webp?v=1"),
+    LoadBitmapTexture("./Texture/Texture_DadaoOrm.webp?v=1"),
+  ]);
+  return new THREE.MeshStandardMaterial({
+    map: albedo,
+    // 极弱的贴图自发光只充当没有 IBL 时的环境底光，强度不足以抹掉方向光高光。
+    emissiveMap: albedo,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0.16,
+    normalMap: normal,
+    aoMap: orm,
+    roughnessMap: orm,
+    metalnessMap: orm,
+    // 这台离屏展示台没有主场景的 PMREM 天空。纯金属在没有环境反射时除几条
+    // 方向光高光外几乎全黑，转到侧面就像贴图丢了。只在加载展示台把金属通道
+    // 压到 0.48、粗糙度略提；游戏内仍用完整 1.0 PBR，不改实际战场材质。
+    roughness: 1.08,
+    metalness: 0.48,
+    aoMapIntensity: 0.72,
   });
 }
 
@@ -152,7 +204,9 @@ export class PropStage {
     this.velocity = 0;
     this.dragging = false;
 
-    this.materials = MaterialBank();
+    this.materialBank = MaterialBank();
+    this.materials = this.materialBank.materials;
+    this.dadaoPbrReady = false;
   }
 
   /** 宿主量好的 CSS 像素尺寸。 */
@@ -184,6 +238,15 @@ export class PropStage {
     const url = MeshUrl(entry.id);
     if (!url) return null;
     const token = (this.token += 1);
+    if (entry.id === "Dadao" && !this.dadaoPbrReady) {
+      try {
+        this.materialBank.set("dadao", await LoadDadaoMaterial());
+        this.dadaoPbrReady = true;
+      } catch (error) {
+        // 加载画面不能被一张未热好的贴图拖死；PALETTE.dadao 仍能给出正确材质读感。
+        console.warn(`[BootProp] 大刀 PBR 加载失败：${String(error).slice(0, 160)}`);
+      }
+    }
     const root = await LoadModel(url, {
       materials: this.materials, batch: true, castShadow: false, receiveShadow: false,
     });
@@ -225,6 +288,7 @@ export class PropStage {
 
   Dispose() {
     this.disposed = true;
+    this.materialBank.dispose();
     this.renderer.dispose();
   }
 }
