@@ -1015,7 +1015,7 @@ export class TengxianCity {
         width: s.width, material: "DirtRoad",
         groundAt: (x, z) => this.GroundHeight(x, z),
         crown: 0.11, skirtDrop: 0.12, step: 12, seed: `road${s.id}`,
-        sectorKey: SectorKey,
+        sectorKey: SectorKey, cutWhere: (x, z) => this.WaterAt(x, z),
       });
       // 巷道（rank:"hutong"）是人走出来的过道：不铺车辙 —— 大车进不了两米巷。
       if (s.rank !== "hutong") {
@@ -1587,7 +1587,7 @@ export class TengxianCity {
         width: horizontal ? alley.d : alley.w, material: "DirtRoad",
         groundAt: (x, z) => this.GroundHeight(x, z),
         crown: 0.075, skirtDrop: 0.25, step: 6, seed: `lane${alley.id}`,
-        sectorKey: SectorKey,
+        sectorKey: SectorKey, cutWhere: (x, z) => this.WaterAt(x, z),
       });
     }
 
@@ -1898,7 +1898,8 @@ export class TengxianCity {
       width: 7.0, material: "DirtRoad",
       groundAt: (x, z) => this.OuterHeight(x, z),
       crown: 0.06, skirtDrop: 0.6, step: 4, seed: "eastApproachRoad",
-      sectorKey: SectorKey,
+      // 荆河横在这条道上（x≈680）：自动断水，路在两岸各收口，不铺过河
+      sectorKey: SectorKey, cutWhere: (x, z) => this.WaterAt(x, z),
     });
     this.sink.SetSector(SectorKey(544 + (EAST_FIELD.bounds.maxX - 544) / 2, EAST_FIELD.roadZ));
     this.BuildEastFarmFields(rnd);
@@ -2489,6 +2490,25 @@ export class TengxianCity {
    * 台地上的弹坑不进这条解析式（弹坑是网格上的位移）—— 差值最大约 1 m，
    * 接进游戏时要么改用射线取地，要么把弹坑也写进这里。
    */
+  /**
+   * 这个 xz 是不是水面（护城河槽里低于水面的部分 + 荆河河槽）。
+   * 样条道路的自动断开（BuildRoadRibbon.cutWhere）用它：路面可以顺着濠岸
+   * 往下铺到水线为止，不许把裙边垂进水里。水面高：濠 MOAT.waterY（-1.6）、
+   * 荆河 -3.0（与 Script_TengxianField.RIVER_SURFACE_Y 同一个数，改要一起改）。
+   */
+  WaterAt(x, z) {
+    const m = Math.max(Math.abs(x), Math.abs(z));
+    const [side, along] = SideAndAlong(x, z);
+    const inner = CITY.platformEdge + MoatBulge(along, side);
+    if (m > inner && m < inner + MOAT.width) {
+      return this.GroundHeight(x, z) < MOAT.waterY + 0.15;
+    }
+    if (DistanceToRiver(x, z) < OUTSKIRTS.river.width / 2 + 14) {
+      return this.OuterHeight(x, z) < -3.0 + 0.15;
+    }
+    return false;
+  }
+
   GroundHeight(x, z) {
     const m = Math.max(Math.abs(x), Math.abs(z));
     const [side, along] = SideAndAlong(x, z);

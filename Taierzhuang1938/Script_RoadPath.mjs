@@ -185,6 +185,32 @@ export function SampleRun(path, s0, s1, step) {
   return out;
 }
 
+/**
+ * 按谓词沿线扫出缺口：where 为真的连续段（各向外扩 margin）变成 [[s0,s1],...]。
+ * 道路的**自动断水**用它 —— 路面碰到护城河/河槽就断开，而不是把裙边垂进水里。
+ * where(x, z, tx, tz) 拿得到切向，调用方可以据此把「路肩两侧的点」也一并判掉
+ * （濠岸是斜线时，中心还在岸上、路肩已经悬在水上）。
+ */
+export function PredicateGaps(path, where, { step = 4, margin = step } = {}) {
+  const n = Math.max(1, Math.round(path.length / step));
+  const gaps = [];
+  let open = null;
+  let last = 0;
+  for (let i = 0; i <= n; i += 1) {
+    const s = (path.length * i) / n;
+    const p = path.At(s);
+    if (where(p.x, p.z, p.tx, p.tz)) {
+      if (open == null) open = s;
+      last = s;
+    } else if (open != null) {
+      gaps.push([open - margin, last + margin]);
+      open = null;
+    }
+  }
+  if (open != null) gaps.push([open - margin, path.length]);
+  return gaps;
+}
+
 /** 点到折线（[[x,z],...]）的最近距离。原散落四份的实现收拢到这里。 */
 export function DistanceToPolyline(x, z, points) {
   let best = 1e9;

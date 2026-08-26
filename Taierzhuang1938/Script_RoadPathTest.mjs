@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import {
-  MakeRoadPath, GapsToRuns, SampleRun, DistanceToPolyline,
+  MakeRoadPath, GapsToRuns, SampleRun, DistanceToPolyline, PredicateGaps,
 } from "./Script_RoadPath.mjs";
 
 // --- 直线（两点）：逐位退化 ---
@@ -101,6 +101,23 @@ import {
   assert.ok(sag > 1 && sag < 12, `弦中点偏差应在 1—12 m（实测 ${sag.toFixed(2)}）`);
   assert.ok(DistanceToPolyline(100, 0, dense) < 0.6, "拐角控制点在走廊里");
   assert.ok(Math.abs(DistanceToPolyline(-40, 0, dense) - 40) < 2, "线外远点距离正确");
+}
+
+// --- 谓词断水：湿段（含扩边）变缺口，接 GapsToRuns 剩两岸 ---
+{
+  const path = MakeRoadPath([[0, 0], [100, 0]]);
+  const gaps = PredicateGaps(path, (x) => x > 40 && x < 60, { step: 4, margin: 2 });
+  assert.equal(gaps.length, 1, "一段水一个缺口");
+  assert.ok(gaps[0][0] >= 40 && gaps[0][0] <= 44 && gaps[0][1] >= 56 && gaps[0][1] <= 60,
+    `缺口要贴着水沿（实测 [${gaps[0][0]}, ${gaps[0][1]}]）`);
+  const runs = GapsToRuns(100, gaps);
+  assert.equal(runs.length, 2, "路在两岸各留一段");
+  assert.deepEqual(PredicateGaps(path, () => false, { step: 4 }), [], "全干无缺口");
+  const all = PredicateGaps(path, () => true, { step: 4, margin: 2 });
+  assert.equal(GapsToRuns(100, all).length, 0, "全湿就整条不铺");
+  // 两段水两个缺口
+  const two = PredicateGaps(path, (x) => (x > 10 && x < 20) || (x > 70 && x < 90), { step: 2, margin: 1 });
+  assert.equal(two.length, 2);
 }
 
 // --- 真实数据冒烟：L0/L1 的大车路点列都能建路 ---
