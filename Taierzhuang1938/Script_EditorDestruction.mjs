@@ -191,7 +191,7 @@ export class DestructionEditor {
       this.showVolumes = on;
       this.RefreshGizmos();
     });
-    Note(tool, "正式玩法中的场景破坏暂时关闭；仅本编辑器临时启用预破碎链。复原或退出会还原进入编辑器时的状态。", true);
+    Note(tool, "玩法里的场景破坏暂时关闭，只在本编辑器临时启用；复原或退出会还原。", true);
 
     const profiles = Section(body, "本关材质分布");
     this.profileList = ListBox(profiles, {

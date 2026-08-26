@@ -103,9 +103,8 @@ export class DebugRenderingEditor {
       this.chipGroups.push(Chips(section, options, this.view, (id) => this.SetView(id)));
     }
     Note(body,
-      "这是前景叠加工具：打开场景、地形、构件或摄影棚编辑器时不会被关闭。"
-      + "前向管线没有延迟渲染的 GBuffer —— 「材质」「光照」组是让材质把该通道"
-      + "当颜色重画一帧的假彩色（low 档材质未注入，这两组不可用）。", true);
+      "前景叠加，开着别的编辑器也不关。前向管线没有 GBuffer：「材质」「光照」是"
+      + "假彩色重画一帧（low 档不可用）。", true);
     const stat = Section(body, "当前靶");
     this.facts = Facts(stat);
   }

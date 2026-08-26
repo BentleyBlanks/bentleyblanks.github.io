@@ -608,9 +608,16 @@ UE 的缺省 Temporal AA（Karis SIGGRAPH 2014 + TemporalAA.usf 出厂 CVar）�
   画在 sRGB 之后是设计期的旧稿，以实装为准）。泛光 / 雾 / 运动模糊 / DOF
   吃的都是解算后的画面。TAA 开着时最后一趟的 FXAA 用 `uFxaa` 关掉，
   锐化保留（UE 对应 Tonemapper Sharpen）。
-- **档位**：`QUALITY_PRESETS` 的 `taa` 位 —— medium/high/ultra 开、low 关
-  （两张全分辨率 RGBA16F 历史靶对集显是实打实的带宽）。ultra 的 4×MSAA
+- **档位与开关**：`QUALITY_PRESETS` 的 `taa` 位是**出厂默认** —— medium/high/ultra
+  开、low 关（两张全分辨率 RGBA16F 历史靶对集显是实打实的带宽）。ultra 的 4×MSAA
   保留：是给 TAA 喂更干净的几何边，叠加不冲突，只是贵。
+  运行时状态在 `PostPipeline.taaEnabled`，画质面板「抗锯齿」那一栏经
+  `graphics.taa` → `ApplyGraphics` → `SetTaaEnabled(on)` 热切（走 GI 那条惰性构造
+  的先例：靶按 `taaEnabled` 建，low 档打开时才建、关掉立刻还显存），所以它
+  **不属于**「要重开页面」的那一组。`ApplyGraphics` 里这一行必须排在 `SetSize`
+  之后 —— SetSize 按当时的 `taaEnabled` 建靶，反过来的话刚打开的那一次会漏建。
+  另有逐次调用的 escape hatch `options.taa === false`（A/B 像素对比测试用，
+  不动面板那一位）。两条路径中断后重新开启都会丢历史（`taaWasActive` 记着）。
 - **镜头硬切**：`PostPipeline.NotifyCameraCut()` 丢历史；不调也只是切换
   瞬间一帧轻微溶解（邻域裁剪一两帧内压回去），语义对应 UE 的 camera cut。
 - **决定论**：抖动与历史全由 frameIndex 驱动，`StepFrames` 推同样多帧

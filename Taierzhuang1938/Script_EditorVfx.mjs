@@ -178,8 +178,7 @@ export class VfxEditor {
 
     const evidence = Section(body, "取证");
     this.facts = Facts(evidence);
-    Note(evidence, "持续火焰/烟雾使用 Vefects 轮廓纹理；贴图未加载时自动退回程序化粒子。"
-      + "爆炸、枪口焰和命中保持原战斗反馈。", true);
+    Note(evidence, "持续火焰/烟雾用 Vefects 轮廓纹理，未加载时退回程序化粒子；爆炸、枪口焰、命中不变。", true);
   }
 
   IsContinuous() { return !!SCENE_EFFECTS[this.effectId]; }

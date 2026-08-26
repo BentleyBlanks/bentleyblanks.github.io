@@ -244,6 +244,10 @@ const topDown = await page.evaluate(async () => {
   const THREE = await import("./vendor/three/build/three.module.js");
   const T = window.Taierzhuang;
   const beforeFar = T.camera.far;
+  const beforeFov = T.camera.fov;
+  // 战斗那份 far 存在 FlyCam.saved 里：编辑器一进来就把相机换成出厂投影，
+  // T.camera.far 已经是编辑器的 2000 了，拿它当「战斗远平面」会对不上。
+  const battleFar = T.editor.flycam.saved.far;
   T.editor.active.TopDown();
   T.StepFrames(3);
   const camera = T.camera;
@@ -256,20 +260,23 @@ const topDown = await page.evaluate(async () => {
     [bounds.maxX, bounds.maxZ], [bounds.minX, bounds.maxZ],
   ];
   return {
-    beforeFar,
+    beforeFar, beforeFov, battleFar,
     far: camera.far,
     height: camera.position.y,
     allCornersVisible: corners.every(([x, z]) => frustum.containsPoint(new THREE.Vector3(x, 0, z))),
   };
 });
-Check("俯瞰当前切片：四角都在视锥且编辑器临时放远 far",
-  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far > topDown.beforeFar,
+Check("场景编辑器出厂投影：远面 2000 m / FOV 55°",
+  topDown.beforeFar === 2000 && topDown.beforeFov === 55,
+  `far=${topDown.beforeFar} fov=${topDown.beforeFov}（战斗 far=${topDown.battleFar}）`);
+Check("俯瞰当前切片：四角都在视锥且 far 盖得住机位",
+  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far >= topDown.beforeFar,
   JSON.stringify(topDown));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 await Step(3);
 const restoredTopDownFar = await page.evaluate(() => window.Taierzhuang.camera.far);
-Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.beforeFar,
-  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}`);
+Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.battleFar,
+  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}（战斗 ${topDown.battleFar}）`);
 
 // ---------------------------------------------------------------------------
 // 1b) 暂停要连**声音**一起停
@@ -361,6 +368,46 @@ Check("画质面板：渲染分辨率真的改到合成靶上",
 Check("画质面板：设置落盘",
   !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
   gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");
+
+// TAA 开关：**点真按钮**，不是直接改 gfx.taa 再调 Apply。
+// 面板上的开关如果没接上回调（或者接错了那一位），直接改字段的测法一样是绿的，
+// 而玩家点了没反应 —— 这一栏加进来的起因正是「设置里根本没有 TAA」。
+const taaToggle = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  // Toggle 建的是 div.edBtn 不是 <button>（Script_EditorUi.Toggle），
+  // 按标签选而不是按位置选：面板加一栏就不该让这条测试挪窝。
+  const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
+    .find((b) => (b.textContent || "").includes("TAA"));
+  const button = Btn();
+  if (!button) return { found: false };
+  const boot = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
+  button.click();
+  T.StepFrames(3);
+  const off = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
+  Btn().click();
+  // 重开的第一帧必须没有历史可混：关着的那几帧没人写历史靶，
+  // 里面躺的是关掉之前那一张，混上去就是一层脏东西。
+  const firstFrameHistory = T.post.hasTaaHistory;
+  T.StepFrames(6);
+  const on = {
+    taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa,
+    settled: T.post.hasTaaHistory,
+  };
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  return { found: true, boot, off, on, firstFrameHistory, saved: saved ? saved.taa : null };
+});
+Check("画质面板：TAA 开关点得动，管线状态与历史靶跟着走",
+  taaToggle.found && taaToggle.boot.taa === true && taaToggle.off.taa === false
+  && taaToggle.off.targets === false && taaToggle.on.taa === true && taaToggle.on.targets === true,
+  taaToggle.found
+    ? `开机=${taaToggle.boot.taa} → 关=${taaToggle.off.taa}/靶${taaToggle.off.targets}`
+      + ` → 开=${taaToggle.on.taa}/靶${taaToggle.on.targets}`
+    : "面板上找不到 TAA 开关");
+Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
+  taaToggle.found && taaToggle.firstFrameHistory === false
+  && taaToggle.on.settled === true && taaToggle.saved === true,
+  `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
 
 await page.click('[data-editor="sound"]');
 await Step(6);
@@ -776,6 +823,7 @@ const scene = await page.evaluate(() => {
   out.originalProjection = [editor.flycam.saved.fov, editor.flycam.saved.far];
   active.TopDown();
   out.topDownFar = T.camera.far;
+  out.topDownHeight = T.camera.position.y;
   const SetSlider = (control, value) => {
     const input = control.root.querySelector("input");
     input.value = String(value);
@@ -936,9 +984,11 @@ Check("场景编辑器只保留关卡与布设职责",
 Check("场景编辑器不再能编辑地形", scene.terrainBlocked);
 Check("场景相机可调 FOV 与远裁剪面",
   scene.projection[0] === 68 && scene.projection[1] === 1500, scene.projection.join(" / "));
-Check("俯瞰全城会自动扩远裁剪面",
-  scene.topDownFar > scene.originalProjection[1],
-  `${scene.originalProjection[1].toFixed(0)} → ${scene.topDownFar.toFixed(0)} m`);
+// 编辑器出厂就是 2000 m，俯瞰通常不需要再扩；但战斗那份 400 m 一定盖不住
+// 俯瞰机位，所以这里断的是「结果够远」，不是「有没有扩过」。
+Check("俯瞰全城的远裁剪面盖得住机位（战斗那份盖不住）",
+  scene.topDownFar > scene.topDownHeight && scene.topDownFar > scene.originalProjection[1],
+  `战斗 ${scene.originalProjection[1].toFixed(0)} → 俯瞰 ${scene.topDownFar.toFixed(0)} m（机位高 ${scene.topDownHeight.toFixed(0)} m）`);
 Check("放置的构件进场景且带碰撞盒",
   scene.items === 1 && scene.nodes >= 1 && scene.colliderGain > 0 && scene.nearby > 0,
   `盒子 +${scene.colliderGain}，附近 ${scene.nearby}`);
