@@ -32,7 +32,7 @@ import { AudioEditor } from "./Script_EditorAudio.mjs";
 import { SceneEditor } from "./Script_EditorScene.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { TerrainEditor } from "./Script_EditorTerrain.mjs";
-import { RoadEditor } from "./Script_EditorRoads.mjs";
+import { SplineEditor } from "./Script_EditorSplines.mjs";
 import { SamplePointEditor } from "./Script_EditorSamplePoints.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
@@ -51,7 +51,7 @@ import {
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
   ActorEditor, WeaponEditor, VfxEditor, AudioEditor, TimelineEditor,
-  SceneEditor, PropLibraryEditor, TerrainEditor, RoadEditor, DestructionEditor,
+  SceneEditor, PropLibraryEditor, TerrainEditor, SplineEditor, DestructionEditor,
   SamplePointEditor,
 ];
 const ALL = [...SETTINGS, ...EDITORS];

@@ -27,9 +27,11 @@
 import * as THREE from "three";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps } from "./Script_RoadPath.mjs";
+import {
+  MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile,
+} from "./Script_RoadPath.mjs";
 
-export { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps };
+export { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile };
 
 // ---------------------------------------------------------------------------
 // 条带累加器
@@ -199,51 +201,6 @@ export function BuildRoadRibbon(sink, {
     }
   }
   return stats;
-}
-
-// ---------------------------------------------------------------------------
-// 轨面高程剖面
-// ---------------------------------------------------------------------------
-
-/**
- * 轨面高程：地面（可另取旁侧采样点避开垫地）→ 箱式平滑 → 抬 lift → 对本地
- * 地面夹持。铁路的顶面必须比地面平顺（坡度 ≲2%），直接逐点贴地会得到
- * 过山车 —— 这正是车站那条 0.46 m 低路基的做法，收拢成可复用的剖面。
- */
-export function MakeCrownProfile(path, {
-  groundAt, step = 4, smooth = 0, lift = 0, clampLo = null, clampHi = null, probeOffset = 0,
-}) {
-  const n = Math.max(2, Math.round(path.length / step) + 1);
-  const stride = path.length / (n - 1);
-  const local = new Float64Array(n);
-  const base = new Float64Array(n);
-  for (let i = 0; i < n; i += 1) {
-    const p = path.At(i * stride);
-    local[i] = groundAt(p.x, p.z);
-    base[i] = probeOffset
-      ? Math.max(local[i], groundAt(p.x + p.tz * probeOffset, p.z - p.tx * probeOffset))
-      : local[i];
-  }
-  const Idx = (s) => Math.min(n - 1, Math.max(0, Math.round(s / stride)));
-  const SmoothAt = (i) => {
-    if (!smooth) return base[i];
-    let sum = 0, cnt = 0;
-    for (let k = -smooth; k <= smooth; k += 1) {
-      sum += base[Math.min(n - 1, Math.max(0, i + k))];
-      cnt += 1;
-    }
-    return sum / cnt;
-  };
-  return {
-    At: (s) => {
-      const i = Idx(s);
-      let crownY = SmoothAt(i) + lift;
-      if (clampLo != null) crownY = Math.max(crownY, local[i] + clampLo);
-      if (clampHi != null) crownY = Math.min(crownY, local[i] + clampHi);
-      return crownY;
-    },
-    LocalAt: (s) => local[Idx(s)],
-  };
 }
 
 // ---------------------------------------------------------------------------

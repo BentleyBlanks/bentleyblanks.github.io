@@ -69,6 +69,7 @@ export const testDefs = {
   BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
   RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
+  WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
@@ -144,6 +145,7 @@ export const tier0 = [
   "CutsceneControlTest",
   "GeoTest",
   "RoadPathTest",
+  "WallPlanTest",
 ];
 
 export const tier2 = [
@@ -158,7 +160,7 @@ export const tier2 = [
 export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -358,8 +360,9 @@ export function InferDomains(files) {
       for (const name of ["terrain", "editor", "render"]) found.add(name);
       matched = true;
     }
-    // 样条道路层被铁路/大车路/大街/编辑器四路共用：地形、编辑器、渲染都要回归
-    if (/^(Script_RoadPath|Script_RoadSpline|Script_EditorRoads)\.mjs$/.test(leaf)) {
+    // 场景样条层（道路 + 围墙 + 编辑器）被铁路/大车路/大街/寨墙/坝墙/石墙村共用：
+    // 地形、编辑器、渲染都要回归
+    if (/^(Script_RoadPath|Script_RoadSpline|Script_WallPlan|Script_WallSpline|Script_EditorSplines)\.mjs$/.test(leaf)) {
       for (const name of ["terrain", "editor", "render"]) found.add(name);
       matched = true;
     }

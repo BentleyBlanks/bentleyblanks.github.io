@@ -52,7 +52,7 @@ import { BuildEastMapBlocks } from "./Script_Landmark_EastMapBlocks.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
-  AddChurch, AddPagoda, AddZhaiWall, AddCompound, AddRoomBlock, AddHardMountainRoof,
+  AddChurch, AddPagoda, AddCompound, AddRoomBlock, AddHardMountainRoof,
   AddTree, AddSandbagEmplacement, AddWell,
   AddCypress, AddPoplar, AddOrchardTree,
 } from "./Script_World.mjs";
@@ -66,6 +66,7 @@ import {
 } from "./Script_LivedInProps.mjs";
 import { CreateWaterSurface } from "./Script_Water.mjs";
 import { BuildRoadRibbon } from "./Script_RoadSpline.mjs";
+import { BuildWallSpline, FlushWallInstances } from "./Script_WallSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：逻辑名 → 既有烘焙配方 + 调色
@@ -1620,26 +1621,35 @@ export class TengxianCity {
     }
 
     // 东关寨墙：**高 2 m、顶宽 0.4 m**（日方实测）—— 极薄，一炮一个口。
+    // 样条围墙管线（Script_WallSpline）：逐模块贴地 + 实例化。缺口改成世界坐标
+    // —— 旧版 gap 挖在局部 0（z=0），寨门门垛却砌在 zhaiGate.z=-65，门洞被墙
+    // 封死、z=0 处反倒有个没名目的洞；世界坐标口径顺手把这条对齐了。
     const zw = EAST_SUBURB.zhaiWall;
     if (zw.enabled !== false && this.InBounds(zw.x, 0, 260)) {
-      AddZhaiWall(this.sink, {
-        x: zw.x, z: 0, ry: Math.PI / 2, length: zw.toZ - zw.fromZ,
-        height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth, seed: "zhaiEast",
-        gaps: [{ at: 0, width: EAST_SUBURB.zhaiGate.width + 1.6 }],
-        // 3 月 16 日 14:00 第二轮集中炮击把东寨门完全打毁，14:15 第三中队沿地隙冲入
-        breaches: [{ at: 24, width: 16 }, { at: -52, width: 12 }],
-        baseY: 0,
-      });
-      // 东寨门：砖券洞
       const g = EAST_SUBURB.zhaiGate;
+      const half = (zw.toZ - zw.fromZ) / 2;
+      BuildWallSpline(this.sink, {
+        name: "ZhaiEast", style: "rammedEarth", material: "ZhaiEarth", tag: "zhaiWall",
+        points: [[zw.x, -half], [zw.x, half]],
+        height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth,
+        seed: "zhaiEast", moduleLen: 3.2, embed: 0.5,
+        groundAt: (x, z) => this.GroundHeight(x, z),
+        gaps: [{ at: [g.x, g.z], width: g.width + 1.6 }],
+        // 3 月 16 日 14:00 第二轮集中炮击把东寨门完全打毁，14:15 第三中队沿地隙冲入
+        breaches: [{ at: [zw.x, -24], width: 16 }, { at: [zw.x, 52], width: 12 }],
+        sectorKey: SectorKey,
+        inRegion: (x, z) => this.InBounds(x, z, 8),
+      });
+      // 东寨门：砖券洞（贴门垛自己的地高，墙都贴地了门垛不能还悬在 0 上）
+      const gy = this.GroundHeight(g.x, g.z);
       for (const s of [-1, 1]) {
         this.sink.Add("HouseBrick", PlaceGeometry(
           MakeBox(1.4, g.height, 1.0, TILE_METERS.brick, `zhaiGate${s}`, BRICK_UV_GRID),
-          { x: g.x, y: g.height / 2, z: g.z + s * (g.width / 2 + 0.7) }));
+          { x: g.x, y: gy + g.height / 2, z: g.z + s * (g.width / 2 + 0.7) }));
       }
       this.sink.Add("HouseBrick", PlaceGeometry(
         MakeBox(1.0, 0.9, g.width + 2.8, TILE_METERS.brick, "zhaiGateTop", BRICK_UV_GRID),
-        { x: g.x, y: g.height + 0.45, z: g.z }));
+        { x: g.x, y: gy + g.height + 0.45, z: g.z }));
     }
 
     // 寺院地阵地：日方称之为「敌之有力据点」的一座小寺庙
@@ -2425,6 +2435,13 @@ export class TengxianCity {
     const bagMatrices = [];
     const rubble = [];
     const dummy = new THREE.Object3D();
+    // 样条围墙的实例化桶（寨墙/坝墙等）：与沙包/瓦砾同一条收尾通道
+    for (const sink of [this.sink, this.farSink]) {
+      FlushWallInstances(sink, {
+        scene: this.scene, meshes: this.meshes, library: this.library,
+        resolve: ResolveTengxianMaterial,
+      });
+    }
     for (const sink of [this.sink, this.farSink]) {
       for (const p of sink.props) {
         if (p.kind === "sandbags") { bagMatrices.push(...p.matrices); continue; }

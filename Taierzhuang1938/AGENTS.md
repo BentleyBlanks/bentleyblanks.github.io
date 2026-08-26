@@ -8,7 +8,7 @@
 （`Data_Battle.mjs` 头注），正片是滕县七关，**每关只建一片切片、换关拆掉重建**
 （`Script_Main.mjs` 头注）。一批老文件头还写着《血战台儿庄》，别被名字骗。
 
-规模：146 个 `Script_*.mjs` + 35 个 `Data_*.mjs` 平铺在根目录，约十万行；`docs/` 35 篇分册。
+规模：173 个 `Script_*.mjs` + 35 个 `Data_*.mjs` 平铺在根目录，约十万行；`docs/` 38 篇分册。
 本文件只放**硬规矩 + 路由表 + docs 导读**；细则、判据、事故过程在 `docs/` 与各文件头注。
 **这个仓库的文件头注释是第一手文档**：为什么存在、架构取舍、踩过的坑都在头注里，
 先读头注再读函数体。
@@ -161,7 +161,11 @@ URL 参数选 preset / quality / scene / gi。
   尺寸全按 `docs/Data_HistoryMaterial.md` 的考据（鲁南民居对外不开窗是最重的形制铁律）。
 - `Script_Geo.mjs` —— UV 密度统一（全场砖缝一样大）、破损形体、批合并。
 - `Script_CityBlockKit.mjs` —— 院落六原型 × 三档 LOD，治「大量重复村庄」。
-- 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）。
+- `Script_RoadPath.mjs` + `Script_RoadSpline.mjs` —— 样条道路管线（铁路/大车路/大街
+  的唯一铺路口径）；`Script_WallPlan.mjs` + `Script_WallSpline.mjs` —— 样条围墙管线
+  （寨墙/坝墙/石墙村/村院墙，逐模块贴地 + InstancedMesh）。Plan/Path 层纯 Node 可测。
+- 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）；道路口径 `docs/Data_RoadSpline.md`、
+  围墙口径 `docs/Data_WallSpline.md`。
 
 ### 地形 / 高度
 - `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地三边必须问同一个函数
@@ -273,7 +277,8 @@ URL 参数选 preset / quality / scene / gi。
 
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
-- `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`。
+- `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
+  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑，原「道路样条」扩围后改名）。
   DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法；
   Profiler（独立窗口的性能剖析，内核 `Script_Profiler.mjs`）还带 keepOnClose ——
   关设置面板回去打仗它照记。
@@ -297,7 +302,7 @@ URL 参数选 preset / quality / scene / gi。
   `Heightmap/`、`BgmReview/`、`_import/`（外部资产取源/烘焙）、`_blender/`（Blender 管线）、
   `_shots/`（出图产物，gitignore）、`vendor/`（three + rapier，别 grep 进去）。
 
-## docs/ 导读（35 篇：先分清「现状」与「留档」）
+## docs/ 导读（38 篇：先分清「现状」与「留档」）
 
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（81 KB，渲染管线唯一现状文档）、`Data_TechPhysics.md`、
@@ -308,7 +313,8 @@ URL 参数选 preset / quality / scene / gi。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`（关卡与过场设计书）、
   `Data_CutsceneRedo.md`（五场过场施工单）、`Data_CityWallPbr.md`、
   `Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
-  `Data_TestRange.md`（?range=1 玩法测试靶场与 Debug.Range 取证口）。
+  `Data_TestRange.md`（?range=1 玩法测试靶场与 Debug.Range 取证口）、
+  `Data_RoadSpline.md`（样条道路）、`Data_WallSpline.md`（样条围墙 + 未迁移例外清单）。
 
 **史实考据底本（三档可信度：信史 / 主流记载 / 流传待考；台词只建立在前两档上）**：
 - `Data_HistoryMaterial.md`（装备/军服/建筑，建模级参数）、`Data_HistoryQuotes.md`（语录校勘）、

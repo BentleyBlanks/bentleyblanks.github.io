@@ -113,7 +113,7 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十一个编辑器（含道路样条）
+// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十一个编辑器（含场景样条PCG）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
 Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 17, `按钮数=${afterGear.entries}`);
 

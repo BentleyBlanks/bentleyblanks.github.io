@@ -3085,38 +3085,5 @@ function ScalePagodaUv(geometry, uScale, vScale) {
   return geometry;
 }
 
-/**
- * 关厢寨墙（东关）。日方实测：**高 2 m、顶宽 0.4 m** —— 极薄，一炮一个口。
- * 与内城墙差一个量级，这条对比本身就是关卡叙事：
- * 「对守军有利的不是城墙的高度与坚固，而是外城的存在与环绕城墙的密集民房。」
- */
-export function AddZhaiWall(sink, {
-  x, z, ry = 0, length, height = 2.0, topWidth = 0.4, baseWidth = 0.9,
-  seed = "zhai", gaps = [], breaches = [], baseY = 0,
-}) {
-  const cos = Math.cos(ry), sin = Math.sin(ry);
-  const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
-  const rnd = Mulberry32(HashString(seed));
-  const segs = Math.max(4, Math.round(length / 1.6));
-  const segLen = length / segs;
-  for (let i = 0; i < segs; i += 1) {
-    const lx = -length / 2 + segLen * (i + 0.5);
-    let skip = false;
-    for (const g of gaps) if (Math.abs(lx - g.at) < g.width / 2) skip = true;
-    if (skip) continue;
-    let h = height;
-    for (const b of breaches) {
-      const d = Math.abs(lx - b.at);
-      if (d < b.width / 2) h = Math.min(h, height * (0.12 + 0.88 * Math.pow(d / (b.width / 2), 1.5)));
-    }
-    h *= 0.94 + rnd() * 0.12;          // 土墙顶本来就是参差的
-    const p = L(lx, 0);
-    sink.Add("ZhaiEarth", PlaceGeometry(
-      MakeBox(segLen * 1.03, h, (topWidth + baseWidth) / 2, TILE_METERS.adobe, `${seed}:s${i}`),
-      { x: p.x, y: baseY + h / 2, z: p.z, ry }));
-    if (h > height * 0.6) {
-      sink.Solid(p.x, baseY + h / 2, p.z, segLen / 2, h / 2, baseWidth / 2, "zhaiWall", ry);
-      sink.Cover(p.x, p.z, baseY + h, sin, cos);
-    }
-  }
-}
+// 关厢寨墙（AddZhaiWall）已迁到样条围墙管线：Script_WallSpline.BuildWallSpline
+// （逐模块贴地 + InstancedMesh），调用点在 Script_TengxianCity 的东关段。

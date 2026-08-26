@@ -1,22 +1,25 @@
-// 道路样条编辑器：把全城的铁路/道路/大街按「中心线控制点」列出来，
-// 现场预览、拖点、加减点、调宽，再导出誊回各自的数据文件。
+// 场景样条PCG编辑器（原「道路样条编辑器」，2026-08-27 扩围墙后改名）：
+// 把全城**沿线生成的场景元素** —— 铁路/道路/大街 + 寨墙/坝墙/石墙村 ——
+// 按「中心线控制点」列出来，现场预览、拖点、加减点、调参，再导出誊回数据文件。
 //
 // ## 它编辑的是谁的数
-// 路的数据故意没有集中成一张新表（那会造出第二份真相）：
+// 路与墙的数据故意没有集中成一张新表（那会造出第二份真相）：
 //   · 城内街       Data_Tengxian.STREETS（axis/at/from/to —— 测试锁死格式）
 //   · 东关巷路     Data_Tengxian.EAST_SUBURB.mapLanes
 //   · 西关/北关大街 Data_Tengxian.WEST_SUBURB.westStreet / NORTH_SUBURB.street
 //   · 津浦铁路     Data_Tengxian.WEST_SUBURB.railway 与 OUTFIELD_SCENES[*].railway
 //   · 城外大车路   Script_TengxianOutfield.OUTFIELD_SCENES[*].roads.points
+//   · 东关寨墙     Data_Tengxian.EAST_SUBURB.zhaiWall（x/fromZ/toZ —— 轴对齐格式）
+//   · 北关坝墙     Data_Tengxian.NORTH_SUBURB.stockade（z/fromX/toX —— 轴对齐格式）
+//   · 石墙村圩墙   Script_TengxianOutfield.OUTFIELD_SCENES[*].villages[*]（矩形 + 外扩 8 m）
 // 本面板把它们统一读成 [[x,z],...] 的控制点做预览编辑；导出的 JSON 里
-// 每条路都带着 source，说明这串点该誊回哪个文件的哪个字段。
-// **轴对齐的数据（STREETS 等）誊回去时仍要保持轴对齐**（两点、同轴）——
-// 面板会在导出里对不再轴对齐的条目标警告，由人决定是改数据格式还是拉直。
+// 每条路线都带着 source，说明这串点该誊回哪个文件的哪个字段。
+// **轴对齐/矩形的数据誊回去时仍要保持原格式** —— 面板会在导出里对拖弯的条目标警告。
 //
 // ## 预览 = 真几何
-// 「重建预览」调的就是游戏里铺路那份 Script_RoadSpline（同一份代码、同一个
-// groundAt），不是示意线 —— 面板里看到贴地的样子就是进游戏的样子。
-// 预览网格抬高 0.02 m 盖在现路上，避免和已生成的路面 z-fight。
+// 「重建预览」调的就是游戏里铺路/砌墙那份 Script_RoadSpline / Script_WallSpline
+// （同一份代码、同一个 groundAt），不是示意线 —— 围墙预览连实例化矩阵表都是
+// 真的那份（变体/塌段/破口逐位一致）。预览抬 0.04 m 盖在现物上防 z-fight。
 //
 // ## 面板里的改动不落盘
 // 与采样点编辑器同一条纪律：改动存 localStorage，刷新不丢；基线在源码里，
@@ -33,12 +36,17 @@ import {
 import { OutfieldSpec } from "./Script_TengxianOutfield.mjs";
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import { BuildRoadRibbon, BuildRailBed, MakeCrownProfile } from "./Script_RoadSpline.mjs";
+import { BuildWallSpline } from "./Script_WallSpline.mjs";
+import { MakeInstanced } from "./Script_Geo.mjs";
 
-const STORE_KEY = "tz1938.roadRoutes.v1";
+const STORE_KEY = "tz1938.sceneSplines.v1";
+const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板存档，读得懂就迁
 
-const KIND_COLOR = { street: 0xd9b45a, road: 0xc9a06a, railway: 0x8fa3b8 };
+const KIND_COLOR = {
+  street: 0xd9b45a, road: 0xc9a06a, railway: 0x8fa3b8, wall: 0x9c8a68,
+};
 
-/** 出厂路线表：把散在各处的道路数据统一读成控制点。 */
+/** 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。 */
 function FactoryRoutes(levelId) {
   const routes = [];
   for (const s of STREETS) {
@@ -90,6 +98,42 @@ function FactoryRoutes(levelId) {
       points: [[wr.x, wr.fromZ], [wr.x, wr.toZ]], axisLocked: true,
     });
   }
+
+  // --- 围墙（样条围墙管线 Script_WallSpline 的三路调用点） ---
+  const zw = EAST_SUBURB.zhaiWall;
+  if (zw && zw.enabled !== false) {
+    const g = EAST_SUBURB.zhaiGate;
+    const half = (zw.toZ - zw.fromZ) / 2;
+    routes.push({
+      key: "wall:eastZhai", id: "EastZhaiWall", label: "东关寨墙", kind: "wall",
+      source: "Data_Tengxian.EAST_SUBURB.zhaiWall（x/fromZ/toZ，轴对齐）",
+      height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth,
+      points: [[zw.x, -half], [zw.x, half]], axisLocked: true,
+      wall: {
+        style: "rammedEarth", seed: "zhaiEast", moduleLen: 3.2, embed: 0.5,
+        gaps: [{ at: [g.x, g.z], width: g.width + 1.6 }],
+        breaches: [{ at: [zw.x, -24], width: 16 }, { at: [zw.x, 52], width: 12 }],
+      },
+    });
+  }
+  const st = NORTH_SUBURB.stockade;
+  if (st) {
+    routes.push({
+      key: "wall:northStockade", id: "NorthStockade", label: "北关坝墙（圩子）", kind: "wall",
+      source: "Data_Tengxian.NORTH_SUBURB.stockade（z/fromX/toX，轴对齐）",
+      height: st.height, topWidth: st.topWidth, baseWidth: st.baseWidth,
+      points: [[st.fromX, st.z], [st.toX, st.z]], axisLocked: true,
+      wall: {
+        style: "rammedEarth", seed: "north:zhai", moduleLen: 3.0, embed: 0.5,
+        damage: 0.3, sideJitter: 0.08, coverSign: -1,
+        gaps: (st.gates || []).map((gt) => {
+          const width = gt.width ?? gt.w ?? 3.0;
+          return { at: [gt.x, st.z], width: width + 2.6 * 2 + 0.3 };
+        }),
+        randomBreaches: { count: 3, widthMin: 9, widthMax: 16, margin: 24, avoidGapMargin: 14 },
+      },
+    });
+  }
   const spec = levelId ? OutfieldSpec(levelId) : null;
   if (spec) {
     (spec.roads || []).forEach((road, i) => {
@@ -111,20 +155,39 @@ function FactoryRoutes(levelId) {
         points: [[rw.x, rw.fromZ], [rw.x, rw.toZ]], axisLocked: true,
       });
     }
+    for (const v of spec.villages || []) {
+      if (!v.stoneWall) continue;
+      const hw = v.w / 2 + 8, hd = v.d / 2 + 8;
+      routes.push({
+        key: `wall:stone:${spec.id}:${v.id}`, id: `${v.id}StoneWall`,
+        label: `${v.id} 干垒石墙`, kind: "wall",
+        source: `Script_TengxianOutfield.OUTFIELD_SCENES.${spec.id}.villages.${v.id}（矩形 x/z/w/d + 外扩 8 m）`,
+        height: 1.45, topWidth: 0.55, baseWidth: 0.55,
+        points: [
+          [v.x - hw, v.z - hd], [v.x + hw, v.z - hd],
+          [v.x + hw, v.z + hd], [v.x - hw, v.z + hd],
+        ],
+        axisLocked: true, closed: true,
+        wall: {
+          style: "dryStone", seed: `${v.id}:stonewall`, moduleLen: 4.5, embed: 0.35,
+          collapseChance: 0.18, heightJitter: 0.16,
+        },
+      });
+    }
   }
   return routes;
 }
 
-export class RoadEditor {
-  static id = "roads";
-  static label = "道路样条";
-  static hint = "铁路/道路/大街的样条中心线：预览、拖点、调宽、导出（数据仍在各源文件）";
+export class SplineEditor {
+  static id = "splines";
+  static label = "场景样条PCG";
+  static hint = "铁路/道路/大街/围墙的样条中心线：预览、拖点、调参、导出（数据仍在各源文件）";
 
   constructor(host) {
     this.host = host;
     this.cameraMode = "fly";
     this.panel = null;
-    this.overrides = {};          // key → { width, points }
+    this.overrides = {};          // key → { width, height, points }
     this.kindFilter = "全部";
     this.mode = "select";
     this.selectedKey = null;
@@ -151,6 +214,7 @@ export class RoadEditor {
       const o = this.overrides[route.key];
       if (!o) continue;
       if (o.width) route.width = o.width;
+      if (o.height) route.height = o.height;
       if (Array.isArray(o.points) && o.points.length >= 2) route.points = o.points;
       route.edited = true;
     }
@@ -165,10 +229,10 @@ export class RoadEditor {
     this.host.flycam.Open();
     this.host.SetViewmodelVisible(false);
     this.group = new THREE.Group();
-    this.group.name = "RoadEditorOverlay";
+    this.group.name = "SplineEditorOverlay";
     this.host.scene.add(this.group);
     this.panel = Panel({
-      title: "道路样条编辑器",
+      title: "场景样条PCG编辑器",
       sub: "WASD+QE 飞 · 右键拖转头 · 左键按当前模式作用于路线",
       variant: "work wide",
       onClose: () => this.host.Close(),
@@ -206,15 +270,17 @@ export class RoadEditor {
       { value: "street", label: "大街" },
       { value: "road", label: "土路" },
       { value: "railway", label: "铁路" },
+      { value: "wall", label: "围墙" },
     ], this.kindFilter, (value) => { this.kindFilter = value; this.FillList(); });
     this.list = ListBox(list, { height: 180, onPick: (key) => this.Select(key) });
     Toggle(list, "叠加显示全部路线", this.showAll, (on) => {
       this.showAll = on; this.BuildOverlay();
     });
-    Toggle(list, "显示路面预览（真几何）", this.showPreview, (on) => {
+    Toggle(list, "显示真几何预览", this.showPreview, (on) => {
       this.showPreview = on; this.BuildOverlay();
     });
-    Note(list, "城外大车路/铁路按当前关卡切片列出；切片外的路线看不到也编不了。");
+    Note(list, "城外大车路/铁路/石墙村按当前关卡切片列出；切片外的路线看不到也编不了。"
+      + "围墙预览走 Script_WallSpline 同一份 PCG（变体/塌段/破口逐位一致）。");
 
     const edit = Section(body, "编辑");
     this.modeChips = Chips(edit, [
@@ -228,14 +294,19 @@ export class RoadEditor {
       format: (v) => `${v.toFixed(1)} m`,
       onInput: (v) => this.PatchSelected((r) => { r.width = +v.toFixed(1); }),
     });
+    this.heightSlider = Slider(edit, {
+      label: "墙高", min: 0.8, max: 4, step: 0.05, value: 2,
+      format: (v) => `${v.toFixed(2)} m`,
+      onInput: (v) => this.PatchSelected((r) => { r.height = +v.toFixed(2); }),
+    });
     ButtonRow(edit, [
       { label: "飞到该路线", onClick: () => this.FlyToSelected() },
       { label: "还原所选", onClick: () => this.RevertSelected() },
       { label: "全部还原出厂", onClick: () => this.RevertAll(), cls: "danger" },
     ]);
     Note(edit, "「选点」点控制点标记选中；「移动」把选中点挪到点击的地面；"
-      + "「插入」在选中点之后加一个点；「删除」点掉一个控制点（至少留两个）。"
-      + "轴对齐来源（城内街等）拖弯后导出会带警告 —— 那些数据格式只有直线。");
+      + "「插入」在选中点之后加一个点；「删除」点掉一个控制点。"
+      + "轴对齐/矩形来源拖弯后导出会带警告 —— 那些数据格式只有直线/矩形。");
 
     const evidence = Section(body, "取证");
     this.facts = Facts(evidence);
@@ -243,14 +314,14 @@ export class RoadEditor {
 
     const io = Section(body, "导出 / 导入");
     this.io = TextArea(io, {
-      rows: 6, placeholder: "导出的 JSON 会出现在这里（含每条路该誊回的 source）",
+      rows: 6, placeholder: "导出的 JSON 会出现在这里（含每条路线该誊回的 source）",
     });
     ButtonRow(io, [
       { label: "导出改动 JSON", onClick: () => this.Export() },
       { label: "导入", onClick: () => this.Import() },
     ]);
     Note(io, "面板里的改动只存在浏览器里。**基线在源码里** —— 改完把 JSON 里的"
-      + "点位誊回各自的数据文件（source 字段写明了去处），否则下次建城还是旧路。", true);
+      + "点位誊回各自的数据文件（source 字段写明了去处），否则下次建城还是旧样。", true);
   }
 
   get selected() { return this.routes.find((r) => r.key === this.selectedKey) || null; }
@@ -265,7 +336,7 @@ export class RoadEditor {
     this.list.Fill(this.Visible().map((route) => ({
       id: route.key,
       name: `${route.edited ? "✎ " : ""}${route.label}`,
-      tail: { street: "街", road: "路", railway: "铁" }[route.kind] || "",
+      tail: { street: "街", road: "路", railway: "铁", wall: "墙" }[route.kind] || "",
       title: `${route.key}\n${route.source}`,
     })));
     this.list.Select(this.selectedKey);
@@ -277,15 +348,28 @@ export class RoadEditor {
     this.selectedKey = key;
     this.selectedPoint = -1;
     this.list.Select(key);
-    if (this.widthSlider) this.widthSlider.Set(route.width);
+    const isWall = route.kind === "wall";
+    if (this.widthSlider) {
+      this.widthSlider.root.style.display = isWall ? "none" : "";
+      if (!isWall && route.width) this.widthSlider.Set(route.width);
+    }
+    if (this.heightSlider) {
+      this.heightSlider.root.style.display = isWall ? "" : "none";
+      if (isWall && route.height) this.heightSlider.Set(route.height);
+    }
     if (fly) this.FlyToSelected();
     this.BuildOverlay();
+  }
+
+  RoutePath(route) {
+    const pts = route.closed ? [...route.points, route.points[0]] : route.points;
+    return MakeRoadPath(pts, route.kind === "wall" ? { subdivisions: 1 } : {});
   }
 
   FlyToSelected() {
     const route = this.selected;
     if (!route) return;
-    const path = MakeRoadPath(route.points);
+    const path = this.RoutePath(route);
     const mid = path.At(path.length / 2);
     const y = this.GroundAt(mid.x, mid.z);
     this.host.camera.position.set(mid.x, y + 42, mid.z + 34);
@@ -363,7 +447,11 @@ export class RoadEditor {
         this.selectedPoint = index;
         this.BuildOverlay();
       } else {
-        if (route.points.length <= 2) { this.host.SetHint("至少要留两个控制点"); return; }
+        const minPoints = route.closed ? 3 : 2;
+        if (route.points.length <= minPoints) {
+          this.host.SetHint(`至少要留${minPoints}个控制点`);
+          return;
+        }
         this.PatchSelected((r) => { r.points.splice(index, 1); });
         this.selectedPoint = -1;
       }
@@ -388,7 +476,8 @@ export class RoadEditor {
     mutate(route);
     route.edited = true;
     this.overrides[route.key] = {
-      width: route.width, points: route.points.map((p) => [p[0], p[1]]),
+      width: route.width, height: route.height,
+      points: route.points.map((p) => [p[0], p[1]]),
     };
     this.dirty = true;
     this.Save();
@@ -419,7 +508,7 @@ export class RoadEditor {
     this.ClearOverlay();
     const shown = this.showAll ? this.routes : (this.selected ? [this.selected] : []);
     for (const route of shown) {
-      const path = MakeRoadPath(route.points);
+      const path = this.RoutePath(route);
       const pts = [];
       const n = Math.max(8, Math.round(path.length / 3));
       for (let i = 0; i <= n; i += 1) {
@@ -453,48 +542,92 @@ export class RoadEditor {
     });
     // 真几何预览
     if (this.showPreview) {
-      const geoms = [];
-      const collector = {
-        Add: (material, geometry) => geoms.push(geometry),
-        Solid: () => {}, SetSector: () => {},
-      };
-      const path = MakeRoadPath(route.points);
-      // 抬 0.04 盖在现路上；深度上的错开靠 polygonOffset（见下），不靠这点高差
-      const groundAt = (x, z) => this.GroundAt(x, z) + 0.04;
-      try {
-        if (route.kind === "railway") {
-          const crown = MakeCrownProfile(path, {
-            groundAt, step: 4, smooth: route.lift < 1 ? 4 : 0, lift: route.lift ?? 1.35,
-          });
-          BuildRailBed(collector, {
-            path, groundAt, crownAt: crown.At, topHalf: 3.4,
-            step: 4, chunkLen: 1e9, seed: `preview:${route.key}`,
-          });
-        } else {
-          BuildRoadRibbon(collector, {
-            path, width: route.width, groundAt,
-            crown: route.crown ?? 0.05, skirtDrop: route.skirt ?? 0.5,
-            step: 4, chunkLen: 1e9, seed: `preview:${route.key}`,
-            // 与游戏侧同一条自动断水规则：预览不许把裙边垂进护城河/河槽
-            cutWhere: (x, z) => this.WaterAt(x, z),
-          });
-        }
-      } catch (error) {
-        console.warn("[RoadEditor] 预览生成失败：", error);
+      if (route.kind === "wall") this.BuildWallPreview(route);
+      else this.BuildRoadPreview(route);
+    }
+  }
+
+  /** 预览与现物几乎共面：polygonOffset 防互咬，深度不回写（预览是叠加层）。 */
+  PreviewMaterial(kind) {
+    return new THREE.MeshStandardMaterial({
+      color: KIND_COLOR[kind] || 0xd8c49a, roughness: 1.0,
+      transparent: true, opacity: 0.85, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    });
+  }
+
+  BuildRoadPreview(route) {
+    const geoms = [];
+    const collector = {
+      Add: (material, geometry) => geoms.push(geometry),
+      Solid: () => {}, SetSector: () => {},
+    };
+    const path = MakeRoadPath(route.points);
+    // 抬 0.04 盖在现路上；深度上的错开靠 polygonOffset，不靠这点高差
+    const groundAt = (x, z) => this.GroundAt(x, z) + 0.04;
+    try {
+      if (route.kind === "railway") {
+        const crown = MakeCrownProfile(path, {
+          groundAt, step: 4, smooth: route.lift < 1 ? 4 : 0, lift: route.lift ?? 1.35,
+        });
+        BuildRailBed(collector, {
+          path, groundAt, crownAt: crown.At, topHalf: 3.4,
+          step: 4, chunkLen: 1e9, seed: `preview:${route.key}`,
+        });
+      } else {
+        BuildRoadRibbon(collector, {
+          path, width: route.width, groundAt,
+          crown: route.crown ?? 0.05, skirtDrop: route.skirt ?? 0.5,
+          step: 4, chunkLen: 1e9, seed: `preview:${route.key}`,
+          // 与游戏侧同一条自动断水规则：预览不许把裙边垂进护城河/河槽
+          cutWhere: (x, z) => this.WaterAt(x, z),
+        });
       }
-      // 预览与现路几乎共面：不开 polygonOffset 的话，稍远一点深度精度就不够，
-      // 两层互咬出锯齿条纹（实拍取证过）。深度不回写 —— 预览是叠加层，
-      // 不该遮挡后画的标记与中心线。
-      const material = new THREE.MeshStandardMaterial({
-        color: KIND_COLOR[route.kind] || 0xd8c49a, roughness: 1.0,
-        transparent: true, opacity: 0.85, depthWrite: false,
-        polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    } catch (error) {
+      console.warn("[SplineEditor] 道路预览生成失败：", error);
+    }
+    const material = this.PreviewMaterial(route.kind);
+    for (const geometry of geoms) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 899;
+      this.group.add(mesh);
+    }
+  }
+
+  /** 围墙预览：调真的 BuildWallSpline，把实例化桶原样摆出来（半透明覆盖色）。 */
+  BuildWallPreview(route) {
+    const stub = { props: [], Solid: () => {}, Cover: () => {}, SetSector: () => {} };
+    try {
+      BuildWallSpline(stub, {
+        name: `preview:${route.key}`,
+        style: route.wall?.style || "rammedEarth",
+        material: "preview", tag: "preview",
+        points: route.points, closed: !!route.closed,
+        height: route.height, topWidth: route.topWidth, baseWidth: route.baseWidth,
+        seed: route.wall?.seed || route.key,
+        moduleLen: route.wall?.moduleLen ?? 3.0,
+        embed: route.wall?.embed ?? 0.5,
+        gaps: route.wall?.gaps || [],
+        breaches: route.wall?.breaches || [],
+        randomBreaches: route.wall?.randomBreaches || null,
+        collapseChance: route.wall?.collapseChance ?? 0,
+        heightJitter: route.wall?.heightJitter ?? 0.10,
+        sideJitter: route.wall?.sideJitter ?? 0.06,
+        damage: route.wall?.damage ?? 0,
+        coverSign: route.wall?.coverSign ?? 1,
+        groundAt: (x, z) => this.GroundAt(x, z) + 0.04,
       });
-      for (const geometry of geoms) {
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = 899;
-        this.group.add(mesh);
-      }
+    } catch (error) {
+      console.warn("[SplineEditor] 围墙预览生成失败：", error);
+      return;
+    }
+    const material = this.PreviewMaterial("wall");
+    for (const p of stub.props) {
+      if (p.kind !== "wallInstances" || !p.matrices.length) continue;
+      const mesh = MakeInstanced(p.geometry, material, p.matrices,
+        { castShadow: false, receiveShadow: false });
+      mesh.renderOrder = 899;
+      this.group.add(mesh);
     }
   }
 
@@ -517,7 +650,10 @@ export class RoadEditor {
   RevertAll() {
     this.overrides = {};
     this.dirty = false;
-    try { window.localStorage.removeItem(STORE_KEY); } catch (error) { /* 无痕模式 */ }
+    try {
+      window.localStorage.removeItem(STORE_KEY);
+      window.localStorage.removeItem(LEGACY_STORE_KEY);
+    } catch (error) { /* 无痕模式 */ }
     this.routes = this.Collect();
     this.selectedPoint = -1;
     this.FillList();
@@ -534,7 +670,8 @@ export class RoadEditor {
 
   Restore() {
     try {
-      const raw = window.localStorage.getItem(STORE_KEY);
+      const raw = window.localStorage.getItem(STORE_KEY)
+        || window.localStorage.getItem(LEGACY_STORE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
@@ -550,18 +687,41 @@ export class RoadEditor {
       || Math.abs(points[0][1] - points[1][1]) < 0.01;
   }
 
+  /** 闭环矩形来源：四点、逐边轴对齐才誊得回 x/z/w/d。 */
+  IsAxisRect(points) {
+    if (points.length !== 4) return false;
+    for (let i = 0; i < 4; i += 1) {
+      const a = points[i], b = points[(i + 1) % 4];
+      if (Math.abs(a[0] - b[0]) > 0.01 && Math.abs(a[1] - b[1]) > 0.01) return false;
+    }
+    return true;
+  }
+
+  ExportWarning(route) {
+    if (!route.axisLocked) return null;
+    if (route.closed) {
+      return this.IsAxisRect(route.points) ? null
+        : "源数据是矩形格式，这四个点已不再是轴对齐矩形 —— 誊回前要么摆正、要么改数据格式";
+    }
+    return this.IsAxisAligned(route.points) ? null
+      : "源数据是轴对齐格式，这串点已不再是轴对齐两点 —— 誊回前要么拉直、要么改数据格式";
+  }
+
   Export() {
     const edited = this.routes.filter((r) => this.overrides[r.key]);
     if (!edited.length) {
       this.io.value = "（没有改动 —— 面板里改过的路线才会出现在导出里）";
       return;
     }
-    this.io.value = JSON.stringify(edited.map((r) => ({
-      key: r.key, id: r.id, source: r.source, width: r.width, points: r.points,
-      ...(r.axisLocked && !this.IsAxisAligned(r.points)
-        ? { warning: "源数据是轴对齐格式，这串点已不再是轴对齐两点 —— 誊回前要么拉直、要么改数据格式" }
-        : {}),
-    })), null, 1);
+    this.io.value = JSON.stringify(edited.map((r) => {
+      const warning = this.ExportWarning(r);
+      return {
+        key: r.key, id: r.id, source: r.source,
+        ...(r.kind === "wall" ? { height: r.height } : { width: r.width }),
+        points: r.points,
+        ...(warning ? { warning } : {}),
+      };
+    }), null, 1);
     this.io.select();
     this.host.SetHint(`已导出 ${edited.length} 条改动`);
   }
@@ -578,7 +738,9 @@ export class RoadEditor {
     let count = 0;
     for (const item of list) {
       if (!item.key || !Array.isArray(item.points) || item.points.length < 2) continue;
-      this.overrides[item.key] = { width: item.width, points: item.points };
+      this.overrides[item.key] = {
+        width: item.width, height: item.height, points: item.points,
+      };
       count += 1;
     }
     this.dirty = true;
@@ -602,9 +764,12 @@ export class RoadEditor {
     this.facts.Set("地高", `${ground.toFixed(2)} m`);
     const route = this.selected;
     if (route) {
-      const path = MakeRoadPath(route.points);
-      this.facts.Set("路线", `${route.label} · ${route.width.toFixed(1)} m 宽`);
-      this.facts.Set("长度 / 控制点", `${path.length.toFixed(0)} m / ${route.points.length} 点`);
+      const path = this.RoutePath(route);
+      const size = route.kind === "wall"
+        ? `${(route.height ?? 0).toFixed(2)} m 高` : `${(route.width ?? 0).toFixed(1)} m 宽`;
+      this.facts.Set("路线", `${route.label} · ${size}`);
+      this.facts.Set("长度 / 控制点",
+        `${path.length.toFixed(0)} m / ${route.points.length} 点${route.closed ? "（闭环）" : ""}`);
       this.facts.Set("选中点", this.selectedPoint >= 0
         ? `#${this.selectedPoint} (${route.points[this.selectedPoint][0]}, ${route.points[this.selectedPoint][1]})`
         : "无");
@@ -612,12 +777,11 @@ export class RoadEditor {
     const messages = [];
     if (this.dirty) messages.push("有未导出的改动 —— 基线在源码里，记得誊回去");
     const sel = this.selected;
-    if (sel && sel.axisLocked && !this.IsAxisAligned(sel.points)) {
-      messages.push("这条路的源数据是轴对齐格式，弯过的点位誊不回去（导出里有警告）");
-    }
+    const warning = sel ? this.ExportWarning(sel) : null;
+    if (warning) messages.push(warning);
     this.status.textContent = messages.join(" · ");
     this.status.classList.toggle("warn", messages.length > 0);
   }
 }
 
-export default RoadEditor;
+export default SplineEditor;

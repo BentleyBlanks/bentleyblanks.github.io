@@ -37,6 +37,7 @@ import {
   AddRoadWear, AddYardWear, AddVillageLife, AddStalkStack, AddWattleFence,
 } from "./Script_LivedInProps.mjs";
 import { BuildRoadRibbon } from "./Script_RoadSpline.mjs";
+import { BuildWallSpline } from "./Script_WallSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 镜像常量
@@ -126,95 +127,34 @@ function MakeInView(host) {
 /**
  * 夯土圩子：高 2.2 / 顶宽 0.5 / 底宽 1.1（数据给死，不许另起炉灶）。
  *
- * 做法照 Script_World.AddZhaiWall，但**不能直接调它** —— 那个函数只有一个
- * 标量 baseY，而这道墙横跨 660 m 的起伏原野（濠外 ±0.55 m 的噪声）。
- * 一个 baseY 的话半条墙悬空、半条墙埋进土里。所以这里逐段采 OuterHeight，
- * 并且每段往地里多埋 0.5 m，让相邻两段的高差不至于在墙脚漏出缝。
+ * 已迁到样条围墙管线（Script_WallSpline.BuildWallSpline）：逐模块贴
+ * OuterHeight + 埋 0.5 m（相邻段高差不在墙脚漏缝的账照旧）、护坡土烘进模块
+ * 几何、渲染走 InstancedMesh（矩阵按 NorthSector 分格，视锥剔除不失效）。
+ * 墙面错位/顶高参差/三处塌口全在管线的随机参数里 —— 三合板围挡那一版的账
+ * （C2_Stockade_Breach.png）由 sideJitter + 变体几何顶着。
  *
  * 战损：1938 年 3 月这圈外郭早已衰败（志载明正德七年筑郭护四关，到 1938 年
- * 只剩矮土寨墙，日方实测东侧那一段高 2 m、顶宽 0.4 m）。三处塌口按种子摆，
+ * 只剩矮土寨墙，日方实测东侧那一段高 2 m、顶宽 0.4 m）。三处塌口按种子撒，
  * 一律避开圩门 14 m —— 玩法上圩门才是通道，塌口只是「这墙拦不住谁」的说明。
  */
 function Stockade(host, s, gates, ctx) {
-  const rnd = Mulberry32(HashString("north:zhai"));
   const inView = MakeInView(host);
-  const damage = ctx.damage ?? 0.3;
-  const height = s.height, thick = (s.topWidth + s.baseWidth) / 2;
-  const z = s.z;
-
-  // 塌口：位置在整条墙上按种子撒，避开圩门
-  const breaches = [];
-  for (let i = 0; i < 3; i += 1) {
-    for (let tries = 0; tries < 12; tries += 1) {
-      const bx = s.fromX + 24 + rnd() * (s.toX - s.fromX - 48);
-      if (gates.some((g) => Math.abs(bx - g.x) < g.width / 2 + 14)) continue;
-      breaches.push({ at: bx, width: 9 + rnd() * 7 });
-      break;
-    }
-  }
-
-  const segLen = 3.0;
-  const total = s.toX - s.fromX;
-  const segs = Math.max(4, Math.round(total / segLen));
-  const step = total / segs;
-  const near = [];                     // 圩门左右各 22 m：进 host.sink（要投影子）
-  const farBySector = new Map();       // 其余：进 host.farSink，按 150 m 切格
-
-  for (let i = 0; i < segs; i += 1) {
-    const cx = s.fromX + step * (i + 0.5);
+  BuildWallSpline(host.sink, {
+    name: "NorthStockade", style: "rammedEarth", material: "ZhaiEarth", tag: "zhaiWall",
+    points: [[s.fromX, s.z], [s.toX, s.z]],
+    height: s.height, topWidth: s.topWidth, baseWidth: s.baseWidth,
+    seed: "north:zhai", moduleLen: 3.0, embed: 0.5,
+    groundAt: (x, z) => host.OuterHeight(x, z),
     // 圩门那一段整段让开：门垛自己把缺口填上（见 StockadeGate 的 clearSpan）
-    if (gates.some((g) => Math.abs(cx - g.x) < g.clearSpan / 2)) continue;
-    if (!inView(cx, z, 260)) continue;
-    let h = height;
-    for (const b of breaches) {
-      const d = Math.abs(cx - b.at);
-      if (d < b.width / 2) {
-        h = Math.min(h, height * (0.10 + 0.90 * Math.pow(d / (b.width / 2), 1.5)));
-      }
-    }
-    // 土墙顶本来就是参差的，再叠一档破损档位
-    h *= 0.93 + rnd() * 0.13 - damage * 0.06;
-    const baseY = host.OuterHeight(cx, z);
-    const buried = 0.5;                // 往地里埋半米：相邻段高差不在墙脚漏缝
-    // 墙面往前后各错开一点点：一条 660 m 的完美平面在出图上读成三合板围挡，
-    // 不是夯的土（第一版实拍 C2_Stockade_Breach.png 的主要问题）。
-    const zJit = (rnd() - 0.5) * 0.16;
-    const parts = [
-      PlaceGeometry(MakeBox(step * 1.04, h + buried, thick, TILE_METERS.adobe, `north:zhai${i}`),
-        { x: cx, y: baseY + (h - buried) / 2, z: z + zJit }),
-      // 墙脚的护坡土：夯土圩子不是一块立起来的板，脚下总堆着塌下来的土。
-      // 它同时把「每段各自采地高」留下的墙脚缝盖住。
-      PlaceGeometry(MakeBox(step * 1.06, 0.9, s.baseWidth * (1.7 + rnd() * 0.5),
-        TILE_METERS.adobe, `north:zhaiFoot${i}`),
-      { x: cx, y: baseY - 0.44 + Math.min(0.30, h * 0.16), z: z + zJit * 0.6 }),
-    ];
-    const geo = MergeGeometries(parts);
-    const nearGate = gates.some((g) => Math.abs(cx - g.x) < 22);
-    if (nearGate) {
-      near.push(geo);
-    } else {
-      const key = NorthSector(cx, z);
-      if (!farBySector.has(key)) farBySector.set(key, []);
-      farBySector.get(key).push(geo);
-    }
-    if (h > height * 0.55) {
-      host.sink.Solid(cx, baseY + h / 2, z, step / 2, h / 2, s.baseWidth / 2, "zhaiWall");
-      // 掩体点每三段一个（≈9 m）：一道 660 m 的墙每 3 m 插一个掩体点，
-      // AI 的掩体表会被这一道墙灌满两百多条，其他地方的掩体全被挤到后面去。
-      if (i % 3 === 0) host.sink.Cover(cx, z, baseY + h, 0, 1);
-    }
-  }
+    gaps: gates.map((g) => ({ at: [g.x, s.z], width: g.clearSpan })),
+    randomBreaches: { count: 3, widthMin: 9, widthMax: 16, margin: 24, avoidGapMargin: 14 },
+    damage: ctx.damage ?? 0.3,
+    sideJitter: 0.08,
+    coverSign: -1,       // 掩体朝 +z（圩内侧），与旧版逐位一致
 
-  if (near.length) {
-    host.sink.SetSector(NorthSector(gates[0].x, z));
-    host.sink.Add("ZhaiEarth", MergeGeometries(near));
-    host.sink.SetSector("");
-  }
-  for (const [key, list] of farBySector) {
-    host.farSink.SetSector(key);
-    host.farSink.Add("ZhaiEarth", MergeGeometries(list));
-  }
-  host.farSink.SetSector("");
+    sectorKey: NorthSector,
+    inRegion: (x, z) => inView(x, z, 260),
+  });
 }
 
 /**

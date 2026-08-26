@@ -87,6 +87,7 @@ import { MakeRoadPath, DistanceToPolyline } from "./Script_RoadPath.mjs";
 import {
   BuildRoadRibbon, BuildRailBed, BuildRailTrack, MakeCrownProfile,
 } from "./Script_RoadSpline.mjs";
+import { BuildWallSpline, FlushWallInstances } from "./Script_WallSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：城外这一套新增的逻辑名
@@ -682,6 +683,13 @@ export class TengxianOutfield {
 
     yield { label: "城外：合批", progress: 0.97 };
     const opts = { resolve: ResolveOutfieldMaterial };
+    // 样条围墙（石墙村/村院墙）的实例化桶：矩阵表变 InstancedMesh，先于合并 Flush
+    for (const s of [this.sink, this.groundSink, this.farSink]) {
+      FlushWallInstances(s, {
+        scene: this.scene, meshes: this.meshes, library: this.library,
+        resolve: ResolveOutfieldMaterial,
+      });
+    }
     for (const m of this.sink.Flush(this.scene, this.library, opts)) this.meshes.push(m);
     for (const m of this.groundSink.Flush(this.scene, this.library,
       { ...opts, castShadow: false })) this.meshes.push(m);
@@ -1888,45 +1896,43 @@ export class TengxianOutfield {
 
   AddVillageCourtyard(sink, { x, z, ry, width, depth, seed, material = "Adobe" }) {
     const wallHeight = 1.55;
-    // 院墙也吃炮火：每段 16% 概率整段塌成瓦砾线，院门 12% 概率只剩门框洞。
-    const courtRnd = Mulberry32(HashString(`${seed}:courtruin`));
-    const fallenSegments = new Set();
-    for (const key of ["north", "west", "east", "south-1", "south1"]) {
-      if (courtRnd() < 0.16) fallenSegments.add(key);
-    }
-    const gateFallen = courtRnd() < 0.12;
-    const AddSegment = (localX, localZ, length, localRy, tag) => {
-      const point = this.VillagePoint(x, z, ry, localX, localZ);
-      const segmentRy = ry + localRy;
-      if (fallenSegments.has(tag)) {
-        this.AddVillageRubble(sink, {
-          x: point.x, z: point.z, ry: segmentRy, seed: `${seed}:${tag}`,
-          rx: length / 2, rz: 0.7, count: 4,
-          materials: [material, material, "DryStone"],
-        });
-        return;
-      }
-      const groundY = this.groundAt(point.x, point.z);
-      sink.Add(material, PlaceGeometry(
-        MakeBox(length, wallHeight, 0.28,
-          material === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick,
-          `${seed}:${tag}`, material === "HouseBrick" ? BRICK_UV_GRID : null),
-        { x: point.x, y: groundY + wallHeight / 2, z: point.z, ry: segmentRy }));
-      sink.Solid(point.x, groundY + wallHeight / 2, point.z,
-        length / 2, wallHeight / 2, 0.14, "villageCourtyard", segmentRy);
-      sink.Cover(point.x, point.z, wallHeight, Math.sin(segmentRy), Math.cos(segmentRy));
-    };
-    AddSegment(0, -depth / 2, width, 0, "north");
-    AddSegment(-width / 2, 0, depth, Math.PI / 2, "west");
-    AddSegment(width / 2, 0, depth, Math.PI / 2, "east");
     const gateWidth = 1.6;
-    const southLength = (width - gateWidth) / 2;
-    for (const side of [-1, 1]) {
-      AddSegment(side * (gateWidth / 2 + southLength / 2), depth / 2,
-        southLength, 0, `south${side}`);
+    const courtRnd = Mulberry32(HashString(`${seed}:courtruin`));
+    const gateFallen = courtRnd() < 0.12;
+    const C = (lx, lz) => {
+      const p = this.VillagePoint(x, z, ry, lx, lz);
+      return [p.x, p.z];
+    };
+    const gate = this.VillagePoint(x, z, ry, 0, depth / 2 + 0.03);
+    // 样条围墙管线：闭环折线一圈（角上互搭）、逐模块贴地、砖/土坯两种风格。
+    // 院墙也吃炮火：整边 16% 概率塌成瓦砾线（fallenRuns 交还这里摆瓦砾，
+    // 南边被院门分成两段各自掷骰 —— 与旧版 south±1 两个键逐位同概率）。
+    const { fallenRuns } = BuildWallSpline(sink, {
+      name: `Court_${seed}`,
+      style: material === "HouseBrick" ? "yardBrick" : "yardAdobe",
+      material, tag: "villageCourtyard",
+      points: [
+        C(-width / 2, -depth / 2), C(width / 2, -depth / 2),
+        C(width / 2, depth / 2), C(-width / 2, depth / 2),
+      ],
+      closed: true,
+      height: wallHeight, topWidth: 0.28, baseWidth: 0.28,
+      seed: `${seed}:ring`, moduleLen: 2.8, embed: 0.35,
+      edgeCollapseChance: 0.16, heightJitter: 0.07, sideJitter: 0.03,
+      coverEvery: 3,
+      groundAt: (xx, zz) => this.groundAt(xx, zz),
+      gaps: [{ at: [gate.x, gate.z], width: gateWidth }],
+      sectorKey: SectorKey,
+      inRegion: (xx, zz) => this.InRegion(xx, zz),
+    });
+    for (const run of fallenRuns) {
+      this.AddVillageRubble(sink, {
+        x: run.x, z: run.z, ry: run.ry, seed: `${seed}:fallen${Math.round(run.x)}`,
+        rx: run.len / 2, rz: 0.7, count: 4,
+        materials: [material, material, "DryStone"],
+      });
     }
     if (!gateFallen) {
-      const gate = this.VillagePoint(x, z, ry, 0, depth / 2 + 0.03);
       sink.Add("WoodDoor", PlaceGeometry(
         MakeBox(gateWidth, 1.75, 0.09, TILE_METERS.wood, `${seed}:gate`),
         { x: gate.x, y: this.groundAt(gate.x, gate.z) + 0.875, z: gate.z, ry }));
@@ -2005,28 +2011,26 @@ export class TengxianOutfield {
           x, z, ry, seed: `${v.id}:${i}:props`, far: false, rnd: vRnd,
         });
       }
-      // 「石墙」：地名的由来 —— 一圈干垒石墙。真碰撞体
+      // 「石墙」：地名的由来 —— 一圈干垒石墙。真碰撞体。
+      // 样条围墙管线：闭环折线（四角互搭不留豁口）、逐模块贴地、塌段压扁摊宽
+      // 代替旧版的整段消失 —— 干垒墙塌了剩一线石堆，不是凭空少一截。
       if (v.stoneWall) {
-        const hw = v.w / 2 + 8, hd = v.d / 2 + 8, wh = 1.45;
-        for (const [ax, az, len, ry] of [
-          [0, -hd, hw * 2, 0], [0, hd, hw * 2, 0],
-          [-hw, 0, hd * 2, Math.PI / 2], [hw, 0, hd * 2, Math.PI / 2]]) {
-          const segs = Math.max(2, Math.round(len / 9));
-          for (let k = 0; k < segs; k += 1) {
-            if (vRnd() < 0.18) continue;                 // 塌口
-            const t = (k + 0.5) / segs - 0.5;
-            const px = v.x + ax + Math.cos(ry) * t * len;
-            const pz = v.z + az - Math.sin(ry) * t * len;
-            const y = this.groundAt(px, pz);
-            const hh = wh * (0.82 + vRnd() * 0.3);
-            sink.Add("DryStone", PlaceGeometry(
-              MakeBox(len / segs * 1.03, hh, 0.55, TILE_METERS.stone, `${v.id}:sw${k}${ax}${az}`),
-              { x: px, y: y + hh / 2, z: pz, ry }));
-            sink.Solid(px, y + hh / 2, pz, len / segs / 2, hh / 2, 0.3,
-              "villageStoneWall", ry);
-            sink.Cover(px, pz, hh, Math.sin(ry), Math.cos(ry));
-          }
-        }
+        const hw = v.w / 2 + 8, hd = v.d / 2 + 8;
+        BuildWallSpline(sink, {
+          name: `StoneWall_${v.id}`, style: "dryStone",
+          material: "DryStone", tag: "villageStoneWall",
+          points: [
+            [v.x - hw, v.z - hd], [v.x + hw, v.z - hd],
+            [v.x + hw, v.z + hd], [v.x - hw, v.z + hd],
+          ],
+          closed: true,
+          height: 1.45, topWidth: 0.55, baseWidth: 0.55,
+          seed: `${v.id}:stonewall`, moduleLen: 4.5, embed: 0.35,
+          collapseChance: 0.18, heightJitter: 0.16, coverEvery: 2,
+          groundAt: (x, z) => this.groundAt(x, z),
+          sectorKey: SectorKey,
+          inRegion: (x, z) => this.InRegion(x, z),
+        });
       }
       sink.SetSector("");
       this.stats.villages += 1;
