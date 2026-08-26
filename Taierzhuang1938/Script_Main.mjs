@@ -2547,15 +2547,10 @@ function FinishEditorSession() {
   editorReturnMenuMode = null;
   if (!mode || !menu) return;
   if (mode !== "pause") { OpenMenu(); return; }
-
-  state.running = false;
-  state.menu = true;
-  ReleasePointerLock();
-  audio.SetPaused(true);
-  hudRoot.style.display = "none";
-  if (viewmodel) viewmodel.root.visible = false;
-  document.getElementById("edRoot")?.classList.add("off");
-  menu.OpenPause();
+  // 回暂停层走与 Esc 完全相同的那一条（ShowPauseMenu）。
+  // 这里以前是把 OpenMenu 抄了一份：额外把枪藏了、把齿轮藏了、还把
+  // state.menu 置了 true —— 那三件都是**主菜单**才该做的事。
+  ShowPauseMenu();
 }
 
 /**
@@ -2660,9 +2655,17 @@ function PlaceMenuGarrison(anchor) {
   }
 }
 
-/** 游戏中按 Esc：挂暂停。世界冻在原地（Frame 不跑），相机不动。 */
-function PauseGame() {
-  if (!menu || !state.running || state.cutscene || state.advancing) return false;
+/**
+ * 挂上暂停层。**进暂停的每一条路都必须走这里**，两条路进的暂停要长得一模一样。
+ *
+ * 这个函数最重要的一条是它**没做**的事：不藏手里那支枪，也不藏齿轮。
+ * 暂停屏是「冻住的战场 + 一层压暗 + 一列字」，枪就是那张照片的一部分；
+ * 而 ResumeFromPause 只管把 HUD、声音和指针锁接回来，谁藏了枪谁就得自己放回来。
+ * 「暂停 → 设置 → 关掉设置 → 继续」曾经在这里抄了一份 OpenMenu（那是**主菜单**
+ * 的收口），于是回到战斗时手里是空的 —— 拿大刀时最刺眼：整只手连刀一起没了，
+ * 而且不换关不重生就再也回不来（换槽的 SwitchSlot 不碰 root.visible）。
+ */
+function ShowPauseMenu() {
   state.running = false;
   ReleasePointerLock();
   // 背景枪声也得停。玩法停靠 Frame() 提前返回，而环境床与音乐是一张自己在跑的
@@ -2672,6 +2675,12 @@ function PauseGame() {
   // ER2 的暂停也是「冻住的画面 + 一层压暗 + 一列字」，HUD 不留。
   hudRoot.style.display = "none";
   menu.OpenPause();
+}
+
+/** 游戏中按 Esc：挂暂停。世界冻在原地（Frame 不跑），相机不动。 */
+function PauseGame() {
+  if (!menu || !state.running || state.cutscene || state.advancing) return false;
+  ShowPauseMenu();
   return true;
 }
 

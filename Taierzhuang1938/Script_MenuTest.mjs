@@ -366,6 +366,16 @@ for (let i = 0; i < 3; i += 1) {
 // 5) Esc 暂停 -> 回主菜单 -> 再进一关
 // ===========================================================================
 {
+  // 玩家报上来的那一次手里拿的是**大刀**（3 号槽），走键位表切过去再走整条路：
+  // 刀的 rig 是双手抱着的一整块，藏起来时画面上是"整只手连刀一起没了"，
+  // 比丢一支步枪显眼得多 —— 出图那一张就是给人眼复核这件事的。
+  await page.evaluate(() => { window.Taierzhuang.Debug.Key("Digit3"); });
+  await page.evaluate(() => window.Taierzhuang.StepFrames(4));
+  const swordUp = await page.evaluate(() => window.Taierzhuang.Debug.Slots());
+  Check("先换到大刀（这一段按玩家那次的持械走）",
+    swordUp.active === "melee" && swordUp.viewmodel === "Dadao",
+    `active=${swordUp.active} viewmodel=${swordUp.viewmodel}`);
+
   // 以前这里直接调 Debug.Pause()，绕开了真实 Esc 与指针锁，正好漏掉了玩家侧的事故。
   await page.keyboard.press("Escape");
   const paused = await page.evaluate(() => ({
@@ -381,6 +391,10 @@ for (let i = 0; i < 3; i += 1) {
   // HUD 必须收起来：顶着阶段条、简报和小地图，暂停菜单读不清（实拍抓到的）
   const hudGone = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
   Check("暂停时 HUD 收起来", hudGone === "none", `display=${hudGone}`);
+  // 暂停屏是「冻住的战场 + 一层压暗 + 一列字」：HUD 收起来，但**手里那支枪留着**。
+  // 它是画面的一部分，藏了就得有人负责放回来 —— 而「继续」不管这件事。
+  const pausedGun = await page.evaluate(() => window.Taierzhuang.viewmodel.root.visible);
+  Check("暂停时手里的枪还在画面里", pausedGun === true, `viewmodel=${pausedGun}`);
   // 暂停不许动相机：动了的话回到游戏时玩家会发现自己看着别处
   const camA = await page.evaluate(() => window.Taierzhuang.Debug.Menu().camera);
   await page.waitForTimeout(400);
@@ -400,9 +414,16 @@ for (let i = 0; i < 3; i += 1) {
   await page.keyboard.press("Escape");
   const settingsClosed = await page.evaluate(() => ({
     editor: window.Taierzhuang.Debug.Editor(), menu: window.Taierzhuang.Debug.Menu(),
+    viewmodel: window.Taierzhuang.viewmodel.root.visible,
   }));
   Check("设置里按 Esc 回到暂停菜单",
     !settingsClosed.editor.panelOpen && settingsClosed.menu.open && settingsClosed.menu.mode === "pause");
+  // 从设置回暂停层不能顺手把枪和齿轮藏了：那是**主菜单**的收口（OpenMenu），
+  // 抄到暂停这条路上就成了「从设置回来手里空了」——拿大刀时整只手都没了，
+  // 而且不换关不重生再也回不来（SwitchSlot 不碰 root.visible）。
+  Check("从设置回暂停层，手里的枪与齿轮都还在",
+    settingsClosed.viewmodel === true && !settingsClosed.editor.hidden,
+    `viewmodel=${settingsClosed.viewmodel} gearHidden=${settingsClosed.editor.hidden}`);
 
   // 实际复现玩家路径：暂停 → 设置 → 构件库预览。过去只有场景/地形工具会
   // 收起暂停菜单，摄影棚类编辑器会把「继续 / 设置 / 调试选项」叠在背景里。
@@ -446,6 +467,16 @@ for (let i = 0; i < 3; i += 1) {
   Check("继续之后背景音接回来", audioBack === false, `audio.paused=${audioBack}`);
   const hudBack = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
   Check("继续之后 HUD 回来", hudBack !== "none", `display=${hudBack}`);
+  // 这一整段走的正是玩家报的那条路：暂停 → 设置 → 构件库 → 关掉 → 继续。
+  // 收口断在哪一步这里都红：回到战斗时手里必须还有枪。
+  await page.evaluate(() => window.Taierzhuang.StepFrames(8));
+  const gunBack = await page.evaluate(() => ({
+    visible: window.Taierzhuang.viewmodel.root.visible, ...window.Taierzhuang.Debug.Slots(),
+  }));
+  Check("从设置/编辑器回来再「继续」，大刀还在手里",
+    gunBack.visible === true && gunBack.viewmodel === "Dadao",
+    `visible=${gunBack.visible} viewmodel=${gunBack.viewmodel}`);
+  await page.screenshot({ path: path.join(outDir, "Menu_ResumeAfterSettings.png") });
 
   const unlockPause = await page.evaluate(() => {
     window.Taierzhuang.Debug.DropPointerLock();
