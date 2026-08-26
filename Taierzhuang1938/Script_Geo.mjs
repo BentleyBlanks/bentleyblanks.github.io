@@ -49,9 +49,46 @@ export function ScaleBoxUv(geometry, w, h, d, unitsPerTile, offsetSeed = "", gri
   return geometry;
 }
 
+/**
+ * 单位盒子的模板。**建一次，全程只读。**
+ *
+ * `new THREE.BoxGeometry(w, h, d)` 每次都要跑六遍 buildPlane、往三个 JS 数组里
+ * push 出两百多个数、再转成 typed array、再 addGroup 六次。建一座城要建几万个
+ * 盒子（MakeBox 有七百多个调用点），这条通用路径是开机耗时里量得到的一块。
+ */
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+
+/**
+ * 与 `new THREE.BoxGeometry(w, h, d)` **逐位相同**的快路。
+ *
+ * 单位盒子的顶点就是 ±0.5，乘以边长即得目标盒子 —— three 那边算的是
+ * `ix * segmentWidth - width_half`，在一段的情况下就是 `±w/2`，而 `0.5 * w`
+ * 与 `w / 2` 在 IEEE754 下是同一个数（除以 2 只动指数），所以不是"近似相同"
+ * 而是逐位相同（Script_GeoTest 逐浮点比过）。法线是轴对齐的、uv 与索引与边长
+ * 无关，直接照抄模板。groups 也照抄：单材质渲染其实不看它，但 clone 语义要一致。
+ */
+function BoxFromUnit(w, h, d) {
+  const src = UNIT_BOX.attributes;
+  const count = src.position.count;
+  const sp = src.position.array;
+  const position = new Float32Array(count * 3);
+  for (let i = 0, o = 0; i < count; i += 1, o += 3) {
+    position[o] = sp[o] * w;
+    position[o + 1] = sp[o + 1] * h;
+    position[o + 2] = sp[o + 2] * d;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(src.normal.array), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(src.uv.array), 2));
+  geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(UNIT_BOX.index.array), 1));
+  for (const g of UNIT_BOX.groups) geometry.addGroup(g.start, g.count, g.materialIndex);
+  return geometry;
+}
+
 /** 建一块 UV 已经改好的方料。 */
 export function MakeBox(w, h, d, unitsPerTile = 1.2, seed = "box", grid = null) {
-  const geometry = new THREE.BoxGeometry(w, h, d);
+  const geometry = BoxFromUnit(w, h, d);
   ScaleBoxUv(geometry, w, h, d, unitsPerTile, seed, grid);
   return geometry;
 }
@@ -202,14 +239,85 @@ export function MergeGeometries(geometries) {
   return merged;
 }
 
-/** 带位姿地把一个几何体并进列表（省掉到处 clone().applyMatrix4()）。 */
+// PlaceGeometry 的算草稿。**别在函数里 new 这些**：这个函数一次开机要被调
+// 十几万次（851 个调用点），每次五个临时对象就是几十万次分配，GC 在开机剖析里
+// 是能单独看见一条的。
+const _placeMatrix = new THREE.Matrix4();
+const _placeQuat = new THREE.Quaternion();
+const _placeEuler = new THREE.Euler();
+const _placePos = new THREE.Vector3();
+const _placeScale = new THREE.Vector3();
+const _placeNormal = new THREE.Matrix3();
+
+/**
+ * 带位姿地把一个几何体并进列表（省掉到处 clone().applyMatrix4()）。
+ *
+ * 实现上**不走 `clone()` + `applyMatrix4()`**：那是"先整份 memcpy 一遍，再把
+ * position 和 normal 各重走一遍"，还顺带拷了 morphAttributes / userData /
+ * drawRange 这些这座城里根本没有的东西。这里直接开目标数组、一趟写完，
+ * 逐浮点与旧路一致（每顶点的算式照抄 Vector3.applyMatrix4 / applyNormalMatrix，
+ * 连 w 除法和 normalize 的顺序都一样，Script_GeoTest 拿旧实现对着比）。
+ * position 与 normal 之外的属性（个别地方有 color）原样拷过来，不做变换 ——
+ * 与 clone 的行为相同。
+ */
 export function PlaceGeometry(geometry, { x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0, scale = 1 } = {}) {
-  const g = geometry.clone();
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, "YXZ"));
-  m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(scale, scale, scale));
-  g.applyMatrix4(m);
-  return g;
+  _placeEuler.set(rx, ry, rz, "YXZ");
+  _placeQuat.setFromEuler(_placeEuler);
+  _placeMatrix.compose(_placePos.set(x, y, z), _placeQuat, _placeScale.set(scale, scale, scale));
+  const src = geometry.attributes;
+  // 交错缓冲（GLTFLoader 可能给出 InterleavedBufferAttribute）走不了下面这条
+  // 按 itemSize 紧排的快路 —— 它的 `.array` 是整条交错缓冲。这种退回老路：
+  // clone() 会把交错属性解成普通属性，正确性优先。
+  if (!src.position || src.position.isInterleavedBufferAttribute) {
+    const g = geometry.clone();
+    g.applyMatrix4(_placeMatrix);
+    return g;
+  }
+  const e = _placeMatrix.elements;
+  const out = new THREE.BufferGeometry();
+
+  const sp = src.position;
+  const count = sp.count;
+  const pa = sp.array;
+  const position = new Float32Array(count * 3);
+  for (let i = 0, o = 0; i < count; i += 1, o += 3) {
+    const vx = pa[o], vy = pa[o + 1], vz = pa[o + 2];
+    const w = 1 / (e[3] * vx + e[7] * vy + e[11] * vz + e[15]);
+    position[o] = (e[0] * vx + e[4] * vy + e[8] * vz + e[12]) * w;
+    position[o + 1] = (e[1] * vx + e[5] * vy + e[9] * vz + e[13]) * w;
+    position[o + 2] = (e[2] * vx + e[6] * vy + e[10] * vz + e[14]) * w;
+  }
+  out.setAttribute("position", new THREE.BufferAttribute(position, 3));
+
+  if (src.normal) {
+    const n = _placeNormal.getNormalMatrix(_placeMatrix).elements;
+    const na = src.normal.array;
+    const normal = new Float32Array(count * 3);
+    for (let i = 0, o = 0; i < count; i += 1, o += 3) {
+      const vx = na[o], vy = na[o + 1], vz = na[o + 2];
+      const nx = n[0] * vx + n[3] * vy + n[6] * vz;
+      const ny = n[1] * vx + n[4] * vy + n[7] * vz;
+      const nz = n[2] * vx + n[5] * vy + n[8] * vz;
+      const inv = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+      normal[o] = nx * inv;
+      normal[o + 1] = ny * inv;
+      normal[o + 2] = nz * inv;
+    }
+    out.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
+  }
+  for (const name of Object.keys(src)) {
+    if (name === "position" || name === "normal") continue;
+    const a = src[name];
+    if (a.isInterleavedBufferAttribute) { out.setAttribute(name, a.clone()); continue; }
+    out.setAttribute(name, new THREE.BufferAttribute(
+      new a.array.constructor(a.array), a.itemSize, a.normalized));
+  }
+  if (geometry.index) {
+    const i = geometry.index;
+    out.setIndex(new THREE.BufferAttribute(new i.array.constructor(i.array), 1));
+  }
+  for (const g of geometry.groups) out.addGroup(g.start, g.count, g.materialIndex);
+  return out;
 }
 
 /**
