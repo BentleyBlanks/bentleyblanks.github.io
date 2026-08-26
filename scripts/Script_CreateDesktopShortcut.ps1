@@ -1,4 +1,4 @@
-# 在桌面放一个「本地预览」快捷方式，指向本仓库这份检出的 Script_StartLocalPreview.cmd。
+﻿# 在桌面放一个「本地预览」快捷方式，指向本仓库这份检出的 Script_StartLocalPreview.cmd。
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\Script_CreateDesktopShortcut.ps1
 #

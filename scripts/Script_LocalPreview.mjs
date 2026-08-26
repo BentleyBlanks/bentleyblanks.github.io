@@ -427,6 +427,10 @@ async function Main() {
   context.lanUrls = lan ? LanAddresses(port) : [];
   mounts.set(rootDir, { port, server });
 
+  // 窗口标题从这里设，不从 .cmd 里设：批处理里的中文会被 chcp 生效前的
+  // 代码页拆错，node 写标题是宽字符，稳。
+  try { process.title = `本地预览 ${path.basename(rootDir)} :${port} — 关掉本窗口即停服`; } catch { /* ignore */ }
+
   console.log("");
   console.log(`  本地预览就绪  ->  http://127.0.0.1:${port}/__preview/`);
   console.log(`  根目录        :  ${rootDir}`);
