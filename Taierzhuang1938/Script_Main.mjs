@@ -23,6 +23,10 @@ import { SetWaterSkyUniforms, UpdateWaterSurfaces } from "./Script_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
+import { RangeField } from "./Script_RangeField.mjs";
+import {
+  RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
+} from "./Data_Range.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -97,6 +101,14 @@ const PREVIEW = !!PREVIEW_ID;
 // 从主页面的「新版序章预览」链接进入时直接开播，不能再让玩家在加载完成后
 // 面对第二颗同义按钮。保留不带 autoplay 的地址作为审片/音频解锁回退入口。
 const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
+/**
+ * 玩法测试靶场（?range=1）：人机共同测试用的独立沙盒（docs/Data_TestRange.md）。
+ * 实现方式是**整表替换**：PHASE_TABLE 在靶场模式下只有 RANGE_PHASE 一关，
+ * 下面所有 `PHASE_TABLE[state.phaseIndex]` 的消费者一个都不用学"这一关不算数"。
+ * 正片的 PHASES（七关、菜单、进度、BootTest 的口径）一概不知道靶场存在。
+ */
+const RANGE = params.get("range") === "1";
+const PHASE_TABLE = RANGE ? [RANGE_PHASE] : PHASES;
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -114,7 +126,7 @@ const SHOT_FIRE = !!(SHOT && params.get("fire"));
  * 三个冒烟脚本（PlayTest / EditorTest / VoiceTest）点的都是 #bootStart 那颗按钮，
  * 出图脚本连点都不点，直接 StepFrames。菜单只服务真人。
  */
-const MENU_ON = !SHOT && !PREVIEW && params.get("menu") !== "0";
+const MENU_ON = !SHOT && !PREVIEW && !RANGE && params.get("menu") !== "0";
 /**
  * 开机建哪一片切片。
  * 给了 ?phase= 就听它的（出图、冒烟、调机位都靠这条）；
@@ -122,9 +134,9 @@ const MENU_ON = !SHOT && !PREVIEW && params.get("menu") !== "0";
  * 城墙是这座城的招牌，序关的界河是二十公里外的空地，当不了门面。
  */
 const PHASE_PARAM = params.get("phase");
-const MENU_SLICE = Math.max(0, PHASES.findIndex((p) => p.id === MENU_SCENE.slice));
+const MENU_SLICE = Math.max(0, PHASE_TABLE.findIndex((p) => p.id === MENU_SCENE.slice));
 const START_PHASE = PHASE_PARAM !== null
-  ? Math.max(0, Math.min(PHASES.length - 1, parseInt(PHASE_PARAM, 10)))
+  ? Math.max(0, Math.min(PHASE_TABLE.length - 1, parseInt(PHASE_PARAM, 10)))
   : (MENU_ON ? MENU_SLICE : 0);
 
 const canvas = document.getElementById("view");
@@ -660,7 +672,7 @@ async function Boot() {
   setStep("装物理引擎……", 0.245);
   await InitPhysics();
 
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
   sky.BakeEnvironment(scene);
   lights.ApplyPreset(preset, sky.sunDirection);
@@ -669,7 +681,7 @@ async function Boot() {
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
 
-  await BuildField(PHASES[state.phaseIndex], setStep, 0.24, 0.62, NextFrame);
+  await BuildField(PHASE_TABLE[state.phaseIndex], setStep, 0.24, 0.62, NextFrame);
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
@@ -703,7 +715,7 @@ async function Boot() {
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
   // 换关时由 EnterLevel 重新按新切片调一次，别每帧调。
   // 浮尘只罩玩家附近那一片：切片最大的一关跨两公里，按整片铺会把粒子摊薄到看不见
-  vfx.AmbientDust(DustBox(PHASES[state.phaseIndex]), 0.075);
+  vfx.AmbientDust(DustBox(PHASE_TABLE[state.phaseIndex]), 0.075);
   // depthBudget 1.22（默认 0.90）：腰射姿态把枪往前推到 pz = -0.32 之后，
   // 最深点（枪口 + 刺刀）变成 |0.32 + 0.8175| + 0.04 + 0.02 ≈ 1.20 m，
   // 沿用 0.90 会被 _RecomputeCompensation 压到 0.55 的下限，枪整体缩到眼前 ——
@@ -773,7 +785,7 @@ async function Boot() {
   function RestoreLevelSky() {
     if (!cutsceneSky) return;
     cutsceneSky = null;
-    const preset = sky.Apply(PHASES[state.phaseIndex].sky);
+    const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
     sky.BakeEnvironment(scene);
     lights.ApplyPreset(preset, sky.sunDirection);
   }
@@ -857,7 +869,7 @@ async function Boot() {
 
 
   // 各阶段的配置时长，给通关冒烟按出厂配置跑用
-  state.phaseMinutes = PHASES.map((p) => p.minutes);
+  state.phaseMinutes = PHASE_TABLE.map((p) => p.minutes);
   window.Taierzhuang = {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
@@ -1054,7 +1066,7 @@ async function Boot() {
       // 这一关是哪一关、目标链走到第几个、路标各在哪儿。
       // 「七关能依次推进」这条断言只能从这里读，读源码是推断不出来的。
       Level: () => {
-        const phase = PHASES[state.phaseIndex];
+        const phase = PHASE_TABLE[state.phaseIndex];
         return {
           index: state.phaseIndex, id: phase.id, title: phase.label,
           objectiveIndex: state.objectiveIndex, objectiveCount: state.objectiveCount,
@@ -1176,6 +1188,98 @@ async function Boot() {
   // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
   window.Tengxian = window.Taierzhuang;
 
+  // --- 靶场取证口（只在 ?range=1 下存在；口径在 docs/Data_TestRange.md） ----
+  // 人机共用：agent 用 State/Targets 断言、GoTo/AimAt 摆位，真人在旁边看同一片场。
+  // 输入不在这里另开门：开枪/开镜/上刺刀/投弹照旧走 Debug.Fire / Key / Mouse / Throw
+  // 的真事件链 —— 测的是键位与玩法，不是函数。
+  if (RANGE) {
+    const RangeTargetSnapshot = (entry) => {
+      const s = entry.soldier;
+      return {
+        id: entry.spec.id, station: entry.spec.station,
+        x: entry.spec.x, z: entry.spec.z,
+        alive: !!(s && s.alive),
+        health: s ? s.health : 0,
+        deadTime: s && !s.alive ? s.deadTime : 0,
+        distance: s ? Math.hypot(s.position.x - player.position.x,
+          s.position.z - player.position.z) : null,
+      };
+    };
+    window.Taierzhuang.Debug.Range = {
+      /** 一眼总览：工位、靶况、击倒/复位计数、玩家武器与弹药 —— 验收的唯一入口。 */
+      State: () => ({
+        stations: RANGE_STATIONS.map((z) => ({ id: z.id, name: z.name, x: z.x, z: z.z })),
+        targets: rangeTargets.map(RangeTargetSnapshot),
+        stats: { ...rangeStats },
+        player: {
+          x: player.position.x, z: player.position.z, yaw: player.yaw, pitch: player.pitch,
+          health: player.health, alive: player.alive,
+          ads: player.ads, fov: camera.fov,
+          slot: state.activeSlot, weapon: currentWeapon,
+          ammo: state.ammo, clips: state.clips, grenades: state.grenades,
+          bayonetFixed: state.bayonetFixed,
+        },
+        pinned: state.pinned,
+        respawnS: RANGE_RESPAWN_S,
+      }),
+      Targets: () => rangeTargets.map(RangeTargetSnapshot),
+      /** 瞬移到某个工位（RangeRifle / RangeGrenade / RangeMelee），面朝各自靶道。 */
+      GoTo: (stationId) => {
+        const zone = RANGE_STATIONS.find((z) => z.id === stationId);
+        if (!zone) return null;
+        player.Spawn(zone.x, zone.z, zone.ry ?? 0);
+        return { id: zone.id, x: zone.x, z: zone.z, yaw: player.yaw };
+      },
+      /**
+       * 把视线摆到某个靶子身上。只摆 yaw/pitch，开火仍走 Debug.Fire ——
+       * 散布、后坐、开镜収束照旧全在链路里。
+       *
+       * offsetY 默认 0.95 = **躯干判定中心**（与 MarchBullet 的 s.position.y + 0.95
+       * 是同一个数，判定圆柱半径 0.45）。两条要知道的账：
+       *   · TryFire 是先施加本发的枪口上跳再采样弹道（「顶上去 100%」的设计），
+       *     所以首发会比瞄点高出 kick × 距离 —— ADS 下约 0.9°，25 m 处 ≈ 0.4 m。
+       *     远靶验命中要么瞄低、要么用近靶（RangeTest 用的 R10）。
+       *   · 命中几何只有躯干圆柱（爆头是 TryFire 里按概率抽的，不是几何），
+       *     所以别瞄头 —— 那条线从圆柱上方擦过去就是脱靶。
+       */
+      AimAt: (targetId, offsetY = 0.95) => {
+        const entry = rangeTargets.find((e) => e.spec.id === targetId);
+        const s = entry ? entry.soldier : null;
+        if (!s) return null;
+        const from = player.EyePosition;
+        const dx = s.position.x - from.x;
+        const dy = (s.position.y + offsetY) - from.y;
+        const dz = s.position.z - from.z;
+        const horiz = Math.hypot(dx, dz) || 1;
+        player.yaw = Math.atan2(-dx, -dz);
+        player.pitch = Math.atan2(dy, horiz);
+        player.aimYaw = 0;
+        player.aimPitch = 0;
+        return { yaw: player.yaw, pitch: player.pitch, distance: Math.hypot(dx, dy, dz) };
+      },
+      /** 整场复位：靶子全部立即重立，玩家满血满弹，击倒/复位计数清零。 */
+      Reset: () => {
+        for (const entry of rangeTargets) {
+          if (entry.soldier) ai.Remove(entry.soldier);
+          entry.soldier = SpawnRangeTarget(entry.spec);
+          entry.deadCounted = false;
+        }
+        rangeStats.killed = 0;
+        rangeStats.respawned = 0;
+        rangeStats.resets += 1;
+        player.health = 100;
+        player.bleeding = false;
+        const loadout = RANGE_PHASE.loadoutOverride;
+        state.mags.primary = { ammo: WEAPONS[loadout.primary].magazine, clips: loadout.spareClips };
+        state.mags.secondary = { ammo: WEAPONS[loadout.secondary].magazine, clips: 2 };
+        const mag = state.mags[state.activeSlot];
+        if (mag) { state.ammo = mag.ammo; state.clips = mag.clips; }
+        state.grenades = loadout.throwables.Grenade;
+        return window.Taierzhuang.Debug.Range.State();
+      },
+    };
+  }
+
   // --- 编辑器套件 ---------------------------------------------------------
   // 建在最后：六个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城、破坏系统）
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
@@ -1188,7 +1292,7 @@ async function Boot() {
     ReturnToMainMenu: MENU_ON ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES, JumpToLevel, graphics, ApplyGraphics, get gi() { return gi; },
+      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, get gi() { return gi; },
       // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
       // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
       // query，避免新序章又落到界河战斗切片。
@@ -1317,7 +1421,7 @@ async function Boot() {
  * 别把这张表挪进 Data_Battle：那是数据层，import 一个世界类进去会让
  * 数据模块反向依赖渲染模块（BootTest 里那几个纯数据的自检也会被拖进 three）。
  */
-const WORLD_CLASSES = { [JIEHE_LEVEL_ID]: JieheField };
+const WORLD_CLASSES = { [JIEHE_LEVEL_ID]: JieheField, [RANGE_LEVEL_ID]: RangeField };
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
@@ -1446,8 +1550,8 @@ function ClearRuntime() {
  */
 async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.advancing = true;
-  state.phaseIndex = Clamp(index, 0, PHASES.length - 1);
-  const phase = PHASES[state.phaseIndex];
+  state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
+  const phase = PHASE_TABLE[state.phaseIndex];
 
   // --- 关前过场 ---
   if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn);
@@ -1522,7 +1626,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   RespawnPlayer(true);
   // 新版序章预览只借用 L0 的地形/光照作为装配底座；不撒 L0 的兵，
   // 否则车厢结束后即使画面没有切关，旧 AI 也会在后台先开火/消耗票池。
-  if (!PREVIEW) SeedSoldiers(phase);
+  // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
+  if (RANGE) { state.pinned = true; SeedRangeTargets(); }
+  else if (!PREVIEW) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
 
   if (!initial) {
@@ -1569,21 +1675,69 @@ async function RunCutscene(id) {
 async function AdvanceLevel(opts = {}) {
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
-  Progress.MarkCleared(PHASES[state.phaseIndex].id, state.phaseIndex);
-  const phase = PHASES[state.phaseIndex];
+  Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
+  const phase = PHASE_TABLE[state.phaseIndex];
   const cutscenes = opts.cutscenes ?? !SHOT;
   state.advancing = true;
   // 关末那几条还没播的旁白先倒出来，别跟着关卡一起消失
   story.FlushTail();
   if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut);
   state.advancing = false;
-  if (state.phaseIndex >= PHASES.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
+  if (state.phaseIndex >= PHASE_TABLE.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
   return EnterLevel(state.phaseIndex + 1, { cutscenes });
 }
 
 /** 调试口：直接跳到某一关（不播过场）。出图与自检走这条。 */
 function JumpToLevel(index) {
   return EnterLevel(index, { cutscenes: false });
+}
+
+// ---------------------------------------------------------------------------
+// 玩法测试靶场（?range=1）的木桩兵
+//
+// 木桩兵是**整具正式的 ija Actor**（骨骼、命中箱、倒地、准心识别全走原链路），
+// 只是 s.dummy = true 让 AiDirector 跳过 Think —— 不索敌、不开火、不自行走位。
+// 「打倒 → 停 RANGE_RESPAWN_S 秒 → 原位复立」由补兵那个 3 秒节拍顺带驱动。
+// 取证口在 Debug.Range（见 window.Taierzhuang 装配处），口径在 docs/Data_TestRange.md。
+// ---------------------------------------------------------------------------
+
+/** 注册表：spec 是 Data_Range.RANGE_TARGETS 里那一条，soldier 是场上这一具。 */
+const rangeTargets = [];
+const rangeStats = { killed: 0, respawned: 0, resets: 0 };
+
+function SpawnRangeTarget(spec) {
+  const s = ai.Spawn("ija", spec.x, spec.z, {
+    weapon: spec.weapon || "Type38", squadId: `Range_${spec.id}`,
+  });
+  if (!s) return null;
+  s.dummy = true;
+  s.order = "hold";
+  s.holdZone = { id: `Range_${spec.id}`, x: spec.x, z: spec.z, radius: 2 };
+  s.goal.set(spec.x, 0, spec.z);
+  s.yaw = spec.yaw ?? Math.PI;          // 面朝工位（+Z）；朝向契约见 Data_Tengxian 头注
+  s.lookYaw = s.yaw;
+  return s;
+}
+
+function SeedRangeTargets() {
+  rangeTargets.length = 0;
+  for (const spec of RANGE_TARGETS) {
+    rangeTargets.push({ spec, soldier: SpawnRangeTarget(spec), deadCounted: false });
+  }
+}
+
+/** 每 3 秒被补兵节拍调一次：清点倒下的、到点的原位复立。 */
+function MaintainRangeTargets() {
+  for (const entry of rangeTargets) {
+    const s = entry.soldier;
+    if (s && s.alive) { entry.deadCounted = false; continue; }
+    if (s && !s.alive && !entry.deadCounted) { entry.deadCounted = true; rangeStats.killed += 1; }
+    if (s && !s.alive && s.deadTime < RANGE_RESPAWN_S) continue;
+    if (s) ai.Remove(s);
+    entry.soldier = SpawnRangeTarget(entry.spec);
+    entry.deadCounted = false;
+    if (entry.soldier) rangeStats.respawned += 1;
+  }
 }
 
 /**
@@ -1600,7 +1754,7 @@ function JumpToLevel(index) {
 function SeedSmokeColumns(phase) {
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
-  if (phase.id === "L0_Jiehe") return;
+  if (phase.id === "L0_Jiehe" || phase.sandbox) return;
 
   const px = player.position.x;
   const pz = player.position.z;
@@ -1901,12 +2055,14 @@ function FindOpenSpot(cx, cz, radius, seed, limits = null) {
  * 所以从**当前路标**往回退一段生。
  */
 function RespawnPlayer(initial = false) {
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
   state.identity = MakeSoldierIdentity(seed);
   currentWeapon = state.identity.weapon;
 
-  if (initial && phase.spawn) {
+  // 靶场（sandbox）阵亡后也回出生工位：那套「退到路标后方」的算法是给战线写的，
+  // 靶场的路标是三个工位，按它算会把人复活到场地边上。
+  if ((initial || phase.sandbox) && phase.spawn) {
     player.Spawn(phase.spawn.x, phase.spawn.z, phase.spawn.ry ?? 0);
   } else {
     // 换人：退到当前路标后方 20 m。往哪边算"后方"？朝上一个路标的方向。
@@ -2323,7 +2479,7 @@ function StartRun() {
   // 这里在玩家按下「进城」的那一下补播：点击本身就是音频与指针锁要的那次用户手势。
   // 调试入口（?phase=N 直跳某关、?intro=0）不播开场 —— 冒烟测试点完「进城」就要拿到
   // 指针锁与键盘，过场一夺控制权它们全挂。玩家正常打开页面没有这些参数。
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   const wantIntro = !params.has("phase") && params.get("intro") !== "0";
   const intro = wantIntro && phase && phase.cutsceneIn;
   if (intro && !state.cutscenesPlayed.some((c) => c.id === intro)) {
@@ -2407,7 +2563,7 @@ function FinishEditorSession() {
  */
 async function StartLevel(index, { cutscenes = false } = {}) {
   if (!menu || state.advancing) return state.phaseIndex;
-  const target = Clamp(index, 0, PHASES.length - 1);
+  const target = Clamp(index, 0, PHASE_TABLE.length - 1);
   CloseMenu();
   // 上一局的残留：结算层与阵亡卡片都是不透明的全屏层，不收掉的话新一关
   // 顶着它们跑，玩家看到的是「点了开始但进不去游戏」。
@@ -3323,7 +3479,7 @@ function ReachObjective(index) {
   o.reached = true;
   o.contested = false;
   state.objectiveIndex = Math.min(index + 1, objectives.length);
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   const text = phase.objectives[state.objectiveIndex];
   if (text) {
     state.storyObjective = text;
@@ -3551,7 +3707,7 @@ function Frame(dt, render = true) {
   // 表现为「手雷从刚跑过去的人身上穿过去」。
   if (physics) physics.Step(dt);
   vfx.Update(dt, camera, state.elapsed);
-  combat.Update(dt, { phase: PHASES[state.phaseIndex] });
+  combat.Update(dt, { phase: PHASE_TABLE[state.phaseIndex] });
   // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
   // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
   if (destruction) destruction.Update(player.position, dt);
@@ -3605,7 +3761,7 @@ function Frame(dt, render = true) {
   if (!state.outcome && state.nraPool <= 0 && !player.Alive) EndBattle("defeat");
 
   state.phaseTime += dt;
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   // 换关：目标链走完，或者配置时长到了（史实时段是往前走的，不等玩家）
   const levelOver = !state.pinned
     && (state.objectiveIndex >= state.objectiveCount || state.phaseTime > state.levelSeconds);
@@ -3613,9 +3769,13 @@ function Frame(dt, render = true) {
     // 异步：建下一片切片要分帧走完。这里只管点火，别 await —— Frame 是同步的。
     AdvanceLevel().catch((error) => console.error("换关失败", error));
   }
-  // 补兵
+  // 补兵（靶场不补战线，只把倒下的木桩兵按 RANGE_RESPAWN_S 复位）
   state.spawnAccumulator += dt;
-  if (state.spawnAccumulator > 3) { state.spawnAccumulator = 0; SeedSoldiers(phase); }
+  if (state.spawnAccumulator > 3) {
+    state.spawnAccumulator = 0;
+    if (RANGE) MaintainRangeTargets();
+    else SeedSoldiers(phase);
+  }
 
   // --- HUD ---
   hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
@@ -3716,7 +3876,7 @@ function Frame(dt, render = true) {
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
  */
 function RenderScene(dt) {
-  const phase = PHASES[state.phaseIndex];
+  const phase = PHASE_TABLE[state.phaseIndex];
   // 探针体每帧推一批。**必须挂在这里，不能挂在玩法那条分支上** ——
   // 出画的路一共四条（玩法 / 过场 / 菜单 / 编辑器），以前只有玩法那条推 GI。
   // 后果：编辑器一打开玩法就停摆，探针一个都不再收敛，Debug Rendering 面板的
@@ -3948,7 +4108,7 @@ function ApplyGraphics() {
     if (gi) {
       gi.enabled = wantGi;
       if (!gi.enabled) { gi.blend = 0; gi.SyncUniforms(); lights.SetGiActive(0); }
-      const preset = SKY_PRESETS[PHASES[state.phaseIndex].sky];
+      const preset = SKY_PRESETS[PHASE_TABLE[state.phaseIndex].sky];
       if (preset) gi.ApplyPreset(preset, graphics.giStrength);
     }
   }

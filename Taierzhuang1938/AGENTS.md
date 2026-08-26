@@ -212,6 +212,12 @@ URL 参数选 preset / quality / scene / gi。
 - `Script_Navigation.mjs` —— 「哪儿站得住」位图 + 按目标算的下坡场。
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
+### 玩法测试靶场（?range=1，人机共同测试）
+- `Data_Range.mjs` —— 靶场配置（工位/靶位/携行，纯数据）；`Script_RangeField.mjs` ——
+  独立场景（战场接口的第三个实现）。装配层在 `?range=1` 时整表替换关卡表，正片不知道它存在。
+- 木桩兵 = `soldier.dummy`（Script_Ai 跳过 Think）；取证口 `Debug.Range`（State/GoTo/AimAt/Reset）。
+- 回归口 `Script_RangeTest.mjs`（combat 域）。先读：`docs/Data_TestRange.md`（弹道两条账必读）。
+
 ### 武器 / 战斗 / 刺刀
 - `Script_Player.mjs` —— 移动、碰撞、姿态、**自由瞄准**（枪口在视野里滑动，
   不钉屏幕中心）、压制、伤口。
@@ -292,7 +298,8 @@ URL 参数选 preset / quality / scene / gi。
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`（关卡与过场设计书）、
   `Data_CutsceneRedo.md`（五场过场施工单）、`Data_CityWallPbr.md`、
-  `Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`。
+  `Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
+  `Data_TestRange.md`（?range=1 玩法测试靶场与 Debug.Range 取证口）。
 
 **史实考据底本（三档可信度：信史 / 主流记载 / 流传待考；台词只建立在前两档上）**：
 - `Data_HistoryMaterial.md`（装备/军服/建筑，建模级参数）、`Data_HistoryQuotes.md`（语录校勘）、

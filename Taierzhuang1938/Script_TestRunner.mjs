@@ -82,6 +82,7 @@ export const testDefs = {
   SprintCrosshairTest: { file: "Script_SprintCrosshairTest.mjs", desc: "动态准心＝真实散布投影（真 Shift+W 路径）" },
   AdsSightTest: { file: "Script_AdsSightTest.mjs", desc: "开镜视野：五支枪的瞄准点不许被枪身糊住" },
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸、空枪白刃、蓄力分挥砍/劈刺" },
+  RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
   WestDistrictCoverageTest: { file: "Script_WestDistrictCoverageTest.mjs", desc: "L4 总览完整生成西关 5 地标与 137 件布设" },
   WestSuburbBlocksTest: { file: "Script_WestSuburbBlocksTest.mjs", desc: "西关 20 个示意图矩形整块覆盖、净空与院落几何" },
@@ -151,7 +152,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "SprintMeleeTest", "BayonetTest"],
+      "AdsSightTest", "SprintViewmodelTest", "SprintMeleeTest", "BayonetTest", "RangeTest"],
   },
   ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
   hud: { label: "HUD/交互提示/目标识别", tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest"] },
@@ -175,7 +176,7 @@ export const domains = {
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Player|Navigation|Movement|Jump|Destruction|Fracture|Battlefield|Outfield)/i },
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range)/i },
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },

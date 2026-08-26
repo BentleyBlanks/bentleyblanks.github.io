@@ -178,6 +178,12 @@ export class Soldier {
     this.coverUntil = -99;
     this.goal = new THREE.Vector3(options.x || 0, 0, options.z || 0);
     this.order = "advance";
+    /**
+     * 靶场木桩兵（Script_Main ?range=1 时由装配层置真）。
+     * Update 里跳过 Think —— 不索敌、不开火、不自行走位（TryFire 要 target，
+     * Think 不跑就永远没有）；挨打、倒地、被准心识别照旧走原链路。
+     */
+    this.dummy = false;
     this.rnd = Mulberry32(this.id * 2654435761);
     this.actor = null;
     this.deadTime = 0;
@@ -833,8 +839,10 @@ export class AiDirector {
         }
         continue;
       }
-      // 「想」分帧轮转：每帧只有六分之一的人重新决策
-      if (i % 6 === slice) this.Think(s, dt * 6, player);
+      // 「想」分帧轮转：每帧只有六分之一的人重新决策。
+      // 木桩兵（s.dummy，见 Soldier 构造器）不想：Act 照走 —— 重力、贴地、
+      // 姿态动画、守点纪律都要，只是永远不会有目标、不会开火。
+      if (i % 6 === slice && !s.dummy) this.Think(s, dt * 6, player);
       this.Act(s, dt, player);
     }
 
