@@ -93,6 +93,20 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 为什么 `renderer.toneMapping` 必须设 `NoToneMapping`：三方源码里 `toneMapping` 只在 `currentRenderTarget === null` 时才注入（module 7549–7559），也就是说渲进 RT 时它本来就不生效；但如果你留着 `ACESFilmicToneMapping`，最后那一 pass 如果哪天直接渲到屏幕，就会**tonemap 两次**。索性关掉，全部收进 Composite。
 
+### 2.1 动态特效灯进入哪一段
+
+爆炸和持续燃烧的点光不在 Composite 里“染一层橙色”，而是在第 3 趟 HDR 主场景里作为
+three 前向 PBR 的直接光参与 `MeshStandardMaterial`：地面、墙、人物和碎块收到的是真正按
+法线、距离和粗糙度计算的光，随后亮面再进入 Bloom，最后才 ACES。粒子火球仍是 HDR
+自发光；两者共用 `VfxSystem` 的生成时刻与 `LightRig` 的秒制包络，所以火球由白热转橙、
+亮度回落时，环境反光也同拍回落。
+
+物理点光数量按画质档固定，持续火源与同时存在的爆炸只是逻辑源；`LightRig.Update` 按
+镜头附近的实际贡献选出有限几盏送给 GPU。所有物理灯常驻 `visible=true`，闲置时
+`intensity=0`，避免第一颗手榴弹或一处新火把改变 `NUM_POINT_LIGHTS`、触发整城 PBR shader
+重编译。特效点光不投实时阴影；太阳阴影仍是唯一阴影图预算，近墙爆光靠直接光、SSAO 与
+已有几何阴影共同维持体积。
+
 Composite 里的 ACES 直接抄 r185 原文（避免和 three 内置材质的观感漂移）：
 
 ```glsl
@@ -644,7 +658,11 @@ col = pow(max(col, 0.0), 1.0 / uGammaLGG);
 // --- 3D LUT（32³ 烘进 1024×32 的 CanvasTexture 条带）---
 col = mix(col, SampleLut(col), uLutAmount);
 // --- 对比 + 饱和 ---
-col = (col - 0.5) * uContrast + 0.5;
+// 对比度是感知域操作。在线性域围绕 0.5 拉伸会把暗部先减掉一大截，
+// 深色枪械/军装即使 BaseColor、GI、AO 都正常，最终也会被硬裁成纯黑。
+vec3 perceptual = LinearToSrgb(col);
+perceptual = (perceptual - 0.5) * uContrast + 0.5;
+col = SrgbToLinear(clamp(perceptual, 0.0, 1.0));
 col = mix(vec3(Luma(col)), col, uSaturation);
 
 // --- 暗角：压亮度，不是叠黑纱 ---
@@ -973,7 +991,7 @@ SH 只有辐照度、没有遮挡，街对面的太阳光会直接漏进屋里 �
 | 天空 IBL（PMREM） | 漫反射那一路被探针**替换**；镜面那一路留着，但按 GI/天空的亮度比做一次遮蔽（屋里的金属件不该照样反着一片亮天） |
 | 半球光 | 退成 0.3 倍底噪（`LightRig.SetGiActive`）。它原本干的就是「天空把冷色洒到朝上的面」，而这正是探针算得**更准**的那部分（它还知道头顶有没有屋顶） |
 | SSAO | **不动**。两者尺度不同：探针管米级的「这间屋子有多暗」，AO 管厘米级的「墙根接触处」。AO 依旧只乘间接光 |
-| 火光（点光源） | 直接光照旧走 `PointLight`；探针只收它的**反弹**（射线命中点上算火光，漏空的射线不算），所以着火的院子会把橙色泼到半条街上 |
+| 特效光（持续火焰 + 爆炸点光） | 直接光走固定预算 `PointLight` 池；探针只收当前入选灯的**反弹**（射线命中点上算火光，漏空的射线不算）。爆炸包络很短，主要读直接光；持续火焰能把橙色反弹留在院墙与街面 |
 | `envIntensity` | 继续有效 —— 它是美术为每一关定的「天有多强」，`ProbeVolume.ApplyPreset()` 把它乘进 `uGiIntensity` |
 
 **画质面板那根「间接光强度」必须两侧同倍。** 它以前只乘探针一侧（`uGiIntensity`），

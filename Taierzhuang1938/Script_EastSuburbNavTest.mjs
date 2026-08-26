@@ -23,7 +23,8 @@ try {
     const rows = [];
     for (const objective of game.battlefield.objectives) {
       game.nav.BeginFrame();
-      const field = game.nav.FieldFor(objective.x, objective.z);
+      // force=true：BFS 现在是跨帧摊的，量连通率要的是"走不走得到"，同步算完
+      const field = game.nav.FieldFor(objective.x, objective.z, true);
       let reach = 0;
       if (field) for (const distance of field.dist) if (distance >= 0) reach += 1;
       rows.push({
