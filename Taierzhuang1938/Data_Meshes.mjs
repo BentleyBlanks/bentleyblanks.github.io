@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "18";
+const MESH_REV = "19";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -253,23 +253,32 @@ export const MESHES = {
   },
   Type89Tank: {
     file: "Type89Tank.tzm.json", category: "vehicle",
-    triangles: 1239, meshBlocks: 4, nodes: 8, joints: 1,
+    triangles: 4089, meshBlocks: 4, nodes: 8, joints: 1,
     materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
-    span: [2.18538, 2.56785, 4.26924],
+    span: [2.15, 2.56, 4.3],
     draws: { high: 4, medium: 4, low: 4 },   // body 两桶（armor/track）+ turret 两桶（armor/steel）
     note: "八九式中战车（甲）。几何来自 CC-BY Type 89 I-Go (Chi-Ro)（Sketchfab / snrnsrk5）："
       + "炮塔偏前、塔后机枪与车体右前机枪球座、前起动轮抬高都是模型自带的。"
-      + "尺寸按史实 2.15 × 2.56 × 4.30 m 归一（2.19/2.57/4.27 为换模减面后实测）。"
+      + "尺寸按史实 2.15 × 2.56 × 4.30 m 归一，并保留源件约 4,100 面。"
       + "装甲 6—17 mm，巷宽 < 2.5 m 进不来。炮塔是关节（turret），将来接载具系统直接转它。",
   },
-  Type94Tankette: {
-    file: "Type94Tankette.tzm.json", category: "vehicle",
-    triangles: 976, meshBlocks: 5, nodes: 6, joints: 1,
-    materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANKETTE,
-    span: [1.592, 1.5725, 3.1002],
-    draws: { high: 5, medium: 5, low: 5 },   // 车辆没有 accent 桶，低模无处可并
-    note: "九四式轻装甲车（豆战车）。一挺机枪、四只负重轮、**车尾牵引钩** —— "
-      + "它本来是拉弹药拖车的，被拉到前线当装甲车用。",
+  Type95HaGo: {
+    file: "Type95HaGo.tzm.json", category: "vehicle",
+    triangles: 3442, meshBlocks: 1, nodes: 8, joints: 1,
+    materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
+    span: [2.07, 2.26289, 4.35428],
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）经体素聚类减面；"
+      + "完整车体剪影保留为单一 armor 网格，标准挂点与炮塔关节仍齐备。",
+  },
+  Type97ChiHa: {
+    file: "Type97ChiHa.tzm.json", category: "vehicle",
+    triangles: 3969, meshBlocks: 4, nodes: 8, joints: 1,
+    materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
+    span: [2.475, 2.38, 5.5],
+    draws: { high: 4, medium: 4, low: 4 },
+    note: "九七式中战车 Chi-Ha。CC-BY（Sketchfab / snrnsrk5），车体、履带、炮塔与炮管"
+      + "分桶导入；履带外廓宽度用于碰撞和巷宽判断。",
   },
 
   Dougong: {
@@ -386,9 +395,9 @@ export const WEAPON_MESH_BY_ID = {
   Mauser96: "Mauser96", ServicePistol: "ServicePistol",
   Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
-  // 两辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
+  // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
   Type89Launcher: "Type89Launcher",
-  Type89Tank: "Type89Tank", Type94Tankette: "Type94Tankette",
+  Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
 };
 
 /**

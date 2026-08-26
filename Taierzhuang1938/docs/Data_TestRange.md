@@ -71,7 +71,7 @@ node Taierzhuang1938/Script_RangeTest.mjs --shot           # 附带按工位各�
 | `State()` | 一眼总览：工位表、每个靶的 alive/health/距离、killed/respawned 计数、玩家武器弹药与 ads/fov。验收的唯一入口。 |
 | `Targets()` | 只要靶况那一段。 |
 | `GoTo(stationId)` | 瞬移到工位并面朝靶道（用 `player.Spawn`，顺带清 pitch/俯仰）。 |
-| `AimAt(targetId, offsetY?)` | 把视线摆到靶上。默认瞄 **躯干判定中心**（+0.95，与 MarchBullet 同一个数）。 |
+| `AimAt(targetId, offsetY?)` | 把视线摆到靶上。默认瞄 **躯干判定中心**（`COMBAT.hitbox.centerY`，与 MarchBullet 同一份数）。 |
 | `Reset()` | 靶全部立即重立、玩家满血满弹、计数清零。用它做用例隔离。 |
 
 ### 两条弹道账（写测试前必读）
@@ -79,8 +79,9 @@ node Taierzhuang1938/Script_RangeTest.mjs --shot           # 附带按工位各�
 1. **首发继承本发的枪口上跳**：`TryFire` 先 `ApplyRecoil` 再采样弹道方向
    （「顶上去 100%」是枪感设计，不是 bug）。ADS 下约 0.9°，25 m 处 ≈ 0.4 m ——
    远靶验命中要么瞄低、要么用近靶（RangeTest 用 R10）。
-2. **命中几何只有躯干圆柱**（半径 0.45，中心 +0.95）；爆头是 TryFire 里按概率抽的，
-   不是几何。别瞄头，那条线从圆柱上方擦过去就是脱靶。
+2. **命中几何只有一个球**（`COMBAT.hitbox` 的 radius / centerY，球心从脚底往上量）；
+   爆头是 TryFire 里按概率抽的，不是几何。别瞄头，那条线从球上方擦过去就是脱靶。
+   想直接看这个球：人物动作编辑器「判定」一节的**子弹判定盒**开关。
 
 ### 典型验收片段
 

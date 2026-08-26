@@ -277,7 +277,10 @@ export const LEVELS_MAP = {
         support: [{ kind: "Type89Launcher", x: -30, z: -46 }] },
       { id: 4, at: "waveClear:3", delay: 7, count: 16, from: [{ x: -26, z: -46 }, { x: 20, z: -46 }, { x: -4, z: -50 }],
         weapons: ["Type38", "Type38", "Type11", "Type38"], advanceTo: { x: 0, z: -8 },
-        vehicles: [{ kind: "Type94Tankette", x: 6, z: -46, path: [{ x: 4, z: -20 }, { x: 2, z: -10 }] }],
+        vehicles: [
+          { kind: "Type95HaGo", x: 6, z: -46, path: [{ x: 4, z: -20 }, { x: 2, z: -10 }] },
+          { kind: "Type97ChiHa", x: -8, z: -48, path: [{ x: -6, z: -22 }, { x: -4, z: -12 }] },
+        ],
         support: [{ kind: "Type92Hmg", x: -28, z: -44 }] },
       { id: 8, at: "event:Signal", delay: 3, count: 14, from: [{ x: -16, z: -40 }, { x: 14, z: -42 }],
         weapons: ["Type38", "Type11"], advanceTo: { x: 0, z: -20 }, retreating: true },

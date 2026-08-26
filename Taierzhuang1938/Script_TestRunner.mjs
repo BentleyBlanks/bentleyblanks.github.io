@@ -101,6 +101,7 @@ export const testDefs = {
   WestStationTest: { file: "Script_WestStationTest.mjs", desc: "津浦路滕县站构件、信号与货运作业物冒烟" },
   DressingProbeTest: { file: "Script_DressingProbeTest.mjs", timeoutMs: 12 * 60 * 1000, desc: "七关布设外部构件的重叠/浮空探针（真浏览器）" },
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
+  FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称手臂（?arms=rig）：手扣在枪上、胳膊不糊屏" },
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
   TargetInfoTest: { file: "Script_TargetInfoTest.mjs", desc: "准心目标识别：番号/姓名/距离、穿墙与雾外不认" },
@@ -169,7 +170,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "SprintMeleeTest", "BayonetTest", "RangeTest"],
+      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest"],
   },
   ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
   hud: { label: "HUD/交互提示/目标识别", tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest"] },

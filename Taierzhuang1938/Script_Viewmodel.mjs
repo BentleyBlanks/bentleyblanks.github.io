@@ -28,6 +28,7 @@
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
+import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
@@ -807,7 +808,9 @@ function AddGrenadeBody(steel, key, x = 0, y = 0, z = -0.055) {
 }
 
 /** 木柄手榴弹：铸铁弹体 φ58×90 + 木柄 φ29×128，全长 220 mm（考据值）。 */
-function BuildGrenadeProp(materials, key) {
+function BuildGrenadeProp(materials, key, grenadeAsset = null) {
+  const imported = CloneGrenadeAsset(grenadeAsset, { firstPerson: true });
+  if (imported) return imported;
   const steel = [];
   const wood = [];
   AddGrenadeBody(steel, key);
@@ -820,9 +823,9 @@ function BuildGrenadeProp(materials, key) {
   return group;
 }
 
-function BuildGrenade(materials, weapon, key) {
+function BuildGrenade(materials, weapon, key, grenadeAsset = null) {
   const group = new THREE.Group();
-  const prop = BuildGrenadeProp(materials, key);
+  const prop = BuildGrenadeProp(materials, key, grenadeAsset);
   // 握在木柄中段，弹体朝前上方
   prop.position.set(0, 0.02, -0.02);
   prop.rotation.set(-0.35, 0, 0);
@@ -967,10 +970,12 @@ const BUILDERS = {
 // （中正式 / 汉阳造 / 三八式）、捷克式、驳壳枪都有一个会动的枪机：每打一发，
 // bolt 这个 Group 要后拉 boltTravel、从 ejectAt 抛一枚壳出去，三八式还要滑开防尘盖。
 // 换成模型 = 这些全没了，而且模型自带的那个拉机柄还会跟我们的枪机重叠成两个手柄。
-// 大刀 / 手榴弹没有可动件，换过去零损失。中正式 / 汉阳造 / 驳壳枪走导入的
+// 大刀没有可动件，换过去零损失。普通手榴弹改走 Script_GrenadeAsset 的 CC-BY
+// GLB（加载失败才退回 BuildGrenade 的程序化形），不能再被旧 Grenade.tzm 覆盖。
+// 中正式 / 汉阳造 / 驳壳枪走导入的
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
-  "Dadao", "Grenade",
+  "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
 ]);
 
@@ -1213,12 +1218,13 @@ export class Viewmodel {
    */
   constructor(library, {
     fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel", meshDocs = null,
-    riggedAssets = null,
+    riggedAssets = null, grenadeAsset = null,
   } = {}) {
     this.library = library;
     // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
     // 不再自己 fetch —— 同一个模型解码两次是白花的内存与开机时间）。
     this.meshDocs = meshDocs;
+    this.grenadeAsset = grenadeAsset;
     this.rigSource = "box";
     this.materials = BuildMaterials(library);
     this.fov = fov;
@@ -1257,6 +1263,14 @@ export class Viewmodel {
     // 挥刀要的是刀身自己绕手转过一百多度，只有原点落在握把上的这一层能做到
     // （weaponMount 的原点就是 rig 的原点，也就是模型规范里的右手握持点）。
     this.swingPivot = new THREE.Group();
+    // 导入手臂的挂点。**它挂在 recoilPivot 上，不挂在枪上**：肩膀属于人，
+    // 不属于武器。挂在武器下面的那一版里，肩要跟着腰射/开镜/冲刺/挥砍的每一次
+    // 姿态旋转一起转 —— 大刀的腰射姿态绕刀身自转 88°，整副手臂就跟着侧翻到
+    // 画面正中糊成一坨（玩家报的"持刀的手完全坏了"）。挂在这一层，手臂照样跟着
+    // 摇摆/步伐/落地/后坐一起动，但武器自己怎么摆都不再牵动肩。
+    // 手仍然严格扣在枪上：那是 FpsArmRig 用 IK 追 handRight/handLeft 做到的。
+    this.armAnchor = new THREE.Group();
+    this.armAnchor.name = "ArmAnchor";
     this.root.add(this.fovRig);
     this.fovRig.add(this.swayPivot);
     this.swayPivot.add(this.bobPivot);
@@ -1264,6 +1278,7 @@ export class Viewmodel {
     this.statePivot.add(this.actionPivot);
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
+    this.recoilPivot.add(this.armAnchor);
     this.weaponMount.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
@@ -1348,7 +1363,7 @@ export class Viewmodel {
     this.debris = this._BuildDebrisPool(6);
 
     // --- 手榴弹（副手投弹用，平时藏着）---------------------------------------
-    this.offhandGrenade = BuildGrenadeProp(this.materials, "offhand");
+    this.offhandGrenade = BuildGrenadeProp(this.materials, "offhand", this.grenadeAsset);
     this.offhandGrenade.visible = false;
     this.handLeft.group.add(this.offhandGrenade);
     this.offhandGrenade.position.set(0, 0.01, 0.0);
@@ -1479,7 +1494,7 @@ export class Viewmodel {
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
     if (!this.rig) {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
-      this.rig = builder(this.materials, this.weapon, weaponId);
+      this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
     }
     this.rigSource = this.rig.source === "model" ? "model" : "box";
     this.swingPivot.add(this.rig.group);
@@ -1500,8 +1515,9 @@ export class Viewmodel {
 
     // 新手臂用 IK 追随上面两只旧手的握点。旧手只当隐藏动画靶，既有每把枪的
     // 拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用，不需要重做动作表。
+    // 挂点给的是 armAnchor（相机稳定）而不是 rig.group，理由见 armAnchor 那段抬头。
     if (this.riggedArms) {
-      this.riggedArms.Attach(this.rig.group, this.handRight.group, this.handLeft.group,
+      this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
         [this.handRight, this.handLeft]);
       this.rigSource = `${this.rigSource}+riggedArms`;
     }

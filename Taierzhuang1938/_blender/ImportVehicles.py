@@ -11,7 +11,8 @@
 
 源图依然不进 Pages（与枪械同一个理由：共享三套 authored PBR，见
 Data_SourceLicenses.md）。扫描/摄影测量件顶点按面拆分，先焊接成真实连通岛，
-再按连通岛逐个减面把三角数压到车辆预算 1600。
+再按连通岛逐个减面。扫描源在近景展示中比程序化远景车需要更多轮廓预算，预算
+逐资产登记在 `SOURCES` 中。
 
 挂点（gunMuzzle / rearMgMuzzle / hatch / mgMuzzle / hullFront）按部件几何推算：
 炮口取枪管最前端的质心、舱盖取炮塔顶面质心、塔后机枪取炮塔后端质心——
@@ -34,9 +35,34 @@ SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
 BUDGET = 1600
 
 SOURCES = {
+    "Type95HaGo": {
+        "file": os.path.join("Model_Type95HaGo", "scene.gltf"),
+        "span": (2.07, 2.27, 4.38),
+        "budget": 6000,
+        # 这件高模被作者按表面切成 13 个 Object_* 网格，源文件没有车体/履带/炮塔
+        # 语义层级；完整保留剪影并压到预算，运行时用 shared armor 材质重漆。
+        "parts": [("Object_", "armor", False)],
+        "singleBody": True,
+        "note": "CC-BY Type 95 Ha-Go（Sketchfab / Jesper Landin）→ 九五式轻战车。"
+                "源件 82.8k 面，按 4.38 × 2.07 × 2.27 m 归一后减至战车预算；"
+                "源 glTF 没有可分离的炮塔/履带节点，保留完整外形为单一装甲网格。",
+    },
+    "Type97ChiHa": {
+        "file": os.path.join("Model_Type97ChiHa", "scene.gltf"),
+        # 导入基准宽度 2.475 m；履带外侧与侧裙撑会在几何清理后把实际外廓推到
+        # 2.621 m。运行时碰撞/巷宽取 Data_Weapons 的实际外廓，避免穿墙。
+        "span": (2.475, 2.38, 5.50),
+        "budget": 5000,
+        "parts": [("Hull", "armor", False), ("Track", "track", False),
+                  ("Turret", "armor", True), ("Barrel", "steel", True)],
+        "note": "CC-BY Type 97 Chi-Ha（Sketchfab / snrnsrk5）→ 九七式中战车。"
+                "车体、履带、炮塔与炮管按源节点分桶，几何实际外廓为 5.50 × 2.621 × 2.38 m，"
+                "运行时按 armor/track/steel 三桶重漆。",
+    },
     "Type89Tank": {
         "file": os.path.join("Model_Type89ChiRo", "scene.gltf"),
         "span": (2.15, 2.56, 4.30),
+        "budget": 5000,
         # (部件组名, 材质桶, 属于炮塔节点?)
         "parts": [("Hull", "armor", False), ("Track", "track", False),
                   ("Turret", "armor", True), ("Barrel", "steel", True)],
@@ -82,8 +108,64 @@ def _Xform(bms, matrix):
         bm.normal_update()
 
 
+def _ClusterToBudget(source, budget):
+    """把扫描式、未焊接高模压成保持轮廓的体素聚类网格。
+
+    九五式源件的相邻三角几乎不共享顶点，collapse 无法越过这些缝收缩；随机
+    删面又会把车体打成缺口。这里按空间格合并顶点并剔除退化/重复三角，优先
+    选择不超预算的最细格距，给远景车辆保住车体、炮塔与履带的整体剪影。
+    """
+    bmesh.ops.triangulate(source, faces=source.faces[:])
+    lo, hi = _Aabb([source])
+    smallest = min(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z)
+    edge = max(smallest / 80.0, 0.005)
+
+    def Cluster(cell):
+        sums, counts = {}, {}
+        def Key(co):
+            return (int(math.floor((co.x - lo.x) / cell)),
+                    int(math.floor((co.y - lo.y) / cell)),
+                    int(math.floor((co.z - lo.z) / cell)))
+        for vert in source.verts:
+            key = Key(vert.co)
+            sums[key] = sums.get(key, Vector((0.0, 0.0, 0.0))) + vert.co
+            counts[key] = counts.get(key, 0) + 1
+        faces, seen = [], set()
+        for face in source.faces:
+            keys = [Key(vert.co) for vert in face.verts]
+            if len(set(keys)) != 3:
+                continue
+            signature = tuple(sorted(keys))
+            if signature in seen:
+                continue
+            seen.add(signature)
+            faces.append(keys)
+        out = bmesh.new()
+        verts = {key: out.verts.new(sums[key] / counts[key]) for key in sums}
+        for keys in faces:
+            try:
+                out.faces.new([verts[key] for key in keys])
+            except ValueError:
+                pass
+        out.normal_update()
+        return out
+
+    best = None
+    for _ in range(16):
+        candidate = Cluster(edge)
+        triangles = len(candidate.faces)
+        if triangles <= budget:
+            return candidate
+        if best is not None:
+            best.free()
+        best = candidate
+        edge *= 1.32
+    return best
+
+
 def BuildImported(name):
     spec = SOURCES[name]
+    budget = spec.get("budget", BUDGET)
     path = _Src(spec["file"])
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
@@ -129,9 +211,11 @@ def BuildImported(name):
     # 绕 X 转 -90°：(x, y, z) -> (x, z, -y)，old +Y(车头) -> new -Z ✓，old +Z(上) -> new +Y ✓
     _Xform(all_bms, Matrix.Rotation(-math.pi * 0.5, 4, "X"))
 
-    # 车头验正：炮管（Barrel 部件）应落在 -Z 半侧；不对就绕 Y 翻 180°
-    blo, bhi = _Aabb([partbm["Barrel"]])
-    if (blo.z + bhi.z) * 0.5 > 0.0:
+    # 车头验正：能分出炮管的源件用它；九五式高模没有语义节点，按源模型
+    # 的 +Y 车头约定直接落入同一规范系。
+    probe = partbm.get("Barrel", next(iter(partbm.values())))
+    blo, bhi = _Aabb([probe])
+    if not spec.get("singleBody") and (blo.z + bhi.z) * 0.5 > 0.0:
         _Xform(all_bms, Matrix.Rotation(math.pi, 4, "Y"))
 
     # 逐轴归一缩放到史实三围（扫描件比例与实车有几厘米级偏差，逐轴拉正）
@@ -145,6 +229,40 @@ def BuildImported(name):
     lo, hi = _Aabb(all_bms)
     _Xform(all_bms, Matrix.Translation((-0.5 * (lo.x + hi.x), -lo.y, -0.5 * (lo.z + hi.z))))
 
+    # 高模九五式没有可分离的炮塔/履带节点。把所有表面压成一个车体网格，同时仍
+    # 保留标准挂点与空炮塔关节，避免它在编辑器、预加载器或将来的载具系统中变成
+    # 一个特例；真正逐帧转炮塔必须使用含语义节点的模型。
+    if spec.get("singleBody"):
+        key = parts[0][0]
+        # 高模扫描件可能含数千个不相连小壳。通用 `_DecimateToBudget` 会逐壳
+        # 创建 modifier，反而把一次 80k 面减面拖成几十分钟；这里整车作为一个
+        # 紧凑网格一次 collapse，目标仍留 8% 余量给三角化与量化。
+        target = int(budget * 0.90)
+        reduced = _ClusterToBudget(partbm[key], target)
+        partbm[key].free()
+        partbm[key] = reduced
+        # collapse 可能删掉炮口或履带的极值顶点。恢复尺寸/落点，防止模型变短后
+        # 与 Data_Weapons 的实体尺寸、碰撞和巷宽规则脱节。
+        lo, hi = _Aabb([partbm[key]])
+        _Xform([partbm[key]], Matrix.Diagonal((
+            spec["span"][0] / (hi.x - lo.x), spec["span"][1] / (hi.y - lo.y),
+            spec["span"][2] / (hi.z - lo.z), 1.0)))
+        lo, hi = _Aabb([partbm[key]])
+        _Xform([partbm[key]], Matrix.Translation((
+            -0.5 * (lo.x + hi.x), -lo.y, -0.5 * (lo.z + hi.z))))
+        hlo, hhi = _Aabb([partbm[key]])
+        mid_y = hlo.y + (hhi.y - hlo.y) * 0.58
+        root = Node("root")
+        body = root.Child("body")
+        body.Add("armor", partbm[key], tile="armor")
+        turret = body.Child("turret", joint=True)
+        turret.Child("gunMuzzle", t=(0.0, mid_y, hlo.z - 0.02))
+        turret.Child("rearMgMuzzle", t=(0.0, mid_y, hhi.z - 0.16))
+        turret.Child("hatch", t=(0.0, hhi.y + 0.02, 0.0))
+        body.Child("mgMuzzle", t=(0.0, hlo.y + (hhi.y - hlo.y) * 0.42, hlo.z - 0.02))
+        body.Child("hullFront", t=(0.0, hlo.y + (hhi.y - hlo.y) * 0.32, hlo.z - 0.02))
+        return root
+
     # --- 炮塔：独立关节节点，枢轴取塔座中心 --------------------------------
     tlo, thi = _Aabb([partbm["Turret"]])
     pivot = Vector((0.0, tlo.y, 0.5 * (tlo.z + thi.z)))
@@ -153,13 +271,13 @@ def BuildImported(name):
                             verts=partbm[key].verts[:])
         partbm[key].normal_update()
 
-    # --- 三角预算（≤1600）：装甲+钢件按连通岛压，履带保形 ------------------
+    # --- 三角预算：装甲+钢件按连通岛压，履带保形 ----------------------------
     def EstTris(bm):
         return sum(max(len(f.verts) - 2, 1) for f in bm.faces)
 
     track_tris = EstTris(partbm["Track"])
     armor_steel = [partbm[k] for k, _b, _t in parts if _b != "track"]
-    dec = _DecimateToBudget(armor_steel, budget=int((BUDGET - track_tris) * 0.92))
+    dec = _DecimateToBudget(armor_steel, budget=int((budget - track_tris) * 0.92))
     if dec is not None:
         idx = 0
         for key, _b, _t in parts:
@@ -224,4 +342,6 @@ def BuilderFor(name):
         return BuildImported(name)
     _Build.__name__ = "BuildImported_%s" % name
     _Build.imported = True
+    _Build.staticMesh = bool(spec.get("singleBody"))
+    _Build.budget = spec.get("budget", BUDGET)
     return _Build

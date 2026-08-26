@@ -80,7 +80,12 @@ export class EditorSuite {
     // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
     this.worldEditDocument = null;
 
-    this.studio = new Studio({ scene: host.scene, camera: host.camera, library: host.library });
+    // actorFactory 传给摄影棚不是为了造人（造人的是各编辑器自己），
+    // 是为了在藏世界的同时把人物合批关掉 —— 见 Studio.SetActorBatch 那段事故账。
+    this.studio = new Studio({
+      scene: host.scene, camera: host.camera, library: host.library,
+      actorFactory: host.actorFactory,
+    });
     this.flycam = new FlyCam(host.camera);
     this.viewport = new ViewportInput(host.canvas);
 

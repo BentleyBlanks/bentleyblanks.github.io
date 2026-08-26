@@ -9,11 +9,13 @@
 // 顺手还逮出一套白下的：`CarriageWallSteel` 在过场数据里一次都没被 mat 引用
 //（端墙渲成纯黑之后早就改走别的配方），却仍旧每次开机下 6.5 MB。
 //
-// 这条测试只做三件事，全部离线：
+// 这条测试做四件事，全部离线：
 //   1. `PBR_SETS` 里每个 URL 在 Texture/ 下真的存在（拼错的话浏览器测试要跑完
 //      整个开机才看得见一条 warn，这里一秒就红）；
 //   2. 总字节不超过 BUDGET_BYTES；
 //   3. 单张不超过 SINGLE_LIMIT_BYTES —— 总量还没爆但混进一张巨图时先出声。
+//   4. 首屏预载的 Type 24 手榴弹 GLB 存在且仍在单件预算内；它不是 PBR_SETS
+//      的贴图，所以必须在这里单独守住，避免构建时误把 14 MB 原始包直接上线。
 //
 // **红了不要直接抬预算。** 先问这张图凭什么这么大：是不是没走 512px WebP 那条线
 //（`_import/BuildWeaponPbr.py` / `_import/Script_BakeCarriagePbr.py`），
@@ -35,6 +37,7 @@ const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const BUDGET_BYTES = 14 * 1024 * 1024;
 /** 单张上限。现在最大的是 1024px 的城墙芯砖，490 KB。 */
 const SINGLE_LIMIT_BYTES = 900 * 1024;
+const GRENADE_ASSET_MAX_BYTES = 5 * 1024 * 1024;
 
 const source = fs.readFileSync(path.join(projectDir, "Script_Main.mjs"), "utf8");
 const start = source.indexOf("const PBR_SETS");
@@ -93,6 +96,12 @@ const oversized = rows.filter((r) => r.bytes > SINGLE_LIMIT_BYTES);
 Check(oversized.length === 0,
   `没有单张超过 ${Mb(SINGLE_LIMIT_BYTES)} MB 的贴图`,
   oversized.map((r) => `${r.url} ${Mb(r.bytes)} MB`).join("、"));
+
+const grenadeAsset = path.join(projectDir, "Model", "Model_Type24Grenade.glb");
+const grenadeBytes = fs.existsSync(grenadeAsset) ? fs.statSync(grenadeAsset).size : 0;
+Check(grenadeBytes > 0 && grenadeBytes <= GRENADE_ASSET_MAX_BYTES,
+  `预载手榴弹 GLB 存在且 ≤ ${Mb(GRENADE_ASSET_MAX_BYTES)} MB`,
+  grenadeBytes ? `实测 ${Mb(grenadeBytes)} MB` : "文件缺失");
 
 console.log(`     最大的五张：${rows.slice(0, 5).map((r) => `${r.url} ${Mb(r.bytes)} MB`).join("  ")}`);
 

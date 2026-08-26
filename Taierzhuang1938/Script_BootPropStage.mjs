@@ -41,7 +41,8 @@ const SHOWCASE = [
   { id: "Grenade", name: "木柄手榴弹" },
   { id: "Dadao", name: "大刀" },
   { id: "Type89Launcher", name: "八九式 重掷弹筒" },
-  { id: "Type94Tankette", name: "九四式 轻装甲车" },
+  { id: "Type95HaGo", name: "九五式 轻战车 Ha-Go" },
+  { id: "Type97ChiHa", name: "九七式 中战车 Chi-Ha" },
   { id: "Type89Tank", name: "八九式 中战车" },
   { id: "Dougong", name: "门楼斗拱" },
   { id: "RidgeBeast", name: "屋脊兽头" },
@@ -55,7 +56,7 @@ const SHOWCASE = [
  * 不抛错 —— 加载画面永远不许因为一件道具的材质名对不上就白屏。
  */
 const PALETTE = {
-  steel: { color: 0x6d7075, roughness: 0.42, metalness: 0.85 },
+  steel: { color: 0x6d7075, roughness: 0.42, metalness: 0.85, side: THREE.DoubleSide },
   blade: { color: 0x9aa0a6, roughness: 0.22, metalness: 0.95 },
   wood: { color: 0x6a4b30, roughness: 0.72, metalness: 0.0 },
   grip: { color: 0x503524, roughness: 0.7, metalness: 0.0 },
@@ -63,8 +64,9 @@ const PALETTE = {
   // Keep a sane fallback for offline/partial-cache loading instead of neutral grey.
   dadao: { color: 0x77736f, roughness: 0.58, metalness: 0.72 },
   red: { color: 0x8e2f27, roughness: 0.66, metalness: 0.0 },
-  armor: { color: 0x555c4a, roughness: 0.66, metalness: 0.35 },
-  track: { color: 0x3b3d3c, roughness: 0.85, metalness: 0.5 },
+  // 摄影测量源偶有单层薄片；展示台必须双面绘制，避免绕到反面时履带/挡泥板消失。
+  armor: { color: 0x555c4a, roughness: 0.66, metalness: 0.35, side: THREE.DoubleSide },
+  track: { color: 0x3b3d3c, roughness: 0.85, metalness: 0.5, side: THREE.DoubleSide },
   leather: { color: 0x4a3524, roughness: 0.68, metalness: 0.0 },
   WoodBeam: { color: 0x6b4f36, roughness: 0.78, metalness: 0.0 },
   WoodDoor: { color: 0x5c4230, roughness: 0.76, metalness: 0.0 },

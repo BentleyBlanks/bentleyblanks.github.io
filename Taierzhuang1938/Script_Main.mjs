@@ -39,6 +39,7 @@ import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mj
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
+import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -66,6 +67,12 @@ const NEAR_SQUAD = { nra: 5, ija: 4 };
 
 /** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
 const TERRAIN_RAY = { terrain: true };
+/**
+ * 子弹判定球（半径 / 球心离脚底的高度）。口径与账在 Data_Battle.COMBAT.hitbox，
+ * 这里只是取个短名字 —— MarchBullet 每帧要读它几十次。
+ * 人物动作编辑器画的就是这一份数。
+ */
+const HITBOX = COMBAT.hitbox;
 /** 没有物理世界时脚部 IK 拿到的法线（平地）。 */
 const FLAT_NORMAL = [0, 1, 0];
 
@@ -125,6 +132,16 @@ const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
+// 第一人称手臂：**默认走旧的程序化手模**，导入的整臂要显式 ?arms=rig 才上。
+//
+// 那副 WRAD 整臂（Model_FpsArms.glb）的几何与 IK 现在是对的（肩挂在相机稳定的
+// 锚点上、解析两骨 IK 带极向量、按 socket 骨头握持，回归口 Script_FpsArmTest），
+// 但**它长得不对**：整条胳膊是光膀子的裸皮，没有军装袖子、没有绑腿式护腕，
+// 一双真实尺寸的手在这套"枪举在身前"的视图模型里要么占掉大半个屏幕、要么
+// 一半埋进枪托。同一帧对照（_shots/Arms_Compare2.png 的做法）里，旧手模的
+// 蓝布袖口 + 收锥手指明显更像 1938 年那支穿军装的手。
+// 所以这条路留着（改姿态/换成带袖子的资产就能一句话打开），但不是默认。
+const RIGGED_ARMS = params.get("arms") === "rig";
 const SHOT_ADS = !!(SHOT && params.get("ads"));
 const SHOT_FIRE = !!(SHOT && params.get("fire"));
 /**
@@ -730,6 +747,7 @@ async function Boot() {
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
   setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
+  const grenadeAsset = await LoadGrenadeAsset();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -748,7 +766,8 @@ async function Boot() {
     fov: 52,
     depthBudget: 1.22,
     meshDocs: actorFactory.meshDocs,
-    riggedAssets: actorFactory.riggedAssets,
+    riggedAssets: RIGGED_ARMS ? actorFactory.riggedAssets : null,
+    grenadeAsset,
   });
   camera.add(viewmodel.root);
   scene.add(camera);
@@ -841,7 +860,7 @@ async function Boot() {
     restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction, grenadeAsset,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
@@ -1260,15 +1279,15 @@ async function Boot() {
        * 把视线摆到某个靶子身上。只摆 yaw/pitch，开火仍走 Debug.Fire ——
        * 散布、后坐、开镜収束照旧全在链路里。
        *
-       * offsetY 默认 0.95 = **躯干判定中心**（与 MarchBullet 的 s.position.y + 0.95
-       * 是同一个数，判定圆柱半径 0.45）。两条要知道的账：
+       * offsetY 默认 = **躯干判定中心** COMBAT.hitbox.centerY（与 MarchBullet 读的
+       * 是同一份数，判定球半径 COMBAT.hitbox.radius）。两条要知道的账：
        *   · TryFire 是先施加本发的枪口上跳再采样弹道（「顶上去 100%」的设计），
        *     所以首发会比瞄点高出 kick × 距离 —— ADS 下约 0.9°，25 m 处 ≈ 0.4 m。
        *     远靶验命中要么瞄低、要么用近靶（RangeTest 用的 R10）。
-       *   · 命中几何只有躯干圆柱（爆头是 TryFire 里按概率抽的，不是几何），
-       *     所以别瞄头 —— 那条线从圆柱上方擦过去就是脱靶。
+       *   · 命中几何只有那一个球（爆头是 TryFire 里按概率抽的，不是几何），
+       *     所以别瞄头 —— 那条线从球上方擦过去就是脱靶。
        */
-      AimAt: (targetId, offsetY = 0.95) => {
+      AimAt: (targetId, offsetY = HITBOX.centerY) => {
         const entry = rangeTargets.find((e) => e.spec.id === targetId);
         const s = entry ? entry.soldier : null;
         if (!s) return null;
@@ -3273,16 +3292,19 @@ function MarchBullet(from, dir, weapon, targets) {
     if (travelled + segLen > range) segLen = range - travelled;
     _segDir.normalize();
 
-    // 先看这一段有没有穿过人：到线段的垂距 < 0.45 m 算命中躯干
+    // 先看这一段有没有穿过人：到线段的垂距小于判定球半径就算命中躯干。
+    // 半径与球心高度是 COMBAT.hitbox（原来是这里的两个字面量）——
+    // 人物动作编辑器要照着同一份数把这个球画出来，两边各写一份的话，
+    // 画出来的球第二天就不是判定用的球了。
     let bestSoldier = null, bestT = Infinity;
     for (const s of targets) {
       _rel.set(s.position.x - _bulletPos.x,
-        s.position.y + 0.95 - _bulletPos.y,
+        s.position.y + HITBOX.centerY - _bulletPos.y,
         s.position.z - _bulletPos.z);
       const t = _rel.dot(_segDir);
       if (t < 0 || t > segLen) continue;
       const perp = _rel.addScaledVector(_segDir, -t).length();
-      if (perp < 0.45 && t < bestT) { bestT = t; bestSoldier = s; }
+      if (perp < HITBOX.radius && t < bestT) { bestT = t; bestSoldier = s; }
     }
     // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
     // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。

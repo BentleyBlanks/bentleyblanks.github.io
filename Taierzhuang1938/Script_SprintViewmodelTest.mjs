@@ -9,6 +9,8 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
+// arms=rig：导入整臂现在是可选路径（默认旧手模，见 Script_Main 的 RIGGED_ARMS），
+// 而这条测试量的正是导入整臂在冲刺姿态下的近裁面回退。
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
@@ -17,7 +19,7 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small&arms=rig`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 const report = await page.evaluate(() => {

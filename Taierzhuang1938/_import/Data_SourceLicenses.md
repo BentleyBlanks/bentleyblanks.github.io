@@ -56,18 +56,27 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
-| 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；摄影测量件先 0.6 mm 焊接再逐连通岛减面到车辆预算 1600 三角（实测 1239）。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
+| 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；保留源件约 4,100 三角。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
+| 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源约 8.3 万面。源文件没有可拆的炮塔/车体/履带语义节点，导入时以全局体素聚类保留轮廓至 3442 三角并作为单一静态装甲件；资产仍提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
+| 九七式中战车 `Type97ChiHa` | `Source/Model_Type97ChiHa/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | Type 97 Chi-Ha 博物馆扫描源约 4,000 面；Hull/Turret/Track/Barrel 部件可分别收桶，炮塔保留为 joint 节点。外廓归一为 2.475 × 2.380 × 5.50 m，并保留源件 3969 三角。 |
+
+车辆源文件由 `_import/SketchfabFetchTanks.py` 通过 BlenderMCP 下载，构建由
+`_blender/ImportVehicles.py` / `BuildVehicles.py` 完成；每份下载包内保留 Sketchfab
+导出的 `license.txt`，并以此表提供运行时资产的 CC-BY 署名链。
+
+## 手榴弹（Sketchfab 下载经本机 BlenderMCP）
+
+| 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
+|---|---|---|---|---|
+| 普通木柄手榴弹 `Model_Type24Grenade.glb` | `Source/Model_SketchfabType24Grenade/scene.gltf` | [KleenStudio — Stick Grenade Type 24 (Stielhandgranate)](https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4) | CC-BY-4.0 | 原包许可文本保留在同目录 `license.txt`。`Script_Type24GrenadeBake.py` 把 3,260 三角的源几何归一为 0.220 m、中心原点、弹头朝 local -Z，并把 2K PBR 压为 1K GLB；`Script_GrenadeAsset.mjs` 预载一次，供第一人称与飞行池共享，读取失败自动退回旧程序化木柄弹。 |
 
 仍走 `_blender/BuildWeapons.py` / `BuildVehicles.py` 的程序化几何：
 
-- 九四式轻装甲车 `Type94Tankette`：Sketchfab 仅有的 CC-BY 候选
-  （siaobai77 `ba15d7ee…`，49,999 面、单材质炮塔与车体融成一体、履带无分桶）
-  在 1600 三角预算与「炮塔必须是关节」的契约下不可用，保留程序化模型。
 - 十一年式轻机枪 `Type11` / 九二式重机枪 `Type92Hmg`：Sketchfab 无 CC-BY 候选
   （试过 type 11 light machine、nambu machine gun、type 92 heavy machine gun、
   japanese ww2 weapon/machine 等词条），保留运行时程序化兜底几何
   （歪把子的左上方敞口方斗特征已做进兜底）。
-- 手榴弹、八九式重掷弹筒：程序化模型已按史料特征建好，无免费源可替换。
+- 集束手榴弹、八九式重掷弹筒：程序化模型仍按史料特征建好；集束的去柄副弹与绑绳不能由单枚来源模型替代。
 
 ## 大刀（付费源，**不随仓库分发**）
 
