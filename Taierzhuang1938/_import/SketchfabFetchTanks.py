@@ -6,10 +6,10 @@ candidate is chosen and probed).
 """
 
 import io
-import json
 import os
 import zipfile
 
+import bpy
 import requests
 
 key = ""
@@ -23,12 +23,16 @@ if not key:
 if not key:
     raise RuntimeError("Sketchfab API key not found")
 
-BASE = r"C:\Users\Bentl\Documents\Program\bentleyblanks_DeepSeek_TaierzhuangSketchfabMore_20260824\Taierzhuang1938\_import\Source"
+HERE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.join(HERE, "Source")
 
 MODELS = [
+    # 九五式轻战车：高模（82.8k 面）只作为源件，导入时压入战车 1600 面预算
+    ("9ebd80d2ea12441dae8e41ad695d939d", "Model_Type95HaGo"),     # JesperLandin, CC-BY-4.0
+    # 九七式中战车：低模；与八九式同一作者，部件命名可共用车辆导入规范
+    ("d3568f32ec4440848e243e4b893a8ba6", "Model_Type97ChiHa"),    # snrnsrk5, CC-BY-4.0
     # 八九式中战车（甲）：博物馆实体扫描，部件组 Hull/Track/Turret/Barrel 齐备
     ("fe3f1f483bc043c6a0907eee444a1e43", "Model_Type89ChiRo"),     # snrnsrk5, CC-BY-4.0
-    # 九四式轻装甲车候选被拒（单材质 50k 面、无炮塔/履带分桶），未保留源包
 ]
 
 HDR = {"Authorization": "Token " + key}

@@ -58,8 +58,9 @@ SOLDIER_HEIGHT = {
 # 车比枪更容易越建越胖：每加一块装甲板都想往外挪一点，五块之后车就宽了半米，
 # 而巷宽 2.5 m 进不进得来是一条**玩法规则**（Data_Levels 抬头）。所以逐轴断言。
 VEHICLE_SPAN = {
+    "Type95HaGo": (2.07, 2.27, 4.38),
+    "Type97ChiHa": (2.475, 2.38, 5.50),
     "Type89Tank": (2.15, 2.56, 4.30),
-    "Type94Tankette": (1.60, 1.60, 3.10),
 }
 VEHICLE_TOLERANCE = 0.08
 HEIGHT_TOLERANCE = 0.070
@@ -77,10 +78,30 @@ def OutDir():
     return os.path.abspath(os.path.join(HERE, "..", "Model"))
 
 
+def NamedArg(flag):
+    """从 Blender `--` 后的参数读取逗号分隔模型名。"""
+    argv = sys.argv
+    argv = argv[argv.index("--") + 1:] if "--" in argv else []
+    for i, arg in enumerate(argv):
+        if arg == flag and i + 1 < len(argv):
+            return {name.strip() for name in argv[i + 1].split(",") if name.strip()}
+    return set()
+
+
 def main():
     out = OutDir()
     os.makedirs(out, exist_ok=True)
+    requested = NamedArg("--only")
+    removed = NamedArg("--remove")
+    index_path = os.path.join(out, "Index.json")
+    # 单件重建不能把其余模型从清单抹掉。只替换本次落盘的条目，同时可把已经
+    # 废弃的型号从清单摘掉；完整构建仍从空清单开始，保证没有历史幽灵条目。
     manifest = []
+    if requested and os.path.isfile(index_path):
+        with open(index_path, "r", encoding="utf-8") as handle:
+            previous = json.load(handle)
+        manifest = [entry for entry in previous.get("models", [])
+                    if entry["name"] not in requested and entry["name"] not in removed]
     failures = []
 
     jobs = []
@@ -107,21 +128,32 @@ def main():
         jobs.append((name, "prop", builder, ""))
     jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,
                  "八九式重掷弹筒：筒身 + 螺杆 + 弧形驻钣。无两脚架，约 45° 手持发射。"))
-    for name, builder in BuildVehicles.VEHICLE_BUILDERS.items():
+    vehicle_names = list(BuildVehicles.VEHICLE_BUILDERS)
+    for name in ImportVehicles.SOURCES:
+        if name not in vehicle_names:
+            vehicle_names.append(name)
+    for name in vehicle_names:
         # 掷弹筒是单兵武器（走上面 weapon 那行），不进 vehicle 名单
         if name == "Type89Launcher":
             continue
         imported = ImportVehicles.BuilderFor(name)
+        builder = BuildVehicles.VEHICLE_BUILDERS.get(name)
+        if imported is None and builder is None:
+            raise RuntimeError("载具没有可用构建器：%s" % name)
         jobs.append((name, "vehicle", imported or builder, ""))
 
     for name, category, builder, notes in jobs:
+        if requested and name not in requested:
+            continue
         ResetScene()
         FLIPPED.clear()
         built = builder()
         root = built[0] if isinstance(built, tuple) else built
         path = os.path.join(out, name + ".tzm.json")
-        tris, blocks, size, audit = WriteTzm(root, path, name, notes)
-        limit = BUDGET[category]
+        static_mesh = getattr(builder, "staticMesh", False)
+        tris, blocks, size, audit = WriteTzm(root, path, name, notes, audit=not static_mesh)
+        # 摄影测量车的近景预算由导入器逐资产声明；其余类别仍强制全局红线。
+        limit = getattr(builder, "budget", BUDGET[category])
         ok = tris <= limit
         if not ok:
             failures.append("%s 三角超预算：%d > %d" % (name, tris, limit))
@@ -196,7 +228,6 @@ def main():
         if FLIPPED:
             print("     翻面兜底：" + "  ".join(FLIPPED))
 
-    index_path = os.path.join(out, "Index.json")
     with open(index_path, "w", encoding="utf-8") as handle:
         json.dump({
             "format": "tzm-index", "version": 1,

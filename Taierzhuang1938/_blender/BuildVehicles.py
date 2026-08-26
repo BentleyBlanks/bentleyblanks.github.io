@@ -374,5 +374,4 @@ def BuildType94Tankette():
 VEHICLE_BUILDERS = {
     "Type89Launcher": BuildType89Launcher,
     "Type89Tank": BuildType89Tank,
-    "Type94Tankette": BuildType94Tankette,
 }

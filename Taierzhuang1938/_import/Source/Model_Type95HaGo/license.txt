@@ -1,0 +1,11 @@
+Model Information:
+* title:	Type 95 Ha-Go
+* source:	https://sketchfab.com/3d-models/type-95-ha-go-9ebd80d2ea12441dae8e41ad695d939d
+* author:	Jesper Landin (https://sketchfab.com/JesperLandin)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Type 95 Ha-Go" (https://sketchfab.com/3d-models/type-95-ha-go-9ebd80d2ea12441dae8e41ad695d939d) by Jesper Landin (https://sketchfab.com/JesperLandin) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

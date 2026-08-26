@@ -300,7 +300,7 @@ Healthy → Wounded（去饱和、不能跑、不能屏息、每秒掉血）
 ### [应做/大] 载具｜完全没有
 
 - **ER2**：F 进出载具；坐席制（驾驶/车长/炮手），玩家控坦克组可同时操作多成员
-- **现状**：Data_Weapons.mjs 定义了 Type89Tank/Type94Tankette 完整参数（装甲、hp、弱点倍率、minAlleyWidthM），但全仓库 grep 无任何 Script_* 引用；战场上一辆车都不存在
+- **现状**：Data_Weapons.mjs 定义了 Type89Tank/Type95HaGo/Type97ChiHa 完整参数（装甲、hp、弱点倍率、minAlleyWidthM），但全仓库 grep 无任何 Script_* 引用；战场上一辆车都不存在
 - **要做**：不做驾驶。改做「接管固定武器」：Script_Main.mjs 加 TryMount()（F 键），可接管缴获的九二式重机、十一年式、我方二十年式迫击炮。坦克只作为敌方目标出现（由集束手榴弹从高处解决）
 - **史实**：缴获重机枪掉转枪口有记录；中国军队缴获并驾驶日军战车的记录不可靠。此处按「不做」处理
 ### [应做/中] 姿态｜完全没有

@@ -868,11 +868,11 @@
    "name": "Type89Tank",
    "category": "vehicle",
    "file": "Type89Tank.tzm.json",
-   "triangles": 1239,
+   "triangles": 4089,
    "meshBlocks": 4,
    "nodes": 8,
    "joints": 1,
-   "bytes": 53923,
+   "bytes": 139309,
    "materials": [
     "armor",
     "steel",
@@ -888,26 +888,60 @@
    ],
    "bounds": {
     "min": [
-     -1.11038,
+     -1.075,
      0.0,
      -2.15
     ],
     "max": [
      1.075,
-     2.56785,
-     2.11924
+     2.56,
+     2.15
     ]
    }
   },
   {
-   "name": "Type94Tankette",
+   "name": "Type95HaGo",
    "category": "vehicle",
-   "file": "Type94Tankette.tzm.json",
-   "triangles": 976,
-   "meshBlocks": 5,
-   "nodes": 6,
+   "file": "Type95HaGo.tzm.json",
+   "triangles": 3442,
+   "meshBlocks": 1,
+   "nodes": 8,
    "joints": 1,
-   "bytes": 39234,
+   "bytes": 200513,
+   "materials": [
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "turret",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.035,
+     0.0,
+     -2.19
+    ],
+    "max": [
+     1.035,
+     2.26289,
+     2.16428
+    ]
+   }
+  },
+  {
+   "name": "Type97ChiHa",
+   "category": "vehicle",
+   "file": "Type97ChiHa.tzm.json",
+   "triangles": 3969,
+   "meshBlocks": 4,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 129770,
    "materials": [
     "armor",
     "steel",
@@ -916,19 +950,21 @@
    "mounts": [
     "root",
     "gunMuzzle",
-    "towHook",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
     "hullFront"
    ],
    "bounds": {
     "min": [
-     -0.796,
-     0.0275,
-     -1.57969
+     -1.2375,
+     0.0,
+     -2.75
     ],
     "max": [
-     0.796,
-     1.6,
-     1.52056
+     1.2375,
+     2.38,
+     2.75
     ]
    }
   }

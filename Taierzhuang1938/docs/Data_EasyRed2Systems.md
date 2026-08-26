@@ -166,13 +166,13 @@ ER2 两层：轻伤自救（屏幕去色、不能跑、不能屏息、B 键绷�
 
 ## 九、载具与重武器
 
-**全部为零**。`Data_Weapons.mjs` 里 `Type89Tank`（八九式中战车，装甲 6–17 mm，`minAlleyWidthM: 2.5`）、`Type94Tankette`（九四式轻装甲车）、`Type92Hmg`（九二式重机，`emplaced: true`）、`Type11`（十一年式，`overheatShots: 200`）参数全写好了，实跑核对：`Type89Tank` / `Type94Tankette` / `Type92Hmg` 在运行时**一次都没被实例化**；`Data_Levels.mjs` 里那些 `vehicles: [...]` / `support: [{kind:"Type92Hmg"}]` 配置**整个文件没有任何模块 import**，是死数据。`emplaced` / `bipod` / `overheat` / `armorPiercing` / `minAlleyWidthM` / `cookable` / `LOADOUTS` / `IJA_SQUAD` / `AMMO` 这一批字段全部只在 `Data_Weapons.mjs` 里出现过一次。
+**全部为零**。`Data_Weapons.mjs` 里 `Type89Tank`（八九式中战车）、`Type95HaGo`（九五式轻战车）、`Type97ChiHa`（九七式中战车）、`Type92Hmg`（九二式重机，`emplaced: true`）、`Type11`（十一年式，`overheatShots: 200`）参数全写好了，实跑核对：三辆战车与 `Type92Hmg` 在运行时**一次都没被实例化**；`Data_Levels.mjs` 里那些 `vehicles: [...]` / `support: [{kind:"Type92Hmg"}]` 配置**整个文件没有任何模块 import**，是死数据。`emplaced` / `bipod` / `overheat` / `armorPiercing` / `minAlleyWidthM` / `cookable` / `LOADOUTS` / `IJA_SQUAD` / `AMMO` 这一批字段全部只在 `Data_Weapons.mjs` 里出现过一次。
 
 **本作的史实版本**（不许为了对标抹平不对称）：
 
 | 类别 | 日方 | 中方 |
 |---|---|---|
-| 战车 | 八九式中战车、九四式轻装甲车 | 无 |
+| 战车 | 八九式中战车、九五式轻战车、九七式中战车 | 无 |
 | 重机 | 九二式重机（固定位，可缴获） | 无（捷克式 ZB-26 是轻机，每班 0–1 挺） |
 | 曲射 | 掷弹筒（能越院墙）、野战重炮 | 二十年式 82 mm 迫击炮，**全战役 2 发** |
 | 空中 | 有（只做声音与阴影，不做可驾驶） | 无 |
@@ -532,7 +532,7 @@ ER2 两层：轻伤自救（屏幕去色、不能跑、不能屏息、B 键绷�
 ### [应做/大] 载具｜完全没有
 
 - **ER2**：坦克玩家可开，有装甲穿透与弹道模拟、部位装甲、座位制、HE/AP/APHE 弹种、车长可标记、双指针罗盘
-- **现状**：Data_Weapons 里 Type89Tank（装甲 6—17 mm、hp 900、weakSpotMultiplier 3.2、minAlleyWidthM 2.5）与 Type94Tankette 参数齐全，实测运行时一次都没被实例化。Data_Levels.mjs 里的 vehicles 配置整个文件没有任何模块 import，是死数据。
+- **现状**：Data_Weapons 里 Type89Tank、Type95HaGo 与 Type97ChiHa 参数齐全，实测运行时一次都没被实例化。Data_Levels.mjs 里的 vehicles 配置整个文件没有任何模块 import，是死数据。
 - **要做**：做日方战车作为敌方单位（不可驾驶）：沿主街路径推进，车载机枪压制，玩家用集束手榴弹从高处砸。玩家不做可驾驶载具 —— 中方没有战车，做了就是失真。
 - **史实**：中方在台儿庄没有战车；反坦克只有集束手榴弹（战防炮全战区几门且在别处）。这个不对称是史实
 ### [应做/中] 载具｜完全没有
