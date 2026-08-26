@@ -155,10 +155,8 @@ export class GraphicsSettings {
     Note(aa, "照搬 UE 的缺省方案：Halton 八相位子像素抖动 + 邻域裁剪的历史累积，"
       + "跑在泛光之前的线性 HDR 域。开着时最后一趟的 FXAA 自动让位 —— 两层叠加"
       + "只会把画面糊软一层，而锐化两种路子都保留。");
-    Note(aa, "关掉退回 FXAA：单帧的边缘模糊，便宜、绝不拖影，但细长边（屋脊、电线、"
-      + "枪管）在移动时会爬。TAA 反过来 —— 静止与移动都稳，代价是两张全分辨率历史靶"
-      + "与快速横移时动体边缘略软。出厂 low 档关、medium 及以上开；这一栏可以热切，"
-      + "不像画质档要重开页面。", true);
+    Note(aa, "关掉退回 FXAA：便宜不拖影，但细长边（屋脊、电线、枪管）移动时会爬。"
+      + "出厂 low 档关、medium 及以上开，可热切。", true);
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");
