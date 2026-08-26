@@ -399,6 +399,18 @@ vec3 AcesFitted(vec3 x) {
   return clamp(OUT * (a / b), 0.0, 1.0);
 }
 
+vec3 LinearToSrgb(vec3 color) {
+  return mix(color * 12.92,
+             1.055 * pow(max(color, vec3(1e-5)), vec3(1.0 / 2.4)) - 0.055,
+             step(0.0031308, color));
+}
+
+vec3 SrgbToLinear(vec3 color) {
+  return mix(color / 12.92,
+             pow((max(color, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)),
+             step(0.04045, color));
+}
+
 vec3 ViewPos(vec2 uv, float depth) {
   vec2 ndc = uv * 2.0 - 1.0;
   return vec3(ndc.x / uProjScale.x, ndc.y / uProjScale.y, -1.0) * depth;
@@ -502,7 +514,14 @@ void main() {
     color *= mix(vec3(1.0), uHighlightTint, hw * uSplitHighlight);
     color = clamp(color, 0.0, 1.0);
   }
-  color = clamp((color - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  // 对比度是感知域操作。旧版直接在线性域围绕 0.5 拉伸：contrast=1.07
+  // 会先减掉 0.035 线性亮度，所有低于它的阴影被硬裁到 0。深色枪械、军装、
+  // 屋檐下表面因此即使 BaseColor / GI / AO 都有信息，最终仍变成纯黑剪影。
+  // 转到 sRGB 后再围绕 0.5 调对比，等价黑位只到约 0.0026 线性亮度；暗部层次
+  // 保留下来，亮部和中间调仍维持原来的感知对比意图。
+  vec3 perceptual = LinearToSrgb(color);
+  perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  color = SrgbToLinear(perceptual);
   float l = Luma(color);
   color = mix(vec3(l), color, uSaturation);
 
@@ -533,9 +552,7 @@ void main() {
 
   // 线性 -> sRGB（自己转：这一 pass 没有 include colorspace_fragment，
   // 交给 renderer.outputColorSpace 会一次都不转，画面直接洗白）
-  vec3 srgb = mix(color * 12.92,
-                  1.055 * pow(max(color, vec3(1e-5)), vec3(1.0 / 2.4)) - 0.055,
-                  step(0.0031308, color));
+  vec3 srgb = LinearToSrgb(color);
   gl_FragColor = vec4(srgb, 1.0);
 }
 `;
