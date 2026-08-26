@@ -48,6 +48,12 @@ import {
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
 const SAVE_KEY = "tengxian1938_sceneedit_v1";
+// 进编辑器的出厂投影：战斗相机的远面只有 400/620 m，在自由飞行里一飞高就把
+// 半座城剔掉，看着像「东西没生成」。编辑器不吃这个性能预算，进来就先给足
+// 2000 m；FOV 回到 55°（与画质缺省一致），免得沿用战斗里改过的那份。
+// FlyCam.Close 退出时会把两项原样还回去。
+const EDITOR_DEFAULT_FAR = 2000;
+const EDITOR_DEFAULT_FOV = 55;
 const MAX_MAP_MARKERS = 96;
 // 车厢序章不是一张可玩的战斗切片，不能把它伪装成 L0_界河。
 // 保持这个 id 与 Data_CutsceneChuchuan 的导出一致；真正打开时由主程序跳到
@@ -623,6 +629,7 @@ export class SceneEditor {
     // 否则摄影棚、构件库等编辑器仍会把暂停菜单留在背景里。
     this.host.scene.add(this.root);
     this.host.flycam.Open();
+    this.ApplyDefaultProjection();
     this.host.SetViewmodelVisible(false);
     // 名牌层放在最前面：面板、提示条都是后来的兄弟节点，天然压在名牌上面。
     this.hudLayer = El("div", "edMapHud");
@@ -656,6 +663,17 @@ export class SceneEditor {
     this.hudLayer = null;
     if (this.panel) this.panel.root.remove();
     this.panel = null;
+  }
+
+  /**
+   * 出厂投影。必须在 BuildUi 之前调用 —— 投影控件是拿相机当前值初始化滑杆的，
+   * 顺序反了滑杆会停在战斗值上，与实际画面对不上。
+   */
+  ApplyDefaultProjection() {
+    const camera = this.host.camera;
+    camera.far = EDITOR_DEFAULT_FAR;
+    camera.fov = EDITOR_DEFAULT_FOV;
+    camera.updateProjectionMatrix();
   }
 
   async LoadModels() {

@@ -11,6 +11,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# stdout 被捕获时 PowerShell 5.1 按 [Console]::OutputEncoding 编码，默认是
+# 系统 ANSI(cp936)；下面回的路径里含中文，调用方按 UTF-8 读就成乱码。
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $target   = Join-Path $PSScriptRoot 'Script_StartLocalPreview.cmd'
 if (-not (Test-Path -LiteralPath $target)) { throw "找不到启动脚本：$target" }
@@ -26,6 +30,9 @@ $icon = Join-Path $repoRoot 'favicon.ico'
 if (Test-Path -LiteralPath $icon) { $shortcut.IconLocation = "$icon,0" }
 $shortcut.Save()
 
-Write-Output "快捷方式已创建：$linkPath"
-Write-Output "  指向：$target"
-Write-Output "  根目录：$repoRoot"
+# 输出保持纯 ASCII + 路径：中文经 PowerShell 的控制台编码转一手就成乱码，
+# 而 node 侧 console.log 走的是 WriteConsoleW，不吃代码页这一套。所以人话
+# 统一由调用方（Script_LocalPreview.mjs --shortcut）来打，这里只报事实。
+Write-Output "SHORTCUT_PATH=$linkPath"
+Write-Output "SHORTCUT_TARGET=$target"
+Write-Output "SHORTCUT_ROOT=$repoRoot"
