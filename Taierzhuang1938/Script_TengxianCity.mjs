@@ -115,6 +115,10 @@ const MATERIAL_MAP = {
   TubeTile: { recipe: "RoofTile", color: 0xb6bfcb },
   WoodBeam: { recipe: "WoodBeam" },
   WoodDoor: { recipe: "WoodDoor" },
+  // 外部手推车/木箱的专属木理：模型几何自己给板缝，贴图只给木纤维，
+  // 避免通用门板/梁柱配方把第二套假接缝套到 UV 岛上。
+  HandcartWood: { recipe: "HandcartWood", roughness: 0.96, normalScale: 0.58 },
+  WoodCrate: { recipe: "WoodCrate", roughness: 0.98, normalScale: 0.68 },
   Sandbag: { recipe: "Sandbag", color: 0xe4dcc0 },
   Ground: { recipe: "Ground" },
   GroundRubble: { recipe: "GroundRubble" },

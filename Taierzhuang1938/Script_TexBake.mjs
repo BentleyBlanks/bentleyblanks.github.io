@@ -494,6 +494,14 @@ export const RECIPES = {
   GateRoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 353, ridges: 11 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),
   WoodBeam: (s) => BakeWood(s ?? 256, { seed: 419, planks: 1, weathered: 0.7 }),
+  // 手推车与木箱的 ImageGen BaseColor + Normal 会在启动时覆盖这两套兜底。
+  // 独立命名避免它们再吃门板缝或整根梁柱尺度的通用木纹。
+  HandcartWood: (s) => BakeWood(s ?? 512, {
+    seed: 431, hue: [118, 101, 82], planks: 1, weathered: 0.86,
+  }),
+  WoodCrate: (s) => BakeWood(s ?? 512, {
+    seed: 439, hue: [164, 137, 96], planks: 1, weathered: 0.72,
+  }),
   // ImageGen 的枣刺篱笆 PBR 在启动时覆盖此兜底；失败时篱笆仍保持粗糙旧木质感。
   WattleFence: (s) => BakeWood(s ?? 256, { seed: 467, hue: [104, 92, 72], planks: 1, weathered: 0.95 }),
   // 外部的 ImageGen 树皮 PBR 在启动时会覆盖这套同步兜底；失败时树仍不至于丢材质。

@@ -138,7 +138,7 @@ const CITY_WALL_DETAIL_ASSETS = Object.freeze({
     "城墙细节 · 小面积露芯", "CityWallCoreExposurePatch"),
 });
 
-function MarketStorage(label, node, material = "WoodDoor") {
+function MarketStorage(label, node, material = "WoodCrate") {
   return { label, url: MARKET_STORAGE_URL, node, material, tag: "prop" };
 }
 
@@ -166,17 +166,20 @@ const ASSETS = Object.freeze({
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall" },
   sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade" },
-  cart: { label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2", materialMap: true, tag: "householdCart" },
+  cart: {
+    label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2",
+    materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart",
+  },
   fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam", tag: "fence" },
-  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodDoor", tag: "prop" },
+  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodCrate", tag: "prop" },
   rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble" },
   militaryCrateClosed: {
     label: "旧式军用木箱（闭合）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
-    node: "MilitaryCrateClosed", material: "WoodDoor", tag: "prop",
+    node: "MilitaryCrateClosed", material: "WoodCrate", tag: "prop",
   },
   militaryCrateOpen: {
     label: "旧式军用木箱（打开）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
-    node: "MilitaryCrateOpen", material: "WoodDoor", tag: "prop",
+    node: "MilitaryCrateOpen", material: "WoodCrate", tag: "prop",
   },
   stackableStone01: { label: "可堆石块 01", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone01", material: "GroundRubble", tag: "rubble" },
   stackableStone02: { label: "可堆石块 02", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone02", material: "GroundRubble", tag: "rubble" },
@@ -438,9 +441,17 @@ function RuntimeMaterialFor(name, library) {
   return ResolveTengxianMaterial(name, library);
 }
 
+function MappedMaterialName(source, spec) {
+  const name = source.name.replace(/\.\d{3}$/, "");
+  if (spec.materialMap && typeof spec.materialMap === "object") {
+    return spec.materialMap[name] || name;
+  }
+  return name;
+}
+
 function ApplyRuntimeMaterial(root, spec, library) {
   if (spec.materialMap) {
-    const bind = (source) => RuntimeMaterialFor(source.name.replace(/\.\d{3}$/, ""), library);
+    const bind = (source) => RuntimeMaterialFor(MappedMaterialName(source, spec), library);
     root.traverse((object) => {
       if (!object.isMesh) return;
       object.material = Array.isArray(object.material)
@@ -512,7 +523,7 @@ function InstancedFormFor(id, asset, library) {
       }
     }
     const material = spec.materialMap
-      ? RuntimeMaterialFor(object.material.name.replace(/\.\d{3}$/, ""), library)
+      ? RuntimeMaterialFor(MappedMaterialName(object.material, spec), library)
       : (spec.material ? RuntimeMaterialFor(spec.material, library) : object.material);
     // 挑出要合并的三个属性各拷一份（InterleavedBufferAttribute.clone() 会
     // 顺手解交织），再把相对 shell 根的变换烘进去 —— shell 自己是单位阵，

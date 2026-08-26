@@ -394,6 +394,24 @@ export class MaterialLibrary {
   }
 
   /**
+   * Replace authored color + normal while keeping a proven procedural ORM.
+   * Small props such as carts and crates need their own UV-scale wood grain,
+   * but do not need another network texture just to repeat the same dry-wood
+   * roughness/occlusion response.
+   */
+  async LoadExternalBaseNormal(name, fallbackName, { albedo, normal }, { timeoutMs = 30000 } = {}) {
+    const fallback = this.baked.get(fallbackName);
+    if (!fallback) throw new Error(`材质未烘焙：${fallbackName}`);
+    const loaded = await Promise.all([
+      this._LoadExternalImage(albedo, true, timeoutMs),
+      this._LoadExternalImage(normal, false, timeoutMs),
+    ]);
+    this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: fallback.orm });
+    this.materials.clear();
+    return name;
+  }
+
+  /**
    * 为局部布景换一张作者绘制的 base color，但继续复用一套已经验过的
    * normal + ORM。这样车厢可以有专属的铆钉钢板／防滑钢板，同时不把
    * PBR 降级成一张无粗糙度、无金属度的彩色贴图。

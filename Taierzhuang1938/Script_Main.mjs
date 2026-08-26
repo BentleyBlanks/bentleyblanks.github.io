@@ -418,18 +418,18 @@ async function Boot() {
   }
 
   /**
-   * 外部 PBR 贴图。二十六套、七十八张图、三十六 MB —— 开机路径上最大的一块网络。
+   * 外部 PBR 贴图。二十八套、八十二张图、约三十八 MB —— 开机路径上最大的一块网络。
    *
    * **不许再写成一个大 Promise.all。** 图片元素的加载没有超时这回事：一条连接
    * 挂住了就既不 load 也不 error，那张图的 Promise 永远悬着，整个 Promise.all
    * 跟着永远不 settle —— 加载画面停在「加载 PBR 材质……」、进度条钉在四分之一，
    * 而展示台在 worker 里照转，页面看上去完全正常。（playwright 里把任意一张
-   * hold 住，一次就复现。）旧写法还有第二个毛病：一个 try 罩着全部二十六套，
-   * 任何一张图 404 都会让**其余二十五套**一起退回程序化 PBR。
+   * hold 住，一次就复现。）旧写法还有第二个毛病：一个 try 罩着全部二十八套，
+   * 任何一张图 404 都会让**其余二十七套**一起退回程序化 PBR。
    *
    * 现在改成：逐套下、逐套接错、每张图带超时（Script_Materials._LoadExternalImage），
-   * 六条道并行 —— 同域本来也只有六个 HTTP/1.1 并发名额，一口气推七十二张只是
-   * 让它们互相排队，还把三十六 MB 的解码压在同一瞬间。步骤文字带上 N/26，
+   * 六条道并行 —— 同域本来也只有六个 HTTP/1.1 并发名额，一口气推八十二张只是
+   * 让它们互相排队，还把约三十八 MB 的解码压在同一瞬间。步骤文字带上 N/28，
    * 卡住的时候一眼能看出停在第几套。
    */
   const PBR_SETS = [
@@ -445,6 +445,12 @@ async function Boot() {
       albedo: "./Texture/Texture_DadaoBase.webp?v=1",
       normal: "./Texture/Texture_DadaoNormal.webp?v=1",
       orm: "./Texture/Texture_DadaoOrm.webp?v=1" },
+    { name: "HandcartWood", fallback: "WoodBeam",
+      albedo: "./Texture/Texture_HandcartWoodBase.webp?v=cartcrate20260826",
+      normal: "./Texture/Texture_HandcartWoodNormal.webp?v=cartcrate20260826" },
+    { name: "WoodCrate", fallback: "WoodDoor",
+      albedo: "./Texture/Texture_WoodCrateBase.webp?v=cartcrate20260826",
+      normal: "./Texture/Texture_WoodCrateNormal.webp?v=cartcrate20260826" },
     { name: "TreeBark",
       albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",
       normal: "./Texture/Texture_TreeBarkNormal.webp?v=1",
@@ -549,7 +555,8 @@ async function Boot() {
       const set = pbrQueue.shift();
       if (!set) return;
       try {
-        await library.LoadExternalSet(set.name, set);
+        if (set.fallback) await library.LoadExternalBaseNormal(set.name, set.fallback, set);
+        else await library.LoadExternalSet(set.name, set);
       } catch (error) {
         // 这一套退回程序化 PBR，别的套不受影响。
         pbrFailed.push(set.name);

@@ -222,6 +222,15 @@ const handcartSpec = handcart.nodes.get("MarketHandcart");
 assert.ok(handcartSpec.triangles <= 4200, "replacement handcart triangle budget");
 assert.equal(handcartSpec.minY, 0, "replacement handcart is ground-ready");
 assert.ok(handcartSpec.maxSpan >= 2.44 && handcartSpec.maxSpan <= 2.46, "replacement handcart keeps game scale");
+for (const material of ["HandcartWood", "WoodCrate"]) {
+  for (const channel of ["Base", "Normal"]) {
+    const fileName = `Texture_${material}${channel}.webp`;
+    const bytes = fs.readFileSync(path.join(root, "Texture", fileName));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", `${fileName}: RIFF header`);
+    assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP", `${fileName}: WebP payload`);
+    assert.ok(bytes.length > 100_000 && bytes.length < 500_000, `${fileName}: useful compressed size`);
+  }
+}
 
 const market = InspectNodes("Model_MarketStorageSet.glb");
 assert.equal(market.nodes.size, 9, "two rice sacks and seven box variants are independent nodes");
@@ -247,6 +256,9 @@ for (const id of [
 ]) assert.match(runtime, new RegExp(`\\b${id}\\b`), `${id} is registered in the component library`);
 assert.match(runtime, /cache\.set\(spec\.url, pending\)/, "shared GLBs cache by URL");
 assert.match(runtime, /if \(spec\.materialMap\)/, "multi-material packs rebind game recipes");
+assert.match(runtime, /materialMap: \{ WoodBeam: "HandcartWood" \}/,
+  "handcart wood no longer reuses the generic structural-beam texture");
+assert.match(runtime, /material: "WoodCrate"/, "wooden boxes use the dedicated crate texture");
 assert.match(runtime, /placement\.yOffset \|\| 0/, "wall-mounted props preserve vertical offsets");
 
 const main = fs.readFileSync(path.join(root, "Script_Main.mjs"), "utf8");
@@ -254,6 +266,12 @@ for (const material of ["Brick", "Core", "Stone"]) {
   for (const channel of ["Base", "Normal", "Orm"]) {
     assert.match(main, new RegExp(`Texture_CityWall${material}${channel}\\.webp`),
       `runtime loads CityWall ${material} ${channel}`);
+  }
+}
+for (const material of ["HandcartWood", "WoodCrate"]) {
+  for (const channel of ["Base", "Normal"]) {
+    assert.match(main, new RegExp(`Texture_${material}${channel}\\.webp`),
+      `runtime loads ${material} ${channel}`);
   }
 }
 
