@@ -69,6 +69,18 @@ for (const phase of phases) {
       }
       return pts;
     }
+    // 返回 { depth, ax, az, push }。
+    //
+    // **depth 的定义一个字都没动**（各分离轴上投影重叠的最小值）——
+    // 0.22 m 那道闸和 ALLOWED 名单都是按这个数攒出来的，改了等于全部作废。
+    //
+    // 新加的是 push：把这件**真的挪开**要走多远。
+    // 这两个数不是一回事，栽过一次所以写下来：depth 取的是 min(a1,c1) − max(a0,c0)，
+    // 当 a 的投影**整个套在** c 的投影里面（细长件横跨一条田埂就是这样），
+    // 这个值等于 a 自己的宽度 —— 沿那条轴挪这么远，a 仍然整个套在里面，没挪开。
+    // 真正的最小平移量是 min(a1 − c0, c1 − a0)：把 a 推出 c 的**某一端**。
+    // （实例：晾晒木架 0.30 m 宽横跨 8.8 m 长的田埂，depth 报 0.29，
+    //   而横着挪 0.34 m 什么也没解决 —— 该挪的是 z，让它整个下田埂。）
     function penetration(a, c) {
       const axes = [
         [Math.cos(a.ry || 0), Math.sin(a.ry || 0)],
@@ -78,15 +90,24 @@ for (const phase of phases) {
       ];
       const pa = corners(a), pc = corners(c);
       let depth = Infinity;
+      let mtv = Infinity, best = [1, 0];
       for (const [ax, az] of axes) {
         let a0 = Infinity, a1 = -Infinity, c0 = Infinity, c1 = -Infinity;
         for (const [px, pz] of pa) { const v = px * ax + pz * az; a0 = Math.min(a0, v); a1 = Math.max(a1, v); }
         for (const [px, pz] of pc) { const v = px * ax + pz * az; c0 = Math.min(c0, v); c1 = Math.max(c1, v); }
         const overlap = Math.min(a1, c1) - Math.max(a0, c0);
-        if (overlap <= 0) return -1;
+        if (overlap <= 0) return { depth: -1, ax: 0, az: 0, push: 0 };
         depth = Math.min(depth, overlap);
+        // 两个方向各自要走多远才把 a 推出 c 的一端，取近的那一头。
+        const back = a1 - c0;        // 往 −轴 推
+        const forward = c1 - a0;     // 往 +轴 推
+        const move = Math.min(back, forward);
+        if (move < mtv) {
+          mtv = move;
+          best = back < forward ? [-ax, -az] : [ax, az];
+        }
       }
-      return depth;
+      return { depth, ax: best[0], az: best[1], push: mtv };
     }
     const out = [];
     for (const e of externals) {
@@ -95,13 +116,21 @@ for (const phase of phases) {
         if (e.min[0] > c.max[0] + 0.5 || e.max[0] < c.min[0] - 0.5
           || e.min[2] > c.max[2] + 0.5 || e.max[2] < c.min[2] - 0.5) continue;
         if (Math.min(e.max[1], c.max[1]) - Math.max(e.min[1], c.min[1]) < 0.15) continue;
-        const depth = penetration(e, c);
+        const { depth, ax, az, push } = penetration(e, c);
         if (depth > 0.22) {
           out.push({
             key: `${+e.c[0].toFixed(1)},${+e.c[2].toFixed(1)}`,
-            prop: { x: +e.c[0].toFixed(1), z: +e.c[2].toFixed(1), tag: e.tag },
-            hit: { x: +c.c[0].toFixed(1), z: +c.c[2].toFixed(1), tag: c.tag },
+            prop: {
+              x: +e.c[0].toFixed(1), z: +e.c[2].toFixed(1), tag: e.tag,
+              hx: +e.h[0].toFixed(2), hz: +e.h[2].toFixed(2), ry: +(e.ry || 0).toFixed(2),
+            },
+            hit: {
+              x: +c.c[0].toFixed(1), z: +c.c[2].toFixed(1), tag: c.tag,
+              hx: +c.h[0].toFixed(2), hz: +c.h[2].toFixed(2), ry: +(c.ry || 0).toFixed(2),
+            },
             depth: +depth.toFixed(2),
+            // 脱开这一件要往哪挪多少（留 0.05 m 富余，别正好贴着）
+            move: { x: +(ax * (push + 0.05)).toFixed(2), z: +(az * (push + 0.05)).toFixed(2) },
           });
         }
       }
@@ -112,8 +141,11 @@ for (const phase of phases) {
   console.log(`phase=${phase} external=${report.count}`
     + ` overlaps=${report.overlaps.length} fresh=${fresh.length}`);
   for (const o of fresh) {
-    console.log(`  FAIL prop(${o.prop.x},${o.prop.z},${o.prop.tag})`
-      + ` x hit(${o.hit.x},${o.hit.z},${o.hit.tag}) depth=${o.depth}`);
+    const Sign = (v) => `${v >= 0 ? "+" : ""}${v}`;
+    console.log(`  FAIL prop(${o.prop.x},${o.prop.z},${o.prop.tag}`
+      + ` 半宽 ${o.prop.hx}×${o.prop.hz})`
+      + ` x hit(${o.hit.x},${o.hit.z},${o.hit.tag} 半宽 ${o.hit.hx}×${o.hit.hz} ry=${o.hit.ry})`
+      + ` depth=${o.depth} → 挪 (${Sign(o.move.x)},${Sign(o.move.z)})`);
     bad += 1;
   }
 }
