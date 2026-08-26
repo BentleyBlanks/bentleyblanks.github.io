@@ -72,8 +72,10 @@ export const VFX_PALETTE = {
   water: LinearOf(0x6E7358),
   brass: LinearOf(0xC9A227),        // 弹壳
   steel: LinearOf(0x8E9299),
-  blood: LinearOf(0x6E1B14),        // 暗红，克制使用
+  blood: LinearOf(0x8E1E12),        // 出膛那一下的鲜红：比暗红亮两档，雾团才有形
   bloodDark: LinearOf(0x3A0E0A),
+  bloodFresh: LinearOf(0xC22A18),   // 雾芯的高光，只给最前面几片
+  bloodDrop: LinearOf(0x5A140E),    // 飞溅的血滴/落地血渍
   // --- HDR 发光（数值给到 3—8，泛光阈值 1.05，Script_Post 会接住）---
   fireHot: LinearOf(0xFFD9A0, 7.0),
   fireMid: LinearOf(0xFF8A2A, 4.0),
@@ -1086,11 +1088,11 @@ const SURFACE_PROFILES = {
     decalRim: VFX_PALETTE.sand, decalHole: VFX_PALETTE.brickHole, sandStream: true,
   },
   flesh: {
-    // 克制。考据明确写了：战损靠弹孔密度，不靠血浆。
+    // 血全部交给 Blood() 出（雾 + 溅射 + 血滴 + 地面血渍），这里只负责把量给足。
     puffs: 0, puffLife: [0.3, 0.6], puffSize: [0.03, 0.16], puffSpeed: 1.0,
     colorA: VFX_PALETTE.blood, colorB: VFX_PALETTE.bloodDark, opacity: 0.4,
     chunks: 0, chunkSize: [0, 0], chunkSpeed: 0, chunkColor: VFX_PALETTE.blood,
-    sparks: 0, decal: false, decalSize: 0, blood: 0.5,
+    sparks: 0, decal: false, decalSize: 0, blood: 1.0,
   },
   water: {
     puffs: 5, puffLife: [0.35, 0.7], puffSize: [0.04, 0.26], puffSpeed: 2.6,
@@ -2059,34 +2061,129 @@ export class VfxSystem {
   }
 
   /**
-   * 血。**克制**：考据里写死了"无墙不饮弹，无土不沃血"要靠弹孔密度表达，
-   * 不是靠满屏血浆。所以这里只有一小团暗红雾 + 几点落地。
+   * 血。一发步枪弹在七十米上打进人体，画面上要**看得见发生了什么**：
+   * 背面炸开的一团雾、顺着弹道甩出去的溅射、落下来的血滴、地上那摊渍。
+   *
+   * 过去这里是"克制版"：四片 0.17 m 的暗红雾、0.5 不透明度、半秒没。
+   * 结果四十米外命中在画面上等于没发生 —— 反馈全压在音频那一路上，
+   * 而 impactFlesh 到八十米只剩 4.8%，两条链一起哑。现在按四层出：
+   *
+   * 1. **雾芯**：两三片高亮鲜红，快、短命，是"打穿了"的那一瞬；
+   * 2. **雾体**：十来片暗红，沿弹道锥形张开并被 drag 拉住，膨到 0.5 m；
+   * 3. **溅射**：拉长的血线，速度比雾快三倍，负责把方向写出来；
+   * 4. **血滴 + 地渍**：会落地会弹的小滴，落点铺一摊贴花 —— 打完之后
+   *    地上留下的痕迹，才是让人相信"这里死过人"的东西。
+   *
+   * 距离补偿仍然保留（粒子是世界尺寸的广告牌，一百米外张角只有零点一度），
+   * 但不再是唯一的手段：18 m 以内不补，往外按 eyeDist/18 抬到封顶 4 倍 ——
+   * 七十米上折合一团 2 m 的雾，在雾里仍然只是个淡红点，这已经是**雾**给的上限
+   * （`taierzhuang-fog-vs-visibility`：雾不许动，那就只能在尺寸上找）。
    */
   Blood(position, direction, amount = 1) {
     const dir = TMP_A.copy(direction).normalize();
-    const count = Math.max(1, Math.round(4 * amount * this.spawnScale));
-    // 距离补偿：粒子是世界尺寸的广告牌，0.17 m 的一团在一百米外张角 0.097°，
-    // 1600 px 宽 / 55° 视场上折合 **2.8 个像素** —— 也就是说，四十米以外
-    // 「打中了」这件事在画面上根本没有发生过。
-    // 补偿的是**屏幕张角**而不是"让血更多"：粒子数、寿命、透明度一个不动，
-    // 只把尺寸按距离往上抬，封顶 3.2 倍（一百米上约九个像素，看得见但仍是一小团）。
-    // 25 m 以内不补 —— 贴脸的那一下本来就够大，再放大就成了血浆片。
     const eyeDist = Math.hypot(position.x - this.eye.x, position.y - this.eye.y,
       position.z - this.eye.z);
-    const far = Math.min(3.2, Math.max(1, eyeDist / 25));
-    for (let i = 0; i < count; i += 1) {
+    const far = Math.min(4.0, Math.max(1, eyeDist / 18));
+    const groundY = this.groundLevel;
+
+    // --- 1. 雾芯：出膛那一下最亮的两三片 -----------------------------------
+    const coreCount = Math.max(1, Math.round(3 * amount * this.spawnScale));
+    for (let i = 0; i < coreCount; i += 1) {
       const s = ResetSpawn();
-      this._ConeVelocity(dir, 0.55, this._Range(0.8, 2.4) * amount);
-      s.x = position.x; s.y = position.y; s.z = position.z;
-      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.2; s.vz = TMP_B.z;
-      s.ay = -3.6; s.drag = 4.5;
-      s.life = this._Range(0.3, 0.6);
-      s.sizeStart = 0.05 * amount * far; s.sizeEnd = 0.17 * amount * far;
-      s.opacity = 0.5; s.fadeIn = 0.05;
+      this._ConeVelocity(dir, 0.35, this._Range(2.6, 5.4) * amount);
+      s.x = position.x + dir.x * 0.06;
+      s.y = position.y + dir.y * 0.06;
+      s.z = position.z + dir.z * 0.06;
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.5; s.vz = TMP_B.z;
+      s.ay = -2.4; s.drag = 6.5;
+      s.life = this._Range(0.18, 0.32);
+      s.sizeStart = 0.06 * amount * far; s.sizeEnd = 0.30 * amount * far;
+      s.opacity = 0.9; s.fadeIn = 0.01;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(3.5);
+      s.colorA = VFX_PALETTE.bloodFresh; s.colorB = VFX_PALETTE.blood;
+      s.seed = this.random();
+      this.pools.smoke.Spawn(s, this.time);
+    }
+
+    // --- 2. 雾体：撑开、留一会儿 -------------------------------------------
+    const mistCount = Math.max(2, Math.round(11 * amount * this.spawnScale));
+    for (let i = 0; i < mistCount; i += 1) {
+      const s = ResetSpawn();
+      this._ConeVelocity(dir, 0.9, this._Range(1.4, 4.2) * amount);
+      s.x = position.x + this._Signed(0.04);
+      s.y = position.y + this._Signed(0.04);
+      s.z = position.z + this._Signed(0.04);
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.3; s.vz = TMP_B.z;
+      s.ay = -3.2; s.drag = 4.2;
+      s.life = this._Range(0.45, 0.95);
+      s.sizeStart = 0.07 * amount * far;
+      s.sizeEnd = 0.5 * amount * far * this._Range(0.6, 1.3);
+      // 单片 0.8 的话十几片叠起来是一颗实心红球，不是雾。0.55 才留得住层次。
+      s.opacity = 0.55; s.fadeIn = 0.04;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(2);
       s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDark;
       s.seed = this.random();
       this.pools.smoke.Spawn(s, this.time);
+    }
+
+    // --- 3. 溅射：沿弹道甩出去的血线（细长片，把方向写出来）---------------
+    const sprayCount = Math.max(2, Math.round(7 * amount * this.spawnScale));
+    for (let i = 0; i < sprayCount; i += 1) {
+      const s = ResetSpawn();
+      this._ConeVelocity(dir, 0.5, this._Range(5, 11) * amount);
+      s.x = position.x + dir.x * 0.05;
+      s.y = position.y + dir.y * 0.05;
+      s.z = position.z + dir.z * 0.05;
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.8; s.vz = TMP_B.z;
+      s.ay = -8.5; s.drag = 1.5;
+      s.life = this._Range(0.16, 0.34);
+      s.sizeStart = 0.035 * amount * far; s.sizeEnd = 0.09 * amount * far;
+      s.opacity = 0.85; s.fadeIn = 0.01;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(4);
+      s.colorA = VFX_PALETTE.blood; s.colorB = VFX_PALETTE.bloodDrop;
+      s.seed = this.random();
+      this.pools.smoke.Spawn(s, this.time);
+    }
+
+    // --- 4. 血滴：会落地、会弹一下的实体小块 -------------------------------
+    const dropCount = Math.round(6 * amount * this.spawnScale);
+    for (let i = 0; i < dropCount; i += 1) {
+      this._ConeVelocity(dir, 0.95, this._Range(2.5, 7) * amount);
+      const size = this._Range(0.008, 0.022);
+      this._SpawnDebris(
+        position.x, position.y, position.z,
+        TMP_B.x, TMP_B.y + 1.6, TMP_B.z,
+        size, size * this._Range(0.7, 1.1), size * this._Range(1.0, 2.2),
+        VFX_PALETTE.bloodDrop, this._Range(0.9, 1.6), groundY, 0.18, 1.4);
+    }
+
+    // --- 5. 地渍：命中点正下方铺一摊，致命伤再在溅射方向上补一小块 ---------
+    // 悬在半空的击中（打在屋顶上的人）离地太远就不留渍，否则血会凭空出现在楼下。
+    const height = position.y - groundY;
+    if (height >= -0.2 && height <= 3.2 && amount >= 0.5) {
+      TMP_C.set(0, 1, 0);
+      const near = Math.max(0.55, Math.min(1.6, amount));
+      // 贴花的形状本体是弹孔（暗芯 + 亮环 + 放射线）。血渍要的是一摊没有暗芯的红，
+      // 所以 rim/hole 两个色都给红，rays 给 0 —— 留着的话地上会出现一颗卡通星号。
+      this._SpawnDecal(
+        { x: position.x + this._Signed(0.12), y: groundY + 0.012, z: position.z + this._Signed(0.12) },
+        TMP_C, this._Range(0.45, 0.75) * near,
+        VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.62, 0);
+      // 贴花池是环形缓冲（高画质 198 格），血渍和弹孔抢同一批格子 ——
+      // 「战损靠弹孔密度」是这作的考据底盘，血不许把墙上的弹孔冲掉。
+      // 所以一次命中最多两格：一摊主渍，外加致命伤才有的一小块溅渍。
+      const splats = amount >= 0.9 ? 1 : 0;
+      for (let i = 0; i < splats; i += 1) {
+        const reach = this._Range(0.4, 1.5) * near;
+        this._SpawnDecal(
+          {
+            x: position.x + dir.x * reach + this._Signed(0.25),
+            y: groundY + 0.012,
+            z: position.z + dir.z * reach + this._Signed(0.25),
+          },
+          TMP_C, this._Range(0.16, 0.34) * near,
+          VFX_PALETTE.blood, VFX_PALETTE.bloodDrop, 0.5, 0);
+      }
     }
   }
 
