@@ -35,6 +35,9 @@ import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
 // 只借这一个纯碰撞工具：它按「沿墙 = 局部 x、墙厚 = 局部 z」登记，
 // 与本文件 Band() 的摆法完全一致（上面那条禁令针对的是 AddCompound 那三个门脸函数）。
 import { SolidWithOpenings } from "./Script_World.mjs";
+import {
+  MakeRoadPath, MakeCrownProfile, BuildRailBed, BuildRailTrack,
+} from "./Script_RoadSpline.mjs";
 
 /** Data_Tengxian.WEST_SUBURB.railway 的镜像（主会话改数据时要同步这里）。 */
 const RAILWAY = { x: -480, gauge: 1.435, fromZ: -330, toZ: 330, crossings: [0] };
@@ -1122,8 +1125,9 @@ export function BuildStation(host, f, ctx) {
 // ===========================================================================
 // 城西段津浦铁路
 //
-// 参照 Script_TengxianOutfield.BuildRailway 的做法**在本文件内自建**
-//（契约禁止 import 城模块；outfield 也不是本关的场景）。三条与野外版不同：
+// 路基/枕木/钢轨走共享的样条道路层（Script_RoadSpline —— 注册表契约明许
+// import 的公共几何模块；此前因契约禁 import 城模块而在本文件抄了一份，
+// 那份实现已并回共享层）。三条与野外版不同：
 //   · 路基压得很低（0.46 m）。野外那条 1.35 m 的堤在城关里会把导航沿 x=-480
 //     切成两半（NavGrid 的判据是盒顶高出地面 0.56 m），而 L1 的出生点
 //     (-480,-205) **就站在这条线上** —— 堤高一档，玩家开局就卡在道砟里。
@@ -1136,142 +1140,68 @@ export function BuildStation(host, f, ctx) {
 function BuildRailway(host, f, ctx, rw) {
   const sink = host.sink;
   const farSink = host.farSink;
-  const rnd = Mulberry32(HashString(`map:${f.id || "station"}:rail`));
   const fromZ = rw.fromZ !== undefined ? Math.max(rw.fromZ, -330) : -330;
   const toZ = rw.toZ !== undefined ? Math.min(rw.toZ, 330) : 330;
   const railX = rw.x;
-  const halfGauge = (rw.gauge || 1.435) / 2;
   const crossings = rw.crossings || [0];
   const CROSS_HALF = 4.5;
-  const InCrossing = (z) => crossings.some((c) => Math.abs(z - c) < CROSS_HALF);
 
   // 分区：桶名跟着世界坐标走，否则 660 m 的钢轨会和车站合成同一只网格，
   // 视锥剔除对它完全失效（Script_World.BuildSink.SetSector 的注释讲的就是这件事）
   const prevSector = sink.sector;
   const prevFarSector = farSink.sector;
   const Near = (z) => Math.abs(z - f.z) < 130;
-  const Use = (z) => (Near(z) ? sink : farSink);
-  const At = (z) => {
-    const s = Use(z);
-    s.SetSector(SectorKey(railX, z));
+  const SinkFor = (x, z) => {
+    const s = Near(z) ? sink : farSink;
+    s.SetSector(SectorKey(x, z));
     return s;
   };
 
-  // 地面剖面：**避开 OUTER_PADS 的采样点**（西关的垫地都在 x>-484），
-  // 取轨线以西 62 m 的原野作平滑基准，再与轨线正下方的真实地面夹一次。
-  const STEP = 4;
-  const n = Math.round((toZ - fromZ) / STEP) + 1;
-  const field = new Float32Array(n);
-  const local = new Float32Array(n);
-  for (let i = 0; i < n; i += 1) {
-    const z = fromZ + i * STEP;
-    field[i] = host.OuterHeight(railX - 62, z);
-    local[i] = host.OuterHeight(railX, z);
-  }
-  const SMOOTH = 4;                       // ±16 m 的箱式平滑：坡度摊到 2% 以下
-  const CrownAt = (i) => {
-    let sum = 0, cnt = 0;
-    for (let k = -SMOOTH; k <= SMOOTH; k += 1) {
-      const j = Math.min(n - 1, Math.max(0, i + k));
-      sum += Math.max(field[j], local[j]);
-      cnt += 1;
-    }
-    const smooth = sum / cnt;
-    return Clamp(smooth + 0.46, local[i] + 0.15, local[i] + 0.50);
-  };
+  // 路线与轨面剖面走共享的样条道路层（Script_RoadSpline）。
+  // 剖面：**避开 OUTER_PADS 的采样点**（西关的垫地都在 x>-484）——
+  // 取轨线以西 62 m 的原野作平滑基准（probeOffset 按 n=(tz,-tx) 的符号，
+  // 路径朝 +z 时 -62 就是轨西），±16 m 箱式平滑把坡度摊到 2% 以下，
+  // 再对轨线正下方的真实地面夹在 [+0.15, +0.50]。
+  const path = MakeRoadPath([[railX, fromZ], [railX, toZ]]);
+  const SOf = (z) => path.ClosestS(railX, z);
+  const crownProfile = MakeCrownProfile(path, {
+    groundAt: (x, z) => host.OuterHeight(x, z),
+    step: 4, smooth: 4, lift: 0.46, clampLo: 0.15, clampHi: 0.50, probeOffset: -62,
+  });
   // 碰撞盒顶只压到 地面+0.34：NavGrid 的「挡路」判据是**每个格子各自的地面**
-  // +0.56，而一段路基盒横跨 8—16 m，地形在段内还会起伏 ~0.15 m。
+  // +0.56，而一段路基盒横跨十几米，地形在段内还会起伏 ~0.15 m。
   // 贴着 0.5 登记的话，某几个格子会被判成墙，导航沿 x=-480 出现随机的断点。
   // 玩家因此比道砟面陷进去 0.12 m —— 第一人称完全看不出来。
   const COLLIDER_RISE = 0.34;
+  const bedGaps = crossings.map((c) => [SOf(c - CROSS_HALF), SOf(c + CROSS_HALF)]);
 
-  // --- 道砟路基：分段梯形（顶面 + 两侧坡肩），底面埋进土里 ---
-  const SLOPE = 1.75;                     // 水平:垂直
-  const topHalf = 3.4;
-  // 先把道口从整条线上挖掉，再逐段细分 —— 「段心落在道口里就跳过」那种写法
-  // 会在道口两侧留下半段长的缺口（缺口宽度取决于段长，而不是道口宽度）。
-  const runs = [];
-  {
-    let cut = fromZ;
-    for (const c of [...crossings].sort((a, b) => a - b)) {
-      const a = c - CROSS_HALF, b = c + CROSS_HALF;
-      if (a > cut) runs.push([cut, Math.min(a, toZ)]);
-      cut = Math.max(cut, b);
-    }
-    if (cut < toZ) runs.push([cut, toZ]);
-  }
-  let seg = 0;
-  const segments = [];
-  for (const [a, b] of runs) {
-    let p0 = a;
-    while (p0 < b) {
-      const segLen = Near(p0) ? 8 : 16;
-      segments.push([p0, Math.min(p0 + segLen, b)]);
-      p0 += segLen;
-    }
-  }
-  for (const [z, z1] of segments) {
-    const cz = (z + z1) / 2;
-    const i = Math.round((cz - fromZ) / STEP);
-    const crown = CrownAt(Math.min(n - 1, Math.max(0, i)));
-    const ground = local[Math.min(n - 1, Math.max(0, i))];
-    const bottom = ground - 1.4;
-    const s = At(cz);
-    Slab(s, "RailBallast", {
-      x: railX, y: (crown + bottom) / 2, z: cz, w: topHalf * 2, h: crown - bottom, d: z1 - z,
-      seed: `rail:bal${seg}`, tile: TILE_METERS.ground,
-    });
-    const drop = Math.max(0.25, crown - ground);
-    const shoulder = Math.hypot(drop * SLOPE, drop);
-    const ang = Math.atan2(drop, drop * SLOPE);
-    for (const side of [-1, 1]) {
-      Slab(s, "RailBallast", {
-        x: railX + side * (topHalf + drop * SLOPE / 2), y: crown - drop / 2 - 0.12, z: cz,
-        w: shoulder, h: 0.3, d: z1 - z, rz: -side * ang,
-        seed: `rail:sh${side}${seg}`, tile: TILE_METERS.ground,
-      });
-    }
-    // 玩家沿轨面走得上去，AI 与南撤的人流照旧能横穿铁路（见 COLLIDER_RISE）
-    sink.Solid(railX, ground + COLLIDER_RISE / 2, cz, topHalf + drop * SLOPE,
-      COLLIDER_RISE / 2, (z1 - z) / 2, "embankment");
-    seg += 1;
-  }
+  // --- 道砟路基：梯形断面扫掠（顶面平轨面、坡脚逐点贴地埋进土里）---
+  BuildRailBed(sink, {
+    path, groundAt: (x, z) => host.OuterHeight(x, z), crownAt: crownProfile.At,
+    topHalf: 3.4, slope: 1.75, material: "RailBallast",
+    gaps: bedGaps, step: 4, chunkLen: 16,
+    colliders: { mode: "lowRise", rise: COLLIDER_RISE, every: 12, tag: "embankment" },
+    sinkFor: SinkFor, colliderSink: sink,
+  });
 
-  // --- 枕木 ---
-  let tie = 0;
-  for (let tz = fromZ; tz < toZ; tz += Near(tz) ? 1.2 : 3.0) {
-    if (InCrossing(tz)) continue;
-    const i = Math.round((tz - fromZ) / STEP);
-    const crown = CrownAt(Math.min(n - 1, Math.max(0, i)));
-    const s = At(tz);
-    Slab(s, "SleeperWood", {
-      x: railX + (rnd() - 0.5) * 0.08, y: crown + 0.09, z: tz, w: 2.6, h: 0.18, d: 0.24,
-      ry: (rnd() - 0.5) * 0.03, seed: `rail:tie${tie}`, tile: TILE_METERS.wood,
-    });
-    tie += 1;
-  }
-
-  // --- 双轨：24 m 一节（钢轨本身 12 m 一根，这里两根合一段省三角）---
-  for (let rz0 = fromZ; rz0 < toZ; rz0 += 24) {
-    const rz1 = Math.min(rz0 + 24, toZ);
-    const cz = (rz0 + rz1) / 2;
-    const i = Math.round((cz - fromZ) / STEP);
-    const crown = CrownAt(Math.min(n - 1, Math.max(0, i)));
-    const s = At(cz);
-    for (const side of [-1, 1]) {
-      Slab(s, "RailSteel", {
-        x: railX + side * halfGauge, y: crown + 0.26, z: cz, w: 0.12, h: 0.16, d: rz1 - rz0,
-        seed: `rail:r${side}${Math.round(cz)}`, tile: TILE_METERS.steel,
-      });
-    }
-  }
+  // --- 枕木 + 双轨（近段 1.2 m 一根进 sink，远段 3.0 m 一根进 farSink）---
+  BuildRailTrack({
+    path, crownAt: crownProfile.At, gauge: rw.gauge || 1.435,
+    sleeperGaps: bedGaps, railGaps: [],           // 钢轨过道口**连续**
+    sinkFor: SinkFor,
+    spacingAt: (s) => (Near(fromZ + s) ? 1.2 : 3.0),
+    seed: `map:${f.id || "station"}:rail`,
+    sleeper: { along: 0.24, h: 0.18, length: 2.6, lift: 0.09,
+      material: "SleeperWood", jitter: 0.04, ryJitter: 0.03 },
+    rail: { w: 0.12, h: 0.16, lift: 0.26, segLen: 24, material: "RailSteel" },
+  });
 
   // --- 平交道口：路基在这里被压平成一条土面，钢轨照旧连续 ---
+  const At = (z) => SinkFor(railX, z);
   for (const c of crossings) {
     if (c < fromZ || c > toZ) continue;
-    const i = Math.round((c - fromZ) / STEP);
-    const crown = CrownAt(Math.min(n - 1, Math.max(0, i)));
-    const ground = local[Math.min(n - 1, Math.max(0, i))];
+    const crown = crownProfile.At(SOf(c));
+    const ground = crownProfile.LocalAt(SOf(c));
     const s = At(c);
     // 钢轨在道口是**连续**的（上面那一轮已经铺满全线），这里只把路基压成土面：
     // 轨顶仍高出土面 0.14 m，正是乡道道口的样子。

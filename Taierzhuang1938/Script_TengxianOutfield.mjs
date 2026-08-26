@@ -83,6 +83,10 @@ import {
 import { AddVillageLife } from "./Script_LivedInProps.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { JIEHE_RIVER, JieheRiverCenterZ } from "./Script_JieheHeight.mjs";
+import { MakeRoadPath, DistanceToPolyline } from "./Script_RoadPath.mjs";
+import {
+  BuildRoadRibbon, BuildRailBed, BuildRailTrack, MakeCrownProfile,
+} from "./Script_RoadSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：城外这一套新增的逻辑名
@@ -617,9 +621,11 @@ export class TengxianOutfield {
     for (const f of this.spec.foci) {
       if (Math.hypot(x - f[0], z - f[1]) < 12 + margin) return true;
     }
-    // 自己铺的路上不许长东西（行道树是**故意**栽在路边的，它自己跳过这一条）
+    // 自己铺的路上不许长东西（行道树是**故意**栽在路边的，它自己跳过这一条）。
+    // **按样条实走的线判，不按控制点折线判**：样条在拐点之间会向外鼓出十几米，
+    // 拿折线判距离的话，鼓出去的那一段路面上照样长麦子。
     if (!skipRoad) for (const road of this.spec.roads || []) {
-      if (this.DistanceToPolyline(x, z, road.points) < road.width / 2 + 3 + margin) return true;
+      if (DistanceToPolyline(x, z, this.RoadPathFor(road).dense) < road.width / 2 + 3 + margin) return true;
     }
     // 河道里、路基上也不许
     const rv = this.spec.river;
@@ -631,17 +637,16 @@ export class TengxianOutfield {
     return false;
   }
 
-  DistanceToPolyline(x, z, points) {
-    let best = 1e9;
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const [x0, z0] = points[i], [x1, z1] = points[i + 1];
-      const dx = x1 - x0, dz = z1 - z0;
-      const len2 = dx * dx + dz * dz || 1;
-      const t = Clamp01(((x - x0) * dx + (z - z0) * dz) / len2);
-      const d = Math.hypot(x - (x0 + dx * t), z - (z0 + dz * t));
-      if (d < best) best = d;
+  /** 一条 spec 路的样条与密集折线（Blocked 判距离用），按 road 对象缓存。 */
+  RoadPathFor(road) {
+    if (!this._roadPaths) this._roadPaths = new Map();
+    let entry = this._roadPaths.get(road);
+    if (!entry) {
+      const path = MakeRoadPath(road.points);
+      entry = { path, dense: path.Dense(8) };
+      this._roadPaths.set(road, entry);
     }
-    return best;
+    return entry;
   }
 
   /** 河心线：直河一眼假，给一点蜿蜒。公式在模块级（宿主也要用同一条）。 */
@@ -1266,30 +1271,25 @@ export class TengxianOutfield {
     }
   }
 
-  /** 大车路：压实的土路 + 两道车辙。 */
+  /**
+   * 大车路：压实的土路。样条条带逐顶点贴地（旧版是折线逐段 TerrainSlab，
+   * 拐点处两段矩形靠 1.06 的富余互叠，实拍是 V 缝或双层重影）。
+   * 宽度抖动搬进了条带（低频 ±9%），车辙照旧不铺 —— 野地土路读得出压痕就够。
+   */
   BuildRoads(rnd) {
-    const quads = [];
+    let index = 0;
     for (const road of this.spec.roads || []) {
-      const pts = road.points;
-      for (let i = 0; i < pts.length - 1; i += 1) {
-        const [x0, z0] = pts[i], [x1, z1] = pts[i + 1];
-        const len = Math.hypot(x1 - x0, z1 - z0);
-        const segs = Math.max(1, Math.round(len / 24));
-        for (let k = 0; k < segs; k += 1) {
-          const t0 = k / segs, t1 = (k + 1) / segs;
-          const ax = x0 + (x1 - x0) * t0, az = z0 + (z1 - z0) * t0;
-          const bx = x0 + (x1 - x0) * t1, bz = z0 + (z1 - z0) * t1;
-          const cx = (ax + bx) / 2, cz = (az + bz) / 2;
-          if (!this.InRegion(cx, cz)) continue;
-          const ry = Math.atan2(-(bz - az), bx - ax);
-          quads.push(this.TerrainSlab(Math.hypot(bx - ax, bz - az) * 1.06,
-            road.width * (0.92 + rnd() * 0.18), {
-              x: cx, z: cz, ry, topOffset: 0.045, bottomOffset: -0.07, cell: 3.5,
-            }));
-        }
-      }
+      BuildRoadRibbon(this.groundSink, {
+        path: this.RoadPathFor(road).path, width: road.width, material: "CartRoad",
+        groundAt: (x, z) => this.groundAt(x, z),
+        crown: 0.045, skirtDrop: 0.6, step: 4, widthJitter: 0.09,
+        seed: `${this.spec.id}:road${index}`,
+        inRegion: (x, z) => this.InRegion(x, z),
+        sectorKey: SectorKey,
+      });
+      index += 1;
     }
-    if (quads.length) this.groundSink.Add("CartRoad", MergeGeometries(quads));
+    void rnd;
   }
 
   /**
@@ -1304,48 +1304,45 @@ export class TengxianOutfield {
     if (!rw) return;
     const h = 1.35, topHalf = 3.4, baseHalf = 5.9;
     const bridgeHalf = rw.bridgeAtZ !== undefined ? 26 : 0;
-    // 缺口按世界 z 给（AddBank 的约定：南北向的线按 z）。
+    // 路线是样条（本关恰好是两点直线，逐位退化为旧走向）。缺口按世界 z 给，
+    // 用 ClosestS 换算成弧长 —— 直线下 s = z - fromZ，逐位相同。
     // 道口这一档必须留：一条从南到北不断的 1.35 m 路基会把 NavGrid
     // 沿 x=rw.x 切成两半 —— 那一侧的 AI 从此过不来。
+    const path = MakeRoadPath([[rw.x, rw.fromZ], [rw.x, rw.toZ]]);
+    const SOf = (z) => path.ClosestS(rw.x, z);
     const gaps = [];
-    for (const c of rw.crossings || []) gaps.push([c - 5.5, c + 5.5]);
-    if (bridgeHalf) gaps.push([rw.bridgeAtZ - bridgeHalf, rw.bridgeAtZ + bridgeHalf]);
-    const InGap = (z) => gaps.some(([a, b]) => z > a && z < b);
-
-    this.AddBank(this.sink, {
-      from: [rw.x, rw.fromZ], to: [rw.x, rw.toZ],
-      height: h, baseHalf, topHalf, material: "Ballast",
-      seed: `${this.spec.id}:rail`, tag: "embankment",
-      gaps, segLen: 9, colliderEvery: 15, cover: false, jitter: 0.04,
+    for (const c of rw.crossings || []) gaps.push([SOf(c - 5.5), SOf(c + 5.5)]);
+    if (bridgeHalf) {
+      gaps.push([SOf(rw.bridgeAtZ - bridgeHalf), SOf(rw.bridgeAtZ + bridgeHalf)]);
+    }
+    // 轨面剖面：野外地形起伏温和（±0.55 m），不平滑、直接地面 +1.35
+    //（与旧版 RidgePrism 贴地 + 定高一致）。
+    const crown = MakeCrownProfile(path, {
+      groundAt: (x, z) => this.groundAt(x, z), step: 4, lift: h,
+    });
+    BuildRailBed(this.sink, {
+      path, groundAt: (x, z) => this.groundAt(x, z), crownAt: crown.At,
+      topHalf, baseHalf, material: "Ballast", gaps, step: 4,
+      colliders: { mode: "steps", steps: 4, every: 15, tag: "embankment" },
+      inRegion: (x, z) => this.InRegion(x, z), sectorKey: SectorKey,
     });
 
     // 枕木与钢轨。按分区分桶 —— 一条 1 km 的钢轨合成一个网格的话，
     // 视锥剔除对它完全失效，整条路每帧都要画满
-    let ties = 0;
-    for (let z = rw.fromZ; z < rw.toZ; z += 0.9) {
-      if (InGap(z) || !this.InRegion(rw.x, z)) continue;
-      this.sink.SetSector(SectorKey(rw.x, z));
-      this.sink.Add("WoodBeam", this.DrapeGeometry(
-        MakeBox(2.5, 0.16, 0.24, TILE_METERS.wood, `tie${Math.round(z * 10)}`),
-        { x: rw.x + (rnd() - 0.5) * 0.06, z, groundOffset: h + 0.08 }));
-      this.sink.SetSector("");
-      ties += 1;
-    }
-    for (const s of [-1, 1]) {
-      for (let z = rw.fromZ; z < rw.toZ; z += 20) {
-        const z1 = Math.min(z + 20, rw.toZ);
-        const cz = (z + z1) / 2;
-        if (InGap(cz) || !this.InRegion(rw.x, cz)) continue;
-        this.sink.SetSector(SectorKey(rw.x, cz));
-        this.sink.Add("RailSteel", this.DrapeGeometry(
-          // 标准轨距 1.435 m（Data_Tengxian.WEST_SUBURB.railway.gauge）
-          MakeBox(0.12, 0.15, z1 - z, TILE_METERS.steel, `rail${s}${Math.round(z)}`),
-          { x: rw.x + s * 0.7175, z: cz, groundOffset: h + 0.23 }));
-        this.sink.SetSector("");
-      }
-    }
+    const track = BuildRailTrack({
+      path, crownAt: crown.At, gauge: rw.gauge || 1.435,
+      sleeperGaps: gaps, railGaps: gaps,
+      sinkFor: (x, z) => { this.sink.SetSector(SectorKey(x, z)); return this.sink; },
+      inRegion: (x, z) => this.InRegion(x, z),
+      seed: `${this.spec.id}:track`,
+      sleeper: { along: 0.24, h: 0.16, length: 2.5, lift: 0.08,
+        material: "WoodBeam", spacing: 0.9, jitter: 0.03 },
+      rail: { w: 0.12, h: 0.15, lift: 0.23, segLen: 20, material: "RailSteel" },
+    });
+    this.sink.SetSector("");
     this.stats.railM = Math.round(rw.toZ - rw.fromZ);
-    this.stats.ties = ties;
+    this.stats.ties = track.ties;
+    void rnd;
 
     // 道口：一条压过道砟的车辙带（真实的乡道道口就是这样，路基在这里被压平）
     const xing = [];

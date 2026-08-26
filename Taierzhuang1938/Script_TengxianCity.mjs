@@ -65,6 +65,7 @@ import {
   AddStalkStack, AddVegetableBeds, AddThreshingFloor, AddGraveMound, AddVillageLife,
 } from "./Script_LivedInProps.mjs";
 import { CreateWaterSurface } from "./Script_Water.mjs";
+import { BuildRoadRibbon } from "./Script_RoadSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 材质：逻辑名 → 既有烘焙配方 + 调色
@@ -996,16 +997,26 @@ export class TengxianCity {
   }
 
   BuildStreets(rnd) {
-    // 土路：春旱干裂、车辙深。压在台地上一层薄板，比夯土地面浅两档
+    // 土路：春旱干裂、车辙深。样条条带贴着 GroundHeight 铺（城内台地是解析
+    // 平地，所以看起来仍是那层薄板：顶面 +0.11、裙边埋到 -0.01，与旧 MakeBox
+    // 的外形一致）。走共享的 BuildRoadRibbon 是为了全城只有一份铺路代码 ——
+    // 数据仍是 STREETS 的轴对齐线段（测试锁死），这里只把它喂成两点样条。
+    // 弹坑照旧不避：GroundHeight 不认弹坑（见其注释），玩家踩的是解析平地，
+    // 街面跟着凹下去反而会让脚穿出路面。
     for (const s of STREETS) {
       const len = s.to - s.from;
       const cx = s.axis === "x" ? (s.from + s.to) / 2 : s.at;
       const cz = s.axis === "x" ? s.at : (s.from + s.to) / 2;
       if (!this.InBounds(cx, cz, Math.max(len, s.width))) continue;
-      this.sink.Add("DirtRoad", PlaceGeometry(
-        MakeBox(s.axis === "x" ? len : s.width, 0.12, s.axis === "x" ? s.width : len,
-          TILE_METERS.ground, `road${s.id}`),
-        { x: cx, y: CITY.platformY + 0.05, z: cz }));
+      BuildRoadRibbon(this.sink, {
+        points: s.axis === "x"
+          ? [[s.from, s.at], [s.to, s.at]]
+          : [[s.at, s.from], [s.at, s.to]],
+        width: s.width, material: "DirtRoad",
+        groundAt: (x, z) => this.GroundHeight(x, z),
+        crown: 0.11, skirtDrop: 0.12, step: 12, seed: `road${s.id}`,
+        sectorKey: SectorKey,
+      });
       // 巷道（rank:"hutong"）是人走出来的过道：不铺车辙 —— 大车进不了两米巷。
       if (s.rank !== "hutong") {
         this.stats.roadMarks += AddRoadWear(this.sink, {
@@ -1566,9 +1577,18 @@ export class TengxianCity {
     const mapLanes = EAST_SUBURB.mapLanes || [];
     for (const alley of mapLanes) {
       if (!this.InBounds(alley.x, alley.z, Math.max(alley.w, alley.d) / 2)) continue;
-      this.sink.Add("DirtRoad", PlaceGeometry(
-        MakeBox(alley.w, 0.075, alley.d, TILE_METERS.ground, alley.id),
-        { x: alley.x, y: 0.038, z: alley.z }));
+      // 巷路照矩形的长轴喂成两点样条，路面贴 GroundHeight（旧版是 y=0.038 的
+      // 平板，压到台坎/地形过渡带就悬空或穿地）。
+      const horizontal = alley.w >= alley.d;
+      BuildRoadRibbon(this.sink, {
+        points: horizontal
+          ? [[alley.x - alley.w / 2, alley.z], [alley.x + alley.w / 2, alley.z]]
+          : [[alley.x, alley.z - alley.d / 2], [alley.x, alley.z + alley.d / 2]],
+        width: horizontal ? alley.d : alley.w, material: "DirtRoad",
+        groundAt: (x, z) => this.GroundHeight(x, z),
+        crown: 0.075, skirtDrop: 0.25, step: 6, seed: `lane${alley.id}`,
+        sectorKey: SectorKey,
+      });
     }
 
     // 东关大街本身也有两道车辙、门前家什和撤离时遗下的小件。
@@ -1873,11 +1893,14 @@ export class TengxianCity {
     // 切片根本不朝东的关卡（L5/L6）一行几何都不生成
     if (!this.InBounds(EAST_FIELD.bounds.minX, EAST_FIELD.roadZ, 60)) return;
     // 大车道出寨门往东的延伸：关厢那条土路不能到 x=540 就断头
-    const roadLen = EAST_FIELD.bounds.maxX - 544;
-    const roadX = 544 + roadLen / 2;
-    this.sink.SetSector(SectorKey(roadX, EAST_FIELD.roadZ));
-    this.sink.Add("DirtRoad", this.DrapeSlab(roadLen, 7.0,
-      { x: roadX, z: EAST_FIELD.roadZ, topOffset: 0.06, bottomOffset: -0.12 }));
+    BuildRoadRibbon(this.sink, {
+      points: [[544, EAST_FIELD.roadZ], [EAST_FIELD.bounds.maxX, EAST_FIELD.roadZ]],
+      width: 7.0, material: "DirtRoad",
+      groundAt: (x, z) => this.OuterHeight(x, z),
+      crown: 0.06, skirtDrop: 0.6, step: 4, seed: "eastApproachRoad",
+      sectorKey: SectorKey,
+    });
+    this.sink.SetSector(SectorKey(544 + (EAST_FIELD.bounds.maxX - 544) / 2, EAST_FIELD.roadZ));
     this.BuildEastFarmFields(rnd);
     for (const farmstead of EAST_FIELD.farmsteads) {
       if (!this.InBounds(farmstead.x, farmstead.z, 70)) continue;

@@ -30,13 +30,13 @@
 // 视锥剔除等于没有。本文件按 150 m 自己切格（NorthSector，镜像 Script_TengxianCity
 // 的 SectorKey），退出前把两个 sink 的分区都复位成 ""（派发处紧接着也是这么做的）。
 
-import * as THREE from "three";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { AddPoplar, AddCypress, SolidWithOpenings } from "./Script_World.mjs";
 import {
   AddRoadWear, AddYardWear, AddVillageLife, AddStalkStack, AddWattleFence,
 } from "./Script_LivedInProps.mjs";
+import { BuildRoadRibbon } from "./Script_RoadSpline.mjs";
 
 // ---------------------------------------------------------------------------
 // 镜像常量
@@ -103,32 +103,6 @@ function Put(sink, material, size, tile, seed, pose, grid = null) {
 /** 合批分区键。镜像 Script_TengxianCity.SectorKey。 */
 function NorthSector(x, z) {
   return `S${Math.floor(x / SECTOR_SIZE)}_${Math.floor(z / SECTOR_SIZE)}`;
-}
-
-/**
- * 一片四边形。**顶点顺序 = 法线朝向，写反了整片是隐形的**（WP-B4 用一整条
- * 西关大街的失踪换来的教训）。mode 决定 UV 怎么投：
- *   "xz" 水平面（俯视投影）；"zy" 竖直面且沿线方向是 z（南北向路的裙边）。
- */
-function Quad(a, b, c, d, tile = TILE_METERS.ground, mode = "xz") {
-  const g = new THREE.BufferGeometry();
-  const pts = [a, b, c, a, c, d];
-  const pos = new Float32Array(18);
-  const uv = new Float32Array(12);
-  for (let i = 0; i < 6; i += 1) {
-    pos[i * 3] = pts[i][0]; pos[i * 3 + 1] = pts[i][1]; pos[i * 3 + 2] = pts[i][2];
-    if (mode === "zy") {
-      uv[i * 2] = pts[i][2] / tile;
-      uv[i * 2 + 1] = pts[i][1] / tile;
-    } else {
-      uv[i * 2] = pts[i][0] / tile;
-      uv[i * 2 + 1] = pts[i][2] / tile;
-    }
-  }
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  g.computeVertexNormals();
-  return g;
 }
 
 /**
@@ -335,52 +309,18 @@ function StockadeGate(host, s, g, ctx) {
  *
  * 铺成带子而不是一块块方板：濠外原野有 ±0.55 m 起伏，加上 NorthMission 垫地
  * （弘道院那一块）的过渡带，一段一段的平板会在过渡带里读成台阶。
+ * 带子本体走共享的样条道路层（Script_RoadSpline.BuildRoadRibbon）：碰撞盒长
+ * = 采样步长 4 m 这条账（10.5 m 一盒时 z≈-486 过渡带里两盒之间 0.79 m 直坎、
+ * 超 autostep 0.55 卡人）已经写死在共享层里，别再另开一份步长。
  */
 function RoadRibbon(host, { x, fromZ, toZ, width, seed }) {
-  const half = width / 2;
   const span = toZ - fromZ;
-  const steps = Math.max(2, Math.round(span / 4));
-  const top = [], skirt = [];
-  const drop = 0.65;
-  let prev = null;
-  for (let i = 0; i <= steps; i += 1) {
-    const z = fromZ + (span * i) / steps;
-    const y = host.OuterHeight(x, z) + ROAD_CROWN;
-    const node = { z, y };
-    if (prev) {
-      // 顶面：按 +x → -x 排，叉积朝上（写反了整条路背面剔除掉，只剩车辙浮在田里）
-      top.push(Quad(
-        [x + half, prev.y, prev.z], [x - half, prev.y, prev.z],
-        [x - half, node.y, node.z], [x + half, node.y, node.z]));
-      // 东裙边（法线 +x）
-      skirt.push(Quad(
-        [x + half, prev.y, prev.z], [x + half, node.y, node.z],
-        [x + half, node.y - drop, node.z], [x + half, prev.y - drop, prev.z],
-        TILE_METERS.ground, "zy"));
-      // 西裙边（法线 -x）
-      skirt.push(Quad(
-        [x - half, node.y, node.z], [x - half, prev.y, prev.z],
-        [x - half, prev.y - drop, prev.z], [x - half, node.y - drop, node.z],
-        TILE_METERS.ground, "zy"));
-    }
-    prev = node;
-  }
-  host.sink.Add("DirtRoad", MergeGeometries(top));
-  host.sink.Add("DirtRoad", MergeGeometries(skirt));
-  // 路基碰撞：贴地面板本来不登记碰撞（走解析地形），但这条路垫了 ROAD_CROWN，
-  // 不登记的话人是踩在路面以下走的、车辙比脚面还高。
-  //
-  // **盒长必须跟着路面的采样步长走（4 m），不能图省事拉到 10 m**：盒顶是平的，
-  // 相邻两盒的落差 = 这一段地面的落差。北关大街正好横穿 NorthMission 垫地
-  // （弘道院那一块）的过渡带 —— 1.2 m 摊在 18 m 上，10.5 m 一盒时 z≈-486
-  // 处两盒之间是一道 0.79 m 的直坎（实测），超过 autostep 0.55，
-  // 玩家往回走要卡住。4 m 一盒之后同一处只剩 0.27 m。
-  const solids = Math.max(1, Math.round(span / 4));
-  for (let i = 0; i < solids; i += 1) {
-    const cz = fromZ + (span * (i + 0.5)) / solids;
-    const cy = host.OuterHeight(x, cz) + ROAD_CROWN;
-    host.sink.Solid(x, cy - 0.24, cz, half, 0.24, (span / solids) / 2, "embankment");
-  }
+  BuildRoadRibbon(host.sink, {
+    points: [[x, fromZ], [x, toZ]], width, material: "DirtRoad",
+    groundAt: (xx, zz) => host.OuterHeight(xx, zz),
+    crown: ROAD_CROWN, skirtDrop: 0.65, step: 4, seed,
+    colliders: { tag: "embankment", thickness: 0.24 },
+  });
   // 车辙、脚迹：分段各按本段地高给 baseY
   const chunks = Math.max(2, Math.round(span / 60));
   for (let c = 0; c < chunks; c += 1) {

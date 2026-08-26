@@ -68,6 +68,7 @@ export const testDefs = {
   },
   BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
+  RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
@@ -142,6 +143,7 @@ export const tier0 = [
   "FractureBakeTest",
   "CutsceneControlTest",
   "GeoTest",
+  "RoadPathTest",
 ];
 
 export const tier2 = [
@@ -156,7 +158,7 @@ export const tier2 = [
 export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -353,6 +355,11 @@ export function InferDomains(files) {
       matched = true;
     }
     if (/^(Data_Tengxian|Script_TengxianCity|Script_TengxianLayoutTest|Script_EastSuburbBlocksTest|Script_Landmark_EastMapBlocks)\.mjs$/.test(leaf)) {
+      for (const name of ["terrain", "editor", "render"]) found.add(name);
+      matched = true;
+    }
+    // 样条道路层被铁路/大车路/大街/编辑器四路共用：地形、编辑器、渲染都要回归
+    if (/^(Script_RoadPath|Script_RoadSpline|Script_EditorRoads)\.mjs$/.test(leaf)) {
       for (const name of ["terrain", "editor", "render"]) found.add(name);
       matched = true;
     }
