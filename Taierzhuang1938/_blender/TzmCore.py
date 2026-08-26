@@ -789,7 +789,7 @@ def AuditSolid(parts):
 # 导出
 # ---------------------------------------------------------------------------
 
-def WriteTzm(root, path, name, notes=""):
+def WriteTzm(root, path, name, notes="", audit=True):
     """把节点树写成 .tzm.json。返回 (三角数, 网格块数, 字节数, 自检报告)。"""
     nodes, meshes = [], []
     index_of = {}
@@ -890,7 +890,7 @@ def WriteTzm(root, path, name, notes=""):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(doc, handle, ensure_ascii=False, separators=(",", ":"))
-    strays, coplanar = AuditSolid(audit_parts)
+    strays, coplanar = AuditSolid(audit_parts) if audit else ([], [])
     return total_tris, len(meshes), os.path.getsize(path), {"strays": strays, "coplanar": coplanar}
 
 

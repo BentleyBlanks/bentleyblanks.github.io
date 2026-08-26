@@ -2711,6 +2711,11 @@ export class Actor {
     const fall = SmoothStep(0.12, 0.78, t);
     const settle = SmoothStep(0.62, 1, t);
     const dir = rag.forward;
+    // 「肢体下面是空的」的下垂量（0—1），由 AiDirector.StepCorpse 按落点地形
+    // 喂进来：趴在坟顶/台缘上时，悬空的手脚不该平举在空中，要朝地垂下去。
+    // 乘 settle —— 倒地过程中不掺和，落定了才垂。
+    const droopBody = (rag.droopBody || 0) * settle;
+    const droopArms = (rag.droopArms || 0) * settle;
 
     // 胯落到 0.085H：贴地的躯干厚度就这么多。翻转方向是 -dir —— 正的 x 是后仰。
     this.body.position.set(0, Lerp(rag.startY ?? d.hipY, 0.085 * d.height, SmoothStep(0.05, 0.82, t)), 0);
@@ -2719,17 +2724,17 @@ export class Actor {
     this.hips.rotation.set(0, 0, 0);
     // 上身在膝软的那一下弓一下，落定后必须归零 —— 留着弯度就成了「半坐着的尸体」
     this.chest.rotation.set(dir * 0.30 * knee * (1 - settle), rag.side * 0.2, -rag.side * 0.18 * fall);
-    this.neck.rotation.set(dir * 0.26 * fall, rag.side * 0.4 * fall, rag.side * 0.35);
+    this.neck.rotation.set(dir * (0.26 * fall + 0.30 * droopBody), rag.side * 0.4 * fall, rag.side * 0.35);
 
     for (const tag of ["L", "R"]) {
       const leg = this.legs[tag];
       // 膝先软，落地后再松开一半 —— 一直保持大弯度会变成「空中蹬着腿」
       const bend = Lerp(0.15, 0.95, knee) * (1 - 0.55 * settle) * (tag === "L" ? 1 : 0.72);
-      BlendEuler(leg.thigh, -bend * dir * 0.5 + 0.25 * fall, 0, leg.side * (0.12 + 0.26 * fall), 1);
+      BlendEuler(leg.thigh, -bend * dir * 0.5 + 0.25 * fall + dir * 0.55 * droopBody, 0, leg.side * (0.12 + 0.26 * fall), 1);
       BlendEuler(leg.knee, -bend * 1.15, 0, 0, 1);
       BlendEuler(leg.ankle, 0.35 * fall, 0, 0, 1);
       const arm = this.arms[tag];
-      BlendEuler(arm.shoulder, dir * 0.9 * fall - 0.2, 0, leg.side * (0.35 + 0.55 * fall), 1);
+      BlendEuler(arm.shoulder, dir * (0.9 * fall + 0.55 * droopArms) - 0.2, 0, leg.side * (0.35 + 0.55 * fall), 1);
       BlendEuler(arm.elbow, -0.5 - 0.4 * fall, 0, 0, 1);
     }
     // 死了枪就脱手：**平躺在身侧的地上**。

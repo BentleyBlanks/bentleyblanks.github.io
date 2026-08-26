@@ -1,0 +1,11 @@
+Model Information:
+* title:	Type 89 I-Go (Chi-Ro)
+* source:	https://sketchfab.com/3d-models/type-89-i-go-chi-ro-fe3f1f483bc043c6a0907eee444a1e43
+* author:	snrnsrk5 (https://sketchfab.com/snrnsrk5)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Type 89 I-Go (Chi-Ro)" (https://sketchfab.com/3d-models/type-89-i-go-chi-ro-fe3f1f483bc043c6a0907eee444a1e43) by snrnsrk5 (https://sketchfab.com/snrnsrk5) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

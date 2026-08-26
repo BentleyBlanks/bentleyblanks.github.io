@@ -75,20 +75,20 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     accentA: Plain("accentA", 0x1F3A93, 0.8, true),
     accentB: Plain("accentB", 0xEDEFF2, 0.7, true),
     helmet: library.Get("SteelHelmet", { roughness: 0.72, metalness: 0.85 }),
-    steel: library.Get("Steel", { roughness: 0.62, metalness: 0.9 }),
+    steel: Plain("steel", 0x6d7075, 0.62, true),
     blade: Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
     dadao: Plain("DadaoPbrFallback", { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
     wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
-    armor: library.Get("SteelHelmet", { roughness: 1, metalness: 0.05 }),
-    track: library.Get("SteelHelmet", { roughness: 1, metalness: 0.30 }),
+    armor: Plain("armor", 0x555c4a, 1, true),
+    track: Plain("track", 0x3b3d3c, 1, true),
     Stone: library.Get("Stone", { roughness: 0.92, metalness: 0 }),
     WoodBeam: library.Get("WoodBeam", { roughness: 0.9, metalness: 0 }),
     WoodDoor: library.Get("WoodDoor", { roughness: 0.88, metalness: 0 }),
     RoofTile: library.Get("RoofTile", { roughness: 0.85, metalness: 0 }),
   });
 
-  const ids = id ? [id] : ["Type89Tank", "Type94Tankette"];
+  const ids = id ? [id] : ["Type95HaGo", "Type97ChiHa", "Type89Tank"];
   const out = [];
   for (const modelId of ids) {
     const entry = MESHES[modelId];

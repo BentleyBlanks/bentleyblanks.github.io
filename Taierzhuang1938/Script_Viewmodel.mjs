@@ -1263,6 +1263,14 @@ export class Viewmodel {
     // 挥刀要的是刀身自己绕手转过一百多度，只有原点落在握把上的这一层能做到
     // （weaponMount 的原点就是 rig 的原点，也就是模型规范里的右手握持点）。
     this.swingPivot = new THREE.Group();
+    // 导入手臂的挂点。**它挂在 recoilPivot 上，不挂在枪上**：肩膀属于人，
+    // 不属于武器。挂在武器下面的那一版里，肩要跟着腰射/开镜/冲刺/挥砍的每一次
+    // 姿态旋转一起转 —— 大刀的腰射姿态绕刀身自转 88°，整副手臂就跟着侧翻到
+    // 画面正中糊成一坨（玩家报的"持刀的手完全坏了"）。挂在这一层，手臂照样跟着
+    // 摇摆/步伐/落地/后坐一起动，但武器自己怎么摆都不再牵动肩。
+    // 手仍然严格扣在枪上：那是 FpsArmRig 用 IK 追 handRight/handLeft 做到的。
+    this.armAnchor = new THREE.Group();
+    this.armAnchor.name = "ArmAnchor";
     this.root.add(this.fovRig);
     this.fovRig.add(this.swayPivot);
     this.swayPivot.add(this.bobPivot);
@@ -1270,6 +1278,7 @@ export class Viewmodel {
     this.statePivot.add(this.actionPivot);
     this.actionPivot.add(this.recoilPivot);
     this.recoilPivot.add(this.weaponMount);
+    this.recoilPivot.add(this.armAnchor);
     this.weaponMount.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
@@ -1506,8 +1515,9 @@ export class Viewmodel {
 
     // 新手臂用 IK 追随上面两只旧手的握点。旧手只当隐藏动画靶，既有每把枪的
     // 拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用，不需要重做动作表。
+    // 挂点给的是 armAnchor（相机稳定）而不是 rig.group，理由见 armAnchor 那段抬头。
     if (this.riggedArms) {
-      this.riggedArms.Attach(this.rig.group, this.handRight.group, this.handLeft.group,
+      this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
         [this.handRight, this.handLeft]);
       this.rigSource = `${this.rigSource}+riggedArms`;
     }
