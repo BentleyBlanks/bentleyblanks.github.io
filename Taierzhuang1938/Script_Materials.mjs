@@ -117,37 +117,47 @@ ${GI_SAMPLE_GLSL}`)
           vec3 giIrradiance = GiSampleIrradiance(vGiWorldPos, giNormal, giView, giConfidence) * uGiIntensity;
           // uGiEnabled 是 0→1 的淡入量（图集收敛前是 0），不是开关
           giConfidence *= uGiEnabled;
+          // 体积**外**的回退值。画质面板那根「间接光强度」已经乘进了 uGiIntensity
+          // （探针一侧），回退的天空 IBL 必须乘同一份 —— 少乘一边，×2 就等于
+          // 「体内两倍、体外一倍」，体积边界上凭空多出一圈硬色差，而且体积跟着
+          // 玩家滚，那圈色差就跟着人走。乘数跟着 uGiEnabled 淡入：图集还没收敛
+          // 就先把体外提亮的话，进关那一秒会先闪一下再落回来。
+          vec3 giFallback = iblIrradiance * mix(1.0, uGiGain, uGiEnabled);
           // ?giView= 假彩色取证：1 材质最终采用的间接辐照度×0.05 /
-          // 2 被替换前的天空 IBL×0.05 / 3 confidence /
-          // 4 原始探针 GI 与 IBL 的亮度比×0.25（与曝光无关，1.0 的比值显示为 0.25 灰）。
+          // 2 被替换前的天空 IBL×0.05（不含上面那份增益，看的是「原样的天」）/
+          // 3 confidence / 4 探针 GI 与体外回退的亮度比×0.25（与曝光无关，
+          // 1.0 的比值显示为 0.25 灰；比值离 1 越远，体积边界那条缝越明显）。
           // 在 mix 之前抓，末端 <dithering_fragment> 处整帧覆盖输出。
           if (uGiDebugView > 0.5) {
             // 正片在探针体外（confidence=0）会回退到天空 IBL。这里以前只画
             // giIrradiance，体积边界外便整片纯黑，误报成“远处没有 GI”。调试图
             // 必须复现下面实际写回 iblIrradiance 的同一条 mix，才能显示真实结果。
             if (uGiDebugView < 1.5) {
-              gGiDebugColor = mix(iblIrradiance, giIrradiance, giConfidence) * 0.05;
+              gGiDebugColor = mix(giFallback, giIrradiance, giConfidence) * 0.05;
             }
             else if (uGiDebugView < 2.5) gGiDebugColor = iblIrradiance * 0.05;
             else if (uGiDebugView < 3.5) gGiDebugColor = vec3(giConfidence);
             else if (uGiDebugView < 4.5) {
               float giDbgL = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
-              float iblDbgL = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+              float iblDbgL = max(dot(giFallback, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
               gGiDebugColor = vec3(giDbgL / iblDbgL * 0.25);
             }
             // 5.5 的上界不能省：6-9 是材质通道视图，值在更早的 chunk 里已经抓好，
             // 这里兜底 else 一接就会把它们全冲成权重和（四个视图一模一样的灰）。
             else if (uGiDebugView < 5.5) gGiDebugColor = vec3(gGiDbgWeightSum * 0.5);
           }
+          #if defined( RE_IndirectSpecular )
           if (giConfidence > 0.0) {
-            #if defined( RE_IndirectSpecular )
-            float giSkyLum = max(dot(iblIrradiance, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+            // 遮蔽比要拿**同倍**的两侧比，否则增益一开就恒等于 1（屋里的金属件
+            // 照样反着一片亮天）。giFallback 与 giIrradiance 都含增益，比值干净。
+            float giSkyLum = max(dot(giFallback, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
             float giLum = dot(giIrradiance, vec3(0.2126, 0.7152, 0.0722));
             float giOcclusion = clamp(giLum / giSkyLum, 0.0, 1.0);
             radiance *= mix(1.0, mix(1.0, giOcclusion, giConfidence), uGiSpecularOcclusion);
-            #endif
-            iblIrradiance = mix(iblIrradiance, giIrradiance, giConfidence);
           }
+          #endif
+          // confidence=0 也要写回：那一路是 giFallback，增益在体外同样生效。
+          iblIrradiance = mix(giFallback, giIrradiance, giConfidence);
         }
         #endif`)
         // 材质通道假彩色（6 BaseColor / 7 粗糙度 / 8 金属度 / 9 太阳阴影）。
