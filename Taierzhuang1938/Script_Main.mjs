@@ -2699,6 +2699,14 @@ function PauseGame() {
 /** 暂停里的「继续」。 */
 function ResumeFromPause() {
   if (!menu) return;
+  // 设置面板很可能还开着：关掉「画质」那一页只关那一页，**入口面板留着**
+  //（Close() 不动 panelOpen）。不收掉它 editor.Capturing 就一直是 true，
+  // 于是「继续」之后：Frame 走的还是编辑器那条分支（世界冻着）、Guard 把每一次
+  // 点击都当成"在点面板"吃掉、RequestPointerLock 直接早退 —— 玩家以为回到了
+  // 战斗，其实镜头和身体都不听话。先把返回层清掉再收面板，否则 TogglePanel
+  // 里的 Close() 会调 FinishEditorSession 把暂停菜单又盖回来。
+  editorReturnMenuMode = null;
+  if (editor && editor.panelOpen) editor.TogglePanel(false);
   menu.Close();
   state.menu = false;
   state.running = true;

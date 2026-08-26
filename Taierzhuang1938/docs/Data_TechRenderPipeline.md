@@ -644,7 +644,11 @@ col = pow(max(col, 0.0), 1.0 / uGammaLGG);
 // --- 3D LUT（32³ 烘进 1024×32 的 CanvasTexture 条带）---
 col = mix(col, SampleLut(col), uLutAmount);
 // --- 对比 + 饱和 ---
-col = (col - 0.5) * uContrast + 0.5;
+// 对比度是感知域操作。在线性域围绕 0.5 拉伸会把暗部先减掉一大截，
+// 深色枪械/军装即使 BaseColor、GI、AO 都正常，最终也会被硬裁成纯黑。
+vec3 perceptual = LinearToSrgb(col);
+perceptual = (perceptual - 0.5) * uContrast + 0.5;
+col = SrgbToLinear(clamp(perceptual, 0.0, 1.0));
 col = mix(vec3(Luma(col)), col, uSaturation);
 
 // --- 暗角：压亮度，不是叠黑纱 ---

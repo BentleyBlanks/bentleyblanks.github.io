@@ -425,6 +425,40 @@ for (let i = 0; i < 3; i += 1) {
     settingsClosed.viewmodel === true && !settingsClosed.editor.hidden,
     `viewmodel=${settingsClosed.viewmodel} gearHidden=${settingsClosed.editor.hidden}`);
 
+  // 玩家说的「点击了设置界面」指的是真的点**进**操作 / 画质 / 音效那三页，
+  // 不是只把入口面板叫出来 —— 三页各自那个 × 走的是 host.Close()，
+  // 与关掉整块面板同一条收口（Close → FinishEditorSession）。
+  // 逐页开→关走一遍，每一步大刀都必须还在手里：只验入口面板会整段漏掉这条路。
+  for (const id of ["controls", "graphics", "sound"]) {
+    await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("settings"));
+    await page.evaluate((editorId) => {
+      document.querySelector(`#edRoot .edBtn[data-editor="${editorId}"]`).click();
+    }, id);
+    await page.evaluate(() => window.Taierzhuang.StepFrames(2));
+    const on = await page.evaluate(() => ({
+      active: window.Taierzhuang.Debug.Editor().active,
+      visible: window.Taierzhuang.viewmodel.root.visible,
+      weapon: window.Taierzhuang.Debug.Slots().viewmodel,
+    }));
+    Check(`点进设置·${id} 时大刀还在手里`,
+      on.active === id && on.visible === true && on.weapon === "Dadao", JSON.stringify(on));
+    // 点这一页自己的 ×（不是面板的 ×，也不是 Esc）：玩家最常用的那个关法
+    await page.evaluate(() => {
+      document.querySelector("#edRoot .edPanel.work .edX").click();
+    });
+    await page.evaluate(() => window.Taierzhuang.StepFrames(2));
+    const off = await page.evaluate(() => ({
+      active: window.Taierzhuang.Debug.Editor().active,
+      mode: window.Taierzhuang.Debug.Menu().mode,
+      visible: window.Taierzhuang.viewmodel.root.visible,
+      weapon: window.Taierzhuang.Debug.Slots().viewmodel,
+    }));
+    Check(`关掉设置·${id} 回暂停层，大刀还在手里`,
+      off.active === null && off.mode === "pause"
+        && off.visible === true && off.weapon === "Dadao", JSON.stringify(off));
+  }
+  await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
+
   // 实际复现玩家路径：暂停 → 设置 → 构件库预览。过去只有场景/地形工具会
   // 收起暂停菜单，摄影棚类编辑器会把「继续 / 设置 / 调试选项」叠在背景里。
   // 所有编辑器接管后都必须整层隐藏菜单；关闭工具后再回原暂停层，不能恢复战斗。
@@ -458,11 +492,22 @@ for (let i = 0; i < 3; i += 1) {
       && !propEditorClosed.running,
     JSON.stringify(propEditorClosed));
 
+  // 按「继续」时设置面板还开着是常事：关掉某一页设置只关那一页，入口面板留着。
+  // 不收掉它 editor.Capturing 就一直是 true —— Frame 走的还是编辑器那条分支
+  //（世界冻着）、每一次点击都被当成"在点面板"吃掉、指针锁也不去抢。
+  // 玩家看到的是「回到了战斗但镜头和身体都不听话」。
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("settings"));
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
+  await page.evaluate(() => window.Taierzhuang.StepFrames(4));
   const resumed = await page.evaluate(() => ({
     running: window.Taierzhuang.state.running, open: window.Taierzhuang.Debug.Menu().open,
+    editor: window.Taierzhuang.Debug.Editor(),
+    locked: window.Taierzhuang.Debug.PointerLock().locked,
   }));
   Check("暂停里的「继续」能回到游戏", resumed.running && !resumed.open, JSON.stringify(resumed));
+  Check("「继续」把还开着的设置面板一并收掉（否则世界还冻着、点击全被吃）",
+    !resumed.editor.panelOpen && !resumed.editor.capturing && resumed.locked === true,
+    JSON.stringify(resumed.editor) + ` locked=${resumed.locked}`);
   const audioBack = await page.evaluate(() => window.Taierzhuang.audio.paused);
   Check("继续之后背景音接回来", audioBack === false, `audio.paused=${audioBack}`);
   const hudBack = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
