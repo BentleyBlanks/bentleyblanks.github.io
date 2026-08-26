@@ -1,5 +1,19 @@
 # Repository Guidelines
 
+## 本地预览（先本地验收，再推 master）
+
+站点 416MB / 2000+ 文件，每次推送都要整站打包上传，Pages 那一轮等好几分钟；**别拿线上当预览环境**。
+
+```bash
+node scripts/Script_LocalPreview.mjs        # 服务本脚本所在的那棵树，默认 8080
+```
+
+- 索引页 `http://127.0.0.1:8080/__preview/`：按最近改动排序列出所有带 `index.html` 的页面，带筛选框；下面一块能把任意 worktree 一键挂到相邻端口（8081、8082…），每棵树独占一个端口，页面里的绝对路径照旧成立。
+- 路径与线上完全一致（`/Taierzhuang1938/…`），一律 `no-store`，改完刷新即生效；支持 Range（mp4/长 BGM 能拖进度条），MIME 表覆盖 `.mjs/.wasm/.glb/.pck`。
+- 刻意**不**发 COOP/COEP：本地能跑而线上跑不了的东西，本地预览就白做了。
+- 桌面快捷方式：`powershell -ExecutionPolicy Bypass -File scripts\Script_CreateDesktopShortcut.ps1`（从哪份检出跑就绑哪份检出；`-Name` 可另起名字）。双击起服，关掉黑窗口即停服，重复双击不会抢端口。
+- **worktree 里不要用 `npm run preview`** —— npm 会把 cwd 换到主检出，你测的是另一棵树。直接 `node scripts/Script_LocalPreview.mjs`。
+
 ## Generated Audio / Volcengine
 
 - All future project-generated music/BGM, ambience, SFX, dialogue, and voice must use Volcengine, never Lovart. A request to generate, replace, revise, or audition any audio must not invoke Lovart, including when the request explicitly says “music”, “BGM”, “song”, “sound effect”, or “audio”.
