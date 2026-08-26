@@ -140,9 +140,10 @@ try {
     if (T.graphics && T.ApplyGraphics) {
       T.graphics.gi = true;
       T.ApplyGraphics();
-      // 重编译一次全场材质 + 980 探针按 12/帧扫满一遍 + 半秒淡入：
-      // 150 帧后量到的才是收敛后的稳态，不是半温的图集
-      T.StepFrames(150);
+      // 重编译一次全场材质 + 全体探针按 batch/帧扫满一遍 + 半秒淡入：
+      // 收敛后量到的才是稳态，不是半温的图集。帧数要盖过 probeCount/batch
+      // （竖直加过层之后 high 档是 1568/12 ≈ 131 帧），少了就把「还在收敛」当成本量。
+      T.StepFrames(220);
       rows.push(await Sample("GI forced on"));
       // “经常顿一下”还可能来自探针体每跨 4 m 滚动一格。按 0.25 m 模拟移动，
       // 既覆盖普通帧也覆盖跨格帧，单列最大值，别让中位数把尖峰藏掉。

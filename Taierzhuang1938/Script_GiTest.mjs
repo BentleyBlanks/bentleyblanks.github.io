@@ -54,8 +54,20 @@ function Check(ok, label, detail = "") {
 // 就会被误画成纯黑。shader 编译只保证语法正确，这条源契约锁住显示口径。
 const materialSource = await readFile(path.join(projectDir, "Script_Materials.mjs"), "utf8");
 Check(materialSource.includes(
-  "gGiDebugColor = mix(iblIrradiance, giIrradiance, giConfidence) * 0.05;"),
+  "gGiDebugColor = mix(giFallback, giIrradiance, giConfidence) * 0.05;"),
 "GI 辐照度视图在探针体外回退天空 IBL");
+// 「间接光强度」只乘探针一侧的话，×2 就是「体内两倍、体外一倍」——
+// 体积边界上一圈硬色差，而且跟着玩家滚。两侧同倍是这套 GI 的硬契约，
+// 它是纯 shader 行为、截图里只看得见结果，所以在源码这一级锁住。
+Check(materialSource.includes("vec3 giFallback = iblIrradiance * mix(1.0, uGiGain, uGiEnabled);"),
+"体积外的天空 IBL 回退乘同一份间接光强度");
+Check(materialSource.includes("iblIrradiance = mix(giFallback, giIrradiance, giConfidence);"),
+"最终间接光走 giFallback→探针 的同一条 mix");
+// 淡出带：一格线性 + 两端折角 = 掠射地面上一条十来像素的硬边（马赫带）。
+const giSource = await readFile(path.join(projectDir, "Script_Gi.mjs"), "utf8");
+Check(/GI_FADE_CELLS\s*=\s*([1-9]|[0-9]*\.[0-9]+)/.test(giSource)
+  && giSource.includes("confidence = edge * edge * (3.0 - 2.0 * edge);"),
+"体积边缘淡出带加宽且 smoothstep（无折角）");
 // GI 关闭档（采样层没编进来）：视图 1/2 必须显示材质实际在用的天空 IBL —— 那
 // 就是此时的间接光本体；画成黑等于把「默认关」误报成「间接光坏了」。
 Check(materialSource.includes(
