@@ -195,33 +195,33 @@ export const VOICE_LINES = [
   { key: "ija_rally_charge",    kind: "rally",  file: "vo_ija_rally_charge.mp3", dur: 1.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "とつげき！", kanji: "突撃！", cn: "冲锋！" },
   { key: "ija_rally_fire",      kind: "rally",  file: "vo_ija_rally_fire.mp3",   dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "うちかたはじめ！", kanji: "撃ち方始め！", cn: "开始射击！" },
   { key: "ija_rally_follow",    kind: "rally",  file: "vo_ija_rally_follow.mp3", dur: 1.42,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "われにつづけ！", kanji: "我に続け！", cn: "跟我上！" },
-  // ija_spot_enemy「てきだ！ひだり！ひだりだ！」（敵だ！左！左だ！）**暂时摘掉**。
-  //
-  // 不是文本的问题 —— 那句是两位评审一致选的，省助词、方位单独成句再补一遍，
-  // 是被枪声压住时的真实口语形态。摘掉是**音频质量**：这一条 seedaudio 出来时
-  // 自带一层房间声，源文件底噪 −38.8 dB，走完对齐链是 −32 dB，
-  // 而闸门要求 ≤ −40（Script_VoiceTest「没有自带环境音」那条）。
-  // 两级 afftdn 频域降噪也只压到 −32；再往下压就开始吃气声了。
-  //
-  // 正解是**重摇一条干净的**（memory 里那条「TTS 自带环境音要重摇」）。
-  // 当时的旧网关连不上（连接被拒），所以先摘。
-  // 以后直接用 Script_VoiceBake.mjs 走火山引擎重生成，底噪 ≤−45 再放回来，
-  // 文本一个字都不用改。spot 类还剩 4 条，短期不会复读。
+  // 突击声库批：全数采用 assault 交付指令，要求 SeedAudio 给出近距离交火时胸腔爆发、
+  // 已经冲上去的急迫感；不是普通操典朗读，也不使用影视反派式的拖长吼叫。
+  { key: "ija_rally_push",      kind: "rally",  file: "vo_ija_rally_push.mp3",   dur: 1.65,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "おせ！おくれるな！", kanji: "押せ！遅れるな！", cn: "压上去！别掉队！" },
+  { key: "ija_rally_storm",     kind: "rally",  file: "vo_ija_rally_storm.mp3",  dur: 2.19,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "とつげき！いっきにいけ！", kanji: "突撃！一気に行け！", cn: "冲锋！一口气冲过去！" },
+  { key: "ija_rally_suppress",  kind: "rally",  file: "vo_ija_rally_suppress.mp3", dur: 1.56, role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "うて！うちつづけろ！", kanji: "撃て！撃ち続けろ！", cn: "开火！持续射击！" },
+  // ija_spot_enemy 曾因底噪撤下；本批已通过 SeedAudio 1.0 重摇并过 −48 dB 闸。
+  { key: "ija_spot_enemy",      kind: "spot",   file: "vo_ija_spot_enemy.mp3",  dur: 2.06,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "てきだ！ひだり！ひだりだ！", kanji: "敵だ！左！左だ！", cn: "敌人！左边！左边！" },
+  { key: "ija_spot_roof",       kind: "spot",   file: "vo_ija_spot_roof.mp3",   dur: 1.39,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "おくじょうにてき！", kanji: "屋上に敵！", cn: "屋顶有敌人！" },
   { key: "ija_spot_mg",         kind: "spot",   file: "vo_ija_spot_mg.mp3",      dur: 2.29,  role: "兵",     pitch: 0,   side: "ija",                 text: "きかんじゅう！まえだ！", kanji: "機関銃！前だ！", cn: "机枪！在前面！" },
   { key: "ija_spot_shina",      kind: "spot",   file: "vo_ija_spot_shina.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
   { key: "ija_spot_target",     kind: "spot",   file: "vo_ija_spot_target.mp3",  dur: 2.30,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", kanji: "目標！右前方！", cn: "目标！右前方！" },
   { key: "ija_spot_wall",       kind: "spot",   file: "vo_ija_spot_wall.mp3",    dur: 1.17,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "じょうへきにてきへい！", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
   { key: "ija_warn_down",       kind: "warn",   file: "vo_ija_warn_down.mp3",    dur: 1.60,  role: "古兵",    pitch: -4,  side: "ija",                 text: "ふせろ！うごくな！", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
+  { key: "ija_warn_cover",      kind: "warn",   file: "vo_ija_warn_cover.mp3",   dur: 2.30,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "かくれろ！あたまをさげろ！", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
   { key: "ija_warn_grenade",    kind: "warn",   file: "vo_ija_warn_grenade.mp3", dur: 1.91,  role: "兵",     pitch: 0,   side: "ija",                 text: "てりゅうだん！ふせろ！", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },
   { key: "ija_warn_shell",      kind: "warn",   file: "vo_ija_warn_shell.mp3",   dur: 1.91,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "ほうげき！たいひ！", kanji: "砲撃！退避！", cn: "炮击！退避！" },
   { key: "ija_ammo_out",        kind: "ammo",   file: "vo_ija_ammo_out.mp3",     dur: 1.21,  role: "兵",     pitch: 0,   side: "ija",                 text: "だんやくをよこせ！", kanji: "弾薬を寄こせ！", cn: "把弹药递过来！" },
   { key: "ija_ammo_reload",     kind: "ammo",   file: "vo_ija_ammo_reload.mp3",  dur: 2.51,  role: "兵",     pitch: 0,   side: "ija",                 text: "そうてんちゅう！えんごたのむ！", kanji: "装填中！援護頼む！", cn: "装填中！掩护我！" },
+  { key: "ija_ammo_pass",       kind: "ammo",   file: "vo_ija_ammo_pass.mp3",    dur: 2.07,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "だんやく！はやくまわせ！", kanji: "弾薬！早く回せ！", cn: "弹药！快传过来！" },
   { key: "ija_hurt_hit",        kind: "hurt",   file: "vo_ija_hurt_hit.mp3",     dur: 1.07,  role: "兵",     pitch: 0,   side: "ija",                 text: "うでをやられた！", kanji: "腕をやられた！", cn: "胳膊中弹了！" },
+  { key: "ija_hurt_leg",        kind: "hurt",   file: "vo_ija_hurt_leg.mp3",     dur: 1.41,  role: "兵",     pitch: 0,   side: "ija", delivery: "assault", text: "あしをやられた！", kanji: "脚をやられた！", cn: "腿受伤了！" },
   { key: "ija_hurt_leader",     kind: "hurt",   file: "vo_ija_hurt_leader.mp3",  dur: 2.51,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "ぶんたいちょうどのがやられた！", kanji: "分隊長殿がやられた！", cn: "分队长中弹了！（分隊長＝相当于中方的班长）" },
   { key: "ija_hurt_medic",      kind: "hurt",   file: "vo_ija_hurt_medic.mp3",   dur: 2.42,  role: "兵",     pitch: 0,   side: "ija",                 text: "えいせいへい！こっちだ！", kanji: "衛生兵！こっちだ！", cn: "卫生兵！在这边！" },
   { key: "ija_move_advance",    kind: "move",   file: "vo_ija_move_advance.mp3", dur: 2.14,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "さんかい！まえへ！", kanji: "散開！前へ！", cn: "散开！向前！" },
   { key: "ija_move_back",       kind: "move",   file: "vo_ija_move_back.mp3",    dur: 2.27,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "いったんさがれ！", kanji: "一旦下がれ！", cn: "暂时后撤！" },
   { key: "ija_move_flank",      kind: "move",   file: "vo_ija_move_flank.mp3",   dur: 1.31,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "そくめんにまわれ！", kanji: "側面に回れ！", cn: "从侧翼绕过去！" },
+  { key: "ija_move_forward",    kind: "move",   file: "vo_ija_move_forward.mp3", dur: 2.01,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "まえへでろ！おせ！", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
 ];
 
 /** 按类别取所有键（不含 event 句），给测试与调试用。 */
