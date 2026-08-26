@@ -102,11 +102,11 @@ if __name__ == "__main__":
                     rough_min=184, rough_max=246)
     build_if_source("GateRoofTile", normal_strength=4.0, metalness=0,
                     rough_min=158, rough_max=226)
-    # Image-generated, de-lit timber scan authored for the Chuchuan carriage.
-    # Keep this separate from WeaponWoodV2: a rifle stock is varnished and fine-
-    # grained, while troop-car bench boards are broad, dry and heavily abraded.
-    build_if_source("CarriageBenchWood", normal_strength=3.4, metalness=0,
-                    rough_min=178, rough_max=242)
+    # 出川车厢那三套（BenchWood / FloorSteel / CeilingSteel）**不在这里生产** ——
+    # 它们的法线与 ORM 是随 base 一起出的，不是从 base 推的，走
+    # _import/Script_BakeCarriagePbr.py 从 1254px 源图降采样。这里原来挂着一条
+    # build_if_source("CarriageBenchWood")，它要的 Source 图不在仓库里、从来没触发；
+    # 留着只会在源图哪天回来时把那边的产物顶掉。一张图只许有一个生产者。
     # 「照城防示意图补全地标」预留 stem（Phase 0 插桩）：各工作包用 imagegen 出
     # _import/Source/Texture_<Stem>Source.png 后，本脚本才会真的构建；没有源图就跳过。
     build_if_source("StationBrick", normal_strength=3.4, metalness=0, rough_min=160, rough_max=226)
@@ -116,6 +116,6 @@ if __name__ == "__main__":
     for stem in (
         "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
         "BrickWallSooty", "Adobe", "Stone", "GateBrick", "GatePaintedWood",
-        "GateRoofTile", "CarriageBenchWood",
+        "GateRoofTile",
     ):
         export_standalone_metallic_roughness(stem)

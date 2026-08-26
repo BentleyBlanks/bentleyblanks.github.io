@@ -62,6 +62,7 @@ export const testDefs = {
     timeoutMs: 5 * 60 * 1000,
     desc: "一张贴图挂死不许把开机吊在「加载 PBR 材质」上",
   },
+  BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
@@ -119,6 +120,7 @@ export const testDefs = {
 export const tier0 = [
   "BootTest",
   "BootStallTest",
+  "BootPayloadTest",
   "PlayTest",
   "TestRunnerTest",
   "ModuleGraphTest",

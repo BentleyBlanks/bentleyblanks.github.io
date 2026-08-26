@@ -533,24 +533,37 @@ async function Boot() {
       albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
       normal: "./Texture/Texture_TemplePlasterNormal.webp?v=1",
       orm: "./Texture/Texture_TemplePlasterOrm.webp?v=1" },
+    // 出川车厢那三套。**曾经是 1254px PNG，一家占掉整张表 71% 的字节**
+    //（28 MB / 39 MB），因为它们是全项目唯一没走 512px WebP 那条烘焙线的贴图。
+    // 而车厢是按世界尺寸平铺的（一张图铺 1 m，见 Script_Cutscene.TILE_BY_RECIPE），
+    // 512px 就是每米 512 个纹素，多出来的分辨率任何机位都采样不到。
+    // 现在走 _import/Script_BakeCarriagePbr.py 降采样出的 WebP：21 MB → 0.37 MB。
+    // 顺带摘掉了 CarriageWallSteel —— Data_CutsceneChuchuan 里一次都没 mat 引用它
+    //（端墙实测渲成纯黑之后早就改走 WoodStock/Adobe），却一直每次开机下 6.5 MB。
     { name: "CarriageBenchWood",
-      albedo: "./Texture/Texture_CarriageBenchWoodBase.png?v=2",
-      normal: "./Texture/Texture_CarriageBenchWoodNormal.png?v=2",
-      orm: "./Texture/Texture_CarriageBenchWoodOrm.png?v=2" },
-    { name: "CarriageWallSteel",
-      albedo: "./Texture/Texture_CarriageWallSteelBase.png?v=2",
-      normal: "./Texture/Texture_CarriageWallSteelNormal.png?v=2",
-      orm: "./Texture/Texture_CarriageWallSteelOrm.png?v=2" },
+      albedo: "./Texture/Texture_CarriageBenchWoodBase.webp?v=car512",
+      normal: "./Texture/Texture_CarriageBenchWoodNormal.webp?v=car512",
+      orm: "./Texture/Texture_CarriageBenchWoodOrm.webp?v=car512" },
     { name: "CarriageFloorSteel",
-      albedo: "./Texture/Texture_CarriageFloorSteelBase.png?v=2",
-      normal: "./Texture/Texture_CarriageFloorSteelNormal.png?v=2",
-      orm: "./Texture/Texture_CarriageFloorSteelOrm.png?v=2" },
+      albedo: "./Texture/Texture_CarriageFloorSteelBase.webp?v=car512",
+      normal: "./Texture/Texture_CarriageFloorSteelNormal.webp?v=car512",
+      orm: "./Texture/Texture_CarriageFloorSteelOrm.webp?v=car512" },
     { name: "CarriageCeilingSteel",
-      albedo: "./Texture/Texture_CarriageCeilingSteelBase.png?v=2",
-      normal: "./Texture/Texture_CarriageCeilingSteelNormal.png?v=2",
-      orm: "./Texture/Texture_CarriageCeilingSteelOrm.png?v=2" },
+      albedo: "./Texture/Texture_CarriageCeilingSteelBase.webp?v=car512",
+      normal: "./Texture/Texture_CarriageCeilingSteelNormal.webp?v=car512",
+      orm: "./Texture/Texture_CarriageCeilingSteelOrm.webp?v=car512" },
   ];
-  const PBR_LANES = 6;
+  /**
+   * 同时在路上的套数。
+   *
+   * **别再按「同域六条 HTTP/1.1 连接」来设这个数。** 线上是 GitHub Pages，走
+   * HTTP/2：一条连接上多路复用，六并发反而把每个请求的往返时延（实测到 Pages
+   * 约 1 s）串成一列 —— 28 套 / 6 就是至少五轮 RTT，而它们本来可以一起飞。
+   * 之所以还留一个上限而不是全放开：一次性铺开会让解码与 GPU 上传挤在同一瞬间，
+   * 而这一步之后紧接着就要建关卡。取 12（36 张图在路上），是"时延摊得开"与
+   * "解码不成堆"之间的折中；贴图总量从 39 MB 压到 12 MB 之后这个数已经不吃紧了。
+   */
+  const PBR_LANES = 12;
 
   setStep("加载 PBR 材质……", 0.242);
   const pbrQueue = PBR_SETS.slice();
