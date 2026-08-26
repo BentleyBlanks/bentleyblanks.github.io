@@ -21,6 +21,13 @@ import {
 } from "./Script_OperationFlow.mjs";
 import { CreateAudioSystem } from "./Script_Audio.mjs";
 import { GetTacticalReadout, NormalizeVisualSettings } from "./Data_Ui.mjs";
+import {
+  FormatShortcut,
+  GetShortcutDefinition,
+  IsSupportedShortcutCode,
+  NormalizeShortcuts,
+  shortcutDefinitions,
+} from "./Data_Shortcuts.mjs";
 import { UpdateEnemySquad } from "./Script_Ai.mjs";
 import {
   ApplyBuddyRescue,
@@ -102,12 +109,15 @@ const elements = {
   soundButton: GetElement("soundButton"),
   settingsButton: GetElement("settingsButton"),
   settingsModal: GetElement("settingsModal"),
+  pauseShortcut: GetElement("pauseShortcut"),
   qualitySelect: GetElement("qualitySelect"),
   uiScaleSelect: GetElement("uiScaleSelect"),
   screenEffectsToggle: GetElement("screenEffectsToggle"),
   reducedMotionToggle: GetElement("reducedMotionToggle"),
   saveSettingsButton: GetElement("saveSettingsButton"),
   settingsStatus: GetElement("settingsStatus"),
+  shortcutList: GetElement("shortcutList"),
+  resetShortcutsButton: GetElement("resetShortcutsButton"),
   tacticalReadout: GetElement("tacticalReadout"),
   concealmentGlyph: GetElement("concealmentGlyph"),
   concealmentLabel: GetElement("concealmentLabel"),
@@ -235,6 +245,7 @@ campState.civilianCostLedger ??= { harm: 0, risk: 0, displacement: 0 };
 campState.civilianCostLedger.displacement ??= 0;
 let state = PrepareMissionFromCamp(CreateInitialMissionState(), campState);
 let world = null;
+let capturingShortcutId = null;
 let screenMode = "loading";
 let lastFrameTime = performance.now();
 let simulationAccumulator = 0;
@@ -456,6 +467,8 @@ function PopulateSettingsPanel() {
   elements.uiScaleSelect.value = settings.uiScale;
   elements.screenEffectsToggle.checked = settings.screenEffects;
   elements.reducedMotionToggle.checked = settings.reducedMotion;
+  capturingShortcutId = null;
+  RenderShortcutList();
   elements.settingsStatus.textContent = `当前渲染：${rendererQuality ?? DetectQuality()}；设置保存在本机。`;
 }
 
@@ -472,6 +485,85 @@ function SaveVisualSettingsFromPanel() {
       ? "设置已应用。"
       : "界面设置已应用；渲染质量会在下次载入战术图时生效。";
   RequestInteractiveRender();
+}
+
+function RenderShortcutList() {
+  if (!elements.shortcutList) return;
+  elements.shortcutList.innerHTML = shortcutDefinitions
+    .map((definition) => {
+      const isCapturing = capturingShortcutId === definition.id;
+      const binding = FormatShortcut(settings.shortcuts[definition.id]);
+      const buttonText = isCapturing ? "请按新按键…" : binding;
+      return `<div class="shortcutRow${isCapturing ? " isCapturing" : ""}"><div><strong>${definition.label}</strong><small>${definition.description}</small></div><button class="shortcutBindButton" type="button" data-shortcut-id="${definition.id}" aria-label="${definition.label}，当前按键 ${binding}">${buttonText}</button></div>`;
+    })
+    .join("");
+  elements.shortcutList.querySelectorAll("[data-shortcut-id]").forEach((button) => {
+    button.addEventListener("click", () => StartShortcutCapture(button.dataset.shortcutId));
+  });
+}
+
+function SetShortcutStatus(message) {
+  elements.settingsStatus.textContent = message;
+}
+
+function StartShortcutCapture(shortcutId) {
+  if (!GetShortcutDefinition(shortcutId)) return;
+  capturingShortcutId = shortcutId;
+  RenderShortcutList();
+  elements.shortcutList.querySelector(`[data-shortcut-id="${shortcutId}"]`)?.focus();
+  SetShortcutStatus("正在记录按键；按 Esc 取消本次修改。");
+}
+
+function StopShortcutCapture() {
+  if (!capturingShortcutId) return false;
+  capturingShortcutId = null;
+  RenderShortcutList();
+  return true;
+}
+
+function CaptureShortcut(event) {
+  if (!capturingShortcutId) return false;
+  event.preventDefault();
+  if (event.code === "Escape") {
+    StopShortcutCapture();
+    SetShortcutStatus("已取消本次快捷键修改。");
+    return true;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey || !IsSupportedShortcutCode(event.code)) {
+    SetShortcutStatus("请使用单个字母、数字、功能键或方向键；不能使用系统组合键。");
+    return true;
+  }
+  const target = capturingShortcutId;
+  const conflict = shortcutDefinitions.find(
+    (definition) => definition.id !== target && settings.shortcuts[definition.id] === event.code,
+  );
+  if (conflict) {
+    SetShortcutStatus(`“${FormatShortcut(event.code)}”已用于“${conflict.label}”，请换一个按键。`);
+    return true;
+  }
+  settings.shortcuts[target] = event.code;
+  settings.shortcuts = NormalizeShortcuts(settings.shortcuts);
+  const definition = GetShortcutDefinition(target);
+  StopShortcutCapture();
+  SaveSettings();
+  SetShortcutStatus(`“${definition.label}”已设为 ${FormatShortcut(event.code)}，并已保存到本机。`);
+  RenderHud();
+  RequestInteractiveRender();
+  return true;
+}
+
+function ResetShortcuts() {
+  capturingShortcutId = null;
+  settings.shortcuts = NormalizeShortcuts({});
+  SaveSettings();
+  RenderShortcutList();
+  SetShortcutStatus("操作快捷键已恢复默认，并已保存到本机。");
+  RenderHud();
+}
+
+function GetShortcutAction(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  return shortcutDefinitions.find((definition) => settings.shortcuts[definition.id] === event.code) ?? null;
 }
 
 function GetSelectedUnit() {
@@ -2543,7 +2635,8 @@ function RenderActionBar() {
       const cooldown = Math.ceil(unit.cooldowns[ability.id] ?? 0);
       const charges = ability.charges ? unit.charges[ability.id] ?? 0 : null;
       const status = cooldown > 0 ? `${cooldown} 秒` : charges !== null ? `剩余 ${charges}` : ability.description;
-      return `<button class="abilityButton${activeAbility === ability.id ? " isActive" : ""}" type="button" data-ability-id="${ability.id}" ${cooldown > 0 || (charges !== null && charges <= 0) ? "disabled" : ""}><span>${ability.name}</span><small>${status}</small><b class="abilityKey">${ability.shortcut}</b></button>`;
+      const shortcutId = definition.abilities.indexOf(ability) === 0 ? "primaryAbility" : "secondaryAbility";
+      return `<button class="abilityButton${activeAbility === ability.id ? " isActive" : ""}" type="button" data-ability-id="${ability.id}" ${cooldown > 0 || (charges !== null && charges <= 0) ? "disabled" : ""}><span>${ability.name}</span><small>${status}</small><b class="abilityKey">${FormatShortcut(settings.shortcuts[shortcutId])}</b></button>`;
     })
     .join("");
   document.querySelectorAll("[data-stance]").forEach((button) => {
@@ -2559,7 +2652,7 @@ function RenderActionBar() {
     elements.worldPrompt.textContent =
       percentage > 0
         ? `${nearby.name} · ${percentage}%`
-        : `F 互动｜${nearby.name}｜约 ${nearby.duration} 秒`;
+        : `${FormatShortcut(settings.shortcuts.interact)} 互动｜${nearby.name}｜约 ${nearby.duration} 秒`;
     elements.worldPrompt.classList.remove("isHidden");
   } else {
     elements.worldPrompt.classList.add("isHidden");
@@ -2589,6 +2682,7 @@ function RenderStatus() {
   elements.pauseButton.setAttribute("aria-pressed", String(state.paused));
   elements.pauseGlyph.textContent = state.paused ? "▶" : "Ⅱ";
   elements.pauseLabel.textContent = state.paused ? "执行计划" : "暂停规划";
+  elements.pauseShortcut.textContent = FormatShortcut(settings.shortcuts.togglePause);
   elements.planningBanner.classList.toggle("isHidden", !state.paused);
   const tacticalReadout = GetTacticalReadout(
     state,
@@ -2703,6 +2797,7 @@ function OpenModal(modal) {
 
 function CloseModal(modal) {
   if (!modal || modal.classList.contains("isHidden")) return;
+  if (modal === elements.settingsModal) capturingShortcutId = null;
   modal.classList.add("isHidden");
   if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
   modalReturnFocus = null;
@@ -2910,6 +3005,7 @@ function HandleWheel(event) {
 
 function HandleKeyDown(event) {
   RequestInteractiveRender();
+  if (CaptureShortcut(event)) return;
   const openModal = GetOpenModal();
   if (openModal) {
     if (event.key === "Escape") {
@@ -2934,27 +3030,32 @@ function HandleKeyDown(event) {
     return;
   }
   if (screenMode !== "mission") return;
-  if (event.code === "Space") {
+  const action = GetShortcutAction(event);
+  if (action?.id === "togglePause") {
     event.preventDefault();
     TogglePause();
-  } else if (/^F[1-4]$/.test(event.key)) {
+  } else if (action?.id?.startsWith("selectUnit")) {
     event.preventDefault();
-    const index = Number(event.key.slice(1)) - 1;
+    const index = Number(action.id.slice(-1)) - 1;
     const unit = state.units[index];
     if (unit) SetSelectedUnits(event.shiftKey ? [...state.selectedUnitIds, unit.id] : [unit.id], event.detail > 1);
-  } else if (event.key === "Tab") {
+  } else if (action?.id === "cycleUnit") {
     event.preventDefault();
     const currentIndex = state.units.findIndex((unit) => unit.id === GetSelectedUnit().id);
     const direction = event.shiftKey ? -1 : 1;
     const nextIndex = (currentIndex + direction + state.units.length) % state.units.length;
     SetSelectedUnits([state.units[nextIndex].id]);
-  } else if (event.key === "1" || event.key === "2") {
+  } else if (action?.id === "primaryAbility" || action?.id === "secondaryAbility") {
+    event.preventDefault();
     const unit = GetSelectedUnit();
-    const ability = GetCharacterDefinition(unit.id)?.abilities[Number(event.key) - 1];
+    const abilityIndex = action.id === "primaryAbility" ? 0 : 1;
+    const ability = GetCharacterDefinition(unit.id)?.abilities[abilityIndex];
     if (ability) UseAbility(ability.id, event.shiftKey);
-  } else if (event.key.toLowerCase() === "f" && view.currentInteractionId) {
+  } else if (action?.id === "interact" && view.currentInteractionId) {
+    event.preventDefault();
     QueueInteraction(view.currentInteractionId, event.shiftKey);
-  } else if (event.key === "Enter" && state.paused) {
+  } else if (action?.id === "executePlan" && state.paused) {
+    event.preventDefault();
     TogglePause(false);
   }
 }
@@ -2970,6 +3071,7 @@ function BindEvents() {
     OpenModal(elements.settingsModal);
   });
   elements.saveSettingsButton.addEventListener("click", SaveVisualSettingsFromPanel);
+  elements.resetShortcutsButton.addEventListener("click", ResetShortcuts);
   elements.soundButton.addEventListener("click", () => {
     settings.muted = !settings.muted;
     audio.SetMuted(settings.muted);

@@ -2505,7 +2505,7 @@ html[data-ui-scale="large"] .abilityButton small {
 }
 
 .settingsModal {
-  width: min(620px, calc(100vw - 28px));
+  width: min(700px, calc(100vw - 28px));
 }
 
 .settingsModal h2 {
@@ -2559,6 +2559,112 @@ html[data-ui-scale="large"] .abilityButton small {
 
 .settingsModal footer > small {
   color: #6f6759;
+}
+
+.shortcutSection {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(93, 85, 68, 0.24);
+}
+
+.settingsSectionHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settingsSectionHeading .eyebrow {
+  margin: 0 0 5px;
+  color: #806c49;
+  font-size: 9px;
+  letter-spacing: 0.13em;
+}
+
+.settingsSectionHeading h3 {
+  margin: 0;
+  color: #322e27;
+  font: 700 19px/1.15 "STSong", serif;
+}
+
+.textButton {
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #4f7062;
+  cursor: pointer;
+  font: 700 11px/1.2 inherit;
+}
+
+.textButton:hover,
+.textButton:focus-visible {
+  color: #283e35;
+  text-decoration: underline;
+}
+
+.shortcutIntro {
+  margin: 9px 0 11px;
+  color: #776f61;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.shortcutList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid rgba(93, 85, 68, 0.32);
+  background: rgba(73, 62, 44, 0.12);
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 62px;
+  padding: 10px 12px;
+  background: rgba(255, 250, 235, 0.38);
+}
+
+.shortcutRow strong,
+.shortcutRow small {
+  display: block;
+}
+
+.shortcutRow strong {
+  color: #322e27;
+  font-size: 11px;
+}
+
+.shortcutRow small {
+  margin-top: 4px;
+  color: #776f61;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.shortcutBindButton {
+  flex: 0 0 auto;
+  min-width: 60px;
+  padding: 7px 9px;
+  border: 1px solid rgba(64, 57, 46, 0.42);
+  background: rgba(244, 237, 215, 0.9);
+  color: #28251f;
+  cursor: pointer;
+  font: 700 10px/1.1 ui-monospace, "Cascadia Mono", monospace;
+}
+
+.shortcutBindButton:hover,
+.shortcutBindButton:focus-visible,
+.shortcutRow.isCapturing .shortcutBindButton {
+  border-color: #537567;
+  background: #dae3d7;
+  outline: none;
+}
+
+.shortcutRow.isCapturing {
+  background: rgba(197, 218, 204, 0.72);
 }
 
 .gameHud.isEntering .panel,
@@ -2715,6 +2821,14 @@ html[data-reduced-motion="true"] .filmGrain {
 
   .settingsGrid select {
     min-width: 105px;
+  }
+
+  .shortcutList {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcutRow {
+    min-height: 58px;
   }
 
   .unitCard:hover,

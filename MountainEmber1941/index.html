@@ -129,11 +129,11 @@
         <div class="topActions">
           <button id="helpButton" class="iconButton" type="button" aria-label="打开操作说明">?</button>
           <button id="soundButton" class="iconButton" type="button" aria-label="切换声音" aria-pressed="false">声</button>
-          <button id="settingsButton" class="iconButton" type="button" aria-label="打开显示设置">设</button>
+          <button id="settingsButton" class="iconButton" type="button" aria-label="打开设置">设</button>
           <button id="pauseButton" class="pauseButton" type="button" aria-pressed="true">
             <span id="pauseGlyph" aria-hidden="true">▶</span>
             <span id="pauseLabel">执行计划</span>
-            <kbd>Space</kbd>
+            <kbd id="pauseShortcut">空格</kbd>
           </button>
         </div>
       </header>
@@ -243,9 +243,9 @@
 
     <section id="settingsModal" class="modalBackdrop isHidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <article class="paperModal settingsModal">
-        <button class="modalClose" type="button" data-close-modal aria-label="关闭显示设置">×</button>
+        <button class="modalClose" type="button" data-close-modal aria-label="关闭设置">×</button>
         <p class="eyebrow">DISPLAY & ACCESSIBILITY</p>
-        <h2 id="settingsTitle">显示与反馈设置</h2>
+        <h2 id="settingsTitle">显示、反馈与操作设置</h2>
         <div class="settingsGrid">
           <label>
             <span>渲染质量<small>更改后重新载入战术图</small></span>
@@ -273,6 +273,17 @@
             <input id="reducedMotionToggle" type="checkbox">
           </label>
         </div>
+        <section class="shortcutSection" aria-labelledby="shortcutTitle">
+          <div class="settingsSectionHeading">
+            <div>
+              <p class="eyebrow">OPERATION CONTROLS</p>
+              <h3 id="shortcutTitle">操作快捷键</h3>
+            </div>
+            <button id="resetShortcutsButton" class="textButton" type="button">恢复默认</button>
+          </div>
+          <p class="shortcutIntro">点击按键后，直接按下新的单键。重复按键会提示冲突；所有改动立即保存到本机。</p>
+          <div id="shortcutList" class="shortcutList" aria-live="polite"></div>
+        </section>
         <footer>
           <small id="settingsStatus">设置会保存在本机。</small>
           <button id="saveSettingsButton" class="primaryButton" type="button">应用设置</button>
@@ -345,6 +356,6 @@
   </main>
 
   <noscript>本游戏需要 JavaScript 与 WebGL。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=18"></script>
+  <script type="module" src="./Script_Game.mjs?v=19"></script>
 </body>
 </html>

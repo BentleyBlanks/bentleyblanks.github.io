@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { characterDefinitions, enemyRoleDefinitions } from "./Data_Characters.mjs";
 import { missionDefinition } from "./Data_Mission.mjs";
 import { GetTacticalReadout, NormalizeVisualSettings } from "./Data_Ui.mjs";
+import { FormatShortcut, NormalizeShortcuts, shortcutDefinitions } from "./Data_Shortcuts.mjs";
 import { MoveToward, UpdateEnemySquad } from "./Script_Ai.mjs";
 import {
   ApplyAbilityCommand,
@@ -73,6 +74,12 @@ function TestUiPresentationContract() {
   assert.equal(normalized.uiScale, "normal", "Invalid UI scales must not break layout.");
   assert.equal(normalized.screenEffects, false, "Combat screen feedback must remain user-controllable.");
   assert.equal(normalized.reducedMotion, true, "OS reduced-motion preference must seed accessibility settings.");
+  assert.equal(normalized.shortcuts.togglePause, "Space", "Default operation shortcuts must be present in saved settings.");
+  assert.equal(shortcutDefinitions.length, 10, "The controls panel must expose every supported keyboard operation.");
+  assert.equal(FormatShortcut("KeyF"), "F", "Keyboard labels must be presented without browser code prefixes.");
+  const repairedShortcuts = NormalizeShortcuts({ togglePause: "KeyF", interact: "KeyF" });
+  assert.equal(repairedShortcuts.togglePause, "Space", "Conflicting saved shortcut data must safely return to defaults.");
+  assert.equal(repairedShortcuts.interact, "KeyF", "Default bindings must remain intact after corrupt shortcut data is repaired.");
 
   const selectedUnit = { hidden: true, inLight: false, stance: "crouch" };
   const tacticalState = {

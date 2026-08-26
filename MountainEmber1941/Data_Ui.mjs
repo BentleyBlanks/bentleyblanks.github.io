@@ -1,3 +1,5 @@
+import { NormalizeShortcuts } from "./Data_Shortcuts.mjs";
+
 export const visualSettingDefaults = Object.freeze({
   muted: false,
   tutorialClosed: false,
@@ -22,6 +24,7 @@ export function NormalizeVisualSettings(candidate = {}, prefersReducedMotion = f
     quality,
     uiScale,
     screenEffects: candidate.screenEffects !== false,
+    shortcuts: NormalizeShortcuts(candidate.shortcuts),
     reducedMotion: candidate.reducedMotion === undefined
       ? Boolean(prefersReducedMotion)
       : Boolean(candidate.reducedMotion),
