@@ -248,16 +248,23 @@ function AddBrickRow(sink, {
       sink.Add("Stone", PlaceGeometry(
         MakeBox(openW + 0.7, 0.15, 0.72, TILE_METERS.stone, `${seed}:ds${k}`),
         { x: sp.x, y: 0.075, z: sp.z, ry }));
+      // 门楣以上那块砖的碰撞（底面高过 1.6 m 净空线，门口照旧走得通）
+      const dupH = Math.max(0.2, eaveY - doorH - 0.2);
+      sink.Solid(p.x, doorH + 0.2 + dupH / 2, p.z, openW / 2, dupH / 2, thickness / 2, "wall", ry);
       continue;
     }
-    // 窗：窗下墙 + 窗上过梁带 + 洞里的暗 + 木过梁 + 窗台石
+    // 窗：窗下墙 + 窗上过梁带 + 洞里的暗 + 木过梁 + 窗台石。
+    // 这两条砖带过去一只碰撞盒都没有（碰撞全在砖墩上），于是每一开间
+    // 从地坪到檐口整整一格是空的 —— 人从排屋外墙直接走进去。窗洞照旧留空。
     sink.Add(brick, PlaceGeometry(
       MakeBox(openW, sillY, thickness, TILE_METERS.brick, `${seed}:sb${k}`, BRICK_UV_GRID),
       { x: p.x, y: sillY / 2, z: p.z, ry }));
+    sink.Solid(p.x, sillY / 2, p.z, openW / 2, sillY / 2, thickness / 2, "wall", ry);
     const upH = Math.max(0.2, eaveY - headY - 0.16);
     sink.Add(brick, PlaceGeometry(
       MakeBox(openW, upH, thickness, TILE_METERS.brick, `${seed}:hb${k}`, BRICK_UV_GRID),
       { x: p.x, y: headY + 0.16 + upH / 2, z: p.z, ry }));
+    sink.Solid(p.x, headY + 0.16 + upH / 2, p.z, openW / 2, upH / 2, thickness / 2, "wall", ry);
     // 暗盒退到墙内侧：摆在墙心会把 0.10 的窗棂整个吞掉（批次A 教室窗的教训）
     const wback = L(lx, depth / 2 - 0.17);
     sink.Add("Charred", PlaceGeometry(
@@ -769,15 +776,21 @@ function AddAuctionHall(host, {
         sink.Add("Stone", PlaceGeometry(
           MakeBox(openW + 0.9, 0.16, 0.84, TILE_METERS.stone, `${seed}:ds`),
           { x: sp.x, y: 0.08, z: sp.z, ry }));
+        sink.Solid(p.x, doorH + 0.22 + (eaveY - doorH - 0.22) / 2, p.z,
+          openW / 2, (eaveY - doorH - 0.22) / 2, thickness / 2, "wall", ry);
         continue;
       }
-      // 连续高窗
+      // 连续高窗。窗台以下 2.45 m 是实砖，过去却没有碰撞盒（碰撞全在砖墩上），
+      // 于是人从拍卖堂外墙直接走进去；窗带那一段才是真洞。
       sink.Add(brick, PlaceGeometry(
         MakeBox(openW, sillY, thickness, TILE_METERS.brick, `${seed}:sb${face}${k}`, BRICK_UV_GRID),
         { x: p.x, y: sillY / 2, z: p.z, ry }));
+      sink.Solid(p.x, sillY / 2, p.z, openW / 2, sillY / 2, thickness / 2, "wall", ry);
       sink.Add(brick, PlaceGeometry(
         MakeBox(openW, eaveY - headY, thickness, TILE_METERS.brick, `${seed}:hb${face}${k}`, BRICK_UV_GRID),
         { x: p.x, y: headY + (eaveY - headY) / 2, z: p.z, ry }));
+      sink.Solid(p.x, headY + (eaveY - headY) / 2, p.z,
+        openW / 2, (eaveY - headY) / 2, thickness / 2, "wall", ry);
       // 高窗**不塞暗盒**：机房/铺面的窗塞一片暗是为了挡住"一眼看穿封闭盒子"，
       // 而拍卖堂是走得进去的大空间，两侧同高的窗本来就该对穿。第一版照抄了暗盒，
       // 站在堂里抬头看是一排黑板子，那间屋子唯一的光源被自己糊死了（B3 自查抓到）。

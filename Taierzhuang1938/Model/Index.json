@@ -178,11 +178,11 @@
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",
-   "triangles": 5636,
+   "triangles": 5603,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 228972,
+   "bytes": 143568,
    "materials": [
     "steel",
     "wood"
@@ -197,13 +197,13 @@
    ],
    "bounds": {
     "min": [
-     -0.02037,
+     -0.02036,
      -0.1088,
      -0.855
     ],
     "max": [
-     0.03532,
-     0.06669,
+     0.03518,
+     0.06001,
      0.25633
     ]
    }

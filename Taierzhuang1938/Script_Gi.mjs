@@ -63,7 +63,7 @@
 //  - 图集瓦片必须留 1 像素边框并且**边框也要算**（按八面体的镜像规则取方向），
 //    否则硬件双线性在瓦片边缘会采到隔壁探针，法线一转就闪一条缝。
 //  - 探针体是跟着玩家滚动的裁剪图（clipmap）：存储下标用环形取模，
-//    只有真正滚进来的那一层才作废重算，否则走一步全场 980 个探针一起重来。
+//    只有真正滚进来的那一层才作废重算，否则走一步全体探针一起重来。
 //  - 探针落在墙体里就没有意义。CPU 侧拿同一张 AABB 表做重定位（往外挤），
 //    挤不出去的直接标记作废，取样时权重为 0 —— 这一条比任何 shader 技巧都管用。
 
@@ -78,18 +78,25 @@ const MAX_FIRES = 6;       // 与 LightRig.fireLights 对齐
  * 画质档。
  *
  * counts 是探针体的格数、spacing 是格距（米），两者相乘就是覆盖范围：
- * high 档 14×5×14 × 4 m = 56 × 20 × 56 m —— 一条街连两侧院子，够巷战用。
+ * high 档 14×8×14 × 4 m = 56 × 32 × 56 m —— 一条街连两侧院子，够巷战用。
  * 再大就得上第二级 cascade，本轮不做（远处仍然吃天空 IBL，会平滑过渡过去）。
  *
- * batch / rays 决定收敛速度与成本：high 档 980 个探针、每帧 12 个，
- * 全场扫一遍 82 帧（1.4 秒）。太阳不动的场景这个延迟看不出来；
+ * **竖着为什么要这么高**：体积按镜头吸附（Scroll 把原点放在眼睛下方 1.5 格），
+ * 竖直只有 5 层时顶面才到地面上 8 m —— 滕县城墙墙身 11.5 m 加女墙 1.6 m，
+ * 也就是说墙的上半截整个落在体积外，腰上横着一条 confidence 淡出带。
+ * 城墙是这座城里最大的一块竖直表面，腰上那条带就是玩家报的「GI 色差」。
+ * 竖直加层只多花收敛时间与两张小图集的显存：每帧仍然是 5 个 draw call、
+ * 取样端仍然是八个角，帧成本不随格数变。
+ *
+ * batch / rays 决定收敛速度与成本：high 档 14×8×14 个探针、每帧 12 个，
+ * 全场扫一遍约 130 帧（2.2 秒）。太阳不动的场景这个延迟看不出来；
  * 真正要紧的是**刚滚进来的探针**，它们插队优先算，几帧就补上。
  */
 export const GI_QUALITY = {
   low: null,
-  medium: { counts: [10, 4, 10], spacing: 5.0, rays: 32, batch: 8, irrTexels: 8, distTexels: 12 },
-  high: { counts: [14, 5, 14], spacing: 4.0, rays: 64, batch: 12, irrTexels: 8, distTexels: 16 },
-  ultra: { counts: [16, 6, 16], spacing: 3.5, rays: 96, batch: 16, irrTexels: 8, distTexels: 16 },
+  medium: { counts: [10, 7, 10], spacing: 5.0, rays: 32, batch: 8, irrTexels: 8, distTexels: 12 },
+  high: { counts: [14, 8, 14], spacing: 4.0, rays: 64, batch: 12, irrTexels: 8, distTexels: 16 },
+  ultra: { counts: [16, 9, 16], spacing: 3.5, rays: 96, batch: 16, irrTexels: 8, distTexels: 16 },
 };
 
 /** 代理体反照率：碰撞盒只有 tag，靠这张表染色。都是线性空间的值。 */
@@ -161,12 +168,19 @@ uniform float uGiDistTexels;
 uniform vec2 uGiIrrAtlas;
 uniform vec2 uGiDistAtlas;
 uniform float uGiIntensity;
+uniform float uGiGain;
 uniform float uGiNormalBias;
 uniform float uGiSpecularOcclusion;
 uniform float uGiEnabled;
 uniform float uGiDebugView;
 uniform float uGiChebOff;      // 取证实验开关：1 = 跳过切比雪夫项（只留三线性+背面）
 float gGiDbgWeightSum = 0.0;   // 取证输出：最近一次 GiSampleIrradiance 的权重和
+
+// 体积边缘的淡出带有多宽（单位：格）。以前是恒定的「一格线性」——
+// 4 m 的带落在掠射的地面上只有十来个像素，而且 confidence 在 0 与 1 两端都是折角，
+// 眼睛会把折角读成一条线（马赫带）。于是体内体外只要有一点亮度差，
+// 体积边界就是一条跟着玩家走的硬色差。加宽 + smoothstep 之后两端切线为零。
+const float GI_FADE_CELLS = 1.75;
 
 vec3 GiStorageCoord(vec3 grid) {
   return mod(grid + uGiBaseCell, uGiCounts);
@@ -193,7 +207,7 @@ vec3 GiSampleIrradiance(vec3 worldPos, vec3 worldNormal, vec3 worldView, out flo
   vec3 biased = worldPos + worldNormal * uGiNormalBias + worldView * (uGiNormalBias * 0.8);
   vec3 gridF = (biased - uGiOrigin) / uGiSpacing;
   vec3 inside = min(gridF, uGiCounts - 1.0 - gridF);
-  float edge = clamp(min(min(inside.x, inside.y), inside.z), 0.0, 1.0);
+  float edge = clamp(min(min(inside.x, inside.y), inside.z) / GI_FADE_CELLS, 0.0, 1.0);
   if (edge <= 0.0) return vec3(0.0);
 
   vec3 base = floor(gridF);
@@ -245,7 +259,7 @@ vec3 GiSampleIrradiance(vec3 worldPos, vec3 worldNormal, vec3 worldView, out flo
 
   gGiDbgWeightSum = weightSum;
   if (weightSum <= 1e-6) return vec3(0.0);
-  confidence = edge;
+  confidence = edge * edge * (3.0 - 2.0 * edge);
   // 图集里存的是余弦加权的**平均辐射亮度**；three 的 iblIrradiance 是 π×L 的量纲
   return (sum / weightSum) * 3.14159265359;
 }
@@ -523,6 +537,10 @@ export function MakeGiUniforms() {
     irrAtlas: { value: new THREE.Vector2(1, 1) },
     distAtlas: { value: new THREE.Vector2(1, 1) },
     intensity: { value: 1 },
+    // 「间接光强度」那根旋钮**单独**再存一份。intensity 里已经乘了它（探针一侧），
+    // 但体积外回退的天空 IBL 也必须乘同一份，否则调到 ×2 就是「体内两倍、体外一倍」，
+    // 体积边界上凭空多出一圈硬色差 —— 而且体积跟着玩家滚，那圈色差就跟着人走。
+    gain: { value: 1 },
     normalBias: { value: 0.4 },
     specularOcclusion: { value: 0.7 },
     enabled: { value: 0 },
@@ -557,6 +575,7 @@ export function BindGiUniforms(target, gi) {
   target.uGiIrrAtlas = gi.irrAtlas;
   target.uGiDistAtlas = gi.distAtlas;
   target.uGiIntensity = gi.intensity;
+  target.uGiGain = gi.gain;
   target.uGiNormalBias = gi.normalBias;
   target.uGiSpecularOcclusion = gi.specularOcclusion;
   target.uGiEnabled = gi.enabled;
@@ -667,6 +686,9 @@ export class ProbeVolume {
    */
   ApplyPreset(preset, gain = 1) {
     this.uniforms.intensity.value = (preset && preset.envIntensity ? preset.envIntensity : 1) * gain;
+    // 玩家那根「间接光强度」要单独留一份给取样端：体积外的天空 IBL 回退乘同一份，
+    // 两边同倍才不会在体积边界上留下一条色差（见 MakeGiUniforms 的 gain）。
+    this.uniforms.gain.value = gain;
   }
 
   MakeAtlas(size) {

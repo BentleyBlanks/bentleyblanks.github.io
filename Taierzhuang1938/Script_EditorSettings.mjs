@@ -143,7 +143,9 @@ export class GraphicsSettings {
     });
     Note(giBox, "默认使用下载的通用 Global SH Probe + 冷灰蓝 AmbientColor：没有实时 GI pass，"
       + "但仍保留有方向的室外补光。打开后才启用半实时辐照度探针；它一帧重算十几个探针，"
-      + "走一步或换时段要一两秒收敛。low 画质档不建探针体，这一栏对它无效。", true);
+      + "走一步或换时段要一两秒收敛。low 画质档不建探针体，这一栏对它无效。"
+      + "「间接光强度」是整份间接漫反射的倍率：探针体内与体积外回退的天空 IBL 一起乘，"
+      + "所以调大只是整体变亮，不会在体积边界上留下一圈跟着人走的色差。", true);
 
     const post = Section(body, "后处理强度（倍率）");
     const godBox = document.createElement("div");

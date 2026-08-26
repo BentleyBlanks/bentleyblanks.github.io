@@ -89,6 +89,12 @@ SOURCES = {
         "colorSplit": True,
         "skip": ("bolt_action_rifle_7_62_scope", "bolt_action_rifle_7_62_wrap",
                  "bolt_action_rifle_7_62_bullet_54mm"),
+        # 这份 CC0 来源已经有完整的毛瑟系机匣、抱箍与通条；再把程序化补件嵌进去
+        # 会把减面预算挤到枪身上，导致木托/机匣变成肉眼可见的碎三角。
+        "noDetails": True,
+        # 原资产的法线贴图不随共享 PBR 带入；减面后必须重建连续的几何法线，
+        # 否则机匣和木托会按三角形一块块断光。
+        "smoothAll": True,
         # 照门挂点 = 第一人称的瞄准线（见 _Mounts）。这一支换过模型源，数是照新几何量的：
         # 等开镜姿态收敛后，瞄准点上半窗 0.055→149、0.060→820、0.066→115、0.072→0。
         # （不是单调的：不同高度切到的是机匣桥、照门座、枪机三样不同的东西。）
@@ -782,6 +788,14 @@ def _AutoSmooth(bms, limit_deg):
             face.smooth = not sharp
 
 
+def _SmoothAll(bms):
+    """Give a PBR-rebound import one continuous normal field per material."""
+    for bm in bms:
+        for face in bm.faces:
+            face.smooth = True
+        bm.normal_update()
+
+
 def _BevelForFirstPerson(bms):
     """Give hard-surface imports a real highlight roll instead of razor edges."""
     for bm in bms:
@@ -1013,6 +1027,8 @@ def BuildImported(name):
     if spec.get("autoSmooth"):
         # 放在减面之后：减面会重排拓扑，先标好的 smooth 标志会被揉乱。
         _AutoSmooth(bms, spec["autoSmooth"])
+    elif spec.get("smoothAll"):
+        _SmoothAll(bms)
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")

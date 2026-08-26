@@ -180,6 +180,63 @@ export function AddWall(sink, material, {
 }
 
 /**
+ * 一面**开了洞的墙**的碰撞：砖砌到哪儿，碰撞就登记到哪儿。
+ *
+ * 为什么要有这一层：门窗洞在本作里是**真的不砌那一段**（墙由若干条水平带叠成，
+ * 洞那一条是空的），而碰撞长期只登记「整开间通高一只盒」。两者对不上就是两种病：
+ *
+ *   · 窗洞被堵死 —— 看得见的是个洞，手榴弹却弹回来、子弹打在空气上。
+ *     玩家实测：车站的窗扔不进手榴弹。全城几百扇格子窗都是这样。
+ *   · 门楣以上穿得过去 —— 门洞按通高掏碰撞，门头上那块砖就成了「有渲染无碰撞」。
+ *     （同一个错在门洞下半截犯过一次，见 AddRoomBlock 里 WP-D1 那条注。）
+ *
+ * 洞口按**沿墙方向的局部偏移 c**（与 AddWall 的 length 同一个轴）与 y 区间给。
+ * 本函数先按所有洞的上下沿把墙横切成若干条带，再在每条带里按当前这一层
+ * 活着的洞纵切成实心段 —— 于是「窗台以下」「窗楣以上」「门垛之间」自动都对。
+ *
+ * 导航不受影响：NavGrid.Refresh 与 AiDirector.Blocked 都会跳过**底面高过脚下
+ * 1.6 m** 的盒子，所以门楣、窗楣那几条带登记了也不会把门口刷成死路。
+ *
+ * @param {object} spec x,z,ry 墙心与朝向；length 沿墙长；y0/y1 墙底墙顶；
+ *   thickness 墙厚；openings [{ c, w, y0, y1 }]；tag 碰撞标签
+ */
+export function SolidWithOpenings(sink, {
+  x, z, ry = 0, length, y0, y1, thickness, tag = "wall", openings = [],
+}) {
+  if (y1 - y0 < 0.02 || length < 0.06) return;
+  const cuts = new Set([y0, y1]);
+  for (const o of openings) {
+    if (o.y1 <= y0 || o.y0 >= y1) continue;
+    cuts.add(Clamp(o.y0, y0, y1));
+    cuts.add(Clamp(o.y1, y0, y1));
+  }
+  const levels = [...cuts].sort((a, b) => a - b);
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  for (let i = 0; i < levels.length - 1; i += 1) {
+    const a = levels[i], b = levels[i + 1];
+    if (b - a < 0.02) continue;
+    const mid = (a + b) / 2;
+    const holes = openings
+      .filter((o) => o.y0 < mid && o.y1 > mid)
+      .map((o) => [o.c - o.w / 2, o.c + o.w / 2])
+      .sort((p, q) => p[0] - q[0]);
+    let cursor = -length / 2;
+    const runs = [];
+    for (const [p, q] of holes) {
+      if (p > cursor) runs.push([cursor, Math.min(p, length / 2)]);
+      cursor = Math.max(cursor, q);
+    }
+    if (cursor < length / 2) runs.push([cursor, length / 2]);
+    for (const [p, q] of runs) {
+      if (q - p < 0.06) continue;                    // 洞挤到墙角：那一小段不登记
+      const off = (p + q) / 2;
+      sink.Solid(x + cos * off, mid, z - sin * off,
+        (q - p) / 2, (b - a) / 2, thickness / 2, tag, ry);
+    }
+  }
+}
+
+/**
  * 硬山屋顶：两坡瓦面 + 正脊 + 出檐 + 两端高出屋面的山墙。
  * 坡度 26°—29°，出檐 0.45 m —— 檐口那一圈阴影是"中式房子"最强的识别特征。
  */
@@ -437,9 +494,15 @@ export function AddRoomBlock(sink, spec) {
         //  「有渲染无碰撞」砖墙堵住，WP-D1 取证后删除。真正的门楣上墙是下面这块。）
         // 上半段墙要垫高
         if (damage < 0.5) {
+          const upH = eaveY - doorH - 0.18;
           sink.Add(wallMat, PlaceGeometry(
-            MakeBox(1.25, eaveY - doorH - 0.18, 0.36, TILE_METERS.brick, `${seed}:up${b}`),
-            { x: bx, y: doorH + 0.18 + (eaveY - doorH - 0.18) / 2, z: bz, ry: ry + f.rot }));
+            MakeBox(1.25, upH, 0.36, TILE_METERS.brick, `${seed}:up${b}`),
+            { x: bx, y: doorH + 0.18 + upH / 2, z: bz, ry: ry + f.rot }));
+          // 门楣上这块砖也要有碰撞，否则子弹与手榴弹从门头上穿墙而过。
+          // 底面在 2.18 m，高过导航与 AI 的 1.6 m 净空线，门口照旧走得通。
+          if (upH > 0.1) {
+            sink.Solid(bx, doorH + 0.18 + upH / 2, bz, 0.7, upH / 2, 0.25, "wall", ry + f.rot);
+          }
         }
         // 同门楼：给屋门也做出进深。f.lz 是这面墙在房子局部坐标里的位置，
         // lz<0 那一面的"里"在反方向，所以要多转 180°，不然门槛与墁地会跑到街上去
@@ -484,7 +547,16 @@ export function AddRoomBlock(sink, spec) {
           sink.Add("WoodDoor", PlaceGeometry(MergeGeometries(frame),
             { x: bx, y: sillY, z: bz, ry: ry + f.rot }));
         }
-        sink.Solid(bx, eaveY / 2, bz, 0.6, eaveY / 2, 0.25, "wall");
+        // 碰撞只登记**砌了砖的那两条带**：槛墙（0—窗台）与窗楣以上。
+        // 旧版在这里登记一只通高盒，于是全城每一扇格子窗都是「看得见的洞 +
+        // 摸得着的墙」：手榴弹弹回来、子弹打在空气上（玩家在车站实测到）。
+        // ry 也补上了 —— 原来漏传，转了 90° 的房子那只盒子连朝向都是错的。
+        const rot2 = ry + f.rot;
+        sink.Solid(bx, sillY / 2, bz, 0.6, sillY / 2, 0.25, "wall", rot2);
+        const headY = sillY + winH;
+        if (eaveY - headY > 0.1) {
+          sink.Solid(bx, (headY + eaveY) / 2, bz, 0.6, (eaveY - headY) / 2, 0.25, "wall", rot2);
+        }
       }
     }
   }

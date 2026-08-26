@@ -33,7 +33,7 @@
 import * as THREE from "three";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { AddPoplar, AddCypress } from "./Script_World.mjs";
+import { AddPoplar, AddCypress, SolidWithOpenings } from "./Script_World.mjs";
 import {
   AddRoadWear, AddYardWear, AddVillageLife, AddStalkStack, AddWattleFence,
 } from "./Script_LivedInProps.mjs";
@@ -850,6 +850,10 @@ function NorthTemple(host, t, ctx) {
         `${seed}:hthr`, { x: sillp.x, y: floorY + 0.11, z: sillp.z, ry });
       Put(sink, "HouseBrick", [bayW - 0.4, hEave - openH, 0.38], TILE_METERS.brick,
         `${seed}:hover`, { x: p.x, y: floorY + openH + (hEave - openH) / 2, z: p.z, ry });
+      // 门楣上这块砖也登记碰撞：底面 2.30 m 高过导航/AI 的 1.6 m 净空线，
+      // 门照旧走得进去，但子弹与手榴弹不再从门头上穿墙而过。
+      sink.Solid(p.x, floorY + openH + (hEave - openH) / 2, p.z,
+        (bayW - 0.4) / 2, (hEave - openH) / 2, 0.19, "wall", ry);
     } else {
       const sillH = 1.0;
       Put(sink, "HouseBrick", [bayW - 0.42, sillH, 0.38], TILE_METERS.brick,
@@ -871,7 +875,12 @@ function NorthTemple(host, t, ctx) {
         { x: p.x, y: floorY + sillH + winH / 2, z: p.z, ry }));
       Put(sink, "HouseBrick", [bayW - 0.42, 0.5, 0.38], TILE_METERS.brick,
         `${seed}:hhd${b}`, { x: p.x, y: floorY + hEave - 0.25, z: p.z, ry });
-      sink.Solid(p.x, floorY + hEave / 2, p.z, (bayW - 0.42) / 2, hEave / 2, 0.19, "wall", ry);
+      // 碰撞只登记砌了砖的槛墙与窗楣带；中间那一格是真洞（只插着几根直棂），
+      // 手榴弹要能从窗口扔进殿里去 —— 旧版整开间通高一只盒，弹回来。
+      SolidWithOpenings(sink, {
+        x: p.x, z: p.z, ry, length: bayW - 0.42, y0: floorY, y1: floorY + hEave, thickness: 0.38,
+        openings: [{ c: 0, w: bayW - 0.42, y0: floorY + sillH, y1: floorY + sillH + winH }],
+      });
     }
   }
   // 屋面：小青瓦两坡 + 平直正脊（村庙没有鸱吻脊兽）

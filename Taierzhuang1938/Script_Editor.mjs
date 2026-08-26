@@ -35,6 +35,7 @@ import { TerrainEditor } from "./Script_EditorTerrain.mjs";
 import { SamplePointEditor } from "./Script_EditorSamplePoints.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
+import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -53,7 +54,8 @@ const EDITORS = [
 ];
 const ALL = [...SETTINGS, ...EDITORS];
 // 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
-const OVERLAYS = [DebugRenderingEditor];
+// 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor];
 
 export class EditorSuite {
   /**
@@ -106,7 +108,7 @@ export class EditorSuite {
     return {
       renderer: host.renderer, scene: host.scene, camera: host.camera, canvas: host.canvas,
       library: host.library, lights: host.lights, post: host.post, vfx: host.vfx,
-      gi: host.game.gi,
+      gi: host.game.gi, profiler: host.profiler,
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,
@@ -125,6 +127,9 @@ export class EditorSuite {
       },
       Close: () => suite.Close(),
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
+      CloseProfiler: () => suite.CloseOverlay(ProfilerEditor.id),
+      // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
+      get launcherOpen() { return suite.panelOpen; },
     };
   }
 
@@ -345,8 +350,13 @@ export class EditorSuite {
     this.SetHint("");
     this.SetCrosshair(false);
     // 只有「完全关闭」才收叠加窗。编辑器之间的切换要保留 Debug Rendering。
+    // keepOnClose 的叠加层（性能剖析）连完全关闭也不收：它量的就是战斗中的帧，
+    // 「关面板回去打」正是它的主用例；要停就在面板里再点一次，或直接关它的窗口。
     if (!switching) {
-      for (const id of [...this.overlays.keys()]) this.CloseOverlay(id);
+      for (const id of [...this.overlays.keys()]) {
+        const Editor = OVERLAYS.find((entry) => entry.id === id);
+        if (!Editor || !Editor.keepOnClose) this.CloseOverlay(id);
+      }
     }
     this.RefreshStatus();
     if (!switching) this.host.game.FinishEditorSession?.();

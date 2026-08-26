@@ -399,6 +399,18 @@ vec3 AcesFitted(vec3 x) {
   return clamp(OUT * (a / b), 0.0, 1.0);
 }
 
+vec3 LinearToSrgb(vec3 color) {
+  return mix(color * 12.92,
+             1.055 * pow(max(color, vec3(1e-5)), vec3(1.0 / 2.4)) - 0.055,
+             step(0.0031308, color));
+}
+
+vec3 SrgbToLinear(vec3 color) {
+  return mix(color / 12.92,
+             pow((max(color, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)),
+             step(0.04045, color));
+}
+
 vec3 ViewPos(vec2 uv, float depth) {
   vec2 ndc = uv * 2.0 - 1.0;
   return vec3(ndc.x / uProjScale.x, ndc.y / uProjScale.y, -1.0) * depth;
@@ -502,7 +514,14 @@ void main() {
     color *= mix(vec3(1.0), uHighlightTint, hw * uSplitHighlight);
     color = clamp(color, 0.0, 1.0);
   }
-  color = clamp((color - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  // 对比度是感知域操作。旧版直接在线性域围绕 0.5 拉伸：contrast=1.07
+  // 会先减掉 0.035 线性亮度，所有低于它的阴影被硬裁到 0。深色枪械、军装、
+  // 屋檐下表面因此即使 BaseColor / GI / AO 都有信息，最终仍变成纯黑剪影。
+  // 转到 sRGB 后再围绕 0.5 调对比，等价黑位只到约 0.0026 线性亮度；暗部层次
+  // 保留下来，亮部和中间调仍维持原来的感知对比意图。
+  vec3 perceptual = LinearToSrgb(color);
+  perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  color = SrgbToLinear(perceptual);
   float l = Luma(color);
   color = mix(vec3(l), color, uSaturation);
 
@@ -533,9 +552,7 @@ void main() {
 
   // 线性 -> sRGB（自己转：这一 pass 没有 include colorspace_fragment，
   // 交给 renderer.outputColorSpace 会一次都不转，画面直接洗白）
-  vec3 srgb = mix(color * 12.92,
-                  1.055 * pow(max(color, vec3(1e-5)), vec3(1.0 / 2.4)) - 0.055,
-                  step(0.0031308, color));
+  vec3 srgb = LinearToSrgb(color);
   gl_FragColor = vec4(srgb, 1.0);
 }
 `;
@@ -771,6 +788,9 @@ export class PostPipeline {
     this.prevViewProjection = new THREE.Matrix4();
     this.sunWorld = new THREE.Vector3();
     this.hasPrev = false;
+    // 性能剖析器（Script_Profiler）。开着时 Render 在每个 pass 两侧 GpuPush/GpuPop，
+    // 由 FrameProfiler.Enable/Disable 挂上与摘下；平时是 null，逐 pass 只多一次判空。
+    this.profiler = null;
     this.targets = {};
     this.bloomMips = [];
     this.SetSize(this.width, this.height);
@@ -944,6 +964,10 @@ export class PostPipeline {
     const T = this.targets;
     this.frame += 1;
     const frame = this.frame;
+    // 剖析：每个 pass 两侧一对 GpuPush/GpuPop（GPU 段计时 + 提交 CPU 归账）。
+    // 阴影图烘在预通道那次 render 内部，由 FrameProfiler 包的 shadowMap.render
+    // 自己拆段，这里不用管。
+    const P = this.profiler;
 
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
     const projScaleY = 1 / tanHalf;
@@ -961,6 +985,7 @@ export class PostPipeline {
     // 整片抹掉（clamp((1.0 − 186)/0.45) = 0），大气透视也补不上去，
     // 二百米外的黑烟柱就成了天上一个越长越大的黑洞。
     // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
+    if (P) P.GpuPush("prepass");
     const skipped = this._CollectSkipped(scene);
     for (const object of skipped) object.visible = false;
     const prevBackground = scene.background;
@@ -974,9 +999,11 @@ export class PostPipeline {
     scene.overrideMaterial = prevOverride;
     scene.background = prevBackground;
     for (const object of skipped) object.visible = true;
+    if (P) P.GpuPop();
 
     // --- 2) SSAO ---
     if (this.preset.ssao) {
+      if (P) P.GpuPush("ssao");
       this.uniformsAo.uNormalDepth.value = T.normalDepth.texture;
       this.uniformsAo.uResolution.value.set(T.ao.width, T.ao.height);
       this.uniformsAo.uProjection.value.copy(camera.projectionMatrix);
@@ -997,13 +1024,16 @@ export class PostPipeline {
       this.uniformsAoBlur.uAo.value = T.aoTmp.texture;
       this.uniformsAoBlur.uDirection.value.set(0, 1);
       this._Blit(this.matAoBlur, T.aoBlur);
+      if (P) P.GpuPop();
     }
 
     // --- 3) 主场景（HDR，AO 已在材质里注入）---
+    if (P) P.GpuPush("main");
     renderer.setRenderTarget(T.hdr);
     renderer.setClearColor(0x000000, 1);
     renderer.clear(true, true, false);
     renderer.render(scene, camera);
+    if (P) P.GpuPop();
 
     // 在亮部提取前就算好这帧会不会跑太阳拖影，因为亮部图的 alpha
     // 只在这种情况下需要顺手打包天空遮挡。旧版到第 5 pass 才投影太阳，
@@ -1025,6 +1055,7 @@ export class PostPipeline {
     if (!godActive) godStrength = 0;
 
     // --- 4) 泛光 ---
+    if (P) P.GpuPush("bloom");
     this.uniformsBright.uSource.value = T.hdr.texture;
     this.uniformsBright.uNormalDepth.value = T.normalDepth.texture;
     this.uniformsBright.uPackSky.value = godActive ? 1 : 0;
@@ -1051,16 +1082,20 @@ export class PostPipeline {
       this._Blit(this.matUp, dst);
       carried = dst;
     }
+    if (P) P.GpuPop();
 
     // --- 5) 太阳方向拖影（便宜的屏幕空间 fallback）---
     if (godActive) {
+      if (P) P.GpuPush("god");
       this.uniformsGod.uBright.value = T.bright.texture;
       this.uniformsGod.uSunUv.value.set(this.sunWorld.x * 0.5 + 0.5, this.sunWorld.y * 0.5 + 0.5);
       this.uniformsGod.uFrame.value = frame;
       this._Blit(this.matGod, T.god);
+      if (P) P.GpuPop();
     }
 
     // --- 6) 合成 ---
+    if (P) P.GpuPush("composite");
     const U = this.uniformsComposite;
     U.uHdr.value = T.hdr.texture;
     U.uBloom.value = this.BloomTarget.texture;
@@ -1112,8 +1147,10 @@ export class PostPipeline {
     U.uMotionScale.value = this.preset.motionBlur && this.hasPrev ? (options.motionBlur ?? 0.15) : 0;
     U.uPrevViewProjection.value.copy(this.prevViewProjection);
     this._Blit(this.matComposite, T.ldr);
+    if (P) P.GpuPop();
 
     // --- 7) FXAA + 锐化 -> 屏幕；调试时改为展示指定的中间靶 ---
+    if (P) P.GpuPush("fxaa");
     const debug = this._GetDebugSource();
     if (debug) {
       this.uniformsDebug.uSource.value = debug.texture || T.ldr.texture;
@@ -1126,6 +1163,7 @@ export class PostPipeline {
       this.uniformsFxaa.uSharpen.value = options.sharpen ?? this.preset.sharpen;
       this._Blit(this.matFxaa, null);
     }
+    if (P) P.GpuPop();
 
     // 记录本帧 viewProjection，下一帧的运动模糊要用
     this.prevViewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);

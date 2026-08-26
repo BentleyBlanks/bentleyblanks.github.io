@@ -73,6 +73,29 @@ try {
       for (const child of node.children) if (child.isMesh && child.visible) visible += 1;
       check(visible > 0, `joint ${key} has no visible geometry`);
     }
+    // 单查 13 个关节“各自有网格”还不够：缓存混搭时每一块都能被创建，
+    // 但会按不相容的局部坐标散到半空。以整棵 Actor 的包围盒锁住
+    // “一具身高尺度内、紧凑的完整人物”，正好覆盖动作编辑器里那种假成功。
+    const checkCompactAssembly = (candidate, label) => {
+      candidate.root.updateMatrixWorld(true);
+      const box = new THREE.Box3();
+      let meshCount = 0;
+      candidate.root.traverse((item) => {
+        if (!item.isMesh || !item.visible) return;
+        meshCount += 1;
+        box.expandByObject(item);
+      });
+      const span = box.getSize(new THREE.Vector3());
+      check(meshCount > 0 && Number.isFinite(span.x + span.y + span.z),
+        `${label} has no finite assembled bounds`);
+      check(span.y > candidate.height * 0.90 && span.y < candidate.height * 1.15
+        && span.x < 0.75 && span.z < 0.80,
+      `${label} model pieces escaped their actor frame: ${span.toArray()}`);
+    };
+    checkCompactAssembly(actor, "NRA");
+    const ija = factory.Create("ija", { seed: 90215, weapon: null });
+    check(ija.meshSource === "model", `IJA should use the procedural tzm model, got ${ija.meshSource}`);
+    checkCompactAssembly(ija, "IJA");
     const footOffset = (leg, mountName) => {
       const segment = leg.ankle;
       const mount = actor.GetMount(mountName);
@@ -209,8 +232,8 @@ try {
     check(seatedArmed.gripR.distanceTo(rightGripCenter) > 0.025
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
-    for (const item of [actor, armed, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "6 states × 3 levels, tzm 模型 13 关节几何, 百姓男女分身, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
+    for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
+    return "6 states × 3 levels, 中日 tzm 模型完整装配, 13 关节几何, 百姓男女分身, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {
