@@ -3069,11 +3069,11 @@ export class ActorFactory {
    * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
    * 所以 Actor.SetWeapon 一行都不用改。
    */
-  WeaponGeometry(weaponId, variant = 0) {
-    const key = `${weaponId}|${variant}|${this.quality}`;
+  WeaponGeometry(weaponId, variant = 0, { includeBayonet = true } = {}) {
+    const key = `${weaponId}|${variant}|${this.quality}|${includeBayonet ? "bayonet" : "bare"}`;
     let built = this.weaponCache.get(key);
     if (!built) {
-      built = this._ModelWeaponGeometry(weaponId, variant)
+      built = this._ModelWeaponGeometry(weaponId, variant, includeBayonet)
         || BuildWeaponGeometry(weaponId, this.quality);
       this.weaponCache.set(key, built);
     }
@@ -3089,12 +3089,12 @@ export class ActorFactory {
    * 于是把一把好好的模型枪报成"退回方块"，红得毫无道理。
    */
   WeaponSource(weaponId, variant = 0) {
-    const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}`);
+    const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet`);
     return built ? built.source : null;
   }
 
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
-  _ModelWeaponGeometry(weaponId, variant = 0) {
+  _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = true) {
     const id = WeaponMeshId(weaponId, variant);
     if (!id || !this.meshDocs.has(id)) return null;
     const data = WEAPONS[weaponId];
@@ -3138,7 +3138,7 @@ export class ActorFactory {
     // 就是这么高，AI 冲锋态（bayonetFixed）不用再临时换几何。只在 high 档并：
     // medium/low 的观看距离读不出那一条刀，白花两千三角。
     // 刀的 socket 挂点（枪口环中心）对到枪的 muzzle 上，环再往后坐 12 mm。
-    if (data?.bayonet && this.quality === "high" && muzzle) {
+    if (includeBayonet && data?.bayonet && this.quality === "high" && muzzle) {
       const bayonetId = BAYONET_MESH_BY_WEAPON[weaponId];
       const bayonetBuilt = bayonetId && this.meshDocs.has(bayonetId)
         ? this._InstantiateMesh(bayonetId) : null;

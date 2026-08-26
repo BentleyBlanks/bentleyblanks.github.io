@@ -484,13 +484,11 @@ const weapon = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
   const out = { id: editor.ActiveId };
+  out.viewLabels = Array.from(active.viewChips.root.querySelectorAll(".edChip"), (node) => node.textContent);
   active.SetWeapon("Zb26");
   window.Taierzhuang.StepFrames(10);
   out.bench = !!active.benchGroup;
   out.benchMeshes = active.benchGroup ? active.benchGroup.children.length : 0;
-  active.SetMode("held");
-  window.Taierzhuang.StepFrames(10);
-  out.held = !!active.actor && active.actor.weaponId === "Zb26";
   active.SetMode("fp");
   window.Taierzhuang.StepFrames(10);
   out.fp = window.Taierzhuang.viewmodel.weaponId === "Zb26";
@@ -503,6 +501,28 @@ const weapon = await page.evaluate(() => {
   active.Trigger("reload");
   window.Taierzhuang.StepFrames(20);
   out.busy = typeof window.Taierzhuang.viewmodel.IsBusy === "function";
+  // 中正式有刺刀预览：台架与第一人称都切换真实独立模型；捷克式没有刺刀，
+  // 控件及投掷动作都不能留下可点的空壳。
+  active.SetMode("bench");
+  active.SetWeapon("ZhongZheng");
+  window.Taierzhuang.StepFrames(10);
+  out.spinDefaultOff = !active.spin;
+  out.bayonetToggleVisible = !active.bayonetToggle.root.hidden;
+  out.benchBayonetBefore = !!active.benchBayonet && !active.benchBayonet.visible;
+  active.bayonetToggle.root.click();
+  out.benchBayonetAfter = !!active.benchBayonet?.visible;
+  active.SetMode("fp");
+  window.Taierzhuang.StepFrames(10);
+  out.fpBayonetAfter = !!window.Taierzhuang.viewmodel.rig?.parts?.bayonet?.visible;
+  active.SetWeapon("Zb26");
+  window.Taierzhuang.StepFrames(10);
+  out.unsupportedBayonetHidden = active.bayonetToggle.root.hidden;
+  out.unsupportedThrowHidden = active.actionButtons.throw.hidden;
+  out.unsupportedMeleeVisible = !active.actionButtons.melee.hidden;
+  active.SetWeapon("Grenade");
+  window.Taierzhuang.StepFrames(10);
+  out.grenadeThrowVisible = !active.actionButtons.throw.hidden;
+  out.grenadeMeleeHidden = active.actionButtons.melee.hidden;
   // 两辆战车已有 .tzm；车辆走整棵关节树并落地，不能再按旧规则当成“无几何”。
   active.SetMode("bench");
   active.SetWeapon("Type89Tank");
@@ -511,12 +531,24 @@ const weapon = await page.evaluate(() => {
   out.benchFov = window.Taierzhuang.camera.fov;
   return out;
 });
-Check("枪械编辑器三视图", weapon.id === "weapon" && weapon.bench && weapon.held && weapon.fp,
+Check("枪械编辑器台架 / 第一人称视图", weapon.id === "weapon" && weapon.bench && weapon.fp,
   `台架网格=${weapon.benchMeshes} fp可见=${weapon.fpVisible}`);
+Check("枪械编辑器不再保留无调校用途的手持视图",
+  weapon.viewLabels.length === 2 && !weapon.viewLabels.includes("手持"), weapon.viewLabels.join(" / "));
 Check("第一人称换回正片镜头、台架换回 85 mm",
   weapon.fpFov === 55 && weapon.benchFov === 42,
   `fp=${weapon.fpFov}° 台架=${weapon.benchFov}°`);
 Check("车辆条目按完整关节树建落地台架", weapon.tankOk);
+Check("枪械编辑器默认不自转", weapon.spinDefaultOff);
+Check("刺刀预览只给支持的枪，并在台架 / 第一人称都切换真实模型",
+  weapon.bayonetToggleVisible && weapon.benchBayonetBefore && weapon.benchBayonetAfter && weapon.fpBayonetAfter,
+  JSON.stringify({
+    toggle: weapon.bayonetToggleVisible, benchBefore: weapon.benchBayonetBefore,
+    benchAfter: weapon.benchBayonetAfter, fpAfter: weapon.fpBayonetAfter,
+  }));
+Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白刃",
+  weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
+Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
 
 // ---------------------------------------------------------------------------
 // 4) 特效预览编辑器

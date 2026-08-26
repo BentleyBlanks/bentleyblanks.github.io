@@ -795,17 +795,22 @@ function BuildMauser96(materials, weapon, key) {
   };
 }
 
-/** 木柄手榴弹：铸铁弹体 φ58×90 + 木柄 φ29×128，全长 220 mm（考据值）。 */
-function BuildGrenadeProp(materials, key) {
-  const steel = [];
-  const wood = [];
-  steel.push(Tube(0.029, 0.029, 0.090, 12, VM_TILE.steel, { x: 0, y: 0, z: -0.055, rx: 0 }));
+/** 向一个几何桶加入一颗去柄前的铸铁弹体。 */
+function AddGrenadeBody(steel, key, x = 0, y = 0, z = -0.055) {
+  steel.push(Tube(0.029, 0.029, 0.090, 12, VM_TILE.steel, { x, y, z, rx: 0 }));
   // 巩式质量参差，弹体常见竖向铸造纹（不是德式那种规整滚花）
   for (let i = 0; i < 6; i += 1) {
     const a = (i / 6) * Math.PI * 2;
     steel.push(Box(0.005, 0.005, 0.086, VM_TILE.steel, `${key}rib${i}`,
-      { x: Math.cos(a) * 0.029, y: Math.sin(a) * 0.029, z: -0.055 }));
+      { x: x + Math.cos(a) * 0.029, y: y + Math.sin(a) * 0.029, z }));
   }
+}
+
+/** 木柄手榴弹：铸铁弹体 φ58×90 + 木柄 φ29×128，全长 220 mm（考据值）。 */
+function BuildGrenadeProp(materials, key) {
+  const steel = [];
+  const wood = [];
+  AddGrenadeBody(steel, key);
   wood.push(Tube(0.0145, 0.0145, 0.128, 10, VM_TILE.wood, { x: 0, y: 0, z: 0.054 }));
   steel.push(Tube(0.016, 0.016, 0.012, 10, VM_TILE.steel, { x: 0, y: 0, z: 0.112 }));
 
@@ -835,6 +840,54 @@ function BuildGrenade(materials, weapon, key) {
       right: { x: 0.0, y: -0.008, z: 0.030, rx: 0.30, ry: 0, rz: -1.52 },
       // 左手拉火绳
       left: { x: -0.055, y: -0.030, z: 0.090, rx: 0.10, ry: 0.5, rz: 1.30 },
+    },
+    boltHandle: new THREE.Vector3(0, 0, 0),
+  };
+}
+
+/**
+ * 集束手榴弹：一枚完整木柄弹作引信，六枚去柄弹围成一圈，再用两道麻绳扎紧。
+ *
+ * 台儿庄的记录是「五至七枚去柄捆在一枚带柄弹周围」，因此不能只是把普通
+ * 手榴弹放大；第一人称和飞行中的剪影都必须看得出是能打战车的集束。
+ */
+function BuildGrenadeBundle(materials, weapon, key) {
+  const steel = [];
+  const wood = [];
+  AddGrenadeBody(steel, `${key}core`);
+  wood.push(Tube(0.0145, 0.0145, 0.128, 10, VM_TILE.wood, { x: 0, y: 0, z: 0.054 }));
+  steel.push(Tube(0.016, 0.016, 0.012, 10, VM_TILE.steel, { x: 0, y: 0, z: 0.112 }));
+  for (let i = 0; i < 6; i += 1) {
+    const a = (i / 6) * Math.PI * 2;
+    AddGrenadeBody(steel, `${key}satellite${i}`, Math.cos(a) * 0.057, Math.sin(a) * 0.057, -0.055);
+  }
+
+  const group = new THREE.Group();
+  AddPart(group, MakePart(steel, materials.steel));
+  AddPart(group, MakePart(wood, materials.wood));
+  // 两道结实的麻绳压住六颗去柄弹；用木材质比另开一套视图模型材质更稳。
+  for (const z of [-0.080, -0.030]) {
+    const rope = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.005, 6, 18), materials.wood);
+    rope.position.z = z;
+    group.add(rope);
+  }
+  // 七枚实际叠在一起的横向体积远大于一颗普通弹；第一人称等比缩小并后移，
+  // 仍保留捆扎结构，同时不把准星与正前方目标压没。
+  group.scale.setScalar(0.62);
+  group.position.set(0.050, -0.030, -0.140);
+  group.rotation.set(-0.35, 0, 0);
+
+  return {
+    group,
+    parts: { bolt: null, dustCover: null, bayonet: null, grenade: group },
+    boltTravel: 0,
+    ejectAt: new THREE.Vector3(0, 0, 0),
+    clipSeat: new THREE.Vector3(0, 0, 0),
+    muzzle: new THREE.Vector3(0, 0.06, -0.12),
+    sight: null,
+    hands: {
+      right: { x: 0.0, y: -0.008, z: 0.030, rx: 0.30, ry: 0, rz: -1.52 },
+      left: { x: -0.075, y: -0.035, z: 0.090, rx: 0.10, ry: 0.5, rz: 1.30 },
     },
     boltHandle: new THREE.Vector3(0, 0, 0),
   };
@@ -901,7 +954,7 @@ const BUILDERS = {
   Mauser96: BuildMauser96,
   ServicePistol: BuildMauser96,
   Grenade: BuildGrenade,
-  GrenadeBundle: BuildGrenade,
+  GrenadeBundle: BuildGrenadeBundle,
   Dadao: BuildDadao,
 };
 
@@ -917,7 +970,7 @@ const BUILDERS = {
 // 大刀 / 手榴弹没有可动件，换过去零损失。中正式 / 汉阳造 / 驳壳枪走导入的
 // 历史枪模：剪影对了，拉栓动画暂时没有（模型 joints 仍是 0）。
 const MODEL_FP = new Set([
-  "Dadao", "Grenade", "GrenadeBundle",
+  "Dadao", "Grenade",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
 ]);
 

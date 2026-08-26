@@ -32,14 +32,15 @@ const heartbeatMs = 60 * 1000;
 const maxCaptureChars = 4 * 1024 * 1024;
 
 const playTestExpectedFailures = [
-  "六十秒内全场开火计数 > 200",
   // 「击杀回执 killConfirm」2026-08-26 已修并摘除：红的根源是测试自己的零余量竞态 ——
   // 等拉栓的 120 帧里友军把摆好的靶子磨死，第二枪打的是尸体，ConfirmHit 不会被调用。
   // 场景/布设类提交改了友军射界就翻红。现在等待期把靶子血垫到打不死（见 Script_PlayTest 11.6）。
   // 「玩家亲手击杀」「打中回执」「打死回执」三条已转绿（击杀测试的陈旧枪口 bug
   // 已修：转向后推两帧再取瞄准线），按 runner 提示从基线摘除。
+  // 「六十秒内全场开火 > 200」两条 2026-08-27 转绿并摘除：导航 BFS 摊帧那一轮
+  // 顺手在建关时预热了各路标的距离场，开场头几秒兵不再各等各的场、直奔墙 ——
+  // 交战起得更快，开火计数过线了。
   "P4 夜袭的携行是 L3_WhiteTowel：一支长枪、一支短枪、肩背大刀",
-  "头六十秒全场开火 > 200",
   // 姿态这条在纯 master 上红、合并树上绿 —— 判定抖动，先留在基线里。
   "姿态决定被发现的距离：60 m 上站着的看得见、趴着的看不见，30 m 上趴着的照样看得见",
   "Esc / 切走 / 关页 / 切后台 四条通道都会把鼠标还给用户",
@@ -113,8 +114,10 @@ export const testDefs = {
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
+  ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 分桶、GPU 分段查询与钩子还原" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
+  PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
   FrameProfileTest: { file: "Script_FrameProfileTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "整帧 CPU/GPU 剖析消融（对机器敏感）" },
   GodRaysPerformanceTest: { file: "Script_GodRaysPerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "体积光方向性性能回归（对机器敏感）" },
@@ -170,7 +173,7 @@ export const domains = {
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["ActorBatchTest", "PropInstancingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
+    tests: ["PostTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -191,7 +194,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Lighting|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 
