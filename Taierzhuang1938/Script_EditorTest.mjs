@@ -244,6 +244,10 @@ const topDown = await page.evaluate(async () => {
   const THREE = await import("./vendor/three/build/three.module.js");
   const T = window.Taierzhuang;
   const beforeFar = T.camera.far;
+  const beforeFov = T.camera.fov;
+  // 战斗那份 far 存在 FlyCam.saved 里：编辑器一进来就把相机换成出厂投影，
+  // T.camera.far 已经是编辑器的 2000 了，拿它当「战斗远平面」会对不上。
+  const battleFar = T.editor.flycam.saved.far;
   T.editor.active.TopDown();
   T.StepFrames(3);
   const camera = T.camera;
@@ -256,20 +260,23 @@ const topDown = await page.evaluate(async () => {
     [bounds.maxX, bounds.maxZ], [bounds.minX, bounds.maxZ],
   ];
   return {
-    beforeFar,
+    beforeFar, beforeFov, battleFar,
     far: camera.far,
     height: camera.position.y,
     allCornersVisible: corners.every(([x, z]) => frustum.containsPoint(new THREE.Vector3(x, 0, z))),
   };
 });
-Check("俯瞰当前切片：四角都在视锥且编辑器临时放远 far",
-  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far > topDown.beforeFar,
+Check("场景编辑器出厂投影：远面 2000 m / FOV 55°",
+  topDown.beforeFar === 2000 && topDown.beforeFov === 55,
+  `far=${topDown.beforeFar} fov=${topDown.beforeFov}（战斗 far=${topDown.battleFar}）`);
+Check("俯瞰当前切片：四角都在视锥且 far 盖得住机位",
+  topDown.allCornersVisible && topDown.far > topDown.height && topDown.far >= topDown.beforeFar,
   JSON.stringify(topDown));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 await Step(3);
 const restoredTopDownFar = await page.evaluate(() => window.Taierzhuang.camera.far);
-Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.beforeFar,
-  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}`);
+Check("退出场景编辑器恢复战斗远平面", restoredTopDownFar === topDown.battleFar,
+  `${topDown.far.toFixed(1)}→${restoredTopDownFar.toFixed(1)}（战斗 ${topDown.battleFar}）`);
 
 // ---------------------------------------------------------------------------
 // 1b) 暂停要连**声音**一起停
@@ -776,6 +783,7 @@ const scene = await page.evaluate(() => {
   out.originalProjection = [editor.flycam.saved.fov, editor.flycam.saved.far];
   active.TopDown();
   out.topDownFar = T.camera.far;
+  out.topDownHeight = T.camera.position.y;
   const SetSlider = (control, value) => {
     const input = control.root.querySelector("input");
     input.value = String(value);
@@ -936,9 +944,11 @@ Check("场景编辑器只保留关卡与布设职责",
 Check("场景编辑器不再能编辑地形", scene.terrainBlocked);
 Check("场景相机可调 FOV 与远裁剪面",
   scene.projection[0] === 68 && scene.projection[1] === 1500, scene.projection.join(" / "));
-Check("俯瞰全城会自动扩远裁剪面",
-  scene.topDownFar > scene.originalProjection[1],
-  `${scene.originalProjection[1].toFixed(0)} → ${scene.topDownFar.toFixed(0)} m`);
+// 编辑器出厂就是 2000 m，俯瞰通常不需要再扩；但战斗那份 400 m 一定盖不住
+// 俯瞰机位，所以这里断的是「结果够远」，不是「有没有扩过」。
+Check("俯瞰全城的远裁剪面盖得住机位（战斗那份盖不住）",
+  scene.topDownFar > scene.topDownHeight && scene.topDownFar > scene.originalProjection[1],
+  `战斗 ${scene.originalProjection[1].toFixed(0)} → 俯瞰 ${scene.topDownFar.toFixed(0)} m（机位高 ${scene.topDownHeight.toFixed(0)} m）`);
 Check("放置的构件进场景且带碰撞盒",
   scene.items === 1 && scene.nodes >= 1 && scene.colliderGain > 0 && scene.nearby > 0,
   `盒子 +${scene.colliderGain}，附近 ${scene.nearby}`);
