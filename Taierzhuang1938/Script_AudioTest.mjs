@@ -471,6 +471,33 @@ else if (melee.swing.seconds > 0.8) Fail(`dadaoSwing 长达 ${melee.swing.second
 else Ok(`白刃三音走 SeedAudio（挥空 ${melee.swing.variants} 变体 / ${melee.swing.seconds}s、`
   + `砍中 ${melee.dadao.seconds}s、刺中 ${melee.bayonet.seconds}s）`);
 
+// 挥空必须**按顺序轮**、且**不许变调**：三条是人工一条条选定的，随机挑会连出两次
+// 同一条，±3% 变调会把选中的音色拧走（0.2 秒的破风声听得出来）。两者都是静默回归 ——
+// 上面那条「3 变体」的断言拦不住，它只看清单不看真正播了哪一条。
+const cycle = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const made = [];
+  const orig = a.ctx.createBufferSource;
+  a.ctx.createBufferSource = function patched() { const src = orig.call(this); made.push(src); return src; };
+  // 同帧齐射有 22 ms 去重窗，六次要拉开放。
+  for (let i = 0; i < 6; i += 1) { a.Play("dadaoSwing"); await sleep(60); }
+  a.ctx.createBufferSource = orig;
+  return made.filter((s) => s.buffer).map((s) => ({
+    durMs: Math.round(s.buffer.duration * 1000),
+    rate: Number(s.playbackRate.value.toFixed(4)),
+  }));
+});
+const durs = cycle.map((c) => c.durMs);
+const rates = cycle.map((c) => c.rate);
+const unique = [...new Set(durs)];
+if (cycle.length !== 6) Fail(`播六次挥空只抓到 ${cycle.length} 个源 —— 这条断言本身没测到东西`);
+else if (rates.some((r) => r !== 1)) Fail(`挥空被逐发变调了：${rates.join(" ")}（选定的三条要原样播）`);
+else if (unique.length !== 3) Fail(`播六次只用到 ${unique.length} 条变体：${durs.join(" ")} ms`);
+else if (durs[0] !== durs[3] || durs[1] !== durs[4] || durs[2] !== durs[5]) {
+  Fail(`挥空不是按顺序轮的：${durs.join(" ")} ms（随机挑会连出两次同一条）`);
+} else Ok(`挥空按顺序轮播且不变调（${durs.slice(0, 3).join(" → ")} ms 循环，rate 恒为 1）`);
+
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 
 await browser.close();
