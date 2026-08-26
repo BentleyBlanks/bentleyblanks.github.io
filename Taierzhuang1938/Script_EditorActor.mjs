@@ -16,11 +16,15 @@
 //   · 步频与步幅对不对（1 m 米格 + 支撑相不打滑）
 //   · 持枪挂点、贴腮、拉栓时右手的行程
 //   · 五个 kind 站一排时的身高差（1.60—1.68 m）与装具差
+//   · **子弹判定盒对不对得上这具身体**（见下面「判定」一节）
 
 import * as THREE from "three";
 import { Panel, Section, Slider, Chips, Select, Toggle, ButtonRow, Facts, Note, ListBox }
   from "./Script_EditorUi.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { COMBAT } from "./Data_Battle.mjs";
+import { CAPSULE } from "./Script_Ai.mjs";
+import { MarkNoPrepass } from "./Script_Post.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
@@ -78,6 +82,183 @@ const CLIPS = [
   { id: "dead", name: "倒地（0.8 s 姿态过渡）", dead: true, make: () => ({ dead: true }) },
 ];
 
+// ---------------------------------------------------------------------------
+// 判定盒的线框
+//
+// 这一节画的是**规则层真正用的那两个体**，不是"差不多这么大"的示意：
+//
+//   · 子弹判定球 —— `COMBAT.hitbox`。玩家开枪走 Script_Main.MarchBullet，
+//     把弹道切成 0.02 s 一段，逐段量「人到线段的垂距 < radius」。所以人物的
+//     命中体是**一个球**，球心从脚底往上量 centerY，**不随姿态、不随身高变**。
+//     （AI 之间与 AI 打玩家是概率命中，压根不碰这个球 —— 别拿这里的球去
+//     解释"日军怎么打中我的"。）
+//   · 移动胶囊 —— `Script_Ai.CAPSULE[stance]`，交给 Rapier 的运动学角色控制器。
+//     总高 = 2·halfHeight + 2·radius、球心在脚底往上 radius+halfHeight，
+//     算式与 Script_Physics.CharacterBody._MakeCollider 逐字一致。
+//
+// 两个体都挂在**展台**上而不是挂在 actor.root 底下：root 带着 ±4% 的身高缩放，
+// 挂进去的话线框会跟着一起缩，而判定用的是不缩的世界米数 —— 那样画出来的
+// 是一个好看的谎。
+// ---------------------------------------------------------------------------
+
+/** 判定球：红橙。移动胶囊：靛蓝。两个颜色在土黄色的城里都不会被认成布景。 */
+const HITBOX_COLOR = 0xff5a3c;
+const CAPSULE_COLOR = 0x49a7ff;
+
+/**
+ * 线框一律**自己摆圈**，不走 `WireframeGeometry(SphereGeometry)`。
+ *
+ * 那条路画出来是一张三角网（连对角线一起画），叠在人身上就是一团红网 ——
+ * 判定球到底多高、多宽、压住身上哪一段，一条都读不出来。判定盒的线框要的是
+ * 几条能读出尺寸的圈，不是把三角形都描一遍。
+ *
+ * 下面三个函数都往同一个 out 数组里追加**线段对**（每两点一段），最后一次成几何。
+ */
+
+/** 一整圈。plane: "xz" | "xy" | "zy"；center 是这一圈在第三轴上的位置。 */
+function PushCircle(out, radius, plane, offset = 0, segments = 40) {
+  const At = (a) => {
+    const c = Math.cos(a) * radius, s = Math.sin(a) * radius;
+    if (plane === "xz") return [c, offset, s];
+    if (plane === "xy") return [c, s + offset, 0];
+    return [0, s + offset, c];             // "zy"
+  };
+  for (let i = 0; i < segments; i += 1) {
+    out.push(...At((i / segments) * Math.PI * 2), ...At(((i + 1) / segments) * Math.PI * 2));
+  }
+}
+
+/** 半圈（胶囊的两个帽）。plane "xy" | "zy"，up=true 画上半、false 画下半。 */
+function PushCap(out, radius, plane, offset, up, segments = 20) {
+  const At = (a) => {
+    const c = Math.cos(a) * radius, s = Math.sin(a) * radius * (up ? 1 : -1);
+    return plane === "xy" ? [c, s + offset, 0] : [0, s + offset, c];
+  };
+  for (let i = 0; i < segments; i += 1) {
+    out.push(...At((i / segments) * Math.PI), ...At(((i + 1) / segments) * Math.PI));
+  }
+}
+
+function LineGeometry(points) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(points), 3));
+  return geometry;
+}
+
+/**
+ * 一套判定线框。一个人一套，跟着那个人的落点走。
+ *
+ * xray（默认开）把 depthTest 关掉：球整个埋在胸腔里，不穿透显示的话
+ * 一条线都看不见 —— 而"看不见"和"没画出来"在截图里是同一件事。
+ */
+class HitboxGizmo {
+  constructor() {
+    this.root = new THREE.Group();
+    this.root.name = "ActorHitboxGizmo";
+    this.owned = [];
+    this.stance = -1;
+
+    this.hitMaterial = MarkNoPrepass(new THREE.LineBasicMaterial({
+      color: HITBOX_COLOR, transparent: true, opacity: 0.9, depthWrite: false,
+    }));
+    this.capMaterial = MarkNoPrepass(new THREE.LineBasicMaterial({
+      color: CAPSULE_COLOR, transparent: true, opacity: 0.75, depthWrite: false,
+    }));
+
+    // --- 子弹判定球 ---
+    // 三条大圈（三个正交面）+ 上下两条纬圈：五条线就读得出球心与半径，
+    // 而且从任何一个机位看过去都有一条圈是正对着的。
+    const { radius, centerY } = COMBAT.hitbox;
+    const points = [];
+    PushCircle(points, radius, "xz", centerY);
+    PushCircle(points, radius, "xy", centerY);
+    PushCircle(points, radius, "zy", centerY);
+    const lat = radius * 0.62;
+    const latR = Math.sqrt(Math.max(0, radius * radius - lat * lat));
+    PushCircle(points, latR, "xz", centerY + lat, 28);
+    PushCircle(points, latR, "xz", centerY - lat, 28);
+    // 球心到脚底的那根竖线：centerY 是从脚底往上量的，这根线画的就是那个数
+    points.push(0, 0, 0, 0, centerY, 0);
+    // 贴地那一圈：球悬在半空，光看球读不出它在地面上压住多大一块
+    PushCircle(points, radius, "xz", 0.006);
+    this.sphereGroup = new THREE.Group();
+    const sphere = new THREE.LineSegments(LineGeometry(points), this.hitMaterial);
+    // renderOrder 要写在**网格**上：three 排的是渲染项，Group 上写了不传给孩子。
+    // 排到最后画，线框才不会被同样关了深度测试的别的半透明东西盖住。
+    sphere.renderOrder = 12;
+    this.sphereGroup.add(sphere);
+    this.owned.push(sphere.geometry);
+    this.root.add(this.sphereGroup);
+
+    // --- 移动胶囊（姿态一换就重建，见 SetStance） ---
+    this.capsuleGroup = new THREE.Group();
+    this.capsuleGroup.visible = false;
+    this.root.add(this.capsuleGroup);
+    this.capsule = null;
+
+    this.SetXray(true);
+  }
+
+  /** stance: 0 站 / 1 蹲 / 2 卧。尺寸与摆位算式与 CharacterBody._MakeCollider 一致。 */
+  SetStance(stance) {
+    const index = Math.max(0, Math.min(CAPSULE.length - 1, stance | 0));
+    if (index === this.stance) return this;
+    this.stance = index;
+    if (this.capsule) {
+      this.capsuleGroup.remove(this.capsule);
+      this.capsule.geometry.dispose();
+      this.capsule = null;
+    }
+    const { radius, height } = CAPSULE[index];
+    const halfHeight = Math.max(0.02, height * 0.5 - radius);
+    const mid = radius + halfHeight;            // 胶囊中心离脚底的高（刚体原点在脚底）
+    const top = mid + halfHeight;
+    const bottom = mid - halfHeight;
+    const points = [];
+    PushCircle(points, radius, "xz", top);
+    PushCircle(points, radius, "xz", bottom);
+    PushCircle(points, radius, "xz", mid, 28);
+    for (const [dx, dz] of [[radius, 0], [-radius, 0], [0, radius], [0, -radius]]) {
+      points.push(dx, bottom, dz, dx, top, dz);
+    }
+    PushCap(points, radius, "xy", top, true);
+    PushCap(points, radius, "zy", top, true);
+    PushCap(points, radius, "xy", bottom, false);
+    PushCap(points, radius, "zy", bottom, false);
+    const mesh = new THREE.LineSegments(LineGeometry(points), this.capMaterial);
+    mesh.renderOrder = 11;
+    this.capsuleGroup.add(mesh);
+    this.capsule = mesh;
+    return this;
+  }
+
+  SetHitboxVisible(on) { this.sphereGroup.visible = !!on; return this; }
+  SetCapsuleVisible(on) { this.capsuleGroup.visible = !!on; return this; }
+
+  SetXray(on) {
+    for (const material of [this.hitMaterial, this.capMaterial]) {
+      material.depthTest = !on;
+      material.needsUpdate = true;
+    }
+    return this;
+  }
+
+  Dispose() {
+    if (this.capsule) this.capsule.geometry.dispose();
+    for (const geometry of this.owned) geometry.dispose();
+    this.hitMaterial.dispose();
+    this.capMaterial.dispose();
+    if (this.root.parent) this.root.parent.remove(this.root);
+  }
+}
+
+/** 当前驱动量对应的姿态档。AI 那边是 s.stance，摄影棚里只有 crouch/prone 两个连续量。 */
+function StanceOf(state) {
+  if ((state.prone ?? 0) >= 0.5) return 2;
+  if ((state.crouch ?? 0) >= 0.5) return 1;
+  return 0;
+}
+
 export class ActorEditor {
   static id = "actor";
   static label = "人物动作";
@@ -101,6 +282,11 @@ export class ActorEditor {
     this.time = 0;
 
     this.actors = [];
+    this.gizmos = [];
+    this.showHitbox = true;   // 判定球出厂就开：这一栏存在的理由就是它
+    this.showCapsule = false;
+    this.xray = true;
+    this.stance = 0;
     this.manualState = {
       moveSpeed: 0, strafe: 0, crouch: 0, prone: 0, aim: 0,
       throwing: 0, melee: 0, hurt: 0, dying: 0, lookYaw: 0, lookPitch: 0, firing: false,
@@ -168,6 +354,27 @@ export class ActorEditor {
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
     Toggle(opts, "六人对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
+
+    // --- 判定盒 ---
+    const box = Section(body, "判定（碰撞盒）");
+    const boxBtns = document.createElement("div");
+    boxBtns.className = "edBtns";
+    box.appendChild(boxBtns);
+    Toggle(boxBtns, "子弹判定盒", this.showHitbox, (on) => {
+      this.showHitbox = on;
+      for (const gizmo of this.gizmos) gizmo.SetHitboxVisible(on);
+    });
+    Toggle(boxBtns, "移动胶囊", this.showCapsule, (on) => {
+      this.showCapsule = on;
+      for (const gizmo of this.gizmos) gizmo.SetCapsuleVisible(on);
+    });
+    Toggle(boxBtns, "穿透显示", this.xray, (on) => {
+      this.xray = on;
+      for (const gizmo of this.gizmos) gizmo.SetXray(on);
+    });
+    Note(box, "红球 = 子弹判定（COMBAT.hitbox，球心从脚底量）；"
+      + "蓝胶囊 = 移动碰撞（Script_Ai.CAPSULE）。两者互不相干。");
+    Note(box, "判定球不随姿态、不随身高动。切「卧倒」看一眼。", true);
 
     // --- 动作 ---
     const act = Section(body, "动作（驱动量配方）");
@@ -240,6 +447,9 @@ export class ActorEditor {
       actor.Dispose();
     }
     this.actors.length = 0;
+    for (const gizmo of this.gizmos) gizmo.Dispose();
+    this.gizmos.length = 0;
+    this.stance = 0;
   }
 
   Rebuild() {
@@ -256,6 +466,15 @@ export class ActorEditor {
       actor.root.position.x = (i - (list.length - 1) / 2) * span;
       this.studio.stand.add(actor.root);
       this.actors.push(actor);
+      // 判定线框与人是兄弟，不是儿子 —— root 带 ±4% 身高缩放，挂进去就跟着缩了
+      const gizmo = new HitboxGizmo();
+      gizmo.root.position.x = actor.root.position.x;
+      gizmo.SetHitboxVisible(this.showHitbox);
+      gizmo.SetCapsuleVisible(this.showCapsule);
+      gizmo.SetXray(this.xray);
+      gizmo.SetStance(this.stance);
+      this.studio.stand.add(gizmo.root);
+      this.gizmos.push(gizmo);
     });
     if (this.towel != null) this.ApplyTowel();
     const entry = KINDS.find((k) => k.id === this.kind);
@@ -282,6 +501,13 @@ export class ActorEditor {
         ? { ...base, ...this.manualState, elapsed: local }
         : { ...base, ...clip.make(local, ctx), elapsed: local };
       actor.Update(dt, state);
+      // 判定线框跟着这个人的落点；胶囊还要跟着姿态换尺寸（AI 那边是 s.stance）
+      const gizmo = this.gizmos[i];
+      if (gizmo) {
+        gizmo.root.position.copy(actor.root.position);
+        gizmo.SetStance(StanceOf(state));
+        if (i === 0) this.stance = gizmo.stance;
+      }
     }
   }
 
@@ -320,6 +546,18 @@ export class ActorEditor {
     this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");
     this.facts.Set("动作", this.manual ? "手动" : this.clipId);
+    // 判定读数。**判定球那两行永远是同一个数**（它不随姿态、不随身高变），
+    // 摆在这里正是为了让"球没跟着人动"这件事有个可引用的读数。
+    const { radius, centerY } = COMBAT.hitbox;
+    this.facts.Set("子弹判定球", `r ${radius.toFixed(2)} m · 心高 ${centerY.toFixed(2)} m`);
+    const cap = CAPSULE[this.stance] || CAPSULE[0];
+    const stanceName = this.stance === 2 ? "卧" : this.stance === 1 ? "蹲" : "站";
+    this.facts.Set("移动胶囊",
+      `${stanceName} · r ${cap.radius.toFixed(2)} m · 高 ${cap.height.toFixed(2)} m`);
+    // 判定球顶超过这一档胶囊的顶 = 判定比身体高出去一截（卧姿必然如此）
+    const overhang = (centerY + radius) - cap.height;
+    this.facts.Set("球顶 − 体高", `${overhang >= 0 ? "+" : ""}${overhang.toFixed(2)} m`,
+      overhang > 0.05 ? "warn" : "");
     this.facts.Set("时间", `${this.time.toFixed(2)} s`);
   }
 }

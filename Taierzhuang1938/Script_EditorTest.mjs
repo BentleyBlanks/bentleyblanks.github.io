@@ -523,6 +523,94 @@ Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`)
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 
 // ---------------------------------------------------------------------------
+// 2b) 川军步兵**真的画出来了几个像素** + 判定盒线框
+//
+// 【2026-08-27 这一节因为一次事故而存在】
+// 症状：人物动作编辑器里选川军步兵，画面上只剩一支浮在空中的中正式。
+// 而当时这个文件的六条断言全绿 —— 因为它们查的是 actors.length、meshSource、
+// 材质不透明、root.visible，**一条也不是「屏幕上有没有这个人」**。
+// 病根在合批层：摄影棚 WorldMask 把 scene 直属子节点全藏了，其中包括开编辑器
+// 之前就建好的那一百个 `ActorBatch_*` InstancedMesh；台上这个人的分件照旧被
+// 挪到 BATCH_LAYER，实例写进了已经藏起来的批次里（见 Studio.SetActorBatch）。
+//
+// 所以这里改成数**颜色**：同一台相机拍两张（人在 / 人藏），逐像素比差值。
+// 画布没开 preserveDrawingBuffer，readPixels 必须与 StepFrames 在同一个 JS 任务里，
+// 让出去一次就清了。medium 档默认开 TAA，所以每张先推几帧让历史收敛。
+// ---------------------------------------------------------------------------
+const drawn = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const active = T.editor.active;
+  active.kindList.Select("nra", true);
+  active.SetClip("idle");
+  // 停表再拍。待机也有呼吸起伏，两张之间人本身就动了几百像素，
+  // 那个数会混进"线框画了多少"里，让这一条断言变得什么都证明不了。
+  active.playing = false;
+  T.StepFrames(45);              // 姿态弹簧收敛 + TAA 历史收敛
+  const gl = T.renderer.getContext();
+  const width = gl.drawingBufferWidth;
+  const height = gl.drawingBufferHeight;
+  const Shot = () => {
+    T.StepFrames(8);
+    const buffer = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
+    return buffer;
+  };
+  const Diff = (a, b) => {
+    let n = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1])
+        + Math.abs(a[i + 2] - b[i + 2]) > 24) n += 1;
+    }
+    return n;
+  };
+  // 1) 人：藏起来前后的差 = 这个人在屏幕上占了多少像素
+  for (const gizmo of active.gizmos) gizmo.root.visible = false;
+  const withActor = Shot();
+  for (const a of active.actors) a.root.visible = false;
+  const withoutActor = Shot();
+  for (const a of active.actors) a.root.visible = true;
+  const bodyPixels = Diff(withActor, withoutActor);
+  // 2) 判定球线框：同样数像素，而不是数 visible
+  for (const gizmo of active.gizmos) gizmo.root.visible = true;
+  const withGizmo = Shot();
+  const gizmoPixels = Diff(withGizmo, withActor);
+  // 3) 卧姿要换成卧姿胶囊（尺寸表是 Script_Ai.CAPSULE，与 Rapier 同一套）
+  active.playing = true;
+  active.SetClip("prone");
+  T.StepFrames(60);
+  const proneStance = active.gizmos[0] ? active.gizmos[0].stance : -1;
+  active.SetClip("idle");
+  T.StepFrames(60);
+  const standStance = active.gizmos[0] ? active.gizmos[0].stance : -1;
+  return {
+    bodyPixels, gizmoPixels, proneStance, standStance,
+    total: width * height,
+    gizmos: active.gizmos.length,
+    // 摄影棚开着的时候合批必须是关的，人物分件必须留在第 0 层（= 自己出画）
+    batchOff: T.actorBatch.enabled === false,
+    onLayerZero: active.actors.every((a) => {
+      let ok = true;
+      a.root.traverse((o) => { if (o.isMesh && o.layers.mask !== 1) ok = false; });
+      return ok;
+    }),
+    // 线框不许混进法线深度预通道（半透明加性的东西一律 allowOverride=false）
+    gizmoNoPrepass: active.gizmos.every((g) =>
+      g.hitMaterial.allowOverride === false && g.capMaterial.allowOverride === false),
+  };
+});
+// 1280×720 上一个 3.4 m 外的人大约占两三万像素；给一个不可能靠噪点凑出来的下限。
+Check("川军步兵在摄影棚里真的画出了像素", drawn.bodyPixels > 6000,
+  `${drawn.bodyPixels} px / ${drawn.total}`);
+Check("摄影棚开着时人物合批是关的、分件留在第 0 层",
+  drawn.batchOff && drawn.onLayerZero);
+Check("子弹判定盒线框画得出来", drawn.gizmoPixels > 300 && drawn.gizmos === 1,
+  `${drawn.gizmoPixels} px`);
+Check("判定线框不进法线深度预通道", drawn.gizmoNoPrepass);
+Check("移动胶囊跟着姿态换档（站 0 / 卧 2）",
+  drawn.standStance === 0 && drawn.proneStance === 2,
+  `stand=${drawn.standStance} prone=${drawn.proneStance}`);
+
+// ---------------------------------------------------------------------------
 // 3) 枪械编辑器
 // ---------------------------------------------------------------------------
 await page.click('[data-editor="weapon"]');

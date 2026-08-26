@@ -76,10 +76,18 @@ export class WorldMask {
  * 把人抬到 y=1000 去看，等于在预览一个雾里的白影。
  */
 export class Studio {
-  constructor({ scene, camera, library }) {
+  /**
+   * @param {object} deps
+   *   scene / camera / library —— 渲染侧
+   *   actorFactory 人物工厂。**只为了摸到它身上的合批层**（见 Open 里那段账）；
+   *                晚绑：Open 的时候才读 .batcher，构造顺序就管不着我们了。
+   */
+  constructor({ scene, camera, library, actorFactory = null }) {
     this.scene = scene;
     this.camera = camera;
     this.library = library;
+    this.actorFactory = actorFactory;
+    this.batchWasEnabled = null;
     this.mask = new WorldMask(scene);
     this.root = new THREE.Group();
     this.root.name = "EditorStudio";
@@ -137,6 +145,7 @@ export class Studio {
     this.root.visible = true;
     this.mask.Hide([this.root]);
     for (const object of alsoHide) this.mask.HideAlso(object);
+    this.SetActorBatch(false);
     this.camera.fov = 42;                 // 85 mm 等效：看模型不畸变
     this.camera.near = 0.05;
     this.camera.updateProjectionMatrix();
@@ -147,6 +156,7 @@ export class Studio {
   Close() {
     if (!this.saved) return this;
     this.ClearStand();
+    this.SetActorBatch(true);
     this.mask.Show();
     this.root.visible = false;
     this.camera.position.copy(this.saved.position);
@@ -156,6 +166,48 @@ export class Studio {
     this.camera.far = this.saved.far;
     this.camera.updateProjectionMatrix();
     this.saved = null;
+    return this;
+  }
+
+  /**
+   * 摄影棚开着的时候**把人物合批关掉**。
+   *
+   * 【2026-08-27 事故：「川军步兵在人物动作编辑器里不显示」】
+   * 症状是打开人物动作编辑器选川军步兵，画面上只有一支浮在空中的中正式，
+   * 人没了；换日军、敢死队、百姓又都好好的 —— 看着像是 nra 这个 kind 的模型坏了。
+   * 不是。取证（phase=2 城里，开编辑器前后各数一次）：
+   *
+   *   · 开编辑器前场景里已经有 **100 个 `ActorBatch_*` InstancedMesh**；
+   *   · `WorldMask.Hide` 把 scene 的直属子节点全藏了，这 100 个一并被藏；
+   *   · 展台上那个人的 23 个分件照旧被 ActorFactory.Create 登记进合批层、
+   *     挪到 BATCH_LAYER（等于不自己出画），实例矩阵写进了**已经藏起来的**那批
+   *     InstancedMesh 里 —— 于是「实例写进去了、一个像素也没有」。
+   *
+   * 为什么偏偏是川军：合批是按「几何 × 材质 × 投不投影」分桶的，桶里的
+   * InstancedMesh 是**头一次真的有实例时才建**。川军是玩家的自己人、永远在近处
+   * 走完整 Actor，桶早就建好了（所以被藏）；日军在城里那一关几乎全在远景层
+   * （ActorCrowd），精细桶还没建过，编辑器里现建的那几个是在 Hide 之后加进
+   * scene 的、不在 mask 的名单里，于是看得见。同一份代码两种表现，全凭
+   * 「这个桶是在藏之前还是藏之后建的」—— 那支看得见的中正式就是这么漏出来的。
+   *
+   * 修法不是去给 mask 开白名单（放行合批网格 = 把外面全城的人一起放进摄影棚），
+   * 而是**摄影棚里根本不需要合批**：台上只有一到六个人，合批省下的那几十个
+   * draw call 换来的是一整类看不见的显示事故。关掉之后分件退回自己出画（layer 0），
+   * 外面那批人的 root 已经被 mask 藏了，一个实例也不会写出来。
+   *
+   * 关掉/装回都记原值：合批本身可以被测试（Script_ActorBatchTest）关着，
+   * 那种时候退出编辑器不该把它替人打开。
+   */
+  SetActorBatch(on) {
+    const batcher = this.actorFactory?.batcher;
+    if (!batcher) return this;
+    if (!on) {
+      if (this.batchWasEnabled === null) this.batchWasEnabled = batcher.enabled;
+      batcher.SetEnabled(false);
+    } else {
+      if (this.batchWasEnabled !== null) batcher.SetEnabled(this.batchWasEnabled);
+      this.batchWasEnabled = null;
+    }
     return this;
   }
 

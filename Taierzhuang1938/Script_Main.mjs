@@ -66,6 +66,12 @@ const NEAR_SQUAD = { nra: 5, ija: 4 };
 
 /** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
 const TERRAIN_RAY = { terrain: true };
+/**
+ * 子弹判定球（半径 / 球心离脚底的高度）。口径与账在 Data_Battle.COMBAT.hitbox，
+ * 这里只是取个短名字 —— MarchBullet 每帧要读它几十次。
+ * 人物动作编辑器画的就是这一份数。
+ */
+const HITBOX = COMBAT.hitbox;
 /** 没有物理世界时脚部 IK 拿到的法线（平地）。 */
 const FLAT_NORMAL = [0, 1, 0];
 
@@ -1250,15 +1256,15 @@ async function Boot() {
        * 把视线摆到某个靶子身上。只摆 yaw/pitch，开火仍走 Debug.Fire ——
        * 散布、后坐、开镜収束照旧全在链路里。
        *
-       * offsetY 默认 0.95 = **躯干判定中心**（与 MarchBullet 的 s.position.y + 0.95
-       * 是同一个数，判定圆柱半径 0.45）。两条要知道的账：
+       * offsetY 默认 = **躯干判定中心** COMBAT.hitbox.centerY（与 MarchBullet 读的
+       * 是同一份数，判定球半径 COMBAT.hitbox.radius）。两条要知道的账：
        *   · TryFire 是先施加本发的枪口上跳再采样弹道（「顶上去 100%」的设计），
        *     所以首发会比瞄点高出 kick × 距离 —— ADS 下约 0.9°，25 m 处 ≈ 0.4 m。
        *     远靶验命中要么瞄低、要么用近靶（RangeTest 用的 R10）。
-       *   · 命中几何只有躯干圆柱（爆头是 TryFire 里按概率抽的，不是几何），
-       *     所以别瞄头 —— 那条线从圆柱上方擦过去就是脱靶。
+       *   · 命中几何只有那一个球（爆头是 TryFire 里按概率抽的，不是几何），
+       *     所以别瞄头 —— 那条线从球上方擦过去就是脱靶。
        */
-      AimAt: (targetId, offsetY = 0.95) => {
+      AimAt: (targetId, offsetY = HITBOX.centerY) => {
         const entry = rangeTargets.find((e) => e.spec.id === targetId);
         const s = entry ? entry.soldier : null;
         if (!s) return null;
@@ -3237,16 +3243,19 @@ function MarchBullet(from, dir, weapon, targets) {
     if (travelled + segLen > range) segLen = range - travelled;
     _segDir.normalize();
 
-    // 先看这一段有没有穿过人：到线段的垂距 < 0.45 m 算命中躯干
+    // 先看这一段有没有穿过人：到线段的垂距小于判定球半径就算命中躯干。
+    // 半径与球心高度是 COMBAT.hitbox（原来是这里的两个字面量）——
+    // 人物动作编辑器要照着同一份数把这个球画出来，两边各写一份的话，
+    // 画出来的球第二天就不是判定用的球了。
     let bestSoldier = null, bestT = Infinity;
     for (const s of targets) {
       _rel.set(s.position.x - _bulletPos.x,
-        s.position.y + 0.95 - _bulletPos.y,
+        s.position.y + HITBOX.centerY - _bulletPos.y,
         s.position.z - _bulletPos.z);
       const t = _rel.dot(_segDir);
       if (t < 0 || t > segLen) continue;
       const perp = _rel.addScaledVector(_segDir, -t).length();
-      if (perp < 0.45 && t < bestT) { bestT = t; bestSoldier = s; }
+      if (perp < HITBOX.radius && t < bestT) { bestT = t; bestSoldier = s; }
     }
     // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
     // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。

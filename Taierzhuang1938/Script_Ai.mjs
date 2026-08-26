@@ -127,8 +127,12 @@ export function MakeSoldierIdentity(seed) {
 /**
  * 三种姿态的胶囊。与 Script_Player.STANCE 是同一套数 ——
  * 两边对"人有多高多粗"必须一致，否则玩家钻得过去的门洞 AI 钻不过去。
+ *
+ * **这是移动碰撞体，不是命中体。** 子弹判定另有一个球（`COMBAT.hitbox`），
+ * 两者互不相干：胶囊决定人挤不挤得过去，球决定子弹算不算打中。
+ * 导出是给人物动作编辑器把两者并排画出来用的 —— 这个区别光看代码很难记住。
  */
-const CAPSULE = [
+export const CAPSULE = [
   { radius: 0.34, height: 1.78 },     // 0 站
   { radius: 0.34, height: 1.21 },     // 1 蹲
   { radius: 0.42, height: 0.58 },     // 2 卧
