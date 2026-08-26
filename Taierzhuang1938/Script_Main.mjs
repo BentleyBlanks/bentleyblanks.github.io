@@ -39,6 +39,7 @@ import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mj
 import { StoryDirector } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
+import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
@@ -730,6 +731,7 @@ async function Boot() {
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
   setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
+  const grenadeAsset = await LoadGrenadeAsset();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -749,6 +751,7 @@ async function Boot() {
     depthBudget: 1.22,
     meshDocs: actorFactory.meshDocs,
     riggedAssets: actorFactory.riggedAssets,
+    grenadeAsset,
   });
   camera.add(viewmodel.root);
   scene.add(camera);
@@ -841,7 +844,7 @@ async function Boot() {
     restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction, grenadeAsset,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
     onPlayerHit: (died) => ConfirmHit(died),
