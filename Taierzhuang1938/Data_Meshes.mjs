@@ -126,9 +126,9 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "ZhongZheng.tzm.json", category: "weapon",
-    triangles: 5633, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 5609, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.05570, 0.17549, 1.11133], lengthM: 1.110,
+    span: [0.05554, 0.16881, 1.11133], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
     note: "中正式。几何来自 Poly Haven CC0 Bolt Action Rifle 7.62；"
       + "剔除现代瞄准镜、包布和独立子弹，仅保留老式栓动枪轮廓，"

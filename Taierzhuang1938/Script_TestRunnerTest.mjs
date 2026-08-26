@@ -66,11 +66,13 @@ const inferred = InferDomains([
   "Taierzhuang1938/Script_Combat.mjs",
   "Taierzhuang1938/Data_Weapons.mjs",
   "Taierzhuang1938/Script_Smoke.mjs",
+  "Taierzhuang1938/Script_Light.mjs",
   "Taierzhuang1938/Unknown_NewModule.mjs",
   "README.md",
 ]);
 Check(inferred.domains.includes("combat"), "战斗文件自动映射 combat");
 Check(inferred.domains.includes("render") && inferred.domains.includes("perf"), "烟雾文件映射 render/perf");
+Check(inferred.domains.includes("render"), "灯光文件自动映射 render");
 assert.deepEqual(inferred.unmatchedProjectFiles, ["Taierzhuang1938/Unknown_NewModule.mjs"]);
 checks += 1;
 

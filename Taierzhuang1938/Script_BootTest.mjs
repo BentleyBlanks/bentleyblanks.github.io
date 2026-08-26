@@ -77,6 +77,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       T.renderer.info.reset();
       // 四套爆炸图各强制播一片，让所有 grid/混合模式/着色器分支都在 Tier 0 真编译。
       // 只在第一关做，位置放到镜头前 18 m；后六关仍保持原本的整帧健康取样。
+      let persistentLightState = null;
       if (testPhase === 0) {
         const forward = T.camera.position.clone();
         T.camera.getWorldDirection(forward);
@@ -96,6 +97,10 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         // 只灌一次发射器，不在 renderer.info.autoReset=false 时多渲染几十帧；
         // 否则性能读数会把 24 帧 draw call/三角形累加起来，形成测试自己的假红。
         T.vfx._UpdateSmokeSources(1);
+        // 粒子与灯是两条渲染链：持续源要注册逻辑火光，四发爆炸要保留四份独立包络，
+        // 固定物理灯槽则始终 visible（闲置 intensity=0），防首炸材质重编译。
+        T.lights.Update(0, T.state.elapsed, blastAt);
+        persistentLightState = T.lights.GetEffectLightState();
         for (const handle of handles) T.vfx.RemoveSceneEffect(handle);
       }
       // 不开 preserveDrawingBuffer，取样必须与渲染在同一个任务里。
@@ -105,6 +110,9 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       // 探针报"画面近乎纯色"，测的是测试自己写错的曝光，不是画面。
       T.StepFrames(1);
       const glErrorAfterVfx = gl.getError();
+      const explosionLightEarly = testPhase === 0 ? T.lights.GetEffectLightState() : null;
+      if (testPhase === 0) T.lights.Update(0.18, T.state.elapsed + 0.18, T.camera.position);
+      const explosionLightLate = testPhase === 0 ? T.lights.GetEffectLightState() : null;
 
       const explosionSpritePools = {};
       const spritePoolNames = {
@@ -211,6 +219,11 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         explosionSpriteRouting,
         authoredSourcePools,
         loadedVefectsMasks: T.vfx.loadedVefectsMasks.size,
+        persistentLightState,
+        explosionLightEarly,
+        explosionLightLate,
+        stableVfxLightPool: T.lights.fireLights.every((light) => light.visible)
+          && T.lights.muzzle.visible,
       };
     }, phase);
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
@@ -225,6 +238,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (health.glError !== 0) bad.push(`GL 错误 ${health.glError}`);
     if (health.glErrorAfterVfx !== 0) bad.push(`爆炸序列帧 GL 错误 ${health.glErrorAfterVfx}`);
     if (health.loadedVefectsMasks !== 5) bad.push(`Vefects 纹理只载入 ${health.loadedVefectsMasks}/5`);
+    if (!health.stableVfxLightPool) bad.push("特效点光仍会靠 visible 开关触发 shader 重编译");
     const authored = health.authoredSourcePools || {};
     if (!authored.sourceSmoke?.masked || authored.sourceSmoke?.fire
       || !authored.sourceFire?.masked || !authored.sourceFire?.fire
@@ -256,6 +270,28 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     // 生活层必须在实际关卡切片里生成。只查包含对应内容的两关，避免把别关的裁剪
     // 当事故：L0 负责界河村落，L5 负责城内十字街与精细院落。
     if (phase === 0) {
+      const persistentLights = health.persistentLightState;
+      const explosionEarly = health.explosionLightEarly;
+      const explosionLate = health.explosionLightLate;
+      if (persistentLights?.persistent !== 2 || persistentLights?.explosions !== 4
+        || persistentLights?.active?.length !== persistentLights?.budget) {
+        bad.push(`燃烧/爆炸点光未进入固定灯池 ${JSON.stringify(persistentLights)}`);
+      }
+      if (explosionEarly?.persistent !== 0 || explosionEarly?.explosions !== 4
+        || explosionEarly?.active?.length < 4
+        || !explosionEarly.active.some((light) => light.intensity > 30 && light.radius > 7)) {
+        bad.push(`爆炸点光颜色/强度/半径包络缺失 ${JSON.stringify(explosionEarly)}`);
+      }
+      const earlyPeak = Math.max(0, ...(explosionEarly?.active || []).map((light) => light.intensity));
+      const latePeak = Math.max(0, ...(explosionLate?.active || []).map((light) => light.intensity));
+      if (!(latePeak > 0 && latePeak < earlyPeak)) {
+        bad.push(`爆炸点光没有按真实时间由亮到暗 early=${earlyPeak} late=${latePeak}`);
+      }
+      const earlyColors = new Set((explosionEarly?.active || []).map((light) => light.color));
+      const lateColors = new Set((explosionLate?.active || []).map((light) => light.color));
+      if ([...earlyColors].every((color) => lateColors.has(color))) {
+        bad.push("爆炸点光没有随白热核 → 橙红火球发生颜色过渡");
+      }
       const outfield = health.environment?.outfield;
       if (!outfield || outfield.villagePropClusters < 1 || outfield.villageProps < 5) {
         bad.push(`村落生活层为空 clusters=${outfield?.villagePropClusters ?? "?"} props=${outfield?.villageProps ?? "?"}`);

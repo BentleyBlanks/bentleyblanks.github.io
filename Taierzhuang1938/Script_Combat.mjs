@@ -399,9 +399,6 @@ export class CombatSystem {
       audio.Play(d > 60 ? "explosionFar" : "explosionNear",
         { position: position.clone(), volume: Clamp(radius / 8, 0.5, 1.2) });
     }
-    if (this.host.lights) {
-      this.host.lights.FlashMuzzle(position, Clamp(radius * 9, 40, 120));
-    }
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
     // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
     // 空间散列与导航只重建一次。

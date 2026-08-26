@@ -720,7 +720,9 @@ async function Boot() {
     console.warn(`[Main] 这些模型没读到，对应的人/枪退回方块几何：${meshes.missing.join(", ")}`);
   }
   setStep(`上刺刀…… 模型 ${meshes.loaded}/${meshes.requested}`, 0.92);
-  vfx = new VfxSystem(scene, library, { quality: QUALITY, maxParticles: SCALE.vfxBudget });
+  vfx = new VfxSystem(scene, library, {
+    quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
+  });
   // 浮尘：体积光要有介质才散射得出来，不然 godStrength 给再大也只是天上一片糊。
   // AmbientDust 会重建整个 DustField（丢旧的、建新的），所以只在这里调一次，
   // 换关时由 EnterLevel 重新按新切片调一次，别每帧调。
@@ -2735,7 +2737,7 @@ function MenuFrame(dt, render = true) {
   if (vfx) vfx.Update(dt, camera, state.elapsed);
   if (sky) sky.Update(state.elapsed);
   if (lights) {
-    lights.Update(dt, state.elapsed);
+    lights.Update(dt, state.elapsed, camera.position);
     camera.getWorldDirection(_forward);
     lights.UpdateShadowFrustum(camera.position, _forward);
   }
@@ -2987,8 +2989,9 @@ function ToggleBayonet() {
   const next = !state.bayonetFixed;
   if (!viewmodel.TriggerFixBayonet?.(next)) return false;
   state.bayonetFixed = next;
-  // "咔哒"落在动画中段左手贴到枪口那一下（0.95 s × 0.52 ≈ 0.49）
-  audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1, delay: 0.48 });
+  // "咔哒"落在刀滑进枪口环那一帧（装 0.95 s × 0.58 ≈ 0.55，卸在 0.52 起拔）
+  audio.Play("stripperLoad", { volume: 0.7, pitch: next ? 1.25 : 1.1,
+    delay: next ? 0.55 : 0.50 });
   hud.Hint(next ? "上刺刀" : "收刺刀", 1.6);
   return true;
 }
@@ -3099,6 +3102,9 @@ let lastLandSerial = 0;
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
+// 弹道起点允许离瞄准轴多远（米）。腰射常态是 0.193 m，这个上限只在"上刺刀之后
+// 枪斜端起来"那一档兜底，见开火里那段注释。
+const MAX_MUZZLE_PARALLAX_M = 0.22;
 const _hitPoint = new THREE.Vector3();
 const _bulletPos = new THREE.Vector3();
 const _bulletVel = new THREE.Vector3();
@@ -3377,7 +3383,6 @@ function TryFire(dt) {
   audio.Play("shellDrop", {
     volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
   });
-  lights.FlashMuzzle(_muzzle, 24);
   // 枪种必须传下去：过去所有玩家武器都落进默认 rifle 配方，驳壳枪、捷克式与
   // 栓动步枪喷出完全相同的焰和烟。ER2 的枪感并不靠把所有枪都抖得更厉害，
   // 而是让每一类武器在同一套输入下仍有自己的出膛节奏。
@@ -3403,7 +3408,17 @@ function TryFire(dt) {
   const eye = player.EyePosition;
   _rel.set(from.x - eye.x, from.y - eye.y, from.z - eye.z);
   const along = _rel.dot(_aimDir);
-  const muzzleOffset = _rel.addScaledVector(_aimDir, -along).length();
+  _rel.addScaledVector(_aimDir, -along);          // 现在 _rel 就是那条垂距向量
+  let muzzleOffset = _rel.length();
+  // 上刺刀之后的"刺杀预备"是**视觉**姿态（Script_Viewmodel.BAYONET_CARRY：把枪
+  // 斜端在身前，刀身才读得出来）。视觉可以斜，弹道不该跟着斜：实测垂距会从
+  // 0.19 m 涨到 0.43 m，而贴脸腰射时那多出来的 0.24 m 就是"明明对着人却打空"。
+  // 所以垂距只保留到上限，超出的部分把起点拉回瞄准轴 —— 枪焰、曳光仍从真枪口出，
+  // 玩家看不出差别，手感上"上了刺刀就打不准"这条不存在。
+  if (muzzleOffset > MAX_MUZZLE_PARALLAX_M) {
+    from.addScaledVector(_rel, -(1 - MAX_MUZZLE_PARALLAX_M / muzzleOffset));
+    muzzleOffset = MAX_MUZZLE_PARALLAX_M;
+  }
 
   _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
@@ -3570,6 +3585,9 @@ function Frame(dt, render = true) {
     // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
     // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
     camera.getWorldDirection(_forward);
+    // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
+    // 墙地仍旧不亮，退出编辑器才突然补算一大步。
+    lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;
@@ -3584,7 +3602,7 @@ function Frame(dt, render = true) {
     // 阴影框要跟着**过场相机**走，不能留在玩家脚下：独立布景在两千米外，
     // 阴影框留在城里等于整场布景没有阴影（看上去就是「人浮在地上」）。
     sky.Update(state.elapsed);
-    lights.Update(dt, state.elapsed);
+    lights.Update(dt, state.elapsed, camera.position);
     if (vfx) vfx.Update(dt, camera, state.elapsed);
     camera.getWorldDirection(_forward);
     lights.UpdateShadowFrustum(camera.position, _forward);
@@ -3771,7 +3789,7 @@ function Frame(dt, render = true) {
   // 投弹蓄力：按住 G/H 的时间同时决定扔多远和引信烧掉多少
   if (state.cooking) state.cook += dt;
   sky.Update(state.elapsed);
-  lights.Update(dt, state.elapsed);
+  lights.Update(dt, state.elapsed, camera.position);
   camera.getWorldDirection(_forward);
   lights.UpdateShadowFrustum(player.position, _forward);
   // 探针体（gi.Update）不在这里推，它挂在 RenderScene 上 —— 见那里的账。

@@ -1418,7 +1418,7 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
-export const SFX_PACK_VERSION = "5";
+export const SFX_PACK_VERSION = "6";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
