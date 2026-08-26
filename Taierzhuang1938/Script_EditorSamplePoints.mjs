@@ -187,8 +187,7 @@ export class SamplePointEditor {
       { label: "导出 mjs 片段", onClick: () => this.Export("mjs") },
       { label: "导入", onClick: () => this.Import() },
     ]);
-    Note(io, "面板里的改动只存在浏览器里。**基线在源码里** —— "
-      + "改完请把「mjs 片段」誊回 Data_SamplePoints.mjs，否则下一次出图拍的还是旧机位。", true);
+    Note(io, "改动只在浏览器里，**基线在源码**：把「mjs 片段」誊回 Data_SamplePoints.mjs，否则出图仍是旧机位。", true);
   }
 
   // -------------------------------------------------------------------------

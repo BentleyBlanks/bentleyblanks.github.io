@@ -844,8 +844,7 @@ export class SceneEditor {
       this.hudNamesVisible = value;
       this.UpdateHudLabels();
     });
-    Note(mark, "区域标记画出占地框，道路标记画出带宽与走向；两者随场景 JSON 存取。"
-      + "“载入滕县图纸标记”直接读取 Data_Tengxian，不另抄一份坐标。", true);
+    Note(mark, "区域标记画占地框，道路标记画带宽走向，随场景 JSON 存取。“载入滕县图纸标记”直接读 Data_Tengxian。", true);
     Note(mark, "「名牌 HUD」把布防图（Data_Tengxian）与已放标记的名字直接投在屏幕上，"
       + "任何机位高度都读得清；「视口显示」管的是近处才看得见的世界牌与占地框。");
     this.RefreshMarkerUi();
@@ -873,13 +872,11 @@ export class SceneEditor {
       { label: "撤销一笔", onClick: () => this.UndoTerrain() },
       { label: "全部还原", onClick: () => this.ResetTerrain(), cls: "danger" },
     ]);
-    Note(terrain, "笔刷同时改**网格顶点**与**解析高程**：看得见的地和踩得到的地一起变。"
-      + "只改前者的话，人会在坑口上平地走过去。", true);
+    Note(terrain, "笔刷同时改**网格顶点**与**解析高程**：看得见的地和踩得到的地一起变。", true);
     Note(terrain, "刷得动的只有**城内台地**（|x|、|z| < 318 m，约 5.5 m 一个顶点）。"
       + "城外那张地面是绕城的方环，七百米以外每两百米才一个顶点 —— "
       + "在那儿落笔会被拒绝并提示，不会偷偷只改解析高程。");
-    Note(terrain, "场景关卡编辑器放置的构件会按自己的落地点重新采样地高："
-      + "地面抬升/下挖时，模型与碰撞盒会一起同步，不会悬空或埋进地里。", true);
+    Note(terrain, "已放置的构件会跟着重采样地高，抬升/下挖都不会悬空或埋进地里。", true);
   }
 
   BuildStorageUi(body) {
@@ -1158,7 +1155,7 @@ export class SceneEditor {
     // 打不到地的时候必须当场说出来。这是「点了没反应」那一类事故里最气人的一种：
     // 眼高才 1.6 m，准心一抬到地平线以上射线就再也碰不到地面，
     // 而屏幕上没有任何东西告诉你这件事。
-    this.host.SetHint(hit ? this.modeHint : "准心在地平线以上 —— 那个方向上没有地面，往下压一点");
+    this.host.SetHint(hit ? this.modeHint : "准心在地平线以上：往下压一点");
     if (!hit) return;
     const radius = this.mode === "terrain" ? this.brush.radius
       : this.mode === "mark" ? Math.max(1.5, Math.min(this.markerDraft.w, this.markerDraft.d) * 0.12)
@@ -1607,8 +1604,7 @@ export class SceneEditor {
     // 与其悄悄留下这种分歧，不如当场拒绝并说清楚在哪儿刷得动。
     const touched = this.ApplyTerrainToMesh(x, z, radius, amount);
     if (!touched) {
-      this.host.SetHint(`这一片地面的网格太疏（城外几十米才一个顶点），笔刷改不动它 —— `
-        + `到城内台地（|x|、|z| < 318 m）上刷，或者把半径调大`);
+      this.host.SetHint("这片网格太疏，刷不动：到城内台地（|x|、|z| < 318 m）刷，或把半径调大");
       return;
     }
     this.terrainOps.push({ x, z, r: radius, amount });

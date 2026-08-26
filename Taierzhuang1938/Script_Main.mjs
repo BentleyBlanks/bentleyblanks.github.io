@@ -288,6 +288,10 @@ const graphics = {
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
+  // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
+  // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
+  // 决定的是走哪条抗锯齿路，所以不套 Mul 那套倍率约定。
+  taa: post.taaEnabled,
   // 体积光临时关停（性能观察期）：god 仍是强度倍率，godEnabled 是整个 pass 的总闸，
   // 关掉时连径向模糊那一趟都不跑。想恢复把出厂值改回 true 即可。
   godEnabled: false,
@@ -4171,6 +4175,9 @@ function ApplyGraphics() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   post.SetSize(Math.round(window.innerWidth * scale), Math.round(window.innerHeight * scale));
+  // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
+  // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
+  post.SetTaaEnabled(graphics.taa !== false);
 
   const wantShadow = !!graphics.shadows;
   if (renderer.shadowMap.enabled !== wantShadow) {

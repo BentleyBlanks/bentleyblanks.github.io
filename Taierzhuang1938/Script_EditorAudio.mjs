@@ -241,8 +241,7 @@ export class AudioEditor {
         if (this.audio) this.audio.Bark(kind, { priority: true, seed: Math.floor(Math.random() * 1000) });
       });
     }
-    this.voiceNote = Note(voice, "带「事件句」标记的三条有前提条件（战车/飞机/无枪），"
-      + "只能由知道前提的调用方点名喊 —— 随机抽中就是穿帮。", true);
+    this.voiceNote = Note(voice, "「事件句」三条有前提（战车/飞机/无枪），只能点名喊，随机抽中即穿帮。", true);
 
     const quiz = Section(body, "盲听指认");
     ButtonRow(quiz, [
