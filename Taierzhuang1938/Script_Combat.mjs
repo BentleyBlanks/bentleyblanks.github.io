@@ -60,7 +60,7 @@ export class CombatSystem {
     this.tmp = new THREE.Vector3();
     this.tmpB = new THREE.Vector3();
 
-    // 投掷物的视觉：一个木柄弹体。池化 —— 投弹是最常用的动作，
+    // 投掷物的视觉：普通弹与七枚一束的集束弹共用池化外壳。投弹是最常用的动作，
     // 每次 new Mesh 会在半个小时的战斗里攒出上千个几何体。
     this.pool = [];
     this.poolIndex = 0;
@@ -71,9 +71,25 @@ export class CombatSystem {
     head.translate(0, 0, -0.12);
     for (let i = 0; i < 12; i += 1) {
       const group = new THREE.Group();
-      const stick = new THREE.Mesh(geometry, host.library.Get("WoodStock"));
-      const body = new THREE.Mesh(head, host.library.Get("Steel"));
-      group.add(stick, body);
+      const regular = new THREE.Group();
+      regular.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
+      const bundle = new THREE.Group();
+      bundle.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
+      // 一根带柄弹 + 六枚去柄弹，正是 Data_Weapons 记录的七枚集束外观。
+      for (let j = 0; j < 6; j += 1) {
+        const a = (j / 6) * Math.PI * 2;
+        const body = new THREE.Mesh(head, host.library.Get("Steel"));
+        body.position.set(Math.cos(a) * 0.057, Math.sin(a) * 0.057, 0);
+        bundle.add(body);
+      }
+      for (const z of [-0.080, -0.030]) {
+        const rope = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.005, 6, 14), host.library.Get("WoodStock"));
+        rope.position.z = z;
+        bundle.add(rope);
+      }
+      bundle.visible = false;
+      group.add(regular, bundle);
+      group.userData.visuals = { regular, bundle };
       group.visible = false;
       group.castShadow = false;
       host.scene.add(group);
@@ -81,9 +97,12 @@ export class CombatSystem {
     }
   }
 
-  TakeMesh() {
+  TakeMesh(kind) {
     const m = this.pool[this.poolIndex % this.pool.length];
     this.poolIndex += 1;
+    const isBundle = kind === "GrenadeBundle";
+    m.userData.visuals.regular.visible = !isBundle;
+    m.userData.visuals.bundle.visible = isBundle;
     m.visible = true;
     return m;
   }
@@ -106,7 +125,7 @@ export class CombatSystem {
     this.Attach(p);
     // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来
     p.fuse = Math.max(0.35, p.fuse - cookedFor);
-    p.mesh = this.TakeMesh();
+    p.mesh = this.TakeMesh(kind);
     p.mesh.position.copy(start);
     this.projectiles.push(p);
     if (this.host.audio) this.host.audio.Play("grenadeThrow", { position: start.clone(), volume: 0.8 });

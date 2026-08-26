@@ -50,6 +50,8 @@ const WEAPONS = [
   // 枪口挂点长在握把底下，谁都没看见 —— 名单漏一把，等于那把枪没人验收。
   { id: "ServicePistol", len: 0.222, closeAt: -0.02 },
   { id: "Grenade", len: 0.22, upright: true },
+  // 集束不是普通木柄弹的缩放版；单列出图，保证七枚与捆扎绳的剪影有人验收。
+  { id: "GrenadeBundle", len: 0.26, upright: true },
   { id: "Dadao", len: 0.90, upright: true },
   // 大刀的第二式样。它没有自己的 Data_Weapons 条目（只是外观变体），
   // 所以靠 variant 序号选，出图文件名另起 shotId 免得覆盖上面那张。
