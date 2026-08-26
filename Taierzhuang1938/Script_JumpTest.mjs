@@ -127,6 +127,28 @@ try {
   Check("助跑加成压在自动翻越判据附近，不许变成跑酷",
     run.sprint.rise < 0.75 && run.sprint.air < 0.62,
     `冲刺跳抬高 ${run.sprint.rise.toFixed(3)} m / 滞空 ${run.sprint.air.toFixed(3)} s`);
+  // 腾空时鼠标必须能转视线，而且要全额落在视线上（枪口偏移不许把它吃掉）。
+  // 当前三档难度的 freeAimDeg 都是 0，自由瞄准锥事实上是关的；这条用例守的是
+  // "锥重新打开时腾空不许退回枪先动"——Script_Player 里那条 !grounded 直跟。
+  const airLook = await page.evaluate(() => {
+    const T = window.Taierzhuang, D = T.Debug;
+    const Sweep = () => {
+      const y0 = T.player.yaw;
+      for (let i = 0; i < 3; i += 1) { D.Look(4, 0); T.StepFrames(1); }
+      return Math.abs(T.player.yaw - y0);
+    };
+    T.player.Spawn(0, 60, 0);
+    T.StepFrames(20);
+    T.player.stamina = 1;
+    D.Key("Space");
+    T.StepFrames(6);
+    const airborne = !D.Jump().grounded;
+    const air = Sweep();
+    return { air, airborne, aimYaw: Math.abs(T.player.aimYaw) };
+  });
+  Check("腾空时鼠标照样转视线",
+    airLook.airborne && airLook.air > 0.015 && airLook.aimYaw < 1e-3,
+    `空中视线 ${airLook.air.toFixed(4)} rad / 枪口残留 ${airLook.aimYaw.toFixed(5)} rad / 在空中=${airLook.airborne}`);
 
   const vault = await page.evaluate(() => {
     const T = window.Taierzhuang, D = T.Debug, bf = T.battlefield;
@@ -142,21 +164,30 @@ try {
       T.player.Spawn(cx - nx * 0.75, cz - nz * 0.75, Math.atan2(-nx, -nz));
       const jump0 = D.Jump().count, vault0 = D.Vault().count;
       D.Key("Space"); T.StepFrames(4);
-      if (D.Vault().active) return {
-        found: true, jumps: D.Jump().count - jump0, vaults: D.Vault().count - vault0,
-      };
+      if (D.Vault().active) {
+        // 翻越途中推鼠标：身体走曲线，脖子照转。原来整帧 return 掉，这半秒画面是僵的。
+        const y0 = T.player.yaw;
+        let stillVaulting = false;
+        for (let i = 0; i < 3; i += 1) { D.Look(4, 0); T.StepFrames(1); stillVaulting ||= D.Vault().active; }
+        return {
+          found: true, jumps: D.Jump().count - jump0, vaults: D.Vault().count - vault0,
+          lookTravel: Math.abs(T.player.yaw - y0), stillVaulting,
+        };
+      }
     }
-    return { found: false, jumps: 0, vaults: 0 };
+    return { found: false, jumps: 0, vaults: 0, lookTravel: 0, stillVaulting: false };
   });
   Check("墙前 Space 保持翻越优先", vault.found && vault.vaults === 1 && vault.jumps === 0,
     `找到=${vault.found} / 翻越 +${vault.vaults} / 跳跃 +${vault.jumps}`);
+  Check("翻越途中照样能转视线", vault.stillVaulting && vault.lookTravel > 0.015,
+    `翻越中=${vault.stillVaulting} / 视线 ${vault.lookTravel.toFixed(4)} rad`);
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
 }
 
 if (failures.length) {
-  console.error(`\n跳跃专项：${4 - failures.length}/4 过；失败：${failures.join("、")}`);
+  console.error(`\n跳跃专项：${8 - failures.length}/8 过；失败：${failures.join("、")}`);
   process.exit(1);
 }
 console.log("\n跳跃专项全过。");

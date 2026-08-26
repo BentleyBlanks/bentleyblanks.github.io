@@ -923,6 +923,10 @@ async function Boot() {
       Mouse: (button = 0, down = true) => {
         document.dispatchEvent(new MouseEvent(down ? "mousedown" : "mouseup", { button, bubbles: true }));
       },
+      // 一次鼠标位移。**不走 mousemove 事件**：那条链路要查指针锁，而出图/测试
+      // 模式下根本拿不到锁，查了就等于测试里转不了头。要测的是"位移进来之后
+      // 视线怎么走"，指针锁归属另有冒烟覆盖。
+      Look: (dx = 0, dy = 0) => { input.lookX += dx; input.lookY += dy; },
       Wheel: (delta) => {
         document.dispatchEvent(new WheelEvent("wheel", { deltaY: delta, bubbles: true }));
       },

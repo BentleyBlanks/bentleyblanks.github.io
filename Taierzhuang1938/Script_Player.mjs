@@ -398,10 +398,21 @@ export class PlayerController {
     return true;
   }
 
-  /** 翻越途中的一帧：位移曲线走完就落地。期间禁开火、禁转身（视角只轻微下压）。 */
-  _StepVault(dt) {
+  /**
+   * 翻越途中的一帧：位移曲线走完就落地。期间禁开火、身体走写死的曲线，
+   * **但视线照转** —— 一按空格人贴着矮墙就进翻越，画面会僵住半秒；玩家那半秒
+   * 里推鼠标什么都不发生，读出来就是"起跳的时候镜头转不动"。翻的是身体不是脖子。
+   */
+  _StepVault(dt, input) {
     const v = this.vault;
     v.t += dt;
+    // 只有相机直跟这一条：自由瞄准/后坐回落都跟着 Update 一起跳过了，
+    // 翻墙那半秒本来也不该有据枪微调。
+    if (input) {
+      const sens = (input.sensitivity ?? 1) * 0.0022;
+      this.yaw += -(input.lookX || 0) * sens;
+      this.pitch = Clamp(this.pitch + -(input.lookY || 0) * sens, -1.35, 1.35);
+    }
     const k = Clamp01(v.t / v.duration);
     const arc = Math.sin(Math.PI * k);
     const from = this._vaultFrom, to = this._vaultTo;
@@ -433,7 +444,7 @@ export class PlayerController {
       return;
     }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
-    if (this.vault.active) return this._StepVault(dt);
+    if (this.vault.active) return this._StepVault(dt, input);
 
     this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
     if (this.jump.buffer > 0) {
@@ -488,7 +499,11 @@ export class PlayerController {
     this.freeAimLimitDeg = DIFFICULTY.freeAimDeg;
     const limit = THREE.MathUtils.degToRad(this.freeAimLimitDeg * (1 - this.ads * 0.72));
     const walking = Math.hypot(input.forward || 0, input.strafe || 0) > 0.05;
-    if (walking) {
+    // 腾空时同样按「相机直跟」走。原来只看 forward/strafe：原地按空格跳起来时两者
+    // 都是 0，鼠标位移就全落进那 2° 的自由瞄准锥里 —— 屏幕上就是「一跳起来镜头
+    // 转不动了」，落地才突然接上。人在半空本来也谈不上据枪微调，这一段没有存在意义。
+    const directLook = walking || !this.grounded;
+    if (directLook) {
       this.yaw += dx;
       this.pitch += dy;
       const recentre = 1 - Math.exp(-dt * 18);
@@ -516,7 +531,7 @@ export class PlayerController {
     // 归位延后 0.10 s 起、再用 0.12 s 拉满。手在动的时候不归位，
     // 于是鼠标位移 1:1 全额落在枪口方向（yaw + aimYaw）上：
     // 边界以内动的是枪、边界以外动的是视线，但**总瞄准角与鼠标永远是 1:1**。
-    const looking = walking || Math.abs(dx) + Math.abs(dy) > 1e-6;
+    const looking = directLook || Math.abs(dx) + Math.abs(dy) > 1e-6;
     this.lookIdle = looking ? 0 : this.lookIdle + dt;
     const settle = Clamp01((this.lookIdle - 0.10) / 0.12);
     if (settle > 0) {
