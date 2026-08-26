@@ -246,11 +246,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Zb26.tzm.json",
-   "triangles": 896,
+   "triangles": 4677,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 30289,
+   "bytes": 198519,
    "materials": [
     "steel",
     "wood"
@@ -265,13 +265,13 @@
    ],
    "bounds": {
     "min": [
-     -0.08471,
-     -0.19222,
+     -0.03999,
+     -0.12294,
      -0.91
     ],
     "max": [
-     0.08579,
-     0.18054,
+     0.03999,
+     0.20366,
      0.255
     ]
    }
@@ -314,11 +314,11 @@
    "name": "Mauser96",
    "category": "weapon",
    "file": "Mauser96.tzm.json",
-   "triangles": 3768,
+   "triangles": 4677,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 140565,
+   "bytes": 182423,
    "materials": [
     "steel",
     "wood"
@@ -333,13 +333,13 @@
    ],
    "bounds": {
     "min": [
-     -0.02309,
-     -0.10122,
-     -0.24227
+     -0.01135,
+     -0.12126,
+     -0.242
     ],
     "max": [
-     0.02309,
-     0.063,
+     0.01135,
+     0.05163,
      0.046
     ]
    }
@@ -348,13 +348,14 @@
    "name": "ServicePistol",
    "category": "weapon",
    "file": "ServicePistol.tzm.json",
-   "triangles": 4679,
-   "meshBlocks": 1,
+   "triangles": 4678,
+   "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 140087,
+   "bytes": 138973,
    "materials": [
-    "steel"
+    "steel",
+    "wood"
    ],
    "mounts": [
     "root",
@@ -367,13 +368,13 @@
    "bounds": {
     "min": [
      -0.01589,
-     -0.07926,
+     -0.05138,
      -0.176
     ],
     "max": [
-     0.01597,
-     0.05027,
-     0.04601
+     0.01591,
+     0.07815,
+     0.046
     ]
    }
   },

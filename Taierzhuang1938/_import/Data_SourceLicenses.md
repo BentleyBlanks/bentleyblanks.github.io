@@ -22,20 +22,25 @@ Sketchfab API Key（登录账号 BentleyJobs）。下载走 `_import/SketchfabBr
 
 导入管线（`_blender/ImportWeapons.py`）按来源模型的结构把几何分进 steel/wood 两桶：
 UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材质低模按**材质名**
-（Gewehr 88 的 `Material` = 木）。所有源图都会被丢弃，运行时统一绑 steel/wood
-两套共享 PBR（见上）。
+（Gewehr 88 与 ZB-26 的 `Material` = 木），整枪共用一套 PBR 的模型按金属度贴图
+（B 通道）拆出非金属木握把。源图只在离线分桶时读取，运行时统一绑 steel/wood
+两套共享 PBR（见上），不会把 Sketchfab/Poly Haven 的大图带进 Pages。
+为保证没有本机缓存贴图时仍能重建，C96 与 Service Pistol 各保留一张 256px
+`Texture_MetalMask.png`（从来源 metallic-roughness / ARM 的 B 通道缩制）；它只在 Blender
+离线分桶时读取，不是运行时材质。
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
 | 中正式 `ZhongZheng` | `Source/Model_PolyHavenBoltActionRifle762/bolt_action_rifle_7_62_1k.gltf` | [Poly Haven — Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62) | CC0 | 取其老式毛瑟系栓动步枪主体，删除现代瞄准镜、缠布和独立子弹；保留木/钢分桶，全长按史实 1.110 m 缩放。 |
 | 汉阳造 `HanYang` | `Source/Model_Gewehr88/scene.gltf` | [TastyTony](https://sketchfab.com/TastyTony) | CC-BY-4.0 | 汉阳八八式的母型就是 Gewehr 88：**整长套筒、曼利夏漏夹弹仓与露出式通条**都是模型自带的，不再用 Kar98k 拉长加假套筒。全长按史实 1.250 m。 |
 | 三八式 `Type38` | `Source/Model_Type38Arisaka/scene.gltf` | [Snijboer](https://sketchfab.com/Snijboer) | CC-BY-4.0 | 三八式：防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条。全长按史实 1.276 m。 |
-| 驳壳枪 `Mauser96` | `Source/Model_MauserC96.glb` | [Plewr](https://plewr.itch.io/mauser-c96-low-poly) | CC0 | 毛瑟 C96。丢掉名为 Boom 的枪口焰网格。 |
-| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，压到 4679 三角。原驳壳枪仍保留给既有关卡。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），所以 `_Collect` 里那个写死的绝对焊接距离只在它身上是真的焊 —— 见 ImportWeapons._WeldDistance。 |
+| 捷克式 `Zb26` | `Source/Model_SketchfabZb26Larkien/scene.gltf` | [Larkien — ZB26](https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34) | CC-BY-4.0 | 上置直弹匣、提把、两脚架、木托和木握把均来自源模；按史实全长 1.165 m 缩放，剔除包在完整主枪管外的 24k 三角重复细分壳，再逐连通岛减面到 4677 三角。 |
+| 驳壳枪 `Mauser96` | `Source/Model_SketchfabMauserC96Maxence/scene.gltf` | [Maxence Rouillet — Mauser C96](https://sketchfab.com/3d-models/mauser-c96-4c49913126894908906c8512a52facd3) | CC-BY-4.0 | 毛瑟 C96：扫帚柄握把、扳机前固定弹仓、长枪管和系绳环均来自源模；按史实全长 0.288 m 缩放，金属度贴图只用于离线木/钢分桶。 |
+| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，移除展示用弹匣、子弹和 B 状态，修正源坐标方向，并按金属度图拆出木握把，成品 4678 三角。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），焊接阈值按模型对角线取值，见 `ImportWeapons._WeldDistance`。 |
 | 大刀第二式样 `DadaoAlt` | `Source/Model_SketchfabDadao/scene.gltf` | [Trector](https://sketchfab.com/trector) | CC-BY-4.0 | 大刀的**外观变体**，没有独立武器数值。圆盘吞口、束节木柄、刃线较直的一路，与主式样的环首宽刃刀刻意不同型。许可原文在 `Source/Model_SketchfabDadao/license.txt`。 |
 
-许可证副本随源放在 `Source/Model_*/License_*.txt`（Sketchfab 生成的 CC-BY-4.0 署名原文，
-文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
+许可证副本随源放在 `Source/Model_*/license.txt` / `License_*.txt`（Sketchfab 生成的
+CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-BY 要求保留）。
 
 ## 刺刀（2026-08-25，经本机 BlenderMCP 下载；构建器 `_blender/ImportBayonets.py`）
 
@@ -55,11 +60,6 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 
 仍走 `_blender/BuildWeapons.py` / `BuildVehicles.py` 的程序化几何：
 
-- 捷克式 `Zb26`：Sketchfab 的 CC-BY 候选（Larkien `6920684e…` 17.4k 面 /
-  TTadive `ced9fd15…` 9.5k 面）在这版 Blender 5.1 的减面里**卡在 ~0.70 压不下去**
-  （全局 collapse、逐连通岛 collapse、dissolve 三条路都试过，最终三角数 6.5–6.7k），
-  6000 三角是任务书性能红线，放行不了。现模保留上插直弹匣、提把、散热环与两脚架，
-  且第一人称已改为模型路径。将来若换渲染器/减面算法，这两个 UID 可直接回炉。
 - 九四式轻装甲车 `Type94Tankette`：Sketchfab 仅有的 CC-BY 候选
   （siaobai77 `ba15d7ee…`，49,999 面、单材质炮塔与车体融成一体、履带无分桶）
   在 1600 三角预算与「炮塔必须是关节」的契约下不可用，保留程序化模型。

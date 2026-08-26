@@ -132,19 +132,41 @@ SOURCES = {
         "note": "CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）→ 三八式。"
                 "防尘滑盖、直拉机柄、护翼准星、两道箍与通条齐备；全长按史实 1.276 m。",
     },
-    # ZB-26 仍走程序化（BuildWeapons.BuildZb26）：Sketchfab 的 CC-BY 候选
-    # （Larkien 17.4k 面 / TTadive 9.5k 面）在 Blender 5.1 的减面上都卡在
-    # ~0.70 减不下去（全局 / 逐连通岛 / dissolve 三种路都试过），三角预算
-    # 6000 是任务书性能红线，放行不了。详见 Data_SourceLicenses.md。
+    "Zb26": {
+        "file": os.path.join("Model_SketchfabZb26Larkien", "scene.gltf"),
+        "lengthM": 1.165,
+        "kind": "rifle",
+        # Larkien 的模型把枪托和握把放在 Material，余下两个材质都是钢件。
+        # 原模长轴沿 +X、Z 向上；roll=-1 把 Z 还原成游戏坐标的 +Y。
+        "matName": {"Material": "wood"},
+        # 这一层是 24k 三角的重复枪管细分壳，包在已有的主枪管 Cylinder_0 外面；
+        # 深度 collapse 会把它拉成跨屏长刺。丢掉重复壳，保留下面的完整枪管。
+        "skip": ("Cylinder.026_0",),
+        "roll": -1.0,
+        "noBevel": True,
+        "noDetails": True,
+        "autoSmooth": 34.0,
+        # ZB-26 的上置弹匣占据正中，照门/准星与瞄准挂点都必须左偏。
+        "mounts": {"gripZ": -0.470, "sightX": -0.025, "sightY": 0.095,
+                   "sightZ": -0.205, "magY": 0.155, "magZ": -0.118},
+        "note": "CC-BY-4.0 ZB26（Sketchfab / Larkien）→ 捷克式。保留上置弹匣、"
+                "两脚架、木托与机匣的来源轮廓；全长按史实 1.165 m，重预算到 6000 三角内。",
+    },
     "Mauser96": {
-        "file": "Model_MauserC96.glb",
+        "file": os.path.join("Model_SketchfabMauserC96Maxence", "scene.gltf"),
         "lengthM": 0.288,
         "kind": "pistol",
-        "skip": ("Boom", "Reload", "Near"),
-        # C96 的照门在机匣顶后端，通用值 0.055 整个落在机匣里：等姿态收敛后实测
-        # 瞄准点上半窗 820/820 全是钢，0.060 起归零。取 0.062 留 2 mm 余量。
+        # 整枪共用一套 PBR；金属度贴图比漫反射颜色可靠（旧钢也会是棕色），
+        # 用它把木握把面拆到 gunWood 桶。原模同样是 Z-up。
+        "metalSplit": True,
+        "metalMask": os.path.join("Model_SketchfabMauserC96Maxence", "Texture_MetalMask.png"),
+        "roll": -1.0,
+        "noBevel": True,
+        "noDetails": True,
+        "autoSmooth": 34.0,
         "mounts": {"sightY": 0.062},
-        "note": "CC0 Mauser C96（itch.io / Plewr）。Boom 是枪口焰网格，丢掉。",
+        "note": "CC-BY-4.0 Mauser C96（Sketchfab / Maxence Rouillet）。"
+                "保留来源模型的机匣、弹仓与扫帚柄轮廓；全长按史实 0.288 m。",
     },
     "Dadao": {
         # **付费素材，源文件不在仓库里**（见 _ExternalRoot 与 Data_SourceLicenses.md）。
@@ -192,7 +214,14 @@ SOURCES = {
                  "service_pistol_hammer_b", "service_pistol_trigger_b",
                  "service_pistol_magazine_loaded", "service_pistol_magazine_empty",
                  "service_pistol_bullet"),
+        # glTF 的长轴是 +X、Z 向上；这份源没有独立木件可供通用启发式判断
+        # 前后，所以显式翻向。金属度贴图负责把握把面分到 wood 桶。
+        "metalSplit": True,
+        "metalMask": os.path.join("Model_PolyHavenServicePistol", "Texture_MetalMask.png"),
+        "roll": -1.0,
+        "flipForward": True,
         "noDetails": True,
+        "mounts": {"sightY": 0.084, "sightZ": 0.030},
         # 不倒角。这支源模 7556 三角、预算 6000，本来就要减面；`_BevelForFirstPerson`
         # 会先把它涨到两万面，逼得减面比例掉到 0.28 —— 倒角出来的那圈高光当场
         # 被压成碎片，还顺手在枪口前戳出 16 mm 的尖刺。Poly Haven 这一支的
@@ -274,7 +303,28 @@ def _BaseColorImage(material):
     return None
 
 
-def _SplitByColor(part, image):
+def _ImageUpstream(material, input_name):
+    """沿 Principled 指定输入反向找第一张图，允许中间夹 Separate Color。"""
+    if material is None or not material.use_nodes or material.node_tree is None:
+        return None
+    principled = next((node for node in material.node_tree.nodes
+                       if node.type == "BSDF_PRINCIPLED"), None)
+    socket = principled.inputs.get(input_name) if principled is not None else None
+    stack = [link.from_node for link in (socket.links if socket else [])]
+    seen = set()
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        if node.type == "TEX_IMAGE" and node.image:
+            return node.image
+        for linked_input in node.inputs:
+            stack.extend(link.from_node for link in linked_input.links)
+    return None
+
+
+def _SplitByColor(part, image, metallic=False):
     """把一份 bmesh 按漫反射采样色拆成 (steel, wood)。
 
     只用来喂"整枪只有一张贴图"的模型：木器在贴图里是棕的（r 明显大于 b），
@@ -310,8 +360,12 @@ def _SplitByColor(part, image):
             y = min(h - 1, int((v % 1.0) * h))
             idx = (y * w + x) * 4
             r, g, b = pixels[idx], pixels[idx + 1], pixels[idx + 2]
-            # 木色：红通道明显高于蓝，且红>绿>蓝的整体趋势
-            bucket = "wood" if (r - b) > 0.05 and (r - g) > 0.015 else "steel"
+            if metallic:
+                # glTF metallic-roughness 的 B 通道：非金属握把约 0，钢件约 1。
+                bucket = "wood" if b < 0.45 else "steel"
+            else:
+                # 木色：红通道明显高于蓝，且红>绿>蓝的整体趋势
+                bucket = "wood" if (r - b) > 0.05 and (r - g) > 0.015 else "steel"
         bm, remap = Target(wood if bucket == "wood" else steel,
                            wood_verts if bucket == "wood" else steel_verts, face)
         verts = [remap.setdefault(v.index, bm.verts.new(v.co)) for v in face.verts]
@@ -350,7 +404,7 @@ def _WeldDistance(diagonal):
 
 
 def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False,
-             source_normals=False):
+             metal_split=False, metal_image=None, source_normals=False):
     """把场景里的网格按 steel/wood 收成两个 bmesh。跳过 skip 里的对象名。"""
     skip = {s.lower() for s in skip}
     buckets = {"steel": [], "wood": []}
@@ -376,11 +430,13 @@ def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_spl
         evaluated.to_mesh_clear()
         raw.faces.ensure_lookup_table()
         forced = _ObjectBucket(obj, name_bucket)
-        if color_split:
+        if color_split or metal_split:
             image = None
             if obj.material_slots and obj.material_slots[0].material:
-                image = _BaseColorImage(obj.material_slots[0].material)
-            steel_part, wood_part = _SplitByColor(raw, image)
+                material = obj.material_slots[0].material
+                image = (metal_image or _ImageUpstream(material, "Metallic") if metal_split
+                         else _BaseColorImage(material))
+            steel_part, wood_part = _SplitByColor(raw, image, metallic=metal_split)
             for bucket, part in (("steel", steel_part), ("wood", wood_part)):
                 if part is not None and part.faces:
                     buckets[bucket].append(part)
@@ -873,10 +929,15 @@ def BuildImported(name):
         raise FileNotFoundError(path)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _ImportFile(path)
+    metal_image = None
+    if spec.get("metalMask"):
+        metal_image = bpy.data.images.load(_Src(spec["metalMask"]), check_existing=True)
     buckets = _Collect(spec.get("matIndex"), spec.get("skip", ()),
                        name_bucket=spec.get("nameBucket"),
                        mat_name=spec.get("matName"),
                        color_split=spec.get("colorSplit", False),
+                       metal_split=spec.get("metalSplit", False),
+                       metal_image=metal_image,
                        source_normals=spec.get("sourcePbr", False))
     if "steel" not in buckets:
         raise RuntimeError("%s 导入后没有钢件" % name)
@@ -884,6 +945,8 @@ def BuildImported(name):
     steel = buckets["steel"]
     bms = [bm for bm in (steel, wood) if bm is not None]
     _AlignLongAxisToZ(bms, spec.get("roll", 1.0))
+    if spec.get("flipForward"):
+        _Xform(bms, Matrix.Rotation(math.pi, 4, "Y"))
     _FlipIfStockIsForward(bms, wood)
     if spec["kind"] != "melee":
         # 刀的木件是握把，本来就骑在刀身轴线上，没有"握把该在膛线下方"这回事；

@@ -1,0 +1,11 @@
+Model Information:
+* title:	ZB26
+* source:	https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34
+* author:	Larkien (https://sketchfab.com/Larkien)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "ZB26" (https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34) by Larkien (https://sketchfab.com/Larkien) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

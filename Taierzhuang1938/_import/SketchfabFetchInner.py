@@ -15,6 +15,7 @@ import json
 import os
 import zipfile
 
+import bpy
 import requests
 
 # --- locate the Sketchfab API key the addon stores --------------------------
@@ -29,13 +30,13 @@ if not key:
 if not key:
     raise RuntimeError("Sketchfab API key not found in addon prefs/scene/env")
 
-BASE = r"C:\Users\Bentl\Documents\Program\bentleyblanks_DeepSeek_TaierzhuangSketchfabGuns_20260824\Taierzhuang1938\_import\Source"
+BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Source")
 
 MODELS = [
     ("40d06bd1d25b45e48fb9965c39901b13", "Model_Type38Arisaka"),   # Snijboer, CC-BY-4.0
     ("d782cbddbaaa4680aa9a28f7b4a1e635", "Model_Gewehr88"),        # TastyTony, CC-BY-4.0
-    # ZB-26 候选（Larkien 6920684e… / TTadive ced9fd15…）被拒：减面卡在 ~0.70，
-    # 超 6000 三角预算，程序化捷克式保留。记录在 Data_SourceLicenses.md。
+    ("6920684ec16d40ffb857245be0661d34", "Model_SketchfabZb26Larkien"),
+    ("4c49913126894908906c8512a52facd3", "Model_SketchfabMauserC96Maxence"),
 ]
 
 HDR = {"Authorization": "Token " + key}

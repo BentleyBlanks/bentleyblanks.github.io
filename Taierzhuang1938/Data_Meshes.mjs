@@ -144,13 +144,12 @@ export const MESHES = {
   },
   Zb26: {
     file: "Zb26.tzm.json", category: "weapon",
-    triangles: 896, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 4677, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.17050, 0.37276, 1.16500], lengthM: 1.165,
+    span: [0.07998, 0.32660, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "ZB-26 轻机枪。**弹匣从上方插**（直的，不是布伦那种弯的）、枪管上提把、"
-      + "前段两脚架张开、带散热环的枪管。**瞄具整条左偏 20 mm** —— 弹匣占着正上方，"
-      + "瞄准线走正中就是穿过弹匣（2026-08-25 修，见 _blender/BuildWeapons.BuildZb26）。",
+    note: "ZB-26 轻机枪。几何来自 Larkien 的 Sketchfab CC-BY-4.0 模型；"
+      + "保留上插直弹匣、提把、两脚架、木托与木握把，按史实全长 1.165 m 重建。",
   },
   Type38: {
     file: "Type38.tzm.json", category: "weapon",
@@ -166,21 +165,22 @@ export const MESHES = {
   },
   Mauser96: {
     file: "Mauser96.tzm.json", category: "weapon",
-    triangles: 3768, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 4677, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.04618, 0.16422, 0.28827], lengthM: 0.288,
+    span: [0.02270, 0.17289, 0.28800], lengthM: 0.288,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "驳壳枪（毛瑟 C96）。几何来自 CC0 Mauser C96（itch.io / Plewr）。"
-      + "扫帚柄握把 + 扳机前方的固定弹仓。",
+    note: "驳壳枪（毛瑟 C96）。几何来自 Maxence Rouillet 的 Sketchfab CC-BY-4.0 模型；"
+      + "保留扫帚柄木握把、扳机前方固定弹仓、长枪管与系绳环。",
   },
   ServicePistol: {
     file: "ServicePistol.tzm.json", category: "weapon",
-    triangles: 4679, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["steel"], mounts: WEAPON_MOUNTS,
-    span: [0.03186, 0.12953, 0.22201], lengthM: 0.222,
-    draws: { high: 1, medium: 1, low: 1 },
+    triangles: 4678, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
+    span: [0.03180, 0.12953, 0.22200], lengthM: 0.222,
+    draws: { high: 2, medium: 2, low: 2 },
     note: "外购九毫米军用手枪。几何来自 Poly Haven CC0 Service Pistol；"
-      + "使用闭锁状态 A，移除展示用弹匣、子弹和空仓挂机状态 B。",
+      + "使用闭锁状态 A，移除展示用弹匣、子弹和空仓挂机状态 B，"
+      + "按原 PBR 金属度分出木握把并修正源模型的上下/枪口方向。",
   },
   Grenade: {
     file: "Grenade.tzm.json", category: "weapon",

@@ -15,7 +15,7 @@
 // 半路上的画面（实测连续四帧 423 / 359 / 322 / 0）。第一版量早了，据此误判汉阳造与
 // 三八式也要抬挂点，白改了两支枪。所以这里推 420 帧再连量六帧、取最坏的一帧。
 //
-// 用法：node Taierzhuang1938/Script_AdsSightTest.mjs
+// 用法：node Taierzhuang1938/Script_AdsSightTest.mjs [--only=Zb26]
 
 import os from "node:os";
 import path from "node:path";
@@ -34,7 +34,12 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 const BLOCKED_LIMIT = 60;
 // 手枪也在里面。ServicePistol 也走模型第一人称（MODEL_FP），第四关是它当副武器，
 // 玩家会右键把它举到眼前 —— 换了几何就得重量一次瞄准线，这是这条闸的原话。
-const GUNS = ["ZhongZheng", "HanYang", "Zb26", "Mauser96", "Type38", "ServicePistol"];
+const ALL_GUNS = ["ZhongZheng", "HanYang", "Zb26", "Mauser96", "Type38", "ServicePistol"];
+const onlyId = process.argv.slice(2).find((arg) => arg.startsWith("--only="))?.slice(7);
+const GUNS = onlyId ? [onlyId] : ALL_GUNS;
+if (onlyId && !ALL_GUNS.includes(onlyId)) {
+  throw new Error(`未知武器：${onlyId}`);
+}
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -108,9 +113,12 @@ try {
         T.Debug.Key("KeyT"); T.StepFrames(90);
       }
       document.dispatchEvent(new MouseEvent("mousedown", { button: 2, bubbles: true }));
-      T.player.pitch = 0.30;                         // 抬头看天：背景干净才量得准
+      // 架起两脚架后俯仰中心更低；同样的 0.30 只会看见暗墙，背景本身就被误数成枪。
+      T.player.pitch = T.viewmodel.weapon?.bipod ? 0.75 : 0.30;
       T.player.aimPitch = 0;
-      T.StepFrames(420);
+      // 两脚架姿态还要把趴姿相机与枪架阻尼一起收敛；420 帧后的第一张仍会扫到墙沿，
+      // 后五张才全是天光。多给 120 帧，避免把暗墙当成枪身。
+      T.StepFrames(T.viewmodel.weapon?.bipod ? 540 : 420);
       // 连量六帧、每帧之间隔开推进：开镜姿态收敛之后枪仍在微微摇（呼吸摆动只被压小
       // 没被压死），只取一帧就可能正好赶在摆动的一端读出假的"干净"。取最坏那一帧。
       const shots = [];
