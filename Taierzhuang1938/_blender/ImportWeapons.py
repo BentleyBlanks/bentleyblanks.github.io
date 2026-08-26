@@ -110,9 +110,14 @@ SOURCES = {
         "matName": {"Material": "wood", "Material.004": "steel", "Material.005": "steel",
                     "Material.006": "steel", "Material.007": "steel"},
         "noDetails": True,
-        # 汉阳造不用抬：等开镜姿态收敛之后实测，0.055—0.076 每一档瞄准点都是干净的。
+        # 照门高度。**旧值 0.055（默认档）作废**：那是照"整支枪挂在准星左边"的
+        # 那一版几何量的 —— 瞄准点当时压根不在枪上，扫 0.055—0.076 当然档档干净。
+        # 2026-08-26 把枪对回瞄准线之后重量（同 Script_AdsSightTest 的上半窗指标）：
+        # 0.050→663、0.054→528、0.058→818、0.062→159、0.066→95、0.070→0、0.074→0、
+        # 0.078 起整窗也归零。取 0.072：上半窗干净，整窗仍留着五十来个像素 ——
+        # 那是准星尖与照门肩，一副能读的照门/准星画面；再往上枪就整个沉出窗外了。
         "mounts": {"muzzleZ": -1.003, "gripZ": -0.418, "sightZ": -0.160,
-                   "magY": BORE - 0.050, "magZ": -0.040},
+                   "sightY": 0.072, "magY": BORE - 0.050, "magZ": -0.040},
         "note": "CC-BY Gewehr 88（Sketchfab / TastyTony）→ 汉阳八八式。整长套筒、"
                 "曼利夏漏夹弹仓与露出式通条是八八式自带的剪影，不再用 Kar98k 拉长加套筒。"
                 "全长按史实 1.250 m。",
@@ -126,9 +131,13 @@ SOURCES = {
         # 背带条按木色桶走（皮革/帆布读作棕件，别读成蓝钢条）。
         "nameBucket": {"All_Wood": "wood", "Sling_Front": "wood",
                        "Sling_BackStock": "wood", "Sling2": "wood"},
-        # 三八式也不用抬（它之前单独修过 adsNearZ，瞄准点本来就干净）。
+        # 照门高度。同汉阳造：**旧值 0.055（默认档）是照歪掉的几何量的**，
+        # 那时瞄准点落在枪身左边的空气里。对回瞄准线后重量上半窗：
+        # 0.054→418、0.058→542、0.062→144、0.066→0、0.070→0、0.074→0。
+        # 取 0.070：上半窗干净，整窗还剩三百来个像素 —— 三八式那副护翼准星
+        # 正好架在瞄准点下方，这是它该有的样子，不是遮挡。
         "mounts": {"muzzleZ": -1.029, "gripZ": -0.443, "sightZ": -0.185,
-                   "magY": BORE - 0.036, "magZ": -0.060},
+                   "sightY": 0.070, "magY": BORE - 0.036, "magZ": -0.060},
         # The first-person eye sits 140 mm behind the sight.  Keep the rear
         # receiver and stock as a separately named node so the viewmodel can
         # hide only that near-plane geometry while aiming; leaving it merged
@@ -153,7 +162,9 @@ SOURCES = {
         "noDetails": True,
         "autoSmooth": 34.0,
         # ZB-26 的上置弹匣占据正中，照门/准星与瞄准挂点都必须左偏。
-        "mounts": {"gripZ": -0.470, "sightX": -0.025, "sightY": 0.095,
+        # -0.025 是照旧几何调的，而旧几何整体左偏 1.56 mm（见 _SymmetryPlaneX）；
+        # 枪对回瞄准线后照门跟着右移同样多，这里补回去，照门缺口才仍在准星上。
+        "mounts": {"gripZ": -0.470, "sightX": -0.0234, "sightY": 0.095,
                    "sightZ": -0.205, "magY": 0.155, "magZ": -0.118},
         "note": "CC-BY-4.0 ZB26（Sketchfab / Larkien）→ 捷克式。保留上置弹匣、"
                 "两脚架、木托与机匣的来源轮廓；全长按史实 1.165 m，重预算到 6000 三角内。",
@@ -586,6 +597,36 @@ def _FlipIfStockIsForward(bms, wood):
         _Xform(bms, Matrix.Rotation(math.pi, 4, "Y"))
 
 
+def _SymmetryPlaneX(steel, lo, hi, kind):
+    """量这把枪的**对称面**在 x 上的位置（膛线、前后照门都长在这个面上）。
+
+    事故（2026-08-26）：这里原本是 `0.5 * (lo.x + hi.x)` —— 整模包围盒的中点。
+    枪不是左右对称的：拉机柄只长在右边，汉阳造那根伸出 40 mm。包围盒中点因此被
+    往右带，对中时整支枪反被推到左边。实测左移量：汉阳造 22.7 mm、三八式 27.4 mm、
+    中正式 8.2 mm、捷克式 1.6 mm（驳壳枪与外购九毫米没有外露机柄，本来就是 0）。
+
+    这不是"模型歪了一点点"：第一人称开镜是把 `sight` 挂点解到屏幕正中，而挂点
+    钉在 x = 0。枪管真身在 x = -22.7 mm、离眼 0.30 m，开镜 FOV 只有 40.7° ——
+    枪就整个挂在准星左边，玩家报的"放大以后枪靠左"就是这个数。第三人称同理：
+    枪按 gripR(x=0) 塞进手里，枪身也跟着偏出手掌。
+
+    对齐 y 的那一段（上面的 barrel_y）早就懂这个道理：它量的是**枪口那一段的
+    钢件**，不是包围盒。x 照抄同一招 —— 枪口前 5% 只有枪管、准星（护翼）与前箍，
+    这几样严格绕膛线轴对称，取它们 x 跨度的中点就是对称面。取中点而不是均值：
+    准星护翼一边厚一边薄这种建模噪音会拉偏均值，跨度中点不受影响。
+
+    冷兵器没有膛线也没有机柄（大刀本来就左右对称，实测中点 0.00 mm），
+    仍走包围盒中点，不去动已经对的东西。
+    """
+    if kind == "melee" or steel is None or not steel.verts:
+        return 0.5 * (lo.x + hi.x)
+    cut = lo.z + (hi.z - lo.z) * 0.05
+    xs = [v.co.x for v in steel.verts if v.co.z < cut]
+    if len(xs) < 24:
+        return 0.5 * (lo.x + hi.x)
+    return 0.5 * (min(xs) + max(xs))
+
+
 def _Place(bms, steel, wood, length_m, kind):
     lo, hi = _Aabb(bms)
     current = hi.z - lo.z
@@ -616,7 +657,7 @@ def _Place(bms, steel, wood, length_m, kind):
             if ys:
                 barrel_y = sum(ys) / len(ys)
         shift_y = BORE - barrel_y
-    shift_x = -0.5 * (lo.x + hi.x)
+    shift_x = -_SymmetryPlaneX(steel, lo, hi, kind)
     _Xform(bms, Matrix.Translation((shift_x, shift_y, shift_z)))
 
 

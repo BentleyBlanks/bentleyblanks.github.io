@@ -218,6 +218,7 @@ export class Soldier {
     this.regoalTime = -99;      // 守点软约束上一次重设目标的时刻
     this.stuckTime = 0;         // 想走但走不动已经持续了多久
     this.detourTime = 0;        // 绕行还剩多久
+    this.idleStepDt = 0;        // 静止分频物理攒下的 dt（见 Act 尾部那笔账）
     this.detourYaw = 0;         // 绕行时把前进方向拧多少
     // 沿墙走的**固定**转向。第 1 批那版每次卡住都重掷一个随机方向，
     // 于是撞墙→左绕一秒→回头撞墙→右绕一秒，是原地打转不是绕路：
@@ -1451,8 +1452,22 @@ export class AiDirector {
     s.crouchBlend += Clamp(crouchTarget - s.crouchBlend, -blendStep, blendStep);
     s.proneBlend += Clamp(proneTarget - s.proneBlend, -blendStep, blendStep);
     // 站着不动的人也要走一次物理：重力、脚下的东西被炸掉、被别的东西顶开，
-    // 都得在这一步里结算。
-    if (!stepped) this.StepBody(s, 0, 0, dt);
+    // 都得在这一步里结算。但**不必每帧**：Rapier 的胶囊 Move 是 Act 的最大单项
+    //（2026-08-27 拆账：Act 占 ai 桶的六成，其中大半是全场静止守军的空移动），
+    // 落了地又没动的人按屏内 2 帧 / 远景与屏外 4 帧一步，dt 累着补偿 ——
+    // 脚下被炸掉最多晚三帧（≈50 ms）才开始掉，屏外根本看不见。
+    // 悬空的（正在掉、刚被炸飞）照旧每帧结算，别让人一顿一顿地落地。
+    if (!stepped) {
+      s.idleStepDt += dt;
+      const cadence = !s.grounded ? 1
+        : (s.renderLod === "detail" ? 2 : 4);
+      if (cadence === 1 || (this.tickIndex + s.id) % cadence === 0) {
+        this.StepBody(s, 0, 0, Math.min(s.idleStepDt, 0.1));
+        s.idleStepDt = 0;
+      }
+    } else {
+      s.idleStepDt = 0;
+    }
 
     if (s.actor) {
       s.actor.root.position.copy(s.position);

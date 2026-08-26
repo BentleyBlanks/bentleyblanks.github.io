@@ -32,6 +32,29 @@ import { ServeRoot } from "./Script_DevServer.mjs";
  * 而那种情况上半窗必然一起黑。改前实测上半窗：中正式 820/820 全黑。
  */
 const BLOCKED_LIMIT = 60;
+
+/**
+ * 第二条闸：**枪必须骑在瞄准线上**（2026-08-26 加）。
+ *
+ * 上面那条只量瞄准线**以上**那半个窗口，于是一支整个挂在瞄准点**左边**的枪，
+ * 窗口里干干净净，它读成满分 —— 汉阳造与三八式在那条闸上一直是 0/820，
+ * 正因为枪压根不在画面正中。用户报的「放大以后枪靠左」就是这么漏过去的。
+ *
+ * 这里量的是**枪自己的对称面投影到画面哪里**：取枪口前 5% 那段钢件
+ * （只有枪管、准星与前箍，严格绕膛线轴对称）x 跨度的中点，投到 NDC。
+ * 排除刺刀 —— 刺刀是按 muzzle 挂点摆的，把它算进来等于拿挂点验挂点。
+ *
+ * 期望值逐枪登记而不是"放宽容差"：捷克式是唯一该偏的一支（弹匣占着正上方，
+ * 瞄具史实左偏，见 docs/Data_GunFeelReview.md），其余五支必须落在瞄准线上。
+ */
+const AXIS_TOLERANCE = 0.020;                        // NDC，1600 宽上约 16 px
+const AXIS_EXPECT = {
+  // 2026-08-26 实测（依次）：0.0004 / 0.0002 / 0.0000 / 0.0000 / 0.0000 —— 对称面就压在瞄准线上。
+  ZhongZheng: 0, HanYang: 0, Type38: 0, Mauser96: 0, ServicePistol: 0,
+  // 捷克式的瞄具史实左偏，枪身因此必须落在瞄准点**右边**：实测 +0.032。
+  // 这不是容差放宽 —— 它偏得比容差多得多，写 0 一样会红。
+  Zb26: 0.032,
+};
 // 手枪也在里面。ServicePistol 也走模型第一人称（MODEL_FP），第四关是它当副武器，
 // 玩家会右键把它举到眼前 —— 换了几何就得重量一次瞄准线，这是这条闸的原话。
 const ALL_GUNS = ["ZhongZheng", "HanYang", "Zb26", "Mauser96", "Type38", "ServicePistol"];
@@ -129,6 +152,50 @@ try {
       const first = shots.reduce((a, b) => (a.upper >= b.upper ? a : b));
       const second = shots.reduce((a, b) => (a.upper <= b.upper ? a : b));
       const vm = T.viewmodel;
+
+      // 枪的对称面在画面上的位置。走真几何（顶点），不走挂点 —— 挂点是解出来的。
+      const AxisNdc = () => {
+        const rig = vm.rig;
+        if (!rig || !rig.group) return null;
+        const cam = T.camera;
+        const Vec3 = cam.position.constructor;
+        cam.updateMatrixWorld(true);
+        rig.group.updateWorldMatrix(true, true);
+        const steel = [];
+        let zLo = Infinity, zHi = -Infinity;
+        rig.group.traverse((o) => {
+          if (!o.isMesh || !o.visible || !o.geometry || !o.geometry.attributes.position) return;
+          const name = o.name || "";
+          if (name.indexOf("Bayonet") === 0) return;
+          if (name.indexOf("steel") < 0) return;      // 木件不参与：枪托本身可以不对称
+          const pos = o.geometry.attributes.position;
+          const v = new Vec3();
+          const pts = [];
+          for (let i = 0; i < pos.count; i += 1) {
+            v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).applyMatrix4(cam.matrixWorldInverse);
+            pts.push(v.x); pts.push(v.z);
+            if (v.z < zLo) zLo = v.z;
+            if (v.z > zHi) zHi = v.z;
+          }
+          steel.push(pts);
+        });
+        if (!steel.length || !isFinite(zLo)) return null;
+        const cut = zLo + (zHi - zLo) * 0.05;         // 相机空间 -z 向前，最小的 z 就是枪口
+        let xLo = Infinity, xHi = -Infinity, n = 0;
+        for (const pts of steel) {
+          for (let i = 0; i < pts.length; i += 2) {
+            if (pts[i + 1] > cut) continue;
+            n += 1;
+            if (pts[i] < xLo) xLo = pts[i];
+            if (pts[i] > xHi) xHi = pts[i];
+          }
+        }
+        if (n < 24) return null;
+        // 相机空间 → NDC。Vector3.applyMatrix4 自带透视除法，别再除一次 w。
+        const mid = new Vec3(0.5 * (xLo + xHi), 0, cut).applyMatrix4(cam.projectionMatrix);
+        return { ndcX: mid.x, camX: 0.5 * (xLo + xHi), verts: n };
+      };
+      const axis = AxisNdc();
       rows[id] = {
         ads: Number(T.player.ads.toFixed(3)),
         blocked: first.upper,                        // 四帧里最坏的一帧
@@ -138,6 +205,9 @@ try {
           ? { x: +vm.rig.sight.x.toFixed(3), y: +vm.rig.sight.y.toFixed(3), z: +vm.rig.sight.z.toFixed(3) }
           : null,
         crosshairOn: document.querySelector(".hudCrosshair").classList.contains("on"),
+        axisNdcX: axis ? +axis.ndcX.toFixed(4) : null,
+        axisCamX: axis ? +axis.camX.toFixed(5) : null,
+        axisVerts: axis ? axis.verts : 0,
       };
     }
     return rows;
@@ -154,6 +224,14 @@ try {
       row && row.blocked <= BLOCKED_LIMIT,
       `上半窗 ${row?.samples?.join(" / ")}（整窗 ${row?.wholeWindow?.join(" / ")}）`);
     Check(`${id} 开镜时收起腰射准心`, row && row.crosshairOn === false);
+    const expect = AXIS_EXPECT[id];
+    if (expect === null || expect === undefined) {
+      console.log(`--   ${id} 枪骑在瞄准线上（未登记期望值） — 实测对称面 NDC x=${row?.axisNdcX}`);
+    } else {
+      Check(`${id} 枪骑在瞄准线上（对称面 NDC x = ${expect} ± ${AXIS_TOLERANCE}）`,
+        row && row.axisNdcX != null && Math.abs(row.axisNdcX - expect) <= AXIS_TOLERANCE,
+        `实测 ${row?.axisNdcX}（相机空间 ${row?.axisCamX} m，取样 ${row?.axisVerts} 顶点）`);
+    }
   }
   Check("页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } finally {
