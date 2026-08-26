@@ -128,8 +128,7 @@ export class GraphicsSettings {
       { value: 0, label: "出厂" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
-    Note(perf, "开关阴影要重编译一次全场材质（几百毫秒的卡顿），因为它是编译期的 "
-      + "#define。只改标志位不重编译的话，画面会留着一层永不更新的假阴影。", true);
+    Note(perf, "阴影是编译期 #define：开关它要重编译全场材质，卡几百毫秒。", true);
 
     const giBox = Section(body, "全局光照（实时探针体）");
     const giRow = document.createElement("div");
@@ -141,11 +140,9 @@ export class GraphicsSettings {
       format: (v) => `×${v.toFixed(2)}`,
       onInput: (v) => { gfx.giStrength = v; this.Apply(); },
     });
-    Note(giBox, "默认使用下载的通用 Global SH Probe + 冷灰蓝 AmbientColor：没有实时 GI pass，"
-      + "但仍保留有方向的室外补光。打开后才启用半实时辐照度探针；它一帧重算十几个探针，"
-      + "走一步或换时段要一两秒收敛。low 画质档不建探针体，这一栏对它无效。"
-      + "「间接光强度」是整份间接漫反射的倍率：探针体内与体积外回退的天空 IBL 一起乘，"
-      + "所以调大只是整体变亮，不会在体积边界上留下一圈跟着人走的色差。", true);
+    Note(giBox, "默认：通用 SH Probe + 冷灰蓝环境光，无实时 GI pass。打开才启用半实时探针，"
+      + "走动或换时段要一两秒收敛（low 档不建探针体，此栏无效）。"
+      + "「间接光强度」是整份间接漫反射的倍率，只整体变亮。", true);
 
     const aa = Section(body, "抗锯齿");
     const aaRow = document.createElement("div");
@@ -169,9 +166,7 @@ export class GraphicsSettings {
     post.appendChild(godBox);
     Toggle(godBox, "体积光（临时默认关）", gfx.godEnabled === true,
       (on) => { gfx.godEnabled = on; this.Save(); });
-    Note(post, "体积光近期在观察它对帧率的影响，出厂先关着。这是整个 pass 的总闸："
-      + "关掉时径向模糊那一趟直接不跑，比把强度拉到 0 更省。打开后强度用下面"
-      + "「体积光」那根倍率调。", true);
+    Note(post, "出厂关着（在看它对帧率的影响）。这是总闸：关掉连径向模糊都不跑，比强度拉 0 更省。", true);
     const Mul = (key, label) => Slider(post, {
       label, min: 0, max: 2, step: 0.05, value: gfx[key],
       format: (v) => `×${v.toFixed(2)}`,
@@ -348,9 +343,8 @@ export class AudioSettings {
       if (on) audio.SetPaused(true); else audio.SetPaused(false);
       this.Save();
     });
-    Note(opts, "「暂停时静音背景」修的是这条：暂停只让 Frame() 提前返回，"
-      + "**一点也拦不住声音** —— 环境床是几条自己在跑的实录循环 + 一个 400 ms 的调度器，"
-      + "玩法停了它照样每隔几百毫秒撒一发远处的枪声。", true);
+    Note(opts, "暂停只让 Frame() 提前返回，**拦不住声音**（环境床是自跑的循环 + 400 ms 调度器）；"
+      + "「暂停时静音背景」修的就是这条。", true);
 
     ButtonRow(opts, [
       { label: "静音", onClick: () => { audio.SetMasterVolume(0); this.Rebuild(); } },

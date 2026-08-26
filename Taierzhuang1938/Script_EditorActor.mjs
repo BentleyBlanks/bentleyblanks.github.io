@@ -214,8 +214,7 @@ export class ActorEditor {
     // --- 读数 ---
     const info = Section(body, "取证");
     this.facts = Facts(info);
-    Note(info, "meshSource=box 表示 Blender 模型没读到、退回了程序化方块几何 —— "
-      + "画面照样有人，但那不是这一版的模型。换模之后先看这一行。", true);
+    Note(info, "meshSource=box = 模型没读到、退回了方块几何。换模后先看这行。", true);
   }
 
   SetClip(id) {

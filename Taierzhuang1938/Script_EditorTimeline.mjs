@@ -126,8 +126,7 @@ export class TimelineEditor {
     this.logBox.style.maxHeight = "132px";
     this.logBox.style.overflowY = "auto";
     check.appendChild(this.logBox);
-    Note(check, "分镜秒数之和必须等于声明时长；对不上 Play() 会直接抛错 —— "
-      + "这类改动在画面上看不出来，只表现为字幕来不及读完。", true);
+    Note(check, "分镜秒数之和必须等于声明时长，对不上 Play() 直接抛错。", true);
     Note(check, "按住 Alt 可临时释放鼠标：序章自由视线暂停响应，松开后继续审片。", true);
   }
 
