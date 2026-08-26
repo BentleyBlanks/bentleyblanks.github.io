@@ -467,6 +467,90 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
   }
 }
 
+// --- 4g. 尸体不定格在坟尖上：小件方台顶上的尸体会滑到地上 -------------------
+// 坟头/街垒的碰撞是「视觉圆包、碰撞方台」：尸体胶囊架在台顶时，人平摊在坟尖
+// 高度的空中，四肢戳在空气里（2026-08-27 那张截图）。改法是 StepCorpse 里认出
+// 「支撑面是个比人还小的高台」就朝台缘推着滑，滑到地上再落定、贴合地表。
+{
+  const r = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const p = T.player;
+    const s = T.ai.soldiers.find((q) => q.alive && q.actor);
+    if (!s) return { skipped: true };
+    const spot = T.physics.FindFreeSpot(p.position.x + 8, p.position.z - 6, 0.6, 1.9, 24);
+    const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
+    // 一座假坟头。物理与战场网格两边都要塞：胶囊靠物理托着，
+    // 而 StepCorpse 的采样走 battlefield.StandHeight（读的是战场网格）。
+    const box = { c: [spot.x, g0 + 0.7, spot.z], h: [1.3, 0.7, 1.3], ry: 0, tag: "testGrave",
+      min: [spot.x - 1.3, g0, spot.z - 1.3], max: [spot.x + 1.3, g0 + 1.4, spot.z + 1.3] };
+    const handle = T.physics.AddSolid(box);
+    const bf = T.battlefield;
+    const key = Math.floor(spot.x / bf.gridSize) * 100003 + Math.floor(spot.z / bf.gridSize);
+    if (!bf.grid.has(key)) bf.grid.set(key, []);
+    bf.grid.get(key).push(box);
+    T.StepFrames(2);
+    s.body.Teleport(spot.x, g0 + 1.4, spot.z);
+    s.position.set(spot.x, g0 + 1.4, spot.z);
+    T.StepFrames(2);
+    s.Kill(null);
+    let maxDroop = 0;
+    for (let i = 0; i < 420; i += 1) {
+      T.StepFrames(1);
+      if (s.actor.ragdollState) maxDroop = Math.max(maxDroop, s.actor.ragdollState.droopArms || 0);
+    }
+    T.physics.RemoveSolid(handle);
+    const cell = bf.grid.get(key); const at = cell.indexOf(box); if (at >= 0) cell.splice(at, 1);
+    const ground = bf.GroundHeight(s.position.x, s.position.z);
+    return {
+      off: Math.hypot(s.position.x - spot.x, s.position.z - spot.z),
+      rest: s.position.y - ground, top: g0 + 1.4, maxDroop, settled: s.corpseSettled,
+      tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z,
+    };
+  });
+  if (r.skipped) Check("台顶的尸体滑到地上", true, "（场上没有活人，跳过）");
+  else {
+    Check("台顶的尸体滑到地上并落定",
+      r.off > 1.0 && Math.abs(r.rest) < 0.2 && r.settled,
+      `滑出 ${r.off.toFixed(2)} m，离地 ${r.rest.toFixed(2)} m（台顶原高 1.4 m），落定=${r.settled}`);
+    Check("滑越台缘途中悬空的手脚垂过",
+      r.maxDroop > 0.1, `下垂量峰值 ${r.maxDroop.toFixed(2)}`);
+    Check("落到平地后躯干放平",
+      Math.abs(r.tiltX) < 0.3 && Math.abs(r.tiltZ) < 0.3,
+      `tiltX=${r.tiltX.toFixed(2)} tiltZ=${r.tiltZ.toFixed(2)}`);
+  }
+}
+
+// --- 4h. 对照：平地上的尸体不滑、不歪、不垂 ---------------------------------
+// 贴合与滑落只该对「落点不平」起反应。平地上死的人要是也出溜半米、
+// 或者躯干带着俯仰，那 4g 修的就不是坟头而是把全场尸体都改了。
+{
+  const r = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const p = T.player;
+    const s = T.ai.soldiers.find((q) => q.alive && q.actor);
+    if (!s) return { skipped: true };
+    const spot = T.physics.FindFreeSpot(p.position.x - 6, p.position.z - 8, 0.6, 1.9, 24);
+    const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
+    s.body.Teleport(spot.x, g0, spot.z);
+    s.position.set(spot.x, g0, spot.z);
+    T.StepFrames(2);
+    const x0 = s.position.x, z0 = s.position.z;
+    s.Kill(null);
+    for (let i = 0; i < 240; i += 1) T.StepFrames(1);
+    return {
+      drift: Math.hypot(s.position.x - x0, s.position.z - z0),
+      tiltX: s.actor.root.rotation.x, tiltZ: s.actor.root.rotation.z,
+      droop: (s.actor.ragdollState && s.actor.ragdollState.droopArms) || 0,
+      settled: s.corpseSettled,
+    };
+  });
+  if (r.skipped) Check("平地上的尸体不滑不歪", true, "（场上没有活人，跳过）");
+  else Check("平地上的尸体不滑不歪",
+    r.drift < 0.5 && Math.abs(r.tiltX) < 0.12 && Math.abs(r.tiltZ) < 0.12 && r.droop < 0.15 && r.settled,
+    `出溜 ${r.drift.toFixed(2)} m，tiltX=${r.tiltX.toFixed(2)} tiltZ=${r.tiltZ.toFixed(2)}，`
+    + `下垂 ${r.droop.toFixed(2)}，落定=${r.settled}`);
+}
+
 // --- 5. 手雷是刚体：会撞墙弹回，也会在地上滚 --------------------------------
 {
   const r = await page.evaluate(async () => {

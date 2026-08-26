@@ -202,6 +202,21 @@ export class Soldier {
     this.corpse = null;
     /** 中弹方向 × 力度，死的那一帧交给尸体刚体当初速度。 */
     this.deathPush = null;
+    this.corpseSettled = false;
+    // 尸体贴地：躯干对齐地表的俯仰/侧倾，与「肢体下面是空的」的下垂量。
+    // 全部带平滑（见 StepCorpse），所以要跨帧存在这儿。
+    this.corpseTiltX = 0;
+    this.corpseTiltZ = 0;
+    this.corpseDroopBody = 0;
+    this.corpseDroopArms = 0;
+    // 滑动的「卡住换向」：上一帧位置、卡住累计时长、限时绕行航向及其剩余时间。
+    this.corpseSlidePX = 0;
+    this.corpseSlidePZ = 0;
+    this.corpseStallT = 0;
+    this.corpseDetourX = 0;
+    this.corpseDetourZ = 0;
+    this.corpseDetourT = 0;
+    this.corpseSlideT = 0;
     // 通视缓存按**目标 id** 存三份。原来一人只有一份、不区分目标：
     // 最近的那个被墙挡住，缓存写下 clear=false，接下来 0.25 s 内换谁来问都答"看不见"，
     // 于是整条战线一起瞎掉（实跑：losCache.clear 为 true 的 0 人）。
@@ -835,7 +850,9 @@ export class AiDirector {
         //
         // 死亡前 0.9 s 仍无条件更新：远景／镜头外的精细层也必须把倒地动作收完，
         // 否则以后走近、从 LOD 切回完整模型时会突然“复活”成站姿。
-        if (s.actor && s.deadTime <= 0.9) {
+        // 尸体刚体还在（最多 8 秒，见 StepCorpse）也继续更新 —— 从坟顶滑到平地的
+        // 途中肢体下垂量在变，姿势冻住的话滑到平地后手脚还保持着悬空下垂的角度。
+        if (s.actor && (s.deadTime <= 0.9 || s.corpse)) {
           s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
         continue;
@@ -1585,15 +1602,144 @@ export class AiDirector {
       s.corpse = physics.MakeCorpse({ position: s.position, velocity: s.deathPush });
       s.deathPush = null;
     }
+
+    // --- 尸体脚下的地形长什么样 --------------------------------------------
+    // 沿身体轴（yaw 正前）与侧轴各探一对点，加中心共五点。查询走 StandHeight
+    // 而不是 groundAt：坟头、街垒这类东西**视觉是圆包、碰撞是方台**，只存在于
+    // 碰撞层里 —— 尸体明明架在坟顶上，groundAt 却只看得见底下的耕地。
+    const bf = this.ctx.battlefield;
+    const t0 = s.corpse.translation();
+    const feetY = t0.y - (s.corpse.userFeetOffset || 0);
+    const yaw = s.yaw || 0;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);    // 人物正面
+    const sxv = Math.cos(yaw), szv = -Math.sin(yaw);   // 人物局部 +X 一侧
+    const L = 0.75, W = 0.35;                          // 半身长 / 半展宽
+    const At = (px, pz) => bf.StandHeight(px, pz, feetY + 0.1);
+    const hC = At(t0.x, t0.z);
+    const dF = At(t0.x + fx * L, t0.z + fz * L) - hC;
+    const dB = At(t0.x - fx * L, t0.z - fz * L) - hC;
+    const dR = At(t0.x + sxv * W, t0.z + szv * W) - hC;
+    const dL = At(t0.x - sxv * W, t0.z - szv * W) - hC;
+    // 高差超过 CLIFF 的采样是「另一层」（旁边的墙顶、台子底下的街面），
+    // 不参与躯干贴合 —— 不然靠墙倒下的人会朝墙面立起 35°。
+    const CLIFF = 0.7;
+    const cF = Math.abs(dF) > CLIFF ? 0 : dF, cB = Math.abs(dB) > CLIFF ? 0 : dB;
+    const cR = Math.abs(dR) > CLIFF ? 0 : dR, cL = Math.abs(dL) > CLIFF ? 0 : dL;
+    const slopeF = (cF - cB) / (2 * L), slopeS = (cR - cL) / (2 * W);
+
+    // --- 坟尖 / 台缘 / 陡坡：滑下去，别定格在刀脊上 ------------------------
+    // 身体两端（或两侧）都比中心低一截 = 蹲在凸尖上；拟合坡度过陡 = 挂在陡坡上。
+    // 真人的尸体不会平衡在这种地方。速度直接写而不是加力 —— 胶囊摩擦 1.1，
+    // 靠力推不动，而这一下要的就是「顺坡出溜」的观感。
+    const convex = Math.max(-(dF + dB) / 2, -(dR + dL) / 2);
+    let sliding = convex > 0.32 || Math.hypot(slopeF, slopeS) > 0.78;
+    let ux = fx, uz = fz;
+    if (sliding) {
+      let low = dF;
+      if (dB < low) { low = dB; ux = -fx; uz = -fz; }
+      if (dR < low) { low = dR; ux = sxv; uz = szv; }
+      if (dL < low) { low = dL; ux = -sxv; uz = -szv; }
+    } else {
+      // 正趴在某个小件的方台顶上（坟头/街垒/沙袋垛）：台面比五点采样的跨距还大
+      // 一圈时上面那条测不出凸度，但台面又比一具人小 —— 人不该躺在这种东西顶上。
+      // 判据：脚下那块盒子两个方向的半宽都收在 1.9 m 内，且顶面高出大地半米以上。
+      // 城墙马道、屋顶这类躺得住的面至少有一个方向是长的，不会被误伤。
+      for (const b of bf.BoxesNear(t0.x, t0.z)) {
+        // 包含判定往外扩一圈胶囊半径：中心刚出台缘时胶囊还踩着台角，
+        // 推力在这儿断掉的话尸体会被摩擦定在台唇上，悬在半空（回归 4g 抓过）。
+        if (t0.x < b.min[0] - 0.4 || t0.x > b.max[0] + 0.4
+          || t0.z < b.min[2] - 0.4 || t0.z > b.max[2] + 0.4) continue;
+        if (Math.abs(b.max[1] - feetY) > 0.3) continue;
+        if ((b.max[0] - b.min[0]) > 3.8 || (b.max[2] - b.min[2]) > 3.8) continue;
+        if (b.max[1] - physics.groundAt(t0.x, t0.z) < 0.5) continue;
+        const ex = t0.x - (b.min[0] + b.max[0]) / 2, ez = t0.z - (b.min[2] + b.max[2]) / 2;
+        const em = Math.hypot(ex, ez);
+        // 朝离台缘最近的方向推（正好在正中就顺着身体朝向走）
+        if (em > 0.05) { ux = ex / em; uz = ez / em; }
+        // 但四个采样里若有真正的低处（比脚低半米以上），优先朝低处走 ——
+        // 「远离台心」那条路可能被贴着的下一座坟头堵死（坟丛里两座相依时，
+        // 尸体会被推进夹缝楔住，悬在坟腰高度不下来；诊断 2026-08-27 抓过）。
+        let lowH = hC + dF, lx = fx, lz = fz;
+        if (hC + dB < lowH) { lowH = hC + dB; lx = -fx; lz = -fz; }
+        if (hC + dR < lowH) { lowH = hC + dR; lx = sxv; lz = szv; }
+        if (hC + dL < lowH) { lowH = hC + dL; lx = -sxv; lz = -szv; }
+        if (lowH < feetY - 0.4) { ux = lx; uz = lz; }
+        sliding = true;
+        break;
+      }
+    }
+    // 滑动总预算 2.5 s：坟丛里两座相贴时，尸体可能在夹缝里怎么推都出不去
+    //（换向也只是沿着壁来回蹭）。预算烧完就认命 —— 躺在坟缝、坟唇上，
+    // 由下面的贴合与下垂把姿势收拾好；要消灭的只是「平摊在孤坟顶上悬空」。
+    if (sliding) {
+      s.corpseSlideT += dt;
+      if (s.corpseSlideT > 2.5) sliding = false;
+    }
+    if (sliding) {
+      // 卡住换向：推着却没挪动（被下一座坟的箱壁、箱角顶住）超过 0.35 s，
+      // 就锁一个拧了 90° 的绕行航向推 0.6 s 沿壁走，到期回到正常算向，
+      // 再堵就再拧。绕行必须**限时**：无时效的转角会叠着正常算向来回打摆，
+      // 把尸体推回坟顶正中钉死（诊断 2026-08-27 第二轮抓过）。
+      const moved = Math.hypot(t0.x - s.corpseSlidePX, t0.z - s.corpseSlidePZ);
+      s.corpseStallT = moved < 0.35 * dt ? s.corpseStallT + dt : 0;
+      if (s.corpseDetourT > 0) {
+        s.corpseDetourT -= dt;
+        ux = s.corpseDetourX;
+        uz = s.corpseDetourZ;
+      }
+      if (s.corpseStallT > 0.35) {
+        s.corpseDetourX = -uz;
+        s.corpseDetourZ = ux;
+        s.corpseDetourT = 0.6;
+        s.corpseStallT = 0;
+        ux = s.corpseDetourX;
+        uz = s.corpseDetourZ;
+      }
+      const v0 = s.corpse.linvel();
+      s.corpse.setLinvel({ x: ux * 1.4, y: Math.min(v0.y, 0), z: uz * 1.4 }, true);
+    } else {
+      s.corpseStallT = 0;
+      s.corpseDetourT = 0;
+    }
+    s.corpseSlidePX = t0.x;
+    s.corpseSlidePZ = t0.z;
+
     // **先钳地再读位置。** 反过来的话读到的是"还没落地"的那一帧，
     // 而尸体停稳之后刚体就被拆了，那个偏差会永久留在尸体上（实测下沉 0.15 m）。
-    physics.ClampToGround(s.corpse, dt, { lift: s.corpse.userFeetOffset || 0.85, restitution: 0, rollDrag: 6 });
+    physics.ClampToGround(s.corpse, dt, { lift: s.corpse.userFeetOffset || 0.85, restitution: 0, rollDrag: sliding ? 1.2 : 6 });
     const t = s.corpse.translation();
     const feet = t.y - (s.corpse.userFeetOffset || 0);
     s.position.set(t.x, feet, t.z);
-    if (s.actor) s.actor.root.position.copy(s.position);
+
+    // --- 贴合：躯干对齐地表，悬空的肢体往下垂 ------------------------------
+    // 倒地动画假设的是平地；真实落点是斜坡、坟包、台缘。躯干的俯仰/侧倾照
+    // 拟合面套在 root 上（死人 root 的朝向本来就没人再管），肢体按「末端相对
+    // 拟合面悬空多少」折算 0—1 的下垂量喂给 PoseRagdoll。都带平滑，滑动途中
+    // 地形变了姿态跟着缓过去，不跳。
+    const p = Clamp01((s.deadTime - 0.25) / 0.65);
+    const ease = p * p * (3 - 2 * p);
+    const k = Math.min(1, 8 * dt);
+    s.corpseTiltX += (Clamp(Math.atan(slopeF), -0.6, 0.6) * ease - s.corpseTiltX) * k;
+    s.corpseTiltZ += (Clamp(Math.atan(slopeS), -0.6, 0.6) * ease - s.corpseTiltZ) * k;
+    const rF = dF - (cF - cB) / 2, rB = dB + (cF - cB) / 2;      // 相对拟合面的残差
+    const rR = dR - (cR - cL) / 2, rL = dL + (cR - cL) / 2;
+    const hangEnds = Clamp01(Math.max(-rF, -rB) / 0.35);
+    const hangAll = Clamp01(Math.max(-rF, -rB, -rR, -rL) / 0.35);
+    s.corpseDroopBody += (hangEnds * ease - s.corpseDroopBody) * k;
+    s.corpseDroopArms += (hangAll * ease - s.corpseDroopArms) * k;
+    if (s.actor) {
+      s.actor.root.position.copy(s.position);
+      s.actor.root.rotation.set(s.corpseTiltX, s.yaw, s.corpseTiltZ, "YXZ");
+      if (s.actor.ragdollState) {
+        s.actor.ragdollState.droopBody = s.corpseDroopBody;
+        s.actor.ragdollState.droopArms = s.corpseDroopArms;
+      }
+    }
+
     const v = s.corpse.linvel();
-    if (s.deadTime > 4 || (Math.hypot(v.x, v.y, v.z) < 0.08 && s.deadTime > 0.6)) {
+    // 滑动中不落定 —— 落定拆刚体，人会冻在坡腰上。8 秒是硬闸，防止在两个
+    // 采样点之间来回振荡的病态地形把刚体永远留在场上。
+    if ((!sliding && (s.deadTime > 4 || (Math.hypot(v.x, v.y, v.z) < 0.08 && s.deadTime > 0.6))) || s.deadTime > 8) {
       physics.RemoveBody(s.corpse);
       s.corpse = null;
       s.corpseSettled = true;
