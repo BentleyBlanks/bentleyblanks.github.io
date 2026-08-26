@@ -8,7 +8,10 @@
 //
 // 测法沿用 Script_BayonetTest 的纪律：采样在同一个 page.evaluate 里同步跑完
 // （rAF 不许插队）；白刃的靶要在**松手前一刻**才埋（早埋会被物理拽回原位）。
+//
+// --shot：跑完断言后按工位各拍一张到 _shots/range/（gitignore），给人工审场地用。
 
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -176,6 +179,20 @@ const checks = [
     result.resetAlive && result.resetStats && result.resetAmmo],
   ["无控制台报错", errors.length === 0],
 ];
+
+if (process.argv.includes("--shot")) {
+  const shotDir = path.join(projectDir, "_shots", "range");
+  mkdirSync(shotDir, { recursive: true });
+  for (const stationId of ["RangeRifle", "RangeGrenade", "RangeMelee"]) {
+    await page.evaluate((id) => {
+      const T = window.Taierzhuang;
+      T.Debug.Range.GoTo(id);
+      T.StepFrames(15);
+    }, stationId);
+    await page.screenshot({ path: path.join(shotDir, `${stationId}.png`) });
+    console.log(`shot ${stationId}.png`);
+  }
+}
 
 console.log(JSON.stringify({ ...result, errors: errors.slice(0, 5) }, null, 2));
 let passed = true;

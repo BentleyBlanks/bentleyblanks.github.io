@@ -15,6 +15,7 @@ http://127.0.0.1:8171/Taierzhuang1938/?shot=1&range=1     # agent：不进指针
 
 ```powershell
 node Taierzhuang1938/Script_RangeTest.mjs                  # 或 Script_TestRunner --only=RangeTest
+node Taierzhuang1938/Script_RangeTest.mjs --shot           # 附带按工位各拍一张到 _shots/range/（人工审场地）
 ```
 
 ## 架构：整表替换，不进正片
