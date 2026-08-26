@@ -41,7 +41,10 @@ import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { PHASES } from "./Data_Battle.mjs";
-import { CITY_FEATURES, LANDMARKS, STREETS } from "./Data_Tengxian.mjs";
+import {
+  CITY_FEATURES, LANDMARKS, STREETS, GATES,
+  EAST_SUBURB, WEST_SUBURB, NORTH_SUBURB, OUTER_LANDMARKS,
+} from "./Data_Tengxian.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
 const SAVE_KEY = "tengxian1938_sceneedit_v1";
@@ -103,38 +106,106 @@ export function NormalizeMapMarker(raw, fallbackId = 1) {
 }
 
 /**
- * 把 Data_Tengxian 的同一份图纸变成编辑器参考标记。这里不抄坐标：公共院落和街道
- * 每次都从 CITY_FEATURES / LANDMARKS / STREETS 现算，图纸移动后标记不会留在旧位置。
+ * 把 Data_Tengxian 的同一份图纸变成编辑器参考标记。这里不抄坐标：公共院落、城门、
+ * 城外关厢和道路每次都从数据现算，图纸移动后标记不会留在旧位置。
  */
 export function MapReferenceMarkers() {
   const markers = [];
+  const addRegion = (text, sourceId, area, ry = 0) => {
+    if (!area || !text) return;
+    markers.push({
+      kind: "region", text, x: area.x, z: area.z, ry,
+      w: area.w || area.span || 18, d: area.d || area.span || 18,
+      source: "map", sourceId,
+    });
+  };
+  const addRoad = (text, sourceId, road) => {
+    if (!road || !text) return;
+    const vertical = road.axis === "z" || (road.axis == null && road.d > road.w);
+    const from = road.from == null ? null : road.from;
+    const to = road.to == null ? null : road.to;
+    const length = from == null || to == null
+      ? (vertical ? road.d : road.w)
+      : Math.abs(to - from);
+    const along = from == null || to == null ? null : (from + to) / 2;
+    markers.push({
+      kind: "road", text, source: "map", sourceId,
+      x: from == null ? road.x : (vertical ? road.at : along),
+      z: from == null ? road.z : (vertical ? along : road.at),
+      ry: vertical ? Math.PI / 2 : 0,
+      w: length, d: road.width || (vertical ? road.w : road.d),
+    });
+  };
   for (const feature of CITY_FEATURES) {
     if (!feature.label) continue;
-    markers.push({
-      kind: "region", text: feature.label, x: feature.x, z: feature.z,
-      ry: feature.ry || 0, w: feature.w, d: feature.d,
-      source: "map", sourceId: `feature:${feature.id}`,
-    });
+    addRegion(feature.label, `feature:${feature.id}`, feature, feature.ry || 0);
   }
   for (const landmark of LANDMARKS) {
     const text = landmark.label || LANDMARK_LABELS[landmark.id];
     if (!text || landmark.kind === "paifang") continue;
-    markers.push({
-      kind: "region", text, x: landmark.x, z: landmark.z,
-      ry: landmark.ry || 0, w: landmark.w || landmark.span || 18,
-      d: landmark.d || landmark.span || 18,
-      source: "map", sourceId: `landmark:${landmark.id}`,
-    });
+    addRegion(text, `landmark:${landmark.id}`, landmark, landmark.ry || 0);
   }
   for (const street of STREETS) {
-    const along = (street.from + street.to) / 2;
-    markers.push({
-      kind: "road", text: street.label, source: "map", sourceId: `street:${street.id}`,
-      x: street.axis === "x" ? along : street.at,
-      z: street.axis === "x" ? street.at : along,
-      ry: street.axis === "x" ? 0 : Math.PI / 2,
-      w: Math.abs(street.to - street.from), d: street.width,
-    });
+    addRoad(street.label, `street:${street.id}`, street);
+  }
+
+  // 四门和关外不是"环境背景"：Notion 城防图将它们与城内院落、街道并列标出。
+  // 之前预设只取前三套城内表，因而编辑器会显得城外没有任何语义信息。
+  for (const gate of GATES) {
+    addRegion(`${({ East: "东门", West: "西门", South: "南门", North: "北门" })[gate.id]} · ${gate.name}`,
+      `gate:${gate.id}`, { x: gate.x, z: gate.z, w: 44, d: 66 }, gate.ry || 0);
+  }
+
+  addRegion("西关", "outskirts:WestSuburb", { x: -414, z: 24, w: 132, d: 278 });
+  addRegion("通信队", "outskirts:Communications", WEST_SUBURB.communications);
+  addRegion("电灯厂", "outskirts:PowerPlant", WEST_SUBURB.powerPlant);
+  addRegion("交易所", "outskirts:Exchange", WEST_SUBURB.exchange);
+  addRegion("滕县站", "outskirts:Station", WEST_SUBURB.station);
+  addRegion("第122师师部", "outskirts:Division122", WEST_SUBURB.division122, WEST_SUBURB.division122.ry || 0);
+  addRoad(WEST_SUBURB.westStreet.label, "outskirts:WestStreet", {
+    axis: "x", at: WEST_SUBURB.westStreet.z,
+    from: WEST_SUBURB.westStreet.fromX, to: WEST_SUBURB.westStreet.toX,
+    width: WEST_SUBURB.westStreet.width,
+  });
+  addRoad("津浦铁路", "outskirts:JinpuRailway", {
+    axis: "z", at: WEST_SUBURB.railway.x, from: -400, to: 400, width: 8,
+  });
+
+  const eastBounds = EAST_SUBURB.bounds;
+  // 标记层的深度上限是 500 m；东关纵深比这个大，故中段总览与各单项节点并存。
+  addRegion("东关", "outskirts:EastSuburb", {
+    x: (eastBounds.minX + eastBounds.maxX) / 2, z: (eastBounds.minZ + eastBounds.maxZ) / 2,
+    w: eastBounds.maxX - eastBounds.minX, d: 500,
+  });
+  addRegion("东关寺院地", "outskirts:EastTemple", EAST_SUBURB.temple);
+  for (const feature of EAST_SUBURB.features || []) {
+    addRegion(feature.label, `outskirts:EastFeature:${feature.id}`, feature);
+  }
+  for (const lane of EAST_SUBURB.mapLanes || []) {
+    if (lane.label) addRoad(lane.label, `outskirts:EastLane:${lane.id}`, lane);
+  }
+
+  const north = NORTH_SUBURB;
+  addRegion("北关", "outskirts:NorthSuburb", {
+    x: (north.stockade.fromX + north.stockade.toX) / 2,
+    z: (north.street.fromZ + north.stockade.z) / 2,
+    w: north.stockade.toX - north.stockade.fromX,
+    d: Math.abs(north.stockade.z - north.street.fromZ),
+  });
+  addRoad(north.street.label, "outskirts:NorthStreet", {
+    axis: "z", at: north.street.x, from: north.street.fromZ, to: north.street.toZ,
+    width: north.street.width,
+  });
+  addRegion("北关庙", "outskirts:NorthTemple", north.temple);
+
+  const outerLabels = {
+    CatholicChurchSouth: "南关天主堂",
+    HongdaoAcademy: "弘道院／神学院",
+    LongquanPagoda: "龙泉塔",
+  };
+  for (const landmark of OUTER_LANDMARKS) {
+    const text = outerLabels[landmark.id];
+    if (text) addRegion(text, `outskirts:Landmark:${landmark.id}`, landmark, landmark.ry || 0);
   }
   return markers;
 }

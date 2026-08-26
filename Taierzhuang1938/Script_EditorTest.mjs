@@ -817,6 +817,11 @@ const scene = await page.evaluate(() => {
       && marker.text === "警察所"),
     road: active.markers.some((marker) => marker.sourceId === "street:FireGodTempleEastStreet"
       && marker.kind === "road" && marker.text === "火神庙东街"),
+    exterior: [
+      "gate:East", "gate:West", "gate:South", "gate:North",
+      "outskirts:PowerPlant", "outskirts:JinpuRailway", "outskirts:EastSuburb",
+      "outskirts:NorthStreet", "outskirts:Landmark:CatholicChurchSouth",
+    ].every((sourceId) => active.markers.some((marker) => marker.sourceId === sourceId)),
   };
   active.Import(json, false);
 
@@ -915,6 +920,7 @@ Check("场景 JSON 存取往返", scene.roundTrip === "0 / 0 → 2 / 2", scene.r
 Check("编辑器从 Data_Tengxian 载入院落与道路图纸标记",
   scene.mapReferences.count >= 35 && scene.mapReferences.school
     && scene.mapReferences.police && scene.mapReferences.road
+    && scene.mapReferences.exterior
     && scene.mapReferences.custom === 2 && scene.mapReferences.customText.includes("滕文中学旧址")
     && scene.mapReferences.customText.includes("火神庙东街"), JSON.stringify(scene.mapReferences));
 Check("旧版 v1 场景文档按空标记层兼容", scene.legacyMarkers === 0, scene.legacyMarkers);
