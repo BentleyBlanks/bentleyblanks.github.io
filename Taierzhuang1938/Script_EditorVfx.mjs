@@ -8,7 +8,7 @@ import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
 const INSTANT_EFFECTS = [
   { id: "ExplosionGrenade", name: "爆炸 · 手榴弹", note: "半径 4 m", run: (v, s) => v.Explosion({ x: 0, y: 0.12, z: 0 }, { radius: 4 * s, kind: "grenade", groundY: 0 }) },
-  { id: "ExplosionMortar", name: "爆炸 · 掷弹筒", note: "半径 7 m", run: (v, s) => v.Explosion({ x: 0, y: 0.16, z: 0 }, { radius: 7 * s, kind: "mortar", groundY: 0 }) },
+  { id: "ExplosionMortar", name: "爆炸 · 掷弹筒", note: "半径 7 m", run: (v, s) => v.Explosion({ x: 0, y: 0.16, z: 0 }, { radius: 7 * s, kind: "launcher", groundY: 0 }) },
   { id: "ExplosionShell", name: "爆炸 · 炮弹", note: "半径 11 m", run: (v, s) => v.Explosion({ x: 0, y: 0.18, z: 0 }, { radius: 11 * s, kind: "shell", groundY: 0 }) },
   { id: "MuzzleRifle", name: "枪口焰 · 步枪", note: "两帧焰 + 枪烟", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "rifle" }) },
   { id: "MuzzleMg", name: "枪口焰 · 机枪", note: "连续武器单次反馈", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "lmg" }) },
@@ -62,6 +62,7 @@ export class VfxEditor {
     this.savedSources = vfx.smokeSources;
     this.savedNextSourceId = vfx.nextSourceId;
     this.savedParticles = this.CaptureParticles(vfx);
+    for (const source of this.savedSources.values()) vfx.DetachSourceLight(source);
     vfx.smokeSources = new Map();
     for (const pool of Object.values(vfx.pools)) pool.Clear();
     vfx.debris.Clear();
@@ -87,7 +88,10 @@ export class VfxEditor {
   Exit() {
     this.Stop();
     const vfx = this.host.vfx;
-    if (this.savedSources) vfx.smokeSources = this.savedSources;
+    if (this.savedSources) {
+      vfx.smokeSources = this.savedSources;
+      for (const source of this.savedSources.values()) vfx.AttachSourceLight(source);
+    }
     vfx.nextSourceId = this.savedNextSourceId;
     if (this.savedParticles) this.RestoreParticles(vfx, this.savedParticles);
     if (vfx.dust && this.savedDustVisible != null) vfx.dust.mesh.visible = this.savedDustVisible;

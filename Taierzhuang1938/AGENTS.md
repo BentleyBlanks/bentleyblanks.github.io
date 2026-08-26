@@ -122,6 +122,11 @@ node Taierzhuang1938/Script_ActorPoseShot.mjs                   # 人物姿态�
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 ```
 
+**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ 性能剖析」，弹独立窗口，
+玩法照跑：CPU 逐系统 / GPU 逐 pass / 掉帧取证 / GC，可导出快照 JSON。
+内核 `Script_Profiler.mjs`、面板 `Script_EditorProfiler.mjs`，账在
+`docs/Data_EditorSuite.md` 对应小节；回归口 `Script_ProfilerTest`（render 域）。
+
 调试页 `Probe.html`（`Script_Probe.mjs`）：材质 / 光照 / 后处理单独摆出来看，
 URL 参数选 preset / quality / scene / gi。
 
@@ -267,7 +272,10 @@ URL 参数选 preset / quality / scene / gi。
 
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
-- `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Settings,Stage,Ui,DebugRendering}.mjs`。
+- `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`。
+  DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法；
+  Profiler（独立窗口的性能剖析，内核 `Script_Profiler.mjs`）还带 keepOnClose ——
+  关设置面板回去打仗它照记。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。
 

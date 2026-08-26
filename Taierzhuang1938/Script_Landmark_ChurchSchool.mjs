@@ -389,11 +389,15 @@ export function BuildChurch(host, f, ctx) {
       x: low.x, z: low.z, length: naveD, height: sillY, thickness: wallT, ry: rot,
       ruin: damage * 0.35, seed: `${seed}:lw${s}`, plinth: "CrossStone",
     });
-    // 窗券以上：整条过梁带（不落地，不用碰撞）
+    // 窗券以上：整条过梁带。它不落地，但**要有碰撞** ——
+    // 否则子弹与手榴弹从窗券之上、檐口之下那条缝里穿墙而过。
+    // 底面在 5.9 m 以上，NavGrid 与 AiDirector 的 1.6 m 净空线之外，不影响走位。
     const head = L(s * naveW / 2, 0);
     sink.Add("HouseBrick", PlaceGeometry(
       MakeBox(naveD, eave - headY, wallT, TILE_METERS.brick, `${seed}:hb${s}`, BRICK_UV_GRID),
       { x: head.x, y: headY + (eave - headY) / 2, z: head.z, ry: rot }));
+    sink.Solid(head.x, headY + (eave - headY) / 2, head.z,
+      wallT / 2, (eave - headY) / 2, naveD / 2, "wall", ry);
     // 砖墩 + 扶壁
     for (let k = 0; k <= bays; k += 1) {
       const end = (k === 0 || k === bays);
@@ -961,15 +965,21 @@ function AddClassroomRow(sink, {
       sink.Add("Stone", PlaceGeometry(
         MakeBox(openW + 0.6, 0.16, 0.9, TILE_METERS.stone, `${seed}:ds${k}`),
         { x: p.x, y: 0.08, z: p.z, ry }));
+      sink.Solid(p.x, doorH + 0.18 + (eaveY - doorH - 0.18) / 2, p.z,
+        openW / 2, (eaveY - doorH - 0.18) / 2, 0.18, "wall", ry);
       continue;
     }
-    // 窗下墙 + 窗上过梁带
+    // 窗下墙 + 窗上过梁带。这两条砖带过去没有碰撞（碰撞全在砖墩上），
+    // 于是一排教室的每一开间从地坪到檐口都是空的 —— 人直接穿墙进教室。
     sink.Add(brick, PlaceGeometry(
       MakeBox(openW, sillY, 0.36, TILE_METERS.brick, `${seed}:sb${k}`, BRICK_UV_GRID),
       { x: p.x, y: sillY / 2, z: p.z, ry }));
+    sink.Solid(p.x, sillY / 2, p.z, openW / 2, sillY / 2, 0.18, "wall", ry);
     sink.Add(brick, PlaceGeometry(
       MakeBox(openW, eaveY - headY - 0.16, 0.36, TILE_METERS.brick, `${seed}:hb${k}`, BRICK_UV_GRID),
       { x: p.x, y: headY + 0.16 + (eaveY - headY - 0.16) / 2, z: p.z, ry }));
+    sink.Solid(p.x, headY + 0.16 + (eaveY - headY - 0.16) / 2, p.z,
+      openW / 2, (eaveY - headY - 0.16) / 2, 0.18, "wall", ry);
     // 洞里的暗（教室是封闭盒子，没有内衬会一眼看穿）。
     // 必须退到墙里侧：第一版把它摆在墙心，0.14 厚的暗盒正好把 0.10 厚的木棂整个吞掉，
     // 出图上一排窗全是空洞的黑方块，一根窗棂都看不见。

@@ -1479,10 +1479,10 @@ const navStats = await page.evaluate(() => {
   const stats = T.nav.Stats();
   const rows = [];
   for (const o of T.battlefield.objectives) {
-    // 每张新场都要占一次"每帧最多算两张"的预算，不重置的话第三个点起一律拿到 null，
-    // 量到的 0% 是预算用完了，不是走不到。BeginFrame 就是引擎每帧自己调的那一个。
+    // BFS 现在是跨帧摊的（Script_Navigation 头注）：不带 force 的话每张场要好几个
+    // BeginFrame 才算完，量到的 0% 是没摊完，不是走不到。连通率要同步算满。
     T.nav.BeginFrame();
-    const field = T.nav.FieldFor(o.x, o.z);
+    const field = T.nav.FieldFor(o.x, o.z, true);
     let reach = 0;
     if (field) for (let i = 0; i < field.dist.length; i += 1) if (field.dist[i] >= 0) reach += 1;
     rows.push({ id: o.id, pct: +(reach / stats.open * 100).toFixed(1) });

@@ -16,7 +16,9 @@
 /** 模型目录。相对 index.html 所在目录。 */
 export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
-const MESH_REV = "15";
+// 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
+// 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
+const MESH_REV = "16";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -124,9 +126,9 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "ZhongZheng.tzm.json", category: "weapon",
-    triangles: 5633, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 5609, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.05570, 0.17549, 1.11133], lengthM: 1.110,
+    span: [0.05554, 0.16881, 1.11133], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
     note: "中正式。几何来自 Poly Haven CC0 Bolt Action Rifle 7.62；"
       + "剔除现代瞄准镜、包布和独立子弹，仅保留老式栓动枪轮廓，"
