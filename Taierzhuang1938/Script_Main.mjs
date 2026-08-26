@@ -147,6 +147,43 @@ function ShowBoot(on) {
   boot.classList.toggle("gone", !on);
   if (on) bootProp?.Show(); else bootProp?.Hide();
 }
+
+/** 让出一个宏任务。**不许换成 setTimeout**：后台页面的定时器被钳到最少 1 s，
+ *  挂过五分钟还会掉到一分钟一次，比不让步还慢。MessageChannel 不是定时器，
+ *  不吃这份钳制（React 的调度器也是为这个用它）。 */
+function NextTask() {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+    channel.port2.postMessage(0);
+  });
+}
+
+/**
+ * 让出一帧 —— 开机与换关那条链上每做一步就调一次，好让进度条动起来。
+ *
+ * **可见时才等 rAF。** 标签页切到后台、或者窗口在 Windows 上被别的窗口整个盖住
+ * （Chrome 的遮挡检测把这两件事判成同一件：hidden），浏览器一帧都不发。整条
+ * 加载链于是钉死在当前这一步 —— 用户实拍到的是加载条停在 86%、字幕停在城生成器
+ * 最后那次 yield 的「就绪」（Script_TengxianCity 末尾那条，在开机的量程里正好落在
+ * 0.24 + 0.62 = 0.86）、而「进 城」还是灰的：那不是游戏就绪，是城建完了，后面
+ * 还有上刺刀、建关、建菜单没跑。切回前台才继续往下走。
+ *
+ * 所以隐藏时不等帧，改走宏任务：反正没人看进度条，加载还比前台快（不再被 60 Hz 限速）。
+ * 等帧的中途被切走也要放行 —— 那一次 rAF 回调永远不会来了。
+ */
+function NextFrame() {
+  if (document.hidden) return NextTask();
+  return new Promise((resolve) => {
+    const finish = () => {
+      document.removeEventListener("visibilitychange", finish);
+      resolve();
+    };
+    requestAnimationFrame(finish);
+    document.addEventListener("visibilitychange", finish, { once: true });
+  });
+}
+
 bootProp?.Show();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
@@ -402,7 +439,6 @@ function SetDebugOption(id, enabled) {
 // 启动
 // ---------------------------------------------------------------------------
 async function Boot() {
-  const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
   const setStep = (label, progress) => {
     bootStep.textContent = label;
     bootBar.style.width = `${Math.round(progress * 100)}%`;
@@ -414,7 +450,7 @@ async function Boot() {
   for (const name of library.PrepareSteps()) {
     baked += 1;
     setStep(`烘贴图 ${baked}/${total} · ${name}`, 0.02 + 0.22 * (baked / total));
-    await nextFrame();
+    await NextFrame();
   }
 
   /**
@@ -594,7 +630,7 @@ async function Boot() {
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
 
-  await BuildField(PHASES[state.phaseIndex], setStep, 0.24, 0.62, nextFrame);
+  await BuildField(PHASES[state.phaseIndex], setStep, 0.24, 0.62, NextFrame);
 
   setStep("上刺刀……", 0.9);
   actorFactory = new ActorFactory(library, { quality: QUALITY });
@@ -773,7 +809,7 @@ async function Boot() {
     },
   });
 
-  await nextFrame();
+  await NextFrame();
   setStep("就绪", 1.0);
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false });
   state.ready = true;
@@ -1229,9 +1265,6 @@ async function Boot() {
 // ---------------------------------------------------------------------------
 // 关卡流程
 // ---------------------------------------------------------------------------
-
-/** 让出一帧。真在跑就等 rAF（进度条要动），出图/自检模式直接过。 */
-const NextFrame = () => new Promise((r) => requestAnimationFrame(r));
 
 /**
  * 这一关站在哪张图上。
