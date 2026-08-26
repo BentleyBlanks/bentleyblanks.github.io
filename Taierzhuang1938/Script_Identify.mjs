@@ -150,18 +150,21 @@ export function TargetCard(entity, dist, detail = "basic") {
   const faction = entity.side === "nra" ? "nra" : "ija";
 
   if (!entity.alive) {
-    // 阵亡的人仍然有名有姓 —— 这一版唯一一处把"这是谁"写在战场上的地方
-    // 就是阵亡卡，尸体沿用同一套读法。日方不给姓名（玩家不该认得他们）。
-    // 地上那具已经是个物件了，所以**不报他的枪**：能不能捡由 F 的提示语在两米内说，
-    // 这里只留他是谁、哪里人、多大、有多远（见 Years 的账）。
-    const bits = faction === "nra"
-      ? [identity.origin, Years(identity), Meters(dist)]
-      : [Meters(dist)];
+    // **日军的尸体不给卡片**（2026-08-26）。原来那张写着「日军 阵亡 · 2m」——
+    // 两样都是废话：玩家刚打死他，知道他是日军；他就躺在脚边，也知道有两米。
+    // 阵亡卡存在的理由是"把这是谁写在战场上"，而日方本来就不给姓名，
+    // 于是那张卡片只剩一个标签，纯粹是低头走路时糊在准心下的噪声。
+    // 能不能捡他的枪由 F 的提示语在两米内说，那一条与这张卡片无关。
+    if (faction !== "nra") return null;
+    // 川军的阵亡卡照旧：他仍然有名有姓 —— 这一版唯一一处把"这是谁"写在战场上的
+    // 地方就是这里。地上那具已经是个物件了，所以**不报他的枪**，
+    // 只留他是谁、哪里人、多大、有多远（见 Years 的账）。
+    const bits = [identity.origin, Years(identity), Meters(dist)];
     return {
       key: `s${entity.id}`,
       faction,
       kind: "corpse",
-      title: faction === "nra" ? `阵亡 ${identity.name || ""}`.trim() : "日军 阵亡",
+      title: `阵亡 ${identity.name || ""}`.trim(),
       meta: bits.filter(Boolean).join(" · "),
       health: null,
       dead: true,
@@ -312,9 +315,12 @@ export class IdentifySystem {
       Consider(e, e.x, e.y, e.z, half, Math.max(half, e.halfHeightM || 0), rangeM);
     }
     // 活人（和车）优先。地上的尸体只在没有活目标时才认，而且只认近处的。
+    // **日军的尸体连扫都不扫** —— TargetCard 对它返回 null（见那儿的账），
+    // 扫进来只会白占一个候选名额、白投一条通视射线，还会把它下面那个
+    // 真该认出来的自己人挤掉。
     if (this.used === 0) {
       for (const s of soldiers) {
-        if (!s || s.alive) continue;
+        if (!s || s.alive || s.side !== "nra") continue;
         Consider(s, s.position.x, s.position.y + CAPSULE[2].y, s.position.z,
           BODY_HALF_W, CAPSULE[2].halfH, IDENTIFY.corpseRangeM);
       }
