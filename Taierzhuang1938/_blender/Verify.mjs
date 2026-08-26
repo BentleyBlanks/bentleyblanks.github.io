@@ -80,6 +80,98 @@ const sandalNodesOk = ["ankleL", "ankleR"].every((nodeName) => {
 Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
   "川军左右脚均为裸足皮肤 + 露趾草鞋双材质");
 
+// 钢盔扣不扣得住颅骨：低多边形的头饰与头是两个独立放样体，**贴着建**的话
+// 分面一削就穿，穿出来的是盔体后半一条肉色折线 —— 只有从后上方（低头看脚边的
+// 尸体）才看得见，三角数、包围盒、材质桶全部正常，所以一路漏到了 2026-08-27：
+// HeadShape 每一圈都带向后的 cz 偏移（颅骨本来就往后鼓），而 Type90Helmet 绕
+// 自己的轴正着建，两者在后脑相切，最深处穿出 2.3 mm。
+//
+// 判据：把头顶点投到水平面上，从中轴朝它自己的方向投一条射线打盔体三角，
+// 余量 = 盔内壁距离 − 顶点距离。只算盔覆盖得到的高度（脸和下颌本来就露着）。
+// 阈值 1 mm 是「肉眼绝对看不出」与「别把盔建成头套」之间的下限。修的那一轮
+// 另跑过一遍面上密采样（每个头三角 21 个重心点），结果与顶点法一致到微米，
+// 所以这里只取顶点 —— 最坏点总落在头最宽那两圈的顶点上。
+const HeadgearClearanceMm = (doc, headName, gearName) => {
+  const nodeIndex = (name) => doc.nodes.findIndex((node) => node.name === name);
+  const head = nodeIndex(headName);
+  const gear = nodeIndex(gearName);
+  if (head < 0 || gear < 0) return null;
+  const offset = [0, 0, 0];
+  for (let cur = gear; cur !== head; cur = doc.nodes[cur].parent) {
+    const node = doc.nodes[cur];
+    // 这条链上全是纯平移节点；真出现旋转就别硬算，交给人去看。
+    if (node.r.some((value) => Math.abs(value) > 1e-9)) return null;
+    for (let a = 0; a < 3; a += 1) offset[a] += node.t[a];
+  }
+  const Positions = (mesh, shift) => {
+    const bytes = Buffer.from(mesh.pos, "base64");
+    const out = [];
+    for (let i = 0; i < mesh.count; i += 1) {
+      out.push([0, 1, 2].map((a) => mesh.posMin[a]
+        + mesh.posScale[a] * bytes.readUInt16LE(i * 6 + a * 2) + shift[a]));
+    }
+    return out;
+  };
+  const Triangles = (mesh, shift) => {
+    const verts = Positions(mesh, shift);
+    const bytes = Buffer.from(mesh.idx, "base64");
+    const wide = mesh.idxBits === 32;
+    const step = wide ? 4 : 2;
+    const Read = (i) => (wide ? bytes.readUInt32LE(i * step) : bytes.readUInt16LE(i * step));
+    const out = [];
+    for (let i = 0; i < mesh.idxCount; i += 3) {
+      out.push([verts[Read(i)], verts[Read(i + 1)], verts[Read(i + 2)]]);
+    }
+    return out;
+  };
+  const headVerts = doc.nodes[head].meshes
+    .flatMap((index) => Positions(doc.meshes[index], [0, 0, 0]));
+  const gearTris = doc.nodes[gear].meshes
+    .flatMap((index) => Triangles(doc.meshes[index], offset));
+  const ys = gearTris.flatMap((tri) => tri.map((v) => v[1]));
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+  // Möller–Trumbore，双面（盔是零厚度的壳，正反面都得算命中）
+  const Hit = (origin, dir, [a, b, c]) => {
+    const e1 = [0, 1, 2].map((i) => b[i] - a[i]);
+    const e2 = [0, 1, 2].map((i) => c[i] - a[i]);
+    const Cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0]];
+    const Dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+    const pv = Cross(dir, e2);
+    const det = Dot(e1, pv);
+    if (Math.abs(det) < 1e-12) return null;
+    const inv = 1 / det;
+    const tv = [0, 1, 2].map((i) => origin[i] - a[i]);
+    const u = Dot(tv, pv) * inv;
+    if (u < -1e-9 || u > 1 + 1e-9) return null;
+    const qv = Cross(tv, e1);
+    const v = Dot(dir, qv) * inv;
+    if (v < -1e-9 || u + v > 1 + 1e-9) return null;
+    const t = Dot(e2, qv) * inv;
+    return t > 1e-9 ? t : null;
+  };
+  let worst = Infinity;
+  for (const [x, y, z] of headVerts) {
+    const r = Math.hypot(x, z);
+    if (r < 1e-6 || y < yMin || y > yMax) continue;
+    const dir = [x / r, 0, z / r];
+    let inner = Infinity;
+    for (const tri of gearTris) {
+      const t = Hit([0, y, 0], dir, tri);
+      if (t !== null && t < inner) inner = t;
+    }
+    if (inner === Infinity) continue;      // 这个方位盔体没有壁（帽檐缺口）
+    worst = Math.min(worst, inner - r);
+  }
+  return worst === Infinity ? null : worst * 1000;
+};
+const ijaPath = path.join(projectDir, "Model", MESHES.SoldierIja.file);
+const ijaDoc = JSON.parse(fs.readFileSync(ijaPath, "utf8"));
+const helmetClearance = HeadgearClearanceMm(ijaDoc, "head", "helmet");
+Report(helmetClearance !== null && helmetClearance >= 1.0,
+  `九〇式钢盔扣得住颅骨（最小余量 ${helmetClearance === null ? "量不出来" : helmetClearance.toFixed(2) + " mm"} ≥ 1.00 mm）`);
+
 // CGMOL 大刀靠原模型的 UV atlas 才能正确读取专用法线/粗糙度。退回盒投影时
 // UV 会跑到 -20..20；只看三角数与包围盒完全发现不了，必须锁定这里。
 const dadaoPath = path.join(projectDir, "Model", MESHES.Dadao.file);

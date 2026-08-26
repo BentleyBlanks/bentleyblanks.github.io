@@ -117,6 +117,15 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     await Shot("side", [0, 0.25, 1]);      // 站 -Z 看（侧面：车头朝左）
     await Shot("front34", [-1, 0.35, -1]); // 左前 3/4（看得到车头与炮塔）
     await Shot("top", [0.01, 1, 0.01]);    // 俯视
+    if (entry.category === "soldier") {
+      // 后上方看头。头饰与颅骨在后脑相切，穿模的样子是**头饰后半一条肉色折线**
+      // （游戏里低头看脚边的尸体大致就是这个角度）——三视图那三张离得太远，
+      // 2 mm 的折线在上面只有一个像素，看不出来。四个人物模型共用一套 HeadShape，
+      // 所以这两张对四个都拍。
+      const head = new THREE.Vector3(center.x, box.max.y - 0.13, 0);
+      await Shot("headRearTop", [0.16, 0.9, 1], head, 0.30);
+      await Shot("headRear34", [0.95, 0.45, 1], head, 0.30);
+    }
     if (modelId === "SoldierNra") {
       const feet = new THREE.Vector3(center.x, box.min.y + 0.10, center.z - 0.05);
       await Shot("feetFront", [-1, 0.18, -1], feet, 0.42);

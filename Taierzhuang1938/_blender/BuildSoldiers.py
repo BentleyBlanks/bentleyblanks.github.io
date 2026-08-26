@@ -601,7 +601,14 @@ def BuildIjaSoldier():
     neck.Add("skin", Neck(d), tile="cloth")
     head = neck.Child("head", t=(0.0, d["headH"] * 0.50 + 0.010, 0.0))
     head.Add("skin", HeadShape(d), tile="cloth")
-    helmet = head.Child("helmet", t=(0.0, 0.006, 0.0))
+    # 盔往后扣 D*0.03：**HeadShape 每一圈都带一个向后的 cz 偏移**（颅骨本来就往
+    # 后鼓，最大 D*0.04），而 Type90Helmet 是绕自己的轴正着建的。两者在后脑相切，
+    # 低多边形的分面一削，y≈HH*0.30 那一圈的后脑与后侧 45° 对角就穿出盔体 2.3 mm ——
+    # 从后上方（低头看脚边的尸体）看得见一条肉色折线。补上同向的偏移最小余量回到
+    # +3.0 mm，而且盔的尺寸/剪影一点没变；把 rz 基数从 D*0.545 抬上去也能解，但那是
+    # 把盔整个拉长，最小余量还只有 +0.8 mm。小檐、盔箍、五角星都建在盔的局部空间里，
+    # 跟着这一个偏移一起走，不用各自挪。
+    helmet = head.Child("helmet", t=(0.0, 0.006, d["headD"] * 0.03))
     helmet.Add("helmet", Type90Helmet(d), tile="steel")
     helmet.Child("helmetStar").Add("accentB", HelmetStar(d), tile="steel")
     head.Child("eyes", t=(0.0, d["headH"] * 0.02, -d["headD"] * 0.42))

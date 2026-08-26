@@ -223,6 +223,16 @@ const farDir = (() => {
 })();
 assert.equal(new IdentifySystem().Update(0.016,
   { eye, dir: farDir, soldiers: [farCorpse] }), null, "远处尸体不认");
+// 日军的尸体**一张卡片都不给**：「日军 阵亡 · 2m」两样都是废话（见 TargetCard 的账）。
+// 连扫都不扫，所以这一帧一条通视射线也不该投。
+const ijaCorpse = MakeSoldier({ id: 6, alive: false, z: -8 });
+const deadIja = new IdentifySystem({ Clear: () => true });
+assert.equal(deadIja.Update(0.016, { eye, dir: down, soldiers: [ijaCorpse] }), null, "日军尸体不给卡片");
+assert.equal(deadIja.stats.rays, 0, "日军尸体连通视都不查");
+assert.equal(TargetCard(ijaCorpse, 2), null, "TargetCard 对日军尸体直接返回 null");
+// 日军的尸体压在自己人身上时，认出来的仍然是自己人（尸体不该占候选名额）。
+assert.equal(new IdentifySystem().Update(0.016,
+  { eye, dir: down, soldiers: [ijaCorpse, corpse] }).key, "s3", "日军尸体不挤掉自己人");
 
 // 写实档：整条链短路，不扫不投射。
 const off = new IdentifySystem({ Clear: () => true });
