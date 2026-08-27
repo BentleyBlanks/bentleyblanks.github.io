@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "20";
+const MESH_REV = "22";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -251,6 +251,24 @@ export const MESHES = {
     note: "八九式重掷弹筒。筒身 + 粗牙螺杆 + **弧形驻钣**，侧面一块击发机构。"
       + "**没有两脚架** —— 加了脚架就成了迫击炮。约 45° 手持抵地发射。",
   },
+  Type11: {
+    file: "Type11.tzm.json", category: "weapon",
+    triangles: 6622, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
+    span: [0.16168, 0.22103, 1.1], lengthM: 1.100,
+    draws: { high: 2, medium: 2, low: 2 },
+    note: "CC-BY Type 11 6.5mm Machine Gun（Sketchfab / buh）→ 十一年式轻机枪。"
+      + "完整枪体不减面；独立展示的桥夹/散弹不作为手持枪体导入。",
+  },
+  Type92Hmg: {
+    file: "Type92Hmg.tzm.json", category: "weapon",
+    triangles: 20065, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["steel"], mounts: WEAPON_MOUNTS,
+    span: [0.53558, 0.55684, 1.156], lengthM: 1.156,
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "九二式重机枪。CadNav 免费 Maya ASCII 源完整保留枪体、冷却套、瞄具与三脚架；"
+      + "只排除两块空白展示方块，未减面。",
+  },
   Type89Tank: {
     file: "Type89Tank.tzm.json", category: "vehicle",
     triangles: 4089, meshBlocks: 4, nodes: 8, joints: 1,
@@ -392,7 +410,7 @@ export function AllMeshUrls() {
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
 export const WEAPON_MESH_BY_ID = {
   ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38",
-  Mauser96: "Mauser96", ServicePistol: "ServicePistol",
+  Mauser96: "Mauser96", ServicePistol: "ServicePistol", Type11: "Type11", Type92Hmg: "Type92Hmg",
   Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
   // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了

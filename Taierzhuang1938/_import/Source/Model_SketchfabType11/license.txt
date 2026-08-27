@@ -1,0 +1,11 @@
+Model Information:
+* title:	Type 11 6.5mm Machine gun (outdated)
+* source:	https://sketchfab.com/3d-models/type-11-65mm-machine-gun-outdated-4a24c481a48a413d92208ccfe7772ecc
+* author:	buh (https://sketchfab.com/buh-late)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Type 11 6.5mm Machine gun (outdated)" (https://sketchfab.com/3d-models/type-11-65mm-machine-gun-outdated-4a24c481a48a413d92208ccfe7772ecc) by buh (https://sketchfab.com/buh-late) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -967,6 +967,73 @@
      0.255
     ]
    }
+  },
+  {
+   "name": "Type11",
+   "category": "weapon",
+   "file": "Type11.tzm.json",
+   "triangles": 6622,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 164310,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.10683,
+     -0.09864,
+     -0.845
+    ],
+    "max": [
+     0.05485,
+     0.12239,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "Type92Hmg",
+   "category": "weapon",
+   "file": "Type92Hmg.tzm.json",
+   "triangles": 20065,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 473269,
+   "materials": [
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.46735,
+     -0.24639,
+     -0.901
+    ],
+    "max": [
+     0.06823,
+     0.31045,
+     0.255
+    ]
+   }
   }
  ]
 }

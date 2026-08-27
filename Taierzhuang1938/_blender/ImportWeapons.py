@@ -154,6 +154,58 @@ SOURCES = {
         "note": "CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）→ 三八式。"
                 "防尘滑盖、直拉机柄、护翼准星、两道箍与通条齐备；全长按史实 1.276 m。",
     },
+    "Type11": {
+        "file": os.path.join("Model_SketchfabType11", "scene.gltf"),
+        "lengthM": 1.100,
+        "kind": "rifle",
+        # 同一下载包还放着独立展示的桥夹、散装子弹和占位 Cube；它们不是枪体，
+        # 不应跟着机枪挂到士兵手上。只排除独立摆件，不改变主枪体的任何三角形。
+        "skip": (
+            "Cube",
+            "5x 6.5x30 arisaka_0", "5x 6.5x30 arisaka.001_0",
+            "5x 6.5x30 arisaka.002_0", "5x 6.5x30 arisaka.003_0",
+            "5x 6.5x30 arisaka.004_0", "5x 6.5x30 arisaka.005_0",
+            "6.5x50mm arisaka_0", "6.5x50mm arisaka 2_0", "6.5x50mm arisaka 3_0",
+            "2 type 11_0", "3 type 11_0", "4 type 11_0", "5 type 11_0",
+            "6 type 11_0", "7 type 11_0", "8 type 11_0",
+        ),
+        # 源模型的钢件与木托共用一张烘焙漫反射图，以像素色分桶保留两种材质。
+        "colorSplit": True,
+        # 用户要求不减面：不补倒角、不添程序化零件，也不走 6k 通用压缩。
+        "noBevel": True,
+        "noDetails": True,
+        "noDecimate": True,
+        "budget": 12000,
+        "smoothAll": True,
+        "note": "CC-BY Type 11 6.5mm Machine Gun（Sketchfab / buh）→ 十一年式轻机枪。"
+                "保留完整来源枪体、左侧漏斗供弹斗与两脚架；独立摆放的桥夹/散弹不进入手持模型；"
+                "全长按史实 1.100 m。",
+    },
+    "Type92Hmg": {
+        # CadNav 提供的是 Maya ASCII 源；离线用 maya-scene-io 转为 GLB。原 .ma
+        # 与下载包的 readme 留在仓库外的本地素材库，方便重建时核验来源；该包
+        # 没有贴图，所有组件统一复用游戏的 gunSteel PBR。
+        "file": os.path.join("Model_CadNavType92", "Model_Type92Hmg.glb"),
+        # CadNav 不允许单独再分发源模型：保持在 TZ1938_SOURCE_ASSETS / 同级
+        # Taierzhuang1938SourceAssets 素材库，公开仓库只保留项目内使用的 TZM 成品。
+        "external": True,
+        "lengthM": 1.156,
+        # 九二式有木制枪托，落位与两手握点沿用步枪规范；Data_Weapons 的实际
+        # 武器种类仍是 hmg，此项只约束离线网格的规范坐标系。
+        "kind": "rifle",
+        # Maya 源中两个 2 m 的 Cube 是展示底板/环境占位，并非机枪的一部分。
+        # stem 匹配会同时排掉 Cube 与 Cube.001；不删除任何枪体或三脚架几何。
+        "skip": ("Cube",),
+        # 用户明确要求不减面：保留母模的全部枪身、散热片、瞄具与三脚架拓扑。
+        "noBevel": True,
+        "noDetails": True,
+        "noDecimate": True,
+        "budget": 120000,
+        "smoothAll": True,
+        "note": "CadNav 免费 Type 92 Heavy Machine Gun（Maya ASCII）→ 九二式重机枪。"
+                "保留完整枪体、冷却套、瞄具和三脚架；仅排除源文件的两块空白展示 Cube；"
+                "全长按史实 1.156 m，未减面。",
+    },
     "Zb26": {
         "file": os.path.join("Model_SketchfabZb26Larkien", "scene.gltf"),
         "lengthM": 1.165,

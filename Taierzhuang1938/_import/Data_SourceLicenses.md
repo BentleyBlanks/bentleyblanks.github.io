@@ -70,12 +70,18 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 |---|---|---|---|---|
 | 普通木柄手榴弹 `Model_Type24Grenade.glb` | `Source/Model_SketchfabType24Grenade/scene.gltf` | [KleenStudio — Stick Grenade Type 24 (Stielhandgranate)](https://sketchfab.com/3d-models/stick-grenade-type-24-stielhandgranate-ad344e190dff4943ba6f739a550dbef4) | CC-BY-4.0 | 原包许可文本保留在同目录 `license.txt`。`Script_Type24GrenadeBake.py` 把 3,260 三角的源几何归一为 0.220 m、中心原点、弹头朝 local -Z，并把 2K PBR 压为 1K GLB；`Script_GrenadeAsset.mjs` 预载一次，供第一人称与飞行池共享，读取失败自动退回旧程序化木柄弹。 |
 
-仍走 `_blender/BuildWeapons.py` / `BuildVehicles.py` 的程序化几何：
+补充的机枪来源与构建策略：
 
-- 十一年式轻机枪 `Type11` / 九二式重机枪 `Type92Hmg`：Sketchfab 无 CC-BY 候选
-  （试过 type 11 light machine、nambu machine gun、type 92 heavy machine gun、
-  japanese ww2 weapon/machine 等词条），保留运行时程序化兜底几何
-  （歪把子的左上方敞口方斗特征已做进兜底）。
+- 十一年式轻机枪 `Type11`：`Source/Model_SketchfabType11/scene.gltf`，
+  [buh — Type 11 6.5mm Machine gun](https://sketchfab.com/3d-models/type-11-65mm-machine-gun-outdated-4a24c481a48a413d92208ccfe7772ecc)，
+  CC-BY。保留下载包内 `license.txt`；只导入完整枪体，独立摆放的桥夹、散弹和占位
+  Cube 不随士兵出现。原始主枪体约 1.05 万三角，按用户要求不减面。
+- 九二式重机枪 `Type92Hmg`：`<SourceAssets>/Weapons/Model_CadNavType92/cadnav.com_model/Models_F1002A028/Type 92.ma`，
+  [CadNav — Type 92 Heavy Machine Gun](https://www.cadnav.com/3d-models/model-48705.html)。CadNav
+  下载原包的 `readme.txt` 允许将模型作为 artwork/project 的一部分使用，禁止单独转售或
+  再分发，并要求标注 cadnav.com。因此原 `.ma`、下载包和离线转换的 `Model_Type92Hmg.glb`
+  只放在本机 `Taierzhuang1938SourceAssets/Weapons/Model_CadNavType92/`，**不进入公开仓库**；
+  构建时只排除两块空白展示 Cube，完整枪体、冷却套、瞄具与三脚架不减面地进入游戏。
 - 集束手榴弹、八九式重掷弹筒：程序化模型仍按史料特征建好；集束的去柄副弹与绑绳不能由单枚来源模型替代。
 
 ## 大刀（付费源，**不随仓库分发**）
