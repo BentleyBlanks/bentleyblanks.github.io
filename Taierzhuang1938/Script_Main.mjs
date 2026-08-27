@@ -52,6 +52,7 @@ import { FrameProfiler } from "./Script_Profiler.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps } from "./Script_TrimProps.mjs";
+import { AircraftFlight } from "./Script_Aircraft.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
@@ -450,6 +451,8 @@ let destruction = null;
 let interact = null;
 let identify = null;
 let cutscene = null;
+// 天空机群是纯视觉层：它跨关复用模型，换关时只更新航线中心。
+let aircraft = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
 // 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
@@ -718,6 +721,9 @@ async function Boot() {
   // 雾全部收到合成 pass 里做（高度雾 + 距离雾 + 按深度去饱和）。
   // 再留一份 THREE.Fog 就是双重打雾，远景直接糊成一块平板。
   scene.fog = null;
+
+  aircraft = new AircraftFlight(scene);
+  aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
 
   await BuildField(PHASE_TABLE[state.phaseIndex], setStep, 0.24, 0.62, NextFrame);
 
@@ -1501,6 +1507,7 @@ function GoToUrlWithRange(on) {
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
+  aircraft?.SetPhase(phase);
   if (destruction) destruction.Clear();
   ClearExternalProps();
   if (battlefield) { battlefield.Dispose(); battlefield = null; }
@@ -3488,7 +3495,6 @@ function TryFire(dt) {
     from.addScaledVector(_rel, -(1 - MAX_MUZZLE_PARALLAX_M / muzzleOffset));
     muzzleOffset = MAX_MUZZLE_PARALLAX_M;
   }
-
   _marchTargets.length = 0;
   const range = weapon.effectiveRangeM || 400;
   for (const s of ai.soldiers) {
@@ -3636,6 +3642,8 @@ function Frame(dt, render = true) {
     battlefield.externalStreamer.Update(camera.position.x, camera.position.z);
     profiler.E("streamer");
   }
+  // 机队独立于玩法暂停与过场：它是远方连续发生的战场环境，不占用 AI / 物理预算。
+  aircraft?.Update(state.elapsed);
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
   // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
