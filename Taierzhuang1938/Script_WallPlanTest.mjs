@@ -5,6 +5,10 @@
 // 契约逐条钉死：覆盖无洞、缺口真空、破口留残根、贴地不悬空、闭环角互搭、
 // 塌段压高、掩体抽稀、同种子逐位确定。
 //
+// 第二轮（覆盖面扩张）又加了三条：拼接重叠、残破咬口、碰撞并段 —— 它们是
+// 城内几百圈院墙搬进本管线时新开的旋钮，错了的症状同样只有实拍才抓得到
+// （墙上一道道竖缝 / 残墙齐得像新砌 / 碰撞表翻十倍）。
+//
 // 用法：node Taierzhuang1938/Script_WallPlanTest.mjs
 
 import assert from "node:assert/strict";
@@ -19,7 +23,7 @@ const FLAT = () => 0;
     moduleLen: 3.0, seed: "t:straight", groundAt: FLAT,
   });
   assert.equal(plan.modules.length, 30, "90 m / 3 m = 30 个模块，不许留尾巴");
-  const covered = plan.modules.reduce((sum, m) => sum + m.sx / 1.02 * 3.0, 0);
+  const covered = plan.modules.reduce((sum, m) => sum + (m.sx / 1.02) * 3.0, 0);
   assert.ok(Math.abs(covered - 90) < 0.5, `模块总长要盖满整条墙（盖了 ${covered.toFixed(1)}）`);
   assert.ok(plan.colliders.length >= 28, "完好直墙几乎每模块一只碰撞盒");
   assert.ok(plan.covers.length <= Math.ceil(plan.colliders.length / 3) + 1,
@@ -172,6 +176,89 @@ const FLAT = () => 0;
   // 变体分布：四种变体都要被用到（实例化的意义就在混着摆）
   const used = new Set(a.modules.map((m) => m.variant));
   assert.equal(used.size, 4, "四种几何变体都要用上");
+}
+
+// --- 拼接重叠：画出来的长度必须比弦长多出 moduleOverlap，且盖满整条 ---
+{
+  for (const overlap of [0, 0.02, 0.12]) {
+    const plan = PlanWallRoute({
+      points: [[0, 0], [60, 0]], height: 2.0, topWidth: 0.4, baseWidth: 0.4,
+      moduleLen: 3.0, moduleOverlap: overlap, seed: "t:lap", groundAt: FLAT,
+      heightJitter: 0, thickJitter: 0, sideJitter: 0,
+    });
+    assert.equal(plan.modules.length, 20, "重叠不许改变模块个数（那是间隔的事）");
+    for (const m of plan.modules) {
+      const drawn = (m.sx / 1) * 3.0;             // sx 已含 lenS×(1+overlap)
+      assert.ok(Math.abs(drawn - 3.0 * (1 + overlap)) < 1e-6,
+        `重叠 ${overlap}：每块画出来要比弦长多 ${(overlap * 100).toFixed(0)}%（实际 ${drawn.toFixed(4)}）`);
+    }
+    // 相邻两块的画出范围必须搭上（缝 ≤ 0）
+    const sorted = [...plan.modules].sort((a, b) => a.x - b.x);
+    for (let i = 1; i < sorted.length; i += 1) {
+      const prevEnd = sorted[i - 1].x + (sorted[i - 1].sx * 3.0) / 2;
+      const nextStart = sorted[i].x - (sorted[i].sx * 3.0) / 2;
+      assert.ok(nextStart - prevEnd <= 1e-6,
+        `重叠 ${overlap}：第 ${i} 块与前一块之间不许露缝（露了 ${(nextStart - prevEnd).toFixed(4)} m）`);
+    }
+    assert.ok(Math.abs(plan.nominal.moduleOverlap - overlap) < 1e-9, "nominal 要把重叠交出去");
+  }
+}
+
+// --- 残破 ruin：从墙头咬口、两端收力、不改平面位置 ---
+{
+  const base = {
+    points: [[0, 0], [66, 0]], height: 2.2, topWidth: 0.35, baseWidth: 0.35,
+    moduleLen: 2.2, seed: "t:ruin", groundAt: FLAT, heightJitter: 0,
+  };
+  const clean = PlanWallRoute({ ...base, ruin: 0 });
+  const worn = PlanWallRoute({ ...base, ruin: 0.8 });
+  assert.equal(clean.modules.length, worn.modules.length, "残破不许改变模块个数");
+  const cleanH = clean.modules.map((m) => m.visH);
+  const wornH = worn.modules.map((m) => m.visH);
+  for (let i = 0; i < wornH.length; i += 1) {
+    assert.ok(wornH[i] <= cleanH[i] + 1e-9, "残破只许把墙头咬低，不许长高");
+  }
+  const spread = Math.max(...wornH) - Math.min(...wornH);
+  assert.ok(spread > 0.3, `ruin=0.8 的墙头要参差（实际只差 ${spread.toFixed(2)} m）`);
+  assert.ok(Math.max(...clean.modules.map((m) => m.visH))
+    - Math.min(...clean.modules.map((m) => m.visH)) < 1e-9, "ruin=0 的墙头要齐");
+  // 咬口的走势：**两端最狠、中段最高**（旧 AddWall 逐切片 bite 的原样搬运；
+  // 逐块比是掷硬币，所以按两端各 25% 与中段 25% 的均值比）。
+  // 这一条锁的是"残墙什么形状"，反过来就成了另一种破法。
+  const Mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  const q = Math.max(2, Math.round(wornH.length * 0.25));
+  const ends = Mean([...wornH.slice(0, q), ...wornH.slice(-q)]);
+  const middle = Mean(wornH.slice(Math.round(wornH.length * 0.375),
+    Math.round(wornH.length * 0.625)));
+  assert.ok(middle > ends,
+    `残破要两端咬得最狠、中段留最高（两端均高 ${ends.toFixed(2)} vs 中段 ${middle.toFixed(2)}）`);
+}
+
+// --- 碰撞并段：等高的相邻模块并成一只长盒，破口处必须断开 ---
+{
+  const opts = {
+    points: [[0, 0], [40, 0], [40, 30], [0, 30]], closed: true,
+    height: 2.15, topWidth: 0.35, baseWidth: 0.35,
+    moduleLen: 2.2, seed: "t:merge", groundAt: FLAT, heightJitter: 0.035,
+    gaps: [{ at: [12, 30], width: 1.5 }],
+  };
+  const loose = PlanWallRoute({ ...opts, colliderMerge: 0 });
+  const merged = PlanWallRoute({ ...opts, colliderMerge: 0.5 });
+  assert.equal(loose.modules.length, merged.modules.length, "并段不许动模块");
+  assert.ok(merged.colliders.length * 4 < loose.colliders.length,
+    `并段要把碰撞盒数压下来（${loose.colliders.length} -> ${merged.colliders.length}）`);
+  // 并出来的盒子仍要盖住整条边，且门洞里一只都没有
+  const total = (list) => list.reduce((sum, c) => sum + c.hx * 2, 0);
+  assert.ok(Math.abs(total(merged.colliders) - total(loose.colliders)) < 1.0,
+    "并段前后碰撞覆盖的总长要一致（并的是盒子不是墙）");
+  for (const c of merged.colliders) {
+    const inGate = Math.abs(c.z - 30) < 1 && Math.abs(c.x - 12) < c.hx;
+    assert.ok(!inGate, `门洞里不许有并出来的碰撞盒（x=${c.x.toFixed(1)}）`);
+  }
+  // 并段取矮的：不许凭空长出挡墙
+  for (const c of merged.colliders) {
+    assert.ok(c.hy * 2 <= 2.15 * 1.05, "并段高度不许超过设计墙高");
+  }
 }
 
 console.log("WallPlanTest: 全部通过");

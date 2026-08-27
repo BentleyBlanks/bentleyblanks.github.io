@@ -77,6 +77,7 @@ import {
   AddCourtyardLife, AddYardWear, AddStalkStack, AddManureHeap,
   AddVegetableBeds, AddStoneRoller,
 } from "./Script_LivedInProps.mjs";
+import { AddYardWallRing, MakeYardFrame } from "./Script_YardWall.mjs";
 
 const DEG = Math.PI / 180;
 /** 硬山坡度 26°—29°。 */
@@ -165,39 +166,28 @@ function GapWall(sink, {
  * 院墙一圈。`gate` = { offset, openW } 时在**南面**（局部 +z）开门洞，其余三面实墙。
  * `gates` = [{offset,openW}, …] 开多个（一格两户：南墙上两家各一个门 / 北户的夹道口）。
  * 门楼由调用方决定（砖院上门楼，土墙院只有木门框）。
+ *
+ * 2026-08-27 起走**样条围墙 PCG**（Script_YardWall → Script_WallSpline）：
+ * 墙身从「逐 0.85 m 切片合并成静态网格」改成按分区实例化的模块。
+ * 全城 395 格 × 四面墙 ≈ 三万五千只盒子常驻显存，而它本来就是同一个模块摆几万次。
+ * 碱脚与瓦压顶各自一只实例网格，压顶跟着**每一块**自己的墙头落 ——
+ * 旧版那条「压顶悬在被削低的墙段上方」的病在管线层面消掉了。
+ * 布设参数（间隔/重叠/抖动/变体数）在 WALL_PRESETS.cityYardBrick / cityYardAdobe，
+ * 设置面板 →「场景样条PCG」里能看能调。
  */
 function WallRing(sink, {
   x, z, ry, w, d, seed, damage = 0, material = "BrickWall", height = 2.1,
   thickness = 0.35, plinth = null, cope = true, gate = null, gates = null, tag = "wall",
 }) {
   const gateList = (gates && gates.length) ? gates : (gate ? [gate] : null);
-  const F = Frame(x, z, ry);
-  const tile = TileFor(material);
-  const sides = [
-    { lx: 0, lz: -d / 2, len: w, rot: 0, id: "n" },
-    { lx: 0, lz: d / 2, len: w, rot: 0, id: "s" },
-    { lx: -w / 2, lz: 0, len: d, rot: Math.PI / 2, id: "w" },
-    { lx: w / 2, lz: 0, len: d, rot: Math.PI / 2, id: "e" },
-  ];
-  for (const s of sides) {
-    const [wx, wz] = F(s.lx, s.lz);
-    if (gateList && s.id === "s") {
-      GapWall(sink, {
-        x: wx, z: wz, ry, length: s.len, height, thickness, material,
-        seed: `${seed}:ring${s.id}`, ruin: damage * 0.7,
-        gaps: gateList.map((g) => ({ at: g.offset, openW: g.openW })),
-        plinth, cope, tag,
-      });
-      continue;
-    }
-    AddWall(sink, material, {
-      x: wx, z: wz, length: s.len, height, thickness, ry: ry + s.rot,
-      ruin: damage * 0.8, seed: `${seed}:ring${s.id}`, tile, plinth, cope, solid: false,
-    });
-    sink.Solid(wx, height / 2, wz, s.len / 2, height / 2, thickness / 2, tag, ry + s.rot);
-    sink.Cover(wx, wz, height * (1 - damage * 0.4),
-      Math.sin(ry + s.rot), Math.cos(ry + s.rot));
-  }
+  AddYardWallRing(sink, {
+    frame: MakeYardFrame(x, z, ry), hw: w / 2, hd: d / 2,
+    preset: material === "Adobe" ? "cityYardAdobe" : "cityYardBrick",
+    material, height, thickness, seed: `${seed}:ring`, damage, tag,
+    gates: (gateList || []).map((g) => ({ side: "s", offset: g.offset, openW: g.openW })),
+    plinth: plinth ? { material: plinth, height: 0.42, grow: 0.06, out: 0.07 } : null,
+    cope: cope ? { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 } : null,
+  });
 }
 
 /**

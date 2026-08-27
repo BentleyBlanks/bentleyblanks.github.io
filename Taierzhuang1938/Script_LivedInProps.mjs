@@ -15,6 +15,7 @@
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
+import { BuildWallSpline } from "./Script_WallSpline.mjs";
 
 function LocalPoint(x, z, ry, localX, localZ) {
   return {
@@ -399,60 +400,27 @@ export function AddVillageLife(sink, {
  * 每段登记一个 1.1 m 的低碰撞与掩蔽点，缺口由调用方用 gaps 给出。
  */
 export function AddWattleFence(sink, {
-  x, z, ry = 0, length = 6, y = 0, seed = "fence", gaps = [],
+  x, z, ry = 0, length = 6, y = 0, seed = "fence", gaps = [], sector = null,
 } = {}) {
-  const rnd = Mulberry32(HashString(seed));
-  const cos = Math.cos(ry), sin = Math.sin(ry);
-  const postEvery = 1.9;
-  const nPosts = Math.max(2, Math.round(length / postEvery) + 1);
-  let pieces = 0;
-  // gaps 按沿线距离给：[起点, 终点]
-  const inGap = (s) => gaps.some(([a, b]) => s > a - 0.3 && s < b + 0.3);
-  for (let i = 0; i < nPosts; i += 1) {
-    const s = (length / (nPosts - 1)) * i;
-    if (inGap(s)) continue;
-    const p = LocalPoint(x, z, ry, s - length / 2, 0);
-    sink.Add("WattleFence", PlaceGeometry(
-      MakeBox(0.09, 1.12 + rnd() * 0.10, 0.09, TILE_METERS.wood, `${seed}:p${i}`),
-      { x: p.x, y: y + 0.58, z: p.z, ry, rz: (rnd() - 0.5) * 0.08 }));
-    pieces += 1;
-  }
-  // 横杆与枝条按缺口切段
-  const cuts = [...gaps.map(([a, b]) => [a, b]), [length + 5, length + 6]]
-    .sort((a, b) => a[0] - b[0]);
-  let cursor = 0;
-  const spans = [];
-  for (const [a, b] of cuts) {
-    if (a > cursor && Math.min(b, length) - cursor > 0.4) {
-      spans.push([cursor, Math.min(b, length)]);
-    }
-    cursor = Math.max(cursor, b);
-  }
-  for (const [s0, s1] of spans) {
-    const mid = (s0 + s1) / 2;
-    const segLen = s1 - s0;
-    const p = LocalPoint(x, z, ry, mid - length / 2, 0);
-    for (const railY of [0.42, 0.86]) {
-      sink.Add("WattleFence", PlaceGeometry(
-        MakeBox(segLen, 0.06, 0.05, TILE_METERS.wood, `${seed}:r${railY}`),
-        { x: p.x, y: y + railY, z: p.z, ry }));
-      pieces += 1;
-    }
-    // 斜绑的枝条层：读成「编出来的墙面」而不是两根悬空杆
-    const brush = Math.max(2, Math.round(segLen / 0.75));
-    for (let i = 0; i < brush; i += 1) {
-      const bs = s0 + (segLen / brush) * (i + 0.5);
-      const bp = LocalPoint(x, z, ry, bs - length / 2, 0);
-      sink.Add("WattleFence", PlaceGeometry(
-        MakeBox(0.05, 0.95 + rnd() * 0.25, 0.03, TILE_METERS.wood, `${seed}:b${i}`),
-        { x: bp.x, y: y + 0.55, z: bp.z, ry, rx: (rnd() - 0.5) * 0.16,
-          rz: Math.PI / 2 * 0.94 + rnd() * 0.06 }));
-      pieces += 1;
-    }
-    sink.Solid(p.x, y + 0.55, p.z, segLen / 2, 0.55, 0.09, "fence", ry);
-    sink.Cover(p.x, p.z, 1.05, sin, cos);
-  }
-  return pieces;
+  // 2026-08-27 起走样条围墙 PCG（Script_WallSpline，预设 wattleFence）：
+  // 一段 9 m 的篱笆原来是「5 根柱 + 2 根杆 + 12 根枝 ≈ 19 只独立盒子」合并进
+  // 静态网格，而它本来就是同一档编织面重复摆。现在一档 = 一只模块几何，
+  // 按分区实例化；四种变体 + 逐实例侧倾/偏航/tint 保住"不是复制粘贴"的读感。
+  //
+  // 缺口口径不变：`gaps` 仍按**沿线距离**给 [起点, 终点]，PlanWallRoute 的
+  // NormalizeAt 认这种写法。碰撞仍是 tag "fence" 的矮盒（能打穿的矮掩体）。
+  const a = LocalPoint(x, z, ry, -length / 2, 0);
+  const b = LocalPoint(x, z, ry, length / 2, 0);
+  const { stats } = BuildWallSpline(sink, {
+    preset: "wattleFence",
+    name: `Fence_${seed}`, material: "WattleFence", tag: "fence",
+    points: [[a.x, a.z], [b.x, b.z]],
+    height: 1.12, topWidth: 0.09, baseWidth: 0.18,
+    seed, gaps, groundAt: () => y,
+    sectorKey: () => (sector !== null ? sector
+      : String(sink.sector || "").replace(/\|$/, "")),
+  });
+  return stats.modules;
 }
 
 /** 碌碡（石滚）：打谷场上碾麦子的石辊，卸在架子边或干脆滚倒在地里。 */

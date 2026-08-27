@@ -26,6 +26,7 @@ import * as THREE from "three";
 import { AddWall, AddHardMountainRoof, AddDoorReveal } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 // ---------------------------------------------------------------------------
 // 局部坐标系：与 PlaceGeometry(ry) / AddWall / AddHardMountainRoof / AddDoorReveal
@@ -434,35 +435,22 @@ function AddXiguanStreetBelt(host, ctx) {
 function AddYardWall(host, {
   L, hw, lzN, lzS, ry, height, seed, damage, gateW = 0, south = "wall", mat = "BrickWall",
 }) {
-  const sink = host.sink;
   const lzC = (lzN + lzS) / 2;
   const depth = lzS - lzN;
-  const sides = [
-    { lx: 0, lz: lzN, len: hw * 2, rot: ry, gate: false },
-    ...(south === "none" ? [] : [{ lx: 0, lz: lzS, len: hw * 2, rot: ry, gate: south === "gate" }]),
-    { lx: -hw, lz: lzC, len: depth, rot: ry + Math.PI / 2, gate: false },
-    { lx: hw, lz: lzC, len: depth, rot: ry + Math.PI / 2, gate: false },
-  ];
-  sides.forEach((s, i) => {
-    const p = L(s.lx, s.lz);
-    const hx = s.rot === ry ? s.len / 2 : 0.3;
-    const hz = s.rot === ry ? 0.3 : s.len / 2;
-    if (host.OnStreet(p.x, p.z, hx, hz)) return;
-    if (!s.gate) {
-      AddWall(sink, mat, {
-        x: p.x, z: p.z, length: s.len, height, thickness: 0.36, ry: s.rot,
-        ruin: damage * 0.8, seed: `${seed}:yw${i}`, plinth: "Stone", cope: true,
-      });
-      return;
-    }
-    const segLen = (s.len - gateW - 2.4) / 2;
-    for (const side of [-1, 1]) {
-      const q = L(s.lx + side * (gateW / 2 + 1.2 + segLen / 2), s.lz);
-      AddWall(sink, mat, {
-        x: q.x, z: q.z, length: segLen, height, thickness: 0.36, ry: s.rot,
-        ruin: damage * 0.8, seed: `${seed}:yw${i}${side}`, plinth: "Stone", cope: true,
-      });
-    }
+  // 样条围墙 PCG：矩形以 (0, lzC) 为心，+lz 仍是临街那一面。
+  // 撞街判定从「整面墙一起丢」细到逐模块 —— 半条边压街时只丢压街的那几块，
+  // 剩下的照砌（旧版整面丢，交易所门脸那一带的院墙会成段消失）。
+  AddYardWallRing(host.sink, {
+    frame: (lx, lz) => L(lx, lzC + lz),
+    hw, hd: depth / 2,
+    preset: "landmarkYard",
+    material: mat, height, thickness: 0.36,
+    seed, ruin: damage * 0.8,
+    sides: south === "none" ? { n: true, w: true, e: true, s: false } : null,
+    // 门洞净宽两侧各让 1.2 m 给门楼的门垛（AddYardGate 砌在那里）
+    gates: south === "gate" && gateW > 0
+      ? [{ side: "s", offset: 0, openW: gateW + 2.4 }] : [],
+    onStreet: (x, z, ex, ez) => host.OnStreet(x, z, ex, ez),
   });
 }
 

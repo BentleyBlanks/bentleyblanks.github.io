@@ -1629,10 +1629,13 @@ export class TengxianCity {
       const g = EAST_SUBURB.zhaiGate;
       const half = (zw.toZ - zw.fromZ) / 2;
       BuildWallSpline(this.sink, {
-        name: "ZhaiEast", style: "rammedEarth", material: "ZhaiEarth", tag: "zhaiWall",
+        // 布设参数（间隔/重叠/抖动/变体）在 Script_WallSpline.WALL_PRESETS.zhaiWall，
+        // 设置面板 →「场景样条PCG」→「拼接资产 / 布设参数」里能看能调。
+        preset: "zhaiWall",
+        name: "ZhaiEast", material: "ZhaiEarth", tag: "zhaiWall",
         points: [[zw.x, -half], [zw.x, half]],
         height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth,
-        seed: "zhaiEast", moduleLen: 3.2, embed: 0.5,
+        seed: "zhaiEast",
         groundAt: (x, z) => this.GroundHeight(x, z),
         gaps: [{ at: [g.x, g.z], width: g.width + 1.6 }],
         // 3 月 16 日 14:00 第二轮集中炮击把东寨门完全打毁，14:15 第三中队沿地隙冲入

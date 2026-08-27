@@ -38,6 +38,7 @@ import * as THREE from "three";
 import { AddWall, AddHardMountainRoof, AddDoorReveal } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 // ---------------------------------------------------------------------------
 // 局部坐标系
@@ -702,44 +703,32 @@ export function BuildChurch(host, f, ctx) {
     const hd = naveD / 2 + 9;
     const wallH = 2.1;
     const gateW = 3.0;
-    const sides = [
-      { lx: 0, lz: -hd, len: hw * 2, rot: ry, gate: false },
-      { lx: 0, lz: hd, len: hw * 2, rot: ry, gate: true },
-      { lx: -hw, lz: 0, len: hd * 2, rot: ry + Math.PI / 2, gate: false },
-      { lx: hw, lz: 0, len: hd * 2, rot: ry + Math.PI / 2, gate: false },
-    ];
-    sides.forEach((s, i) => {
-      const p = L(s.lx, s.lz);
-      const hx = s.rot === ry ? s.len / 2 : 0.3;
-      const hz = s.rot === ry ? 0.3 : s.len / 2;
-      if (host.OnStreet(p.x, p.z, hx, hz)) return;
-      if (!s.gate) {
-        AddWall(sink, "HouseBrick", {
-          x: p.x, z: p.z, length: s.len, height: wallH, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}`, plinth: "CrossStone",
-        });
-        return;
-      }
-      const segLen = (s.len - gateW - 1.8) / 2;
+    // 一圈院墙走样条围墙 PCG：四角互搭、逐模块判撞街（旧版整面墙压街就整面丢）
+    AddYardWallRing(sink, {
+      frame: (lx, lz) => L(lx, lz),
+      hw, hd, preset: "landmarkYardPlain",
+      material: "HouseBrick", height: wallH, thickness: 0.35,
+      seed: `${seed}:yw`, ruin: damage * 0.8,
+      // 门洞净宽两侧各让 0.9 m 给门垛
+      gates: [{ side: "s", offset: 0, openW: gateW + 1.8 }],
+      plinth: { material: "CrossStone", height: 0.42, grow: 0.06, out: 0.07 },
+      onStreet: (x, z, ex, ez) => host.OnStreet(x, z, ex, ez),
+    });
+    {
+      // 门垛一对 + 门额石（不走 PCG：它们是这座门自己的构件，不是墙段）
       for (const side of [-1, 1]) {
-        const q = L(s.lx + side * (gateW / 2 + 0.9 + segLen / 2), s.lz);
-        AddWall(sink, "HouseBrick", {
-          x: q.x, z: q.z, length: segLen, height: wallH, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}${side}`, plinth: "CrossStone",
-        });
-        // 门垛
-        const g = L(s.lx + side * (gateW / 2 + 0.45), s.lz);
+        const g = L(side * (gateW / 2 + 0.45), hd);
         sink.Add("HouseBrick", PlaceGeometry(
           MakeBox(0.9, 2.9, 0.7, TILE_METERS.brick, `${seed}:gp${side}`, BRICK_UV_GRID),
-          { x: g.x, y: 1.45, z: g.z, ry: s.rot }));
-        sink.Solid(g.x, 1.45, g.z, 0.45, 1.45, 0.35, "wall", s.rot);
+          { x: g.x, y: 1.45, z: g.z, ry }));
+        sink.Solid(g.x, 1.45, g.z, 0.45, 1.45, 0.35, "wall", ry);
       }
       // 门额石正好压在两根门垛上：宽度 = 净宽 + 两根 0.9 m 的垛，多一寸就悬空
-      const lin = L(s.lx, s.lz);
+      const lin = L(0, hd);
       sink.Add("CrossStone", PlaceGeometry(
         MakeBox(gateW + 1.8, 0.32, 0.78, TILE_METERS.stone, `${seed}:glin`),
-        { x: lin.x, y: 3.04, z: lin.z, ry: s.rot }));
-    });
+        { x: lin.x, y: 3.04, z: lin.z, ry }));
+    }
     // 门到堂前台阶的一条石板路
     const pathLen = hd - (naveD / 2 + tw + 1.2);
     if (pathLen > 2) {
@@ -1045,35 +1034,17 @@ export function BuildSchool(host, f, ctx) {
   // --- 围墙一圈 + 南面校门 ---
   const wallH = 2.2;
   const gateW = 3.4;
-  {
-    const sides = [
-      { lx: 0, lz: -d / 2, len: w, rot: ry, gate: false },
-      { lx: 0, lz: d / 2, len: w, rot: ry, gate: true },
-      { lx: -w / 2, lz: 0, len: d, rot: ry + Math.PI / 2, gate: false },
-      { lx: w / 2, lz: 0, len: d, rot: ry + Math.PI / 2, gate: false },
-    ];
-    sides.forEach((s, i) => {
-      const p = L(s.lx, s.lz);
-      const hx = s.rot === ry ? s.len / 2 : 0.3;
-      const hz = s.rot === ry ? 0.3 : s.len / 2;
-      if (host.OnStreet(p.x, p.z, hx, hz)) return;
-      if (!s.gate) {
-        AddWall(sink, wallMat, {
-          x: p.x, z: p.z, length: s.len, height: wallH, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}`, plinth: "Stone", cope: true,
-        });
-        return;
-      }
-      const segLen = (s.len - gateW - 2.6) / 2;
-      for (const side of [-1, 1]) {
-        const q = L(s.lx + side * (gateW / 2 + 1.3 + segLen / 2), s.lz);
-        AddWall(sink, wallMat, {
-          x: q.x, z: q.z, length: segLen, height: wallH, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}${side}`, plinth: "Stone", cope: true,
-        });
-      }
-    });
-  }
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => L(lx, lz),
+    hw: w / 2, hd: d / 2, preset: "landmarkYard",
+    material: wallMat, height: wallH, thickness: 0.35,
+    seed: `${seed}:yw`, ruin: damage * 0.8,
+    // 门洞净宽两侧各让 1.3 m 给校门门墩
+    gates: [{ side: "s", offset: 0, openW: gateW + 2.6 }],
+    plinth: { material: "Stone", height: 0.42, grow: 0.06, out: 0.07 },
+    cope: { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 },
+    onStreet: (x, z, ex, ez) => host.OnStreet(x, z, ex, ez),
+  });
 
   // --- 校门门楼：两墩 + 木过梁 + 挂匾位 + 小瓦顶。挂匾那块石板是「这是学校」的落款 ---
   {

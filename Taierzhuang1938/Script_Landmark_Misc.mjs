@@ -48,6 +48,7 @@ import {
 } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { AddYardWear } from "./Script_LivedInProps.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 const DEG = Math.PI / 180;
 const SLOPE27 = Math.tan(27 * DEG);
@@ -90,38 +91,48 @@ function Room(host, f, ry, lx, lz, spec) {
 }
 
 /**
- * 一圈院墙，临街那面（局部 +z）中间留 openW 的开口。
- * cope 只给临街那一面：瓦压顶是 AddWall 里**按段**生成的，一圈 248 m 的机关院墙
- * 全给压顶就是 +3.5k 三角，而背面那两道墙十几米外根本读不出压顶。
+ * 一圈院墙，临街那面（局部 +z）中间留 openW 的开口。走样条围墙 PCG
+ * （Script_YardWall → Script_WallSpline），四角由管线互搭。
+ *
+ * cope 默认只给临街那一面：旧账是「瓦压顶按段生成，一圈 248 m 全给就是
+ * +3.5k 三角」；转实例化之后压顶是**同一只几何摆 N 次**，那笔三角账没了，
+ * 但读图账还在 —— 背面那两道墙十几米外读不出压顶，仍然不给。
+ * 现在按 `copeSides` 逐面控制（默认只有临街 s 面）。
  */
 function AddYardWall(sink, f, ry, o) {
   const S = SiteFrame(f, ry);
-  const hw = f.w / 2, hd = f.d / 2, t = o.thickness;
-  const sides = [
-    { lx: 0, lz: -hd, len: f.w + t, rot: 0, gate: false, cope: false, tag: "n" },
-    { lx: -hw, lz: 0, len: f.d, rot: Math.PI / 2, gate: false, cope: false, tag: "w" },
-    { lx: hw, lz: 0, len: f.d, rot: Math.PI / 2, gate: false, cope: false, tag: "e" },
-    { lx: 0, lz: hd, len: f.w + t, rot: 0, gate: true, cope: true, tag: "s" },
-  ];
-  for (const s of sides) {
-    const common = {
-      height: o.height, thickness: t, ry: ry + s.rot, ruin: o.ruin,
-      plinth: o.plinth, cope: o.cope === true ? true : (o.cope !== false && s.cope),
-      tile: o.tile || TILE_METERS.brick,
-    };
-    if (s.gate && o.openW > 0) {
-      const segLen = (s.len - o.openW) / 2;
-      for (const side of [-1, 1]) {
-        const p = S.At(s.lx + side * (o.openW / 2 + segLen / 2), s.lz);
-        AddWall(sink, o.material, {
-          ...common, x: p.x, z: p.z, length: segLen, seed: `${o.seed}:${s.tag}${side}`,
-        });
-      }
-    } else {
-      const p = S.At(s.lx, s.lz);
-      AddWall(sink, o.material, { ...common, x: p.x, z: p.z, length: s.len, seed: `${o.seed}:${s.tag}` });
-    }
+  const frame = (lx, lz) => S.At(lx, lz);
+  const copeAll = o.cope === true;
+  const copeNone = o.cope === false;
+  const plinth = o.plinth
+    ? { material: o.plinth, height: 0.42, grow: 0.06, out: 0.07 } : null;
+  const cope = { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 };
+  const common = {
+    frame, hw: f.w / 2, hd: f.d / 2,
+    material: o.material, height: o.height, thickness: o.thickness,
+    ruin: o.ruin, plinth,
+    gates: o.openW > 0 ? [{ side: "s", offset: 0, openW: o.openW }] : [],
+    ...(o.tune || {}),
+  };
+  if (copeAll || copeNone) {
+    AddYardWallRing(sink, {
+      ...common, preset: copeNone ? "landmarkYardPlain" : "landmarkYard",
+      seed: o.seed, cope: copeNone ? null : cope,
+    });
+    return;
   }
+  // 临街一面上压顶，另外三面不上：两趟建，各自只留自己那几面的模块。
+  // 种子共用 o.seed —— 弧长哈希取种，两趟在同一条线上算出的是同一批模块，
+  // 高度/姿态/tint 逐位一致，接缝处不会错开。
+  AddYardWallRing(sink, {
+    ...common, preset: "landmarkYard", seed: o.seed, cope,
+    sides: { n: false, w: false, e: false, s: true },
+  });
+  AddYardWallRing(sink, {
+    ...common, preset: "landmarkYardPlain", seed: o.seed, cope: null,
+    plinth: plinth ? { ...plinth } : null,
+    sides: { n: true, w: true, e: true, s: false },
+  });
 }
 
 /**

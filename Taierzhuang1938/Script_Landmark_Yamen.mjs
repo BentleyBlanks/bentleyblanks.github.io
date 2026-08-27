@@ -35,6 +35,7 @@ import {
   MakeBox, PlaceGeometry, MergeGeometries, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import { Clamp } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 /** 硬山坡度 27.5°（docs/Data_HistoryMaterial.md：26°—29°）。 */
 const ROOF_SLOPE = 0.52;
@@ -254,25 +255,36 @@ export function BuildYamen(host, f, ctx) {
   // ---------------------------------------------------------------------
   // 院墙一圈：南墙被大门断开，东墙前院段开一道侧门
   // ---------------------------------------------------------------------
-  WallRun("wS-", -halfW, -gateW / 2, 0, wallH, { cope: true });
-  WallRun("wS+", gateW / 2, halfW, 0, wallH, { cope: true });
-  WallRun("wN", -halfW, halfW, d, wallH);
-  // 东西墙：沿 z 走，rot=+90° 让墙长对上 d
+  // 样条围墙 PCG（Script_YardWall）。本文件的 A(lx, s) 是「自南院墙往北量 s」，
+  // 而院墙管线的约定是 +lz = 临街/开门那一面 —— 所以传进去的 frame 把 lz 取反：
+  // lz = halfD - s，于是 lz=+halfD 是南墙（大门那面）、-halfD 是北墙。
+  // 压顶只给南墙那一面（旧版 WallRun 的 cope:true 只出现在 wS±）：分两趟建，
+  // 共用同一个 seed —— 弧长哈希取种，两趟算出的是同一批模块，接缝不错开。
   {
-    const pW = A(-halfW, d / 2);
-    AddWall(sink, brick, {
-      x: pW.x, z: pW.z, length: d, height: wallH, thickness: 0.5,
-      ry: ry + Math.PI / 2, ruin: damage * 0.5, seed: `${seed}:wW`, plinth: "Stone",
+    const halfD = d / 2;
+    const yardFrame = (lx, lz) => A(lx, halfD - lz);
+    const common = {
+      frame: yardFrame, hw: halfW, hd: halfD,
+      material: brick, height: wallH, thickness: 0.5,
+      seed: `${seed}:yard`, ruin: damage * 0.5,
+      plinth: { material: "Stone", height: 0.42, grow: 0.06, out: 0.07 },
+      gates: [
+        { side: "s", offset: 0, openW: gateW },
+        // 东院墙前院段的侧门，净宽 2.0 m
+        { side: "e", offset: halfD - sSideGate, openW: 2.0 },
+      ],
+    };
+    AddYardWallRing(sink, {
+      ...common, preset: "landmarkYard",
+      cope: { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 },
+      sides: { s: true, n: false, w: false, e: false },
     });
-    const segS = sSideGate - 1.0;                      // 侧门净宽 2.0 m
-    const segN = sSideGate + 1.0;
-    for (const [key, s0, s1] of [["wE0", 0, segS], ["wE1", segN, d]]) {
-      const p = A(halfW, (s0 + s1) / 2);
-      AddWall(sink, brick, {
-        x: p.x, z: p.z, length: s1 - s0, height: wallH, thickness: 0.5,
-        ry: ry + Math.PI / 2, ruin: damage * 0.5, seed: `${seed}:${key}`, plinth: "Stone",
-      });
-    }
+    AddYardWallRing(sink, {
+      ...common, preset: "landmarkYardPlain", cope: null,
+      sides: { s: false, n: true, w: true, e: true },
+    });
+  }
+  {
     // 侧门：过梁 + 门上一段墙（不登记碰撞，洞口留着走人）
     Box("WoodBeam", "sideLintel", halfW, sSideGate, 2.28, 0.55, 0.26, 2.6,
       { tile: TILE_METERS.wood });

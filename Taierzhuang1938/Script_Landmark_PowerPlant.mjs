@@ -31,6 +31,7 @@ import * as THREE from "three";
 import { AddWall } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 const WALL_T = 0.5;          // 厂房外墙：比民居的 0.36 厚一档（工业砌体 + 吃屋架推力）
 const YARD_HW = 22.5;        // 厂墙半宽/半深：贴着 OUTER_PADS 的 46×34 内边，出界就掉进 -1.2 的原野
@@ -401,31 +402,16 @@ export function BuildPowerPlant(host, f, ctx) {
   const subCx = 9.0, subCz = 13.0, subHw = 7.0, subHd = 2.5;
   {
     const h = 1.6;
-    const sides = [
-      { lx: subCx, lz: subCz - subHd, len: subHw * 2, rot: ry, gap: true },
-      { lx: subCx, lz: subCz + subHd, len: subHw * 2, rot: ry, gap: false },
-      { lx: subCx - subHw, lz: subCz, len: subHd * 2, rot: ry + Math.PI / 2, gap: false },
-      { lx: subCx + subHw, lz: subCz, len: subHd * 2, rot: ry + Math.PI / 2, gap: false },
-    ];
-    sides.forEach((s, i) => {
-      const p = L(s.lx, s.lz);
-      if (!s.gap) {
-        AddWall(sink, brick, {
-          x: p.x, z: p.z, length: s.len, height: h, thickness: 0.3, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:sub${i}`, plinth: "Stone",
-        });
-        return;
-      }
-      // 朝厂院的一面留 2.4 m 的口子（沿局部 x 走向的墙，缺口也沿 x 让）
-      const openW = 2.4;
-      const segLen = (s.len - openW) / 2;
-      for (const side of [-1, 1]) {
-        const q = L(s.lx + side * (openW / 2 + segLen / 2), s.lz);
-        AddWall(sink, brick, {
-          x: q.x, z: q.z, length: segLen, height: h, thickness: 0.3, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:sub${i}${side}`, plinth: "Stone",
-        });
-      }
+    // 样条围墙 PCG：闭环矮墙，朝厂院的一面（局部 -z）留 2.4 m 的口子。
+    // 本文件的 L 是 +lz 指南的那一套，而口子开在 -lz 一侧 —— frame 里把 lz
+    // 取反，让管线约定的「+lz = 开口那一面」对上。
+    AddYardWallRing(sink, {
+      frame: (lx, lz) => L(subCx + lx, subCz - lz),
+      hw: subHw, hd: subHd, preset: "landmarkYardPlain",
+      material: brick, height: h, thickness: 0.3,
+      seed: `${seed}:sub`, ruin: damage * 0.8,
+      gates: [{ side: "s", offset: 0, openW: 2.4 }],
+      plinth: { material: "Stone", height: 0.42, grow: 0.06, out: 0.07 },
     });
     // 变压器台：石台 + 铁壳 + 两只套管
     const tp = L(subCx + 2.5, subCz + 1.2);
@@ -551,55 +537,35 @@ export function BuildPowerPlant(host, f, ctx) {
   // =========================================================================
   {
     const h = 2.2, gateW = 4.4, gateLx = -2.0;
-    const sides = [
-      { lx: 0, lz: -YARD_HD, len: YARD_HW * 2, rot: ry, gate: true },
-      { lx: 0, lz: YARD_HD, len: YARD_HW * 2, rot: ry, gate: false },
-      { lx: -YARD_HW, lz: 0, len: YARD_HD * 2, rot: ry + Math.PI / 2, gate: false },
-      { lx: YARD_HW, lz: 0, len: YARD_HD * 2, rot: ry + Math.PI / 2, gate: false },
-    ];
-    sides.forEach((s, i) => {
-      const p = L(s.lx, s.lz);
-      const hx = s.rot === ry ? s.len / 2 : 0.3;
-      const hz = s.rot === ry ? 0.3 : s.len / 2;
-      if (host.OnStreet(p.x, p.z, hx, hz)) return;
-      if (!s.gate) {
-        AddWall(sink, brick, {
-          x: p.x, z: p.z, length: s.len, height: h, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}`, plinth: "Stone",
-        });
-        return;
-      }
-      // 门两侧各一段（门垛 1.0 m 宽，两侧各让 0.5）
-      const half = s.len / 2;
-      const segs = [
-        { c: (-half + (gateLx - gateW / 2 - 1.0)) / 2, len: (gateLx - gateW / 2 - 1.0) + half },
-        { c: ((gateLx + gateW / 2 + 1.0) + half) / 2, len: half - (gateLx + gateW / 2 + 1.0) },
-      ];
-      for (let k = 0; k < segs.length; k += 1) {
-        if (segs[k].len < 1) continue;
-        const q = L(segs[k].c, s.lz);
-        AddWall(sink, brick, {
-          x: q.x, z: q.z, length: segs[k].len, height: h, thickness: 0.35, ry: s.rot,
-          ruin: damage * 0.8, seed: `${seed}:yw${i}${k}`, plinth: "Stone",
-        });
-      }
+    // 一圈厂墙走样条围墙 PCG。厂门开在局部 -z 那一面（临街），frame 取反 lz。
+    // 门洞净宽两侧各让 1.0 m 给门垛。
+    AddYardWallRing(sink, {
+      frame: (lx, lz) => L(lx, -lz),
+      hw: YARD_HW, hd: YARD_HD, preset: "landmarkYardPlain",
+      material: brick, height: h, thickness: 0.35,
+      seed: `${seed}:yw`, ruin: damage * 0.8,
+      gates: [{ side: "s", offset: -gateLx, openW: gateW + 2.0 }],
+      plinth: { material: "Stone", height: 0.42, grow: 0.06, out: 0.07 },
+      onStreet: (x, z, ex, ez) => host.OnStreet(x, z, ex, ez),
+    });
+    {
       // 门垛 + 门额石（无字：1938 年 3 月的厂名字样无资料）
       for (const side of [-1, 1]) {
-        const q = L(gateLx + side * (gateW / 2 + 0.5), s.lz);
+        const q = L(gateLx + side * (gateW / 2 + 0.5), -YARD_HD);
         sink.Add(brick, PlaceGeometry(
           MakeBox(1.0, 3.3, 0.9, TILE_METERS.brick, `${seed}:gp${side}`, BRICK_UV_GRID),
           { x: q.x, y: 1.65, z: q.z, ry }));
         sink.Solid(q.x, 1.65, q.z, 0.5, 1.65, 0.45, "wall", ry);
       }
-      const c = L(gateLx, s.lz);
+      const c = L(gateLx, -YARD_HD);
       sink.Add("Stone", PlaceGeometry(
         MakeBox(gateW + 2.0, 0.34, 1.0, TILE_METERS.stone, `${seed}:glin`),
         { x: c.x, y: 3.15, z: c.z, ry }));
-      const plq = L(gateLx, s.lz - 0.56);
+      const plq = L(gateLx, -YARD_HD - 0.56);
       sink.Add("Stone", PlaceGeometry(
         MakeBox(2.0, 0.55, 0.14, TILE_METERS.stone, `${seed}:plaque`),
         { x: plq.x, y: 2.55, z: plq.z, ry }));
-    });
+    }
 
     // 值班房：门里东侧一间小屋（5.4×4.4，檐口 2.9）。厂区的人的尺度参照
     const gx = 5.6, gz = -13.4, gw = 5.4, gd = 4.4, geave = 2.9;

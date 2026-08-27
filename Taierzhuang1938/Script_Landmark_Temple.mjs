@@ -32,6 +32,7 @@
 import { AddWall, AddDoorReveal, AddCypress, AddPaifang } from "./Script_World.mjs";
 import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 const WALL_TILE = TILE_METERS.brick;
 /** 庙墙 2.7 m：比民居院墙（2.0—2.5）高一档 —— 庙院对街封闭得更死。PRESUMED。 */
@@ -446,28 +447,16 @@ function AddTempleYard(sink, L, ry, o) {
   const { w, d, seed, damage = 0, burnt = false, height = YARD_WALL_H, gateSpan, wallMat = "HouseBrick" } = o;
   const mat = burnt ? "BrickWallSooty" : wallMat;
   const ruin = Clamp(damage * 0.7, 0, 0.55);
-  const runs = [
-    { lx: 0, lz: -d / 2, len: w, rot: 0, id: "n" },
-    { lx: -w / 2, lz: 0, len: d, rot: Math.PI / 2, id: "wl" },
-    { lx: w / 2, lz: 0, len: d, rot: Math.PI / 2, id: "e" },
-  ];
-  for (const run of runs) {
-    const [x, z] = L(run.lx, run.lz);
-    AddWall(sink, mat, {
-      x, z, length: run.len, height, thickness: 0.44,
-      ry: ry + run.rot, ruin, seed: `${seed}:w${run.id}`,
-      tile: WALL_TILE, plinth: "Stone", cope: true,
-    });
-  }
-  // 南面（开门那面）：两段墙夹一个 gateSpan 的口子
-  const segLen = Math.max(1.0, (w - gateSpan) / 2);
-  for (const s of [-1, 1]) {
-    const [x, z] = L(s * (gateSpan / 2 + segLen / 2), d / 2);
-    AddWall(sink, mat, {
-      x, z, length: segLen, height, thickness: 0.44,
-      ry, ruin, seed: `${seed}:ws${s}`, tile: WALL_TILE, plinth: "Stone", cope: true,
-    });
-  }
+  // 样条围墙 PCG：闭环折线（四角互搭）、条石碱脚 + 瓦压顶各一只实例网格。
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => L(lx, lz),
+    hw: w / 2, hd: d / 2, preset: "landmarkYard",
+    material: mat, height, thickness: 0.44,
+    seed: `${seed}:w`, ruin,
+    gates: [{ side: "s", offset: 0, openW: Math.min(gateSpan, w - 2.0) }],
+    plinth: { material: "Stone", height: 0.42, grow: 0.06, out: 0.07 },
+    cope: { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 },
+  });
 }
 
 /** 石甬路：中轴上一条铺石的路。俯瞰时这条亮线把庙院从灰瓦民居网格里拉出来。 */

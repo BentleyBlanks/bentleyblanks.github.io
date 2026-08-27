@@ -13,7 +13,7 @@
 // notPermanentGarrison：这里只做设施不摆兵。番号木牌是**净几何牌面**（不写字），
 // 谁挂在门口由战斗时段数据决定，不由场景写死。
 //
-// 预算取向：外圈院墙沿用 AddWall（街上平视看得见的那一圈，细节不能省），
+// 预算取向：外圈院墙走样条围墙 PCG（Script_YardWall，街上平视看得见的那一圈，
 // 院内隔墙走本文件的 PartitionWall（4.2 m 一段而不是 0.85 m 一段，便宜十几倍）。
 // 除旗面 PaintRed（hq）与草料 VillageStraw（billet）外，不往分区里引入新材质。
 //
@@ -29,13 +29,14 @@
 
 import * as THREE from "three";
 import {
-  AddWall, AddGatehouse, AddRoomBlock, AddHardMountainRoof,
+  AddGatehouse, AddRoomBlock, AddHardMountainRoof,
   AddSandbagEmplacement, AddPole, AddWell,
 } from "./Script_World.mjs";
 import {
   MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 import {
   AddCourtyardLife, AddYardWear, AddStalkStack, AddManureHeap, AddStoneRoller,
 } from "./Script_LivedInProps.mjs";
@@ -128,30 +129,19 @@ function AddStrut(sink, material, a, b, thickness, seed) {
 function Enclosure(host, f, ctx, o) {
   const sink = host.sink;
   const ry = ctx.ry;
-  const tile = o.wallMat === "Adobe" ? TILE_METERS.adobe : TILE_METERS.brick;
-  const closed = [
-    { lx: 0, lz: -f.d / 2, len: f.w, rot: 0 },
-    { lx: -f.w / 2, lz: 0, len: f.d, rot: Math.PI / 2 },
-    { lx: f.w / 2, lz: 0, len: f.d, rot: Math.PI / 2 },
-  ];
-  closed.forEach((s, i) => {
-    const p = Local(f, ry, s.lx, s.lz);
-    AddWall(sink, o.wallMat, {
-      x: p.x, z: p.z, length: s.len, height: o.wallH, thickness: 0.38,
-      ry: ry + s.rot, ruin: ctx.damage * 0.75, seed: `${o.seed}:w${i}`,
-      tile, plinth: o.plinth, cope: true,
-    });
+  // 一圈院墙走样条围墙 PCG（Script_YardWall → Script_WallSpline）：
+  // 四角由管线互搭，压顶跟着每一块自己的墙头落，墙身按分区实例化。
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => Local(f, ry, lx, lz),
+    hw: f.w / 2, hd: f.d / 2,
+    preset: o.wallMat === "Adobe" ? "cityYardAdobe" : "landmarkYard",
+    material: o.wallMat, height: o.wallH, thickness: 0.38,
+    seed: `${o.seed}:yard`, ruin: ctx.damage * 0.75,
+    gates: [{ side: "s", offset: 0, openW: o.gateOpenW }],
+    plinth: o.plinth
+      ? { material: o.plinth, height: 0.42, grow: 0.06, out: 0.07 } : null,
+    cope: { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 },
   });
-  // 前墙：门洞两侧各一段
-  const segLen = (f.w - o.gateOpenW) / 2;
-  for (const side of [-1, 1]) {
-    const p = Local(f, ry, side * (o.gateOpenW / 2 + segLen / 2), f.d / 2);
-    AddWall(sink, o.wallMat, {
-      x: p.x, z: p.z, length: segLen, height: o.wallH, thickness: 0.38,
-      ry, ruin: ctx.damage * 0.7, seed: `${o.seed}:wf${side}`,
-      tile, plinth: o.plinth, cope: true,
-    });
-  }
   const g = Local(f, ry, 0, f.d / 2);
   AddGatehouse(sink, {
     x: g.x, z: g.z, ry, seed: `${o.seed}:gh`,

@@ -140,16 +140,16 @@ function MakeInView(host) {
 function Stockade(host, s, gates, ctx) {
   const inView = MakeInView(host);
   BuildWallSpline(host.sink, {
-    name: "NorthStockade", style: "rammedEarth", material: "ZhaiEarth", tag: "zhaiWall",
+    preset: "stockade",
+    name: "NorthStockade", material: "ZhaiEarth", tag: "zhaiWall",
     points: [[s.fromX, s.z], [s.toX, s.z]],
     height: s.height, topWidth: s.topWidth, baseWidth: s.baseWidth,
-    seed: "north:zhai", moduleLen: 3.0, embed: 0.5,
+    seed: "north:zhai",
     groundAt: (x, z) => host.OuterHeight(x, z),
     // 圩门那一段整段让开：门垛自己把缺口填上（见 StockadeGate 的 clearSpan）
     gaps: gates.map((g) => ({ at: [g.x, s.z], width: g.clearSpan })),
     randomBreaches: { count: 3, widthMin: 9, widthMax: 16, margin: 24, avoidGapMargin: 14 },
     damage: ctx.damage ?? 0.3,
-    sideJitter: 0.08,
     coverSign: -1,       // 掩体朝 +z（圩内侧），与旧版逐位一致
 
     sectorKey: NorthSector,

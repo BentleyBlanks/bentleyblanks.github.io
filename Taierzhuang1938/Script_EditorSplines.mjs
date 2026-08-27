@@ -21,6 +21,16 @@
 // （同一份代码、同一个 groundAt），不是示意线 —— 围墙预览连实例化矩阵表都是
 // 真的那份（变体/塌段/破口逐位一致）。预览抬 0.04 m 盖在现物上防 z-fight。
 //
+// ## 拼接资产 / 布设参数
+// 围墙不是一条挤出来的带子，是**一个模块摆 N 次**。所以面板里另开一档：
+//   · 「拼接资产」把那几只原始几何**在场里摆出来** —— 变体模块、碱脚条、
+//     压顶条，外加一段按当前间隔/重叠拼起来的三块演示，缝在哪儿一眼看得见；
+//   · 「布设参数」是 Script_WallSpline.WALL_PRESETS 那张表的直接滑杆：
+//     模块间隔、拼接重叠、埋深、变体数、六路随机的每一路。改了立刻重建预览，
+//     **建城读的也是同一份**（SetWallPresetOverride），不用改源码就能看效果。
+// 预设改动同样只存 localStorage，导出的 JSON 里带 `presets` 一节，誊回
+// Script_WallSpline.WALL_PRESETS 才算落地。
+//
 // ## 面板里的改动不落盘
 // 与采样点编辑器同一条纪律：改动存 localStorage，刷新不丢；基线在源码里，
 // 改完必须「导出」誊回数据文件。
@@ -36,14 +46,53 @@ import {
 import { OutfieldSpec } from "./Script_TengxianOutfield.mjs";
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import { BuildRoadRibbon, BuildRailBed, MakeCrownProfile } from "./Script_RoadSpline.mjs";
-import { BuildWallSpline } from "./Script_WallSpline.mjs";
-import { MakeInstanced } from "./Script_Geo.mjs";
+import {
+  BuildWallSpline, WALL_PRESETS, WallPreset, SetWallPresetOverride, MakeWallAssetSet,
+} from "./Script_WallSpline.mjs";
+import { MakeInstanced, MakeBox, TILE_METERS } from "./Script_Geo.mjs";
+import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 
 const STORE_KEY = "tz1938.sceneSplines.v1";
 const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板存档，读得懂就迁
 
+/** 资产台离地高度：城内院墙 2 m 上下，抬到这里背景就只剩天。 */
+const ASSET_STAGE_LIFT = 13;
+
 const KIND_COLOR = {
   street: 0xd9b45a, road: 0xc9a06a, railway: 0x8fa3b8, wall: 0x9c8a68,
+};
+
+/**
+ * 「布设参数」面板上的滑杆表。每一行 = WALL_PRESETS 里的一个字段。
+ * 分两组：**拼接**（模块怎么排）与**随机**（怎么不重复），因为调它们的
+ * 目的完全不同 —— 前者管缝和密度，后者管"这不是复印纸"。
+ */
+const WALL_PARAMS = [
+  { key: "moduleLen", label: "模块间隔", min: 0.8, max: 12, step: 0.1, unit: "m", group: "拼接" },
+  { key: "moduleOverlap", label: "拼接重叠", min: 0, max: 0.20, step: 0.005, unit: "×", group: "拼接" },
+  { key: "embed", label: "埋深", min: 0, max: 1.2, step: 0.02, unit: "m", group: "拼接" },
+  { key: "variants", label: "几何变体数", min: 1, max: 6, step: 1, unit: "份", group: "拼接" },
+  { key: "geoQuantH", label: "几何量化·高", min: 0, max: 2, step: 0.25, unit: "m", group: "拼接" },
+  { key: "geoQuantW", label: "几何量化·厚", min: 0, max: 0.5, step: 0.05, unit: "m", group: "拼接" },
+  { key: "heightJitter", label: "高度抖动", min: 0, max: 0.4, step: 0.005, unit: "×", group: "随机" },
+  { key: "heightCell", label: "高度包络档长", min: 4, max: 48, step: 1, unit: "m", group: "随机" },
+  { key: "leanJitter", label: "侧倾", min: 0, max: 0.08, step: 0.001, unit: "rad", group: "随机" },
+  { key: "yawJitter", label: "偏航", min: 0, max: 0.08, step: 0.001, unit: "rad", group: "随机" },
+  { key: "sideJitter", label: "横向错位", min: 0, max: 0.3, step: 0.005, unit: "m", group: "随机" },
+  { key: "thickJitter", label: "厚度抖动", min: 0, max: 0.3, step: 0.005, unit: "×", group: "随机" },
+  { key: "tintJitter", label: "逐块色调", min: 0, max: 0.25, step: 0.005, unit: "×", group: "随机" },
+  { key: "collapseChance", label: "塌段概率", min: 0, max: 0.6, step: 0.01, unit: "", group: "随机" },
+  { key: "edgeCollapseChance", label: "整边塌概率", min: 0, max: 0.6, step: 0.01, unit: "", group: "随机" },
+  { key: "coverEvery", label: "掩体抽稀", min: 1, max: 10, step: 1, unit: "块", group: "随机" },
+  { key: "colliderMerge", label: "碰撞并段容差", min: 0, max: 1.5, step: 0.05, unit: "m", group: "随机" },
+];
+
+const PARAM_DEFAULTS = {
+  moduleLen: 3.0, moduleOverlap: 0.02, embed: 0.5, variants: 4,
+  geoQuantH: 0, geoQuantW: 0,
+  heightJitter: 0.10, heightCell: 18, leanJitter: 0.020, yawJitter: 0.010,
+  sideJitter: 0.06, thickJitter: 0.08, tintJitter: 0.06,
+  collapseChance: 0, edgeCollapseChance: 0, coverEvery: 3, colliderMerge: 0,
 };
 
 /** 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。 */
@@ -110,7 +159,7 @@ function FactoryRoutes(levelId) {
       height: zw.height, topWidth: zw.topWidth, baseWidth: zw.baseWidth,
       points: [[zw.x, -half], [zw.x, half]], axisLocked: true,
       wall: {
-        style: "rammedEarth", seed: "zhaiEast", moduleLen: 3.2, embed: 0.5,
+        preset: "zhaiWall", seed: "zhaiEast",
         gaps: [{ at: [g.x, g.z], width: g.width + 1.6 }],
         breaches: [{ at: [zw.x, -24], width: 16 }, { at: [zw.x, 52], width: 12 }],
       },
@@ -124,8 +173,7 @@ function FactoryRoutes(levelId) {
       height: st.height, topWidth: st.topWidth, baseWidth: st.baseWidth,
       points: [[st.fromX, st.z], [st.toX, st.z]], axisLocked: true,
       wall: {
-        style: "rammedEarth", seed: "north:zhai", moduleLen: 3.0, embed: 0.5,
-        damage: 0.3, sideJitter: 0.08, coverSign: -1,
+        preset: "stockade", seed: "north:zhai", damage: 0.3, coverSign: -1,
         gaps: (st.gates || []).map((gt) => {
           const width = gt.width ?? gt.w ?? 3.0;
           return { at: [gt.x, st.z], width: width + 2.6 * 2 + 0.3 };
@@ -168,10 +216,7 @@ function FactoryRoutes(levelId) {
           [v.x + hw, v.z + hd], [v.x - hw, v.z + hd],
         ],
         axisLocked: true, closed: true,
-        wall: {
-          style: "dryStone", seed: `${v.id}:stonewall`, moduleLen: 4.5, embed: 0.35,
-          collapseChance: 0.18, heightJitter: 0.16,
-        },
+        wall: { preset: "villageStone", seed: `${v.id}:stonewall` },
       });
     }
   }
@@ -198,7 +243,17 @@ export class SplineEditor {
     this.group = null;
     this.markers = [];
     this.raycaster = new THREE.Raycaster();
+    this.presetEdits = {};        // 预设名 → 改过的字段（叠加在 WALL_PRESETS 上）
+    this.presetKey = "zhaiWall";  // 「拼接资产 / 布设参数」当前看的是哪一路墙
+    this.showAssets = false;      // 资产台开关
+    this.assetGroup = null;
+    this.assetAnchor = null;      // 资产台落点（世界 xyz + 朝向）
+    this.assetSpan = 12;          // 台面总长（相机取景用）
+    this.assetHeight = 2;
+    this.ownedAssets = [];        // 资产台自己烘的几何，退出时 dispose
+    this.ownedAssetMaterials = [];
     this.Restore();
+    this.ApplyPresetEdits();
     this.routes = this.Collect();
     this.selectedKey = this.routes[0]?.key || null;
   }
@@ -240,13 +295,16 @@ export class SplineEditor {
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
     this.FillList();
+    this.FillPresetList();
     if (this.selectedKey) this.Select(this.selectedKey, { fly: false });
+    this.SyncPresetUi();
     this.BuildOverlay();
     return this;
   }
 
   Exit() {
     this.Save();
+    this.ClearAssets();
     this.ClearOverlay(true);
     this.host.flycam.Close();
     this.host.SetViewmodelVisible(true);
@@ -308,13 +366,51 @@ export class SplineEditor {
       + "「插入」在选中点之后加一个点；「删除」点掉一个控制点。"
       + "轴对齐/矩形来源拖弯后导出会带警告 —— 那些数据格式只有直线/矩形。");
 
+    // --- 拼接资产 / 布设参数 ---
+    const pcg = Section(body, "拼接资产 / 布设参数");
+    this.presetList = ListBox(pcg, {
+      height: 132, onPick: (key) => this.SelectPreset(key),
+    });
+    this.assetFacts = Facts(pcg);
+    Toggle(pcg, "在场里摆出拼接资产台", this.showAssets, (on) => {
+      this.showAssets = on;
+      this.BuildAssets();
+      if (on) this.FlyToAssets();
+    });
+    ButtonRow(pcg, [
+      { label: "资产台搬到眼前", onClick: () => { this.assetAnchor = null; this.BuildAssets(); this.FlyToAssets(); } },
+      { label: "还原该预设", onClick: () => this.RevertPreset() },
+    ]);
+    Note(pcg, "资产台从左到右：**变体模块**（建城时实例化的就是这几只）、"
+      + "碱脚条、压顶条，最后一组是按当前「模块间隔 / 拼接重叠」拼起来的三块 —— "
+      + "缝和压茬看这一组。地上每格 1 m。");
+    this.paramSliders = {};
+    let lastGroup = "";
+    for (const row of WALL_PARAMS) {
+      if (row.group !== lastGroup) {
+        lastGroup = row.group;
+        Note(pcg, row.group === "拼接"
+          ? "拼接：模块怎么排（间隔是标称值，实际步距按整除弦长；重叠让相邻两块互相压进去）"
+          : "随机：怎么不重复（六路全部确定性，按沿线弧长哈希取种）");
+      }
+      this.paramSliders[row.key] = Slider(pcg, {
+        label: row.label, min: row.min, max: row.max, step: row.step,
+        value: PARAM_DEFAULTS[row.key],
+        format: (v) => `${row.step >= 1 ? v.toFixed(0) : v.toFixed(3)}${row.unit}`,
+        onInput: (v) => this.PatchPreset(row.key, +v.toFixed(4)),
+      });
+    }
+    Note(pcg, "**改的是 Script_WallSpline.WALL_PRESETS 那张表** —— 预览与建城读同一份，"
+      + "调完退出面板重建关卡就能看到。导出 JSON 里的 `presets` 一节要誊回源码。", true);
+
     const evidence = Section(body, "取证");
     this.facts = Facts(evidence);
     this.status = Note(evidence, "", true);
 
     const io = Section(body, "导出 / 导入");
     this.io = TextArea(io, {
-      rows: 6, placeholder: "导出的 JSON 会出现在这里（含每条路线该誊回的 source）",
+      rows: 6,
+      placeholder: "导出的 JSON 会出现在这里（routes = 控制点，presets = 布设参数，各带 source）",
     });
     ButtonRow(io, [
       { label: "导出改动 JSON", onClick: () => this.Export() },
@@ -322,6 +418,235 @@ export class SplineEditor {
     ]);
     Note(io, "面板里的改动只存在浏览器里。**基线在源码里** —— 改完把 JSON 里的"
       + "点位誊回各自的数据文件（source 字段写明了去处），否则下次建城还是旧样。", true);
+  }
+
+  // -------------------------------------------------------------------------
+  // 预设列表 / 资产台
+  // -------------------------------------------------------------------------
+
+  FillPresetList() {
+    if (!this.presetList) return;
+    const used = new Set(this.routes.filter((r) => r.wall?.preset).map((r) => r.wall.preset));
+    this.presetList.Fill(Object.entries(WALL_PRESETS).map(([key, preset]) => ({
+      id: key,
+      name: `${this.presetEdits[key] ? "✎ " : ""}${preset.label || key}`,
+      tail: used.has(key) ? "本关" : "",
+      title: `${key}
+style=${preset.style}`,
+    })));
+    this.presetList.Select(this.presetKey);
+  }
+
+  SelectPreset(key) {
+    if (!WALL_PRESETS[key]) return;
+    this.presetKey = key;
+    this.presetList.Select(key);
+    this.SyncPresetUi();
+    this.BuildAssets();
+  }
+
+  /** 滑杆读数跟上当前预设。 */
+  SyncPresetUi() {
+    if (!this.paramSliders) return;
+    const values = this.PresetValues();
+    for (const row of WALL_PARAMS) {
+      this.paramSliders[row.key]?.Set(values[row.key]);
+    }
+    this.RefreshAssetFacts();
+  }
+
+  RefreshAssetFacts() {
+    if (!this.assetFacts) return;
+    const key = this.presetKey;
+    const preset = WallPreset(key);
+    const v = this.PresetValues();
+    this.assetFacts.Set("预设 / 风格", `${preset.label || key} · ${preset.style}`);
+    this.assetFacts.Set("模块 长×重叠",
+      `${v.moduleLen.toFixed(2)} m × ${(1 + v.moduleOverlap).toFixed(3)}`);
+    this.assetFacts.Set("有效步距 / 露缝",
+      `${v.moduleLen.toFixed(2)} m / 压 ${(v.moduleLen * v.moduleOverlap * 100).toFixed(1)} cm`);
+    this.assetFacts.Set("变体 / 量化",
+      `${v.variants} 份 · 高 ${v.geoQuantH || "精确"} / 厚 ${v.geoQuantW || "精确"}`);
+    this.assetFacts.Set("碱脚 / 压顶",
+      `${preset.plinth ? preset.plinth.material : "无"} / ${preset.cope ? preset.cope.material : "无"}`);
+    const edited = this.presetEdits[key];
+    this.assetFacts.Set("改动", edited ? `${Object.keys(edited).join("、")}` : "无（出厂值）",
+      edited ? "warn" : "");
+  }
+
+  ClearAssets() {
+    if (this.assetGroup) {
+      this.host.scene.remove(this.assetGroup);
+      this.assetGroup = null;
+    }
+    for (const g of this.ownedAssets) g.dispose();
+    this.ownedAssets = [];
+    for (const m of this.ownedAssetMaterials) m.dispose();
+    this.ownedAssetMaterials = [];
+  }
+
+  /**
+   * 资产台落点：相机前方 14 m、**离地 ASSET_STAGE_LIFT 米**。
+   *
+   * 为什么架在空中而不是摆地上：城内是一片 2 m 高的院墙网格，摆在地面的资产台
+   * 会被就近那圈墙挡掉大半 —— 第一版实拍出来就是「飞过去只看见别人家的院墙」。
+   * 抬到十二米以上，背景是天，几只原始件的轮廓、缝和压茬才读得干净。
+   */
+  AssetAnchor() {
+    if (this.assetAnchor) return this.assetAnchor;
+    const cam = this.host.camera;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    dir.y = 0;
+    if (dir.lengthSq() < 1e-4) dir.set(0, 0, -1);
+    dir.normalize();
+    const x = cam.position.x + dir.x * 14;
+    const z = cam.position.z + dir.z * 14;
+    // 台面朝向：让**看件的那一面朝太阳**。不定这一条的话，台子朝哪边全看
+    // 用户进面板时相机朝哪儿，逆光时几只件全是黑剪影 —— 拼缝、压茬、
+    // 顶檐起伏这些要看的东西一个都读不出来。
+    const sun = this.host.lights?.sunDirection;
+    let ry = Math.atan2(dir.x, dir.z);
+    if (sun && Math.hypot(sun.x, sun.z) > 0.05) {
+      ry = Math.atan2(sun.x, sun.z);
+    }
+    this.assetAnchor = { x, z, y: this.GroundAt(x, z) + ASSET_STAGE_LIFT, ry };
+    return this.assetAnchor;
+  }
+
+  /** 把相机摆到能一眼看全资产台的地方（在台子自己的局部系里算，再变换出去）。 */
+  FlyToAssets() {
+    const group = this.assetGroup;
+    const a = this.AssetAnchor();
+    const span = this.assetSpan || 12;
+    const eye = new THREE.Vector3(span / 2, span * 0.28, span * 0.98);
+    const look = new THREE.Vector3(span / 2, (this.assetHeight || 2) * 0.5, 0);
+    if (group) {
+      group.updateMatrixWorld(true);
+      group.localToWorld(eye);
+      group.localToWorld(look);
+    } else {
+      eye.set(a.x, a.y + 3, a.z + 10);
+      look.set(a.x, a.y + 1, a.z);
+    }
+    const camera = this.host.camera;
+    camera.position.copy(eye);
+    const forward = look.sub(eye).normalize();
+    const yaw = Math.atan2(-forward.x, -forward.z);
+    const pitch = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1));
+    this.host.flycam.yaw = yaw;
+    this.host.flycam.pitch = pitch;
+    camera.rotation.set(pitch, yaw, 0, "YXZ");
+  }
+
+  MaterialFor(name) {
+    try {
+      return ResolveTengxianMaterial(name, this.host.library);
+    } catch (error) {
+      return this.PreviewMaterial("wall");
+    }
+  }
+
+  /**
+   * 资产台：把当前预设的**原始拼接件**摆在地上。
+   *
+   * 摆的是真几何 + 真材质（MakeWallAssetSet 调的就是建城那两个烘焙函数），
+   * 不是另画一份示意 —— 面板上看到什么，城里摆的就是什么。
+   * 从左到右：变体 0..n-1、碱脚条、压顶条、按当前间隔/重叠拼起来的三块。
+   */
+  BuildAssets() {
+    this.ClearAssets();
+    this.RefreshAssetFacts();
+    if (!this.showAssets) return;
+    const a = this.AssetAnchor();
+    let set = null;
+    const preset = WallPreset(this.presetKey);
+    const route = this.routes.find((r) => r.wall?.preset === this.presetKey);
+    const sample = preset.sample || { material: "ZhaiEarth", height: 2.2, baseWidth: 0.4, topWidth: 0.4 };
+    try {
+      // 尺寸优先取本关真在用这套预设的那条墙；城内院墙这类不在路线表里的
+      // 就用预设自带的 sample（"这一路墙大致多高多厚"）
+      set = MakeWallAssetSet(this.presetKey, route ? {
+        height: route.height, topWidth: route.topWidth, baseWidth: route.baseWidth,
+      } : {
+        height: sample.height, topWidth: sample.topWidth, baseWidth: sample.baseWidth,
+      });
+    } catch (error) {
+      console.warn("[SplineEditor] 拼接资产烘焙失败：", error);
+      return;
+    }
+    const group = new THREE.Group();
+    group.name = "SplineEditorAssets";
+    group.position.set(a.x, a.y, a.z);
+    group.rotation.y = a.ry;
+    const nominal = set.nominal;
+    const gap = Math.max(0.7, nominal.moduleLen * 0.28);
+    let cursor = 0;
+    const Put = (geometry, material, x, y, owned) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, 0);
+      mesh.renderOrder = 902;
+      group.add(mesh);
+      if (owned) this.ownedAssets.push(geometry);
+    };
+    const bodyMat = this.MaterialFor(sample.material);
+    // ① 变体模块：抬到地面上（几何原点在模块中心）
+    for (let i = 0; i < set.variants.length; i += 1) {
+      cursor += nominal.moduleLen / 2 + (i ? gap : 0);
+      Put(set.variants[i], bodyMat, cursor, nominal.height / 2, true);
+      cursor += nominal.moduleLen / 2;
+    }
+    // ② 碱脚条 / 压顶条
+    for (const trim of [set.plinth, set.cope]) {
+      if (!trim) continue;
+      cursor += gap + nominal.moduleLen / 2;
+      Put(trim.geometry, this.MaterialFor(trim.material), cursor, trim.spec.height / 2, true);
+      cursor += nominal.moduleLen / 2;
+    }
+    // ③ 拼接演示：三块按真实步距 + 重叠摆，缝在哪儿一眼看得见
+    const step = nominal.moduleLen;
+    const scaleX = 1 + nominal.moduleOverlap;
+    cursor += gap * 2.2;
+    const demoStart = cursor + step / 2;
+    const jointMat = this.PreviewMaterial("street");
+    this.ownedAssetMaterials.push(jointMat);
+    for (let i = 0; i < 3; i += 1) {
+      const mesh = new THREE.Mesh(set.variants[i % set.variants.length], bodyMat);
+      mesh.position.set(demoStart + step * i, nominal.height / 2, 0);
+      mesh.scale.set(scaleX, 1, 1);
+      mesh.renderOrder = 902;
+      group.add(mesh);
+      // 拼缝标：模块边界在哪儿。不插这几根针，重叠调到 0.03 与调到 0.12
+      // 在画面上是同一堵连续的墙 —— 那正是重叠要干的事，但调参时得看得见。
+      for (const end of [-0.5, 0.5]) {
+        const geometry = MakeBox(0.05, nominal.height * 1.22, 0.05,
+          TILE_METERS.wood, `joint${i}${end}`);
+        this.ownedAssets.push(geometry);
+        const tick = new THREE.Mesh(geometry, jointMat);
+        tick.position.set(demoStart + step * (i + end), nominal.height / 2,
+          nominal.baseWidth / 2 + 0.10);
+        tick.renderOrder = 904;
+        group.add(tick);
+      }
+    }
+    cursor = demoStart + step * 3;
+    // ④ 一米一格的地尺：不给刻度就没法把"重叠 3 cm"读成一个长度
+    const rulerLen = Math.ceil(cursor) + 1;
+    const ruler = new THREE.Group();
+    const rulerMats = [this.PreviewMaterial("railway"), this.PreviewMaterial("road")];
+    this.ownedAssetMaterials.push(...rulerMats);
+    for (let i = 0; i < rulerLen; i += 1) {
+      const geometry = MakeBox(0.96, 0.02, 0.14, TILE_METERS.stone, `ruler${i}`);
+      this.ownedAssets.push(geometry);
+      const mesh = new THREE.Mesh(geometry, rulerMats[i % 2]);
+      mesh.position.set(i + 0.5, 0.02, nominal.baseWidth / 2 + 0.55);
+      mesh.renderOrder = 903;
+      ruler.add(mesh);
+    }
+    group.add(ruler);
+    this.assetSpan = Math.max(6, cursor);
+    this.assetHeight = nominal.height;
+    this.host.scene.add(group);
+    this.assetGroup = group;
   }
 
   get selected() { return this.routes.find((r) => r.key === this.selectedKey) || null; }
@@ -357,6 +682,12 @@ export class SplineEditor {
       this.heightSlider.root.style.display = isWall ? "" : "none";
       if (isWall && route.height) this.heightSlider.Set(route.height);
     }
+    if (isWall && route.wall?.preset && route.wall.preset !== this.presetKey) {
+      this.presetKey = route.wall.preset;
+      if (this.presetList) this.presetList.Select(this.presetKey);
+      this.SyncPresetUi();
+      this.BuildAssets();
+    }
     if (fly) this.FlyToSelected();
     this.BuildOverlay();
   }
@@ -372,10 +703,13 @@ export class SplineEditor {
     const path = this.RoutePath(route);
     const mid = path.At(path.length / 2);
     const y = this.GroundAt(mid.x, mid.z);
+    // 相机停在路线南侧 34 m、高 42 m，**朝 −z 俯视**。
+    // 原来这里写的是 yaw = π —— YXZ 下那是朝 +z，从路线南边再往南看，
+    // 「飞到该路线」飞过去只看得见一片空地（实测朝向点积 = −1，正对面）。
     this.host.camera.position.set(mid.x, y + 42, mid.z + 34);
-    this.host.flycam.yaw = Math.PI;
+    this.host.flycam.yaw = 0;
     this.host.flycam.pitch = -0.85;
-    this.host.camera.rotation.set(-0.85, Math.PI, 0, "YXZ");
+    this.host.camera.rotation.set(-0.85, 0, 0, "YXZ");
   }
 
   // -------------------------------------------------------------------------
@@ -598,21 +932,17 @@ export class SplineEditor {
   BuildWallPreview(route) {
     const stub = { props: [], Solid: () => {}, Cover: () => {}, SetSector: () => {} };
     try {
+      // 预设打底 + 这条路线自己的缺口/破口/种子 —— 与建城时同一条调用
       BuildWallSpline(stub, {
+        preset: route.wall?.preset || "zhaiWall",
         name: `preview:${route.key}`,
-        style: route.wall?.style || "rammedEarth",
         material: "preview", tag: "preview",
         points: route.points, closed: !!route.closed,
         height: route.height, topWidth: route.topWidth, baseWidth: route.baseWidth,
         seed: route.wall?.seed || route.key,
-        moduleLen: route.wall?.moduleLen ?? 3.0,
-        embed: route.wall?.embed ?? 0.5,
         gaps: route.wall?.gaps || [],
         breaches: route.wall?.breaches || [],
         randomBreaches: route.wall?.randomBreaches || null,
-        collapseChance: route.wall?.collapseChance ?? 0,
-        heightJitter: route.wall?.heightJitter ?? 0.10,
-        sideJitter: route.wall?.sideJitter ?? 0.06,
         damage: route.wall?.damage ?? 0,
         coverSign: route.wall?.coverSign ?? 1,
         groundAt: (x, z) => this.GroundAt(x, z) + 0.04,
@@ -649,6 +979,9 @@ export class SplineEditor {
 
   RevertAll() {
     this.overrides = {};
+    this.presetEdits = {};
+    this.ApplyPresetEdits();
+    this.SyncPresetUi();
     this.dirty = false;
     try {
       window.localStorage.removeItem(STORE_KEY);
@@ -664,7 +997,9 @@ export class SplineEditor {
   Save() {
     if (!this.dirty) return;
     try {
-      window.localStorage.setItem(STORE_KEY, JSON.stringify(this.overrides));
+      window.localStorage.setItem(STORE_KEY, JSON.stringify({
+        ...this.overrides, __presets: this.presetEdits,
+      }));
     } catch (error) { /* 无痕模式：存不下就算了 */ }
   }
 
@@ -675,10 +1010,52 @@ export class SplineEditor {
       if (!raw) return;
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
-        this.overrides = data;
+        const { __presets: presets, ...routes } = data;
+        this.overrides = routes;
+        this.presetEdits = (presets && typeof presets === "object") ? presets : {};
         this.dirty = true;
       }
     } catch (error) { /* 存坏了就用出厂表 */ }
+  }
+
+  // -------------------------------------------------------------------------
+  // 布设参数（WALL_PRESETS 的改动）
+  // -------------------------------------------------------------------------
+
+  /** 把面板里的预设改动推给 Script_WallSpline —— 预览与建城读的是同一份。 */
+  ApplyPresetEdits() {
+    for (const name of Object.keys(WALL_PRESETS)) {
+      SetWallPresetOverride(name, this.presetEdits[name] || null);
+    }
+  }
+
+  /** 当前预设的完整参数（出厂值 + 面板改动）。 */
+  PresetValues(name = this.presetKey) {
+    const p = WallPreset(name);
+    const out = {};
+    for (const row of WALL_PARAMS) out[row.key] = p[row.key] ?? PARAM_DEFAULTS[row.key];
+    return out;
+  }
+
+  PatchPreset(key, value) {
+    const patch = { ...(this.presetEdits[this.presetKey] || {}), [key]: value };
+    this.presetEdits[this.presetKey] = patch;
+    SetWallPresetOverride(this.presetKey, patch);
+    this.dirty = true;
+    this.Save();
+    this.FillPresetList();
+    this.BuildOverlay();
+  }
+
+  RevertPreset() {
+    delete this.presetEdits[this.presetKey];
+    SetWallPresetOverride(this.presetKey, null);
+    this.dirty = true;
+    this.Save();
+    this.SyncPresetUi();
+    this.FillPresetList();
+    this.BuildOverlay();
+    this.host.SetHint(`已还原预设 ${WALL_PRESETS[this.presetKey]?.label || this.presetKey}`);
   }
 
   IsAxisAligned(points) {
@@ -709,32 +1086,44 @@ export class SplineEditor {
 
   Export() {
     const edited = this.routes.filter((r) => this.overrides[r.key]);
-    if (!edited.length) {
-      this.io.value = "（没有改动 —— 面板里改过的路线才会出现在导出里）";
+    const presets = Object.keys(this.presetEdits);
+    if (!edited.length && !presets.length) {
+      this.io.value = "（没有改动 —— 面板里改过的路线/预设才会出现在导出里）";
       return;
     }
-    this.io.value = JSON.stringify(edited.map((r) => {
-      const warning = this.ExportWarning(r);
-      return {
-        key: r.key, id: r.id, source: r.source,
-        ...(r.kind === "wall" ? { height: r.height } : { width: r.width }),
-        points: r.points,
-        ...(warning ? { warning } : {}),
-      };
-    }), null, 1);
+    const payload = {
+      routes: edited.map((r) => {
+        const warning = this.ExportWarning(r);
+        return {
+          key: r.key, id: r.id, source: r.source,
+          ...(r.kind === "wall" ? { height: r.height } : { width: r.width }),
+          points: r.points,
+          ...(warning ? { warning } : {}),
+        };
+      }),
+      // 布设参数：誊回 Script_WallSpline.WALL_PRESETS 对应的那一项
+      presets: presets.length ? {
+        source: "Script_WallSpline.mjs → WALL_PRESETS",
+        edits: this.presetEdits,
+      } : undefined,
+    };
+    this.io.value = JSON.stringify(payload, null, 1);
     this.io.select();
-    this.host.SetHint(`已导出 ${edited.length} 条改动`);
+    this.host.SetHint(`已导出 ${edited.length} 条路线 / ${presets.length} 个预设改动`);
   }
 
   Import() {
-    let list = null;
+    let data = null;
     try {
-      list = JSON.parse(this.io.value);
+      data = JSON.parse(this.io.value);
     } catch (error) {
-      this.host.SetHint("解析不了：这里只吃导出的那种 JSON 数组");
+      this.host.SetHint("解析不了：这里只吃导出的那种 JSON");
       return;
     }
-    if (!Array.isArray(list) || !list.length) { this.host.SetHint("空表，没有导入"); return; }
+    // 老格式（改名前）是一个纯数组，认；新格式是 { routes, presets }
+    const list = Array.isArray(data) ? data : (data && data.routes) || [];
+    const presetEdits = (!Array.isArray(data) && data && data.presets && data.presets.edits) || null;
+    if (!list.length && !presetEdits) { this.host.SetHint("空表，没有导入"); return; }
     let count = 0;
     for (const item of list) {
       if (!item.key || !Array.isArray(item.points) || item.points.length < 2) continue;
@@ -743,12 +1132,22 @@ export class SplineEditor {
       };
       count += 1;
     }
+    let presetCount = 0;
+    for (const [name, patch] of Object.entries(presetEdits || {})) {
+      if (!WALL_PRESETS[name] || !patch || typeof patch !== "object") continue;
+      this.presetEdits[name] = patch;
+      presetCount += 1;
+    }
+    this.ApplyPresetEdits();
     this.dirty = true;
     this.Save();
     this.routes = this.Collect();
     this.FillList();
+    this.FillPresetList();
+    this.SyncPresetUi();
+    this.BuildAssets();
     this.BuildOverlay();
-    this.host.SetHint(`已导入 ${count} 条路线改动`);
+    this.host.SetHint(`已导入 ${count} 条路线 / ${presetCount} 个预设改动`);
   }
 
   // -------------------------------------------------------------------------

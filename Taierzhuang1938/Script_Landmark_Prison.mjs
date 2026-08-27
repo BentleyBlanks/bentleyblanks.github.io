@@ -60,6 +60,7 @@ import {
 } from "./Script_Geo.mjs";
 import { Mulberry32, HashString, Clamp } from "./Script_Noise.mjs";
 import { AddYardWear } from "./Script_LivedInProps.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 // ---------------------------------------------------------------------------
 // 推定尺寸（全部为 PRESUMED，依据见报告 WP_A1.md）
@@ -987,24 +988,17 @@ export function BuildPrison(host, f, ctx) {
   const H = JAIL.wallHeight, T = JAIL.wallThick;
 
   // --- 围墙四面。大门在局部 +z 那一面，只此一处开口 ---
+  // 走样条围墙 PCG，但用 prisonWall 预设：模块 9.5 m、抖动为零 ——
+  // 「整段的、匀质的高墙」是形制（头注②），不许被随机化成一圈民居院墙。
   const gateSpan = JAIL.gateOpenW + 3.2;
-  const frontSeg = (f.w - gateSpan) / 2;
-  for (const s of [-1, 1]) {
-    AddSlabWall(sink, {
-      L, ry, cx: s * (gateSpan / 2 + frontSeg / 2), cz: hd, length: frontSeg, axis: "x",
-      height: H, thick: T, seed: `${seed}:fw${s}`, ruin, mat, tileMat, outward: [0, 1],
-    });
-  }
-  AddSlabWall(sink, {
-    L, ry, cx: 0, cz: -hd, length: f.w, axis: "x", height: H, thick: T,
-    seed: `${seed}:bw`, ruin, mat, tileMat, outward: [0, -1],
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => L(lx, lz),
+    hw, hd, preset: "prisonWall",
+    material: mat, height: H, thickness: T,
+    seed: `${seed}:wall`, ruin, tag: "prisonWall",
+    gates: [{ side: "s", offset: 0, openW: gateSpan }],
+    cope: { material: tileMat, height: 0.13, grow: 0.0, out: 0.28, minH: 0.94 },
   });
-  for (const s of [-1, 1]) {
-    AddSlabWall(sink, {
-      L, ry, cx: s * hw, cz: 0, length: f.d, axis: "z", height: H, thick: T,
-      seed: `${seed}:sw${s}`, ruin, mat, tileMat, outward: [s, 0],
-    });
-  }
 
   // --- 重门 ---
   AddHeavyGate(sink, {
@@ -1139,25 +1133,16 @@ export function BuildDetention(host, f, ctx) {
   const ruin = Clamp(damage * 0.55, 0, 0.55);
   const H = DETENTION.wallHeight, T = DETENTION.wallThick;
 
-  // --- 围墙：同样是连续无窗的实墙，只是矮一档 ---
+  // --- 围墙：同样是连续无窗的实墙，只是矮一档（同上走 prisonWall 预设）---
   const gateSpan = DETENTION.gateOpenW + 3.0;
-  const frontSeg = (f.w - gateSpan) / 2;
-  for (const s of [-1, 1]) {
-    AddSlabWall(sink, {
-      L, ry, cx: s * (gateSpan / 2 + frontSeg / 2), cz: hd, length: frontSeg, axis: "x",
-      height: H, thick: T, seed: `${seed}:fw${s}`, ruin, mat, tileMat, outward: [0, 1], segLen: 8,
-    });
-  }
-  AddSlabWall(sink, {
-    L, ry, cx: 0, cz: -hd, length: f.w, axis: "x", height: H, thick: T,
-    seed: `${seed}:bw`, ruin, mat, tileMat, outward: [0, -1], segLen: 8,
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => L(lx, lz),
+    hw, hd, preset: "prisonWall", moduleLen: 8,
+    material: mat, height: H, thickness: T,
+    seed: `${seed}:wall`, ruin, tag: "prisonWall",
+    gates: [{ side: "s", offset: 0, openW: gateSpan }],
+    cope: { material: tileMat, height: 0.13, grow: 0.0, out: 0.28, minH: 0.94 },
   });
-  for (const s of [-1, 1]) {
-    AddSlabWall(sink, {
-      L, ry, cx: s * hw, cz: 0, length: f.d, axis: "z", height: H, thick: T,
-      seed: `${seed}:sw${s}`, ruin, mat, tileMat, outward: [s, 0], segLen: 8,
-    });
-  }
 
   // --- 门楼加强（无转角岗楼，警戒室做在门上）---
   AddHeavyGate(sink, {

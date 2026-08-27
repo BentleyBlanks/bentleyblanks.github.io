@@ -24,6 +24,13 @@
 //   5. 逐实例色调 tint（InstancedMesh.instanceColor，亮度 ± 冷暖微差）
 //   6. 模块随机性按「沿线弧长哈希」取种 —— 改缺口/改参数不重掷整条墙
 //
+// ## 拼接口径（moduleLen / moduleOverlap）
+// 一条 run 先按 `round(runLen / moduleLen)` 等分成 n 段，**实际步距 = runLen/n**
+// （所以 moduleLen 是"标称间隔"，不是硬步距 —— 端头不许留半截）。每个模块再按
+// `1 + moduleOverlap` 拉长，让相邻两块**互相压进去一点**：不叠这一点，模块之间
+// 在斜光下会读出一道道竖缝（旧 AddWall 里那个写死的 1.03 是同一笔账）。
+// 编辑器「场景样条PCG → 拼接资产」把这两个数连同拼缝一起画出来。
+//
 // ## 缺口坐标系（唯一口径）
 // gaps / breaches 一律世界坐标 `{ at:[x,z], width }`（内部用 ClosestS 换算弧长；
 // 也认 `{ s, width }` 与 `[s0,s1]`）。三套旧写法到此为止。
@@ -52,6 +59,7 @@ function NormalizeAt(path, item) {
  *   height        墙高（米，地面以上）
  *   topWidth / baseWidth  顶宽 / 底宽（米）
  *   moduleLen     模块标称长（米，默认 3.0）；实际按整除弦长缩放
+ *   moduleOverlap 相邻模块互相压进去的比例（默认 0.02）——拼缝不许露
  *   groundAt      (x,z) => 地面标高。**必须传宿主那一份**
  *   seed          随机种子
  *   gaps          穿墙缺口（寨门/圩门等，模块整个跳过）
@@ -62,6 +70,10 @@ function NormalizeAt(path, item) {
  *   edgeCollapseChance  闭环专用：整边塌成瓦砾线的概率（模块不生成，
  *                 记进 fallenRuns 由调用方摆瓦砾）—— 村院墙的 16%
  *   damage        战损档（压低整体高度，北关坝墙 ctx.damage）
+ *   ruin          残破度 0—1：逐模块从墙头咬掉一口，**一段的两端咬得最狠**，
+ *                 旧 AddWall 逐切片 bite 的原样搬运（城内院墙那一路的"残墙"）
+ *   colliderMerge 把相邻等高模块并成一只碰撞盒的高差容差（米，0 = 不并）。
+ *                 城内几百圈院墙逐模块登记会把碰撞表翻十倍
  *   inRegion      (x,z)=>bool 切片过滤（模块级）
  *   embed         往地里埋多深（默认 0.5，坝墙的账）
  *   heightJitter / heightCell   高度抖动比例 / 低频档长
@@ -84,9 +96,10 @@ function NormalizeAt(path, item) {
 export function PlanWallRoute({
   points, closed = false, smooth = false,
   height, topWidth = 0.4, baseWidth = 0.9,
-  moduleLen = 3.0, groundAt, seed = "wall",
+  moduleLen = 3.0, moduleOverlap = 0.02, groundAt, seed = "wall",
   gaps = [], breaches = [], randomBreaches = null,
-  collapseChance = 0, edgeCollapseChance = 0, damage = 0,
+  collapseChance = 0, edgeCollapseChance = 0, damage = 0, ruin = 0,
+  colliderMerge = 0,
   inRegion = null, embed = 0.5,
   heightJitter = 0.10, heightCell = 18,
   leanJitter = 0.020, yawJitter = 0.010, sideJitter = 0.06,
@@ -179,6 +192,8 @@ export function PlanWallRoute({
     }
     const n = Math.max(1, Math.round(runLen / moduleLen));
     const mlen = runLen / n;
+    // 本条 run 的碰撞候选：colliderMerge > 0 时在 run 结束后并成长盒
+    const runSolids = [];
     for (let i = 0; i < n; i += 1) {
       const s0 = a + mlen * i;
       const s1 = s0 + mlen;
@@ -190,6 +205,17 @@ export function PlanWallRoute({
 
       let visH = height * Math.max(0.4,
         1 + EnvAt(sc) * heightJitter + (rnd() - 0.5) * heightJitter * 0.6 - damage * 0.06);
+      // 残破：从墙头咬掉一口。**一段 run 的两端咬得最狠、中段留得最高**
+      // （edge 在两端为 0、中段为 1，bite ×(1-0.4·edge)）—— 这是旧 AddWall
+      // 逐切片 bite 的原样搬运，城内那几百圈院墙的"残墙"读感就是这么来的：
+      // 塌的是墙角与门口那一带，中间那截还立着。别按直觉把它反过来。
+      // 光靠 damage 压高度只会整条一起矮，读成"矮墙"而不是"残墙"。
+      if (ruin > 0) {
+        const t = n > 1 ? i / (n - 1) : 0.5;
+        const edge = Math.min(t, 1 - t) * 2;
+        const bite = ruin * (0.3 + 0.7 * rnd()) * (1 - edge * 0.4);
+        visH = Math.max(0.18, visH * (1 - bite));
+      }
       for (const br of allBreaches) {
         const d = Math.abs(sc - br.s);
         if (d < br.width / 2) {
@@ -228,23 +254,26 @@ export function PlanWallRoute({
       const tintBase = 1 + (rnd() - 0.5) * tintJitter * 2;
       const warm = (rnd() - 0.5) * tintJitter * 0.66;
 
+      // 长度缩放拆成两笔：lenS 是「弦长 + 拼接重叠」，sxSpread 是塌段摊开。
+      // 压顶/碱脚的实例只吃 lenS —— 它们不跟着塌段摊宽（那是墙身的事）。
+      const lenS = (drawLen * (1 + moduleOverlap)) / moduleLen;
       modules.push({
         s: sc,
         x: pc.x + pc.tx * shift + nx * side,
         z: pc.z + pc.tz * shift + nz * side,
         y: bottomY + hh / 2,
         yaw, roll,
-        sx: (drawLen * 1.02 / moduleLen) * sxSpread, sy: hh / nominalH, sz: szSpread,
+        sx: lenS * sxSpread, sy: hh / nominalH, sz: szSpread,
+        lenS, drawLen,
         variant: Math.floor(rnd() * variants) % variants,
         tint: [tintBase * (1 + warm), tintBase, tintBase * (1 - warm)],
-        topY, visH, collapsed,
+        gy: gc, topY, visH, collapsed,
       });
 
       if (visH > height * coverMinH) {
-        colliders.push({
-          x: pc.x, y: gc + visH / 2, z: pc.z,
-          hx: mlen / 2, hy: visH / 2,
-          hz: (baseWidth / 2) * (collapsed ? szSpread : 1),
+        runSolids.push({
+          s0, s1, x: pc.x, z: pc.z, y: gc + visH / 2, visH,
+          hx: mlen / 2, hz: (baseWidth / 2) * (collapsed ? szSpread : 1),
           ry: Math.atan2(-pc.tz, pc.tx),
         });
         if (coverTick % coverEvery === 0) {
@@ -252,6 +281,44 @@ export function PlanWallRoute({
           covers.push({ x: pc.x, z: pc.z, h: visH, fx: nx * coverSign, fz: nz * coverSign });
         }
         coverTick += 1;
+      }
+    }
+    // 碰撞并段：折线 run 是直的，相邻等高模块并成一只长盒。
+    // 城内几百圈院墙逐模块登记会把碰撞表从千位翻到万位（Rapier 建体 + 导航位图
+    // + AI 粗筛都按盒数走），并段后与旧 AddWall「一面墙一只盒」同量级。
+    if (colliderMerge > 0 && !smooth) {
+      let group = null;
+      const FlushGroup = () => {
+        if (!group) return;
+        const sm = (group.sA + group.sB) / 2;
+        const pm = path.At(sm);
+        colliders.push({
+          x: pm.x, y: group.gy + group.visH / 2, z: pm.z,
+          hx: (group.sB - group.sA) / 2, hy: group.visH / 2, hz: group.hz,
+          ry: Math.atan2(-pm.tz, pm.tx),
+        });
+        group = null;
+      };
+      for (const c of runSolids) {
+        if (group && Math.abs(c.visH - group.visH) <= colliderMerge
+          && Math.abs(c.s0 - group.sB) < 0.05) {
+          group.sB = c.s1;
+          group.visH = Math.min(group.visH, c.visH);   // 并段取矮的：不许凭空长出挡墙
+          group.hz = Math.max(group.hz, c.hz);
+          group.gy = Math.min(group.gy, c.y - c.visH / 2);
+          continue;
+        }
+        FlushGroup();
+        group = {
+          sA: c.s0, sB: c.s1, visH: c.visH, hz: c.hz, gy: c.y - c.visH / 2,
+        };
+      }
+      FlushGroup();
+    } else {
+      for (const c of runSolids) {
+        colliders.push({
+          x: c.x, y: c.y, z: c.z, hx: c.hx, hy: c.visH / 2, hz: c.hz, ry: c.ry,
+        });
       }
     }
   }
@@ -267,7 +334,10 @@ export function PlanWallRoute({
       fallen: fallenRuns.length,
       breaches: allBreaches.length,
     },
-    nominal: { moduleLen, height: nominalH, thickness, topWidth, baseWidth, embed },
+    nominal: {
+      moduleLen, moduleOverlap, height: nominalH, thickness,
+      topWidth, baseWidth, embed,
+    },
   };
 }
 

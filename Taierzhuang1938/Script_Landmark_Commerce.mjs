@@ -27,6 +27,7 @@ import {
   SolidWithOpenings,
 } from "./Script_World.mjs";
 import { AddCourtyardLife, AddYardWear } from "./Script_LivedInProps.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 const DEG = Math.PI / 180;
 const SLOPE27 = Math.tan(27 * DEG);
@@ -61,35 +62,27 @@ function SolidSlab(sink, p, cy, hx, hy, hz, ry, tag = "wall") {
 
 /**
  * 一圈院墙，临街那面（局部 +z）中间留 openW 的开口。
- * 南北两面故意做成 f.w + thickness 长，把四角的缺口盖住（AddCompound 那边留了角缝）。
+ *
+ * 走样条围墙 PCG（Script_YardWall → Script_WallSpline）：四角由管线互搭
+ * （旧版靠把南北两面做成 f.w + thickness 长来盖角缝，现在是闭环端模块各向角点
+ * 加长半个墙厚 —— 同一件事，但不再由每个调用点各写一遍）。
+ * 布设参数在 WALL_PRESETS.landmarkYard，设置面板 →「场景样条PCG」里能调。
  */
 function AddYardWall(sink, f, ry, o) {
   const S = SiteFrame(f, ry);
-  const hw = f.w / 2, hd = f.d / 2, t = o.thickness;
-  const sides = [
-    { lx: 0, lz: -hd, len: f.w + t, rot: 0, gate: false, tag: "n" },
-    { lx: -hw, lz: 0, len: f.d, rot: Math.PI / 2, gate: false, tag: "w" },
-    { lx: hw, lz: 0, len: f.d, rot: Math.PI / 2, gate: false, tag: "e" },
-    { lx: 0, lz: hd, len: f.w + t, rot: 0, gate: true, tag: "s" },
-  ];
-  for (const s of sides) {
-    const common = {
-      height: o.height, thickness: t, ry: ry + s.rot, ruin: o.ruin,
-      plinth: o.plinth, cope: o.cope, tile: o.tile || TILE_METERS.brick,
-    };
-    if (s.gate && o.openW > 0) {
-      const segLen = (s.len - o.openW) / 2;
-      for (const side of [-1, 1]) {
-        const p = S.At(s.lx + side * (o.openW / 2 + segLen / 2), s.lz);
-        AddWall(sink, o.material, {
-          ...common, x: p.x, z: p.z, length: segLen, seed: `${o.seed}:${s.tag}${side}`,
-        });
-      }
-    } else {
-      const p = S.At(s.lx, s.lz);
-      AddWall(sink, o.material, { ...common, x: p.x, z: p.z, length: s.len, seed: `${o.seed}:${s.tag}` });
-    }
-  }
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => S.At(lx, lz),
+    hw: f.w / 2, hd: f.d / 2,
+    preset: o.cope === false ? "landmarkYardPlain" : "landmarkYard",
+    material: o.material, height: o.height, thickness: o.thickness,
+    seed: o.seed, ruin: o.ruin,
+    gates: o.openW > 0 ? [{ side: "s", offset: 0, openW: o.openW }] : [],
+    plinth: o.plinth
+      ? { material: o.plinth, height: 0.42, grow: 0.06, out: 0.07 } : null,
+    cope: o.cope === false
+      ? null : { material: "RoofTile", height: 0.09, grow: 0.05, out: 0.16, minH: 0.55 },
+    ...(o.tune || {}),
+  });
 }
 
 /**
@@ -586,6 +579,9 @@ export function BuildPawnshop(host, f, ctx) {
   AddYardWall(sink, f, ry, {
     height: wallH, thickness: wallT, material: wallMat, ruin: ctx.damage * 0.55,
     plinth: "Stone", cope: true, openW: gateOpen, seed: `${seed}:hi`,
+    // 墙头碎瓷按定高 wallH 摆（下面那段）：墙顶再抖 ±0.13 m 就会出现
+    // 「碎瓷埋进压顶 / 悬在压顶上方」。当铺这一圈把高度抖动收到近乎零。
+    tune: { heightJitter: 0.006, leanJitter: 0.002 },
   });
 
   // 墙头碎瓷：临街一面与两山靠街的一段插满碎瓷片。远看是压顶上一条毛边，近看才知道是防爬的。

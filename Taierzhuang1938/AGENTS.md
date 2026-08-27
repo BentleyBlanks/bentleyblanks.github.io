@@ -162,8 +162,12 @@ URL 参数选 preset / quality / scene / gi。
 - `Script_Geo.mjs` —— UV 密度统一（全场砖缝一样大）、破损形体、批合并。
 - `Script_CityBlockKit.mjs` —— 院落六原型 × 三档 LOD，治「大量重复村庄」。
 - `Script_RoadPath.mjs` + `Script_RoadSpline.mjs` —— 样条道路管线（铁路/大车路/大街
-  的唯一铺路口径）；`Script_WallPlan.mjs` + `Script_WallSpline.mjs` —— 样条围墙管线
-  （寨墙/坝墙/石墙村/村院墙，逐模块贴地 + InstancedMesh）。Plan/Path 层纯 Node 可测。
+  的唯一铺路口径）；`Script_WallPlan.mjs` + `Script_WallSpline.mjs` + `Script_YardWall.mjs`
+  —— 样条围墙管线（**全项目布墙的唯一口径**：寨墙/坝墙/石墙村/村院墙/城内街坊院墙/
+  机关·学校·庙·衙署·监狱·厂区的一圈院墙/枣刺篱笆，逐模块贴地 + InstancedMesh）。
+  Plan/Path 层纯 Node 可测。布设参数集中在 `Script_WallSpline.WALL_PRESETS`
+  一张表 —— **调用点不许再自己写间隔/重叠/抖动**，那正是收拢前的病根。
+  没迁的（房屋墙体、单堵特征墙、村落远景档、内城城墙）在 Data_WallSpline.md 有清单。
 - 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）；道路口径 `docs/Data_RoadSpline.md`、
   围墙口径 `docs/Data_WallSpline.md`。
 
@@ -287,7 +291,9 @@ URL 参数选 preset / quality / scene / gi。
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
-  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑，原「道路样条」扩围后改名）。
+  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + **拼接资产台与布设参数**
+  ——「一个模块摆 N 次」那几只原始件与 WALL_PRESETS 的滑杆都在这里，
+  原「道路样条」扩围后改名）。
   DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法；
   Profiler（独立窗口的性能剖析，内核 `Script_Profiler.mjs`）还带 keepOnClose ——
   关设置面板回去打仗它照记。

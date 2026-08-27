@@ -21,6 +21,7 @@ import {
 } from "./Script_World.mjs";
 import { MakeBox, PlaceGeometry, TILE_METERS, BRICK_UV_GRID } from "./Script_Geo.mjs";
 import { AddYardWear } from "./Script_LivedInProps.mjs";
+import { AddYardWallRing } from "./Script_YardWall.mjs";
 
 // 制式机关院的一套推定尺寸。都是「比民居高一档」，不是凭空拍的：
 // 民居院墙 1.8—2.2、檐口 2.4—2.8，机关院各加 0.4—0.6 m。
@@ -41,26 +42,23 @@ function LocalTo(f, ry, lx, lz) {
   return { x: f.x + cos * lx - sin * lz, z: f.z - sin * lx - cos * lz };
 }
 
-/** 沿 +lx 跑的一段院墙（lx0→lx1，落在 lz 上）。 */
-function AddRunX(sink, f, ry, o) {
-  const len = o.lx1 - o.lx0;
-  if (len < 0.7) return;
-  const p = LocalTo(f, ry, (o.lx0 + o.lx1) / 2, o.lz);
-  AddWall(sink, o.mat, {
-    x: p.x, z: p.z, length: len, height: o.height, thickness: o.thickness,
-    ry, ruin: o.ruin, seed: o.seed, plinth: "Stone", cope: true,
-  });
-}
-
-/** 沿 +lz 跑的一段院墙（lz0→lz1，落在 lx 上）。AddWall 传 ry+PI/2 时，
- *  它的切片轴正好与院落局部 +lz 重合。 */
-function AddRunZ(sink, f, ry, o) {
-  const len = o.lz1 - o.lz0;
-  if (len < 0.7) return;
-  const p = LocalTo(f, ry, o.lx, (o.lz0 + o.lz1) / 2);
-  AddWall(sink, o.mat, {
-    x: p.x, z: p.z, length: len, height: o.height, thickness: o.thickness,
-    ry: ry + Math.PI / 2, ruin: o.ruin, seed: o.seed, plinth: "Stone", cope: true,
+/**
+ * 一圈机关院墙（走样条围墙 PCG：Script_YardWall → Script_WallSpline）。
+ * 旧版的 AddRunX / AddRunZ 各自砌一条边，四角靠"正好停在角上"对接 ——
+ * 外角上留一道墙厚的缝。现在闭环由管线在角上互搭。
+ *
+ * @param o.sides / o.sideRange  哪几面砌、某一面只砌一段（警察所的院子
+ *   临街那面已被正房封住，两山墙只砌到正房后檐）
+ */
+function AddOfficeYardWall(sink, f, ry, o) {
+  AddYardWallRing(sink, {
+    frame: (lx, lz) => LocalTo(f, ry, lx, lz),
+    hw: f.w / 2, hd: f.d / 2,
+    preset: "landmarkYard",
+    material: o.mat, height: o.height, thickness: o.thickness,
+    seed: o.seed, ruin: o.ruin,
+    sides: o.sides || null, sideRange: o.sideRange || null,
+    gates: o.gates || [],
   });
 }
 
@@ -277,12 +275,10 @@ export function BuildGarrison(host, f, ctx) {
 
   // --- 一圈院墙。大门开在临街那一面（+lz）正中 ---
   const wallArgs = { mat, height: OFFICE.yardWallH, thickness: OFFICE.yardWallT, ruin };
-  AddRunX(sink, f, ry, { ...wallArgs, lx0: -hw, lx1: -gateHalf, lz: hd, seed: `${seed}:wS0` });
-  AddRunX(sink, f, ry, { ...wallArgs, lx0: gateHalf, lx1: hw, lz: hd, seed: `${seed}:wS1` });
-  AddRunX(sink, f, ry, { ...wallArgs, lx0: -hw, lx1: hw, lz: -hd, seed: `${seed}:wN` });
-  for (const s of [-1, 1]) {
-    AddRunZ(sink, f, ry, { ...wallArgs, lx: s * hw, lz0: -hd, lz1: hd, seed: `${seed}:wE${s}` });
-  }
+  AddOfficeYardWall(sink, f, ry, {
+    ...wallArgs, seed: `${seed}:yard`,
+    gates: [{ side: "s", offset: 0, openW: gateHalf * 2 }],
+  });
 
   AddOfficeGate(sink, f, ry, {
     lx: 0, lz: hd, openW: gateW, wallH: OFFICE.yardWallH,
@@ -382,12 +378,11 @@ export function BuildPolice(host, f, ctx) {
 
   // 院子的三面墙（正房已经封住临街那一面）
   const wallArgs = { mat, height: OFFICE.yardWallH, thickness: OFFICE.yardWallT, ruin };
-  AddRunX(sink, f, ry, { ...wallArgs, lx0: -hw, lx1: hw, lz: -hd, seed: `${seed}:wN` });
-  for (const s of [-1, 1]) {
-    AddRunZ(sink, f, ry, {
-      ...wallArgs, lx: s * hw, lz0: -hd, lz1: hd - frontD - 0.6, seed: `${seed}:wE${s}`,
-    });
-  }
+  AddOfficeYardWall(sink, f, ry, {
+    ...wallArgs, seed: `${seed}:yard`,
+    sides: { n: true, w: true, e: true, s: false },
+    sideRange: { w: [-hd, hd - frontD - 0.6], e: [-hd, hd - frontD - 0.6] },
+  });
 
   // 门内一座岗亭（警察所只设一岗）
   AddSentryBooth(sink, f, ry, {

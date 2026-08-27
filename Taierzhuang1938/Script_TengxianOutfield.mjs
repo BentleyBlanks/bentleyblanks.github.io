@@ -1908,18 +1908,16 @@ export class TengxianOutfield {
     // 院墙也吃炮火：整边 16% 概率塌成瓦砾线（fallenRuns 交还这里摆瓦砾，
     // 南边被院门分成两段各自掷骰 —— 与旧版 south±1 两个键逐位同概率）。
     const { fallenRuns } = BuildWallSpline(sink, {
-      name: `Court_${seed}`,
-      style: material === "HouseBrick" ? "yardBrick" : "yardAdobe",
-      material, tag: "villageCourtyard",
+      preset: material === "HouseBrick"
+        ? "villageCourtyardBrick" : "villageCourtyardAdobe",
+      name: `Court_${seed}`, material, tag: "villageCourtyard",
       points: [
         C(-width / 2, -depth / 2), C(width / 2, -depth / 2),
         C(width / 2, depth / 2), C(-width / 2, depth / 2),
       ],
       closed: true,
       height: wallHeight, topWidth: 0.28, baseWidth: 0.28,
-      seed: `${seed}:ring`, moduleLen: 2.8, embed: 0.35,
-      edgeCollapseChance: 0.16, heightJitter: 0.07, sideJitter: 0.03,
-      coverEvery: 3,
+      seed: `${seed}:ring`,
       groundAt: (xx, zz) => this.groundAt(xx, zz),
       gaps: [{ at: [gate.x, gate.z], width: gateWidth }],
       sectorKey: SectorKey,
@@ -2017,16 +2015,15 @@ export class TengxianOutfield {
       if (v.stoneWall) {
         const hw = v.w / 2 + 8, hd = v.d / 2 + 8;
         BuildWallSpline(sink, {
-          name: `StoneWall_${v.id}`, style: "dryStone",
-          material: "DryStone", tag: "villageStoneWall",
+          preset: "villageStone",
+          name: `StoneWall_${v.id}`, material: "DryStone", tag: "villageStoneWall",
           points: [
             [v.x - hw, v.z - hd], [v.x + hw, v.z - hd],
             [v.x + hw, v.z + hd], [v.x - hw, v.z + hd],
           ],
           closed: true,
           height: 1.45, topWidth: 0.55, baseWidth: 0.55,
-          seed: `${v.id}:stonewall`, moduleLen: 4.5, embed: 0.35,
-          collapseChance: 0.18, heightJitter: 0.16, coverEvery: 2,
+          seed: `${v.id}:stonewall`, coverEvery: 2,
           groundAt: (x, z) => this.groundAt(x, z),
           sectorKey: SectorKey,
           inRegion: (x, z) => this.InRegion(x, z),

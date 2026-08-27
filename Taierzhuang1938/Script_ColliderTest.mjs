@@ -55,30 +55,57 @@ function AuditInPage(options) {
     && m.geometry.attributes && m.geometry.attributes.position);
 
   // --- 1. 静态几何摊成世界坐标的三角形汤 ----------------------------------
+  //
+  // **InstancedMesh 必须逐实例摊开**：它的 matrixWorld 是物体自己的变换（多半
+  // 是单位阵），逐实例的位置在 instanceMatrix 里。只读 matrixWorld 的话，
+  // 一整片实例化的砖（样条围墙、篱笆、沙包）会被算成「全都堆在原点」——
+  // 于是它们的碰撞盒背后一个三角形都没有，整条墙报成隐形墙。
+  // 这一条是 2026-08-27 城内院墙转样条 PCG 时抓到的：本测试当时把
+  // 几百道**画得好好的**院墙判成空洞，只因为它们不再是合并网格。
+  const InstanceCount = (m) => (m.isInstancedMesh
+    ? Math.min(m.count, m.instanceMatrix ? m.instanceMatrix.count : m.count) : 1);
   let total = 0;
   for (const m of meshes) {
     const g = m.geometry;
-    total += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    total += ((g.index ? g.index.count : g.attributes.position.count) / 3) * InstanceCount(m);
   }
   const tri = new Float32Array(total * 9);
   let n = 0;
+  const mat = new Float32Array(16);
   for (const m of meshes) {
     m.updateMatrixWorld(true);
-    const e = m.matrixWorld.elements;
+    const world = m.matrixWorld.elements;
     const pos = m.geometry.attributes.position;
     const pa = pos.array;
     const idx = m.geometry.index;
     const count = idx ? idx.count : pos.count;
-    for (let i = 0; i < count; i += 3) {
-      for (let k = 0; k < 3; k += 1) {
-        const vi = (idx ? idx.getX(i + k) : (i + k)) * 3;
-        const vx = pa[vi], vy = pa[vi + 1], vz = pa[vi + 2];
-        const base = n * 9 + k * 3;
-        tri[base] = e[0] * vx + e[4] * vy + e[8] * vz + e[12];
-        tri[base + 1] = e[1] * vx + e[5] * vy + e[9] * vz + e[13];
-        tri[base + 2] = e[2] * vx + e[6] * vy + e[10] * vz + e[14];
+    const instances = InstanceCount(m);
+    const ia = m.isInstancedMesh ? m.instanceMatrix.array : null;
+    for (let inst = 0; inst < instances; inst += 1) {
+      if (!ia) {
+        for (let k = 0; k < 16; k += 1) mat[k] = world[k];
+      } else {
+        // world × instance（列主序 4x4，只用得上前三行）
+        const o = inst * 16;
+        for (let c = 0; c < 4; c += 1) {
+          for (let r = 0; r < 4; r += 1) {
+            let v = 0;
+            for (let k = 0; k < 4; k += 1) v += world[k * 4 + r] * ia[o + c * 4 + k];
+            mat[c * 4 + r] = v;
+          }
+        }
       }
-      n += 1;
+      for (let i = 0; i < count; i += 3) {
+        for (let k = 0; k < 3; k += 1) {
+          const vi = (idx ? idx.getX(i + k) : (i + k)) * 3;
+          const vx = pa[vi], vy = pa[vi + 1], vz = pa[vi + 2];
+          const base = n * 9 + k * 3;
+          tri[base] = mat[0] * vx + mat[4] * vy + mat[8] * vz + mat[12];
+          tri[base + 1] = mat[1] * vx + mat[5] * vy + mat[9] * vz + mat[13];
+          tri[base + 2] = mat[2] * vx + mat[6] * vy + mat[10] * vz + mat[14];
+        }
+        n += 1;
+      }
     }
   }
 

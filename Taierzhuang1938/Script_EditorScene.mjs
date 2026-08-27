@@ -35,6 +35,7 @@ import {
   AddAlarmTower, AddSquareFort, AddChurch, AddMosque, AddSandbagPlug,
 } from "./Script_World.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import { FlushWallInstances } from "./Script_WallSpline.mjs";
 import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
 import { MakeBox, MakeSandbag, MakeInstanced, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
@@ -1891,6 +1892,12 @@ export class SceneEditor {
  */
 export function FlushSinkProps(sink, target, library, owned) {
   const matrices = [];
+  // 样条围墙 / 篱笆的实例桶（kind:"wallInstances"）：与建城时同一条收尾通道。
+  // 不接这一路的话，编辑器里凡是走 Script_WallSpline 的构件会**静默消失** ——
+  // 几何建了、矩阵算了、没人把它变成网格。
+  FlushWallInstances(sink, {
+    scene: target, meshes: [], library, resolve: ResolveTengxianMaterial,
+  });
   for (const prop of sink.props) {
     if (prop.kind === "sandbags") { matrices.push(...prop.matrices); continue; }
     if (prop.kind === "tree") { AddTree(sink, prop); continue; }
