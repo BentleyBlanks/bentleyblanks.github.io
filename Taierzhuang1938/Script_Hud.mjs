@@ -118,6 +118,8 @@ const ACTION_ICONS = {
   bandage: `<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.2" y="9" width="17.6" height="6" rx="3"/><path d="M9 9v6M15 9v6"/></g></svg>`,
   // 双向箭头：换枪
   switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
+  // 踢开近身敌人的靴印 + 刀线：特殊条件下的处决
+  execution: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-4 6-4 9-2l3 2 4-1M13 16l3-7m-1 2 5-5M7 19l3 2"/></svg>`,
 };
 ACTION_ICONS.action = ACTION_ICONS.interact;
 
@@ -252,6 +254,24 @@ export class Hud {
     this.el.subtitle = mk("hudSubtitle");
     this.el.hint = mk("hudHint");
     this.el.actions = mk("hudActions");
+    this.el.meleeQte = mk("hudMeleeQte");
+    this.el.meleeQte.innerHTML = `
+      <div class="mqSlow">慢动作 · 白刃接触</div>
+      <div class="mqTitle"></div>
+      <div class="mqPrompt"></div>
+      <div class="mqKeys"></div>
+      <div class="mqProgress"><i></i></div>
+      <div class="mqTimeline"><b></b><i></i></div>
+      <div class="mqResult"></div>
+      <div class="mqAssist"></div>`;
+    this.el.mqTitle = this.el.meleeQte.querySelector(".mqTitle");
+    this.el.mqPrompt = this.el.meleeQte.querySelector(".mqPrompt");
+    this.el.mqKeys = this.el.meleeQte.querySelector(".mqKeys");
+    this.el.mqProgress = this.el.meleeQte.querySelector(".mqProgress i");
+    this.el.mqTimeline = this.el.meleeQte.querySelector(".mqTimeline i");
+    this.el.mqSweet = this.el.meleeQte.querySelector(".mqTimeline b");
+    this.el.mqResult = this.el.meleeQte.querySelector(".mqResult");
+    this.el.mqAssist = this.el.meleeQte.querySelector(".mqAssist");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
     this.el.grenadeWarnings = mk("hudGrenadeWarnings");
@@ -314,6 +334,53 @@ export class Hud {
       }
     }
   }
+
+  /** 六套白刃 QTE 共用一张中心卡；只读 Script_MeleeQte.View() 的脱敏快照。 */
+  SetMeleeQte(view) {
+    const root = this.el.meleeQte;
+    if (!view) {
+      root.className = "hudMeleeQte";
+      root.setAttribute("aria-hidden", "true");
+      this.meleeQteState = null;
+      return;
+    }
+    this.meleeQteState = { ...view, keys: [...(view.keys || [])] };
+    root.className = `hudMeleeQte on ${view.kind} ${view.phase}`
+      + (view.success === true ? " success" : view.success === false ? " fail" : "")
+      + (view.wrongPulse > 0.05 ? " wrong" : "");
+    root.setAttribute("aria-hidden", "false");
+    root.setAttribute("aria-label", `${view.label}，${view.prompt}`);
+    this.el.mqTitle.textContent = view.label;
+    this.el.mqPrompt.textContent = view.phase === "resolve"
+      ? (view.success ? (view.kind === "execution" ? "踹开！收刀！" : "拨开刺刀！可按 F 处决") : "失手")
+      : view.prompt;
+    const signature = `${view.serial}|${view.index}|${view.expected}|${view.phase}`;
+    if (this.el.mqKeys.dataset.signature !== signature) {
+      this.el.mqKeys.dataset.signature = signature;
+      this.el.mqKeys.innerHTML = (view.keys || []).map((key, index) => {
+        const done = view.input === "sequence" && index < view.index;
+        const expected = String(key) === String(view.expected)
+          && (view.input !== "sequence" || index === view.index);
+        return `<kbd class="${done ? "done" : expected ? "expected" : ""}">${key}</kbd>`;
+      }).join(`<span>›</span>`);
+    }
+    this.el.mqProgress.style.width = `${Math.round((view.progress || 0) * 100)}%`;
+    this.el.mqTimeline.style.width = `${Math.round((view.timeT || 0) * 100)}%`;
+    const sweet = view.sweetStart == null ? null : {
+      left: view.sweetStart * 100, width: (view.sweetEnd - view.sweetStart) * 100,
+    };
+    this.el.mqSweet.style.display = sweet ? "block" : "none";
+    if (sweet) {
+      this.el.mqSweet.style.left = `${sweet.left}%`;
+      this.el.mqSweet.style.width = `${sweet.width}%`;
+    }
+    this.el.mqResult.textContent = view.phase === "resolve"
+      ? (view.success ? "成功" : "失败") : `${Math.max(0, view.timeLeft).toFixed(1)} 秒`;
+    this.el.mqAssist.textContent = view.assist === "auto" ? "辅助：自动完成"
+      : view.assist === "hold" ? "辅助：长按代替连按" : "快速反应";
+  }
+
+  MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }
 
   /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。 */
   SetWeaponName(weaponName) {

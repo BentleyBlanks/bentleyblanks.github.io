@@ -126,11 +126,14 @@ export class InputRouter {
    * @param {object} hooks
    *   Context() -> "world" | "orders"   当前上下文
    *   Guard(event) -> boolean            返回 false 表示这次输入被吞掉（例如没拿到指针锁）
+   *   Capture(event, detail) -> boolean  临时独占输入（QTE 等）；true = 不再查键位表
    *   OnAction(action, detail)           边沿动作回调
    */
-  constructor({ Context = () => "world", Guard = () => true, OnAction = () => {} } = {}) {
+  constructor({ Context = () => "world", Guard = () => true, Capture = () => false,
+    OnAction = () => {} } = {}) {
     this.Context = Context;
     this.Guard = Guard;
+    this.Capture = Capture;
     this.OnAction = OnAction;
     this.held = new Set();          // 按下的键码
     this.mouse = new Set();         // 按下的鼠标键号
@@ -161,6 +164,10 @@ export class InputRouter {
     if (this.bound) return this;
     const onKeyDown = (e) => {
       if (this.suppressed) { e.preventDefault?.(); return; }
+      if (this.Capture(e, { code: e.code, down: true, repeat: !!e.repeat })) {
+        e.preventDefault?.();
+        return;
+      }
       const entry = this._Lookup(e.code);
       if (entry && entry.prevent) e.preventDefault();
       // 长按的自动重复不算新的一次按下
@@ -173,6 +180,10 @@ export class InputRouter {
     const onKeyUp = (e) => {
       this.held.delete(e.code);
       if (this.suppressed) return;
+      if (this.Capture(e, { code: e.code, down: false, repeat: false })) {
+        e.preventDefault?.();
+        return;
+      }
       // 抬起时要按**当前**上下文重查：Tab 松开的那一刻上下文已经从 orders 变回 world，
       // 所以 orders 这条本身必须是 context:"any"，否则松不开（曾经就是这么卡住的）。
       const entry = this._Lookup(e.code);

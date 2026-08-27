@@ -228,16 +228,18 @@ for (let i = 0; i < 3; i += 1) {
   const panel = await page.evaluate(() => ({
     levels: [...document.querySelectorAll("#menu .mnLevel")].length,
     prologue: document.querySelector("#menu .mnProloguePreview")?.textContent || "",
-    sandbox: document.querySelector("#menu .mnSandboxLevel")?.textContent || "",
+    sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => entry.textContent || ""),
     map: !!document.querySelector("#menu .mnMap"),
     zones: document.querySelectorAll("#menu .mnMapZone").length,
     title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  Check("选章列出临时序章入口、七关与靶场",
-    panel.levels === 9 && panel.prologue.includes("出川") && panel.sandbox.includes("玩法测试靶场"),
-    `levels=${panel.levels} prologue=${panel.prologue} sandbox=${panel.sandbox}`);
+  Check("选章列出临时序章入口、七关与两个测试沙盒",
+    panel.levels === 10 && panel.prologue.includes("出川")
+      && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
+      && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场")),
+    `levels=${panel.levels} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
   Check("简报有标题、目标清单与进入按钮",
@@ -638,12 +640,19 @@ for (let i = 0; i < 3; i += 1) {
   const brief = await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuShow("levels");
     const menu = window.Taierzhuang.menu;
-    menu.SelectLevel(menu.entries.length - 1);
+    const rangeIndex = menu.entries.findIndex((entry) => entry.id === "Range"
+      || entry.sandboxKey === "range");
+    menu.SelectLevel(rangeIndex);
     return {
       selected: window.Taierzhuang.Debug.Menu().selected,
       title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
-      mark: document.querySelector("#menu .mnSandboxLevel .mnLvMark")?.textContent || "",
-      no: document.querySelector("#menu .mnSandboxLevel .mnLvNo")?.textContent || "",
+      mark: document.querySelector("#menu .mnSandboxLevel.on .mnLvMark")?.textContent || "",
+      no: document.querySelector("#menu .mnSandboxLevel.on .mnLvNo")?.textContent || "",
+      sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => ({
+        no: entry.querySelector(".mnLvNo")?.textContent || "",
+        name: entry.querySelector(".mnLvName")?.textContent || "",
+        mark: entry.querySelector(".mnLvMark")?.textContent || "",
+      })),
       map: !!document.querySelector("#menu .mnMap"),
       objectives: document.querySelectorAll("#menu .mnObjectives li").length,
       go: document.querySelector("#menu .mnGo")?.textContent || "",
@@ -652,6 +661,12 @@ for (let i = 0; i < 3; i += 1) {
   Check("靶场条目排在七关之后，标「沙盒」",
     brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七关 0..6，沙盒是第 7 条
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
+  Check("选章同时列出玩法靶场与白刃 QTE 测试场",
+    brief.sandboxes.length === 2
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃"
+      && brief.sandboxes.every((entry) => entry.mark === "沙盒")
+      && brief.sandboxes[1].name.includes("白刃战 QTE"),
+    JSON.stringify(brief.sandboxes));
   Check("靶场简报有标题、工位清单与进入按钮，且**不画**那张滕县全图",
     brief.title === "玩法测试靶场" && brief.objectives >= 3
       && brief.go.includes("玩法测试靶场") && !brief.map,

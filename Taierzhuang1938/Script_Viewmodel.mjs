@@ -2021,6 +2021,9 @@ export class Viewmodel {
 
     // --- 动作推进 -----------------------------------------------------------
     this._StepAction(step, lowAmmo);
+    // QTE 是临时高优先级动作层，覆盖既有拉栓/挥刀残留，但不另起自己的计时器；
+    // 规则控制器给的 pose 同时驱动 HUD、敌人骨架与这一双第一人称手臂。
+    if (input.meleeQte) this._AnimMeleeQte(input.meleeQte);
 
     // 装填/拉栓/劈砍时强制脱离瞄准：手都离开握把了还能瞄才是穿帮
     const actionBlend = this.action ? Ease.Pulse(Clamp01(this.action.t)) : 0;
@@ -2053,7 +2056,7 @@ export class Viewmodel {
     // 静音的是**姿态**，不是冲刺本身：脚下照跑、体力照扣、步伐晃动（bob/cadence 读的是
     // 原始 sprint）也照旧。"边跑边挥刀"要的就是这个 —— 停下来才能挥的刀不是大刀。
     // 蓄力（meleeWind）与装刺刀也算白刃期：这两段同样不能从冲刺姿态起手
-    const meleeing = !!(this.action && (this.action.kind === "melee"
+    const meleeing = !!input.meleeQte || !!(this.action && (this.action.kind === "melee"
       || this.action.kind === "meleeWind" || this.action.kind === "fixBayonet"));
     // 起 30 / 落 8：劈砍的蓄力段只有 90 ms，姿态必须在蓄力里就让出来，否则出刀那一下
     // 还有半个冲刺姿态压着。收招慢一倍，免得刀"啪"地弹回冲刺位置。
@@ -2628,6 +2631,47 @@ export class Viewmodel {
     const hit = Ease.Pulse(t) * Mix(0.85, 1.25, Clamp01(power));
     this.actionPivot.position.set(-0.16 * hit, 0.06 * hit, -0.12 * hit);
     this.actionPivot.rotation.set(0.20 * hit, -0.70 * hit, 0.55 * hit, "YXZ");
+  }
+
+  /** 三格挡 + 三处决的第一人称肩臂/武器轨迹；敌人骨架对应层在 Script_Actor。 */
+  _AnimMeleeQte(qte) {
+    if (!this.rig) return;
+    const style = Math.max(0, Math.min(2, qte.style | 0));
+    const inputT = Clamp01(qte.inputT || 0);
+    const resolveT = Clamp01(qte.resolveT || 0);
+    const pulse = Clamp01(qte.pulse || 0);
+    if (qte.kind === "block") {
+      const brace = qte.phase === "input" ? 0.58 + inputT * 0.22 : 1 - resolveT;
+      const shove = qte.phase === "resolve" && qte.success ? Ease.Pulse(resolveT) : 0;
+      const side = style === 1 ? Math.sin((inputT * 6 + pulse) * Math.PI)
+        : style === 2 ? Math.sin(inputT * Math.PI * 4) : 0;
+      this.actionPivot.position.set(-0.04 * side, 0.12 * brace, -0.16 * brace - 0.18 * shove);
+      this.actionPivot.rotation.set(-0.24 * brace, -0.24 * side, 0.58 * side, "YXZ");
+      this.swingPivot.rotation.set(style === 0 ? -0.18 : 0.18 * side,
+        style === 2 ? -0.22 * side : 0, style === 0 ? 0.52 : -0.18 * side, "YXZ");
+      return;
+    }
+    // 0—45% 是踹开：武器收住、相机里读作身体前送；随后三种终结走刀。
+    const kick = qte.phase === "resolve" ? Ease.Pulse(Math.min(1, resolveT / 0.52)) : 0;
+    const cutT = qte.phase === "resolve" ? Clamp01((resolveT - 0.34) / 0.66) : 0;
+    const wind = Ease.Out(Math.min(1, cutT * 2.3));
+    const strike = Ease.In(Clamp01((cutT - 0.28) / 0.34));
+    const recover = Ease.Out(Clamp01((cutT - 0.66) / 0.34));
+    const hit = Math.max(0, strike - recover);
+    if (style === 0) {
+      this.actionPivot.position.set(0.05 * wind, -0.05 * kick - 0.28 * hit, -0.20 * kick - 0.20 * hit);
+      this.actionPivot.rotation.set(-0.18 * wind + 0.48 * hit, 0.18 * wind, -0.55 * wind - 1.05 * hit, "YXZ");
+      this.swingPivot.rotation.x = -0.70 * wind + 1.65 * hit;
+    } else if (style === 1) {
+      this.actionPivot.position.set(-0.10 * wind + 0.22 * hit, -0.04 * kick, -0.20 * kick - 0.16 * hit);
+      this.actionPivot.rotation.set(0.10 * hit, -0.62 * wind + 1.20 * hit, 0.52 * wind - 0.72 * hit, "YXZ");
+      this.swingPivot.rotation.z = 0.48 * wind - 1.45 * hit;
+    } else {
+      this.actionPivot.position.set(-0.06 * wind + 0.04 * hit, 0.03 * wind - 0.04 * kick,
+        0.12 * wind - 0.20 * kick - 0.38 * hit);
+      this.actionPivot.rotation.set(0.13 * wind - 0.08 * hit, 0.22 * wind - 0.18 * hit,
+        -0.12 * wind, "YXZ");
+    }
   }
 
   /**

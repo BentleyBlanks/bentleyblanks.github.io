@@ -250,6 +250,11 @@ export class Soldier {
     // 上刺刀。CHARGE 状态一进就上，白刃距离（2 m 内）真的会捅 —— 不是只跑过去开枪。
     this.bayonetFixed = false;
     this.meleeTimer = 0;
+    // 白刃 QTE 的短期演出状态。规则只由 Script_MeleeQte 写，AI / Actor 只读；
+    // executionReadyUntil 是格挡成功、重伤或强压制之后那五秒“特殊条件”的门闩。
+    this.meleeQte = null;
+    this.executionReadyUntil = -99;
+    this.qteTraining = null;
     this.chargeUntil = -99;      // 玩家下"上刺刀"之后这道命令的有效期
     this.flankUntil = -99;       // 绕行命令的有效期，到点或超时就转 advance
     this.covertUntil = -99;      // 潜行命令的有效期：跟班长同姿态且不开枪
@@ -866,7 +871,7 @@ export class AiDirector {
       // 「想」分帧轮转：每帧只有六分之一的人重新决策。
       // 木桩兵（s.dummy，见 Soldier 构造器）不想：Act 照走 —— 重力、贴地、
       // 姿态动画、守点纪律都要，只是永远不会有目标、不会开火。
-      if (i % 6 === slice && !s.dummy) this.Think(s, dt * 6, player);
+      if (i % 6 === slice && !s.dummy && !s.meleeQte) this.Think(s, dt * 6, player);
       this.Act(s, dt, player);
     }
 
@@ -1285,6 +1290,9 @@ export class AiDirector {
     // 不补的话站在墙头上的人在墙被炸掉之后会浮在半空。
     let stepped = false;
 
+    // 白刃演出接管整帧：不重新 Think、不走导航、不在格挡中途再开一枪。
+    if (s.meleeQte) { this.StepMeleeQte(s, dt, player); return; }
+
     // 翻越途中接管整帧：走位移曲线，不做别的。
     if (s.state === STATE.VAULT) { this.StepVault(s, dt); return; }
 
@@ -1509,6 +1517,35 @@ export class AiDirector {
         lookYaw: s.lookYaw, lookPitch: 0,
       });
     }
+  }
+
+  /** QTE 对手原地面向玩家，正式 Actor 仍走同一份骨架、贴地和 LOD 链。 */
+  StepMeleeQte(s, dt, player) {
+    const qte = s.meleeQte;
+    const target = player?.position || s.target?.position;
+    if (target) {
+      const dx = target.x - s.position.x, dz = target.z - s.position.z;
+      s.yaw = ApproachAngle(s.yaw, Math.atan2(-dx, -dz), 7.5 * dt);
+    }
+    s.moveSpeed = 0;
+    s.aimBlend = 0;
+    s.lookYaw = 0;
+    s.idleStepDt += dt;
+    if (!s.grounded || (this.tickIndex + s.id) % 2 === 0) {
+      this.StepBody(s, 0, 0, Math.min(0.1, s.idleStepDt));
+      s.idleStepDt = 0;
+    }
+    if (!s.actor) return;
+    s.actor.root.position.copy(s.position);
+    s.actor.root.rotation.y = s.yaw;
+    const inputThrust = qte.kind === "block" && qte.phase === "input"
+      ? 0.18 + qte.inputT * 0.58 : 0;
+    s.actor.Update(dt, {
+      moveSpeed: 0, aim: 0, crouch: 0, prone: 0,
+      grounded: s.grounded, verticalVelocity: s.velocityY,
+      melee: inputThrust, meleeQte: qte, elapsed: this.time,
+      lookYaw: 0, lookPitch: 0,
+    });
   }
 
   /**
@@ -1824,6 +1861,9 @@ export class AiDirector {
     // 但对玩家要缩（COMBAT.player.meleeScale）—— 一下秒杀玩家会让"被冲锋"
     // 变成读盘而不是危机。46 点仍然是满血的将近一半：挨两下就该退了。
     if (s.target.isPlayer && player) {
+      // 玩家持大刀或已装刺刀时，真实的冲锋命中先交给通用 QTE。没带可格挡
+      // 武器、已有一场 QTE 或规则拒绝时才落回原来的 46 点刺刀伤害。
+      if (this.ctx.meleeQte?.BeginBlock?.(s)) return;
       player.TakeHit(110 * (COMBAT.player?.meleeScale ?? 0.42), "torso", dir,
         { from: s.position.clone(), melee: true });
     } else if (s.target.ref) {

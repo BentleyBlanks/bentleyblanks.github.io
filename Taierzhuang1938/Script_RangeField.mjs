@@ -25,6 +25,7 @@ import { BuildSink } from "./Script_World.mjs";
 import {
   RANGE_WORLD, RANGE_CAMERA_FAR, RANGE_STATIONS, RANGE_TARGETS,
 } from "./Data_Range.mjs";
+import { MELEE_QTE_LEVEL_ID } from "./Data_MeleeQte.mjs";
 
 /** 靶道朝北（-Z）。挡弹墙立在最远靶身后这一线。 */
 const BACKSTOP_Z = 1350;
@@ -35,9 +36,10 @@ const THROW_WALL = { z: 1461, x0: 1364, x1: 1372, h: 0.78, d: 0.7 };
 
 export class RangeField {
   /** 构造参数与 TengxianField / JieheField 同形（BuildField 统一喂）。 */
-  constructor(scene, library, { bounds = null, zones = RANGE_STATIONS } = {}) {
+  constructor(scene, library, { bounds = null, zones = RANGE_STATIONS, levelId = null } = {}) {
     this.scene = scene;
     this.library = library;
+    this.levelId = levelId;
 
     this.meshes = [];
     /** 物理世界。由装配层在建完切片之后挂上来（见 Script_Main.BuildPhysics）。 */
@@ -91,6 +93,32 @@ export class RangeField {
     const sink = new BuildSink();
     sink.SetSector("Range");
 
+    if (this.levelId === MELEE_QTE_LEVEL_ID) {
+      // 六个 20 m 间隔的白刃工位：前三块用石色标格挡、后三块加砖色横杠标处决。
+      // 所有目标前方都留足无碰撞空地，背后的横墙只负责收住画面与误射。
+      for (const objective of this.objectives) {
+        sink.Add("Stone", PlaceGeometry(MakeBox(8.4, 0.10, 8.0, 1.2, `qte_pad_${objective.id}`),
+          { x: objective.x, y: 0.05, z: objective.z - 1.1 }));
+        sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.18, 2.4, 0.18, 1.2, `qte_sign_${objective.id}`),
+          { x: objective.x - 3.5, y: 1.2, z: objective.z + 2.6 }));
+        sink.Add(objective.kind === "execution" ? "BrickWall" : "WoodBeam",
+          PlaceGeometry(MakeBox(2.6, 0.15, 0.22, 1.2, `qte_mark_${objective.id}`),
+            { x: objective.x - 2.2, y: 1.82, z: objective.z + 2.6,
+              rz: objective.kind === "execution" ? -0.22 : 0.22 }));
+        this.stats.structures += 1;
+      }
+      const width = this.bounds.maxX - this.bounds.minX - 10;
+      const centerX = (this.bounds.minX + this.bounds.maxX) * 0.5;
+      sink.Add("BrickWall", PlaceGeometry(MakeBox(width, 3.2, 0.8, 1.2, "qte_backstop"),
+        { x: centerX, y: 1.6, z: 1448 }));
+      sink.Solid(centerX, 1.6, 1448, width * 0.5, 1.6, 0.4, "wall");
+      this.stats.structures += 1;
+      for (const mesh of sink.Flush(this.scene, this.library)) this.meshes.push(mesh);
+      this.colliders = sink.colliders;
+      this.covers = sink.covers.slice();
+      return;
+    }
+
     // 沙袋线两道：步枪位胸墙 + 投弹位低墙
     for (const line of [FIRING_LINE, THROW_WALL]) {
       const w = line.x1 - line.x0;
@@ -140,11 +168,12 @@ export class RangeField {
 
   /** 分帧生成。用法与 TengxianField / JieheField.BuildSteps 一致。 */
   *BuildSteps() {
-    yield { label: "靶场：地皮", progress: 0.3 };
+    const label = this.levelId === MELEE_QTE_LEVEL_ID ? "白刃测试场" : "靶场";
+    yield { label: `${label}：地皮`, progress: 0.3 };
     this.BuildGround();
-    yield { label: "靶场：工事与标识", progress: 0.7 };
+    yield { label: `${label}：工事与标识`, progress: 0.7 };
     this.BuildStructures();
-    yield { label: "靶场：碰撞格", progress: 0.92 };
+    yield { label: `${label}：碰撞格`, progress: 0.92 };
     this.BuildCollisionGrid();
     yield { label: "就绪", progress: 1.0 };
   }

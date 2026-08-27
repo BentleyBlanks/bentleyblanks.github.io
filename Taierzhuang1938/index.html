@@ -60,7 +60,9 @@
         "./Script_FarLand.mjs": "./Script_FarLand.mjs?v=1",
         "./Script_JieheField.mjs": "./Script_JieheField.mjs?v=1",
         "./Data_Range.mjs": "./Data_Range.mjs?v=1",
-        "./Script_RangeField.mjs": "./Script_RangeField.mjs?v=1",
+        "./Data_MeleeQte.mjs": "./Data_MeleeQte.mjs?v=1",
+        "./Script_MeleeQte.mjs": "./Script_MeleeQte.mjs?v=1",
+        "./Script_RangeField.mjs": "./Script_RangeField.mjs?v=2",
         "./Script_RoadPath.mjs": "./Script_RoadPath.mjs?v=3",
         "./Script_RoadSpline.mjs": "./Script_RoadSpline.mjs?v=3",
         "./Script_WallPlan.mjs": "./Script_WallPlan.mjs?v=2",
@@ -72,20 +74,20 @@
         "./Script_Landmark_EastMapBlocks.mjs": "./Script_Landmark_EastMapBlocks.mjs?v=1",
         "./Script_Water.mjs": "./Script_Water.mjs?v=2",
         "./Script_Navigation.mjs": "./Script_Navigation.mjs?v=5",
-        "./Script_Input.mjs": "./Script_Input.mjs?v=4",
+        "./Script_Input.mjs": "./Script_Input.mjs?v=5",
         "./Script_Wheel.mjs": "./Script_Wheel.mjs?v=1",
         "./Script_Interact.mjs": "./Script_Interact.mjs?v=3",
         "./Script_Identify.mjs": "./Script_Identify.mjs?v=4",
         "./Script_Player.mjs": "./Script_Player.mjs?v=7",
-        "./Script_Ai.mjs": "./Script_Ai.mjs?v=15",
-        "./Script_Actor.mjs": "./Script_Actor.mjs?v=16",
+        "./Script_Ai.mjs": "./Script_Ai.mjs?v=16",
+        "./Script_Actor.mjs": "./Script_Actor.mjs?v=17",
         "./Script_ActorCrowd.mjs": "./Script_ActorCrowd.mjs?v=3",
         "./Script_ActorBatch.mjs": "./Script_ActorBatch.mjs?v=1",
-        "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=14",
+        "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=15",
         "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=11",
         "./Script_Audio.mjs": "./Script_Audio.mjs?v=10",
         "./Data_Voice.mjs": "./Data_Voice.mjs?v=7",
-        "./Script_Hud.mjs": "./Script_Hud.mjs?v=15",
+        "./Script_Hud.mjs": "./Script_Hud.mjs?v=16",
         "./Script_Story.mjs": "./Script_Story.mjs?v=1",
         "./Script_TengxianField.mjs": "./Script_TengxianField.mjs?v=2",
         "./Script_Cutscene.mjs": "./Script_Cutscene.mjs?v=17",
@@ -132,7 +134,7 @@
         "./Data_History.mjs": "./Data_History.mjs?v=1",
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=3",
-        "./Script_Menu.mjs": "./Script_Menu.mjs?v=7",
+        "./Script_Menu.mjs": "./Script_Menu.mjs?v=8",
         "./Script_DebugOptions.mjs": "./Script_DebugOptions.mjs?v=1",
         "./Script_BootProp.mjs": "./Script_BootProp.mjs?v=2",
         "./Script_BootPropStage.mjs": "./Script_BootPropStage.mjs?v=5",
@@ -185,7 +187,7 @@
        异步写法下先用后备字体开机，字体到了自然换上（display=swap 本来就是这个观感）。 -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
         media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="./Style_Game.css?v=15">
+  <link rel="stylesheet" href="./Style_Game.css?v=16">
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=4">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
@@ -280,6 +282,6 @@
       }, 25000);
     })();
   </script>
-  <script type="module" src="./Script_Main.mjs?v=89"></script>
+  <script type="module" src="./Script_Main.mjs?v=90"></script>
 </body>
 </html>

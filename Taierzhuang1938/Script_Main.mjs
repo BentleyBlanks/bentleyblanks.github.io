@@ -27,6 +27,9 @@ import { RangeField } from "./Script_RangeField.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
+import {
+  MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID, MELEE_QTE_TARGETS, MELEE_QTE_STATIONS,
+} from "./Data_MeleeQte.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -41,6 +44,7 @@ import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
+import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
@@ -123,7 +127,9 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
  * 正片的 PHASES（七关、菜单、进度、BootTest 的口径）一概不知道靶场存在。
  */
 const RANGE = params.get("range") === "1";
-const PHASE_TABLE = RANGE ? [RANGE_PHASE] : PHASES;
+const MELEE_TEST = params.get("melee") === "1";
+const SANDBOX = RANGE || MELEE_TEST;
+const PHASE_TABLE = RANGE ? [RANGE_PHASE] : MELEE_TEST ? [MELEE_QTE_PHASE] : PHASES;
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -157,7 +163,7 @@ const MENU_ON = !SHOT && !PREVIEW && params.get("menu") !== "0";
  * 调试选项与「退出靶场」都挂在它上面 —— 但开机不开：靶场是「进页面就是这片场地」，
  * 而且菜单的运镜机位表（MENU_SHOTS）按正片关卡 id 分组，靶场那一片根本没有机位。
  */
-const MENU_AT_BOOT = MENU_ON && !RANGE;
+const MENU_AT_BOOT = MENU_ON && !SANDBOX;
 /**
  * 开机建哪一片切片。
  * 给了 ?phase= 就听它的（出图、冒烟、调机位都靠这条）；
@@ -441,6 +447,7 @@ let physics = null;
 let navGrid = null;
 let player = null;
 let ai = null;
+let meleeQte = null;
 let vfx = null;
 let viewmodel = null;
 let actorFactory = null;
@@ -813,6 +820,63 @@ async function Boot() {
     },
   }, { maxAlive: SCALE.maxAlive, seed: 19380317, insideWalls: levelBounds });
 
+  // 白刃规则只拿窄接口；伤害、血雾、声音与朝向仍走装配层现有对象。
+  meleeQte = new MeleeQteDirector({
+    Player: () => player,
+    Soldiers: () => ai?.soldiers || [],
+    Time: () => ai?.time || 0,
+    CanBlock: () => {
+      const weapon = WEAPONS[currentWeapon];
+      return !!(weapon && (weapon.kind === "melee" || (weapon.bayonet && state.bayonetFixed)));
+    },
+    CanExecute: () => {
+      const weapon = WEAPONS[currentWeapon];
+      return !!(weapon && (weapon.kind === "melee" || (weapon.bayonet && state.bayonetFixed)));
+    },
+    DamagePlayer: (amount, attacker, kind) => {
+      if (!player?.Alive) return false;
+      const dx = player.position.x - attacker.position.x;
+      const dz = player.position.z - attacker.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      return player.TakeHit(amount, "torso", new THREE.Vector3(dx / len, 0, dz / len), {
+        from: attacker.position.clone(), melee: true, qte: kind,
+      });
+    },
+    KillSoldier: (soldier) => {
+      if (!soldier?.alive) return false;
+      const dx = soldier.position.x - player.position.x;
+      const dz = soldier.position.z - player.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const direction = new THREE.Vector3(dx / len, 0, dz / len);
+      const died = soldier.TakeHit(999, "torso", direction);
+      vfx?.Blood(new THREE.Vector3(soldier.position.x, soldier.position.y + 1.05,
+        soldier.position.z), direction, 1);
+      return died;
+    },
+    Play: (event, attacker) => {
+      const sound = event === "bayonetRush" || event === "executionStart" ? "dadaoSwing"
+        : event === "blockSuccess" ? "bayonetHit"
+        : event === "executionSuccess" ? "dadaoHit"
+        : event === "blockFail" || event === "executionFail" ? "bayonetHit" : null;
+      if (sound) audio.Play(sound, {
+        position: attacker?.position?.clone?.(), volume: event.includes("Success") ? 0.92 : 0.72,
+      });
+    },
+    Focus: (attacker, realDt) => {
+      if (!attacker || !player?.Alive) return;
+      const dx = attacker.position.x - player.position.x;
+      const dz = attacker.position.z - player.position.z;
+      const target = Math.atan2(-dx, -dz);
+      let delta = target - player.yaw;
+      if (delta > Math.PI) delta -= Math.PI * 2;
+      else if (delta < -Math.PI) delta += Math.PI * 2;
+      player.yaw += Clamp(delta, -realDt * 5.5, realDt * 5.5);
+      player.aimYaw *= Math.max(0, 1 - realDt * 12);
+      player.aimPitch *= Math.max(0, 1 - realDt * 12);
+    },
+  }, { assist: params.get("qteAssist") || "tap" });
+  ai.ctx.meleeQte = meleeQte;
+
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
@@ -923,6 +987,7 @@ async function Boot() {
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
     renderer, scene, camera, post, sky, lights, library, profiler, get gi() { return gi; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
+    get meleeQte() { return meleeQte; },
     story, combat, destruction, interact, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
@@ -1335,6 +1400,97 @@ async function Boot() {
     };
   }
 
+  if (MELEE_TEST) {
+    const Snapshot = (entry) => {
+      const soldier = entry.soldier;
+      return {
+        id: entry.spec.id, station: entry.spec.station, kind: entry.spec.kind,
+        pattern: entry.spec.pattern, alive: !!soldier?.alive,
+        health: soldier?.health ?? 0,
+        x: soldier?.position.x ?? entry.spec.x, z: soldier?.position.z ?? entry.spec.z,
+        qte: soldier?.meleeQte ? { ...soldier.meleeQte } : null,
+        executableUntil: soldier?.executionReadyUntil ?? -99,
+      };
+    };
+    const Face = (soldier) => {
+      if (!soldier) return null;
+      const dx = soldier.position.x - player.position.x;
+      const dz = soldier.position.z - player.position.z;
+      player.yaw = Math.atan2(-dx, -dz);
+      player.pitch = 0;
+      player.aimYaw = 0;
+      player.aimPitch = 0;
+      return { yaw: player.yaw, distance: Math.hypot(dx, dz) };
+    };
+    window.Taierzhuang.Debug.MeleeQte = {
+      State: () => ({
+        ...meleeQte.State(),
+        stations: MELEE_QTE_STATIONS.map((station) => ({ ...station })),
+        targets: meleeTargets.map(Snapshot),
+        trainingStats: { ...meleeStats },
+        player: {
+          x: player.position.x, z: player.position.z, yaw: player.yaw,
+          health: player.health, alive: player.Alive,
+          slot: state.activeSlot, weapon: currentWeapon, bayonetFixed: state.bayonetFixed,
+        },
+        hud: hud.MeleeQteState(),
+        viewmodel: {
+          x: viewmodel.actionPivot.position.x, y: viewmodel.actionPivot.position.y,
+          z: viewmodel.actionPivot.position.z,
+          rx: viewmodel.actionPivot.rotation.x, ry: viewmodel.actionPivot.rotation.y,
+          rz: viewmodel.actionPivot.rotation.z,
+        },
+      }),
+      Targets: () => meleeTargets.map(Snapshot),
+      GoTo: (stationId) => {
+        meleeQte.Cancel("trainingMove");
+        const station = MELEE_QTE_STATIONS.find((entry) => entry.id === stationId);
+        const target = meleeTargets.find((entry) => entry.spec.station === stationId)?.soldier;
+        if (!station || !target) return null;
+        player.Spawn(station.x, station.z, station.ry ?? 0);
+        // 调试瞬移不是“换人出生”，不能带三秒出生保护；否则在工位故意放弃格挡
+        // 只会亮失败字样却不扣血，测试到的就不是正片失败链。
+        player.spawnGrace = 0;
+        Face(target);
+        return { id: station.id, x: station.x, z: station.z, targetId: target.id };
+      },
+      TriggerBlock: (pattern = 0) => {
+        meleeQte.Cancel("debugTrigger");
+        const entry = meleeTargets.find((item) => item.spec.kind === "block"
+          && item.spec.pattern === Number(pattern));
+        if (!entry?.soldier?.alive) return false;
+        Face(entry.soldier);
+        return meleeQte.BeginBlock(entry.soldier, Number(pattern));
+      },
+      TriggerExecution: (pattern = 0) => {
+        meleeQte.Cancel("debugTrigger");
+        const entry = meleeTargets.find((item) => item.spec.kind === "execution"
+          && item.spec.pattern === Number(pattern));
+        if (!entry?.soldier?.alive) return false;
+        Face(entry.soldier);
+        return meleeQte.TryBeginExecution(Number(pattern), entry.soldier);
+      },
+      MakeExecutable: (targetId = null) => {
+        const entry = targetId ? meleeTargets.find((item) => item.spec.id === targetId) : meleeTargets[0];
+        return !!meleeQte.MakeExecutable(entry?.soldier || null);
+      },
+      SetAssist: (mode) => meleeQte.SetAssist(mode),
+      Reset: () => {
+        meleeQte.Cancel("trainingReset");
+        for (const entry of meleeTargets) if (entry.soldier) ai.Remove(entry.soldier);
+        SeedMeleeTargets();
+        meleeStats.completed = 0;
+        meleeStats.respawned = 0;
+        meleeStats.resets += 1;
+        player.health = 100;
+        player.bleeding = false;
+        state.bayonetFixed = true;
+        SyncBayonet();
+        return window.Taierzhuang.Debug.MeleeQte.State();
+      },
+    };
+  }
+
   // --- 编辑器套件 ---------------------------------------------------------
   // 建在最后：六个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城、破坏系统）
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
@@ -1422,10 +1578,10 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      sandbox: RANGE_PHASE,
-      sandboxMode: RANGE,
-      PlaySandbox: () => GoToUrlWithRange(true),
-      ExitSandbox: () => GoToUrlWithRange(false),
+      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE],
+      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee" : false,
+      PlaySandbox: (key) => GoToSandbox(key),
+      ExitSandbox: () => GoToSandbox(null),
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
@@ -1485,7 +1641,11 @@ async function Boot() {
  * 别把这张表挪进 Data_Battle：那是数据层，import 一个世界类进去会让
  * 数据模块反向依赖渲染模块（BootTest 里那几个纯数据的自检也会被拖进 three）。
  */
-const WORLD_CLASSES = { [JIEHE_LEVEL_ID]: JieheField, [RANGE_LEVEL_ID]: RangeField };
+const WORLD_CLASSES = {
+  [JIEHE_LEVEL_ID]: JieheField,
+  [RANGE_LEVEL_ID]: RangeField,
+  [MELEE_QTE_LEVEL_ID]: RangeField,
+};
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
 
 /**
@@ -1496,9 +1656,12 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  * 靶场是互斥的两条旁路）、`menu=0`（进去就没有暂停菜单，也就没有退出靶场的路）。
  * 与编辑器那条 OpenProloguePreview 同一个套路。
  */
-function GoToUrlWithRange(on) {
+function GoToSandbox(key) {
   const url = new URL(window.location.href);
-  if (on) url.searchParams.set("range", "1"); else url.searchParams.delete("range");
+  url.searchParams.delete("range");
+  url.searchParams.delete("melee");
+  if (key === "range") url.searchParams.set("range", "1");
+  else if (key === "melee") url.searchParams.set("melee", "1");
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
   url.searchParams.delete("menu");
@@ -1621,6 +1784,8 @@ function DustBox(phase) {
 
 /** 换关时把整片切片以外的东西也清干净：兵、尸体、烟柱、在途弹。 */
 function ClearRuntime() {
+  meleeQte?.Cancel("levelChange");
+  hud?.SetMeleeQte(null);
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
   if (ai) ai.Dispose();
@@ -1717,6 +1882,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 否则车厢结束后即使画面没有切关，旧 AI 也会在后台先开火/消耗票池。
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
+  else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
   else if (!PREVIEW) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
 
@@ -1826,6 +1992,51 @@ function MaintainRangeTargets() {
     entry.soldier = SpawnRangeTarget(entry.spec);
     entry.deadCounted = false;
     if (entry.soldier) rangeStats.respawned += 1;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 白刃 QTE 测试章（?melee=1）的六具正式 Actor。前三具主动触发指定格挡，后三具
+// 常态满足处决特殊条件；死亡仍走 Soldier.Kill，三秒后原位重建，方便连续比较。
+// ---------------------------------------------------------------------------
+const meleeTargets = [];
+const meleeStats = { completed: 0, respawned: 0, resets: 0 };
+
+function SpawnMeleeTarget(spec) {
+  const soldier = ai.Spawn("ija", spec.x, spec.z, {
+    weapon: "Type38", squadId: `MeleeQte_${spec.id}`,
+  });
+  if (!soldier) return null;
+  soldier.dummy = true;
+  soldier.bayonetFixed = true;
+  soldier.qteTraining = { kind: spec.kind, pattern: spec.pattern, station: spec.station };
+  soldier.order = "hold";
+  soldier.holdZone = { id: `MeleeQte_${spec.id}`, x: spec.x, z: spec.z, radius: 1.5 };
+  soldier.goal.set(spec.x, 0, spec.z);
+  soldier.yaw = spec.yaw ?? Math.PI;
+  soldier.lookYaw = 0;
+  if (spec.kind === "execution") soldier.suppression = 0.84;
+  return soldier;
+}
+
+function SeedMeleeTargets() {
+  meleeQte?.Cancel("trainingReset");
+  meleeTargets.length = 0;
+  for (const spec of MELEE_QTE_TARGETS) {
+    meleeTargets.push({ spec, soldier: SpawnMeleeTarget(spec), deadCounted: false });
+  }
+}
+
+function MaintainMeleeTargets() {
+  for (const entry of meleeTargets) {
+    const soldier = entry.soldier;
+    if (soldier?.alive) { entry.deadCounted = false; continue; }
+    if (soldier && !entry.deadCounted) { entry.deadCounted = true; meleeStats.completed += 1; }
+    if (soldier && soldier.deadTime < 3) continue;
+    if (soldier) ai.Remove(soldier);
+    entry.soldier = SpawnMeleeTarget(entry.spec);
+    entry.deadCounted = false;
+    if (entry.soldier) meleeStats.respawned += 1;
   }
 }
 
@@ -2221,7 +2432,7 @@ function RespawnPlayer(initial = false) {
   state.fireMode = "auto";
   player.bipod = false;
   // 换关领新枪：刺刀从收着开始（上刺刀是玩家的一个决定，不是默认状态）
-  state.bayonetFixed = false;
+  state.bayonetFixed = MELEE_TEST;
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
@@ -2827,6 +3038,9 @@ const router = new InputRouter({
     if (!PointerLocked() && !SHOT) { RequestPointerLock(); return false; }
     return true;
   },
+  // QTE 先于 KEYMAP 接管 A/D/V/F 的按下与松开；否则 A/D 会同时让玩家横移，
+  // V 会另起一刀，F 又会顺手捡地上的枪，屏幕提示与实际因果就分叉了。
+  Capture: (_event, detail) => !!meleeQte?.HandleInput(detail.code, detail.down, detail.repeat),
   OnAction: (action, detail) => {
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
     if (!state.ready) return;
@@ -2846,7 +3060,9 @@ const router = new InputRouter({
       case "bandage":
         if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 });
         return;
-      case "interact": DoInteract(); return;
+      case "interact":
+        if (meleeQte?.TryBeginExecution()) return;
+        DoInteract(); return;
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
       case "map": hud.ToggleMinimap(); return;
@@ -3103,13 +3319,13 @@ function DoInteract() {
  * 绷带库存，1/2 来自实际槽位。没有可执行动作就传空数组，不用计时器伪造教程窗口。
  */
 function UpdateContextualActionPrompts() {
-  if (!player?.Alive) {
+  if (!player?.Alive || meleeQte?.Active) {
     hud.SetActionPrompts([]);
     return;
   }
   const interaction = interact?.Query(player) || null;
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
-  hud.SetActionPrompts(ContextualActionPrompts({
+  const prompts = ContextualActionPrompts({
     interaction,
     bleeding: player.bleeding,
     bandages: player.bandages,
@@ -3117,7 +3333,11 @@ function UpdateContextualActionPrompts() {
     bayonet: gunInHand && WEAPONS[currentWeapon]?.bayonet
       ? { fixed: state.bayonetFixed } : null,
     ammoEmpty: gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
-  }));
+  });
+  if (meleeQte?.ExecutionCandidate()) {
+    prompts.unshift({ keys: "F", label: "踹开处决", kind: "execution" });
+  }
+  hud.SetActionPrompts(prompts);
 }
 
 /**
@@ -3628,6 +3848,11 @@ const _proj = new THREE.Vector3();
  *   而不是把断言的时长缩水去迁就它。
  */
 function Frame(dt, render = true) {
+  const realDt = dt;
+  // QTE 窗口走真实时间；下面玩家、AI、弹道、特效和叙事统一吃缩放后的玩法时间。
+  // 这句必须在 state.elapsed 之前：否则慢的只有 AI，玩家/故事仍按正常速度飞过去。
+  if (state.ready && meleeQte) meleeQte.Update(realDt);
+  dt *= meleeQte?.TimeScale ?? 1;
   state.frame += 1;
   state.elapsed += dt;
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
@@ -3701,6 +3926,11 @@ function Frame(dt, render = true) {
   const firePrev = input.fire;
   ReadKeys();
   EnsureDebugInventory();
+  if (meleeQte?.Active) {
+    input.forward = 0; input.strafe = 0; input.sprint = false;
+    input.fire = false; input.ads = false;
+    input.crouchPressed = false; input.pronePressed = false;
+  }
   fireEdge = input.fire && !firePrev;
   profiler.E("input");
   profiler.B("player");
@@ -3833,6 +4063,7 @@ function Frame(dt, render = true) {
     // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
     // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
     lowAmmo: state.ammo <= 1,
+    meleeQte: meleeQte?.ViewPose() || null,
   });
   profiler.E("viewmodel");
 
@@ -3928,6 +4159,7 @@ function Frame(dt, render = true) {
     state.spawnAccumulator = 0;
     profiler.B("spawn");
     if (RANGE) MaintainRangeTargets();
+    else if (MELEE_TEST) MaintainMeleeTargets();
     else SeedSoldiers(phase);
     profiler.E("spawn");
   }
@@ -3962,7 +4194,7 @@ function Frame(dt, render = true) {
   const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
   hud.SetCrosshair({
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && !state.ordersOpen && !state.cutscene,
+      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active,
     spreadDeg,
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
@@ -3978,11 +4210,12 @@ function Frame(dt, render = true) {
     soldiers: ai.soldiers,
     // extras：载具与固定火力点按 Script_Identify 的字段契约挂进来。
     // 战车系统还没进正片（Data_Levels 的 vehicles 仍是设计数据），所以现在是空的。
-    detail: player.Alive && !state.ordersOpen && !state.cutscene
+    detail: player.Alive && !state.ordersOpen && !state.cutscene && !meleeQte?.Active
       ? (DIFFICULTY.targetInfo ?? "basic") : false,
     spreadDeg,
   }));
   hud.SetSuppression(player.suppression);
+  hud.SetMeleeQte(meleeQte?.View() || null);
   // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
   // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
   // 满血挨一发三八式（当时 39.6 点）之后暗角只有 0.088 × 边缘 0.52 ≈ 看不见，

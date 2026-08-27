@@ -91,7 +91,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 |---|---|
 | terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
 | physics | Physics → Collider → Jump → Destruction → FractureBake |
-| combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel → FpsArm |
+| combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel → FpsArm → SprintMelee → Bayonet → Range → MeleeQte |
 | ai | AiBehavior、Visibility |
 | hud | HudPrompt、HudPromptBrowser |
 | audio / voice | AudioTest / VoiceTest |

@@ -222,8 +222,8 @@ export class MainMenu {
    *   root         DOM 容器（#menu）
    *   camera       THREE.PerspectiveCamera —— 只在 title 态被接管，暂停态不碰
    *   phases       Data_Battle.PHASES
-   *   sandbox      可选：选章末尾那条沙盒条目（Data_Range.RANGE_PHASE）
-   *   sandboxMode  这一局本身是否跑在沙盒里（?range=1）
+   *   sandboxes    可选：选章末尾的沙盒条目数组（靶场 / 白刃 QTE 测试章）
+   *   sandboxMode  false | "range" | "melee"
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
    *   Resume()     暂停态的「继续」
@@ -244,11 +244,12 @@ export class MainMenu {
      * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
      * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
      */
-    this.sandbox = host.sandbox || null;
-    /** 列表上真正排出来的条目 = 七关 + 可选的沙盒条目。键盘上下也按它走。 */
-    this.entries = this.sandbox ? [...this.phases, this.sandbox] : [...this.phases];
+    this.sandboxes = Array.isArray(host.sandboxes)
+      ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
+    /** 列表上真正排出来的条目 = 七关 + 全部沙盒条目。键盘上下也按它走。 */
+    this.entries = [...this.phases, ...this.sandboxes];
     /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
-    this.sandboxMode = !!host.sandboxMode;
+    this.sandboxMode = host.sandboxMode || false;
 
     this.open = false;
     /** live = 开机菜单（接管相机、跑运镜）；暂停态是 false（世界冻在原地）。 */
@@ -428,7 +429,7 @@ export class MainMenu {
       // 关号取标题里的那个序数字（「二 · 东关」-> 「二」），名字取后半。
       // 沙盒条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的关号列。
       const [no, ...rest] = phase.sandbox
-        ? ["靶", phase.label] : phase.label.split("·");
+        ? [phase.sandboxGlyph || "靶", phase.label] : phase.label.split("·");
       const mkSpan = (cls, text) => {
         const s = document.createElement("span");
         s.className = cls;
@@ -686,7 +687,10 @@ export class MainMenu {
    */
   Play(index, opts = {}) {
     if (this.busy) return;
-    if (this.entries[index]?.sandbox) { this.host.PlaySandbox?.(); return; }
+    if (this.entries[index]?.sandbox) {
+      this.host.PlaySandbox?.(this.entries[index].sandboxKey || "range");
+      return;
+    }
     // 已经在靶场里了：正片那七关同样换不过去，先退回正片再说。
     if (this.sandboxMode) { this.host.ExitSandbox?.(); return; }
     this.busy = true;
