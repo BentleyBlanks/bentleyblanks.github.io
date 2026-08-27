@@ -92,6 +92,13 @@ SOURCES = {
         # 这份 CC0 来源已经有完整的毛瑟系机匣、抱箍与通条；再把程序化补件嵌进去
         # 会把减面预算挤到枪身上，导致木托/机匣变成肉眼可见的碎三角。
         "noDetails": True,
+        # 玩家明确要求保留这份母模的全部几何：中正式不参与通用 6k 减面流程。
+        # 同时禁止导入后补倒角，避免把原模型的完整拓扑再加工成另一份网格。
+        "noDecimate": True,
+        "noBevel": True,
+        # 这不是全局武器预算的例外口子；只记录这份第一人称主武器的原模预算。
+        # 实际三角数由 BuildAll 写入 Model/Index.json，并由 Verify 与运行时实测。
+        "budget": 25000,
         # 原资产的法线贴图不随共享 PBR 带入；减面后必须重建连续的几何法线，
         # 否则机匣和木托会按三角形一块块断光。
         "smoothAll": True,
@@ -1019,11 +1026,12 @@ def BuildImported(name):
     if not spec.get("noDetails"):
         steel, wood = _AddHistoricalDetails(name, steel, wood, spec["lengthM"])
     bms = [bm for bm in (steel, wood) if bm is not None]
-    decimated = _DecimateToBudget(bms)
-    if decimated is not None:
-        steel = decimated[0]
-        wood = decimated[1] if len(decimated) > 1 else None
-        bms = [bm for bm in (steel, wood) if bm is not None]
+    if not spec.get("noDecimate"):
+        decimated = _DecimateToBudget(bms)
+        if decimated is not None:
+            steel = decimated[0]
+            wood = decimated[1] if len(decimated) > 1 else None
+            bms = [bm for bm in (steel, wood) if bm is not None]
     if spec.get("autoSmooth"):
         # 放在减面之后：减面会重排拓扑，先标好的 smooth 标志会被揉乱。
         _AutoSmooth(bms, spec["autoSmooth"])
@@ -1073,4 +1081,6 @@ def BuilderFor(name):
         return BuildImported(name)
     _Build.__name__ = "BuildImported_%s" % name
     _Build.imported = True
+    if spec.get("budget"):
+        _Build.budget = spec["budget"]
     return _Build

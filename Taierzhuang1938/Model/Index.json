@@ -175,40 +175,6 @@
    }
   },
   {
-   "name": "ZhongZheng",
-   "category": "weapon",
-   "file": "ZhongZheng.tzm.json",
-   "triangles": 5603,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 143568,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.02036,
-     -0.1088,
-     -0.855
-    ],
-    "max": [
-     0.03518,
-     0.06001,
-     0.25633
-    ]
-   }
-  },
-  {
    "name": "HanYang",
    "category": "weapon",
    "file": "HanYang.tzm.json",
@@ -965,6 +931,40 @@
      1.2375,
      2.38,
      2.75
+    ]
+   }
+  },
+  {
+   "name": "ZhongZheng",
+   "category": "weapon",
+   "file": "ZhongZheng.tzm.json",
+   "triangles": 6703,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 169595,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01938,
+     -0.10733,
+     -0.855
+    ],
+    "max": [
+     0.03618,
+     0.05737,
+     0.255
     ]
    }
   }

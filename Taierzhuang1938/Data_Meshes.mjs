@@ -126,13 +126,13 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "ZhongZheng.tzm.json", category: "weapon",
-    triangles: 5603, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 6703, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.05554, 0.16881, 1.11133], lengthM: 1.110,
+    span: [0.05556, 0.16470, 1.11000], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "中正式。几何来自 Poly Haven CC0 Bolt Action Rifle 7.62；"
+    note: "中正式。完整几何来自 Poly Haven CC0 Bolt Action Rifle 7.62；"
       + "剔除现代瞄准镜、包布和独立子弹，仅保留老式栓动枪轮廓，"
-      + "并按中正式史实全长 1.110 m 重建。",
+      + "全程不减面，并按中正式史实全长 1.110 m 导入。",
   },
   HanYang: {
     file: "HanYang.tzm.json", category: "weapon",
