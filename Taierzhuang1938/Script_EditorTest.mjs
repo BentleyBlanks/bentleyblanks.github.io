@@ -1560,8 +1560,9 @@ Check("新版预览点击播放后自动推进且不提前启动旧 L0 AI",
 
 await page.evaluate(() => {
   const T = window.Taierzhuang;
-  // Notion 2026-08-24 定稿总长 102 s；最后 12 s 是地点卡、开门与自动下车。
-  T.StepFrames(102 * 60 + 8, 1 / 60, false);
+  // 片长以正在播的 cut.seconds 为准（CHUCHUAN_END 会随排片调整），
+  // 硬编码 Notion 定稿秒数在片长变化时会假红；末尾垫 8 帧余量。
+  T.StepFrames(Math.ceil(T.cutscene.cut.seconds * 60) + 8, 1 / 60, false);
 });
 await page.waitForTimeout(10);
 const previewDone = await page.evaluate(() => {
