@@ -903,11 +903,11 @@
    "name": "Type95HaGo",
    "category": "vehicle",
    "file": "Type95HaGo.tzm.json",
-   "triangles": 3442,
+   "triangles": 82142,
    "meshBlocks": 1,
    "nodes": 8,
    "joints": 1,
-   "bytes": 200513,
+   "bytes": 3311215,
    "materials": [
     "armor"
    ],
@@ -928,8 +928,8 @@
     ],
     "max": [
      1.035,
-     2.26289,
-     2.16428
+     2.27,
+     2.19
     ]
    }
   },
@@ -941,7 +941,7 @@
    "meshBlocks": 4,
    "nodes": 8,
    "joints": 1,
-   "bytes": 129770,
+   "bytes": 133216,
    "materials": [
     "armor",
     "steel",

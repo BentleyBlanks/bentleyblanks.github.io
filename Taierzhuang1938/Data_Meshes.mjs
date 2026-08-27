@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "19";
+const MESH_REV = "20";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -264,12 +264,12 @@ export const MESHES = {
   },
   Type95HaGo: {
     file: "Type95HaGo.tzm.json", category: "vehicle",
-    triangles: 3442, meshBlocks: 1, nodes: 8, joints: 1,
+    triangles: 82142, meshBlocks: 1, nodes: 8, joints: 1,
     materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
-    span: [2.07, 2.26289, 4.35428],
+    span: [2.07, 2.27, 4.38],
     draws: { high: 1, medium: 1, low: 1 },
-    note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）经体素聚类减面；"
-      + "完整车体剪影保留为单一 armor 网格，标准挂点与炮塔关节仍齐备。",
+    note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）原始 82,142 三角；"
+      + "不焊点、不减面，完整车体保留为单一 armor 网格，标准挂点与炮塔关节仍齐备。",
   },
   Type97ChiHa: {
     file: "Type97ChiHa.tzm.json", category: "vehicle",
@@ -277,8 +277,8 @@ export const MESHES = {
     materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.475, 2.38, 5.5],
     draws: { high: 4, medium: 4, low: 4 },
-    note: "九七式中战车 Chi-Ha。CC-BY（Sketchfab / snrnsrk5），车体、履带、炮塔与炮管"
-      + "分桶导入；履带外廓宽度用于碰撞和巷宽判断。",
+    note: "九七式中战车 Chi-Ha。CC-BY（Sketchfab / snrnsrk5）原始 3,969 三角，不焊点、不减面；"
+      + "车体、履带、炮塔与炮管分桶导入，履带外廓宽度用于碰撞和巷宽判断。",
   },
 
   Dougong: {
