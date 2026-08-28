@@ -130,7 +130,11 @@ assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imp
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");
 assert.match(editor, /动作适用对象/, "editor reports the action's intended character type");
-assert.match(editor, /length:\s*5[\s\S]*modelVariant/, "editor exposes all five variants per faction");
+assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the four-soldier plus one-officer model contract");
+assert.match(runtime, /nraOfficer:\s*OFFICER_MODEL_VARIANTS/, "NRA officer selects only the officer source model");
+assert.match(runtime, /ijaOfficer:\s*OFFICER_MODEL_VARIANTS/, "IJA officer selects only the officer source model");
+assert.match(editor, /GetLugouCharacterVariantEntries/, "editor exposes selectable source models");
+assert.match(editor, /4兵\+1官对比/, "editor offers a full faction lineup instead of a hidden random variant");
 assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");
 assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y,\s*0\)/,

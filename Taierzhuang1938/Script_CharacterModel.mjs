@@ -57,6 +57,31 @@ export const LUGOU_ANIMATION_PROFILE_BY_KIND = Object.freeze({
   ijaOfficer: Object.freeze({ faction: "ija", role: "officer", label: "日军军官", clipIds: OFFICER_ACTION_IDS }),
 });
 
+// 每方的五套来源模型不是五个等价的步兵皮肤：01—04 是普通士兵，05 是军官。
+// 这张表既限制战场随机抽取，也给人物动作编辑器提供可逐个点选的真实名单；否则
+// 「步兵」会不小心抽到军官，而编辑器只能靠 seed 碰运气，根本验不了四兵一官。
+const SOLDIER_MODEL_VARIANTS = Object.freeze([0, 1, 2, 3]);
+const OFFICER_MODEL_VARIANTS = Object.freeze([4]);
+export const LUGOU_MODEL_VARIANTS_BY_KIND = Object.freeze({
+  nra: SOLDIER_MODEL_VARIANTS,
+  nraDare: SOLDIER_MODEL_VARIANTS,
+  nraOfficer: OFFICER_MODEL_VARIANTS,
+  ija: SOLDIER_MODEL_VARIANTS,
+  ijaOfficer: OFFICER_MODEL_VARIANTS,
+});
+
+/** 当前身份可用的源模型序号（0-based；对应 Lugou{Faction}01—05）。 */
+export function GetLugouCharacterVariantEntries(kind) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  const variants = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || [];
+  return variants.map((modelVariant) => Object.freeze({
+    modelVariant,
+    role: profile?.role || "soldier",
+    modelNumber: modelVariant + 1,
+    modelId: `${profile?.faction === "ija" ? "LugouIja" : "LugouNra"}${String(modelVariant + 1).padStart(2, "0")}`,
+  }));
+}
+
 /** 当前角色可预览的导入动作；条目始终保留阵营与身份，供 UI 标注和校验。 */
 export function GetLugouAnimationEntries(kind) {
   const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
@@ -386,12 +411,14 @@ export function CreateLugouCharacterRig(library, kind, options = {}, targetHeigh
   if (!faction) return null;
   const variants = library?.byFaction?.[faction] || [];
   if (!variants.length) return null;
-  const explicit = Number.isInteger(options.modelVariant) ? options.modelVariant : null;
+  const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || SOLDIER_MODEL_VARIANTS;
+  const explicit = Number.isInteger(options.modelVariant) && allowed.includes(options.modelVariant)
+    ? options.modelVariant : null;
   const index = options.protagonist && faction === "nra"
     ? 0
     : explicit !== null
-      ? ((explicit % variants.length) + variants.length) % variants.length
-      : HashString(`${faction}:${options.seed ?? 0}:model`) % variants.length;
+      ? explicit
+      : allowed[HashString(`${faction}:${options.seed ?? 0}:model`) % allowed.length];
   return new LugouCharacterRig(variants[index], {
     kind, targetHeight, seed: options.seed ?? 0, variantIndex: index,
   });

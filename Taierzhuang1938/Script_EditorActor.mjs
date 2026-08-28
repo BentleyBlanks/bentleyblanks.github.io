@@ -27,17 +27,18 @@ import { CAPSULE } from "./Script_Ai.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import {
   DefaultLugouAnimationId,
+  GetLugouCharacterVariantEntries,
   GetLugouAnimationEntries,
   IsLugouAnimationAllowed,
 } from "./Script_CharacterModel.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
-  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；同阵营五套外观稳定随机" },
-  { id: "nraDare", name: "国军敢死队", note: "国军五套模型 + 背刀骨骼挂点" },
-  { id: "nraOfficer", name: "国军军官", note: "国军五套模型；军官身份由武器与剧情数据表达" },
-  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；同阵营五套外观稳定随机" },
-  { id: "ijaOfficer", name: "日军军官", note: "日军五套模型；军官身份由武器与剧情数据表达" },
+  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；可逐个查看 4 名士兵" },
+  { id: "nraDare", name: "国军敢死队", note: "4 名国军士兵模型 + 背刀骨骼挂点" },
+  { id: "nraOfficer", name: "国军军官", note: "国军第 5 套军官模型；身份与手枪由剧情数据表达" },
+  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；可逐个查看 4 名士兵" },
+  { id: "ijaOfficer", name: "日军军官", note: "日军第 5 套军官模型；身份与手枪由剧情数据表达" },
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 
@@ -357,6 +358,7 @@ export class ActorEditor {
     this.weaponId = "ZhongZheng";
     this.animationMode = "imported";
     this.clipId = DefaultLugouAnimationId(this.kind);
+    this.modelVariant = GetLugouCharacterVariantEntries(this.kind)[0]?.modelVariant ?? null;
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
@@ -414,7 +416,9 @@ export class ActorEditor {
       onPick: (id) => {
         this.kind = id;
         this.weaponId = DEFAULT_WEAPON_BY_KIND[id] ?? null;
+        this.modelVariant = GetLugouCharacterVariantEntries(id)[0]?.modelVariant ?? null;
         if (this.weaponSelect) this.weaponSelect.Set(this.weaponId || "");
+        this.FillModelList();
         this.NormalizeImportedClip();
         this.FillActionList();
         this.Rebuild();
@@ -429,6 +433,12 @@ export class ActorEditor {
         ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
       this.weaponId, (v) => { this.weaponId = v || null; this.Rebuild(); });
 
+    this.modelSelect = Select(who, "源模型", [], "", (value) => {
+      this.modelVariant = Number(value);
+      this.Rebuild();
+    });
+    this.FillModelList();
+
     Slider(who, {
       label: "个体种子", min: 0, max: 40, step: 1, value: this.seed,
       format: (v) => v.toFixed(0),
@@ -438,7 +448,7 @@ export class ActorEditor {
     opts.className = "edBtns";
     who.appendChild(opts);
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
-    Toggle(opts, "十模型对比", false, (on) => { this.lineup = on; this.Rebuild(); });
+    Toggle(opts, "本阵营 4兵+1官对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
 
     // --- 判定盒 ---
@@ -546,6 +556,21 @@ export class ActorEditor {
     this.clipList.Select(this.clipId);
   }
 
+  FillModelList() {
+    if (!this.modelSelect) return;
+    const variants = GetLugouCharacterVariantEntries(this.kind);
+    this.modelSelect.Fill(variants.map((entry) => ({
+      value: String(entry.modelVariant),
+      label: entry.role === "officer"
+        ? `军官 · ${entry.modelId}`
+        : `士兵 ${entry.modelNumber} · ${entry.modelId}`,
+    })));
+    if (!variants.some((entry) => entry.modelVariant === this.modelVariant)) {
+      this.modelVariant = variants[0]?.modelVariant ?? null;
+    }
+    this.modelSelect.Set(String(this.modelVariant ?? ""));
+  }
+
   NormalizeImportedClip() {
     if (this.animationMode !== "imported") return;
     if (!IsLugouAnimationAllowed(this.kind, this.clipId)) {
@@ -604,12 +629,15 @@ export class ActorEditor {
     this.time = 0;
     const factory = this.host.actorFactory;
     if (!factory) return;
+    const faction = this.kind.startsWith("ija") ? "ija" : "nra";
+    const soldierKind = faction === "ija" ? "ija" : "nra";
+    const officerKind = faction === "ija" ? "ijaOfficer" : "nraOfficer";
     const list = this.lineup
       ? [
-        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "nra", modelVariant })),
-        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "ija", modelVariant })),
+        ...GetLugouCharacterVariantEntries(soldierKind).map(({ modelVariant }) => ({ kind: soldierKind, modelVariant })),
+        ...GetLugouCharacterVariantEntries(officerKind).map(({ modelVariant }) => ({ kind: officerKind, modelVariant })),
       ]
-      : [{ kind: this.kind, modelVariant: null }];
+      : [{ kind: this.kind, modelVariant: this.modelVariant }];
     const span = 1.15;
     list.forEach((entrySpec, i) => {
       const kind = entrySpec.kind;
@@ -635,7 +663,7 @@ export class ActorEditor {
     if (this.towel != null) this.ApplyTowel();
     const entry = KINDS.find((k) => k.id === this.kind);
     if (this.kindNote && entry) this.kindNote.textContent = entry.note;
-    this.studio.Frame(1.75, this.lineup ? 12.2 : 3.4);
+    this.studio.Frame(1.75, this.lineup ? 6.4 : 3.4);
     this.Step(0);
   }
 
@@ -715,7 +743,7 @@ export class ActorEditor {
       actor.usingRiggedCharacter ? "good" : "bad");
     this.facts.Set("角色模型", actor.modelId || "未载入",
       actor.modelId ? "good" : "bad");
-    this.facts.Set("阵营外观序号", actor.modelVariant == null ? "—" : `${actor.modelVariant + 1} / 5`);
+    this.facts.Set("源模型", actor.modelVariant == null ? "—" : `${actor.modelId || `外观 ${actor.modelVariant + 1}`} · ${actor.kind.includes("Officer") ? "军官" : "士兵"}`);
     this.facts.Set("网格 / 三角", `${meshes} / ${Math.round(triangles)}`);
     this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");

@@ -82,13 +82,16 @@ try {
     protagonist.Dispose();
     for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
       const variants = [];
-      for (let modelVariant = 0; modelVariant < 5; modelVariant += 1) {
+      for (let modelVariant = 0; modelVariant < 4; modelVariant += 1) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
         candidate.Dispose();
       }
-      check(variants.join(",") === [1, 2, 3, 4, 5].map((n) => `${prefix}0${n}`).join(","),
-        `${kind} five-model lineup mismatch: ${variants.join(",")}`);
+      check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
+        `${kind} four-soldier lineup mismatch: ${variants.join(",")}`);
+      const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
+      check(officer.modelId === `${prefix}05`, `${kind} officer model mismatch: ${officer.modelId}`);
+      officer.Dispose();
     }
 
     // 百姓：男女两个分身各查一遍。这个 kind 是最后一个从 GLB 搬过来的
