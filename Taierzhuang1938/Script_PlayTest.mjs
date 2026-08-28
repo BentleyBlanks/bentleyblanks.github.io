@@ -1943,12 +1943,12 @@ Check("AI 一分钟里真的翻过墙（这个动词不是玩家专属）",
 
 
 // ===========================================================================
-// 14) 换模：Blender 出的 .tzm.json 有没有真的顶上来
+// 14) 换模：卢沟桥资产烘焙出的蒙皮 GLB 有没有真的顶上来
 //
 // 为什么这一节必须存在：换模最舒服的失败方式是**静默降级** —— 模型 404、
 // 关节名对不上、材质桶认错，加载器一律 warn + 返回 null，页面照跑、画面照出，
 // 只是人还是原来那堆方块。光看截图分不出"模型糙"和"根本没换"，所以这里一律
-// 从运行时取证：源头是 model 还是 box、挂点在不在、单人 draw call 多少。
+// 从运行时取证：源头是不是 Lugou GLB、骨骼挂点在不在、单人 draw call 多少。
 // ===========================================================================
 Stage("14 换模");
 await Boot(0, "small");
@@ -1983,6 +1983,9 @@ const mesh = await page.evaluate(() => {
     status,
     kind: a ? a.kind : null,
     source: a ? a.meshSource : null,
+    modelId: a ? a.modelId : null,
+    importedClips: a?.characterRig?.clipById?.size || 0,
+    boneHitboxes: a?.GetBoneHitboxes?.().length || 0,
     joints,
     hasEyes: !!(a && a.eyes),
     eyesAhead: a ? a.eyes.position.z < 0 : false,      // 视线挂点必须在脸那一侧（-Z）
@@ -2001,8 +2004,10 @@ const mesh = await page.evaluate(() => {
 Check("人与枪的模型全部读到（一个都不许静默丢）",
   mesh.status.ready && mesh.status.loaded === mesh.status.requested && mesh.status.missing.length === 0,
   `读到 ${mesh.status.loaded}/${mesh.status.requested}${mesh.status.missing.length ? "，缺：" + mesh.status.missing.join(",") : ""}`);
-Check("场上的人用的是 Blender 模型，不是退回的方块",
-  mesh.source === "model", `${mesh.kind} 用的是 ${mesh.source}`);
+Check("场上的军人用的是卢沟桥蒙皮 GLB，不是旧程序化方块",
+  /^glb:Lugou(?:Nra|Ija)0[1-5]$/.test(mesh.source || "")
+    && mesh.importedClips === 16 && mesh.boneHitboxes === 11,
+  `${mesh.kind} 用的是 ${mesh.source} / ${mesh.importedClips} 动作 / ${mesh.boneHitboxes} 命中体`);
 Check("模型接上了现有骨架：13 根骨头一根不少",
   mesh.joints, mesh.joints ? "hips/chest/neck + 双臂双腿齐全" : "有骨头没接上");
 Check("挂点在：eyes 在脸那一侧、weaponMount 在",

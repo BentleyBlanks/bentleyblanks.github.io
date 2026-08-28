@@ -1,8 +1,8 @@
-// 人物动作编辑器：把 Script_Actor 的姿态系统单独拎到摄影棚里看。
+// 人物动作编辑器：十套蒙皮模型的 16 条源动作 + 保留的程序化驱动量摄影棚。
 //
-// ## 这个项目没有「动画剪辑」这种东西
-// Actor 是**程序化姿态**：没有骨骼动画、没有 AnimationClip、没有关键帧文件。
-// 每一帧的姿势由 Actor.Update(dt, state) 里那个 state 对象算出来 ——
+// 军人可见动作来自 GLB AnimationClip；Actor 的程序化 state 继续作为游戏状态机、
+// 死亡根运动和手动动作试验层。编辑器必须同时把两者列出来，不能用配方名冒充资产。
+// 程序化层的每一帧仍由 Actor.Update(dt, state) 里的 state 对象算出来 ——
 //   moveSpeed / strafe / crouch / prone / aim / firing / throwing / melee /
 //   hurt / dying / dead / lookYaw / lookPitch
 // 十三个连续量的组合就是全部「动作」。
@@ -25,14 +25,15 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { LUGOU_ANIMATION_IDS, LUGOU_ANIMATION_LABELS } from "./Script_CharacterModel.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
-  { id: "nra", name: "川军步兵", note: "布军帽 + 青天白日帽徽，无钢盔，绑腿 + 露趾草鞋" },
-  { id: "nraDare", name: "敢死队", note: "白毛巾 + 背后大刀 + 腰间手榴弹" },
-  { id: "nraOfficer", name: "川军军官", note: "武装带 + 枪套，不背枪（过场里的师长／参谋长／长官）" },
-  { id: "ija", name: "日军步兵", note: "昭五式立领 + 九〇式钢盔，1938 年 3—4 月无屁帘" },
-  { id: "ijaOfficer", name: "日军军官", note: "军帽 + 驳壳枪（本作用它代指指挥角色）" },
+  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；同阵营五套外观稳定随机" },
+  { id: "nraDare", name: "国军敢死队", note: "国军五套模型 + 背刀骨骼挂点" },
+  { id: "nraOfficer", name: "国军军官", note: "国军五套模型；军官身份由武器与剧情数据表达" },
+  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；同阵营五套外观稳定随机" },
+  { id: "ijaOfficer", name: "日军军官", note: "日军五套模型；军官身份由武器与剧情数据表达" },
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 
@@ -81,6 +82,11 @@ const CLIPS = [
   { id: "dying", name: "濒死下沉", make: (t) => ({ dying: Math.min(1, (t % 4) / 2.2) }) },
   { id: "dead", name: "倒地（0.8 s 姿态过渡）", dead: true, make: () => ({ dead: true }) },
 ];
+
+const IMPORTED_CLIPS = LUGOU_ANIMATION_IDS.map((id) => ({
+  id,
+  name: `${LUGOU_ANIMATION_LABELS[id] || id} · ${id}`,
+}));
 
 // ---------------------------------------------------------------------------
 // 判定盒的线框
@@ -145,6 +151,44 @@ function LineGeometry(points) {
   return geometry;
 }
 
+function PushBoneCircle(out, center, axisU, axisV, radius, toLocal, segments = 20) {
+  const At = (angle) => toLocal(new THREE.Vector3().copy(center)
+    .addScaledVector(axisU, Math.cos(angle) * radius)
+    .addScaledVector(axisV, Math.sin(angle) * radius));
+  for (let i = 0; i < segments; i += 1) {
+    const a = At((i / segments) * Math.PI * 2);
+    const b = At(((i + 1) / segments) * Math.PI * 2);
+    out.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  }
+}
+
+function PushBoneSphere(out, center, radius, toLocal) {
+  PushBoneCircle(out, center, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), radius, toLocal);
+  PushBoneCircle(out, center, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), radius, toLocal);
+  PushBoneCircle(out, center, new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), radius, toLocal);
+}
+
+function PushBoneCapsule(out, start, end, radius, toLocal) {
+  const axis = new THREE.Vector3().subVectors(end, start);
+  if (axis.lengthSq() < 1e-8) { PushBoneSphere(out, start, radius, toLocal); return; }
+  axis.normalize();
+  const reference = Math.abs(axis.y) < 0.9
+    ? new THREE.Vector3(0, 1, 0)
+    : new THREE.Vector3(1, 0, 0);
+  const axisU = new THREE.Vector3().crossVectors(axis, reference).normalize();
+  const axisV = new THREE.Vector3().crossVectors(axis, axisU).normalize();
+  PushBoneCircle(out, start, axisU, axisV, radius, toLocal);
+  PushBoneCircle(out, end, axisU, axisV, radius, toLocal);
+  for (let i = 0; i < 4; i += 1) {
+    const angle = i * Math.PI * 0.5;
+    const offset = new THREE.Vector3().copy(axisU).multiplyScalar(Math.cos(angle) * radius)
+      .addScaledVector(axisV, Math.sin(angle) * radius);
+    const a = toLocal(new THREE.Vector3().copy(start).add(offset));
+    const b = toLocal(new THREE.Vector3().copy(end).add(offset));
+    out.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  }
+}
+
 /**
  * 一套判定线框。一个人一套，跟着那个人的落点走。
  *
@@ -190,6 +234,17 @@ class HitboxGizmo {
     this.owned.push(sphere.geometry);
     this.root.add(this.sphereGroup);
 
+    // 正式判定体每帧从 Actor 的骨骼世界坐标重建。只在编辑器里做这份线框，
+    // 游戏弹道直接读同一批 shape，不依赖可视化几何。
+    this.boneGeometry = LineGeometry([]);
+    this.boneLines = new THREE.LineSegments(this.boneGeometry, this.hitMaterial);
+    this.boneLines.renderOrder = 12;
+    this.boneGroup = new THREE.Group();
+    this.boneGroup.add(this.boneLines);
+    this.root.add(this.boneGroup);
+    this.hasBoneHitboxes = false;
+    this.hitboxVisible = true;
+
     // --- 移动胶囊（姿态一换就重建，见 SetStance） ---
     this.capsuleGroup = new THREE.Group();
     this.capsuleGroup.visible = false;
@@ -232,7 +287,12 @@ class HitboxGizmo {
     return this;
   }
 
-  SetHitboxVisible(on) { this.sphereGroup.visible = !!on; return this; }
+  SetHitboxVisible(on) {
+    this.hitboxVisible = !!on;
+    this.sphereGroup.visible = this.hitboxVisible && !this.hasBoneHitboxes;
+    this.boneGroup.visible = this.hitboxVisible && this.hasBoneHitboxes;
+    return this;
+  }
   SetCapsuleVisible(on) { this.capsuleGroup.visible = !!on; return this; }
 
   SetXray(on) {
@@ -243,8 +303,28 @@ class HitboxGizmo {
     return this;
   }
 
+  UpdateFromActor(actor) {
+    const shapes = actor?.GetBoneHitboxes?.() || [];
+    this.hasBoneHitboxes = shapes.length > 0;
+    this.sphereGroup.visible = this.hitboxVisible && !this.hasBoneHitboxes;
+    this.boneGroup.visible = this.hitboxVisible && this.hasBoneHitboxes;
+    if (!this.hasBoneHitboxes) return this;
+    this.root.updateWorldMatrix(true, false);
+    const points = [];
+    const ToLocal = (point) => this.root.worldToLocal(new THREE.Vector3().copy(point));
+    for (const shape of shapes) {
+      if (shape.type === "sphere") PushBoneSphere(points, shape.center, shape.worldRadius, ToLocal);
+      else PushBoneCapsule(points, shape.start, shape.end, shape.worldRadius, ToLocal);
+    }
+    this.boneGeometry.setAttribute("position",
+      new THREE.BufferAttribute(new Float32Array(points), 3));
+    this.boneGeometry.computeBoundingSphere();
+    return this;
+  }
+
   Dispose() {
     if (this.capsule) this.capsule.geometry.dispose();
+    this.boneGeometry.dispose();
     for (const geometry of this.owned) geometry.dispose();
     this.hitMaterial.dispose();
     this.capMaterial.dispose();
@@ -262,7 +342,7 @@ function StanceOf(state) {
 export class ActorEditor {
   static id = "actor";
   static label = "人物动作";
-  static hint = "预览六种人物的全部驱动量组合";
+  static hint = "预览十套模型、16 条骨骼动作与程序化驱动量";
 
   constructor(host) {
     this.host = host;
@@ -272,11 +352,12 @@ export class ActorEditor {
 
     this.kind = "nra";
     this.weaponId = "ZhongZheng";
-    this.clipId = "idle";
+    this.animationMode = "imported";
+    this.clipId = "RifleIdle";
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
-    this.lineup = false;      // 五个 kind 站一排
+    this.lineup = false;      // 国军五人 + 日军五人
     this.towel = null;        // null = 按 kind 的默认
     this.manual = false;
     this.time = 0;
@@ -352,7 +433,7 @@ export class ActorEditor {
     opts.className = "edBtns";
     who.appendChild(opts);
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
-    Toggle(opts, "六人对比", false, (on) => { this.lineup = on; this.Rebuild(); });
+    Toggle(opts, "十模型对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
 
     // --- 判定盒 ---
@@ -372,18 +453,27 @@ export class ActorEditor {
       this.xray = on;
       for (const gizmo of this.gizmos) gizmo.SetXray(on);
     });
-    Note(box, "红球 = 子弹判定（COMBAT.hitbox，球心从脚底量）；"
-      + "蓝胶囊 = 移动碰撞（Script_Ai.CAPSULE）。两者互不相干。");
-    Note(box, "判定球不随姿态、不随身高动。切「卧倒」看一眼。", true);
+    Note(box, "红色 = 头、躯干、双臂、双腿的随骨骼命中体；"
+      + "蓝胶囊 = Rapier 移动碰撞。两套职责互不相干。");
+    Note(box, "GLB 加载失败时红色命中体才回退为 COMBAT.hitbox 固定球。", true);
 
     // --- 动作 ---
-    const act = Section(body, "动作（驱动量配方）");
+    const act = Section(body, "动作（资产与程序化）");
+    Chips(act, [
+      { value: "imported", label: "16 条导入动作" },
+      { value: "programmatic", label: "程序化配方" },
+    ], this.animationMode, (value) => {
+      this.animationMode = value;
+      this.manual = false;
+      this.clipId = value === "imported" ? "RifleIdle" : "idle";
+      this.FillActionList();
+      this.Rebuild();
+    });
     this.clipList = ListBox(act, {
       height: 168,
       onPick: (id) => this.SetClip(id),
     });
-    this.clipList.Fill(CLIPS.map((c) => ({ id: c.id, name: c.name })));
-    this.clipList.Select(this.clipId);
+    this.FillActionList();
 
     ButtonRow(act, [
       { label: "▶ / ⏸", onClick: () => { this.playing = !this.playing; } },
@@ -398,7 +488,10 @@ export class ActorEditor {
     // --- 手动调参 ---
     const man = Section(body, "手动调参");
     Chips(man, [{ value: "clip", label: "按配方" }, { value: "manual", label: "手动" }],
-      "clip", (v) => { this.manual = v === "manual"; });
+      "clip", (v) => {
+        this.manual = v === "manual";
+        if (this.manual) this.animationMode = "programmatic";
+      });
     const S = (key, label, min, max) => {
       this.sliders[key] = Slider(man, {
         label, min, max, step: 0.01, value: this.manualState[key],
@@ -421,13 +514,26 @@ export class ActorEditor {
     // --- 读数 ---
     const info = Section(body, "取证");
     this.facts = Facts(info);
-    Note(info, "meshSource=box = 模型没读到、退回了方块几何。换模后先看这行。", true);
+    Note(info, "meshSource 应为 glb:Lugou…；出现 box/model 表示角色 GLB 没有接入。", true);
+  }
+
+  FillActionList() {
+    if (!this.clipList) return;
+    const entries = this.animationMode === "imported"
+      ? IMPORTED_CLIPS
+      : CLIPS.map((clip) => ({ id: clip.id, name: clip.name }));
+    this.clipList.Fill(entries);
+    this.clipList.Select(this.clipId);
   }
 
   SetClip(id) {
-    const clip = CLIPS.find((c) => c.id === id);
     this.clipId = id;
     this.time = 0;
+    if (this.animationMode === "imported") {
+      for (const actor of this.actors) actor.PlayImportedAnimation(id);
+      return;
+    }
+    const clip = CLIPS.find((c) => c.id === id);
     // 倒地是一次性状态机（Actor 内部有 ragdollState），换到它要重建才能从头演
     if (clip && clip.dead) this.Rebuild();
   }
@@ -458,11 +564,21 @@ export class ActorEditor {
     this.time = 0;
     const factory = this.host.actorFactory;
     if (!factory) return;
-    const list = this.lineup ? KINDS.map((k) => k.id) : [this.kind];
+    const list = this.lineup
+      ? [
+        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "nra", modelVariant })),
+        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "ija", modelVariant })),
+      ]
+      : [{ kind: this.kind, modelVariant: null }];
     const span = 1.15;
-    list.forEach((kind, i) => {
+    list.forEach((entrySpec, i) => {
+      const kind = entrySpec.kind;
       const weapon = this.lineup ? undefined : (this.weaponId || null);
-      const actor = factory.Create(kind, { seed: this.seed + i * 7, weapon });
+      const actor = factory.Create(kind, {
+        seed: this.seed + i * 7,
+        weapon,
+        modelVariant: entrySpec.modelVariant,
+      });
       actor.root.position.x = (i - (list.length - 1) / 2) * span;
       this.studio.stand.add(actor.root);
       this.actors.push(actor);
@@ -479,7 +595,7 @@ export class ActorEditor {
     if (this.towel != null) this.ApplyTowel();
     const entry = KINDS.find((k) => k.id === this.kind);
     if (this.kindNote && entry) this.kindNote.textContent = entry.note;
-    this.studio.Frame(1.75, this.lineup ? 7.4 : 3.4);
+    this.studio.Frame(1.75, this.lineup ? 12.2 : 3.4);
     this.Step(0);
   }
 
@@ -499,13 +615,18 @@ export class ActorEditor {
       const local = this.time + (this.lineup ? i * 0.37 : 0);
       const state = this.manual
         ? { ...base, ...this.manualState, elapsed: local }
-        : { ...base, ...clip.make(local, ctx), elapsed: local };
+        : this.animationMode === "imported"
+          ? base
+          : { ...base, ...clip.make(local, ctx), elapsed: local };
+      if (this.animationMode === "imported" && !this.manual) actor.PlayImportedAnimation(this.clipId);
+      else actor.ClearImportedAnimation();
       actor.Update(dt, state);
       // 判定线框跟着这个人的落点；胶囊还要跟着姿态换尺寸（AI 那边是 s.stance）
       const gizmo = this.gizmos[i];
       if (gizmo) {
         gizmo.root.position.copy(actor.root.position);
         gizmo.SetStance(StanceOf(state));
+        gizmo.UpdateFromActor(actor);
         if (i === 0) this.stance = gizmo.stance;
       }
     }
@@ -541,23 +662,23 @@ export class ActorEditor {
       ? this.host.actorFactory.WeaponGeometry(this.weaponId) : null;
     this.facts.Set("kind", actor.kind);
     this.facts.Set("身高", `${actor.height.toFixed(3)} m`);
-    this.facts.Set("meshSource", actor.meshSource, actor.usingModel ? "good" : "bad");
+    this.facts.Set("meshSource", actor.meshSource,
+      actor.usingRiggedCharacter ? "good" : "bad");
+    this.facts.Set("角色模型", actor.modelId || "未载入",
+      actor.modelId ? "good" : "bad");
+    this.facts.Set("阵营外观序号", actor.modelVariant == null ? "—" : `${actor.modelVariant + 1} / 5`);
     this.facts.Set("网格 / 三角", `${meshes} / ${Math.round(triangles)}`);
     this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");
-    this.facts.Set("动作", this.manual ? "手动" : this.clipId);
-    // 判定读数。**判定球那两行永远是同一个数**（它不随姿态、不随身高变），
-    // 摆在这里正是为了让"球没跟着人动"这件事有个可引用的读数。
-    const { radius, centerY } = COMBAT.hitbox;
-    this.facts.Set("子弹判定球", `r ${radius.toFixed(2)} m · 心高 ${centerY.toFixed(2)} m`);
+    this.facts.Set("动作", this.manual ? "程序化手动" : `${this.animationMode} · ${this.clipId}`);
+    const boneHitboxes = actor.GetBoneHitboxes?.() || [];
+    this.facts.Set("骨骼命中体", boneHitboxes.length ? `${boneHitboxes.length} 个 · 实时随骨骼` : "保底固定球",
+      boneHitboxes.length ? "good" : "warn");
     const cap = CAPSULE[this.stance] || CAPSULE[0];
     const stanceName = this.stance === 2 ? "卧" : this.stance === 1 ? "蹲" : "站";
     this.facts.Set("移动胶囊",
       `${stanceName} · r ${cap.radius.toFixed(2)} m · 高 ${cap.height.toFixed(2)} m`);
-    // 判定球顶超过这一档胶囊的顶 = 判定比身体高出去一截（卧姿必然如此）
-    const overhang = (centerY + radius) - cap.height;
-    this.facts.Set("球顶 − 体高", `${overhang >= 0 ? "+" : ""}${overhang.toFixed(2)} m`,
-      overhang > 0.05 ? "warn" : "");
+    this.facts.Set("命中部位", boneHitboxes.length ? "头 / 躯干 / 四肢" : "躯干保底");
     this.facts.Set("时间", `${this.time.toFixed(2)} s`);
   }
 }

@@ -74,9 +74,8 @@ const NEAR_SQUAD = { nra: 5, ija: 4 };
 /** 弹道与抛掷物的射线要连解析地表一起打（见 Script_Physics.RaycastTerrain）。 */
 const TERRAIN_RAY = { terrain: true };
 /**
- * 子弹判定球（半径 / 球心离脚底的高度）。口径与账在 Data_Battle.COMBAT.hitbox，
- * 这里只是取个短名字 —— MarchBullet 每帧要读它几十次。
- * 人物动作编辑器画的就是这一份数。
+ * 非军人或角色 GLB 加载失败时的保底判定球。正式军人命中走 Actor 上随骨骼更新的
+ * 头/躯干/四肢球体与胶囊；这个值只保证资源故障时游戏仍可进行。
  */
 const HITBOX = COMBAT.hitbox;
 /** 没有物理世界时脚部 IK 拿到的法线（平地）。 */
@@ -3526,26 +3525,37 @@ function MarchBullet(from, dir, weapon, targets) {
     if (travelled + segLen > range) segLen = range - travelled;
     _segDir.normalize();
 
-    // 先看这一段有没有穿过人：到线段的垂距小于判定球半径就算命中躯干。
-    // 半径与球心高度是 COMBAT.hitbox（原来是这里的两个字面量）——
-    // 人物动作编辑器要照着同一份数把这个球画出来，两边各写一份的话，
-    // 画出来的球第二天就不是判定用的球了。
-    let bestSoldier = null, bestT = Infinity;
+    // 军人使用蒙皮骨架上的分部位球/胶囊；蹲、卧、跑、倒地时每一段都跟着对应
+    // 骨头走。只有模型资源缺席的角色才回落到固定球，确保加载故障不让敌人无敌。
+    let bestSoldier = null, bestPart = "torso", bestT = Infinity;
     for (const s of targets) {
+      const boneHit = s.actor?.RaycastHitboxes?.(_bulletPos, _segDir, segLen) || null;
+      if (boneHit) {
+        if (boneHit.t < bestT) {
+          bestT = boneHit.t;
+          bestPart = boneHit.part;
+          bestSoldier = s;
+        }
+        continue;
+      }
       _rel.set(s.position.x - _bulletPos.x,
         s.position.y + HITBOX.centerY - _bulletPos.y,
         s.position.z - _bulletPos.z);
-      const t = _rel.dot(_segDir);
-      if (t < 0 || t > segLen) continue;
-      const perp = _rel.addScaledVector(_segDir, -t).length();
-      if (perp < HITBOX.radius && t < bestT) { bestT = t; bestSoldier = s; }
+      const fallbackT = _rel.dot(_segDir);
+      if (fallbackT < 0 || fallbackT > segLen) continue;
+      const perp = _rel.addScaledVector(_segDir, -fallbackT).length();
+      if (perp < HITBOX.radius && fallbackT < bestT) {
+        bestT = fallbackT;
+        bestPart = "torso";
+        bestSoldier = s;
+      }
     }
     // terrain:true —— 子弹要打得中山坡。以前只与碰撞盒求交，打向土坎、河堤、
     // 路基的子弹一律穿过去，弹着点凭空出现在坡的另一边。
     const wallHit = battlefield.Raycast(_bulletPos, _segDir, segLen, TERRAIN_RAY);
     if (bestSoldier && (!wallHit || bestT < wallHit.t)) {
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, bestT);
-      return { soldier: bestSoldier, dist: travelled + bestT, dir: _segDir };
+      return { soldier: bestSoldier, part: bestPart, dist: travelled + bestT, dir: _segDir };
     }
     if (wallHit) {
       _hitPoint.copy(_bulletPos).addScaledVector(_segDir, wallHit.t);
@@ -3737,7 +3747,7 @@ function TryFire(dt) {
   };
 
   if (shot.soldier) {
-    const part = shot.dist < 40 && Mulberry32(state.frame * 7919)() < 0.12 ? "head" : "torso";
+    const part = shot.part || "torso";
     // 这里**不扣票**：扣票走 Soldier.Kill() 发的阵亡事件。
     // 两条路径同时扣的话，玩家亲手打死的人会扣两票。
     const died = shot.soldier.TakeHit(weapon.damage, part, dir);

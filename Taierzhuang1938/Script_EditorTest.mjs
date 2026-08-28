@@ -476,34 +476,56 @@ await Step(20);
 const actor = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
-  active.SetClip("run");
+  const importedActions = active.clipList.root.querySelectorAll(".it").length;
+  active.SetClip("RifleRun");
   window.Taierzhuang.StepFrames(20);
   const one = active.actors.length;
   const kind = active.actors[0] ? active.actors[0].kind : null;
   const source = active.actors[0] ? active.actors[0].meshSource : null;
+  const primary = active.actors[0];
+  let socketDirectionDot = -1;
+  if (primary?.weaponGroup && primary?.characterRig) {
+    primary.root.updateWorldMatrix(true, true);
+    const rightSocket = primary.characterRig.Socket("weaponR");
+    const leftSocket = primary.characterRig.Socket("weaponL");
+    if (rightSocket && leftSocket) {
+      const right = primary.weaponMuzzle.clone();
+      const left = primary.weaponMuzzle.clone();
+      const grip = primary.weaponGripFront.clone().applyMatrix4(primary.weaponGroup.matrixWorld);
+      rightSocket.getWorldPosition(right);
+      leftSocket.getWorldPosition(left);
+      socketDirectionDot = grip.sub(right).normalize().dot(left.sub(right).normalize());
+    }
+  }
   active.lineup = true;
   active.Rebuild();
   window.Taierzhuang.StepFrames(10);
-  const five = active.actors.length;
-  // 六种人物全部走程序化 tzm 模型（GLB 分段皮 2026-08-26 已经拆掉），
-  // 这里查的还是同一件事：每个人身上的网格都得是不透明、写深度、进法线预通道的。
-  // 判据从「有 riggedSkin 且是 segmentMode」改成「meshSource 是 model 且几何本身合规」——
-  // 静默退回方块几何（meshSource === "box"）也会让这一条红。
+  const lineupCount = active.actors.length;
+  // 十套军人全部走新的蒙皮 GLB。SkinnedMesh 整棵刻意跳过 overrideMaterial
+  // 法线/深度预通道（该预通道没有 skinning define，会把人压到原点），但主材质仍须
+  // 至少有一份不透明、写深度的主体材质；头发/帽带的 alpha 卡允许透明且不写深度。
+  // 静默退回旧 model/box 也会让这一条红。
   const rigidShadingSolid = active.actors.every((previewActor) => {
-    if (previewActor.meshSource !== "model") return false;
-    let solid = true;
+    if (!previewActor.meshSource.startsWith("glb:Lugou")
+      || !previewActor.characterRig?.root?.userData?.skipNormalDepth) return false;
+    let materialsValid = true;
+    let opaqueDepthMaterial = false;
     let meshes = 0;
     previewActor.root.traverse((object) => {
-      if (!object.isMesh || !object.visible) return;
+      if (!object.isSkinnedMesh || !object.visible) return;
       meshes += 1;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      solid = solid && object.userData.skipNormalDepth !== true
-        && materials.every((material) => material && !material.transparent
-          && material.opacity === 1 && material.depthWrite && material.depthTest);
+      materialsValid = materialsValid && materials.every((material) => material
+          && material.opacity === 1 && material.depthTest);
+      opaqueDepthMaterial = opaqueDepthMaterial || materials.some((material) => material
+          && !material.transparent && material.depthWrite);
     });
-    return solid && meshes > 0;
+    return materialsValid && opaqueDepthMaterial && meshes > 0;
   });
   active.lineup = false;
+  active.animationMode = "programmatic";
+  active.manual = false;
+  active.FillActionList();
   active.SetClip("dead");
   window.Taierzhuang.StepFrames(30);
   const ragdoll = !!(active.actors[0] && active.actors[0].ragdollState);
@@ -513,7 +535,8 @@ const actor = await page.evaluate(() => {
     && active.weaponId === null
     && active.weaponSelect.Value() === "";
   return {
-    id: editor.ActiveId, one, five, kind, source, ragdoll, civilianUnarmed, rigidShadingSolid,
+    id: editor.ActiveId, one, lineupCount, importedActions, kind, source,
+    ragdoll, civilianUnarmed, rigidShadingSolid, socketDirectionDot,
     studio: editor.studio.Active,
     worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
     viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
@@ -521,9 +544,13 @@ const actor = await page.evaluate(() => {
 });
 Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${actor.kind}`);
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
-// KINDS 现在含川军、敢死队、军官、日军、日军军官、百姓，共六种。
-Check("单人 / 六种人物对比", actor.one === 1 && actor.five === 6, `${actor.one} → ${actor.five}`);
-Check("六种人物都用 tzm 模型，且不透明/写深度法线", actor.rigidShadingSolid);
+Check("单人 / 十套军人模型对比", actor.one === 1 && actor.lineupCount === 10,
+  `${actor.one} → ${actor.lineupCount}`);
+Check("人物编辑器列出全部 16 条导入动作", actor.importedActions === 16,
+  `${actor.importedActions} 条`);
+Check("十套人物都用蒙皮 GLB，且主体材质不透明/写深度", actor.rigidShadingSolid);
+Check("枪身前握把沿左右手骨骼挂点定向", actor.socketDirectionDot > 0.98,
+  `dot=${actor.socketDirectionDot.toFixed(4)}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 
@@ -546,6 +573,9 @@ const drawn = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const active = T.editor.active;
   active.kindList.Select("nra", true);
+  active.animationMode = "programmatic";
+  active.manual = false;
+  active.FillActionList();
   active.SetClip("idle");
   // 停表再拍。待机也有呼吸起伏，两张之间人本身就动了几百像素，
   // 那个数会混进"线框画了多少"里，让这一条断言变得什么都证明不了。

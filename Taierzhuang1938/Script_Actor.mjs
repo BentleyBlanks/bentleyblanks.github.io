@@ -1,10 +1,9 @@
-// 《血战台儿庄》程序化人物：模型 + 动画。
+// 《血战台儿庄》人物状态机与附件系统。
 //
-// 为什么全部手搭骨架而不用 SkinnedMesh：
-//   深度法线预通道靠 scene.overrideMaterial 覆盖全场（见 Script_Post.mjs 的帧结构第 1 步），
-//   覆盖材质里没有 skinning 的 define 和 uniform，蒙皮网格在那一 pass 里会整个塌到原点，
-//   于是 SSAO 拿到一团乱码、墙角全是黑斑。所以人物一律 Object3D 层级 + 逐帧写
-//   rotation/quaternion，每根骨头就是一个 Group，底下挂着若干已经合批好的静态网格。
+// 国军/日军的可见人体已由 Script_CharacterModel 的蒙皮 GLB 与 AnimationClip 接管。
+// 这里的 Object3D 程序化骨架只保留状态机、死亡根运动、百姓与资源故障回退；军人旧网格
+// 会被隐藏。SkinnedMesh 整棵标 skipNormalDepth，避免 overrideMaterial 预通道缺 skinning
+// define 时塌到原点；主场景和阴影仍正常蒙皮渲染。
 //
 // 三条贯穿本文件的规矩：
 //   1) **零 Math.random**。个体差异（身高、军装深浅、待机相位、鞋子）全部来自
@@ -27,6 +26,10 @@ import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_G
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
+import {
+  CreateLugouCharacterRig,
+  LoadLugouCharacterAssets,
+} from "./Script_CharacterModel.mjs";
 import {
   ACTOR_MESH_BY_VARIANT,
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
@@ -1155,6 +1158,12 @@ const AIM_Q = new THREE.Quaternion();
 const PARENT_Q = new THREE.Quaternion();
 const OFF_Q = new THREE.Quaternion();
 const POSE_E = new THREE.Euler();
+const SOCKET_SOURCE_AXIS = new THREE.Vector3();
+const SOCKET_TARGET_WORLD = new THREE.Vector3();
+const SOCKET_TARGET_LOCAL = new THREE.Vector3();
+const SOCKET_RIGHT_WORLD = new THREE.Vector3();
+const SOCKET_ELBOW_WORLD = new THREE.Vector3();
+const SOCKET_AIM_Q = new THREE.Quaternion();
 
 export class Actor {
   /** @param {ActorFactory} factory */
@@ -1321,6 +1330,16 @@ export class Actor {
       footedge: "footEdgeR", footedgel: "footEdgeL", footedger: "footEdgeR", back: "back",
     });
 
+    // 军人可见模型在所有程序化控制节点建完以后接入：旧节点继续算移动、死亡与
+    // 编辑器驱动量，但它们的网格会全部隐藏；蒙皮模型、动作、挂点和命中体只走 GLB。
+    this.characterRig = factory.CreateCharacterRig(kind, options, spec.height);
+    this.usingRiggedCharacter = !!this.characterRig;
+    this.modelVariant = this.characterRig ? this.characterRig.variantIndex : null;
+    this.modelId = this.characterRig ? this.characterRig.modelId : null;
+    this.riggedWeaponMount = null;
+    this.riggedBackMount = null;
+    if (this.characterRig) this._AdoptRiggedCharacter();
+
     // --- 动画内部状态（全部确定性）---
     this.time = 0;
     this.gaitPhase = rnd();                  // 起步相位各不相同，一排人才不像广播体操
@@ -1363,6 +1382,129 @@ export class Actor {
     return HashString(`${this.seed}|${weaponId}`) % list.length;
   }
 
+  _AdoptRiggedCharacter() {
+    // 先藏旧人体，再挂新人体；顺序反过来会把刚挂上的 SkinnedMesh 一起藏掉。
+    this.body.traverse((object) => { if (object.isMesh) object.visible = false; });
+    this.characterRig.Attach(this);
+    this.meshSource = `glb:${this.characterRig.modelId}`;
+    this.usingModel = true;
+
+    const weaponSocket = this.characterRig.Socket("weaponR");
+    if (weaponSocket) {
+      this.riggedWeaponMount = new THREE.Group();
+      this.riggedWeaponMount.name = "SocketAttachment_WeaponR";
+      weaponSocket.add(this.riggedWeaponMount);
+      this.mounts.weapon = this.riggedWeaponMount;
+      this.mounts.weaponMount = this.riggedWeaponMount;
+    }
+    const backSocket = this.characterRig.Socket("backBlade");
+    if (backSocket) {
+      this.riggedBackMount = new THREE.Group();
+      this.riggedBackMount.name = "SocketAttachment_BackBlade";
+      backSocket.add(this.riggedBackMount);
+    }
+    if (this.weaponGroup) this._MountRiggedWeapon(this.weaponGroup);
+    if (this.backDadao && this.riggedBackMount) {
+      if (this.backDadao.parent) this.backDadao.parent.remove(this.backDadao);
+      this.riggedBackMount.add(this.backDadao);
+      this.backDadao.position.set(0, 0, 0);
+      this.backDadao.rotation.set(-0.18, 0.10, -2.35, "YXZ");
+      this.backDadao.scale.setScalar(this._SocketScaleCompensation(this.riggedBackMount));
+      this.backDadao.traverse((object) => { if (object.isMesh) object.visible = true; });
+    }
+  }
+
+  /**
+   * Weapons are authored in metres and must keep their real dimensions.  Max Biped
+   * armatures arrive with a 0.01 object scale, nested below both the actor's height
+   * variation and the GLB normalisation scale.  Cancelling only the two outer scales
+   * made every socketed rifle one hundredth size; read the actual socket world scale
+   * so the same rule also survives differently authored source rigs.
+   */
+  _SocketScaleCompensation(socket) {
+    this.root.updateWorldMatrix(true, true);
+    const worldScale = socket.getWorldScale(new THREE.Vector3());
+    const inherited = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.y), Math.abs(worldScale.z));
+    return inherited > 1e-6 ? 1 / inherited : this.weaponScale;
+  }
+
+  _MountRiggedWeapon(group) {
+    if (!this.riggedWeaponMount || !group) return;
+    if (group.parent) group.parent.remove(group);
+    this.riggedWeaponMount.add(group);
+    group.position.set(0, 0, 0);
+    group.rotation.set(0, 0, 0);
+    group.scale.setScalar(this._SocketScaleCompensation(this.riggedWeaponMount));
+    group.traverse((object) => { if (object.isMesh) object.visible = true; });
+  }
+
+  /**
+   * Align authored weapon geometry to the animated hand sockets.
+   *
+   * Weapon models use their right-hand grip as local origin, while their front
+   * grip/muzzle lies along the barrel axis.  Max Biped hand axes are not the same
+   * as that authoring frame, so inheriting the right-hand quaternion alone lays a
+   * rifle sideways across the shoulders.  Reconstruct the attachment rotation
+   * from live socket positions after every mixer update: two-handed weapons point
+   * their front grip at the left hand; one-handed weapons continue the right
+   * forearm direction.  Muzzle flashes and ballistics use weaponGroup.matrixWorld,
+   * so they receive this exact same transform.
+   */
+  _UpdateRiggedWeaponMount() {
+    if (!this.riggedWeaponMount || !this.weaponGroup || !this.characterRig) return;
+    const rightSocket = this.characterRig.Socket("weaponR");
+    if (!rightSocket) return;
+
+    let hasTarget = false;
+    if (this.weaponTwoHanded && this.weaponGripFront.lengthSq() > 1e-8) {
+      const leftSocket = this.characterRig.Socket("weaponL");
+      if (leftSocket) {
+        leftSocket.getWorldPosition(SOCKET_TARGET_WORLD);
+        hasTarget = true;
+        SOCKET_SOURCE_AXIS.copy(this.weaponGripFront);
+      }
+    } else if (this.weaponMuzzle.lengthSq() > 1e-8) {
+      const forearm = this.characterRig.bones.forearmR;
+      if (forearm) {
+        rightSocket.getWorldPosition(SOCKET_RIGHT_WORLD);
+        forearm.getWorldPosition(SOCKET_ELBOW_WORLD);
+        SOCKET_TARGET_WORLD.copy(SOCKET_RIGHT_WORLD)
+          .multiplyScalar(2).sub(SOCKET_ELBOW_WORLD);
+        hasTarget = true;
+        SOCKET_SOURCE_AXIS.copy(this.weaponMuzzle);
+      }
+    }
+    if (!hasTarget || SOCKET_SOURCE_AXIS.lengthSq() < 1e-8) return;
+
+    this.riggedWeaponMount.updateWorldMatrix(true, false);
+    SOCKET_TARGET_LOCAL.copy(SOCKET_TARGET_WORLD);
+    this.riggedWeaponMount.worldToLocal(SOCKET_TARGET_LOCAL);
+    if (SOCKET_TARGET_LOCAL.lengthSq() < 1e-8) return;
+    SOCKET_SOURCE_AXIS.normalize();
+    SOCKET_TARGET_LOCAL.normalize();
+    SOCKET_AIM_Q.setFromUnitVectors(SOCKET_SOURCE_AXIS, SOCKET_TARGET_LOCAL);
+    this.weaponGroup.quaternion.copy(SOCKET_AIM_Q);
+    this.weaponGroup.updateMatrix();
+  }
+
+  PlayImportedAnimation(actionId) {
+    if (this.characterRig) this.characterRig.ForceClip(actionId);
+    return this;
+  }
+
+  ClearImportedAnimation() {
+    if (this.characterRig) this.characterRig.ForceClip(null);
+    return this;
+  }
+
+  GetBoneHitboxes() {
+    return this.characterRig ? this.characterRig.GetHitboxes() : [];
+  }
+
+  RaycastHitboxes(origin, direction, maxDistance) {
+    return this.characterRig ? this.characterRig.Raycast(origin, direction, maxDistance) : null;
+  }
+
   /**
    * 把持刀模型斜挂到背上。武器规范系的刀尖指向 -Z；旋到背部后刀柄露左肩、
    * 刀尖落右腰，和旧背法一致。模型读不到才挂原来的程序化骨块。
@@ -1394,7 +1536,7 @@ export class Actor {
   /** 换手持模型。几何在工厂里按 id 缓存，这里只换 Group。 */
   SetWeapon(weaponId) {
     if (this.weaponGroup) {
-      this.weaponMount.remove(this.weaponGroup);
+      if (this.weaponGroup.parent) this.weaponGroup.parent.remove(this.weaponGroup);
       this.weaponGroup = null;
     }
     this.weaponId = weaponId || null;
@@ -1412,7 +1554,8 @@ export class Actor {
     }
     // 抵消 root 上的身高缩放：人可以高矮不同，中正式永远是 1110 mm
     group.scale.setScalar(this.weaponScale);
-    this.weaponMount.add(group);
+    if (this.riggedWeaponMount) this._MountRiggedWeapon(group);
+    else this.weaponMount.add(group);
     this.weaponGroup = group;
     this.weaponMuzzle.copy(built.muzzle);
     this.weaponGripFront.copy(built.gripFront);
@@ -1556,6 +1699,10 @@ export class Actor {
 
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
+    if (this.characterRig) {
+      this.characterRig.Update(dt, s);
+      this._UpdateRiggedWeaponMount();
+    }
     const weapon = this.weaponData;
     // fireSequence 是战斗 AI 的逐发边沿；过场仍只给 firing，保留旧的布尔退路。
     // 这解决了 500 rpm 机枪 firing 恒 true、整段连射只有第一发人物会动的问题。
@@ -1993,6 +2140,12 @@ export class Actor {
       // 它走上面的 stanceDrop，那一步在腿 IK 之前，脚才留得住在地面上。
       this.chest.rotation.x -= dying * 0.45;
       this.neck.rotation.x -= dying * 0.30;          // 头也垂下去
+    }
+    // 正常帧的可见骨架由导入动作完整驱动；程序化 body 只在 Ragdoll 的提前返回
+    // 分支里保留，用作整个人绕胯倒地的根运动，避免与蒙皮动作叠两遍。
+    if (this.characterRig) {
+      this.body.position.set(0, d.hipY, 0);
+      this.body.rotation.set(0, 0, 0);
     }
   }
 
@@ -2833,6 +2986,7 @@ export class Actor {
   Dispose() {
     if (this.disposed) return;
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
+    if (this.characterRig) this.characterRig.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
     this.root.clear();
     this.weaponGroup = null;
@@ -2863,6 +3017,7 @@ export class ActorFactory {
     this.meshLoading = null;
     this.meshReport = { requested: 0, loaded: 0, missing: [], ready: false };
     this.riggedAssets = null;
+    this.characterAssets = null;
     this.disposed = false;
   }
 
@@ -2878,7 +3033,9 @@ export class ActorFactory {
   async PreloadMeshes() {
     if (this.meshLoading) return this.meshLoading;
     const wanted = new Set([
-      ...Object.values(SOLDIER_MESH_BY_KIND),
+      // SoldierNra / SoldierIja 已从正式通路废弃：军人 GLB 失败时宁可显式退回 box，
+      // 也不静默显示旧兵模。百姓仍使用原来的男女程序化模型。
+      SOLDIER_MESH_BY_KIND.civilian,
       ...Object.values(ACTOR_MESH_BY_VARIANT).flatMap((byVariant) => Object.values(byVariant)),
       ...Object.values(WEAPON_MESH_BY_ID),
       ...Object.values(WEAPON_MESH_VARIANTS).flat(),
@@ -2886,18 +3043,21 @@ export class ActorFactory {
     ]);
     const ids = [...wanted].filter((id) => MESHES[id]);
     this.meshLoading = (async () => {
-      const [docs, riggedAssets] = await Promise.all([
+      const [docs, riggedAssets, characterAssets] = await Promise.all([
         Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
         LoadRiggedAssets(),
+        LoadLugouCharacterAssets(),
       ]);
       ids.forEach((id, i) => { if (docs[i]) this.meshDocs.set(id, docs[i]); });
       this.riggedAssets = riggedAssets;
+      this.characterAssets = characterAssets;
       this.meshReport = {
         requested: ids.length,
         loaded: this.meshDocs.size,
         missing: ids.filter((id) => !this.meshDocs.has(id)),
         ready: true,
         rigged: riggedAssets.report,
+        characters: characterAssets.report,
       };
       return this.meshReport;
     })();
@@ -3000,6 +3160,10 @@ export class ActorFactory {
     // 编辑器两处），漏掉一个的后果是那批人在画面上整个消失，而不是掉帧。
     if (this.batcher) this.batcher.Add(actor);
     return actor;
+  }
+
+  CreateCharacterRig(kind, options = {}, targetHeight = 1.68) {
+    return CreateLugouCharacterRig(this.characterAssets, kind, options, targetHeight);
   }
 
   /** 接上人物合批层。传 null 就是关掉（每个分件退回自己一个 draw call）。 */
