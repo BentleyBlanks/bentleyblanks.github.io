@@ -38,6 +38,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { BuildSink } from "./Script_World.mjs";
+import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
+import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 import { PropStreamer } from "./Script_PropStreaming.mjs";
 import { PropBatcher } from "./Script_PropBatch.mjs";
@@ -354,6 +356,33 @@ const PLACEMENTS = Object.freeze({
   ],
 });
 
+/**
+ * 全城俯瞰（`?phase=overview`）那一片**自己没有手摆件** —— 它要的正是
+ * 「城里该有的都在」：城墙那一整套修补/泄水嘴/压顶/两处缺口是登记在
+ * `CH3_Jiuhusuo` 名下的，东关那几件在 CH2/CH4 名下，谁都不在 `Overview` 名下。
+ * 不补这一条，Wall_* 那批采样点与 Z18—Z21 的墙面专项拍出来就是**光墙**。
+ *
+ * **按 bounds 现算，不手抄一份副本**：手抄的那一刻就开始过期 —— 下一个人往 CH3
+ * 加一处墙面修补，俯瞰这一片会悄悄少一件，而少了什么没有任何测试看得出来。
+ * 去重按「资产 + 坐标」：同一处东西被两章各登记一次是常事（东关那几件就是）。
+ */
+const OVERVIEW_PLACEMENTS = (() => {
+  const seen = new Set();
+  const out = [];
+  for (const [levelId, list] of Object.entries(PLACEMENTS)) {
+    if (levelId === "L0_Jiehe") continue;            // 城北二十公里，不在这一片里
+    for (const entry of list) {
+      if (entry.x < OVERVIEW_BOUNDS.minX || entry.x > OVERVIEW_BOUNDS.maxX
+        || entry.z < OVERVIEW_BOUNDS.minZ || entry.z > OVERVIEW_BOUNDS.maxZ) continue;
+      const key = `${entry.asset}@${entry.x.toFixed(2)},${entry.z.toFixed(2)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(entry);
+    }
+  }
+  return Object.freeze(out);
+})();
+
 // Several catalog entries intentionally share one GLB. Cache by URL so seven
 // stones cost one request and one parsed source scene instead of seven.
 const cache = new Map();
@@ -592,6 +621,12 @@ export function BasePlacements() {
   return PLACEMENTS;
 }
 
+/** 这一片有哪些手摆件。`Overview` 是现算的并集，见 OVERVIEW_PLACEMENTS 的注释。 */
+function PlacementsFor(phaseId) {
+  if (phaseId === OVERVIEW_LEVEL_ID) return OVERVIEW_PLACEMENTS;
+  return PLACEMENTS[phaseId] || [];
+}
+
 /** Clone one runtime prop for the component-library studio without placing it in a level. */
 export async function InstantiateExternalProp(id, library) {
   if (!ASSETS[id]) return null;
@@ -618,7 +653,7 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   ClearExternalProps();
   // 两层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
   // 城内每户布设（Script_TownDressing）。后者跨关共位 —— 城是同一座城。
-  const placements = [...(PLACEMENTS[phaseId] || []), ...TownDressingFor(bounds)];
+  const placements = [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
   if (!placements.length) return { count: 0, failed: [], colliders: [], streamer: null };
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
@@ -695,5 +730,5 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
 }
 
 export function ExternalPropCount(phaseId, bounds) {
-  return (PLACEMENTS[phaseId] || []).length + TownDressingFor(bounds).length;
+  return PlacementsFor(phaseId).length + TownDressingFor(bounds).length;
 }

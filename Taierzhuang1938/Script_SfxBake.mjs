@@ -536,9 +536,22 @@ async function Main() {
   if (report) return;
   // 部分重烘时保住上一轮已经登记的 pendingCues（与 cues 同一条理由）。
   if (Object.keys(pendingCues).length || (partial && manifest.pendingCues)) {
-    manifest.pendingCues = partial ? { ...(manifest.pendingCues || {}), ...pendingCues } : pendingCues;
-    manifest.pendingNote = "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，"
-      + "运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。";
+    const merged = partial ? { ...(manifest.pendingCues || {}), ...pendingCues } : pendingCues;
+    // **毕业的要踢出去。** 部分重烘原来只做并集不做删除：把 Data_SfxSources 里某一组的
+    // `pending: true` 去掉、照组名重烘之后，那几条同时挂在 cues 与 pendingCues 上
+    // （2026-08-29 INT3a 的十五条就是这么来的，当时是手工把两个键从 JSON 里删的）。
+    // 运行时与 AudioNormalize 都只读 cues，不影响行为，但清单上是一笔糊涂账 ——
+    // 而清单正是「这条音接没接线」唯一的账本。进了 cues 就不再是 pending。
+    for (const cue of Object.keys(merged)) if (manifest.cues[cue]) delete merged[cue];
+    if (Object.keys(merged).length) {
+      manifest.pendingCues = merged;
+      manifest.pendingNote = "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，"
+        + "运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。";
+    } else {
+      // 一条不剩就把两个键一起摘掉，别在清单里留一个空对象充当「还有账没清」。
+      delete manifest.pendingCues;
+      delete manifest.pendingNote;
+    }
   }
   manifest.bakedAt = new Date().toISOString().slice(0, 10);
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");

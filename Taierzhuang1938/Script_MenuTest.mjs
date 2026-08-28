@@ -237,15 +237,16 @@ for (let i = 0; i < 3; i += 1) {
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  // 规格：正式章节（七章）与测试场景（靶场 / 白刃 QTE / 过场预览）分两组，
-  // 见 docs/Data_MissionRemake.md §9。数目 = 7 + 2 + 6 场预览。
+  // 规格：正式章节（七章）与测试场景（靶场 / 白刃 QTE / 界河白盒 / 过场预览）分两组，
+  // 见 docs/Data_MissionRemake.md §9。数目 = 7 + 3 + 6 场预览。
   Check("选章分成「正式章节」与「测试场景」两组",
     panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
     panel.groups.join(" / "));
-  Check("正式章节七章 + 两个沙盒 + 六场过场预览",
-    panel.levels === 15 && panel.previews === 6 && panel.prologue.includes("出川")
+  Check("正式章节七章 + 三个沙盒 + 六场过场预览",
+    panel.levels === 16 && panel.previews === 6 && panel.prologue.includes("出川")
       && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
-      && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场")),
+      && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场"))
+      && panel.sandboxes.some((entry) => entry.includes("界河 · 白盒")),
     `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
@@ -668,11 +669,14 @@ for (let i = 0; i < 3; i += 1) {
   Check("靶场条目排在七章之后，标「沙盒」",
     brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七章 0..6，沙盒是第 7 条
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章同时列出玩法靶场与白刃 QTE 测试场",
-    brief.sandboxes.length === 2
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃"
+  // 三条沙盒：靶场 / 白刃 QTE 测试场 / 界河白盒（2026-08-29 补的第三条，
+  // 界河那片地退出正片但资产完整，见 Data_Menu.JIEHE_SANDBOX_PHASE）。
+  Check("选章同时列出玩法靶场、白刃 QTE 测试场与界河白盒",
+    brief.sandboxes.length === 3
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃,河"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
-      && brief.sandboxes[1].name.includes("白刃战 QTE"),
+      && brief.sandboxes[1].name.includes("白刃战 QTE")
+      && brief.sandboxes[2].name.includes("界河"),
     JSON.stringify(brief.sandboxes));
   Check("靶场简报有标题、工位清单与进入按钮，且**不画**那张滕县全图",
     brief.title === "玩法测试靶场" && brief.objectives >= 3

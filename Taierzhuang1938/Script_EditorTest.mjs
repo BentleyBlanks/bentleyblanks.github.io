@@ -786,6 +786,17 @@ Check("盲听出四选一", audio.blind === 4);
 await page.click('[data-ambience="night"]');
 await page.click('[data-music="tension"]');
 await Step(8);
+// 音乐包 5.6 MB，是四个包里最后落地的那一个：按下按钮时 `musicBuffers` 多半还空着，
+// `Music()` 只把 cue 记下来就返回（Script_Audio「还没载到：这一段就是没有音乐」），
+// 等包到了 LoadMusicPack 的回调再拿 musicCue 补播一次。所以这里等的是
+// **播放头真的建起来**，不是等一个固定帧数 —— 固定 8 帧在包变大之后就是一条
+// 随机红（2026-08-29 实测：musicCue=tension 而 musicLayer=null）。
+// 包一直载不到时不在这儿卡死：跳出去让下面那条断言照常报红。
+for (let i = 0; i < 120; i += 1) {
+  if (await page.evaluate(() => !!window.Taierzhuang.audio.musicLayer)) break;
+  await Step(4);
+  await page.waitForTimeout(250);
+}
 const backgroundPlaying = await page.evaluate(() => {
   const audio = window.Taierzhuang.audio;
   return {
@@ -862,27 +873,35 @@ const timeline = await page.evaluate(() => {
     active.Stop();
   }
   // 静音快进后，目标时刻仍在持续的对白应从对应采样点接回，而不是从头播或没声。
+  // **取样口径跟着新序章走**（2026-08-29）：旧序章那条 `prologue_young_dispatch_01`
+  // 已经不在 CS_Chuchuan 里，照旧钉着它 Seek(9.2) 读到的永远是 null。
+  // 新序章镜 1 的第一句是 `ch0_liuwencai_01`（shot 1 局部 2.2 s，镜 1 从 0 起算），
+  // 把它的时长临时改成 4 s 再拖到 2.8 s —— 目标时刻落在这一句的中段，
+  // 应当从 0.6 s 这个采样点接回。**别改成「拖到某个整数秒再看谁在响」**：
+  // 判据必须是「这一句、这个偏移」，不然换一条台词的 at 就悄悄失效了。
   active.SelectCut("CS_Chuchuan");
+  const SEEK_CUE = "ch0_liuwencai_01";
+  const SEEK_AT = 2.8;                       // = 台词 at 2.2 + 期望偏移 0.6
   const audio = window.Taierzhuang.audio;
   const originalPlay = audio.Play;
   const originalStopVoice = audio.StopVoice;
-  const originalVoice = audio.voiceBank.get("prologue_young_dispatch_01");
+  const originalVoice = audio.voiceBank.get(SEEK_CUE);
   const calls = [];
-  audio.voiceBank.set("prologue_young_dispatch_01", { ...(originalVoice || {}), duration: 4 });
+  audio.voiceBank.set(SEEK_CUE, { ...(originalVoice || {}), duration: 4 });
   audio.Play = function(name, opts = {}) {
     calls.push({ name, offset: Number(opts.offset || 0) });
     return { nodes: [], duration: Math.max(0, 4 - Number(opts.offset || 0)) };
   };
   audio.StopVoice = () => true;
   try {
-    active.Seek(9.2);
-    out.audioSeek = calls.findLast((entry) => entry.name === "voice.prologue_young_dispatch_01") || null;
+    active.Seek(SEEK_AT);
+    out.audioSeek = calls.findLast((entry) => entry.name === `voice.${SEEK_CUE}`) || null;
   } finally {
     active.Stop();
     audio.Play = originalPlay;
     audio.StopVoice = originalStopVoice;
-    if (originalVoice) audio.voiceBank.set("prologue_young_dispatch_01", originalVoice);
-    else audio.voiceBank.delete("prologue_young_dispatch_01");
+    if (originalVoice) audio.voiceBank.set(SEEK_CUE, originalVoice);
+    else audio.voiceBank.delete(SEEK_CUE);
   }
 
   // 连点三次必须连过三镜；不能依赖下一帧才更新的 UI shotIndex。
@@ -899,7 +918,7 @@ const seekOk = timeline.cuts.every((c) => c.playing && Math.abs(c.time - 6.0) < 
 Check("六场（含新版与 Legacy）都能拖到 6.0 s", seekOk,
   timeline.cuts.map((c) => `${c.id}=${c.time}`).join(" "));
 Check("Timeline 跳转会同步到对白采样位置",
-  timeline.audioSeek?.name === "voice.prologue_young_dispatch_01"
+  timeline.audioSeek?.name === "voice.ch0_liuwencai_01"
     && Math.abs(timeline.audioSeek.offset - 0.6) < 0.05,
   JSON.stringify(timeline.audioSeek));
 Check("快速连续切镜不会重复卡在同一镜", timeline.rapidShot?.shot === 3,
@@ -1722,10 +1741,15 @@ await Step(6);
 const sample = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const tool = T.editor.active;
-  // 换切片要十几秒；冒烟只挑本切片里的点位，不让面板去切关。
+  // 换切片要十几秒；冒烟只验「位姿装到相机上」，不让面板去切关。
   tool.followPhase = false;
   const saved = { fov: T.editor.flycam.saved.fov, far: T.editor.flycam.saved.far };
-  const point = tool.Points().find((p) => p.phase === T.state.builtPhase);
+  // 本切片里有点位就用它；没有就退到全城俯瞰那一片（2026-08-29 起城里那
+  // 八十来个机位全挂在 phase: "overview" 上，七章切片里只剩三个「时段对照」点）。
+  // 这一节量的是相机位姿，与脚下那片地建没建出来无关。
+  const point = tool.Points().find((p) => p.phase === T.state.builtPhase)
+    || tool.Points().find((p) => p.phase === "overview")
+    || tool.Points()[0];
   const pose = tool.ApplyPointById(point.id);
   const applied = {
     x: +T.camera.position.x.toFixed(2), y: +T.camera.position.y.toFixed(2),

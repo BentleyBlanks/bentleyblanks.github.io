@@ -230,8 +230,14 @@ export const CS_Ch3_BreakWall = {
       n: 2, seconds: 5.4, focalMm: 85,
       note: "军曹走到跟前逼问番号；伤兵答不出来。左边另一名日军把救护白布从担架上扯下来擦刺刀。镜末 0.35 s 刺刀落下，随即切走。",
       camera: { from: [0.2, 1.35, -7.0], look: [0.6, 1.0, 11.2] },
+      // ★ 2026-08-29 抛光批：与序章镜 5 同一类错 —— 字幕窗按字数排的，没对音频长度。
+      //   ch3_ija_gunso_03 的音频 dur=3.48（Data_MissionCh3），原来 0.2 起、字幕窗 3.2 s：
+      //   字先没 0.28 s，而且音要到 3.68 s 才收，下一句却排在 3.50 s —— 压着 0.18 s 重叠。
+      //   LintCutscene 读的是字幕窗（0.2+3.2=3.4 < 3.5），所以它一声不吭。
+      //   改法只挪这两句、**不动镜长 5.4 s**：03 从 0.0 起、窗 3.5 s（音 3.48 收在窗内），
+      //   04 仍在 3.5 s 起、窗 1.9 s 收在镜末 5.4 s。
       lines: [
-        { at: 0.2, seconds: 3.2, who: "ija_gunso", voice: "ch3_ija_gunso_03", text: "支那兵。报出番号。" },
+        { at: 0.0, seconds: 3.5, who: "ija_gunso", voice: "ch3_ija_gunso_03", text: "支那兵。报出番号。" },
         { at: 3.5, seconds: 1.9, who: "ija_gunso", voice: "ch3_ija_gunso_04", text: "不答？" },
       ],
       sfx: [

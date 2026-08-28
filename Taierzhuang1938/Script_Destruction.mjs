@@ -20,6 +20,10 @@ import {
 import {
   FRACTURE_PATTERNS, FRACTURE_SEGMENT_COUNT, FracturePatternAt,
 } from "./Data_FracturePatterns.mjs";
+// 摆点层摆下去的那几件东西（弹药箱、油料桶…）**故意不进碰撞**，所以这一层的
+// NearbyColliders 永远找不到它们。它们的「被炸中」走这张纯规则登记表 ——
+// 由头与分工写在 Script_BlastTargets.mjs 的头注里。
+import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 
 export const MAX_DAMAGE_VOLUMES = 24;
 const MIN_FRAGMENT_HALF = 0.055;
@@ -808,10 +812,18 @@ export class DestructionSystem {
   }
 
   Blast(position, radius, energy, { kind = "grenade" } = {}) {
-    if (!this.battlefield || !(radius > 0) || !(energy > 0)) return { hits: 0, broken: 0 };
+    // 摆点层的物件先算 —— **两道闸都要绕开**：
+    //   · `!this.battlefield`：出图/编辑器里场景还没接上，但摆件已经在场上了；
+    //   · `!this.Enabled`：GAMEPLAY_DESTRUCTION_ENABLED 是**几何破坏**的总闸，
+    //     关掉它不该顺手把「弹药箱打得中吗」一起关掉（那是玩法，不是画面预算）。
+    // 表是空的时候这一行就是一次 Map.size 检查，不值得为它加条件。
+    const targets = BLAST_TARGETS.Blast(position, radius, energy, kind);
+    if (!this.battlefield || !(radius > 0) || !(energy > 0)) {
+      return { hits: 0, broken: 0, targets: targets.hit };
+    }
     if (!this.Enabled) {
       this.disabledHits += 1;
-      return { hits: 0, broken: 0, disabled: true };
+      return { hits: 0, broken: 0, disabled: true, targets: targets.hit };
     }
     const candidates = this.battlefield.NearbyColliders(position.x, position.z, radius + 2.5);
     const broken = [];
@@ -835,7 +847,7 @@ export class DestructionSystem {
       if (result.broken) broken.push(result.pending);
     }
     if (broken.length) this._Commit(broken);
-    return { hits, broken: broken.length };
+    return { hits, broken: broken.length, targets: targets.hit };
   }
 
   _Commit(brokenList) {

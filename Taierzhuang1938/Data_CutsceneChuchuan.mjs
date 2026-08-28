@@ -2569,14 +2569,25 @@ export const CS_Chuchuan = {
     // ── 镜 5｜1:29—1:47 何有田小声＋罗班长三句（自由）──────────────────────
     // 罗班长在镜头前 3.4 秒从门口走回车厢深处、转身对着何有田；
     // 何有田那句「小声」是说给旁边人听的，班长照样听见了 —— 这就是他的答话。
+    //
+    // ★ 2026-08-29 抛光批：本镜四句重排过一次。原来的排法有两处对不上音频 ——
+    //   ① 何有田那句的**字幕窗 5.0 s 比音频短 0.6 s**（Data_MissionCh0 的
+    //      ch0_heyoutian_02 dur=5.60）：字先没，声还在，读起来像配错了；
+    //   ② 音频 0.8+5.60=6.40 s 才收，下一句却排在 6.30 s ——**压着 0.10 s 重叠**。
+    //      LintCutscene 那条重叠检查读的是**字幕窗**（5.0 → 5.8 < 6.3），所以它
+    //      一声不吭；重叠的是音，不是字，只有对着 VOICE_LINES 的 dur 才看得出来。
+    //   改法只动本镜四句的 at/seconds，**镜长仍是 18.0 s**（九镜之和 = 166.5 s 不变）。
+    //   现在每一句的字幕窗都 ≥ 自己的音频长度，且下一句一律排在上一句**音频收尾之后**：
+    //     heyoutian_02  0.8 →音 6.40／字 6.60      luo_06  6.8 →音 7.57／字 9.00
+    //     luo_07        9.2 →音 10.18／字 12.10    luo_08 12.4 →音 14.99／字 17.00
     { n: 5, seconds: 18.0, focalMm: 35,
       camera: { from: [-1.95, 1.36, 3.42], look: [0.60, 1.15, -0.80] },
       sfx: [{ at: 0.3, name: "gearRustle", volume: 0.30 }, { at: 11.8, name: "impactMetal", volume: 0.26 }],
       propMoves: [...SideDoorHoldOpenMoves()],
       lines: [
-        { at: 0.8, seconds: 5.0, who: "heyoutian", voiceCue: "ch0_heyoutian_02", text: "听说李长官讲，我们再撇也比草人强。" },
-        { at: 6.3, seconds: 2.2, who: "luo", voiceCue: "ch0_luo_06", text: "你还笑？" },
-        { at: 9.0, seconds: 2.9, who: "luo", voiceCue: "ch0_luo_07", text: "人家拿话臊你。" },
+        { at: 0.8, seconds: 5.8, who: "heyoutian", voiceCue: "ch0_heyoutian_02", text: "听说李长官讲，我们再撇也比草人强。" },
+        { at: 6.8, seconds: 2.2, who: "luo", voiceCue: "ch0_luo_06", text: "你还笑？" },
+        { at: 9.2, seconds: 2.9, who: "luo", voiceCue: "ch0_luo_07", text: "人家拿话臊你。" },
         { at: 12.4, seconds: 4.6, who: "luo", voiceCue: "ch0_luo_08", text: "枪发到你手头，就打个兵样出来。" },
       ] },
 

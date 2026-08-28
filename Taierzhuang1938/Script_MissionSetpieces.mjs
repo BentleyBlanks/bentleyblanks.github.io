@@ -47,6 +47,10 @@ import {
 } from "./Script_Interact.mjs";
 import { EmplacementInteraction, AmmoResupplyInteraction } from "./Script_Emplacement.mjs";
 import { TelegraphKeyInteraction, TelegraphReconnectInteraction } from "./Script_Telegraph.mjs";
+// 「可被炸中的场景物件」登记表（纯规则，destruction 那一侧每炸一次就喂它一笔）。
+// 二关阶段③的殉爆倒计时靠它才有一只**真的打得中**的弹药箱 ——
+// 分工与为什么不是一条 host 回调，写在 Script_BlastTargets.mjs 的头注里。
+import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 
 // ---------------------------------------------------------------------------
 // 数值
@@ -66,6 +70,26 @@ import { TelegraphKeyInteraction, TelegraphReconnectInteraction } from "./Script
  * columnLaneM     并排两列的横向间距。
  * columnScatterM  遇袭时往路沟一侧散开多远。
  * columnRegoalS   多久给每个人重设一次目标（每帧写目标 = 每帧打断寻路）。
+ *
+ * ── 二关殉爆（§3 阶段③「掷弹筒命中后冒烟倒计时 4—6 s，拖出 6 m 算救下」）──
+ * crateHp          一只弹药箱的耐久。一发掷弹筒直接命中够打穿，
+ *                  三米外的一颗手榴弹不够 —— 不然清侧翼的手榴弹会顺手点着自家的箱子。
+ * crateRadiusM     箱子自己的半径（命中距离先减掉它再算衰减）。
+ * crateFuseS       冒烟倒计时。策划案给的是 4—6 s，取中间。
+ * crateSafeM       拖出这么远算救下（策划案原文 6 m）。
+ * cookoffRadiusM   殉爆的爆炸半径 / cookoffDamage 能量。一箱手榴弹比一发掷弹筒重。
+ * shellFlightS     退路那条（host.Detonate 没接线时走 host.Shell）的飞行时间。
+ *                  Script_Combat.CallIncoming("artillery") 写死 2.6 s，
+ *                  所以炸点要提前这么多秒下单，响声才落在倒计时归零那一刻。
+ *
+ * ── 五关终局（§6 阶段⑪「体力无法完全恢复、两侧夹击、活动空间缩小」）──────
+ * lastStandStaminaFloor  体力恢复上限最低压到这个值（1 = 不压）。
+ * lastStandStaminaStepS  每这么多秒往下压一档。
+ * lastStandStaminaStep   一档压多少。
+ * lastStandWaveS         两侧压上的波次间隔（每波之后自己收紧）。
+ * lastStandWaveTighten   每过一波，间隔乘这个数（越打越密）。
+ * lastStandWaveCount     一波从两侧各上来几个。
+ * lastStandFlankM        两侧院门离机枪位多远（波次的出生点）。
  */
 export const SETPIECE_TUNING = Object.freeze({
   columnSpeedMS: 1.35,
@@ -75,6 +99,22 @@ export const SETPIECE_TUNING = Object.freeze({
   columnLaneM: 3.2,
   columnScatterM: 7.5,
   columnRegoalS: 0.5,
+
+  crateHp: 55,
+  crateRadiusM: 0.55,
+  crateFuseS: 5.0,
+  crateSafeM: 6.0,
+  cookoffRadiusM: 7.5,
+  cookoffDamage: 130,
+  shellFlightS: 2.6,
+
+  lastStandStaminaFloor: 0.45,
+  lastStandStaminaStepS: 22,
+  lastStandStaminaStep: 0.12,
+  lastStandWaveS: 26,
+  lastStandWaveTighten: 0.86,
+  lastStandWaveCount: 3,
+  lastStandFlankM: 26,
 });
 
 const Num = (value, fallback = 0) => {
@@ -380,6 +420,32 @@ class SetpieceContext {
   /** 摆一件关内道具。宿主没接线时返回 null —— 章节侧不因此报错。 */
   Prop(spec) { return this.d.host.Prop?.({ ...spec, tag: spec.tag ?? this.d.levelId }) || null; }
 
+  /**
+   * 把一件东西登记成**可被炸中的实体**（Script_BlastTargets）。
+   *
+   * 与 `Prop` 是两件事：`Prop` 摆的是**看得见**的那一件，这一条登记的是
+   * 「掷弹筒打过来算不算打着它」。两条一般成对写，id 也一律取同一个 ——
+   * 出问题时 `Debug.SetpieceProps` 与 `Debug.BlastTargets` 对得上号。
+   *
+   * tag 一律是本章 levelId，换关由 `Reset` 一把清掉。
+   */
+  BlastTarget(spec = {}) {
+    return BLAST_TARGETS.Register({ ...spec, tag: spec.tag ?? this.d.levelId });
+  }
+
+  /**
+   * 面朝某个方向的 ry。**与关卡数据 `spawn.ry` / 过场 cast 的 ry 同一个口径**：
+   * `ry = atan2(-dx, -dz)`（Data_CutsceneCh5 头上那两行常量就是这么来的：
+   * 面朝西 = +π/2，面朝东 = −π/2）。视角接替落地时要用它，不然人是背着战场出生的。
+   */
+  YawTo(from, to) {
+    if (!from || !to) return 0;
+    const dx = Num(to.x) - Num(from.x);
+    const dz = Num(to.z) - Num(from.z);
+    if (Math.abs(dx) < 1e-6 && Math.abs(dz) < 1e-6) return 0;
+    return Math.atan2(-dx, -dz);
+  }
+
   /** 造一个演员（后送队、担架员、机枪副射手…）。 */
   SpawnActor(spec) { return this.d.host.SpawnActor?.(spec) || null; }
 
@@ -460,6 +526,618 @@ const AID_YARD = {
  * 摆这一章的 A 区差异件。**只摆差异**，院子本身的家底归布设层。
  * 锚点取不到（切片里没有这个路标）就一件不摆，不报错。
  */
+// ---------------------------------------------------------------------------
+// 二关阶段③：可被打中的弹药箱 + 殉爆倒计时
+//
+// 「掷弹筒专找弹药箱」。这一段以前是空的 —— 场上没有一只打得中的箱子
+//（`CookingCrate()` 恒返回 null，§10.7 的施工单第一条）。现在的链路是：
+//
+//   摆点层 Setup           → s.Prop（看得见的那只箱子）
+//                          + s.BlastTarget（打得中的那只箱子）
+//   掷弹筒/手榴弹炸过来     → Script_Combat.Blast → Script_Destruction.Blast
+//                          → BLAST_TARGETS.Blast → 这只箱子的 OnDestroyed
+//   OnDestroyed            → 只记一笔（回调是在 destruction 改拓扑的**半路**上
+//                            被调的，这里做任何演出都等于在别人的栈上加戏）
+//   下一帧的 Update        → 起烟、喊话、开倒计时；玩家拖出 6 m 算救下，否则殉爆
+//
+// **不自己算伤害。** 谁被炸着由 destruction 报，殉爆那一下走宿主的 Detonate /
+// Shell（与日军自己的炮弹同一条爆炸链路），这一层只负责「摆」与「计时」。
+// ---------------------------------------------------------------------------
+
+/** 一只可拖、可被打中的弹药箱。返回它的 id。 */
+function StageCrate(s, id, at, note = "") {
+  if (!at) return null;
+  s.Prop({ id, kind: "box", position: at, color: 0x6b5a41, note });
+  s.BlastTarget({
+    id, x: at.x, y: at.y, z: at.z,
+    radius: s.d.tuning.crateRadiusM, hp: s.d.tuning.crateHp,
+    // **只记事实，不做演出。** 见上面那段链路注释。
+    // 位置取 `info.where`（登记表里那一件此刻在哪儿）而不是闭包里的 at ——
+    // 玩家正抬着它的时候被打中，烟该冒在他怀里，不是冒在箱子原来摆的地方。
+    //
+    // **排队，不是覆盖。** 殉爆那一下会把旁边两只一起打穿（这是对的：一箱手榴弹
+    // 炸开就是会引燃隔壁），一次覆盖式的赋值会让其中一只**再也不冒烟**——
+    // 场上少了一只箱子，却什么都没发生。
+    OnDestroyed: (info) => {
+      s.mem.cookQueue = s.mem.cookQueue || [];
+      s.mem.cookQueue.push({
+        id, hitBy: info.kind,
+        at: { x: info.where.x, y: info.where.y, z: info.where.z },
+      });
+    },
+  });
+  s.Register(PickUpLoadInteraction({
+    id: `${id}_take`, position: at, kindId: "ammoCrate",
+    label: "拖走这一箱", carry: s.carry, once: false,
+    options: { label: "手榴弹箱", payload: { crateId: id, damp: false } },
+    // 抬起来那一刻把地上那只藏掉，不然「手上抬着一只、原地还摆着一只」。
+    // 放下的时候由 UpdateCrateCookoff 在落点补一只回来。
+    OnComplete: () => { s.d.host.SetPropState?.(id, "removed"); },
+  }));
+  return id;
+}
+
+/** 箱子落地：在落点补一只看得见的回来（原来那只在抬起时藏掉了）。 */
+function DropCrateProp(s, cook) {
+  cook.moves = (cook.moves || 0) + 1;
+  // 反复抬起放下不许无限摆件：三次之后就用同一个 id 覆盖（Prop 重名直接返回旧的）。
+  const n = Math.min(3, cook.moves);
+  return s.Prop({ id: `${cook.id}_at${n}`, kind: "box", position: cook.at, color: 0x6b5a41 });
+}
+
+/** 这一帧玩家手上抬着的是不是那只冒烟的箱子。 */
+function CarryingCrate(s, crateId) {
+  const view = s.carry?.View?.();
+  return !!(view && view.payload && view.payload.crateId === crateId);
+}
+
+/**
+ * 殉爆。**优先走宿主的 `Detonate`**（一次立刻发生的爆炸，与日军的炮弹同一条
+ * Combat.Blast）；没接线时退到 `Shell` —— 它走 CallIncoming，带 shellFlightS 的
+ * 飞行时间与一声呼啸，所以调用方要提前那么多秒下单。两条都缺就只剩火与烟。
+ */
+function DetonateCrate(s, at) {
+  if (s.d.host.Detonate) {
+    s.d.host.Detonate({
+      at, radius: s.d.tuning.cookoffRadiusM, damage: s.d.tuning.cookoffDamage, kind: "shell",
+    });
+    return "detonate";
+  }
+  if (s.d.host.Shell) { s.d.host.Shell({ at, count: 1 }); return "shell"; }
+  return "none";
+}
+
+/** 每帧推一下二关的殉爆状态机。 */
+function UpdateCrateCookoff(s) {
+  const T = s.d.tuning;
+  // ⓪ 抬着的那一只跟着人走 —— **不管它有没有在烧**。它在你怀里，照样打得中，
+  //    「抱着一箱手榴弹在巷子里挨了一发」本来就该是这一关能发生的事。
+  const held = s.carry?.View?.()?.payload?.crateId || null;
+  if (held) {
+    const p = s.PlayerPos();
+    if (p) BLAST_TARGETS.MoveTo(held, p.x, p.z, p.y);
+  }
+
+  // ① 立案：destruction 在上一帧报了「这只箱子被打穿了」。
+  //    **一次只烧一只** —— 两只同时冒烟的话玩家只来得及拖一只，
+  //    那不是难度，是设计上没想清楚该拖哪一只。排队的那几只挨个来
+  //    （殉爆引燃隔壁是这一关该有的样子，但要一只一只演）。
+  if (s.mem.cookQueue && s.mem.cookQueue.length && !s.mem.cooking) {
+    const req = s.mem.cookQueue.shift();
+    s.mem.cooking = {
+      id: req.id, at: { ...req.at }, from: { ...req.at },
+      until: s.Time() + T.crateFuseS, saved: false,
+    };
+    s.mem.cookCount = (s.mem.cookCount || 0) + 1;
+    // 冒烟走火墙那条现成的烟源（**不伤人**：现在烧的是箱子，不是路）。
+    s.d.host.Firewall?.({
+      id: `${req.id}_smoke`, from: req.at, to: req.at,
+      seconds: T.crateFuseS + 0.6, damagePlayer: false,
+    });
+    s.Hint("箱子冒烟了 —— 拖开！", 4.0);
+    s.Say("赵德贵", "箱子拖开！", 2.2);
+    // 退路那条要提前下单，响声才落在倒计时归零那一刻。
+    if (!s.d.host.Detonate) {
+      s.After(Math.max(0, T.crateFuseS - T.shellFlightS), (ss) => {
+        const cook = ss.mem.cooking;
+        // 拖走了就别炸了 —— 这一发是给「没拖走」准备的。
+        if (!cook || cook.id !== req.id || cook.saved) return;
+        DetonateCrate(ss, cook.at);
+        cook.fired = true;
+      }, `ch2_cookShell_${req.id}_${s.mem.cookCount}`);
+    }
+  }
+  const cook = s.mem.cooking;
+  if (!cook) return;
+
+  // ② 抬着走：冒烟那只的落点跟着人走（登记表那一侧在 ⓪ 已经挪过了）。
+  const carried = CarryingCrate(s, cook.id);
+  if (carried) {
+    const p = s.PlayerPos();
+    if (p) cook.at = { x: p.x, y: p.y, z: p.z };
+  } else if (cook.wasCarried) {
+    // 中途放下了（F，或者被打断）：在落点补一只看得见的回来。
+    DropCrateProp(s, cook);
+  }
+  cook.wasCarried = carried;
+  const moved = Math.hypot(cook.at.x - cook.from.x, cook.at.z - cook.from.z);
+
+  // ③ 拖出 6 m 算救下。**判的是箱子走了多远，不是玩家走了多远** ——
+  //    空着手跑开六米不算把箱子拖开了。
+  if (carried && moved >= T.crateSafeM) {
+    cook.saved = true;
+    cook.wasCarried = false;
+    s.mem.cooking = null;
+    s.mem.cratesSaved = (s.mem.cratesSaved || 0) + 1;
+    BLAST_TARGETS.Remove(cook.id);
+    s.carry?.Drop("cratePulled");
+    s.Prop({ id: `${cook.id}_safe`, kind: "box", position: cook.at, color: 0x5c4c36 });
+    s.Hint("拖出来了。", 2.4);
+    return;
+  }
+
+  // ④ 到点：殉爆。抬着它的人一起吃 —— 这是「拖」这件事的赌注。
+  if (s.Time() >= cook.until) {
+    s.mem.cooking = null;
+    s.mem.cratesBlown = (s.mem.cratesBlown || 0) + 1;
+    BLAST_TARGETS.Remove(cook.id);
+    s.d.host.SetPropState?.(cook.id, "removed");
+    // 中途放下时补的那几只也一起摘掉 —— 炸完还剩一只完好的箱子在原地是穿帮。
+    for (let n = 1; n <= 3; n += 1) s.d.host.SetPropState?.(`${cook.id}_at${n}`, "removed");
+    if (carried) s.carry?.ForceRelease("cookoff");
+    if (!cook.fired) DetonateCrate(s, cook.at);
+    // 炸完那一片烧起来（对玩家有伤害 —— 一箱手榴弹炸完不会只留个坑）。
+    s.d.host.Firewall?.({
+      id: `${cook.id}_fire`, from: cook.at,
+      to: { x: cook.at.x + 3.2, y: cook.at.y, z: cook.at.z + 1.4 },
+      seconds: 14, damagePlayer: true,
+    });
+    s.Hint("那一箱炸了。", 2.6);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 三关 ER-4：可跟随的电话线（那条线**本身就是路标**）
+//
+// 「HUD 只给方向不给箭头，线本身就是路标。」以前这句话是空的 —— 场上没有线，
+// 「沿电话线前进」只是一行任务文字。
+//
+// 做法：沿本章路标那一串**贴地**铺一条线（策划案原话「样条，贴墙根与地面」）。
+// 走的是运行时轻量摆件那条口子，所以有两条硬约束要守：
+//   · 每件一次 draw call —— 线分段不能按米切，一段三四十米，中点采一次地面高度；
+//   · 换关一把清掉。
+// 断点处不接上：两个断头之间空开一截，玩家自己看得见「线断在这儿」。
+//
+// **本章的运行时摆件因此涨到 28 件**（A 区差异件 8 + 幸存者 3 + 线 17），
+// 超过 Script_Main 那条口子注释里写的「一章十来件」。这一次是有意超的：
+// 那条口径当时只覆盖「同一个院子越来越破」的差异件，而一条四百米长的线
+// 本来就不是几件东西。代价可数：28 次 draw call、不投影、不进 prepass、
+// 不进碰撞导航流送，而开机红线是 5000 —— 它连零头都不到。
+// 真要压回去，把 segMaxM 调大或把 A 区那几件搬去布设层，两条都不动这里的逻辑。
+//
+// **不做**：真正的样条几何（RoadSpline/WallSpline 是建场时的批次几何，
+// 它们出的是烘进场景的路与墙，表达不了「这一关这条线断在哪儿」）。
+// ---------------------------------------------------------------------------
+
+/**
+ * 沿 points 铺一条贴地的线。
+ * @returns 摆下去的件数
+ */
+function LayWire(s, id, points, opts = {}) {
+  // 一段最长多少米。**这是一条画面预算** —— 每段一次 draw call，
+  // 而运行时摆件那条口子的口径是「一章十来件」。38 m 一段是妥协出来的：
+  // 再长，贴地的那一根在起伏上会浮起来；再短，一条街就吃掉几十个 draw call。
+  const segMaxM = Num(opts.segMaxM, 38);
+  const lift = Num(opts.lift, 0.06);
+  const color = opts.color ?? 0x241f1b;
+  const thick = Num(opts.thick, 0.07);
+  let n = 0;
+  let seg = 0;
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const total = Math.hypot(b.x - a.x, b.z - a.z);
+    if (!(total > 0.5)) continue;
+    const parts = Math.max(1, Math.ceil(total / segMaxM));
+    for (let k = 0; k < parts; k += 1) {
+      const t0 = k / parts;
+      const t1 = (k + 1) / parts;
+      const from = { x: a.x + (b.x - a.x) * t0, z: a.z + (b.z - a.z) * t0 };
+      const to = { x: a.x + (b.x - a.x) * t1, z: a.z + (b.z - a.z) * t1 };
+      const len = Math.hypot(to.x - from.x, to.z - from.z);
+      const mx = (from.x + to.x) / 2;
+      const mz = (from.z + to.z) / 2;
+      const y = Num(s.d.host.Ground?.(mx, mz), 0) + lift;
+      // 盒子的长边在局部 +X 上；绕 Y 转 θ 把 +X 转到 (dx,dz)：θ = atan2(-dz, dx)。
+      const ry = Math.atan2(-(to.z - from.z), to.x - from.x);
+      const made = s.Prop({
+        id: `${id}_${seg}`, kind: "box", size: [len, thick, thick],
+        position: { x: mx, y, z: mz }, rotationY: ry, color,
+      });
+      if (made) n += 1;
+      seg += 1;
+    }
+  }
+  return n;
+}
+
+/** 一根电线杆（贴地那条线的支点，也是「这儿有条线」的读法）。 */
+function WirePost(s, id, at, height = 2.6, color = 0x4a3f2f) {
+  if (!at) return null;
+  return s.Prop({
+    id, kind: "box", size: [0.16, height, 0.16],
+    position: { x: at.x, y: Num(at.y, 0), z: at.z }, color,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 三关 ER-6：幸存者实体（「这边还有活的！」那一拍要有人可救）
+//
+// 「屋内散布 4—6 名幸存者，能走的交互一次即跟随幺娃走。」以前这一段只有
+// 「屋内清空」那条闸（§10.7 施工单第三条：缺一类「躺着的、能被交互的人」）。
+//
+// 这一层能拿到的三样东西：`Prop`（躺着那一具的可见体）、`carry` 的 `wounded`
+// 档（背起来 —— 走得慢、打不了枪，这正是「搀扶」该有的代价）、`SpawnActor`
+// （交出去之后自己走的那一个）。三样拼起来就是一条完整的救人回路，
+// **一行新玩法都不用写**（摆点层纪律第二条）。
+//
+// 交给谁：`companion.Locate("yaowa")` —— 幺娃在哪儿，交接点就在哪儿
+//（策划案原话「能走的交给幺娃」）。他不在场时退到 A 区方向的固定点。
+// ---------------------------------------------------------------------------
+
+const CH3_SURVIVORS = [
+  { id: "ch3_surv1", dx: -3.2, dz: 2.6, ry: 0.35, note: "靠着门框，腿上一道" },
+  { id: "ch3_surv2", dx: 1.8, dz: -1.4, ry: -1.10, note: "趴在担架旁边，还有气" },
+  { id: "ch3_surv3", dx: 4.6, dz: 3.2, ry: 0.90, note: "被压在翻倒的门板下头" },
+];
+
+/** 屋里那两三个还活着的人。**只摆躯体**，交互等「这边还有活的！」那一拍再开。 */
+function PlaceSurvivorBodies(s) {
+  let n = 0;
+  for (const item of CH3_SURVIVORS) {
+    const at = s.Near("C3_ForwardAid", item.dx, item.dz);
+    if (!at) break;
+    // 躺着的人：一具人形大小、军装色的躯体。**不是白布** —— 白布那一档
+    // （shroudedBody）是盖死人的，五关 A 区罗班长那一副才是它。
+    const made = s.Prop({
+      id: item.id, kind: "debris", size: [0.54, 0.34, 1.84],
+      position: at, rotationY: item.ry, color: 0x6b6350, note: item.note,
+    });
+    if (made) n += 1;
+    s.mem.survivorAt = s.mem.survivorAt || {};
+    s.mem.survivorAt[item.id] = at;
+  }
+  s.mem.survivorCount = n;
+  return n;
+}
+
+/** 开搀扶。事实（那一句喊出来了）与兜底（屋里清空了）走同一个 Once。 */
+function OpenSurvivorRescue(s) {
+  s.Once("ch3_survivors", (ss) => {
+    const spots = ss.mem.survivorAt || {};
+    ss.mem.survivorsSaved = 0;
+    ss.mem.survivorsTotal = Object.keys(spots).length;
+    if (!ss.mem.survivorsTotal) return;
+    // 交接点：幺娃站的地方。他不在场（选章直跳、名额满了）时退到侧门方向。
+    const HandoffAt = () => ss.companion?.Locate?.("yaowa")
+      || ss.Near("C3_ForwardAid", -8, -6);
+    for (const [id, at] of Object.entries(spots)) {
+      ss.Register(PickUpLoadInteraction({
+        id: `${id}_lift`, position: at, kindId: "wounded",
+        label: "搀起他", carry: ss.carry,
+        options: {
+          label: "还能走的伤兵", canDrop: true, payload: { survivor: id },
+          note: "背着人 —— 走不快，也打不了",
+        },
+        OnComplete: () => { ss.d.host.SetPropState?.(id, "removed"); },
+      }));
+    }
+    ss.Register(GiveSupplyInteraction({
+      id: "ch3_survivorHandoff", Anchor: HandoffAt, item: "伤兵", label: "交给幺娃",
+      Has: () => !!ss.carry?.View?.()?.payload?.survivor,
+      OnComplete: () => {
+        const who = ss.carry?.View?.()?.payload?.survivor || null;
+        ss.carry?.Drop("handedOver");
+        ss.mem.survivorsSaved = (ss.mem.survivorsSaved || 0) + 1;
+        // 交出去之后他自己走：往撤回 A 区那个方向。**不做群体避障**
+        //（与后送队同一条口径），能走出这条街就够了。
+        const at = HandoffAt();
+        const back = ss.Zone("C3_AidReturn") || ss.Zone("C3_EastGateOut");
+        if (at && back) {
+          const handle = ss.SpawnActor({
+            label: "还能走的伤兵", x: at.x + 1.2, z: at.z + 0.8, weapon: null, squadId: "Ch3Survivors",
+          });
+          if (handle) {
+            ss.mem.walkers = ss.mem.walkers || [];
+            ss.mem.walkers.push({ handle, to: { x: back.x, z: back.z }, who });
+          }
+        }
+        if (ss.mem.survivorsSaved >= ss.mem.survivorsTotal) {
+          ss.Hint("能走的都交到幺娃手里了。", 3.2);
+        } else {
+          ss.Hint(`交出去 ${ss.mem.survivorsSaved} 个，还有 ${ss.mem.survivorsTotal - ss.mem.survivorsSaved} 个。`, 2.6);
+        }
+      },
+      once: false,
+    }));
+  });
+}
+
+/** 交出去的那几个自己往回走。每 columnRegoalS 重设一次目标（每帧写＝每帧打断寻路）。 */
+function UpdateWalkers(s) {
+  const list = s.mem.walkers;
+  if (!list || !list.length) return;
+  const now = s.Time();
+  if (now - (s.mem.walkerRegoalAt || -99) < s.d.tuning.columnRegoalS) return;
+  s.mem.walkerRegoalAt = now;
+  for (const w of list) {
+    if (!w.handle) continue;
+    if (s.d.host.Alive && !s.d.host.Alive(w.handle)) continue;
+    s.d.host.SetGoal?.(w.handle, w.to.x, w.to.z);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 四关阶段⑧：罗班长救顺子（固定战场事件 4—6 秒）
+//
+// 策划案原文：「炮弹击中侧墙 → 墙塌、玩家被冲击波击倒、武器脱手、视角贴地、
+// 日军从烟尘中接近补刺 → 罗班长用通用近战动作撞开敌人、拖顺子离开 →
+// 日军火力射来、罗班长腹部中弹。玩家很快恢复控制。」
+//
+// INT2 只接上了三件：无敌窗、检查点、台词（§10.7 施工单第五条 ——
+// 「缺的是那一段的**动作表演**」）。这一轮补的就是那一段，规矩没变：
+//
+//   · **不夺移动权。** 这里一帧都不锁视角、不锁走路。「被掀翻」是把姿态压成卧姿
+//     （GroundPov 走的是现成的 prone），玩家想爬起来随时爬得起来；
+//   · **武器脱手走负重层**，不新造一个「禁火」状态：carry 的 `wounded` 档本来就
+//     「两只手都占着 —— 枪背在背上」，Script_Main 的开火路径见 carry.Blocking 就 return。
+//     四五秒之后脚本自己 ForceRelease 把枪还回去，另有一道看门狗兜底；
+//   · **墙塌走 destruction**：一发真炮弹落在侧墙上（host.Shell → Combat.CallIncoming
+//     → Combat.Blast → Destruction.Blast），碎裂、破口、碎片、重烘导航全是现成的。
+//     炮弹有 shellFlightS 的飞行时间，所以整段从「下单」到「落地」要留出那一段；
+//   · **罗班长走演员**：Detach 掉跟随，然后每半秒把他的 goal 写到玩家脚下 ——
+//     他是自己跑过来的，不是瞬移过来的；
+//   · **超时自动放行**：到点无论走到哪一步，一律还枪、关无敌、收尾。
+//
+// 还欠一件（登记在 Data_MissionCh4 头注 ENGINE_REQUEST 3）：「日军**一名**从烟尘里
+// 接近再被撞开」需要点名一个日军演员，而装配层的 `SpawnActor` 写死 `ai.Spawn("nra")`，
+// `EnemiesNear` 只回个数不回句柄 —— 这一层够不着任何一个日军个体。现在那半秒
+// 用声音演（脚步 → 拉栓 → 撞击 → 倒地），画面上是烟。
+// ---------------------------------------------------------------------------
+
+/**
+ * 这一段的时刻表（秒，相对事件起点）。改这里就是改节奏，别去动散在下面的数。
+ * 全长 releaseS = 5.4 s，落在策划案的「4—6 秒」里。
+ */
+const CH4_SAVE = Object.freeze({
+  whistleS: 0.0,        // 呼啸（炮弹在路上）
+  hitS: 1.2,            // 炮弹落在侧墙上：爆炸声 + 墙塌 + 尘烟 + 击倒 + 脱手
+  ijaNearS: 2.0,        // 烟尘里那一步脚步声
+  ijaBoltS: 2.6,        // 一声拉栓（他要补刺了）
+  luoHitsS: 3.2,        // 罗班长撞开他
+  dragS: 3.8,           // 抓着领子把你往后拖
+  weaponBackS: 4.4,     // 枪捡回来
+  releaseS: 5.4,        // 无敌窗关、整段放行
+  invulnS: 6.2,         // 无敌窗给够（放行之后还留一点余量）
+  groundPovS: 3.2,      // 贴地视角持续多久
+  wallOffsetM: 7.5,     // 侧墙离玩家多远
+  blastRadiusM: 4.5,    // 墙那一下的爆炸半径（够拆一段寨墙，够不着后头的人）
+  blastEnergy: 260,     // 砖石墙面的 health 是 270 —— 一发到位，一发也只到位一段
+});
+
+/** 罗班长救顺子：整段的启动。事实与兜底都走这一个 Once。 */
+function BeginCh4Rescue(s) {
+  s.Once("ch4_luoSaves", (ss) => {
+    const now = ss.Time();
+    ss.mem.rescueAt = now;
+    // ① 先打检查点：这四到六秒里被打倒走**倒带**，不走死亡链路。
+    ss.checkpoint?.Save();
+    ss.d.host.SetPlayerInvulnerable?.(true, CH4_SAVE.invulnS);
+    // ② 推事件：env beat「炮弹打在侧墙上。墙塌下来，你被掀翻，枪脱了手。」挂在它上面。
+    ss.Signal("C4_LuoSaves");
+    // ③ 炮弹在路上。落点取玩家侧后方的墙线。
+    //
+    //    **为什么不走 host.Shell。** Shell = Combat.CallIncoming("artillery")，
+    //    radius 11 / damage 160、落点还带 ±3.5 m 抖动 —— 玩家有无敌窗，
+    //    可**罗班长与幺娃就跟在他身后**，这一发很可能在他自己的戏之前先把他炸死，
+    //    而这一段之后整关都要靠他俩（carryLeader）。
+    //    并且它买不到墙塌：`GAMEPLAY_DESTRUCTION_ENABLED` 现在是 false，
+    //    正片里 Destruction.Blast 直接被 Enabled 那道闸挡掉。
+    //    所以这里只呼啸 + 爆炸声 + 尘烟；真要拆墙的那一下走可选的 `Detonate`
+    //    （半径 4.5 / 能量 260：够打穿一段砖石墙面 health 270，够不着后头的人），
+    //    等破坏总闸向正片放行时它就自己变成真的塌。
+    const p = ss.PlayerPos();
+    const wall = p
+      ? { x: p.x + CH4_SAVE.wallOffsetM, y: p.y, z: p.z - 2.0 }
+      : ss.Near("C4_NarrowLane", CH4_SAVE.wallOffsetM, -2.0);
+    ss.mem.rescueWall = wall;
+    ss.d.host.PlaySfx?.("shellIncoming", { position: wall, volume: 0.9 });
+
+    // ④ 落地那一刻：炸声 + 墙塌 + 尘烟 + 击倒 + 脱手 + 罗班长动身。
+    ss.After(CH4_SAVE.hitS, (c) => {
+      const at = c.mem.rescueWall;
+      c.d.host.PlaySfx?.("explosionNear", { position: at, volume: 1.0 });
+      c.d.host.Detonate?.({
+        at, radius: CH4_SAVE.blastRadiusM, damage: CH4_SAVE.blastEnergy, kind: "shell",
+      });
+      // 尘烟：走火墙那条现成的烟源，**不伤人**（这是灰，不是火）。
+      if (at) c.d.host.Firewall?.({ id: "ch4_wallDust", from: at, to: at, seconds: 7, damagePlayer: false });
+      // 被掀翻：压成卧姿。**玩家仍然能动** —— 想爬起来就爬得起来。
+      c.d.host.GroundPov?.({ seconds: CH4_SAVE.groundPovS, blackOut: false });
+      // 武器脱手：占住手，几秒内打不了枪（见上面那段注释）。
+      c.carry?.Begin("wounded", {
+        label: "枪脱了手", note: "手上空的 —— 先起来",
+        canDrop: false, refuseLine: "枪甩出去了！", payload: { scripted: "ch4_disarm" },
+      });
+      c.d.host.PlaySfx?.("bodyFall", { volume: 0.7 });
+      // 罗班长从跟随里脱出来，直接往玩家脚下跑。
+      c.companion?.Detach("luo");
+      c.mem.rescueTracking = true;
+    }, "ch4_rescueHit");
+
+    // ⑤ 烟尘里的那一个（声音演，见上面的 ENGINE_REQUEST 说明）。
+    ss.After(CH4_SAVE.ijaNearS, (c) => c.d.host.PlaySfx?.("footstepRubble", { volume: 0.85 }), "ch4_rescueStep");
+    ss.After(CH4_SAVE.ijaBoltS, (c) => c.d.host.PlaySfx?.("bolt", { volume: 0.8 }), "ch4_rescueBolt");
+    ss.After(CH4_SAVE.luoHitsS, (c) => {
+      c.d.host.PlaySfx?.("impactFlesh", { volume: 0.75 });
+      c.d.host.PlaySfx?.("bodyFall", { volume: 0.6 });
+    }, "ch4_rescueShove");
+    ss.After(CH4_SAVE.dragS, (c) => {
+      c.d.host.PlaySfx?.("footstepRubble", { volume: 0.6 });
+      c.Hint("他把你往后拖。", 2.2);
+    }, "ch4_rescueDrag");
+
+    // ⑥ 枪还回来。**这是整段唯一必须发生的一件事** —— 看门狗在 Update 里还有一道。
+    ss.After(CH4_SAVE.weaponBackS, (c) => EndCh4Disarm(c), "ch4_rescueArmed");
+    ss.After(CH4_SAVE.releaseS, (c) => EndCh4Rescue(c, "timetable"), "ch4_rescueRelease");
+  });
+}
+
+/** 把枪还回去。重复调是安全的（没占着手就什么都不做）。 */
+function EndCh4Disarm(s) {
+  const view = s.carry?.View?.();
+  if (view && view.payload && view.payload.scripted === "ch4_disarm") {
+    s.carry?.ForceRelease("rearmed");
+    s.Hint("枪捡回来了。", 2.0);
+    return true;
+  }
+  return false;
+}
+
+/** 整段收尾：还枪、关无敌、停掉「罗班长追着玩家跑」。超时也走这一条。 */
+function EndCh4Rescue(s, why = "done") {
+  if (s.mem.rescueEnded) return false;
+  s.mem.rescueEnded = why;
+  EndCh4Disarm(s);
+  s.d.host.SetPlayerInvulnerable?.(false);
+  s.mem.rescueTracking = false;
+  s.companion?.Attach("luo");
+  return true;
+}
+
+/** 每帧：罗班长往玩家脚下跑 + 超时看门狗。 */
+function UpdateCh4Rescue(s) {
+  const began = s.mem.rescueAt;
+  if (!began) return;
+  const now = s.Time();
+  // 罗班长的演员：半秒一次重设目标（每帧写目标 = 每帧打断寻路）。
+  if (s.mem.rescueTracking && now - (s.mem.rescueGoalAt || -99) >= s.d.tuning.columnRegoalS) {
+    s.mem.rescueGoalAt = now;
+    const handle = s.companion?.Handle?.("luo");
+    const p = s.PlayerPos();
+    if (handle && p) s.d.host.SetGoal?.(handle, p.x, p.z);
+  }
+  // 看门狗：定时器被别的路径吞掉时（换关、过场打断、异常），这一条照样把枪还回去。
+  // **不许出现「事件演完了枪还在地上」** —— 那一关从此打不动。
+  if (!s.mem.rescueEnded && now - began > CH4_SAVE.releaseS + 2.0) {
+    EndCh4Rescue(s, "watchdog");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 五关阶段⑪：最终白刃的两条终局手感
+//
+// 策划案：「两侧夹击、**体力无法完全恢复**、弹药越来越少、无小队救援、
+// 活动空间缩小。守不住整条街。」INT2 只接上了钉关与判定（§10.7 施工单第六条：
+// 「这两条是玩家参数与 AI 压迫曲线」）。
+//
+// **章节作用域，一个全局数都不动。** 两条都走宿主动词，参数只在
+// SETPIECE_TUNING 的 lastStand* 那一组里，而且都在这一章结束时**还原**：
+//   · 体力：`SetStaminaCeiling(v)` —— 恢复的上限，不是消耗速度。
+//     Script_Player 的 `stamina = Clamp01(stamina + ...)` 那一行的上限从 1 变成 v，
+//     「跑一段、喘不匀、再跑一段更短」就是它。DIFFICULTY.staminaSeconds 一个字不改。
+//   · 波次：`SpawnEnemy({x,z})` —— 从机枪位两侧的院门各上来几个，间隔越收越紧。
+//     tuning.ijaSpawn 已经是 ["west","south"] 两侧，这一层加的是**时序**。
+//
+// 两条宿主动词现在都还没接线（装配层不在本批的可改范围内），所以这一段现在
+// 静默不发生 —— 与摆点层其余每一条的降级方式一致。要它们发生，Script_Main 的
+// setpieces host 里各加一行（照抄下面注释里的签名），这张表一个字都不用改。
+// ---------------------------------------------------------------------------
+
+/** 终局开始（顺子转身回去那一拍）。 */
+function BeginCh5LastStand(s) {
+  s.Once("ch5_lastStand", (ss) => {
+    ss.mem.lastStandAt = ss.Time();
+    ss.mem.staminaCeil = 1;
+    ss.mem.waveAt = ss.Time();
+    ss.mem.waveGap = ss.d.tuning.lastStandWaveS;
+    ss.mem.waves = 0;
+    ss.mem.waveSpawned = 0;
+  });
+}
+
+/** 终局收束：把借来的两样东西还回去（体力上限、波次时钟）。 */
+function EndCh5LastStand(s) {
+  if (!s.mem.lastStandAt) return false;
+  s.mem.lastStandAt = 0;
+  if (s.mem.staminaCeil !== 1) {
+    s.mem.staminaCeil = 1;
+    s.d.host.SetStaminaCeiling?.(1);
+  }
+  return true;
+}
+
+function UpdateCh5LastStand(s) {
+  const began = s.mem.lastStandAt;
+  if (!began) return;
+  const T = s.d.tuning;
+  const now = s.Time();
+
+  // ① 体力恢复上限逐档往下压，压到 lastStandStaminaFloor 为止。
+  //    **不碰消耗速度** —— 那是全作手感（DIFFICULTY.staminaSeconds）。
+  const steps = Math.floor((now - began) / T.lastStandStaminaStepS);
+  const want = Math.max(T.lastStandStaminaFloor, 1 - steps * T.lastStandStaminaStep);
+  if (Math.abs(want - (s.mem.staminaCeil ?? 1)) > 1e-3) {
+    s.mem.staminaCeil = want;
+    s.d.host.SetStaminaCeiling?.(want);
+  }
+
+  // ② 两侧压上的波次。间隔每过一波乘 lastStandWaveTighten —— 越打越密。
+  if (now - s.mem.waveAt < s.mem.waveGap) return;
+  s.mem.waveAt = now;
+  s.mem.waveGap = Math.max(8, s.mem.waveGap * T.lastStandWaveTighten);
+  s.mem.waves = (s.mem.waves || 0) + 1;
+  const nest = s.Zone("C5_GunNest");
+  if (!nest || !s.d.host.SpawnEnemy) return;
+  // 长街沿 X 走（z≈0），所以「两侧」= ±Z 的那两排院门；东边（+X）是他们来的方向。
+  for (let side = -1; side <= 1; side += 2) {
+    for (let i = 0; i < T.lastStandWaveCount; i += 1) {
+      const x = nest.x + 14 + i * 3.4;
+      const z = nest.z + side * T.lastStandFlankM + (i - 1) * 1.8;
+      const handle = s.d.host.SpawnEnemy({
+        x, z, weapon: i === 0 ? "Type38" : null, squadId: `Ch5Wave${s.mem.waves}`,
+      });
+      if (handle) s.mem.waveSpawned = (s.mem.waveSpawned || 0) + 1;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 五关阶段⑫：视角接替 —— 一秒黑帧 + 身份字卡 + 落在正确的位置与朝向上
+//
+// INT2 的 SwitchPov 只搬人 + 换任务文字（§10.7 施工单最后一条）。补的是两件：
+//   · **换身份的表现**：三张 1 s 黑帧字卡（Data_CutsceneCh5 的 PovCard，
+//     版式与序章那张地点卡同一档；黑帧上声音不断，与「用声音衔接」不冲突）；
+//   · **落地朝向**：`SwitchPov` 现在带 `yaw`（口径同 spawn.ry，见 ctx.YawTo）。
+//     不给朝向的话，接替过去的人是**背着战场**站着的 —— 换了身份第一眼看见的
+//     是墙，那半分钟的「他在干什么」就没了。
+//     装配层还没读这个字段时它就是被忽略的一个多余属性，不报错。
+// ---------------------------------------------------------------------------
+
+function SwitchPovWithCard(s, spec) {
+  const at = spec.at;
+  if (!at) return false;
+  // 卡先播：黑帧盖住这一次搬人。播不动（宿主没接过场）时就是直接换过去。
+  if (spec.card) s.d.host.PlayCutscene?.(spec.card);
+  s.d.host.SwitchPov?.({
+    id: spec.id, cast: spec.cast, label: spec.label, at, task: spec.task,
+    yaw: spec.face ? s.YawTo(at, spec.face) : undefined,
+  });
+  s.mem.povAt = spec.id;
+  s.mem.povCount = (s.mem.povCount || 0) + 1;
+  return true;
+}
+
 function DressAidYard(s, levelId) {
   const plan = AID_YARD[levelId];
   if (!plan) return 0;
@@ -747,6 +1425,21 @@ export const SETPIECES = {
           once: false,
         }));
       }
+
+      // ③ 摆在缺口后头那三只**打得中**的箱子（StageCrate 上面那段注释是完整链路）。
+      //    位置照策划案：投弹点与院墙之间那一片 —— 掷弹筒够得着，玩家也拖得动。
+      //    三只是给三次机会，不是三次同时冒烟（状态机一次只烧一只）。
+      const cook = [
+        { id: "ch2_cookCrate1", dx: -4.0, dz: 3.0, note: "摞在墙根的手榴弹箱" },
+        { id: "ch2_cookCrate2", dx: 1.5, dz: 5.5, note: "刚拖过来的一箱" },
+        { id: "ch2_cookCrate3", dx: 5.0, dz: 2.0, note: "压在瓦砾上的一箱" },
+      ];
+      s.mem.cookCrates = 0;
+      for (const item of cook) {
+        const at = s.Near("C2_Courtyard", item.dx, item.dz);
+        if (!at) break;
+        if (StageCrate(s, item.id, at, item.note)) s.mem.cookCrates += 1;
+      }
     },
 
     onVoice: {
@@ -770,16 +1463,10 @@ export const SETPIECES = {
 
     Update(s) {
       // ③ 殉爆：掷弹筒命中弹药箱 → 冒烟 4—6 s → 拖出 6 m 算救下。
-      //    引擎侧的「谁被打中了」由宿主报（destruction / combat 的回执），
-      //    没接线时这一段静默不发生 —— 不自己造一套伤害判定。
-      const cooking = s.d.host.CookingCrate?.();
-      if (cooking && !s.mem.cookingId) {
-        s.mem.cookingId = cooking.id;
-        s.Hint("箱子冒烟了 —— 拖开！", 4.0);
-        s.Say("赵德贵", "箱子拖开！", 2.2);
-      } else if (!cooking && s.mem.cookingId) {
-        s.mem.cookingId = null;
-      }
+      //    「谁被打中了」由 destruction 经 Script_BlastTargets 报上来（不是时钟、
+      //    也不是这一层自己算的伤害）；状态机在 UpdateCrateCookoff 里，完整链路
+      //    见它上面那段注释。宿主一件都没接线时它静默不发生，不报错。
+      UpdateCrateCookoff(s);
 
       // ④ 缺口内日军清空 → BayonetDone。**不许把「打完了」写成时间到了** ——
       //    兜底判据在 Data_MissionCh2.EVENTS 里，这里只报事实。
@@ -801,7 +1488,11 @@ export const SETPIECES = {
   //
   //   ①  A 区：搬药箱、拆门板、接电话线（ER-5 / ER-4）
   //   ④  报纸（ER-7）
+  //   ⑥  **看得见的那条电话线**：A 区 → 侧门 → 失守街区 → C 区，失守街区那一头断开
+  //       （ER-4「线本身就是路标」；LayWire / WirePost 上面那段注释是完整口径）
   //   ⑦⑧ 处决声音先行段 → 破墙确认 → CS_Ch3_BreakWall（ER-1）
+  //   ⑨  **幸存者实体**：屋里三具躺着的人 → 搀起（carry 的 wounded 档）→ 交给幺娃
+  //       → 他自己往 A 区方向走（ER-6；「这边还有活的！」那一拍开门）
   //   ⑩  撕短褂（ER-2）
   //   ⑪  传单入火 → 火墙封路（ER-3）
   //   ⑫  剪线（ER-4）
@@ -867,6 +1558,45 @@ export const SETPIECES = {
           },
         }));
       }
+
+      // ⑥ 那条**看得见的**电话线（ER-4：线本身就是路标）。
+      //    走线照本章路标：A 区 → 东门侧门 → 失守街区 → C 区前沿救护点。
+      //    在失守街区那一头**断开**：两个断头空着一截，中间没有线 ——
+      //    「最后一段线路还通，不是我们这边断的」是靠这一眼成立的，不是靠台词。
+      const lineYard = s.Zone("C3_AidStation");
+      const lineGate = s.Zone("C3_EastGateOut");
+      const lineLost = s.Zone("C3_LostBlock");
+      const lineFwd = s.Zone("C3_ForwardAid");
+      if (lineYard && lineGate && lineLost && lineFwd) {
+        const P = (z, dx = 0, dz = 0) => ({ x: z.x + dx, z: z.z + dz });
+        // 断口取剪线交互那一处（Near("C3_LostBlock", -8, 4)）前后各 4 m。
+        const cutAt = { x: lineLost.x - 8, z: lineLost.z + 4 };
+        s.mem.wireProps = 0;
+        s.mem.wireProps += LayWire(s, "ch3_wireA", [
+          P(lineYard, 9, 3), P(lineGate, -6, 6), { x: cutAt.x - 3.4, z: cutAt.z - 1.2 },
+        ]);
+        s.mem.wireProps += LayWire(s, "ch3_wireB", [
+          { x: cutAt.x + 3.4, z: cutAt.z + 1.2 }, P(lineLost, 6, -6), P(lineFwd, -7, 4),
+        ]);
+        // 两个断头：一段翘起来的短线 + 一根歪掉的杆。断口本身不接。
+        s.Prop({
+          id: "ch3_wireEndA", kind: "box", size: [1.1, 0.07, 0.07], rotationY: 0.42,
+          position: { x: cutAt.x - 2.4, y: Num(s.d.host.Ground?.(cutAt.x - 2.4, cutAt.z - 0.9), 0) + 0.22, z: cutAt.z - 0.9 },
+          color: 0x241f1b, note: "断头（这一头还带着电）",
+        });
+        s.Prop({
+          id: "ch3_wireEndB", kind: "box", size: [1.1, 0.07, 0.07], rotationY: -0.30,
+          position: { x: cutAt.x + 2.4, y: Num(s.d.host.Ground?.(cutAt.x + 2.4, cutAt.z + 0.9), 0) + 0.18, z: cutAt.z + 0.9 },
+          color: 0x241f1b, note: "断头（另一头）",
+        });
+        WirePost(s, "ch3_wirePost1", s.Near("C3_EastGateOut", -6, 6), 2.6);
+        WirePost(s, "ch3_wirePost2", { x: cutAt.x, y: Num(s.d.host.Ground?.(cutAt.x, cutAt.z), 0), z: cutAt.z }, 1.5, 0x3d3428);
+        WirePost(s, "ch3_wirePost3", s.Near("C3_LostBlock", 6, -6), 2.6);
+      }
+
+      // ⑨ 屋里那两三个还活着的人（ER-6）。**躯体在 Setup 就摆**——玩家破墙看见的
+      //    院子里本来就躺着人；能不能搀走要等「这边还有活的！」那一拍（见 onVoice）。
+      PlaceSurvivorBodies(s);
     },
 
     onZone: {
@@ -917,6 +1647,12 @@ export const SETPIECES = {
     },
 
     onVoice: {
+      // ⑨ 幺娃喊「这边还有活的！」—— **搀扶就从这一拍开门**（ER-6）。
+      //    这是「节拍与实体对齐」的那一条：喊出来的同一刻屋里的人真的可以被搀走，
+      //    不是喊完之后玩家在空屋里找一圈。
+      ch3_yaowa_09(s) { OpenSurvivorRescue(s); },
+      // ⑨ 「能走的交给幺娃！」—— 同一件事的另一条入口（Once 保证只开一次）。
+      ch3_luo_17(s) { OpenSurvivorRescue(s); },
       // ⑩ 军医喊「绷带没得了！」之后才亮出短褂 —— 在那之前它不可用、不进 HUD。
       ch3_junyi_06(s) {
         const at = s.Near("C3_ForwardAid", 2, -3);
@@ -966,8 +1702,17 @@ export const SETPIECES = {
       if (s.d.once.has("ch3_execConfirmed") && !s.mem.cleared) {
         const zone = s.Zone("C3_ForwardAid");
         const left = zone ? Num(s.d.host.EnemiesNear?.(zone.x, zone.z, zone.radius), -1) : -1;
-        if (left === 0) { s.mem.cleared = true; s.Signal("AssaultCleared"); }
+        if (left === 0) {
+          s.mem.cleared = true;
+          s.Signal("AssaultCleared");
+          // 兜底：那两句喊话被吞掉时（语音占麦、玩家跑太快），屋里清空这件**事实**
+          // 同样开门。少了这一条，「这边还有活的」没播出去 = 人永远搀不起来。
+          OpenSurvivorRescue(s);
+        }
       }
+
+      // ⑨ 交出去的那几个自己往回走。
+      UpdateWalkers(s);
     },
   },
 
@@ -978,7 +1723,8 @@ export const SETPIECES = {
   //   ③  写信（贴图纸片道具）
   //   ③  CS_Ch4_UnfinishedLetter 改挂**休整之后**（关中过场）
   //   ⑤⑦ 两枚照明弹
-  //   ⑧  罗班长救顺子（固定事件 4—6 s）→ 罗班长 SetAbsent 从五关起永久缺席
+  //   ⑧  罗班长救顺子（固定事件 4—6 s：炮响→墙塌→击倒贴地→武器脱手→罗班长跑过来
+  //       →撞开→拖走→中弹；时刻表与规矩见 BeginCh4Rescue）→ SetAbsent 永久缺席
   //   ⑨  carryLeader：幺娃与一名士兵抬罗班长，玩家掩护
   //   ⑩  CS_Ch4_AidStation 挂**进 A 区那一拍**（关中过场）
   // =========================================================================
@@ -1060,17 +1806,20 @@ export const SETPIECES = {
       ch4_luo_05(s) {
         s.After(3.0, (ss) => ss.d.host.PlayCutscene?.("CS_Ch4_UnfinishedLetter"), "ch4_letterCut");
       },
-      // ⑧ 罗班长救顺子。固定战场事件 4—6 s：墙塌 → 击倒 → 武器脱手 → 贴地视角 →
-      //    日军补刺 → 罗班长撞开他、把玩家往后拖 → 腹部中弹。
-      //    **事件期间玩家不许死**：先打一个检查点，再把伤害交给演出。
+      // ⑧ 罗班长救顺子的**起点**。幺娃「顺哥！左边！」是这一段前面的最后一句 ——
+      //    挂在它上面，整段就由剧本自己起头，不必等 EVENTS 的时刻兜底。
+      //    整段的时刻表与规矩在 BeginCh4Rescue 上面那段注释里。
+      ch4_yaowa_07(s) { BeginCh4Rescue(s); },
+      // ⑧ 兜底入口：那一句被吞掉时（语音占麦、玩家跑太快），罗班长喊「起来！」
+      //    这一拍照样把整段起起来。Once 保证两条路只走一次。
       ch4_luo_16(s) {
-        s.checkpoint?.Save();
-        s.d.host.SetPlayerInvulnerable?.(true, 6.5);
-        s.mem.luoSavedAt = s.Time();
+        BeginCh4Rescue(s);
+        s.mem.luoSavedAt = s.mem.rescueAt || s.Time();
       },
       // ⑧ 收尾：罗班长腹部中弹。他从这一拍起是**伤员**，不是战斗员。
+      //    枪也在这一拍之前还给玩家了（EndCh4Rescue 里那一下）。
       ch4_luo_17(s) {
-        s.d.host.SetPlayerInvulnerable?.(false);
+        EndCh4Rescue(s, "luoWounded");
         s.mem.luoWounded = true;
         // 抬他的人：幺娃 + 一名士兵。抬的人被打倒时要有第二个人接手 ——
         // 「担架落地卡住流程」是这一段唯一不许出现的失败态。
@@ -1090,7 +1839,8 @@ export const SETPIECES = {
       },
     },
 
-    Update() {},
+    // ⑧ 罗班长往玩家脚下跑 + 「枪一定要还回来」的看门狗。
+    Update(s) { UpdateCh4Rescue(s); },
   },
 
   // =========================================================================
@@ -1103,7 +1853,8 @@ export const SETPIECES = {
   //   ⑦  生路三重确认
   //   ⑧  TurnedBack → CS_Ch5_TurnBack（关中过场）
   //   ⑪  钉关：坚持到最后一副担架离开视野
-  //   ⑫  povChain 三段 → ChapterRelease
+  //   ⑪  终局手感：体力恢复上限递减 + 两侧压上的波次（章节作用域，换关还原）
+  //   ⑫  povChain 三段（1 s 黑帧＋身份字卡＋落地朝向）→ ChapterRelease
   // =========================================================================
   CH5_Chengqiang: {
     id: "CH5_Chengqiang",
@@ -1219,6 +1970,9 @@ export const SETPIECES = {
       ch5_shunzi_07(s) {
         s.Signal("TurnedBack");
         s.d.host.SilenceCoverFire?.(false);
+        // ⑪ 终局手感从这一拍起算：体力恢复上限逐档往下压、两侧的波次开钟。
+        //    **章节作用域**，收在 ch5_shunzi_18（他倒下）与换关时还原。
+        BeginCh5LastStand(s);
       },
       // ⑩② 最后防守第二层：机枪卡壳 + 弹尽。**脚本把这挺枪弄坏**，
       //     不许替玩家离位 —— 拉几下枪机、什么时候弃枪是玩家自己的事。
@@ -1232,34 +1986,50 @@ export const SETPIECES = {
       ch5_shunzi_14(s) { s.Signal("LastFriendDown"); },
       // ⑩③ 装上刺刀，四连吼开始。
       ch5_shunzi_15(s) { s.Signal("BayonetFixed"); s.d.host.SetMeleeGate?.(true); },
-      // ⑪ 中弹倒地（不切黑）。
+      // ⑪ 中弹倒地（不切黑）。终局那两条借来的旋钮在这一拍还回去 ——
+      //    接下来是另外三个人，他们不该继承顺子那条压下去的体力线。
       ch5_shunzi_18(s) {
         s.After(24, (ss) => {
           ss.Signal("ShunziDown");
           ss.d.host.GroundPov?.({ seconds: 5.0, blackOut: false });
+          // **他倒下的那一刻**才把终局那两条借来的旋钮还回去 —— 不是他说那句话的
+          // 时候（那之后还有二十多秒白刃要打，提前还等于把最后那一段松开了）。
+          // 后面三段接替是另外三个人，不该继承顺子那条压下去的体力线。
+          EndCh5LastStand(ss);
         }, "ch5_shunziDown");
       },
-      // ⑫ 视角接替三段。**每一段都是玩家控制**：换出生点 + 换身份 + 一段短活。
-      //    段与段之间不切黑，用声音衔接。
+      // ⑫ 视角接替三段。**每一段都是玩家控制**：一秒黑帧＋身份字卡 → 换出生点
+      //    ＋朝向 → 一段短活。口径见 SwitchPovWithCard 上面那段注释。
       ch5_canmou_01(s) {
         s.Signal("PovGunner");
-        s.d.host.SwitchPov?.({
+        const at = s.Near("C5_WestStreet", 8, 2.4);
+        SwitchPovWithCard(s, {
           id: "gunner", cast: "s124", label: "一二四师机枪副射手",
-          at: s.Near("C5_WestStreet", 6, -4), task: "接过机枪，打完这一梭",
+          card: "CS_Ch5_PovGunnerCard", at, task: "接过机枪，打完这一梭",
+          // 面朝十字街口（东）—— 日军是从那头压过来的。背着街坐下就等于没有这一段。
+          face: s.Zone("C5_Crossroad"),
         });
       },
       ch5_xiaoqin_01(s) {
         s.Signal("PovLineman");
-        s.d.host.SwitchPov?.({
+        // 位置对着关末那一场（CS_Ch5_PovChain 镜 3/4 的电话兵就在这一带），
+        // 玩家上一眼看见的院子与他这一刻站的院子是同一个。
+        const at = s.Near("C5_Crossroad", -94, -3.4);
+        SwitchPovWithCard(s, {
           id: "lineman", cast: "xiaoqin", label: "前沿电话兵",
-          at: s.Near("C5_Crossroad", -6, 8), task: "把伤亡报告递进院子",
+          card: "CS_Ch5_PovLinemanCard", at, task: "把伤亡报告递进院子",
+          // 面朝院子深处（炊事兵拿枪、医护兵搬弹的那一头）。
+          face: at ? { x: at.x - 4.5, z: at.z - 4.0 } : null,
         });
       },
       ch5_xiaoqin_02(s) {
         s.Signal("PovXiaoqin");
-        s.d.host.SwitchPov?.({
+        const at = s.Near("C5_AidRuin", 4, -6);
+        SwitchPovWithCard(s, {
           id: "xiaoqin", cast: "xiaoqin", label: "通信兵小秦",
-          at: s.Near("C5_AidRuin", 4, -6), task: "接线：东关回话",
+          card: "CS_Ch5_PovXiaoqinCard", at, task: "接线：东关回话",
+          // 面朝 A 区那半截电话杆（AID_YARD.CH5_Chengqiang 的 a5_phonePost）。
+          face: s.Near("C5_AidRuin", 12.5, 1.0),
         });
       },
       // ⑫ 小秦喊完「听到回话！」—— **钉关放行就在这一拍**。
@@ -1272,6 +2042,8 @@ export const SETPIECES = {
 
     Update(s, dt) {
       s.mem.column?.Update(dt);
+      // ⑪ 终局手感：体力恢复上限递减 + 两侧压上的波次（章节作用域，见上面那段注释）。
+      UpdateCh5LastStand(s);
       // ⑪ 唯一判定：**坚持到最后一副担架离开视野**（不是打赢）。
       // 队列走完全部路点 = 最后一副担架出了西关。
       if (s.mem.column?.arrived) {
@@ -1430,12 +2202,41 @@ export const SETPIECES = {
  *   SetMeleeGate(on)                 白刃 QTE 的正片开关
  *   SetPlayerInvulnerable(on, secs)  固定事件那 4—6 秒
  *   EnemiesNear(x, z, r) -> number   这一片还有几个活着的日军
- *   CookingCrate() -> {id}|null      正在冒烟等着殉爆的弹药箱
  *   TakeItem(id) -> boolean          从背包里扣一件（民用短褂）
+ *
+ * ── 2026-08-29 抛光批 P1 要的三条（**装配层还没接线**）──────────────────────
+ * 三条都写成可选，没接线时那件事静默不发生（与本层其余每一条一致）。
+ * 各只要 Script_Main 的 setpieces host 里加一行：
+ *
+ *   Detonate({at,radius,damage,kind}) -> boolean
+ *       立刻在 at 炸一下（二关弹药箱殉爆）。走 Combat.Blast，与日军的炮弹同一条链路：
+ *         Detonate: ({ at, radius = 7.5, damage = 130, kind = "shell" }) =>
+ *           !!combat?.Blast(new THREE.Vector3(at.x, at.y ?? 0, at.z), radius, damage, kind),
+ *       没接线时退到 `Shell`（CallIncoming，带 2.6 s 飞行与一声呼啸，
+ *       所以摆点层会提前那么多秒下单）—— 能用，只是多一声不该有的呼啸。
+ *
+ *   SetStaminaCeiling(v)             体力**恢复的上限**（1 = 常态）。五关终局章节作用域：
+ *         SetStaminaCeiling: (v) => { if (player) player.staminaCeiling = Math.max(0.2, Math.min(1, v)); },
+ *       另需 Script_Player 那一行 `Clamp01(this.stamina + ...)` 改成夹到
+ *       `this.staminaCeiling ?? 1`。**不许动 DIFFICULTY.staminaSeconds**（那是全作手感）。
+ *
+ *   SpawnEnemy({x,z,weapon,squadId}) -> handle|null   撒一个**日军**（五关终局两侧的波次）。
+ *       现有的 SpawnActor 写死 `ai.Spawn("nra", ...)`，这一层够不着任何一个日军个体；
+ *       四关阶段⑧「点名一个日军从烟尘里走近再被撞开」缺的也是它。
+ *         SpawnEnemy: ({ x, z, weapon, squadId }) => ai?.Spawn("ija", x, z, { weapon, squadId }) ?? null,
+ *
+ * 另：`SwitchPov` 现在多收一个 `yaw`（落地朝向，口径同 spawn.ry）。装配层读它之前
+ * 它只是个被忽略的属性 —— 表现是接替过去的人背着战场站着（见 SwitchPovWithCard）。
+ *
+ * ── 已作废 ──────────────────────────────────────────────────────────────────
+ *   CookingCrate() —— 由 Script_BlastTargets 取代：弹药箱现在是**真的打得中的实体**，
+ *   destruction 每炸一次就把事实喂进那张登记表，不再需要宿主自己报「哪只在冒烟」。
  */
 export class MissionSetpieceDirector {
   constructor(host = {}) {
     this.host = host;
+    /** 摆点层自己的旋钮。章节数据只写常量名，不写数（AGENTS 硬规矩 12）。 */
+    this.tuning = { ...SETPIECE_TUNING, ...(host.tuning || {}) };
     this.levelId = null;
     this.phase = null;
     this.spec = null;
@@ -1498,8 +2299,17 @@ export class MissionSetpieceDirector {
   Reset(reason = "reset") {
     for (const column of this.columns) column.Reset();
     this.columns.length = 0;
+    // 五关终局借走的那条体力上限**一定要还** —— 忘了还的症状是「下一关一进去
+    // 就跑两步喘不上气」，而下一关的数据里根本没有这回事。
+    if (this.mem && this.mem.staminaCeil !== undefined && this.mem.staminaCeil !== 1) {
+      try { this.host.SetStaminaCeiling?.(1); } catch { /* 宿主的事 */ }
+    }
     if (this.levelId) {
       try { this.host.Interact?.()?.Clear(this.levelId); } catch { /* 宿主的事 */ }
+      // 可被炸中的物件也按本章 tag 清。**漏了这一条的症状很隐蔽**：
+      // 上一关那只弹药箱还在表里，下一关同一片地方一炸，它的 OnDestroyed 会
+      // 往一个已经换过的 mem 上写字（那个闭包捕获的是上一关的 s）。
+      BLAST_TARGETS.Clear(this.levelId);
     }
     this.levelId = null;
     this.phase = null;

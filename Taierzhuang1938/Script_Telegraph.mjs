@@ -32,12 +32,13 @@
 // 松手进度退回去但不清零 —— 手抖一下不该从头再接一次。
 //
 // ── 音效 ────────────────────────────────────────────────────────────────────
-// 两条 key 由 A2 批登记在 `Data_SfxSources`（telegraphKey 三变体 / telegraphHum
-// 一条 loop，现在还在 `manifest.pendingCues` 里）。**同名合成配方合上之前
-// `audio.Play` 静默返回 null**，所以每条都带一个「现有最近的源」当备胎
-// （见 TELEGRAPH_SFX），第一次播不响就换备胎并记住 —— 与 Script_AircraftStrafe
-// 同一条写法。电键那条的备胎是 `grenadePin`，这是 Data_MissionCh6 头注
-// 「现在拿 grenadePin 顶」定下的口径，不是随手挑的。
+// 两条 key（telegraphKey 三变体 / telegraphHum 一条 loop）由 A2 批登记在
+// `Data_SfxSources`，**2026-08-29 集成批 INT3a 已经接线完毕**：合成配方补齐、
+// 素材从 `manifest.pendingCues` 毕业进 `cues`，`audio.Play` 现在会真的出声。
+// 备胎那条路（TELEGRAPH_SFX）保留不动 —— 它不是给「还没接线」用的，是给
+// 「这一台机器上采样没载到 / 音频关掉了」用的：第一次播不响就换备胎并记住，
+// 与 Script_AircraftStrafe 同一条写法。电键那条的备胎是 `grenadePin`，
+// 这是 Data_MissionCh6 头注「现在拿 grenadePin 顶」定下的口径，不是随手挑的。
 //
 // ── 给集成批的 CH6 摆点示例（坐标照 Data_MissionCh6.CHAPTER.zones）──────────
 //

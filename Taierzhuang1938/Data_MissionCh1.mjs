@@ -422,15 +422,15 @@ export const VOICE_LINES = [
   //    §0 说顺子的性格靠剧情节点表达，不靠他自己解释，所以说话的是班长。
   { key: "ch1_luo_01", who: "luo", delivery: "shout", dur: 0.67, text: "枪上膛！" },
   { key: "ch1_luo_02", who: "luo", delivery: "shout", dur: 1.88, text: "前头田坎有人影！" },
-  { key: "ch1_luo_03", who: "luo", delivery: "shout", dur: 1.80, text: "莫等他走拢！打！" },
+  { key: "ch1_luo_03", who: "luo", delivery: "shout", dur: 1.99, text: "莫等他走拢！打！" },
   { key: "ch1_luo_04", who: "luo", delivery: "shout", dur: 2.31, text: "掷弹筒！听到响就换地方！" },
   { key: "ch1_luo_05", who: "luo", delivery: "shout", dur: 3.06, text: "少扯！顺子，把箱子送过去！" },
   { key: "ch1_luo_06", who: "luo", delivery: "shout", dur: 2.60, text: "涵洞那头有人摸过来！封起！" },
-  { key: "ch1_luo_07", who: "luo", delivery: "shout", dur: 2.49, text: "退到村口！靠田坎顶到起！" },
+  { key: "ch1_luo_07", who: "luo", delivery: "shout", dur: 2.08, text: "退到村口！靠田坎顶到起！" },
   { key: "ch1_luo_08", who: "luo", delivery: "normal", dur: 1.11, text: "送到南边接应点。" },
   { key: "ch1_luo_09", who: "luo", delivery: "normal", dur: 1.45, text: "人交到手里再回来。" },
   { key: "ch1_luo_10", who: "luo", delivery: "shout", dur: 2.60, text: "先查涵洞。里头黑，看清楚再进。" },
-  { key: "ch1_luo_11", who: "luo", delivery: "shout", dur: 2.86, text: "机枪！左手边那个土堆！" },
+  { key: "ch1_luo_11", who: "luo", delivery: "shout", dur: 2.48, text: "机枪！左手边那个土堆！" },
   { key: "ch1_luo_12", who: "luo", delivery: "shout", dur: 2.51, text: "绕破屋过去，从侧面掏他！" },
   { key: "ch1_luo_13", who: "luo", delivery: "shout", dur: 1.71, text: "散开！莫挤到一堆！" },
   // 阶段六这四句是全关情绪的转折点，录的时候不许收着。
@@ -446,7 +446,7 @@ export const VOICE_LINES = [
   { key: "ch1_luo_23", who: "luo", delivery: "shout", dur: 0.89, text: "南边过不去了。" },
   { key: "ch1_luo_24", who: "luo", delivery: "shout", dur: 0.87, text: "把人带回城！" },
   // 这一句是**查完路之后**平着说的，与上面两句急喊分开：短演出的落点在这里。
-  { key: "ch1_luo_25", who: "luo", delivery: "normal", dur: 2.68, text: "路断了。把能走的带回城。" },
+  { key: "ch1_luo_25", who: "luo", delivery: "normal", dur: 3.14, text: "路断了。把能走的带回城。" },
   { key: "ch1_luo_26", who: "luo", delivery: "shout", dur: 0.71, text: "担架先过！" },
   { key: "ch1_luo_27", who: "luo", delivery: "shout", dur: 0.92, text: "莫把人落下！" },
 
@@ -487,7 +487,7 @@ export const VOICE_LINES = [
 
   // ── 赵德贵（3 句）：老成持重，管弹药纪律，说的都是「怎么活下来」的话。
   { key: "ch1_zhaodegui_01", who: "zhaodegui", delivery: "shout", dur: 1.99, text: "机枪！趴倒！莫抬头！" },
-  { key: "ch1_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 4.88, text: "那个阵地空了，弹药盒还在。去翻。" },
+  { key: "ch1_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 3.78, text: "那个阵地空了，弹药盒还在。去翻。" },
   { key: "ch1_zhaodegui_03", who: "zhaodegui", delivery: "normal", dur: 3.07, text: "步枪够不到它。莫白费子弹。" },
 
   // ── 刘文财（2 句）：什么都要数一遍。
@@ -499,7 +499,7 @@ export const VOICE_LINES = [
   { key: "ch1_danjiayuan_02", who: "danjiayuan", delivery: "normal", dur: 2.18, text: "你莫问，抬得到就不远。" },
   { key: "ch1_danjiayuan_03", who: "danjiayuan", delivery: "shout", dur: 2.23, text: "担架进屋头！进屋头！" },
   { key: "ch1_danjiayuan_04", who: "danjiayuan", delivery: "shout", dur: 1.92, text: "快走！趁它拉起来！" },
-  { key: "ch1_danjiayuan_05", who: "danjiayuan", delivery: "weak", dur: 3.52, text: "手……我这只手抬不起来了。" },
+  { key: "ch1_danjiayuan_05", who: "danjiayuan", delivery: "weak", dur: 4.09, text: "手……我这只手抬不起来了。" },
 
   // ── 伤员（4 句，全部 weak）：躺在担架上的那个人。他是全关的量尺 ——
   //    开头问「临城还有好远」，结尾只关心「腿莫擦地」。中间他一直在。

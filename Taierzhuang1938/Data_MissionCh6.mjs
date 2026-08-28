@@ -393,7 +393,7 @@ export const VOICE_LINES = [
     text: "决以死拼，以报国家，以报知遇。",
     note: "复诵最后电文。语气比常态再郑重一档：逐字确认、节奏均匀、情绪收在里面。不是朗诵，是核对。",
   },
-  { key: "ch6_canmou_10", who: "canmou", delivery: "normal", dur: 3.09, text: "跟到报码纸念。一组一组来。" },
+  { key: "ch6_canmou_10", who: "canmou", delivery: "normal", dur: 3.02, text: "跟到报码纸念。一组一组来。" },
   { key: "ch6_canmou_11", who: "canmou", delivery: "shout", dur: 1.64, text: "炮！接头松了！" },
   { key: "ch6_canmou_12", who: "canmou", delivery: "normal", dur: 2.93, text: "密码本、底稿、呼号表 —— 烧。" },
   { key: "ch6_canmou_13", who: "canmou", delivery: "normal", dur: 2.31, text: "带不走的机器，砸了再走。" },

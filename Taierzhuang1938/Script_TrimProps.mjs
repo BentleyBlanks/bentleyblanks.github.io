@@ -20,6 +20,7 @@ import * as THREE from "three";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 
 /**
  * 资产表：tzm 模型 id → 摆放语义。
@@ -217,6 +218,10 @@ export const TRIM_PLACEMENTS = Object.freeze({
   CH3_Jiuhusuo: [...ChurchTrim(), ...JAIL_TRIM, ...CIVIC],
   CH5_Chengqiang: [...CIVIC],
   CH6_Zuihou: [...JAIL_TRIM, ...CIVIC],
+  // 全城俯瞰（?phase=overview）：**四组全给**。上面那段按 x/z 算的可达性逐条对得上 ——
+  // 车站/道口 x≈−480 在 minX −520 之内、天主堂 z=238 与监狱 z≈−192 都在 −360…400 里头。
+  // 这一片是采样点表八成机位与 Z 系列的舞台，缺哪一组就是那几张图上光秃秃一片。
+  [OVERVIEW_LEVEL_ID]: [...RailwayTrim(), ...ChurchTrim(), ...JAIL_TRIM, ...CIVIC],
 });
 
 const docCache = new Map();

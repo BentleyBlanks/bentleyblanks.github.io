@@ -37,12 +37,20 @@ const PROBE_SHOTS = [
 /**
  * 正片镜头表：由 index.html 的 debug 接口驱动（Script_Main 暴露 window.Taierzhuang）。
  *
- * ⚠ 2026-08-28 任务流程重制之后，下面 Z 系列里凡写  的机位都要重新安家。
- * 那些机位（城墙细部、西关车站/通讯队、南墙缺口、城防图总览……）当年是靠
- * 「城墙关」那一片**全城切片**才拍得到的，而重制之后没有哪一章会生成整座城
- * （现在的 phase=4 是东关之夜，只有东关那一角）。要恢复它们得先给
- * Data_Battle.OVERVIEW_BOUNDS 开一条可用的入口 —— 那件事留给集成批。
- * 七章那八张（Game_CH*）已经按新章号重挂好，可以照常拍。
+ * ## 三种 query，别混
+ *   `phase=0…6`      七章各自的切片。天光/破损档跟着章走，Game_CH* 与
+ *                    「这一章长什么样」的专项用它。
+ *   `phase=overview` **全城俯瞰**（Data_Menu.OVERVIEW_PHASE = Data_Battle.OVERVIEW_BOUNDS）。
+ *                    2026-08-29 补的入口：任务流程重制之后没有哪一章会生成整座城，
+ *                    而 Z 系列里绝大多数（城墙细部、四门、缺口、西关车站/通信队、
+ *                    城内地标、城防图总览……）当年正是靠「城墙关」那片全城切片拍的。
+ *                    这一片天光钉死 smokyDay —— 那些机位本来就是在白天验样式的，
+ *                    挂到 phase=4（东关之夜）上拍出来只有黑轮廓。
+ *   `jiehe=1`        序 · 界河白盒。城北二十公里那片原野退出正片，资产还在。
+ *
+ * `setup.menuShot` 只在**菜单接管相机**的页面上有效（不带 `shot=1`）：
+ * 它按 id 在 Data_Menu.MENU_SHOTS[当前切片] 里找一条当基座，再由 `cam:` 覆盖位姿。
+ * 全城俯瞰那一组是 EastGate / SouthEastTower / Rampart / Yamen。
  */
 const GAME_SHOTS = [
   // 七章各一张。名字带章号与地名 —— 视觉审查是按图说话的，
@@ -63,94 +71,97 @@ const GAME_SHOTS = [
   { name: "Game_Z2_Fire", query: "shot=1&phase=2&quality=high&scale=medium&fire=1" },
   // 城楼专项回归：东门外仰看宗鲁门。菜单长焦能验轮廓，这一张负责验屋面不穿插、
   // 檐下斗拱和月台石栏在近景也确实存在，防止以后又退化成四块交叉板。
-  { name: "Game_Z3_GateTower", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z3_GateTower", query: "shot=1&phase=overview&quality=high&scale=medium",
     // 东门轴在 z=-65；旧 z=0 拍到的只是门南侧一堵墙，城楼从未进画。
     setup: { x: 360, z: -65, yaw: Math.PI / 2, pitch: 0.22, quiet: true } },
   // 生活层专项：冻结敌军开火，避免中弹红闪把路肩家什、车辙和院落细节染没。
-  { name: "Game_Z4_CityLife", query: "shot=1&phase=5&quality=high&scale=medium",
+  { name: "Game_Z4_CityLife", query: "shot=1&phase=overview&quality=high&scale=medium",
     // CentralEastStreet 只延伸到 x=75；旧 x=88 在城图重排后会落进院墙。
     setup: { x: 62, z: 0, yaw: Math.PI / 2, pitch: -0.08, quiet: true } },
-  { name: "Game_Z5_VillageLife", query: "shot=1&phase=0&quality=high&scale=medium",
+  // 界河村落生活层：机位在 z=-1278，那是城北二十公里那片原野 —— 七章里没有一章
+  // 的 bounds 够得着，所以走 ?jiehe=1 那条白盒入口（Data_Menu.JIEHE_SANDBOX_PHASE）。
+  { name: "Game_Z5_VillageLife", query: "shot=1&jiehe=1&quality=high&scale=medium",
     setup: { x: -154, z: -1278, yaw: 0, pitch: -0.05, quiet: true } },
   // 角楼专项：复用菜单里用户实际看见问题的“东南角望楼”长焦机位。
   // 旧四块交叉板屋顶在玩法近景不一定暴露，但这个镜头会直接看出悬空和穿插。
-  { name: "Game_Z6_CornerTower", query: "quality=high&scale=medium",
+  { name: "Game_Z6_CornerTower", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower" } },
   // 墙身专项：东墙外近距离仰看包砖修补、泄水孔、垛口压顶与墙顶铺砖。
-  { name: "Game_Z7_WallDetail", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z7_WallDetail", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 364, z: 198, yaw: Math.PI / 2, pitch: 0.19, quiet: true } },
   // 城图布局回归：从县衙上方俯看公共院落和交叉街，验主次街尺度、
   // 院落不压路以及功能区的体量差，而不是又拍一次十字街正面。
-  { name: "Game_Z8_CityLayout", query: "phase=5&quality=high&scale=medium",
+  { name: "Game_Z8_CityLayout", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "Yamen" } },
   // 东关连续性：从濠外沿东门大街回看东门，必须同时读到关厢住宅带、道路和城门，
   // 防止东关生成成与城门脱节的一块独立布景。
-  { name: "Game_Z9_EastGateStreet", query: "quality=high&scale=medium",
+  { name: "Game_Z9_EastGateStreet", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "EastGate" } },
   // 城防图东侧逐框验收：一个镜头同时收进核心 6 框与东北/东南延伸，
   // 用屋顶占地轮廓检查“每个闭合框都是整块模型区”，不是零散地标。
-  { name: "Game_Z22_EastDefenseBlocks", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z22_EastDefenseBlocks", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "EastGate", hideMenu: true, cam: {
       from: [445, 540, 0], look: [445, 0, 0], up: [0, 0, -1], focalMm: 18,
     } } },
   // 防区空间关系：站在东墙炮击缺口向城内看，验缺口后的街、掩体与城内纵深，
   // 避免和既有东门仰视、东关常规战斗镜头重复。
-  { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z10_BreachIntoCity", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 294, z: -65, yaw: Math.PI / 2, pitch: -0.09, quiet: true } },
   // 城防图总验收：北向上、东向右的近正交鸟瞰。必须一张图同时读出四门错位、
   // 环濠、主次街层级、城内功能院落与东西/北关；菜单与战斗 HUD 全部隐藏。
-  { name: "Game_Z23_CityDefensePlan", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z23_CityDefensePlan", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower", hideMenu: true, sky: "chuchuanDay",
       cam: { from: [0, 560, 1], look: [0, 0, -1], focalMm: 12.5 } } },
   // 两个缺口各留一张城外正面照：必须同时看见非对称 V 形断肩、黄褐夯土芯、
   // 墙体真实厚度、内外瓦砾扇与中央通行槽，防止以后又退回规则凹槽。
-  { name: "Game_Z18_EastWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z18_EastWallBreach", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 350, z: 15, yaw: Math.PI / 2, pitch: 0.12, quiet: true } },
-  { name: "Game_Z19_SouthWallBreach", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z19_SouthWallBreach", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 285, z: 350, yaw: 0, pitch: 0.12, quiet: true } },
   // 完整墙段的两张材质/建模近景：一张锁补砖与灰青砖 PBR，一张锁石框泄水嘴、
   // 压顶和勒脚，防止后续优化只顾缺口、把其余 2.4 km 墙身退回光滑灰盒。
-  { name: "Game_Z20_SouthWallRepairPbr", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z20_SouthWallRepairPbr", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower", hideMenu: true,
       cam: { from: [-214, 6.2, 330], look: [-214, 4.2, 308], focalMm: 65 } } },
-  { name: "Game_Z21_SouthWallDrainPbr", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z21_SouthWallDrainPbr", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower", hideMenu: true,
       cam: { from: [-116, 8.7, 331], look: [-116, 8.7, 308], focalMm: 70 } } },
   // 西关整块街区回归：高空正俯视必须能读出铁路—十五个无名框—五个具名框—
   // 城壕的连续关系；三个地面机位分别锁车站、通讯院、厂区/交易所的体量。
-  { name: "Game_Z22_WestBlocksOverview", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z22_WestBlocksOverview", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower", hideMenu: true, sky: "chuchuanDay",
       cam: { from: [-410, 650, 15], look: [-410, 0, 15], focalMm: 24, far: 1800 } } },
-  { name: "Game_Z23_WestStation", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z23_WestStation", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: -421, z: -82, yaw: Math.PI / 2, pitch: 0.06, quiet: true } },
-  { name: "Game_Z24_WestCommunications", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z24_WestCommunications", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: -410, z: -4.0, yaw: 0, pitch: 0.12, quiet: true } },
-  { name: "Game_Z25_WestPowerExchange", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z25_WestPowerExchange", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: -410, z: 4.0, yaw: Math.PI, pitch: 0.10, quiet: true } },
-  { name: "Game_Z26_WestExchange", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z26_WestExchange", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: -410, z: 166, yaw: 0, pitch: 0.06, quiet: true } },
   // ——批次A 之后的四个视觉盲区补口（旧机位没有一张能看到中城师部/北城功能区/庙街/南城）——
   // 中城师部：当典后街上看 124 师部门脸（门楼+番号木牌+沙袋哨位+旗）。
-  { name: "Game_Z11_DivisionHq", query: "shot=1&phase=5&quality=high&scale=medium",
+  { name: "Game_Z11_DivisionHq", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: -38, z: -90.5, yaw: Math.PI / 2, pitch: -0.02, quiet: true } },
-  // 庙街：龙王庙街东口隔街看山门（红门脸+起翘屋脊是庙的识别语言）。北城要 phase=4。
-  { name: "Game_Z12_TempleStreet", query: "shot=1&phase=4&quality=high&scale=medium",
+  // 庙街：龙王庙街东口隔街看山门（红门脸+起翘屋脊是庙的识别语言）。北城只有俯瞰切片有。
+  { name: "Game_Z12_TempleStreet", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 96, z: -144, yaw: 1.0033, pitch: 0.07, quiet: true } },
   // 北城羁押区：监狱两排牢房之间的甬道——一侧全是铁窗、一侧一个洞都没有（WP-A1 验证机位）。
   // 注意别摆在警察所与监狱之间的巷口：那条缝会被 PlanBlocks 补上一格民居，第一版机位一脸墙。
-  { name: "Game_Z13_JailQuarter", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z13_JailQuarter", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 162, z: -196.7, yaw: -1.55, pitch: 0.02, quiet: true } },
   // 南城：站在火神庙东街街心正看天主堂钟塔（南城唯一高点）。街外 4 m 就是院墙，机位必须压街心。
-  { name: "Game_Z14_SouthChurch", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z14_SouthChurch", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 36, z: 210, yaw: Math.PI, pitch: 0.06, quiet: true } },
   // 西关大街：站在街心往东看怀古门 —— 一张图同时验土路、沿街铺面、通讯队院墙、
-  // 师部方向与桥头引道。西关带只在 phase=1 生成（bounds）。
+  // 师部方向与桥头引道。**留在 phase=1**：这一张验的是「第一章那条路走起来长什么样」，
+  // 与俯瞰切片上的 West_Street 采样点是两件事。
   { name: "Game_Z15_XiguanStreet", query: "shot=1&phase=1&quality=high&scale=medium",
     setup: { x: -405, z: 0, yaw: -Math.PI / 2, pitch: 0.02, quiet: true } },
   // 护城河水面专项：斜跨东墙濠沟，近岸、深水与城墙倒映必须同时入画。
   // 这张固定镜头用来抓屏幕空间水深方向写反、全屏泡沫和滚动法线接缝。
   //（master 侧原名 Z11，与本分支的师部机位撞号，合并时改为 Z16。）
-  { name: "Game_Z16_MoatWater", query: "shot=1&phase=4&quality=high&scale=medium",
+  { name: "Game_Z16_MoatWater", query: "shot=1&phase=overview&quality=high&scale=medium",
     setup: { x: 314, z: 165, yaw: -0.73, pitch: -0.46, quiet: true } },
   // 民居屋面专项：屋脊高度俯瞰城内院落，中景与远景两档必须同框。
   // 这一张是补一个**只有从屋面之上才暴露**的盲区：远景档的坡顶曾经是
@@ -158,21 +169,21 @@ const GAME_SHOTS = [
   // 的实心大饼 —— 地面机位一辈子拍不到，玩家一进主菜单的关厢机位就看见了。
   // 验收点：① 每座房的正脊是屋面最高处；② 瓦面压在墙上、不悬空、不互相穿插；
   // ③ 远景那一片与近处的中景院落是同一种房子（院墙 + 门口 + 正房）。
-  { name: "Game_Z17_BlockRoofs", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z17_BlockRoofs", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower",
       cam: { from: [140, 26, 150], look: [-60, 3, 40], focalMm: 42 } } },
   // 南城学校群俯视：同框验收滕文中学两进教室、书院小学一进教室，以及各自
-  // 校门—操场—教室的连续铺地轴线。必须用 phase=4，L5 的切片不生成南城。
-  { name: "Game_Z20_SouthSchools", query: "phase=4&quality=high&scale=medium",
+  // 校门—操场—教室的连续铺地轴线。南城只有俯瞰切片有（七章里没有一章的 bounds 铺到 z=330）。
+  { name: "Game_Z20_SouthSchools", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower",
       cam: { from: [-140, 155, 330], look: [-140, 0, 220], focalMm: 48 } } },
   // 编辑器语义层全城验收：一键从 Data_Tengxian 读取公共院落和十九段街路，
   // 区域画琥珀框、道路画蓝色带，中文牌必须在俯瞰相机里可读。
-  { name: "Game_Z21_EditorMapLabels", query: "phase=4&quality=high&scale=medium&menu=0",
+  { name: "Game_Z21_EditorMapLabels", query: "phase=overview&quality=high&scale=medium&menu=0",
     setup: { editorMapLabels: true } },
   // 东北治安与羁押组团俯视：警察所、警备队、监狱和看守所同框，重点看机关院
   // 石框列队场、门房/旗杆和监狱高墙，不让四处再淹没在普通民居屋顶里。
-  { name: "Game_Z22_PoliceQuarter", query: "phase=4&quality=high&scale=medium",
+  { name: "Game_Z22_PoliceQuarter", query: "phase=overview&quality=high&scale=medium",
     setup: { menuShot: "SouthEastTower",
       cam: { from: [160, 125, -95], look: [160, 0, -210], focalMm: 50 } } },
 ];

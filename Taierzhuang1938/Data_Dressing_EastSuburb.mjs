@@ -126,8 +126,9 @@ export const PLACEMENTS = Object.freeze([
     note: "路北院：木水桶，撂在院当中的过道上" },
   { asset: "ryChoppingBlock", x: 440.6, z: -84.2, ry: 0.3,
     note: "路北院：劈柴墩，斧印很新" },
-  { asset: "ryDryingRack", x: 450.81, z: -84.47, ry: 1.55,
-    note: "路北院东墙根：晾晒木架，架上的东西被人一把撸走了" },
+  { asset: "ryDryingRack", x: 448.2, z: -83.2, ry: 1.55,
+    note: "路北院东墙根：晾晒木架，架上的东西被人一把撸走了（2026-08-29 从 (450.81,-84.47) 西移 2.9 m："
+      + "CH3 失守街区→前沿救护点那条目标连线从旧位置 1.82 m 外擦过，撞规则 8）" },
 
   // east3_0_0_8（dmg 0.46）：东头的院子，日子还整着。
   { asset: "longBench", x: 511.6, z: -86.86, ry: 0.08,

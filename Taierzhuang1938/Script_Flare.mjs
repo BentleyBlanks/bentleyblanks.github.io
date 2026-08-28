@@ -38,10 +38,12 @@
 // 烟源池。所以 BootTest 的 drawCalls ≤ 5000 / triangles ≤ 600 万两条红线一动不动。
 //
 // ── 音效 ────────────────────────────────────────────────────────────────────
-// 四条 key 由 A2 批登记在 `Data_SfxSources`（flareLaunch / flareIgnite /
-// flareBurn / flareOut，现在还在 `manifest.pendingCues` 里）。**同名合成配方合上
-// 之前 `audio.Play` 静默返回 null**，所以每条都带一个「现有最近的源」当备胎
-// （见 FLARE_SFX），第一次播不响就换备胎并记住 —— 与 Script_AircraftStrafe 同一条写法。
+// 四条 key（flareLaunch / flareIgnite / flareBurn / flareOut）由 A2 批登记在
+// `Data_SfxSources`，**2026-08-29 集成批 INT3a 已经接线完毕**：合成配方补齐、
+// 素材从 `manifest.pendingCues` 毕业进 `cues`，`audio.Play` 现在会真的出声。
+// 备胎那条路（FLARE_SFX）保留不动 —— 它不是给「还没接线」用的，是给
+// 「这一台机器上采样没载到 / 音频关掉了」用的：第一次播不响就换备胎并记住，
+// 与 Script_AircraftStrafe 同一条写法。
 //
 // ── 给集成批的 CH4 摆点示例（坐标照 Data_MissionCh4.CHAPTER.zones）──────────
 // 两枚都是**剧情节拍，不是随机**：日方 `ija_gunso` 喊完

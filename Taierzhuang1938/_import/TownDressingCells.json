@@ -601,42 +601,7 @@
  ],
  "phases": [
   {
-   "id": "L0_Jiehe",
-   "bounds": {
-    "minX": -620,
-    "maxX": 620,
-    "minZ": -1620,
-    "maxZ": -900
-   },
-   "spawn": {
-    "x": 0,
-    "z": -1470
-   },
-   "zones": [
-    {
-     "id": "Approach",
-     "x": 0,
-     "z": -1420,
-     "radius": 34
-    },
-    {
-     "id": "Kan",
-     "x": 0,
-     "z": -1255,
-     "radius": 30
-    },
-    {
-     "id": "Beishahe",
-     "x": 0,
-     "z": -1000,
-     "radius": 34
-    }
-   ],
-   "detailRadius": 100,
-   "midRadius": 210
-  },
-  {
-   "id": "L1_Beishahe",
+   "id": "CH0_Chuchuan",
    "bounds": {
     "minX": -620,
     "maxX": -230,
@@ -649,31 +614,78 @@
    },
    "zones": [
     {
-     "id": "SecondLine",
-     "x": -480,
-     "z": -180,
-     "radius": 34
+     "id": "C0_Carriage",
+     "x": -478,
+     "z": -140,
+     "radius": 24
     },
     {
-     "id": "Dawn",
-     "x": -480,
-     "z": -130,
+     "id": "C0_Depot",
+     "x": -466,
+     "z": -95,
+     "radius": 24
+    },
+    {
+     "id": "C0_Door",
+     "x": -452,
+     "z": -55,
+     "radius": 24
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "CH1_NanLu",
+   "bounds": {
+    "minX": -620,
+    "maxX": -230,
+    "minZ": -250,
+    "maxZ": 210
+   },
+   "spawn": {
+    "x": -480,
+    "z": -205
+   },
+   "zones": [
+    {
+     "id": "C1_Railbed",
+     "x": -466,
+     "z": -150,
      "radius": 30
     },
     {
-     "id": "XiguanStation",
+     "id": "C1_Village",
+     "x": -470,
+     "z": -88,
+     "radius": 28
+    },
+    {
+     "id": "C1_Culvert",
      "x": -458,
-     "z": -82,
-     "radius": 42
+     "z": -30,
+     "radius": 26
     },
     {
-     "id": "PowerPlant",
-     "x": -410,
-     "z": 69,
-     "radius": 34
+     "id": "C1_SouthRoad",
+     "x": -436,
+     "z": 30,
+     "radius": 28
     },
     {
-     "id": "WestGate",
+     "id": "C1_Ditch",
+     "x": -448,
+     "z": 130,
+     "radius": 28
+    },
+    {
+     "id": "C1_Fallback",
+     "x": -500,
+     "z": 96,
+     "radius": 24
+    },
+    {
+     "id": "C1_BackToWall",
      "x": -330,
      "z": 0,
      "radius": 26
@@ -683,52 +695,111 @@
    "midRadius": 210
   },
   {
-   "id": "L2_Dongguan",
+   "id": "CH2_Shouliudan",
    "bounds": {
     "minX": 250,
-    "maxX": 620,
+    "maxX": 700,
     "minZ": -520,
     "maxZ": 420
    },
    "spawn": {
-    "x": 432,
+    "x": 446,
     "z": -65
    },
    "zones": [
     {
-     "id": "ZhaiGate",
+     "id": "C2_ZhaiGate",
      "x": 480,
      "z": -65,
      "radius": 20
     },
     {
-     "id": "Courtyard",
+     "id": "C2_Ditch",
+     "x": 500,
+     "z": -65,
+     "radius": 22
+    },
+    {
+     "id": "C2_Courtyard",
      "x": 462,
      "z": -19,
      "radius": 26
     },
     {
-     "id": "Temple",
+     "id": "C2_BackStreet",
+     "x": 449,
+     "z": -180,
+     "radius": 22
+    },
+    {
+     "id": "C2_Temple",
      "x": 427,
      "z": -465,
      "radius": 26
-    },
-    {
-     "id": "Breach",
-     "x": 500,
-     "z": -65,
-     "radius": 22
     }
    ],
    "detailRadius": 100,
    "midRadius": 210
   },
   {
-   "id": "L3_Fanji",
+   "id": "CH3_Jiuhusuo",
    "bounds": {
-    "minX": 250,
+    "minX": 140,
     "maxX": 600,
-    "minZ": -520,
+    "minZ": -260,
+    "maxZ": 220
+   },
+   "spawn": {
+    "x": 276,
+    "z": -65
+   },
+   "zones": [
+    {
+     "id": "C3_AidStation",
+     "x": 214,
+     "z": -18,
+     "radius": 30
+    },
+    {
+     "id": "C3_EastGateOut",
+     "x": 296,
+     "z": -65,
+     "radius": 24
+    },
+    {
+     "id": "C3_LostBlock",
+     "x": 449,
+     "z": -110,
+     "radius": 24
+    },
+    {
+     "id": "C3_ForwardAid",
+     "x": 462,
+     "z": -19,
+     "radius": 26
+    },
+    {
+     "id": "C3_Firebreak",
+     "x": 480,
+     "z": -65,
+     "radius": 20
+    },
+    {
+     "id": "C3_AidReturn",
+     "x": 214,
+     "z": -18,
+     "radius": 30
+    }
+   ],
+   "detailRadius": 100,
+   "midRadius": 210
+  },
+  {
+   "id": "CH4_DongguanYe",
+   "bounds": {
+    "minX": 150,
+    "maxX": 600,
+    "minZ": -300,
     "maxZ": 170
    },
    "spawn": {
@@ -737,81 +808,111 @@
    },
    "zones": [
     {
-     "id": "Temple",
-     "x": 427,
-     "z": -465,
-     "radius": 26
+     "id": "C4_Assembly",
+     "x": 449,
+     "z": -175,
+     "radius": 24
     },
     {
-     "id": "Lane",
+     "id": "C4_DarkLane",
      "x": 478,
      "z": -89,
      "radius": 22
     },
     {
-     "id": "GateRetake",
-     "x": 516,
-     "z": -65,
-     "radius": 20
+     "id": "C4_FlareCross",
+     "x": 449,
+     "z": -22,
+     "radius": 22
     },
     {
-     "id": "EastGateIn",
+     "id": "C4_NarrowLane",
+     "x": 443,
+     "z": 121,
+     "radius": 22
+    },
+    {
+     "id": "C4_CarryBack",
      "x": 296,
      "z": -65,
      "radius": 24
+    },
+    {
+     "id": "C4_AidStation",
+     "x": 214,
+     "z": -18,
+     "radius": 30
     }
    ],
    "detailRadius": 100,
    "midRadius": 210
   },
   {
-   "id": "L4_Chengqiang",
+   "id": "CH5_Chengqiang",
    "bounds": {
-    "minX": -520,
-    "maxX": 780,
-    "minZ": -360,
-    "maxZ": 400
+    "minX": -370,
+    "maxX": 285,
+    "minZ": -190,
+    "maxZ": 140
    },
    "spawn": {
-    "x": 276,
+    "x": 240,
     "z": -65
    },
    "zones": [
     {
-     "id": "Rampway",
-     "x": 288,
-     "z": -85,
-     "radius": 16
+     "id": "C5_AidRuin",
+     "x": 214,
+     "z": -18,
+     "radius": 30
     },
     {
-     "id": "Rampart",
-     "x": 294,
-     "z": 288,
-     "radius": 22
+     "id": "C5_Crossroad",
+     "x": 0,
+     "z": 0,
+     "radius": 20
     },
     {
-     "id": "SouthWall",
-     "x": 150,
-     "z": 296,
+     "id": "C5_WestStreet",
+     "x": -160,
+     "z": 0,
+     "radius": 24
+    },
+    {
+     "id": "C5_GunNest",
+     "x": -230,
+     "z": 0,
+     "radius": 20
+    },
+    {
+     "id": "C5_GateInner",
+     "x": -278,
+     "z": 0,
+     "radius": 20
+    },
+    {
+     "id": "C5_GateOut",
+     "x": -330,
+     "z": 0,
      "radius": 26
     },
     {
-     "id": "SouthBreach",
-     "x": 285,
-     "z": 296,
-     "radius": 18
+     "id": "C5_ReturnGun",
+     "x": -215,
+     "z": 0,
+     "radius": 20
     }
    ],
    "detailRadius": 100,
    "midRadius": 210
   },
   {
-   "id": "L5_Shizijie",
+   "id": "CH6_Zuihou",
    "bounds": {
-    "minX": -325,
-    "maxX": 285,
+    "minX": -480,
+    "maxX": 100,
     "minZ": -190,
-    "maxZ": 140
+    "maxZ": 150
    },
    "spawn": {
     "x": 62,
@@ -819,73 +920,44 @@
    },
    "zones": [
     {
-     "id": "Crossroad",
-     "x": 0,
-     "z": 0,
-     "radius": 20
+     "id": "C6_DivisionHq",
+     "x": -58,
+     "z": -55,
+     "radius": 30
     },
     {
-     "id": "Yamen",
-     "x": 128,
-     "z": -118,
-     "radius": 32
-    },
-    {
-     "id": "WestStreet",
+     "id": "C6_WestStreet",
      "x": -160,
      "z": 0,
      "radius": 24
     },
     {
-     "id": "WestGateInner",
+     "id": "C6_GateInner",
      "x": -278,
      "z": 0,
      "radius": 20
-    }
-   ],
-   "detailRadius": 100,
-   "midRadius": 210
-  },
-  {
-   "id": "L6_Beimen",
-   "bounds": {
-    "minX": -360,
-    "maxX": 340,
-    "minZ": -640,
-    "maxZ": 200
-   },
-   "spawn": {
-    "x": -286,
-    "z": 0
-   },
-   "zones": [
+    },
     {
-     "id": "WestBarbican",
+     "id": "C6_Barbican",
      "x": -322,
      "z": 0,
      "radius": 16
     },
     {
-     "id": "NorthStreet",
-     "x": -145,
-     "z": -160,
+     "id": "C6_WestOuter",
+     "x": -380,
+     "z": 0,
      "radius": 24
     },
     {
-     "id": "NorthGate",
-     "x": -145,
-     "z": -296,
-     "radius": 20
-    },
-    {
-     "id": "WheatField",
-     "x": 0,
-     "z": -520,
-     "radius": 46
+     "id": "C6_PowerPlant",
+     "x": -410,
+     "z": 69,
+     "radius": 34
     }
    ],
-   "detailRadius": 70,
-   "midRadius": 170
+   "detailRadius": 100,
+   "midRadius": 210
   }
  ],
  "assetDims": {
@@ -2159,7 +2231,7 @@
     "scale": 0.92
    }
   ],
-  "L1_Beishahe": [
+  "CH1_NanLu": [
    {
     "asset": "house",
     "x": -1224,
@@ -2230,7 +2302,7 @@
     "ry": 0.5
    }
   ],
-  "L2_Dongguan": [
+  "CH2_Shouliudan": [
    {
     "asset": "house",
     "x": 462,
@@ -2284,7 +2356,7 @@
     "scale": 0.85
    }
   ],
-  "L3_Fanji": [
+  "CH4_DongguanYe": [
    {
     "asset": "cart",
     "x": 468,
@@ -2325,7 +2397,7 @@
     "ry": -0.16
    }
   ],
-  "L4_Chengqiang": [
+  "CH3_Jiuhusuo": [
    {
     "asset": "cityWallBreachShoulderLeft",
     "x": 305,
@@ -2641,7 +2713,7 @@
     "scale": 0.76
    }
   ],
-  "L5_Shizijie": [
+  "CH5_Chengqiang": [
    {
     "asset": "cart",
     "x": 112,
@@ -2683,7 +2755,7 @@
     "scale": 0.9
    }
   ],
-  "L6_Beimen": [
+  "CH6_Zuihou": [
    {
     "asset": "cart",
     "x": -188,
@@ -2732,10 +2804,7 @@
    "damage": 0.049,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -248.18,
@@ -2749,10 +2818,7 @@
    "damage": 0.196,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -221.93,
@@ -2766,10 +2832,7 @@
    "damage": 0.014,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -194.7,
@@ -2783,10 +2846,7 @@
    "damage": 0.184,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -172.1,
@@ -2800,10 +2860,7 @@
    "damage": 0.141,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -114.72,
@@ -2817,10 +2874,7 @@
    "damage": 0.224,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -89.85,
@@ -2834,10 +2888,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -63.99,
@@ -2851,10 +2902,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -35.73,
@@ -2868,10 +2916,7 @@
    "damage": 0.198,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -10.53,
@@ -2885,10 +2930,7 @@
    "damage": 0.184,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -267.31,
@@ -2903,9 +2945,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -2921,9 +2962,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -2939,9 +2979,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -2956,10 +2995,7 @@
    "damage": 0.071,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -109.42,
@@ -2973,10 +3009,7 @@
    "damage": 0.229,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "detail"
-   }
+   "tiers": {}
   },
   {
    "x": -87.02,
@@ -2990,10 +3023,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -273.54,
@@ -3008,9 +3038,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid"
    }
   },
   {
@@ -3026,9 +3055,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -3044,9 +3072,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -3061,10 +3088,7 @@
    "damage": 0.155,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -167.87,
@@ -3078,10 +3102,7 @@
    "damage": 0.106,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -60.1,
@@ -3095,10 +3116,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -36.49,
@@ -3112,10 +3130,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -11.14,
@@ -3129,10 +3144,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -267.56,
@@ -3147,10 +3159,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3166,10 +3178,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3185,10 +3197,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3204,9 +3216,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3222,9 +3233,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3240,9 +3250,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3258,9 +3267,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3276,9 +3284,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "far",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3294,9 +3301,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "far",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3312,9 +3318,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3330,10 +3335,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3349,10 +3354,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3368,9 +3373,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3386,9 +3390,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3404,9 +3407,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3422,9 +3424,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3440,10 +3441,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3459,10 +3460,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3478,9 +3479,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3496,9 +3496,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3514,9 +3513,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3532,9 +3530,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3550,10 +3547,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3569,10 +3566,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3588,10 +3585,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3607,9 +3604,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3625,9 +3621,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -3643,9 +3638,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -3661,9 +3655,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "detail"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -3679,9 +3672,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -3697,9 +3689,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -3714,10 +3705,7 @@
    "damage": 0.38,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": 38.89,
@@ -3731,10 +3719,7 @@
    "damage": 0.201,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 66.32,
@@ -3748,10 +3733,7 @@
    "damage": 0.455,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 92.15,
@@ -3765,10 +3747,7 @@
    "damage": 0.451,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 116,
@@ -3782,10 +3761,7 @@
    "damage": 0.38,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 146.06,
@@ -3800,8 +3776,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "far",
+    "CH4_DongguanYe": "far"
    }
   },
   {
@@ -3817,8 +3793,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "far",
+    "CH4_DongguanYe": "far"
    }
   },
   {
@@ -3834,8 +3810,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "far",
+    "CH4_DongguanYe": "far"
    }
   },
   {
@@ -3851,10 +3827,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -3869,10 +3844,7 @@
    "damage": 0.207,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 42.48,
@@ -3886,10 +3858,7 @@
    "damage": 0.207,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 69.32,
@@ -3903,10 +3872,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 151.2,
@@ -3921,8 +3887,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "far",
+    "CH4_DongguanYe": "far"
    }
   },
   {
@@ -3938,8 +3904,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -3955,8 +3921,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -3972,10 +3938,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -3991,10 +3956,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -4010,9 +3974,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4028,9 +3991,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4046,9 +4008,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4064,9 +4025,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4082,11 +4043,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4102,9 +4062,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4120,9 +4079,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4138,9 +4097,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4156,11 +4115,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4176,11 +4134,10 @@
    "state": "collapsed",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -4196,10 +4153,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4215,10 +4172,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4234,10 +4191,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4253,9 +4210,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4271,10 +4227,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4290,9 +4246,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4308,9 +4263,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4326,9 +4280,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4344,10 +4297,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "detail"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4363,9 +4316,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4381,9 +4333,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4399,9 +4350,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4417,10 +4367,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "detail"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4436,9 +4386,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4454,9 +4403,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4472,9 +4420,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4490,9 +4437,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4508,9 +4454,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4526,9 +4471,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4544,10 +4488,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "detail"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4563,10 +4507,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4582,9 +4526,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4600,9 +4543,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4618,9 +4560,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4636,9 +4577,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4654,9 +4594,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4672,9 +4611,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4690,9 +4628,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4708,9 +4645,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4726,10 +4662,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "detail"
+    "CH0_Chuchuan": "mid",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4745,10 +4681,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4764,9 +4700,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4782,9 +4717,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4800,9 +4734,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4818,9 +4751,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4836,10 +4768,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4855,10 +4787,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "detail",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "detail",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4874,10 +4806,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4893,9 +4825,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4911,9 +4842,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4929,9 +4859,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4947,9 +4876,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -4965,9 +4893,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -4983,10 +4910,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5002,10 +4929,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5021,10 +4948,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5040,9 +4967,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "mid"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5058,9 +4984,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5076,9 +5001,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5094,9 +5018,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5112,9 +5035,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5130,9 +5053,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5148,9 +5071,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5166,9 +5089,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5184,11 +5107,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5204,11 +5126,10 @@
    "state": "collapsed",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "mid",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5224,9 +5145,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5242,9 +5162,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5260,9 +5179,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5278,9 +5196,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "detail"
    }
   },
   {
@@ -5296,9 +5213,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5314,9 +5230,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5332,9 +5247,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5350,9 +5264,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5368,9 +5281,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5386,9 +5299,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5404,9 +5317,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5422,11 +5335,10 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5442,11 +5354,10 @@
    "state": "collapsed",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "mid",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5462,9 +5373,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5480,9 +5390,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5498,9 +5407,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5516,9 +5424,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5534,9 +5441,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5552,9 +5459,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5570,9 +5477,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5588,11 +5495,10 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "mid",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "detail",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5608,9 +5514,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5626,9 +5531,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5644,9 +5548,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5662,9 +5565,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5680,9 +5582,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5698,9 +5599,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5716,11 +5617,10 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5736,11 +5636,10 @@
    "state": "collapsed",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "mid",
-    "L3_Fanji": "detail",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5756,9 +5655,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5774,9 +5672,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5792,9 +5689,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5810,9 +5706,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "detail",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "detail",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5828,9 +5723,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5846,9 +5740,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5864,9 +5758,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5882,9 +5776,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5900,11 +5794,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5920,9 +5813,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5938,9 +5830,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -5956,9 +5847,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -5974,9 +5864,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -5992,9 +5882,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -6010,11 +5900,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "detail",
+    "CH4_DongguanYe": "detail",
+    "CH5_Chengqiang": "detail"
    }
   },
   {
@@ -6030,11 +5919,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "mid",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "mid",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6050,9 +5938,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6068,9 +5956,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6086,9 +5974,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6104,11 +5992,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6124,11 +6011,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -6144,10 +6030,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6163,10 +6049,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6182,10 +6068,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6201,9 +6087,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6219,9 +6104,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6237,9 +6121,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6255,9 +6138,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6273,10 +6155,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6292,10 +6174,10 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "mid"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6311,9 +6193,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6329,9 +6210,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6347,9 +6227,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6365,9 +6244,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6383,9 +6261,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6401,9 +6278,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6419,9 +6295,9 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6437,9 +6313,9 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6455,9 +6331,9 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6473,8 +6349,7 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6489,10 +6364,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -119.84,
@@ -6507,8 +6379,7 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6523,10 +6394,7 @@
    "damage": 0.211,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -57.69,
@@ -6540,10 +6408,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -26.92,
@@ -6558,8 +6423,7 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH6_Zuihou": "far"
    }
   },
   {
@@ -6575,9 +6439,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid"
    }
   },
   {
@@ -6593,9 +6456,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -6610,10 +6472,7 @@
    "damage": 0.2,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -172.52,
@@ -6627,10 +6486,7 @@
    "damage": 0.046,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -138.45,
@@ -6644,10 +6500,7 @@
    "damage": 0.08,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -110.8,
@@ -6661,10 +6514,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -80.8,
@@ -6678,10 +6528,7 @@
    "damage": 0.127,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -47.72,
@@ -6695,10 +6542,7 @@
    "damage": 0.118,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -17.69,
@@ -6712,10 +6556,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -272.41,
@@ -6730,8 +6571,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "mid",
-    "L4_Chengqiang": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "mid"
    }
   },
   {
@@ -6747,8 +6588,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L1_Beishahe": "far",
-    "L4_Chengqiang": "far"
+    "CH0_Chuchuan": "far",
+    "CH1_NanLu": "far"
    }
   },
   {
@@ -6763,9 +6604,7 @@
    "damage": 0.061,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -58.64,
@@ -6779,9 +6618,7 @@
    "damage": 0.237,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -29.41,
@@ -6795,9 +6632,7 @@
    "damage": 0.38,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -196.53,
@@ -6811,9 +6646,7 @@
    "damage": 0.059,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -170.52,
@@ -6827,9 +6660,7 @@
    "damage": 0.035,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -141,
@@ -6843,9 +6674,7 @@
    "damage": 0.102,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -49.14,
@@ -6859,9 +6688,7 @@
    "damage": 0.38,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -19.26,
@@ -6875,9 +6702,7 @@
    "damage": 0.38,
    "state": "damaged",
    "burnt": true,
-   "tiers": {
-    "L4_Chengqiang": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": -181.99,
@@ -6891,9 +6716,7 @@
    "damage": 0.071,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -151.38,
@@ -6907,9 +6730,7 @@
    "damage": 0.127,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -89.15,
@@ -6923,9 +6744,7 @@
    "damage": 0.16,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "far"
-   }
+   "tiers": {}
   },
   {
    "x": -27.38,
@@ -6939,9 +6758,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": 11.64,
@@ -6956,9 +6773,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "far",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6974,9 +6790,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "mid"
    }
   },
   {
@@ -6992,9 +6807,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "far"
    }
   },
   {
@@ -7010,9 +6824,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7028,9 +6841,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7046,9 +6859,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7064,9 +6877,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7082,11 +6895,10 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "mid",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7102,9 +6914,8 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "far"
    }
   },
   {
@@ -7120,9 +6931,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "far"
    }
   },
   {
@@ -7138,9 +6948,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH5_Chengqiang": "mid",
+    "CH6_Zuihou": "far"
    }
   },
   {
@@ -7156,9 +6965,9 @@
    "state": "intact",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7174,9 +6983,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7192,9 +7001,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7210,9 +7019,9 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7228,11 +7037,10 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "far",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7248,11 +7056,10 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "far",
-    "L4_Chengqiang": "mid",
-    "L5_Shizijie": "far",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid",
+    "CH5_Chengqiang": "mid"
    }
   },
   {
@@ -7267,10 +7074,7 @@
    "damage": 0.24,
    "state": "intact",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 38.12,
@@ -7284,10 +7088,7 @@
    "damage": 0.439,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 92.33,
@@ -7301,10 +7102,7 @@
    "damage": 0.457,
    "state": "damaged",
    "burnt": false,
-   "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
-   }
+   "tiers": {}
   },
   {
    "x": 177.21,
@@ -7319,8 +7117,8 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -7336,8 +7134,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -7353,8 +7151,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -7370,10 +7168,9 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L3_Fanji": "far",
-    "L4_Chengqiang": "mid",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "mid",
+    "CH4_DongguanYe": "mid"
    }
   },
   {
@@ -7389,8 +7186,7 @@
    "state": "damaged",
    "burnt": true,
    "tiers": {
-    "L4_Chengqiang": "detail",
-    "L6_Beimen": "far"
+    "CH3_Jiuhusuo": "far"
    }
   },
   {
@@ -7406,9 +7202,8 @@
    "state": "damaged",
    "burnt": false,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L4_Chengqiang": "detail",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "far"
    }
   },
   {
@@ -7424,9 +7219,8 @@
    "state": "collapsed",
    "burnt": true,
    "tiers": {
-    "L2_Dongguan": "far",
-    "L4_Chengqiang": "detail",
-    "L6_Beimen": "far"
+    "CH2_Shouliudan": "far",
+    "CH3_Jiuhusuo": "far"
    }
   },
   {
@@ -7441,9 +7235,7 @@
    "damage": 0.406,
    "state": "damaged",
    "burnt": true,
-   "tiers": {
-    "L4_Chengqiang": "mid"
-   }
+   "tiers": {}
   },
   {
    "x": 91.18,
@@ -7457,9 +7249,7 @@
    "damage": 0.408,
    "state": "damaged",
    "burnt": true,
-   "tiers": {
-    "L4_Chengqiang": "detail"
-   }
+   "tiers": {}
   }
  ]
 }

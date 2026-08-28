@@ -339,6 +339,50 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   r.missing ? "" : `${r.before?.topologyRebuilds} -> ${r.after?.topologyRebuilds}`);
 }
 
+// 7. 可被炸中的场景物件（Script_BlastTargets）—— 摆点层摆的那几件东西
+//    **不进碰撞**，所以 NearbyColliders 永远找不到它们；它们的「被炸中」
+//    走这张纯规则登记表。二关阶段③的殉爆倒计时全靠这一条。
+//
+//    这一段特意排在**关掉破坏权限之后**：GAMEPLAY_DESTRUCTION_ENABLED 是
+//    「几何破坏」的总闸，关掉它不该顺手把「弹药箱打得中吗」一起关掉
+//    （那是玩法，不是画面预算）。下面第二条断言验的就是这一点。
+{
+  const r = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    // 与 Script_Destruction 走同一个 import map 条目 = 同一份模块实例。
+    const { BLAST_TARGETS } = await import("./Script_BlastTargets.mjs");
+    BLAST_TARGETS.Clear();
+    // 先把破坏权限关回正片口径 —— 这一条要验的就是「关着也照样打得中」。
+    T.destruction.SetPreviewMode(false);
+    const p = T.player.position;
+    const at = { x: p.x + 3, y: p.y, z: p.z + 3 };
+    const far = { x: p.x + 60, y: p.y, z: p.z + 60 };
+    const fired = [];
+    BLAST_TARGETS.Register({
+      id: "test_near", tag: "test", x: at.x, y: at.y, z: at.z, hp: 40,
+      OnDestroyed: (info) => fired.push(info.id),
+    });
+    BLAST_TARGETS.Register({
+      id: "test_far", tag: "test", x: far.x, y: far.y, z: far.z, hp: 40,
+      OnDestroyed: (info) => fired.push(info.id),
+    });
+    const gameplayEnabled = T.Debug.Destruction().gameplayEnabled;
+    const previewMode = T.Debug.Destruction().previewMode;
+    const blast = T.destruction.Blast(at, 6, 400, { kind: "launcher" });
+    const state = BLAST_TARGETS.State();
+    BLAST_TARGETS.Clear("test");
+    return { fired, blast, state, gameplayEnabled, previewMode, left: BLAST_TARGETS.Count };
+  });
+  Check("一次爆炸经 destruction 报到可炸物件登记表", r.blast?.targets === 1,
+    `targets=${r.blast?.targets}`);
+  Check("破坏权限关着也照样打得中（那是玩法，不是画面预算）",
+    !r.gameplayEnabled && !r.previewMode && r.fired.includes("test_near"),
+    `gameplay=${r.gameplayEnabled} preview=${r.previewMode} 炸掉=${r.fired.join(",")}`);
+  Check("六十米外那一件不受影响", !r.fired.includes("test_far"), r.fired.join(","));
+  Check("按 tag 清得干净（不清的话下一关同一片地方一炸会跑上一关的回调）",
+    r.left === 0, `还剩 ${r.left}`);
+}
+
 // 新 shader 路径在真的破口激活后仍不得产生 WebGL 错误。
 {
   const closed = await page.evaluate(() => {

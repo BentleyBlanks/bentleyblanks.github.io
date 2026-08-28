@@ -417,7 +417,7 @@ export const VOICE_LINES = [
   { key: "ch4_zhaodegui_03", who: "zhaodegui", delivery: "normal", dur: 3.12, text: "我屋头那面墙一到下雨就渗水。" },
   { key: "ch4_yaowa_02", who: "yaowa", delivery: "normal", dur: 1.18, text: "我妈一个人堵不住。" },
   // 「低声」——§5 原话如此，走 whisper 档
-  { key: "ch4_heyoutian_02", who: "heyoutian", delivery: "whisper", dur: 4.39, text: "我姐屋头那棵桃树，也该开了。" },
+  { key: "ch4_heyoutian_02", who: "heyoutian", delivery: "whisper", dur: 4.31, text: "我姐屋头那棵桃树，也该开了。" },
   { key: "ch4_yaowa_03", who: "yaowa", delivery: "normal", dur: 1.97, text: "不是三个婆娘等你？" },
   { key: "ch4_heyoutian_03", who: "heyoutian", delivery: "normal", dur: 0.82, text: "扯把子的。" },
   { key: "ch4_heyoutian_04", who: "heyoutian", delivery: "normal", dur: 1.40, text: "哪有三个。" },
@@ -443,7 +443,7 @@ export const VOICE_LINES = [
   { key: "ch4_zhaodegui_04", who: "zhaodegui", delivery: "whisper", dur: 1.09, text: "莫数了。" },
   // 日方：text 必须是纯假名（汉字会被 seed-audio 当中文读）。汉字写法只作文档用：
   // 止まれ。音を立てるな。
-  { key: "ch4_ija_gunso_01", who: "ija_gunso", delivery: "whisper", dur: 4.43, text: "とまれ。おとをたてるな。" },
+  { key: "ch4_ija_gunso_01", who: "ija_gunso", delivery: "whisper", dur: 2.78, text: "とまれ。おとをたてるな。" },
 
   // ── ⑤ 第一枚照明弹 ────────────────────────────────────────────────────
   { key: "ch4_yaowa_05", who: "yaowa", delivery: "shout", dur: 0.70, text: "照明弹！" },
@@ -509,13 +509,13 @@ export const VOICE_LINES = [
   { key: "ch4_shunzi_12", who: "shunzi", delivery: "shout", dur: 2.02, text: "日你先人，你再看！" },
   { key: "ch4_shunzi_13", who: "shunzi", delivery: "shout", dur: 0.87, text: "你莫乱说！" },
   { key: "ch4_yaowa_10", who: "yaowa", delivery: "whisper", dur: 0.70, text: "顺哥……" },
-  { key: "ch4_shunzi_14", who: "shunzi", delivery: "normal", dur: 2.87, text: "你不是说打完再写吗？" },
+  { key: "ch4_shunzi_14", who: "shunzi", delivery: "normal", dur: 2.67, text: "你不是说打完再写吗？" },
   { key: "ch4_paizhang_01", who: "paizhang", delivery: "shout", dur: 1.86, text: "能拿枪的都到西街！" },
   { key: "ch4_shunzi_15", who: "shunzi", delivery: "normal", dur: 0.30, text: "枪给我。" },
 
   // ── 过场 1 · CS_Ch4_UnfinishedLetter（口述四句 + 收信）────────────────
   // 四句与 Texture/Tex_PaperLetter.png 上的四列逐字一致，改一个字就对不上贴图。
-  { key: "ch4_luo_19", who: "luo", delivery: "normal", dur: 3.12, text: "娘的眼睛，请郎中再看一哈。" },
+  { key: "ch4_luo_19", who: "luo", delivery: "normal", dur: 2.87, text: "娘的眼睛，请郎中再看一哈。" },
   { key: "ch4_luo_20", who: "luo", delivery: "normal", dur: 2.24, text: "欠王家的谷，等发饷再还。" },
   { key: "ch4_luo_21", who: "luo", delivery: "normal", dur: 2.45, text: "春妹的鞋莫做大了。" },
   { key: "ch4_luo_22", who: "luo", delivery: "normal", dur: 0.62, text: "等我回来……" },
@@ -524,7 +524,7 @@ export const VOICE_LINES = [
   // ── 过场 2 · CS_Ch4_AidStation ───────────────────────────────────────
   { key: "ch4_danjiayuan_01", who: "danjiayuan", delivery: "shout", dur: 1.57, text: "让一哈！让开！" },
   { key: "ch4_junyi_06", who: "junyi", delivery: "normal", dur: 1.90, text: "剪开。灯拿近点。" },
-  { key: "ch4_shunzi_16", who: "shunzi", delivery: "normal", dur: 2.99, text: "再包一道。他刚才还在喘。" },
+  { key: "ch4_shunzi_16", who: "shunzi", delivery: "normal", dur: 3.00, text: "再包一道。他刚才还在喘。" },
   { key: "ch4_junyi_07", who: "junyi", delivery: "normal", dur: 0.77, text: "没得脉了。" },
   { key: "ch4_danjiayuan_02", who: "danjiayuan", delivery: "shout", dur: 2.02, text: "这边还在出血！" },
 ];

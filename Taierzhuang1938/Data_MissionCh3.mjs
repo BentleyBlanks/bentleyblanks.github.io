@@ -493,7 +493,7 @@ export const VOICE_LINES = [
 
   // ── 阶段 2｜死在山东（伤兵气力不足，走 weak 档）──────────────────────
   { key: "ch3_s124_01", who: "s124", delivery: "weak", dur: 3.02, text: "我屋头只晓得我出了川。" },
-  { key: "ch3_s124_02", who: "s124", delivery: "weak", dur: 3.41, text: "真死在这儿，连埋哪儿都不晓得。" },
+  { key: "ch3_s124_02", who: "s124", delivery: "weak", dur: 2.95, text: "真死在这儿，连埋哪儿都不晓得。" },
   { key: "ch3_luo_01", who: "luo", delivery: "normal", dur: 1.88, text: "莫急到给自己找坟。" },
   { key: "ch3_luo_02", who: "luo", delivery: "normal", dur: 2.54, text: "还能拿枪就先活今天。" },
 
@@ -508,7 +508,7 @@ export const VOICE_LINES = [
   { key: "ch3_shunzi_04", who: "shunzi", delivery: "normal", dur: 0.70, text: "也是因为缺人。" },
   { key: "ch3_luo_08", who: "luo", delivery: "normal", dur: 0.91, text: "哪个长官不缺人？" },
   { key: "ch3_luo_09", who: "luo", delivery: "normal", dur: 2.63, text: "有的喊你滚，有的把枪给你。" },
-  { key: "ch3_luo_10", who: "luo", delivery: "normal", dur: 3.57, text: "枪拿到了，就莫打得比草人还撇。" },
+  { key: "ch3_luo_10", who: "luo", delivery: "normal", dur: 3.44, text: "枪拿到了，就莫打得比草人还撇。" },
   { key: "ch3_xiaoqin_01", who: "xiaoqin", delivery: "shout", dur: 2.36, text: "哪个龟儿子又踩电话线！" },
 
   // ── 阶段 4｜报纸 ─────────────────────────────────────────────────────
@@ -522,7 +522,7 @@ export const VOICE_LINES = [
   { key: "ch3_junguan_02", who: "junguan", delivery: "shout", dur: 1.13, text: "去把活的带回来！" },
 
   // ── 阶段 6—8｜侦察段：一律 whisper ──────────────────────────────────
-  { key: "ch3_yaowa_06", who: "yaowa", delivery: "whisper", dur: 4.62, text: "飞机连担架都照打，还保哪个的命。" },
+  { key: "ch3_yaowa_06", who: "yaowa", delivery: "whisper", dur: 4.83, text: "飞机连担架都照打，还保哪个的命。" },
   { key: "ch3_luo_11", who: "luo", delivery: "whisper", dur: 2.12, text: "莫踩出声音。" },
   { key: "ch3_xiaoqin_04", who: "xiaoqin", delivery: "whisper", dur: 1.87, text: "线在这头还是通的。" },
   { key: "ch3_heyoutian_04", who: "heyoutian", delivery: "whisper", dur: 1.05, text: "他们在里头做啥子？" },
@@ -553,7 +553,7 @@ export const VOICE_LINES = [
   { key: "ch3_shunzi_06", who: "shunzi", delivery: "normal", dur: 2.21, text: "莫让他再流了。" },
 
   // ── 阶段 11｜传单入火之后（过场里没有台词，两句在过场外面说）───────────
-  { key: "ch3_yaowa_10", who: "yaowa", delivery: "normal", dur: 1.62, text: "保命……" },
+  { key: "ch3_yaowa_10", who: "yaowa", delivery: "normal", dur: 0.85, text: "保命……" },
   { key: "ch3_yaowa_11", who: "yaowa", delivery: "normal", dur: 1.70, text: "保个鸭儿的命。" },
 
   // ── 阶段 12｜撤回 A 区 ───────────────────────────────────────────────
@@ -575,7 +575,7 @@ export const VOICE_LINES = [
     text: "ひきずりだせ。", kanji: "引きずり出せ。", cn: "拖出来。",
   },
   {
-    key: "ch3_ija_gunso_03", who: "ija_gunso", delivery: "normal", dur: 3.75,
+    key: "ch3_ija_gunso_03", who: "ija_gunso", delivery: "normal", dur: 3.14,
     text: "しなへいだな。ばんごうをいえ。", kanji: "支那兵だな。番号を言え。", cn: "是支那兵吧。报出番号。",
   },
   {

@@ -44,8 +44,9 @@ export const PLACEMENTS = Object.freeze([
     note: "车站北头货位：换轨用的枕木料，撂在道砟坡脚" },
   { asset: "ryTimberStack", x: -472.4, z: -122.6, ry: -0.06,
     note: "车站北头货位：第二垛枕木料" },
-  { asset: "battlefieldTimberBeam", x: -470.2, z: -124.0, ry: 1.62,
-    note: "车站北头货位：顺着站台方向躺的一根长木梁" },
+  { asset: "battlefieldTimberBeam", x: -471.2, z: -124.0, ry: 1.62,
+    note: "车站北头货位：顺着站台方向躺的一根长木梁（2026-08-29 从 x=-470.2 西移 1 m："
+      + "CH1 路基→村落那条目标连线离旧位置 2.52 m，撞规则 8 的 3 m 净空）" },
   { asset: "marketCrate03", x: -468.8, z: -121.4, ry: 0.3,
     note: "车站北头货位：没上车的板条箱" },
   { asset: "marketCrate01", x: -467.9, z: -122.6, ry: -0.5,

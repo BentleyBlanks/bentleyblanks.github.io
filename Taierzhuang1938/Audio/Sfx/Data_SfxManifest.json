@@ -121,10 +121,12 @@
     },
     "explosionNear": {
       "files": [
-        "AudioSfx_ExplosionNear_01.mp3"
+        "AudioSfx_ExplosionNear_01.mp3",
+        "AudioSfx_ExplosionNear_02.mp3",
+        "AudioSfx_ExplosionNear_03.mp3"
       ],
       "seconds": 2.4,
-      "credit": "Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023",
+      "credit": "Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 ／ Gamemaster Audio · 近距爆炸（偏亮） · Sonniss GDC 2017 ／ Gamemaster Audio · 近距爆炸（偏闷、长尾） · Sonniss GDC 2017",
       "license": "sonniss"
     },
     "explosionFar": {

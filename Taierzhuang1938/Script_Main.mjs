@@ -66,7 +66,7 @@ import { CompanionDirector } from "./Script_Companion.mjs";
 import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
 import { MissionSetpieceDirector } from "./Script_MissionSetpieces.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
-import { MENU_SCENE } from "./Data_Menu.mjs";
+import { MENU_SCENE, OVERVIEW_PHASE, JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -156,8 +156,34 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
  */
 const RANGE = params.get("range") === "1";
 const MELEE_TEST = params.get("melee") === "1";
-const SANDBOX = RANGE || MELEE_TEST;
-const PHASE_TABLE = RANGE ? [RANGE_PHASE] : MELEE_TEST ? [MELEE_QTE_PHASE] : PHASES;
+/**
+ * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
+ * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
+ * OUTFIELD_SCENES.L0_Jiehe / Data_Dressing_JieheVillages 那一整套资产一件没删 ——
+ * 这条入口就是给它们的（回归口 Script_JieheTerrainTest）。切片定义在 Data_Menu。
+ */
+const JIEHE = params.get("jiehe") === "1";
+/**
+ * 全城俯瞰（?phase=overview）：**出图与自检专用**，不进选章列表。
+ * 重制之后没有哪一章会建整座城，而「照城防图核对整座城」这件事仍然要做 ——
+ * 采样点表（Data_SamplePoints 的 `phase: "overview"`）、Script_ShotTest 的 Z 系列
+ * 与 Script_TownDressingDump 都从这条入口进。切片是 Data_Battle.OVERVIEW_BOUNDS。
+ *
+ * 它**不算 SANDBOX**：菜单要照常在开机时接管相机（Z 系列靠 `menuShot` 架机位），
+ * 换成沙盒那一套「菜单只建不开」之后，ApplyShot 摆完就会被玩家相机顶掉。
+ *
+ * 代价说清楚：菜单开着、选章仍然列七章，而这条 URL 下 PHASE_TABLE 只有一条 ——
+ * 真人在这儿点某一章会被 `StartLevel` 的 Clamp 夹回这一片（不崩，但也不是那一章）。
+ * 出图与自检脚本从不点选章，所以没为这一条另加一层门；真要进正片就把 query 去掉。
+ */
+const PHASE_PARAM = params.get("phase");
+const OVERVIEW = PHASE_PARAM === "overview";
+const SANDBOX = RANGE || MELEE_TEST || JIEHE;
+const PHASE_TABLE = RANGE ? [RANGE_PHASE]
+  : MELEE_TEST ? [MELEE_QTE_PHASE]
+    : JIEHE ? [JIEHE_SANDBOX_PHASE]
+      : OVERVIEW ? [OVERVIEW_PHASE]
+        : PHASES;
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -198,10 +224,12 @@ const MENU_AT_BOOT = MENU_ON && !SANDBOX;
  * 没给且要进菜单，就建 MENU_SCENE.slice —— 菜单背后那片活场景是城墙那一关，
  * 城墙是这座城的招牌，序关的界河是二十公里外的空地，当不了门面。
  */
-const PHASE_PARAM = params.get("phase");
 const MENU_SLICE = Math.max(0, PHASE_TABLE.findIndex((p) => p.id === MENU_SCENE.slice));
-const START_PHASE = PHASE_PARAM !== null
-  ? Math.max(0, Math.min(PHASE_TABLE.length - 1, parseInt(PHASE_PARAM, 10)))
+// `?phase=overview` 已经在上面换掉了整张表，这里就没有序号可解析了 ——
+// parseInt("overview") 是 NaN，而 NaN 会一路穿过 Math.min/Math.max 变成 START_PHASE。
+const PHASE_INDEX = PHASE_PARAM !== null ? parseInt(PHASE_PARAM, 10) : NaN;
+const START_PHASE = Number.isFinite(PHASE_INDEX)
+  ? Math.max(0, Math.min(PHASE_TABLE.length - 1, PHASE_INDEX))
   : (MENU_AT_BOOT ? MENU_SLICE : 0);
 
 const canvas = document.getElementById("view");
@@ -1394,9 +1422,9 @@ async function Boot() {
     // 视角接替（五关⑫）。**每一段都是玩家控制**：换出生点 + 换身份 + 一段短活。
     // 段与段之间不切黑（策划案原文），所以这里只搬人、补血、报一行字幕 ——
     // 没有淡出、没有过场、没有 Respawn（Respawn 会扣兵员池、弹死亡卡）。
-    SwitchPov: ({ id, label, at, task } = {}) => {
+    SwitchPov: ({ id, label, at, task, yaw } = {}) => {
       if (!player || !at) return false;
-      player.Spawn(at.x, at.z, player.yaw);
+      player.Spawn(at.x, at.z, typeof yaw === "number" ? yaw : player.yaw);
       state.ammo = Math.max(state.ammo, 5);
       state.setpieceFacts.pov = id || label || "?";
       hud.Say(null, `视角接替：${label || id}`, 3.2, "system");
@@ -1433,6 +1461,24 @@ async function Boot() {
     // 交火声床整层淡出/淡入（三关处决声音先行段）。音频账归 INT3，这里只记事实；
     // 接上之后把它翻给 Script_Audio 的环境层即可，摆点表一个字都不用改。
     SetCombatBed: (on) => { state.setpieceFacts.combatBed = !!on; return true; },
+
+    // 一次立刻发生的爆炸，与日军炮弹同一条 Combat.Blast（二关殉爆、四关墙塌那一下）。
+    Detonate: ({ at, radius, damage, kind } = {}) => {
+      if (!combat || !at) return false;
+      combat.Blast(at, radius ?? 6, damage ?? 120, kind || "shell");
+      return true;
+    },
+
+    // 体力**恢复的上限**（1 = 常态）。五关终局章节作用域，换关由摆点层自己还原。
+    SetStaminaCeiling: (v) => {
+      if (!player) return false;
+      player.staminaCeiling = Math.max(0.2, Math.min(1, v));
+      return true;
+    },
+
+    // 撒一个日军（五关终局两侧波次；四关固定事件也缺它才只能用声音演）。
+    SpawnEnemy: ({ x, z, weapon, squadId } = {}) =>
+      ai ? (ai.Spawn("ija", x, z, { weapon: weapon || undefined, squadId }) ?? null) : null,
   });
 
   // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
@@ -2246,9 +2292,14 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE],
-      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee" : false,
+      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, JIEHE_SANDBOX_PHASE],
+      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
+      // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
+      // 三个沙盒都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
+      //（全城俯瞰会拿到序章那两条路基机位）。正片下 PHASE_TABLE === PHASES，
+      // 这条与旧行为逐字相同。
+      SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
       ExitSandbox: () => GoToSandbox(null),
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
@@ -2328,8 +2379,10 @@ function GoToSandbox(key) {
   const url = new URL(window.location.href);
   url.searchParams.delete("range");
   url.searchParams.delete("melee");
+  url.searchParams.delete("jiehe");
   if (key === "range") url.searchParams.set("range", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
+  else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
   url.searchParams.delete("menu");

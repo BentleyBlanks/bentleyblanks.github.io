@@ -28,6 +28,16 @@ import {
 
 const NS = "http://www.w3.org/2000/svg";
 
+/**
+ * 沙盒模式（`host.sandboxMode`）→ 暂停菜单里的两句话。
+ * key 与 Script_Main 的 `?range=1 / ?melee=1 / ?jiehe=1` 一一对应。
+ */
+const SANDBOX_NAMES = {
+  range: { where: "靶场", exit: "退出靶场" },
+  melee: { where: "白刃测试场", exit: "退出白刃测试场" },
+  jiehe: { where: "界河白盒", exit: "退出界河白盒" },
+};
+
 /** 缓动：进出都软的推轨。ER2 的菜单运镜没有一处是匀速的。 */
 function EaseInOutSine(k) { return 0.5 - 0.5 * Math.cos(Math.PI * Clamp01(k)); }
 function Lerp(a, b, k) { return a + (b - a) * k; }
@@ -361,11 +371,14 @@ export class MainMenu {
    */
   PauseItems() {
     if (this.sandboxMode) {
+      // 三片沙盒各自报自己的名字：在界河白盒里按 Esc 看到「退出靶场」，
+      // 会让人以为自己进错了地方。
+      const here = SANDBOX_NAMES[this.sandboxMode] || SANDBOX_NAMES.range;
       return [
-        { id: "resume", label: "继续", hint: "回到靶场" },
+        { id: "resume", label: "继续", hint: `回到${here.where}` },
         { id: "settings", label: "设置", hint: "操作、画面与声音" },
         { id: "debug", label: "调试选项", hint: "碰撞、移动、伤害与补给的测试开关" },
-        { id: "exitSandbox", label: "退出靶场", hint: "重载回正片，回到主菜单" },
+        { id: "exitSandbox", label: here.exit, hint: "重载回正片，回到主菜单" },
       ];
     }
     return [
@@ -648,8 +661,9 @@ export class MainMenu {
     if (!phase.sandbox) mk("mnBriefDate").textContent = phase.date;   // 沙盒没有史实日期
     const meta = mk("mnBriefMeta");
     // 沙盒没有时限也没有兵员池（都是 9999 的占位数），拿工位数与携行说事才有信息。
+    // 界河白盒没有工位也没有木桩兵，所以这三句允许被 phase.metaText 整条换掉。
     const metaTexts = phase.sandbox
-      ? ["不计时 · 不计进度", `工位 ${phase.zones.length}`, "木桩兵自动复位"]
+      ? (phase.metaText || ["不计时 · 不计进度", `工位 ${phase.zones.length}`, "木桩兵自动复位"])
       : [`约 ${phase.minutes} 分钟`,
         `城里还站着的人 ${phase.nraPool}`, `路标 ${phase.zones.length}`];
     for (const text of metaTexts) {
@@ -818,7 +832,9 @@ export class MainMenu {
   /** 按当前建好的切片取机位表。切片换了就重取（回主菜单时会用到）。 */
   PickShots(reset = false) {
     const index = this.host.SliceIndex?.() ?? 0;
-    const phase = this.phases[index];
+    // 优先问装配层「现在建好的是哪一片」：沙盒与 ?phase=overview 都不在 PHASES 里，
+    // 只按序号去查 this.phases 会取到别人的机位（见 Script_Main 的 SlicePhase 注释）。
+    const phase = this.host.SlicePhase?.() || this.phases[index];
     if (!phase) return;
     if (!reset && this.shotSliceId === phase.id) return;
     this.shotSliceId = phase.id;
@@ -916,7 +932,7 @@ export class MainMenu {
 
     // 角上那行小字只报地名（ER2 报的是地图名）。note 是写给改坐标的人看的，不上屏。
     if (this.el.shotNote) {
-      const phase = this.phases[this.host.SliceIndex?.() ?? 0];
+      const phase = this.host.SlicePhase?.() || this.phases[this.host.SliceIndex?.() ?? 0];
       this.el.shotNote.textContent = phase
         ? `${phase.label}　${shot.title || shot.id}` : (shot.title || "");
     }

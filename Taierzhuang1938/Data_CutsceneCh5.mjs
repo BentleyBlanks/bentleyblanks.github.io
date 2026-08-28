@@ -315,7 +315,80 @@ export const CS_Ch5_PovChain = {
   },
 };
 
+// ===========================================================================
+// ③ 视角接替的三张**身份字卡**（各 3.6—4.9 s）
+// ===========================================================================
+//
+// §6 阶段⑫ 的三段接替以前只换出生点、换任务文字，玩家不知道自己变成了谁
+//（§10.7 施工单最后一条：「缺的是『换身份』的表现」）。这三张卡把那件事说出来：
+// **一秒黑帧 + 一行身份**，随后落在新的位置与朝向上（摆点层的 SwitchPovWithCard）。
+//
+// 与关末那一场 CS_Ch5_PovChain 是两回事：那一场是**顺子倒下之后**的十二秒交接
+//（贴地 → 机枪位 → 电话兵 → 听筒落地），一镜一个人，它自己**不切黑**。
+// 这三张是**关内**每一次真的换人操作时的过门。
+//
+// ★ 与策划案「段与段之间不切黑，用声音衔接」的关系：这三张卡的黑帧是抛光批
+//   点名要的（1 s 黑帧 + 身份字卡）。折中的做法是**声音不断** —— 每一张的黑帧上
+//   都压着远处的枪炮，卡与卡之间听起来是连着的；黑的只有画面，只有一秒。
+//   要退回「完全不切黑」，把三张的镜 1（black:true 那一镜）删掉即可，
+//   摆点层那一侧一个字都不用改。
+const PovCard = (id, name, text, seconds, cardSeconds) => ({
+  id,
+  title: name,
+  seconds,
+  trigger: "afterLevel:CH5_Chengqiang",
+  standalone: false,
+  setOrigin: [0, 0, 0],
+  why: "换人是这一段唯一的事件。玩家在一秒黑帧里知道自己成了谁，睁眼就落在那个岗位上 —— 不用旁白解释「岗位不断有人补上」。",
+  people: {},
+  props: [],
+  cast: [],
+  shots: [
+    // 镜 1：一秒黑。**声音不断**（远处的枪与炮照旧），所以断的只有画面。
+    {
+      n: 1, seconds: 1.0, focalMm: 35, black: true,
+      note: "一秒黑帧。远处的枪炮压着不停 —— 城还在打，只是换了一双眼睛。",
+      camera: { from: [-230.0, 1.60, 0.0], look: [-200.0, 1.50, 0.0] },
+      sfx: [
+        { at: 0.05, name: "rifleIjaFar", volume: 0.30 },
+        { at: 0.60, name: "explosionFar", volume: 0.26 },
+      ],
+    },
+    // 镜 2：身份字卡（与序章地点卡同一档版式：black + titleCard + sub.title）。
+    {
+      n: 2, seconds: cardSeconds, focalMm: 35, black: true, titleCard: true,
+      note: "身份字卡。只有一行，不加注解 —— 这个人是谁，接下来那半分钟自己会说。",
+      camera: { from: [-230.0, 1.60, 0.0], look: [-200.0, 1.50, 0.0] },
+      sfx: [{ at: 0.20, name: "rifleNraFar", volume: 0.24 }],
+      subs: [{ at: 0.1, seconds: cardSeconds - 0.2, title: true, text }],
+    },
+  ],
+  skipCard: {
+    title: name,
+    lines: [
+      { tier: "主流", text: "守城部队主力建制瓦解后，残余官兵仍在城内继续抵抗，岗位不断有人补上。" },
+      { tier: "虚构", text: `这一段由${name}接手。` },
+    ],
+  },
+});
+
+/** ⑫① 补机枪位的 124 师伤兵（「你会不会打？」「看过两回。」）。 */
+export const CS_Ch5_PovGunnerCard =
+  PovCard("CS_Ch5_PovGunnerCard", "机枪副射手", "第124师 · 机枪副射手", 4.9, 3.9);
+
+/** ⑫② 递伤亡报告的前沿电话兵。 */
+export const CS_Ch5_PovLinemanCard =
+  PovCard("CS_Ch5_PovLinemanCard", "前沿电话兵", "前沿电话兵", 3.6, 2.6);
+
+/** ⑫③ 小秦 —— 电话另一端。他从这一拍起是玩家，一直演到终章。 */
+export const CS_Ch5_PovXiaoqinCard =
+  PovCard("CS_Ch5_PovXiaoqinCard", "通信兵小秦", "通信兵 · 小秦", 3.8, 2.8);
+
 /** 本章过场（按播放顺序）。Data_TengxianScript 汇总时照这个数组展开。 */
-export const CH5_CUTSCENES = [CS_Ch5_TurnBack, CS_Ch5_PovChain];
+export const CH5_CUTSCENES = [
+  CS_Ch5_TurnBack,
+  CS_Ch5_PovGunnerCard, CS_Ch5_PovLinemanCard, CS_Ch5_PovXiaoqinCard,
+  CS_Ch5_PovChain,
+];
 
 export default CH5_CUTSCENES;

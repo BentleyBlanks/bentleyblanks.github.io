@@ -224,6 +224,33 @@ node Taierzhuang1938/Script_VoiceBake.mjs --story --dry    # 只看要烘哪些�
 抒情句尚可当作留白，`ch3_ija_gunso_03`「しなへいだな。ばんごうをいえ。」中间空 1.98 s
 就明显是断了。**下一轮要收的话，收在这里，不要去动响度。**
 
+### 2026-08-29 抛光批 P3：收了 20 条，留了 7 条
+
+按上面那条口径逐条判过一遍。判据不是「有没有停」，是**停在不在标点上、剩下的字够不够念**：
+
+- **留**：停顿落在原文写着的「……」或逗号上，且去掉停顿之后的语速仍在 3—5 字/秒。
+  `ch1_shangbing_02`「狗日的小日本……连躺起的人都不放过。」1.66 s 正落在那个省略号上，
+  一个躺着的伤兵说这句话本来就要喘一口；`ch0_shunzi_05` / `ch0_shunzi_07` 是耳语独白，
+  `ch6_canmou_03`「小秦，东关是个啥子情况？」是叫完名字等人应声。这些不是断，是句读。
+- **收**：停顿不在标点上，或者剩下的字被挤到 6—9 字/秒（模型把时间花在了空白上）。
+  `ch4_shunzi_16`「再包一道。他刚才还在喘。」2.99 s 里空掉 1.70 s，12 个字塞进 1.29 s；
+  `ch1_luo_03`「莫等他走拢！打！」是喊话，中间空 1.00 s 等于把命令拆成两句。
+
+全表 20 条重烘，句中最长静音 **24 条 >1 s → 7 条**（>0.8 s 55 → 39）。
+7 条里 6 条是上面「留」的那一档，第 7 条是 `ch4_ija_gunso_01`。
+
+**重烘是掷骰子，不是修复 —— 必须留候选池。** `Script_VoiceBake` 一次调用内部最多摇 3 条 take，
+但它**按底噪挑**，不看句中静音；也就是说每跑一次只是抽一次样，而且**新的直接盖掉旧的**。
+第一轮 20 条里有 3 条（`ch4_ija_gunso_01` 1.50→2.78 s）被摇得比原来更差。
+正确做法是每摇一轮先把成品拷进候选池，最后按静音挑一条装回去，
+再按 `WriteDurations` 同一条正则把 `dur` 写回 `Data_MissionChX.mjs`
+（**别手算 `dur`**：管线用的是 `ffprobe format=duration` 四舍五入到两位）。
+
+**日语两句一顿的那条收不动。** `ch4_ija_gunso_01`「とまれ。おとをたてるな。」摇了 9 条，
+最好的一条仍有 1.10 s（从 1.50 s 降下来）。句号在中间、又是耳语，模型每次都在那儿断开。
+1.10 s 上留住了 —— 一个日军军曹压着嗓子先喝「站住」再补「别出声」，中间隔一拍并不假，
+再摇下去只是烧钱。**要真收干净得改词**（把两句并成一句），那是台词的事，不是烘焙的事。
+
 ## 运行时：从 beat 到声音
 
 ```
@@ -338,7 +365,7 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `magIn` | 1 | 0.65 s | 5.6 KB | Dramatic Cat · 步枪弹匣入位 · Sonniss GDC 2024 |
 | `grenadePin` | 1 | 0.60 s | 5.1 KB | TS Sound · 火柴摩擦点燃 · Sonniss Game Audio Monthly #4 |
 | `grenadeThrow` | 1 | 0.55 s | 4.9 KB | David Dumais Audio · 重挥破风 · Sonniss GDC 2020 |
-| `explosionNear` | 1 | 2.40 s | 19.2 KB | Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 |
+| `explosionNear` | 3 | 2.40 s | 57.6 KB | Bluezone Corporation · 城区爆炸 · Sonniss GDC 2023 ／ Gamemaster Audio · 近距爆炸（偏亮 / 偏闷长尾）· Sonniss GDC 2017 |
 | `explosionFar` | 1 | 2.60 s | 20.9 KB | Gamemaster Audio · 远处爆炸 · Sonniss GDC 2017 |
 | `shellIncoming` | 1 | 2.00 s | 16.2 KB | Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020 |
 | `shellImpact` | 1 | 2.80 s | 22.5 KB | Coll Anderson · 野外迫击炮爆炸实录 · Sonniss GDC 2015 |
@@ -831,16 +858,16 @@ gitignore 的 —— 谁的本地没有原始长片，谁的 cue 就被从清单
 `Script_AudioNormalize` 拉平过的老 mp3 重新切一遍、覆盖掉它们的响度）。
 要「只看不写」请用 `--report`，且**同样要带组名**。
 
-### 一处遗留：部分重烘不会把毕业的 cue 踢出 `pendingCues`
+### 已修：部分重烘会把毕业的 cue 踢出 `pendingCues`（2026-08-29 · 抛光批 P2）
 
-`Script_SfxBake.Main()` 收尾那一段在 `partial` 模式下是
+原来 `Script_SfxBake.Main()` 收尾那一段在 `partial` 模式下是
 `{ ...(manifest.pendingCues || {}), ...pendingCues }` —— 只做并集，不做删除。
 于是「组上的 `pending` 去掉了、照组名重烘」之后，这 15 条同时出现在 `cues`
 与 `pendingCues` 里。运行时与 `AudioNormalize` 都只读 `cues`，不影响行为，
-但清单上是一笔糊涂账。本轮是手工把 `pendingCues` / `pendingNote` 两个键从
-`Data_SfxManifest.json` 里删掉的；`Script_SfxBake.mjs` 不在 INT3a 的文件所有权内，
-**修法留给下一个动那只脚本的人**：部分重烘时应当把已经进了 `cues` 的键从
-`pendingCues` 里剔掉。
+但清单上是一笔糊涂账 —— 而清单正是「这条音接没接线」唯一的账本。
+INT3a 当时是**手工**把 `pendingCues` / `pendingNote` 两个键从 `Data_SfxManifest.json`
+里删掉的；现在脚本自己会做：合并之后凡已经进了 `cues` 的键一律从 `pendingCues` 剔掉，
+一条不剩就把这两个键一起摘掉，不留空对象充当「还有账没清」。
 
 `Data_SfxSources.mjs` **不在 `index.html` 的 import map 里**（全项目只有 Node 侧的
 烘焙脚本 import 它），所以 A2 那一批不需要 bump 任何 `?v=`；
@@ -947,12 +974,37 @@ gitignore 的 —— 谁的本地没有原始长片，谁的 cue 就被从清单
 
 **四处真的会糊，按严重程度排：**
 
-1. **`explosionNear` 只有一个变体。** 本文件自己的规矩是「每秒都在响的音必须多变体」，
-   手榴弹雨正是那种场合：二十几记爆炸全从同一条 2.4 s 的 wav 出，±3% 逐发变调盖不住
-   —— 听感上会从「一片爆炸」塌成「同一记爆炸响了二十遍」。
-   **这是本项唯一的素材缺口**，建议补 2 条同厂同类的近场城区爆炸变体
-   （Bluezone `BC0277 explosion_urban` 那一组里还有可用的，与现用那条同库同型）。
-   本批按分工没有动它。
+1. ~~**`explosionNear` 只有一个变体。**~~ **2026-08-29 抛光批 P3 补上了，现在是 3 条。**
+   本文件自己的规矩是「每秒都在响的音必须多变体」，手榴弹雨正是那种场合：
+   二十几记爆炸全从同一条 2.4 s 的 wav 出，±3% 逐发变调盖不住 ——
+   听感上会从「一片爆炸」塌成「同一记爆炸响了二十遍」。
+
+   补的两条**不是**当初建议的「Bluezone BC0277 那一组里的另一条」：
+   archive.org 的 Sonniss 镜像是**每家厂商只放四个文件**的抽样，
+   `BluezoneCorp - Detonation - Explosion` 目录里带 `urban` 的**就那一条**，没有第二条同库的。
+   改按**频谱选**而不是按文件名选 —— 拿现用的 BC0277 当靶子
+   （谱心 1772 Hz、>4 kHz 占 11.9 %、降 20 dB 用 0.72 s），
+   把镜像里所有非科幻的爆炸素材量了一遍，选出一深一亮把靶子夹在中间的两条：
+
+   | 变体 | 素材 | 谱心 | >4 kHz | 成品电平 |
+   | --- | --- | --- | --- | --- |
+   | `_01` | Bluezone `BC0277_explosion_urban_004_02`（GDC 2023） | 1772 Hz | 11.9 % | −24.92 dBFS |
+   | `_02` | Gamemaster `explosion_large_08`（GDC 2017） | 1807 Hz | 13.6 % | −25.03 dBFS |
+   | `_03` | Gamemaster `explosion_med_long_tail_01`（GDC 2017） | 1453 Hz | 9.9 % | −24.99 dBFS |
+
+   Gamemaster 这个包已经是 `explosionFar` 的来源，三条变体只出自两家厂商，
+   底噪与房间感是一路的。三条包络都验过是单调衰减（没有第二记爆炸糊在 2.4 s 窗口里）。
+   `explosionNear` **不在 `SAMPLE_CYCLE` 里**，所以走的仍是随机挑 + 逐发 ±3% 变调，
+   这一批没有动这个语义。
+
+   > **重切 `ExplosionUrban` 会把 `_01` 的响度打回原形。** 这一条差点悄悄过去：
+   > `_01` 的 cut 上没有 `alignDbfs`，它现在的 −24.92 dBFS 是当年
+   > `Script_AudioNormalize --write` **事后**拉平的；照组名重切会从原素材按
+   > `gain: 0.97` 重新生成，量出来是 **−13.03 dBFS（响了将近 12 dB）**，
+   > 而清单、测试、`--report` 之外的任何一道闸都不会响。
+   > 补变体时必须把 `_01` 从 git 还原（新变体自己带 `alignDbfs: -25`，不受影响），
+   > 或者重切完立刻跑一遍 `Script_AudioNormalize.mjs --report`。
+   > 一般规律：**没有 `alignDbfs` 的老 cue 不要重切**。
 2. **混响 send 是线性叠加的。** `SAMPLE_WET.explosionNear` 0.45，街巷 IR 0.95 s、
    开阔地 2.6 s；二十记同距离的爆炸叠上去，湿声总能量就是 0.45×N ——
    2026-08-20 那一轮定论过的「不知道哪儿来的、带拖尾」正是这个机制，只是那次的成因是

@@ -7,14 +7,18 @@
 //   ... --from-workspace                                       # 用系统临时目录里的上次原始音频重转码
 //   node Taierzhuang1938/Script_VoiceBake.mjs --normalize      # 只统一响度，不重新生成
 //   node Taierzhuang1938/Script_VoiceBake.mjs --clean <key>…   # 只为降底噪重摇，不如旧的就留旧的
-//   node Taierzhuang1938/Script_VoiceBake.mjs --prologue --force # 序章只允许 SeedAudio 1.0
 //   ... --motivation-level=1|2|3                         # 连续动员强度；默认 3（最终定稿）
 //   node Taierzhuang1938/Script_VoiceBake.mjs --story           # 七章剧情台词（kind:"story"）
 //   node Taierzhuang1938/Script_VoiceBake.mjs --chapter=3       # 只烘第三关那一章
 //
 // 烘完把实测时长写回**行本体所在的文件**（战场口令在 Data_Voice.mjs，
 // 章节台词在 Data_MissionChX.mjs）的 dur 字段；战斗 Bark 断言 0.3—2.6 s，
-// 序章对白独立 0.45—4.8 s，剧情台词按字数给上限（StoryMaxDur）。
+// 剧情台词按字数给上限（StoryMaxDur）。
+//
+// 旧序章那一档（`line.prologue` / `--prologue` / PROLOGUE_ROLE_PROMPTS）2026-08-29
+// 随 11 条 `prologue_*` 行一起删了：新序章的车厢对白是 `kind:"story"` 的章节台词
+// （Data_MissionCh0），走的是下面那条剧情分支。Data_Voice 里 `prologue` 为真的行
+// 现在是 0 条，留着那三处只会让下一个人以为还有一条独立通道。
 //
 // ## 章节剧情台词（2026-08-28 任务流程重制）
 // 与战场口令是两类活，后期参数也分开（见 CAST_VOICE_PROMPTS / EncodeOptionsFor）：
@@ -281,7 +285,6 @@ function EncodeOptionsFor(line) {
     };
   }
   if (line.promptMode === "continuousScene") return { maxDur: 22.0, maxTempo: 1.25 };
-  if (line.prologue) return { maxDur: 5.0, maxTempo: 1.35 };
   return undefined;
 }
 
@@ -377,14 +380,6 @@ const DELIVERY_PROMPTS = {
     + "人还清醒，话还说得完整，只是托不住。不是呻吟，也不是临终气音。",
 };
 
-const PROLOGUE_ROLE_PROMPTS = {
-  "年轻传令兵": "十八九岁的四川男兵，嗓音年轻偏亮但已有长途行军后的疲惫；说话直率、带一点想家的憨气，川味自然，不卖弄方言。",
-  "旧伤士兵": "四十岁上下的四川老兵，男中低音，嗓子略哑，慢而省力；见过伤亡，语气平静克制，不故作沧桑。",
-  "机枪手": "三十岁上下的四川男兵，嗓音厚实、稳，嘴上爱打趣，底色是照应年轻人的老练和善意。",
-  "擦枪士兵": "二十多岁的四川男兵，声音偏低而干，正被发涩的枪栓惹烦；只短促嘟囔，不喊叫。",
-  "车外军官": "三十五岁上下的四川男性基层军官，中低音有穿透力；隔着车门发命令，急而清楚，不表演式咆哮。",
-};
-
 /**
  * 章节剧情台词的提示词：音色（谁）× 交付档（怎么说）× 台词原文。
  *
@@ -455,16 +450,6 @@ function SeedAudioPrompt(line) {
       "回答者必须始终是同一群十到十二名十七八岁的年轻四川男兵，人数感、年轻男性声线、距离与空间连续一致。群体起声允许约八十到二百五十毫秒的自然先后、轻微抢话、不同气口和参差尾音，让人听出是真人在临场回应；不能采样级完全对齐，也不能把同一条单人录音机械复制叠加。严禁把回答拆成轮流喊或拖成长回声，严禁把群体台词做成一个人低声回答，严禁低沉含糊，严禁中年厚重男声、女声或儿童声。",
       "严格按下列顺序和原文说完，并让最后一句在22秒内自然收住：",
       motivationText,
-    ].join("\n");
-  }
-  if (line.prologue) {
-    const character = PROLOGUE_ROLE_PROMPTS[line.role] || "四川男性军人，嗓音自然、克制，符合1938年长期行军后的疲惫状态。";
-    return [
-      "生成一条单句、干净、孤立的中文男性对白配音。",
-      "使用自然四川话口音，不能说成普通话腔，也不要夸张模仿或喜剧化。",
-      character,
-      "不要音乐、不要旁白、不要环境声、不要音效、不要念角色名；开口前后只留极短静音。",
-      `只说这一句原文：“${line.text}”`,
     ].join("\n");
   }
   if (line.side === "ija") {
@@ -613,7 +598,6 @@ else if (chapterArg) {
   lines = VOICE_LINES.filter((l) => l.kind === "story" && l.chapter === n);
 }
 else if (args.includes("--story")) lines = VOICE_LINES.filter((l) => l.kind === "story");
-else if (args.includes("--prologue")) lines = VOICE_LINES.filter((l) => l.prologue);
 else if (args.includes("--missing")) lines = VOICE_LINES.filter((l) => !Has(l));
 else if (args.includes("--all")) lines = VOICE_LINES.slice();
 else { console.log("要指定 key，或 --missing / --all / --story / --chapter=N / --normalize"); process.exit(0); }

@@ -9,7 +9,23 @@
 // 位姿字段的含义见 Data_SamplePoints.mjs 顶部那段。
 
 import { PHASES } from "./Data_Battle.mjs";
+import { OVERVIEW_PHASE } from "./Data_Menu.mjs";
 import { SAMPLE_POINTS, SAMPLE_GROUPS, EYE_HEIGHT } from "./Data_SamplePoints.mjs";
+
+/**
+ * `point.phase` 认两种值：**七章的序号**，或者字符串 `"overview"`。
+ *
+ * 后者是任务流程重制之后补的那片全城俯瞰切片（Data_Menu.OVERVIEW_PHASE，
+ * bounds 就是 Data_Battle.OVERVIEW_BOUNDS）。城里那八十来个机位当年挂在
+ * 「城墙关」上，重制之后没有哪一章会建整座城 —— 硬摊回某一章的话，
+ * 一批图要拆成四次建城、四种天光，两批之间就不可比了。
+ *
+ * URL 侧一一对应：序号 → `?phase=3`，`"overview"` → `?phase=overview`。
+ */
+export const OVERVIEW_KEY = "overview";
+export function PhaseFor(phase) {
+  return phase === OVERVIEW_KEY ? OVERVIEW_PHASE : (PHASES[phase] || null);
+}
 
 /**
  * 「站在 (fromX,fromZ) 看 (toX,toZ)」的 yaw。
@@ -27,7 +43,8 @@ export function ResolvePoint(point) {
     id: point.id,
     label: point.label || point.id,
     group: point.group || "Landmark",
-    phase: point.phase ?? 4,
+    // 缺省是全城俯瞰那一片 —— 城里的机位绝大多数属于它，而七章里没有一章能兜住。
+    phase: point.phase ?? OVERVIEW_KEY,
     x: point.x,
     z: point.z,
     // y 是绝对高度（城墙顶、空中）；h 是离地高度（地面机位）。两者只许有一个。
@@ -95,20 +112,22 @@ export function SampleRunPlan(ordered = OrderedPoints()) {
     if (!byPhase.has(point.phase)) byPhase.set(point.phase, []);
     byPhase.get(point.phase).push(point);
   }
+  // 排序键：全城俯瞰排在七章之前（它是本表的主场，一次建城拍掉八成的点）。
+  const Order = (phase) => (phase === OVERVIEW_KEY ? -1 : Number(phase));
   return [...byPhase.entries()]
-    .sort((a, b) => a[0] - b[0])
+    .sort((a, b) => Order(a[0]) - Order(b[0]))
     .map(([phase, points]) => ({
       phase,
-      phaseId: PHASES[phase]?.id || `phase${phase}`,
-      phaseLabel: PHASES[phase]?.label || `phase ${phase}`,
-      sky: PHASES[phase]?.sky || null,
+      phaseId: PhaseFor(phase)?.id || `phase${phase}`,
+      phaseLabel: PhaseFor(phase)?.label || `phase ${phase}`,
+      sky: PhaseFor(phase)?.sky || null,
       points,
     }));
 }
 
 /** 点位在本关 bounds 里吗。bounds 之外那一片根本不生成，拍出来是空地。 */
 export function InPhaseBounds(point) {
-  const bounds = PHASES[point.phase]?.bounds;
+  const bounds = PhaseFor(point.phase)?.bounds;
   if (!bounds) return false;
   return point.x >= bounds.minX && point.x <= bounds.maxX
     && point.z >= bounds.minZ && point.z <= bounds.maxZ;
@@ -134,14 +153,14 @@ export function ValidatePoints(list = SAMPLE_POINTS) {
       problems.push(`${where}：x/z 不是有限数`);
     }
     if (raw.y != null && raw.h != null) problems.push(`${where}：y 与 h 只许写一个`);
-    if (!PHASES[point.phase]) problems.push(`${where}：phase ${point.phase} 不存在`);
+    if (!PhaseFor(point.phase)) problems.push(`${where}：phase ${point.phase} 不存在`);
     else if (!InPhaseBounds(point)) {
-      const b = PHASES[point.phase].bounds;
+      const b = PhaseFor(point.phase).bounds;
       // 空中机位往回看城是合法的：机位站在切片外，画面里的东西仍在切片内。
       // 但也不能站到天边去 —— 超出 250 m 就是真的拍不到了。
       const out = Math.max(b.minX - point.x, point.x - b.maxX, b.minZ - point.z, point.z - b.maxZ);
       if (!point.outsideBounds) {
-        problems.push(`${where}：(${point.x}, ${point.z}) 落在 ${PHASES[point.phase].id} 的 bounds 外`
+        problems.push(`${where}：(${point.x}, ${point.z}) 落在 ${PhaseFor(point.phase).id} 的 bounds 外`
           + `（x ${b.minX}—${b.maxX} / z ${b.minZ}—${b.maxZ}），那一片不会生成`
           + "；空中机位往回看城的话写 outsideBounds: true");
       } else if (out > 250) {
@@ -172,7 +191,8 @@ export function SerializePoints(points) {
       `id: ${JSON.stringify(point.id)}`,
       `label: ${JSON.stringify(point.label)}`,
       `group: ${JSON.stringify(point.group)}`,
-      `phase: ${point.phase}`,
+      // phase 可以是序号，也可以是 "overview" —— 后者必须带引号才是合法字面量。
+      `phase: ${typeof point.phase === "string" ? JSON.stringify(point.phase) : point.phase}`,
       `x: ${Num(point.x)}`, `z: ${Num(point.z)}`,
     ];
     if (point.y != null) parts.push(`y: ${Num(point.y)}`);

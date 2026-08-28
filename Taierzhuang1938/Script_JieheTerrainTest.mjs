@@ -1,17 +1,16 @@
 // 「序 · 界河」微地形冒烟：高差必须可读，排水沟必须真的挡弹。
 //
-// ⚠ **2026-08-28 起这一份整份红，而且不是回归。**
-// 任务流程重制（docs/Data_MissionRemake.md）把七关换成了新的七章，界河那一关
-// 不在新流程里了 —— 于是 ?phase=0 建的是序章（借第一章那片城外原野），
-// 不再是 Script_JieheField 那张独立地图，本文件的九条断言一条都对不上。
+// **入口是 `?jiehe=1`，不是某一章**（2026-08-29 起）。
 //
-// 底层资产**一件都没删**：Script_JieheField、Script_JieheHeight、
-// OUTFIELD_SCENES.L0_Jiehe、Data_Dressing_JieheVillages 都还在，只是没有章节
-// 会去建它们（Script_TownDressingTest 的 ORPHANED_OUTFIELD_PACKS 里也登记了同一件事）。
-// 要修只有两条路，都是**内容决策**，不是测试能自己解决的：
-//   ① 给界河重新安一章（或给它开一条像 ?range=1 那样的独立入口），本文件照旧跑；
-//   ② 认定界河退出本作，把这一份连同那批资产一起撤掉。
-// 在决定之前别去改断言把它糊绿 —— 糊绿等于把「那张图已经没人建了」这件事藏起来。
+// 任务流程重制（docs/Data_MissionRemake.md）把七关换成了新的七章，界河那一关
+// 不在新流程里了 —— 于是 2026-08-28 到 29 之间这一份整份红：?phase=0 建的是
+// 序章（借第一章那片城外原野），不再是 Script_JieheField 那张独立地图。
+//
+// 底层资产**一件都没删**（Script_JieheField、Script_JieheHeight、
+// OUTFIELD_SCENES.L0_Jiehe、Data_Dressing_JieheVillages），所以走的是当时记下的
+// 第一条路：给界河开一条像 ?range=1 那样的独立入口 —— 选章「测试场景」组里的
+// 「界河 · 白盒」（Data_Menu.JIEHE_SANDBOX_PHASE，Script_Main 的 PHASE_TABLE 整表替换）。
+// bounds / spawn / 路标与重制前的 L0 关逐字相同，所以下面九条断言的判据一个字没改。
 //
 // 用法：node Taierzhuang1938/Script_JieheTerrainTest.mjs
 // 退出码即成败。测试走真浏览器和 PhysicsWorld.RaycastTerrain，不读源码猜结果。
@@ -43,7 +42,7 @@ function Check(name, ok, detail = "") {
 }
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=0&quality=high&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&jiehe=1&quality=high&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(60));
@@ -122,18 +121,28 @@ try {
 
     // 高度图接入后的视觉回归：长条耕地/麦垄/道路必须逐顶点贴地，不能只拿
     // 中心点对齐后让四角悬空。薄层允许的最高露出是麦苗 0.18 m。
+    //
+    // **大车路的裙边单独算**：路面走 BuildRoadRibbon（Script_RoadSpline），
+    // 断面是「顶面 groundAt + crown(0.045)」外加两侧一圈往下 skirtDrop(0.6) 的裙边 ——
+    // 裙边是**故意埋进土里**的，它盖的是每 4 m 一次采样之间的地形起伏，
+    // 没有它路沿在坡上就会开一条缝。所以那一圈顶点稳定落在 −0.555 m
+    //（= crown 0.045 − skirtDrop 0.6），拿 −0.09 那条通用底线去卡它是卡错了对象。
+    // 悬空那一侧（正向 0.19）对路面照旧严判 —— 会不会飘起来才是这条断言的本行。
     const groundLayerMaterials = new Set([
       "FieldSoil", "FieldSoilDark", "WheatRow", "WheatRowDry", "CartRoad", "RiverSand",
     ]);
     let groundLayerVertices = 0, minGroundLayerGap = Infinity, maxGroundLayerGap = -Infinity;
+    let minRoadSkirtGap = Infinity;
     for (const mesh of field.outfield.meshes) {
       const materialName = mesh.name.split("|").at(-1).replace("Static_", "");
       if (!groundLayerMaterials.has(materialName)) continue;
+      const isRoad = materialName === "CartRoad";
       const position = mesh.geometry.attributes.position;
       for (let i = 0; i < position.count; i += 1) {
         const gap = position.getY(i) - field.GroundHeight(position.getX(i), position.getZ(i));
         groundLayerVertices += 1;
-        minGroundLayerGap = Math.min(minGroundLayerGap, gap);
+        if (isRoad) minRoadSkirtGap = Math.min(minRoadSkirtGap, gap);
+        else minGroundLayerGap = Math.min(minGroundLayerGap, gap);
         maxGroundLayerGap = Math.max(maxGroundLayerGap, gap);
       }
     }
@@ -176,7 +185,7 @@ try {
       sourceUrl: heightmap.TAIZHUANG_HEIGHTMAP.source.url,
       samplerError,
       matchedAnchors, anchorCount, worstAnchorGap, badAnchors,
-      groundLayerVertices, minGroundLayerGap, maxGroundLayerGap,
+      groundLayerVertices, minGroundLayerGap, maxGroundLayerGap, minRoadSkirtGap,
       openingVillages, openingCompounds, openingSides, openingClearance, routeVillages,
       villageStats,
       villageArchetypes: [...outfieldModule.VILLAGE_BUILDING_ARCHETYPES],
@@ -203,8 +212,11 @@ try {
     `${result.matchedAnchors}/${result.anchorCount} 个地面锚点；最大偏差 ${result.worstAnchorGap.toFixed(3)} m`);
   Check("耕地、麦垄与道路逐顶点贴地",
     result.groundLayerVertices > 100000
-      && result.minGroundLayerGap >= -0.09 && result.maxGroundLayerGap <= 0.19,
-    `${result.groundLayerVertices} 顶点；离地 ${result.minGroundLayerGap.toFixed(3)}…${result.maxGroundLayerGap.toFixed(3)} m`);
+      && result.minGroundLayerGap >= -0.09 && result.maxGroundLayerGap <= 0.19
+      // 路面裙边照 BuildRoadRibbon 的 crown 0.045 − skirtDrop 0.6 = −0.555 算，留 0.07 余量。
+      && result.minRoadSkirtGap >= -0.625,
+    `${result.groundLayerVertices} 顶点；离地 ${result.minGroundLayerGap.toFixed(3)}…${result.maxGroundLayerGap.toFixed(3)} m`
+      + `；路面裙边最深 ${result.minRoadSkirtGap.toFixed(3)} m`);
   Check("目标走线上能看到一至两个村落",
     result.openingVillages.length >= 1 && result.routeVillages.length >= 2,
     `开场 ${result.openingVillages.join("/") || "无"}；全程 ${result.routeVillages.join("/") || "无"}`);

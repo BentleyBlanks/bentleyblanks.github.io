@@ -623,7 +623,9 @@ export class PlayerController {
     this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * 6));
     // 冲刺时长挂难度：staminaSeconds 就是"从满到空能跑几秒"。
     const burn = 1 / Math.max(1, DIFFICULTY.staminaSeconds);
-    this.stamina = Clamp01(this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * 0.13));
+    // 恢复的上限受 staminaCeiling 夹（五关终局的章节作用域旋钮，常态 1；消耗不受它管）。
+    this.stamina = Math.max(0, Math.min(this.staminaCeiling ?? 1,
+      this.stamina + ((canSprint || this.fastCrawl) ? -dt * burn : dt * 0.13)));
     this.lean += ((input.lean || 0) - this.lean) * (1 - Math.exp(-dt * 9));
 
     // 屏息：只在开镜时有意义，能压住摇摆，但会很快耗尽

@@ -33,9 +33,8 @@ import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { PHASES } from "./Data_Battle.mjs";
 import {
-  SampleRunPlan, ValidatePoints, GroupLabel, OrderedPoints,
+  SampleRunPlan, ValidatePoints, GroupLabel, OrderedPoints, PhaseFor,
 } from "./Script_SamplePoints.mjs";
 import { SAMPLE_GROUPS } from "./Data_SamplePoints.mjs";
 
@@ -223,7 +222,10 @@ if (problems.length) {
 
 const onlyIds = args.has("only") ? new Set(String(args.get("only")).split(",")) : null;
 const onlyGroup = args.get("group") || null;
-const onlyPhase = args.has("phase") ? Number(args.get("phase")) : null;
+// --phase= 认 0—6，也认 "overview"（点位表的 phase 就是这两种值，见 Data_SamplePoints 头注）。
+const onlyPhaseArg = args.has("phase") ? String(args.get("phase")) : null;
+const onlyPhase = onlyPhaseArg === null ? null
+  : (onlyPhaseArg === "overview" ? "overview" : Number(onlyPhaseArg));
 const selected = OrderedPoints().filter((point) => (
   (!onlyIds || onlyIds.has(point.id))
   && (!onlyGroup || point.group === onlyGroup)
@@ -335,7 +337,7 @@ for (const batch of plan) {
       });
     }
     const stats = FrameStats(buffer);
-    const verdict = FrameVerdict(stats, point.sky || PHASES[point.phase]?.sky);
+    const verdict = FrameVerdict(stats, point.sky || PhaseFor(point.phase)?.sky);
     manifest.shots.push({
       id: point.id,
       file: `${point.fileName}.png`,
@@ -345,9 +347,9 @@ for (const batch of plan) {
       groupLabel: GroupLabel(point.group),
       note: point.note,
       phase: point.phase,
-      phaseId: PHASES[point.phase]?.id || null,
-      phaseLabel: PHASES[point.phase]?.label || null,
-      sky: point.sky || PHASES[point.phase]?.sky || null,
+      phaseId: PhaseFor(point.phase)?.id || null,
+      phaseLabel: PhaseFor(point.phase)?.label || null,
+      sky: point.sky || PhaseFor(point.phase)?.sky || null,
       skyOverridden: !!point.sky,
       pose,
       bytes: buffer.length,

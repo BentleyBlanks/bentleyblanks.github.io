@@ -412,7 +412,7 @@ export const VOICE_LINES = [
 
   // --- 负伤排长：军令三句（01—03）是「生路」的第一重确认，语气不许含糊 ---
   { key: "ch5_paizhang_01", who: "paizhang", delivery: "normal", dur: 2.33, text: "你跟后送队去西街口。" },
-  { key: "ch5_paizhang_02", who: "paizhang", delivery: "normal", dur: 4.36, text: "出了西关，跟他们一起往临城方向走。" },
+  { key: "ch5_paizhang_02", who: "paizhang", delivery: "normal", dur: 3.15, text: "出了西关，跟他们一起往临城方向走。" },
   { key: "ch5_paizhang_03", who: "paizhang", delivery: "normal", dur: 0.83, text: "不用再回来。" },
   { key: "ch5_paizhang_04", who: "paizhang", delivery: "normal", dur: 0.23, text: "不用。" },
   { key: "ch5_paizhang_05", who: "paizhang", delivery: "normal", dur: 1.95, text: "能出去就算你命大。" },

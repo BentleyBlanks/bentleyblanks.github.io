@@ -111,16 +111,16 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 page.on("pageerror", (error) => console.error(`PAGEERROR ${String(error).slice(0, 200)}`));
 
-// ★ 2026-08-28 任务流程重制之后**没有哪一章会生成整座城**（旧「城墙关」没了），
-// 所以这里不能再靠 ?phase=N 蹭一片全城切片。现用第二章（东关，唯一一片同时
-// 收进城墙东段与关厢的切片）起页面，格子表照旧由生成器自己算。
-// 要真正的全城俯瞰（Data_Battle.OVERVIEW_BOUNDS）得另开一条编辑器入口 ——
-// 那件事留给集成批，见 docs/Data_MissionRemake.md §10.4。
-// **产物 _import/TownDressingCells.json 目前仍是重制前那一份**（phases 里还是
-// 旧关号）：城的几何一个字没动，格子/街表/地标照旧可用；受影响的只有
-// 「目标连线不挡」那一条规则用的是旧目标链。重跑本脚本会一并刷新。
+// ★ 走**全城俯瞰**那条入口（`?phase=overview`，Data_Menu.OVERVIEW_PHASE，
+// bounds 就是 Data_Battle.OVERVIEW_BOUNDS）。
+//
+// 为什么必须是它而不是随便一章：`PlanBlocks` 只在 bounds 之内排院子，
+// 拿某一章的切片起页面，抄回来的户口册就只有那一角的格子 —— 而校验器
+// （Script_TownDressingTest 规则 9「每一件都要完整落进某一格院子」）是拿这张表
+// 当**几何真相**用的，缺了格子就会把好好的布设判成「没落进任何院子」。
+// 重制之后七章里没有哪一章会生成整座城，所以 2026-08-29 补了这条入口。
 await page.goto(
-  `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=high&scale=small`,
+  `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=overview&quality=high&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 // 城内关卡的 battlefield 是 TengxianField，格子表在它包着的 city 上。
 await page.waitForFunction(

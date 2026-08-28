@@ -244,6 +244,35 @@ export const SFX_SOURCES = [
     // 城区版而不是旷野版：这场仗打在滕县城里，冲击之后应该有墙面反射与碎砖。
     cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true }],
   },
+  // --- explosionNear 的第 2/3 个变体（2026-08-29 抛光批 P3）------------------
+  // 手榴弹雨那一段每秒都在响 explosionNear，独苗变体会被听成「同一个 wav 在复读」——
+  // 本表自己的规矩就是「每秒都在响的音必须多变体」，这里是最后一处没做到的。
+  //
+  // **为什么不是 Bluezone 的另外几条**：archive.org 那份镜像是**每家厂商只放四个文件**
+  // 的抽样，Bluezone 的 Detonation 目录里带 urban 的就 BC0277 这一条，没有第二条同库的。
+  // 于是改按**频谱选**，不按文件名选：拿现成的 BC0277（谱心 1772 Hz、>4 kHz 占 11.9 %、
+  // 降 20 dB 用 0.72 s）当靶子，把镜像里所有非科幻的爆炸量了一遍，
+  // Gamemaster 这两条一深一亮把靶子夹在中间（1453 / 1807 Hz），是全表最近的两条；
+  // 而且这个包已经是 explosionFar 的来源，三个变体出自同两家厂商，底噪与房间感是一路的。
+  //
+  // 三条都不许「越炸越大」：alignDbfs −25 是 Script_AudioNormalize 的一次性音口径，
+  // BC0277 那条实测 −24.92 dBFS，新的两条对齐到同一条线上，轮播时只换音色不换音量。
+  {
+    id: "ExplosionUrbanLarge",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Gamemaster Audio -  Explosion Sound Pack/explosion_large_08.mp3",
+    credit: "Gamemaster Audio · 近距爆炸（偏亮） · Sonniss GDC 2017",
+    license: "sonniss",
+    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true, append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "ExplosionUrbanLongTail",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Gamemaster Audio -  Explosion Sound Pack/explosion_med_long_tail_01.mp3",
+    credit: "Gamemaster Audio · 近距爆炸（偏闷、长尾） · Sonniss GDC 2017",
+    license: "sonniss",
+    cuts: [{ cue: "explosionNear", tail: 2.4, gain: 0.97, whole: true, append: true, alignDbfs: -25 }],
+  },
   {
     id: "ExplosionFar",
     item: "sonniss-gdc-2017-game-audio-bundle-normalized",

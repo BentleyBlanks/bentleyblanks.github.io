@@ -14,8 +14,10 @@
 //   6  街心不摆：任何非巷道街，|across| < width/2 − 1.0 即压路心；
 //      巷道（hutong）两米宽，实心件一概不进。
 //   7  地标与公共院落的保留区（w/d 半径 +2 m）不进 —— 那是地标构建器的地盘。
-//   8  目标连线不挡：所在关卡相邻目标（含出生点→首目标）的连线 3 m 内，
+//   8  目标连线不挡：所在章相邻目标（含出生点→首目标）的连线 3 m 内，
 //      不摆最大边长 > 1.4 m 的实心件（L2 东关排屋停摆事故的教训）。
+//      两处不判：**过场承载章**（cutsceneOnly，玩家一步不走）与**片区包**
+//      （quarter，按规则 9 一定在院墙里头）—— 理由逐条写在代码那儿。
 //   9  分区各守其土：片区包（quarter）的每一件都要完整落进某一格院子
 //      （格子四边收 0.55 m 当院墙）；街道包（street）贴街肩、不进院子；
 //      城防包（defense）只在顺城街带 / 门里 / 缺口一带，也不进院子。
@@ -30,6 +32,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EAST_SUBURB } from "./Data_Tengxian.mjs";
 import { PHASES } from "./Data_Battle.mjs";
+import { JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(
@@ -112,15 +115,15 @@ const blockerRects = [
   }),
 ];
 
-// 切片主要落在城墙以内的那几章（重制后：救护所 / 城墙没有了 / 最后一封）。
-// **旧关号也留着**：_import/TownDressingCells.json 是重制前导出的那一份
-//（城的几何没动，格子表仍然有效），里面的 phase id 还是旧的。等 dump 重跑之后
-// 可以把旧的四条删掉。这一组只驱动一条「不红只报」的提示，不影响成败。
-const cityPhaseIds = new Set([
-  "CH3_Jiuhusuo", "CH5_Chengqiang", "CH6_Zuihou",
-  "L4_Chengqiang", "L5_Shizijie", "L6_Beimen",
-]);
-const segmentsByPhase = data.phases.map((phase) => {
+// 切片主要落在城墙以内的那几章。这一组只驱动一条「不红只报」的提示，不影响成败。
+// （旧关号 L4/L5/L6 已经摘掉：2026-08-29 重跑过 dump，户口册里的 phase id 全是新章。）
+const cityPhaseIds = new Set(["CH3_Jiuhusuo", "CH5_Chengqiang", "CH6_Zuihou"]);
+// 规则 8 只对**玩家真的会走过去**的章成立。序章是过场承载章（cutsceneOnly：
+// 不建自己的切片、不撒兵、进章即播过场），它那条「目标连线」是车厢/月台/车门
+// 三个过场锚点的连线，玩家一步都不走 —— 拿它去判西关的木料堆挡不挡路，
+// 挡的是一条不存在的路。
+const walkedPhaseIds = new Set(PHASES.filter((phase) => !phase.cutsceneOnly).map((phase) => phase.id));
+const segmentsByPhase = data.phases.filter((phase) => walkedPhaseIds.has(phase.id)).map((phase) => {
   const points = [{ x: phase.spawn.x, z: phase.spawn.z }, ...phase.zones];
   const segments = [];
   for (let i = 0; i + 1 < points.length; i += 1) {
@@ -191,7 +194,15 @@ for (const { file, region, placements } of regions) {
       }
     }
 
-    if (solid && Math.max(spec.dims[0], spec.dims[2]) * scale > 1.4) {
+    // 规则 8 只管**院子外面**的大件。片区包（quarter）按规则 9 一定完整落在某一格
+    // 院子里（还退了 0.55 m 的院墙），玩家走到那儿先撞的是院墙，不是院里那摊瓦砾；
+    // 而目标连线是一条**直线代理**，城内几章的连线本来就横穿整片街坊 ——
+    // 拿它去判院内摆件，判的是一条玩家走不了的路。
+    // （2026-08-29：重跑 dump 换成新章的目标链之后，这条规则一口气报出三件院内
+    //   摆件，逐件挪开只会把「院子里有生活」这件事挪没。街道/城防/城外三种包
+    //   本来就在路面与开阔地上，照旧严判。）
+    if (solid && region.kind !== "quarter"
+      && Math.max(spec.dims[0], spec.dims[2]) * scale > 1.4) {
       for (const phase of segmentsByPhase) {
         const b = phase.bounds;
         if (p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ) continue;
@@ -268,17 +279,23 @@ for (const { file, region, placements } of regions) {
     + "玩家路线不经过，建议挪到 detail/mid 格。");
 }
 
-// 城外包不许只在数据文件里“存在”：每一件都必须至少进入一个实际章节切片。
+// 城外包不许只在数据文件里“存在”：每一件都必须至少进入一个**会被建出来的切片**。
 // 这条专门防回 EastFarmFar 已布设、但东侧几章的 maxX 全部在它西边的情况。
 //
-// **整包没有承载章的例外**（下面这张名单）：2026-08-28 的任务流程重制取消了
+// 「会被建出来的切片」= 七章 + 界河白盒（?jiehe=1）。白盒不是关卡、不计进度，
+// 但它确确实实按同一套 bounds/levelId 把那片地连同布设建出来 —— 判「这一件会不会
+// 被生成」的时候，它与一章等价。全城俯瞰（?phase=overview）不进这张表：
+// 它的 bounds 与旧「城墙关」相同，本来就被城内几章覆盖，加进来只会让这条规则失效。
+const buildableSlices = [...PHASES, JIEHE_SANDBOX_PHASE];
+//
+// **整包没有承载切片的例外**（下面这张名单）：2026-08-28 的任务流程重制取消了
 // 北门突围那一关，北关那一包布设于是没有任何切片会建它。那不是布设作者写错了
 // 坐标，是流程改了 —— 硬红在这里只会逼下一个人去改数据。降为提示并点名登记，
 // 等哪一章重新走到北关、或这一包被正式撤掉时，把它从名单里删掉。
+//
+// 界河那一包 2026-08-29 已经从名单里摘掉：白盒入口把它接回来了。
 const ORPHANED_OUTFIELD_PACKS = new Set([
-  // 界河那一关（旧 L0）取消：城北二十公里那片村落布设没有承载章了。
-  "Data_Dressing_JieheVillages.mjs",
-  // 北门突围那一关（旧 L6）取消：北关坝墙一带同理。
+  // 北门突围那一关（旧 L6）取消：北关坝墙一带没有承载切片。
   "Data_Dressing_NorthSuburb.mjs",
 ]);
 for (const { file, region, placements } of regions) {
@@ -287,15 +304,15 @@ for (const { file, region, placements } of regions) {
   for (let index = 0; index < placements.length; index += 1) {
     const p = placements[index];
     checks += 1;
-    const visibleInPhase = PHASES.some((phase) => p.x >= phase.bounds.minX && p.x <= phase.bounds.maxX
-      && p.z >= phase.bounds.minZ && p.z <= phase.bounds.maxZ);
+    const visibleInPhase = buildableSlices.some((phase) => p.x >= phase.bounds.minX
+      && p.x <= phase.bounds.maxX && p.z >= phase.bounds.minZ && p.z <= phase.bounds.maxZ);
     if (!visibleInPhase && ORPHANED_OUTFIELD_PACKS.has(file)) { orphaned += 1; continue; }
     if (!visibleInPhase) {
-      fail(`${file}[${index}] ${p.asset}@(${p.x},${p.z}): 没有任何章节切片会生成这件城外布设。`);
+      fail(`${file}[${index}] ${p.asset}@(${p.x},${p.z}): 没有任何切片会生成这件城外布设（七章 + 界河白盒都够不着）。`);
     }
   }
   if (orphaned) {
-    notes.push(`${file}: ${orphaned} 件城外布设整包无承载章（任务流程重制取消了走到那一片的关卡）`
+    notes.push(`${file}: ${orphaned} 件城外布设整包无承载切片（任务流程重制取消了走到那一片的关卡）`
       + " —— 等哪一章重新走到那儿，或这一包被正式撤掉，再把它从 ORPHANED_OUTFIELD_PACKS 里删掉。");
   }
 }

@@ -18,10 +18,10 @@
 import {
   Panel, Section, Row, ButtonRow, Chips, Slider, ListBox, Facts, Note, TextArea, Toggle,
 } from "./Script_EditorUi.mjs";
-import { PHASES } from "./Data_Battle.mjs";
 import { SAMPLE_POINTS, SAMPLE_GROUPS } from "./Data_SamplePoints.mjs";
 import {
   ResolvePoint, OrderedPoints, ValidatePoints, SerializePoints, YawTo, InPhaseBounds, GroupLabel,
+  PhaseFor, OVERVIEW_KEY,
 } from "./Script_SamplePoints.mjs";
 
 const STORE_KEY = "tz1938.samplePoints.v1";
@@ -213,7 +213,7 @@ export class SamplePointEditor {
       id: point.id,
       name: `${problems.has(point.id) ? "⚠ " : ""}${point.label}`,
       tail: `${point.phase}`,
-      title: `${point.id} · ${PHASES[point.phase]?.label || ""}\n${point.note || ""}`,
+      title: `${point.id} · ${PhaseFor(point.phase)?.label || ""}\n${point.note || ""}`,
     })));
     this.list.Select(this.selectedId);
   }
@@ -239,12 +239,25 @@ export class SamplePointEditor {
     return resolved;
   }
 
+  /**
+   * 现在建的是哪一片，按**点位表的 phase 口径**说（序号，或者 `"overview"`）。
+   * 装配层的 `game.PHASES` 就是当场那张 PHASE_TABLE：`?phase=overview` 下它只有一条。
+   */
+  BuiltPhaseKey() {
+    const built = this.host.game.state.builtPhase ?? 0;
+    const here = this.host.game.PHASES?.[built];
+    return here && here.id === "Overview" ? OVERVIEW_KEY : built;
+  }
+
   /** 点位不在当前切片里就换切片。换关要十几秒，所以只在真的不一样时动。 */
   EnsurePhase() {
     const point = this.selected;
     if (!point) return false;
-    const phase = point.phase ?? 4;
-    if (this.host.game.state.builtPhase === phase) return false;
+    const phase = point.phase ?? OVERVIEW_KEY;
+    if (this.BuiltPhaseKey() === phase) return false;
+    // 全城俯瞰不是 PHASE_TABLE 里的一关（`?phase=overview` 是**整表替换**），
+    // 当场跳不过去 —— 只能重载页面。这里什么都不做，由 RefreshFacts 把话说清楚。
+    if (typeof phase !== "number") return false;
     this.host.game.JumpToLevel(phase);
     return true;
   }
@@ -265,7 +278,7 @@ export class SamplePointEditor {
    * 一批图里混进一个顺序依赖，整批就不可比了。
    */
   BaseFov() { return this.host.game.graphics?.fov ?? 55; }
-  BaseFar(phase) { return PHASES[phase]?.cameraFar ?? 620; }
+  BaseFar(phase) { return PhaseFor(phase)?.cameraFar ?? 620; }
 
   /**
    * 把一份解析过的位姿装到相机上。**出图脚本走的也是这一条**。
@@ -379,7 +392,7 @@ export class SamplePointEditor {
     const z = +camera.position.z.toFixed(2);
     const group = this.groupFilter === "全部" ? "Landmark" : this.groupFilter;
     const id = this.UniqueId(`${group}_New`);
-    const phase = this.host.game.state.builtPhase ?? 4;
+    const phase = this.BuiltPhaseKey();
     this.points.push({
       id, label: id, group, phase, x, z,
       h: +(camera.position.y - this.GroundAt(x, z)).toFixed(2),
@@ -515,16 +528,18 @@ export class SamplePointEditor {
     this.facts.Set("朝向 / 俯仰",
       `${(this.host.flycam.yaw * 57.2958).toFixed(0)}° / ${(this.host.flycam.pitch * 57.2958).toFixed(0)}°`);
     this.facts.Set("FOV / 远面", `${camera.fov.toFixed(0)}° / ${camera.far.toFixed(0)} m`);
-    const built = this.host.game.state.builtPhase;
-    this.facts.Set("当前切片", `${built} ${PHASES[built]?.label || ""}`);
+    const built = this.BuiltPhaseKey();
+    this.facts.Set("当前切片", `${built} ${PhaseFor(built)?.label || ""}`);
     this.facts.Set("点位总数", `${this.points.length}${this.dirty ? " · 已改动" : ""}`);
     if (!resolved) { this.status.textContent = "没有选中点位"; return; }
     const messages = [];
     if (built !== resolved.phase) {
-      messages.push(`切片不对：本点属于 ${PHASES[resolved.phase]?.label || resolved.phase}，`
-        + "现在建的是另一关，看到的不是它该有的样子");
+      messages.push(`切片不对：本点属于 ${PhaseFor(resolved.phase)?.label || resolved.phase}，`
+        + (resolved.phase === OVERVIEW_KEY
+          ? "那一片当场切不过去 —— 用 ?phase=overview 重载页面再看这一批"
+          : "现在建的是另一关，看到的不是它该有的样子"));
     }
-    if (!InPhaseBounds(resolved)) messages.push("落在本关 bounds 之外：那一片根本不生成");
+    if (!InPhaseBounds(resolved)) messages.push("落在本片 bounds 之外：那一片根本不生成");
     if (this.dirty) messages.push("有未导出的改动 —— 基线在源码里，记得誊回去");
     this.status.textContent = messages.join(" · ");
     this.status.classList.toggle("warn", messages.length > 0);

@@ -59,24 +59,38 @@ ER2 的战役选单是「左边任务列表 + 右边简报 + 一张前线地图�
 进度存 `localStorage` 的 `tengxian_progress_v1`（`{ furthest, cleared }`），
 过一关写一次。有进度时第一项变成「继续 · 某关」。
 
-### 列表两头那两条不是关
+### 「测试场景」组：三条沙盒 + 过场预览，都不是关
 
-- 最上面是**临时序章入口**「出川 · 车厢序章」（标「预览」），跳 `?preview=CS_Chuchuan`。
-- 最下面是**玩法测试靶场**（标「沙盒」，`Data_Range.RANGE_PHASE`，口径在
-  `Data_TestRange.md`），跳 `?range=1`。
+正式章节七章之后隔一条分隔线，是「测试场景」组（2026-08-29 起三条沙盒）：
 
-两条都**不进 `phases`**：菜单里另有一份 `entries = [...phases, sandbox]` 专给列表与
-键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七关数。
-靶场的简报直接读 `RANGE_PHASE`（工位、机制、携行），但**不画那张全图** ——
-`MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)，画出来是一张空图。
+| 条目 | 标号 | 切片 | query |
+| --- | --- | --- | --- |
+| 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
+| 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
+| 界河 · 白盒 | 河 | `Data_Menu.JIEHE_SANDBOX_PHASE` | `?jiehe=1` |
 
-进出靶场都是**整页重载**（`Script_Main.GoToUrlWithRange`），因为 `PHASE_TABLE` 在
-`?range=1` 下是整表替换的，当场换不过去。所以靶场里的暂停菜单换成沙盒那一套：
-继续 / 设置 / 调试选项 / **退出靶场**，不给当场做不到的「选章」与「主菜单」。
+组里还有过场预览条目（含「出川 · 车厢序章」，跳 `?preview=CS_Chuchuan`）。
+
+三条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes, ...previews]`
+专给列表与键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七章数。
+沙盒简报直接读各自的 phase（工位/路标、机制、携行），但**不画那张全图** ——
+`MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)、界河在城北 1.5 km，画出来都是空图。
+（那三句 meta 允许被 `phase.metaText` 整条换掉：界河白盒没有工位也没有木桩兵。）
+
+进出沙盒都是**整页重载**（`Script_Main.GoToSandbox`），因为 `PHASE_TABLE` 在这三个 query
+下都是整表替换的，当场换不过去。所以沙盒里的暂停菜单换成那一套：继续 / 设置 /
+调试选项 / **退出<各自的名字>**，不给当场做不到的「选章」与「主菜单」。
+
+另有一条**不进选章**的切片：全城俯瞰 `?phase=overview`（`Data_Menu.OVERVIEW_PHASE`）。
+它没有玩法，只服务出图与自检，摆进列表只会让人以为那是一关 —— 口径见
+`Data_SamplePoints.md` 与 `Data_MissionRemake.md` §10.9。
 
 配套的一条：`MENU_ON` 与 `MENU_AT_BOOT` 分了家。靶场里菜单**照建**（Esc 暂停、设置、
-调试选项和那条出口都挂在它上面），只是开机不 `Open()` —— 菜单的运镜机位表按正片
-关卡 id 分组，靶场那一片根本没有机位。`MainMenu` 构造完自己先 `add("off")`：以前
+调试选项和那条出口都挂在它上面），只是开机不 `Open()`。
+机位表按**建好的那一片**取（`host.SlicePhase()`，不是按「第几章」查 `PHASES`）——
+沙盒与 `?phase=overview` 都不在 `PHASES` 里，按序号查会取到别人的机位；
+没配机位的切片退到 `FallbackShot`。全城俯瞰那一组配了四条（`MENU_SHOTS.Overview`），
+`Script_ShotTest` 的 Z 系列拿它们当机架。`MainMenu` 构造完自己先 `add("off")`：以前
 构造后必定紧跟一次 `Open()`，漏掉这一行看不出来，靶场里就是一屏标题盖在场地上。
 
 ## 两条入口的差别（故意的）

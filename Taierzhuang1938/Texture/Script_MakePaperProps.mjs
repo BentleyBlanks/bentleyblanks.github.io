@@ -35,7 +35,8 @@ const basesDir = args.get("bases") ? path.resolve(String(args.get("bases"))) : n
 
 // ---------------------------------------------------------------------------
 // 道具清单。text 里的每一条最终都要能逐字读出来。
-// 传单/报纸用繁体（1938 年铅印实况），家信用简体（策划案给的原句，且是粗手写）。
+// 三张有字的纸**一律繁体**：传单/报纸是 1938 年的铅印实况，家信是同年的手写实况。
+// 策划案原句写成简体只是文档录入方便，不是美术口径 —— 贴图要照 1938 年写。
 // ---------------------------------------------------------------------------
 const PROPS = [
   { key: "leaflet", out: "Tex_PaperLeaflet.png", w: 1024, h: 1536, base: "base_leaflet.png" },
@@ -522,10 +523,13 @@ function BuildLetter(){
     color: I, opacity: 0.93, jitter: 1.9, inkVary: 0.42, drift: 0.95,
     shadow: true, weight: 400, weightVary: true,
   };
-  Column("娘的眼睛，请郎中再看一哈", Object.assign({ x: 838, y: 236 }, hand));
-  Column("欠王家的谷，等发饷再还",   Object.assign({ x: 648, y: 262 }, hand));
+  // 1938 年的手写家信只可能是繁体（俗写）。简体是 1956 年才有的字表，
+  // 写在这张纸上就是年代穿帮 —— 玩家在第四关末尾会把这封信举到眼前看。
+  // 「莫」「一哈」「哈」这类川东口语用字繁简同形，原样保留：要改的是字体不是方言。
+  Column("娘的眼睛，請郎中再看一哈", Object.assign({ x: 838, y: 236 }, hand));
+  Column("欠王家的穀，等發餉再還",   Object.assign({ x: 648, y: 262 }, hand));
   Column("春妹的鞋莫做大了",         Object.assign({ x: 462, y: 246 }, hand));
-  Column("等我回来……",              Object.assign({ x: 272, y: 268 }, hand));
+  Column("等我回來……",              Object.assign({ x: 272, y: 268 }, hand));
   // 写到一半停笔：几点墨渍。要甩开末列，不然会被读成「等我回来…………」
   for (let i=0;i<3;i++){
     const b = document.createElement("div");

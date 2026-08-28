@@ -1,68 +1,58 @@
 # Taierzhuang1938 项目入口（agent 必读）
 
 《滕县 一九三八》—— 1938 年 3 月滕县保卫战的浏览器 FPS 白盒。川军第 122 师守城四日，
-七关线性关卡；玩法对标 Easy Red 2，枪感对标战地系列。Three.js 0.185 + Rapier3D，
+七章线性关卡；玩法对标 Easy Red 2，枪感对标战地系列。Three.js 0.185 + Rapier3D，
 全部 vendor 收在仓库内，零 CDN；渲染管线零 addon（后处理链从 RenderTarget 手搭）。
-
-目录名叫 Taierzhuang1938 是历史遗留：台儿庄那套「开放战场 + 占领点」已整体作废
-（`Data_Battle.mjs` 头注），正片是滕县七关，**每关只建一片切片、换关拆掉重建**
-（`Script_Main.mjs` 头注）。一批老文件头还写着《血战台儿庄》，别被名字骗。
+目录名叫 Taierzhuang1938 是历史遗留：台儿庄那套「开放战场 + 占领点」已整体作废，
+正片是滕县七章，**每章只建一片切片、换章拆掉重建**（`Script_Main.mjs` 头注）。
 
 规模：175 个 `Script_*.mjs` + 38 个 `Data_*.mjs` 平铺在根目录，约十万行；`docs/` 39 篇分册。
 本文件只放**硬规矩 + 路由表 + docs 导读**；细则、判据、事故过程在 `docs/` 与各文件头注。
-**这个仓库的文件头注释是第一手文档**：为什么存在、架构取舍、踩过的坑都在头注里，
-先读头注再读函数体。
+**这个仓库的文件头注释是第一手文档**：先读头注再读函数体。
 
 ## 硬规矩（三行一条：规矩 / 为什么 / 守着它的）
 
 1. **改任何浏览器模块，必须 bump `index.html` import map 里那一行 `?v=`；新增模块必须登记进 import map。**
    只盖入口不盖模块图 = 「新壳配旧芯」：入口拿到新版、它 import 的模块吃缓存旧版，
    手机 Safari 黏得多所以只在移动端复现。症状是「改了没生效 / 音频丢了」。
-   守着它的：`index.html:18-23` 头注；源码里一律不许自己写 `?v=`（同一模块两个 URL = 加载两份实例）。
+   守着它的：`Script_ModuleGraphTest`；源码里一律不许自己写 `?v=`（同一模块两个 URL = 两份实例）。
 
 2. **`Data_*.mjs` 与规则层不许 import three。**
    出图脚本、导航烘焙、剧本自检全在纯 Node 里跑；沾上 three，命令行工具就得拖起整个渲染库。
-   守着它的：各 Data 文件头注「纯数据，不许 import three」；`Script_TexBake` / `Script_FarLand` /
-   `Script_Identify` / `Script_CutsceneCheck` 同律。
+   守着它的：各 Data 文件头注「纯数据，不许 import three」；TexBake / FarLand / Identify /
+   CutsceneCheck 四只脚本同律。
 
-3. **新静态几何一律走 `BuildSink` 分区合批（`Script_World.mjs:27`），不许散着 add Mesh。**
-   人物合批前实测过一次：15 万三角形占掉一帧 1408 个 draw call（全场的 84%）——
-   瓶颈是 three 每次提交的 JS 固定开销，不是三角形。
-   守着它的：BootTest 的 draw call 红线；`Script_LivedInProps` 头注「全部走 BuildSink 合批」。
+3. **新静态几何一律走 `BuildSink` 分区合批，不许散着 add Mesh。**
+   实测过一次：15 万三角形占掉一帧 1408 个 draw call（全场的 84%）——
+   瓶颈是 three 每次提交的 JS 固定开销，不是三角形。守着它的：BootTest 的 draw call 红线。
 
 4. **开机红线：drawCalls ≤ 5000、triangles ≤ 6,000,000，七关逐关量，越线即 FAIL。**
    这是整机预算的唯一口径；docs 里旧设计书写的预算数字一律作废。
    守着它的：`Script_BootTest.mjs:36-37`（`MAX_DRAW_CALLS` / `MAX_TRIANGLES`）。
 
 5. **坐标与朝向契约：X 向东、Z 向南、Y 向上，单位米，原点 = 城中心十字街口。**
-   人物正面与枪口方向一律**局部 -Z**（`Script_RiggedModel.mjs:570`）；导入的 FBX/GLB 源朝
-   glTF +Z，由桥接层翻转（`:428`）——新导入资产先查朝向再摆。
-   守着它的：`Data_Tengxian.mjs` 头注；过场数据里「Actor 正面是局部 -Z」是探针核实过的约定。
+   人物正面与枪口一律**局部 -Z**；导入的 FBX/GLB 源朝 glTF +Z，由桥接层翻转 ——
+   新导入资产先查朝向再摆。守着它的：`Data_Tengxian.mjs` 与 `Script_RiggedModel.mjs` 头注。
 
-6. **出图「一关只建一次城」：按关卡分批，关内连着拍完再换关。**
+6. **出图「一片只建一次城」：按切片分批，片内连着拍完再换。**
    建一次城十几秒，八十多个点位挨个重开页面就是二十分钟纯等待。
-   守着它的：`Script_SamplePoints.SampleRunPlan`；口径在 `docs/Data_SamplePoints.md`
-   与 `Script_SamplePointShot.mjs:18`。
+   守着它的：`Script_SamplePoints.SampleRunPlan`；口径在 `docs/Data_SamplePoints.md`。
 
 7. **浏览器测试用现成 TestKit，禁止现写一次性浏览器探针脚本。**
-   无头 Chromium 的指针锁在 Windows 上是全系统 `ClipCursor`：会把开发机上真人的鼠标
-   夹在屏幕左上角，且无头下退出指针锁**不解夹**。游戏侧 `navigator.webdriver` 下走假锁
-   （`Script_Main.mjs:2044 FAKE_POINTER_LOCK`），测试别读 `pointerLockElement`。
-   现成入口：`../PrairieFire1937/Script_BrowserTestKit.mjs` 的 `LaunchBrowser` +
-   本目录 `Script_DevServer.ServeRoot`；缺能力就往现有测试/出图脚本里加，别另起炉灶。
+   无头 Chromium 的指针锁在 Windows 上是全系统 `ClipCursor`，会把真人的鼠标夹在屏幕左上角
+   且退出**不解夹**；游戏侧 `navigator.webdriver` 下走假锁，测试别读 `pointerLockElement`。
+   现成入口：`../PrairieFire1937/Script_BrowserTestKit.LaunchBrowser` + `Script_DevServer.ServeRoot`。
 
 8. **grep / 全文搜索必须排除 `vendor/`。**
    `vendor/rapier/build/rapier.module.mjs` 是 2.86 MB 的**单行**文件，一条命中就把输出撑爆。
    守着它的：没有测试，只有你自己 —— `rg --glob '!vendor'` 或按文件类型过滤。
 
 9. **worktree 里跑测试直接 `node` 调脚本，别信 `npm run` 的默认行为。**
-   npm 以最近的 package.json 为项目根：本 worktree 根有 package.json 时没事；没有时向上爬到
-   主仓库、测的是**另一棵树**，全绿也说明不了任何事。
-   守着它的：`docs/Data_TestTiers.md` 第二节末段；出过一整轮白跑的事故（TunnelLight 记录）。
+   npm 以最近的 package.json 为项目根：没有时会向上爬到主仓库、测的是**另一棵树**，
+   全绿也说明不了任何事。守着它的：`docs/Data_TestTiers.md` 第二节末段。
 
 10. **材质两条铁律：albedo 标 `SRGBColorSpace`、normal/orm 必须 `NoColorSpace`；SSAO 只乘间接光。**
-    反了的话：颜色发灰、法线方向错、粗糙度偏亮；SSAO 乘了直接光 = 太阳照到的墙角也发黑，
-    那是脏，不是遮蔽。
+    反了就颜色发灰、法线方向错；SSAO 乘了直接光 = 太阳照到的墙角也发黑，那是脏不是遮蔽。
     守着它的：`Script_Materials.mjs` 头注；`docs/Data_TechRenderPipeline.md` 的「坑」一节。
 
 11. **新增 `Script_*Test.mjs` 必须登记进 `Script_TestRunner.mjs` 的 `testDefs` 并归 tier/domain。**
@@ -78,11 +68,9 @@
 ### 开发服务
 
 ```powershell
-node Taierzhuang1938/Script_DevServer.mjs        # 默认端口 8171
+node Taierzhuang1938/Script_DevServer.mjs        # 默认端口 8171，服务 worktree 根
 ```
 
-服务的是 worktree 根，路径与线上一致；显式 MIME 表（Windows 注册表把 .js 映成
-text/plain，不写显式表模块加载直接炸）。
 **所有测试与出图脚本自带 `ServeRoot` 起临时服务，不需要预先开 DevServer。**
 
 ### 测试（分级细则、超时、历史红基线全在 `docs/Data_TestTiers.md`）
@@ -90,30 +78,24 @@ text/plain，不写显式表模块加载直接炸）。
 ```powershell
 node Taierzhuang1938/Script_TestRunner.mjs                          # Tier 0：BootTest + PlayTest + 纯 Node 快测
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master  # 推荐：按 Git 改动自动追加 Tier 1
-node Taierzhuang1938/Script_TestRunner.mjs --changed=... --dry-run  # 先看会选中什么，不执行
-node Taierzhuang1938/Script_TestRunner.mjs --domain=combat          # 显式领域（仍叠加 Tier 0）
 node Taierzhuang1938/Script_TestRunner.mjs --domain-only=terrain    # 排障：只跑领域探针，绕过 Tier 0
 node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest        # 单项
-node Taierzhuang1938/Script_TestRunner.mjs --tier=1                 # 全部自动 Tier 1
-node Taierzhuang1938/Script_TestRunner.mjs --list                   # 完整分级表
+node Taierzhuang1938/Script_TestRunner.mjs --list                   # 完整分级表（另有 --domain= / --tier= / --dry-run）
 ```
 
-- Tier 0 全程实测 12—17 分钟（机器相关，别当保证值）。
-- Tier 2（性能与出图）不被 `--changed` 自动触发，只给提示；出图测试进程成功
-  只代表产物生成成功，仍需人工看图。
-- PlayTest 有历史红基线：`BASELINE` ≠ 全绿，新增断言名才算 `FAIL`；
-  `--strict-baseline` 把历史红也算失败。
+- Tier 0 全程实测 12—17 分钟（机器相关，别当保证值）；Tier 2 不被 `--changed` 自动触发，
+  且出图进程成功只代表产物生成成功，仍需人工看图。
+- PlayTest 有历史红基线：`BASELINE` ≠ 全绿，新增断言名才算 `FAIL`；`--strict-baseline` 全算。
 
 ### 出图（视觉审查的唯一输入来源；全部落 `_shots/`，已 gitignore）
 
 ```powershell
-node Taierzhuang1938/Script_SamplePointShot.mjs                 # 采样点基线：固定机位逐点拍；--compare= 与上一批逐张对位
+node Taierzhuang1938/Script_SamplePointShot.mjs                 # 采样点基线；--compare= 与上一批逐张对位
 node Taierzhuang1938/Script_ShotTest.mjs                        # 正片固定镜头（--probe / --only=名字）
 node Taierzhuang1938/Script_CutsceneShot.mjs                    # 过场：播一场，指定秒数各落一张
 node Taierzhuang1938/Script_DressingShot.mjs --phase=5 --x=...  # 布设自验：任意机位拍当前城
-node Taierzhuang1938/Script_WeaponShot.mjs                      # 枪械台架四宫格（近距离穿模/贴图密度问题只有它拍得出）
-node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # 单个 TZM 模型三视图
-node Taierzhuang1938/Script_ActorPoseShot.mjs                   # 人物姿态联系图
+node Taierzhuang1938/Script_WeaponShot.mjs                      # 枪械台架四宫格（近距离穿模只有它拍得出）
+node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图；姿态图 Script_ActorPoseShot.mjs
 ```
 
 ### 性能与调试
@@ -122,14 +104,10 @@ node Taierzhuang1938/Script_ActorPoseShot.mjs                   # 人物姿态�
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 ```
 
-**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ Profiler」开关，弹独立窗口，
-玩法照跑：CPU 逐系统 / GPU 逐 pass / 掉帧取证 / GC，可导出快照 JSON。
-没有页面内面板（用户点名去掉的）。内核 `Script_Profiler.mjs`、面板
-`Script_EditorProfiler.mjs`，账在 `docs/Data_EditorSuite.md` 对应小节；
-回归口 `Script_ProfilerTest`（render 域）。
-
-调试页 `Probe.html`（`Script_Probe.mjs`）：材质 / 光照 / 后处理单独摆出来看，
-URL 参数选 preset / quality / scene / gi。
+**实机常驻剖析器**：编辑器面板「渲染调试（可叠加）→ Profiler」弹独立窗口，玩法照跑
+（CPU 逐系统 / GPU 逐 pass / 掉帧取证 / GC）。**没有页面内面板**（用户点名去掉的）。
+内核 `Script_Profiler.mjs` + 面板 `Script_EditorProfiler.mjs`，回归口 `Script_ProfilerTest`；
+调试页 `Probe.html` 把材质 / 光照 / 后处理单独摆出来看。
 
 ## 路由表：改哪个系统，动哪些文件，先读哪份分册
 
@@ -137,102 +115,88 @@ URL 参数选 preset / quality / scene / gi。
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。
 - `Script_BootProp` / `BootPropStage` / `BootPropWorker` —— 加载画面的可转道具台
-  （展示的就是游戏内那批 TZM 模型；转动跑在 worker 里，建关卡不掉帧）。
+  （转动跑在 worker 里，建关卡不掉帧）。
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
 ### 渲染管线 / GI / 灯光天空
-- `Script_Post.mjs` —— 自研后处理：深度法线预通道 → SSAO → Bloom → 体积光 →
-  tonemap → 抗锯齿，顺序错一条画面就「塑料」；帧结构在文件头。
-- `Script_Gi.mjs` —— 半实时辐照度探针体（DDGI 式）+ `Data_GlobalShProbe.mjs`；
-  回归口 `Script_GiTest.mjs`。
-- `Script_Light.mjs` —— 太阳 + 跟随式阴影框（框只开 62 米、移动吸附纹素网格）、
-  SH Probe、火光池、枪口闪光。
-- `Script_Sky.mjs` —— 解析式天空 + PMREM 环境贴图；`Script_Water.mjs` —— Gerstner 护城河。
+- `Script_Post.mjs` —— 自研后处理：深度法线预通道 → SSAO → Bloom → 体积光 → tonemap →
+  抗锯齿，**顺序错一条画面就「塑料」**；帧结构在文件头。
+- `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
+  `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光）、
+  `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。
 - 先读：`docs/Data_TechRenderPipeline.md`（唯一现状文档；GI 在 §12，坑表在末尾）。
 
 ### 材质 / 贴图
-- `Script_TexBake.mjs` —— 纯 JS PBR 烘焙，每种材质出 albedo / normal / orm 三张裸字节。
-- `Script_Materials.mjs` —— 包成 three 纹理与 MeshStandardMaterial，SSAO 注入间接光。
-- `Script_Noise.mjs` —— 确定性噪声全家桶（Mulberry32 / Fbm / Worley…），一切散布参数的随机源。
+- `Script_TexBake.mjs`（纯 JS PBR 烘焙，每种材质出 albedo / normal / orm）→
+  `Script_Materials.mjs`（包成 three 纹理，SSAO 注入间接光）。
+- `Script_Noise.mjs` —— 确定性噪声全家桶，**一切散布参数的随机源**（不许 Math.random）。
 - 先读：`docs/Data_TechRenderPipeline.md` §11；城墙专用 PBR 见 `docs/Data_CityWallPbr.md`。
 
 ### 世界生成底座（台儿庄时期沉淀，滕县共用）
-- `Script_World.mjs` —— 鲁南民居 / 寨墙 / 清真寺建造器 + `BuildSink` 合批槽；
-  尺寸全按 `docs/Data_HistoryMaterial.md` 的考据（鲁南民居对外不开窗是最重的形制铁律）。
-- `Script_Geo.mjs` —— UV 密度统一（全场砖缝一样大）、破损形体、批合并。
-- `Script_CityBlockKit.mjs` —— 院落六原型 × 三档 LOD，治「大量重复村庄」。
-- `Script_RoadPath.mjs` + `Script_RoadSpline.mjs` —— 样条道路管线（铁路/大车路/大街
-  的唯一铺路口径）；`Script_WallPlan.mjs` + `Script_WallSpline.mjs` + `Script_YardWall.mjs`
-  —— 样条围墙管线（**全项目布墙的唯一口径**：寨墙/坝墙/石墙村/村院墙/城内街坊院墙/
-  机关·学校·庙·衙署·监狱·厂区的一圈院墙/枣刺篱笆，逐模块贴地 + InstancedMesh）。
-  Plan/Path 层纯 Node 可测。布设参数集中在 `Script_WallSpline.WALL_PRESETS`
-  一张表 —— **调用点不许再自己写间隔/重叠/抖动**，那正是收拢前的病根。
-  没迁的（房屋墙体、单堵特征墙、村落远景档、内城城墙）在 Data_WallSpline.md 有清单。
-- 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）；道路口径 `docs/Data_RoadSpline.md`、
-  围墙口径 `docs/Data_WallSpline.md`。
+- `Script_World.mjs` —— 鲁南民居 / 寨墙 / 清真寺建造器 + `BuildSink` 合批槽；尺寸全按
+  `docs/Data_HistoryMaterial.md` 的考据（**鲁南民居对外不开窗**是最重的形制铁律）。
+- `Script_Geo.mjs`（UV 密度统一、破损形体、批合并）、`Script_CityBlockKit.mjs`
+  （院落六原型 × 三档 LOD，治「大量重复村庄」）。
+- `Script_RoadPath.mjs` + `Script_RoadSpline.mjs` —— 样条道路管线（**唯一铺路口径**）；
+  `Script_WallPlan.mjs` + `Script_WallSpline.mjs` + `Script_YardWall.mjs` —— 样条围墙管线
+  （**全项目布墙的唯一口径**，逐模块贴地 + InstancedMesh）。Plan/Path 层纯 Node 可测；
+  布设参数集中在 `Script_WallSpline.WALL_PRESETS` 一张表 ——
+  **调用点不许再自己写间隔/重叠/抖动**，那正是收拢前的病根。
+- 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）、`docs/Data_RoadSpline.md`、
+  `docs/Data_WallSpline.md`（含没迁进样条的那几类墙的清单）。
 
 ### 地形 / 高度
-- `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地三边必须问同一个函数
+- `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地**三边必须问同一个函数**
   （前身是「手抄高度表悄悄过期、道具整片浮空」）。
-- `Script_JieheHeight.mjs` —— 序关（界河）最终地面采样器，纯算术。
-- `Script_HeightmapCli.mjs` —— 真实 SRTM 高程下载 / 采样 / 布设贴地 CLI；数据在 `Heightmap/`。
+- `Script_JieheHeight.mjs`（界河地面采样器，纯算术）、`Script_HeightmapCli.mjs`
+  （SRTM 高程下载 / 采样 / 布设贴地 CLI，数据在 `Heightmap/`）。
 - 先读：`docs/Data_TaierzhuangHeightmap.md`（运行时契约）。
 
 ### 滕县城 / 关卡
-- `Script_TengxianCity.mjs` —— 整座城的生成器；数字全来自 `Data_Tengxian.mjs`
-  （逐条带出处与「推定」标注），**任何尺寸不许在生成器里另起炉灶**。
-- `Script_TengxianOutfield.mjs` —— 城外鲁南平原（序关/一关的战场都在城圈外）。
-- `Script_TengxianField.mjs` —— 把「城」包成规则层认得的「战场」（GroundHeight /
-  Raycast / covers… 的翻译层）。
-- `Script_JieheField.mjs` —— 序关独立场景，不是城的切片。
-- **章节数据一章一个文件**：`Data_MissionCh0.mjs` … `Data_MissionCh6.mjs`，各导出
-  `CHAPTER`（史料字段 + zones + beats + `tuning` 打法字段）与 `VOICE_LINES`；过场占位在
-  `Data_CutsceneCh1.mjs` … `Data_CutsceneCh6.mjs`（序章复用 `Data_CutsceneChuchuan`）。
-  `Data_TengxianScript.mjs` 与 `Data_Battle.mjs` 只是**组装层**（LEVELS / ZONES / TUNING / PHASES），
-  自己不再写关表；分层校验（打法字段不许摊在 CHAPTER 顶层、zones 数 == objectives 数、
-  zone id 全局唯一、路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
-  `Data_Levels.mjs` 是台儿庄旧版布局（留档）。
-- **没有哪一章会生成整座城了**（重制取消了「城墙关」）：编辑器与几处布设自检要的
-  全城俯瞰片是 `Data_Battle.OVERVIEW_BOUNDS` —— 不可游玩的常量，不进 PHASES。
+- `Script_TengxianCity.mjs` —— 整座城的生成器；数字全来自 `Data_Tengxian.mjs`（逐条带出处
+  与「推定」标注），**任何尺寸不许在生成器里另起炉灶**。
+- `Script_TengxianOutfield.mjs`（城外鲁南平原）＋ `Script_TengxianField.mjs`
+  （把「城」翻译成规则层认得的「战场」）；`Script_JieheField.mjs` 是界河**独立场景**，
+  不是城的切片（入口 `?jiehe=1`）。
+- **章节数据一章一个文件**：`Data_MissionCh0…6.mjs` 各导出 `CHAPTER`（史料字段 + zones +
+  beats + `tuning`）与 `VOICE_LINES`，过场在 `Data_CutsceneCh*.mjs`。
+  `Data_TengxianScript.mjs` 与 `Data_Battle.mjs` 只是**组装层**，自己不再写关表；
+  分层校验（打法字段不许摊在 CHAPTER 顶层、zones 数 == objectives 数、zone id 全局唯一、
+  路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
+- **没有哪一章会生成整座城了**（重制取消了「城墙关」）：要全城就走 `?phase=overview`
+  （`Data_Menu.OVERVIEW_PHASE`，bounds = `Data_Battle.OVERVIEW_BOUNDS`，天光钉死 smokyDay）。
+  它**不进 PHASES、不进选章**，只服务出图与自检 —— 采样点表八成的机位、Script_ShotTest
+  的 Z 系列、Script_TownDressingDump 都从这条入口进。
 - 先读：`docs/Data_MissionRemake.md`（**本轮任务流程的唯一口径**，§10 是工程契约）、
-  `docs/Data_TengxianCity.md`（考据）、`Data_TengxianDesign.md`（上一轮关卡与过场设计书，留档）。
+  `docs/Data_TengxianCity.md`（考据）。
 
 ### 地标（14 个，并行工作包纪律）
 - `Script_LandmarkRegistry.mjs` —— kind → Build 函数注册表；并行制作期**冻结**，
-  新增 kind 由主会话统一加。构建器契约在它的头注。
-- `Script_Landmark_*.mjs` —— 一个工作包只改一个文件：车站 / 清真寺（Garrison）/ 衙门 /
-  教会学校 / 电灯公司 / 监狱 / 122 师部 / 商业街 / 城郊四向 / Temple / Misc。
+  新增 kind 由主会话统一加。`Script_Landmark_*.mjs` **一个工作包只改一个文件**。
 - 先读：注册表头注 + `docs/Data_TengxianCity.md` 对应地标小节（史实纪律逐条带可信度）。
 
 ### 布设 / 流送 / 外部资产
-- `Script_TownDressing.mjs` —— 城内「每家每户」布设注册表（世界坐标登记一次，
-  按关卡 bounds 过滤；同一只米袋三关不搬家）+ 10 份 `Data_Dressing_*.mjs` 分区工作包。
-- `Script_PropStreaming.mjs` —— 视觉流送；**碰撞不流送**（AI/破坏/命中读碰撞表，
-  随玩家位置加卸载会打出两样仗）。
-- `Script_PropBatch.mjs` —— 布设 GPU instancing 桶管理器（几何×材质分桶、静态矩阵、
-  流送标脏重写实例表；取舍与实测数字在文件头）。回归口 `Script_PropInstancingTest.mjs`。
-- `Script_ExternalProps.mjs` —— 下载来的 .glb 布景，已升级成真的场上物体（有碰撞）；
-  运行时摆位走 PropBatch 实例化，编辑器仍走克隆老路。
-- `Script_LivedInProps.mjs` —— 程序化生活道具（全走 BuildSink）；`Script_TrimProps.mjs` ——
-  ≤400 三角的 tzm 饰件层（物理契约不同，独立一层）。
-- `Data_ExternalAssets_*.mjs` —— 三份外部资产目录（村居农具 / 家什 / ChineseLife）。
-- 先读：`docs/Data_ExternalPropSources.md`（来源与署名）。
+- `Script_TownDressing.mjs` —— 城内「每家每户」布设注册表（世界坐标登记一次、按 bounds 过滤，
+  同一只米袋三关不搬家）+ 10 份 `Data_Dressing_*.mjs` 分区工作包。
+- `Script_PropStreaming.mjs` —— 视觉流送；**碰撞不流送**（随玩家位置加卸载会打出两样仗）。
+- `Script_PropBatch.mjs` —— 布设 GPU instancing 桶管理器（取舍与实测数字在文件头）；
+  回归口 `Script_PropInstancingTest.mjs`。
+- `Script_ExternalProps.mjs`（下载来的 .glb 布景，有碰撞）＋ `Script_LivedInProps.mjs`
+  （程序化生活道具，全走 BuildSink）＋ `Script_TrimProps.mjs`（≤400 三角的 tzm 饰件层，
+  物理契约不同所以独立一层）；目录 `Data_ExternalAssets_*.mjs`，来源见 `docs/Data_ExternalPropSources.md`。
 
 ### 模型管线（TZM 与 GLB）
-- `_blender/` —— 程序化 Blender 管线：`BuildAll.py` 等出 `Model/*.tzm.json`，
-  `Verify.mjs` 与 `Data_Meshes.mjs`（手写但可校验的清单）逐字段互核。
-- `Script_MeshLoad.mjs` —— TZM 加载器（为什么不用 glTF 见头注）。
-- `Script_RiggedModel.mjs` —— GLB 蒙皮桥接：把程序化动画重定向到导入骨架，
+- `_blender/` —— 程序化 Blender 管线出 `Model/*.tzm.json`；`Verify.mjs` 与
+  `Data_Meshes.mjs` 逐字段互核。加载器 `Script_MeshLoad.mjs`（为什么不用 glTF 见头注）。
+- `Script_RiggedModel.mjs` —— GLB 蒙皮桥接：程序化动画重定向到导入骨架，
   失败自动降级回程序化几何，不堵开机、不改战斗时序。
 - 先读：`_blender/Verify.mjs` 头注；改模型只重建那一件，别跑全量 BuildAll。
 
 ### 人物 / AI / 合批
-- `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial
-  不带 skinning，蒙皮会在 SSAO 里塌成原点，见头注）。
-- `Script_ActorBatch.mjs` —— 按「几何 × 材质」收成 InstancedMesh；
-  `Script_ActorCrowd.mjs` —— 远景人群（「看得见的人」与「画得起的人」分层）。
-- `Script_Ai.mjs` —— 士兵 AI 与战斗结算（同屏活人上限、掩体、压制、士气）。
-- `Script_Navigation.mjs` —— 「哪儿站得住」位图 + 按目标算的下坡场。
+- `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
+  蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
+  `Script_ActorCrowd.mjs` 管远景人群。
+- `Script_Ai.mjs`（士兵 AI 与战斗结算）、`Script_Navigation.mjs`（「哪儿站得住」位图 + 下坡场）。
 - 先读：`docs/Data_TechPhysics.md`（角色 IK 部分）。
 
 ### 玩法测试靶场（?range=1，人机共同测试）
@@ -247,217 +211,151 @@ URL 参数选 preset / quality / scene / gi。
 - 专用章与正片共用正式 Soldier/Actor/伤害/死亡链；`Debug.MeleeQte` 只做摆位和取证。
 - 回归口 `Script_MeleeQteTest.mjs`（combat 域）。先读：`docs/Data_MeleeQte.md`。
 
+### 界河白盒（?jiehe=1，退出正片但资产完整的那片城北原野）
+- 切片是 `Data_Menu.JIEHE_SANDBOX_PHASE`。**id 仍是 `L0_Jiehe`** —— `OUTFIELD_SCENES` /
+  `PLACEMENTS` / `TRIM_PLACEMENTS` 三张表都按这个 levelId 分组，换 id 等于把布景摘光；
+  bounds / spawn / 路标与重制前的 L0 关逐字相同，打法字段抽干（无日军、不结算、不换关）。
+- 选章「测试场景」组第三条，进出与靶场同一条路：**改 query 再重载**。
+  回归口 `Script_JieheTerrainTest.mjs`（terrain 域）。
+
 ### 武器 / 战斗 / 刺刀
-- `Script_Player.mjs` —— 移动、碰撞、姿态、**自由瞄准**（枪口在视野里滑动，
-  不钉屏幕中心）、压制、伤口。
-- `Script_Viewmodel.mjs` —— 第一人称手与枪；里面几乎每个数字都是手感数字。
-- `Script_Combat.mjs` —— 投掷物、白刃、日军间接火力、胜负判定。
-- `Script_Identify.mjs` —— 准心指着谁（HUD / 难度 / 取证三处共读，纯几何不 import three）。
+- `Script_Player.mjs`（移动/碰撞/姿态/**自由瞄准** —— 枪口在视野里滑动、不钉屏幕中心）、
+  `Script_Viewmodel.mjs`（第一人称手与枪，几乎每个数字都是手感数字）、
+  `Script_Combat.mjs`（投掷物/白刃/日军间接火力/胜负判定）、
+  `Script_Identify.mjs`（准心指着谁，纯几何不 import three）。
 - `Data_Weapons.mjs` —— 武器数据；中方装备必须参差（杂牌军一个班至少三种枪）。
-- 先读：`docs/Data_GunFeelReview.md`（常设审查表，自由瞄准口径在末节）、
-  `Data_Bayonet.md`（刺刀）、`Data_PlayerDamage.md`（挨打链，别动 aiAccuracyBase）、
-  `Data_BattlefieldNumbers.md`（BF1/BFV datamine 参考值）。
+- 先读：`docs/Data_GunFeelReview.md`（常设审查表，自由瞄准口径在末节）、`Data_Bayonet.md`、
+  `Data_PlayerDamage.md`（挨打链，**别动 aiAccuracyBase**）、`Data_BattlefieldNumbers.md`。
 
 ### 物理
-- `Script_Physics.mjs` —— Rapier3D 封装（vendor/rapier；为什么换掉自写碰撞见头注：
-  斜墙的 AABB 包围盒把 20 m 斜墙登记成 14×14 实心方块）。
-- 回归口 `Script_PhysicsTest.mjs`；先读 `docs/Data_TechPhysics.md`。
+- `Script_Physics.mjs` —— Rapier3D 封装（为什么换掉自写碰撞见头注：斜墙的 AABB 把 20 m
+  斜墙登记成 14×14 实心方块）。回归口 `Script_PhysicsTest.mjs`；先读 `docs/Data_TechPhysics.md`。
 
 ### 通行 / 跳跃 / 翻越 / 攀爬
-- `Data_Traversal.mjs` —— **通行高度阶梯**（膝高自动跨过 / 腰高翻越 / 肩高攀爬 /
-  再高一律不可通过）。玩家、AI、autostep、导航图四处**共读这一张表**，
-  判据不许各写各的；跳跃的净抬高压在 `vaultMin` 之下，所以跳不上任何该翻越的东西。
-- 消费者：`Script_Player.TryVault` / `Script_Ai.TryVault` / `PhysicsWorld.autostepMax` /
-  `NavGrid.stepOver`；取证口 `Debug.Traversal()` 与 `Debug.Vault()`。
+- `Data_Traversal.mjs` —— **通行高度阶梯**（膝高跨过 / 腰高翻越 / 肩高攀爬 / 再高不可通过）。
+  玩家、AI、autostep、导航图四处**共读这一张表**；跳跃的净抬高压在 `vaultMin` 之下，
+  所以跳不上任何该翻越的东西。取证口 `Debug.Traversal()` / `Debug.Vault()`。
 - 回归口 `Script_JumpTest.mjs`（14 条，判据现取 `Debug.Traversal()`，断言里不抄数）。
 - 先读：`docs/Data_Traversal.md`。
 
 ### 破坏
-- `Script_Destruction.mjs` —— 统一场景破坏：离线预破碎 + 运行时代理；
-  一次爆炸只重建一次拓扑；主体照旧分区合批守 draw call。
-- `Script_FractureBake.mjs` —— 离线模板生成器（固定种子），产物提交进
-  `Data_FracturePatterns.mjs`，运行时只读。
-- 先读：`docs/Data_Destruction.md`。
+- `Script_Destruction.mjs` —— 统一场景破坏：离线预破碎 + 运行时代理，**一次爆炸只重建一次拓扑**。
+  模板由 `Script_FractureBake.mjs` 固定种子离线生成，产物在 `Data_FracturePatterns.mjs`，
+  运行时只读。先读：`docs/Data_Destruction.md`。
 
 ### 音频
-- `Script_Audio.mjs` —— 合成打底（32 个 WebAudio 配方）+ 实录采样逐条盖同名配方，
-  盖不上就回落合成。
-- 来源表：`Data_SfxSources` / `Data_AmbSources` / `Data_MusicSources` / `Data_Voice`
-  （川军口令是**四川话**，不是普通话）。
-- 烘焙：`Script_SfxBake` / `AmbBake` / `MusicBake` / `VoiceBake` / `SeedAudio*Bake`；
-  响度对齐 `Script_AudioNormalize`；产物在 `Audio/`。
+- `Script_Audio.mjs` —— 合成配方打底 + 实录采样逐条盖同名配方，盖不上就回落合成。
+- 来源表 `Data_SfxSources` / `Data_AmbSources` / `Data_MusicSources` / `Data_Voice`
+  （川军口令是**四川话**）；烘焙 `Script_{Sfx,Amb,Music,Voice,SeedAudio*}Bake`，
+  响度对齐 `Script_AudioNormalize`，产物在 `Audio/`。
 - 先读：`docs/Data_AudioAssets.md`。
 
 ### 过场 / 剧情
-- `Script_Cutscene.mjs` —— 实机演出；只有用户点名的五场夺控制权，战斗内演出不夺。
-- 分镜数据：`Data_Cutscene{Chuchuan,BeimenBreakout,LastWire,LiZongrenTang,WangMingzhang}.mjs`；
-  `Script_CutsceneCheck.mjs` 纯 Node 数据自检（Cutscene 从它 re-export 校验器）。
-- `Script_Story.mjs` —— 把 `Data_TengxianScript.mjs`（七关目标链 + 台词 + 分镜）按关派发；
-  史实注记卡 `Data_History.mjs`；编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。
-- 先读：`docs/Data_CutsceneRedo.md`（五场施工单 + Notion 定稿状态）、`Data_TengxianDesign.md`。
+- `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
+  分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
+- `Script_Story.mjs` —— 把七章目标链 + 台词 + 分镜按章派发；史实注记卡 `Data_History.mjs`，
+  编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 
 ### HUD / 菜单 / 输入
 - `Script_Hud.mjs` —— 纯 DOM/CSS，不进 three 渲染；层级参考战地，含阵亡卡片。
-- `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单：活战场打底 + 一台相机导演（机位表是纯数据）。
-- `Script_Input.mjs` —— 键位数据表 + 路由器；`Script_Interact.mjs` —— F 键按上下文分流；
-  `Script_Wheel.mjs` —— 指挥径向轮盘；`Script_DebugOptions.mjs` —— 调试开关唯一真相。
+- `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单（活战场打底 + 相机导演）；`Data_Menu` 还放着
+  **两片不进 PHASES 的切片**：全城俯瞰 `OVERVIEW_PHASE` 与界河白盒 `JIEHE_SANDBOX_PHASE`。
+- `Script_Input.mjs`（键位表 + 路由器）、`Script_Interact.mjs`（F 键分流）、
+  `Script_Wheel.mjs`（指挥轮盘）、`Script_DebugOptions.mjs`（调试开关唯一真相）。
 - 先读：`docs/Data_MainMenu.md`。
 
 ### 交互 / 负重（担架·搬运·救护交互点）
-- `Script_Interact.mjs` —— 两层：**内建分支**（拾枪/分弹药，够得着的是活战场对象）＋
-  **可注册交互点框架**（`Register(spec)`，三种手势 tap/hold/confirm、距离与朝向判据、
-  一次性/冷却、优先级）；文件末尾是八个**救护类预制**（止血/递药/查伤员/拆门板/
-  接线/剪线/拾传单/投火/撕短褂/抬起负重），全是纯函数，摆点是章节与集成批的事。
-- `Script_Carry.mjs` —— 负重状态机（`CARRY_KINDS` 一张表：担架/伤员/药箱/弹药箱/
-  门板/铁锅）。三条卸载路径：F 放下、左键扔下、脚本 `ForceRelease`；
-  `canDrop:false` 是「拒绝松手」变体（第四关抬罗班长）。
-  与玩家控制器的接口只有 `player.carrySpeedScale` 一个字段（Player 三处读它：
-  乘进移速、封冲刺、封开镜）；「能不能开枪」在装配层 `TryFire` 读 `carry.Blocking`。
-- 回归口 `Script_CarryTest.mjs`（纯 Node，tier1，domain `interact` ＋ `combat`）；
-  取证口 `Debug.Carry` / `Debug.Interact`。HUD 侧是进度环 `.hudInteractRing`
-  与负重条 `.hudCarry`，武器 UI 禁用态挂在 `#hud.carrying`。
+- `Script_Interact.mjs` —— 两层：**内建分支**（拾枪/分弹药）＋**可注册交互点框架**
+  （`Register(spec)`，三种手势）；文件末尾十个**救护类预制**全是纯函数，摆点是章节的事。
+- `Script_Carry.mjs` —— 负重状态机（`CARRY_KINDS` 一张表）。三条卸载路径：F 放下、左键扔下、
+  脚本 `ForceRelease`；`canDrop:false` 是「拒绝松手」变体（第四章抬罗班长）。与玩家控制器的
+  接口只有 `player.carrySpeedScale`；「能不能开枪」在装配层 `TryFire` 读 `carry.Blocking`。
+- 回归口 `Script_CarryTest.mjs`（纯 Node）；取证口 `Debug.Carry` / `Debug.Interact`，
+  HUD 侧是 `.hudInteractRing` 与 `.hudCarry`，武器 UI 禁用态挂在 `#hud.carrying`。
 
 ### 架设武器（可接管的固定机枪位）
-- `Script_Emplacement.mjs` —— `EMPLACEMENT_KINDS` 一张表 ＋ 一台状态机：射界限位、
-  热量（一直压约一条弹板顶红线 / 打一梭歇一梭永不过热）、两种卡壳（概率小卡可排障、
-  `ForceJam` 的必然失效拉几下枪机就报废）、弹板与补弹。**纯规则，不 import three**。
-  接管入口与补弹点是 `Script_Interact` 的注册点（`EmplacementInteraction` /
-  `AmmoResupplyInteraction` 两个预制）；弹道借装配层的 `Fire(shot)` 钩子走同一条
-  `MarchBullet`。**脚本只能把枪弄坏，上/下枪位永远是玩家自己按的那一下。**
-- NPC 射手与 `Script_Ai` 共用同一道闸：战位名就是 `soldier.emplacementId`，
-  `SyncNpc(soldiers)` 按它认领/释放，不另建占位表。
-- 键位：F 接管/离位（枪废了是「弃枪」）、R 拉枪机（按住排障 / 换弹板）、左键开火。
-- 回归口 `Script_EmplacementTest.mjs`（纯 Node，domain `interact` ＋ `combat` ＋ `ai`）；
-  取证口 `Debug.Emplacement`。HUD 是热条面板 `.hudEmplacement`，武器 UI 禁用态
-  挂在 `#hud.emplaced`。
+- `Script_Emplacement.mjs` —— `EMPLACEMENT_KINDS` 一张表 ＋ 一台状态机（射界限位、热量、
+  两种卡壳、弹板与补弹）。**纯规则，不 import three**；弹道借装配层的 `Fire(shot)` 走同一条
+  `MarchBullet`，接管/补弹是 `Script_Interact` 的注册点。
+  **脚本只能把枪弄坏，上/下枪位永远是玩家自己按的那一下。**
+- NPC 射手与 `Script_Ai` 共用同一道闸：战位名就是 `soldier.emplacementId`，不另建占位表。
+  键位 F 接管/离位、R 拉枪机、左键开火。
+- 回归口 `Script_EmplacementTest.mjs`（纯 Node）；取证口 `Debug.Emplacement`，
+  HUD 是 `.hudEmplacement`，武器 UI 禁用态挂在 `#hud.emplaced`。
 
 ### 日机扫射（第一关的核心演出）
-- `Script_AircraftStrafe.mjs` —— 一条通场的状态机：进入 → 扫射 → 拉起离场，
-  四个节拍（enter/fire/cease/exit）出 `OnPhase` 与 `story.Signal`。**纯规则，不 import three**。
-  三条预设 `STRAFE_PRESETS`（railPass 打车辆 / crowdTurn 转向人群且弹线追队列 /
-  divePress 逼到玩家脚下）。牺牲**全靠白名单点名**：`victims` 必死、`immune` 必不死，
-  一次随机都不掷（§0 保留的三项创作性还原第 1 条）。玩家那一下是一扇窗
-  `[atS − windowS, atS]`，开关 `SetPlayerDamage`、时长 `SetPlayerWindow`；
-  「从数秒前重来」的检查点不在这一层。
-- `Script_Aircraft.mjs` —— 绕圈的远方机群（**没动**）＋ 扫射的**渲染那一半**：
-  航线点名的那一架脱离圆周由脚本摆位，走完藏 2.5 s 再归队；
+- `Script_AircraftStrafe.mjs` —— 一条通场的状态机，四个节拍出 `OnPhase` 与 `story.Signal`。
+  **纯规则，不 import three**；三条预设 `STRAFE_PRESETS`。
+  牺牲**全靠白名单点名**（`victims` 必死、`immune` 必不死），**一次随机都不掷**
+  （§0 保留的三项创作性还原第 1 条）。玩家那一下是一扇可配置的窗。
+- `Script_Aircraft.mjs` —— 远方机群（**没动**）＋ 扫射的渲染那一半；
   `MakeAircraftStrafeHost` 是宿主适配器（曳光/弹着/音效定位/玩家挨这一下）。
-- 音效四条 key 在 `Data_SfxSources`（PlaneDive / StrafeNear / StrafeFar / StrafeDirt）；
-  同名合成配方合上之前自动退到 `amb.planeFar` / `type92` / `type11` / `impactDirt`。
-- 回归口 `Script_AircraftStrafeTest.mjs`（纯 Node，domain `combat`）；取证口 `Debug.Strafe`。
-  摆点示例（CH1 三条航线的线段坐标）在 `Script_AircraftStrafe.mjs` 头注。
+- 回归口 `Script_AircraftStrafeTest.mjs`（纯 Node）；取证口 `Debug.Strafe`。
+  摆点示例（CH1 三条航线坐标）与音效备胎在 `Script_AircraftStrafe.mjs` 头注。
 
 ### 照明弹（第四关的招牌机制）
-- `Script_Flare.mjs` —— 一枚照明弹的五相位时间线：升空 → 顶空点燃 → 伞降缓落燃烧 →
-  熄灭 → **暗适应**，四个节拍（launch/ignite/out/clear）出 `OnPhase` 与 `story.Signal`
-  （CH4 的 `C4_FlareUp`）。**纯规则，不 import three**；两条预设 `FLARE_PRESETS`
-  （crossLane 横巷 / narrowLane 窄巷白刃），两枚都是剧情节拍，`LaunchSequence` 排时刻表。
-- **暴露机制是它的另一半产物**：燃烧期把 `Script_Ai.SIGHT_BY_STANCE` 三档**同乘**
-  一个倍率（敌我一起暴露），熄灭后压到 1 以下几秒再还原。乘法保住了「姿态决定
-  被发现的距离」——照明弹底下趴着仍然更难被看见。写入口只有 `AiDirector.SetSightScale`，
-  三处判定共读 `SightRange(stance)`；**换关/Abort 必须还原成 1**。
-- 画面走现有池子，不新建管线：灯是 `LightRig` 火光池的一盏（`AddFire({flicker:false})`
-  ＋新增 `UpdateFire`，castShadow 恒 false），烟是 `VfxSystem` 的烟源（＋新增
-  `MoveSmokeSource`，烟迹要跟着走才叫「迹」）。强度按 `groundLux × agl²` 反推，
-  改顶空高度不用重调亮度。
-- 音效四条 key 在 `Data_SfxSources`（flareLaunch / flareIgnite / flareBurn / flareOut）；
-  前两条没接线时退到 `launcherPop` / `grenadeThrow`，后两条**不给备胎**（造不出来）。
-- 回归口 `Script_FlareTest.mjs`（纯 Node，domain `ai` ＋ `render`）；取证口 `Debug.Flare`
-  （带 `ai.SightState()`，光强对了不算数，要三档真的一起抬起来）。摆点示例在文件头注。
+- `Script_Flare.mjs` —— 五相位时间线（升空 / 顶空点燃 / 伞降燃烧 / 熄灭 / **暗适应**）。
+  **纯规则，不 import three**；两条预设 `FLARE_PRESETS`，两枚都是剧情节拍。
+- **暴露机制是它的另一半产物**：燃烧期把 `Script_Ai.SIGHT_BY_STANCE` 三档**同乘**一个倍率
+  （敌我一起暴露）。乘法保住了「姿态决定被发现的距离」；写入口只有 `AiDirector.SetSightScale`，
+  **换关 / Abort 必须还原成 1**。画面借现有池子（火光池 + 烟源），draw call 红线不动。
+- 回归口 `Script_FlareTest.mjs`（纯 Node）；取证口 `Debug.Flare`（带 `ai.SightState()` ——
+  光强对了不算数，要三档真的一起抬起来）。摆点示例与音效备胎在文件头注。
 
 ### 发报（终章亲手发出最后一封电报）
-- `Script_Telegraph.mjs` —— 码组状态机：按一下电键发一个码组（一组四位、两到三声
-  「嗒」），报码纸逐组勾掉；炮击 `ForceDisconnect()` 把**正在发的那一组作废**，
-  重连是 S1 框架的 hold 手势（1.2 s）。**纯规则，不 import three**。
-  自动断线排在 `breakAfterGroup`（夹进 `[1, total−1]`，不许落在「发毕」以后）。
-- **不夺控制权**：玩家可以中途走开去打仗，进度原样保留，没有任何超时会失败。
-  两个交互点预制（`TelegraphKeyInteraction` tap / `TelegraphReconnectInteraction` hold）
-  由本文件出，`interact.Register` 摆点 —— 交互框架不反过来依赖这个玩法系统。
-- 「发毕。」是 `Data_MissionCh6` 里 xiaoqin 的台词，**本层一个字都不说**，只回 `OnComplete`。
-  默认信号名与 CH6 EVENTS 逐条对应：`KeySeated` / `WireBreak` / `WireSent`。
-- 音效两条 key 在 `Data_SfxSources`（telegraphKey 三变体顺序轮播不随机 / telegraphHum）；
-  电键没接线时退到 `grenadePin`，底噪不给备胎。
-- 回归口 `Script_TelegraphTest.mjs`（纯 Node，domain `interact` ＋ `hud`）；
-  取证口 `Debug.Telegraph`。HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
+- `Script_Telegraph.mjs` —— 码组状态机（按一下发一组、一组四位），断线是**脚本推的**
+  （`ForceDisconnect` / `breakAfterGroup`，夹进 `[1, total−1]`），重连走 hold 手势。**纯规则**。
+- **不夺控制权**：玩家可以中途走开去打仗，进度原样保留，没有任何超时会失败。两个交互点预制
+  由本文件出，`interact.Register` 摆点 —— 交互框架不反向依赖玩法系统。
+  「发毕。」是章节台词，**本层一个字都不说**，只回 `OnComplete`。
+- 回归口 `Script_TelegraphTest.mjs`（纯 Node）；取证口 `Debug.Telegraph`，
+  HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
 
-### 任务流程引擎钩子（集成批 INT1：把七章内容与四个新系统接起来的引擎侧原语）
-- **关中过场** —— beats 里 `{ at, type:"cutscene", id:"CS_x" }`；等价入口是
-  `story.Signal("<名字>")`（登记表 `Script_Story.SIGNAL_CUTSCENES`）与宿主 API
-  `window.Taierzhuang.PlayMidCutscene(id)`。三条路走的都是**同一个 RunCutscene** ——
-  Esc 跳过与字幕补卡的语义因此与关首过场一致。派发期间剧本停摆（`story.CutsceneHold`）、
-  战斗输入被 `router.SetSuppressed` 掐掉。`CHAPTER.cutsceneMid` 兼容住：写字符串挂
-  默认信号 `ChapterMidCutscene`，写 `{ id, signal }` 挂指定信号。
-  **组装层开机就查 id 是否注册**（`Data_TengxianScript`）。
-- **LEVEL_CUES 自动构建** —— `Script_Story.BuildLevelCues(CHAPTER_EVENTS)` 照七章各自的
-  `export const EVENTS` 建判定表。三种名字字段（`name`/`event`/`id`）与三种判据字段
-  （`fallback`/`predicate`/`cue`）一律认；判据用**受限文法解析，不 eval**
-  （比较式的 `||`/`&&` 组合，字段限 zone/objectiveIndex/objectiveCount/levelTime/
-  levelSeconds/pool）；没写判据的按登记顺序**均匀铺开**到关卡时长上。
-  章节没导出 EVENTS 的补丁在 `SUPPLEMENT_CUES`（现在只有 CH2 的 BayonetDone）。
-  `story.Signal` 主动推的永远优先 —— 那条既有路径一个字没改。
-- `Script_Companion.mjs` —— 具名同伴（罗班长、幺娃、何有田…）。**纯规则，不 import three**。
-  默认名册从本章 beats 的 `who` 推导（该章说过话的战斗员自动在场），
-  `COMPANION_CAST` 一张档案表决定谁能生成、跟随还是待命。对外四件事：
-  `Locate(castId)`（接 `story.AttachVoice` 的 `locate` —— 台词从此有方位）、
-  `SetAbsent(castId)`（**跨关保留**，罗班长四关牺牲、五关起缺席）、
-  `Fell(castId)`（走现有倒地，不是删人）、`Detach/Attach(castId)`。
-  造人走 `AiDirector.Spawn("nra", ...)` 并塞一个具名 `identity`，**从 nra 名额里出人**，
-  所以开机红线不受影响（`MAX_COMPANIONS = 6`）。每帧排在 `ai.Update` 之前。
-- `Script_Checkpoint.mjs` —— 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。
-  **纯规则**，环形位置采样：`Save()` / `Rewind(seconds)`。还原位置/姿态/血/弹，
-  **不扣兵员池、不弹死亡卡、不换人**。给 S3 的 `OnPlayerHit` 用，
+### 任务流程引擎钩子（集成批 INT1：七章内容与新系统之间的引擎侧原语）
+- **关中过场**：beats 的 `{ type:"cutscene", id }`、`story.Signal(名字)`
+  （`Script_Story.SIGNAL_CUTSCENES`）、`Taierzhuang.PlayMidCutscene(id)` 三条路
+  **共用同一个 RunCutscene**，所以 Esc 跳过与补卡语义与关首过场一致。
+- **LEVEL_CUES 自动构建**：`Script_Story.BuildLevelCues(CHAPTER_EVENTS)` 照各章
+  `export const EVENTS` 建判定表，判据走**受限文法解析、不 eval**。
+- `Script_Companion.mjs` —— 具名同伴。**从 nra 名额里出人**（`MAX_COMPANIONS = 6`），
+  所以开机红线不受影响；`SetAbsent` 跨关保留（罗班长四关牺牲、五关起缺席）。
+- `Script_Checkpoint.mjs` —— 脚本检查点。**不扣兵员池、不弹死亡卡**，
   必须在把伤害提交给死亡链路**之前**调 —— 打完再调，卡已经弹了。
-- **钉关** —— `CHAPTER.mechanics.pinFinalZone: true` 时，走到最后一个路标不自动换关，
-  等 `story.Signal("ChapterRelease")` 才放行（CH5 的最终白刃战三层与视角接替三段
-  全在最后一个路标之后）。保险丝：超过配置时长 + 240 s 自动放行并告警。
-- **过场引擎三件小补**：prop 的 `texture` 贴图（`transparent`/`alphaTest`/`repeat`，
-  与 `mat` 互斥，`kind:"panel"` 是立着的平面）、`shot.headLook.blendIn`（切镜时视角过渡）、
-  `shot.sfx` 的 `fadeIn`/`fadeOut`/`seconds`/`crossfade`、
-  `ambientMotion[].decelSeconds`（列车进站不再硬停）。
-- 回归口 `Script_MissionHooksTest.mjs`（纯 Node，domain `cutscene` ＋ `ai` ＋ `interact`）
-  ＋ `Script_CutsceneControlTest.mjs` 里的过场引擎三条；取证口 `Debug.Companions` /
-  `Debug.Checkpoint` / `Debug.ChapterPin` / `Debug.MidCutscenes`。
-  字段口径见 `docs/Data_MissionRemake.md` §10.6。
+- **钉关** `CHAPTER.mechanics.pinFinalZone`：等 `story.Signal("ChapterRelease")` 放行，
+  保险丝是配置时长 + 240 s。
+- 回归口 `Script_MissionHooksTest.mjs`（纯 Node）＋ `Script_CutsceneControlTest.mjs`
+  的过场引擎三条；取证口 `Debug.Companions` / `Debug.Checkpoint` / `Debug.ChapterPin` /
+  `Debug.MidCutscenes`。字段口径与过场引擎三件小补见 `docs/Data_MissionRemake.md` §10.6。
 
 ### 章节摆点（集成批 INT2：七章内容 × 九个玩法系统的唯一接缝）
-- `Script_MissionSetpieces.mjs` —— **纯规则，不 import three**。「哪一章在哪一拍做什么」
-  是一张按 levelId 索引的数据表 `SETPIECES`，**一章一条**；装配层里因此
-  **一行 `if (章 id)` 都没有**（只建一次、每帧推一下、换关 `BeginLevel`）。
-  一章能挂四种钩子：`Setup(s)` / `onZone[zoneId](s)` / `onVoice[key](s)`（key = `beat.voice`，
-  剧本节拍与玩法节拍靠它对齐）/ `Update(s, dt)`。
-  `s` 把九个系统与宿主回调包成**判空过的**门面 —— 章节数据里不写 `if (s.carry)`。
-  同文件里另有 `EscortColumn`：一关武装后送与五关分段护送**共用同一台**队列控制器。
-- 三条纪律：**不夺移动权**（固定事件走关中过场）、**不重复实现玩法**（只负责摆）、
-  **与叙事层的接缝只有 `story.Signal(name)`**（名字在各章 `EVENTS` 里登记）。
-- **`event:` 的判据一律「事实 ‖ 时刻」两条都写。** 只写事实的判据在「玩家不动」的
-  回归里一条都不成立（各等 `MAX_WAIT.event = 80 s`）；只挂 `zone:` 更糟（95 s，
-  六拍走位就是 570 s）——「终章剧本剩 11 条」那条红就是这么来的。
-- 回归口 `Script_MissionSetpiecesTest.mjs`（纯 Node，domain `ai` ＋ `interact` ＋ `cutscene`）；
-  取证口 `Debug.Setpieces` / `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
-  口径见 `docs/Data_MissionRemake.md` §10.7。
+- `Script_MissionSetpieces.mjs` —— **纯规则，不 import three**。`SETPIECES` 一张按 levelId
+  索引的表，**一章一条**，四种钩子 `Setup` / `onZone` / `onVoice` / `Update`；装配层里因此
+  **一行 `if (章 id)` 都没有**。`s` 是判空过的门面，章节数据不写 `if (s.carry)`。
+- 三条纪律：**不夺移动权**、**不重复实现玩法**（只负责摆）、与叙事层的接缝只有 `story.Signal(name)`。
+- **`event:` 的判据一律「事实 ‖ 时刻」两条都写** —— 只写事实的在「玩家不动」的回归里
+  一条都不成立，各空等 80 s（只挂 `zone:` 是 95 s）。
+- 回归口 `Script_MissionSetpiecesTest.mjs`（纯 Node）；取证口 `Debug.Setpieces` /
+  `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
+  口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
 ### 编辑器（15 个模块，不对玩家开放）
-- `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
+- `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
-  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + **拼接资产台与布设参数**
-  ——「一个模块摆 N 次」那几只原始件与 WALL_PRESETS 的滑杆都在这里，
-  原「道路样条」扩围后改名）。
-  DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法；
-  Profiler（独立窗口的性能剖析，内核 `Script_Profiler.mjs`）还带 keepOnClose ——
-  关设置面板回去打仗它照记。
+  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
+  DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。
 
 ### VFX
-- `Script_Vfx.mjs` —— 粒子与特效：弹孔、砖粉、烟、碎砖弹跳；三条架构约束在头注。
-- 先读：`docs/Data_TechRenderPipeline.md`。
+- `Script_Vfx.mjs` —— 粒子与特效（弹孔/砖粉/烟/碎砖弹跳）；三条架构约束在头注。
+  先读：`docs/Data_TechRenderPipeline.md`。
 
 ### 测试 / 出图
-- `Script_TestRunner.mjs` —— 分级入口（见「常用命令」）；`Script_BootTest.mjs` 七关开机 +
-  性能红线；`Script_PlayTest.mjs` 真浏览器端到端通关，130 条断言**从运行时状态取证**；
+- `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七章开机 + 性能红线；
+  `Script_PlayTest.mjs` 真浏览器端到端通关（130 条断言**从运行时状态取证**）；
   40+ 专项 `Script_*Test.mjs` 按领域挂在 Tier 1/2。
-- 出图七支（见「常用命令」）+ `Script_SamplePoints.mjs`（一关一建的出图计划）+
-  `Data_SamplePoints.mjs`（机位表，用采样点编辑器逐点调，出图脚本不自己算机位）。
+- 出图七支 + `Script_SamplePoints.mjs`（一片一建的出图计划）+ `Data_SamplePoints.mjs`
+  （机位表，用采样点编辑器逐点调，出图脚本不自己算机位）。
 - 先读：`docs/Data_TestTiers.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`（评分表）。
 
 ### 资产目录
@@ -468,32 +366,27 @@ URL 参数选 preset / quality / scene / gi。
 ## docs/ 导读（39 篇：先分清「现状」与「留档」）
 
 **现状口径（改对应系统前必读）**：
-- `Data_TechRenderPipeline.md`（81 KB，渲染管线唯一现状文档）、`Data_TechPhysics.md`、
+- `Data_TechRenderPipeline.md`（渲染管线唯一现状文档）、`Data_TechPhysics.md`、
   `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`。
-- `Data_MissionDesign.md` —— **关卡层宪法**：线性剧情关，优先级高于之前的 ER2 占点结构。
-- `Data_Traversal.md` —— **通行高度阶梯**（多高的东西过得去；跳跃/翻越/攀爬的规范）。
+- `Data_MissionRemake.md` —— **本轮任务流程的唯一口径**；`Data_MissionDesign.md` —— 关卡层宪法
+  （线性剧情关，优先级高于之前的 ER2 占点结构）；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（常设审查项，每轮都跑）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
-- `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`（关卡与过场设计书）、
-  `Data_CutsceneRedo.md`（五场过场施工单）、`Data_CityWallPbr.md`、
-  `Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
-  `Data_TestRange.md`（?range=1 玩法测试靶场与 Debug.Range 取证口）、
-  `Data_MeleeQte.md`（?melee=1 六式白刃 QTE、触发条件与 Debug.MeleeQte）、
-  `Data_RoadSpline.md`（样条道路）、`Data_WallSpline.md`（样条围墙 + 未迁移例外清单）。
+- `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`、`Data_CutsceneRedo.md`、
+  `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
+  `Data_TestRange.md`（?range=1）、`Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
+  `Data_WallSpline.md`（样条道路/围墙 + 未迁移例外清单）。
 
 **史实考据底本（三档可信度：信史 / 主流记载 / 流传待考；台词只建立在前两档上）**：
 - `Data_HistoryMaterial.md`（装备/军服/建筑，建模级参数）、`Data_HistoryQuotes.md`（语录校勘）、
-  `Data_HistoryTimeline.md`（台儿庄逐日）、`Data_TengxianTimeline.md`（滕县逐日与指挥链）、
+  `Data_HistoryTimeline.md` 与 `Data_TengxianTimeline.md`（逐日与指挥链）、
   `Data_TengxianCity.md`（滕县城考据，地标史实全在这）、
-  `Data_BattlefieldNumbers.md`（BF1/BFV 枪械 datamine，是参考值不是口径）。
+  `Data_BattlefieldNumbers.md`（BF1/BFV datamine，是参考值不是口径）。
 
 **历史提案与留档（别按现状读）**：
-- 六篇 `Data_EasyRed2*.md`（Benchmark / Controls / Parity / Plan / Systems / Visual，
-  共约 380 KB）—— 对标 Easy Red 2 的调研与改造提案；其中的「现状」判断早已过期。
-- `Data_DesignFirstPass.md` —— 首轮设计书，头注自标「留档」；**其性能预算作废，
-  以 5000 / 600 万开机红线为准**。
-- `Data_GunFeelRound1.md` —— 第 1 轮打分存档（常设表在 GunFeelReview）。
-- `Data_StoryFlow.md` —— 台儿庄旧版六关剧情流程（滕县剧本在 `Data_TengxianScript.mjs`）。
+- 六篇 `Data_EasyRed2*.md`（约 380 KB，对标调研与提案，「现状」判断早已过期）、
+  `Data_DesignFirstPass.md`（首轮设计书，**性能预算作废**，以开机红线为准）、
+  `Data_GunFeelRound1.md`、`Data_StoryFlow.md`（台儿庄旧版剧情流程）。
 - `Data_TechRepoLessons.md` —— 开工前的代码考古报告；它的「坑」清单（缓存戳 / 色彩空间 /
   指针锁 / WebAudio / worktree）至今全部有效，新 agent 值得通读一遍。
 

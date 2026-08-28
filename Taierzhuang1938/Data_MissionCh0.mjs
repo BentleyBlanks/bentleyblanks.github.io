@@ -156,7 +156,7 @@ export const VOICE_LINES = [
   { key: "ch0_shunzi_01", who: "shunzi", delivery: "normal", dur: 2.41, text: "……春妹会喊爹了。" },
   { key: "ch0_shunzi_02", who: "shunzi", delivery: "normal", dur: 3.36, text: "娘的眼睛越发不好，穿针都要人帮。" },
   { key: "ch0_shunzi_03", who: "shunzi", delivery: "normal", dur: 3.74, text: "屋头恁多事等你，还跑出来打啥子仗？" },
-  { key: "ch0_luo_03", who: "luo", delivery: "normal", dur: 2.02, text: "不打，人家早晚打到屋门口。" },
+  { key: "ch0_luo_03", who: "luo", delivery: "normal", dur: 2.25, text: "不打，人家早晚打到屋门口。" },
   { key: "ch0_shunzi_04", who: "shunzi", delivery: "normal", dur: 2.56, text: "山东离屋门口还远得很。" },
   { key: "ch0_luo_04", who: "luo", delivery: "normal", dur: 2.27, text: "南京以前也觉得远。" },
 
@@ -174,7 +174,7 @@ export const VOICE_LINES = [
 
   // ── 镜 7｜顺子的计划（§1 阶段 3，全段耳语）──────────────────────────────
   { key: "ch0_shunzi_05", who: "shunzi", delivery: "whisper", dur: 3.22, text: "前头若喊送伤兵，老子就去。" },
-  { key: "ch0_shunzi_06", who: "shunzi", delivery: "whisper", dur: 3.78, text: "送到临城，找个地方把衣裳一换。" },
+  { key: "ch0_shunzi_06", who: "shunzi", delivery: "whisper", dur: 3.25, text: "送到临城，找个地方把衣裳一换。" },
   { key: "ch0_shunzi_07", who: "shunzi", delivery: "whisper", dur: 3.37, text: "枪一丢，哪个认得到我？" },
   { key: "ch0_yaowa_02", who: "yaowa", delivery: "whisper", dur: 2.25, text: "那不就是逃兵？" },
   { key: "ch0_shunzi_08", who: "shunzi", delivery: "whisper", dur: 4.28, text: "我是遭抓来的，又不是自己来送命的。" },

@@ -327,16 +327,60 @@
 
 回归口：`node Taierzhuang1938/Script_MissionSetpiecesTest.mjs`（纯 Node，毫秒级）。取证口 `Debug.Setpieces` / `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
 
-#### INT2 还欠什么（下一批的施工单）
+### 10.8 抛光批 P1｜演出与实体补齐（2026-08-29）
 
-按「差在哪一层」分，不按章分 —— 同一件缺口往往同时卡住三章。
+INT2 之后剩下的是「差一层实体/演出」的那几项。这一批把它们补上，**装配层
+（`Script_Main`）一行没动** —— 缺的引擎动词一律写成可选（`s.d.host.X?.()`），
+没接线时那件事静默不发生，与摆点层其余每一条的降级方式一致。
 
-| 缺的是什么 | 卡住哪几拍 | 为什么这一批没做 |
+| 项 | 落在哪儿 | 怎么做的 |
 | --- | --- | --- |
-| **可被打中的弹药箱实体** | 二关阶段③殉爆倒计时（`CookingCrate` 恒返回 null） | 现在的箱子是交互点 + 搬运态，场上没有一只掷弹筒打得中的实体。要它得先有一类「可被伤害的场景物件」，那是 destruction 层的活 |
+| **可被打中的弹药箱实体＋殉爆倒计时** | 二关阶段③ | 新增 `Script_BlastTargets.mjs`（纯规则登记表）。`Script_Destruction.Blast()` 每炸一次把（位置/半径/能量/种类）喂给它，摆点层在 Setup 里 `s.Prop` + `s.BlastTarget` 摆三只箱子。命中 → 下一帧起烟 + 倒计时 `crateFuseS` → 玩家把箱子拖出 `crateSafeM` 算救下，否则殉爆。抬着的那只跟着人走（**在你怀里照样打得中**）；一发把两只一起打穿时**排队**，一只一只演。`CookingCrate()` 作废 |
+| **幸存者实体** | 三关 ER-6 | 屋内三具躺着的躯体（Setup 就摆）＋ 搀扶走 `carry` 的 `wounded` 档 ＋ 交给幺娃（交接点 = `companion.Locate("yaowa")`）→ 交出去的人自己往 A 区方向走。「这边还有活的！」（`ch3_yaowa_09`）那一拍开门，「屋里清空」是兜底入口 |
+| **可跟随的电话线** | 三关 ER-4 | `LayWire` 沿本章路标铺一条**贴地**的线（A 区→侧门→失守街区→C 区），失守街区那一头断开、两个断头 + 一根歪掉的半截杆。断口与剪线交互同一处 |
+| **墙塌／击倒／武器脱手那 4—6 秒** | 四关阶段⑧ | `BeginCh4Rescue` 的 5.4 s 时刻表：检查点 → 无敌窗 → 呼啸 → 1.2 s 后炸在侧墙上（爆炸声 + `Detonate` + 尘烟）→ `GroundPov` 贴地 + `carry.Begin("wounded")` 占住手（＝武器脱手、禁火）→ 罗班长 `Detach` 后每半秒把 goal 写到玩家脚下 → 声音演「接近/拉栓/撞开/拖走」→ 还枪 → 放行。**超时看门狗**保证枪一定回来 |
+| **终局手感** | 五关阶段⑪ | 章节作用域：体力**恢复上限**逐档下压到 `lastStandStaminaFloor`（不碰 `DIFFICULTY.staminaSeconds`）、两侧院门的波次间隔逐波收紧。顺子倒下与换关时一律还原 |
+| **视角接替的换身份表现** | 五关阶段⑫ | 三张 1 s 黑帧身份字卡（`Data_CutsceneCh5` 的 `CS_Ch5_Pov*Card`，版式同序章地点卡；黑帧上声音不断）＋ `SwitchPov` 多带一个 `yaw` 落地朝向 |
+| **序章镜 5 / 三关破墙镜 2 的音字对不上** | `Data_CutsceneChuchuan` / `Data_CutsceneCh3` | 字幕窗按字数排、没对音频 `dur`：序章 `ch0_heyoutian_02` 窗短 0.6 s 且与下一句音频重叠 0.10 s；三关 `ch3_ija_gunso_03` 窗短 0.28 s、重叠 0.18 s。两处都只挪句子、**镜长与九镜之和不变** |
+
+> **`LintCutscene` 看不见这一类错。** 它那条重叠检查读的是**字幕窗**，而重叠的是**音**。
+> 要对上只能拿 `Data_MissionChX.VOICE_LINES` 的 `dur` 去比 —— 这一批是手工比的，
+> 想常态化就得让 CutsceneCheck 也读一遍 VOICE_LINES。
+
+#### 还欠什么（装配层那三行 + 一件动画）
+
+| 缺的是什么 | 卡住哪几拍 | 怎么补 |
+| --- | --- | --- |
+| `Detonate({at,radius,damage,kind})` | 二关殉爆现在退到 `Shell`（`CallIncoming`，带 2.6 s 飞行与一声不该有的呼啸）；四关那面侧墙现在只有声音与尘烟 | `Script_Main` 的 setpieces host 加一行走 `combat.Blast`。签名抄在 `Script_MissionSetpieces` 的 host 契约注释里 |
+| **真的塌** | 四关阶段⑧那面侧墙 | `Data_Destruction.GAMEPLAY_DESTRUCTION_ENABLED` 现在是 `false`（正片不改变场景拓扑，等预破碎表现专项验收）。它一天不放行，任何路径都拆不动那面墙 —— 摆点层这一侧已经在正确的拍上调 `Detonate` 了，放行当天不用改一个字 |
+| `SetStaminaCeiling(v)` | 五关阶段⑪「体力无法完全恢复」 | host 一行 + `Script_Player` 那句 `Clamp01(this.stamina + ...)` 夹到 `this.staminaCeiling ?? 1`。**不许动 `DIFFICULTY.staminaSeconds`** |
+| `SpawnEnemy({x,z,...})` | 五关阶段⑪两侧的波次；四关阶段⑧「点名一名日军从烟尘里走近再被撞开」 | 现有 `SpawnActor` 写死 `ai.Spawn("nra")`，`EnemiesNear` 只回个数不回句柄 —— 摆点层够不着任何一个日军个体。四关那半秒现在用声音演 |
+| `SwitchPov` 读 `yaw` | 五关阶段⑫落地朝向 | 摆点层已经在传了；装配层读它之前，接替过去的人是背着战场站着的 |
 | **交火声床的整层淡入淡出** | 三关阶段⑦声音先行段（`SetCombatBed` 只记事实） | 音频账归 INT3。摆点表已经在正确的拍上调它了，接上之后一个字都不用改 |
-| **幸存者与伤员实体** | 三关 ER-6（搜四到六名幸存者、能走的交给幺娃）、五关最终白刃的「两侧压上」 | 要一类「躺着的、能被交互的人」；`carryWounded` 现在只有「屋内清空」那条闸 |
-| **可跟随的电话线样条** | 三关 ER-4 的「线本身就是路标」与保护小秦查断点 | 两头接线与剪线的交互都在，缺的是那条走线实体（布设层） |
-| **墙塌 / 击倒 / 武器脱手的那 4—6 秒演出** | 四关阶段⑧罗班长救顺子 | 无敌窗口、检查点、台词与 `carryLeader` 都接上了，缺的是那一段的**动作表演**（需要一段专门的镜头或一套贴地视角，属过场/动画层） |
-| **体力不回满、活动空间逐步缩小** | 五关阶段⑪最终白刃 | 钉关与判定都在，这两条是玩家参数与 AI 压迫曲线，动它们会牵动全作手感 |
-| **视角接替的完整交接** | 五关阶段⑫（`SwitchPov` 只搬人 + 换任务文字） | 三段都在、都保持玩家控制、都不切黑；缺的是「换身份」的表现（第一人称手臂/装备换一套） |
+| **活动空间逐步缩小** | 五关阶段⑪ | 这一条是 AI 压迫曲线与可走区域，动它会牵动全作手感，本批没做 |
+
+### 10.9 抛光批 P2｜工具、测试与文档收尾（2026-08-29）
+
+重制换掉了七章的 id、bounds 与目标链，一批**工具与测试仍钉在旧关号上** —— 它们不报错，
+只是安静地量错东西。这一批把那些尾巴清掉，正片行为一个字没改。
+
+| 钉在哪儿 | 症状 | 现在的口径 |
+| --- | --- | --- |
+| 没有一章会生成整座城 | 采样点表 89 个机位里 74 个、`Script_ShotTest` 的 Z 系列约二十张、`Script_TownDressingDump` 全部挂在旧「城墙关」上；`menuShot: "SouthEastTower"` 这类基座直接抛「找不到菜单机位」 | 新增 **`?phase=overview`**（`Data_Menu.OVERVIEW_PHASE`，bounds = `Data_Battle.OVERVIEW_BOUNDS`，天光钉死 smokyDay，不进 PHASES / 不进选章）。三处工具统一从这条入口进；点位表的 `phase` 从此认 `"overview"` 与 0—6 两种值 |
+| 界河退出正片但资产完整 | `Script_JieheTerrainTest` 整份红（`?phase=0` 建的是序章不是界河），`Data_Dressing_JieheVillages` 157 件登记为「无承载章」 | 新增 **`?jiehe=1`「界河 · 白盒」**（选章「测试场景」组第三条，`JIEHE_SANDBOX_PHASE`，id 仍是 `L0_Jiehe`）。bounds / spawn / 路标与旧 L0 逐字相同，所以那九条断言判据一个字没改 |
+| `_import/TownDressingCells.json` 是重制前那一份 | `phases` 里还是旧关号，规则 8「目标连线不挡」量的是旧目标链 | 照 `?phase=overview` 重跑；264 格逐格 seed 与旧版相同（城的几何一个字没动），只有 `phases` 换成新章 |
+| 旧关号残留的两处判据 | `Script_JumpTest` 在 `?phase=0`（过场承载章，玩家一步不走）量助跑跳，读出来是 0.00 m；`Script_DamageTest` 已于 INT3a 迁到 CH1 但数没回写文档 | JumpTest 改挂 `?phase=1`；`docs/Data_PlayerDamage.md` §五「落地的数」按 CH1 实跑重写 |
+
+**两条不是「糊绿」的判据放宽**，理由都写在代码那儿：
+① 规则 8（目标连线不挡）不判**过场承载章**（`cutsceneOnly`，玩家一步不走）与**片区包**
+（`quarter`，按规则 9 一定在院墙里头，玩家先撞的是院墙）；
+② 界河「逐顶点贴地」的负向底线对**路面裙边**单列 —— 裙边是 `BuildRoadRibbon` 的
+`crown 0.045 − skirtDrop 0.6 = −0.555`，**故意埋进土里**盖采样点之间的起伏，
+拿 −0.09 那条通用底线卡它是卡错了对象。悬空那一侧（+0.19）照旧严判。
+
+真正挪了坐标的只有三件城外/街道布设（各 1—8 m，逐件在 `note` 里写明原因与旧坐标）：
+`deadTreeTrunk01` / `ryDryingRack` / `battlefieldTimberBeam` —— 新章的目标连线从它们身上压过去。
+
+北关那一片（z ≲ −360）**仍然没有承载切片**：`OVERVIEW_BOUNDS.minZ = −360` 只越过北墙一点点。
+所以 `Data_Dressing_NorthSuburb` 还挂在 `ORPHANED_OUTFIELD_PACKS` 里，采样点表的三个北关机位
+退表（坐标留在 `Data_SamplePoints.mjs` 的注释里，重新有章走到那儿照抄回去即可）。
