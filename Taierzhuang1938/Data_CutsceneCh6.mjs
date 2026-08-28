@@ -586,11 +586,17 @@ export const CS_Ch6_Epilogue = {
         note: "五处标注，一处不多。地名只三个，箭头只一条，部队标识只一处 —— 「极简」是硬要求",
       },
       // 声音在这一镜里换轨：电流声退掉，序章那列军列的车轮声顶上来。
-      // ★ ENGINE_REQUEST 7：没有交叉淡入的接口，这里只能靠 carriageRattle 三下逐级抬音量。
+      //
+      // 2026-08-29 集成批 INT2：交叉淡入的接口有了（INT1 的 `shot.sfx[].crossfade`
+      // ／`fadeIn`／`fadeOut`／`seconds`，逐帧写 gain）。第一下车轮声带
+      // `crossfade: "grenadePin"` —— 把上一镜那条顶着电流声的「嗒」按同样的时长
+      // 淡出去，两条一起变才叫渐变。**电流声本身仍然是拿 grenadePin 顶的**
+      //（ENGINE_REQUEST 7 的第二条：库里没有发报机底噪），
+      // 真素材进来之后把这里的名字换掉即可，节奏一个数都不用动。
       sfx: [
-        { at: 2.20, name: "carriageRattle", volume: 0.16 },
-        { at: 4.10, name: "carriageRattle", volume: 0.26 },
-        { at: 5.90, name: "carriageRattle", volume: 0.36 },
+        { at: 2.20, name: "carriageRattle", volume: 0.16, fadeIn: 1.8, crossfade: "grenadePin" },
+        { at: 4.10, name: "carriageRattle", volume: 0.26, fadeIn: 1.2 },
+        { at: 5.90, name: "carriageRattle", volume: 0.36, fadeIn: 1.0 },
       ],
       subs: [
         { at: 0.20, seconds: 7.15, tier: "主流", text: "1938年3月17日，王铭章在滕县殉国。" },

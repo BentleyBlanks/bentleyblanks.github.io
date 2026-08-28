@@ -8,6 +8,10 @@
 // make an otherwise identical impact look quieter. Continuous beds and music use whole-file
 // RMS. Runtime distance, cue importance, ambience layers and music levels remain in
 // Script_Audio.mjs; source files must not carry those mix decisions.
+//
+// EXEMPTIONS (see the table below) carry a per-file target for takes whose level is a human
+// decision rather than a missing pass. They are still verified — against their own metric and
+// target — but never rewritten, not even under --write.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -24,6 +28,37 @@ const TARGETS = Object.freeze({
   oneShot: { metric: "activeRmsDbfs", targetDbfs: -25, toleranceDb: 0.5 },
   continuous: { metric: "rmsDbfs", targetDbfs: -27, toleranceDb: 0.5 },
 });
+
+// 逐文件豁免：**这几条成品的响度是人工定的，不许被这只脚本拉平。**
+//
+// 白刃三音（挥空 3 变体 + 砍中 + 刺中）是 2026-08-26 人工试听选定的 SeedAudio take，
+// 由 Script_SeedAudioMeleeBake.mjs 单独烘，烘焙期就按它自己的一套口径压过一道：
+// **整段 RMS −28.5 dBFS**（TARGET_RMS_DB）外加一道 −6 dBFS 的峰值保险。
+// 那不是漏掉的一步，是一条设计决定（docs/Data_AudioAssets.md
+// 「白刃三音为什么是生成的，不是实录的」）：
+//   · 这几条 take 从模型出来就比库里其它音「实」得多 —— 波峰因数 13—17 dB，
+//     而实录冲击音是 19—27。按同一条平线对齐的话，**白刃一出手就盖住整场枪声**；
+//   · 而 `Script_Audio.SAMPLE_MIX` 里那几个数是照旧素材（Sonniss 顶包）调的。
+//     压到全库中位 −28.5 之后 SAMPLE_MIX 一个数都不用动，运行时配平原样成立。
+// 换句话说：库线（有声段 RMS −25）管的是「没人挑过的音」；挑过的音走人工那一档。
+// 这与 `SAMPLE_CYCLE`（挑过的变体按顺序轮播、不做逐发变调）是同一条规矩：
+// **不许拿概率或平均值去糊人工选定的东西。**
+//
+// 注意豁免换的是**两件事**：目标从 −25 换成 −28.5，量法从「有声段 RMS（20 ms 帧、
+// 门限取最响帧的 10%）」换成「整段 RMS」。只换目标不换量法是量错的 ——
+// 白刃这几条是短促冲击音，两种量法在它们身上差 2—3 dB（实测有声段 −25.5…−28.5、
+// 整段 −28.40…−28.56），拿有声段去对 −28.5 会把三条本来合格的判成红。
+//
+// 豁免不等于不验：容差 ±0.5 与 −1 dBFS 的峰值上限照旧走，五条现在落在
+// −28.40…−28.56，散布 0.16 dB —— 谁把它们重烘成别的响度，这只脚本照样红。
+// 要撤销豁免，先撤销 docs 里那条设计决定，别从这张表下手。
+const EXEMPT_DBFS_MELEE = -28.5;
+const MELEE_EXEMPT_WHY = "人工选定的白刃 take：整段 RMS −28.5 dBFS（Script_SeedAudioMeleeBake 的口径）";
+const EXEMPTIONS = new Map([
+  "AudioSfx_DadaoSwing_01.mp3", "AudioSfx_DadaoSwing_02.mp3", "AudioSfx_DadaoSwing_03.mp3",
+  "AudioSfx_DadaoHit_01.mp3", "AudioSfx_BayonetHit_01.mp3",
+].map((file) => [file, { metric: "rmsDbfs", targetDbfs: EXEMPT_DBFS_MELEE, why: MELEE_EXEMPT_WHY }]));
+
 const PEAK_CEILING_DBFS = -1;
 const PROCESS_LIMIT_DBFS = -1.5; // Leave MP3 reconstruction headroom for the -1 dBFS decoded ceiling.
 const MAX_BUFFER = 384 * 1024 * 1024;
@@ -177,27 +212,41 @@ for (const group of groups) {
   const rows = [];
   for (const file of group.files) {
     if (!fs.existsSync(file)) throw new Error(`Manifest file is missing: ${file}`);
+    // 豁免只换目标，不换量法：同一条有声段 RMS、同一道峰值上限。
+    // 它把「已经是对的」和「还没对齐」分开，而不是把这几条移出验收。
+    const exempt = EXEMPTIONS.get(path.basename(file)) || null;
+    const target = exempt
+      ? { ...group.target, metric: exempt.metric || group.target.metric, targetDbfs: exempt.targetDbfs }
+      : group.target;
     const probe = Probe(file);
     const before = Measure(file, probe);
-    const metric = before[group.target.metric];
-    const gainDb = group.target.targetDbfs - metric;
-    const needsWrite = Math.abs(gainDb) > group.target.toleranceDb || before.peakDbfs > PEAK_CEILING_DBFS + 0.1;
-    if (write && needsWrite) Encode(file, probe, gainDb, group.target);
-    const after = write ? Measure(file) : before;
-    const level = after[group.target.metric];
-    const error = level - group.target.targetDbfs;
-    const good = Math.abs(error) <= group.target.toleranceDb && after.peakDbfs <= PEAK_CEILING_DBFS + 0.1;
-    if (!good && !write) failed = true;
-    if (!good && write) failed = true;
-    rows.push({ file: path.basename(file), before: metric, after: level, peak: after.peakDbfs, error, good });
+    const metric = before[target.metric];
+    const gainDb = target.targetDbfs - metric;
+    const needsWrite = Math.abs(gainDb) > target.toleranceDb || before.peakDbfs > PEAK_CEILING_DBFS + 0.1;
+    // **豁免的文件一个字节都不碰**：它们的电平是人工定的，--write 也不许覆盖。
+    if (write && needsWrite && !exempt) Encode(file, probe, gainDb, target);
+    const after = write && !exempt ? Measure(file) : before;
+    const level = after[target.metric];
+    const error = level - target.targetDbfs;
+    const good = Math.abs(error) <= target.toleranceDb && after.peakDbfs <= PEAK_CEILING_DBFS + 0.1;
+    if (!good) failed = true;
+    rows.push({ file: path.basename(file), before: metric, after: level, peak: after.peakDbfs, error, good,
+      exempt, target: target.targetDbfs, metric: target.metric });
   }
-  const levels = rows.map((row) => row.after);
+  // 统计只算走库线的那些：把人工那一档混进来的话，「散布」量的是两条平线的间距，
+  // 不是任何一条线自己有多齐 —— 那个数没有意义，还会掩盖真正的走样。
+  const onLine = rows.filter((row) => !row.exempt);
+  const levels = (onLine.length ? onLine : rows).map((row) => row.after);
   const min = Math.min(...levels);
   const max = Math.max(...levels);
-  console.log(`${group.name}: ${rows.length} files, ${group.target.metric} ${min.toFixed(2)}..${max.toFixed(2)} dBFS, spread ${(max - min).toFixed(2)} dB, target ${group.target.targetDbfs} dBFS`);
+  const exemptCount = rows.length - onLine.length;
+  console.log(`${group.name}: ${rows.length} files, ${group.target.metric} ${min.toFixed(2)}..${max.toFixed(2)} dBFS, spread ${(max - min).toFixed(2)} dB, target ${group.target.targetDbfs} dBFS`
+    + (exemptCount ? `（另有 ${exemptCount} 个按人工档验收，不计入散布）` : ""));
   if (report || write) {
     for (const row of rows) {
-      console.log(`  ${row.good ? "OK" : "FAIL"} ${row.file.padEnd(40)} ${row.before.toFixed(2).padStart(7)} -> ${row.after.toFixed(2).padStart(7)} dBFS  peak ${row.peak.toFixed(2).padStart(6)}`);
+      const flag = row.good ? (row.exempt ? "EXEM" : "OK  ") : "FAIL";
+      console.log(`  ${flag} ${row.file.padEnd(40)} ${row.before.toFixed(2).padStart(7)} -> ${row.after.toFixed(2).padStart(7)} dBFS  peak ${row.peak.toFixed(2).padStart(6)}`
+        + (row.exempt ? `  ← 人工档 ${row.metric} ${row.target} dBFS：${row.exempt.why}` : ""));
     }
   }
 }

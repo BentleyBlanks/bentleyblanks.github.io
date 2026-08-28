@@ -1,6 +1,6 @@
 // 《血战台儿庄》音频引擎 —— **合成打底 + 实录采样盖在上面**。
 //
-// 底层是 32 个 WebAudio 节点图配方（RECIPES），一个外部文件都不用；
+// 底层是 58 个 WebAudio 节点图配方（RECIPES），一个外部文件都不用；
 // 上层是实录素材（Audio/Sfx/，免版税包与 PD/CC0 素材，见 Data_SfxSources.mjs），
 // 由 LoadSfxPack 在解锁之后**逐条盖掉同名配方**，盖不上去就照旧用合成的。
 //
@@ -1233,6 +1233,273 @@ const RECIPES = {
     v.wetGain.gain.value = 0.45;
     v.Live(0.75);
   },
+
+  // =========================================================================
+  // 任务流程重制 · 音效缺口批 A2 的十五条兜底配方（2026-08-29 接线）
+  //
+  // **这十五条的主料是实录**（素材、切法与选材理由见 Data_SfxSources.mjs 末尾那批，
+  // 逐条的验收数字在 docs/Data_AudioAssets.md「重制新增音效」）。这里写的是
+  // `LoadSfxPack` 盖不上去时的回落 —— 与上面那 43 条同一条契约：
+  // 采样 404 / 离线 / file:// 协议下仍然发得出声，**没有音效的战场也仍然是能打的战场**。
+  //
+  // 所以这一批刻意写得薄：三到五个节点、不追求像，只保证「这一刻有东西响了」，
+  // 而且**响的是对的那一类东西**（惨叫是浊音不是噪声、电键是干脆的一记不是嗡、
+  // 扫射是一梭子不是一发）。想听它们本来的样子请让采样包载进来。
+  // 唯一一处不薄的是 strafeNear：航空机枪的身份是「一梭子」，只给一发就不成立了。
+  // =========================================================================
+
+  // --- 实录人声的兜底（三条都是非语言嗓音）---------------------------------
+  // 走 hurt 那条路子：锯齿基频过两个共振峰当元音 —— 少了共振峰就是纯电子音，
+  // 而这三条最要紧的正是「听得出是个人」。
+  execScream(A, v) {
+    const t = v.t, dur = 0.5;
+    const f0 = v.F(v.R(240, 285));           // 成年男性痛叫（素材实测 361→256 / 230→134）
+    const src = v.Osc(A.Wave("string"), f0);
+    Glide(src.frequency, t, f0, f0 * 0.62, dur);   // 喊出去就往下掉
+    const f1 = v.Filter("bandpass", 780, 5.0);
+    const f2 = v.Filter("bandpass", 1420, 6.5);
+    const g1 = v.Gain(0.62), g2 = v.Gain(0.4);
+    const bus = v.Gain(FLOOR);
+    // **掐尾**：起来一声、断掉，不给它把整声喊完（素材那两条也是 0.14—0.16 s 收干净的）。
+    Swell(bus.gain, t, 0.5, 0.03, dur * 0.42, dur * 0.4);
+    src.connect(f1).connect(g1).connect(bus);
+    src.connect(f2).connect(g2).connect(bus);
+    bus.connect(v.out);
+    v.Start(src, t, dur + 0.05);
+    v.wetGain.gain.value = 0.5;              // 隔着墙听见的，混响多给一点
+    v.Live(0.7);
+  },
+
+  // 大出血伤员的持续低声痛呼：**闷的、压着的**，不是惨叫。
+  // 低通 900 顶替素材那条「捂着嘴」的天然闷感；中间一次换气靠两段包络。
+  painMoan(A, v) {
+    const t = v.t;
+    const f0 = v.F(v.R(105, 130));
+    const src = v.Osc(A.Wave("string"), f0);
+    Glide(src.frequency, t, f0, f0 * 0.86, 2.4);
+    const band = v.Filter("bandpass", 520, 3.6);
+    const lp = v.Filter("lowpass", v.F(900), 0.8);
+    const bus = v.Gain(FLOOR);
+    Swell(bus.gain, t, 0.3, 0.14, 0.75, 0.35);          // 第一口
+    Swell(bus.gain, t + 1.32, 0.24, 0.16, 0.6, 0.45);   // 换气之后第二口
+    src.connect(band).connect(lp).connect(bus).connect(v.out);
+    v.Start(src, t, 2.55);
+    v.wetGain.gain.value = 0.3;
+    v.Live(2.7);
+  },
+
+  // 罗班长腹部中弹那一声：闷哼，短，一次发声就完。与满场随机的 hurt 分开。
+  hitGrunt(A, v) {
+    const t = v.t, dur = 0.4;
+    const f0 = v.F(v.R(275, 305));
+    const src = v.Osc(A.Wave("string"), f0);
+    Glide(src.frequency, t, f0, f0 * 0.72, dur);
+    const band = v.Filter("bandpass", 640, 5.5);
+    const lp = v.Filter("lowpass", v.F(1300), 0.9);     // 压住的，不是喊出来的
+    const bus = v.Gain(FLOOR);
+    Hit(bus.gain, t, 0.42, 0.012, dur);
+    src.connect(band).connect(lp).connect(bus).connect(v.out);
+    v.Start(src, t, dur + 0.05);
+    v.wetGain.gain.value = 0.12;             // 就在你旁边，不该有房间
+    v.Live(0.5);
+  },
+
+  // --- 照明弹（第四关）：发射 → 点燃 → 燃烧 → 熄灭 ------------------------
+  // 发射的那一下是**闷的推力**（迫击炮式发射筒），不是枪口爆音；
+  // 后面那条上升的噪声尾巴是「它还在往上走」，切短了这条 cue 就没意义了。
+  flareLaunch(A, v) {
+    const t = v.t;
+    Thud(v, t, 210, 78, 0.26, 0.62, 480);
+    const rise = v.Noise("pink", 2.5);
+    const band = v.Filter("bandpass", v.F(700), 1.3);
+    Glide(band.frequency, t + 0.05, v.F(700), v.F(2100), 2.2);   // 越升越尖 = 越飞越远
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t + 0.05, 0.16, 0.18, 1.1, 1.1);
+    rise.connect(band).connect(g).connect(v.out);
+    v.Start(rise, t + 0.05, 2.5);
+    v.wetGain.gain.value = 0.4;
+    v.Live(2.7);
+  },
+
+  // 顶空点燃：一记「噗」的冲头接刚烧起来的嘶声。
+  flareIgnite(A, v) {
+    const t = v.t;
+    const puff = v.Noise("white", 1.15);
+    const band = v.Filter("bandpass", v.F(1600), 0.9);
+    Glide(band.frequency, t, v.F(2600), v.F(1200), 0.9);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.5, 0.006, 1.05);
+    puff.connect(band).connect(g).connect(v.out);
+    v.Start(puff, t, 1.15);
+    Grains(v, t + 0.02, 4, 0.25, 2200, 5200, 0.09);   // 药柱起火时溅出来的几点
+    v.wetGain.gain.value = 0.5;              // 在头顶两百米上，全是反射
+    v.Live(1.35);
+  },
+
+  // 滞空燃烧：稳定的嘶声 + 一点慢飘。**采样版是可循环的 6 秒**，
+  // 合成这条只保证「有东西在头顶烧着」——接线侧照旧按需要反复触发。
+  flareBurn(A, v) {
+    const t = v.t, dur = 3.0;
+    const fire = v.Noise("pink", dur);
+    const band = v.Filter("bandpass", v.F(1250), 0.8);
+    // 3.7 Hz 的慢飘：照明弹吊在伞下是**晃着**烧的，频心钉死就成了电吹风。
+    const drift = v.Osc("sine", 3.7);
+    const driftGain = v.Gain(v.F(260));
+    drift.connect(driftGain).connect(band.frequency);
+    v.Start(drift, t, dur);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.2, 0.25, dur - 0.85, 0.6);
+    fire.connect(band).connect(g).connect(v.out);
+    v.Start(fire, t, dur);
+    v.wetGain.gain.value = 0.45;
+    v.Live(dur + 0.2);
+  },
+
+  // 熄灭：两秒多的自然衰减。**素材里是真的烧完了**，合成这条只能用曲线冒充，
+  // 所以衰减写得慢而不平 —— 一路直着掉下去听着像有人把音量拧了。
+  flareOut(A, v) {
+    const t = v.t;
+    const fire = v.Noise("pink", 2.6);
+    const lp = v.Filter("lowpass", v.F(2400), 0.7);
+    Glide(lp.frequency, t, v.F(2400), v.F(420), 2.3);   // 先失高频再失能量
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.18, 0.05, 0.55, 1.9);
+    fire.connect(lp).connect(g).connect(v.out);
+    v.Start(fire, t, 2.6);
+    v.wetGain.gain.value = 0.45;
+    v.Live(2.8);
+  },
+
+  // --- 发报（终章）---------------------------------------------------------
+  // 电键的「嗒」：一九三〇年代的电键是黄铜杆＋弹簧＋触点 —— 干、短、
+  // 带一点点金属余韵，**按下与抬起是两下**（隔 60 ms，抬起那下轻得多）。
+  telegraphKey(A, v) {
+    MetalClick(v, v.t, v.R(2600, 3100), 0.3, 0.028, 15);
+    MetalClick(v, v.t + 0.062, v.R(1900, 2300), 0.12, 0.022, 13);
+    v.wetGain.gain.value = 0.06;             // 手底下那点东西，不该有房间
+    v.Live(0.2);
+  },
+
+  // 发报机的电流底噪：工频 50 Hz 与它的谐波。
+  // **不加谐波就是一条正弦测试音**；一九三〇年代的电台也不会有八千赫以上的东西。
+  telegraphHum(A, v) {
+    const t = v.t, dur = 3.0;
+    const hum = v.Osc("sine", v.F(50));
+    const harm = v.Osc("sawtooth", v.F(150));
+    const lp = v.Filter("lowpass", v.F(1400), 0.7);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.14, 0.2, dur - 0.55, 0.35);
+    const hg = v.Gain(0.28);
+    hum.connect(g);
+    harm.connect(hg).connect(lp).connect(g);
+    g.connect(v.out);
+    v.Start(hum, t, dur);
+    v.Start(harm, t, dur);
+    v.wetGain.gain.value = 0.05;             // 在机器里，不在屋子里
+    v.Live(dur + 0.2);
+  },
+
+  // --- 日机攻击（第一关）---------------------------------------------------
+  // 俯冲通场：双发活塞机的引擎啸声。**多普勒必须是一条完整的抛物线** ——
+  // 音高与音量一起先涨后落，两者错开就成了「有人在拧收音机」。
+  // 采样那条的多普勒是录出来的，这条是算的，差别就在这里。
+  planeDive(A, v) {
+    const t = v.t, dur = 5.0;
+    const base = v.F(118);
+    const engine = v.Osc("sawtooth", base);
+    // 螺旋桨两片桨叶的拍频：单条振荡器太干净，像电锯。
+    const engine2 = v.Osc("sawtooth", base * 1.013);
+    // 先升调（迎面来）再降调（掠过去）—— 峰值落在通场那一刻。
+    Glide(engine.frequency, t, base * 0.86, base * 1.24, dur * 0.55);
+    Glide(engine.frequency, t + dur * 0.55, base * 1.24, base * 0.8, dur * 0.45);
+    Glide(engine2.frequency, t, base * 0.87, base * 1.26, dur * 0.55);
+    Glide(engine2.frequency, t + dur * 0.55, base * 1.26, base * 0.81, dur * 0.45);
+    const lp = v.Filter("lowpass", v.F(2600), 0.9);
+    Glide(lp.frequency, t, v.F(1100), v.F(3800), dur * 0.55);
+    Glide(lp.frequency, t + dur * 0.55, v.F(3800), v.F(900), dur * 0.45);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.32, dur * 0.5, 0.15, dur * 0.4);
+    engine.connect(lp); engine2.connect(lp);
+    lp.connect(g).connect(v.out);
+    v.Start(engine, t, dur); v.Start(engine2, t, dur);
+    v.wetGain.gain.value = 0.5;
+    v.Live(dur + 0.2);
+  },
+
+  // 空对地扫射（近）：航空机枪 ~900 rpm。**这条必须是一梭子**，
+  // 不是一发 —— 一发就成了地面上有人在点射，扫射的身份全在射速上。
+  // 逐发排会被节点预算吃掉一半，所以走 GunAuto（整条点射共用一套发声链）。
+  strafeNear(A, v) {
+    const shots = Clamp(v.burst ?? 6, 1, 14);
+    GunAuto(A, v, {
+      thumpHi: 132, thumpLo: 58, thumpDur: 0.05, thumpLevel: 0.5,
+      blastFreq: 2200, blastQ: 0.7, blastLevel: 0.82, blastDecay: 0.03, drive: 0.66,
+      // 架在枪架上的机枪：每发后面那记金属余振是「这枪不在人手里」的唯一线索。
+      mechFreq: 4600, mechLevel: 0.26, mechDelay: 0.014,
+      tailDur: 0.5, tailLevel: 0.07, wet: 0.35,
+    }, shots, 60 / 900);
+  },
+
+  // 空对地扫射（远，300 m）：**不是把近的调小** —— 瞬态被空气吃掉只剩尖头加长尾。
+  // 一梭子在这个距离上糊成一串「哒哒哒」的头，尾巴才是远场的全部价值。
+  strafeFar(A, v) {
+    const t = v.t;
+    const shots = Clamp(v.burst ?? 6, 1, 14);
+    const interval = 60 / 900;
+    const src = v.Noise("white", shots * interval + 0.2);
+    const band = v.Filter("bandpass", v.F(760), 1.2);
+    const hp = v.Filter("highpass", v.F(200), 0.7);
+    const g = v.Gain(FLOOR);
+    src.connect(band).connect(hp).connect(g).connect(v.out);
+    for (let i = 0; i < shots; i += 1) Hit(g.gain, t + i * interval, 0.4 * v.R(0.85, 1.05), 0.002, 0.04);
+    v.Start(src, t, shots * interval + 0.2);
+    const tail = v.Noise("brown", 1.9);
+    const tailLp = v.Filter("lowpass", v.F(600), 0.5);
+    const tailGain = v.Gain(FLOOR);
+    Swell(tailGain.gain, t + 0.02, 0.13, 0.1, shots * interval, 1.4);
+    tail.connect(tailLp).connect(tailGain).connect(v.out);
+    v.Start(tail, t + 0.02, 1.9);
+    v.wetGain.gain.value = 0.55;             // 远场几乎全是尾巴
+    v.Live(2.2);
+  },
+
+  // 弹着扫过土路的那一串：三十几记等间距的锐利音爆，中间没有断口。
+  // 与 impactDirt 的差别是**成串**：一发是「打偏了」，一串是「弹线正在追你」。
+  strafeDirt(A, v) {
+    const t = v.t, span = 2.6;
+    Ticks(v, t, 18, span, 900, 3400, 0.2, 0.035, 5);      // 打进夯土的闷头
+    Ticks(v, t + 0.03, 14, span, 2600, 6800, 0.11, 0.02, 8);  // 溅起来的碎石
+    Thud(v, t + span * 0.42, 150, 70, 0.16, 0.28, 320);   // 中途一记打在硬地上
+    v.wetGain.gain.value = 0.25;
+    v.Live(span + 0.4);
+  },
+
+  // --- 重机枪（第五关）-----------------------------------------------------
+  // 过热：九二式是**气冷**的，过热时不是水汽嘶嘶，是散热片与枪管热胀冷缩的
+  // 一记记金属轻响。所以是「咔」加一条很短的金属余韵，不是嘶声。
+  mgOverheat(A, v) {
+    const t = v.t;
+    MetalClick(v, t, v.R(3200, 4200), 0.24, 0.03, 16);
+    const ring = v.Osc("triangle", v.F(v.R(1500, 2100)));
+    const rg = v.Gain(FLOOR);
+    Hit(rg.gain, t + 0.004, 0.07, 0.002, 0.2);
+    ring.connect(rg).connect(v.out);
+    v.Start(ring, t + 0.004, 0.24);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.35);
+  },
+
+  // 卡壳之后那一下拉柄。**不能照抄 bolt** —— 那是一支步枪的旋转后拉枪机；
+  // 重机枪的拉柄是一大块钢被整个拽回来，重得多、慢得多、行程长得多。
+  mgCharge(A, v) {
+    const t = v.t;
+    MetalClick(v, t, 1700, 0.28, 0.05, 9);               // 手抓上去的那一下
+    MetalScrape(v, t + 0.04, 0.34, 900, 1800, 0.22);     // 一大块钢被拽回来
+    Thud(v, t + 0.30, 165, 72, 0.12, 0.4, 380);          // 到底那一记闷响
+    MetalClick(v, t + 0.34, 2100, 0.24, 0.07, 11);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.85);
+  },
 };
 
 /** 对外暴露的音效名清单，给冒烟测试与关卡编辑器用。 */
@@ -1368,6 +1635,14 @@ const NODE_COST = {
   // 命中/击杀回执：一条 Thud（4 节点）+ 一条带通噪声（4 节点），击杀多一条 Thud。
   // 写实一点点是故意的 —— 这两条**绝不许被预算闸门丢掉**（见 Play 的 priority）。
   hitConfirm: 9, killConfirm: 13,
+  // 缺口批 A2 的十五条兜底配方（2026-08-29）。数是照各自建了几个节点数出来的、
+  // 再往上留一格 —— 这张表管的是**合成回落**那条路；采样盖上去之后 LoadSfxPack
+  // 会把它们统一改成 2（连发的改 8），见 LoadSfxPack 头注第 3 条。
+  // 不写这几行的话默认取 19：一记照明弹燃烧就吃掉六分之一预算，而它是要一直烧着的。
+  strafeNear: 16, mgCharge: 15, strafeDirt: 12, strafeFar: 10,
+  execScream: 9, flareLaunch: 9, flareIgnite: 9,
+  flareBurn: 8, telegraphKey: 8, telegraphHum: 8, mgOverheat: 8,
+  painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
 };
 const DEFAULT_COST = 19;
 
@@ -1400,7 +1675,7 @@ const MIX_GAIN = {
 // ===========================================================================
 // 实录采样层
 //
-// 2026-08-19 起，上面那 32 个合成配方**全部被实录采样盖住**（素材来源与切割
+// 2026-08-19 起，上面那批合成配方**全部被实录采样盖住**（素材来源与切割
 // 参数见 Data_SfxSources.mjs / Script_SfxBake.mjs）。合成那套一行没删，理由：
 //   · 采样是 fetch 来的，会 404、会被离线、会在没网的本地文件协议下失败；
 //     盖不上去就自动退回合成，**没有音效的战场也仍然是能打的战场**。
@@ -1418,13 +1693,15 @@ const MIX_GAIN = {
 export const SFX_BASE = "Audio/Sfx/";
 export const AMB_BASE = "Audio/Amb/";
 export const MUSIC_BASE = "Audio/Music/";
-export const SFX_PACK_VERSION = "7";
+// 7 → 8：缺口批 A2 的十五个 cue 从 pendingCues 搬进 cues（2026-08-29）。
+// 清单本身换了内容，戳不动的话浏览器会拿着旧清单去要新文件（或者反过来）。
+export const SFX_PACK_VERSION = "8";
 export const AMB_PACK_VERSION = "1";
 export const MUSIC_PACK_VERSION = "5";
 
 // ---- 采样取数：并发闸 + 重试 ----------------------------------------------
 //
-// 三个包是**一解锁就同时开拉**的：70 条人声 + 41 条音效 + 10 条环境床 + 9 段音乐，
+// 三个包是**一解锁就同时开拉**的：一百多条人声 + 56 条音效 + 10 条环境床 + 9 段音乐，
 // 一百三十来个请求一口气全甩出去。这在本地预览下不总是安全的 —— 同一台机器上
 // 往往还有别的 agent 在跑重活，突发里被掐掉几条连接是常事。而这里每一条失败都是
 // **静默**的：吞掉、计数、退回合成，表现只是「怎么听着还是那套合成音」。
@@ -1521,6 +1798,24 @@ const SAMPLE_MIX = {
   // 弹壳与脚步同一档：每开一枪响一次的东西，与枪声同量级的话整场只剩叮叮当当。
   shellDrop: 0.3,
   bugleCharge: 0.7, whistle: 0.6,
+  // --- 缺口批 A2（2026-08-29 接线）---------------------------------------
+  // 三条人声：hitGrunt 与 hurt 同一档（都是「有人中弹了」这件事），
+  // execScream 压低是**策划要求**（第三关处决段隔着墙、低概率、低音量 ——
+  // 那一声的作用是让玩家明白里面在干什么，不是展览）；
+  // painMoan 更低：它是持续响着的背景，与枪声同量级的话整场只剩这个人在哼。
+  hitGrunt: 0.8, execScream: 0.55, painMoan: 0.5,
+  // 照明弹一个循环四条。燃烧那条**滞空好几十秒**，所以压到全表最低的一档
+  // （比脚步略高）—— 一直在响的东西不能按「一次事件」配平；
+  // 发射与点燃是事件，可以站高一点。
+  flareLaunch: 0.7, flareIgnite: 0.6, flareOut: 0.45, flareBurn: 0.35,
+  // 电键是**玩法反馈**（这一下敲进去没有），与拉栓同一条理由，要听得见；
+  // 电流底噪同样是一直在响的床，压到 0.3。
+  telegraphKey: 0.7, telegraphHum: 0.3,
+  // 日机：planeDive 全表第二响 —— 它压到头顶来这件事必须盖过场上的枪声，
+  // 那正是第一关那一拍的全部内容。近扫射与 type92 同档，远扫射与远射两条同档。
+  planeDive: 0.9, strafeNear: 0.85, strafeDirt: 0.6, strafeFar: 0.5,
+  // 重机枪两件都是玩法反馈：卡壳清没清、还能不能打。拉柄与 bolt 同一档。
+  mgCharge: 0.95, mgOverheat: 0.7,
 };
 
 /** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */
@@ -1531,6 +1826,16 @@ const SAMPLE_WET = {
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
   footstepDirt: 0.12, footstepRubble: 0.12, shellDrop: 0.12,
+  // --- 缺口批 A2（2026-08-29 接线）---------------------------------------
+  // 照明弹三条给得多：它们**在两百米的头顶上**，听到的几乎全是反射；
+  // 处决那声隔着一堵墙与一个院子，同理。反过来，电键与拉柄就在你手底下，
+  // 给了混响就变成「隔壁屋里有人在敲」——贴身的小动作一律近乎全干。
+  execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12,
+  flareIgnite: 0.5, flareBurn: 0.45, flareOut: 0.45, flareLaunch: 0.4,
+  telegraphKey: 0.06, telegraphHum: 0.05,
+  // 远近是两条真的录音，湿度也要分开：300 m 外那一梭子的价值全在尾巴上。
+  planeDive: 0.5, strafeFar: 0.55, strafeNear: 0.35, strafeDirt: 0.25,
+  mgOverheat: 0.1, mgCharge: 0.1,
 };
 
 /**
@@ -1561,6 +1866,14 @@ const AMB_AIR = {   // → Play 的 airCut
   rifleNraFar: 1200, rifleIjaFar: 1200, zb26: 1100, type92: 1000, type11: 1100,
   "amb.cannonFar": 800, "amb.planeFar": 1800, "amb.moanFar": 1400,
   "amb.crow": 2600, "amb.dogFar": 2200, "amb.rooster": 2200,
+  // 缺口批 A2 里**只有这两条会以「没有 position 的远处」身份出现**（其余十三条
+  // 都由接线侧带着 position 播，空气低通由 Play 按距离自己算）：
+  //   · strafeFar 录于 300 m 外，比远射两条（1200）还远一档 → 1100；
+  //   · planeDive 是从远处压到头顶来的通场，比 amb.planeFar（1800，一直在远处盘旋）
+  //     亮一档 —— 它「近」正是这一拍吓人的原因，滤狠了就成了另一架飞机。
+  // 撒进 AMBIENCE_PRESETS.events 的那一刻这两行才起作用；先备着，
+  // 免得接线侧只加了事件、忘了这一层，于是远处那一梭子带着全套高频蹦出来。
+  strafeFar: 1100, planeDive: 2200,
 };
 
 /**
@@ -1571,8 +1884,15 @@ const AMB_AIR = {   // → Play 的 airCut
  * 变体是**人工一条条试听选定**的，要的就是它们本来的样子。变调会把选中的音色
  * 拧走（±3% 对 0.2 秒的破风声是听得出来的），随机挑则会「连出两次同一条」，
  * 恰恰是选三条想避免的事。
+ *
+ * 2026-08-29 加进来的 `telegraphKey`（电键单点，三变体）是同一类东西，理由却不同：
+ * 它的三条是**从同一条素材里钉死三个位置**切出来的（Data_SfxSources 的 TelegraphKey
+ * 注写了为什么不走自动挑法），而**发报是连着敲的** —— 随机挑三条里的一条，
+ * 敲二十下必然连出两次同一条，那一刻听感就从「有人在发报」塌成「打字机在响」。
+ * 逐发变调同样不行：0.2 秒的金属敲击 ±3% 是听得出来的，而这三条的音色差别
+ * 本来就只有一点点，变调会把它糊成「同一下敲得不太准」。
  */
-const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit"]);
+const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。

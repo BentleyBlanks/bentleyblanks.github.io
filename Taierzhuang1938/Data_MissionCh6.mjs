@@ -50,13 +50,22 @@
 //      带不走的机器给一次「砸」的近战交互。销毁完才开西门大街的通路。
 //   4. `groundPov` —— 小秦被击倒后**不切黑**：相机落到 0.30—0.35 m 眼高、保留 ±0.5 rad 转头、
 //      听觉低通并压低音量，持续 4—6 s 后再黑出。现在的死亡流程是直接黑屏＋重开。
-//   5. `epilogueMap` —— 尾声地图卡。需要 shot 级的 `mapCard`：
+//   5. `epilogueMap` —— **已解决**（INT2）：`shot.mapCard` 由 Script_Cutscene 的
+//      `_ApplyMapCard` 实现 —— 底图当背景、五处标注按归一化坐标叠成 DOM
+//      （地名带圆点、部队标识带方框、南进箭头是一条带箭镞的细线）。
+//      电流→车轮的交叉淡入走 INT1 的 `shot.sfx[].crossfade`。原始需求留档：
+//      尾声地图卡。需要 shot 级的 `mapCard`：
 //      底图 `Texture/Tex_PaperEndingMap.png`（1536×1024 横向、**一个字都没有**），
 //      标注（滕县／临城／台儿庄／日军南进箭头／台儿庄附近的中国军队标识）由 DOM 层按
 //      归一化坐标叠上去 —— 贴图那一批就是照这个口径出的，节点与箭头故意没画。
 //      落地方式二选一：props 支持 `texture:` 字段（本文件的 CS_Ch6_Epilogue 已按这个写），
 //      或者给 shot 加一个专用 mapCard 分支。没接线时它退化成一块纸色卡＋三行字幕，能播。
-//   6. `midLevelCutscene` —— **本章最硬的一条**。Script_Main 只在关卡边界播 cutsceneIn／
+//   6. `midLevelCutscene` —— **已解决**（INT1 建钩子、INT2 挂上去）：
+//      本章两场关中过场都接上了 —— CS_Ch6_LastWire 走 beat 级
+//      `{ at:"event:WireConfirm", type:"cutscene", id }`，CS_Ch6_Xiguan 走
+//      EVENTS.FlankMg 的 `cutscene:` 字段（摆点层推 Signal 时播）。
+//      标了 dupOfCutscene 的那几条 beats 已按本条原来的交代删掉。原文留档：
+//      Script_Main 只在关卡边界播 cutsceneIn／
 //      cutsceneOut（1908/2043 行），关内没有任何触发口，只有取证用的 host.PlayCutscene(id)。
 //      本章要在关内播两场（最后电报确认、西关殉国）。请加 beat 级
 //      `{ at, type: "cutscene", id }` → host.PlayCutscene(id)。
@@ -78,11 +87,20 @@
 export const CHAPTER = {
   id: "CH6_Zuihou",
   title: "终章 · 最后一封",
+  // §7 明写「玩家＝小秦」。**这一条必须在章节数据里**：具名同伴的默认名册是
+  // 从 beats 的 who 推出来的，而小秦在本章话最多 —— 不点名的话场上会有两个小秦，
+  // 一个是你、一个站你旁边（INT1 时靠 Script_Companion 的过渡表挡着，INT2 删了那张表）。
+  playerCast: "xiaoqin",
   place: "城内临时师部 → 西门大街 → 西关电灯厂",
   date: "一九三八年三月十七日 午后 — 黄昏",
   clock: "03-17 15:00 — 18:00",
   sky: "burningStreet",
   music: "exodus",
+  // 终章：师部里只有两个有名字的人，**而且两个都是 combatant:false** ——
+  // 按 beats 推名册会推出一张空表（推导只收战斗员），于是参谋与师长的每一句
+  // 都从玩家脑门上发出来。这是必须显式点名的典型情形。
+  // 小秦不进表：**玩家就是他**（playerCast）。
+  roster: ["canmou", "wangmingzhang"],
   minutes: 10,
   pool: { start: 44, end: 12, label: "城里还站着的人", presumed: true },
   brief: [
@@ -122,11 +140,11 @@ export const CHAPTER = {
   // =========================================================================
   // beats
   //
-  // 触发式只用 start / delay / zone。**本章一条 event: 都不写**，理由是工程上的：
-  // Script_Story.LEVEL_CUES 里还没有 CH6_Zuihou 这一项（那是 F2/集成批的文件，
-  // 内容批不许动），而 event: 等不到时的兜底是 MAX_WAIT.event = 80 s ——
-  // 一条 event 就把整条台词链挂住 80 秒，表现成「剧本被吞了」。
-  // 需要真·玩家动作把关的那几拍登记在文件末尾的 EVENTS 表里，接上之后按表逐条换。
+  // 触发式用 start / delay / event。**INT2 起 zone: 一条不剩**：六拍走位改挂
+  // `event:`，判据里那一支 `c.zone === "..."` 与原来的 zone: 逐字等价，
+  // 只是多了一条时刻兜底（理由见文件末尾 EVENTS 的头注：钉住不动时
+  // 一条 zone 要吃 MAX_WAIT.zone = 95 s，六条就把终章十分钟的预算吃光）。
+  // 关中过场那两场也在这条链上（`type:"cutscene"`）。
   // =========================================================================
   beats: [
     // ── 开场：进城内临时师部 ────────────────────────────────────────────
@@ -135,7 +153,11 @@ export const CHAPTER = {
     { at: "delay:2.4", type: "env", text: "你是小秦。全城的线断了一整天，还通的只剩师部这一条。", tier: "虚构" },
 
     // ── 阶段 ①：前两封电报 ─────────────────────────────────────────────
-    { at: "zone:C6_DivisionHq", type: "line", who: "canmou", voice: "ch6_canmou_01", text: "前两封都发出去了。", tier: "虚构" },
+    // at 从 `zone:` 改成 `event:`（INT2）：判据是「走进师部**或者**已经过了半分钟」。
+    // 纯 zone 的问题不在正片而在回归 —— PlayTest 的剧本长跑把关卡钉住、玩家不动，
+    // 六条 zone 各吃一次 MAX_WAIT.zone = 95 s，本章十分钟的预算被 570 s 吃光，
+    // 表现成「终章剧本被吞了 11 条」。event 的兜底判据由本章 EVENTS 给。
+    { at: "event:AtDivisionHq", type: "line", who: "canmou", voice: "ch6_canmou_01", text: "前两封都发出去了。", tier: "虚构" },
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_02", text: "援军还是没得消息。", tier: "虚构" },
     { at: "delay:2.6", type: "system", text: "案上压着前两封的底稿 —— 走近可以看。" },
     // 底稿只给关键词。完整电文没有原件传世，进「史实注记」而不是进旁白。
@@ -158,20 +180,22 @@ export const CHAPTER = {
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_05", text: "记下。", tier: "虚构" },
 
     // ── 阶段 ③：最后电报（王铭章四问）──────────────────────────────────
-    // dupOfCutscene: CS_Ch6_LastWire —— midLevelCutscene 接上以后，从「电台还能发不？」
-    // 到复诵那四条删掉，改成 { type:"cutscene", id:"CS_Ch6_LastWire" }。
+    // INT2：midLevelCutscene 已经接上（Script_Story 的 `type:"cutscene"` beat →
+    // 宿主 PlayMidCutscene）。按本文件原来的交代，从「电台还能发不？」到复诵那四条
+    // **已经删掉**，换成下面那一条 cutscene beat —— 同一段戏不演两遍。
     { at: "delay:3.2", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_01", text: "东南还能联系几个营？", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_06", text: "两个营的线还通。人剩好多，报不上来。", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_02", text: "独立山方向还有枪声没得？", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "xiaoqin", voice: "ch6_xiaoqin_06", text: "早上还有。这阵听不到了。", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_03", text: "西关还能不能走担架？", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_07", text: "西门还开着。出了城就不晓得了。", tier: "虚构" },
-    { at: "delay:2.8", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_04", text: "电台还能发不？", tier: "虚构", dupOfCutscene: "CS_Ch6_LastWire" },
-    { at: "delay:2.4", type: "line", who: "canmou", voice: "ch6_canmou_08", text: "还能发。", tier: "虚构", dupOfCutscene: "CS_Ch6_LastWire" },
-    { at: "delay:2.4", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_05", text: "那就发。", tier: "虚构", dupOfCutscene: "CS_Ch6_LastWire" },
-    // ★ 玩家必须明确听见的一句。短句「决心死拼，以报国家」是主流记载；
-    //   长版与用字差异（死拼／死拚）走下一条小字，不放进人物口中当事实断言。
-    { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_09", text: "决以死拼，以报国家，以报知遇。", tier: "主流", dupOfCutscene: "CS_Ch6_LastWire" },
+    // ★ 关中过场（12.2 s）：参谋逐字复诵最后一封电文 → 王铭章追问「电台还能发不？」
+    //   →「还能发。」→「那就发。」。**玩家必须明确听见的那一句**
+    //   「决以死拼，以报国家，以报知遇。」在这一场里（Data_CutsceneCh6 的第 4 镜），
+    //   所以关内不再重复；它是本章的转轴，下一段亲手敲电键才有分量。
+    //   挂在 event:WireConfirm 上：真发生（玩家走到电台桌前、四问问完）由摆点层推，
+    //   推不出来时吃本章 EVENTS 给的时刻兜底。
+    { at: "event:WireConfirm", type: "cutscene", id: "CS_Ch6_LastWire" },
     { at: "delay:3.6", type: "narration", text: "长版落款「职王铭章叩铣」。「铣」为电报韵目代日，即十六日。", tier: "主流" },
 
     // ── 阶段 ④：玩家亲手发报（telegraph；不切三人称）──────────────────
@@ -191,27 +215,25 @@ export const CHAPTER = {
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_12", text: "密码本、底稿、呼号表 —— 烧。", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_13", text: "带不走的机器，砸了再走。", tier: "虚构" },
     { at: "delay:3.6", type: "line", who: "xiaoqin", voice: "ch6_xiaoqin_09", text: "烧完了。", tier: "虚构" },
-    { at: "zone:C6_WestStreet", type: "objective", text: "处理密码材料，随通信组沿西门大街转移" },
+    { at: "event:CipherDone", type: "objective", text: "处理密码材料，随通信组沿西门大街转移" },
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_14", text: "跟到走，莫散。", tier: "虚构" },
-    { at: "zone:C6_GateInner", type: "objective", text: "穿过西门里" },
+    { at: "event:AtGateInner", type: "objective", text: "穿过西门里" },
     { at: "delay:2.8", type: "env", text: "西门里街一直通到城门洞。这条街是通视的 —— 城门楼上看得见你。", tier: "主流" },
-    { at: "zone:C6_Barbican", type: "objective", text: "出西门瓮城" },
+    { at: "event:AtBarbican", type: "objective", text: "出西门瓮城" },
     { at: "delay:2.8", type: "env", text: "瓮城里挤着伤员、担架和往外走的人。没人说话。", tier: "虚构" },
-    { at: "zone:C6_WestOuter", type: "objective", text: "沿西关大街向电灯厂" },
+    { at: "event:AtWestOuter", type: "objective", text: "沿西关大街向电灯厂" },
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_15", text: "师长在前头。跟上。", tier: "虚构" },
 
     // ── 阶段 ⑥：西关殉国（groundPov）──────────────────────────────────
-    // dupOfCutscene: CS_Ch6_Xiguan —— midLevelCutscene 接上以后，从「机枪！侧面！」
-    // 到地面视角四要素改成 { type:"cutscene", id:"CS_Ch6_Xiguan" }。
-    { at: "zone:C6_PowerPlant", type: "objective", text: "到电灯厂附近 —— 侧面机枪突然开火" },
+    // INT2：从「机枪！侧面！」到地面视角四要素那六条 **已经删掉**，换成下面这一条
+    // cutscene beat —— 本文件原来的交代就是这么写的（同一段戏不演两遍）。
+    // 地面视角（groundPov：相机落到 0.30—0.35 m 眼高、保留转头、四要素）在
+    // CS_Ch6_Xiguan 的第 4—6 镜里，比关内的 env 字幕说得清楚。
+    { at: "event:FlankMg", type: "objective", text: "到电灯厂附近 —— 侧面机枪突然开火" },
     { at: "delay:2.6", type: "env", text: "电灯厂的烟囱就在前头。二十二米 —— 西城楼上一眼就看得见它。", tier: "主流" },
-    { at: "delay:3.0", type: "shout", who: "canmou", voice: "ch6_canmou_16", text: "机枪！侧面！", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
-    { at: "delay:2.2", type: "shout", who: "canmou", voice: "ch6_canmou_17", text: "师长——！", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
-    // 地面视角四要素（§7 阶段 6）。不用慢动作、不虚构遗言、不长特写、不骤停音效。
-    { at: "delay:3.0", type: "env", text: "你的脸贴在地上。有人在拖师长。", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
-    { at: "delay:3.0", type: "env", text: "有人把文件箱压在自己身子底下。", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
-    { at: "delay:3.0", type: "env", text: "远处还有人在呼叫师部。线的那一头不晓得师部已经没有了。", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
-    { at: "delay:3.0", type: "env", text: "最后一封，是你亲手发出去的。", tier: "虚构", dupOfCutscene: "CS_Ch6_Xiguan" },
+    { at: "delay:3.0", type: "cutscene", id: "CS_Ch6_Xiguan" },
+    // 过场里没有的那一句 —— 它是**小秦自己的**收束，不是殉国那一场的镜头语言。
+    { at: "delay:3.0", type: "env", text: "最后一封，是你亲手发出去的。", tier: "虚构" },
 
     { at: "end", type: "narration", text: "一九三八年三月十七日，王铭章在滕县殉国。最后一封电报已经发出去了。", tier: "主流" },
   ],
@@ -241,6 +263,46 @@ export const CHAPTER = {
  * 每条都写了 fallback：**没有兜底的事件闸等于把剧本交给玩法系统的心情**。
  */
 export const EVENTS = [
+  // ── 走位闸（INT2 新增四条 + 复用 CipherDone/FlankMg）───────────────────────
+  // 本章原来把六拍走位挂在 `zone:` 上。正片里那样是对的（走到了就播），
+  // 但 PlayTest 的剧本长跑**把关卡钉住、玩家不动**，六条 zone 各吃一次
+  // MAX_WAIT.zone = 95 s —— 570 s，比本章十分钟的九成预算还多，
+  // 于是终章的剧本每轮都剩十来条没播（「CH6 剩 11」那条红）。
+  // 改挂 event 之后判据是「走进那个圈 **或者** 时刻到了」：正片行为一模一样
+  //（zone 那一支立刻成立），回归里则永远不会空等一百秒。
+  {
+    id: "AtDivisionHq",
+    when: "玩家走进城内临时师部（§7 阶段①的第一句在这一拍）",
+    anchorBeat: "line/canmou/ch6_canmou_01（「前两封都发出去了。」）",
+    fallback: "(c) => c.zone === \"C6_DivisionHq\" || c.levelTime > 30",
+    note: "师部离出生点 130 m，走过去半分钟够了；兜底给得早，站着不动也不会冷场",
+  },
+  {
+    id: "WireConfirm",
+    when: "四问问完、参谋要开始复诵最后一封电文（关中过场 CS_Ch6_LastWire 的挂点）",
+    anchorBeat: "cutscene/CS_Ch6_LastWire",
+    fallback: "(c) => c.levelTime > 210",
+    note: "整章的转轴。摆点层在玩家站到电台桌前、四问的最后一问说完时推；"
+      + "**兜底只能给时刻** —— 它不对应任何一个路标",
+  },
+  {
+    id: "AtGateInner",
+    when: "玩家走进西门里（通视直街那一段）",
+    anchorBeat: "objective「穿过西门里」",
+    fallback: "(c) => c.zone === \"C6_GateInner\" || c.levelTime > 350",
+  },
+  {
+    id: "AtBarbican",
+    when: "玩家走进西门瓮城",
+    anchorBeat: "objective「出西门瓮城」",
+    fallback: "(c) => c.zone === \"C6_Barbican\" || c.levelTime > 372",
+  },
+  {
+    id: "AtWestOuter",
+    when: "玩家走上西关大街",
+    anchorBeat: "objective「沿西关大街向电灯厂」",
+    fallback: "(c) => c.zone === \"C6_WestOuter\" || c.levelTime > 394",
+  },
   {
     id: "DraftsRead",
     when: "玩家看过前两封电报的底稿（draftReading，两张任意一张即可）",
@@ -286,16 +348,21 @@ export const EVENTS = [
   {
     id: "CipherDone",
     when: "密码本、底稿、呼号表三件都处理完（cipherDisposal）",
-    anchorBeat: "line/xiaoqin/ch6_xiaoqin_09（「烧完了。」）＋ 开西门大街通路",
-    fallback: "(c) => c.levelTime > 400 || c.objectiveIndex >= 1",
-    note: "三件全销毁才放行；没做完就走，通信组的纪律就白写了",
+    anchorBeat: "objective「处理密码材料，随通信组沿西门大街转移」（「烧完了。」的下一拍）",
+    fallback: "(c) => c.zone === \"C6_WestStreet\" || c.levelTime > 330",
+    note: "三件全销毁才放行；没做完就走，通信组的纪律就白写了。"
+      + "兜底把原来那条 c.objectiveIndex >= 1 撤了 —— 它在玩家刚走进师部时就成立，"
+      + "会把转移任务提前到发报之前",
   },
   {
     id: "FlankMg",
     when: "抵电灯厂附近，侧面机枪开火（进 C6_PowerPlant 后由玩法层 Signal）",
     anchorBeat: "shout/canmou/ch6_canmou_16（「机枪！侧面！」）＋ CS_Ch6_Xiguan",
-    fallback: "(c) => c.zone === 'C6_PowerPlant' || c.objectiveIndex >= 5",
-    note: "zone: 已经够用，登记它是为了让 midLevelCutscene 有一个明确的挂点",
+    fallback: "(c) => c.zone === 'C6_PowerPlant' || c.objectiveIndex >= 5 || c.levelTime > 416",
+    cutscene: "CS_Ch6_Xiguan",
+    note: "midLevelCutscene 的挂点：摆点层真推 Signal(\"FlankMg\") 时由 Script_Story 请求"
+      + "宿主播 CS_Ch6_Xiguan（关内那条 cutscene beat 是同一场的另一条入口，"
+      + "cutsceneFired 保证只播一次）。补了时刻兜底，理由同上面四条走位闸",
   },
 ];
 

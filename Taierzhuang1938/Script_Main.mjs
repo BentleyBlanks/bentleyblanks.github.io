@@ -64,6 +64,7 @@ import { FlareDirector, MakeFlareHost } from "./Script_Flare.mjs";
 import { TelegraphSystem, MakeTelegraphHost } from "./Script_Telegraph.mjs";
 import { CompanionDirector } from "./Script_Companion.mjs";
 import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
+import { MissionSetpieceDirector } from "./Script_MissionSetpieces.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
@@ -444,6 +445,14 @@ const state = {
   chapterReleased: false,
   chapterReleaseAt: 0,        // 放行时的关内秒数（取证：是被信号放的还是被保险丝放的）
   cutscenesPlayed: [],        // 播过/跳过的过场，通关冒烟看这张表
+  // 摆点层记下的**同一局之内**的场景事实（拆过几块门板、罗班长倒下了）。
+  // 不进存档 —— 它们是场景状态，不是进度。取证口在 Debug.Setpieces。
+  setpieceFacts: {},
+  // 剧情道具背包。现在只有一件：顺子藏在背包底的那件民用短褂（序章起就在，
+  // 三关阶段⑩撕掉之后**永久移除、不给替代品**）。
+  setpieceItems: { civilianShirt: 1 },
+  // 火墙（三关传单入火那一段封住的追击路线）。每条 { id, ax, az, bx, bz, until, damagePlayer }。
+  firewalls: [],
   prevAllies: 0,
   storyObjective: null,
   playerAliveLast: true,
@@ -524,6 +533,13 @@ let companion = null;
 // 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。环形采样在 Script_Checkpoint，
 // 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
 let checkpoint = null;
+// 章节摆点（集成批 INT2）。「哪一章在哪一拍做什么」是**数据**，在 Script_MissionSetpieces
+// 的 SETPIECES 里一章一条；装配层只建一次、每帧推一下、换关告诉它换到哪儿去了。
+// 它是七个玩法系统与七章内容之间唯一的接缝 —— 这个文件里因此**没有一行 if (章 id)**。
+let setpieces = null;
+// 脚本安排的无敌窗口（四关罗班长救顺子那 4—6 秒）。到时刻为止，玩家被打倒
+// 不走死亡链路而是走检查点倒带 —— 固定事件里死掉会把那一段整个跳过去。
+let scriptInvulnUntil = 0;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
 // 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
@@ -1196,6 +1212,229 @@ async function Boot() {
     Player: () => player,
   }));
 
+  // 章节摆点（集成批 INT2）。**七个玩法系统与七章内容之间唯一的接缝。**
+  // 系统一律走取值器交给它 —— 它们每关重建，拷值出去会指到上一关。
+  // 每一条回调都是「引擎动词」，一条章节内容都不许写进这里：
+  // 「第五关的机枪摆在哪儿」在 Script_MissionSetpieces.SETPIECES.CH5_Chengqiang 里。
+  setpieces = new MissionSetpieceDirector({
+    Time: () => state.elapsed,
+    LevelTime: () => state.phaseTime,
+    PlayerPos: () => (player ? { x: player.position.x, y: player.position.y, z: player.position.z } : null),
+    // 玩家此刻在哪个路标圈里。与 story 的 ctx.zone 同一条判据，不另写一份。
+    PlayerZone: () => {
+      if (!battlefield || !player) return null;
+      const zone = battlefield.objectives.find((o) =>
+        Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
+      return zone ? zone.id : null;
+    },
+    Ground: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : 0),
+
+    Story: () => story,
+    Carry: () => carry,
+    Interact: () => interact,
+    Emplacement: () => emplacement,
+    Strafe: () => strafe,
+    Flare: () => flare,
+    Telegraph: () => telegraph,
+    Companion: () => companion,
+    Checkpoint: () => checkpoint,
+
+    // --- 演员：与具名同伴同一条造人路径（AiDirector.Spawn），不另造一套 -----
+    SpawnActor: ({ label, x, z, weapon, squadId }) => {
+      if (!ai) return null;
+      const seed = HashString(`setpiece:${label}:${Math.round(x)}:${Math.round(z)}`);
+      const identity = { ...MakeSoldierIdentity(seed), name: label || "后送队" };
+      return ai.Spawn("nra", x, z, {
+        identity, weapon: weapon || identity.weapon, squadId: squadId || "Setpiece",
+      });
+    },
+    Despawn: (soldier) => { if (soldier && ai) ai.Remove(soldier); },
+    PositionOf: (soldier) => (soldier && soldier.position
+      ? { x: soldier.position.x, y: soldier.position.y, z: soldier.position.z } : null),
+    Alive: (soldier) => !!(soldier && soldier.alive),
+    SetGoal: (soldier, x, z) => {
+      if (!soldier || !ai) return;
+      soldier.goal.set(x, 0, z);
+      soldier.holdZone = null;
+      // 与 CompanionDirector 同一笔账：挡住 AiDirector 自己的「重设目标」，
+      // **并且要用 ai 自己的钟**（state.elapsed 在过场里照走而 ai.time 不走）。
+      soldier.manualGoalUntil = ai.time + 3.0;
+    },
+
+    // --- 演出 ---------------------------------------------------------------
+    Hint: (text, seconds) => hud.Hint(text, seconds),
+    Say: (who, text, seconds) => hud.Say(who, text, seconds),
+    PlaySfx: (name, opts = {}) => audio.Play(name, opts.position
+      ? { ...opts, position: new THREE.Vector3(opts.position.x, opts.position.y ?? 0, opts.position.z) }
+      : opts),
+    // 关中过场：与 story 的 `type:"cutscene"` beat 走同一个实现。
+    PlayCutscene: (id) => PlayMidCutscene(id),
+
+    // 这一片还有几个活着的日军。「缺口清空了没有」这类判据只认它，不认时钟。
+    EnemiesNear: (x, z, r) => {
+      if (!ai) return 0;
+      let n = 0;
+      for (const s of ai.soldiers) {
+        if (!s.alive || s.side === "nra") continue;
+        if (Math.hypot(s.position.x - x, s.position.z - z) <= r) n += 1;
+      }
+      return n;
+    },
+
+    // 一片友军同时投弹（二关「甩！」那一拍的「手榴弹雨」）。
+    // 走的是玩家那条投掷链路（Combat.Throw）—— 弹道、刚体、伤害与玩家自己甩的
+    // 一模一样，不另写一套 AI 手雷。起手同帧、落点在 spreadS 内错开。
+    VolleyThrow: ({ x, z, radius = 40, spreadS = 0.8, max = 14 } = {}) => {
+      if (!combat || !ai || !player) return 0;
+      let thrown = 0;
+      for (const s of ai.soldiers) {
+        if (!s.alive || s.side !== "nra") continue;
+        if (Math.hypot(s.position.x - x, s.position.z - z) > radius) continue;
+        if (thrown >= max) break;
+        const dir = new THREE.Vector3(x - s.position.x, 0, z - s.position.z);
+        if (dir.lengthSq() < 1e-4) continue;
+        dir.normalize();
+        const from = new THREE.Vector3(s.position.x, s.position.y + 1.2, s.position.z);
+        // 起手同帧、落点错开：全都同时落地是一声巨响，不是一场雨。
+        const jitter = (thrown % 5) / 5 * spreadS;
+        combat.Throw("Grenade", 0.62 + jitter * 0.2, from, dir, jitter);
+        thrown += 1;
+      }
+      return thrown;
+    },
+
+    // 固定事件那 4—6 秒：玩家不许死。到时刻为止，被打倒走检查点倒带。
+    SetPlayerInvulnerable: (on, seconds = 6) => {
+      scriptInvulnUntil = on ? state.elapsed + Math.max(0, seconds) : 0;
+    },
+
+    // 跨关记一笔（拆过几块门板、罗班长倒下了）。存进 state 供出图与取证读；
+    // **不进存档** —— 这些是同一局之内的场景状态，不是进度。
+    MarkPersistent: (key, value) => { state.setpieceFacts[key] = value; },
+
+    // --- 关内道具 -----------------------------------------------------------
+    // 布设那一层（Script_ExternalProps / Data_Dressing_*）是**建场时**按世界坐标
+    // 铺的，同一只米袋在三关里在同一个位置 —— 它表达不了「同一个院子在三章里
+    // 越来越破」。所以摆点层另有一条**运行时**的轻量摆件口：几块带贴图的板子、
+    // 几只箱子、一副盖白布的担架。它们不进碰撞、不进流送、不进烘焙，
+    // 只是「这一章这个院子里多出来的那几件东西」。
+    Prop: (spec) => MakeSetpieceProp(spec),
+    SetPropState: (id, next) => SetSetpiecePropState(id, next),
+
+    // --- 火墙（三关传单入火）------------------------------------------------
+    // 「油料带成为一段 8—10 m 的持续火墙（≥90 s），追兵改走另一侧院门。
+    //   火墙对玩家同样有伤害 —— 它是封路，不是单向道具。」
+    Firewall: ({ id, from, to, seconds = 90, damagePlayer = true } = {}) => {
+      if (!from) return null;
+      const a = { x: from.x, z: from.z };
+      const b = to ? { x: to.x, z: to.z } : a;
+      const wall = {
+        id: id || `fw${state.firewalls.length}`,
+        ax: a.x, az: a.z, bx: b.x, bz: b.z,
+        until: state.elapsed + Math.max(1, seconds),
+        damagePlayer: !!damagePlayer, lastHurt: 0, smoke: [],
+      };
+      // 沿线撒几处烟与火光。走的是 VfxSystem 现成的烟源池 —— 不新建任何管线，
+      // 开机红线（drawCalls / triangles）不受影响。
+      const steps = Math.max(2, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / 2.2));
+      for (let i = 0; i <= steps; i += 1) {
+        const t = steps ? i / steps : 0;
+        const x = a.x + (b.x - a.x) * t;
+        const z = a.z + (b.z - a.z) * t;
+        const y = battlefield ? battlefield.GroundHeight(x, z) : 0;
+        const handle = vfx?.SmokeSource(new THREE.Vector3(x, y + 0.2, z), { rate: 5, scale: 1.1, fire: true });
+        if (handle) wall.smoke.push(handle);
+      }
+      // 火的声音归 INT3（`fireNear` 现在只是环境层的一条 bed，没有 one-shot 配方；
+      // audio.Play 拿不认识的名字会静默返回 null，硬点一个名字只会让人以为接上了）。
+      state.firewalls.push(wall);
+      return wall.id;
+    },
+
+    // 一发炮弹落在指定点附近（终章师部挨炮那一拍）。走的是既有的 CallIncoming。
+    Shell: ({ at, count = 1 } = {}) => {
+      if (!at || !combat) return 0;
+      for (let i = 0; i < count; i += 1) {
+        combat.CallIncoming("artillery", new THREE.Vector3(at.x + i * 3.5, 0, at.z - i * 2.5));
+      }
+      return count;
+    },
+
+    // 「门开着」是一条**工程事实**，不是一句台词（§0 验收结果 5）。城门洞本身
+    // 是建场时的几何（Script_TengxianCity 的 gate），这里只记一笔并把它交给取证 ——
+    // 真有一天门是关着的，这条记录是排障的第一站。
+    OpenGate: (id) => { state.setpieceFacts[`gate:${id}`] = "open"; return true; },
+
+    // 身后那挺机枪停下（五关阶段⑧）。表现在两件事上：掩护火力的音床停、
+    // 那一段的友军不再补位。**只做前一半**：后一半归撒兵，改它会牵动整关的压力曲线。
+    SilenceCoverFire: (on) => { state.setpieceFacts.coverFireSilent = !!on; return true; },
+
+    // AI 抬人（四关掩护罗班长撤离）。抬的人被打倒时由摆点层换人 ——
+    // 「担架落地卡住流程」是这一段唯一不许出现的失败态。
+    CarryLeader: ({ who, bearers = [], to } = {}) => {
+      if (!companion || !ai) return false;
+      const target = PHASE_TABLE[state.phaseIndex]?.zones?.find((z) => z.id === to);
+      let moved = 0;
+      for (const castId of bearers) {
+        const handle = companion.Handle(castId);
+        if (!handle || !handle.alive) continue;
+        handle.goal.set(target ? target.x : player.position.x, 0, target ? target.z : player.position.z);
+        handle.manualGoalUntil = ai.time + 90;
+        moved += 1;
+      }
+      const carriedBy = companion.Handle(who);
+      if (carriedBy && target) {
+        carriedBy.goal.set(target.x, 0, target.z);
+        carriedBy.manualGoalUntil = ai.time + 90;
+      }
+      state.setpieceFacts.carryLeader = `${who}:${moved}`;
+      return moved > 0;
+    },
+
+    // 视角接替（五关⑫）。**每一段都是玩家控制**：换出生点 + 换身份 + 一段短活。
+    // 段与段之间不切黑（策划案原文），所以这里只搬人、补血、报一行字幕 ——
+    // 没有淡出、没有过场、没有 Respawn（Respawn 会扣兵员池、弹死亡卡）。
+    SwitchPov: ({ id, label, at, task } = {}) => {
+      if (!player || !at) return false;
+      player.Spawn(at.x, at.z, player.yaw);
+      state.ammo = Math.max(state.ammo, 5);
+      state.setpieceFacts.pov = id || label || "?";
+      hud.Say(null, `视角接替：${label || id}`, 3.2, "system");
+      if (task) { state.storyObjective = task; hud.SetObjective(task, state.nraPool, null); }
+      return true;
+    },
+
+    // 击倒之后的地面视角（终章小秦、五关顺子）。相机落到 0.30—0.35 m 眼高、
+    // 保留转头 —— 走的是既有的**卧姿**，不新造一套相机状态。
+    GroundPov: ({ seconds = 5, blackOut = false } = {}) => {
+      if (!player) return false;
+      player.stance = "prone";
+      state.setpieceFacts.groundPov = +state.elapsed.toFixed(1);
+      if (blackOut) setTimeout(() => { state.pendingRespawn = false; }, seconds * 1000);
+      return true;
+    },
+
+    // 白刃 QTE 的正片开关。训练场那套判定与正片是同一套（Script_MeleeQte），
+    // 这里只把「这一段开始了」记下来给取证与 HUD 首提示用。
+    SetMeleeGate: (on) => { state.setpieceFacts.meleeGate = !!on; return true; },
+
+    // 正在冒烟等着殉爆的弹药箱。**没有可交互的弹药箱实体**（二关 crateHauling
+    // 的箱子现在是交互点 + 搬运态，不是场上的实体），所以这一条恒返回 null：
+    // 殉爆倒计时那一档还欠一件真实体，登记在下面 Debug.Setpieces 的说明里。
+    CookingCrate: () => null,
+
+    // 从剧情背包里扣一件（三关撕短褂）。扣不掉就是这一下不算数。
+    TakeItem: (id) => {
+      if (!state.setpieceItems[id]) return false;
+      state.setpieceItems[id] -= 1;
+      return true;
+    },
+
+    // 交火声床整层淡出/淡入（三关处决声音先行段）。音频账归 INT3，这里只记事实；
+    // 接上之后把它翻给 Script_Audio 的环境层即可，摆点表一个字都不用改。
+    SetCombatBed: (on) => { state.setpieceFacts.combatBed = !!on; return true; },
+  });
+
   // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
   // 这里只把"从眼位到那个人的胸口有没有被挡死"接回来 —— 与 HasLineOfSight 同一条判据。
   identify = new IdentifySystem({
@@ -1232,7 +1471,7 @@ async function Boot() {
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeQte() { return meleeQte; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
-    companion, checkpoint,
+    companion, checkpoint, setpieces,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // 关中过场的宿主 API（story.Signal→过场 的等价入口）。玩法系统批直接调它，
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
@@ -1614,6 +1853,30 @@ async function Boot() {
       }),
       SaveCheckpoint: () => !!checkpoint?.Save(),
       RewindCheckpoint: (seconds) => (checkpoint ? checkpoint.Rewind(seconds) : null),
+      /**
+       * 章节摆点的取证口（集成批 INT2）。
+       *
+       *   Debug.Setpieces()              这一章摆了什么、推过哪些信号、后送队走到哪儿
+       *   Debug.SetpieceFacts()          同一局之内的场景事实（门板拆了几块、门开没开）
+       *   Debug.SetpieceProps()          运行时道具清单
+       *
+       * `signals` 是最要紧的一栏：**七章与九个系统之间的接缝只有这一条**，
+       * 「这一拍该发生的事到底推没推」在这里一眼看得出来。
+       *
+       * 还欠着的动词（host 里恒返回 null / 只记事实的那几条）：
+       *   CookingCrate  —— 二关殉爆倒计时要一件**真的弹药箱实体**，现在的箱子
+       *                    是交互点 + 搬运态，场上没有可被掷弹筒打中的那一只；
+       *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
+       */
+      Setpieces: () => (setpieces ? setpieces.State() : null),
+      SetpieceFacts: () => ({ ...state.setpieceFacts, items: { ...state.setpieceItems } }),
+      SetpieceProps: () => [...setpieceProps.entries()].map(([id, entry]) => ({
+        id, kind: entry.spec.kind || "box", visible: !!entry.root?.visible,
+        x: +entry.root.position.x.toFixed(1), z: +entry.root.position.z.toFixed(1),
+      })),
+      Firewalls: () => state.firewalls.map((w) => ({
+        id: w.id, until: +w.until.toFixed(1), damagePlayer: w.damagePlayer, smoke: w.smoke.length,
+      })),
       // --- 过场的取证口 ---
       PlayCutscene: (id) => RunCutscene(id),
       PlayMidCutscene: (id) => PlayMidCutscene(id),
@@ -2201,8 +2464,120 @@ function DustBox(phase) {
 }
 
 /** 换关时把整片切片以外的东西也清干净：兵、尸体、烟柱、在途弹。 */
+// ---------------------------------------------------------------------------
+// 摆点道具（集成批 INT2）
+//
+// 布设那一层是**建场时**按世界坐标铺的，同一只米袋在三关里在同一个位置 ——
+// 它表达不了「同一个院子在三章里越来越破」（§0 三个功能院落的环境递进）。
+// 所以这里另有一条**运行时**的轻量摆件口：几块带贴图的板子、几只箱子、
+// 一副盖白布的门板担架。
+//
+// 三条硬约束（越界就该改成布设层的活）：
+//   · **不进碰撞、不进导航、不进流送、不进烘焙** —— 它们是看的，不是撞的；
+//   · 每件一次 draw call，一章不许超过十来件（开机红线 drawCalls ≤ 5000 有余量，
+//     但一章几百件就该走 Script_ExternalProps 的实例化那条路）；
+//   · 换关一把清掉（ClearRuntime）。
+// ---------------------------------------------------------------------------
+
+/** 这一关摆的运行时道具：id -> { root, spec }。 */
+const setpieceProps = new Map();
+/** 贴图只读一次：同一张纸在一章里可能挂三块板子。 */
+const setpiecePropTextures = new Map();
+
+function SetpiecePropTexture(path) {
+  if (setpiecePropTextures.has(path)) return setpiecePropTextures.get(path);
+  const texture = new THREE.TextureLoader().load(path);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  setpiecePropTextures.set(path, texture);
+  return texture;
+}
+
+/**
+ * 摆一件运行时道具。
+ *
+ * kind：
+ *   panel        立着的一块带贴图的平面（信纸、底稿、报纸）
+ *   plane        平躺的一块带贴图的平面（摊在桌上的纸）
+ *   box          一只箱子（烧黑的弹药箱、药箱）
+ *   shroudedBody 盖白布的门板担架（五关 A 区那一副）
+ *   crate/stretcher/debris  box 的几个别名，只是默认尺寸与颜色不同
+ */
+function MakeSetpieceProp(spec = {}) {
+  if (!scene || !spec || !spec.position) return null;
+  const id = String(spec.id || `sp${setpieceProps.size}`);
+  if (setpieceProps.has(id)) return id;
+  const kind = spec.kind || "box";
+  const at = spec.position;
+  const y = Number.isFinite(at.y) ? at.y : (battlefield ? battlefield.GroundHeight(at.x, at.z) : 0);
+  let mesh = null;
+  if (kind === "panel" || kind === "plane") {
+    const size = spec.size || [0.28, 0.20];
+    const geometry = new THREE.PlaneGeometry(size[0], size[1]);
+    const material = new THREE.MeshStandardMaterial({
+      map: spec.texture ? SetpiecePropTexture(spec.texture) : null,
+      color: spec.color ?? 0xece0c4, roughness: 1.0, metalness: 0,
+      side: THREE.DoubleSide, transparent: !!spec.transparent,
+    });
+    mesh = new THREE.Mesh(geometry, material);
+    // plane 是摊着的（纸在桌上），panel 是立着的（贴在墙上/靠着箱子）。
+    if (kind === "plane") mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(at.x, y + (kind === "plane" ? 0.92 : 1.15), at.z);
+  } else {
+    const size = spec.size
+      || (kind === "shroudedBody" ? [0.62, 0.26, 1.92]
+        : kind === "stretcher" ? [0.58, 0.14, 1.85]
+          : kind === "debris" ? [0.9, 0.22, 0.7] : [0.72, 0.42, 0.48]);
+    const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    const material = new THREE.MeshStandardMaterial({
+      color: spec.color ?? (kind === "shroudedBody" ? 0xd8d2c4 : 0x6b5a41),
+      roughness: 1.0, metalness: 0,
+    });
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(at.x, y + size[1] / 2 + (kind === "shroudedBody" ? 0.34 : 0), at.z);
+  }
+  mesh.rotation.y = Number(spec.rotationY) || 0;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.name = `Setpiece_${id}`;
+  scene.add(mesh);
+  setpieceProps.set(id, { root: mesh, spec });
+  return id;
+}
+
+/** 改一件道具的状态。现在只有一档：`removed`（三关拆下来的那几块门板）。 */
+function SetSetpiecePropState(id, next) {
+  const entry = setpieceProps.get(String(id));
+  if (!entry) return false;
+  if (next === "removed") entry.root.visible = false;
+  else if (next === "shown") entry.root.visible = true;
+  entry.state = next;
+  return true;
+}
+
+/** 换关：一件不留。贴图缓存留着（同一张纸下一关还会用）。 */
+function ClearSetpieceProps() {
+  for (const entry of setpieceProps.values()) {
+    if (entry.root) {
+      scene.remove(entry.root);
+      entry.root.geometry?.dispose();
+      entry.root.material?.dispose();
+    }
+  }
+  setpieceProps.clear();
+}
+
 function ClearRuntime() {
   meleeQte?.Cancel("levelChange");
+  // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
+  // **缺席宣告不在这里清**（那在 companion 手里，是剧情事实不是关卡状态）。
+  setpieces?.Reset("levelChange");
+  ClearSetpieceProps();
+  for (const wall of state.firewalls) {
+    for (const handle of wall.smoke) vfx?.RemoveSmokeSource(handle);
+  }
+  state.firewalls.length = 0;
+  scriptInvulnUntil = 0;
   hud?.SetMeleeQte(null);
   // 负重与交互点都是**按关摆的**：不清的话上一关抬着的担架会跟到下一关，
   // 上一关的交互点会在新切片的同一坐标上悄悄复活。
@@ -2343,11 +2718,20 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
   if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
     companion.BeginLevel(phase.id, {
+      // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
+      // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
+      // 一律推不出来，终章更是推出一张空表（两个说话的人都不是战斗员）。
+      roster: phase.roster || phase.level?.roster || undefined,
       beats: phase.level?.beats || [], zones: phase.zones,
       // 这一章玩家演的是谁 —— 他不进名册（终章玩家就是小秦，而小秦在终章话最多）。
-      // 章节数据还没有这个字段，Companion 侧暂有一张过渡表；INT2 写上之后这里就走数据。
       playerCast: phase.playerCast || phase.level?.playerCast || undefined,
     });
+  }
+  // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
+  // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
+  // 靶场／白刃训练场／预览／过场承载章都不摆 —— 那几条路上没有章节内容。
+  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
+    setpieces.BeginLevel(phase.id, phase);
   }
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
@@ -4849,8 +5233,41 @@ function Frame(dt, render = true) {
   // 帧内局部变量。玩家最常见的死法是被手榴弹/掷弹筒炸死，而爆炸结算在
   // combat.Update 里 —— 判定放在 player.Update 紧后面的话，那一类死法会被整个吞掉：
   // 不弹卡片、兵员池不扣、不换人，玩家永远躺在地上。
+  // 脚本安排的无敌窗口（四关罗班长救顺子那 4—6 秒）：这一段是脚本不是战斗，
+  // 死在里面会把整拍跳过去。被打倒时**不走死亡链路**，走检查点倒带 ——
+  // 不扣兵员池、不弹死亡卡、不换人（Script_Checkpoint 的头注写着为什么）。
+  if (state.playerAliveLast && !player.Alive && state.elapsed < scriptInvulnUntil) {
+    if (checkpoint?.Rewind(2.0)) state.playerAliveLast = true;
+  }
   if (state.playerAliveLast && !player.Alive) OnPlayerDown();
   state.playerAliveLast = player.Alive;
+
+  // 火墙（三关传单入火封住的那条追击路线）。**对玩家同样有伤害** ——
+  // 它是封路，不是单向道具。烧完就把烟收掉。
+  if (state.firewalls.length) {
+    for (let i = state.firewalls.length - 1; i >= 0; i -= 1) {
+      const wall = state.firewalls[i];
+      if (state.elapsed > wall.until) {
+        for (const handle of wall.smoke) vfx?.RemoveSmokeSource(handle);
+        state.firewalls.splice(i, 1);
+        continue;
+      }
+      if (!wall.damagePlayer || !player.Alive) continue;
+      if (state.elapsed - wall.lastHurt < 0.6) continue;
+      // 点到线段的距离：1.6 m 之内算站在火里。
+      const dx = wall.bx - wall.ax;
+      const dz = wall.bz - wall.az;
+      const len2 = dx * dx + dz * dz;
+      const t = len2 > 0
+        ? Clamp(((player.position.x - wall.ax) * dx + (player.position.z - wall.az) * dz) / len2, 0, 1)
+        : 0;
+      const near = Math.hypot(player.position.x - (wall.ax + dx * t), player.position.z - (wall.az + dz * t));
+      if (near > 1.6) continue;
+      wall.lastHurt = state.elapsed;
+      player.TakeHit(9, "legs", null, { fire: true });
+      hud.Hint("火里过不去。", 1.6);
+    }
+  }
 
   // 脚本检查点：**排在死亡判定之后**，采的是这一帧最终的位置/姿态/血/弹。
   // 排在前面的话，被打死的那一帧也会被采进环里，倒带就退回到"刚好要死"的那一刻。
@@ -4883,6 +5300,10 @@ function Frame(dt, render = true) {
     pool: state.nraPool,
   });
   if (story.ObjectiveText) state.storyObjective = story.ObjectiveText;
+  // 章节摆点：**排在 story.Update 之后**。它的 onVoice 钩子读的是 story.fired，
+  // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
+  // 这种同拍的事会看得出来差一帧。
+  setpieces?.Update(dt);
   profiler.E("story");
 
   // --- 结束条件 ---

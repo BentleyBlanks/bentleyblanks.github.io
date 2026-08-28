@@ -151,14 +151,17 @@ export function ParsePredicate(source) {
  * 章节没有导出 EVENTS、或导出的那条没有兜底式时，这里补。
  *
  * **只填空，不覆盖**：章节自己写了判据的一律以章节为准。
- * C2 那条是照 Data_MissionCh2.mjs 头注 ENGINE_REQUEST 4 的原文抄的
- *（那份文件是内容批的，集成批不许改，所以判据落在这里）。
+ *
+ * ── 2026-08-29 集成批 INT2：这张表现在是空的 ────────────────────────────────
+ * 唯一那条补丁（CH2 的 BayonetDone）已经搬回 `Data_MissionCh2.mjs` 自己的
+ * `export const EVENTS`。INT1 时把它写在这里是因为「集成批不许改内容批的文件」；
+ * INT2 那道闸解除了，判据就该回到它描述的那一章去 ——
+ * 一个事件的名字与兜底判据分居两个文件，第二天就会分叉。
+ *
+ * **机制本身留着**：将来再出现「章节还没来得及登记」的空窗时，
+ * 往这里填一条比改七个章节文件安全（它只填空、不覆盖）。
  */
-const SUPPLEMENT_CUES = {
-  CH2_Shouliudan: {
-    BayonetDone: (c) => c.objectiveIndex >= 4 || c.levelTime > c.levelSeconds * 0.72,
-  },
-};
+const SUPPLEMENT_CUES = {};
 
 /** 关卡钉住时放行换关用的信号名。章节数据里写 mechanics.pinFinalZone 才生效。 */
 export const CHAPTER_RELEASE_SIGNAL = "ChapterRelease";

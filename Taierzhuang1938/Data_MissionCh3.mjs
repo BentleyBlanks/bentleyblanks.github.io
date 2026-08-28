@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // 三个功能院落的坐标（§0「三个功能院落」的工程落点）
 //
-//   A 区 · 城内主救护所   (214, -30)   —— 第二区公所那一片大院（Data_Tengxian
+//   A 区 · 城内主救护所   (214, -18)   —— 第二区公所那一片大院（Data_Tengxian
 //        的 CITY_FEATURES.EastDistrictOffice，50×74 m，城内东部最大的一组院落）
 //        的北门一侧。三关、四关末、五关开头是**同一个院子**，三章共用这一个锚点，
 //        谁都不许各写一份坐标。
@@ -29,6 +29,23 @@
 // 下面七条是本章 beats 与两段固定演出**已经按它们写好了**的引擎缺口。没有它们，
 // 台词与目标链照常能跑（Story 层不依赖任何一条），但玩家的手上是空的 ——
 // 而 §0 的硬规矩是「所有低强度段落必须包含玩家动作」。
+//
+// ── 2026-08-29 集成批 INT2 的销项 ──────────────────────────────────────────
+//   ER-1 executionScene   ✅ 声音先行段（掐交火声床 → 间隔单发 rifleIja + execScream，
+//                            间隔 9—14 s，玩家走多快决定多长）+ ExecutionConfirmed →
+//                            CS_Ch3_BreakWall（关中过场）。摆点在
+//                            Script_MissionSetpieces.SETPIECES.CH3_Jiuhusuo。
+//   ER-2 tearShirt        ✅ 长按 confirm；短褂从 state.setpieceItems 永久扣掉，
+//                            扣不掉就这一下不算数（不给替代品）。
+//   ER-3 leafletFire      ✅ 拾传单 → 投炉火 → 火墙（9 m、95 s，**对玩家同样有伤害**）
+//                            → LeafletBurned → CS_Ch3_LeafletFire。
+//   ER-4 phoneLine        ◐ 两头接线与剪线的**交互**都在；「可跟随的样条」与
+//                            「保护小秦查断点」还欠（那要一条走线实体，属布设层）。
+//   ER-5 doorPlank        ✅ 三块门板可拆；拆掉的门框状态记进 setpieceFacts，
+//                            四关、五关的 A 区差异件里门板照旧靠在墙根。
+//   ER-6 carryWounded     ◐ 「屋内清空 → AssaultCleared」这条闸在；
+//                            四到六名幸存者的逐个处置还欠（要幸存者实体）。
+//   ER-7 报纸             ✅ 靠近读标题，完整内容留给历史档案（不做全文界面）。
 //
 // ER-1 executionScene · 声音先行段（§4 阶段 7 → 阶段 8）
 //   走进 C3_ForwardAid 半径 45 m 时：**先掐掉交火声**（前沿的枪声床整层淡出 1.5 s），
@@ -99,66 +116,119 @@
 /**
  * 本章要用到的 `event:` 触发名与判定条件（契约 §10.3 / Script_Story.LEVEL_CUES）。
  *
- * **beats 里一条都没有直接用 `event:`** —— LEVEL_CUES 现在还没有 CH3_Jiuhusuo 这个键，
- * 用了就是每条各等 80 s 的兜底，整条剧本链会被推到关卡后半段（Data_MissionCh1 骨架
- * 头注里记了这个坑）。所以本章的链子只用 start / delay / zone / end，
- * 这张表是**给 F2 批照抄进 LEVEL_CUES 的施工单**：接线之后，`moveBeats` 里点名的
- * 那几条可以把 at 从 delay/zone 换成 event，节奏会准得多。
+ * ── 2026-08-29 集成批 INT2：**接线完成，moveBeats 全部落地** ─────────────────
+ * INT1 把 LEVEL_CUES 改成由各章 `EVENTS` 自动构建，这张表因此从「施工单」
+ * 变成了真判定表。本轮按 `moveBeats` 逐条把点名的 beat 从 delay/zone 换成
+ * `event:`（换过的条目标了 `moved: true`），并且：
+ *   · 六拍走位另加了 AidStationReady / AtEastGate / AtLostBlock / AtFirebreak /
+ *     AtAidReturn 五条闸（ExecutionConfirmed 顶掉了原来的 zone:C3_ForwardAid）；
+ *   · **每一条都补了时刻兜底**。原来的判据只写事实（zone / objectiveIndex），
+ *     玩家不动时一条都不成立，于是每条各等 MAX_WAIT.event = 80 s。
+ *     事实优先、时刻兜底，两条都要有 —— 少了前者节奏是假的，少了后者链会挂住。
  *
- * predicate 一栏是可直接粘进 LEVEL_CUES 的兜底式（真发生时由装配层 Signal 覆盖，
- * 「真发生过的事永远比时刻表准」）。
+ * 真发生时由 `Script_MissionSetpieces.SETPIECES.CH3_Jiuhusuo` 推
+ * `story.Signal("<名字>")`，推过的永远优先于兜底。
  */
 export const EVENTS = [
+  // ── 走位闸（集成批 INT2 新增）────────────────────────────────────────────
+  // 本章原来把六拍走位挂在 `zone:` 上。正片里那样是对的（走到了就播），
+  // 但 Script_PlayTest 的剧本长跑**把关卡钉住、玩家不动**，六条 zone 各吃一次
+  // MAX_WAIT.zone = 95 s —— 570 s，比本章十八分钟的九成预算还多一大截。
+  // 改挂 event 之后判据是「走进那个圈 **或者** 时刻到了」：正片行为一模一样
+  //（zone 那一支立刻成立），回归里则永远不会空等一百秒。
+  //
+  // **每一条都有时刻兜底。** 下面老的七条原来只写事实判据（zone / objectiveIndex），
+  // 钉住不动时一条都不成立，于是每条各等 MAX_WAIT.event = 80 s ——
+  // 七条就是九分半钟的静默。事实优先、时刻兜底，两条都要有。
+  {
+    event: "AidStationReady",
+    what: "玩家走进 A 区主救护所（§4 阶段 1 的医疗语音在这一拍）",
+    signal: "zone:C3_AidStation",
+    predicate: '(c) => c.zone === "C3_AidStation" || c.levelTime > 25',
+  },
+  {
+    event: "AtEastGate",
+    what: "从东门侧门出城（§4 阶段 5 末）",
+    signal: "zone:C3_EastGateOut",
+    predicate: '(c) => c.zone === "C3_EastGateOut" || c.levelTime > 300',
+  },
+  {
+    event: "AtLostBlock",
+    what: "进东关失守街区，沿电话线摸过去（§4 阶段 6）",
+    signal: "zone:C3_LostBlock",
+    predicate: '(c) => c.zone === "C3_LostBlock" || c.levelTime > 340',
+  },
+  {
+    event: "AtFirebreak",
+    what: "走到炉子/油料堆那一处（§4 阶段 11 的舞台）",
+    signal: "zone:C3_Firebreak",
+    predicate: '(c) => c.zone === "C3_Firebreak" || c.levelTime > 640',
+  },
+  {
+    event: "AtAidReturn",
+    what: "撤回 A 区主救护所（§4 阶段 12）",
+    signal: "zone:C3_AidReturn",
+    predicate: '(c) => c.zone === "C3_AidReturn" || c.levelTime > 720',
+  },
   {
     event: "PhoneDead",
     what: "前沿救护点失去回应（§4 阶段 5）。小秦那两句与军官的命令挂在这上面。",
     signal: "装配层在 A 区三件杂活（药箱/门板/电话线）做完任一件、且玩家在 C3_AidStation 内停留 ≥60 s 时推。",
     predicate: "(c) => c.objectiveIndex >= 1 || c.levelTime > c.levelSeconds * 0.22",
     moveBeats: ["ch3_xiaoqin_02", "ch3_xiaoqin_03", "ch3_junguan_01", "ch3_junguan_02"],
+    moved: true,
   },
   {
     event: "ExecutionAudible",
     what: "交火声消失、间隔单发枪声起（§4 阶段 7、ER-1）。这是声音先行段的开始。",
     signal: "玩家进入 C3_ForwardAid 半径 45 m。",
-    predicate: "(c) => c.zone === \"C3_LostBlock\" && c.levelTime > c.levelSeconds * 0.44",
+    // INT2：`&&` 改成 `||` 并补时刻兜底 —— 原式要求「在圈里**并且**过了四成时长」，
+    // 两条都不成立时这一拍要等 80 s，声音先行段整个塌掉。
+    predicate: '(c) => c.zone === "C3_LostBlock" || c.levelTime > 380',
     moveBeats: ["ch3_heyoutian_04", "ch3_ija_gunso_01"],
+    moved: true,
   },
   {
     event: "ExecutionConfirmed",
     what: "玩家在破墙观察位看清院内正在发生什么（§4 阶段 8）。→ 播 CS_Ch3_BreakWall。",
     signal: "玩家进入破墙观察位（C3_ForwardAid 内的固定点）且视线穿过缺口。",
-    predicate: "(c) => c.zone === \"C3_ForwardAid\"",
+    predicate: '(c) => c.zone === "C3_ForwardAid" || c.levelTime > 470',
     moveBeats: ["ch3_yaowa_07", "ch3_yaowa_08", "ch3_heyoutian_05", "ch3_luo_12"],
+    moved: true,
     cutscene: "CS_Ch3_BreakWall",
   },
   {
     event: "AssaultCleared",
     what: "行刑日军被歼、屋内搜完（§4 阶段 9、ER-6）。撕短褂那一段接在它后面。",
     signal: "最后一名幸存者被处置完。",
-    predicate: "(c) => c.objectiveIndex >= 4",
+    predicate: "(c) => c.objectiveIndex >= 4 || c.levelTime > 520",
     moveBeats: ["ch3_junyi_06"],
+    moved: true,
   },
   {
     event: "ShirtTorn",
     what: "民用短褂被撕开、背包道具消失（§4 阶段 10、ER-2）。",
     signal: "长按交互完成。",
-    predicate: "(c) => c.objectiveIndex >= 4 && c.levelTime > c.levelSeconds * 0.68",
+    predicate: "(c) => c.objectiveIndex >= 4 || c.levelTime > 575",
     moveBeats: ["ch3_heyoutian_08", "ch3_shunzi_05", "ch3_shunzi_06"],
+    moved: true,
   },
   {
     event: "LeafletBurned",
     what: "传单投入炉火、油料被引燃、一条追击路线被封（§4 阶段 11、ER-3）。→ 播 CS_Ch3_LeafletFire。",
     signal: "长按交互完成。",
-    predicate: "(c) => c.zone === \"C3_Firebreak\"",
+    predicate: '(c) => c.zone === "C3_Firebreak" || c.levelTime > 665',
     moveBeats: ["ch3_yaowa_10", "ch3_yaowa_11"],
+    moved: true,
     cutscene: "CS_Ch3_LeafletFire",
   },
   {
     event: "LineCut",
     what: "小秦剪断无法回收的那一段电话线（§4 阶段 12、ER-4）。",
     signal: "短按交互完成。",
-    predicate: "(c) => c.objectiveIndex >= 5",
+    predicate: "(c) => c.objectiveIndex >= 5 || c.levelTime > 745",
     moveBeats: ["ch3_xiaoqin_05"],
+    moved: true,
   },
 ];
 
@@ -170,6 +240,14 @@ export const CHAPTER = {
   clock: "03-16 17:00 — 20:00",
   sky: "smokyDay",
   music: "streetDistress",
+  // 三关：救护所这一章多了两个**不开口也必须在场**的人 ——
+  //   小秦（护线、查断点、剪线，§4 阶段 6/12 的玩家动作全绕着他）、
+  //   军医（combatant:false，钉在院里；不点名的话「能走的靠右边！」
+  //         这类医疗语音全从玩家脑门上发出来）。
+  // 六个名额满了，**刘文财这一章不在场**：他在本章只有牙痛与「还有几副担架？」
+  // 两处功能性台词，没有他也读得通；而少了小秦或军医，这一关的两处玩家动作
+  // 就没有可保护、可交付的对象。他的台词退化成非空间化播放，不会丢。
+  roster: ["luo", "yaowa", "heyoutian", "zhaodegui", "xiaoqin", "junyi"],
   minutes: 18,
   pool: { start: 168, end: 140, label: "城里还站着的人", presumed: true },
   brief: [
@@ -186,14 +264,14 @@ export const CHAPTER = {
     "撤回主救护所",
   ],
   zones: [
-    { id: "C3_AidStation", name: "A 区 · 主救护所", x: 214, z: -30, radius: 30 },
+    { id: "C3_AidStation", name: "A 区 · 主救护所", x: 214, z: -18, radius: 30 },
     { id: "C3_EastGateOut", name: "东门 · 侧门", x: 296, z: -65, radius: 24 },
     { id: "C3_LostBlock", name: "东关失守街区", x: 449, z: -110, radius: 24 },
     { id: "C3_ForwardAid", name: "C 区 · 前沿救护点", x: 462, z: -19, radius: 26 },
     { id: "C3_Firebreak", name: "炉火封路", x: 480, z: -65, radius: 20 },
     // 同一个院子的第二次出场（环境已变：伤员大增、绷带血水满地）。
     // 坐标与 C3_AidStation 相同、id 不同 —— 目标链要玩家真的走回去。
-    { id: "C3_AidReturn", name: "撤回 A 区 · 主救护所", x: 214, z: -30, radius: 30 },
+    { id: "C3_AidReturn", name: "撤回 A 区 · 主救护所", x: 214, z: -18, radius: 30 },
   ],
   tuning: {
     bounds: { minX: 140, maxX: 600, minZ: -260, maxZ: 220 },
@@ -208,7 +286,13 @@ export const CHAPTER = {
     },
   },
   // ── beats 的排法 ─────────────────────────────────────────────────────────
-  // 触发式只用 start / delay / zone / end（原因见上面 EVENTS 的头注）。
+  // 触发式用 start / delay / event / end。**INT2 起 zone: 一条不剩** ——
+  // 走位改挂 `event:`，判据里那一支 `c.zone === "..."` 与原来的 zone: 逐字等价，
+  // 只是多了一条时刻兜底（原因见上面 EVENTS 的头注）。
+  //
+  // 阶段 10 那七条原来同挂一个 delay，INT2 拆成两拍：前三条挂 AssaultCleared
+  //（屋里搜完、绷带用光），后四条挂 ShirtTorn（短褂**真的**撕了）——
+  // 不拆的话等于「衣服还没撕，何有田就认出来了」。
   // **连着写同一个 at 的是一组**：Script_Story.BeginLevel 会给同组第二条起标
   // sameAsPrev，只等 0.25 s（仍受 MIN_GAP 2 s 与语音占位闸约束），
   // 一段对话因此是「第一句等条件，后面几句自己接上」。相邻两组的 at 字符串
@@ -222,12 +306,12 @@ export const CHAPTER = {
     { at: "delay:3.0", type: "objective", text: "在主救护所搬药箱、拆门板、接电话线" },
 
     // ── 阶段 1｜回到 A 区主救护所（有序）─────────────────────────────────
-    { at: "zone:C3_AidStation", type: "env", text: "院子还有秩序。能走的靠右排，门板拆下来当担架，电话线顺墙头拉进来。", tier: "虚构" },
-    { at: "zone:C3_AidStation", type: "shout", who: "junyi", voice: "ch3_junyi_01", text: "能走的靠右边！" },
-    { at: "zone:C3_AidStation", type: "shout", who: "junyi", voice: "ch3_junyi_02", text: "先压住出血！" },
-    { at: "zone:C3_AidStation", type: "shout", who: "junyi", voice: "ch3_junyi_03", text: "这个抬进去！" },
-    { at: "zone:C3_AidStation", type: "shout", who: "junyi", voice: "ch3_junyi_04", text: "没得担架了，拆门板！" },
-    { at: "zone:C3_AidStation", type: "shout", who: "junyi", voice: "ch3_junyi_05", text: "莫堵门！" },
+    { at: "event:AidStationReady", type: "env", text: "院子还有秩序。能走的靠右排，门板拆下来当担架，电话线顺墙头拉进来。", tier: "虚构" },
+    { at: "event:AidStationReady", type: "shout", who: "junyi", voice: "ch3_junyi_01", text: "能走的靠右边！" },
+    { at: "event:AidStationReady", type: "shout", who: "junyi", voice: "ch3_junyi_02", text: "先压住出血！" },
+    { at: "event:AidStationReady", type: "shout", who: "junyi", voice: "ch3_junyi_03", text: "这个抬进去！" },
+    { at: "event:AidStationReady", type: "shout", who: "junyi", voice: "ch3_junyi_04", text: "没得担架了，拆门板！" },
+    { at: "event:AidStationReady", type: "shout", who: "junyi", voice: "ch3_junyi_05", text: "莫堵门！" },
 
     // 军医只处理战伤（§4 阶段 1 的括号：刘文财牙痛没人理）。
     { at: "delay:5.0", type: "line", who: "liuwencai", voice: "ch3_liuwencai_01", text: "军医，我这颗牙痛了三天了。", tier: "虚构" },
@@ -280,36 +364,36 @@ export const CHAPTER = {
     { at: "delay:9.5", type: "env", text: "何有田没有接话，只朝门外看了一眼。", tier: "虚构" },
 
     // ── 阶段 5｜前沿救护点失联（不切黑，侧门直接出发）───────────────────
-    { at: "delay:7.0", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_02", text: "前头救护点没声音。" },
-    { at: "delay:7.0", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_03", text: "最后一段线路还通，不是我们这边断的。" },
-    { at: "delay:7.0", type: "line", who: "junguan", voice: "ch3_junguan_01", text: "里面还有走不了的伤兵。" },
-    { at: "delay:7.0", type: "shout", who: "junguan", voice: "ch3_junguan_02", text: "去把活的带回来！" },
+    { at: "event:PhoneDead", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_02", text: "前头救护点没声音。" },
+    { at: "event:PhoneDead", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_03", text: "最后一段线路还通，不是我们这边断的。" },
+    { at: "event:PhoneDead", type: "line", who: "junguan", voice: "ch3_junguan_01", text: "里面还有走不了的伤兵。" },
+    { at: "event:PhoneDead", type: "shout", who: "junguan", voice: "ch3_junguan_02", text: "去把活的带回来！" },
 
-    { at: "zone:C3_EastGateOut", type: "objective", text: "从东门侧门出城，沿电话线前进" },
+    { at: "event:AtEastGate", type: "objective", text: "从东门侧门出城，沿电话线前进" },
 
     // ── 阶段 6｜穿过失守街区（沿电话线、绕开机枪、屋顶观察）─────────────
-    { at: "zone:C3_LostBlock", type: "objective", text: "穿过失守街区，绕开机枪" },
-    { at: "zone:C3_LostBlock", type: "env", text: "地上散着投降传单：「放下武器，可保生命」。", tier: "主流" },
-    { at: "zone:C3_LostBlock", type: "line", who: "yaowa", voice: "ch3_yaowa_06", text: "飞机连担架都照打，还保哪个的命。" },
-    { at: "zone:C3_LostBlock", type: "line", who: "luo", voice: "ch3_luo_11", text: "莫踩出声音。" },
-    { at: "zone:C3_LostBlock", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_04", text: "线在这头还是通的。", tier: "虚构" },
+    { at: "event:AtLostBlock", type: "objective", text: "穿过失守街区，绕开机枪" },
+    { at: "event:AtLostBlock", type: "env", text: "地上散着投降传单：「放下武器，可保生命」。", tier: "主流" },
+    { at: "event:AtLostBlock", type: "line", who: "yaowa", voice: "ch3_yaowa_06", text: "飞机连担架都照打，还保哪个的命。" },
+    { at: "event:AtLostBlock", type: "line", who: "luo", voice: "ch3_luo_11", text: "莫踩出声音。" },
+    { at: "event:AtLostBlock", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_04", text: "线在这头还是通的。", tier: "虚构" },
 
     // ── 阶段 7｜处决声音（ER-1 的声音先行段：只有耳朵，没有画面）────────
-    { at: "delay:14.0", type: "env", text: "交火声停了。", tier: "虚构" },
-    { at: "delay:14.0", type: "env", text: "隔很久一声枪。再隔很久，又是一声。", tier: "主流" },
-    { at: "delay:14.0", type: "env", text: "屋里有东西被拖过地面。有人在咳。有一声很短的叫，断在半中间。", tier: "主流" },
-    { at: "delay:14.0", type: "line", who: "heyoutian", voice: "ch3_heyoutian_04", text: "他们在里头做啥子？" },
-    { at: "delay:14.0", type: "env", text: "没有人回答他。", tier: "虚构" },
+    { at: "event:ExecutionAudible", type: "env", text: "交火声停了。", tier: "虚构" },
+    { at: "event:ExecutionAudible", type: "env", text: "隔很久一声枪。再隔很久，又是一声。", tier: "主流" },
+    { at: "event:ExecutionAudible", type: "env", text: "屋里有东西被拖过地面。有人在咳。有一声很短的叫，断在半中间。", tier: "主流" },
+    { at: "event:ExecutionAudible", type: "line", who: "heyoutian", voice: "ch3_heyoutian_04", text: "他们在里头做啥子？" },
+    { at: "event:ExecutionAudible", type: "env", text: "没有人回答他。", tier: "虚构" },
     // 墙那边的日语口令。text 是字幕（中文），voice 点的是纯假名那一条。
-    { at: "delay:14.0", type: "shout", who: "ija_gunso", voice: "ch3_ija_gunso_01", text: "站不起来的，到墙边去。" },
+    { at: "event:ExecutionAudible", type: "shout", who: "ija_gunso", voice: "ch3_ija_gunso_01", text: "站不起来的，到墙边去。" },
 
     // ── 阶段 8｜确认系统处决（沿墙找到观察位 → CS_Ch3_BreakWall）────────
-    { at: "zone:C3_ForwardAid", type: "objective", text: "确认前沿救护点里正在发生什么，然后开火" },
-    { at: "zone:C3_ForwardAid", type: "env", text: "破墙外面：白布担架、翻倒的药箱、墙根下一排躺着的人，地上是拖过去的痕迹。", tier: "主流" },
-    { at: "zone:C3_ForwardAid", type: "line", who: "yaowa", voice: "ch3_yaowa_07", text: "这些人都没枪了……" },
-    { at: "zone:C3_ForwardAid", type: "shout", who: "yaowa", voice: "ch3_yaowa_08", text: "日你先人！这些人都躺起了！" },
-    { at: "zone:C3_ForwardAid", type: "line", who: "heyoutian", voice: "ch3_heyoutian_05", text: "妈卖批……这帮畜生。" },
-    { at: "zone:C3_ForwardAid", type: "line", who: "luo", voice: "ch3_luo_12", text: "左边两个，屋门三个。" },
+    { at: "event:ExecutionConfirmed", type: "objective", text: "确认前沿救护点里正在发生什么，然后开火" },
+    { at: "event:ExecutionConfirmed", type: "env", text: "破墙外面：白布担架、翻倒的药箱、墙根下一排躺着的人，地上是拖过去的痕迹。", tier: "主流" },
+    { at: "event:ExecutionConfirmed", type: "line", who: "yaowa", voice: "ch3_yaowa_07", text: "这些人都没枪了……" },
+    { at: "event:ExecutionConfirmed", type: "shout", who: "yaowa", voice: "ch3_yaowa_08", text: "日你先人！这些人都躺起了！" },
+    { at: "event:ExecutionConfirmed", type: "line", who: "heyoutian", voice: "ch3_heyoutian_05", text: "妈卖批……这帮畜生。" },
+    { at: "event:ExecutionConfirmed", type: "line", who: "luo", voice: "ch3_luo_12", text: "左边两个，屋门三个。" },
     // ↑ 这一条之后由 ExecutionConfirmed 播 CS_Ch3_BreakWall（罗班长「左右分开。」→
     //   「开火！里头活的带出来！」），播完立即恢复控制，下面这一组接着来。
 
@@ -323,25 +407,25 @@ export const CHAPTER = {
     { at: "delay:5.0", type: "shout", who: "luo", voice: "ch3_luo_17", text: "能走的交给幺娃！", tier: "虚构" },
 
     // ── 阶段 10｜顺子毁掉逃跑衣服（ER-2）────────────────────────────────
-    { at: "delay:12.0", type: "shout", who: "junyi", voice: "ch3_junyi_06", text: "绷带没得了！按到起！", tier: "虚构" },
-    { at: "delay:12.0", type: "system", text: "寻找可用布料 —— 绷带用完了。" },
-    { at: "delay:12.0", type: "system", text: "长按：撕开背包里那件民用短褂。" },
-    { at: "delay:12.0", type: "line", who: "heyoutian", voice: "ch3_heyoutian_08", text: "这不是你留到临城换的衣裳？" },
-    { at: "delay:12.0", type: "line", who: "shunzi", voice: "ch3_shunzi_05", text: "按稳。" },
-    { at: "delay:12.0", type: "line", who: "shunzi", voice: "ch3_shunzi_06", text: "莫让他再流了。" },
-    { at: "delay:12.0", type: "env", text: "顺子没有再说别的。", tier: "虚构" },
+    { at: "event:AssaultCleared", type: "shout", who: "junyi", voice: "ch3_junyi_06", text: "绷带没得了！按到起！", tier: "虚构" },
+    { at: "event:AssaultCleared", type: "system", text: "寻找可用布料 —— 绷带用完了。" },
+    { at: "event:AssaultCleared", type: "system", text: "长按：撕开背包里那件民用短褂。" },
+    { at: "event:ShirtTorn", type: "line", who: "heyoutian", voice: "ch3_heyoutian_08", text: "这不是你留到临城换的衣裳？" },
+    { at: "event:ShirtTorn", type: "line", who: "shunzi", voice: "ch3_shunzi_05", text: "按稳。" },
+    { at: "event:ShirtTorn", type: "line", who: "shunzi", voice: "ch3_shunzi_06", text: "莫让他再流了。" },
+    { at: "event:ShirtTorn", type: "env", text: "顺子没有再说别的。", tier: "虚构" },
 
     // ── 阶段 11｜传单入火（ER-3 → CS_Ch3_LeafletFire，全程无台词）───────
-    { at: "zone:C3_Firebreak", type: "objective", text: "撕开短褂止血，把传单投进炉火封路" },
-    { at: "zone:C3_Firebreak", type: "system", text: "长按：把传单丢进炉火。" },
+    { at: "event:AtFirebreak", type: "objective", text: "撕开短褂止血，把传单投进炉火封路" },
+    { at: "event:AtFirebreak", type: "system", text: "长按：把传单丢进炉火。" },
     // 火起来之后幺娃那两句 —— 台词在过场外面说，过场里一个字都没有。
-    { at: "delay:7.0", type: "line", who: "yaowa", voice: "ch3_yaowa_10", text: "保命……" },
-    { at: "delay:7.0", type: "line", who: "yaowa", voice: "ch3_yaowa_11", text: "保个鸭儿的命。" },
+    { at: "event:LeafletBurned", type: "line", who: "yaowa", voice: "ch3_yaowa_10", text: "保命……" },
+    { at: "event:LeafletBurned", type: "line", who: "yaowa", voice: "ch3_yaowa_11", text: "保个鸭儿的命。" },
 
     // ── 阶段 12｜撤回主救护所（院内已变，开头闲谈的人大多沉默）──────────
-    { at: "zone:C3_AidReturn", type: "objective", text: "撤回主救护所" },
-    { at: "zone:C3_AidReturn", type: "shout", who: "luo", voice: "ch3_luo_18", text: "街口顶一哈，等担架过去。", tier: "虚构" },
-    { at: "zone:C3_AidReturn", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_05", text: "这段线回收不了，我剪了。", tier: "虚构" },
+    { at: "event:AtAidReturn", type: "objective", text: "撤回主救护所" },
+    { at: "event:AtAidReturn", type: "shout", who: "luo", voice: "ch3_luo_18", text: "街口顶一哈，等担架过去。", tier: "虚构" },
+    { at: "event:AtAidReturn", type: "line", who: "xiaoqin", voice: "ch3_xiaoqin_05", text: "这段线回收不了，我剪了。", tier: "虚构" },
 
     { at: "delay:9.0", type: "env", text: "院子还是那个院子。门板拆完了，地上是绷带和血水。", tier: "虚构" },
     { at: "delay:9.0", type: "line", who: "liuwencai", voice: "ch3_liuwencai_04", text: "还有几副担架？" },

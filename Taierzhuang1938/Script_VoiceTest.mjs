@@ -108,58 +108,100 @@ Object.assign(r, await page.evaluate(() => {
   };
 }));
 
-// 序章配音资产是时间轴契约：18 句对白只占 11 个 cue；1:08—1:30 的八句必须
-// 由一个连续 SeedAudio 1.0 场景文件承载，不能被误拆成八条独立 TTS。
-const PROLOGUE_EXPECTED = [
-  ["prologue_young_dispatch_01", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", "我们出川好久了哦。"],
-  ["prologue_old_wound_01", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_01.mp3", "路莫问，跟到走就是。"],
-  ["prologue_young_dispatch_02", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_02.mp3", "我都忘了屋头腊肉是啥味道了。"],
-  ["prologue_machine_gunner_01", "机枪手", "AudioSfx_PrologueVoiceMachineGunner_01.mp3", "你娃儿还惦记腊肉。"],
-  ["prologue_young_dispatch_03", "年轻传令兵", "AudioSfx_PrologueVoiceYoungDispatch_03.mp3", "不惦记吃的惦记啥子嘛。"],
-  ["prologue_machine_gunner_02", "机枪手", "AudioSfx_PrologueVoiceMachineGunner_02.mp3", "到了前头，有热水喝你就谢天谢地。"],
-  ["prologue_rifleman_01", "擦枪士兵", "AudioSfx_PrologueVoiceRifleman_01.mp3", "又卡。"],
-  ["prologue_old_wound_02", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_02.mp3", "你少骂两句，它兴许听话点。"],
-  ["prologue_old_wound_03", "旧伤士兵", "AudioSfx_PrologueVoiceOldWound_03.mp3", "近咯。"],
-  ["prologue_motivation_01", "班长与众人", "AudioSfx_PrologueVoiceMotivation_04.mp3", "班长（洪亮、逐句升温）：这次你们去啊。出川，晓不晓得啊？\n众人（十到十二名十七八岁男兵自然错拍、斗志昂扬）：我们晓得。打日本！\n班长（短促有力）：去死，怕不怕？\n众人（两三人先起、其余瞬间压上）：不怕！\n班长（继续逼问）：为啥子不怕？\n众人（年轻声线自然重叠、满腔热血）：我们要保护我们的国家！\n班长（哽咽一瞬）：好样的。\n班长（洪亮坚决地命令）：都把东西带好。前头就是滕县。"],
-  ["prologue_external_officer_01", "车外军官", "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", "通信排，下车！线盘背起，搞快！"],
-];
+// ---------------------------------------------------------------------------
+// 序章（CS_Chuchuan）的配音契约 —— 2026-08-29 集成批 INT3a 按新序章重定标
+//
+// 这四条原来钉在**旧序章**上：42 s / 六镜 / 18 句对白压成 11 个 `prologue_*` cue /
+// 1:08—1:30 的八句班长动员由一条连续 SeedAudio 场景文件承载。
+// 任务流程重制把序章整段换掉了（docs/Data_MissionRemake.md §1）：
+// 现在是 166.5 s / 九镜 / **31 句**，说话的全是有名有姓的 CAST，
+// 走 `ch0_*` 章节语音通道（行本体在 Data_MissionCh0.mjs，由 Data_Voice 拼进总表）。
+// 那 11 条 prologue_* 行已经从 VOICE_LINES 里退役（mp3 留档在盘上）。
+//
+// 重写时守的是**新序章的设计不变量**，不是把旧数字换成新数字：
+//   · 每一句都有 voiceCue，且每个 voiceCue 在总表里认得出来（写错 key = 静默丢台词）；
+//   · 屏幕上的说话人与声库里那一行的 who 必须是同一个人（挑错人 = 别人的嗓子）；
+//   · 31 条全部烘出了音频（序章是正片第一分钟，不许靠纯字幕降级过关）；
+//   · 三档交付（常态/急喊/耳语）都真的用上了 —— 顺子那段咬耳朵是靠**音量差**
+//     让玩家知道「现在不能出声」的，全刷成常态就白做了；
+//   · 剧情语音是**单槽**，后一句会顶掉前一句：踩得太多就是有人被切掉半句。
+// 时间轴结构（九镜、秒数和、固定演出 ≤45 s）由 Script_CutsceneControlTest 守。
+// ---------------------------------------------------------------------------
 const prologue = await page.evaluate(async () => {
   const mod = await import("./Data_Voice.mjs");
   const cutMod = await import("./Data_CutsceneChuchuan.mjs");
   const bank = new Map([...window.Taierzhuang.audio.voiceBank.values()].map((e) => [e.key, e]));
-  const assets = mod.VOICE_LINES.filter((e) => e.prologue).map((e) => {
-    const loaded = bank.get(e.key) || {};
-    return { key: e.key, role: e.role, file: e.file, text: e.text, duration: loaded.duration || 0,
-      backend: e.backend, provider: e.provider, promptMode: e.promptMode, lineCount: e.lineCount || 1 };
-  });
-  const dialogue = cutMod.CS_Chuchuan.shots.flatMap((shot) => (shot.lines || []).map((line) => ({ shot: shot.n, ...line })));
-  const motivation = dialogue.filter((line) => line.shot === 6);
-  return { assets, dialogueCount: dialogue.length, motivation: motivation.map((line) => ({ who: line.who, voiceCue: line.voiceCue || null, text: line.text })) };
+  const rows = new Map(mod.VOICE_LINES.map((line) => [line.key, line]));
+  const spoken = [];
+  for (const shot of cutMod.CS_Chuchuan.shots) {
+    for (const line of shot.lines || []) {
+      const row = rows.get(line.voiceCue) || null;
+      const loaded = bank.get(line.voiceCue) || null;
+      spoken.push({
+        shot: shot.n, at: line.at, subSeconds: line.seconds, who: line.who,
+        cue: line.voiceCue || null,
+        row: row ? { who: row.who, kind: row.kind, chapter: row.chapter, delivery: row.delivery, dur: row.dur } : null,
+        duration: loaded ? loaded.duration : 0,
+      });
+    }
+  }
+  return {
+    spoken,
+    orphanRows: mod.VOICE_LINES.filter((line) => /^prologue_/.test(line.key)).map((line) => line.key),
+    // 资产留档：行删了，人工试听选定的 take 仍在盘上（旧序章 CS_ChuchuanLegacy 也留着）。
+    legacyAssetAlive: (await fetch("Audio/AudioSfx_PrologueVoiceMotivation_04.mp3", { method: "GET" })).ok,
+  };
 });
-const assets = prologue.assets;
-const prologueShape = assets.length === PROLOGUE_EXPECTED.length
-  && assets.every((e, i) => e.key === PROLOGUE_EXPECTED[i][0] && e.role === PROLOGUE_EXPECTED[i][1]
-    && e.file === PROLOGUE_EXPECTED[i][2] && e.text === PROLOGUE_EXPECTED[i][3]);
-const prologueDurOk = assets.every((e) => e.duration >= 0.45
-  && (e.promptMode === "continuousScene" ? e.duration <= 22.5 : e.duration <= 5.2));
-Check("序章 18 句对白恰好映射为 11 个 cue，且 cue/file/角色/文本逐条匹配", prologueShape && prologue.dialogueCount === 18,
-  `资产 ${assets.length} 个 / 对白 ${prologue.dialogueCount} 句${prologueShape ? "" : "，期望顺序或字段不匹配"}`);
-Check("序章单句 cue 在 0.45—5.2 s，连续动员 cue 不超过 22.5 s", prologueDurOk,
-  `时长 ${assets.map((e) => e.duration.toFixed(2)).join("/")}`);
-const seedOnly = assets.every((e) => e.backend === "seedaudio1.0" && e.provider === "volcengine");
-Check("序章全部配音资产锁定火山引擎 SeedAudio 1.0，不允许 Lovart、Qwen 或系统朗读回退", seedOnly,
-  assets.map((e) => `${e.key}:${e.provider || "缺失"}/${e.backend || "缺失"}`).join(" "));
-const motivationContinuous = prologue.motivation.length === 8
-  && prologue.motivation[0].voiceCue === "prologue_motivation_01"
-  && prologue.motivation.slice(1).every((line) => line.voiceCue === null)
-  && assets.find((e) => e.key === "prologue_motivation_01")?.promptMode === "continuousScene"
-  && assets.find((e) => e.key === "prologue_motivation_01")?.lineCount === 8;
-Check("1:08—1:30 八句只触发一个连续音频 cue", motivationContinuous,
-  prologue.motivation.map((line) => `${line.who}:${line.voiceCue || "字幕"}`).join(" / "));
+const spoken = prologue.spoken;
+const noCue = spoken.filter((line) => !line.cue);
+const unknownCue = spoken.filter((line) => line.cue && !line.row);
+const wrongChannel = spoken.filter((line) => line.row
+  && (line.row.kind !== "story" || line.row.chapter !== 0 || !/^ch0_/.test(line.cue)));
+const wrongSpeaker = spoken.filter((line) => line.row && line.row.who !== line.who);
+Check("序章每一句都有 voiceCue，且每个 cue 都能在总表里认出来（走 ch0_* 章节通道）",
+  spoken.length === 31 && !noCue.length && !unknownCue.length && !wrongChannel.length && !wrongSpeaker.length,
+  `${spoken.length} 句`
+  + (noCue.length ? `；${noCue.length} 句没有 cue` : "")
+  + (unknownCue.length ? `；总表里没有：${unknownCue.map((l) => l.cue).join(" ")}` : "")
+  + (wrongChannel.length ? `；走错通道：${wrongChannel.map((l) => l.cue).join(" ")}` : "")
+  + (wrongSpeaker.length ? `；说话人对不上：${wrongSpeaker.map((l) => `${l.cue}(屏上 ${l.who}/表里 ${l.row.who})`).join(" ")}` : ""));
+
+const unbaked = spoken.filter((line) => !(line.duration > 0));
+Check("序章 31 条台词全部烘出了音频（正片第一分钟不许靠纯字幕降级过关）",
+  unbaked.length === 0,
+  unbaked.length ? `还没烘：${unbaked.map((l) => l.cue).join(" ")}`
+    : `最长 ${Math.max(...spoken.map((l) => l.duration)).toFixed(2)}s / 最短 ${Math.min(...spoken.map((l) => l.duration)).toFixed(2)}s`);
+
+const deliveries = spoken.reduce((acc, line) => {
+  if (line.row) acc[line.row.delivery] = (acc[line.row.delivery] || 0) + 1;
+  return acc;
+}, {});
+Check("序章三档交付都用上了（顺子那段耳语靠音量差说话，全刷成常态就白做了）",
+  ["normal", "shout", "whisper"].every((kind) => (deliveries[kind] || 0) >= 3),
+  JSON.stringify(deliveries));
+
+// 单槽：后一句起播会顶掉前一句。策划上允许搭一点（换气抢话），
+// 但踩进去超过 0.35 s（约一个字）就是真的把上一句切掉了。
+const OVERLAP_LIMIT_S = 0.35;
+const overlaps = [];
+for (const shot of new Set(spoken.map((line) => line.shot))) {
+  const inShot = spoken.filter((line) => line.shot === shot);
+  for (let i = 1; i < inShot.length; i += 1) {
+    const gap = inShot[i].at - (inShot[i - 1].at + inShot[i - 1].duration);
+    if (gap < -OVERLAP_LIMIT_S) overlaps.push(`${inShot[i - 1].cue}→${inShot[i].cue} 叠 ${(-gap).toFixed(2)}s`);
+  }
+}
+Check("序章没有一句被下一句踩掉（剧情语音是单槽，新的顶掉旧的）",
+  overlaps.length === 0, overlaps.length ? overlaps.join(" / ") : `全部 31 句依次说完（容差 ${OVERLAP_LIMIT_S}s）`);
+
+Check("旧序章那 11 条 prologue_* 已从总表退役，音频资产仍留档",
+  prologue.orphanRows.length === 0 && prologue.legacyAssetAlive,
+  prologue.orphanRows.length ? `总表里还剩：${prologue.orphanRows.join(" ")}`
+    : `总表零条；Audio/AudioSfx_PrologueVoice*.mp3 ${prologue.legacyAssetAlive ? "仍在盘上" : "**已经不见了**"}`);
 
 // 章节剧情台词是**先写词、后烘音**的：内容批把台词写进 Data_MissionChX.mjs 之后，
 // 到烘焙之前那段时间里，它们必然 404。那不是回归，是设计好的降级（纯字幕）——
-// 所以这里把两类错误分开算：战斗口令与序章对白一条都不许丢，剧情台词只报数。
+// 所以这里把两类错误分开算：战斗口令一条都不许丢，剧情台词（含序章那 31 句）只报数。
 const storyLoad = await page.evaluate(async () => {
   const mod = await import("./Data_Voice.mjs");
   const A = window.Taierzhuang.audio;
@@ -174,7 +216,7 @@ const storyLoad = await page.evaluate(async () => {
   };
 });
 const hardErrors = r.errors.filter((e) => !e.startsWith("vo_ch"));
-Check("配音全部解码成功（战斗口令与序章对白，一条都不许静默丢）",
+Check("配音全部解码成功（战斗口令一条都不许静默丢）",
   r.size >= 30 && hardErrors.length === 0,
   `载入 ${r.size} 条，硬错误 ${hardErrors.length} 条${hardErrors.length ? "：" + hardErrors.join(" / ") : ""}`
   + `；剧情台词 ${storyLoad.baked}/${storyLoad.total} 条已烘焙（其余降级为纯字幕）`);
@@ -198,8 +240,10 @@ Check("日方六类齐全（少一类就会复读）",
 Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",
   r.ijaBaka.length === 0, r.ijaBaka.length ? "命中：" + r.ijaBaka.join(" ") : "干净");
 const battleDurations = await page.evaluate(() => [...window.Taierzhuang.audio.voiceBank.values()]
-  .filter((e) => !e.prologue && e.kind !== "story").map((e) => e.duration));
-Check("战斗 Bark 仍在 0.3—2.6 s（序章对白与剧情台词各有独立时长闸）",
+  .filter((e) => e.kind !== "story").map((e) => e.duration));
+// prologue 这个筛子 2026-08-29 拿掉了：旧序章那 11 条 prologue_* 行已经退役，
+// 现在 kind !== "story" 剩下的就是纯粹的战场口令（中方 31 条 + 日方 28 条）。
+Check("战斗 Bark 仍在 0.3—2.6 s（剧情台词另有各自的交付档闸）",
   battleDurations.every((d) => d > 0.3 && d < 2.6),
   `战斗最长 ${Math.max(...battleDurations).toFixed(2)}s，最短 ${Math.min(...battleDurations).toFixed(2)}s`);
 const cross = await page.evaluate(() => {
@@ -285,7 +329,7 @@ const mix = await page.evaluate(async () => {
   }
   return out;
 });
-// 战斗口令与序章对白：一条平线。远近交给距离衰减，不许由文件音量代劳。
+// 战斗口令：一条平线。远近交给距离衰减，不许由文件音量代劳。
 const barkMix = mix.filter((m) => !m.story);
 const rmsVals = barkMix.map((m) => m.rms);
 const spread = Math.max(...rmsVals) - Math.min(...rmsVals);

@@ -15,6 +15,53 @@
 //
 // 用法：node Taierzhuang1938/Script_DamageTest.mjs
 // 退出码即成败。
+//
+// ---------------------------------------------------------------------------
+// 2026-08-29 集成批 INT3a：取样章从 `?phase=0` 换到 `?phase=1`
+//
+// **为什么必须换：`phase=0` 现在是零敌人的过场章。** 任务流程重制之后
+// `Data_Battle.PHASES[0]` 是 `CH0_Chuchuan`（序章·出川，`cutsceneOnly: true`、
+// `ijaPool: 0`、`ijaSpawn: []`、玩家手上连枪都没有）。靶场第一步就是
+// 「从场上挑三个活着的日本兵」，在那一关挑到的是**零个** ——
+// 于是射击周期 `cycle` 算出来是 NaN，`while (elapsed < seconds)` 一轮都不进，
+// 整份 TTK 报告变成一串 −1，而且它不报错：这一层的十九条断言集体失去意义。
+//
+// **为什么挑第一关（CH1_NanLu）而不是别的：出生点附近的敌我态势与旧 L0 最像。**
+// 靶场量的是「三个日本兵在 25 m 上打你」，所以要的是与旧 `L0_Jiehe` 同一种
+// 战场：开阔地、日军从北面压过来、有炮兵与重机枪支援、压力系数同一档。
+// 逐项对照（旧 L0_Jiehe → 新 CH1_NanLu）：
+//   · ijaPressure   1.0        → 1.0        （完全相同）
+//   · ijaSpawn      ["north"]  → ["north"]  （完全相同）
+//   · ijaSupport    artillery+hmg → artillery+hmg（完全相同）
+//   · ijaForce      lmgEvery 13 / hmgTeams 1 / armor 0（完全相同 —— 决定敌方枪械配比，
+//                   而枪械配比直接决定 TTK：三八式 72 / 九二式 92）
+//   · 地形          城北界河原野 → 城外津浦路路基与南向大车路（同为城外开阔地）
+//   · 叙事位置      玩家的第一场仗 → 玩家的第一场仗（brief 原话「这是玩家的第一场仗」）
+// 第二关（CH2_Shouliudan）不合适：ijaPressure 1.5、从东面压、多一支掷弹筒，
+// 而且打的是东关的院落巷战 —— 那是另一种交火距离，TTK 基线不可比。
+//
+// **新基线从哪来：口径一个数都没动，所以基线也不该动。** `COMBAT.player` 那十一个
+// 字段（docs/Data_PlayerDamage.md §二）、`aiAccuracyBase`、`Data_Weapons` 的伤害
+// 全部原样；换章换掉的只是「场上那三个日本兵拿的是什么枪」，而 CH1 的 ijaForce
+// 与旧 L0 逐字相同，所以 TTK 落在同一条带子里。断言仍按 docs §五「落地的数」验：
+// 三人 25 m 站姿 15 次中位数 ≈ 9—13 s，闸门留 8—24 s；姿态梯度（卧 > 立）照旧。
+//
+// 换章之后在 CH1_NanLu 上实跑的数（2026-08-29，24/24 全绿）：
+//   · 场上 15 个日本兵，武器 Type38 / Type11 / Type92Hmg —— 与旧 L0 的
+//     ijaForce（lmgEvery 13 / hmgTeams 1 / armor 0）算出来的配比一致，
+//     **这是「换章没换掉被测对象」最直接的证据**；
+//   · 三人 25 m 站姿 TTK 中位数 **12.2 s**（旧口径同一台靶场 5.2 s，比值 2.3×），
+//     落在 docs §五 记的 9—13 s 里；靶场命中率新 19% / 旧 31%，也对得上；
+//   · 姿态梯度 立 14.2 s / 蹲 14.8 s / 卧 25.1 s（docs §五 记的是 12—13 / 13—18 / 20—25
+//     —— 立与卧各比旧账高一两秒。**不知道确切原因，也不假装知道**：ijaForce 一样、
+//     口径一个数没动，最可能的是这一关场上那三个人抽到的枪与站位与旧 L0 不同
+//     （靶场只挑「前三个活着的日本兵」，谁排在前面取决于撒兵）。断言压的是
+//     「卧 > 立」这条**关系**，不压绝对值 —— 姿态是最大的一根杠杆，
+//     它的方向比它的秒数更值得守。）；
+//   · 单发最重 60.7（九二式重机爆头 92 × 0.33 × 2.0），仍在 maxBulletDamage 62 之下。
+// 这几个数**没有回写 docs/Data_PlayerDamage.md** —— 那份文档不在 INT3a 的文件
+// 所有权内，§五「落地的数」那张表该由主管统一更新。
+// ---------------------------------------------------------------------------
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,10 +91,32 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=0&quality=low&scale=small`,
+// phase=1 = CH1_NanLu（第一关 · 往南的路）。**不能用 phase=0**：那是零敌人的
+// 过场章，靶场一个射手都挑不到（见文件头「取样章」那一节）。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+
+// 取样章体检：**先证明这一关真有日本兵**，再谈 TTK。
+// 上一版把这件事默认成立，于是换到过场章之后整份报告静默变成一串 −1 ——
+// 「靶场里一个人都没有」和「打了九十秒没打死」在输出上长得一模一样。
+const arena = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  const battle = await import("./Data_Battle.mjs");
+  const phase = battle.PHASES[T.state.phaseIndex] || {};
+  const alive = T.ai.soldiers.filter((s) => s.side === "ija" && s.alive);
+  return {
+    id: phase.id,
+    pressure: phase.ijaPressure,
+    spawn: (phase.ijaSpawn || []).join("/"),
+    ija: alive.length,
+    weapons: [...new Set(alive.map((s) => s.weapon?.id || s.weapon?.name || "?"))].sort(),
+  };
+});
+Check(`取样章 ${arena.id} 场上有日本兵可打（少于三个就没有靶场可言）`,
+  arena.ija >= 3,
+  `${arena.ija} 人在场，压力 ${arena.pressure}／来向 ${arena.spawn}，武器 ${arena.weapons.join("/") || "（无）"}`);
 
 // ===========================================================================
 // 页面里的一台"靶场"。
@@ -94,6 +163,10 @@ await page.evaluate(() => {
         shooters.push(s);
         if (shooters.length >= (opt.shooters ?? 3)) break;
       }
+      // 一个射手都没有就**明说**。原来这里不查：换到零敌人的过场章之后
+      // cycle 算成 NaN、循环一轮都不进，报告变成一串 −1 却不报错 ——
+      // 「靶场里没人」和「打了九十秒没打死」在输出上长得一模一样。
+      if (!shooters.length) throw new Error("靶场里一个活着的日本兵都没有 —— 取样章选错了");
 
       player.Spawn(player.position.x, player.position.z, player.yaw);
       player.spawnGrace = 0;                       // 出生保护另有断言，这里不测它

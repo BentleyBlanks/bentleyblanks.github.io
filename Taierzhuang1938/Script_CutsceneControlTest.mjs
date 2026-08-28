@@ -3,6 +3,9 @@ import fs from "node:fs";
 import { ClampHeadLook, ResolveHeadLookConfig } from "./Script_CutsceneCheck.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
+// 序章的每一句台词都要在总表里认得出来 —— 写错一个 voiceCue 的后果是静默降级成
+// 纯字幕（画面照跑、控制台干净、通关冒烟全绿），只有对着表逐条查才看得见。
+import { VOICE_LINES } from "./Data_Voice.mjs";
 
 const cut = {
   id: "TEST_HeadLook", title: "test", seconds: 1,
@@ -267,44 +270,130 @@ sfxDirector.Skip();
 await sfxPlay;
 assert.equal(sfxDirector.sfxFades.length, 0, "跳过/收摊时淡变账本要清干净");
 
-const motivationShot = CS_Chuchuan.shots.find((shot) => shot.n === 6);
-const motivationStart = CS_Chuchuan.shots.slice(0, 5).reduce((sum, shot) => sum + shot.seconds, 0);
-const motivationEnd = motivationStart + motivationShot.seconds;
-assert.equal(motivationStart, 68, "the continuous squad-leader exchange starts at 1:08");
-assert.equal(motivationEnd, 90, "the continuous squad-leader exchange ends at 1:30");
-assert.equal(motivationShot.lines.length, 8, "the motivation exchange preserves all eight authored lines");
-assert.equal(motivationShot.lines.filter((line) => line.voiceCue).length, 1,
-  "the 1:08—1:30 exchange triggers one continuous audio file instead of eight isolated clips");
-assert.equal(motivationShot.lines[0].voiceCue, "prologue_motivation_01");
-assert.equal(CS_Chuchuan.walk, undefined, "gameplay WASD cannot detach the player from the authored seated/exit path");
-assert.equal(CS_Chuchuan.suppress.movement, true, "gameplay movement stays suppressed for the whole prologue");
-const locationShotStart = CS_Chuchuan.shots.slice(0, 6).reduce((sum, shot) => sum + shot.seconds, 0);
-const doorShotStart = CS_Chuchuan.shots.slice(0, 7).reduce((sum, shot) => sum + shot.seconds, 0);
-assert.equal(locationShotStart, 90, "the Tengxian location card begins immediately after the exchange");
-assert.equal(doorShotStart, 93, "the carriage door opens after the short location card");
-assert.equal(CS_Chuchuan.seconds, 105, "the side-door walk has enough authored time to reach and stop on the platform");
-assert.equal(CS_Chuchuan.shots.length, 11, "the exit is split into aisle, threshold, steps, and platform beats");
+// ===========================================================================
+// 序章 CS_Chuchuan 的设计不变量（2026-08-29 集成批 INT3a 重定标）
+//
+// 这一段原来钉在**旧序章**上（42 s / 六镜 / 1:08—1:30 的八句班长动员 /
+// 最后 12 秒第一人称走下车）。任务流程重制把序章整段换掉了
+//（docs/Data_MissionRemake.md §1，逐条对照写在 Data_CutsceneChuchuan 的头注）：
+// 现在是 166.5 s / 九镜 / 31 句 ch0_* 章节台词，**玩家全程坐在座位上**，
+// 收口是「远处炮声 → 罗班长喊口令 → 短切黑出字幕」，人根本还没下车。
+//
+// 重写的时候刻意不去「把旧数字换成新数字」——那样下一次改秒数还得再改一遍测试，
+// 而且测不出任何设计意图。这里断言的是**策划案定死的那几条不变量**：
+//   ① 九镜的秒数之和 === 全场时长（改一镜秒数忘了改总长 = 时间轴静默错位）；
+//   ② 固定演出 ≤ 45 s（§1 过场规格：车厢主体必须是可自由转头的第一人称）；
+//   ③ 自由段用全场 headLook 范围，只有固定演出镜才收窄；
+//   ④ 每一句 voiceCue 在 Data_Voice 的总表里有对应行（写错 key = 静默没声音）；
+//   ⑤ 玩家全程坐在同一个座位上，相机就长在他眼睛里。
+// 布景那几条（月台同一条里程、车门整套一起滑、行李密度）照旧留着 —— 它们
+// 与序章内容无关，是这一场的舞台本身，重制一件没动。
+// ===========================================================================
+
+// ① 九镜的秒数之和必须等于 seconds。Data_CutsceneChuchuan 里 CHUCHUAN_END 是
+//    整套时间轴的锚（演员轨、propMoves、ambientMotion 的 stopAt 全按它算），
+//    对不上就是「最后一镜被截掉半截」或者「黑场卡之后还空着两秒」。
+const shotTotal = CS_Chuchuan.shots.reduce((sum, shot) => sum + shot.seconds, 0);
+assert.equal(CS_Chuchuan.shots.length, 9, "the remade prologue is authored as nine shots");
+assert.ok(Math.abs(shotTotal - CS_Chuchuan.seconds) < 1e-9,
+  `shot seconds must sum to the authored length (${shotTotal} vs ${CS_Chuchuan.seconds})`);
+assert.equal(CS_Chuchuan.seconds, 166.5, "the remade prologue runs 2:46.5 end to end");
+
+// ② 固定演出的预算。「固定演出」= 收窄了转头幅度的镜（per-shot headLook）
+//    加上黑场字卡；其余镜相机钉在座位上不动、只给基准视轴，玩家自己转头。
+//    §1 的过场规格给的上限是 45 s，现在是镜 2（30）+ 镜 3（7）+ 镜 9（4.5）= 41.5。
+//    这条闸挡的是「一镜一镜加演出，加着加着序章又变回一段过场电影」。
+const staged = CS_Chuchuan.shots.filter((shot) => shot.headLook || shot.black);
+const stagedSeconds = staged.reduce((sum, shot) => sum + shot.seconds, 0);
+assert.deepEqual(staged.map((shot) => shot.n), [2, 3, 9],
+  "only the letter/door beats and the closing black card are staged");
+assert.ok(stagedSeconds <= 45,
+  `staged beats must stay within the 45 s budget (now ${stagedSeconds}s across shots ${staged.map((s) => s.n).join("/")})`);
+assert.ok(stagedSeconds / CS_Chuchuan.seconds < 0.5,
+  "more than half the prologue must remain freely look-around-able");
+
+// ③ 自由段吃全场范围，固定演出镜只许**收窄**、不许放宽 —— 放宽等于在演出里
+//    把玩家的头甩出画面。全场范围本身也要够宽：坐着的人得能低头看自己的身体、
+//    抬头看行李架（±120° / −76°—+66°）。
+assert.ok(CS_Chuchuan.headLook.yaw[1] >= 2.0 && CS_Chuchuan.headLook.yaw[0] <= -2.0,
+  "the seated soldier can turn to either side of the carriage");
 assert.ok(CS_Chuchuan.headLook.pitch[0] <= -1.3 && CS_Chuchuan.headLook.pitch[1] >= 1.1,
   "the seated soldier can look down at his body and raise his view toward the luggage racks");
-const playerSoldier = CS_Chuchuan.cast.find((actor) => actor.id === "playerSoldier");
-assert.equal(playerSoldier?.firstPerson, true, "the camera belongs to an ordinary actor body, not a detached observer");
-assert.equal(playerSoldier?.track[0]?.state?.sit, 1, "the player begins seated on the bench");
-assert.ok(playerSoldier.track.every((frame) => !frame.state?.hidden), "the player is never hidden or teleported during disembarkation");
-assert.ok(playerSoldier.track.some((frame) => frame.t === 101 && frame.pos[0] > 5 && frame.pos[1] >= 0.58),
-  "the player crosses the side threshold and reaches the raised station platform");
-assert.ok(playerSoldier.track.at(-1).pos[2] > 7 && playerSoldier.track.at(-1).state?.moveSpeed === 0,
-  "the player walks along the platform and comes to a real stop");
-const seatedShot = CS_Chuchuan.shots.find((shot) => shot.n === 3);
-assert.deepEqual([seatedShot.camera.from[0], seatedShot.camera.from[2]],
-  [playerSoldier.track[0].pos[0], playerSoldier.track[0].pos[2]],
-  "the opening camera is physically located on the player's occupied bench seat");
-const squadLeader = CS_Chuchuan.cast.find((actor) => actor.id === "squadLeader");
-const interiorCrowd = CS_Chuchuan.cast.filter((actor) => actor.id !== "stretcherBearerA" && actor.id !== "stretcherBearerB"
-  && actor.id !== "lightWounded" && actor.id !== "externalOfficer");
+for (const shot of CS_Chuchuan.shots) {
+  if (!shot.headLook) {
+    assert.equal(ResolveHeadLookConfig(CS_Chuchuan, shot).yaw[1], CS_Chuchuan.headLook.yaw[1],
+      `shot ${shot.n} is a free beat and must inherit the full look range`);
+    continue;
+  }
+  assert.ok(shot.headLook.yaw[1] <= CS_Chuchuan.headLook.yaw[1]
+    && shot.headLook.yaw[0] >= CS_Chuchuan.headLook.yaw[0]
+    && shot.headLook.pitch[1] <= CS_Chuchuan.headLook.pitch[1]
+    && shot.headLook.pitch[0] >= CS_Chuchuan.headLook.pitch[0],
+  `shot ${shot.n} narrows the look range instead of widening it`);
+}
+
+// ④ 每一句 voiceCue 都要在 Data_Voice 的总表里有行，而且必须是本章的 ch0_* 行
+//    （story 通道、chapter 0）。写错一个 key 的后果是**静默降级成纯字幕** ——
+//    画面照跑、控制台干净，只是这句话没人说，正是最难查的那一类。
+//    顺带守住「不许回头去引用旧序章那 11 条 prologue_*」：那批行已经删了。
+const voiceRows = new Map(VOICE_LINES.map((line) => [line.key, line]));
+const spoken = CS_Chuchuan.shots.flatMap((shot) => (shot.lines || []).map((line) => ({ shot: shot.n, ...line })));
+assert.equal(spoken.length, 31, "the remade prologue speaks 31 authored lines");
+assert.equal(spoken.filter((line) => line.voiceCue).length, spoken.length,
+  "every authored line carries a voiceCue — a subtitle with no cue is a line nobody says");
+for (const line of spoken) {
+  const row = voiceRows.get(line.voiceCue);
+  assert.ok(row, `shot ${line.shot}: voiceCue ${line.voiceCue} has no row in VOICE_LINES`);
+  assert.equal(row.kind, "story", `${line.voiceCue} must ride the story voice channel, not the Bark pool`);
+  assert.equal(row.chapter, 0, `${line.voiceCue} must belong to chapter 0`);
+  assert.equal(row.who, line.who, `${line.voiceCue} is attributed to ${line.who} on screen but ${row.who} in the voice table`);
+}
+assert.equal(VOICE_LINES.filter((line) => /^prologue_/.test(line.key)).length, 0,
+  "the eleven orphaned prologue_* rows from the old prologue are gone from VOICE_LINES");
+// 台词分布：策划案要的是「六镜有台词 + 三镜没有」（镜 3 是列车进站、镜 6 是低头
+// 看短褂、镜 9 是黑场卡 —— 这三拍靠画面和音效说话）。全挤在一两镜里就成了念稿。
+const talkingShots = CS_Chuchuan.shots.filter((shot) => (shot.lines || []).length > 0).map((shot) => shot.n);
+assert.deepEqual(talkingShots, [1, 2, 4, 5, 7, 8], "six shots carry dialogue; three carry only picture and sound");
+
+// ⑤ 玩家：全程坐在左侧长凳同一个座位上，相机就长在他眼睛里。
+//    旧版最后 12 秒是「起身→过道→踏板→月台」的第一人称行走段，
+//    新策划案里人还没下车 —— 那一段连同它的排队下车编排一起删了。
+assert.equal(CS_Chuchuan.walk, undefined, "gameplay WASD cannot detach the player from the authored seated view");
+assert.equal(CS_Chuchuan.suppress.movement, true, "gameplay movement stays suppressed for the whole prologue");
+const player = CS_Chuchuan.cast.find((actor) => actor.id === "shunzi");
+assert.equal(player?.firstPerson, true, "the camera belongs to an ordinary actor body, not a detached observer");
+assert.ok(player.track.every((frame) => frame.state?.sit === 1),
+  "the player stays seated for the whole prologue — he never gets up and never leaves the carriage");
+assert.ok(player.track.every((frame) => !frame.state?.hidden), "the player is never hidden or teleported");
+const seat = player.track[0].pos;
+assert.ok(player.track.every((frame) => frame.pos[0] === seat[0] && frame.pos[2] === seat[2]),
+  "the player never slides along the bench between shots");
+assert.ok(seat[0] < 0, "the player sits on the LEFT bench so the side door on the right wall is not a grazing angle");
+for (const shot of CS_Chuchuan.shots) {
+  assert.deepEqual([shot.camera.from[0], shot.camera.from[2]], [seat[0], seat[2]],
+    `shot ${shot.n} camera must sit on the player's own bench seat`);
+}
+// 最后一拍：罗班长喊完口令，全车人开始收东西 —— 那是「准备下车」，不是下车。
+assert.ok(player.track.at(-1).state?.prepare > 0.5,
+  "the prologue ends on the player packing up, not on him standing in the doorway");
+
+// 罗班长：全场站着（他是喊口令的那个），不许坐进座位里消失。
+const luo = CS_Chuchuan.cast.find((actor) => actor.id === "luo");
+assert.ok(luo.track.every((frame) => frame.state?.sit !== 1),
+  "the squad leader stays on his feet in the aisle instead of disappearing into a seat");
+const orderAt = CS_Chuchuan.shots.slice(0, 7).reduce((sum, shot) => sum + shot.seconds, 0);
+assert.equal(orderAt, 143, "the distant gunfire and the squad leader's orders start at 2:23");
+assert.ok(luo.track.some((frame) => frame.t >= orderAt && frame.state?.prepare > 0),
+  "the squad leader is visibly getting the squad up once the orders start");
+
+// 车厢里的人：坐满长凳、少数几个站在两侧，过道要留得出来。
+const OUTSIDE = new Set(["stretcherBearerA", "stretcherBearerB", "lightWounded",
+  "villagerA", "villagerB", "depotHand", "junguan"]);
+const interiorCrowd = CS_Chuchuan.cast.filter((actor) => !OUTSIDE.has(actor.id));
 const seatedInterior = interiorCrowd.filter((actor) => actor.track?.[0]?.state?.sit === 1);
 const standingBackground = interiorCrowd.filter((actor) => actor.id.startsWith("crowdStand"));
-assert.equal(interiorCrowd.length, 28, "the carriage keeps all seated passengers while leaving its aisle usable");
-assert.equal(seatedInterior.length, 21, "every bench segment seats riders mid-segment, including the four focal soldiers");
+assert.ok(interiorCrowd.length >= 24, "the carriage is crowded, not a stage with six actors on it");
+assert.ok(seatedInterior.length >= 18, "every bench segment seats riders mid-segment, including the focal soldiers");
 assert.equal(standingBackground.length, 6, "only six scattered background passengers stand by the sides and doors");
 assert.ok(standingBackground.every((actor) => Math.abs(actor.track[0].pos[0]) > 1),
   "standing background passengers stay clear of the center aisle");
@@ -313,31 +402,28 @@ assert.ok(new Set(crowdAppearances.map((actor) => actor.uniformHex)).size > 4,
   "crowd tops use several deterministic colors");
 assert.ok(new Set(crowdAppearances.map((actor) => actor.trouserHex)).size > 4,
   "crowd trousers use several deterministic colors");
-assert.ok(squadLeader.track.every((frame) => frame.state?.sit !== 1),
-  "squad leader remains standing at the rear of the carriage instead of disappearing into a seat");
-assert.ok(Math.abs(squadLeader.track[0].pos[0]) < 0.1 && squadLeader.track[0].pos[2] > 5.5,
-  "squad leader starts visibly at the far end of the carriage");
-assert.ok(squadLeader.track.some((frame) => frame.t <= motivationStart && frame.state?.prepare > 0),
-  "rear squad leader must be ready before the exchange begins");
-for (const actor of CS_Chuchuan.cast.filter((item) => item.id !== "squadLeader" && item.track?.[0]?.state?.sit === 1)) {
-  const stop = actor.track.find((frame) => frame.state?.prepare > 0 && frame.state?.sit === 1);
-  const ready = actor.track.find((frame) => frame.state?.prepare >= 0.99 && frame.state?.sit !== 1 && !frame.state?.hidden);
-  assert.ok(stop?.t >= 56 && stop?.t <= motivationStart, `${actor.id} did not stop work between the two cannon beats`);
-  assert.ok(ready?.t >= locationShotStart && ready?.t <= doorShotStart,
-    `${actor.id} must rise during the location card, after the exchange and before the door opens`);
-}
 
+// 兵站月台（镜 4 起）：**整套布景走同一条里程**，不然一切镜就整体瞬移。
+const doorShot = CS_Chuchuan.shots.find((shot) => shot.n === 3);
 assert.ok(!CS_Chuchuan.props.some((prop) => prop.kind === "model"),
   "the broken-axis station glb stays out of the set until the Blender pipeline is rerun (see engineRequests)");
 const stationParts = CS_Chuchuan.props.filter((prop) => /^Station(?!Stretcher)/.test(prop.name || ""));
 assert.ok(stationParts.length >= 40, "the station beat is dressed as a full authored set: platform, canopy, office, sign, benches, crane");
 const stationBaseMove = (CS_Chuchuan.ambientMotion || []).find((move) => move.name === "StationBase");
-assert.equal(stationBaseMove?.stopAt, 56, "the station rides one uniform ambientMotion mileage and halts with the train");
+// 列车必须**先停稳、门才开**。停车与开门写在两处（演员/布景轨用全局秒，
+// propMoves 用镜内相对秒），两边各写一个数就会漂 —— 这条断言把它们绑在一起。
+const doorShotStart = CS_Chuchuan.shots.slice(0, 2).reduce((sum, shot) => sum + shot.seconds, 0);
+const doorSlideAt = doorShotStart + Math.min(...doorShot.propMoves.map((move) => move.startAt));
+assert.ok(stationBaseMove?.stopAt >= doorShotStart && stationBaseMove.stopAt <= doorSlideAt,
+  `the station mileage halts inside the arrival shot and before the door slides`
+  + `（stopAt ${stationBaseMove?.stopAt}，镜 3 起 ${doorShotStart}，门开 ${doorSlideAt}）`);
 assert.ok(Math.abs(stationBaseMove.from[2] + stationBaseMove.speed * stationBaseMove.stopAt - 5.7) < 0.05,
   "the single mileage ends with the platform under the side door, so no shot cut can teleport the station");
 const stationMoveNames = new Set((CS_Chuchuan.ambientMotion || []).map((move) => move.name));
 assert.ok(stationParts.every((part) => stationMoveNames.has(part.name)),
   "every station part shares the same mileage move, so the set cannot shear apart mid-pass");
+
+// 车厢本身（重制一件没动，照旧守住）
 const sideDoor = CS_Chuchuan.props.find((prop) => prop.name === "CarriageDoor");
 assert.ok(sideDoor?.pos[0] > 2.7 && sideDoor?.pos[2] > 5,
   "the carriage door is cut into the platform-facing side wall, not the front or rear end wall");
@@ -348,27 +434,13 @@ assert.ok(CS_Chuchuan.props.some((prop) => prop.name === "SideDoorStepInner")
 "two physical footboards bridge the carriage floor to the platform");
 const personalEffects = CS_Chuchuan.props.filter((prop) => /^(RackPack|Bedroll|BenchPack|Canteen)/.test(prop.name));
 assert.ok(personalEffects.length >= 55, "the carriage contains dense, repeated personal luggage rather than a few token bags");
-const exitShots = CS_Chuchuan.shots.filter((shot) => shot.n >= 8);
-assert.ok(exitShots.every((shot) => shot.camera.walkBob?.amount > 0),
-  "the authored exit path includes deterministic first-person walking animation");
-assert.ok(exitShots.at(-1).camera.walkBob?.fadeOut > 0, "the final platform walk eases to a stable stop");
-const openingDoorParts = new Set(exitShots[0].propMoves.map((move) => move.name));
+// 车门是**一整套**一起滑：门皮、五块门板、两根撑、门闩、外侧包铁与吊挂。
+// 少挂一件，那一件就留在原地，开门时门框上挂着一条铁皮。
+const openingDoorParts = new Set((doorShot.propMoves || []).map((move) => move.name));
 assert.ok(["CarriageDoor", "DoorPlank0", "DoorPlank4", "DoorBraceLeft", "DoorBraceRight", "DoorLatch"]
   .every((name) => openingDoorParts.has(name)), "door skin, planks, braces, and latch slide as one assembly");
-for (const actor of ["youngDispatch", "rifleman", "oldWound", "machineGunner", "squadLeader"]
-  .map((id) => CS_Chuchuan.cast.find((item) => item.id === id))) {
-  assert.ok(actor.track.every((frame) => frame.t < doorShotStart || !frame.state?.hidden),
-    `${actor.id} must queue and walk through the visible side door instead of vanishing at the old car end`);
-  assert.ok(actor.track.some((frame) => frame.pos[0] >= 4.65 && frame.pos[1] >= 0.58),
-    `${actor.id} must reach the same station platform as the player`);
-}
-for (const actor of CS_Chuchuan.cast.filter((item) => ["stretcherBearerA", "stretcherBearerB", "lightWounded"].includes(item.id))) {
-  const walkingExit = actor.track.find((frame) => frame.t === 63);
-  const hiddenExit = actor.track.find((frame) => frame.t === 64);
-  assert.equal(walkingExit?.state?.hidden, undefined, `${actor.id} must keep walking after the station shot ends`);
-  assert.equal(hiddenExit?.state?.hidden, true, `${actor.id} only hides after leaving the window's visible run`);
-  assert.equal(actor.track.find((frame) => frame.t === 56)?.ry, Math.PI, `${actor.id} walks forward along the platform`);
-}
+assert.ok([...openingDoorParts].every((name) => CS_Chuchuan.props.some((prop) => prop.name === name)),
+  "the door assembly only moves parts that actually exist in the set");
 
 const router = new InputRouter();
 const input = { forward: 1, strafe: 1, lean: 1, sprint: true, breathHold: true, fire: true, ads: true };
@@ -376,4 +448,7 @@ router.SetSuppressed(true);
 router.Read(input);
 assert.deepEqual(input, { forward: 0, strafe: 0, lean: 0, sprint: false, breathHold: false, fire: false, ads: false }, "all gameplay axes suppressed");
 router.SetSuppressed(false);
-console.log("Cutscene control tests passed: seated first-person soldier, full mouse pitch, side-door/platform walk, cohesive door assembly, luggage density, camera directions, finish/skip, audio restore, old compatibility, input suppression");
+console.log("Cutscene control tests passed: camera directions, finish/skip, audio restore, old compatibility, "
+  + "input suppression, ambientMotion deceleration, headLook blendIn, cutscene sfx crossfade; "
+  + `remade prologue invariants (9 shots / ${CS_Chuchuan.seconds}s / staged ${stagedSeconds}s ≤ 45 / `
+  + `${spoken.length} lines all resolving to ch0_* voice rows / player seated throughout)`);

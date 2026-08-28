@@ -270,6 +270,31 @@ const CSS = `
   font-size:clamp(14px,1.35vw,22px);line-height:2.1}
 .csTallyLabel{color:#8f8776;letter-spacing:.32em;min-width:6em;text-align:right}
 .csTallyNote{color:#7e7767;font-size:.72em;margin-left:.8em}
+/* 地图卡（shot.mapCard，尾声那一镜）。底图**一个字都没有**，
+   地名、箭头、部队标识全是这一层按归一化坐标叠上去的 DOM ——
+   贴图那一批就是照这个口径出的（Texture/PaperProps_README.md「交付边界」）。
+   为什么不画进三维布景：一张 3:2 的纸正面平拍，DOM 层对得准、改得动、
+   在任何分辨率上字都是清的；画进贴图就得为每次改标注重出一次图。 */
+.csMap{position:absolute;left:0;right:0;top:${BAR_RATIO * 100}%;bottom:${BAR_RATIO * 100 + 13}%;
+  display:none;align-items:center;justify-content:center;pointer-events:none}
+.csMap.on{display:flex}
+.csMapFrame{position:relative;height:100%;aspect-ratio:3/2;background-size:contain;
+  background-repeat:no-repeat;background-position:center;background-color:#6a6455}
+.csMapMark{position:absolute;transform:translate(-50%,-50%);color:#2e2a22;
+  font-size:clamp(10px,1.05vw,17px);letter-spacing:.08em;white-space:nowrap;
+  text-shadow:0 1px 0 #e9e0c8,0 0 3px #e9e0c8}
+.csMapMark::before{content:"";position:absolute;left:50%;top:-0.95em;width:5px;height:5px;
+  margin-left:-2.5px;border-radius:50%;background:#2e2a22}
+.csMapMark.emphasis{font-weight:700;font-size:clamp(12px,1.3vw,21px)}
+.csMapMark.emphasis::before{width:8px;height:8px;margin-left:-4px}
+/* 部队标识：方框，不是圆点（军标里方框是步兵） */
+.csMapMark.unit::before{border-radius:0;width:9px;height:6px;margin-left:-4.5px}
+/* 箭头：一条带箭镞的细线。日军南进只有这一条 —— 「极简」是硬要求 */
+.csMapArrow{position:absolute;height:0;border-top:2px solid #6d2b22;transform-origin:0 50%}
+.csMapArrow::after{content:"";position:absolute;right:-1px;top:-5px;
+  border-left:9px solid #6d2b22;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.csMapArrowLabel{position:absolute;transform:translate(-50%,-140%);color:#6d2b22;
+  font-size:clamp(9px,.95vw,15px);letter-spacing:.1em;white-space:nowrap}
 `;
 
 function EnsureStyle(doc) {
@@ -607,6 +632,7 @@ export class CutsceneDirector {
     el.innerHTML = `
       <div class="csBar top"></div>
       <div class="csBar bot"></div>
+      <div class="csMap"><div class="csMapFrame"></div></div>
       <div class="csBlack"></div>
       <div class="csSubs"></div>
       <div class="csLine"></div>
@@ -615,12 +641,68 @@ export class CutsceneDirector {
     this.rootHost.appendChild(el);
     this.dom = {
       root: el,
+      map: el.querySelector(".csMap"),
+      mapFrame: el.querySelector(".csMapFrame"),
       black: el.querySelector(".csBlack"),
       subs: el.querySelector(".csSubs"),
       line: el.querySelector(".csLine"),
       card: el.querySelector(".csCard"),
       skip: el.querySelector(".csSkip"),
     };
+  }
+
+  /**
+   * 地图卡（`shot.mapCard`，2026-08-29 集成批 INT2）。
+   *
+   * 底图 `Texture/Tex_PaperEndingMap.png` 上**一个字都没有**：滕县／临城／台儿庄
+   * 三处节点、日军南进箭头、台儿庄附近的中国军队标识全由这一层按归一化坐标
+   * （左上角为 0,0）叠上去。贴图那一批就是照这个口径出的，节点与箭头故意没画
+   * （见 Texture/PaperProps_README.md「交付边界」）。
+   *
+   * 只在**镜头切换时**重建一次 DOM：每帧重建的话浏览器会在这一镜里反复重排，
+   * 而这一镜有七秒多。没有 mapCard 的镜头把这一层藏起来（不是删掉）。
+   */
+  _ApplyMapCard(shot) {
+    if (!this.dom || !this.dom.map) return;
+    const card = shot && shot.mapCard;
+    if (this.mapShot === shot) return;
+    this.mapShot = shot;
+    if (!card) {
+      this.dom.map.classList.remove("on");
+      this.dom.mapFrame.innerHTML = "";
+      return;
+    }
+    const frame = this.dom.mapFrame;
+    frame.style.backgroundImage = card.texture ? `url("${card.texture}")` : "";
+    const parts = [];
+    for (const marker of card.markers || []) {
+      if (!marker) continue;
+      if (marker.kind === "arrow" && marker.from && marker.to) {
+        // 一条带箭镞的细线：长度与角度按两端归一化坐标现算（容器是 3:2，
+        // 所以竖直方向要乘 2/3 才是同一把尺子）。
+        const ax = Number(marker.from[0]) * 100;
+        const ay = Number(marker.from[1]) * 100;
+        const bx = Number(marker.to[0]) * 100;
+        const by = Number(marker.to[1]) * 100;
+        const dx = bx - ax;
+        const dy = (by - ay) * (2 / 3);
+        const len = Math.hypot(dx, dy);
+        const deg = Math.atan2(dy, dx) * 180 / Math.PI;
+        parts.push(`<div class="csMapArrow" style="left:${ax}%;top:${ay}%;`
+          + `width:${len}%;transform:rotate(${deg.toFixed(2)}deg)"></div>`);
+        if (marker.label) {
+          parts.push(`<div class="csMapArrowLabel" style="left:${(ax + bx) / 2}%;`
+            + `top:${(ay + by) / 2}%">${marker.label}</div>`);
+        }
+        continue;
+      }
+      const at = marker.at || [0.5, 0.5];
+      const cls = `csMapMark${marker.emphasis ? " emphasis" : ""}${marker.kind === "unit" ? " unit" : ""}`;
+      parts.push(`<div class="${cls}" style="left:${Number(at[0]) * 100}%;`
+        + `top:${Number(at[1]) * 100}%">${marker.label || ""}</div>`);
+    }
+    frame.innerHTML = parts.join("");
+    this.dom.map.classList.add("on");
   }
 
   // -------------------------------------------------------------------------
@@ -656,6 +738,8 @@ export class CutsceneDirector {
     this.subSlots.length = 0;
     this.lineSlot = null;
     this.cardTime = -1;
+    // 地图卡（shot.mapCard）当前挂在哪一镜上；null = 还没摆过。
+    this.mapShot = null;
     this.headLook = cut.cameraMode === "headLook"
       || (cut.shots || []).some((shot) => shot.cameraMode === "headLook" || shot.camera?.cameraMode === "headLook");
     this.lookConfig = ResolveHeadLookConfig(cut, null);
@@ -773,6 +857,8 @@ export class CutsceneDirector {
     this._FireCues(cut, shot, start, local);
     this._ApplyFlashes(cut, shot, start);
     this._ApplyBlack(shot, local, dt);
+    // 地图卡：只在切镜时重建一次（尾声那一镜有七秒多，每帧重排 DOM 是白烧）。
+    this._ApplyMapCard(shot);
     this._TickText(dt);
     this._TickSfx(dt);
 
@@ -1859,7 +1945,13 @@ export class CutsceneDirector {
   _ClearText() {
     this.subSlots.length = 0;
     this.lineSlot = null;
-    if (this.dom) { this.dom.subs.innerHTML = ""; this.dom.line.innerHTML = ""; }
+    if (this.dom) {
+      this.dom.subs.innerHTML = "";
+      this.dom.line.innerHTML = "";
+      // 地图卡跟着字幕一起收：留着的话下一场过场会顶着上一场的地图开演。
+      this.mapShot = null;
+      if (this.dom.map) { this.dom.map.classList.remove("on"); this.dom.mapFrame.innerHTML = ""; }
+    }
   }
 
   // -------------------------------------------------------------------------

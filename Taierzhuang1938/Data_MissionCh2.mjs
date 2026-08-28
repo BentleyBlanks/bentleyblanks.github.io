@@ -30,9 +30,11 @@
 // EVENTS —— 本章 beats 用到的事件名（`at: "event:*"`）
 //
 //   BayonetDone   第一次白刃战打完（缺口内日军被清空）。用来接呕吐/「莫说了」那一组。
-//                 **Script_Story.LEVEL_CUES 里目前没有 CH2_Shouliudan 表**，所以它
-//                 现在只能靠 MAX_WAIT.event = 80 s 兜底：能播，但会晚。补法见下面
-//                 ENGINE_REQUEST 4。
+//                 2026-08-29 集成批 INT2：判据从 Script_Story 的补丁表
+//                 （SUPPLEMENT_CUES）搬回本文件的 `export const EVENTS`
+//                 —— 一个事件的名字与兜底判据从此只有一处，那一处就是这里。
+//                 真发生（缺口内日军清空）时由 Script_MissionSetpieces 推
+//                 `story.Signal("BayonetDone")`，推过的永远优先于兜底。
 //
 // 其余四个阶段一律挂在本章自己的 zones 上（zone:C2_*），不依赖任何未实现的信号。
 // ---------------------------------------------------------------------------
@@ -68,12 +70,27 @@
 //      · 该段禁用训练场的 trainingResetS 自动复位（正片没有木桩，复位会把敌人变回站桩）。
 //      · 缺口内日军清空时 story.Signal("BayonetDone")（见 ENGINE_REQUEST 4）。
 //
-// 4. LEVEL_CUES 缺 CH2_Shouliudan 表
-//    请集成批在 Script_Story.LEVEL_CUES 加一条，给 BayonetDone 一个时刻兜底：
-//      CH2_Shouliudan: { BayonetDone: (c) => c.objectiveIndex >= 4
-//                          || c.levelTime > c.levelSeconds * 0.72 }
-//    没有它的话，呕吐那一组要等 80 s 才播，后面整条链跟着往后拖。
+// 4. LEVEL_CUES 缺 CH2_Shouliudan 表 —— **已解决**（INT2，2026-08-29）
+//    本文件补了 `export const EVENTS`，Script_Story.BuildLevelCues 照它自动建表；
+//    Script_Story 里那条 SUPPLEMENT_CUES 补丁同批删掉（判据只留一处）。
 // ---------------------------------------------------------------------------
+
+/**
+ * 本章的关内事件线。字段口径见 docs/Data_MissionRemake.md §10.6：
+ * 名字字段三选一（name / event / id）、兜底判据三选一（fallback / predicate / cue），
+ * Script_Story.BuildLevelCues 一律认。
+ *
+ * 判据照的是本文件头注 ENGINE_REQUEST 4 那一行原文，一个字没改 ——
+ * 它原来抄在 Script_Story.SUPPLEMENT_CUES 里，INT2 搬回来了。
+ */
+export const EVENTS = [
+  {
+    name: "BayonetDone", stage: 4,
+    what: "第一次白刃战打完 —— 坍塌缺口内的日军被清空",
+    signal: "Script_MeleeQte 的那一段结束、缺口半径内没有活着的日军时由摆点层推",
+    fallback: "(c) => c.objectiveIndex >= 4 || c.levelTime > c.levelSeconds * 0.72",
+  },
+];
 
 export const CHAPTER = {
   id: "CH2_Shouliudan",
@@ -83,6 +100,12 @@ export const CHAPTER = {
   clock: "03-16 10:30 — 17:00",
   sky: "smokyDay",
   music: "siege",
+  // 二关：还是那五个人。这一关没有外来番号，也没有医护 ——
+  // 东关外壕上就是这一个班在守（§3）。
+  // 顺序同样照「首次开口的先后」（＝INT2 之前 RosterFromBeats 的输出逐字同序）。
+  // 理由见 Data_MissionCh1 那张表上面的长注释：名册顺序 = ai.Spawn 的调用顺序，
+  // 换个顺序就把这一关的 AI 决策整条重排。
+  roster: ["zhaodegui", "yaowa", "liuwencai", "heyoutian", "luo"],
   minutes: 18,
   pool: { start: 208, end: 168, label: "城里还站着的人", presumed: true },
   brief: [

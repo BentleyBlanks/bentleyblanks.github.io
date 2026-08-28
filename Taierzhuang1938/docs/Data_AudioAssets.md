@@ -319,8 +319,9 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 
 ## 成品
 
-51 个文件 / 396 KB（44.1 kHz 单声道 72 kbps MP3），在 `Audio/Sfx/`，
-清单 `Audio/Sfx/Data_SfxManifest.json`。
+72 个文件 / 747 KB（44.1 kHz 单声道 72 kbps MP3），在 `Audio/Sfx/`，
+清单 `Audio/Sfx/Data_SfxManifest.json`。下面这张表是 2026-08-19 那一批的 33 个 cue；
+2026-08-28 缺口批 A2 补的 15 个 cue 另有一张表，见本文末「重制新增音效」。
 
 | cue | 变体 | 时长 | 体积 | 素材 |
 | --- | --- | --- | --- | --- |
@@ -785,35 +786,65 @@ node Taierzhuang1938/Script_AudioTest.mjs
 规格出处：`docs/Data_MissionRemake.md` §2/§3/§4/§5/§6/§7，以及
 `Data_MissionCh1/3/4/5/6.mjs` 头注里与音频有关的那几条 `ENGINE_REQUEST`。
 
-## 交付形态：先落 `pendingCues`，不进 `cues`
+## 交付形态：先落 `pendingCues`，2026-08-29 已搬进 `cues`
 
 `AudioEngine.LoadSfxPack` 对**没有同名合成配方**的 cue 是直接抛错的
 （`Script_Audio.mjs` 的「没有同名配方，盖不上去」），所以这 15 条要是直接写进
 `Data_SfxManifest.json` 的 `cues`，代价是：每次开机多十五条 `sfxErrors`，
 `Script_AudioTest` 的三条计数断言（清单 cue 数 / 盖住数 / 载入零报错）当场全红。
-**素材还没接线就先红一片测试不算交付**，所以它们落在清单的 `pendingCues` 段：
+**素材还没接线就先红一片测试不算交付**，所以它们先落在清单的 `pendingCues` 段：
 
 - 文件在仓库里、清单里有账、`Data_SfxSources` 里有完整的来源与切法；
 - 运行时看不见（`LoadSfxPack` 只遍历 `cues`）；
 - `Script_AudioNormalize.mjs` 也不去动它们（它同样只读 `cues`）——
   所以**烘焙期就按它的口径对齐好了**（下面「验收数字」）。
 
-### 集成批接线要做的四件事
+### 集成批接线要做的四件事（2026-08-29 · INT3a 已全部做完）
 
-1. `Script_Audio.RECIPES` 给这 15 个 cue 各加一条**合成兜底配方**（采样载不到时的
-   回落，与现有 32 条同一条路子）；军号那种特例不适用，照 `explosionNear` 一类写即可。
-2. `SAMPLE_MIX` / `SAMPLE_WET` / `AMB_AIR`（远场那两条）/ `NODE_COST` 逐条加行 ——
-   不加的话 `MIX_GAIN` 取 1、`NODE_COST` 取默认的 19，一记照明弹燃烧就吃掉六分之一预算。
-3. `Script_AudioTest.mjs` 的 `RECIPE_COUNT` 从 41 改成 56。
-4. 把 `Data_SfxSources.mjs` 里这些组的 `pending: true` 删掉，**照组名重跑**
-   （`node Taierzhuang1938/Script_SfxBake.mjs ExecScreamShout ExecScreamCry PainMoanMuffled …`），
-   产物自动从 `pendingCues` 挪进 `cues`。
-   **不要跑不带组名的全量**：不带组名时清单从零重建，而 `Audio/Sfx/_raw/` 是 gitignore 的，
-   没有原始长片的组会被跳过 —— 结果是把没重切成的 cue 从清单里抹掉。这条在改动之前就是这样。
+1. ✅ `Script_Audio.RECIPES` 给这 15 个 cue 各加一条**合成兜底配方**（采样载不到时的
+   回落，与原有 43 条同一条路子）。写得薄是刻意的：三到五个节点、不追求像，
+   只保证「有东西响了，而且响的是对的那一类」——惨叫是浊音不是噪声、电键是干脆
+   的一记不是嗡、扫射是一梭子不是一发。唯一不薄的是 `strafeNear`：航空机枪
+   ~900 rpm 的身份就是「一梭子」，只给一发这条 cue 就不成立了，所以它走 `GunAuto`。
+2. ✅ `SAMPLE_MIX` / `SAMPLE_WET` / `AMB_AIR` / `NODE_COST` 逐条加了行。
+   两条不直观的：**一直在响的东西不能按「一次事件」配平**（`flareBurn` 0.35、
+   `telegraphHum` 0.3，与脚步同一档）；**玩法反馈必须听得见**（`mgCharge` 0.95、
+   `telegraphKey` 0.7，与 `bolt` 同一条理由 —— 卡壳清没清、这一下敲进去没有）。
+   `AMB_AIR` 只加了 `strafeFar` 1100 与 `planeDive` 2200：其余十三条都由接线侧带着
+   position 播，空气低通由 `Play` 按距离自己算，写进这张表反而会滤两遍。
+3. ✅ `Script_AudioTest.mjs` 的 `RECIPE_COUNT` 从 41 改成 56。
+   顺带把 `telegraphKey` 加进了 `SAMPLE_CYCLE`（A2 在素材表里点名要求的）：
+   它的三条是从同一条素材里钉死三个位置切出来的，而**发报是连着敲的** ——
+   随机挑必然连出两次同一条，听感就从「有人在发报」塌成「打字机在响」；
+   0.2 秒的金属敲击也经不起 ±3% 逐发变调。
+4. ✅ 把 `Data_SfxSources.mjs` 里这些组的 `pending: true` 删掉、**照组名重烘**，
+   产物从 `pendingCues` 挪进了 `cues`。十九个 mp3 逐字节与重烘前相同 ——
+   切法是确定性的，这一步只动清单。
+
+顺带 bump 了 `Script_Audio.SFX_PACK_VERSION`（7 → 8）：清单换了内容，戳不动的话
+浏览器会拿着缓存里的旧清单去要新文件（或者反过来）。
+
+**重烘一律照组名点名。** 不带组名的全量会把清单从零重建，而 `Audio/Sfx/_raw/` 是
+gitignore 的 —— 谁的本地没有原始长片，谁的 cue 就被从清单里抹掉。
+另外注意 `Script_SfxBake.mjs` **没有 `--dry` 这个旗标**：不认识的 `--x` 会被当成
+「没点名任何组」，于是走全量下载 + 全量重切那条路（实测会把 49 个已经由
+`Script_AudioNormalize` 拉平过的老 mp3 重新切一遍、覆盖掉它们的响度）。
+要「只看不写」请用 `--report`，且**同样要带组名**。
+
+### 一处遗留：部分重烘不会把毕业的 cue 踢出 `pendingCues`
+
+`Script_SfxBake.Main()` 收尾那一段在 `partial` 模式下是
+`{ ...(manifest.pendingCues || {}), ...pendingCues }` —— 只做并集，不做删除。
+于是「组上的 `pending` 去掉了、照组名重烘」之后，这 15 条同时出现在 `cues`
+与 `pendingCues` 里。运行时与 `AudioNormalize` 都只读 `cues`，不影响行为，
+但清单上是一笔糊涂账。本轮是手工把 `pendingCues` / `pendingNote` 两个键从
+`Data_SfxManifest.json` 里删掉的；`Script_SfxBake.mjs` 不在 INT3a 的文件所有权内，
+**修法留给下一个动那只脚本的人**：部分重烘时应当把已经进了 `cues` 的键从
+`pendingCues` 里剔掉。
 
 `Data_SfxSources.mjs` **不在 `index.html` 的 import map 里**（全项目只有 Node 侧的
-烘焙脚本 import 它），所以本批不需要 bump 任何 `?v=`；接线批改
-`Script_Audio.mjs` / `Script_AudioTest.mjs` 时按规矩自己 bump。
+烘焙脚本 import 它），所以 A2 那一批不需要 bump 任何 `?v=`；
+接线批改了 `Script_Audio.mjs`，它的 `?v=` 由集成批统一 bump。
 
 ## 清单
 
@@ -864,9 +895,12 @@ node Taierzhuang1938/Script_AudioTest.mjs
 - 首尾端点电平：全部 ≤ −52 dB（两条 loop 的 −52/−53 是 20 ms 淡出落在稳态嘶声上，
   其余都在 −64 dB 以下）—— **没有硬切口，不会「咔」**。
 
-搬进 `cues` 之后 `Script_AudioNormalize.mjs`（只读验收）对这 19 个文件应当直接是绿的。
-注意 SFX 组现在**本来就是红的**，与本批无关：白刃那五条 SeedAudio 成品是按全库中位
-−28.5 dBFS 压的（见上面「白刃三音为什么是生成的」），从来没并进 −25 那条平线。
+搬进 `cues` 之后 `Script_AudioNormalize.mjs`（只读验收）对这 19 个文件**实测直接是绿的**
+（2026-08-29：72 个文件、有声段 RMS −25.48…−24.58、散布 0.90 dB）。
+
+白刃那五条 SeedAudio 成品此前让 SFX 组**恒红**，与 A2 无关：它们是按人工那一档
+（整段 RMS −28.5 dBFS）压的，从来没并进 −25 这条库线。2026-08-29 的处置是
+**给它们一条显式豁免，而不是拉平** —— 理由见下一节。
 
 ## 频谱验收（我听不见，靠看）
 
@@ -934,12 +968,59 @@ node Taierzhuang1938/Script_AudioTest.mjs
 ## 重新烘焙
 
 ```bash
-# 一律照组名重烘（不带组名的全量会从零重建清单，见上面第 4 条）
+# 一律照组名重烘（不带组名的全量会从零重建清单、并且下载+重切全库，见上面第 4 条）
 node Taierzhuang1938/Script_SfxBake.mjs ExecScreamShout ExecScreamCry   # 共用一个 cue 的组必须一起烘
 node Taierzhuang1938/Script_SfxBake.mjs FlareBurn --recut          # 点燃/燃烧/熄灭三条同源，一起重切
 node Taierzhuang1938/Script_SfxBake.mjs TelegraphKey --report      # 先看候选表再钉位置
+
+# 2026-08-29 接线时全批重烘用的就是这一行（--recut = 不下载，只拿 _raw 重切）。
+# 十九个 mp3 逐字节与重烘前相同，只有清单变了 —— 切法是确定性的。
+node Taierzhuang1938/Script_SfxBake.mjs --recut \
+  ExecScreamShout ExecScreamCry PainMoanMuffled HitGruntStifled \
+  FlareLaunch FlareBurn TelegraphKey TelegraphHum \
+  PlaneDive StrafeNear StrafeFar StrafeDirt MgOverheat MgCharge
 ```
 
 原始长片仍落 `Audio/Sfx/_raw/`（已 gitignore）。本批新增的四个切割字段
 （`fadeInS` / `fadeOutS` / `alignDbfs` / `loop`，与组上的 `pending`）
 在 `Script_SfxBake.mjs` 头注里逐条写了为什么。
+
+---
+
+# 响度验收里的人工豁免（2026-08-29）
+
+`Script_AudioNormalize.mjs` 是全仓库非对白音频的响度闸：一次性音按**有声段 RMS**
+（20 ms 帧、门限取最响帧的 10%）对齐到 −25 dBFS，环境床与音乐按整段 RMS 对齐到
+−27 dBFS，峰值一律不许过 −1 dBFS。
+
+白刃那五条（`AudioSfx_DadaoSwing_01/02/03`、`AudioSfx_DadaoHit_01`、
+`AudioSfx_BayonetHit_01`）**从来不在这条线上**，所以 SFX 组长期恒红。
+2026-08-29 的处置是**给它们一条显式豁免，而不是把它们拉平**：
+
+- **为什么不拉平。** 那个 −28.5 dBFS 不是漏掉的一步，是一条设计决定
+  （见上面「白刃三音为什么是生成的，不是实录的」）：这几条 take 的波峰因数只有
+  13—17 dB，而实录冲击音是 19—27，按同一条平线对齐会让**白刃一出手就盖住整场枪声**；
+  而 `Script_Audio.SAMPLE_MIX` 里那几个数是照旧素材（Sonniss 顶包）调的，
+  压到 −28.5 之后 SAMPLE_MIX 一个数都不用动。更根本的一条：这五条是**人工一条条
+  试听选定**的 take，与 `SAMPLE_CYCLE`（挑过的变体按顺序轮播、不做逐发变调）
+  是同一条规矩 —— **不许拿概率或平均值去糊人工选定的东西**。
+- **豁免换的是两件事，不是一件。** 目标从 −25 换成 −28.5，量法从「有声段 RMS」
+  换成「整段 RMS」（`Script_SeedAudioMeleeBake.TARGET_RMS_DB` 的口径）。
+  只换目标不换量法会量错：这几条是短促冲击音，两种量法在它们身上差 2—3 dB
+  （实测有声段 −25.52…−28.48、整段 −28.40…−28.56），拿有声段去对 −28.5
+  会把三条本来合格的判成红。
+- **豁免不等于不验。** 容差 ±0.5 dB 与 −1 dBFS 的峰值上限照旧走，
+  报告里这五行标 `EXEM` 并打印它们走的是哪一档；谁把它们重烘成别的响度，
+  这只脚本照样红。豁免的文件**一个字节都不碰**，`--write` 也不许覆盖。
+- **散布只统计走库线的那些。** 把人工那一档混进「散布 0.90 dB」里的话，
+  那个数量的是两条平线的间距，不是任何一条线自己有多齐。
+
+要撤销豁免，先撤销上面那条设计决定，别从 `EXEMPTIONS` 那张表下手。
+
+```
+SFX: 72 files, activeRmsDbfs -25.48..-24.58 dBFS, spread 0.90 dB, target -25 dBFS（另有 5 个按人工档验收，不计入散布）
+Ambience cues: 24 files, activeRmsDbfs -25.49..-24.85 dBFS, spread 0.64 dB, target -25 dBFS
+Ambience beds: 10 files, rmsDbfs -27.47..-27.23 dBFS, spread 0.24 dB, target -27 dBFS
+Music: 9 files, rmsDbfs -27.45..-27.43 dBFS, spread 0.02 dB, target -27 dBFS
+Audio native levels are aligned.
+```

@@ -363,18 +363,7 @@
       "seconds": 4.055,
       "credit": "Volcengine SeedAudio 1.0 · 序章蒸汽机车入站汽笛",
       "license": "volcengine"
-    }
-  },
-  "bakedAt": "2026-08-28",
-  "normalization": {
-    "normalizedAt": "2026-08-25",
-    "tool": "Script_AudioNormalize.mjs",
-    "peakCeilingDbfs": -1,
-    "metric": "activeRmsDbfs",
-    "targetDbfs": -25,
-    "toleranceDb": 0.5
-  },
-  "pendingCues": {
+    },
     "execScream": {
       "files": [
         "AudioSfx_ExecScream_01.mp3",
@@ -502,5 +491,13 @@
       "license": "sonniss"
     }
   },
-  "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。"
+  "bakedAt": "2026-08-28",
+  "normalization": {
+    "normalizedAt": "2026-08-25",
+    "tool": "Script_AudioNormalize.mjs",
+    "peakCeilingDbfs": -1,
+    "metric": "activeRmsDbfs",
+    "targetDbfs": -25,
+    "toleranceDb": 0.5
+  }
 }

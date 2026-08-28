@@ -78,7 +78,10 @@ const load = await page.evaluate(() => {
   };
 });
 
-const RECIPE_COUNT = 41;   // 2026-08-24 序章车厢新增 SeedAudio 蒸汽机车汽笛
+// 2026-08-24 序章车厢新增 SeedAudio 蒸汽机车汽笛 → 41
+// 2026-08-29 集成批 INT3a：缺口批 A2 的十五个 cue 接完线，从 pendingCues 搬进 cues → 56
+//   （惨叫 / 痛呼 / 闷哼、照明弹四条、发报两条、日机三条、扫地一条、重机两条）
+const RECIPE_COUNT = 56;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -94,9 +97,15 @@ else Ok("采样载入零报错");
 if (load.prologueSfx.length) Fail(`序章专用音未盖上：${load.prologueSfx.join(" ")}`);
 else Ok("序章 8 条专用音全部盖上");
 
+// Timeline 静音快进之后，目标时刻仍在说的那一句必须从**对应采样点**接回来，
+// 不能从头播、也不能没声（编辑器审片全靠这条）。
+// 2026-08-29：取样键从旧序章的 `prologue_young_dispatch_01` 换成新序章的
+// `ch0_shunzi_02`（3.36 s，镜 2 顺子读家信那一句）—— 旧序章那 11 条 prologue_* 行
+// 已经从 Data_Voice 的总表里退役了，拿它取样只会量到「voiceBank 里没有这条」。
+// 挑长的那一句是有理由的：偏移 0.5 s 之后还得剩下够长的一段才量得出差别。
 const voiceSeek = await page.evaluate(() => {
   const a = window.Taierzhuang.audio;
-  const key = "prologue_young_dispatch_01";
+  const key = "ch0_shunzi_02";
   const entry = a.voiceBank.get(key);
   if (!entry) return null;
   const name = `voice.${key}`;
@@ -108,11 +117,11 @@ const voiceSeek = await page.evaluate(() => {
   return out;
 });
 if (!voiceSeek || voiceSeek.duration === undefined) {
-  Fail(`序章人声无法做采样跳转：${JSON.stringify(voiceSeek)}`);
+  Fail(`序章章节台词无法做采样跳转：${JSON.stringify(voiceSeek)}（ch0_shunzi_02 没进 voiceBank？）`);
 } else if (Math.abs(voiceSeek.offset - 0.5) > 0.001
     || Math.abs(voiceSeek.duration - (voiceSeek.full - 0.5)) > 0.05) {
   Fail(`人声采样偏移不对：${JSON.stringify(voiceSeek)}`);
-} else Ok("序章人声可从 Timeline 目标采样点起播");
+} else Ok("序章章节台词可从 Timeline 目标采样点起播（ch0_shunzi_02）");
 
 // 军号是「一个音 + playbackRate 排动机」，基频量错了整段跑调 ——
 // 495.5 Hz 是 Last Post 那个持续音的实测值（G 号的 B4）。
@@ -477,31 +486,65 @@ else Ok(`白刃三音走 SeedAudio（挥空 ${melee.swing.variants} 变体 / ${m
 // 挥空必须**按顺序轮**、且**不许变调**：三条是人工一条条选定的，随机挑会连出两次
 // 同一条，±3% 变调会把选中的音色拧走（0.2 秒的破风声听得出来）。两者都是静默回归 ——
 // 上面那条「3 变体」的断言拦不住，它只看清单不看真正播了哪一条。
+//
+// **认源要按 dadaoSwing 自己的 buffer 认，不能数「全部一次性源」。**
+// 上一版就是数一次性源，于是「播六次抓到 8 个 / 9 个」随机翻红：这 360 ms 的窗口
+// 里场上的 AI 随时会喊一句，而 `voice.*` 也是一次性 BufferSource（LoadVoices 里那条
+// 配方），采样版的枪声、脚步、弹着同理 —— 它们全都不是循环源，`!s.loop` 一条都挡不住。
+// 现在先把清单里那三个挥空文件自己解一份、算出指纹（长度 + 64 点抽样和），
+// 抓到的源逐个比对指纹：**只有真的是这三条 buffer 的才算数**，别人喊多少句都无所谓。
+// 指纹能比长度可靠：三条变体的时长将来完全可能撞在同一个毫秒上（清单里写的都是 0.55 s）。
 const cycle = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const entry = a.sfxManifest && a.sfxManifest.cues.dadaoSwing;
+  if (!entry || !entry.files) return { error: "清单里没有 dadaoSwing" };
+  const Fingerprint = (buf) => {
+    const d = buf.getChannelData(0);
+    const step = Math.max(1, Math.floor(d.length / 64));
+    let sum = 0;
+    for (let i = 0; i < d.length; i += step) sum += d[i];
+    return `${buf.length}:${sum.toFixed(6)}`;
+  };
+  // 同一个 AudioContext 解同一份 mp3，PCM 逐字节相同 —— 指纹因此是可比的。
+  const mine = new Map();
+  for (let i = 0; i < entry.files.length; i += 1) {
+    const url = `${mod.SFX_BASE}${entry.files[i]}?v=${mod.SFX_PACK_VERSION}`;
+    const buf = await a.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+    mine.set(Fingerprint(buf), i + 1);
+  }
   const made = [];
   const orig = a.ctx.createBufferSource;
   a.ctx.createBufferSource = function patched() { const src = orig.call(this); made.push(src); return src; };
   // 同帧齐射有 22 ms 去重窗，六次要拉开放。
-  for (let i = 0; i < 6; i += 1) { a.Play("dadaoSwing"); await sleep(60); }
+  // priority：这一条测的是**轮播顺序与变调**，不是预算闸 —— 被闸掉一发就成了抛硬币。
+  for (let i = 0; i < 6; i += 1) { a.Play("dadaoSwing", { priority: true, volume: 0.02 }); await sleep(60); }
   a.ctx.createBufferSource = orig;
-  // 只数**一次性**源：环境床与音乐是循环源，它们在这半秒里刚好载完补起播的话
-  // 会混进来，把「播六次抓到几个」变成抛硬币。
-  return made.filter((s) => s.buffer && !s.loop).map((s) => ({
+  const picked = made.filter((s) => s.buffer && mine.has(Fingerprint(s.buffer))).map((s) => ({
+    variant: mine.get(Fingerprint(s.buffer)),
     durMs: Math.round(s.buffer.duration * 1000),
     rate: Number(s.playbackRate.value.toFixed(4)),
   }));
+  return { picked, variants: mine.size, others: made.length - picked.length };
 });
-const durs = cycle.map((c) => c.durMs);
-const rates = cycle.map((c) => c.rate);
-const unique = [...new Set(durs)];
-if (cycle.length !== 6) Fail(`播六次挥空只抓到 ${cycle.length} 个源 —— 这条断言本身没测到东西`);
-else if (rates.some((r) => r !== 1)) Fail(`挥空被逐发变调了：${rates.join(" ")}（选定的三条要原样播）`);
-else if (unique.length !== 3) Fail(`播六次只用到 ${unique.length} 条变体：${durs.join(" ")} ms`);
-else if (durs[0] !== durs[3] || durs[1] !== durs[4] || durs[2] !== durs[5]) {
-  Fail(`挥空不是按顺序轮的：${durs.join(" ")} ms（随机挑会连出两次同一条）`);
-} else Ok(`挥空按顺序轮播且不变调（${durs.slice(0, 3).join(" → ")} ms 循环，rate 恒为 1）`);
+if (cycle.error) Fail(`挥空轮播测不到东西：${cycle.error}`);
+else {
+  const seq = cycle.picked.map((c) => c.variant);
+  const durs = cycle.picked.map((c) => c.durMs);
+  const rates = cycle.picked.map((c) => c.rate);
+  const unique = [...new Set(seq)];
+  if (cycle.picked.length !== 6) {
+    Fail(`播六次挥空只认到 ${cycle.picked.length} 个 dadaoSwing 源`
+      + `（同期另有 ${cycle.others} 个别人的一次性源）—— 这条断言本身没测到东西`);
+  } else if (rates.some((r) => r !== 1)) Fail(`挥空被逐发变调了：${rates.join(" ")}（选定的三条要原样播）`);
+  else if (cycle.variants !== 3) Fail(`清单里挥空只有 ${cycle.variants} 条变体（白刃是连续动作，连砍会复读）`);
+  else if (unique.length !== 3) Fail(`播六次只用到 ${unique.length} 条变体：变体号 ${seq.join(" ")}`);
+  else if (seq[0] !== seq[3] || seq[1] !== seq[4] || seq[2] !== seq[5]) {
+    Fail(`挥空不是按顺序轮的：变体号 ${seq.join(" ")}（随机挑会连出两次同一条）`);
+  } else Ok(`挥空按顺序轮播且不变调（变体 ${seq.slice(0, 3).join(" → ")}，`
+    + `${durs.slice(0, 3).join(" / ")} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
+}
 
 if (problems.length) { for (const p of problems.slice(0, 10)) Fail(p); }
 

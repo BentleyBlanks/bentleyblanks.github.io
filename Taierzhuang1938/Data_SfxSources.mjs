@@ -456,15 +456,23 @@ export const SFX_SOURCES = [
   },
 
   // =========================================================================
-  // 任务流程重制 · 音效缺口批 A2（2026-08-28）
+  // 任务流程重制 · 音效缺口批 A2（2026-08-28 烘焙 / 2026-08-29 接线）
   //
-  // 下面这些组全部带 `pending: true`：素材已经烘好、响度也按 −25 dBFS 对齐过了，
+  // 这些组一开始全带 `pending: true`：素材已经烘好、响度也按 −25 dBFS 对齐过了，
   // 但 `Script_Audio.RECIPES` 里还没有同名的合成配方 —— `LoadSfxPack` 对没有同名
   // 配方的 cue 是**直接抛错**的（「没有同名配方，盖不上去」），放进 manifest.cues
   // 会让每次开机多出十几条 sfxErrors，并把 AudioTest 的三条计数断言一起顶红。
-  // 所以它们落在 `manifest.pendingCues`：文件在仓库里、清单里有账、运行时看不见。
-  // **集成批补完配方后，把这些组的 `pending: true` 删掉重烘即可**（顺带 bump
-  // Script_AudioTest 的 RECIPE_COUNT，并给 SAMPLE_MIX / SAMPLE_WET / NODE_COST 加行）。
+  // 于是它们先落在 `manifest.pendingCues`：文件在仓库里、清单里有账、运行时看不见。
+  //
+  // **2026-08-29 集成批 INT3a 已经接完线**：`Script_Audio.RECIPES` 补了十五条同名
+  // 兜底配方、`SAMPLE_MIX` / `SAMPLE_WET` / `AMB_AIR` / `NODE_COST` 各自加了行、
+  // `SFX_PACK_VERSION` 从 7 bump 到 8、`Script_AudioTest.RECIPE_COUNT` 从 41 改成 56，
+  // 这里的 `pending` 随之删光，照组名重烘之后产物从 pendingCues 搬进了 cues。
+  //
+  // **重烘一律照组名点名**（`node Script_SfxBake.mjs ExecScreamShout ExecScreamCry …`）。
+  // 不带组名的全量会把清单从零重建，而 `Audio/Sfx/_raw/` 是 gitignore 的 ——
+  // 谁的本地没有原始长片，谁的 cue 就被从清单里抹掉。共用同一个 cue 的组
+  //（ExecScreamShout + ExecScreamCry）必须一起烘。
   //
   // 规格出处：docs/Data_MissionRemake.md §2/§4/§5/§6/§7 与七个 Data_MissionChX 头注的
   // ENGINE_REQUEST。逐条的验收数字在 docs/Data_AudioAssets.md「重制新增音效」一节。
@@ -477,7 +485,6 @@ export const SFX_SOURCES = [
   // 第三关处决段是隔着墙听到的，那一声的作用是让玩家明白里面在干什么，不是展览。
   {
     id: "ExecScreamShout",
-    pending: true,
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "SoundBits -  Screams & Shouts 2 - Humans/Male_Shout-of-Pain_132.mp3",
     credit: "SoundBits · 男性痛叫 · Sonniss GDC 2016",
@@ -490,7 +497,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "ExecScreamCry",
-    pending: true,
     item: "game-audio-monthly",
     path: "Sonniss.com - Game Audio Monthy - #2/SoundBits - Screams & Shouts/Screams&Shouts_human_male_011.mp3",
     credit: "SoundBits · 男性短叫 · Sonniss Game Audio Monthly #2",
@@ -504,7 +510,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "PainMoanMuffled",
-    pending: true,
     item: "sonniss-gdc-2018-game-audio-bundle-normalized",
     path: "Airborne Sound - Human/Scream,Male,Mid Thirties,Mouth Covered,Gasps,Fast,Shriek,Panic.mp3",
     credit: "Airborne Sound · 三十多岁男性，捂着嘴的痛呼与喘 · Sonniss GDC 2018",
@@ -520,7 +525,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "HitGruntStifled",
-    pending: true,
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "Bottle Rocket Fx - Scream/Grunt_Pain_Male_BB_10_SCREAM LIBRARY_BRFX-004.mp3",
     credit: "Bottle Rocket Fx · 男性痛哼 · Sonniss GDC 2016",
@@ -541,7 +545,6 @@ export const SFX_SOURCES = [
   // 熄灭听着是**同一支照明弹的三个阶段**，不是三样东西拼起来的。
   {
     id: "FlareLaunch",
-    pending: true,
     item: "sonniss-gdc-2023-game-audio-bundle-normalized",
     path: "InspectorJ - Essentials 03 Fireworks/FRWKComr_InsJ_Fireworks_Launch_Close_01-03.mp3",
     credit: "InspectorJ · 焰火近距离发射 · Sonniss GDC 2023",
@@ -555,7 +558,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "FlareBurn",
-    pending: true,
     item: "game-audio-monthly",
     path: "Sonniss.com - Game Audio Monthly - #4/TS Sound - Fire, Sizzles, and Ignites...Oh my!/FLARE_IGNITE_WITH_WATER_SIZZLES_01.mp3",
     credit: "TS Sound · 信号弹点燃与持续燃烧 · Sonniss Game Audio Monthly #4",
@@ -584,7 +586,6 @@ export const SFX_SOURCES = [
   // 首尾呼应的前提是它**得是同一个声音**，另录一条反而把这处收束拆散了。
   {
     id: "TelegraphKey",
-    pending: true,
     item: "sonniss-gdc-2026-game-audio-bundle-normalized",
     path: "344 Audio - Antique Small Metals/METLMvmt_  Tinkering Antique Lock_344 Audio_Antique Small Metals.mp3",
     credit: "344 Audio · 古董黄铜锁具摆弄 · Sonniss GDC 2026",
@@ -608,7 +609,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "TelegraphHum",
-    pending: true,
     item: "sonniss-gdc-2017-game-audio-bundle-normalized",
     path: "RedSonic - Hums Light Machines/electric_hum_buzz_01.mp3",
     credit: "RedSonic · 电器低鸣与嗡声 · Sonniss GDC 2017",
@@ -626,7 +626,6 @@ export const SFX_SOURCES = [
   // 三样东西分开录、分开切：**飞机的引擎**、**飞机的机枪**、**弹着扫过地面**。
   {
     id: "PlaneDive",
-    pending: true,
     item: "sonniss-gdc-2019-game-audio-bundle-normalized",
     path: "Pole Position - Bristol Blenheim Mk 1 1934/blenheim_mk_i_t3_ext_distant_medium_fly_bys_end_of_runway_ORTF_MKH8040.mp3",
     credit: "Pole Position Production · 布里斯托尔「布伦海姆」1934（通场）· Sonniss GDC 2019",
@@ -641,7 +640,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "StrafeNear",
-    pending: true,
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_1m_left_blanks_Triple_shots_x_2.mp3",
     credit: "Pole Position Production · M1919A4 .30cal（炮塔架，1 m 左侧）· Sonniss GDC 2016",
@@ -658,7 +656,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "StrafeFar",
-    pending: true,
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_300m_in_front_blanks_Triple_shots_x_2.mp3",
     credit: "Pole Position Production · M1919A4 .30cal（炮塔架，300 m 正前）· Sonniss GDC 2016",
@@ -670,7 +667,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "StrafeDirt",
-    pending: true,
     item: "sonniss-gdc-2017-game-audio-bundle-normalized",
     path: "Pole Position - The Warfare Library/warfare_t3_mg_whizzes_ricochets_bullet_cracks_M10.mp3",
     credit: "Pole Position Production · 机枪弹丸掠过、跳弹与音爆 · Sonniss GDC 2017",
@@ -687,7 +683,6 @@ export const SFX_SOURCES = [
   // 「啄木鸟」那条身份证不动。缺的是过热与卡壳这两件，补在这里。
   {
     id: "MgOverheat",
-    pending: true,
     item: "sonniss-gdc-2015-game-audio-bundle-normalized",
     path: "Eiravaein Works - Ilmarinen/Ilmarinen,blacksmith,forge,lighthammer,anvil,hotiron,rattle,taphammer,belts,gears,ambiance.mp3",
     credit: "Eiravaein Works · 铁匠铺：轻锤敲热铁 · Sonniss GDC 2015",
@@ -702,7 +697,6 @@ export const SFX_SOURCES = [
   },
   {
     id: "MgCharge",
-    pending: true,
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "Pole Position Production - Various Gun Foley & Handling/SAIGA-12_12g_solid_slug_foley_close_up_RSM191_R_cocking.mp3",
     credit: "Pole Position Production · 重型枪机拉柄（近距离）· Sonniss GDC 2016",

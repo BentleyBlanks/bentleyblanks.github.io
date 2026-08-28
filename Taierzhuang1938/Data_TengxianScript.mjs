@@ -274,6 +274,16 @@ export const LEVELS = CHAPTERS.map((c) => ({
   //   { id:"CS_x", signal:"名字" }   挂在指定信号上（CH5 的转身该挂 TurnedBack）
   // 判定与派发在 Script_Story（SIGNAL_CUTSCENES）；这一层只负责传下去与查注册。
   cutsceneMid: c.cutsceneMid || null,
+  // 这一章玩家演的是谁（CAST id）。六章是顺子，终章 §7 明写「玩家＝小秦」。
+  // 装配层把它传给 CompanionDirector.BeginLevel —— **玩家自己不进名册**，
+  // 否则终章场上会有两个小秦（一个是你，一个站你旁边）。
+  // 不写就是 Script_Companion.DEFAULT_PLAYER_CAST（顺子）。
+  playerCast: c.playerCast || null,
+  // 本章在场的具名同伴（CAST id 数组，上限 Script_Companion.MAX_COMPANIONS）。
+  // 不写就由 beats 的 who 推（RosterFromBeats）—— 推导只收「该章说过话的战斗员」，
+  // 军医、参谋、师长这些 combatant:false 的人一律推不出来，
+  // 终章更是会推出一张空表。所以七章都显式点了名，理由逐章写在章节数据里。
+  roster: Array.isArray(c.roster) ? c.roster : null,
   beats: c.beats,
 }));
 

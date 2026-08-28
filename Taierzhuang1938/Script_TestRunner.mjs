@@ -86,6 +86,7 @@ export const testDefs = {
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
   MissionHooksTest: { file: "Script_MissionHooksTest.mjs", desc: "任务流程引擎钩子：关中过场 beat / Signal→过场、LEVEL_CUES 七章自动构建、具名同伴 Locate 与剧本指令、脚本检查点倒带、钉关原语（纯 Node，毫秒级）" },
+  MissionSetpiecesTest: { file: "Script_MissionSetpiecesTest.mjs", desc: "章节摆点：七章 Setup 不抛、台词节拍与信号名对得上、INT1 六条对接项、后送队队列控制器、装配层接线（纯 Node，毫秒级）" },
   PhysicsTest: { file: "Script_PhysicsTest.mjs", desc: "真浏览器撞墙：碰撞扫掠" },
   ColliderTest: {
     file: "Script_ColliderTest.mjs",
@@ -201,7 +202,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest"],
+    tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   hud: {
     label: "HUD/交互提示/目标识别",
@@ -214,7 +215,7 @@ export const domains = {
     // 所以碰交互框架的改动要连着它一起跑。
     // 脚本检查点（倒带）改的是玩家状态的还原，与负重/机枪位共用同一批状态，
     // 所以也挂在这个域下。
-    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest", "MissionHooksTest"],
+    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
@@ -224,7 +225,7 @@ export const domains = {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
     // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
-    tests: ["CutsceneControlTest", "ActorPoseTest", "MissionHooksTest"],
+    tests: ["CutsceneControlTest", "ActorPoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   render: {
     label: "渲染与合批自动契约",

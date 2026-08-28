@@ -161,22 +161,27 @@ export const VOICE_DELIVERY_MIX = {
 };
 export const STORY_DELIVERIES = Object.keys(VOICE_DELIVERY_MIX);
 
-const BATTLE_LINES = [
-  // ===== 序章｜出川（18 句对白／11 个 cue，按过场时间轴固定顺序） =============
-  // 新序章全部锁定 SeedAudio 1.0 与四川话。1:08—1:30 必须作为一个连续场景一次生成，
-  // 不能拆成八条独立 TTS；text 保存完整提示词台词，字幕分句在 Data_CutsceneChuchuan。
-  { key: "prologue_young_dispatch_01", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_01.mp3", dur: 2.07, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "我们出川好久了哦。" },
-  { key: "prologue_old_wound_01", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_01.mp3", dur: 2.88, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "路莫问，跟到走就是。" },
-  { key: "prologue_young_dispatch_02", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_02.mp3", dur: 3.12, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "我都忘了屋头腊肉是啥味道了。" },
-  { key: "prologue_machine_gunner_01", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_01.mp3", dur: 1.62, role: "机枪手", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "你娃儿还惦记腊肉。" },
-  { key: "prologue_young_dispatch_03", kind: "prologue", file: "AudioSfx_PrologueVoiceYoungDispatch_03.mp3", dur: 2.12, role: "年轻传令兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "不惦记吃的惦记啥子嘛。" },
-  { key: "prologue_machine_gunner_02", kind: "prologue", file: "AudioSfx_PrologueVoiceMachineGunner_02.mp3", dur: 3.16, role: "机枪手", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "到了前头，有热水喝你就谢天谢地。" },
-  { key: "prologue_rifleman_01", kind: "prologue", file: "AudioSfx_PrologueVoiceRifleman_01.mp3", dur: 0.71, role: "擦枪士兵", pitch: 0, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "又卡。" },
-  { key: "prologue_old_wound_02", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_02.mp3", dur: 2.70, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "你少骂两句，它兴许听话点。" },
-  { key: "prologue_old_wound_03", kind: "prologue", file: "AudioSfx_PrologueVoiceOldWound_03.mp3", dur: 0.48, role: "旧伤士兵", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "近咯。" },
-  { key: "prologue_motivation_01", kind: "prologue", file: "AudioSfx_PrologueVoiceMotivation_04.mp3", dur: 21.21, role: "班长与众人", pitch: -2, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "continuousScene", lineCount: 8, text: "班长（洪亮、逐句升温）：这次你们去啊。出川，晓不晓得啊？\n众人（十到十二名十七八岁男兵自然错拍、斗志昂扬）：我们晓得。打日本！\n班长（短促有力）：去死，怕不怕？\n众人（两三人先起、其余瞬间压上）：不怕！\n班长（继续逼问）：为啥子不怕？\n众人（年轻声线自然重叠、满腔热血）：我们要保护我们的国家！\n班长（哽咽一瞬）：好样的。\n班长（洪亮坚决地命令）：都把东西带好。前头就是滕县。" },
-  { key: "prologue_external_officer_01", kind: "prologue", file: "AudioSfx_PrologueVoiceExternalOfficer_01.mp3", dur: 3.65, role: "车外军官", pitch: -1, prologue: true, backend: "seedaudio1.0", provider: "volcengine", promptMode: "singleLine", text: "通信排，下车！线盘背起，搞快！" },
+// ## 2026-08-29：11 条 prologue_* 行已从本表删除（任务流程重制 · 集成批 INT3a）
+//
+// 那批行（`prologue_young_dispatch_*` / `_old_wound_*` / `_machine_gunner_*` /
+// `_rifleman_01` / `_motivation_01` / `_external_officer_01`，18 句对白压成 11 个 cue）
+// 是**旧序章**的资产。旧序章讲的是「无名观察者 + 班长动员问答」，
+// 2026-08-28 的任务流程重制把它整段换掉了（docs/Data_MissionRemake.md §1）：
+// 新序章是 166.5 s / 九镜 / 31 句，说话的人全部是有名有姓的 CAST
+//（顺子、罗班长、幺娃、何有田、刘文才、军官），走 `ch0_*` 章节语音通道
+//（行本体在 `Data_MissionCh0.mjs` 的 VOICE_LINES，由下面的拼表并进来）。
+//
+// 也就是说这 11 行**没有任何一处再引用**：`Data_CutsceneChuchuan.CS_Chuchuan` 的
+// 31 个 voiceCue 一个都不是它们，`Bark` 按 kind 挑也挑不到 `kind: "prologue"`。
+// 留在表里的唯一效果是 `LoadVoices` 每次开机白解 11 个再也不会被播的文件，
+// 并让「序章 18 句 / 11 个 cue」那几条断言继续按一份废弃的时间轴验收。
+//
+// **音频文件一个都没删**：`Audio/AudioSfx_PrologueVoice*.mp3`（13 个，含
+// Motivation 的三次试摇）仍在盘上。它们是人工试听过的 SeedAudio take，
+// 重新生成不可复现；旧序章 `CS_ChuchuanLegacy` 也仍在 `Data_CutsceneChuchuan.mjs`
+// 里留档。哪天要回看旧序章，把这几行贴回来就行。
 
+const BATTLE_LINES = [
   { key: "rally_bayonet",   kind: "rally",  file: "vo_rally_bayonet.mp3",  dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
   { key: "rally_charge",    kind: "rally",  file: "vo_rally_charge.mp3",   dur: 2.50,  role: "班长",    pitch: -2,                  text: "冲！给老子冲！" },
   { key: "rally_dadao",     kind: "rally",  file: "vo_rally_dadao.mp3",    dur: 2.37,  role: "老兵",    pitch: -4,                  text: "杀！大刀砍拢去！" },
@@ -371,8 +376,9 @@ const CHAPTER_LINES = [];
 
 /**
  * 总表 = 战场口令 + 七章剧情台词。
- * 顺序有意义：战场口令在前，序章那批 prologue 行也在其中；
- * 现有断言（「前 31 条是战斗 Bark」之类）按 kind 过滤，不靠下标。
+ * 顺序有意义：战场口令在前（中方 31 条 + 日方 28 条），章节台词按章号接在后面。
+ * 现有断言（「战斗 Bark 时长在 0.3—2.6 s」之类）按 kind 过滤，不靠下标 ——
+ * 2026-08-29 删掉表头那 11 条 prologue_* 行时，正因为如此一条断言都没受影响。
  */
 export const VOICE_LINES = [...BATTLE_LINES, ...CHAPTER_LINES];
 

@@ -97,10 +97,15 @@
 //        Script_Main 那段注释里写着，会把这一拍整个跳过去）。
 //    躲避完成后立刻恢复战斗控制：地面日军同时接近。
 //
-// 7. LEVEL_CUES 缺 CH1_NanLu 表
-//    Script_Story.LEVEL_CUES 现在没有本章的键，`event:` 只会等 80 s 的超时兜底 ——
-//    六个事件全靠兜底的话，后半关的台词会整体往后拖到关末被 FlushTail 吞掉。
-//    请集成批照 EVENTS 表加一条（每条的 fallback 已经写在那张表里）。
+// 7. LEVEL_CUES 缺 CH1_NanLu 表 —— **已解决**（INT1 + INT2）
+//    INT1 把 LEVEL_CUES 改成由各章 `EVENTS` 自动构建，本章六条判据直接生效；
+//    INT2 另补了五条**走位闸**（AtVillage / AtCulvert / AtSouthRoad / AtDitch /
+//    AtFallback），把原来挂 `zone:` 的十条 beat 改挂 `event:`。
+//    判据是「走进那个圈 **或者** 时刻到了」——正片行为一模一样，
+//    而回归里一条 zone 不再吃 MAX_WAIT.zone = 95 s（五条就是 475 s）。
+//    **开场那一段（21.8 s 出敌情、一分钟内开枪）仍然全走 delay，一条都没动。**
+//    三条航线、后送队、接替担架、松手与倒带的摆点在
+//    `Script_MissionSetpieces.SETPIECES.CH1_NanLu`。
 //
 // 8. 惨叫与纯痛呼**不写 TTS 行**
 //    担架员中弹的那一声、伤员滑落时的痛呼、百姓的哭喊，全部走实录素材
@@ -116,6 +121,26 @@
  * 纯数据，不被运行时读取；照抄进 LEVEL_CUES 即可。
  */
 export const EVENTS = [
+  // ── 走位闸（集成批 INT2 新增）────────────────────────────────────────────
+  // 本关的五拍走位原来挂在 `zone:` 上。正片里那样是对的（走到了就播），
+  // 但 Script_PlayTest 的剧本长跑把关卡钉住、玩家不动，五条 zone 各吃一次
+  // MAX_WAIT.zone = 95 s —— 475 s，本关二十分钟的九成预算只剩四十几秒余量，
+  // 一次意外的重生就会把结尾那两句（§0 验收结果之二）挤到关外。
+  // 改挂 event 之后判据是「走进那个圈 **或者** 时刻到了」：**正片行为一模一样**
+  //（zone 那一支立刻成立），回归里则永远不会空等一百秒。
+  //
+  // ★ 开场那一段（关内 21.8 s 出敌情、一分钟内开枪）**仍然全走 delay**，
+  //   一条都没有动 —— 那是验收指标，不许取决于玩家有没有走进某个圈。
+  { name: "AtVillage", stage: 1, what: "退进村庄外围，靠田坎顶住",
+    fallback: '(c) => c.zone === "C1_Village" || c.levelTime > 95' },
+  { name: "AtCulvert", stage: 3, what: "跟随后送队过涵洞，沿大车路向南",
+    fallback: '(c) => c.zone === "C1_Culvert" || c.levelTime > 215' },
+  { name: "AtSouthRoad", stage: 4, what: "地面截击 —— 日军小股侧面接近",
+    fallback: '(c) => c.zone === "C1_SouthRoad" || c.levelTime > 335' },
+  { name: "AtDitch", stage: 5, what: "路沟与炮损民房；日机第一次掠过就在这一带",
+    fallback: '(c) => c.zone === "C1_Ditch" || c.levelTime > 440' },
+  { name: "AtFallback", stage: 10, what: "战术撤回 —— 掩护担架后撤，断住追兵",
+    fallback: '(c) => c.zone === "C1_Fallback" || c.levelTime > 720' },
   {
     name: "EscortCall", stage: 2,
     what: "后方喊「缺两个护送伤兵的！」，交通壕后侧木门打开、两副担架抬出",
@@ -162,6 +187,23 @@ export const CHAPTER = {
   clock: "03-14 拂晓 — 午后",
   sky: "smokyDay",
   music: "fieldLament",
+  // 本章在场的具名同伴（§8 人物速查 + §2 的场面需要）。**不写就由 beats 的 who 推**，
+  // 推出来的名册对前两关刚好够用，但从三关起就不对了（军医、排长、参谋在场却
+  // 不一定开口，而 combatant:false 的人一律推不出来）—— 所以七章一律显式点名。
+  // 上限六个（Script_Companion.MAX_COMPANIONS），**从 nra 名额里出人**，
+  // 撒兵自动少撒同样多，开机红线不受影响。
+  //
+  // 一关：整个班都在。担架员与伤员不进这张表 —— 他们由后送队
+  //（Script_MissionSetpieces 的 EscortColumn）自己摆，重复点名会多出一份人。
+  //
+  // **顺序照「首次开口的先后」写，不许随手改。** 名册的顺序就是 ai.Spawn 的调用
+  // 顺序，它决定这五个人拿到哪几个 soldier id、被编进哪个班组 —— 换一个顺序，
+  // 场上每一枪打给谁就整条重排。这不是理论：INT2 第一版把赵德贵挪到末位，
+  // Script_AiBehaviorTest「姿态没有阈值抽动」当场从 6 次变成 7 次（阈值是 6），
+  // 而那条断言测的是**日军**单兵在十二秒里蹲起了几回。AI 决策是混沌的
+  //（Script_ExternalProps 头注记过同一笔账），所以这张表写成与 INT2 之前
+  // RosterFromBeats 推出来的**逐字同序**，本关的 AI 行为因此一帧都没变。
+  roster: ["luo", "yaowa", "zhaodegui", "heyoutian", "liuwencai"],
   minutes: 20,
   pool: { start: 240, end: 208, label: "城里还站着的人", presumed: true },
   brief: [
@@ -238,8 +280,8 @@ export const CHAPTER = {
     { at: "delay:10.0", type: "shout", who: "luo", voice: "ch1_luo_05", text: "少扯！顺子，把箱子送过去！", tier: "虚构" },
     { at: "delay:9.0", type: "shout", who: "luo", voice: "ch1_luo_06", text: "涵洞那头有人摸过来！封起！", tier: "虚构" },
 
-    { at: "zone:C1_Village", type: "objective", text: "退进村庄外围，靠田坎顶住" },
-    { at: "zone:C1_Village", type: "shout", who: "luo", voice: "ch1_luo_07", text: "退到村口！靠田坎顶到起！", tier: "虚构" },
+    { at: "event:AtVillage", type: "objective", text: "退进村庄外围，靠田坎顶住" },
+    { at: "event:AtVillage", type: "shout", who: "luo", voice: "ch1_luo_07", text: "退到村口！靠田坎顶到起！", tier: "虚构" },
     // 刘文财的「数」：前期是算账，后期会变成压恐惧的方式（§8）。这里还只是算账。
     { at: "delay:12.0", type: "line", who: "liuwencai", voice: "ch1_liuwencai_01", text: "我这头就剩三个桥夹了。", tier: "虚构" },
     { at: "delay:8.0", type: "line", who: "heyoutian", voice: "ch1_heyoutian_02", text: "你数它做啥子？打完再数。", tier: "虚构" },
@@ -258,8 +300,8 @@ export const CHAPTER = {
     { at: "event:EscortCall", type: "objective", text: "跟随后送队 —— 不要跑到队伍前头去" },
 
     // ── 阶段三｜武装后送（玩家持枪，不抬担架）──────────────────────────────
-    { at: "zone:C1_Culvert", type: "objective", text: "跟随后送队过涵洞，沿大车路向南" },
-    { at: "zone:C1_Culvert", type: "shout", who: "danjiayuan", voice: "ch1_danjiayuan_01", text: "担架起！后头跟到起！", tier: "虚构" },
+    { at: "event:AtCulvert", type: "objective", text: "跟随后送队过涵洞，沿大车路向南" },
+    { at: "event:AtCulvert", type: "shout", who: "danjiayuan", voice: "ch1_danjiayuan_01", text: "担架起！后头跟到起！", tier: "虚构" },
     { at: "delay:13.0", type: "shout", who: "luo", voice: "ch1_luo_10", text: "先查涵洞。里头黑，看清楚再进。", tier: "虚构" },
     { at: "delay:15.0", type: "shout", who: "heyoutian", voice: "ch1_heyoutian_04", text: "后头有尾巴！那两个不是我们的人！", tier: "虚构" },
     { at: "delay:14.0", type: "line", who: "zhaodegui", voice: "ch1_zhaodegui_02", text: "那个阵地空了，弹药盒还在。去翻。", tier: "虚构" },
@@ -273,14 +315,14 @@ export const CHAPTER = {
     { at: "delay:16.0", type: "line", who: "yaowa", voice: "ch1_yaowa_03", text: "吃个鸭儿，泥巴又不顶饿。", tier: "虚构" },
 
     // ── 阶段四｜地面截击 ──────────────────────────────────────────────────
-    { at: "zone:C1_SouthRoad", type: "objective", text: "打退截路的日军小股" },
-    { at: "zone:C1_SouthRoad", type: "shout", who: "luo", voice: "ch1_luo_11", text: "机枪！左手边那个土堆！", tier: "虚构" },
-    { at: "zone:C1_SouthRoad", type: "shout", who: "danjiayuan", voice: "ch1_danjiayuan_03", text: "担架进屋头！进屋头！", tier: "虚构" },
+    { at: "event:AtSouthRoad", type: "objective", text: "打退截路的日军小股" },
+    { at: "event:AtSouthRoad", type: "shout", who: "luo", voice: "ch1_luo_11", text: "机枪！左手边那个土堆！", tier: "虚构" },
+    { at: "event:AtSouthRoad", type: "shout", who: "danjiayuan", voice: "ch1_danjiayuan_03", text: "担架进屋头！进屋头！", tier: "虚构" },
     { at: "delay:11.0", type: "shout", who: "luo", voice: "ch1_luo_12", text: "绕破屋过去，从侧面掏他！", tier: "虚构" },
     { at: "delay:13.0", type: "shout", who: "yaowa", voice: "ch1_yaowa_04", text: "近路那两个我压到起！", tier: "虚构" },
 
     // ── 阶段五｜日机第一次掠过 ────────────────────────────────────────────
-    { at: "zone:C1_Ditch", type: "env", text: "路沟边上是几间炮损民房。担架歇在墙根，白布在风里翻。" },
+    { at: "event:AtDitch", type: "env", text: "路沟边上是几间炮损民房。担架歇在墙根，白布在风里翻。" },
     { at: "event:AircraftFirstPass", type: "shout", who: "yaowa", voice: "ch1_yaowa_05", text: "飞机！飞机来了！", tier: "虚构" },
     { at: "event:AircraftFirstPass", type: "shout", who: "luo", voice: "ch1_luo_13", text: "散开！莫挤到一堆！", tier: "虚构" },
     { at: "event:AircraftFirstPass", type: "line", who: "liuwencai", voice: "ch1_liuwencai_02", text: "它冲前头那几台车去的。", tier: "虚构" },
@@ -340,8 +382,8 @@ export const CHAPTER = {
     { at: "delay:5.5", type: "line", who: "luo", voice: "ch1_luo_25", text: "路断了。把能走的带回城。", tier: "虚构" },
 
     // ── 阶段十｜战术撤回（返程无闲谈，只剩战术口令）──────────────────────
-    { at: "zone:C1_Fallback", type: "objective", text: "掩护担架后撤，断住追兵" },
-    { at: "zone:C1_Fallback", type: "shout", who: "luo", voice: "ch1_luo_26", text: "担架先过！", tier: "虚构" },
+    { at: "event:AtFallback", type: "objective", text: "掩护担架后撤，断住追兵" },
+    { at: "event:AtFallback", type: "shout", who: "luo", voice: "ch1_luo_26", text: "担架先过！", tier: "虚构" },
     { at: "delay:5.0", type: "shout", who: "yaowa", voice: "ch1_yaowa_10", text: "右边又上来了！", tier: "虚构" },
     { at: "delay:5.0", type: "shout", who: "heyoutian", voice: "ch1_heyoutian_08", text: "弹药！", tier: "虚构" },
     { at: "delay:5.0", type: "shout", who: "luo", voice: "ch1_luo_27", text: "莫把人落下！", tier: "虚构" },

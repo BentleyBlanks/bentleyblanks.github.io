@@ -419,6 +419,23 @@ URL 参数选 preset / quality / scene / gi。
   `Debug.Checkpoint` / `Debug.ChapterPin` / `Debug.MidCutscenes`。
   字段口径见 `docs/Data_MissionRemake.md` §10.6。
 
+### 章节摆点（集成批 INT2：七章内容 × 九个玩法系统的唯一接缝）
+- `Script_MissionSetpieces.mjs` —— **纯规则，不 import three**。「哪一章在哪一拍做什么」
+  是一张按 levelId 索引的数据表 `SETPIECES`，**一章一条**；装配层里因此
+  **一行 `if (章 id)` 都没有**（只建一次、每帧推一下、换关 `BeginLevel`）。
+  一章能挂四种钩子：`Setup(s)` / `onZone[zoneId](s)` / `onVoice[key](s)`（key = `beat.voice`，
+  剧本节拍与玩法节拍靠它对齐）/ `Update(s, dt)`。
+  `s` 把九个系统与宿主回调包成**判空过的**门面 —— 章节数据里不写 `if (s.carry)`。
+  同文件里另有 `EscortColumn`：一关武装后送与五关分段护送**共用同一台**队列控制器。
+- 三条纪律：**不夺移动权**（固定事件走关中过场）、**不重复实现玩法**（只负责摆）、
+  **与叙事层的接缝只有 `story.Signal(name)`**（名字在各章 `EVENTS` 里登记）。
+- **`event:` 的判据一律「事实 ‖ 时刻」两条都写。** 只写事实的判据在「玩家不动」的
+  回归里一条都不成立（各等 `MAX_WAIT.event = 80 s`）；只挂 `zone:` 更糟（95 s，
+  六拍走位就是 570 s）——「终章剧本剩 11 条」那条红就是这么来的。
+- 回归口 `Script_MissionSetpiecesTest.mjs`（纯 Node，domain `ai` ＋ `interact` ＋ `cutscene`）；
+  取证口 `Debug.Setpieces` / `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
+  口径见 `docs/Data_MissionRemake.md` §10.7。
+
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`

@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // 场景基底：A 区废墟 → 西街长街 → 西关城门
 //
-//   A 区 · 城内主救护所 (214, -30) —— 与三关、四关**同一个院子**（口径见
+//   A 区 · 城内主救护所 (214, -18) —— 与三关、四关**同一个院子**（口径见
 //        Data_MissionCh3 头注），这一次是废墟：一侧房屋坍塌、罗班长遗体盖白布、
 //        电话断线、药箱大多空、门板担架仍在、熟人缺席。
 //   西街长街 = 西门大街那条 z=0 的通视直街（城内唯一一条从城心一眼望到西城门楼的走廊）。
@@ -32,10 +32,11 @@
 //   序章「老子没打算死在山东。」→ 一关「老子不松，一起死。」→ 五关「老子今天不走了」
 //   （ch5_shunzi_18「老子今天不走了——来啊！」，§0 验收结果第 6 条那四连吼的末句）。
 //
-// 触发式为什么几乎只用 zone/delay：`event:` 的判定表在 Script_Story.LEVEL_CUES，
-// 那张表里还没有 CH5 的条目（F2/集成批的活）。没接线的 event 只能靠 80 s 兜底触发，
-// 五条就是五分钟的静默 —— 所以本章的节拍先挂在**今天就成立**的 zone 与 delay 上，
-// 要挂的事件名登记在下面的 EVENTS 里，接线之后再按注释改挂。
+// 触发式仍然只用 zone/delay，**这是有意的**：本章十二个阶段是一条时间上连续的
+// 撤退线，节拍本来就该跟着「走到哪儿了」与「上一句说完多久」走。下面 EVENTS 里
+// 那十四条现在（INT2 起）全部有判据、也全部由 `Script_MissionSetpieces` 在
+// 事实发生的那一刻推 —— 它们是**给玩法系统与关中过场用的挂点**，
+// 不是台词的触发式。两件事分开之后，改一条台词的时机不会牵动一挺机枪。
 //
 // ---------------------------------------------------------------------------
 // ENGINE_REQUEST（契约 §10.4：内容批只登记，不改共享模块）
@@ -51,17 +52,23 @@
 //     ①西关城门**真的打开**（门洞可通行、不是贴图）；②城门外那段路真的可见
 //     （bounds 已往西让到 -370，就是为了这一眼）；③任务点 C5_GateOut 在**城外**。
 //     三条缺一条，§0 验收结果第 5 条就不成立。
-//  5. **turnBack** —— 顺子折返那一拍的两件事：
+//  5. **turnBack** —— (b) **已解决**（INT2）：`cutsceneMid` 现在写成
+//     `{ id:"CS_Ch5_TurnBack", signal:"TurnedBack" }`，顺子喊完「老子回去压住！」
+//     那一拍由摆点层推 TurnedBack，Script_Story 请求宿主播那一场，播完还控制权。
+//     (a) 任务文字保留几秒那一条仍按 beats 的 delay 链走（objective 那条排在
+//     顺子四句之后 0.8 s，中间隔着幺娃与顺子来回六句，实测有十秒以上）。
+//     顺子折返那一拍的两件事：
 //     (a) 机枪声停下之后，任务文字**先保留【撤出滕县 —— 通过西关】数秒**再更新成
 //         【返回最后火力点】（玩家要有几秒钟是「还可以走」的状态，不能瞬切）；
 //     (b) 过场 CS_Ch5_TurnBack（8.5 s）在这一拍**关中播放**，不是关末 ——
 //         引擎目前只有 cutsceneIn/cutsceneOut 两个钩子，所以本章多给了一个
 //         `cutsceneMid` 字段等着接线（见 CHAPTER.cutsceneMid）。播完恢复完全控制。
-//  6. **lastBayonet** —— 最终白刃战：两侧夹击、体力不回满、活动空间逐步缩小，
-//     唯一判定是【坚持到最后一副担架离开视野】。**工程闸**：C5_ReturnGun 是目标链
-//     最后一个路标，走到就 objectiveIndex ≥ objectiveCount，Script_Main 会立刻换关 ——
-//     阶段⑩⑪⑫会被整段吃掉。这一段必须用 `state.pinned` 钉住关卡，直到最后一副担架
-//     离开视野判定成立才放行。
+//  6. **lastBayonet** —— **工程闸已解决**（INT2）：`mechanics.pinFinalZone: true`
+//     已经写进本章（见 CHAPTER.mechanics）。走到 C5_ReturnGun 不再自动换关，
+//     等 `story.Signal("ChapterRelease")` 才放行 —— 由摆点层在小秦喊完
+//     「听到回话！」那一拍推。装配层另有一道「配置时长 + 240 s」的保险丝。
+//     战斗侧的口径不变：两侧夹击、体力不回满、活动空间逐步缩小，
+//     唯一判定是【坚持到最后一副担架离开视野】。
 //  7. **povChain** —— 视角接替三段（124 师副射手 → 前沿电话兵 → 小秦）的控制权交接：
 //     每一段都是**玩家控制**（打机枪、穿院落递报告、敲听筒），段与段之间不切黑，
 //     用声音衔接。三段的字幕由 system beat 报出（「视角接替：…」）。
@@ -80,36 +87,62 @@
 //     B 区集结院 (449,-140) 与东关外壕都在本章切片 (maxX 285) 之外。折中：A 区→十字街口
 //     这一段路边院落请摆上同一组母题 —— 塌掉的投弹街垒、**烧黑的弹药箱**、纸灰、碎碗；
 //     三条 env beat 点的就是它们，摆件不到位这三条就成了空话。
-// 11. **PlayTest 待改一行** —— Script_PlayTest.mjs 断言「第五章打完自动接 CS_Ch5_TurnBack」。
-//     按 §6 过场规格，关末播的是**视角接替**（CS_Ch5_PovChain），转身那一场改在关中播，
-//     所以 cutsceneOut 已改。那一行断言的期望值请由集成批一并改成 CS_Ch5_PovChain。
+// 11. **PlayTest 待改一行** —— **已解决**（INT1 改的断言期望值）：
+//     Script_PlayTest 现在断言「第五章打完自动接 CS_Ch5_PovChain」。
 // ---------------------------------------------------------------------------
 
 /**
  * 本章要用的叙事事件（`at: "event:<id>"`）登记表。
  *
- * 现在**还没有一条 beat 挂在 event 上** —— 判定表（Script_Story.LEVEL_CUES）里没有
- * CH5 的条目，挂上去只会靠 80 s 兜底触发。接线的做法二选一：
- *   · 规则层在事实发生的那一刻 `story.Signal("<id>")`（推过的优先，最准）；
- *   · 或在 LEVEL_CUES.CH5_Chengqiang 里按 objectiveIndex/levelTime 写判据。
- * 接好之后，把 `nowAt` 那一条 beat 的 at 换成 `event:<id>` 即可，台词一个字不用动。
+ * ── 2026-08-29 集成批 INT2：十四条**全部补上了 fallback** ────────────────────
+ * INT1 建的 `Script_Story.BuildLevelCues` 会照这张表建判定表；没写判据的那一条
+ * 会吃「按登记顺序均匀铺开」的兜底 —— 均匀铺开不是"准"，只是"不会把链挂死"，
+ * 而本章十四条的次序与真实节奏差得远（视角接替三段挤在关末，均匀铺开会把
+ * 它们摊到关中）。所以逐条按**自己那一拍的事实**写：
+ *   · 能用路标表达的一律写 `c.zone === "..."`（走到了就是走到了）；
+ *   · 只能用时间兜的写成 `c.levelTime > c.levelSeconds * <比例>`，比例照 §6
+ *     十二阶段在关内的先后排，**单调递增**。
+ *
+ * 真发生时由 `Script_MissionSetpieces` 推 `story.Signal("<id>")`，
+ * 推过的永远优先于兜底（Script_Story 那条既有路径一个字没动）。
+ *
+ * **TurnedBack 是唯一不给时刻兜底的一条**：它挂着关中过场
+ * `CS_Ch5_TurnBack`（见 CHAPTER.cutsceneMid），而关中过场必须由事实推 ——
+ * 时刻表推出来的"转身"会在玩家还站在城门口犹豫的时候抢走镜头。
+ * 它的兜底是「人已经回到机枪位了」这个**更晚的事实**：真走回去了，
+ * 转身当然已经发生过，这时补播不会抢在玩家前头。
  */
 export const EVENTS = [
   { id: "EvacOrder", when: "负伤排长下完「不用再回来」，任务文字变【护送后送队撤出滕县】那一刻",
-    nowAt: "delay（跟在排长第三句后面）", mechanic: "escapeOffered" },
-  { id: "CookOnGun", when: "炊事兵被拉上机枪位、原射手交代完三句", nowAt: "delay（十字街口那组之后）", mechanic: null },
-  { id: "GunNestTaken", when: "玩家接管最后一个火力点的机枪", nowAt: "zone:C5_GunNest + delay", mechanic: "emplacedGun" },
-  { id: "LastLitterPassed", when: "最后一副担架通过火力点，排长喊「够了！」", nowAt: "delay", mechanic: "escortConvoy" },
-  { id: "EscapeSeen", when: "玩家站到城门内侧、门外道路与后送队都在视野里", nowAt: "zone:C5_GateInner", mechanic: "escapeOffered" },
-  { id: "MgSilent", when: "身后的机枪停了（射手位没人了）", nowAt: "zone:C5_GateOut", mechanic: "turnBack" },
-  { id: "TurnedBack", when: "顺子决定折返，任务更新【返回最后火力点】", nowAt: "delay（顺子「老子回去压住！」之后）", mechanic: "turnBack" },
-  { id: "GunJam", when: "机枪卡壳/弹尽，改步枪＋手榴弹", nowAt: "delay（重占机枪位之后）", mechanic: "gunJam" },
-  { id: "LastFriendDown", when: "最后一名友军中弹倒下，两个方向的日军进街", nowAt: "delay", mechanic: "lastBayonet" },
-  { id: "BayonetFixed", when: "顺子装上刺刀、四连吼开始", nowAt: "delay", mechanic: "lastBayonet" },
-  { id: "ShunziDown", when: "顺子中弹/被刺倒地（不切黑）", nowAt: "delay", mechanic: "povChain" },
-  { id: "PovGunner", when: "视角接替①：124 师机枪副射手", nowAt: "delay", mechanic: "povChain" },
-  { id: "PovLineman", when: "视角接替②：前沿电话兵", nowAt: "delay", mechanic: "povChain" },
-  { id: "PovXiaoqin", when: "视角接替③：通信兵小秦（接终章）", nowAt: "delay", mechanic: "povChain" },
+    nowAt: "delay（跟在排长第三句后面）", mechanic: "escapeOffered",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.06" },
+  { id: "CookOnGun", when: "炊事兵被拉上机枪位、原射手交代完三句", nowAt: "delay（十字街口那组之后）", mechanic: null,
+    fallback: "(c) => c.zone === \"C5_Crossroad\" || c.levelTime > c.levelSeconds * 0.20" },
+  { id: "GunNestTaken", when: "玩家接管最后一个火力点的机枪", nowAt: "zone:C5_GunNest + delay", mechanic: "emplacedGun",
+    fallback: "(c) => c.zone === \"C5_GunNest\" || c.levelTime > c.levelSeconds * 0.36" },
+  { id: "LastLitterPassed", when: "最后一副担架通过火力点，排长喊「够了！」", nowAt: "delay", mechanic: "escortConvoy",
+    fallback: "(c) => c.objectiveIndex >= 4 || c.levelTime > c.levelSeconds * 0.44" },
+  { id: "EscapeSeen", when: "玩家站到城门内侧、门外道路与后送队都在视野里", nowAt: "zone:C5_GateInner", mechanic: "escapeOffered",
+    fallback: "(c) => c.zone === \"C5_GateInner\" || c.levelTime > c.levelSeconds * 0.50" },
+  { id: "MgSilent", when: "身后的机枪停了（射手位没人了）", nowAt: "zone:C5_GateOut", mechanic: "turnBack",
+    fallback: "(c) => c.zone === \"C5_GateOut\" || c.levelTime > c.levelSeconds * 0.56" },
+  { id: "TurnedBack", when: "顺子决定折返，任务更新【返回最后火力点】", nowAt: "delay（顺子「老子回去压住！」之后）", mechanic: "turnBack",
+    // 关中过场的挂点 —— **不给时刻兜底**，兜底是一个更晚的事实（见上面头注）。
+    fallback: "(c) => c.zone === \"C5_ReturnGun\"" },
+  { id: "GunJam", when: "机枪卡壳/弹尽，改步枪＋手榴弹", nowAt: "delay（重占机枪位之后）", mechanic: "gunJam",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.70" },
+  { id: "LastFriendDown", when: "最后一名友军中弹倒下，两个方向的日军进街", nowAt: "delay", mechanic: "lastBayonet",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.76" },
+  { id: "BayonetFixed", when: "顺子装上刺刀、四连吼开始", nowAt: "delay", mechanic: "lastBayonet",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.81" },
+  { id: "ShunziDown", when: "顺子中弹/被刺倒地（不切黑）", nowAt: "delay", mechanic: "povChain",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.86" },
+  { id: "PovGunner", when: "视角接替①：124 师机枪副射手", nowAt: "delay", mechanic: "povChain",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.90" },
+  { id: "PovLineman", when: "视角接替②：前沿电话兵", nowAt: "delay", mechanic: "povChain",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.94" },
+  { id: "PovXiaoqin", when: "视角接替③：通信兵小秦（接终章）", nowAt: "delay", mechanic: "povChain",
+    fallback: "(c) => c.levelTime > c.levelSeconds * 0.97" },
 ];
 
 export const CHAPTER = {
@@ -120,6 +153,17 @@ export const CHAPTER = {
   clock: "03-17 06:00 — 15:00",
   sky: "dawn",
   music: "wallPressure",
+  // 五关：**罗班长不在这张表里** —— 他四关牺牲，摆点层在那一拍调了
+  // `companion.SetAbsent("luo")`，而缺席宣告是**跨关保留**的：
+  // 就算这里写上他，CompanionDirector 也会拒绝生成（log 里记「剧本已宣告缺席」）。
+  // 写不写都一样，不写是为了让这张表本身读得出「他不在了」。
+  //
+  // 幺娃在后送队方向（阶段⑧「顺哥！机枪停了！」是从街那头喊过来的）；
+  // 排长下军令、军医报「在后送队那边」、赵德贵交代机枪三句、
+  // 124 师伤兵是视角接替①、小秦是视角接替③与终章的玩家。
+  // **刘文财这一章不在场**：他只剩「机枪还有多少弹？」一句（§8 说他后期
+  // 用数数控制恐惧，那一句非空间化照样成立）。
+  roster: ["paizhang", "yaowa", "junyi", "zhaodegui", "s124", "xiaoqin"],
   minutes: 20,
   pool: { start: 96, end: 44, label: "城里还站着的人", presumed: true },
   brief: [
@@ -137,7 +181,7 @@ export const CHAPTER = {
     "返回最后火力点",
   ],
   zones: [
-    { id: "C5_AidRuin", name: "A 区废墟 · 清晨", x: 214, z: -30, radius: 30 },
+    { id: "C5_AidRuin", name: "A 区废墟 · 清晨", x: 214, z: -18, radius: 30 },
     { id: "C5_Crossroad", name: "十字街口", x: 0, z: 0, radius: 20 },
     { id: "C5_WestStreet", name: "西街长街", x: -160, z: 0, radius: 24 },
     { id: "C5_GunNest", name: "最后一个火力点", x: -230, z: 0, radius: 20 },
@@ -303,9 +347,11 @@ export const CHAPTER = {
   // 关末播的是**视角接替**（§6 过场 2）：顺子倒下不切黑 → 担架离开街道 → 124 师伤兵
   // → 电话兵中弹、听筒落地，「东关？东关回话。」的声音直接衔接终章。
   cutsceneOut: "CS_Ch5_PovChain",
-  // 关**中**播的转身（§6 过场 1，8.5 s）。引擎还没有这个钩子 —— 见 ENGINE_REQUEST 5(b)；
-  // 在接线之前它只是数据，Data_TengxianScript 不读这个字段。
-  cutsceneMid: "CS_Ch5_TurnBack",
+  // 关**中**播的转身（§6 过场 1，8.5 s）。INT1 建了钩子、INT2 把它挂到了
+  // **TurnedBack** 这条信号上（写成字符串会挂在默认信号 ChapterMidCutscene 上，
+  // 那条没有人推）：顺子喊完「老子回去压住！」那一拍由 Script_MissionSetpieces
+  // 推 story.Signal("TurnedBack") → Script_Story 请求宿主播这一场 → 播完还控制权。
+  cutsceneMid: { id: "CS_Ch5_TurnBack", signal: "TurnedBack" },
   mechanics: {
     emplacedGun: true,        // 接管机枪位：控过热、优先打掷弹筒、封两侧院门
     gunJam: true,             // 机枪失效：卡壳/弹尽 → 改步枪 + 手榴弹
@@ -314,6 +360,13 @@ export const CHAPTER = {
     turnBack: true,           // 身后火力停止 → 顺子主动折返（任务更新【返回最后火力点】）
     lastBayonet: true,        // 最终白刃战：两侧夹击、体力不回满、活动空间缩小
     povChain: true,           // 视角接替三段：机枪副射手 → 电话兵 → 小秦
+    // ★ 钉关（INT1 的引擎原语，INT2 在这里声明）：C5_ReturnGun 是目标链最后一个
+    // 路标，而阶段⑩⑪⑫（最后防守三层、最终白刃战、视角接替三段）**全在它之后**。
+    // 不钉住的话一踏进那个圈 objectiveIndex ≥ objectiveCount，Script_Main 立刻换关，
+    // 本章后三分之一被整段吃掉。放行等 story.Signal("ChapterRelease") ——
+    // 由 Script_MissionSetpieces 在小秦喊完「听到回话！」那一拍推。
+    // 保险丝在装配层：超过配置时长 + 240 s 自动放行并告警。
+    pinFinalZone: true,
   },
 };
 

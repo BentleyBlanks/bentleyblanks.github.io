@@ -114,20 +114,18 @@ export function IsCompanionCast(castId) {
 }
 
 /**
- * 这一章玩家演的是谁 —— **他自己不能同时站在自己旁边。**
+ * 默认的玩家角色。
  *
- * 六章里玩家是顺子；终章 §7 明写「玩家＝小秦」，而小秦在终章话最多，
- * 按 beats 推名册会把他推出来，于是场上会有两个小秦（一个是你，一个站你旁边）。
+ * **玩家自己不能同时站在自己旁边。** 六章里玩家是顺子；终章 §7 明写
+ * 「玩家＝小秦」，而小秦在终章话最多，按 beats 推名册会把他推出来，
+ * 于是场上会有两个小秦（一个是你，一个站你旁边）。
  *
- * 这张表是**过渡措施**：INT2 把 `CHAPTER.playerCast` 写进章节数据之后，
- * 装配层会把那个值传给 BeginLevel，这里就该删掉。留着表也不冲突 ——
- * 显式传进来的 playerCast 优先。
+ * INT1 时这里另有一张过渡表 `CHAPTER_PLAYER_CAST`（只有终章一条）。
+ * **INT2 删了它**：那一条现在写在 `Data_MissionCh6.CHAPTER.playerCast` 上，
+ * 由 Data_TengxianScript.LEVELS 传到装配层，再由 `BeginLevel({ playerCast })`
+ * 传进来 —— 「这一章玩家演谁」是章节内容，不是引擎常量。
+ * 章节没写就退到这个默认值。
  */
-export const CHAPTER_PLAYER_CAST = {
-  CH6_Zuihou: "xiaoqin",
-};
-
-/** 默认的玩家角色（六章都是顺子）。 */
 export const DEFAULT_PLAYER_CAST = "shunzi";
 
 /**
@@ -208,14 +206,14 @@ export class CompanionDirector {
    *   roster  显式名册（castId 数组）。不给就由 beats 推导（RosterFromBeats）。
    *   beats   本章 beats（roster 缺位时用它推导）
    *   zones   本章路标 [{id,x,z,radius}]，hold 模式按 holdZone 就近钉
-   *   playerCast  这一章玩家演的是谁（终章是小秦）。不给就查 CHAPTER_PLAYER_CAST。
-   *              **他不进默认名册** —— 否则场上会有两个他。
+   *   playerCast  这一章玩家演的是谁（终章是小秦，写在 CHAPTER.playerCast 上）。
+   *              不给就退到 DEFAULT_PLAYER_CAST。**他不进默认名册** ——
+   *              否则场上会有两个他。
    */
   BeginLevel(levelId, opts = {}) {
     this.Reset("levelChange");
     this.levelId = levelId || null;
-    const playerCast = opts.playerCast
-      || CHAPTER_PLAYER_CAST[levelId] || DEFAULT_PLAYER_CAST;
+    const playerCast = opts.playerCast || DEFAULT_PLAYER_CAST;
     const wanted = (Array.isArray(opts.roster) && opts.roster.length)
       ? opts.roster.filter((id) => id !== playerCast)
       : RosterFromBeats(opts.beats || [], this.max, { exclude: playerCast });
@@ -345,6 +343,21 @@ export class CompanionDirector {
   Has(castId) {
     const member = this.members.get(castId);
     return !!(member && member.handle && !member.fell);
+  }
+
+  /**
+   * 这个人的宿主句柄（场上那一具）。
+   *
+   * 摆点层要它做两件事：把班里的人塞进扫射航线的 `immune` 白名单
+   *（后面还有戏的人一律必不死），以及把某个人交给别的系统当同伴
+   *（担架前端、抬罗班长的那两个）。
+   *
+   * **不许直接读 this.members** —— 那是内部结构；这里给一条窄出口，
+   * 将来换存储不影响调用方。倒下的人也返回句柄（尸体也是场上的东西）。
+   */
+  Handle(castId) {
+    const member = this.members.get(castId);
+    return member ? member.handle : null;
   }
 
   /**

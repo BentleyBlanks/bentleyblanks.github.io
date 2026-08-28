@@ -6,7 +6,7 @@
 //
 //   B 区 · 东关临时集结院 (449, -175)  东关大街北段的一处普通民居院。
 //        第五关玩家再次路过时它已坍塌（弹药箱烧黑、碎碗纸灰），无旁白也能认出。
-//   A 区 · 城内主救护所   (214, -30)   与三关、五关**同一个院子**（口径见 Data_MissionCh3 头注）。
+//   A 区 · 城内主救护所   (214, -18)   与三关、五关**同一个院子**（口径见 Data_MissionCh3 头注）。
 //   两个锚点都是三章共用的，**不许单独挪**；要挪就连同 CH3/CH5 的同名路标一起挪。
 //
 // spawn 沿用旧 L3 那个点：第二区纵向巷（生成器 x≈456 的明确车道）上，离寺院院墙
@@ -46,8 +46,13 @@
 // ---------------------------------------------------------------------------
 // ENGINE_REQUEST（本章要的引擎能力；章节内容批不许改共享模块，集成批统一处理）
 //
-//   1. **关内过场挂点**（两处都要，是本章最大的一处顺序错位）
-//      引擎现在只有 `cutsceneIn`(beforeLevel) / `cutsceneOut`(afterLevel) 两个挂点。
+//   1. **关内过场挂点** —— **已解决**（INT1 建钩子、INT2 挂上去）
+//      两场都改成关中过场：CS_Ch4_UnfinishedLetter 挂在九十秒休整之后
+//      （罗班长「先把今晚熬过去。」的下一拍），CS_Ch4_AidStation 挂在玩家
+//      抬着罗班长走进 A 区那一拍。挂点在
+//      `Script_MissionSetpieces.SETPIECES.CH4_DongguanYe`，CHAPTER 的
+//      cutsceneIn / cutsceneOut 都已置 null。下面这一段是当时的问题描述，留档：
+//      引擎当时只有 `cutsceneIn`(beforeLevel) / `cutsceneOut`(afterLevel) 两个挂点。
 //      按策划案：
 //        · CS_Ch4_UnfinishedLetter 应在**九十秒休整之后**播（阶段③），现在只能挂
 //          cutsceneIn，实际是进章即播 —— 顺序变成 ③①②，休整段的静被提前掐掉；
@@ -111,6 +116,12 @@ export const CHAPTER = {
   sky: "night",
   // 夜战旧曲整批未通过评审；新候选选定前只留夜风、脚步与远处枪炮。
   music: null,
+  // 四关：**幺娃必须在场** —— 阶段⑨抬罗班长的是他（「幺娃，抓稳！」），
+  // 摆点层的 carryLeader 直接按 castId 找他的句柄，不在场就抬不起来。
+  // 小秦（接电话、铺线）、赵德贵（门口口令）、军医（⑩⑪的抢救）同理。
+  // 六个名额满了，**124 师伤兵这一章不点名**：他是「不同番号的人」的代表，
+  // 台词非空间化反而对（§5 阶段①的重新编组本来就是一群没名字的人）。
+  roster: ["luo", "yaowa", "heyoutian", "zhaodegui", "xiaoqin", "junyi"],
   minutes: 18,
   pool: { start: 140, end: 96, label: "城里还站着的人", presumed: true },
   brief: [
@@ -133,7 +144,7 @@ export const CHAPTER = {
     { id: "C4_FlareCross", name: "照明弹横巷", x: 449, z: -22, radius: 22 },
     { id: "C4_NarrowLane", name: "窄巷 · 白刃", x: 443, z: 121, radius: 22 },
     { id: "C4_CarryBack", name: "东门 · 抬回城", x: 296, z: -65, radius: 24 },
-    { id: "C4_AidStation", name: "A 区 · 主救护所", x: 214, z: -30, radius: 30 },
+    { id: "C4_AidStation", name: "A 区 · 主救护所", x: 214, z: -18, radius: 30 },
   ],
   tuning: {
     bounds: { minX: 150, maxX: 600, minZ: -300, maxZ: 170 },
@@ -151,7 +162,7 @@ export const CHAPTER = {
     { at: "delay:3.0", type: "objective", text: "在集结院分弹药、接电话、确认口令" },
 
     // ── ① B 区集结院：按口径分弹药、送弹、回收阵亡者武器、接电话、门口确认口令 ──
-    { at: "zone:C4_Assembly", type: "env", tier: "虚构",
+    { at: "event:AtAssembly", type: "env", tier: "虚构",
       text: "院子里挤着三四个番号的人。有人在数弹药，有人把阵亡的枪一支支靠到墙根。" },
     { at: "delay:2.4", type: "line", who: "s124", voice: "ch4_s124_01", tier: "虚构", text: "三七二旅的。" },
     { at: "delay:2.0", type: "line", who: "heyoutian", voice: "ch4_heyoutian_01", tier: "虚构", text: "哪一团？" },
@@ -199,7 +210,7 @@ export const CHAPTER = {
     { at: "delay:2.0", type: "shout", who: "luo", voice: "ch4_luo_07", tier: "虚构", text: "跟到我，一个跟一个。" },
 
     // ── ④ 黑暗接敌（无照明弹）：靠脚步、拉栓声、日语口令、远处火光、屋顶轮廓 ──
-    { at: "zone:C4_DarkLane", type: "objective", text: "摸黑接敌 —— 看不到就听" },
+    { at: "event:AtDarkLane", type: "objective", text: "摸黑接敌 —— 看不到就听" },
     { at: "delay:2.4", type: "line", who: "yaowa", voice: "ch4_yaowa_04", tier: "虚构", text: "黑得看得到个鸭儿。" },
     { at: "delay:2.2", type: "line", who: "luo", voice: "ch4_luo_08", tier: "虚构", text: "看不到就听。" },
     { at: "delay:2.2", type: "line", who: "luo", voice: "ch4_luo_09", tier: "虚构", text: "枪口莫对到自己人。" },
@@ -210,7 +221,7 @@ export const CHAPTER = {
     { at: "delay:2.4", type: "env", tier: "虚构", text: "拉栓声。就在墙那头，听得出不止一个人。" },
 
     // ── ⑤ 第一枚照明弹：横巷突然照亮，敌我一起暴露 ────────────────────────
-    { at: "zone:C4_FlareCross", type: "objective", text: "第一枚照明弹：贴墙，打屋顶" },
+    { at: "event:AtFlareCross", type: "objective", text: "第一枚照明弹：贴墙，打屋顶" },
     { at: "delay:2.0", type: "shout", who: "yaowa", voice: "ch4_yaowa_05", tier: "虚构", text: "照明弹！" },
     { at: "delay:2.0", type: "shout", who: "luo", voice: "ch4_luo_10", tier: "虚构", text: "贴墙！" },
     { at: "delay:2.0", type: "shout", who: "yaowa", voice: "ch4_yaowa_06", tier: "虚构", text: "右边屋顶！" },
@@ -229,7 +240,7 @@ export const CHAPTER = {
     { at: "delay:2.6", type: "line", who: "xiaoqin", voice: "ch4_xiaoqin_03", tier: "虚构", text: "线在我手头，脚下莫踩。" },
 
     // ── ⑦ 第二枚照明弹与白刃战：窄巷敌我十余米 ──────────────────────────
-    { at: "zone:C4_NarrowLane", type: "objective", text: "窄巷白刃，跟住自己人" },
+    { at: "event:AtNarrowLane", type: "objective", text: "窄巷白刃，跟住自己人" },
     { at: "delay:2.0", type: "env", tier: "虚构", text: "第二枚照明弹。十几米外，两边都愣了半秒。" },
     { at: "delay:2.0", type: "shout", who: "luo", voice: "ch4_luo_13", tier: "虚构", text: "上刺刀！" },
     { at: "delay:2.0", type: "shout", who: "luo", voice: "ch4_luo_14", tier: "虚构", text: "跟住自己人！" },
@@ -252,7 +263,7 @@ export const CHAPTER = {
     { at: "delay:2.2", type: "line", who: "luo", voice: "ch4_luo_17", tier: "虚构", text: "……莫喊。" },
 
     // ── ⑨ 掩护罗班长撤离：拖/抬由 AI 执行，玩家压制。与一关「松手」直接反差 ──
-    { at: "zone:C4_CarryBack", type: "objective", text: "掩护罗班长撤离，把人抬回城" },
+    { at: "event:AtCarryBack", type: "objective", text: "掩护罗班长撤离，把人抬回城" },
     { at: "delay:2.0", type: "shout", who: "shunzi", voice: "ch4_shunzi_03", tier: "虚构", text: "莫松手！" },
     { at: "delay:2.0", type: "shout", who: "shunzi", voice: "ch4_shunzi_04", tier: "虚构", text: "把班长拖进去！" },
     { at: "delay:2.0", type: "shout", who: "shunzi", voice: "ch4_shunzi_05", tier: "虚构", text: "幺娃，抓稳！" },
@@ -264,7 +275,7 @@ export const CHAPTER = {
     { at: "delay:2.2", type: "shout", who: "liuwencai", voice: "ch4_liuwencai_05", tier: "虚构", text: "还有一条街！" },
 
     // ── ⑩ 回到 A 区主救护所：同一个院子，认得出门板、墙角、报纸、药箱 ────────
-    { at: "zone:C4_AidStation", type: "objective", text: "回到主救护所" },
+    { at: "event:AtAidStation", type: "objective", text: "回到主救护所" },
     { at: "delay:2.6", type: "env", tier: "虚构", text: "还是那个院子。门板还是那天拆的那几块，靠在墙根。" },
     { at: "delay:2.8", type: "env", tier: "虚构", text: "小秦接电话的墙角还在，墙上那张旧报纸也还在。药箱少了一半。" },
     { at: "delay:2.2", type: "shout", who: "yaowa", voice: "ch4_yaowa_09", tier: "虚构", text: "担架兵！这边！" },
@@ -292,8 +303,16 @@ export const CHAPTER = {
 
     { at: "end", type: "narration", text: "那封回信最后一行停在「等我回来……」。他说打完再写。", tier: "虚构" },
   ],
-  cutsceneIn: "CS_Ch4_UnfinishedLetter",
-  cutsceneOut: "CS_Ch4_AidStation",
+  // 两场都改成**关中过场**（集成批 INT2 落地本文件 ENGINE_REQUEST 第 1 条）：
+  //   · CS_Ch4_UnfinishedLetter 挂在**九十秒休整之后**（罗班长「先把今晚熬过去。」
+  //     那一句的下一拍）。挂 cutsceneIn 的老做法是进章即播，顺序变成 ③①②，
+  //     休整段那份静被提前掐掉；
+  //   · CS_Ch4_AidStation 挂在**玩家抬着罗班长走进 A 区**那一拍，播完恢复控制，
+  //     随后才是 beats 里顺子的失控对话。挂 cutsceneOut 的老做法是关末才播，
+  //     「没得脉了」会落在「不可能」后面，因果整个颠倒。
+  // 挂点在 Script_MissionSetpieces.SETPIECES.CH4_DongguanYe（onVoice / onZone）。
+  cutsceneIn: null,
+  cutsceneOut: null,
   mechanics: {
     flares: true,             // 照明弹：横巷突然照亮 → 熄灭后重新变暗（敌我一起暴露）
     darkNavigation: true,     // 靠脚步/拉栓声/日语口令/远处火光/屋顶轮廓判位
@@ -318,11 +337,31 @@ export const CHAPTER = {
  * MAX_WAIT.event = 80 s 的超时兜底照常播，只是时机不准，不会吞掉后面的剧本。
  */
 export const EVENTS = [
+  // ── 走位闸（集成批 INT2 新增）────────────────────────────────────────────
+  // 本章原来把六拍走位挂在 `zone:` 上。正片里那样是对的（走到了就播），
+  // 但 Script_PlayTest 的剧本长跑把关卡钉住、玩家不动，六条 zone 各吃一次
+  // MAX_WAIT.zone = 95 s —— 570 s，把本章十八分钟的九成预算吃掉一多半，
+  // 再加上两场关中过场就没有余量了。改挂 event 之后判据是
+  //「走进那个圈 **或者** 时刻到了」：正片行为一模一样，回归里不会空等。
+  { name: "AtAssembly", stage: "§5 阶段 1 · 进 B 区集结院",
+    cue: '(c) => c.zone === "C4_Assembly" || c.levelTime > 20' },
+  { name: "AtDarkLane", stage: "§5 阶段 4 · 黑暗接敌",
+    cue: '(c) => c.zone === "C4_DarkLane" || c.levelTime > 195' },
+  { name: "AtFlareCross", stage: "§5 阶段 5 · 照明弹横巷",
+    cue: '(c) => c.zone === "C4_FlareCross" || c.levelTime > 245' },
+  { name: "AtNarrowLane", stage: "§5 阶段 7 · 窄巷白刃",
+    cue: '(c) => c.zone === "C4_NarrowLane" || c.levelTime > 305' },
+  { name: "AtCarryBack", stage: "§5 阶段 9 · 掩护罗班长撤离",
+    cue: '(c) => c.zone === "C4_CarryBack" || c.levelTime > 440' },
+  { name: "AtAidStation", stage: "§5 阶段 10 · 回到 A 区主救护所",
+    cue: '(c) => c.zone === "C4_AidStation" || c.levelTime > 570' },
   {
     name: "C4_LuoSaves",
     stage: "§5 阶段 8 · 罗班长救顺子",
     signal: "玩法系统批在固定事件脚本启动的那一帧 story.Signal(\"C4_LuoSaves\")",
-    cue: "c => c.zone === \"C4_NarrowLane\" && c.levelTime > c.levelSeconds * 0.58",
+    // INT2：`&&` 改成 `||` 并补时刻兜底。原式要求「在窄巷里**并且**过了
+    // 五成八的时长」，两条都不成立时这一拍要等 80 s —— 而它是本关的转轴。
+    cue: '(c) => c.zone === "C4_NarrowLane" || c.levelTime > 370',
     note: "炮弹击中侧墙 → 墙塌、玩家被击倒、武器脱手、贴地视角 → 日军走近补刺 → "
       + "罗班长撞开他、拖玩家离开 → 罗班长腹部中弹。全程 4—6 秒，随后立即还控制权。",
   },
@@ -330,7 +369,7 @@ export const EVENTS = [
     name: "C4_BadCountersign",
     stage: "§5 阶段 6 · 黑暗转移里的口令报错",
     signal: "口令交互（mechanics.passwordChallenge）判定友军报错时 Signal",
-    cue: "c => c.zone === \"C4_FlareCross\" && c.objectiveIndex >= 2",
+    cue: '(c) => c.zone === "C4_FlareCross" || c.levelTime > 270',
     note: "友军报错口令 → 几秒的互相指枪与喊叫 → 罗班长喝止。**不许真开友伤**，"
       + "只做「误瞄」状态。现在这一段挂在 delay 链上，接线后可改挂 event。",
   },
@@ -338,7 +377,7 @@ export const EVENTS = [
     name: "C4_FlareUp",
     stage: "§5 阶段 5 / 7 · 两枚照明弹",
     signal: "照明弹系统在每一枚升空时 Signal（同名可推两次，Story 只认第一次）",
-    cue: "c => c.zone === \"C4_FlareCross\" || c.zone === \"C4_NarrowLane\"",
+    cue: '(c) => c.zone === "C4_FlareCross" || c.zone === "C4_NarrowLane" || c.levelTime > 250',
     note: "照亮期间敌我同时暴露；熄灭后有数秒暗适应。日方的「しょうめいだんをあげろ！」是口头信号。",
   },
 ];
