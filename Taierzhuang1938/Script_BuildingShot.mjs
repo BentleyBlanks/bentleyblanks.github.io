@@ -40,12 +40,13 @@ const SUBJECTS = {
   // 1 · 城内民居：参考图「城墙外侧紧贴的两栋民居」。三开间正房单体。
   Dwelling: {
     note: "城内民居（三开间正房单体）",
+    // 尺寸跟着 AddCompound 现在的档走（HOUSE_DEPTH_K / HOUSE_EAVE_LIFT 之后）。
     // ry=π/2：把山墙转到正对正交相机。参考三视图的「正视图」画的就是山墙面
     // （照片里那两栋民居是山墙冲着城墙的），排布对不上就没法逐项比。
     // facing=-1 让门窗那一面朝 −X，于是落在「侧视图」里 —— 与参考图一致。
     build: `(W, sink) => {
-      const eave = 2.75, depth = 5.4, width = 10.2;
-      const ridge = eave + depth * 0.5 * Math.tan(27.5 * Math.PI / 180);
+      const eave = 3.15, depth = 4.6, width = 9.5;
+      const ridge = eave + depth * 0.5 * Math.tan(34 * Math.PI / 180);
       W.AddRoomBlock(sink, {
         x: 0, z: 0, ry: Math.PI / 2, width, depth, eaveY: eave, ridgeY: ridge,
         seed: "bench:dwelling", damage: 0, burnt: false, facing: -1, bays: 3,

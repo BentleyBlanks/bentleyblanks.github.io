@@ -746,8 +746,11 @@ export function AddCompound(sink, spec) {
 
   // --- 正房（北，三开间）---
   const mainW = Math.min(width - 2.4, 9 + rnd() * 2);   // 三开间面阔 9—11 m
-  const mainD = 4.6 + rnd() * 1.2;                       // 进深 4.5—6 m
-  const eave = 2.45 + rnd() * 0.3;                       // 檐口 2.4—2.8 m
+  // 体量档与 CityBlockKit 的 HOUSE_DEPTH_K / HOUSE_EAVE_LIFT 一致：照 AI 还原
+  // 三视图那栋「进深约 4.2、檐高约 3.15 的小高房」。两边必须同调 —— 同一条街上
+  // 一半院子是 AddCompound 建的、一半是 CityBlockKit 建的。
+  const mainD = (4.6 + rnd() * 1.2) * 0.85;              // 进深收到 3.9—4.9 m
+  const eave = 2.45 + rnd() * 0.3 + 0.58;                // 檐口抬到 3.0—3.3 m
   const ridge = eave + mainD * 0.5 * Math.tan(THREE.MathUtils.degToRad(34));
   const [mx, mz] = L(0, -depth / 2 + mainD / 2 + 0.4);
   AddRoomBlock(sink, {

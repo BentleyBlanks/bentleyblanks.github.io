@@ -369,7 +369,7 @@ export const PLACEMENTS = Object.freeze([
   { asset: "wineJarCluster", x: 476.38, z: -165.02, ry: -0.35,
     note: "东路大院东厢：酒坛一堆，这一户开着小酒坊" },
 
-  { asset: "marketRiceSack01", x: 476.59, z: -144.5, ry: 0.42,
+  { asset: "marketRiceSack01", x: 477.28, z: -144.5, ry: 0.42,
     note: "东路院东厢：米袋" },
   { asset: "marketBox01", x: 468.84, z: -144.25, ry: -0.3,
     note: "东路院：木箱" },
