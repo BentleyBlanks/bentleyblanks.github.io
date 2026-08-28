@@ -120,6 +120,23 @@ const ACTION_ICONS = {
   switchWeapon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3.4-3.4M20 15H7l3.4 3.4"/></svg>`,
   // 踢开近身敌人的靴印 + 刀线：特殊条件下的处决
   execution: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-4 6-4 9-2l3 2 4-1M13 16l3-7m-1 2 5-5M7 19l3 2"/></svg>`,
+  // --- 任务流程重制新增：担架/搬运/救护那一批 ---------------------------------
+  // 两根杠加一张布：担架、门板担架、抬起任何重物
+  carry: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9h20M2 15h20M6 7.5v9M18 7.5v9"/></svg>`,
+  // 一卷纱布：递纱布 / 交药品
+  supply: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="10" rx="2"/><path d="M9 7v10M15 7v10"/></svg>`,
+  // 医用十字：检查伤员
+  check: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>`,
+  // 一扇带横撑的门板：拆门板
+  plank: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M5 9h14M5 15h14"/></svg>`,
+  // 两个接头之间一段线：接 / 剪电话线
+  wire: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c4 0 4-10 8-10s4 10 8 10"/><circle cx="3" cy="17" r="1.6"/><circle cx="19" cy="17" r="1.6"/></svg>`,
+  // 一簇火苗：投传单入火
+  fire: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4 6 5.5 6 10a6 6 0 0 1-12 0c0-2.6 1.4-4 3-5.6.4 1.6 1.2 2.4 2 2.6-.6-2.6-.4-5 1-7Z"/></svg>`,
+  // 一张印着字的纸：传单
+  leaflet: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`,
+  // 一张被撕开的布：撕短褂
+  tear: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h5l-2 4 2 3-2 4 2 3-1 4H5zM19 3h-5l2 4-2 3 2 4-2 3 1 4h4z"/></svg>`,
 };
 ACTION_ICONS.action = ACTION_ICONS.interact;
 
@@ -130,9 +147,22 @@ ACTION_ICONS.action = ACTION_ICONS.interact;
  */
 export function ContextualActionPrompts({
   interaction = null, bleeding = 0, bandages = 0, slots = {},
-  bayonet = null, ammoEmpty = false,
+  bayonet = null, ammoEmpty = false, carry = null,
 } = {}) {
   const prompts = [];
+  /**
+   * 手上占着东西的时候，提示条上**只剩怎么把它放下**。
+   * 换枪、上刺刀、白刃这几条这会儿一条都做不到，列出来就是在提示玩家去按没反应的键；
+   * 而「放下」是他此刻唯一还能做的决定（`canDrop:false` 的那次连这个也没有 ——
+   * 第四关抬罗班长，剧情要求他不许松手，那就不给他一个假的出口）。
+   */
+  if (carry?.active) {
+    if (carry.phase === "carry" && carry.canDrop) {
+      prompts.push({ keys: "F", label: carry.prompt || "放下", kind: "carry" });
+      if (carry.canThrow) prompts.push({ keys: "左键", label: "扔下，立刻还手", kind: "carry" });
+    }
+    return prompts;
+  }
   if (interaction?.label) {
     prompts.push({ keys: "F", label: interaction.label, kind: interaction.kind || "interact" });
   }
@@ -188,6 +218,9 @@ export class Hud {
     this.confirms = [];
     this.actionPrompts = [];
     this.actionPromptSignature = "";
+    /** 负重条与进度环各自的「上一次画的是什么」，签名不变就一个属性都不动。 */
+    this.carrySignature = "";
+    this.interactRingOn = false;
     /**
      * 准心当前画出来的缝（像素）与它对应的散布角。
      * 平滑在这里做而不是在 CSS transition 里：散布是每帧都在变的连续量，
@@ -254,6 +287,34 @@ export class Hud {
     this.el.subtitle = mk("hudSubtitle");
     this.el.hint = mk("hudHint");
     this.el.actions = mk("hudActions");
+    /**
+     * 按住型交互的进度环（按住止血 / 拆门板 / 撕短褂）。画在准星正下方一点点，
+     * 与情境提示条同一块视野。**用 SVG 的 stroke-dashoffset 走圈**，不是一条进度条：
+     * 圆环在准星附近不占横向空间，也不会跟下方的字幕抢那一行。
+     * 常驻 DOM，只改属性 —— 每次重建 SVG 会在按住的那两秒里持续触发布局。
+     */
+    this.el.interactRing = mk("hudInteractRing");
+    this.el.interactRing.innerHTML =
+      `<svg viewBox="0 0 44 44" aria-hidden="true">`
+      + `<circle class="ringBase" cx="22" cy="22" r="19"/>`
+      + `<circle class="ringFill" cx="22" cy="22" r="19"/></svg>`
+      + `<span class="ringLabel"></span>`;
+    this.el.interactRingFill = this.el.interactRing.querySelector(".ringFill");
+    this.el.interactRingLabel = this.el.interactRing.querySelector(".ringLabel");
+    this.interactRingCircumference = 2 * Math.PI * 19;
+    this.el.interactRingFill.style.strokeDasharray = `${this.interactRingCircumference}`;
+    this.el.interactRingFill.style.strokeDashoffset = `${this.interactRingCircumference}`;
+    this.el.interactRing.setAttribute("aria-hidden", "true");
+    /** 负重条：抬着什么、抬得稳没有。位置在武器区上方，与它同一栏（都是「手上是什么」）。 */
+    this.el.carry = mk("hudCarry");
+    this.el.carry.innerHTML =
+      `<span class="carryIco">${ACTION_ICONS.carry}</span>`
+      + `<span class="carryText"><b></b><i></i></span>`
+      + `<span class="carryBar"><u></u></span>`;
+    this.el.carryLabel = this.el.carry.querySelector(".carryText b");
+    this.el.carryNote = this.el.carry.querySelector(".carryText i");
+    this.el.carryBar = this.el.carry.querySelector(".carryBar u");
+    this.el.carry.setAttribute("aria-hidden", "true");
     this.el.meleeQte = mk("hudMeleeQte");
     this.el.meleeQte.innerHTML = `
       <div class="mqSlow">慢动作 · 白刃接触</div>
@@ -747,6 +808,71 @@ export class Hud {
       this.el.actions.appendChild(row);
     }
     this.el.actions.classList.toggle("on", next.length > 0);
+  }
+
+  /**
+   * 按住型交互的进度环。只读 `InteractSystem.View()` 的脱敏快照，
+   * null 就收掉。**每帧调都行**：改的只是两个属性，没有 DOM 重建。
+   *
+   * `holding=false` 时环在往回退（松手了但还没退干净），换个颜色告诉玩家
+   * 「你松手了，还来得及按回去」—— 没有这一档，玩家读到的是"卡住了"。
+   */
+  SetInteractProgress(view = null) {
+    const root = this.el.interactRing;
+    if (!view) {
+      if (this.interactRingOn) {
+        this.interactRingOn = false;
+        root.className = "hudInteractRing";
+        root.setAttribute("aria-hidden", "true");
+      }
+      return;
+    }
+    this.interactRingOn = true;
+    const t = Math.max(0, Math.min(1, Number(view.t) || 0));
+    root.className = `hudInteractRing on ${view.gesture || "hold"}`
+      + (view.holding ? "" : " fading");
+    root.setAttribute("aria-hidden", "false");
+    root.setAttribute("aria-label", `${view.label || "交互"} ${Math.round(t * 100)}%`);
+    this.el.interactRingFill.style.strokeDashoffset =
+      `${this.interactRingCircumference * (1 - t)}`;
+    if (this.el.interactRingLabel.textContent !== (view.label || "")) {
+      this.el.interactRingLabel.textContent = view.label || "";
+    }
+  }
+
+  /**
+   * 负重条 + 全局「手上占着」态。只读 `CarrySystem.View()`。
+   *
+   * `#hud.carrying` 这个类是**武器 UI 禁用态的唯一开关**：弹药、装备格与武器名
+   * 一起压暗（CSS 里做），因为它们这会儿一个都用不上。准星由装配层另行收掉
+   * （SetCrosshair 的 visible），不在这里管 —— 那是同一件事的两处口径，
+   * 但准星要跟着 `player.Alive` 与过场一起判，收在装配层那一处更完整。
+   */
+  SetCarry(view = null) {
+    const root = this.el.carry;
+    const signature = view
+      ? `${view.kindId}|${view.label}|${view.note}|${view.phase}` : "";
+    if (signature !== this.carrySignature) {
+      this.carrySignature = signature;
+      if (view) {
+        this.el.carryLabel.textContent = view.label || "";
+        this.el.carryNote.textContent = view.note || "";
+      }
+      root.className = view ? `hudCarry on ${view.phase}` : "hudCarry";
+      root.setAttribute("aria-hidden", view ? "false" : "true");
+      if (view) root.setAttribute("aria-label", `负重：${view.label}，${view.prompt || ""}`);
+      this.root.classList.toggle("carrying", !!view);
+    }
+    if (view) this.el.carryBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.t)) * 100)}%`;
+  }
+
+  /** 取证口：冒烟脚本读它断言 HUD 真的进了负重态（而不是只有规则层变了）。 */
+  CarryState() {
+    return {
+      on: this.root.classList.contains("carrying"),
+      label: this.el.carryLabel.textContent,
+      ring: this.interactRingOn ? this.el.interactRingLabel.textContent : null,
+    };
   }
 
   /** 史实注记卡片。排队弹，不叠在一起。 */

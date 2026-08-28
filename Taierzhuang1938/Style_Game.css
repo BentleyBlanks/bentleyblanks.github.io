@@ -210,7 +210,65 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudAction.pickup .ico, .hudAction.interact .ico { color: var(--warn); }
 .hudAction.ammo kbd { border-color: rgba(224,176,98,0.82); color: var(--warn); }
 .hudAction.ammo .ico { color: var(--warn); }
-.hudAction.bandage .ico { color: #e2a48e; }
+.hudAction.bandage .ico, .hudAction.supply .ico, .hudAction.check .ico { color: #e2a48e; }
+.hudAction.carry .ico, .hudAction.plank .ico { color: var(--warn); }
+.hudAction.wire .ico { color: #9dc0e4; }
+.hudAction.fire .ico, .hudAction.tear .ico { color: #e18a71; }
+
+/* 按住型交互的进度环（按住止血 / 拆门板 / 撕短褂）。
+   在准星正下方一点点：视线不用离开准星，也不压住下面的字幕行。
+   环走满 = 完成；松手后 .fading 让它变灰往回退——玩家要能读出"我松手了，
+   但还没退干净，按回去还来得及"，不然这一档看起来就是卡住。 */
+.hudInteractRing {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, 46px);
+  width: 44px; height: 44px; z-index: 3; opacity: 0;
+  transition: opacity 0.12s linear; pointer-events: none;
+}
+.hudInteractRing.on { opacity: 1; }
+.hudInteractRing svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.hudInteractRing circle { fill: none; stroke-width: 3; stroke-linecap: round; }
+.hudInteractRing .ringBase { stroke: rgba(230,223,205,0.18); }
+.hudInteractRing .ringFill { stroke: var(--warn); transition: stroke-dashoffset 0.05s linear; }
+/* 长按确认（撕短褂 / 剪线）是不可逆的决定，用告警色与它区分开 */
+.hudInteractRing.confirm .ringFill { stroke: #e18a71; }
+.hudInteractRing.fading .ringFill { stroke: rgba(230,223,205,0.42); }
+.hudInteractRing .ringLabel {
+  position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  margin-top: 5px; white-space: nowrap; font-size: 12px; color: rgba(230,223,205,0.78);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* 负重条：抬着什么、抬稳没有。贴在右下武器区上方——「手上是什么」本来就该在同一栏。
+   bottom 排在 .hudState（116px，流血/受伤/压制那一行）之上，两条不许叠 ——
+   抬着担架挨枪子正是它们同时出现的时候。 */
+.hudCarry {
+  position: absolute; right: 18px; bottom: 152px; z-index: 3;
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 12px 6px 9px; opacity: 0; transition: opacity 0.16s linear;
+  border: 1px solid rgba(230,223,205,0.24); border-left: 2px solid var(--warn);
+  background: rgba(10,10,9,0.62);
+}
+.hudCarry.on { opacity: 1; }
+.hudCarry .carryIco { display: flex; width: 22px; height: 22px; color: var(--warn); }
+.hudCarry .carryIco svg {
+  width: 100%; height: 100%; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.hudCarry .carryText { display: flex; flex-direction: column; line-height: 1.3; }
+.hudCarry .carryText b { color: var(--paper); font-size: 14px; font-weight: 600; }
+.hudCarry .carryText i { color: var(--dim); font-size: 11px; font-style: normal; }
+.hudCarry .carryBar {
+  position: absolute; left: 0; bottom: 0; width: 100%; height: 2px;
+  background: rgba(230,223,205,0.12);
+}
+.hudCarry .carryBar u { display: block; height: 100%; background: var(--warn); }
+/* 举起 / 放下那两段是过渡态，条在走；抬稳了就满格不闪 */
+.hudCarry.lift .carryBar u, .hudCarry.release .carryBar u { transition: width 0.06s linear; }
+
+/* 负重时的武器 UI 禁用态：弹药、装备格、武器名一起压暗——这会儿一个都用不上。
+   准星由装配层收掉（SetCrosshair 的 visible），不在这里做。 */
+#hud.carrying .combatWeapon, #hud.carrying .combatAmmo,
+#hud.carrying .combatEquipment { opacity: 0.3; filter: grayscale(0.8); }
 
 /* 白刃 QTE：慢动作里唯一留在中央的高优先级信息。宽条是完成度，细条是真实时间；
    定时处决的亮区直接画在细条上，玩家不必把百分比换算成时机。 */
@@ -300,6 +358,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    那几秒功能层本来也没有决策价值：玩家站在出生点、目标在正前方、
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
 #hud.staging .hudMarkers, #hud.staging .hudActions,
+#hud.staging .hudInteractRing, #hud.staging .hudCarry,
 #hud.staging .hudTarget { opacity: 0; }
 .hudMarkers { transition: opacity 0.4s ease; }
 
@@ -367,6 +426,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .combatStance svg { width: 31px; height: 31px; }
   .ammoCurrent { font-size: 27px; }
   .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 94px); max-width: 230px; }
+  .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); }
+  .hudInteractRing { transform: translate(-50%, 38px); }
   .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
   .hudHint { bottom: 50px; }
 }

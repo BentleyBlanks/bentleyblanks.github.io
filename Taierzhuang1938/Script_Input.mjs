@@ -43,6 +43,7 @@ export const CONTROL_GUIDE = [
       { keys: "空枪左键", label: "没子弹时点左键直接白刃" },
       { keys: "G / H", label: "投手榴弹 / 集束手榴弹" },
       { keys: "F", label: "拾枪、换枪或给战友分弹" },
+      { keys: "按住 F", label: "止血、拆门板、接线：按住到进度环走满" },
       { keys: "B", label: "有绷带且流血时包扎止血" },
     ],
   },
@@ -103,9 +104,14 @@ export const KEYMAP = [
   // 装 / 卸刺刀。只有 Data_Weapons 里 bayonet: true 的枪吃这个键。
   { code: "KeyX", action: "bayonet", mode: "press", context: "any" },
   { code: "KeyB", action: "bandage", mode: "press", context: "any" },
-  // F 是最拥挤的一个键，语义按上下文分流（拾枪拾弹 / 分弹药 / 将来的救人拖人）。
+  // F 是最拥挤的一个键，语义按上下文分流（拾枪拾弹 / 分弹药 / 救护交互 / 放下负重）。
   // **它不再是"叫炮"** —— 叫炮进了 Tab 轮盘的第 8 格。
-  { code: "KeyF", action: "interact", mode: "press", context: "any" },
+  //
+  // 【2026-08-28 从 press 改成 holdAction】任务流程重制给 F 加了两种按住型手势
+  // （按住止血带进度环、长按确认撕短褂），而 press 模式只下发按下那一个边沿 ——
+  // 没有松手边沿，进度环就永远退不回去、confirm 也判不出"中途松手"。
+  // 按下那一侧的行为完全没变：装配层在 detail.down 为真时走原来那条分流。
+  { code: "KeyF", action: "interact", mode: "holdAction", context: "any" },
   // ER2 的地图不是常驻 HUD：默认收起，需要时按 M 看一眼，再按一次回到战场。
   { code: "KeyM", action: "map", mode: "press", context: "world" },
   { code: "KeyG", action: "cook:Grenade", mode: "holdAction", context: "any" },

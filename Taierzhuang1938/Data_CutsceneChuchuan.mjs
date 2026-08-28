@@ -360,22 +360,70 @@ export const CS_ChuchuanLegacy = {
 };
 
 // ---------------------------------------------------------------------------
-// 新版《序章｜出川》——普通士兵第一人称、可自由环视的车厢、移动窗外层、105 秒时间轴。
+// 《序章｜出川》——普通士兵第一人称、可自由环视的车厢、移动窗外层。
 // 车厢坐标是独立局部系；不绑定界河高度图。这里只写数据，不 import three。
+// ---------------------------------------------------------------------------
+//
+// ── 2026-08-28 任务流程重制（docs/Data_MissionRemake.md §1）────────────────
+// 上一版（105 s）讲的是「无名观察者 + 班长动员问答」，被新策划案整段替换：
+// 序章的作用**只有三件事** —— 川军军容装备纪律混乱、第五战区接纳并补枪弹、
+// 顺子准备借后送任务逃走。所以本轮重做的是**内容**，车厢/窗外/小站/门外那几层
+// 布景与它们的运动层一件没动（它们本来就对）。逐条对照：
+//
+//   · 演员表换成新 CAST（§10.2）：shunzi（玩家）／luo／yaowa／heyoutian／
+//     liuwencai／zhaodegui 在车厢里，junguan 在兵站月台上。旧的匿名五人
+//    （youngDispatch/rifleman/oldWound/machineGunner/squadLeader）整组删除。
+//   · **玩家全程坐在座位上**。旧版最后 12 秒是「起身→过道→踏板→月台」的第一人称
+//     行走段；新策划案的收口是「远处炮声 → 罗班长喊收骰子/枪上膛 → 短切黑出字幕」，
+//     人根本还没下车。行走段连同它的 EasedWalk/排队下车编排一起删掉 ——
+//     少了那一段，全车三十个人的下车竞速与相机穿模风险也一起没了。
+//   · 玩家从右侧长凳挪到**左侧**（x=−1.95）：侧门在右壁 z 4.4—7.0，坐在右壁边上
+//     看门是贴着墙根的掠射角；坐到对面才「透过车门看兵站」（§1 阶段 2）。
+//     从座位 (−1.95,1.36,3.42) 望出去，门框切出的可见楔形是月台上
+//     z≈5.5—11.1 那一条 —— 兵站的摊子、弹药箱、担架、军官全部摆在这条里面。
+//   · 固定镜头「必要演出」= 镜 2（读家信＋四句对话）＋镜 3（列车减速、车门滑开）
+//     ＋镜 9（黑场地点卡）= 30.0+7.0+4.5 = **41.5 s ≤ 45 s**（§1 过场规格）。
+//     其余六镜相机钉死在座位上不动，只给基准视轴，玩家自己转头 —— 那才是
+//    「车厢主体保持第一人称可转动视角」。固定演出镜用 **per-shot headLook**
+//     把转头幅度收窄（引擎支持 shot.headLook，见 ResolveHeadLookConfig），
+//     不切 cameraMode：中途从 headLook 跳 director 会把玩家的视角硬掰回去。
+//   · 不做全国战局蒙太奇 —— 旧版开头那两张「1937 年全面抗战爆发／1938 年 3 月
+//     第 122 师抵达滕县」黑场字卡整个删掉，直接淡入车厢。史料交代留在 skipCard。
 // ---------------------------------------------------------------------------
 
 // 车厢钢地板：CarriageFloor 中心 y=0、厚 0.18 → 顶面 0.09。演员的 pos.y 就是脚底，
 // 写 0.13 时全车人悬空 4 cm（低头看自己的脚会看见一条缝）。
 const CHUCHUAN_CAR_G = 0.09;
 const CHUCHUAN_CAR_RY = Math.PI;
-const CHUCHUAN_MOTIVATION_AT = 68.0;
-const CHUCHUAN_GEAR_AT = 87.4;
-const CHUCHUAN_DOOR_AT = 93.0;
-const CHUCHUAN_TRAIN_STOP_AT = 56.0;
 const CHUCHUAN_SEAT_LIFT = 0.13;
-const CHUCHUAN_END = 105.0;
 const CHUCHUAN_SIDE_DOOR_Z = 5.7;
 const CHUCHUAN_PLATFORM_Y = 0.58;
+
+// ── 时间轴（九镜，秒数之和必须 === CHUCHUAN_END）─────────────────────────────
+//   镜1  0.0— 27.0  自由   车厢闲谈：赌骰子、切腊肉（§1 阶段 1 的五句空间语音）
+//   镜2 27.0— 57.0  固定   读家信＋「南京以前也觉得远」四句（过场规格 1、2）
+//   镜3 57.0— 64.0  固定   列车减速停车、侧门滑开（过场规格 3 的前半）
+//   镜4 64.0— 89.0  自由   兵站与第五战区补给：喝令放回、军官三句（阶段 2）
+//   镜5 89.0—107.0  自由   何有田小声＋罗班长三句（阶段 2 后半）
+//   镜6 107.0—111.0 固定基准 顺子低头亮出背包底那件短褂
+//   镜7 111.0—143.0 自由   顺子的计划：与幺娃咬耳朵七句（阶段 3）
+//   镜8 143.0—162.0 自由   远处炮声、罗班长三句口令、门外军官喊下车
+//   镜9 162.0—166.5 黑场   地点卡「山东·滕县／1938年3月」，火车声渐变炮声
+const CHUCHUAN_END = 166.5;
+/** 列车停稳（整套 ambientMotion 的 stopAt）。镜 3 第 1.6 秒。 */
+const CHUCHUAN_TRAIN_STOP_AT = 58.6;
+/**
+ * 侧门开始滑与滑到位（滑 2 s）。演员轨用**全局秒**，而 propMoves 用**镜内相对秒**——
+ * 镜 3 从 CHUCHUAN_SHOT3_AT 起算，两者靠这三个常量换算，不许在两边各写一个数。
+ */
+const CHUCHUAN_SHOT3_AT = 57.0;
+const CHUCHUAN_DOOR_AT = 60.5;
+const CHUCHUAN_DOOR_OPEN_AT = 62.5;
+/** 兵站自由段起点（镜 4）与「顺子的计划」起点（镜 6）。 */
+const CHUCHUAN_DEPOT_AT = 64.0;
+const CHUCHUAN_PLAN_AT = 107.0;
+/** 远处炮声与罗班长的口令（镜 8）。全车人从这一刻起开始收东西。 */
+const CHUCHUAN_ORDER_AT = 143.0;
 
 // ── 长凳分段与坐席 ────────────────────────────────────────────────────────
 // 凳段中心 [-5.8,-1.95,1.95,5.8]、每段长 3.45 → 段内可坐区间是 ±1.725，段间有缝。
@@ -692,160 +740,128 @@ function TrackMoveState(from, to, seconds, extra = {}) {
   return { prepare: 1, moveSpeed: speed / 4.2, travelSpeed: speed, ...extra };
 }
 
+// ── 车厢里的固定机位（局部坐标）─────────────────────────────────────────────
+// 玩家坐左侧长凳靠 +z 那一头；幺娃紧挨着他往车厢深处坐一格（咬耳朵要够得着）；
+// 赌骰子的刘文财与何有田在**对面右凳**、离玩家 6—7 m，看得清但不是特写；
+// 赵德贵管弹药，坐右凳靠中间。罗班长不坐 —— 他在过道里走动（见 CHUCHUAN_LUO_*）。
+const CHUCHUAN_SEAT_SHUNZI = [-1.95, CHUCHUAN_CAR_G, 3.42];
+const CHUCHUAN_SEAT_YAOWA = [-1.95, CHUCHUAN_CAR_G, 2.30];
+const CHUCHUAN_SEAT_LIUWENCAI = [1.95, CHUCHUAN_CAR_G, -3.30];
+const CHUCHUAN_SEAT_HEYOUTIAN = [1.95, CHUCHUAN_CAR_G, -1.80];
+const CHUCHUAN_SEAT_ZHAODEGUI = [1.95, CHUCHUAN_CAR_G, 0.75];
+/** 罗班长过道上的三个站位：看赌局 → 走到顺子跟前读信 → 门口对着月台。 */
+const CHUCHUAN_LUO_WATCH = [-0.95, CHUCHUAN_CAR_G, 0.60];
+const CHUCHUAN_LUO_LETTER = [-0.85, CHUCHUAN_CAR_G, 3.15];
+const CHUCHUAN_LUO_DOOR = [0.90, CHUCHUAN_CAR_G, 5.20];
+
 /**
  * 一名坐席乘客的全程轨道。
  *
- * ── 下车段的排序（本轮重排的核心）────────────────────────────────────────
- * 旧版让全车人从 95.2 s 起就往过道里走，而玩家的相机 93—101 s 正好沿同一条过道、
- * 同一扇门出去：出图里 t=94 相机贴着别人的帽顶、t=100 直接从排队的人身体里穿过去。
- * 现在的口径是 **玩家先走、人群明显错后**：
- *   · 93—98.5 s 相机在过道里，这段时间**没有一个人离座**（只是站起来靠在自己座位前）；
- *   · 98.8 s 起按「离门远近」依次离座（queueOrder 0 最近门），每人错开 0.8 s；
- *   · 排到门口、跨门槛、下踏板的落点全部往 −z 一侧散开，避开玩家最后停的
- *     (6.8, 7.4)；镜 11 回头仍能看见战友一个接一个从门里下来。
- * queueOrder 大的人在 105 s 内根本轮不到，就一直站在过道里排着 —— 这是对的，
- * 一节车 30 个人不可能十秒钟走空。
+ * 本轮把下车段整个删了（见文件头 2026-08-28 那一节）：新序章在「罗班长喊完
+ * 枪上膛」那一刻就切黑，谁都还没离座。所以这条轨道只有一件事 —— **原地坐着，
+ * 按三个节点换姿态**：停车（停手抬头）→ 兵站（看车门）→ 口令（收东西）。
+ * 全程 pos 不变，Lint 的滑步检查自然为 0。
  */
-function CarSeatTrack(pos, lifeState, stopDelay, queueOrder, exitX, facingRy = CHUCHUAN_CAR_RY) {
-  const stopAt = 56.8 + stopDelay;
-  const side = Math.sign(pos[0]) || 1;
-  const aisleX = side * 0.74;
-  // 起立点：站在自己座位**前面**的空地上。写回 x=±1.95 的话人是站在凳面里的
-  //（凳段 x 跨 1.66—2.24），小腿整条埋进座板。
-  const standPos = [side * 1.28, CHUCHUAN_CAR_G, pos[2]];
-  const exitAt = 98.8 + queueOrder * 0.8;
-  const aisleAt = exitAt + 1.0;
-  const aislePos = [aisleX, CHUCHUAN_CAR_G, pos[2]];
-  const queuePos = [aisleX, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z - 0.5];
-  const queueAt = aisleAt + Math.max(0.5, Math.abs(queuePos[2] - pos[2]) / 1.7);
-  const thresholdPos = [3.30, 0.24, CHUCHUAN_SIDE_DOOR_Z - 0.1];
-  const thresholdAt = queueAt + 1.0;
-  const platformPos = [4.80, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z - 0.35 - Math.abs(exitX) * 0.5];
-  const platformAt = thresholdAt + 0.95;
-  const outsidePos = [5.70 + Math.abs(exitX) * 0.35, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z - 1.7 - Math.abs(exitX) * 1.1];
-  const outsideAt = platformAt + 1.3;
-  const tail = Math.max(CHUCHUAN_END, outsideAt + 0.1);
+function CarSeatTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
+  const lift = CHUCHUAN_SEAT_LIFT;
+  const seated = { ...lifeState, sit: 1, seatLift: lift };
+  const at = (t, state) => ({ t, pos, ry: facingRy, state });
   return [
-    { t: 0, pos, ry: facingRy, state: { ...lifeState, sit: 1, seatLift: CHUCHUAN_SEAT_LIFT } },
-    { t: stopAt, pos, ry: facingRy, state: { ...lifeState, sit: 1, seatLift: CHUCHUAN_SEAT_LIFT } },
-    // 两声炮之间陆续停手、抬头；动员问答全程仍坐着，不抢班长的站姿。
-    { t: Math.min(67.7, stopAt + 0.65), pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.08 } },
-    { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.16 } },
-    // “好样的”之后默默把随身物件收好；地点卡期间才起身。
-    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.55 } },
-    { t: 90.8, pos, ry: facingRy, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.8 } },
-    // 门一开就起身，但只是离座站到自己座位前；过道让给先走的玩家。
-    { t: CHUCHUAN_DOOR_AT - 0.7, pos, ry: facingRy, state: TrackMoveState(pos, standPos, 0.7, { prepare: 1 }) },
-    { t: CHUCHUAN_DOOR_AT, pos: standPos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    { t: exitAt, pos: standPos, ry: facingRy, state: TrackMoveState(standPos, aislePos, aisleAt - exitAt) },
-    // 从自己的座位进过道、沿过道走到侧门、跨踏板登上月台；不再黑场瞬移到车尾。
-    { t: aisleAt, pos: aislePos, ry: Math.PI, state: TrackMoveState(aislePos, queuePos, queueAt - aisleAt) },
-    { t: queueAt, pos: queuePos, ry: Math.PI, state: TrackMoveState(queuePos, thresholdPos, thresholdAt - queueAt) },
-    { t: thresholdAt, pos: thresholdPos, ry: -Math.PI / 2, state: TrackMoveState(thresholdPos, platformPos, platformAt - thresholdAt) },
-    { t: platformAt, pos: platformPos, ry: -Math.PI / 2, state: TrackMoveState(platformPos, outsidePos, outsideAt - platformAt) },
-    { t: outsideAt, pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
-    { t: tail, pos: outsidePos, ry: Math.PI, state: { prepare: 1, moveSpeed: 0 } },
+    at(0, seated),
+    at(CHUCHUAN_TRAIN_STOP_AT + stopDelay, seated),
+    // 车一停，手上的活陆续停下、抬头（prepare 就是「停手抬头」那一档）。
+    // stopDelay 最大 3.12 s，+0.8 之后仍在 CHUCHUAN_DEPOT_AT 之前 —— 这里**不能**再
+    // 套一层 Math.min(CHUCHUAN_DOOR_AT, …)：门开得比最慢那几个人抬头还早，
+    // 夹一下就把这一帧压到上一帧前面去（关键帧时间倒退＝硬错）。
+    at(CHUCHUAN_TRAIN_STOP_AT + stopDelay + 0.8, { sit: 1, seatLift: lift, prepare: 0.12 }),
+    at(CHUCHUAN_DEPOT_AT, { sit: 1, seatLift: lift, prepare: 0.20 }),
+    // 「收骰子！枪上膛！」之后全车开始收拾随身物件，但仍坐着 —— 切黑时人还在座位上。
+    at(CHUCHUAN_ORDER_AT, { sit: 1, seatLift: lift, prepare: 0.30 }),
+    at(CHUCHUAN_ORDER_AT + 8.0, { sit: 1, seatLift: lift, prepare: 0.86 }),
+    at(CHUCHUAN_END, { sit: 1, seatLift: lift, prepare: 0.90 }),
   ];
 }
 
-/**
- * 班长从头就立在镜头正对的车厢末端，面向满车人检查弹药；他不是被坐席和人群吞掉的第五个
- * 同质化乘客。第二声炮后只需收起手里的弹匣、正身说话，动员时始终可见。
- */
-/**
- * 班长下车段重排：旧版让他 94.9 s 起沿过道→门→月台走，落点 (5.55, 5.7) 正是
- * 玩家镜 10 末尾的机位 (5.20, 5.7) 与镜 11 起点 —— t=100 那张图里相机整个穿在
- * 他身体里。现在他**先于玩家一步下车、随即让开到月台前方**：跨门槛比相机早 2 s，
- * 99 s 就离开门口，101 s 前走到 (7.5, 11.0) 站定回身。玩家镜 11 停稳时他在
- * 正前方四米、和车外军官一左一右，画面里终于有人。
- */
-// facingRy 1.35（YawFacing 口径：朝 −x 略偏 −z）＝ 班长侧身对着整节车说话。
-// 原来写 Math.PI 是朝 +z、也就是背对全车对着端墙；改成 0 又变成 22 秒正脸怼镜头
-//（脸是光板，施工单明说不许）。1.35 从玩家座位看过去是 3/4 背影，正是分镜要的。
-function CarRearLeaderTrack(pos, facingRy = 0) {
-  const doorPos = [1.90, CHUCHUAN_CAR_G, CHUCHUAN_SIDE_DOOR_Z - 0.10];
-  const thresholdPos = [3.30, 0.24, CHUCHUAN_SIDE_DOOR_Z];
-  const platformPos = [4.85, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z + 0.6];
-  const standPos = [7.20, CHUCHUAN_PLATFORM_Y, 12.4];
-  return [
-    { t: 0, pos, ry: facingRy, state: { checkAmmo: 0.85, moveSpeed: 0 } },
-    { t: 56.8, pos, ry: facingRy, state: { checkAmmo: 0.22, prepare: 0.10, moveSpeed: 0 } },
-    { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { prepare: 0.28, moveSpeed: 0 } },
-    { t: 83.6, pos, ry: facingRy, state: { prepare: 0.42, moveSpeed: 0 } },
-    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { prepare: 0.74, moveSpeed: 0 } },
-    // 门开满（93.0 起滑 2 s）之后他才动，94.6—95.8 走到门边、95.8—96.9 跨门槛。
-    // 93.0 就起步的话，t=94 相机的视线扫掠点正好压在他身上（实测 1.6 m 一个后脑勺
-    // 糊满全幅）；等到 94.6 再走，那一刻他还在 2.6 m 外、离视轴 45°。
-    // ry 全部按 YawFacing = atan2(-dx,-dz) 逐段给：原来整段保持 π／−π/2，
-    // 人是横着平移过去的。
-    { t: CHUCHUAN_DOOR_AT, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    { t: 94.6, pos, ry: -1.388, state: TrackMoveState(pos, doorPos, 1.2, { prepare: 1 }) },
-    { t: 95.8, pos: doorPos, ry: -1.642, state: TrackMoveState(doorPos, thresholdPos, 1.1, { prepare: 1 }) },
-    { t: 96.9, pos: thresholdPos, ry: -1.941, state: TrackMoveState(thresholdPos, platformPos, 1.0, { prepare: 1 }) },
-    { t: 97.9, pos: platformPos, ry: -2.772, state: TrackMoveState(platformPos, standPos, 3.3, { prepare: 1 }) },
-    { t: 101.2, pos: standPos, ry: -0.75, state: { prepare: 1, moveSpeed: 0 } },
-    { t: CHUCHUAN_END, pos: standPos, ry: -0.75, state: { prepare: 1, moveSpeed: 0 } },
-  ];
-}
-
-/** 靠侧壁、行李架或车门站着的兵保持原位；黑场地点卡内才随排撤下，不在开门镜里凭空闪走。 */
+/** 靠侧壁、行李架或车门站着的兵：同样原地不动，只换姿态档。 */
 function CarStandTrack(pos, lifeState, stopDelay, facingRy = CHUCHUAN_CAR_RY) {
-  const stopAt = 56.8 + stopDelay;
   const { sit: _sit, ...standingLife } = lifeState || {};
+  const at = (t, state) => ({ t, pos, ry: facingRy, state });
   return [
-    { t: 0, pos, ry: facingRy, state: { ...standingLife, moveSpeed: 0 } },
-    { t: stopAt, pos, ry: facingRy, state: { ...standingLife, prepare: 0.10, moveSpeed: 0 } },
-    { t: CHUCHUAN_MOTIVATION_AT, pos, ry: facingRy, state: { prepare: 0.18, moveSpeed: 0 } },
-    { t: CHUCHUAN_GEAR_AT, pos, ry: facingRy, state: { prepare: 0.58, moveSpeed: 0 } },
-    { t: 90.8, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
-    // 背景站客在镜头结束时仍按次序排队；不为“清空车厢”凭空消失。
-    { t: CHUCHUAN_END, pos, ry: facingRy, state: { prepare: 1, moveSpeed: 0 } },
+    at(0, { ...standingLife, moveSpeed: 0 }),
+    at(CHUCHUAN_TRAIN_STOP_AT + stopDelay, { ...standingLife, prepare: 0.10, moveSpeed: 0 }),
+    at(CHUCHUAN_DEPOT_AT, { prepare: 0.20, moveSpeed: 0 }),
+    at(CHUCHUAN_ORDER_AT, { prepare: 0.32, moveSpeed: 0 }),
+    at(CHUCHUAN_ORDER_AT + 8.0, { prepare: 0.88, moveSpeed: 0 }),
+    at(CHUCHUAN_END, { prepare: 0.90, moveSpeed: 0 }),
   ];
 }
 
 /**
- * 玩家身体与相机必须走**同一条曲线**。
+ * 罗班长：全场唯一在车厢里走动的人，三个站位对应三段戏。
  *
- * 镜 8—11 的相机是 ease:"easeInOut"，而演员轨道两帧之间只会线性插值 ——
- * 于是镜 8 的中段相机落后身体 0.2 m，第一人称相机正好停在自己脑袋后面：
- * t=94 那张图整幅被自己的帽子和后脑勺糊住。（顺带查实：firstPerson 现在
- * **没有**真的把头藏掉，见 engineRequests；所以这 0.2 m 直接可见。）
- * 这里按 EASINGS.easeInOut 逐段采样，身体永远和相机同相位。
+ * ★ **ry 必须自己解缠**。两帧之间 ry 是线性插值的，写「离得最近的那个角」不够 ——
+ *   1.571 → −2.435 会让他倒着转 4 rad（一个原地大转身），所以下面每一段都把目标角
+ *   加了 2π 挑到「短的那一边」。角度按 YawFacing = atan2(−dx, −dz)：
+ *   0 = 朝 −z（车厢深处）、π/2 = 朝 −x（左壁／顺子）、−π/2 = 朝 +x（侧门／月台）。
+ *
+ * ★ 走位那几段用了 t 与 t+0.0001 两帧：**转身与迈步必须分开**。同一帧里既改 ry
+ *   又给 moveSpeed，人会一边横移一边转（旧版班长下车那段就是这样横着滑出去的）。
  */
-function EaseInOut(k) { return k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k); }
-
-function EasedWalk(from, to, t0, t1, extra = {}, steps = 6) {
-  const frames = [];
-  for (let i = 0; i < steps; i += 1) {
-    const k0 = i / steps, k1 = (i + 1) / steps;
-    const e0 = EaseInOut(k0), e1 = EaseInOut(k1);
-    const p0 = [0, 1, 2].map((a) => from[a] + (to[a] - from[a]) * e0);
-    const p1 = [0, 1, 2].map((a) => from[a] + (to[a] - from[a]) * e1);
-    frames.push({ t: t0 + (t1 - t0) * k0, pos: p0, state: TrackMoveState(p0, p1, (t1 - t0) / steps, extra) });
-  }
-  return frames;
+function CarAisleLeaderTrack() {
+  const A = CHUCHUAN_LUO_WATCH, B = CHUCHUAN_LUO_LETTER, C = CHUCHUAN_LUO_DOOR;
+  const FACE_DEEP = 0;             // 朝 −z：盯着对面凳上的赌局
+  const FACE_FRONT = 3.1808;       // 朝 +z（= −3.1024 + 2π）：骂完切腊肉的，转身往前走
+  const FACE_SHUNZI = Math.PI / 2; // 朝 −x：站在顺子跟前
+  const FACE_TO_DOOR = 3.8480;     // 走向侧门那一段的朝向（= −2.4352 + 2π）
+  const FACE_PLATFORM = 4.7124;    // 朝 +x：站在门口对着月台
+  const FACE_BACK = 6.6660;        // 走回车厢深处那一段（= 0.3826 + 2π）
+  const FACE_HEYOUTIAN = 5.4034;   // 朝右凳上的何有田（= −0.8798 + 2π）
+  return [
+    { t: 0, pos: A, ry: FACE_DEEP, state: { checkAmmo: 0.7, moveSpeed: 0 } },
+    // 12.0—12.8 转身朝 +z：接着就要隔着车厢骂「哪个龟儿子拿刺刀切腊肉」（镜 1 第 13 秒）
+    { t: 12.0, pos: A, ry: FACE_DEEP, state: { checkAmmo: 0.3, moveSpeed: 0 } },
+    { t: 12.8, pos: A, ry: FACE_FRONT, state: { moveSpeed: 0 } },
+    { t: 27.0, pos: A, ry: FACE_FRONT, state: TrackMoveState(A, B, 2.6) },
+    { t: 29.6, pos: B, ry: FACE_FRONT, state: { moveSpeed: 0 } },
+    { t: 30.4, pos: B, ry: FACE_SHUNZI, state: { moveSpeed: 0, reach: 0.30 } },
+    // 读信：信在顺子手里，班长半侧着听；41—43 s 伸手把信收回去。
+    { t: 41.0, pos: B, ry: FACE_SHUNZI, state: { moveSpeed: 0, reach: 0.62 } },
+    { t: 43.0, pos: B, ry: FACE_SHUNZI, state: { moveSpeed: 0, reach: 0.12 } },
+    { t: 55.8, pos: B, ry: FACE_SHUNZI, state: { moveSpeed: 0 } },
+    { t: 56.6, pos: B, ry: FACE_TO_DOOR, state: { moveSpeed: 0 } },
+    { t: 56.6001, pos: B, ry: FACE_TO_DOOR, state: TrackMoveState(B, C, 2.7) },
+    { t: 59.3, pos: C, ry: FACE_TO_DOOR, state: { moveSpeed: 0 } },
+    { t: 60.1, pos: C, ry: FACE_PLATFORM, state: { moveSpeed: 0 } },
+    // 兵站段站在门口：喝令拿摊边东西的兵放回去，再听兵站军官说话。
+    { t: 89.0, pos: C, ry: FACE_PLATFORM, state: { moveSpeed: 0 } },
+    { t: 89.0001, pos: C, ry: FACE_BACK, state: TrackMoveState(C, A, 3.4) },
+    { t: 92.4, pos: A, ry: FACE_BACK, state: { moveSpeed: 0 } },
+    { t: 93.2, pos: A, ry: FACE_HEYOUTIAN, state: { moveSpeed: 0 } },
+    { t: CHUCHUAN_ORDER_AT, pos: A, ry: FACE_HEYOUTIAN, state: { moveSpeed: 0, prepare: 0.20 } },
+    { t: CHUCHUAN_END, pos: A, ry: FACE_HEYOUTIAN, state: { moveSpeed: 0, prepare: 0.50 } },
+  ];
 }
 
-/** 玩家不是悬空的摄影机：他有一具普通士兵身体，先坐在右侧长凳，再完整走侧门下车。 */
+/**
+ * 玩家（顺子）不是悬空的摄影机：他有一具普通士兵身体，全场坐在**左侧**长凳上
+ *（侧门在右壁，坐右边看门是贴着墙根的掠射角，见文件头）。相机与身体同一个点、
+ * 全程不动，所以不再需要旧版那套 EasedWalk 同相位采样。
+ */
 function PlayerSoldierTrack() {
-  const seat = [1.95, CHUCHUAN_CAR_G, 3.42];
-  const aisle = [0.70, CHUCHUAN_CAR_G, 5.30];
-  // 踏板高度按道具实测：门槛顶 0.15、内踏板顶 0.24、外踏板顶 0.48、月台面 0.58。
-  // 旧值 0.18 让脚陷进内踏板 6 cm。
-  const threshold = [3.35, 0.24, CHUCHUAN_SIDE_DOOR_Z];
-  const platform = [5.20, CHUCHUAN_PLATFORM_Y, CHUCHUAN_SIDE_DOOR_Z];
-  const standing = [6.80, CHUCHUAN_PLATFORM_Y, 7.40];
+  const seat = CHUCHUAN_SEAT_SHUNZI;
+  const ry = -Math.PI / 2;   // 朝 +x：正对过道与对面的右壁／侧门
+  const lift = CHUCHUAN_SEAT_LIFT;
+  const at = (t, state) => ({ t, pos: seat, ry, state });
   return [
-    { t: 0, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, warmHands: 0.35 } },
-    { t: 57.2, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.10 } },
-    { t: CHUCHUAN_MOTIVATION_AT, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.16 } },
-    { t: CHUCHUAN_GEAR_AT, pos: seat, ry: Math.PI / 2, state: { sit: 1, seatLift: CHUCHUAN_SEAT_LIFT, prepare: 0.55 } },
-    { t: 90.8, pos: seat, ry: Math.PI / 2, state: { prepare: 1, moveSpeed: 0 } },
-    ...EasedWalk(seat, aisle, 93.0, 95.5).map((f) => ({ ...f, ry: 2.55 })),
-    ...EasedWalk(aisle, threshold, 95.5, 98.5).map((f) => ({ ...f, ry: -Math.PI / 2 })),
-    ...EasedWalk(threshold, platform, 98.5, 101.0).map((f) => ({ ...f, ry: -Math.PI / 2 })),
-    ...EasedWalk(platform, standing, 101.0, 105.0).map((f) => ({ ...f, ry: -1.0 })),
-    { t: CHUCHUAN_END, pos: standing, ry: 0, state: { prepare: 1, moveSpeed: 0 } },
+    at(0, { sit: 1, seatLift: lift, warmHands: 0.35 }),
+    at(CHUCHUAN_TRAIN_STOP_AT, { sit: 1, seatLift: lift, prepare: 0.10 }),
+    at(CHUCHUAN_DEPOT_AT, { sit: 1, seatLift: lift, prepare: 0.18 }),
+    // 镜 6：低头把背包底那件民用短褂扒出来给幺娃看（reach = 空手往前下方伸）
+    at(CHUCHUAN_PLAN_AT, { sit: 1, seatLift: lift, reach: 0.15 }),
+    at(CHUCHUAN_PLAN_AT + 2.0, { sit: 1, seatLift: lift, reach: 0.75 }),
+    at(CHUCHUAN_PLAN_AT + 5.0, { sit: 1, seatLift: lift, reach: 0.20 }),
+    at(CHUCHUAN_ORDER_AT, { sit: 1, seatLift: lift, prepare: 0.30 }),
+    at(CHUCHUAN_END, { sit: 1, seatLift: lift, prepare: 0.86 }),
   ];
 }
 
@@ -873,42 +889,46 @@ function CrowdAppearance(n) {
  * 现在每段只排三个坐席，全部落在段中心 ±1.35 以内（坐姿 z 向占 ±0.24，
  * 离段端至少留 0.4 m）：
  *   段 -5.8 → -7.05 / -5.80 / -4.55
- *   段 -1.95 → -3.35 / -2.55（重点 NPC）/ -0.75
- *   段  1.95 →  0.75 / 1.90 / 2.50—2.75（重点 NPC）/ 3.42（玩家，右侧）
+ *   段 -1.95 → -3.35 / -0.75（左）；右侧这一段让给刘文财 -3.30 与何有田 -1.80
+ *   段  1.95 →  0.75 / 2.50 / 3.42（右）；左侧这一段让给幺娃 2.30 与顺子 3.42
  *   段  5.8 →  4.55 / 5.80 / 7.05（右侧被侧门占掉，没有这一段）
- * 重点 NPC 的 z 一律不动（-2.55 / 2.75），只把背景乘客让开。
+ * 2026-08-28：坐姿在 z 向占 ±0.24，所以背景乘客与新 CAST 的座位间距一律 ≥0.95 m ——
+ * 左 1.90 与幺娃 2.30 只差 0.40（净空 0.08，两个人叠在一起），整条删掉；
+ * 右 -3.35 与刘文财 -3.30 是同一个位子，也删。
  */
 const CHUCHUAN_CROWD_SEAT_Z = {
-  "-1": [-7.05, -5.80, -4.55, -3.35, -0.75, 0.75, 1.90, 4.55, 5.80, 7.05],
-  "1": [-7.05, -5.80, -4.55, -3.35, -0.75, 0.75],
+  "-1": [-7.05, -5.80, -4.55, -3.35, -0.75, 0.75, 4.55, 5.80, 7.05],
+  "1": [-7.05, -5.80, -4.55, -0.75, 2.50, 3.42],
 };
 
 function CreateCarriageCrowdCast() {
   const crowd = [];
-  // 下车顺序按「离侧门多远」排：门口的人先动，车厢深处的人在 105 s 内还轮不到，
-  // 就一直站在过道里排队 —— 一节三十人的车不可能十秒钟走空。
   const seats = [];
   for (const side of [-1, 1]) {
     for (const z of CHUCHUAN_CROWD_SEAT_Z[String(side)]) seats.push({ side, z });
   }
-  seats.sort((a, b) => Math.abs(CHUCHUAN_SIDE_DOOR_Z - a.z) - Math.abs(CHUCHUAN_SIDE_DOOR_Z - b.z));
-  seats.forEach(({ side, z }, order) => {
+  seats.forEach(({ side, z }) => {
     const id = `crowdSeat${side < 0 ? "L" : "R"}${String(Math.round((z + 8) * 10)).padStart(3, "0")}`;
     const n = crowd.length;
     crowd.push({
       id, kind: "nra", weapon: n % 3 === 0 ? null : "HanYang", seed: `chuchuan${id}`,
       ...CrowdAppearance(n),
       track: CarSeatTrack([side * 1.95, CHUCHUAN_CAR_G, z], CHUCHUAN_CROWD_LIFE[n % CHUCHUAN_CROWD_LIFE.length],
-        (n % 7) * 0.52, order, side * (0.35 + (order % 4) * 0.30), side < 0 ? -Math.PI / 2 : Math.PI / 2),
+        (n % 7) * 0.52, side < 0 ? -Math.PI / 2 : Math.PI / 2),
     });
   });
-  // 站客靠在**凳段之间的空档**前，不站在别人的腿上；x 从 ±1.2 挪到 ±1.35，
-  // 把 |x|<1.0 的净过道整条让给玩家的相机（93—98.5 s 它正沿过道走向车门）。
-  // 右侧 z≈3.9 那一位删掉：他离玩家座位 (1.95,3.42) 只有 0.7 m，镜 8 第一帧
-  // 就是一张贴脸的帽顶。
+  // 站客靠在**凳段之间的空档**前，不站在别人的腿上。
+  //
+  // 2026-08-28 逐个重摆过：新 CAST 占了四个坐席，旧站位有四处压到 0.6—0.8 m
+  //（坐着的人腿往过道里伸，站着的人正好站在他腿上）。现在的口径是
+  // **离最近一个坐着的人 ≥0.85 m**，并且不许压在两条关键视线上：
+  //   · 座位 → 车门（镜 3/4，穿过 (4.20, 6.20)）；
+  //   · 座位 → 赌局（镜 1，穿过 (1.98, −2.55)）。
+  // 2 号站客特意摆到赌局那张板子前面（1.40, −2.55）—— 离两个赌客各 0.93 m，
+  // 又不挡镜 1 的视线（同深度上偏出 0.88 m），读作围观的第三个人。
   const standingPlaces = [
-    [-1.35, -7.90, 0], [1.38, -3.87, Math.PI], [-1.30, 0.00, 0],
-    [1.34, 8.40, Math.PI], [-1.35, 3.87, 0], [-1.35, 6.90, 0],
+    [-1.35, -7.90, 0], [1.40, -2.55, Math.PI / 2], [-1.36, 8.10, Math.PI],
+    [1.34, 8.40, Math.PI], [1.36, 1.60, Math.PI], [-1.35, 6.43, 0],
   ];
   standingPlaces.forEach(([x, z, ry], index) => {
     const n = crowd.length;
@@ -944,7 +964,10 @@ const CHUCHUAN_STATION_X = 7.4;                     // 月台中心 x（宽 6.0 
 const CHUCHUAN_STATION_SPEED = 1.65;                // m/s：16 s 掠过 26.4 m，与旧版同速
 const CHUCHUAN_STATION_STOP_Z = CHUCHUAN_SIDE_DOOR_Z;
 const CHUCHUAN_STATION_FROM_Z = CHUCHUAN_STATION_STOP_Z - CHUCHUAN_STATION_SPEED * CHUCHUAN_TRAIN_STOP_AT;
-const CHUCHUAN_STATION_ENTER_AT = 39;               // 站台前端进入右窗视野的时刻
+/** 站台前端进入右窗视野的时刻（停车前 17 s）。 */
+const CHUCHUAN_STATION_ENTER_AT = CHUCHUAN_TRAIN_STOP_AT - 17;
+/** 进站段的长度：月台上的人与担架都按这个跨度反算「掠过 + 自己走」的合速度。 */
+const CHUCHUAN_STATION_PASS = CHUCHUAN_TRAIN_STOP_AT - CHUCHUAN_STATION_ENTER_AT;
 
 function StationPlatformZ(time) {
   const t = Math.max(0, Math.min(CHUCHUAN_TRAIN_STOP_AT, time));
@@ -952,21 +975,27 @@ function StationPlatformZ(time) {
 }
 
 /**
- * 站台上的人先随车站掠过，再自己沿月台走出车窗范围。最后的 hidden 帧放在
- * 画外，不能再把三人同时切掉；ry=π 保证他们真的朝 +Z 走，而不是倒着滑。
+ * 月台上的人：随站台被推进来，**停车时正好停在 stopZ**，之后就站在那儿不动。
+ *
+ * 旧版（StationRailTrack）让他们停车后继续沿月台走出画外，理由是那时候镜头很快
+ * 就切走了。新序章不一样：车停下之后玩家在座位上对着敞开的车门看 80 秒（镜 4—8），
+ * 月台上的人**必须一直在**。而担架、货担、摊子这些道具挂的是 ambientMotion
+ *（只有一条速度 + 一个 stopAt，没有减速段也没有第二段），道具在 stopAt 那一刻
+ * 就钉住了 —— 人再走下去，担架就会从抬担架的人手里脱出来。所以人和道具一起停。
+ *
+ * walk 是**进站那一段里他自己往前走了多少米**（合速度 = 月台里程 + walk/PASS）。
+ * ry=π 是朝 +z，也就是他们前进的方向。
  */
-function StationRailTrack(x, platformOffset, walkDistance, state = { moveSpeed: 0.16 }) {
-  const posAt = (time, walking) => [x, CHUCHUAN_PLATFORM_Y, StationPlatformZ(time) + platformOffset + walking];
-  const passSpan = CHUCHUAN_TRAIN_STOP_AT - CHUCHUAN_STATION_ENTER_AT;
-  // travelSpeed 是世界坐标中的合速度（车站掠过 + 人自己走）；moveSpeed 仍只管步态。
-  const passingState = { ...state, travelSpeed: (CHUCHUAN_STATION_SPEED * passSpan + walkDistance) / passSpan };
-  const exitState = { ...state, travelSpeed: 3.6 / 7 };
+function PlatformRider(x, stopZ, walk, extraState = {}, facingRy = Math.PI) {
+  const enterZ = stopZ - CHUCHUAN_STATION_SPEED * CHUCHUAN_STATION_PASS - walk;
+  const travelSpeed = CHUCHUAN_STATION_SPEED + walk / CHUCHUAN_STATION_PASS;
+  const gait = Math.min(1, (walk / CHUCHUAN_STATION_PASS) / 4.2);
+  const at = (t, z, state) => ({ t, pos: [x, CHUCHUAN_PLATFORM_Y, z], ry: facingRy, state });
   return [
-    { t: 0, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: { hidden: true } },
-    { t: CHUCHUAN_STATION_ENTER_AT, pos: posAt(CHUCHUAN_STATION_ENTER_AT, 0), ry: Math.PI, state: passingState },
-    { t: CHUCHUAN_TRAIN_STOP_AT, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance), ry: Math.PI, state: exitState },
-    { t: 63, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance + 3.6), ry: Math.PI, state: exitState },
-    { t: 64, pos: posAt(CHUCHUAN_TRAIN_STOP_AT, walkDistance + 4.4), ry: Math.PI, state: { hidden: true } },
+    at(0, enterZ, { hidden: true }),
+    at(CHUCHUAN_STATION_ENTER_AT, enterZ, { ...extraState, moveSpeed: gait, travelSpeed }),
+    at(CHUCHUAN_TRAIN_STOP_AT, stopZ, { ...extraState, moveSpeed: 0 }),
+    at(CHUCHUAN_END, stopZ, { ...extraState, moveSpeed: 0 }),
   ];
 }
 
@@ -1039,6 +1068,50 @@ const CHUCHUAN_STATION_PARTS = [
     name: `StationCrate${i}`, kind: "box", size: [0.62, 0.55, 0.62], pos: [dx, 0.86 + lift, dz],
     mat: "WoodStock", color: 0xb59a6c,
   })),
+  // ── 兵站（2026-08-28 新加，§1 阶段 2）───────────────────────────────────
+  // **摆位不是随手挑的**：玩家全程坐在 (−1.95, 1.36, 3.42) 不动，门框（右壁
+  // z 4.40—7.00、外皮 x≈2.99）把可见范围切成一个楔形 —— 从座位算，方位角
+  // 11.4°—36.4°（以 +x 为 0、朝 +z 为正）。落到月台面上就是 x≈8.4 那一列的
+  // z≈5.5—11.1。下面每一件的**世界 z 都换算过**（局部 dz = 世界 z − 5.7，
+  // 因为月台停稳时中心正好在侧门外 z=5.7），全部落在这条楔形里；
+  // 摆到 dz<0 的一律看不见 —— 那半边被门框前沿挡住。
+  //
+  // 1) 百姓的货担与摊子：一块搁在两只条凳上的板、两只竹筐、几件散货。
+  { name: "StationStallTop", kind: "box", size: [1.05, 0.08, 2.30], pos: [1.00, 1.02, 2.30], mat: "WoodStock", color: 0xb39a70, repeat: 1 },
+  ...[-0.95, 0.95].map((d, i) => ({
+    name: `StationStallTrestle${i}`, kind: "box", size: [0.85, 0.90, 0.10], pos: [1.00, 0.53, 2.30 + d],
+    mat: "WoodStock", color: 0x947c58, repeat: 1,
+  })),
+  ...[[-0.62, 0.42], [0.15, 0.36], [0.86, 0.40]].map(([dz, r], i) => ({
+    name: `StationStallBasket${i}`, kind: "cyl", size: [r, 0.44], pos: [1.05, 1.28, 2.30 + dz],
+    mat: "WattleFence", color: 0xa8935f, roughness: 0.99,
+  })),
+  ...[[-0.30, 0.16, 0.10], [0.48, 0.13, 0.09], [1.02, 0.18, 0.12]].map(([dz, w, h], i) => ({
+    name: `StationStallGoods${i}`, kind: "box", size: [w, h, w], pos: [0.74, 1.06 + h / 2, 2.30 + dz],
+    mat: "ClothNra", color: i % 2 ? 0x8d7f62 : 0x776b52,
+  })),
+  // 一副挑在地上的货担（扁担 + 两只筐）：百姓正在把它挪开给军列让路。
+  { name: "StationCarryPole", kind: "box", size: [0.07, 0.07, 2.05], pos: [2.05, 0.72, 4.30], mat: "WoodBeam", color: 0x6a5540 },
+  ...[-0.78, 0.78].map((d, i) => ({
+    name: `StationCarryBasket${i}`, kind: "cyl", size: [0.40, 0.52], pos: [2.05, 0.84, 4.30 + d],
+    mat: "WattleFence", color: 0xa08a5c, roughness: 0.99,
+  })),
+  // 2) 兵站开出来的新枪弹药箱：三只压在一起 + 一只掀了盖的。军械箱比货箱窄长，
+  //    颜色也压得比民用木箱深一档，隔着车门一眼分得出「这是发给我们的东西」。
+  //    箱头那块深色板是**调拨戳记**的位置：字做不出来（没有文字贴图），做成一块
+  //    刷了漆的深色方块，读作「箱头刷过字」——空白的军械箱比没有箱子还假。
+  ...[[-0.80, 1.90, 0.00], [-0.80, 1.90, 0.42], [-0.80, 2.86, 0.00], [-0.10, 2.34, 0.00]]
+    .map(([dx, dz, lift], i) => ({
+      name: `StationAmmoCase${i}`, kind: "box", size: [0.46, 0.40, 0.94], pos: [dx, 0.79 + lift, dz],
+      mat: "WoodStock", color: 0x8a7448, repeat: 1,
+    })),
+  ...[0, 1, 2, 3].map((i) => ({
+    name: `StationAmmoCaseMark${i}`, kind: "box", size: [0.05, 0.16, 0.40],
+    pos: [[-0.56, -0.56, -0.56, 0.14][i], 0.83 + [0, 0, 0.42, 0][i], [1.90, 2.86, 1.90, 2.34][i]],
+    mat: "WoodBeam", color: 0x4b4436, roughness: 0.95,
+  })),
+  // 掀开的箱盖斜靠在最上面那只箱子上
+  { name: "StationAmmoLid", kind: "box", size: [0.44, 0.05, 0.92], pos: [-1.12, 1.36, 2.34], rz: 0.62, mat: "WoodStock", color: 0x7d6a44, repeat: 1 },
   // ── 水鹤：立在月台北端（玩家背后），是「这是一座加水的小站」的读点 ───────
   { name: "StationCraneMast", kind: "cyl", size: [0.17, 3.20], pos: [-2.45, 2.18, -11.5], mat: "Steel", color: 0x3d3a35 },
   { name: "StationCraneArm", kind: "box", size: [1.90, 0.15, 0.15], pos: [-3.35, 3.62, -11.5], mat: "Steel", color: 0x3d3a35 },
@@ -1131,12 +1204,63 @@ function CarriagePersonalEffects() {
       );
     });
   }
-  // 玩家脚边的通信兵装备明确归属于“我”，低头就能读到自己的身份。
+  // 顺子自己的家当摆在左侧座位脚边（2026-08-28 从右侧搬过来，并去掉线盘 ——
+  // 新剧本里通信兵是小秦，顺子只是 9 连的一名二等兵）。背包见 CarriageStoryProps。
   props.push(
-    { kind: "box", size: [0.48, 0.34, 0.58], pos: [2.22, 0.25, 3.60], mat: "ClothNra", color: 0x5d625b, name: "PlayerFieldPack" },
-    { kind: "cyl", size: [0.24, 0.38], pos: [1.15, 0.30, 3.72], rz: Math.PI / 2, mat: "WoodStock", color: 0x5a3d27, name: "PlayerCableReel" },
-    { kind: "box", size: [0.34, 0.12, 0.46], pos: [1.28, 0.18, 3.12], mat: "Steel", color: 0x5f594d, name: "PlayerMessTin" },
+    { kind: "box", size: [0.34, 0.12, 0.46], pos: [-1.30, 0.18, 3.16], mat: "Steel", color: 0x5f594d, name: "ShunziMessTin" },
+    { kind: "cyl", size: [0.09, 0.30], pos: [-2.42, 0.87, 3.05], mat: "Steel", color: 0x4c514a, name: "ShunziCanteen" },
   );
+  return props;
+}
+
+/**
+ * 新序章要**看得见**的那几件东西（§1 阶段 1、3）：赌骰子的子弹、切腊肉的刺刀、
+ * 背包底那件民用短褂。全部是简单几何，一件也不挂动画 —— 它们只要在画里、
+ * 在对的人手边就够了，台词负责说明它们是什么。
+ *
+ * 摆位与人的对应：
+ *   · 赌局在**右凳** z −3.30（刘文财）与 −1.80（何有田）之间，板子压在 −2.55 的凳面上；
+ *     从顺子座位望过去是 6—7 m 的中景，正是「看得清在干啥、但不是特写」那一档。
+ *   · 腊肉摊在幺娃（左凳 2.30）膝上的一块布上；刺刀挂在他右手（见 cast 的 attachments）。
+ *   · 短褂塞在顺子脚边的背包里，只露一角 —— 民用蓝灰，跟一车军服一眼分得开。
+ */
+function CarriageStoryProps() {
+  const DICE_Z = -2.55;
+  const props = [
+    // ── 赌局：凳面上一块木板当桌 ──────────────────────────────────────────
+    { kind: "box", size: [0.46, 0.05, 0.66], pos: [1.98, 0.575, DICE_Z], mat: "WoodStock", color: 0x9c8358, repeat: 1, name: "DiceBoard" },
+    // 三颗骰子（0.045 的小方块，7 m 外只剩三个亮点，但**近看它就是骰子**）
+    ...[[1.93, -0.10], [2.02, -0.02], [1.97, 0.09]].map(([x, dz], i) => ({
+      kind: "box", size: [0.045, 0.045, 0.045], pos: [x, 0.625, DICE_Z + dz], ry: 0.3 + i * 0.4,
+      color: 0xd8d2c2, roughness: 0.7, name: `Dice${i}`,
+    })),
+    // 押在板上的子弹：六发横躺（cyl 的轴在 Y，rx=π/2 把它放倒成沿 Z 的一根）
+    ...[[1.86, -0.18], [1.89, -0.13], [1.92, -0.21], [2.08, 0.17], [2.11, 0.22], [2.05, 0.24]]
+      .map(([x, dz], i) => ({
+        kind: "cyl", size: [0.0115, 0.058], pos: [x, 0.611, DICE_Z + dz], rx: Math.PI / 2,
+        color: i % 2 ? 0xa8863f : 0x9c7c3a, roughness: 0.55, name: `DiceStakeRound${i}`,
+      })),
+    // 掉在凳面上、还没归堆的两发
+    ...[[2.14, -0.28], [1.82, 0.30]].map(([x, dz], i) => ({
+      kind: "cyl", size: [0.0115, 0.058], pos: [x, 0.578, DICE_Z + dz], rx: Math.PI / 2, ry: 0.5 - i,
+      color: 0xa08039, roughness: 0.55, name: `DiceLooseRound${i}`,
+    })),
+    // ── 幺娃的腊肉：膝上一块布、一条腊肉、切下来的一片 ──────────────────────
+    { kind: "box", size: [0.36, 0.02, 0.32], pos: [-1.62, 0.632, 2.30], mat: "ClothNra", color: 0x9c9078, name: "PorkCloth" },
+    { kind: "box", size: [0.17, 0.10, 0.27], pos: [-1.62, 0.692, 2.30], color: 0x5b3222, roughness: 0.82, name: "CuredPork" },
+    { kind: "box", size: [0.14, 0.013, 0.075], pos: [-1.49, 0.649, 2.15], ry: 0.4, color: 0x6f4230, roughness: 0.8, name: "CuredPorkSlice" },
+    // 刺刀：本体摆在幺娃手边，真正的位置由 cast.attachments 挂到他右手上。
+    // **不用 mat:"Steel"** —— 库里的 Steel 金属度接近 1，而 _MakeProp 不转 metalness，
+    // 封闭车厢里没有可反射的环境，金属一律渲成纯黑（docs §1.9）。走无贴图平涂。
+    { kind: "box", size: [0.030, 0.020, 0.42], pos: [-1.44, 0.72, 2.18], color: 0x8e948f, roughness: 0.42, name: "YaowaBayonet" },
+    // ── 顺子脚边的背包与那件民用短褂 ──────────────────────────────────────
+    { kind: "box", size: [0.48, 0.36, 0.54], pos: [-1.18, 0.27, 3.95], mat: "ClothNra", color: 0x5d625b, name: "ShunziPack" },
+    { kind: "box", size: [0.025, 0.38, 0.07], pos: [-0.95, 0.29, 3.82], mat: "ClothNra", color: 0xa69472, name: "ShunziPackStrap" },
+    // 短褂只露一角：民用的蓝灰棉布，跟一整车土黄军装是两种颜色 ——
+    // 玩家不用被告知也看得出「这不是发的」。
+    { kind: "box", size: [0.22, 0.11, 0.28], pos: [-1.00, 0.40, 3.86], ry: 0.22, mat: "ClothNra", color: 0xaeb8c0, roughness: 0.98, name: "ShunziCivilianShirt" },
+    { kind: "box", size: [0.17, 0.055, 0.19], pos: [-0.92, 0.47, 3.79], ry: -0.35, mat: "ClothNra", color: 0x9ea9b3, roughness: 0.98, name: "ShunziCivilianShirtFold" },
+  ];
   return props;
 }
 
@@ -1164,14 +1288,17 @@ function SideDoorHoldOpenMoves() {
   }));
 }
 
-// 担架随两名担架兵一起掠过：速度是「站台里程 + 他们自己沿月台走的 3.3 m」的合速度，
-// 与 StationRailTrack 用的是同一组数，所以担架永远在两人中间，不会掉队或抢跑。
-const CHUCHUAN_STRETCHER_OFFSET = 10.0;
-const CHUCHUAN_STRETCHER_WALK = 3.3;
-const CHUCHUAN_STRETCHER_PASS = CHUCHUAN_TRAIN_STOP_AT - CHUCHUAN_STATION_ENTER_AT;
-const CHUCHUAN_STRETCHER_SPEED = CHUCHUAN_STATION_SPEED + CHUCHUAN_STRETCHER_WALK / CHUCHUAN_STRETCHER_PASS;
-const CHUCHUAN_STRETCHER_FROM_Z = CHUCHUAN_STATION_FROM_Z + CHUCHUAN_STRETCHER_OFFSET
-  - CHUCHUAN_STRETCHER_WALK * CHUCHUAN_STATION_ENTER_AT / CHUCHUAN_STRETCHER_PASS;
+// 担架随两名担架兵一起掠过：速度是「站台里程 + 他们自己沿月台走的 3.0 m」的合速度，
+// 与 PlatformRider 用的是同一组数，所以担架永远在两人中间，不会掉队或抢跑。
+//
+// ★ 停在**世界 z = 8.4**（局部 dz = +2.7）不是随手选的：那正落在「从座位透过车门
+//   看得见」的楔形里（见 CHUCHUAN_STATION_PARTS 里兵站那一段的算法）。担架在这里
+//   一直摆到切黑 —— 它是顺子那套逃跑计划的**前置**：先看见后送伤兵这件事真的存在，
+//   十几秒后他才跟幺娃说「前头若喊送伤兵，老子就去」。
+const CHUCHUAN_STRETCHER_WALK = 3.0;
+const CHUCHUAN_STRETCHER_STOP_Z = 8.4;
+const CHUCHUAN_STRETCHER_SPEED = CHUCHUAN_STATION_SPEED + CHUCHUAN_STRETCHER_WALK / CHUCHUAN_STATION_PASS;
+const CHUCHUAN_STRETCHER_FROM_Z = CHUCHUAN_STRETCHER_STOP_Z - CHUCHUAN_STRETCHER_SPEED * CHUCHUAN_TRAIN_STOP_AT;
 
 const CHUCHUAN_STRETCHER_PARTS = [
   { name: "StationStretcher", kind: "box", size: [1.25, 0.15, 2.15], pos: [6.85, 1.22], mat: "ClothNra", color: 0xb29a78 },
@@ -2044,17 +2171,22 @@ function FarCountryside() {
   return props;
 }
 
+/**
+ * 本场自带的人物表条目（并进 CAST，Data_TengxianScript 那边是 `if (!CAST[id])`，
+ * 不会顶掉同名的正式条目）。
+ *
+ * 2026-08-28：有台词的六个人（shunzi/luo/yaowa/heyoutian/liuwencai/junguan）
+ * **已经在 Data_TengxianScript.CAST 里**（契约 §10.2），这里一条都不重复登记 ——
+ * 重复登记的坏处不是报错，是「同一个人两份 note」，改了一份另一份还在。
+ * 下面只剩没有台词、只在画面里出现的月台群众。
+ */
 const CHUCHUAN_PEOPLE = {
-  youngDispatch: { name: "年轻传令兵", short: "年轻传令兵", real: false, note: "车厢内可见 NPC；补鞋并承担三句对白" },
-  rifleman: { name: "擦枪士兵", short: "擦枪士兵", real: false, note: "车厢内可见 NPC；检查发涩枪栓" },
-  oldWound: { name: "旧伤士兵", short: "旧伤士兵", real: false, note: "车厢内可见 NPC；腿缠旧绷带，靠墙休息" },
-  machineGunner: { name: "机枪手", short: "机枪手", real: false, note: "车厢内可见 NPC；机枪放在脚边" },
-  squadLeader: { name: "班长", short: "班长", real: false, note: "车厢内可见 NPC；检查弹药并完成动员问答" },
-  squad: { name: "众人", short: "众人", real: false, note: "满载 64 人车厢的先后应答与唯一一次齐声" },
-  stretcherBearerA: { name: "担架兵甲", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
-  stretcherBearerB: { name: "担架兵乙", short: "担架兵", real: false, note: "小站窗外固定轨道 NPC" },
-  lightWounded: { name: "轻伤员", short: "轻伤员", real: false, note: "小站窗外可走轻伤员" },
-  externalOfficer: { name: "车外军官", short: "车外军官", real: false, note: "门外喊话 NPC" },
+  stretcherBearerA: { name: "", short: "担架兵", real: false, note: "兵站月台 NPC；与担架同一条里程，停车后站在门外 z=8.4" },
+  stretcherBearerB: { name: "", short: "担架兵", real: false, note: "兵站月台 NPC；担架另一头" },
+  lightWounded: { name: "", short: "轻伤员", real: false, note: "兵站月台 NPC；等后送的可走轻伤员" },
+  depotHand: { name: "", short: "拿东西的兵", real: false, note: "兵站月台 NPC；顺手拿摊边东西，被罗班长喝令放回（§1 阶段 2）" },
+  villagerA: { name: "", short: "百姓", real: false, note: "兵站月台 NPC；挪货担给军列让路" },
+  villagerB: { name: "", short: "百姓", real: false, note: "兵站月台 NPC；守着自己的摊子" },
 };
 
 export const CS_Chuchuan = {
@@ -2068,8 +2200,9 @@ export const CS_Chuchuan = {
   setOrigin: [2400, 0, 2400],
   cameraMode: "headLook",
   headLook: { yaw: [-2.09, 2.09], pitch: [-1.32, 1.15], sensitivityScale: 0.8 },
-  // 玩家是通信排里没有特殊身份的一名普通士兵：坐在右侧长凳，鼠标可完整低头抬头，
-  // 地点卡内随大家起身，最后以第一人称走正式侧门、踏板和月台。
+  // 玩家是 9 连的二等兵谢长顺（顺子）：全场坐在**左侧**长凳上，鼠标可完整低头抬头
+  //（±120° / −76°—+66°），车不停、人不下车 —— 序章在罗班长喊完口令那一刻切黑。
+  // 三个「固定演出」镜（2/3/9）用 per-shot headLook 把幅度收窄，不切 cameraMode。
   // 天空换成本场专属的 chuchuanDay（Script_Sky 里新增的一档，正片七关一律不用）：
   // smokyDay 的 horizon 2.40 / envIntensity 1.05 在这一场的实测结果是
   // 「窗户纯白过曝、车厢内接近纯黑」——天地比不是太小是太大。新档把天压下来、
@@ -2084,12 +2217,12 @@ export const CS_Chuchuan = {
   // 山脊从半山腰切掉一块。
   cameraFar: 3500,
   suppress: { movement: true, weapon: true, crosshair: true, combatHud: true },
-  objective: "坐在长凳上转头观察车厢，停车后随队下车。",
-  handoff: { task: "跟随通信排。", once: true },
-  why: "1937 年川军徒步出川抗战，1938 年 3 月第 122 师抵达滕县；玩家作为通信排普通一兵，从自己的座位看见满载军运车里的疲惫、损耗与习惯性准备，并随队从侧门登上月台。",
-  // 整段都持续移动，而不是只在小站那十八秒挪一下背景。近景快、中景慢、远景最慢，
+  objective: "在车厢里等命令。",
+  handoff: { task: "下车 —— 前头是滕县。", once: true },
+  why: "序章只干三件事（docs/Data_MissionRemake.md §1）：让玩家看见川军的军容装备纪律有多混乱；看见第五战区接纳这支被两个战区推掉的部队、还发了枪弹；看见顺子准备借后送伤兵的差事逃走。人物决定为什么战斗——这一场把「为什么」的起点定成「他本来不打算打」。",
+  // 整段都持续移动，而不是只在小站那十几秒挪一下背景。近景快、中景慢、远景最慢，
   // 玩家即使不看站台，也会从窗框里读出列车正在前进。
-  // 小站也走同一条 ambientMotion（速度 1.65 m/s、stopAt 56 s、终点正好是侧门外），
+  // 小站也走同一条 ambientMotion（速度 1.65 m/s、stopAt 58.6 s、终点正好是侧门外），
   // 不再是「镜 4 用 propMoves 推到 +13.2、镜 5 再 hold 回 +5.7」那种切镜倒跳 7.5 m 的写法。
   ambientMotion: [
     ...[[-1, "Left"], [1, "Right"]].flatMap(([side, label]) => WindowLandscapeMotion(side, label)),
@@ -2180,6 +2313,9 @@ export const CS_Chuchuan = {
     ...CarriageBench(-1, "Left"),
     ...CarriageBench(1, "Right"),
     ...CarriagePersonalEffects(),
+    // 新序章要看得见的那几件：骰子与押注的子弹、幺娃的腊肉与刺刀、顺子背包底
+    // 露出来的那件民用短褂（§1 阶段 1、3）。
+    ...CarriageStoryProps(),
     // 两块靠端墙的地铺给无座时席地休息，薄垫不侵占中央通道。
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [-1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5f594d, name: "FloorMatLeft" },
     { kind: "box", size: [1.25, 0.055, 1.65], pos: [1.15, 0.15, -7.55], mat: "ClothNra", color: 0x5b5549, name: "FloorMatRight" },
@@ -2267,131 +2403,260 @@ export const CS_Chuchuan = {
   ],
 
   cast: [
-    // 玩家本人也是同制服、同身高体系里的普通通信兵；仅隐藏头部避免第一人称穿模，
-    // 低头仍能看见胸前装具、双臂、裤腿和脚。
-    { id: "playerSoldier", kind: "nra", weapon: null, seed: "chuchuanPlayer", firstPerson: true, uniformHex: 0x66717d, trouserHex: 0x4c555d, accessoryHex: 0x77705b, track: PlayerSoldierTrack() },
-    // 五名重点士兵承接台词；其余乘客不是背景板，而是满载军运车的连续人群层。
-    // 四人的座位语义不动（谁在哪、对坐关系照旧）；只把下车顺序排到玩家后面 ——
-    // queueOrder 12—15 意味着他们 105 s 内还在过道里排队，不会跟相机抢门。
-    { id: "youngDispatch", kind: "nra", weapon: null, seed: "chuchuanYoung", uniformHex: 0x5C6674, attachments: [{ name: "ShoeTool", mount: "handL", offset: [0, -0.16, -0.04], rotation: [0.2, 0, 0] }], track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, -2.55], { repairShoe: 1 }, 0.0, 13, -0.7, -Math.PI / 2) },
-    { id: "rifleman", kind: "nra", weapon: "HanYang", seed: "chuchuanRifle", uniformHex: 0x828A93, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, -2.55], { cleanRifle: 1 }, 1.0, 14, 0.5, Math.PI / 2) },
-    { id: "oldWound", kind: "nra", weapon: null, seed: "chuchuanOld", uniformHex: 0x8A8778, track: CarSeatTrack([-1.95, CHUCHUAN_CAR_G, 2.75], { sleep: 0.8 }, 1.8, 11, -0.5, -Math.PI / 2) },
-    { id: "machineGunner", kind: "nra", weapon: "Zb26", seed: "chuchuanMachine", uniformHex: 0x6E7684, track: CarSeatTrack([1.95, CHUCHUAN_CAR_G, 2.50], {}, 2.6, 12, 0.7, Math.PI / 2) },
-    // 班长固定在车厢末端站着、面对全车，视线一转就能找到他；不再被塞回右侧座椅。
-    { id: "squadLeader", kind: "nra", weapon: "HanYang", seed: "chuchuanLeader", uniformHex: 0x4f5a61, track: CarRearLeaderTrack([0, CHUCHUAN_CAR_G, 5.95], 1.35) },
+    // ── 车厢里的班（新 CAST，契约 §10.2）─────────────────────────────────────
+    // 顺子＝玩家：同制服、同身高体系里的普通士兵，仅隐藏头部避免第一人称穿模，
+    // 低头仍能看见胸前装具、双臂、裤腿和脚。**空手** —— 枪弹要到兵站才发（§1 阶段 2），
+    // 而且这一车按日方记载三分之一以上本来就没有步枪。
+    { id: "shunzi", kind: "nra", weapon: null, seed: "chuchuanShunzi", firstPerson: true,
+      uniformHex: 0x66717d, trouserHex: 0x4c555d, accessoryHex: 0x77705b, track: PlayerSoldierTrack() },
+    // 罗班长：全场唯一在过道里走动的人（看赌局 → 走到顺子跟前读信 → 门口 → 走回来）。
+    { id: "luo", kind: "nra", weapon: "HanYang", seed: "chuchuanLuo",
+      uniformHex: 0x4f5a61, trouserHex: 0x3f474c, accessoryHex: 0x6f6a55, track: CarAisleLeaderTrack() },
+    // 幺娃：紧挨着顺子坐（咬耳朵要够得着），膝上一块布切腊肉，右手挂着那把被班长骂的刺刀。
+    // repairShoe 是引擎里「坐着低头在膝上摆弄东西」那一档姿态，切腊肉借它，不另开姿态。
+    { id: "yaowa", kind: "nra", weapon: null, seed: "chuchuanYaowa", uniformHex: 0x8A8778,
+      attachments: [{ name: "YaowaBayonet", mount: "handR", offset: [0.02, -0.15, -0.05], rotation: [0.42, 0, 0] }],
+      track: CarSeatTrack(CHUCHUAN_SEAT_YAOWA, { repairShoe: 0.85 }, 0.4, -Math.PI / 2) },
+    // 何有田与刘文财：对面右凳上隔着一块板赌骰子，押的是子弹（checkAmmo = 低头看手里的东西）。
+    // 何有田空着手 —— 他后面那句「我们再撇也比草人强」是笑话，也是这一车的实情。
+    { id: "heyoutian", kind: "nra", weapon: null, seed: "chuchuanHeyoutian", uniformHex: 0x828A93,
+      track: CarSeatTrack(CHUCHUAN_SEAT_HEYOUTIAN, { checkAmmo: 0.55 }, 1.0, Math.PI / 2) },
+    { id: "liuwencai", kind: "nra", weapon: "ZhongZheng", seed: "chuchuanLiuwencai", uniformHex: 0x6E7684,
+      track: CarSeatTrack(CHUCHUAN_SEAT_LIUWENCAI, { checkAmmo: 0.8 }, 1.6, Math.PI / 2) },
+    // 赵德贵：老成持重、管弹药纪律。策划案序章没给他台词，所以他只擦枪、不开口 ——
+    // 但人必须在画里，五关之后「四川这阵是不是在下雨／该是」那一问一答才有来处。
+    { id: "zhaodegui", kind: "nra", weapon: "HanYang", seed: "chuchuanZhaodegui", uniformHex: 0x767E75,
+      track: CarSeatTrack(CHUCHUAN_SEAT_ZHAODEGUI, { cleanRifle: 0.7 }, 2.4, Math.PI / 2) },
     ...CreateCarriageCrowdCast(),
-    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA", track: StationRailTrack(6.1, CHUCHUAN_STRETCHER_OFFSET, CHUCHUAN_STRETCHER_WALK) },
-    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB", track: StationRailTrack(7.6, CHUCHUAN_STRETCHER_OFFSET, CHUCHUAN_STRETCHER_WALK) },
-    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded", track: StationRailTrack(9.15, 6.5, 2.2, { moveSpeed: 0.11, crouch: 0.25 }) },
-    // 车外军官：先站在门外正对车门喊话（镜 8 从车里往外看就是他），
-    // 99—100.6 s 让开到月台前方并转身回望，镜 11 玩家停稳时他和班长一左一右
-    // 站在画面里 —— 旧版把他钉在 (5.9, 8.0) 面朝 +x（背对下车的人），
-    // 而且正好卡在玩家的落脚点旁边。
-    { id: "externalOfficer", kind: "nra", weapon: null, seed: "chuchuanOfficer", track: [
-      { t: 0, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: Math.PI / 2, state: { hidden: true } },
-      { t: CHUCHUAN_DOOR_AT - 0.4, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: Math.PI / 2, state: { hidden: false, moveSpeed: 0 } },
-      { t: 98.0, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.90], ry: -3.025, state: TrackMoveState([5.35, 0, 6.90], [5.90, 0, 11.60], 3.2, { prepare: 0.3 }) },
-      { t: 101.2, pos: [5.90, CHUCHUAN_PLATFORM_Y, 11.60], ry: 0.85, state: { prepare: 0.3, moveSpeed: 0 } },
-      { t: CHUCHUAN_END, pos: [5.90, CHUCHUAN_PLATFORM_Y, 11.60], ry: 0.85, state: { prepare: 0.3, moveSpeed: 0 } },
+
+    // ── 兵站月台（停车后全部落在「从座位透过车门看得见」的楔形里）──────────────
+    // 一副担架停在门外 z=8.4：顺子先看见「后送伤兵」这件事真的存在，
+    // 四十秒后才跟幺娃说「前头若喊送伤兵，老子就去」。
+    { id: "stretcherBearerA", kind: "nra", weapon: null, seed: "chuchuanBearerA",
+      track: PlatformRider(6.85, CHUCHUAN_STRETCHER_STOP_Z - 1.35, CHUCHUAN_STRETCHER_WALK) },
+    { id: "stretcherBearerB", kind: "nra", weapon: null, seed: "chuchuanBearerB",
+      track: PlatformRider(6.85, CHUCHUAN_STRETCHER_STOP_Z + 1.35, CHUCHUAN_STRETCHER_WALK) },
+    { id: "lightWounded", kind: "nra", weapon: null, seed: "chuchuanWounded",
+      track: PlatformRider(9.20, 6.60, 2.2, { crouch: 0.25 }) },
+    // 百姓：一个在挪自己的货担给军列让路，一个守着摊子（§1 阶段 2 第一句）。
+    // 站在月台上不动的人，在这一场的局部系里是**跟着月台以 1.65 m/s 滑过来**的，
+    // 所以 moveSpeed 给 0、travelSpeed 给月台速度 —— 反过来写就是「原地踏步的滑步」。
+    { id: "villagerA", kind: "civilian", seed: "chuchuanVillagerA",
+      track: PlatformRider(8.95, 10.00, 2.6, { reach: 0.35 }) },
+    { id: "villagerB", kind: "civilian", seed: "chuchuanVillagerB",
+      track: PlatformRider(8.90, 8.30, 0, {}, Math.PI / 2) },
+    // 兵站兵：顺手去拿摊边的东西，被门口的罗班长一嗓子喝住又放回去。
+    // 前三帧直接借 PlatformRider（hidden → 进站 → 停车），后面接自己的 reach 起落。
+    // 站在摊子外侧（离摊面 1.04 m，探身够得着），离担架兵前端 2.1 m —— 不许再往
+    // 门口挪：7.55/7.30 那一版离担架兵只有 0.74 m，两个人插在一起。
+    { id: "depotHand", kind: "nra", weapon: null, seed: "chuchuanDepotHand", track: (() => {
+      const x = 7.80, stopZ = 8.85, face = Math.PI / 2;
+      const at = (t, state) => ({ t, pos: [x, CHUCHUAN_PLATFORM_Y, stopZ], ry: face, state });
+      return [
+        ...PlatformRider(x, stopZ, 0, {}, face).slice(0, 3),
+        at(CHUCHUAN_DEPOT_AT + 0.6, { moveSpeed: 0, reach: 0.15 }),
+        at(CHUCHUAN_DEPOT_AT + 2.2, { moveSpeed: 0, reach: 0.85 }),
+        at(CHUCHUAN_DEPOT_AT + 3.4, { moveSpeed: 0, reach: 0.85 }),
+        // 罗班长在镜 4 第 2.6 秒喊「放回去！」，手在 +5.2 s 之前落回去。
+        at(CHUCHUAN_DEPOT_AT + 5.2, { moveSpeed: 0, reach: 0.30 }),
+        at(CHUCHUAN_DEPOT_AT + 6.4, { moveSpeed: 0 }),
+        at(CHUCHUAN_END, { moveSpeed: 0 }),
+      ];
+    })() },
+    // 兵站军官（nraOfficer：武装带＋枪套＋皮鞋、不背枪）。**门还关着的时候**就位，
+    // 所以他凭空出现那一帧整个被门板挡住；门滑开，他已经站在那儿了。
+    { id: "junguan", kind: "nraOfficer", weapon: null, seed: "chuchuanJunguan", track: [
+      { t: 0, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.20], ry: Math.PI / 2, state: { hidden: true } },
+      { t: CHUCHUAN_DOOR_AT - 0.4, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.20], ry: Math.PI / 2, state: { hidden: false, moveSpeed: 0 } },
+      { t: CHUCHUAN_ORDER_AT, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.20], ry: Math.PI / 2, state: { moveSpeed: 0 } },
+      { t: CHUCHUAN_END, pos: [5.35, CHUCHUAN_PLATFORM_Y, 6.20], ry: Math.PI / 2, state: { moveSpeed: 0, prepare: 0.4 } },
     ] },
   ],
 
   people: CHUCHUAN_PEOPLE,
 
+  // ── 分镜 ────────────────────────────────────────────────────────────────
+  // 九镜，机位**全部是同一个点**：顺子的眼睛 (−1.95, 1.36, 3.42)。他没有站起来过，
+  // 所以这一场没有一次真正的「运镜」—— 只有 look/lookTo 的换向，加上玩家自己的转头。
+  //
+  // 「固定演出」与「自由段落」的区别落在两件事上（不是 cameraMode）：
+  //   · 固定演出镜（2/3/9）给 look→lookTo 的换向，并用 per-shot headLook 把转头
+  //     幅度收窄到 ±0.7 上下，保证读家信、开门、字卡这三件事一定在画里；
+  //   · 自由镜（1/4/5/6/7/8）只给一个基准视轴，headLook 走全场默认的 ±2.09 / −1.32—1.15。
+  //   合计固定演出 30.0 + 7.0 + 4.5 = 41.5 s ≤ 45 s（§1 过场规格）。
   shots: [
-    // 0:00—0:08：观察者口吻的两张历史字卡；只留轮轨声，不进音乐。
-    { n: 1, seconds: 4, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true, timingLocked: true,
-      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
-      subs: [{ at: 0.1, seconds: 3.9, title: true, text: "1937年，全面抗战爆发。川军徒步出川，赴几千里外的前线。" }] },
-    { n: 2, seconds: 4, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true, timingLocked: true,
-      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
-      subs: [{ at: 0.1, seconds: 3.9, title: true, text: "1938年3月，第122师抵达滕县。" }] },
-
-    // 0:08—0:40：玩家坐在右侧长凳；低头能看见自己的身体与脚边通信装备。
-    { n: 3, seconds: 32, focalMm: 35, cameraMode: "headLook", fadeIn: 0.8, timingLocked: true,
-      camera: { from: [1.95, 1.36, 3.42], look: [-0.4, 1.32, 3.42] },
-      sfx: [{ at: 0.5, name: "carriageRattle", volume: 0.28 }, { at: 22.3, name: "bolt", volume: 0.42 }],
+    // ── 镜 1｜0:00—0:27 车厢闲谈（自由）────────────────────────────────────
+    // 基准视轴朝车厢深处：罗班长站在过道正中、右凳上是赌骰子的两个人、
+    // 画左边缘是切腊肉的幺娃。三处「空间语音」的说话人都在同一幅画里，
+    // 玩家不转头也能看明白谁在说话，转头又能一个个看清楚。
+    { n: 1, seconds: 27.0, focalMm: 35, fadeIn: 0.8,
+      camera: { from: [-1.95, 1.36, 3.42], look: [0.30, 1.05, -2.60] },
+      sfx: [
+        { at: 0.5, name: "carriageRattle", volume: 0.30 },
+        { at: 9.6, name: "carriageRattle", volume: 0.24 },
+        { at: 19.4, name: "carriageRattle", volume: 0.26 },
+      ],
       lines: [
-        { at: 0.6, seconds: 2.2, who: "youngDispatch", voiceCue: "prologue_young_dispatch_01", text: "我们出川好久了哦。" },
-        { at: 3.2, seconds: 3.3, who: "oldWound", voiceCue: "prologue_old_wound_01", text: "路莫问，跟到走就是。" },
-        { at: 7.0, seconds: 3.5, who: "youngDispatch", voiceCue: "prologue_young_dispatch_02", text: "我都忘了屋头腊肉是啥味道了。" },
-        { at: 11.2, seconds: 2.4, who: "machineGunner", voiceCue: "prologue_machine_gunner_01", text: "你娃儿还惦记腊肉。" },
-        { at: 14.4, seconds: 2.5, who: "youngDispatch", voiceCue: "prologue_young_dispatch_03", text: "不惦记吃的惦记啥子嘛。" },
-        { at: 17.4, seconds: 4.2, who: "machineGunner", voiceCue: "prologue_machine_gunner_02", text: "到了前头，有热水喝你就谢天谢地。" },
-        { at: 22.4, seconds: 1.5, who: "rifleman", voiceCue: "prologue_rifleman_01", text: "又卡。" },
-        { at: 24.9, seconds: 4.0, who: "oldWound", voiceCue: "prologue_old_wound_02", text: "你少骂两句，它兴许听话点。" },
+        { at: 2.2, seconds: 4.2, who: "liuwencai", voiceCue: "ch0_liuwencai_01", text: "哪个拿老子的子弹押骰子了？" },
+        { at: 7.2, seconds: 4.0, who: "heyoutian", voiceCue: "ch0_heyoutian_01", text: "你那几颗烂子弹值个锤子。" },
+        { at: 13.0, seconds: 4.0, who: "luo", voiceCue: "ch0_luo_01", text: "哪个龟儿子拿刺刀切腊肉？" },
+        { at: 17.8, seconds: 3.1, who: "yaowa", voiceCue: "ch0_yaowa_01", text: "擦干净就是了嘛。" },
+        { at: 21.8, seconds: 4.4, who: "luo", voiceCue: "ch0_luo_02", text: "等哈捅鬼子，先给人家抹盐嗦？" },
       ] },
 
-    // 0:40—0:56：列车缓缓进入小站。月台从后窗掠进来；担架兵和轻伤员各自
-    // 走过窗格，镜头过后仍在画外继续走，不以切镜当作消失。
-    // look 从 (3.8,1.52,2.6) 改成 (3.8,1.24,4.02)：旧视轴正对 z=2.95 那根窗竖框
-    //（0.85 m 外的一根 0.12 m 立柱 = 画面正中 8° 宽的一条黑带），而且抬着看，
-    // 只看得见天。新视轴穿 z≈2.95—4.48 那一格窗的中心、并往下压 —— 月台面、
-    // 担架兵与轻伤员都落在画里。
-    { n: 4, seconds: 16, focalMm: 35, cameraMode: "headLook", camera: { from: [1.95, 1.36, 3.42], look: [3.8, 1.26, 3.38] },
-      sfx: [{ at: 0.18, name: "trainWhistle", volume: 0.48 }, { at: 2.3, name: "trainBrake", volume: 0.62 }, { at: 4.7, name: "stretcherWood", volume: 0.42 }, { at: 7.5, name: "coughLow", volume: 0.32 }],
-      // 站台与担架不再在这里用 propMoves 推：整座小站由 cut.ambientMotion 沿一条
-      // 匀速里程走到侧门外并 stopAt=56 停住，切镜与它无关，结构上不会倒跳。
-    },
-
-    // 0:56—1:08：恰好两次远炮；第二声更近，五人先后停手，旧伤兵睁眼。
-    { n: 5, seconds: 12, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [1.95, 1.36, 3.42], look: [-0.4, 1.28, 3.42] },
-      shakeAt: [{ at: 0.6, seconds: 0.7, amount: 0.42 }, { at: 7.0, seconds: 0.95, amount: 0.82 }],
-      sfx: [{ at: 0.6, name: "amb.cannonFar", volume: 0.48 }, { at: 7.0, name: "explosionFar", volume: 0.68 }],
-      lines: [{ at: 2.0, seconds: 1.6, who: "oldWound", voiceCue: "prologue_old_wound_03", text: "近咯。" }] },
-
-    // 1:08—1:30：整段只触发一个 SeedAudio 1.0 复合 cue；其余行只负责逐句字幕。
-    { n: 6, seconds: 22, focalMm: 35, cameraMode: "headLook", timingLocked: true, camera: { from: [1.95, 1.36, 3.42], look: [0, 1.58, 5.95] },
-      sfx: [{ at: 18.1, name: "gearRustle", volume: 0.34 }],
+    // ── 镜 2｜0:27—0:57 读家信＋四句对话（**固定演出**，过场规格 1、2）──────
+    // 罗班长 27.0—29.6 s 沿过道走到顺子跟前站定（他不识字，信要顺子念）。
+    // 起手看的是**自己手里那张信纸**（0.76 m，引擎近平面会自己收到 0.03—1.2 m），
+    // 缓缓抬到班长的手与胸口 —— 全程不给脸：站着的人在坐着的人眼里本来就只有半身。
+    // 41—43 s 他伸手把信收回去（cast 里的 reach 起落），四句对话接在收信之后。
+    { n: 2, seconds: 30.0, focalMm: 35,
+      headLook: { yaw: [-0.70, 0.70], pitch: [-0.50, 0.45] },
+      camera: { from: [-1.95, 1.36, 3.42], look: [-1.32, 0.96, 3.28], lookTo: [-0.98, 1.12, 3.20], ease: "easeInOut" },
+      sfx: [
+        { at: 1.0, name: "carriageRattle", volume: 0.22 },
+        // 汽笛压在最后一句下面：这一句刚落，车就开始减速进兵站。
+        { at: 26.6, name: "trainWhistle", volume: 0.34 },
+      ],
       lines: [
-        { at: 0.2, seconds: 4.1, who: "squadLeader", voiceCue: "prologue_motivation_01", text: "这次你们去啊。出川，晓不晓得啊？" },
-        // 下列时点来自十七八岁年轻士兵自然错拍定稿的真实停顿，不是把八句音频拼起来。
-        { at: 4.8, seconds: 2.8, who: "squad", text: "我们晓得。打日本！" },
-        { at: 8.4, seconds: 0.6, who: "squadLeader", text: "去死，怕不怕？" },
-        { at: 9.7, seconds: 0.6, who: "squad", text: "不怕！" },
-        { at: 10.6, seconds: 0.9, who: "squadLeader", text: "为啥子不怕？" },
-        { at: 11.5, seconds: 3.6, who: "squad", text: "我们要保护我们的国家！" },
-        { at: 16.5, seconds: 0.6, who: "squadLeader", text: "好样的。" },
-        { at: 18.1, seconds: 3.7, who: "squadLeader", text: "都把东西带好。前头就是滕县。" },
+        { at: 0.8, seconds: 3.4, who: "shunzi", voiceCue: "ch0_shunzi_01", text: "……春妹会喊爹了。" },
+        { at: 4.8, seconds: 5.0, who: "shunzi", voiceCue: "ch0_shunzi_02", text: "娘的眼睛越发不好，穿针都要人帮。" },
+        { at: 10.6, seconds: 5.1, who: "shunzi", voiceCue: "ch0_shunzi_03", text: "屋头恁多事等你，还跑出来打啥子仗？" },
+        { at: 16.3, seconds: 4.2, who: "luo", voiceCue: "ch0_luo_03", text: "不打，人家早晚打到屋门口。" },
+        { at: 21.0, seconds: 3.7, who: "shunzi", voiceCue: "ch0_shunzi_04", text: "山东离屋门口还远得很。" },
+        { at: 25.2, seconds: 3.4, who: "luo", voiceCue: "ch0_luo_04", text: "南京以前也觉得远。" },
       ] },
 
-    // 1:30—1:33：短黑地点卡；人物在黑场内起身，不用镜头外瞬移遮演出。
-    { n: 7, seconds: 3, focalMm: 50, cameraMode: "headLook", black: true, titleCard: true, timingLocked: true,
-      camera: { from: [0, 1.6, -6], look: [0, 1.6, -7] },
-      subs: [{ at: 0, seconds: 3, title: true, date: true, text: "山东·滕县／1938年3月" }] },
+    // ── 镜 3｜0:57—1:04 列车减速停车、侧门滑开（**固定演出**，过场规格 3 前半）──
+    // 视轴从车厢里转到侧门上，门在镜内第 3.5—5.5 秒滑开（全局 60.5—62.5）。
+    // ★ 整套 ambientMotion 在 58.6 s（镜内 1.6 s）**硬停**：引擎只吃一条速度 +
+    //   一个 stopAt，没有减速段（见 Data_MissionCh0 的 ENGINE_REQUEST）。所以这一镜
+    //   刻意让视轴在那一秒正朝着车厢里侧 —— 窗外那一下急停不在画面正中。
+    { n: 3, seconds: 7.0, focalMm: 35,
+      headLook: { yaw: [-0.85, 0.85], pitch: [-0.55, 0.50] },
+      camera: { from: [-1.95, 1.36, 3.42], look: [-0.60, 1.24, 4.40], lookTo: [3.30, 1.16, 5.70], ease: "easeInOut" },
+      sfx: [
+        { at: 0.2, name: "trainBrake", volume: 0.62 },
+        { at: 1.5, name: "carriageRattle", volume: 0.34 },
+        { at: 3.5, name: "carriageDoorSlide", volume: 0.72 },
+        { at: 5.8, name: "stepBallast", volume: 0.30 },
+      ],
+      shakeAt: [{ at: 1.2, seconds: 0.8, amount: 0.22 }],
+      propMoves: SideDoorMoves().map((move) => ({
+        ...move,
+        startAt: CHUCHUAN_DOOR_AT - CHUCHUAN_SHOT3_AT,
+        endAt: CHUCHUAN_DOOR_OPEN_AT - CHUCHUAN_SHOT3_AT,
+      })) },
 
-    // 1:33—1:35.5：玩家已随大家起身，侧门整组沿车壁滑开；先从座位走进过道。
-    { n: 8, seconds: 2.5, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [1.95, 1.65, 3.42], to: [0.70, 1.65, 5.30], look: [0.3, 1.52, 5.45], lookTo: [3.4, 1.52, 5.70], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeIn: 0.45 } },
-      sfx: [{ at: 0.1, name: "carriageDoorSlide", volume: 0.7 }],
-      propMoves: [...SideDoorMoves()],
-      lines: [{ at: 0.6, seconds: 4.0, who: "externalOfficer", voiceCue: "prologue_external_officer_01", text: "通信排，下车！线盘背起，搞快！" }] },
+    // ── 镜 4｜1:04—1:29 兵站与第五战区补给（自由，§1 阶段 2）──────────────────
+    // 基准视轴穿过敞开的车门打在月台上。门框切出的可见楔形是 z≈5.5—11.1 那一条：
+    // 军官、担架、摊子、货担、掀了盖的弹药箱全部在里面（摆位算法见 STATION_PARTS）。
+    { n: 4, seconds: 25.0, focalMm: 35,
+      camera: { from: [-1.95, 1.36, 3.42], look: [4.20, 1.10, 6.20] },
+      sfx: [
+        { at: 1.2, name: "stretcherWood", volume: 0.40 },
+        { at: 5.6, name: "impactWood", volume: 0.34 },
+        { at: 14.8, name: "impactWood", volume: 0.30 },
+        { at: 22.4, name: "coughLow", volume: 0.28 },
+      ],
+      propMoves: [...SideDoorHoldOpenMoves()],
+      lines: [
+        { at: 2.6, seconds: 4.2, who: "luo", voiceCue: "ch0_luo_05", text: "放回去！莫拿老百姓的东西！" },
+        { at: 8.4, seconds: 4.2, who: "junguan", voiceCue: "ch0_junguan_01", text: "前头两个战区都不肯收我们。" },
+        { at: 13.2, seconds: 4.2, who: "junguan", voiceCue: "ch0_junguan_02", text: "第五战区肯接，还给了枪弹。" },
+        { at: 18.0, seconds: 6.6, who: "junguan", voiceCue: "ch0_junguan_03", text: "到了前头，哪个再乱拿老百姓东西，老子先收拾哪个！" },
+      ] },
 
-    // 1:35.5—1:38.5：沿过道走到门框，镜头不再穿端墙或从车尾离开。
-    { n: 9, seconds: 3, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [0.70, 1.65, 5.30], to: [3.35, 1.80, 5.70], look: [3.2, 1.62, 5.70], lookTo: [5.4, 1.80, 5.70], ease: "easeInOut", walkBob: { amount: 0.020, frequency: 1.85 } },
-      sfx: [{ at: 0.5, name: "stepBallast", volume: 0.38 }, { at: 2.0, name: "stepBallast", volume: 0.42 }],
+    // ── 镜 5｜1:29—1:47 何有田小声＋罗班长三句（自由）──────────────────────
+    // 罗班长在镜头前 3.4 秒从门口走回车厢深处、转身对着何有田；
+    // 何有田那句「小声」是说给旁边人听的，班长照样听见了 —— 这就是他的答话。
+    { n: 5, seconds: 18.0, focalMm: 35,
+      camera: { from: [-1.95, 1.36, 3.42], look: [0.60, 1.15, -0.80] },
+      sfx: [{ at: 0.3, name: "gearRustle", volume: 0.30 }, { at: 11.8, name: "impactMetal", volume: 0.26 }],
+      propMoves: [...SideDoorHoldOpenMoves()],
+      lines: [
+        { at: 0.8, seconds: 5.0, who: "heyoutian", voiceCue: "ch0_heyoutian_02", text: "听说李长官讲，我们再撇也比草人强。" },
+        { at: 6.3, seconds: 2.2, who: "luo", voiceCue: "ch0_luo_06", text: "你还笑？" },
+        { at: 9.0, seconds: 2.9, who: "luo", voiceCue: "ch0_luo_07", text: "人家拿话臊你。" },
+        { at: 12.4, seconds: 4.6, who: "luo", voiceCue: "ch0_luo_08", text: "枪发到你手头，就打个兵样出来。" },
+      ] },
+
+    // ── 镜 6｜1:47—1:51 亮短褂（固定基准，无台词）──────────────────────────
+    // 顺子低头把背包底那件民用短褂扒出来一角。四秒、无台词、不解释 ——
+    // 蓝灰棉布摆在一车土黄军装里，本身就说明它不是发的。
+    // ★ 这一镜**不收窄 headLook**：它只把基准视轴压到脚边，玩家想抬头就抬头。
+    //   收窄了就变成第四个「固定演出」镜，45 秒的预算要超（41.5 + 4.0 = 45.5）。
+    { n: 6, seconds: 4.0, focalMm: 35,
+      camera: { from: [-1.95, 1.36, 3.42], look: [-1.05, 0.44, 3.90] },
+      sfx: [{ at: 0.6, name: "gearRustle", volume: 0.42 }],
       propMoves: [...SideDoorHoldOpenMoves()] },
 
-    // 1:38.5—1:41：跨门槛和两级踏板，脚下高度真实接到石基月台。
-    { n: 10, seconds: 2.5, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [3.35, 1.80, 5.70], to: [5.20, 2.14, 5.70], look: [5.2, 1.92, 5.70], lookTo: [6.6, 2.00, 9.50], ease: "easeInOut", walkBob: { amount: 0.024, frequency: 1.65 } },
-      sfx: [{ at: 0.35, name: "stepBallast", volume: 0.48 }, { at: 1.45, name: "stepBallast", volume: 0.50 }],
-      propMoves: [...SideDoorHoldOpenMoves()] },
+    // ── 镜 7｜1:51—2:23 顺子的计划（自由，§1 阶段 3）────────────────────────
+    // 基准视轴落在幺娃身上（1.1 m，两个人凑在一起说话的距离），但**镜头不锁他** ——
+    // 玩家随时可以把头转开去看车门外的担架、看罗班长、看窗外，台词照说。
+    // 这一段是全场唯一一次「玩家知道的比全班都多」：顺子把逃跑计划说出口了。
+    { n: 7, seconds: 32.0, focalMm: 35,
+      camera: { from: [-1.95, 1.36, 3.42], look: [-1.55, 1.10, 2.15] },
+      sfx: [{ at: 10.1, name: "carriageRattle", volume: 0.18 }, { at: 14.5, name: "coughLow", volume: 0.24 }],
+      propMoves: [...SideDoorHoldOpenMoves()],
+      lines: [
+        { at: 0.6, seconds: 4.2, who: "shunzi", voiceCue: "ch0_shunzi_05", text: "前头若喊送伤兵，老子就去。" },
+        { at: 5.4, seconds: 4.6, who: "shunzi", voiceCue: "ch0_shunzi_06", text: "送到临城，找个地方把衣裳一换。" },
+        { at: 10.6, seconds: 3.8, who: "shunzi", voiceCue: "ch0_shunzi_07", text: "枪一丢，哪个认得到我？" },
+        { at: 15.0, seconds: 2.9, who: "yaowa", voiceCue: "ch0_yaowa_02", text: "那不就是逃兵？" },
+        { at: 18.5, seconds: 5.1, who: "shunzi", voiceCue: "ch0_shunzi_08", text: "我是遭抓来的，又不是自己来送命的。" },
+        { at: 24.1, seconds: 2.9, who: "yaowa", voiceCue: "ch0_yaowa_03", text: "罗班长晓得不？" },
+        { at: 27.6, seconds: 4.2, who: "shunzi", voiceCue: "ch0_shunzi_09", text: "你敢说，老子先把你丢下车。" },
+      ] },
 
-    // 1:41—1:45：登上站台后再沿站台走几步、停稳，身后的战友仍从同一扇门排队下来。
-    { n: 11, seconds: 4, focalMm: 35, cameraMode: "headLook", timingLocked: true,
-      camera: { from: [5.20, 2.14, 5.70], to: [6.80, 2.14, 7.40], look: [6.7, 2.04, 9.6], lookTo: [6.8, 1.96, 12.6], ease: "easeInOut", walkBob: { amount: 0.018, frequency: 1.75, fadeOut: 1.35 } },
-      sfx: [{ at: 0.6, name: "stepBallast", volume: 0.46 }, { at: 2.0, name: "stepBallast", volume: 0.42 }],
-      propMoves: [...SideDoorHoldOpenMoves()] },
+    // ── 镜 8｜2:23—2:42 远处炮声与口令（自由）──────────────────────────────
+    // 顺子那句「老子没打算死在山东」是他三句弧线的第一句（§6：一关「老子不松，
+    // 一起死」→ 五关「老子今天不走了」）。话音刚落就是炮声 —— 不给他答复。
+    // 9.4/10.2 的两声枪栓压在「枪上膛！」下面：口令落地是**满车人一起拉栓**。
+    { n: 8, seconds: 19.0, focalMm: 35,
+      camera: { from: [-1.95, 1.36, 3.42], look: [0.35, 1.15, -1.40] },
+      shakeAt: [{ at: 4.8, seconds: 0.7, amount: 0.34 }, { at: 6.0, seconds: 1.0, amount: 0.62 }],
+      sfx: [
+        { at: 4.6, name: "amb.cannonFar", volume: 0.50 },
+        { at: 5.9, name: "explosionFar", volume: 0.64 },
+        { at: 9.4, name: "bolt", volume: 0.46 },
+        { at: 10.2, name: "bolt", volume: 0.40 },
+        { at: 12.8, name: "gearRustle", volume: 0.40 },
+      ],
+      propMoves: [...SideDoorHoldOpenMoves()],
+      lines: [
+        { at: 0.4, seconds: 3.6, who: "shunzi", voiceCue: "ch0_shunzi_10", text: "老子没打算死在山东。" },
+        { at: 6.6, seconds: 2.2, who: "luo", voiceCue: "ch0_luo_09", text: "收骰子！" },
+        { at: 9.1, seconds: 2.2, who: "luo", voiceCue: "ch0_luo_10", text: "枪上膛！" },
+        { at: 11.7, seconds: 4.0, who: "luo", voiceCue: "ch0_luo_11", text: "下车以后莫给老子跑散了！" },
+        { at: 15.9, seconds: 3.0, who: "junguan", voiceCue: "ch0_junguan_04", text: "下车！按班站好！" },
+      ] },
+
+    // ── 镜 9｜2:42—2:46.5 短切黑，地点卡（**固定**）─────────────────────────
+    // black:true 的镜第一帧就全黑（引擎第二轮补丁），所以这里是**硬切**不是淡出 ——
+    // 策划案要的就是「短切黑」。声音上接：制动的余响 → 一声近炮 → 连续的远炮，
+    // 火车声就这么换成炮声，下一关开场不需要再解释一次。
+    { n: 9, seconds: 4.5, focalMm: 50, black: true, titleCard: true,
+      camera: { from: [-1.95, 1.36, 3.42], look: [-0.95, 1.36, 3.42] },
+      sfx: [
+        { at: 0.2, name: "trainBrake", volume: 0.30 },
+        { at: 2.2, name: "explosionFar", volume: 0.52 },
+        { at: 3.4, name: "amb.cannonFar", volume: 0.58 },
+      ],
+      subs: [{ at: 0.1, seconds: 4.2, title: true, date: true, text: "山东·滕县／1938年3月" }] },
   ],
 
   skipCard: {
-    title: "出川",
+    title: "序章 · 出川",
     lines: [
-      { text: "1937年，全面抗战爆发。川军徒步出川，赴几千里外的前线。", tier: "主流" },
-      { text: "1938年3月，第122师抵达滕县。", tier: "主流" },
+      { text: "第二十二集团军是川军。军服式样不一，草鞋，步枪型号杂乱，三分之一以上没有枪。", tier: "主流" },
+      { text: "前头两个战区都不肯收；第五战区肯接，还给了枪弹。", tier: "主流" },
+      { text: "顺子的背包底藏着一件民用短褂——他打算借后送伤兵的差事走人。", tier: "虚构" },
       { text: "山东·滕县／1938年3月", tier: "主流" },
     ],
   },
+
+  // 三句只见于通俗读物与网文、未见 1937—38 年文件或当事人同时代记录背书，一律不用。
+  // 注意：何有田那句「我们再撇也比草人强」不在此列 —— 它是策划案 §1 的定稿台词，
+  // 说的是「拿话臊我们」这件事本身，不是把那段轶闻当史实引用。
+  forbiddenLines: ["抗日无力，扰民有余", "土匪部队", "诸葛亮还扎草人当疑兵"],
 };

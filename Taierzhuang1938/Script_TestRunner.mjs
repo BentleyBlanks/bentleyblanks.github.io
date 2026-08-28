@@ -75,6 +75,7 @@ export const testDefs = {
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
+  CarryTest: { file: "Script_CarryTest.mjs", desc: "担架/搬运负重状态机 + 可注册交互框架三手势 + 八个救护预制（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
@@ -175,10 +176,17 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest"],
+      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest",
+      // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
+      // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
+      "CarryTest"],
   },
   ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
   hud: { label: "HUD/交互提示/目标识别", tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest"] },
+  interact: {
+    label: "交互框架/负重（担架·搬运·救护交互点）",
+    tests: ["CarryTest", "HudPromptTest", "HudPromptBrowserTest"],
+  },
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
@@ -199,7 +207,8 @@ export const domains = {
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee|Carry)/i },
+  { domain: "interact", pattern: /(Carry|Interact|Script_Input|Hud|Prompt)/i },
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },

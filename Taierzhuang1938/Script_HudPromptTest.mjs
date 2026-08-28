@@ -3,6 +3,7 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AmmoReadout, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
 import { IdentifySystem, TargetCard, IDENTIFY } from "./Script_Identify.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
 
 const guideText = CONTROL_GUIDE.flatMap((group) => group.rows)
   .map((row) => `${row.keys} ${row.label}`).join("\n");
@@ -63,6 +64,46 @@ const stacked = ContextualActionPrompts({
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage", "switchWeapon"]);
 
 console.log("ok  操作说明与情境 HUD 提示条件通过");
+
+// --- 负重时提示条被接管：只剩「怎么把它放下」 --------------------------------
+// 规则那一侧（状态机本身）在 Script_CarryTest；这里只验 HUD 的读法。
+// 判据现取 CARRY_KINDS 的时长，不抄数（AGENTS 硬规矩 12）。
+const CarryAt = (kindId, opts = {}) => {
+  const carry = new CarrySystem({ Time: () => 0 });
+  const dummy = { Alive: true, yaw: 0, position: { x: 0, y: 0, z: 0 }, carrySpeedScale: 1 };
+  carry.Begin(kindId, opts);
+  if (opts.lifted !== false) {
+    for (let t = 0; t < CARRY_KINDS[kindId].liftS + 0.1; t += 0.05) carry.Update(0.05, dummy);
+  }
+  return carry.View();
+};
+
+// 举起段还没抬稳：那一下按 F 也没用，所以先不给提示。
+assert.deepEqual(ContextualActionPrompts({ carry: CarryAt("ammoCrate", { lifted: false }) }), []);
+// 抬稳之后：空手时会出的那五条（拾枪/包扎/空枪白刃/刺刀/换枪）**一条都不许出现**。
+const hauling = ContextualActionPrompts({
+  carry: CarryAt("ammoCrate"),
+  interaction: { label: "拾起 三八式步枪", kind: "pickup" },
+  bleeding: 0.5, bandages: 2,
+  slots: { primary: "HanYang", secondary: "Mauser96" },
+  bayonet: { fixed: false }, ammoEmpty: true,
+});
+assert.deepEqual(hauling.map((prompt) => prompt.kind), ["carry", "carry"]);
+assert.deepEqual(hauling.map((prompt) => prompt.keys), ["F", "左键"]);
+assert.match(hauling[0].label, /放下/);
+assert.match(hauling[1].label, /扔下/);
+// 担架摔不掉（那是个人，不是麻袋）→ 没有「左键扔下」那一条。
+assert.deepEqual(ContextualActionPrompts({ carry: CarryAt("stretcher") })
+  .map((prompt) => prompt.keys), ["F"]);
+// 第四关抬罗班长「拒绝松手」：一条提示都不给 —— 不许给玩家一个假的出口。
+assert.deepEqual(ContextualActionPrompts({ carry: CarryAt("stretcher", { canDrop: false }) }), []);
+// 空手时一切照旧（老行为的护栏）。
+assert.deepEqual(ContextualActionPrompts({ carry: null }), []);
+assert.deepEqual(ContextualActionPrompts({
+  carry: null, interaction: { label: "拾起 三八式步枪", kind: "pickup" },
+}).map((prompt) => prompt.kind), ["pickup"]);
+
+console.log("ok  负重时提示条只剩放下/扔下，担架不给扔、拒绝松手不给出口");
 
 // --- 动态准心：缝必须是真实散布角的投影，不是手感常数 -----------------------
 // 55° 竖直视场、900 px 视口：半高 450，tan(27.5°) = 0.520567。

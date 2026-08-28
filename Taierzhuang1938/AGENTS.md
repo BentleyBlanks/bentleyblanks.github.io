@@ -303,6 +303,20 @@ URL 参数选 preset / quality / scene / gi。
   `Script_Wheel.mjs` —— 指挥径向轮盘；`Script_DebugOptions.mjs` —— 调试开关唯一真相。
 - 先读：`docs/Data_MainMenu.md`。
 
+### 交互 / 负重（担架·搬运·救护交互点）
+- `Script_Interact.mjs` —— 两层：**内建分支**（拾枪/分弹药，够得着的是活战场对象）＋
+  **可注册交互点框架**（`Register(spec)`，三种手势 tap/hold/confirm、距离与朝向判据、
+  一次性/冷却、优先级）；文件末尾是八个**救护类预制**（止血/递药/查伤员/拆门板/
+  接线/剪线/拾传单/投火/撕短褂/抬起负重），全是纯函数，摆点是章节与集成批的事。
+- `Script_Carry.mjs` —— 负重状态机（`CARRY_KINDS` 一张表：担架/伤员/药箱/弹药箱/
+  门板/铁锅）。三条卸载路径：F 放下、左键扔下、脚本 `ForceRelease`；
+  `canDrop:false` 是「拒绝松手」变体（第四关抬罗班长）。
+  与玩家控制器的接口只有 `player.carrySpeedScale` 一个字段（Player 三处读它：
+  乘进移速、封冲刺、封开镜）；「能不能开枪」在装配层 `TryFire` 读 `carry.Blocking`。
+- 回归口 `Script_CarryTest.mjs`（纯 Node，tier1，domain `interact` ＋ `combat`）；
+  取证口 `Debug.Carry` / `Debug.Interact`。HUD 侧是进度环 `.hudInteractRing`
+  与负重条 `.hudCarry`，武器 UI 禁用态挂在 `#hud.carrying`。
+
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`

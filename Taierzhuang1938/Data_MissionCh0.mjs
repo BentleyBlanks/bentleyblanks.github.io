@@ -18,9 +18,31 @@
 // 车厢本身是过场自带的 standalone 布景（setOrigin 远离城心），底下铺的是哪片
 // 地皮它不关心 —— 这也是能借片的原因。
 //
-// 后续序章内容批要做的是把 CS_Chuchuan 改成新策划案的 ≤45 秒版本＋车厢自由段落，
-// 本文件的流程接线不用动。
+// 2026-08-28 内容批（C0）已把 CS_Chuchuan 重做成策划案 §1 的三阶段版本：
+// 车厢闲谈 → 兵站与第五战区补给 → 顺子的计划 → 收骰子/枪上膛 → 短切黑地点卡。
+// 全长 166.5 s（九镜），其中**固定镜头「必要演出」41.5 s ≤ 45 s**（读家信 30.0 +
+// 列车减速开门 7.0 + 黑场地点卡 4.5）；其余六镜相机钉在顺子的座位上不动，
+// 只给基准视轴，玩家自己转头。本文件的流程接线一个字没动。
 // ---------------------------------------------------------------------------
+//
+// ENGINE_REQUEST: ambientMotion 需要减速段（现在只有 from/axis/speed/stopAt，
+//   到点硬停）。序章「列车减速进兵站」那一刻，窗外近景 7.2 m/s、月台 1.65 m/s
+//   在同一帧归零 —— 用在 CS_Chuchuan 镜 3（阶段 2 的进站）。建议加
+//   `decelSeconds`（到 stopAt 前多少秒开始线性减速）即可，不必做曲线。
+// ENGINE_REQUEST: 切镜时 headLook 幅度需要过渡（例如 shot.headLook.blendIn 秒）。
+//   序章镜 1（自由，yaw ±2.09）切镜 2（固定演出，yaw ±0.70）时，玩家若正把头
+//   转在边缘，视角会被瞬间拽回四十度。用在序章全部「自由段落 → 固定演出」的接缝，
+//   一共四处（镜 1→2、2→3、5→6、6→7）。
+// ENGINE_REQUEST: 过场 sfx 需要 fadeIn/fadeOut（或两条 cue 的 crossfade）。
+//   策划案序章收口写的是「火车声渐变近距离炮声」，现在只能把 trainBrake 与
+//   explosionFar/amb.cannonFar 前后叠着放，听感是「切」不是「渐变」。用在镜 9。
+//
+// INTEGRATION: Script_VoiceTest.mjs 的三条序章断言钉在**旧** CS_Chuchuan 上
+//   （`dialogueCount === 18`、shot.n===6 的八句动员、PROLOGUE_EXPECTED 那 11 个
+//   prologue_* cue）。新序章是 31 句 / 六镜有台词 / 全部走 ch0_* 章节语音通道，
+//   那三条必然翻红；Data_Voice.mjs 里 11 条 prologue_* 行也随之成为孤儿（资产还在，
+//   没人再引用）。两处都不在 C0 的文件所有权内（§10.4：Script_VoiceTest 归 F2、
+//   Tier0 测试口径归 F1），留给集成批统一改口径。
 //
 // 兵员池曲线（全七章，逐章递减，登记在 Data_TengxianScript.PRESUMED_STAGING）：
 //   序章 240→240（**不耗**）→ 一 240→208 → 二 208→168 → 三 168→140
@@ -48,7 +70,7 @@ export const CHAPTER = {
   objectives: [
     "在车厢里等命令",
     "透过车门看兵站补给",
-    "下车 —— 前头是滕县",
+    "枪上膛 —— 前头是滕县",
   ],
   zones: [
     // 三个路标只当 HUD 去向与 LOD 焦点用（本章不建切片、不走路），坐标取 CH1 那片
@@ -77,14 +99,19 @@ export const CHAPTER = {
     },
   },
   // 骨架级 beats：title 卡 + 三条阶段提示 + 关末一条。
-  // **完整台词由序章内容批填**（§1 的空间语音、兵站军官、顺子与幺娃那段计划）。
+  //
+  // **本章的对白一句都不在 beats 里**，全部在过场 CS_Chuchuan 的 shots[].lines 上
+  // （§1 那三十一句：空间语音五句、读家信与四句对话、兵站军官三句、何有田与罗班长
+  // 四句、顺子与幺娃七句、口令四句）。cutsceneOnly 章的 beats 不承担对白 ——
+  // 进章即播过场、播完自动 AdvanceLevel，这几条 beat 只是过场之后那一两秒的兜底，
+  // 所以也不配 voice（voice 是给 line/shout 型 beat 用的，见契约 §10.3）。
   // 触发式只用 start/delay —— 本章不走路，zone: 永远等不到。
   beats: [
     { at: "start", type: "title", text: "出川", sub: "一九三八年三月　军列南下", tier: "主流" },
     { at: "delay:4.0", type: "objective", text: "在车厢里等命令" },
     { at: "delay:6.0", type: "objective", text: "透过车门看兵站补给" },
-    { at: "delay:6.0", type: "objective", text: "下车 —— 前头是滕县" },
-    { at: "end", type: "narration", text: "山东 · 滕县。一九三八年三月。", tier: "主流" },
+    { at: "delay:6.0", type: "objective", text: "枪上膛 —— 前头是滕县" },
+    { at: "end", type: "narration", text: "军列到站。前头是滕县。", tier: "主流" },
   ],
   cutsceneIn: "CS_Chuchuan",
   cutsceneOut: null,
@@ -96,5 +123,71 @@ export const CHAPTER = {
   },
 };
 
-// 本章新增台词语音行（结构同 Data_Voice.mjs 现有行；key 形如 ch0_shunzi_01）。
-export const VOICE_LINES = [];
+// ---------------------------------------------------------------------------
+// 本章台词语音行（结构见 docs/Data_AudioAssets.md「章节剧情语音」）。
+//
+// 与过场 CS_Chuchuan 的 shots[].lines 是**一一对应**的：那边每一句写 voiceCue，
+// 这边写行本体。key 形如 ch0_<who>_<两位序号>，序号按**每个人自己的出场顺序**排，
+// 不是全章流水号 —— 序号乱了不会报错，只会让后面补录的人对不上是哪一句。
+// 文件名不写：Data_Voice.Normalize 会按 key 推成 vo_ch0_xxx_NN.mp3（手写必错）。
+// dur: 0 是必须留的占位，烘焙完由 Script_VoiceBake 把实测时长写回这一行。
+//
+// delivery 四档的分配口径（§10.3 + Data_Voice.VOICE_DELIVERY_MIX）：
+//   · shout —— 罗班长隔着一节车厢喊的（骂切腊肉的、喝令放回、三句下车口令），
+//     以及兵站军官对着一车人训话那句。**「你还笑？／人家拿话臊你」不是喊**：
+//     那是他走回来站在何有田面前说的，喊出来就变成训斥，味道全丢。
+//   · whisper —— 顺子跟幺娃咬耳朵那一整段（含幺娃的两句回话）、何有田那句「小声」
+//     的牢骚，以及顺子最后那句「老子没打算死在山东」。耳语档要比常态**轻 6 dB**，
+//     玩家是靠音量差听出「这话不能让班长听见」的。
+//   · normal —— 其余。读家信那四句尤其不许抬：那是两个人凑在一起说的话。
+//   · weak —— 序章一句都没有（没人负伤）。
+// ---------------------------------------------------------------------------
+export const VOICE_LINES = [
+  // ── 镜 1｜车厢闲谈：赌骰子与切腊肉（§1 阶段 1 的空间语音）──────────────────
+  { key: "ch0_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 0, text: "哪个拿老子的子弹押骰子了？" },
+  { key: "ch0_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 0, text: "你那几颗烂子弹值个锤子。" },
+  { key: "ch0_luo_01", who: "luo", delivery: "shout", dur: 0, text: "哪个龟儿子拿刺刀切腊肉？" },
+  { key: "ch0_yaowa_01", who: "yaowa", delivery: "normal", dur: 0, text: "擦干净就是了嘛。" },
+  { key: "ch0_luo_02", who: "luo", delivery: "shout", dur: 0, text: "等哈捅鬼子，先给人家抹盐嗦？" },
+
+  // ── 镜 2｜读家信＋四句对话（过场规格 1、2）──────────────────────────────
+  // 前两句是顺子替罗班长念信上的字（班长不识字），所以是**念**不是说 ——
+  // 提示词里给「照着纸念、断句偏平」的口气，不要演。
+  { key: "ch0_shunzi_01", who: "shunzi", delivery: "normal", dur: 0, text: "……春妹会喊爹了。" },
+  { key: "ch0_shunzi_02", who: "shunzi", delivery: "normal", dur: 0, text: "娘的眼睛越发不好，穿针都要人帮。" },
+  { key: "ch0_shunzi_03", who: "shunzi", delivery: "normal", dur: 0, text: "屋头恁多事等你，还跑出来打啥子仗？" },
+  { key: "ch0_luo_03", who: "luo", delivery: "normal", dur: 0, text: "不打，人家早晚打到屋门口。" },
+  { key: "ch0_shunzi_04", who: "shunzi", delivery: "normal", dur: 0, text: "山东离屋门口还远得很。" },
+  { key: "ch0_luo_04", who: "luo", delivery: "normal", dur: 0, text: "南京以前也觉得远。" },
+
+  // ── 镜 4｜兵站与第五战区补给（§1 阶段 2）────────────────────────────────
+  { key: "ch0_luo_05", who: "luo", delivery: "shout", dur: 0, text: "放回去！莫拿老百姓的东西！" },
+  { key: "ch0_junguan_01", who: "junguan", delivery: "normal", dur: 0, text: "前头两个战区都不肯收我们。" },
+  { key: "ch0_junguan_02", who: "junguan", delivery: "normal", dur: 0, text: "第五战区肯接，还给了枪弹。" },
+  { key: "ch0_junguan_03", who: "junguan", delivery: "shout", dur: 0, text: "到了前头，哪个再乱拿老百姓东西，老子先收拾哪个！" },
+
+  // ── 镜 5｜何有田小声＋罗班长三句 ──────────────────────────────────────
+  { key: "ch0_heyoutian_02", who: "heyoutian", delivery: "whisper", dur: 0, text: "听说李长官讲，我们再撇也比草人强。" },
+  { key: "ch0_luo_06", who: "luo", delivery: "normal", dur: 0, text: "你还笑？" },
+  { key: "ch0_luo_07", who: "luo", delivery: "normal", dur: 0, text: "人家拿话臊你。" },
+  { key: "ch0_luo_08", who: "luo", delivery: "normal", dur: 0, text: "枪发到你手头，就打个兵样出来。" },
+
+  // ── 镜 7｜顺子的计划（§1 阶段 3，全段耳语）──────────────────────────────
+  { key: "ch0_shunzi_05", who: "shunzi", delivery: "whisper", dur: 0, text: "前头若喊送伤兵，老子就去。" },
+  { key: "ch0_shunzi_06", who: "shunzi", delivery: "whisper", dur: 0, text: "送到临城，找个地方把衣裳一换。" },
+  { key: "ch0_shunzi_07", who: "shunzi", delivery: "whisper", dur: 0, text: "枪一丢，哪个认得到我？" },
+  { key: "ch0_yaowa_02", who: "yaowa", delivery: "whisper", dur: 0, text: "那不就是逃兵？" },
+  { key: "ch0_shunzi_08", who: "shunzi", delivery: "whisper", dur: 0, text: "我是遭抓来的，又不是自己来送命的。" },
+  { key: "ch0_yaowa_03", who: "yaowa", delivery: "whisper", dur: 0, text: "罗班长晓得不？" },
+  { key: "ch0_shunzi_09", who: "shunzi", delivery: "whisper", dur: 0, text: "你敢说，老子先把你丢下车。" },
+
+  // ── 镜 8｜远处炮声与口令 ──────────────────────────────────────────────
+  // 顺子三句弧线的第一句（§6）：序章「老子没打算死在山东」→ 一关「老子不松，
+  // 一起死」→ 五关「老子今天不走了」。三句必须是同一个人同一种硬气，
+  // 所以这一句仍走耳语档（说给幺娃听的），不是宣言。
+  { key: "ch0_shunzi_10", who: "shunzi", delivery: "whisper", dur: 0, text: "老子没打算死在山东。" },
+  { key: "ch0_luo_09", who: "luo", delivery: "shout", dur: 0, text: "收骰子！" },
+  { key: "ch0_luo_10", who: "luo", delivery: "shout", dur: 0, text: "枪上膛！" },
+  { key: "ch0_luo_11", who: "luo", delivery: "shout", dur: 0, text: "下车以后莫给老子跑散了！" },
+  { key: "ch0_junguan_04", who: "junguan", delivery: "shout", dur: 0, text: "下车！按班站好！" },
+];

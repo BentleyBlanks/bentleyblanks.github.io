@@ -47,6 +47,7 @@ import { InputRouter } from "./Script_Input.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
+import { CarrySystem } from "./Script_Carry.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
@@ -476,6 +477,10 @@ let story = null;
 let combat = null;
 let destruction = null;
 let interact = null;
+// 负重状态机（担架/药箱/门板…）。规则在 Script_Carry，这里只接线。
+let carry = null;
+/** 上一帧枪收没收（负重的边沿）；别每帧写 visible，会跟过场那一处抢。 */
+let carryHidGun = false;
 let identify = null;
 let cutscene = null;
 // 天空机群是纯视觉层：它跨关复用模型，换关时只更新航线中心。
@@ -940,6 +945,10 @@ async function Boot() {
       ReleasePointerLock();
       input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
       input.lookX = 0; input.lookY = 0; input.sprint = false; input.breathHold = false;
+      // 按住 F 的那一下断在这儿。过场期间输入被 SetSuppressed 掐掉，松手边沿永远到不了 ——
+      // 不主动断的话，进度环会一直亮着「按住中」挂在过场画面上。
+      interact?.CancelHold("cutscene");
+      hud?.SetInteractProgress(null);
       // 玩家手里的枪挂在相机下：不藏的话每一镜右下角都趴着一支带刺刀的步枪，
       // 五个分镜 agent 全靠把 look 点推到 45 m 外抬高近平面来切它 —— 这里一行就够。
       if (viewmodel && viewmodel.root) viewmodel.root.visible = false;
@@ -947,7 +956,8 @@ async function Boot() {
     onRelease: () => {
       state.cutscene = null;
       router?.SetSuppressed(false);
-      if (viewmodel && viewmodel.root) viewmodel.root.visible = true;
+      // 过场里抬着东西的话（第一关接替担架那一段就是），枪该继续收着。
+      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
       if (state.running && !state.menu) RequestPointerLock();
     },
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
@@ -977,6 +987,15 @@ async function Boot() {
       state.clips -= 1;
       return true;
     },
+  });
+
+  // 负重（担架 / 药箱 / 弹药箱 / 门板 / 铁锅 / 伤员）。规则与数值全在 Script_Carry；
+  // 装配层只给它四个窄回调，并在 Frame 里按顺序推它（必须排在 player.Update 之前）。
+  carry = new CarrySystem({
+    Play: (name, opts) => audio.Play(name, opts),
+    Hint: (text, seconds) => hud.Hint(text, seconds),
+    Say: (who, text, seconds) => hud.Say(who, text, seconds),
+    Time: () => state.elapsed,
   });
 
   // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
@@ -1014,7 +1033,7 @@ async function Boot() {
     renderer, scene, camera, post, sky, lights, library, profiler, get gi() { return gi; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeQte() { return meleeQte; },
-    story, combat, destruction, interact, wheel,
+    story, combat, destruction, interact, carry, wheel,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
     graphics, ApplyGraphics,
@@ -1107,14 +1126,38 @@ async function Boot() {
         open: state.ordersOpen, index: wheel.index, label: wheel.Label,
         cursor: { x: wheel.cursorX, y: wheel.cursorY }, order: state.order,
       }),
-      // 交互：够得着什么、捡过几次、分过几次弹
+      // 交互：够得着什么、捡过几次、分过几次弹、注册了哪些交互点
       Interact: () => {
         const c = interact.Query(player);
         return {
           kind: c ? c.kind : null, label: c ? c.label : null,
+          gesture: c ? c.gesture : null,
           pickups: interact.pickups, handouts: interact.handouts,
           pickedUp: state.pickedUp, pickedUpVariant: state.pickedUpVariant ?? 0, weapon: currentWeapon,
+          ...interact.State(),
         };
+      },
+      /**
+       * 负重取证口。摆点是集成批的事，这里给的是**驱动 + 取证**：
+       *   Debug.Carry.Begin("stretcher", { canDrop:false })  直接抬起来（跳过交互点）
+       *   Debug.Carry.Force("dive")                          脚本强行松手（第一关扑入路沟）
+       *   Debug.Carry.State()                                规则层 + HUD 两侧一起取
+       * `speedScale` 读的是**玩家身上那个字段**，不是表里的数 ——
+       * 「规则算出来了但没写进玩家」正是这一类接线最容易漏的一环。
+       */
+      Carry: {
+        Begin: (kindId, opts) => carry.Begin(kindId, opts),
+        Drop: (reason) => carry.Drop(reason),
+        Throw: (reason) => carry.Throw(reason),
+        Force: (reason) => carry.ForceRelease(reason),
+        Reset: (reason) => carry.Reset(reason),
+        Anchor: () => carry.PartnerAnchor(player),
+        State: () => ({
+          ...carry.State(),
+          playerSpeedScale: player.carrySpeedScale,
+          gunVisible: !!viewmodel?.root?.visible,
+          hud: hud.CarryState(),
+        }),
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
       /**
@@ -1829,6 +1872,13 @@ function DustBox(phase) {
 function ClearRuntime() {
   meleeQte?.Cancel("levelChange");
   hud?.SetMeleeQte(null);
+  // 负重与交互点都是**按关摆的**：不清的话上一关抬着的担架会跟到下一关，
+  // 上一关的交互点会在新切片的同一坐标上悄悄复活。
+  carry?.Reset("levelChange");
+  interact?.Clear();
+  carryHidGun = false;
+  hud?.SetCarry(null);
+  hud?.SetInteractProgress(null);
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
   if (ai) ai.Dispose();
@@ -2414,6 +2464,9 @@ function FindOpenSpot(cx, cz, radius, seed, limits = null) {
  */
 function RespawnPlayer(initial = false) {
   const phase = PHASE_TABLE[state.phaseIndex];
+  // 换人上来的是空手的：上一个人抬着的担架留在他倒下的地方，不跟着换的人走。
+  carry?.Reset("respawn");
+  carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
   state.identity = MakeSoldierIdentity(seed);
   currentWeapon = state.identity.weapon;
@@ -2881,6 +2934,9 @@ function OpenMenu() {
   // 「暂停 -> 回主菜单」这条路要显式解一次暂停，不解的话菜单是哑的。
   audio.SetPaused(false);
   hudRoot.style.display = "none";
+  // 同过场：菜单里松手边沿到不了玩法层，按住中的那一下要在这里断掉。
+  interact?.CancelHold("menu");
+  hud?.SetInteractProgress(null);
   if (viewmodel) viewmodel.root.visible = false;
   ShowBoot(false);
   if (ai) ai.Dispose();
@@ -2895,7 +2951,8 @@ function CloseMenu() {
   menu.Close();
   state.menu = false;
   hudRoot.style.display = "";
-  if (viewmodel) viewmodel.root.visible = true;
+  // 回到战场时手上还占着东西的话，枪继续收着（负重的边沿不会重放一次）。
+  if (viewmodel) viewmodel.root.visible = !carry?.Blocking;
   if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
 }
 
@@ -3123,8 +3180,14 @@ const router = new InputRouter({
       case "bandage":
         if (player?.Bandage()) audio.Play("stripperLoad", { volume: 0.6 });
         return;
+      // F 现在是 holdAction（按住型救护交互要松手边沿，见 Script_Input 那条注释）。
+      // 松手只做一件事：把按住中的进度交还给 InteractSystem（hold 型慢慢退、
+      // confirm 型立刻清零）。按下那一侧的分流顺序与改之前完全一样。
       case "interact":
+        if (detail.down === false) { interact?.Release(); return; }
         if (meleeQte?.TryBeginExecution()) return;
+        // 手上占着东西时，F 的语义就只剩「放下」——不再去查地上有没有枪可捡。
+        if (carry?.Active) { carry.Drop("player"); return; }
         DoInteract(); return;
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
@@ -3374,7 +3437,8 @@ function DoTraverse() {
  */
 function DoInteract() {
   if (!player?.Alive || !interact) return false;
-  return !!interact.Perform(player);
+  // Press：点按型当场做完，按住型开始读条（进度由 interact.Update 每帧推）。
+  return !!interact.Press(player);
 }
 
 /**
@@ -3389,6 +3453,8 @@ function UpdateContextualActionPrompts() {
   const interaction = interact?.Query(player) || null;
   const gunInHand = state.activeSlot === "primary" || state.activeSlot === "secondary";
   const prompts = ContextualActionPrompts({
+    // 抬着东西时这一条会把提示条整段接管（只剩「放下 / 扔下」），见 ContextualActionPrompts。
+    carry: carry?.View() || null,
     interaction,
     bleeding: player.bleeding,
     bandages: player.bandages,
@@ -3397,7 +3463,9 @@ function UpdateContextualActionPrompts() {
       ? { fixed: state.bayonetFixed } : null,
     ammoEmpty: gunInHand && state.ammo <= 0 && !!WEAPONS[currentWeapon]?.magazine,
   });
-  if (meleeQte?.ExecutionCandidate()) {
+  // 抬着东西的时候提示条已经被负重接管（只剩放下/扔下），别再往前面插一条处决 ——
+  // 那一下 F 的实际结果是「放下担架」，提示与因果就分叉了。
+  if (!carry?.Active && meleeQte?.ExecutionCandidate()) {
     prompts.unshift({ keys: "F", label: "踹开处决", kind: "execution" });
   }
   hud.SetActionPrompts(prompts);
@@ -3661,6 +3729,10 @@ function ConfirmHit(died) {
 function TryFire(dt) {
   fireCooldown -= dt;
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
+  // 手上占着东西：左键不是开枪，是**把它摔了**（「可扔下快速恢复」那一条）。
+  // 挨打的时候玩家去够的键本来就是左键，不该让他先想起来 F 在哪。
+  // 担架 canThrow:false —— 那是个人，不是麻袋，摔不掉，左键就什么也不做。
+  if (carry?.Blocking) { if (fireEdge) carry.Throw("fire"); return; }
   if (viewmodel.IsBusy?.()) return;
   // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
@@ -4007,9 +4079,22 @@ function Frame(dt, render = true) {
   }
   fireEdge = input.fire && !firePrev;
   profiler.E("input");
+  // 负重必须排在 player.Update **之前**：它写的 carrySpeedScale 就是这一帧
+  // 玩家要用的那个乘数，写晚一帧就会出现「刚抬起来还能冲刺一步」。
+  carry?.Update(dt, player);
   profiler.B("player");
   player.Update(dt, input, WEAPONS[currentWeapon]);
   profiler.E("player");
+  // 按住型交互反过来要排在 player.Update **之后**：够不够得着要用这一帧的位置，
+  // 玩家走开一步进度就该断，而不是在后台接着读条。
+  interact?.Update(dt, player);
+  // 负重时收枪（两只手都占着）。**只在边沿写 visible**：过场、菜单、倒地镜头
+  // 三处也在切同一个字段，每帧写会互相盖掉。三者当下正管着枪时这里一律不插手 ——
+  // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
+  if (viewmodel?.root && carryHidGun !== !!carry?.Blocking) {
+    carryHidGun = !!carry?.Blocking;
+    if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
+  }
   input.lookX = 0; input.lookY = 0;
   input.crouchPressed = false; input.pronePressed = false;
 
@@ -4267,8 +4352,9 @@ function Frame(dt, render = true) {
   const firearm = Number(weapon?.spreadHipDeg) > 0;
   const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
   hud.SetCrosshair({
+    // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
-      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active,
+      && !state.ordersOpen && !state.cutscene && !meleeQte?.Active && !carry?.Blocking,
     spreadDeg,
     fovDeg: camera.fov,
     viewportHeight: window.innerHeight,
@@ -4290,6 +4376,9 @@ function Frame(dt, render = true) {
   }));
   hud.SetSuppression(player.suppression);
   hud.SetMeleeQte(meleeQte?.View() || null);
+  // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
+  hud.SetInteractProgress(interact?.View() || null);
+  hud.SetCarry(carry?.View() || null);
   // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
   // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
   // 满血挨一发三八式（当时 39.6 点）之后暗角只有 0.088 × 边缘 0.52 ≈ 看不见，

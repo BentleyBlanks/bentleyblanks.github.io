@@ -105,6 +105,15 @@ export class PlayerController {
     this.bipod = false;
     this.fastCrawl = false;                     // 卧姿按住 Shift：更快也更响
 
+    /**
+     * 负重乘数。1 = 空手；抬着担架/药箱/门板时由 `Script_Carry` 每帧写进来。
+     *
+     * **移动的账只有这一本**：负重不自己算一套速度，只往这条乘法链上加一个数。
+     * 三处读它 —— 乘进移速、封掉冲刺、封掉开镜（两只手都占着，枪端不起来）。
+     * 「能不能开枪」不在这里判，那条在装配层的 TryFire 里读 `carry.Blocking`。
+     */
+    this.carrySpeedScale = 1;
+
     // --- 翻越 / 攀爬 ---------------------------------------------------------
     // 这座城是一进一进的四合院，院墙 2 m、窗台 0.9 m，而自动抬腿只到 stepMax ——
     // 也就是说在这一批之前，所有院墙、所有窗台都是死墙，玩家只能走门洞。
@@ -597,7 +606,9 @@ export class PlayerController {
     // ER2 的规矩：架式武器不架起两脚架就不许开镜（MG42/白朗宁/反坦克枪都是）。
     // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
     const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod;
-    const wantAds = input.ads && !bipodBlocked && this.grounded ? 1 : 0;
+    // 抬着东西时枪根本不在手上（视图模型也收了），开镜与冲刺一并封掉。
+    const loaded = this.carrySpeedScale < 1;
+    const wantAds = input.ads && !bipodBlocked && this.grounded && !loaded ? 1 : 0;
     // 存下来给相机用。相机侧的 FOV 过渡（固定 150 ms）要跟玩家读同一个"意图"，
     // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
     this.wantAds = wantAds === 1;
@@ -608,7 +619,7 @@ export class PlayerController {
     // 只把速度从 0.72 提到 1.25，并把脚步声放大 —— 快就得响，这是一对取舍。
     this.fastCrawl = !!input.sprint && this.stance === "prone" && this.stamina > 0.05;
     const canSprint = input.sprint && this.stamina > 0.05 && this.ads < 0.25
-      && this.stance === "stand" && input.forward > 0.3;
+      && this.stance === "stand" && input.forward > 0.3 && !loaded;
     this.sprint += ((canSprint ? 1 : 0) - this.sprint) * (1 - Math.exp(-dt * 6));
     // 冲刺时长挂难度：staminaSeconds 就是"从满到空能跑几秒"。
     const burn = 1 / Math.max(1, DIFFICULTY.staminaSeconds);
@@ -644,6 +655,8 @@ export class PlayerController {
     // 腿部中弹会拖着走
     speed *= this.LegPenalty();
     speed *= Clamp(this.health / 60, 0.45, 1);
+    // 负重（担架 / 弹药箱 / 门板…各自一档，数在 Script_Carry.CARRY_KINDS）
+    speed *= Clamp(this.carrySpeedScale, 0.05, 1);
     if (this.debug.fastMove) speed *= 3;
 
     const forward = this._forward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));

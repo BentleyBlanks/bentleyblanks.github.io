@@ -11,6 +11,69 @@
 // bounds / spawn 沿用旧 L2：spawn 在东门大街清路中央（x=446），2026-08-27 那次
 // 「开局贴着院墙满屏是砖」的事故就是在这条线上修的，别再往东挪。
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// 演出取舍（§3「过场动画」那一条的落地）
+//
+// **本关不设传统开场动画**，五个阶段全部是可控战斗，核心演出嵌在里面：
+//   · 压枪口「莫打。／再近点。／稳到！」→「甩！」——罗班长四句用 whisper→shout
+//     的递进走 delivery 档（ch2_luo_01..04），玩家一直握着枪，镜头不接管；
+//   · 白刃战前只有一句口令（「上刺刀！」「认到人再下手！」），没有慢镜没有特写；
+//   · 战后何有田墙角呕吐、幺娃「杀鸡」话头落空，也全在玩家能自由转视角的时候发生；
+//   · 撤到后街之后的**清点**（罗班长连喊两个名字无人应 → 何有田抱铁锅出来）
+//     同样是 beats，不是过场 —— 让玩家站在人堆里听那两声没人答应的点名。
+// 关末只留一镜黑场收束（CS_Ch2_AfterBayonet，9 s）：旧阵地在炮击里塌掉、
+// 班还在、名字少了两个。**不做**日军受挫的胜利镜头，不把局部击退包装成守住东关。
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// EVENTS —— 本章 beats 用到的事件名（`at: "event:*"`）
+//
+//   BayonetDone   第一次白刃战打完（缺口内日军被清空）。用来接呕吐/「莫说了」那一组。
+//                 **Script_Story.LEVEL_CUES 里目前没有 CH2_Shouliudan 表**，所以它
+//                 现在只能靠 MAX_WAIT.event = 80 s 兜底：能播，但会晚。补法见下面
+//                 ENGINE_REQUEST 4。
+//
+// 其余四个阶段一律挂在本章自己的 zones 上（zone:C2_*），不依赖任何未实现的信号。
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// ENGINE_REQUEST —— 本章需要的引擎能力（契约 §10.4：内容批只登记，集成批统一实现）
+//
+// 1. grenadeRain（集中投弹 → 手榴弹雨）
+//    要的是「玩家与背景守军**同时**投」。现在背景守军没有听导演口令齐投的接口，
+//    玩家一个人甩出去只会是三颗手榴弹，不是史料里那场雨。
+//    建议：规则层在罗班长「甩！」那一拍（beat.voice === "ch2_luo_04"，或装配层自己
+//    Signal("GrenadeVolley")）对 C2_Ditch 半径内的友军 AI 下一次 throwAt，
+//    起手同帧、落点在 0.3—0.8 s 内错开；投出去的弹与玩家的走同一套弹道与伤害。
+//    数量口径见 brief：集中六七十人、连续二三百枚。
+//
+// 2. crateHauling（拖弹箱 / 受潮弹 / 拖走将被引爆的箱子）
+//    弹药箱要成为可交互实体，三个状态：
+//      ① 拖动：进搬运态（移速 ≈0.55、不能开枪、可主动放下），与第一关担架搬运
+//         共用同一条输入闸最省事；
+//      ② 受潮弹单独码：拖到指定点算完成，混进好弹堆里要有一次失败反馈；
+//      ③ 将被引爆：掷弹筒命中后冒烟倒计时 4—6 s，拖出 6 m 算救下，否则连锁殉爆。
+//    现在 mechanics.crateHauling 只有旗标没有实现，第一、第三阶段的玩家动作全落空。
+//
+// 3. 白刃 QTE 接入（引擎已有，缺的是正片触发点）
+//    模块：Script_MeleeQte.MeleeQteDirector（BeginBlock / TryBeginExecution，
+//    三套格挡 + 三套处决在 Data_MeleeQte.MELEE_BLOCK_PATTERNS / MELEE_EXECUTION_PATTERNS）。
+//    正片接入方式：
+//      · 触发点＝本章 zone:C2_BackStreet 的坍塌缺口段。日军进入 MELEE_QTE.blockReachM
+//        (2.15 m) 且面朝玩家时由 AI 调 director.BeginBlock(attacker)；玩家反打走
+//        TryBeginExecution（F），与训练场同一套输入与判定，不另写一份。
+//      · 这是全作**第一次**白刃战：第一次 BeginBlock 前 HUD 要给一次按键提示
+//        （之后不再提示）。
+//      · 该段禁用训练场的 trainingResetS 自动复位（正片没有木桩，复位会把敌人变回站桩）。
+//      · 缺口内日军清空时 story.Signal("BayonetDone")（见 ENGINE_REQUEST 4）。
+//
+// 4. LEVEL_CUES 缺 CH2_Shouliudan 表
+//    请集成批在 Script_Story.LEVEL_CUES 加一条，给 BayonetDone 一个时刻兜底：
+//      CH2_Shouliudan: { BayonetDone: (c) => c.objectiveIndex >= 4
+//                          || c.levelTime > c.levelSeconds * 0.72 }
+//    没有它的话，呕吐那一组要等 80 s 才播，后面整条链跟着往后拖。
+// ---------------------------------------------------------------------------
 
 export const CHAPTER = {
   id: "CH2_Shouliudan",
@@ -59,23 +122,139 @@ export const CHAPTER = {
       note: "随身六枚；这一关的手榴弹从弹药箱里源源不断地拿（见 mechanics.grenadeRain）。",
     },
   },
+  // beats 的排法：**一个阶段一簇**，簇内所有条写同一个 at ——
+  // Script_Story 的 sameAsPrev 会让同 at 的后续条只等 0.25 s（仍受 MIN_GAP 2 s 与
+  // 语音占麦的约束），这正是「这几句一起来」的意思。第一条负责等条件，
+  // 后面的跟着它走，不用每条各等一遍 95 s 的兜底。
   beats: [
+    // ── 阶段一｜炮火中布置手榴弹 ────────────────────────────────────────
     { at: "start", type: "title", text: "手榴弹雨", sub: "一九三八年三月十六日 十时三十分　东关", tier: "主流" },
-    { at: "delay:3.0", type: "objective", text: "把弹药箱拖到投掷点，分散摆开" },
+    { at: "delay:2.5", type: "objective", text: "把弹药箱拖到投掷点，分散摆开" },
+    { at: "delay:2.5", type: "env", text: "炮弹一直在外壕那边落。碎瓦掉在肩上，没有人抬头。" },
+
+    { at: "zone:C2_ZhaiGate", type: "env", text: "弹药箱一口一口往投掷点拖。拖过去分开摆，不敢堆到一处。" },
+    { at: "zone:C2_ZhaiGate", type: "shout", who: "zhaodegui", voice: "ch2_zhaodegui_01", text: "莫拿刺刀撬箱子！", tier: "虚构" },
+    { at: "zone:C2_ZhaiGate", type: "line", who: "yaowa", voice: "ch2_yaowa_01", text: "不用刺刀啷个开？", tier: "虚构" },
+    { at: "zone:C2_ZhaiGate", type: "line", who: "zhaodegui", voice: "ch2_zhaodegui_02", text: "你脑壳是摆设嗦？", tier: "虚构" },
+    { at: "zone:C2_ZhaiGate", type: "line", who: "liuwencai", voice: "ch2_liuwencai_01", text: "哪个龟儿子又拿走两颗？", tier: "虚构" },
+    { at: "zone:C2_ZhaiGate", type: "line", who: "heyoutian", voice: "ch2_heyoutian_01", text: "拿去试受潮没得。", tier: "虚构" },
+    { at: "zone:C2_ZhaiGate", type: "line", who: "liuwencai", voice: "ch2_liuwencai_02", text: "你拿嘴试！", tier: "虚构" },
+    // 功能口令（策划案给了动作没给字）：受潮弹单独放，是 crateHauling 的第二个状态。
+    { at: "zone:C2_ZhaiGate", type: "shout", who: "zhaodegui", voice: "ch2_zhaodegui_03", text: "受潮的单独码一边！", tier: "虚构" },
+
+    // 心理残留：飞机不攻击也照骂。一关日机扫射之后留下来的东西。
+    { at: "delay:9", type: "env", text: "天上又有飞机的声音，顺着城墙往南去。" },
+    { at: "delay:9", type: "shout", who: "yaowa", voice: "ch2_yaowa_02", text: "妈卖批，又来了？", tier: "虚构" },
+    { at: "delay:9", type: "env", text: "飞机没有下来。也没有人笑他。" },
+
+    // ── 阶段二｜集中投弹 ────────────────────────────────────────────────
     { at: "zone:C2_Ditch", type: "objective", text: "压住枪口，等他们进外壕再甩" },
+    { at: "zone:C2_Ditch", type: "env", text: "外壕对面的坡上开始有人往下滑。一个，接着一片。" },
+    // whisper → whisper → normal → shout：四句是一条递进，delivery 见 VOICE_LINES。
+    { at: "zone:C2_Ditch", type: "line", who: "luo", voice: "ch2_luo_01", text: "莫打。", tier: "虚构" },
+    { at: "zone:C2_Ditch", type: "line", who: "luo", voice: "ch2_luo_02", text: "再近点。", tier: "虚构" },
+    { at: "zone:C2_Ditch", type: "line", who: "luo", voice: "ch2_luo_03", text: "稳到！", tier: "虚构" },
+    { at: "zone:C2_Ditch", type: "shout", who: "luo", voice: "ch2_luo_04", text: "甩！", tier: "虚构" },
+    { at: "zone:C2_Ditch", type: "env", text: "六七十个人一起甩。外壕里连着炸了半分钟，二三百枚。", tier: "主流" },
+
+    // ── 阶段三｜敌军调整战术 ────────────────────────────────────────────
     { at: "zone:C2_Courtyard", type: "objective", text: "拖走要被引爆的弹药箱，清侧翼" },
+    { at: "zone:C2_Courtyard", type: "env", text: "他们换了打法：重机枪压住墙头，掷弹筒专找弹药箱。" },
+    // 交流变短：只剩方向、名词、动作。
+    { at: "zone:C2_Courtyard", type: "shout", who: "yaowa", voice: "ch2_yaowa_03", text: "右边！", tier: "虚构" },
+    { at: "zone:C2_Courtyard", type: "shout", who: "zhaodegui", voice: "ch2_zhaodegui_04", text: "箱子拖开！", tier: "虚构" },
+    { at: "zone:C2_Courtyard", type: "shout", who: "liuwencai", voice: "ch2_liuwencai_03", text: "掷弹筒！", tier: "虚构" },
+    { at: "zone:C2_Courtyard", type: "shout", who: "luo", voice: "ch2_luo_05", text: "趴下！", tier: "虚构" },
+    { at: "zone:C2_Courtyard", type: "env", text: "工兵在壕上铺木板。第三块已经搭过来了。" },
+
+    // ── 阶段四｜第一次白刃战 ────────────────────────────────────────────
     { at: "zone:C2_BackStreet", type: "objective", text: "上刺刀 —— 后街街垒的缺口" },
+    { at: "zone:C2_BackStreet", type: "env", text: "寨墙塌了一段。人从缺口里翻进来，隔着一个院子。" },
+    { at: "zone:C2_BackStreet", type: "shout", who: "luo", voice: "ch2_luo_06", text: "上刺刀！", tier: "虚构" },
+    { at: "zone:C2_BackStreet", type: "shout", who: "luo", voice: "ch2_luo_07", text: "认到人再下手！", tier: "虚构" },
+
+    // 战后：吹牛的那个人吐了。玩笑第一次接不下去（§0 全队情绪·二关）。
+    { at: "event:BayonetDone", type: "env", text: "何有田在墙角吐了。吐完扶着墙，半天没起来。" },
+    { at: "event:BayonetDone", type: "line", who: "yaowa", voice: "ch2_yaowa_04", text: "你不是说杀鬼子跟杀鸡一样？", tier: "虚构" },
+    { at: "event:BayonetDone", type: "line", who: "heyoutian", voice: "ch2_heyoutian_02", text: "莫说了。", tier: "虚构" },
+    { at: "event:BayonetDone", type: "env", text: "他擦了嘴。这回没有人接下去。" },
+
+    // ── 阶段五｜交替换防 ────────────────────────────────────────────────
     { at: "zone:C2_Temple", type: "objective", text: "交替换防，退守寺院地" },
+    { at: "zone:C2_Temple", type: "shout", who: "luo", voice: "ch2_luo_08", text: "第一组先撤！我们压到起！", tier: "虚构" },
+    // 功能口令：拆枪机 —— 带不走的枪不能留给对面（策划案阶段五的动作，没给字）。
+    { at: "zone:C2_Temple", type: "shout", who: "liuwencai", voice: "ch2_liuwencai_04", text: "枪机我拆了！带不走！", tier: "虚构" },
+    { at: "zone:C2_Temple", type: "shout", who: "zhaodegui", voice: "ch2_zhaodegui_05", text: "手榴弹先转过去！", tier: "虚构" },
+    { at: "zone:C2_Temple", type: "shout", who: "luo", voice: "ch2_luo_09", text: "撤到第二道街垒！", tier: "虚构" },
+
+    // 清点：两个名字没有人答应。这一段是玩家站在人堆里听的，不是过场。
+    { at: "delay:26", type: "env", text: "后街的枪声稀下来。罗班长开始点名。" },
+    { at: "delay:26", type: "shout", who: "luo", voice: "ch2_luo_10", text: "李长贵！", tier: "虚构" },
+    { at: "delay:26", type: "shout", who: "luo", voice: "ch2_luo_11", text: "胡万清！", tier: "虚构" },
+    { at: "delay:26", type: "env", text: "没有人应。第二遍喊完，只剩炮声。" },
+    { at: "delay:26", type: "env", text: "何有田抱着一口铁锅从侧巷绕出来。" },
+    { at: "delay:26", type: "shout", who: "heyoutian", voice: "ch2_heyoutian_03", text: "老子还活起！", tier: "虚构" },
+    { at: "delay:26", type: "line", who: "liuwencai", voice: "ch2_liuwencai_05", text: "锅比命还要紧嗦？", tier: "虚构" },
+    { at: "delay:26", type: "line", who: "heyoutian", voice: "ch2_heyoutian_04", text: "总得吃饭。", tier: "虚构" },
+    { at: "delay:26", type: "env", text: "没有人笑。很久都没有人再开口。" },
+
     { at: "end", type: "narration", text: "局部把他们压回去了。东关没有守住，只是还没有丢。", tier: "主流" },
   ],
   cutsceneIn: null,
   cutsceneOut: "CS_Ch2_AfterBayonet",
   mechanics: {
     grenadeRain: true,        // 集中投弹：玩家与背景守军同时投，成「手榴弹雨」
-    crateHauling: true,       // 拖弹药箱、清瓦砾、受潮弹单独放
+    crateHauling: true,       // 拖弹药箱、清瓦砾、受潮弹单独放、拖走将被引爆的箱子
     bayonetFirst: true,       // 第一次白刃战：突刺、枪托、推挡、体力管理、拾大刀
+    meleeQte: true,           // 白刃走 Script_MeleeQte 的格挡/处决 QTE（见 ENGINE_REQUEST 3）
     coveredWithdrawal: true,  // 交替换防：掩护第一组撤离 → 拆枪机 → 撤到第二街垒
   },
 };
 
-export const VOICE_LINES = [];
+// 章节剧情台词（docs/Data_AudioAssets.md「章节剧情语音」）。
+// key = ch2_<who>_<NN>，按每个人在本章的**出场顺序**编号；file 由 Data_Voice 推导，别手写。
+// dur: 0 是占位，烘完由 Script_VoiceBake 写回这一行。
+export const VOICE_LINES = [
+  // 阶段一｜撬箱子那组（粗粝，但笑声已经短而勉强）
+  { key: "ch2_zhaodegui_01", who: "zhaodegui", delivery: "shout", dur: 0, text: "莫拿刺刀撬箱子！" },
+  { key: "ch2_yaowa_01", who: "yaowa", delivery: "normal", dur: 0, text: "不用刺刀啷个开？" },
+  { key: "ch2_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 0, text: "你脑壳是摆设嗦？" },
+  { key: "ch2_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 0, text: "哪个龟儿子又拿走两颗？" },
+  { key: "ch2_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 0, text: "拿去试受潮没得。" },
+  { key: "ch2_liuwencai_02", who: "liuwencai", delivery: "normal", dur: 0, text: "你拿嘴试！" },
+  { key: "ch2_zhaodegui_03", who: "zhaodegui", delivery: "shout", dur: 0, text: "受潮的单独码一边！" },
+  // 飞机声：心理残留，不是真的又来扫射
+  { key: "ch2_yaowa_02", who: "yaowa", delivery: "shout", dur: 0, text: "妈卖批，又来了？" },
+
+  // 阶段二｜压枪口。whisper → whisper → normal → shout，四句是一条递进，
+  // 不许拉齐音量：玩家是靠音量差听出「现在还不能出声」的。
+  { key: "ch2_luo_01", who: "luo", delivery: "whisper", dur: 0, text: "莫打。" },
+  { key: "ch2_luo_02", who: "luo", delivery: "whisper", dur: 0, text: "再近点。" },
+  { key: "ch2_luo_03", who: "luo", delivery: "normal", dur: 0, text: "稳到！" },
+  { key: "ch2_luo_04", who: "luo", delivery: "shout", dur: 0, text: "甩！" },
+
+  // 阶段三｜交流变短
+  { key: "ch2_yaowa_03", who: "yaowa", delivery: "shout", dur: 0, text: "右边！" },
+  { key: "ch2_zhaodegui_04", who: "zhaodegui", delivery: "shout", dur: 0, text: "箱子拖开！" },
+  { key: "ch2_liuwencai_03", who: "liuwencai", delivery: "shout", dur: 0, text: "掷弹筒！" },
+  { key: "ch2_luo_05", who: "luo", delivery: "shout", dur: 0, text: "趴下！" },
+
+  // 阶段四｜白刃战前两句口令，战后三句
+  { key: "ch2_luo_06", who: "luo", delivery: "shout", dur: 0, text: "上刺刀！" },
+  { key: "ch2_luo_07", who: "luo", delivery: "shout", dur: 0, text: "认到人再下手！" },
+  { key: "ch2_yaowa_04", who: "yaowa", delivery: "normal", dur: 0, text: "你不是说杀鬼子跟杀鸡一样？" },
+  // 吐完，脱力。weak 档不许抬齐到常态响度。
+  { key: "ch2_heyoutian_02", who: "heyoutian", delivery: "weak", dur: 0, text: "莫说了。" },
+
+  // 阶段五｜交替换防与清点
+  { key: "ch2_luo_08", who: "luo", delivery: "shout", dur: 0, text: "第一组先撤！我们压到起！" },
+  { key: "ch2_liuwencai_04", who: "liuwencai", delivery: "shout", dur: 0, text: "枪机我拆了！带不走！" },
+  { key: "ch2_zhaodegui_05", who: "zhaodegui", delivery: "shout", dur: 0, text: "手榴弹先转过去！" },
+  { key: "ch2_luo_09", who: "luo", delivery: "shout", dur: 0, text: "撤到第二道街垒！" },
+  // 点名的两个名字是虚构的无名者（城内约三千人里绝大多数没有留下名字）。
+  { key: "ch2_luo_10", who: "luo", delivery: "shout", dur: 0, text: "李长贵！" },
+  { key: "ch2_luo_11", who: "luo", delivery: "shout", dur: 0, text: "胡万清！" },
+  { key: "ch2_heyoutian_03", who: "heyoutian", delivery: "shout", dur: 0, text: "老子还活起！" },
+  { key: "ch2_liuwencai_05", who: "liuwencai", delivery: "normal", dur: 0, text: "锅比命还要紧嗦？" },
+  { key: "ch2_heyoutian_04", who: "heyoutian", delivery: "normal", dur: 0, text: "总得吃饭。" },
+];
