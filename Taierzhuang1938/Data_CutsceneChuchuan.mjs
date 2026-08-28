@@ -2061,7 +2061,9 @@ export const CS_Chuchuan = {
   id: "CS_Chuchuan",
   title: "出川",
   seconds: CHUCHUAN_END,
-  trigger: "beforeLevel:L0_Jiehe",
+  // 任务流程重制之后这一场就是正片序章（CH0_Chuchuan）的关前过场，
+  // 不再只是 ?preview= 的审片入口。旧版 CS_ChuchuanLegacy 的 trigger 保留原样留档。
+  trigger: "beforeLevel:CH0_Chuchuan",
   standalone: true,
   setOrigin: [2400, 0, 2400],
   cameraMode: "headLook",

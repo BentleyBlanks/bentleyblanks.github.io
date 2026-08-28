@@ -20,6 +20,15 @@
 // 后面整本剧本被静默吞掉，日志上什么都看不出来（最难查的一类 bug）。
 // 兜底触发的那一条会记 byTimeout: true，通关冒烟看这个比例。
 
+// ── beat.voice：台词的语音通道（2026-08-28 任务流程重制）─────────────────────
+// 一条 beat 可以带 `voice: "ch3_yaowa_07"`，指名要播哪一条录好的台词。
+// 这一层**只管在正确的时刻报出 key 与说话人**；「那个人现在站在哪儿」是装配层
+// 才知道的事（Story 手里没有场景、没有演员表位置），所以播放走注入的回调：
+//   story.AttachVoice(({ key, who, position }) => audio.PlayStoryVoice(key, { position }))
+// 没接线、或者那一条还没烘出音频时，回调返回 null，这里就当纯字幕处理 ——
+// **绝不因此中断剧本**：台词先写、音频后烘是常态，不是错误。
+import { VoiceDurOf } from "./Data_Voice.mjs";
+
 import { LEVELS, CAST, MENU, CREDITS, FindLevel } from "./Data_TengxianScript.mjs";
 
 /**
@@ -83,6 +92,16 @@ const LEVEL_CUES = {
  */
 const MAX_WAIT = { after: 0, zone: 95, event: 80, fight: 70, fightEnd: 85, end: 1e9 };
 const MIN_GAP = 2.0;              // 两条台词之间的最小间隔，不然会叠成一团
+// 带语音的那一条要**占住话筒直到自己说完**：字幕的默认停留（3.4—5.4 s）跟音频
+// 长度没有关系，按默认间隔放行下一条，长句子会被下一句从中间打断。
+// 上限 8 s 是保险丝：真有一条 20 s 的连续场景（序章动员那种）也不至于把整条
+// 剧本链卡在那儿 —— 超时兜底虽然照常在走，但那要等到 MAX_WAIT。
+const VOICE_HOLD_MAX = 8.0;
+const VOICE_HOLD_TAIL = 0.35;     // 说完之后再留一点，别话音未落就下一句
+// 字幕跟着语音走：有音频时字幕至少陪到人说完（取长者）。
+// 反过来不成立 —— 音频短不代表字幕可以更短，字幕有自己的可读下限。
+const SUBTITLE_TAIL = 0.6;
+const SUBTITLE_MAX = 9.0;
 
 /** 把一条 beat 的 at 解析成运行时条件。**没有翻译，只有解析。** */
 function ParseAt(at) {
@@ -117,10 +136,72 @@ export class StoryDirector {
     this.cued = new Set();         // 时刻表判定已发生的事件
     this.fired = [];               // 播过的 beats（测试断言看这个）
     this.objectiveText = null;
+    // --- 语音通道（可选，没接线就是纯字幕）---
+    this.voicePlay = null;         // ({key, who, position}) => {duration}|number|null
+    this.voiceLocate = null;       // (who) => {x,y,z}|null，宿主用来定位说话人
+    this.voiceStop = null;         // () => void，换关时掐掉上一句
+    this.voiceLog = [];            // 取证：每条 voiced beat 到底播没播出来
+  }
+
+  /**
+   * 接上语音通道。宿主给一个「把这条 key 播出来」的回调，Story 只负责报时机。
+   *
+   * 为什么是注入而不是 Story 自己拿 audio 去播：**定位说话人不是叙事层的事。**
+   * 「幺娃现在在哪儿」要问演员表 / AI / 过场轨道，那些全在装配层手里；
+   * Story 一旦自己去找人，就得把半个装配层拖进这个纯规则模块。
+   *
+   * @param {Function|object} play `({ key, who, position }) => {duration}|number|null`；
+   *   也可以传 `{ play, locate }`，其中 `locate(who)` 返回说话人世界坐标。
+   *   传 null 解绑（换关、进过场时把话筒收回来）。
+   */
+  AttachVoice(play, locate = null) {
+    if (play && typeof play === "object" && typeof play.play === "function") {
+      this.voicePlay = play.play;
+      this.voiceLocate = typeof play.locate === "function" ? play.locate : null;
+      // stop 只在对象形式里给：换关时要把上一关还在响的那句掐掉，
+      // 否则新关的第一句会和旧关的最后一句叠在一起（切黑期间尤其明显）。
+      this.voiceStop = typeof play.stop === "function" ? play.stop : null;
+      return true;
+    }
+    this.voicePlay = typeof play === "function" ? play : null;
+    this.voiceLocate = typeof locate === "function" ? locate : null;
+    this.voiceStop = null;
+    return !!this.voicePlay;
+  }
+
+  /**
+   * 播一条 beat 的语音，返回它的时长（秒）；没有语音就返回 0。
+   *
+   * 三种「没有」都返回 0 且不报错，因为它们都是**正常状态**：
+   * beat 没写 voice、宿主没接线、那条还没烘出音频。
+   */
+  _Speak(beat) {
+    if (!beat.voice || !this.voicePlay) return 0;
+    let position = null;
+    if (this.voiceLocate) {
+      try { position = this.voiceLocate(beat.who) || null; } catch { position = null; }
+    }
+    let result = null;
+    try {
+      result = this.voicePlay({ key: beat.voice, who: beat.who || null, position });
+    } catch (err) {
+      // 宿主那边炸了不该把剧本一起带走：吞掉，留痕，继续演。
+      this.voiceLog.push({ key: beat.voice, played: false, error: String(err && err.message || err) });
+      return 0;
+    }
+    if (!result) { this.voiceLog.push({ key: beat.voice, played: false }); return 0; }
+    // 宿主可以回 {duration}、回秒数、或者只回个 true（那就查表兜底）。
+    const dur = typeof result === "number" ? result
+      : (typeof result.duration === "number" ? result.duration : VoiceDurOf(beat.voice));
+    this.voiceLog.push({ key: beat.voice, played: true, dur });
+    return dur > 0 ? dur : 0;
   }
 
   /** 换关：装载这一关的全部 beats。 */
   BeginLevel(levelId) {
+    // 上一关最后一句可能还在响：切黑两秒之后它会盖在新关第一句上面。
+    if (this.voiceStop) { try { this.voiceStop(); } catch { /* 宿主的事，别带崩剧本 */ } }
+    this.voiceLog = [];
     const level = FindLevel(levelId);
     this.levelId = levelId;
     // sameAsPrev：连着几条写同一个 at 的，作者的意思是「这几句一起来」。
@@ -165,6 +246,10 @@ export class StoryDirector {
   }
 
   get FiredCount() { return this.fired.length; }
+  /** 这一关有多少条台词真的有人声（接线自检看它，别看「有没有报错」）。 */
+  get VoicedCount() { return this.voiceLog.filter((v) => v.played).length; }
+  /** 点了名却没播出来的 key（未烘焙 / 没接线 / 宿主抛异常）。降级是正常的，但要看得见。 */
+  get VoiceMisses() { return this.voiceLog.filter((v) => !v.played).map((v) => v.key); }
   get ObjectiveText() { return this.objectiveText; }
   /** 剩下多少条没播 —— 通关冒烟用它判断剧本有没有被吞掉。 */
   get Remaining() { return Math.max(0, this.queue.length - this.index); }
@@ -246,6 +331,25 @@ export class StoryDirector {
     return n;
   }
 
+  /**
+   * 说一句：先把语音放出去，再按「字幕默认时长」与「音频时长」取长者显示。
+   *
+   * 两个时间是两件事，不能混：
+   *   · 字幕停留 —— 读得完就行，有自己的下限；
+   *   · 话筒占用（sinceLast）—— 说完之前不放行下一条，否则长句会被下一句打断。
+   * 没有语音时这个函数与改造前逐字等价（默认时长、MIN_GAP 照旧）。
+   */
+  _Speech(speaker, beat, seconds, variant = "") {
+    const dur = this._Speak(beat);
+    const shown = dur > 0 ? Math.min(SUBTITLE_MAX, Math.max(seconds, dur + SUBTITLE_TAIL)) : seconds;
+    this.hud.Say(speaker, beat.text, shown, variant);
+    // sinceLast 是**倒扣**的：置成负数就等于让下一条多等这么久
+    //（Update 里的闸是 sinceLast < MIN_GAP 就不放行）。
+    const hold = dur > 0 ? Math.min(VOICE_HOLD_MAX, dur + VOICE_HOLD_TAIL) : 0;
+    this.sinceLast = hold > MIN_GAP ? MIN_GAP - hold : 0;
+    return dur;
+  }
+
   Play(beat, byTimeout) {
     const who = beat.who ? CAST[beat.who] : null;
     const speaker = who ? (who.short || who.name) : null;
@@ -255,22 +359,21 @@ export class StoryDirector {
         this.sinceLast = 0;
         break;
       case "line":
-        this.hud.Say(speaker, beat.text, 4.2);
-        this.sinceLast = 0;
+        this._Speech(speaker, beat, 4.2);
         break;
-      case "shout":
-        this.hud.Say(speaker, beat.text, 3.4, "shout");
-        this.sinceLast = 0;
-        if (this.audio) this.audio.Play("whistle", { volume: 0.35 });
+      case "shout": {
+        const spoken = this._Speech(speaker, beat, 3.4, "shout");
+        // 哨子是「没有配音时的喊话替身」。真有人声了还叠一声哨，
+        // 等于在台词上盖一层噪音 —— 有语音就不吹。
+        if (this.audio && !spoken) this.audio.Play("whistle", { volume: 0.35 });
         break;
+      }
       case "narration":
-        this.hud.Say(null, beat.text, 4.8);
-        this.sinceLast = 0;
+        this._Speech(null, beat, 4.8);
         break;
       // env：环境描写。没有说话的人，语气也不是旁白点评，走同一条字幕但更长一点
       case "env":
-        this.hud.Say(null, beat.text, 5.4);
-        this.sinceLast = 0;
+        this._Speech(null, beat, 5.4);
         break;
       // system：机制播报（「城里还站着的人 ＋132」「弹药：无。」）。
       // 走字幕而不是 Hint —— 这几条是**剧本里的一句**，通关冒烟要在 spoken 里找到它。
@@ -293,7 +396,7 @@ export class StoryDirector {
     }
     this.fired.push({
       level: beat.level, type: beat.type, who: beat.who || null,
-      at: beat.at || null, tier: beat.tier || null,
+      at: beat.at || null, tier: beat.tier || null, voice: beat.voice || null,
       text: beat.text || "", byTimeout: !!byTimeout,
     });
   }

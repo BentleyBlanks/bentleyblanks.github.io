@@ -328,7 +328,7 @@ if (cross.mid < 1 || cross.late < 1) {
 // 听者有没有跟着相机走。
 //
 // 这一条是补的：SetListener 写好之后**全仓库零调用点**，WebAudio 的 listener
-// 一辈子停在世界原点。序·界河的切片在 z = −1470，于是每一发枪声都按一千四百米
+// 一辈子停在世界原点。城外那一章的切片离城心五百多米，于是每一发枪声都按五百米
 // 算距离 —— 直达声被 panner 压掉三十分贝没了，而混响 send 在 Panner 之前分出去、
 // 不吃距离衰减，玩家听到的就只剩全场每一发枪的混响尾巴糊在一起：密密麻麻、
 // 没有方向（HRTF 只在 25 m 内开）、没有高频（空气低通钳在 700 Hz 的地板上）。
@@ -336,7 +336,10 @@ if (cross.mid < 1 || cross.late < 1) {
 const listener = await page.evaluate(async () => {
   const T = window.Taierzhuang;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  T.JumpToPhase(0);                      // 界河：切片离世界原点一千四百米，钉住不动一眼看得出来
+  // 第一章（城外原野）：切片离世界原点五百多米，听者钉住不动一眼看得出来。
+  // **不能用序章**：那是过场承载章，JumpToPhase 对它不重建场、不 Respawn，
+  // 相机停在上一关哪儿就还在哪儿，这条断言就测不到东西了。
+  T.JumpToPhase(1);
   await sleep(400);
   T.StepFrames(30);
   await sleep(200);
@@ -425,7 +428,7 @@ const shell = await page.evaluate(async () => {
   const T = window.Taierzhuang, a = T.audio;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const entry = a.sfxManifest && a.sfxManifest.cues.shellDrop;
-  // 得先站到一关里，手上还得有枪有子弹 —— 前面那条听者断言把关卡跳到了序·界河。
+  // 得先站到一章里，手上还得有枪有子弹 —— 前面那条听者断言把关卡跳到了第一章。
   T.JumpToPhase(2);
   await sleep(900);
   T.StepFrames(30);

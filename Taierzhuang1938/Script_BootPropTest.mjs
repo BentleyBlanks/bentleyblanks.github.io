@@ -47,12 +47,24 @@ try {
   await page.waitForFunction(() => document.getElementById("bootStep")?.textContent === "就绪",
     null, { timeout: 240000, polling: 200 });
 
-  const lag = (await worker.evaluate(() => self.__lag)).sort((a, b) => b - a);
+  const raw = await worker.evaluate(() => self.__lag);
+  const lag = raw.slice().sort((a, b) => b - a);
   const stalls = lag.filter((v) => v > 60).length;
   const worst = Math.round(lag[0] || 0);
-  console.log(`ok   worker 侧 ${lag.length} 拍，最长 ${worst} ms，>60 ms 的 ${stalls} 拍`);
-  // 主线程那 9 秒里只有 26 帧；worker 这边一秒钟就该有几十拍。
-  assert.ok(lag.length > 120, `worker 只跑了 ${lag.length} 拍，展示台八成又回主线程了`);
+  // 量到的窗口有多长（毫秒）与实际拍频。
+  //
+  // **判据用拍频，不用拍数。** 拍数是「窗口长度 × 拍频」，而窗口长度是
+  // 「首关建完要多久」—— 那是关卡内容的函数，不是这条回归要验的东西。
+  // 2026-08-28 任务流程重制换掉首关（原来是界河那片密得多的原野）之后，
+  // 同样健康的 worker 只跑了 79 拍，旧的 >120 判据就这么红了一次。
+  const spanMs = raw.reduce((sum, v) => sum + v, 0);
+  const rate = spanMs > 0 ? lag.length / (spanMs / 1000) : 0;
+  console.log(`ok   worker 侧 ${lag.length} 拍 / ${Math.round(spanMs)} ms（${rate.toFixed(0)} 拍/s），`
+    + `最长 ${worst} ms，>60 ms 的 ${stalls} 拍`);
+  // 主线程建首关时只交得出个位数的帧率；worker 这边 16 ms 一拍 ≈ 60 拍/s，
+  // 被拖回主线程就会塌到十几。40 拍/s 是那两档中间的分界。
+  assert.ok(lag.length >= 40, `worker 只跑了 ${lag.length} 拍，窗口太短，测不出东西`);
+  assert.ok(rate >= 40, `worker 只有 ${rate.toFixed(0)} 拍/s，展示台八成又回主线程了`);
   assert.ok(stalls <= 8, `worker 被拖住 ${stalls} 次，它不该跟着主线程一起卡`);
 
   const card = await page.evaluate(() => ({

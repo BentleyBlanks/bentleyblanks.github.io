@@ -1,9 +1,25 @@
-// 《滕县 1938》剧本 —— 七关的目标链、节拍、台词、人物表，与五场过场的分镜。
+// 《滕县 1938》剧本 —— 七章的目标链、节拍、台词、人物表，与全部过场的分镜。
 //
 // **纯数据，不许 import three**（Node 里要能直接 import：自检、导词表、
 // 考据比对都读这一份；一旦沾上 three，命令行工具就得拖起整个渲染库）。
 //
-// 施工底本：docs/Data_TengxianDesign.md（关卡与过场设计书）
+// ---------------------------------------------------------------------------
+// 2026-08-28 任务流程重制：这一份不再自己写关表，改成**组装层**。
+//
+//   七章各自一个文件：Data_MissionCh0.mjs … Data_MissionCh6.mjs，
+//   每份导出 CHAPTER（史料字段 + zones + beats + tuning 打法字段）与 VOICE_LINES。
+//   这里只做三件事：
+//     1. 把七份 CHAPTER 的**史料层**摊成 LEVELS（打法字段一个都不带过来 ——
+//        它们由 Data_Battle.mjs 从同一份 CHAPTER.tuning 取，两边不重叠，
+//        「改了剧本忘了改关卡表」这类错在结构上就发生不了）；
+//     2. 汇总过场（旧五场保留但从正片流程脱钩，新六章各自一份占位）；
+//     3. 汇总人物表与推定值登记表。
+//   施工口径：docs/Data_MissionRemake.md（唯一口径，§10 是工程契约）。
+//
+//   旧七关（L0_Jiehe … L6_Beimen）的关表与台词整份删除，git 历史里有。
+// ---------------------------------------------------------------------------
+//
+// 施工底本：docs/Data_MissionRemake.md（本轮）、docs/Data_TengxianDesign.md（上一轮，留档）
 // 考据底本：docs/Data_TengxianTimeline.md（逐日过程与指挥链，三档可信度）
 // 世界坐标：Data_Tengxian.mjs（X 向东，Z 向南，Y 向上，原点 = 城中心十字街口）
 //
@@ -51,6 +67,54 @@
  * 这里照抄，不许改名，改了下游按名字对台词的自检会漏。
  */
 export const CAST = {
+  // --- 任务流程重制的班组（docs/Data_MissionRemake.md §8 人物速查）---------
+  // 配音与 beats 的 who 一律用这些 id（契约 §10.2）。
+  shunzi: {
+    name: "谢长顺", short: "顺子", real: false,
+    note: "玩家。第 122 师 364 旅 727 团 3 营 9 连二等兵，赶场路上被绳子捆来的壮丁。籍贯与连别为推定",
+  },
+  luo: {
+    name: "罗茂才", short: "罗班长", real: false,
+    note: "9 连 3 班班长，四川人。老兵，出川那一趟从头走到尾。四关夜战救顺子时腹部中弹牺牲",
+  },
+  yaowa: {
+    name: "", short: "幺娃", real: false,
+    note: "班里最年轻的一个。前期模仿老兵骂人，日机扫射后第一个失控大骂；最怕黑、最想家",
+  },
+  heyoutian: {
+    name: "何有田", short: "何有田", real: false,
+    note: "最爱吹牛说笑（三个婆娘）。二关白刃战后呕吐；后期脏话越重、话越少。只有姐姐给他写过信",
+  },
+  liuwencai: {
+    name: "刘文财", short: "刘文财", real: false,
+    note: "斤斤计较、什么都数。后期数数变成控制恐惧的方式：机枪还剩多少、还有几副担架",
+  },
+  xiaoqin: {
+    name: "", short: "小秦", real: false,
+    note: "通信兵。护线、接电话、骂踩线的。五关末视角③、终章的玩家角色，随王铭章殉难倒下",
+  },
+  zhaodegui: {
+    name: "赵德贵", short: "赵德贵", real: false,
+    note: "老成持重。管弹药纪律，接想家的话头",
+  },
+  paizhang: {
+    name: "", short: "排长", real: false,
+    note: "负伤排长。五关下达「出了西关不用再回来」的军令",
+  },
+  junyi: {
+    name: "", short: "军医", real: false,
+    note: "军医／卫生兵。只处理战伤（刘文财牙痛没人理）",
+  },
+  s124: {
+    name: "", short: "伤兵", real: false,
+    note: "第 124 师伤兵，三七二旅的。五关视角①的机枪副射手",
+  },
+  danjiayuan: { name: "", short: "担架员", real: false, note: "虚构，无名" },
+  shangbing: { name: "", short: "伤员", real: false, note: "虚构，无名" },
+  junguan: { name: "", short: "军官", real: false, note: "兵站军官。序章「第五战区肯接，还给了枪弹」" },
+  canmou: { name: "", short: "参谋", real: false, note: "通信参谋。终章复诵最后电文" },
+  ija_gunso: { name: "", short: "军曹", real: false, note: "日军军曹。台词走日语分支（VoiceBake 的假名支）" },
+  // --- 上一轮的班组（旧关表已删，条目保留：旧过场的 who 仍指着它们）--------
   player: {
     name: "谢长顺", short: "长顺", real: false,
     note: "第 122 师 364 旅 727 团 3 营 9 连 二等兵，四川三台人，十八岁。籍贯为推定",
@@ -64,6 +128,11 @@ export const CAST = {
     note: "9 连连长，四川人",
   },
   // --- 真实历史人物 ---------------------------------------------------------
+  // 契约 §10.2 的 id（新章一律用这个）；旧过场仍用 wang，两条指同一个人。
+  wangmingzhang: {
+    name: "王铭章", short: "师长", real: true,
+    note: "第 122 师师长／第 41 军前方总指挥。3 月 17 日殉国。终章：追问战况、「那就发」「收起」，西关电灯厂殉国",
+  },
   wang: {
     name: "王铭章", short: "师长", real: true,
     note: "第 122 师师长／第 41 军前方总指挥（职务三说并列：代军长／前方总指挥／第二线指挥官）。3 月 17 日殉国",
@@ -92,345 +161,136 @@ export const CAST = {
 };
 
 // ===========================================================================
-// 关卡表（七关）
+// 章表（七章）—— 组装层
 // ===========================================================================
 
+import { CHAPTER as CH0, VOICE_LINES as VO0 } from "./Data_MissionCh0.mjs";
+import { CHAPTER as CH1, VOICE_LINES as VO1 } from "./Data_MissionCh1.mjs";
+import { CHAPTER as CH2, VOICE_LINES as VO2 } from "./Data_MissionCh2.mjs";
+import { CHAPTER as CH3, VOICE_LINES as VO3 } from "./Data_MissionCh3.mjs";
+import { CHAPTER as CH4, VOICE_LINES as VO4 } from "./Data_MissionCh4.mjs";
+import { CHAPTER as CH5, VOICE_LINES as VO5 } from "./Data_MissionCh5.mjs";
+import { CHAPTER as CH6, VOICE_LINES as VO6 } from "./Data_MissionCh6.mjs";
+
 /**
- * beats 的 at 触发式（沿用 Data_Script.mjs 的一套，Script_Story 那层的翻译表能直接吃）：
+ * 七章，**按正片顺序**。数组顺序就是选章顺序、就是 AdvanceLevel 的顺序，
+ * 也是 ?phase=N 的 N。改顺序等于改流程，别当成排版。
+ */
+export const CHAPTERS = [CH0, CH1, CH2, CH3, CH4, CH5, CH6];
+
+/** 契约 §10.1 写死的章节 id 与顺序。对不上就抛 —— 下游一整排表都按这个 id 取。 */
+const CHAPTER_IDS = [
+  "CH0_Chuchuan", "CH1_NanLu", "CH2_Shouliudan", "CH3_Jiuhusuo",
+  "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",
+];
+
+/**
+ * 组装前的硬校验。**史料层与打法层的分层规则在这里执行**：
+ *   · 史料字段（title/date/sky/minutes/pool/objectives/beats…）必须齐；
+ *   · 打法字段（bounds/spawn/ijaPressure…）**只许出现在 chapter.tuning 里**，
+ *     摊在 chapter 顶层就是把两层混起来了，直接抛；
+ *   · zones 与 objectives 数量必须一致 —— 旧关表里两者对不上是历史债，
+ *     objectiveIndex 与 HUD 文案会错位，这一轮修掉并用断言钉住；
+ *   · zone id 全局唯一（Data_Battle 的 ZONES 是一张扁平表，重名会互相顶掉）。
+ */
+const TUNING_ONLY_KEYS = [
+  "bounds", "spawn", "ijaPressure", "ijaSpawn", "ijaSupport", "ijaForce", "ijaPool",
+  "loadout", "loadoutOverride", "cameraFar", "detailRadius", "midRadius",
+  "nightRaid", "disarmed", "spotter", "corridorGun", "scavengeRifle", "fieldFrom", "cutsceneOnly",
+];
+
+const seenZoneIds = new Set();
+for (let i = 0; i < CHAPTERS.length; i += 1) {
+  const c = CHAPTERS[i];
+  const where = `Data_MissionCh${i}`;
+  if (!c || c.id !== CHAPTER_IDS[i]) {
+    throw new Error(`${where}: 章节 id 应为 ${CHAPTER_IDS[i]}，实际是 ${c && c.id}`);
+  }
+  for (const key of ["title", "place", "date", "sky", "objectives", "zones", "beats", "brief", "pool", "tuning"]) {
+    if (c[key] === undefined || c[key] === null) throw new Error(`${where}: 缺字段 ${key}`);
+  }
+  if (!(c.minutes > 0)) throw new Error(`${where}: minutes 必须是正数`);
+  for (const key of TUNING_ONLY_KEYS) {
+    if (key in c) throw new Error(`${where}: 打法字段 ${key} 不许写在 CHAPTER 顶层，搬进 CHAPTER.tuning`);
+  }
+  if (!c.tuning.bounds || !c.tuning.spawn) throw new Error(`${where}: tuning 缺 bounds 或 spawn`);
+  if (!c.zones.length) throw new Error(`${where}: 至少要有一个路标`);
+  if (c.zones.length !== c.objectives.length) {
+    throw new Error(`${where}: zones(${c.zones.length}) 与 objectives(${c.objectives.length}) 数量必须一致`);
+  }
+  for (const zone of c.zones) {
+    if (!zone.id || !zone.name || !Number.isFinite(zone.x) || !Number.isFinite(zone.z) || !(zone.radius > 0)) {
+      throw new Error(`${where}: 路标 ${zone && zone.id} 字段不全`);
+    }
+    if (seenZoneIds.has(zone.id)) throw new Error(`${where}: 路标 id ${zone.id} 与别处重名（ZONES 是全局扁平表）`);
+    seenZoneIds.add(zone.id);
+    const b = c.tuning.bounds;
+    if (zone.x < b.minX || zone.x > b.maxX || zone.z < b.minZ || zone.z > b.maxZ) {
+      throw new Error(`${where}: 路标 ${zone.id} (${zone.x}, ${zone.z}) 落在本章切片外`);
+    }
+  }
+}
+
+/**
+ * beats 的 at 触发式（Script_Story 那层的翻译表能直接吃）：
  *   start / end
  *   wave:N            第 N 波攻击开始
  *   waveClear:N       第 N 波被打退
- *   zone:名字          进入触发区
- *   event:名字         规则层派发的事件
+ *   zone:路标id        进入触发区（**必须是本章 zones 里的 id**）
+ *   event:名字         规则层派发的事件（判定表在 Script_Story.LEVEL_CUES）
  *   delay:秒           上一条之后过多久
  * type：title / line / shout / narration / objective / note / hint / system / env
  *
- * clock 是**史料时刻**（Data_TengxianTimeline.md 有出处），不是推定；
- * pool（城里还站着的人）是**推定**的关卡数值，登记在 PRESUMED_STAGING。
+ * pool（城里还站着的人）是**推定**的关卡数值，登记在 PRESUMED_STAGING.poolCurve。
  */
-export const LEVELS = [
-  // =========================================================================
-  {
-    id: "L0_Jiehe",
-    title: "序 · 界河",
-    place: "滕县以北 · 界河南岸 · 津浦路西",
-    date: "一九三八年三月十四日 拂晓 — 十九时",
-    clock: { from: "03-14 05:30", to: "03-14 19:00" },
-    sky: "dawn",
-    // 北上接敌。垫底的一层，几乎察觉不到。
-    music: "fieldLament",
-    bounds: "L0Jiehe",
-    minutes: 14,
-    pool: { start: 220, end: 196, label: "城里还站着的人", presumed: true },
-    objective: "跟着班长到界河南岸的土坎",
-    objectives: [
-      "跟着班长到界河南岸的土坎",
-      "找一支枪（从倒下的人身上捡）",
-      "守住土坎，顶过第一轮炮击",
-      "掩护第三七〇旅退下来的人过路",
-      "天黑前撤到北沙河",
-    ],
-    mechanic: "手榴弹经济：手榴弹是主武器，步枪是奢侈品。HUD 弹药第一行是手榴弹。「无枪」是合法初始状态。",
-    brief: [
-      "第二十二集团军是川军，娘子关下来之后一直没补充过。",
-      "全集团军名义四个师，每旅不过一个团之众，总兵力不过两万员名。",
-      "对面是第十师团濑谷支队 —— 一个不满员的步兵联队，背后拖着一个师团级的炮兵群。",
-    ],
-    // 正片入口继续使用已接好界河战斗的旧版出川；新版车厢序章只从
-    // ?preview=CS_Chuchuan 进入，完成后停在预览终点，等待《断线》接手。
-    cutsceneIn: "CS_ChuchuanLegacy",
-    beats: [
-      { at: "start", type: "title", text: "界河", sub: "一九三八年三月十四日 拂晓　两下店方向", tier: "主流" },
-      { at: "start", type: "line", who: "qiu", text: "弟兄，把布袋系紧了。六颗，一颗都别掉。", tier: "虚构" },
-      { at: "delay:3.0", type: "line", who: "qiu", text: "没枪的跟着有枪的走。谁倒了，枪归下一个。", tier: "虚构",
-        source: "日方记川军三分之一以上没有步枪，各自带手榴弹约六发" },
-      { at: "delay:5.0", type: "hint", text: "主武器是木柄手榴弹：旋开底盖，拉火绳，贴近再扔", tier: "提示" },
-      { at: "zone:Kan", type: "objective", text: "守住土坎，顶过第一轮炮击" },
-      { at: "zone:Kan", type: "line", who: "yang", text: "弟兄们，趴住。他们的炮先来，人后来。", tier: "虚构" },
-      { at: "event:FirstBarrage", type: "line", who: "qiu", text: "数着点儿。一轮打完他们才动。", tier: "虚构" },
-      { at: "wave:2", type: "line", who: "qiu", text: "石墙那边的人退下来了。让开路，别挡着。", tier: "虚构",
-        source: "3/14 拂晓日军突破津浦路西第 124 师 370 旅石墙阵地" },
-      { at: "wave:2", type: "objective", text: "掩护第三七〇旅退下来的人过路" },
-      { at: "waveClear:3", type: "line", who: "yang", text: "十九时，三七〇旅趁黑往滕县撤。咱们跟着走。", tier: "转述",
-        source: "19 时第 370 旅利用暗夜向滕县方向撤退" },
-      { at: "waveClear:3", type: "objective", text: "天黑前撤到北沙河" },
-      { at: "end", type: "narration", text: "这一天，川军三个师在正面兵力上占优，一日之内全线动摇。真正的不对称在火力，不在人数。", tier: "主流" },
-    ],
-  },
+export const LEVELS = CHAPTERS.map((c) => ({
+  id: c.id,
+  title: c.title,
+  place: c.place,
+  date: c.date,
+  clock: c.clock,
+  sky: c.sky,
+  // 环境音档与天空档不同名时由章自己指定（序章的车厢就是这种情形）。
+  ambience: c.ambience || null,
+  music: c.music || null,
+  minutes: c.minutes,
+  pool: c.pool,
+  // HUD 开局那一条；Script_Story 读 level.objective 当初始任务文本。
+  objective: c.objectives[0],
+  objectives: c.objectives,
+  mechanic: c.mechanic || MechanicSummary(c),
+  mechanics: c.mechanics || {},
+  brief: c.brief,
+  cutsceneIn: c.cutsceneIn || null,
+  cutsceneOut: c.cutsceneOut || null,
+  beats: c.beats,
+}));
 
-  // =========================================================================
-  {
-    id: "L1_Beishahe",
-    title: "一 · 北沙河 · 入城",
-    place: "北沙河二线阵地 → 津浦路 → 西关车站、电灯厂 → 滕县西门",
-    date: "一九三八年三月十四日夜 — 十五日黄昏",
-    clock: { from: "03-14 21:00", to: "03-15 18:00" },
-    sky: "night",
-    // 夜战旧曲整批未通过评审；新候选选定前只留夜风、脚步与远处枪炮。
-    music: null,
-    bounds: "L1Approach",
-    minutes: 16,
-    // 全局唯一一次上涨：收容第 127 师 757 团残部数百人（史料）。
-    // 具体加多少人是推定 —— 史料只说「数百人」。
-    pool: { start: 196, end: 328, gain: 132, label: "城里还站着的人", presumed: true },
-    objective: "夜里在北沙河挖第二线阵地",
-    objectives: [
-      "夜里在北沙河挖第二线阵地",
-      "收容第一二七师第七五七团退下来的散兵",
-      "天亮后顶住到十三时",
-      "沿津浦路南撤，穿过西关车站与电灯厂",
-      "黄昏前从西门进城",
-    ],
-    mechanic: "收容与兵员池：第一次让玩家看见「城里还站着的人」这个数字，且这是全局唯一一次上涨。另有「撤退不是失败」——目标完成时计时器跳一大段。",
-    brief: [
-      "十四日夜，孙震亲赴前线，在北沙河召开军事会议。",
-      "调七二七团二营，收容一二七师七五七团残部数百人，配置第二线阵地。",
-    ],
-    cutsceneIn: "CS_LiZongrenTang",
-    beats: [
-      { at: "start", type: "title", text: "北沙河", sub: "一九三八年三月十四日 夜", tier: "主流" },
-      { at: "start", type: "line", who: "yang", text: "昨儿夜里，孙代总司令亲自到北沙河开的会。二营和收容起来的七五七团弟兄，就摆在这条线上。", tier: "转述",
-        source: "3/14 夜孙震亲赴前线在北沙河召开军事会议，调 727 团 2 营并收容 127 师 757 团残部数百人" },
-      { at: "delay:3.0", type: "hint", text: "按住 E —— 挖。挖得深一寸，明早少死一个", tier: "提示" },
-      { at: "event:Regroup", type: "line", who: "qiu", text: "问清楚是哪个团的，能拿枪的就编进来。", tier: "虚构" },
-      { at: "event:Regroup", type: "system", text: "城里还站着的人 ＋132", tier: "系统",
-        source: "史料只说「收容 757 团残部数百人」，具体人数为推定" },
-      { at: "zone:Dawn", type: "line", who: "qiu", text: "天要亮了。亮了就该他们的炮说话。", tier: "虚构" },
-      { at: "event:JieheFall", type: "line", who: "yang", text: "界河正面破了。四十五军那两个师往城头镇退，滕县这边只剩咱们。", tier: "转述",
-        source: "3/15 13 时界河正面阵地被突破；45 军两师向城头镇方向退却" },
-      { at: "event:JieheFall", type: "objective", text: "沿津浦路南撤，穿过西关车站与电灯厂" },
-      { at: "zone:XiguanStation", type: "line", who: "qiu", text: "那烟囱是电灯厂。师部原先就在那儿，昨儿搬进城了。", tier: "虚构",
-        source: "王铭章师部原设城外电灯厂，接死守命令后迁入城内" },
-      { at: "zone:WestGate", type: "line", who: "qiu", text: "……这墙。", tier: "虚构" },
-      { at: "zone:WestGate", type: "hint", text: "从濠底到墙顶，十六米。你现在是在外头看它", tier: "提示" },
-      { at: "end", type: "narration", text: "黄昏，日军步兵第十联队抵达滕县城下。守军收缩入城。", tier: "主流" },
-    ],
-  },
+/**
+ * 菜单「本关机制」那一行。章自己给了 mechanic 字符串就用它；没给就把
+ * mechanics 的旗标列出来 —— 旗标名本身就是给后续系统批看的接口清单，
+ * 摆在选章里也顺带提醒「这一章还欠哪几个动词」。
+ */
+function MechanicSummary(chapter) {
+  const flags = Object.entries(chapter.mechanics || {})
+    .filter(([, on]) => on).map(([name]) => name);
+  return flags.length ? `本章机制：${flags.join(" / ")}` : "";
+}
 
-  // =========================================================================
-  {
-    id: "L2_Dongguan",
-    title: "二 · 东关",
-    place: "滕县东关 · 东寨门、关厢院落、寺院地",
-    date: "一九三八年三月十六日 十时三十分 — 十七时",
-    clock: { from: "03-16 10:30", to: "03-16 17:00" },
-    sky: "smokyDay",
-    music: "siege",
-    bounds: "L2EastSuburb",
-    minutes: 22,
-    pool: { start: 328, end: 300, label: "城里还站着的人", presumed: true },
-    objective: "在东寨门缺口处堵口",
-    objectives: [
-      "在东寨门缺口处堵口",
-      "退进院落，掏枪眼",
-      "经打通的隔墙在院落之间转移，守住寺院地阵地",
-      "顶住第四、第五次攻击",
-      "十七时的第六次攻势 —— 这一次守不住",
-    ],
-    mechanic: "堵口（连续投弹压制条）＋ 枪眼与打通墙（凿墙 E 交互扩成「掏射孔」与「打通过人洞」两档）。",
-    brief: [
-      "东关有一道土寨墙：高两米，顶宽四十公分。一炮一个口。",
-      "日方自己的战后检讨说：对守军有利的不是城墙的高度与坚固，",
-      "而是外城的存在，与环绕城墙的密集民房的存在。",
-    ],
-    beats: [
-      { at: "start", type: "title", text: "东关", sub: "一九三八年三月十六日 十时三十分", tier: "主流" },
-      { at: "start", type: "line", who: "yan", text: "弟兄们，缺口交给一营。手榴弹往壕里扔，别停手。", tier: "虚构",
-        source: "严翊为真实人物；史料：集中六七十人向壕沟内连续猛投二三百枚手榴弹" },
-      { at: "delay:3.0", type: "hint", text: "投弹密度够高，突进壕沟的人就压得回去。停一口气，他们就上来了", tier: "提示" },
-      { at: "waveClear:1", type: "line", who: "qiu", text: "这道寨墙才两米高，四十公分厚。挡不住炮。", tier: "虚构",
-        source: "日方实测东关寨墙高 2 m、顶宽 0.4 m" },
-      { at: "waveClear:1", type: "line", who: "qiu", text: "挡得住的是后头这一片房。家家掏眼，一个院一个院跟他耗。", tier: "虚构",
-        source: "日方检讨：对守军有利的不是城墙高度与坚固，而是外城与环绕城墙的密集民房" },
-      { at: "waveClear:1", type: "hint", text: "看准发白的砖缝，按住 E —— 短按掏射孔，长按打通过人洞", tier: "提示" },
-      { at: "wave:4", type: "line", who: "qiu", text: "他们不走巷子了。他们在炸墙——从房子里过来。", tier: "虚构" },
-      { at: "event:TempleHold", type: "line", who: "yang", text: "寺院这块地丢了，东关就成了他们的。守住。", tier: "虚构",
-        source: "日方要图称寺院地为「敌之有力据点」" },
-      { at: "wave:6", type: "line", who: "qiu", text: "第六回了。", tier: "虚构",
-        source: "全天日军对东关五至六次攻击均被击退，17 时发动第六次攻势" },
-      { at: "event:BreachLost", type: "shout", who: "qiu", text: "退！往里退——别在缺口上站着！", tier: "虚构" },
-      { at: "end", type: "narration", text: "日军自十六日十四时十五分突入东寨门，到十七日下午十四时才把外城肃清。光这一片关厢，打了二十四小时。", tier: "信史" },
-    ],
-  },
-
-  // =========================================================================
-  {
-    id: "L3_Fanji",
-    title: "三 · 夺回东关门",
-    place: "滕县东关 · 寺院地 → 东关门 → 东门",
-    date: "一九三八年三月十六日 十八时 — 二十四时",
-    clock: { from: "03-16 18:00", to: "03-17 00:00" },
-    sky: "night",
-    // 夺回东关门 —— 全场两处反攻之一，战鼓在这儿。
-    music: "charge",
-    bounds: "L3EastNight",
-    minutes: 15,
-    pool: { start: 300, end: 236, label: "城里还站着的人", presumed: true },
-    objective: "摸黑在寺院地集合",
-    objectives: [
-      "摸黑在寺院地集合",
-      "沿巷道逼近东关门",
-      "夺回东关门",
-      "二十一时接到放弃城外阵地的命令",
-      "把伤员先送进城，最后一批从东门退入城内",
-    ],
-    mechanic: "夜战与白刃：夜里日军火力优势削掉一半，是全局唯一一次玩家在交换比上占便宜的时段。整局情绪高点在这里，之后一路向下。",
-    brief: [
-      "十八时以后，守军组织反击。",
-      "城防司令张宣武亲率数十名战士，反击突入的四十余名日兵。",
-    ],
-    cutsceneOut: "CS_LastWire",
-    beats: [
-      { at: "start", type: "title", text: "夺回东关门", sub: "一九三八年三月十六日 十八时以后", tier: "主流" },
-      { at: "start", type: "line", who: "zhang", text: "弟兄们，跟我上。趁天黑，把东关门夺回来。", tier: "虚构",
-        source: "张宣武为真实人物；史料：亲率数十名战士反击突入的四十余名日兵，东关门失而复得" },
-      { at: "delay:3.0", type: "line", who: "qiu", text: "夜里他们不敢往前压。这话是老兵传的，信不信由你——今晚咱们就当它是真的。", tier: "虚构",
-        source: "「日军不敢夜战」见于张宣武回忆，标为回忆而非通则" },
-      { at: "delay:5.0", type: "hint", text: "夜战：先扔后进。刺刀和大刀在这几个小时里比枪管用", tier: "提示" },
-      { at: "event:GateRetaken", type: "line", who: "qiu", text: "回来了。东关门回来了。", tier: "虚构" },
-      { at: "event:Order2100", type: "line", who: "zhang", text: "师长的意思——城外的阵地不要了。人全部收回城墙上。", tier: "转述",
-        source: "21 时王铭章决心放弃城外阵地、集中兵力守城垣" },
-      { at: "event:Order2100", type: "objective", text: "把伤员先送进城，最后一批从东门退入城内" },
-      { at: "event:Order2100", type: "line", who: "yang", text: "伤的先走。抬不动的，两个人架一个。", tier: "虚构" },
-      { at: "zone:EastGateIn", type: "narration", text: "二十四时前后，城外部队由西门退入城中。", tier: "主流" },
-      { at: "end", type: "narration", text: "这一夜是整场仗里唯一一次交换比对咱们有利的几个小时。之后再没有过。", tier: "虚构" },
-    ],
-  },
-
-  // =========================================================================
-  {
-    id: "L4_Chengqiang",
-    title: "四 · 城墙",
-    place: "滕县东城墙、东南角望楼 → 南城墙",
-    date: "一九三八年三月十七日 八时 — 十五时",
-    clock: { from: "03-17 08:00", to: "03-17 15:00" },
-    sky: "smokyDay",
-    music: "wallPressure",
-    bounds: "L4Wall",
-    minutes: 20,
-    pool: { start: 236, end: 178, label: "城里还站着的人", presumed: true },
-    objective: "从东门旁的上城道上城",
-    objectives: [
-      "从东门旁的上城道上城",
-      "在东南角望楼一带守住",
-      "十时之后：找出弹着变准的原因",
-      "试着压制城东塔上的观测（你打不掉）",
-      "十四时南城墙被轰开，沿墙顶转移到南墙",
-      "在南墙缺口顶到十五时",
-    ],
-    mechanic: "炮击观测：塔被占后落弹从随机变成「跟着你走」，玩家只能靠墙脚防空洞与炮击间隙。第二个机制是「四条上城道」的空间规则——这条规则会在下一关杀死玩家。",
-    brief: [
-      "全城只有四条上城道，都在城门旁边。",
-      "城墙是一条只有四个出入口的高空回廊。",
-    ],
-    beats: [
-      { at: "start", type: "title", text: "城墙", sub: "一九三八年三月十七日 八时以后", tier: "主流" },
-      { at: "start", type: "line", who: "qiu", text: "记住上城的路。全城就四条，都在城门旁边。走错一条，你就下不来。", tier: "虚构",
-        source: "城内上城的道路只是每座城门的旁边有一条" },
-      { at: "zone:Rampart", type: "hint", text: "墙脚一排洞是防空洞。炮来了钻进去，炮停了再上墙", tier: "提示" },
-      { at: "event:TowerTaken", type: "line", who: "qiu", text: "你看东边那个塔。塔顶上有人。", tier: "虚构" },
-      { at: "event:TowerTaken", type: "line", who: "yang", text: "他们上了龙泉塔。从三十米高的地方给炮兵报点子。", tier: "转述",
-        source: "3/17 10 时日军观测班占领城东龙泉塔，从 30 m 高处逐一报告弹着点（信史）" },
-      { at: "event:TowerTaken", type: "hint", text: "炮弹从这一刻起会跟着你走。你打不掉那个塔，只能拖", tier: "提示" },
-      { at: "event:SouthBreach", type: "shout", who: "runner", text: "南城墙被轰开了！七四三团那两个连顶不住——", tier: "虚构",
-        source: "3/17 14 时集中炮火猛轰南城墙，第 743 团两个连防守的南关城墙被重炮轰开大缺口" },
-      { at: "event:SouthBreach", type: "line", who: "yang", text: "三七〇旅的吕旅长和汪副旅长都重伤了。七四〇团王团长阵亡在东关方向。", tier: "转述",
-        source: "370 旅旅长吕康、副旅长汪朝廉重伤；740 团团长王麟阵亡" },
-      { at: "event:MoveToSouth", type: "hint", text: "墙上过不去的地方只能从城门旁下城，再从另一条上来", tier: "提示" },
-      { at: "end", type: "narration", text: "十五时，日军巩固占领南城墙。", tier: "主流" },
-    ],
-  },
-
-  // =========================================================================
-  {
-    id: "L5_Shizijie",
-    title: "五 · 十字街",
-    place: "滕县城内 · 十字街口、县衙、西门里街",
-    date: "一九三八年三月十七日 十五时 — 十七时三十分",
-    clock: { from: "03-17 15:00", to: "03-17 17:30" },
-    sky: "burningStreet",
-    music: "streetDistress",
-    bounds: "L5Crossroad",
-    minutes: 16,
-    pool: { start: 178, end: 96, label: "城里还站着的人", presumed: true },
-    objective: "从南墙撤下来，退到十字街口",
-    objectives: [
-      "从南墙撤下来，退到十字街口",
-      "在县衙外围收拢散兵",
-      "十七时西门楼失守 —— 十字街被机枪封锁",
-      "横穿西门里街（不能直着跑）",
-      "到西门附近，掩护师部一行转移",
-    ],
-    mechanic: "视线走廊封锁：从西城门楼直到十字街口的直线走廊被一挺重机枪完全控制，第一次直着穿必死。解法要把前四关学的掏墙、烟、院墙背面全用上。",
-    brief: [
-      "十七时，日军夺取西城门楼，切断守军经西门通往火车站的退路。",
-      "日兵占领西城门楼后，即集中火力向城中心十字街口扫射。",
-    ],
-    cutsceneOut: "CS_WangMingzhang",
-    beats: [
-      { at: "start", type: "title", text: "十字街", sub: "一九三八年三月十七日 十五时　城中心十字街口", tier: "主流" },
-      { at: "start", type: "line", who: "wang", text: "弟兄们，站住脚。这儿是城心，退到这儿就不能再退了。", tier: "虚构",
-        source: "承接句，称谓合规（官对兵「弟兄们」）" },
-      { at: "delay:3.0", type: "line", who: "qiu", text: "师长在街当中站着呢。", tier: "虚构" },
-      { at: "zone:Yamen", type: "line", who: "yang", text: "县衙这一圈还有人，把他们收拢起来。", tier: "虚构" },
-      { at: "event:WestTowerLost", type: "shout", who: "runner", text: "西门楼丢了——机枪从西门里街一路扫到十字街口！", tier: "虚构",
-        source: "3/17 17 时日军夺取西城门楼，占领后即集中火力向城中心十字街口扫射" },
-      { at: "event:WestTowerLost", type: "hint", text: "西城门楼到十字街口是一条通视的直街。直着跑，你活不过三步", tier: "提示" },
-      { at: "event:WestTowerLost", type: "hint", text: "用你在东关学的：掏墙、绕院墙背面、等火起来的烟", tier: "提示" },
-      { at: "zone:WestStreet", type: "line", who: "qiu", text: "城里烧起来了。风是南边来的，烟压得低——趁烟走。", tier: "虚构",
-        source: "3/17 集中炮击致城内起火，时而强劲的南风将烟吹得笼罩全城（信史）" },
-      { at: "event:EscortHQ", type: "shout", who: "adjutant", text: "师长要往西关走，去车站。掩护！", tier: "虚构" },
-      { at: "end", type: "narration", text: "西门通往火车站的那条路，这时候已经不在咱们手里了。", tier: "主流" },
-    ],
-  },
-
-  // =========================================================================
-  {
-    id: "L6_Beimen",
-    title: "六 · 北门",
-    place: "滕县西门瓮城 → 北门里街 → 北门 → 城北麦地",
-    date: "一九三八年三月十七日 二十一时 — 十八日 午",
-    clock: { from: "03-17 21:00", to: "03-18 12:00" },
-    sky: "night",
-    // 北门突围不是反攻：玩家已经没有弹药，音乐也不再使用战鼓。
-    music: "exodus",
-    bounds: "L6Breakout",
-    minutes: 12,
-    pool: { start: 96, end: 40, label: "城里还站着的人", presumed: true },
-    objective: "跟着人流去西门",
-    objectives: [
-      "跟着人流去西门（挤不出去）",
-      "退出瓮城，改走北门里街",
-      "沿街躲避 —— 你没有子弹了",
-      "帮着扒开北门的土袋",
-      "出城，向北走进麦地",
-    ],
-    mechanic: "脱离战斗：武器栏清空、瞄准失效、HUD 只剩计时器与兵员池，唯一的动作是走和拽人。",
-    brief: [
-      "二十一时，幸存守城部队开始自行突围。",
-      "西门瓮城的外门与内门之间，完全是人的漩涡。",
-    ],
-    cutsceneOut: "CS_BeimenBreakout",
-    beats: [
-      { at: "start", type: "title", text: "北门", sub: "一九三八年三月十七日 二十一时", tier: "主流" },
-      { at: "zone:WestBarbican", type: "env", text: "外门与内门之间挤成一团。土袋封得只剩一人宽的口子。", tier: "环境" },
-      { at: "zone:WestBarbican", type: "shout", who: "crowd", text: "过不去——前头堵死了——", tier: "虚构",
-        source: "日军第九中队安田少尉手记：外門と内門の間は全く人の渦だ（信史）" },
-      { at: "zone:WestBarbican", type: "hint", text: "你挤不出去。往回退", tier: "提示" },
-      { at: "event:NoAmmo", type: "system", text: "弹药：无。", tier: "系统" },
-      { at: "event:NoAmmo", type: "line", who: "qiu", text: "不打了。走北门。侯副营长在那儿扒门。", tier: "虚构" },
-      { at: "zone:NorthGate", type: "line", who: "hou", text: "扒北门。一个跟一个，不许出声。", tier: "虚构",
-        source: "侯子平为真实人物；史料：3 营副营长侯子平指挥扒开北城门突围" },
-      { at: "zone:NorthGate", type: "hint", text: "按住 E —— 扒土袋。两只手，别嫌慢", tier: "提示" },
-      { at: "event:Out", type: "line", who: "qiu", text: "出去了。别回头，往北走。", tier: "虚构" },
-      { at: "end", type: "narration", text: "日军未追击。", tier: "主流" },
-    ],
-  },
-];
+/** 各章新增的语音行（Data_Voice 拼接用；F2 批负责接线）。 */
+export const CHAPTER_VOICE_LINES = [...VO0, ...VO1, ...VO2, ...VO3, ...VO4, ...VO5, ...VO6];
 
 // ===========================================================================
-// 过场（五场）
+// 过场
 // ===========================================================================
+//
+// 两组：
+//   · **正片七章**用的 CS_Chuchuan（序章车厢）与 CS_Ch1_* … CS_Ch6_*
+//     （各章一个文件，基建批留占位、内容批填实）；
+//   · **旧战役五场**（CS_ChuchuanLegacy / CS_LiZongrenTang / CS_LastWire /
+//     CS_WangMingzhang / CS_BeimenBreakout）——从正片流程脱钩，但文件与注册保留：
+//     它们里面的分镜手法、史实注记与「不演王铭章举枪自尽」那段长注释是资产，
+//     删掉等于把账一起删掉。选章的「测试场景」组留了预览入口。
 //
 // 分镜数据结构（Script_Cutscene.mjs 是唯一消费者）：
 //
@@ -457,11 +317,35 @@ import { CS_LiZongrenTang } from "./Data_CutsceneLiZongrenTang.mjs";
 import { CS_LastWire } from "./Data_CutsceneLastWire.mjs";
 import { CS_WangMingzhang } from "./Data_CutsceneWangMingzhang.mjs";
 import { CS_BeimenBreakout } from "./Data_CutsceneBeimenBreakout.mjs";
+import { CH1_CUTSCENES } from "./Data_CutsceneCh1.mjs";
+import { CH2_CUTSCENES } from "./Data_CutsceneCh2.mjs";
+import { CH3_CUTSCENES } from "./Data_CutsceneCh3.mjs";
+import { CH4_CUTSCENES } from "./Data_CutsceneCh4.mjs";
+import { CH5_CUTSCENES } from "./Data_CutsceneCh5.mjs";
+import { CH6_CUTSCENES } from "./Data_CutsceneCh6.mjs";
 
-export const CUTSCENES = {
-  CS_Chuchuan, CS_ChuchuanLegacy,
-  CS_LiZongrenTang, CS_LastWire, CS_WangMingzhang, CS_BeimenBreakout,
-};
+/** 正片七章的过场，按章序摊平。序章复用 CS_Chuchuan（Data_CutsceneChuchuan.mjs）。 */
+export const CHAPTER_CUTSCENES = [
+  CS_Chuchuan,
+  ...CH1_CUTSCENES, ...CH2_CUTSCENES, ...CH3_CUTSCENES,
+  ...CH4_CUTSCENES, ...CH5_CUTSCENES, ...CH6_CUTSCENES,
+];
+
+/** 旧战役五场：从正片流程脱钩，仅留预览入口与留档。 */
+export const LEGACY_CUTSCENES = [
+  CS_ChuchuanLegacy, CS_LiZongrenTang, CS_LastWire, CS_WangMingzhang, CS_BeimenBreakout,
+];
+
+export const CUTSCENES = Object.fromEntries(
+  [...CHAPTER_CUTSCENES, ...LEGACY_CUTSCENES].map((cut) => [cut.id, cut]));
+
+// 章表引用的过场必须真的注册过 —— 打错一个字的后果是「关末什么都不播」，
+// 静默且只在真跑到那一关时才看得见。
+for (const level of LEVELS) {
+  for (const id of [level.cutsceneIn, level.cutsceneOut]) {
+    if (id && !CUTSCENES[id]) throw new Error(`Data_TengxianScript: ${level.id} 引用了没注册的过场 ${id}`);
+  }
+}
 
 // 各场自带的人物表条目并进 CAST（过场文件不许反过来 import CAST，会成环）。
 for (const cut of Object.values(CUTSCENES)) {
@@ -480,10 +364,10 @@ export function FindLevel(id) {
   return LEVELS.find((l) => l.id === id) || null;
 }
 
-/** 过场的播放顺序（给预览页与章节选单用）。 */
+/** 过场的播放顺序（给预览页与选章的「测试场景」组用）：先正片七章，后旧五场。 */
 export const CUTSCENE_ORDER = [
-  "CS_Chuchuan", "CS_ChuchuanLegacy",
-  "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout",
+  ...CHAPTER_CUTSCENES.map((cut) => cut.id),
+  ...LEGACY_CUTSCENES.map((cut) => cut.id),
 ];
 
 // ===========================================================================
@@ -513,7 +397,8 @@ export const CREDITS = [
   "",
   "真实历史人物：王铭章、赵渭滨、张宣武、严翊、侯子平、王麟、孙震、李宗仁、汤恩伯。",
   "他们在本作中只做史料里有的事。",
-  "谢长顺、邱茂才、杨守成为虚构人物 —— 城内约三千人里，绝大多数没有留下名字。",
+  "谢长顺（顺子）、罗班长、幺娃、何有田、刘文财、小秦、赵德贵为虚构人物 ——",
+  "城内约三千人里，绝大多数没有留下名字。",
   "",
   "两处必须并列摆出、不许只说一半的地方：",
   "· 王铭章的殉国方式（1938 年电讯的自戕说 ／ 墓志与回忆的中弹说），本作采后者；",
@@ -541,15 +426,17 @@ export const CREDITS = [
 export const PRESUMED_STAGING = [
   { id: "playerIdentity", value: "谢长顺 / 四川三台 / 十八岁 / 727 团 3 营 9 连二等兵",
     note: "玩家是虚构人物。所属番号（122 师 364 旅 727 团 3 营）为史料，连别与籍贯为推定" },
-  { id: "squadNames", value: ["邱茂才", "杨守成"],
-    note: "班长与连长的名字由设计书写死，均为虚构人物，不对应任何真实军官" },
-  { id: "poolCurve", value: [220, 196, 328, 300, 236, 178, 96, 40],
-    note: "「城里还站着的人」逐关数值全为推定。史料只给三个锚点：城内约 3000 人、能打的不足 2000、突围约 500 人。关卡池是一个班排级切片，不是全城人数，不许拿来当伤亡统计" },
-  { id: "poolGain", value: 132,
-    note: "L1 收容 757 团残部的加成。史料只说「收容数百人」，具体数字无载" },
-  { id: "levelMinutes", value: [14, 16, 22, 15, 20, 16, 12],
-    note: "各关时长为设计值，与史实时段的长短无关" },
-  { id: "cutsceneCameras", value: "五场过场的全部机位世界坐标",
+  { id: "squadNames", value: ["罗班长", "幺娃", "何有田", "刘文财", "小秦", "赵德贵"],
+    note: "顺子那一班的名字由任务流程规格写死（docs/Data_MissionRemake.md §8），均为虚构人物，不对应任何真实军官" },
+  { id: "poolCurve", value: CHAPTERS.flatMap((c, i) => (i === 0 ? [c.pool.start, c.pool.end] : [c.pool.end])),
+    note: "「城里还站着的人」逐章数值全为推定：序章不耗（240→240），一章起逐章递减到终章 12。史料只给三个锚点：城内约 3000 人、能打的不足 2000、突围约 500 人。关卡池是一个班排级切片，不是全城人数，不许拿来当伤亡统计" },
+  { id: "levelMinutes", value: CHAPTERS.map((c) => c.minutes),
+    note: "各章时长为设计值，与史实时段的长短无关（策划案给的是 18—22 分钟量级）" },
+  { id: "aidStationSite", value: "A 区主救护所 = 城内第二区公所大院 (214, -30)",
+    note: "策划案只说「学校/大药铺院落」，城内哪一处无载。选点是本实现推定，三关/四关末/五关开头共用同一个锚点" },
+  { id: "divisionHqSite", value: "城内临时师部 = 城中第 124 师师部那组院落 (-58, -55)",
+    note: "王铭章师部原设城外电灯厂，16 日接死守命令后迁入城内；**城内具体位置无载**，选点为推定" },
+  { id: "cutsceneCameras", value: "全部过场的机位世界坐标",
     note: "分镜表给的是机位高度、俯仰角、焦距与被摄物，**世界坐标全部是本实现推定的**。改机位不算改史实，但改「谁在画面里、他在做什么」算" },
   // 过场侧的推定（机位坐标、随行人数、布景位置……）各场自己登记在
   // Data_Cutscene*.mjs 的 presumed 数组里，这里汇总 —— 一场一个文件，并行改不互踩。

@@ -4,7 +4,7 @@
 // 到街区，避免"全场有几栋房"掩盖某一地块没有生成院落的回归。
 
 import assert from "node:assert/strict";
-import { PHASES } from "./Data_Battle.mjs";
+import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 import {
   WEST_SUBURB_BLOCKS,
   WEST_SUBURB_NAMED_BLOCKS,
@@ -13,9 +13,9 @@ import {
 } from "./Data_WestSuburbBlocks.mjs";
 import { BuildWestSuburbBlocks } from "./Script_WestSuburbBlocks.mjs";
 
-const overview = PHASES.find((phase) => phase.id === "L4_Chengqiang");
-assert.ok(overview, "L4_Chengqiang overview phase is required");
-const { bounds } = overview;
+// 全城俯瞰片：任务流程重制之后它不再是某一章的切片（没有哪一章建整座城），
+// 改成 Data_Battle.OVERVIEW_BOUNDS 这个不可游玩的常量。
+const bounds = OVERVIEW_BOUNDS;
 
 const REQUIRED_LANDMARKS = ["station", "communications", "powerPlant", "exchange"];
 const REQUIRED_CLEARANCES = ["railway", "westStreet", "moat", "wall"];
@@ -113,7 +113,7 @@ for (const block of WEST_SUBURB_ALL_BLOCKS) {
   assert.ok(block.kind.length > 0, `${block.id} kind cannot be empty`);
 
   const rect = BlockRect(block);
-  assert.ok(IsInside(rect, bounds), `${block.id} footprint must sit wholly inside L4_Chengqiang`);
+  assert.ok(IsInside(rect, bounds), `${block.id} footprint must sit wholly inside the city overview slice`);
 }
 
 for (let i = 0; i < WEST_SUBURB_ALL_BLOCKS.length; i += 1) {
@@ -211,7 +211,7 @@ const host = MakeHost();
 BuildWestSuburbBlocks(host, WEST_SUBURB_BLOCKS, {
   groundAt: () => 0,
   damage: 0,
-  phase: "L4_Chengqiang",
+  phase: "CityOverview",
 });
 host.AssertClosed();
 

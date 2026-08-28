@@ -185,8 +185,17 @@ URL 参数选 preset / quality / scene / gi。
 - `Script_TengxianField.mjs` —— 把「城」包成规则层认得的「战场」（GroundHeight /
   Raycast / covers… 的翻译层）。
 - `Script_JieheField.mjs` —— 序关独立场景，不是城的切片。
-- `Data_Battle.mjs` —— 七关目标链与切片边界；`Data_Levels.mjs` 是台儿庄旧版布局（留档）。
-- 先读：`docs/Data_TengxianCity.md`（考据）、`Data_TengxianDesign.md`（关卡与过场设计书）。
+- **章节数据一章一个文件**：`Data_MissionCh0.mjs` … `Data_MissionCh6.mjs`，各导出
+  `CHAPTER`（史料字段 + zones + beats + `tuning` 打法字段）与 `VOICE_LINES`；过场占位在
+  `Data_CutsceneCh1.mjs` … `Data_CutsceneCh6.mjs`（序章复用 `Data_CutsceneChuchuan`）。
+  `Data_TengxianScript.mjs` 与 `Data_Battle.mjs` 只是**组装层**（LEVELS / ZONES / TUNING / PHASES），
+  自己不再写关表；分层校验（打法字段不许摊在 CHAPTER 顶层、zones 数 == objectives 数、
+  zone id 全局唯一、路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
+  `Data_Levels.mjs` 是台儿庄旧版布局（留档）。
+- **没有哪一章会生成整座城了**（重制取消了「城墙关」）：编辑器与几处布设自检要的
+  全城俯瞰片是 `Data_Battle.OVERVIEW_BOUNDS` —— 不可游玩的常量，不进 PHASES。
+- 先读：`docs/Data_MissionRemake.md`（**本轮任务流程的唯一口径**，§10 是工程契约）、
+  `docs/Data_TengxianCity.md`（考据）、`Data_TengxianDesign.md`（上一轮关卡与过场设计书，留档）。
 
 ### 地标（14 个，并行工作包纪律）
 - `Script_LandmarkRegistry.mjs` —— kind → Build 函数注册表；并行制作期**冻结**，

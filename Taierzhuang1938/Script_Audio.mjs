@@ -1968,6 +1968,9 @@ export class AudioEngine {
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;
     this.voiceErrors = [];
+    // 剧情语音**单槽**：同一时刻只许有一条对白在响（见 PlayStoryVoice）。
+    this.storyVoice = null;          // 正在响的那条的 Voice 句柄
+    this.storyVoiceKey = null;       // 它的 key（取证与编辑器用）
     // --- 实录音效采样。盖不上去就用合成的那套，同样不影响任何其他功能 ---
     this.sampleCues = new Set();     // 已经被采样盖住的配方名
     this.sfxErrors = [];
@@ -1975,6 +1978,7 @@ export class AudioEngine {
     this.sfxManifest = null;
     this.lastBarkAt = -99;
     this.lastBarkKindAt = new Map();
+    this.lastBarkPickKey = null;      // 上一次 Bark 实际挑中的 key（取证用）
     this.barkCounter = 0;      // 名字 → 上次触发时间（去重用）
     this.noiseCache = new Map();
     this.shaperCache = new Map();
@@ -2283,8 +2287,13 @@ export class AudioEngine {
     let ok = 0;
     await Promise.all(entries.map(async (e) => {
       try {
+        if (!e.file) throw new Error("没有文件名");
         // 声库资产覆写同名 MP3 时也必须换 URL，否则玩家只会听到浏览器缓存里的旧 take。
-        const bytes = await FetchAudioAsset(`${base}${e.file}?v=20260822qwenprologue`);
+        // **剧情台词不重试**：章节内容批会先把台词写进表、过几天才烘音频，
+        // 中间这段时间每条未烘焙的行都会 404。默认 2 次重试 = 一条缺失台词发三个请求，
+        // 几十条就是开机时几百个白等的请求（「加载卡在夯地」那一类症状的做法）。
+        const bytes = await FetchAudioAsset(`${base}${e.file}?v=20260828chapterstory`,
+          e.kind === "story" ? 0 : 2);
         const buf = await this.ctx.decodeAudioData(bytes);
         const name = "voice." + e.key;
         RECIPES[name] = (A, v) => {
@@ -2509,6 +2518,10 @@ export class AudioEngine {
       // 「手榴弹！莫得了！」，全班有枪时不该被喊「莫得枪的，跟到走」。
       // 这道闸比在每个关卡里挨个屏蔽可靠：漏配的默认行为是**不喊**，而不是乱喊。
       if (e.event) continue;
+      // 章节剧情台词同理，而且更狠：每一条只属于一个人、只在剧本的某一拍成立。
+      // 被随机抽中就是「顺子在别人的关里自言自语」。它们只能由 beat.voice 点名
+      //（走 PlayStoryVoice），这里连 kind 都不让它匹配上。
+      if (e.kind === "story") continue;
       if (e.kind === kind) pool.push(e);
     }
     if (!pool.length) return null;
@@ -2522,7 +2535,60 @@ export class AudioEngine {
 
     this.lastBarkAt = now;
     this.lastBarkKindAt.set(kindKey, now);
+    this.lastBarkPickKey = pick.key;
     return this.Play("voice." + pick.key, { position, volume, pitch, priority });
+  }
+
+  /**
+   * 播一条**章节剧情台词**（`beat.voice` 点名的那条）。
+   *
+   * 刻意不走 Bark，三个理由，每一个都足以单独否掉 Bark：
+   *   1. **节流闸会静默吃掉对白**。Bark 的 0.55 s 全局闸与 4.5 s 同类闸是给
+   *      「一条街上五十个人别同时喊卧倒」用的；用在剧本台词上，结果是
+   *      玩家随机漏听半场戏，而且日志上什么都看不出来。
+   *   2. **±4% 变调会毁掉角色**。Bark 拿变调把 6 个音色摊成一个班；
+   *      剧情台词是某个具体的人的嗓子（顺子/罗班长/幺娃），调一动就不是他了。
+   *   3. **阵营过滤会挡住日方台词**。Bark 按 side 挑池子，而剧本里日军军曹
+   *      开口时调用方并不知道要把 side 也传对。
+   *
+   * 单槽：**新的顶掉旧的**。选顶掉而不是排队，是因为剧本的下一拍已经在演了 ——
+   * 排队会让台词落在错误的画面上（人已经跑进院子，声音还在门外那句）。
+   * 排队的那一半交给 Script_Story：voiced beat 会按音频时长把下一条压住，
+   * 所以「顶掉」在正常节奏下根本不会发生，它只是最后一道保险。
+   *
+   * 距离：位置只用来做空间化，**不许用来丢句子**。超出人声剔除半径就退化成
+   * 非空间化播放（剧情台词听不见 = 剧情丢了；一句「顺哥！机枪停了！」
+   * 本来就是从街那头喊过来的）。
+   *
+   * @returns {{key:string,duration:number,voice:object}|null} null = 没有这条音频，
+   *   由调用方降级成纯字幕（这是常态，不是错误：台词先写、音频后烘）。
+   */
+  PlayStoryVoice(key, { position = null, volume = 1 } = {}) {
+    if (!this.ctx || this.disposed || this.voiceMute) return null;
+    const entry = key ? this.voiceBank.get(key) : null;
+    if (!entry) return null;
+    let at = position;
+    if (at) {
+      const dx = at.x - this.listenerPos.x;
+      const dy = at.y - this.listenerPos.y;
+      const dz = at.z - this.listenerPos.z;
+      if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
+    }
+    this.StopStoryVoice();
+    const voice = this.Play("voice." + key, { position: at, volume, pitch: 1, priority: true });
+    if (!voice) return null;
+    this.storyVoice = voice;
+    this.storyVoiceKey = key;
+    return { key, duration: entry.duration || entry.dur || 0, voice };
+  }
+
+  /** 掐掉正在响的剧情台词（换关、切过场、被下一条顶掉时）。 */
+  StopStoryVoice() {
+    if (!this.storyVoice) return false;
+    const stopped = this.StopVoice(this.storyVoice);
+    this.storyVoice = null;
+    this.storyVoiceKey = null;
+    return stopped;
   }
 
   /**

@@ -211,12 +211,12 @@ const JAIL_TRIM = JailTrim();
 
 export const TRIM_PLACEMENTS = Object.freeze({
   L0_Jiehe: [],
-  L1_Beishahe: RailwayTrim(),
-  L2_Dongguan: [],
-  L3_Fanji: [],
-  L4_Chengqiang: [...ChurchTrim(), ...JAIL_TRIM, ...CIVIC],
-  L5_Shizijie: [...CIVIC],
-  L6_Beimen: [...JAIL_TRIM, ...CIVIC],
+  CH1_NanLu: RailwayTrim(),
+  CH2_Shouliudan: [],
+  CH4_DongguanYe: [],
+  CH3_Jiuhusuo: [...ChurchTrim(), ...JAIL_TRIM, ...CIVIC],
+  CH5_Chengqiang: [...CIVIC],
+  CH6_Zuihou: [...JAIL_TRIM, ...CIVIC],
 });
 
 const docCache = new Map();

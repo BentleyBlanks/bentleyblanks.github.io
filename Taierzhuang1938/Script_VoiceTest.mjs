@@ -32,9 +32,17 @@ await page.waitForFunction(() => window.Taierzhuang && window.Taierzhuang.audio,
 // 真点一下：没有用户手势时 AudioContext 是 suspended 的
 await page.click("#bootStart").catch(() => {});
 await page.evaluate(() => window.Taierzhuang.audio.Unlock());
+// **等整包载完，不是等第一条载完。**
+// 原来的条件是 `voiceBank.size > 0`：只要有一条解好就往下走，于是后面那一串
+// 「载入几条 / 六类齐不齐 / 音量散布」全是在一份**载了一半的声库**上量的。
+// 平时它侥幸不红，是因为文件都在浏览器缓存里、七十条几乎同时解完；
+// 一 bump 缓存戳（改声库时一定会 bump）就整批重下，这条竞态立刻现形，
+// 而症状是「六类口令齐全 FAIL」——看上去像声库坏了，其实是测试没等。
+// LoadPacks 载完会把 voiceLoading 放回 false，那才是「这一趟结束了」的准确信号。
 await page.waitForFunction(
-  () => window.Taierzhuang.audio.voiceBank.size > 0
-     || (window.Taierzhuang.audio.voiceErrors || []).length > 0,
+  () => window.Taierzhuang.audio.voiceLoading === false
+     && (window.Taierzhuang.audio.voiceBank.size > 0
+       || (window.Taierzhuang.audio.voiceErrors || []).length > 0),
   null, { timeout: 180000 }).catch(() => {});
 
 const r = await page.evaluate(() => {
@@ -149,8 +157,32 @@ const motivationContinuous = prologue.motivation.length === 8
 Check("1:08—1:30 八句只触发一个连续音频 cue", motivationContinuous,
   prologue.motivation.map((line) => `${line.who}:${line.voiceCue || "字幕"}`).join(" / "));
 
-Check("配音全部解码成功（一条都不许静默丢）", r.size >= 30 && r.errors.length === 0,
-  `载入 ${r.size} 条，错误 ${r.errors.length} 条${r.errors.length ? "：" + r.errors.join(" / ") : ""}`);
+// 章节剧情台词是**先写词、后烘音**的：内容批把台词写进 Data_MissionChX.mjs 之后，
+// 到烘焙之前那段时间里，它们必然 404。那不是回归，是设计好的降级（纯字幕）——
+// 所以这里把两类错误分开算：战斗口令与序章对白一条都不许丢，剧情台词只报数。
+const storyLoad = await page.evaluate(async () => {
+  const mod = await import("./Data_Voice.mjs");
+  const A = window.Taierzhuang.audio;
+  const story = mod.VOICE_LINES.filter((l) => l.kind === "story");
+  const files = new Set(story.map((l) => l.file));
+  return {
+    total: story.length,
+    baked: story.filter((l) => A.voiceBank.has(l.key)).length,
+    pendingErrors: (A.voiceErrors || []).filter((e) => files.has(e.file)).length,
+    warnings: mod.VOICE_MERGE_WARNINGS,
+    deliveries: mod.VOICE_DELIVERY_MIX,
+  };
+});
+const hardErrors = r.errors.filter((e) => !e.startsWith("vo_ch"));
+Check("配音全部解码成功（战斗口令与序章对白，一条都不许静默丢）",
+  r.size >= 30 && hardErrors.length === 0,
+  `载入 ${r.size} 条，硬错误 ${hardErrors.length} 条${hardErrors.length ? "：" + hardErrors.join(" / ") : ""}`
+  + `；剧情台词 ${storyLoad.baked}/${storyLoad.total} 条已烘焙（其余降级为纯字幕）`);
+// 章节台词的体检（key 命名、who 在 CAST 表里、delivery 合法、日方纯假名、无重复 key）
+// 在 Data_Voice 拼表时做，坏行会被剔出总表 —— 那正是「台词静默消失」的样子，必须报出来。
+Check("章节台词拼表零告警（坏行会被剔出总表 = 台词静默消失）",
+  storyLoad.warnings.length === 0,
+  storyLoad.warnings.length ? storyLoad.warnings.slice(0, 5).join(" / ") : `${storyLoad.total} 条全部通过`);
 Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 hitmarker 用嘴说了一遍）",
   Object.keys(r.kinds).length >= 6, JSON.stringify(r.kinds));
 // 这条断言原来是「日语不许混进来」—— 那是还没有日方声库时的写法，
@@ -166,8 +198,8 @@ Check("日方六类齐全（少一类就会复读）",
 Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",
   r.ijaBaka.length === 0, r.ijaBaka.length ? "命中：" + r.ijaBaka.join(" ") : "干净");
 const battleDurations = await page.evaluate(() => [...window.Taierzhuang.audio.voiceBank.values()]
-  .filter((e) => !e.prologue).map((e) => e.duration));
-Check("战斗 Bark 仍在 0.3—2.6 s（序章对白使用独立时长闸）",
+  .filter((e) => !e.prologue && e.kind !== "story").map((e) => e.duration));
+Check("战斗 Bark 仍在 0.3—2.6 s（序章对白与剧情台词各有独立时长闸）",
   battleDurations.every((d) => d > 0.3 && d < 2.6),
   `战斗最长 ${Math.max(...battleDurations).toFixed(2)}s，最短 ${Math.min(...battleDurations).toFixed(2)}s`);
 const cross = await page.evaluate(() => {
@@ -224,8 +256,10 @@ const mix = await page.evaluate(async () => {
   const voice = await import("./Data_Voice.mjs");
   const sampled = new Set(voice.VOICE_LINES.filter((l) => l.sample).map((l) => l.key));
   const out = [];
-  // voiceBank 只存元数据，解好的缓冲藏在配方闭包里取不到 —— 重新 fetch 一遍最省事
+  // voiceBank 只存元数据，解好的缓冲藏在配方闭包里取不到 —— 重新 fetch 一遍最省事。
+  // 还没烘出音频的剧情台词直接跳过：它们在表里、不在盘上，这是正常状态。
   for (const line of voice.VOICE_LINES) {
+    if (!A.voiceBank.has(line.key)) continue;
     const res = await fetch(voice.VOICE_BASE + line.file);
     const pcm = await A.ctx.decodeAudioData(await res.arrayBuffer());
     const d = pcm.getChannelData(0);
@@ -243,31 +277,143 @@ const mix = await page.evaluate(async () => {
     const sorted = frames.slice().sort((a, b) => a - b);
     out.push({
       key: line.key, sampled: sampled.has(line.key),
+      story: line.kind === "story", delivery: line.delivery || null,
+      dur: pcm.duration,
       rms: 20 * Math.log10(rms + 1e-9),
       floor: 20 * Math.log10(sorted[Math.floor(sorted.length * 0.08)] + 1e-9),
     });
   }
   return out;
 });
-const rmsVals = mix.map((m) => m.rms);
+// 战斗口令与序章对白：一条平线。远近交给距离衰减，不许由文件音量代劳。
+const barkMix = mix.filter((m) => !m.story);
+const rmsVals = barkMix.map((m) => m.rms);
 const spread = Math.max(...rmsVals) - Math.min(...rmsVals);
-Check("整批音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不许由文件音量代劳）",
+Check("战场口令音量一致（散布 ≤ 2.5 dB；远近交给距离衰减，不许由文件音量代劳）",
   spread <= 2.5,
   `有声段 RMS ${Math.min(...rmsVals).toFixed(1)} … ${Math.max(...rmsVals).toFixed(1)} dB，`
   + `散布 ${spread.toFixed(1)} dB`);
+// 剧情台词**不能**拉成同一条平线：耳语必须比常态轻，否则玩家听不出「现在不能出声」。
+// 每条只跟自己那一档的目标比（VOICE_DELIVERY_MIX，与 Script_VoiceBake 共读同一张表）。
+const storyMix = mix.filter((m) => m.story);
+const offBand = storyMix.filter((m) => {
+  const target = (storyLoad.deliveries[m.delivery] || storyLoad.deliveries.normal).rms;
+  return Math.abs(m.rms - target) > 2.0;
+});
+Check("剧情台词各按交付档归一（耳语要比常态轻，不许一刀切齐）",
+  offBand.length === 0,
+  storyMix.length
+    ? (offBand.length ? offBand.map((m) => `${m.key} ${m.delivery} ${m.rms.toFixed(1)}dB`).join(" ")
+      : `${storyMix.length} 条全部落在各自档位 ±2.0 dB 内`)
+    : "本轮还没有已烘焙的剧情台词");
 // 实录那条（惨叫）的「底噪」量到的是它自己的衰减尾巴，豁免。
 // 这只是 20 ms 幅度分位烟测，不是 VAD：短促、没有停顿的低声对白会把最轻的
 // 人声尾音量成约 -36…-39 dB。把失败线放在 -35 dB，仍会抓住此前确实带房间声的
 // -18.7 dB 坏 take，同时不靠给短句硬塞静音来“过测试”。
-const noisy = mix.filter((m) => !m.sampled && m.floor > -35);
+// **短句也豁免**：削掉首尾静音之后，一句 0.4 s 的话里一格静音都不剩，
+// 第 8 百分位量到的是最轻的那个人声帧（实测「晓得。」量出 −23 dB，而它其实是干净的）。
+// 短句的底噪闸在烘焙侧，量的是原始 take 里那段真静音（Script_VoiceBake.NoiseFloorRaw）。
+const FLOOR_MIN_S = 1.2;
+const measurable = mix.filter((m) => !m.sampled && m.dur >= FLOOR_MIN_S);
+const noisy = measurable.filter((m) => m.floor > -35);
 Check("没有自带环境音（TTS 偶尔会附一层房间声/风声，混在战场上就是穿帮）",
   noisy.length === 0,
   noisy.length ? noisy.map((m) => `${m.key} ${m.floor.toFixed(0)}dB`).join(" ")
-    : `最吵的一条 ${Math.max(...mix.filter((m) => !m.sampled).map((m) => m.floor)).toFixed(0)} dB`);
+    : `可量的 ${measurable.length} 条里最吵的一条 ${Math.max(...measurable.map((m) => m.floor)).toFixed(0)} dB`
+      + `（另有 ${mix.length - measurable.length} 条短于 ${FLOOR_MIN_S}s 或为实录，按烘焙侧的闸算）`);
 
 Check("节流生效：连着两句只出一句（五十个人不能同时喊卧倒）", r.firstOk && r.secondBlocked,
   `第一句${r.firstOk ? "出" : "没出"}，第二句${r.secondBlocked ? "被吃掉" : "也出了"}`);
 Check("指定 key 能喊到那一句（下命令不能从 rally 里随便挑）", r.keyedOk, "rally_hold");
+
+// ---------------------------------------------------------------------------
+// 章节剧情台词的通道：beat.voice → Story.AttachVoice → Audio.PlayStoryVoice
+// 这一段验的是**接线**，不是声库：系统建好了没接上，在这个项目里已经发生过好几次。
+// ---------------------------------------------------------------------------
+const chan = await page.evaluate(async () => {
+  const A = window.Taierzhuang.audio;
+  // 剧情台词不许被随机抽中：塞一条假的 story 行进池子，喊 240 次看它会不会被挑走。
+  A.voiceBank.set("__test_story", { key: "__test_story", kind: "story", text: "测试", side: "nra" });
+  let leaked = false;
+  for (let i = 0; i < 240; i += 1) {
+    A.lastBarkAt = -99; A.lastBarkKindAt.clear(); A.lastBarkPickKey = null;
+    A.Bark(["spot", "ammo", "move", "rally", "warn", "hurt", "story"][i % 7], { seed: i });
+    if (A.lastBarkPickKey === "__test_story") leaked = true;
+  }
+  const storyKindPool = A.Bark("story", { seed: 1 });
+  A.voiceBank.delete("__test_story");
+
+  // PlayStoryVoice：点名能播、缺音频静默降级、单槽顶掉、不吃 Bark 的节流闸
+  A.lastBarkAt = A.ctx.currentTime;              // 假装刚有人喊过（Bark 此刻会闸掉一切）
+  const first = A.PlayStoryVoice("rally_hold");
+  const firstHandle = A.storyVoice;
+  const second = A.PlayStoryVoice("rally_charge");
+  const missing = A.PlayStoryVoice("ch9_nobody_01");
+  const nullKey = A.PlayStoryVoice(null);
+  const slotKey = A.storyVoiceKey;
+  A.StopStoryVoice();
+  return {
+    leaked, storyKindPool: !!storyKindPool,
+    firstOk: !!first && first.duration > 0,
+    preempted: !!second && A.storyVoice !== firstHandle && slotKey === "rally_charge",
+    missingNull: missing === null && nullKey === null,
+    stopped: A.storyVoice === null,
+  };
+});
+Check("剧情台词进不了 Bark 的随机池（只能由 beat.voice 点名）",
+  !chan.leaked && !chan.storyKindPool,
+  chan.leaked ? "被随机抽中了" : "240 次随机挑选一次都没抽到，Bark(\"story\") 也返回 null");
+Check("PlayStoryVoice 点名能播，且不吃 Bark 的 0.55 s / 4.5 s 节流闸（对白不许随机消失）",
+  chan.firstOk, "rally_hold");
+Check("剧情语音单槽：新的顶掉旧的（不叠成两个人同时说话）", chan.preempted,
+  `槽里现在是 ${chan.preempted ? "rally_charge" : "没换过来"}`);
+Check("没有音频时静默降级返回 null（台词先写、音频后烘是常态，不许报错阻塞）",
+  chan.missingNull && chan.stopped, "ch9_nobody_01 / null 都返回 null，StopStoryVoice 清空了槽");
+
+// Story 侧：带 voice 的 beat 会调宿主回调，字幕跟着音频时长走；没接线时照样出字幕。
+const storyChan = await page.evaluate(async () => {
+  const { StoryDirector } = await import("./Script_Story.mjs");
+  const said = [];
+  const hud = { Say: (who, text, seconds) => said.push({ who, text, seconds }), Title: () => {} };
+  const played = [];
+  const d = new StoryDirector({ hud, audio: null });
+
+  d.AttachVoice(({ key, who, position }) => { played.push({ key, who, position }); return { duration: 3.0 }; },
+    (who) => ({ x: 1, y: 2, z: 3, who }));
+  d.Play({ type: "line", who: "shunzi", text: "晓得。", voice: "ch0_shunzi_01" }, false);
+  const voiced = { subtitle: said.at(-1).seconds, hold: d.sinceLast, log: d.voiceLog.slice() };
+
+  // 没接线：纯字幕，默认时长，绝不抛
+  d.AttachVoice(null);
+  d.Play({ type: "line", who: "shunzi", text: "老子不松，一起死。", voice: "ch1_shunzi_04" }, false);
+  const bare = { subtitle: said.at(-1).seconds, hold: d.sinceLast };
+
+  // 宿主抛异常：吞掉、留痕、剧本继续
+  d.AttachVoice(() => { throw new Error("宿主炸了"); });
+  let threw = false;
+  try { d.Play({ type: "shout", who: "luo", text: "上刺刀！", voice: "ch4_luo_11" }, false); }
+  catch { threw = true; }
+  return {
+    voiced, bare, threw, misses: d.VoiceMisses, voicedCount: d.VoicedCount,
+    subtitles: said.length, calls: played,
+  };
+});
+Check("beat.voice 会把 key 与说话人交给宿主（定位说话人是宿主的事，不是叙事层的）",
+  storyChan.calls.length === 1 && storyChan.calls[0].key === "ch0_shunzi_01"
+  && storyChan.calls[0].who === "shunzi" && storyChan.calls[0].position?.x === 1,
+  JSON.stringify(storyChan.calls));
+Check("字幕跟着语音走：3.0 s 的台词字幕不早于音频结束（line 默认 4.2 s，取长者）",
+  storyChan.voiced.subtitle >= 3.0 && storyChan.voiced.subtitle >= 4.2,
+  `字幕 ${storyChan.voiced.subtitle.toFixed(2)}s`);
+Check("有语音的一条会占住话筒到说完（下一条不许从中间打断）",
+  storyChan.voiced.hold < 0 && storyChan.voiced.hold <= 2.0 - 3.0,
+  `sinceLast=${storyChan.voiced.hold.toFixed(2)}（负数 = 下一条还要再等这么久）`);
+// 未接线不记进 VoiceMisses：那是全局状态（整局都没有语音），不是这一条台词的问题；
+// 每条都记一遍只会把日志淹掉。宿主抛异常则必须记 —— 那是真的丢了一句。
+Check("没接线 / 宿主抛异常都只降级成纯字幕，绝不中断剧本",
+  !storyChan.threw && storyChan.bare.subtitle === 4.2 && storyChan.bare.hold === 0
+  && storyChan.subtitles === 3 && storyChan.misses.length === 1,
+  `三条 beat 都出了字幕；宿主抛异常的那条记进 VoiceMisses：${storyChan.misses.join(" ") || "（空）"}`);
 
 // 真打起来会不会喊 —— 上面几条只证明「声库能放」，不证明「战场上真的接上了」。
 // 这是最容易漏的一段：系统建好了但没接线，这个项目里已经发生过好几次

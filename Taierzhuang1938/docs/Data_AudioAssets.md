@@ -78,6 +78,158 @@ node Taierzhuang1938/Script_VoiceTest.mjs
 
 ---
 
+# 章节剧情语音（2026-08-28 任务流程重制）
+
+七章正片的台词语音通道。规格出处：`docs/Data_MissionRemake.md` §10.2（CAST id）与 §10.3（台词→语音）。
+与战场口令（下面那三十几条 Bark）**是两类活**，除了共用同一条 SeedAudio 管线与同一个
+`Audio/` 目录，后期参数、挑选方式、失败行为全都不一样：
+
+| | 战场口令 | 章节剧情台词 |
+| --- | --- | --- |
+| 谁喊 | 谁都行，按 `kind` 随机挑 | 只能是那个人（`who` = CAST id） |
+| 怎么触发 | `Audio.Bark(kind)`，带全局与同类两道节流闸 | `beat.voice` 点名 → `Audio.PlayStoryVoice(key)`，**不吃那两道闸** |
+| 变调 | ±4%，把 6 个音色摊成一个班 | 无。调一动就不是那个人了 |
+| 长度 | 3—12 字，压到 Bark 的默认上限 | 整句，按字数给上限（`StoryMaxDur`） |
+| 响度 | 全部齐平到 `TARGET_RMS` | 按交付档分（`VOICE_DELIVERY_MIX`），耳语必须更轻 |
+| 没有音频时 | 不喊 | **纯字幕照演**（台词先写、音频后烘是常态） |
+
+## 命名规则
+
+- 语音 key：`ch<N>_<who>_<两位序号>`，例如 `ch3_yaowa_07`。
+- 文件名：`vo_<key>.mp3`，落 `Audio/`。行里不写 `file` 时由 `Data_Voice.Normalize` 按 key 推出来 —— 别手写，写错的后果是静默 404。
+- 行本体写在 `Data_MissionChX.mjs` 的 `VOICE_LINES`（章节内容批的文件），`Data_Voice.mjs` 只做拼接与体检；
+  拼表时 key 命名、`who` 是否在 `STORY_CAST_IDS` 里、`delivery` 是否合法、日方是否纯假名、有无重复 key 逐条查，
+  坏行会被**剔出总表**并记进 `VOICE_MERGE_WARNINGS`（`Script_VoiceTest` 断言它是空的 —— 坏行被剔掉的样子就是「台词静默消失」）。
+
+一行的最小写法（其余字段可省）：
+
+```js
+{ key: "ch3_yaowa_07", who: "yaowa", delivery: "whisper", dur: 0, text: "这些人都没枪了……" }
+```
+
+`dur: 0` 是**必须写的占位**：烘焙完由 `Script_VoiceBake` 把实测时长写回这一行（写回的是行所在的
+`Data_MissionChX.mjs`，不是 `Data_Voice.mjs`）。运行时用的是解码出来的真实时长，`dur` 只给纯 Node 侧估算用。
+
+## 音色表
+
+一个 CAST id 一条提示词，在 `Script_VoiceBake.CAST_VOICE_PROMPTS`；年龄/性格口径来自
+`Data_MissionRemake.md` §8 人物速查。SeedAudio 这条接口没有音色 id、没有情绪参数
+（pitch/speech/loudness 三个 rate 固定为 0），**音色完全靠描述词约束**，所以提示词就是演员表：
+
+| CAST id | 人物 | 声音口径（摘要） |
+| --- | --- | --- |
+| `shunzi` | 顺子（玩家） | 二十出头，年轻偏干不亮，警惕木讷、话短，不油滑 |
+| `luo` | 罗班长 | 三十五到四十，沙哑粗嗓男中低音，命令不容置疑，骂人是日常语气 |
+| `yaowa` | 幺娃 | 十六七岁少年兵，偏亮偏细、气息浅，情绪藏不住 |
+| `heyoutian` | 何有田 | 三十上下，嗓门大位置靠前、尾音上扬，带笑意的江湖气 |
+| `liuwencai` | 刘文财 | 二十五到三十，嗓子紧、语速快、咬字碎，算账口吻 |
+| `xiaoqin` | 小秦 | 二十出头通信兵，清亮干净、咬字清楚，报话一板一眼 |
+| `zhaodegui` | 赵德贵 | 四十上下，胸腔厚、语速慢，话不多但落地 |
+| `paizhang` | 负伤排长 | 三十多岁军官，有威信但气息不够用，句尾往下掉 |
+| `junyi` | 军医/卫生兵 | 三十多岁，疲惫、语速快、边动手边说，情绪已磨平 |
+| `s124` | 124 师伤兵 | 二十五到三十川军，气力不足、慢半拍，带建制被打散的茫然 |
+| `danjiayuan` | 担架员 | 二十多岁，说话夹在喘气里，句子被呼吸切断 |
+| `shangbing` | 伤员 | 重伤躺着，轻、靠后、断续，从牙缝里挤字 |
+| `junguan` | 兵站军官 | 三十五上下，中低音有穿透力，急而清楚，不表演式咆哮 |
+| `canmou` | 通信参谋 | 四十上下，稳、咬字清楚，复诵电文的职业口吻 |
+| `wangmingzhang` | 王铭章 | 四十五到五十的川籍将领，沉毅克制，冷静追问，不慷慨陈词 |
+| `ija_gunso` | 日军军曹 | 三十上下日本男性，硬、方正、操典断句；**text 必须纯假名** |
+
+CAST id 与音色表一一对应是**硬闸**：`Script_VoiceBake` 启动时对表，缺一条直接退出（缺了不会报错，
+只会把那个人换成通用四川男兵 —— 听得出来，但没人查得到原因）。
+
+## 交付档（delivery）
+
+与音色正交的第二层：同一个顺子要能压着嗓子说、也要能在最后一条街上吼。
+四档的数值在 `Data_Voice.VOICE_DELIVERY_MIX`（烘焙与测试共读这一张表），提示词在
+`Script_VoiceBake.DELIVERY_PROMPTS`：
+
+- `normal` —— 常态对白；
+- `shout` —— 战场急喊（与战斗口令同一档音量）；
+- `whisper` —— 第三关摸到救护点外那一段的耳语。**必须比常态轻**：拉齐了就是「压低声音地大喊」，
+  玩家是靠音量差听出「现在不能出声」的。atempo 上限也压到几乎不动，气声被拉快会先碎；
+- `weak` —— 负伤、临终、脱力。同理不许抬齐。
+
+**惨叫、哭嚎、纯痛呼不走 TTS。** 非语言的嗓音模型做不像（`hurt_scream` 那一条的教训在下一节），
+这类行写 `sample: { item, path, credit, maxDur }` 从免版税素材库取真人录音。按新剧本，
+以下位置已知需要走实录，内容批写到时直接标 `sample`，不要让 SeedAudio 去演：
+
+- 第三关前沿救护点：处决段的短促惨叫（§4 阶段 7）；
+- 第三关/第四关：大出血伤员的痛呼（有词的呻吟仍可走 `weak` 档 TTS，纯「啊——」走实录）；
+- 第四关：罗班长中弹瞬间的闷哼。
+- 有词的怒吼（顺子最后那四句、幺娃的「日你先人！」）走 `shout` 档 TTS —— 那是台词，不是惨叫。
+
+## 烘焙命令
+
+```powershell
+node Taierzhuang1938/Script_VoiceBake.mjs --story          # 七章全部剧情台词（只烘没有音频的）
+node Taierzhuang1938/Script_VoiceBake.mjs --chapter=3      # 只烘第三关那一章
+node Taierzhuang1938/Script_VoiceBake.mjs ch3_yaowa_07 --force   # 单条重烘
+node Taierzhuang1938/Script_VoiceBake.mjs --story --dry    # 只看要烘哪些、各自什么档，不花钱
+```
+
+密钥只从 `VOLCENGINE_API_KEY` 环境变量读，绝不进仓库、日志或截图。
+
+**短句的两条闸都改过（2026-08-28 实测「晓得。」踩出来的）：**
+
+1. **响度要量成品，不量中间产物。** 原来按 stage.wav 一次性写死增益，成品从不回看；
+   一条 0.6 s 的短话目标 −16.1 dBFS，出来是 −13.4。病根不是 mp3，是**有声段 RMS 在短句上本来就不稳**
+   （20 ms 帧格与句子起点对不齐，30 个帧里换掉一两个就是好几分贝，和 loudnorm 在短句上不准是同一个道理）。
+   现在按成品实测值补差、从同一份 stage 重编，**永远只有一代 mp3**。
+2. **底噪要量原始 take，不量削完静音的成品。** 削掉首尾静音之后，短句里一格静音都不剩，
+   第 8 百分位量到的是最轻的那个人声帧（实测 −23 dB），干净的一条会被判成「有房间声」，
+   白重摇两次还差点被 `afftdn` 啃掉辅音。短于 `FLOOR_MIN_S` 的成品改从原始 take 上量
+   （`NoiseFloorRaw`：先扔掉数字静音，取最轻的**真实**信号，再按施加的增益折算），
+   并且短句一律不做降噪 —— 0.4 s 的音里没有可供建模的噪声段。
+
+## 运行时：从 beat 到声音
+
+```
+Data_MissionChX.beats[i].voice = "ch3_yaowa_07"
+  → Script_Story.Play()  ── beat.voice 存在就调宿主回调
+  → StoryDirector.AttachVoice(playFn) 注入的 playFn({ key, who, position })
+  → Script_Audio.PlayStoryVoice(key, { position })
+  → RECIPES["voice.ch3_yaowa_07"]（与音效共用 Panner / 空气低通 / 混响 / 预算闸）
+```
+
+- **定位说话人是宿主的事**，不是叙事层的：Story 手里没有场景、没有演员表位置，只报 `who` 与 `key`。
+  宿主可以传对象形式 `AttachVoice({ play, locate, stop })`，`locate(who)` 给世界坐标、`stop()` 换关时掐掉上一句。
+- **单槽**：`PlayStoryVoice` 播新的之前先停旧的（不叠成两个人同时说话）。
+  排队的那一半在 Story 侧：带语音的一条会按音频时长把下一条压住（`VOICE_HOLD_MAX` 封顶），
+  所以正常节奏下根本轮不到「顶掉」，它只是最后一道保险。
+- **字幕跟着语音走**：字幕停留取「默认时长」与「音频时长 + 尾巴」的**长者**（`SUBTITLE_MAX` 封顶）。
+  反过来不成立 —— 音频短不代表字幕可以更短，字幕有自己的可读下限。
+- **位置只用于空间化，不用于丢句子**：说话人超出人声剔除半径就退化成非空间化播放。
+  一句「顺哥！机枪停了！」本来就是从街那头喊过来的，被距离闸丢掉等于剧情丢了。
+- 剧情台词**进不了 Bark 的随机池**（`kind === "story"` 在挑选时直接跳过），只能点名。
+
+## 降级链（每一层都不许报错阻塞）
+
+| 情况 | 行为 |
+| --- | --- |
+| beat 没写 `voice` | 纯字幕，与改造前逐字等价 |
+| 宿主没接 `AttachVoice` | 纯字幕，默认字幕时长 |
+| 那条还没烘出音频（404） | 纯字幕；`LoadVoices` 对 `kind:"story"` **不重试**（几十条未烘焙 = 开机几百个白等的请求），失败计入 `voiceErrors` |
+| 宿主回调抛异常 | 吞掉、记进 `StoryDirector.VoiceMisses`、字幕照出 |
+| 玩家关了语音 / AudioContext 没解锁 | 同上，纯字幕 |
+
+取证口：`StoryDirector.VoicedCount` / `.VoiceMisses`（这一关点了名却没响的 key）、
+`AudioEngine.storyVoiceKey`（此刻槽里是谁）。
+
+## 本节验证入口
+
+```powershell
+node Taierzhuang1938/Script_VoiceBake.mjs --story --dry
+node Taierzhuang1938/Script_TestRunner.mjs --domain-only=voice
+```
+
+`Script_VoiceTest.mjs` 除原有的声库闸外，还验：章节台词拼表零告警、剧情行进不了随机池、
+`PlayStoryVoice` 点名能播且不吃节流闸、单槽顶掉、缺音频返回 null、`beat.voice` 把 key 与说话人交给宿主、
+字幕不早于音频结束、没接线/宿主抛异常都只降级成纯字幕。
+剧情台词的响度按各自交付档验（不并进战场口令那条「散布 ≤ 2.5 dB」的平线）。
+
+---
+
 # 音效：从「全部合成」换成「实录采样盖在合成上」
 
 2026-08-19。此前这个项目的 32 个音效全部是 WebAudio 现场合成的（`Script_Audio.mjs`

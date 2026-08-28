@@ -37,8 +37,17 @@ const MAX_DRAW_CALLS = 5000;
 const MAX_TRIANGLES = 6000000;
 
 let failed = 0;
-// 七关各启一次：每关换天光、换切片，是不同的 shader 分支组合与不同的几何量
+// 章节表：按 id 分派逐章专项断言（原来按 phase 序号写死，任务流程重制换了一整套
+// 章节之后，序号与内容的对应整个错位 —— 改成从数据层现取 id）。
+const { PHASES } = await import("./Data_Battle.mjs");
+const LEVEL_IDS = PHASES.map((p) => p.id);
+// 序章是过场承载章：它借第一章的切片开机（tuning.fieldFrom），场上不撒兵。
+const CUTSCENE_ONLY = new Set(PHASES.filter((p) => p.cutsceneOnly).map((p) => p.id));
+
+// 七章各启一次：每章换天光、换切片，是不同的 shader 分支组合与不同的几何量
 for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
+  const levelId = LEVEL_IDS[phase];
+  const cutsceneOnly = CUTSCENE_ONLY.has(levelId);
   problems.length = 0;
   const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=high&scale=small`;
   let health = null;
@@ -52,7 +61,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       null, { timeout: 30000 });
     await page.evaluate(() => window.Taierzhuang.StepFrames(120));
     await page.waitForTimeout(600);
-    health = await page.evaluate((testPhase) => {
+    health = await page.evaluate(({ testPhase, testLevelId }) => {
       const T = window.Taierzhuang;
       const gl = T.renderer.getContext();
       const glError = gl.getError();
@@ -200,9 +209,11 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         // registered 是全部登记数（碰撞永远全量）
         externalStreaming: T.battlefield?.externalStreamer
           ? T.battlefield.externalStreamer.Stats() : null,
-        wallCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckWallCorridor
-          ? T.battlefield.CheckWallCorridor() : null,
-        sightCorridor: level === "L4_Chengqiang" && T.battlefield?.CheckSightCorridor
+        // 墙顶回廊那一条已经没有承载章了：重制之后没有哪一章生成整圈城墙
+        // （CheckWallAccess 要 800 m 以上的可达墙顶），留给编辑器的全城俯瞰片
+        // （Data_Battle.OVERVIEW_BOUNDS）去验。这里只留通视走廊 ——
+        // 那正好是第五章「城墙没有了」的关卡机制：西门大街一眼望穿。
+        sightCorridor: testLevelId === "CH5_Chengqiang" && T.battlefield?.CheckSightCorridor
           ? T.battlefield.CheckSightCorridor() : null,
         skyTexels,
         geoTexels,
@@ -226,7 +237,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         stableVfxLightPool: T.lights.fireLights.every((light) => light.visible)
           && T.lights.muzzle.visible,
       };
-    }, phase);
+    }, { testPhase: phase, testLevelId: levelId });
     await page.evaluate(() => { window.Taierzhuang.renderer.info.autoReset = true; });
     // 出生点前方得有路。
     //
@@ -284,7 +295,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     // 画面不是纯色：黑屏、只剩天空、只剩雾，三种事故都表现为 spread 极小
     if (health.spread < 8) bad.push(`画面近乎纯色 spread=${health.spread}`);
     // 夜战本来就只有很窄的一段动态，阀值得分档
-    const toneFloor = (phase === 3 || phase === 5) ? 5 : 12;
+    const toneFloor = (PHASES[phase].sky === "night" || PHASES[phase].sky === "dawn") ? 5 : 12;
     if (health.tones < toneFloor) bad.push(`色调档位太少 tones=${health.tones}`);
     if (!health.hasEnvironment) bad.push("场景缺少环境贴图（人物与刀枪会变黑）");
     if (health.drawCalls < 12) bad.push(`几乎没画东西 calls=${health.drawCalls}`);
@@ -302,8 +313,9 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (health.skyTexels === 0) bad.push("预通道里没有 w=0 的天空像素（天空穹又混进预通道了？）");
     if (health.vfxDepthValid !== 1) bad.push("粒子层没接上预通道（远处的烟会没有大气透视）");
     if (!(health.vfxFogDensity > 0)) bad.push(`粒子层的雾没接上 density=${health.vfxFogDensity}`);
-    // 生活层必须在实际关卡切片里生成。只查包含对应内容的两关，避免把别关的裁剪
-    // 当事故：L0 负责界河村落，L5 负责城内十字街与精细院落。
+    // 生活层必须在实际章节切片里生成。只查包含对应内容的那一章，避免把别章的裁剪
+    // 当事故：CH1 负责城外村落，CH5 负责城内街道与精细院落，CH3 负责东城墙细节。
+    // 点光那一组与场景内容无关（爆炸/常驻火光的灯池），仍固定在第一次开机时验。
     if (phase === 0) {
       const persistentLights = health.persistentLightState;
       const explosionEarly = health.explosionLightEarly;
@@ -327,41 +339,55 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       if ([...earlyColors].every((color) => lateColors.has(color))) {
         bad.push("爆炸点光没有随白热核 → 橙红火球发生颜色过渡");
       }
+    }
+    // 城外布设（津浦路路基 + 路西村庄 + 大车路）：口径从旧界河那一关搬到第一章。
+    // 阈值按 OUTFIELD_SCENES["CH1_NanLu"] 那份 spec 的实测量重定 —— 界河那一片
+    // 是另一份密度得多的 spec，照抄它的门槛必红。
+    if (levelId === "CH1_NanLu") {
       const outfield = health.environment?.outfield;
       if (!outfield || outfield.villagePropClusters < 1 || outfield.villageProps < 5) {
         bad.push(`村落生活层为空 clusters=${outfield?.villagePropClusters ?? "?"} props=${outfield?.villageProps ?? "?"}`);
       }
-      if (!outfield || outfield.banks < 5 || outfield.pits < 25
-        || outfield.craters < 35 || outfield.graves < 40 || outfield.trees < 250
-        || outfield.villageBuildings < 105) {
-        bad.push(`界河战术布设不足 banks=${outfield?.banks ?? "?"} pits=${outfield?.pits ?? "?"}`
+      if (!outfield || outfield.banks < 1 || outfield.pits < 5
+        || outfield.craters < 5 || outfield.graves < 10 || outfield.trees < 40
+        || outfield.villageBuildings < 20) {
+        bad.push(`城外战术布设不足 banks=${outfield?.banks ?? "?"} pits=${outfield?.pits ?? "?"}`
           + ` craters=${outfield?.craters ?? "?"} graves=${outfield?.graves ?? "?"}`
           + ` trees=${outfield?.trees ?? "?"} houses=${outfield?.villageBuildings ?? "?"}`);
       }
     }
-    if (phase === 5) {
+    if (levelId === "CH5_Chengqiang") {
       const city = health.environment?.city;
       if (!city || city.householdProps < 5 || city.streetClusters < 1
         || city.streetProps < 5 || city.roadMarks < 5) {
         bad.push(`城镇生活层不足 household=${city?.householdProps ?? "?"} streetClusters=${city?.streetClusters ?? "?"} streetProps=${city?.streetProps ?? "?"} roadMarks=${city?.roadMarks ?? "?"}`);
       }
     }
-    if (phase === 4) {
+    // 城墙细节层：旧口径钉在「城墙关」上，重制之后没有哪一章建整圈城墙了。
+    // 改成**按切片里到底有没有那样东西**来判：墙段进得来就验补砖/泄水嘴/弹着疤，
+    // 角楼进得来才验角楼细节。这样谁也不用再手工维护「哪一关该验哪一条」。
+    const sliceBounds = PHASES[phase].bounds;
+    const inSlice = (x, z) => x >= sliceBounds.minX && x <= sliceBounds.maxX
+      && z >= sliceBounds.minZ && z <= sliceBounds.maxZ;
+    const wallInSlice = [[305, 0], [-305, 0], [0, 305], [0, -305]].some(([x, z]) => inSlice(x, z));
+    const cornerInSlice = [[305, 305], [305, -305], [-305, 305], [-305, -305]]
+      .some(([x, z]) => inSlice(x, z));
+    if (wallInSlice || cornerInSlice) {
       const city = health.environment?.city;
-      if (!city || city.wallDetails < 80 || city.cornerTowerDetails < 40) {
-        bad.push(`城墙细节层不足 wall=${city?.wallDetails ?? "?"} corner=${city?.cornerTowerDetails ?? "?"}`);
+      if (wallInSlice && (!city || city.wallDetails < 30)) {
+        bad.push(`城墙细节层不足 wall=${city?.wallDetails ?? "?"}`);
       }
-      if (!health.wallCorridor?.ok) {
-        bad.push(`城墙回廊失联 top=${health.wallCorridor?.topReachableSpan ?? "?"} leak=${health.wallCorridor?.leakSpan ?? "?"}`);
+      if (cornerInSlice && (!city || city.cornerTowerDetails < 10)) {
+        bad.push(`角楼细节层不足 corner=${city?.cornerTowerDetails ?? "?"}`);
       }
-      if (!health.sightCorridor?.ok) {
-        bad.push(`西门至十字街通视被挡 blockers=${health.sightCorridor?.blockers?.length ?? "?"}`);
-      }
+    }
+    if (levelId === "CH5_Chengqiang" && !health.sightCorridor?.ok) {
+      bad.push(`西门至十字街通视被挡 blockers=${health.sightCorridor?.blockers?.length ?? "?"}`);
     }
     if (health.decalOrigin.join(",") !== "17,3,-9") bad.push(`贴花仍被物理抬离命中面 ${health.decalOrigin}`);
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
-    if (health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
+    if (!cutsceneOnly && health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
     const expectedSprites = {
       legacy: { frames: 16, grid: "4,4", size: 1024 },
       compact: { frames: 25, grid: "5,5", size: 1024 },
@@ -394,7 +420,8 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
         import("./Script_ExternalProps.mjs"), import("./Data_Battle.mjs"),
       ]);
       const p = PHASES[phaseIndex];
-      return ExternalPropCount(p.id, p.bounds);
+      // 借片的章（序章）按 fieldFrom 取布设表 —— 与 Script_Main.FieldIdFor 同一条口径。
+      return ExternalPropCount(p.fieldFrom || p.id, p.bounds);
     }, phase);
     if (!health.externalProps || health.externalProps.count !== expectedExternalProps
       || health.externalProps.failed?.length) {
@@ -424,14 +451,13 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       ? `${String(health.level).padEnd(14)} spread=${health.spread} tones=${health.tones} calls=${health.drawCalls} `
         + `tris=${(health.triangles / 1000).toFixed(0)}k programs=${health.programs} alive=${health.alive} `
         + `sky=${(health.skyTexels / (health.skyTexels + health.geoTexels) * 100).toFixed(0)}%`
-        + (phase === 0 ? ` villageProps=${health.environment?.outfield?.villageProps ?? "?"}` : "")
-        + (phase === 4 ? ` wallDetails=${health.environment?.city?.wallDetails ?? "?"}`
-          + ` cornerDetails=${health.environment?.city?.cornerTowerDetails ?? "?"}`
-          + ` wallTop=${health.wallCorridor?.topReachableSpan ?? "?"}m`
-          + ` leak=${health.wallCorridor?.leakSpan ?? "?"}m` : "")
-        + (phase === 5 ? ` streetProps=${health.environment?.city?.streetProps ?? "?"}`
+        + (levelId === "CH1_NanLu" ? ` villageProps=${health.environment?.outfield?.villageProps ?? "?"}` : "")
+        + (health.environment?.city ? ` wallDetails=${health.environment.city.wallDetails ?? "?"}`
+          + ` cornerDetails=${health.environment.city.cornerTowerDetails ?? "?"}` : "")
+        + (levelId === "CH5_Chengqiang" ? ` streetProps=${health.environment?.city?.streetProps ?? "?"}`
           + ` householdProps=${health.environment?.city?.householdProps ?? "?"}`
-          + ` roadMarks=${health.environment?.city?.roadMarks ?? "?"}` : "")
+          + ` roadMarks=${health.environment?.city?.roadMarks ?? "?"}`
+          + ` sight=${health.sightCorridor?.ok ? "ok" : "blocked"}` : "")
       : "(no health)")
     + (spawnRun ? ` spawnRun=${spawnRun.ran}m` : "")
     + (bad.length ? `  << ${bad.join("; ")}` : ""));

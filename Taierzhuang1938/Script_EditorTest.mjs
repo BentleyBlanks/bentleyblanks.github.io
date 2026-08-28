@@ -1671,15 +1671,15 @@ const prologueRow = await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   let requested = false;
   // 不在这一条真的重载页面；替身只验证列表项会走独立的新版序章入口，
-  // 而不是误落到 L0_界河。真正预览页的完整起播与收口已在第 9 节验证。
+  // 而不是误落到某一片战斗切片。真正预览页的完整起播与收口已在第 9 节验证。
   active.host.game.OpenProloguePreview = () => { requested = true; };
   const rows = [...active.levelList.root.children];
   const prologue = rows.find((row) => row.textContent.includes("序章 · 出川（车厢）"));
-  const beishahe = rows.find((row) => row.textContent.includes("北沙河 · 入城"));
+  const battleRow = rows.find((row) => row.textContent.includes("往南的路"));
   prologue?.click();
   // 走 ListBox 行的真实 click，不直接调 JumpToLevel，确保 UI 选关链路也在测试内。
-  beishahe?.click();
-  return { requested, present: !!prologue, battleRowPresent: !!beishahe };
+  battleRow?.click();
+  return { requested, present: !!prologue, battleRowPresent: !!battleRow };
 });
 Check("场景编辑器列出新版车厢序章并走独立入口",
   prologueRow.present && prologueRow.requested && prologueRow.battleRowPresent,
@@ -1701,7 +1701,7 @@ const menuSlice = await page.evaluate(() => {
   };
 });
 Check("主菜单打开的场景关卡编辑器能切到所选关卡切片",
-  menuSlice.id === "L1_Beishahe" && menuSlice.built === 1 && !menuSlice.menu
+  menuSlice.id === "CH1_NanLu" && menuSlice.built === 1 && !menuSlice.menu
     && JSON.stringify(menuSlice.bounds) === JSON.stringify(menuSlice.expected) && menuSlice.patched,
   JSON.stringify(menuSlice));
 await page.evaluate(() => window.Taierzhuang.editor.Close());

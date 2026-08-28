@@ -44,7 +44,9 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 
-async function Boot(phase = 0, scale = "small") {
+// **默认开机进第一章，不是序章。** 序章（CH0）是过场承载章：不撒兵、不发枪，
+// 在那儿量「开枪消耗弹药」「阵亡换人」「AI 数量稳定」测到的都是空场。
+async function Boot(phase = 1, scale = "small") {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=medium&scale=${scale}`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
@@ -55,7 +57,7 @@ async function Boot(phase = 0, scale = "small") {
 // 1) 调试口齐不齐（后面所有断言都靠它）
 // ===========================================================================
 Stage("1 调试口");
-await Boot(0);
+await Boot(1);
 const api = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const d = T.Debug || {};
@@ -87,8 +89,9 @@ Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0
   && tengxianForce.bundles === 0 && tengxianForce.grenades === 6,
   `装甲=${tengxianForce.armor} 集束=${tengxianForce.bundles} 木柄弹=${tengxianForce.grenades}`);
 
-// 默认入口回归：主页面不带 phase/preview 时，L0 的「开始」必须播 Legacy；
-// 新版 CS_Chuchuan 只由独立预览 URL 触发。
+// 默认入口回归：主页面不带 phase/preview 时，开机落在序章（CH0），
+// 点「进 城」必须播新版车厢序章 CS_Chuchuan —— 重制之后它就是正片的关前过场，
+// 不再只是一个预览页。旧版 CS_ChuchuanLegacy 从正片脱钩，只留在选章的测试场景组。
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined
@@ -100,8 +103,8 @@ const defaultIntro = await page.evaluate(() => ({
   playing: window.Taierzhuang.Debug.Cutscene().playing,
   phase: window.Taierzhuang.Debug.Level().id,
 }));
-Check("默认开始游戏/L0 使用 Legacy 出川", defaultIntro.current === "CS_ChuchuanLegacy"
-  && defaultIntro.playing && defaultIntro.phase === "L0_Jiehe", JSON.stringify(defaultIntro));
+Check("默认开始游戏/序章播新版车厢出川", defaultIntro.current === "CS_Chuchuan"
+  && defaultIntro.playing && defaultIntro.phase === "CH0_Chuchuan", JSON.stringify(defaultIntro));
 await page.evaluate(() => {
   const T = window.Taierzhuang;
   T.Debug.SkipCutscene();
@@ -121,7 +124,7 @@ await page.evaluate(() => {
 // ===========================================================================
 {
   // menu=0：跳过主菜单，进页面就是这一关（菜单会盖住 #bootStart，而这一节要点它）
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=0&quality=low&scale=small&menu=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=1&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.click("#bootStart");
@@ -348,7 +351,7 @@ Check("白刃能砍到人", !melee.noEnemy && melee.hpAfter < melee.hpBefore,
 // ===========================================================================
 Stage("6 目标链");
 // 必须重开一次：前面几节把玩家瞬移得满地图都是，目标链早被推过几格了
-await Boot(0);
+await Boot(1);
 const chain = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
   const before = D.Level();
@@ -393,9 +396,12 @@ Check("走进路标圈里目标链会推进", chain.advanced === chain.blocked +
 // 七关能依次推进：一关一关点完目标链再换关。
 // 不真走两公里 —— CompleteLevel 把目标链一路点完，AdvanceLevel 建下一片切片。
 // 建切片是异步的（分帧走完），所以这里必须 await，不能只 StepFrames。
-Stage("6.2 七关依次推进（每关都要重建一片切片，约两分钟）");
+Stage("6.2 七章依次推进（每章都要重建一片切片，约两分钟）");
 const ladder = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
+  // **显式回到序章起跑**：别靠「上一节正好开机在第 0 章」蹭 —— 默认开机章是
+  // 会变的（现在是第一章，因为序章不撒兵、量不了别的东西）。
+  await T.JumpToPhase(0);
   const seen = [];
   for (let i = 0; i < 7; i += 1) {
     const lv = D.Level();
@@ -409,14 +415,20 @@ const ladder = await page.evaluate(async () => {
   return { seen, outcome: D.Outcome() };
 }, undefined);
 const ladderIds = ladder.seen.map((r) => r.id);
-Check("七关能依次推进", ladderIds.length === 7 && new Set(ladderIds).size === 7,
+Check("七章能依次推进", ladderIds.length === 7 && new Set(ladderIds).size === 7,
   ladderIds.join(" -> "));
-Check("每关都有自己的目标链与兵员池",
-  ladder.seen.every((r) => r.zones >= 3 && r.pool > 0),
+// 序章只有三个路标（它不建切片、不走路，路标只当 HUD 去向）；战斗章至少五个。
+Check("每章都有自己的目标链与兵员池",
+  ladder.seen.every((r) => r.zones >= (r.id === "CH0_Chuchuan" ? 3 : 5) && r.pool > 0),
   ladder.seen.map((r) => `${r.id}:${r.zones}标/${r.pool}人`).join(" "));
-// 「城里还站着的人」是单调下降的（唯一一次上涨由剧本的 system beat 交代）
+// 「城里还站着的人」**只会往下走**：序章不耗（240→240），一章起逐章递减。
+// 判据不抄具体数（数在 Data_MissionChX 里，抄进测试第二天就过期），只验形状：
+// 序章与第一章同数、其后严格递减、终章仍有人。
 const poolCurve = ladder.seen.map((r) => r.pool);
-Check("兵员池按剧本给的曲线走", poolCurve[0] === 220 && poolCurve[6] === 96,
+Check("兵员池序章不耗、其后逐章递减",
+  poolCurve[0] === poolCurve[1]
+    && poolCurve.slice(1).every((v, i, arr) => i === 0 || v < arr[i - 1])
+    && poolCurve[6] > 0,
   poolCurve.join(" -> "));
 
 // ===========================================================================
@@ -504,12 +516,13 @@ Check("换成另一个有名有姓有籍贯的人", death.alive && !!death.origi
 // ===========================================================================
 // 8) 剧本真的在播 —— 这一条是整份测试存在的主要理由
 //
-// 换城之后这一节整个重写：台儿庄那六句（刘振海、孙连仲、黄樵松《榴花》、
-// 王范堂、陆诒、万有福）一句都不再存在。滕县这七关有自己的一本，
-// 断言挑的是**六句有史料出处、且分别落在不同关**的，
-// 漏掉任何一关都会有一条红。
+// 任务流程重制之后这一节又改了一次判据：**不再挑具体台词**。
+// 上一轮挑的是六句有史料出处的对白，而现在七章的 beats 是基建批留的骨架，
+// 台词由各章内容批填 —— 挑一句写死在测试里，等于让内容批每改一句都来改测试。
+// 改成认**章名 title 卡**：那是每一章第一条 beat，与章节 id 一起由数据层写死，
+// 派发不出来就说明这一章的剧本根本没装载（正是这一节要防的那件事）。
 // ===========================================================================
-Stage("8 剧本长跑（七关按出厂时长的九成推，约七分钟）");
+Stage("8 剧本长跑（七章按出厂时长的九成推，约七分钟）");
 const storySeen = [];
 // 分块推帧，一块 1800 帧（三十秒）。
 // **不许一次 evaluate 里同步跑一万三千帧**：那是把渲染进程主线程一口气占住
@@ -523,8 +536,8 @@ for (let phase = 0; phase < 7; phase += 1) {
     // 附近重生的 —— 目标链会自己往前跳，跳完就自动换关，剧本队列被重置，
     // 于是"这一关的剧本剩几条"量到的是下一关的。实测这一段的关名整体错了一格。
     T.Debug.PinLevel(true);
-    // 只推到本关时长的九成：推满会触发自动换关，那时 story 的队列已经换成
-    // 下一关的了，Remaining 量到的是新队列
+    // 只推到本章时长的九成：推满会触发自动换关，那时 story 的队列已经换成
+    // 下一章的了，Remaining 量到的是新队列
     return Math.round(T.state.levelSeconds * 60 * 0.9);
   }, phase);
   for (let done = 0; done < total; done += 1800) {
@@ -554,38 +567,32 @@ const storyRun = await page.evaluate((seen) => {
     totalFired: fired.length,
     byTimeout: fired.filter((f) => f.byTimeout).length,
     levels: [...new Set(fired.map((f) => f.level))],
-    // 六句，分别落在 L0 / L1 / L2 / L3 / L5 / L6
-    hasGrenade: has("六颗，一颗都别掉"),                 // L0 手榴弹经济
-    hasBeishahe: has("孙代总司令亲自到北沙河"),          // L1 3/14 夜北沙河会议
-    hasZhaiWall: has("四十公分厚"),                     // L2 日方实测东关寨墙
-    hasNightRaid: has("把东关门夺回来"),                 // L3 张宣武反击
-    hasWestTower: has("西门楼丢了"),                     // L5 3/17 17 时西城门楼失守
-    hasNorthGate: has("扒北门"),                        // L6 侯子平扒开北城门
+    // 七张章名卡，一章一条（各章 beats 的第一条 title）
+    titles: ["出川", "往南的路", "手榴弹雨", "救护所", "东关之夜", "城墙没有了", "最后一封"]
+      .filter((t) => fired.some((f) => f.type === "title" && (f.text || "") === t)),
     sample: fired.slice(-4).map((f) => `${f.level}:${f.text}`),
   };
 }, storySeen);
-Check("剧本 beats 真的派发出来了", storyRun.totalFired >= 60,
+Check("剧本 beats 真的派发出来了", storyRun.totalFired >= 45,
   `播了 ${storyRun.totalFired} 条，其中 ${storyRun.byTimeout} 条靠超时兜底`);
-Check("七关的剧本都派发过", storyRun.levels.length === 7, storyRun.levels.join(" "));
-Check("L0 班长「六颗，一颗都别掉」出现过", storyRun.hasGrenade);
-Check("L1 北沙河军事会议那句出现过", storyRun.hasBeishahe);
-Check("L2 东关寨墙「四十公分厚」出现过", storyRun.hasZhaiWall);
-Check("L3 张宣武「把东关门夺回来」出现过", storyRun.hasNightRaid);
-Check("L5 「西门楼丢了」出现过", storyRun.hasWestTower);
-Check("L6 侯子平「扒北门」出现过", storyRun.hasNorthGate);
+Check("七章的剧本都派发过", storyRun.levels.length === 7, storyRun.levels.join(" "));
+Check("七张章名卡都打过", storyRun.titles.length === 7, storyRun.titles.join(" / "));
 // 每一关都该基本播完，剩太多说明链子卡住了
 const stuck = storyRun.seen.filter((x) => x.remaining > 6);
-Check("没有哪一关的剧本被卡住", stuck.length === 0,
-  stuck.length ? stuck.map((x) => `${x.id}(剩${x.remaining})`).join(" ") : "七关都跑完了");
+Check("没有哪一章的剧本被卡住", stuck.length === 0,
+  stuck.length ? stuck.map((x) => `${x.id}(剩${x.remaining})`).join(" ") : "七章都跑完了");
 
 // ===========================================================================
-// 8.5) 过场：六场（含新版与 Legacy）都能播、都能跳过，王铭章那场真的触发
+// 8.5) 过场：正片七章那八场 + 脱钩的旧五场，都能播、都能跳过；
+//      关卡边界上真的会自动接（拿第五章那一场验）
 // ===========================================================================
 Stage("8.5 过场");
-await Boot(0);
+await Boot(1);
 const cuts = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
-  const ids = ["CS_Chuchuan", "CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
+  // 全表从数据层现取，不在测试里手抄一份会过期的名单。
+  const { CUTSCENE_ORDER } = await import("./Data_TengxianScript.mjs");
+  const ids = CUTSCENE_ORDER;
   const rows = [];
   for (const id of ids) {
     const p = D.PlayCutscene(id);
@@ -602,14 +609,15 @@ const cuts = await page.evaluate(async () => {
   }
   return { rows, played: D.Cutscene().played.map((c) => c.id) };
 });
-Check("六场过场都能播起来", cuts.rows.every((r) => r.playing && r.current === r.id),
+Check("全部过场都能播起来", cuts.rows.length >= 13 && cuts.rows.every((r) => r.playing && r.current === r.id),
   cuts.rows.map((r) => `${r.id}:${r.playing ? "播" : "没播"}`).join(" "));
-Check("六场过场都能 Esc 跳过（跳过后卡片仍把史实补出来）",
+Check("全部过场都能 Esc 跳过（跳过后卡片仍把史实补出来）",
   cuts.rows.every((r) => r.skipped), cuts.rows.map((r) => `${r.id}:${r.skipped}`).join(" "));
-Check("王铭章殉国那场真的触发得到",
-  cuts.played.includes("CS_WangMingzhang"),
+Check("从正片脱钩的旧五场仍然播得动（文件与注册都保留）",
+  ["CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"]
+    .every((id) => cuts.played.includes(id)),
   `播过：${cuts.played.join(" ")}`);
-// 关卡边界上真的会自动播：第五关（十字街）打完接 CS_WangMingzhang
+// 章节边界上真的会自动播：第五章（城墙没有了）打完接 CS_Ch5_TurnBack
 const cutTrigger = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
   await T.JumpToPhase(5);
@@ -622,7 +630,7 @@ const cutTrigger = await page.evaluate(async () => {
   await p;
   return { fired: at.current, after: D.Level().id };
 });
-Check("第五关打完自动接王铭章那场过场", cutTrigger.fired === "CS_WangMingzhang",
+Check("第五章打完自动接本章的关末过场", cutTrigger.fired === "CS_Ch5_TurnBack",
   `触发的是 ${cutTrigger.fired}，之后进 ${cutTrigger.after}`);
 
 // ===========================================================================
@@ -632,7 +640,7 @@ Check("第五关打完自动接王铭章那场过场", cutTrigger.fired === "CS_
 // 两种收场：七关走完从北门出去（breakout），或者池子空了（defeat）。
 // ===========================================================================
 Stage("9 结束条件");
-await Boot(0);
+await Boot(1);
 const outcome = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   T.state.outcome = null;
@@ -657,7 +665,7 @@ Check("突围收场会放尾声，且尾声说的是史实（不打歼敌数）"
 // 10) 长跑不崩、AI 数量稳定
 // ===========================================================================
 Stage("10 长跑");
-await Boot(4, "medium");
+await Boot(2, "medium");
 const soak = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const samples = [];
@@ -689,7 +697,7 @@ Check("长跑无报错", errors.length === 0, errors.slice(0, 3).join(" | "));
 
 // 11.1 出生点：不但站得下，还得看得出去
 Stage("11 第 1 批：出生点 / 票池 / 交战");
-await Boot(0, "small");
+await Boot(1, "small");
 const spawnSmall = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   return {
@@ -707,13 +715,13 @@ Check("玩家出生点向 8 个方位射 20 m 至少三条通（与 FindOpenSpot
 
 // 11.2 票池**不**随战场规模缩放。
 // 台儿庄那一版按 SCALE.maxAlive 缩过（开放战场的票池是个平衡旋钮）；
-// 滕县的「城里还站着的人」是剧本给死的一条曲线（220→196→328→…→96，
-// 登记在 PRESUMED_STAGING.poolCurve），跟同屏人数没有关系 ——
+// 滕县的「城里还站着的人」是剧本给死的一条曲线（登记在 PRESUMED_STAGING.poolCurve），
+// 跟同屏人数没有关系 ——
 // 缩了它就不再是那条曲线，屏幕上那个数字也就不再对应剧本里的任何东西。
-await Boot(0, "large");
+await Boot(1, "large");
 const poolLarge = await page.evaluate(() => window.Taierzhuang.state.phasePoolNra);
-Check("兵员池照剧本给的数，不随战场规模缩放（small === large === 220）",
-  spawnSmall.poolMax === 220 && poolLarge === 220,
+Check("兵员池照剧本给的数，不随战场规模缩放（small === large）",
+  spawnSmall.poolMax > 0 && spawnSmall.poolMax === poolLarge,
   `small=${spawnSmall.poolMax} large=${poolLarge}`);
 
 // 11.3 六十秒开火计数 / 状态分布 / 占领点易主 —— 玩家全程不动手
@@ -963,7 +971,8 @@ Check("一枚手榴弹放倒一堆人：回执只出一条（不是连杀播报�
 
 // 12.1 键位表真的接上了：1/2/3/4 与滚轮走的是合成键盘事件，不是直接调函数
 Stage("12 第 2 批：键位 / 携行 / 手感");
-await Boot(3, "small");
+// 夜袭那一章（东关之夜）现在是第四章，它的携行走 LOADOUTS.L3_WhiteTowel。
+await Boot(4, "small");
 const slots = await page.evaluate(() => {
   const T = window.Taierzhuang, D = T.Debug;
   // 冻场：日军挪到四百米外，补兵的钟拨到负一百万秒（SeedSoldiers 每三秒补一批
@@ -991,7 +1000,7 @@ Check("滚轮也能循环切槽",
   slots.wheeled.active !== slots.seen[slots.seen.length - 1].active,
   `${slots.seen[slots.seen.length - 1].active} -> ${slots.wheeled.active}`);
 
-// 12.2 LOADOUTS 真的被读了：phase=3（P4 夜袭）是 L3_WhiteTowel
+// 12.2 LOADOUTS 真的被读了：phase=4（东关之夜）是 L3_WhiteTowel
 Check("P4 夜袭的携行是 L3_WhiteTowel：一支长枪、一支短枪、肩背大刀",
   slots.seen[0].loadout === "L3_WhiteTowel"
   && slots.seen[0].slots.secondary === "Mauser96"
@@ -1503,11 +1512,11 @@ Check("每个路标都能从本关大部分地方走到（导航场连通）",
 // 轮盘要走真的键盘事件与真的 mousemove 事件，潜行要看受令者的姿态跟着班长变。
 // ===========================================================================
 Stage("13 第 3 批：翻越 / 上墙 / 下水 / 拾取 / 轮盘 / 潜行");
-// **必须在城里那一关测。** 第一关是界河南岸的开阔野地 —— 没有院墙可翻、
-// 没有上城道可爬、没有护城河可下。在那儿跑这一组，四条会一起报
-// 「没找到马道/没找到可翻的墙/淹 0 m」，而那不是回归，是选错了关。
-// 第五关（城墙）同时有这三样：东门旁的上城道、城内的四合院、南濠。
-await Boot(4, "small");
+// **必须在城里那一章测。** 第一章是城外原野 —— 没有院墙可翻、没有上城道可爬、
+// 没有护城河可下。在那儿跑这一组，四条会一起报「没找到马道/没找到可翻的墙/淹 0 m」，
+// 而那不是回归，是选错了章。
+// 第三章（救护所）同时有这三样：东门旁的上城道、城内的四合院、东濠。
+await Boot(3, "small");
 
 // 13.1 马道：从坡脚一路走到墙顶（4 m），中途不许被卡住
 const ramp = await page.evaluate(() => {
@@ -1951,7 +1960,7 @@ Check("AI 一分钟里真的翻过墙（这个动词不是玩家专属）",
 // 从运行时取证：源头是不是 Lugou GLB、骨骼挂点在不在、单人 draw call 多少。
 // ===========================================================================
 Stage("14 换模");
-await Boot(0, "small");
+await Boot(1, "small");
 const mesh = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const f = T.actorFactory;
@@ -2054,7 +2063,7 @@ Check("模型读不到时退回程序化方块几何，且不抛",
 // 14.7 开镜：照门必须落在画面正中。这条是之前专门解出来的（_MakeAdsPose 是解方程
 // 不是手调），换模/改手位最容易把它碰掉，而静态截图上"差二十个像素"看不出来。
 {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&ads=1&phase=0&quality=medium&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&ads=1&phase=1&quality=medium&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
   const ads = await page.evaluate(() => {

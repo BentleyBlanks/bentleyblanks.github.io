@@ -1,24 +1,31 @@
 // 《滕县 一九三八》战场数据 —— 纯数据，**不许 import three**。
 //
 // 台儿庄那套（开放战场 + 占领点 + 战役阶段）整个作废。
-// 这一份是**七关线性关卡**：一关一片切片、一条目标链、一段史料时段。
-// 玩法迁就场景，不是场景迁就玩法 —— 关卡的边界、路标坐标全部落在
+// 这一份是**七章线性关卡**：一章一片切片、一条目标链、一段史料时段。
+// 玩法迁就场景，不是场景迁就玩法 —— 章节的边界、路标坐标全部落在
 // Data_Tengxian.mjs 那座按志载与日方战详报建起来的城上。
 //
+// ---------------------------------------------------------------------------
+// 2026-08-28 任务流程重制：这一份也变成**组装层**。
+//
+//   打法数字（bounds / spawn / ijaPressure / 携行 / 路标坐标）现在写在
+//   七个 Data_MissionChX.mjs 的 CHAPTER.tuning 与 CHAPTER.zones 里 ——
+//   与史料层同住一个文件、但分在两个字段，好让「章节内容批」一个人改一章
+//   而不用同时开两份共享表。本文件负责把它们摊成 ZONES / TUNING / PHASES，
+//   校验一条都没放松（缺打法配置直接抛、引用不存在的路标直接抛）。
+//   施工口径：docs/Data_MissionRemake.md §10。
+// ---------------------------------------------------------------------------
+//
 // 史料 vs 推定的分工（这一条是纪律，不是风格）：
-//   · 关名、日期、时刻、brief、pool 的曲线 —— 全部从 Data_TengxianScript.LEVELS 取，
+//   · 章名、日期、时刻、brief、pool 的曲线 —— 全部从 Data_TengxianScript.LEVELS 取，
 //     那份是考据过的底本，这里一个字都不复制、不改写；
-//   · 本文件只新增**打法层**的数字（敌军压力、支援种类、携行、切片范围、路标坐标），
+//   · 本文件只组装**打法层**的数字（敌军压力、支援种类、携行、切片范围、路标坐标），
 //     这些**全部是推定**，逐条登记在下面的 PRESUMED_TUNING。
 //
 // 世界坐标：X 向东，Z 向南，城心为原点。城墙中心线 ±305；四门位置按城防示意图略作错位。
 
-import { LEVELS } from "./Data_TengxianScript.mjs";
-import {
-  CITY, GATES, EAST_SUBURB, EAST_FIELD, WEST_SUBURB, LANDMARKS, CROSSROAD,
-} from "./Data_Tengxian.mjs";
-
-const GATE = (id) => GATES.find((gate) => gate.id === id);
+import { LEVELS, CHAPTERS } from "./Data_TengxianScript.mjs";
+import { CITY, GATES, EAST_FIELD } from "./Data_Tengxian.mjs";
 
 /**
  * 城的骨架摘要 —— 只是把 Data_Tengxian 里规则层用得到的那几个数搬过来，
@@ -49,237 +56,75 @@ export const WORLD = {
 };
 
 /**
- * 目标链上的路标（zone）。
+ * 目标链上的路标（zone）—— **组装自七章的 CHAPTER.zones**。
  *
  * **线性关卡里这不是占领点**：没有占领条、不会被反夺，owner 恒为 nra。
  * 它同时是三样东西 ——
  *   1. HUD 上的下一处去向；
- *   2. Data_TengxianScript 的 beats 里 `zone:名字` 的触发区；
- *   3. 撒兵与出生点的锚。
- * id 必须与剧本里的 `zone:` 名字**逐字一致**，对不上就是那句台词永远不播。
+ *   2. Data_MissionChX 的 beats 里 `zone:名字` 的触发区；
+ *   3. 撒兵与出生点的锚，以及 LOD 焦点。
+ * id 必须与本章 beats 里的 `zone:` 名字**逐字一致**，对不上就是那句台词永远不播。
  *
- * 坐标除注明外**全部是推定**：史料给的是「东寨门」「十字街口」「县衙」这类地名，
- * 具体到米的位置来自 Data_Tengxian 的图纸，而那份图纸自己也标了哪些是推定。
+ * 这里是一张**扁平表**（id → zone），所以 zone id 必须全局唯一；
+ * 唯一性与「zones 数量 == objectives 数量」由 Data_TengxianScript 的组装校验钉住。
+ *
+ * 坐标**全部是推定**：地名来自史料与策划案，具体到米的位置来自 Data_Tengxian 的图纸，
+ * 而那份图纸自己也标了哪些是推定。逐章的选点理由写在各 Data_MissionChX 的头注里。
  */
-export const ZONES = {
-  // --- 序 · 界河（城北二十公里外的开阔地；本作只取「南岸土坎」那一小片） ---
-  Approach: { id: "Approach", name: "界河南岸", x: 0, z: -1420, radius: 34 },
-  Kan: { id: "Kan", name: "土坎", x: 0, z: -1255, radius: 30 },
-  Beishahe: { id: "Beishahe", name: "北沙河", x: 0, z: -1000, radius: 34 },
-
-  // --- 一 · 北沙河 → 津浦路 → 西关 → 西门 ---
-  SecondLine: { id: "SecondLine", name: "第二线阵地", x: -480, z: -180, radius: 34 },
-  Dawn: { id: "Dawn", name: "天亮前的路口", x: -480, z: -130, radius: 30 },
-  XiguanStation: {
-    id: "XiguanStation", name: "滕县车站", radius: 42,
-    x: WEST_SUBURB.station.x, z: WEST_SUBURB.station.z,
-  },
-  PowerPlant: {
-    id: "PowerPlant", name: "电灯厂", radius: 34,
-    x: WEST_SUBURB.powerPlant.x, z: WEST_SUBURB.powerPlant.z,
-  },
-  WestGate: { id: "WestGate", name: "西门 · 怀古门", x: -330, z: GATE("West").z, radius: 26 },
-
-  // --- 二 · 东关（本战真正的主战场，打了整整二十四小时） ---
-  ZhaiGate: {
-    id: "ZhaiGate", name: "东关街口", radius: 20,
-    x: 480, z: EAST_SUBURB.roadZ,
-  },
-  Courtyard: { id: "Courtyard", name: "关厢院落", x: 462, z: -19, radius: 26 },
-  Temple: {
-    id: "Temple", name: "寺院地", radius: 26,
-    x: EAST_SUBURB.temple.x, z: EAST_SUBURB.temple.z,
-  },
-  Breach: { id: "Breach", name: "缺口", x: 500, z: EAST_SUBURB.roadZ, radius: 22 },
-
-  // --- 三 · 夺回东关门（夜） ---
-  Lane: { id: "Lane", name: "巷道", x: 478, z: -89, radius: 22 },
-  GateRetake: { id: "GateRetake", name: "东关门", x: 516, z: EAST_SUBURB.roadZ, radius: 20 },
-  EastGateIn: { id: "EastGateIn", name: "东门 · 宗鲁门", x: 296, z: GATE("East").z, radius: 24 },
-
-  // --- 四 · 城墙 ---
-  // 上城道：RAMPS 里东门旁那一条，沿墙内侧爬。坐标是墙内侧顺城街上的落脚点。
-  // -20：上城道脚已沿爬升方向让开门洞 20 m（RAMPS v2.1），路标跟着脚走
-  Rampway: { id: "Rampway", name: "东门旁上城道", x: 288, z: GATE("East").z - 20, radius: 16 },
-  Rampart: { id: "Rampart", name: "东南角望楼", x: 294, z: 288, radius: 22 },
-  SouthWall: { id: "SouthWall", name: "南城墙", x: 150, z: 296, radius: 26 },
-  SouthBreach: { id: "SouthBreach", name: "南墙缺口", x: 285, z: 296, radius: 18 },
-
-  // --- 五 · 十字街 ---
-  Crossroad: { id: "Crossroad", name: "十字街口", x: CROSSROAD.x, z: CROSSROAD.z, radius: 20 },
-  Yamen: {
-    id: "Yamen", name: "县衙", radius: 32,
-    x: LANDMARKS.find((l) => l.id === "Yamen").x,
-    z: LANDMARKS.find((l) => l.id === "Yamen").z,
-  },
-  WestStreet: { id: "WestStreet", name: "西门大街", x: -160, z: GATE("West").z, radius: 24 },
-  WestGateInner: { id: "WestGateInner", name: "西门里", x: -278, z: GATE("West").z, radius: 20 },
-
-  // --- 六 · 北门突围 ---
-  WestBarbican: { id: "WestBarbican", name: "西门瓮城", x: -322, z: GATE("West").z, radius: 16 },
-  NorthStreet: { id: "NorthStreet", name: "北关大街", x: GATE("North").x, z: -160, radius: 24 },
-  NorthGate: { id: "NorthGate", name: "北门 · 望阙门", x: GATE("North").x, z: -296, radius: 20 },
-  WheatField: { id: "WheatField", name: "城北麦地", x: 0, z: -520, radius: 46 },
-};
+export const ZONES = Object.fromEntries(
+  CHAPTERS.flatMap((chapter) => chapter.zones.map((zone) => [zone.id, zone])));
 
 /**
- * 打法层的每关配置。**这一整张表都是推定**，与史料无关。
+ * 打法层的每章配置 —— **组装自七章的 CHAPTER.tuning**。这一整张表都是推定，与史料无关。
  *
- * bounds  本关生成哪一片。切片越小 draw call 越低，但也别把玩家要去的地方切掉。
+ * bounds  本章生成哪一片。切片越小 draw call 越低，但也别把玩家要去的地方切掉。
  *         性能红线是 drawCalls ≤ 5000 / triangles ≤ 600 万，这张表是主要的旋钮。
- * zones   目标链，按顺序走。id 见 ZONES。
  * spawn   开局站位。**线性关卡里玩家开局是在阵地上跟着自己的班**，
  *         不是空地中央 —— 所以出生点写死在第一个路标的后方，不再随机找空地。
+ *         出生点前方三米必须走得通，BootTest 的 spawnRun 是那道闸。
+ * fieldFrom
+ *         借别章的切片建场（序章那种「过场承载章」用）。BuildField 拿它去查
+ *         OUTFIELD_SCENES / 外部布设 / tzm 饰件三张按 levelId 分组的表。
+ * cutsceneOnly
+ *         这一章不建自己的切片、不撒兵、不 Respawn：进章即播 cutsceneIn，
+ *         播完自动进下一章（见 Script_Main.EnterLevel）。
  * cameraFar
  *         相机远平面（米）。不写就用 620。
  *         这是**唯一一个不会动场景内容**的 draw call 旋钮：雾在两三百米外
  *         已经把东西吃干净了（fog.max 0.94），远平面收进去只是让视锥剔除
- *         把那些看不见的网格提前扔掉。收之前先确认本关最远的一处路标还在里头。
+ *         把那些看不见的网格提前扔掉。收之前先确认本章最远的一处路标还在里头。
  * detailRadius / midRadius
- *         LOD 三档的分界（米）。**这是 draw call 的主要旋钮之一。**
- *         不写就用默认 100 / 210。城里那几关目标链拉得开（四个焦点撒在全城），
- *         默认值会让四片全细节院落同时在场，实测把 calls 顶到 1451。
+ *         LOD 三档的分界（米）。不写就用默认 100 / 210。
+ *         **调 draw call 优先调 bounds，不是调 detailRadius** —— 实测把
+ *         detailRadius 从 100 压到 62，三角形掉了 24% 而 calls 反而涨了：
+ *         院落从 detail 掉到 silhouette 之后进的是按扇区分批的远景 sink，
+ *         扇区多一个就多一批。少生成才是少 draw call，降细节不是。
  */
-const TUNING = {
-  L0_Jiehe: {
-    // 界河在城北约二十公里，与滕县城不共景。切片取城北开阔原野，
-    // **不让城墙入画** —— 真在界河看得见滕县城墙是史实错误。
-    bounds: { minX: -620, maxX: 620, minZ: -1620, maxZ: -900 },
-    zones: ["Approach", "Kan", "Beishahe"],
-    spawn: { x: 0, z: -1470, ry: Math.PI },
-    ijaPressure: 1.0, ijaSpawn: ["north"], ijaSupport: ["artillery", "hmg"],
-    // 滕县方向的日军不是一排散兵：步兵分队的轻机枪、沿河架设的重机枪与后方
-    // 炮兵共同推进。装甲栏明确为零——34 辆九四式在临城方向，不进本关。
-    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: false, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 260,
-    // 手榴弹经济：手榴弹是主武器，步枪是奢侈品。**「无枪」是合法初始状态。**
-    // 日方记川军三分之一以上没有步枪，各自带手榴弹约六发。
-    loadoutOverride: {
-      primary: null, secondary: null, melee: "Dadao",
-      throwables: { Grenade: 6 }, spareClips: 0,
-      note: "出川时领的：一条布袋，六颗手榴弹。枪要从倒下的人身上捡。",
-    },
-    scavengeRifle: true,
-  },
-  L1_Beishahe: {
-    bounds: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
-    zones: ["SecondLine", "Dawn", "XiguanStation", "PowerPlant", "WestGate"],
-    // 朝南：西关沿贴城津浦路一路南撤，车站与通信队就在西门外。
-    spawn: { x: -480, z: -205, ry: Math.PI },
-    ijaPressure: 1.15, ijaSpawn: ["north"], ijaSupport: ["artillery", "hmg"],
-    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: false, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 300,
-    loadoutOverride: {
-      primary: "HanYang", secondary: null, melee: "Dadao",
-      throwables: { Grenade: 5 }, spareClips: 3,
-      note: "捡来的汉阳造。桥夹三个，打完就没有了。",
-    },
-  },
-  L2_Dongguan: {
-    // 寺院地按布防图位于东北延伸框；切片必须把完整东侧 13 框一起纳入，
-    // 否则 Temple 路标会在关卡外、北部五框也只在总览里存在。
-    bounds: { minX: 250, maxX: 620, minZ: -520, maxZ: 420 },
-    zones: ["ZhaiGate", "Courtyard", "Temple", "Breach"],
-    // 东门大街的清路中央，避开两侧门前家什；朝东正对东关门与缺口。
-    // 【2026-08-27】原来在 x=432：城防图东侧重建（Data_Tengxian 的
-    // FirstDistrictNorthEastA/B 两排）把第一区公所那两块院区一直铺到 x=434，
-    // 于是这个出生点落进了院子里 —— 人贴着院墙东面 1.8 m，开局满屏是砖，
-    // 按 W 走不出一米。和 L3 那次「站在寺院檐下」是同一类事故（见下一关注释）。
-    // 挪到院区东墙外 12 m 的东门大街上，仍在东关大街路口以西、路标圈外。
-    spawn: { x: 446, z: EAST_SUBURB.roadZ, ry: -Math.PI / 2 },
-    ijaPressure: 1.5, ijaSpawn: ["east"], ijaSupport: ["launcher", "hmg", "artillery"],
-    // 日军战详报：工兵逐间爆破民房打通墙体；联队炮四门在土城子西侧，
-    // 重机枪沿河西岸配置。没有战车或装甲车参加滕县攻城。
-    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 420,
-    loadoutOverride: {
-      primary: "HanYang", secondary: null, melee: "Dadao",
-      throwables: { Grenade: 6 }, spareClips: 4,
-      note: "木柄手榴弹六枚；东关靠密集投弹和院墙，不靠并不存在的反坦克集束弹。",
-    },
-  },
-  L3_Fanji: {
-    // 比 L2 只裁掉南部延伸：保留布防图东北寺院地至东门的完整北段巷网。
-    // **调 draw call 优先调 bounds，不是调 detailRadius** ——
-    // 实测把 detailRadius 从 100 压到 62，三角形掉了 24% 而 calls 反而涨了：
-    // 院落从 detail 掉到 silhouette 之后进的是**按扇区分批**的远景 sink，
-    // 扇区多一个就多一批。少生成才是少 draw call，降细节不是。
-    bounds: { minX: 250, maxX: 600, minZ: -520, maxZ: 170 },
-    zones: ["Temple", "Lane", "GateRetake", "EastGateIn"],
-    // 出生点要**出**寺院的屋檐：原来站在 (414,-76)，正压在寺院地那座
-    // 26×22 m 房子的檐下，出图上是一条横贯全屏的黑带（屋顶的背面）。
-    // 第二区纵向巷（生成器 x≈456 m 的明确车道）上，离寺院院墙留出 30 m 以上；朝寺院集合。
-    spawn: { x: 456.6, z: -128, ry: Math.atan2(-48, -42.6) },
-    // 夜里日军火力优势削掉一半 —— 全局唯一一次玩家在交换比上占便宜的时段
-    ijaPressure: 0.85, ijaSpawn: ["east"], ijaSupport: ["hmg"],
-    ijaForce: { lmgEvery: 13, hmgTeams: 1, engineers: true, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 300, nightRaid: true,
-    loadoutOverride: {
-      primary: "HanYang", secondary: "Mauser96", melee: "Dadao",
-      throwables: { Grenade: 6 }, spareClips: 3,
-      note: "夜袭携行仍按约六枚木柄手榴弹；白刃是近距补充，不是无限火力。",
-    },
-  },
-  L4_Chengqiang: {
-    // 城墙关卡要能验证四条上城道和完整的城防图外轮廓，因此生成四面墙；
-    // 东南主战区仍由 spawn 与 zones 控制，不靠裁掉北墙来省几百个三角形。
-    // 西界必须越过津浦路与西关全部生活布设（最西一件 x=-502.6）：这一关也是
-    // 编辑器核对整座城防外轮廓的总览切片，旧 minX=-360 只剩西城门外一小截空地，
-    // 车站、通信队、电灯厂、交易所和西关大街因此在俯视验收里整片消失。
-    // 俯瞰验收要把「城内 → 东门 → 东关 → 农田/远端农院」一次收全；
-    // 额外 24 m 留给 EastFarmFar 的屋檐、院墙和生活道具，不让边缘件被裁半。
-    bounds: { minX: -520, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -360, maxZ: 400 },
-    zones: ["Rampway", "Rampart", "SouthWall", "SouthBreach"],
-    spawn: { x: 276, z: GATE("East").z, ry: Math.PI / 2 },
-    ijaPressure: 1.7, ijaSpawn: ["east", "south"], ijaSupport: ["artillery", "launcher", "hmg"],
-    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 480,
-    // 龙泉塔上的观测班：十时之后落弹从随机变成「跟着你走」。塔打不掉，只能拖。
-    spotter: { fromLevelSeconds: 240, at: [620, 210], note: "3/17 10 时日军观测班占领城东龙泉塔" },
-    loadoutOverride: {
-      primary: "HanYang", secondary: null, melee: "Dadao",
-      throwables: { Grenade: 4 }, spareClips: 3,
-      note: "守了两昼夜，木柄手榴弹只剩四枚；没有集束弹，也没有可打的战车。",
-    },
-  },
-  L5_Shizijie: {
-    // 西门、十字街口与西门大街共用 z=0 的直瞄轴；县署前街与其余门位仍保留错位。
-    bounds: { minX: -325, maxX: 285, minZ: -190, maxZ: 140 },
-    // 出生点站在原点十字街口，正对西城门楼的贴地火力走廊。
-    cameraFar: 400,
-    zones: ["Crossroad", "Yamen", "WestStreet", "WestGateInner"],
-    spawn: { x: 62, z: CROSSROAD.z, ry: Math.PI / 2 },
-    ijaPressure: 1.9, ijaSpawn: ["west", "south"], ijaSupport: ["hmg", "launcher"],
-    ijaForce: { lmgEvery: 13, hmgTeams: 2, engineers: true, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 460,
-    corridorGun: { x: -300, z: CROSSROAD.z, y: 13.0, note: "3/17 17 时日军夺西城门楼后沿西门大街向十字街口扫射" },
-    loadout: "L4_LastFiveMinutes",
-  },
-  L6_Beimen: {
-    bounds: { minX: -360, maxX: 340, minZ: -640, maxZ: 200 },
-    zones: ["WestBarbican", "NorthStreet", "NorthGate", "WheatField"],
-    detailRadius: 70, midRadius: 170,
-    // 朝西：第一个目标是「跟着人流去西门」（挤不出去）
-    spawn: { x: -286, z: GATE("West").z, ry: Math.PI / 2 },
-    ijaPressure: 0.6, ijaSpawn: ["west"], ijaSupport: [],
-    ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
-    ijaPool: 240,
-    // 脱离战斗：武器栏清空、瞄准失效，唯一的动作是走和拽人。
-    disarmed: true,
-    loadoutOverride: {
-      primary: null, secondary: null, melee: null, throwables: {}, spareClips: 0,
-      note: "弹药：无。",
-    },
-  },
+const TUNING = Object.fromEntries(CHAPTERS.map((chapter) => [chapter.id, chapter.tuning]));
+
+/**
+ * 编辑器与几处布设自检要的**全城俯瞰切片**。
+ *
+ * 正片七章没有哪一章会把整座城连同东郊一起建出来（重制之后城墙关不复存在），
+ * 而「照城防图核对整座城的外轮廓」这件事仍然要做 —— 西关那一带的车站、通信队、
+ * 电灯厂、交易所与西关大街，以及东郊的远端农院、田埂与荆河前缘，都只有在这一片
+ * 里才同时在场。所以把它单独摆成一个**不可游玩的常量**，不进 PHASES。
+ *
+ * 西界越过津浦路与西关全部生活布设（最西一件 x=-502.6）；东界额外留 24 m
+ * 给 EastFarmFar 的屋檐、院墙和生活道具，不让边缘件被裁半。
+ */
+export const OVERVIEW_BOUNDS = {
+  minX: -520, maxX: EAST_FIELD.bounds.maxX + 24, minZ: -360, maxZ: 400,
 };
 
 /**
- * 七关。史料字段一律从 LEVELS 取，打法字段从 TUNING 取 —— 两边不重叠，
+ * 七章。史料字段一律从 LEVELS 取，打法字段从 TUNING 取 —— 两边不重叠，
  * 所以「改了剧本忘了改关卡表」这类错在结构上就发生不了。
  */
-export const PHASES = LEVELS.map((level) => {
+export const PHASES = LEVELS.map((level, index) => {
+  const chapter = CHAPTERS[index];
   const t = TUNING[level.id];
-  if (!t) throw new Error(`Data_Battle: 关卡 ${level.id} 没有打法配置`);
+  if (!t) throw new Error(`Data_Battle: 章节 ${level.id} 没有打法配置`);
   return {
     id: level.id,
     level,
@@ -287,22 +132,24 @@ export const PHASES = LEVELS.map((level) => {
     label: level.title,
     place: level.place,
     sky: level.sky,
+    ambience: level.ambience || null,
     music: level.music || null,
     minutes: level.minutes,
     brief: level.brief,
-    story: level.id,                 // 叙事层直接按关卡 id 装载，不再有翻译表
+    story: level.id,                 // 叙事层直接按章节 id 装载，不再有翻译表
     cutsceneIn: level.cutsceneIn || null,
     cutsceneOut: level.cutsceneOut || null,
     objectives: level.objectives,
     mechanic: level.mechanic,
-    // 「城里还站着的人」：史料只给三个锚点，逐关数值是推定，
+    mechanics: level.mechanics,
+    // 「城里还站着的人」：史料只给三个锚点，逐章数值是推定，
     // 登记在 Data_TengxianScript.PRESUMED_STAGING 的 poolCurve
     nraPool: level.pool.start,
     poolGain: level.pool.gain || 0,
     ...t,
-    zones: t.zones.map((id) => {
-      const zone = ZONES[id];
-      if (!zone) throw new Error(`Data_Battle: ${level.id} 引用了不存在的路标 ${id}`);
+    zones: chapter.zones.map((z) => {
+      const zone = ZONES[z.id];
+      if (!zone) throw new Error(`Data_Battle: ${level.id} 引用了不存在的路标 ${z.id}`);
       return zone;
     }),
   };
@@ -350,31 +197,32 @@ export const PRESUMED_TUNING = [
   { id: "zoneCoordinates", value: "ZONES 全表",
     note: "路标坐标。地名来自史料，具体到米的位置来自 Data_Tengxian 的图纸，而图纸本身已标注哪些是推定" },
   { id: "levelBounds", value: "TUNING[*].bounds",
-    note: "每关生成哪一片。纯工程量（draw call 预算），与史实无关" },
+    note: "每章生成哪一片。纯工程量（draw call 预算），与史实无关" },
   { id: "lodRadius", value: "TUNING[*].detailRadius / midRadius",
     note: "LOD 分界。纯工程量，与史实无关" },
-  { id: "ijaPool", value: [260, 300, 420, 300, 480, 460, 240],
-    note: "日方兵员池。史料给的是「一个不满员的步兵联队 + 师团级炮兵群」，没有逐时段兵力数" },
-  { id: "ijaPressure", value: [1.0, 1.15, 1.5, 0.85, 1.7, 1.9, 0.6],
-    note: "压力系数，纯难度曲线。唯一有史料支撑的形状是 L3 那一档低于两边——「夜里日军火力优势削掉一半」见张宣武回忆" },
+  { id: "ijaPool", value: CHAPTERS.map((c) => c.tuning.ijaPool),
+    note: "日方兵员池。史料给的是「一个不满员的步兵联队 + 师团级炮兵群」，没有逐时段兵力数（序章不打仗，那一格是 0）" },
+  { id: "ijaPressure", value: CHAPTERS.map((c) => c.tuning.ijaPressure),
+    note: "压力系数，纯难度曲线。唯一有史料支撑的形状是第四章（东关之夜）那一档低于两边——「夜里日军火力优势削掉一半」见张宣武回忆" },
   { id: "ijaForce", value: "TUNING[*].ijaForce",
-    note: "日军合成攻击编组。步兵分队约十三人配一挺十一年式轻机枪是编制参照；每关可见重机枪组数、出现位置与后方运输呈现为玩法推定。装甲数为零是滕县攻城战的史实约束：34 辆九四式配属临城方向，战车队 3 月 26 日后才用于台儿庄" },
-  { id: "loadout", value: "TUNING[*].loadoutOverride",
-    note: "携行。「三分之一以上没有步枪、各带手榴弹约六发」为日方记载，具体到每关发几颗、几个桥夹是推定" },
+    note: "日军合成攻击编组。步兵分队约十三人配一挺十一年式轻机枪是编制参照；每章可见重机枪组数、出现位置与后方运输呈现为玩法推定。装甲数为零是滕县攻城战的史实约束：34 辆九四式配属临城方向，战车队 3 月 26 日后才用于台儿庄" },
+  { id: "loadout", value: "TUNING[*].loadout / loadoutOverride",
+    note: "携行。「三分之一以上没有步枪、各带手榴弹约六发」为日方记载，具体到每章发几颗、几个桥夹是推定" },
   { id: "spawn", value: "TUNING[*].spawn",
     note: "玩家开局站位。史料不记二等兵站在哪儿" },
-  { id: "spotterDelay", value: 240, unit: "s",
-    note: "L4 落弹变准的时刻。史料只说 3/17 10 时观测班占领龙泉塔，折算成关内秒数是设计值" },
+  { id: "corridorGun", value: "TUNING.CH5_Chengqiang.corridorGun",
+    note: "西城门楼那挺沿街扫射的重机枪。史料只说 3/17 17 时日军夺西城门楼后向十字街口扫射，具体架在哪一块砖上是推定" },
 ];
 
 /**
  * 兵员池：「死了换一个人接着打」。
  *
  * 这不是无代价复活 —— 每换一个人，池子少一个。池子的名字叫**「城里还站着的人」**，
- * 而这座城的结局是必然陷落的：数字只会往下走，全局唯一一次上涨是第一关末尾
- * 收容第 127 师 757 团残部（史料只说「数百人」，加多少是推定）。
+ * 而这座城的结局是必然陷落的：数字**只会往下走**。序章不耗（还没到滕县），
+ * 一章起逐章递减到终章。这一轮的重制取消了旧关表里那一次「收容 757 团残部」
+ * 的上涨 —— 新流程里没有那个节点。
  *
- * 逐关数值见 Data_TengxianScript.LEVELS[*].pool，全部登记为推定。
+ * 逐章数值见 Data_TengxianScript.LEVELS[*].pool，全部登记为推定。
  * **不许拿它当伤亡统计**：它是一个班排级切片，不是全城三千人。
  */
 export const REINFORCE = {

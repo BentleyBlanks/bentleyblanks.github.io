@@ -112,7 +112,14 @@ const blockerRects = [
   }),
 ];
 
-const cityPhaseIds = new Set(["L4_Chengqiang", "L5_Shizijie", "L6_Beimen"]);
+// 切片主要落在城墙以内的那几章（重制后：救护所 / 城墙没有了 / 最后一封）。
+// **旧关号也留着**：_import/TownDressingCells.json 是重制前导出的那一份
+//（城的几何没动，格子表仍然有效），里面的 phase id 还是旧的。等 dump 重跑之后
+// 可以把旧的四条删掉。这一组只驱动一条「不红只报」的提示，不影响成败。
+const cityPhaseIds = new Set([
+  "CH3_Jiuhusuo", "CH5_Chengqiang", "CH6_Zuihou",
+  "L4_Chengqiang", "L5_Shizijie", "L6_Beimen",
+]);
 const segmentsByPhase = data.phases.map((phase) => {
   const points = [{ x: phase.spawn.x, z: phase.spawn.z }, ...phase.zones];
   const segments = [];
@@ -261,18 +268,35 @@ for (const { file, region, placements } of regions) {
     + "玩家路线不经过，建议挪到 detail/mid 格。");
 }
 
-// 城外包不许只在数据文件里“存在”：每一件都必须至少进入一个实际关卡切片。
-// 这条专门防回 EastFarmFar 已布设、但 L2/L3/L4 的 maxX 全部在它西边的情况。
+// 城外包不许只在数据文件里“存在”：每一件都必须至少进入一个实际章节切片。
+// 这条专门防回 EastFarmFar 已布设、但东侧几章的 maxX 全部在它西边的情况。
+//
+// **整包没有承载章的例外**（下面这张名单）：2026-08-28 的任务流程重制取消了
+// 北门突围那一关，北关那一包布设于是没有任何切片会建它。那不是布设作者写错了
+// 坐标，是流程改了 —— 硬红在这里只会逼下一个人去改数据。降为提示并点名登记，
+// 等哪一章重新走到北关、或这一包被正式撤掉时，把它从名单里删掉。
+const ORPHANED_OUTFIELD_PACKS = new Set([
+  // 界河那一关（旧 L0）取消：城北二十公里那片村落布设没有承载章了。
+  "Data_Dressing_JieheVillages.mjs",
+  // 北门突围那一关（旧 L6）取消：北关坝墙一带同理。
+  "Data_Dressing_NorthSuburb.mjs",
+]);
 for (const { file, region, placements } of regions) {
   if (region.kind !== "outfield") continue;
+  let orphaned = 0;
   for (let index = 0; index < placements.length; index += 1) {
     const p = placements[index];
     checks += 1;
     const visibleInPhase = PHASES.some((phase) => p.x >= phase.bounds.minX && p.x <= phase.bounds.maxX
       && p.z >= phase.bounds.minZ && p.z <= phase.bounds.maxZ);
+    if (!visibleInPhase && ORPHANED_OUTFIELD_PACKS.has(file)) { orphaned += 1; continue; }
     if (!visibleInPhase) {
-      fail(`${file}[${index}] ${p.asset}@(${p.x},${p.z}): 没有任何关卡切片会生成这件城外布设。`);
+      fail(`${file}[${index}] ${p.asset}@(${p.x},${p.z}): 没有任何章节切片会生成这件城外布设。`);
     }
+  }
+  if (orphaned) {
+    notes.push(`${file}: ${orphaned} 件城外布设整包无承载章（任务流程重制取消了走到那一片的关卡）`
+      + " —— 等哪一章重新走到那儿，或这一包被正式撤掉，再把它从 ORPHANED_OUTFIELD_PACKS 里删掉。");
   }
 }
 

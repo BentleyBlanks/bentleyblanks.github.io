@@ -148,13 +148,27 @@
   font-size: 10.5px; letter-spacing: 0.12em; color: rgba(230, 223, 205, 0.38);
 }
 .mnLvMark.done { color: var(--ours, #9dc0e4); }
-.mnProloguePreview { border-bottom: 1px solid rgba(224, 176, 98, 0.22); }
+/* 分组标题（正式章节 / 测试场景）。规格：docs/Data_MissionRemake.md §9 ——
+   旧过场与靶场已经从正片流程脱钩，摆在章节中间等于谎报流程，必须分组。 */
+.mnLevelGroup {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 14px 16px 6px 14px;
+  border-top: 1px solid rgba(230, 223, 205, 0.10);
+}
+.mnLevelGroup:first-child { border-top: 0; padding-top: 6px; }
+.mnLevelGroup b {
+  font-size: 12px; letter-spacing: 0.22em; font-weight: 500;
+  color: var(--warn, #e0b062); opacity: 0.9;
+}
+.mnLevelGroup small { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(230, 223, 205, 0.34); }
+
 .mnProloguePreview .mnLvMark { color: var(--warn, #e0b062); }
-/* 沙盒（玩法测试靶场）：与七关同一张列表，但一条分隔线划开 ——
-   它不属于正片，不该看起来像第八关。 */
-.mnSandboxLevel { margin-top: 6px; border-top: 1px solid rgba(224, 176, 98, 0.22); }
-.mnSandboxLevel .mnLvNo { color: rgba(230, 223, 205, 0.42); }
-.mnSandboxLevel .mnLvMark { color: var(--warn, #e0b062); }
+/* 测试场景组的条目（靶场、白刃 QTE、过场预览）：章号列压暗，
+   与正式章节那一列金色的「第 N 关」拉开 —— 它们不属于正片。 */
+.mnSandboxLevel .mnLvNo,
+.mnCutscenePreview .mnLvNo { color: rgba(230, 223, 205, 0.42); }
+.mnSandboxLevel .mnLvMark,
+.mnCutscenePreview .mnLvMark { color: var(--warn, #e0b062); }
 
 .mnBrief {
   flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 24px 26px;

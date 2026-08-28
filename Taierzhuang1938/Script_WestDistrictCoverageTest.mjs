@@ -1,16 +1,14 @@
-// 西关总览覆盖守卫：L4 是城防外轮廓的编辑器验收切片，必须真把津浦铁路与
-// 西关整条功能带生成进来；不能只靠 landmark 的宽松半径“蹭进来”几栋孤楼。
+// 西关总览覆盖守卫：Data_Battle.OVERVIEW_BOUNDS 是城防外轮廓的编辑器验收切片，
+// 必须真把津浦铁路与西关整条功能带生成进来；不能只靠 landmark 的宽松半径“蹭进来”几栋孤楼。
+//（重制之前这一片是「城墙关」L4 的 bounds；现在没有哪一章建整座城了，见 Data_Battle。）
 
 import assert from "node:assert/strict";
-import { PHASES } from "./Data_Battle.mjs";
+import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 import { WEST_SUBURB } from "./Data_Tengxian.mjs";
 import { REGION, PLACEMENTS } from "./Data_Dressing_WestSuburb.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 
-const overview = PHASES.find((phase) => phase.id === "L4_Chengqiang");
-assert.ok(overview, "L4_Chengqiang overview phase is required");
-
-const { bounds } = overview;
+const bounds = OVERVIEW_BOUNDS;
 const contains = (x, z) => x >= bounds.minX && x <= bounds.maxX
   && z >= bounds.minZ && z <= bounds.maxZ;
 

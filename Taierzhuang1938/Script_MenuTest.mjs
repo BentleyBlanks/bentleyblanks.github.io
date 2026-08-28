@@ -6,7 +6,7 @@
 //
 // 用法：
 //   node Taierzhuang1938/Script_MenuTest.mjs            冒烟（约两分钟）
-//   node Taierzhuang1938/Script_MenuTest.mjs --shots    再把七关的菜单机位各出一张图
+//   node Taierzhuang1938/Script_MenuTest.mjs --shots    再把七章的菜单机位各出一张图
 // 退出码即成败。图落在 Taierzhuang1938/_shots/（已 gitignore）。
 
 import path from "node:path";
@@ -112,7 +112,7 @@ await Boot();
   // 菜单里摆的是几个守军，**一个日军都不许有** ——
   // 有敌人就会开打，开打就死人，而兵员池是关卡状态（玩家还没按开始）
   Check("菜单场景里只有守军、没有日军", m.nra === 5 && m.ija === 0, `nra=${m.nra} ija=${m.ija}`);
-  Check("菜单背后建的是城墙那一关（Data_Menu.MENU_SCENE.slice）", m.menu.slice === 4,
+  Check("菜单背后建的是东关那一章（Data_Menu.MENU_SCENE.slice）", m.menu.slice === 2,
     `slice=${m.menu.slice}`);
 }
 
@@ -185,7 +185,7 @@ await page.click(".edPanel.launcher .edX");
     `fov=${after.fov.toFixed(1)}`);
 
   const shots = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shotCount);
-  Check("城墙那一关配了三个机位", shots === 3, `shots=${shots}`);
+  Check("东关那一章配了两个机位", shots === 2, `shots=${shots}`);
 
   // 站在菜单里十秒：不许死人，兵员池不许动（菜单不消耗关卡状态）
   const poolBefore = await page.evaluate(() => window.Taierzhuang.state.nraPool);
@@ -220,13 +220,15 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 3) 选章：临时序章入口、七关、简报、那张全图
+// 3) 选章：两组（正式章节 / 测试场景）、简报、那张全图
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
   await page.waitForTimeout(150);
   const panel = await page.evaluate(() => ({
     levels: [...document.querySelectorAll("#menu .mnLevel")].length,
+    groups: [...document.querySelectorAll("#menu .mnLevelGroup b")].map((e) => e.textContent),
+    previews: [...document.querySelectorAll("#menu .mnCutscenePreview")].length,
     prologue: document.querySelector("#menu .mnProloguePreview")?.textContent || "",
     sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => entry.textContent || ""),
     map: !!document.querySelector("#menu .mnMap"),
@@ -235,11 +237,16 @@ for (let i = 0; i < 3; i += 1) {
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  Check("选章列出临时序章入口、七关与两个测试沙盒",
-    panel.levels === 10 && panel.prologue.includes("出川")
+  // 规格：正式章节（七章）与测试场景（靶场 / 白刃 QTE / 过场预览）分两组，
+  // 见 docs/Data_MissionRemake.md §9。数目 = 7 + 2 + 6 场预览。
+  Check("选章分成「正式章节」与「测试场景」两组",
+    panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
+    panel.groups.join(" / "));
+  Check("正式章节七章 + 两个沙盒 + 六场过场预览",
+    panel.levels === 15 && panel.previews === 6 && panel.prologue.includes("出川")
       && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
       && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场")),
-    `levels=${panel.levels} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
+    `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
   Check("简报有标题、目标清单与进入按钮",
@@ -254,7 +261,7 @@ for (let i = 0; i < 3; i += 1) {
     title: document.querySelector("#menu .mnBriefTitle").textContent,
     slice: document.querySelector("#menu .mnMapSlice").getAttribute("x"),
   }));
-  Check("换一关，简报与图上的切片框都跟着换", second.title.includes("东关"), second.title);
+  Check("换一章，简报与图上的切片框都跟着换", second.title.includes("手榴弹雨"), second.title);
 }
 
 // ===========================================================================
@@ -275,7 +282,7 @@ for (let i = 0; i < 3; i += 1) {
   }));
   await page.waitForTimeout(1200);
   const b = await page.evaluate(() => window.Taierzhuang.cutscene?.time || 0);
-  Check("「开始」播关前过场", a.playing && a.id === "CS_ChuchuanLegacy", `id=${a.id} playing=${a.playing}`);
+  Check("「开始」播序章那一场过场", a.playing && a.id === "CS_Chuchuan", `id=${a.id} playing=${a.playing}`);
   Check("过场真的在往前走（不是卡在第一帧）", b > a.t + 0.5, `t ${a.t.toFixed(2)} -> ${b.toFixed(2)} s`);
 
   // Esc 跳过，别在冒烟里干等三十八秒
@@ -287,7 +294,8 @@ for (let i = 0; i < 3; i += 1) {
     level: window.Taierzhuang.Debug.Level().id,
     open: window.Taierzhuang.Debug.Menu().open,
   }));
-  Check("跳过过场之后真的进了序 · 界河", done.running && done.level === "L0_Jiehe" && !done.open,
+  // 序章是过场承载章：车厢播完（或 Esc 跳过）自动接第一章，中间不建自己的切片。
+  Check("跳过序章过场之后自动接进第一关", done.running && done.level === "CH1_NanLu" && !done.open,
     `running=${done.running} level=${done.level}`);
 
   // 回主菜单，下一节从选章再进一次
@@ -316,7 +324,7 @@ for (let i = 0; i < 3; i += 1) {
       viewmodel: T.viewmodel.root.visible,
     };
   });
-  Check("从选章能进关（二 · 东关）", inGame.running && inGame.level === "L2_Dongguan",
+  Check("从选章能进关（第二关 · 手榴弹雨）", inGame.running && inGame.level === "CH2_Shouliudan",
     `running=${inGame.running} level=${inGame.level} built=${inGame.built}`);
   Check("进关后菜单收起、HUD 与枪回来", inGame.menuOff && !inGame.hudHidden && inGame.viewmodel,
     `menuOff=${inGame.menuOff} hud=${!inGame.hudHidden} vm=${inGame.viewmodel}`);
@@ -585,8 +593,8 @@ for (let i = 0; i < 3; i += 1) {
 // ===========================================================================
 {
   await page.evaluate(() => {
-    localStorage.setItem("tengxian1938_progress_v1",
-      JSON.stringify({ cleared: ["L0_Jiehe", "L1_Beishahe"], furthest: 2 }));
+    localStorage.setItem("tengxian1938_progress_v2",
+      JSON.stringify({ cleared: ["CH0_Chuchuan", "CH1_NanLu"], furthest: 2 }));
   });
   await Boot();
   const m = await page.evaluate(() => {
@@ -599,9 +607,8 @@ for (let i = 0; i < 3; i += 1) {
     };
   });
   Check("有进度时第一项是「继续」", m.first.startsWith("继续"), m.first);
-  Check("打过的两关标「已通过」，下一关标「下一关」",
-    m.marks[0] === "预览" && m.marks[1] === "已通过"
-      && m.marks[2] === "已通过" && m.marks[3] === "下一关",
+  Check("打过的两章标「已通过」，下一章标「下一关」",
+    m.marks[0] === "已通过" && m.marks[1] === "已通过" && m.marks[2] === "下一关",
     m.marks.join("|"));
   Check("选章默认落在下一关上", m.selected === 2, `selected=${m.selected}`);
   await page.evaluate(() => window.Taierzhuang.Debug.ResetProgress());
@@ -658,8 +665,8 @@ for (let i = 0; i < 3; i += 1) {
       go: document.querySelector("#menu .mnGo")?.textContent || "",
     };
   });
-  Check("靶场条目排在七关之后，标「沙盒」",
-    brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七关 0..6，沙盒是第 7 条
+  Check("靶场条目排在七章之后，标「沙盒」",
+    brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七章 0..6，沙盒是第 7 条
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
   Check("选章同时列出玩法靶场与白刃 QTE 测试场",
     brief.sandboxes.length === 2
@@ -726,7 +733,7 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 8) 七关的菜单机位各出一张图（--shots）
+// 8) 七章的菜单机位各出一张图（--shots）
 // ===========================================================================
 if (withShots) {
   for (let phase = 0; phase < 7; phase += 1) {

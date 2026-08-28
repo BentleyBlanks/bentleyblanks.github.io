@@ -2,11 +2,12 @@
 //
 // 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的那张地图），
 // 一切「真的去做点什么」都通过 host 回调交回装配层（Script_Main）：
-//   host.Play(index, opts)   进某一关
-//   host.PlaySandbox()       进选章末尾那条沙盒（玩法测试靶场，重载页面）
+//   host.Play(index, opts)   进某一章
+//   host.PlayCutscene(id)    播一场过场（选章「测试场景」组的预览条目）
+//   host.PlaySandbox()       进「测试场景」组里的沙盒（玩法测试靶场，重载页面）
 //   host.ExitSandbox()       从靶场退回正片
 //   host.Resume()            从暂停回到游戏
-//   host.SliceIndex()        现在建好的是哪一关的切片（决定用哪一组机位）
+//   host.SliceIndex()        现在建好的是哪一章的切片（决定用哪一组机位）
 //   host.Unlock()            第一次点击时解锁音频（浏览器要用户手势）
 // 这条界线是刻意的：菜单不许自己 import 战场、AI、玩家 —— 那三个模块换一遍，
 // 菜单不该跟着改一行。
@@ -39,7 +40,10 @@ function Lerp(a, b, k) { return a + (b - a) * k; }
  * 这一作没有存档系统（自动检查点在关内，见 docs/Data_DesignFirstPass.md），
  * 菜单要的只是「继续」该从哪一关开始、选章里哪几关打过了。
  */
-const STORE_KEY = "tengxian1938_progress_v1";
+// v2：2026-08-28 任务流程重制换了全部章节 id（L0_Jiehe… → CH0_Chuchuan…）。
+// 沿用 v1 的话，老存档里那串 cleared 一个都对不上、furthest 却还是旧的关号 ——
+// 表现成「选章里一关没通过，第一项却写着继续 · 第五关」。换键即弃旧档。
+const STORE_KEY = "tengxian1938_progress_v2";
 
 export const Progress = {
   Read() {
@@ -246,8 +250,17 @@ export class MainMenu {
      */
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
-    /** 列表上真正排出来的条目 = 七关 + 全部沙盒条目。键盘上下也按它走。 */
-    this.entries = [...this.phases, ...this.sandboxes];
+    /**
+     * 过场预览条目（选章「测试场景」组的第三类）。
+     * 与沙盒同理：**不进 this.phases**，不算进度、不参与「继续」与「下一关」。
+     * host 只要给 { id, label, note }，点下去走 host.PlayCutscene(id)。
+     */
+    this.previews = Array.isArray(host.previews) ? host.previews.filter(Boolean) : [];
+    /**
+     * 列表上真正排出来的条目 = 七章 + 沙盒 + 过场预览。键盘上下也按它走。
+     * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
+     */
+    this.entries = [...this.phases, ...this.sandboxes, ...this.previews];
     /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
     this.sandboxMode = host.sandboxMode || false;
 
@@ -330,8 +343,8 @@ export class MainMenu {
     const label = resume ? `继续 · ${this.phases[progress.furthest].label}` : MENU.start;
     return [
       { id: "start", label,
-        hint: resume ? "从上次通过的下一关接着打" : "从序 · 界河开始，先播「出川」那一场过场" },
-      { id: "levels", label: MENU.chapters, hint: "七关任选一关直接进（不播过场）" },
+        hint: resume ? "从上次通过的下一章接着打" : "从序章 · 出川开始，先播车厢那一场过场" },
+      { id: "levels", label: MENU.chapters, hint: "七章任选一章直接进（不播过场），另有测试场景组" },
       { id: "codex", label: MENU.codex, hint: "哪些数是史料、哪些是推定" },
       { id: "credits", label: MENU.credits, hint: "史料口径与虚构人物的交代" },
       { id: "settings", label: "设置", hint: "操作、画面与声音" },
@@ -393,7 +406,15 @@ export class MainMenu {
     this.el.itemHint.textContent = this.items[this.itemIndex]?.hint || "";
   }
 
-  /** 选章面板：左边七关，右边简报 + 全图。 */
+  /**
+   * 选章面板：左边两组条目，右边简报 + 全图。
+   *
+   * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
+   *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
+   *   测试场景 —— 靶场、白刃 QTE 测试场、过场预览（新版车厢序章与旧战役五场）。
+   * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」，
+   * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
+   */
   BuildLevels() {
     const wrap = document.createElement("div");
     wrap.className = "mnLevels";
@@ -405,31 +426,32 @@ export class MainMenu {
     wrap.appendChild(this.el.brief);
     this.el.levelsWrap = wrap;
 
-    // 这是临时审片入口，不混进 PHASES／存档／默认继续关；等《断线》接完再把它
-    // 变成正式第一关。放在选章最上面，让玩家无需记 query 参数也能选到新版序章。
-    const prologue = document.createElement("button");
-    prologue.className = "mnLevel mnProloguePreview";
-    const prologueSpan = (cls, text) => {
-      const s = document.createElement("span");
-      s.className = cls;
-      s.textContent = text;
-      prologue.appendChild(s);
+    const Group = (text, note) => {
+      const head = document.createElement("div");
+      head.className = "mnLevelGroup";
+      const title = document.createElement("b");
+      title.textContent = text;
+      const sub = document.createElement("small");
+      sub.textContent = note;
+      head.append(title, sub);
+      this.el.levelList.appendChild(head);
     };
-    prologueSpan("mnLvNo", "序");
-    prologueSpan("mnLvName", "出川 · 车厢序章");
-    prologueSpan("mnLvDate", "临时入口 · 约 2 分钟");
-    prologueSpan("mnLvMark", "预览");
-    prologue.addEventListener("click", () => this.host.PlayPrologue?.());
-    this.el.levelList.appendChild(prologue);
 
-    this.levelEls = this.entries.map((phase, i) => {
+    this.levelEls = [];
+    const Row = (entry, i) => {
       const b = document.createElement("button");
-      b.className = phase.sandbox ? "mnLevel mnSandboxLevel" : "mnLevel";
+      b.className = "mnLevel";
+      if (entry.sandbox) b.classList.add("mnSandboxLevel");
+      // 预览条目**不带 mnSandboxLevel**：那个类名是「沙盒」那两条的身份证
+      // （冒烟按它数沙盒条目），混进来会把过场预览也算成沙盒。
+      if (entry.preview) b.classList.add("mnCutscenePreview");
+      // 新版车厢序章那一条保留旧类名：主页面与冒烟脚本都按它找入口。
+      if (entry.preview && entry.cutscene === "CS_Chuchuan") b.classList.add("mnProloguePreview");
       b.dataset.i = String(i);
-      // 关号取标题里的那个序数字（「二 · 东关」-> 「二」），名字取后半。
-      // 沙盒条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的关号列。
-      const [no, ...rest] = phase.sandbox
-        ? [phase.sandboxGlyph || "靶", phase.label] : phase.label.split("·");
+      // 章号取标题里的那个序数字（「第二关 · 手榴弹雨」→「第二关」），名字取后半。
+      // 沙盒与预览条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的章号列。
+      const [no, ...rest] = (entry.sandbox || entry.preview)
+        ? [entry.glyph || entry.sandboxGlyph || "靶", entry.label] : entry.label.split("·");
       const mkSpan = (cls, text) => {
         const s = document.createElement("span");
         s.className = cls;
@@ -438,15 +460,24 @@ export class MainMenu {
         return s;
       };
       mkSpan("mnLvNo", no.trim());
-      mkSpan("mnLvName", (rest.join("·") || phase.label).trim());
-      // 副行给日期；沙盒没有日期（它的 date 是「测试靶场」，跟名字重了），给 place
-      mkSpan("mnLvDate", phase.sandbox ? phase.place : phase.date);
+      mkSpan("mnLvName", (rest.join("·") || entry.label).trim());
+      // 副行给日期；沙盒与预览没有史实日期（沙盒的 date 是「测试靶场」，跟名字重了），给 place
+      mkSpan("mnLvDate", (entry.sandbox || entry.preview) ? entry.place : entry.date);
       mkSpan("mnLvMark", "");
       b.addEventListener("mouseenter", () => this.SelectLevel(i));
       b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
       this.el.levelList.appendChild(b);
-      return b;
-    });
+      this.levelEls[i] = b;
+    };
+
+    Group("正式章节", "序章到终章，按顺序打");
+    this.phases.forEach((phase, i) => Row(phase, i));
+    if (this.sandboxes.length || this.previews.length) {
+      Group("测试场景", "不计进度，不影响正片");
+      const offset = this.phases.length;
+      this.sandboxes.forEach((entry, i) => Row(entry, offset + i));
+      this.previews.forEach((entry, i) => Row(entry, offset + this.sandboxes.length + i));
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -595,6 +626,7 @@ export class MainMenu {
     this.levelEls.forEach((el, k) => {
       el.classList.toggle("on", k === this.selected);
       const mark = el.querySelector(".mnLvMark");
+      if (this.entries[k].preview) { mark.textContent = "预览"; mark.className = "mnLvMark"; return; }
       if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
       const done = progress.cleared.includes(this.entries[k].id);
       mark.textContent = done ? "已通过" : (k === progress.furthest ? "下一关" : "");
@@ -602,6 +634,7 @@ export class MainMenu {
     });
 
     const phase = this.entries[this.selected];
+    if (phase.preview) { this.BuildPreviewBrief(phase); return; }
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -633,7 +666,7 @@ export class MainMenu {
       p.textContent = line;
       lines.appendChild(p);
     }
-    mk("mnBriefHead").textContent = "这一关要做的";
+    mk("mnBriefHead").textContent = "这一章要做的";
     const list = mk("mnObjectives", "ol");
     for (const o of phase.objectives || []) {
       const li = document.createElement("li");
@@ -651,6 +684,40 @@ export class MainMenu {
     }
     const go = mk("mnGo", "button");
     go.textContent = `进入 · ${phase.label}`;
+    go.addEventListener("click", () => this.Play(this.selected));
+  }
+
+  /**
+   * 过场预览条目的简报。
+   *
+   * 不画那张滕县全图：过场多是 standalone 布景（自带原点，离城心两三公里），
+   * 在城的图上画出来是一个贴着边框的空盒子，说明不了任何事。
+   */
+  BuildPreviewBrief(entry) {
+    const brief = this.el.brief;
+    brief.textContent = "";
+    const mk = (cls, tag = "div") => {
+      const e = document.createElement(tag);
+      e.className = cls;
+      brief.appendChild(e);
+      return e;
+    };
+    mk("mnBriefTitle").textContent = entry.label;
+    mk("mnBriefPlace").textContent = entry.place;
+    const meta = mk("mnBriefMeta");
+    for (const text of ["不计时 · 不计进度", `${entry.seconds ?? "?"} 秒`, "Esc 可跳过"]) {
+      const s = document.createElement("span");
+      s.textContent = text;
+      meta.appendChild(s);
+    }
+    const lines = mk("mnBriefLines");
+    for (const line of entry.brief || []) {
+      const p = document.createElement("p");
+      p.textContent = line;
+      lines.appendChild(p);
+    }
+    const go = mk("mnGo", "button");
+    go.textContent = `播放 · ${entry.label}`;
     go.addEventListener("click", () => this.Play(this.selected));
   }
 
@@ -679,24 +746,36 @@ export class MainMenu {
   }
 
   /**
-   * 进一关。**选章默认不播过场**：那条是「挑一关来打」的入口，
-   * 每次都先看三十八秒的出川会把它变成看片入口。战役入口才播（Activate）。
+   * 进一章。**选章默认不播过场**：那条是「挑一章来打」的入口，
+   * 每次都先看一分多钟的出川会把它变成看片入口。战役入口才播（Activate）。
+   * 例外见下面 cutsceneOnly 那一段。
    *
    * 沙盒条目走另一条路：靶场是**整表替换**（PHASE_TABLE 只剩它一关），
    * 当场换不过去，只能重载页面 —— 交给 host.PlaySandbox。
+   * 过场预览条目更简单：根本不进关，直接交给 host.PlayCutscene。
    */
   Play(index, opts = {}) {
     if (this.busy) return;
+    // 过场预览：不进关、不建切片，播完回到菜单原处。
+    if (this.entries[index]?.preview) {
+      this.host.Unlock?.();
+      this.host.PlayCutscene?.(this.entries[index].cutscene);
+      return;
+    }
     if (this.entries[index]?.sandbox) {
       this.host.PlaySandbox?.(this.entries[index].sandboxKey || "range");
       return;
     }
-    // 已经在靶场里了：正片那七关同样换不过去，先退回正片再说。
+    // 已经在靶场里了：正片那七章同样换不过去，先退回正片再说。
     if (this.sandboxMode) { this.host.ExitSandbox?.(); return; }
     this.busy = true;
     this.host.Unlock?.();
-    Promise.resolve(this.host.Play(index, { cutscenes: false, ...opts }))
-      .catch((error) => { console.error("[Menu] 进关失败", error); })
+    // **过场承载章（序章）必须播**：它整章就是那一场过场，不建自己的切片。
+    // 按选章的默认「不播过场」进去，玩家会落在上一片切片上、一个人都没有，
+    // 而本章什么也不会发生 —— 那不是「跳过演出」，是掉进一个空场。
+    const cutsceneOnly = !!this.entries[index]?.cutsceneOnly;
+    Promise.resolve(this.host.Play(index, { cutscenes: cutsceneOnly, ...opts }))
+      .catch((error) => { console.error("[Menu] 进章失败", error); })
       .finally(() => { this.busy = false; });
   }
 

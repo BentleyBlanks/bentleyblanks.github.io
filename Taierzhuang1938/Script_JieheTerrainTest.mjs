@@ -1,5 +1,18 @@
 // 「序 · 界河」微地形冒烟：高差必须可读，排水沟必须真的挡弹。
 //
+// ⚠ **2026-08-28 起这一份整份红，而且不是回归。**
+// 任务流程重制（docs/Data_MissionRemake.md）把七关换成了新的七章，界河那一关
+// 不在新流程里了 —— 于是 ?phase=0 建的是序章（借第一章那片城外原野），
+// 不再是 Script_JieheField 那张独立地图，本文件的九条断言一条都对不上。
+//
+// 底层资产**一件都没删**：Script_JieheField、Script_JieheHeight、
+// OUTFIELD_SCENES.L0_Jiehe、Data_Dressing_JieheVillages 都还在，只是没有章节
+// 会去建它们（Script_TownDressingTest 的 ORPHANED_OUTFIELD_PACKS 里也登记了同一件事）。
+// 要修只有两条路，都是**内容决策**，不是测试能自己解决的：
+//   ① 给界河重新安一章（或给它开一条像 ?range=1 那样的独立入口），本文件照旧跑；
+//   ② 认定界河退出本作，把这一份连同那批资产一起撤掉。
+// 在决定之前别去改断言把它糊绿 —— 糊绿等于把「那张图已经没人建了」这件事藏起来。
+//
 // 用法：node Taierzhuang1938/Script_JieheTerrainTest.mjs
 // 退出码即成败。测试走真浏览器和 PhysicsWorld.RaycastTerrain，不读源码猜结果。
 

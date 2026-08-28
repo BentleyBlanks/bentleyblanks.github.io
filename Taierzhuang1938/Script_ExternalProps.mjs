@@ -234,7 +234,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "rubble", x: -32, z: -1300, ry: 0.48, scale: 0.78 },
     { asset: "courtyardHouse", x: 128, z: -1352, ry: -0.08, scale: 0.92 },
   ],
-  L1_Beishahe: [
+  CH1_NanLu: [
     { asset: "house", x: -1224, z: -164, ry: 0.04 },
     { asset: "houseRow", x: -1152, z: -208, ry: -0.1 },
     { asset: "sandbag", x: -1210, z: -140, ry: 0.35 },
@@ -247,7 +247,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "stackableStone04", x: -1237.5, z: -150.7, ry: -0.2, scale: 0.72 },
     { asset: "deadTreeTrunk01", x: -1268, z: -183, ry: 0.5 },
   ],
-  L2_Dongguan: [
+  CH2_Shouliudan: [
     { asset: "house", x: 462, z: -144, ry: 0.03 },
     { asset: "housePair", x: 428, z: -178, ry: 0.06 },
     // 原来在 (500, -60)：正落在第四个目标圈（500,-65 半径 22）里，10 m 的长边
@@ -264,7 +264,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "militaryCrateOpen", x: 477, z: -91, ry: -0.48 },
     { asset: "stackableStone06", x: 521, z: 12, ry: 0.9, scale: 0.85 },
   ],
-  L3_Fanji: [
+  CH4_DongguanYe: [
     { asset: "cart", x: 468, z: -54, ry: 0.16, scale: 0.86 },
     { asset: "crate", x: 471, z: -52, ry: -0.22, scale: 0.88 },
     { asset: "housePair", x: 508, z: -30, ry: -0.08 },
@@ -272,7 +272,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "marketRiceSack01", x: 473, z: -50, ry: 0.38 },
     { asset: "marketBox01", x: 471.8, z: -49.5, ry: -0.16 },
   ],
-  L4_Chengqiang: [
+  CH3_Jiuhusuo: [
     // 东墙缺口（世界 305,-15）：两只断肩把墙皮、夯土芯和真实墙厚连成 V 形，
     // 瓦砾扇跨墙内外但中间留 3.8 m 净槽，玩家与补位 AI 仍沿缺口通过。
     { asset: "cityWallBreachShoulderLeft", x: 305, z: -7.5, ry: Math.PI / 2 },
@@ -334,7 +334,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "stackableStone05", x: 304.3, z: -64.4, ry: 0.62, scale: 0.68 },
     { asset: "stackableStone07", x: 310, z: -70, ry: -0.3, scale: 0.76 },
   ],
-  L5_Shizijie: [
+  CH5_Chengqiang: [
     { asset: "cart", x: 112, z: -38, ry: 0.38, scale: 0.84 },
     { asset: "crate", x: 116, z: -36, ry: -0.22, scale: 0.86 },
     { asset: "houseRow", x: 84, z: -70, ry: 0.22 },
@@ -342,10 +342,10 @@ const PLACEMENTS = Object.freeze({
     { asset: "rubble", x: -66, z: 44, ry: 0.18, scale: 0.92 },
     { asset: "deadTreeTrunk02", x: -72, z: 51, ry: -0.44, scale: 0.9 },
   ],
-  L6_Beimen: [
+  CH6_Zuihou: [
     { asset: "cart", x: -188, z: -128, ry: 0.18, scale: 0.82 },
     { asset: "crate", x: -184, z: -127, ry: -0.14, scale: 0.84 },
-    // 原来在 (-224, -160)：压在北门（-322,0）通往城北两个目标（-145,-296 与
+    // 原来在 (-224, -160)：压在北门通往城北两个目标（-145,-296 与
     // 0,-520）的那条对角线上，两条通视一起被这一栋挡掉。往西让 9 m 就都让开了
     // （空位是扫出来的：不压进既有院墙、也不落在任何一条目标连线上）。
     { asset: "housePair", x: -232, z: -164, ry: 0.12 },

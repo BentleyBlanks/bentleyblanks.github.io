@@ -101,10 +101,67 @@
 //
 // role 只记录「这句话该由谁喊」，运行时不据此挑人 —— 挑选按 kind + 种子，
 // 见 Script_Audio.Bark()。
+//
+// ## kind: "story" —— 章节剧情台词（2026-08-28 任务流程重制）
+// 上面这三十几条是**没有主人的战场口令**：谁喊都行，按 kind 随机挑。
+// 章节台词正好相反：每一条只属于一个人、只在剧本的某一拍出现，
+// 一旦被随机抽中就是「顺子在别人的关里自言自语」。所以它们：
+//   · kind 一律 "story"，`Bark` 的随机池按 kind 过滤时永远选不中（还有一道
+//     显式的 `kind === "story"` 闸，见 Script_Audio.Bark）；
+//   · 只能由 `beat.voice` 用 key 点名，走 Script_Audio.PlayStoryVoice
+//     （单槽、不吃 Bark 的 0.55 s / 4.5 s 节流闸 —— 那两道闸是给环境喊话的，
+//     用在对白上就是「这句台词随机不见了」）；
+//   · 行本体写在各章的 `Data_MissionChX.mjs` 里（章节内容批的文件），
+//     这里只做拼接与体检。没烘出音频的行照样留在表里：运行时静默降级成纯字幕。
+//
+// 章节行的最小写法（其余字段可省，见 Normalize）：
+//   { key: "ch3_yaowa_07", who: "yaowa", delivery: "whisper", dur: 0,
+//     text: "这些人都没枪了……" }
+import { VOICE_LINES as CH0_LINES } from "./Data_MissionCh0.mjs";
+import { VOICE_LINES as CH1_LINES } from "./Data_MissionCh1.mjs";
+import { VOICE_LINES as CH2_LINES } from "./Data_MissionCh2.mjs";
+import { VOICE_LINES as CH3_LINES } from "./Data_MissionCh3.mjs";
+import { VOICE_LINES as CH4_LINES } from "./Data_MissionCh4.mjs";
+import { VOICE_LINES as CH5_LINES } from "./Data_MissionCh5.mjs";
+import { VOICE_LINES as CH6_LINES } from "./Data_MissionCh6.mjs";
 
 export const VOICE_BASE = "Audio/";
 
-export const VOICE_LINES = [
+/**
+ * 章节台词的 CAST id（docs/Data_MissionRemake.md §10.2）。
+ * 章节行的 `who` 只能取这里面的值 —— 配音提示词按 who 挑（Script_VoiceBake
+ * 的 CAST_VOICE_PROMPTS 逐条对应），写错 id 出来的就是「别人的嗓子」。
+ */
+export const STORY_CAST_IDS = [
+  "shunzi", "luo", "yaowa", "heyoutian", "liuwencai", "xiaoqin", "zhaodegui",
+  "paizhang", "junyi", "s124", "danjiayuan", "shangbing", "junguan", "canmou",
+  "wangmingzhang", "ija_gunso",
+];
+
+/**
+ * 交付档（delivery）：**同一套后期参数不能同时伺候急喊和耳语。**
+ *
+ * 战场口令那三十几条全是「站着喊」，所以一直只有一组常数：压到 2.35 s、
+ * 归一到 −16.1 dBFS。章节台词里有两类它伺候不了的：
+ *   · **耳语**（第三关摸到救护点外那一段）。归一到 −16.1 就是「压低声音地大喊」——
+ *     波形一样响，气声却没有喊话的胸腔共鸣，听感变成「离麦克风很近的怪人」。
+ *     耳语必须**比常态轻**，玩家是靠音量差听出「现在不能出声」这件事的。
+ *   · **负伤/临终的虚弱**（罗班长、担架上的伤员）。同理，抬到齐平就没救了。
+ * atempo 也要分档：气声被拉快会先碎（辅音糊成一片），所以耳语几乎不许压。
+ *
+ * rms 是有声段 RMS 目标（dBFS），tempo 是 atempo 的上限倍率。
+ * Script_VoiceBake 烘的时候按这张表走，Script_VoiceTest 按同一张表验 ——
+ * 两边共读一张表，才不会出现「烘的和验的不是一个标准」。
+ */
+export const VOICE_DELIVERY_MIX = {
+  normal:  { rms: -16.1, tempo: 1.15 },   // 常态对白
+  shout:   { rms: -16.1, tempo: 1.20 },   // 战场急喊（与战斗口令同一档音量）
+  whisper: { rms: -22.0, tempo: 1.06 },   // 压低的耳语：**必须比常态轻 6 dB**
+  weak:    { rms: -19.0, tempo: 1.08 },   // 负伤、临终、脱力
+};
+export const STORY_DELIVERIES = Object.keys(VOICE_DELIVERY_MIX);
+
+const BATTLE_LINES = [
   // ===== 序章｜出川（18 句对白／11 个 cue，按过场时间轴固定顺序） =============
   // 新序章全部锁定 SeedAudio 1.0 与四川话。1:08—1:30 必须作为一个连续场景一次生成，
   // 不能拆成八条独立 TTS；text 保存完整提示词台词，字幕分句在 Data_CutsceneChuchuan。
@@ -224,7 +281,113 @@ export const VOICE_LINES = [
   { key: "ija_move_forward",    kind: "move",   file: "vo_ija_move_forward.mp3", dur: 2.01,  role: "分隊長",   pitch: -2,  side: "ija", delivery: "assault", text: "まえへでろ！おせ！", kanji: "前へ出ろ！押せ！", cn: "冲到前面！压上去！" },
 ];
 
-/** 按类别取所有键（不含 event 句），给测试与调试用。 */
+// ===========================================================================
+// 章节剧情台词的拼接
+//
+// 七个 `Data_MissionChX.mjs` 各自导出一段 VOICE_LINES（空数组也要能工作 ——
+// 章节内容批是并行开工的，任何时刻都可能有几章还是空的）。
+// 这里只做三件事：**补默认值、体检、拼进总表**。不改一个字的台词。
+//
+// 体检不抛异常：一条写错的台词不该让整局游戏开不起来（语音本来就是可降级的）。
+// 坏行被剔出总表并记进 VOICE_MERGE_WARNINGS，由 Script_VoiceTest 断言它是空的 ——
+// 「静默丢一条台词」和「开不了机」之间，前者更难查，所以必须留痕。
+// ===========================================================================
+
+const STORY_KEY_RE = /^ch([0-6])_([a-z0-9_]+)_(\d{2})$/;
+const CAST_SET = new Set(STORY_CAST_IDS);
+
+/** 章节行的默认值：key 里已经写明的东西不必再抄一遍（file/chapter 都能推出来）。 */
+function Normalize(line, chapter) {
+  const m = STORY_KEY_RE.exec(String(line.key || ""));
+  return {
+    kind: "story",
+    delivery: "normal",
+    ...line,
+    chapter,
+    // 文件名是机械推导的：key `ch3_yaowa_07` → `vo_ch3_yaowa_07.mp3`。
+    // 写错文件名的后果是静默 404 + 只剩字幕，所以默认不让人手写。
+    file: line.file || (m ? `vo_${line.key}.mp3` : ""),
+    // dur 由 Script_VoiceBake 烘完写回**章节文件**（不是这里）。
+    // 未烘焙时是 0：运行时用解码出来的真实时长，这个值只给纯 Node 侧的估算用。
+    dur: typeof line.dur === "number" ? line.dur : 0,
+  };
+}
+
+export const VOICE_MERGE_WARNINGS = [];
+
+function MergeChapter(lines, chapter, seen, out) {
+  if (!Array.isArray(lines)) {
+    VOICE_MERGE_WARNINGS.push(`ch${chapter}: VOICE_LINES 不是数组`);
+    return;
+  }
+  for (const raw of lines) {
+    const line = Normalize(raw, chapter);
+    const m = STORY_KEY_RE.exec(String(line.key || ""));
+    if (!m) {
+      VOICE_MERGE_WARNINGS.push(`ch${chapter}: key「${line.key}」不合命名规则 ch<N>_<who>_<NN>`);
+      continue;
+    }
+    if (Number(m[1]) !== chapter) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: key 里的章号与所在文件（ch${chapter}）对不上`);
+      continue;
+    }
+    if (line.who !== m[2]) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: who「${line.who}」与 key 里的说话人对不上`);
+      continue;
+    }
+    if (!CAST_SET.has(line.who)) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: who「${line.who}」不在 STORY_CAST_IDS 里`);
+      continue;
+    }
+    if (!VOICE_DELIVERY_MIX[line.delivery]) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: delivery「${line.delivery}」不在 VOICE_DELIVERY_MIX 里`);
+      continue;
+    }
+    if (!line.text) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: 没有 text`);
+      continue;
+    }
+    // 日方角色的 text 必须是纯假名：seed-audio 从文本判断语言，
+    // 写成汉字的「突撃！」会被当中文读（见上面日方那一批的头注）。
+    if (line.who === "ija_gunso" && /[一-鿿]/.test(line.text)) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: 日方台词含汉字，必须写成纯假名`);
+      continue;
+    }
+    if (seen.has(line.key)) {
+      VOICE_MERGE_WARNINGS.push(`${line.key}: key 重复，后一条已丢弃`);
+      continue;
+    }
+    seen.add(line.key);
+    out.push(line);
+  }
+}
+
+const CHAPTER_LINES = [];
+{
+  const seen = new Set(BATTLE_LINES.map((l) => l.key));
+  const chapters = [CH0_LINES, CH1_LINES, CH2_LINES, CH3_LINES, CH4_LINES, CH5_LINES, CH6_LINES];
+  for (let i = 0; i < chapters.length; i += 1) MergeChapter(chapters[i], i, seen, CHAPTER_LINES);
+}
+
+/**
+ * 总表 = 战场口令 + 七章剧情台词。
+ * 顺序有意义：战场口令在前，序章那批 prologue 行也在其中；
+ * 现有断言（「前 31 条是战斗 Bark」之类）按 kind 过滤，不靠下标。
+ */
+export const VOICE_LINES = [...BATTLE_LINES, ...CHAPTER_LINES];
+
+/** 按类别取所有键（不含 event 句与剧情行），给测试与调试用。 */
 export function VoiceKeysOf(kind) {
-  return VOICE_LINES.filter((v) => v.kind === kind && !v.event).map((v) => v.key);
+  return VOICE_LINES.filter((v) => v.kind === kind && !v.event && v.kind !== "story").map((v) => v.key);
+}
+
+/** 某一章的剧情台词。留给「按关加载」用（现在全表一次性载，见 LoadVoices 头注）。 */
+export function StoryVoiceLinesOf(chapter) {
+  return CHAPTER_LINES.filter((v) => v.chapter === chapter);
+}
+
+/** key → 时长（秒）。给 Script_Story 在宿主没回报时长时兜底算字幕停留。 */
+export function VoiceDurOf(key) {
+  const line = VOICE_LINES.find((v) => v.key === key);
+  return line ? (line.dur || 0) : 0;
 }

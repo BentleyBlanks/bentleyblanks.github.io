@@ -62,8 +62,29 @@ import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
+import { CUTSCENES, LEGACY_CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
+
+/**
+ * 选章「测试场景」组里的过场预览条目。
+ *
+ * 只列**需要人工审片**的两类：新版车厢序章（正片序章就播它），
+ * 与从正片流程脱钩、文件与注册都保留的旧战役五场。
+ * 各章的关前/关末过场不列 —— 它们会在关卡边界上自己播，摆在这里只是噪音。
+ */
+const MENU_PREVIEWS = [CUTSCENES.CS_Chuchuan, ...LEGACY_CUTSCENES]
+  .filter(Boolean)
+  .map((cut) => ({
+    preview: true,
+    id: `PV_${cut.id}`,
+    cutscene: cut.id,
+    glyph: "场",
+    label: `过场 · ${cut.title}`,
+    place: cut.id,
+    seconds: Math.round(cut.seconds),
+    brief: [cut.why || ""].filter(Boolean),
+  }));
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
@@ -879,6 +900,12 @@ async function Boot() {
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
+  // 剧情语音接线：Story 报时机，Audio 出声（单槽，新句顶旧句）。
+  // locate 暂缺——章节演员表落地后由集成批补「说话人在哪儿」，缺位时自动退化为非空间化播放。
+  story.AttachVoice({
+    play: ({ key, position }) => audio.PlayStoryVoice(key, { position }),
+    stop: () => audio.StopStoryVoice(),
+  });
   /**
    * 换天光。套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，
    * 少一件就是「天是夜的、地是白天的」。过场（cut.sky）与采样点出图
@@ -1572,7 +1599,11 @@ async function Boot() {
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
-      PlayPrologue: () => StartMenuPrologue(),
+      PlayCutscene: (id) => StartMenuCutscene(id),
+      // 选章「测试场景」组的第三类：过场预览。**不进 PHASES**，不计进度。
+      // 正片七章的关前/关末过场会自己在关卡边界上播，这里只留两种需要人工审片的：
+      // 新版车厢序章，以及从正片流程脱钩、但文件与注册都保留的旧战役五场。
+      previews: MENU_PREVIEWS,
       // 靶场：菜单里当一条「特殊关卡」摆着，但进出都是**重载页面**。
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
@@ -1667,6 +1698,18 @@ function GoToSandbox(key) {
   window.location.assign(url.toString());
 }
 
+/**
+ * 这一片切片按哪个 id 取内容。
+ *
+ * 常态就是章节自己的 id；**过场承载章（序章）借下一章的切片** ——
+ * 它自己不建场（EnterLevel 里 cutsceneOnly 那一支直接跳过 BuildField），
+ * 但 ?phase=0 直跳、开机冒烟与出图仍然要有一片地皮才起得来引擎，
+ * 那时就照 tuning.fieldFrom 去查三张按 levelId 分组的表：
+ * OUTFIELD_SCENES（城外内容）、PLACEMENTS（外部 GLB 布景）、TRIM_PLACEMENTS（tzm 饰件）。
+ * 口径见 Data_MissionCh0.mjs 头注。
+ */
+function FieldIdFor(phase) { return phase.fieldFrom || phase.id; }
+
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   aircraft?.SetPhase(phase);
@@ -1682,7 +1725,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     // 城外内容按关卡 id 开关（一·北沙河那一关整关都在城外原野上，
     // 城的生成器管不到那儿）。见 Script_TengxianOutfield.OUTFIELD_SCENES。
     // 独立场景（界河）也按它取自己那份布景表。
-    levelId: phase.id,
+    // 序章那种借片的章走 FieldIdFor（见上）。
+    levelId: FieldIdFor(phase),
     // LOD 焦点给本关的目标链：玩家会去的地方出全院落，其余按体块剪影。
     // 焦点给错的后果不是"难看"，是把 draw call 花在玩家永远不去的城角上。
     foci: phase.zones.map((z) => [z.x, z.z]),
@@ -1697,7 +1741,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     await yieldFrame();
   }
   const external = await AddExternalProps({
-    scene, library, phaseId: phase.id, bounds: phase.bounds,
+    scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
   });
   // streamer 单独挂：externalProps 会被测试整个 evaluate 出去序列化，
@@ -1718,7 +1762,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = await AddTrimProps({ scene, library, phaseId: phase.id });
+  const trim = await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -1793,8 +1837,15 @@ function ClearRuntime() {
 }
 
 /**
- * 进一关。**这是异步的** —— 建一片切片要分帧走完，不然主线程会卡死几秒，
+ * 进一章。**这是异步的** —— 建一片切片要分帧走完，不然主线程会卡死几秒，
  * 浏览器直接判成无响应。期间 state.ready = false，Frame() 只走渲染。
+ *
+ * **过场承载章（phase.cutsceneOnly，现在只有序章）**走一条短路：
+ * 播完 cutsceneIn 就直接接下一章，中间**不建切片、不撒兵、不 Respawn**——
+ * 车厢是过场自带的 standalone 布景，底下铺的是哪一片它不关心，
+ * 而重建一片要十几秒，纯属让玩家对着加载条等一场自己不需要的场景。
+ * （开机直跳 ?phase=0 那一支例外：那时 Boot 已经按 fieldFrom 建好了地皮，
+ * 引擎要有个地方站，所以 initial 分支照常 Respawn。）
  *
  * @param {number} index
  * @param {object} opts initial 开机那一次（战场已经建好，别重建）；
@@ -1805,11 +1856,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
+  const cutsceneOnly = !!phase.cutsceneOnly;
 
   // --- 关前过场 ---
   if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn);
 
-  if (!initial) {
+  if (!initial && !cutsceneOnly) {
     state.ready = false;
     ShowBoot(true);
     bootStart.disabled = true;
@@ -1845,8 +1897,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.objectiveCount = phase.zones.length;
   state.levelSeconds = phase.minutes * 60;
   // 「城里还站着的人」按剧本给的曲线走。**不做橡皮筋补给** ——
-  // 这座城里没有后方，数字只会往下走（唯一一次上涨是 L1 收容 757 团残部，
-  // 由剧本的 event:Regroup 那一条 system beat 交代，见 Data_TengxianScript）。
+  // 这座城里没有后方，数字只会往下走（序章那一章不耗，见 Data_MissionCh0 的曲线注释）。
   state.nraPool = phase.nraPool;
   state.phasePoolNra = phase.nraPool;
   state.ijaPool = phase.ijaPool;
@@ -1865,34 +1916,42 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (gi) gi.ApplyPreset(preset, graphics.giStrength);
   hud.SetPhase(phase);
   hud.ShowBrief(phase);
-  // 环境档与天空档同名，直接把 phase.sky 递进去。
+  // 环境档通常与天空档同名，直接把 phase.sky 递进去。
   // 旧写法是 night/dawn 之外一律「battle」，于是「烟尘白天」和「烧着的街」
   // 共用一档 —— 第三关满街在烧却听不见火，就是这么丢的。
-  audio.Ambience(phase.sky);
+  // 两者不同名的章（序章的天是 chuchuanDay、环境是车厢内）由数据层显式给 ambience。
+  audio.Ambience(phase.ambience || phase.sky);
   // 音乐按关走。上一版整场只有结局那一下会响 —— 四个 cue 里三个从来没进过游戏。
   audio.Music(phase.music);
 
   const loaded = story.BeginLevel(phase.id);
   state.storyObjective = phase.objectives[0] || null;
-  if (loaded === 0) console.warn("这一关没有剧本：", phase.id);
+  if (loaded === 0) console.warn("这一章没有剧本：", phase.id);
 
-  RespawnPlayer(true);
-  // 新版序章预览只借用 L0 的地形/光照作为装配底座；不撒 L0 的兵，
-  // 否则车厢结束后即使画面没有切关，旧 AI 也会在后台先开火/消耗票池。
+  // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
+  // 底下那片地皮上不该有一条战线在后台开火消耗票池。
+  if (!cutsceneOnly || initial) RespawnPlayer(true);
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
-  else if (!PREVIEW) SeedSoldiers(phase);
+  else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
 
   if (!initial) {
     ShowBoot(false);
     bootStart.textContent = SHOT ? "（出图模式）" : (PREVIEW ? "播放序章" : "进 城");
   }
-  // 这一片切片是哪一关的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
-  state.builtPhase = state.phaseIndex;
+  // 这一片切片是哪一章的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
+  // **借片的章不改它**：地皮还是上一次建的那一片，改了菜单会去取一组不存在的机位。
+  if (!cutsceneOnly || initial) state.builtPhase = state.phaseIndex;
   state.ready = true;
   state.advancing = false;
+  // 过场承载章的收尾：过场播完就接下一章。放在 advancing 清掉之后 ——
+  // AdvanceLevel 开头那道 `if (state.advancing) return` 会把它整个吞掉。
+  // 出图/自检（cutscenes=false）不接，那两条路要的是「停在这一章可复现」。
+  if (cutsceneOnly && cutscenes && !initial && state.phaseIndex < PHASE_TABLE.length - 1) {
+    return AdvanceLevel({ cutscenes });
+  }
   return state.phaseIndex;
 }
 
@@ -2048,12 +2107,12 @@ function MaintainMeleeTargets() {
  *
  * 选点：挂在**还没走到的那几个路标**上 —— 前面在烧，那是你要去的方向。
  * 排掉 45 m 以内的：烟柱底盘半径十几米，长在脸上就是一堵灰墙。
- * 界河那一关不挂（城外野地，没有房子可烧）。
+ * 序章（过场承载章）与靶场不挂。
  */
 function SeedSmokeColumns(phase) {
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
-  if (phase.id === "L0_Jiehe" || phase.sandbox) return;
+  if (phase.cutsceneOnly || phase.sandbox) return;
 
   const px = player.position.x;
   const pz = player.position.z;
@@ -2752,17 +2811,22 @@ function StartPreview({ unlockAudio = true } = {}) {
   return true;
 }
 
-/** 选章里的临时入口：先不伪造「出川 → 界河」的可玩接缝，播完回到选章。 */
-function StartMenuPrologue() {
-  if (!cutscene || cutscene.Playing) return false;
+/**
+ * 选章「测试场景」组里的过场预览：播一场，播完回到菜单原处。
+ *
+ * **不换关、不建切片**：过场自带 standalone 布景，底下铺的是菜单那片切片。
+ * 这条路只服务审片，正片七章的过场由关卡边界自己触发。
+ */
+function StartMenuCutscene(id) {
+  if (!cutscene || cutscene.Playing || !id) return false;
   state.menu = false;
   state.running = false;
   menu?.Close();
   hudRoot.style.display = "";
   audio.Unlock();
   ReleasePointerLock();
-  RunCutscene("CS_Chuchuan")
-    .catch((error) => console.error("[Main] 序章预览失败", error))
+  RunCutscene(id)
+    .catch((error) => console.error("[Main] 过场预览失败", id, error))
     .finally(() => { if (MENU_AT_BOOT) OpenMenu(); });
   return true;
 }

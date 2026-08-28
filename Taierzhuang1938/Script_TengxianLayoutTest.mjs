@@ -11,7 +11,7 @@ import {
   CITY_FEATURES, CITY_BLOCK_PROFILES, CITY_BLOCK_ZONES, STREET_LIFE_RESERVES,
   EAST_SUBURB, EAST_FIELD, EAST_DEFENSE, LEVEL_BOUNDS, BASTIONS, RAMPS, PRESUMED,
 } from "./Data_Tengxian.mjs";
-import { PHASES } from "./Data_Battle.mjs";
+import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 
 const EPSILON = 0.01;
 const failures = [];
@@ -313,15 +313,12 @@ check(minimumHomes >= 80,
 check(EAST_SUBURB.zhaiWall.enabled === true,
   "The documented east stockade and East_ZhaiGate must be built, not left as disabled placeholder data.");
 
-// L4 同时是场景编辑器的全城俯瞰验收切片。它必须收进完整东郊，而不是只收进
-// 关厢前半截；否则远端农院、田埂与荆河前缘会在图上成为一条没有解释的空白。
-const l4 = PHASES.find((phase) => phase.id === "L4_Chengqiang");
+// OVERVIEW_BOUNDS 是场景编辑器的全城俯瞰验收切片（重制前是「城墙关」的 bounds）。
+// 它必须收进完整东郊，而不是只收进关厢前半截；否则远端农院、田埂与荆河前缘
+// 会在图上成为一条没有解释的空白。
 const eastCoverageEdge = EAST_FIELD.bounds.maxX + 24;
-check(!!l4, "L4_Chengqiang is required for the full-city editor aerial.");
-if (l4) {
-  check(l4.bounds.maxX >= eastCoverageEdge,
-    `L4 east edge ${l4.bounds.maxX} must cover the complete east field through ${eastCoverageEdge}.`);
-}
+check(OVERVIEW_BOUNDS.maxX >= eastCoverageEdge,
+  `Overview east edge ${OVERVIEW_BOUNDS.maxX} must cover the complete east field through ${eastCoverageEdge}.`);
 check(LEVEL_BOUNDS.L4Wall.maxX >= eastCoverageEdge,
   "Data_Tengxian LEVEL_BOUNDS.L4Wall must stay in sync with the full east-district coverage.");
 const fieldPattern = EAST_FIELD.fieldPattern;

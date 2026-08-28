@@ -34,29 +34,33 @@ const PROBE_SHOTS = [
   { name: "Probe_StreetDawn", query: "scene=street&preset=dawn&quality=high" },
 ];
 
-/** 正片镜头表：由 index.html 的 debug 接口驱动（Script_Main 暴露 window.Taierzhuang）。 */
+/**
+ * 正片镜头表：由 index.html 的 debug 接口驱动（Script_Main 暴露 window.Taierzhuang）。
+ *
+ * ⚠ 2026-08-28 任务流程重制之后，下面 Z 系列里凡写  的机位都要重新安家。
+ * 那些机位（城墙细部、西关车站/通讯队、南墙缺口、城防图总览……）当年是靠
+ * 「城墙关」那一片**全城切片**才拍得到的，而重制之后没有哪一章会生成整座城
+ * （现在的 phase=4 是东关之夜，只有东关那一角）。要恢复它们得先给
+ * Data_Battle.OVERVIEW_BOUNDS 开一条可用的入口 —— 那件事留给集成批。
+ * 七章那八张（Game_CH*）已经按新章号重挂好，可以照常拍。
+ */
 const GAME_SHOTS = [
-  // 七关各一张。名字带关号与地名 —— 视觉审查是按图说话的，
-  // 图名看不出是哪一关的话，评语就落不回代码
-  { name: "Game_L0_Jiehe", query: "shot=1&phase=0&quality=high&scale=medium" },
-  // 村落专项回归：从石墙村南侧看院内正立面。村核扩建后镜头后移到村界外，
-  // 避免回归图出生在新房墙体内。
-  { name: "Game_L0_JieheVillage", query: "shot=1&phase=0&quality=high&scale=medium",
-    setup: { x: -154, z: -1278, yaw: 0, pitch: -0.04, quiet: true } },
-  // 主路线专项：越过第一道阵地回望土坎，固定验收斜田坎、下切水沟、两侧农院
-  // 与弹坑群是否真的进入玩法空间，而不是只在出生镜头摆一层远景。
-  { name: "Game_L0_JieheRoute", query: "shot=1&phase=0&quality=high&scale=medium",
-    setup: { x: 0, z: -1348, yaw: Math.PI, pitch: -0.06, quiet: true } },
-  { name: "Game_L1_Beishahe", query: "shot=1&phase=1&quality=high&scale=medium" },
-  { name: "Game_L2_Dongguan", query: "shot=1&phase=2&quality=high&scale=medium" },
-  { name: "Game_L3_Fanji", query: "shot=1&phase=3&quality=high&scale=medium" },
-  { name: "Game_L4_Chengqiang", query: "shot=1&phase=4&quality=high&scale=medium" },
-  { name: "Game_L5_Shizijie", query: "shot=1&phase=5&quality=high&scale=medium" },
-  { name: "Game_L6_Beimen", query: "shot=1&phase=6&quality=high&scale=medium" },
+  // 七章各一张。名字带章号与地名 —— 视觉审查是按图说话的，
+  // 图名看不出是哪一章的话，评语就落不回代码
+  { name: "Game_CH0_Chuchuan", query: "shot=1&phase=0&quality=high&scale=medium" },
+  { name: "Game_CH1_NanLu", query: "shot=1&phase=1&quality=high&scale=medium" },
+  // 村落专项回归：城外那片村落的院内正立面（旧界河那两张专项的接班人）。
+  { name: "Game_CH1_Village", query: "shot=1&phase=1&quality=high&scale=medium",
+    setup: { x: -520, z: -128, yaw: -Math.PI / 2, pitch: -0.04, quiet: true } },
+  { name: "Game_CH2_Shouliudan", query: "shot=1&phase=2&quality=high&scale=medium" },
+  { name: "Game_CH3_Jiuhusuo", query: "shot=1&phase=3&quality=high&scale=medium" },
+  { name: "Game_CH4_DongguanYe", query: "shot=1&phase=4&quality=high&scale=medium" },
+  { name: "Game_CH5_Chengqiang", query: "shot=1&phase=5&quality=high&scale=medium" },
+  { name: "Game_CH6_Zuihou", query: "shot=1&phase=6&quality=high&scale=medium" },
   // 这两张不是「多出来的花絮」：E3（开镜视野）与 D3（开火表现）此前只能靠审查员
   // 每轮手搓临时探针去看，连吃两轮盲区。加进常规集，下一轮直接从标准图里评。
   { name: "Game_Z1_Ads", query: "shot=1&phase=2&quality=high&scale=medium&ads=1" },
-  { name: "Game_Z2_Fire", query: "shot=1&phase=4&quality=high&scale=medium&fire=1" },
+  { name: "Game_Z2_Fire", query: "shot=1&phase=2&quality=high&scale=medium&fire=1" },
   // 城楼专项回归：东门外仰看宗鲁门。菜单长焦能验轮廓，这一张负责验屋面不穿插、
   // 檐下斗拱和月台石栏在近景也确实存在，防止以后又退化成四块交叉板。
   { name: "Game_Z3_GateTower", query: "shot=1&phase=4&quality=high&scale=medium",

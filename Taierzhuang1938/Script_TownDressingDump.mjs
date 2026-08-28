@@ -1,4 +1,4 @@
-// 城内布设「户口册」导出：真浏览器把 L4（全城切片）建起来，抄出每一格院子
+// 城内布设「户口册」导出：真浏览器把全城切片建起来，抄出每一格院子
 // 最终盖成什么（kind / 朝向 / 战损），连同街表、地标、缺口、外部道具目录与
 // 各件 GLB 的实测尺寸，落成一份 JSON 给并行布设包与校验器用。
 //
@@ -111,8 +111,16 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 page.on("pageerror", (error) => console.error(`PAGEERROR ${String(error).slice(0, 200)}`));
 
+// ★ 2026-08-28 任务流程重制之后**没有哪一章会生成整座城**（旧「城墙关」没了），
+// 所以这里不能再靠 ?phase=N 蹭一片全城切片。现用第二章（东关，唯一一片同时
+// 收进城墙东段与关厢的切片）起页面，格子表照旧由生成器自己算。
+// 要真正的全城俯瞰（Data_Battle.OVERVIEW_BOUNDS）得另开一条编辑器入口 ——
+// 那件事留给集成批，见 docs/Data_MissionRemake.md §10.4。
+// **产物 _import/TownDressingCells.json 目前仍是重制前那一份**（phases 里还是
+// 旧关号）：城的几何一个字没动，格子/街表/地标照旧可用；受影响的只有
+// 「目标连线不挡」那一条规则用的是旧目标链。重跑本脚本会一并刷新。
 await page.goto(
-  `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=4&quality=high&scale=small`,
+  `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=high&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 // 城内关卡的 battlefield 是 TengxianField，格子表在它包着的 city 上。
 await page.waitForFunction(
