@@ -75,7 +75,9 @@ import { Mulberry32, HashString, Clamp01 } from "./Script_Noise.mjs";
 import {
   MOAT, MARCH_GROUND, WEST_SUBURB, EAST_SUBURB, OUTSKIRTS, OUTER_LANDMARKS,
 } from "./Data_Tengxian.mjs";
-import { BuildSink, AddTree } from "./Script_World.mjs";
+import {
+  BuildSink, AddTree, AddGableTrim, AddPierPorchHouse,
+} from "./Script_World.mjs";
 import {
   MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS, BRICK_UV_GRID,
   RoofSlopeLayout, RoofSlabY,
@@ -152,6 +154,11 @@ export const VILLAGE_BUILDING_ARCHETYPES = Object.freeze([
   "LCourtyard",
   "Granary",
   "FarmShed",
+  // 村口门房：两根粗方砖墩托一片深出檐，墩间敞口或一对板门。
+  // 依据 1938 年滕县城墙照片正中那一栋（同一形制，城上是值房、村口是门房）。
+  // 前七种全是四面围合的方盒；`FarmShed` 虽然敞口，却是三根细木柱的草棚 ——
+  // 「重砖墩 + 深檐」这一形在原表里没有对应件。
+  "PierPorchGate",
 ]);
 
 /**
@@ -1700,12 +1707,18 @@ export class TengxianOutfield {
             wallMaterial === "HouseBrick" ? BRICK_UV_GRID : null),
           { x: point.x, y: eaveY + height / 2, z: point.z, ry }));
       }
-      if (!far && level < 3) {
-        const vent = this.VillagePoint(x, z, ry, end * (width / 2 + 0.22), 0);
-        sink.Add("WoodDoor", PlaceGeometry(
-          MakeBox(0.07, 0.32, 0.34, TILE_METERS.wood, `${seed}:vent${end}`),
-          { x: vent.x, y: eaveY + (roof.ridgeY - eaveY) * 0.43, z: vent.z,
-            ry: ry + Math.PI / 2 }));
+      // 搏风带 + 圆气孔 + 碱脚。旧版这里只挂一块 0.32×0.34 的方木板当气孔 ——
+      // 照片里那是个**圆洞**，而真正决定山墙轮廓的那条沿坡砖脊压边当时根本没做，
+      // 山墙的阶梯边缘在近处一览无余。三件都交给城内城外共用的 AddGableTrim。
+      // 三档塌顶的山墙被压矮到 0.72 且只剩一端，压边会飘在断口上方，整组跳过。
+      if (level < 3) {
+        const gablePoint = this.VillagePoint(x, z, ry, end * (width / 2 + 0.08), 0);
+        AddGableTrim(sink, {
+          x: gablePoint.x, z: gablePoint.z, ry,
+          depth, eaveY, ridgeY: roof.ridgeY, baseY: floorY,
+          seed: `${seed}:gt${end}`, wallThickness: 0.26, far,
+          copingMaterial: "RoofTile", plinthMaterial: "DryStone",
+        });
       }
     }
     return { ...roof, collapsed: level === 3, solids };
@@ -1777,6 +1790,27 @@ export class TengxianOutfield {
     sink.Solid(x, foundation.bottomY + foundationHeight / 2, z,
       width / 2 + 0.23, foundationHeight / 2, depth / 2 + 0.23,
       "villageFoundation", ry);
+
+    // 门房整栋交给 Script_World 的共用构件：它的墙/墩/檐关系和这里的
+    // 「方盒 + 立面 + 坡顶」三段式对不上，硬塞进来只会给每一段加分支。
+    // 远村只求 80—300 m 的轮廓，砖墩和门簪都读不出来，退回三开间省掉开销。
+    // 三档塌顶**不走门房分支**：AddPierPorchHouse 只会按 damage 压矮墙身、掀掉瓦面，
+    // 出来是「四面墙完整站着、屋顶整个没了、露出一片干净石基础」——读作烂尾楼，
+    // 不是被炸过。塌顶的碎墙分段、瓦砾泼坡、断脊梁全在下面的通用路径里
+    // （AddVillageWallSlabs + AddCollapsedRoofKit），直接落回去用现成的。
+    if (kind === "PierPorchGate" && !far && (!ruin || ruin.level < 3)) {
+      const built = AddPierPorchHouse(sink, {
+        x, z, ry, width, depth, porchDepth: Math.min(1.8, depth * 0.42),
+        eaveY: foundation.floorY + eave, baseY: foundation.floorY,
+        seed: `${seed}:pph`, damage: ruin ? ruin.level * 0.24 : 0,
+        // 必须是 villageWall：室内坪抬在石基础顶上，用城内的 wall 标签会被
+        // JieheTerrainTest 的贴地审计判成「悬空」（坡地上能差出一米多）。
+        tag: "villageWall",
+      });
+      this.stats.villageBuildings += 1;
+      this.stats.villageArchetypes[kind] = (this.stats.villageArchetypes[kind] || 0) + 1;
+      return { floorY: foundation.floorY, ridgeY: built.ridgeY };
+    }
 
     const wallMaterial = kind === "AdobeCottage" || kind === "FarmShed"
       ? "Adobe" : "HouseBrick";
@@ -1970,13 +2004,18 @@ export class TengxianOutfield {
         const z = v.z + (vRnd() - 0.5) * (v.d - 12);
         // 鲁南主房坐北朝南；只留少量沿地块边界的偏转，不再每栋乱转 30°。
         const ry = (vRnd() - 0.5) * 0.18;
+        // 门房是单开间的过道，面阔只有住宅的一半、进深更浅、檐口反而更高
+        // —— 车马要从墩间过。拿住宅的 8.6 m 面阔去建它就成了个大车棚。
         const width = kind === "Granary" ? 5.2 + vRnd() * 1.8
           : kind === "FarmShed" ? 6.2 + vRnd() * 2.0
-            : 8.6 + vRnd() * 3.0;
+            : kind === "PierPorchGate" ? 4.0 + vRnd() * 0.9
+              : 8.6 + vRnd() * 3.0;
         const depth = kind === "Granary" ? 4.0 + vRnd() * 0.8
-          : 4.7 + vRnd() * 1.4;
+          : kind === "PierPorchGate" ? 3.2 + vRnd() * 0.7
+            : 4.7 + vRnd() * 1.4;
         const eave = kind === "Granary" ? 2.25 : kind === "FarmShed" ? 2.4
-          : 2.45 + vRnd() * 0.32;
+          : kind === "PierPorchGate" ? 3.0 + vRnd() * 0.3
+            : 2.45 + vRnd() * 0.32;
         this.AddVillageBuilding(sink, {
           x, z, ry, width, depth, eave, seed: `${v.id}:${i}:main`,
           kind: kind === "TwinHouse" || kind === "LCourtyard" ? "ThreeBayBrick" : kind,
