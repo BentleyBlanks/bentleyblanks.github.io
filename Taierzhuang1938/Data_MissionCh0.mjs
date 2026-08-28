@@ -144,50 +144,50 @@ export const CHAPTER = {
 // ---------------------------------------------------------------------------
 export const VOICE_LINES = [
   // ── 镜 1｜车厢闲谈：赌骰子与切腊肉（§1 阶段 1 的空间语音）──────────────────
-  { key: "ch0_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 0, text: "哪个拿老子的子弹押骰子了？" },
-  { key: "ch0_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 0, text: "你那几颗烂子弹值个锤子。" },
-  { key: "ch0_luo_01", who: "luo", delivery: "shout", dur: 0, text: "哪个龟儿子拿刺刀切腊肉？" },
-  { key: "ch0_yaowa_01", who: "yaowa", delivery: "normal", dur: 0, text: "擦干净就是了嘛。" },
-  { key: "ch0_luo_02", who: "luo", delivery: "shout", dur: 0, text: "等哈捅鬼子，先给人家抹盐嗦？" },
+  { key: "ch0_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 2.54, text: "哪个拿老子的子弹押骰子了？" },
+  { key: "ch0_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 2.98, text: "你那几颗烂子弹值个锤子。" },
+  { key: "ch0_luo_01", who: "luo", delivery: "shout", dur: 3.19, text: "哪个龟儿子拿刺刀切腊肉？" },
+  { key: "ch0_yaowa_01", who: "yaowa", delivery: "normal", dur: 2.17, text: "擦干净就是了嘛。" },
+  { key: "ch0_luo_02", who: "luo", delivery: "shout", dur: 2.76, text: "等哈捅鬼子，先给人家抹盐嗦？" },
 
   // ── 镜 2｜读家信＋四句对话（过场规格 1、2）──────────────────────────────
   // 前两句是顺子替罗班长念信上的字（班长不识字），所以是**念**不是说 ——
   // 提示词里给「照着纸念、断句偏平」的口气，不要演。
-  { key: "ch0_shunzi_01", who: "shunzi", delivery: "normal", dur: 0, text: "……春妹会喊爹了。" },
-  { key: "ch0_shunzi_02", who: "shunzi", delivery: "normal", dur: 0, text: "娘的眼睛越发不好，穿针都要人帮。" },
-  { key: "ch0_shunzi_03", who: "shunzi", delivery: "normal", dur: 0, text: "屋头恁多事等你，还跑出来打啥子仗？" },
-  { key: "ch0_luo_03", who: "luo", delivery: "normal", dur: 0, text: "不打，人家早晚打到屋门口。" },
-  { key: "ch0_shunzi_04", who: "shunzi", delivery: "normal", dur: 0, text: "山东离屋门口还远得很。" },
-  { key: "ch0_luo_04", who: "luo", delivery: "normal", dur: 0, text: "南京以前也觉得远。" },
+  { key: "ch0_shunzi_01", who: "shunzi", delivery: "normal", dur: 2.41, text: "……春妹会喊爹了。" },
+  { key: "ch0_shunzi_02", who: "shunzi", delivery: "normal", dur: 3.36, text: "娘的眼睛越发不好，穿针都要人帮。" },
+  { key: "ch0_shunzi_03", who: "shunzi", delivery: "normal", dur: 3.74, text: "屋头恁多事等你，还跑出来打啥子仗？" },
+  { key: "ch0_luo_03", who: "luo", delivery: "normal", dur: 2.02, text: "不打，人家早晚打到屋门口。" },
+  { key: "ch0_shunzi_04", who: "shunzi", delivery: "normal", dur: 2.56, text: "山东离屋门口还远得很。" },
+  { key: "ch0_luo_04", who: "luo", delivery: "normal", dur: 2.27, text: "南京以前也觉得远。" },
 
   // ── 镜 4｜兵站与第五战区补给（§1 阶段 2）────────────────────────────────
-  { key: "ch0_luo_05", who: "luo", delivery: "shout", dur: 0, text: "放回去！莫拿老百姓的东西！" },
-  { key: "ch0_junguan_01", who: "junguan", delivery: "normal", dur: 0, text: "前头两个战区都不肯收我们。" },
-  { key: "ch0_junguan_02", who: "junguan", delivery: "normal", dur: 0, text: "第五战区肯接，还给了枪弹。" },
-  { key: "ch0_junguan_03", who: "junguan", delivery: "shout", dur: 0, text: "到了前头，哪个再乱拿老百姓东西，老子先收拾哪个！" },
+  { key: "ch0_luo_05", who: "luo", delivery: "shout", dur: 1.94, text: "放回去！莫拿老百姓的东西！" },
+  { key: "ch0_junguan_01", who: "junguan", delivery: "normal", dur: 2.07, text: "前头两个战区都不肯收我们。" },
+  { key: "ch0_junguan_02", who: "junguan", delivery: "normal", dur: 2.36, text: "第五战区肯接，还给了枪弹。" },
+  { key: "ch0_junguan_03", who: "junguan", delivery: "shout", dur: 4.17, text: "到了前头，哪个再乱拿老百姓东西，老子先收拾哪个！" },
 
   // ── 镜 5｜何有田小声＋罗班长三句 ──────────────────────────────────────
-  { key: "ch0_heyoutian_02", who: "heyoutian", delivery: "whisper", dur: 0, text: "听说李长官讲，我们再撇也比草人强。" },
-  { key: "ch0_luo_06", who: "luo", delivery: "normal", dur: 0, text: "你还笑？" },
-  { key: "ch0_luo_07", who: "luo", delivery: "normal", dur: 0, text: "人家拿话臊你。" },
-  { key: "ch0_luo_08", who: "luo", delivery: "normal", dur: 0, text: "枪发到你手头，就打个兵样出来。" },
+  { key: "ch0_heyoutian_02", who: "heyoutian", delivery: "whisper", dur: 5.60, text: "听说李长官讲，我们再撇也比草人强。" },
+  { key: "ch0_luo_06", who: "luo", delivery: "normal", dur: 0.77, text: "你还笑？" },
+  { key: "ch0_luo_07", who: "luo", delivery: "normal", dur: 0.98, text: "人家拿话臊你。" },
+  { key: "ch0_luo_08", who: "luo", delivery: "normal", dur: 2.59, text: "枪发到你手头，就打个兵样出来。" },
 
   // ── 镜 7｜顺子的计划（§1 阶段 3，全段耳语）──────────────────────────────
-  { key: "ch0_shunzi_05", who: "shunzi", delivery: "whisper", dur: 0, text: "前头若喊送伤兵，老子就去。" },
-  { key: "ch0_shunzi_06", who: "shunzi", delivery: "whisper", dur: 0, text: "送到临城，找个地方把衣裳一换。" },
-  { key: "ch0_shunzi_07", who: "shunzi", delivery: "whisper", dur: 0, text: "枪一丢，哪个认得到我？" },
-  { key: "ch0_yaowa_02", who: "yaowa", delivery: "whisper", dur: 0, text: "那不就是逃兵？" },
-  { key: "ch0_shunzi_08", who: "shunzi", delivery: "whisper", dur: 0, text: "我是遭抓来的，又不是自己来送命的。" },
-  { key: "ch0_yaowa_03", who: "yaowa", delivery: "whisper", dur: 0, text: "罗班长晓得不？" },
-  { key: "ch0_shunzi_09", who: "shunzi", delivery: "whisper", dur: 0, text: "你敢说，老子先把你丢下车。" },
+  { key: "ch0_shunzi_05", who: "shunzi", delivery: "whisper", dur: 3.22, text: "前头若喊送伤兵，老子就去。" },
+  { key: "ch0_shunzi_06", who: "shunzi", delivery: "whisper", dur: 3.78, text: "送到临城，找个地方把衣裳一换。" },
+  { key: "ch0_shunzi_07", who: "shunzi", delivery: "whisper", dur: 3.37, text: "枪一丢，哪个认得到我？" },
+  { key: "ch0_yaowa_02", who: "yaowa", delivery: "whisper", dur: 2.25, text: "那不就是逃兵？" },
+  { key: "ch0_shunzi_08", who: "shunzi", delivery: "whisper", dur: 4.28, text: "我是遭抓来的，又不是自己来送命的。" },
+  { key: "ch0_yaowa_03", who: "yaowa", delivery: "whisper", dur: 2.31, text: "罗班长晓得不？" },
+  { key: "ch0_shunzi_09", who: "shunzi", delivery: "whisper", dur: 2.21, text: "你敢说，老子先把你丢下车。" },
 
   // ── 镜 8｜远处炮声与口令 ──────────────────────────────────────────────
   // 顺子三句弧线的第一句（§6）：序章「老子没打算死在山东」→ 一关「老子不松，
   // 一起死」→ 五关「老子今天不走了」。三句必须是同一个人同一种硬气，
   // 所以这一句仍走耳语档（说给幺娃听的），不是宣言。
-  { key: "ch0_shunzi_10", who: "shunzi", delivery: "whisper", dur: 0, text: "老子没打算死在山东。" },
-  { key: "ch0_luo_09", who: "luo", delivery: "shout", dur: 0, text: "收骰子！" },
-  { key: "ch0_luo_10", who: "luo", delivery: "shout", dur: 0, text: "枪上膛！" },
-  { key: "ch0_luo_11", who: "luo", delivery: "shout", dur: 0, text: "下车以后莫给老子跑散了！" },
-  { key: "ch0_junguan_04", who: "junguan", delivery: "shout", dur: 0, text: "下车！按班站好！" },
+  { key: "ch0_shunzi_10", who: "shunzi", delivery: "whisper", dur: 1.06, text: "老子没打算死在山东。" },
+  { key: "ch0_luo_09", who: "luo", delivery: "shout", dur: 0.62, text: "收骰子！" },
+  { key: "ch0_luo_10", who: "luo", delivery: "shout", dur: 0.68, text: "枪上膛！" },
+  { key: "ch0_luo_11", who: "luo", delivery: "shout", dur: 2.77, text: "下车以后莫给老子跑散了！" },
+  { key: "ch0_junguan_04", who: "junguan", delivery: "shout", dur: 1.73, text: "下车！按班站好！" },
 ];

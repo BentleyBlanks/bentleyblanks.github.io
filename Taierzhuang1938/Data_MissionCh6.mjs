@@ -311,54 +311,54 @@ export const EVENTS = [
 // ===========================================================================
 export const VOICE_LINES = [
   // ── 通信参谋 canmou ────────────────────────────────────────────────
-  { key: "ch6_canmou_01", who: "canmou", delivery: "normal", dur: 0, text: "前两封都发出去了。" },
-  { key: "ch6_canmou_02", who: "canmou", delivery: "normal", dur: 0, text: "援军还是没得消息。" },
-  { key: "ch6_canmou_03", who: "canmou", delivery: "normal", dur: 0, text: "小秦，东关是个啥子情况？" },
-  { key: "ch6_canmou_04", who: "canmou", delivery: "normal", dur: 0, text: "罗班长那一组喃？" },
-  { key: "ch6_canmou_05", who: "canmou", delivery: "normal", dur: 0, text: "记下。" },
-  { key: "ch6_canmou_06", who: "canmou", delivery: "normal", dur: 0, text: "两个营的线还通。人剩好多，报不上来。" },
-  { key: "ch6_canmou_07", who: "canmou", delivery: "normal", dur: 0, text: "西门还开着。出了城就不晓得了。" },
-  { key: "ch6_canmou_08", who: "canmou", delivery: "normal", dur: 0, text: "还能发。" },
+  { key: "ch6_canmou_01", who: "canmou", delivery: "normal", dur: 1.69, text: "前两封都发出去了。" },
+  { key: "ch6_canmou_02", who: "canmou", delivery: "normal", dur: 2.18, text: "援军还是没得消息。" },
+  { key: "ch6_canmou_03", who: "canmou", delivery: "normal", dur: 3.08, text: "小秦，东关是个啥子情况？" },
+  { key: "ch6_canmou_04", who: "canmou", delivery: "normal", dur: 0.96, text: "罗班长那一组喃？" },
+  { key: "ch6_canmou_05", who: "canmou", delivery: "normal", dur: 0.50, text: "记下。" },
+  { key: "ch6_canmou_06", who: "canmou", delivery: "normal", dur: 3.42, text: "两个营的线还通。人剩好多，报不上来。" },
+  { key: "ch6_canmou_07", who: "canmou", delivery: "normal", dur: 4.14, text: "西门还开着。出了城就不晓得了。" },
+  { key: "ch6_canmou_08", who: "canmou", delivery: "normal", dur: 0.70, text: "还能发。" },
   // ★ 复诵电文。交付档是 normal，但要的是**郑重**：一个字一个字确认过去的职业口吻，
   //   不许朗诵腔、不许悲壮、不许拖长音。字面按策划案，用字差异走字幕小字。
   {
-    key: "ch6_canmou_09", who: "canmou", delivery: "normal", dur: 0,
+    key: "ch6_canmou_09", who: "canmou", delivery: "normal", dur: 3.88,
     text: "决以死拼，以报国家，以报知遇。",
     note: "复诵最后电文。语气比常态再郑重一档：逐字确认、节奏均匀、情绪收在里面。不是朗诵，是核对。",
   },
-  { key: "ch6_canmou_10", who: "canmou", delivery: "normal", dur: 0, text: "跟到报码纸念。一组一组来。" },
-  { key: "ch6_canmou_11", who: "canmou", delivery: "shout", dur: 0, text: "炮！接头松了！" },
-  { key: "ch6_canmou_12", who: "canmou", delivery: "normal", dur: 0, text: "密码本、底稿、呼号表 —— 烧。" },
-  { key: "ch6_canmou_13", who: "canmou", delivery: "normal", dur: 0, text: "带不走的机器，砸了再走。" },
-  { key: "ch6_canmou_14", who: "canmou", delivery: "normal", dur: 0, text: "跟到走，莫散。" },
-  { key: "ch6_canmou_15", who: "canmou", delivery: "normal", dur: 0, text: "师长在前头。跟上。" },
-  { key: "ch6_canmou_16", who: "canmou", delivery: "shout", dur: 0, text: "机枪！侧面！" },
-  { key: "ch6_canmou_17", who: "canmou", delivery: "shout", dur: 0, text: "师长——！" },
+  { key: "ch6_canmou_10", who: "canmou", delivery: "normal", dur: 3.09, text: "跟到报码纸念。一组一组来。" },
+  { key: "ch6_canmou_11", who: "canmou", delivery: "shout", dur: 1.64, text: "炮！接头松了！" },
+  { key: "ch6_canmou_12", who: "canmou", delivery: "normal", dur: 2.93, text: "密码本、底稿、呼号表 —— 烧。" },
+  { key: "ch6_canmou_13", who: "canmou", delivery: "normal", dur: 2.31, text: "带不走的机器，砸了再走。" },
+  { key: "ch6_canmou_14", who: "canmou", delivery: "normal", dur: 1.90, text: "跟到走，莫散。" },
+  { key: "ch6_canmou_15", who: "canmou", delivery: "normal", dur: 1.85, text: "师长在前头。跟上。" },
+  { key: "ch6_canmou_16", who: "canmou", delivery: "shout", dur: 1.47, text: "机枪！侧面！" },
+  { key: "ch6_canmou_17", who: "canmou", delivery: "shout", dur: 2.01, text: "师长——！" },
 
   // ── 小秦 xiaoqin（玩家）────────────────────────────────────────────
-  { key: "ch6_xiaoqin_01", who: "xiaoqin", delivery: "normal", dur: 0, text: "线全断了。东关那一段断在城墙根，我接不回来。" },
-  { key: "ch6_xiaoqin_02", who: "xiaoqin", delivery: "normal", dur: 0, text: "街被切成一段一段的，人过不去。" },
-  { key: "ch6_xiaoqin_03", who: "xiaoqin", delivery: "normal", dur: 0, text: "后送队往西转移了。" },
-  { key: "ch6_xiaoqin_04", who: "xiaoqin", delivery: "normal", dur: 0, text: "建制大多散了。不同番号的人还在补位置。" },
+  { key: "ch6_xiaoqin_01", who: "xiaoqin", delivery: "normal", dur: 4.21, text: "线全断了。东关那一段断在城墙根，我接不回来。" },
+  { key: "ch6_xiaoqin_02", who: "xiaoqin", delivery: "normal", dur: 2.47, text: "街被切成一段一段的，人过不去。" },
+  { key: "ch6_xiaoqin_03", who: "xiaoqin", delivery: "normal", dur: 1.80, text: "后送队往西转移了。" },
+  { key: "ch6_xiaoqin_04", who: "xiaoqin", delivery: "normal", dur: 3.97, text: "建制大多散了。不同番号的人还在补位置。" },
   // 停顿在 beats 那条 delay 里，不写进音频：TTS 念省略号会自己加一口气，
   // 那口气比停顿本身还响。这一条要的是**平的**，答不出来才是重点。
   {
-    key: "ch6_xiaoqin_05", who: "xiaoqin", delivery: "normal", dur: 0,
+    key: "ch6_xiaoqin_05", who: "xiaoqin", delivery: "normal", dur: 0.96,
     text: "……没得回应。",
     note: "答不上来的那一句。开头留一点点迟疑就够，不要叹气、不要哽咽、不要加重。",
   },
-  { key: "ch6_xiaoqin_06", who: "xiaoqin", delivery: "normal", dur: 0, text: "早上还有。这阵听不到了。" },
-  { key: "ch6_xiaoqin_07", who: "xiaoqin", delivery: "shout", dur: 0, text: "我接！莫断！" },
-  { key: "ch6_xiaoqin_08", who: "xiaoqin", delivery: "normal", dur: 0, text: "发毕。" },
-  { key: "ch6_xiaoqin_09", who: "xiaoqin", delivery: "normal", dur: 0, text: "烧完了。" },
+  { key: "ch6_xiaoqin_06", who: "xiaoqin", delivery: "normal", dur: 2.51, text: "早上还有。这阵听不到了。" },
+  { key: "ch6_xiaoqin_07", who: "xiaoqin", delivery: "shout", dur: 1.52, text: "我接！莫断！" },
+  { key: "ch6_xiaoqin_08", who: "xiaoqin", delivery: "normal", dur: 0.44, text: "发毕。" },
+  { key: "ch6_xiaoqin_09", who: "xiaoqin", delivery: "normal", dur: 0.67, text: "烧完了。" },
 
   // ── 王铭章 wangmingzhang（真实人物：只做史料里有的事）──────────────
   // 四问是策划案给的虚构台词，只问战况、不作事实断言；「那就发」「收起」同理。
   // 电文本体不放在他口中（原件未见公布），由参谋复诵 + 字幕并列版本差异。
-  { key: "ch6_wangmingzhang_01", who: "wangmingzhang", delivery: "normal", dur: 0, text: "东南还能联系几个营？" },
-  { key: "ch6_wangmingzhang_02", who: "wangmingzhang", delivery: "normal", dur: 0, text: "独立山方向还有枪声没得？" },
-  { key: "ch6_wangmingzhang_03", who: "wangmingzhang", delivery: "normal", dur: 0, text: "西关还能不能走担架？" },
-  { key: "ch6_wangmingzhang_04", who: "wangmingzhang", delivery: "normal", dur: 0, text: "电台还能发不？" },
-  { key: "ch6_wangmingzhang_05", who: "wangmingzhang", delivery: "normal", dur: 0, text: "那就发。" },
-  { key: "ch6_wangmingzhang_06", who: "wangmingzhang", delivery: "normal", dur: 0, text: "收起。" },
+  { key: "ch6_wangmingzhang_01", who: "wangmingzhang", delivery: "normal", dur: 2.49, text: "东南还能联系几个营？" },
+  { key: "ch6_wangmingzhang_02", who: "wangmingzhang", delivery: "normal", dur: 3.31, text: "独立山方向还有枪声没得？" },
+  { key: "ch6_wangmingzhang_03", who: "wangmingzhang", delivery: "normal", dur: 2.33, text: "西关还能不能走担架？" },
+  { key: "ch6_wangmingzhang_04", who: "wangmingzhang", delivery: "normal", dur: 1.77, text: "电台还能发不？" },
+  { key: "ch6_wangmingzhang_05", who: "wangmingzhang", delivery: "normal", dur: 0.63, text: "那就发。" },
+  { key: "ch6_wangmingzhang_06", who: "wangmingzhang", delivery: "normal", dur: 0.51, text: "收起。" },
 ];

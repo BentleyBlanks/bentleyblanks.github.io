@@ -384,118 +384,118 @@ export const CHAPTER = {
 // ===========================================================================
 export const VOICE_LINES = [
   // ── 阶段 1｜A 区医疗语音（军医只处理战伤）──────────────────────────────
-  { key: "ch3_junyi_01", who: "junyi", delivery: "shout", dur: 0, text: "能走的靠右边！" },
-  { key: "ch3_junyi_02", who: "junyi", delivery: "shout", dur: 0, text: "先压住出血！" },
-  { key: "ch3_junyi_03", who: "junyi", delivery: "shout", dur: 0, text: "这个抬进去！" },
-  { key: "ch3_junyi_04", who: "junyi", delivery: "shout", dur: 0, text: "没得担架了，拆门板！" },
-  { key: "ch3_junyi_05", who: "junyi", delivery: "shout", dur: 0, text: "莫堵门！" },
-  { key: "ch3_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 0, text: "军医，我这颗牙痛了三天了。" },
+  { key: "ch3_junyi_01", who: "junyi", delivery: "shout", dur: 1.89, text: "能走的靠右边！" },
+  { key: "ch3_junyi_02", who: "junyi", delivery: "shout", dur: 1.03, text: "先压住出血！" },
+  { key: "ch3_junyi_03", who: "junyi", delivery: "shout", dur: 0.69, text: "这个抬进去！" },
+  { key: "ch3_junyi_04", who: "junyi", delivery: "shout", dur: 2.07, text: "没得担架了，拆门板！" },
+  { key: "ch3_junyi_05", who: "junyi", delivery: "shout", dur: 1.13, text: "莫堵门！" },
+  { key: "ch3_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 2.34, text: "军医，我这颗牙痛了三天了。" },
 
   // ── 阶段 2｜被抓来当兵 ───────────────────────────────────────────────
-  { key: "ch3_yaowa_01", who: "yaowa", delivery: "normal", dur: 0, text: "顺哥，你真是遭绳子捆来的？" },
-  { key: "ch3_shunzi_01", who: "shunzi", delivery: "normal", dur: 0, text: "赶场路上。" },
-  { key: "ch3_shunzi_02", who: "shunzi", delivery: "normal", dur: 0, text: "保长带四个人，一根绳子，老子就成国军了。" },
-  { key: "ch3_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 0, text: "老子跟你们不一样，老子是自己来的。" },
-  { key: "ch3_liuwencai_02", who: "liuwencai", delivery: "normal", dur: 0, text: "自己来吃饭的。" },
-  { key: "ch3_heyoutian_02", who: "heyoutian", delivery: "normal", dur: 0, text: "吃饭不算自己来嗦？" },
+  { key: "ch3_yaowa_01", who: "yaowa", delivery: "normal", dur: 2.81, text: "顺哥，你真是遭绳子捆来的？" },
+  { key: "ch3_shunzi_01", who: "shunzi", delivery: "normal", dur: 0.67, text: "赶场路上。" },
+  { key: "ch3_shunzi_02", who: "shunzi", delivery: "normal", dur: 4.10, text: "保长带四个人，一根绳子，老子就成国军了。" },
+  { key: "ch3_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 3.08, text: "老子跟你们不一样，老子是自己来的。" },
+  { key: "ch3_liuwencai_02", who: "liuwencai", delivery: "normal", dur: 1.14, text: "自己来吃饭的。" },
+  { key: "ch3_heyoutian_02", who: "heyoutian", delivery: "normal", dur: 2.58, text: "吃饭不算自己来嗦？" },
 
   // ── 阶段 2｜想家 ─────────────────────────────────────────────────────
-  { key: "ch3_yaowa_02", who: "yaowa", delivery: "normal", dur: 0, text: "四川这阵是不是在下雨？" },
-  { key: "ch3_zhaodegui_01", who: "zhaodegui", delivery: "normal", dur: 0, text: "该是。" },
-  { key: "ch3_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 0, text: "屋头这个时候，房檐一晚上都在滴水。" },
-  { key: "ch3_yaowa_03", who: "yaowa", delivery: "normal", dur: 0, text: "我妈最烦屋头漏雨。" },
-  { key: "ch3_shunzi_03", who: "shunzi", delivery: "normal", dur: 0, text: "那你回去补。" },
-  { key: "ch3_yaowa_04", who: "yaowa", delivery: "normal", dur: 0, text: "回得去再说嘛。" },
+  { key: "ch3_yaowa_02", who: "yaowa", delivery: "normal", dur: 2.96, text: "四川这阵是不是在下雨？" },
+  { key: "ch3_zhaodegui_01", who: "zhaodegui", delivery: "normal", dur: 0.51, text: "该是。" },
+  { key: "ch3_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 3.72, text: "屋头这个时候，房檐一晚上都在滴水。" },
+  { key: "ch3_yaowa_03", who: "yaowa", delivery: "normal", dur: 2.16, text: "我妈最烦屋头漏雨。" },
+  { key: "ch3_shunzi_03", who: "shunzi", delivery: "normal", dur: 0.53, text: "那你回去补。" },
+  { key: "ch3_yaowa_04", who: "yaowa", delivery: "normal", dur: 1.17, text: "回得去再说嘛。" },
 
   // ── 阶段 2｜死在山东（伤兵气力不足，走 weak 档）──────────────────────
-  { key: "ch3_s124_01", who: "s124", delivery: "weak", dur: 0, text: "我屋头只晓得我出了川。" },
-  { key: "ch3_s124_02", who: "s124", delivery: "weak", dur: 0, text: "真死在这儿，连埋哪儿都不晓得。" },
-  { key: "ch3_luo_01", who: "luo", delivery: "normal", dur: 0, text: "莫急到给自己找坟。" },
-  { key: "ch3_luo_02", who: "luo", delivery: "normal", dur: 0, text: "还能拿枪就先活今天。" },
+  { key: "ch3_s124_01", who: "s124", delivery: "weak", dur: 3.02, text: "我屋头只晓得我出了川。" },
+  { key: "ch3_s124_02", who: "s124", delivery: "weak", dur: 3.41, text: "真死在这儿，连埋哪儿都不晓得。" },
+  { key: "ch3_luo_01", who: "luo", delivery: "normal", dur: 1.88, text: "莫急到给自己找坟。" },
+  { key: "ch3_luo_02", who: "luo", delivery: "normal", dur: 2.54, text: "还能拿枪就先活今天。" },
 
   // ── 阶段 3｜第五战区与川军处境 ───────────────────────────────────────
-  { key: "ch3_s124_03", who: "s124", delivery: "normal", dur: 0, text: "你们就是前头两个战区都不要的那批川军？" },
-  { key: "ch3_heyoutian_03", who: "heyoutian", delivery: "normal", dur: 0, text: "你妈——" },
-  { key: "ch3_luo_03", who: "luo", delivery: "normal", dur: 0, text: "是。" },
-  { key: "ch3_luo_04", who: "luo", delivery: "normal", dur: 0, text: "一战区不要，二战区也不要。" },
-  { key: "ch3_luo_05", who: "luo", delivery: "normal", dur: 0, text: "第五战区肯发枪给我们。" },
-  { key: "ch3_luo_06", who: "luo", delivery: "normal", dur: 0, text: "人家要的不是我们磕头。" },
-  { key: "ch3_luo_07", who: "luo", delivery: "normal", dur: 0, text: "是要我们把这段路顶住。" },
-  { key: "ch3_shunzi_04", who: "shunzi", delivery: "normal", dur: 0, text: "也是因为缺人。" },
-  { key: "ch3_luo_08", who: "luo", delivery: "normal", dur: 0, text: "哪个长官不缺人？" },
-  { key: "ch3_luo_09", who: "luo", delivery: "normal", dur: 0, text: "有的喊你滚，有的把枪给你。" },
-  { key: "ch3_luo_10", who: "luo", delivery: "normal", dur: 0, text: "枪拿到了，就莫打得比草人还撇。" },
-  { key: "ch3_xiaoqin_01", who: "xiaoqin", delivery: "shout", dur: 0, text: "哪个龟儿子又踩电话线！" },
+  { key: "ch3_s124_03", who: "s124", delivery: "normal", dur: 0.04, text: "你们就是前头两个战区都不要的那批川军？" },
+  { key: "ch3_heyoutian_03", who: "heyoutian", delivery: "normal", dur: 1.02, text: "你妈——" },
+  { key: "ch3_luo_03", who: "luo", delivery: "normal", dur: 0.61, text: "是。" },
+  { key: "ch3_luo_04", who: "luo", delivery: "normal", dur: 2.76, text: "一战区不要，二战区也不要。" },
+  { key: "ch3_luo_05", who: "luo", delivery: "normal", dur: 2.19, text: "第五战区肯发枪给我们。" },
+  { key: "ch3_luo_06", who: "luo", delivery: "normal", dur: 0.26, text: "人家要的不是我们磕头。" },
+  { key: "ch3_luo_07", who: "luo", delivery: "normal", dur: 3.16, text: "是要我们把这段路顶住。" },
+  { key: "ch3_shunzi_04", who: "shunzi", delivery: "normal", dur: 0.70, text: "也是因为缺人。" },
+  { key: "ch3_luo_08", who: "luo", delivery: "normal", dur: 0.91, text: "哪个长官不缺人？" },
+  { key: "ch3_luo_09", who: "luo", delivery: "normal", dur: 2.63, text: "有的喊你滚，有的把枪给你。" },
+  { key: "ch3_luo_10", who: "luo", delivery: "normal", dur: 3.57, text: "枪拿到了，就莫打得比草人还撇。" },
+  { key: "ch3_xiaoqin_01", who: "xiaoqin", delivery: "shout", dur: 2.36, text: "哪个龟儿子又踩电话线！" },
 
   // ── 阶段 4｜报纸 ─────────────────────────────────────────────────────
-  { key: "ch3_yaowa_05", who: "yaowa", delivery: "normal", dur: 0, text: "报纸写的是真的喃？" },
-  { key: "ch3_shangbing_01", who: "shangbing", delivery: "weak", dur: 0, text: "缴了枪的也遭拉走了。" },
+  { key: "ch3_yaowa_05", who: "yaowa", delivery: "normal", dur: 2.18, text: "报纸写的是真的喃？" },
+  { key: "ch3_shangbing_01", who: "shangbing", delivery: "weak", dur: 2.74, text: "缴了枪的也遭拉走了。" },
 
   // ── 阶段 5｜前沿救护点失联 ───────────────────────────────────────────
-  { key: "ch3_xiaoqin_02", who: "xiaoqin", delivery: "normal", dur: 0, text: "前头救护点没声音。" },
-  { key: "ch3_xiaoqin_03", who: "xiaoqin", delivery: "normal", dur: 0, text: "最后一段线路还通，不是我们这边断的。" },
-  { key: "ch3_junguan_01", who: "junguan", delivery: "normal", dur: 0, text: "里面还有走不了的伤兵。" },
-  { key: "ch3_junguan_02", who: "junguan", delivery: "shout", dur: 0, text: "去把活的带回来！" },
+  { key: "ch3_xiaoqin_02", who: "xiaoqin", delivery: "normal", dur: 2.08, text: "前头救护点没声音。" },
+  { key: "ch3_xiaoqin_03", who: "xiaoqin", delivery: "normal", dur: 3.13, text: "最后一段线路还通，不是我们这边断的。" },
+  { key: "ch3_junguan_01", who: "junguan", delivery: "normal", dur: 3.32, text: "里面还有走不了的伤兵。" },
+  { key: "ch3_junguan_02", who: "junguan", delivery: "shout", dur: 1.13, text: "去把活的带回来！" },
 
   // ── 阶段 6—8｜侦察段：一律 whisper ──────────────────────────────────
-  { key: "ch3_yaowa_06", who: "yaowa", delivery: "whisper", dur: 0, text: "飞机连担架都照打，还保哪个的命。" },
-  { key: "ch3_luo_11", who: "luo", delivery: "whisper", dur: 0, text: "莫踩出声音。" },
-  { key: "ch3_xiaoqin_04", who: "xiaoqin", delivery: "whisper", dur: 0, text: "线在这头还是通的。" },
-  { key: "ch3_heyoutian_04", who: "heyoutian", delivery: "whisper", dur: 0, text: "他们在里头做啥子？" },
-  { key: "ch3_yaowa_07", who: "yaowa", delivery: "whisper", dur: 0, text: "这些人都没枪了……" },
+  { key: "ch3_yaowa_06", who: "yaowa", delivery: "whisper", dur: 4.62, text: "飞机连担架都照打，还保哪个的命。" },
+  { key: "ch3_luo_11", who: "luo", delivery: "whisper", dur: 2.12, text: "莫踩出声音。" },
+  { key: "ch3_xiaoqin_04", who: "xiaoqin", delivery: "whisper", dur: 1.87, text: "线在这头还是通的。" },
+  { key: "ch3_heyoutian_04", who: "heyoutian", delivery: "whisper", dur: 1.05, text: "他们在里头做啥子？" },
+  { key: "ch3_yaowa_07", who: "yaowa", delivery: "whisper", dur: 1.73, text: "这些人都没枪了……" },
   // 这一条是幺娃第一次压不住 —— 从耳语跳到吼，情绪转折就落在这个音量差上。
-  { key: "ch3_yaowa_08", who: "yaowa", delivery: "shout", dur: 0, text: "日你先人！这些人都躺起了！" },
-  { key: "ch3_heyoutian_05", who: "heyoutian", delivery: "whisper", dur: 0, text: "妈卖批……这帮畜生。" },
-  { key: "ch3_luo_12", who: "luo", delivery: "whisper", dur: 0, text: "左边两个，屋门三个。" },
+  { key: "ch3_yaowa_08", who: "yaowa", delivery: "shout", dur: 2.68, text: "日你先人！这些人都躺起了！" },
+  { key: "ch3_heyoutian_05", who: "heyoutian", delivery: "whisper", dur: 3.58, text: "妈卖批……这帮畜生。" },
+  { key: "ch3_luo_12", who: "luo", delivery: "whisper", dur: 1.68, text: "左边两个，屋门三个。" },
 
   // ── 过场 CS_Ch3_BreakWall 里的两句（罗班长）────────────────────────────
-  { key: "ch3_luo_13", who: "luo", delivery: "whisper", dur: 0, text: "左右分开。" },
-  { key: "ch3_luo_14", who: "luo", delivery: "shout", dur: 0, text: "开火！里头活的带出来！" },
+  { key: "ch3_luo_13", who: "luo", delivery: "whisper", dur: 0.93, text: "左右分开。" },
+  { key: "ch3_luo_14", who: "luo", delivery: "shout", dur: 1.97, text: "开火！里头活的带出来！" },
 
   // ── 阶段 9｜突入救护点 ───────────────────────────────────────────────
-  { key: "ch3_luo_15", who: "luo", delivery: "shout", dur: 0, text: "一个都莫放过去！" },
-  { key: "ch3_yaowa_09", who: "yaowa", delivery: "shout", dur: 0, text: "这边还有活的！" },
-  { key: "ch3_luo_16", who: "luo", delivery: "shout", dur: 0, text: "先救人！" },
-  { key: "ch3_liuwencai_03", who: "liuwencai", delivery: "shout", dur: 0, text: "屋后又上来了！" },
-  { key: "ch3_heyoutian_06", who: "heyoutian", delivery: "shout", dur: 0, text: "狗日的小日本，莫让他们进屋！" },
+  { key: "ch3_luo_15", who: "luo", delivery: "shout", dur: 0.94, text: "一个都莫放过去！" },
+  { key: "ch3_yaowa_09", who: "yaowa", delivery: "shout", dur: 1.57, text: "这边还有活的！" },
+  { key: "ch3_luo_16", who: "luo", delivery: "shout", dur: 1.03, text: "先救人！" },
+  { key: "ch3_liuwencai_03", who: "liuwencai", delivery: "shout", dur: 1.09, text: "屋后又上来了！" },
+  { key: "ch3_heyoutian_06", who: "heyoutian", delivery: "shout", dur: 2.59, text: "狗日的小日本，莫让他们进屋！" },
   // 何有田击倒日军之后只咬牙骂这两个字：脏话越重，话越少（§8）。不喊，压着说。
-  { key: "ch3_heyoutian_07", who: "heyoutian", delivery: "normal", dur: 0, text: "畜生。" },
-  { key: "ch3_luo_17", who: "luo", delivery: "shout", dur: 0, text: "能走的交给幺娃！" },
+  { key: "ch3_heyoutian_07", who: "heyoutian", delivery: "normal", dur: 1.13, text: "畜生。" },
+  { key: "ch3_luo_17", who: "luo", delivery: "shout", dur: 1.99, text: "能走的交给幺娃！" },
 
   // ── 阶段 10｜撕短褂止血（无变化感言，两句都是干活的话）────────────────
-  { key: "ch3_junyi_06", who: "junyi", delivery: "shout", dur: 0, text: "绷带没得了！按到起！" },
-  { key: "ch3_heyoutian_08", who: "heyoutian", delivery: "normal", dur: 0, text: "这不是你留到临城换的衣裳？" },
-  { key: "ch3_shunzi_05", who: "shunzi", delivery: "normal", dur: 0, text: "按稳。" },
-  { key: "ch3_shunzi_06", who: "shunzi", delivery: "normal", dur: 0, text: "莫让他再流了。" },
+  { key: "ch3_junyi_06", who: "junyi", delivery: "shout", dur: 1.64, text: "绷带没得了！按到起！" },
+  { key: "ch3_heyoutian_08", who: "heyoutian", delivery: "normal", dur: 2.94, text: "这不是你留到临城换的衣裳？" },
+  { key: "ch3_shunzi_05", who: "shunzi", delivery: "normal", dur: 0.30, text: "按稳。" },
+  { key: "ch3_shunzi_06", who: "shunzi", delivery: "normal", dur: 2.21, text: "莫让他再流了。" },
 
   // ── 阶段 11｜传单入火之后（过场里没有台词，两句在过场外面说）───────────
-  { key: "ch3_yaowa_10", who: "yaowa", delivery: "normal", dur: 0, text: "保命……" },
-  { key: "ch3_yaowa_11", who: "yaowa", delivery: "normal", dur: 0, text: "保个鸭儿的命。" },
+  { key: "ch3_yaowa_10", who: "yaowa", delivery: "normal", dur: 1.62, text: "保命……" },
+  { key: "ch3_yaowa_11", who: "yaowa", delivery: "normal", dur: 1.70, text: "保个鸭儿的命。" },
 
   // ── 阶段 12｜撤回 A 区 ───────────────────────────────────────────────
-  { key: "ch3_luo_18", who: "luo", delivery: "shout", dur: 0, text: "街口顶一哈，等担架过去。" },
-  { key: "ch3_xiaoqin_05", who: "xiaoqin", delivery: "normal", dur: 0, text: "这段线回收不了，我剪了。" },
+  { key: "ch3_luo_18", who: "luo", delivery: "shout", dur: 2.43, text: "街口顶一哈，等担架过去。" },
+  { key: "ch3_xiaoqin_05", who: "xiaoqin", delivery: "normal", dur: 1.89, text: "这段线回收不了，我剪了。" },
   // 刘文财后期用数数控制恐惧（§8）：不再说「亏本」，改成数还剩多少。
-  { key: "ch3_liuwencai_04", who: "liuwencai", delivery: "normal", dur: 0, text: "还有几副担架？" },
+  { key: "ch3_liuwencai_04", who: "liuwencai", delivery: "normal", dur: 0.96, text: "还有几副担架？" },
 
   // ── 日方军曹（纯假名；kanji/cn 只作文档）─────────────────────────────
   // 01 是墙那边传过来的口令（阶段 7，玩家只闻其声）；02—04 在 CS_Ch3_BreakWall 里。
   // 逼问番号那两句就是 03 与 04：一句带史实通称的逼问，一句四个音节的追问，
   // 之后是刺刀。不堆辱骂 —— 批判力度由队友台词与画面里的白布、药箱、拖痕完成。
   {
-    key: "ch3_ija_gunso_01", who: "ija_gunso", delivery: "shout", dur: 0,
+    key: "ch3_ija_gunso_01", who: "ija_gunso", delivery: "shout", dur: 2.06,
     text: "たてぬものはかべぎわへ。", kanji: "立てぬ者は壁際へ。", cn: "站不起来的，到墙边去。",
   },
   {
-    key: "ch3_ija_gunso_02", who: "ija_gunso", delivery: "shout", dur: 0,
+    key: "ch3_ija_gunso_02", who: "ija_gunso", delivery: "shout", dur: 1.27,
     text: "ひきずりだせ。", kanji: "引きずり出せ。", cn: "拖出来。",
   },
   {
-    key: "ch3_ija_gunso_03", who: "ija_gunso", delivery: "normal", dur: 0,
+    key: "ch3_ija_gunso_03", who: "ija_gunso", delivery: "normal", dur: 3.75,
     text: "しなへいだな。ばんごうをいえ。", kanji: "支那兵だな。番号を言え。", cn: "是支那兵吧。报出番号。",
   },
   {
-    key: "ch3_ija_gunso_04", who: "ija_gunso", delivery: "normal", dur: 0,
+    key: "ch3_ija_gunso_04", who: "ija_gunso", delivery: "normal", dur: 0.63,
     text: "こたえぬか。", kanji: "答えぬか。", cn: "不答吗。",
   },
 ];

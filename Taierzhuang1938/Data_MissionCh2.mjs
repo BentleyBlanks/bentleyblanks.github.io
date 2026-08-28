@@ -216,45 +216,45 @@ export const CHAPTER = {
 // dur: 0 是占位，烘完由 Script_VoiceBake 写回这一行。
 export const VOICE_LINES = [
   // 阶段一｜撬箱子那组（粗粝，但笑声已经短而勉强）
-  { key: "ch2_zhaodegui_01", who: "zhaodegui", delivery: "shout", dur: 0, text: "莫拿刺刀撬箱子！" },
-  { key: "ch2_yaowa_01", who: "yaowa", delivery: "normal", dur: 0, text: "不用刺刀啷个开？" },
-  { key: "ch2_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 0, text: "你脑壳是摆设嗦？" },
-  { key: "ch2_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 0, text: "哪个龟儿子又拿走两颗？" },
-  { key: "ch2_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 0, text: "拿去试受潮没得。" },
-  { key: "ch2_liuwencai_02", who: "liuwencai", delivery: "normal", dur: 0, text: "你拿嘴试！" },
-  { key: "ch2_zhaodegui_03", who: "zhaodegui", delivery: "shout", dur: 0, text: "受潮的单独码一边！" },
+  { key: "ch2_zhaodegui_01", who: "zhaodegui", delivery: "shout", dur: 2.02, text: "莫拿刺刀撬箱子！" },
+  { key: "ch2_yaowa_01", who: "yaowa", delivery: "normal", dur: 1.52, text: "不用刺刀啷个开？" },
+  { key: "ch2_zhaodegui_02", who: "zhaodegui", delivery: "normal", dur: 1.43, text: "你脑壳是摆设嗦？" },
+  { key: "ch2_liuwencai_01", who: "liuwencai", delivery: "normal", dur: 2.04, text: "哪个龟儿子又拿走两颗？" },
+  { key: "ch2_heyoutian_01", who: "heyoutian", delivery: "normal", dur: 2.03, text: "拿去试受潮没得。" },
+  { key: "ch2_liuwencai_02", who: "liuwencai", delivery: "normal", dur: 0.97, text: "你拿嘴试！" },
+  { key: "ch2_zhaodegui_03", who: "zhaodegui", delivery: "shout", dur: 2.03, text: "受潮的单独码一边！" },
   // 飞机声：心理残留，不是真的又来扫射
-  { key: "ch2_yaowa_02", who: "yaowa", delivery: "shout", dur: 0, text: "妈卖批，又来了？" },
+  { key: "ch2_yaowa_02", who: "yaowa", delivery: "shout", dur: 2.11, text: "妈卖批，又来了？" },
 
   // 阶段二｜压枪口。whisper → whisper → normal → shout，四句是一条递进，
   // 不许拉齐音量：玩家是靠音量差听出「现在还不能出声」的。
-  { key: "ch2_luo_01", who: "luo", delivery: "whisper", dur: 0, text: "莫打。" },
-  { key: "ch2_luo_02", who: "luo", delivery: "whisper", dur: 0, text: "再近点。" },
-  { key: "ch2_luo_03", who: "luo", delivery: "normal", dur: 0, text: "稳到！" },
-  { key: "ch2_luo_04", who: "luo", delivery: "shout", dur: 0, text: "甩！" },
+  { key: "ch2_luo_01", who: "luo", delivery: "whisper", dur: 0.55, text: "莫打。" },
+  { key: "ch2_luo_02", who: "luo", delivery: "whisper", dur: 0.31, text: "再近点。" },
+  { key: "ch2_luo_03", who: "luo", delivery: "normal", dur: 0.36, text: "稳到！" },
+  { key: "ch2_luo_04", who: "luo", delivery: "shout", dur: 0.43, text: "甩！" },
 
   // 阶段三｜交流变短
-  { key: "ch2_yaowa_03", who: "yaowa", delivery: "shout", dur: 0, text: "右边！" },
-  { key: "ch2_zhaodegui_04", who: "zhaodegui", delivery: "shout", dur: 0, text: "箱子拖开！" },
-  { key: "ch2_liuwencai_03", who: "liuwencai", delivery: "shout", dur: 0, text: "掷弹筒！" },
-  { key: "ch2_luo_05", who: "luo", delivery: "shout", dur: 0, text: "趴下！" },
+  { key: "ch2_yaowa_03", who: "yaowa", delivery: "shout", dur: 0.67, text: "右边！" },
+  { key: "ch2_zhaodegui_04", who: "zhaodegui", delivery: "shout", dur: 1.41, text: "箱子拖开！" },
+  { key: "ch2_liuwencai_03", who: "liuwencai", delivery: "shout", dur: 1.21, text: "掷弹筒！" },
+  { key: "ch2_luo_05", who: "luo", delivery: "shout", dur: 0.34, text: "趴下！" },
 
   // 阶段四｜白刃战前两句口令，战后三句
-  { key: "ch2_luo_06", who: "luo", delivery: "shout", dur: 0, text: "上刺刀！" },
-  { key: "ch2_luo_07", who: "luo", delivery: "shout", dur: 0, text: "认到人再下手！" },
-  { key: "ch2_yaowa_04", who: "yaowa", delivery: "normal", dur: 0, text: "你不是说杀鬼子跟杀鸡一样？" },
+  { key: "ch2_luo_06", who: "luo", delivery: "shout", dur: 0.70, text: "上刺刀！" },
+  { key: "ch2_luo_07", who: "luo", delivery: "shout", dur: 1.88, text: "认到人再下手！" },
+  { key: "ch2_yaowa_04", who: "yaowa", delivery: "normal", dur: 3.64, text: "你不是说杀鬼子跟杀鸡一样？" },
   // 吐完，脱力。weak 档不许抬齐到常态响度。
-  { key: "ch2_heyoutian_02", who: "heyoutian", delivery: "weak", dur: 0, text: "莫说了。" },
+  { key: "ch2_heyoutian_02", who: "heyoutian", delivery: "weak", dur: 1.05, text: "莫说了。" },
 
   // 阶段五｜交替换防与清点
-  { key: "ch2_luo_08", who: "luo", delivery: "shout", dur: 0, text: "第一组先撤！我们压到起！" },
-  { key: "ch2_liuwencai_04", who: "liuwencai", delivery: "shout", dur: 0, text: "枪机我拆了！带不走！" },
-  { key: "ch2_zhaodegui_05", who: "zhaodegui", delivery: "shout", dur: 0, text: "手榴弹先转过去！" },
-  { key: "ch2_luo_09", who: "luo", delivery: "shout", dur: 0, text: "撤到第二道街垒！" },
+  { key: "ch2_luo_08", who: "luo", delivery: "shout", dur: 1.78, text: "第一组先撤！我们压到起！" },
+  { key: "ch2_liuwencai_04", who: "liuwencai", delivery: "shout", dur: 2.19, text: "枪机我拆了！带不走！" },
+  { key: "ch2_zhaodegui_05", who: "zhaodegui", delivery: "shout", dur: 1.93, text: "手榴弹先转过去！" },
+  { key: "ch2_luo_09", who: "luo", delivery: "shout", dur: 1.06, text: "撤到第二道街垒！" },
   // 点名的两个名字是虚构的无名者（城内约三千人里绝大多数没有留下名字）。
-  { key: "ch2_luo_10", who: "luo", delivery: "shout", dur: 0, text: "李长贵！" },
-  { key: "ch2_luo_11", who: "luo", delivery: "shout", dur: 0, text: "胡万清！" },
-  { key: "ch2_heyoutian_03", who: "heyoutian", delivery: "shout", dur: 0, text: "老子还活起！" },
-  { key: "ch2_liuwencai_05", who: "liuwencai", delivery: "normal", dur: 0, text: "锅比命还要紧嗦？" },
-  { key: "ch2_heyoutian_04", who: "heyoutian", delivery: "normal", dur: 0, text: "总得吃饭。" },
+  { key: "ch2_luo_10", who: "luo", delivery: "shout", dur: 0.59, text: "李长贵！" },
+  { key: "ch2_luo_11", who: "luo", delivery: "shout", dur: 0.58, text: "胡万清！" },
+  { key: "ch2_heyoutian_03", who: "heyoutian", delivery: "shout", dur: 1.16, text: "老子还活起！" },
+  { key: "ch2_liuwencai_05", who: "liuwencai", delivery: "normal", dur: 1.72, text: "锅比命还要紧嗦？" },
+  { key: "ch2_heyoutian_04", who: "heyoutian", delivery: "normal", dur: 0.91, text: "总得吃饭。" },
 ];
