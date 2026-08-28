@@ -13,12 +13,17 @@ const VIEWS = [
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。" },
+  { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
   { id: "ao", label: "AO 原始", group: "AO", note: "SSAO 尚未双边模糊的半分辨率结果。" },
   { id: "aoBlur", label: "AO 模糊", group: "AO", note: "实际注入材质间接光的 AO 结果。" },
   { id: "baseColor", label: "BaseColor", group: "材质", note: "反照率（贴图×顶点色×材质色），光照之前的底色。" },
   { id: "roughness", label: "粗糙度", group: "材质", note: "ORM 采样后的 roughnessFactor；白 = 糙、黑 = 光。" },
   { id: "metalness", label: "金属度", group: "材质", note: "ORM 采样后的 metalnessFactor；这一关的世界大多是 0（黑），枪机、刺刀才亮。" },
   { id: "shadow", label: "太阳阴影", group: "光照", note: "平行光阴影因子：白 = 照到、黑 = 挡住。阴影框只有 66 m，框外恒白 —— 顺带能看到覆盖边界。不收影的材质显示黑。" },
+  { id: "diffuseLighting", label: "Diffuse Lighting", group: "光照", note: "正式 reflectedLight.directDiffuse：太阳/局部直射的漫反射贡献（HDR 映射显示）。" },
+  { id: "specularLighting", label: "Specular Lighting", group: "光照", note: "正式 reflectedLight.directSpecular：太阳/局部直射的镜面高光贡献（HDR 映射显示）。" },
+  { id: "reflection", label: "Reflection", group: "光照", note: "正式 reflectedLight.indirectSpecular：环境 IBL 的粗糙反射，已包含正式 SSAO/GI 镜面遮蔽。" },
+  { id: "indirectLighting", label: "Indirect Lighting", group: "光照", note: "正式 reflectedLight.indirectDiffuse：探针 GI 或天空 IBL 的漫反射，已包含正式 SSAO。" },
   { id: "giWorld", label: "GI 辐照度", group: "光照", note: "材质最终采用的间接辐照度（×0.05）；探针体外按正式渲染回退到天空 IBL，不应为黑。" },
   { id: "giConfidence", label: "GI 置信度", group: "光照", note: "取样置信度：1 = 全用探针，0 = 退回天空 IBL；体积边缘的淡出带就在这里看。探针体关着（出厂默认）时恒 0，全黑是准确信息。" },
   { id: "giIrradiance", label: "辐照度图集", group: "GI", note: "实时探针体的 RGB 辐照度 atlas；探针体没开时显示不可用斜纹（去「画质」里打开）。" },
@@ -33,6 +38,7 @@ const VIEWS = [
  */
 const MATERIAL_VIEW_MODES = {
   giWorld: 1, giConfidence: 3, baseColor: 6, roughness: 7, metalness: 8, shadow: 9,
+  diffuseLighting: 10, specularLighting: 11, reflection: 12, indirectLighting: 13,
 };
 
 /**
@@ -48,6 +54,7 @@ const VIEW_TARGETS = {
   dof: (post) => post?.targets?.normalDepth,
   normal: (post) => post?.targets?.normalDepth,
   depth: (post) => post?.targets?.normalDepth,
+  motionVector: (post) => post?.targets?.normalDepth,
   ao: (post) => post?.targets?.ao,
   aoBlur: (post) => post?.targets?.aoBlur,
   giIrradiance: (post, gi) => gi?.irradiance?.[gi.pingPong],
@@ -57,6 +64,10 @@ const VIEW_TARGETS = {
   roughness: (post) => post?.targets?.hdr,
   metalness: (post) => post?.targets?.hdr,
   shadow: (post) => post?.targets?.hdr,
+  diffuseLighting: (post) => post?.targets?.hdr,
+  specularLighting: (post) => post?.targets?.hdr,
+  reflection: (post) => post?.targets?.hdr,
+  indirectLighting: (post) => post?.targets?.hdr,
   giWorld: (post) => post?.targets?.hdr,
   giConfidence: (post) => post?.targets?.hdr,
 };

@@ -54,7 +54,8 @@ function MakeTexture(bytes, size, { srgb = false, repeat = 1, anisotropy = 1 } =
  *   采样层 —— GI_SAMPLE_GLSL + 图集 uniforms + uGiEnabled 分支，只在探针体打开时
  *            编进去。即使 uGiEnabled 恒为 0 这坨代码也占着采样器与寄存器，
  *            实测整帧贵 ~2.7 ms（2026-08-26 FrameProfileTest，RTX 4070 SUPER）；
- *   调试层 —— uGiDebugView / gGiDebugColor / 材质通道视图 6-9 / 末端整帧覆盖。
+ *   调试层 —— uGiDebugView / gGiDebugColor / 材质通道视图 6-9、光照分量视图
+ *            10-13 / 末端整帧覆盖。
  *            GI 关着也要在：?giView 与 Debug Rendering 面板不依赖探针体。
  */
 export function InjectIndirectLighting(material, { ssao = null, gi = null, destruction = null } = {}) {
@@ -69,19 +70,10 @@ export function InjectIndirectLighting(material, { ssao = null, gi = null, destr
       shader.uniforms.uSsaoMap = ssao.map;
       shader.uniforms.uSsaoResolution = ssao.resolution;
       shader.uniforms.uSsaoStrength = ssao.strength;
-      fragment = fragment
-        .replace("#include <common>", `#include <common>
+      fragment = fragment.replace("#include <common>", `#include <common>
         uniform sampler2D uSsaoMap;
         uniform vec2 uSsaoResolution;
-        uniform float uSsaoStrength;`)
-        .replace("#include <aomap_fragment>", `#include <aomap_fragment>
-        {
-          float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
-          ssao = mix(1.0, ssao, uSsaoStrength);
-          reflectedLight.indirectDiffuse *= ssao;
-          // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
-          reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
-        }`);
+        uniform float uSsaoStrength;`);
     }
 
     if (gi && gi.sampling !== false) {
@@ -191,7 +183,7 @@ ${GI_SAMPLE_GLSL}`)
       //         iblIrradiance，所以视图 1 与视图 2 在这个档位是同一张图；
       //   3/4/5 = 黑 —— confidence / 亮度比 / 权重和都是探针量，没有探针 = 0，
       //         黑不是坏视图，是准确信息（画面里没有探针 GI）；
-      //   6-9 材质通道与采样版逐字节相同。
+      //   6-9 材质通道、10-13 光照分量与采样版逐字节相同。
       shader.uniforms.uGiDebugView = gi.debugView;
       fragment = fragment
         .replace("#include <common>", `#include <common>
@@ -218,6 +210,28 @@ ${GI_SAMPLE_GLSL}`)
         #endif`)
         .replace("#include <dithering_fragment>", `#include <dithering_fragment>
         if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
+    }
+
+    // 光照分量必须在 <aomap_fragment> **之后**截取：这里正是 SSAO 实际压过
+    // indirectDiffuse / indirectSpecular 的位置；往 lights_fragment_end 前挪会把
+    // 未遮蔽的旧值拿去调试，面板反而和正式画面不一致。没有 SSAO 时仍替换该
+    // chunk，以便光照分量视图在 low/关闭 AO 的档位照常工作。
+    if (ssao || gi) {
+      fragment = fragment.replace("#include <aomap_fragment>", `#include <aomap_fragment>
+        ${ssao ? `{
+          float ssao = texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution).r;
+          ssao = mix(1.0, ssao, uSsaoStrength);
+          reflectedLight.indirectDiffuse *= ssao;
+          // 镜面遮蔽：粗糙面遮得多、光滑面遮得少（Lagarde 的近似）
+          reflectedLight.indirectSpecular *= clamp(pow(ssao, 1.0 + material.roughness * 2.0), 0.0, 1.0);
+        }` : ""}
+        ${gi ? `// 10 直射漫反射 / 11 直射镜面 / 12 IBL 反射 / 13 GI/IBL 漫反射。
+        // 四项都是 reflectedLight 的正式累积项；不要从最终 totalDiffuse/
+        // totalSpecular 再猜，后者已经把两条路径相加，无法定位是哪一路失衡。
+        if (uGiDebugView > 9.5 && uGiDebugView < 10.5) gGiDebugColor = reflectedLight.directDiffuse;
+        if (uGiDebugView > 10.5 && uGiDebugView < 11.5) gGiDebugColor = reflectedLight.directSpecular;
+        if (uGiDebugView > 11.5 && uGiDebugView < 12.5) gGiDebugColor = reflectedLight.indirectSpecular;
+        if (uGiDebugView > 12.5 && uGiDebugView < 13.5) gGiDebugColor = reflectedLight.indirectDiffuse;` : ""}`);
     }
 
     if (destruction) {

@@ -162,14 +162,15 @@ const debugRendering = await page.evaluate(() => {
   // 假彩色编号必须一起被 SetView 设置，编号见 Script_EditorDebugRendering。
   const materialViews = {
     baseColor: 6, roughness: 7, metalness: 8, shadow: 9, giWorld: 1, giConfidence: 3,
+    diffuseLighting: 10, specularLighting: 11, reflection: 12, indirectLighting: 13,
   };
-  for (const view of ["normal", "depth", "ao", "aoBlur", "bloomExtract", "bloom", "fog", "dof", "giIrradiance", "giDistance",
-    "baseColor", "roughness", "metalness", "shadow", "giWorld", "giConfidence"]) {
+  for (const view of ["normal", "depth", "motionVector", "ao", "aoBlur", "bloomExtract", "bloom", "fog", "dof", "giIrradiance", "giDistance",
+    "baseColor", "roughness", "metalness", "shadow", "diffuseLighting", "specularLighting", "reflection", "indirectLighting", "giWorld", "giConfidence"]) {
     panel.SetView(view);
     T.StepFrames(2);
     const source = T.post._GetDebugSource();
     let expected = T.post.targets.hdr.texture;
-    if (["normal", "depth", "fog", "dof"].includes(view)) expected = T.post.targets.normalDepth.texture;
+    if (["normal", "depth", "motionVector", "fog", "dof"].includes(view)) expected = T.post.targets.normalDepth.texture;
     else if (view === "ao") expected = T.post.targets.ao.texture;
     else if (view === "aoBlur") expected = T.post.targets.aoBlur.texture;
     else if (view === "bloomExtract") expected = T.post.targets.bright.texture;

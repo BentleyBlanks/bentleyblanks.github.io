@@ -787,6 +787,9 @@ const FRAG_DEBUG_VIEW = /* glsl */`
   uniform float uDofStrength;
   uniform float uDofFocus;
   uniform float uDofRange;
+  uniform mat4 uPrevViewProjection;
+  uniform vec2 uResolution;
+  uniform float uHasPrev;
   varying vec2 vUv;
 
   vec3 ToSrgb(vec3 c) {
@@ -836,13 +839,28 @@ const FRAG_DEBUG_VIEW = /* glsl */`
       // 雾本身可能接近灰色，直接看它不容易看出系数；假彩色才看得见断层和高度带。
       color = mix(vec3(0.015, 0.035, 0.18), vec3(1.0, 0.63, 0.04), fog);
       color = ToSrgb(color);
-    } else {                           // 景深 CoC：严格复算 Composite 的远景散焦系数。
+    } else if (uMode < 7.5) {          // 景深 CoC：严格复算 Composite 的远景散焦系数。
       float coc = texel.a <= 0.0 ? 1.0
         : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), texel.a);
       coc *= uDofStrength;
       // 即使阵亡景深没触发也保留深蓝底，避免「全黑」被误判成展示 pass 没出画。
       color = mix(vec3(0.015, 0.06, 0.30), vec3(1.0, 0.72, 0.04), clamp(coc, 0.0, 1.0));
       color = ToSrgb(color);
+    } else {                           // Motion Vector：与 TAA 同一套深度反投影相机速度。
+      // 没有逐物体 velocity buffer；这张图如实展示运动模糊/TAA 实际使用的速度近似。
+      float depth = texel.a <= 0.0 ? 400.0 : texel.a;
+      vec2 ndc = vUv * 2.0 - 1.0;
+      vec3 viewPos = vec3(ndc.x / max(uProjScale.x, 0.0001),
+                          ndc.y / max(uProjScale.y, 0.0001), -1.0) * depth;
+      vec4 worldPos = uInvView * vec4(viewPos, 1.0);
+      vec4 prevClip = uPrevViewProjection * worldPos;
+      vec2 prevUv = (prevClip.xy / max(abs(prevClip.w), 0.0001)) * 0.5 + 0.5;
+      vec2 velocityPx = (vUv - prevUv) * uResolution;
+      if (uHasPrev < 0.5 || prevClip.w <= 0.0) velocityPx = vec2(0.0);
+      vec2 encodedDirection = clamp(velocityPx / 32.0, vec2(-1.0), vec2(1.0));
+      color = vec3(0.5 + encodedDirection.x * 0.5,
+                   0.5 + encodedDirection.y * 0.5,
+                   clamp(length(velocityPx) / 32.0, 0.0, 1.0));
     }
     gl_FragColor = vec4(color, 1.0);
   }`;
@@ -1012,6 +1030,7 @@ export class PostPipeline {
       uInvView: { value: new THREE.Matrix4() }, uProjScale: { value: new THREE.Vector2(1, 1) },
       uFogDensity: { value: 0 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 }, uFogMax: { value: 0.94 },
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 }, uDofRange: { value: 2.8 },
+      uPrevViewProjection: { value: new THREE.Matrix4() }, uResolution: { value: new THREE.Vector2(1, 1) }, uHasPrev: { value: 0 },
     };
     this.matDebug = this._Mat(FRAG_DEBUG_VIEW, this.uniformsDebug);
     // final 之外的值只在开发用面板明确要求时才生效；正式出图完全不走这里。
@@ -1192,6 +1211,7 @@ export class PostPipeline {
       // 用同一套 uniforms 实时重算效果系数。这样不会为纯调试多占一张全分辨率显存靶。
       case "fog": return { texture: T.normalDepth.texture, mode: 6 };
       case "dof": return { texture: T.normalDepth.texture, mode: 7 };
+      case "motionVector": return { texture: T.normalDepth.texture, mode: 8 };
       // enabled 为 false 时图集是上一次收敛留下的陈旧内容，或者干脆一片全黑
       // （画质档从没开过 GI 就是这一种）。这种情况要显式报"不可用"斜纹，
       // 而不是把一张黑图送到屏幕上 —— 后者跟"渲染坏了"长得一模一样。
@@ -1213,6 +1233,9 @@ export class PostPipeline {
       // 所以不能再拿 debugGi 缺席当"未注入"的代理。
       case "baseColor": case "roughness": case "metalness": case "shadow":
         return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugInjected };
+      // 光照分量是线性 HDR；沿用 hdr 的 Reinhard + sRGB 可视化，别把高亮全钳白。
+      case "diffuseLighting": case "specularLighting": case "reflection": case "indirectLighting":
+        return { texture: T.hdr.texture, mode: 4, unavailable: !this.debugInjected };
       // GI 的世界空间视图同理只要求材质注入过：探针体关着时 giWorld 显示的
       // 是材质**实际在用**的间接辐照度（天空 IBL 回退），giConfidence 恒 0
       // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
@@ -1521,6 +1544,9 @@ export class PostPipeline {
       DU.uDofStrength.value = U.uDofStrength.value;
       DU.uDofFocus.value = U.uDofFocus.value;
       DU.uDofRange.value = U.uDofRange.value;
+      DU.uPrevViewProjection.value.copy(U.uPrevViewProjection.value);
+      DU.uResolution.value.copy(U.uResolution.value);
+      DU.uHasPrev.value = this.hasPrev ? 1 : 0;
       this.uniformsDebug.uSource.value = debug.texture || T.ldr.texture;
       this.uniformsDebug.uMode.value = debug.mode;
       this.uniformsDebug.uUnavailable.value = debug.unavailable || !debug.texture ? 1 : 0;
