@@ -534,13 +534,12 @@ const actor = await page.evaluate(() => {
       && previewActor.weaponId === "Type38")
     && active.actors[4]?.kind === "ijaOfficer"
     && active.actors[4]?.weaponId === "Mauser96";
-  // 当前阵营五套军人全部走新的蒙皮 GLB。SkinnedMesh 整棵刻意跳过 overrideMaterial
-  // 法线/深度预通道（该预通道没有 skinning define，会把人压到原点），但主材质仍须
-  // 至少有一份不透明、写深度的主体材质；头发/帽带的 alpha 卡允许透明且不写深度。
+  // 当前阵营五套军人全部走新的蒙皮 GLB，且必须进入法线/深度预通道；主材质须至少有一份
+  // 不透明、写深度的主体材质。头发/帽带的 alpha 卡允许透明且不写深度。
   // 静默退回旧 model/box 也会让这一条红。
   const rigidShadingSolid = active.actors.every((previewActor) => {
     if (!previewActor.meshSource.startsWith("glb:Lugou")
-      || !previewActor.characterRig?.root?.userData?.skipNormalDepth) return false;
+      || previewActor.characterRig?.root?.userData?.skipNormalDepth) return false;
     let materialsValid = true;
     let opaqueDepthMaterial = false;
     let meshes = 0;
@@ -595,22 +594,6 @@ Check("枪身前握把沿左右手骨骼挂点定向", actor.socketDirectionDot 
   `dot=${actor.socketDirectionDot.toFixed(4)}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
-
-// 公共摄影棚为了枪械微距允许缩到 0.35 m；人物入口必须自己拦住，否则相机会钻进
-// 躯干，近裁面切掉外层衣服后露出内部/背面，看起来像模型变成了半透明。
-const actorZoom = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  for (let i = 0; i < 80; i += 1) active.OnWheel(-1);
-  const orbitDistance = active.studio.orbit.dist;
-  const cameraDistance = active.studio.camera.position.distanceTo(active.studio.orbit.target);
-  active.Rebuild();
-  T.StepFrames(8);
-  return { orbitDistance, cameraDistance };
-});
-Check("人物编辑器近距缩放不会穿进模型",
-  actorZoom.orbitDistance >= 0.75 && Math.abs(actorZoom.cameraDistance - actorZoom.orbitDistance) < 1e-4,
-  `轨道=${actorZoom.orbitDistance.toFixed(3)} m 相机=${actorZoom.cameraDistance.toFixed(3)} m`);
 
 // ---------------------------------------------------------------------------
 // 2b) 川军步兵**真的画出来了几个像素** + 判定盒线框

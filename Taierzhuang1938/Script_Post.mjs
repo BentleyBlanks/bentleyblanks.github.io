@@ -55,8 +55,8 @@ float Hash12(vec2 p) {
 
 // ---------------------------------------------------------------------------
 // 深度法线预通道用的覆盖材质
-// 用 three 的 chunk 拼，USE_INSTANCING / 形变这些分支交给它自己处理，
-// 不然实例化的瓦砾在预通道里全部塌到原点，AO 就是一片乱码。
+// 用 three 的 chunk 拼，USE_INSTANCING / USE_SKINNING / 形变这些分支交给它自己处理，
+// 不然实例化的瓦砾会塌到原点，蒙皮人物会留在绑定姿势，AO / TAA / 运动模糊一起读错。
 // ---------------------------------------------------------------------------
 function MakeNormalDepthMaterial(destruction = null) {
   const uniforms = { uFar: { value: 500 } };
@@ -67,6 +67,8 @@ function MakeNormalDepthMaterial(destruction = null) {
     vertexShader: /* glsl */`
       #include <common>
       #include <batching_pars_vertex>
+      #include <skinning_pars_vertex>
+      #include <morphtarget_pars_vertex>
       varying vec3 vViewNormal;
       varying float vViewDepth;
       ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
@@ -75,10 +77,13 @@ function MakeNormalDepthMaterial(destruction = null) {
         #include <beginnormal_vertex>
         #include <morphinstance_vertex>
         #include <morphnormal_vertex>
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
         #include <defaultnormal_vertex>
         vViewNormal = normalize(transformedNormal);
         #include <begin_vertex>
         #include <morphtarget_vertex>
+        #include <skinning_vertex>
         #include <project_vertex>
         vViewDepth = -mvPosition.z;
         ${destruction ? `
@@ -924,6 +929,7 @@ export class PostPipeline {
 
     this.normalDepthMaterial = MakeNormalDepthMaterial(destruction);
     this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
+    this._skipWorldPosition = new THREE.Vector3();
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.quadMesh.frustumCulled = false;
@@ -1246,18 +1252,32 @@ export class PostPipeline {
   }
 
   /**
-   * 收集这一帧要在预通道里整个藏掉的对象（userData.skipNormalDepth === true）。
+   * 收集这一帧要在预通道里藏掉的对象：显式 skipNormalDepth，或超过自己的
+   * normalDepthMaxDistance（只给蒙皮人物的小分件用；躯干主轮廓没有距离上限）。
    *
    * 每帧遍历一次场景图：这一趟本来就要被渲染器自己遍历好几遍，多一次几十微秒，
    * 换来的是"挂上去就生效"——缓存一份列表的话，换关重建场景那一帧必然是脏的，
    * 而这个 bug 的表现（天上一个黑洞）恰恰要花一小时才定位得到。
    * 只收当前可见的：本来就藏着的对象不该被这里"帮忙"打开。
    */
-  _CollectSkipped(scene) {
+  _CollectSkipped(scene, camera = null) {
     const list = this._skipScratch;
     list.length = 0;
     scene.traverse((object) => {
-      if (object.visible && object.userData && object.userData.skipNormalDepth) list.push(object);
+      if (!object.visible || !object.userData) return;
+      if (object.userData.skipNormalDepth) {
+        list.push(object);
+        return;
+      }
+      const maxDistance = Number(object.userData.normalDepthMaxDistance) || 0;
+      if (camera && maxDistance > 0) {
+        // RenderScene 已在本帧统一更新 scene.matrixWorld；直接读矩阵，别让每个小分件
+        // 再沿父链 updateWorldMatrix 一遍，把省下的 GPU 成本换成 JS 遍历。
+        this._skipWorldPosition.setFromMatrixPosition(object.matrixWorld);
+        if (camera.position.distanceToSquared(this._skipWorldPosition) > maxDistance * maxDistance) {
+          list.push(object);
+        }
+      }
     });
     return list;
   }
@@ -1325,7 +1345,7 @@ export class PostPipeline {
     // 二百米外的黑烟柱就成了天上一个越长越大的黑洞。
     // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
     if (P) P.GpuPush("prepass");
-    const skipped = this._CollectSkipped(scene);
+    const skipped = this._CollectSkipped(scene, camera);
     for (const object of skipped) object.visible = false;
     const prevBackground = scene.background;
     const prevOverride = scene.overrideMaterial;

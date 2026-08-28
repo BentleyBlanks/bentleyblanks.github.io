@@ -108,6 +108,9 @@ export function DefaultLugouAnimationId(kind) {
 
 const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=3";
 const ASSET_VERSION = "3";
+// 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
+// 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
+const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
 const LOADER = new GLTFLoader();
 let loadPromise = null;
 
@@ -221,7 +224,6 @@ export class LugouCharacterRig {
     this.modelId = asset.record.id;
     this.root = CloneSkeleton(asset.gltf.scene);
     this.root.name = `Rigged_${this.modelId}`;
-    this.root.userData.skipNormalDepth = true;
     this.actor = null;
     this.forcedClip = null;
     this.currentId = null;
@@ -265,12 +267,25 @@ export class LugouCharacterRig {
       start: new THREE.Vector3(),
       end: new THREE.Vector3(),
     }));
+    const skinnedParts = [];
     this.root.traverse((object) => {
       if (!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
+      if (object.isSkinnedMesh) {
+        const triangles = (object.geometry.index?.count
+          || object.geometry.attributes.position?.count || 0) / 3;
+        skinnedParts.push({ object, triangles });
+      }
     });
+    const silhouettePart = skinnedParts.reduce((best, part) =>
+      (!best || part.triangles > best.triangles ? part : best), null);
+    for (const part of skinnedParts) {
+      if (part !== silhouettePart) {
+        part.object.userData.normalDepthMaxDistance = NORMAL_DEPTH_DETAIL_MAX_DISTANCE;
+      }
+    }
     this.Play("RifleIdle", 0);
     // Stable idle phase: the five source models do not breathe in lockstep.
     this.mixer.setTime((HashString(`${seed}|phase`) % 1000) / 1000);

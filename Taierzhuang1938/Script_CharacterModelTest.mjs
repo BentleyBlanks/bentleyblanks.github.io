@@ -126,6 +126,10 @@ assert.match(runtime, /nraOfficer:[\s\S]*?role:\s*"officer"/, "NRA officer profi
 assert.match(runtime, /ijaOfficer:[\s\S]*?role:\s*"officer"/, "IJA officer profile is explicit");
 assert.match(runtime, /GetLugouAnimationEntries\(kind\)/, "runtime exposes role-filtered imported clips");
 assert.match(runtime, /IsLugouAnimationAllowed\(kind, clipId\)/, "runtime exposes an applicability guard");
+assert.doesNotMatch(runtime, /this\.root\.userData\.skipNormalDepth\s*=\s*true/,
+  "rigged characters are not removed wholesale from NormalDepth");
+assert.match(runtime, /normalDepthMaxDistance\s*=\s*NORMAL_DEPTH_DETAIL_MAX_DISTANCE/,
+  "only small distant skinned parts use a NormalDepth distance LOD");
 assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");
