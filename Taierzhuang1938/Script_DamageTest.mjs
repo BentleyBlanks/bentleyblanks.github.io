@@ -44,10 +44,28 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=0&quality=low&scale=small`,
+// phase=1（北沙河）而不是 0：任务流程重制把 phase=0 改成不撒兵的过场序章，
+// 靶场在那儿一个射手都收不到。第 1 章两个世界（重制前后）都是真战斗章。
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+
+// 先点名再开靶。这条红了 = 本章没撒兵（或步枪兵不够三个），是判据不成立，
+// 不是伤害口径回归 —— 别顺着后面的 TypeError 去查 Range.Run。
+const muster = await page.evaluate(() => {
+  const { ai } = window.Taierzhuang;
+  const ija = ai.soldiers.filter((s) => s.side === "ija" && s.alive);
+  return { ija: ija.length, rifles: ija.filter((s) => s.weapon?.kind === "boltRifle").length };
+});
+Check("本章真的撒了兵：至少三个活着的持步枪日军", muster.rifles >= 3,
+  `活日军 ${muster.ija}，其中步枪兵 ${muster.rifles}`);
+if (muster.rifles < 3) {
+  await browser.close();
+  server.close();
+  console.log(`\n0/${results.length} 通过\n失败：\n  ` + results.map((r) => r.name).join("\n  "));
+  process.exit(1);
+}
 
 // ===========================================================================
 // 页面里的一台"靶场"。
@@ -88,11 +106,17 @@ await page.evaluate(() => {
       const saved = { ...tables.COMBAT.player };
       if (opt.patch) Object.assign(tables.COMBAT.player, opt.patch);
 
+      // 只收步枪兵：前 N 个活兵是什么枪由撒兵顺序决定，混进一挺十一年式
+      // （周期 0.82 s 对 2.2 s）TTK 直接塌半，阈值就得跟着章走。焊死成
+      // 三八式之后，口径与 docs/Data_PlayerDamage.md 的「三人 25 m」相同，换章不动数。
       const shooters = [];
       for (const s of ai.soldiers) {
-        if (s.side !== "ija" || !s.alive) continue;
+        if (s.side !== "ija" || !s.alive || s.weapon?.kind !== "boltRifle") continue;
         shooters.push(s);
         if (shooters.length >= (opt.shooters ?? 3)) break;
+      }
+      if (shooters.length < (opt.shooters ?? 3)) {
+        throw new Error(`靶场只收到 ${shooters.length} 个持步枪日军——本章撒兵了吗？`);
       }
 
       player.Spawn(player.position.x, player.position.z, player.yaw);
