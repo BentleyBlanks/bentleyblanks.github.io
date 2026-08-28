@@ -7,7 +7,10 @@ import { Panel, Section, Chips, Facts, Note } from "./Script_EditorUi.mjs";
 const VIEWS = [
   { id: "final", label: "最终画面", group: "输出", note: "正式的合成 + FXAA 输出。" },
   { id: "hdr", label: "HDR 场景", group: "输出", note: "泛光、雾和调色之前的主场景 HDR 靶。" },
-  { id: "bloom", label: "泛光", group: "输出", note: "亮部提取与多级升采样后的泛光输入。" },
+  { id: "bloomExtract", label: "Bloom 提取", group: "后处理", note: "按阈值、软膝与亮度钳制后的半分辨率亮部；黑色区域不会进入 Bloom。" },
+  { id: "bloom", label: "Bloom 合成", group: "后处理", note: "多级降采样再 tent 升采样叠回的最终 Bloom 靶；与正式合成实际采样的是同一张。" },
+  { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
+  { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
   { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。" },
   { id: "ao", label: "AO 原始", group: "AO", note: "SSAO 尚未双边模糊的半分辨率结果。" },
@@ -39,7 +42,10 @@ const MATERIAL_VIEW_MODES = {
 const VIEW_TARGETS = {
   final: (post) => post?.targets?.ldr,
   hdr: (post) => post?.targets?.hdr,
+  bloomExtract: (post) => post?.targets?.bright,
   bloom: (post) => post?.BloomTarget,
+  fog: (post) => post?.targets?.normalDepth,
+  dof: (post) => post?.targets?.normalDepth,
   normal: (post) => post?.targets?.normalDepth,
   depth: (post) => post?.targets?.normalDepth,
   ao: (post) => post?.targets?.ao,
@@ -96,7 +102,7 @@ export class DebugRenderingEditor {
 
   BuildUi(body) {
     this.chipGroups = [];
-    for (const group of ["输出", "GBuffer", "材质", "光照", "AO", "GI"]) {
+    for (const group of ["输出", "后处理", "GBuffer", "材质", "光照", "AO", "GI"]) {
       const section = Section(body, group);
       const options = VIEWS.filter((item) => item.group === group)
         .map((item) => ({ value: item.id, label: item.label, title: item.note }));
@@ -141,6 +147,15 @@ export class DebugRenderingEditor {
     this.facts.Set("材质假彩色", injected ? "已注入" : "low 档未注入，材质/光照组不可用", injected ? "good" : "warn");
     const shadowOn = !!this.host.renderer?.shadowMap?.enabled;
     this.facts.Set("太阳阴影", shadowOn ? "启用" : "关闭（阴影视图会是全黑/全白）", shadowOn ? "good" : "warn");
+    const composite = post?.uniformsComposite;
+    if (this.view === "fog") {
+      const density = composite?.uFogDensity?.value ?? 0;
+      this.facts.Set("雾效", density > 0 ? `启用 · 密度 ${density.toFixed(3)}` : "关闭（雾量图为深蓝）", density > 0 ? "good" : "warn");
+    }
+    if (this.view === "dof") {
+      const strength = composite?.uDofStrength?.value ?? 0;
+      this.facts.Set("景深", strength > 0 ? `启用 · 强度 ${strength.toFixed(2)}` : "当前未触发（阵亡镜头才开启）", strength > 0 ? "good" : "warn");
+    }
   }
 }
 

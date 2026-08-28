@@ -163,18 +163,19 @@ const debugRendering = await page.evaluate(() => {
   const materialViews = {
     baseColor: 6, roughness: 7, metalness: 8, shadow: 9, giWorld: 1, giConfidence: 3,
   };
-  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance",
+  for (const view of ["normal", "depth", "ao", "aoBlur", "bloomExtract", "bloom", "fog", "dof", "giIrradiance", "giDistance",
     "baseColor", "roughness", "metalness", "shadow", "giWorld", "giConfidence"]) {
     panel.SetView(view);
     T.StepFrames(2);
     const source = T.post._GetDebugSource();
-    const expected = view === "normal" || view === "depth"
-      ? T.post.targets.normalDepth.texture
-      : view === "ao" ? T.post.targets.ao.texture
-        : view === "aoBlur" ? T.post.targets.aoBlur.texture
-          : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
-            : view === "giDistance" ? T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture
-              : T.post.targets.hdr.texture;
+    let expected = T.post.targets.hdr.texture;
+    if (["normal", "depth", "fog", "dof"].includes(view)) expected = T.post.targets.normalDepth.texture;
+    else if (view === "ao") expected = T.post.targets.ao.texture;
+    else if (view === "aoBlur") expected = T.post.targets.aoBlur.texture;
+    else if (view === "bloomExtract") expected = T.post.targets.bright.texture;
+    else if (view === "bloom") expected = T.post.BloomTarget.texture;
+    else if (view === "giIrradiance") expected = T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture;
+    else if (view === "giDistance") expected = T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
     visible[view] = source?.texture === expected;
     matMode[view] = T.library.gi ? T.library.gi.debugView.value === (materialViews[view] || 0) : false;
     lit[view] = Brightest();

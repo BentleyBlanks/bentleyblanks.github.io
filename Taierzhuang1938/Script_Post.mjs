@@ -778,6 +778,15 @@ const FRAG_DEBUG_VIEW = /* glsl */`
   uniform sampler2D uSource;
   uniform float uMode;
   uniform float uUnavailable;
+  uniform mat4 uInvView;
+  uniform vec2 uProjScale;
+  uniform float uFogDensity;
+  uniform float uFogFalloff;
+  uniform float uFogBase;
+  uniform float uFogMax;
+  uniform float uDofStrength;
+  uniform float uDofFocus;
+  uniform float uDofRange;
   varying vec2 vUv;
 
   vec3 ToSrgb(vec3 c) {
@@ -809,9 +818,30 @@ const FRAG_DEBUG_VIEW = /* glsl */`
     } else if (uMode < 4.5) {          // HDR / 辐照度：Reinhard + sRGB
       color = color / (color + vec3(1.0));
       color = ToSrgb(color);
-    } else {                           // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
+    } else if (uMode < 5.5) {          // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
       // 走 Reinhard 会把 0.5 的粗糙度压成 0.33，读数就不准了；
       // 天空穹没被注入、还是 HDR 亮度，pow 后钳到白 —— 当背景正合适。
+      color = ToSrgb(color);
+    } else if (uMode < 6.5) {          // 雾量：严格复算 Composite 的距离 × 高度系数。
+      float fog = 0.0;
+      if (texel.a > 0.0 && uFogDensity > 0.0) {
+        vec2 ndc = vUv * 2.0 - 1.0;
+        vec3 viewPos = vec3(ndc.x / max(uProjScale.x, 0.0001),
+                            ndc.y / max(uProjScale.y, 0.0001), -1.0) * texel.a;
+        vec4 worldPos = uInvView * vec4(viewPos, 1.0);
+        float distanceFog = 1.0 - exp(-texel.a * uFogDensity);
+        float heightFog = exp(-max(worldPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
+        fog = clamp(distanceFog * heightFog, 0.0, uFogMax);
+      }
+      // 雾本身可能接近灰色，直接看它不容易看出系数；假彩色才看得见断层和高度带。
+      color = mix(vec3(0.015, 0.035, 0.18), vec3(1.0, 0.63, 0.04), fog);
+      color = ToSrgb(color);
+    } else {                           // 景深 CoC：严格复算 Composite 的远景散焦系数。
+      float coc = texel.a <= 0.0 ? 1.0
+        : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), texel.a);
+      coc *= uDofStrength;
+      // 即使阵亡景深没触发也保留深蓝底，避免「全黑」被误判成展示 pass 没出画。
+      color = mix(vec3(0.015, 0.06, 0.30), vec3(1.0, 0.72, 0.04), clamp(coc, 0.0, 1.0));
       color = ToSrgb(color);
     }
     gl_FragColor = vec4(color, 1.0);
@@ -979,6 +1009,9 @@ export class PostPipeline {
 
     this.uniformsDebug = {
       uSource: { value: null }, uMode: { value: 4 }, uUnavailable: { value: 0 },
+      uInvView: { value: new THREE.Matrix4() }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFogDensity: { value: 0 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 }, uFogMax: { value: 0.94 },
+      uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 }, uDofRange: { value: 2.8 },
     };
     this.matDebug = this._Mat(FRAG_DEBUG_VIEW, this.uniformsDebug);
     // final 之外的值只在开发用面板明确要求时才生效；正式出图完全不走这里。
@@ -1149,9 +1182,16 @@ export class PostPipeline {
       case "ao": return { texture: T.ao.texture, mode: 2, unavailable: !this.preset.ssao };
       case "aoBlur": return { texture: T.aoBlur.texture, mode: 2, unavailable: !this.preset.ssao };
       case "hdr": return { texture: T.hdr.texture, mode: 4 };
+      // Bloom 提取与最终合成分开看：前者用于判断阈值/软膝是否切掉了该进的亮部，
+      // 后者用于判断多级 tent 叠加后的覆盖范围和强度。
+      case "bloomExtract": return { texture: T.bright.texture, mode: 4 };
       // 送屏的要与合成 pass 真正吃的是同一张（见 uBloom 那一行）：bloomMips[0]
       // 只是第 0 级的降采样，还没叠上更小几级的 tent 放大，看着比实际泛光弱一大截。
       case "bloom": return { texture: this.BloomTarget?.texture, mode: 4 };
+      // 这两项没有独立 RT：Debug pass 从与 Composite 同一张 NormalDepth 靶取深度，
+      // 用同一套 uniforms 实时重算效果系数。这样不会为纯调试多占一张全分辨率显存靶。
+      case "fog": return { texture: T.normalDepth.texture, mode: 6 };
+      case "dof": return { texture: T.normalDepth.texture, mode: 7 };
       // enabled 为 false 时图集是上一次收敛留下的陈旧内容，或者干脆一片全黑
       // （画质档从没开过 GI 就是这一种）。这种情况要显式报"不可用"斜纹，
       // 而不是把一张黑图送到屏幕上 —— 后者跟"渲染坏了"长得一模一样。
@@ -1469,6 +1509,18 @@ export class PostPipeline {
     if (P) P.GpuPush("fxaa");
     const debug = this._GetDebugSource();
     if (debug) {
+      // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份
+      // "调试参数"：时段预设切换一帧后两份数字就会分叉，面板反而成了假信息。
+      const DU = this.uniformsDebug;
+      DU.uInvView.value.copy(U.uInvView.value);
+      DU.uProjScale.value.copy(U.uProjScale.value);
+      DU.uFogDensity.value = U.uFogDensity.value;
+      DU.uFogFalloff.value = U.uFogFalloff.value;
+      DU.uFogBase.value = U.uFogBase.value;
+      DU.uFogMax.value = U.uFogMax.value;
+      DU.uDofStrength.value = U.uDofStrength.value;
+      DU.uDofFocus.value = U.uDofFocus.value;
+      DU.uDofRange.value = U.uDofRange.value;
       this.uniformsDebug.uSource.value = debug.texture || T.ldr.texture;
       this.uniformsDebug.uMode.value = debug.mode;
       this.uniformsDebug.uUnavailable.value = debug.unavailable || !debug.texture ? 1 : 0;
