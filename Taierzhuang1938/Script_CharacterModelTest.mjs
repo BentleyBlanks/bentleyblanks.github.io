@@ -51,6 +51,21 @@ assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 
 
 for (const model of manifest.models) {
   assert.deepEqual(model.animations, expectedActions, `${model.id} manifest actions`);
+  assert.equal(Number.isInteger(model.limitedWeightVertices), true,
+    `${model.id} records four-weight conversion count`);
+  assert.equal(model.limitedWeightVertices >= 0, true,
+    `${model.id} four-weight conversion count is non-negative`);
+  assert.deepEqual(Object.keys(model.animationAudit), expectedActions,
+    `${model.id} has one source-parity audit per action`);
+  for (const actionId of expectedActions) {
+    const audit = model.animationAudit[actionId];
+    assert.equal(audit.sourceFrames >= 2, true, `${model.id}/${actionId} source frames`);
+    assert.equal(audit.sourceBones >= 52, true, `${model.id}/${actionId} source bones`);
+    assert.equal(audit.maxPoseDeltaError <= 0.001, true,
+      `${model.id}/${actionId} matches its Max/BIP pose`);
+    assert.equal(audit.maxGroundPenetrationMeters <= 0.002, true,
+      `${model.id}/${actionId} keeps the deformed mesh above ground`);
+  }
   assert.deepEqual(Object.keys(model.boneRoles).sort(), [...expectedRoles].sort(), `${model.id} semantic bones`);
   assert.deepEqual([...model.sockets].sort(),
     ["Socket_BackBlade", "Socket_HeadGear", "Socket_WeaponL", "Socket_WeaponR"].sort());
@@ -66,6 +81,8 @@ for (const model of manifest.models) {
   assert.equal((gltf.skins || []).length >= 1, true, `${model.id} GLB skin`);
   assert.equal((gltf.meshes || []).length >= 1, true, `${model.id} GLB mesh`);
   assert.equal((gltf.animations || []).length, expectedActions.length, `${model.id} GLB animations`);
+  assert.equal((gltf.nodes || []).some((node) => node.name === "GroundRoot"), true,
+    `${model.id} GLB has an offline mesh-grounding root`);
 }
 
 const runtime = fs.readFileSync(path.join(here, "Script_CharacterModel.mjs"), "utf8");
@@ -73,6 +90,7 @@ const actor = fs.readFileSync(path.join(here, "Script_Actor.mjs"), "utf8");
 const cutscene = fs.readFileSync(path.join(here, "Script_Cutscene.mjs"), "utf8");
 const main = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 const editor = fs.readFileSync(path.join(here, "Script_EditorActor.mjs"), "utf8");
+const bakePowerShell = fs.readFileSync(path.join(here, "_import", "Script_BakeLugouCharacters.ps1"), "utf8");
 assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?\?\s*0/,
   "protagonist selects Nra01");
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
@@ -86,5 +104,11 @@ assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,
 assert.doesNotMatch(main, /shot\.dist\s*<\s*40[\s\S]{0,100}head/, "head hit is not rolled after impact");
 assert.match(editor, /IMPORTED_CLIPS/, "editor exposes imported clips");
 assert.match(editor, /length:\s*5[\s\S]*modelVariant/, "editor exposes all five variants per faction");
+assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
+  "runtime does not align ankle-height foot bones to the floor");
+assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y,\s*0\)/,
+  "offline-grounded rig cancels the parent body's hip-height translation");
+assert.match(bakePowerShell, /LUGOU_CANONICAL_ACTIONS\s*=\s*'true'/,
+  "Max batch exports the actions from their canonical NRA01 source rig");
 
-console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} actions, sockets and bone hitboxes verified`);
+console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity and ground audits, sockets and bone hitboxes verified`);

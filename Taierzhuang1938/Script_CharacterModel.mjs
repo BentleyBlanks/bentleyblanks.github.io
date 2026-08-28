@@ -33,8 +33,8 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   PistolFire: "手枪射击",
 });
 
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=1";
-const ASSET_VERSION = "1";
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=2";
+const ASSET_VERSION = "2";
 const LOADER = new GLTFLoader();
 let loadPromise = null;
 
@@ -201,27 +201,14 @@ export class LugouCharacterRig {
   Attach(actor) {
     this.actor = actor;
     actor.body.add(this.root);
-    // Max Biped scenes store each soldier at its original five-person lineup offset,
-    // and the FBX armature object also carries a small vertical pivot offset.  The
-    // mesh bake recentres the bind-pose vertices, but glTF skinning still exposes
-    // those armature transforms through the bones.  Align by the animated skeleton
-    // itself: pelvis on actor X/Z, lowest idle foot on the actor's ground plane.
-    // Every imported clip keeps the pelvis translation fixed, so this one correction
-    // remains valid while rotations drive crouch/prone/run.
-    this.root.position.set(0, 0, 0);
-    actor.root.updateWorldMatrix(true, true);
-    const pelvis = this.bones.pelvis?.getWorldPosition(new THREE.Vector3()) || null;
-    const footL = this.bones.footL?.getWorldPosition(new THREE.Vector3()) || null;
-    const footR = this.bones.footR?.getWorldPosition(new THREE.Vector3()) || null;
-    const Local = (point) => (point ? actor.root.worldToLocal(point.clone()) : null);
-    const pelvisLocal = Local(pelvis);
-    const feet = [Local(footL), Local(footR)].filter(Boolean);
-    const floorY = feet.length ? Math.min(...feet.map((point) => point.y)) : 0;
-    this.root.position.set(
-      -(pelvisLocal?.x || 0),
-      -floorY,
-      -(pelvisLocal?.z || 0),
-    );
+    // The offline bake recentres the complete skinned model and grounds every
+    // animation frame against the actual deformed mesh.  A Biped Foot node is an
+    // ankle pivot, not a sole marker; aligning that bone to Y=0 buried both boots.
+    // The rig is parented below Actor.body, whose pivot is deliberately at hip
+    // height for ragdoll rotation.  Cancel that parent translation so the GLB's
+    // audited ground origin still coincides with Actor.root; do not infer another
+    // offset from an ankle-height foot bone.
+    this.root.position.set(0, -actor.body.position.y, 0);
     actor.root.updateWorldMatrix(true, true);
     return this;
   }

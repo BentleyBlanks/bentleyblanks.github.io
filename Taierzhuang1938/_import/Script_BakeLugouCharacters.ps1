@@ -140,6 +140,8 @@ $environmentValues = [ordered]@{
     LUGOU_EXPORT_DIR = $resolvedIntermediateDir
     LUGOU_NRA_SCENE = $nraBridgePath
     LUGOU_IJA_SCENE = $ijaBridgePath
+    # The BIP files were authored on NRA01.  Export that source motion once; the
+    # Blender pass transfers its rest-relative pose onto each target's own axes.
     LUGOU_CANONICAL_ACTIONS = 'true'
     LUGOU_RESUME = $(if ($Resume) { 'true' } else { 'false' })
 }

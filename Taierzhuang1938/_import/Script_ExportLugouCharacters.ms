@@ -4,9 +4,10 @@
   The source package stores ten rigged soldiers in two 3ds Max 2014 scenes and sixteen
   Character Studio motions as .bip files.  Blender cannot reconstruct the Skin/Physique
   modifiers or Biped tracks from those proprietary containers.  This script performs the
-  lossless side of the bridge inside 3ds Max: ten bind-pose FBX files plus one skeleton-only
-  FBX per character and motion.  Script_BakeLugouCharacters.py consolidates those files into
-  ten web-ready GLBs afterwards.
+  lossless side of the bridge inside 3ds Max: ten bind-pose FBX files plus sixteen
+  skeleton-only actions from the motions' canonical NRA01 authoring rig.  The diagnostic
+  non-canonical mode can still export every model/action pair.  Script_BakeLugouCharacters.py
+  consolidates the canonical poses onto all ten target rigs afterwards.
 
   Required environment variables:
     LUGOU_SOURCE_DIR  Folder containing the two bound soldier .max files and bip/.
@@ -429,7 +430,12 @@ fn Main =
     if LugouSideOnly == undefined or LugouSideOnly == "" or (toLower LugouSideOnly) == "ija" do
         ExportSide "Ija" ijaScene
     if LugouSideOnly == undefined or LugouSideOnly == "" then
-        LogLine "DONE: exported 10 bind-pose models and 160 retargeted animation files."
+    (
+        if LugouCanonicalActions != undefined and (toLower LugouCanonicalActions) == "true" then
+            LogLine "DONE: exported 10 bind-pose models and 16 canonical animation files."
+        else
+            LogLine "DONE: exported 10 bind-pose models and 160 diagnostic animation files."
+    )
     else
         LogLine ("DONE: exported side " + LugouSideOnly + ".")
     close LugouLogStream

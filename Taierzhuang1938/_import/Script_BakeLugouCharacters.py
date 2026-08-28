@@ -1,10 +1,10 @@
 """Consolidate the 3ds Max FBX bridge into ten web-ready animated GLBs.
 
 Input is produced by ``Script_ExportLugouCharacters.ms``.  Each bind-pose FBX contains the
-original Skin/Physique deformation and materials; the animation FBXs contain one canonical
-Biped hierarchy baked at one sample per frame.  This baker combines the sixteen actions,
-adds semantic weapon/back/hand sockets, embeds textures as WebP and validates every fresh
-GLB import before writing the manifest consumed by the browser runtime.
+original Skin/Physique deformation and materials; the sixteen canonical NRA01 animation FBXs
+contain the BIP motion 3ds Max produced, baked at one sample per frame.  This baker transfers
+those rest-relative poses onto every original rig, adds semantic sockets, embeds textures as
+WebP and validates every fresh GLB import before writing the browser manifest.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from mathutils import Matrix, Vector
 
 MODEL_PATTERN = re.compile(r"^Model_(Lugou(?:Nra|Ija)\d{2})\.fbx$", re.IGNORECASE)
 ACTION_PATTERN = re.compile(
-    r"^Animation_LugouCanonical_([A-Za-z][A-Za-z0-9]*)\.fbx$",
+    r"^Animation_(LugouCanonical|Lugou(?:Nra|Ija)\d{2})_([A-Za-z][A-Za-z0-9]*)\.fbx$",
     re.IGNORECASE,
 )
 EXPECTED_ACTIONS = (
@@ -69,6 +69,7 @@ SOCKETS = {
     "Socket_BackBlade": "chest",
     "Socket_HeadGear": "head",
 }
+GROUND_ROOT_NAME = "GroundRoot"
 
 
 def ParseArgs() -> argparse.Namespace:
@@ -78,6 +79,7 @@ def ParseArgs() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--texture-dir", type=Path)
     parser.add_argument("--keep-blend", action="store_true")
+    parser.add_argument("--model", help="Bake one Lugou model while iterating on the pipeline")
     return parser.parse_args(argv)
 
 
@@ -148,6 +150,56 @@ def SkinnedMeshes(objects: list[bpy.types.Object]) -> list[bpy.types.Object]:
     ]
 
 
+def LimitSkinWeights(meshes: list[bpy.types.Object], limit: int = 4) -> int:
+    """Match Three.js' four-weight shader before pose/ground validation.
+
+    Letting the glTF exporter perform this truncation at the very end means the
+    baker grounds one deformation while the browser renders another.  Apply the
+    same top-four normalized weights up front so every offline audit observes the
+    exact skin data that ships.
+    """
+    changedVertices = 0
+    for mesh in meshes:
+        for vertex in mesh.data.vertices:
+            weighted = sorted(
+                ((assignment.group, assignment.weight) for assignment in vertex.groups
+                 if assignment.weight > 0),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            if len(weighted) <= limit:
+                continue
+            changedVertices += 1
+            kept = weighted[:limit]
+            total = sum(weight for _, weight in kept)
+            for groupIndex, _ in weighted[limit:]:
+                mesh.vertex_groups[groupIndex].remove([vertex.index])
+            if total > 1e-12:
+                for groupIndex, weight in kept:
+                    mesh.vertex_groups[groupIndex].add(
+                        [vertex.index], weight / total, "REPLACE"
+                    )
+    return changedVertices
+
+
+def AddGroundRoot(armature: bpy.types.Object) -> str:
+    """Parent the imported Biped under a dedicated, unweighted placement bone."""
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    try:
+        groundBone = armature.data.edit_bones.new(GROUND_ROOT_NAME)
+        groundBone.head = (0.0, 0.0, 0.0)
+        groundBone.tail = (0.0, 0.0, 0.1)
+        for bone in armature.data.edit_bones:
+            if bone != groundBone and bone.parent is None:
+                bone.parent = groundBone
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+        armature.select_set(False)
+    return GROUND_ROOT_NAME
+
+
 def WorldBounds(meshes: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     low = Vector((float("inf"), float("inf"), float("inf")))
     high = Vector((float("-inf"), float("-inf"), float("-inf")))
@@ -160,6 +212,24 @@ def WorldBounds(meshes: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     if not all(value < float("inf") for value in low):
         raise RuntimeError("could not measure character bounds")
     return low, high
+
+
+def EvaluatedMeshGroundZ(meshes: list[bpy.types.Object]) -> float:
+    """Return the actual lowest deformed vertex in Blender Z-up world space."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    groundZ = float("inf")
+    for mesh in meshes:
+        evaluatedObject = mesh.evaluated_get(depsgraph)
+        evaluatedMesh = evaluatedObject.to_mesh()
+        try:
+            matrixWorld = evaluatedObject.matrix_world
+            for vertex in evaluatedMesh.vertices:
+                groundZ = min(groundZ, (matrixWorld @ vertex.co).z)
+        finally:
+            evaluatedObject.to_mesh_clear()
+    if groundZ == float("inf"):
+        raise RuntimeError("could not measure evaluated character ground")
+    return groundZ
 
 
 def NormalizeCharacterFrame(
@@ -322,14 +392,7 @@ def ReadCanonicalBindRest(
     canonicalNames: tuple[str, ...],
     canonicalTopology: tuple[int, ...],
 ) -> dict[str, Matrix]:
-    """Capture the NRA01 Figure/bind matrices used as the shared motion zero.
-
-    A skeleton-only FBX exported after ``biped.loadBipFile`` stores the loaded
-    action pose in the FBX bind/rest matrices.  Treating those per-action matrices
-    as rest would cancel the stance (for example, crouch-fire becomes a T pose)
-    and retain only small recoil keys.  The untouched NRA01 bind scene is the
-    authoritative source rest for every canonical BIP action.
-    """
+    """Capture the NRA01 Figure/bind matrices used as the BIP motion zero."""
     ResetScene()
     importedObjects, _ = ImportFbx(modelPath, False)
     armature = MainArmature(importedObjects)
@@ -359,10 +422,23 @@ def CanonicalizeSkeleton(
     # deleting a weighted bone would lose the character's head accessory.  Keep
     # the extra leaf and canonicalize the 52 shared Biped bones around it.
     mappedBones = allBones
-    if len(allBones) == len(canonicalNames) + 1:
-        extraBones = [bone for bone in allBones if "headnub" in NormalizeName(bone.name)]
-        if len(extraBones) == 1:
-            mappedBones = [bone for bone in allBones if bone != extraBones[0]]
+    if len(allBones) > len(canonicalNames):
+        # One NRA bind rig has a weighted HeadNub; StandFireCrouch's BIP has an
+        # additional Neck link.  Find the known removable bones whose collapsed
+        # hierarchy matches the fixed 52-bone runtime topology.  MapSkeletonByTopology
+        # already walks through excluded parents, so removing Neck1 correctly makes
+        # Head a logical child of Neck without discarding Neck1's sampled transform.
+        knownExtras = [
+            bone for bone in allBones
+            if "headnub" in NormalizeName(bone.name)
+            or (
+                re.search(r"neck\d+$", NormalizeName(bone.name)) is not None
+                and bone.parent is not None
+                and "neck" in NormalizeName(bone.parent.name)
+            )
+        ]
+        if len(knownExtras) == len(allBones) - len(canonicalNames):
+            mappedBones = [bone for bone in allBones if bone not in knownExtras]
     if len(mappedBones) != len(canonicalNames):
         raise RuntimeError(
             f"{armature.name}: skeleton has {len(allBones)} bones, canonical has {len(canonicalNames)}"
@@ -402,27 +478,33 @@ def RestLocalMatrix(bone: bpy.types.Bone) -> Matrix:
     return bone.parent.matrix_local.inverted_safe() @ bone.matrix_local if bone.parent else bone.matrix_local.copy()
 
 
-def PoseLocalMatrix(poseBone: bpy.types.PoseBone) -> Matrix:
-    return poseBone.parent.matrix.inverted_safe() @ poseBone.matrix if poseBone.parent else poseBone.matrix.copy()
+def PoseLocalMatrix(
+    poseBone: bpy.types.PoseBone,
+    includedNames: set[str] | None = None,
+) -> Matrix:
+    parent = poseBone.parent
+    if includedNames is not None:
+        while parent is not None and parent.name not in includedNames:
+            parent = parent.parent
+    return parent.matrix.inverted_safe() @ poseBone.matrix if parent else poseBone.matrix.copy()
 
 
 def RetargetAction(
     sourceArmature: bpy.types.Object,
     baseArmature: bpy.types.Object,
+    meshes: list[bpy.types.Object],
     sourceAction: bpy.types.Action,
     actionId: str,
-    canonicalSourceRest: dict[str, Matrix],
+    sourceBindRest: dict[str, Matrix],
 ) -> bpy.types.Action:
-    """Bake one FBX/Biped motion onto this model's own rest axes and proportions.
+    """Bake one canonical Max/BIP motion onto this model's bind rig.
 
     FBX force-sampling writes every bone's full local translation as well as its
-    rotation.  Reusing those raw curves on another Biped works only when bone roll,
-    rest axes and segment lengths are byte-identical; the Japanese and Nationalist
-    source rigs are not.  Each action FBX also captures its loaded frame as its own
-    FBX rest pose, so its local pose must be compared with the untouched NRA01 bind
-    rest rather than that per-action rest.  Transfer that canonical rest delta and
-    rebuild it on the target hierarchy.  This is baked here so the browser only
-    plays ordinary glTF clips.
+    rotation.  Model-specific BIP loads are not interchangeable here: some source
+    Bipeds have scene-specific controller structures that accept the file but turn
+    the whole body sideways.  NRA01 is the source rig the motions were authored on.
+    Compare its sampled pose with the untouched NRA01 bind rest, then rebuild that
+    same delta on each target's own rest axes and proportions.
     """
     sourceBones = sourceArmature.data.bones
     targetBones = baseArmature.data.bones
@@ -431,26 +513,19 @@ def RetargetAction(
         raise RuntimeError(
             f"{actionId}: skeleton mismatch ({len(sharedNames)} shared of {len(sourceBones)} source bones)"
         )
-    missingCanonical = [name for name in sharedNames if name not in canonicalSourceRest]
-    if missingCanonical:
-        raise RuntimeError(f"{actionId}: canonical rest missing bones {missingCanonical}")
+    missingBind = [name for name in sharedNames if name not in sourceBindRest]
+    if missingBind:
+        raise RuntimeError(f"{actionId}: source bind rest missing bones {missingBind}")
     targetRest = {name: RestLocalMatrix(targetBones[name]) for name in sharedNames}
+    sharedNameSet = set(sharedNames)
     orderedNames = sorted(sharedNames, key=lambda name: len(sourceBones[name].parent_recursive))
-    rootNames = [name for name in sharedNames if targetBones[name].parent is None]
+    rootNames = [
+        name for name in sharedNames
+        if targetBones[name].parent is None or targetBones[name].parent.name not in sharedNameSet
+    ]
     if len(rootNames) != 1:
         raise RuntimeError(f"{actionId}: expected one root bone, found {rootNames}")
     rootName = rootNames[0]
-    footNames = [
-        name for name in sharedNames
-        if "foot" in NormalizeName(name) or "toe" in NormalizeName(name)
-    ]
-    if len(footNames) < 2:
-        raise RuntimeError(f"{actionId}: could not identify both feet")
-    targetGroundZ = min(
-        min(targetBones[name].head_local.z, targetBones[name].tail_local.z)
-        for name in footNames
-    )
-
     targetAction = bpy.data.actions.new(name=f"Animation_{actionId}")
     targetAction.use_fake_user = True
     sourceArmature.animation_data_create().action = sourceAction
@@ -458,6 +533,8 @@ def RetargetAction(
     targetAnimation.action = targetAction
     start = int(round(sourceAction.frame_range[0]))
     end = int(round(sourceAction.frame_range[1]))
+    maxPoseDeltaError = 0.0
+    maxGroundCorrection = 0.0
     scene = bpy.context.scene
     previousFrame = scene.frame_current
     try:
@@ -470,36 +547,83 @@ def RetargetAction(
             for name in orderedNames:
                 sourcePose = sourceArmature.pose.bones[name]
                 targetPose = baseArmature.pose.bones[name]
-                sourceLocal = PoseLocalMatrix(sourcePose)
-                delta = canonicalSourceRest[name].inverted_safe() @ sourceLocal
+                sourceLocal = PoseLocalMatrix(sourcePose, sharedNameSet)
+                delta = sourceBindRest[name].inverted_safe() @ sourceLocal
                 targetLocal = targetRest[name] @ delta
                 targetPose.matrix = (
                     targetPose.parent.matrix @ targetLocal if targetPose.parent else targetLocal
                 )
             bpy.context.view_layer.update()
-            # Gameplay locomotion already moves Actor.root, so imported clips must
-            # be in-place.  Strip horizontal BIP root travel and ground both feet
-            # every frame; otherwise legacy pelvis heights can bury a running
-            # model while a crouch clip happens to look correct.
-            rootPose = baseArmature.pose.bones[rootName]
-            rootMatrix = rootPose.matrix.copy()
-            rootMatrix.translation.x = targetRest[rootName].translation.x
-            rootMatrix.translation.y = targetRest[rootName].translation.y
-            rootPose.matrix = rootMatrix
-            bpy.context.view_layer.update()
-            currentGroundZ = min(
-                min(baseArmature.pose.bones[name].head.z, baseArmature.pose.bones[name].tail.z)
-                for name in footNames
-            )
-            rootMatrix = rootPose.matrix.copy()
-            rootMatrix.translation.z += targetGroundZ - currentGroundZ
-            rootPose.matrix = rootMatrix
-            bpy.context.view_layer.update()
+            # Compare the canonical Max/BIP pose before applying the deliberate
+            # global in-place/ground correction.  The correction is not a pose
+            # mismatch; it is the world placement contract for gameplay.
+            for name in orderedNames:
+                sourceDelta = sourceBindRest[name].inverted_safe() @ PoseLocalMatrix(
+                    sourceArmature.pose.bones[name], sharedNameSet
+                )
+                targetDelta = targetRest[name].inverted_safe() @ PoseLocalMatrix(
+                    baseArmature.pose.bones[name]
+                )
+                maxPoseDeltaError = max(
+                    maxPoseDeltaError,
+                    max(abs(a - b) for rowA, rowB in zip(sourceDelta, targetDelta, strict=True)
+                        for a, b in zip(rowA, rowB, strict=True)),
+                )
+            # Lock this source frame into the target Action before asking the
+            # dependency graph to evaluate the skinned mesh.  Once earlier frame
+            # keys exist, an update otherwise restores their interpolation and
+            # silently discards the just-assigned pose/ground correction.
             for name in orderedNames:
                 targetPose = baseArmature.pose.bones[name]
                 targetPose.keyframe_insert(data_path="location", frame=frame, group=name)
                 targetPose.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=name)
                 targetPose.keyframe_insert(data_path="scale", frame=frame, group=name)
+            # Gameplay locomotion already moves Actor.root, so imported clips are
+            # in-place.  Ground against the actual deformed uniform/boot mesh, not
+            # a foot-bone head: a Biped foot node sits around the ankle and treating
+            # it as the sole visibly buries both boots.
+            rootPose = baseArmature.pose.bones[rootName]
+            rootMatrix = rootPose.matrix.copy()
+            rootMatrix.translation.x = targetRest[rootName].translation.x
+            rootMatrix.translation.y = targetRest[rootName].translation.y
+            rootPose.matrix = rootMatrix
+            rootPose.keyframe_insert(data_path="location", frame=frame, group=rootName)
+            rootPose.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=rootName)
+            rootPose.keyframe_insert(data_path="scale", frame=frame, group=rootName)
+            groundPose = baseArmature.pose.bones[GROUND_ROOT_NAME]
+            groundPose.matrix_basis.identity()
+            groundPose.keyframe_insert(data_path="location", frame=frame, group=GROUND_ROOT_NAME)
+            groundPose.keyframe_insert(
+                data_path="rotation_quaternion", frame=frame, group=GROUND_ROOT_NAME
+            )
+            groundPose.keyframe_insert(data_path="scale", frame=frame, group=GROUND_ROOT_NAME)
+            # Re-evaluate the just-keyed action at this exact frame.  A view-layer
+            # update alone can leave the evaluated skin one dependency-graph tick
+            # behind the pose channels, which under-measures the required lift.
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            currentGroundZ = EvaluatedMeshGroundZ(meshes)
+            # Only lift penetration.  A source pose may intentionally leave a few
+            # millimetres of clearance (notably the prone clip's raised boot); pulling
+            # that pose downward changes its authored body placement and can make the
+            # fresh glTF skin penetrate by the same amount after bind conversion.
+            groundCorrection = max(0.0, -currentGroundZ)
+            maxGroundCorrection = max(maxGroundCorrection, groundCorrection)
+            groundMatrix = groundPose.matrix.copy()
+            # EvaluatedMeshGroundZ is in world metres, while Biped bone matrices
+            # are in the armature's local units (the Max FBXs carry a 0.01 object
+            # scale).  Convert explicitly or a requested 1 cm lift becomes 0.1 mm.
+            groundAxisWorldScale = (
+                baseArmature.matrix_world.to_3x3() @ Vector((0.0, 0.0, 1.0))
+            ).length
+            groundMatrix.translation.z += groundCorrection / max(groundAxisWorldScale, 1e-8)
+            groundPose.matrix = groundMatrix
+            groundPose.keyframe_insert(data_path="location", frame=frame, group=GROUND_ROOT_NAME)
+            groundPose.keyframe_insert(
+                data_path="rotation_quaternion", frame=frame, group=GROUND_ROOT_NAME
+            )
+            groundPose.keyframe_insert(data_path="scale", frame=frame, group=GROUND_ROOT_NAME)
+            bpy.context.view_layer.update()
     finally:
         scene.frame_set(previousFrame)
         targetAnimation.action = None
@@ -508,19 +632,31 @@ def RetargetAction(
         for poseBone in baseArmature.pose.bones:
             poseBone.matrix_basis.identity()
         bpy.context.view_layer.update()
+    targetAction["sourceFrameCount"] = end - start + 1
+    targetAction["sourceBoneCount"] = len(sharedNames)
+    targetAction["maxPoseDeltaError"] = maxPoseDeltaError
+    targetAction["maxGroundCorrectionMeters"] = maxGroundCorrection
     return targetAction
 
 
 def ImportAction(
     path: Path,
     baseArmature: bpy.types.Object,
+    meshes: list[bpy.types.Object],
     actionId: str,
-    canonicalSourceRest: dict[str, Matrix],
+    sourceBindRest: dict[str, Matrix],
+    canonicalNames: tuple[str, ...],
+    canonicalTopology: tuple[int, ...],
 ) -> bpy.types.Action:
     importedObjects, importedActions = ImportFbx(path, True)
     targetAction: bpy.types.Action | None = None
     try:
         actionArmature = MainArmature(importedObjects)
+        # Max appends numeric suffixes when a scene contains several Bipeds
+        # (for example `Bip001 Pelvis001`).  Rename bind and action hierarchies
+        # by topology so scene-unique suffixes do not block canonical
+        # rest-relative motion comparison against each target skeleton.
+        CanonicalizeSkeleton(actionArmature, [], canonicalNames, canonicalTopology)
         baseBones = set(baseArmature.data.bones.keys())
         actionBones = set(actionArmature.data.bones.keys())
         shared = baseBones & actionBones
@@ -536,9 +672,10 @@ def ImportAction(
         targetAction = RetargetAction(
             actionArmature,
             baseArmature,
+            meshes,
             sourceAction,
             actionId,
-            canonicalSourceRest,
+            sourceBindRest,
         )
         return targetAction
     finally:
@@ -614,7 +751,7 @@ def ExportGlb(path: Path) -> None:
         export_all_influences=False,
         export_influence_nb=4,
         export_def_bones=True,
-        export_optimize_animation_size=True,
+        export_optimize_animation_size=False,
         export_optimize_animation_keep_anim_armature=True,
         export_optimize_animation_keep_anim_object=True,
         export_morph=False,
@@ -629,7 +766,7 @@ def ExportGlb(path: Path) -> None:
         raise RuntimeError(f"glTF export failed: {path}")
 
 
-def ValidateGlb(path: Path) -> dict[str, object]:
+def ValidateGlb(path: Path, animationAudit: dict[str, dict[str, object]]) -> dict[str, object]:
     ResetScene()
     result = bpy.ops.import_scene.gltf(filepath=str(path), import_pack_images=False)
     if "FINISHED" not in result:
@@ -645,16 +782,36 @@ def ValidateGlb(path: Path) -> dict[str, object]:
         raise RuntimeError(
             f"{path.name}: expected {len(EXPECTED_ACTIONS)} actions, found {len(actions)}"
         )
+    armature = armatures[0]
+    animationData = armature.animation_data_create()
+    for track in animationData.nla_tracks:
+        track.mute = True
+    maxPenetrationByAction: dict[str, float] = {}
+    scene = bpy.context.scene
+    for action in bpy.data.actions:
+        animationData.action = action
+        start, end = action.frame_range
+        sampleCount = max(2, int(animationAudit.get(action.name, {}).get("sourceFrames", 2)))
+        maxPenetration = 0.0
+        for sampleIndex in range(sampleCount):
+            sampleFrame = start + (end - start) * sampleIndex / (sampleCount - 1)
+            wholeFrame = int(sampleFrame)
+            scene.frame_set(wholeFrame, subframe=sampleFrame - wholeFrame)
+            bpy.context.view_layer.update()
+            maxPenetration = max(maxPenetration, -EvaluatedMeshGroundZ(meshes))
+        maxPenetrationByAction[action.name] = max(0.0, maxPenetration)
+    animationData.action = None
     return {
         "armatures": len(armatures),
         "skinnedMeshes": len(meshes),
         "animations": actions,
+        "maxGroundPenetrationMeters": maxPenetrationByAction,
     }
 
 
-def DiscoverInputs(inputDir: Path) -> tuple[dict[str, Path], dict[str, Path]]:
+def DiscoverInputs(inputDir: Path) -> tuple[dict[str, Path], dict[str, dict[str, Path]]]:
     models: dict[str, Path] = {}
-    actions: dict[str, Path] = {}
+    actions: dict[str, dict[str, Path]] = defaultdict(dict)
     for path in inputDir.glob("*.fbx"):
         modelMatch = MODEL_PATTERN.match(path.name)
         if modelMatch:
@@ -662,8 +819,8 @@ def DiscoverInputs(inputDir: Path) -> tuple[dict[str, Path], dict[str, Path]]:
             continue
         actionMatch = ACTION_PATTERN.match(path.name)
         if actionMatch:
-            actions[actionMatch.group(1)] = path
-    return models, actions
+            actions[actionMatch.group(1)][actionMatch.group(2)] = path
+    return models, dict(actions)
 
 
 def BakeModel(
@@ -684,13 +841,14 @@ def BakeModel(
     if not meshes:
         raise RuntimeError(f"{modelPath.name}: bind FBX has no skinned mesh")
     CanonicalizeSkeleton(armature, meshes, canonicalNames, canonicalTopology)
+    limitedWeightVertices = LimitSkinWeights(meshes)
+    AddGroundRoot(armature)
     boneMap = CoreBoneMap(armature)
     missingRoles = sorted(REQUIRED_CORE_BONES - set(boneMap))
     if missingRoles:
         raise RuntimeError(f"{modelPath.name}: missing core bones {missingRoles}")
     exportRoot, bounds = NormalizeCharacterFrame(modelId, importedObjects, meshes)
     missingTextures = RelinkImages(textureIndex)
-
     actions: dict[str, bpy.types.Action] = {}
     for actionId in EXPECTED_ACTIONS:
         actionPath = actionPaths.get(actionId)
@@ -699,11 +857,27 @@ def BakeModel(
         actions[actionId] = ImportAction(
             actionPath,
             armature,
+            meshes,
             actionId,
             canonicalSourceRest,
+            canonicalNames,
+            canonicalTopology,
         )
     sockets = AddSockets(armature, boneMap)
     BuildNlaTracks(armature, actions)
+    # ValidateGlb resets Blender to a fresh scene, invalidating every Action RNA
+    # handle.  Freeze the source-parity evidence before that destructive reload.
+    animationAudit = {
+        actionId: {
+            "sourceFrames": int(actions[actionId].get("sourceFrameCount", 0)),
+            "sourceBones": int(actions[actionId].get("sourceBoneCount", 0)),
+            "maxPoseDeltaError": float(actions[actionId].get("maxPoseDeltaError", 1)),
+            "maxGroundCorrectionMeters": float(
+                actions[actionId].get("maxGroundCorrectionMeters", 0)
+            ),
+        }
+        for actionId in EXPECTED_ACTIONS
+    }
     armature["characterId"] = modelId
     armature["faction"] = "nra" if "Nra" in modelId else "ija"
     armature["boneRoles"] = json.dumps(boneMap, ensure_ascii=True, separators=(",", ":"))
@@ -716,7 +890,21 @@ def BakeModel(
             filepath=str(outputDir / f"Scene_{modelId}.blend"),
             check_existing=False,
         )
-    validation = ValidateGlb(outputPath)
+    validation = ValidateGlb(outputPath, animationAudit)
+    for actionId, penetration in validation["maxGroundPenetrationMeters"].items():
+        animationAudit[actionId]["maxGroundPenetrationMeters"] = penetration
+    poseFailures = [
+        actionId for actionId, audit in animationAudit.items()
+        if float(audit["maxPoseDeltaError"]) > 0.001
+    ]
+    groundFailures = [
+        actionId for actionId, audit in animationAudit.items()
+        if float(audit["maxGroundPenetrationMeters"]) > 0.002
+    ]
+    if poseFailures or groundFailures:
+        raise RuntimeError(
+            f"{modelId}: animation audit failed; pose={poseFailures}, ground={groundFailures}"
+        )
     return {
         "id": modelId,
         "faction": "nra" if "Nra" in modelId else "ija",
@@ -724,11 +912,13 @@ def BakeModel(
         "source": modelPath.name,
         "vertices": vertices,
         "triangles": triangles,
+        "limitedWeightVertices": limitedWeightVertices,
         "bytes": outputPath.stat().st_size,
         "boneRoles": boneMap,
         "bounds": bounds,
         "sockets": sockets,
         "animations": list(EXPECTED_ACTIONS),
+        "animationAudit": animationAudit,
         "missingTextures": missingTextures,
         "validation": validation,
     }
@@ -745,12 +935,21 @@ def Main() -> None:
     models, actions = DiscoverInputs(inputDir)
     if len(models) != 10:
         raise RuntimeError(f"expected 10 bind-pose FBX files, found {len(models)}")
-    if set(actions) != set(EXPECTED_ACTIONS):
-        missing = sorted(set(EXPECTED_ACTIONS) - set(actions))
-        extra = sorted(set(actions) - set(EXPECTED_ACTIONS))
+    if "LugouCanonical" not in actions and set(actions) != set(models):
+        raise RuntimeError(
+            f"model/action set mismatch: models={sorted(models)}, actions={sorted(actions)}"
+        )
+    # Current bridges use LugouCanonical.  Accept NRA01's equivalent set so an
+    # already-exported full bridge can be rebaked without another four-minute Max run.
+    canonicalActions = actions.get("LugouCanonical") or actions.get("LugouNra01")
+    if canonicalActions is None:
+        raise RuntimeError("missing canonical Lugou action FBXs")
+    if set(canonicalActions) != set(EXPECTED_ACTIONS):
+        missing = sorted(set(EXPECTED_ACTIONS) - set(canonicalActions))
+        extra = sorted(set(canonicalActions) - set(EXPECTED_ACTIONS))
         raise RuntimeError(f"canonical action mismatch: missing={missing}, extra={extra}")
     textureIndex = BuildTextureIndex(textureDir)
-    canonicalNames, canonicalTopology = ReadCanonicalSkeleton(actions)
+    canonicalNames, canonicalTopology = ReadCanonicalSkeleton(canonicalActions)
     canonicalModelPath = models.get("LugouNra01")
     if canonicalModelPath is None:
         raise RuntimeError("missing canonical Model_LugouNra01.fbx")
@@ -762,13 +961,17 @@ def Main() -> None:
 
     startedAt = time.perf_counter()
     records: list[dict[str, object]] = []
-    for modelId in sorted(models):
+    selectedModels = [args.model] if args.model else sorted(models)
+    unknownModels = [modelId for modelId in selectedModels if modelId not in models]
+    if unknownModels:
+        raise RuntimeError(f"unknown model selection: {unknownModels}")
+    for modelId in selectedModels:
         print(f"BAKE {modelId}")
         records.append(
             BakeModel(
                 modelId,
                 models[modelId],
-                actions,
+                canonicalActions,
                 outputDir,
                 textureIndex,
                 args.keep_blend,
