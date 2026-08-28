@@ -110,6 +110,10 @@ const IMPORTED_CLIPS = LUGOU_ANIMATION_IDS.map((id) => ({
 /** 判定球：红橙。移动胶囊：靛蓝。两个颜色在土黄色的城里都不会被认成布景。 */
 const HITBOX_COLOR = 0xff5a3c;
 const CAPSULE_COLOR = 0x49a7ff;
+// 摄影棚公共轨道相机允许枪械贴到 0.35 m 看细节，但人物躯干本身就接近这个厚度。
+// 人物编辑器继续沿用公共下限会让镜头钻进衣服，近裁面切掉外壳后露出背面，视觉上
+// 就像整个人变成了半透明。这个下限只收人物入口，不影响枪械/构件的微距检查。
+const ACTOR_CAMERA_MIN_DISTANCE = 0.75;
 
 /**
  * 线框一律**自己摆圈**，不走 `WireframeGeometry(SphereGeometry)`。
@@ -643,6 +647,14 @@ export class ActorEditor {
         new THREE.Vector3(0, 0, -1));
     }
     this.RefreshFacts();
+  }
+
+  /** 人物专用滚轮缩放：不让相机穿进躯干。 */
+  OnWheel(delta) {
+    this.studio.Zoom(delta);
+    if (this.studio.orbit.dist >= ACTOR_CAMERA_MIN_DISTANCE) return;
+    this.studio.orbit.dist = ACTOR_CAMERA_MIN_DISTANCE;
+    this.studio.ApplyCamera();
   }
 
   RefreshFacts() {
