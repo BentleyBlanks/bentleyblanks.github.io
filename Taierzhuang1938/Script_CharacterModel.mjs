@@ -168,10 +168,11 @@ export async function LoadLugouCharacterAssets() {
 // 按 3A 人物碰撞的配置方式写成“部位代理表”：所有尺寸是资产的局部米制，端点
 // 只认语义骨骼，运行时再跟随每个模型、每条动画的骨架变换。头不再是一颗挂在
 // Head pivot 上的孤球——Max Biped 的 Head pivot 靠近颈根，孤球会吞到胸胶囊里，
-// 造成画面上打脸、规则却先返回 torso。现在头是 neck→head 的短胶囊，胸到颈根
-// 也独立成一段，二者只在颈部交界，面颅范围不会被躯干覆盖。
+// 造成画面上打脸、规则却先返回 torso。头部的另一端必须取导出资产的
+// Socket_HeadGear（头盔中心），不能取 Bip001 Head 旋转枢轴；否则 kneel 等动作下
+// 头胶囊会退化成一小圈脖子，编辑器看起来像“头部碰撞没了”。
 export const CHARACTER_HITBOX_PROFILE = Object.freeze([
-  { id: "head", type: "capsule", a: "neck", b: "head", radius: 0.115, part: "head", priority: 3 },
+  { id: "head", type: "capsule", a: "neck", b: "headGear", radius: 0.115, part: "head", priority: 3 },
   { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
   { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
   { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
@@ -230,6 +231,9 @@ export class LugouCharacterRig {
       backBlade: FindNode(this.root, "Socket_BackBlade") || this.bones.chest || null,
       headGear: FindNode(this.root, "Socket_HeadGear") || this.bones.head || null,
     };
+    // 碰撞代理既可引用骨骼，也可引用已烘进 GLB 的稳定挂点。headGear 是头盔中心；
+    // 它与 Head pivot 不同，前者才是可见头部的正确端点。
+    this.hitboxNodes = { ...this.bones, headGear: this.sockets.headGear };
     this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => ({
       ...definition,
       center: new THREE.Vector3(),
@@ -339,8 +343,8 @@ export class LugouCharacterRig {
         if (!bone) continue;
         bone.getWorldPosition(shape.center);
       } else {
-        const boneA = this.bones[shape.a];
-        const boneB = this.bones[shape.b];
+        const boneA = this.hitboxNodes[shape.a];
+        const boneB = this.hitboxNodes[shape.b];
         if (!boneA || !boneB) continue;
         boneA.getWorldPosition(shape.start);
         boneB.getWorldPosition(shape.end);

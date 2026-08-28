@@ -88,6 +88,8 @@ for (const model of manifest.models) {
   assert.equal((gltf.animations || []).length, expectedActions.length, `${model.id} GLB animations`);
   assert.equal((gltf.nodes || []).some((node) => node.name === "GroundRoot"), true,
     `${model.id} GLB has an offline mesh-grounding root`);
+  assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
+    `${model.id} GLB has the head-centre collision anchor`);
 }
 
 const runtime = fs.readFileSync(path.join(here, "Script_CharacterModel.mjs"), "utf8");
@@ -101,7 +103,10 @@ assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
-assert.match(runtime, /a: "neck", b: "head"[\s\S]*?part: "head"/, "head uses its neck-to-head bone span");
+assert.match(runtime, /a: "neck", b: "headGear"[\s\S]*?part: "head"/,
+  "head uses the neck-to-headgear span rather than the neck-root pivot");
+assert.match(runtime, /headGear: this\.sockets\.headGear/,
+  "head hitbox binds the exported headgear socket");
 assert.match(runtime, /getWorldScale\(WORLD_SCALE\)/, "hitbox radius uses actual render-root scale");
 assert.match(runtime, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
 assert.doesNotMatch(runtime, /distanceSqToSegment\(shape\.start/, "old closest-distance capsule approximation removed");
