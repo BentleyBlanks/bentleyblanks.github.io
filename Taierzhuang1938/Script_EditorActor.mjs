@@ -24,6 +24,7 @@ import { Panel, Section, Slider, Chips, Select, Toggle, ButtonRow, Facts, Note, 
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
+import { KIND_SPEC } from "./Script_Actor.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import {
   DefaultLugouAnimationId,
@@ -42,10 +43,12 @@ const KINDS = [
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 
-const DEFAULT_WEAPON_BY_KIND = {
-  nra: "ZhongZheng", nraDare: "HanYang", nraOfficer: null,
-  ija: "Type38", ijaOfficer: "Mauser96", civilian: null,
-};
+const DEFAULT_WEAPON_CHOICE = "__source_default__";
+
+/** 默认配枪只读 Actor 的正式 kind 配置，编辑器不维护第二张会漂移的搭配表。 */
+function DefaultWeaponForKind(kind) {
+  return KIND_SPEC[kind]?.defaultWeapon ?? null;
+}
 
 /** 一个周期性的 0→1→0 脉冲（投弹 / 白刃 / 中弹这类一次性动作靠它循环演示）。 */
 function Pulse(t, period, rise = 0.18, hold = 0.10) {
@@ -355,14 +358,17 @@ export class ActorEditor {
     this.cameraMode = "studio";
 
     this.kind = "nra";
-    this.weaponId = "ZhongZheng";
+    // undefined = 按每个人物 kind 的正式默认；null = 用户明确选择空手。
+    // 分开记这两种状态，本阵营对比才能逐身份配枪，又允许一键换成同一把枪。
+    this.weaponOverride = undefined;
+    this.weaponId = DefaultWeaponForKind(this.kind);
     this.animationMode = "imported";
     this.clipId = DefaultLugouAnimationId(this.kind);
     this.modelVariant = GetLugouCharacterVariantEntries(this.kind)[0]?.modelVariant ?? null;
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
-    this.lineup = false;      // 国军五人 + 日军五人
+    this.lineup = false;      // 当前阵营四名士兵 + 一名军官
     this.towel = null;        // null = 按 kind 的默认
     this.manual = false;
     this.time = 0;
@@ -415,9 +421,8 @@ export class ActorEditor {
       height: 136,
       onPick: (id) => {
         this.kind = id;
-        this.weaponId = DEFAULT_WEAPON_BY_KIND[id] ?? null;
         this.modelVariant = GetLugouCharacterVariantEntries(id)[0]?.modelVariant ?? null;
-        if (this.weaponSelect) this.weaponSelect.Set(this.weaponId || "");
+        this.SyncResolvedWeapon();
         this.FillModelList();
         this.NormalizeImportedClip();
         this.FillActionList();
@@ -429,9 +434,11 @@ export class ActorEditor {
     this.kindNote = Note(who, KINDS[0].note);
 
     this.weaponSelect = Select(who, "武器",
-      [{ value: "", label: "（空手）" },
+      [{ value: DEFAULT_WEAPON_CHOICE, label: "（按人物源配置）" },
+        { value: "", label: "（空手）" },
         ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
-      this.weaponId, (v) => { this.weaponId = v || null; this.Rebuild(); });
+      DEFAULT_WEAPON_CHOICE, (v) => this.SetWeaponChoice(v));
+    Note(who, "默认按 Script_Actor 的人物配置配枪；选择具体武器后会立即替换当前人物，本阵营对比时会替换五人。", true);
 
     this.modelSelect = Select(who, "源模型", [], "", (value) => {
       this.modelVariant = Number(value);
@@ -608,6 +615,28 @@ export class ActorEditor {
     for (const actor of this.actors) actor.SetTowel(this.towel);
   }
 
+  WeaponForKind(kind) {
+    return this.weaponOverride === undefined
+      ? DefaultWeaponForKind(kind)
+      : this.weaponOverride;
+  }
+
+  SyncResolvedWeapon() {
+    this.weaponId = this.WeaponForKind(this.kind);
+    if (this.weaponSelect) {
+      const value = this.weaponOverride === undefined
+        ? DEFAULT_WEAPON_CHOICE
+        : (this.weaponOverride || "");
+      this.weaponSelect.Set(value);
+    }
+  }
+
+  SetWeaponChoice(value) {
+    this.weaponOverride = value === DEFAULT_WEAPON_CHOICE ? undefined : (value || null);
+    this.SyncResolvedWeapon();
+    this.Rebuild();
+  }
+
   // -------------------------------------------------------------------------
   // 展台
   // -------------------------------------------------------------------------
@@ -641,7 +670,7 @@ export class ActorEditor {
     const span = 1.15;
     list.forEach((entrySpec, i) => {
       const kind = entrySpec.kind;
-      const weapon = this.lineup ? undefined : (this.weaponId || null);
+      const weapon = this.WeaponForKind(kind);
       const actor = factory.Create(kind, {
         seed: this.seed + i * 7,
         weapon,
@@ -671,7 +700,8 @@ export class ActorEditor {
   Step(dt) {
     this.time += dt;
     const clip = CLIPS.find((c) => c.id === this.clipId) || CLIPS[0];
-    const ctx = { weapon: this.weaponId ? WEAPONS[this.weaponId] : null };
+    const activeWeaponId = this.actors[0]?.weaponId ?? this.weaponId;
+    const ctx = { weapon: activeWeaponId ? WEAPONS[activeWeaponId] : null };
     for (let i = 0; i < this.actors.length; i += 1) {
       const actor = this.actors[i];
       const base = {
@@ -734,9 +764,10 @@ export class ActorEditor {
       const position = o.geometry.attributes.position;
       triangles += (index ? index.count : (position ? position.count : 0)) / 3;
     });
-    const weapon = this.weaponId ? WEAPONS[this.weaponId] : null;
-    const built = this.weaponId && this.host.actorFactory
-      ? this.host.actorFactory.WeaponGeometry(this.weaponId) : null;
+    const activeWeaponId = actor.weaponId || null;
+    const weapon = activeWeaponId ? WEAPONS[activeWeaponId] : null;
+    const built = activeWeaponId && this.host.actorFactory
+      ? this.host.actorFactory.WeaponGeometry(activeWeaponId, actor.weaponVariant) : null;
     this.facts.Set("kind", actor.kind);
     this.facts.Set("身高", `${actor.height.toFixed(3)} m`);
     this.facts.Set("meshSource", actor.meshSource,
@@ -745,7 +776,8 @@ export class ActorEditor {
       actor.modelId ? "good" : "bad");
     this.facts.Set("源模型", actor.modelVariant == null ? "—" : `${actor.modelId || `外观 ${actor.modelVariant + 1}`} · ${actor.kind.includes("Officer") ? "军官" : "士兵"}`);
     this.facts.Set("网格 / 三角", `${meshes} / ${Math.round(triangles)}`);
-    this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
+    const weaponMode = this.weaponOverride === undefined ? "源配置" : "手动替换";
+    this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind} · ${weaponMode}）` : `空手（${weaponMode}）`);
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");
     const importedEntry = this.animationMode === "imported"
       ? GetLugouAnimationEntries(this.kind).find((entry) => entry.id === this.clipId) : null;
