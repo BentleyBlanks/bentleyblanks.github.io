@@ -150,8 +150,19 @@ export class LightRig {
     cam.updateProjectionMatrix();
   }
 
-  /** 点一处火：返回逻辑句柄，可以再关掉。位置固定的火（着火的房子、燃烧的战车）。 */
-  AddFire(position, { intensity = 6, radius = 20, color = 0xff7a2a } = {}) {
+  /**
+   * 点一处火：返回逻辑句柄，可以再关掉。位置固定的火（着火的房子、燃烧的战车）。
+   *
+   * `flicker: false` 是给**自带包络的光源**开的口子（照明弹走这一条）：
+   * 这里那两条正弦是「火在烧」的抖动，套在一枚照明弹的升空—点燃—衰减曲线上
+   * 就成了双份抖动，而且调用方给的强度永远兑现不了（它还要被乘一次 flicker）。
+   * 关掉之后 `currentIntensity` 就等于调用方写进来的那个数，逐帧由 `UpdateFire` 改。
+   *
+   * `priority` 让照明弹在灯槽紧张时压过远处常驻的火：它是这一关唯一的主光源。
+   */
+  AddFire(position, {
+    intensity = 6, radius = 20, color = 0xff7a2a, flicker = true, priority = 1,
+  } = {}) {
     const handle = this.nextFireHandle;
     this.nextFireHandle += 1;
     this.fireSources.set(handle, {
@@ -161,11 +172,28 @@ export class LightRig {
       base: Math.max(0, Number(intensity) || 0),
       radius: Math.max(1, Number(radius) || 20),
       seed: handle * 37.13,
+      flicker: flicker !== false,
       currentIntensity: 0,
       score: 0,
-      priority: 1,
+      priority: Math.max(0, Number(priority) || 1),
     });
     return handle;
+  }
+
+  /**
+   * 改一盏已有的火光：位置 / 强度 / 半径 / 颜色，四样都是可选的。
+   * 会动的光源（照明弹伞降、火把、提灯）用它逐帧写，**不要拆了重建** ——
+   * 每帧 Remove+Add 会让 `seed`（抖动相位）与灯槽排序每帧重掷。
+   * @returns {boolean} 这个句柄还在不在
+   */
+  UpdateFire(handle, { position = null, intensity = null, radius = null, color = null } = {}) {
+    const state = this.fireSources.get(handle);
+    if (!state) return false;
+    if (position) state.position.set(position.x, position.y, position.z);
+    if (intensity != null) state.base = Math.max(0, Number(intensity) || 0);
+    if (radius != null) state.radius = Math.max(1, Number(radius) || state.radius);
+    if (color != null) state.color.setHex(color);
+    return true;
   }
 
   RemoveFire(handle) {
@@ -241,13 +269,18 @@ export class LightRig {
     const candidates = [];
 
     // 火焰闪烁：两个不同频率的正弦叠一点噪声。单频率会看出规律的"呼吸"。
+    // `flicker:false` 的光源自带包络（照明弹），这里原样兑现它写进来的强度。
     for (const state of this.fireSources.values()) {
-      const t = elapsed * 1.0 + state.seed;
-      const flicker = 0.72
-        + 0.18 * Math.sin(t * 7.3)
-        + 0.10 * Math.sin(t * 17.9 + 1.7)
-        + 0.08 * Math.sin(t * 31.1 + 3.1);
-      state.currentIntensity = state.base * Math.max(0.28, flicker);
+      if (state.flicker === false) {
+        state.currentIntensity = state.base;
+      } else {
+        const t = elapsed * 1.0 + state.seed;
+        const flicker = 0.72
+          + 0.18 * Math.sin(t * 7.3)
+          + 0.10 * Math.sin(t * 17.9 + 1.7)
+          + 0.08 * Math.sin(t * 31.1 + 3.1);
+        state.currentIntensity = state.base * Math.max(0.28, flicker);
+      }
       state.currentRadius = state.radius;
       state.score = this._ScoreEffect(state, state.currentRadius, scoringFocus);
       candidates.push(state);

@@ -270,6 +270,99 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 #hud.carrying .combatWeapon, #hud.carrying .combatAmmo,
 #hud.carrying .combatEquipment { opacity: 0.3; filter: grayscale(0.8); }
 
+/* 架设机枪面板。摆在准星**下方**、字幕上方：过热要在瞄准的同时读得到，
+   放到屏幕角落等于没有（第五关唯一的教学界面就是这条热条）。
+   与白刃 QTE 同一块视野，但两者不会同时出现（架着枪拼不了刺刀）。 */
+.hudEmplacement {
+  position: absolute; left: 50%; top: 62%; z-index: 6;
+  width: min(340px, calc(100vw - 40px)); box-sizing: border-box;
+  transform: translateX(-50%); opacity: 0; transition: opacity 0.14s linear;
+  padding: 7px 11px 6px;
+  border: 1px solid rgba(230,223,205,0.22); border-top: 2px solid var(--warn);
+  background: rgba(10,10,9,0.60);
+  font-size: 12px; letter-spacing: 0.04em;
+}
+.hudEmplacement.on { opacity: 1; }
+.empTop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.empLabel { color: var(--paper); font-size: 13px; font-weight: 600; }
+.empAmmo { color: rgba(230,223,205,0.72); font: 600 12px/1 ui-monospace, Consolas, monospace; }
+/* 热条：底槽 + 走条 + 一根警戒线。警戒线常驻——玩家要看得见"还剩多少余量"，
+   不是等它红了才知道自己压太久。 */
+.empHeat {
+  position: relative; height: 5px; margin: 5px 0 0;
+  background: rgba(230,223,205,0.14); overflow: hidden;
+}
+.empHeat u { display: block; height: 100%; width: 0; background: var(--ours); transition: width 0.08s linear; }
+.empHeat .empHeatWarn {
+  position: absolute; top: -1px; bottom: -1px; width: 1px;
+  background: rgba(230,223,205,0.55); text-decoration: none;
+}
+.hudEmplacement.heat-warm .empHeat u { background: #c9b168; }
+.hudEmplacement.heat-hot .empHeat u { background: var(--warn); }
+.hudEmplacement.heat-overheat { border-top-color: var(--theirs); }
+.hudEmplacement.heat-overheat .empHeat u { background: var(--theirs); animation: empPulse 0.5s linear infinite; }
+@keyframes empPulse { 50% { opacity: 0.45; } }
+/* 小卡的排障进度：单独一条细线，不去占准星那个 F 交互环 */
+.empJam { height: 2px; margin-top: 2px; background: transparent; }
+.hudEmplacement.jam .empJam { background: rgba(230,223,205,0.14); }
+.empJam u { display: block; height: 100%; width: 0; background: var(--paper); }
+.empBottom { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 5px; }
+.empPrompt { color: var(--warn); font-style: normal; font-size: 12px; }
+.hudEmplacement.jam .empPrompt, .hudEmplacement.dead .empPrompt { color: var(--theirs); }
+.empExit { color: rgba(230,223,205,0.52); font-size: 11px; white-space: nowrap; }
+.hudEmplacement.dead { border-top-color: var(--theirs); }
+.hudEmplacement.dead .empHeat u { background: rgba(230,223,205,0.22); animation: none; }
+/* 架着机枪时手上那支步枪一个都用不上，武器 UI 同负重态一起压暗 */
+#hud.emplaced .combatWeapon, #hud.emplaced .combatAmmo,
+#hud.emplaced .combatEquipment { opacity: 0.3; filter: grayscale(0.8); }
+
+/* 报码纸（终章亲手发报）。右下、负重条那一栏 —— 与「手上是什么」同一列。
+   不摆到准星附近：那块地方归机枪热条与白刃 QTE，而发报根本不用瞄准。
+   **不压暗武器 UI**：发报不占手，玩家随时能还手（§7「不夺控制权」）。 */
+.hudTelegraph {
+  position: absolute; right: 18px; bottom: 152px; z-index: 4;
+  width: 152px; box-sizing: border-box;
+  padding: 6px 9px 5px; opacity: 0; transition: opacity 0.16s linear;
+  border: 1px solid rgba(230,223,205,0.24); border-left: 2px solid var(--ours);
+  background: rgba(10,10,9,0.62);
+  font-size: 11px; letter-spacing: 0.04em;
+}
+.hudTelegraph.on { opacity: 1; }
+.tgTop { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tgLabel { color: var(--paper); font-size: 12px; font-weight: 600; }
+.tgCount { color: rgba(230,223,205,0.72); font: 600 11px/1 ui-monospace, Consolas, monospace; }
+/* 一组一行。等宽字体是硬要求：四位一组的电码要能一眼竖着对齐着数。 */
+.tgPaper {
+  margin: 5px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.tgGroup {
+  display: flex; align-items: center; gap: 6px;
+  color: rgba(230,223,205,0.82); font: 600 12px/1.45 ui-monospace, Consolas, monospace;
+}
+.tgGroup b { font-weight: 600; }
+/* 勾：没发的是一个空框，发了的画一道横杠把那组划掉 —— 真的报务员就是这么销的。 */
+.tgGroup .tgTick {
+  width: 8px; height: 8px; box-sizing: border-box; flex: 0 0 auto;
+  border: 1px solid rgba(230,223,205,0.34); text-decoration: none;
+}
+.tgGroup.sent { color: rgba(230,223,205,0.40); text-decoration: line-through; }
+.tgGroup.sent .tgTick { border-color: var(--ours); background: var(--ours); }
+.tgGroup.active { color: var(--paper); }
+.tgGroup.active .tgTick { border-color: var(--paper); animation: tgKey 0.28s linear infinite; }
+@keyframes tgKey { 50% { background: rgba(230,223,205,0.55); } }
+/* 细条只画**这一组**那两三声「嗒」，不是整封的进度（整封看纸上勾了几组）。 */
+.tgBar { height: 2px; margin-top: 5px; background: rgba(230,223,205,0.12); }
+.tgBar u { display: block; height: 100%; width: 0; background: var(--paper); }
+.tgBottom { margin-top: 4px; }
+.tgPrompt { color: rgba(230,223,205,0.62); font-style: normal; font-size: 11px; }
+/* 接头松了：整块换成警示色，提示语跟着变成「按住接回接头」。 */
+.hudTelegraph.broken { border-left-color: var(--theirs); }
+.hudTelegraph.broken .tgPrompt { color: var(--theirs); }
+/* 报码纸与负重条同一格；抬着东西发不了报，两者不会同时出现，但真撞上时
+   让负重条压在上面（它是更急的信息）。 */
+#hud.carrying .hudTelegraph { opacity: 0; }
+
 /* 白刃 QTE：慢动作里唯一留在中央的高优先级信息。宽条是完成度，细条是真实时间；
    定时处决的亮区直接画在细条上，玩家不必把百分比换算成时机。 */
 .hudMeleeQte {
@@ -427,6 +520,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .ammoCurrent { font-size: 27px; }
   .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 94px); max-width: 230px; }
   .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); }
+  .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); width: 132px; }
   .hudInteractRing { transform: translate(-50%, 38px); }
   .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
   .hudHint { bottom: 50px; }

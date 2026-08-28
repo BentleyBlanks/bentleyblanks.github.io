@@ -2011,6 +2011,33 @@ export class VfxSystem {
     source.lightHandle = -1;
   }
 
+  /**
+   * 把一个烟源挪到别处。**会动的发烟体**（照明弹伞降的微烟迹、燃烧着往下掉的
+   * 残骸）用它 —— 已经生成的粒子留在原地不动，新粒子从新位置出，那条「迹」
+   * 就是这么来的。每帧 Remove+Add 得不到这个效果：那样每帧只剩一团。
+   * 挂了直接光的烟源（fire > 0）连灯一起挪。
+   * @returns {boolean} 这个句柄还在不在
+   */
+  MoveSmokeSource(handle, position) {
+    const source = this.smokeSources.get(handle);
+    if (!source || !position) return false;
+    // 灯按**位移**跟着走，不是直接对齐：SmokeSource 建灯时给了一段抬高
+    // （火头比烟根高），照抄坐标会把那段抬高抹掉。
+    const dx = position.x - source.position.x;
+    const dy = position.y - source.position.y;
+    const dz = position.z - source.position.z;
+    source.position.set(position.x, position.y, position.z);
+    if (source.lightProfile) {
+      source.lightProfile.position.x += dx;
+      source.lightProfile.position.y += dy;
+      source.lightProfile.position.z += dz;
+      if (source.lightHandle >= 0 && this.lights) {
+        this.lights.UpdateFire?.(source.lightHandle, { position: source.lightProfile.position });
+      }
+    }
+    return true;
+  }
+
   RemoveSmokeSource(handle) {
     const source = this.smokeSources.get(handle);
     this.DetachSourceLight(source);

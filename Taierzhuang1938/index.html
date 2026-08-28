@@ -34,7 +34,9 @@
         "./Script_Geo.mjs": "./Script_Geo.mjs?v=3",
         "./Script_LivedInProps.mjs": "./Script_LivedInProps.mjs?v=3",
         "./Script_ExternalProps.mjs": "./Script_ExternalProps.mjs?v=13",
-        "./Script_Aircraft.mjs": "./Script_Aircraft.mjs?v=1",
+        "./Script_Aircraft.mjs": "./Script_Aircraft.mjs?v=2",
+        "./Script_AircraftStrafe.mjs": "./Script_AircraftStrafe.mjs?v=1",
+        "./Script_Flare.mjs": "./Script_Flare.mjs?v=1",
         "./Script_PropBatch.mjs": "./Script_PropBatch.mjs?v=1",
         "./Script_PropStreaming.mjs": "./Script_PropStreaming.mjs?v=2",
         "./Data_ExternalAssets_ChineseLife.mjs": "./Data_ExternalAssets_ChineseLife.mjs?v=1",
@@ -49,7 +51,7 @@
         "./Script_Post.mjs": "./Script_Post.mjs?v=14",
         "./Script_Profiler.mjs": "./Script_Profiler.mjs?v=2",
         "./Script_Sky.mjs": "./Script_Sky.mjs?v=6",
-        "./Script_Light.mjs": "./Script_Light.mjs?v=4",
+        "./Script_Light.mjs": "./Script_Light.mjs?v=5",
         "./Data_GlobalShProbe.mjs": "./Data_GlobalShProbe.mjs?v=1",
         "./Script_Gi.mjs": "./Script_Gi.mjs?v=7",
         "./Script_World.mjs": "./Script_World.mjs?v=14",
@@ -79,17 +81,19 @@
         "./Script_Wheel.mjs": "./Script_Wheel.mjs?v=1",
         "./Script_Interact.mjs": "./Script_Interact.mjs?v=4",
         "./Script_Carry.mjs": "./Script_Carry.mjs?v=1",
+        "./Script_Emplacement.mjs": "./Script_Emplacement.mjs?v=1",
+        "./Script_Telegraph.mjs": "./Script_Telegraph.mjs?v=1",
         "./Script_Identify.mjs": "./Script_Identify.mjs?v=4",
         "./Script_Player.mjs": "./Script_Player.mjs?v=8",
-        "./Script_Ai.mjs": "./Script_Ai.mjs?v=16",
+        "./Script_Ai.mjs": "./Script_Ai.mjs?v=17",
         "./Script_Actor.mjs": "./Script_Actor.mjs?v=19",
         "./Script_ActorCrowd.mjs": "./Script_ActorCrowd.mjs?v=3",
         "./Script_ActorBatch.mjs": "./Script_ActorBatch.mjs?v=2",
         "./Script_Viewmodel.mjs": "./Script_Viewmodel.mjs?v=15",
-        "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=11",
+        "./Script_Vfx.mjs": "./Script_Vfx.mjs?v=12",
         "./Script_Audio.mjs": "./Script_Audio.mjs?v=11",
         "./Data_Voice.mjs": "./Data_Voice.mjs?v=8",
-        "./Script_Hud.mjs": "./Script_Hud.mjs?v=17",
+        "./Script_Hud.mjs": "./Script_Hud.mjs?v=19",
         "./Script_Story.mjs": "./Script_Story.mjs?v=2",
         "./Script_TengxianField.mjs": "./Script_TengxianField.mjs?v=2",
         "./Script_Cutscene.mjs": "./Script_Cutscene.mjs?v=19",
@@ -202,7 +206,7 @@
        异步写法下先用后备字体开机，字体到了自然换上（display=swap 本来就是这个观感）。 -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
         media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="./Style_Game.css?v=17">
+  <link rel="stylesheet" href="./Style_Game.css?v=19">
   <!-- 主菜单与选章。颜色与字距沿用 Style_Game.css 的 :root，所以必须排在它后面。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=5">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
@@ -297,6 +301,6 @@
       }, 25000);
     })();
   </script>
-  <script type="module" src="./Script_Main.mjs?v=94"></script>
+  <script type="module" src="./Script_Main.mjs?v=97"></script>
 </body>
 </html>

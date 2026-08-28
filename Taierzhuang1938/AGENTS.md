@@ -317,6 +317,69 @@ URL 参数选 preset / quality / scene / gi。
   取证口 `Debug.Carry` / `Debug.Interact`。HUD 侧是进度环 `.hudInteractRing`
   与负重条 `.hudCarry`，武器 UI 禁用态挂在 `#hud.carrying`。
 
+### 架设武器（可接管的固定机枪位）
+- `Script_Emplacement.mjs` —— `EMPLACEMENT_KINDS` 一张表 ＋ 一台状态机：射界限位、
+  热量（一直压约一条弹板顶红线 / 打一梭歇一梭永不过热）、两种卡壳（概率小卡可排障、
+  `ForceJam` 的必然失效拉几下枪机就报废）、弹板与补弹。**纯规则，不 import three**。
+  接管入口与补弹点是 `Script_Interact` 的注册点（`EmplacementInteraction` /
+  `AmmoResupplyInteraction` 两个预制）；弹道借装配层的 `Fire(shot)` 钩子走同一条
+  `MarchBullet`。**脚本只能把枪弄坏，上/下枪位永远是玩家自己按的那一下。**
+- NPC 射手与 `Script_Ai` 共用同一道闸：战位名就是 `soldier.emplacementId`，
+  `SyncNpc(soldiers)` 按它认领/释放，不另建占位表。
+- 键位：F 接管/离位（枪废了是「弃枪」）、R 拉枪机（按住排障 / 换弹板）、左键开火。
+- 回归口 `Script_EmplacementTest.mjs`（纯 Node，domain `interact` ＋ `combat` ＋ `ai`）；
+  取证口 `Debug.Emplacement`。HUD 是热条面板 `.hudEmplacement`，武器 UI 禁用态
+  挂在 `#hud.emplaced`。
+
+### 日机扫射（第一关的核心演出）
+- `Script_AircraftStrafe.mjs` —— 一条通场的状态机：进入 → 扫射 → 拉起离场，
+  四个节拍（enter/fire/cease/exit）出 `OnPhase` 与 `story.Signal`。**纯规则，不 import three**。
+  三条预设 `STRAFE_PRESETS`（railPass 打车辆 / crowdTurn 转向人群且弹线追队列 /
+  divePress 逼到玩家脚下）。牺牲**全靠白名单点名**：`victims` 必死、`immune` 必不死，
+  一次随机都不掷（§0 保留的三项创作性还原第 1 条）。玩家那一下是一扇窗
+  `[atS − windowS, atS]`，开关 `SetPlayerDamage`、时长 `SetPlayerWindow`；
+  「从数秒前重来」的检查点不在这一层。
+- `Script_Aircraft.mjs` —— 绕圈的远方机群（**没动**）＋ 扫射的**渲染那一半**：
+  航线点名的那一架脱离圆周由脚本摆位，走完藏 2.5 s 再归队；
+  `MakeAircraftStrafeHost` 是宿主适配器（曳光/弹着/音效定位/玩家挨这一下）。
+- 音效四条 key 在 `Data_SfxSources`（PlaneDive / StrafeNear / StrafeFar / StrafeDirt）；
+  同名合成配方合上之前自动退到 `amb.planeFar` / `type92` / `type11` / `impactDirt`。
+- 回归口 `Script_AircraftStrafeTest.mjs`（纯 Node，domain `combat`）；取证口 `Debug.Strafe`。
+  摆点示例（CH1 三条航线的线段坐标）在 `Script_AircraftStrafe.mjs` 头注。
+
+### 照明弹（第四关的招牌机制）
+- `Script_Flare.mjs` —— 一枚照明弹的五相位时间线：升空 → 顶空点燃 → 伞降缓落燃烧 →
+  熄灭 → **暗适应**，四个节拍（launch/ignite/out/clear）出 `OnPhase` 与 `story.Signal`
+  （CH4 的 `C4_FlareUp`）。**纯规则，不 import three**；两条预设 `FLARE_PRESETS`
+  （crossLane 横巷 / narrowLane 窄巷白刃），两枚都是剧情节拍，`LaunchSequence` 排时刻表。
+- **暴露机制是它的另一半产物**：燃烧期把 `Script_Ai.SIGHT_BY_STANCE` 三档**同乘**
+  一个倍率（敌我一起暴露），熄灭后压到 1 以下几秒再还原。乘法保住了「姿态决定
+  被发现的距离」——照明弹底下趴着仍然更难被看见。写入口只有 `AiDirector.SetSightScale`，
+  三处判定共读 `SightRange(stance)`；**换关/Abort 必须还原成 1**。
+- 画面走现有池子，不新建管线：灯是 `LightRig` 火光池的一盏（`AddFire({flicker:false})`
+  ＋新增 `UpdateFire`，castShadow 恒 false），烟是 `VfxSystem` 的烟源（＋新增
+  `MoveSmokeSource`，烟迹要跟着走才叫「迹」）。强度按 `groundLux × agl²` 反推，
+  改顶空高度不用重调亮度。
+- 音效四条 key 在 `Data_SfxSources`（flareLaunch / flareIgnite / flareBurn / flareOut）；
+  前两条没接线时退到 `launcherPop` / `grenadeThrow`，后两条**不给备胎**（造不出来）。
+- 回归口 `Script_FlareTest.mjs`（纯 Node，domain `ai` ＋ `render`）；取证口 `Debug.Flare`
+  （带 `ai.SightState()`，光强对了不算数，要三档真的一起抬起来）。摆点示例在文件头注。
+
+### 发报（终章亲手发出最后一封电报）
+- `Script_Telegraph.mjs` —— 码组状态机：按一下电键发一个码组（一组四位、两到三声
+  「嗒」），报码纸逐组勾掉；炮击 `ForceDisconnect()` 把**正在发的那一组作废**，
+  重连是 S1 框架的 hold 手势（1.2 s）。**纯规则，不 import three**。
+  自动断线排在 `breakAfterGroup`（夹进 `[1, total−1]`，不许落在「发毕」以后）。
+- **不夺控制权**：玩家可以中途走开去打仗，进度原样保留，没有任何超时会失败。
+  两个交互点预制（`TelegraphKeyInteraction` tap / `TelegraphReconnectInteraction` hold）
+  由本文件出，`interact.Register` 摆点 —— 交互框架不反过来依赖这个玩法系统。
+- 「发毕。」是 `Data_MissionCh6` 里 xiaoqin 的台词，**本层一个字都不说**，只回 `OnComplete`。
+  默认信号名与 CH6 EVENTS 逐条对应：`KeySeated` / `WireBreak` / `WireSent`。
+- 音效两条 key 在 `Data_SfxSources`（telegraphKey 三变体顺序轮播不随机 / telegraphHum）；
+  电键没接线时退到 `grenadePin`，底噪不给备胎。
+- 回归口 `Script_TelegraphTest.mjs`（纯 Node，domain `interact` ＋ `hud`）；
+  取证口 `Debug.Telegraph`。HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
+
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`

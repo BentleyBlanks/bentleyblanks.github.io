@@ -76,6 +76,10 @@ export const testDefs = {
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
   CarryTest: { file: "Script_CarryTest.mjs", desc: "担架/搬运负重状态机 + 可注册交互框架三手势 + 八个救护预制（纯 Node，毫秒级）" },
+  EmplacementTest: { file: "Script_EmplacementTest.mjs", desc: "架设机枪位：接管/离位、射界限位、过热曲线、两种卡壳、NPC 占位互斥、补弹（纯 Node，毫秒级）" },
+  AircraftStrafeTest: { file: "Script_AircraftStrafeTest.mjs", desc: "日机扫射航线：相位机四拍、弹着线推进与追人群、必死/必不死白名单、玩家躲避窗口、音效降级（纯 Node，毫秒级）" },
+  FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
+  TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
@@ -179,13 +183,30 @@ export const domains = {
       "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
-      "CarryTest"],
+      "CarryTest",
+      // 架设机枪把左键整条接管过去（TryFire 的第一道闸）、还借 MarchBullet 打弹道，
+      // 所以它同样同时挂在 combat 与 interact 两个域。
+      "EmplacementTest",
+      // 日机扫射自己算一条伤害链（打倒 NPC、打倒玩家），不走 MarchBullet 也不走 Blast，
+      // 所以碰伤害口径的改动要连着它一起跑（毫秒级，白搭一条不亏）。
+      "AircraftStrafeTest"],
   },
-  ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
-  hud: { label: "HUD/交互提示/目标识别", tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest"] },
+  // 机枪位与 Script_Ai 共用「一个战位只填一个人」那道闸（soldier.emplacementId），
+  // 所以碰 AI 的改动要连着 EmplacementTest 一起跑（毫秒级，白搭一条不亏）。
+  // 照明弹归这里而不是归 combat：它一发子弹都不打，改的是 SIGHT_BY_STANCE 那条
+  // **发现距离**——碰 Script_Ai 的改动最容易悄悄把倍率那条读点绕过去
+  // （FlareTest 有一条专门扫源码数裸读次数）。
+  ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest"] },
+  hud: {
+    label: "HUD/交互提示/目标识别",
+    // 报码纸是 HUD 面板，改 Script_Hud 要连着它一起跑（TelegraphTest 有一段扫 HUD 源码）。
+    tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest", "TelegraphTest"],
+  },
   interact: {
-    label: "交互框架/负重（担架·搬运·救护交互点）",
-    tests: ["CarryTest", "HudPromptTest", "HudPromptBrowserTest"],
+    label: "交互框架/负重/架设机枪/发报（担架·搬运·救护交互点·机枪位·电键）",
+    // 发报的两个点（电键 tap / 接头 hold）是拿真的 InteractSystem 跑的，
+    // 所以碰交互框架的改动要连着它一起跑。
+    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest"],
   },
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
@@ -194,7 +215,9 @@ export const domains = {
   cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
   render: {
     label: "渲染与合批自动契约",
-    tests: ["PostTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest"],
+    // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
+    //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
+    tests: ["PostTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -207,16 +230,18 @@ export const domains = {
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee|Carry)/i },
-  { domain: "interact", pattern: /(Carry|Interact|Script_Input|Hud|Prompt)/i },
-  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal)/i },
-  { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
+  // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
+  { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Script_Input|Hud|Prompt)/i },
+  // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
+  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare)/i },
+  { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Flare|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 

@@ -30,7 +30,20 @@ const STATE = {
  * 影响"会不会被打"。原来两边一律 120 m 一刀切，趴下除了走得慢没有任何收益，
  * 于是玩家（和 AI）永远没有理由卧倒。
  */
-const SIGHT_BY_STANCE = [120, 80, 45];
+export const SIGHT_BY_STANCE = [120, 80, 45];
+
+/**
+ * 发现距离的**全局倍率**上下限（`AiDirector.SetSightScale`）。
+ *
+ * 谁在写它：第四关的照明弹（Script_Flare）—— 燃烧期把三档一起抬上去（敌我同时
+ * 暴露），熄灭之后压到 1 以下几秒（暗适应），过完再还原成 1。
+ *
+ * 为什么是**乘一个数**而不是改这张表：三档的比例就是「姿态决定被发现的距离」
+ * 那条机制本身。整表乘同一个数，站/蹲/卧的次序与比例一个都不变 ——
+ * 照明弹底下趴着仍然比站着难被看见。谁要是改成「照明弹期间一律 200 m」，
+ * 这条机制当场作废。
+ */
+export const SIGHT_SCALE_RANGE = Object.freeze({ min: 0.25, max: 4 });
 
 // 六人战斗组。不是给 HUD 看的职业系统，而是让一群人不再对着同一个点做同一个动作：
 // 组长定方向，突击手靠前，机枪/掩护手压后，侧翼手走最外侧，步枪手填中间。
@@ -386,6 +399,12 @@ export class AiDirector {
      * 玩家重生、软约束重设目标），漏掉任何一条这个洞就还在。
      */
     this.insideWalls = insideWalls;
+    /**
+     * 发现距离的全局倍率（见 SIGHT_SCALE_RANGE 的注释）。1 = 原样。
+     * 唯一的写入者是第四关的照明弹；**换关/复活时一定要还原成 1**，
+     * 否则下一关一进去满场就互相看得见。
+     */
+    this.sightScale = 1;
     this.rnd = Mulberry32(seed);
     this.tickIndex = 0;
     this.time = 0;
@@ -953,6 +972,38 @@ export class AiDirector {
   static StanceEye(stance) { return stance === 2 ? 0.5 : stance === 1 ? 1.0 : 1.5; }
 
   /**
+   * 某个姿态**现在**的被发现距离。三处判定（玩家、友邻、旧目标复核）共读这一条，
+   * 别在调用点各乘各的倍率。
+   */
+  SightRange(stance) {
+    // 下标夹一次而不是写两遍 `SIGHT_BY_STANCE[...] ?? SIGHT_BY_STANCE[0]`：
+    // FlareTest 会数这张表被下标读了几次 —— 多一处就是多一条绕过倍率的路。
+    // stance 缺失（undefined）按 |0 落到 0 = 站着，与旧写法的 ?? 120 同义。
+    return SIGHT_BY_STANCE[Clamp(stance | 0, 0, SIGHT_BY_STANCE.length - 1)] * this.sightScale;
+  }
+
+  /**
+   * 设发现距离的全局倍率（照明弹的暴露机制）。夹在 SIGHT_SCALE_RANGE 里 ——
+   * 一个写错的 0 会让全场瞎掉，一个写错的 50 会让全城一起开火。
+   * @returns {number} 夹过之后真正生效的倍率
+   */
+  SetSightScale(scale) {
+    const v = Number(scale);
+    this.sightScale = Number.isFinite(v)
+      ? Clamp(v, SIGHT_SCALE_RANGE.min, SIGHT_SCALE_RANGE.max) : 1;
+    return this.sightScale;
+  }
+
+  /** 取证口：Debug.Flare 与 FlareTest 靠它断言「照亮期抬了、熄灭后还回去了」。 */
+  SightState() {
+    return {
+      scale: this.sightScale,
+      base: [...SIGHT_BY_STANCE],
+      now: SIGHT_BY_STANCE.map((_, i) => this.SightRange(i)),
+    };
+  }
+
+  /**
    * 卧倒可以立即发生（活命反应），重新起身必须等承诺时间过去。
    * 这道迟滞专门消掉 suppression=0.50、距离=20 m 两侧的站蹲振荡。
    */
@@ -1032,12 +1083,12 @@ export class AiDirector {
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
-      if (d < SIGHT_BY_STANCE[st]) this._PushNear(d, player, true, -1, st, player.position);
+      if (d < this.SightRange(st)) this._PushNear(d, player, true, -1, st, player.position);
     }
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
       const d = s.position.distanceTo(other.position);
-      if (d < (SIGHT_BY_STANCE[other.stance] ?? 120)) {
+      if (d < this.SightRange(other.stance)) {
         this._PushNear(d, other, false, other.id, other.stance, other.position);
       }
     }
@@ -1063,7 +1114,7 @@ export class AiDirector {
           ? (player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0)
           : s.target.ref.stance;
         currentDist = s.position.distanceTo(s.target.position);
-        currentVisible = currentDist < (SIGHT_BY_STANCE[s.target.stance] ?? 120) * 1.12
+        currentVisible = currentDist < this.SightRange(s.target.stance) * 1.12
           && this.HasLineOfSight(s, s.target);
       }
     }

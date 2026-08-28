@@ -315,6 +315,48 @@ export class Hud {
     this.el.carryNote = this.el.carry.querySelector(".carryText i");
     this.el.carryBar = this.el.carry.querySelector(".carryBar u");
     this.el.carry.setAttribute("aria-hidden", "true");
+    /**
+     * 架设机枪面板：热条 + 弹药 + 一行提示 + 退出键。
+     * 位置在准星下方偏低那一块（比字幕高、比提示条低）——
+     * 过热是**要在瞄准的同时读到**的信息，摆到屏幕角落就等于没有。
+     */
+    this.el.emplacement = mk("hudEmplacement");
+    this.el.emplacement.innerHTML =
+      `<div class="empTop"><b class="empLabel"></b><span class="empAmmo"></span></div>`
+      + `<div class="empHeat"><u></u><s class="empHeatWarn"></s></div>`
+      + `<div class="empJam"><u></u></div>`
+      + `<div class="empBottom"><i class="empPrompt"></i><span class="empExit"></span></div>`;
+    this.el.empLabel = this.el.emplacement.querySelector(".empLabel");
+    this.el.empAmmo = this.el.emplacement.querySelector(".empAmmo");
+    this.el.empHeatBar = this.el.emplacement.querySelector(".empHeat u");
+    this.el.empHeatWarn = this.el.emplacement.querySelector(".empHeatWarn");
+    this.el.empJamBar = this.el.emplacement.querySelector(".empJam u");
+    this.el.empPrompt = this.el.emplacement.querySelector(".empPrompt");
+    this.el.empExit = this.el.emplacement.querySelector(".empExit");
+    this.el.emplacement.setAttribute("aria-hidden", "true");
+    this.emplacementSignature = "";
+    /**
+     * 报码纸（终章亲手发报）。摆在右下、负重条那一栏 —— 与「手上是什么」同一列，
+     * 因为它就是「手上这会儿在干的活」。**不放在准星附近**：发报不用瞄准，
+     * 而那块地方归机枪热条与白刃 QTE（三者都在准星下方会打架）。
+     *
+     * 一组一行，勾掉的划掉。这张纸是玩家**唯一**能对出「还剩几组」的地方，
+     * 所以它不是一条进度条：策划案要的是「报码纸确认（不是纯演出，玩家要能对错）」。
+     */
+    this.el.telegraph = mk("hudTelegraph");
+    this.el.telegraph.innerHTML =
+      `<div class="tgTop"><b class="tgLabel"></b><span class="tgCount"></span></div>`
+      + `<ol class="tgPaper"></ol>`
+      + `<div class="tgBar"><u></u></div>`
+      + `<div class="tgBottom"><i class="tgPrompt"></i></div>`;
+    this.el.tgLabel = this.el.telegraph.querySelector(".tgLabel");
+    this.el.tgCount = this.el.telegraph.querySelector(".tgCount");
+    this.el.tgPaper = this.el.telegraph.querySelector(".tgPaper");
+    this.el.tgBar = this.el.telegraph.querySelector(".tgBar u");
+    this.el.tgPrompt = this.el.telegraph.querySelector(".tgPrompt");
+    this.el.telegraph.setAttribute("aria-hidden", "true");
+    this.telegraphSignature = "";
+    this.telegraphPaperKey = "";
     this.el.meleeQte = mk("hudMeleeQte");
     this.el.meleeQte.innerHTML = `
       <div class="mqSlow">慢动作 · 白刃接触</div>
@@ -872,6 +914,125 @@ export class Hud {
       on: this.root.classList.contains("carrying"),
       label: this.el.carryLabel.textContent,
       ring: this.interactRingOn ? this.el.interactRingLabel.textContent : null,
+    };
+  }
+
+  /**
+   * 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。只读 `EmplacementSystem.View()`。
+   *
+   * **热条是这一关唯一的教学界面**：策划案里原射手交代给炊事兵的三句
+   * 「枪托抵稳。」「短点射。」「莫一直压。」在玩家这边就只剩这一条会变红的横条 ——
+   * 所以它必须在准星附近（不是角落里的一个小图标），而且过热那一档要**明显**。
+   *
+   * `#hud.emplaced` 与负重那条 `.carrying` 是同一类开关：武器 UI 一起压暗，
+   * 因为架着枪的时候手上那支步枪一个都用不上。
+   */
+  SetEmplacement(view = null) {
+    const root = this.el.emplacement;
+    const signature = view
+      ? `${view.id}|${view.label}|${view.heatState}|${view.jam ? view.jam.kind : ""}`
+        + `|${view.dead ? 1 : 0}|${view.prompt}|${view.exit}` : "";
+    if (signature !== this.emplacementSignature) {
+      this.emplacementSignature = signature;
+      if (view) {
+        this.el.empLabel.textContent = view.label || "";
+        this.el.empPrompt.textContent = view.prompt || "";
+        this.el.empExit.textContent = view.exit ? `F — ${view.exit}` : "";
+      }
+      root.className = view
+        ? `hudEmplacement on heat-${view.heatState}`
+          + (view.jam ? ` jam ${view.jam.kind}` : "") + (view.dead ? " dead" : "")
+        : "hudEmplacement";
+      root.setAttribute("aria-hidden", view ? "false" : "true");
+      if (view) {
+        root.setAttribute("aria-label",
+          `${view.label}：热量 ${Math.round(view.heat * 100)}%，${view.prompt || "可射击"}`);
+      }
+      this.root.classList.toggle("emplaced", !!view);
+    }
+    if (!view) return;
+    this.el.empHeatBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.heat)) * 100)}%`;
+    // 警戒线是画在条上的一根竖线：玩家要看得见"还有多少余量"，不是等它变红才知道。
+    this.el.empHeatWarn.style.left = `${Math.round(view.warnHeat * 100)}%`;
+    const ammo = view.dead ? "——"
+      : `${String(view.rounds).padStart(2, "0")} / ${view.belts} 板`;
+    if (this.el.empAmmo.textContent !== ammo) this.el.empAmmo.textContent = ammo;
+    // 小卡的排障进度直接画在热条底下（不占准星那个环 —— 那个环归 F 交互）。
+    const clearT = view.jam && view.jam.kind !== "fatal" ? view.jam.t : 0;
+    this.el.empJamBar.style.width = `${Math.round(clearT * 100)}%`;
+  }
+
+  /**
+   * 报码纸（终章亲手发报）。只读 `TelegraphSystem.View()` 的脱敏快照。
+   *
+   * **码组那张列表只在换封电报时重建**（`telegraphPaperKey`），之后每帧只改
+   * class 与两个文本 —— 一封电报要在屏幕上挂好几分钟，每帧重建一遍 `<ol>`
+   * 会在整段发报里持续触发布局。与热条那条同一笔账。
+   *
+   * 这里**不带 `#hud.telegraphing` 那种武器 UI 禁用态**：发报不占手
+   * （§7 明写「不夺控制权」，玩家可以中途走开、可以还手），
+   * 压暗武器 UI 会给出「你这会儿开不了枪」的错误读数。
+   */
+  SetTelegraph(view = null) {
+    const root = this.el.telegraph;
+    const paperKey = view ? `${view.id}|${view.groups.map((g) => g.code).join(",")}` : "";
+    if (paperKey !== this.telegraphPaperKey) {
+      this.telegraphPaperKey = paperKey;
+      this.el.tgPaper.innerHTML = view
+        ? view.groups.map((g) =>
+          `<li class="tgGroup"><s class="tgTick"></s><b>${g.code}</b></li>`).join("")
+        : "";
+      if (view) this.el.tgLabel.textContent = view.label || "";
+    }
+    const signature = view
+      ? `${view.phase}|${view.sent}|${view.total}|${view.prompt}` : "";
+    if (signature !== this.telegraphSignature) {
+      this.telegraphSignature = signature;
+      root.className = view
+        ? `hudTelegraph on ${view.phase}` + (view.broken ? " broken" : "")
+        : "hudTelegraph";
+      root.setAttribute("aria-hidden", view ? "false" : "true");
+      if (view) {
+        this.el.tgCount.textContent = `${view.sent} / ${view.total}`;
+        this.el.tgPrompt.textContent = view.prompt || "";
+        root.setAttribute("aria-label",
+          `${view.label}：已发 ${view.sent} 组，共 ${view.total} 组。${view.prompt || ""}`);
+        const items = this.el.tgPaper.children;
+        for (let i = 0; i < items.length; i += 1) {
+          const g = view.groups[i];
+          const want = `tgGroup${g && g.sent ? " sent" : ""}${g && g.active ? " active" : ""}`;
+          if (items[i].className !== want) items[i].className = want;
+        }
+      }
+    }
+    if (!view) return;
+    // 细条只画**当前这一组**的两三声「嗒」，不是整封电报的进度 ——
+    // 整封的进度就是那张纸上勾掉了几组，不需要第二处口径。
+    this.el.tgBar.style.width = `${Math.round(Math.max(0, Math.min(1, view.t)) * 100)}%`;
+  }
+
+  /** 取证口：冒烟脚本读它断言 HUD 真的挂出了报码纸（而不是只有规则层变了）。 */
+  TelegraphState() {
+    return {
+      on: this.el.telegraph.className.includes("on"),
+      label: this.el.tgLabel.textContent,
+      count: this.el.tgCount.textContent,
+      prompt: this.el.tgPrompt.textContent,
+      groups: [...this.el.tgPaper.children].map((li) => li.className),
+      className: this.el.telegraph.className,
+    };
+  }
+
+  /** 取证口：冒烟脚本读它断言 HUD 真的进了机枪态。 */
+  EmplacementState() {
+    return {
+      on: this.root.classList.contains("emplaced"),
+      label: this.el.empLabel.textContent,
+      prompt: this.el.empPrompt.textContent,
+      exit: this.el.empExit.textContent,
+      ammo: this.el.empAmmo.textContent,
+      heatWidth: this.el.empHeatBar.style.width,
+      className: this.el.emplacement.className,
     };
   }
 

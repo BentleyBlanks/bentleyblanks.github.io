@@ -48,6 +48,7 @@ import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
+import { EmplacementSystem } from "./Script_Emplacement.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
@@ -57,11 +58,14 @@ import { FrameProfiler } from "./Script_Profiler.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps } from "./Script_TrimProps.mjs";
-import { AircraftFlight } from "./Script_Aircraft.mjs";
+import { AircraftFlight, MakeAircraftStrafeHost } from "./Script_Aircraft.mjs";
+import { AircraftStrafeDirector } from "./Script_AircraftStrafe.mjs";
+import { FlareDirector, MakeFlareHost } from "./Script_Flare.mjs";
+import { TelegraphSystem, MakeTelegraphHost } from "./Script_Telegraph.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
-import { WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
 import { CUTSCENES, LEGACY_CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
@@ -479,12 +483,31 @@ let destruction = null;
 let interact = null;
 // 负重状态机（担架/药箱/门板…）。规则在 Script_Carry，这里只接线。
 let carry = null;
-/** 上一帧枪收没收（负重的边沿）；别每帧写 visible，会跟过场那一处抢。 */
+/** 上一帧枪收没收（负重与架设机枪共用的边沿）；别每帧写 visible，会跟过场那一处抢。 */
 let carryHidGun = false;
+// 架设武器（可接管的固定机枪位）。规则与数值全在 Script_Emplacement，这里只接线。
+let emplacement = null;
+/** 冒烟用的「扳机一直扣着」（Debug.Emplacement.Fire）；正片里恒为 false。 */
+let debugEmplacedFire = false;
+/** 上枪位之前是站是蹲；离位时还回去（不然从机枪上下来的人永远是蹲着的）。 */
+let seatStanceBefore = null;
+/** 上一帧占着哪一挺；用来认出「刚下枪位」那一个边沿。 */
+let mountedIdLast = null;
+/** 机枪位的世界模型：id -> { root, nodes }。摆点建、换关拆。 */
+const emplacementViews = new Map();
 let identify = null;
 let cutscene = null;
 // 天空机群是纯视觉层：它跨关复用模型，换关时只更新航线中心。
 let aircraft = null;
+// 日机扫射航线（第一关阶段五/六/八）。规则与数值全在 Script_AircraftStrafe，
+// 宿主适配器在 Script_Aircraft，这里只接线。
+let strafe = null;
+// 照明弹（第四关东关之夜）。时间线、光强包络与发现距离倍率全在 Script_Flare；
+// 灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，这里只接线。
+let flare = null;
+// 发报（终章亲手发出最后一封电报）。码组推进/中断/重连全在 Script_Telegraph；
+// 两个交互点由它出预制，装配层只把系统实例交给摆点方。
+let telegraph = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
 // 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
@@ -948,6 +971,10 @@ async function Boot() {
       // 按住 F 的那一下断在这儿。过场期间输入被 SetSuppressed 掐掉，松手边沿永远到不了 ——
       // 不主动断的话，进度环会一直亮着「按住中」挂在过场画面上。
       interact?.CancelHold("cutscene");
+      // 机枪的扳机同理：过场期间输入被掐掉，松手边沿到不了，不主动断的话
+      // 过场一结束枪会自己接着响一梭。
+      emplacement?.SetFire(false);
+      emplacement?.EndClear();
       hud?.SetInteractProgress(null);
       // 玩家手里的枪挂在相机下：不藏的话每一镜右下角都趴着一支带刺刀的步枪，
       // 五个分镜 agent 全靠把 look 点推到 45 m 外抬高近平面来切它 —— 这里一行就够。
@@ -998,6 +1025,64 @@ async function Boot() {
     Time: () => state.elapsed,
   });
 
+  // 架设机枪（第五关那挺）。射速、过热、卡壳、弹药全在 Script_Emplacement；
+  // 装配层只给它三样：声音/提示、**把一发真的打出去**、以及把指向交回给世界模型。
+  emplacement = new EmplacementSystem({
+    Play: (name, opts) => audio.Play(name, opts && opts.position
+      ? { ...opts, position: new THREE.Vector3(opts.position.x, opts.position.y, opts.position.z) }
+      : opts),
+    Hint: (text, seconds) => hud.Hint(text, seconds),
+    Say: (who, text, seconds) => hud.Say(who, text, seconds),
+    Time: () => state.elapsed,
+    Fire: (shot) => FireEmplacedShot(shot),
+    Aim: (view) => AimEmplacementView(view),
+    // 「视角接到枪上」：把人挪到射手位并换成射手姿态。**只在玩家自己按下那一下
+    // 之后发生**，不是脚本把人拽过去 —— 挪的距离本来就只有一步（交互点的够得着
+    // 半径不到两米）。姿态记下来，离位时还回去。
+    Seat: ({ seat, stance }) => {
+      if (!player?.Alive) return;
+      seatStanceBefore = player.stance;
+      const y = battlefield ? battlefield.GroundHeight(seat.x, seat.z) : player.position.y;
+      player.position.set(seat.x, y, seat.z);
+      player.body?.Teleport(seat.x, y, seat.z);
+      if (stance) player.stance = stance;
+    },
+  });
+
+  // 日机扫射航线（第一关阶段五 / 六 / 八）。规则在 Script_AircraftStrafe，
+  // three 那一侧的翻译（曳光、弹着、音效定位、玩家挨这一下）在 Script_Aircraft
+  // 的 MakeAircraftStrafeHost —— 装配层只把「谁是谁」告诉它。
+  // 取的全是取值器：battlefield 每关重建、story 每关换一份，拷值出去会指到上一关。
+  strafe = new AircraftStrafeDirector(MakeAircraftStrafeHost({
+    vfx, audio, hud,
+    Time: () => state.elapsed,
+    player: () => player,
+    battlefield: () => battlefield,
+    Story: () => story,
+    Soldiers: () => ai?.soldiers ?? null,
+  }));
+
+  // 照明弹（第四关阶段五 / 七）。时间线与暴露倍率在 Script_Flare（纯规则），
+  // 画面那一半由它自己的 MakeFlareHost 翻给 LightRig 的火光池与 VfxSystem 的烟源。
+  // ai / story / battlefield 全取取值器：它们每关重建，拷值出去会指到上一关。
+  flare = new FlareDirector(MakeFlareHost({
+    lights, vfx, audio, hud,
+    Time: () => state.elapsed,
+    Ai: () => ai,
+    Story: () => story,
+    Battlefield: () => battlefield,
+    Player: () => player,
+  }));
+
+  // 发报（终章阶段四）。**不夺控制权**：玩家爱什么时候按什么时候按，
+  // 走开进度也留着 —— 所以这里除了每帧推它一下，什么都不封。
+  telegraph = new TelegraphSystem(MakeTelegraphHost({
+    audio, hud,
+    Time: () => state.elapsed,
+    Story: () => story,
+    Player: () => player,
+  }));
+
   // 准心指着谁。规则在 Script_Identify（纯几何，不 import three），
   // 这里只把"从眼位到那个人的胸口有没有被挡死"接回来 —— 与 HasLineOfSight 同一条判据。
   identify = new IdentifySystem({
@@ -1033,7 +1118,7 @@ async function Boot() {
     renderer, scene, camera, post, sky, lights, library, profiler, get gi() { return gi; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeQte() { return meleeQte; },
-    story, combat, destruction, interact, carry, wheel,
+    story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
     graphics, ApplyGraphics,
@@ -1157,6 +1242,104 @@ async function Boot() {
           playerSpeedScale: player.carrySpeedScale,
           gunVisible: !!viewmodel?.root?.visible,
           hud: hud.CarryState(),
+        }),
+      },
+      /**
+       * 架设机枪取证口。摆点是集成批的事，这里给的是**驱动 + 取证**：
+       *   Debug.Emplacement.Create({...})        摆一挺（不带交互点，直接用）
+       *   Debug.Emplacement.Occupy(id)           上枪位（等价于玩家按 F）
+       *   Debug.Emplacement.Fire(true/false)     扣住/松开扳机
+       *   Debug.Emplacement.Jam(id)              脚本触发的必然失效（§6 阶段⑩②）
+       *   Debug.Emplacement.State()              规则层 + HUD + 世界模型三侧一起取
+       * `gunVisible` 读的是**视图模型那个字段**，不是规则层的推断 ——
+       * 「规则说收枪了但画面没收」正是这一类接线最容易漏的一环。
+       */
+      Emplacement: {
+        Create: (spec) => emplacement.CreateEmplacement(spec),
+        Occupy: (id) => emplacement.Occupy(id, player),
+        Vacate: (reason) => emplacement.Vacate(reason),
+        Fire: (down) => { debugEmplacedFire = down !== false; return emplacement.SetFire(debugEmplacedFire); },
+        Bolt: () => emplacement.PullBolt(),
+        // 名字不叫 Clear：`emplacement.Clear(tag)` 是「按 tag 收掉战位」，
+        // 这一条是「按住 R 排小卡」，同名会在取证脚本里被读反。
+        HoldClear: (down) => (down === false ? emplacement.EndClear() : emplacement.BeginClear()),
+        Reload: () => emplacement.Reload(),
+        Resupply: (id, belts) => emplacement.Resupply(id, belts),
+        Jam: (id, opts) => emplacement.ForceJam(id, opts),
+        State: () => ({
+          ...emplacement.State(),
+          gunVisible: !!viewmodel?.root?.visible,
+          playerYaw: player.yaw, playerPitch: player.pitch,
+          worldModels: [...emplacementViews.entries()]
+            .map(([id, view]) => ({ id, hasModel: !!view.root })),
+          hud: hud.EmplacementState(),
+        }),
+      },
+      /**
+       * 日机扫射取证口。摆点（三条航线的线段与白名单）是集成批的事，
+       * 这里给的是**驱动 + 取证**：
+       *   Debug.Strafe.Run({ preset:"crowdTurn", from, to, victims })  起一条航线
+       *   Debug.Strafe.Dodge()                       扑入路沟（等价于玩家躲开）
+       *   Debug.Strafe.PlayerDamage(false)           整条关掉对玩家的伤害
+       *   Debug.Strafe.Window(3.5)                   调宽躲避窗口
+       *   Debug.Strafe.State()                       规则层 + 世界模型两侧一起取
+       * `modelAt` 读的是**场景里那架飞机的世界坐标**，不是规则层的推断 ——
+       * 「规则飞过去了但模型还在圆周上」正是这一类接线最容易漏的一环。
+       */
+      Strafe: {
+        Run: (spec) => strafe.StrafeRun(spec),
+        Dodge: (reason) => strafe.Dodge(reason),
+        Abort: (reason) => strafe.Abort(reason),
+        Ping: (origin, dir, maxDistM) => strafe.Ping(origin, dir, maxDistM),
+        PlayerDamage: (on) => strafe.SetPlayerDamage(on),
+        Window: (seconds) => strafe.SetPlayerWindow(seconds),
+        State: () => {
+          const view = strafe.View();
+          const form = view ? aircraft?.FormFor(view.aircraft.id) : null;
+          return {
+            ...strafe.State(),
+            modelAt: form ? { x: form.root.position.x, y: form.root.position.y, z: form.root.position.z } : null,
+            modelVisible: form ? !!form.root.visible : null,
+          };
+        },
+      },
+      /**
+       * 照明弹的取证口。
+       *   Debug.Flare.Launch({ preset:"crossLane", from, at })  打一枚
+       *   Debug.Flare.Sequence([{ atS, preset, from, at }])     排时刻表
+       *   Debug.Flare.Exposure(false)                           只留画面，不动发现距离
+       *   Debug.Flare.State()                                   规则层 + AI 侧一起取
+       * `ai` 那一段是这条机制的**真正判据**：光强包络对了不算数，
+       * 要 SIGHT_BY_STANCE 三档真的一起抬起来、熄灭之后真的还回去。
+       */
+      Flare: {
+        Launch: (spec) => flare.LaunchFlare(spec),
+        Sequence: (items) => flare.LaunchSequence(items),
+        Cancel: (ticket) => flare.CancelSequence(ticket),
+        Abort: (id, reason) => flare.Abort(id, reason),
+        Exposure: (on) => flare.SetExposure(on),
+        State: () => ({
+          ...flare.State(),
+          ai: ai?.SightState() ?? null,
+          lights: lights?.GetEffectLightState() ?? null,
+        }),
+      },
+      /**
+       * 发报的取证口。
+       *   Debug.Telegraph.Begin({ groups:[...], breakAfterGroup:2 })  开一封
+       *   Debug.Telegraph.Key()                     敲一下电键（等价于玩家按 F）
+       *   Debug.Telegraph.Break() / Reconnect()     炮击松脱 / 接回去
+       *   Debug.Telegraph.State()                   规则层 + HUD 两侧一起取
+       */
+      Telegraph: {
+        Begin: (spec) => telegraph.BeginTelegraph(spec),
+        Key: (reason) => telegraph.Key(reason),
+        Break: (reason) => telegraph.ForceDisconnect(reason),
+        Reconnect: (reason) => telegraph.Reconnect(reason),
+        Abort: (reason) => telegraph.Abort(reason),
+        State: () => ({
+          ...telegraph.State(),
+          hud: hud.TelegraphState(),
         }),
       },
       Prompts: () => hud.actionPrompts.map((prompt) => ({ ...prompt })),
@@ -1875,9 +2058,23 @@ function ClearRuntime() {
   // 负重与交互点都是**按关摆的**：不清的话上一关抬着的担架会跟到下一关，
   // 上一关的交互点会在新切片的同一坐标上悄悄复活。
   carry?.Reset("levelChange");
+  // 扫射航线也是按关摆的：不清的话上一关那条航线会带着白名单飞进下一关。
+  strafe?.Reset("levelChange");
+  // 照明弹同理，而且**它还欠着 AI 一笔账**：Reset 会把发现距离倍率还原成 1。
+  // 不还的话下一关一进去满场 2.4 倍视距，表现成「敌人隔着两百米就开火」。
+  flare?.Reset("levelChange");
+  // 发的那封电报也不许跨关：底噪要停，报码纸要收。
+  telegraph?.Reset("levelChange");
   interact?.Clear();
+  // 机枪位同理：它的世界模型也要拆，不然下一关的同一坐标上会多出一挺枪。
+  emplacement?.Clear();
+  for (const view of emplacementViews.values()) if (view.root) scene.remove(view.root);
+  emplacementViews.clear();
+  debugEmplacedFire = false;
   carryHidGun = false;
   hud?.SetCarry(null);
+  hud?.SetEmplacement(null);
+  hud?.SetTelegraph(null);
   hud?.SetInteractProgress(null);
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
@@ -2466,6 +2663,8 @@ function RespawnPlayer(initial = false) {
   const phase = PHASE_TABLE[state.phaseIndex];
   // 换人上来的是空手的：上一个人抬着的担架留在他倒下的地方，不跟着换的人走。
   carry?.Reset("respawn");
+  // 换人上来的也没在机枪位上：上一个人是趴在枪上死的，枪留在原地等下一个人。
+  emplacement?.Reset("respawn");
   carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
   state.identity = MakeSoldierIdentity(seed);
@@ -2936,6 +3135,8 @@ function OpenMenu() {
   hudRoot.style.display = "none";
   // 同过场：菜单里松手边沿到不了玩法层，按住中的那一下要在这里断掉。
   interact?.CancelHold("menu");
+  emplacement?.SetFire(false);
+  emplacement?.EndClear();
   hud?.SetInteractProgress(null);
   if (viewmodel) viewmodel.root.visible = false;
   ShowBoot(false);
@@ -3170,7 +3371,11 @@ const router = new InputRouter({
     switch (action) {
       case "crouch": input.crouchPressed = true; return;
       case "prone": input.pronePressed = true; return;
-      case "reload": Reload(); return;
+      // 架着机枪时 R 是**拉枪机**：没卡壳就当换弹板，小卡是排障起手（按住继续），
+      // 脚本触发的必然失效则数着拉了几下 —— 拉够了这挺枪就废了（§6 阶段⑩②）。
+      case "reload":
+        if (emplacement?.Mounted) { emplacement.PullBolt(); return; }
+        Reload(); return;
       // V 是 holdAction：按下开始蓄力，松手按蓄了多久决定挥砍还是劈刺。
       // 大刀/投掷物在 BeginMeleeCharge 里直接落回一次性出招（它们不蓄力）。
       case "melee":
@@ -3186,6 +3391,9 @@ const router = new InputRouter({
       case "interact":
         if (detail.down === false) { interact?.Release(); return; }
         if (meleeQte?.TryBeginExecution()) return;
+        // 架着机枪时 F 的语义就只剩「离位」（枪废了就是「弃枪」）。
+        // **离位永远是玩家自己按的这一下** —— 脚本没有替他下枪位的口子。
+        if (emplacement?.Mounted) { emplacement.Vacate("player"); return; }
         // 手上占着东西时，F 的语义就只剩「放下」——不再去查地上有没有枪可捡。
         if (carry?.Active) { carry.Drop("player"); return; }
         DoInteract(); return;
@@ -3448,6 +3656,24 @@ function DoInteract() {
 function UpdateContextualActionPrompts() {
   if (!player?.Alive || meleeQte?.Active) {
     hud.SetActionPrompts([]);
+    return;
+  }
+  // 架着机枪时提示条整段被机枪接管：这会儿能按的就只有扳机、R 和 F。
+  // 留着「上刺刀」「包扎」「换枪」那几条会让玩家去按一个当下没有语义的键。
+  const mounted = emplacement?.View() || null;
+  if (mounted) {
+    const prompts = [];
+    if (mounted.jam) {
+      prompts.push({
+        keys: "R",
+        label: mounted.jam.kind === "fatal" ? "拉枪机" : "按住排障",
+        kind: "reload",
+      });
+    } else if (!mounted.dead && mounted.rounds < mounted.beltRounds && mounted.belts > 0) {
+      prompts.push({ keys: "R", label: "换弹板", kind: "reload" });
+    }
+    prompts.push({ keys: "F", label: mounted.exit, kind: "interact" });
+    hud.SetActionPrompts(prompts);
     return;
   }
   const interaction = interact?.Query(player) || null;
@@ -3728,6 +3954,15 @@ function ConfirmHit(died) {
 
 function TryFire(dt) {
   fireCooldown -= dt;
+  // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
+  // 步枪链整条短路 —— 手上那支枪这会儿背在背上。
+  // `debugEmplacedFire` 是冒烟用的「一直扣着扳机」：真人按住鼠标时 input.fire 每帧
+  // 都是真的，而无头测试里 router.Read 每帧会把它读回 false —— 不留这个口子的话，
+  // 测试只能打出一发（每帧被读回去一次）。
+  if (emplacement?.Mounted) {
+    emplacement.SetFire((!!input.fire || debugEmplacedFire) && player.Alive);
+    return;
+  }
   if (!input.fire || fireCooldown > 0 || !player.Alive) return;
   // 手上占着东西：左键不是开枪，是**把它摔了**（「可扔下快速恢复」那一条）。
   // 挨打的时候玩家去够的键本来就是左键，不该让他先想起来 F 在哪。
@@ -3915,6 +4150,113 @@ function TryFire(dt) {
 }
 
 // ---------------------------------------------------------------------------
+// 架设机枪：把 Script_Emplacement 排好的那一发真的打出去 + 世界模型
+// ---------------------------------------------------------------------------
+const _empFrom = new THREE.Vector3();
+const _empDir = new THREE.Vector3();
+const _empTargets = [];
+/**
+ * 弹道收敛距离。**枪口不在眼位上**：射手趴/蹲在枪后头，枪口比眼睛低半米、前半米。
+ * 平行射出去的话弹着永远比准心低那么多，而本作没有准星可以标注这条偏差。
+ * 所以照玩家步枪那条视差口径的做法收敛：把弹道拉到**准心真正指着的那个点**上
+ * （AimPoint 会先投一条射线，指着墙就收敛在墙上，指着天就收敛在这个距离上）。
+ */
+const EMPLACED_CONVERGE_M = 160;
+
+function FireEmplacedShot(shot) {
+  if (!player || !battlefield) return;
+  _empFrom.set(shot.origin.x, shot.origin.y, shot.origin.z);
+  const aim = AimPoint(EMPLACED_CONVERGE_M);
+  _empDir.set(aim.x - _empFrom.x, aim.y - _empFrom.y, aim.z - _empFrom.z);
+  if (_empDir.lengthSq() < 1e-6) _empDir.set(shot.dir.x, shot.dir.y, shot.dir.z);
+  _empDir.normalize();
+  // 散布：架起来的枪比端着稳得多（Script_Emplacement 的 spreadDeg），
+  // 但仍然要有 —— 一挺打不散的机枪就是一支狙击枪。种子跟着帧号走，可复现。
+  const spread = THREE.MathUtils.degToRad(shot.spreadDeg || 0.3);
+  const rnd = Mulberry32(state.frame * 2654435761 + shot.index);
+  _empDir.applyAxisAngle(_yAxis, (rnd() - 0.5) * spread);
+  _empDir.applyAxisAngle(_xAxis, (rnd() - 0.5) * spread);
+
+  vfx.MuzzleFlash(_empFrom, _empDir, { scale: 1.25, kind: "hmg" });
+  _empTargets.length = 0;
+  for (const s of ai.soldiers) {
+    if (!s.alive || s.side === shot.side) continue;
+    if (s.position.distanceTo(_empFrom) > shot.rangeM + 4) continue;
+    _empTargets.push(s);
+  }
+  // 借玩家步枪那条 MarchBullet：重力、空气阻力、地形与骨骼命中体一条都不少。
+  const weapon = { ...WEAPONS[shot.weaponId], effectiveRangeM: shot.rangeM };
+  const result = MarchBullet(_empFrom, _empDir, weapon, _empTargets);
+  if (result.soldier) {
+    const died = result.soldier.TakeHit(shot.damage, result.part || "torso", _empDir);
+    vfx.Blood(_hitPoint, _empDir, died ? 1 : 0.5);
+    audio.Play("impactFlesh", { position: _hitPoint.clone(), volume: 0.7 });
+    ConfirmHit(died);
+  } else if (result.wall) {
+    const n = new THREE.Vector3(result.wall.normal[0], result.wall.normal[1], result.wall.normal[2]);
+    const surface = SURFACE_BY_TAG[result.wall.box.tag] || "brick";
+    vfx.Impact(_hitPoint, n, surface);
+    audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
+    if (destruction && result.wall.box && result.wall.box.tag !== "dirt") {
+      destruction.Hit(result.wall.box, _hitPoint, shot.damage, { kind: "bullet", normal: n });
+    }
+  }
+  // 机枪**每发都出曳光**（与步枪 1/5 是两条账）：满场只有靠它才读得出
+  // 压制火力从哪个方向来，这也是「封住两侧院门」看得见的那一半。
+  if (shot.tracer) vfx.Tracer(_empFrom, _hitPoint.clone(), { kind: shot.side === "ija" ? "ija" : "nra" });
+}
+
+/**
+ * 机枪位的世界模型。**只有一件事**：把 Model/ 里那挺九二式摆到战位上、跟着射界转。
+ *
+ * 第一人称不另做一套手/枪 rig（低动画量原则）：射手位就在枪后头 0.85 m，
+ * 玩家的相机本来就在这挺枪的正后方 —— 看见的就是这个模型。
+ * 手臂 IK 缺席是**有意**的取舍，记在这里免得下一个 agent 当成漏做。
+ */
+function SyncEmplacementViews() {
+  // 绝大多数关一挺机枪都没有：不早退的话每帧白建一个 List() 数组。
+  if (!emplacement || (emplacement.GunCount === 0 && emplacementViews.size === 0)) return;
+  for (const [id, view] of [...emplacementViews]) {
+    if (emplacement.Emplacement(id)) continue;
+    scene.remove(view.root);
+    emplacementViews.delete(id);
+  }
+  for (const gun of emplacement.List()) {
+    let view = emplacementViews.get(gun.id);
+    if (!view) {
+      // 摆点常常只给 x/z（关卡数据不该背地形高度），y=0 就当没给，问地面要。
+      if (Math.abs(gun.position.y) < 1e-6 && battlefield) {
+        const y = battlefield.GroundHeight(gun.position.x, gun.position.z);
+        gun.position.y = y;
+        gun.seat.y = y;
+      }
+      const meshId = WEAPON_MESH_BY_ID[gun.kind.weaponId];
+      const built = meshId && actorFactory
+        ? actorFactory.ModelInstance(meshId, {
+          steel: library.Get("Steel", { roughness: 0.72, metalness: 0.55 }),
+          wood: library.Get("WoodStock", { roughness: 0.86, metalness: 0 }),
+        }) : null;
+      if (!built) { emplacementViews.set(gun.id, { root: null }); continue; }
+      built.root.name = `Emplacement_${gun.id}`;
+      view = { root: built.root, nodes: built.nodes };
+      scene.add(built.root);
+      emplacementViews.set(gun.id, view);
+    }
+    if (!view.root) continue;
+    view.root.position.set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z);
+    view.root.rotation.set(gun.pitch, gun.yaw, 0, "YXZ");
+  }
+}
+
+/** 玩家在打的时候指向每帧都在变，直接跟着写 —— 比等下一次 Sync 少一帧滞后。 */
+function AimEmplacementView(view) {
+  if (!view) return;
+  const entry = emplacementViews.get(view.id);
+  if (!entry || !entry.root) return;
+  entry.root.rotation.set(view.pitch, view.yaw, 0, "YXZ");
+}
+
+// ---------------------------------------------------------------------------
 // 目标链
 // ---------------------------------------------------------------------------
 /**
@@ -4014,7 +4356,9 @@ function Frame(dt, render = true) {
     profiler.E("streamer");
   }
   // 机队独立于玩法暂停与过场：它是远方连续发生的战场环境，不占用 AI / 物理预算。
-  aircraft?.Update(state.elapsed);
+  // **扫射航线不是**：它归玩法时间（strafe.Update 在下面那段里推），
+  // 所以暂停/过场时 View() 停在原地不动，那一架就钉在航线上不再前进。
+  aircraft?.Update(state.elapsed, strafe?.View() ?? null);
 
   // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
   // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
@@ -4077,6 +4421,12 @@ function Frame(dt, render = true) {
     input.fire = false; input.ads = false;
     input.crouchPressed = false; input.pronePressed = false;
   }
+  // 架着机枪：人钉在射手位上。移动/冲刺/开镜/换姿势一并封掉，**左键留着**
+  // （它这会儿是机枪的扳机）。与白刃 QTE 同一条封法，不另起一套。
+  if (emplacement?.Mounted) {
+    input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
+    input.crouchPressed = false; input.pronePressed = false;
+  }
   fireEdge = input.fire && !firePrev;
   profiler.E("input");
   // 负重必须排在 player.Update **之前**：它写的 carrySpeedScale 就是这一帧
@@ -4085,14 +4435,37 @@ function Frame(dt, render = true) {
   profiler.B("player");
   player.Update(dt, input, WEAPONS[currentWeapon]);
   profiler.E("player");
+  // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
+  // 夹晚一帧画面就会先越界再被拉回来。
+  if (emplacement) {
+    emplacement.SyncNpc(ai.soldiers);
+    // 按住 R 排小卡。R 在键位表里是 press（没有松手边沿），所以按住这件事
+    // 直接问 router 要 —— 比给 R 改成 holdAction 安全：那样 Reload() 会被调两次。
+    if (emplacement.Mounted && router?.Down("KeyR")) emplacement.BeginClear();
+    else emplacement.EndClear();
+    emplacement.Update(dt, player);
+    SyncEmplacementViews();
+    // 「刚下枪位」那一个边沿：把上枪位之前的姿态还回去。用边沿而不是在 Vacate 里做，
+    // 是因为离位有四条路（玩家按 F、人倒了、换关、战位被收掉），一条条挂钩会漏。
+    const mountedNow = emplacement.MountedId;
+    if (mountedIdLast && !mountedNow && seatStanceBefore) {
+      player.stance = seatStanceBefore;
+      seatStanceBefore = null;
+    }
+    mountedIdLast = mountedNow;
+  }
   // 按住型交互反过来要排在 player.Update **之后**：够不够得着要用这一帧的位置，
   // 玩家走开一步进度就该断，而不是在后台接着读条。
   interact?.Update(dt, player);
-  // 负重时收枪（两只手都占着）。**只在边沿写 visible**：过场、菜单、倒地镜头
-  // 三处也在切同一个字段，每帧写会互相盖掉。三者当下正管着枪时这里一律不插手 ——
+  // 发报：码组推进与底噪。排在 interact **之后** —— 那一层这一帧刚可能
+  // 把一组发出去。**什么都不封**：玩家可以边发边走开，进度留着（§7 不夺控制权）。
+  telegraph?.Update(dt, player);
+  // 负重与架设机枪都要收枪（两只手都占着 / 枪背在背上）。**只在边沿写 visible**：
+  // 过场、菜单、倒地镜头三处也在切同一个字段，每帧写会互相盖掉。
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
-  if (viewmodel?.root && carryHidGun !== !!carry?.Blocking) {
-    carryHidGun = !!carry?.Blocking;
+  const handsBusy = !!carry?.Blocking || !!emplacement?.Blocking;
+  if (viewmodel?.root && carryHidGun !== handsBusy) {
+    carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
   }
   input.lookX = 0; input.lookY = 0;
@@ -4233,6 +4606,12 @@ function Frame(dt, render = true) {
   if (state.prevAllies > 0 && alliesNow < state.prevAllies && story) story.Signal("allyDown");
   state.prevAllies = alliesNow;
 
+  // 照明弹：升空→点燃→伞降燃烧→熄灭→暗适应，外加**发现距离倍率**。
+  // **必须排在 ai.Update 之前**：倍率要在这一帧的 Think 之前写进 AiDirector，
+  // 写晚一帧就成了「亮了，但这一帧还没有人看见」。灯与烟由它自己的宿主
+  // 适配器写进 LightRig / VfxSystem，那两个的 Update 都排在后面（见下）。
+  flare?.Update(dt);
+
   profiler.B("ai");
   ai.Update(dt, camera);
   profiler.E("ai");
@@ -4248,6 +4627,10 @@ function Frame(dt, render = true) {
   profiler.E("vfx");
   profiler.B("combat");
   combat.Update(dt, { phase: PHASE_TABLE[state.phaseIndex] });
+  // 日机扫射：弹着线推进、白名单结算、玩家躲避窗口。**必须排在下面那条
+  // 死亡判定之前** —— 它打得倒玩家，排在后面那一类死法会被整帧吞掉
+  // （与手榴弹/掷弹筒同一笔账，见死亡判定那段注释）。
+  strafe?.Update(dt);
   // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
   // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
   if (destruction) destruction.Update(player.position, dt);
@@ -4349,10 +4732,14 @@ function Frame(dt, render = true) {
   // 大刀与手榴弹没有散布可言，给固定小十字，别拿步枪的锥去骗人。
   // 判据是 spreadHipDeg（只有枪才有），不是 magazine —— 手榴弹的 magazine 是
   // "身上还剩几颗"，拿它当"这是一把枪"会让攥着弹的时候画出一个 3° 的假锥。
-  const firearm = Number(weapon?.spreadHipDeg) > 0;
-  const spreadDeg = firearm ? player.SpreadDeg(weapon) : 0;
+  // 架着机枪时准心画的是**机枪**的散布锥（Script_Emplacement 的 spreadDeg），
+  // 不是背上那支步枪的 —— 拿步枪的锥去骗人比不画还差。
+  const empView = emplacement?.View() || null;
+  const firearm = empView ? true : Number(weapon?.spreadHipDeg) > 0;
+  const spreadDeg = empView ? empView.spreadDeg : (firearm ? player.SpreadDeg(weapon) : 0);
   hud.SetCrosshair({
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
+    // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
     visible: DIFFICULTY.showCrosshair !== false && player.Alive
       && !state.ordersOpen && !state.cutscene && !meleeQte?.Active && !carry?.Blocking,
     spreadDeg,
@@ -4379,6 +4766,10 @@ function Frame(dt, render = true) {
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   hud.SetInteractProgress(interact?.View() || null);
   hud.SetCarry(carry?.View() || null);
+  // 架设机枪面板（热条 / 弹药 / 卡壳 / 退出提示）。同样只读脱敏快照。
+  hud.SetEmplacement(empView);
+  // 报码纸（终章亲手发报）。同样只读脱敏快照。
+  hud.SetTelegraph(telegraph?.View() || null);
   // 受伤反馈三层（底噪 / 红闪 / 濒死搏动）＋ 来弹方位，见 Hud.SetHurt。
   // 这里原来是一行 `SetDamage(Clamp01(1 - health/70) * 0.62)` ——
   // 满血挨一发三八式（当时 39.6 点）之后暗角只有 0.088 × 边缘 0.52 ≈ 看不见，
