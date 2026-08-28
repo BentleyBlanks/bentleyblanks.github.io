@@ -52,6 +52,21 @@ const SUBJECTS = {
       });
     }`,
   },
+  // 1b · 参考图那栋民居的**尺寸**：进深约 4 m、檐高约 3.2 m 的小高房。
+  //      与上面那栋游戏里在用的三开间正房（进深 5.4 / 檐高 2.6 / 面阔 10.2）
+  //      不是一个体量 —— 10 米长的正房再怎么调屋面也变不成 4 米见方的小屋。
+  //      两个都摆在台上，形制对不对与尺寸对不对才分得开。
+  DwellingSmall: {
+    note: "城内民居（参考图尺寸：小高房）",
+    build: `(W, sink) => {
+      const eave = 3.15, depth = 4.2, width = 5.6;
+      const ridge = eave + depth * 0.5 * Math.tan(34 * Math.PI / 180);
+      W.AddRoomBlock(sink, {
+        x: 0, z: 0, ry: Math.PI / 2, width, depth, eaveY: eave, ridgeY: ridge,
+        seed: "bench:dwsmall", damage: 0, burnt: false, facing: -1, bays: 2,
+      });
+    }`,
+  },
   // 2 · 城楼：参考图「日寇攻占的滕县城楼」。只拍城楼本体，不带城台与券洞
   //     （城台是 AddGateComplex 的事，混在一起就看不清楼身比例）。
   GateTower: {

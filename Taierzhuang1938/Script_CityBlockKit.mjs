@@ -81,7 +81,7 @@ import { AddYardWallRing, MakeYardFrame } from "./Script_YardWall.mjs";
 
 const DEG = Math.PI / 180;
 /** 硬山坡度 26°—29°。 */
-const PITCH_RAD = 27.5 * DEG;
+const PITCH_RAD = 34 * DEG;   // 27.5° 的屋面在正交立面上偏扁，参考图更陡
 /** 脊高 = 檐口 + 半进深 × tan(27.5°)。 */
 const PITCH = Math.tan(PITCH_RAD);
 
