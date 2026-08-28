@@ -504,8 +504,17 @@ export function AddGableTrim(sink, {
     for (const s of [-1, 1]) {
       if (copeCut > 0.05 && s > 0) continue;
       pieces.push(Sweep(s));
-      // 檐口那一头的挑头：参考图里两端各有这么一坨向外的收头。
+      // 檐口那一头的挑头 + **墀头**。
+      // 参考图里这块收头不是悬空的：它坐在一段自墙面逐皮外挑的砖上（墀头），
+      // 三皮砖一皮比一皮出挑，把收头接回墙身。没有墀头，收头在正交立面上就是
+      // 一块飘在墙角外的砖 —— 我的前一版正是这样。
       const zT = s * hd * 1.045, yT = Top(s * hd);
+      for (let k = 0; k < 3; k += 1) {
+        pieces.push(PlaceGeometry(
+          MakeBox(wallThickness + 0.03 + 0.05 * k, 0.13, 0.26 + 0.09 * k,
+            TILE_METERS.brick, `${seed}:chitou${s}${k}`),
+          { y: yT - 0.07 - 0.13 * (2 - k), z: s * hd + s * 0.03 * k }));
+      }
       pieces.push(PlaceGeometry(
         MakeBox(copeW + 0.14, copeH * 1.25, 0.30, TILE_METERS.roof, `${seed}:copeEnd${s}`),
         { y: yT + copeH * 0.6, z: zT + s * 0.06 }));
@@ -547,6 +556,7 @@ export function AddGableTrim(sink, {
 export function AddHardMountainRoof(sink, {
   x, z, width, depth, eaveY, ridgeY, ry = 0, seed = "r", ruined = false, burnt = false,
   rafters = true, baseY = 0, overhang = 0.45, gableDepth = null, copeScale = 1,
+  gableVent = true,
 }) {
   // gableDepth：山墙只砌这么深，默认与屋面同深。门房那一类「屋面挑出去盖住
   // 敞口前廊、廊两侧是通透的」的形制，山墙**不能**跟着屋面一路包到前檐 ——
@@ -610,6 +620,11 @@ export function AddHardMountainRoof(sink, {
               sampler.YAt(u, lx) + 0.10,
               z - Math.sin(ry) * lx + Math.cos(ry) * zz];
           };
+          // 檐口瓦头（滴水）：参考图檐口下缘是一排小圆头，不是一条光边。
+          const tip = At(1);
+          sink.Add(tileMat, PlaceGeometry(
+            MakeBox(0.115, 0.10, 0.13, TILE_METERS.roof, `${seed}:瓦头${side}${i}`),
+            { x: tip[0], y: tip[1] - 0.035, z: tip[2], ry }));
           for (let k = 0; k < 2; k += 1) {
             const a = At(k / 2), b = At((k + 1) / 2);
             sink.Add(tileMat, PlaceGeometry(
@@ -672,7 +687,7 @@ export function AddHardMountainRoof(sink, {
       topAt: gTop, copeScale,
       // 前廊那一头山墙被切掉了，压边也跟着只铺剩下的那一坡。
       copeCut: cut > 0.05 ? cut : 0,
-      wallThickness: 0.30, vent: !ruined,
+      wallThickness: 0.30, vent: gableVent && !ruined,
       copingMaterial: burnt ? "BrickWallSooty" : "RoofTile",
       plinthMaterial: "CrossStone",
     });
@@ -1189,8 +1204,10 @@ export function AddPierPorchHouse(sink, {
     // 山墙只砌主体那一段，前廊两侧敞着 —— 参考图侧视图里那根砖墩是独立站在
     // 山墙之外的，山墙若跟着屋面包过去，前廊就变成了封闭房间。
     gableDepth: depth,
-    // 这一形制的山墙压边比民居细得多（参考三视图侧视图里只是一道薄边）。
+    // 这一形制的山墙压边比民居细得多（参考三视图侧视图里只是一道薄边），
+    // 而且**没有圆气孔** —— 铺房那张参考图的山墙是素的，气孔是民居的做法。
     copeScale: 0.62,
+    gableVent: false,
   });
   return { ridgeY, eaveY };
 }
