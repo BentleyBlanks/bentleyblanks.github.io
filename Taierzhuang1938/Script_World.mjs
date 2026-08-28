@@ -237,6 +237,72 @@ export function SolidWithOpenings(sink, {
 }
 
 /**
+ * 硬山山墙的墙体本身：一片**五边形棱柱**（下方矩形 + 上方三角山尖）。
+ *
+ * 取代原来「若干段等宽方盒逼近三角形」的做法。那一版在正交侧视图上就是一排
+ * 台阶：段数再多也只是把台阶变细，而山尖附近每段的高度差最大，恰恰是最显眼的
+ * 地方。搏风带能压住一部分，压不住的仍从压边上沿冒出来。
+ *
+ * 局部系：厚度沿 x（±thickness/2），进深沿 z（±depth/2），y 向上。
+ * UV 一律取 (z, y)/tile —— 山墙是薄片，侧面窄到看不出拉伸，砖缝尺度与
+ * 同场景其它砖墙一致（这是 Script_Geo 那条「全场砖缝一样大」的口径）。
+ */
+export function MakeGablePrism(depth, baseY, eaveY, ridgeY, thickness, tile, seed = "gp",
+  zMin = null, zMax = null) {
+  const hd = depth / 2, ht = thickness / 2;
+  // zMin/zMax：只砌这一段 z。默认整片（−hd…+hd）。
+  //
+  // 门房那一类「屋面挑出去盖住敞口前廊」的形制要从前檐那头切掉一截，而**切**
+  // 和**整体平移**不是一回事：平移会把山尖挪到正脊底下之外，山墙于是从屋面里
+  // 斜插出来。切法保持顶边始终贴着同一条屋面剖面 —— 山尖若被切掉，剩下的就是
+  // 一段单斜边，这也正是真实做法（前廊那头山墙到此为止，屋面继续挑出去）。
+  const z0 = Math.max(-hd, zMin === null ? -hd : zMin);
+  const z1 = Math.min(hd, zMax === null ? hd : zMax);
+  const TopAt = (z) => eaveY + (ridgeY - eaveY) * (1 - Math.abs(z) / hd);
+  const outline = [[z0, baseY], [z1, baseY]];
+  outline.push([z1, TopAt(z1)]);
+  if (z0 < 0 && z1 > 0) outline.push([0, ridgeY]);   // 山尖还在这一段里
+  outline.push([z0, TopAt(z0)]);
+  const pos = [], uv = [], nrm = [];
+  const jitter = (HashString(seed) % 97) / 97 * 0.31;      // 与邻墙错开砖缝起点
+  const U = (z, y) => [z / tile + jitter, y / tile + jitter];
+  const Tri = (a, b, c, n) => {
+    for (const p of [a, b, c]) {
+      pos.push(p[0], p[1], p[2]);
+      const t = U(p[2], p[1]);
+      uv.push(t[0], t[1]);
+      nrm.push(n[0], n[1], n[2]);
+    }
+  };
+  // 两片五边形端面（扇形三角化；五边形是凸的，扇形没问题）
+  for (const side of [1, -1]) {
+    const x = side * ht;
+    for (let i = 1; i < outline.length - 1; i += 1) {
+      const a = [x, outline[0][1], outline[0][0]];
+      const b = [x, outline[i][1], outline[i][0]];
+      const c = [x, outline[i + 1][1], outline[i + 1][0]];
+      if (side > 0) Tri(a, b, c, [1, 0, 0]);
+      else Tri(a, c, b, [-1, 0, 0]);
+    }
+  }
+  // 五条侧棱面（底、两竖边、两斜坡）
+  for (let i = 0; i < outline.length; i += 1) {
+    const p0 = outline[i], p1 = outline[(i + 1) % outline.length];
+    const dz = p1[0] - p0[0], dy = p1[1] - p0[1];
+    const len = Math.hypot(dz, dy) || 1;
+    const n = [0, dz / len, -dy / len];
+    const a = [ht, p0[1], p0[0]], b = [ht, p1[1], p1[0]];
+    const c = [-ht, p1[1], p1[0]], d = [-ht, p0[1], p0[0]];
+    Tri(a, b, c, n); Tri(a, c, d, n);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3));
+  return g;
+}
+
+/**
  * 硬山山墙的三件饰件：**搏风带 + 山尖圆气孔 + 条石碱脚**。
  *
  * 为什么单独拆出来：山墙本体（城内 `AddHardMountainRoof`、城外
@@ -260,8 +326,10 @@ export function AddGableTrim(sink, {
   x, z, ry = 0, depth, eaveY, ridgeY, seed = "gt",
   copingMaterial = "RoofTile", plinthMaterial = "DryStone", ventMaterial = "WoodDoor",
   wallThickness = 0.30, coping = true, vent = true, plinth = true,
-  baseY = 0, far = false,
+  baseY = 0, far = false, copeCut = 0,
 }) {
+  // copeCut：山墙被切掉的那一截（前廊那一头）。压边只铺山墙还在的部分，
+  // 碱脚同理 —— 否则会有一条压边悬在敞口前廊的空气里。
   const rise = Math.max(0.05, ridgeY - eaveY);
   const halfDepth = depth / 2;
   const angle = Math.atan2(rise, halfDepth);
@@ -273,11 +341,19 @@ export function AddGableTrim(sink, {
 
   if (coping) {
     for (const s of [-1, 1]) {
+      // 被切掉那一坡（局部 z 正那一端 = 前廊那头）整条不铺。
+      if (copeCut > 0.05 && s > 0) continue;
       // 沿坡的一条：中点在半坡处，绕局部 x 轴倾斜。两端各留 0.12 m 出头 ——
       // 檐口那头压过檐、脊那头在正脊下交汇，不留断口。
+      //
+      // rx 的符号是 **+s*angle，不是 −s*angle**。抄 AddHardMountainRoof 里坡面那一行
+      // 会得到反的：那一行的 cz 是「局部 z 取负」之后的世界偏移（见该函数内
+      // `z - cos(ry)*cz`），而这里的 pieces 是先在真正的局部系里摆好再整组转 ry。
+      // 反了的样子在实机截图里看不出来（屋面把它压住了），正交侧视图上是**两根
+      // 斜杠交叉成 X、戳出屋面老远，山尖底下多一个 V**。
       pieces.push(PlaceGeometry(
         MakeBox(copeW, copeH, slopeLen + 0.24, TILE_METERS.roof, `${seed}:cope${s}`),
-        { y: eaveY + rise / 2, z: s * (halfDepth / 2), rx: -s * angle }));
+        { y: eaveY + rise / 2, z: s * (halfDepth / 2), rx: s * angle }));
     }
     // 脊端那颗压头：两条坡沿在山尖交汇处的一小块，避免两根斜盒子对顶出尖角。
     pieces.push(PlaceGeometry(
@@ -301,9 +377,14 @@ export function AddGableTrim(sink, {
   // 条石碱脚：墙脚一圈浅色过墙石。照片里它是山墙上明度最高的一条，
   // 也是「这堵墙站在地上」的唯一交代。
   if (plinth) {
+    // 剩下那一段的中心在局部 z = −copeCut/2，标准旋转后是世界 (−sin, −cos)·(cut/2)。
+    const pd = Math.max(0.2, depth - copeCut);
     sink.Add(plinthMaterial, PlaceGeometry(
-      MakeBox(wallThickness + 0.08, 0.42, depth + 0.1, TILE_METERS.stone, `${seed}:plinth`),
-      { x, y: baseY + 0.21, z, ry }));
+      MakeBox(wallThickness + 0.08, 0.42, pd + 0.1, TILE_METERS.stone, `${seed}:plinth`),
+      {
+        x: x - Math.sin(ry) * (copeCut / 2), y: baseY + 0.21,
+        z: z - Math.cos(ry) * (copeCut / 2), ry,
+      }));
   }
 }
 
@@ -313,22 +394,37 @@ export function AddGableTrim(sink, {
  */
 export function AddHardMountainRoof(sink, {
   x, z, width, depth, eaveY, ridgeY, ry = 0, seed = "r", ruined = false, burnt = false,
-  rafters = true, baseY = 0,
+  rafters = true, baseY = 0, overhang = 0.45, gableDepth = null,
 }) {
+  // gableDepth：山墙只砌这么深，默认与屋面同深。门房那一类「屋面挑出去盖住
+  // 敞口前廊、廊两侧是通透的」的形制，山墙**不能**跟着屋面一路包到前檐 ——
+  // 包过去前廊就成了封闭房间，参考图里那根独立砖墩也就无处可站。
   // baseY：山墙从哪一层砌起。坡面与正脊本来就吃绝对的 eaveY/ridgeY，只有山墙
   // 是「从 0 一路砌到山尖」的整块——放到城墙顶上时它会一直垂到地面。
+  //
+  // overhang 从写死改成参数：门房那一类「深挑檐落在砖墩上」的形制，出檐是它
+  // 最强的识别特征，0.45 m 撑不起来。
+  //
+  // 屋面厚度：0.12 m 的瓦板在正交立面上只是一条线，屋面读不出厚度。加厚到 0.26。
+  // **不要改回「檐口挂一条竖直封边板」那个做法** —— 试过，ColliderTest 直接红：
+  // 那是一块竖直的、檐口高度的、没有碰撞体的板，正中「看得见的墙、摸不着」。
+  // 屋面坡板同样没有碰撞却不报，因为它是斜面；判据看的是竖面。
   const rise = ridgeY - eaveY;
   const halfDepth = depth / 2;
   const slopeLen = Math.hypot(halfDepth, rise);
   const angle = Math.atan2(rise, halfDepth);
-  const overhang = 0.45;
   const tileMat = burnt ? "BrickWallSooty" : "RoofTile";
 
   if (!ruined) {
     for (const s of [-1, 1]) {
-      const g = MakeBox(width + overhang * 2, 0.12, slopeLen + overhang, TILE_METERS.roof, `${seed}:s${s}`);
-      const cy = eaveY + rise / 2;
-      const cz = s * (halfDepth / 2);
+      const g = MakeBox(width + overhang * 2, 0.26, slopeLen + overhang, TILE_METERS.roof, `${seed}:s${s}`);
+      // 盒子中心必须落在**「正脊 → 檐口外缘」整条斜线**的中点，而不是
+      // (eaveY+rise/2, halfDepth/2) —— 后者是「脊到檐口」的中点，没算出檐那一截。
+      // 出檐 0.45 时错开约 0.1 m 看不出来；参数化到 0.72 之后，屋面就短一截、
+      // 吊在檐口上方，正交立面上是屋面与封边板之间一道白缝。
+      const runLen = slopeLen + overhang;
+      const cy = ridgeY - (runLen / 2) * Math.sin(angle);
+      const cz = s * (runLen / 2) * Math.cos(angle);
       sink.Add(tileMat, PlaceGeometry(g, {
         x: x + Math.cos(ry) * 0 - Math.sin(ry) * cz,
         y: cy,
@@ -371,21 +467,19 @@ export function AddHardMountainRoof(sink, {
     }
   }
 
-  // 山墙：硬山的两端墙体高出屋面，这是"硬山"二字的由来
+  // 山墙：硬山的两端墙体高出屋面，这是"硬山"二字的由来。
+  // 一整片五边形棱柱，不再拿方盒堆台阶（见 MakeGablePrism 头注）。
   for (const s of [-1, 1]) {
-    const gable = [];
-    const steps = 6;
-    for (let i = 0; i < steps; i += 1) {
-      const t0 = i / steps, t1 = (i + 1) / steps;
-      const zc = (t0 + t1) * 0.5;
-      const topY = eaveY + rise * (1 - Math.abs(zc * 2 - 1)) * 0 + rise * (1 - Math.abs((t0 + t1) - 1));
-      const hh = Math.max(0.12, topY - baseY);
-      const segD = depth / steps;
-      gable.push(PlaceGeometry(
-        MakeBox(0.30, hh, segD, TILE_METERS.brick, `${seed}:g${s}${i}`),
-        { x: 0, y: baseY + hh / 2, z: -depth / 2 + segD * (i + 0.5) }));
-    }
-    const merged = MergeGeometries(gable);
+    const gd = Math.min(depth, gableDepth || depth);
+    // 山墙比屋面浅时，它靠**后**对齐（前廊那一头让开）：局部 z 取负是「朝前」，
+    // 所以山墙中心要往 −z 之外、也就是世界侧的 +cos(ry) 方向挪半个差值。
+    // 前廊那一头把山墙切掉 cut 米。
+    // **注意别跟着坡面盒那套走**：坡面盒用的是内部的负号映射 (−sin·cz, −cos·cz)，
+    // 而山墙棱柱是整片只吃一次 ry 的标准旋转，它的局部 +z 就是调用方的 +z ——
+    // 也就是前廊那一头。所以切的是 **zMax**。
+    const cut = depth - gd;
+    const merged = MakeGablePrism(depth, baseY, eaveY, ridgeY, 0.30,
+      TILE_METERS.brick, `${seed}:g${s}`, -depth / 2, depth / 2 - cut);
     const gx = s * (width / 2 + 0.15);
     const gwx = x + Math.cos(ry) * gx;
     const gwz = z - Math.sin(ry) * gx;
@@ -396,6 +490,8 @@ export function AddHardMountainRoof(sink, {
     // 但不给它气孔 —— 山墙已经缺了口，再穿一个圆洞就成筛子了。
     AddGableTrim(sink, {
       x: gwx, z: gwz, ry, depth, eaveY, ridgeY, baseY, seed: `${seed}:gt${s}`,
+      // 前廊那一头山墙被切掉了，压边也跟着只铺剩下的那一坡。
+      copeCut: cut > 0.05 ? cut : 0,
       wallThickness: 0.30, vent: !ruined,
       copingMaterial: burnt ? "BrickWallSooty" : "RoofTile",
       plinthMaterial: "CrossStone",
@@ -833,16 +929,31 @@ export function AddPierPorchHouse(sink, {
       MakeBox(0.74, 0.14, 0.74, TILE_METERS.stone, `${seed}:pierCap${s}`),
       { x: p.x, y: baseY + bodyH + 0.07, z: p.z, ry }));
   }
-  // 墩间的额枋：一根通长木梁把两墩连起来，檐口的重量由它转到墩上。
+  // 墩间的额枋：一根木梁把两墩连起来，檐口的重量由它转到墩上。
+  // **只跨在两墩之间**，不通到山墙外 —— 旧版是一根通宽大木板横在檐下，正交
+  // 正视图上像给房子系了条腰带，参考图那里是一根收在墩内的梁。
+  const beamSpan = pierSide * 2 + 0.62;
   const beam = L(0, pierZ);
   sink.Add("WoodBeam", PlaceGeometry(
-    MakeBox(width, 0.26, 0.30, TILE_METERS.wood, `${seed}:archi`),
-    { x: beam.x, y: baseY + bodyH + 0.21, z: beam.z, ry }));
+    MakeBox(beamSpan, 0.24, 0.28, TILE_METERS.wood, `${seed}:archi`),
+    { x: beam.x, y: baseY + bodyH + 0.20, z: beam.z, ry }));
+  // 墩顶斗块：额枋与檐口之间的一对方块。参考图正视图里，墩头到檐口不是一刀切，
+  // 中间垫着一层比墩窄、比枋厚的墩子，出檐才「有东西托着」。
+  for (const s of [-1, 1]) {
+    const p = L(s * pierSide, pierZ);
+    sink.Add("WoodBeam", PlaceGeometry(
+      MakeBox(0.46, 0.24, 0.46, TILE_METERS.wood, `${seed}:dou${s}`),
+      { x: p.x, y: baseY + bodyH + 0.44, z: p.z, ry }));
+  }
 
-  // --- 正面：门洞两侧各一段短墙 + 门楣，门洞净宽 1.5 m ---
-  const openW = Math.min(1.6, width - 1.4);
+  // --- 正面：门洞占满两墩之间 ---
+  //
+  // 旧版门洞净宽写死 1.6 m，于是 4.4 m 面阔的门房正视图变成「一大片砖墙中间
+  // 开个小门」，而参考图是 **墩 ｜ 大门洞 ｜ 墩**：两墩之间几乎全是洞，车马从
+  // 中间过。这一形制的门房本来就是过道，不是住人的屋子。
+  const openW = Math.max(1.4, width - 1.0);
   const segLen = (width - openW) / 2;
-  const doorH = 2.15;
+  const doorH = Math.max(2.15, bodyH - 0.45);
   if (segLen > 0.12) {
     for (const s of [-1, 1]) {
       Slab(L(s * (openW / 2 + segLen / 2), depth / 2), segLen,
@@ -851,14 +962,16 @@ export function AddPierPorchHouse(sink, {
   }
   const head = L(0, depth / 2);
   sink.Add("WoodBeam", PlaceGeometry(
-    MakeBox(openW + 0.5, 0.22, t + 0.06, TILE_METERS.wood, `${seed}:lintel`),
-    { x: head.x, y: baseY + doorH + 0.11, z: head.z, ry }));
-  const overH = Math.max(0.1, bodyH - doorH - 0.22);
-  sink.Add(wallMat, PlaceGeometry(
-    MakeBox(openW, overH, t, TILE_METERS.brick, `${seed}:overDoor`, BRICK_UV_GRID),
-    { x: head.x, y: baseY + doorH + 0.22 + overH / 2, z: head.z, ry }));
-  sink.Solid(head.x, baseY + doorH + 0.22 + overH / 2, head.z,
-    openW / 2, overH / 2, t / 2, tag, ry);
+    MakeBox(openW + 0.4, 0.24, t + 0.06, TILE_METERS.wood, `${seed}:lintel`),
+    { x: head.x, y: baseY + doorH + 0.12, z: head.z, ry }));
+  const overH = Math.max(0.08, bodyH - doorH - 0.24);
+  if (overH > 0.1) {
+    sink.Add(wallMat, PlaceGeometry(
+      MakeBox(openW, overH, t, TILE_METERS.brick, `${seed}:overDoor`, BRICK_UV_GRID),
+      { x: head.x, y: baseY + doorH + 0.24 + overH / 2, z: head.z, ry }));
+    sink.Solid(head.x, baseY + doorH + 0.24 + overH / 2, head.z,
+      openW / 2, overH / 2, t / 2, tag, ry);
+  }
   // 门道的里子。**要转 180°**：AddDoorReveal 把墁地往它自己的 +lz 铺（「朝里」），
   // 而这里的门开在 +lz 那一面，朝里是 −lz。不转的话门槛石和墁地会铺到门外的檐下。
   // 门槛与墁地都吃绝对 y（0.07 / −0.01），所以只在落地时装 —— 摆到城墙顶上时
@@ -884,6 +997,12 @@ export function AddPierPorchHouse(sink, {
     x: roofCenter.x, z: roofCenter.z, width, depth: roofDepth,
     eaveY, ridgeY, ry, baseY, seed: `${seed}:roof`,
     ruined: damage > 0.7, burnt, rafters: true,
+    // 深挑檐是这一形制的命根子：檐口要越过砖墩挑出去，正面才读成「墩托着一片
+    // 大屋檐」而不是「墙上盖了块板」。0.45 m 的通用出檐在这里明显不够。
+    overhang: 0.72,
+    // 山墙只砌主体那一段，前廊两侧敞着 —— 参考图侧视图里那根砖墩是独立站在
+    // 山墙之外的，山墙若跟着屋面包过去，前廊就变成了封闭房间。
+    gableDepth: depth,
   });
   return { ridgeY, eaveY };
 }
@@ -2428,7 +2547,7 @@ export function AddSandbagEmplacement(sink, {
  * 角部单独抬高一点，保留「翘厦」的剪影，但不夸张成影视城飞檐。
  */
 function MakeGateRoofShell(width, depth, {
-  eaveOut = 1.6, rise = 1.55, cornerLift = 0.26, thickness = 0.14,
+  eaveOut = 1.6, rise = 1.55, cornerLift = 0.95, thickness = 0.14,
   tile = TILE_METERS.roof, seed = "gateRoof",
 } = {}) {
   const halfW = width / 2 + eaveOut;
@@ -2452,17 +2571,33 @@ function MakeGateRoofShell(width, depth, {
     for (let i = 1; i < points.length - 1; i += 1) PushTriangle(points[0], points[i], points[i + 1]);
   };
 
+  // --- 歇山，不是四坡 ---
+  //
+  // 旧版两端直接从檐口三角收到正脊端点，那是**庑殿（四坡）**。参考三视图与
+  // 1938 年那张照片都是歇山：正脊两端下方先是一小片竖直的山花，山花底下才继续
+  // 是撒头那一坡。少了这一块，侧立面读成四坡攒尖，「重檐歇山」只剩「重檐」。
+  //
+  // hipTop 是撒头的顶边高度；zg 取 halfD*(1−hipTop/rise) 不是随手拍的：主坡在
+  // x=±ridgeHalf 处的侧边就是 z = halfD*(1−y/rise) 这条线，把山花底角**摁在这条
+  // 线上**，山花的两条上边就正好与主坡侧边重合 —— 不留缝，也不用再补过渡面。
+  const hipTop = rise * 0.45;
+  const zg = halfD * (1 - hipTop / rise);
   const frontFaces = [
-    [P(-halfW, EaveY(-halfW), halfD), P(-ridgeHalf, 0, halfD), P(-ridgeHalf, rise, 0)],
+    [P(-halfW, EaveY(-halfW), halfD), P(-ridgeHalf, 0, halfD), P(-ridgeHalf, hipTop, zg)],
     [P(-ridgeHalf, 0, halfD), P(0, 0, halfD), P(0, rise, 0), P(-ridgeHalf, rise, 0)],
     [P(0, 0, halfD), P(ridgeHalf, 0, halfD), P(ridgeHalf, rise, 0), P(0, rise, 0)],
-    [P(ridgeHalf, 0, halfD), P(halfW, EaveY(halfW), halfD), P(ridgeHalf, rise, 0)],
+    [P(ridgeHalf, 0, halfD), P(halfW, EaveY(halfW), halfD), P(ridgeHalf, hipTop, zg)],
   ];
+  // 撒头：两端从檐口两角升到山花底边（四边形，不再收成一个点）。
+  // 山花本身**不并进这张壳** —— 它是木板不是瓦面，由 AddGateTower 用木材质单独
+  // 贴一片填这个洞；并进来会被当成瓦，也会跟木板打 z-fighting。
   const topFaces = [
     ...frontFaces,
     ...frontFaces.map((face) => face.map((p) => P(p[0], p[1], -p[2])).reverse()),
-    [P(halfW, EaveY(halfW), halfD), P(halfW, EaveY(halfW), -halfD), P(ridgeHalf, rise, 0)],
-    [P(-halfW, EaveY(-halfW), -halfD), P(-halfW, EaveY(-halfW), halfD), P(-ridgeHalf, rise, 0)],
+    [P(halfW, EaveY(halfW), halfD), P(halfW, EaveY(halfW), -halfD),
+      P(ridgeHalf, hipTop, -zg), P(ridgeHalf, hipTop, zg)],
+    [P(-halfW, EaveY(-halfW), -halfD), P(-halfW, EaveY(-halfW), halfD),
+      P(-ridgeHalf, hipTop, zg), P(-ridgeHalf, hipTop, -zg)],
   ];
   for (const face of topFaces) PushFace(face);
 
@@ -2498,7 +2633,7 @@ function MakeGateRoofShell(width, depth, {
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  geometry.userData.gateRoof = { halfW, halfD, ridgeHalf, rise, cornerLift };
+  geometry.userData.gateRoof = { halfW, halfD, ridgeHalf, rise, cornerLift, hipTop, zg };
   return geometry;
 }
 
@@ -2528,7 +2663,7 @@ function MakeBeamBetween(a, b, thickness, tile, seed) {
 export function AddGateTower(sink, {
   x, z, ry = 0, baseY = 0, seed = "gateTower",
   terraceW = 17, terraceD = 11, terraceH = 0.45,
-  bodyW = 11.4, bodyD = 7.2, columnH = 4.4, upperH = 3.0, eaveOut = 1.6,
+  bodyW = 11.4, bodyD = 7.2, columnH = 4.4, upperH = 3.0, eaveOut = 2.1,
 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
@@ -2618,17 +2753,20 @@ export function AddGateTower(sink, {
     MakeBox(bodyW + 1.0, 0.34, bodyD + 1.0, TILE_METERS.stone, `${seed}:base`),
     { x, y: deck + 0.17, z, ry }));
   const floor = deck + 0.34;      // 0.34 m 一级，压在 0.56 m 抬腿线以下，走得上去
-  for (let cx = 0; cx < 4; cx += 1) {
+  // 下层柱列：一排 8 根，不是 4 根。参考三视图的下层是一道**密柱廊**（十来根
+  // 细柱贴着墙前站成一排），4 根粗柱读出来是亭子的四角，不是城楼的檐廊。
+  const LOWER_COLS = 8;
+  for (let cx = 0; cx < LOWER_COLS; cx += 1) {
     for (let cz = 0; cz < 2; cz += 1) {
-      const lx = -bodyW / 2 + (bodyW * cx) / 3;
+      const lx = -bodyW / 2 + (bodyW * cx) / (LOWER_COLS - 1);
       const lz = -bodyD / 2 + bodyD * cz;
       const p = L(lx, lz);
       sink.Add("GatePaintRed", PlaceGeometry(
-        new THREE.CylinderGeometry(0.18, 0.215, columnH, 12),
+        new THREE.CylinderGeometry(0.15, 0.18, columnH, 12),
         { x: p.x, y: floor + columnH / 2, z: p.z, ry }));
       sink.Add("Ashlar", PlaceGeometry(
-        new THREE.CylinderGeometry(0.29, 0.34, 0.22, 12),
-        { x: p.x, y: floor + 0.11, z: p.z, ry }));
+        new THREE.CylinderGeometry(0.25, 0.29, 0.20, 12),
+        { x: p.x, y: floor + 0.10, z: p.z, ry }));
     }
   }
   // 额枋（彩画那一条）：褪色的青绿 + 一条红
@@ -2645,23 +2783,51 @@ export function AddGateTower(sink, {
       MakeBox(0.3, 0.42, bodyD + 0.5, TILE_METERS.wood, `${seed}:arcx${s}`),
       { x: q.x, y: floor + columnH - 0.3, z: q.z, ry }));
   }
-  // 下层槛墙：只砌半人高，上面是敞的（亭阁，不是碉楼）。
-  // 与墙垂直的那两面各留一个门洞：墙顶走道从楼里穿过去。
+  // 下层：**柱廊背后一道通高实砖墙，明间开门**。
+  // 旧版只砌半人高槛墙、上面全是格扇，正交立面与参考三视图并排一比，下层读成
+  // 一圈通透的敞廊；参考图（与 1938 年那张照片）的下层是实砖墙，柱子贴在墙前
+  // 站成一排，只有明间一个门洞。城楼是要守的，不是观景亭。
+  //
+  // 与墙垂直的那两面仍各留门洞：墙顶走道从楼里穿过去，这条通行性不许动。
+  const LOWER_DOOR_W = 2.4;
+  const lowerWallH = columnH - 0.30;
   for (const s of [-1, 1]) {
-    const p = L(0, s * (bodyD / 2 - 0.05));
+    const segLen = (bodyW - LOWER_DOOR_W) / 2;
+    for (const half of [-1, 1]) {
+      const p = L(half * (LOWER_DOOR_W / 2 + segLen / 2), s * (bodyD / 2 - 0.05));
+      sink.Add("GateBrick", PlaceGeometry(
+        MakeBox(segLen, lowerWallH, 0.28, TILE_METERS.brick,
+          `${seed}:lw${s}${half}`, BRICK_UV_GRID),
+        { x: p.x, y: floor + lowerWallH / 2, z: p.z, ry }));
+      sink.Solid(p.x, floor + lowerWallH / 2, p.z, segLen / 2, lowerWallH / 2, 0.2, "tower", ry);
+    }
+    // 明间门楣以上仍是墙
+    const headP = L(0, s * (bodyD / 2 - 0.05));
+    const headH = Math.max(0.2, lowerWallH - 2.35);
     sink.Add("GateBrick", PlaceGeometry(
-      MakeBox(bodyW, 1.15, 0.28, TILE_METERS.brick, `${seed}:sill${s}`, BRICK_UV_GRID),
-      { x: p.x, y: floor + 0.58, z: p.z, ry }));
-    sink.Solid(p.x, floor + 0.58, p.z, bodyW / 2, 0.58, 0.2, "tower", ry);
+      MakeBox(LOWER_DOOR_W, headH, 0.28, TILE_METERS.brick,
+        `${seed}:lwHead${s}`, BRICK_UV_GRID),
+      { x: headP.x, y: floor + 2.35 + headH / 2, z: headP.z, ry }));
+    // 与城墙垂直的那两面同样砌到通高，只在 walkGap 处让开墙顶走道。
+    // 这两面若还留半人高槛墙，屋面抬高之后侧立面下层就空出一大片，
+    // 整座楼读成「四根柱子顶着两层屋顶」。
     for (const half of [-1, 1]) {
       const segLen = bodyD / 2 - walkGap;
       if (segLen < 0.4) continue;
       const q = L(s * (bodyW / 2 - 0.05), half * (walkGap + segLen / 2));
       sink.Add("GateBrick", PlaceGeometry(
-        MakeBox(0.28, 1.15, segLen, TILE_METERS.brick, `${seed}:sillx${s}${half}`, BRICK_UV_GRID),
-        { x: q.x, y: floor + 0.58, z: q.z, ry }));
-      sink.Solid(q.x, floor + 0.58, q.z, 0.2, 0.58, segLen / 2, "tower", ry);
+        MakeBox(0.28, lowerWallH, segLen, TILE_METERS.brick,
+          `${seed}:sillx${s}${half}`, BRICK_UV_GRID),
+        { x: q.x, y: floor + lowerWallH / 2, z: q.z, ry }));
+      sink.Solid(q.x, floor + lowerWallH / 2, q.z, 0.2, lowerWallH / 2, segLen / 2, "tower", ry);
     }
+    // 走道穿过的那一段：门楣以上补墙，人还是过得去（净高 2.35 m）。
+    const gq = L(s * (bodyW / 2 - 0.05), 0);
+    const gh = Math.max(0.2, lowerWallH - 2.35);
+    sink.Add("GateBrick", PlaceGeometry(
+      MakeBox(0.28, gh, walkGap * 2, TILE_METERS.brick,
+        `${seed}:sillxHead${s}`, BRICK_UV_GRID),
+      { x: gq.x, y: floor + 2.35 + gh / 2, z: gq.z, ry }));
   }
   sink.Cover(x, z, floor + 1.15, sin, cos);
 
@@ -2694,28 +2860,21 @@ export function AddGateTower(sink, {
         { x: p.x, y: y0 + (h * i) / (horizontal + 1), z: p.z, ry }));
     }
   };
-  const lowerScreenY = floor + 1.18;
-  const lowerScreenH = columnH - 1.82;
-  const bayW = bodyW / 3;
+  // 下层不再有格扇（墙已经砌实），只保留明间的木门框与门楣。
+  // 门洞本身保持全空：既有纵深，也不偷改唯一四条上城道的通行性。
+  const lowerDoorH = 2.35;
   for (const face of [-1, 1]) {
-    for (const bay of [-1, 1]) {
-      AddLatticeScreen({
-        lx: bay * bayW, lz: face * (bodyD / 2 - 0.09), y0: lowerScreenY,
-        w: bayW - 0.42, h: lowerScreenH, tag: `lowerScreen${face}${bay}`,
-      });
-    }
-    // 明间门框：门洞本身保持全空，既有纵深，也不偷改唯一四条上城道的通行性。
     for (const jamb of [-1, 1]) {
-      const p = L(jamb * 1.17, face * (bodyD / 2 - 0.10));
+      const p = L(jamb * (LOWER_DOOR_W / 2 - 0.05), face * (bodyD / 2 - 0.10));
       sink.Add("GatePaintRed", PlaceGeometry(
-        MakeBox(0.16, lowerScreenH, 0.18, TILE_METERS.wood,
+        MakeBox(0.16, lowerDoorH, 0.18, TILE_METERS.wood,
           `${seed}:doorJamb${face}${jamb}`),
-        { x: p.x, y: lowerScreenY + lowerScreenH / 2, z: p.z, ry }));
+        { x: p.x, y: floor + lowerDoorH / 2, z: p.z, ry }));
     }
     const head = L(0, face * (bodyD / 2 - 0.10));
     sink.Add("GatePaintGreen", PlaceGeometry(
-      MakeBox(2.5, 0.20, 0.20, TILE_METERS.wood, `${seed}:doorHead${face}`),
-      { x: head.x, y: lowerScreenY + lowerScreenH - 0.10, z: head.z, ry }));
+      MakeBox(LOWER_DOOR_W + 0.3, 0.22, 0.20, TILE_METERS.wood, `${seed}:doorHead${face}`),
+      { x: head.x, y: floor + lowerDoorH + 0.11, z: head.z, ry }));
   }
 
   // 斗拱和雀替：远景里它们是檐下连续的一条彩色阴影，也是「亭阁」而不是脚手架的关键。
@@ -2744,8 +2903,15 @@ export function AddGateTower(sink, {
   // --- 下檐（重檐的第一层）：闭合歇山顶、筒瓦垄、戗脊和吻兽 ---
   const eave1 = floor + columnH;
   const AddRoof = (yEave, w, d, tag, detailScale = 1) => {
-    const rise = Math.max(1.12, Math.min(w, d) * 0.22);
-    const cornerLift = 0.26 * detailScale;
+    // 屋面举高。0.22 的系数在 7.2 m 进深上只有 1.58 m —— 正交立面上两层屋面
+    // 读成两块平板贴在楼身上。参考三视图里上檐从檐口到正脊约占整座楼身的三分之一，
+    // 屋面是有体量的一大块，不是一块板。0.40 对应约 30°，是北方官式常见坡度。
+    const rise = Math.max(1.6, Math.min(w, d) * 0.40);
+    // 翼角起翘。旧值 0.26 是「不夸张成影视城飞檐」的克制取值，但正交立面与
+    // 参考三视图并排一比就看得出：那一版四条檐口是**直的**，读成硬山盝顶而不是
+    // 歇山翘厦。参考图（与 1938 年那张照片）的翼角翘得很明显，是这座楼最强的
+    // 识别特征之一。0.95 m 在 11.4 m 面阔上约合 1/12，属于北方官式的常见幅度。
+    const cornerLift = 0.95 * detailScale;
     const halfW = w / 2 + eaveOut;
     const halfD = d / 2 + eaveOut;
     const ridgeHalf = Math.max(w * 0.24, halfW - halfD * 0.78);
@@ -2777,12 +2943,21 @@ export function AddGateTower(sink, {
 
     // 筒瓦垄：不是贴图上的线，而是沿坡面铺的细实体，逆光时仍能读出屋面尺度。
     const tileRows = Math.max(9, Math.round((w + eaveOut * 2) / 0.72));
+    const hipTopT = rise * 0.45;
+    const zgT = halfD * (1 - hipTopT / rise);
     for (const side of [-1, 1]) {
       for (let i = 0; i <= tileRows; i += 1) {
         const lx = -halfW + (halfW * 2 * i) / tileRows;
+        const inner = Math.abs(lx) <= ridgeHalf;
         const ridgeX = Math.max(-ridgeHalf, Math.min(ridgeHalf, lx));
+        // 歇山之后，正脊两端外侧的瓦面是**撒头**，顶边在 (±ridgeHalf, hipTop, ±zg)。
+        // 这一段的瓦垄仍按老写法收到正脊端点的话，会整排飞在撒头上方 ——
+        // 正交立面与俯视图上是从脊端射出的一把扇子。
+        const top = inner
+          ? [ridgeX, rise + 0.08, 0]
+          : [ridgeX, hipTopT + 0.08, side * zgT];
         PlaceLocal("GateRoofTile", MakeBeamBetween(
-          [lx, EaveY(lx) + 0.08, side * halfD], [ridgeX, rise + 0.08, 0],
+          [lx, EaveY(lx) + 0.08, side * halfD], top,
           0.075 * detailScale, TILE_METERS.roof, `${seed}:${tag}:tile${side}${i}`));
       }
     }
@@ -2812,14 +2987,20 @@ export function AddGateTower(sink, {
       0.17 * detailScale, TILE_METERS.roof, `${seed}:${tag}:ridgeCap`));
     for (const sideX of [-1, 1]) {
       for (const sideZ of [-1, 1]) {
+        // 垂脊从**山花底角**起，不是从正脊端点起 —— 歇山改造之后那一段瓦面
+        // 已经不在了，仍按老起点画会有一条脊悬在撒头上方，两边露白缝。
+        const hipTop0 = rise * 0.45;
+        const zg0 = halfD * (1 - hipTop0 / rise);
         PlaceLocal("GateRoofTile", MakeBeamBetween(
-          [sideX * ridgeHalf, rise + 0.11, 0],
+          [sideX * ridgeHalf, hipTop0 + 0.10, sideZ * zg0],
           [sideX * halfW, EaveY(halfW) + 0.11, sideZ * halfD],
           0.22 * detailScale, TILE_METERS.roof, `${seed}:${tag}:hip${sideX}${sideZ}`));
         for (const t of [0.48, 0.68]) {
+          const hipTop1 = rise * 0.45;
+          const zg1 = halfD * (1 - hipTop1 / rise);
           const bx = sideX * (ridgeHalf + (halfW - ridgeHalf) * t);
-          const bz = sideZ * halfD * t;
-          const by = rise * (1 - t) + EaveY(halfW) * t + 0.25;
+          const bz = sideZ * (zg1 + (halfD - zg1) * t);
+          const by = hipTop1 * (1 - t) + EaveY(halfW) * t + 0.25;
           PlaceLocal("GateRoofTile", PlaceGeometry(
             MakeBox(0.22 * detailScale, 0.30 * detailScale, 0.22 * detailScale,
               TILE_METERS.roof, `${seed}:${tag}:beast${sideX}${sideZ}${t}`),
@@ -2834,9 +3015,36 @@ export function AddGateTower(sink, {
         MakeBox(0.36 * detailScale, 0.20 * detailScale, 0.62 * detailScale,
           TILE_METERS.roof, `${seed}:${tag}:chiwenNose${sideX}`),
         { x: sideX * (ridgeHalf + 0.42), y: rise + 0.57, z: 0 }));
+
+      // --- 歇山山花 ---
+      // 少了这一块，正脊两端就直接四面落坡，侧立面读成四坡攒尖而不是歇山。
+      // 山花是一片**竖立**的三角板，坐在正脊端头下方；它下面才继续是撒头那一坡。
+      // 参考三视图与 1938 年那张照片的两层屋面都是歇山，这是「重檐歇山」四个字
+      // 里「歇山」的那一半，之前整个没做。
+      // 尺寸必须与 MakeGateRoofShell 里留的那个洞**逐字一致**，否则不是露缝
+      // 就是穿出瓦面。两处都用 hipTop = rise*0.45、zg = halfD*(1−hipTop/rise)。
+      const hipTop = rise * 0.45;
+      const gz = halfD * (1 - hipTop / rise);
+      const panel = MakeGablePrism(gz * 2, hipTop, hipTop, rise,
+        0.14 * detailScale, TILE_METERS.wood, `${seed}:${tag}:gable${sideX}`);
+      panel.translate(sideX * ridgeHalf, 0, 0);
+      PlaceLocal("GatePaintRed", panel);
+      // 博脊：山花两条斜边上的压边，把板与瓦面接住
+      const gh = rise - hipTop;
+      const gAngle = Math.atan2(gh, gz);
+      for (const sz of [-1, 1]) {
+        PlaceLocal("GateRoofTile", PlaceGeometry(
+          MakeBox(0.26 * detailScale, 0.16 * detailScale,
+            Math.hypot(gz, gh) + 0.1, TILE_METERS.roof,
+            `${seed}:${tag}:bo${sideX}${sz}`),
+          {
+            x: sideX * ridgeHalf, y: hipTop + gh / 2, z: sz * (gz / 2),
+            rx: sz * gAngle,
+          }));
+      }
     }
   };
-  AddBracketSets(eave1, bodyW, bodyD, "lowerBracket", 4);
+  AddBracketSets(eave1, bodyW, bodyD, "lowerBracket", 11);
   AddRoof(eave1, bodyW, bodyD, "r1", 1);
 
   // --- 上层：矮一圈的楼身 + 上檐 ---
@@ -2865,17 +3073,48 @@ export function AddGateTower(sink, {
       { x: p.x, y: upFloor + 0.45, z: p.z, ry }));
   }
   // 上层三间格扇。上楼没有玩家通路要求，可以完整收住立面，让第二层不再是八根孤柱。
-  const upperBayW = upW / 3;
+  // 上层格扇：6 间。参考三视图上层是一排细密的格窗（六七间），3 间大格扇
+  // 会把上层读成一间大敞厅。
+  const UPPER_BAYS = 6;
+  const upperBayW = upW / UPPER_BAYS;
   for (const face of [-1, 1]) {
-    for (const bay of [-1, 0, 1]) {
+    for (let i = 0; i < UPPER_BAYS; i += 1) {
       AddLatticeScreen({
-        lx: bay * upperBayW, lz: face * (upD / 2 - 0.08), y0: upFloor + 0.92,
-        w: upperBayW - 0.32, h: upperH - 1.38, tag: `upperScreen${face}${bay}`,
-        vertical: 2, horizontal: 2,
+        lx: -upW / 2 + upperBayW * (i + 0.5), lz: face * (upD / 2 - 0.08),
+        y0: upFloor + 0.92, w: upperBayW - 0.16, h: upperH - 1.38,
+        tag: `upperScreen${face}${i}`, vertical: 2, horizontal: 2,
       });
     }
   }
-  AddBracketSets(upFloor + upperH, upW, upD, "upperBracket", 4);
+  // 上层两侧（±x 面）此前完全空着：侧立面上二层读成「两根柱子撑着屋顶」。
+  // 与 ±z 面同样处理 —— 砖槛墙打底，上面一整片格扇。
+  for (const sx of [-1, 1]) {
+    const q = L(sx * (upW / 2 - 0.06), 0);
+    sink.Add("GateBrick", PlaceGeometry(
+      MakeBox(0.24, 0.9, upD, TILE_METERS.brick, `${seed}:usillx${sx}`, BRICK_UV_GRID),
+      { x: q.x, y: upFloor + 0.45, z: q.z, ry }));
+    const sh = upperH - 1.38;
+    for (const half of [-1, 1]) {
+      const segD = upD / 2;
+      const c = L(sx * (upW / 2 - 0.06), half * segD / 2);
+      // 沿 z 排的格扇：把 AddLatticeScreen 的局部 x 轴转 90° 用
+      sink.Add("GatePaintRed", PlaceGeometry(
+        MakeBox(0.12, sh, 0.12, TILE_METERS.wood, `${seed}:uxJamb${sx}${half}`),
+        { x: c.x, y: upFloor + 0.92 + sh / 2, z: c.z, ry }));
+      for (let i = 0; i < 3; i += 1) {
+        const m = L(sx * (upW / 2 - 0.06), half * (segD * (i + 0.5) / 3));
+        sink.Add("GatePaintGreen", PlaceGeometry(
+          MakeBox(0.10, sh - 0.16, 0.06, TILE_METERS.wood, `${seed}:uxV${sx}${half}${i}`),
+          { x: m.x, y: upFloor + 0.92 + sh / 2, z: m.z, ry }));
+      }
+    }
+    for (const rail of [0, 1]) {
+      sink.Add("GatePaintGreen", PlaceGeometry(
+        MakeBox(0.14, 0.10, upD, TILE_METERS.wood, `${seed}:uxRail${sx}${rail}`),
+        { x: q.x, y: upFloor + 0.92 + rail * sh, z: q.z, ry }));
+    }
+  }
+  AddBracketSets(upFloor + upperH, upW, upD, "upperBracket", 9);
   AddRoof(upFloor + upperH, upW, upD, "r2", 0.84);
 }
 
