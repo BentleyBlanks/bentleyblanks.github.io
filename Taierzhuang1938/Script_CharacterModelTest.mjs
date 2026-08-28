@@ -50,6 +50,11 @@ assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 
 assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 5);
 
 for (const model of manifest.models) {
+  const factionStem = model.faction === "ija" ? "Ija" : "Nra";
+  assert.equal(model.animationSource, `Lugou${factionStem}Canonical`,
+    `${model.id} uses its own faction's canonical animation rig`);
+  assert.equal(model.animationSourceModel, `Lugou${factionStem}01`,
+    `${model.id} records its same-faction animation source model`);
   assert.deepEqual(model.animations, expectedActions, `${model.id} manifest actions`);
   assert.equal(Number.isInteger(model.limitedWeightVertices), true,
     `${model.id} records four-weight conversion count`);
@@ -108,7 +113,7 @@ assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");
 assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y,\s*0\)/,
   "offline-grounded rig cancels the parent body's hip-height translation");
-assert.match(bakePowerShell, /LUGOU_CANONICAL_ACTIONS\s*=\s*'true'/,
-  "Max batch exports the actions from their canonical NRA01 source rig");
+assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
+  "Max batch exports faction-canonical NRA and IJA action sources");
 
 console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity and ground audits, sockets and bone hitboxes verified`);

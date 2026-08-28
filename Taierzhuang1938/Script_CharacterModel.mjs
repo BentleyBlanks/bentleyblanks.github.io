@@ -33,8 +33,8 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   PistolFire: "手枪射击",
 });
 
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=2";
-const ASSET_VERSION = "2";
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=3";
+const ASSET_VERSION = "3";
 const LOADER = new GLTFLoader();
 let loadPromise = null;
 

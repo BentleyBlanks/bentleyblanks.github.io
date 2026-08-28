@@ -1,10 +1,11 @@
 """Consolidate the 3ds Max FBX bridge into ten web-ready animated GLBs.
 
 Input is produced by ``Script_ExportLugouCharacters.ms``.  Each bind-pose FBX contains the
-original Skin/Physique deformation and materials; the sixteen canonical NRA01 animation FBXs
-contain the BIP motion 3ds Max produced, baked at one sample per frame.  This baker transfers
-those rest-relative poses onto every original rig, adds semantic sockets, embeds textures as
-WebP and validates every fresh GLB import before writing the browser manifest.
+original Skin/Physique deformation and materials; the two sets of sixteen faction-canonical
+animation FBXs contain the BIP motion sampled on NRA01 and IJA01 at one sample per frame.  This
+baker transfers each faction's rest-relative poses onto its five original rigs, adds semantic
+sockets, embeds textures as WebP and validates every fresh GLB import before writing the browser
+manifest.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from mathutils import Matrix, Vector
 
 MODEL_PATTERN = re.compile(r"^Model_(Lugou(?:Nra|Ija)\d{2})\.fbx$", re.IGNORECASE)
 ACTION_PATTERN = re.compile(
-    r"^Animation_(LugouCanonical|Lugou(?:Nra|Ija)\d{2})_([A-Za-z][A-Za-z0-9]*)\.fbx$",
+    r"^Animation_(Lugou(?:Nra|Ija)Canonical|Lugou(?:Nra|Ija)\d{2})_([A-Za-z][A-Za-z0-9]*)\.fbx$",
     re.IGNORECASE,
 )
 EXPECTED_ACTIONS = (
@@ -392,7 +393,7 @@ def ReadCanonicalBindRest(
     canonicalNames: tuple[str, ...],
     canonicalTopology: tuple[int, ...],
 ) -> dict[str, Matrix]:
-    """Capture the NRA01 Figure/bind matrices used as the BIP motion zero."""
+    """Capture the faction source rig's Figure/bind matrices used as BIP motion zero."""
     ResetScene()
     importedObjects, _ = ImportFbx(modelPath, False)
     armature = MainArmature(importedObjects)
@@ -497,14 +498,13 @@ def RetargetAction(
     actionId: str,
     sourceBindRest: dict[str, Matrix],
 ) -> bpy.types.Action:
-    """Bake one canonical Max/BIP motion onto this model's bind rig.
+    """Bake one faction-canonical Max/BIP motion onto this model's bind rig.
 
     FBX force-sampling writes every bone's full local translation as well as its
-    rotation.  Model-specific BIP loads are not interchangeable here: some source
-    Bipeds have scene-specific controller structures that accept the file but turn
-    the whole body sideways.  NRA01 is the source rig the motions were authored on.
-    Compare its sampled pose with the untouched NRA01 bind rest, then rebuild that
-    same delta on each target's own rest axes and proportions.
+    rotation.  NRA and IJA have different Figure/bind axes, so their sampled actions
+    are deliberately kept separate.  Compare the sampled pose with the untouched
+    same-faction source rest, then rebuild that delta on each target's own rest axes
+    and proportions.
     """
     sourceBones = sourceArmature.data.bones
     targetBones = baseArmature.data.bones
@@ -833,6 +833,8 @@ def BakeModel(
     canonicalNames: tuple[str, ...],
     canonicalTopology: tuple[int, ...],
     canonicalSourceRest: dict[str, Matrix],
+    animationSource: str,
+    animationSourceModel: str,
 ) -> dict[str, object]:
     ResetScene()
     importedObjects, _ = ImportFbx(modelPath, False)
@@ -910,6 +912,8 @@ def BakeModel(
         "faction": "nra" if "Nra" in modelId else "ija",
         "url": f"./Model/Character/{outputPath.name}",
         "source": modelPath.name,
+        "animationSource": animationSource,
+        "animationSourceModel": animationSourceModel,
         "vertices": vertices,
         "triangles": triangles,
         "limitedWeightVertices": limitedWeightVertices,
@@ -935,29 +939,7 @@ def Main() -> None:
     models, actions = DiscoverInputs(inputDir)
     if len(models) != 10:
         raise RuntimeError(f"expected 10 bind-pose FBX files, found {len(models)}")
-    if "LugouCanonical" not in actions and set(actions) != set(models):
-        raise RuntimeError(
-            f"model/action set mismatch: models={sorted(models)}, actions={sorted(actions)}"
-        )
-    # Current bridges use LugouCanonical.  Accept NRA01's equivalent set so an
-    # already-exported full bridge can be rebaked without another four-minute Max run.
-    canonicalActions = actions.get("LugouCanonical") or actions.get("LugouNra01")
-    if canonicalActions is None:
-        raise RuntimeError("missing canonical Lugou action FBXs")
-    if set(canonicalActions) != set(EXPECTED_ACTIONS):
-        missing = sorted(set(EXPECTED_ACTIONS) - set(canonicalActions))
-        extra = sorted(set(canonicalActions) - set(EXPECTED_ACTIONS))
-        raise RuntimeError(f"canonical action mismatch: missing={missing}, extra={extra}")
     textureIndex = BuildTextureIndex(textureDir)
-    canonicalNames, canonicalTopology = ReadCanonicalSkeleton(canonicalActions)
-    canonicalModelPath = models.get("LugouNra01")
-    if canonicalModelPath is None:
-        raise RuntimeError("missing canonical Model_LugouNra01.fbx")
-    canonicalSourceRest = ReadCanonicalBindRest(
-        canonicalModelPath,
-        canonicalNames,
-        canonicalTopology,
-    )
 
     startedAt = time.perf_counter()
     records: list[dict[str, object]] = []
@@ -965,7 +947,49 @@ def Main() -> None:
     unknownModels = [modelId for modelId in selectedModels if modelId not in models]
     if unknownModels:
         raise RuntimeError(f"unknown model selection: {unknownModels}")
+    sourceContexts: dict[str, tuple[
+        dict[str, Path], str, tuple[str, ...], tuple[int, ...], dict[str, Matrix]
+    ]] = {}
     for modelId in selectedModels:
+        factionStem = "Nra" if "Nra" in modelId else "Ija"
+        sideCanonicalId = f"Lugou{factionStem}Canonical"
+        animationSource = sideCanonicalId if sideCanonicalId in actions else modelId
+        animationSourceModel = f"Lugou{factionStem}01" if animationSource == sideCanonicalId else modelId
+        if animationSource not in actions:
+            raise RuntimeError(
+                f"{modelId}: missing faction-canonical action set {sideCanonicalId}"
+            )
+        if animationSource not in sourceContexts:
+            canonicalActions = actions[animationSource]
+            if set(canonicalActions) != set(EXPECTED_ACTIONS):
+                missing = sorted(set(EXPECTED_ACTIONS) - set(canonicalActions))
+                extra = sorted(set(canonicalActions) - set(EXPECTED_ACTIONS))
+                raise RuntimeError(
+                    f"{animationSource} action mismatch: missing={missing}, extra={extra}"
+                )
+            canonicalNames, canonicalTopology = ReadCanonicalSkeleton(canonicalActions)
+            canonicalModelPath = models.get(animationSourceModel)
+            if canonicalModelPath is None:
+                raise RuntimeError(f"missing canonical Model_{animationSourceModel}.fbx")
+            canonicalSourceRest = ReadCanonicalBindRest(
+                canonicalModelPath,
+                canonicalNames,
+                canonicalTopology,
+            )
+            sourceContexts[animationSource] = (
+                canonicalActions,
+                animationSourceModel,
+                canonicalNames,
+                canonicalTopology,
+                canonicalSourceRest,
+            )
+        (
+            canonicalActions,
+            animationSourceModel,
+            canonicalNames,
+            canonicalTopology,
+            canonicalSourceRest,
+        ) = sourceContexts[animationSource]
         print(f"BAKE {modelId}")
         records.append(
             BakeModel(
@@ -978,6 +1002,8 @@ def Main() -> None:
                 canonicalNames,
                 canonicalTopology,
                 canonicalSourceRest,
+                animationSource,
+                animationSourceModel,
             )
         )
     manifest = {
