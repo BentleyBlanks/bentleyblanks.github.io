@@ -160,7 +160,11 @@ export class Soldier {
     this.crouchBlend = 0;
     this.proneBlend = 0;
     this.stanceUntil = -99;
-    this.lastProneAt = -99;
+    this.lastRiseAt = -99;
+    this.suppressedAt = -99;
+    // 被压制打断的自动冲锋记冷却：几秒内不重新发起。没有它，压制一衰减过阈值
+    // 就再冲、站上火线半秒又被压回卧倒，charge↔suppressed 两秒一圈来回抽。
+    this.chargeCooldownUntil = -99;
     this.target = null;
     this.targetVisible = false;
     this.targetLostTime = 0;
@@ -962,6 +966,9 @@ export class AiDirector {
     // 否则冲锋边界上依旧会站/蹲各抢一次。
     const emergencyDrop = stance === 2 && stance > s.stance;
     if (!force && !emergencyDrop && this.time < s.stanceUntil) return;
+    // 从卧倒爬起来的时刻。SUPPRESSED 的 mayProne 按它再武装：刚起身的人
+    // 除非压制爆表（emergencyDrop 那档），不许马上再趴回去。
+    if (s.stance === 2) s.lastRiseAt = this.time;
     s.stance = stance;
     s.stanceUntil = this.time + holdS;
   }
@@ -1116,14 +1123,23 @@ export class AiDirector {
     const engageRange = s.tacticalRole === "support" ? 95 : 74;
     const wasEngaged = s.state === STATE.FIRE || s.state === STATE.CHARGE;
     if (s.suppression > 0.50 || (s.state === STATE.SUPPRESSED && s.suppression > 0.32)) {
+      // 被压制打断的冲锋是失败的冲锋：这一轮不再自动重起。冷却带抖动，
+      // 免得全班同一秒重新站起来吃同一轮齐射。玩家下的刺刀令不受此限。
+      if (s.state === STATE.CHARGE && s.order !== "charge") {
+        s.chargeCooldownUntil = this.time + 8 + s.rnd() * 4;
+      }
+      if (s.state !== STATE.SUPPRESSED) s.suppressedAt = this.time;
       s.state = STATE.SUPPRESSED;
       // 中等压制先蹲住，强压制才卧倒；刚爬起来三秒内除非压制爆表，不重复趴。
       // 旧版每一发近失弹都触发「卧倒→衰减→起身」，连续枪声下看起来就像抽搐。
-      const mayProne = this.time - s.lastProneAt > 3.2 || s.suppression > 0.82;
+      const mayProne = this.time - s.lastRiseAt > 3.0 || s.suppression > 0.82;
       if (s.stance === 2 || (s.suppression > 0.66 && mayProne)) {
-        if (s.stance !== 2) s.lastProneAt = this.time;
-        this.SetStance(s, 2, 1.8, true);
-      } else {
+        // 卧倒承诺 3.4–4.6 秒，比压制从 0.9 衰减清零（1.6 秒）长：起身时机由
+        // 承诺期决定而不是由压制阈值决定，双方就不会在同一条阈值线上同步蹲起。
+        this.SetStance(s, 2, 3.4 + s.rnd() * 1.2, true);
+      } else if (this.time - s.suppressedAt > 0.2) {
+        // 蹲下压半拍（0.2 秒反应时间）：一轮排枪两三发连着到，等这半拍能分清
+        // 「蹲得住」还是「必须趴」，不然 0.1 秒内先蹲一次又趴一次，白多一次切换。
         this.SetStance(s, 1, 1.35);
       }
     } else if (s.ammo <= 0) {
@@ -1148,15 +1164,24 @@ export class AiDirector {
           : s.tacticalRole === "leader" ? 13
             : s.tacticalRole === "rifleman" ? 10 : 0;
       const wasAutoCharge = s.state === STATE.CHARGE && s.order !== "charge";
+      // 冲锋的**发起**也看压制值：压制没清完（≥0.25）、还押着姿态承诺（多半是
+      // 卧倒没到期）、或上一次冲锋刚被压制打断的人，都不许新起冲锋。旧版在
+      // SUPPRESSED 一跌破 0.32 时就转 CHARGE 强制站立，正是姿态抽动环的另一半。
+      // 已在冲锋中的不看这些 —— 一发近失弹不该打散端着刺刀的人。
+      const chargeReady = this.time >= s.chargeCooldownUntil && s.suppression < 0.25
+        && (s.stance === 0 || this.time >= s.stanceUntil);
       const charge = chargeRange > 0
-        && (bestDist < chargeRange || (wasAutoCharge && bestDist < chargeRange + 7))
+        && (wasAutoCharge ? bestDist < chargeRange + 7 : chargeReady && bestDist < chargeRange)
         && s.cohesion > 0.5 && s.squadMateCount > 0;
       if (charge && !wasAutoCharge) s.combatModeUntil = this.time + 1.4;
       const committedCharge = charge || (wasAutoCharge && this.time < s.combatModeUntil
         && bestDist < chargeRange + 10);
       s.state = committedCharge ? STATE.CHARGE : STATE.FIRE;
+      // 对射姿势的承诺期 2.2 秒：FireStance 的迟滞带挡得住近失弹的小波动，
+      // 挡不住压制在带宽两侧的慢波 —— 1.35 秒时实测还剩 1.4–1.8 秒节奏的
+      // 站蹲微调。卧倒（emergencyDrop）与冲锋（force）都不吃这条承诺。
       this.SetStance(s, committedCharge ? 0 : this.FireStance(s, bestDist),
-        committedCharge ? 1.0 : 1.35, committedCharge);
+        committedCharge ? 1.0 : 2.2, committedCharge);
     } else {
       // 推进途中的蹲行门槛从 0.3 提到 0.55：0.3 一发近失弹就能压到，
       // 于是整条推进线都在以 0.6 倍速半蹲着蹭。真被打住了才蹲着走。
@@ -1220,7 +1245,12 @@ export class AiDirector {
    * 一条都不占就站着打 —— 远距离站姿射击本来就是这场仗里最常见的样子。
    */
   FireStance(s, bestDist) {
-    if (s.suppression > 0.25) return 1;
+    // 已经卧倒且压制未清的人保持卧姿射击：头顶还在过弹时不撑起半个身子，
+    // 起身统一等真正安静下来（压制清到 0.20 以下）。这半格迟滞消掉卧↔蹲往返。
+    if (s.stance === 2 && s.suppression > 0.20) return 2;
+    // 压制项两侧取不同阈值：站着的 0.35 才蹲，蹲着的要清到 0.12 才站。
+    // 单阈值（旧 0.25）会被近失弹的 +0.16 在两侧来回踢，对射中每两秒蹲起一次。
+    if (s.stance >= 1 ? s.suppression > 0.12 : s.suppression > 0.35) return 1;
     const c = s.cover;
     if (c && (c.height ?? 1) < 1.25
       && Math.hypot(c.x - s.position.x, c.z - s.position.z) < 1.3) return 1;
