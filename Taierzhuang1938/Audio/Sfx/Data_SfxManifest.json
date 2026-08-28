@@ -365,7 +365,7 @@
       "license": "volcengine"
     }
   },
-  "bakedAt": "2026-08-26",
+  "bakedAt": "2026-08-28",
   "normalization": {
     "normalizedAt": "2026-08-25",
     "tool": "Script_AudioNormalize.mjs",
@@ -373,5 +373,134 @@
     "metric": "activeRmsDbfs",
     "targetDbfs": -25,
     "toleranceDb": 0.5
-  }
+  },
+  "pendingCues": {
+    "execScream": {
+      "files": [
+        "AudioSfx_ExecScream_01.mp3",
+        "AudioSfx_ExecScream_02.mp3"
+      ],
+      "seconds": 0.62,
+      "credit": "SoundBits · 男性痛叫 · Sonniss GDC 2016 ／ SoundBits · 男性短叫 · Sonniss Game Audio Monthly #2",
+      "license": "sonniss"
+    },
+    "painMoan": {
+      "files": [
+        "AudioSfx_PainMoan_01.mp3"
+      ],
+      "seconds": 2.6,
+      "credit": "Airborne Sound · 三十多岁男性，捂着嘴的痛呼与喘 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "hitGrunt": {
+      "files": [
+        "AudioSfx_HitGrunt_01.mp3"
+      ],
+      "seconds": 0.512,
+      "credit": "Bottle Rocket Fx · 男性痛哼 · Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "flareLaunch": {
+      "files": [
+        "AudioSfx_FlareLaunch_01.mp3"
+      ],
+      "seconds": 2.6,
+      "credit": "InspectorJ · 焰火近距离发射 · Sonniss GDC 2023",
+      "license": "sonniss"
+    },
+    "flareIgnite": {
+      "files": [
+        "AudioSfx_FlareIgnite_01.mp3"
+      ],
+      "seconds": 1.2,
+      "credit": "TS Sound · 信号弹点燃与持续燃烧 · Sonniss Game Audio Monthly #4",
+      "license": "sonniss"
+    },
+    "flareBurn": {
+      "files": [
+        "AudioSfx_FlareBurn_01.mp3"
+      ],
+      "seconds": 6,
+      "loop": true,
+      "credit": "TS Sound · 信号弹点燃与持续燃烧 · Sonniss Game Audio Monthly #4",
+      "license": "sonniss"
+    },
+    "flareOut": {
+      "files": [
+        "AudioSfx_FlareOut_01.mp3"
+      ],
+      "seconds": 2.9,
+      "credit": "TS Sound · 信号弹点燃与持续燃烧 · Sonniss Game Audio Monthly #4",
+      "license": "sonniss"
+    },
+    "telegraphKey": {
+      "files": [
+        "AudioSfx_TelegraphKey_01.mp3",
+        "AudioSfx_TelegraphKey_02.mp3",
+        "AudioSfx_TelegraphKey_03.mp3"
+      ],
+      "seconds": 0.21,
+      "credit": "344 Audio · 古董黄铜锁具摆弄 · Sonniss GDC 2026 ／ 344 Audio · 古董黄铜锁具摆弄 · Sonniss GDC 2026 ／ 344 Audio · 古董黄铜锁具摆弄 · Sonniss GDC 2026",
+      "license": "sonniss"
+    },
+    "telegraphHum": {
+      "files": [
+        "AudioSfx_TelegraphHum_01.mp3"
+      ],
+      "seconds": 6,
+      "loop": true,
+      "credit": "RedSonic · 电器低鸣与嗡声 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "planeDive": {
+      "files": [
+        "AudioSfx_PlaneDive_01.mp3"
+      ],
+      "seconds": 7,
+      "credit": "Pole Position Production · 布里斯托尔「布伦海姆」1934（通场）· Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "strafeNear": {
+      "files": [
+        "AudioSfx_StrafeNear_01.mp3"
+      ],
+      "seconds": 1.5,
+      "credit": "Pole Position Production · M1919A4 .30cal（炮塔架，1 m 左侧）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "strafeFar": {
+      "files": [
+        "AudioSfx_StrafeFar_01.mp3"
+      ],
+      "seconds": 2.2,
+      "credit": "Pole Position Production · M1919A4 .30cal（炮塔架，300 m 正前）· Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "strafeDirt": {
+      "files": [
+        "AudioSfx_StrafeDirt_01.mp3"
+      ],
+      "seconds": 2.9,
+      "credit": "Pole Position Production · 机枪弹丸掠过、跳弹与音爆 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "mgOverheat": {
+      "files": [
+        "AudioSfx_MgOverheat_01.mp3",
+        "AudioSfx_MgOverheat_02.mp3"
+      ],
+      "seconds": 0.35,
+      "credit": "Eiravaein Works · 铁匠铺：轻锤敲热铁 · Sonniss GDC 2015",
+      "license": "sonniss"
+    },
+    "mgCharge": {
+      "files": [
+        "AudioSfx_MgCharge_01.mp3"
+      ],
+      "seconds": 0.9,
+      "credit": "Pole Position Production · 重型枪机拉柄（近距离）· Sonniss GDC 2016",
+      "license": "sonniss"
+    }
+  },
+  "pendingNote": "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。"
 }

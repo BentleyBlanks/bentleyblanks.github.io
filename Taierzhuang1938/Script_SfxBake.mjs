@@ -20,6 +20,18 @@
 //   2. **连发取末发**（pick:"last"）。三连发里第一发的尾巴糊在第二发上，
 //      只有末发的尾巴是干净的；拿第一发去循环，连射时会听见「回声重叠」。
 //   3. **尾巴必须淡干净**。硬切的尾巴每次触发都「咔」一下，比没有音效更糟。
+//
+// ## 2026-08-28（任务流程重制 · 音效缺口批 A2）加的四个字段
+//   · `fadeInS` / `fadeOutS` —— 覆盖默认的 3 ms 进 / 120 ms 出。掐尾的惨叫要收得更快，
+//     照明弹熄灭要 1.3 s 的长衰减，循环用的床两头只能各 20 ms（长淡入淡出在接缝上
+//     就是每圈一个坑）。
+//   · `alignDbfs` —— 烘完**量成品**、按差补增益、从同一份 stage.wav 重编，直到有声段
+//     RMS 落在目标 ±0.3 dB 内（口径与 `Script_AudioNormalize.mjs` 的「一次性音」组
+//     逐字相同：20 ms 帧、门限 10%、峰值上限 −1 dBFS）。**永远只有一代 mp3。**
+//     不带这个字段的老 cue 一个字节都不碰 —— 它们的响度是 AudioNormalize 事后拉平的。
+//   · `loop` —— 只写进清单当元数据，供接线时判断这条能不能循环。
+//   · 组上的 `pending` —— 素材烘好了但 `Script_Audio.RECIPES` 里还没有同名配方，
+//     写进 `manifest.pendingCues`（运行时看不见）。见 Main() 里那段注释。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -225,6 +237,74 @@ function WriteWav(file, pcm) {
   fs.writeFileSync(file, buf);
 }
 
+/**
+ * 量**成品** mp3 的有声段 RMS 与峰值，口径与 `Script_AudioNormalize.mjs` 逐字相同
+ * （20 ms 帧、门限取最响帧的 10%、单声道）。
+ *
+ * 为什么必须量成品：72 kbps 单声道编宽带噪声，**解出来的 RMS 会比编码前高 2—3 dB**，
+ * 而短音的有声段 RMS 本来就对帧格敏感 —— 只量编码前的 stage.wav 会稳定偏亮
+ * （对白那一轮「晓得。」的教训，见 docs/Data_AudioAssets.md）。
+ */
+function MeasureMp3(file) {
+  const raw = execFileSync(FFMPEG, ["-v", "error", "-i", file, "-map", "0:a:0",
+    "-ac", "1", "-f", "f32le", "-acodec", "pcm_f32le", "-"], { maxBuffer: 1 << 29 });
+  const n = Math.floor(raw.length / 4);
+  if (!n) throw new Error(`解不出采样：${file}`);
+  const frame = Math.round(SR * 0.02);
+  const frames = [];
+  let peak = 0;
+  for (let s = 0; s < n; s += frame) {
+    const e = Math.min(n, s + frame);
+    let sum = 0;
+    for (let i = s; i < e; i += 1) {
+      const v = raw.readFloatLE(i * 4);
+      sum += v * v;
+      peak = Math.max(peak, Math.abs(v));
+    }
+    frames.push(Math.sqrt(sum / Math.max(1, e - s)));
+  }
+  const loudest = Math.max(...frames);
+  const active = frames.filter((v) => v >= loudest * 0.1);
+  const square = active.reduce((t, v) => t + v * v, 0);
+  const Db = (v) => 20 * Math.log10(Math.max(1e-12, v));
+  return { activeRmsDbfs: Db(Math.sqrt(square / Math.max(1, active.length))), peakDbfs: Db(peak) };
+}
+
+/** 把 filters 与 stage.wav 编成成品 mp3。每次都从**同一份 stage.wav** 重编，永远只有一代 mp3。 */
+function EncodeMp3(tmpWav, outMp3, filters) {
+  const args = ["-y", "-v", "error", "-i", tmpWav];
+  if (filters.length) args.push("-af", filters.join(","));
+  args.push("-ac", "1", "-ar", String(SR), "-b:a", BITRATE, outMp3);
+  execFileSync(FFMPEG, args);
+}
+
+// 与 Script_AudioNormalize 同一组常数：SFX 属于「一次性音」组，目标 −25 dBFS 有声段 RMS，
+// 峰值上限 −1 dBFS，容差 ±0.5 dB。烘焙期就对齐的话，成品搬进 manifest.cues 之后
+// `Script_AudioNormalize.mjs`（只读验收）立刻就是绿的，不必再过一遍有损重编。
+const ALIGN_TOLERANCE_DB = 0.3;
+const ALIGN_PEAK_CEILING_DBFS = -1;
+const ALIGN_LIMIT_DBFS = -1.5;   // 给 mp3 重建留余量，与 AudioNormalize 的 PROCESS_LIMIT 同值
+
+/**
+ * 把成品对齐到 `cut.alignDbfs`。老 cue 不带这个字段 —— 它们的响度是
+ * `Script_AudioNormalize.mjs --write` 事后拉平的，这里一个字节都不碰。
+ */
+function AlignLoudness(tmpWav, outMp3, filters, targetDbfs) {
+  let gainDb = 0;
+  let last = MeasureMp3(outMp3);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const error = targetDbfs - last.activeRmsDbfs;
+    if (Math.abs(error) <= ALIGN_TOLERANCE_DB && last.peakDbfs <= ALIGN_PEAK_CEILING_DBFS + 0.1) return last;
+    gainDb += Math.max(-6, Math.min(6, error));
+    const limit = Math.pow(10, ALIGN_LIMIT_DBFS / 20).toFixed(8);
+    EncodeMp3(tmpWav, outMp3, [...filters,
+      `volume=${gainDb.toFixed(4)}dB`,
+      `alimiter=limit=${limit}:attack=2:release=50:level=false`]);
+    last = MeasureMp3(outMp3);
+  }
+  return last;
+}
+
 function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   const pre = Math.round(SR * 0.012);                    // 起音前留一点，别切掉冲头
   const start = cut.whole ? hit.at : Math.max(0, hit.at - pre);
@@ -234,13 +314,19 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   let peak = 0;
   for (let i = 0; i < seg.length; i += 1) peak = Math.max(peak, Math.abs(seg[i]));
   const scale = peak > 1e-4 ? (cut.gain / peak) : 1;
-  const fadeIn = Math.round(SR * 0.003);
-  const fadeOut = Math.round(Math.min(seg.length * 0.4, SR * 0.12));
+  // fadeInS / fadeOutS 覆盖默认值。默认那两个数是给「冲击音」定的：3 ms 进、120 ms 出。
+  // 掐尾的惨叫要更短的收（0.15 s 内收干净才是「掐」），照明弹熄灭要长得多（1.3 s），
+  // 循环用的床两头都只要 20 ms —— 长淡入淡出在循环接缝上就是每圈一个坑。
+  const fadeIn = Math.round(SR * (cut.fadeInS ?? 0.003));
+  // 默认那道「不许超过整段 40%」的封顶是给冲击音兜底的；**显式写了 fadeOutS 就是
+  // 要那个长度**（照明弹熄灭那条 1.3 s 的衰减本来就该占掉大半条音），放宽到 90%。
+  const fadeOutCap = seg.length * (cut.fadeOutS != null ? 0.9 : 0.4);
+  const fadeOut = Math.round(Math.min(fadeOutCap, SR * (cut.fadeOutS ?? 0.12)));
   for (let i = 0; i < seg.length; i += 1) {
     let g = scale;
-    if (i < fadeIn) g *= i / fadeIn;
+    if (fadeIn > 0 && i < fadeIn) g *= i / fadeIn;
     const tail = seg.length - i;
-    if (tail < fadeOut) g *= tail / fadeOut;
+    if (fadeOut > 0 && tail < fadeOut) g *= tail / fadeOut;
     seg[i] *= g;
   }
   WriteWav(tmpWav, seg);
@@ -255,14 +341,12 @@ function CutOne(pcm, hit, cut, tmpWav, outMp3) {
   if (cut.rate && cut.rate !== 1) filters.push(`asetrate=${Math.round(SR * cut.rate)}`, `aresample=${SR}`);
   if (cut.hp) filters.push(`highpass=f=${cut.hp}`);
   if (cut.lp) filters.push(`lowpass=f=${cut.lp}`);
-  const args = ["-y", "-v", "error", "-i", tmpWav];
-  if (filters.length) args.push("-af", filters.join(","));
-  args.push("-ac", "1", "-ar", String(SR), "-b:a", BITRATE, outMp3);
-  execFileSync(FFMPEG, args);
+  EncodeMp3(tmpWav, outMp3, filters);
+  const level = cut.alignDbfs != null ? AlignLoudness(tmpWav, outMp3, filters, cut.alignDbfs) : null;
   fs.rmSync(tmpWav, { force: true });
 
   const seconds = (seg.length / SR) / (cut.rate || 1);
-  return { seconds, bytes: fs.statSync(outMp3).size, seg };
+  return { seconds, bytes: fs.statSync(outMp3).size, seg, level };
 }
 
 // 序章专用音的确定性程序合成。每个 cue 都是独立短音，使用固定 LCG 噪声与衰减正弦，
@@ -334,6 +418,19 @@ async function Main() {
   manifest.licenses = SFX_LICENSES;
   manifest.cues = manifest.cues || {};
 
+  // pendingCues：**素材已经烘好、但 Script_Audio 里还没有同名合成配方**的 cue。
+  // `AudioEngine.LoadSfxPack` 对没有同名配方的 cue 是直接抛错的（「没有同名配方，
+  // 盖不上去」），所以把它们放进 `cues` 会让每次开机多出十几条 sfxErrors，
+  // 并把 `Script_AudioTest` 的三条计数断言一起顶红 —— 素材还没接线，先红一片测试
+  // 不是交付。放这儿：运行时看不见（LoadSfxPack 只遍历 cues），
+  // `Script_AudioNormalize` 也不会去动它们（它只读 cues）。
+  // 集成批加完配方后，把 Data_SfxSources 里对应组的 `pending: true` 删掉重烘即可。
+  // 每次运行都从空表开始（不像 cues 那样带着上一轮的记录）：待接线的 cue 还在调，
+  // 重烘一遍就该是重新来过。代价是**共用同一个 cue 的 pending 组必须一起烘**
+  // （execScream 的两个变体分属两组），全量烘焙与照组名一起点名都满足这一条。
+  const pendingCues = {};
+  const CueTable = (group) => (group.pending ? pendingCues : manifest.cues);
+
   let total = 0;
   for (const group of groups) {
     // SeedAudio 那几条（序章汽笛、白刃三音）是**人工试听选定**的成品，不由这个程序
@@ -395,12 +492,13 @@ async function Main() {
     }
 
     const used = new Set();
+    const table = CueTable(group);
     for (const cut of group.cuts) {
       const n = Math.max(1, cut.variants || 1);
-      const prev = (cut.append && manifest.cues[cut.cue]?.files) || [];
+      const prev = (cut.append && table[cut.cue]?.files) || [];
       const files = prev.slice();
-      let seconds = manifest.cues[cut.cue]?.seconds || 0;
-      let tone = manifest.cues[cut.cue]?.toneHz || null;
+      let seconds = table[cut.cue]?.seconds || 0;
+      let tone = table[cut.cue]?.toneHz || null;
       for (let v = 0; v < n; v += 1) {
         const hit = cut.whole ? WholeSpan(pcm, cut) : Pick(found.hits, cut, used);
         if (!hit) { console.log(`   ! ${cut.cue}：第 ${v + 1} 个变体没挑出合适的一下`); break; }
@@ -416,16 +514,19 @@ async function Main() {
         }
         total += info.bytes;
         console.log(`   · ${name}  ${info.seconds.toFixed(2)}s  ${(info.bytes / 1024).toFixed(1)} KB`
-          + `  ← 素材 ${hit.atS.toFixed(2)}s（衰减 ${hit.decayS.toFixed(2)}s）`);
+          + `  ← 素材 ${hit.atS.toFixed(2)}s（衰减 ${hit.decayS.toFixed(2)}s）`
+          + (info.level ? `  有声段 ${info.level.activeRmsDbfs.toFixed(2)} dBFS`
+            + `／峰值 ${info.level.peakDbfs.toFixed(2)} dBFS` : ""));
         if (cut.whole) break;                       // 整段模式没有第二个变体可挑
       }
       if (!files.length) { console.log(`   ! ${cut.cue}：一个变体都没切出来`); continue; }
-      manifest.cues[cut.cue] = {
+      table[cut.cue] = {
         files,
         seconds: Number(seconds.toFixed(3)),
         ...(tone ? { toneHz: tone } : {}),
-        credit: cut.append && manifest.cues[cut.cue]?.credit
-          ? `${manifest.cues[cut.cue].credit} ／ ${group.credit}`
+        ...(cut.loop ? { loop: true } : {}),
+        credit: cut.append && table[cut.cue]?.credit
+          ? `${table[cut.cue].credit} ／ ${group.credit}`
           : group.credit,
         license: group.license,
       };
@@ -433,11 +534,19 @@ async function Main() {
   }
 
   if (report) return;
+  // 部分重烘时保住上一轮已经登记的 pendingCues（与 cues 同一条理由）。
+  if (Object.keys(pendingCues).length || (partial && manifest.pendingCues)) {
+    manifest.pendingCues = partial ? { ...(manifest.pendingCues || {}), ...pendingCues } : pendingCues;
+    manifest.pendingNote = "素材已烘好，但 Script_Audio.RECIPES 里还没有同名配方，"
+      + "运行时不会加载（LoadSfxPack 只遍历 cues）。配方补齐后把 Data_SfxSources 对应组的 pending 去掉重烘。";
+  }
   manifest.bakedAt = new Date().toISOString().slice(0, 10);
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
   const count = Object.values(manifest.cues).reduce((s, c) => s + c.files.length, 0);
+  const pendingCount = Object.values(manifest.pendingCues || {}).reduce((s, c) => s + c.files.length, 0);
   console.log(`\n清单 ${path.relative(HERE, MANIFEST)}：`
-    + `${Object.keys(manifest.cues).length} 个 cue / ${count} 个文件，本次新增 ${(total / 1024).toFixed(0)} KB`);
+    + `${Object.keys(manifest.cues).length} 个 cue / ${count} 个文件，本次新增 ${(total / 1024).toFixed(0)} KB`
+    + (pendingCount ? `；待接线 ${Object.keys(manifest.pendingCues).length} 个 cue / ${pendingCount} 个文件` : ""));
 }
 
 Main().catch((error) => { console.error(error.stack || error.message || error); process.exit(1); });

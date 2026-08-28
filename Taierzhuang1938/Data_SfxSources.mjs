@@ -30,7 +30,11 @@
 // 切割字段：whole 整段用（素材本身就是一次性音）；prefer 挑法（loud/sustain）；
 //   pick:"last" 取末发；variants 切几个变体；append 把变体接到已有 cue 后面；
 //   rate 重采样倍率（>1 升调变短，模拟小口径）；hp/lp 高低通；notch 陷波（挖掉素材自带的啸叫）；
-//   decay 衰减时长硬筛（挡掉 0.05 秒的咔哒声冒充落地声）；tone 顺便量基频。
+//   decay 衰减时长硬筛（挡掉 0.05 秒的咔哒声冒充落地声）；tone 顺便量基频；
+//   exactAtS 按波形秒数直接落刀（自动挑法挑不准时，看过 --report 再钉死一个位置）。
+//   2026-08-28 新增：fadeInS/fadeOutS 覆盖默认淡入淡出；alignDbfs 烘完量成品把有声段
+//   RMS 对齐到该值（口径同 Script_AudioNormalize 的「一次性音」组）；loop 只写进清单当
+//   元数据；组上的 pending 表示「Script_Audio 还没有同名配方」，产物落 manifest.pendingCues。
 export const SFX_LICENSES = {
   sonniss: {
     name: "Sonniss GDC Game Audio Bundle",
@@ -449,6 +453,269 @@ export const SFX_SOURCES = [
     credit: "SpliceSound · 哨子（CC0）· Wikimedia Commons",
     license: "commons",
     cuts: [{ cue: "whistle", tail: 0.9, gain: 0.85, prefer: "loud", decay: [0.15, 1.2] }],
+  },
+
+  // =========================================================================
+  // 任务流程重制 · 音效缺口批 A2（2026-08-28）
+  //
+  // 下面这些组全部带 `pending: true`：素材已经烘好、响度也按 −25 dBFS 对齐过了，
+  // 但 `Script_Audio.RECIPES` 里还没有同名的合成配方 —— `LoadSfxPack` 对没有同名
+  // 配方的 cue 是**直接抛错**的（「没有同名配方，盖不上去」），放进 manifest.cues
+  // 会让每次开机多出十几条 sfxErrors，并把 AudioTest 的三条计数断言一起顶红。
+  // 所以它们落在 `manifest.pendingCues`：文件在仓库里、清单里有账、运行时看不见。
+  // **集成批补完配方后，把这些组的 `pending: true` 删掉重烘即可**（顺带 bump
+  // Script_AudioTest 的 RECIPE_COUNT，并给 SAMPLE_MIX / SAMPLE_WET / NODE_COST 加行）。
+  //
+  // 规格出处：docs/Data_MissionRemake.md §2/§4/§5/§6/§7 与七个 Data_MissionChX 头注的
+  // ENGINE_REQUEST。逐条的验收数字在 docs/Data_AudioAssets.md「重制新增音效」一节。
+  // =========================================================================
+
+  // --- 实录人声（明令不许走 TTS）-------------------------------------------
+  // 三条都是**非语言的嗓音**。SeedAudio 做不像（hurt_scream 那条的教训在
+  // docs/Data_AudioAssets.md「交付档」节），所以从免版税实录库里取真人录音。
+  // 选材两条底线：① 必须是成年男性；② 宁可短、闷、克制，也不要「猎奇的一声啊——」，
+  // 第三关处决段是隔着墙听到的，那一声的作用是让玩家明白里面在干什么，不是展览。
+  {
+    id: "ExecScreamShout",
+    pending: true,
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "SoundBits -  Screams & Shouts 2 - Humans/Male_Shout-of-Pain_132.mp3",
+    credit: "SoundBits · 男性痛叫 · Sonniss GDC 2016",
+    license: "sonniss",
+    // 第三关阶段 7 的短促惨叫（隔墙、低概率、低音量）。原素材 0.95 s：起音在 0.05 s，
+    // 之后是一条越来越松的尾巴。**只留 0.62 s 并用 0.16 s 收干净** —— 策划案要的是
+    // 「掐尾」：一声起来、断掉，不给它把整声喊完。基频 361→256 Hz（成年男性）。
+    cuts: [{ cue: "execScream", exactAtS: 0.02, tail: 0.62, gain: 0.92,
+      fadeOutS: 0.16, alignDbfs: -25 }],
+  },
+  {
+    id: "ExecScreamCry",
+    pending: true,
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #2/SoundBits - Screams & Shouts/Screams&Shouts_human_male_011.mp3",
+    credit: "SoundBits · 男性短叫 · Sonniss Game Audio Monthly #2",
+    license: "sonniss",
+    // 第二个变体。**一条惨叫绝不能只有一个样本** —— 处决段会响好几次，
+    // 同一份 wav 连出两次就从「里面在杀人」变成「音效在循环」。
+    // 这条基频更低（230 Hz），性格与上一条分得开：那条是喊出来的，这条是被打断的。
+    // 同厂同库（SoundBits Screams & Shouts），音色对得上。
+    cuts: [{ cue: "execScream", exactAtS: 0.00, tail: 0.55, gain: 0.92,
+      fadeOutS: 0.14, append: true, alignDbfs: -25 }],
+  },
+  {
+    id: "PainMoanMuffled",
+    pending: true,
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "Airborne Sound - Human/Scream,Male,Mid Thirties,Mouth Covered,Gasps,Fast,Shriek,Panic.mp3",
+    credit: "Airborne Sound · 三十多岁男性，捂着嘴的痛呼与喘 · Sonniss GDC 2018",
+    license: "sonniss",
+    // 第三/四关大出血伤员的**持续低声痛呼**。选这条素材的理由是「捂着嘴」：
+    // 整条录音是一个男人被捂住嘴发出的声音 —— 天然是闷的、压着的，
+    // 正是「疼得受不了但喊不出来」的质地，不需要再靠低通去伪造。
+    // 3.36—5.96 s 那一段实测基频 106—165 Hz（全条最低的一段，其余多在 370 Hz 上），
+    // 连续两秒半没有断口，中间有一次换气 —— 这是全库唯一一段**真的低而持续**的男声痛呼。
+    // 首尾都给长一点的淡入淡出（0.05 / 0.30 s）：它不是冲击音，硬起硬收会像剪坏的。
+    cuts: [{ cue: "painMoan", exactAtS: 3.36, tail: 2.60, gain: 0.9,
+      fadeInS: 0.05, fadeOutS: 0.30, alignDbfs: -25 }],
+  },
+  {
+    id: "HitGruntStifled",
+    pending: true,
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Bottle Rocket Fx - Scream/Grunt_Pain_Male_BB_10_SCREAM LIBRARY_BRFX-004.mp3",
+    credit: "Bottle Rocket Fx · 男性痛哼 · Sonniss GDC 2016",
+    license: "sonniss",
+    // 第四关罗班长腹部中弹那一声：**闷哼，不是惨叫**（Data_MissionCh4 头注第 8 条原话
+    // 「压住的、不是惨叫」）。原素材 0.46 s，起音后 0.3 s 就没了 —— 短是对的。
+    // rate 0.82：原声基频约 350 Hz，压到 290 Hz 才对得上罗班长的音色口径
+    // （三十五到四十、沙哑粗嗓男中低音，见 docs/Data_AudioAssets.md 音色表）。
+    // 与已有的 `hurt`（Articulated 的 Joshua ／ 344 Audio 的士兵闷哼）是**不同库**：
+    // 这一声是点名给一个角色的，不能和满场随机的中弹哼混成一个音。
+    cuts: [{ cue: "hitGrunt", exactAtS: 0.02, tail: 0.42, gain: 0.9,
+      rate: 0.82, fadeOutS: 0.10, alignDbfs: -25 }],
+  },
+
+  // --- 照明弹（第四关）-----------------------------------------------------
+  // 一个完整循环四条：发射 → 顶空点燃 → 持续燃烧（可循环）→ 熄灭。
+  // 后三条同源同一次录音（TS Sound 那条 61 秒的「信号弹点燃」），所以点燃、燃烧、
+  // 熄灭听着是**同一支照明弹的三个阶段**，不是三样东西拼起来的。
+  {
+    id: "FlareLaunch",
+    pending: true,
+    item: "sonniss-gdc-2023-game-audio-bundle-normalized",
+    path: "InspectorJ - Essentials 03 Fireworks/FRWKComr_InsJ_Fireworks_Launch_Close_01-03.mp3",
+    credit: "InspectorJ · 焰火近距离发射 · Sonniss GDC 2023",
+    license: "sonniss",
+    // 发射的「咚」＋升空的呼啸。拿焰火的发射筒而不是枪械音：照明弹是从迫击炮式的
+    // 发射筒／信号枪打上去的，那一下是**闷的推力**，不是枪口爆音。
+    // 整条 3.44 s，能量在 0.02—0.5 s 涨到顶再拖一条上升的噪声尾巴 ——
+    // 留 2.6 s 就是为了那条尾巴：玩家要听得出「它还在往上走」。
+    cuts: [{ cue: "flareLaunch", exactAtS: 0.00, tail: 2.60, gain: 0.92,
+      fadeOutS: 0.35, alignDbfs: -25 }],
+  },
+  {
+    id: "FlareBurn",
+    pending: true,
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthly - #4/TS Sound - Fire, Sizzles, and Ignites...Oh my!/FLARE_IGNITE_WITH_WATER_SIZZLES_01.mp3",
+    credit: "TS Sound · 信号弹点燃与持续燃烧 · Sonniss Game Audio Monthly #4",
+    license: "sonniss",
+    // **这是一条真的照明弹录音**（不是「火焰音效」顶包），一条 61 秒的素材里
+    // 点燃、稳定燃烧、结束都在：
+    //   · flareIgnite —— 0.30 s 处那记点燃冲头「噗」，留 1.2 s 带出刚烧起来的嘶声；
+    //   · flareBurn   —— 26.0 s 起 6 秒，全条最平稳的一段（燃烧已经稳定），loop；
+    //                    两头各 20 ms 淡入淡出，**长淡入淡出在循环接缝上就是每圈一个坑**；
+    //   · flareOut    —— **素材末尾是真的烧完了**：实测 58.5 s 起从 −33 dB 一路掉到
+    //                    60.6 s 的 −61 dB，两秒多的自然衰减。所以熄灭不用造，
+    //                    直接取最后 2.9 s（起手 57.8 s 还有 0.7 s 稳定燃烧再开始沉下去）。
+    //                    ——「熄灭衰减」这类音只要有真的，就别用淡出曲线冒充。
+    cuts: [
+      { cue: "flareIgnite", exactAtS: 0.30, tail: 1.20, gain: 0.92, fadeOutS: 0.25, alignDbfs: -25 },
+      { cue: "flareBurn", exactAtS: 26.0, tail: 6.00, gain: 0.85, loop: true,
+        fadeInS: 0.02, fadeOutS: 0.02, alignDbfs: -25 },
+      { cue: "flareOut", exactAtS: 57.80, tail: 2.90, gain: 0.85, fadeInS: 0.03, fadeOutS: 0.15, alignDbfs: -25 },
+    ],
+  },
+
+  // --- 发报（终章）---------------------------------------------------------
+  // Data_MissionCh6 头注「音效缺口三条」的前两条。第三条（火车车轮声）**不重做**：
+  // 尾声要的「电流声渐变序章火车车轮声」里那个车轮声，指的就是序章那一条 ——
+  // 复用 `Audio/Amb/AudioAmb_TrainInterior.mp3`（30 s 立体声床，含轮轨咔嗒），
+  // 首尾呼应的前提是它**得是同一个声音**，另录一条反而把这处收束拆散了。
+  {
+    id: "TelegraphKey",
+    pending: true,
+    item: "sonniss-gdc-2026-game-audio-bundle-normalized",
+    path: "344 Audio - Antique Small Metals/METLMvmt_  Tinkering Antique Lock_344 Audio_Antique Small Metals.mp3",
+    credit: "344 Audio · 古董黄铜锁具摆弄 · Sonniss GDC 2026",
+    license: "sonniss",
+    // 电键的「嗒」。库里没有电键实录，退而求其次要的是**同一种东西**：
+    // 一九三〇年代的电键是黄铜杆＋弹簧＋触点，声音是干、短、带一点点金属余韵的一记
+    // ——「古董小金属件」这条录的就是黄铜锁具在手里摆弄，同材质同尺寸同录音棚。
+    // 三个变体从同一条素材里挑三下不同的：发报是**连着敲**的，
+    // 一个样本敲二十下就成了打字机。这三条也因此不能靠随机挑（会连出两次同一条），
+    // 接线时请照白刃三音的做法进 SAMPLE_CYCLE 顺序轮播，且不做逐发变调。
+    //
+    // **位置是钉死的，不走自动挑法。** 这条素材里的敲击最密处只隔 60 ms，
+    // 自动挑法给的 0.28 s 窗口一口气吃进三下 —— 按一次键响三声，比没有音效更糟。
+    // 逐条听（看）过之后钉了三个位置，都只留 17 ms 的引头 ——
+    // 按键音的前面多五十毫秒空白，手感上就是「按下去慢半拍」。
+    cuts: [
+      { cue: "telegraphKey", exactAtS: 0.145, tail: 0.21, gain: 0.9, fadeOutS: 0.06, alignDbfs: -25 },
+      { cue: "telegraphKey", exactAtS: 1.285, tail: 0.25, gain: 0.9, fadeOutS: 0.06, append: true, alignDbfs: -25 },
+      { cue: "telegraphKey", exactAtS: 2.425, tail: 0.23, gain: 0.9, fadeOutS: 0.06, append: true, alignDbfs: -25 },
+    ],
+  },
+  {
+    id: "TelegraphHum",
+    pending: true,
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "RedSonic - Hums Light Machines/electric_hum_buzz_01.mp3",
+    credit: "RedSonic · 电器低鸣与嗡声 · Sonniss GDC 2017",
+    license: "sonniss",
+    // 发报机的电流底噪（尾声开头那一段「电流声」）。取 2.0 s 起的 6 秒 ——
+    // 整条 11.7 s 的电平方差极小（工频谐波稳定成条），是「最无聊的一段」，
+    // 这正是选床的判据（见 docs/Data_AudioAssets.md 环境床那一节）。
+    // lp 7000：一九三〇年代的电台不会有八千赫以上的东西，砍掉才不像现代电源适配器。
+    cuts: [{ cue: "telegraphHum", exactAtS: 2.00, tail: 6.00, gain: 0.85, loop: true,
+      lp: 7000, fadeInS: 0.03, fadeOutS: 0.03, alignDbfs: -25 }],
+  },
+
+  // --- 日机攻击（第一关）---------------------------------------------------
+  // Data_MissionCh1 头注 ENGINE_REQUEST 第 4 条：两轮航线，第二轮转向人群。
+  // 三样东西分开录、分开切：**飞机的引擎**、**飞机的机枪**、**弹着扫过地面**。
+  {
+    id: "PlaneDive",
+    pending: true,
+    item: "sonniss-gdc-2019-game-audio-bundle-normalized",
+    path: "Pole Position - Bristol Blenheim Mk 1 1934/blenheim_mk_i_t3_ext_distant_medium_fly_bys_end_of_runway_ORTF_MKH8040.mp3",
+    credit: "Pole Position Production · 布里斯托尔「布伦海姆」1934（通场）· Sonniss GDC 2019",
+    license: "sonniss",
+    // 俯冲通场的引擎啸声。**与 `amb.planeFar` 同一条素材、同一架飞机**（1934 年首飞的
+    // 双发活塞机，与九六陆攻同代）—— 远处盘旋那一声和压到头顶这一声必须是同一架，
+    // 换素材就成了两架飞机。这里取的是整条 235 s 里第三次、也是最近的一次通场：
+    // 156.5 s 起 7 秒，实测 −36 dB 涨到 160.0 s 的 −9 dB 再落回 −34 dB，
+    // **多普勒是录出来的，不是变调做的** —— 这也是不用合成器的唯一理由。
+    cuts: [{ cue: "planeDive", exactAtS: 156.50, tail: 7.00, gain: 0.95,
+      fadeInS: 0.15, fadeOutS: 0.45, alignDbfs: -25 }],
+  },
+  {
+    id: "StrafeNear",
+    pending: true,
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_1m_left_blanks_Triple_shots_x_2.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal（炮塔架，1 m 左侧）· Sonniss GDC 2016",
+    license: "sonniss",
+    // 空对地扫射的**近**版本。选材同 `type92` 的理由再走一遍，且更硬：
+    // 这条录的是**架在炮塔上**的 M1919A4 —— 机载机枪就是这么装的，
+    // 每发后面那记枪架金属余振是「这枪不在人手里」的唯一线索。
+    // 素材里两组三连发（0.05 s 与 4.35 s），取第二组：它后面的尾巴没有别的动作压着。
+    //
+    // **这条破了「只切单发、射速由引擎排」那条规矩，是故意的**：航空机枪 ~900 rpm，
+    // 一次扫射两秒钟就是三十发，逐发排会被 NODE_BUDGET 那道闸吃掉一半（还是随机的一半）。
+    // 所以给的是一段**现成的三连发**，接线时按需要连着触发即可。
+    cuts: [{ cue: "strafeNear", exactAtS: 4.33, tail: 1.50, gain: 0.95, fadeOutS: 0.20, alignDbfs: -25 }],
+  },
+  {
+    id: "StrafeFar",
+    pending: true,
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal on turret/M1919A4_Browning_Machine_Gun_.30cal_on_turret_300m_in_front_blanks_Triple_shots_x_2.mp3",
+    credit: "Pole Position Production · M1919A4 .30cal（炮塔架，300 m 正前）· Sonniss GDC 2016",
+    license: "sonniss",
+    // 同一挺枪、同一次射击、300 m 外的另一支麦。**远近是两条真的录音**（选材硬标准第 3 条）：
+    // 远处那一梭子的尾巴是野地给的，近射加低通造不出来。
+    // 同样取第二组三连发，尾巴留到 2.2 s —— 远场的价值全在尾巴上。
+    cuts: [{ cue: "strafeFar", exactAtS: 4.32, tail: 2.20, gain: 0.85, fadeOutS: 0.35, alignDbfs: -25 }],
+  },
+  {
+    id: "StrafeDirt",
+    pending: true,
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Pole Position - The Warfare Library/warfare_t3_mg_whizzes_ricochets_bullet_cracks_M10.mp3",
+    credit: "Pole Position Production · 机枪弹丸掠过、跳弹与音爆 · Sonniss GDC 2017",
+    license: "sonniss",
+    // 弹着扫过土路的那一串「噼啪」。与 `amb.whizz` 同一条素材（那条切的是**单发**掠过），
+    // 这里要的是**一串**：119.72 s 起近三秒，实测全段稳在 −26 dB 上没有断口 ——
+    // 一梭子打过来的连续音爆与跳弹，正好铺在第二轮扫射弹线追人群的那几秒上。
+    cuts: [{ cue: "strafeDirt", exactAtS: 119.72, tail: 2.90, gain: 0.9,
+      fadeInS: 0.02, fadeOutS: 0.30, alignDbfs: -25 }],
+  },
+
+  // --- 重机枪（第五关）-----------------------------------------------------
+  // 三件里**连发已经有了**：`type92`（M1919A4 单发）＋ SAMPLE_BURST 的 200 rpm，
+  // 「啄木鸟」那条身份证不动。缺的是过热与卡壳这两件，补在这里。
+  {
+    id: "MgOverheat",
+    pending: true,
+    item: "sonniss-gdc-2015-game-audio-bundle-normalized",
+    path: "Eiravaein Works - Ilmarinen/Ilmarinen,blacksmith,forge,lighthammer,anvil,hotiron,rattle,taphammer,belts,gears,ambiance.mp3",
+    credit: "Eiravaein Works · 铁匠铺：轻锤敲热铁 · Sonniss GDC 2015",
+    license: "sonniss",
+    // 过热的「咔哒」。九二式是**气冷**的（不是马克沁那种水冷），过热时的声音不是
+    // 水汽嘶嘶，是散热片与枪管热胀冷缩的一记记金属轻响 —— 所以取的是铁匠铺里
+    // 轻锤敲在**热铁**上的点击（同一种物件、同一种温度状态）。
+    // 素材 10.8 s 里十几下独立的敲击，挑两下当变体：接线时按热度提高触发频率，
+    // 一个样本连着响就成了节拍器。
+    cuts: [{ cue: "mgOverheat", tail: 0.35, gain: 0.85, variants: 2,
+      minGap: 0.35, decay: [0.05, 0.6], fadeOutS: 0.10, alignDbfs: -25 }],
+  },
+  {
+    id: "MgCharge",
+    pending: true,
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - Various Gun Foley & Handling/SAIGA-12_12g_solid_slug_foley_close_up_RSM191_R_cocking.mp3",
+    credit: "Pole Position Production · 重型枪机拉柄（近距离）· Sonniss GDC 2016",
+    license: "sonniss",
+    // 卡壳之后那一下拉栓。**不能用已有的 `bolt`**：那是 M1903A3 的旋转后拉枪机，
+    // 一支步枪的动作；重机枪的拉柄是一大块钢被整个拽回来再放回去，重得多。
+    // 这条素材是 12 号霰弹枪的枪机拉柄近录，十四下干净独立的动作，正是需要的那个重量。
+    // 素材里「拉」（峰值 0.52）与「放回」（峰值 0.27）是**隔着 1.4 s** 的两下 ——
+    // 两下一起切进来就是中间一个 0.5 s 的洞，玩家按完键要等一秒半才听完，像卡住了。
+    // 所以只取「拉」那一下（18.47 s，全条最干净的一记，后面有 0.8 s 干净衰减），
+    // 需要两段式的话由接线侧触发两次。
+    cuts: [{ cue: "mgCharge", exactAtS: 18.47, tail: 0.90, gain: 0.9,
+      fadeOutS: 0.15, alignDbfs: -25 }],
   },
 ];
 

@@ -733,3 +733,171 @@ node Taierzhuang1938/Script_AudioTest.mjs
 
 通关冒烟里那条「每发之后补拉栓声与抛壳落地」也跟着改了：现在同时断言
 **没去要 `shellImpact`**。
+
+---
+
+# 重制新增音效（2026-08-28 · 任务流程重制音效缺口批 A2）
+
+七章重制排出来的音效缺口，一次补齐 **15 个 cue / 19 个文件 / 314 KB**，全部落
+`Audio/Sfx/`，来源与切割参数登记在 `Data_SfxSources.mjs` 末尾那一段。
+规格出处：`docs/Data_MissionRemake.md` §2/§3/§4/§5/§6/§7，以及
+`Data_MissionCh1/3/4/5/6.mjs` 头注里与音频有关的那几条 `ENGINE_REQUEST`。
+
+## 交付形态：先落 `pendingCues`，不进 `cues`
+
+`AudioEngine.LoadSfxPack` 对**没有同名合成配方**的 cue 是直接抛错的
+（`Script_Audio.mjs` 的「没有同名配方，盖不上去」），所以这 15 条要是直接写进
+`Data_SfxManifest.json` 的 `cues`，代价是：每次开机多十五条 `sfxErrors`，
+`Script_AudioTest` 的三条计数断言（清单 cue 数 / 盖住数 / 载入零报错）当场全红。
+**素材还没接线就先红一片测试不算交付**，所以它们落在清单的 `pendingCues` 段：
+
+- 文件在仓库里、清单里有账、`Data_SfxSources` 里有完整的来源与切法；
+- 运行时看不见（`LoadSfxPack` 只遍历 `cues`）；
+- `Script_AudioNormalize.mjs` 也不去动它们（它同样只读 `cues`）——
+  所以**烘焙期就按它的口径对齐好了**（下面「验收数字」）。
+
+### 集成批接线要做的四件事
+
+1. `Script_Audio.RECIPES` 给这 15 个 cue 各加一条**合成兜底配方**（采样载不到时的
+   回落，与现有 32 条同一条路子）；军号那种特例不适用，照 `explosionNear` 一类写即可。
+2. `SAMPLE_MIX` / `SAMPLE_WET` / `AMB_AIR`（远场那两条）/ `NODE_COST` 逐条加行 ——
+   不加的话 `MIX_GAIN` 取 1、`NODE_COST` 取默认的 19，一记照明弹燃烧就吃掉六分之一预算。
+3. `Script_AudioTest.mjs` 的 `RECIPE_COUNT` 从 41 改成 56。
+4. 把 `Data_SfxSources.mjs` 里这些组的 `pending: true` 删掉，**照组名重跑**
+   （`node Taierzhuang1938/Script_SfxBake.mjs ExecScreamShout ExecScreamCry PainMoanMuffled …`），
+   产物自动从 `pendingCues` 挪进 `cues`。
+   **不要跑不带组名的全量**：不带组名时清单从零重建，而 `Audio/Sfx/_raw/` 是 gitignore 的，
+   没有原始长片的组会被跳过 —— 结果是把没重切成的 cue 从清单里抹掉。这条在改动之前就是这样。
+
+`Data_SfxSources.mjs` **不在 `index.html` 的 import map 里**（全项目只有 Node 侧的
+烘焙脚本 import 它），所以本批不需要 bump 任何 `?v=`；接线批改
+`Script_Audio.mjs` / `Script_AudioTest.mjs` 时按规矩自己 bump。
+
+## 清单
+
+| cue | 变体 | 时长 | 体积 | 用在哪 | 素材 |
+| --- | ---: | ---: | ---: | --- | --- |
+| `execScream` | 2 | 0.62 / 0.55 s | 10.2 KB | 三关处决段（隔墙、低概率、低音量） | SoundBits · 男性痛叫 · GDC 2016 ／ SoundBits · 男性短叫 · Game Audio Monthly #2 |
+| `painMoan` | 1 | 2.60 s | 20.9 KB | 三/四关大出血伤员 | Airborne Sound · 三十多岁男性、捂着嘴的痛呼与喘 · GDC 2018 |
+| `hitGrunt` | 1 | 0.51 s | 4.5 KB | 四关罗班长腹部中弹 | Bottle Rocket Fx · 男性痛哼 · GDC 2016 |
+| `flareLaunch` | 1 | 2.60 s | 20.9 KB | 四关照明弹发射 | InspectorJ · 焰火近距离发射 · GDC 2023 |
+| `flareIgnite` | 1 | 1.20 s | 9.8 KB | 顶空点燃 | TS Sound · 信号弹点燃 · Game Audio Monthly #4 |
+| `flareBurn` | 1 **loop** | 6.00 s | 47.4 KB | 滞空持续燃烧 | 同上（同一次录音的稳定燃烧段） |
+| `flareOut` | 1 | 2.90 s | 23.3 KB | 熄灭衰减 | 同上（同一次录音的**自然烧完段**） |
+| `telegraphKey` | 3 | 0.21 / 0.25 / 0.23 s | 7.1 KB | 终章电键单点 | 344 Audio · 古董黄铜锁具 · GDC 2026 |
+| `telegraphHum` | 1 **loop** | 6.00 s | 47.4 KB | 终章发报机电流底噪 | RedSonic · 电器低鸣与嗡声 · GDC 2017 |
+| `planeDive` | 1 | 7.00 s | 55.1 KB | 一关日机俯冲通场 | Pole Position · 布里斯托尔「布伦海姆」1934 · GDC 2019 |
+| `strafeNear` | 1 | 1.50 s | 12.3 KB | 空对地扫射（近） | Pole Position · M1919A4 .30cal 炮塔架 1 m · GDC 2016 |
+| `strafeFar` | 1 | 2.20 s | 17.8 KB | 空对地扫射（远） | Pole Position · 同一挺枪、同一次射击、300 m 外的另一支麦 |
+| `strafeDirt` | 1 | 2.90 s | 23.3 KB | 弹着扫过土路的一串近弹 | Pole Position · The Warfare Library 弹丸掠过与跳弹 · GDC 2017 |
+| `mgOverheat` | 2 | 0.35 s | 6.6 KB | 五关重机枪过热咔哒 | Eiravaein Works · 铁匠铺轻锤敲热铁 · GDC 2015 |
+| `mgCharge` | 1 | 0.90 s | 7.6 KB | 五关卡壳拉栓 | Pole Position · 重型枪机拉柄近录 · GDC 2016 |
+
+许可：**全部 Sonniss GDC Game Audio Bundle（archive.org 镜像），免版税、可商用、
+不要求署名**。厂商名照旧逐条记在 `Data_SfxSources.mjs` 里 —— 那是选材的依据，不是法务义务。
+本批**没有一条走 TTS / SeedAudio / MiniMax**：三条人声按 `docs/Data_AudioAssets.md`
+「交付档」一节的明令，非语言嗓音一律取真人实录。
+
+## 复用了什么（这几件没有重做）
+
+- **火车车轮声 loop**（终章尾声「电流声渐变序章火车车轮声」）—— 复用
+  `Audio/Amb/AudioAmb_TrainInterior.mp3`（30 s 立体声床，含轮轨咔嗒，`beds.trainInterior`）。
+  这处收束的意思就是「回到序章那节车厢」，**另录一条反而把首尾呼应拆散了**。
+- **九二式重机连发** —— 已有的 `type92`（M1919A4 单发）＋ `SAMPLE_BURST` 的 200 rpm，
+  「啄木鸟」那条身份证不动。缺口批只补了过热与卡壳。
+- **日机远场盘旋** —— 已有的 `amb.planeFar` 与新的 `planeDive` 是**同一条素材、同一架飞机**
+  的远近两次通场。
+- **单发弹丸掠过** —— 已有的 `amb.whizz` 与新的 `strafeDirt` 同源，前者切单发、后者切一串。
+- **伤员痛呼床（远、不定位）** —— 已有的 `amb.moanFar`（Coll Anderson 战后群体呻吟）
+  就是第四关 A 区院内那层背景，`painMoan` 是它旁边**具体那一个人**。
+
+## 验收数字
+
+响度口径与 `Script_AudioNormalize.mjs` 的「一次性音」组逐字相同（20 ms 帧、门限取最响帧的
+10%、目标 −25 dBFS、峰值上限 −1 dBFS），**由 `Script_SfxBake` 的新字段 `alignDbfs`
+在烘焙期量成品补差**（量成品不量 stage.wav —— 72 kbps 单声道编宽带噪声解出来会高 2—3 dB）：
+
+- 有声段 RMS：**−25.15 … −24.70 dBFS**，散布 0.45 dB（容差 ±0.5）；
+- 峰值：**−14.16 … −1.54 dBFS**，全部在 −1 dBFS 之下；
+- 首尾端点电平：全部 ≤ −52 dB（两条 loop 的 −52/−53 是 20 ms 淡出落在稳态嘶声上，
+  其余都在 −64 dB 以下）—— **没有硬切口，不会「咔」**。
+
+搬进 `cues` 之后 `Script_AudioNormalize.mjs`（只读验收）对这 19 个文件应当直接是绿的。
+注意 SFX 组现在**本来就是红的**，与本批无关：白刃那五条 SeedAudio 成品是按全库中位
+−28.5 dBFS 压的（见上面「白刃三音为什么是生成的」），从来没并进 −25 那条平线。
+
+## 频谱验收（我听不见，靠看）
+
+逐条渲染「波形 + 对数频谱」贴图过一遍，配 时长 / 有声段 RMS / 峰值 / 端点电平四个数。
+逐条结论：
+
+- `execScream` 两条 —— 起音后整条都是**有基频有共振峰**的浊音（实测基频 361→256 Hz
+  与 230→134 Hz，都是成年男性区间），谐波梯清楚，无削顶，尾部由 0.14—0.16 s 的淡出收干净。
+- `painMoan` —— 2.6 s 里三段发声夹两次换气，低频基频带明显（106—165 Hz），
+  共振峰结构完整；这是全库唯一一段**真的低而持续**的男声痛呼，也是选「捂着嘴」那条素材的原因。
+- `hitGrunt` —— 单个短事件，能量集中在低段并有结构（降调 18% 之后基频约 290 Hz），
+  0.51 s 内收完，无第二次发声（不是惨叫）。
+- `flareIgnite / flareBurn / flareOut` —— 点燃是一记冲头接嘶声；燃烧段 6 秒逐帧 RMS
+  稳在 −25±1 dB（是「最无聊的一段」，适合循环）；熄灭段实测从 −22 dB 平滑掉到 −56 dB，
+  **是素材里真的烧完了**，不是淡出曲线冒充的。
+- `telegraphKey` 三条 —— 每条是一记主击＋一记轻的（按下＋抬起），引头只留 17 ms
+  （按键音前面多五十毫秒空白，手感上就是「按下去慢半拍」）。
+- `telegraphHum` —— 工频谐波稳定成条，6 秒里无起伏，低通 7 kHz 之后没有现代电源那种毛刺。
+- `planeDive` —— 教科书式的通场包络：−36 dB 涨到 −9 dB 再落回 −34 dB，高频带随距离
+  张开再收拢，**多普勒是录出来的**。
+- `strafeNear / strafeFar` —— 同一次三连发的两个机位：近的低频冲击厚、瞬态硬；
+  远的瞬态被吃掉只剩尖头加长尾。两张图摆一起就是「远近是两条真的录音」这条标准的样子。
+- `strafeDirt` —— 2.9 秒里三十几记等间距的锐利音爆，中间没有断口。
+- `mgOverheat` 两条 —— 冲头后有清楚的金属共振模态（横条纹），0.35 s 内衰完。
+- `mgCharge` —— 一记宽带机械撞击加衰减，无金属振铃（是拉柄不是敲钟）。
+
+**仍需人工试听的两处**：惨叫与痛呼是不是「克制不猎奇」、电键的「嗒」够不够干脆 ——
+这两条机器判不了。
+
+## 手榴弹雨（第二关）·「密集多发叠放会不会糊」评估
+
+按分工只评估、不改 `Script_Audio.mjs`。第二关 brief 的口径是**集中六七十人、连续二三百枚**，
+`mechanics.grenadeRain` 要求「玩家与背景守军同时投、落点在 0.3—0.8 s 内错开」。
+沿现有链路（`Script_Combat.Blast` → `audio.Play("explosionNear")`）逐道闸算下来：
+
+**不是瓶颈的三处：**
+
+- **预算闸**：采样版 `explosionNear` 的 `NODE_COST` 是 2，`NODE_BUDGET` 120 ——
+  理论上同时六十记爆炸才顶到天花板，一场手榴弹雨挤不满。
+- **去重窗**：`DEDUPE_S` 22 ms 只合并**同一帧**的重复；落点按设计错开 0.3—0.8 s，
+  基本撞不上这道窗。
+- **距离闸**：`Blast` 按听者距离在 60 m 处分近/远，外壕投弹距玩家十几到三十米，
+  全部走 `explosionNear`（2.4 s、`SAMPLE_MIX` 1.0 —— 全表最响的一条）。
+
+**四处真的会糊，按严重程度排：**
+
+1. **`explosionNear` 只有一个变体。** 本文件自己的规矩是「每秒都在响的音必须多变体」，
+   手榴弹雨正是那种场合：二十几记爆炸全从同一条 2.4 s 的 wav 出，±3% 逐发变调盖不住
+   —— 听感上会从「一片爆炸」塌成「同一记爆炸响了二十遍」。
+   **这是本项唯一的素材缺口**，建议补 2 条同厂同类的近场城区爆炸变体
+   （Bluezone `BC0277 explosion_urban` 那一组里还有可用的，与现用那条同库同型）。
+   本批按分工没有动它。
+2. **混响 send 是线性叠加的。** `SAMPLE_WET.explosionNear` 0.45，街巷 IR 0.95 s、
+   开阔地 2.6 s；二十记同距离的爆炸叠上去，湿声总能量就是 0.45×N ——
+   2026-08-20 那一轮定论过的「不知道哪儿来的、带拖尾」正是这个机制，只是那次的成因是
+   距离不衰减，这次是**数量**。接线时建议给一个齐射感知的 wet 折减，
+   或把超过前几记之外的爆炸改派 `explosionFar`（听觉上本来也只有最近几记有清楚的爆头）。
+3. **主限幅器会抽。** master 上那只 `DynamicsCompressor` 是 threshold −8 dB、ratio 12、
+   release 0.22 s；密集爆炸会让它一直压着不放，底下的枪声与人声整体被摁下去 ——
+   听感就是「一打起来什么都听不清」。
+4. **合成回落是个坑。** 采样包一旦载不到，`explosionNear` 走合成配方，`NODE_COST` 18，
+   **六记同时的爆炸就吃光 120 的预算**，此后除了 `priority` 的声音全被丢。
+   正常路径下遇不到，但这一关是全作爆炸最密的一关，值得在接线时给爆炸类单独设个并发上限。
+
+## 重新烘焙
+
+```bash
+# 一律照组名重烘（不带组名的全量会从零重建清单，见上面第 4 条）
+node Taierzhuang1938/Script_SfxBake.mjs ExecScreamShout ExecScreamCry   # 共用一个 cue 的组必须一起烘
+node Taierzhuang1938/Script_SfxBake.mjs FlareBurn --recut          # 点燃/燃烧/熄灭三条同源，一起重切
+node Taierzhuang1938/Script_SfxBake.mjs TelegraphKey --report      # 先看候选表再钉位置
+```
+
+原始长片仍落 `Audio/Sfx/_raw/`（已 gitignore）。本批新增的四个切割字段
+（`fadeInS` / `fadeOutS` / `alignDbfs` / `loop`，与组上的 `pending`）
+在 `Script_SfxBake.mjs` 头注里逐条写了为什么。
