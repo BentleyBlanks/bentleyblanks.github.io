@@ -54,88 +54,42 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
-    // 五个 kind 一律用程序化 tzm 模型，**不许**再退回 Model_*Soldier.glb /
-    // Model_Civilian*.glb 那套 13 个刚体分段：那套分段之间没有交叠余量，
-    // 肩/肘/腕/胯/膝/踝一转就开缝，躯干还是一张薄板，百姓那两个更是连脚都没有。
-    // 判据写成「meshSource 是 model 且 13 根骨头下面都挂着可见几何」——
-    // 换回 GLB 皮会把这些几何整片藏起来，这一条立刻红。
-    check(actor.meshSource === "model",
-      `NRA should use the procedural tzm model, got ${actor.meshSource}`);
-    const jointNodes = {
-      hips: actor.hips, chest: actor.chest, neck: actor.neck,
-      armL: actor.arms.L.shoulder, foreL: actor.arms.L.elbow,
-      armR: actor.arms.R.shoulder, foreR: actor.arms.R.elbow,
-      thighL: actor.legs.L.thigh, shinL: actor.legs.L.knee, footL: actor.legs.L.ankle,
-      thighR: actor.legs.R.thigh, shinR: actor.legs.R.knee, footR: actor.legs.R.ankle,
-    };
-    for (const [key, node] of Object.entries(jointNodes)) {
-      let visible = 0;
-      for (const child of node.children) if (child.isMesh && child.visible) visible += 1;
-      check(visible > 0, `joint ${key} has no visible geometry`);
-    }
-    // 单查 13 个关节“各自有网格”还不够：缓存混搭时每一块都能被创建，
-    // 但会按不相容的局部坐标散到半空。以整棵 Actor 的包围盒锁住
-    // “一具身高尺度内、紧凑的完整人物”，正好覆盖动作编辑器里那种假成功。
-    const checkCompactAssembly = (candidate, label) => {
-      candidate.root.updateMatrixWorld(true);
-      const box = new THREE.Box3();
-      let meshCount = 0;
-      candidate.root.traverse((item) => {
-        if (!item.isMesh || !item.visible) return;
-        meshCount += 1;
-        box.expandByObject(item);
+    // 军人可见人体已全部换成卢沟桥资产的蒙皮 GLB；程序化骨架仍只作为动作编辑器
+    // 的独立模式和既有挂点 API 兼容层，不得重新成为正式军人外观。
+    const checkRiggedSoldier = (candidate, faction) => {
+      check(candidate.meshSource.startsWith(`glb:Lugou${faction}`),
+        `${faction} should use a Lugou skinned GLB, got ${candidate.meshSource}`);
+      check(candidate.characterRig?.clipById?.size === 16,
+        `${candidate.meshSource} did not expose all 16 imported actions`);
+      let skinnedMeshes = 0;
+      candidate.characterRig.root.traverse((item) => {
+        if (item.isSkinnedMesh && item.visible) skinnedMeshes += 1;
       });
-      const span = box.getSize(new THREE.Vector3());
-      check(meshCount > 0 && Number.isFinite(span.x + span.y + span.z),
-        `${label} has no finite assembled bounds`);
-      check(span.y > candidate.height * 0.90 && span.y < candidate.height * 1.15
-        && span.x < 0.75 && span.z < 0.80,
-      `${label} model pieces escaped their actor frame: ${span.toArray()}`);
+      check(skinnedMeshes > 0, `${candidate.meshSource} has no visible SkinnedMesh`);
+      const hitboxes = candidate.GetBoneHitboxes();
+      check(hitboxes.length === 11
+        && hitboxes.some((shape) => shape.part === "head")
+        && hitboxes.some((shape) => shape.part === "torso")
+        && hitboxes.some((shape) => shape.part === "limb"),
+      `${candidate.meshSource} bone hitboxes are incomplete`);
     };
-    checkCompactAssembly(actor, "NRA");
+    checkRiggedSoldier(actor, "Nra");
     const ija = factory.Create("ija", { seed: 90215, weapon: null });
-    check(ija.meshSource === "model", `IJA should use the procedural tzm model, got ${ija.meshSource}`);
-    checkCompactAssembly(ija, "IJA");
-    const footOffset = (leg, mountName) => {
-      const segment = leg.ankle;
-      const mount = actor.GetMount(mountName);
-      actor.root.updateMatrixWorld(true);
-      // GLTFLoader 会把多材质分段实例化为 Group + 子 Mesh，可见几何要递归找；
-      // 被隐藏的旧程序化脚网格仍挂在踝下，量包围盒时必须排除。
-      const box = new THREE.Box3();
-      let visibleMeshes = 0;
-      segment.traverse((item) => {
-        if (!item.isMesh || !item.visible) return;
-        visibleMeshes += 1;
-        box.expandByObject(item);
-      });
-      check(visibleMeshes > 0, `missing visible ${mountName} geometry`);
-      const ankle = mount.getWorldPosition(new THREE.Vector3());
-      return {
-        ankleY: ankle.y - actor.root.position.y,
-        offset: [
-          box.min.x - ankle.x, box.min.y - ankle.y, box.min.z - ankle.z,
-          box.max.x - ankle.x, box.max.y - ankle.y, box.max.z - ankle.z,
-        ],
-      };
-    };
-    const { offset: footL, ankleY: ankleL } = footOffset(actor.legs.L, "footL");
-    const { offset: footR, ankleY: ankleR } = footOffset(actor.legs.R, "footR");
-    // 2026-08-25 资产修复后鞋底烘在世界 0.010 m（对齐 Ija 的 0.009）；
-    // 这里锁「贴地不悬空、不沉地、不脱离踝」。
-    const soleL = ankleL + footL[1];
-    const soleR = ankleR + footR[1];
-    check(soleL > -0.02 && soleL < 0.02 && soleR > -0.02 && soleR < 0.02,
-      `NRA soles drifted from the ground plane: L=${soleL} R=${soleR}`);
-    check(footL[1] < -0.005 && footL[4] <= 0.2 && footR[1] < -0.005 && footR[4] <= 0.2,
-      `NRA feet detached from their ankle pivots: L=${footL} R=${footR}`);
-    const footSymmetry = [
-      footL[0] + footR[3], footL[3] + footR[0], // X 轴镜像
-      footL[1] - footR[1], footL[4] - footR[4], // 高度一致
-      footL[2] - footR[2], footL[5] - footR[5], // 鞋尖同向
-    ];
-    check(footSymmetry.every((value) => Math.abs(value) < 0.004),
-      `NRA left/right foot segment mismatch: L=${footL} R=${footR}`);
+    checkRiggedSoldier(ija, "Ija");
+    const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
+    check(protagonist.modelId === "LugouNra01",
+      `protagonist should use LugouNra01, got ${protagonist.modelId}`);
+    protagonist.Dispose();
+    for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
+      const variants = [];
+      for (let modelVariant = 0; modelVariant < 5; modelVariant += 1) {
+        const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
+        variants.push(candidate.modelId);
+        candidate.Dispose();
+      }
+      check(variants.join(",") === [1, 2, 3, 4, 5].map((n) => `${prefix}0${n}`).join(","),
+        `${kind} five-model lineup mismatch: ${variants.join(",")}`);
+    }
 
     // 百姓：男女两个分身各查一遍。这个 kind 是最后一个从 GLB 搬过来的
     //（2026-08-26），而它原来的毛病恰恰是「脚整个不存在、人陷在地下 11 cm」，
@@ -233,7 +187,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "6 states × 3 levels, 中日 tzm 模型完整装配, 13 关节几何, 百姓男女分身, sole clearance, seated legs, weapon-palm clearance, invalid values, mounts, default regression, armed blend";
+    return "10 套军人蒙皮 GLB, 16 动作, 11 骨骼命中体, 主角国军 01, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance";
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

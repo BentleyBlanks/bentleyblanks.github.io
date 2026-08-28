@@ -13,15 +13,16 @@
 //     史实信息不许因为跳过而丢失（这是设计书的硬要求，不是可选项）。
 //
 // ── 三条不许违反的工程规矩 ──────────────────────────────────────────────
-//   1. **不许 SkinnedMesh。** Actor 是骨头组＋刚体块，深度法线预通道拿
-//      overrideMaterial 覆盖全场，蒙皮网格会塌。这里只用 ActorFactory 造人。
+//   1. **人物只从 ActorFactory 创建。** 国军/日军是蒙皮 GLB，并由
+//      Script_CharacterModel 标记 skipNormalDepth，不能让无 skinning define 的
+//      overrideMaterial 预通道覆盖；百姓与资产故障回退仍可走程序化刚体骨架。
 //   2. **不许 Math.random()。** 手持晃动、抖动全走 Script_Noise 的
 //      Mulberry32 / HashString / ValueNoise2 —— 出图必须可复现，
 //      否则视觉审查每跑一次得到一张不同的图，没法比。
 //   3. **半透明/加性/billboard 材质建完必须 MarkNoPrepass。**
 //      这里只有枪口焰是加性贴片，建材质的那一行紧跟着就调它。
 //
-// ── 绘制量（1280×720、actorQuality=medium 实测，只数过场自己带进场的东西）──
+// ── 历史绘制量（旧刚体军人，1280×720、actorQuality=medium，仅供布景量级参考）──
 //   CS_Chuchuan        340 网格 / 30.8k 三角 / 1 灯   （独立布景，城不在视锥里）
 //   CS_LiZongrenTang    39 网格 /  2.1k 三角 / 1 灯   （独立布景）
 //   CS_LastWire         77 网格 /  5.6k 三角 / 1 灯   （独立布景）
@@ -34,8 +35,9 @@
 //
 // ── 与 Script_Actor 的关系 ──────────────────────────────────────────────
 // 本模块**不 import Script_Actor**，工厂由外部注入（actorFactory）。
-// 换模 agent 正在重写那个文件，硬耦合过去两边都动不了。
-// 需要的接口只有三个：Create(kind,{seed}) → { root, Update(dt,state), SetWeapon(id), Dispose() }。
+// 需要的核心接口是 Create(kind,{seed}) →
+// { root, Update(dt,state), SetWeapon(id), Dispose() }；第一人称演员还会调用
+// characterRig.SetHeadVisible(false)，避免眼位相机看见头部内壁。
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -760,6 +762,10 @@ export class CutsceneDirector {
         try {
           actor = this.actorFactory.Create(spec.kind || "nra", {
             seed: spec.seed || spec.id,
+            // 第一人称演员就是玩家在过场里可低头看见的主人公身体，固定国军 01；
+            // 其余国军/日军照 ActorFactory 的稳定种子随机五种外观。
+            protagonist: spec.firstPerson === true,
+            modelVariant: spec.firstPerson === true ? 0 : undefined,
             uniformHex: spec.uniformHex,
             trouserHex: spec.trouserHex,
             accessoryHex: spec.accessoryHex,
@@ -779,6 +785,7 @@ export class CutsceneDirector {
           actor.neck.traverse((node) => {
             if (node && node.isMesh) node.visible = false;
           });
+          actor.characterRig?.SetHeadVisible(false);
           actor.firstPerson = true;
         }
         // 独立车厢没有接进正片地形的 groundProbe；让它去采远处 L0 的高度会把

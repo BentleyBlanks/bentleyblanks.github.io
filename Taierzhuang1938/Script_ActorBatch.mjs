@@ -1,4 +1,5 @@
-// 《滕县 一九三八》人物合批：把所有人物的分件网格按「几何 × 材质」收成 InstancedMesh。
+// 《滕县 一九三八》程序化人物合批：把百姓等刚体分件按「几何 × 材质」收成 InstancedMesh。
+// 国军/日军现为逐骨骼蒙皮 GLB，必须走 SkinnedMesh，并整人跳过本模块。
 //
 // 为什么非做不可（实测数字，phase=2 城里，1280×720）：
 //   城里同时站着 69 个人，每个人是 24—33 个分件网格（一根骨头下按材质分桶合并过，
@@ -170,6 +171,10 @@ export class ActorBatcher {
     for (const entry of record.entries) entry.mesh.layers.set(0);
     record.entries.length = 0;
     record.revision = actor.partsRevision | 0;
+    // 蒙皮 GLB 必须由 SkinnedMesh 自己提交，不能进刚体 InstancedMesh。它身上的枪/刀
+    // 虽是普通 Mesh，但每帧跟随骨骼 socket；单独合批既省不了提交，还会在开关合批时
+    // 造成阴影/透明排序差异。整个人跳过，程序化百姓仍照旧参与刚体合批。
+    if (actor.usingRiggedCharacter) return;
     const root = actor.root;
     root.traverse((object) => {
       if (!object.isMesh || object.isInstancedMesh || object.isSkinnedMesh) return;

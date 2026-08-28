@@ -1,0 +1,920 @@
+{
+  "schema": 1,
+  "generatedBy": "Script_BakeLugouCharacters.py",
+  "models": [
+    {
+      "id": "LugouIja01",
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja01.glb",
+      "source": "Model_LugouIja01.fbx",
+      "vertices": 6574,
+      "triangles": 11106,
+      "bytes": 2945208,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557657,
+          -0.189996,
+          -0.0
+        ],
+        "max": [
+          0.557657,
+          0.189996,
+          1.758352
+        ],
+        "size": [
+          1.115314,
+          0.379993,
+          1.758352
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouIja02",
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja02.glb",
+      "source": "Model_LugouIja02.fbx",
+      "vertices": 8888,
+      "triangles": 14703,
+      "bytes": 3221512,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557658,
+          -0.217298,
+          -0.0
+        ],
+        "max": [
+          0.557658,
+          0.217298,
+          1.774785
+        ],
+        "size": [
+          1.115316,
+          0.434596,
+          1.774785
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouIja03",
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja03.glb",
+      "source": "Model_LugouIja03.fbx",
+      "vertices": 9251,
+      "triangles": 15573,
+      "bytes": 3456704,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557657,
+          -0.225761,
+          -0.0
+        ],
+        "max": [
+          0.557657,
+          0.225761,
+          1.761351
+        ],
+        "size": [
+          1.115315,
+          0.451522,
+          1.761351
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouIja04",
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja04.glb",
+      "source": "Model_LugouIja04.fbx",
+      "vertices": 9134,
+      "triangles": 15351,
+      "bytes": 2985972,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557658,
+          -0.239783,
+          -0.0
+        ],
+        "max": [
+          0.557658,
+          0.239783,
+          1.774785
+        ],
+        "size": [
+          1.115316,
+          0.479567,
+          1.774785
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouIja05",
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja05.glb",
+      "source": "Model_LugouIja05.fbx",
+      "vertices": 8115,
+      "triangles": 13393,
+      "bytes": 2958620,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557658,
+          -0.221502,
+          -0.0
+        ],
+        "max": [
+          0.557658,
+          0.221502,
+          1.774784
+        ],
+        "size": [
+          1.115315,
+          0.443004,
+          1.774784
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouNra01",
+      "faction": "nra",
+      "url": "./Model/Character/Model_LugouNra01.glb",
+      "source": "Model_LugouNra01.fbx",
+      "vertices": 4412,
+      "triangles": 8450,
+      "bytes": 3304824,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.887994,
+          -0.183443,
+          0.0
+        ],
+        "max": [
+          0.887993,
+          0.183443,
+          1.814391
+        ],
+        "size": [
+          1.775986,
+          0.366885,
+          1.814391
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouNra02",
+      "faction": "nra",
+      "url": "./Model/Character/Model_LugouNra02.glb",
+      "source": "Model_LugouNra02.fbx",
+      "vertices": 5221,
+      "triangles": 9917,
+      "bytes": 3761760,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.887993,
+          -0.185672,
+          -0.0
+        ],
+        "max": [
+          0.887993,
+          0.185672,
+          1.817118
+        ],
+        "size": [
+          1.775986,
+          0.371343,
+          1.817118
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouNra03",
+      "faction": "nra",
+      "url": "./Model/Character/Model_LugouNra03.glb",
+      "source": "Model_LugouNra03.fbx",
+      "vertices": 5088,
+      "triangles": 9485,
+      "bytes": 3411416,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.887993,
+          -0.195535,
+          -0.0
+        ],
+        "max": [
+          0.887993,
+          0.195535,
+          1.768286
+        ],
+        "size": [
+          1.775986,
+          0.39107,
+          1.768286
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouNra04",
+      "faction": "nra",
+      "url": "./Model/Character/Model_LugouNra04.glb",
+      "source": "Model_LugouNra04.fbx",
+      "vertices": 4620,
+      "triangles": 8868,
+      "bytes": 3774804,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.887993,
+          -0.177933,
+          0.0
+        ],
+        "max": [
+          0.887993,
+          0.177933,
+          1.79927
+        ],
+        "size": [
+          1.775986,
+          0.355866,
+          1.79927
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [
+        "Map #81",
+        "Map #82"
+      ],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    },
+    {
+      "id": "LugouNra05",
+      "faction": "nra",
+      "url": "./Model/Character/Model_LugouNra05.glb",
+      "source": "Model_LugouNra05.fbx",
+      "vertices": 4591,
+      "triangles": 8683,
+      "bytes": 3385672,
+      "boneRoles": {
+        "head": "Bip002 Head",
+        "neck": "Bip002 Neck",
+        "chest": "Bip002 Spine2",
+        "pelvis": "Bip002 Pelvis",
+        "handR": "Bip002 R Hand",
+        "handL": "Bip002 L Hand",
+        "footR": "Bip002 R Foot",
+        "footL": "Bip002 L Foot",
+        "upperArmR": "Bip002 R UpperArm",
+        "upperArmL": "Bip002 L UpperArm",
+        "forearmR": "Bip002 R Forearm",
+        "forearmL": "Bip002 L Forearm",
+        "thighR": "Bip002 R Thigh",
+        "thighL": "Bip002 L Thigh",
+        "calfR": "Bip002 R Calf",
+        "calfL": "Bip002 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.887994,
+          -0.183206,
+          0.0
+        ],
+        "max": [
+          0.887994,
+          0.183206,
+          1.807481
+        ],
+        "size": [
+          1.775988,
+          0.366413,
+          1.807481
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire"
+      ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt"
+        ]
+      }
+    }
+  ],
+  "elapsedSeconds": 258.452
+}
