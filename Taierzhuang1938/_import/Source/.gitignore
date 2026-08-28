@@ -12,6 +12,11 @@ mauserc96.glb
 mauserc96.blend
 Texture_*Source.png
 
+# 用户提供的卢沟桥合集需要把拆分后的独立源模与贴图哈希清单一起保留；
+# 运行时 TZM 不能替代这些可继续编辑、仍指向原 DDS/TGA/JPEG 的 Blend。
+!Model_LugouqiaoWeapons/*.blend
+!Model_LugouqiaoWeapons/Data_LugouqiaoWeaponTextures.json
+
 # Sketchfab 源包的贴图不进仓库（导入管线只用几何，Steel/Wood 共享 PBR 在 Texture/）
 Model_*/textures/
 

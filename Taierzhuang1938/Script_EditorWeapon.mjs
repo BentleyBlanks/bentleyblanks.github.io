@@ -22,6 +22,8 @@ const KIND_LABEL = {
   boltRifle: "栓动步枪", lmg: "轻机枪", hmg: "重机枪", pistol: "手枪",
   throwable: "投掷物", melee: "近战", mortar: "掷弹筒", vehicle: "车辆",
 };
+const SIDE_SHORT = { nra: "中", ija: "日", neutral: "未明" };
+const SIDE_LONG = { nra: "中方（第 22 集团军）", ija: "日方（濑谷支队）", neutral: "阵营未明/通用资产" };
 
 /**
  * 有没有几何。**判据是模型表，不是 kind。**
@@ -145,7 +147,7 @@ export class WeaponEditor {
     this.list.Fill(Object.keys(WEAPONS).map((id) => {
       const w = WEAPONS[id];
       return {
-        id, name: `${w.name}`, tail: `${w.side === "nra" ? "中" : "日"}·${KIND_LABEL[w.kind] || w.kind}`,
+        id, name: `${w.name}`, tail: `${SIDE_SHORT[w.side] || "未明"}·${KIND_LABEL[w.kind] || w.kind}`,
         title: w.fullName,
       };
     }));
@@ -581,7 +583,7 @@ export class WeaponEditor {
     this.facts.Clear();
     const F = (k, v, tone = "") => this.facts.Set(k, v, tone);
     F("全称", w.fullName);
-    F("阵营", w.side === "nra" ? "中方（第 22 集团军）" : "日方（濑谷支队）");
+    F("阵营", SIDE_LONG[w.side] || "阵营未明/通用资产");
     F("类别", KIND_LABEL[w.kind] || w.kind);
     if (w.ammo) {
       const a = AMMO[w.ammo];

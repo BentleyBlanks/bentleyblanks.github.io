@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "textures": [
+    {
+      "sourceName": "ammobox.dds",
+      "preservedName": "Texture_LugouqiaoType11AmmoBox.dds",
+      "bytes": 174904,
+      "sha256": "ce65da20ef3fba742a716d09dd55d7c9733d7a3e360e976462617a5994d53f01"
+    },
+    {
+      "sourceName": "body.dds",
+      "preservedName": "Texture_LugouqiaoType11Body.dds",
+      "bytes": 699192,
+      "sha256": "4ef5e035549064b73329c5bd742c91890ed8f6f01267b04bdb1d0326fec0224e"
+    },
+    {
+      "sourceName": "body2.dds",
+      "preservedName": "Texture_LugouqiaoType11BodyAlt.dds",
+      "bytes": 699192,
+      "sha256": "3f59b7c4e55ccb1f4f92c6c5742301d28baa1cfd4b49a4cab0356805f5fc4d98"
+    },
+    {
+      "sourceName": "dl772.jpg",
+      "preservedName": "Texture_LugouqiaoUnidentifiedBoltActionRifleBase.jpg",
+      "bytes": 123234,
+      "sha256": "a2de371fc8f9d34d3bad3ae3e136dc103f900dbc29f6f3514d21c2d68eee4c3d"
+    },
+    {
+      "sourceName": "fore.dds",
+      "preservedName": "Texture_LugouqiaoType11Fore.dds",
+      "bytes": 699192,
+      "sha256": "acc9c3390c2aa5c94916811607f06adcbc19cc84cdb3ec38bcb945617ebb8b30"
+    },
+    {
+      "sourceName": "Lug_reb.tga",
+      "preservedName": "Texture_LugouqiaoWaltherP38Base.tga",
+      "bytes": 1248,
+      "sha256": "89abf08b89a566d6f3e1eb7cb8da154591724849abc59148c6f2a0546b30ff2d"
+    },
+    {
+      "sourceName": "maose_d.tga",
+      "preservedName": "Texture_LugouqiaoMauser96Base.tga",
+      "bytes": 12582956,
+      "sha256": "f2d97b5b5907b7a5c763afcfbfc1a54523a253a710d700257a98303f033d75be"
+    },
+    {
+      "sourceName": "maose_s.tga",
+      "preservedName": "Texture_LugouqiaoMauser96Specular.tga",
+      "bytes": 12582956,
+      "sha256": "3413c1e32e06ee42ff87bccc2d27652fa5349a9268e3c01a7bed0874d22f1a64"
+    },
+    {
+      "sourceName": "MKCRMT.jpg",
+      "preservedName": "Texture_LugouqiaoUnidentifiedAntiaircraftMetal.jpg",
+      "bytes": 131593,
+      "sha256": "c57c120ccf0dc5b188d3c439a3af7a04baac076adbb31db80b67134658710da1"
+    },
+    {
+      "sourceName": "Mkwood.jpg",
+      "preservedName": "Texture_LugouqiaoUnidentifiedAntiaircraftWood.jpg",
+      "bytes": 42883,
+      "sha256": "8c3aae215bd0e53dd418f99a1ae75ee36efde16482370459df66a05b94063d22"
+    },
+    {
+      "sourceName": "PJP.jpg",
+      "preservedName": "Texture_LugouqiaoLightMortarBase.jpg",
+      "bytes": 274071,
+      "sha256": "f180d65a31f5b7c2dbd91e397037763966e8fac7c2f06c53edd247cfd108ce59"
+    },
+    {
+      "sourceName": "stripe01L.jpg",
+      "preservedName": "Texture_LugouqiaoOfficerSwordBase.jpg",
+      "bytes": 562789,
+      "sha256": "382683886038035aab2f93a743b9f2f7f80dffdc8fe8fbc76b1022f454c9fbb5"
+    },
+    {
+      "sourceName": "Tex_0155_1.dds",
+      "preservedName": "Texture_LugouqiaoRingPommelDaggerBase.dds",
+      "bytes": 524416,
+      "sha256": "91325d35c85961a33b9bcc765ad0fc53fcc41b242f85278177128917815def82"
+    },
+    {
+      "sourceName": "Wp_Gun_Karabiner 98 Kurz_d.tga",
+      "preservedName": "Texture_LugouqiaoKarabiner98kBase.tga",
+      "bytes": 8604988,
+      "sha256": "82a1405c852b9385b90ce3cab595ff386d7352c07e3ab530e795d485ab294835"
+    },
+    {
+      "sourceName": "Wp_Gun_Karabiner 98 Kurz_n.tga",
+      "preservedName": "Texture_LugouqiaoKarabiner98kNormal.tga",
+      "bytes": 8844774,
+      "sha256": "48e7b0d1c2a6d472a11de6a3e4d08a7af4bb905f865bf6c8bbaf5bd86489a02a"
+    },
+    {
+      "sourceName": "WW-100heqdf.jpg",
+      "preservedName": "Texture_LugouqiaoUnidentifiedMunitionBase.jpg",
+      "bytes": 135914,
+      "sha256": "ea51ad87ac3f6964e8493f8bf0dfd3c4b4205e8bb9083f5980c8059708daff86"
+    }
+  ]
+}

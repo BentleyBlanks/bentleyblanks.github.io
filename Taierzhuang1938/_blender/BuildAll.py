@@ -25,6 +25,7 @@ import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
 import ImportWeapons                 # noqa: E402
+import ImportLugouqiaoWeapons        # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
 
@@ -40,6 +41,11 @@ WEAPON_LENGTH = {
     "Mauser96": 0.288, "ServicePistol": 0.222,
     "Grenade": 0.220, "Dadao": 0.900, "DadaoAlt": 0.900, "Type89Launcher": 0.413,
     "Type11": 1.100, "Type92Hmg": 1.156,
+    "WaltherP38": 0.216, "BrowningTripodAssembly": 2.273,
+    "UnidentifiedMunition": 0.253, "UnidentifiedBoltActionRifle": 1.120,
+    "OfficerSwordSet": 1.000, "RingPommelDagger": 0.450,
+    "UnidentifiedAntiaircraftGun": 1.100, "LightMortar": 0.500,
+    "MediumMortar": 1.444, "Karabiner98k": 1.110,
     # 刺刀是独立模型（挂 socket 到枪口，见 ImportBayonets.py 抬头）。
     # 全长同样是史实数：HY1935 572 mm / 汉阳式 517 mm / 三十年式 514 mm。
     "BayonetZhongZheng": 0.572, "BayonetHanYang": 0.517, "BayonetType38": 0.514,
@@ -128,6 +134,16 @@ def main():
         if optional_builder:
             jobs.append((optional_name, "weapon", optional_builder,
                          ImportWeapons.SOURCES[optional_name]["note"]))
+    # 卢沟桥资源包的同名枪（Type11 / Mauser96）在这里排到旧导入器之后：
+    # 新资源存在时覆盖同名 job，旧模型仍留在仓库作为对比参考，不删除。
+    lugouqiao_jobs = []
+    for name, spec in ImportLugouqiaoWeapons.SOURCES.items():
+        builder = ImportLugouqiaoWeapons.BuilderFor(name)
+        if builder:
+            lugouqiao_jobs.append((name, "weapon", builder, spec["note"]))
+    replacement_names = {entry[0] for entry in lugouqiao_jobs}
+    jobs = [entry for entry in jobs if entry[0] not in replacement_names]
+    jobs.extend(lugouqiao_jobs)
     for name in ImportBayonets.SOURCES:
         builder = ImportBayonets.BuilderFor(name)
         if builder:
