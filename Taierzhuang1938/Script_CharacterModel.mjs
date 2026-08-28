@@ -14,24 +14,68 @@ export const LUGOU_ANIMATION_IDS = Object.freeze([
   "StandFireCrouchAlt", "AdvanceKneelFire", "AdvanceFire", "PistolFire",
 ]);
 
+// 标签按**实测**写，不按源文件名写：见下面 POSE_CLIPS 的头注，源 FBX 的名字
+// 与里面的动作对不上号。名字是资产契约（清单 / 烘焙脚本 / 编辑器三处同名），
+// 不改；改的是这里对人说的那句话。带「★」的三条是名实不符、量出来纠正过的。
 export const LUGOU_ANIMATION_LABELS = Object.freeze({
-  LeanWallSitPeek: "靠墙坐姿探视",
-  RifleIdle: "持枪待机",
-  RifleIdleAlt: "持枪待机（二）",
+  LeanWallSitPeek: "坐地探视",
+  RifleIdle: "★单膝跪地据枪（源名写作「持枪待机」，实为跪姿）",
+  RifleIdleAlt: "★单膝跪地据枪（二）",
   RifleRun: "持枪跑步",
   CrouchFire: "蹲姿射击",
   CrouchFireAlt: "蹲姿射击（二）",
-  CrouchIdle: "蹲姿静态",
+  CrouchIdle: "跪蹲俯身",
   MachineGunFire: "机枪射击",
   EmplacementIdle: "机炮静姿",
-  AttackCommand: "进攻指令",
-  ProneFire: "匍匐射击",
-  StandFireCrouch: "起身射击下蹲",
-  StandFireCrouchAlt: "起身射击下蹲（二）",
+  AttackCommand: "进攻指令（站姿挥臂）",
+  ProneFire: "★站姿甩臂过肩（源名写作「匍匐射击」，实为站姿）",
+  StandFireCrouch: "★匍匐据枪（源名写作「起身射击下蹲」，实为卧姿）",
+  StandFireCrouchAlt: "起身射击下蹲",
   AdvanceKneelFire: "上前蹲射",
-  AdvanceFire: "上前射击",
+  AdvanceFire: "站姿据枪 / 上前射击",
   PistolFire: "手枪射击",
 });
+
+/**
+ * 姿态 → 导入 clip。**取用一律走这张表，不许在别处按名字硬写 clip id。**
+ *
+ * 【为什么要这张表】源 FBX 的文件名是按印象起的，与里面的动作对不上号；
+ * 运行时按名字挑 clip，于是「卧倒」挑到一段站姿、「站着待机」挑到一段跪姿。
+ * 下面这些数是实机量的骨骼世界坐标（演员脚下平面记作 0，模型 1.65 m）：
+ *
+ *   StandFireCrouch   头 0.22–0.38  胯 0.02–0.15  手 0.18–0.36  → **趴着据枪**（真匍匐）
+ *   ProneFire         头 1.15–1.32  胯 0.58–0.74  手 1.6–1.76   → 站着把手臂甩过肩
+ *   RifleIdle / Alt   头 0.72–0.78  胯 0.17–0.19                → 单膝跪地据枪
+ *   AdvanceFire       头 1.09–1.29  胯 0.55–0.69                → **站姿据枪**（真站着）
+ *   AttackCommand     头 1.15–1.28  胯 0.58–0.67                → 站着挥臂指挥
+ *   CrouchIdle        头 0.65       胯 0.41                     → 跪蹲俯身
+ *   CrouchFire        头 0.62       胯 0.37                     → 蹲姿据枪
+ *   LeanWallSitPeek   头 0.52       胯 0.00                     → 坐在地上
+ *
+ * 回归口在 Script_CutscenePoseTest.mjs：它按这张表逐条量高度，
+ * 换一批动作资产（或重烘）把姿态换了位置，那条测试会先红。
+ */
+const POSE_CLIPS = Object.freeze({
+  sit: "LeanWallSitPeek",
+  tend: "EmplacementIdle",
+  proneFire: "StandFireCrouch",
+  crouchFire: "CrouchFire",
+  crouchIdle: "CrouchIdle",
+  pistolFire: "PistolFire",
+  machineGunFire: "MachineGunFire",
+  standFire: "AdvanceFire",
+  standIdle: "AdvanceFire",
+  standReach: "AttackCommand",
+  run: "RifleRun",
+});
+
+export const LUGOU_POSE_CLIPS = POSE_CLIPS;
+
+/**
+ * 地面标定取样时刻：站姿据枪那一段前 1 s 还在跨步，1.4 s 之后两只脚才踩实。
+ * Attach 拿这一帧量「最低那只脚离演员地平面多少」，量完把相位放回去。
+ */
+const FLOOR_CALIBRATION_TIME = 1.6;
 
 const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=1";
 const ASSET_VERSION = "1";
@@ -193,9 +237,10 @@ export class LugouCharacterRig {
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
     });
-    this.Play("RifleIdle", 0);
+    this.Play(POSE_CLIPS.standIdle, 0);
     // Stable idle phase: the five source models do not breathe in lockstep.
-    this.mixer.setTime((HashString(`${seed}|phase`) % 1000) / 1000);
+    this.idlePhaseSeconds = (HashString(`${seed}|phase`) % 1000) / 1000;
+    this.mixer.setTime(this.idlePhaseSeconds);
   }
 
   Attach(actor) {
@@ -206,9 +251,14 @@ export class LugouCharacterRig {
     // mesh bake recentres the bind-pose vertices, but glTF skinning still exposes
     // those armature transforms through the bones.  Align by the animated skeleton
     // itself: pelvis on actor X/Z, lowest idle foot on the actor's ground plane.
-    // Every imported clip keeps the pelvis translation fixed, so this one correction
-    // remains valid while rotations drive crouch/prone/run.
+    // 【2026-08-29 修正】原注释写的「每个 clip 的胯位移都固定」是错的：实测胯高
+    // 在 clip 之间差 0.6 m 以上（匍匐 0.12、站姿据枪 0.69）。所以这一次标定必须
+    // 在**指定的站姿参考帧**上量，不能在「构造时碰巧停在哪一帧」上量 —— 否则
+    // 同一个人换个 seed（相位不同）就落在不同的地平面上。各姿态自己的胯高由
+    // clip 负责，脚一律在 clip 内落到同一个平面，这一项常数补偿因而仍然成立。
     this.root.position.set(0, 0, 0);
+    const phase = this.mixer.time;
+    this.mixer.setTime(FLOOR_CALIBRATION_TIME);
     actor.root.updateWorldMatrix(true, true);
     const pelvis = this.bones.pelvis?.getWorldPosition(new THREE.Vector3()) || null;
     const footL = this.bones.footL?.getWorldPosition(new THREE.Vector3()) || null;
@@ -222,12 +272,15 @@ export class LugouCharacterRig {
       -floorY,
       -(pelvisLocal?.z || 0),
     );
+    this.mixer.setTime(phase);
     actor.root.updateWorldMatrix(true, true);
     return this;
   }
 
   Play(id, fadeSeconds = 0.12) {
-    const clip = this.clipById.get(id) || this.clipById.get("RifleIdle") || this.clipById.values().next().value;
+    const clip = this.clipById.get(id)
+      || this.clipById.get(POSE_CLIPS.standIdle)
+      || this.clipById.values().next().value;
     if (!clip || this.currentId === id) return this;
     const next = this.mixer.clipAction(clip);
     next.enabled = true;
@@ -245,26 +298,40 @@ export class LugouCharacterRig {
     return this;
   }
 
+  /**
+   * 状态 → clip。**优先级是身体先，手势后**：
+   *   躺 ＞ 跪/蹲 ＞ 手上的活（伸手/投弹/白刃/望远镜）＞ 走跑 ＞ 站着待着。
+   *
+   * 【为什么这个次序是硬的】手势那一档只有站姿素材。原来它排在 prone/crouch
+   * 前面，于是「跪着给伤员包扎」「躺在门板上」的人只要带一点 reach 就被换成
+   * 站姿挥臂 —— 救护所里三个 prone:1 的伤员全站起来举着手。姿态决定骨架，
+   * 手势只能在**姿态允许的范围内**表达；没有对应姿态的手势素材时，宁可不做
+   * 手势，也不许把人拉站起来。
+   */
   _ActionForState(state) {
     if (this.forcedClip) return this.forcedClip;
     const weaponId = this.actor?.weaponId || "";
     const lifePose = state.lifePose && typeof state.lifePose === "object" ? state.lifePose : state;
-    if ((lifePose.sit || 0) > 0.35 || (lifePose.watch || 0) > 0.35) return "LeanWallSitPeek";
-    if ((lifePose.cleanRifle || 0) > 0.35 || (lifePose.checkAmmo || 0) > 0.35) return "EmplacementIdle";
-    if (state.throwing > 0.08 || state.melee > 0.08 || state.binoculars > 0.08 || state.reach > 0.08) {
-      return "AttackCommand";
-    }
-    if (state.prone > 0.45) return "ProneFire";
+    if ((lifePose.sit || 0) > 0.35 || (lifePose.watch || 0) > 0.35) return POSE_CLIPS.sit;
+    if ((lifePose.cleanRifle || 0) > 0.35 || (lifePose.checkAmmo || 0) > 0.35) return POSE_CLIPS.tend;
+    const prone = (state.prone || 0) > 0.45;
+    const low = !prone && ((state.crouch || 0) > 0.35 || (state.kneel || 0) > 0.35);
     if (state.firing) {
-      if (weaponId === "Mauser96") return "PistolFire";
-      if (this.actor?.weaponData?.rpm) return "MachineGunFire";
-      if (state.crouch > 0.35) return "CrouchFire";
-      return "AdvanceFire";
+      if (weaponId === "Mauser96") return POSE_CLIPS.pistolFire;
+      // 机枪手无论卧倒还是蹲着都走机枪那一段（它自带的就是低姿），
+      // 这一条比姿态优先 —— 换成匍匐据枪，手里那挺枪就飞了。
+      if (this.actor?.weaponData?.rpm) return POSE_CLIPS.machineGunFire;
+      if (prone) return POSE_CLIPS.proneFire;
+      if (low) return POSE_CLIPS.crouchFire;
+      return POSE_CLIPS.standFire;
     }
-    if (state.crouch > 0.35 || state.kneel > 0.35) return "CrouchIdle";
-    if ((state.moveSpeed || 0) > 0.10) return "RifleRun";
-    const alternate = HashString(`${this.actor?.seed || this.modelId}|idle`) & 1;
-    return alternate ? "RifleIdleAlt" : "RifleIdle";
+    if (prone) return POSE_CLIPS.proneFire;
+    if (low) return POSE_CLIPS.crouchIdle;
+    if (state.throwing > 0.08 || state.melee > 0.08 || state.binoculars > 0.08 || state.reach > 0.08) {
+      return POSE_CLIPS.standReach;
+    }
+    if ((state.moveSpeed || 0) > 0.10) return POSE_CLIPS.run;
+    return POSE_CLIPS.standIdle;
   }
 
   Update(dt, state = {}) {

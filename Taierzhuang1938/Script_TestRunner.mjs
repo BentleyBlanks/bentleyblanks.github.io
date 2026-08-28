@@ -135,6 +135,11 @@ export const testDefs = {
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
   ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 分桶、GPU 分段查询与钩子还原" },
   ActorPoseTest: { file: "Script_ActorPoseTest.mjs", desc: "车厢生活动作模块冒烟（Chromium 加载本地模块）" },
+  CutscenePoseTest: {
+    file: "Script_CutscenePoseTest.mjs",
+    timeoutMs: 15 * 60 * 1000,
+    desc: "蒙皮姿态契约：clip 高度带 + 躺＞跪＞手势的优先级 + 三场过场逐人头骨高度（真浏览器）",
+  },
   GiTest: { file: "Script_GiTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "全局光照开关对照" },
   PostTest: { file: "Script_PostTest.mjs", desc: "后处理感知域对比：暗部信息不被裁成纯黑" },
   PerformanceTest: { file: "Script_PerformanceTest.mjs", timeoutMs: 30 * 60 * 1000, desc: "帧率/负载实测（对机器敏感）" },
@@ -227,7 +232,7 @@ export const domains = {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
     // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
-    tests: ["CutsceneControlTest", "ActorPoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
+    tests: ["CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   render: {
     label: "渲染与合批自动契约",

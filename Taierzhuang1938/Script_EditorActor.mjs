@@ -353,7 +353,7 @@ export class ActorEditor {
     this.kind = "nra";
     this.weaponId = "ZhongZheng";
     this.animationMode = "imported";
-    this.clipId = "RifleIdle";
+    this.clipId = "AdvanceFire"; // 名实注意：RifleIdle 实为跪姿，真站姿 idle 是 AdvanceFire（见 LUGOU_POSE_CLIPS）
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
@@ -465,7 +465,7 @@ export class ActorEditor {
     ], this.animationMode, (value) => {
       this.animationMode = value;
       this.manual = false;
-      this.clipId = value === "imported" ? "RifleIdle" : "idle";
+      this.clipId = value === "imported" ? "AdvanceFire" : "idle";
       this.FillActionList();
       this.Rebuild();
     });
