@@ -25,7 +25,11 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
-import { LUGOU_ANIMATION_IDS, LUGOU_ANIMATION_LABELS } from "./Script_CharacterModel.mjs";
+import {
+  DefaultLugouAnimationId,
+  GetLugouAnimationEntries,
+  IsLugouAnimationAllowed,
+} from "./Script_CharacterModel.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
@@ -82,11 +86,6 @@ const CLIPS = [
   { id: "dying", name: "濒死下沉", make: (t) => ({ dying: Math.min(1, (t % 4) / 2.2) }) },
   { id: "dead", name: "倒地（0.8 s 姿态过渡）", dead: true, make: () => ({ dead: true }) },
 ];
-
-const IMPORTED_CLIPS = LUGOU_ANIMATION_IDS.map((id) => ({
-  id,
-  name: `${LUGOU_ANIMATION_LABELS[id] || id} · ${id}`,
-}));
 
 // ---------------------------------------------------------------------------
 // 判定盒的线框
@@ -357,7 +356,7 @@ export class ActorEditor {
     this.kind = "nra";
     this.weaponId = "ZhongZheng";
     this.animationMode = "imported";
-    this.clipId = "RifleIdle";
+    this.clipId = DefaultLugouAnimationId(this.kind);
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
@@ -416,6 +415,8 @@ export class ActorEditor {
         this.kind = id;
         this.weaponId = DEFAULT_WEAPON_BY_KIND[id] ?? null;
         if (this.weaponSelect) this.weaponSelect.Set(this.weaponId || "");
+        this.NormalizeImportedClip();
+        this.FillActionList();
         this.Rebuild();
       },
     });
@@ -464,12 +465,12 @@ export class ActorEditor {
     // --- 动作 ---
     const act = Section(body, "动作（资产与程序化）");
     Chips(act, [
-      { value: "imported", label: "16 条导入动作" },
+      { value: "imported", label: "导入动作（按角色过滤）" },
       { value: "programmatic", label: "程序化配方" },
     ], this.animationMode, (value) => {
       this.animationMode = value;
       this.manual = false;
-      this.clipId = value === "imported" ? "RifleIdle" : "idle";
+      this.clipId = value === "imported" ? DefaultLugouAnimationId(this.kind) : "idle";
       this.FillActionList();
       this.Rebuild();
     });
@@ -477,6 +478,7 @@ export class ActorEditor {
       height: 168,
       onPick: (id) => this.SetClip(id),
     });
+    this.importedClipNote = Note(act, "导入动作仅列出当前角色可用的阵营与身份；不会跨阵营或把士兵动作套给军官。", true);
     this.FillActionList();
 
     ButtonRow(act, [
@@ -524,22 +526,56 @@ export class ActorEditor {
   FillActionList() {
     if (!this.clipList) return;
     const entries = this.animationMode === "imported"
-      ? IMPORTED_CLIPS
+      ? GetLugouAnimationEntries(this.kind).map((clip) => ({
+        id: clip.id,
+        name: `${clip.name} · ${clip.id}`,
+        tail: clip.targetLabel,
+        title: `仅适用于${clip.targetLabel}；使用${clip.faction === "nra" ? "国军" : "日军"}原始骨架烘焙的曲线`,
+      }))
       : CLIPS.map((clip) => ({ id: clip.id, name: clip.name }));
+    if (this.animationMode === "imported") {
+      this.NormalizeImportedClip();
+      const profile = GetLugouAnimationEntries(this.kind)[0];
+      if (this.importedClipNote) {
+        this.importedClipNote.textContent = profile
+          ? `当前：${profile.targetLabel}。只显示该角色的 ${GetLugouAnimationEntries(this.kind).length} 条动作；曲线只从本阵营模型播放。`
+          : "百姓没有导入军人动作；请切换到程序化配方预览。";
+      }
+    }
     this.clipList.Fill(entries);
     this.clipList.Select(this.clipId);
   }
 
+  NormalizeImportedClip() {
+    if (this.animationMode !== "imported") return;
+    if (!IsLugouAnimationAllowed(this.kind, this.clipId)) {
+      this.clipId = DefaultLugouAnimationId(this.kind);
+    }
+  }
+
   SetClip(id) {
+    if (this.animationMode === "imported" && !IsLugouAnimationAllowed(this.kind, id)) {
+      this.NormalizeImportedClip();
+      this.FillActionList();
+      return;
+    }
     this.clipId = id;
     this.time = 0;
     if (this.animationMode === "imported") {
-      for (const actor of this.actors) actor.PlayImportedAnimation(id);
+      this.PlayImportedClipForCompatibleActors();
       return;
     }
     const clip = CLIPS.find((c) => c.id === id);
     // 倒地是一次性状态机（Actor 内部有 ragdollState），换到它要重建才能从头演
     if (clip && clip.dead) this.Rebuild();
+  }
+
+  /** 一排对比时也逐人复核，杜绝把当前角色的曲线送给另一阵营/身份。 */
+  PlayImportedClipForCompatibleActors() {
+    for (const actor of this.actors) {
+      if (IsLugouAnimationAllowed(actor.kind, this.clipId)) actor.PlayImportedAnimation(this.clipId);
+      else actor.ClearImportedAnimation();
+    }
   }
 
   ApplyTowel() {
@@ -622,7 +658,8 @@ export class ActorEditor {
         : this.animationMode === "imported"
           ? base
           : { ...base, ...clip.make(local, ctx), elapsed: local };
-      if (this.animationMode === "imported" && !this.manual) actor.PlayImportedAnimation(this.clipId);
+      if (this.animationMode === "imported" && !this.manual
+        && IsLugouAnimationAllowed(actor.kind, this.clipId)) actor.PlayImportedAnimation(this.clipId);
       else actor.ClearImportedAnimation();
       actor.Update(dt, state);
       // 判定线框跟着这个人的落点；胶囊还要跟着姿态换尺寸（AI 那边是 s.stance）
@@ -682,7 +719,11 @@ export class ActorEditor {
     this.facts.Set("网格 / 三角", `${meshes} / ${Math.round(triangles)}`);
     this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");
-    this.facts.Set("动作", this.manual ? "程序化手动" : `${this.animationMode} · ${this.clipId}`);
+    const importedEntry = this.animationMode === "imported"
+      ? GetLugouAnimationEntries(this.kind).find((entry) => entry.id === this.clipId) : null;
+    this.facts.Set("动作", this.manual ? "程序化手动"
+      : importedEntry ? `${importedEntry.targetLabel} · ${importedEntry.name}` : `${this.animationMode} · ${this.clipId}`);
+    if (importedEntry) this.facts.Set("动作适用对象", `${importedEntry.targetLabel} · ${importedEntry.faction === "nra" ? "国军源骨架" : "日军源骨架"}`, "good");
     const boneHitboxes = actor.GetBoneHitboxes?.() || [];
     this.facts.Set("骨骼命中体", boneHitboxes.length ? `${boneHitboxes.length} 个 · 实时随骨骼` : "保底固定球",
       boneHitboxes.length ? "good" : "warn");

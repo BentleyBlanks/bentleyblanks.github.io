@@ -33,6 +33,53 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   PistolFire: "手枪射击",
 });
 
+// 导入动作不能只按 clip 名字认。四类军人都借用同一套短名（例如每边都有
+// `RifleIdle`），但实际曲线是按各自阵营的 canonical rig 烘进 GLB 的；把 NRA
+// 曲线喂进 IJA，或把机枪兵姿态交给军官，都会让编辑器给出看似能播、实则错误的
+// 预览。本表是人物动作编辑器的唯一适用性账本：新导入动作先标清对象，再开放给 UI。
+const SOLDIER_ACTION_IDS = Object.freeze([
+  "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
+  "CrouchFire", "CrouchFireAlt", "CrouchIdle", "MachineGunFire",
+  "EmplacementIdle", "ProneFire", "StandFireCrouch", "StandFireCrouchAlt",
+  "AdvanceKneelFire", "AdvanceFire",
+]);
+const OFFICER_ACTION_IDS = Object.freeze([
+  "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "CrouchIdle",
+  "AttackCommand", "PistolFire",
+]);
+
+export const LUGOU_ANIMATION_PROFILE_BY_KIND = Object.freeze({
+  nra: Object.freeze({ faction: "nra", role: "soldier", label: "国军士兵", clipIds: SOLDIER_ACTION_IDS }),
+  nraDare: Object.freeze({ faction: "nra", role: "soldier", label: "国军敢死队", clipIds: SOLDIER_ACTION_IDS }),
+  nraOfficer: Object.freeze({ faction: "nra", role: "officer", label: "国军军官", clipIds: OFFICER_ACTION_IDS }),
+  ija: Object.freeze({ faction: "ija", role: "soldier", label: "日军士兵", clipIds: SOLDIER_ACTION_IDS }),
+  ijaOfficer: Object.freeze({ faction: "ija", role: "officer", label: "日军军官", clipIds: OFFICER_ACTION_IDS }),
+});
+
+/** 当前角色可预览的导入动作；条目始终保留阵营与身份，供 UI 标注和校验。 */
+export function GetLugouAnimationEntries(kind) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  if (!profile) return [];
+  return profile.clipIds.map((clipId) => Object.freeze({
+    id: clipId,
+    clipId,
+    faction: profile.faction,
+    role: profile.role,
+    targetLabel: profile.label,
+    name: LUGOU_ANIMATION_LABELS[clipId] || clipId,
+  }));
+}
+
+/** 入口防线：即使旧 UI 或脚本直接传 clipId，也不允许越过角色适用范围。 */
+export function IsLugouAnimationAllowed(kind, clipId) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  return !!profile && profile.clipIds.includes(clipId);
+}
+
+export function DefaultLugouAnimationId(kind) {
+  return GetLugouAnimationEntries(kind)[0]?.id || null;
+}
+
 const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=3";
 const ASSET_VERSION = "3";
 const LOADER = new GLTFLoader();

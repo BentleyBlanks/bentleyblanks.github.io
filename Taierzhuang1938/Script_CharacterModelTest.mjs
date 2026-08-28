@@ -107,7 +107,15 @@ assert.match(cutscene, /protagonist:\s*spec\.firstPerson\s*===\s*true[\s\S]*?mod
 assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,
   "first-person protagonist hides only its skinned head bone");
 assert.doesNotMatch(main, /shot\.dist\s*<\s*40[\s\S]{0,100}head/, "head hit is not rolled after impact");
-assert.match(editor, /IMPORTED_CLIPS/, "editor exposes imported clips");
+assert.match(runtime, /LUGOU_ANIMATION_PROFILE_BY_KIND/, "runtime owns the character-action compatibility ledger");
+assert.match(runtime, /nraOfficer:[\s\S]*?role:\s*"officer"/, "NRA officer profile is explicit");
+assert.match(runtime, /ijaOfficer:[\s\S]*?role:\s*"officer"/, "IJA officer profile is explicit");
+assert.match(runtime, /GetLugouAnimationEntries\(kind\)/, "runtime exposes role-filtered imported clips");
+assert.match(runtime, /IsLugouAnimationAllowed\(kind, clipId\)/, "runtime exposes an applicability guard");
+assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");
+assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
+  "editor rechecks every lineup actor before playing an imported clip");
+assert.match(editor, /动作适用对象/, "editor reports the action's intended character type");
 assert.match(editor, /length:\s*5[\s\S]*modelVariant/, "editor exposes all five variants per faction");
 assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");
