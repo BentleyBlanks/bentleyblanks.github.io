@@ -85,6 +85,7 @@ export const testDefs = {
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
+  MissionHooksTest: { file: "Script_MissionHooksTest.mjs", desc: "任务流程引擎钩子：关中过场 beat / Signal→过场、LEVEL_CUES 七章自动构建、具名同伴 Locate 与剧本指令、脚本检查点倒带、钉关原语（纯 Node，毫秒级）" },
   PhysicsTest: { file: "Script_PhysicsTest.mjs", desc: "真浏览器撞墙：碰撞扫掠" },
   ColliderTest: {
     file: "Script_ColliderTest.mjs",
@@ -196,7 +197,12 @@ export const domains = {
   // 照明弹归这里而不是归 combat：它一发子弹都不打，改的是 SIGHT_BY_STANCE 那条
   // **发现距离**——碰 Script_Ai 的改动最容易悄悄把倍率那条读点绕过去
   // （FlareTest 有一条专门扫源码数裸读次数）。
-  ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest"] },
+  ai: {
+    label: "AI 与战场内容预算",
+    // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
+    // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
+    tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest"],
+  },
   hud: {
     label: "HUD/交互提示/目标识别",
     // 报码纸是 HUD 面板，改 Script_Hud 要连着它一起跑（TelegraphTest 有一段扫 HUD 源码）。
@@ -206,13 +212,20 @@ export const domains = {
     label: "交互框架/负重/架设机枪/发报（担架·搬运·救护交互点·机枪位·电键）",
     // 发报的两个点（电键 tap / 接头 hold）是拿真的 InteractSystem 跑的，
     // 所以碰交互框架的改动要连着它一起跑。
-    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest"],
+    // 脚本检查点（倒带）改的是玩家状态的还原，与负重/机枪位共用同一批状态，
+    // 所以也挂在这个域下。
+    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "TelegraphTest", "MissionHooksTest"],
   },
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
   editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
-  cutscene: { label: "过场/车厢生活动作", tests: ["CutsceneControlTest", "ActorPoseTest"] },
+  cutscene: {
+    label: "过场/剧本派发/车厢生活动作",
+    // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
+    // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
+    tests: ["CutsceneControlTest", "ActorPoseTest", "MissionHooksTest"],
+  },
   render: {
     label: "渲染与合批自动契约",
     // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
@@ -232,15 +245,15 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
-  { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Script_Input|Hud|Prompt)/i },
+  { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
-  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare)/i },
+  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
-  { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train)/i },
+  { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
   { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Flare|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];

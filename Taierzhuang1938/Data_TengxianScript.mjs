@@ -164,19 +164,24 @@ export const CAST = {
 // 章表（七章）—— 组装层
 // ===========================================================================
 
-import { CHAPTER as CH0, VOICE_LINES as VO0 } from "./Data_MissionCh0.mjs";
-import { CHAPTER as CH1, VOICE_LINES as VO1 } from "./Data_MissionCh1.mjs";
-import { CHAPTER as CH2, VOICE_LINES as VO2 } from "./Data_MissionCh2.mjs";
-import { CHAPTER as CH3, VOICE_LINES as VO3 } from "./Data_MissionCh3.mjs";
-import { CHAPTER as CH4, VOICE_LINES as VO4 } from "./Data_MissionCh4.mjs";
-import { CHAPTER as CH5, VOICE_LINES as VO5 } from "./Data_MissionCh5.mjs";
-import { CHAPTER as CH6, VOICE_LINES as VO6 } from "./Data_MissionCh6.mjs";
+// 七章一律用**命名空间导入**：不是所有章都导出 EVENTS（序章没有事件线、
+// 第二关那一条写在文件头注释里），而具名 import 一个不存在的导出是**链接期
+// SyntaxError** —— 整个页面起不来，而且报错指向这一行，不指向缺导出的那一章。
+import * as M0 from "./Data_MissionCh0.mjs";
+import * as M1 from "./Data_MissionCh1.mjs";
+import * as M2 from "./Data_MissionCh2.mjs";
+import * as M3 from "./Data_MissionCh3.mjs";
+import * as M4 from "./Data_MissionCh4.mjs";
+import * as M5 from "./Data_MissionCh5.mjs";
+import * as M6 from "./Data_MissionCh6.mjs";
+
+const CHAPTER_MODULES = [M0, M1, M2, M3, M4, M5, M6];
 
 /**
  * 七章，**按正片顺序**。数组顺序就是选章顺序、就是 AdvanceLevel 的顺序，
  * 也是 ?phase=N 的 N。改顺序等于改流程，别当成排版。
  */
-export const CHAPTERS = [CH0, CH1, CH2, CH3, CH4, CH5, CH6];
+export const CHAPTERS = CHAPTER_MODULES.map((m) => m.CHAPTER);
 
 /** 契约 §10.1 写死的章节 id 与顺序。对不上就抛 —— 下游一整排表都按这个 id 取。 */
 const CHAPTER_IDS = [
@@ -240,6 +245,7 @@ for (let i = 0; i < CHAPTERS.length; i += 1) {
  *   event:名字         规则层派发的事件（判定表在 Script_Story.LEVEL_CUES）
  *   delay:秒           上一条之后过多久
  * type：title / line / shout / narration / objective / note / hint / system / env
+ *   ／ cutscene（关中过场：`{ at, type:"cutscene", id:"CS_x" }`，id 必须已注册）
  *
  * pool（城里还站着的人）是**推定**的关卡数值，登记在 PRESUMED_STAGING.poolCurve。
  */
@@ -263,6 +269,11 @@ export const LEVELS = CHAPTERS.map((c) => ({
   brief: c.brief,
   cutsceneIn: c.cutsceneIn || null,
   cutsceneOut: c.cutsceneOut || null,
+  // 关**中**过场（2026-08-28 集成批 INT1）。两种写法：
+  //   "CS_x"                        挂在默认信号 ChapterMidCutscene 上
+  //   { id:"CS_x", signal:"名字" }   挂在指定信号上（CH5 的转身该挂 TurnedBack）
+  // 判定与派发在 Script_Story（SIGNAL_CUTSCENES）；这一层只负责传下去与查注册。
+  cutsceneMid: c.cutsceneMid || null,
   beats: c.beats,
 }));
 
@@ -278,7 +289,23 @@ function MechanicSummary(chapter) {
 }
 
 /** 各章新增的语音行（Data_Voice 拼接用；F2 批负责接线）。 */
-export const CHAPTER_VOICE_LINES = [...VO0, ...VO1, ...VO2, ...VO3, ...VO4, ...VO5, ...VO6];
+export const CHAPTER_VOICE_LINES = CHAPTER_MODULES.flatMap((m) => m.VOICE_LINES || []);
+
+/**
+ * 各章的关内事件线登记表，**原样**摊给 Script_Story 去建 LEVEL_CUES。
+ *
+ * 这里不做字段归一：七章的 EVENTS 是三批人分别写的，名字字段有 name/event/id
+ * 三种、判据字段有 fallback/predicate/cue 三种（还有一章一条都没写）。
+ * 归一化的规矩属于叙事层（Script_Story.BuildLevelCues），
+ * 这一层只负责**把它们凑齐**并带上 cutsceneMid —— 数据层不猜语义。
+ *
+ * 没有导出 EVENTS 的章给空数组：那不是错误（序章整章是过场，没有事件线）。
+ */
+export const CHAPTER_EVENTS = CHAPTERS.map((chapter, index) => ({
+  levelId: chapter.id,
+  events: Array.isArray(CHAPTER_MODULES[index].EVENTS) ? CHAPTER_MODULES[index].EVENTS : [],
+  cutsceneMid: chapter.cutsceneMid || null,
+}));
 
 // ===========================================================================
 // 过场
@@ -341,9 +368,24 @@ export const CUTSCENES = Object.fromEntries(
 
 // 章表引用的过场必须真的注册过 —— 打错一个字的后果是「关末什么都不播」，
 // 静默且只在真跑到那一关时才看得见。
+//
+// 三个入口一起查：关首（cutsceneIn）、关末（cutsceneOut）、关中（cutsceneMid
+// 与 beats 里的 `{type:"cutscene"}`）。关中那两条尤其要查 —— 它们在关卡中段
+// 才派发，打错字要玩到一半才发现，而那时画面上什么都不会发生。
 for (const level of LEVELS) {
-  for (const id of [level.cutsceneIn, level.cutsceneOut]) {
+  const midId = typeof level.cutsceneMid === "string" ? level.cutsceneMid
+    : (level.cutsceneMid && level.cutsceneMid.id) || null;
+  if (level.cutsceneMid && !midId) {
+    throw new Error(`Data_TengxianScript: ${level.id} 的 cutsceneMid 既不是过场 id 也没有 id 字段`);
+  }
+  for (const id of [level.cutsceneIn, level.cutsceneOut, midId]) {
     if (id && !CUTSCENES[id]) throw new Error(`Data_TengxianScript: ${level.id} 引用了没注册的过场 ${id}`);
+  }
+  for (const beat of level.beats || []) {
+    if (beat.type !== "cutscene") continue;
+    const id = beat.id || beat.cutscene || null;
+    if (!id) throw new Error(`Data_TengxianScript: ${level.id} 有一条 type:"cutscene" 的 beat 没写 id（at=${beat.at}）`);
+    if (!CUTSCENES[id]) throw new Error(`Data_TengxianScript: ${level.id} 的 beat（at=${beat.at}）引用了没注册的过场 ${id}`);
   }
 }
 

@@ -277,3 +277,21 @@
 3. 七章从选章逐一可进、目标链可走通、关末正确接续下一章；
 4. §0 的「六个明确验收结果」逐条核对；
 5. 开机红线不破：drawCalls ≤ 5000、triangles ≤ 600 万。
+
+### 10.6 引擎钩子（集成批 INT1，2026-08-28）
+
+七章的 `ENGINE_REQUEST` 里跨章共用的那几件，实现在引擎侧。**章节数据按下面的字段名对接。**
+
+| 能力 | 数据口径（章节侧写什么） | 引擎侧 |
+| --- | --- | --- |
+| 关中过场 | beats 里 `{ at, type:"cutscene", id:"CS_x" }`；或 `CHAPTER.cutsceneMid = "CS_x"` / `{ id, signal }`；或 EVENTS 条目加 `cutscene:"CS_x"` | `Script_Story` 派发 → 宿主 `window.Taierzhuang.PlayMidCutscene(id)`（就是 `RunCutscene`，Esc 跳过与字幕补卡与关首过场一致）。派发期间剧本停摆、战斗输入被掐。id 必须已注册，组装层开机就查 |
+| 关内事件线 | 各章 `export const EVENTS`。名字字段 `name`／`event`／`id` 任一；兜底判据字段 `fallback`／`predicate`／`cue` 任一，写成 `"(c) => c.zone === \"X\" \|\| c.levelTime > c.levelSeconds * 0.4"` | `Script_Story.LEVEL_CUES` 由 `BuildLevelCues(CHAPTER_EVENTS)` 自动构建。判据用**受限文法**解析（比较式的 `\|\|`／`&&` 组合，字段限 `zone/objectiveIndex/objectiveCount/levelTime/levelSeconds/pool`），不 eval。没写判据的按登记顺序均匀铺开到关卡时长上。`story.Signal(name)` 主动推的永远优先 |
+| 具名同伴 | 默认名册从本章 beats 的 `who` 推导（该章说过话的战斗员）。要精修就在章节侧点名（`roster`）或用脚本指令 | `Script_Companion.CompanionDirector`：`Locate(castId)`（= `story.AttachVoice` 的 `locate`）、`SetAbsent(castId)`（跨关保留）、`Fell(castId)`（走现有倒地）、`Detach/Attach(castId)`、`Hold(castId, zone)`。上限 `MAX_COMPANIONS = 6`，**从 nra 名额里出人**，开机红线不受影响 |
+| 脚本检查点 | 无数据字段；由玩法系统在「脚本安排的击倒」发生时调用 | `Script_Checkpoint.CheckpointRecorder`：`Save()` / `Rewind(seconds)`。还原位置/姿态/血/弹，**不扣兵员池、不弹死亡卡、不换人**。必须在把伤害提交给死亡链路**之前**调 |
+| 钉关 | `CHAPTER.mechanics.pinFinalZone: true` | 走到最后一个路标不自动换关，等 `story.Signal("ChapterRelease")` 放行。保险丝：超过配置时长 + 240 s 自动放行并 `console.warn` |
+| 过场道具贴图 | prop `{ kind:"plane"\|"panel", texture:"...", transparent, alphaTest, opacity, repeat, doubleSided }`（`panel` = 立着的平面） | `texture` 与 `mat` 互斥；半透明自动 `MarkNoPrepass` |
+| 视角过渡 | `shot.headLook.blendIn`（秒） | 切镜时把 headLook 幅度缓动收进新范围，过渡期间玩家仍能自己转；不写 = 老行为（硬钳） |
+| 音效渐变 | `shot.sfx[]` 加 `fadeIn` / `fadeOut` / `seconds` / `crossfade:"别的cue名"\|true` | 逐帧写 gain，不排 WebAudio 自动化曲线（过场会被 Esc 打断、被 Timeline 拖动） |
+| 列车减速 | `ambientMotion[].decelSeconds`（配 `stopAt` 用） | 线性减速段的闭式积分：多层景物同时停稳，减速距离各按自己的速度成比例 |
+
+回归口：`node Taierzhuang1938/Script_MissionHooksTest.mjs`（纯 Node）＋ `Script_CutsceneControlTest.mjs` 的过场引擎三条。

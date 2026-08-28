@@ -39,7 +39,7 @@ import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
-import { StoryDirector } from "./Script_Story.mjs";
+import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset } from "./Script_GrenadeAsset.mjs";
@@ -62,6 +62,8 @@ import { AircraftFlight, MakeAircraftStrafeHost } from "./Script_Aircraft.mjs";
 import { AircraftStrafeDirector } from "./Script_AircraftStrafe.mjs";
 import { FlareDirector, MakeFlareHost } from "./Script_Flare.mjs";
 import { TelegraphSystem, MakeTelegraphHost } from "./Script_Telegraph.mjs";
+import { CompanionDirector } from "./Script_Companion.mjs";
+import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { MENU_SCENE } from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
@@ -434,6 +436,13 @@ const state = {
   // 钉住当前关（只给测试用）：剧本长跑要在**一关之内**按出厂时长推满，
   // 不许中途自动换关 —— 换关会重置剧本队列，量到的就不是这一关的剧本了。
   pinned: false,
+  // 钉关原语（mechanics.pinFinalZone）：走到最后一个路标**不自动换关**，
+  // 等 story.Signal("ChapterRelease") 才放行。第五关最终白刃战那三层与视角接替
+  // 三段全在最后一个路标之后，不钉住的话 objectiveIndex 一满就换关，整段被吃掉。
+  // 与上面那条 pinned 分开：pinned 是测试用的手闸，这一条是**章节数据声明的**。
+  pinFinalZone: false,
+  chapterReleased: false,
+  chapterReleaseAt: 0,        // 放行时的关内秒数（取证：是被信号放的还是被保险丝放的）
   cutscenesPlayed: [],        // 播过/跳过的过场，通关冒烟看这张表
   prevAllies: 0,
   storyObjective: null,
@@ -508,6 +517,13 @@ let flare = null;
 // 发报（终章亲手发出最后一封电报）。码组推进/中断/重连全在 Script_Telegraph；
 // 两个交互点由它出预制，装配层只把系统实例交给摆点方。
 let telegraph = null;
+// 具名同伴（罗班长、幺娃、何有田…）。名册、跟随几何与「谁在场」全在 Script_Companion；
+// 这里只把「造人 / 挪人 / 倒地」三件事翻给 AiDirector。它同时是 story 语音的定位来源
+//（AttachVoice 的 locate），没有它的话每一句台词都是从玩家脑门上发出来的。
+let companion = null;
+// 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。环形采样在 Script_Checkpoint，
+// 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
+let checkpoint = null;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
 // 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
@@ -928,12 +944,109 @@ async function Boot() {
   // 叙事层：把 Data_TengxianScript 那本考据过的剧本按关派发。
   // 线性关卡不需要翻译层，剧本的 at 语义就是运行时语义（见 Script_Story 的头注）。
   story = new StoryDirector({ hud, audio });
-  // 剧情语音接线：Story 报时机，Audio 出声（单槽，新句顶旧句）。
-  // locate 暂缺——章节演员表落地后由集成批补「说话人在哪儿」，缺位时自动退化为非空间化播放。
+
+  // 具名同伴。**必须建在 story.AttachVoice 之前** —— locate 参数就是它。
+  // 造人这一件事全走 AiDirector：同伴就是普通的 nra 兵，只是带着名字与固定站位，
+  // 所以射击、掩体、倒地、准心识别一条链路都不用改（也不许改）。
+  companion = new CompanionDirector({
+    Time: () => state.elapsed,
+    PlayerPos: () => (player ? { x: player.position.x, y: player.position.y, z: player.position.z } : null),
+    PlayerYaw: () => (player ? player.yaw : 0),
+    Spawn: ({ castId, label, x, z, weapon, squadId }) => {
+      if (!ai) return null;
+      // identity 是**具名**的：准心识别与阵亡播报读的都是它，不给的话
+      // 「罗班长」在场上会显示成一个随机姓名，那就等于没有这个人。
+      const seed = HashString(`companion:${castId}`);
+      const identity = { ...MakeSoldierIdentity(seed), name: label || castId };
+      const soldier = ai.Spawn("nra", x, z, {
+        identity, weapon: weapon || identity.weapon, squadId,
+      });
+      if (soldier) soldier.castId = castId;
+      return soldier;
+    },
+    Despawn: (soldier) => {
+      if (!soldier || !ai) return;
+      // 撤走 ≠ 阵亡：不能走 Kill（那会扣阵亡计数、留一具尸体、还可能触发
+      // 「友军倒下」那条剧本信号）。AiDirector.Remove 连刚体、尸体、演员一起收。
+      ai.Remove(soldier);
+    },
+    PositionOf: (soldier) => (soldier && soldier.position
+      ? { x: soldier.position.x, y: soldier.position.y, z: soldier.position.z } : null),
+    // 「他现在归别人管」：玩家从轮盘下过命令（charge / flank / covert，
+    // AiDirector.IssueOrder 会把 order 改掉并给一个有效期），或者他正占着一个
+    // 固定战位（重机枪）。这三种情况下跟随一律让开 ——
+    // 不让的话「上刺刀冲锋」按下去，班里的人还是在玩家脚边打转，命令白下。
+    Busy: (soldier) => !!soldier && (soldier.order === "charge" || soldier.order === "flank"
+      || soldier.order === "covert" || !!soldier.emplacementId),
+    Alive: (soldier) => !!(soldier && soldier.alive),
+    Place: (soldier, x, z) => {
+      if (!soldier || !battlefield) return;
+      const y = battlefield.GroundHeight(x, z);
+      soldier.position.set(x, y, z);
+      soldier.body?.Teleport(x, y, z);
+      soldier.goal.set(x, 0, z);
+    },
+    SetGoal: (soldier, x, z) => {
+      if (!soldier) return;
+      soldier.goal.set(x, 0, z);
+      soldier.holdZone = null;
+      // manualGoalUntil 挡住 AiDirector 自己的「重设目标」（Think 里那条 autoAdvance），
+      // 否则跟随目标写下去下一拍就被它改回战线方向。**要用 ai 自己的钟** ——
+      // state.elapsed 在过场/编辑器里照走而 ai.time 不走，拿前者会越拉越偏。
+      soldier.manualGoalUntil = ai.time + 3.0;
+    },
+    SetHold: (soldier, zone) => {
+      if (!soldier) return;
+      soldier.holdZone = zone || null;
+      soldier.order = zone ? "hold" : "advance";
+      if (zone) soldier.goal.set(zone.x, 0, zone.z);
+    },
+    // 「某人倒下」走**现有倒地**：尸体刚体、掉落物、阵亡计数、剧本的 allyDown
+    // 信号一条都不绕过去 —— 剧本让他倒下与他被打倒在引擎里应该是同一件事。
+    Fell: (soldier) => { if (soldier && soldier.alive) soldier.Kill(null); },
+  });
+
+  // 脚本检查点。采的是玩家这一帧的位置/姿态/血/弹，倒带时原样写回去。
+  checkpoint = new CheckpointRecorder({
+    Time: () => state.elapsed,
+    Sample: () => (player && player.Alive ? {
+      x: player.position.x, y: player.position.y, z: player.position.z,
+      yaw: player.yaw, pitch: player.pitch, stance: player.stance,
+      health: player.health, bleeding: player.bleeding, bandages: player.bandages,
+      ammo: state.ammo, clips: state.clips,
+      grenades: state.grenades, bundles: state.bundles,
+    } : null),
+    Apply: (sample) => {
+      if (!player || !sample) return false;
+      // Spawn 会顺手把血、伤口、出生保护一并复位 —— 这正是「重来」要的：
+      // 挨的那一下连同流血一起收回去，而**不动兵员池、不弹死亡卡、不换人**。
+      player.Spawn(sample.x, sample.z, sample.yaw);
+      player.pitch = sample.pitch ?? 0;
+      player.stance = sample.stance || "stand";
+      if (Number.isFinite(sample.health)) player.health = sample.health;
+      if (Number.isFinite(sample.bandages)) player.bandages = sample.bandages;
+      if (Number.isFinite(sample.ammo)) state.ammo = sample.ammo;
+      if (Number.isFinite(sample.clips)) state.clips = sample.clips;
+      if (Number.isFinite(sample.grenades)) state.grenades = sample.grenades;
+      if (Number.isFinite(sample.bundles)) state.bundles = sample.bundles;
+      // 重来的那一下手上不该还抬着担架（担架已经翻了），也不该还架着机枪。
+      carry?.Reset("checkpoint");
+      emplacement?.EndClear?.();
+      state.playerAliveLast = true;
+      return true;
+    },
+  });
+
+  // 剧情语音接线：Story 报时机，Audio 出声（单槽，新句顶旧句），
+  // **Companion 报「说话的人站在哪儿」**（locate）。定位不到就退化成非空间化播放 ——
+  // 军官的画外喊话、旁白、以及这一章没点名的人本来就没有身体。
   story.AttachVoice({
     play: ({ key, position }) => audio.PlayStoryVoice(key, { position }),
+    locate: (who) => (companion ? companion.Locate(who) : null),
     stop: () => audio.StopStoryVoice(),
   });
+  // 关中过场：Story 报时机，装配层夺控制权、播、还回来（与关首过场同一条路）。
+  story.AttachCutscene((id) => PlayMidCutscene(id));
   /**
    * 换天光。套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，
    * 少一件就是「天是夜的、地是白天的」。过场（cut.sky）与采样点出图
@@ -1119,7 +1232,11 @@ async function Boot() {
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeQte() { return meleeQte; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
+    companion, checkpoint,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
+    // 关中过场的宿主 API（story.Signal→过场 的等价入口）。玩法系统批直接调它，
+    // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
+    PlayMidCutscene,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
     graphics, ApplyGraphics,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
@@ -1467,8 +1584,40 @@ async function Boot() {
       AdvanceLevel: (opts) => AdvanceLevel(opts || {}),
       // 钉住/放开当前关。剧本长跑要用它，见 state.pinned 的注释。
       PinLevel: (on) => { state.pinned = on !== false; return state.pinned; },
+      // --- 钉关原语（mechanics.pinFinalZone）的取证口 ---
+      // 「走到最后一个路标为什么没换关」只能从这里读。
+      ChapterPin: () => ({
+        pinFinalZone: state.pinFinalZone,
+        released: state.chapterReleased,
+        releaseAt: state.chapterReleaseAt,
+        signal: CHAPTER_RELEASE_SIGNAL,
+        signalled: story ? story.Signalled(CHAPTER_RELEASE_SIGNAL) : false,
+        objectiveIndex: state.objectiveIndex, objectiveCount: state.objectiveCount,
+        phaseTime: state.phaseTime, levelSeconds: state.levelSeconds,
+      }),
+      ReleaseChapter: () => { story?.Signal(CHAPTER_RELEASE_SIGNAL); return state.chapterReleased; },
+      // --- 具名同伴的取证口 ---
+      Companions: () => ({
+        present: companion ? companion.Present : [],
+        roster: companion ? companion.Roster : [],
+        absent: companion ? companion.Absent : [],
+        log: companion ? companion.log.slice() : [],
+        located: companion
+          ? Object.fromEntries(companion.Roster.map((id) => [id, companion.Locate(id)]))
+          : {},
+      }),
+      // --- 脚本检查点的取证口 ---
+      Checkpoint: () => ({
+        samples: checkpoint ? checkpoint.Count : 0,
+        rewinds: checkpoint ? checkpoint.rewinds.slice() : [],
+        latest: checkpoint ? checkpoint.Latest : null,
+      }),
+      SaveCheckpoint: () => !!checkpoint?.Save(),
+      RewindCheckpoint: (seconds) => (checkpoint ? checkpoint.Rewind(seconds) : null),
       // --- 过场的取证口 ---
       PlayCutscene: (id) => RunCutscene(id),
+      PlayMidCutscene: (id) => PlayMidCutscene(id),
+      MidCutscenes: () => (story ? story.MidCutscenes : []),
       SkipCutscene: () => { if (cutscene) cutscene.Skip(); return !!cutscene; },
       Cutscene: () => ({
         playing: cutscene ? cutscene.Playing : false,
@@ -2065,6 +2214,12 @@ function ClearRuntime() {
   flare?.Reset("levelChange");
   // 发的那封电报也不许跨关：底噪要停，报码纸要收。
   telegraph?.Reset("levelChange");
+  // 具名同伴按关摆：不清的话上一关那几个人会连着 handle 一起留到下一关，
+  // 而 ai.Dispose 已经把兵表清空了 —— Locate 会指着一具不存在的 soldier。
+  // **缺席宣告（罗班长四关牺牲）不在这里清**，那是剧情事实不是关卡状态。
+  companion?.Reset("levelChange");
+  // 检查点环里的坐标是上一关切片的：倒到这一关就是穿墙。
+  checkpoint?.Reset("levelChange");
   interact?.Clear();
   // 机枪位同理：它的世界模型也要拆，不然下一关的同一坐标上会多出一挺枪。
   emplacement?.Clear();
@@ -2143,6 +2298,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   state.objectiveIndex = 0;
   state.objectiveCount = phase.zones.length;
   state.levelSeconds = phase.minutes * 60;
+  // 钉关：章节数据声明 mechanics.pinFinalZone 的，走到最后一个路标不自动换关。
+  state.pinFinalZone = !!(phase.mechanics && phase.mechanics.pinFinalZone);
+  state.chapterReleased = false;
+  state.chapterReleaseAt = 0;
   // 「城里还站着的人」按剧本给的曲线走。**不做橡皮筋补给** ——
   // 这座城里没有后方，数字只会往下走（序章那一章不耗，见 Data_MissionCh0 的曲线注释）。
   state.nraPool = phase.nraPool;
@@ -2178,11 +2337,26 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
   // 底下那片地皮上不该有一条战线在后台开火消耗票池。
   if (!cutsceneOnly || initial) RespawnPlayer(true);
+  // 具名同伴**排在撒兵之前**：SeedSoldiers 的 CountNear("nra",40) 与
+  // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
+  // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
+  // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
+  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
+    companion.BeginLevel(phase.id, {
+      beats: phase.level?.beats || [], zones: phase.zones,
+      // 这一章玩家演的是谁 —— 他不进名册（终章玩家就是小秦，而小秦在终章话最多）。
+      // 章节数据还没有这个字段，Companion 侧暂有一张过渡表；INT2 写上之后这里就走数据。
+      playerCast: phase.playerCast || phase.level?.playerCast || undefined,
+    });
+  }
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
+  // 进关先打一个检查点：第一拍就被击倒时也有地方可退。
+  checkpoint?.Reset("enterLevel");
+  checkpoint?.Save();
 
   if (!initial) {
     ShowBoot(false);
@@ -2230,6 +2404,28 @@ async function RunCutscene(id) {
   }
   return result;
 }
+
+/**
+ * 播一场**关中**过场（`{type:"cutscene"}` beat 与 `story.Signal→过场` 的落点）。
+ *
+ * 与关首/关末过场走的是同一个 RunCutscene：夺控制权、掐战斗输入、放指针锁、
+ * 收枪、播完还回来；Esc 跳过与字幕补卡的语义因此**天然一致**（同一个导演）。
+ * Story 那边靠这个 Promise 停住剧本推进（见 StoryDirector.cutsceneHold）。
+ *
+ * 三种情况直接回 null 且不报错（都是正常状态，不许把一关卡死）：
+ *   · 过场系统还没建起来（出图/预览的某些路径）；
+ *   · 已经在播一场了（不许两场叠着播）；
+ *   · 正在换关（镜头这时候归 AdvanceLevel）。
+ */
+function PlayMidCutscene(id) {
+  if (!id || !cutscene) return null;
+  if (cutscene.Playing || state.advancing) return null;
+  if (!CUTSCENES[id]) { console.warn("没有这场关中过场：", id); return null; }
+  return RunCutscene(id);
+}
+
+/** 章节钉住时，等这条信号才放行换关（名字见 Script_Story.CHAPTER_RELEASE_SIGNAL）。 */
+const PIN_RELEASE_GRACE_S = 240;
 
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
@@ -4612,6 +4808,11 @@ function Frame(dt, render = true) {
   // 适配器写进 LightRig / VfxSystem，那两个的 Update 都排在后面（见下）。
   flare?.Update(dt);
 
+  // 具名同伴的跟随目标。**必须排在 ai.Update 之前**：goal 要在这一帧的 Think
+  // 之前写进去，写晚一帧就是「班长永远慢你一步」。它自己按 regoalS 分频，
+  // 不是每帧都真的写（每帧写 goal 等于每帧打断寻路）。
+  companion?.Update(dt);
+
   profiler.B("ai");
   ai.Update(dt, camera);
   profiler.E("ai");
@@ -4651,6 +4852,10 @@ function Frame(dt, render = true) {
   if (state.playerAliveLast && !player.Alive) OnPlayerDown();
   state.playerAliveLast = player.Alive;
 
+  // 脚本检查点：**排在死亡判定之后**，采的是这一帧最终的位置/姿态/血/弹。
+  // 排在前面的话，被打死的那一帧也会被采进环里，倒带就退回到"刚好要死"的那一刻。
+  checkpoint?.Update();
+
   profiler.B("story");
   const contested = UpdateObjectives(dt);
 
@@ -4688,8 +4893,31 @@ function Frame(dt, render = true) {
 
   state.phaseTime += dt;
   const phase = PHASE_TABLE[state.phaseIndex];
+
+  // --- 钉关（mechanics.pinFinalZone）---------------------------------------
+  // 第五关最后一个路标是「返回最后火力点」，而阶段⑩⑪⑫（最后防守三层、
+  // 最终白刃战、视角接替三段）全在它**之后**。按常规规则一踏进那个圈就
+  // objectiveIndex ≥ objectiveCount，Script_Main 立刻换关，整段被吃掉。
+  // 所以章节数据声明这条旗标之后，走到最后一个路标只是"到了"，
+  // 要等 story.Signal("ChapterRelease") 才放行。
+  //
+  // 保险丝：信号一直不来的话，超过配置时长 + PIN_RELEASE_GRACE_S 自动放行并告警。
+  // 没有它，一条忘了接的信号就是"这一关永远打不完"，而画面上完全看不出为什么。
+  if (state.pinFinalZone && !state.chapterReleased) {
+    if (story.Signalled(CHAPTER_RELEASE_SIGNAL)) {
+      state.chapterReleased = true;
+      state.chapterReleaseAt = state.phaseTime;
+    } else if (state.phaseTime > state.levelSeconds + PIN_RELEASE_GRACE_S) {
+      state.chapterReleased = true;
+      state.chapterReleaseAt = state.phaseTime;
+      console.warn(`钉关保险丝：${phase.id} 等不到 ${CHAPTER_RELEASE_SIGNAL}，`
+        + `已超时 ${Math.round(state.phaseTime - state.levelSeconds)} s，自动放行`);
+    }
+  }
+  const chapterPinned = state.pinFinalZone && !state.chapterReleased;
+
   // 换关：目标链走完，或者配置时长到了（史实时段是往前走的，不等玩家）
-  const levelOver = !state.pinned
+  const levelOver = !state.pinned && !chapterPinned
     && (state.objectiveIndex >= state.objectiveCount || state.phaseTime > state.levelSeconds);
   if (levelOver && !state.advancing && !state.outcome) {
     // 异步：建下一片切片要分帧走完。这里只管点火，别 await —— Frame 是同步的。

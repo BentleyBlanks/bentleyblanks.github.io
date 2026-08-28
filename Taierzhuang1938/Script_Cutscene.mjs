@@ -163,6 +163,7 @@ function Ease(name, k) {
   return fn(Clamp01(k));
 }
 
+
 /**
  * Actor 的正面是**局部 -Z**（见 Script_Ai：yaw = atan2(-dx, -dz)）。
  * 分镜数据里的 ry 都按这个约定写；下游要算「面朝某个方向」时用这个函数，
@@ -318,6 +319,38 @@ export class CutsceneDirector {
     chorusTalk: 0.5,    // 群体应答时每个人的说话幅度打几折
     chorusRadius: 9.0,  // 群体应答按「离带头那个人多远」挑人
   });
+
+  /**
+   * 一条 ambientMotion 在 t 时刻走了多远（米）。
+   *
+   * 没有 decelSeconds 时就是 `t × speed`，与改造前逐浮点相同。
+   *
+   * **decelSeconds**（2026-08-28 集成批 INT1，序章 ENGINE_REQUEST）：
+   * 列车进站不能硬停。原来只有 stopAt，到点那一帧窗外近景 7.2 m/s、月台 1.65 m/s
+   * 同时归零 —— 画面上是「世界被按了暂停」，不是「车停下了」。
+   * 现在给一段线性减速：stopAt 前 decelSeconds 秒开始，速度从 speed 线性降到 0。
+   *
+   * 位移是这条速度曲线的积分（**闭式，不积分状态** —— 出图要能从任意时刻抓帧，
+   * 见 _ApplyActors 头上那条规矩）：
+   *   t ≤ t0            : v·t
+   *   t0 < t < stopAt   : v·t0 + v·(τ − τ²/(2·d))，τ = t − t0
+   *   t ≥ stopAt        : v·t0 + v·d/2
+   * 三层窗外景物各自的 speed 不同、decelSeconds 相同，于是**同时**停稳，
+   * 而各自的减速距离与自己的速度成正比 —— 这正是真实列车该有的样子。
+   *
+   * （挂在类上而不是写成模块级函数：见本类顶上那条 new Function 的账。）
+   */
+  static AmbientDistance(t, move) {
+    const speed = Number(move.speed) || 0;
+    const decel = Math.max(0, Number(move.decelSeconds) || 0);
+    const stopAt = Number(move.stopAt);
+    if (!decel || !Number.isFinite(stopAt)) return t * speed;
+    const t0 = Math.max(0, stopAt - decel);
+    if (t <= t0) return t * speed;
+    const span = Math.max(1e-6, stopAt - t0);
+    const tau = Math.min(t, stopAt) - t0;
+    return speed * t0 + speed * (tau - (tau * tau) / (2 * span));
+  }
 
   /** 0—1 的说话包络：at 起缓入，end 后缓出。**闭式函数，不积分**（见 _ApplyActors）。 */
   static TalkEnvelope(t, at, end, delay = 0) {
@@ -479,10 +512,15 @@ export class CutsceneDirector {
     // Timeline seek 会主动终止旧播放头，再从目标时间重建仍在持续的对白。
     // 不留这本账，快速拖动几次就会叠出好几个人声。
     this.activeCueVoices = new Set();
+    // 过场音效的淡入/淡出/交叉淡变账本（见 _StartSfx）。每条 {name,voice,gain,...}。
+    this.sfxFades = [];
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.lookNeutral = false;
     this.lookConfig = ResolveHeadLookConfig(null, null);
+    // 切镜时 headLook 幅度的过渡（shot.headLook.blendIn）。null = 没在过渡。
+    this.lookBlend = null;
+    this.lookShot = null;
     this.headLook = false;
     this.walkConfig = null;
     this.walkOffset = new THREE.Vector3();
@@ -518,6 +556,21 @@ export class CutsceneDirector {
   get AllowsLook() { return !!(this.playing && this.headLook && !this.lookNeutral); }
   get Look() { return { yaw: this.lookYaw, pitch: this.lookPitch }; }
 
+  /**
+   * 切镜过渡期间**放宽**的视线范围。
+   *
+   * 没在过渡就是本镜自己的范围。过渡中的范围是「上一镜停在哪儿」与「本镜允许到哪儿」
+   * 的并集 —— 不放宽的话，玩家的输入会在过渡的第一帧就被新范围一把拽回去，
+   * blendIn 那条平滑曲线等于白写（这一条是实测踩出来的，不是理论）。
+   */
+  _LookRange(axis) {
+    const base = this.lookConfig[axis];
+    const blend = this.lookBlend;
+    if (!blend) return base;
+    const held = axis === "yaw" ? blend.yaw0 : blend.pitch0;
+    return [Math.min(base[0], held), Math.max(base[1], held)];
+  }
+
   /** 输入层传入鼠标增量；过场机位本身仍由时间轴唯一驱动。 */
   AddLook(deltaX = 0, deltaY = 0) {
     if (!this.AllowsLook) return this.Look;
@@ -525,8 +578,8 @@ export class CutsceneDirector {
     // Three 的相机在 lookAt 后仍沿局部轴旋转：正 yaw 是画面向左，正 pitch 是
     // 画面向上。因此标准第一人称输入必须两轴都减 movement，不能只凭 Euler 数值
     // 的正负猜玩家实际看到的方向。
-    this.lookYaw = ClampHeadLook(this.lookYaw - Number(deltaX || 0) * scale, this.lookConfig.yaw);
-    this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this.lookConfig.pitch);
+    this.lookYaw = ClampHeadLook(this.lookYaw - Number(deltaX || 0) * scale, this._LookRange("yaw"));
+    this.lookPitch = ClampHeadLook(this.lookPitch - Number(deltaY || 0) * scale, this._LookRange("pitch"));
     return this.Look;
   }
 
@@ -609,6 +662,8 @@ export class CutsceneDirector {
     this.lookNeutral = !!(this.ctx.neutralLook || this.ctx.forceNeutralLook || this.ctx.deterministicView);
     this.lookYaw = 0;
     this.lookPitch = 0;
+    this.lookBlend = null;
+    this.lookShot = null;
     this.walkConfig = cut.walk || null;
     this.walkOffset.set(0, 0, 0);
     this.walkBob = 0;
@@ -719,6 +774,7 @@ export class CutsceneDirector {
     this._ApplyFlashes(cut, shot, start);
     this._ApplyBlack(shot, local, dt);
     this._TickText(dt);
+    this._TickSfx(dt);
 
     if (this.time >= cut.seconds) {
       // 正常播完：还有 epilogueCard 的（王铭章那场并列史源装不下三秒）先补卡片。
@@ -911,9 +967,13 @@ export class CutsceneDirector {
       }
     } else if (spec.kind === "heightTerrain") {
       geometry = BuildHeightTerrainGeometry(spec.terrain || {});
-    } else if (spec.kind === "backdrop") {
+    } else if (spec.kind === "backdrop" || spec.kind === "panel") {
       // 车窗外的远山层是竖直的，不可沿用 ground plane 的 -90° 旋转。
       // 它只承担最远层云山并盖住世界默认天空／地平线；近中景仍由独立实体构成。
+      //
+      // "panel" 是同一块几何的另一个名字，给**立着的贴图道具**用（糊在墙上的
+      // 标语、挂着的布告、竖着的传单）。名字分开只为可读性：数据里写 backdrop
+      // 会让下一个人以为那是远景幕布。躺在地上的纸用 "plane"（自带 -90° 旋转）。
       geometry = new THREE.PlaneGeometry(size[0], size[1]);
     } else {
       geometry = new THREE.BoxGeometry(size[0], size[1], size[2] ?? size[0]);
@@ -924,19 +984,45 @@ export class CutsceneDirector {
     this.ownedGeometries.push(geometry);
 
     let material = null;
+    // ── prop.texture：贴一张图上去（2026-08-28 集成批 INT1 补全）────────────
+    // 用在四关/终章那几件「一张纸就是全部内容」的道具：传单、报纸、布告、
+    // 电报底稿、糊在墙上的标语。它们不是砖也不是木头，材质库里没有对应配方，
+    // 而做成一块平面 + 一张带 alpha 的图是最省的做法（一次 draw call，纸边是真的）。
+    //
+    // 三条与之前不同的地方：
+    //   · **texture 与 mat 互斥**：以前写了 texture 又写 mat 的话，下面那段库查询
+    //     会把贴图整个盖掉（材质变成一块砖，图一点都看不见，而且不报错）；
+    //   · **透明是显式的**：transparent / alphaTest / opacity 三个旋钮给数据层，
+    //     不猜 —— 一张不透明的纸开了 transparent 只会白挨一次排序；
+    //   · **repeat 走 wrap**：Box/Plane 的 UV 是每面 0—1，贴图要铺几遍得让它 wrap，
+    //     不然 repeat 大于 1 时只是把图拉伸到边缘的一列像素。
     if (spec.texture) {
       const texture = new THREE.TextureLoader().load(spec.texture);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.anisotropy = 4;
+      if (spec.repeat !== undefined) {
+        const rep = Array.isArray(spec.repeat) ? spec.repeat : [spec.repeat, spec.repeat];
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(Number(rep[0]) || 1, Number(rep[1]) || Number(rep[0]) || 1);
+      }
+      // 透明贴片默认双面：一张纸从背面看过去不该消失。
+      const doubleSided = spec.doubleSided ?? !!spec.transparent;
       material = new THREE.MeshStandardMaterial({
         map: texture, color: spec.color ?? 0xffffff, roughness: spec.roughness ?? 0.98,
-        metalness: spec.metalness ?? 0, side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+        metalness: spec.metalness ?? 0, side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+        transparent: !!spec.transparent,
+        opacity: spec.opacity ?? 1,
+        // alphaTest 与 transparent 是两条路：前者是"抠掉"（不进排序、能写深度），
+        // 后者是"半透"（要排序、不写深度）。纸边发毛的多半是只开了 transparent。
+        alphaTest: spec.alphaTest ?? (spec.transparent ? 0.35 : 0),
+        depthWrite: spec.depthWrite ?? !spec.transparent,
       });
       this.ownedMaterials.push(material);
     }
-    if (spec.mat && this.library && typeof this.library.Get === "function") {
+    if (!spec.texture && spec.mat && this.library && typeof this.library.Get === "function") {
       // repeat：贴图在这块几何上铺几遍。Box/Plane 的 UV 是每面 0—1，一张 2 m 的
       // 土路纹理铺满 140 m 的地面就是一片拉丝（出川那张地面的「流水纹」就是它）。
       // 按「几何尺寸 ÷ 贴图的物理尺寸（约 2 m）」给 repeat，地面才像地面。
@@ -979,6 +1065,10 @@ export class CutsceneDirector {
       material = tinted;
       this.ownedMaterials.push(tinted);
     }
+    // 半透明/抠图的东西建完必须 MarkNoPrepass（文件头第 3 条）：不做这一步，
+    // 深度法线预通道会拿 overrideMaterial 把它一起覆盖掉 —— 一张半透明的传单
+    // 会在预通道里变成一块实心方片，SSAO 与体积光的天空判据跟着废。
+    if (material && (material.transparent || material.alphaTest > 0)) MarkNoPrepass(material);
     const mesh = new THREE.Mesh(geometry, material);
     // 自发光只是**让自己亮**，照不亮旁边的东西（没有 GI）。
     // 「台灯是唯一光源」「油灯」「门缝一条光」这三处要真的照亮屋子，
@@ -1120,7 +1210,7 @@ export class CutsceneDirector {
     const shotHeadLook = shot.cameraMode === "headLook"
       || cam.cameraMode === "headLook" || cut.cameraMode === "headLook";
     this.headLook = shotHeadLook;
-    if (shotHeadLook) this.lookConfig = ResolveHeadLookConfig(cut, shot);
+    if (shotHeadLook) this._StepLookBlend(cut, shot, cam);
     const k = shot.seconds > 0 ? local / shot.seconds : 1;
     const e = Ease(cam.ease, k);
     const o = this.origin;
@@ -1219,6 +1309,50 @@ export class CutsceneDirector {
         const halfFov = (this.camera.fov * Math.PI) / 360;
         this.gunsight.scale.setScalar(Math.tan(halfFov) / Math.tan((13.5 * Math.PI) / 180));
       }
+    }
+  }
+
+  /**
+   * 换镜时把 headLook 的幅度**过渡**过去（shot.headLook.blendIn 秒）。
+   *
+   * 序章 ENGINE_REQUEST：镜 1 是自由段（yaw ±2.09），镜 2 是固定演出（yaw ±0.70）。
+   * 玩家若正把头转在边缘，切镜那一帧视角会被瞬间拽回四十度 —— 这不是"限制生效了"，
+   * 这是"画面被人抢走了"。序章有四处这样的接缝（镜 1→2、2→3、5→6、6→7）。
+   *
+   * 做法：切镜时如果当前视线落在新范围之外，就记下它，用 blendIn 秒缓动收进去；
+   * 过渡期间玩家仍可以自己转（范围按 _LookRange 放宽，见那里的账）。
+   * blendIn 不写或写 0 = 老行为（硬钳），一个字都没改。
+   */
+  _StepLookBlend(cut, shot, cam) {
+    const cfg = ResolveHeadLookConfig(cut, shot);
+    const blendIn = Math.max(0, Number(
+      shot.headLook?.blendIn ?? cam.headLook?.blendIn ?? cut.headLook?.blendIn ?? 0) || 0);
+    if (this.lookShot !== shot.n) {
+      this.lookShot = shot.n;
+      const wantYaw = ClampHeadLook(this.lookYaw, cfg.yaw);
+      const wantPitch = ClampHeadLook(this.lookPitch, cfg.pitch);
+      const off = Math.abs(wantYaw - this.lookYaw) > 1e-4 || Math.abs(wantPitch - this.lookPitch) > 1e-4;
+      this.lookBlend = (blendIn > 0 && off && !this.lookNeutral)
+        ? { yaw0: this.lookYaw, pitch0: this.lookPitch, seconds: blendIn, t: 0 }
+        : null;
+    }
+    this.lookConfig = cfg;
+    if (!this.lookBlend) {
+      this.lookYaw = ClampHeadLook(this.lookYaw, cfg.yaw);
+      this.lookPitch = ClampHeadLook(this.lookPitch, cfg.pitch);
+      return;
+    }
+    const blend = this.lookBlend;
+    blend.t = Math.min(blend.seconds, blend.t + Math.max(0, this.time - this.prevTime));
+    const e = Ease("easeInOut", blend.t / blend.seconds);
+    // 从「切镜那一刻停在哪儿」缓到「本镜允许的最近边界」。玩家过渡期间自己转过的量
+    // 会被下一帧的 _LookRange 接住，不会被这条曲线抹掉。
+    this.lookYaw = Lerp(this.lookYaw, ClampHeadLook(this.lookYaw, cfg.yaw), e);
+    this.lookPitch = Lerp(this.lookPitch, ClampHeadLook(this.lookPitch, cfg.pitch), e);
+    if (blend.t >= blend.seconds) {
+      this.lookBlend = null;
+      this.lookYaw = ClampHeadLook(this.lookYaw, cfg.yaw);
+      this.lookPitch = ClampHeadLook(this.lookPitch, cfg.pitch);
     }
   }
 
@@ -1405,7 +1539,7 @@ export class CutsceneDirector {
       // 到站后不能让窗外景物继续掠过。用钳住的全局时间而不是把 speed
       // 直接置零，保证停下的那一帧正好接续此前的位置、没有循环层跳变。
       const motionTime = move.stopAt === undefined ? this.time : Math.min(this.time, move.stopAt);
-      const distance = motionTime * (Number(move.speed) || 0);
+      const distance = CutsceneDirector.AmbientDistance(motionTime, move);
       // 早期出川序章把每一根电杆按 18 m 回卷；同一根杆和同一棵树每两三秒
       // 从窗后跳回，哪怕远中近三层速度不同也还是一眼能看出“循环贴图”。
       // 连续行程的道具由数据预先铺到整段 99 秒的铁路上，永不回卷；驶出窗框后
@@ -1529,6 +1663,8 @@ export class CutsceneDirector {
       }
     }
     this.activeCueVoices.clear();
+    // 淡变账本跟着一起收：留着的话下一场的第一帧会去写一个已经停掉的 gain。
+    this.sfxFades.length = 0;
   }
 
   /**
@@ -1594,11 +1730,94 @@ export class CutsceneDirector {
       const id = key("sfx", i);
       if (this.fired.has(id) || !crossed(sfx.at)) return;
       this.fired.add(id);
-      if (this.audio && typeof this.audio.Play === "function") {
-        const voice = this.audio.Play(sfx.name, { volume: sfx.volume ?? 0.5 });
-        if (voice) this.activeCueVoices.add(voice);
-      }
+      this._StartSfx(sfx);
     });
+  }
+
+  /**
+   * 起一条过场音效，带淡入 / 淡出 / 交叉淡变。
+   *
+   * 序章 ENGINE_REQUEST：策划案收口写的是「火车声**渐变**近距离炮声」，
+   * 终章尾声写的是「发报机电流声**渐变**序章火车车轮声」。
+   * 在此之前只能把两条 cue 前后叠着放，听感是"切"不是"渐变" —— 而这两处
+   * 恰恰是 §0「章节之间的切黑必须用声音衔接」那条规矩唯一的落点。
+   *
+   * 数据字段（全部可选，都不写就是老行为：起一声、由 AudioEngine 自然收尾）：
+   *   fadeIn      淡入秒数
+   *   seconds     响多久之后开始淡出（不写就不主动淡出）
+   *   fadeOut     淡出秒数（写了 seconds 没写 fadeOut 时按 fadeIn 或 0.8 s）
+   *   crossfade   "别的cue名" | true —— 起这一条的同时把那一条淡出。
+   *               给字符串就只淡出同名的那条；给 true 淡出当前全部过场音效。
+   *               淡出时长取本条的 fadeIn（"一起变"才叫渐变）。
+   *
+   * 音量走 voice.out.gain（AudioEngine 的干声起点）。**不改 Script_Audio** ——
+   * 那是 F2 的文件，而这件事只发生在过场里，没必要给全局音频加一层包络。
+   */
+  _StartSfx(sfx) {
+    if (!this.audio || typeof this.audio.Play !== "function") return null;
+    const fadeIn = Math.max(0, Number(sfx.fadeIn) || 0);
+    if (sfx.crossfade) {
+      const target = typeof sfx.crossfade === "string" ? sfx.crossfade : null;
+      this._FadeOutSfx(target, fadeIn || Number(sfx.fadeOut) || 0.8);
+    }
+    const peak = sfx.volume ?? 0.5;
+    const voice = this.audio.Play(sfx.name, { volume: peak, position: sfx.position || null });
+    if (!voice) return null;
+    this.activeCueVoices.add(voice);
+    const gain = voice.out && voice.out.gain ? voice.out.gain : null;
+    const entry = {
+      name: sfx.name, voice, gain,
+      peak: gain && Number.isFinite(gain.value) ? gain.value : peak,
+      fadeIn, t: 0,
+      holdUntil: Number.isFinite(Number(sfx.seconds)) ? Math.max(0, Number(sfx.seconds)) : Infinity,
+      fadeOut: Math.max(0, Number(sfx.fadeOut) || fadeIn || 0.8),
+      out: 0, done: false,
+    };
+    if (gain && fadeIn > 0) gain.value = 0;
+    this.sfxFades.push(entry);
+    return voice;
+  }
+
+  /** 把还在响的过场音效淡出。name=null 表示全部。 */
+  _FadeOutSfx(name, seconds) {
+    for (const entry of this.sfxFades) {
+      if (entry.done || entry.out > 0) continue;
+      if (name && entry.name !== name) continue;
+      entry.holdUntil = entry.t;
+      entry.fadeOut = Math.max(0.05, seconds);
+    }
+  }
+
+  /**
+   * 每帧推一次音效包络。**用 gain.value 直接写，不排 WebAudio 的自动化曲线** ——
+   * 过场可以被 Esc 打断、被 Timeline 拖动、被下一场顶掉，排好的曲线取消不干净，
+   * 而逐帧写值天然跟着导演的时钟走（包括 0.25 倍速与暂停）。
+   */
+  _TickSfx(dt) {
+    if (!this.sfxFades.length) return;
+    for (const entry of this.sfxFades) {
+      if (entry.done) continue;
+      entry.t += dt;
+      const gain = entry.gain;
+      if (entry.t >= entry.holdUntil) {
+        entry.out += dt;
+        const k = Clamp01(entry.out / Math.max(1e-3, entry.fadeOut));
+        if (gain) gain.value = entry.peak * (1 - k);
+        if (k >= 1) {
+          entry.done = true;
+          if (this.audio && typeof this.audio.StopVoice === "function") {
+            try { this.audio.StopVoice(entry.voice); } catch { /* 已经自然结束 */ }
+          }
+          this.activeCueVoices.delete(entry.voice);
+        }
+        continue;
+      }
+      if (gain && entry.fadeIn > 0) {
+        gain.value = entry.peak * Clamp01(entry.t / entry.fadeIn);
+      }
+    }
+    // 收摊：done 的不再占位（一场里可能起几十条）
+    if (this.sfxFades.some((e) => e.done)) this.sfxFades = this.sfxFades.filter((e) => !e.done);
   }
 
   _TickText(dt) {
@@ -1691,7 +1910,7 @@ export class CutsceneDirector {
   _Finish(silent) {
     if (!this.playing && !this.cut) return;
     if (silent) this.StopCueAudio();
-    else this.activeCueVoices.clear();
+    else { this.activeCueVoices.clear(); this.sfxFades.length = 0; }
     this.playing = false;
     this.cardTime = -1;
     this._TeardownSet();

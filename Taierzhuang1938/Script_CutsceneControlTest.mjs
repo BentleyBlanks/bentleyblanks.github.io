@@ -159,6 +159,114 @@ assert.deepEqual(seekAudio.plays.at(-1), { name: "voice.seek_voice", offset: 1 }
 seekDirector.Skip();
 await seekPlay;
 
+// ===========================================================================
+// 2026-08-28 集成批 INT1：过场引擎三件小补
+//   ① ambientMotion 的减速段（列车进站不再硬停）
+//   ② shot.headLook.blendIn（自由段 → 固定演出的视角过渡）
+//   ③ 过场 sfx 的 fadeIn / fadeOut / crossfade（火车声渐变炮声）
+// ===========================================================================
+
+// --- ① ambientMotion.decelSeconds ------------------------------------------
+const noDecel = { name: "x", speed: 7.2, from: [0, 0, 0], axis: [0, 0, 1] };
+assert.equal(Director.AmbientDistance(3, noDecel), 21.6, "没写 decelSeconds 时逐浮点与改造前相同");
+assert.equal(Director.AmbientDistance(3, { ...noDecel, stopAt: 10 }), 21.6, "有 stopAt 没 decel 也不变");
+const fast = { name: "near", speed: 7.2, stopAt: 10, decelSeconds: 4, from: [0, 0, 0], axis: [0, 0, 1] };
+const slow = { name: "platform", speed: 1.65, stopAt: 10, decelSeconds: 4, from: [0, 0, 0], axis: [0, 0, 1] };
+assert.equal(Director.AmbientDistance(6, fast), 43.2, "减速段开始之前仍是匀速");
+// 停稳那一刻走过的总路程 = v·t0 + v·d/2
+assert.ok(Math.abs(Director.AmbientDistance(10, fast) - (7.2 * 6 + 7.2 * 2)) < 1e-9, "减速段的积分对得上");
+assert.equal(Director.AmbientDistance(12, fast), Director.AmbientDistance(10, fast), "stopAt 之后不再前进");
+// 「同时停稳、各自的减速距离与速度成正比」—— 这正是三层窗外景物该有的样子
+const fastBrake = Director.AmbientDistance(10, fast) - Director.AmbientDistance(6, fast);
+const slowBrake = Director.AmbientDistance(10, slow) - Director.AmbientDistance(6, slow);
+assert.ok(Math.abs(fastBrake / slowBrake - 7.2 / 1.65) < 1e-9, "两层同时停稳，减速距离按各自速度成比例");
+// 单调且连续（不许在 t0 那一帧跳一下）
+let prevD = 0;
+for (let t = 0; t <= 12.0001; t += 0.25) {
+  const d = Director.AmbientDistance(t, fast);
+  assert.ok(d >= prevD - 1e-9, `减速段位移必须单调（t=${t.toFixed(2)}）`);
+  assert.ok(d - prevD <= 7.2 * 0.25 + 1e-9, `减速段速度不许超过匀速段（t=${t.toFixed(2)}）`);
+  prevD = d;
+}
+
+// --- ② shot.headLook.blendIn ------------------------------------------------
+const MakeBlendCut = (blendIn) => ({
+  id: `TEST_Blend_${blendIn}`, title: "blend", seconds: 2.4, cast: [], props: [],
+  cameraMode: "headLook", headLook: { yaw: [-2.0, 2.0], pitch: [-0.4, 0.4], sensitivityScale: 1 },
+  shots: [
+    { n: 1, seconds: 0.4, focalMm: 50, cameraMode: "headLook",
+      headLook: { yaw: [-2.0, 2.0], pitch: [-0.4, 0.4] }, camera: { from: [0, 1, 4], look: [0, 1, 0] } },
+    { n: 2, seconds: 2.0, focalMm: 50, cameraMode: "headLook",
+      headLook: { yaw: [-0.7, 0.7], pitch: [-0.4, 0.4], ...(blendIn ? { blendIn } : {}) },
+      camera: { from: [0, 1, 4], look: [0, 1, 0] } },
+  ],
+});
+const RunBlend = async (blendIn) => {
+  const cutData = MakeBlendCut(blendIn);
+  const d = new Director({ camera: new FakeCamera(), scene: new FakeScene(),
+    table: { [cutData.id]: cutData } });
+  const p = d.Play(cutData.id);
+  d.AddLook(-750, 0);                       // 把头转到 +1.5 rad（第一镜允许 ±2.0）
+  const startYaw = d.Look.yaw;
+  const samples = [];
+  for (let i = 0; i < 12; i += 1) { d.Update(0.1); samples.push(d.Look.yaw); }
+  d.Skip();
+  await p;
+  return { startYaw, samples };
+};
+const hard = await RunBlend(0);
+assert.ok(Math.abs(hard.startYaw - 1.5) < 1e-9, "第一镜的宽范围允许 1.5 rad");
+assert.ok(Math.abs(hard.samples[3] - 0.7) < 1e-9,
+  "不写 blendIn = 老行为：切到固定演出那一帧直接钳到边界（把头拽回四十度）");
+const soft = await RunBlend(0.6);
+assert.ok(soft.samples[3] > 0.7 + 1e-6,
+  "写了 blendIn：切镜第一帧不许把视角一把拽回去");
+assert.ok(soft.samples[3] < soft.startYaw, "过渡是往边界收，不是不动");
+assert.ok(soft.samples[4] < soft.samples[3], "过渡期间逐帧继续收");
+assert.ok(Math.abs(soft.samples[10] - 0.7) < 1e-6, "blendIn 走完之后仍然落在本镜的范围内");
+
+// --- ③ 过场 sfx 的淡入 / 淡出 / 交叉淡变 ------------------------------------
+const sfxCut = {
+  id: "TEST_Sfx", title: "sfx", seconds: 4, cast: [], props: [],
+  shots: [{ n: 1, seconds: 4, focalMm: 50, camera: { from: [0, 1, 4], look: [0, 1, 0] },
+    sfx: [
+      { at: 0.05, name: "trainWheels", volume: 0.6, fadeIn: 0.5 },
+      { at: 1.0, name: "cannonFar", volume: 0.8, fadeIn: 0.5, crossfade: "trainWheels" },
+    ] }],
+};
+const sfxAudio = {
+  plays: [], stops: 0, voices: {},
+  Play(name, opts) {
+    const voice = { nodes: [], out: { gain: { value: opts.volume ?? 0.5 } } };
+    this.plays.push(name);
+    this.voices[name] = voice;
+    return voice;
+  },
+  StopVoice() { this.stops += 1; },
+};
+const sfxDirector = new Director({ camera: new FakeCamera(), scene: new FakeScene(),
+  audio: sfxAudio, table: { [sfxCut.id]: sfxCut } });
+const sfxPlay = sfxDirector.Play(sfxCut.id);
+const TrainGain = () => sfxAudio.voices.trainWheels.out.gain.value;
+const CannonGain = () => (sfxAudio.voices.cannonFar ? sfxAudio.voices.cannonFar.out.gain.value : null);
+sfxDirector.Update(0.1);
+assert.deepEqual(sfxAudio.plays, ["trainWheels"], "第一条 cue 到点起声");
+assert.ok(TrainGain() > 0 && TrainGain() < 0.6, "fadeIn 期间是渐强，不是一上来就满");
+for (let i = 0; i < 5; i += 1) sfxDirector.Update(0.1);     // t = 0.6
+assert.ok(Math.abs(TrainGain() - 0.6) < 1e-9, "fadeIn 走完之后到达 volume");
+for (let i = 0; i < 5; i += 1) sfxDirector.Update(0.1);     // t = 1.1，跨过 crossfade 那一条
+assert.deepEqual(sfxAudio.plays, ["trainWheels", "cannonFar"], "第二条 cue 到点起声");
+const trainAfter = TrainGain();
+assert.ok(trainAfter < 0.6, "crossfade 让前一条开始淡出");
+assert.ok(CannonGain() < 0.8, "新起的那条同时在淡入 —— 这才叫渐变，不是切");
+for (let i = 0; i < 8; i += 1) sfxDirector.Update(0.1);
+assert.equal(TrainGain(), 0, "淡出走完之后前一条归零");
+assert.ok(sfxAudio.stops >= 1, "淡出到零的那条要真的被停掉，不留播放头");
+assert.ok(Math.abs(CannonGain() - 0.8) < 1e-9, "后一条淡入到自己的 volume");
+sfxDirector.Skip();
+await sfxPlay;
+assert.equal(sfxDirector.sfxFades.length, 0, "跳过/收摊时淡变账本要清干净");
+
 const motivationShot = CS_Chuchuan.shots.find((shot) => shot.n === 6);
 const motivationStart = CS_Chuchuan.shots.slice(0, 5).reduce((sum, shot) => sum + shot.seconds, 0);
 const motivationEnd = motivationStart + motivationShot.seconds;

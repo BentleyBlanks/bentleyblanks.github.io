@@ -380,6 +380,45 @@ URL 参数选 preset / quality / scene / gi。
 - 回归口 `Script_TelegraphTest.mjs`（纯 Node，domain `interact` ＋ `hud`）；
   取证口 `Debug.Telegraph`。HUD 是报码纸 `.hudTelegraph`（**不压暗武器 UI** —— 发报不占手）。
 
+### 任务流程引擎钩子（集成批 INT1：把七章内容与四个新系统接起来的引擎侧原语）
+- **关中过场** —— beats 里 `{ at, type:"cutscene", id:"CS_x" }`；等价入口是
+  `story.Signal("<名字>")`（登记表 `Script_Story.SIGNAL_CUTSCENES`）与宿主 API
+  `window.Taierzhuang.PlayMidCutscene(id)`。三条路走的都是**同一个 RunCutscene** ——
+  Esc 跳过与字幕补卡的语义因此与关首过场一致。派发期间剧本停摆（`story.CutsceneHold`）、
+  战斗输入被 `router.SetSuppressed` 掐掉。`CHAPTER.cutsceneMid` 兼容住：写字符串挂
+  默认信号 `ChapterMidCutscene`，写 `{ id, signal }` 挂指定信号。
+  **组装层开机就查 id 是否注册**（`Data_TengxianScript`）。
+- **LEVEL_CUES 自动构建** —— `Script_Story.BuildLevelCues(CHAPTER_EVENTS)` 照七章各自的
+  `export const EVENTS` 建判定表。三种名字字段（`name`/`event`/`id`）与三种判据字段
+  （`fallback`/`predicate`/`cue`）一律认；判据用**受限文法解析，不 eval**
+  （比较式的 `||`/`&&` 组合，字段限 zone/objectiveIndex/objectiveCount/levelTime/
+  levelSeconds/pool）；没写判据的按登记顺序**均匀铺开**到关卡时长上。
+  章节没导出 EVENTS 的补丁在 `SUPPLEMENT_CUES`（现在只有 CH2 的 BayonetDone）。
+  `story.Signal` 主动推的永远优先 —— 那条既有路径一个字没改。
+- `Script_Companion.mjs` —— 具名同伴（罗班长、幺娃、何有田…）。**纯规则，不 import three**。
+  默认名册从本章 beats 的 `who` 推导（该章说过话的战斗员自动在场），
+  `COMPANION_CAST` 一张档案表决定谁能生成、跟随还是待命。对外四件事：
+  `Locate(castId)`（接 `story.AttachVoice` 的 `locate` —— 台词从此有方位）、
+  `SetAbsent(castId)`（**跨关保留**，罗班长四关牺牲、五关起缺席）、
+  `Fell(castId)`（走现有倒地，不是删人）、`Detach/Attach(castId)`。
+  造人走 `AiDirector.Spawn("nra", ...)` 并塞一个具名 `identity`，**从 nra 名额里出人**，
+  所以开机红线不受影响（`MAX_COMPANIONS = 6`）。每帧排在 `ai.Update` 之前。
+- `Script_Checkpoint.mjs` —— 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。
+  **纯规则**，环形位置采样：`Save()` / `Rewind(seconds)`。还原位置/姿态/血/弹，
+  **不扣兵员池、不弹死亡卡、不换人**。给 S3 的 `OnPlayerHit` 用，
+  必须在把伤害提交给死亡链路**之前**调 —— 打完再调，卡已经弹了。
+- **钉关** —— `CHAPTER.mechanics.pinFinalZone: true` 时，走到最后一个路标不自动换关，
+  等 `story.Signal("ChapterRelease")` 才放行（CH5 的最终白刃战三层与视角接替三段
+  全在最后一个路标之后）。保险丝：超过配置时长 + 240 s 自动放行并告警。
+- **过场引擎三件小补**：prop 的 `texture` 贴图（`transparent`/`alphaTest`/`repeat`，
+  与 `mat` 互斥，`kind:"panel"` 是立着的平面）、`shot.headLook.blendIn`（切镜时视角过渡）、
+  `shot.sfx` 的 `fadeIn`/`fadeOut`/`seconds`/`crossfade`、
+  `ambientMotion[].decelSeconds`（列车进站不再硬停）。
+- 回归口 `Script_MissionHooksTest.mjs`（纯 Node，domain `cutscene` ＋ `ai` ＋ `interact`）
+  ＋ `Script_CutsceneControlTest.mjs` 里的过场引擎三条；取证口 `Debug.Companions` /
+  `Debug.Checkpoint` / `Debug.ChapterPin` / `Debug.MidCutscenes`。
+  字段口径见 `docs/Data_MissionRemake.md` §10.6。
+
 ### 编辑器（15 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（九个要接管相机，同开必抖）。
 - `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`

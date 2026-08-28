@@ -617,7 +617,13 @@ Check("从正片脱钩的旧五场仍然播得动（文件与注册都保留）"
   ["CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"]
     .every((id) => cuts.played.includes(id)),
   `播过：${cuts.played.join(" ")}`);
-// 章节边界上真的会自动播：第五章（城墙没有了）打完接 CS_Ch5_TurnBack
+// 章节边界上真的会自动播：第五章（城墙没有了）打完接 **CS_Ch5_PovChain**。
+//
+// 2026-08-28 集成批 INT1 改的期望值（Data_MissionCh5.mjs 的 ENGINE_REQUEST 11 点名要求）：
+// 按策划案 §6 的过场规格，关末播的是**视角接替**（顺子倒下不切黑 → 担架离开街道 →
+// 124 师伤兵 → 电话兵中弹、听筒落地，声音直接接进终章）；**转身那一场改成关中播**
+// （CHAPTER.cutsceneMid = CS_Ch5_TurnBack，由 story 的关中过场通道派发）。
+// 章节数据的 cutsceneOut 已经是 CS_Ch5_PovChain，这一行原来钉的是改之前那个值。
 const cutTrigger = await page.evaluate(async () => {
   const T = window.Taierzhuang, D = T.Debug;
   await T.JumpToPhase(5);
@@ -630,7 +636,7 @@ const cutTrigger = await page.evaluate(async () => {
   await p;
   return { fired: at.current, after: D.Level().id };
 });
-Check("第五章打完自动接本章的关末过场", cutTrigger.fired === "CS_Ch5_TurnBack",
+Check("第五章打完自动接本章的关末过场", cutTrigger.fired === "CS_Ch5_PovChain",
   `触发的是 ${cutTrigger.fired}，之后进 ${cutTrigger.after}`);
 
 // ===========================================================================

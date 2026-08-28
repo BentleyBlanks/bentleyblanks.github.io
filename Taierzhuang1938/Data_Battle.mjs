@@ -139,6 +139,9 @@ export const PHASES = LEVELS.map((level, index) => {
     story: level.id,                 // 叙事层直接按章节 id 装载，不再有翻译表
     cutsceneIn: level.cutsceneIn || null,
     cutsceneOut: level.cutsceneOut || null,
+    // 关中过场：判定与派发全在 Script_Story（SIGNAL_CUTSCENES），装配层不直接读它，
+    // 带过来只是为了让选章/编辑器能列出「这一章有几场过场」。
+    cutsceneMid: level.cutsceneMid || null,
     objectives: level.objectives,
     mechanic: level.mechanic,
     mechanics: level.mechanics,

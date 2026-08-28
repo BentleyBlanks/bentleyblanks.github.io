@@ -75,6 +75,28 @@ export function ValidateCutscene(cut, cast = CAST) {
     if (!cameraModes.has(mode)) problems.push(`${cut.id} 镜${shot.n}: 未知 cameraMode「${mode}」`);
     checkRange(shot.headLook?.yaw ?? cam.headLook?.yaw, `镜${shot.n} headLook.yaw`);
     checkRange(shot.headLook?.pitch ?? cam.headLook?.pitch, `镜${shot.n} headLook.pitch`);
+    // blendIn：自由段 → 固定演出的视角过渡秒数（2026-08-28 INT1）。
+    // 负数或非数字会让过渡在第一帧就"完成"，表现与没写一样 —— 静默失败，所以硬查。
+    const blendIn = shot.headLook?.blendIn ?? cam.headLook?.blendIn;
+    if (blendIn !== undefined && (!Number.isFinite(Number(blendIn)) || Number(blendIn) < 0)) {
+      problems.push(`${cut.id} 镜${shot.n}: headLook.blendIn 必须是非负数字`);
+    }
+    // 过场音效的淡变字段。写错了听不出来是"没渐变"还是"没这条音"，所以也硬查。
+    for (const sfx of shot.sfx || []) {
+      if (!sfx || typeof sfx.name !== "string" || !sfx.name) {
+        problems.push(`${cut.id} 镜${shot.n}: sfx 缺 name`);
+        continue;
+      }
+      for (const field of ["fadeIn", "fadeOut", "seconds"]) {
+        if (sfx[field] === undefined) continue;
+        if (!Number.isFinite(Number(sfx[field])) || Number(sfx[field]) < 0) {
+          problems.push(`${cut.id} 镜${shot.n}: sfx「${sfx.name}」的 ${field} 必须是非负数字`);
+        }
+      }
+      if (sfx.crossfade !== undefined && typeof sfx.crossfade !== "string" && typeof sfx.crossfade !== "boolean") {
+        problems.push(`${cut.id} 镜${shot.n}: sfx「${sfx.name}」的 crossfade 只能是别的 cue 名或 true`);
+      }
+    }
     if (cam.fromActor && !castIds.has(cam.fromActor)) problems.push(`${cut.id} 镜${shot.n}: fromActor「${cam.fromActor}」不在 cast 里`);
     if (cam.lookActor && !castIds.has(cam.lookActor)) problems.push(`${cut.id} 镜${shot.n}: lookActor「${cam.lookActor}」不在 cast 里`);
     for (const line of shot.lines || []) {
@@ -92,6 +114,16 @@ export function ValidateCutscene(cut, cast = CAST) {
     }
     for (const move of shot.propMoves || []) {
       if (!(cut.props || []).some((p) => p.name === move.name)) problems.push(`${cut.id} 镜${shot.n}: propMoves 指向不存在的道具「${move.name}」`);
+    }
+  }
+  // ambientMotion 的减速段（2026-08-28 INT1）：decelSeconds 只有配着 stopAt 才有意义，
+  // 单写一个 decelSeconds 是"永远不会到来的减速"，画面上完全看不出写错了。
+  for (const move of cut.ambientMotion || []) {
+    if (move.decelSeconds === undefined) continue;
+    if (!Number.isFinite(Number(move.decelSeconds)) || Number(move.decelSeconds) < 0) {
+      problems.push(`${cut.id}: ambientMotion「${move.name}」的 decelSeconds 必须是非负数字`);
+    } else if (!Number.isFinite(Number(move.stopAt))) {
+      problems.push(`${cut.id}: ambientMotion「${move.name}」写了 decelSeconds 却没有 stopAt（减不到头）`);
     }
   }
   for (const actor of cut.cast || []) {
