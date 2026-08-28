@@ -75,6 +75,7 @@ export const testDefs = {
   HudPromptTest: { file: "Script_HudPromptTest.mjs", desc: "HUD 提示规则（纯 Node，秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
+  CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
@@ -145,6 +146,7 @@ export const tier0 = [
   "HudPromptTest",
   "RiggedModelTest",
   "CharacterModelTest",
+  "CharacterHitboxMathTest",
   "FractureBakeTest",
   "CutsceneControlTest",
   "GeoTest",
@@ -173,7 +175,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest"],
+      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest", "CharacterHitboxMathTest"],
   },
   ai: { label: "AI 与战场内容预算", tests: ["AiBehaviorTest", "VisibilityTest"] },
   hud: { label: "HUD/交互提示/目标识别", tests: ["HudPromptTest", "HudPromptBrowserTest", "TargetInfoTest"] },
@@ -197,7 +199,7 @@ export const domains = {
 const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee)/i },
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Script_Input|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },

@@ -30,6 +30,7 @@ import {
   CreateLugouCharacterRig,
   LoadLugouCharacterAssets,
 } from "./Script_CharacterModel.mjs";
+import { RaycastCapsule } from "./Script_CharacterHitboxMath.mjs";
 import {
   ACTOR_MESH_BY_VARIANT,
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
@@ -1153,6 +1154,7 @@ function AttachBone(parent, geometries, materials, position) {
 // 就是每秒几千次分配 —— GC 抖动在 55fps 的预算里是看得见的。
 const POSE_A = new THREE.Vector3();
 const POSE_B = new THREE.Vector3();
+const ACTOR_HITBOX_SCALE = new THREE.Vector3();
 const REST_Q = new THREE.Quaternion();
 const AIM_Q = new THREE.Quaternion();
 const PARENT_Q = new THREE.Quaternion();
@@ -1321,6 +1323,28 @@ export class Actor {
       back: makeMount("back", this.chest,
         new THREE.Vector3(0, 0.08 * d.height, 0.11 * d.height)),
     };
+    // 百姓与模型加载故障不会再退到“脚底上 0.95 m 的大球”。同样按可见人体的
+    // 头/躯干/四肢拆成短胶囊；节点来自这一套程序化骨架，所以坐、卧、倒地、IK
+    // 都会同步。军人 GLB 有各自更精确的骨骼表，见 GetBoneHitboxes 的优先分支。
+    const capsule = (id, a, b, radius, part, priority = 0) => ({
+      id, type: "capsule", a, b, radius, part, priority,
+      start: new THREE.Vector3(), end: new THREE.Vector3(), worldRadius: 0,
+    });
+    this.proceduralHitboxes = [
+      capsule("head", this.neck, this.eyes, Math.max(d.headW, d.headD) * 0.56, "head", 3),
+      capsule("upperTorso", this.chest, this.neck, Math.max(d.chestHalf, d.chestDepth) * 0.80, "torso", 1),
+      capsule("lowerTorso", this.hips, this.chest, Math.max(d.waistHalf, d.waistDepth) * 0.88, "torso", 1),
+      capsule("upperArmL", this.arms.L.shoulder, this.arms.L.elbow, 0.037 * d.height, "limb"),
+      capsule("forearmL", this.arms.L.elbow, this.mounts.handL, 0.032 * d.height, "limb"),
+      capsule("upperArmR", this.arms.R.shoulder, this.arms.R.elbow, 0.037 * d.height, "limb"),
+      capsule("forearmR", this.arms.R.elbow, this.mounts.handR, 0.032 * d.height, "limb"),
+      capsule("thighL", this.legs.L.thigh, this.mounts.kneeL, 0.044 * d.height, "limb"),
+      capsule("calfL", this.legs.L.knee, this.mounts.footL, 0.036 * d.height, "limb"),
+      capsule("footL", this.mounts.footL, this.mounts.footEdgeL, 0.034 * d.height, "limb"),
+      capsule("thighR", this.legs.R.thigh, this.mounts.kneeR, 0.044 * d.height, "limb"),
+      capsule("calfR", this.legs.R.knee, this.mounts.footR, 0.036 * d.height, "limb"),
+      capsule("footR", this.mounts.footR, this.mounts.footEdgeR, 0.034 * d.height, "limb"),
+    ];
     this._mountAliases = Object.freeze({
       eye: "eyes", eyes: "eyes", weapon: "weapon", weaponmount: "weaponMount",
       hand: "handR", handl: "handL", handleft: "handL", lefthand: "handL",
@@ -1498,11 +1522,29 @@ export class Actor {
   }
 
   GetBoneHitboxes() {
-    return this.characterRig ? this.characterRig.GetHitboxes() : [];
+    if (this.characterRig) return this.characterRig.GetHitboxes();
+    this.root.updateWorldMatrix(true, true);
+    const scale = this.root.getWorldScale(ACTOR_HITBOX_SCALE).y || 1;
+    for (const shape of this.proceduralHitboxes || []) {
+      shape.worldRadius = shape.radius * scale;
+      shape.a.getWorldPosition(shape.start);
+      shape.b.getWorldPosition(shape.end);
+    }
+    return this.proceduralHitboxes || [];
   }
 
   RaycastHitboxes(origin, direction, maxDistance) {
-    return this.characterRig ? this.characterRig.Raycast(origin, direction, maxDistance) : null;
+    if (this.characterRig) return this.characterRig.Raycast(origin, direction, maxDistance);
+    let best = null;
+    for (const shape of this.GetBoneHitboxes()) {
+      const distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);
+      if (distance !== null && distance <= maxDistance && (!best
+          || distance < best.t - 1e-6
+          || (Math.abs(distance - best.t) <= 1e-6 && shape.priority > best.shape.priority))) {
+        best = { t: distance, part: shape.part, shape };
+      }
+    }
+    return best;
   }
 
   /**

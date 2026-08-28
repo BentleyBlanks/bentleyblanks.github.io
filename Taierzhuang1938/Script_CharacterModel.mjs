@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { RaycastCapsule, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
@@ -164,24 +165,25 @@ export async function LoadLugouCharacterAssets() {
   return loadPromise;
 }
 
-const HITBOX_DEFS = Object.freeze([
-  { type: "sphere", role: "head", radius: 0.14, part: "head" },
-  { type: "capsule", a: "pelvis", b: "chest", radius: 0.20, part: "torso" },
-  { type: "capsule", a: "chest", b: "neck", radius: 0.15, part: "torso" },
-  { type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "forearmL", b: "handL", radius: 0.070, part: "limb" },
-  { type: "capsule", a: "upperArmR", b: "forearmR", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "forearmR", b: "handR", radius: 0.070, part: "limb" },
-  { type: "capsule", a: "thighL", b: "calfL", radius: 0.105, part: "limb" },
-  { type: "capsule", a: "calfL", b: "footL", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "thighR", b: "calfR", radius: 0.105, part: "limb" },
-  { type: "capsule", a: "calfR", b: "footR", radius: 0.085, part: "limb" },
+// 按 3A 人物碰撞的配置方式写成“部位代理表”：所有尺寸是资产的局部米制，端点
+// 只认语义骨骼，运行时再跟随每个模型、每条动画的骨架变换。头不再是一颗挂在
+// Head pivot 上的孤球——Max Biped 的 Head pivot 靠近颈根，孤球会吞到胸胶囊里，
+// 造成画面上打脸、规则却先返回 torso。现在头是 neck→head 的短胶囊，胸到颈根
+// 也独立成一段，二者只在颈部交界，面颅范围不会被躯干覆盖。
+export const CHARACTER_HITBOX_PROFILE = Object.freeze([
+  { id: "head", type: "capsule", a: "neck", b: "head", radius: 0.115, part: "head", priority: 3 },
+  { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
+  { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
+  { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
+  { id: "forearmL", type: "capsule", a: "forearmL", b: "handL", radius: 0.060, part: "limb", priority: 0 },
+  { id: "upperArmR", type: "capsule", a: "upperArmR", b: "forearmR", radius: 0.075, part: "limb", priority: 0 },
+  { id: "forearmR", type: "capsule", a: "forearmR", b: "handR", radius: 0.060, part: "limb", priority: 0 },
+  { id: "thighL", type: "capsule", a: "thighL", b: "calfL", radius: 0.10, part: "limb", priority: 0 },
+  { id: "calfL", type: "capsule", a: "calfL", b: "footL", radius: 0.075, part: "limb", priority: 0 },
+  { id: "thighR", type: "capsule", a: "thighR", b: "calfR", radius: 0.10, part: "limb", priority: 0 },
+  { id: "calfR", type: "capsule", a: "calfR", b: "footR", radius: 0.075, part: "limb", priority: 0 },
 ]);
 
-const RAY = new THREE.Ray();
-const RAY_POINT = new THREE.Vector3();
-const SEGMENT_POINT = new THREE.Vector3();
-const SPHERE = new THREE.Sphere();
 const WORLD_SCALE = new THREE.Vector3();
 
 /** One independently animated, skeleton-cloned soldier. */
@@ -228,7 +230,7 @@ export class LugouCharacterRig {
       backBlade: FindNode(this.root, "Socket_BackBlade") || this.bones.chest || null,
       headGear: FindNode(this.root, "Socket_HeadGear") || this.bones.head || null,
     };
-    this.hitboxes = HITBOX_DEFS.map((definition) => ({
+    this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => ({
       ...definition,
       center: new THREE.Vector3(),
       start: new THREE.Vector3(),
@@ -325,8 +327,10 @@ export class LugouCharacterRig {
 
   GetHitboxes() {
     this.root.updateWorldMatrix(true, true);
-    const scale = this.actor?.height ? this.actor.height / 1.68
-      : this.root.getWorldScale(WORLD_SCALE).y || 1;
+    // 判定半径要随 **实际渲染根节点** 缩放。旧实现拿 Actor 的名义身高除以
+    // 1.68；但十个 GLB 的源身高不同，且 root 已按各自 sourceHeight 缩过一次，
+    // 这会让同一套代理和看见的模型差到数厘米。世界缩放同时覆盖 cutscene 父节点。
+    const scale = this.root.getWorldScale(WORLD_SCALE).y || 1;
     const active = [];
     for (const shape of this.hitboxes) {
       shape.worldRadius = shape.radius * scale;
@@ -347,22 +351,17 @@ export class LugouCharacterRig {
   }
 
   Raycast(origin, direction, maxDistance) {
-    RAY.set(origin, direction);
     let best = null;
     for (const shape of this.GetHitboxes()) {
-      let distance = null;
+      let distance;
       if (shape.type === "sphere") {
-        SPHERE.set(shape.center, shape.worldRadius);
-        const point = RAY.intersectSphere(SPHERE, RAY_POINT);
-        if (point) distance = point.distanceTo(origin);
+        distance = RaycastSphere(origin, direction, shape.center, shape.worldRadius);
       } else {
-        const distanceSq = RAY.distanceSqToSegment(shape.start, shape.end, RAY_POINT, SEGMENT_POINT);
-        if (distanceSq <= shape.worldRadius * shape.worldRadius) {
-          distance = Math.max(0, RAY_POINT.distanceTo(origin)
-            - Math.sqrt(Math.max(0, shape.worldRadius * shape.worldRadius - distanceSq)));
-        }
+        distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);
       }
-      if (distance !== null && distance <= maxDistance && (!best || distance < best.t)) {
+      if (distance !== null && distance <= maxDistance && (!best
+          || distance < best.t - 1e-6
+          || (Math.abs(distance - best.t) <= 1e-6 && (shape.priority || 0) > (best.shape.priority || 0)))) {
         best = { t: distance, part: shape.part, shape };
       }
     }

@@ -100,8 +100,17 @@ assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?
   "protagonist selects Nra01");
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
+assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
+assert.match(runtime, /a: "neck", b: "head"[\s\S]*?part: "head"/, "head uses its neck-to-head bone span");
+assert.match(runtime, /getWorldScale\(WORLD_SCALE\)/, "hitbox radius uses actual render-root scale");
+assert.match(runtime, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
+assert.doesNotMatch(runtime, /distanceSqToSegment\(shape\.start/, "old closest-distance capsule approximation removed");
 assert.match(runtime, /SetHeadVisible\(visible\)/, "first-person head visibility control exists");
 assert.match(actor, /SOLDIER_MESH_BY_KIND\.civilian/, "old soldier models are not preloaded");
+assert.match(actor, /this\.proceduralHitboxes\s*=\s*\[/,
+  "procedural civilian and fallback models have segmented hitboxes");
+assert.match(actor, /capsule\("head", this\.neck, this\.eyes/,
+  "procedural head uses neck-to-eye proxy instead of fallback torso sphere");
 assert.match(cutscene, /protagonist:\s*spec\.firstPerson\s*===\s*true[\s\S]*?modelVariant:\s*spec\.firstPerson\s*===\s*true\s*\?\s*0/,
   "first-person protagonist requests Nra01");
 assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,

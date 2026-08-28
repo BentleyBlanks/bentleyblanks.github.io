@@ -105,6 +105,10 @@ try {
     for (const [variant, civilian] of civilianVariants) {
       check(civilian.meshSource === "model",
         `civilian ${variant} fell back to ${civilian.meshSource} instead of the tzm model`);
+      const hitboxes = civilian.GetBoneHitboxes();
+      check(hitboxes.length === 13 && hitboxes.some((shape) => shape.id === "head")
+        && hitboxes.some((shape) => shape.id === "footL") && hitboxes.some((shape) => shape.id === "footR"),
+      `civilian ${variant} does not expose its segmented bullet proxies`);
       civilian.root.updateMatrixWorld(true);
       const joints = {
         hips: civilian.hips, chest: civilian.chest, neck: civilian.neck,
