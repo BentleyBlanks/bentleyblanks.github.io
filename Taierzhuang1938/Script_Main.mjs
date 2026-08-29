@@ -189,17 +189,9 @@ const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
-// 第一人称手臂：**默认仍走旧的程序化手模**，导入的整臂写 ?arms=rig 才上。
-//
-// 2026-08-29 这一轮本来是奔着"默认打开导入整臂"去的（用户要的就是手跟着骨骼
-// 走），袖子这个老阻塞项也确实解决了：军装袖管挂在 bicep / forearm 两根骨头上
-// 跟着 IK 走（FpsArmRig._BuildSleeves），拉伸也跟（_StretchSleeves），握点从
-// 棍的轴心推到表面（GRIP_RADIUS）。**但它还是不能默认上**，剩下的是手本身：
-// ARM_SCALE 0.62 之后那双手只有十厘米出头，又是从枪的另一侧扣上来的，
-// 端枪那一帧里两只手加起来读不出几个像素 —— 画面上是"两条袖子伸到枪那儿就没了"。
-// 对照图 _shots/Rig_v3_hip.png 与 _shots/Tune_K_hip.png。
-// 要默认打开，缺的是把手放大 + 换成从上方扣住护木的握姿，那是下一轮的事。
-const RIGGED_ARMS = params.get("arms") === "rig";
+// 第一人称默认使用国军模型 01 派生的真实蒙皮双手。`?arms=legacy` 只留作资产读取
+// 失败时的诊断入口；正常游戏、截图与冲刺都不再显示程序化手。
+const RIGGED_ARMS = params.get("arms") !== "legacy";
 const SHOT_ADS = !!(SHOT && params.get("ads"));
 const SHOT_FIRE = !!(SHOT && params.get("fire"));
 /**

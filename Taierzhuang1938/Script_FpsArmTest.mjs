@@ -17,8 +17,8 @@
 // 覆盖腰射与开镜两个姿态、步枪与大刀两把武器 —— 大刀那组姿态转得最狠，
 // 是这条链最容易再翻的地方。
 
-// 注意 URL 上的 **arms=rig**：导入整臂不是默认（默认是旧的程序化手模，理由写在
-// Script_Main 的 RIGGED_ARMS 抬头），这条测试守的就是那条可选路径。
+// 国军 01 双手现在就是默认路径；URL 不再带 arms=rig，防止测试只守着一个玩家
+// 永远不会进入的隐藏分支。
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -34,7 +34,7 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small&arms=rig`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
@@ -79,7 +79,10 @@ const report = await page.evaluate(async () => {
     return point;
   };
 
-  const out = { cases: [], hasArms: !!arms, chains: arms ? arms.report.chains : 0 };
+  const out = {
+    cases: [], hasArms: !!arms, chains: arms ? arms.report.chains : 0,
+    source: arms?.report?.source,
+  };
   for (const weapon of ["ZhongZheng", "Dadao"]) {
     vm.Equip(weapon);
     for (const ads of [0, 1]) {
@@ -87,20 +90,10 @@ const report = await page.evaluate(async () => {
         vm.Update(1 / 60, { ads, moveSpeed: 0, grounded: true, crouch: 0, sprint: 0 });
       }
       T.StepFrames(6);
-      const entry = { weapon, ads, painted: +PaintedFraction().toFixed(4), wrist: {}, bicep: {} };
+      const entry = { weapon, ads, painted: +PaintedFraction().toFixed(4), grip: {} };
       for (const side of ["r", "l"]) {
-        const bones = arms.bones[side];
         const hand = side === "r" ? vm.handRight.group : vm.handLeft.group;
-        const wrist = Camera(bones.wrist);
-        const grip = Camera(hand);
-        entry.wrist[side] = +wrist.distanceTo(grip).toFixed(3);
-        // 大臂根在视锥里吗：−Z 前方、按半视场折算的画面边界
-        const bicep = Camera(bones.bicep);
-        const half = Math.tan((52 / 2) * Math.PI / 180);
-        entry.bicep[side] = bicep.z < -0.02
-          && Math.abs(bicep.y) < half * -bicep.z
-          && Math.abs(bicep.x) < half * -bicep.z * (canvas.width / canvas.height);
-        entry.stretch = { ...arms.stretch };
+        entry.grip[side] = +Camera(arms.modelHands[side]).distanceTo(Camera(hand)).toFixed(4);
       }
       out.cases.push(entry);
     }
@@ -109,21 +102,16 @@ const report = await page.evaluate(async () => {
 });
 
 const checks = [];
-checks.push(["导入手臂两条 IK 链都建起来了", report.hasArms && report.chains === 2, `chains=${report.chains}`]);
+checks.push(["国军 01 左右手模型都接入默认路径", report.hasArms && report.chains === 2
+  && report.source === "LugouNra01", `source=${report.source} / hands=${report.chains}`]);
 for (const entry of report.cases) {
   const label = `${entry.weapon} ${entry.ads ? "开镜" : "腰射"}`;
   checks.push([`${label} 手臂在画面上读得出且没糊屏（0.5%—22%）`,
     entry.painted >= 0.005 && entry.painted <= 0.22,
     `${(entry.painted * 100).toFixed(1)}%`]);
-  checks.push([`${label} 两只手都扣在握点上（≤ 12 cm）`,
-    entry.wrist.r <= 0.12 && entry.wrist.l <= 0.12,
-    `右 ${entry.wrist.r} m / 左 ${entry.wrist.l} m`]);
-  checks.push([`${label} 大臂根落在视锥之外`,
-    !entry.bicep.r && !entry.bicep.l,
-    `右 ${entry.bicep.r ? "进画面" : "画外"} / 左 ${entry.bicep.l ? "进画面" : "画外"}`]);
-  checks.push([`${label} 骨头没被拉过头（≤ 1.35）`,
-    entry.stretch.r <= 1.351 && entry.stretch.l <= 1.351,
-    `右 ${entry.stretch.r} / 左 ${entry.stretch.l}`]);
+  checks.push([`${label} 两只模型手掌中心都锁在握点附近（≤ 6 cm）`,
+    entry.grip.r <= 0.06 && entry.grip.l <= 0.06,
+    `右 ${entry.grip.r} m / 左 ${entry.grip.l} m`]);
 }
 checks.push(["页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | ")]);
 

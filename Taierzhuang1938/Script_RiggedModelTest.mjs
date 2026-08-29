@@ -46,13 +46,12 @@ function AssertTexturedMaterialsHaveNormals(doc, label) {
   }
 }
 
-const arms = ReadGlb("Model_FpsArms.glb");
+const arms = ReadGlb("Model_FpsArmsNra01.glb");
 const armNames = Names(arms);
-AssertTexturedMaterialsHaveNormals(arms, "FPS arms");
-assert.ok((arms.skins || []).length >= 1, "FPS arms keep a skin");
+assert.equal((arms.meshes || []).length, 2, "FPS hands export one authored mesh per side");
+assert.equal((arms.skins || []).length, 0, "NRA01 skin is applied offline, not retargeted at runtime");
 assert.ok((arms.textures || []).length >= 1, "FPS arms keep an albedo texture");
-for (const bone of ["shoulder.r", "bicep.r", "forearm.r", "wrist.r", "finger_index3.r",
-  "shoulder.l", "wrist.l", "finger_thumb3.l"]) assert.ok(armNames.has(bone), `FPS arm bone ${bone}`);
-assert.ok(Animations(arms).has("GripIdle"), "FPS arms include GripIdle");
+for (const node of ["HandRight", "HandLeft"]) assert.ok(armNames.has(node), `FPS hand node ${node}`);
+assert.equal((arms.animations || []).length, 0, "FPS arms freeze model 01 RifleIdle as bind pose");
 
-console.log(`ok   FPS arms: ${arms.skins.length} skin, ${armNames.size} nodes, ${arms.animations.length} animation`);
+console.log(`ok   NRA01 FPS hands: ${arms.meshes.length} meshes, ${armNames.size} nodes, ${arms.animations?.length || 0} animation`);
