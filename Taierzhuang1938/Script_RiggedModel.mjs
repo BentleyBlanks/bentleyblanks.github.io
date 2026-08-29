@@ -106,6 +106,14 @@ const ELBOW_POLE = {
 // 差的这一点要么让手够不到枪（手悬空、枪自己飘着，就是上一版的样子），
 // 要么把骨头拉长一点点。选后者：拉到 1.35 倍以内肉眼看不出，手一定扣在枪上。
 const MAX_STRETCH = 1.35;
+// 握点是那根"被握住的棍"的**轴心**，不是它的表面。
+//
+// 旧的程序化手把原点定在轴心上，掌心自然落在原点下方 −Y 处，也就是贴着木头；
+// 而 IK 送到握点的是**掌心本身**（见 _GripFrame），于是整只手被塞进护木/枪颈
+// 里面 —— 画面上就是"一条袖子伸到枪那儿就没了，只在机匣旁边露出一小块肉"。
+// 把目标沿掌心外法向（手的局部 +Y）推出一个握持半径，手才是**扣在**枪上。
+// 护木 44 mm 宽、枪颈 38 mm，取 0.022 m。
+const GRIP_RADIUS = 0.022;
 
 /**
  * 骨骼名归一化。
@@ -169,8 +177,9 @@ function AimBone(bone, child, worldTarget) {
 
 /** Imported WRAD arms driven to the existing weapon-specific hand targets. */
 export class FpsArmRig {
-  constructor(gltf) {
+  constructor(gltf, materials = null) {
     this.gltf = gltf;
+    this.materials = materials;
     this.root = CloneSkeleton(gltf.scene);
     this.root.name = "RiggedFpsArms";
     this.root.userData.skipNormalDepth = true;
@@ -204,7 +213,14 @@ export class FpsArmRig {
     this.tmpQuaternion = new THREE.Quaternion();
     this.tmpQuaternion2 = new THREE.Quaternion();
     this._CollectBones();
+    this.sleeveMeshes = [];
+    this._BuildSleeves();
+    const sleeveSet = new Set(this.sleeveMeshes);
     this.root.traverse((object) => {
+      // 袖子用的是**材质库里那一份共用的军装布**。下面那串修正（乘 0.62、压
+      // envMap、抬 roughness）是冲着这副手臂自带的皮肤贴图去的，落到共用材质上
+      // 就等于把全场所有蓝布一起调暗一次，而且每次换枪再乘一遍。
+      if (sleeveSet.has(object)) return;
       if (object.isMesh) {
         // 这副 WRAD 手臂的源材质标了 doubleSided。肩现在稳定落在视锥下沿之外，
         // 但小臂仍会擦着画面下沿进出；双面渲染会把人站在袖筒内部看到的背面也
@@ -278,6 +294,111 @@ export class FpsArmRig {
       console.warn(`[RiggedModel] 手臂骨骼没对上，IK 不会跑：${this.report.missing.join(", ")}`);
     }
     this.report.armLen = this.arm.r ? +(this.arm.r.l1 + this.arm.r.l2).toFixed(3) : 0;
+  }
+
+  /**
+   * 给这副**光膀子**的手臂穿上军装。
+   *
+   * 这是"导入整臂默认不上"的唯一阻塞项（见 docs/Data_GunFeelReview.md）：几何和
+   * IK 早就对了，但资产本身是裸皮 —— 没有袖子、没有护腕，一条粉白的胳膊从画面
+   * 下沿伸进来，比它要取代的那副程序化手更不像 1938 年那支穿军装的手。
+   *
+   * 袖子**挂在骨头上**（bicep / forearm 各一节），所以它跟着 IK 解出来的姿态走，
+   * 不需要蒙皮、也不需要动那张 GLB。刚性套管在肘上会有一道接缝，靠两节各自往
+   * 关节方向多伸一截、彼此交叠盖掉 —— 低模低到这个份上，交叠比缝好看得多。
+   *
+   * 尺寸一律按**骨长的比例**给，不写绝对米数：整副手臂带着 ARM_SCALE 0.62，
+   * 写死的半径会在缩放之后对不上肉。比例取自真人（小臂长 0.26 m、腕 r 0.028、
+   * 肘 r 0.045），再放 15% 余量把皮包进去。
+   */
+  _BuildSleeves() {
+    const cloth = this.materials && this.materials.cloth;
+    if (!cloth) return;
+    this.root.updateWorldMatrix(true, true);
+    this.sleeveSegments = { r: [], l: [] };
+    for (const side of ["r", "l"]) {
+      const bones = this.bones[side];
+      if (!bones) continue;
+      // 小臂：腕端细、肘端粗，往肘的方向多伸 18% 去盖接缝
+      this._SleeveSegment(side, bones.forearm, bones.wrist, cloth, {
+        near: 0.230, far: 0.155, back: 0.18, forward: 0.02, cuff: true,
+      });
+      // 大臂：肩端粗。往下伸得多一点，把肘那圈交叠做厚
+      this._SleeveSegment(side, bones.bicep, bones.forearm, cloth, {
+        near: 0.280, far: 0.245, back: 0.10, forward: 0.16, cuff: false,
+      });
+    }
+  }
+
+  /**
+   * 一节袖管。**长度与半径都在"root 局部单位"里算**，不是米也不是骨头局部单位：
+   * 这副骨架每根骨头带着自己的缩放（实测腕以下 1 局部单位 ≈ 0.12 m），拿骨头
+   * 局部坐标当长度用会差一个数量级。做法是给骨头挂一个 holder，把它的缩放
+   * 反过来抵消掉，于是 holder 里面 1 单位 = 1 root 局部单位 = 一节骨头量出来的
+   * 那个距离的同一把尺子。
+   */
+  _SleeveSegment(side, bone, child, material, spec) {
+    const boneLocal = child.position.length();
+    if (boneLocal < 1e-6) return;
+    const a = this.root.worldToLocal(bone.getWorldPosition(new THREE.Vector3()));
+    const b = this.root.worldToLocal(child.getWorldPosition(new THREE.Vector3()));
+    const len = a.distanceTo(b);
+    if (len < 1e-6) return;
+    const holder = new THREE.Object3D();
+    holder.name = `${bone.name}Sleeve`;
+    holder.scale.setScalar(boneLocal / len);   // 抵消这根骨头累计的缩放
+    bone.add(holder);
+
+    const dir = child.position.clone().normalize();
+    const back = len * spec.back;
+    const forward = len * spec.forward;
+    const total = len + back + forward;
+    const geometry = new THREE.CylinderGeometry(
+      len * spec.far, len * spec.near, total, 10, 1, false);
+    geometry.rotateX(Math.PI / 2);             // 轴改成 +Z，跟 dir 对齐
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    mesh.position.copy(dir).multiplyScalar((len + forward - back) / 2);
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.userData.skipNormalDepth = true;
+    holder.add(mesh);
+    this.sleeveMeshes.push(mesh);
+    const record = { mesh, ring: null, dir, len, back, forward };
+    this.sleeveSegments[side].push(record);
+
+    if (!spec.cuff) return;
+    // 袖口翻边：比袖管粗一圈的一道薄环，收在腕那一端
+    const ring = new THREE.Mesh(
+      new THREE.CylinderGeometry(len * spec.far * 1.22, len * spec.far * 1.22,
+        len * 0.10, 10, 1, false).rotateX(Math.PI / 2), material);
+    ring.quaternion.copy(mesh.quaternion);
+    ring.position.copy(dir).multiplyScalar(len + forward - len * 0.05);
+    ring.frustumCulled = false;
+    ring.castShadow = false;
+    ring.userData.skipNormalDepth = true;
+    holder.add(ring);
+    this.sleeveMeshes.push(ring);
+    record.ring = ring;
+    record.ringInset = len * 0.05;
+  }
+
+  /**
+   * IK 够不着时会把骨头拉长（最多 MAX_STRETCH 1.35，见 _SolveArm）。袖子是按
+   * **绑定姿势**的骨长做的，不跟着拉的话，手一伸远袖口就退到腕后面去，
+   * 露出一截光胳膊 —— 实测左臂常年拉到 1.20，正是那一截。
+   */
+  _StretchSleeves(side, stretch) {
+    const list = this.sleeveSegments && this.sleeveSegments[side];
+    if (!list) return;
+    for (const seg of list) {
+      const len = seg.len * stretch;
+      seg.mesh.scale.z = stretch;
+      seg.mesh.position.copy(seg.dir).multiplyScalar((len + seg.forward - seg.back) / 2);
+      if (seg.ring) {
+        seg.ring.position.copy(seg.dir).multiplyScalar(len + seg.forward - seg.ringInset);
+      }
+    }
   }
 
   /**
@@ -414,6 +535,8 @@ export class FpsArmRig {
     if (grip) {
       target.sub(this._v5.copy(grip.palmDir).applyQuaternion(goal)
         .multiplyScalar(grip.palmLength * ARM_SCALE));
+      // 从棍的轴心挪到棍的表面，见 GRIP_RADIUS 抬头
+      target.add(this._v5.set(0, 1, 0).applyQuaternion(goal).multiplyScalar(GRIP_RADIUS));
     }
     let { l1, l2 } = this.arm[side];
     const distance = shoulderPoint.distanceTo(target);
@@ -444,6 +567,7 @@ export class FpsArmRig {
       .addScaledVector(pole, l1 * Math.sin(angle));
     AimBone(bicep, forearm, this.anchor.localToWorld(elbow));
     AimBone(forearm, wrist, this.anchor.localToWorld(this._v5.copy(target)));
+    this._StretchSleeves(side, stretch);
   }
 
   /**

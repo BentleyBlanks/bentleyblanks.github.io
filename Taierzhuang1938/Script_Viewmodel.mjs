@@ -1443,7 +1443,7 @@ export class Viewmodel {
     this.riggedArms = null;
     if (riggedAssets && riggedAssets.fpsArms) {
       try {
-        this.riggedArms = new FpsArmRig(riggedAssets.fpsArms);
+        this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, this.materials);
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
       }
@@ -1454,10 +1454,11 @@ export class Viewmodel {
     // 肩肘属于人，武器怎么摆都不该牵着它转。导入整臂启用时这两条让位给它。
     this.sleeveRight = MakeSleeve(this.materials, 1);
     this.sleeveLeft = MakeSleeve(this.materials, -1);
-    if (!this.riggedArms) {
-      this.armAnchor.add(this.sleeveRight.group);
-      this.armAnchor.add(this.sleeveLeft.group);
-    }
+    // 导入整臂在跑的时候这两条也照样挂着、照样每帧对准 —— 冲刺时 FpsArmRig 会
+    // 整副让位给旧手模（SetSprintFallback），那一刻手不能是光秃秃两只拳头。
+    // 显隐交给 Attach/SetSprintFallback 在**网格**那一层管，这里只管位置。
+    this.armAnchor.add(this.sleeveRight.group);
+    this.armAnchor.add(this.sleeveLeft.group);
     this._sleeveTmp = { a: new THREE.Vector3(), b: new THREE.Vector3(), q: new THREE.Quaternion() };
 
     // --- 枪口焰 -------------------------------------------------------------
@@ -1623,7 +1624,7 @@ export class Viewmodel {
     // 挂点给的是 armAnchor（相机稳定）而不是 rig.group，理由见 armAnchor 那段抬头。
     if (this.riggedArms) {
       this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
-        [this.handRight, this.handLeft]);
+        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]);
       this.rigSource = `${this.rigSource}+riggedArms`;
     }
 
@@ -2302,7 +2303,7 @@ export class Viewmodel {
     this._StepFlash(step);
     this._StepDebris(step);
     if (this.riggedArms) this.riggedArms.Update(step);
-    else this._UpdateSleeves();
+    this._UpdateSleeves();
   }
 
   /**

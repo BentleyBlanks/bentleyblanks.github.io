@@ -174,15 +174,16 @@ const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
-// 第一人称手臂：**默认走旧的程序化手模**，导入的整臂要显式 ?arms=rig 才上。
+// 第一人称手臂：**默认仍走旧的程序化手模**，导入的整臂写 ?arms=rig 才上。
 //
-// 那副 WRAD 整臂（Model_FpsArms.glb）的几何与 IK 现在是对的（肩挂在相机稳定的
-// 锚点上、解析两骨 IK 带极向量、按 socket 骨头握持，回归口 Script_FpsArmTest），
-// 但**它长得不对**：整条胳膊是光膀子的裸皮，没有军装袖子、没有绑腿式护腕，
-// 一双真实尺寸的手在这套"枪举在身前"的视图模型里要么占掉大半个屏幕、要么
-// 一半埋进枪托。同一帧对照（_shots/Arms_Compare2.png 的做法）里，旧手模的
-// 蓝布袖口 + 收锥手指明显更像 1938 年那支穿军装的手。
-// 所以这条路留着（改姿态/换成带袖子的资产就能一句话打开），但不是默认。
+// 2026-08-29 这一轮本来是奔着"默认打开导入整臂"去的（用户要的就是手跟着骨骼
+// 走），袖子这个老阻塞项也确实解决了：军装袖管挂在 bicep / forearm 两根骨头上
+// 跟着 IK 走（FpsArmRig._BuildSleeves），拉伸也跟（_StretchSleeves），握点从
+// 棍的轴心推到表面（GRIP_RADIUS）。**但它还是不能默认上**，剩下的是手本身：
+// ARM_SCALE 0.62 之后那双手只有十厘米出头，又是从枪的另一侧扣上来的，
+// 端枪那一帧里两只手加起来读不出几个像素 —— 画面上是"两条袖子伸到枪那儿就没了"。
+// 对照图 _shots/Rig_v3_hip.png 与 _shots/Tune_K_hip.png。
+// 要默认打开，缺的是把手放大 + 换成从上方扣住护木的握姿，那是下一轮的事。
 const RIGGED_ARMS = params.get("arms") === "rig";
 const SHOT_ADS = !!(SHOT && params.get("ads"));
 const SHOT_FIRE = !!(SHOT && params.get("fire"));
