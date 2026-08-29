@@ -83,11 +83,27 @@ try {
           const dot = (-Math.sin(soldier.yaw) * dx - Math.cos(soldier.yaw) * dz) / moved;
           prev.movingSamples += 1;
           if (dot > 0.15) prev.directedSamples += 1;
+          // 「自动推进服从小队共同方向」只对**推进状态**的自动推进者有定义：
+          // fire/suppressed 里的挪掩体、charge 的扑人本来就不看队向（实测
+          // 这两桶常年 43–45%，纯稀释）；同伴队吃的是跟随器的手动 goal，
+          // 也不是 SetSquadGoal 发的。任务流程重制后开局就接敌，混采会把
+          // 战斗噪声当成「不服从」。
           if (!soldier.holdZone && soldier.order === "advance"
+            && soldier.state === "advance" && T.ai.time >= soldier.manualGoalUntil
             && Math.hypot(soldier.squadForwardX, soldier.squadForwardZ) > 0.5) {
             const squadDot = (soldier.squadForwardX * dx + soldier.squadForwardZ * dz) / moved;
             prev.squadSamples += 1;
-            if (squadDot > 0) prev.squadDirectedSamples += 1;
+            // 编队保持算服从：队伍被火力钉住时质心不动，排在前面的人要**往回**
+            // 收拢到 SetSquadGoal 分派的槽位（goal 在队向身后），这是纪律不是散兵。
+            // 当年要防的回归（每人各奔几百米外的终点/导航场在街口各给各的答案）
+            // goal 全在前方，享受不到这条豁免，读数仍会塌到 ~0.5。
+            const gx = soldier.goal.x - soldier.position.x;
+            const gz = soldier.goal.z - soldier.position.z;
+            const goalLen = Math.hypot(gx, gz);
+            const towardSlotBehind = goalLen > 0.3
+              && (gx * dx + gz * dz) / (goalLen * moved) > 0
+              && gx * soldier.squadForwardX + gz * soldier.squadForwardZ < 0;
+            if (squadDot > 0 || towardSlotBehind) prev.squadDirectedSamples += 1;
           }
         }
         prev.yaw = soldier.yaw; prev.stance = soldier.stance; prev.target = target;
@@ -130,11 +146,27 @@ try {
 
     // 把日军临时从规则层隐藏，强制走「没有近敌」分支：仍在自动推进的友军小队
     // 必须统一锁当前未完成路标，不能恢复成每人挑最近点。
+    //
+    // 任务流程重制后各章友军全被剧本钉住（同伴队滚动续 manualGoalUntil、守点队
+    // 带 holdZone），场上不再有天然「自动推进」的友军 —— 直接按旧过滤器采样
+    // 恒为空集，测出来的是章节内容不是 AI。所以这里把剧本层也临时清掉
+    // （事后原样还原），逼出 UpdateSquads 的 autoAdvance 支路再验行为本身；
+    // 多跑几轮 UpdateSquads 是给 ApproachAngle 限速的队向留收敛时间
+    // （正常游戏里队向早已对准，这里是探针当场改令，得补上这几秒）。
     const savedIjaStates = T.ai.soldiers
       .filter((soldier) => soldier.side === "ija")
       .map((soldier) => [soldier, soldier.state]);
     for (const [soldier] of savedIjaStates) soldier.state = "dead";
-    T.ai.UpdateSquads();
+    const savedNraOrders = T.ai.soldiers
+      .filter((soldier) => soldier.alive && soldier.side === "nra")
+      .map((soldier) => [soldier, soldier.holdZone, soldier.order, soldier.manualGoalUntil,
+        soldier.goal.x, soldier.goal.z]);
+    for (const [soldier] of savedNraOrders) {
+      soldier.holdZone = null;
+      soldier.order = "advance";
+      soldier.manualGoalUntil = -99;
+    }
+    for (let round = 0; round < 5; round += 1) T.ai.UpdateSquads();
     const mission = T.battlefield.objectives.find((objective) => !objective.reached)
       || T.battlefield.objectives[T.battlefield.objectives.length - 1];
     const fallback = T.ai.soldiers.filter((soldier) => soldier.alive && soldier.side === "nra"
@@ -148,6 +180,12 @@ try {
       const oz = (mission?.z ?? soldier.position.z) - soldier.position.z;
       return gx * ox + gz * oz > 0;
     }).length;
+    for (const [soldier, holdZone, order, manualGoalUntil, goalX, goalZ] of savedNraOrders) {
+      soldier.holdZone = holdZone;
+      soldier.order = order;
+      soldier.manualGoalUntil = manualGoalUntil;
+      soldier.goal.set(goalX, 0, goalZ);
+    }
     for (const [soldier, state] of savedIjaStates) soldier.state = state;
     return {
       count: soldiers.length, roles, squads,
@@ -187,6 +225,10 @@ try {
     `触发冷却前开火=${sample.overheatShots}`);
   Check("移动方向与身体朝向一致", sample.directionRatio >= 0.6,
     `一致采样 ${(sample.directionRatio * 100).toFixed(1)}%`);
+  // 0.58 的余量账（2026-08-29 任务流程重制并入 master 后重校）：本口径只采
+  // 推进状态、且把「向身后槽位收拢」记为服从后，CH1 实测 ~73%（重制未并 master
+  // 前 ~95%，差值来自 58e78f71 压制钉队是有意为之）；要防的散兵回归读数 ~50%。
+  // 旧口径混采 fire/charge 战斗噪声时曾掉到 57.6% 贴闸，不是 AI 退步。
   Check("自动推进服从小队共同方向", sample.squadDirectionRatio >= 0.58,
     `同向采样 ${(sample.squadDirectionRatio * 100).toFixed(1)}%`);
   Check("无近敌时整队回退到当前任务路标", sample.fallbackCount >= 2
