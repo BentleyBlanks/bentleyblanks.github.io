@@ -551,6 +551,8 @@ export class CutsceneDirector {
     this.walkOffset = new THREE.Vector3();
     this.walkBob = 0;
     this.walkKeys = new Set();
+    // 布景建好、着色器还没编完的那一段：时间轴按住不走（见 Play 的 hold 与 Release）。
+    this.held = false;
     this._released = false;
     this.subSlots = [];               // { text, tier, small, big, note, until }
     this.lineSlot = null;
@@ -576,6 +578,10 @@ export class CutsceneDirector {
   }
 
   get Playing() { return this.playing; }
+  /** 时间轴是不是被按住（装配层在编着色器）。 */
+  get Held() { return this.held; }
+  /** 这一场的布景根节点。装配层照它预编译着色器，不用去翻整棵场景树。 */
+  get SetRoot() { return this.setRoot; }
   get Time() { return this.time; }
   get CurrentId() { return this.cut ? this.cut.id : null; }
   get AllowsLook() { return !!(this.playing && this.headLook && !this.lookNeutral); }
@@ -782,6 +788,10 @@ export class CutsceneDirector {
     }
     // 一进场先摆一帧，免得第一帧还停在玩家的机位上（会闪一下旧画面）。
     this.Update(0);
+    // ctx.hold：装配层要先把这套布景的着色器编出来（见 Script_Main.RunCutscene）。
+    // 编译是一次十几秒的同步长任务，不按住的话第一镜会在加载画面背后白白流走 ——
+    // 玩家等完之后进来看到的是第二镜，头几句台词永远听不到。Release() 放行。
+    this.held = !!ctx.hold;
     return new Promise((resolve) => { this.resolve = resolve; });
   }
 
@@ -811,9 +821,15 @@ export class CutsceneDirector {
     this.savedAudio = null;
   }
 
+  /** 放行被 hold 住的时间轴（着色器编完了）。没按住时是空操作。 */
+  Release() { this.held = false; }
+
   /** 跳过。字幕仍以卡片补出 —— 史实信息不许因为跳过而丢失。 */
   Skip() {
     if (!this.playing || this.skipped) return;
+    // 预热期间按 Esc 也算数：先放行时间轴，不然补出来的卡片没人推，
+    // 这一场的 Promise 永远不 resolve（装配层那边正等着它换关）。
+    this.held = false;
     this.skipped = true;
     this.StopCueAudio();
     const card = this._SkipCardOf(this.cut);
@@ -825,6 +841,8 @@ export class CutsceneDirector {
 
   Update(dt) {
     if (!this.playing) return;
+    // 按住期间一动不动（连卡片计时都不走）：这一段屏幕上盖着加载画面。
+    if (this.held) return;
     if (this.cardTime >= 0) {
       this.cardTime += dt;
       if (this.cardTime >= this.cardHold) this._Finish(false);
@@ -2014,6 +2032,8 @@ export class CutsceneDirector {
       this.dom.black.style.opacity = "0";
     }
     this.blackAlpha = 0;
+    // 收场必须解开按住：不解的话下一场若走不到 Release，时间轴会停在 0。
+    this.held = false;
     this._RestoreCamera();
     this._RestoreAudio();
     if (this.skyApplied && this.restoreSky) this.restoreSky();

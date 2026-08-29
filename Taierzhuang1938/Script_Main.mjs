@@ -233,6 +233,12 @@ function ShowBoot(on) {
   if (on) bootProp?.Show(); else bootProp?.Hide();
 }
 
+/** 加载画面那行字与那条进度条。开机、换关、过场预热三条链共用这一只口。 */
+function SetBootStep(label, progress) {
+  bootStep.textContent = label;
+  bootBar.style.width = `${Math.round(Clamp01(progress) * 100)}%`;
+}
+
 /** 让出一个宏任务。**不许换成 setTimeout**：后台页面的定时器被钳到最少 1 s，
  *  挂过五分钟还会掉到一分钟一次，比不让步还慢。MessageChannel 不是定时器，
  *  不吃这份钳制（React 的调度器也是为这个用它）。 */
@@ -400,6 +406,9 @@ const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
 const state = {
   ready: false,
   running: false,
+  // 预编译着色器的那一段（见 WarmupShaders）：加载画面盖着屏幕，这几帧一律不出画。
+  // 出画就等于把还没编完的 program 全部同步逼出来，而那正是这一步要摊开的账。
+  warming: false,
   // 预览不属于可玩关卡：完成后停在片尾，不自动启动旧 L0 的 AI/战斗。
   preview: PREVIEW,
   previewId: PREVIEW_ID,
@@ -2714,7 +2723,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   const cutsceneOnly = !!phase.cutsceneOnly;
 
   // --- 关前过场 ---
-  if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn);
+  // 盖加载画面：关前过场的布景是当场建的，预热要几秒（序章那一场最重）。
+  if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn, { loading: true });
 
   if (!initial && !cutsceneOnly) {
     state.ready = false;
@@ -2722,10 +2732,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     bootStart.disabled = true;
     bootStart.textContent = "……";
     ClearRuntime();
-    await BuildField(phase, (label, progress) => {
-      bootStep.textContent = label;
-      bootBar.style.width = `${Math.round(progress * 100)}%`;
-    }, 0, 1);
+    await BuildField(phase, SetBootStep, 0, 1);
     navGrid = MakeNavGrid(battlefield);
     destruction.SetWorld(battlefield, physics, navGrid);
     ai.ctx.battlefield = battlefield;
@@ -2839,13 +2846,246 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 }
 
 /**
+ * 预编译一棵子树的着色器 —— **进序章那十几秒的黑屏就是这一步**。
+ *
+ * 车厢序章的布景一口气往场景里加三千多个网格、几十种新材质。three 是惰性编译的：
+ * 这些 program 要到**第一次被渲染时**才链接，而 program 一链接就要同步问驱动
+ * 「链好了没」（profile 里那条 14.6 s 的长任务，九成时间在 getProgramParameter）。
+ * 表现就是玩家点完「序章」以后画面整个冻住十几秒，没有进度条、连加载画面都没有，
+ * 而这期间浏览器随时会判成无响应。
+ *
+ * 这里把那笔账**提前、摊开、放到加载画面背后**，分四段（见下面每段的抬头）：
+ * 提交编译 → 重编场上原有材质 → 按批真画出来 → 放出剩下的网格，每段之间让一帧，
+ * 进度条真的在动，而不是钉在一格上等十几秒。实测（RTX 4070 SUPER / 序章）
+ * 总时长 14.6 s → 17.3 s，而最长的一次冻结 14.6 s → 2.8 s。
+ *
+ * **调用期间必须 state.warming = true**：这几帧是这里自己在按批出画的，
+ * 主循环不许再插一帧进来 —— 那一帧看得见所有东西，等于把整笔账一口气付掉。
+ *
+ * 完整口径（含为什么只 `compile` 主 pass 不够、两条会让预热白做的坑）：
+ * `docs/Data_TechRenderPipeline.md` §16。
+ *
+ * @param {THREE.Object3D|null} root 要预热的子树
+ * @param {(label: string, progress: number) => void|null} onStep 进度回调（null = 不报）
+ */
+async function WarmupShaders(root, onStep = null, shouldStop = null) {
+  if (!root) return 0;
+  const meshes = [];
+  root.traverse((object) => {
+    if (object.isMesh || object.isPoints || object.isLine || object.isSprite) meshes.push(object);
+  });
+  if (!meshes.length) return 0;
+
+  // 代表网格：同一个 program 只画一次。去重键是材质加上几条会进 program cache key
+  // 的物体特征（蒙皮 / 实例化 / 顶点色）；键漏了某一维只意味着那个 program 退回
+  // 老路（用到它的第一帧现编），不会出错。三千六百件收敛到三百来个代表。
+  const seen = new Set();
+  const picks = [];
+  for (const object of meshes) {
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    let novel = false;
+    for (const material of materials) {
+      if (!material) continue;
+      // 已经热着的跳过。判据与 three 自己在 setProgram 里的一样（有 currentProgram
+      // 且版本没变）—— 只是个省事的过滤，漏判同样只是退回老路。
+      const properties = renderer.properties.get(material);
+      if (properties && properties.currentProgram && properties.__version === material.version) continue;
+      const key = `${material.uuid}|${object.isSkinnedMesh ? 1 : 0}|${object.isInstancedMesh ? 1 : 0}`
+        + `|${object.geometry?.attributes?.color ? 1 : 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      novel = true;
+    }
+    if (novel) picks.push(object);
+  }
+  if (!picks.length) return 0;
+
+  // 藏起来用的是**层**不是 visible：visible 是层级的（父物体一藏，整棵子树连同
+  // 想画的那件一起没了），layers 是逐物体的 —— projectObject 照样往下走。
+  // 空层同时把灯也排除掉（灯都在 0 层），这一件的阴影 pass 跟着一起跳过。
+  const HIDDEN_LAYER = 31;
+  const masks = new Map(meshes.map((object) => [object, object.layers.mask]));
+  for (const object of meshes) object.layers.set(HIDDEN_LAYER);
+
+  // 每次让帧都问一句还要不要继续：玩家在预热里按了 Esc（Skip 会放开 held）、
+  // 这一场已经收了、或者换了一场 —— 就地收工，剩下的照旧退回「用到时现编」。
+  const Yield = async () => {
+    await NextFrame();
+    return !(shouldStop && shouldStop());
+  };
+
+  try {
+    // --- 一、提交编译 -------------------------------------------------------
+    // renderer.compile 是同步的（ANGLE 在这一步做 HLSL 翻译），整包一次交上去就是
+    // 四五秒的长任务；分批交、批间让一帧，进度条才动得起来。交完不等它链完 ——
+    // 链接在驱动的编译线程上继续跑，第三段出画时正好陆续到货。
+    const SUBMIT = 16;
+    for (let i = 0; i < picks.length; i += SUBMIT) {
+      const proxy = new THREE.Group();
+      // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
+      // parent —— compile 只读不写，这一层是安全的。
+      proxy.children = picks.slice(i, i + SUBMIT);
+      try {
+        renderer.compile(proxy, camera, scene);
+      } catch (error) {
+        console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
+        break;
+      }
+      const submitted = Math.min(picks.length, i + SUBMIT);
+      onStep?.(`提交着色器…… ${submitted}/${picks.length}`, 0.05 + 0.3 * (submitted / picks.length));
+      if (!await Yield()) return picks.length;
+    }
+
+    // --- 二、场上原有材质的重编 ---------------------------------------------
+    // 过场一开场就换天光（Play 里 applySky 排在建布景之前），场上那座城的材质整批
+    // 作废要重编。这笔账与新布景无关，却同样落在「进过场」这一下，而且是最大的一
+    // 块（实测六七秒）。同样按批放出来摊平；八批就够 —— 城里上万件，逐件跑的开销
+    // 比它省下的还大。累加式放出，最后一批放完城就是完整的一座。
+    const outside = [];
+    scene.traverse((object) => {
+      if (!(object.isMesh || object.isPoints || object.isLine || object.isSprite)) return;
+      if (!masks.has(object)) outside.push(object);
+    });
+    const outsideMasks = new Map(outside.map((object) => [object, object.layers.mask]));
+    for (const object of outside) object.layers.set(HIDDEN_LAYER);
+    try {
+      const SLICES = 8;
+      const size = Math.ceil(outside.length / SLICES) || 1;
+      for (let i = 0; i < outside.length; i += size) {
+        for (const object of outside.slice(i, i + size)) object.layers.mask = outsideMasks.get(object);
+        RenderScene(0);
+        const shown = Math.min(outside.length, i + size);
+        onStep?.(`重编场景光照…… ${Math.ceil(shown / size)}/${SLICES}`, 0.35 + 0.2 * (shown / outside.length));
+        if (!await Yield()) return picks.length;
+      }
+    } finally {
+      for (const object of outside) object.layers.mask = outsideMasks.get(object);
+    }
+
+    // --- 三、出画落实 -------------------------------------------------------
+    // **只提交主 pass 是不够的**：深度法线预通道、阴影、渲到浮点靶的那几套变体
+    // 都是另外的 program，只有真画一帧才会被建出来 —— 实测只做第一段的话，
+    // 第一帧照样冻十几秒（profile 落在 setProgram → getUniforms → onFirstUse）。
+    //
+    // 一批画多少件按上一批的结果收放：建出了新 program 的收到一件（一个 program
+    // 三五百毫秒，几件挤进同一帧就是好几秒的冻结），纯命中缓存的一路翻倍放开
+    // （那种一批只要几毫秒，逐件跑三百趟纯属白等）。
+    let chunk = 2;
+    let done = 0;
+    while (done < picks.length) {
+      const batch = picks.slice(done, done + chunk);
+      const culled = batch.map((object) => object.frustumCulled);
+      for (const object of batch) {
+        object.layers.mask = masks.get(object);
+        // 视锥剔除会把没进画面的整批跳过 —— 跳过就没编，账原封不动留给后面某一镜。
+        // 这一步要的是把 program 逼出来，不是把画面画对。
+        object.frustumCulled = false;
+      }
+      const started = performance.now();
+      const had = renderer.info.programs.length;
+      RenderScene(0);
+      const cost = performance.now() - started;
+      const born = renderer.info.programs.length - had;
+      for (let k = 0; k < batch.length; k += 1) {
+        batch[k].layers.set(HIDDEN_LAYER);
+        batch[k].frustumCulled = culled[k];
+      }
+      done += batch.length;
+      if (born) chunk = 1;
+      else if (cost < 30) chunk = Math.min(32, chunk * 2);
+      onStep?.(`预热材质…… ${done}/${picks.length}`, 0.55 + 0.35 * (done / picks.length));
+      if (!await Yield()) return picks.length;
+    }
+
+    // --- 四、把剩下的网格放出来 ---------------------------------------------
+    // 上面只画了代表件，另外三千多件的顶点/索引缓冲一次都还没传上去 —— 全堆在
+    // 第一帧就是一秒半的卡顿。缓冲上传比编译便宜得多，按大批累加放出来即可；
+    // 最后一批放完场上就是完整的一套，正好当收尾的兜底帧。
+    const REVEAL = 256;
+    for (let i = 0; i < meshes.length; i += REVEAL) {
+      for (const object of meshes.slice(i, i + REVEAL)) object.layers.mask = masks.get(object);
+      RenderScene(0);
+      const shown = Math.min(meshes.length, i + REVEAL);
+      onStep?.(`载入网格…… ${shown}/${meshes.length}`, 0.9 + 0.1 * (shown / meshes.length));
+      if (!await Yield()) return picks.length;
+    }
+  } finally {
+    for (const object of meshes) object.layers.mask = masks.get(object);
+  }
+  onStep?.("就绪", 1);
+  return picks.length;
+}
+
+/** WarmCutscene 的场次号（见那里的注释）。 */
+let warmSeq = 0;
+
+/**
+ * 过场开演前的预热：布景已经建好（Play 的 hold 把时间轴按在 0），
+ * 这里把它的着色器编出来再放行。
+ *
+ * `loading = true` 时把加载画面盖上去 —— 从菜单进的那几条（战役入口、选章、
+ * 过场预览）要等好几秒，那几秒必须有进度条；关中过场不盖，那条路上不该弹出加载页。
+ */
+async function WarmCutscene({ loading }) {
+  // 谁是**当前**这一场的预热。上一场被 Esc 掐掉、或者两场叠着来的时候，
+  // 旧的那一趟还挂在 await 上；收工时它不许去动加载画面和 state.warming
+  //（不然会把新一场的加载画面当场收掉）。
+  const token = ++warmSeq;
+  const id = cutscene.CurrentId;
+  const savedLabel = bootStart.textContent;
+  const savedDisabled = bootStart.disabled;
+  if (loading) {
+    ShowBoot(true);
+    bootStart.disabled = true;
+    bootStart.textContent = "……";
+    SetBootStep("搭布景……", 0.1);
+  }
+  state.warming = true;
+  try {
+    await WarmupShaders(cutscene.SetRoot, loading ? SetBootStep : null,
+      // 按 Esc 跳过（Skip 会放开 held）、这一场已经收了、或者换了一场 —— 都就地收工。
+      () => warmSeq !== token || !cutscene.Playing || !cutscene.Held || cutscene.CurrentId !== id);
+  } finally {
+    if (warmSeq === token) {
+      state.warming = false;
+      if (loading) {
+        ShowBoot(false);
+        bootStart.textContent = savedLabel;
+        bootStart.disabled = savedDisabled;
+      }
+    }
+  }
+}
+
+/**
  * 播一场过场并等它播完（或被 Esc 跳过后卡片读完）。
  * 播过场期间玩家没有控制权，指针锁也要放掉 —— 不放的话鼠标还在转相机，
  * 而相机已经被过场接管，玩家会看到画面在自己抖。
+ *
+ * **开演前一定先预热着色器**（见 WarmCutscene）：布景是当场建的，不预热的话
+ * 第一帧要同步编几十个 program，画面冻十几秒而时间轴照走。
+ *
+ * @param {string} id
+ * @param {object} opts loading：预热那几秒要不要盖加载画面（关卡边界上的过场要）
  */
-async function RunCutscene(id) {
+async function RunCutscene(id, { loading = false } = {}) {
   if (!cutscene) return null;
-  const result = await cutscene.Play(id, { poolOut: state.nraPool, neutralLook: SHOT });
+  // 出图与手动步进那两条路**不预热**：那里时钟是外面的（StepFrames 一调就推帧），
+  // 按住时间轴等一段异步预热的话，出图脚本会对着停在第 0 秒的画面连拍 N 张。
+  // 那两条路也不在乎卡顿，它们要的是可复现。
+  const warm = !SHOT && !MANUAL_STEP;
+  const pending = cutscene.Play(id, { poolOut: state.nraPool, neutralLook: SHOT, hold: warm });
+  // 先挂一只空 catch：预热那几秒里若 Play 已经被别的场收掉（aborted），
+  // 没人接的 rejection 会先被浏览器报成 unhandledrejection。真正的错还是从下面 await 抛。
+  pending.catch(() => {});
+  if (warm) {
+    try {
+      await WarmCutscene({ loading });
+    } finally {
+      cutscene.Release();
+    }
+  }
+  const result = await pending;
   state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
   // 新版序章的终点是一个可复现的交接提示，不是旧 L0 的开战入口。
   // 正常播完、Esc 跳过、失焦收口都只会经过这里一次。
@@ -2899,7 +3139,7 @@ async function AdvanceLevel(opts = {}) {
   state.advancing = true;
   // 关末那几条还没播的旁白先倒出来，别跟着关卡一起消失
   story.FlushTail();
-  if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut);
+  if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut, { loading: true });
   state.advancing = false;
   if (state.phaseIndex >= PHASE_TABLE.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
   return EnterLevel(state.phaseIndex + 1, { cutscenes });
@@ -3708,7 +3948,7 @@ function StartPreview({ unlockAudio = true } = {}) {
   ReleasePointerLock();
   if (ai) ai.Dispose();
   ShowBoot(false);
-  const pending = RunCutscene(PREVIEW_ID);
+  const pending = RunCutscene(PREVIEW_ID, { loading: true });
   pending.catch((error) => {
     // 预览入口必须在无音频、低画质或数据错误时稳定收口；把错误留在调试口，
     // 不让一个未处理 rejection 把页面的后续控制器拖死。
@@ -3736,7 +3976,7 @@ function StartRun() {
   const wantIntro = !params.has("phase") && params.get("intro") !== "0";
   const intro = wantIntro && phase && phase.cutsceneIn;
   if (intro && !state.cutscenesPlayed.some((c) => c.id === intro)) {
-    RunCutscene(intro);      // 播完 RunCutscene 自己会把指针锁要回来
+    RunCutscene(intro, { loading: true });   // 播完 RunCutscene 自己会把指针锁要回来
     return;
   }
   RequestPointerLock();
@@ -5709,6 +5949,9 @@ function Loop(now) {
   profiler.EndFrame();
 }
 function LoopStep(dt) {
+  // 预热着色器的那几帧不出画（见 WarmupShaders）：屏幕上盖着加载画面，
+  // 而这时候渲染一帧就等于把要摊开的那笔编译账一口气同步付掉。
+  if (state.warming) return;
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   // 编辑器与菜单都要独占相机；编辑器优先，以便能从菜单里的设置入口直接编辑切片。

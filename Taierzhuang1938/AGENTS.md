@@ -334,6 +334,15 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   的过场引擎三条；取证口 `Debug.Companions` / `Debug.Checkpoint` / `Debug.ChapterPin` /
   `Debug.MidCutscenes`。字段口径与过场引擎三件小补见 `docs/Data_MissionRemake.md` §10.6。
 
+### 进过场要先预热着色器（别把它当加载资源）
+- 布景是当场建的，几十个新 program 全在**第一帧**同步编出来 —— 那就是「点序章后冻十几秒」。
+  `Script_Main.WarmupShaders` 把它分四段摊到加载画面背后（提交编译 / 重编场景光照 /
+  出画落实 / 载入网格），期间 `state.warming` 禁出画、`CutsceneDirector` 的 `hold` 按住时间轴。
+- **改这条链前先读 `docs/Data_TechRenderPipeline.md` §16**（含两条会让预热白做的坑：
+  藏东西要用 `layers` 不能用 `visible`、放出来的那一批必须 `frustumCulled = false`）。
+- 回归口：`Script_MenuTest.mjs`「开始」那三条（预热期间有加载画面与进度条、放行后时间轴真的走、
+  开演时 `t < 1.5 s`）。
+
 ### 章节摆点（集成批 INT2：七章内容 × 九个玩法系统的唯一接缝）
 - `Script_MissionSetpieces.mjs` —— **纯规则，不 import three**。`SETPIECES` 一张按 levelId
   索引的表，**一章一条**，四种钩子 `Setup` / `onZone` / `onVoice` / `Update`；装配层里因此

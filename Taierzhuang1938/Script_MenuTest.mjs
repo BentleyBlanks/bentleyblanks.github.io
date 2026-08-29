@@ -277,6 +277,20 @@ for (let i = 0; i < 3; i += 1) {
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("start"));
   await page.waitForTimeout(900);
+  // 开演前有一段着色器预热（Script_Main.WarmupShaders）：布景已经建好、时间轴被
+  // 按住，屏幕上盖着加载画面。这一段几秒到十几秒不等（看机器和驱动的着色器缓存），
+  // 所以**不能按固定等待去采时间轴**，要等 Held 放开再采。
+  const warming = await page.evaluate(() => ({
+    held: !!window.Taierzhuang.cutscene?.Held,
+    boot: !document.getElementById("boot").classList.contains("gone"),
+    bar: document.querySelector("#bootBar i").style.width,
+    step: document.getElementById("bootStep").textContent,
+  }));
+  Check("预热期间盖着加载画面、进度条在走（不是黑屏干等）",
+    !warming.held || (warming.boot && parseFloat(warming.bar) > 0),
+    `held=${warming.held} boot=${warming.boot} bar=${warming.bar} step=${warming.step}`);
+  await page.waitForFunction(() => window.Taierzhuang.cutscene && !window.Taierzhuang.cutscene.Held,
+    null, { timeout: 120000 }).catch(() => {});
   const a = await page.evaluate(() => ({
     playing: !!window.Taierzhuang.cutscene?.Playing,
     id: window.Taierzhuang.state.cutscene,
@@ -286,6 +300,7 @@ for (let i = 0; i < 3; i += 1) {
   const b = await page.evaluate(() => window.Taierzhuang.cutscene?.time || 0);
   Check("「开始」播序章那一场过场", a.playing && a.id === "CS_Chuchuan", `id=${a.id} playing=${a.playing}`);
   Check("过场真的在往前走（不是卡在第一帧）", b > a.t + 0.5, `t ${a.t.toFixed(2)} -> ${b.toFixed(2)} s`);
+  Check("预热完才开演：头几秒的台词没有在加载画面背后白白流走", a.t < 1.5, `t=${a.t.toFixed(2)} s`);
 
   // Esc 跳过，别在冒烟里干等三十八秒
   await page.keyboard.press("Escape");

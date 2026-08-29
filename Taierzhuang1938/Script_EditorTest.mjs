@@ -1679,6 +1679,11 @@ const previewHref = await page.getAttribute("#bootPreview", "href").catch(() => 
 Check("开发入口明确指向新版序章预览",
   previewHref === "?preview=CS_Chuchuan&autoplay=1", `href=${previewHref}`);
 
+// Esc 跳过之后要把**补出来的卡片**也读完才算收口（`cardHold`，出川那张 8.4 s）。
+// 原来写的 500 帧 = 8.33 s，比卡片还短 —— 能不能过全看那一刻真实 rAF 多插了几帧，
+// 是一枚硬币。这里按卡片时长留足余量（12 s）。
+const SKIP_CARD_FRAMES = 720;
+
 async function PreviewPage(query = "?preview=CS_Chuchuan") {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/${query}`,
     { waitUntil: "load", timeout: 120000 });
@@ -1687,6 +1692,12 @@ async function PreviewPage(query = "?preview=CS_Chuchuan") {
   await page.click("#bootStart");
   await page.waitForFunction(() => window.Taierzhuang.Debug.Preview().playing,
     null, { timeout: 30000 });
+  // 起播之后还有一段着色器预热（Script_Main.WarmupShaders）：布景已经建好、
+  // 时间轴被按住（`Held`），屏幕上盖着加载画面。这一段几秒到几十秒不等（看机器
+  // 与驱动的着色器缓存），期间 StepFrames 一帧都推不动 —— 不等它放开就往下推，
+  // 片子还停在第 0 秒，后面每一条都会假红。
+  await page.waitForFunction(() => !window.Taierzhuang.cutscene?.Held,
+    null, { timeout: 240000 });
 }
 
 await PreviewPage();
@@ -1723,7 +1734,7 @@ Check("新版预览正常完成后只交接一次并停在终点",
 
 await PreviewPage();
 await page.evaluate(() => window.Taierzhuang.Debug.SkipCutscene());
-await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
 await page.waitForTimeout(10);
 const previewSkipped = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -1743,7 +1754,7 @@ const silentLowStart = await page.evaluate(() => {
   T.Debug.SkipCutscene();
   return { p, audio: !!T.audio.ctx };
 });
-await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
 const silentLow = { ...silentLowStart,
   done: await page.evaluate(() => window.Taierzhuang.Debug.Preview().done) };
 Check("低画质/无音频预览可起播并收口", silentLow.p.playing
@@ -1751,7 +1762,7 @@ Check("低画质/无音频预览可起播并收口", silentLow.p.playing
 
 await PreviewPage();
 await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-await page.evaluate(() => window.Taierzhuang.StepFrames(500, 1 / 60, false));
+await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
 const blurred = await page.evaluate(() => window.Taierzhuang.Debug.Preview());
 Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurred.playing
   && blurred.aiAlive === 0, JSON.stringify(blurred));
