@@ -57,15 +57,16 @@ const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
 
-function BattlefieldAsset(label, node, material, tag = "prop", solid = true) {
-  return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid };
+function BattlefieldAsset(label, node, material, tag = "prop", solid = true,
+  category = "院落小件") {
+  return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid, category };
 }
 
 const BATTLEFIELD_ASSETS = Object.freeze({
-  battlefieldBarbedWire01: BattlefieldAsset("战场包 · 铁丝网 01", "BattlefieldBarbedWire01", null, "fence"),
-  battlefieldBarbedWire02: BattlefieldAsset("战场包 · 铁丝网 02", "BattlefieldBarbedWire02", null, "fence"),
-  battlefieldBeamObstacle01: BattlefieldAsset("战场包 · 木梁障碍 01", "BattlefieldBeamObstacle01", null, "barricade"),
-  battlefieldBeamObstacle02: BattlefieldAsset("战场包 · 木梁障碍 02", "BattlefieldBeamObstacle02", null, "barricade"),
+  battlefieldBarbedWire01: BattlefieldAsset("战场包 · 铁丝网 01", "BattlefieldBarbedWire01", null, "fence", true, "工事"),
+  battlefieldBarbedWire02: BattlefieldAsset("战场包 · 铁丝网 02", "BattlefieldBarbedWire02", null, "fence", true, "工事"),
+  battlefieldBeamObstacle01: BattlefieldAsset("战场包 · 木梁障碍 01", "BattlefieldBeamObstacle01", null, "barricade", true, "工事"),
+  battlefieldBeamObstacle02: BattlefieldAsset("战场包 · 木梁障碍 02", "BattlefieldBeamObstacle02", null, "barricade", true, "工事"),
   battlefieldSupplyBox: BattlefieldAsset("战场包 · 补给箱", "BattlefieldSupplyBox", null),
   battlefieldCanvasCover01: BattlefieldAsset("战场包 · 掩布 01", "BattlefieldCanvasCover01", null),
   battlefieldCompartmentCrate: BattlefieldAsset("战场包 · 分格弹药箱", "BattlefieldCompartmentCrate", null),
@@ -73,19 +74,19 @@ const BATTLEFIELD_ASSETS = Object.freeze({
   battlefieldGrenadeStack: BattlefieldAsset("战场包 · 手榴弹堆", "BattlefieldGrenadeStack", null),
   battlefieldCartridgeScatter: BattlefieldAsset("战场包 · 散落弹药", "BattlefieldCartridgeScatter", null),
   battlefieldCanvasCover02: BattlefieldAsset("战场包 · 掩布 02", "BattlefieldCanvasCover02", null),
-  battlefieldHedgehog: BattlefieldAsset("战场包 · 拒马", "BattlefieldHedgehog", null, "barricade"),
+  battlefieldHedgehog: BattlefieldAsset("战场包 · 拒马", "BattlefieldHedgehog", null, "barricade", true, "工事"),
   battlefieldOpenBin: BattlefieldAsset("战场包 · 敞口容器", "BattlefieldOpenBin", null),
   battlefieldGroundSheet: BattlefieldAsset("战场包 · 地面帆布", "BattlefieldGroundSheet", null, "prop", false),
   battlefieldTimberBeam: BattlefieldAsset("战场包 · 木梁", "BattlefieldTimberBeam", null),
   battlefieldMetalPole: BattlefieldAsset("战场包 · 金属杆", "BattlefieldMetalPole", null),
-  battlefieldPillbox: BattlefieldAsset("战场包 · 碉堡", "BattlefieldPillbox", null, "wall"),
+  battlefieldPillbox: BattlefieldAsset("战场包 · 碉堡", "BattlefieldPillbox", null, "wall", true, "工事"),
   battlefieldLadder: BattlefieldAsset("战场包 · 梯子", "BattlefieldLadder", null),
-  battlefieldTrenchEarthwork: BattlefieldAsset("战场包 · 战壕地形", "BattlefieldTrenchEarthwork", null, "rubble", false),
-  battlefieldSandbag01: BattlefieldAsset("战场包 · 沙袋 01", "BattlefieldSandbag01", null, "barricade"),
-  battlefieldSandbag02: BattlefieldAsset("战场包 · 沙袋 02", "BattlefieldSandbag02", null, "barricade"),
-  battlefieldSandbag03: BattlefieldAsset("战场包 · 沙袋 03", "BattlefieldSandbag03", null, "barricade"),
-  battlefieldGroundPlane: BattlefieldAsset("战场包 · 地面片", "BattlefieldGroundPlane", null, "rubble", false),
-  battlefieldRock: BattlefieldAsset("战场包 · 岩石", "BattlefieldRock", null, "rubble"),
+  battlefieldTrenchEarthwork: BattlefieldAsset("战场包 · 战壕地形", "BattlefieldTrenchEarthwork", null, "rubble", false, "工事"),
+  battlefieldSandbag01: BattlefieldAsset("战场包 · 沙袋 01", "BattlefieldSandbag01", null, "barricade", true, "工事"),
+  battlefieldSandbag02: BattlefieldAsset("战场包 · 沙袋 02", "BattlefieldSandbag02", null, "barricade", true, "工事"),
+  battlefieldSandbag03: BattlefieldAsset("战场包 · 沙袋 03", "BattlefieldSandbag03", null, "barricade", true, "工事"),
+  battlefieldGroundPlane: BattlefieldAsset("战场包 · 地面片", "BattlefieldGroundPlane", null, "rubble", false, "景观"),
+  battlefieldRock: BattlefieldAsset("战场包 · 岩石", "BattlefieldRock", null, "rubble", true, "景观"),
 });
 
 function CityWallBreachAsset(label, node) {
@@ -93,7 +94,7 @@ function CityWallBreachAsset(label, node) {
   // 不规则断面和瓦砾轮廓，重复登记一个大 AABB 会把中央净宽重新封死。
   return {
     label, url: CITY_WALL_BREACH_URL, node, materialMap: true,
-    tag: "rubble", solid: false,
+    tag: "rubble", solid: false, category: "工事",
   };
 }
 
@@ -119,7 +120,7 @@ function CityWallDetailAsset(label, node) {
   // 平白造出隐形台阶，也会让子弹在装饰层上提前命中。
   return {
     label, url: CITY_WALL_DETAIL_URL, node, materialMap: true,
-    tag: "wallDetail", solid: false,
+    tag: "wallDetail", solid: false, category: "工事",
   };
 }
 
@@ -141,7 +142,7 @@ const CITY_WALL_DETAIL_ASSETS = Object.freeze({
 });
 
 function MarketStorage(label, node, material = "WoodCrate") {
-  return { label, url: MARKET_STORAGE_URL, node, material, tag: "prop" };
+  return { label, url: MARKET_STORAGE_URL, node, material, tag: "prop", category: "院落小件" };
 }
 
 /**
@@ -159,42 +160,44 @@ function MarketStorage(label, node, material = "WoodCrate") {
 /** 资产包片段 → 总表条目（补上包级 url）。 */
 function PackAssets(pack, table) {
   const out = {};
-  for (const [id, spec] of Object.entries(table)) out[id] = { ...spec, url: pack.url };
+  for (const [id, spec] of Object.entries(table)) {
+    out[id] = { category: "院落小件", ...spec, url: pack.url };
+  }
   return out;
 }
 
 const ASSETS = Object.freeze({
-  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=3", material: null, tag: "wall" },
-  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall" },
-  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall" },
-  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade" },
+  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=3", material: null, tag: "wall", category: "建筑" },
+  houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall", category: "建筑" },
+  housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall", category: "建筑" },
+  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade", category: "工事" },
   cart: {
     label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2",
-    materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart",
+    materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart", category: "院落小件",
   },
-  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WattleFence", tag: "fence" },
-  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodCrate", tag: "prop" },
-  rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble" },
+  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WattleFence", tag: "fence", category: "工事" },
+  crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodCrate", tag: "prop", category: "院落小件" },
+  rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble", category: "院落小件" },
   militaryCrateClosed: {
     label: "旧式军用木箱（闭合）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
-    node: "MilitaryCrateClosed", material: "WoodCrate", tag: "prop",
+    node: "MilitaryCrateClosed", material: "WoodCrate", tag: "prop", category: "院落小件",
   },
   militaryCrateOpen: {
     label: "旧式军用木箱（打开）", url: "./Model/Model_MilitaryCrateSet.glb?v=1",
-    node: "MilitaryCrateOpen", material: "WoodCrate", tag: "prop",
+    node: "MilitaryCrateOpen", material: "WoodCrate", tag: "prop", category: "院落小件",
   },
-  stackableStone01: { label: "可堆石块 01", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone01", material: "GroundRubble", tag: "rubble" },
-  stackableStone02: { label: "可堆石块 02", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone02", material: "GroundRubble", tag: "rubble" },
-  stackableStone03: { label: "可堆石块 03", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone03", material: "GroundRubble", tag: "rubble" },
-  stackableStone04: { label: "可堆石块 04", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone04", material: "GroundRubble", tag: "rubble" },
-  stackableStone05: { label: "可堆石块 05", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone05", material: "GroundRubble", tag: "rubble" },
-  stackableStone06: { label: "可堆石块 06", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone06", material: "GroundRubble", tag: "rubble" },
-  stackableStone07: { label: "可堆石块 07", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone07", material: "GroundRubble", tag: "rubble" },
-  deadTreeTrunk01: { label: "无叶枯树干 01", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk01", material: "WoodBeam", tag: "deadTree" },
-  deadTreeTrunk02: { label: "无叶枯树干 02", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk02", material: "WoodBeam", tag: "deadTree" },
+  stackableStone01: { label: "可堆石块 01", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone01", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone02: { label: "可堆石块 02", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone02", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone03: { label: "可堆石块 03", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone03", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone04: { label: "可堆石块 04", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone04", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone05: { label: "可堆石块 05", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone05", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone06: { label: "可堆石块 06", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone06", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  stackableStone07: { label: "可堆石块 07", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone07", material: "GroundRubble", tag: "rubble", category: "院落小件" },
+  deadTreeTrunk01: { label: "无叶枯树干 01", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk01", material: "WoodBeam", tag: "deadTree", category: "景观" },
+  deadTreeTrunk02: { label: "无叶枯树干 02", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk02", material: "WoodBeam", tag: "deadTree", category: "景观" },
   courtyardHouse: {
     label: "中式四合院", url: "./Model/Model_AncientChineseCourtyardHouse.glb?v=1",
-    node: "AncientChineseCourtyardHouse", materialMap: true, tag: "wall",
+    node: "AncientChineseCourtyardHouse", materialMap: true, tag: "wall", category: "建筑",
   },
   marketRiceSack01: MarketStorage("市场米袋 01", "MarketRiceSack01", "Sandbag"),
   marketRiceSack02: MarketStorage("市场米袋 02", "MarketRiceSack02", "Sandbag"),
@@ -612,7 +615,7 @@ export function ExternalPropCatalog() {
   return Object.entries(ASSETS).map(([id, spec]) => ({
     id, label: spec.label, url: spec.url, node: spec.node ?? null,
     material: spec.material, materialMap: !!spec.materialMap, tag: spec.tag,
-    solid: spec.solid !== false,
+    solid: spec.solid !== false, category: spec.category,
   }));
 }
 

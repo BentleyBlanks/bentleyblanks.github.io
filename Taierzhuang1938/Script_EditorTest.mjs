@@ -1324,6 +1324,11 @@ const props = await page.evaluate(() => {
     selected: active.paletteId,
     loaded: active.preview && active.preview.loaded,
     meshes: active.preview ? active.preview.meshes : 0,
+    categories: active.categories,
+    externalCategories: Object.fromEntries([
+      "External_cart", "External_house", "External_battlefieldBarbedWire01",
+      "External_deadTreeTrunk01",
+    ].map((id) => [id, active.Entry(id)?.cat])),
     originalProjection: [T.editor.studio.saved.fov, T.editor.studio.saved.far],
     projection: [T.camera.fov, T.camera.far],
     sections: [...active.panel.root.querySelectorAll(".edSection > .h")]
@@ -1337,6 +1342,13 @@ Check("构件库预览器不混入关卡布设或地形面板",
   props.sections.includes("全部可布设构件") && props.sections.includes("预览相机")
     && !props.sections.includes("已放置") && !props.sections.includes("地形笔刷"),
   props.sections.join(" / "));
+Check("外部 GLB 按物体品类合并筛选",
+  !props.categories.includes("外部道具")
+    && props.externalCategories.External_cart === "院落小件"
+    && props.externalCategories.External_house === "建筑"
+    && props.externalCategories.External_battlefieldBarbedWire01 === "工事"
+    && props.externalCategories.External_deadTreeTrunk01 === "景观",
+  JSON.stringify({ categories: props.categories, entries: props.externalCategories }));
 Check("构件库相机可调 FOV 与远裁剪面",
   props.projection[0] === 47 && props.projection[1] === 480, props.projection.join(" / "));
 Check("切换到构件库前恢复场景相机参数",
@@ -1494,6 +1506,7 @@ const externalProp = await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   return {
     selected: active.paletteId,
+    category: active.cat,
     loaded: active.preview && active.preview.loaded,
     meshes: active.preview ? active.preview.meshes : 0,
     source: active.facts.root.textContent,
@@ -1501,6 +1514,7 @@ const externalProp = await page.evaluate(() => {
 });
 Check("构件库覆盖正式战场新增的带署名外部 GLB",
   externalProp.selected === "External_cart" && externalProp.loaded && externalProp.meshes > 0
+    && externalProp.category === "院落小件"
     && externalProp.source.includes("Model_Handcart.glb"), JSON.stringify(externalProp));
 
 // ---------------------------------------------------------------------------

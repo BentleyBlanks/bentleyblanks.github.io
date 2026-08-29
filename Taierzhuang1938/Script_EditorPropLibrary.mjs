@@ -29,11 +29,11 @@ export class PropLibraryEditor {
       // 持续烟火有自己的“特效预览”入口；构件摄影棚不驱动 VfxSystem，放进来只会空白。
       ...PLACEABLE.filter((entry) => !entry.effect),
       ...this.externalCatalog.map((entry) => ({
-        id: `External_${entry.id}`, name: entry.label, cat: "外部道具",
+        id: `External_${entry.id}`, name: entry.label, cat: entry.category,
         external: entry.id, url: entry.url, uses: [], defaults: {},
       })),
     ];
-    this.categories = [...PLACEABLE_CATEGORIES.filter((category) => category !== "特效"), "外部道具"];
+    this.categories = PLACEABLE_CATEGORIES.filter((category) => category !== "特效");
     this.cat = this.categories[0];
     this.paletteId = this.entries[0] ? this.entries[0].id : null;
     this.damageState = "original";
