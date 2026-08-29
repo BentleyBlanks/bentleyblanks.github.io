@@ -139,7 +139,9 @@ export class PropLibraryEditor {
     if (!BUILDING_DAMAGE_STATES[value]) return;
     this.damageState = value;
     if (this.damageChips) this.damageChips.Set(value);
-    this.ShowSelected();
+    // 战损是同一件场景构件的替换态，不是换展品。切换时必须保留镜头，
+    // 否则包围盒随瓦砾改变后自动重取景，会让固定在同一布设点的墙体看似漂移。
+    this.ShowSelected({ preserveCamera: true });
   }
 
   StepSelection(direction) {
@@ -176,7 +178,7 @@ export class PropLibraryEditor {
     this.preview = null;
   }
 
-  async ShowSelected() {
+  async ShowSelected({ preserveCamera = false } = {}) {
     if (!this.host.studio.Active) return;
     const token = ++this.previewToken;
     this.ClearPreview();
@@ -220,13 +222,22 @@ export class PropLibraryEditor {
     }
     const box = new THREE.Box3().setFromObject(root);
     if (!box.isEmpty()) {
-      const center = box.getCenter(new THREE.Vector3());
-      root.position.x -= center.x;
-      root.position.z -= center.z;
-      root.position.y -= box.min.y;
+      if (supportsDamage) {
+        // 正片生成器约定 item.x / item.z 是构件的布设 pivot，且从局部 y=0 起砌。
+        // 三档战损的洞口、坍墙和瓦砾会改变各自包围盒，绝不能再按当前包围盒居中；
+        // 否则每次切换都会把整座建筑（尤其院墙）平移到另一个世界坐标。
+        root.position.set(0, 0, 0);
+        root.userData.previewAnchor = "placementPivot";
+      } else {
+        const center = box.getCenter(new THREE.Vector3());
+        root.position.x -= center.x;
+        root.position.z -= center.z;
+        root.position.y -= box.min.y;
+        root.userData.previewAnchor = "boundsCenter";
+      }
     }
     root.updateMatrixWorld(true);
-    this.FramePreview();
+    if (!preserveCamera) this.FramePreview();
     this.RefreshFacts(entry, new THREE.Box3().setFromObject(root));
   }
 

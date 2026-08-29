@@ -1372,6 +1372,14 @@ const damageOriginal = await page.evaluate(() => {
     state: active.preview?.damageState,
     facts: active.facts.root.textContent,
     texture: textures.find((src) => src.includes("Texture_BrickWallBase")) || "",
+    anchor: active.previewRoot.userData.previewAnchor,
+    position: active.previewRoot.position.toArray(),
+    camera: {
+      target: active.host.studio.orbit.target.toArray(),
+      distance: active.host.studio.orbit.dist,
+      yaw: active.host.studio.orbit.yaw,
+      pitch: active.host.studio.orbit.pitch,
+    },
   };
 });
 Check("构件库原始态保留正式房屋基模与砖材",
@@ -1401,6 +1409,14 @@ const damageEarly = await page.evaluate(() => {
     sectionHidden: active.damageSection.parentElement.hidden,
     facts: active.facts.root.textContent,
     texture: textures.find((src) => src.includes("Texture_BuildingDamageEarlyBase")) || "",
+    anchor: active.previewRoot.userData.previewAnchor,
+    position: active.previewRoot.position.toArray(),
+    camera: {
+      target: active.host.studio.orbit.target.toArray(),
+      distance: active.host.studio.orbit.dist,
+      yaw: active.host.studio.orbit.yaw,
+      pitch: active.host.studio.orbit.pitch,
+    },
   };
 });
 Check("构件库可即时预览炮击初损建模态",
@@ -1432,6 +1448,14 @@ const damageSevere = await page.evaluate(() => {
     detail: active.preview?.damageDetail,
     facts: active.facts.root.textContent,
     texture: textures.find((src) => src.includes("Texture_BuildingDamageSevereBase")) || "",
+    anchor: active.previewRoot.userData.previewAnchor,
+    position: active.previewRoot.position.toArray(),
+    camera: {
+      target: active.host.studio.orbit.target.toArray(),
+      distance: active.host.studio.orbit.dist,
+      yaw: active.host.studio.orbit.yaw,
+      pitch: active.host.studio.orbit.pitch,
+    },
   };
 });
 Check("构件库可即时预览严重破坏建模态",
@@ -1444,6 +1468,16 @@ Check("构件库可即时预览严重破坏建模态",
     && damageSevere.detail?.exposedBeams === 3
     && damageSevere.detail?.roofFragments === 22,
   JSON.stringify(damageSevere));
+Check("同源建筑三档共用布设 pivot 且切换不重取景",
+  damageOriginal.anchor === "placementPivot"
+    && damageEarly.anchor === "placementPivot"
+    && damageSevere.anchor === "placementPivot"
+    && JSON.stringify(damageOriginal.position) === JSON.stringify([0, 0, 0])
+    && JSON.stringify(damageEarly.position) === JSON.stringify(damageOriginal.position)
+    && JSON.stringify(damageSevere.position) === JSON.stringify(damageOriginal.position)
+    && JSON.stringify(damageEarly.camera) === JSON.stringify(damageOriginal.camera)
+    && JSON.stringify(damageSevere.camera) === JSON.stringify(damageOriginal.camera),
+  JSON.stringify({ original: damageOriginal, early: damageEarly, severe: damageSevere }));
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),
 });
@@ -1463,6 +1497,37 @@ await page.evaluate(() => {
   window.Taierzhuang.editor.active.previewRoot.rotation.y = 0;
 });
 await Step(1);
+
+const damagePivotAudit = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  return active.entries.filter((entry) => entry.damageStates).map((entry) => {
+    active.SetPalette(entry.id);
+    const cameraBefore = {
+      target: active.host.studio.orbit.target.toArray(),
+      distance: active.host.studio.orbit.dist,
+    };
+    const states = {};
+    for (const state of ["original", "shellDamaged", "severeDamage"]) {
+      active.SetDamageState(state);
+      states[state] = {
+        anchor: active.previewRoot.userData.previewAnchor,
+        position: active.previewRoot.position.toArray(),
+        camera: {
+          target: active.host.studio.orbit.target.toArray(),
+          distance: active.host.studio.orbit.dist,
+        },
+      };
+    }
+    return { id: entry.id, cameraBefore, states };
+  });
+});
+const driftingDamageEntries = damagePivotAudit.filter((entry) => Object.values(entry.states)
+  .some((state) => state.anchor !== "placementPivot"
+    || JSON.stringify(state.position) !== JSON.stringify([0, 0, 0])
+    || JSON.stringify(state.camera) !== JSON.stringify(entry.cameraBefore)));
+Check("全部战损建筑和地标三档都锁定同一世界原点",
+  damagePivotAudit.length >= 10 && driftingDamageEntries.length === 0,
+  JSON.stringify(driftingDamageEntries));
 
 const textureLineage = await page.evaluate(async () => {
   const Load = async (name) => {
