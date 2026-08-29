@@ -2520,7 +2520,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   const external = await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
-    generatedPlacements: battlefield.city?.generatedExternalProps || [],
+    generatedPlacements: battlefield.generatedExternalProps
+      || battlefield.city?.generatedExternalProps || [],
   });
   // streamer 单独挂：externalProps 会被测试整个 evaluate 出去序列化，
   // 里面不能有 three 对象。

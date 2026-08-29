@@ -37,7 +37,9 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
-import { BuildSink, EXTERNAL_SANDBAG_ASSET_IDS } from "./Script_World.mjs";
+import {
+  BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
+} from "./Script_World.mjs";
 import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
@@ -56,6 +58,7 @@ const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=2";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=1";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
+const LEAFLESS_TREE_URL = "./Model/Model_LeaflessTreeSet.glb?v=1";
 
 function BattlefieldAsset(label, node, material, tag = "prop", solid = true,
   category = "院落小件") {
@@ -195,6 +198,9 @@ const ASSETS = Object.freeze({
   stackableStone07: { label: "可堆石块 07", url: "./Model/Model_StackableStoneSet.glb?v=1", node: "StackableStone07", material: "GroundRubble", tag: "rubble", category: "院落小件" },
   deadTreeTrunk01: { label: "无叶枯树干 01", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk01", material: "WoodBeam", tag: "deadTree", category: "景观" },
   deadTreeTrunk02: { label: "无叶枯树干 02", url: "./Model/Model_DeadTreeTrunkSet.glb?v=1", node: "DeadTreeTrunk02", material: "WoodBeam", tag: "deadTree", category: "景观" },
+  leaflessTreeOak: { label: "无叶乔木 · 老橡树", url: LEAFLESS_TREE_URL, node: "LeaflessTreeOak", material: "TreeBark", tag: "prop", solid: false, category: "景观" },
+  leaflessTree01: { label: "无叶乔木 · 枝展型", url: LEAFLESS_TREE_URL, node: "LeaflessTree01", material: "TreeBark", tag: "prop", solid: false, category: "景观" },
+  leaflessTreeLowPoly: { label: "无叶乔木 · 疏枝型", url: LEAFLESS_TREE_URL, node: "LeaflessTreeLowPoly", material: "TreeBark", tag: "prop", solid: false, category: "景观" },
   courtyardHouse: {
     label: "中式四合院", url: "./Model/Model_AncientChineseCourtyardHouse.glb?v=1",
     node: "AncientChineseCourtyardHouse", materialMap: true, tag: "wall", category: "建筑",
@@ -724,6 +730,15 @@ export async function LoadExternalSandbagModels(library) {
   return new Map(entries.filter(([, root]) => root));
 }
 
+/** 场景编辑器需要的程序化构件外部模板：沙袋组合 + 三种无叶树。 */
+export async function LoadExternalWorldModels(library) {
+  const ids = [...EXTERNAL_SANDBAG_ASSET_IDS, ...EXTERNAL_LEAFLESS_TREE_ASSET_IDS];
+  const entries = await Promise.all(ids.map(async (id) => (
+    [id, await InstantiateExternalProp(id, library)]
+  )));
+  return new Map(entries.filter(([, root]) => root));
+}
+
 /** Remove the previous level's visual-only props before its scene is disposed. */
 export function ClearExternalProps() {
   if (liveStreamer) { liveStreamer.Dispose(); liveStreamer = null; }
@@ -807,11 +822,15 @@ export async function AddExternalProps({
         x: placement.x, y, z: placement.z,
         minY: y + form.geoMinY * scale,
         generatedSandbag: Boolean(placement.generatedSandbag),
+        generatedTree: Boolean(placement.generatedTree),
         requiresOwnCollider: placement.solid !== false,
       };
     }
     streamer.Register({
       x: placement.x, z: placement.z, maxDim, label: id, parts, probe,
+      // 三月无叶树在中远景只剩亚像素细枝。高模保留近景枝干拓扑，
+      // 但不为雾里的不可见细枝支付 330 m 建筑级实例半径。
+      loadRadius: placement.generatedTree ? 140 : null,
       make: () => {
         const prop = CloneLoadedAsset(id, asset, library);
         if (!prop) return null;
@@ -820,6 +839,7 @@ export async function AddExternalProps({
         prop.rotation.y = placement.ry || 0;
         prop.scale.setScalar(scale);
         prop.userData.generatedSandbag = Boolean(placement.generatedSandbag);
+        prop.userData.generatedTree = Boolean(placement.generatedTree);
         prop.userData.requiresOwnCollider = placement.solid !== false;
         prop.userData.expectedMinY = y;
         return prop;

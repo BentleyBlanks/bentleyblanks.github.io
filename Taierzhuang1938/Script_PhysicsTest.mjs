@@ -628,18 +628,21 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const props = f.externalStreamer ? f.externalStreamer.LiveProps() : [];
     const bad = [];
     for (const p of props) {
-      let name, x, z, minY, expectedMinY, generatedSandbag, requiresOwnCollider;
+      let name, x, z, minY, expectedMinY, generatedSandbag, generatedTree,
+        requiresOwnCollider;
       if (p.object) {
         box.setFromObject(p.object);
         name = p.object.name; x = p.object.position.x; z = p.object.position.z;
         minY = box.min.y;
         expectedMinY = p.object.userData.expectedMinY;
         generatedSandbag = Boolean(p.object.userData.generatedSandbag);
+        generatedTree = Boolean(p.object.userData.generatedTree);
         requiresOwnCollider = p.object.userData.requiresOwnCollider !== false;
       } else {
         name = p.name; x = p.x; z = p.z; minY = p.minY;
         expectedMinY = p.y;
         generatedSandbag = Boolean(p.generatedSandbag);
+        generatedTree = Boolean(p.generatedTree);
         requiresOwnCollider = p.requiresOwnCollider !== false;
       }
       const ground = f.GroundHeight(x, z);
@@ -652,7 +655,14 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
         && x >= b.min[0] - 0.8 && x <= b.max[0] + 0.8
         && z >= b.min[2] - 0.8 && z <= b.max[2] + 0.8
       ));
-      const claimed = requiresOwnCollider ? mine : aggregate;
+      // 生成树保留的是 AddTree 的细树干盒，不把整片树冠的 GLB 包围盒变成
+      // 隐形墙；它和组合沙袋一样由生成器拥有碰撞，只是认领范围仍按树心。
+      const generatedTreeTrunk = generatedTree && f.colliders.find((b) => (
+        b.tag === "prop" && Math.abs(b.c[0] - x) < 0.05 && Math.abs(b.c[2] - z) < 0.05
+        && (b.max[0] - b.min[0]) < 1.5 && (b.max[2] - b.min[2]) < 1.5
+      ));
+      const claimed = generatedTree ? generatedTreeTrunk
+        : (requiresOwnCollider ? mine : aggregate);
       if (Math.abs(lift) > 0.15 || !claimed) {
         bad.push(`${name} ${generatedSandbag ? "层位" : "离地"}${lift.toFixed(2)}m`
           + `${claimed ? "" : (generatedSandbag ? " 无整段碰撞" : " 无碰撞体")}`);

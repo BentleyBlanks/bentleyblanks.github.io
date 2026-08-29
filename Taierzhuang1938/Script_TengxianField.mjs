@@ -87,6 +87,7 @@ export class TengxianField {
     this.colliders = [];
     this.covers = [];
     this.meshes = [];
+    this.generatedExternalProps = [];
     this.grid = new Map();
     this.gridSize = this.city.gridSize;
     this.bounds = bounds
@@ -119,6 +120,10 @@ export class TengxianField {
     this.colliders = this.city.colliders.concat(this.outfield.colliders);
     this.covers = this.city.covers.concat(this.outfield.covers);
     this.meshes = this.city.meshes.concat(this.outfield.meshes);
+    this.generatedExternalProps = [
+      ...this.city.generatedExternalProps,
+      ...this.outfield.generatedExternalProps,
+    ];
     this.gridSize = this.city.gridSize;
     // **格子必须重建**：city.BuildCollisionGrid 只刷了城自己那张表，
     // 直接沿用 city.grid 的话，城外那几千个盒子对射线、对 AI、对玩家全是隐形的

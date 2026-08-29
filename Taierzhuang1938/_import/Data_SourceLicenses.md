@@ -177,10 +177,15 @@ Unity Labs 三个源包的直接下载地址分别是：
 | 中式四合院 `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb) | CC-BY-4.0 | 作为序章单处地标；减至 5,500 三角，使用共享夯土和屋瓦材质。 |
 | 战场构件 `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya) | CC-BY-4.0 | 拆成 24 个可独立选择节点并全部注册进构件库；战壕 3,500 三角，其余单件不超过 1,519 三角。 |
 | 手推车和市场储物 `Model_Handcart.glb`、`Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew) | CC-BY-4.0 | 新手推车替换旧模型，减至 4,200 三角；另拆出 2 种米袋、3 种木箱、4 种板条箱，单件不超过 900 三角。 |
+| 无叶乔木三变体 `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc)、[tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a)、[tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib)、[Helindu](https://sketchfab.com/Helindu) | CC-BY-4.0 | 三件均落地、统一高度基准并移除源贴图；运行时共享 `TreeBark` 材质，按既有树位 seed 稳定随机选择并走 GPU 实例化/流送。 |
 
 CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。
 新三包的原始 `scene.gltf` / `scene.bin`、Sketchfab 自动生成署名和许可副本保存在
 `Source/Model_Sketchfab*/`；`Script_SketchfabPackBake.py` 可重建四份运行时 GLB。
+
+无叶树三份原始 `scene.gltf` / `scene.bin` 与 Sketchfab 自动生成的 `license.txt`
+同样保存在各自 `Source/Model_Sketchfab*Tree*` 目录；
+`Script_SketchfabTreeBake.py` 可重建 `Model_LeaflessTreeSet.glb`。
 
 ### Poly Haven CC0 构件
 

@@ -1,0 +1,11 @@
+Model Information:
+* title:	tree without leaves ,Low Poly
+* source:	https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152
+* author:	Helindu (https://sketchfab.com/Helindu)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "tree without leaves ,Low Poly" (https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) by Helindu (https://sketchfab.com/Helindu) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

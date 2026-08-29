@@ -14,7 +14,7 @@ import {
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { LoadDocument } from "./Script_MeshLoad.mjs";
 import {
-  ExternalPropCatalog, InstantiateExternalProp, LoadExternalSandbagModels,
+  ExternalPropCatalog, InstantiateExternalProp, LoadExternalWorldModels,
 } from "./Script_ExternalProps.mjs";
 
 export class PropLibraryEditor {
@@ -154,7 +154,7 @@ export class PropLibraryEditor {
   async LoadModels() {
     this.status.textContent = `模型载入中（${MODEL_PLACEABLE.length} 项）…`;
     const [externalModels] = await Promise.all([
-      LoadExternalSandbagModels(this.host.library),
+      LoadExternalWorldModels(this.host.library),
       Promise.all(MODEL_PLACEABLE.map(async (id) => {
         const doc = await LoadDocument(MeshUrl(id));
         if (doc) this.modelDocs.set(id, doc);
@@ -165,7 +165,8 @@ export class PropLibraryEditor {
     this.status.textContent = `已覆盖 ${this.entries.length} 项，其中 tzm 模型 `
       + `${this.modelDocs.size}/${MODEL_PLACEABLE.length}，外部 GLB ${this.externalCatalog.length}`;
     const entry = this.Entry(this.paletteId);
-    if (entry && (entry.model || entry.id === "Barricade" || entry.id === "SandbagPlug")) {
+    if (entry && (entry.model || entry.id === "Tree"
+      || entry.id === "Barricade" || entry.id === "SandbagPlug")) {
       this.ShowSelected();
     }
   }

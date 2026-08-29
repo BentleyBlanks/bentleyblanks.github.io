@@ -561,6 +561,9 @@ export class TengxianCity {
     for (const m of this.farSink.Flush(this.scene, this.library,
       { resolve: ResolveTengxianMaterial, castShadow: false })) this.meshes.push(m);
     this.FlushProps();
+    this.generatedExternalProps.push(
+      ...this.sink.externalProps, ...this.farSink.externalProps,
+    );
     this.colliders = this.sink.colliders.concat(this.farSink.colliders);
     this.covers = this.sink.covers;
     this.BuildCollisionGrid();

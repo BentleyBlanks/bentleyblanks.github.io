@@ -31,6 +31,7 @@ system in `Script_TengxianCity.mjs` and `Script_TengxianOutfield.mjs`.
 | `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb), CC-BY-4.0 | One 11.85 m landmark, reduced to 5,500 triangles; source textures replaced by shared adobe and roof-tile recipes. |
 | `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya), CC-BY-4.0 | Split into 24 independently selectable component-library entries. The trench is reduced to 3,500 triangles and every other entry to 1,519 triangles or fewer. |
 | `Model_Handcart.glb`, `Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew), CC-BY-4.0 | Replacement handcart plus two rice sacks, three boxes, and four slatted crates. Every storage component is independently selectable and stays below 900 triangles; wooden storage shares the regenerated ImageGen `WoodCrate` PBR set. |
+| `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc), [tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a), [tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib), [Helindu](https://sketchfab.com/Helindu), CC-BY-4.0 | Three grounded, equal-height, runtime-budget variants. Every existing deciduous-tree seed deterministically selects one variant and a yaw; evergreen cypresses keep their distinct authored silhouette. Source textures are replaced by the shared `TreeBark` material. |
 
 The three source packages and their generated Sketchfab credit text are retained
 under `_import/Source/Model_Sketchfab*/`. `_import/Script_SketchfabPackBake.py`
@@ -38,6 +39,12 @@ removes the original high-resolution textures, decimates meshes, grounds every
 component, and binds the runtime's shared material recipes. The courtyard is
 placed once in `L0_Jiehe`; the battlefield pieces are used by the walled-town
 defense dressing (see below).
+
+The leafless-tree sources and their generated credit text are retained under
+the three matching `_import/Source/Model_Sketchfab*Tree*` directories.
+`_import/Script_SketchfabTreeBake.py` rebuilds the shared GLB. Tree positions
+and trunk collision stay in the procedural world builders; only the visible
+mesh is handed to the external-prop instancing and streaming layer.
 
 ## Life-dressing packs (2026-08-25 density round)
 

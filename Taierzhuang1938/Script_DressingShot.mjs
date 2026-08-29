@@ -74,10 +74,12 @@ await page.evaluate(({ pose }) => {
     game.menu.shotIndex = index;
     game.menu.shotTime = 0;
     game.menu.ApplyShot(0);
+    game.battlefield?.externalStreamer?.ForceSync(pose.x, pose.z);
     game.StepFrames(12);
     return;
   }
   game.player.Spawn(pose.x, pose.z, pose.yaw);
+  game.battlefield?.externalStreamer?.ForceSync(pose.x, pose.z);
   game.player.pitch = pose.pitch;
   game.player.health = 100;
   game.player.bleeding = 0;

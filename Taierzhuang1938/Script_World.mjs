@@ -31,6 +31,7 @@ export class BuildSink {
     this.breakables = [];         // 可凿的墙面 { x,y,z, nx,nz, w,h, wallId }
     this.covers = [];             // AI 掩体点 { x, z, height, faceX, faceZ }
     this.props = [];              // 需要单独成 mesh 的东西（半透明、动的）
+    this.externalProps = [];      // 交给 Script_ExternalProps 实例化/流送的下载模型摆位
     this.sector = "";             // 见 SetSector
   }
 
@@ -55,6 +56,10 @@ export class BuildSink {
     const key = this.sector + materialName;
     if (!this.buckets.has(key)) this.buckets.set(key, []);
     this.buckets.get(key).push(geometry);
+  }
+
+  External(placement) {
+    if (placement) this.externalProps.push(placement);
   }
 
   /**
@@ -1878,7 +1883,7 @@ function StemPoint(points, height, t) {
  * 造一棵落叶乔木的骨架。profile 只控制树种剪影；枝条层级、树干弯曲与根部都由
  * seed 固定，出图与编辑器每次重建都会得到同一棵树。
  */
-function AddLeaflessTree(sink, {
+function AddProceduralLeaflessTree(sink, {
   x, z, seed, scale, material, height, baseY,
 }, profile) {
   const rnd = Mulberry32(HashString(seed));
@@ -1971,6 +1976,46 @@ function AddLeaflessTree(sink, {
   sink.Solid(x, baseY + h / 2, z, baseRadius * 1.45, h / 2, baseRadius * 1.45, "prop");
 }
 
+/**
+ * Sketchfab 的三种无叶树共用 7 m 高的离线规格。模型选择和朝向只读 seed，
+ * 因而同一布设点跨关、跨 LOD、跨重载都不会换树；视觉本体交给外部摆件层做
+ * GPU 实例化与距离流送，碰撞仍留在 BuildSink，绝不随视觉流送增删。
+ */
+export const EXTERNAL_LEAFLESS_TREE_ASSET_IDS = Object.freeze([
+  "leaflessTreeOak", "leaflessTree01", "leaflessTreeLowPoly",
+]);
+const EXTERNAL_LEAFLESS_TREE_REFERENCE_HEIGHT = 7.0;
+
+function AddLeaflessTree(sink, {
+  x, z, seed, scale, material, height, baseY,
+}, profile) {
+  // 非正式 BuildSink（少量老测试/工具桩）没有外部模型槽时保留程序化兜底。
+  if (typeof sink.External !== "function") {
+    AddProceduralLeaflessTree(sink,
+      { x, z, seed, scale, material, height, baseY }, profile);
+    return;
+  }
+  const heightRnd = Mulberry32(HashString(seed));
+  const h = height > 0 ? height : (profile.heightMin + heightRnd() * profile.heightRange) * scale;
+  const modelRnd = Mulberry32(HashString(`${seed}:leaflessTreeModel`));
+  const asset = EXTERNAL_LEAFLESS_TREE_ASSET_IDS[
+    Math.floor(modelRnd() * EXTERNAL_LEAFLESS_TREE_ASSET_IDS.length)
+  ];
+  sink.External({
+    asset, x, y: baseY, z, ry: modelRnd() * Math.PI * 2,
+    scale: h / EXTERNAL_LEAFLESS_TREE_REFERENCE_HEIGHT,
+    solid: false, generatedTree: true,
+  });
+
+  const shapeScale = h / profile.referenceHeight;
+  const colliderHeight = h * (profile.colliderHeightRatio ?? 1);
+  const colliderRadius = profile.colliderRadiusScale == null
+    ? profile.baseRadius * shapeScale * 1.45
+    : profile.colliderRadiusScale * scale;
+  sink.Solid(x, baseY + colliderHeight / 2, z,
+    colliderRadius, colliderHeight / 2, colliderRadius, "prop");
+}
+
 /** 杨树/柳树：三四月枝条透光、新叶尚未展开，靠真实分叉而非一团假树冠读形。 */
 export function AddTree(sink, {
   x, z, seed = "t", scale = 1, material = "TreeBark", height = 0, baseY = 0,
@@ -2051,7 +2096,7 @@ export function AddPoplar(sink, {
  * 果树（修剪过的梨/柿）：鲁南农家院旁一排矮壮果树。
  * 冬季修剪痕很明显：主杆矮、三四根骨架枝张开成碗口，枝端平齐 —— 一眼是人为的。
  */
-export function AddOrchardTree(sink, {
+function AddProceduralOrchardTree(sink, {
   x, z, seed = "orchard", scale = 1, height = 0, baseY = 0,
   material = "Willow",
 }) {
@@ -2088,6 +2133,20 @@ export function AddOrchardTree(sink, {
   }
   sink.Add(material, PlaceGeometry(MergeGeometries(branches), { x, y: baseY, z }));
   sink.Solid(x, baseY + boleH / 2, z, 0.22 * scale, boleH / 2, 0.22 * scale, "prop");
+}
+
+export function AddOrchardTree(sink, {
+  x, z, seed = "orchard", scale = 1, height = 0, baseY = 0,
+  material = "Willow",
+}) {
+  if (typeof sink.External !== "function") {
+    AddProceduralOrchardTree(sink, { x, z, seed, scale, height, baseY, material });
+    return;
+  }
+  AddLeaflessTree(sink, { x, z, seed, scale, height, baseY, material }, {
+    heightMin: 2.9, heightRange: 1.1, referenceHeight: 3.4,
+    baseRadius: 0.17, colliderHeightRatio: 0.45, colliderRadiusScale: 0.22,
+  });
 }
 
 /** 电线杆 + 断掉的电话线：镇子有电报电话，线被打断垂下来是很强的战场符号。 */

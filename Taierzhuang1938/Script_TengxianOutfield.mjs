@@ -571,6 +571,7 @@ export class TengxianOutfield {
     this.groundSink = new BuildSink();  // 贴地的（不投阴影 —— 一块 0.3 m 的麦地投影是噪点）
     this.farSink = new BuildSink();     // 远景剪影（不投阴影）
     this.meshes = [];
+    this.generatedExternalProps = [];
     this.colliders = [];
     this.covers = [];
     this.stats = { banks: 0, parapets: 0, pits: 0, graves: 0, trees: 0,
@@ -721,6 +722,11 @@ export class TengxianOutfield {
       { ...opts, castShadow: false })) this.meshes.push(m);
     for (const m of this.farSink.Flush(this.scene, this.library,
       { ...opts, castShadow: false })) this.meshes.push(m);
+    this.generatedExternalProps = [
+      ...this.sink.externalProps,
+      ...this.groundSink.externalProps,
+      ...this.farSink.externalProps,
+    ];
     this.colliders = this.sink.colliders
       .concat(this.groundSink.colliders, this.farSink.colliders);
     this.covers = this.sink.covers.concat(this.farSink.covers);

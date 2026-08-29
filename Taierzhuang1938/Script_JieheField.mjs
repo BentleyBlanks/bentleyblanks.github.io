@@ -148,6 +148,7 @@ export class JieheField {
     this.channel = (this.river && this.river.channel) || null;
 
     this.meshes = [];
+    this.generatedExternalProps = [];
     /** 物理世界。由装配层在建完切片之后挂上来（见 Script_Main.BuildPhysics）。 */
     this.physics = null;
     this.colliders = [];
@@ -302,6 +303,7 @@ export class JieheField {
     yield { label: "界河：碰撞格", progress: 0.96 };
     this.colliders = this.outfield.colliders.slice();
     this.covers = this.outfield.covers.slice();
+    this.generatedExternalProps = this.outfield.generatedExternalProps.slice();
     for (const m of this.outfield.meshes) this.meshes.push(m);
     this.BuildCollisionGrid();
     yield { label: "就绪", progress: 1.0 };

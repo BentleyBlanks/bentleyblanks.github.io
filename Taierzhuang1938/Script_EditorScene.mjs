@@ -39,7 +39,7 @@ import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { FlushWallInstances } from "./Script_WallSpline.mjs";
 import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
 import { MakeBox } from "./Script_Geo.mjs";
-import { LoadExternalSandbagModels } from "./Script_ExternalProps.mjs";
+import { LoadExternalWorldModels } from "./Script_ExternalProps.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
@@ -766,7 +766,7 @@ export class SceneEditor {
 
   async LoadModels() {
     const [externalModels] = await Promise.all([
-      LoadExternalSandbagModels(this.host.library),
+      LoadExternalWorldModels(this.host.library),
       Promise.all(MODEL_PLACEABLE.map(async (id) => {
         if (this.modelDocs.has(id)) return;
         const doc = await LoadDocument(MeshUrl(id));
@@ -777,7 +777,8 @@ export class SceneEditor {
     // 载入前就摆下的模型/外部沙袋构件这时候才补建出来。
     if (this.items.some((it) => {
       const entry = this.Entry(it.type);
-      return entry && (entry.model || entry.id === "Barricade" || entry.id === "SandbagPlug");
+      return entry && (entry.model || entry.id === "Tree"
+        || entry.id === "Barricade" || entry.id === "SandbagPlug");
     })) this.RebuildAll();
   }
 
@@ -2024,6 +2025,17 @@ export function FlushSinkProps(sink, target, library, owned,
     }
   }
   sink.props.length = 0;
+  for (const placement of sink.externalProps) {
+    const template = externalModels.get(placement.asset);
+    if (!template) continue;
+    const model = template.clone(true);
+    model.name = `Placed_${placement.asset}`;
+    model.position.set(placement.x, Number.isFinite(placement.y) ? placement.y : 0, placement.z);
+    model.rotation.y = placement.ry || 0;
+    model.scale.setScalar(placement.scale || 1);
+    target.add(model);
+  }
+  sink.externalProps.length = 0;
 }
 
 export default SceneEditor;

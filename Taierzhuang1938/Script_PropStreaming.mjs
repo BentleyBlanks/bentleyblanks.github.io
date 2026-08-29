@@ -15,6 +15,8 @@
 //     < 6 m     → 200   （枯树/砖堆/排屋碎件）
 //     ≥ 6 m     → 330   （建筑级：房/院，基本等于「常驻」——雾外才卸）
 // 卸载半径 = 加载半径 + 24 m 的迟滞带，人在半径线上来回走不会闪烁。
+// 个别由调用方量过画质/性能的资产可显式给 loadRadius；当前只有细枝高模树使用，
+// 它在 140 m 外已被战争雾吃成亚像素，不能按 7 m 包围盒误算成建筑常驻件。
 // 改这四个数之前先想清楚：加载半径只影响画面，不影响碰撞与 AI。
 //
 // 【预算】每帧最多 spawn/despawn 各 budget 件（默认 8）：一口气进城不掉帧，
@@ -57,9 +59,12 @@ export class PropStreamer {
    * parts: [{ bucket, matrix }]，实例化形态；给了它 spawn 就不走 make。
    * probe: 测试探针（Script_PhysicsTest 用）：{ name, x, y, z, minY }，
    *        minY 是按合并几何包围盒 × 摆位矩阵算的世界底面。
+   * loadRadius: 可选的资产级实测半径；不给则仍按 maxDim 四档计算。
    */
-  Register({ x, z, maxDim, make, label = "", parts = null, probe = null }) {
-    const rIn = LoadRadiusFor(maxDim);
+  Register({ x, z, maxDim, make, label = "", parts = null, probe = null,
+    loadRadius = null }) {
+    const rIn = Number.isFinite(loadRadius) && loadRadius > 0
+      ? loadRadius : LoadRadiusFor(maxDim);
     const rOut = rIn + HYSTERESIS;
     this.entries.push({
       x, z, make, label, parts, probe,

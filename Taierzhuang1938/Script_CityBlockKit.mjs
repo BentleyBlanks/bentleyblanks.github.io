@@ -1224,39 +1224,12 @@ function YardTree(sink, { x, z, ry, w, d, seed, kind, duplex }, chance, near = t
       ? Frame(x, z, ry)(-mir * (w / 2 - 2.6), d / 2 - 5.2)
       : Frame(x, z, ry)(mir * (w / 2 - 2.5), d / 2 - 2.7);
   const height = 4.6 + ((HashString(`${seed}:th`) >>> 0) % 100) / 100 * 1.8;
-  if (near) AddTree(sink, { x: tx, z: tz, seed: `${seed}:tree`, material: "Willow", height });
-  else SparseTree(sink, { x: tx, z: tz, seed: `${seed}:tree`, height, baseY });
+  // 三种下载树都由外部摆件层实例化并按距离流送；近/中景继续共用同一 seed，
+  // 因此 LOD 切换只改院落体量，不会让树换位置、换品种或突然跳回程序化枝架。
+  AddTree(sink, {
+    x: tx, z: tz, seed: `${seed}:tree`, material: "Willow", height, baseY,
+  });
   return 1;
-}
-
-/**
- * 中景档的枯树：主干 + 四根大枝 + 四根梢，**约 140 三角**。
- *
- * `AddTree` 一棵 1225 三角 —— 那是给近景准备的枝网，
- * 150 m 外一根椽子都看不清的距离上照搬它，一关就能多出两万三角
- * （实测一·北沙河那一关直接顶穿 +15% 红线）。这一档只要「一团探出墙头的
- * 深色枝杈」，四根大枝就够。三月无叶，所以没有树冠、只有枝。
- */
-function SparseTree(sink, { x, z, seed, height = 5.2, baseY = 0 }) {
-  const rnd = Mulberry32(HashString(`${seed}:sparse`));
-  const r = height * 0.035;
-  const trunk = new THREE.CylinderGeometry(r * 0.45, r, height * 0.62, 6);
-  sink.Add("Willow", PlaceGeometry(trunk,
-    { x, y: baseY + height * 0.31, z, rz: (rnd() - 0.5) * 0.10 }));
-  const spin = rnd() * Math.PI * 2;
-  for (let i = 0; i < 4; i += 1) {
-    const a = spin + i * Math.PI / 2 + (rnd() - 0.5) * 0.5;
-    const len = height * (0.34 + rnd() * 0.14);
-    const limb = new THREE.CylinderGeometry(r * 0.16, r * 0.5, len, 4);
-    const tilt = 0.62 + rnd() * 0.3;
-    sink.Add("Willow", PlaceGeometry(limb, {
-      x: x + Math.cos(a) * Math.sin(tilt) * len * 0.5,
-      y: baseY + height * 0.62 + Math.cos(tilt) * len * 0.5,
-      z: z + Math.sin(a) * Math.sin(tilt) * len * 0.5,
-      ry: -a, rz: tilt,
-    }));
-  }
-  sink.Solid(x, baseY + height * 0.35, z, r * 2.2, height * 0.35, r * 2.2, "prop");
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import {
   BuildSink, AddBarricade, AddSandbagPlug, AddSandbagEmplacement,
   EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_SANDBAG_METRICS, EXTERNAL_SANDBAG_PACKING,
+  AddTree, AddPoplar, AddOrchardTree,
+  EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
 
 
@@ -141,6 +143,49 @@ for (const spec of trunks.nodes.values()) {
   assert.equal(spec.minY, 0, "trunk is ground-ready");
   assert.ok(spec.maxSpan >= 3 && spec.maxSpan <= 4.1, "trunk keeps real-world length");
 }
+
+const leaflessTrees = InspectNodes("Model_LeaflessTreeSet.glb", 3_600_000);
+assert.deepEqual([...leaflessTrees.nodes.keys()].sort(),
+  ["LeaflessTree01", "LeaflessTreeLowPoly", "LeaflessTreeOak"],
+  "three leafless tree variants are independently instanceable");
+const treeTriangleBudgets = new Map([
+  ["LeaflessTreeOak", 24_000],
+  ["LeaflessTree01", 30_000],
+  ["LeaflessTreeLowPoly", 13_000],
+]);
+for (const [name, spec] of leaflessTrees.nodes) {
+  assert.ok(spec.triangles <= treeTriangleBudgets.get(name), `${name} triangle budget`);
+  assert.ok(Math.abs(spec.minY) < 0.01, `${name} is ground-ready within one centimetre`);
+  assert.ok(spec.maxSpan >= 6.7 && spec.maxSpan <= 7.7,
+    `${name} keeps the shared seven-metre reference scale`);
+}
+
+function GeneratedTree(build) {
+  const sink = new BuildSink();
+  build(sink);
+  assert.equal(sink.externalProps.length, 1, "tree builder emits one external model placement");
+  const placement = sink.externalProps[0];
+  assert.ok(EXTERNAL_LEAFLESS_TREE_ASSET_IDS.includes(placement.asset),
+    "tree placement selects an approved Sketchfab variant");
+  assert.ok(placement.generatedTree && placement.solid === false,
+    "tree GLB stays visual-only while the builder owns collision");
+  assert.equal(sink.colliders.length, 1, "tree keeps one deterministic trunk collider");
+  return { placement, colliders: sink.colliders };
+}
+
+const selectedTrees = new Set();
+for (let index = 0; index < 60; index += 1) {
+  const build = (sink) => AddTree(sink,
+    { x: 4, z: -7, seed: `tree-asset-test-${index}`, height: 7 });
+  const first = GeneratedTree(build);
+  const second = GeneratedTree(build);
+  assert.deepEqual(first, second, "tree model choice, yaw, scale and collider are seed-deterministic");
+  selectedTrees.add(first.placement.asset);
+}
+assert.deepEqual([...selectedTrees].sort(), [...EXTERNAL_LEAFLESS_TREE_ASSET_IDS].sort(),
+  "representative tree seeds exercise all three approved variants");
+GeneratedTree((sink) => AddPoplar(sink, { x: 1, z: 2, seed: "poplar-asset-test" }));
+GeneratedTree((sink) => AddOrchardTree(sink, { x: 1, z: 2, seed: "orchard-asset-test" }));
 
 const courtyard = InspectNodes("Model_AncientChineseCourtyardHouse.glb", 400_000);
 assert.deepEqual([...courtyard.nodes.keys()], ["AncientChineseCourtyardHouse"]);
@@ -343,6 +388,7 @@ for (const id of [
   "militaryCrateClosed", "militaryCrateOpen",
   ...Array.from({ length: 7 }, (_, index) => `stackableStone${String(index + 1).padStart(2, "0")}`),
   "deadTreeTrunk01", "deadTreeTrunk02",
+  ...EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
   "courtyardHouse", "marketRiceSack01", "marketRiceSack02",
   ...Array.from({ length: 3 }, (_, index) => `marketBox${String(index + 1).padStart(2, "0")}`),
   ...Array.from({ length: 4 }, (_, index) => `marketCrate${String(index + 1).padStart(2, "0")}`),
@@ -397,4 +443,5 @@ console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${b
   + ` ruralHouse=${ruralHouse.bytes.length}`
   + ` breach=${breach.bytes}`
   + ` wallDetail=${wallDetail.bytes}`
-  + ` handcart=${handcart.bytes} market=${market.bytes}`);
+  + ` handcart=${handcart.bytes} market=${market.bytes}`
+  + ` leaflessTrees=${leaflessTrees.bytes}`);
