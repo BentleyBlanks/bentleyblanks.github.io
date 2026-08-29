@@ -74,10 +74,11 @@ const PROLOGUE_SCENE = {
  */
 export const BUILDING_DAMAGE_STATES = Object.freeze({
   original: Object.freeze({ id: "original", label: "原始状态", damage: null, burnt: false, material: null, detail: null }),
-  // 初损直接承接上一版严重档：一处真实立面缺口、断梁、散瓦与三组爆点都保留。
-  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.88, burnt: false, material: "BuildingDamageEarly", detail: "shell" }),
-  // 新严重档跨过各正式生成器的彻底坍塌阈值，并由 detail 层再补第二缺口的现场证据。
-  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.98, burnt: true, material: "BuildingDamageSevere", detail: "severe" }),
+  // 三档必须读成同一栋建筑的时间序列：不换砖型、不换全局焦色，也不在初损时改掉屋脊。
+  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.38, burnt: false,
+    material: "BuildingDamageEarly", detail: "early", profile: "early" }),
+  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.72, burnt: false,
+    material: "BuildingDamageSevere", detail: "severe", profile: "severe" }),
 });
 export const BUILDING_DAMAGE_STATE_OPTIONS = Object.freeze(
   Object.values(BUILDING_DAMAGE_STATES).map(({ id: value, label }) => Object.freeze({ value, label })),
@@ -439,7 +440,7 @@ export const PLACEABLE = [
     defaults: { w: 16, d: 14, damage: 0.2 },
     build: (sink, it) => AddCompound(sink, {
       x: it.x, z: it.z, ry: it.ry, width: it.w, depth: it.d, damage: it.damage,
-      burnt: it.burnt, seed: it.seed,
+      burnt: it.burnt, damageProfile: it.damageProfile, seed: it.seed,
     }),
   },
   {
@@ -449,7 +450,7 @@ export const PLACEABLE = [
     build: (sink, it) => AddRoomBlock(sink, {
       x: it.x, z: it.z, ry: it.ry, width: it.w, depth: it.d,
       eaveY: it.h, ridgeY: it.h * 1.7, seed: it.seed, damage: it.damage,
-      burnt: it.burnt, facing: 1, bays: 3,
+      burnt: it.burnt, damageProfile: it.damageProfile, facing: 1, bays: 3,
     }),
   },
   {
@@ -458,7 +459,7 @@ export const PLACEABLE = [
     defaults: { w: 1.5, damage: 0.1 },
     build: (sink, it) => AddGatehouse(sink, {
       x: it.x, z: it.z, ry: it.ry, seed: it.seed, damage: it.damage,
-      burnt: it.burnt, openW: it.w,
+      burnt: it.burnt, damageProfile: it.damageProfile, openW: it.w,
     }),
   },
   {
@@ -489,7 +490,7 @@ export const PLACEABLE = [
     defaults: { w: 11, d: 24, h: 16, damage: 0.15 },
     build: (sink, it) => AddChurch(sink, {
       x: it.x, z: it.z, ry: it.ry, nave: [it.w, it.d], towerH: it.h,
-      seed: it.seed, damage: it.damage,
+      seed: it.seed, damage: it.damage, damageProfile: it.damageProfile,
     }),
   },
   {
@@ -604,7 +605,8 @@ export function BuildPlaceableVisual(target, entry, item, {
 
   const damageState = ResolveBuildingDamageState(entry, item);
   const buildItem = damageState && damageState.damage != null
-    ? { ...item, damage: damageState.damage, burnt: damageState.burnt }
+    ? { ...item, damage: damageState.damage, burnt: damageState.burnt,
+      damageProfile: damageState.profile }
     : item;
   const resolve = DamageMaterialResolver(damageState, library);
   const sink = new BuildSink();

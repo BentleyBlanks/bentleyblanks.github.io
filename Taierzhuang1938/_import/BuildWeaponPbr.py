@@ -8,7 +8,7 @@ packs ambient occlusion / roughness / metalness into the glTF-style ORM channels
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +65,50 @@ def build_if_source(stem: str, **params) -> None:
         build(stem, **params)
 
 
+def _damage_mask(size: tuple[int, int], regions: list[tuple[float, float, float, float]]) -> Image.Image:
+    """Soft local masks keep every untouched pixel sourced from the canonical brick wall."""
+    w, h = size
+    mask = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(mask)
+    for cx, cy, rx, ry in regions:
+        x, y = cx * w, cy * h
+        # Two offset lobes avoid the pasted-sticker look while staying well clear of tile edges.
+        draw.ellipse((x - rx * w, y - ry * h, x + rx * w, y + ry * h), fill=255)
+        draw.ellipse((x - rx * w * 0.72, y - ry * h * 1.12,
+                      x + rx * w * 0.88, y + ry * h * 0.76), fill=255)
+    return mask.filter(ImageFilter.GaussianBlur(max(4, round(min(size) * 0.018))))
+
+
+def build_damage_variant(stem: str, *, regions: list[tuple[float, float, float, float]],
+                         normal_strength: float, rough_min: int, rough_max: int,
+                         base_quality: int = 88, map_quality: int = 78) -> None:
+    """Composite ImageGen blast edits only locally over the tracked canonical brick PBR.
+
+    Image generation is responsible for the fracture material inside each scar. The original
+    BrickWall maps remain the source everywhere else, so switching editor state cannot silently
+    change brick dimensions, bond, palette, mortar, or edge tiling.
+    """
+    source = SOURCE / f"Texture_{stem}Source.png"
+    if not source.is_file():
+        return
+    base = Image.open(TEXTURE / "Texture_BrickWallBase.webp").convert("RGB")
+    edited = Image.open(source).convert("RGB").resize(base.size, Image.Resampling.LANCZOS)
+    mask = _damage_mask(base.size, regions)
+    composed = Image.composite(edited, base, mask)
+    composed.save(TEXTURE / f"Texture_{stem}Base.webp", "WEBP", quality=base_quality, method=6)
+
+    original_normal = Image.open(TEXTURE / "Texture_BrickWallNormal.webp").convert("RGB")
+    damaged_normal = _normal_map(composed, normal_strength)
+    Image.composite(damaged_normal, original_normal, mask).save(
+        TEXTURE / f"Texture_{stem}Normal.webp", "WEBP", quality=map_quality, method=6
+    )
+    original_orm = Image.open(TEXTURE / "Texture_BrickWallOrm.webp").convert("RGB")
+    damaged_orm = _orm(composed, metalness=0, rough_min=rough_min, rough_max=rough_max)
+    Image.composite(damaged_orm, original_orm, mask).save(
+        TEXTURE / f"Texture_{stem}Orm.webp", "WEBP", quality=map_quality, method=6
+    )
+
+
 def export_standalone_metallic_roughness(stem: str) -> None:
     """Export inspector-friendly PBR channels while runtime keeps compact ORM."""
     packed = TEXTURE / f"Texture_{stem}Orm.webp"
@@ -98,10 +142,13 @@ if __name__ == "__main__":
     # 构件库的两档预建模战损。高分辨率 base color 由 imagegen 产出；这里统一
     # 做无缝偏移、浏览器尺寸压缩并推导对位的 normal / ORM，避免把原始 PNG
     # 直接塞进开机路径，也避免各编辑器各自解释一套表面状态。
-    build_if_source("BuildingDamageEarly", normal_strength=4.0, metalness=0,
-                    rough_min=184, rough_max=244, base_quality=84, map_quality=72)
-    build_if_source("BuildingDamageSevere", normal_strength=5.2, metalness=0,
-                    rough_min=196, rough_max=252, base_quality=84, map_quality=72)
+    build_damage_variant("BuildingDamageEarly", normal_strength=4.1,
+                         rough_min=178, rough_max=242,
+                         regions=[(0.30, 0.32, 0.14, 0.11), (0.68, 0.66, 0.14, 0.11)])
+    build_damage_variant("BuildingDamageSevere", normal_strength=4.8,
+                         rough_min=186, rough_max=248,
+                         regions=[(0.30, 0.32, 0.19, 0.15), (0.68, 0.66, 0.19, 0.15),
+                                  (0.55, 0.25, 0.16, 0.13), (0.35, 0.80, 0.16, 0.13)])
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
     # Dedicated gate surfaces.  These stay separate from the city-wide brick and

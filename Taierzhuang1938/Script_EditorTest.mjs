@@ -1346,6 +1346,33 @@ Check("切换到构件库前恢复场景相机参数",
 await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   active.SetPalette("RoomBlock");
+  active.SetDamageState("original");
+});
+await Step(2);
+const damageOriginal = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  const textures = [];
+  active.previewRoot.traverse((node) => {
+    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
+    if (src) textures.push(src);
+  });
+  return {
+    state: active.preview?.damageState,
+    facts: active.facts.root.textContent,
+    texture: textures.find((src) => src.includes("Texture_BrickWallBase")) || "",
+  };
+});
+Check("构件库原始态保留正式房屋基模与砖材",
+  damageOriginal.state === "original" && damageOriginal.facts.includes("原始状态")
+    && !!damageOriginal.texture,
+  JSON.stringify(damageOriginal));
+await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
+await page.screenshot({
+  path: path.join(projectDir, "_shots", "editor_prop_damage_original.png"),
+});
+
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
   active.SetDamageState("shellDamaged");
 });
 await Step(2);
@@ -1367,15 +1394,14 @@ const damageEarly = await page.evaluate(() => {
 Check("构件库可即时预览炮击初损建模态",
   damageEarly.state === "shellDamaged" && !damageEarly.sectionHidden
     && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture
-    && damageEarly.detail?.stage === "shell"
-    && damageEarly.detail?.impactMarks === 3
-    && damageEarly.detail?.fractureBricks >= 40
-    && damageEarly.detail?.crackSegments === 54
-    && damageEarly.detail?.looseBricks === 30
-    && damageEarly.detail?.exposedBeams === 3
-    && damageEarly.detail?.roofFragments === 16,
+    && damageEarly.detail?.stage === "early"
+    && damageEarly.detail?.impactMarks === 2
+    && damageEarly.detail?.fractureBricks === 20
+    && damageEarly.detail?.crackSegments === 20
+    && damageEarly.detail?.looseBricks === 14
+    && damageEarly.detail?.exposedBeams === 0
+    && damageEarly.detail?.roofFragments === 6,
   JSON.stringify(damageEarly));
-await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_early.png"),
 });
@@ -1399,16 +1425,58 @@ const damageSevere = await page.evaluate(() => {
 Check("构件库可即时预览严重破坏建模态",
   damageSevere.state === "severeDamage" && damageSevere.facts.includes("严重破坏")
     && !!damageSevere.texture
-    && damageSevere.detail?.impactMarks === 5
-    && damageSevere.detail?.fractureBricks >= 84
-    && damageSevere.detail?.crackSegments === 160
-    && damageSevere.detail?.looseBricks === 52
-    && damageSevere.detail?.exposedBeams === 6
-    && damageSevere.detail?.roofFragments === 36,
+    && damageSevere.detail?.impactMarks === 4
+    && damageSevere.detail?.fractureBricks === 56
+    && damageSevere.detail?.crackSegments === 84
+    && damageSevere.detail?.looseBricks === 34
+    && damageSevere.detail?.exposedBeams === 3
+    && damageSevere.detail?.roofFragments === 22,
   JSON.stringify(damageSevere));
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),
 });
+
+const textureLineage = await page.evaluate(async () => {
+  const Load = async (name) => {
+    const img = new Image();
+    img.src = new URL(`./Texture/${name}`, location.href).href;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 512, 512);
+    return ctx.getImageData(0, 0, 512, 512).data;
+  };
+  const [base, early, severe] = await Promise.all([
+    Load("Texture_BrickWallBase.webp"),
+    Load("Texture_BuildingDamageEarlyBase.webp"),
+    Load("Texture_BuildingDamageSevereBase.webp"),
+  ]);
+  const regions = [
+    [0.30, 0.32, 0.22, 0.19], [0.68, 0.66, 0.22, 0.19],
+    [0.55, 0.25, 0.19, 0.17], [0.35, 0.80, 0.19, 0.17],
+  ];
+  let earlyDiff = 0, severeDiff = 0, samples = 0;
+  for (let y = 0; y < 512; y += 4) {
+    for (let x = 0; x < 512; x += 4) {
+      const inside = regions.some(([cx, cy, rx, ry]) => {
+        const dx = x / 512 - cx, dy = y / 512 - cy;
+        return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1;
+      });
+      if (inside) continue;
+      const p = (y * 512 + x) * 4;
+      for (let c = 0; c < 3; c += 1) {
+        earlyDiff += Math.abs(base[p + c] - early[p + c]);
+        severeDiff += Math.abs(base[p + c] - severe[p + c]);
+        samples += 1;
+      }
+    }
+  }
+  return { early: earlyDiff / samples, severe: severeDiff / samples };
+});
+Check("两档贴图在爆点之外逐像素沿用原始砖材",
+  textureLineage.early < 8 && textureLineage.severe < 8,
+  `early=${textureLineage.early.toFixed(2)} severe=${textureLineage.severe.toFixed(2)}`);
 
 await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("Paifang"));
 await Step(1);
