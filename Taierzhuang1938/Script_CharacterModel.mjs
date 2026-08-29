@@ -296,6 +296,30 @@ export const CHARACTER_HITBOX_PROFILE = Object.freeze([
 
 const WORLD_SCALE = new THREE.Vector3();
 
+/**
+ * Build the grip point carried by the authored fingers, not by Blender's BONE-parent tail.
+ *
+ * A zero-location object parented to a Blender bone exports at that bone's tail.  Max Biped
+ * hand tails do not point into the palm: on the Lugou rigs they sit 8-10 cm away from the
+ * four finger roots.  The old Socket_WeaponL/R empties therefore preserved animation, but
+ * described empty air beside it.  Finger1..4 are the four knuckles and are direct children
+ * of the hand on every source rig; their centroid is the stable, animated palm grip.
+ */
+function BuildHandGrip(hand, side, fallback) {
+  if (!hand) return fallback || null;
+  const suffixes = new Set([1, 2, 3, 4].map((index) => `${side}finger${index}`));
+  const knuckles = hand.children.filter((child) => child.isBone
+    && [...suffixes].some((suffix) => NormalizeName(child.name).endsWith(suffix)));
+  if (knuckles.length !== 4) return fallback || hand;
+  const grip = new THREE.Object3D();
+  grip.name = `RuntimeGrip_Weapon${side === "r" ? "R" : "L"}`;
+  for (const knuckle of knuckles) grip.position.add(knuckle.position);
+  grip.position.multiplyScalar(1 / knuckles.length);
+  grip.userData.gripSource = "fingerRootCentroid";
+  hand.add(grip);
+  return grip;
+}
+
 /** One independently animated, skeleton-cloned soldier. */
 export class LugouCharacterRig {
   constructor(asset, { kind, targetHeight, seed, variantIndex }) {
@@ -338,6 +362,10 @@ export class LugouCharacterRig {
       weaponL: FindNode(this.root, "Socket_WeaponL") || this.bones.handL || null,
       backBlade: FindNode(this.root, "Socket_BackBlade") || this.bones.chest || null,
       headGear: FindNode(this.root, "Socket_HeadGear") || this.bones.head || null,
+    };
+    this.grips = {
+      weaponR: BuildHandGrip(this.bones.handR, "r", this.sockets.weaponR),
+      weaponL: BuildHandGrip(this.bones.handL, "l", this.sockets.weaponL),
     };
     // 碰撞代理既可引用骨骼，也可引用已烘进 GLB 的稳定挂点。headGear 是头盔中心；
     // 它与 Head pivot 不同，前者才是可见头部的正确端点。
@@ -476,6 +504,10 @@ export class LugouCharacterRig {
 
   Socket(role) {
     return this.sockets[role] || null;
+  }
+
+  Grip(role) {
+    return this.grips[role] || this.Socket(role);
   }
 
   GetHitboxes() {

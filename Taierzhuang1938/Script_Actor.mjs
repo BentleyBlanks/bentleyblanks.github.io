@@ -1165,6 +1165,15 @@ const SOCKET_TARGET_WORLD = new THREE.Vector3();
 const SOCKET_TARGET_LOCAL = new THREE.Vector3();
 const SOCKET_RIGHT_WORLD = new THREE.Vector3();
 const SOCKET_ELBOW_WORLD = new THREE.Vector3();
+const SOCKET_BODY_LOW_WORLD = new THREE.Vector3();
+const SOCKET_BODY_HIGH_WORLD = new THREE.Vector3();
+const SOCKET_SOURCE_UP = new THREE.Vector3();
+const SOCKET_SOURCE_RIGHT = new THREE.Vector3();
+const SOCKET_TARGET_UP = new THREE.Vector3();
+const SOCKET_TARGET_RIGHT = new THREE.Vector3();
+const SOCKET_FRAME_SOURCE = new THREE.Matrix4();
+const SOCKET_FRAME_TARGET = new THREE.Matrix4();
+const SOCKET_MOUNT_INVERSE = new THREE.Matrix4();
 const SOCKET_AIM_Q = new THREE.Quaternion();
 
 export class Actor {
@@ -1413,7 +1422,7 @@ export class Actor {
     this.meshSource = `glb:${this.characterRig.modelId}`;
     this.usingModel = true;
 
-    const weaponSocket = this.characterRig.Socket("weaponR");
+    const weaponSocket = this.characterRig.Grip("weaponR");
     if (weaponSocket) {
       this.riggedWeaponMount = new THREE.Group();
       this.riggedWeaponMount.name = "SocketAttachment_WeaponR";
@@ -1468,20 +1477,23 @@ export class Actor {
    * Weapon models use their right-hand grip as local origin, while their front
    * grip/muzzle lies along the barrel axis.  Max Biped hand axes are not the same
    * as that authoring frame, so inheriting the right-hand quaternion alone lays a
-   * rifle sideways across the shoulders.  Reconstruct the attachment rotation
-   * from live socket positions after every mixer update: two-handed weapons point
-   * their front grip at the left hand; one-handed weapons continue the right
-   * forearm direction.  Muzzle flashes and ballistics use weaponGroup.matrixWorld,
-   * so they receive this exact same transform.
+   * rifle sideways across the shoulders.  Two points only determine the barrel
+   * axis, not the roll around it: the old bridge used setFromUnitVectors and could
+   * therefore leave the stock several centimetres above an otherwise correctly
+   * aimed palm.  Reconstruct a complete frame after every mixer update: front grip
+   * points at the left hand (or a pistol follows the right forearm), while weapon
+   * up follows the animated torso's up direction projected off that axis.  Muzzle
+   * flashes and ballistics use weaponGroup.matrixWorld, so they receive this exact
+   * same transform.
    */
   _UpdateRiggedWeaponMount() {
     if (!this.riggedWeaponMount || !this.weaponGroup || !this.characterRig) return;
-    const rightSocket = this.characterRig.Socket("weaponR");
+    const rightSocket = this.characterRig.Grip("weaponR");
     if (!rightSocket) return;
 
     let hasTarget = false;
     if (this.weaponTwoHanded && this.weaponGripFront.lengthSq() > 1e-8) {
-      const leftSocket = this.characterRig.Socket("weaponL");
+      const leftSocket = this.characterRig.Grip("weaponL");
       if (leftSocket) {
         leftSocket.getWorldPosition(SOCKET_TARGET_WORLD);
         hasTarget = true;
@@ -1506,7 +1518,40 @@ export class Actor {
     if (SOCKET_TARGET_LOCAL.lengthSq() < 1e-8) return;
     SOCKET_SOURCE_AXIS.normalize();
     SOCKET_TARGET_LOCAL.normalize();
-    SOCKET_AIM_Q.setFromUnitVectors(SOCKET_SOURCE_AXIS, SOCKET_TARGET_LOCAL);
+
+    // Build a full source/target basis.  Using only the forward pair leaves roll
+    // underdetermined; the shortest-arc quaternion was the reason the rifle could
+    // pass above an open palm even though the old direction-dot test stayed green.
+    SOCKET_SOURCE_UP.set(0, 1, 0)
+      .addScaledVector(SOCKET_SOURCE_AXIS, -SOCKET_SOURCE_UP.dot(SOCKET_SOURCE_AXIS));
+    if (SOCKET_SOURCE_UP.lengthSq() < 1e-8) SOCKET_SOURCE_UP.set(1, 0, 0);
+    SOCKET_SOURCE_UP.normalize();
+    SOCKET_SOURCE_RIGHT.crossVectors(SOCKET_SOURCE_UP, SOCKET_SOURCE_AXIS).normalize();
+
+    const bodyLow = this.characterRig.bones.pelvis;
+    const bodyHigh = this.characterRig.bones.neck || this.characterRig.bones.chest;
+    if (bodyLow && bodyHigh) {
+      bodyLow.getWorldPosition(SOCKET_BODY_LOW_WORLD);
+      bodyHigh.getWorldPosition(SOCKET_BODY_HIGH_WORLD);
+      SOCKET_TARGET_UP.copy(SOCKET_BODY_HIGH_WORLD).sub(SOCKET_BODY_LOW_WORLD);
+      SOCKET_MOUNT_INVERSE.copy(this.riggedWeaponMount.matrixWorld).invert();
+      SOCKET_TARGET_UP.transformDirection(SOCKET_MOUNT_INVERSE);
+    } else {
+      SOCKET_TARGET_UP.set(0, 1, 0);
+    }
+    SOCKET_TARGET_UP.addScaledVector(SOCKET_TARGET_LOCAL,
+      -SOCKET_TARGET_UP.dot(SOCKET_TARGET_LOCAL));
+    if (SOCKET_TARGET_UP.lengthSq() < 1e-8) {
+      SOCKET_TARGET_UP.set(0, 1, 0)
+        .addScaledVector(SOCKET_TARGET_LOCAL, -SOCKET_TARGET_LOCAL.y);
+    }
+    SOCKET_TARGET_UP.normalize();
+    SOCKET_TARGET_RIGHT.crossVectors(SOCKET_TARGET_UP, SOCKET_TARGET_LOCAL).normalize();
+
+    SOCKET_FRAME_SOURCE.makeBasis(SOCKET_SOURCE_RIGHT, SOCKET_SOURCE_UP, SOCKET_SOURCE_AXIS);
+    SOCKET_FRAME_TARGET.makeBasis(SOCKET_TARGET_RIGHT, SOCKET_TARGET_UP, SOCKET_TARGET_LOCAL);
+    SOCKET_AIM_Q.setFromRotationMatrix(
+      SOCKET_FRAME_TARGET.multiply(SOCKET_FRAME_SOURCE.invert()));
     this.weaponGroup.quaternion.copy(SOCKET_AIM_Q);
     this.weaponGroup.updateMatrix();
   }

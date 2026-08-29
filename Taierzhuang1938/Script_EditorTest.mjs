@@ -479,8 +479,10 @@ const actor = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
   const importedActions = active.clipList.root.querySelectorAll(".it").length;
-  active.SetClip("RifleRun");
-  window.Taierzhuang.StepFrames(20);
+  // 用户反馈的正是编辑器默认站姿：旧测试只验枪轴，哪怕 Biped 手骨尾端落在
+  // 掌外 8-10 cm，枪从张开的手掌旁边穿过去也会是绿的。固定复现该姿态。
+  active.SetClip("AdvanceFire");
+  window.Taierzhuang.StepFrames(45);
   const one = active.actors.length;
   const kind = active.actors[0] ? active.actors[0].kind : null;
   const source = active.actors[0] ? active.actors[0].meshSource : null;
@@ -488,17 +490,92 @@ const actor = await page.evaluate(() => {
   const sourceDefault = primary?.weaponId === "ZhongZheng"
     && active.weaponSelect.Value() === "__source_default__";
   let socketDirectionDot = -1;
+  let rightGripError = Infinity;
+  let leftHandWeaponGap = Infinity;
+  let rightHandWeaponGap = Infinity;
+  let fingerGripSources = false;
+  let legacySocketSeparation = 0;
+  let weaponRollDot = -1;
   if (primary?.weaponGroup && primary?.characterRig) {
     primary.root.updateWorldMatrix(true, true);
-    const rightSocket = primary.characterRig.Socket("weaponR");
-    const leftSocket = primary.characterRig.Socket("weaponL");
+    const rightSocket = primary.characterRig.Grip("weaponR");
+    const leftSocket = primary.characterRig.Grip("weaponL");
     if (rightSocket && leftSocket) {
+      const Vector3 = primary.root.position.constructor;
       const right = primary.weaponMuzzle.clone();
       const left = primary.weaponMuzzle.clone();
       const grip = primary.weaponGripFront.clone().applyMatrix4(primary.weaponGroup.matrixWorld);
       rightSocket.getWorldPosition(right);
       leftSocket.getWorldPosition(left);
-      socketDirectionDot = grip.sub(right).normalize().dot(left.sub(right).normalize());
+      socketDirectionDot = grip.clone().sub(right).normalize()
+        .dot(left.clone().sub(right).normalize());
+      rightGripError = new Vector3().applyMatrix4(primary.weaponGroup.matrixWorld).distanceTo(right);
+      fingerGripSources = rightSocket.userData.gripSource === "fingerRootCentroid"
+        && leftSocket.userData.gripSource === "fingerRootCentroid";
+      const legacyRight = primary.characterRig.Socket("weaponR");
+      const legacyLeft = primary.characterRig.Socket("weaponL");
+      legacySocketSeparation = legacyRight && legacyLeft
+        ? legacyRight.getWorldPosition(new Vector3()).distanceTo(right)
+          + legacyLeft.getWorldPosition(new Vector3()).distanceTo(left)
+        : 0;
+
+      // 真正量可见蒙皮手与枪械网格，而不是再量一个空 Object3D。顶点距离对这次
+      // 回归很敏感：坏版左手约 68 mm，指根掌心版约 1-2 mm。
+      const weaponVertices = [];
+      primary.weaponGroup.traverse((object) => {
+        const position = object.geometry?.attributes?.position;
+        if (!object.isMesh || !position) return;
+        object.updateWorldMatrix(true, false);
+        for (let i = 0; i < position.count; i += 1) {
+          weaponVertices.push(new Vector3().fromBufferAttribute(position, i)
+            .applyMatrix4(object.matrixWorld));
+        }
+      });
+      const HandWeaponGap = (hand) => {
+        let minimum = Infinity;
+        primary.characterRig.root.traverse((object) => {
+          const position = object.geometry?.attributes?.position;
+          const skinIndex = object.geometry?.attributes?.skinIndex;
+          const skinWeight = object.geometry?.attributes?.skinWeight;
+          if (!object.isSkinnedMesh || !position || !skinIndex || !skinWeight) return;
+          object.skeleton.update();
+          const handBoneIndices = new Set();
+          hand.traverse((node) => {
+            const index = object.skeleton.bones.indexOf(node);
+            if (index >= 0) handBoneIndices.add(index);
+          });
+          object.updateWorldMatrix(true, false);
+          for (let i = 0; i < position.count; i += 1) {
+            let influence = 0;
+            for (let component = 0; component < 4; component += 1) {
+              if (handBoneIndices.has(skinIndex.getComponent(i, component))) {
+                influence += skinWeight.getComponent(i, component);
+              }
+            }
+            if (influence < 0.2) continue;
+            const handVertex = new Vector3().fromBufferAttribute(position, i);
+            object.applyBoneTransform(i, handVertex);
+            handVertex.applyMatrix4(object.matrixWorld);
+            for (const weaponVertex of weaponVertices) {
+              minimum = Math.min(minimum, handVertex.distanceToSquared(weaponVertex));
+            }
+          }
+        });
+        return Math.sqrt(minimum);
+      };
+      rightHandWeaponGap = HandWeaponGap(primary.characterRig.bones.handR);
+      leftHandWeaponGap = HandWeaponGap(primary.characterRig.bones.handL);
+
+      // StandFireCrouch 是最容易把枪翻到掌外的一条：旧 shortest-arc 方案实测
+      // weapon-up · torso-up = -0.31。切过去再量一次完整姿态框架。
+      active.SetClip("StandFireCrouch");
+      window.Taierzhuang.StepFrames(45);
+      primary.root.updateWorldMatrix(true, true);
+      const bodyLow = primary.characterRig.bones.pelvis.getWorldPosition(new Vector3());
+      const bodyHigh = (primary.characterRig.bones.neck || primary.characterRig.bones.chest)
+        .getWorldPosition(new Vector3());
+      const weaponUp = new Vector3(0, 1, 0).transformDirection(primary.weaponGroup.matrixWorld);
+      weaponRollDot = weaponUp.dot(bodyHigh.sub(bodyLow).normalize());
     }
   }
   // 走真实下拉 change 事件，不只调内部方法：用户反馈的正是面板里换枪不生效。
@@ -571,6 +648,8 @@ const actor = await page.evaluate(() => {
   return {
     id: editor.ActiveId, one, lineupCount, importedActions, kind, source,
     ragdoll, civilianUnarmed, rigidShadingSolid, socketDirectionDot,
+    rightGripError, leftHandWeaponGap, rightHandWeaponGap,
+    fingerGripSources, legacySocketSeparation, weaponRollDot,
     sourceDefault, singleWeaponReplaced, nraLineupSourceDefaults,
     ijaLineupSourceDefaults, lineupWeaponsReplaced,
     studio: editor.studio.Active,
@@ -592,6 +671,16 @@ Check("本阵营对比下拉可统一替换全部枪械", actor.lineupWeaponsRep
 Check("本阵营五套人物都用蒙皮 GLB，且主体材质不透明/写深度", actor.rigidShadingSolid);
 Check("枪身前握把沿左右手骨骼挂点定向", actor.socketDirectionDot > 0.98,
   `dot=${actor.socketDirectionDot.toFixed(4)}`);
+Check("配枪改用原动画四指根掌心，不再用偏在掌外的 Biped 手骨尾端",
+  actor.fingerGripSources && actor.legacySocketSeparation > 0.10,
+  `旧挂点总偏差=${(actor.legacySocketSeparation * 100).toFixed(1)} cm`);
+Check("右手掌心与枪械后握点重合", actor.rightGripError < 0.001,
+  `${(actor.rightGripError * 1000).toFixed(2)} mm`);
+Check("默认站姿双手可见网格都贴住枪身",
+  actor.rightHandWeaponGap < 0.02 && actor.leftHandWeaponGap < 0.02,
+  `右 ${(actor.rightHandWeaponGap * 1000).toFixed(1)} mm / 左 ${(actor.leftHandWeaponGap * 1000).toFixed(1)} mm`);
+Check("卧姿配枪滚转朝向与身体一致，不会倒扣在手掌外", actor.weaponRollDot > 0.10,
+  `dot=${actor.weaponRollDot.toFixed(3)}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 
