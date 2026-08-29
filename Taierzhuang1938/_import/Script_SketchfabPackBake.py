@@ -85,7 +85,12 @@ def Triangles(obj: bpy.types.Object) -> int:
     return len(obj.data.loop_triangles)
 
 
-def Optimize(obj: bpy.types.Object, targetTriangles: int, targetSpan: float | None = None) -> tuple[int, int]:
+def Optimize(
+    obj: bpy.types.Object,
+    targetTriangles: int,
+    targetSpan: float | None = None,
+    flatShading: bool = False,
+) -> tuple[int, int]:
     before = Triangles(obj)
     if before > targetTriangles:
         modifier = obj.modifiers.new("RuntimeDecimate", "DECIMATE")
@@ -107,15 +112,27 @@ def Optimize(obj: bpy.types.Object, targetTriangles: int, targetSpan: float | No
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.shade_smooth_by_angle()
+    if flatShading:
+        # The market crates are assembled from square-section slats. Smoothing their
+        # 90-degree corners turns every broad board face into a false bulge under the
+        # studio/game lights. Imported glTF meshes retain custom split normals even
+        # after shade_flat, so explicitly replace every loop normal with its face normal.
+        bpy.ops.object.shade_flat()
+        flatNormals = [None] * len(obj.data.loops)
+        for polygon in obj.data.polygons:
+            for loopIndex in polygon.loop_indices:
+                flatNormals[loopIndex] = polygon.normal.copy()
+        obj.data.normals_split_custom_set(flatNormals)
+    else:
+        bpy.ops.object.shade_smooth_by_angle()
     return before, Triangles(obj)
 
 
-def Process(objects, name, materialFor, targetTriangles, targetSpan=None):
+def Process(objects, name, materialFor, targetTriangles, targetSpan=None, flatShading=False):
     for obj in objects:
         SetMarker(obj, materialFor(obj) if callable(materialFor) else materialFor)
     result = Join(objects, name)
-    before, after = Optimize(result, targetTriangles, targetSpan)
+    before, after = Optimize(result, targetTriangles, targetSpan, flatShading)
     print(f"{name}: {before} -> {after} triangles", flush=True)
     return result
 
@@ -216,7 +233,10 @@ def BakeMarket() -> None:
     output = []
     for sourceName, runtimeName, material, target, span in marketStorageSpecs:
         members = [obj for obj in groups[sourceName] if "PLANE" not in obj.name.upper()]
-        output.append(Process(members, runtimeName, material, target, span))
+        output.append(Process(
+            members, runtimeName, material, target, span,
+            flatShading=runtimeName.startswith("MarketCrate"),
+        ))
     Export(output, "Model_MarketStorageSet.glb")
 
 

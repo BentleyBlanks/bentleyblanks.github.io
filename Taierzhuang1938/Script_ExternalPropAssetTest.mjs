@@ -21,7 +21,67 @@ function ReadGlb(fileName, maxBytes = 300_000) {
   const jsonLength = bytes.readUInt32LE(12);
   assert.equal(bytes.readUInt32LE(16), 0x4e4f534a, `${fileName}: first chunk is JSON`);
   const json = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
-  return { bytes, json };
+  const binaryChunkHeader = 20 + jsonLength;
+  assert.equal(bytes.readUInt32LE(binaryChunkHeader + 4), 0x004e4942,
+    `${fileName}: second chunk is binary`);
+  return { bytes, json, binaryOffset: binaryChunkHeader + 8 };
+}
+
+function AccessorReader(glb, accessorIndex) {
+  const accessor = glb.json.accessors[accessorIndex];
+  const view = glb.json.bufferViews[accessor.bufferView];
+  const components = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[accessor.type];
+  const componentBytes = { 5123: 2, 5125: 4, 5126: 4 }[accessor.componentType];
+  assert.ok(components && componentBytes, `supported accessor ${accessorIndex}`);
+  const start = glb.binaryOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const stride = view.byteStride ?? components * componentBytes;
+  const read = accessor.componentType === 5123
+    ? (offset) => glb.bytes.readUInt16LE(offset)
+    : accessor.componentType === 5125
+      ? (offset) => glb.bytes.readUInt32LE(offset)
+      : (offset) => glb.bytes.readFloatLE(offset);
+  return {
+    count: accessor.count,
+    get: (index, component = 0) => read(start + index * stride + component * componentBytes),
+  };
+}
+
+function AssertFlatTriangleNormals(glb, nodeNames, maxDegrees = 1) {
+  const allowedDot = Math.cos(maxDegrees * Math.PI / 180);
+  for (const nodeName of nodeNames) {
+    const node = glb.json.nodes.find((entry) => entry.name === nodeName);
+    assert.ok(node?.mesh != null, `${nodeName}: mesh exists`);
+    let lowestDot = 1;
+    for (const primitive of glb.json.meshes[node.mesh].primitives) {
+      const positions = AccessorReader(glb, primitive.attributes.POSITION);
+      const normals = AccessorReader(glb, primitive.attributes.NORMAL);
+      const indices = AccessorReader(glb, primitive.indices);
+      for (let offset = 0; offset < indices.count; offset += 3) {
+        const ids = [indices.get(offset), indices.get(offset + 1), indices.get(offset + 2)];
+        const points = ids.map((id) => [
+          positions.get(id, 0), positions.get(id, 1), positions.get(id, 2),
+        ]);
+        const edgeA = points[1].map((value, axis) => value - points[0][axis]);
+        const edgeB = points[2].map((value, axis) => value - points[0][axis]);
+        const face = [
+          edgeA[1] * edgeB[2] - edgeA[2] * edgeB[1],
+          edgeA[2] * edgeB[0] - edgeA[0] * edgeB[2],
+          edgeA[0] * edgeB[1] - edgeA[1] * edgeB[0],
+        ];
+        const faceLength = Math.hypot(...face);
+        assert.ok(faceLength > 1e-8, `${nodeName}: non-degenerate triangle`);
+        for (const id of ids) {
+          const dot = (face[0] * normals.get(id, 0)
+            + face[1] * normals.get(id, 1)
+            + face[2] * normals.get(id, 2)) / faceLength;
+          lowestDot = Math.min(lowestDot, dot);
+        }
+      }
+    }
+    const worstDegrees = Math.acos(Math.max(-1, Math.min(1, lowestDot))) * 180 / Math.PI;
+    assert.ok(lowestDot >= allowedDot,
+      `${nodeName}: slat faces keep flat normals (worst ${worstDegrees.toFixed(2)} degrees)`);
+  }
 }
 
 function InspectNodes(fileName, maxBytes) {
@@ -359,6 +419,8 @@ for (const [name, spec] of market.nodes) {
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
   assert.ok(spec.maxSpan >= 0.5 && spec.maxSpan <= 0.96, `${name} has hand-placeable scale`);
 }
+AssertFlatTriangleNormals(ReadGlb("Model_MarketStorageSet.glb"),
+  Array.from({ length: 4 }, (_, index) => `MarketCrate${String(index + 1).padStart(2, "0")}`));
 
 const householdWare = InspectNodes("Model_HouseholdWareSet.glb", 800_000);
 for (const name of ["WoodAxe", "SmithHammer", "IronSpade"]) {
