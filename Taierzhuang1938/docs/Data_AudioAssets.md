@@ -504,8 +504,17 @@ node Taierzhuang1938/Script_AudioTest.mjs
 
 ## 现在的结构
 
-一档环境 = **2—4 条实录的床** + 撒在上面的一次性音。档名与天空预设同名
+一档环境 = **2—3 条实录的床** + 撒在上面的一次性音。档名与天空预设同名
 （`Script_Sky` 的 `SKY_PRESETS`），关卡切场直接把 `phase.sky` 递进去。
+
+### 2026-08-29｜默认环境改为无人声、以冷风为底
+
+人工试听否决了把战斗人群当作「一片战场」的做法：即使压低和低通，仍会留下难听、
+不可定位的人声噪杂。当前所有默认 preset 因此只用风、远炮、火与环境事件；
+`windPlain` 是开阔战场的默认底，并且整组床的运行时增益已经下调，给实际枪声、脚步与剧情台词留出位置。
+
+`battleFar`、`crowdFar` 与 `amb.moanFar` 保留在素材包和清单里，便于未来某段**明确审核过的**剧情单独调用；
+它们不再由任何默认 preset 自动播放。
 
 | 床 | 用在哪 | 素材 |
 | --- | --- | --- |
@@ -513,13 +522,13 @@ node Taierzhuang1938/Script_AudioTest.mjs
 | `windStreet` | 巷战 | Articulated Sounds · 街道强风、枝叶与吱呀 · GDC 2020 |
 | `windNight` | 夜（**无虫**） | Systematic Sound · 夜间林地，风与枝叶 · GDC 2024 |
 | `dawnField` | 黎明 | Fox Audio · 乡野白天，公鸡与鸟 · GDC 2018 |
-| `battleFar` | 全场最要紧的一条 | Coll Anderson · 持续交火中的人群 · GDC 2015 |
-| `crowdFar` | 城里还有人 | Coll Anderson · 人群骚动 · GDC 2015 |
+| `battleFar` | 素材包保留，默认不播放 | Coll Anderson · 持续交火中的人群 · GDC 2015 |
+| `crowdFar` | 素材包保留，默认不播放 | Coll Anderson · 人群骚动 · GDC 2015 |
 | `shellingFar` | 远处的炮火（**叠出来的**） | Pole Position · 远处火炮 · GDC 2017 |
 | `fireNear` / `fireFar` | 烧着的街 | Pole Position · 房屋大火（近 / 弱）· GDC 2018 |
 
-一次性音 9 条：`amb.cannonFar` `amb.whizz` `amb.crow` `amb.dogFar` `amb.rooster`
-`amb.creak` `amb.debris` `amb.planeFar` `amb.moanFar`。
+素材包的一次性音有 9 条：`amb.cannonFar` `amb.whizz` `amb.crow` `amb.dogFar` `amb.rooster`
+`amb.creak` `amb.debris` `amb.planeFar` `amb.moanFar`；默认 preset 不调度最后那条人声素材。
 它们**注册成新的配方**（与人声采样同一条路子），于是去重、预算闸、声像、
 混响 send 这一整套原封不动地复用。与音效包不同的是：这些 cue 没有同名的合成
 配方可盖，**载不到就是没有** —— 一只合成的乌鸦比没有乌鸦更糟。
@@ -531,9 +540,8 @@ node Taierzhuang1938/Script_AudioTest.mjs
 1. **季节与纬度对得上。** 要的是华北平原早春：叶子还没长出来、干、冷、旷。
    宁可用「冬末的开阔地」也不要「春天的树林」—— 鸟一多、树叶一响，
    滕县立刻变成度假村。
-2. **人声不能听出是哪国话。** Coll Anderson 那几条战斗人群是英语录的，只取
-   **非语义**段落（持续交火的嘈杂、远处的呻吟、人群骚动），再低通到 1.1 kHz
-   以下推进混响里 —— 到这个距离上剩下的只有情绪，没有词。
+2. **默认环境不使用人声。** 旧版曾尝试把 Coll Anderson 的战斗人群低通到听不出语言，
+   但人工试听仍然觉得嘈杂；这些素材现仅保留在库内，不进入任何默认 preset。
 3. **一次性音要真的是一次性音。** 狗吠、乌鸦、公鸡都从**单独录的素材**里切，
    不从别的环境录音里抠 —— 抠出来必带原录音的底噪，叠上去就是两层空气打架。
 
@@ -777,8 +785,8 @@ send 分在 Panner **之前**，那是对的（湿信号不该跟着头转，见
 
 ## 5. 距离闸（说实话：它不是这一轮的功臣）
 
-新加了三档「听不见就别播」：枪 160 m（`GUN_CULL_M`，再远交给环境床 `battleFar`
-那条持续交火的实录）、喊话 90 m（人喊一嗓子传得到的距离）、其余 400 m 兜底。
+新加了三档「听不见就别播」：枪 160 m（`GUN_CULL_M`，再远不播伪造的逐发枪声）、
+喊话 90 m（人喊一嗓子传得到的距离）、其余 400 m 兜底。默认环境不再用战斗人群床填补这段距离。
 
 **但现有七关里枪那一档几乎一次都不触发** —— AI 的交火距离由武器射程管着，
 真在对射的基本都在 130 m 以内，两三百米外那几个兵根本没在开枪。
@@ -908,8 +916,8 @@ INT3a 当时是**手工**把 `pendingCues` / `pendingNote` 两个键从 `Data_Sf
 - **日机远场盘旋** —— 已有的 `amb.planeFar` 与新的 `planeDive` 是**同一条素材、同一架飞机**
   的远近两次通场。
 - **单发弹丸掠过** —— 已有的 `amb.whizz` 与新的 `strafeDirt` 同源，前者切单发、后者切一串。
-- **伤员痛呼床（远、不定位）** —— 已有的 `amb.moanFar`（Coll Anderson 战后群体呻吟）
-  就是第四关 A 区院内那层背景，`painMoan` 是它旁边**具体那一个人**。
+- **伤员痛呼素材** —— `amb.moanFar`（Coll Anderson 战后群体呻吟）仍在素材包中，
+  但默认环境不再调度；需要明确、具体的伤员反馈时继续使用 `painMoan`。
 
 ## 验收数字
 

@@ -1548,8 +1548,8 @@ const GUN_FAR_M = 130;
  * **这么远以外的枪不再逐发播**（2026-08-20）。
  *
  * 那么远的一枪直达声只剩 −32 dB，方位也早被 equalpower 抹平了 —— 它对玩家唯一的
- * 作用就是往混响里再倒一勺。而「几百米外连成一片的仗」这层本来就有专人负责：
- * 环境床 `battleFar` 是一整条持续交火的实录，它给的是一片战场，
+ * 作用就是往混响里再倒一勺。默认环境不再拿带人声的战斗人群床填这个空白：
+ * 远处的战况由可辨位置的实际交火、低频远炮与场景风声交代，
  * 不是四十个各自为战的点声源。
  *
  * 160 m 这个数不是拍的：远场素材录于 50 m 外、近远交叉在 130 m 上收尾，
@@ -1993,15 +1993,17 @@ export const AMBIENCE_PRESETS = {
     transition: { brake: { cue: "trainBrake", atS: 50, endS: 68, mode: "oneShot" } },
   },
 
+  // 2026-08-29 无人声环境基线：默认环境绝不播放 battleFar / crowdFar / amb.moanFar。
+  // 这三条仍保留在素材包，方便日后做明确、单独审核的剧情场景；不能再悄悄垫在全场。
+  // 各床整体压低，让玩家的定位枪声、脚步和剧情台词始终优先。
+
   // 序 · 上墙（L0，smokyDay）：站在北寨墙上，墙北是护城河与开阔地。
-  // 风最大、远处最响、流弹最多 —— 这一关是「你正站在战线上」。
+  // 开阔冷风是默认底；远炮只留很轻的一层，战线压力交给场上的真实交火。
   smokyDay: {
     space: "open", fallbackWind: 0.075, fallbackCut: 520,
     layers: [
-      { bed: "windPlain", gain: 0.9, seg: 13 },
-      { bed: "battleFar", gain: 0.85, seg: 11 },
-      { bed: "shellingFar", gain: 0.7, seg: 9 },
-      { bed: "crowdFar", gain: 0.3, seg: 10 },
+      { bed: "windPlain", gain: 0.42, seg: 13 },
+      { bed: "shellingFar", gain: 0.20, seg: 9 },
     ],
     events: [
       { name: "amb.whizz", perMin: 5.0, volume: 0.5 },
@@ -2019,10 +2021,9 @@ export const AMBIENCE_PRESETS = {
   dawn: {
     space: "open", fallbackWind: 0.05, fallbackCut: 480,
     layers: [
-      { bed: "dawnField", gain: 0.7, seg: 15 },
-      { bed: "windPlain", gain: 0.5, seg: 12 },
-      { bed: "battleFar", gain: 0.55, seg: 11 },
-      { bed: "fireFar", gain: 0.3, seg: 7 },
+      { bed: "dawnField", gain: 0.30, seg: 15 },
+      { bed: "windPlain", gain: 0.32, seg: 12 },
+      { bed: "fireFar", gain: 0.13, seg: 7 },
     ],
     events: [
       { name: "amb.rooster", perMin: 0.7, volume: 0.34 },
@@ -2039,10 +2040,9 @@ export const AMBIENCE_PRESETS = {
   burningStreet: {
     space: "street", fallbackWind: 0.06, fallbackCut: 400,
     layers: [
-      { bed: "fireNear", gain: 0.8, seg: 7 },
-      { bed: "windStreet", gain: 0.6, seg: 11 },
-      { bed: "battleFar", gain: 0.7, seg: 10 },
-      { bed: "fireFar", gain: 0.45, seg: 6 },
+      { bed: "fireNear", gain: 0.36, seg: 7 },
+      { bed: "windStreet", gain: 0.34, seg: 11 },
+      { bed: "fireFar", gain: 0.16, seg: 6 },
     ],
     events: [
       { name: "amb.debris", perMin: 4.0, volume: 0.4 },
@@ -2056,19 +2056,17 @@ export const AMBIENCE_PRESETS = {
   },
 
   // 三 · 白毛巾（L3）与 四 · 最后五分钟（L4）都是 night。
-  // **夜里最要紧的是「静」**：床只剩风，远处的仗压到刚够听见。
-  // 狗、呻吟、木料吱呀撒得极稀（一分钟一两次）—— 稀才吓人，密了就成了背景音乐。
+  // **夜里最要紧的是「静」**：冷风为底，远炮和余火只保留到刚够感知。
+  // 狗和木料吱呀撒得极稀；不再用随机呻吟制造气氛。
   night: {
     space: "open", fallbackWind: 0.045, fallbackCut: 340,
     layers: [
-      { bed: "windNight", gain: 0.8, seg: 17 },
-      { bed: "battleFar", gain: 0.32, seg: 11 },
-      { bed: "shellingFar", gain: 0.3, seg: 9 },
-      { bed: "fireFar", gain: 0.22, seg: 7 },
+      { bed: "windNight", gain: 0.34, seg: 17 },
+      { bed: "shellingFar", gain: 0.12, seg: 9 },
+      { bed: "fireFar", gain: 0.08, seg: 7 },
     ],
     events: [
       { name: "amb.dogFar", perMin: 1.5, volume: 0.3 },
-      { name: "amb.moanFar", perMin: 0.9, volume: 0.26 },
       { name: "amb.creak", perMin: 1.6, volume: 0.28 },
       { name: "rifleIjaFar", perMin: 2.0, volume: 0.09 },
       { name: "amb.cannonFar", perMin: 0.8, volume: 0.34 },
@@ -2081,9 +2079,8 @@ export const AMBIENCE_PRESETS = {
   dusk: {
     space: "open", fallbackWind: 0.055, fallbackCut: 440,
     layers: [
-      { bed: "windPlain", gain: 0.75, seg: 13 },
-      { bed: "battleFar", gain: 0.5, seg: 11 },
-      { bed: "fireFar", gain: 0.35, seg: 7 },
+      { bed: "windPlain", gain: 0.34, seg: 13 },
+      { bed: "fireFar", gain: 0.15, seg: 7 },
     ],
     events: [
       { name: "amb.crow", perMin: 1.5, volume: 0.32 },
@@ -2095,10 +2092,8 @@ export const AMBIENCE_PRESETS = {
   overcast: {
     space: "street", fallbackWind: 0.06, fallbackCut: 460,
     layers: [
-      { bed: "windStreet", gain: 0.75, seg: 12 },
-      { bed: "battleFar", gain: 0.65, seg: 11 },
-      { bed: "crowdFar", gain: 0.35, seg: 10 },
-      { bed: "shellingFar", gain: 0.45, seg: 9 },
+      { bed: "windStreet", gain: 0.34, seg: 12 },
+      { bed: "shellingFar", gain: 0.16, seg: 9 },
     ],
     events: [
       { name: "amb.whizz", perMin: 3.0, volume: 0.45 },
