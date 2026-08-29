@@ -1830,11 +1830,13 @@ const fullScene = await page.evaluate(async () => {
   const routeKeys = tool.routes.map((route) => route.key);
   const seedIds = tool.seedRows.map((row) => row.id);
   const lines = tool.overlay?.children.filter((node) => node.isLine).length || 0;
+  const jsonFolds = [...tool.panel.root.querySelectorAll(".edJsonFold")]
+    .map((node) => ({ open: node.open, summary: node.querySelector("summary")?.textContent || "" }));
   T.editor.Close();
   const restoredEnvironment = tool.host.game.GetEnvironmentState();
   return {
     id: T.Debug.Level().id, bounds: T.battlefield.bounds, sections, routeKeys, seedIds, lines,
-    beforeEnvironment, night, restoredEnvironment, countyUrl, carriageUrl,
+    beforeEnvironment, night, restoredEnvironment, countyUrl, carriageUrl, jsonFolds,
     bootGone: document.getElementById("boot").classList.contains("gone"),
     launcherPresent: !!document.querySelector('[data-editor="fullScene"]'),
   };
@@ -1856,50 +1858,71 @@ Check("完整 Spline 清单复用真数据并覆盖城街、东关、铁路、�
 Check("完整县城随机种子清单含主种子、地形与 Spline 派生种子",
   ["county.master", "county.outfield", "county.terrain", "spline.west:railway"]
     .every((id) => fullScene.seedIds.includes(id)), `${fullScene.seedIds.length} 项`);
+Check("完整场景编辑器的三块 JSON 默认折叠",
+  fullScene.jsonFolds.length === 3 && fullScene.jsonFolds.every((fold) => !fold.open),
+  JSON.stringify(fullScene.jsonFolds));
 Check("环境预设实时切换并在退出完整场景编辑器后恢复",
   fullScene.beforeEnvironment.name === "editorClear" && fullScene.night.name === "night"
     && fullScene.restoredEnvironment.name === "editorClear" && !fullScene.restoredEnvironment.override,
   JSON.stringify({ before: fullScene.beforeEnvironment, night: fullScene.night, after: fullScene.restoredEnvironment }));
 Check("完整县城 / 车厢切换 URL 清理互斥场景参数",
   new URL(fullScene.countyUrl).searchParams.get("phase") === "fullscene"
+    && !new URL(fullScene.countyUrl).searchParams.has("fullSceneView")
     && !new URL(fullScene.countyUrl).searchParams.has("preview")
-    && new URL(fullScene.carriageUrl).searchParams.get("preview") === "CS_Chuchuan"
-    && new URL(fullScene.carriageUrl).searchParams.get("autoplay") === "1"
-    && !new URL(fullScene.carriageUrl).searchParams.has("phase"),
+    && new URL(fullScene.carriageUrl).searchParams.get("phase") === "fullscene"
+    && new URL(fullScene.carriageUrl).searchParams.get("fullSceneView") === "carriage"
+    && !new URL(fullScene.carriageUrl).searchParams.has("preview")
+    && !new URL(fullScene.carriageUrl).searchParams.has("autoplay"),
   `${new URL(fullScene.countyUrl).search} / ${new URL(fullScene.carriageUrl).search}`);
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?preview=CS_Chuchuan&autoplay=1&editor=fullScene&menu=0&quality=low&audio=0`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=fullscene&fullSceneView=carriage&editor=fullScene&menu=0&quality=low&audio=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state.ready
   && window.Taierzhuang.editor?.ActiveId === "fullScene"
-  && window.Taierzhuang.Debug.Preview().playing, null, { timeout: 300000 });
-await page.waitForFunction(() => !window.Taierzhuang.cutscene?.Held,
-  null, { timeout: 240000 });
+  && window.Taierzhuang.cutscene?.staticSet?.id === "CS_Chuchuan", null, { timeout: 300000 });
 const carriageEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const tool = T.editor.active;
   const before = T.cutscene.Time;
   T.StepFrames(60, 1 / 60, false);
-  const advanced = T.cutscene.Time;
-  tool.playing = false;
-  tool.SeekCarriage(7.5);
-  const sought = T.cutscene.Time;
-  return {
-    mode: tool.sceneMode, before, advanced, sought,
+  const after = T.cutscene.Time;
+  const buttons = [...tool.panel.root.querySelectorAll(".edBtn")].map((node) => node.textContent);
+  const result = {
+    mode: tool.sceneMode, before, after,
+    playing: T.cutscene.Playing,
+    staticSet: T.cutscene.staticSet ? { ...T.cutscene.staticSet } : null,
+    mounted: !!T.cutscene.SetRoot,
+    props: tool.carriageSet?.props || 0,
+    actors: tool.carriageSet?.actors ?? -1,
+    preview: T.Debug.Preview(),
+    fly: tool.host.flycam.Active,
+    cinematicVisible: !!document.querySelector(".csRoot.on"),
+    buttons,
     seedValues: tool.seedRows.map((row) => row.value),
     sections: [...tool.panel.root.querySelectorAll(".edSection > .h")]
       .map((node) => node.textContent),
+    jsonFolds: [...tool.panel.root.querySelectorAll(".edJsonFold")]
+      .map((node) => node.open),
   };
+  T.editor.Close();
+  result.unmounted = !T.cutscene.staticSet && !T.cutscene.SetRoot;
+  return result;
 });
-Check("车厢奇观在完整场景编辑器中由正式时间轴播放与定位",
-  carriageEditor.mode === "carriage" && carriageEditor.advanced > carriageEditor.before + 0.8
-    && Math.abs(carriageEditor.sought - 7.5) < 0.15,
-  JSON.stringify({ before: carriageEditor.before, advanced: carriageEditor.advanced, sought: carriageEditor.sought }));
-Check("车厢场景暴露完整确定性种子与环境面板",
+Check("车厢奇观是可自由巡看的纯静态场景，不启动正式序章",
+  carriageEditor.mode === "carriage" && carriageEditor.mounted && carriageEditor.unmounted
+    && carriageEditor.props > 100 && carriageEditor.actors === 0 && carriageEditor.fly
+    && !carriageEditor.playing && !carriageEditor.preview.active && !carriageEditor.cinematicVisible
+    && carriageEditor.before === carriageEditor.after
+    && !carriageEditor.sections.includes("车厢走带")
+    && !carriageEditor.buttons.some((label) => /播放|暂停|回到头/.test(label)),
+  JSON.stringify({ props: carriageEditor.props, actors: carriageEditor.actors,
+    before: carriageEditor.before, after: carriageEditor.after, preview: carriageEditor.preview }));
+Check("车厢静态场景只列布景种子并保留环境面板",
   carriageEditor.seedValues.includes(19380314)
-    && carriageEditor.seedValues.includes("chuchuanShunzi")
-    && carriageEditor.sections.includes("车厢走带")
-    && carriageEditor.sections.includes("环境系统 / 氛围预设"),
+    && !carriageEditor.seedValues.includes("chuchuanShunzi")
+    && carriageEditor.sections.includes("车厢场景巡看机位")
+    && carriageEditor.sections.includes("环境系统 / 氛围预设")
+    && carriageEditor.jsonFolds.length === 2 && carriageEditor.jsonFolds.every((open) => !open),
   `${carriageEditor.seedValues.length} 项`);
 
 // ---------------------------------------------------------------------------

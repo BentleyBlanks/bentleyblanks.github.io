@@ -123,9 +123,15 @@ const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
+const EDITOR_PARAM = params.get("editor");
+// 上一版曾把完整场景编辑器的车厢按钮指到正式序章预览。旧书签若还带着这组 query，
+// 也必须按静态场景解释，不能因为缓存 URL 又把过场播起来。
+const LEGACY_FULL_SCENE_CARRIAGE = EDITOR_PARAM === "fullScene"
+  && params.get("preview") === "CS_Chuchuan";
 // 新版序章是一个**独立预览**：它只展示车厢时间轴，不把下车后的未完玩法
 // 硬接到旧界河。稳定入口固定为 ?preview=CS_Chuchuan；其它 query 仍走正片。
-const PREVIEW_ID = params.get("preview") === "CS_Chuchuan" ? "CS_Chuchuan" : null;
+const PREVIEW_ID = !LEGACY_FULL_SCENE_CARRIAGE && params.get("preview") === "CS_Chuchuan"
+  ? "CS_Chuchuan" : null;
 const PREVIEW = !!PREVIEW_ID;
 // 从主页面的「新版序章预览」链接进入时直接开播，不能再让玩家在加载完成后
 // 面对第二颗同义按钮。保留不带 autoplay 的地址作为审片/音频解锁回退入口。
@@ -160,8 +166,12 @@ const JIEHE = params.get("jiehe") === "1";
  */
 const PHASE_PARAM = params.get("phase");
 const OVERVIEW = PHASE_PARAM === "overview";
-const FULL_SCENE = PHASE_PARAM === "fullscene";
-const EDITOR_PARAM = params.get("editor");
+const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
+// 完整场景编辑器内部的只读视图：carriage 仍走 fullscene 旁路，只是在城外另挂
+// 一份静态车厢布景。它不是 preview=CS_Chuchuan，也绝不会启动正式序章。
+const FULL_SCENE_VIEW = FULL_SCENE
+  && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
+  ? "carriage" : "county";
 const SANDBOX = RANGE || MELEE_TEST || JIEHE;
 const PHASE_TABLE = RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
@@ -2275,7 +2285,7 @@ async function Boot() {
         url.searchParams.delete("menu");
         window.location.assign(url.toString());
       },
-      sceneMode: PREVIEW ? "carriage" : FULL_SCENE ? "county" : "level",
+      sceneMode: FULL_SCENE ? FULL_SCENE_VIEW : "level",
       ApplyEnvironment: (name) => ApplySkyPreset(name),
       GetEnvironmentState: () => ({
         name: cutsceneSky || PHASE_TABLE[state.phaseIndex].sky,
@@ -2406,9 +2416,8 @@ async function Boot() {
   if (SHOT) StartRun();
   else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
   if (EDITOR_PARAM === "fullScene" && !SHOT) {
-    // 完整县城 URL 是直接进工具，不再让用户隔着已经打开的编辑器再点一次「进城」。
-    // 车厢预览由 StartPreview 自己收启动页；县城旁路没有那一步，必须在这里显式收掉，
-    // 否则编辑器与全城都已就绪，画面背景却仍是加载展示台上的坦克。
+    // 完整县城与车厢静态场景都直接进工具，不再让用户隔着已经打开的编辑器
+    // 再点一次「进城」。两者都不是正式序章预览，必须在这里显式收掉启动展示台。
     if (FULL_SCENE) {
       ShowBoot(false);
       state.menu = false;

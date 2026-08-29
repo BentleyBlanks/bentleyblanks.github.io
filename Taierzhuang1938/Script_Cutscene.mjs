@@ -521,6 +521,9 @@ export class CutsceneDirector {
     this.resolve = null;
     this.fired = new Set();
     this.setRoot = null;
+    // 编辑器可把同源布景挂成纯静态场景；这条支路不进入 playing、不建字幕、
+    // 不套音频/镜头时间轴。Play 开场前会先卸掉它，避免两套布景叠在一起。
+    this.staticSet = null;
     this.actors = new Map();          // id -> { actor, spec }
     this.props = new Map();           // name -> { mesh, base }
     this.lineTimeline = [];           // Play() 时摊平的台词时间轴（说话/转头都查它）
@@ -726,6 +729,7 @@ export class CutsceneDirector {
     const problems = ValidateCutscene(cut);
     // 时长对不上就直接炸，别让它带着错的节奏上线 —— 这类错在画面上看不出来。
     if (problems.length) throw new Error(`过场数据自检不过：\n${problems.join("\n")}`);
+    if (this.staticSet) this.UnmountStaticSet();
     // 上一场还没播完就被叫了下一场：把旧的 Promise 收掉，别让调用方挂死。
     if (this.playing) {
       const stale = this.resolve;
@@ -893,6 +897,51 @@ export class CutsceneDirector {
   // -------------------------------------------------------------------------
   // 布景
   // -------------------------------------------------------------------------
+
+  /**
+   * 把一场演出的布景源挂成纯静态场景，供完整场景编辑器自由巡看。
+   *
+   * 这不是 Play 的暂停态：不进入 playing、不触发 onCapture、不显示黑边/字幕、
+   * 不切环境音或音乐，也不读取 shots。默认连演员都不建，只留下 props 中的车厢、
+   * 月台、窗外地形与全部场景陈设；因此工具不会悄悄变成一场“停住的过场”。
+   */
+  MountStaticSet(id, { at = 0, includeActors = false } = {}) {
+    if (this.playing) return null;
+    const cut = this.table[id];
+    if (!cut) return null;
+    const problems = ValidateCutscene(cut);
+    if (problems.length) throw new Error(`静态布景数据自检不过：\n${problems.join("\n")}`);
+    if (this.staticSet) this.UnmountStaticSet();
+    if (this.setRoot) return null;
+
+    const sceneCut = includeActors ? cut : { ...cut, cast: [] };
+    this.time = Clamp(Number(at) || 0, 0, Math.max(0, Number(cut.seconds) || 0));
+    this.prevTime = this.time;
+    this.lineTimeline = [];
+    try {
+      this._BuildSet(sceneCut);
+      if (includeActors) this._ApplyActors(sceneCut, 0);
+    } catch (error) {
+      this._TeardownSet();
+      throw error;
+    }
+    this.staticSet = { id, at: this.time, includeActors: !!includeActors };
+    return {
+      id, root: this.setRoot, props: this.props.size, actors: this.actors.size,
+      at: this.time, includeActors: !!includeActors,
+    };
+  }
+
+  /** 卸掉 MountStaticSet 建的纯场景；正式过场与普通战场状态都不受影响。 */
+  UnmountStaticSet() {
+    if (!this.staticSet) return false;
+    this._TeardownSet();
+    this.staticSet = null;
+    this.time = 0;
+    this.prevTime = 0;
+    this.lineTimeline = [];
+    return true;
+  }
 
   _BuildSet(cut) {
     const origin = cut.setOrigin || [0, 0, 0];
@@ -2053,6 +2102,7 @@ export class CutsceneDirector {
 
   Dispose() {
     if (this.playing) this._Finish(true);
+    if (this.staticSet) this.UnmountStaticSet();
     if (this.doc && this._onKey) this.doc.removeEventListener("keydown", this._onKey);
     if (this.doc && this._onKeyUp) this.doc.removeEventListener("keyup", this._onKeyUp);
     if (this.dom && this.dom.root.parentNode) this.dom.root.parentNode.removeChild(this.dom.root);

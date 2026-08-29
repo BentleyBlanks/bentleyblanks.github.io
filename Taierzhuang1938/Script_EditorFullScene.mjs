@@ -1,12 +1,13 @@
-// 完整场景编辑器：一次巡看完整滕县与四门外，并可切到 CS_Chuchuan 车厢奇观。
+// 完整场景编辑器：一次巡看完整滕县与四门外，并可切到出川军列车厢静态场景。
 //
 // 这是只读的场景总览与取证工具，不承担「章节切片 + 摆件文档」那套关卡编辑语义：
 // 原 Script_EditorScene.mjs 不 import 本模块，本模块也不读写它的 worldEditDocument。
 // 县城几何、Spline、随机种子与环境参数全部读现有运行时/数据源，不维护第二份真相。
+// 车厢只挂 props 静态布景，不播放 shots、不加载演员，也不显示对白/字幕/时间轴。
 
 import * as THREE from "three";
 import {
-  Panel, Section, ButtonRow, Chips, Slider, ListBox, Facts, Note, TextArea, Toggle,
+  Panel, Section, ButtonRow, Chips, ListBox, Facts, Note, TextArea, Toggle,
   CameraProjectionControls,
 } from "./Script_EditorUi.mjs";
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
@@ -15,7 +16,6 @@ import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { CS_Chuchuan } from "./Data_CutsceneChuchuan.mjs";
 
 const CARRIAGE_ID = "CS_Chuchuan";
-const SEEK_STEP = 1 / 60;
 const KIND_COLOR = {
   street: 0xffc95f, road: 0xe6a56b, railway: 0x9fc8ff, wall: 0xd0b394,
 };
@@ -41,6 +41,30 @@ export const FULL_SCENE_CAMERA_PRESETS = Object.freeze({
   }),
 });
 
+const CARRIAGE_ORIGIN = CS_Chuchuan.setOrigin || [0, 0, 0];
+const CarriagePoint = ([x, y, z]) => Object.freeze([
+  CARRIAGE_ORIGIN[0] + x, CARRIAGE_ORIGIN[1] + y, CARRIAGE_ORIGIN[2] + z,
+]);
+
+/** 纯场景巡看机位；与 shots 镜头表完全分离。 */
+export const CARRIAGE_SCENE_CAMERA_PRESETS = Object.freeze({
+  overview: Object.freeze({
+    label: "车厢整体", position: CarriagePoint([15, 8, 20]), look: CarriagePoint([0, 1.8, 0]), fov: 54, far: 4200,
+  }),
+  interior: Object.freeze({
+    label: "车厢内部", position: CarriagePoint([0, 1.72, 6.8]), look: CarriagePoint([0, 1.45, -4.5]), fov: 58, far: 4200,
+  }),
+  platform: Object.freeze({
+    label: "月台一侧", position: CarriagePoint([13, 4.5, 18]), look: CarriagePoint([0, 1.7, 4]), fov: 52, far: 4200,
+  }),
+  roof: Object.freeze({
+    label: "车顶俯看", position: CarriagePoint([11, 14, 14]), look: CarriagePoint([0, 1.5, 0]), fov: 48, far: 4200,
+  }),
+  landscape: Object.freeze({
+    label: "窗外环境", position: CarriagePoint([24, 12, 34]), look: CarriagePoint([0, 1.5, 0]), fov: 56, far: 4200,
+  }),
+});
+
 const ENV_LABELS = Object.freeze({
   editorClear: "编辑器清晰日", dusk: "黄昏", smokyDay: "硝烟白昼", chuchuanDay: "车厢白昼", overcast: "阴天",
   burningStreet: "燃烧街巷", night: "夜间", dawn: "拂晓",
@@ -52,14 +76,13 @@ export function FullSceneUrl(href, target) {
   for (const key of ["range", "melee", "jiehe", "shot", "manual"]) url.searchParams.delete(key);
   url.searchParams.set("editor", "fullScene");
   url.searchParams.set("menu", "0");
+  url.searchParams.set("phase", "fullscene");
+  url.searchParams.delete("preview");
+  url.searchParams.delete("autoplay");
   if (target === "carriage") {
-    url.searchParams.set("preview", CARRIAGE_ID);
-    url.searchParams.set("autoplay", "1");
-    url.searchParams.delete("phase");
+    url.searchParams.set("fullSceneView", "carriage");
   } else {
-    url.searchParams.set("phase", "fullscene");
-    url.searchParams.delete("preview");
-    url.searchParams.delete("autoplay");
+    url.searchParams.delete("fullSceneView");
   }
   return url.toString();
 }
@@ -74,7 +97,7 @@ function AddNestedSeeds(value, path, rows, seen) {
   for (const [key, entry] of Object.entries(value)) {
     const next = path ? `${path}.${key}` : key;
     if (key === "seed" && (typeof entry === "string" || Number.isFinite(entry))) {
-      rows.push({ id: next, value: entry, source: next, purpose: "CS_Chuchuan 确定性生成" });
+      rows.push({ id: next, value: entry, source: next, purpose: "车厢静态场景确定性生成" });
     } else AddNestedSeeds(entry, next, rows, seen);
   }
 }
@@ -83,7 +106,9 @@ function AddNestedSeeds(value, path, rows, seen) {
 export function CollectFullSceneSeeds({ sceneMode = "county", battlefield = null, routes = null } = {}) {
   const rows = [];
   if (sceneMode === "carriage") {
-    AddNestedSeeds(CS_Chuchuan, CARRIAGE_ID, rows, new Set());
+    // 静态场景只生成 props；演员与 shots 的 seed 不在这张账里，避免把序章演出
+    // 误报成场景内容。重复的两侧远景种子仍会在下方按 id/value 去重。
+    AddNestedSeeds(CS_Chuchuan.props, `${CARRIAGE_ID}.props`, rows, new Set());
   } else {
     const master = battlefield?.city?.seed ?? 19380317;
     rows.push(
@@ -112,23 +137,41 @@ export function FullSceneEnvironment(name) {
 
 function Json(value) { return JSON.stringify(value, null, 2); }
 
+/** JSON 默认折叠；只有用户主动展开或点“查看 JSON”才占面板高度。 */
+function CollapsedJson(parent, label, options) {
+  const details = document.createElement("details");
+  details.className = "edJsonFold";
+  const summary = document.createElement("summary");
+  summary.textContent = label;
+  details.appendChild(summary);
+  const area = TextArea(details, options);
+  parent.appendChild(details);
+  area.details = details;
+  return area;
+}
+
+function RevealJson(area, value) {
+  if (!area) return;
+  area.value = Json(value);
+  if (area.details) area.details.open = true;
+}
+
 export class FullSceneEditor {
   static id = "fullScene";
   static label = "完整场景预览";
-  static hint = "完整县城与四门外 / CS_Chuchuan 车厢切换，随机种子、Spline 与环境参数只读取证";
+  static hint = "完整县城与四门外 / 出川军列车厢静态场景切换，随机种子、Spline 与环境参数只读取证";
 
   constructor(host) {
     this.host = host;
     this.sceneMode = host.game.sceneMode || "county";
-    this.cameraMode = this.sceneMode === "carriage" ? "none" : "fly";
+    this.cameraMode = "fly";
     this.routes = CollectSceneSplineRoutes(null);
     this.kindFilter = "全部";
     this.showAllSplines = true;
     this.selectedRouteKey = this.routes[0]?.key || null;
     this.overlay = null;
     this.panel = null;
-    this.playing = this.sceneMode === "carriage";
-    this.speed = 1;
+    this.carriageSet = null;
     this.environmentState = null;
     this.seedRows = [];
     this.selectedSeedId = null;
@@ -140,31 +183,36 @@ export class FullSceneEditor {
 
   Enter(root) {
     this.environmentState = this.host.game.GetEnvironmentState?.() || null;
-    if (this.cameraMode === "fly") {
-      this.host.flycam.Open();
-      this.host.SetViewmodelVisible(false);
+    this.host.flycam.Open();
+    this.host.SetViewmodelVisible(false);
+    if (this.sceneMode === "county") {
       this.overlay = new THREE.Group();
       this.overlay.name = "FullSceneSplineOverlay";
       this.host.scene.add(this.overlay);
+    } else {
+      this.carriageSet = this.host.cutscene?.MountStaticSet?.(CARRIAGE_ID, {
+        at: 0, includeActors: false,
+      }) || null;
     }
     this.panel = Panel({
       title: "完整场景编辑器",
       sub: this.sceneMode === "carriage"
-        ? "CS_Chuchuan · 车厢奇观 / 实机时间轴"
+        ? "出川军列车厢 · 静态场景自由巡看"
         : "完整县城 · WASD+QE 飞行 · 拖动转头",
       variant: "work wide",
       onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
-    if (this.sceneMode !== "carriage") {
-      if (this.sceneMode === "county") this.ApplyCamera("county");
+    if (this.sceneMode === "county") {
+      this.ApplyCamera("county");
       this.FillSplineList();
       this.SelectRoute(this.selectedRouteKey, false);
-    }
+    } else this.ApplyCamera("overview");
     this.RefreshSeeds();
-    this.SelectEnvironment(this.host.game.GetEnvironmentState?.().name
-      || (this.sceneMode === "carriage" ? "chuchuanDay" : "editorClear"), false);
+    const initialEnvironment = this.sceneMode === "carriage" ? "chuchuanDay"
+      : (this.host.game.GetEnvironmentState?.().name || "editorClear");
+    this.SelectEnvironment(initialEnvironment, this.sceneMode === "carriage");
     return this;
   }
 
@@ -174,7 +222,11 @@ export class FullSceneEditor {
       this.host.scene.remove(this.overlay);
       this.overlay = null;
     }
-    if (this.cameraMode === "fly") this.host.flycam.Close();
+    if (this.carriageSet) {
+      this.host.cutscene?.UnmountStaticSet?.();
+      this.carriageSet = null;
+    }
+    this.host.flycam.Close();
     this.host.SetViewmodelVisible(true);
     if (this.environmentState) this.host.game.RestoreEnvironmentState?.(this.environmentState);
     this.panel?.root.remove();
@@ -189,7 +241,7 @@ export class FullSceneEditor {
     ]);
     Note(scene, this.sceneMode === "county"
       ? "当前一次生成城内与东西南北门外；这是独立完整切片，不改变章节关卡编辑器。"
-      : "当前驱动正式 CS_Chuchuan 场景与 CutsceneDirector；不是复制出来的车厢模型。", true);
+      : "当前只挂载车厢、月台与窗外环境的静态布景；没有演员、对白、字幕、音频或镜头时间轴。", true);
 
     if (this.sceneMode !== "carriage") this.BuildCountyUi(body);
     else this.BuildCarriageUi(body);
@@ -218,31 +270,26 @@ export class FullSceneEditor {
     this.splineList = ListBox(spline, { height: 190, onPick: (key) => this.SelectRoute(key, true) });
     this.splineFacts = Facts(spline);
     ButtonRow(spline, [
-      { label: "当前路线 JSON", onClick: () => { this.splineJson.value = Json(this.RouteEvidence(this.selectedRoute)); } },
-      { label: "全部路线 JSON", onClick: () => { this.splineJson.value = Json(this.routes.map((r) => this.RouteEvidence(r))); } },
+      { label: "当前路线 JSON", onClick: () => RevealJson(this.splineJson, this.RouteEvidence(this.selectedRoute)) },
+      { label: "全部路线 JSON", onClick: () => RevealJson(this.splineJson, this.routes.map((r) => this.RouteEvidence(r))) },
     ]);
-    this.splineJson = TextArea(spline, { rows: 7, placeholder: "路线控制点、长度、宽高、种子与来源" });
+    this.splineJson = CollapsedJson(spline, "JSON（默认折叠）", {
+      rows: 7, placeholder: "路线控制点、长度、宽高、种子与来源",
+    });
   }
 
   BuildCarriageUi(body) {
-    const transport = Section(body, "车厢走带");
-    ButtonRow(transport, [
-      { label: "▶ 播放", onClick: () => this.PlayCarriage() },
-      { label: "⏸ 暂停", onClick: () => { this.playing = false; } },
-      { label: "⏮ 回到头", onClick: () => this.SeekCarriage(0) },
-    ]);
-    Slider(transport, {
-      label: "速度", min: 0.1, max: 2, step: 0.05, value: 1,
-      format: (v) => `${v.toFixed(2)}×`, onInput: (v) => { this.speed = v; },
-    });
-    this.carriageTime = Slider(transport, {
-      label: "时间", min: 0, max: CS_Chuchuan.seconds, step: 0.1, value: 0,
-      format: (v) => `${v.toFixed(1)} s`, onInput: (v) => this.SeekCarriage(v),
-    });
-    this.carriageFacts = Facts(transport);
-    this.carriageFacts.Set("场景", `${CS_Chuchuan.id} · ${CS_Chuchuan.title}`);
-    this.carriageFacts.Set("时长 / 镜头", `${CS_Chuchuan.seconds.toFixed(1)} s / ${CS_Chuchuan.shots.length}`);
-    this.carriageFacts.Set("演员 / 道具", `${CS_Chuchuan.cast.length} / ${CS_Chuchuan.props.length}`);
+    const cameras = Section(body, "车厢场景巡看机位");
+    Chips(cameras, Object.entries(CARRIAGE_SCENE_CAMERA_PRESETS).map(([value, spec]) => ({
+      value, label: spec.label,
+    })), "overview", (id) => this.ApplyCamera(id));
+    CameraProjectionControls(cameras, this.host.camera, { farMax: 5000 });
+    Note(cameras, "自由巡看：WASD；Q/E 降升；Shift 加速；Ctrl 慢速；滚轮调速度。", false);
+    this.carriageFacts = Facts(cameras);
+    this.carriageFacts.Set("预览模式", "纯静态场景");
+    this.carriageFacts.Set("布景构件", this.carriageSet?.props ?? 0);
+    this.carriageFacts.Set("演员 / 时间轴", "未加载 / 未启动");
+    this.carriageFacts.Set("场景源", "Data_CutsceneChuchuan.props");
     this.carriageFacts.Set("天空 / 远裁剪", `${CS_Chuchuan.sky} / ${CS_Chuchuan.cameraFar} m`);
   }
 
@@ -252,7 +299,9 @@ export class FullSceneEditor {
       value: name, label: ENV_LABELS[name] || name,
     })), "smokyDay", (name) => this.SelectEnvironment(name, true));
     this.environmentFacts = Facts(environment);
-    this.environmentJson = TextArea(environment, { rows: 9, placeholder: "完整天空、灯光、雾与后期参数" });
+    this.environmentJson = CollapsedJson(environment, "环境 JSON（默认折叠）", {
+      rows: 9, placeholder: "完整天空、灯光、雾与后期参数",
+    });
     ButtonRow(environment, [
       { label: "恢复进入时环境", onClick: () => {
         this.host.game.RestoreEnvironmentState?.(this.environmentState);
@@ -267,9 +316,11 @@ export class FullSceneEditor {
     this.seedList = ListBox(seeds, { height: 180, onPick: (id) => this.SelectSeed(id) });
     this.seedFacts = Facts(seeds);
     ButtonRow(seeds, [
-      { label: "完整种子清单 JSON", onClick: () => { this.seedJson.value = Json(this.seedRows); } },
+      { label: "完整种子清单 JSON", onClick: () => RevealJson(this.seedJson, this.seedRows) },
     ]);
-    this.seedJson = TextArea(seeds, { rows: 7, placeholder: "种子值、来源与用途" });
+    this.seedJson = CollapsedJson(seeds, "种子 JSON（默认折叠）", {
+      rows: 7, placeholder: "种子值、来源与用途",
+    });
   }
 
   SwitchScene(target) {
@@ -278,8 +329,10 @@ export class FullSceneEditor {
   }
 
   ApplyCamera(id) {
-    const spec = FULL_SCENE_CAMERA_PRESETS[id];
-    if (!spec || this.sceneMode === "carriage") return false;
+    const table = this.sceneMode === "carriage"
+      ? CARRIAGE_SCENE_CAMERA_PRESETS : FULL_SCENE_CAMERA_PRESETS;
+    const spec = table[id];
+    if (!spec) return false;
     const camera = this.host.camera;
     camera.position.fromArray(spec.position);
     camera.fov = spec.fov;
@@ -443,59 +496,9 @@ export class FullSceneEditor {
     this.seedFacts?.Set("来源", row.source);
   }
 
-  PlayCarriage() {
-    const director = this.host.cutscene;
-    if (!director) return false;
-    if (!director.Playing) {
-      try { director.Play(CARRIAGE_ID).catch(() => null); }
-      catch (error) { this.host.SetHint(`车厢播放失败：${error.message}`); return false; }
-    }
-    this.playing = true;
-    return true;
-  }
-
-  SeekCarriage(seconds) {
-    const director = this.host.cutscene;
-    if (!director || this.sceneMode !== "carriage") return false;
-    const target = Math.max(0, Math.min(CS_Chuchuan.seconds - 0.01, seconds));
-    const wasPlaying = this.playing;
-    director.StopCueAudio?.();
-    if (director.Playing) { director.Skip(); director.Update(99); }
-    const audio = director.audio;
-    director.audio = null;
-    try {
-      const pending = director.Play(CARRIAGE_ID);
-      pending?.catch?.(() => null);
-      let elapsed = 0;
-      let guard = 0;
-      while (elapsed < target && guard < 20000) {
-        director.Update(SEEK_STEP);
-        elapsed += SEEK_STEP;
-        guard += 1;
-      }
-    } catch (error) {
-      this.host.SetHint(`车厢定位失败：${error.message}`);
-      return false;
-    } finally {
-      director.audio = audio;
-    }
-    director.SyncCueAudioAtTime?.();
-    this.playing = wasPlaying;
-    return true;
-  }
-
   Update(dt) {
-    if (this.cameraMode === "fly") {
-      this.host.flycam.Update(dt);
-      if (this.host.viewmodel?.root?.visible) this.host.SetViewmodelVisible(false);
-      return;
-    }
-    const director = this.host.cutscene;
-    if (this.playing && director?.Playing) director.Update(dt * this.speed);
-    else if (director?.Playing && director.cardTime >= 0) director.Update(dt);
-    const time = director?.Playing ? director.Time : 0;
-    this.carriageTime?.Set(time);
-    this.carriageFacts?.Set("状态 / 时间", `${this.playing ? "播放" : "暂停"} · ${time.toFixed(1)} / ${CS_Chuchuan.seconds.toFixed(1)} s`);
+    this.host.flycam.Update(dt);
+    if (this.host.viewmodel?.root?.visible) this.host.SetViewmodelVisible(false);
   }
 }
 

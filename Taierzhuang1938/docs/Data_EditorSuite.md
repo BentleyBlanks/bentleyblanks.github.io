@@ -225,15 +225,19 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 边界覆盖北关坝墙、城西津浦路、东郊农田与南侧善国门，同时保留既有 `?phase=overview`
 出图基线不动。
 
-面板把四类运行时真相放在同一处：完整县城与 `CS_Chuchuan` 车厢奇观切换；县城总种子、
-派生种子与车厢数据中所有 `seed` 字段；`CollectSceneSplineRoutes` 从正式街道、铁路、
+面板把四类运行时真相放在同一处：完整县城与出川军列车厢静态场景切换；县城总种子、
+派生种子与车厢静态 props 中的 `seed` 字段；`CollectSceneSplineRoutes` 从正式街道、铁路、
 东关巷路、寨墙和北关坝墙收集的只读中心线；`SKY_PRESETS` 的天空、灯光、雾、曝光、
 Bloom、体积光、饱和度和对比度完整参数。Spline 叠加层按正式 `MakeRoadPath` 采样并逐点问
 当前战场 `GroundHeight`，所以中心线与生成几何共用同一坐标和地面。
 
-车厢入口固定为 `?preview=CS_Chuchuan&autoplay=1&editor=fullScene&menu=0`。编辑器暂停了普通
-`Frame` 的过场分支，因此走带由本工具自己推进正式 `CutsceneDirector`，支持播放、暂停、
-回到头和时间定位；并没有另做一套车厢动画。退出工具时恢复进入前的相机投影和环境预设。
+车厢入口固定为 `?phase=fullscene&fullSceneView=carriage&editor=fullScene&menu=0`。它通过
+`CutsceneDirector.MountStaticSet` 复用同源 props 建造器，但明确不调用 `Play`：不进入
+`playing`，不触发序章镜头、演员、对白、字幕、音频或交接，只提供自由飞行和五个静态巡场
+机位。退出工具时卸掉静态布景，并恢复进入前的相机投影和环境预设。
+
+Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与摘要读数始终可见，只有用户
+主动展开或点击 JSON 按钮时才占用面板高度。
 
 ### 构件库预览 `Script_EditorPropLibrary.mjs`
 
