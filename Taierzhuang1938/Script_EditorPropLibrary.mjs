@@ -244,6 +244,13 @@ export class PropLibraryEditor {
       damageState && damageState.id !== "original" ? "good" : "");
     this.facts.Set("战损贴图", damageState?.material
       ? `Texture_${damageState.material}{Base,Normal,Orm}.webp` : "沿用原始材质");
+    const detail = this.preview?.damageDetail;
+    this.facts.Set("近景破坏细节", detail
+      ? `${detail.impactMarks} 处冲击面 · ${detail.fractureBricks} 块断砖 · `
+        + `${detail.crackSegments} 段裂缝 · ${detail.looseBricks} 块落砖`
+        + (detail.exposedBeams ? ` · ${detail.exposedBeams} 根断梁 · ${detail.roofFragments} 片散瓦` : "")
+      : "无附加战损构件",
+    detail ? "good" : "");
     this.facts.Set("网格", this.preview ? this.preview.meshes : 0);
     this.facts.Set("碰撞盒定义", this.preview ? this.preview.colliders.length : 0);
     this.facts.Set("包围尺寸", size

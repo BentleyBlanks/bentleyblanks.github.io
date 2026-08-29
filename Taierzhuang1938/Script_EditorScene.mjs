@@ -33,6 +33,7 @@ import {
   BuildSink, AddTree, AddPole, AddWell, AddMillstone, AddWaterVat, AddBarricade,
   AddCompound, AddRoomBlock, AddGatehouse, AddRampart, AddDugout, AddPaifang,
   AddAlarmTower, AddSquareFort, AddChurch, AddMosque, AddSandbagPlug,
+  AddBuildingDamageDetails,
 } from "./Script_World.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { FlushWallInstances } from "./Script_WallSpline.mjs";
@@ -72,9 +73,9 @@ const PROLOGUE_SCENE = {
  * 同时换几何损伤参数与专属 imagegen PBR，预览与场景布设共走 BuildPlaceableVisual。
  */
 export const BUILDING_DAMAGE_STATES = Object.freeze({
-  original: Object.freeze({ id: "original", label: "原始状态", damage: null, burnt: false, material: null }),
-  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.46, burnt: false, material: "BuildingDamageEarly" }),
-  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.88, burnt: true, material: "BuildingDamageSevere" }),
+  original: Object.freeze({ id: "original", label: "原始状态", damage: null, burnt: false, material: null, detail: null }),
+  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.46, burnt: false, material: "BuildingDamageEarly", detail: "early" }),
+  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.88, burnt: true, material: "BuildingDamageSevere", detail: "severe" }),
 });
 export const BUILDING_DAMAGE_STATE_OPTIONS = Object.freeze(
   Object.values(BUILDING_DAMAGE_STATES).map(({ id: value, label }) => Object.freeze({ value, label })),
@@ -101,6 +102,23 @@ function DamageMaterialResolver(state, library) {
     BUILDING_DAMAGE_SURFACES.has(name) ? state.material : name,
     targetLibrary,
   );
+}
+
+function DamageDetailDimensions(sink, entry, item) {
+  let colliderHeight = 0;
+  let colliderWidth = 0;
+  let colliderDepth = 0;
+  for (const collider of sink.colliders) {
+    colliderHeight = Math.max(colliderHeight, collider.max?.[1] || 0);
+    colliderWidth = Math.max(colliderWidth, (collider.max?.[0] || 0) - (collider.min?.[0] || 0));
+    colliderDepth = Math.max(colliderDepth, (collider.max?.[2] || 0) - (collider.min?.[2] || 0));
+  }
+  const gateWidth = entry.id === "Gatehouse" ? Number(item.w || 1.5) + 1.2 : 0;
+  return {
+    width: Math.max(2.4, gateWidth, Number(item.w) || 0, colliderWidth || 0),
+    depth: Math.max(1.0, Number(item.d) || 0, Math.min(colliderDepth || 0, 28), gateWidth ? 1.1 : 0),
+    height: Math.max(2.4, Number(item.h) || 0, colliderHeight || 0),
+  };
 }
 
 const LANDMARK_LABELS = Object.freeze({
@@ -588,8 +606,16 @@ export function BuildPlaceableVisual(target, entry, item, {
     : item;
   const resolve = DamageMaterialResolver(damageState, library);
   const sink = new BuildSink();
+  let damageDetail = null;
   try {
     entry.build(sink, buildItem);
+    if (damageState?.detail) {
+      damageDetail = AddBuildingDamageDetails(sink, {
+        x: buildItem.x, z: buildItem.z, ry: buildItem.ry,
+        ...DamageDetailDimensions(sink, entry, buildItem),
+        seed: `${buildItem.seed}:${entry.id}`, stage: damageState.detail,
+      });
+    }
   } catch (error) {
     console.warn(`[SceneEditor] ${entry.id} 建不出来：${String(error).slice(0, 160)}`);
   }
@@ -598,7 +624,10 @@ export function BuildPlaceableVisual(target, entry, item, {
   for (const mesh of flushed) ownedGeometries.push(mesh.geometry);
   let meshes = 0;
   target.traverse((node) => { if (node.isMesh) meshes += 1; });
-  return { loaded: true, colliders: sink.colliders, meshes, damageState: damageState?.id || null };
+  return {
+    loaded: true, colliders: sink.colliders, meshes,
+    damageState: damageState?.id || null, damageDetail,
+  };
 }
 
 export class SceneEditor {

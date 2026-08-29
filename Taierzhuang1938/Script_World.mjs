@@ -201,6 +201,149 @@ export function AddWall(sink, material, {
 }
 
 /**
+ * 构件库两档预建模战损的近景细节层。
+ *
+ * 主体建筑仍由各自的正式生成器按 damage 改轮廓；这一层只补那些不能靠一根
+ * 0..1 数值自然长出来的局部证据：凹进去的弹着中心、崩开的砖圈、放射裂缝、
+ * 墙脚落砖，以及严重档的断梁、散瓦和墙角残砖。全部继续进入 BuildSink 材质桶，
+ * 不为每一块碎砖新开 Mesh / draw call；seed 相同就逐顶点相同。
+ */
+export function AddBuildingDamageDetails(sink, {
+  x, z, ry = 0, width = 9, depth = 6, height = 4, seed = "damage", stage = "early",
+} = {}) {
+  const severe = stage === "severe";
+  const rnd = Mulberry32(HashString(`${seed}:damageDetail:${stage}`));
+  const w = Clamp(Math.abs(width) || 9, 2.4, 34);
+  const d = Clamp(Math.abs(depth) || 6, 1.0, 28);
+  const h = Clamp(Math.abs(height) || 4, 2.4, 10);
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  const At = (lx, lz) => ({ x: x + cos * lx - sin * lz, z: z - sin * lx - cos * lz });
+  // 不同生成器的墙厚从 0.36 到 0.76 m；冲击件必须落到外皮之外。此前统一只
+  // 推 0.05 m，实际埋在墙体内部，只有恰好落进窗洞时才看得见。
+  const surfaceOffset = Clamp(Math.min(w, d) * 0.025, 0.22, 0.38);
+  const facadeZ = d / 2 + surfaceOffset;
+  const faceRy = ry + Math.PI;
+  const detail = {
+    stage, impactMarks: 0, fractureBricks: 0, crackSegments: 0,
+    looseBricks: 0, exposedBeams: 0, roofFragments: 0,
+  };
+
+  const AddImpact = (index, lx, cy, radius) => {
+    const center = At(lx, facadeZ + 0.025);
+    const core = new THREE.CircleGeometry(radius * (severe ? 0.52 : 0.42), severe ? 18 : 14);
+    sink.Add("Charred", PlaceGeometry(core, { x: center.x, y: cy, z: center.z, ry: faceRy }));
+    detail.impactMarks += 1;
+
+    // 缺几块的砖圈比一只规则黑圆更重要：眼睛会把缺口读成断面，而不是贴花。
+    const ringCount = severe ? 15 : 11;
+    const missingRun = Math.floor(rnd() * ringCount);
+    for (let i = 0; i < ringCount; i += 1) {
+      const distance = Math.min((i - missingRun + ringCount) % ringCount,
+        (missingRun - i + ringCount) % ringCount);
+      if (distance <= (severe ? 1 : 0)) continue;
+      const a = (i / ringCount) * Math.PI * 2 + rnd() * 0.08;
+      const rr = radius * (0.66 + rnd() * 0.12);
+      const p = At(lx + Math.cos(a) * rr, facadeZ + 0.055 + rnd() * 0.025);
+      const bw = radius * (severe ? 0.34 : 0.28) * (0.78 + rnd() * 0.36);
+      const bh = radius * (0.15 + rnd() * 0.07);
+      sink.Add("CityBrickWorn", PlaceGeometry(
+        MakeBox(bw, bh, 0.12 + rnd() * 0.08, TILE_METERS.brick, `${seed}:impact${index}:brick${i}`),
+        { x: p.x, y: cy + Math.sin(a) * rr, z: p.z, ry: faceRy, rz: a + Math.PI / 2 },
+      ));
+      detail.fractureBricks += 1;
+    }
+
+    // 放射裂缝不是一根直线：每条由两三段错开的细凹槽拼成。
+    const arms = severe ? 6 : 4;
+    for (let arm = 0; arm < arms; arm += 1) {
+      const a = (arm / arms) * Math.PI * 2 + (rnd() - 0.5) * 0.55;
+      const segments = severe ? 3 : 2;
+      for (let part = 0; part < segments; part += 1) {
+        const r0 = radius * (0.42 + part * 0.33);
+        const seg = radius * (0.34 + rnd() * 0.18);
+        const bend = a + (rnd() - 0.5) * 0.28;
+        const p = At(lx + Math.cos(bend) * r0, facadeZ + 0.012);
+        sink.Add("Charred", PlaceGeometry(
+          MakeBox(0.028 + rnd() * 0.018, seg, 0.018, TILE_METERS.wood,
+            `${seed}:impact${index}:crack${arm}:${part}`),
+          { x: p.x, y: cy + Math.sin(bend) * r0, z: p.z, ry: faceRy, rz: Math.PI / 2 - bend },
+        ));
+        detail.crackSegments += 1;
+      }
+    }
+  };
+
+  const impactCount = severe ? 3 : 2;
+  for (let i = 0; i < impactCount; i += 1) {
+    const band = impactCount === 1 ? 0 : i / (impactCount - 1) - 0.5;
+    // 初损落在门窗楣以上的连续实墙带：随机打进窗洞既遮住冲击圈，也像贴花穿帮。
+    // 严重档已有真实缺口，可以把落点分散到整面残墙。
+    const lx = severe
+      ? band * w * 0.52 + (rnd() - 0.5) * w * 0.12
+      : band * w * 0.50 + (rnd() - 0.5) * w * 0.05;
+    const cy = severe ? h * (0.30 + rnd() * 0.34) : h * (0.76 + rnd() * 0.07);
+    const radius = Clamp((severe ? 0.68 : 0.42) + rnd() * (severe ? 0.42 : 0.24), 0.34, 1.1);
+    AddImpact(i, lx, cy, radius);
+  }
+
+  // 落砖有厚度、有随机朝向，并从破面向外铺开；不是贴在墙脚的一张噪声地毯。
+  const looseCount = severe ? 30 : 12;
+  for (let i = 0; i < looseCount; i += 1) {
+    const lx = (rnd() - 0.5) * w * (severe ? 0.72 : 0.52);
+    const outward = 0.18 + Math.pow(rnd(), 1.7) * (severe ? 2.2 : 0.9);
+    const p = At(lx, d / 2 + outward);
+    const bw = 0.19 + rnd() * 0.28;
+    const bh = 0.10 + rnd() * 0.16;
+    sink.Add(i % 5 === 0 ? "CrossStone" : "CityBrickWorn", PlaceGeometry(
+      MakeBox(bw, bh, 0.18 + rnd() * 0.30, 0.34, `${seed}:loose${i}`),
+      { x: p.x, y: bh / 2 + rnd() * 0.06, z: p.z, ry: ry + rnd() * Math.PI, rz: (rnd() - 0.5) * 0.45 },
+    ));
+    detail.looseBricks += 1;
+  }
+
+  if (severe) {
+    // 两根从屋架掉下来的主梁把“没屋顶”变成“屋架断了”，并给坍塌方向。
+    for (let i = 0; i < 3; i += 1) {
+      const lx = (-0.28 + i * 0.28) * w + (rnd() - 0.5) * 0.35;
+      const beamLen = Clamp(h * (0.62 + rnd() * 0.24), 2.0, 6.2);
+      const p = At(lx, d / 2 + 0.32 + rnd() * 0.45);
+      sink.Add(i === 1 ? "Charred" : "WoodBeam", PlaceGeometry(
+        MakeBox(0.16 + rnd() * 0.08, beamLen, 0.18 + rnd() * 0.08,
+          TILE_METERS.wood, `${seed}:fallenBeam${i}`),
+        { x: p.x, y: beamLen * 0.45, z: p.z, ry: faceRy, rz: (i - 1) * 0.34 + (rnd() - 0.5) * 0.18 },
+      ));
+      detail.exposedBeams += 1;
+    }
+
+    const roofCount = 16;
+    for (let i = 0; i < roofCount; i += 1) {
+      const p = At((rnd() - 0.5) * w * 0.68, d / 2 + 0.35 + rnd() * 1.8);
+      sink.Add(i % 4 === 0 ? "Charred" : "RoofTile", PlaceGeometry(
+        MakeBox(0.16 + rnd() * 0.28, 0.055 + rnd() * 0.06, 0.22 + rnd() * 0.36,
+          TILE_METERS.roof, `${seed}:roofFrag${i}`),
+        { x: p.x, y: 0.05 + rnd() * 0.09, z: p.z, ry: ry + rnd() * Math.PI, rz: (rnd() - 0.5) * 0.5 },
+      ));
+      detail.roofFragments += 1;
+    }
+
+    // 两侧墙角留下逐皮错开的残砖，剪影不再是一根整齐的垂直线。
+    for (const side of [-1, 1]) {
+      for (let course = 0; course < 7; course += 1) {
+        if ((course + (side > 0 ? 1 : 0)) % 4 === 0) continue;
+        const p = At(side * (w / 2 - 0.10 - (course % 2) * 0.11), facadeZ + 0.09);
+        sink.Add("CityBrickWorn", PlaceGeometry(
+          MakeBox(0.34, 0.15, 0.30, TILE_METERS.brick, `${seed}:tooth${side}:${course}`),
+          { x: p.x, y: 0.65 + course * 0.17, z: p.z, ry: faceRy, rz: (rnd() - 0.5) * 0.12 },
+        ));
+        detail.fractureBricks += 1;
+      }
+    }
+  }
+
+  return detail;
+}
+
+/**
  * 一面**开了洞的墙**的碰撞：砖砌到哪儿，碰撞就登记到哪儿。
  *
  * 为什么要有这一层：门窗洞在本作里是**真的不砌那一段**（墙由若干条水平带叠成，
@@ -645,16 +788,18 @@ export function AddHardMountainRoof(sink, {
       MakeBox(width + overhang * 2, 0.22, 0.38, TILE_METERS.roof, `${seed}:ridge`),
       { x, y: ridgeY + 0.07, z, ry }));
   } else {
-    // 塌掉的屋面：只剩几根焦黑的梁架横在山墙之间
+    // 塌掉的屋面：梁架从墙头向屋内/地面倾倒。旧版把中心钉在 ridgeY 附近，
+    // 墙已经削低、梁却整根悬在空中；这里让每根至少有一端落到残墙高度。
     const rnd = Mulberry32(HashString(`${seed}:col`));
     for (let i = 0; i < 5; i += 1) {
       const lx = -width / 2 + (i + 0.5) * (width / 5);
-      const drop = 0.3 + rnd() * 0.8;
+      const beamLen = depth * (0.5 + rnd() * 0.5);
+      const fall = (rnd() - 0.5) * 0.92;
       sink.Add("WoodBeam", PlaceGeometry(
-        MakeBox(0.16, 0.14, depth * (0.5 + rnd() * 0.5), TILE_METERS.wood, `${seed}:bm${i}`),
+        MakeBox(0.16, 0.14, beamLen, TILE_METERS.wood, `${seed}:bm${i}`),
         {
-          x: x + Math.cos(ry) * lx, y: ridgeY - drop, z: z - Math.sin(ry) * lx,
-          ry, rx: (rnd() - 0.5) * 0.5, rz: (rnd() - 0.5) * 0.35,
+          x: x + Math.cos(ry) * lx, y: eaveY * (0.52 + rnd() * 0.24),
+          z: z - Math.sin(ry) * lx, ry, rx: fall, rz: (rnd() - 0.5) * 0.28,
         }));
     }
   }
@@ -816,6 +961,11 @@ export function AddRoomBlock(sink, spec) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => [x + cos * lx - sin * lz, z - sin * lx - cos * lz];
   const collapsed = damage > 0.62;
+  // 严重档固定打掉朝院立面的一侧窗间墙。避开明间门洞，否则“多一个洞”只会
+  // 落在本来就是空的地方，轮廓几乎不变；左右由 seed 决定，同一建筑不会跳变。
+  const breachBay = bays > 1
+    ? (HashString(`${seed}:facadeBreach`) & 1 ? 0 : bays - 1)
+    : 0;
 
   // 四面墙：面朝院子那一面（+z * facing）开门窗，其余三面实墙
   const faces = [
@@ -832,7 +982,9 @@ export function AddRoomBlock(sink, spec) {
       // 被 ruin 削低后墙头与瓦面之间是一排刺眼的天光条（WP-D1 取证 §5-3）。
       AddWall(sink, wallMat, {
         x: fx, z: fz, length: f.len, height: eaveY, thickness: 0.36,
-        ry: ry + f.rot, ruin: i >= 2 ? damage * 0.85 : 0, seed: `${seed}:f${i}`,
+        ry: ry + f.rot,
+        ruin: i >= 2 ? damage * 0.85 : (collapsed ? damage * 0.72 : 0),
+        seed: `${seed}:f${i}`,
         plinth: "Stone",
       });
       // 山墙顶上的小「口眼」（通风口）——两山墙才有
@@ -851,9 +1003,12 @@ export function AddRoomBlock(sink, spec) {
       const lz2 = f.lz + (-f.len / 2 + bayW * (b + 0.5)) * -Math.sin(f.rot);
       const [bx, bz] = L(lx, lz2);
       const isDoor = b === Math.floor(bays / 2);
+      const breachThisBay = collapsed && !isDoor && b === breachBay;
       // 门/窗两侧的墙垛
       const pierW = (bayW - (isDoor ? 1.25 : 1.05)) / 2;
       for (const s2 of [-1, 1]) {
+        // 只拿掉靠外的一根墙垛，另一根仍保留齿状断边；整开间全删会像布尔切出的方洞。
+        if (breachThisBay && s2 === (breachBay === 0 ? -1 : 1)) continue;
         const off = s2 * (bayW / 2 - pierW / 2);
         const [px, pz] = L(lx + off * Math.cos(f.rot), lz2 + off * -Math.sin(f.rot));
         // 墙垛也在檐口线上，同理不吃 ruin（战损仍由山墙/屋面/塌房表达）
@@ -905,12 +1060,14 @@ export function AddRoomBlock(sink, spec) {
       } else {
         // 格子窗：窗台 0.9 m，窗高 1.1 m，木棂做成井字
         const sillY = 0.92, winH = 1.06;
-        sink.Add(wallMat, PlaceGeometry(MakeBox(1.05, sillY, 0.36, TILE_METERS.brick, `${seed}:sl${b}`),
-          { x: bx, y: sillY / 2, z: bz, ry: ry + f.rot }));
-        sink.Add(wallMat, PlaceGeometry(
-          MakeBox(1.05, Math.max(0.1, eaveY - sillY - winH), 0.36, TILE_METERS.brick, `${seed}:hd${b}`),
-          { x: bx, y: sillY + winH + Math.max(0.1, eaveY - sillY - winH) / 2, z: bz, ry: ry + f.rot }));
-        if (damage < 0.55) {
+        if (!breachThisBay) {
+          sink.Add(wallMat, PlaceGeometry(MakeBox(1.05, sillY, 0.36, TILE_METERS.brick, `${seed}:sl${b}`),
+            { x: bx, y: sillY / 2, z: bz, ry: ry + f.rot }));
+          sink.Add(wallMat, PlaceGeometry(
+            MakeBox(1.05, Math.max(0.1, eaveY - sillY - winH), 0.36, TILE_METERS.brick, `${seed}:hd${b}`),
+            { x: bx, y: sillY + winH + Math.max(0.1, eaveY - sillY - winH) / 2, z: bz, ry: ry + f.rot }));
+        }
+        if (damage < 0.55 && !breachThisBay) {
           const frame = [];
           frame.push(PlaceGeometry(MakeBox(1.05, 0.08, 0.1, TILE_METERS.wood, `${seed}:wf1${b}`), { y: 0 }));
           frame.push(PlaceGeometry(MakeBox(1.05, 0.08, 0.1, TILE_METERS.wood, `${seed}:wf2${b}`), { y: winH }));
@@ -929,11 +1086,13 @@ export function AddRoomBlock(sink, spec) {
         // 旧版在这里登记一只通高盒，于是全城每一扇格子窗都是「看得见的洞 +
         // 摸得着的墙」：手榴弹弹回来、子弹打在空气上（玩家在车站实测到）。
         // ry 也补上了 —— 原来漏传，转了 90° 的房子那只盒子连朝向都是错的。
-        const rot2 = ry + f.rot;
-        sink.Solid(bx, sillY / 2, bz, 0.6, sillY / 2, 0.25, "wall", rot2);
-        const headY = sillY + winH;
-        if (eaveY - headY > 0.1) {
-          sink.Solid(bx, (headY + eaveY) / 2, bz, 0.6, (eaveY - headY) / 2, 0.25, "wall", rot2);
+        if (!breachThisBay) {
+          const rot2 = ry + f.rot;
+          sink.Solid(bx, sillY / 2, bz, 0.6, sillY / 2, 0.25, "wall", rot2);
+          const headY = sillY + winH;
+          if (eaveY - headY > 0.1) {
+            sink.Solid(bx, (headY + eaveY) / 2, bz, 0.6, (eaveY - headY) / 2, 0.25, "wall", rot2);
+          }
         }
       }
     }
@@ -1009,21 +1168,41 @@ export function AddGatehouse(sink, { x, z, ry, seed, damage = 0, burnt = false, 
   const h = 3.6;
   const mat = burnt ? "BrickWallSooty" : "BrickWall";
   const cos = Math.cos(ry), sin = Math.sin(ry);
+  const rnd = Mulberry32(HashString(`${seed}:gateDamage`));
+  const collapsed = damage > 0.62;
   // 两根门垛
   for (const s of [-1, 1]) {
     const lx = s * (openW / 2 + 0.28);
-    sink.Add(mat, PlaceGeometry(MakeBox(0.56, h, 0.72, TILE_METERS.brick, `${seed}:pier${s}`),
-      { x: x + cos * lx, y: h / 2, z: z - sin * lx, ry }));
-    sink.Solid(x + cos * lx, h / 2, z - sin * lx, 0.32, h / 2, 0.4, "wall", ry);
+    const pierH = collapsed ? h * (0.54 + rnd() * 0.22) : h;
+    sink.Add(mat, PlaceGeometry(MakeBox(0.56, pierH, 0.72, TILE_METERS.brick, `${seed}:pier${s}`),
+      { x: x + cos * lx, y: pierH / 2, z: z - sin * lx, ry, rz: collapsed ? s * 0.025 : 0 }));
+    sink.Solid(x + cos * lx, pierH / 2, z - sin * lx, 0.32, pierH / 2, 0.4, "wall", ry);
     // 门墩石
     sink.Add("Stone", PlaceGeometry(MakeBox(0.42, 0.52, 0.42, TILE_METERS.stone, `${seed}:dun${s}`),
       { x: x + cos * (lx + s * 0.16), y: 0.26, z: z - sin * (lx + s * 0.16), ry }));
   }
   // 门额与小瓦顶
-  sink.Add("WoodBeam", PlaceGeometry(MakeBox(openW + 1.2, 0.26, 0.8, TILE_METERS.wood, `${seed}:lin`),
-    { x, y: 2.32, z, ry }));
-  sink.Add(mat, PlaceGeometry(MakeBox(openW + 1.2, h - 2.58, 0.62, TILE_METERS.brick, `${seed}:up`),
-    { x, y: 2.58 + (h - 2.58) / 2, z, ry }));
+  if (!collapsed) {
+    sink.Add("WoodBeam", PlaceGeometry(MakeBox(openW + 1.2, 0.26, 0.8, TILE_METERS.wood, `${seed}:lin`),
+      { x, y: 2.32, z, ry }));
+    sink.Add(mat, PlaceGeometry(MakeBox(openW + 1.2, h - 2.58, 0.62, TILE_METERS.brick, `${seed}:up`),
+      { x, y: 2.58 + (h - 2.58) / 2, z, ry }));
+  } else {
+    // 门额不是整根蒸发：一截还卡在门垛上，一截斜落下来，砖额只剩一侧断块。
+    for (const s of [-1, 1]) {
+      sink.Add(s > 0 ? "Charred" : "WoodBeam", PlaceGeometry(
+        MakeBox(openW * 0.56, 0.22, 0.52, TILE_METERS.wood, `${seed}:brokenLin${s}`),
+        { x: x + cos * s * openW * 0.25, y: 2.12 - (s > 0 ? 0.36 : 0),
+          z: z - sin * s * openW * 0.25, ry, rz: s * (0.16 + rnd() * 0.12) },
+      ));
+    }
+    const upperX = x + cos * -openW * 0.30;
+    const upperZ = z - sin * -openW * 0.30;
+    sink.Add(mat, PlaceGeometry(
+      MakeBox(openW * 0.62, 0.62, 0.62, TILE_METERS.brick, `${seed}:upperRemnant`),
+      { x: upperX, y: 2.68, z: upperZ, ry, rz: -0.08 },
+    ));
+  }
   if (damage < 0.6) {
     for (const s of [-1, 1]) {
       sink.Add(burnt ? "BrickWallSooty" : "RoofTile", PlaceGeometry(
@@ -1034,7 +1213,9 @@ export function AddGatehouse(sink, { x, z, ry, seed, damage = 0, burnt = false, 
       { x, y: h + 0.5, z, ry }));
   }
   // 门洞的里子：门槛 + 门道墁地 + 木框。没有它，门楼在街景里就是一个纯黑方块
-  AddDoorReveal(sink, { x, z, ry, openW, openH: 2.18, depth: 2.1, seed: `${seed}:rv` });
+  AddDoorReveal(sink, {
+    x, z, ry, openW, openH: 2.18, depth: 2.1, seed: `${seed}:rv`, jamb: !collapsed,
+  });
   // 门板（一扇歪着，一扇掉了——打了半个月的镇子不会有齐整的门）
   if (damage < 0.75) {
     sink.Add("WoodDoor", PlaceGeometry(MakeBox(openW / 2 - 0.04, 2.15, 0.07, TILE_METERS.wood, `${seed}:d0`),
@@ -1345,6 +1526,11 @@ export function AddMosque(sink, { x, z, ry = 0, seed = "mq", damage = 0.4 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => [x + cos * lx - sin * lz, z - sin * lx - cos * lz];
   const W = 30, D = 26;
+  // 编辑器的严重档必须跨过房屋生成器的塌顶阈值；旧倍率把 0.88 压成 0.616，
+  // 结果整座礼拜堂仍是一栋齐顶房，只是贴图变黑。普通历史缺省仍沿用旧倍率。
+  const severe = damage > 0.72;
+  const gateDamage = severe ? damage : damage * 0.6;
+  const hallDamage = severe ? damage : damage * 0.7;
 
   // 院墙（弹孔墙：这面墙每平方米上百个弹孔，靠 BrickWallSooty 的剥落 + 后面撒弹孔贴花表达）
   const walls = [
@@ -1371,13 +1557,13 @@ export function AddMosque(sink, { x, z, ry = 0, seed = "mq", damage = 0.4 }) {
     });
   }
   const [gx, gz] = L(0, D / 2);
-  AddGatehouse(sink, { x: gx, z: gz, ry, seed: `${seed}:gate`, damage: damage * 0.6, openW: gateW });
+  AddGatehouse(sink, { x: gx, z: gz, ry, seed: `${seed}:gate`, damage: gateDamage, openW: gateW });
 
   // 礼拜堂（北，最大的一进；卷棚顶做成两坡但脊部略平）
   const [hx, hz] = L(0, -D / 2 + 7.5);
   AddRoomBlock(sink, {
     x: hx, z: hz, ry, width: 18, depth: 11, eaveY: 3.4, ridgeY: 6.1,
-    seed: `${seed}:hall`, damage: damage * 0.7, facing: 1, bays: 5, roofRafters: false,
+    seed: `${seed}:hall`, damage: hallDamage, facing: 1, bays: 5, roofRafters: false,
   });
   // 讲堂（西）与配房（东）
   const [jx, jz] = L(-W / 2 + 4.2, 2.0);
@@ -3760,6 +3946,8 @@ export function AddChurch(sink, {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
   const eave = 7.4, ridge = 11.6;
+  const collapsed = damage > 0.62;
+  const rnd = Mulberry32(HashString(`${seed}:churchDamage`));
 
   // 中厅四壁（清水砖，砌到檐口）
   const sides = [
@@ -3790,7 +3978,8 @@ export function AddChurch(sink, {
     }
   });
   AddHardMountainRoof(sink, {
-    x, z, width: w, depth: d, eaveY: eave, ridgeY: ridge, ry, seed: `${seed}:roof`, rafters: false,
+    x, z, width: w, depth: d, eaveY: eave, ridgeY: ridge, ry, seed: `${seed}:roof`,
+    ruined: collapsed, burnt: collapsed, rafters: false,
   });
 
   // 钟塔：山面一座方塔 + 四坡锥顶
@@ -3799,27 +3988,45 @@ export function AddChurch(sink, {
   sink.Add("CrossStone", PlaceGeometry(
     MakeBox(tw + 0.8, 1.0, tw + 0.8, TILE_METERS.stone, `${seed}:tbase`),
     { x: tp.x, y: 0.5, z: tp.z, ry }));
-  sink.Add("HouseBrick", PlaceGeometry(
-    MakeBox(tw, towerH - 1.0, tw, TILE_METERS.brick, `${seed}:tower`, BRICK_UV_GRID),
-    { x: tp.x, y: 1.0 + (towerH - 1.0) / 2, z: tp.z, ry }));
-  sink.Solid(tp.x, towerH / 2, tp.z, tw / 2 + 0.4, towerH / 2, tw / 2 + 0.4, "wall");
+  const towerTop = collapsed ? towerH * (0.64 + rnd() * 0.08) : towerH;
+  const towerBodyH = towerTop - 1.0;
+  sink.Add(collapsed ? "BrickWallSooty" : "HouseBrick", PlaceGeometry(
+    MakeBox(tw, towerBodyH, tw, TILE_METERS.brick, `${seed}:tower`, BRICK_UV_GRID),
+    { x: tp.x, y: 1.0 + towerBodyH / 2, z: tp.z, ry, rz: collapsed ? 0.018 : 0 }));
+  sink.Solid(tp.x, towerTop / 2, tp.z, tw / 2 + 0.4, towerTop / 2, tw / 2 + 0.4, "wall");
   // 钟层的券洞
   for (const s of [-1, 1]) {
     const p = L(s * (tw / 2 - 0.02), d / 2 + tw / 2 - 0.4);
-    sink.Add("Charred", PlaceGeometry(
-      MakeBox(0.2, 2.4, 1.5, TILE_METERS.stone, `${seed}:bell${s}`),
-      { x: p.x, y: towerH - 2.6, z: p.z, ry }));
+    if (!collapsed) {
+      sink.Add("Charred", PlaceGeometry(
+        MakeBox(0.2, 2.4, 1.5, TILE_METERS.stone, `${seed}:bell${s}`),
+        { x: p.x, y: towerH - 2.6, z: p.z, ry }));
+    }
   }
   // 锥顶
-  const spire = new THREE.ConeGeometry(tw * 0.78, 4.6, 4);
-  const uv = spire.attributes.uv;
-  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3);
-  sink.Add("TubeTile", PlaceGeometry(spire, { x: tp.x, y: towerH + 2.3, z: tp.z, ry: ry + Math.PI / 4 }));
+  if (!collapsed) {
+    const spire = new THREE.ConeGeometry(tw * 0.78, 4.6, 4);
+    const uv = spire.attributes.uv;
+    for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3);
+    sink.Add("TubeTile", PlaceGeometry(spire,
+      { x: tp.x, y: towerH + 2.3, z: tp.z, ry: ry + Math.PI / 4 }));
+  } else {
+    // 钟塔顶部留下能读出原锥顶结构的断木，不用“整座塔被水平裁短”代替坍塌。
+    for (let i = 0; i < 5; i += 1) {
+      const a = (i / 5) * Math.PI * 2 + rnd() * 0.25;
+      sink.Add(i === 0 ? "Charred" : "WoodBeam", PlaceGeometry(
+        MakeBox(0.18, 2.3 + rnd() * 1.2, 0.18, TILE_METERS.wood, `${seed}:spireRafter${i}`),
+        { x: tp.x + Math.sin(a) * 0.75, y: towerTop + 0.7, z: tp.z + Math.cos(a) * 0.75,
+          ry: a, rz: (rnd() - 0.5) * 0.55 },
+      ));
+    }
+    sink.props.push({ kind: "rubblePile", x: tp.x, z: tp.z, radius: tw * 0.72, seed: `${seed}:towerFall` });
+  }
   // 大门
   const door = L(0, d / 2 + tw - 0.42);
   AddDoorReveal(sink, {
     x: door.x, z: door.z, ry: ry + Math.PI, openW: 1.9, openH: 3.0, depth: 1.4,
-    seed: `${seed}:door`, paving: "CrossStone", sill: "CrossStone",
+    seed: `${seed}:door`, paving: "CrossStone", sill: "CrossStone", jamb: !collapsed,
   });
 }
 

@@ -1343,6 +1343,7 @@ const damageEarly = await page.evaluate(() => {
   });
   return {
     state: active.preview?.damageState,
+    detail: active.preview?.damageDetail,
     sectionHidden: active.damageSection.parentElement.hidden,
     facts: active.facts.root.textContent,
     texture: textures.find((src) => src.includes("Texture_BuildingDamageEarlyBase")) || "",
@@ -1350,8 +1351,17 @@ const damageEarly = await page.evaluate(() => {
 });
 Check("构件库可即时预览炮击初损建模态",
   damageEarly.state === "shellDamaged" && !damageEarly.sectionHidden
-    && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture,
+    && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture
+    && damageEarly.detail?.impactMarks === 2
+    && damageEarly.detail?.fractureBricks >= 18
+    && damageEarly.detail?.crackSegments === 16
+    && damageEarly.detail?.looseBricks === 12
+    && damageEarly.detail?.exposedBeams === 0,
   JSON.stringify(damageEarly));
+await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
+await page.screenshot({
+  path: path.join(projectDir, "_shots", "editor_prop_damage_early.png"),
+});
 
 await page.evaluate(() => window.Taierzhuang.editor.active.SetDamageState("severeDamage"));
 await Step(2);
@@ -1364,13 +1374,24 @@ const damageSevere = await page.evaluate(() => {
   });
   return {
     state: active.preview?.damageState,
+    detail: active.preview?.damageDetail,
     facts: active.facts.root.textContent,
     texture: textures.find((src) => src.includes("Texture_BuildingDamageSevereBase")) || "",
   };
 });
 Check("构件库可即时预览严重破坏建模态",
   damageSevere.state === "severeDamage" && damageSevere.facts.includes("严重破坏")
-    && !!damageSevere.texture, JSON.stringify(damageSevere));
+    && !!damageSevere.texture
+    && damageSevere.detail?.impactMarks === 3
+    && damageSevere.detail?.fractureBricks >= 40
+    && damageSevere.detail?.crackSegments === 54
+    && damageSevere.detail?.looseBricks === 30
+    && damageSevere.detail?.exposedBeams === 3
+    && damageSevere.detail?.roofFragments === 16,
+  JSON.stringify(damageSevere));
+await page.screenshot({
+  path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),
+});
 
 await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("Paifang"));
 await Step(1);
