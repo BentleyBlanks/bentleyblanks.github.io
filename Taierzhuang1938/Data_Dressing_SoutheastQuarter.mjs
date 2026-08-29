@@ -382,7 +382,7 @@ export const PLACEMENTS = Object.freeze([
   // blk16_13 (164.87, 22.88) 两进院 · 损：前院里一摞从倒座扒出来的酒坛。
   { asset: "wineJarCluster", x: 175.18, z: 16.38, ry: 0.4,
     note: "blk16_13 两进院前院：从倒座扒出来的一摞酒坛" },
-  { asset: "clayLiddedJar", x: 176.78, z: 17.58, ry: -0.7,
+  { asset: "clayLiddedJar", x: 176.78, z: 17.1, ry: -0.7,
     note: "blk16_13：酒坛边一只加盖的坛子" },
 
   // blk15_15 (134.94, 68.64) 一进院 · 损：磨道踩得比别处实。

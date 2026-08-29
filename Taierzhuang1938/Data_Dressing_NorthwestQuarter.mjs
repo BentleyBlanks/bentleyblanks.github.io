@@ -120,7 +120,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk7_6 柴院：跟前一袋靠在一起的第二袋粮" },
 
   // blk9_6 土墙院（-27.24,-134.07）damage 0.20：靠十字街这一侧，情景开始乱。
-  { asset: "rubble", x: -45.61, z: -132.77, ry: 0.62, scale: 0.9,
+  { asset: "rubble", x: -45.61, z: -134.6, ry: 0.62, scale: 0.9,
     note: "blk9_6 靠东侧的一户：正房西山墙被流弹削了一角，砖瓦塌在墙根" },
   { asset: "stackableStone07", x: -44.39, z: -133.7, ry: -0.4, scale: 0.95,
     note: "blk9_6：从塌角里滚出来的一块过墙石" },

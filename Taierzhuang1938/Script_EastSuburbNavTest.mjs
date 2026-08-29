@@ -3,18 +3,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { PHASES } from "./Data_Battle.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
+const phaseIndex = 2;
+const expectedObjectives = PHASES[phaseIndex].zones.length;
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
 
 try {
   const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&phase=2&quality=high&scale=small`, {
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&phase=${phaseIndex}&quality=high&scale=small`, {
     waitUntil: "load", timeout: 120000,
   });
-  await page.waitForFunction(() => window.Taierzhuang?.nav && window.Taierzhuang?.battlefield?.objectives?.length === 4, null, { timeout: 180000 });
+  await page.waitForFunction((count) => window.Taierzhuang?.nav
+    && window.Taierzhuang?.battlefield?.objectives?.length === count,
+  expectedObjectives, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(120));
   const result = await page.evaluate(() => {
     const game = window.Taierzhuang;

@@ -57,8 +57,12 @@ per-item attribution in `Data_ExternalAssets_ChineseLife.mjs`),
 Beyond the per-level `PLACEMENTS`, the town and its surroundings carry a second
 placement layer: `Script_TownDressing.mjs` merges ten region files — four city
 quarters, the commercial streets, the wall-ring defenses, and four outfield
-regions (east/west/north suburbs, Jiehe villages) — about 1,300 placements in
-total after the 2026-08-25 density round. Placements are registered once in
+regions (east/west/north suburbs, Jiehe villages) — 1,558 placements after the
+2026-08-29 all-scene life-detail pass. The additional 267 props are organized
+as paired narrative clusters around already-validated wells, millstones,
+woodpiles, benches, carts, street stalls, and defensive rest positions; they
+deliberately exercise the long-tail bucket, basin, tray, basket, stool, lamp,
+axe, hammer, and spade assets instead of repeating haystacks. Placements are registered once in
 world coordinates and filtered by each level's `TUNING.bounds`, so the same
 rice sack appears at the same spot in every level that generates that part of
 the map; visuals stream around the camera by size class

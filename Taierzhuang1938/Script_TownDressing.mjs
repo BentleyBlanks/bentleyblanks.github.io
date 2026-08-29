@@ -25,18 +25,23 @@ import { REGION as ES_REGION, PLACEMENTS as ES } from "./Data_Dressing_EastSubur
 import { REGION as WS_REGION, PLACEMENTS as WS } from "./Data_Dressing_WestSuburb.mjs";
 import { REGION as NS_REGION, PLACEMENTS as NS } from "./Data_Dressing_NorthSuburb.mjs";
 import { REGION as JV_REGION, PLACEMENTS as JV } from "./Data_Dressing_JieheVillages.mjs";
+import { LifeScenesFor } from "./Data_Dressing_LifeScenes.mjs";
+
+function RegionPlacements(region, placements) {
+  return Object.freeze([...placements, ...LifeScenesFor(region.id)]);
+}
 
 export const TOWN_DRESSING_REGIONS = Object.freeze([
-  { region: NE_REGION, placements: NE },
-  { region: SE_REGION, placements: SE },
-  { region: NW_REGION, placements: NW },
-  { region: SW_REGION, placements: SW },
-  { region: MS_REGION, placements: MS },
-  { region: DF_REGION, placements: DF },
-  { region: ES_REGION, placements: ES },
-  { region: WS_REGION, placements: WS },
-  { region: NS_REGION, placements: NS },
-  { region: JV_REGION, placements: JV },
+  { region: NE_REGION, placements: RegionPlacements(NE_REGION, NE) },
+  { region: SE_REGION, placements: RegionPlacements(SE_REGION, SE) },
+  { region: NW_REGION, placements: RegionPlacements(NW_REGION, NW) },
+  { region: SW_REGION, placements: RegionPlacements(SW_REGION, SW) },
+  { region: MS_REGION, placements: RegionPlacements(MS_REGION, MS) },
+  { region: DF_REGION, placements: RegionPlacements(DF_REGION, DF) },
+  { region: ES_REGION, placements: RegionPlacements(ES_REGION, ES) },
+  { region: WS_REGION, placements: RegionPlacements(WS_REGION, WS) },
+  { region: NS_REGION, placements: RegionPlacements(NS_REGION, NS) },
+  { region: JV_REGION, placements: RegionPlacements(JV_REGION, JV) },
 ]);
 
 export const TOWN_DRESSING = Object.freeze(

@@ -260,9 +260,9 @@ export const PLACEMENTS = Object.freeze([
     note: "blk11_3 土墙院正房山墙下：队尾的阔口陶坛" },
 
   // blk14_10 AdobeYard（挨过炮）：墙根的劈柴墩，斧子撂在墩上，柴已经码起来了。
-  { asset: "ryChoppingBlock", x: 106.11, z: -16.38, ry: 1.771,
+  { asset: "ryChoppingBlock", x: 106.45, z: -16.91, ry: 1.771,
     note: "blk14_10 土墙院西墙根：墙根的劈柴墩" },
-  { asset: "phWoodAxe", x: 106.35, z: -16.81, ry: 2.471,
+  { asset: "phWoodAxe", x: 106.69, z: -17.34, ry: 2.471,
     note: "blk14_10 土墙院西墙根：撂在墩边的木柄斧" },
   { asset: "ryFirewoodStack", x: 105.93, z: -15.47, ry: 1.571,
     note: "blk14_10 土墙院西墙根：码起来的柴垛" },

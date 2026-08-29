@@ -284,7 +284,7 @@ export const PLACEMENTS = Object.freeze([
     note: "西二路院：柴垛，垛顶压着块石头防风" },
   { asset: "clayWaterVat", x: 374.03, z: -144.38, ry: -0.28,
     note: "西二路院：柴垛旁的水缸" },
-  { asset: "phWoodenBucket", x: 377.28, z: -144.38, ry: 0.5,
+  { asset: "phWoodenBucket", x: 377.28, z: -144.0, ry: 0.5,
     note: "西二路院：木水桶，桶梁搭在缸沿上" },
 
   { asset: "phWickerBasketLidded", x: 375.49, z: -93.31, ry: 0.25,

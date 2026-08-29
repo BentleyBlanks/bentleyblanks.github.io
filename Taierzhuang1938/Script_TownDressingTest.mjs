@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url";
 import { EAST_SUBURB } from "./Data_Tengxian.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import { JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
+import { LIFE_SCENE_DRESSING, LifeScenesFor } from "./Data_Dressing_LifeScenes.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(
@@ -57,7 +58,7 @@ const FORBIDDEN_IN_CITY = new Set([
 ]);
 // 上限（2026-08-25 起放宽）：视觉走流送后，件数的真正预算是「焦点附近同时活着
 // 多少」+ 碰撞表规模，不再是全量 draw call。局部密度另有 45 m 邻域闸（规则 11）。
-const CAPS = { quarter: 150, street: 130, defense: 90, outfield: 220 };
+const CAPS = { quarter: 190, street: 160, defense: 110, outfield: 220 };
 // 城外的主路净空带（西关的铁路/站台不在此表——那一包靠探针与截图兜）
 const OUTFIELD_ROADS = [
   { id: "EastGateRoad", axis: "x", at: -65, from: 310, to: 756, half: 4.2 },
@@ -140,7 +141,38 @@ for (const file of REGION_FILES) {
     fail(`${file}: 必须导出 REGION 与 PLACEMENTS。`);
     continue;
   }
-  regions.push({ file: path.basename(file), region: module.REGION, placements: module.PLACEMENTS });
+  regions.push({
+    file: path.basename(file), region: module.REGION,
+    placements: [...module.PLACEMENTS, ...LifeScenesFor(module.REGION.id)],
+  });
+}
+
+// 全场景生活加密不是一坨只在总览里看得到的数据：九个承载片区都必须接入，
+// 且七章与界河白盒逐片至少能看到一组。长尾工具/家什种类也要真正用起来。
+const expectedLifeRegions = [
+  "NortheastQuarter", "SoutheastQuarter", "NorthwestQuarter", "SouthwestQuarter",
+  "MainStreets", "Defenses", "EastSuburb", "WestSuburb", "JieheVillages",
+];
+const lifePlacements = Object.values(LIFE_SCENE_DRESSING).flat();
+checks += 1;
+if (lifePlacements.length < 250) {
+  fail(`全场景生活加密只有 ${lifePlacements.length} 件，低于 250 件覆盖闸。`);
+}
+const lifeAssets = new Set(lifePlacements.map((placement) => placement.asset));
+checks += 1;
+if (lifeAssets.size < 20) fail(`生活加密只用了 ${lifeAssets.size} 类资产，构件库长尾没有铺开。`);
+for (const regionId of expectedLifeRegions) {
+  checks += 1;
+  const count = LifeScenesFor(regionId).length;
+  if (count < 16) fail(`${regionId}: 生活加密只有 ${count} 件。`);
+}
+for (const phase of [...PHASES, JIEHE_SANDBOX_PHASE]) {
+  const b = phase.bounds;
+  const count = lifePlacements.filter((placement) => placement.x >= b.minX
+    && placement.x <= b.maxX && placement.z >= b.minZ && placement.z <= b.maxZ).length;
+  checks += 1;
+  if (count < 8) fail(`${phase.id}: 生活加密只有 ${count} 件进入本场景。`);
+  else notes.push(`${phase.id}: 新增生活场景细节 ${count} 件。`);
 }
 
 const everything = [];   // {x, z, r, file, index, label} 供去重
