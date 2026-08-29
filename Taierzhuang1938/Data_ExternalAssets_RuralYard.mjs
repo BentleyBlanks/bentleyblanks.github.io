@@ -36,7 +36,7 @@
 
 export const PACK = Object.freeze({
   id: "RuralYard",
-  url: "./Model/Model_RuralYardSet.glb?v=1",
+  url: "./Model/Model_RuralYardSet.glb?v=2",
   license: "CC0 1.0",
   sources: Object.freeze([
     "Kenney Nature Kit — https://kenney.nl/assets/nature-kit",

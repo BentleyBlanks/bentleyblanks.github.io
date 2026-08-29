@@ -91,6 +91,8 @@ function InspectNodes(fileName, maxBytes) {
     if (node.mesh == null) continue;
     const mesh = json.meshes[node.mesh];
     let triangles = 0;
+    let vertices = 0;
+    let indices = 0;
     let minY = Infinity;
     let maxSpan = 0;
     let hasUv = true;
@@ -99,11 +101,13 @@ function InspectNodes(fileName, maxBytes) {
       const indexCount = primitive.indices == null
         ? positions.count : json.accessors[primitive.indices].count;
       triangles += indexCount / 3;
+      vertices += positions.count;
+      indices += indexCount;
       minY = Math.min(minY, positions.min[1]);
       maxSpan = Math.max(maxSpan, ...positions.max.map((value, axis) => value - positions.min[axis]));
       hasUv = hasUv && primitive.attributes.TEXCOORD_0 != null;
     }
-    result.set(node.name, { triangles, minY, maxSpan, hasUv });
+    result.set(node.name, { triangles, vertices, indices, minY, maxSpan, hasUv });
   }
   return { bytes: bytes.length, json, nodes: result };
 }
@@ -203,6 +207,17 @@ for (const spec of trunks.nodes.values()) {
   assert.equal(spec.minY, 0, "trunk is ground-ready");
   assert.ok(spec.maxSpan >= 3 && spec.maxSpan <= 4.1, "trunk keeps real-world length");
 }
+
+const ruralYard = InspectNodes("Model_RuralYardSet.glb", 300_000);
+assert.equal(ruralYard.nodes.size, 15, "all rural-yard components remain independently selectable");
+const waterBucket = ruralYard.nodes.get("WaterBucket");
+assert.ok(waterBucket, "rural-yard water bucket node exists");
+assert.equal(waterBucket.triangles, 68, "water bucket keeps the source silhouette budget");
+assert.equal(waterBucket.minY, 0, "water bucket is ground-ready");
+assert.ok(waterBucket.maxSpan >= 0.33 && waterBucket.maxSpan <= 0.35,
+  "water bucket keeps the intended real-world height");
+assert.ok(waterBucket.indices / waterBucket.vertices > 1.5,
+  "water bucket shares angle-limited normals across triangulation seams");
 
 const leaflessTrees = InspectNodes("Model_LeaflessTreeSet.glb", 3_600_000);
 assert.deepEqual([...leaflessTrees.nodes.keys()].sort(),

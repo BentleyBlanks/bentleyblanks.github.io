@@ -82,6 +82,10 @@ class Spec:
     clip: tuple[str, float] | None = None
     #: degrees around X/Y/Z applied after the material pass.
     rotate: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    #: Preserve authored hard edges while sharing normals across shallow
+    #: triangulation seams. Keep the kit's faceted style by default; rounded
+    #: containers opt in where flat-shading every triangle breaks the light.
+    smooth_by_angle: bool = False
     note: str = ""
 
 
@@ -116,7 +120,10 @@ SPECS: tuple[Spec, ...] = (
 
     # —— Kenney Survival Kit ——
     Spec("WaterBucket", "Model_KenneySurvivalKit", "bucket.glb",
-         {"*": "WoodDoor"}, target=("z", 0.34), triangles=300),
+         {"*": "WoodDoor"}, target=("z", 0.34), triangles=300,
+         smooth_by_angle=True,
+         note="share normals within each wooden stave so the source's triangulated "
+              "quads do not light as alternating dark and bright triangles"),
     Spec("FarmHoe", "Model_KenneySurvivalKit", "tool-hoe.glb",
          {}, split=("z", 0.190, "WoodBeam", "Steel"),
          rotate=(90.0, 0.0, 0.0), target=("y", 1.55), triangles=300,
@@ -319,7 +326,15 @@ def Optimize(obj: bpy.types.Object, spec: Spec) -> tuple[int, int, Vector]:
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.shade_flat()
+    if spec.smooth_by_angle:
+        # Kenney's bucket walls are authored as triangulated four-sided staves.
+        # Flat shading gives the two almost-coplanar halves independent normals,
+        # which turns every stave into a dark/light diagonal under the game sun.
+        # Angle-limited smoothing joins only those shallow seams and keeps the
+        # actual stave corners, rim and handle edges crisp.
+        bpy.ops.object.shade_smooth_by_angle()
+    else:
+        bpy.ops.object.shade_flat()
 
     low, high = Bounds(obj)
     return before, Triangles(obj), high - low
