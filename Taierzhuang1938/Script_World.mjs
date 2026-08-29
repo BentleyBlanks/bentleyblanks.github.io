@@ -1701,13 +1701,45 @@ export const EXTERNAL_SANDBAG_ASSET_IDS = Object.freeze([
   "battlefieldSandbag01", "battlefieldSandbag02", "battlefieldSandbag03",
 ]);
 
-const EXTERNAL_SANDBAG_METRICS = Object.freeze({
+export const EXTERNAL_SANDBAG_METRICS = Object.freeze({
   battlefieldSandbag01: Object.freeze({ width: 1.926, height: 0.426, depth: 0.866 }),
   battlefieldSandbag02: Object.freeze({ width: 2.017, height: 0.426, depth: 1.303 }),
   battlefieldSandbag03: Object.freeze({ width: 1.883, height: 0.533, depth: 0.936 }),
 });
-const EXTERNAL_SANDBAG_SLOT = 1.48;
-const EXTERNAL_SANDBAG_ROW_STEP = 0.36;
+// 堆垛参数只在这里定一份：层距必须小于三种模型缩放后的最低袋高，奇偶层错缝；
+// 纵深三道互相压叠。否则包围盒看似相交，袋端的收尖轮廓仍会在斜视图里露出贯通空洞。
+export const EXTERNAL_SANDBAG_PACKING = Object.freeze({
+  slot: 1.48,
+  layerStep: 0.225,
+  nominalHeight: 0.28,
+  laneStep: 0.52,
+  oddRowInset: 0.14,
+  rowTaper: 0.018,
+  rowShift: 0.30,
+});
+
+function ExternalSandbagRows(height, minimum = 2) {
+  const { layerStep, nominalHeight } = EXTERNAL_SANDBAG_PACKING;
+  return Math.max(minimum,
+    Math.round(Math.max(0, height - nominalHeight) / layerStep) + 1);
+}
+
+function ExternalSandbagRowSpan(span, row) {
+  const packing = EXTERNAL_SANDBAG_PACKING;
+  const taper = Math.min(span.width * 0.11, row * packing.rowTaper);
+  const oddInset = row % 2 ? Math.min(packing.oddRowInset, span.width * 0.09) : 0;
+  const width = Math.max(span.width * 0.64, span.width - taper * 2 - oddInset * 2);
+  const direction = Math.floor(row / 2) % 2 ? -1 : 1;
+  const shift = row % 2
+    ? direction * Math.min(packing.rowShift, span.width * 0.085)
+    : 0;
+  return { center: span.center + shift, width };
+}
+
+function ExternalSandbagLanes(depth) {
+  const step = Math.min(EXTERNAL_SANDBAG_PACKING.laneStep, Math.max(0.24, depth * 0.24));
+  return [-step, 0, step];
+}
 
 /** 固定种子洗牌袋：每连续三件必含 01/02/03 各一件，但次序随构件 seed 改变。 */
 function MakeExternalSandbagPicker(rnd) {
@@ -1725,12 +1757,12 @@ function MakeExternalSandbagPicker(rnd) {
 }
 
 function PushExternalSandbag(sink, placements, pick, rnd, {
-  x, y, z, ry, slotWidth = EXTERNAL_SANDBAG_SLOT,
+  x, y, z, ry, slotWidth = EXTERNAL_SANDBAG_PACKING.slot,
 }) {
   const asset = pick();
   const metrics = EXTERNAL_SANDBAG_METRICS[asset];
-  // 槽宽略微压叠，外部组合件之间不露规则的竖缝；整体仍保持等比缩放。
-  const scale = (slotWidth * (1.03 + (rnd() - 0.5) * 0.08)) / metrics.width;
+  // 袋体略宽于槽位：软袋落下会相互挤压，不能像木箱一样边贴边仍留下笔直暗缝。
+  const scale = (slotWidth * (1.08 + (rnd() - 0.5) * 0.08)) / metrics.width;
   placements.push({
     asset, x, y, z, ry, scale, solid: false,
     generatedSandbag: true,
@@ -1747,17 +1779,17 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const placements = [];
   const pick = MakeExternalSandbagPicker(rnd);
-  const rows = Math.max(2, Math.ceil(height / EXTERNAL_SANDBAG_ROW_STEP));
+  const rows = ExternalSandbagRows(height);
   for (let row = 0; row < rows; row += 1) {
-    const rowLen = length * (1 - row * 0.06);
-    const n = Math.max(2, Math.ceil(rowLen / EXTERNAL_SANDBAG_SLOT));
+    const rowLen = length * (1 - row * 0.055);
+    const n = Math.max(2, Math.ceil(rowLen / EXTERNAL_SANDBAG_PACKING.slot));
     const slotWidth = rowLen / n;
     for (let i = 0; i < n; i += 1) {
       const lx = -rowLen / 2 + (i + 0.5) * (rowLen / n);
       const lz = (rnd() - 0.5) * 0.12;
       PushExternalSandbag(sink, placements, pick, rnd, {
         x: x + cos * lx - sin * lz,
-        y: row * EXTERNAL_SANDBAG_ROW_STEP,
+        y: row * EXTERNAL_SANDBAG_PACKING.layerStep,
         z: z - sin * lx - cos * lz,
         ry: ry + (rnd() - 0.5) * 0.20,
         slotWidth,
@@ -3007,10 +3039,10 @@ export function AddSandbagPlug(sink, {
   const rnd = Mulberry32(HashString(seed));
   const pick = MakeExternalSandbagPicker(rnd);
   const fillH = mode === "full" ? openH : (mode === "partial" ? openH * 0.62 : openH * 0.9);
-  const rows = Math.max(3, Math.ceil(fillH / EXTERNAL_SANDBAG_ROW_STEP));
+  const rows = ExternalSandbagRows(fillH, 3);
   const placements = [];
   for (let r = 0; r < rows; r += 1) {
-    const y = baseY + r * EXTERNAL_SANDBAG_ROW_STEP;
+    const y = baseY + r * EXTERNAL_SANDBAG_PACKING.layerStep;
     const spans = mode === "slit"
       ? [
         { center: -(openW + slitWidth) / 4, width: (openW - slitWidth) / 2 },
@@ -3018,12 +3050,15 @@ export function AddSandbagPlug(sink, {
       ]
       : [{ center: 0, width: openW }];
     for (const span of spans) {
-      const n = Math.max(1, Math.ceil(span.width / EXTERNAL_SANDBAG_SLOT));
-      const slotWidth = span.width / n;
+      const rowSpan = ExternalSandbagRowSpan(span, r);
+      const n = Math.max(1, Math.ceil(rowSpan.width / EXTERNAL_SANDBAG_PACKING.slot));
+      const slotWidth = rowSpan.width / n;
       for (let i = 0; i < n; i += 1) {
-        const lx = span.center - span.width / 2 + (i + 0.5) * slotWidth;
-        for (const lz of [-depth * 0.3, 0, depth * 0.3]) {
-          const p = L(lx + (rnd() - 0.5) * 0.10, lz);
+        const lx = rowSpan.center - rowSpan.width / 2 + (i + 0.5) * slotWidth;
+        const lanes = ExternalSandbagLanes(depth);
+        for (let lane = 0; lane < lanes.length; lane += 1) {
+          const settle = (r % 2 ? 1 : -1) * (lane - 1) * 0.025;
+          const p = L(lx + (rnd() - 0.5) * 0.07, lanes[lane] + settle);
           PushExternalSandbag(sink, placements, pick, rnd, {
             x: p.x, y, z: p.z,
             ry: ry + (rnd() - 0.5) * 0.22,
@@ -3060,8 +3095,9 @@ export function AddSandbagEmplacement(sink, {
 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
-  const bagW = EXTERNAL_SANDBAG_SLOT, bagH = EXTERNAL_SANDBAG_ROW_STEP, bagD = 0.72;
-  const rows = Math.max(1, Math.ceil(height / bagH));
+  const bagW = EXTERNAL_SANDBAG_PACKING.slot;
+  const bagH = EXTERNAL_SANDBAG_PACKING.layerStep, bagD = 0.72;
+  const rows = ExternalSandbagRows(height, 1);
   const segments = [
     { axis: "x", lx: 0, lz: depth / 2, len: length },
     { axis: "z", lx: -length / 2 + bagD / 2, lz: 0, len: depth },

@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   BuildSink, AddBarricade, AddSandbagPlug, AddSandbagEmplacement,
-  EXTERNAL_SANDBAG_ASSET_IDS,
+  EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_SANDBAG_METRICS, EXTERNAL_SANDBAG_PACKING,
 } from "./Script_World.mjs";
 
 
@@ -172,7 +172,43 @@ function GeneratedSandbags(build) {
     "each composition mixes battlefield sandbag 01/02/03");
   assert.ok(placements.every((entry) => entry.solid === false && entry.generatedSandbag),
     "external meshes stay visual-only while aggregate builder colliders remain authoritative");
+  assert.ok(placements.every((entry) => (
+    EXTERNAL_SANDBAG_METRICS[entry.asset].height * entry.scale
+      >= EXTERNAL_SANDBAG_PACKING.layerStep - 1e-6
+  )), "every scaled bag is tall enough to overlap the next packed layer");
   return { placements, colliders: sink.colliders };
+}
+
+{
+  const sink = new BuildSink();
+  AddSandbagPlug(sink, {
+    x: 0, z: 0, ry: 0, openW: 3.8, openH: 2.6, depth: 2.4,
+    mode: "partial", seed: "packing-audit",
+  });
+  const placements = sink.props.find((prop) => prop.kind === "externalSandbags").placements;
+  const rows = new Map();
+  for (const placement of placements) {
+    const key = placement.y.toFixed(6);
+    if (!rows.has(key)) rows.set(key, []);
+    rows.get(key).push(placement);
+  }
+  const orderedRows = [...rows.values()];
+  assert.ok(orderedRows.length >= 5, "sandbag plug has enough tightly packed supporting layers");
+  for (const [index, row] of orderedRows.entries()) {
+    assert.deepEqual([...new Set(row.map((entry) => entry.asset))].sort(),
+      [...EXTERNAL_SANDBAG_ASSET_IDS].sort(),
+      `sandbag row ${index} visibly mixes all three authored bag forms`);
+  }
+  for (let index = 1; index < orderedRows.length; index += 1) {
+    const lowerX = orderedRows[index - 1].map((entry) => entry.x).sort((a, b) => a - b);
+    const upperX = orderedRows[index].map((entry) => entry.x).sort((a, b) => a - b);
+    assert.notDeepEqual(upperX, lowerX, `sandbag row ${index} breaks the vertical seams`);
+  }
+  const laneCenters = [...new Set(orderedRows[0].map((entry) => entry.z.toFixed(3)))]
+    .map(Number).sort((a, b) => a - b);
+  assert.equal(laneCenters.length, 3, "sandbag plug keeps three interlocked depth lanes");
+  assert.ok(laneCenters[2] - laneCenters[0] <= EXTERNAL_SANDBAG_PACKING.laneStep * 2 + 0.06,
+    "sandbag depth lanes stay close enough to support one another");
 }
 
 for (const [label, build, tag] of [
