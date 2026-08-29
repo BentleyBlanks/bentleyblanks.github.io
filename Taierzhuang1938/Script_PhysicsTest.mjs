@@ -603,15 +603,18 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     r.after ? `${r.after.solids} / ${r.after.fieldColliders}` : "");
 }
 
-// --- 7. 下载来的 .glb 布景：落地、且每一件都有碰撞体 ------------------------
+// --- 7. 下载来的 .glb 布景：落地、且碰撞归属正确 -----------------------------
 //
 // 这一条是补 2026-08-25 那个洞的。原来 Script_ExternalProps 只把模型摆进场景，
 // 既不按模型自己的包围盒落地、也不登记碰撞：手推车悬在 59.6 m 的天上、
 // 乡村房屋悬空 7.4 m，而所有人都能从一栋六米四的房子里穿过去。
 // 两条都从运行时取证，不读源码：
 //   · 每件摆件的可见包围盒底面必须贴着它脚下的地面（容差 0.15 m）；
-//   · 每件摆件必须在 field.colliders 里有一只**自己的**盒子（按中心点认领，
-//     不能靠"附近有别的盒子"蒙混过去 —— 旁边有院墙是常态）。
+//   · 普通摆件必须在 field.colliders 里有一只**自己的**盒子（按中心点认领，
+//     不能靠"附近有别的盒子"蒙混过去 —— 旁边有院墙是常态）；
+//   · Script_World 拼出来的沙袋是例外：每只 GLB 只是整段工事的视觉分件，上层
+//     本来就不落地，也不各建一只碎碰撞盒；它们必须由 barricade / sandbagPlug /
+//     sandbagEmplacement 的整段盒认领。
 {
   const r = await page.evaluate(async () => {
     const THREE = await import("./vendor/three/build/three.module.js?v=1");
@@ -625,26 +628,39 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const props = f.externalStreamer ? f.externalStreamer.LiveProps() : [];
     const bad = [];
     for (const p of props) {
-      let name, x, z, minY;
+      let name, x, z, minY, expectedMinY, generatedSandbag, requiresOwnCollider;
       if (p.object) {
         box.setFromObject(p.object);
         name = p.object.name; x = p.object.position.x; z = p.object.position.z;
         minY = box.min.y;
+        expectedMinY = p.object.userData.expectedMinY;
+        generatedSandbag = Boolean(p.object.userData.generatedSandbag);
+        requiresOwnCollider = p.object.userData.requiresOwnCollider !== false;
       } else {
         name = p.name; x = p.x; z = p.z; minY = p.minY;
+        expectedMinY = p.y;
+        generatedSandbag = Boolean(p.generatedSandbag);
+        requiresOwnCollider = p.requiresOwnCollider !== false;
       }
       const ground = f.GroundHeight(x, z);
-      const lift = minY - ground;
+      const lift = minY - (generatedSandbag ? expectedMinY : ground);
       // 认领：中心点落在这只盒子的水平投影里、且高度重合
       const mine = own.find((b) => Math.abs(b.c[0] - x) < 2.5
         && Math.abs(b.c[2] - z) < 2.5 && f.colliders.includes(b));
-      if (Math.abs(lift) > 0.15 || !mine) {
-        bad.push(`${name} 离地${lift.toFixed(2)}m${mine ? "" : " 无碰撞体"}`);
+      const aggregate = generatedSandbag && f.colliders.find((b) => (
+        ["barricade", "sandbagPlug", "sandbagEmplacement"].includes(b.tag)
+        && x >= b.min[0] - 0.8 && x <= b.max[0] + 0.8
+        && z >= b.min[2] - 0.8 && z <= b.max[2] + 0.8
+      ));
+      const claimed = requiresOwnCollider ? mine : aggregate;
+      if (Math.abs(lift) > 0.15 || !claimed) {
+        bad.push(`${name} ${generatedSandbag ? "层位" : "离地"}${lift.toFixed(2)}m`
+          + `${claimed ? "" : (generatedSandbag ? " 无整段碰撞" : " 无碰撞体")}`);
       }
     }
     return { n: props.length, own: own.length, bad };
   });
-  Check("下载来的布景都落在地面上、且每件都有自己的碰撞体",
+  Check("下载布景逐件落地；组合沙袋层位正确且由整段工事碰撞认领",
     r.n > 0 && r.bad.length === 0,
     `${r.n} 件摆件 / ${r.own} 只盒子${r.bad.length ? "；出问题的：" + r.bad.join("、") : ""}`);
 }

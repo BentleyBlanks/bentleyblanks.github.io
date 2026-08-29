@@ -38,7 +38,8 @@ import {
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { FlushWallInstances } from "./Script_WallSpline.mjs";
 import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
-import { MakeBox, MakeSandbag, MakeInstanced, TILE_METERS } from "./Script_Geo.mjs";
+import { MakeBox } from "./Script_Geo.mjs";
+import { LoadExternalSandbagModels } from "./Script_ExternalProps.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
@@ -584,7 +585,7 @@ function BrushFalloff(distance, radius) {
  * 场景关卡编辑器与构件库预览器共用，避免预览器另抄一份“看起来差不多”的模型。
  */
 export function BuildPlaceableVisual(target, entry, item, {
-  library, modelDocs = new Map(), ownedGeometries = [],
+  library, modelDocs = new Map(), externalModels = new Map(), ownedGeometries = [],
 } = {}) {
   if (!entry) return { loaded: false, colliders: [], meshes: 0 };
   if (entry.model) {
@@ -623,7 +624,7 @@ export function BuildPlaceableVisual(target, entry, item, {
   } catch (error) {
     console.warn(`[SceneEditor] ${entry.id} 建不出来：${String(error).slice(0, 160)}`);
   }
-  FlushSinkProps(sink, target, library, ownedGeometries, resolve);
+  FlushSinkProps(sink, target, library, ownedGeometries, resolve, externalModels);
   const flushed = sink.Flush(target, library, { resolve });
   for (const mesh of flushed) ownedGeometries.push(mesh.geometry);
   let meshes = 0;
@@ -684,6 +685,7 @@ export class SceneEditor {
      */
     this.physicsWorld = null;
     this.modelDocs = new Map();
+    this.externalModels = new Map();
     this.normalsDirty = new Set();
     this.normalsTimer = 0;
     this.groundPatched = null;
@@ -763,13 +765,20 @@ export class SceneEditor {
   }
 
   async LoadModels() {
-    for (const id of MODEL_PLACEABLE) {
-      if (this.modelDocs.has(id)) continue;
-      const doc = await LoadDocument(MeshUrl(id));
-      if (doc) this.modelDocs.set(id, doc);
-    }
-    // 载入前就摆下的模型这时候才补建出来
-    if (this.items.some((it) => this.Entry(it.type) && this.Entry(it.type).model)) this.RebuildAll();
+    const [externalModels] = await Promise.all([
+      LoadExternalSandbagModels(this.host.library),
+      Promise.all(MODEL_PLACEABLE.map(async (id) => {
+        if (this.modelDocs.has(id)) return;
+        const doc = await LoadDocument(MeshUrl(id));
+        if (doc) this.modelDocs.set(id, doc);
+      })),
+    ]);
+    this.externalModels = externalModels;
+    // 载入前就摆下的模型/外部沙袋构件这时候才补建出来。
+    if (this.items.some((it) => {
+      const entry = this.Entry(it.type);
+      return entry && (entry.model || entry.id === "Barricade" || entry.id === "SandbagPlug");
+    })) this.RebuildAll();
   }
 
   // -------------------------------------------------------------------------
@@ -1525,7 +1534,8 @@ export class SceneEditor {
       node.name = `Placed_${item.type}_${item.id}`;
       node.position.y = groundY;
       const built = BuildPlaceableVisual(node, entry, item, {
-        library, modelDocs: this.modelDocs, ownedGeometries: this.ownedGeometries,
+        library, modelDocs: this.modelDocs, externalModels: this.externalModels,
+        ownedGeometries: this.ownedGeometries,
       });
       if (addColliders) {
         for (const box of built.colliders) {
@@ -1975,8 +1985,8 @@ export class SceneEditor {
  * 那一份和城的生命周期绑在一起，这里不能借。**不展开的后果不是难看，是消失** ——
  * AddBarricade 整条沙包墙都在 props 里，不展开的话点了「沙包路障」什么也不出现。
  */
-export function FlushSinkProps(sink, target, library, owned, resolve = ResolveTengxianMaterial) {
-  const matrices = [];
+export function FlushSinkProps(sink, target, library, owned,
+  resolve = ResolveTengxianMaterial, externalModels = new Map()) {
   // 样条围墙 / 篱笆的实例桶（kind:"wallInstances"）：与建城时同一条收尾通道。
   // 不接这一路的话，编辑器里凡是走 Script_WallSpline 的构件会**静默消失** ——
   // 几何建了、矩阵算了、没人把它变成网格。
@@ -1984,7 +1994,19 @@ export function FlushSinkProps(sink, target, library, owned, resolve = ResolveTe
     scene: target, meshes: [], library, resolve,
   });
   for (const prop of sink.props) {
-    if (prop.kind === "sandbags") { matrices.push(...prop.matrices); continue; }
+    if (prop.kind === "externalSandbags") {
+      for (const placement of prop.placements) {
+        const template = externalModels.get(placement.asset);
+        if (!template) continue;
+        const model = template.clone(true);
+        model.name = `Placed_${placement.asset}`;
+        model.position.set(placement.x, placement.y || 0, placement.z);
+        model.rotation.y = placement.ry || 0;
+        model.scale.setScalar(placement.scale || 1);
+        target.add(model);
+      }
+      continue;
+    }
     if (prop.kind === "tree") { AddTree(sink, prop); continue; }
     if (prop.kind === "rubblePile" || prop.kind === "breachSpill") {
       const rnd = Mulberry32(HashString(prop.seed || "pile"));
@@ -2002,13 +2024,6 @@ export function FlushSinkProps(sink, target, library, owned, resolve = ResolveTe
     }
   }
   sink.props.length = 0;
-  if (matrices.length) {
-    const geometry = MakeSandbag(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag");
-    const mesh = MakeInstanced(geometry, ResolveTengxianMaterial("Sandbag", library), matrices);
-    mesh.name = "PlacedSandbags";
-    target.add(mesh);
-    owned.push(geometry);
-  }
 }
 
 export default SceneEditor;

@@ -13,7 +13,9 @@ import {
 } from "./Script_EditorScene.mjs";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { LoadDocument } from "./Script_MeshLoad.mjs";
-import { ExternalPropCatalog, InstantiateExternalProp } from "./Script_ExternalProps.mjs";
+import {
+  ExternalPropCatalog, InstantiateExternalProp, LoadExternalSandbagModels,
+} from "./Script_ExternalProps.mjs";
 
 export class PropLibraryEditor {
   static id = "props";
@@ -38,6 +40,7 @@ export class PropLibraryEditor {
     this.paletteId = this.entries[0] ? this.entries[0].id : null;
     this.damageState = "original";
     this.modelDocs = new Map();
+    this.externalModels = new Map();
     this.ownedGeometries = [];
     this.previewRoot = null;
     this.preview = null;
@@ -148,15 +151,21 @@ export class PropLibraryEditor {
 
   async LoadModels() {
     this.status.textContent = `模型载入中（${MODEL_PLACEABLE.length} 项）…`;
-    await Promise.all(MODEL_PLACEABLE.map(async (id) => {
-      const doc = await LoadDocument(MeshUrl(id));
-      if (doc) this.modelDocs.set(id, doc);
-    }));
+    const [externalModels] = await Promise.all([
+      LoadExternalSandbagModels(this.host.library),
+      Promise.all(MODEL_PLACEABLE.map(async (id) => {
+        const doc = await LoadDocument(MeshUrl(id));
+        if (doc) this.modelDocs.set(id, doc);
+      })),
+    ]);
+    this.externalModels = externalModels;
     if (this.disposed) return;
     this.status.textContent = `已覆盖 ${this.entries.length} 项，其中 tzm 模型 `
       + `${this.modelDocs.size}/${MODEL_PLACEABLE.length}，外部 GLB ${this.externalCatalog.length}`;
     const entry = this.Entry(this.paletteId);
-    if (entry && entry.model) this.ShowSelected();
+    if (entry && (entry.model || entry.id === "Barricade" || entry.id === "SandbagPlug")) {
+      this.ShowSelected();
+    }
   }
 
   ClearPreview() {
@@ -198,6 +207,7 @@ export class PropLibraryEditor {
       built = BuildPlaceableVisual(root, entry, item, {
         library: this.host.library,
         modelDocs: this.modelDocs,
+        externalModels: this.externalModels,
         ownedGeometries: this.ownedGeometries,
       });
     }

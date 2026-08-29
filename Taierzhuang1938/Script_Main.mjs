@@ -2477,11 +2477,13 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   const external = await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
+    generatedPlacements: battlefield.city?.generatedExternalProps || [],
   });
   // streamer 单独挂：externalProps 会被测试整个 evaluate 出去序列化，
   // 里面不能有 three 对象。
   battlefield.externalProps = {
-    count: external.count, failed: external.failed, colliders: external.colliders,
+    count: external.count, generatedCount: external.generatedCount,
+    failed: external.failed, colliders: external.colliders,
   };
   battlefield.externalStreamer = external.streamer;
   // 先在出生点收敛一次：进关第一帧就该看见眼前的家什，而不是看着它们冒出来。

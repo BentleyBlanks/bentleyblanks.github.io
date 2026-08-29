@@ -37,7 +37,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
-import { BuildSink } from "./Script_World.mjs";
+import { BuildSink, EXTERNAL_SANDBAG_ASSET_IDS } from "./Script_World.mjs";
 import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
@@ -675,7 +675,7 @@ function InstancedFormFor(id, asset, library) {
  * 但浮点残差与将来可能出现的偏心模型都靠这一步兜住。
  */
 function SolidFor(sink, spec, asset, placement) {
-  if (spec.solid === false) return 0;
+  if (spec.solid === false || placement.solid === false) return 0;
   const s = placement.scale || 1;
   const ry = placement.ry || 0;
   const [ox, oz] = asset.offset;
@@ -713,6 +713,17 @@ export async function InstantiateExternalProp(id, library) {
   return CloneLoadedAsset(id, await LoadAsset(id), library);
 }
 
+/**
+ * 构件库/场景编辑器共用的三种沙袋模板。返回的根节点可以 clone，几何和材质由
+ * ExternalProps 缓存持有；调用方只移除克隆，不 dispose 共享资源。
+ */
+export async function LoadExternalSandbagModels(library) {
+  const entries = await Promise.all(EXTERNAL_SANDBAG_ASSET_IDS.map(async (id) => (
+    [id, await InstantiateExternalProp(id, library)]
+  )));
+  return new Map(entries.filter(([, root]) => root));
+}
+
 /** Remove the previous level's visual-only props before its scene is disposed. */
 export function ClearExternalProps() {
   if (liveStreamer) { liveStreamer.Dispose(); liveStreamer = null; }
@@ -729,12 +740,20 @@ export function ClearExternalProps() {
  * 否则 AI 找掩体与破坏系统的粗筛里没有这些盒子 —— 物理世界有、粗筛没有，
  * 是最难认的一类不一致。
  */
-export async function AddExternalProps({ scene, library, phaseId, groundAt, bounds }) {
+export async function AddExternalProps({
+  scene, library, phaseId, groundAt, bounds, generatedPlacements = [],
+}) {
   ClearExternalProps();
   // 两层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
   // 城内每户布设（Script_TownDressing）。后者跨关共位 —— 城是同一座城。
-  const placements = [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
-  if (!placements.length) return { count: 0, failed: [], colliders: [], streamer: null };
+  // generatedPlacements 是 Script_World 构建器产出的沙袋组合；它只负责画面，
+  // 碰撞仍由 AddBarricade/AddSandbagPlug/AddSandbagEmplacement 的整段盒负责。
+  const placements = [
+    ...PlacementsFor(phaseId), ...TownDressingFor(bounds), ...generatedPlacements,
+  ];
+  if (!placements.length) {
+    return { count: 0, generatedCount: 0, failed: [], colliders: [], streamer: null };
+  }
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
   const loaded = await Promise.all(ids.map(async (id) => [id, await LoadAsset(id)]));
@@ -758,7 +777,9 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   for (const placement of placements) {
     const asset = models.get(placement.asset);
     if (!asset) { failed.push(placement.asset); continue; }
-    const y = groundAt(placement.x, placement.z) + (placement.yOffset || 0);
+    const y = Number.isFinite(placement.y)
+      ? placement.y
+      : groundAt(placement.x, placement.z) + (placement.yOffset || 0);
     SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
     const scale = placement.scale || 1;
     const maxDim = Math.max(asset.half[0], asset.half[1], asset.half[2]) * 2 * scale;
@@ -785,6 +806,8 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
         name: `External_${id}_${index}`,
         x: placement.x, y, z: placement.z,
         minY: y + form.geoMinY * scale,
+        generatedSandbag: Boolean(placement.generatedSandbag),
+        requiresOwnCollider: placement.solid !== false,
       };
     }
     streamer.Register({
@@ -796,6 +819,9 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
         prop.position.set(placement.x, y, placement.z);
         prop.rotation.y = placement.ry || 0;
         prop.scale.setScalar(scale);
+        prop.userData.generatedSandbag = Boolean(placement.generatedSandbag);
+        prop.userData.requiresOwnCollider = placement.solid !== false;
+        prop.userData.expectedMinY = y;
         return prop;
       },
     });
@@ -806,7 +832,10 @@ export async function AddExternalProps({ scene, library, phaseId, groundAt, boun
   scene.add(root);
   liveRoot = root;
   liveStreamer = streamer;
-  return { count, failed, colliders: sink.colliders, streamer };
+  return {
+    count, generatedCount: generatedPlacements.length,
+    failed, colliders: sink.colliders, streamer,
+  };
 }
 
 export function ExternalPropCount(phaseId, bounds) {

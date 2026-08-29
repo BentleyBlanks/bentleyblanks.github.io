@@ -423,10 +423,14 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       // 借片的章（序章）按 fieldFrom 取布设表 —— 与 Script_Main.FieldIdFor 同一条口径。
       return ExternalPropCount(p.fieldFrom || p.id, p.bounds);
     }, phase);
-    if (!health.externalProps || health.externalProps.count !== expectedExternalProps
+    const expectedExternalPropsWithGenerated = expectedExternalProps
+      + (health.externalProps?.generatedCount || 0);
+    if (!health.externalProps || health.externalProps.count !== expectedExternalPropsWithGenerated
       || health.externalProps.failed?.length) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
-        + ` expected=${expectedExternalProps} failed=${health.externalProps?.failed?.join(",") || "none"}`);
+        + ` expected=${expectedExternalPropsWithGenerated}`
+        + ` generated=${health.externalProps?.generatedCount || 0}`
+        + ` failed=${health.externalProps?.failed?.join(",") || "none"}`);
     }
     // 流送自洽（实例化语义，2026-08-26）：登记数必须等于摆位数，live 不得超过
     // 登记数；live = 实例化件(batched) + 克隆件(clones)，桶里的实例总数必须

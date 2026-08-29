@@ -1690,27 +1690,81 @@ export function AddMosque(sink, { x, z, ry = 0, seed = "mq", damage = 0.4 }) {
     { x: stx, y: 0.14, z: stz, ry }));
 }
 
+/**
+ * 外部战场包里的三种沙袋组合件。
+ *
+ * 这三件不是 0.62 m 的程序化单袋，而是约 1.9—2.0 m 宽的一小段袋墙；构建器按
+ * 目标槽宽等比缩放后拼排。尺寸来自 Model_BattlefieldPack.glb 的实测包围盒，既
+ * 决定相邻件间距，也让 01/02/03 的原始比例保持不变。
+ */
+export const EXTERNAL_SANDBAG_ASSET_IDS = Object.freeze([
+  "battlefieldSandbag01", "battlefieldSandbag02", "battlefieldSandbag03",
+]);
+
+const EXTERNAL_SANDBAG_METRICS = Object.freeze({
+  battlefieldSandbag01: Object.freeze({ width: 1.926, height: 0.426, depth: 0.866 }),
+  battlefieldSandbag02: Object.freeze({ width: 2.017, height: 0.426, depth: 1.303 }),
+  battlefieldSandbag03: Object.freeze({ width: 1.883, height: 0.533, depth: 0.936 }),
+});
+const EXTERNAL_SANDBAG_SLOT = 1.48;
+const EXTERNAL_SANDBAG_ROW_STEP = 0.36;
+
+/** 固定种子洗牌袋：每连续三件必含 01/02/03 各一件，但次序随构件 seed 改变。 */
+function MakeExternalSandbagPicker(rnd) {
+  let deck = [];
+  return () => {
+    if (!deck.length) {
+      deck = [...EXTERNAL_SANDBAG_ASSET_IDS];
+      for (let index = deck.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(rnd() * (index + 1));
+        [deck[index], deck[swap]] = [deck[swap], deck[index]];
+      }
+    }
+    return deck.pop();
+  };
+}
+
+function PushExternalSandbag(sink, placements, pick, rnd, {
+  x, y, z, ry, slotWidth = EXTERNAL_SANDBAG_SLOT,
+}) {
+  const asset = pick();
+  const metrics = EXTERNAL_SANDBAG_METRICS[asset];
+  // 槽宽略微压叠，外部组合件之间不露规则的竖缝；整体仍保持等比缩放。
+  const scale = (slotWidth * (1.03 + (rnd() - 0.5) * 0.08)) / metrics.width;
+  placements.push({
+    asset, x, y, z, ry, scale, solid: false,
+    generatedSandbag: true,
+  });
+}
+
+function PushExternalSandbagGroup(sink, placements) {
+  if (placements.length) sink.props.push({ kind: "externalSandbags", placements });
+}
+
 /** 街垒：门板、水缸、粮包、独轮车、沙包 —— 就便器材，不是工事教科书。 */
 export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", height = 1.15 }) {
   const rnd = Mulberry32(HashString(seed));
   const cos = Math.cos(ry), sin = Math.sin(ry);
-  const bags = [];
-  const dummy = new THREE.Object3D();
-  const rows = Math.max(2, Math.round(height / 0.24));
+  const placements = [];
+  const pick = MakeExternalSandbagPicker(rnd);
+  const rows = Math.max(2, Math.ceil(height / EXTERNAL_SANDBAG_ROW_STEP));
   for (let row = 0; row < rows; row += 1) {
     const rowLen = length * (1 - row * 0.06);
-    const n = Math.max(2, Math.round(rowLen / 0.6));
+    const n = Math.max(2, Math.ceil(rowLen / EXTERNAL_SANDBAG_SLOT));
+    const slotWidth = rowLen / n;
     for (let i = 0; i < n; i += 1) {
       const lx = -rowLen / 2 + (i + 0.5) * (rowLen / n);
       const lz = (rnd() - 0.5) * 0.12;
-      dummy.position.set(x + cos * lx - sin * lz, 0.12 + row * 0.225, z - sin * lx - cos * lz);
-      dummy.rotation.set((rnd() - 0.5) * 0.1, ry + (rnd() - 0.5) * 0.28, (rnd() - 0.5) * 0.1);
-      dummy.scale.set(1, 0.95 + rnd() * 0.14, 1);
-      dummy.updateMatrix();
-      bags.push(dummy.matrix.clone());
+      PushExternalSandbag(sink, placements, pick, rnd, {
+        x: x + cos * lx - sin * lz,
+        y: row * EXTERNAL_SANDBAG_ROW_STEP,
+        z: z - sin * lx - cos * lz,
+        ry: ry + (rnd() - 0.5) * 0.20,
+        slotWidth,
+      });
     }
   }
-  sink.props.push({ kind: "sandbags", matrices: bags });
+  PushExternalSandbagGroup(sink, placements);
   sink.Solid(x, height / 2, z, length / 2 + 0.15, height / 2, 0.3, "barricade", ry);
   sink.Cover(x, z, height, sin, cos);
 
@@ -2951,27 +3005,35 @@ export function AddSandbagPlug(sink, {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
   const rnd = Mulberry32(HashString(seed));
+  const pick = MakeExternalSandbagPicker(rnd);
   const fillH = mode === "full" ? openH : (mode === "partial" ? openH * 0.62 : openH * 0.9);
-  const rows = Math.max(3, Math.round(fillH / 0.26));
-  const matrices = [];
-  const dummy = new THREE.Object3D();
+  const rows = Math.max(3, Math.ceil(fillH / EXTERNAL_SANDBAG_ROW_STEP));
+  const placements = [];
   for (let r = 0; r < rows; r += 1) {
-    const y = baseY + 0.13 + r * 0.26;
-    const n = Math.max(3, Math.round(openW / 0.62));
-    for (let i = 0; i < n; i += 1) {
-      const lx = -openW / 2 + (i + 0.5) * (openW / n);
-      // slit：中间留一条一人宽的缝 —— 这条缝就是 1938 年 3 月 17 日夜里全城唯一的出口
-      if (mode === "slit" && Math.abs(lx) < slitWidth / 2) continue;
-      for (const lz of [-depth * 0.3, 0, depth * 0.3]) {
-        dummy.position.set(...(() => { const p = L(lx + (rnd() - 0.5) * 0.1, lz); return [p.x, y, p.z]; })());
-        dummy.rotation.set((rnd() - 0.5) * 0.12, ry + (rnd() - 0.5) * 0.3, (rnd() - 0.5) * 0.12);
-        dummy.scale.set(1, 0.95 + rnd() * 0.14, 1);
-        dummy.updateMatrix();
-        matrices.push(dummy.matrix.clone());
+    const y = baseY + r * EXTERNAL_SANDBAG_ROW_STEP;
+    const spans = mode === "slit"
+      ? [
+        { center: -(openW + slitWidth) / 4, width: (openW - slitWidth) / 2 },
+        { center: (openW + slitWidth) / 4, width: (openW - slitWidth) / 2 },
+      ]
+      : [{ center: 0, width: openW }];
+    for (const span of spans) {
+      const n = Math.max(1, Math.ceil(span.width / EXTERNAL_SANDBAG_SLOT));
+      const slotWidth = span.width / n;
+      for (let i = 0; i < n; i += 1) {
+        const lx = span.center - span.width / 2 + (i + 0.5) * slotWidth;
+        for (const lz of [-depth * 0.3, 0, depth * 0.3]) {
+          const p = L(lx + (rnd() - 0.5) * 0.10, lz);
+          PushExternalSandbag(sink, placements, pick, rnd, {
+            x: p.x, y, z: p.z,
+            ry: ry + (rnd() - 0.5) * 0.22,
+            slotWidth,
+          });
+        }
       }
     }
   }
-  sink.props.push({ kind: "sandbags", matrices });
+  PushExternalSandbagGroup(sink, placements);
   // 碰撞：堵死的整片挡住，留缝的分两块挡住缝的两侧
   if (mode === "slit") {
     for (const s of [-1, 1]) {
@@ -2989,8 +3051,8 @@ export function AddSandbagPlug(sink, {
  * 低矮的野战掩体：前沿一排沙袋 + 两侧短翼，后方敞开供补位和撤退。
  *
  * 它和 AddSandbagPlug 的用途不同：堵门是连续实体，这里是东关白盒里的
- * 投弹位、机枪位和预备队院落掩体。仍然复用同一套实例化沙袋，避免为几
- * 个固定战位引入新的材质或 draw call。
+ * 投弹位、机枪位和预备队院落掩体。画面复用外部战场包的 01/02/03 三种
+ * 沙袋组合件；碰撞仍是一段一盒，不随外部网格的细碎轮廓改变。
  */
 export function AddSandbagEmplacement(sink, {
   x, z, ry = 0, baseY = 0, seed = "emplacement",
@@ -2998,34 +3060,35 @@ export function AddSandbagEmplacement(sink, {
 }) {
   const cos = Math.cos(ry), sin = Math.sin(ry);
   const L = (lx, lz) => ({ x: x + cos * lx + sin * lz, z: z - sin * lx + cos * lz });
-  const bagW = 0.62, bagH = 0.24, bagD = 0.34;
+  const bagW = EXTERNAL_SANDBAG_SLOT, bagH = EXTERNAL_SANDBAG_ROW_STEP, bagD = 0.72;
   const rows = Math.max(1, Math.ceil(height / bagH));
   const segments = [
     { axis: "x", lx: 0, lz: depth / 2, len: length },
     { axis: "z", lx: -length / 2 + bagD / 2, lz: 0, len: depth },
     { axis: "z", lx: length / 2 - bagD / 2, lz: 0, len: depth },
   ];
-  const matrices = [];
-  const dummy = new THREE.Object3D();
+  const placements = [];
   const rnd = Mulberry32(HashString(seed));
+  const pick = MakeExternalSandbagPicker(rnd);
   for (let row = 0; row < rows; row += 1) {
     const rowOffset = row % 2 ? bagW * 0.5 : 0;
     for (const segment of segments) {
       const count = Math.max(1, Math.ceil(segment.len / bagW));
+      const slotWidth = segment.len / count;
       for (let i = 0; i < count; i += 1) {
         const along = -segment.len / 2 + (i + 0.5) * segment.len / count + rowOffset;
         const p = L(segment.lx + (segment.axis === "x" ? along : 0),
           segment.lz + (segment.axis === "z" ? along : 0));
         const axisRy = segment.axis === "x" ? ry : ry + Math.PI / 2;
-        dummy.position.set(p.x, baseY + bagH * (row + 0.5), p.z);
-        dummy.rotation.set((rnd() - 0.5) * 0.10, axisRy + (rnd() - 0.5) * 0.18, (rnd() - 0.5) * 0.10);
-        dummy.scale.set(1, 0.94 + rnd() * 0.12, 1);
-        dummy.updateMatrix();
-        matrices.push(dummy.matrix.clone());
+        PushExternalSandbag(sink, placements, pick, rnd, {
+          x: p.x, y: baseY + bagH * row, z: p.z,
+          ry: axisRy + (rnd() - 0.5) * 0.16,
+          slotWidth,
+        });
       }
     }
   }
-  sink.props.push({ kind: "sandbags", matrices });
+  PushExternalSandbagGroup(sink, placements);
   const solidH = rows * bagH;
   for (const segment of segments) {
     const p = L(segment.lx, segment.lz);

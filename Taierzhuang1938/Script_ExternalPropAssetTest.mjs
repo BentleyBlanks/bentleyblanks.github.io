@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  BuildSink, AddBarricade, AddSandbagPlug, AddSandbagEmplacement,
+  EXTERNAL_SANDBAG_ASSET_IDS,
+} from "./Script_World.mjs";
 
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -151,6 +155,41 @@ AssertTexturedMaterialsHaveNormals(battlefield.json, "battlefield pack", "Model_
 for (const [name, spec] of battlefield.nodes) {
   assert.ok(spec.triangles <= 3500, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
+}
+
+function GeneratedSandbags(build) {
+  const sink = new BuildSink();
+  build(sink);
+  assert.ok(!sink.props.some((prop) => prop.kind === "sandbags"),
+    "sandbag builders no longer emit procedural MakeSandbag instance buckets");
+  const placements = sink.props
+    .filter((prop) => prop.kind === "externalSandbags")
+    .flatMap((prop) => prop.placements);
+  assert.ok(placements.length >= EXTERNAL_SANDBAG_ASSET_IDS.length,
+    "sandbag builder emits an external model composition");
+  assert.deepEqual([...new Set(placements.map((entry) => entry.asset))].sort(),
+    [...EXTERNAL_SANDBAG_ASSET_IDS].sort(),
+    "each composition mixes battlefield sandbag 01/02/03");
+  assert.ok(placements.every((entry) => entry.solid === false && entry.generatedSandbag),
+    "external meshes stay visual-only while aggregate builder colliders remain authoritative");
+  return { placements, colliders: sink.colliders };
+}
+
+for (const [label, build, tag] of [
+  ["barricade", (sink) => AddBarricade(sink,
+    { x: 4, z: -7, ry: 0.3, length: 5, height: 1.15, seed: "asset-test-bar" }), "barricade"],
+  ["sandbag plug", (sink) => AddSandbagPlug(sink,
+    { x: -3, z: 6, ry: -0.2, openW: 3.8, openH: 2.6, depth: 2.4,
+      mode: "partial", seed: "asset-test-plug" }), "sandbagPlug"],
+  ["sandbag emplacement", (sink) => AddSandbagEmplacement(sink,
+    { x: 10, z: 12, ry: 0.6, length: 7, depth: 2.6, height: 0.72,
+      seed: "asset-test-emplacement" }), "sandbagEmplacement"],
+]) {
+  const first = GeneratedSandbags(build);
+  const second = GeneratedSandbags(build);
+  assert.deepEqual(first.placements, second.placements, `${label} model mix is seed-deterministic`);
+  assert.ok(first.colliders.some((collider) => collider.tag === tag),
+    `${label} keeps its aggregate gameplay collider`);
 }
 
 const ruralHouse = ReadGlb("Model_ChineseRuralHouse.glb", 5_500_000);

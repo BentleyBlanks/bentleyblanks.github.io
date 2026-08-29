@@ -57,7 +57,7 @@ import {
   AddCypress, AddPoplar, AddOrchardTree,
 } from "./Script_World.mjs";
 import {
-  MakeBox, MakeSandbag, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
+  MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
   MakeInstanced, TILE_METERS, BRICK_UV_GRID, RoofSlopeLayout,
 } from "./Script_Geo.mjs";
 import {
@@ -437,6 +437,9 @@ export class TengxianCity {
     this.sink = new BuildSink();          // 近景：投阴影
     this.farSink = new BuildSink();       // 远景剪影：不投阴影（省掉阴影 pass 的那一份三角形）
     this.meshes = [];
+    // Script_World 的沙袋构建器只产出外部模型摆位；建城收尾把它交给
+    // Script_ExternalProps 的统一加载/实例化/流送通道。
+    this.generatedExternalProps = [];
     this.colliders = [];
     this.covers = [];
     this.grid = new Map();
@@ -2439,7 +2442,6 @@ export class TengxianCity {
   // =========================================================================
 
   FlushProps() {
-    const bagMatrices = [];
     const rubble = [];
     const dummy = new THREE.Object3D();
     // 样条围墙的实例化桶（寨墙/坝墙等）：与沙包/瓦砾同一条收尾通道
@@ -2451,7 +2453,10 @@ export class TengxianCity {
     }
     for (const sink of [this.sink, this.farSink]) {
       for (const p of sink.props) {
-        if (p.kind === "sandbags") { bagMatrices.push(...p.matrices); continue; }
+        if (p.kind === "externalSandbags") {
+          this.generatedExternalProps.push(...p.placements);
+          continue;
+        }
         if (p.kind === "breachSpill" || p.kind === "rubblePile") {
           const rnd = Mulberry32(HashString(p.seed || "pile"));
           const n = p.kind === "breachSpill" ? 26 : 34;
@@ -2471,13 +2476,6 @@ export class TengxianCity {
         if (p.kind === "tree") AddTree(this.farSink, p);
       }
       sink.props.length = 0;
-    }
-    if (bagMatrices.length) {
-      const mesh = MakeInstanced(MakeSandbag(0.62, 0.24, 0.34, TILE_METERS.sandbag, "bag"),
-        ResolveTengxianMaterial("Sandbag", this.library), bagMatrices);
-      mesh.name = "SandbagPlugs";
-      this.scene.add(mesh);
-      this.meshes.push(mesh);
     }
     if (rubble.length) {
       const mesh = MakeInstanced(MakeBox(1, 1, 1, 0.32, "rubbleUnit"),
