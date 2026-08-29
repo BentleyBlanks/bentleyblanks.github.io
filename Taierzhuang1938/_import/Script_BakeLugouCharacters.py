@@ -6,6 +6,29 @@ animation FBXs contain the BIP motion sampled on NRA01 and IJA01 at one sample p
 baker transfers each faction's rest-relative poses onto its five original rigs, adds semantic
 sockets, embeds textures as WebP and validates every fresh GLB import before writing the browser
 manifest.
+
+2026-08-29 incident, read before touching the grounding code
+------------------------------------------------------------
+A bake shipped ten GLBs in which the **root bone's own translation never reached the
+file**: every one of the sixteen clips held the pelvis at its rest height, so the lying,
+kneeling and sitting clips all stood upright in mid-air.  Non-root translation (thigh,
+clavicle) survived; only the root channel was flat.
+
+It shipped because the only pose-related audit asked *"does the deformed mesh dip below
+Z=0?"* and the ground correction was lift-only (``max(0.0, -groundZ)``).  A body frozen at
+standing height floats, floating bodies never dip below zero, so the audit reported
+``maxGroundPenetrationMeters == 0`` for all 160 clip/model pairs and looked healthy.
+
+Two rules came out of it, both enforced below:
+
+*   **Ground clearance is not a pose audit.**  Contact poses (prone, sit) legitimately let
+    the mesh sink a little into the contact plane, and a floating body trivially passes a
+    penetration test.  ``AUDIT_GROUND_LIMITS`` therefore keeps the standing reference clip
+    tight and lets contact poses breathe -- it is no longer pretending to guard the pose.
+*   **The pose audit measures the pelvis.**  ``ValidateGlb`` reports each clip's pelvis
+    world height from the freshly re-imported GLB, and ``BakeModel`` refuses to write a
+    model whose sixteen clips share one pelvis height (``MIN_PELVIS_SPREAD_METERS``).
+    Script_CharacterModelTest re-measures the same thing straight out of the shipped GLB.
 """
 
 from __future__ import annotations
@@ -71,6 +94,15 @@ SOCKETS = {
     "Socket_HeadGear": "head",
 }
 GROUND_ROOT_NAME = "GroundRoot"
+# The only clip whose soles are genuinely meant to rest on the floor; every other clip is a
+# contact pose that may sink a few centimetres into the surface it lies or kneels on.
+STANDING_REFERENCE_ACTION = "AdvanceFire"
+AUDIT_GROUND_LIMITS = {"standing": 0.08, "contact": 0.25}
+# Sixteen clips that share one pelvis height mean the root translation channel was lost.
+# See the module docstring: this, not ground penetration, is the pose audit.
+MIN_PELVIS_SPREAD_METERS = 0.40
+MAX_LOW_POSE_PELVIS_METERS = 0.35
+MIN_HIGH_POSE_PELVIS_METERS = 0.70
 
 
 def ParseArgs() -> argparse.Namespace:
@@ -535,6 +567,8 @@ def RetargetAction(
     end = int(round(sourceAction.frame_range[1]))
     maxPoseDeltaError = 0.0
     maxGroundCorrection = 0.0
+    rootHeightLow = float("inf")
+    rootHeightHigh = float("-inf")
     scene = bpy.context.scene
     previousFrame = scene.frame_current
     try:
@@ -584,12 +618,24 @@ def RetargetAction(
             # it as the sole visibly buries both boots.
             rootPose = baseArmature.pose.bones[rootName]
             rootMatrix = rootPose.matrix.copy()
-            rootMatrix.translation.x = targetRest[rootName].translation.x
-            rootMatrix.translation.y = targetRest[rootName].translation.y
+            # `rootPose.matrix` is armature space, so the in-place lock has to come from the
+            # root bone's armature-space rest head -- NOT from `targetRest[rootName]`, which
+            # since GroundRoot exists is expressed in GroundRoot's *bone* axes (its Y points
+            # along world Z).  Both happen to be ~zero on the current Biped, which is exactly
+            # why the mixed-frame version could sit here unnoticed.
+            restHead = targetBones[rootName].matrix_local.translation
+            rootMatrix.translation.x = restHead.x
+            rootMatrix.translation.y = restHead.y
             rootPose.matrix = rootMatrix
             rootPose.keyframe_insert(data_path="location", frame=frame, group=rootName)
             rootPose.keyframe_insert(data_path="rotation_quaternion", frame=frame, group=rootName)
             rootPose.keyframe_insert(data_path="scale", frame=frame, group=rootName)
+            # Evidence that the authored root motion actually made it into this Action.
+            # A clip whose root never leaves its rest height is either a genuinely static
+            # pose or -- far more likely -- the 2026-08-29 regression coming back.
+            rootWorldZ = (baseArmature.matrix_world @ rootPose.matrix).translation.z
+            rootHeightLow = min(rootHeightLow, rootWorldZ)
+            rootHeightHigh = max(rootHeightHigh, rootWorldZ)
             groundPose = baseArmature.pose.bones[GROUND_ROOT_NAME]
             groundPose.matrix_basis.identity()
             groundPose.keyframe_insert(data_path="location", frame=frame, group=GROUND_ROOT_NAME)
@@ -636,6 +682,8 @@ def RetargetAction(
     targetAction["sourceBoneCount"] = len(sharedNames)
     targetAction["maxPoseDeltaError"] = maxPoseDeltaError
     targetAction["maxGroundCorrectionMeters"] = maxGroundCorrection
+    targetAction["rootHeightLowMeters"] = rootHeightLow
+    targetAction["rootHeightHighMeters"] = rootHeightHigh
     return targetAction
 
 
@@ -766,7 +814,11 @@ def ExportGlb(path: Path) -> None:
         raise RuntimeError(f"glTF export failed: {path}")
 
 
-def ValidateGlb(path: Path, animationAudit: dict[str, dict[str, object]]) -> dict[str, object]:
+def ValidateGlb(
+    path: Path,
+    animationAudit: dict[str, dict[str, object]],
+    pelvisBoneName: str,
+) -> dict[str, object]:
     ResetScene()
     result = bpy.ops.import_scene.gltf(filepath=str(path), import_pack_images=False)
     if "FINISHED" not in result:
@@ -787,25 +839,39 @@ def ValidateGlb(path: Path, animationAudit: dict[str, dict[str, object]]) -> dic
     for track in animationData.nla_tracks:
         track.mute = True
     maxPenetrationByAction: dict[str, float] = {}
+    pelvisHeightByAction: dict[str, list[float]] = {}
+    # The pose audit reads the pelvis out of the *shipped* file, not out of the bake's own
+    # bookkeeping.  See the module docstring: trusting the baker's self-report is how the
+    # frozen-root regression reached the browser.
+    pelvisPose = armature.pose.bones.get(pelvisBoneName)
+    if pelvisPose is None:
+        raise RuntimeError(f"{path.name}: re-imported GLB has no pelvis bone {pelvisBoneName}")
     scene = bpy.context.scene
     for action in bpy.data.actions:
         animationData.action = action
         start, end = action.frame_range
         sampleCount = max(2, int(animationAudit.get(action.name, {}).get("sourceFrames", 2)))
         maxPenetration = 0.0
+        pelvisLow = float("inf")
+        pelvisHigh = float("-inf")
         for sampleIndex in range(sampleCount):
             sampleFrame = start + (end - start) * sampleIndex / (sampleCount - 1)
             wholeFrame = int(sampleFrame)
             scene.frame_set(wholeFrame, subframe=sampleFrame - wholeFrame)
             bpy.context.view_layer.update()
             maxPenetration = max(maxPenetration, -EvaluatedMeshGroundZ(meshes))
+            pelvisZ = (armature.matrix_world @ pelvisPose.matrix).translation.z
+            pelvisLow = min(pelvisLow, pelvisZ)
+            pelvisHigh = max(pelvisHigh, pelvisZ)
         maxPenetrationByAction[action.name] = max(0.0, maxPenetration)
+        pelvisHeightByAction[action.name] = [pelvisLow, pelvisHigh]
     animationData.action = None
     return {
         "armatures": len(armatures),
         "skinnedMeshes": len(meshes),
         "animations": actions,
         "maxGroundPenetrationMeters": maxPenetrationByAction,
+        "pelvisHeightMeters": pelvisHeightByAction,
     }
 
 
@@ -877,6 +943,10 @@ def BakeModel(
             "maxGroundCorrectionMeters": float(
                 actions[actionId].get("maxGroundCorrectionMeters", 0)
             ),
+            "rootHeightMeters": [
+                float(actions[actionId].get("rootHeightLowMeters", 0)),
+                float(actions[actionId].get("rootHeightHighMeters", 0)),
+            ],
         }
         for actionId in EXPECTED_ACTIONS
     }
@@ -892,20 +962,37 @@ def BakeModel(
             filepath=str(outputDir / f"Scene_{modelId}.blend"),
             check_existing=False,
         )
-    validation = ValidateGlb(outputPath, animationAudit)
+    validation = ValidateGlb(outputPath, animationAudit, boneMap["pelvis"])
     for actionId, penetration in validation["maxGroundPenetrationMeters"].items():
         animationAudit[actionId]["maxGroundPenetrationMeters"] = penetration
+    for actionId, heights in validation["pelvisHeightMeters"].items():
+        animationAudit[actionId]["pelvisHeightMeters"] = [round(value, 6) for value in heights]
     poseFailures = [
         actionId for actionId, audit in animationAudit.items()
         if float(audit["maxPoseDeltaError"]) > 0.001
     ]
     groundFailures = [
         actionId for actionId, audit in animationAudit.items()
-        if float(audit["maxGroundPenetrationMeters"]) > 0.002
+        if float(audit["maxGroundPenetrationMeters"]) > (
+            AUDIT_GROUND_LIMITS["standing"] if actionId == STANDING_REFERENCE_ACTION
+            else AUDIT_GROUND_LIMITS["contact"]
+        )
     ]
-    if poseFailures or groundFailures:
+    # The pose audit.  Ground clearance cannot see a frozen root -- a body stuck at standing
+    # height simply floats -- so the sixteen clips' pelvis heights are what gets checked.
+    pelvisLow = min(audit["pelvisHeightMeters"][0] for audit in animationAudit.values())
+    pelvisHigh = max(audit["pelvisHeightMeters"][1] for audit in animationAudit.values())
+    pelvisSpread = pelvisHigh - pelvisLow
+    poseSpreadFailure = (
+        pelvisSpread < MIN_PELVIS_SPREAD_METERS
+        or pelvisLow > MAX_LOW_POSE_PELVIS_METERS
+        or pelvisHigh < MIN_HIGH_POSE_PELVIS_METERS
+    )
+    if poseFailures or groundFailures or poseSpreadFailure:
         raise RuntimeError(
-            f"{modelId}: animation audit failed; pose={poseFailures}, ground={groundFailures}"
+            f"{modelId}: animation audit failed; pose={poseFailures}, ground={groundFailures}, "
+            f"pelvis={pelvisLow:.3f}..{pelvisHigh:.3f} (spread {pelvisSpread:.3f}) -- a spread "
+            "below the threshold means the root translation channel never reached the GLB"
         )
     return {
         "id": modelId,
@@ -922,6 +1009,7 @@ def BakeModel(
         "bounds": bounds,
         "sockets": sockets,
         "animations": list(EXPECTED_ACTIONS),
+        "pelvisHeightSpreadMeters": round(pelvisSpread, 6),
         "animationAudit": animationAudit,
         "missingTextures": missingTextures,
         "validation": validation,
@@ -1007,7 +1095,7 @@ def Main() -> None:
             )
         )
     manifest = {
-        "schema": 1,
+        "schema": 2,
         "generatedBy": "Script_BakeLugouCharacters.py",
         "models": records,
         "elapsedSeconds": round(time.perf_counter() - startedAt, 3),

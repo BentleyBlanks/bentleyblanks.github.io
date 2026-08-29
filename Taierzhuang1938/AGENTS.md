@@ -190,6 +190,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Data_Meshes.mjs` 逐字段互核。加载器 `Script_MeshLoad.mjs`（为什么不用 glTF 见头注）。
 - `Script_RiggedModel.mjs` —— GLB 蒙皮桥接：程序化动画重定向到导入骨架，
   失败自动降级回程序化几何，不堵开机、不改战斗时序。
+- 十名蒙皮士兵（`Model/Character/`）由 `_import/Script_BakeLugouCharacters.{ps1,py}`
+  从 3ds Max 桥烘出。**动它之前先读那份 py 的模块头注**：2026-08-29 有一次重烘把根骨
+  位移轨道烘丢了，十六条 clip 的人全钉在站立高度，而当时唯一的贴地审计对此完全看不见
+  （悬空的人不会陷进地里）。姿态闸现在是「逐 clip 量骨盆高度」，且
+  `Script_CharacterModelTest` 直接解析 GLB 现量（`_import/Script_LugouGlbPose.mjs`），
+  不看烘焙自报的清单数。那次的离线修复留在 `_import/Script_RestoreLugouPelvisTracks.mjs`。
 - 先读：`_blender/Verify.mjs` 头注；改模型只重建那一件，别跑全量 BuildAll。
 
 ### 人物 / AI / 合批

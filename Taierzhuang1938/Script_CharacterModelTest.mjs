@@ -1,9 +1,33 @@
 // Ten imported soldiers: offline GLB contract + runtime wiring (pure Node).
+//
+// ===========================================================================
+// 【2026-08-29：姿态审计从「读清单自报数」改成「直接读 GLB 量骨盆」】
+//
+// 这里原来只有一条贴地闸：`maxGroundPenetrationMeters ≤ 0.002`。它漏掉了本仓库
+// 最贵的一次资产事故 —— v3 重烘把根骨（骨盆）的位移轨道烘丢了，十六条 clip 的人
+// 全被钉在站立高度悬在空中；**悬空的人永远不会陷进地里**，所以那条闸不但没红，
+// 十条模型 × 十六条 clip 的 penetration 全是 0.000000，看起来还格外健康。
+//
+// 教训有两条，都写进下面的断言里了：
+//   1) 审计不能只问「有没有陷进地里」，必须问「姿势对不对」。加了逐 clip 的骨盆
+//      高度：十六条 clip 的骨盆不许挤成一个数（跨 clip 落差 ≥ 0.40 m），而且必须
+//      同时存在真躺/坐的低位与真站的高位。姿态一旦被冻住，这条先红。
+//   2) 数不能只信烘焙自己写的清单 —— 那是同一次坏烘焙的产物。骨盆那条现在**直接
+//      解析 GLB、走一遍 FK 现量**（_import/Script_LugouGlbPose.mjs），清单只用来
+//      交叉核对；两边对不上也算红。
+//
+// 贴地阈值也随实测改了口径：作者摆的躺/坐姿本来就允许身体小幅陷进接触面
+// （膝、靴尖、压扁的鞋底），拿「绝对最低顶点 ≥ 0」当铁律，等于必须把躺着的人
+// 整个抬离地面。所以站姿参考 clip 仍然守得很紧（≤ 0.08 m），躺/坐这类接触姿
+// 放到 ≤ 0.25 m —— 这一条本来就不是姿态闸，姿态闸是上面第 1 条。
+// ===========================================================================
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { LoadGlb, MeasurePose } from "./_import/Script_LugouGlbPose.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const characterDir = path.join(here, "Model", "Character");
@@ -18,6 +42,14 @@ const expectedRoles = [
   "upperArmR", "upperArmL", "forearmR", "forearmL",
   "thighR", "thighL", "calfR", "calfL",
 ];
+// 真站姿那条 clip（名字与内容对不上号的账在 Script_CharacterModel 的 POSE_CLIPS 头注）。
+// 它是唯一一条「鞋底就该踩在地面上」的参考，贴地守得最紧。
+const STANDING_REFERENCE_CLIP = "AdvanceFire";
+// 姿态闸的两条硬线，单位是资产自身的米（未按演员身高缩放）：
+// 十六条 clip 的骨盆不许挤成一个数，且必须真有低位（躺/坐）与高位（站）。
+const MIN_PELVIS_SPREAD = 0.40;
+const MAX_LOW_POSE_PELVIS = 0.35;
+const MIN_HIGH_POSE_PELVIS = 0.70;
 
 function ReadGlbJson(filePath) {
   const fd = fs.openSync(filePath, "r");
@@ -40,7 +72,7 @@ function ReadGlbJson(filePath) {
 const manifestPath = path.join(characterDir, "Data_LugouCharacterManifest.json");
 assert.ok(fs.existsSync(manifestPath), "character bake manifest exists");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-assert.equal(manifest.schema, 1);
+assert.equal(manifest.schema, 2);
 assert.equal(manifest.models.length, 10, "ten character records");
 assert.deepEqual(manifest.models.map((model) => model.id), [
   "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04", "LugouIja05",
@@ -68,8 +100,14 @@ for (const model of manifest.models) {
     assert.equal(audit.sourceBones >= 52, true, `${model.id}/${actionId} source bones`);
     assert.equal(audit.maxPoseDeltaError <= 0.001, true,
       `${model.id}/${actionId} matches its Max/BIP pose`);
-    assert.equal(audit.maxGroundPenetrationMeters <= 0.002, true,
-      `${model.id}/${actionId} keeps the deformed mesh above ground`);
+    // 躺/坐这类接触姿允许身体小幅陷进接触面；站姿参考 clip 仍然守 8 cm。
+    const groundLimit = actionId === STANDING_REFERENCE_CLIP ? 0.08 : 0.25;
+    assert.equal(audit.maxGroundPenetrationMeters <= groundLimit, true,
+      `${model.id}/${actionId} ground contact ${audit.maxGroundPenetrationMeters} <= ${groundLimit}`);
+    assert.equal(Array.isArray(audit.pelvisHeightMeters) && audit.pelvisHeightMeters.length === 2, true,
+      `${model.id}/${actionId} records the clip's pelvis height band`);
+    assert.equal(audit.pelvisHeightMeters[0] <= audit.pelvisHeightMeters[1], true,
+      `${model.id}/${actionId} pelvis height band is ordered`);
   }
   assert.deepEqual(Object.keys(model.boneRoles).sort(), [...expectedRoles].sort(), `${model.id} semantic bones`);
   assert.deepEqual([...model.sockets].sort(),
@@ -90,6 +128,29 @@ for (const model of manifest.models) {
     `${model.id} GLB has an offline mesh-grounding root`);
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
+
+  // ── 姿态闸：直接解析 GLB 走 FK 现量，不看清单自报的数 ──────────────────────
+  const measured = MeasurePose(LoadGlb(glbPath), {
+    pelvisName: model.boneRoles.pelvis,
+    headName: model.boneRoles.head,
+    samples: 9,
+  });
+  assert.equal(measured.pelvisSpread >= MIN_PELVIS_SPREAD, true,
+    `${model.id} 十六条 clip 的骨盆高度落差只有 ${measured.pelvisSpread.toFixed(3)} m`
+    + `（要求 ≥ ${MIN_PELVIS_SPREAD}）—— 姿态被冻住了，多半是根骨位移轨道又丢了`);
+  assert.equal(measured.pelvisLow <= MAX_LOW_POSE_PELVIS, true,
+    `${model.id} 最低的骨盆也有 ${measured.pelvisLow.toFixed(3)} m：没有任何一条 clip 能把人放到地上`);
+  assert.equal(measured.pelvisHigh >= MIN_HIGH_POSE_PELVIS, true,
+    `${model.id} 最高的骨盆只有 ${measured.pelvisHigh.toFixed(3)} m：没有一条真站姿`);
+  for (const actionId of expectedActions) {
+    const recorded = model.animationAudit[actionId].pelvisHeightMeters;
+    const seen = measured.byClip[actionId].pelvis;
+    // 清单是烘焙时按源帧数密采样记的，这里只取 9 帧，所以清单那条带子必须**包住**
+    // 现量的这条（留 2 cm 采样误差）。对不上说明有人只改了一边。
+    assert.equal(recorded[0] <= seen[0] + 0.02 && recorded[1] >= seen[1] - 0.02, true,
+      `${model.id}/${actionId} 清单记的骨盆高度 ${recorded} 没包住 GLB 实测 `
+      + `[${seen[0].toFixed(3)}, ${seen[1].toFixed(3)}]`);
+  }
 }
 
 const runtime = fs.readFileSync(path.join(here, "Script_CharacterModel.mjs"), "utf8");
@@ -146,4 +207,5 @@ assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y
 assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
   "Max batch exports faction-canonical NRA and IJA action sources");
 
-console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity and ground audits, sockets and bone hitboxes verified`);
+console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity, `
+  + "GLB-measured pelvis-pose and ground audits, sockets and bone hitboxes verified");

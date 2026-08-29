@@ -133,45 +133,40 @@ export function DefaultLugouAnimationId(kind) {
  *
  * 【为什么要这张表】源 FBX 的文件名是按印象起的，与里面的动作对不上号；
  * 运行时按名字挑 clip，于是「卧倒」挑到一段站姿、「站着待机」挑到一段跪姿。
- * 下面这些数是实机量的骨骼世界坐标（演员脚下平面记作 0，模型 1.65 m）：
+ * 下面这些数是实机量的骨骼世界坐标（演员脚下平面记作 0；探针是 nra / seed 41938，
+ * 抽到 Nra01、整体缩放 0.898。2026-08-29 补回骨盆位移轨道之后重量了一遍）：
  *
- *   StandFireCrouch   头 0.22–0.38  胯 0.02–0.15  手 0.18–0.36  → **趴着据枪**（真匍匐）
- *   ProneFire         头 1.15–1.32  胯 0.58–0.74  手 1.6–1.76   → 站着把手臂甩过肩
- *   RifleIdle / Alt   头 0.72–0.78  胯 0.17–0.19                → 单膝跪地据枪
- *   AdvanceFire       头 1.09–1.29  胯 0.55–0.69                → **站姿据枪**（真站着）
- *   AttackCommand     头 1.15–1.28  胯 0.58–0.67                → 站着挥臂指挥
- *   CrouchIdle        头 0.65       胯 0.41                     → 跪蹲俯身
- *   CrouchFire        头 0.62       胯 0.37                     → 蹲姿据枪
- *   LeanWallSitPeek   头 0.52       胯 0.00                     → 坐在地上
+ *   StandFireCrouch   头 0.37–0.51  胯 0.16–0.28  手 0.27–0.48  → **趴着据枪**（真匍匐）
+ *   ProneFire         头 1.36       胯 0.82–0.83  手 1.48–1.50  → 站着把手臂甩过肩
+ *   RifleIdle / Alt   头 0.86       胯 0.31                     → 单膝跪地据枪
+ *   AdvanceFire       头 1.18–1.38  胯 0.69–0.80                → **站姿据枪**（真站着）
+ *   AttackCommand     头 1.27–1.34  胯 0.70–0.76                → 站着挥臂指挥
+ *   CrouchIdle        头 0.79       胯 0.54                     → 跪蹲俯身
+ *   CrouchFire        头 0.76       胯 0.51                     → 蹲姿据枪
+ *   LeanWallSitPeek   头 0.66–0.67  胯 0.13–0.14                → 坐在地上
+ *   RifleRun          头 1.20–1.26  胯 0.63–0.69                → 持枪跑步
  *
  * 回归口在 Script_CutscenePoseTest.mjs：它按这张表逐条量高度，
  * 换一批动作资产（或重烘）把姿态换了位置，那条测试会先红。
  *
  * ---------------------------------------------------------------------------
- * 【2026-08-29 合并 master 之后：上面那些数暂时**对不上**，而且不是这张表的错】
+ * 【2026-08-29：v3 那批重烘曾经把胯的位移轨道烘丢了 —— 已修，记住是怎么漏的】
  *
- * 清单 v3 那批重烘（master 的 80fac555 / dddd54d9 / ebc9b03b）**把胯的位移轨道
- * 烘没了**。同一台探针在 v3 资产上量下来，十六条 clip 的胯高全是同一个数：
+ * 清单 v3 的重烘（master 的 dddd54d9 / 80fac555）在 Biped 根骨上方插了一根不蒙皮的
+ * `GroundRoot`，把就地化与贴地整体搬到那根骨头上；结果**根骨自己的位移轨道没进
+ * GLB**：十六条 clip 的胯高全是同一个数 0.846，头最低的一条也有 1.06 m，
+ * 救护所里躺担架的伤员和跪着的军医一屋子人全站着。大腿、锁骨这些非根骨的位移
+ * 轨道都还在，丢的只有根骨那一条。
  *
- *   v1（本表依据）  StandFireCrouch 胯 0.02–0.15   AdvanceFire 胯 0.55–0.69
- *   v3（现在的资产）StandFireCrouch 胯 0.85–0.85   AdvanceFire 胯 0.85–0.85
- *                   —— 十六条**全部** 0.846，头最低的一条也有 1.06 m
+ * 它为什么没被拦住：烘焙侧的贴地补偿是 `max(0, -groundZ)`，**只抬不放**。
+ * 人悬在空中永远不会陷进地里，于是清单里 `maxGroundPenetrationMeters ≤ 2 mm`
+ * 那条审计轻松通过 —— 它量的是「有没有陷进地里」，不是「姿势对不对」。
  *
- * 直接证据在 GLB 里，不用进浏览器也能看：v1 的 `Bip002 Pelvis.position` 逐条
- * clip 都在动（StandFireCrouch 幅度 17.07，LeanWallSitPeek 1.17，AdvanceFire 14.63），
- * v3 里这条轨道**全零**；取而代之的 `GroundRoot.position` 十六条里只有 ProneFire
- * 一条非零。烘焙脚本那一步的贴地补偿是 `max(0.0, -currentGroundZ)` ——
- * 只会把陷进地里的帧往上顶，不会把人往下放，所以「胯被冻在站立高度」这件事
- * 反而让清单里的 maxGroundPenetrationMeters 审计**轻松通过**：
- * 它量的是「有没有陷进地里」，不是「姿势对不对」。
- *
- * 于是现在场上**没有任何一条 clip 能把人放到地上**：救护所里躺担架的四个伤员
- * 头高 1.06–1.13 m（该是 0.1–0.5），跪着的军医头高 1.08 m（该是 0.45–1.0）。
- *
- * **这张表没改、也不该改。** 语义映射本身仍然成立（v1 上逐条量过），
- * 缺的是资产里那条位移轨道 —— 运行时补不回来，只能重烘。把 CutscenePoseTest
- * 的高度带放宽来「修绿」等于把这道闸拆了：那等于承认「趴在担架上的人头可以
- * 在 1.1 m」。所以那条测试现在是红的，红得有据，等重烘。
+ * 修法：源 `.max`/`.bip` 与中间 FBX 都不在机器上，重跑 3ds Max 桥这条路不通；
+ * 轨道本身还在仓库里（v1 的 3d1f879b），由 `_import/Script_RestoreLugouPelvisTracks.mjs`
+ * 搬回并逐 clip 对回接触深度。**这张表一个字没改**，语义映射本来就是对的。
+ * 现在守门的换成了「逐 clip 量骨盆高度、十六条不许挤成一个数」，
+ * 而且是 Script_CharacterModelTest 直接读 GLB 量，不再看烘焙自报的数。
  * ---------------------------------------------------------------------------
  */
 const POSE_CLIPS = Object.freeze({
@@ -190,8 +185,10 @@ const POSE_CLIPS = Object.freeze({
 
 export const LUGOU_POSE_CLIPS = POSE_CLIPS;
 
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=3";
-const ASSET_VERSION = "3";
+// v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB。十套模型的二进制都变了，
+// 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是站着的那批。
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=4";
+const ASSET_VERSION = "4";
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
@@ -391,11 +388,12 @@ export class LugouCharacterRig {
     // offset from an ankle-height foot bone.
     //
     // 【2026-08-29 合并记录】这里曾经有一版「在站姿参考帧上量最低那只脚」的
-    // 运行时标定（本分支加的，配一个 FLOOR_CALIBRATION_TIME 常数）。那是给
-    // 清单 v1 那批**没有离线贴地**的 GLB 打的补丁；v3 重烘之后每一帧都对着
-    // 变形后的网格审过贴地（清单里逐动作记 maxGroundPenetrationMeters ≤ 2 mm），
-    // 再在运行时按脚踝骨补一次就是双重矫正，会把靴子埋进地里。整段删掉，
-    // 只保留抵消父节点胯高这一项。CharacterModelTest 有一条反向断言看着它。
+    // 运行时标定（本分支加的，配一个 FLOOR_CALIBRATION_TIME 常数）。Biped 的 Foot
+    // 是**脚踝枢轴**不是鞋底，把它对到 Y=0 等于把每个人往下压约 0.115 m，靴子直接
+    // 埋进地里；而离线烘焙已经逐帧对着变形后的网格摆好了每条 clip 的接触面
+    // （清单逐动作记 pelvisHeightMeters / maxGroundPenetrationMeters），运行时再按
+    // 脚踝补一次就是双重矫正。整段删掉，只保留抵消父节点胯高这一项。
+    // CharacterModelTest 有一条反向断言看着它。
     this.root.position.set(0, -actor.body.position.y, 0);
     actor.root.updateWorldMatrix(true, true);
     return this;
