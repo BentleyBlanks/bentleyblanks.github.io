@@ -210,6 +210,12 @@ try {
         axisNdcX: axis ? +axis.ndcX.toFixed(4) : null,
         axisCamX: axis ? +axis.camX.toFixed(5) : null,
         axisVerts: axis ? axis.verts : 0,
+        nearDof: {
+          strength: T.post.uniformsComposite.uNearDofStrength.value,
+          focus: T.post.uniformsComposite.uNearDofFocus.value,
+          range: T.post.uniformsComposite.uNearDofRange.value,
+          maxPx: T.post.uniformsComposite.uNearDofMaxPx.value,
+        },
       };
     }
     return rows;
@@ -217,7 +223,13 @@ try {
 
   const screenshotPath = path.join(os.tmpdir(), "TaierzhuangAdsSight.png");
   await page.screenshot({ path: screenshotPath });
-  console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
+  const releasedNearDof = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    document.dispatchEvent(new MouseEvent("mouseup", { button: 2, bubbles: true }));
+    T.StepFrames(20);
+    return T.post.uniformsComposite.uNearDofStrength.value;
+  });
+  console.log(JSON.stringify({ ...report, releasedNearDof, screenshotPath, errors }, null, 2));
 
   for (const id of GUNS) {
     const row = report[id];
@@ -226,6 +238,10 @@ try {
       row && row.blocked <= BLOCKED_LIMIT,
       `上半窗 ${row?.samples?.join(" / ")}（整窗 ${row?.wholeWindow?.join(" / ")}）`);
     Check(`${id} 开镜时收起腰射准心`, row && row.crosshairOn === false);
+    Check(`${id} 开镜触发轻微近景景深`, row && row.nearDof.strength > 0.5
+      && row.nearDof.strength < 0.8 && row.nearDof.focus > row.nearDof.range
+      && row.nearDof.maxPx >= 3 && row.nearDof.maxPx <= 6,
+    row ? `strength=${row.nearDof.strength.toFixed(2)} focus=${row.nearDof.focus.toFixed(2)}m max=${row.nearDof.maxPx.toFixed(1)}px` : "无结果");
     const expect = AXIS_EXPECT[id];
     if (expect === null || expect === undefined) {
       console.log(`--   ${id} 枪骑在瞄准线上（未登记期望值） — 实测对称面 NDC x=${row?.axisNdcX}`);
@@ -235,6 +251,8 @@ try {
         `实测 ${row?.axisNdcX}（相机空间 ${row?.axisCamX} m，取样 ${row?.axisVerts} 顶点）`);
     }
   }
+  Check("退镜关闭近景景深", releasedNearDof < 0.001,
+    `strength=${releasedNearDof}`);
   Check("页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | "));
 } finally {
   await browser.close();

@@ -164,8 +164,11 @@ export class DebugRenderingEditor {
       this.facts.Set("雾效", density > 0 ? `启用 · 密度 ${density.toFixed(3)}` : "关闭（雾量图为深蓝）", density > 0 ? "good" : "warn");
     }
     if (this.view === "dof") {
-      const strength = composite?.uDofStrength?.value ?? 0;
-      this.facts.Set("景深", strength > 0 ? `启用 · 强度 ${strength.toFixed(2)}` : "当前未触发（阵亡镜头才开启）", strength > 0 ? "good" : "warn");
+      const farStrength = composite?.uDofStrength?.value ?? 0;
+      const nearStrength = composite?.uNearDofStrength?.value ?? 0;
+      const strength = Math.max(farStrength, nearStrength);
+      const mode = farStrength > nearStrength ? "阵亡远景" : "开镜近景";
+      this.facts.Set("景深", strength > 0 ? `启用 · ${mode} ${strength.toFixed(2)}` : "当前未触发", strength > 0 ? "good" : "warn");
     }
   }
 }

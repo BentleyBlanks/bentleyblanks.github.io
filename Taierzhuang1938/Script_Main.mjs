@@ -4710,6 +4710,12 @@ const _marchTargets = [];
 const ADS_FOV_TIME = 0.15;
 let adsFovT = 0;      // 相机侧的开镜量，与 player.ads（动画侧）分开走
 let breathFov = 1;    // 屏息那 6% 的独立平滑
+// ADS 近景景深：像战地/COD 那样把贴眼的照门、枪身与掩体边缘轻轻散焦，
+// 但从 ADS_NEAR_DOF_FOCUS_M 起完全清楚，目标区与远景不吃这层模糊。
+const ADS_NEAR_DOF_STRENGTH = 0.72;
+const ADS_NEAR_DOF_FOCUS_M = 1.60;
+const ADS_NEAR_DOF_RANGE_M = 0.85;
+const ADS_NEAR_DOF_MAX_PX = 4.5;
 
 // --- 枪感第 1 轮的方子 2 / 3 / 4 所需的状态量 ------------------------------
 // 方子 2「开火画面顿挫」：实测原来开火 FOV 偏移 0.0000°，全仓库无任何 shake/punch。
@@ -5905,6 +5911,11 @@ function RenderScene(dt) {
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
   // mask 与生平卡随后由浏览器叠上去。死亡最初 0.32 秒渐入，和 UI 遮罩同步。
   const deathDof = player && !player.Alive ? Clamp01(player.deadTime / 0.32) : 0;
+  // 跟相机自己的 ADS 过渡而不是枪模动画走：同一趟 150 ms 收放，拉栓/装填时
+  // 又会被 adsSuppress 自然摘掉。没有铁瞄的刀/手雷不属于「开镜」，不触发。
+  const adsNearDof = state.running && !state.menu && !state.cutscene && player?.Alive
+    && viewmodel?.root?.visible && viewmodel?.rig?.sight
+    ? Clamp01(adsFovT * (viewmodel.adsSuppress ?? 1)) : 0;
   profiler.B("post");
   post.Render(scene, camera, {
     sunDirection: sky.sunDirection,
@@ -5924,6 +5935,10 @@ function RenderScene(dt) {
     dofFocus: 1.5,
     dofRange: 2.8,
     dofMaxPx: 11.0,
+    nearDofStrength: adsNearDof * ADS_NEAR_DOF_STRENGTH,
+    nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
+    nearDofRange: ADS_NEAR_DOF_RANGE_M,
+    nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
   });
   profiler.E("post");
   profiler.GpuFrameEnd();

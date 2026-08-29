@@ -527,11 +527,15 @@ uniform mat4 uInvView;
 uniform vec2 uProjScale;
 uniform float uDamage;      // 受伤：边缘泛红 + 去色
 uniform float uFade;        // 黑场
-// 阵亡景深：焦点固定在贴地镜头前景，深度越远 CoC 越大；随后 HUD 才叠 mask/UI。
+// 两条景深共用这一趟圆盘采样：阵亡镜头虚化远景；ADS 只虚化贴眼的枪与掩体。
 uniform float uDofStrength;
 uniform float uDofFocus;
 uniform float uDofRange;
 uniform float uDofMaxPx;
+uniform float uNearDofStrength;
+uniform float uNearDofFocus;
+uniform float uNearDofRange;
+uniform float uNearDofMaxPx;
 // 大气：Easy Red 2 的“远景退进去”不是靠一层灰纱盖上去，
 // 而是**染在物体自身上**：指数距离雾 x 高度雾，再按雾量去饱和降对比。
 // 三件事合起来才有纵深 —— 只做其中一件都是“屏幕上蒙了层灰”。
@@ -627,15 +631,22 @@ void main() {
     color = texture2D(uHdr, uv).rgb;
   }
 
-  // --- 阵亡景深：近景仍锐利，背景用 12 抽样圆盘做重度散焦 ---
+  // --- 景深：阵亡虚化远景；开镜只轻微虚化贴眼近景 -----------------------
   // 不能用 CSS blur：那会把贴在镜头前的地面也一起糊掉，只剩一张均匀毛玻璃。
-  // rtNormalDepth.w 是线性视深，正好能把「倒地后眼前一两米」与远处战场分开。
-  if (uDofStrength > 0.001) {
-    float coc = nd.w <= 0.0 ? 1.0
+  // rtNormalDepth.w 是线性视深；视图模型退出 overrideMaterial 后仍以 alpha=1
+  // 写入这一张靶，等价于稳定的 1 m 近景标签，不会把枪重新塞回 SSAO 预通道。
+  if (uDofStrength > 0.001 || uNearDofStrength > 0.001) {
+    float farCoc = nd.w <= 0.0 ? 1.0
       : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), nd.w);
-    coc *= uDofStrength;
+    farCoc *= uDofStrength;
+    float nearStart = max(0.0, uNearDofFocus - max(uNearDofRange, 0.01));
+    float nearCoc = nd.w <= 0.0 ? 0.0
+      : 1.0 - smoothstep(nearStart, uNearDofFocus, nd.w);
+    nearCoc *= uNearDofStrength;
+    float coc = max(farCoc, nearCoc);
     if (coc > 0.001) {
-      vec2 radius = vec2(uDofMaxPx * coc) / uResolution;
+      float radiusPx = max(uDofMaxPx * farCoc, uNearDofMaxPx * nearCoc);
+      vec2 radius = vec2(radiusPx) / uResolution;
       float seed = Ign(gl_FragCoord.xy + uFrame * 3.17) * 6.2831853;
       vec3 blur = vec3(0.0);
       const int DOF_TAPS = 12;
@@ -792,6 +803,9 @@ const FRAG_DEBUG_VIEW = /* glsl */`
   uniform float uDofStrength;
   uniform float uDofFocus;
   uniform float uDofRange;
+  uniform float uNearDofStrength;
+  uniform float uNearDofFocus;
+  uniform float uNearDofRange;
   uniform mat4 uPrevViewProjection;
   uniform vec2 uResolution;
   uniform float uHasPrev;
@@ -844,11 +858,16 @@ const FRAG_DEBUG_VIEW = /* glsl */`
       // 雾本身可能接近灰色，直接看它不容易看出系数；假彩色才看得见断层和高度带。
       color = mix(vec3(0.015, 0.035, 0.18), vec3(1.0, 0.63, 0.04), fog);
       color = ToSrgb(color);
-    } else if (uMode < 7.5) {          // 景深 CoC：严格复算 Composite 的远景散焦系数。
-      float coc = texel.a <= 0.0 ? 1.0
+    } else if (uMode < 7.5) {          // 景深 CoC：严格复算 Composite 的近/远散焦系数。
+      float farCoc = texel.a <= 0.0 ? 1.0
         : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), texel.a);
-      coc *= uDofStrength;
-      // 即使阵亡景深没触发也保留深蓝底，避免「全黑」被误判成展示 pass 没出画。
+      farCoc *= uDofStrength;
+      float nearStart = max(0.0, uNearDofFocus - max(uNearDofRange, 0.01));
+      float nearCoc = texel.a <= 0.0 ? 0.0
+        : 1.0 - smoothstep(nearStart, uNearDofFocus, texel.a);
+      nearCoc *= uNearDofStrength;
+      float coc = max(farCoc, nearCoc);
+      // 即使两条景深都没触发也保留深蓝底，避免「全黑」被误判成展示 pass 没出画。
       color = mix(vec3(0.015, 0.06, 0.30), vec3(1.0, 0.72, 0.04), clamp(coc, 0.0, 1.0));
       color = ToSrgb(color);
     } else {                           // Motion Vector：与 TAA 同一套深度反投影相机速度。
@@ -1008,6 +1027,8 @@ export class PostPipeline {
       uDamage: { value: 0 }, uFade: { value: 0 },
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
+      uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 },
+      uNearDofRange: { value: 0.85 }, uNearDofMaxPx: { value: 4.5 },
       uFogDensity: { value: 0.013 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 },
       uFogMax: { value: 0.94 },
       uFogColorSky: { value: new THREE.Vector3(0.62, 0.64, 0.68) },
@@ -1036,6 +1057,7 @@ export class PostPipeline {
       uInvView: { value: new THREE.Matrix4() }, uProjScale: { value: new THREE.Vector2(1, 1) },
       uFogDensity: { value: 0 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 }, uFogMax: { value: 0.94 },
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 }, uDofRange: { value: 2.8 },
+      uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 }, uNearDofRange: { value: 0.85 },
       uPrevViewProjection: { value: new THREE.Matrix4() }, uResolution: { value: new THREE.Vector2(1, 1) }, uHasPrev: { value: 0 },
     };
     this.matDebug = this._Mat(FRAG_DEBUG_VIEW, this.uniformsDebug);
@@ -1540,6 +1562,10 @@ export class PostPipeline {
     U.uDofFocus.value = options.dofFocus ?? 1.5;
     U.uDofRange.value = options.dofRange ?? 2.8;
     U.uDofMaxPx.value = options.dofMaxPx ?? 11.0;
+    U.uNearDofStrength.value = options.nearDofStrength ?? 0;
+    U.uNearDofFocus.value = options.nearDofFocus ?? 1.6;
+    U.uNearDofRange.value = options.nearDofRange ?? 0.85;
+    U.uNearDofMaxPx.value = options.nearDofMaxPx ?? 4.5;
     U.uFrame.value = frame;
     U.uProjScale.value.set(projScaleX, projScaleY);
     U.uInvView.value.copy(camera.matrixWorld);
@@ -1564,6 +1590,9 @@ export class PostPipeline {
       DU.uDofStrength.value = U.uDofStrength.value;
       DU.uDofFocus.value = U.uDofFocus.value;
       DU.uDofRange.value = U.uDofRange.value;
+      DU.uNearDofStrength.value = U.uNearDofStrength.value;
+      DU.uNearDofFocus.value = U.uNearDofFocus.value;
+      DU.uNearDofRange.value = U.uNearDofRange.value;
       DU.uPrevViewProjection.value.copy(U.uPrevViewProjection.value);
       DU.uResolution.value.copy(U.uResolution.value);
       DU.uHasPrev.value = this.hasPrev ? 1 : 0;
