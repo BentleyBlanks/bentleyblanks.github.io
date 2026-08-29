@@ -217,6 +217,24 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 `Pick` 的 `maxDist` 跟随 `camera.far`，`PickWorld` 的采样步数按射程等密度放大
 （≈7 m 一步，上限 420 步），守着它的是 EditorTest 的「俯瞰机位」两条断言。
 
+### 完整场景预览 `Script_EditorFullScene.mjs`
+
+它与「场景关卡」是两件工具。场景关卡继续负责章节切片、摆件文档和关卡标记；完整场景
+预览只读，不写 `worldEditDocument`，也不改变任何章节任务数据。县城入口固定为
+`?phase=fullscene&menu=0&editor=fullScene`：独立 `FULL_SCENE_PHASE` 一次生成城内和四门外，
+边界覆盖北关坝墙、城西津浦路、东郊农田与南侧善国门，同时保留既有 `?phase=overview`
+出图基线不动。
+
+面板把四类运行时真相放在同一处：完整县城与 `CS_Chuchuan` 车厢奇观切换；县城总种子、
+派生种子与车厢数据中所有 `seed` 字段；`CollectSceneSplineRoutes` 从正式街道、铁路、
+东关巷路、寨墙和北关坝墙收集的只读中心线；`SKY_PRESETS` 的天空、灯光、雾、曝光、
+Bloom、体积光、饱和度和对比度完整参数。Spline 叠加层按正式 `MakeRoadPath` 采样并逐点问
+当前战场 `GroundHeight`，所以中心线与生成几何共用同一坐标和地面。
+
+车厢入口固定为 `?preview=CS_Chuchuan&autoplay=1&editor=fullScene&menu=0`。编辑器暂停了普通
+`Frame` 的过场分支，因此走带由本工具自己推进正式 `CutsceneDirector`，支持播放、暂停、
+回到头和时间定位；并没有另做一套车厢动画。退出工具时恢复进入前的相机投影和环境预设。
+
 ### 构件库预览 `Script_EditorPropLibrary.mjs`
 
 专门浏览场景关卡编辑器能布设的全部构件，以及 `Script_ExternalProps` 已放进正式战场的

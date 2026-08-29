@@ -94,6 +94,66 @@ export const OVERVIEW_PHASE = Object.freeze({
   spawn: Object.freeze({ x: 0, z: 0, ry: Math.PI / 2 }),
 });
 
+/**
+ * 完整场景编辑器专用边界。
+ *
+ * `OVERVIEW_BOUNDS` 是既有出图基线，不能为了编辑器擅自扩张：它只到北关以南、
+ * 善国门以北。这里另开一片，把四门外需要巡场的最远锚点全部包进来：
+ * 北关坝墙 z=-560、城西津浦路、东郊农田 maxX=756、城南善国门 z=900。
+ */
+export const FULL_SCENE_BOUNDS = Object.freeze({
+  minX: -520, maxX: 780, minZ: -590, maxZ: 940,
+});
+
+export const FULL_SCENE_LEVEL_ID = "FullScene";
+
+/**
+ * 完整县城只读预览切片。它不进 PHASES、不进选章，也不承担任务编辑语义。
+ * `fieldFrom: Overview` 只让已有的全城手摆件/饰件并集继续生效；真正的生成范围
+ * 仍只认上面的 FULL_SCENE_BOUNDS。
+ */
+export const FULL_SCENE_PHASE = Object.freeze({
+  id: FULL_SCENE_LEVEL_ID,
+  fieldFrom: OVERVIEW_LEVEL_ID,
+  date: "完整场景预览",
+  label: "完整县城（场景编辑器）",
+  place: "开发专用 · 城内与四门外",
+  // 完整巡场需要读到一公里外的四门外轮廓；smokyDay 在这个尺度上会把整城吃成灰片。
+  // 使用编辑器专属长视距白昼，用户仍可在环境面板一键切回硝烟、夜间等全部预设。
+  sky: "editorClear",
+  music: null,
+  minutes: 600,
+  brief: Object.freeze([
+    "完整生成滕县城、东西南北四门外关厢，以及北关坝墙、东郊农田和南关善国门。",
+    "只供完整场景编辑器巡场、Spline 与环境取证；原场景关卡编辑器仍按章节切片工作。",
+  ]),
+  story: FULL_SCENE_LEVEL_ID,
+  cutsceneIn: null,
+  cutsceneOut: null,
+  objectives: Object.freeze(["无 —— 只读巡场，不编辑任务关卡"]),
+  mechanic: "完整场景预览切片：不撒兵、不结算、不换关。",
+  nraPool: 9999,
+  poolGain: 0,
+  ijaPool: 0,
+  ijaPressure: 0,
+  ijaSpawn: Object.freeze([]),
+  ijaSupport: Object.freeze([]),
+  ijaForce: Object.freeze({ lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" }),
+  bounds: FULL_SCENE_BOUNDS,
+  cameraFar: 3600,
+  detailRadius: 130,
+  midRadius: 260,
+  zones: Object.freeze([
+    { id: "FS_City", name: "县城", x: 0, z: 0, radius: 40 },
+    { id: "FS_East", name: "东门外", x: 620, z: -65, radius: 40 },
+    { id: "FS_West", name: "西门外", x: -430, z: 0, radius: 40 },
+    { id: "FS_North", name: "北门外", x: -80, z: -520, radius: 40 },
+    { id: "FS_South", name: "南门外", x: 0, z: 420, radius: 40 },
+    { id: "FS_Shanguo", name: "善国门", x: 0, z: 900, radius: 32 },
+  ]),
+  spawn: Object.freeze({ x: 0, z: 0, ry: Math.PI / 2 }),
+});
+
 /** 界河白盒的 id。**沿用旧关号 `L0_Jiehe`**（见 JIEHE_SANDBOX_PHASE 的注释）。 */
 export const JIEHE_LEVEL_ID = "L0_Jiehe";
 

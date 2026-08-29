@@ -41,7 +41,7 @@ import {
 } from "./Script_EditorUi.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import {
-  STREETS, EAST_SUBURB, WEST_SUBURB, NORTH_SUBURB,
+  STREETS, EAST_SUBURB, EAST_FIELD, WEST_SUBURB, NORTH_SUBURB,
 } from "./Data_Tengxian.mjs";
 import { OutfieldSpec } from "./Script_TengxianOutfield.mjs";
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
@@ -96,12 +96,13 @@ const PARAM_DEFAULTS = {
 };
 
 /** 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。 */
-function FactoryRoutes(levelId) {
+export function CollectSceneSplineRoutes(levelId = null) {
   const routes = [];
   for (const s of STREETS) {
     routes.push({
       key: `city:${s.id}`, id: s.id, label: s.label || s.id, kind: "street",
       source: "Data_Tengxian.STREETS（axis/at/from/to，轴对齐，测试锁死）",
+      seed: `road${s.id}`,
       width: s.width, crown: 0.11, skirt: 0.12,
       points: s.axis === "x"
         ? [[s.from, s.at], [s.to, s.at]] : [[s.at, s.from], [s.at, s.to]],
@@ -113,6 +114,7 @@ function FactoryRoutes(levelId) {
     routes.push({
       key: `eastLane:${lane.id}`, id: lane.id, label: lane.label || lane.id, kind: "street",
       source: "Data_Tengxian.EAST_SUBURB.mapLanes（x/z/w/d 矩形）",
+      seed: `lane${lane.id}`,
       width: horizontal ? lane.d : lane.w, crown: 0.075, skirt: 0.25,
       points: horizontal
         ? [[lane.x - lane.w / 2, lane.z], [lane.x + lane.w / 2, lane.z]]
@@ -125,6 +127,7 @@ function FactoryRoutes(levelId) {
     routes.push({
       key: "west:street", id: "WestStreet", label: ws.label || "西关大街", kind: "street",
       source: "Data_Tengxian.WEST_SUBURB.westStreet（z/fromX/toX/width）",
+      seed: "west:street",
       width: ws.width, crown: 0.22, skirt: 0.65,
       points: [[ws.fromX, ws.z], [ws.toX, ws.z]], axisLocked: true,
     });
@@ -134,6 +137,7 @@ function FactoryRoutes(levelId) {
     routes.push({
       key: "north:street", id: "NorthStreet", label: ns.label || "北关大街", kind: "street",
       source: "Data_Tengxian.NORTH_SUBURB.street（x/fromZ/toZ/width）",
+      seed: "north:street",
       width: ns.width, crown: 0.22, skirt: 0.65,
       points: [[ns.x, ns.fromZ], [ns.x, ns.toZ]], axisLocked: true,
     });
@@ -143,10 +147,19 @@ function FactoryRoutes(levelId) {
     routes.push({
       key: "west:railway", id: "JinpuRailWest", label: "津浦铁路（城西段）", kind: "railway",
       source: "Data_Tengxian.WEST_SUBURB.railway（x/fromZ/toZ）",
+      seed: "map:Station:rail",
       width: 6.8, lift: 0.46,
       points: [[wr.x, wr.fromZ], [wr.x, wr.toZ]], axisLocked: true,
     });
   }
+
+  routes.push({
+    key: "east:approach", id: "EastApproachRoad", label: "东关外大车道", kind: "road",
+    source: "Script_TengxianCity.BuildEastApproach（端点取 Data_Tengxian.EAST_FIELD.bounds）",
+    seed: "eastApproachRoad", width: 7.0, crown: 0.06, skirt: 0.6,
+    points: [[544, EAST_FIELD.roadZ], [EAST_FIELD.bounds.maxX, EAST_FIELD.roadZ]],
+    axisLocked: true,
+  });
 
   // --- 围墙（样条围墙管线 Script_WallSpline 的三路调用点） ---
   const zw = EAST_SUBURB.zhaiWall;
@@ -189,6 +202,7 @@ function FactoryRoutes(levelId) {
         key: `outfield:${spec.id}:road${i}`, id: `${spec.id}Road${i}`,
         label: `${spec.id} 大车路 ${i + 1}`, kind: "road",
         source: `Script_TengxianOutfield.OUTFIELD_SCENES.${spec.id}.roads[${i}].points`,
+        seed: road.seed || `${spec.id}:road${i}`,
         width: road.width, crown: 0.045, skirt: 0.6,
         points: road.points.map((p) => [p[0], p[1]]), axisLocked: false,
       });
@@ -199,6 +213,7 @@ function FactoryRoutes(levelId) {
         key: `outfield:${spec.id}:railway`, id: `${spec.id}Rail`,
         label: `${spec.id} 津浦路路基`, kind: "railway",
         source: `Script_TengxianOutfield.OUTFIELD_SCENES.${spec.id}.railway（x/fromZ/toZ）`,
+        seed: `${spec.id}:railway`,
         width: 6.8, lift: 1.35,
         points: [[rw.x, rw.fromZ], [rw.x, rw.toZ]], axisLocked: true,
       });
@@ -264,7 +279,7 @@ export class SplineEditor {
   }
 
   Collect() {
-    const routes = FactoryRoutes(this.levelId);
+    const routes = CollectSceneSplineRoutes(this.levelId);
     for (const route of routes) {
       const o = this.overrides[route.key];
       if (!o) continue;

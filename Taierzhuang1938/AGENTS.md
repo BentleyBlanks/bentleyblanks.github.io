@@ -358,10 +358,12 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
   口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
-### 编辑器（15 个模块，不对玩家开放）
+### 编辑器（17 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
+- `Script_Editor{Scene,FullScene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
   （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
+  FullScene = 完整县城与四门外 / CS_Chuchuan 车厢的只读巡场、种子、Spline 与环境取证；
+  不读写 Scene 的关卡文档。
   DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。

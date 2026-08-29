@@ -136,6 +136,22 @@ void main() {
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
 export const SKY_PRESETS = {
+  // 完整场景编辑器专用的长视距白昼。县城总览机位离最远门外约 1.6 km，正片的
+  // 历史硝烟档会把四关厢压成同一片灰；这一档把雾留作轻空气透视，但不遮掉地物。
+  // 不进七章、不进过场，只由 Data_Menu.FULL_SCENE_PHASE 使用。
+  editorClear: {
+    sunElevation: 56, sunAzimuth: 232,
+    zenith: [0.95, 1.12, 1.48], horizon: [1.30, 1.31, 1.34], ground: [0.52, 0.47, 0.39],
+    sunColor: [1.0, 0.94, 0.82], sunIntensity: 64, sunSize: 0.000012, glow: 0.95, glowSpread: 12,
+    smoke: 0.18, smokeColor: [1.05, 1.03, 0.99], smokeHeight: 0.10, stars: 0.0,
+    lightColor: 0xffe8cc, lightIntensity: 6.6,
+    hemiSky: 0x9bb6dc, hemiGround: 0x76583d, hemiIntensity: 1.20,
+    envIntensity: 1.35, shProbeIntensity: 0.58, ambientIntensity: 0.30,
+    fog: { density: 0.00018, falloff: 600, max: 0.42,
+      sky: [0.68, 0.67, 0.64], ground: [0.40, 0.40, 0.41], sunGain: 0.12,
+      desat: 0.12, flatten: 0.04 },
+    exposure: 0.54, godStrength: 0.12, bloom: 0.16, saturation: 1.0, contrast: 1.08,
+  },
   // ==========================================================================
   // 太阳仰角这一栏是本作**最贵的一个数**，改之前先读这一段。
   //

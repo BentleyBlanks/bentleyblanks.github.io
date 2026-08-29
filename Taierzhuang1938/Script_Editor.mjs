@@ -33,6 +33,7 @@ import { SceneEditor } from "./Script_EditorScene.mjs";
 import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { TerrainEditor } from "./Script_EditorTerrain.mjs";
 import { SplineEditor } from "./Script_EditorSplines.mjs";
+import { FullSceneEditor } from "./Script_EditorFullScene.mjs";
 import { SamplePointEditor } from "./Script_EditorSamplePoints.mjs";
 import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
@@ -52,7 +53,7 @@ const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
   ActorEditor, WeaponEditor, VfxEditor, AudioEditor, TimelineEditor,
   SceneEditor, PropLibraryEditor, TerrainEditor, SplineEditor, DestructionEditor,
-  SamplePointEditor,
+  FullSceneEditor, SamplePointEditor,
 ];
 const ALL = [...SETTINGS, ...EDITORS];
 // 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。

@@ -66,7 +66,9 @@ import { CompanionDirector } from "./Script_Companion.mjs";
 import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
 import { MissionSetpieceDirector } from "./Script_MissionSetpieces.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
-import { MENU_SCENE, OVERVIEW_PHASE, JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
+import {
+  MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE,
+} from "./Data_Menu.mjs";
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
@@ -158,12 +160,15 @@ const JIEHE = params.get("jiehe") === "1";
  */
 const PHASE_PARAM = params.get("phase");
 const OVERVIEW = PHASE_PARAM === "overview";
+const FULL_SCENE = PHASE_PARAM === "fullscene";
+const EDITOR_PARAM = params.get("editor");
 const SANDBOX = RANGE || MELEE_TEST || JIEHE;
 const PHASE_TABLE = RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : JIEHE ? [JIEHE_SANDBOX_PHASE]
       : OVERVIEW ? [OVERVIEW_PHASE]
-        : PHASES;
+        : FULL_SCENE ? [FULL_SCENE_PHASE]
+          : PHASES;
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -2270,6 +2275,21 @@ async function Boot() {
         url.searchParams.delete("menu");
         window.location.assign(url.toString());
       },
+      sceneMode: PREVIEW ? "carriage" : FULL_SCENE ? "county" : "level",
+      ApplyEnvironment: (name) => ApplySkyPreset(name),
+      GetEnvironmentState: () => ({
+        name: cutsceneSky || PHASE_TABLE[state.phaseIndex].sky,
+        override: !!cutsceneSky,
+      }),
+      RestoreEnvironmentState: (snapshot) => {
+        if (snapshot?.override && snapshot.name) ApplySkyPreset(snapshot.name);
+        else {
+          cutsceneSky = null;
+          const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
+          sky.BakeEnvironment(scene);
+          lights.ApplyPreset(preset, sky.sunDirection);
+        }
+      },
       // 所有真正的编辑器都从菜单交接出来：主菜单本身有运镜，暂停菜单有
       // 「继续 / 设置 / 调试选项」；两者都不该和编辑器叠在同一张画面上。
       // 同时保留原菜单层，完整退出编辑器后再回去，而不是意外恢复战斗。
@@ -2385,6 +2405,17 @@ async function Boot() {
 
   if (SHOT) StartRun();
   else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
+  if (EDITOR_PARAM === "fullScene" && !SHOT) {
+    // 完整县城 URL 是直接进工具，不再让用户隔着已经打开的编辑器再点一次「进城」。
+    // 车厢预览由 StartPreview 自己收启动页；县城旁路没有那一步，必须在这里显式收掉，
+    // 否则编辑器与全城都已就绪，画面背景却仍是加载展示台上的坦克。
+    if (FULL_SCENE) {
+      ShowBoot(false);
+      state.menu = false;
+      state.running = false;
+    }
+    editor.Open("fullScene");
+  }
 }
 
 // ---------------------------------------------------------------------------

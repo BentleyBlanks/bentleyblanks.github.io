@@ -113,9 +113,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十一个编辑器（含场景样条PCG）
+// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十二个编辑器（含完整场景与场景样条PCG）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 17, `按钮数=${afterGear.entries}`);
+Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 18, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -1809,7 +1809,101 @@ Check("出图模式下编辑器不可见但 API 还在",
   shot.hidden && !shot.gearVisible && shot.api);
 
 // ---------------------------------------------------------------------------
-// 9) 新版序章预览入口：独立收口、单次交接、无旧 L0 AI
+// 9) 完整场景编辑器：独立完整切片 + Spline/种子/环境取证
+// ---------------------------------------------------------------------------
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?phase=fullscene&menu=0&editor=fullScene&quality=low&scale=small&audio=0`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state.ready
+  && window.Taierzhuang.editor?.ActiveId === "fullScene", null, { timeout: 300000 });
+await Step(8);
+const fullScene = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  const tool = T.editor.active;
+  const helper = await import("./Script_EditorFullScene.mjs");
+  const beforeEnvironment = tool.host.game.GetEnvironmentState();
+  tool.SelectEnvironment("night", true);
+  const night = tool.host.game.GetEnvironmentState();
+  const countyUrl = helper.FullSceneUrl(location.href, "county");
+  const carriageUrl = helper.FullSceneUrl(location.href, "carriage");
+  const sections = [...tool.panel.root.querySelectorAll(".edSection > .h")]
+    .map((node) => node.textContent);
+  const routeKeys = tool.routes.map((route) => route.key);
+  const seedIds = tool.seedRows.map((row) => row.id);
+  const lines = tool.overlay?.children.filter((node) => node.isLine).length || 0;
+  T.editor.Close();
+  const restoredEnvironment = tool.host.game.GetEnvironmentState();
+  return {
+    id: T.Debug.Level().id, bounds: T.battlefield.bounds, sections, routeKeys, seedIds, lines,
+    beforeEnvironment, night, restoredEnvironment, countyUrl, carriageUrl,
+    bootGone: document.getElementById("boot").classList.contains("gone"),
+    launcherPresent: !!document.querySelector('[data-editor="fullScene"]'),
+  };
+});
+Check("完整场景编辑器使用独立全县城切片并覆盖四门外最远锚点",
+  fullScene.id === "FullScene" && fullScene.bootGone
+    && fullScene.bounds.minX <= -480 && fullScene.bounds.maxX >= 756
+    && fullScene.bounds.minZ <= -560 && fullScene.bounds.maxZ >= 900,
+  JSON.stringify({ id: fullScene.id, bounds: fullScene.bounds }));
+Check("完整场景编辑器入口与四类只读取证面板齐全",
+  fullScene.launcherPresent
+    && ["场景", "完整巡场机位", "Spline 完整预览（只读）", "环境系统 / 氛围预设", "确定性随机种子"]
+      .every((name) => fullScene.sections.includes(name)), fullScene.sections.join(" / "));
+Check("完整 Spline 清单复用真数据并覆盖城街、东关、铁路、北关与寨墙",
+  ["city:WestGateStreet", "eastLane:EastGuangStreet", "west:railway", "north:street",
+    "wall:eastZhai", "wall:northStockade", "east:approach"]
+    .every((key) => fullScene.routeKeys.includes(key)) && fullScene.lines >= 7,
+  JSON.stringify({ count: fullScene.routeKeys.length, lines: fullScene.lines }));
+Check("完整县城随机种子清单含主种子、地形与 Spline 派生种子",
+  ["county.master", "county.outfield", "county.terrain", "spline.west:railway"]
+    .every((id) => fullScene.seedIds.includes(id)), `${fullScene.seedIds.length} 项`);
+Check("环境预设实时切换并在退出完整场景编辑器后恢复",
+  fullScene.beforeEnvironment.name === "editorClear" && fullScene.night.name === "night"
+    && fullScene.restoredEnvironment.name === "editorClear" && !fullScene.restoredEnvironment.override,
+  JSON.stringify({ before: fullScene.beforeEnvironment, night: fullScene.night, after: fullScene.restoredEnvironment }));
+Check("完整县城 / 车厢切换 URL 清理互斥场景参数",
+  new URL(fullScene.countyUrl).searchParams.get("phase") === "fullscene"
+    && !new URL(fullScene.countyUrl).searchParams.has("preview")
+    && new URL(fullScene.carriageUrl).searchParams.get("preview") === "CS_Chuchuan"
+    && new URL(fullScene.carriageUrl).searchParams.get("autoplay") === "1"
+    && !new URL(fullScene.carriageUrl).searchParams.has("phase"),
+  `${new URL(fullScene.countyUrl).search} / ${new URL(fullScene.carriageUrl).search}`);
+
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?preview=CS_Chuchuan&autoplay=1&editor=fullScene&menu=0&quality=low&audio=0`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state.ready
+  && window.Taierzhuang.editor?.ActiveId === "fullScene"
+  && window.Taierzhuang.Debug.Preview().playing, null, { timeout: 300000 });
+await page.waitForFunction(() => !window.Taierzhuang.cutscene?.Held,
+  null, { timeout: 240000 });
+const carriageEditor = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const tool = T.editor.active;
+  const before = T.cutscene.Time;
+  T.StepFrames(60, 1 / 60, false);
+  const advanced = T.cutscene.Time;
+  tool.playing = false;
+  tool.SeekCarriage(7.5);
+  const sought = T.cutscene.Time;
+  return {
+    mode: tool.sceneMode, before, advanced, sought,
+    seedValues: tool.seedRows.map((row) => row.value),
+    sections: [...tool.panel.root.querySelectorAll(".edSection > .h")]
+      .map((node) => node.textContent),
+  };
+});
+Check("车厢奇观在完整场景编辑器中由正式时间轴播放与定位",
+  carriageEditor.mode === "carriage" && carriageEditor.advanced > carriageEditor.before + 0.8
+    && Math.abs(carriageEditor.sought - 7.5) < 0.15,
+  JSON.stringify({ before: carriageEditor.before, advanced: carriageEditor.advanced, sought: carriageEditor.sought }));
+Check("车厢场景暴露完整确定性种子与环境面板",
+  carriageEditor.seedValues.includes(19380314)
+    && carriageEditor.seedValues.includes("chuchuanShunzi")
+    && carriageEditor.sections.includes("车厢走带")
+    && carriageEditor.sections.includes("环境系统 / 氛围预设"),
+  `${carriageEditor.seedValues.length} 项`);
+
+// ---------------------------------------------------------------------------
+// 10) 新版序章预览入口：独立收口、单次交接、无旧 L0 AI
 // ---------------------------------------------------------------------------
 const previewHref = await page.getAttribute("#bootPreview", "href").catch(() => null);
 Check("开发入口明确指向新版序章预览",
