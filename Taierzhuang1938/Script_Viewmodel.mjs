@@ -439,17 +439,81 @@ function BuildHandGeometry(side, key) {
     -S * 0.30,
   );
 
-  // 腕：收锥的圆管接进袖口，不再是一块 50×46×52 的方盒
-  skin.push(Tube(0.026, 0.030, 0.058, 8, TIP, { x: 0, y: -0.048, z: -0.056, rx: 0.28 }));
-
-  // 袖口（军装布料）：圆的，比腕粗一圈，翻边做成一道薄环。
-  // 原来是三个方盒，其中 cuffA 有 64×62 mm —— 比手腕粗一倍，像戴了个纸箱。
-  cloth.push(Tube(0.034, 0.031, 0.090, 8, VM_TILE.cloth, { x: 0, y: -0.062, z: -0.112, rx: 0.28 }));
-  cloth.push(Tube(0.037, 0.037, 0.014, 8, VM_TILE.cloth, { x: 0, y: -0.055, z: -0.076, rx: 0.28 }));
-  // 小臂只露一小截：再长就会在开镜时糊住半个屏幕
-  cloth.push(Tube(0.033, 0.031, 0.078, 8, VM_TILE.cloth, { x: 0, y: -0.078, z: -0.182, rx: 0.30 }));
-
+  // **腕、袖口、小臂不在这里。** 它们归 MakeSleeve，见下面那段抬头：
+  // 手的朝向是按"握住这根棍"解出来的，小臂跟着它走必然指错方向。
   return { skin, cloth };
+}
+
+// ---------------------------------------------------------------------------
+// 小臂与袖口
+// ---------------------------------------------------------------------------
+//
+// **事故：袖子曾经长在手上。**
+//
+// 旧版把腕 + 袖口 + 小臂那三根管子直接摆进 BuildHandGeometry 的 z < 0 一侧，
+// 于是小臂方向 = 手的局部 -Z，完全由 hands.right/left 那几个欧拉角决定。
+// 而那几个角是按**握持**调出来的（"手要以这个姿态卡在枪颈上"），小臂指向哪儿
+// 只是副产品 —— 三支步枪的 ry 都是 0，小臂于是顺着武器的 -Z **朝枪口伸**。
+// 玩家看到的就是：机匣上方糊着一坨蓝灰色的多面体，看不出是什么东西。
+// （用户 2026-08-29 的截图；射线取证打到的是 HandRight 的 cloth 网格。）
+// 大刀那一条早就发现了这个毛病，办法是给 handRot 加 ry = π —— 但那是把整只手
+// 连着手指一起翻过去，只是碰巧刀柄两头对称才看不出来，步枪上一翻手就背过去了。
+//
+// 正确的拆法：**手只管握，小臂只管从肘伸到腕。** 小臂自己是一节挂在 armAnchor
+// （相机稳定层）下的锥管，每帧从肘锚点朝当前手位对准、按距离拉长。手怎么转、
+// 枪怎么摆、投弹时左手飞到哪儿，小臂都还是从画面下沿伸上来的那一条。
+//
+// 肘锚点落在视锥下沿之外（视场 52°，前方 d 米处画面下沿 y ≈ -0.49 d）：
+// 于是画面里永远只有袖口和拳头，看不到肘、更看不到大臂。
+//
+// 两个数都是量出来的，不是猜的：肘要摆在**手的下方**，不是摆在身体两侧。
+// 第一人称的枪端在身前偏右（腰射时右手落在眼前 (0.10, -0.14, -0.32)、
+// 左手托在护木上 (0.13, -0.14, -0.74)，都在中线**右侧**），左肘照人体常识写在
+// 身体左边（x = -0.165）的话，左小臂就要从画面左下角斜穿到右前方的护木 ——
+// 一根横贯整个下半屏的蓝管子，比它替换掉的那坨还难看。
+// 端枪的人本来就是把左肘**收到枪下面**顶住肋骨的，所以左肘写在 x ≈ 0。
+const ELBOW_ANCHOR = {
+  right: new THREE.Vector3(0.260, -0.360, -0.060),
+  left: new THREE.Vector3(0.020, -0.360, -0.500),
+};
+// 小臂末端停在离握持点这么远的地方 —— 也就是腕的位置。手掌本体只有 5 cm 出头，
+// 停太近袖口会吃掉手指，停太远腕和掌之间会开一道缝。
+const WRIST_INSET = 0.052;
+// setFromUnitVectors 的起始轴：小臂几何是按 +Z 建的
+const SLEEVE_FORWARD = new THREE.Vector3(0, 0, 1);
+
+/**
+ * 一条小臂：局部 +Z 朝手（长度 1，靠 shaft.scale.z 拉到实际长度）。
+ * 袖口翻边与露出来的一小截腕跟着 cap 一起挪到远端，不吃拉伸。
+ */
+function MakeSleeve(materials, side) {
+  const group = new THREE.Group();
+  group.name = side > 0 ? "SleeveRight" : "SleeveLeft";
+  // 单位长的锥管：z=0 是肘（粗）、z=1 是腕（细）
+  // 半径沿用旧袖子那一套（腕 32 / 肘 38 mm）。**别按真人尺寸放大**：这套视图模型
+  // 是按小手做的，一条真实粗细（φ95 mm）的小臂在 52° 视场里有 130 px 宽，
+  // 等于用袖子把下半屏糊掉一条。
+  const shaft = MakePart(
+    [Tube(0.032, 0.038, 1, 10, VM_TILE.cloth, { z: 0.5 })], materials.cloth);
+  shaft.name = `${group.name}Shaft`;
+  group.add(shaft);
+
+  const cap = new THREE.Group();
+  cap.name = `${group.name}Cap`;
+  // 袖口翻边：比袖管粗一圈的一道薄环，军装袖子的收口就是这么一条
+  const cuff = MakePart(
+    [Tube(0.037, 0.037, 0.016, 10, VM_TILE.cloth, { z: -0.006 })], materials.cloth);
+  cuff.name = `${group.name}Cuff`;
+  // 袖口到掌根之间露出来的那一截腕（皮肤）。两头都往里插一点，接缝靠**交叠**
+  // 闭合，不靠坐标凑 —— 手会随动作在腕轴上小幅前后动，留缝就会被看见。
+  const wrist = MakePart(
+    [Tube(0.026, 0.030, 0.056, 10, VM_TILE.cloth, { z: 0.024 })], materials.skin);
+  wrist.name = `${group.name}Wrist`;
+  cap.add(cuff);
+  cap.add(wrist);
+  group.add(cap);
+
+  return { group, shaft, cap, meshes: [shaft, cuff, wrist] };
 }
 
 /** 组装一只手为 Group（原点 = 握持点），返回 { group, meshes }。 */
@@ -457,10 +521,11 @@ function MakeHand(materials, side, key) {
   const parts = BuildHandGeometry(side, key);
   const group = new THREE.Group();
   group.name = side > 0 ? "HandRight" : "HandLeft";
+  // cloth 桶现在恒为空（袖子搬去 MakeSleeve 了），MakePart 对空桶返回 null
   const meshes = [
     MakePart(parts.skin, materials.skin),
     MakePart(parts.cloth, materials.cloth),
-  ];
+  ].filter(Boolean);
   for (const mesh of meshes) group.add(mesh);
   return { group, meshes };
 }
@@ -1033,21 +1098,26 @@ const MODEL_FP_TWEAK = {
     pose: { x: 0, y: 0.02, z: -0.02, rx: -0.35, ry: 0, rz: 0 },
     handRot: { right: [0.30, 0, -1.52], left: [0.10, 0.5, 1.30] },
   },
+  // 三支栓动步枪的左手 ry = -π/2 是"托住护木"的必要条件，别改回 0.35：
+  // 手指是绕手的局部 **X 轴**卷的（见 BuildHandGeometry 抬头），ry ≈ 0 时局部 X
+  // 落在武器的横向上，于是四指是**横着**扒在护木上的 —— 从枪管方向看过去，
+  // 它们整排埋进木头里，只在开镜时从机匣右边支出四根平行的指头（"一把耙子"）。
+  // ry = -π/2 把局部 X 转到枪管轴上，手指才是绕着护木卷的。
   ZhongZheng: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
   },
   HanYang: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
   },
   Type38: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, 0.35, 1.35] },
+    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
   },
   Zb26: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.10, 0, -1.50], left: [0.20, 0.28, 1.32] },
+    handRot: { right: [0.10, 0, -1.50], left: [0.20, -Math.PI / 2, 1.32] },
   },
   Mauser96: {
     pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
@@ -1380,6 +1450,15 @@ export class Viewmodel {
     }
     this.handBase = { right: new THREE.Vector3(), left: new THREE.Vector3() };
     this.handBaseRot = { right: new THREE.Euler(), left: new THREE.Euler() };
+    // 小臂挂 armAnchor（相机稳定层），不挂枪 —— 理由同 armAnchor 那段抬头：
+    // 肩肘属于人，武器怎么摆都不该牵着它转。导入整臂启用时这两条让位给它。
+    this.sleeveRight = MakeSleeve(this.materials, 1);
+    this.sleeveLeft = MakeSleeve(this.materials, -1);
+    if (!this.riggedArms) {
+      this.armAnchor.add(this.sleeveRight.group);
+      this.armAnchor.add(this.sleeveLeft.group);
+    }
+    this._sleeveTmp = { a: new THREE.Vector3(), b: new THREE.Vector3(), q: new THREE.Quaternion() };
 
     // --- 枪口焰 -------------------------------------------------------------
     this.flash = this._BuildFlash();
@@ -1630,6 +1709,8 @@ export class Viewmodel {
     // 旧手重新打开，结果腰射时新旧两套手同时在画。冲刺回退由 FpsArmRig 独占控制。
     if (!this.riggedArms) {
       for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
+      // 右手藏了袖子也得藏，否则开镜时机匣旁边还挂着半截空袖管
+      for (const mesh of this.sleeveRight.meshes) this.adsHideParts.push(mesh);
     }
     // rig 自己报的那一份（枪身上落在眼后 / 近裁面死区里的零件）。
     // 由建 rig 的那个函数点名，因为只有它知道哪块料是机匣、哪块是枪托 ——
@@ -2221,6 +2302,43 @@ export class Viewmodel {
     this._StepFlash(step);
     this._StepDebris(step);
     if (this.riggedArms) this.riggedArms.Update(step);
+    else this._UpdateSleeves();
+  }
+
+  /**
+   * 把两条小臂从肘锚点对准当前手位。**每帧都要做**：手位被拉栓/装填/投弹/
+   * 上刺刀那几条动画每帧改写（见 _ResetAnimatedParts 之后那一串 _Anim*），
+   * Equip 时摆一次是不够的。
+   *
+   * 读手位前必须先 updateMatrixWorld：这一帧的 weaponMount / recoilPivot 姿态
+   * 刚在上面几行写完，矩阵还是上一帧的。armAnchor 与手同在 root 这条链上，
+   * 所以即便相机本身的世界矩阵还没更新，两者之间的**相对**变换也是对的。
+   */
+  _UpdateSleeves() {
+    const on = !!this.rig;
+    this.sleeveRight.group.visible = on;
+    this.sleeveLeft.group.visible = on;
+    if (!on) return;
+    this.root.updateMatrixWorld(true);
+    this._AimSleeve(this.sleeveRight, this.handRight.group, ELBOW_ANCHOR.right);
+    this._AimSleeve(this.sleeveLeft, this.handLeft.group, ELBOW_ANCHOR.left);
+  }
+
+  _AimSleeve(sleeve, handGroup, elbow) {
+    const { a, b, q } = this._sleeveTmp;
+    // 手的握持点换算到 armAnchor 局部空间（肘锚点就写在这个空间里）
+    handGroup.getWorldPosition(a);
+    this.armAnchor.worldToLocal(a);
+    const dir = b.copy(a).sub(elbow);
+    const reach = dir.length();
+    if (reach < 1e-4) return;
+    dir.divideScalar(reach);
+    sleeve.group.position.copy(elbow);
+    // 手搓四元数而不是 lookAt：lookAt 读父级的世界矩阵，这一帧它未必是新的
+    sleeve.group.quaternion.copy(q.setFromUnitVectors(SLEEVE_FORWARD, dir));
+    // 腕停在握持点之前 WRIST_INSET 处；手位再近也不许把袖子压成负长度
+    sleeve.shaft.scale.z = Math.max(0.04, reach - WRIST_INSET);
+    sleeve.cap.position.z = sleeve.shaft.scale.z;
   }
 
   /** 姿态 + 增量×权重。上刺刀的"端刺刀"姿态就是这么叠上去的。 */
@@ -2837,7 +2955,7 @@ export class Viewmodel {
         node.geometry.dispose();
       }
     });
-    for (const hand of [this.handRight, this.handLeft]) {
+    for (const hand of [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]) {
       for (const mesh of hand.meshes) if (mesh.geometry) mesh.geometry.dispose();
     }
     if (this.root.parent) this.root.parent.remove(this.root);
