@@ -218,7 +218,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk13_7 烧过的一进院：火里没烧掉的石磨盘" },
 
   // blk13_6 LCourtyard（挨过炮、烧过）：火场里剩下的一口陶缸与掀落的墙石。
-  { asset: "clayRoundVat", x: 53.17, z: -86.85, ry: 1.871,
+  { asset: "clayRoundVat", x: 53.17, z: -86.24, ry: 1.871,
     note: "blk13_6 烧过的 L 形院：火场里剩下的圆腹陶缸" },
   { asset: "stackableStone02", x: 53.38, z: -87.42, ry: 0.971, scale: 0.95,
     note: "blk13_6 烧过的 L 形院：掀下来的过墙石" },
@@ -322,9 +322,9 @@ export const PLACEMENTS = Object.freeze([
   // blk16_9 OneEntry（挨过炮）：门道边搁着的布灯笼与一只方凳。
   { asset: "clothLantern", x: 144.67, z: -79.84, ry: -2.942,
     note: "blk16_9 窄院门道里：门道边搁在地上的布灯笼" },
-  { asset: "ryYardStool", x: 144.07, z: -79.95, ry: -3.442,
+  { asset: "ryYardStool", x: 144.07, z: -79.53, ry: -3.442,
     note: "blk16_9 窄院门道里：门边的木方凳" },
-  { asset: "bambooHat", x: 145.17, z: -79.98, ry: -2.542,
+  { asset: "bambooHat", x: 145.17, z: -79.53, ry: -2.542,
     note: "blk16_9 窄院门道里：撂在凳边的斗笠" },
 
   // blk16_10 WellYard（挨过炮、烧过）：井台边洗衣的木盆与两只水桶。
@@ -445,7 +445,7 @@ export const PLACEMENTS = Object.freeze([
   // 「前店后院」在屋脊上方也能读出来，和路肩上的恒源酱园相接。
   { asset: "shopPlaque", x: 182.36, z: -40.12, ry: 1.58,
     note: "blk16_11 东门大街北侧铺面后院：卸下的门板靠着库房墙，铺子已上板" },
-  { asset: "wineJarCluster", x: 181.27, z: -40.48, ry: -0.22,
+  { asset: "wineJarCluster", x: 181.27, z: -41.35, ry: -0.22,
     note: "blk16_11 东门大街北侧铺面后院：酱园暂存的一簇酒坛，贴着后院矮墙" },
 
   // blk17_11 AdobeYard：从商铺过到公署边巷住区的一户修车人家。

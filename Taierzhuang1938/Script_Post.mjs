@@ -55,8 +55,8 @@ float Hash12(vec2 p) {
 
 // ---------------------------------------------------------------------------
 // 深度法线预通道用的覆盖材质
-// 用 three 的 chunk 拼，USE_INSTANCING / 形变这些分支交给它自己处理，
-// 不然实例化的瓦砾在预通道里全部塌到原点，AO 就是一片乱码。
+// 用 three 的 chunk 拼，USE_INSTANCING / USE_SKINNING / 形变这些分支交给它自己处理，
+// 不然实例化的瓦砾会塌到原点，蒙皮人物会留在绑定姿势，AO / TAA / 运动模糊一起读错。
 // ---------------------------------------------------------------------------
 function MakeNormalDepthMaterial(destruction = null) {
   const uniforms = { uFar: { value: 500 } };
@@ -67,6 +67,8 @@ function MakeNormalDepthMaterial(destruction = null) {
     vertexShader: /* glsl */`
       #include <common>
       #include <batching_pars_vertex>
+      #include <skinning_pars_vertex>
+      #include <morphtarget_pars_vertex>
       varying vec3 vViewNormal;
       varying float vViewDepth;
       ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
@@ -75,10 +77,13 @@ function MakeNormalDepthMaterial(destruction = null) {
         #include <beginnormal_vertex>
         #include <morphinstance_vertex>
         #include <morphnormal_vertex>
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
         #include <defaultnormal_vertex>
         vViewNormal = normalize(transformedNormal);
         #include <begin_vertex>
         #include <morphtarget_vertex>
+        #include <skinning_vertex>
         #include <project_vertex>
         vViewDepth = -mvPosition.z;
         ${destruction ? `
@@ -778,6 +783,18 @@ const FRAG_DEBUG_VIEW = /* glsl */`
   uniform sampler2D uSource;
   uniform float uMode;
   uniform float uUnavailable;
+  uniform mat4 uInvView;
+  uniform vec2 uProjScale;
+  uniform float uFogDensity;
+  uniform float uFogFalloff;
+  uniform float uFogBase;
+  uniform float uFogMax;
+  uniform float uDofStrength;
+  uniform float uDofFocus;
+  uniform float uDofRange;
+  uniform mat4 uPrevViewProjection;
+  uniform vec2 uResolution;
+  uniform float uHasPrev;
   varying vec2 vUv;
 
   vec3 ToSrgb(vec3 c) {
@@ -809,10 +826,46 @@ const FRAG_DEBUG_VIEW = /* glsl */`
     } else if (uMode < 4.5) {          // HDR / 辐照度：Reinhard + sRGB
       color = color / (color + vec3(1.0));
       color = ToSrgb(color);
-    } else {                           // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
+    } else if (uMode < 5.5) {          // 材质通道假彩色：0-1 数据，只做 sRGB 编码。
       // 走 Reinhard 会把 0.5 的粗糙度压成 0.33，读数就不准了；
       // 天空穹没被注入、还是 HDR 亮度，pow 后钳到白 —— 当背景正合适。
       color = ToSrgb(color);
+    } else if (uMode < 6.5) {          // 雾量：严格复算 Composite 的距离 × 高度系数。
+      float fog = 0.0;
+      if (texel.a > 0.0 && uFogDensity > 0.0) {
+        vec2 ndc = vUv * 2.0 - 1.0;
+        vec3 viewPos = vec3(ndc.x / max(uProjScale.x, 0.0001),
+                            ndc.y / max(uProjScale.y, 0.0001), -1.0) * texel.a;
+        vec4 worldPos = uInvView * vec4(viewPos, 1.0);
+        float distanceFog = 1.0 - exp(-texel.a * uFogDensity);
+        float heightFog = exp(-max(worldPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
+        fog = clamp(distanceFog * heightFog, 0.0, uFogMax);
+      }
+      // 雾本身可能接近灰色，直接看它不容易看出系数；假彩色才看得见断层和高度带。
+      color = mix(vec3(0.015, 0.035, 0.18), vec3(1.0, 0.63, 0.04), fog);
+      color = ToSrgb(color);
+    } else if (uMode < 7.5) {          // 景深 CoC：严格复算 Composite 的远景散焦系数。
+      float coc = texel.a <= 0.0 ? 1.0
+        : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), texel.a);
+      coc *= uDofStrength;
+      // 即使阵亡景深没触发也保留深蓝底，避免「全黑」被误判成展示 pass 没出画。
+      color = mix(vec3(0.015, 0.06, 0.30), vec3(1.0, 0.72, 0.04), clamp(coc, 0.0, 1.0));
+      color = ToSrgb(color);
+    } else {                           // Motion Vector：与 TAA 同一套深度反投影相机速度。
+      // 没有逐物体 velocity buffer；这张图如实展示运动模糊/TAA 实际使用的速度近似。
+      float depth = texel.a <= 0.0 ? 400.0 : texel.a;
+      vec2 ndc = vUv * 2.0 - 1.0;
+      vec3 viewPos = vec3(ndc.x / max(uProjScale.x, 0.0001),
+                          ndc.y / max(uProjScale.y, 0.0001), -1.0) * depth;
+      vec4 worldPos = uInvView * vec4(viewPos, 1.0);
+      vec4 prevClip = uPrevViewProjection * worldPos;
+      vec2 prevUv = (prevClip.xy / max(abs(prevClip.w), 0.0001)) * 0.5 + 0.5;
+      vec2 velocityPx = (vUv - prevUv) * uResolution;
+      if (uHasPrev < 0.5 || prevClip.w <= 0.0) velocityPx = vec2(0.0);
+      vec2 encodedDirection = clamp(velocityPx / 32.0, vec2(-1.0), vec2(1.0));
+      color = vec3(0.5 + encodedDirection.x * 0.5,
+                   0.5 + encodedDirection.y * 0.5,
+                   clamp(length(velocityPx) / 32.0, 0.0, 1.0));
     }
     gl_FragColor = vec4(color, 1.0);
   }`;
@@ -876,6 +929,7 @@ export class PostPipeline {
 
     this.normalDepthMaterial = MakeNormalDepthMaterial(destruction);
     this._skipScratch = [];            // _CollectSkipped 的复用数组，别每帧 new
+    this._skipWorldPosition = new THREE.Vector3();
     this.quadScene = new THREE.Scene();
     this.quadMesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.quadMesh.frustumCulled = false;
@@ -979,6 +1033,10 @@ export class PostPipeline {
 
     this.uniformsDebug = {
       uSource: { value: null }, uMode: { value: 4 }, uUnavailable: { value: 0 },
+      uInvView: { value: new THREE.Matrix4() }, uProjScale: { value: new THREE.Vector2(1, 1) },
+      uFogDensity: { value: 0 }, uFogFalloff: { value: 18 }, uFogBase: { value: 0 }, uFogMax: { value: 0.94 },
+      uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 }, uDofRange: { value: 2.8 },
+      uPrevViewProjection: { value: new THREE.Matrix4() }, uResolution: { value: new THREE.Vector2(1, 1) }, uHasPrev: { value: 0 },
     };
     this.matDebug = this._Mat(FRAG_DEBUG_VIEW, this.uniformsDebug);
     // final 之外的值只在开发用面板明确要求时才生效；正式出图完全不走这里。
@@ -1149,9 +1207,17 @@ export class PostPipeline {
       case "ao": return { texture: T.ao.texture, mode: 2, unavailable: !this.preset.ssao };
       case "aoBlur": return { texture: T.aoBlur.texture, mode: 2, unavailable: !this.preset.ssao };
       case "hdr": return { texture: T.hdr.texture, mode: 4 };
+      // Bloom 提取与最终合成分开看：前者用于判断阈值/软膝是否切掉了该进的亮部，
+      // 后者用于判断多级 tent 叠加后的覆盖范围和强度。
+      case "bloomExtract": return { texture: T.bright.texture, mode: 4 };
       // 送屏的要与合成 pass 真正吃的是同一张（见 uBloom 那一行）：bloomMips[0]
       // 只是第 0 级的降采样，还没叠上更小几级的 tent 放大，看着比实际泛光弱一大截。
       case "bloom": return { texture: this.BloomTarget?.texture, mode: 4 };
+      // 这两项没有独立 RT：Debug pass 从与 Composite 同一张 NormalDepth 靶取深度，
+      // 用同一套 uniforms 实时重算效果系数。这样不会为纯调试多占一张全分辨率显存靶。
+      case "fog": return { texture: T.normalDepth.texture, mode: 6 };
+      case "dof": return { texture: T.normalDepth.texture, mode: 7 };
+      case "motionVector": return { texture: T.normalDepth.texture, mode: 8 };
       // enabled 为 false 时图集是上一次收敛留下的陈旧内容，或者干脆一片全黑
       // （画质档从没开过 GI 就是这一种）。这种情况要显式报"不可用"斜纹，
       // 而不是把一张黑图送到屏幕上 —— 后者跟"渲染坏了"长得一模一样。
@@ -1173,6 +1239,9 @@ export class PostPipeline {
       // 所以不能再拿 debugGi 缺席当"未注入"的代理。
       case "baseColor": case "roughness": case "metalness": case "shadow":
         return { texture: T.hdr.texture, mode: 5, unavailable: !this.debugInjected };
+      // 光照分量是线性 HDR；沿用 hdr 的 Reinhard + sRGB 可视化，别把高亮全钳白。
+      case "diffuseLighting": case "specularLighting": case "reflection": case "indirectLighting":
+        return { texture: T.hdr.texture, mode: 4, unavailable: !this.debugInjected };
       // GI 的世界空间视图同理只要求材质注入过：探针体关着时 giWorld 显示的
       // 是材质**实际在用**的间接辐照度（天空 IBL 回退），giConfidence 恒 0
       // （黑 = 没有探针 GI）—— 都是准确信息，不是"不可用"。
@@ -1183,18 +1252,32 @@ export class PostPipeline {
   }
 
   /**
-   * 收集这一帧要在预通道里整个藏掉的对象（userData.skipNormalDepth === true）。
+   * 收集这一帧要在预通道里藏掉的对象：显式 skipNormalDepth，或超过自己的
+   * normalDepthMaxDistance（只给蒙皮人物的小分件用；躯干主轮廓没有距离上限）。
    *
    * 每帧遍历一次场景图：这一趟本来就要被渲染器自己遍历好几遍，多一次几十微秒，
    * 换来的是"挂上去就生效"——缓存一份列表的话，换关重建场景那一帧必然是脏的，
    * 而这个 bug 的表现（天上一个黑洞）恰恰要花一小时才定位得到。
    * 只收当前可见的：本来就藏着的对象不该被这里"帮忙"打开。
    */
-  _CollectSkipped(scene) {
+  _CollectSkipped(scene, camera = null) {
     const list = this._skipScratch;
     list.length = 0;
     scene.traverse((object) => {
-      if (object.visible && object.userData && object.userData.skipNormalDepth) list.push(object);
+      if (!object.visible || !object.userData) return;
+      if (object.userData.skipNormalDepth) {
+        list.push(object);
+        return;
+      }
+      const maxDistance = Number(object.userData.normalDepthMaxDistance) || 0;
+      if (camera && maxDistance > 0) {
+        // RenderScene 已在本帧统一更新 scene.matrixWorld；直接读矩阵，别让每个小分件
+        // 再沿父链 updateWorldMatrix 一遍，把省下的 GPU 成本换成 JS 遍历。
+        this._skipWorldPosition.setFromMatrixPosition(object.matrixWorld);
+        if (camera.position.distanceToSquared(this._skipWorldPosition) > maxDistance * maxDistance) {
+          list.push(object);
+        }
+      }
     });
     return list;
   }
@@ -1262,7 +1345,7 @@ export class PostPipeline {
     // 二百米外的黑烟柱就成了天上一个越长越大的黑洞。
     // Script_Sky 早就标了 userData.skipNormalDepth，只是从来没人读它。
     if (P) P.GpuPush("prepass");
-    const skipped = this._CollectSkipped(scene);
+    const skipped = this._CollectSkipped(scene, camera);
     for (const object of skipped) object.visible = false;
     const prevBackground = scene.background;
     const prevOverride = scene.overrideMaterial;
@@ -1469,6 +1552,21 @@ export class PostPipeline {
     if (P) P.GpuPush("fxaa");
     const debug = this._GetDebugSource();
     if (debug) {
+      // 雾量 / CoC 调试视图必须复用刚刚送进 Composite 的本帧参数。不要另存一份
+      // "调试参数"：时段预设切换一帧后两份数字就会分叉，面板反而成了假信息。
+      const DU = this.uniformsDebug;
+      DU.uInvView.value.copy(U.uInvView.value);
+      DU.uProjScale.value.copy(U.uProjScale.value);
+      DU.uFogDensity.value = U.uFogDensity.value;
+      DU.uFogFalloff.value = U.uFogFalloff.value;
+      DU.uFogBase.value = U.uFogBase.value;
+      DU.uFogMax.value = U.uFogMax.value;
+      DU.uDofStrength.value = U.uDofStrength.value;
+      DU.uDofFocus.value = U.uDofFocus.value;
+      DU.uDofRange.value = U.uDofRange.value;
+      DU.uPrevViewProjection.value.copy(U.uPrevViewProjection.value);
+      DU.uResolution.value.copy(U.uResolution.value);
+      DU.uHasPrev.value = this.hasPrev ? 1 : 0;
       this.uniformsDebug.uSource.value = debug.texture || T.ldr.texture;
       this.uniformsDebug.uMode.value = debug.mode;
       this.uniformsDebug.uUnavailable.value = debug.unavailable || !debug.texture ? 1 : 0;

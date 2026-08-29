@@ -323,6 +323,23 @@ function BuildMaterials(library) {
     // 且这支枪在战场上滚了半个月，抬到物理真值会变成镀铬件；0.20 是「暗但有形」的落点。
     blued: library.Plain("VmBlued", { color: 0x7a7d82, roughness: 0.44, metalness: 0.80 }),
     leather: library.Plain("VmLeather", { color: 0x3a2c22, roughness: 0.86, metalness: 0 }),
+    lqWaltherP38: SafeMaterial(library, "LugouqiaoWaltherP38", {}, 0x595d64),
+    lqBrowningTripod: SafeMaterial(library, "Steel", {}, 0x555960),
+    lqUnidentifiedMunition: SafeMaterial(library, "LugouqiaoUnidentifiedMunition", {}, 0x68625a),
+    lqUnidentifiedBoltActionRifle: SafeMaterial(library, "LugouqiaoUnidentifiedBoltActionRifle", {}, 0x6b5642),
+    lqOfficerSword: SafeMaterial(library, "LugouqiaoOfficerSword", {}, 0x68635c),
+    lqRingPommelDagger: SafeMaterial(library, "LugouqiaoRingPommelDagger", {}, 0x605b52),
+    lqUnidentifiedAntiaircraftMetal: SafeMaterial(library, "LugouqiaoUnidentifiedAntiaircraftMetal", {}, 0x565a60),
+    lqUnidentifiedAntiaircraftWood: SafeMaterial(library, "LugouqiaoUnidentifiedAntiaircraftWood", {}, 0x6b4c32),
+    lqLightMortar: SafeMaterial(library, "LugouqiaoLightMortar", {}, 0x5d5e58),
+    lqType11AmmoBox: SafeMaterial(library, "LugouqiaoType11AmmoBox", {}, 0x5e5b4e),
+    lqType11Body: SafeMaterial(library, "LugouqiaoType11Body", {}, 0x575a55),
+    lqType11BodyAlt: SafeMaterial(library, "LugouqiaoType11BodyAlt", {}, 0x575a55),
+    lqType11Fore: SafeMaterial(library, "LugouqiaoType11Fore", {}, 0x67513a),
+    lqMauser96: SafeMaterial(library, "LugouqiaoMauser96", {}, 0x5a4c3e),
+    lqMediumMortar: SafeMaterial(library, "Steel", {}, 0x555960),
+    lqKarabiner98k: SafeMaterial(library, "LugouqiaoKarabiner98k", {}, 0x5d4a38),
+    lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
     flash: library.Plain("VmMuzzleFlash", {
@@ -977,6 +994,8 @@ const BUILDERS = {
 const MODEL_FP = new Set([
   "Dadao",
   "ZhongZheng", "HanYang", "Type38", "Zb26", "Mauser96", "ServicePistol",
+  "Type11", "WaltherP38", "Karabiner98k", "UnidentifiedBoltActionRifle",
+  "OfficerSwordSet", "RingPommelDagger", "UnidentifiedAntiaircraftGun",
 ]);
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
@@ -984,6 +1003,13 @@ const VM_MATERIAL_BY_MESH = {
   steel: "steel", blade: "blade", grip: "grip", dadao: "dadao", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
+  lqWaltherP38: "lqWaltherP38", lqBrowningTripod: "lqBrowningTripod",
+  lqUnidentifiedMunition: "lqUnidentifiedMunition", lqUnidentifiedBoltActionRifle: "lqUnidentifiedBoltActionRifle",
+  lqOfficerSword: "lqOfficerSword", lqRingPommelDagger: "lqRingPommelDagger",
+  lqUnidentifiedAntiaircraftMetal: "lqUnidentifiedAntiaircraftMetal", lqUnidentifiedAntiaircraftWood: "lqUnidentifiedAntiaircraftWood",
+  lqLightMortar: "lqLightMortar", lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
+  lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore", lqMauser96: "lqMauser96",
+  lqMediumMortar: "lqMediumMortar", lqKarabiner98k: "lqKarabiner98k", lqWeaponPlain: "lqWeaponPlain",
 };
 
 /**

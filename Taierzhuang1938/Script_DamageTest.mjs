@@ -40,27 +40,31 @@
 // 第二关（CH2_Shouliudan）不合适：ijaPressure 1.5、从东面压、多一支掷弹筒，
 // 而且打的是东关的院落巷战 —— 那是另一种交火距离，TTK 基线不可比。
 //
-// **新基线从哪来：口径一个数都没动，所以基线也不该动。** `COMBAT.player` 那十一个
-// 字段（docs/Data_PlayerDamage.md §二）、`aiAccuracyBase`、`Data_Weapons` 的伤害
-// 全部原样；换章换掉的只是「场上那三个日本兵拿的是什么枪」，而 CH1 的 ijaForce
-// 与旧 L0 逐字相同，所以 TTK 落在同一条带子里。断言仍按 docs §五「落地的数」验：
-// 三人 25 m 站姿 15 次中位数 ≈ 9—13 s，闸门留 8—24 s；姿态梯度（卧 > 立）照旧。
+// **新基线从哪来：口径一个数都没动。** `COMBAT.player` 那十一个字段
+//（docs/Data_PlayerDamage.md §二）、`aiAccuracyBase`、`Data_Weapons` 的伤害全部原样；
+// 换章换掉的只是「场上那三个日本兵拿的是什么枪」，而 CH1 的 ijaForce 与旧 L0 逐字相同。
 //
-// 换章之后在 CH1_NanLu 上实跑的数（2026-08-29，24/24 全绿）：
-//   · 场上 15 个日本兵，武器 Type38 / Type11 / Type92Hmg —— 与旧 L0 的
-//     ijaForce（lmgEvery 13 / hmgTeams 1 / armor 0）算出来的配比一致，
-//     **这是「换章没换掉被测对象」最直接的证据**；
-//   · 三人 25 m 站姿 TTK 中位数 **12.2 s**（旧口径同一台靶场 5.2 s，比值 2.3×），
-//     落在 docs §五 记的 9—13 s 里；靶场命中率新 19% / 旧 31%，也对得上；
-//   · 姿态梯度 立 14.2 s / 蹲 14.8 s / 卧 25.1 s（docs §五 记的是 12—13 / 13—18 / 20—25
-//     —— 立与卧各比旧账高一两秒。**不知道确切原因，也不假装知道**：ijaForce 一样、
-//     口径一个数没动，最可能的是这一关场上那三个人抽到的枪与站位与旧 L0 不同
-//     （靶场只挑「前三个活着的日本兵」，谁排在前面取决于撒兵）。断言压的是
-//     「卧 > 立」这条**关系**，不压绝对值 —— 姿态是最大的一根杠杆，
-//     它的方向比它的秒数更值得守。）；
-//   · 单发最重 60.7（九二式重机爆头 92 × 0.33 × 2.0），仍在 maxBulletDamage 62 之下。
-// 这几个数 2026-08-29 已经回写进 docs/Data_PlayerDamage.md §五「落地的数」
-//（抛光批 P2）。**两边只许有一份真相**：以后改了这里的实跑账，同一趟改那张表。
+// ---------------------------------------------------------------------------
+// 2026-08-29 合并 master：射手**焊死成持步枪的日军**（f200b906）
+//
+// 这一条同时**解释掉**了换章那一版里那个「立与卧各比旧账高一两秒、不知道确切原因」
+// 的悬案 —— 原因就是射手是混编的。靶场原来只挑「前三个活着的日本兵」，谁排在
+// 前面取决于撒兵顺序；混进一挺十一年式（周期 0.82 s 对三八式的 2.2 s）TTK 直接
+// 塌半，于是每换一次章、每动一次撒兵，阈值就得跟着走一次。焊死成三八式之后
+// 数字是确定的，换章不再动数 —— 这也是为什么下面这份账比换章那一版整体长三成：
+// 纯步枪一轮 2.2 s，射速与单发伤害都低于混编，是口径换纯步枪的代价，不是回归。
+//
+// 合并后在 CH1_NanLu 上实跑的数（2026-08-29，24/24 全绿）：
+//   · 场上 15 个日本兵（其中步枪兵 13），武器 Type38 / Type11 / Type92Hmg ——
+//     与旧 L0 的 ijaForce（lmgEvery 13 / hmgTeams 1 / armor 0）算出来的配比一致，
+//     **这是「换章没换掉被测对象」最直接的证据**；靶场从这 13 个里取前三个；
+//   · 三人 25 m 站姿 TTK 中位数 **16.1 s**（旧口径同一台靶场 6.6 s，比值 2.44×），
+//     落在闸门 8—24 s 里；靶场命中率新 19% / 旧 30%；
+//   · 姿态梯度 立 16.9 s / 蹲 17.6 s / 卧 29.3 s。断言压的是「卧 > 立」这条**关系**
+//     与那条宽带，不压绝对值 —— 姿态是最大的一根杠杆，它的方向比它的秒数更值得守；
+//   · 单发最重 47.5，仍在 maxBulletDamage 62 之下。
+// 这几个数已经回写进 docs/Data_PlayerDamage.md §五「落地的数」。
+// **两边只许有一份真相**：以后改了这里的实跑账，同一趟改那张表。
 // ---------------------------------------------------------------------------
 
 import path from "node:path";
@@ -91,16 +95,19 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 
-// phase=1 = CH1_NanLu（第一关 · 往南的路）。**不能用 phase=0**：那是零敌人的
-// 过场章，靶场一个射手都挑不到（见文件头「取样章」那一节）。
+// phase=1 = CH1_NanLu（第一关 · 往南的路）。**不能用 phase=0**：任务流程重制把
+// phase=0 换成了不撒兵的过场序章，靶场在那儿一个射手都收不到
+//（见文件头「取样章」那一节）。第 1 章重制前后都是真战斗章。
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
-// 取样章体检：**先证明这一关真有日本兵**，再谈 TTK。
-// 上一版把这件事默认成立，于是换到过场章之后整份报告静默变成一串 −1 ——
-// 「靶场里一个人都没有」和「打了九十秒没打死」在输出上长得一模一样。
+// 取样章体检：**先点名，再开靶**。先证明这一关真撒了兵、且步枪兵够三个，
+// 再谈 TTK。上一版把这件事默认成立，于是换到过场章之后整份报告静默变成
+// 一串 −1 ——「靶场里一个人都没有」和「打了九十秒没打死」在输出上长得一模一样。
+// 这条红了 = 判据不成立（本章没撒兵 / 步枪兵不够），**不是伤害口径回归**；
+// 别顺着后面的 TypeError 去查 Range.Run。
 const arena = await page.evaluate(async () => {
   const T = window.Taierzhuang;
   const battle = await import("./Data_Battle.mjs");
@@ -111,12 +118,20 @@ const arena = await page.evaluate(async () => {
     pressure: phase.ijaPressure,
     spawn: (phase.ijaSpawn || []).join("/"),
     ija: alive.length,
+    rifles: alive.filter((s) => s.weapon?.kind === "boltRifle").length,
     weapons: [...new Set(alive.map((s) => s.weapon?.id || s.weapon?.name || "?"))].sort(),
   };
 });
-Check(`取样章 ${arena.id} 场上有日本兵可打（少于三个就没有靶场可言）`,
-  arena.ija >= 3,
-  `${arena.ija} 人在场，压力 ${arena.pressure}／来向 ${arena.spawn}，武器 ${arena.weapons.join("/") || "（无）"}`);
+Check(`取样章 ${arena.id} 撒了兵，且至少三个活着的持步枪日军可当射手`,
+  arena.rifles >= 3,
+  `活日军 ${arena.ija}（步枪兵 ${arena.rifles}），压力 ${arena.pressure}／来向 ${arena.spawn}，`
+  + `武器 ${arena.weapons.join("/") || "（无）"}`);
+if (arena.rifles < 3) {
+  await browser.close();
+  server.close();
+  console.log(`\n0/${results.length} 通过\n失败：\n  ` + results.map((r) => r.name).join("\n  "));
+  process.exit(1);
+}
 
 // ===========================================================================
 // 页面里的一台"靶场"。
@@ -157,16 +172,21 @@ await page.evaluate(() => {
       const saved = { ...tables.COMBAT.player };
       if (opt.patch) Object.assign(tables.COMBAT.player, opt.patch);
 
+      // 只收步枪兵：前 N 个活兵是什么枪由撒兵顺序决定，混进一挺十一年式
+      // （周期 0.82 s 对 2.2 s）TTK 直接塌半，阈值就得跟着章走。焊死成
+      // 三八式之后，口径与 docs/Data_PlayerDamage.md 的「三人 25 m」相同，换章不动数。
       const shooters = [];
       for (const s of ai.soldiers) {
-        if (s.side !== "ija" || !s.alive) continue;
+        if (s.side !== "ija" || !s.alive || s.weapon?.kind !== "boltRifle") continue;
         shooters.push(s);
         if (shooters.length >= (opt.shooters ?? 3)) break;
       }
-      // 一个射手都没有就**明说**。原来这里不查：换到零敌人的过场章之后
-      // cycle 算成 NaN、循环一轮都不进，报告变成一串 −1 却不报错 ——
-      // 「靶场里没人」和「打了九十秒没打死」在输出上长得一模一样。
-      if (!shooters.length) throw new Error("靶场里一个活着的日本兵都没有 —— 取样章选错了");
+      // 人数不够就**明说**。原来这里不查：换到零敌人的过场章之后 cycle 算成
+      // NaN、循环一轮都不进，报告变成一串 −1 却不报错 ——「靶场里没人」和
+      // 「打了九十秒没打死」在输出上长得一模一样。
+      if (shooters.length < (opt.shooters ?? 3)) {
+        throw new Error(`靶场只收到 ${shooters.length} 个持步枪日军 —— 本章撒兵了吗？取样章选对了吗？`);
+      }
 
       player.Spawn(player.position.x, player.position.z, player.yaw);
       player.spawnGrace = 0;                       // 出生保护另有断言，这里不测它

@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "22";
+const MESH_REV = "23";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -167,12 +167,12 @@ export const MESHES = {
   },
   Mauser96: {
     file: "Mauser96.tzm.json", category: "weapon",
-    triangles: 4677, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.02270, 0.17289, 0.28800], lengthM: 0.288,
-    draws: { high: 2, medium: 2, low: 2 },
-    note: "驳壳枪（毛瑟 C96）。几何来自 Maxence Rouillet 的 Sketchfab CC-BY-4.0 模型；"
-      + "保留扫帚柄木握把、扳机前方固定弹仓、长枪管与系绳环。",
+    triangles: 1123, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqMauser96"], mounts: WEAPON_MOUNTS,
+    span: [0.02412, 0.13300, 0.28800], lengthM: 0.288,
+    draws: { high: 1, medium: 1, low: 1 },
+    note: "卢沟桥资源包源节点 Sphere001：毛瑟 C96。保留原 UV、maose_d 漫反射与"
+      + "maose_s 高光源图；项目原 CC-BY C96 源文件继续保留在 _import 作对比参考。",
   },
   ServicePistol: {
     file: "ServicePistol.tzm.json", category: "weapon",
@@ -253,12 +253,65 @@ export const MESHES = {
   },
   Type11: {
     file: "Type11.tzm.json", category: "weapon",
-    triangles: 6622, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.16168, 0.22103, 1.1], lengthM: 1.100,
-    draws: { high: 2, medium: 2, low: 2 },
-    note: "CC-BY Type 11 6.5mm Machine Gun（Sketchfab / buh）→ 十一年式轻机枪。"
-      + "完整枪体不减面；独立展示的桥夹/散弹不作为手持枪体导入。",
+    triangles: 4530, meshBlocks: 5, nodes: 7, joints: 0,
+    materials: ["lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore", "lqWeaponPlain"],
+    mounts: WEAPON_MOUNTS,
+    span: [0.24071, 0.25577, 1.10027], lengthM: 1.100,
+    draws: { high: 5, medium: 5, low: 5 },
+    note: "卢沟桥资源包源节点 QEDQD：十一年式轻机枪。保留 body/body2/fore/ammobox"
+      + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
+  },
+  WaltherP38: {
+    file: "WaltherP38.tzm.json", category: "weapon", triangles: 4529, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqWaltherP38"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38。",
+  },
+  BrowningTripodAssembly: {
+    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 4520, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.74167, 1.43247, 2.27406], lengthM: 2.273,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 BROTRIPO009；仅能确认勃朗宁式三脚架/机件组合，具体型号未明。",
+  },
+  UnidentifiedMunition: {
+    file: "UnidentifiedMunition.tzm.json", category: "weapon", triangles: 128, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqUnidentifiedMunition"], mounts: WEAPON_MOUNTS, span: [0.06568, 0.06906, 0.253], lengthM: 0.253,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Cylinder026；弹体型号未明，识别截图随源归档。",
+  },
+  UnidentifiedBoltActionRifle: {
+    file: "UnidentifiedBoltActionRifle.tzm.json", category: "weapon", triangles: 4523, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["lqUnidentifiedBoltActionRifle", "lqWeaponPlain"], mounts: WEAPON_MOUNTS,
+    span: [0.08972, 0.24887, 1.120], lengthM: 1.120, draws: { high: 2, medium: 2, low: 2 },
+    note: "源节点 FQDQD / MK98_*；可确认栓动步枪，具体型号未明。",
+  },
+  OfficerSwordSet: {
+    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 2895, meshBlocks: 1, nodes: 5, joints: 0,
+    materials: ["lqOfficerSword"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05748, 0.07389, 0.99504], lengthM: 1.000,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Group146；军刀与刀鞘组合，具体制式未明。",
+  },
+  RingPommelDagger: {
+    file: "RingPommelDagger.tzm.json", category: "weapon", triangles: 515, meshBlocks: 1, nodes: 5, joints: 0,
+    materials: ["lqRingPommelDagger"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05430, 0.06812, 0.450], lengthM: 0.450,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Mesh_0300；带环首短刃，具体制式未明。",
+  },
+  UnidentifiedAntiaircraftGun: {
+    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 4932, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["lqUnidentifiedAntiaircraftMetal", "lqUnidentifiedAntiaircraftWood"], mounts: WEAPON_MOUNTS,
+    span: [0.52085, 0.60153, 1.09878], lengthM: 1.100, draws: { high: 2, medium: 2, low: 2 },
+    note: "源节点 MK1；可确认高射炮形制并保留 MKCRMT/Mkwood 两张原贴图，具体型号未明。",
+  },
+  LightMortar: {
+    file: "LightMortar.tzm.json", category: "weapon", triangles: 3124, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqLightMortar"], mounts: WEAPON_MOUNTS, span: [0.35814, 0.49899, 0.500], lengthM: 0.500,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 PJP；轻型迫击/掷弹器，具体型号未明。",
+  },
+  MediumMortar: {
+    file: "MediumMortar.tzm.json", category: "weapon", triangles: 4534, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqMediumMortar"], mounts: WEAPON_MOUNTS, span: [0.79565, 1.20429, 1.44394], lengthM: 1.444,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；中型迫击炮，具体型号未明。",
+  },
+  Karabiner98k: {
+    file: "Karabiner98k.tzm.json", category: "weapon", triangles: 4535, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqKarabiner98k"], mounts: WEAPON_MOUNTS, span: [0.08304, 0.19262, 1.10961], lengthM: 1.110,
+    draws: { high: 1, medium: 1, low: 1 }, note: "源节点直接命名 Karabiner 98 Kurz；保留 diffuse 与 normal 原贴图。",
   },
   Type92Hmg: {
     file: "Type92Hmg.tzm.json", category: "weapon",
@@ -415,6 +468,11 @@ export const WEAPON_MESH_BY_ID = {
   // 掷弹筒走武器规范系（右手握点 = 原点、筒口朝 -Z），人物能直接拿着它；
   // 三辆车走车辆规范系，只有台架/摆场景用得上，人物拿不了
   Type89Launcher: "Type89Launcher",
+  WaltherP38: "WaltherP38", BrowningTripodAssembly: "BrowningTripodAssembly",
+  UnidentifiedMunition: "UnidentifiedMunition", UnidentifiedBoltActionRifle: "UnidentifiedBoltActionRifle",
+  OfficerSwordSet: "OfficerSwordSet", RingPommelDagger: "RingPommelDagger",
+  UnidentifiedAntiaircraftGun: "UnidentifiedAntiaircraftGun", LightMortar: "LightMortar",
+  MediumMortar: "MediumMortar", Karabiner98k: "Karabiner98k",
   Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
 };
 

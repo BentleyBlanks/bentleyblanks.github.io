@@ -99,7 +99,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk9_2：跟前一只并排的军箱，箱盖钉着没开" },
 
   // blk4_3 一进院（-163.43,-205.92）：北门大街西侧第三排，院里那棵老树倒了。
-  { asset: "deadTreeTrunk02", x: -169.47, z: -200.59, ry: 0.22, scale: 0.75,
+  { asset: "deadTreeTrunk02", x: -169.93, z: -200.59, ry: 0.22, scale: 0.75,
     note: "blk4_3 一进院院心西侧：三月里放倒的老树，粗一截还横在院里" },
   { asset: "stackableStone06", x: -166.57, z: -200.09, ry: -0.35,
     note: "blk4_3：树旁一块当凳子坐的石头" },
@@ -427,7 +427,7 @@ export const PLACEMENTS = Object.freeze([
     note: "blk7_5 一进院：缸边的木盆" },
 
   // blk7_7 L 形院（-81.71,-114.40）damage 0.22。
-  { asset: "ryDryingRack", x: -91.5, z: -157.91, ry: -0.06,
+  { asset: "ryDryingRack", x: -91.5, z: -158.89, ry: -0.06,
     note: "blk7_7 L 形院：晾晒木架，两根横杆空着，这一户走得急" },
   { asset: "wovenBasket", x: -91.22, z: -158.74, ry: 0.5,
     note: "blk7_7 L 形院：架下的笸箩" },

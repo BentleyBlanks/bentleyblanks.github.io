@@ -277,40 +277,6 @@
    }
   },
   {
-   "name": "Mauser96",
-   "category": "weapon",
-   "file": "Mauser96.tzm.json",
-   "triangles": 4677,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 182284,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01116,
-     -0.12126,
-     -0.242
-    ],
-    "max": [
-     0.01154,
-     0.05163,
-     0.046
-    ]
-   }
-  },
-  {
    "name": "ServicePistol",
    "category": "weapon",
    "file": "ServicePistol.tzm.json",
@@ -969,40 +935,6 @@
    }
   },
   {
-   "name": "Type11",
-   "category": "weapon",
-   "file": "Type11.tzm.json",
-   "triangles": 6622,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 164310,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.10683,
-     -0.09864,
-     -0.845
-    ],
-    "max": [
-     0.05485,
-     0.12239,
-     0.255
-    ]
-   }
-  },
-  {
    "name": "Type92Hmg",
    "category": "weapon",
    "file": "Type92Hmg.tzm.json",
@@ -1032,6 +964,404 @@
      0.06823,
      0.31045,
      0.255
+    ]
+   }
+  },
+  {
+   "name": "WaltherP38",
+   "category": "weapon",
+   "file": "WaltherP38.tzm.json",
+   "triangles": 4529,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 197810,
+   "materials": [
+    "lqWaltherP38"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01434,
+     -0.06741,
+     -0.17009
+    ],
+    "max": [
+     0.01434,
+     0.04473,
+     0.04609
+    ]
+   }
+  },
+  {
+   "name": "BrowningTripodAssembly",
+   "category": "weapon",
+   "file": "BrowningTripodAssembly.tzm.json",
+   "triangles": 4520,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 227689,
+   "materials": [
+    "lqBrowningTripod"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.62539,
+     -0.67306,
+     -2.227
+    ],
+    "max": [
+     0.11628,
+     0.75941,
+     0.04706
+    ]
+   }
+  },
+  {
+   "name": "UnidentifiedMunition",
+   "category": "weapon",
+   "file": "UnidentifiedMunition.tzm.json",
+   "triangles": 128,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 3808,
+   "materials": [
+    "lqUnidentifiedMunition"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.03284,
+     0.00047,
+     -0.207
+    ],
+    "max": [
+     0.03284,
+     0.06953,
+     0.046
+    ]
+   }
+  },
+  {
+   "name": "OfficerSwordSet",
+   "category": "weapon",
+   "file": "OfficerSwordSet.tzm.json",
+   "triangles": 2895,
+   "meshBlocks": 1,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 137217,
+   "materials": [
+    "lqOfficerSword"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.02753,
+     -0.04104,
+     -0.72709
+    ],
+    "max": [
+     0.02995,
+     0.03285,
+     0.26795
+    ]
+   }
+  },
+  {
+   "name": "RingPommelDagger",
+   "category": "weapon",
+   "file": "RingPommelDagger.tzm.json",
+   "triangles": 515,
+   "meshBlocks": 1,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 11526,
+   "materials": [
+    "lqRingPommelDagger"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.02715,
+     -0.03954,
+     -0.18
+    ],
+    "max": [
+     0.02715,
+     0.02858,
+     0.27
+    ]
+   }
+  },
+  {
+   "name": "LightMortar",
+   "category": "weapon",
+   "file": "LightMortar.tzm.json",
+   "triangles": 3124,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 64740,
+   "materials": [
+    "lqLightMortar"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.17907,
+     -0.33646,
+     -0.454
+    ],
+    "max": [
+     0.17907,
+     0.16253,
+     0.046
+    ]
+   }
+  },
+  {
+   "name": "Mauser96",
+   "category": "weapon",
+   "file": "Mauser96.tzm.json",
+   "triangles": 1123,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 30337,
+   "materials": [
+    "lqMauser96"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01208,
+     -0.08266,
+     -0.242
+    ],
+    "max": [
+     0.01204,
+     0.05034,
+     0.046
+    ]
+   }
+  },
+  {
+   "name": "MediumMortar",
+   "category": "weapon",
+   "file": "MediumMortar.tzm.json",
+   "triangles": 4534,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 202726,
+   "materials": [
+    "lqMediumMortar"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.04691,
+     -0.56574,
+     -1.39794
+    ],
+    "max": [
+     0.74874,
+     0.63855,
+     0.046
+    ]
+   }
+  },
+  {
+   "name": "Karabiner98k",
+   "category": "weapon",
+   "file": "Karabiner98k.tzm.json",
+   "triangles": 4535,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 156452,
+   "materials": [
+    "lqKarabiner98k"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.02598,
+     -0.12659,
+     -0.855
+    ],
+    "max": [
+     0.05706,
+     0.06603,
+     0.25461
+    ]
+   }
+  },
+  {
+   "name": "UnidentifiedBoltActionRifle",
+   "category": "weapon",
+   "file": "UnidentifiedBoltActionRifle.tzm.json",
+   "triangles": 4523,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 151200,
+   "materials": [
+    "lqUnidentifiedBoltActionRifle",
+    "lqWeaponPlain"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.0702,
+     -0.10343,
+     -0.865
+    ],
+    "max": [
+     0.01952,
+     0.14544,
+     0.255
+    ]
+   }
+  },
+  {
+   "name": "UnidentifiedAntiaircraftGun",
+   "category": "weapon",
+   "file": "UnidentifiedAntiaircraftGun.tzm.json",
+   "triangles": 4932,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 175803,
+   "materials": [
+    "lqUnidentifiedAntiaircraftMetal",
+    "lqUnidentifiedAntiaircraftWood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.39934,
+     -0.2415,
+     -0.84501
+    ],
+    "max": [
+     0.12151,
+     0.36003,
+     0.25377
+    ]
+   }
+  },
+  {
+   "name": "Type11",
+   "category": "weapon",
+   "file": "Type11.tzm.json",
+   "triangles": 4530,
+   "meshBlocks": 5,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 145094,
+   "materials": [
+    "lqType11AmmoBox",
+    "lqType11Body",
+    "lqType11BodyAlt",
+    "lqType11Fore",
+    "lqWeaponPlain"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.05723,
+     -0.11602,
+     -0.84514
+    ],
+    "max": [
+     0.18348,
+     0.13975,
+     0.25513
     ]
    }
   }

@@ -15,6 +15,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "../Script_DevServer.mjs";
@@ -63,6 +64,27 @@ for (const [id, entry] of Object.entries(MESHES)) {
 }
 for (const name of built.keys()) {
   if (!MESHES[name]) Report(false, `${name}：Index.json 里有，Data_Meshes 里漏登记`);
+}
+
+// 用户提供的卢沟桥合集不是“只有网格”的模型包：16 张 DDS/TGA/JPEG 原图是
+// 资产的一部分。浏览器用的是转换后的 JPG/PNG，但这里逐文件校验仓库内保留副本，
+// 避免以后重跑导入或改名时无声漏掉一张贴图。
+const lugouqiaoSourceDir = path.join(projectDir, "_import", "Source", "Model_LugouqiaoWeapons");
+const lugouqiaoTextureManifestPath = path.join(lugouqiaoSourceDir, "Data_LugouqiaoWeaponTextures.json");
+if (!fs.existsSync(lugouqiaoTextureManifestPath)) {
+  Report(false, "卢沟桥武器原贴图清单存在");
+} else {
+  const textureManifest = JSON.parse(fs.readFileSync(lugouqiaoTextureManifestPath, "utf8"));
+  const textureDir = path.join(lugouqiaoSourceDir, "Texture_Source");
+  let textureSetOk = textureManifest.textures.length === 16;
+  for (const texture of textureManifest.textures) {
+    const texturePath = path.join(textureDir, texture.preservedName);
+    if (!fs.existsSync(texturePath)) { textureSetOk = false; continue; }
+    const payload = fs.readFileSync(texturePath);
+    const digest = createHash("sha256").update(payload).digest("hex");
+    if (payload.length !== texture.bytes || digest !== texture.sha256) textureSetOk = false;
+  }
+  Report(textureSetOk, "卢沟桥武器 16 张原贴图逐文件字节数与 SHA-256 一致");
 }
 
 // 川军脚部的史实造型不能只靠注释约定：左右踝节点必须同时保留裸足皮肤与草鞋

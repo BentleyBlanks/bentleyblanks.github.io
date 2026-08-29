@@ -167,7 +167,9 @@ try {
           if (!o.isMesh || !o.visible || !o.geometry || !o.geometry.attributes.position) return;
           const name = o.name || "";
           if (name.indexOf("Bayonet") === 0) return;
-          if (name.indexOf("steel") < 0) return;      // 木件不参与：枪托本身可以不对称
+          // C96 的源模把金属与木握把画在同一张 maose_d 图里，不能为了迎合测试
+          // 强拆 UV/材质槽；把这个已核验的混合材质桶纳入枪口轴采样。
+          if (name.indexOf("steel") < 0 && name.indexOf("lqMauser96") < 0) return;
           const pos = o.geometry.attributes.position;
           const v = new Vec3();
           const pts = [];

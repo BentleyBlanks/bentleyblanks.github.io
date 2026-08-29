@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { RaycastCapsule, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
@@ -36,6 +37,97 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   PistolFire: "手枪射击",
 });
 
+// 导入动作不能只按 clip 名字认。四类军人都借用同一套短名（例如每边都有
+// `RifleIdle`），但实际曲线是按各自阵营的 canonical rig 烘进 GLB 的；把 NRA
+// 曲线喂进 IJA，或把机枪兵姿态交给军官，都会让编辑器给出看似能播、实则错误的
+// 预览。本表是人物动作编辑器的唯一适用性账本：新导入动作先标清对象，再开放给 UI。
+//
+// 【注意这张表管的是「谁能预览什么」，不是「运行时怎么取用」】十套 GLB 每一套
+// 都仍带全部 16 条 clip（CharacterModelTest 逐个核对），所以军官在正片里照样
+// 播得了 AdvanceFire。运行时的取用一律走下面的 POSE_CLIPS 语义表。
+const SOLDIER_ACTION_IDS = Object.freeze([
+  "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
+  "CrouchFire", "CrouchFireAlt", "CrouchIdle", "MachineGunFire",
+  "EmplacementIdle", "ProneFire", "StandFireCrouch", "StandFireCrouchAlt",
+  "AdvanceKneelFire", "AdvanceFire",
+]);
+const OFFICER_ACTION_IDS = Object.freeze([
+  "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "CrouchIdle",
+  "AttackCommand", "PistolFire",
+]);
+
+export const LUGOU_ANIMATION_PROFILE_BY_KIND = Object.freeze({
+  nra: Object.freeze({ faction: "nra", role: "soldier", label: "国军士兵", clipIds: SOLDIER_ACTION_IDS }),
+  nraDare: Object.freeze({ faction: "nra", role: "soldier", label: "国军敢死队", clipIds: SOLDIER_ACTION_IDS }),
+  nraOfficer: Object.freeze({ faction: "nra", role: "officer", label: "国军军官", clipIds: OFFICER_ACTION_IDS }),
+  ija: Object.freeze({ faction: "ija", role: "soldier", label: "日军士兵", clipIds: SOLDIER_ACTION_IDS }),
+  ijaOfficer: Object.freeze({ faction: "ija", role: "officer", label: "日军军官", clipIds: OFFICER_ACTION_IDS }),
+});
+
+// 每方的五套来源模型不是五个等价的步兵皮肤：01—04 是普通士兵，05 是军官。
+// 这张表既限制战场随机抽取，也给人物动作编辑器提供可逐个点选的真实名单；否则
+// 「步兵」会不小心抽到军官，而编辑器只能靠 seed 碰运气，根本验不了四兵一官。
+const SOLDIER_MODEL_VARIANTS = Object.freeze([0, 1, 2, 3]);
+const OFFICER_MODEL_VARIANTS = Object.freeze([4]);
+export const LUGOU_MODEL_VARIANTS_BY_KIND = Object.freeze({
+  nra: SOLDIER_MODEL_VARIANTS,
+  nraDare: SOLDIER_MODEL_VARIANTS,
+  nraOfficer: OFFICER_MODEL_VARIANTS,
+  ija: SOLDIER_MODEL_VARIANTS,
+  ijaOfficer: OFFICER_MODEL_VARIANTS,
+});
+
+/** 当前身份可用的源模型序号（0-based；对应 Lugou{Faction}01—05）。 */
+export function GetLugouCharacterVariantEntries(kind) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  const variants = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || [];
+  return variants.map((modelVariant) => Object.freeze({
+    modelVariant,
+    role: profile?.role || "soldier",
+    modelNumber: modelVariant + 1,
+    modelId: `${profile?.faction === "ija" ? "LugouIja" : "LugouNra"}${String(modelVariant + 1).padStart(2, "0")}`,
+  }));
+}
+
+/** 当前角色可预览的导入动作；条目始终保留阵营与身份，供 UI 标注和校验。 */
+export function GetLugouAnimationEntries(kind) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  if (!profile) return [];
+  return profile.clipIds.map((clipId) => Object.freeze({
+    id: clipId,
+    clipId,
+    faction: profile.faction,
+    role: profile.role,
+    targetLabel: profile.label,
+    name: LUGOU_ANIMATION_LABELS[clipId] || clipId,
+  }));
+}
+
+/** 入口防线：即使旧 UI 或脚本直接传 clipId，也不允许越过角色适用范围。 */
+export function IsLugouAnimationAllowed(kind, clipId) {
+  const profile = LUGOU_ANIMATION_PROFILE_BY_KIND[kind];
+  return !!profile && profile.clipIds.includes(clipId);
+}
+
+/**
+ * 编辑器一打开该摆什么姿势。**按语义挑，不按名单顺序挑。**
+ *
+ * 名单第一条是 `LeanWallSitPeek`（坐在地上）—— 拿它当默认，人物编辑器一打开
+ * 就是个坐在地上的人，验不了身高也验不了配枪。这里改成「先要站姿」：
+ * 士兵取 POSE_CLIPS.standIdle（AdvanceFire，真站姿据枪），军官名单里没有它，
+ * 顺位取 standReach（AttackCommand，站姿挥臂）；两条都不在名单里才落回第一条。
+ * 语义来源仍是下面那张 POSE_CLIPS，绝不在这里按 clip 名字硬写。
+ */
+export function DefaultLugouAnimationId(kind) {
+  const entries = GetLugouAnimationEntries(kind);
+  if (!entries.length) return null;
+  for (const pose of ["standIdle", "standReach", "run"]) {
+    const clipId = POSE_CLIPS[pose];
+    if (clipId && entries.some((entry) => entry.id === clipId)) return clipId;
+  }
+  return entries[0].id;
+}
+
 /**
  * 姿态 → 导入 clip。**取用一律走这张表，不许在别处按名字硬写 clip id。**
  *
@@ -54,6 +146,33 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
  *
  * 回归口在 Script_CutscenePoseTest.mjs：它按这张表逐条量高度，
  * 换一批动作资产（或重烘）把姿态换了位置，那条测试会先红。
+ *
+ * ---------------------------------------------------------------------------
+ * 【2026-08-29 合并 master 之后：上面那些数暂时**对不上**，而且不是这张表的错】
+ *
+ * 清单 v3 那批重烘（master 的 80fac555 / dddd54d9 / ebc9b03b）**把胯的位移轨道
+ * 烘没了**。同一台探针在 v3 资产上量下来，十六条 clip 的胯高全是同一个数：
+ *
+ *   v1（本表依据）  StandFireCrouch 胯 0.02–0.15   AdvanceFire 胯 0.55–0.69
+ *   v3（现在的资产）StandFireCrouch 胯 0.85–0.85   AdvanceFire 胯 0.85–0.85
+ *                   —— 十六条**全部** 0.846，头最低的一条也有 1.06 m
+ *
+ * 直接证据在 GLB 里，不用进浏览器也能看：v1 的 `Bip002 Pelvis.position` 逐条
+ * clip 都在动（StandFireCrouch 幅度 17.07，LeanWallSitPeek 1.17，AdvanceFire 14.63），
+ * v3 里这条轨道**全零**；取而代之的 `GroundRoot.position` 十六条里只有 ProneFire
+ * 一条非零。烘焙脚本那一步的贴地补偿是 `max(0.0, -currentGroundZ)` ——
+ * 只会把陷进地里的帧往上顶，不会把人往下放，所以「胯被冻在站立高度」这件事
+ * 反而让清单里的 maxGroundPenetrationMeters 审计**轻松通过**：
+ * 它量的是「有没有陷进地里」，不是「姿势对不对」。
+ *
+ * 于是现在场上**没有任何一条 clip 能把人放到地上**：救护所里躺担架的四个伤员
+ * 头高 1.06–1.13 m（该是 0.1–0.5），跪着的军医头高 1.08 m（该是 0.45–1.0）。
+ *
+ * **这张表没改、也不该改。** 语义映射本身仍然成立（v1 上逐条量过），
+ * 缺的是资产里那条位移轨道 —— 运行时补不回来，只能重烘。把 CutscenePoseTest
+ * 的高度带放宽来「修绿」等于把这道闸拆了：那等于承认「趴在担架上的人头可以
+ * 在 1.1 m」。所以那条测试现在是红的，红得有据，等重烘。
+ * ---------------------------------------------------------------------------
  */
 const POSE_CLIPS = Object.freeze({
   sit: "LeanWallSitPeek",
@@ -71,14 +190,11 @@ const POSE_CLIPS = Object.freeze({
 
 export const LUGOU_POSE_CLIPS = POSE_CLIPS;
 
-/**
- * 地面标定取样时刻：站姿据枪那一段前 1 s 还在跨步，1.4 s 之后两只脚才踩实。
- * Attach 拿这一帧量「最低那只脚离演员地平面多少」，量完把相位放回去。
- */
-const FLOOR_CALIBRATION_TIME = 1.6;
-
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=1";
-const ASSET_VERSION = "1";
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=3";
+const ASSET_VERSION = "3";
+// 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
+// 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
+const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
 const LOADER = new GLTFLoader();
 let loadPromise = null;
 
@@ -161,24 +277,26 @@ export async function LoadLugouCharacterAssets() {
   return loadPromise;
 }
 
-const HITBOX_DEFS = Object.freeze([
-  { type: "sphere", role: "head", radius: 0.14, part: "head" },
-  { type: "capsule", a: "pelvis", b: "chest", radius: 0.20, part: "torso" },
-  { type: "capsule", a: "chest", b: "neck", radius: 0.15, part: "torso" },
-  { type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "forearmL", b: "handL", radius: 0.070, part: "limb" },
-  { type: "capsule", a: "upperArmR", b: "forearmR", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "forearmR", b: "handR", radius: 0.070, part: "limb" },
-  { type: "capsule", a: "thighL", b: "calfL", radius: 0.105, part: "limb" },
-  { type: "capsule", a: "calfL", b: "footL", radius: 0.085, part: "limb" },
-  { type: "capsule", a: "thighR", b: "calfR", radius: 0.105, part: "limb" },
-  { type: "capsule", a: "calfR", b: "footR", radius: 0.085, part: "limb" },
+// 按 3A 人物碰撞的配置方式写成“部位代理表”：所有尺寸是资产的局部米制，端点
+// 只认语义骨骼，运行时再跟随每个模型、每条动画的骨架变换。头不再是一颗挂在
+// Head pivot 上的孤球——Max Biped 的 Head pivot 靠近颈根，孤球会吞到胸胶囊里，
+// 造成画面上打脸、规则却先返回 torso。头部的另一端必须取导出资产的
+// Socket_HeadGear（头盔中心），不能取 Bip001 Head 旋转枢轴；否则 kneel 等动作下
+// 头胶囊会退化成一小圈脖子，编辑器看起来像“头部碰撞没了”。
+export const CHARACTER_HITBOX_PROFILE = Object.freeze([
+  { id: "head", type: "capsule", a: "neck", b: "headGear", radius: 0.115, part: "head", priority: 3 },
+  { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
+  { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
+  { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
+  { id: "forearmL", type: "capsule", a: "forearmL", b: "handL", radius: 0.060, part: "limb", priority: 0 },
+  { id: "upperArmR", type: "capsule", a: "upperArmR", b: "forearmR", radius: 0.075, part: "limb", priority: 0 },
+  { id: "forearmR", type: "capsule", a: "forearmR", b: "handR", radius: 0.060, part: "limb", priority: 0 },
+  { id: "thighL", type: "capsule", a: "thighL", b: "calfL", radius: 0.10, part: "limb", priority: 0 },
+  { id: "calfL", type: "capsule", a: "calfL", b: "footL", radius: 0.075, part: "limb", priority: 0 },
+  { id: "thighR", type: "capsule", a: "thighR", b: "calfR", radius: 0.10, part: "limb", priority: 0 },
+  { id: "calfR", type: "capsule", a: "calfR", b: "footR", radius: 0.075, part: "limb", priority: 0 },
 ]);
 
-const RAY = new THREE.Ray();
-const RAY_POINT = new THREE.Vector3();
-const SEGMENT_POINT = new THREE.Vector3();
-const SPHERE = new THREE.Sphere();
 const WORLD_SCALE = new THREE.Vector3();
 
 /** One independently animated, skeleton-cloned soldier. */
@@ -190,7 +308,6 @@ export class LugouCharacterRig {
     this.modelId = asset.record.id;
     this.root = CloneSkeleton(asset.gltf.scene);
     this.root.name = `Rigged_${this.modelId}`;
-    this.root.userData.skipNormalDepth = true;
     this.actor = null;
     this.forcedClip = null;
     this.currentId = null;
@@ -225,54 +342,61 @@ export class LugouCharacterRig {
       backBlade: FindNode(this.root, "Socket_BackBlade") || this.bones.chest || null,
       headGear: FindNode(this.root, "Socket_HeadGear") || this.bones.head || null,
     };
-    this.hitboxes = HITBOX_DEFS.map((definition) => ({
+    // 碰撞代理既可引用骨骼，也可引用已烘进 GLB 的稳定挂点。headGear 是头盔中心；
+    // 它与 Head pivot 不同，前者才是可见头部的正确端点。
+    this.hitboxNodes = { ...this.bones, headGear: this.sockets.headGear };
+    this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => ({
       ...definition,
       center: new THREE.Vector3(),
       start: new THREE.Vector3(),
       end: new THREE.Vector3(),
     }));
+    const skinnedParts = [];
     this.root.traverse((object) => {
       if (!object.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
+      if (object.isSkinnedMesh) {
+        const triangles = (object.geometry.index?.count
+          || object.geometry.attributes.position?.count || 0) / 3;
+        skinnedParts.push({ object, triangles });
+      }
     });
+    const silhouettePart = skinnedParts.reduce((best, part) =>
+      (!best || part.triangles > best.triangles ? part : best), null);
+    for (const part of skinnedParts) {
+      if (part !== silhouettePart) {
+        part.object.userData.normalDepthMaxDistance = NORMAL_DEPTH_DETAIL_MAX_DISTANCE;
+      }
+    }
+    // 出厂姿势按语义取，不按 clip 名取：`RifleIdle` 的名字写着「持枪待机」，
+    // 里面却是单膝跪地（见 POSE_CLIPS 头注）。
     this.Play(POSE_CLIPS.standIdle, 0);
     // Stable idle phase: the five source models do not breathe in lockstep.
-    this.idlePhaseSeconds = (HashString(`${seed}|phase`) % 1000) / 1000;
-    this.mixer.setTime(this.idlePhaseSeconds);
+    // （这个相位以前还要在 Attach 里存下来再放回去，因为那时的贴地标定会临时
+    // 拨动 mixer；离线贴地之后 Attach 不再碰时间轴，存不存都一样，就不存了。）
+    this.mixer.setTime((HashString(`${seed}|phase`) % 1000) / 1000);
   }
 
   Attach(actor) {
     this.actor = actor;
     actor.body.add(this.root);
-    // Max Biped scenes store each soldier at its original five-person lineup offset,
-    // and the FBX armature object also carries a small vertical pivot offset.  The
-    // mesh bake recentres the bind-pose vertices, but glTF skinning still exposes
-    // those armature transforms through the bones.  Align by the animated skeleton
-    // itself: pelvis on actor X/Z, lowest idle foot on the actor's ground plane.
-    // 【2026-08-29 修正】原注释写的「每个 clip 的胯位移都固定」是错的：实测胯高
-    // 在 clip 之间差 0.6 m 以上（匍匐 0.12、站姿据枪 0.69）。所以这一次标定必须
-    // 在**指定的站姿参考帧**上量，不能在「构造时碰巧停在哪一帧」上量 —— 否则
-    // 同一个人换个 seed（相位不同）就落在不同的地平面上。各姿态自己的胯高由
-    // clip 负责，脚一律在 clip 内落到同一个平面，这一项常数补偿因而仍然成立。
-    this.root.position.set(0, 0, 0);
-    const phase = this.mixer.time;
-    this.mixer.setTime(FLOOR_CALIBRATION_TIME);
-    actor.root.updateWorldMatrix(true, true);
-    const pelvis = this.bones.pelvis?.getWorldPosition(new THREE.Vector3()) || null;
-    const footL = this.bones.footL?.getWorldPosition(new THREE.Vector3()) || null;
-    const footR = this.bones.footR?.getWorldPosition(new THREE.Vector3()) || null;
-    const Local = (point) => (point ? actor.root.worldToLocal(point.clone()) : null);
-    const pelvisLocal = Local(pelvis);
-    const feet = [Local(footL), Local(footR)].filter(Boolean);
-    const floorY = feet.length ? Math.min(...feet.map((point) => point.y)) : 0;
-    this.root.position.set(
-      -(pelvisLocal?.x || 0),
-      -floorY,
-      -(pelvisLocal?.z || 0),
-    );
-    this.mixer.setTime(phase);
+    // The offline bake recentres the complete skinned model and grounds every
+    // animation frame against the actual deformed mesh.  A Biped Foot node is an
+    // ankle pivot, not a sole marker; aligning that bone to Y=0 buried both boots.
+    // The rig is parented below Actor.body, whose pivot is deliberately at hip
+    // height for ragdoll rotation.  Cancel that parent translation so the GLB's
+    // audited ground origin still coincides with Actor.root; do not infer another
+    // offset from an ankle-height foot bone.
+    //
+    // 【2026-08-29 合并记录】这里曾经有一版「在站姿参考帧上量最低那只脚」的
+    // 运行时标定（本分支加的，配一个 FLOOR_CALIBRATION_TIME 常数）。那是给
+    // 清单 v1 那批**没有离线贴地**的 GLB 打的补丁；v3 重烘之后每一帧都对着
+    // 变形后的网格审过贴地（清单里逐动作记 maxGroundPenetrationMeters ≤ 2 mm），
+    // 再在运行时按脚踝骨补一次就是双重矫正，会把靴子埋进地里。整段删掉，
+    // 只保留抵消父节点胯高这一项。CharacterModelTest 有一条反向断言看着它。
+    this.root.position.set(0, -actor.body.position.y, 0);
     actor.root.updateWorldMatrix(true, true);
     return this;
   }
@@ -358,8 +482,10 @@ export class LugouCharacterRig {
 
   GetHitboxes() {
     this.root.updateWorldMatrix(true, true);
-    const scale = this.actor?.height ? this.actor.height / 1.68
-      : this.root.getWorldScale(WORLD_SCALE).y || 1;
+    // 判定半径要随 **实际渲染根节点** 缩放。旧实现拿 Actor 的名义身高除以
+    // 1.68；但十个 GLB 的源身高不同，且 root 已按各自 sourceHeight 缩过一次，
+    // 这会让同一套代理和看见的模型差到数厘米。世界缩放同时覆盖 cutscene 父节点。
+    const scale = this.root.getWorldScale(WORLD_SCALE).y || 1;
     const active = [];
     for (const shape of this.hitboxes) {
       shape.worldRadius = shape.radius * scale;
@@ -368,8 +494,8 @@ export class LugouCharacterRig {
         if (!bone) continue;
         bone.getWorldPosition(shape.center);
       } else {
-        const boneA = this.bones[shape.a];
-        const boneB = this.bones[shape.b];
+        const boneA = this.hitboxNodes[shape.a];
+        const boneB = this.hitboxNodes[shape.b];
         if (!boneA || !boneB) continue;
         boneA.getWorldPosition(shape.start);
         boneB.getWorldPosition(shape.end);
@@ -380,22 +506,17 @@ export class LugouCharacterRig {
   }
 
   Raycast(origin, direction, maxDistance) {
-    RAY.set(origin, direction);
     let best = null;
     for (const shape of this.GetHitboxes()) {
-      let distance = null;
+      let distance;
       if (shape.type === "sphere") {
-        SPHERE.set(shape.center, shape.worldRadius);
-        const point = RAY.intersectSphere(SPHERE, RAY_POINT);
-        if (point) distance = point.distanceTo(origin);
+        distance = RaycastSphere(origin, direction, shape.center, shape.worldRadius);
       } else {
-        const distanceSq = RAY.distanceSqToSegment(shape.start, shape.end, RAY_POINT, SEGMENT_POINT);
-        if (distanceSq <= shape.worldRadius * shape.worldRadius) {
-          distance = Math.max(0, RAY_POINT.distanceTo(origin)
-            - Math.sqrt(Math.max(0, shape.worldRadius * shape.worldRadius - distanceSq)));
-        }
+        distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);
       }
-      if (distance !== null && distance <= maxDistance && (!best || distance < best.t)) {
+      if (distance !== null && distance <= maxDistance && (!best
+          || distance < best.t - 1e-6
+          || (Math.abs(distance - best.t) <= 1e-6 && (shape.priority || 0) > (best.shape.priority || 0)))) {
         best = { t: distance, part: shape.part, shape };
       }
     }
@@ -416,12 +537,14 @@ export function CreateLugouCharacterRig(library, kind, options = {}, targetHeigh
   if (!faction) return null;
   const variants = library?.byFaction?.[faction] || [];
   if (!variants.length) return null;
-  const explicit = Number.isInteger(options.modelVariant) ? options.modelVariant : null;
+  const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || SOLDIER_MODEL_VARIANTS;
+  const explicit = Number.isInteger(options.modelVariant) && allowed.includes(options.modelVariant)
+    ? options.modelVariant : null;
   const index = options.protagonist && faction === "nra"
     ? 0
     : explicit !== null
-      ? ((explicit % variants.length) + variants.length) % variants.length
-      : HashString(`${faction}:${options.seed ?? 0}:model`) % variants.length;
+      ? explicit
+      : allowed[HashString(`${faction}:${options.seed ?? 0}:model`) % allowed.length];
   return new LugouCharacterRig(variants[index], {
     kind, targetHeight, seed: options.seed ?? 0, variantIndex: index,
   });

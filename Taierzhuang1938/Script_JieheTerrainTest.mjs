@@ -229,6 +229,20 @@ try {
     result.villageArchetypes.length >= 7
       && new Set(result.villageArchetypes).size === result.villageArchetypes.length,
     result.villageArchetypes.join("/"));
+  // 上面那条只读**常量表**：往表里加一个名字它就变绿，哪怕那种房子一栋都没建出来
+  // （新原型漏接 AddVillageBuilding 的分支就是这个下场）。这条数实际建成计数。
+  // TwinHouse / LCourtyard 是组合原型，落到 AddVillageBuilding 时已被换成
+  // ThreeBayBrick / AdobeCottage / StoneBaseHouse，本来就不会自报家门，排除。
+  {
+    const composite = new Set(["TwinHouse", "LCourtyard"]);
+    const built = result.villageStats.villageArchetypes || {};
+    const missing = result.villageArchetypes
+      .filter((k) => !composite.has(k) && !(built[k] > 0));
+    Check("每种村屋原型都真的建出至少一栋",
+      missing.length === 0,
+      missing.length ? `没建出来：${missing.join("/")}`
+        : Object.entries(built).map(([k, n]) => `${k}×${n}`).join(" "));
+  }
   Check("界河沿线生成足够多的房屋与生活细节",
     result.villageStats.villageBuildings >= 105 && result.villageStats.villageDetails >= 760,
     `${result.villageStats.villageBuildings} 栋，${result.villageStats.villageDetails} 组细节`);

@@ -84,6 +84,8 @@ export const testDefs = {
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：16 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
+  CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
+  ActorDepthTest: { file: "Script_ActorDepthTest.mjs", desc: "蒙皮人物写入 NormalDepth，防 TAA 把背景叠回军装" },
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
   FractureBakeTest: { file: "Script_FractureBakeTest.mjs", desc: "预破碎离线数据（纯 Node，秒级）" },
   CutsceneControlTest: { file: "Script_CutsceneControlTest.mjs", desc: "过场导演机位/生命周期（桩 three，Node 可跑）" },
@@ -161,6 +163,7 @@ export const tier0 = [
   "HudPromptTest",
   "RiggedModelTest",
   "CharacterModelTest",
+  "CharacterHitboxMathTest",
   "FractureBakeTest",
   "CutsceneControlTest",
   "GeoTest",
@@ -189,7 +192,8 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest", "CharacterModelTest",
+      "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest",
+      "CharacterModelTest", "CharacterHitboxMathTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -238,7 +242,7 @@ export const domains = {
     label: "渲染与合批自动契约",
     // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
-    tests: ["PostTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
+    tests: ["PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -252,7 +256,8 @@ const changedDomainRules = [
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
+  // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion)/i },

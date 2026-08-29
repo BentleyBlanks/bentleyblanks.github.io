@@ -73,7 +73,7 @@ export const PLACEMENTS = Object.freeze([
     note: "同一户：第二只粮袋，与前一只对齐" },
 
   // ── blk0_13（西城根一进院） ──
-  { asset: "stackableStone01", x: -280.94, z: 18.12, ry: 0.44, scale: 1.05,
+  { asset: "stackableStone01", x: -281.29, z: 17.57, ry: 0.44, scale: 1.05,
     note: "西城根土院：补院墙用的碎石，堆在西厢房南头" },
   { asset: "stackableStone06", x: -281.64, z: 18.72, ry: -0.29, scale: 0.95,
     note: "同一户：第二块，墙还没砌就赶上了围城" },

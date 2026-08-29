@@ -24,23 +24,31 @@ import { Panel, Section, Slider, Chips, Select, Toggle, ButtonRow, Facts, Note, 
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { COMBAT } from "./Data_Battle.mjs";
 import { CAPSULE } from "./Script_Ai.mjs";
+import { KIND_SPEC } from "./Script_Actor.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
-import { LUGOU_ANIMATION_IDS, LUGOU_ANIMATION_LABELS } from "./Script_CharacterModel.mjs";
+import {
+  DefaultLugouAnimationId,
+  GetLugouCharacterVariantEntries,
+  GetLugouAnimationEntries,
+  IsLugouAnimationAllowed,
+} from "./Script_CharacterModel.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
-  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；同阵营五套外观稳定随机" },
-  { id: "nraDare", name: "国军敢死队", note: "国军五套模型 + 背刀骨骼挂点" },
-  { id: "nraOfficer", name: "国军军官", note: "国军五套模型；军官身份由武器与剧情数据表达" },
-  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；同阵营五套外观稳定随机" },
-  { id: "ijaOfficer", name: "日军军官", note: "日军五套模型；军官身份由武器与剧情数据表达" },
+  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；可逐个查看 4 名士兵" },
+  { id: "nraDare", name: "国军敢死队", note: "4 名国军士兵模型 + 背刀骨骼挂点" },
+  { id: "nraOfficer", name: "国军军官", note: "国军第 5 套军官模型；身份与手枪由剧情数据表达" },
+  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；可逐个查看 4 名士兵" },
+  { id: "ijaOfficer", name: "日军军官", note: "日军第 5 套军官模型；身份与手枪由剧情数据表达" },
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 
-const DEFAULT_WEAPON_BY_KIND = {
-  nra: "ZhongZheng", nraDare: "HanYang", nraOfficer: null,
-  ija: "Type38", ijaOfficer: "Mauser96", civilian: null,
-};
+const DEFAULT_WEAPON_CHOICE = "__source_default__";
+
+/** 默认配枪只读 Actor 的正式 kind 配置，编辑器不维护第二张会漂移的搭配表。 */
+function DefaultWeaponForKind(kind) {
+  return KIND_SPEC[kind]?.defaultWeapon ?? null;
+}
 
 /** 一个周期性的 0→1→0 脉冲（投弹 / 白刃 / 中弹这类一次性动作靠它循环演示）。 */
 function Pulse(t, period, rise = 0.18, hold = 0.10) {
@@ -83,11 +91,6 @@ const CLIPS = [
   { id: "dead", name: "倒地（0.8 s 姿态过渡）", dead: true, make: () => ({ dead: true }) },
 ];
 
-const IMPORTED_CLIPS = LUGOU_ANIMATION_IDS.map((id) => ({
-  id,
-  name: `${LUGOU_ANIMATION_LABELS[id] || id} · ${id}`,
-}));
-
 // ---------------------------------------------------------------------------
 // 判定盒的线框
 //
@@ -110,7 +113,6 @@ const IMPORTED_CLIPS = LUGOU_ANIMATION_IDS.map((id) => ({
 /** 判定球：红橙。移动胶囊：靛蓝。两个颜色在土黄色的城里都不会被认成布景。 */
 const HITBOX_COLOR = 0xff5a3c;
 const CAPSULE_COLOR = 0x49a7ff;
-
 /**
  * 线框一律**自己摆圈**，不走 `WireframeGeometry(SphereGeometry)`。
  *
@@ -351,13 +353,19 @@ export class ActorEditor {
     this.cameraMode = "studio";
 
     this.kind = "nra";
-    this.weaponId = "ZhongZheng";
+    // undefined = 按每个人物 kind 的正式默认；null = 用户明确选择空手。
+    // 分开记这两种状态，本阵营对比才能逐身份配枪，又允许一键换成同一把枪。
+    this.weaponOverride = undefined;
+    this.weaponId = DefaultWeaponForKind(this.kind);
     this.animationMode = "imported";
-    this.clipId = "AdvanceFire"; // 名实注意：RifleIdle 实为跪姿，真站姿 idle 是 AdvanceFire（见 LUGOU_POSE_CLIPS）
+    // 默认预览动作走 DefaultLugouAnimationId：它既过角色适用性这道闸，又按
+    // LUGOU_POSE_CLIPS 的**语义**挑站姿（不是按 clip 名字硬写 —— RifleIdle 实为跪姿）。
+    this.clipId = DefaultLugouAnimationId(this.kind);
+    this.modelVariant = GetLugouCharacterVariantEntries(this.kind)[0]?.modelVariant ?? null;
     this.seed = 3;
     this.speed = 1;
     this.playing = true;
-    this.lineup = false;      // 国军五人 + 日军五人
+    this.lineup = false;      // 当前阵营四名士兵 + 一名军官
     this.towel = null;        // null = 按 kind 的默认
     this.manual = false;
     this.time = 0;
@@ -410,8 +418,11 @@ export class ActorEditor {
       height: 136,
       onPick: (id) => {
         this.kind = id;
-        this.weaponId = DEFAULT_WEAPON_BY_KIND[id] ?? null;
-        if (this.weaponSelect) this.weaponSelect.Set(this.weaponId || "");
+        this.modelVariant = GetLugouCharacterVariantEntries(id)[0]?.modelVariant ?? null;
+        this.SyncResolvedWeapon();
+        this.FillModelList();
+        this.NormalizeImportedClip();
+        this.FillActionList();
         this.Rebuild();
       },
     });
@@ -420,9 +431,17 @@ export class ActorEditor {
     this.kindNote = Note(who, KINDS[0].note);
 
     this.weaponSelect = Select(who, "武器",
-      [{ value: "", label: "（空手）" },
+      [{ value: DEFAULT_WEAPON_CHOICE, label: "（按人物源配置）" },
+        { value: "", label: "（空手）" },
         ...Object.keys(WEAPONS).map((id) => ({ value: id, label: `${WEAPONS[id].name}  ${id}` }))],
-      this.weaponId, (v) => { this.weaponId = v || null; this.Rebuild(); });
+      DEFAULT_WEAPON_CHOICE, (v) => this.SetWeaponChoice(v));
+    Note(who, "默认按 Script_Actor 的人物配置配枪；选择具体武器后会立即替换当前人物，本阵营对比时会替换五人。", true);
+
+    this.modelSelect = Select(who, "源模型", [], "", (value) => {
+      this.modelVariant = Number(value);
+      this.Rebuild();
+    });
+    this.FillModelList();
 
     Slider(who, {
       label: "个体种子", min: 0, max: 40, step: 1, value: this.seed,
@@ -433,7 +452,7 @@ export class ActorEditor {
     opts.className = "edBtns";
     who.appendChild(opts);
     Toggle(opts, "白毛巾", false, (on) => { this.towel = on; this.ApplyTowel(); });
-    Toggle(opts, "十模型对比", false, (on) => { this.lineup = on; this.Rebuild(); });
+    Toggle(opts, "本阵营 4兵+1官对比", false, (on) => { this.lineup = on; this.Rebuild(); });
     Toggle(opts, "米格", true, (on) => this.studio.SetGridVisible(on));
 
     // --- 判定盒 ---
@@ -460,12 +479,12 @@ export class ActorEditor {
     // --- 动作 ---
     const act = Section(body, "动作（资产与程序化）");
     Chips(act, [
-      { value: "imported", label: "16 条导入动作" },
+      { value: "imported", label: "导入动作（按角色过滤）" },
       { value: "programmatic", label: "程序化配方" },
     ], this.animationMode, (value) => {
       this.animationMode = value;
       this.manual = false;
-      this.clipId = value === "imported" ? "AdvanceFire" : "idle";
+      this.clipId = value === "imported" ? DefaultLugouAnimationId(this.kind) : "idle";
       this.FillActionList();
       this.Rebuild();
     });
@@ -473,6 +492,7 @@ export class ActorEditor {
       height: 168,
       onPick: (id) => this.SetClip(id),
     });
+    this.importedClipNote = Note(act, "导入动作仅列出当前角色可用的阵营与身份；不会跨阵营或把士兵动作套给军官。", true);
     this.FillActionList();
 
     ButtonRow(act, [
@@ -520,17 +540,58 @@ export class ActorEditor {
   FillActionList() {
     if (!this.clipList) return;
     const entries = this.animationMode === "imported"
-      ? IMPORTED_CLIPS
+      ? GetLugouAnimationEntries(this.kind).map((clip) => ({
+        id: clip.id,
+        name: `${clip.name} · ${clip.id}`,
+        tail: clip.targetLabel,
+        title: `仅适用于${clip.targetLabel}；使用${clip.faction === "nra" ? "国军" : "日军"}原始骨架烘焙的曲线`,
+      }))
       : CLIPS.map((clip) => ({ id: clip.id, name: clip.name }));
+    if (this.animationMode === "imported") {
+      this.NormalizeImportedClip();
+      const profile = GetLugouAnimationEntries(this.kind)[0];
+      if (this.importedClipNote) {
+        this.importedClipNote.textContent = profile
+          ? `当前：${profile.targetLabel}。只显示该角色的 ${GetLugouAnimationEntries(this.kind).length} 条动作；曲线只从本阵营模型播放。`
+          : "百姓没有导入军人动作；请切换到程序化配方预览。";
+      }
+    }
     this.clipList.Fill(entries);
     this.clipList.Select(this.clipId);
   }
 
+  FillModelList() {
+    if (!this.modelSelect) return;
+    const variants = GetLugouCharacterVariantEntries(this.kind);
+    this.modelSelect.Fill(variants.map((entry) => ({
+      value: String(entry.modelVariant),
+      label: entry.role === "officer"
+        ? `军官 · ${entry.modelId}`
+        : `士兵 ${entry.modelNumber} · ${entry.modelId}`,
+    })));
+    if (!variants.some((entry) => entry.modelVariant === this.modelVariant)) {
+      this.modelVariant = variants[0]?.modelVariant ?? null;
+    }
+    this.modelSelect.Set(String(this.modelVariant ?? ""));
+  }
+
+  NormalizeImportedClip() {
+    if (this.animationMode !== "imported") return;
+    if (!IsLugouAnimationAllowed(this.kind, this.clipId)) {
+      this.clipId = DefaultLugouAnimationId(this.kind);
+    }
+  }
+
   SetClip(id) {
+    if (this.animationMode === "imported" && !IsLugouAnimationAllowed(this.kind, id)) {
+      this.NormalizeImportedClip();
+      this.FillActionList();
+      return;
+    }
     this.clipId = id;
     this.time = 0;
     if (this.animationMode === "imported") {
-      for (const actor of this.actors) actor.PlayImportedAnimation(id);
+      this.PlayImportedClipForCompatibleActors();
       return;
     }
     const clip = CLIPS.find((c) => c.id === id);
@@ -538,9 +599,39 @@ export class ActorEditor {
     if (clip && clip.dead) this.Rebuild();
   }
 
+  /** 一排对比时也逐人复核，杜绝把当前角色的曲线送给另一阵营/身份。 */
+  PlayImportedClipForCompatibleActors() {
+    for (const actor of this.actors) {
+      if (IsLugouAnimationAllowed(actor.kind, this.clipId)) actor.PlayImportedAnimation(this.clipId);
+      else actor.ClearImportedAnimation();
+    }
+  }
+
   ApplyTowel() {
     if (this.towel == null) return;
     for (const actor of this.actors) actor.SetTowel(this.towel);
+  }
+
+  WeaponForKind(kind) {
+    return this.weaponOverride === undefined
+      ? DefaultWeaponForKind(kind)
+      : this.weaponOverride;
+  }
+
+  SyncResolvedWeapon() {
+    this.weaponId = this.WeaponForKind(this.kind);
+    if (this.weaponSelect) {
+      const value = this.weaponOverride === undefined
+        ? DEFAULT_WEAPON_CHOICE
+        : (this.weaponOverride || "");
+      this.weaponSelect.Set(value);
+    }
+  }
+
+  SetWeaponChoice(value) {
+    this.weaponOverride = value === DEFAULT_WEAPON_CHOICE ? undefined : (value || null);
+    this.SyncResolvedWeapon();
+    this.Rebuild();
   }
 
   // -------------------------------------------------------------------------
@@ -564,16 +655,19 @@ export class ActorEditor {
     this.time = 0;
     const factory = this.host.actorFactory;
     if (!factory) return;
+    const faction = this.kind.startsWith("ija") ? "ija" : "nra";
+    const soldierKind = faction === "ija" ? "ija" : "nra";
+    const officerKind = faction === "ija" ? "ijaOfficer" : "nraOfficer";
     const list = this.lineup
       ? [
-        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "nra", modelVariant })),
-        ...Array.from({ length: 5 }, (_, modelVariant) => ({ kind: "ija", modelVariant })),
+        ...GetLugouCharacterVariantEntries(soldierKind).map(({ modelVariant }) => ({ kind: soldierKind, modelVariant })),
+        ...GetLugouCharacterVariantEntries(officerKind).map(({ modelVariant }) => ({ kind: officerKind, modelVariant })),
       ]
-      : [{ kind: this.kind, modelVariant: null }];
+      : [{ kind: this.kind, modelVariant: this.modelVariant }];
     const span = 1.15;
     list.forEach((entrySpec, i) => {
       const kind = entrySpec.kind;
-      const weapon = this.lineup ? undefined : (this.weaponId || null);
+      const weapon = this.WeaponForKind(kind);
       const actor = factory.Create(kind, {
         seed: this.seed + i * 7,
         weapon,
@@ -595,7 +689,7 @@ export class ActorEditor {
     if (this.towel != null) this.ApplyTowel();
     const entry = KINDS.find((k) => k.id === this.kind);
     if (this.kindNote && entry) this.kindNote.textContent = entry.note;
-    this.studio.Frame(1.75, this.lineup ? 12.2 : 3.4);
+    this.studio.Frame(1.75, this.lineup ? 6.4 : 3.4);
     this.Step(0);
   }
 
@@ -603,7 +697,8 @@ export class ActorEditor {
   Step(dt) {
     this.time += dt;
     const clip = CLIPS.find((c) => c.id === this.clipId) || CLIPS[0];
-    const ctx = { weapon: this.weaponId ? WEAPONS[this.weaponId] : null };
+    const activeWeaponId = this.actors[0]?.weaponId ?? this.weaponId;
+    const ctx = { weapon: activeWeaponId ? WEAPONS[activeWeaponId] : null };
     for (let i = 0; i < this.actors.length; i += 1) {
       const actor = this.actors[i];
       const base = {
@@ -618,7 +713,8 @@ export class ActorEditor {
         : this.animationMode === "imported"
           ? base
           : { ...base, ...clip.make(local, ctx), elapsed: local };
-      if (this.animationMode === "imported" && !this.manual) actor.PlayImportedAnimation(this.clipId);
+      if (this.animationMode === "imported" && !this.manual
+        && IsLugouAnimationAllowed(actor.kind, this.clipId)) actor.PlayImportedAnimation(this.clipId);
       else actor.ClearImportedAnimation();
       actor.Update(dt, state);
       // 判定线框跟着这个人的落点；胶囊还要跟着姿态换尺寸（AI 那边是 s.stance）
@@ -657,20 +753,26 @@ export class ActorEditor {
       const position = o.geometry.attributes.position;
       triangles += (index ? index.count : (position ? position.count : 0)) / 3;
     });
-    const weapon = this.weaponId ? WEAPONS[this.weaponId] : null;
-    const built = this.weaponId && this.host.actorFactory
-      ? this.host.actorFactory.WeaponGeometry(this.weaponId) : null;
+    const activeWeaponId = actor.weaponId || null;
+    const weapon = activeWeaponId ? WEAPONS[activeWeaponId] : null;
+    const built = activeWeaponId && this.host.actorFactory
+      ? this.host.actorFactory.WeaponGeometry(activeWeaponId, actor.weaponVariant) : null;
     this.facts.Set("kind", actor.kind);
     this.facts.Set("身高", `${actor.height.toFixed(3)} m`);
     this.facts.Set("meshSource", actor.meshSource,
       actor.usingRiggedCharacter ? "good" : "bad");
     this.facts.Set("角色模型", actor.modelId || "未载入",
       actor.modelId ? "good" : "bad");
-    this.facts.Set("阵营外观序号", actor.modelVariant == null ? "—" : `${actor.modelVariant + 1} / 5`);
+    this.facts.Set("源模型", actor.modelVariant == null ? "—" : `${actor.modelId || `外观 ${actor.modelVariant + 1}`} · ${actor.kind.includes("Officer") ? "军官" : "士兵"}`);
     this.facts.Set("网格 / 三角", `${meshes} / ${Math.round(triangles)}`);
-    this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind}）` : "空手");
+    const weaponMode = this.weaponOverride === undefined ? "源配置" : "手动替换";
+    this.facts.Set("武器", weapon ? `${weapon.name}（${weapon.kind} · ${weaponMode}）` : `空手（${weaponMode}）`);
     if (built) this.facts.Set("武器几何", built.source, built.source === "model" ? "good" : "bad");
-    this.facts.Set("动作", this.manual ? "程序化手动" : `${this.animationMode} · ${this.clipId}`);
+    const importedEntry = this.animationMode === "imported"
+      ? GetLugouAnimationEntries(this.kind).find((entry) => entry.id === this.clipId) : null;
+    this.facts.Set("动作", this.manual ? "程序化手动"
+      : importedEntry ? `${importedEntry.targetLabel} · ${importedEntry.name}` : `${this.animationMode} · ${this.clipId}`);
+    if (importedEntry) this.facts.Set("动作适用对象", `${importedEntry.targetLabel} · ${importedEntry.faction === "nra" ? "国军源骨架" : "日军源骨架"}`, "good");
     const boneHitboxes = actor.GetBoneHitboxes?.() || [];
     this.facts.Set("骨骼命中体", boneHitboxes.length ? `${boneHitboxes.length} 个 · 实时随骨骼` : "保底固定球",
       boneHitboxes.length ? "good" : "warn");

@@ -140,6 +140,8 @@ $environmentValues = [ordered]@{
     LUGOU_EXPORT_DIR = $resolvedIntermediateDir
     LUGOU_NRA_SCENE = $nraBridgePath
     LUGOU_IJA_SCENE = $ijaBridgePath
+    # Sample every BIP on NRA01 and IJA01 separately.  The two faction rigs do not
+    # share Figure/bind axes, so a single NRA source bends Japanese limbs incorrectly.
     LUGOU_CANONICAL_ACTIONS = 'true'
     LUGOU_RESUME = $(if ($Resume) { 'true' } else { 'false' })
 }
@@ -166,8 +168,8 @@ finally {
 }
 
 $modelFbx = @(Get-ChildItem -LiteralPath $resolvedIntermediateDir -File -Filter 'Model_Lugou*.fbx')
-$animationFbx = @(Get-ChildItem -LiteralPath $resolvedIntermediateDir -File -Filter 'Animation_LugouCanonical_*.fbx')
-if ($modelFbx.Count -ne 10 -or $animationFbx.Count -ne 16) {
+$animationFbx = @(Get-ChildItem -LiteralPath $resolvedIntermediateDir -File -Filter 'Animation_Lugou*Canonical_*.fbx')
+if ($modelFbx.Count -ne 10 -or $animationFbx.Count -ne 32) {
     throw "Incomplete FBX bridge: models=$($modelFbx.Count), animations=$($animationFbx.Count)"
 }
 

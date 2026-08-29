@@ -187,6 +187,76 @@ export const WEAPONS = {
       + "玩家同样按接替者 seed 随机抽取，拾取时保留尸体上那一式。",
   },
 
+  // --- 卢沟桥资源包 ---------------------------------------------------------
+  // 这十项是新增；Mauser96 / Type11 则沿用原 id，只替换模型与材质。模型节点没给出
+  // 可靠制式名的条目一律保留“型号未明”，不从外形硬猜成史实型号。
+  WaltherP38: {
+    id: "WaltherP38", name: "瓦尔特 P38", fullName: "Walther P38 自动手枪",
+    side: "neutral", kind: "pistol", ammo: "Service9", lengthM: 0.216, massKg: 0.96,
+    magazine: 8, reloadKind: "boxMag", damage: 38, headMultiplier: 2.2, effectiveRangeM: 50,
+    fireIntervalS: 0.18, reloadTimeS: 2.2,
+    recoil: { pitch: 1.35, yaw: 0.72, kick: 0.027, recoverS: 0.12, recoverFrac: 1.0 },
+    swayScale: 0.72, adsTimeS: 0.17, adsFovScale: 0.86, spreadHipDeg: 3.2, spreadAdsDeg: 0.82,
+    note: "源模型套筒铭文可直接识别；玩法参数沿用现有九毫米军用手枪档。",
+  },
+  Karabiner98k: {
+    id: "Karabiner98k", name: "Kar98k", fullName: "Karabiner 98k 栓动步枪",
+    side: "neutral", kind: "boltRifle", ammo: "Mauser792", lengthM: 1.110, massKg: 3.9,
+    magazine: 5, reloadKind: "stripper", damage: 78, headMultiplier: 2.6, effectiveRangeM: 500,
+    boltTimeS: 1.05, fireIntervalS: 1.25, reloadTimeS: 3.4,
+    recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
+    swayScale: 1.0, adsTimeS: 0.28, adsFovScale: 0.72, spreadHipDeg: 2.6, spreadAdsDeg: 0.18,
+    note: "源节点直接命名 Wp_Gun_Karabiner 98 Kurz；保留原 diffuse/normal。",
+  },
+  UnidentifiedBoltActionRifle: {
+    id: "UnidentifiedBoltActionRifle", name: "未明栓动步枪", fullName: "栓动步枪（具体型号未明）",
+    side: "neutral", kind: "boltRifle", ammo: "Mauser792", lengthM: 1.120, massKg: 4.0,
+    magazine: 5, reloadKind: "stripper", damage: 76, headMultiplier: 2.6, effectiveRangeM: 450,
+    boltTimeS: 1.10, fireIntervalS: 1.32, reloadTimeS: 3.6,
+    recoil: { pitch: 3.0, yaw: 0.6, kick: 0.058, recoverS: 0.25, recoverFrac: 1.0 },
+    swayScale: 1.08, adsTimeS: 0.31, adsFovScale: 0.74, spreadHipDeg: 2.9, spreadAdsDeg: 0.24,
+    note: "源节点只有 FQDQD / MK98_* 工作名；截图可确认枪类，不能可靠确认制式。",
+  },
+  OfficerSwordSet: {
+    id: "OfficerSwordSet", name: "军刀与刀鞘", fullName: "军刀与刀鞘（具体制式未明）",
+    side: "ija", kind: "melee", lengthM: 1.0, massKg: 1.3, damage: 210,
+    swingTimeS: 0.48, reachM: 1.95, silent: true,
+    note: "源节点 Group146；作为一套保留刀、鞘与原贴图，不冒认具体制式。",
+  },
+  RingPommelDagger: {
+    id: "RingPommelDagger", name: "环首短刃", fullName: "带环首短刃（具体制式未明）",
+    side: "neutral", kind: "melee", lengthM: 0.45, massKg: 0.65, damage: 155,
+    swingTimeS: 0.36, reachM: 1.45, silent: true,
+    note: "源节点 Mesh_0300；按截图特征描述，不推断年代或军种。",
+  },
+  BrowningTripodAssembly: {
+    id: "BrowningTripodAssembly", name: "勃朗宁三脚架组件", fullName: "勃朗宁式三脚架/机件组合（具体型号未明）",
+    side: "neutral", kind: "mortar", lengthM: 2.273, massKg: 30,
+    note: "源节点 BROTRIPO009；仅加入台架预览，识别结论未定。",
+  },
+  UnidentifiedMunition: {
+    id: "UnidentifiedMunition", name: "未明弹体", fullName: "弹体（具体型号未明）",
+    side: "neutral", kind: "mortar", lengthM: 0.253, massKg: 2.0,
+    note: "源节点 Cylinder026；保留 WW-100heqdf 原贴图并附识别截图。",
+  },
+  UnidentifiedAntiaircraftGun: {
+    id: "UnidentifiedAntiaircraftGun", name: "未明高射炮", fullName: "高射炮（具体型号未明）",
+    side: "neutral", kind: "mortar", lengthM: 1.10, massKg: 20,
+    note: "源节点 MK1；保留 MKCRMT 与 Mkwood 两张原贴图，仅加入台架预览。",
+  },
+  LightMortar: {
+    id: "LightMortar", name: "轻型迫击器", fullName: "轻型迫击/掷弹器（具体型号未明）",
+    side: "neutral", kind: "mortar", lengthM: 0.50, massKg: 3.0,
+    damage: 105, radiusM: 4.5, rangeMinM: 35, rangeMaxM: 500,
+    note: "源节点 PJP；形制可确认类别，具体型号未明。",
+  },
+  MediumMortar: {
+    id: "MediumMortar", name: "中型迫击炮", fullName: "中型迫击炮（具体型号未明）",
+    side: "neutral", kind: "mortar", lengthM: 1.444, massKg: 45,
+    damage: 150, radiusM: 7.0, rangeMinM: 80, rangeMaxM: 1500,
+    note: "源节点 sphere3；仅按可见结构归类，具体型号未明。",
+  },
+
   // --- 日方 -----------------------------------------------------------------
   Type38: {
     id: "Type38",

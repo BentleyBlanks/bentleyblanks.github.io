@@ -4,9 +4,11 @@
   The source package stores ten rigged soldiers in two 3ds Max 2014 scenes and sixteen
   Character Studio motions as .bip files.  Blender cannot reconstruct the Skin/Physique
   modifiers or Biped tracks from those proprietary containers.  This script performs the
-  lossless side of the bridge inside 3ds Max: ten bind-pose FBX files plus one skeleton-only
-  FBX per character and motion.  Script_BakeLugouCharacters.py consolidates those files into
-  ten web-ready GLBs afterwards.
+  lossless side of the bridge inside 3ds Max: ten bind-pose FBX files plus sixteen
+  skeleton-only actions sampled once on each faction's own canonical rig (NRA01 and IJA01).
+  The diagnostic non-canonical mode can still export every model/action pair.
+  Script_BakeLugouCharacters.py consolidates each faction's canonical poses onto its five
+  target rigs afterwards.
 
   Required environment variables:
     LUGOU_SOURCE_DIR  Folder containing the two bound soldier .max files and bip/.
@@ -373,7 +375,11 @@ fn ExportSide sideId sourceScene =
     )
 
     local useCanonicalActions = LugouCanonicalActions != undefined and (toLower LugouCanonicalActions) == "true"
-    local shouldExportActions = not useCanonicalActions or sideId == "Nra"
+    -- NRA and IJA use different Figure/bind axes and proportions.  Sampling only
+    -- NRA01 and applying that rest-relative delta to the Japanese rigs produces
+    -- the visibly broken shoulders, wrists and knees seen in the actor editor.
+    -- Always sample one canonical source per faction.
+    local shouldExportActions = true
     if shouldExportActions do
     (
         local actionEntries = GetActionEntries()
@@ -382,12 +388,12 @@ fn ExportSide sideId sourceScene =
             local actionFile = actionEntry[1]
             local actionId = actionEntry[2]
             if not doesFileExist actionFile do Fail ("Missing BIP: " + actionFile)
-            local firstModelIndex = if useCanonicalActions then 1 else 1
+            local firstModelIndex = 1
             local lastModelIndex = if useCanonicalActions then 1 else entries.count
             for modelIndex = firstModelIndex to lastModelIndex do
             (
                 local outputName = if useCanonicalActions then
-                    ("Animation_LugouCanonical_" + actionId + ".fbx")
+                    ("Animation_Lugou" + sideId + "Canonical_" + actionId + ".fbx")
                 else
                     ("Animation_Lugou" + sideId + (Pad2 modelIndex) + "_" + actionId + ".fbx")
                 local actionOutput = JoinPath LugouExportDir outputName
@@ -429,7 +435,12 @@ fn Main =
     if LugouSideOnly == undefined or LugouSideOnly == "" or (toLower LugouSideOnly) == "ija" do
         ExportSide "Ija" ijaScene
     if LugouSideOnly == undefined or LugouSideOnly == "" then
-        LogLine "DONE: exported 10 bind-pose models and 160 retargeted animation files."
+    (
+        if LugouCanonicalActions != undefined and (toLower LugouCanonicalActions) == "true" then
+            LogLine "DONE: exported 10 bind-pose models and 32 faction-canonical animation files."
+        else
+            LogLine "DONE: exported 10 bind-pose models and 160 diagnostic animation files."
+    )
     else
         LogLine ("DONE: exported side " + LugouSideOnly + ".")
     close LugouLogStream

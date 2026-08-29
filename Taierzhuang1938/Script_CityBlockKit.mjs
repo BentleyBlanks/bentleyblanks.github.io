@@ -81,7 +81,24 @@ import { AddYardWallRing, MakeYardFrame } from "./Script_YardWall.mjs";
 
 const DEG = Math.PI / 180;
 /** 硬山坡度 26°—29°。 */
-const PITCH_RAD = 27.5 * DEG;
+/**
+ * 城内民居的体量档 —— 照 Notion「场景设计 → AI还原」那张民居三视图定的。
+ *
+ * 参考图里那栋是**进深约 4.2 m、檐高约 3.15 m 的小高房**（山墙面高/宽≈1.15）；
+ * 这里原来的是进深 4.8–5.9、檐高 2.4–2.9 的「深而矮」，山墙面比值只有 0.7 —— 屋面
+ * 怎么调都变不出参考图那个形，差的是尺寸本身。
+ *
+ * **注意这与考据范围冲突**：`docs/Data_HistoryMaterial.md` 记的鲁南民居是
+ * 进深 4.5–6 m / 檐高 2.4–2.8 m，抬到 3.1 已经出界。这是用户看过并排图后
+ * 明确要求「按 AI 三视图改」的取舍，不是笔误。
+ *
+ * 两个数必须**同时施加到细节／中景／远景三档**（MidBody / FarBody 各有一份
+ * 同样的表达式），少改一处 LOD 一切换房子就跳一下。
+ */
+const HOUSE_EAVE_LIFT = 0.58;   // 檐高统一抬
+const HOUSE_DEPTH_K = 0.85;     // 进深统一收
+
+const PITCH_RAD = 34 * DEG;   // 27.5° 的屋面在正交立面上偏扁，参考图更陡
 /** 脊高 = 檐口 + 半进深 × tan(27.5°)。 */
 const PITCH = Math.tan(PITCH_RAD);
 
@@ -450,8 +467,8 @@ function BuildTwoEntry(sink, o) {
 
   // 正房（后进，三开间，门朝南）
   const mainW = Math.min(w - 3.0, 10.0 + rnd() * 1.4);
-  const mainD = Math.min(5.0 + rnd() * 0.9, d * 0.3);
-  const eave = 2.55 + rnd() * 0.22;
+  const mainD = Math.min(5.0 + rnd() * 0.9, d * 0.3) * HOUSE_DEPTH_K;
+  const eave = 2.55 + rnd() * 0.22 + HOUSE_EAVE_LIFT;
   const [nx, nz] = F(0, -d / 2 + 0.6 + mainD / 2);
   AddRoomBlock(sink, {
     x: nx, z: nz, ry, width: mainW, depth: mainD,
@@ -548,7 +565,7 @@ function BuildAdobeYard(sink, o) {
 
   // 正房：土坯 + 过墙石碱脚
   const mainW = Math.min(9.2 + rnd() * 1.6, w - 2.6);
-  const mainD = Math.min(4.7 + rnd() * 0.8, d - 3.0);
+  const mainD = Math.min(4.7 + rnd() * 0.8, d - 3.0) * HOUSE_DEPTH_K;
   const [nx, nz] = F(-mir * w * 0.05, -d / 2 + 0.7 + mainD / 2);
   AdobeHouse(sink, {
     x: nx, z: nz, ry, width: mainW, depth: mainD, eaveY: 2.42 + rnd() * 0.2,
@@ -617,8 +634,8 @@ function BuildLCourtyard(sink, o) {
 
   const wingD = 3.8;
   const mainW = Math.min(w * 0.44, 10.5);
-  const mainD = 4.9 + rnd() * 0.8;
-  const eave = 2.5 + rnd() * 0.24;
+  const mainD = (4.9 + rnd() * 0.8) * HOUSE_DEPTH_K;
+  const eave = 2.5 + rnd() * 0.24 + HOUSE_EAVE_LIFT;
   // 正房要给厢房让开：厢房占掉 wingD 一条，正房中心不许越过它
   const wingSide = -mir;
   const mainAt = wingSide * Math.min(w * 0.16, Math.max(0, w / 2 - wingD - mainW / 2 - 0.6));
@@ -692,8 +709,8 @@ function BuildWellYard(sink, o) {
 
   // 北面两户：正房 + 一间西厢
   const mainW = Math.min(w * 0.42, 10.0);
-  const mainD = 4.8 + rnd() * 0.7;
-  const eave = 2.48 + rnd() * 0.24;
+  const mainD = (4.8 + rnd() * 0.7) * HOUSE_DEPTH_K;
+  const eave = 2.48 + rnd() * 0.24 + HOUSE_EAVE_LIFT;
   const [nx, nz] = F(-mir * w * 0.18, -d / 2 + 0.6 + mainD / 2);
   AddRoomBlock(sink, {
     x: nx, z: nz, ry, width: mainW, depth: mainD,
@@ -1105,7 +1122,7 @@ function BuildShopRow(sink, o) {
     const uw = rowW * spans[u] / acc;
     const unitW = uw - 0.34;                       // 让出中缝：两家的硬山山墙在那里贴到一起
     const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
-    const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+    const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34 + HOUSE_EAVE_LIFT;
     const podiumH = 0.22 + ((HashString(`${seed}:up${u}`) >>> 0) % 100) / 100 * 0.12;
     const [ux, uz] = F(cursor + uw / 2, frontZ - unitD / 2);
     const bays = Math.max(2, Math.round(unitW / 3.3));
@@ -1149,7 +1166,7 @@ function BuildShopRow(sink, o) {
     const storeW = Math.min(rowW * 0.5, 8.4);
     const [stx, stz] = F(-mir * rowW * 0.16, d / 2 - 0.5 - rowD - yardD + 0.6 + 2.1);
     AdobeHouse(sink, {
-      x: stx, z: stz, ry, width: storeW, depth: 4.2, eaveY: 2.35,
+      x: stx, z: stz, ry, width: storeW, depth: 4.2 * HOUSE_DEPTH_K, eaveY: 2.35 + HOUSE_EAVE_LIFT,
       seed: `${seed}:store`, damage, burnt, facing: 1,
     });
     const [px2, pz2] = F(mir * rowW * 0.26, d / 2 - 0.5 - rowD - yardD * 0.5);
@@ -1323,7 +1340,7 @@ export function BuildCityBlockMid(sink, cell, {
     for (let u = 0; u < units; u += 1) {
       const uw = rowW * spans[u] / acc;
       const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
-      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34 + HOUSE_EAVE_LIFT;
       const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
       // 椽子与烟囱都只给临街的头一间：远景档按同一个 `${seed}:u${u}` 挑烟囱，
       // 两档要是各挑各的间，走近的过程就是「烟囱换了一间」。
@@ -1332,7 +1349,7 @@ export function BuildCityBlockMid(sink, cell, {
       cursor += uw;
     }
     const [yx, yz] = F(0, -d / 2 + 3.2);
-    MidBody(sink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0, eave: 2.3,
+    MidBody(sink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0 * HOUSE_DEPTH_K, eave: 2.3 + HOUSE_EAVE_LIFT,
       seed: `${seed}:store`, burnt, damage, baseY });
     return;
   }
@@ -1348,7 +1365,7 @@ export function BuildCityBlockMid(sink, cell, {
     const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
     const houseD = Math.min(4.8, d * 0.30);
     const hz = -d / 2 + 0.65 + houseD / 2;
-    const eave = adobe ? 2.38 : 2.52;
+    const eave = (adobe ? 2.38 : 2.52) + HOUSE_EAVE_LIFT;
     for (const s of [-1, 1]) {
       const edge = split + s * 0.62;
       const span = s < 0 ? (edge - (-w / 2 + 0.55)) : ((w / 2 - 0.55) - edge);
@@ -1380,7 +1397,7 @@ export function BuildCityBlockMid(sink, cell, {
     const houseD = Math.min(4.8, d * 0.30);
     const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
     MidBody(sink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
-      rafters: true, eave: adobe ? 2.4 : 2.54, seed: `${seed}:north`, burnt, damage, baseY,
+      rafters: true, eave: (adobe ? 2.4 : 2.54) + HOUSE_EAVE_LIFT, seed: `${seed}:north`, burnt, damage, baseY,
       chimney: true });
     const sW = Math.min(w - 4.6, 9.6);
     const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
@@ -1398,7 +1415,7 @@ export function BuildCityBlockMid(sink, cell, {
   }
 
   const mainW = w * (adobe ? 0.5 : 0.6);
-  const mainD = d * (profile === "double" ? 0.32 : 0.40);
+  const mainD = d * (profile === "double" ? 0.32 : 0.40) * HOUSE_DEPTH_K;
   const [nx, nz] = F(mir * w * 0.04, -d / 2 + 0.6 + mainD / 2);
   // 正房这一座留椽子（中景的近端 100 m 上，檐口那条锯齿阴影还看得见），
   // 配楼一律不留 —— 那是纯浪费。
@@ -1671,14 +1688,14 @@ export function BuildCityBlockFar(farSink, cell, {
     for (let u = 0; u < units; u += 1) {
       const uw = rowW * spans[u] / acc;
       const unitD = Math.max(4.2, rowD - ((HashString(`${seed}:ud${u}`) >>> 0) % 100) / 100 * 0.9);
-      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34;
+      const eave = 2.62 + ((HashString(`${seed}:ue${u}`) >>> 0) % 100) / 100 * 0.34 + HOUSE_EAVE_LIFT;
       const [ux, uz] = F(cursor + uw / 2, d / 2 - 0.5 - unitD / 2);
       FarBody(farSink, { x: ux, z: uz, ry, width: uw, depth: unitD, eave,
         baseY, seed: `${seed}:u${u}`, burnt, damage, gable: true, chimney: u === 0 });
       cursor += uw;
     }
     const [yx, yz] = F(0, -d / 2 + 3.2);
-    FarBody(farSink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0, eave: 2.3,
+    FarBody(farSink, { x: yx, z: yz, ry, width: rowW * 0.5, depth: 4.0 * HOUSE_DEPTH_K, eave: 2.3 + HOUSE_EAVE_LIFT,
       baseY, seed: `${seed}:store`, burnt, damage });
     return;
   }
@@ -1701,7 +1718,7 @@ export function BuildCityBlockFar(farSink, cell, {
     const split = ((HashString(`${seed}:split`) >>> 0) % 100 - 50) / 100 * w * 0.12;
     const houseD = Math.min(4.8, d * 0.30);
     const hz = -d / 2 + 0.65 + houseD / 2;
-    const eave = adobe ? 2.38 : 2.52;
+    const eave = (adobe ? 2.38 : 2.52) + HOUSE_EAVE_LIFT;
     const leftIn = -w / 2 + 0.55, rightIn = w / 2 - 0.55;
     const cut = Clamp(split, leftIn + 5.2, rightIn - 5.2);
     for (const s of [-1, 1]) {
@@ -1733,7 +1750,7 @@ export function BuildCityBlockFar(farSink, cell, {
     const houseD = Math.min(4.8, d * 0.30);
     const [nx2, nz2] = F(mir * w * 0.04, -d / 2 + 0.65 + houseD / 2);
     FarBody(farSink, { x: nx2, z: nz2, ry, width: Math.min(w - 2.6, 10.4), depth: houseD,
-      eave: adobe ? 2.4 : 2.54, baseY, seed: `${seed}:north`, burnt, damage,
+      eave: (adobe ? 2.4 : 2.54) + HOUSE_EAVE_LIFT, baseY, seed: `${seed}:north`, burnt, damage,
       adobe, gable: true, chimney: true });
     const sW = Math.min(w - 4.6, 9.6);
     const [sx2, sz2] = F(mir * (w / 2 - 0.55 - sW / 2), zSplit + 0.28 + houseD / 2);
@@ -1752,7 +1769,7 @@ export function BuildCityBlockFar(farSink, cell, {
   }
 
   const mainW = w * (adobe ? 0.5 : 0.6);
-  const mainD = d * (profile === "double" ? 0.32 : 0.40);
+  const mainD = d * (profile === "double" ? 0.32 : 0.40) * HOUSE_DEPTH_K;
   const [nx, nz] = F(mir * w * 0.04, -d / 2 + 0.6 + mainD / 2);
   FarBody(farSink, { x: nx, z: nz, ry, width: mainW, depth: mainD,
     eave: adobe ? 2.4 : 2.6, baseY, seed: `${seed}:main`, burnt, damage,

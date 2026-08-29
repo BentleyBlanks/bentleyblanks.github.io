@@ -162,19 +162,21 @@ const debugRendering = await page.evaluate(() => {
   // 假彩色编号必须一起被 SetView 设置，编号见 Script_EditorDebugRendering。
   const materialViews = {
     baseColor: 6, roughness: 7, metalness: 8, shadow: 9, giWorld: 1, giConfidence: 3,
+    diffuseLighting: 10, specularLighting: 11, reflection: 12, indirectLighting: 13,
   };
-  for (const view of ["normal", "depth", "ao", "aoBlur", "giIrradiance", "giDistance",
-    "baseColor", "roughness", "metalness", "shadow", "giWorld", "giConfidence"]) {
+  for (const view of ["normal", "depth", "motionVector", "ao", "aoBlur", "bloomExtract", "bloom", "fog", "dof", "giIrradiance", "giDistance",
+    "baseColor", "roughness", "metalness", "shadow", "diffuseLighting", "specularLighting", "reflection", "indirectLighting", "giWorld", "giConfidence"]) {
     panel.SetView(view);
     T.StepFrames(2);
     const source = T.post._GetDebugSource();
-    const expected = view === "normal" || view === "depth"
-      ? T.post.targets.normalDepth.texture
-      : view === "ao" ? T.post.targets.ao.texture
-        : view === "aoBlur" ? T.post.targets.aoBlur.texture
-          : view === "giIrradiance" ? T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture
-            : view === "giDistance" ? T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture
-              : T.post.targets.hdr.texture;
+    let expected = T.post.targets.hdr.texture;
+    if (["normal", "depth", "motionVector", "fog", "dof"].includes(view)) expected = T.post.targets.normalDepth.texture;
+    else if (view === "ao") expected = T.post.targets.ao.texture;
+    else if (view === "aoBlur") expected = T.post.targets.aoBlur.texture;
+    else if (view === "bloomExtract") expected = T.post.targets.bright.texture;
+    else if (view === "bloom") expected = T.post.BloomTarget.texture;
+    else if (view === "giIrradiance") expected = T.editor.host.game.gi.irradiance[T.editor.host.game.gi.pingPong].texture;
+    else if (view === "giDistance") expected = T.editor.host.game.gi.distanceMoments[T.editor.host.game.gi.pingPong].texture;
     visible[view] = source?.texture === expected;
     matMode[view] = T.library.gi ? T.library.gi.debugView.value === (materialViews[view] || 0) : false;
     lit[view] = Brightest();
@@ -483,6 +485,8 @@ const actor = await page.evaluate(() => {
   const kind = active.actors[0] ? active.actors[0].kind : null;
   const source = active.actors[0] ? active.actors[0].meshSource : null;
   const primary = active.actors[0];
+  const sourceDefault = primary?.weaponId === "ZhongZheng"
+    && active.weaponSelect.Value() === "__source_default__";
   let socketDirectionDot = -1;
   if (primary?.weaponGroup && primary?.characterRig) {
     primary.root.updateWorldMatrix(true, true);
@@ -497,17 +501,45 @@ const actor = await page.evaluate(() => {
       socketDirectionDot = grip.sub(right).normalize().dot(left.sub(right).normalize());
     }
   }
+  // 走真实下拉 change 事件，不只调内部方法：用户反馈的正是面板里换枪不生效。
+  active.weaponSelect.root.value = "Type38";
+  active.weaponSelect.root.dispatchEvent(new Event("change"));
+  window.Taierzhuang.StepFrames(10);
+  const singleWeaponReplaced = active.actors.length === 1
+    && active.actors[0].weaponId === "Type38"
+    && active.weaponId === "Type38";
+  active.SetWeaponChoice("__source_default__");
   active.lineup = true;
   active.Rebuild();
   window.Taierzhuang.StepFrames(10);
   const lineupCount = active.actors.length;
-  // 十套军人全部走新的蒙皮 GLB。SkinnedMesh 整棵刻意跳过 overrideMaterial
-  // 法线/深度预通道（该预通道没有 skinning define，会把人压到原点），但主材质仍须
-  // 至少有一份不透明、写深度的主体材质；头发/帽带的 alpha 卡允许透明且不写深度。
+  const nraLineupSourceDefaults = active.actors.length === 5
+    && active.actors.slice(0, 4).every((previewActor) => previewActor.kind === "nra"
+      && previewActor.weaponId === "ZhongZheng")
+    && active.actors[4]?.kind === "nraOfficer"
+    && active.actors[4]?.weaponId === null;
+  active.weaponSelect.root.value = "Zb26";
+  active.weaponSelect.root.dispatchEvent(new Event("change"));
+  window.Taierzhuang.StepFrames(10);
+  const lineupWeaponsReplaced = active.actors.length === 5
+    && active.actors.every((previewActor) => previewActor.weaponId === "Zb26");
+  active.SetWeaponChoice("__source_default__");
+  active.lineup = false;
+  active.kindList.Select("ija", true);
+  active.lineup = true;
+  active.Rebuild();
+  window.Taierzhuang.StepFrames(10);
+  const ijaLineupSourceDefaults = active.actors.length === 5
+    && active.actors.slice(0, 4).every((previewActor) => previewActor.kind === "ija"
+      && previewActor.weaponId === "Type38")
+    && active.actors[4]?.kind === "ijaOfficer"
+    && active.actors[4]?.weaponId === "Mauser96";
+  // 当前阵营五套军人全部走新的蒙皮 GLB，且必须进入法线/深度预通道；主材质须至少有一份
+  // 不透明、写深度的主体材质。头发/帽带的 alpha 卡允许透明且不写深度。
   // 静默退回旧 model/box 也会让这一条红。
   const rigidShadingSolid = active.actors.every((previewActor) => {
     if (!previewActor.meshSource.startsWith("glb:Lugou")
-      || !previewActor.characterRig?.root?.userData?.skipNormalDepth) return false;
+      || previewActor.characterRig?.root?.userData?.skipNormalDepth) return false;
     let materialsValid = true;
     let opaqueDepthMaterial = false;
     let meshes = 0;
@@ -523,6 +555,7 @@ const actor = await page.evaluate(() => {
     return materialsValid && opaqueDepthMaterial && meshes > 0;
   });
   active.lineup = false;
+  active.kindList.Select("nra", true);
   active.animationMode = "programmatic";
   active.manual = false;
   active.FillActionList();
@@ -533,10 +566,13 @@ const actor = await page.evaluate(() => {
   window.Taierzhuang.StepFrames(10);
   const civilianUnarmed = active.kind === "civilian"
     && active.weaponId === null
-    && active.weaponSelect.Value() === "";
+    && active.actors[0]?.weaponId === null
+    && active.weaponSelect.Value() === "__source_default__";
   return {
     id: editor.ActiveId, one, lineupCount, importedActions, kind, source,
     ragdoll, civilianUnarmed, rigidShadingSolid, socketDirectionDot,
+    sourceDefault, singleWeaponReplaced, nraLineupSourceDefaults,
+    ijaLineupSourceDefaults, lineupWeaponsReplaced,
     studio: editor.studio.Active,
     worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
     viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
@@ -544,11 +580,16 @@ const actor = await page.evaluate(() => {
 });
 Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${actor.kind}`);
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
-Check("单人 / 十套军人模型对比", actor.one === 1 && actor.lineupCount === 10,
+Check("单人 / 本阵营四兵一官模型对比", actor.one === 1 && actor.lineupCount === 5,
   `${actor.one} → ${actor.lineupCount}`);
-Check("人物编辑器列出全部 16 条导入动作", actor.importedActions === 16,
+Check("人物编辑器列出当前士兵适用的 14 条导入动作", actor.importedActions === 14,
   `${actor.importedActions} 条`);
-Check("十套人物都用蒙皮 GLB，且主体材质不透明/写深度", actor.rigidShadingSolid);
+Check("人物编辑器单人默认读取正式人物配枪", actor.sourceDefault);
+Check("人物编辑器下拉可替换单人枪械", actor.singleWeaponReplaced);
+Check("国军四兵一官按源配置装备默认枪械", actor.nraLineupSourceDefaults);
+Check("日军四兵一官按源配置装备默认枪械", actor.ijaLineupSourceDefaults);
+Check("本阵营对比下拉可统一替换全部枪械", actor.lineupWeaponsReplaced);
+Check("本阵营五套人物都用蒙皮 GLB，且主体材质不透明/写深度", actor.rigidShadingSolid);
 Check("枪身前握把沿左右手骨骼挂点定向", actor.socketDirectionDot > 0.98,
   `dot=${actor.socketDirectionDot.toFixed(4)}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
