@@ -691,7 +691,7 @@ Check("移动胶囊跟着姿态换档（站 0 / 卧 2）",
 // ---------------------------------------------------------------------------
 await page.click('[data-editor="weapon"]');
 await Step(15);
-const weapon = await page.evaluate(() => {
+const weapon = await page.evaluate(async () => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
   const out = { id: editor.ActiveId };
@@ -734,6 +734,18 @@ const weapon = await page.evaluate(() => {
   window.Taierzhuang.StepFrames(10);
   out.grenadeThrowVisible = !active.actionButtons.throw.hidden;
   out.grenadeMeleeHidden = active.actionButtons.melee.hidden;
+  const THREE = await import("./vendor/three/build/three.module.js");
+  active.SetMode("bench");
+  active.SetWeapon("MediumMortar");
+  window.Taierzhuang.StepFrames(10);
+  const mortarBox = new THREE.Box3().setFromObject(active.benchGroup);
+  const mortarSpan = mortarBox.getSize(new THREE.Vector3());
+  out.mortarGrounded = Math.abs(mortarBox.min.y) < 0.005;
+  out.mortarErected = mortarSpan.y > mortarSpan.x * 0.9;
+  active.SetWeapon("OfficerSwordSet");
+  window.Taierzhuang.StepFrames(10);
+  const swordSpan = new THREE.Box3().setFromObject(active.benchGroup).getSize(new THREE.Vector3());
+  out.swordInspectionPose = swordSpan.x > swordSpan.y * 5;
   // 两辆战车已有 .tzm；车辆走整棵关节树并落地，不能再按旧规则当成“无几何”。
   active.SetMode("bench");
   active.SetWeapon("Type89Tank");
@@ -760,6 +772,9 @@ Check("刺刀预览只给支持的枪，并在台架 / 第一人称都切换真�
 Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白刃",
   weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
 Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
+Check("迫击炮台架按架设姿态落地", weapon.mortarGrounded && weapon.mortarErected,
+  `ground=${weapon.mortarGrounded} erected=${weapon.mortarErected}`);
+Check("军刀台架取消人物动作轴，改为横向检视", weapon.swordInspectionPose);
 
 // ---------------------------------------------------------------------------
 // 4) 特效预览编辑器

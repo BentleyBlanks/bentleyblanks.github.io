@@ -308,6 +308,14 @@ def OrientOutward(bm):
                 volume += a.cross(b).dot(c)
         if volume < 0.0:
             bmesh.ops.reverse_faces(bm, faces=group)
+            # reverse_faces 只改绕序；自定义逐角法线仍指着翻面前的方向。
+            # 导入模型若保留 AUTHORED_NORMAL_LAYER，导出器又会优先读它，结果就是
+            # “面已经朝外、光照法线仍朝内”：正面发黑、轮廓像漏面。
+            authored = bm.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
+            if authored is not None:
+                for face in group:
+                    for loop in face.loops:
+                        loop[authored] = -Vector(loop[authored])
             flipped += 1
     if flipped:
         bm.normal_update()
@@ -566,6 +574,10 @@ def _ExtractLoops(bm, tile):
     inv_tile = 0.0 if tile is None else 1.0 / max(tile, 1e-6)
     out = []
     for f in bm.faces:
+        # 小于约 0.03 mm × 0.03 mm 的三角在 uint16 位置量化后会塌成线/点；
+        # 留着只会制造黑缝和重复索引，不贡献可见轮廓。
+        if f.calc_area() <= 1e-9:
+            continue
         fn = f.normal.copy()
         if fn.length < 1e-9:
             continue
@@ -573,6 +585,7 @@ def _ExtractLoops(bm, tile):
         # UV：按面法线的主轴做盒式投影，尺度换算成「米 / 每格米数」。
         # 全场贴图密度统一是这套管线的既有规矩（见 Script_Geo 的抬头注释）。
         ax = max(range(3), key=lambda i: abs(fn[i]))
+        face_out = []
         for loop in f.loops:
             v = loop.vert
             if authored_normal is not None and Vector(loop[authored_normal]).length > 1e-9:
@@ -585,6 +598,11 @@ def _ExtractLoops(bm, tile):
                 n.normalize()
             else:
                 n = fn
+            # 非流形旧模型或极瘦三角会把共享顶点的面积加权法线拉到面背后。
+            # 无论法线来自源文件还是自动光滑，最终都不能与承载它的面相反；否则
+            # 正面会被当成背面照亮，编辑器里看起来就是漏面/黑三角。
+            if n.dot(fn) <= 0.05:
+                n = fn
             co = v.co
             if source_uv is not None:
                 authored = loop[source_uv].uv
@@ -595,7 +613,14 @@ def _ExtractLoops(bm, tile):
                 uv = (co.x * inv_tile, co.z * inv_tile)
             else:
                 uv = (co.x * inv_tile, co.y * inv_tile)
-            out.append(((co.x, co.y, co.z), (n.x, n.y, n.z), uv))
+            face_out.append(((co.x, co.y, co.z), (n.x, n.y, n.z), uv))
+        averaged = Vector((0.0, 0.0, 0.0))
+        for _position, normal, _uv in face_out:
+            averaged += Vector(normal)
+        if averaged.length < 1e-8 or averaged.normalized().dot(fn) <= 0.05:
+            face_out = [(position, (fn.x, fn.y, fn.z), uv)
+                        for position, _normal, uv in face_out]
+        out.extend(face_out)
     return out
 
 
@@ -649,6 +674,41 @@ def _Quantize(positions, normals, uvs, indices):
 
     qnrm = [max(-127, min(127, int(round(v * 127.0)))) for v in normals]
 
+    # 浮点空间里仍有面积的极细三角，经过 uint16 位置量化后也可能塌成线；
+    # 用最终整数坐标复查一次并直接剔除，保证浏览器拿到的索引没有零面积面。
+    kept_indices = []
+    for i in range(0, len(indices), 3):
+        ia, ib, ic = indices[i:i + 3]
+        a = qpos[ia * 3:ia * 3 + 3]
+        b = qpos[ib * 3:ib * 3 + 3]
+        c = qpos[ic * 3:ic * 3 + 3]
+        ab = [b[axis] - a[axis] for axis in range(3)]
+        ac = [c[axis] - a[axis] for axis in range(3)]
+        cross = [ab[1] * ac[2] - ab[2] * ac[1],
+                 ab[2] * ac[0] - ab[0] * ac[2],
+                 ab[0] * ac[1] - ab[1] * ac[0]]
+        if cross == [0, 0, 0]:
+            continue
+        physical_cross = [cross[0] * pscale[1] * pscale[2],
+                          cross[1] * pscale[2] * pscale[0],
+                          cross[2] * pscale[0] * pscale[1]]
+        face_normal = Vector(physical_cross).normalized()
+        averaged = Vector(tuple(qnrm[ia * 3 + axis] + qnrm[ib * 3 + axis]
+                                + qnrm[ic * 3 + axis] for axis in range(3)))
+        if averaged.length > 1e-8 and averaged.normalized().dot(face_normal) > 0.05:
+            kept_indices.extend((ia, ib, ic))
+            continue
+        # 量化改变了极瘦三角的有效朝向时，给它独占三个顶点和面法线；不能就地
+        # 改共享顶点，否则相邻的正常面会一起被拉花。
+        for source in (ia, ib, ic):
+            replacement = len(qpos) // 3
+            qpos.extend(qpos[source * 3:source * 3 + 3])
+            quv.extend(quv[source * 2:source * 2 + 2])
+            qnrm.extend(max(-127, min(127, int(round(face_normal[axis] * 127.0))))
+                        for axis in range(3))
+            kept_indices.append(replacement)
+
+    count = len(qpos) // 3
     wide = count > 65535
     return {
         "count": count,
@@ -660,8 +720,8 @@ def _Quantize(positions, normals, uvs, indices):
         "nrm": _B64("b", qnrm),
         "uv": _B64("H", quv),
         "idxBits": 32 if wide else 16,
-        "idxCount": len(indices),
-        "idx": _B64("I" if wide else "H", indices),
+        "idxCount": len(kept_indices),
+        "idx": _B64("I" if wide else "H", kept_indices),
     }
 
 
@@ -864,7 +924,7 @@ def WriteTzm(root, path, name, notes="", audit=True):
                     bounds_max[a] = max(bounds_max[a], p[a])
             block = _Quantize(positions, normals, uvs, indices)
             block["material"] = material
-            total_tris += len(indices) // 3
+            total_tris += block["idxCount"] // 3
             mesh_ids.append(len(meshes))
             meshes.append(block)
         if mesh_ids:

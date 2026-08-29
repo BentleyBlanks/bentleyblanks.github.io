@@ -101,6 +101,7 @@ await page.addStyleTag({ content: ".edPanel, .edGear, #hud, .hud { display: none
 
 const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   const T = window.Taierzhuang;
+  const THREE = await import("./vendor/three/build/three.module.js");
   const editor = T.editor.active;
   editor.spin = false;
   editor.SetMode("bench");
@@ -115,8 +116,7 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   // 照着 name 分桶的话每一块都落进 else 分支，整支枪会被刷成同一种材质，
   // 对照图看起来"和有贴图的一模一样"，得出的结论是反的。
   if (flatMode && editor.benchGroup) {
-    // 页面已经加载过 three，这次 import 拿到的是同一个模块实例（不是第二份库）
-    const THREE = await import("./vendor/three/build/three.module.js");
+    // 页面已经加载过 three，上面的 import 拿到的是同一个模块实例（不是第二份库）
     const plain = {
       steel: new THREE.MeshStandardMaterial({ color: 0x3B3E42, roughness: 0.55, metalness: 0.85 }),
       blade: new THREE.MeshStandardMaterial({ color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
@@ -129,10 +129,10 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
     for (const key of Object.keys(plain)) {
       if (editor.materials && editor.materials[key]) byRef.set(editor.materials[key], plain[key]);
     }
-    for (const child of editor.benchGroup.children) {
-      if (!child.isMesh || !child.material || child.material.isMeshBasicMaterial) continue;
+    editor.benchGroup.traverse((child) => {
+      if (!child.isMesh || !child.material || child.material.isMeshBasicMaterial) return;
       child.material = byRef.get(child.material) || plain.steel;
-    }
+    });
   }
 
   const src = document.getElementById("view");
@@ -140,18 +140,23 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   const sheet = document.createElement("canvas");
   sheet.width = cw * 2; sheet.height = ch * 2;
   const ctx = sheet.getContext("2d");
-  const half = w.len * 0.5;
-  const centerY = w.upright ? 1.10 + half * 0.55 : 1.10;
-  const wide = Math.max(0.45, w.len * 1.25);
+  // 不再猜“平举 1.1 m / 竖放半个枪长”：架设武器现在按真实包围盒落地，刀具
+  // 也可能在 ActorGeometry 中转过轴。直接从最终台架组取中心与跨度，截图才能
+  // 与编辑器所见严格一致，不会把高射炮或三脚架的上半截裁掉。
+  const bounds = new THREE.Box3().setFromObject(editor.benchGroup);
+  const center = bounds.getCenter(new THREE.Vector3());
+  const span = bounds.getSize(new THREE.Vector3());
+  const centerY = center.y;
+  const wide = Math.max(0.75, w.len * 1.8, span.x * 2.0, span.y * 2.0);
   const views = [
     { name: "正侧", yaw: Math.PI, pitch: 0.05, dist: wide, tx: 0, ty: centerY },
     { name: "俯视", yaw: Math.PI, pitch: 1.20, dist: wide, tx: 0, ty: centerY },
     { name: "四分之三", yaw: Math.PI + 0.85, pitch: 0.32, dist: wide * 0.9, tx: 0, ty: centerY },
     {
       name: "机匣特写", yaw: Math.PI + 0.45, pitch: 0.20,
-      dist: Math.max(0.26, w.len * 0.30),
-      tx: w.closeAt != null ? w.closeAt : (w.upright ? 0 : -0.04),
-      ty: w.upright ? 1.10 + half * 0.9 : 1.10,
+      dist: Math.max(0.26, Math.min(wide * 0.65, Math.max(span.x, span.y, span.z) * 0.65)),
+      tx: w.closeAt != null ? w.closeAt : center.x,
+      ty: centerY + span.y * 0.18,
     },
   ];
   for (let i = 0; i < views.length; i += 1) {

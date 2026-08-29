@@ -262,12 +262,12 @@ export const MESHES = {
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
   WaltherP38: {
-    file: "WaltherP38.tzm.json", category: "weapon", triangles: 4529, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqWaltherP38"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38。",
+    file: "WaltherP38.tzm.json", category: "weapon", triangles: 4517, meshBlocks: 2, nodes: 7, joints: 0,
+    materials: ["lqWeaponPlain", "wood"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
+    draws: { high: 2, medium: 2, low: 2 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38；12×12 占位图仅对应握把，不再错误铺满整枪。",
   },
   BrowningTripodAssembly: {
-    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 4520, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 4513, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.74167, 1.43247, 2.27406], lengthM: 2.273,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 BROTRIPO009；仅能确认勃朗宁式三脚架/机件组合，具体型号未明。",
   },
@@ -280,12 +280,12 @@ export const MESHES = {
     file: "UnidentifiedBoltActionRifle.tzm.json", category: "weapon", triangles: 4523, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["lqUnidentifiedBoltActionRifle", "lqWeaponPlain"], mounts: WEAPON_MOUNTS,
     span: [0.08972, 0.24887, 1.120], lengthM: 1.120, draws: { high: 2, medium: 2, low: 2 },
-    note: "源节点 FQDQD / MK98_*；可确认栓动步枪，具体型号未明。",
+    note: "源节点 FQDQD / MK98_MA1+TRG；排除横向陈列的 BA2/LOK，并补齐机匣至枪口的连续钢管，具体型号未明。",
   },
   OfficerSwordSet: {
-    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 2895, meshBlocks: 1, nodes: 5, joints: 0,
-    materials: ["lqOfficerSword"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05748, 0.07389, 0.99504], lengthM: 1.000,
-    draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Group146；军刀与刀鞘组合，具体制式未明。",
+    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 3906, meshBlocks: 2, nodes: 5, joints: 0,
+    materials: ["lqOfficerSword", "lqWeaponPlain"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05975, 0.07192, 1.00151], lengthM: 1.000,
+    draws: { high: 2, medium: 2, low: 2 }, note: "源节点 Group146；仅刀柄饰带使用 stripe01L，刀身与刀鞘改回枪钢材质，具体制式未明。",
   },
   RingPommelDagger: {
     file: "RingPommelDagger.tzm.json", category: "weapon", triangles: 515, meshBlocks: 1, nodes: 5, joints: 0,
@@ -293,10 +293,10 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Mesh_0300；带环首短刃，具体制式未明。",
   },
   UnidentifiedAntiaircraftGun: {
-    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 4932, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["lqUnidentifiedAntiaircraftMetal", "lqUnidentifiedAntiaircraftWood"], mounts: WEAPON_MOUNTS,
-    span: [0.52085, 0.60153, 1.09878], lengthM: 1.100, draws: { high: 2, medium: 2, low: 2 },
-    note: "源节点 MK1；可确认高射炮形制并保留 MKCRMT/Mkwood 两张原贴图，具体型号未明。",
+    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 4612, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqWeaponPlain"], mounts: WEAPON_MOUNTS,
+    span: [0.32552, 0.81215, 1.09980], lengthM: 1.100, draws: { high: 1, medium: 1, low: 1 },
+    note: "源节点 MK1；删除悬空陈列件，纠正枪口朝向；MKCRMT 原图为随机噪点，改用项目枪钢 PBR，具体型号未明。",
   },
   LightMortar: {
     file: "LightMortar.tzm.json", category: "weapon", triangles: 3124, meshBlocks: 1, nodes: 7, joints: 0,

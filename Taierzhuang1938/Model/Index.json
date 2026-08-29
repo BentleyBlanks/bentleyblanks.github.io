@@ -971,13 +971,14 @@
    "name": "WaltherP38",
    "category": "weapon",
    "file": "WaltherP38.tzm.json",
-   "triangles": 4529,
-   "meshBlocks": 1,
+   "triangles": 4517,
+   "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 197810,
+   "bytes": 191416,
    "materials": [
-    "lqWaltherP38"
+    "lqWeaponPlain",
+    "wood"
    ],
    "mounts": [
     "root",
@@ -1004,11 +1005,11 @@
    "name": "BrowningTripodAssembly",
    "category": "weapon",
    "file": "BrowningTripodAssembly.tzm.json",
-   "triangles": 4520,
+   "triangles": 4513,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 227689,
+   "bytes": 261747,
    "materials": [
     "lqBrowningTripod"
    ],
@@ -1041,7 +1042,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 3808,
+   "bytes": 5177,
    "materials": [
     "lqUnidentifiedMunition"
    ],
@@ -1070,13 +1071,14 @@
    "name": "OfficerSwordSet",
    "category": "weapon",
    "file": "OfficerSwordSet.tzm.json",
-   "triangles": 2895,
-   "meshBlocks": 1,
+   "triangles": 3906,
+   "meshBlocks": 2,
    "nodes": 5,
    "joints": 0,
-   "bytes": 137217,
+   "bytes": 199537,
    "materials": [
-    "lqOfficerSword"
+    "lqOfficerSword",
+    "lqWeaponPlain"
    ],
    "mounts": [
     "root",
@@ -1086,14 +1088,14 @@
    ],
    "bounds": {
     "min": [
-     -0.02753,
-     -0.04104,
-     -0.72709
+     -0.02985,
+     -0.03959,
+     -0.73039
     ],
     "max": [
-     0.02995,
-     0.03285,
-     0.26795
+     0.0299,
+     0.03233,
+     0.27112
     ]
    }
   },
@@ -1105,7 +1107,7 @@
    "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 11526,
+   "bytes": 26743,
    "materials": [
     "lqRingPommelDagger"
    ],
@@ -1136,7 +1138,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 64740,
+   "bytes": 139136,
    "materials": [
     "lqLightMortar"
    ],
@@ -1162,6 +1164,43 @@
    }
   },
   {
+   "name": "Type11",
+   "category": "weapon",
+   "file": "Type11.tzm.json",
+   "triangles": 4530,
+   "meshBlocks": 5,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 186070,
+   "materials": [
+    "lqType11AmmoBox",
+    "lqType11Body",
+    "lqType11BodyAlt",
+    "lqType11Fore",
+    "lqWeaponPlain"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.1204,
+     0.03931,
+     -0.84514
+    ],
+    "max": [
+     0.12031,
+     0.29508,
+     0.25513
+    ]
+   }
+  },
+  {
    "name": "Mauser96",
    "category": "weapon",
    "file": "Mauser96.tzm.json",
@@ -1169,7 +1208,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 30337,
+   "bytes": 44897,
    "materials": [
     "lqMauser96"
    ],
@@ -1202,7 +1241,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 202726,
+   "bytes": 260615,
    "materials": [
     "lqMediumMortar"
    ],
@@ -1235,7 +1274,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 156452,
+   "bytes": 146900,
    "materials": [
     "lqKarabiner98k"
    ],
@@ -1268,7 +1307,7 @@
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 151200,
+   "bytes": 177824,
    "materials": [
     "lqUnidentifiedBoltActionRifle",
     "lqWeaponPlain"
@@ -1298,50 +1337,12 @@
    "name": "UnidentifiedAntiaircraftGun",
    "category": "weapon",
    "file": "UnidentifiedAntiaircraftGun.tzm.json",
-   "triangles": 4932,
-   "meshBlocks": 2,
+   "triangles": 4612,
+   "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 175803,
+   "bytes": 235576,
    "materials": [
-    "lqUnidentifiedAntiaircraftMetal",
-    "lqUnidentifiedAntiaircraftWood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.39934,
-     -0.2415,
-     -0.84501
-    ],
-    "max": [
-     0.12151,
-     0.36003,
-     0.25377
-    ]
-   }
-  },
-  {
-   "name": "Type11",
-   "category": "weapon",
-   "file": "Type11.tzm.json",
-   "triangles": 4530,
-   "meshBlocks": 5,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 145094,
-   "materials": [
-    "lqType11AmmoBox",
-    "lqType11Body",
-    "lqType11BodyAlt",
-    "lqType11Fore",
     "lqWeaponPlain"
    ],
    "mounts": [
@@ -1354,14 +1355,14 @@
    ],
    "bounds": {
     "min": [
-     -0.05723,
-     -0.11602,
-     -0.84514
+     -0.16276,
+     -0.21032,
+     -0.8448
     ],
     "max": [
-     0.18348,
-     0.13975,
-     0.25513
+     0.16276,
+     0.60183,
+     0.255
     ]
    }
   }

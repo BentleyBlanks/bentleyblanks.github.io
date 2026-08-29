@@ -45,6 +45,20 @@ function IsVehicle(id) {
   return !!w && w.kind === "vehicle" && !!MESHES[WEAPON_MESH_BY_ID[id]];
 }
 
+/** 架设武器/弹体在台架上按自身包围盒落地，不沿用手枪的 1.1 m 平举姿态。 */
+function IsGroundedBench(id) {
+  const w = WEAPONS[id];
+  return !!w && w.kind === "mortar" && !!MESHES[WEAPON_MESH_BY_ID[id]];
+}
+
+/** WeaponGeometry 为人物动作把刀刃转成 +Y；台架取消这层动作姿态。
+ * 两门迫击炮则从运输时的水平规范轴抬到约 58° 的架设姿态。 */
+function BenchPosePitch(id) {
+  if (id === "OfficerSwordSet" || id === "RingPommelDagger") return -Math.PI / 2;
+  if (id === "LightMortar" || id === "MediumMortar") return Math.PI * 0.32;
+  return 0;
+}
+
 /** 人能拿在手里的。车辆不算 —— 它没有第一人称手持视图。 */
 function IsHandheld(id) {
   return HasGeometry(id) && !IsVehicle(id);
@@ -482,16 +496,26 @@ export class WeaponEditor {
     // 仍按默认规则把高画质刺刀并入武器几何，不改变战场表现。
     const built = factory.WeaponGeometry(this.weaponId, this.weaponVariant | 0, { includeBayonet: false });
     const group = new THREE.Group();
+    const pose = new THREE.Group();
+    group.add(pose);
     for (const [key, geometry] of built.geometries) {
       const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      group.add(mesh);
+      pose.add(mesh);
     }
-    group.position.y = 1.1;
+    pose.rotation.x = BenchPosePitch(this.weaponId);
     // 枪的规范朝向是枪口指 -Z，而起手机位也在 -Z —— 不转的话开场是「看着枪口」。
     // 转 90° 变成正侧面：全长、护木分段、表尺、刺刀座一次看全。
     group.rotation.y = Math.PI / 2;
+    const grounded = IsGroundedBench(this.weaponId);
+    const benchBounds = new THREE.Box3().setFromObject(group);
+    const benchSpan = benchBounds.getSize(new THREE.Vector3());
+    if (grounded) {
+      group.position.y = -benchBounds.min.y;
+    } else {
+      group.position.y = 1.1;
+    }
     this.studio.stand.add(group);
     this.benchGroup = group;
 
@@ -502,7 +526,7 @@ export class WeaponEditor {
         new THREE.BoxGeometry(0.016, 0.016, 0.016),
         new THREE.MeshBasicMaterial({ color: hex }));
       marker.position.copy(vec);
-      group.add(marker);
+      pose.add(marker);
     };
     MarkerAt(built.muzzle, 0xd6604a);
     MarkerAt(built.gripFront, 0x9dc0e4);
@@ -520,12 +544,14 @@ export class WeaponEditor {
           built.muzzle.z - socket.z + 0.012,
         );
         bayonet.root.visible = this.bayonetPreview;
-        group.add(bayonet.root);
+        pose.add(bayonet.root);
         this.benchBayonet = bayonet.root;
       }
     }
-    this.studio.Frame(1.2, Math.max(1.4, (weapon.lengthM || 1) * 2.0));
-    this.studio.orbit.target.set(0, 1.1, 0);
+    const targetY = grounded ? Math.max(0.08, benchSpan.y * 0.5) : 1.1;
+    this.studio.Frame(grounded ? Math.max(0.7, benchSpan.y) : 1.2,
+      Math.max(1.4, (weapon.lengthM || 1) * 2.0));
+    this.studio.orbit.target.set(0, targetY, 0);
     this.studio.ApplyCamera();
   }
 

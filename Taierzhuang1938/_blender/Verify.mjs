@@ -102,6 +102,80 @@ const sandalNodesOk = ["ankleL", "ankleR"].every((nodeName) => {
 Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
   "川军左右脚均为裸足皮肤 + 露趾草鞋双材质");
 
+// 2026-08-28 新拆出的卢沟桥武器曾同时出现三类静默损坏：闭壳翻面后逐角法线
+// 没有跟着翻、旧 DCC 的 material_index=255 丢进默认桶，以及退化三角形成黑缝。
+// 浏览器会照常加载这些文件，三角数/包围盒也都合理，所以在真渲染前先直接审计
+// 压缩后的最终产物。面法线与三顶点平均光照法线反向即判坏，不依赖 Blender 环境。
+const lugouqiaoWeaponIds = [
+  "WaltherP38", "BrowningTripodAssembly", "UnidentifiedMunition",
+  "UnidentifiedBoltActionRifle", "OfficerSwordSet", "RingPommelDagger",
+  "UnidentifiedAntiaircraftGun", "LightMortar", "Type11", "Mauser96",
+  "MediumMortar", "Karabiner98k",
+];
+const AuditCompressedMesh = (mesh) => {
+  const pos = Buffer.from(mesh.pos, "base64");
+  const nrm = Buffer.from(mesh.nrm, "base64");
+  const idx = Buffer.from(mesh.idx, "base64");
+  const ReadPos = (vertex) => [0, 1, 2].map((axis) => mesh.posMin[axis]
+    + mesh.posScale[axis] * pos.readUInt16LE(vertex * 6 + axis * 2));
+  const ReadNormal = (vertex) => [0, 1, 2].map((axis) => nrm.readInt8(vertex * 3 + axis) / 127);
+  const ReadIndex = mesh.idxBits === 32
+    ? (index) => idx.readUInt32LE(index * 4)
+    : (index) => idx.readUInt16LE(index * 2);
+  let degenerate = 0;
+  let reversed = 0;
+  for (let i = 0; i < mesh.idxCount; i += 3) {
+    const ia = ReadIndex(i); const ib = ReadIndex(i + 1); const ic = ReadIndex(i + 2);
+    const a = ReadPos(ia); const b = ReadPos(ib); const c = ReadPos(ic);
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const face = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0]];
+    const faceLength = Math.hypot(...face);
+    if (faceLength <= 1e-10) { degenerate += 1; continue; }
+    const na = ReadNormal(ia); const nb = ReadNormal(ib); const nc = ReadNormal(ic);
+    const smooth = [na[0] + nb[0] + nc[0], na[1] + nb[1] + nc[1], na[2] + nb[2] + nc[2]];
+    const smoothLength = Math.hypot(...smooth);
+    if (smoothLength <= 1e-8) continue;
+    const agreement = (face[0] * smooth[0] + face[1] * smooth[1] + face[2] * smooth[2])
+      / (faceLength * smoothLength);
+    if (agreement < -0.05) reversed += 1;
+  }
+  return { degenerate, reversed };
+};
+for (const id of lugouqiaoWeaponIds) {
+  const entry = MESHES[id];
+  const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", entry.file), "utf8"));
+  const audit = doc.meshes.reduce((sum, mesh) => {
+    const result = AuditCompressedMesh(mesh);
+    sum.degenerate += result.degenerate;
+    sum.reversed += result.reversed;
+    return sum;
+  }, { degenerate: 0, reversed: 0 });
+  Report(audit.degenerate === 0 && audit.reversed === 0,
+    `卢沟桥武器终产物法线/拓扑 ${id}（反向 ${audit.reversed}，退化 ${audit.degenerate}）`);
+}
+const MaterialTriangles = (id) => {
+  const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES[id].file), "utf8"));
+  return new Map(doc.meshes.map((mesh) => [mesh.material, mesh.idxCount / 3]));
+};
+const p38Buckets = MaterialTriangles("WaltherP38");
+Report(p38Buckets.has("lqWeaponPlain") && p38Buckets.has("wood") && p38Buckets.size === 2,
+  "P38 金属与握把分桶，不再把 12×12 占位贴图铺满整枪");
+const rifleBuckets = MaterialTriangles("UnidentifiedBoltActionRifle");
+Report(rifleBuckets.size === 2 && (rifleBuckets.get("lqUnidentifiedBoltActionRifle") || 0) > 1000
+  && (rifleBuckets.get("lqWeaponPlain") || 0) > 2500,
+  "未识别栓动步枪 MA1 木件与 TRG/补管钢件齐全（不受 material_index=255 影响）");
+const type11Buckets = MaterialTriangles("Type11");
+Report(type11Buckets.size === 5 && (type11Buckets.get("lqWeaponPlain") || 0) <= 500,
+  "十一年式五个材质桶均命中，默认材质面不超过 500");
+const swordBuckets = MaterialTriangles("OfficerSwordSet");
+Report(swordBuckets.has("lqOfficerSword") && swordBuckets.has("lqWeaponPlain")
+  && swordBuckets.size === 2, "军刀仅饰带使用源贴图，刀身/刀鞘回钢材质");
+const antiaircraftBuckets = MaterialTriangles("UnidentifiedAntiaircraftGun");
+Report(antiaircraftBuckets.has("lqWeaponPlain") && antiaircraftBuckets.size === 1,
+  "未明高射炮删除悬空陈列件并禁用噪点伪底色，回枪钢材质");
+
 // 钢盔扣不扣得住颅骨：低多边形的头饰与头是两个独立放样体，**贴着建**的话
 // 分面一削就穿，穿出来的是盔体后半一条肉色折线 —— 只有从后上方（低头看脚边的
 // 尸体）才看得见，三角数、包围盒、材质桶全部正常，所以一路漏到了 2026-08-27：
