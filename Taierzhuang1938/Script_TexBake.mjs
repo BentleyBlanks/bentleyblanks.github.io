@@ -581,7 +581,6 @@ export const RECIPES = {
   }),
   WoodCrate: (s) => BakeCrateWood(s ?? 512),
   WattleFence: (s) => BakeFenceWood(s ?? 256, { seed: 467, hue: [104, 92, 72] }),
-  WoodFence: (s) => BakeFenceWood(s ?? 256, { seed: 479, hue: [122, 102, 72] }),
   // 外部的 ImageGen 树皮 PBR 在启动时会覆盖这套同步兜底；失败时树仍不至于丢材质。
   TreeBark: (s) => BakeWood(s ?? 256, { seed: 457, hue: [92, 82, 66], planks: 1, weathered: 0.9 }),
   WoodStock: (s) => BakeWood(s ?? 256, { seed: 433, hue: [98, 66, 40], planks: 1, weathered: 0.15 }),

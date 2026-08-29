@@ -93,6 +93,7 @@ if __name__ == "__main__":
     build_if_source("RoofTile", normal_strength=3.0, metalness=0, rough_min=126, rough_max=208)
     build_if_source("Sandbag", normal_strength=1.8, metalness=0, rough_min=208, rough_max=255)
     build_if_source("WattleFence", normal_strength=3.8, metalness=0, rough_min=192, rough_max=255)
+    build_if_source("WoodCrate", normal_strength=2.3, metalness=0, rough_min=178, rough_max=238)
     build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
     # 构件库的两档预建模战损。高分辨率 base color 由 imagegen 产出；这里统一
     # 做无缝偏移、浏览器尺寸压缩并推导对位的 normal / ORM，避免把原始 PNG
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     build_if_source("TemplePlaster", normal_strength=3.0, metalness=0, rough_min=200, rough_max=252)
     build_if_source("ChurchPlaster", normal_strength=2.6, metalness=0, rough_min=190, rough_max=248)
     for stem in (
-        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
+        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence", "WoodCrate",
         "BrickWallSooty", "BuildingDamageEarly", "BuildingDamageSevere", "Adobe",
         "Stone", "GateBrick", "GatePaintedWood", "GateRoofTile",
     ):

@@ -268,17 +268,25 @@ for (const material of ["Brick", "Core", "Stone"]) {
       `runtime loads CityWall ${material} ${channel}`);
   }
 }
-for (const material of ["HandcartWood"]) {
+for (const material of ["HandcartWood", "WoodCrate", "WattleFence"]) {
   for (const channel of ["Base", "Normal"]) {
     assert.match(main, new RegExp(`Texture_${material}${channel}\\.webp`),
       `runtime loads ${material} ${channel}`);
   }
 }
-assert.doesNotMatch(main, /name: "WoodCrate"/, "wood crates no longer download the visibly tiled generated PBR");
-assert.doesNotMatch(main, /name: "WattleFence"/, "wattle fences no longer download the visibly discontinuous generated PBR");
+for (const material of ["WoodCrate", "WattleFence"]) {
+  for (const channel of ["Base", "Normal", "Orm"]) {
+    const fileName = `Texture_${material}${channel}.webp`;
+    const bytes = fs.readFileSync(path.join(root, "Texture", fileName));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", `${fileName}: RIFF header`);
+    assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP", `${fileName}: WebP payload`);
+  }
+  assert.match(main, new RegExp(`Texture_${material}Base\\.webp\\?v=woodpbr20260829`),
+    `${material} uses the regenerated PBR set`);
+}
 const texBake = fs.readFileSync(path.join(root, "Script_TexBake.mjs"), "utf8");
-for (const recipe of ["BakeCrateWood", "BakeFenceWood", "WoodCrate", "WattleFence", "WoodFence"]) {
-  assert.match(texBake, new RegExp(`\\b${recipe}\\b`), `${recipe} stays on the procedural wood path`);
+for (const recipe of ["BakeCrateWood", "BakeFenceWood", "WoodCrate", "WattleFence"]) {
+  assert.match(texBake, new RegExp(`\\b${recipe}\\b`), `${recipe} retains a procedural fallback`);
 }
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`
