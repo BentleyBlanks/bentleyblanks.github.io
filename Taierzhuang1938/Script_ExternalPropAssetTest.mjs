@@ -240,6 +240,29 @@ for (const [name, spec] of market.nodes) {
   assert.ok(spec.maxSpan >= 0.5 && spec.maxSpan <= 0.96, `${name} has hand-placeable scale`);
 }
 
+const householdWare = InspectNodes("Model_HouseholdWareSet.glb", 800_000);
+for (const name of ["WoodAxe", "SmithHammer", "IronSpade"]) {
+  const node = householdWare.json.nodes.find((entry) => entry.name === name);
+  assert.ok(node && node.mesh != null, `${name} node exists`);
+  const materialNames = new Set(householdWare.json.meshes[node.mesh].primitives
+    .map((primitive) => householdWare.json.materials[primitive.material]?.name));
+  assert.deepEqual([...materialNames].sort(), ["Steel", "WoodBeam"],
+    `${name} separates its steel head from its wooden handle`);
+}
+
+const chineseLife = InspectNodes("Model_ChineseLifeSet.glb", 750_000);
+for (const [name, minTriangles] of [
+  ["ClothLantern", 950],
+  ["WinnowingBasket", 1600],
+  ["WovenBasket", 1000],
+  ["BambooHat", 1250],
+]) {
+  const spec = chineseLife.nodes.get(name);
+  assert.ok(spec, `${name} node exists`);
+  assert.ok(spec.triangles >= minTriangles,
+    `${name} keeps enough surface geometry to avoid visible decimation holes`);
+}
+
 const runtime = fs.readFileSync(path.join(root, "Script_ExternalProps.mjs"), "utf8");
 for (const id of [
   "militaryCrateClosed", "militaryCrateOpen",
@@ -260,6 +283,12 @@ assert.match(runtime, /materialMap: \{ WoodBeam: "HandcartWood" \}/,
   "handcart wood no longer reuses the generic structural-beam texture");
 assert.match(runtime, /material: "WoodCrate"/, "wooden boxes use the dedicated crate texture");
 assert.match(runtime, /placement\.yOffset \|\| 0/, "wall-mounted props preserve vertical offsets");
+assert.match(runtime, /ProjectRuntimeUv\(object\.geometry, materialName\)/,
+  "runtime-bound external props receive metre-scale projected UVs");
+assert.match(runtime, /source\.side/,
+  "runtime material rebinding preserves the GLB material side mode");
+assert.match(runtime, /name === "WoodBeam" \|\| name === "WoodDoor"/,
+  "small external woodwork avoids the structural beam and door texture scale");
 
 const main = fs.readFileSync(path.join(root, "Script_Main.mjs"), "utf8");
 for (const material of ["Brick", "Core", "Stone"]) {

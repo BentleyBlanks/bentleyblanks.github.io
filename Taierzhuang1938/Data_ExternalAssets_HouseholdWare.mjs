@@ -14,7 +14,7 @@
 // Wicker 换成 "Sandbag" —— 那正是这两个语义名在 MATERIALS 里压着的底材配方，
 // 只是丢掉调色（陶少了 0xb99a82 的赭、编织少了 0xb99761 的黄）。
 
-export const PACK = Object.freeze({ id: "HouseholdWare", url: "./Model/Model_HouseholdWareSet.glb?v=1" });
+export const PACK = Object.freeze({ id: "HouseholdWare", url: "./Model/Model_HouseholdWareSet.glb?v=2" });
 
 export const ASSETS = Object.freeze({
   // —— 木质容器 ——
@@ -31,9 +31,9 @@ export const ASSETS = Object.freeze({
   phLowWoodStool: { label: "小板凳", node: "LowWoodStool", material: "WoodDoor", tag: "prop" },
   phRoughWoodTable: { label: "粗木桌", node: "RoughWoodTable", material: "WoodBeam", tag: "prop" },
   // —— 木柄铁头手工具（烘焙时已放平，落地即是「掉在地上的家伙什」） ——
-  phWoodAxe: { label: "木柄斧", node: "WoodAxe", material: "Steel", tag: "prop" },
-  phSmithHammer: { label: "铁锤", node: "SmithHammer", material: "Steel", tag: "prop" },
-  phIronSpade: { label: "铁锹", node: "IronSpade", material: "Steel", tag: "prop" },
+  phWoodAxe: { label: "木柄斧", node: "WoodAxe", materialMap: true, material: null, tag: "prop" },
+  phSmithHammer: { label: "铁锤", node: "SmithHammer", materialMap: true, material: null, tag: "prop" },
+  phIronSpade: { label: "铁锹", node: "IronSpade", materialMap: true, material: null, tag: "prop" },
   // —— 柴与灯 ——
   phFirewoodBranches: { label: "柴枝堆", node: "FirewoodBranches", material: "WoodBeam", tag: "prop" },
   phWoodLantern: { label: "木框风灯", node: "WoodLantern", material: "WoodDoor", tag: "prop" },

@@ -43,7 +43,7 @@ import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 import { PropStreamer } from "./Script_PropStreaming.mjs";
 import { PropBatcher } from "./Script_PropBatch.mjs";
-import { MergeGeometries } from "./Script_Geo.mjs";
+import { MergeGeometries, TILE_METERS } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 // 并行下载工作包各交一份目录片段（PACK.url + 无 url 的 ASSETS 表），此处接线。
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
@@ -94,7 +94,7 @@ function CityWallBreachAsset(label, node) {
   // 不规则断面和瓦砾轮廓，重复登记一个大 AABB 会把中央净宽重新封死。
   return {
     label, url: CITY_WALL_BREACH_URL, node, materialMap: true,
-    tag: "rubble", solid: false, category: "工事",
+    tag: "rubble", solid: false, category: "工事", projectUvs: false,
   };
 }
 
@@ -120,7 +120,7 @@ function CityWallDetailAsset(label, node) {
   // 平白造出隐形台阶，也会让子弹在装饰层上提前命中。
   return {
     label, url: CITY_WALL_DETAIL_URL, node, materialMap: true,
-    tag: "wallDetail", solid: false, category: "工事",
+    tag: "wallDetail", solid: false, category: "工事", projectUvs: false,
   };
 }
 
@@ -395,6 +395,67 @@ const prepared = new Map();
 let liveRoot = null;
 let liveStreamer = null;
 
+/**
+ * 下载模型的 UV 是给它原来的 atlas / 扫描贴图画的，不是给本项目的平铺 PBR
+ * 配方画的。把 WoodBeam / Stone 直接套上去会把整张贴图挤进一个窄 UV 岛，
+ * 木轮、井台和农具就出现一圈圈粗黑条，看起来像贴图损坏。
+ *
+ * 这里按顶点法线的主轴做确定性的 box projection，坐标直接使用模型米制位置，
+ * 所以纹理密度与 Script_Geo 的程序化几何共用 TILE_METERS。外部房屋保留作者
+ * 原贴图，不进这条；城墙破口的 UV 是本项目离线明确铺过的，也由 projectUvs:false
+ * 保留。其余运行时重绑项目材质的 GLB 全部走这一条。
+ */
+function RuntimeTileMeters(name) {
+  if (/Steel|Iron|Metal/i.test(name)) return TILE_METERS.steel;
+  if (/Ground/i.test(name)) return TILE_METERS.ground;
+  if (/Roof/i.test(name)) return TILE_METERS.roof;
+  if (/Adobe|Rammed/i.test(name)) return TILE_METERS.adobe;
+  if (/Brick/i.test(name)) return TILE_METERS.brick;
+  if (/Stone|Ashlar|Ceramic|Rubble/i.test(name)) return TILE_METERS.stone;
+  if (/Cloth|Straw/i.test(name)) return TILE_METERS.cloth;
+  if (/Sandbag|Wicker/i.test(name)) return TILE_METERS.sandbag;
+  return TILE_METERS.wood;
+}
+
+function ProjectRuntimeUv(geometry, materialName) {
+  const position = geometry?.attributes?.position;
+  const normal = geometry?.attributes?.normal;
+  if (!position || !normal) return geometry;
+  const projected = geometry.clone();
+  const uv = new Float32Array(position.count * 2);
+  const tile = RuntimeTileMeters(materialName);
+  for (let i = 0; i < position.count; i += 1) {
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+    const nx = normal.getX(i), ny = normal.getY(i), nz = normal.getZ(i);
+    const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+    let u, v;
+    if (ax >= ay && ax >= az) {
+      u = (nx >= 0 ? -z : z) / tile;
+      v = y / tile;
+    } else if (ay >= az) {
+      u = x / tile;
+      v = (ny >= 0 ? z : -z) / tile;
+    } else {
+      u = (nz >= 0 ? x : -x) / tile;
+      v = y / tile;
+    }
+    uv[i * 2] = u;
+    uv[i * 2 + 1] = v;
+  }
+  projected.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  projected.userData.externalUvProjection = { material: materialName, tileMeters: tile };
+  return projected;
+}
+
+function PrepareRuntimeUvs(root, spec) {
+  if (spec.projectUvs === false || (!spec.material && !spec.materialMap)) return;
+  root.traverse((object) => {
+    if (!object.isMesh || Array.isArray(object.material)) return;
+    const materialName = spec.material || MappedMaterialName(object.material, spec);
+    object.geometry = ProjectRuntimeUv(object.geometry, materialName);
+  });
+}
+
 async function LoadSource(id) {
   const spec = ASSETS[id];
   if (cache.has(spec.url)) return cache.get(spec.url);
@@ -433,6 +494,7 @@ function PrepareAsset(id, gltf) {
   node.position.set(0, 0, 0);
   node.rotation.set(0, 0, 0);
   node.scale.copy(source.scale);
+  PrepareRuntimeUvs(node, spec);
   node.updateMatrixWorld(true);
   const raw = new THREE.Box3().setFromObject(node);
   const shell = new THREE.Group();
@@ -468,9 +530,23 @@ async function LoadAsset(id) {
 // 民居本来就该同色）。Steel 保留这层自己的粗糙度/金属度，表里没有它的行。
 // 【为什么必须过表】library.Get 对没烘焙的名字直接抛「材质未烘焙」——
 // PolyHaven 包第一次用 HouseholdCeramic 时是整关炸掉才发现的。
-function RuntimeMaterialFor(name, library) {
-  if (name === "Steel") return library.Get("Steel", { roughness: 0.72, metalness: 0.55 });
-  return ResolveTengxianMaterial(name, library);
+function RuntimeMaterialFor(name, library, source = null) {
+  // Blender 烘焙出来的外部静态件普遍是双面：竹筐、斗笠、薄铁皮和木板靠这条
+  // 才能从内外两侧都看见。以前重绑库材质时只保留了“叫什么”，把 side 丢了，
+  // 于是正面正常、转半圈就整片消失。让材质库按 source.side 直接建缓存变体，
+  // 既保住项目的 GI/AO shader 注入，也不污染全场共用的 FrontSide 底材。
+  const side = source && [THREE.FrontSide, THREE.BackSide, THREE.DoubleSide].includes(source.side)
+    ? { side: source.side } : {};
+  // WoodBeam / WoodDoor 的贴图是给一米级程序化梁柱与门板铺的，细柄、车轮、
+  // 凳腿套上去会出现夸张的板缝和树皮状粗条。外部网格统一改用无假板缝、
+  // 专为任意 UV 木器烘的 HandcartWood；木箱仍由 spec 明确走 WoodCrate。
+  if (name === "WoodBeam" || name === "WoodDoor") {
+    return ResolveTengxianMaterial("HandcartWood", library, side);
+  }
+  if (name === "Steel") {
+    return library.Get("Steel", { roughness: 0.72, metalness: 0.55, ...side });
+  }
+  return ResolveTengxianMaterial(name, library, side);
 }
 
 function MappedMaterialName(source, spec) {
@@ -483,7 +559,7 @@ function MappedMaterialName(source, spec) {
 
 function ApplyRuntimeMaterial(root, spec, library) {
   if (spec.materialMap) {
-    const bind = (source) => RuntimeMaterialFor(MappedMaterialName(source, spec), library);
+    const bind = (source) => RuntimeMaterialFor(MappedMaterialName(source, spec), library, source);
     root.traverse((object) => {
       if (!object.isMesh) return;
       object.material = Array.isArray(object.material)
@@ -492,10 +568,11 @@ function ApplyRuntimeMaterial(root, spec, library) {
     return;
   }
   if (!spec.material) return;
-  const material = RuntimeMaterialFor(spec.material, library);
   root.traverse((object) => {
     if (!object.isMesh) return;
-    object.material = material;
+    object.material = Array.isArray(object.material)
+      ? object.material.map((source) => RuntimeMaterialFor(spec.material, library, source))
+      : RuntimeMaterialFor(spec.material, library, object.material);
   });
 }
 
@@ -555,8 +632,8 @@ function InstancedFormFor(id, asset, library) {
       }
     }
     const material = spec.materialMap
-      ? RuntimeMaterialFor(MappedMaterialName(object.material, spec), library)
-      : (spec.material ? RuntimeMaterialFor(spec.material, library) : object.material);
+      ? RuntimeMaterialFor(MappedMaterialName(object.material, spec), library, object.material)
+      : (spec.material ? RuntimeMaterialFor(spec.material, library, object.material) : object.material);
     // 挑出要合并的三个属性各拷一份（InterleavedBufferAttribute.clone() 会
     // 顺手解交织），再把相对 shell 根的变换烘进去 —— shell 自己是单位阵，
     // matrixWorld 就是那份局部变换。

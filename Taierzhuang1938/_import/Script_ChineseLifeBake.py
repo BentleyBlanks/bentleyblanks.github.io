@@ -226,16 +226,16 @@ SOURCES = (
         ((), "WineJarCluster", "Stone", 650, None, 0.55),
     )),
     ("Model_SketchfabOldChineseLantern", (
-        ((), "ClothLantern", "ClothNra", 600, None, 0.52),
+        ((), "ClothLantern", "ClothNra", 1200, None, 0.52),
     )),
     ("Model_SketchfabChineseSignboard", (
         ((), "ShopPlaque", "WoodDoor", 320, None, 1.15),
     )),
     ("Model_SketchfabWinnow", (
-        ((), "WinnowingBasket", "Sandbag", 600, None, 0.78),
+        ((), "WinnowingBasket", "Sandbag", 1800, None, 0.78),
     )),
     ("Model_SketchfabBambooBasket", (
-        ((), "WovenBasket", "Sandbag", 500, 0.54, None),
+        ((), "WovenBasket", "Sandbag", 1800, 0.54, None),
     )),
     ("Model_SketchfabLowWoodenBench", (
         ((), "WoodPlatformBench", "WoodBeam", 700, 1.62, None),
@@ -249,7 +249,7 @@ SOURCES = (
     )),
     # 只要斗笠本体：Hat.rope 那条系带垂在帽檐之下，留着它整顶帽子会离地悬空。
     ("Model_SketchfabAsianConicalHat", (
-        (("Object_3",), "BambooHat", "Sandbag", 450, 0.46, None),
+        (("Object_3",), "BambooHat", "Sandbag", 1400, 0.46, None),
     )),
 )
 

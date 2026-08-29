@@ -192,13 +192,13 @@ const PLAIN_MAP = {
 };
 
 /** 桶名 → 材质。传给 BuildSink.Flush 的 resolve 钩子。 */
-export function ResolveTengxianMaterial(name, library) {
+export function ResolveTengxianMaterial(name, library, overrides = {}) {
   const plain = PLAIN_MAP[name];
-  if (plain) return library.Plain(name, plain);
+  if (plain) return library.Plain(name, { ...plain, ...overrides });
   const spec = MATERIAL_MAP[name];
-  if (!spec) return library.Get(name);              // 没登记的按配方名直接取
+  if (!spec) return library.Get(name, overrides);   // 没登记的按配方名直接取
   const { recipe, ...options } = spec;
-  return library.Get(recipe, options);
+  return library.Get(recipe, { ...options, ...overrides });
 }
 
 // ---------------------------------------------------------------------------

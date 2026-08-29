@@ -11,8 +11,8 @@ contract as Script_ExternalAssetBake.py:
   * origin at the **bottom face centre** (minZ = 0, XY centred) so
     `Script_ExternalProps.PrepareAsset` has nothing left to correct;
   * every downloaded texture stripped — the runtime rebinds the project's own
-    baked recipes by material name, which is why the material of each object is
-    renamed to that recipe here.
+    baked recipes by material name. Mixed wood/metal hand tools are split by
+    their grounded long axis instead of being painted as one steel object.
 
 Two things this bake does that the battlefield bake did not need:
 
@@ -62,9 +62,9 @@ WARES = (
     ("RoughWoodTable", "Model_PolyHavenWoodenTable02", "wooden_table_02_1k.gltf",
      1200, None, "WoodBeam", False, None),
     ("WickerTray", "Model_PolyHavenWickerBasket01", "wicker_basket_01_1k.gltf",
-     900, 0.52, "Wicker", False, None),
+     2400, 0.52, "Wicker", False, None),
     ("WickerBasketLidded", "Model_PolyHavenWickerBasket02", "wicker_basket_02_1k.gltf",
-     1000, 0.46, "Wicker", False, None),
+     2800, 0.46, "Wicker", False, None),
     ("WoodAxe", "Model_PolyHavenWoodenAxe02", "wooden_axe_02_1k.gltf",
      500, 0.70, "Steel", True, None),
     ("SmithHammer", "Model_PolyHavenCrossPeinHammer", "cross_pein_hammer_1k.gltf",
@@ -79,6 +79,15 @@ WARES = (
     ("WoodLantern", "Model_PolyHavenWoodenLantern01", "wooden_lantern_01_1k.gltf",
      900, 0.42, "WoodDoor", False, "glass"),
 )
+
+# LayFlat puts the longest extent on Blender Y.  Each tuple is
+# (cut fraction from low Y, metal side).  Fractions survive source rescaling;
+# metre thresholds did not when Poly Haven revised an upstream asset.
+TOOL_SPLITS = {
+    "WoodAxe": (0.72, "high"),
+    "SmithHammer": (0.80, "high"),
+    "IronSpade": (0.32, "low"),
+}
 
 
 def ResetScene() -> None:
@@ -201,6 +210,20 @@ def Material(name: str) -> bpy.types.Material:
     return material
 
 
+def SplitToolMaterial(obj: bpy.types.Object, split: tuple[float, str]) -> None:
+    """Assign WoodBeam to the handle and Steel to a laid-flat working end."""
+    low, high = Bounds(obj)
+    fraction, metal_side = split
+    cut = low.y + (high.y - low.y) * fraction
+    obj.data.materials.clear()
+    obj.data.materials.append(Material("WoodBeam"))
+    obj.data.materials.append(Material("Steel"))
+    for polygon in obj.data.polygons:
+        centre_y = sum(obj.data.vertices[index].co.y for index in polygon.vertices) / len(polygon.vertices)
+        is_metal = centre_y >= cut if metal_side == "high" else centre_y <= cut
+        polygon.material_index = 1 if is_metal else 0
+
+
 def Optimize(obj: bpy.types.Object, target_triangles: int,
              target_span: float | None, material_name: str, lay_flat: bool) -> tuple[int, int, int]:
     before = TriangleCount(obj)
@@ -221,6 +244,9 @@ def Optimize(obj: bpy.types.Object, target_triangles: int,
     # Blender is Z-up; the glTF exporter turns this into the game's Y-up.
     if lay_flat:
         LayFlat(obj)
+    tool_split = TOOL_SPLITS.get(obj.name)
+    if tool_split:
+        SplitToolMaterial(obj, tool_split)
     lo, hi = Bounds(obj)
     obj.data.transform(Matrix.Translation((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z)))
     if target_span is not None:
@@ -228,9 +254,11 @@ def Optimize(obj: bpy.types.Object, target_triangles: int,
         obj.data.transform(Matrix.Scale(target_span / current, 4))
     obj.location = (0, 0, 0)
 
-    # Strip the downloaded PBR set; the runtime rebinds by this name.
-    obj.data.materials.clear()
-    obj.data.materials.append(Material(material_name))
+    # Strip the downloaded PBR set; the runtime rebinds by these names. Mixed
+    # tools already carry WoodBeam + Steel from SplitToolMaterial.
+    if not tool_split:
+        obj.data.materials.clear()
+        obj.data.materials.append(Material(material_name))
     return before, TriangleCount(obj), orphans
 
 

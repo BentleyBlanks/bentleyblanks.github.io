@@ -52,6 +52,21 @@ per-item attribution in `Data_ExternalAssets_ChineseLife.mjs`),
 (HouseholdCeramic/Wicker/HouseholdCloth…) now resolve through
 `ResolveTengxianMaterial`, so external props share the town's exact tints.
 
+Runtime material replacement also preserves each GLB slot's front/back side mode.
+Thin basket weave, hats, sheet metal and boards are authored double-sided and must
+remain visible from both directions after their source material is replaced. Props
+that use the project's tileable PBR recipes receive metre-scale box-projected UVs;
+their downloaded atlas UVs are not compatible with those recipes and previously
+produced broad stripes across wheels, wells and tools. The two city-wall packs keep
+their explicitly authored UVs. Small external woodwork uses `HandcartWood` (a
+grain-only PBR without fake plank seams), while crates retain `WoodCrate`.
+
+`Model_HouseholdWareSet.glb` now keeps separate `WoodBeam` and `Steel` primitives
+for the axe, hammer and spade instead of painting the wooden handles as steel. The
+thin woven props in that pack and the winnow, basket, lantern and conical hat in
+`Model_ChineseLifeSet.glb` retain a higher decimation budget to avoid opening cracks
+along their silhouette.
+
 ## Walled-town per-household dressing (2026-08-25)
 
 Beyond the per-level `PLACEMENTS`, the town and its surroundings carry a second
