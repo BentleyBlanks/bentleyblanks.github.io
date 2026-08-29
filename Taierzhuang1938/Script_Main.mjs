@@ -5157,14 +5157,16 @@ function AimEmplacementView(view) {
  *（半径内 8 m 以内有活着的日兵就先不算到），否则玩家会在被压着打的时候
  * 莫名其妙被推进到下一段剧本。
  *
- * @returns {string|null} 当前正在争夺的路标名（HUD 顶栏用）
+ * o.contested 只喂**世界里那枚路标图标**（Script_Hud 的 fight 类）。它不再往
+ * 顶栏的目标行上写字：「争夺中：XX」是占领点那一套留下的尾巴，占领点删掉之后
+ * 它还在顶栏盖着剧本给的目标文案（「退进村庄外围，靠田坎顶住」被顶成
+ * 「争夺中：路西村庄外围」）—— 顶栏那一行归剧本，不归战场状态。
  */
 function UpdateObjectives(dt) {
   const objectives = battlefield.objectives;
-  if (!objectives.length) return null;
+  if (!objectives.length) return;
   const index = Math.min(state.objectiveIndex, objectives.length - 1);
   const target = objectives[index];
-  let contested = null;
 
   for (const o of objectives) {
     let theirs = 0;
@@ -5174,20 +5176,18 @@ function UpdateObjectives(dt) {
       theirs += 1;
     }
     o.contested = theirs > 0 && !o.reached;
-    if (o === target && o.contested) contested = o.name;
   }
 
-  if (state.objectiveIndex >= objectives.length) return contested;
-  if (!player.Alive) return contested;
+  if (state.objectiveIndex >= objectives.length) return;
+  if (!player.Alive) return;
   const dist = Math.hypot(player.position.x - target.x, player.position.z - target.z);
-  if (dist > target.radius) return contested;
+  if (dist > target.radius) return;
   // 圈里还有人贴着就先不算到
   for (const s of ai.soldiers) {
     if (!s.alive || s.side === "nra") continue;
-    if (Math.hypot(s.position.x - target.x, s.position.z - target.z) < 8) return contested;
+    if (Math.hypot(s.position.x - target.x, s.position.z - target.z) < 8) return;
   }
   ReachObjective(index);
-  return contested;
 }
 
 /** 到达一个路标。剧本的 zone: 触发、下一条目标文案、烟柱重挂都挂在这里。 */
@@ -5581,7 +5581,7 @@ function Frame(dt, render = true) {
   checkpoint?.Update();
 
   profiler.B("story");
-  const contested = UpdateObjectives(dt);
+  UpdateObjectives(dt);
 
   // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
   // 线性关卡里逼玩家往前打的是**时间**与**剧本**，不是一条会把你耗死的进度条：
@@ -5664,8 +5664,7 @@ function Frame(dt, render = true) {
 
   // --- HUD ---
   profiler.B("hud");
-  hud.SetObjective(contested ? `争夺中：${contested}` : (state.storyObjective || phase.label),
-    state.nraPool, null);
+  hud.SetObjective(state.storyObjective || phase.label, state.nraPool, null);
   hud.SetState({
     stance: player.stance,
     wounded: player.wounds.length > 0,

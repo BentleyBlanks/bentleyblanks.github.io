@@ -154,7 +154,7 @@ Downed 层完全没有（`player.Downed` 与 `Incapacitate()` 都不存在，`he
 
 M 键全屏地图标：激活占领点及归属、我方兵员池、**传令兵当前位置**（这是我们独有的一个好东西 —— 你能看着他在图上跑）、浮桥、师指挥所。**不标日方炮兵位置** —— 日方支援不给任何 HUD，玩家只能靠听。
 
-**胜负条件必须时刻可读**。这是 ER2 被骂「新手不知道自己为什么输了」的那条，我们同样犯了：`hud.SetObjective` 现在打的是阶段 label 或「争夺中：XX」。改成一行硬信息：「**守住清真寺 · 能拿枪的人 587 · 前线：文昌阁**」。
+**胜负条件必须时刻可读**。这是 ER2 被骂「新手不知道自己为什么输了」的那条，我们同样犯了：`hud.SetObjective` 曾经打的是阶段 label 或「争夺中：XX」。改成一行硬信息：「**守住清真寺 · 能拿枪的人 587 · 前线：文昌阁**」。（**已部分落地**：「争夺中：XX」这条占领点尾巴已删，顶栏一行归剧本的 objective 文案；「城里还站着的人 N」改成只在掉数那一刻飘一下，不再常驻。「前线：XX」还没做。）
 
 难度改成一个 `difficulty` 对象在各系统里被读取，绝不硬编码：`{ aiAccuracy, blastRadius, suppressionScale, playerDamage, staminaSeconds, overheat, bulletGravity, freeAimDeg, ironSightOffset, autoSurrender: false, showCrosshair, enemyMarkers }`。开机面板三个预设（体验/标准/写实）+ 高级展开滑条，存 localStorage，同屏放战场规模三档（复用 `SCALE_PRESETS`）。**web 路人的默认档应偏「体验」**：准星开、免疫压制、AI 精度 0.7。
 

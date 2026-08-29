@@ -94,7 +94,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudObjective .objectiveMark { color: var(--warn); font-size: 9px; }
 .hudObjective .o { color: var(--paper); font-weight: 600; letter-spacing: 0.05em; }
-.hudObjective .forces { display: flex; gap: 9px; font-size: 11px; white-space: nowrap; }
+/* 兵员池不再常驻顶栏：平时整块不占位，只有数字掉了才飘一下（见 Hud.SetObjective）。 */
+.hudObjective .forces { display: none; gap: 9px; font-size: 11px; white-space: nowrap; }
+.hudObjective .forces.flash { display: flex; animation: hudPoolFlash 3.4s ease-out both; }
+@keyframes hudPoolFlash {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .hudObjective .t { color: var(--theirs); }
 @keyframes hudObjectiveChanged {
   0% { filter: brightness(1); }

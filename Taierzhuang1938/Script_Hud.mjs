@@ -421,16 +421,35 @@ export class Hud {
   }
 
   SetObjective(text, ours, theirs) {
-    // 信息不对称：站在占领区里才看得见对面还剩多少人。
-    // 目标只在这一处更新；不再把同一句任务文字重复扔到屏幕下方。
+    // 顶栏这一行归**剧本**：打的是本段的目标文案（没有就退回阶段 label）。
+    //
+    // 「城里还站着的人 N」不再常驻。机制一点没动 —— 池子照跑、减到零仍然是全作
+    // 唯一的失败条件 —— 但一个每分钟才动一下的数字挂在准心正上方，读起来像
+    // 占领点时代的计分板，会把玩家的注意力从「现在该干什么」上拽走。改成
+    // **只在它掉数的那一刻飘一下**：数字变了才让 .forces 走一遍淡入淡出，
+    // 平时 display:none，不占位、不留空档。
+    //
+    // 信息不对称照旧：theirs 为 null 就不写「对面 N」。
     const intel = theirs === null ? "" : `<span class="t">对面 ${theirs}</span>`;
     const signature = `${text}|${ours}|${theirs}`;
     if (this.el.objective.dataset.signature !== signature) {
       const objectiveChanged = this.el.objective.dataset.objective !== text;
+      // 第一次进关不算「掉数」（this.poolLast 还没有值），别一开局就飘一行。
+      const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;
+      this.poolLast = ours;
       this.el.objective.dataset.signature = signature;
       this.el.objective.dataset.objective = text;
       this.el.objective.innerHTML = `<span class="objectiveMark">◆</span><span class="o">${text}</span>`
-        + `<span class="forces"><span class="p">${REINFORCE.poolLabel} ${ours}</span>${intel}</span>`;
+        + `<span class="forces${poolChanged ? " flash" : ""}">`
+        + `<span class="p">${REINFORCE.poolLabel} ${ours}</span>${intel}</span>`;
+      if (poolChanged) {
+        // 淡完就把 flash 摘掉，让 .forces 退回 display:none。
+        // 不摘的话动画停在 opacity:0 上，元素还占着位 —— 顶栏会留一段空档。
+        // 抓的是**这一次**建出来的节点：中途再重建一遍的话这个引用已经脱离文档，
+        // 摘它不会误伤新那一次的动画。
+        const forces = this.el.objective.querySelector(".forces");
+        setTimeout(() => forces?.classList.remove("flash"), 3500);
+      }
       if (objectiveChanged) {
         this.el.objective.classList.remove("changed");
         requestAnimationFrame(() => this.el.objective.classList.add("changed"));
