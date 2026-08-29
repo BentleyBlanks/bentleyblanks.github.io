@@ -70,29 +70,9 @@ import { MENU_SCENE, OVERVIEW_PHASE, JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs
 import { WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE } from "./Data_Battle.mjs";
-import { CUTSCENES, LEGACY_CUTSCENES } from "./Data_TengxianScript.mjs";
+import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
-
-/**
- * 选章「测试场景」组里的过场预览条目。
- *
- * 只列**需要人工审片**的两类：新版车厢序章（正片序章就播它），
- * 与从正片流程脱钩、文件与注册都保留的旧战役五场。
- * 各章的关前/关末过场不列 —— 它们会在关卡边界上自己播，摆在这里只是噪音。
- */
-const MENU_PREVIEWS = [CUTSCENES.CS_Chuchuan, ...LEGACY_CUTSCENES]
-  .filter(Boolean)
-  .map((cut) => ({
-    preview: true,
-    id: `PV_${cut.id}`,
-    cutscene: cut.id,
-    glyph: "场",
-    label: `过场 · ${cut.title}`,
-    place: cut.id,
-    seconds: Math.round(cut.seconds),
-    brief: [cut.why || ""].filter(Boolean),
-  }));
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
@@ -2323,20 +2303,17 @@ async function Boot() {
       GroundHeight: (x, z) => (battlefield ? battlefield.GroundHeight(x, z) : null),
       Unlock: () => audio.Unlock(),
       Play: (index, opts) => StartLevel(index, opts),
-      PlayCutscene: (id) => StartMenuCutscene(id),
-      // 选章「测试场景」组的第三类：过场预览。**不进 PHASES**，不计进度。
-      // 正片七章的关前/关末过场会自己在关卡边界上播，这里只留两种需要人工审片的：
-      // 新版车厢序章，以及从正片流程脱钩、但文件与注册都保留的旧战役五场。
-      previews: MENU_PREVIEWS,
       // 靶场：菜单里当一条「特殊关卡」摆着，但进出都是**重载页面**。
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, JIEHE_SANDBOX_PHASE],
+      // 玩家可见的测试场景只保留两条核心玩法入口。界河与过场仍可通过
+      // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
+      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE],
       sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
-      // 三个沙盒都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
+      // 这些独立切片都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
       //（全城俯瞰会拿到序章那两条路基机位）。正片下 PHASE_TABLE === PHASES，
       // 这条与旧行为逐字相同。
       SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
@@ -3733,26 +3710,6 @@ function StartPreview({ unlockAudio = true } = {}) {
     state.running = false;
     if (ai) ai.Dispose();
   });
-  return true;
-}
-
-/**
- * 选章「测试场景」组里的过场预览：播一场，播完回到菜单原处。
- *
- * **不换关、不建切片**：过场自带 standalone 布景，底下铺的是菜单那片切片。
- * 这条路只服务审片，正片七章的过场由关卡边界自己触发。
- */
-function StartMenuCutscene(id) {
-  if (!cutscene || cutscene.Playing || !id) return false;
-  state.menu = false;
-  state.running = false;
-  menu?.Close();
-  hudRoot.style.display = "";
-  audio.Unlock();
-  ReleasePointerLock();
-  RunCutscene(id)
-    .catch((error) => console.error("[Main] 过场预览失败", id, error))
-    .finally(() => { if (MENU_AT_BOOT) OpenMenu(); });
   return true;
 }
 

@@ -221,7 +221,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 切片是 `Data_Menu.JIEHE_SANDBOX_PHASE`。**id 仍是 `L0_Jiehe`** —— `OUTFIELD_SCENES` /
   `PLACEMENTS` / `TRIM_PLACEMENTS` 三张表都按这个 levelId 分组，换 id 等于把布景摘光；
   bounds / spawn / 路标与重制前的 L0 关逐字相同，打法字段抽干（无日军、不结算、不换关）。
-- 选章「测试场景」组第三条，进出与靶场同一条路：**改 query 再重载**。
+- 不进玩家可见的「测试场景」组，只保留 `?jiehe=1` 内部直达入口；进出与靶场同一条路：
+  **改 query 再重载**。
   回归口 `Script_JieheTerrainTest.mjs`（terrain 域）。
 
 ### 武器 / 战斗 / 刺刀

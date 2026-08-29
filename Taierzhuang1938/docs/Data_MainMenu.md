@@ -59,25 +59,24 @@ ER2 的战役选单是「左边任务列表 + 右边简报 + 一张前线地图�
 进度存 `localStorage` 的 `tengxian_progress_v1`（`{ furthest, cleared }`），
 过一关写一次。有进度时第一项变成「继续 · 某关」。
 
-### 「测试场景」组：三条沙盒 + 过场预览，都不是关
+### 「测试场景」组：只保留两条核心玩法沙盒
 
-正式章节七章之后隔一条分隔线，是「测试场景」组（2026-08-29 起三条沙盒）：
+正式章节七章之后隔一条分隔线，是「测试场景」组。玩家可见列表固定为两条：
 
 | 条目 | 标号 | 切片 | query |
 | --- | --- | --- | --- |
 | 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
 | 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
-| 界河 · 白盒 | 河 | `Data_Menu.JIEHE_SANDBOX_PHASE` | `?jiehe=1` |
 
-组里还有过场预览条目（含「出川 · 车厢序章」，跳 `?preview=CS_Chuchuan`）。
+界河白盒与过场预览不再列入选章，避免测试入口越积越多。它们的内部直达 query 仍保留：
+`?jiehe=1` 服务地形回归与人工验收，`?preview=CS_Chuchuan` 服务序章预览。
 
-三条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes, ...previews]`
+两条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
 专给列表与键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七章数。
 沙盒简报直接读各自的 phase（工位/路标、机制、携行），但**不画那张全图** ——
-`MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)、界河在城北 1.5 km，画出来都是空图。
-（那三句 meta 允许被 `phase.metaText` 整条换掉：界河白盒没有工位也没有木桩兵。）
+`MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)，画出来是空图。
 
-进出沙盒都是**整页重载**（`Script_Main.GoToSandbox`），因为 `PHASE_TABLE` 在这三个 query
+进出沙盒都是**整页重载**（`Script_Main.GoToSandbox`），因为 `PHASE_TABLE` 在这些 query
 下都是整表替换的，当场换不过去。所以沙盒里的暂停菜单换成那一套：继续 / 设置 /
 调试选项 / **退出<各自的名字>**，不给当场做不到的「选章」与「主菜单」。
 

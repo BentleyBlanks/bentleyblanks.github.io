@@ -3,7 +3,6 @@
 // 分工：这一份**只管菜单自己**（画面上的字、机位的运镜、选章的那张地图），
 // 一切「真的去做点什么」都通过 host 回调交回装配层（Script_Main）：
 //   host.Play(index, opts)   进某一章
-//   host.PlayCutscene(id)    播一场过场（选章「测试场景」组的预览条目）
 //   host.PlaySandbox()       进「测试场景」组里的沙盒（玩法测试靶场，重载页面）
 //   host.ExitSandbox()       从靶场退回正片
 //   host.Resume()            从暂停回到游戏
@@ -261,16 +260,10 @@ export class MainMenu {
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
     /**
-     * 过场预览条目（选章「测试场景」组的第三类）。
-     * 与沙盒同理：**不进 this.phases**，不算进度、不参与「继续」与「下一关」。
-     * host 只要给 { id, label, note }，点下去走 host.PlayCutscene(id)。
-     */
-    this.previews = Array.isArray(host.previews) ? host.previews.filter(Boolean) : [];
-    /**
-     * 列表上真正排出来的条目 = 七章 + 沙盒 + 过场预览。键盘上下也按它走。
+     * 列表上真正排出来的条目 = 七章 + 两条玩法沙盒。键盘上下也按它走。
      * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
      */
-    this.entries = [...this.phases, ...this.sandboxes, ...this.previews];
+    this.entries = [...this.phases, ...this.sandboxes];
     /** 现在这一局本身就跑在沙盒里（?range=1）：暂停菜单换成「退出靶场」那一套。 */
     this.sandboxMode = host.sandboxMode || false;
 
@@ -371,7 +364,7 @@ export class MainMenu {
    */
   PauseItems() {
     if (this.sandboxMode) {
-      // 三片沙盒各自报自己的名字：在界河白盒里按 Esc 看到「退出靶场」，
+      // 各片沙盒报自己的名字：通过直达 query 进入界河白盒时按 Esc 不能显示「退出靶场」，
       // 会让人以为自己进错了地方。
       const here = SANDBOX_NAMES[this.sandboxMode] || SANDBOX_NAMES.range;
       return [
@@ -424,7 +417,7 @@ export class MainMenu {
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
-   *   测试场景 —— 靶场、白刃 QTE 测试场、过场预览（新版车厢序章与旧战役五场）。
+   *   测试场景 —— 只列玩法测试靶场与白刃 QTE 测试场。
    * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」，
    * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
    */
@@ -455,15 +448,10 @@ export class MainMenu {
       const b = document.createElement("button");
       b.className = "mnLevel";
       if (entry.sandbox) b.classList.add("mnSandboxLevel");
-      // 预览条目**不带 mnSandboxLevel**：那个类名是「沙盒」那两条的身份证
-      // （冒烟按它数沙盒条目），混进来会把过场预览也算成沙盒。
-      if (entry.preview) b.classList.add("mnCutscenePreview");
-      // 新版车厢序章那一条保留旧类名：主页面与冒烟脚本都按它找入口。
-      if (entry.preview && entry.cutscene === "CS_Chuchuan") b.classList.add("mnProloguePreview");
       b.dataset.i = String(i);
       // 章号取标题里的那个序数字（「第二关 · 手榴弹雨」→「第二关」），名字取后半。
-      // 沙盒与预览条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的章号列。
-      const [no, ...rest] = (entry.sandbox || entry.preview)
+      // 沙盒条目的 label 里没有「·」，硬拆会把整个标题塞进 34 px 的章号列。
+      const [no, ...rest] = entry.sandbox
         ? [entry.glyph || entry.sandboxGlyph || "靶", entry.label] : entry.label.split("·");
       const mkSpan = (cls, text) => {
         const s = document.createElement("span");
@@ -474,8 +462,8 @@ export class MainMenu {
       };
       mkSpan("mnLvNo", no.trim());
       mkSpan("mnLvName", (rest.join("·") || entry.label).trim());
-      // 副行给日期；沙盒与预览没有史实日期（沙盒的 date 是「测试靶场」，跟名字重了），给 place
-      mkSpan("mnLvDate", (entry.sandbox || entry.preview) ? entry.place : entry.date);
+      // 副行给日期；沙盒没有史实日期（date 是「测试靶场」，跟名字重了），给 place
+      mkSpan("mnLvDate", entry.sandbox ? entry.place : entry.date);
       mkSpan("mnLvMark", "");
       b.addEventListener("mouseenter", () => this.SelectLevel(i));
       b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
@@ -485,11 +473,10 @@ export class MainMenu {
 
     Group("正式章节", "序章到终章，按顺序打");
     this.phases.forEach((phase, i) => Row(phase, i));
-    if (this.sandboxes.length || this.previews.length) {
+    if (this.sandboxes.length) {
       Group("测试场景", "不计进度，不影响正片");
       const offset = this.phases.length;
       this.sandboxes.forEach((entry, i) => Row(entry, offset + i));
-      this.previews.forEach((entry, i) => Row(entry, offset + this.sandboxes.length + i));
     }
   }
 
@@ -639,7 +626,6 @@ export class MainMenu {
     this.levelEls.forEach((el, k) => {
       el.classList.toggle("on", k === this.selected);
       const mark = el.querySelector(".mnLvMark");
-      if (this.entries[k].preview) { mark.textContent = "预览"; mark.className = "mnLvMark"; return; }
       if (this.entries[k].sandbox) { mark.textContent = "沙盒"; mark.className = "mnLvMark"; return; }
       const done = progress.cleared.includes(this.entries[k].id);
       mark.textContent = done ? "已通过" : (k === progress.furthest ? "下一关" : "");
@@ -647,7 +633,6 @@ export class MainMenu {
     });
 
     const phase = this.entries[this.selected];
-    if (phase.preview) { this.BuildPreviewBrief(phase); return; }
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -701,40 +686,6 @@ export class MainMenu {
     go.addEventListener("click", () => this.Play(this.selected));
   }
 
-  /**
-   * 过场预览条目的简报。
-   *
-   * 不画那张滕县全图：过场多是 standalone 布景（自带原点，离城心两三公里），
-   * 在城的图上画出来是一个贴着边框的空盒子，说明不了任何事。
-   */
-  BuildPreviewBrief(entry) {
-    const brief = this.el.brief;
-    brief.textContent = "";
-    const mk = (cls, tag = "div") => {
-      const e = document.createElement(tag);
-      e.className = cls;
-      brief.appendChild(e);
-      return e;
-    };
-    mk("mnBriefTitle").textContent = entry.label;
-    mk("mnBriefPlace").textContent = entry.place;
-    const meta = mk("mnBriefMeta");
-    for (const text of ["不计时 · 不计进度", `${entry.seconds ?? "?"} 秒`, "Esc 可跳过"]) {
-      const s = document.createElement("span");
-      s.textContent = text;
-      meta.appendChild(s);
-    }
-    const lines = mk("mnBriefLines");
-    for (const line of entry.brief || []) {
-      const p = document.createElement("p");
-      p.textContent = line;
-      lines.appendChild(p);
-    }
-    const go = mk("mnGo", "button");
-    go.textContent = `播放 · ${entry.label}`;
-    go.addEventListener("click", () => this.Play(this.selected));
-  }
-
   // -------------------------------------------------------------------------
   // 动作
   // -------------------------------------------------------------------------
@@ -766,16 +717,9 @@ export class MainMenu {
    *
    * 沙盒条目走另一条路：靶场是**整表替换**（PHASE_TABLE 只剩它一关），
    * 当场换不过去，只能重载页面 —— 交给 host.PlaySandbox。
-   * 过场预览条目更简单：根本不进关，直接交给 host.PlayCutscene。
    */
   Play(index, opts = {}) {
     if (this.busy) return;
-    // 过场预览：不进关、不建切片，播完回到菜单原处。
-    if (this.entries[index]?.preview) {
-      this.host.Unlock?.();
-      this.host.PlayCutscene?.(this.entries[index].cutscene);
-      return;
-    }
     if (this.entries[index]?.sandbox) {
       this.host.PlaySandbox?.(this.entries[index].sandboxKey || "range");
       return;

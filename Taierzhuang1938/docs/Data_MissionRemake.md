@@ -228,7 +228,7 @@
 ## 9. 选章要求
 
 - 正式章节（按序）：序章｜出川 → 第一关｜往南的路 → 第二关｜手榴弹雨 → 第三关｜救护所 → 第四关｜东关之夜 → 第五关｜城墙没有了 → 终章｜最后一封（含尾声）。
-- 选章界面区分**正式章节**与**测试场景**两组：正式=以上七章；其余（靶场、白刃 QTE、过场预览等）全部归入测试场景组。
+- 选章界面区分**正式章节**与**测试场景**两组：正式=以上七章；测试场景只列玩法测试靶场与白刃 QTE 测试场。界河白盒、过场预览等内部入口不进入玩家可见列表。
 
 ---
 
@@ -367,7 +367,7 @@ INT2 之后剩下的是「差一层实体/演出」的那几项。这一批把�
 | 钉在哪儿 | 症状 | 现在的口径 |
 | --- | --- | --- |
 | 没有一章会生成整座城 | 采样点表 89 个机位里 74 个、`Script_ShotTest` 的 Z 系列约二十张、`Script_TownDressingDump` 全部挂在旧「城墙关」上；`menuShot: "SouthEastTower"` 这类基座直接抛「找不到菜单机位」 | 新增 **`?phase=overview`**（`Data_Menu.OVERVIEW_PHASE`，bounds = `Data_Battle.OVERVIEW_BOUNDS`，天光钉死 smokyDay，不进 PHASES / 不进选章）。三处工具统一从这条入口进；点位表的 `phase` 从此认 `"overview"` 与 0—6 两种值 |
-| 界河退出正片但资产完整 | `Script_JieheTerrainTest` 整份红（`?phase=0` 建的是序章不是界河），`Data_Dressing_JieheVillages` 157 件登记为「无承载章」 | 新增 **`?jiehe=1`「界河 · 白盒」**（选章「测试场景」组第三条，`JIEHE_SANDBOX_PHASE`，id 仍是 `L0_Jiehe`）。bounds / spawn / 路标与旧 L0 逐字相同，所以那九条断言判据一个字没改 |
+| 界河退出正片但资产完整 | `Script_JieheTerrainTest` 整份红（`?phase=0` 建的是序章不是界河），`Data_Dressing_JieheVillages` 157 件登记为「无承载章」 | 新增 **`?jiehe=1`「界河 · 白盒」**内部直达入口（`JIEHE_SANDBOX_PHASE`，id 仍是 `L0_Jiehe`，不进入玩家可见的选章列表）。bounds / spawn / 路标与旧 L0 逐字相同，所以那九条断言判据一个字没改 |
 | `_import/TownDressingCells.json` 是重制前那一份 | `phases` 里还是旧关号，规则 8「目标连线不挡」量的是旧目标链 | 照 `?phase=overview` 重跑；264 格逐格 seed 与旧版相同（城的几何一个字没动），只有 `phases` 换成新章 |
 | 旧关号残留的两处判据 | `Script_JumpTest` 在 `?phase=0`（过场承载章，玩家一步不走）量助跑跳，读出来是 0.00 m；`Script_DamageTest` 已于 INT3a 迁到 CH1 但数没回写文档 | JumpTest 改挂 `?phase=1`；`docs/Data_PlayerDamage.md` §五「落地的数」按 CH1 实跑重写 |
 
