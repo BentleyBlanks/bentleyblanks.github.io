@@ -277,6 +277,17 @@ for (const [name, spec] of battlefield.nodes) {
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
 
+const barbedWire = InspectNodes("Model_BarbedWireSet.glb", 175_000);
+assert.deepEqual([...barbedWire.nodes.keys()].sort(),
+  ["BattlefieldBarbedWire01", "BattlefieldBarbedWire02"],
+  "project-authored barbed-wire variants are independently selectable");
+for (const [name, spec] of barbedWire.nodes) {
+  assert.ok(spec.triangles >= 700 && spec.triangles <= 3500,
+    `${name} keeps modeled strands and barbs inside the prop budget`);
+  assert.equal(spec.minY, 0, `${name} is ground-ready`);
+  assert.ok(spec.maxSpan >= 3.1 && spec.maxSpan <= 3.5, `${name} keeps the old placement footprint`);
+}
+
 function GeneratedSandbags(build) {
   const sink = new BuildSink();
   build(sink);
@@ -476,6 +487,8 @@ for (const id of [
   ...wallDetailNames.map((name) => name[0].toLowerCase() + name.slice(1)),
 ]) assert.match(runtime, new RegExp(`\\b${id}\\b`), `${id} is registered in the component library`);
 assert.match(runtime, /cache\.set\(spec\.url, pending\)/, "shared GLBs cache by URL");
+assert.match(runtime, /Model_BarbedWireSet\.glb\?v=1/,
+  "barbed-wire ids use the authored obstacle set instead of the plain source helices");
 assert.match(runtime, /if \(spec\.materialMap\)/, "multi-material packs rebind game recipes");
 assert.match(runtime, /materialMap: \{ WoodBeam: "HandcartWood" \}/,
   "handcart wood no longer reuses the generic structural-beam texture");

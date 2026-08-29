@@ -55,6 +55,7 @@ import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_Chin
 const LOADER = new GLTFLoader();
 
 const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=2";
+const BARBED_WIRE_URL = "./Model/Model_BarbedWireSet.glb?v=1";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=2";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
@@ -65,9 +66,18 @@ function BattlefieldAsset(label, node, material, tag = "prop", solid = true,
   return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid, category };
 }
 
+function BarbedWireAsset(label, node) {
+  // 原 Battlefield Pack 两个同名源节点都只是 80 三角的无刺螺旋线，近看就是
+  // 多边形弹簧。保留资产 id 与摆位契约，改由本项目可复现烘焙的有刺障碍网格承接。
+  return {
+    label, url: BARBED_WIRE_URL, node, materialMap: true,
+    material: null, tag: "fence", solid: true, category: "工事",
+  };
+}
+
 const BATTLEFIELD_ASSETS = Object.freeze({
-  battlefieldBarbedWire01: BattlefieldAsset("战场包 · 铁丝网 01", "BattlefieldBarbedWire01", null, "fence", true, "工事"),
-  battlefieldBarbedWire02: BattlefieldAsset("战场包 · 铁丝网 02", "BattlefieldBarbedWire02", null, "fence", true, "工事"),
+  battlefieldBarbedWire01: BarbedWireAsset("铁丝网 · 蛇腹障碍", "BattlefieldBarbedWire01"),
+  battlefieldBarbedWire02: BarbedWireAsset("铁丝网 · 三道桩网", "BattlefieldBarbedWire02"),
   battlefieldBeamObstacle01: BattlefieldAsset("战场包 · 木梁障碍 01", "BattlefieldBeamObstacle01", null, "barricade", true, "工事"),
   battlefieldBeamObstacle02: BattlefieldAsset("战场包 · 木梁障碍 02", "BattlefieldBeamObstacle02", null, "barricade", true, "工事"),
   battlefieldSupplyBox: BattlefieldAsset("战场包 · 补给箱", "BattlefieldSupplyBox", null),
