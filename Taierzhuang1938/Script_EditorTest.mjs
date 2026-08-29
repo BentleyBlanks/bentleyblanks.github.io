@@ -1447,6 +1447,22 @@ Check("构件库可即时预览严重破坏建模态",
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),
 });
+for (const angle of [
+  { name: "side", radians: Math.PI / 2 },
+  { name: "rear", radians: Math.PI },
+]) {
+  await page.evaluate((radians) => {
+    window.Taierzhuang.editor.active.previewRoot.rotation.y = radians;
+  }, angle.radians);
+  await Step(1);
+  await page.screenshot({
+    path: path.join(projectDir, "_shots", `editor_prop_damage_severe_${angle.name}.png`),
+  });
+}
+await page.evaluate(() => {
+  window.Taierzhuang.editor.active.previewRoot.rotation.y = 0;
+});
+await Step(1);
 
 const textureLineage = await page.evaluate(async () => {
   const Load = async (name) => {

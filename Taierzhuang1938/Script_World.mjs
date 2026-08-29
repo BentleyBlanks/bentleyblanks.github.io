@@ -442,10 +442,13 @@ export function HardRoofSampler({ width, halfDepth, overhang, eaveY, ridgeY }) {
  * 举折屋面的一片瓦面（含底皮与三条封边）。局部系：x 沿面阔、z 沿进深、y 向上；
  * `side` = +1 / −1 决定往哪一坡铺。整片只受调用处一次 ry。
  */
-function MakeHardRoofShell(sampler, { width, overhang, side, thickness, tile, seed }) {
+function MakeHardRoofShell(sampler, {
+  width, overhang, side, thickness, tile, seed, cellVisible = null,
+  segmentsX = null, segmentsU = null,
+}) {
   const { YAt, zEave, halfW } = sampler;
-  const NX = Math.max(3, Math.round(width / 2.4));
-  const NU = 6;
+  const NX = segmentsX || Math.max(3, Math.round(width / 2.4));
+  const NU = segmentsU || 6;
   const pos = [], uv = [], idxTri = [];
   const jitter = (HashString(seed) % 89) / 89 * 0.27;
   const Push = (a, b, c) => {
@@ -455,27 +458,45 @@ function MakeHardRoofShell(sampler, { width, overhang, side, thickness, tile, se
     }
   };
   const Quad = (a, b, c, d) => { Push(a, b, c); Push(a, c, d); };
+  const DoubleEdge = (a, b, a2, b2) => {
+    Quad(a, b, b2, a2);
+    Quad(a2, b2, b, a);
+  };
   const Pt = (i, j, drop = 0) => {
     const lx = -halfW + (halfW * 2 * i) / NX;
     const u = j / NU;
     return [lx, YAt(u, lx) - drop, side * zEave * u];
   };
+  const Visible = (i, j) => !cellVisible || cellVisible(i, j, NX, NU);
   for (let i = 0; i < NX; i += 1) {
     for (let j = 0; j < NU; j += 1) {
+      if (!Visible(i, j)) continue;
       const a = Pt(i, j), b = Pt(i + 1, j), c = Pt(i + 1, j + 1), d = Pt(i, j + 1);
       if (side > 0) Quad(a, b, c, d); else Quad(a, d, c, b);
       const a2 = Pt(i, j, thickness), b2 = Pt(i + 1, j, thickness);
       const c2 = Pt(i + 1, j + 1, thickness), d2 = Pt(i, j + 1, thickness);
       if (side > 0) Quad(a2, d2, c2, b2); else Quad(a2, b2, c2, d2);
+      // 战损坡面每个缺格都补出真实厚度的断口边；边缘双面，侧后视不会因绕到
+      // 背面就突然消失。完整屋面不走这里，保持原模型三角形数与外观不变。
+      if (cellVisible) {
+        if (j > 0 && !Visible(i, j - 1)) DoubleEdge(a, b, a2, b2);
+        if (j + 1 < NU && !Visible(i, j + 1)) DoubleEdge(c, d, c2, d2);
+        if (i > 0 && !Visible(i - 1, j)) DoubleEdge(d, a, d2, a2);
+        if (i + 1 < NX && !Visible(i + 1, j)) DoubleEdge(b, c, b2, c2);
+      }
     }
     // 檐口封边（沿坡的斜面，不是竖板 —— 竖板会被 ColliderTest 判成「摸不着的墙」）
-    const e0 = Pt(i, NU), e1 = Pt(i + 1, NU);
-    const f0 = Pt(i, NU, thickness), f1 = Pt(i + 1, NU, thickness);
-    if (side > 0) Quad(e0, e1, f1, f0); else Quad(e0, f0, f1, e1);
+    if (Visible(i, NU - 1)) {
+      const e0 = Pt(i, NU), e1 = Pt(i + 1, NU);
+      const f0 = Pt(i, NU, thickness), f1 = Pt(i + 1, NU, thickness);
+      if (side > 0) Quad(e0, e1, f1, f0); else Quad(e0, f0, f1, e1);
+    }
   }
   // 两端封边
   for (const i of [0, NX]) {
+    const cellI = i === 0 ? 0 : NX - 1;
     for (let j = 0; j < NU; j += 1) {
+      if (!Visible(cellI, j)) continue;
       const a = Pt(i, j), b = Pt(i, j + 1);
       const a2 = Pt(i, j, thickness), b2 = Pt(i, j + 1, thickness);
       if (i === 0) Quad(a, b, b2, a2); else Quad(a, a2, b2, b);
@@ -791,9 +812,10 @@ export function AddHardMountainRoof(sink, {
       MakeBox(width + overhang * 2, 0.22, 0.38, TILE_METERS.roof, `${seed}:ridge`),
       { x, y: ridgeY + 0.07, z, ry }));
   } else if (partialRuin) {
-    // 预建模严重档只掀掉近侧一坡：另一坡、两山墙和断开的正脊仍保留，玩家才能
+    // 预建模严重档只掀掉一坡：另一坡与两山墙仍保留，玩家才能
     // 一眼认出这是原来那栋房，而不是切状态时换了一只废墟模型。
     const survivingSide = (HashString(`${seed}:survivingSlope`) & 1) ? 1 : -1;
+    const missingSide = -survivingSide;
     sink.Add(tileMat, PlaceGeometry(
       MakeHardRoofShell(sampler, {
         width, overhang, side: survivingSide, thickness: 0.26,
@@ -801,28 +823,47 @@ export function AddHardMountainRoof(sink, {
       }),
       { x, y: 0, z, ry },
     ));
-    const gap = width * 0.28;
-    const segment = Math.max(0.5, (width + overhang * 2 - gap) / 2);
-    const ridgeU = 0.12;
-    const ridgeZ = survivingSide * sampler.zEave * ridgeU;
-    for (const side of [-1, 1]) {
-      const lx = side * (gap / 2 + segment / 2);
-      sink.Add(tileMat, PlaceGeometry(
-        MakeBox(segment, 0.22, 0.38, TILE_METERS.roof, `${seed}:partialRidge${side}`),
-        { x: x + Math.cos(ry) * lx + Math.sin(ry) * ridgeZ,
-          y: sampler.YAt(ridgeU, lx) + 0.03,
-          z: z - Math.sin(ry) * lx + Math.cos(ry) * ridgeZ, ry },
-      ));
-    }
+    sink.Add(tileMat, PlaceGeometry(
+      MakeHardRoofShell(sampler, {
+        width, overhang, side: missingSide, thickness: 0.26,
+        tile: TILE_METERS.roof, seed: `${seed}:damagedSlope`, segmentsX: 12, segmentsU: 10,
+        cellVisible: (i, j, nx, nu) => {
+          const ax = ((i + 0.5) / nx) * 2 - 1;
+          const au = (j + 0.5) / nu;
+          const holeA = ((ax + 0.18) / 0.60) ** 2 + ((au - 0.46) / 0.38) ** 2 < 1;
+          const holeB = ((ax - 0.58) / 0.43) ** 2 + ((au - 0.78) / 0.29) ** 2 < 1;
+          const holeC = ((ax + 0.72) / 0.30) ** 2 + ((au - 0.16) / 0.21) ** 2 < 1;
+          return !(holeA || holeB || holeC);
+        },
+      }),
+      { x, y: 0, z, ry },
+    ));
+
+    // 破坡下的断椽必须仍沿同一条举折曲线。旧版把几根长盒子放在屋心、再给一个
+    // 经验旋角：每根都会跨过 z=0，另一端从幸存瓦面里穿出来。这里从缺失坡上的
+    // 两个采样端点反求中心和倾角，且整体下沉到瓦皮以下；不再生成会横切弧面的
+    // “断脊盒”，脊上的残瓦由战损细节层的 roofFragments 表达。
     const rnd = Mulberry32(HashString(`${seed}:partialRafters`));
-    for (let i = 0; i < 4; i += 1) {
-      const lx = -width * 0.34 + i * width * 0.22;
-      const beamLen = depth * (0.46 + rnd() * 0.20);
-      sink.Add(i === 2 ? "Charred" : "WoodBeam", PlaceGeometry(
-        MakeBox(0.15, 0.14, beamLen, TILE_METERS.wood, `${seed}:partialBeam${i}`),
-        { x: x + Math.cos(ry) * lx, y: eaveY * (0.58 + rnd() * 0.18),
-          z: z - Math.sin(ry) * lx, ry, rx: -survivingSide * (0.28 + rnd() * 0.32),
-          rz: (rnd() - 0.5) * 0.18 },
+    const rafterCount = Math.max(4, Math.round(width / 1.7));
+    for (let i = 0; i < rafterCount; i += 1) {
+      const lx = -width * 0.43 + (i + 0.5) * (width * 0.86 / rafterCount);
+      const uA = 0.05 + rnd() * 0.08;
+      const uB = 0.68 + rnd() * 0.24;
+      const zA = missingSide * sampler.zEave * uA;
+      const zB = missingSide * sampler.zEave * uB;
+      const yA = sampler.YAt(uA, lx) - 0.18;
+      const yB = sampler.YAt(uB, lx) - 0.18;
+      const len = Math.hypot(zB - zA, yB - yA);
+      const cz = (zA + zB) / 2;
+      sink.Add(i % 3 === 2 ? "Charred" : "WoodBeam", PlaceGeometry(
+        MakeBox(0.14, 0.12, len, TILE_METERS.wood, `${seed}:partialBeam${i}`),
+        {
+          x: x + Math.cos(ry) * lx + Math.sin(ry) * cz,
+          y: (yA + yB) / 2,
+          z: z - Math.sin(ry) * lx + Math.cos(ry) * cz,
+          ry,
+          rx: Math.atan2(yB - yA, Math.abs(zB - zA)) * -missingSide,
+        },
       ));
     }
   } else {
