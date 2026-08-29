@@ -116,27 +116,16 @@ async function LoadBitmapTexture(url, { srgb = false } = {}) {
 }
 
 async function LoadDadaoMaterial() {
-  const [albedo, normal, orm] = await Promise.all([
-    LoadBitmapTexture("./Texture/Texture_DadaoBase.webp?v=1", { srgb: true }),
-    LoadBitmapTexture("./Texture/Texture_DadaoNormal.webp?v=1"),
-    LoadBitmapTexture("./Texture/Texture_DadaoOrm.webp?v=1"),
-  ]);
+  const albedo = await LoadBitmapTexture("./Texture/Texture_DadaoBase.webp?v=1", { srgb: true });
   return new THREE.MeshStandardMaterial({
     map: albedo,
-    // 极弱的贴图自发光只充当没有 IBL 时的环境底光，强度不足以抹掉方向光高光。
-    emissiveMap: albedo,
-    emissive: new THREE.Color(0xffffff),
-    emissiveIntensity: 0.16,
-    normalMap: normal,
-    aoMap: orm,
-    roughnessMap: orm,
-    metalnessMap: orm,
-    // 这台离屏展示台没有主场景的 PMREM 天空。纯金属在没有环境反射时除几条
-    // 方向光高光外几乎全黑，转到侧面就像贴图丢了。只在加载展示台把金属通道
-    // 压到 0.48、粗糙度略提；游戏内仍用完整 1.0 PBR，不改实际战场材质。
-    roughness: 1.08,
-    metalness: 0.48,
-    aoMapIntensity: 0.72,
+    // 这是一把单材质桶的 UV 图：刀刃、木柄和金属环全在同一张图上。战场里有
+    // PMREM 天空时可由 ORM 与法线逐像素还原；离屏展示台没有反射环境，直接套
+    // 那一套会让宽刃在三盏方向光之间跳成黑亮的碎块（尤其是低面数的刀背）。
+    // 因此展示台只保留实拍底色，改用温和的半金属陈列材质——轮廓与锈痕清楚，
+    // 拖动时仍有一条连续的钢光，也不会把木柄误画成镜面。游戏内材质不受影响。
+    roughness: 0.76,
+    metalness: 0.18,
   });
 }
 
