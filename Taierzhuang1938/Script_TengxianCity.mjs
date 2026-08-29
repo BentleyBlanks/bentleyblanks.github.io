@@ -108,6 +108,10 @@ const MATERIAL_MAP = {
   // 民居一套（鲁南：青砖 + 淡色过墙石交织，平原段大量土坯 + 麦秸泥）
   BrickWall: { recipe: "BrickWall", color: 0xe8ecf2 },
   BrickWallSooty: { recipe: "BrickWallSooty", color: 0xdfe2e6 },
+  // 构件库预建模的两档离散战损面。几何仍由各建筑/地标正式生成器按 damage
+  // 生成，这两项只负责把同一档的弹孔、剥落与焦痕统一到对应 imagegen PBR。
+  BuildingDamageEarly: { recipe: "BuildingDamageEarly", color: 0xf2f0eb, roughness: 1.0, normalScale: 0.86 },
+  BuildingDamageSevere: { recipe: "BuildingDamageSevere", color: 0xd9dcdf, roughness: 1.0, normalScale: 1.08 },
   HouseBrick: { recipe: "BrickWall", color: 0xe8ecf2 },
   CrossStone: { recipe: "Stone", color: 0xfbfaf6 },
   Stone: { recipe: "Stone", color: 0xfbfaf6 },

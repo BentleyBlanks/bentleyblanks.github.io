@@ -45,13 +45,16 @@ def _orm(image: Image.Image, *, metalness: int, rough_min: int, rough_max: int) 
 
 
 def build(stem: str, *, source_stem: str | None = None, normal_strength: float,
-          metalness: int, rough_min: int, rough_max: int) -> None:
+          metalness: int, rough_min: int, rough_max: int,
+          base_quality: int = 90, map_quality: int = 92) -> None:
     source = SOURCE / f"Texture_{source_stem or stem}Source.png"
     base = _seamless(Image.open(source)).resize((512, 512), Image.Resampling.LANCZOS)
-    base.save(TEXTURE / f"Texture_{stem}Base.webp", "WEBP", quality=90, method=6)
-    _normal_map(base, normal_strength).save(TEXTURE / f"Texture_{stem}Normal.webp", "WEBP", quality=92, method=6)
+    base.save(TEXTURE / f"Texture_{stem}Base.webp", "WEBP", quality=base_quality, method=6)
+    _normal_map(base, normal_strength).save(
+        TEXTURE / f"Texture_{stem}Normal.webp", "WEBP", quality=map_quality, method=6
+    )
     _orm(base, metalness=metalness, rough_min=rough_min, rough_max=rough_max).save(
-        TEXTURE / f"Texture_{stem}Orm.webp", "WEBP", quality=92, method=6
+        TEXTURE / f"Texture_{stem}Orm.webp", "WEBP", quality=map_quality, method=6
     )
 
 
@@ -91,6 +94,13 @@ if __name__ == "__main__":
     build_if_source("Sandbag", normal_strength=1.8, metalness=0, rough_min=208, rough_max=255)
     build_if_source("WattleFence", normal_strength=3.8, metalness=0, rough_min=192, rough_max=255)
     build_if_source("BrickWallSooty", normal_strength=3.8, metalness=0, rough_min=172, rough_max=236)
+    # 构件库的两档预建模战损。高分辨率 base color 由 imagegen 产出；这里统一
+    # 做无缝偏移、浏览器尺寸压缩并推导对位的 normal / ORM，避免把原始 PNG
+    # 直接塞进开机路径，也避免各编辑器各自解释一套表面状态。
+    build_if_source("BuildingDamageEarly", normal_strength=3.4, metalness=0,
+                    rough_min=184, rough_max=244, base_quality=84, map_quality=72)
+    build_if_source("BuildingDamageSevere", normal_strength=4.2, metalness=0,
+                    rough_min=196, rough_max=252, base_quality=84, map_quality=72)
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)
     # Dedicated gate surfaces.  These stay separate from the city-wide brick and
@@ -115,7 +125,7 @@ if __name__ == "__main__":
     build_if_source("ChurchPlaster", normal_strength=2.6, metalness=0, rough_min=190, rough_max=248)
     for stem in (
         "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence",
-        "BrickWallSooty", "Adobe", "Stone", "GateBrick", "GatePaintedWood",
-        "GateRoofTile",
+        "BrickWallSooty", "BuildingDamageEarly", "BuildingDamageSevere", "Adobe",
+        "Stone", "GateBrick", "GatePaintedWood", "GateRoofTile",
     ):
         export_standalone_metallic_roughness(stem)

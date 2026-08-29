@@ -1327,6 +1327,61 @@ Check("构件库相机可调 FOV 与远裁剪面",
 Check("切换到构件库前恢复场景相机参数",
   JSON.stringify(props.originalProjection) === JSON.stringify(scene.originalProjection),
   `${scene.originalProjection.join("/")} → ${props.originalProjection.join("/")}`);
+
+await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  active.SetPalette("RoomBlock");
+  active.SetDamageState("shellDamaged");
+});
+await Step(2);
+const damageEarly = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  const textures = [];
+  active.previewRoot.traverse((node) => {
+    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
+    if (src) textures.push(src);
+  });
+  return {
+    state: active.preview?.damageState,
+    sectionHidden: active.damageSection.parentElement.hidden,
+    facts: active.facts.root.textContent,
+    texture: textures.find((src) => src.includes("Texture_BuildingDamageEarlyBase")) || "",
+  };
+});
+Check("构件库可即时预览炮击初损建模态",
+  damageEarly.state === "shellDamaged" && !damageEarly.sectionHidden
+    && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture,
+  JSON.stringify(damageEarly));
+
+await page.evaluate(() => window.Taierzhuang.editor.active.SetDamageState("severeDamage"));
+await Step(2);
+const damageSevere = await page.evaluate(() => {
+  const active = window.Taierzhuang.editor.active;
+  const textures = [];
+  active.previewRoot.traverse((node) => {
+    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
+    if (src) textures.push(src);
+  });
+  return {
+    state: active.preview?.damageState,
+    facts: active.facts.root.textContent,
+    texture: textures.find((src) => src.includes("Texture_BuildingDamageSevereBase")) || "",
+  };
+});
+Check("构件库可即时预览严重破坏建模态",
+  damageSevere.state === "severeDamage" && damageSevere.facts.includes("严重破坏")
+    && !!damageSevere.texture, JSON.stringify(damageSevere));
+
+await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("Paifang"));
+await Step(1);
+const damageUnavailable = await page.evaluate(() => ({
+  selected: window.Taierzhuang.editor.active.paletteId,
+  hidden: window.Taierzhuang.editor.active.damageSection.parentElement.hidden,
+}));
+Check("没有真实战损生成逻辑的地标不显示伪变体",
+  damageUnavailable.selected === "Paifang" && damageUnavailable.hidden,
+  JSON.stringify(damageUnavailable));
+
 await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("External_cart"));
 await Step(6);
 const externalProp = await page.evaluate(() => {

@@ -9,6 +9,7 @@ import {
 } from "./Script_EditorUi.mjs";
 import {
   PLACEABLE, PLACEABLE_CATEGORIES, MODEL_PLACEABLE, BuildPlaceableVisual,
+  BUILDING_DAMAGE_STATES, BUILDING_DAMAGE_STATE_OPTIONS, SupportsBuildingDamageStates,
 } from "./Script_EditorScene.mjs";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { LoadDocument } from "./Script_MeshLoad.mjs";
@@ -35,6 +36,7 @@ export class PropLibraryEditor {
     this.categories = [...PLACEABLE_CATEGORIES.filter((category) => category !== "特效"), "外部道具"];
     this.cat = this.categories[0];
     this.paletteId = this.entries[0] ? this.entries[0].id : null;
+    this.damageState = "original";
     this.modelDocs = new Map();
     this.ownedGeometries = [];
     this.previewRoot = null;
@@ -76,6 +78,12 @@ export class PropLibraryEditor {
     this.FillPalette();
     Note(library, "这里展示的清单与场景关卡编辑器完全共用：程序化构件来自 Script_World，"
       + "模型来自 Data_Meshes；预览与实际布设不会分叉。");
+
+    this.damageSection = Section(body, "建模状态");
+    this.damageChips = Chips(this.damageSection, BUILDING_DAMAGE_STATE_OPTIONS, this.damageState,
+      (value) => this.SetDamageState(value));
+    Note(this.damageSection, "建筑与地标若提供战损变体，可在原始、炮击初损和严重破坏之间即时切换；"
+      + "没有该状态的道具会隐藏本栏。");
 
     const camera = Section(body, "预览相机");
     this.gridToggle = Toggle(camera, "米格与地台", true,
@@ -124,6 +132,13 @@ export class PropLibraryEditor {
     this.ShowSelected();
   }
 
+  SetDamageState(value) {
+    if (!BUILDING_DAMAGE_STATES[value]) return;
+    this.damageState = value;
+    if (this.damageChips) this.damageChips.Set(value);
+    this.ShowSelected();
+  }
+
   StepSelection(direction) {
     if (!this.entries.length) return;
     const current = Math.max(0, this.entries.findIndex((entry) => entry.id === this.paletteId));
@@ -158,8 +173,11 @@ export class PropLibraryEditor {
     this.ClearPreview();
     const entry = this.Entry(this.paletteId);
     if (!entry) return;
+    const supportsDamage = SupportsBuildingDamageStates(entry);
+    if (this.damageSection) this.damageSection.parentElement.hidden = !supportsDamage;
     const item = {
       id: 0, type: entry.id, x: 0, z: 0, ry: 0, seed: `preview_${entry.id}`,
+      damageState: supportsDamage ? this.damageState : "original",
       ...(entry.defaults || {}),
     };
     const root = new THREE.Group();
@@ -220,6 +238,12 @@ export class PropLibraryEditor {
     this.facts.Set("来源", entry.external ? entry.url
       : (entry.model ? `Model/${entry.model}.tzm.json` : "Script_World 程序化"));
     this.facts.Set("参数", (entry.uses || []).join(" / ") || "固定尺寸");
+    const damageState = SupportsBuildingDamageStates(entry)
+      ? BUILDING_DAMAGE_STATES[this.damageState] : null;
+    this.facts.Set("建模状态", damageState ? damageState.label : "无战损变体",
+      damageState && damageState.id !== "original" ? "good" : "");
+    this.facts.Set("战损贴图", damageState?.material
+      ? `Texture_${damageState.material}{Base,Normal,Orm}.webp` : "沿用原始材质");
     this.facts.Set("网格", this.preview ? this.preview.meshes : 0);
     this.facts.Set("碰撞盒定义", this.preview ? this.preview.colliders.length : 0);
     this.facts.Set("包围尺寸", size
