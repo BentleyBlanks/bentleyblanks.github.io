@@ -1,15 +1,16 @@
 # 台儿庄白盒测试分级（Data_TestTiers）
 
 > 统一入口：`node Taierzhuang1938/Script_TestRunner.mjs`。
-> 最后登记核对：2026-08-26，56/56 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
+> 最后登记核对：2026-08-29，73/73 个 `Script_*Test.mjs` 已登记（以 `Script_TestRunnerTest.mjs` 的实数为准），另含高度图 verify。
 
 ## 一、目标与纪律
 
-测试按爆炸半径分档，领域选择既可以显式指定，也可以从 Git 改动自动推断：
+测试按“执行时机 × 爆炸半径”分配。日常不再把十几分钟整机回归绑在每次编辑后：
 
-1. **Tier 0 每次必跑**：七关开机、端到端通关和纯 Node 快测；
-2. **Tier 1 按领域追加**：优先使用 `--changed` 自动选择，或显式 `--domain=…`；
-3. **Tier 2 低频人工审查**：性能实测与出图不被 `--changed` 自动触发，只给出建议。
+1. **quick（默认）**：11 个纯 Node 快测 + 命中领域的纯 Node 探针，供编辑循环；
+2. **prepush**：完整领域探针，并按具体文件风险追加 Boot/Play/Geo，供推送前验收；
+3. **full**：完整 Tier 0 + 命中领域，供共享底座、集成批和终验；
+4. **Tier 2**：性能实测与出图仍是低频人工审查，不由 `--changed` 自动执行。
 
 `Script_PlayTest.mjs` 是跨模块整机安全网，但领域专项仍负责它够不到的深度，
 例如伤害口径重放、整墙碰撞扫掠、碰撞盒与几何对账、AI 决策和编辑器数据契约。
@@ -17,23 +18,29 @@
 ## 二、推荐命令
 
 ```powershell
-# 默认：Tier 0
+# 默认：quick，纯 Node 快速基座
 node Taierzhuang1938/Script_TestRunner.mjs
 
-# 推荐：比较 origin/master、当前提交、暂存/未暂存和未跟踪文件，
-# 自动运行 Tier 0 + 命中的 Tier 1，并提示相关 Tier 2
-node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master
+# 编辑循环：比较提交、暂存/未暂存和未跟踪文件，只跑命中领域的纯 Node 探针
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=quick --fail-fast
+
+# 推送前：完整领域专项；只有高风险文件才追加 BootTest / PlayTest / GeoTest
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast
+
+# 集成/终验：完整 Tier 0 + 命中领域
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=full
 
 # 先看自动选择，不执行
 node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --dry-run
 
-# 显式领域：默认仍会叠加 Tier 0
+# 显式领域：默认叠加快速基座；推送前加 --profile=prepush
 node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain
 
 # 排障专用：只跑领域探针，明确绕过 Tier 0
 node Taierzhuang1938/Script_TestRunner.mjs --domain-only=terrain
 
-# Tier 0 + 全部自动 Tier 1 / 独立人工 Tier 2 / 单项
+# 兼容旧入口：完整 Tier 0 / Tier 0 + 全部 Tier 1 / 独立人工 Tier 2 / 单项
+node Taierzhuang1938/Script_TestRunner.mjs --tier=0
 node Taierzhuang1938/Script_TestRunner.mjs --tier=1
 node Taierzhuang1938/Script_TestRunner.mjs --tier=2
 node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
@@ -42,7 +49,13 @@ node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest
 `--list` 显示完整分级；`--fail-fast` 第一条新增红即停；`--verbose` 透传全部输出；
 `--strict-baseline` 把 PlayTest 的历史红也计为失败。
 
+纯文档、说明和源工程（`.blend/.py/.ps1`）改动在 `--changed` 下会明确跳过游戏测试；
+未知运行时文件在 quick 显示警告，prepush 会保守补完整整机门禁。启动任何测试前会先检查
+`playwright-core`；缺依赖时立即退出，不再先跑几十秒后逐项失败。
+
 可以直接在 worktree 中运行上述 `node` 命令，也可以使用仓库的 npm scripts。
+npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目，`npm run test:all`
+才是明确的全仓冒烟；`npm run test:changed:dry` 只展示将运行哪些项目。
 npm 会以**向上找到的第一个** `package.json` 为项目根：worktree 根签出了 package.json
 时就是 worktree 自己（安全）；没签出、或在子目录里敲时会一路爬回共享主检出，测的是
 另一棵树。拿不准就先跑 `npm prefix` 看一眼，或干脆直接 `node`（详见
@@ -51,9 +64,11 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 ## 三、输出、超时与退出码
 
 - 默认透出子测试的 `--- 阶段` 行，并每 60 秒打印心跳；其余输出只在失败时显示尾部。
+- 选择阶段显示 profile、测试清单和基于历史量级的预计耗时；`--dry-run` 不做依赖预检。
 - BootTest 上限 4 分钟，PlayTest 上限 20 分钟，一般测试上限 10 分钟；
   性能/出图测试按项目登记放宽到 20—30 分钟。
 - `Ctrl+C`、终止信号和超时会清理当前测试及其浏览器子进程。
+- runner 启动的浏览器测试跨 worktree 共用一个全局槽；多 agent 会排队，不再同时争抢 GPU/内存。
 - `PASS`：测试全绿；`BASELINE`：只有已登记历史红；`FAIL`：新增红、崩溃或超时。
 - 默认只要没有 `FAIL` 就返回 0；`--strict-baseline` 下历史红也返回 1。
 - **测试内部的等待另算**：`page.waitForFunction(fn, arg?, options?)` 的第二格是
@@ -67,25 +82,28 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 610.5 秒、Tier 0 合计 703.7 秒；同日其他两轮曾达到 887.9 与 996.7 秒。
 耗时受机器和渲染改动影响，不再使用“约 12 分钟”作为保证值。
 
-## 四、Tier 0 —— 每次改动必跑
+## 四、Tier 0 —— 快速基座与整机门禁分开
 
 | 测试 | 守什么 |
 |---|---|
-| BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线 |
-| BootStallTest | 一张外部贴图挂死（连接不回数据）不许把开机吊在「加载 PBR 材质」上；只有那一套走程序化退路 |
 | BootPayloadTest | 开机贴图字节红线：`PBR_SETS` 的总量与单张上限、URL 存在性、fallback 指向真配方（纯 Node）|
-| PlayTest | 真浏览器端到端通关，130 条运行时断言 |
 | TestRunnerTest | 分级选择、Git 映射、历史基线、登记完整性 |
 | ModuleGraphTest | 从入口递归走模块图与 index.html import map 对账：新模块必登记、源码禁自写 ?v=（纯 Node） |
 | HudPromptTest | HUD 提示纯逻辑 |
 | RiggedModelTest | `.tzm.json` 绑定模型数据 |
+| CharacterModelTest / CharacterHitboxMathTest | 蒙皮角色资产与子弹代理数学 |
 | FractureBakeTest | 预破碎离线数据 |
 | CutsceneControlTest | 过场导演机位与生命周期 |
+| GeoTest / RoadPathTest / WallPlanTest | 几何快路、道路与围墙规划契约；其中 GeoTest 需浏览器，只在门禁档运行 |
+| BootTest | 七关开机冒烟、WebGL 健康、draw call/triangles 红线；prepush 按渲染/关卡风险触发 |
+| BootStallTest | 外部贴图挂死降级；prepush 仅由材质/贴图/外部资产链触发 |
+| PlayTest | 真浏览器端到端通关；prepush 仅由共享玩法/任务流程触发，full 固定运行 |
 
 ## 五、Tier 1 —— 自动领域探针
 
-`--domain=…` 默认运行 Tier 0 加下表自动探针。`--changed` 依据文件名与共享底座
-规则匹配一个或多个领域；无法识别的台儿庄文件会明确列出，并由 Tier 0 保守兜底。
+`--domain=…` 默认运行快速基座，加上下表中不启动浏览器的探针；prepush 才运行该领域
+完整探针。`--changed` 依据文件名与共享底座规则匹配领域。`TestRunnerTest` 会扫描全部已跟踪
+台儿庄文件，强制每个运行时文件“匹配领域或显式忽略”，不允许映射缺口长期积累。
 
 | 领域 | 自动探针 |
 |---|---|
@@ -100,6 +118,7 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 | cutscene | CutsceneControl、ActorPose |
 | render | ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |
+| infra | TestRunnerTest、ModuleGraphTest（测试入口与本地服务） |
 
 改 `Script_Main.mjs` 会保守选择所有有自动探针的领域。测试文件本身按其登记领域反向映射。
 
@@ -110,14 +129,14 @@ npm 会以**向上找到的第一个** `package.json` 为项目根：worktree �
 
 ## 七、PlayTest 历史红基线
 
-截至 2026-08-26，PlayTest 有 5 条历史红。runner 按**完整断言名和重复次数**核对：
+截至 2026-08-29，PlayTest 有 3 条历史红。runner 按**完整断言名和重复次数**核对：
 
 - 实际红是基线子集：显示 `BASELINE`，缺失项会提示“已转绿、应更新基线”；
 - 出现未登记断言名：显示 `FAIL` 并返回 1；
 - 没有正常的通关汇总（崩溃、卡死、超时）：始终 `FAIL`；
 - 同名历史红的实际细节仍会列出，不等于问题已被认可或修复。
 
-当前基线包括两条火力节奏、夜袭携行、姿态可见度和 Esc 指针锁。
+当前基线包括两条火力节奏和 Esc 指针锁。
 清理一条后应立即删除 runner 中对应基线。
 
 （击杀回执 killConfirm 那条 08-26 已修并摘除：红的根源不是回执链坏了，而是测试

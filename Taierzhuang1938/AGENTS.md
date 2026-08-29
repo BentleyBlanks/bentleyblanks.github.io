@@ -76,15 +76,19 @@ node Taierzhuang1938/Script_DevServer.mjs        # 默认端口 8171，服务 wo
 ### 测试（分级细则、超时、历史红基线全在 `docs/Data_TestTiers.md`）
 
 ```powershell
-node Taierzhuang1938/Script_TestRunner.mjs                          # Tier 0：BootTest + PlayTest + 纯 Node 快测
-node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master  # 推荐：按 Git 改动自动追加 Tier 1
+node Taierzhuang1938/Script_TestRunner.mjs                          # quick：纯 Node 快速基座，编辑循环约几十秒
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=quick --fail-fast    # 编辑循环
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=prepush --fail-fast  # 推送前领域专项 + 风险门禁
+node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=full                  # 集成/终验
 node Taierzhuang1938/Script_TestRunner.mjs --domain-only=terrain    # 排障：只跑领域探针，绕过 Tier 0
 node Taierzhuang1938/Script_TestRunner.mjs --only=DamageTest        # 单项
 node Taierzhuang1938/Script_TestRunner.mjs --list                   # 完整分级表（另有 --domain= / --tier= / --dry-run）
 ```
 
-- Tier 0 全程实测 12—17 分钟（机器相关，别当保证值）；Tier 2 不被 `--changed` 自动触发，
-  且出图进程成功只代表产物生成成功，仍需人工看图。
+- quick 的 11 项基座不启动浏览器；旧版完整 Tier 0 实测 12—17 分钟，只由 full、
+  显式 `--tier=0` 或 prepush 的高风险文件触发。Tier 2 仍不自动执行，出图仍需人工看图。
+- 浏览器测试先做 `playwright-core` 预检，并跨 worktree 共用全局测试槽，避免多 agent
+  同时抢 GPU/内存；纯文档与源工程改动由 `--changed` 明确跳过。
 - PlayTest 有历史红基线：`BASELINE` ≠ 全绿，新增断言名才算 `FAIL`；`--strict-baseline` 全算。
 
 ### 出图（视觉审查的唯一输入来源；全部落 `_shots/`，已 gitignore）

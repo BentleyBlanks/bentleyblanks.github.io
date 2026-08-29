@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,9 +12,12 @@ import {
   ParseArgs,
   ResolveSelection,
   ValidateRegistry,
+  browserTests,
   domains,
   testDefs,
   tier0,
+  tier0Browser,
+  tier0Fast,
   tier2,
 } from "./Script_TestRunner.mjs";
 
@@ -39,9 +43,13 @@ for (const [name, def] of Object.entries(testDefs)) {
 }
 
 const voiceSelection = ResolveSelection(ParseArgs(["--domain=voice"]));
-Check(tier0.every((name) => voiceSelection.includes(name)), "--domain 默认叠加 Tier 0");
-Check(voiceSelection.includes("VoiceTest"), "--domain 追加领域探针");
+Check(tier0Fast.every((name) => voiceSelection.includes(name)), "--domain 默认叠加快速 Tier 0");
+Check(!voiceSelection.includes("VoiceTest"), "quick 不启动 voice 浏览器探针");
 Check(ParseArgs(["--dry-run"]).dryRun, "--dry-run 参数可用");
+Check(ParseArgs(["--profile=prepush"]).profile === "prepush", "--profile 参数可用");
+
+const voicePrepush = ResolveSelection(ParseArgs(["--profile=prepush", "--domain=voice"]));
+Check(voicePrepush.includes("VoiceTest"), "prepush 运行完整领域探针");
 
 const voiceOnly = ResolveSelection(ParseArgs(["--domain-only=voice"]));
 assert.deepEqual(voiceOnly, domains.voice.tests, "--domain-only 只跑领域探针");
@@ -52,6 +60,11 @@ Check(tier0.every((name) => tier1Selection.includes(name)), "--tier=1 包含 Tie
 Check(GetTier1Tests().every((name) => tier1Selection.includes(name)), "--tier=1 包含全部自动领域探针");
 assert.deepEqual(ResolveSelection(ParseArgs(["--tier=2"])), tier2, "--tier=2 只跑低频人工档");
 checks += 1;
+
+const defaultSelection = ResolveSelection(ParseArgs([]));
+assert.deepEqual(defaultSelection, tier0Fast, "默认入口只跑快速 Tier 0");
+checks += 1;
+Check(tier0Browser.every((name) => !defaultSelection.includes(name)), "默认入口不启动浏览器");
 
 assert.throws(
   () => ParseArgs(["--only=VoiceTest", "--domain=voice"]),
@@ -87,6 +100,50 @@ for (const domain of ["terrain", "physics", "combat", "ai", "editor", "cutscene"
 }
 assert.deepEqual(sharedData.unmatchedProjectFiles, []);
 checks += 1;
+
+const docsOnly = InferDomains(["Taierzhuang1938/docs/Data_TestTiers.md", "Taierzhuang1938/AGENTS.md"]);
+assert.deepEqual(
+  ResolveSelection(ParseArgs(["--changed=origin/master"]), docsOnly.domains, docsOnly),
+  [],
+  "纯文档改动不运行游戏测试",
+);
+checks += 1;
+
+const missionChange = InferDomains(["Taierzhuang1938/Script_MissionSetpieces.mjs"]);
+Check(missionChange.domains.includes("cutscene") && missionChange.domains.includes("ai"), "任务摆点映射 cutscene/ai");
+const missionQuick = ResolveSelection(ParseArgs(["--changed=origin/master"]), missionChange.domains, missionChange);
+Check(missionQuick.includes("MissionSetpiecesTest") && !missionQuick.includes("PlayTest"), "任务摆点编辑循环跑纯 Node 专项而不跑整局");
+const missionPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), missionChange.domains, missionChange);
+Check(missionPrepush.includes("PlayTest"), "任务摆点推送前追加整局门禁");
+
+const textureChange = InferDomains(["Taierzhuang1938/Texture/Texture_BrickWallBase.webp"]);
+Check(textureChange.domains.includes("render"), "贴图改动映射 render");
+const texturePrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), textureChange.domains, textureChange);
+Check(texturePrepush.includes("BootTest") && texturePrepush.includes("BootStallTest"), "贴图推送前追加开机与挂死门禁");
+
+const trackedProjectResult = spawnSync("git", ["ls-files", "Taierzhuang1938"], {
+  cwd: path.resolve(dirHere, ".."),
+  encoding: "utf8",
+  windowsHide: true,
+});
+assert.equal(trackedProjectResult.status, 0, trackedProjectResult.stderr || "git ls-files 失败");
+checks += 1;
+const trackedProjectFiles = trackedProjectResult.stdout.split(/\r?\n/).filter(Boolean);
+const projectCoverage = InferDomains(trackedProjectFiles);
+assert.deepEqual(
+  projectCoverage.unmatchedProjectFiles,
+  [],
+  `台儿庄生产文件必须映射领域或显式忽略：${projectCoverage.unmatchedProjectFiles.join(", ")}`,
+);
+checks += 1;
+
+for (const file of testFiles) {
+  const source = fs.readFileSync(path.join(dirHere, file), "utf8");
+  if (/^import .*LaunchBrowser/m.test(source)) {
+    const testName = [...Object.entries(testDefs)].find(([, def]) => def.file === file)?.[0];
+    Check(browserTests.has(testName), `启动浏览器的测试已标记：${testName}`);
+  }
+}
 
 const expectedName = testDefs.PlayTest.expectedFailures[0];
 const baselineOutput = `通关冒烟：129/130 过\n没过的：\n  · ${expectedName}  — detail\n`;

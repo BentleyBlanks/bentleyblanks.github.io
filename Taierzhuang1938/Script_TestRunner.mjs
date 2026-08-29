@@ -1,14 +1,18 @@
 // ===========================================================================
 // Script_TestRunner.mjs —— 台儿庄白盒的测试分级入口
 //
-// 现有测试按爆炸半径分三档：
-//   Tier 0：每次改动必跑的整机安全网与纯 Node 快测。
+// 现有测试按爆炸半径分三档，并按执行时机提供 profile：
+//   quick：默认，纯 Node 快测 + 改动领域的纯 Node 探针。
+//   prepush：领域完整探针 + 由文件风险触发的 Boot/Play/Geo 门禁。
+//   full：旧版完整 Tier 0 + 领域探针；--tier=0/1/2 保持兼容。
 //   Tier 1：按领域触发的自动深度探针；--changed 可从 Git 改动自动推断。
 //   Tier 2：对机器敏感或需要人工看图的低频审查，不被 --changed 自动触发。
 //
 // 常用命令：
 //   node Taierzhuang1938/Script_TestRunner.mjs
 //   node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master
+//   node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --changed=origin/master
+//   node Taierzhuang1938/Script_TestRunner.mjs --profile=full --changed=origin/master
 //   node Taierzhuang1938/Script_TestRunner.mjs --domain=terrain
 //   node Taierzhuang1938/Script_TestRunner.mjs --tier=1
 //   node Taierzhuang1938/Script_TestRunner.mjs --tier=2
@@ -21,15 +25,22 @@
 // ===========================================================================
 
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const fileHere = fileURLToPath(import.meta.url);
 const dirHere = path.dirname(fileHere);
 const repoRoot = path.resolve(dirHere, "..");
+const requireHere = createRequire(import.meta.url);
 const defaultTimeoutMs = 10 * 60 * 1000;
 const heartbeatMs = 60 * 1000;
 const maxCaptureChars = 4 * 1024 * 1024;
+const browserLockPath = path.join(os.tmpdir(), "Taierzhuang1938_BrowserTests.lock");
+const browserLockPollMs = 5 * 1000;
+const browserLockTimeoutMs = 30 * 60 * 1000;
 
 const playTestExpectedFailures = [
   // 「击杀回执 killConfirm」2026-08-26 已修并摘除：红的根源是测试自己的零余量竞态 ——
@@ -153,11 +164,20 @@ export const testDefs = {
   ShotTest: { file: "Script_ShotTest.mjs", args: ["_shots"], timeoutMs: 15 * 60 * 1000, desc: "逐关逐机位实拍出图（人工审）" },
 };
 
-export const tier0 = [
-  "BootTest",
-  "BootStallTest",
+export const browserTests = new Set([
+  "ActorBatchTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
+  "AudioTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
+  "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "FixedCenterAimTest", "FpsArmTest",
+  "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
+  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "MeleeQteTest", "MenuTest",
+  "PerformanceTest", "PhysicsTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
+  "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
+  "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
+]);
+
+export const tier0Fast = [
   "BootPayloadTest",
-  "PlayTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -166,10 +186,14 @@ export const tier0 = [
   "CharacterHitboxMathTest",
   "FractureBakeTest",
   "CutsceneControlTest",
-  "GeoTest",
   "RoadPathTest",
   "WallPlanTest",
 ];
+
+export const tier0Browser = ["BootTest", "BootStallTest", "PlayTest", "GeoTest"];
+
+// 兼容旧入口：--tier=0 仍代表原来的完整 Tier 0。日常默认/--changed 使用 profile=quick。
+export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
   "ShotTest",
@@ -250,26 +274,73 @@ export const domains = {
     tests: [],
     tier2Tests: ["PerformanceTest", "FrameProfileTest", "GodRaysPerformanceTest"],
   },
+  infra: {
+    label: "测试入口/本地服务基础设施",
+    tests: ["TestRunnerTest", "ModuleGraphTest"],
+  },
 };
 
 const changedDomainRules = [
-  { domain: "terrain", pattern: /(Heightmap|JieheHeight|Terrain|Battlefield|Outfield|Ground|Data_Levels)/i },
+  { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Aim|Reticle|Viewmodel|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
-  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion)/i },
-  { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Script_Input|index\.html)/i },
+  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
+  { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|DebugOptions|Script_Input|Style_Game|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
-  { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
-  { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Flare|Outfield|PropBatch|PropStreaming|ExternalProps|TownDressing|Data_Dressing|Profiler|\.glsl|index\.html)/i },
+  { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
+  { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|GlobalShProbe|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
+  { domain: "physics", pattern: /vendor\/rapier/i },
+  { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer)/i },
 ];
+
+const ignoredChangeRules = [
+  /\/docs\//i,
+  /\/(?:AGENTS|README)[^/]*\.md$/i,
+  /\.md$/i,
+  /\.(?:py|ps1|ms|blend|mtl|txt)$/i,
+  /\/(?:_raw|_shots)\//i,
+  /\/\.gitignore$/i,
+];
+
+const prepushGateRules = [
+  {
+    tests: ["PlayTest"],
+    pattern: /(Script_Main|Script_Player|Script_Input|Script_Combat|Script_Ai|Script_Story|Script_Interact|Script_Mission|Data_Battle|Data_Levels|Data_MissionCh|Data_Script|TengxianScript|Companion|Checkpoint)/i,
+  },
+  {
+    tests: ["BootTest"],
+    pattern: /(Script_Main|index\.html|Data_Battle|Data_Levels|Render|Shader|Material|Texture|Model|Scene|Outfield|Battlefield|Tengxian|Jiehe|Dressing|ExternalAssets|ExternalProps|FarLand|Sky|Water)/i,
+  },
+  {
+    tests: ["BootStallTest"],
+    pattern: /(Pbr|Texture|Material|MeshLoad|ExternalAssets|ExternalProps)/i,
+  },
+  {
+    tests: ["GeoTest"],
+    pattern: /(Geo|Mesh|Model|Collider|Geometry|CityBlockKit|Landmark)/i,
+  },
+];
+
+const domainPrepushGates = {
+  terrain: ["BootTest", "GeoTest"],
+  physics: ["PlayTest", "GeoTest"],
+  combat: ["PlayTest"],
+  ai: ["PlayTest"],
+  hud: ["PlayTest"],
+  interact: ["PlayTest"],
+  menu: ["BootTest"],
+  editor: ["BootTest"],
+  cutscene: ["PlayTest"],
+  render: ["BootTest", "BootStallTest", "GeoTest"],
+};
 
 let activeChild = null;
 let interruptedSignal = null;
@@ -303,23 +374,33 @@ export function ValidateRegistry() {
       throw new Error(`测试文件扩展名异常：${name} -> ${def.file}`);
     }
   }
+  for (const name of browserTests) {
+    if (!testDefs[name]) throw new Error(`浏览器测试未登记：${name}`);
+  }
+  for (const name of tier0Fast) {
+    if (browserTests.has(name)) throw new Error(`快速 Tier 0 不得启动浏览器：${name}`);
+  }
 }
 
 function ValidateOptions(opts) {
   const hasOnly = opts.only.length > 0;
-  const hasSelectors = opts.tier !== null || opts.domains.length || opts.domainOnly.length || opts.changedBase;
-  if (hasOnly && hasSelectors) throw new Error("--only 不能和 --tier/--domain/--domain-only/--changed 混用");
+  const hasSelectors = opts.tier !== null || opts.profile !== null || opts.domains.length || opts.domainOnly.length || opts.changedBase;
+  if (hasOnly && hasSelectors) throw new Error("--only 不能和 --tier/--profile/--domain/--domain-only/--changed 混用");
   if (opts.domainOnly.length && (opts.domains.length || opts.changedBase || opts.tier !== null)) {
     throw new Error("--domain-only 是排障专用的独占选择器，不能和其他选择器混用");
   }
   if (opts.tier === 2 && (opts.domains.length || opts.changedBase)) {
     throw new Error("--tier=2 是独立人工审查档，不能和 --domain/--changed 混用");
   }
+  if (opts.tier !== null && opts.profile !== null) {
+    throw new Error("--tier 是兼容旧入口，不能和 --profile 混用");
+  }
 }
 
 export function ParseArgs(argv) {
   const opts = {
     tier: null,
+    profile: null,
     domains: [],
     domainOnly: [],
     only: [],
@@ -342,6 +423,10 @@ export function ParseArgs(argv) {
     else if (key === "fail-fast") opts.failFast = true;
     else if (key === "strict-baseline") opts.strictBaseline = true;
     else if (key === "changed") opts.changedBase = val || "origin/master";
+    else if (key === "profile") {
+      if (!/^(quick|prepush|full)$/.test(val)) throw new Error(`未知 profile=${val || "(空)"}（可用：quick、prepush、full）`);
+      opts.profile = val;
+    }
     else if (key === "tier") {
       if (!/^[012]$/.test(val)) throw new Error(`未知 tier=${val || "(空)"}（可用：0、1、2）`);
       opts.tier = Number(val);
@@ -364,15 +449,37 @@ export function ParseArgs(argv) {
   return opts;
 }
 
-export function ResolveSelection(opts, inferredDomains = []) {
+export function ResolveSelection(opts, inferredDomains = [], changeInfo = {}) {
   ValidateDomains([...opts.domains, ...opts.domainOnly, ...inferredDomains]);
   if (opts.only.length) return opts.only.slice();
   if (opts.tier === 2) return tier2.slice();
   if (opts.domainOnly.length) return Unique(opts.domainOnly.flatMap((name) => domains[name].tests));
 
-  const names = tier0.slice();
-  if (opts.tier === 1) names.push(...GetTier1Tests());
-  for (const name of Unique([...opts.domains, ...inferredDomains])) names.push(...domains[name].tests);
+  // 旧的 --tier 明确保留原行为，供既有脚本和完整门禁使用。
+  if (opts.tier === 0) return tier0.slice();
+  if (opts.tier === 1) return Unique([...tier0, ...GetTier1Tests()]);
+
+  const activeDomains = Unique([...opts.domains, ...inferredDomains]);
+  const profile = opts.profile ?? "quick";
+  const changedModeHasNothingToTest = opts.changedBase
+    && changeInfo.changedProjectFiles === 0;
+  if (changedModeHasNothingToTest) return [];
+
+  const names = profile === "full" ? tier0.slice() : tier0Fast.slice();
+  for (const domainName of activeDomains) {
+    const selected = domains[domainName].tests;
+    names.push(...(profile === "quick" ? selected.filter((name) => !browserTests.has(name)) : selected));
+  }
+
+  if (profile === "prepush") {
+    names.push(...(changeInfo.prepushGates ?? []));
+    // 显式 --domain 没有文件上下文时，按领域的最大合理爆炸半径补门禁。
+    if (!opts.changedBase) {
+      for (const domainName of activeDomains) names.push(...(domainPrepushGates[domainName] ?? []));
+    }
+    // 未知运行时文件不能悄悄放过；只在推送前档保守补完整整机门禁。
+    if ((changeInfo.unmatchedProjectFiles?.length ?? 0) > 0) names.push(...tier0Browser);
+  }
   return Unique(names);
 }
 
@@ -401,12 +508,20 @@ export function CollectChangedFiles(base = "origin/master") {
 export function InferDomains(files) {
   const found = new Set();
   const unmatchedProjectFiles = [];
+  const ignoredProjectFiles = [];
+  const changedProjectFiles = [];
+  const prepushGates = new Set();
   const allAutomatedDomains = Object.keys(domains).filter((name) => domains[name].tests.length);
   const testByFile = new Map(Object.entries(testDefs).map(([name, def]) => [def.file, name]));
 
   for (const rawFile of files) {
     const file = rawFile.replaceAll("\\", "/");
     if (!file.startsWith("Taierzhuang1938/")) continue;
+    if (ignoredChangeRules.some((pattern) => pattern.test(file))) {
+      ignoredProjectFiles.push(file);
+      continue;
+    }
+    changedProjectFiles.push(file);
     const leaf = path.posix.basename(file);
     let matched = false;
 
@@ -447,9 +562,18 @@ export function InferDomains(files) {
         matched = true;
       }
     }
+    for (const rule of prepushGateRules) {
+      if (rule.pattern.test(file)) for (const name of rule.tests) prepushGates.add(name);
+    }
     if (!matched) unmatchedProjectFiles.push(file);
   }
-  return { domains: [...found], unmatchedProjectFiles };
+  return {
+    domains: [...found],
+    unmatchedProjectFiles,
+    ignoredProjectFiles,
+    changedProjectFiles: changedProjectFiles.length,
+    prepushGates: [...prepushGates],
+  };
 }
 
 export function GetTier2Recommendations(domainNames) {
@@ -489,6 +613,87 @@ function KillProcessTree(child) {
   } else {
     child.kill("SIGTERM");
   }
+}
+
+function Sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function IsProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function AcquireBrowserLock(testName) {
+  const startedAt = Date.now();
+  let lastNoticeAt = 0;
+  while (Date.now() - startedAt < browserLockTimeoutMs) {
+    if (interruptedSignal) return null;
+    try {
+      const fd = fs.openSync(browserLockPath, "wx");
+      fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, testName, createdAt: Date.now() }));
+      fs.closeSync(fd);
+      return () => {
+        try {
+          const owner = JSON.parse(fs.readFileSync(browserLockPath, "utf8"));
+          if (owner.pid === process.pid) fs.unlinkSync(browserLockPath);
+        } catch {
+          // 锁已被清理或内容损坏时不再扩大删除范围。
+        }
+      };
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      let owner = null;
+      try { owner = JSON.parse(fs.readFileSync(browserLockPath, "utf8")); } catch {}
+      const stale = !owner || !IsProcessAlive(owner.pid) || Date.now() - Number(owner.createdAt || 0) > browserLockTimeoutMs;
+      if (stale) {
+        try { fs.unlinkSync(browserLockPath); } catch {}
+        continue;
+      }
+      if (Date.now() - lastNoticeAt >= 30 * 1000) {
+        console.log(`[runner] … ${testName} 等待浏览器测试槽（占用者 ${owner.testName ?? "unknown"}, pid ${owner.pid}）`);
+        lastNoticeAt = Date.now();
+      }
+      await Sleep(browserLockPollMs);
+    }
+  }
+  throw new Error(`${testName} 等待浏览器测试槽超过 ${Math.round(browserLockTimeoutMs / 60000)} 分钟`);
+}
+
+function PreflightSelection(selection) {
+  if (!selection.some((name) => browserTests.has(name))) return;
+  try {
+    requireHere.resolve("playwright-core");
+  } catch {
+    throw new Error("本次包含浏览器测试，但缺少 playwright-core；请先 npm install，再重新运行（尚未执行任何测试）");
+  }
+}
+
+const estimatedSeconds = {
+  BootTest: 100,
+  BootStallTest: 15,
+  PlayTest: 700,
+  GeoTest: 20,
+  ShotTest: 390,
+  GiTest: 300,
+  PerformanceTest: 600,
+  DeathViewTest: 240,
+  FrameProfileTest: 600,
+  GodRaysPerformanceTest: 600,
+};
+
+function EstimateSelectionSeconds(selection) {
+  return selection.reduce((sum, name) => sum + (estimatedSeconds[name] ?? (browserTests.has(name) ? 60 : 1)), 0);
+}
+
+function FormatDuration(seconds) {
+  if (seconds < 60) return `约 ${seconds} 秒`;
+  return `约 ${Math.ceil(seconds / 60)} 分钟`;
 }
 
 export function RunOne(name, def, verbose = false) {
@@ -619,8 +824,14 @@ function InstallSignalHandlers() {
 }
 
 function PrintList() {
-  console.log("Tier 0（每次改动必跑）：");
-  for (const name of tier0) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
+  console.log("Profile（默认 quick；--changed 会按 Git 改动缩小范围）：");
+  console.log("  quick      纯 Node 快测 + 命中领域的纯 Node 探针（编辑循环）");
+  console.log("  prepush    完整领域探针 + 按文件风险触发 Boot/Play/Geo（推送前）");
+  console.log("  full       完整 Tier 0 + 命中领域探针（集成/终验）");
+  console.log("快速 Tier 0（quick 基座，不启动浏览器）：");
+  for (const name of tier0Fast) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
+  console.log("整机 Tier 0（prepush 按风险触发；full/--tier=0 全跑）：");
+  for (const name of tier0Browser) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
   console.log("Tier 1（全部自动领域探针；通常优先用 --changed/--domain）：");
   for (const name of GetTier1Tests()) console.log(`  ${name.padEnd(20)} ${testDefs[name].desc}`);
   console.log("Tier 2（低频人工审查，不由 --changed 自动触发）：");
@@ -642,30 +853,44 @@ export async function Main(argv = process.argv.slice(2)) {
   }
 
   let changedFiles = [];
-  let inferred = { domains: [], unmatchedProjectFiles: [] };
+  let inferred = {
+    domains: [],
+    unmatchedProjectFiles: [],
+    ignoredProjectFiles: [],
+    changedProjectFiles: 0,
+    prepushGates: [],
+  };
   if (opts.changedBase) {
     changedFiles = CollectChangedFiles(opts.changedBase);
     inferred = InferDomains(changedFiles);
-    console.log(`[runner] Git 改动 ${changedFiles.length} 个；推断领域：${inferred.domains.join(", ") || "无"}`);
+    console.log(`[runner] Git 改动 ${changedFiles.length} 个；台儿庄运行时改动 ${inferred.changedProjectFiles} 个；推断领域：${inferred.domains.join(", ") || "无"}`);
+    if (inferred.ignoredProjectFiles.length) {
+      console.log(`[runner] 文档/源工程改动无需运行游戏测试：${inferred.ignoredProjectFiles.join(", ")}`);
+    }
     if (inferred.unmatchedProjectFiles.length) {
-      console.log(`[runner] 未匹配领域、已由 Tier 0 保守兜底：${inferred.unmatchedProjectFiles.join(", ")}`);
+      console.log(`[runner] 未匹配领域：${inferred.unmatchedProjectFiles.join(", ")}`);
     }
   }
 
-  const selection = ResolveSelection(opts, inferred.domains);
+  const selection = ResolveSelection(opts, inferred.domains, inferred);
   for (const name of selection) {
     if (!testDefs[name]) throw new Error(`未知测试名：${name}（用 --list 查）`);
   }
-  if (!selection.length) throw new Error("选择结果为空；该领域可能只有 Tier 2 建议，请用 --tier=2 或 --list");
+  if (!selection.length) {
+    console.log("[runner] 没有需要运行的测试（无台儿庄运行时改动，或改动均为文档/源工程）");
+    return 0;
+  }
 
   const activeDomains = Unique([...opts.domains, ...opts.domainOnly, ...inferred.domains]);
   const recommendations = GetTier2Recommendations(activeDomains);
   if (recommendations.length) console.log(`[runner] 本次另建议人工审查 Tier 2：${recommendations.join(", ")}`);
-  console.log(`[runner] 共 ${selection.length} 个：${selection.join(", ")}`);
+  const profileLabel = opts.tier !== null ? `legacy-tier-${opts.tier}` : (opts.profile ?? "quick");
+  console.log(`[runner] profile=${profileLabel}，共 ${selection.length} 个，预计 ${FormatDuration(EstimateSelectionSeconds(selection))}：${selection.join(", ")}`);
   if (opts.dryRun) {
     console.log("[runner] --dry-run：只展示选择，不执行测试");
     return 0;
   }
+  PreflightSelection(selection);
 
   interruptedSignal = null;
   const removeSignalHandlers = InstallSignalHandlers();
@@ -673,7 +898,15 @@ export async function Main(argv = process.argv.slice(2)) {
   try {
     for (const name of selection) {
       process.stdout.write(`[runner] ▶ ${name} …\n`);
-      const rawResult = await RunOne(name, testDefs[name], opts.verbose);
+      let releaseBrowserLock = null;
+      let rawResult;
+      try {
+        if (browserTests.has(name)) releaseBrowserLock = await AcquireBrowserLock(name);
+        if (interruptedSignal) break;
+        rawResult = await RunOne(name, testDefs[name], opts.verbose);
+      } finally {
+        releaseBrowserLock?.();
+      }
       if (interruptedSignal) {
         console.log(`[runner] ${name} 已中断，子进程已清理`);
         break;
