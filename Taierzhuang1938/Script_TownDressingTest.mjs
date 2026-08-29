@@ -34,6 +34,10 @@ import { EAST_SUBURB } from "./Data_Tengxian.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import { JIEHE_SANDBOX_PHASE } from "./Data_Menu.mjs";
 import { LIFE_SCENE_DRESSING, LifeScenesFor } from "./Data_Dressing_LifeScenes.mjs";
+import {
+  LIFE_SCENE_DRESSING_PASS_TWO,
+  LifeScenesPassTwoFor,
+} from "./Data_Dressing_LifeScenesPassTwo.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(
@@ -58,7 +62,7 @@ const FORBIDDEN_IN_CITY = new Set([
 ]);
 // 上限（2026-08-25 起放宽）：视觉走流送后，件数的真正预算是「焦点附近同时活着
 // 多少」+ 碰撞表规模，不再是全量 draw call。局部密度另有 45 m 邻域闸（规则 11）。
-const CAPS = { quarter: 190, street: 160, defense: 110, outfield: 220 };
+const CAPS = { quarter: 210, street: 180, defense: 120, outfield: 240 };
 // 城外的主路净空带（西关的铁路/站台不在此表——那一包靠探针与截图兜）
 const OUTFIELD_ROADS = [
   { id: "EastGateRoad", axis: "x", at: -65, from: 310, to: 756, half: 4.2 },
@@ -143,7 +147,11 @@ for (const file of REGION_FILES) {
   }
   regions.push({
     file: path.basename(file), region: module.REGION,
-    placements: [...module.PLACEMENTS, ...LifeScenesFor(module.REGION.id)],
+    placements: [
+      ...module.PLACEMENTS,
+      ...LifeScenesFor(module.REGION.id),
+      ...LifeScenesPassTwoFor(module.REGION.id),
+    ],
   });
 }
 
@@ -173,6 +181,30 @@ for (const phase of [...PHASES, JIEHE_SANDBOX_PHASE]) {
   checks += 1;
   if (count < 8) fail(`${phase.id}: 生活加密只有 ${count} 件进入本场景。`);
   else notes.push(`${phase.id}: 新增生活场景细节 ${count} 件。`);
+}
+
+const passTwoPlacements = Object.values(LIFE_SCENE_DRESSING_PASS_TWO).flat();
+checks += 1;
+if (passTwoPlacements.length < 130) {
+  fail(`生活加密第二轮只有 ${passTwoPlacements.length} 件，低于 130 件覆盖闸。`);
+}
+const passTwoAssets = new Set(passTwoPlacements.map((placement) => placement.asset));
+checks += 1;
+if (passTwoAssets.size < 24) {
+  fail(`生活加密第二轮只用了 ${passTwoAssets.size} 类资产，工具与家什仍不够丰富。`);
+}
+for (const regionId of expectedLifeRegions) {
+  checks += 1;
+  const count = LifeScenesPassTwoFor(regionId).length;
+  if (count < 8) fail(`${regionId}: 生活加密第二轮只有 ${count} 件。`);
+}
+for (const phase of [...PHASES, JIEHE_SANDBOX_PHASE]) {
+  const b = phase.bounds;
+  const count = passTwoPlacements.filter((placement) => placement.x >= b.minX
+    && placement.x <= b.maxX && placement.z >= b.minZ && placement.z <= b.maxZ).length;
+  checks += 1;
+  if (count < 5) fail(`${phase.id}: 生活加密第二轮只有 ${count} 件进入本场景。`);
+  else notes.push(`${phase.id}: 第二轮补齐生活工具 ${count} 件。`);
 }
 
 const everything = [];   // {x, z, r, file, index, label} 供去重

@@ -267,7 +267,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
   { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Flare|Outfield|PropBatch|PropStreaming|ExternalProps|Profiler|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Model|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|Smoke|Flare|Outfield|PropBatch|PropStreaming|ExternalProps|TownDressing|Data_Dressing|Profiler|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
 ];
 

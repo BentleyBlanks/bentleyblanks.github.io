@@ -26,9 +26,14 @@ import { REGION as WS_REGION, PLACEMENTS as WS } from "./Data_Dressing_WestSubur
 import { REGION as NS_REGION, PLACEMENTS as NS } from "./Data_Dressing_NorthSuburb.mjs";
 import { REGION as JV_REGION, PLACEMENTS as JV } from "./Data_Dressing_JieheVillages.mjs";
 import { LifeScenesFor } from "./Data_Dressing_LifeScenes.mjs";
+import { LifeScenesPassTwoFor } from "./Data_Dressing_LifeScenesPassTwo.mjs";
 
 function RegionPlacements(region, placements) {
-  return Object.freeze([...placements, ...LifeScenesFor(region.id)]);
+  return Object.freeze([
+    ...placements,
+    ...LifeScenesFor(region.id),
+    ...LifeScenesPassTwoFor(region.id),
+  ]);
 }
 
 export const TOWN_DRESSING_REGIONS = Object.freeze([
