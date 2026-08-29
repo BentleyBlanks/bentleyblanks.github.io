@@ -172,7 +172,7 @@ const ASSETS = Object.freeze({
     label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2",
     materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart",
   },
-  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodBeam", tag: "fence" },
+  fence: { label: "木栅栏", url: "./Model/Model_WoodFence.glb?v=1", material: "WoodFence", tag: "fence" },
   crate: { label: "木箱", url: "./Model/Model_WoodCrate.glb?v=1", material: "WoodCrate", tag: "prop" },
   rubble: { label: "砖瓦堆", url: "./Model/Model_BrickRubble.glb?v=1", material: "GroundRubble", tag: "rubble" },
   militaryCrateClosed: {

@@ -222,7 +222,7 @@ const handcartSpec = handcart.nodes.get("MarketHandcart");
 assert.ok(handcartSpec.triangles <= 4200, "replacement handcart triangle budget");
 assert.equal(handcartSpec.minY, 0, "replacement handcart is ground-ready");
 assert.ok(handcartSpec.maxSpan >= 2.44 && handcartSpec.maxSpan <= 2.46, "replacement handcart keeps game scale");
-for (const material of ["HandcartWood", "WoodCrate"]) {
+for (const material of ["HandcartWood"]) {
   for (const channel of ["Base", "Normal"]) {
     const fileName = `Texture_${material}${channel}.webp`;
     const bytes = fs.readFileSync(path.join(root, "Texture", fileName));
@@ -268,11 +268,17 @@ for (const material of ["Brick", "Core", "Stone"]) {
       `runtime loads CityWall ${material} ${channel}`);
   }
 }
-for (const material of ["HandcartWood", "WoodCrate"]) {
+for (const material of ["HandcartWood"]) {
   for (const channel of ["Base", "Normal"]) {
     assert.match(main, new RegExp(`Texture_${material}${channel}\\.webp`),
       `runtime loads ${material} ${channel}`);
   }
+}
+assert.doesNotMatch(main, /name: "WoodCrate"/, "wood crates no longer download the visibly tiled generated PBR");
+assert.doesNotMatch(main, /name: "WattleFence"/, "wattle fences no longer download the visibly discontinuous generated PBR");
+const texBake = fs.readFileSync(path.join(root, "Script_TexBake.mjs"), "utf8");
+for (const recipe of ["BakeCrateWood", "BakeFenceWood", "WoodCrate", "WattleFence", "WoodFence"]) {
+  assert.match(texBake, new RegExp(`\\b${recipe}\\b`), `${recipe} stays on the procedural wood path`);
 }
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`

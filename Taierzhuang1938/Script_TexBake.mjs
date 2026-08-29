@@ -272,6 +272,66 @@ export function BakeWood(size = 512, { seed = 4, hue = [110, 84, 54], planks = 5
 }
 
 /**
+ * 去皮枝条：给枣刺篱笆和独立木栅栏的每根杆子用。
+ *
+ * 这是「材质」，不是一张把整面篱笆（枝条、绑绳、空隙）画死在里面的照片；
+ * 篱笆的结构应由 `Script_WallSpline` 的几何给出。这样无论 UV 岛怎样拆、杆件怎样
+ * 转向，都不会再出现生成图里那种四块互不相干的绑枝或一段一段的假接缝。
+ */
+export function BakeFenceWood(size = 256, { seed = 467, hue = [111, 96, 70] } = {}) {
+  return BakeMaps(size, (px, py, out) => {
+    const u = px / size, v = py / size;
+    // 主纹只读作「顺着枝条的皮纹」；每格至少数十道，平铺时不会重复成可辨的大图案。
+    const longGrain = TileableFbm2(u * 9, v * 72, 9, {
+      octaves: 3, seed: seed + 11, periodY: 72,
+    });
+    const fibre = Ridged2(u * 13, v * 126, {
+      octaves: 2, seed: seed + 23, periodY: 126,
+    });
+    const pores = TileableFbm2(u * 58, v * 58, 58, { octaves: 2, seed: seed + 37 });
+    const weather = TileableFbm2(u * 18, v * 18, 18, { octaves: 3, seed: seed + 47 });
+    const ridge = Clamp01((fibre - 0.58) * 2.5);
+    const shade = (longGrain - 0.5) * 28 + (pores - 0.5) * 12 - ridge * 16;
+    const sunBleach = Clamp01((weather - 0.55) * 1.45);
+    const base = [hue[0] + shade, hue[1] + shade, hue[2] + shade];
+    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], 142, sunBleach * 0.18);
+    out.r = base[0]; out.g = base[1]; out.b = base[2];
+    out.h = Clamp01(0.54 + (longGrain - 0.5) * 0.14 + ridge * 0.18 + (pores - 0.5) * 0.06);
+    out.rough = Clamp01(0.88 + pores * 0.09 + sunBleach * 0.04);
+    out.ao = Clamp01(0.76 + longGrain * 0.19 - ridge * 0.10);
+    out.metal = 0;
+  }, { normalStrength: 1.45 });
+}
+
+/**
+ * 木箱板材：箱体的板缝、钉子和封边都已是 GLB 几何，不允许再烘一套假接缝。
+ * 仅保留细密锯痕、纵向木纤维与轻微搬运磨损，避免生成图的四宫格拼接痕。
+ */
+export function BakeCrateWood(size = 512, { seed = 439, hue = [151, 124, 84] } = {}) {
+  return BakeMaps(size, (px, py, out) => {
+    const u = px / size, v = py / size;
+    const grain = TileableFbm2(u * 11, v * 86, 11, {
+      octaves: 3, seed: seed + 13, periodY: 86,
+    });
+    const saw = Ridged2(u * 19, v * 144, {
+      octaves: 2, seed: seed + 29, periodY: 144,
+    });
+    const fine = TileableFbm2(u * 74, v * 74, 74, { octaves: 2, seed: seed + 43 });
+    const wear = TileableFbm2(u * 21, v * 21, 21, { octaves: 3, seed: seed + 59 });
+    const groove = Clamp01((saw - 0.64) * 2.8);
+    const tone = (grain - 0.5) * 22 + (fine - 0.5) * 8 - groove * 14;
+    const dust = Clamp01((wear - 0.62) * 1.7);
+    const base = [hue[0] + tone, hue[1] + tone, hue[2] + tone];
+    for (let c = 0; c < 3; c += 1) base[c] = Mix(base[c], 176, dust * 0.13);
+    out.r = base[0]; out.g = base[1]; out.b = base[2];
+    out.h = Clamp01(0.58 + (grain - 0.5) * 0.13 + groove * 0.15 + (fine - 0.5) * 0.05);
+    out.rough = Clamp01(0.82 + fine * 0.10 + dust * 0.05);
+    out.ao = Clamp01(0.80 + grain * 0.15 - groove * 0.10);
+    out.metal = 0;
+  }, { normalStrength: 1.35 });
+}
+
+/**
  * 土布军装：**一块近乎纯色的布**，靠垂坠的褶、汗渍浮土和一点织向立住，不靠花纹。
  * 西北军灰蓝布 / 日军土黄。
  *
@@ -508,16 +568,14 @@ export const RECIPES = {
   GateRoofTile: (s) => BakeRoofTile(s ?? 512, { seed: 353, ridges: 11 }),
   WoodDoor: (s) => BakeWood(s ?? 512, { seed: 401, planks: 4 }),
   WoodBeam: (s) => BakeWood(s ?? 256, { seed: 419, planks: 1, weathered: 0.7 }),
-  // 手推车与木箱的 ImageGen BaseColor + Normal 会在启动时覆盖这两套兜底。
-  // 独立命名避免它们再吃门板缝或整根梁柱尺度的通用木纹。
+  // 小型木制件不用门板缝或整根梁柱尺度的通用木纹；箱体和篱笆均由确定性 PBR
+  // 烘焙，几何自身负责板缝、绑枝等结构细节。
   HandcartWood: (s) => BakeWood(s ?? 512, {
     seed: 431, hue: [118, 101, 82], planks: 1, weathered: 0.86,
   }),
-  WoodCrate: (s) => BakeWood(s ?? 512, {
-    seed: 439, hue: [164, 137, 96], planks: 1, weathered: 0.72,
-  }),
-  // ImageGen 的枣刺篱笆 PBR 在启动时覆盖此兜底；失败时篱笆仍保持粗糙旧木质感。
-  WattleFence: (s) => BakeWood(s ?? 256, { seed: 467, hue: [104, 92, 72], planks: 1, weathered: 0.95 }),
+  WoodCrate: (s) => BakeCrateWood(s ?? 512),
+  WattleFence: (s) => BakeFenceWood(s ?? 256, { seed: 467, hue: [104, 92, 72] }),
+  WoodFence: (s) => BakeFenceWood(s ?? 256, { seed: 479, hue: [122, 102, 72] }),
   // 外部的 ImageGen 树皮 PBR 在启动时会覆盖这套同步兜底；失败时树仍不至于丢材质。
   TreeBark: (s) => BakeWood(s ?? 256, { seed: 457, hue: [92, 82, 66], planks: 1, weathered: 0.9 }),
   WoodStock: (s) => BakeWood(s ?? 256, { seed: 433, hue: [98, 66, 40], planks: 1, weathered: 0.15 }),

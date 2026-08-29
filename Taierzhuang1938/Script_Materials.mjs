@@ -333,6 +333,7 @@ export class MaterialLibrary {
       if (!recipe) continue;
       const size = name.startsWith("Cloth") || name === "Steel" || name === "SteelHelmet"
         || name === "Sandbag" || name === "WoodBeam" || name === "WoodStock"
+        || name === "WattleFence" || name === "WoodFence"
         ? Math.min(256, this.textureSize)
         : this.textureSize;
       const maps = recipe(size);

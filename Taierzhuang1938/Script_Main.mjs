@@ -650,9 +650,6 @@ async function Boot() {
     { name: "HandcartWood", fallback: "WoodBeam",
       albedo: "./Texture/Texture_HandcartWoodBase.webp?v=cartcrate20260826",
       normal: "./Texture/Texture_HandcartWoodNormal.webp?v=cartcrate20260826" },
-    { name: "WoodCrate", fallback: "WoodDoor",
-      albedo: "./Texture/Texture_WoodCrateBase.webp?v=cartcrate20260826",
-      normal: "./Texture/Texture_WoodCrateNormal.webp?v=cartcrate20260826" },
     { name: "TreeBark",
       albedo: "./Texture/Texture_TreeBarkBase.webp?v=1",
       normal: "./Texture/Texture_TreeBarkNormal.webp?v=1",
@@ -707,10 +704,6 @@ async function Boot() {
       albedo: "./Texture/Texture_SandbagBase.webp?v=regen20260824",
       normal: "./Texture/Texture_SandbagNormal.webp?v=regen20260824",
       orm: "./Texture/Texture_SandbagOrm.webp?v=regen20260824" },
-    { name: "WattleFence",
-      albedo: "./Texture/Texture_WattleFenceBase.webp?v=regen20260824",
-      normal: "./Texture/Texture_WattleFenceNormal.webp?v=regen20260824",
-      orm: "./Texture/Texture_WattleFenceOrm.webp?v=regen20260824" },
     { name: "BrickWallSooty",
       albedo: "./Texture/Texture_BrickWallSootyBase.webp?v=1",
       normal: "./Texture/Texture_BrickWallSootyNormal.webp?v=1",
@@ -815,13 +808,13 @@ async function Boot() {
   const PBR_LANES = 12;
 
   /**
-   * 二十九张程序化配方里有二十四张**开机就会被上面那张表整套顶掉**
+   * 大部分程序化配方会被上面那张表整套顶掉
    * （`LoadExternalSet` 直接 `baked.set(name, 下载来的三张)`）。烘完再扔＝白烧 CPU：
    * 实测占开机 8.4 s 里的大头（Adobe 1.24 s、RoofTile 1.24 s、BrickWall 0.97 s…）。
    *
    * 所以开机只烘外部图不覆盖的那几张（ClothNra / ClothIja / SteelHelmet，以及
-   * `fallback` 那一路要拿来当 ORM 底材的 WoodBeam / WoodDoor —— 少烘一张，
-   * 手推车和木箱就没有粗糙度可继承了）。被跳过的那些**等外部那套真读失败了再补烘**，
+   * `fallback` 那一路要拿来当 ORM 底材的 WoodBeam —— 少烘一张，
+   * 手推车就没有粗糙度可继承了）。被跳过的那些**等外部那套真读失败了再补烘**，
    * 见下面 catch 里的那一行：一套几百毫秒，而读失败本来就是异常路径。
    *
    * 别把这里改成"全烘一遍保平安"：那正是这段代码要删掉的东西。
