@@ -154,6 +154,13 @@ function Box(w, h, d, tile, seed, pose) {
   return Place(MakeBox(w, h, d, tile, seed), pose);
 }
 
+/** 低面数椭球。手掌/关节不能再用方料；但细分数也只给到一眼读不出棱的程度。 */
+function Ellipsoid(rx, ry, rz, tile, pose = {}) {
+  const geometry = new THREE.SphereGeometry(1, 10, 7);
+  ScaleUvInPlace(geometry, (2 * Math.PI * Math.max(rx, rz)) / tile, (Math.PI * ry) / tile);
+  return Place(geometry, { ...pose, sx: rx, sy: ry, sz: rz });
+}
+
 /** 圆管/圆柱，轴沿 Z（枪管、弹体、握把都是这个朝向）。 */
 function Tube(rTop, rBottom, len, segments, tile, pose) {
   const geometry = new THREE.CylinderGeometry(rTop, rBottom, len, segments, 1, false);
@@ -393,31 +400,35 @@ function BuildHandGeometry(side, key) {
       const len = lens[i];
       // ry 只是让整根指往外斜一点（拇指走虎口），链的闭合仍然只由 ang 决定
       const dx = Math.sin(ry) * dz;
-      skin.push(Tube(radii[i + 1], radii[i], len, 6, TIP,
+      skin.push(Tube(radii[i + 1], radii[i], len, 9, TIP,
         { x: px + dx * len * 0.5, y: py + dy * len * 0.5, z: pz + dz * len * 0.5, rx: ang, ry }));
       px += dx * len; py += dy * len; pz += dz * len;
     }
     // 指尖收个圆头，免得看到一个平切面
-    skin.push(Tube(radii[radii.length - 1] * 0.55, radii[radii.length - 1], 0.006, 6, TIP,
+    skin.push(Tube(radii[radii.length - 1] * 0.55, radii[radii.length - 1], 0.006, 9, TIP,
       { x: px, y: py, z: pz, rx: ang, ry }));
   };
 
-  // 掌：两段收锥（指根宽、腕端窄）。一整块 76×82 的板是"手是方料"的头号来源
-  skin.push(Box(0.076, 0.028, 0.046, VM_TILE.cloth, `${key}palmA`, { x: 0, y: -0.024, z: 0.008, rx: 0.10 }));
-  skin.push(Box(0.062, 0.026, 0.044, VM_TILE.cloth, `${key}palmB`, { x: 0, y: -0.030, z: -0.032, rx: 0.06 }));
+  // 掌：两块交叠椭球做出「指根宽、掌根窄」的连续轮廓。上一版虽然拆成
+  // 两块收锥，本质仍是两只长方体；近镜头下掌沿那道 90° 硬折与反腕叠在一起，
+  // 看起来就是一把折断的木夹子。椭球仍是低面数，但掌背到大/小鱼际已经是圆转的。
+  skin.push(Ellipsoid(0.037, 0.018, 0.030, VM_TILE.cloth,
+    { x: 0, y: -0.024, z: 0.006, rx: 0.10 }));
+  skin.push(Ellipsoid(0.031, 0.017, 0.027, VM_TILE.cloth,
+    { x: 0, y: -0.029, z: -0.031, rx: 0.06 }));
   // 掌指关节那一排：握拳时最先顶出来的一条横棱，做成圆的
-  skin.push(Tube(0.013, 0.013, 0.072, 6, TIP, { x: 0, y: -0.016, z: 0.028, rx: 0, ry: Math.PI / 2 }));
+  skin.push(Tube(0.012, 0.012, 0.070, 9, TIP, { x: 0, y: -0.016, z: 0.028, rx: 0, ry: Math.PI / 2 }));
   // 小鱼际（小指侧掌沿）：手不是左右对称的板，这一坨让它有握持的厚度
-  skin.push(Tube(0.014, 0.011, 0.062, 6, TIP,
+  skin.push(Tube(0.013, 0.010, 0.060, 9, TIP,
     { x: -S * 0.031, y: -0.028, z: -0.008, rx: 0.08, ry: 0.10 * S }));
 
   // 四指。i=0 是食指侧：最长、卷得最少；到小指逐根变短变细、卷得更深 ——
   // 握住圆柱时四指本来就不齐，这一点差异就是"手"和"梳子"的分界。
-  const pitch = 0.0182;
+  const pitch = 0.0175;
   for (let i = 0; i < 4; i += 1) {
     const x = (i - 1.5) * pitch * S;
     const k = 1 - i * 0.075;                       // 逐根变短
-    const r0 = 0.0078 * (1 - i * 0.05);            // 逐根变细
+    const r0 = 0.0072 * (1 - i * 0.05);            // 逐根变细
     Finger(
       x,
       { y: -0.014 - i * 0.0015, z: 0.030, a: 0.10 + i * 0.05 },
@@ -476,8 +487,13 @@ const ELBOW_ANCHOR = {
   right: new THREE.Vector3(0.260, -0.360, -0.060),
   left: new THREE.Vector3(0.020, -0.360, -0.500),
 };
-// 小臂末端停在离握持点这么远的地方 —— 也就是腕的位置。手掌本体只有 5 cm 出头，
-// 停太近袖口会吃掉手指，停太远腕和掌之间会开一道缝。
+// 手的原点是「被握住的棍的轴心」，**不是腕关节**。掌根在手局部的
+// z < 0 一侧；袖管若直接追原点，袖口就会卡在枪上，拳头却在另一边，
+// 画面上读成「前臂接在手背/拇指上，腕子反折」。这个点取自 BuildHandGeometry
+// 里 palmB 的掌根与旧腕管的交叠中心，必须跟着 handGroup 旋转；不能把它当成
+// 枪局部或 armAnchor 里的固定偏移。
+const HAND_WRIST_LOCAL = new THREE.Vector3(0, -0.040, -0.058);
+// 小臂末端停在离解剖腕点这么远的地方；剩下一截由 cap 里的皮肤腕管接上。
 const WRIST_INSET = 0.052;
 // setFromUnitVectors 的起始轴：小臂几何是按 +Z 建的
 const SLEEVE_FORWARD = new THREE.Vector3(0, 0, 1);
@@ -2327,8 +2343,9 @@ export class Viewmodel {
 
   _AimSleeve(sleeve, handGroup, elbow) {
     const { a, b, q } = this._sleeveTmp;
-    // 手的握持点换算到 armAnchor 局部空间（肘锚点就写在这个空间里）
-    handGroup.getWorldPosition(a);
+    // 把手掌后方的真正腕点换算到 armAnchor 空间。这里不能再用
+    // handGroup.getWorldPosition：那是枪的握持轴心，正是上一版「反关节」的病根。
+    handGroup.localToWorld(a.copy(HAND_WRIST_LOCAL));
     this.armAnchor.worldToLocal(a);
     const dir = b.copy(a).sub(elbow);
     const reach = dir.length();

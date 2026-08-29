@@ -643,3 +643,23 @@ B4 是给枪写的：枪要从斜挎位摆回肩上、要压住后坐，所以�
 
 回归：`Script_GunFeelTest` / `Script_AdsSightTest` / `Script_BayonetTest` /
 `Script_SprintViewmodelTest` / `Script_FpsArmTest` 全绿。
+
+---
+
+## 2026-08-29 · 旧手模掌根与前臂重连
+
+上一轮把袖管从手的局部轴拆出来是对的，但新的 `_AimSleeve()` 仍把
+`handGroup` 原点当成了腕关节。那个原点的真正语义是「枪的握持轴心」：袖口
+追到枪上，掌根却仍在手模局部的另一侧，于是前臂看上去接在了手背/
+拇指上，就是玩家截图里的「反关节」。
+
+现在用 `HAND_WRIST_LOCAL` 显式标出掌根后方的解剖腕点，每帧先随当前手部姿态
+变换到 `armAnchor` 空间，再让袖管追这个点。因此腰射、开镜、拉栓和换弹不再
+各自凑腕位，同一条掌根—腕—前臂链始终连续。
+
+掌体同时由方盒换成交叠低面数椭球，手指圆管增加侧面并稍微收细；这次
+不改各武器的握持点与动作时序，只修轮廓和骨链接点。
+
+回归：`Script_GunFeelTest` / `Script_AdsSightTest` /
+`Script_SprintViewmodelTest` / `Script_FpsArmTest` 全绿；本地枪械编辑器实拍复查
+中正式、汉阳造、捷克式、驳壳枪与中正式拉栓中帧。
