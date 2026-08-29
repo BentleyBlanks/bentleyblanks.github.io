@@ -554,9 +554,9 @@ export const RECIPES = {
   // 构件库离散战损态的 imagegen PBR 兜底。正式图缺失时仍保留相同的
   // “初阶崩裂 / 严重破坏”层级，不让编辑器因为一张贴图 404 回到同一张完好墙。
   BuildingDamageEarly: (s) => BakeBrickWall((s ?? 512) * 2,
-    { seed: 191, rowsPerTile: 20, damage: 0.42, sootiness: 0.32 }),
+    { seed: 191, rowsPerTile: 20, damage: 0.72, sootiness: 0.28 }),
   BuildingDamageSevere: (s) => BakeBrickWall((s ?? 512) * 2,
-    { seed: 197, rowsPerTile: 20, damage: 0.88, sootiness: 0.96 }),
+    { seed: 197, rowsPerTile: 20, damage: 1.0, sootiness: 0.62 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   // 滕县城墙的三套 ImageGen PBR 在启动时覆盖这些同步兜底。独立命名避免把
   // 民居青砖、土坯房和普通院落条石一起换成军事城墙尺度的纹理。

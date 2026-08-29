@@ -1352,11 +1352,13 @@ const damageEarly = await page.evaluate(() => {
 Check("构件库可即时预览炮击初损建模态",
   damageEarly.state === "shellDamaged" && !damageEarly.sectionHidden
     && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture
-    && damageEarly.detail?.impactMarks === 2
-    && damageEarly.detail?.fractureBricks >= 18
-    && damageEarly.detail?.crackSegments === 16
-    && damageEarly.detail?.looseBricks === 12
-    && damageEarly.detail?.exposedBeams === 0,
+    && damageEarly.detail?.stage === "shell"
+    && damageEarly.detail?.impactMarks === 3
+    && damageEarly.detail?.fractureBricks >= 40
+    && damageEarly.detail?.crackSegments === 54
+    && damageEarly.detail?.looseBricks === 30
+    && damageEarly.detail?.exposedBeams === 3
+    && damageEarly.detail?.roofFragments === 16,
   JSON.stringify(damageEarly));
 await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
 await page.screenshot({
@@ -1382,12 +1384,12 @@ const damageSevere = await page.evaluate(() => {
 Check("构件库可即时预览严重破坏建模态",
   damageSevere.state === "severeDamage" && damageSevere.facts.includes("严重破坏")
     && !!damageSevere.texture
-    && damageSevere.detail?.impactMarks === 3
-    && damageSevere.detail?.fractureBricks >= 40
-    && damageSevere.detail?.crackSegments === 54
-    && damageSevere.detail?.looseBricks === 30
-    && damageSevere.detail?.exposedBeams === 3
-    && damageSevere.detail?.roofFragments === 16,
+    && damageSevere.detail?.impactMarks === 5
+    && damageSevere.detail?.fractureBricks >= 84
+    && damageSevere.detail?.crackSegments === 160
+    && damageSevere.detail?.looseBricks === 52
+    && damageSevere.detail?.exposedBeams === 6
+    && damageSevere.detail?.roofFragments === 36,
   JSON.stringify(damageSevere));
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),

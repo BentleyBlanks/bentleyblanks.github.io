@@ -98,9 +98,9 @@ if __name__ == "__main__":
     # 构件库的两档预建模战损。高分辨率 base color 由 imagegen 产出；这里统一
     # 做无缝偏移、浏览器尺寸压缩并推导对位的 normal / ORM，避免把原始 PNG
     # 直接塞进开机路径，也避免各编辑器各自解释一套表面状态。
-    build_if_source("BuildingDamageEarly", normal_strength=3.4, metalness=0,
+    build_if_source("BuildingDamageEarly", normal_strength=4.0, metalness=0,
                     rough_min=184, rough_max=244, base_quality=84, map_quality=72)
-    build_if_source("BuildingDamageSevere", normal_strength=4.2, metalness=0,
+    build_if_source("BuildingDamageSevere", normal_strength=5.2, metalness=0,
                     rough_min=196, rough_max=252, base_quality=84, map_quality=72)
     build_if_source("Adobe", normal_strength=3.2, metalness=0, rough_min=218, rough_max=255)
     build_if_source("Stone", normal_strength=3.1, metalness=0, rough_min=156, rough_max=226)

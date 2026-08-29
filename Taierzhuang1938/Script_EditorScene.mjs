@@ -74,8 +74,10 @@ const PROLOGUE_SCENE = {
  */
 export const BUILDING_DAMAGE_STATES = Object.freeze({
   original: Object.freeze({ id: "original", label: "原始状态", damage: null, burnt: false, material: null, detail: null }),
-  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.46, burnt: false, material: "BuildingDamageEarly", detail: "early" }),
-  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.88, burnt: true, material: "BuildingDamageSevere", detail: "severe" }),
+  // 初损直接承接上一版严重档：一处真实立面缺口、断梁、散瓦与三组爆点都保留。
+  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.88, burnt: false, material: "BuildingDamageEarly", detail: "shell" }),
+  // 新严重档跨过各正式生成器的彻底坍塌阈值，并由 detail 层再补第二缺口的现场证据。
+  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.98, burnt: true, material: "BuildingDamageSevere", detail: "severe" }),
 });
 export const BUILDING_DAMAGE_STATE_OPTIONS = Object.freeze(
   Object.values(BUILDING_DAMAGE_STATES).map(({ id: value, label }) => Object.freeze({ value, label })),
