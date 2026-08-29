@@ -1503,30 +1503,51 @@ export function AddPierPorchHouse(sink, {
 
 /** 水井：石砌井口，井栏外径 0.8—1.0 m、高 0.4—0.6 m。 */
 export function AddWell(sink, x, z) {
-  const g = new THREE.CylinderGeometry(0.48, 0.52, 0.52, 20, 1, true);
+  // 井筒故意是开口几何；WellStone 材质为双面，确保从井口往下看时内壁不会
+  // 因背面剔除消失。井圈补一只实体 torus，把零厚度的圆柱边缘藏起来。
+  const g = new THREE.CylinderGeometry(0.48, 0.52, 0.52, 24, 1, true);
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 2.2, uv.getY(i) * 0.4);
-  sink.Add("Stone", PlaceGeometry(g, { x, y: 0.26, z }));
-  const lip = new THREE.TorusGeometry(0.5, 0.055, 6, 18);
+  sink.Add("WellStone", PlaceGeometry(g, { x, y: 0.26, z }));
+  const lip = new THREE.TorusGeometry(0.5, 0.055, 8, 24);
   lip.rotateX(Math.PI / 2);
-  sink.Add("Stone", PlaceGeometry(lip, { x, y: 0.52, z }));
+  sink.Add("WellStone", PlaceGeometry(lip, { x, y: 0.52, z }));
+  const depth = new THREE.CircleGeometry(0.405, 24);
+  depth.rotateX(-Math.PI / 2);
+  sink.Add("WellDepth", PlaceGeometry(depth, { x, y: 0.08, z }));
   sink.Solid(x, 0.26, z, 0.55, 0.26, 0.55, "prop");
   sink.Cover(x, z, 0.52, 0, 1);
 }
 
 export function AddMillstone(sink, x, z, seed = "ms") {
   const base = new THREE.CylinderGeometry(0.52, 0.55, 0.18, 18);
-  sink.Add("Stone", PlaceGeometry(base, { x, y: 0.09, z }));
+  sink.Add("Millstone", PlaceGeometry(base, { x, y: 0.09, z }));
   const top = new THREE.CylinderGeometry(0.44, 0.44, 0.16, 18);
-  sink.Add("Stone", PlaceGeometry(top, { x, y: 0.26, z, ry: HashString(seed) % 100 / 100 }));
+  sink.Add("Millstone", PlaceGeometry(top, { x, y: 0.26, z, ry: HashString(seed) % 100 / 100 }));
   sink.Solid(x, 0.17, z, 0.55, 0.17, 0.55, "prop");
 }
 
 export function AddWaterVat(sink, x, z, seed = "vat") {
-  const g = new THREE.CylinderGeometry(0.42, 0.34, 0.78, 16, 1, true);
+  // 水缸是敞口旋转体，不是上下一样粗的管子。材质为双面、口沿为实体，镜头
+  // 从缸口上方或旋到背后都能读到内壁；水面把空心圆筒底下的地面遮住。
+  const profile = [
+    new THREE.Vector2(0.33, 0.00),
+    new THREE.Vector2(0.38, 0.08),
+    new THREE.Vector2(0.45, 0.28),
+    new THREE.Vector2(0.46, 0.56),
+    new THREE.Vector2(0.42, 0.72),
+    new THREE.Vector2(0.40, 0.78),
+  ];
+  const g = new THREE.LatheGeometry(profile, 24);
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * 2.0, uv.getY(i) * 0.7);
-  sink.Add("Stone", PlaceGeometry(g, { x, y: 0.39, z }));
+  sink.Add("WaterVatCeramic", PlaceGeometry(g, { x, y: 0, z, ry: HashString(seed) % 100 / 100 }));
+  const lip = new THREE.TorusGeometry(0.405, 0.045, 8, 24);
+  lip.rotateX(Math.PI / 2);
+  sink.Add("WaterVatCeramic", PlaceGeometry(lip, { x, y: 0.78, z }));
+  const water = new THREE.CircleGeometry(0.345, 24);
+  water.rotateX(-Math.PI / 2);
+  sink.Add("VatWater", PlaceGeometry(water, { x, y: 0.66, z }));
   sink.Solid(x, 0.39, z, 0.44, 0.39, 0.44, "prop");
   sink.Cover(x, z, 0.78, 0, 1);
 }

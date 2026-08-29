@@ -115,6 +115,14 @@ const MATERIAL_MAP = {
   HouseBrick: { recipe: "BrickWall", color: 0xe8ecf2 },
   CrossStone: { recipe: "Stone", color: 0xfbfaf6 },
   Stone: { recipe: "Stone", color: 0xfbfaf6 },
+  // 院落三件各有 imagegen Base + Normal；开口井筒与水缸必须双面，否则从口沿
+  // 往里看会被背面剔除。石磨也同档，保证构件库转到任意角度时不缺面。
+  WellStone: { recipe: "WellStone", color: 0xf0f1ee, roughness: 1.0,
+    normalScale: 0.82, side: THREE.DoubleSide },
+  Millstone: { recipe: "Millstone", color: 0xeeeeea, roughness: 1.0,
+    normalScale: 0.74, side: THREE.DoubleSide },
+  WaterVatCeramic: { recipe: "WaterVatCeramic", color: 0xf3ece5, roughness: 0.72,
+    normalScale: 0.68, envMapIntensity: 0.72, side: THREE.DoubleSide },
   Adobe: { recipe: "Adobe", color: 0xf6e6c4 },
   RoofTile: { recipe: "RoofTile", color: 0xd8dde4 },
   // 城楼筒瓦：比民居小青瓦更深更冷
@@ -183,6 +191,8 @@ const PLAIN_MAP = {
   PaintGreen: { color: DustBlend(PALETTE.paintGreen, 0.35), roughness: 0.94 },
   IronPlate: { color: PALETTE.ironDoor, roughness: 0.62, metalness: 0.5 },
   Charred: { color: PALETTE.charred, roughness: 0.95 },
+  WellDepth: { color: 0x151a18, roughness: 1.0, side: THREE.DoubleSide },
+  VatWater: { color: 0x38433d, roughness: 0.24, metalness: 0.0, side: THREE.DoubleSide },
   Wheat: { color: PALETTE.wheat, roughness: 0.94 },
   WheatLight: { color: 0x718251, roughness: 0.96 },
   FieldStubble: { color: 0x8d774f, roughness: 0.98 },

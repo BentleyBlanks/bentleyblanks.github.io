@@ -611,6 +611,11 @@ export const RECIPES = {
   GroundRubble: (s) => BakeRubbleGround(s ?? 512, { seed: 719, brickiness: 0.85 }),
   Sandbag: (s) => BakeSandbag(s ?? 256, { seed: 809 }),
   Stone: (s) => BakeStone(s ?? 512, { seed: 907 }),
+  // 院落三件的 imagegen Base + Normal 兜底。正常开机整套覆盖；任一外图失败时
+  // 仍要有同名 recipe，catch 才能补烘而不是到建场时抛“材质未烘焙”。
+  WellStone: (s) => BakeStone(s ?? 512, { seed: 911, courses: 6, perCourse: 5 }),
+  Millstone: (s) => BakeStone(s ?? 512, { seed: 919, courses: 1, perCourse: 1 }),
+  WaterVatCeramic: (s) => BakeFlat(s ?? 256, { color: [58, 43, 32], rough: 0.78 }),
   // 庙墙灰浆：ImageGen 的 TemplePlaster PBR 在启动时覆盖此兜底；失败时退回土坯质感。
   TemplePlaster: (s) => BakeAdobe(s ?? 512, { seed: 223 }),
   // 车站红砖 / 监狱青砖：同上，外部 webp 开机覆盖；兜底只保证「加载失败不丢材质」，

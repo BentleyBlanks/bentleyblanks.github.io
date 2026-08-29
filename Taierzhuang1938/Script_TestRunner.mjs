@@ -142,7 +142,10 @@ export const testDefs = {
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
   MenuTest: { file: "Script_MenuTest.mjs", desc: "主菜单接线 29 条" },
   BootPropTest: { file: "Script_BootPropTest.mjs", desc: "开机陈设道具计数" },
-  EditorTest: { file: "Script_EditorTest.mjs", desc: "编辑器套件（phase=5 十字街）44+ 项" },
+  // 现有套件已扩到 143 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
+  // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
+  EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
+    desc: "编辑器套件（phase=5 十字街）143 项" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },

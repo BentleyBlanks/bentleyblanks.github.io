@@ -1355,6 +1355,45 @@ Check("切换到构件库前恢复场景相机参数",
   JSON.stringify(props.originalProjection) === JSON.stringify(scene.originalProjection),
   `${scene.originalProjection.join("/")} → ${props.originalProjection.join("/")}`);
 
+// 三件院落小物不能再共用通用 Stone：构件库就是玩家报告问题的入口，逐件确认
+// Base / Normal 真接上，并把双面材质契约钉住（井筒和水缸从口沿看进去就是背面）。
+await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
+const courtyardPbr = {};
+for (const spec of [
+  { id: "Well", stem: "WellStone" },
+  { id: "Millstone", stem: "Millstone" },
+  { id: "WaterVat", stem: "WaterVat" },
+]) {
+  await page.evaluate((id) => window.Taierzhuang.editor.active.SetPalette(id), spec.id);
+  await Step(2);
+  courtyardPbr[spec.id] = await page.evaluate(() => {
+    const active = window.Taierzhuang.editor.active;
+    const base = [], normal = [], sides = [];
+    active.previewRoot.traverse((node) => {
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of materials) {
+        if (!material) continue;
+        const baseSrc = material.map?.image?.currentSrc || material.map?.image?.src;
+        const normalSrc = material.normalMap?.image?.currentSrc || material.normalMap?.image?.src;
+        if (baseSrc) base.push(baseSrc);
+        if (normalSrc) normal.push(normalSrc);
+        sides.push(material.side);
+      }
+    });
+    return { base, normal, sides, meshes: active.preview?.meshes || 0 };
+  });
+  const result = courtyardPbr[spec.id];
+  Check(`${spec.id} 使用专属 Base + Normal 且背面可见`,
+    result.meshes > 0
+      && result.base.some((src) => src.includes(`Texture_${spec.stem}Base.webp`))
+      && result.normal.some((src) => src.includes(`Texture_${spec.stem}Normal.webp`))
+      && result.sides.includes(2),
+    JSON.stringify(result));
+  await page.screenshot({
+    path: path.join(projectDir, "_shots", `editor_prop_${spec.id}_pbr.png`),
+  });
+}
+
 await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   active.SetPalette("RoomBlock");
@@ -1386,7 +1425,6 @@ Check("构件库原始态保留正式房屋基模与砖材",
   damageOriginal.state === "original" && damageOriginal.facts.includes("原始状态")
     && !!damageOriginal.texture,
   JSON.stringify(damageOriginal));
-await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
 await page.screenshot({
   path: path.join(projectDir, "_shots", "editor_prop_damage_original.png"),
 });

@@ -737,6 +737,17 @@ async function Boot() {
       albedo: "./Texture/Texture_StoneBase.webp?v=1",
       normal: "./Texture/Texture_StoneNormal.webp?v=1",
       orm: "./Texture/Texture_StoneOrm.webp?v=1" },
+    // 院落三件：imagegen Base + 对位 Normal，继续借 Stone ORM 的非金属全粗糙口径。
+    // 缺图时各自退回同名程序化配方，不牵连通用 Stone 或其它外部 PBR。
+    { name: "WellStone", fallback: "Stone",
+      albedo: "./Texture/Texture_WellStoneBase.webp?v=courtyardpbr20260830",
+      normal: "./Texture/Texture_WellStoneNormal.webp?v=courtyardpbr20260830" },
+    { name: "Millstone", fallback: "Stone",
+      albedo: "./Texture/Texture_MillstoneBase.webp?v=courtyardpbr20260830",
+      normal: "./Texture/Texture_MillstoneNormal.webp?v=courtyardpbr20260830" },
+    { name: "WaterVatCeramic", fallback: "Stone",
+      albedo: "./Texture/Texture_WaterVatBase.webp?v=courtyardpbr20260830",
+      normal: "./Texture/Texture_WaterVatNormal.webp?v=courtyardpbr20260830" },
     { name: "StationBrick",
       albedo: "./Texture/Texture_StationBrickBase.webp?v=e2",
       normal: "./Texture/Texture_StationBrickNormal.webp?v=e2",
