@@ -37,6 +37,7 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
+import { FpsArmPose } from "./Data_FpsArmPoses.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -1039,7 +1040,7 @@ function BuildDadao(materials, weapon, key) {
     sight: null,
     hands: {
       // 双手握柄：右手在上（靠护手），左手在下（靠铁环）。
-      // ry = π 的理由与 MODEL_FP_TWEAK.Dadao 那条一样：小臂要顺着刀柄往身体方向
+      // ry = π 与 Data_FpsArmPoses 的大刀接触轴一致：小臂要顺着刀柄往身体方向
       // 伸，不能顺着刀身伸。这条是模型读不到时的退路，两边得给同一个手位。
       right: { x: 0, y: 0, z: -0.055, rx: 0, ry: Math.PI, rz: -1.52 },
       left: { x: 0, y: 0, z: 0.055, rx: 0, ry: Math.PI, rz: 1.60 },
@@ -1095,65 +1096,13 @@ const VM_MATERIAL_BY_MESH = {
 };
 
 /**
- * 每把枪在**第一人称手里**的摆法。模型的规范系是"右手握把 = 原点、刃/柄朝 -Z"，
- * 而第一人称要把它端到眼前、稍微立起来一点，所以这里给一层姿态修正。
- * 手的**朝向**推不出来（挂点只有位置没有旋转），沿用手搭 rig 里调好的那几个角。
- */
-const MODEL_FP_TWEAK = {
-  Dadao: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    // ry = π：**小臂朝哪边伸**。手的局部 -Z 是小臂方向（袖口/前臂那三根管子都摆在
-    // z < 0 一侧，见 BuildHandGeometry），原来 ry = 0 让小臂顺着武器的 -Z 伸出去 ——
-    // 那是刀身的方向。旧姿态里刀平举向前，小臂跟着指向画面深处还看不出毛病；
-    // 新姿态把刀立起来之后，两条小臂就变成两截灰盒子横在刀身上，把刀刃挡掉一半。
-    // 加 π 之后小臂改朝武器 +Z（刀柄、柄尾环那一侧），也就是顺着握把往下、往画外
-    // 伸回身体 —— 这才是双手握刀该有的样子，画面里也只剩下拳头。
-    handRot: { right: [0, Math.PI, -1.52], left: [0, Math.PI, 1.60] },
-  },
-  Grenade: {
-    // 弹体朝前上方：跟手搭 rig 里 prop.rotation.x = -0.35 是同一个角
-    pose: { x: 0, y: 0.02, z: -0.02, rx: -0.35, ry: 0, rz: 0 },
-    handRot: { right: [0.30, 0, -1.52], left: [0.10, 0.5, 1.30] },
-  },
-  // 三支栓动步枪的左手 ry = -π/2 是"托住护木"的必要条件，别改回 0.35：
-  // 手指是绕手的局部 **X 轴**卷的（见 BuildHandGeometry 抬头），ry ≈ 0 时局部 X
-  // 落在武器的横向上，于是四指是**横着**扒在护木上的 —— 从枪管方向看过去，
-  // 它们整排埋进木头里，只在开镜时从机匣右边支出四根平行的指头（"一把耙子"）。
-  // ry = -π/2 把局部 X 转到枪管轴上，手指才是绕着护木卷的。
-  ZhongZheng: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
-  },
-  HanYang: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
-  },
-  Type38: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.08, 0, -1.52], left: [0.18, -Math.PI / 2, 1.35] },
-  },
-  Zb26: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.10, 0, -1.50], left: [0.20, -Math.PI / 2, 1.32] },
-  },
-  Mauser96: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
-  },
-  ServicePistol: {
-    pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
-    handRot: { right: [0.12, 0, -1.50], left: [0.10, 0.4, 1.30] },
-  },
-};
-
-/**
  * 拿一个 TZM 文档搭第一人称的 rig。契约与 BuildBoltRifle 那几个完全一致，
  * 所以 Equip / 开镜 / 枪口焰 / 深度预算一行都不用改。读不到就返回 null，
  * 调用方退回手搭的 rig —— 少一个模型不能让人空着手。
  */
 function BuildFromModel(materials, weapon, key, doc) {
-  const tweak = MODEL_FP_TWEAK[key] || MODEL_FP_TWEAK[key.replace("Bundle", "")]
-    || { pose: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 }, handRot: { right: [0, 0, -1.5], left: [0, 0, 1.6] } };
+  const armPose = FpsArmPose(key);
+  if (!armPose) throw new Error(`缺少逐枪第一人称姿势数据：${key}`);
   const table = {};
   for (const [meshName, vmName] of Object.entries(VM_MATERIAL_BY_MESH)) {
     if (materials[vmName]) table[meshName] = materials[vmName];
@@ -1173,8 +1122,8 @@ function BuildFromModel(materials, weapon, key, doc) {
 
   const group = new THREE.Group();
   group.name = `VmModel_${key}`;
-  built.root.position.set(tweak.pose.x, tweak.pose.y, tweak.pose.z);
-  built.root.rotation.set(tweak.pose.rx, tweak.pose.ry, tweak.pose.rz, "XYZ");
+  built.root.position.set(0, 0, 0);
+  built.root.rotation.set(0, 0, 0);
   group.add(built.root);
   // group 还没进场景，它的 matrixWorld 就是单位阵 —— 于是挂点的 matrixWorld
   // 读出来正好是 rig 局部坐标，正是 muzzle / hands 要的那个空间。
@@ -1215,8 +1164,8 @@ function BuildFromModel(materials, weapon, key, doc) {
     : new THREE.Vector3(0.026, 0.035, -0.06);
   const clipSeat = magazine.clone();
   clipSeat.y += 0.045;
-  const hr = tweak.handRot.right;
-  const hl = tweak.handRot.left;
+  const hr = armPose.contacts.right;
+  const hl = armPose.contacts.left;
 
   return {
     group,
@@ -1229,54 +1178,14 @@ function BuildFromModel(materials, weapon, key, doc) {
     // 已经写进 TZM 的 sight 挂点。过去这里硬编码 null，三把新枪都丢了铁瞄。
     sight,
     hands: {
-      right: { x: gripR.x, y: gripR.y, z: gripR.z, rx: hr[0], ry: hr[1], rz: hr[2] },
-      left: { x: gripL.x, y: gripL.y, z: gripL.z, rx: hl[0], ry: hl[1], rz: hl[2] },
+      right: { x: hr.position[0], y: hr.position[1], z: hr.position[2], rx: hr.rotation[0], ry: hr.rotation[1], rz: hr.rotation[2] },
+      left: { x: hl.position[0], y: hl.position[1], z: hl.position[2], rx: hl.rotation[0], ry: hl.rotation[1], rz: hl.rotation[2] },
     },
     boltHandle,
     adsHide,
     source: "model",
   };
 }
-
-/**
- * 各武器的腰射姿态（枪在画面里的位置）。
- * 这张表是最该反复调的东西：枪压得越低越"沉"，越靠右越像端着走。
- */
-// 事故：rifle 原本 pz = -0.095，机匣后端面（局部 z = -0.095 + 0.245/2）停在离
-// 相机 6.75 cm 的地方，机匣在 1600×900 上有 243 px 高 —— 一根横穿右半屏的钢梁。
-// 3A 的第一人称枪机匣在这个分辨率上通常是 110—140 px。把 pz 推到 -0.320
-// （后端面退到 ~29 cm）才落回那个区间。注意**只有 pz 改画面**：整体缩放绕相机
-// 原点是等比的，改 depthBudget 一个像素都不动，它管的是"枪会不会插进墙里"。
-const HIP_POSES = {
-  rifle: { px: 0.100, py: -0.142, pz: -0.320, rx: 0.045, ry: -0.060, rz: 0.028 },
-  lmg: { px: 0.100, py: -0.165, pz: -0.300, rx: 0.070, ry: -0.090, rz: 0.045 },
-  pistol: { px: 0.055, py: -0.090, pz: -0.140, rx: 0.030, ry: -0.050, rz: 0.020 },
-  // 木柄弹原来离眼只有 13 cm、又在视线下 15 cm：握点是 49° 俯角，手必然整只
-  // 掉出 27.5° 的半视场，只剩一根怼脸的木棍。推到 42 cm 后手、柄、弹体能同框。
-  throwable: { px: 0.100, py: -0.140, pz: -0.420, rx: 0.150, ry: -0.250, rz: 0.100 },
-  // 大刀。**上一版这一行等于"没拿刀"**：pz = -0.130 把刀柄摆在眼前 13 cm，
-  // 而 py = -0.165 —— 也就是握把在视线下方 atan(0.165/0.130) = 52°，而半视场只有
-  // 27.5°。整只手连同刀柄全部落在画面下沿之外；刀身又几乎顺着视线方向指出去
-  // （rx 只有 -0.18，等于平举向前），60 cm 的刀身在屏幕上是一条端面朝人的细线，
-  // 剩下那一点点还正好被右下角的小地图盖住。逐顶点投影的取证：整把刀只有刀身
-  // 那一块有 21% 的顶点落在 1600×900 里，而且全挤在 x>1217、y>755 的那个角上，
-  // 手是 0%。玩家报的"拿着大刀但基本上看不到"就是这么来的，不是亮度问题
-  // ——同一帧同一光照下汉阳造是看得见的。
-  //
-  // 这一版按"能看见"反解：
-  //   · pz 从 -0.130 推到 -0.500 —— 刀是 0.9 m 的长家伙，握把离眼 13 cm 时
-  //     刀身张角超过整个视场，必然要么怼脸要么出框。半米才是"举在身前"的距离。
-  //     （只有 pz/px/py 的**比值**改画面：整体等比缩放绕相机原点不动一个像素，
-  //     深度预算会自己把总尺度收回 0.9 m 以内，见 _RecomputeCompensation。）
-  //   · rx +0.75 / ry -0.75 把刀身从"指着前方"抬成"斜举于右前"，刀尖落在
-  //     画面右上（约 x1350 y240），刀柄在右下角出框 —— 一条完整的斜线。
-  //   · rz +1.54 是绕刀身自转：仍让 57 mm 的刀面侧对镜头（刃朝镜头时只剩
-  //     5.4 mm 厚的一条线），但把正刃转到实际挥砍的前缘。
-  // 把刀沿自身轴翻到正刃在前：上一版 rz=-1.60 虽然让刀面可见，却把刀背
-  // 摆在挥砍的前缘，第一眼就是反刃握刀。+1.54 保留同样的宽刃剪影，但正刃朝向
-  // 下一刀真正落下的方向；同时把刀略往中线收，蓄力时才有空间继续往右上拉。
-  melee: { px: 0.235, py: -0.195, pz: -0.520, rx: 0.720, ry: -0.620, rz: 1.540 },
-};
 
 // 上刺刀那套动作用到的几个数（口径见 docs/Data_Bayonet.md「动画」一节）。
 //
@@ -1469,6 +1378,12 @@ export class Viewmodel {
     }
     this.handBase = { right: new THREE.Vector3(), left: new THREE.Vector3() };
     this.handBaseRot = { right: new THREE.Euler(), left: new THREE.Euler() };
+    this.gripContactRight = new THREE.Object3D();
+    this.gripContactRight.name = "FpsGripContactRight";
+    this.gripContactLeft = new THREE.Object3D();
+    this.gripContactLeft.name = "FpsGripContactLeft";
+    this.armPose = null;
+    this.actionSpec = null;
     // 小臂挂 armAnchor（相机稳定层），不挂枪 —— 理由同 armAnchor 那段抬头：
     // 肩肘属于人，武器怎么摆都不该牵着它转。导入整臂启用时这两条让位给它。
     this.sleeveRight = MakeSleeve(this.materials, 1);
@@ -1598,6 +1513,8 @@ export class Viewmodel {
     this.weaponVariant = Number.isInteger(variant) && variant > 0 ? variant : 0;
     this.weapon = weaponId ? WEAPONS[weaponId] || null : null;
     this.action = null;
+    this.carryOverride = null;
+    this.bayonetCarry = this.bayonetFixed && this.weapon?.bayonet ? 1 : 0;
     this.boltOpen = false;
     this.pendingHoldOpen = false;
     this.flashTime = 999;
@@ -1620,6 +1537,15 @@ export class Viewmodel {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
       this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
     }
+    this.armPose = FpsArmPose(weaponId);
+    if (!this.armPose) throw new Error(`缺少逐枪第一人称姿势数据：${weaponId}`);
+    this.actionSpec = this.armPose.actions;
+    for (const [side, contact] of Object.entries(this.armPose.contacts)) {
+      this.rig.hands[side] = {
+        x: contact.position[0], y: contact.position[1], z: contact.position[2],
+        rx: contact.rotation[0], ry: contact.rotation[1], rz: contact.rotation[2],
+      };
+    }
     this.rigSource = this.rig.source === "model" ? "model" : "box";
     this.swingPivot.add(this.rig.group);
     this.rig.group.add(this.handRight.group);
@@ -1636,6 +1562,11 @@ export class Viewmodel {
     this.handBase.left.copy(this.handLeft.group.position);
     this.handBaseRot.right.copy(this.handRight.group.rotation);
     this.handBaseRot.left.copy(this.handLeft.group.rotation);
+    this.gripContactRight.position.copy(this.handBase.right);
+    this.gripContactRight.rotation.copy(this.handBaseRot.right);
+    this.gripContactLeft.position.copy(this.handBase.left);
+    this.gripContactLeft.rotation.copy(this.handBaseRot.left);
+    this.rig.group.add(this.gripContactRight, this.gripContactLeft);
 
     // 骨骼双臂用两骨 IK 追随上面两只旧手的握持坐标系。旧手只当隐藏动画靶，既有
     // 每把枪的拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用；真实 Hand 骨和十指负责
@@ -1643,8 +1574,8 @@ export class Viewmodel {
     // 挂点给的是 armAnchor（相机稳定）而不是 rig.group，理由见 armAnchor 那段抬头。
     if (this.riggedArms) {
       this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
-        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft],
-        PoseKindOf(this.weapon));
+        this.gripContactRight, this.gripContactLeft,
+        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft], weaponId);
       this.rigSource = `${this.rigSource}+riggedArms`;
     }
 
@@ -1684,9 +1615,9 @@ export class Viewmodel {
 
     // 姿态表
     const kind = PoseKindOf(this.weapon);
-    this.hipPose = { ...HIP_POSES[kind] };
-    this.adsPose = this._MakeAdsPose(kind);
-    this.sprintPose = this._MakeSprintPose(kind);
+    this.hipPose = this._PoseFromSpec(this.armPose.hip.weapon);
+    this.adsPose = this._MakeAdsPose(kind, this.armPose.ads.weapon);
+    this.sprintPose = this._PoseFromSpec(this.armPose.sprint.weapon);
 
     this._CollectAdsHideParts();
 
@@ -1752,15 +1683,21 @@ export class Viewmodel {
    * 所以位置是解出来的（rigPos = 目标点 - 照门局部坐标），不是手调的。
    * 没有照门的武器（大刀、手榴弹）退化成一个"举到眼前"的准备姿态。
    */
-  _MakeAdsPose(kind) {
-    if (!this.rig || !this.rig.sight) {
+  _PoseFromSpec(spec) {
+    if (!spec || spec.mode !== "fixed") return null;
+    return {
+      px: spec.position[0], py: spec.position[1], pz: spec.position[2],
+      rx: spec.rotation[0], ry: spec.rotation[1], rz: spec.rotation[2],
+    };
+  }
+
+  _MakeAdsPose(kind, spec = this.armPose?.ads?.weapon) {
+    if (spec?.mode === "fixed") {
       this.adsOffset.set(0, 0, 0);
-      // 大刀的"开镜"是架刀预备：双手把刀提到胸前、刀身更竖更靠中线，
-      // 刀尖压进画面上沿以内。**不能沿用旧的那组数**（pz -0.055 把刀柄贴在眼球上，
-      // 和旧腰射姿态一样整只手都在画外），理由见 HIP_POSES.melee 那段账。
-      if (kind === "melee") return { px: 0.175, py: -0.170, pz: -0.470, rx: 0.900, ry: -0.540, rz: -1.500 };
-      if (kind === "throwable") return { px: 0.080, py: -0.100, pz: -0.350, rx: 0.28, ry: -0.10, rz: 0.05 };
-      return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
+      return this._PoseFromSpec(spec);
+    }
+    if (!this.rig || !this.rig.sight) {
+      throw new Error(`${this.weaponId || kind} 的 ADS 姿势要求 sight，但模型没有 sight`);
     }
     const s = this.rig.sight;
     // 正常玩法没有 override，照门仍严格解到相机中心。编辑器可临时把枪挪开，
@@ -1771,10 +1708,10 @@ export class Viewmodel {
       offset.y * SIGHT_CALIBRATION_PER_PX,
       0);
     return {
-      px: -s.x + this.adsOffset.x,
-      py: -s.y + this.adsOffset.y,
-      pz: -SIGHT_EYE_DISTANCE - s.z,
-      rx: 0, ry: 0, rz: 0,
+      px: -s.x + this.adsOffset.x + (spec?.offset?.[0] || 0),
+      py: -s.y + this.adsOffset.y + (spec?.offset?.[1] || 0),
+      pz: -(spec?.eyeDistance ?? SIGHT_EYE_DISTANCE) - s.z + (spec?.offset?.[2] || 0),
+      rx: spec?.rotation?.[0] || 0, ry: spec?.rotation?.[1] || 0, rz: spec?.rotation?.[2] || 0,
     };
   }
 
@@ -1789,44 +1726,15 @@ export class Viewmodel {
     if (!this.weapon || !this.rig || !this.rig.sight) return false;
     const ClampPixel = (value) => Math.max(-32, Math.min(32, Number(value) || 0));
     this.ironSightOffsetOverride = { x: ClampPixel(x), y: ClampPixel(y) };
-    this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon));
+    this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon), this.armPose?.ads?.weapon);
     return true;
   }
 
   /** 清除编辑器临时值，恢复照门与屏幕中心严格共轴。 */
   ResetIronSightOffsetPixels() {
     this.ironSightOffsetOverride = null;
-    if (this.weapon && this.rig) this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon));
+    if (this.weapon && this.rig) this.adsPose = this._MakeAdsPose(PoseKindOf(this.weapon), this.armPose?.ads?.weapon);
     return { x: 0, y: 0 };
-  }
-
-  /** 冲刺：枪斜向下约 40°，同时向右外侧甩开，视野让出来。 */
-  _MakeSprintPose(kind) {
-    const base = HIP_POSES[kind];
-    // 大刀不能套这组绝对角：rx/ry/rz 是照着"枪口朝前"写的，把它们盖到刀上等于
-    // 把刀重新平举回视线方向 —— 又变回看不见的那一版。刀的冲刺是"刀锋压低、
-    // 往右外侧带"，所以从它自己的腰射姿态上做增量。
-    if (kind === "melee") {
-      return {
-        px: base.px + 0.020,
-        py: base.py - 0.030,
-        pz: base.pz + 0.020,
-        // 刀尖从"斜举"压到略低于水平（rx 0.75 -> -0.10），整把刀落到画面右下角，
-        // 中间那块视野让出来。压过头（试过 -0.52 那一版）刀会整个沉出下沿，
-        // 冲刺时又变成"手里没东西"——这正是这轮要修的毛病，不能在冲刺上重犯。
-        rx: base.rx - 0.85,
-        ry: base.ry + 0.10,
-        rz: base.rz + 0.35,
-      };
-    }
-    return {
-      px: base.px + 0.045,
-      py: base.py - 0.055,
-      pz: base.pz + 0.055,
-      rx: -0.70,          // -Z 前向绕 +X 转负角 = 枪口下压，约 40°
-      ry: 0.44,
-      rz: 0.30,
-    };
   }
 
   /**
@@ -2316,7 +2224,11 @@ export class Viewmodel {
     // --- 枪焰 / 碎屑 ---------------------------------------------------------
     this._StepFlash(step);
     this._StepDebris(step);
-    if (this.riggedArms) this.riggedArms.Update(step);
+    if (this.riggedArms) {
+      this.armAnchor.quaternion.identity();
+      this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue) });
+      this.riggedArms.Update(step);
+    }
     this._UpdateSleeves();
   }
 
@@ -2450,6 +2362,10 @@ export class Viewmodel {
     this.handRight.group.rotation.copy(this.handBaseRot.right);
     this.handLeft.group.position.copy(this.handBase.left);
     this.handLeft.group.rotation.copy(this.handBaseRot.left);
+    if (this.riggedArms) {
+      this.riggedArms.SetContactWeight("r", 1);
+      this.riggedArms.SetContactWeight("l", 1);
+    }
     const bolt = this.rig.parts.bolt;
     if (bolt && !this.boltOpen) { bolt.position.z = 0; bolt.rotation.z = 0; }
     const cover = this.rig.parts.dustCover;
@@ -2475,10 +2391,12 @@ export class Viewmodel {
     if (!bolt) return;
     const travel = rig.boltTravel;
 
-    const lift = Ease.InOut(Ease.Seg(t, 0.00, 0.22));
-    const back = Ease.InOut(Ease.Seg(t, 0.20, 0.52));
-    const fwd = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, 0.55, 0.82));
-    const drop = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, 0.80, 1.00));
+    const timing = this.actionSpec?.bolt?.timing || [0.22, 0.52, 0.82];
+    const [liftEnd, backEnd, forwardEnd] = timing;
+    const lift = Ease.InOut(Ease.Seg(t, 0.00, liftEnd));
+    const back = Ease.InOut(Ease.Seg(t, Math.max(0, liftEnd - 0.02), backEnd));
+    const fwd = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, Math.min(0.95, backEnd + 0.03), forwardEnd));
+    const drop = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, Math.max(0, forwardEnd - 0.02), 1.00));
 
     const slide = (back - fwd) * travel;
     bolt.rotation.z = -1.35 * (lift - drop);
@@ -2496,6 +2414,7 @@ export class Viewmodel {
     const reach = Ease.InOut(Ease.Seg(t, 0.02, 0.20));
     const ret = Ease.InOut(Ease.Seg(t, 0.82, 1.00));
     const attach = Clamp01(reach - ret);
+    this.riggedArms?.SetContactWeight("r", 1 - attach);
     const target = this._tmpVec.set(handle.x, handle.y, handle.z + slide);
     this.handRight.group.position.lerpVectors(this.handBase.right, target, attach);
     this.handRight.group.rotation.set(
@@ -2510,8 +2429,10 @@ export class Viewmodel {
   }
 
   _AnimReload(t, kind) {
-    if (kind === "topMag") return this._AnimReloadTopMag(t);
-    if (kind === "hopper") return this._AnimReloadHopper(t);
+    const family = this.actionSpec?.reload?.family || kind;
+    if (family === "topMag") return this._AnimReloadTopMag(t);
+    if (family === "hopper") return this._AnimReloadHopper(t);
+    if (family === "boxMag") return this._AnimReloadBoxMag(t);
     return this._AnimReloadStripper(t);
   }
 
@@ -2568,7 +2489,9 @@ export class Viewmodel {
     const away = Ease.InOut(Ease.Seg(t, 0.06, 0.24));
     const home = Ease.InOut(Ease.Seg(t, 0.80, 1.00));
     const off = Clamp01(away - home);
+    this.riggedArms?.SetContactWeight("r", 1 - off);
     const handTarget = this._tmpVec.set(seat.x + 0.02, seat.y + 0.05, seat.z + 0.06);
+    handTarget.lerp(this.handBase.right, this.weaponId === "Type38" ? 0.35 : 0.15);
     this.handRight.group.position.lerpVectors(this.handBase.right, handTarget, off);
     this.handRight.group.position.y -= (1 - bring) * off * 0.20;
     this.handRight.group.position.z += (1 - bring) * off * 0.10;
@@ -2615,6 +2538,7 @@ export class Viewmodel {
     const grabA = Clamp01(Ease.InOut(Ease.Seg(t, 0.04, 0.16)) - Ease.InOut(Ease.Seg(t, 0.30, 0.40)));
     const grabB = Clamp01(Ease.InOut(Ease.Seg(t, 0.52, 0.62)) - Ease.InOut(Ease.Seg(t, 0.80, 0.96)));
     const grab = Math.max(grabA, grabB);
+    this.riggedArms?.SetContactWeight("r", 1 - grab);
     this.handRight.group.position.lerpVectors(this.handBase.right, seatPos, grab);
     this.handRight.group.position.y += grabA * Ease.Seg(t, 0.16, 0.32) * 0.16;
     this.handRight.group.position.y -= (1 - Ease.Seg(t, 0.52, 0.66)) * grabB * 0.22;
@@ -2628,14 +2552,37 @@ export class Viewmodel {
     if (rig.parts.bolt) rig.parts.bolt.position.z = charge * rig.boltTravel;
   }
 
+  /** 驳壳枪以外的手枪：底部退匣 → 腰间取新匣 → 插匣 → 拉套筒。 */
+  _AnimReloadBoxMag(t) {
+    const seat = this.rig.clipSeat || this._tmpVec.set(0, -0.04, -0.02);
+    const tilt = Ease.InOut(Ease.Seg(t, 0.00, 0.16)) - Ease.InOut(Ease.Seg(t, 0.84, 1.00));
+    this.actionPivot.position.set(-0.025 * tilt, 0.025 * tilt, 0.035 * tilt);
+    this.actionPivot.rotation.set(0.08 * tilt, 0.22 * tilt, -0.28 * tilt, "YXZ");
+    const leave = Ease.InOut(Ease.Seg(t, 0.08, 0.25));
+    const returnHome = Ease.InOut(Ease.Seg(t, 0.78, 0.98));
+    const off = Clamp01(leave - returnHome);
+    const insert = Ease.InOut(Ease.Seg(t, 0.48, 0.72));
+    const target = this._tmpVec2.set(seat.x - 0.018, seat.y - 0.055 + insert * 0.050, seat.z + 0.020);
+    target.lerp(this.handBase.right, 0.45);
+    this.handRight.group.position.lerpVectors(this.handBase.right, target, off);
+    this.handRight.group.rotation.set(
+      Mix(this.handBaseRot.right.x, -0.34, off),
+      Mix(this.handBaseRot.right.y, 0.18, off),
+      Mix(this.handBaseRot.right.z, -0.92, off), "YXZ");
+    this.riggedArms?.SetContactWeight("r", 1 - off);
+    const rack = Ease.Pulse(Ease.Seg(t, 0.78, 0.96));
+    if (this.rig.parts.bolt) this.rig.parts.bolt.position.z = rack * this.rig.boltTravel;
+  }
+
   /** 十一年式漏斗：把 6 个桥夹压进左侧弹斗、盖上压弹板。玩家一般用不到，留给 AI 展示。 */
   _AnimReloadHopper(t) {
     const raise = Ease.Pulse(t);
     this.actionPivot.position.set(-0.05 * raise, 0.03 * raise, 0.05 * raise);
     this.actionPivot.rotation.set(0.05 * raise, 0.5 * raise, -0.5 * raise, "YXZ");
     const off = Ease.Pulse(Ease.Seg(t, 0.1, 0.9));
-    this.handRight.group.position.x = this.handBase.right.x - off * 0.10;
-    this.handRight.group.position.y = this.handBase.right.y + off * 0.12;
+    this.riggedArms?.SetContactWeight("r", 1 - off);
+    this.handRight.group.position.x = this.handBase.right.x - off * 0.045;
+    this.handRight.group.position.y = this.handBase.right.y + off * 0.055;
   }
 
   /**
@@ -2694,11 +2641,11 @@ export class Viewmodel {
     // --- 左手：护木 → 下沉取刀 → 枪管前段 ----------------------------------
     const dip = Ease.InOut(Ease.Seg(t, 0.10, 0.32)) - Ease.InOut(Ease.Seg(t, 0.32, 0.48));
     const mount = Ease.InOut(Ease.Seg(t, 0.34, 0.56)) - Ease.InOut(Ease.Seg(t, 0.68, 0.92));
+    this.riggedArms?.SetContactWeight("l", 1 - Math.max(dip, mount));
     const muzzle = this.rig.muzzle;
-    // 目标摆在枪口后方 0.19 m。手其实到不了这儿（胳膊差着 0.3 m，见
-    // BAYONET_SLIDE_Z 的抬头），IK 会把它停在伸得到的最前面 —— 这正是要的：
-    // 手推到枪管前段，刀从那儿自己滑进枪口环。
-    const hold = this._tmpVec2.set(muzzle.x - 0.048, muzzle.y - 0.042, muzzle.z + 0.190);
+    // 手只推到臂长允许的枪管前段；余下距离由刀沿枪管滑入枪口环。
+    const hold = this._tmpVec2.set(this.handBase.left.x - 0.035,
+      this.handBase.left.y + 0.014, this.handBase.left.z + 0.005);
     const hand = this._tmpVec.copy(this.handBase.left);
     hand.lerp(SHEATH_HAND, dip);          // 先松开、往下沉一截（取刀）
     hand.lerp(hold, mount);               // 再沿枪身往前推
@@ -2729,6 +2676,17 @@ export class Viewmodel {
 
   /** 近战：刺刀劈刺（thrust）/ 刺刀挥砍（cut）/ 大刀劈砍（slash）/ 枪托砸（bash）。 */
   _AnimMelee(t, mode, power = 1) {
+    this.riggedArms?.SetContactWeight("r", 1);
+    this.riggedArms?.SetContactWeight("l", 0);
+    const actionPulse = Ease.Pulse(t);
+    const dadaoRegrip = this.weaponId === "Dadao";
+    const regrip = actionPulse * (dadaoRegrip ? 1.00 : 0.72);
+    this.handLeft.group.position.lerp(this.handBase.right, regrip);
+    // 大刀爆发帧不能把双掌压在刀柄同一点：那会迫使左肩横跨身体追右手，
+    // 即使掌心 residual 很小，左肘/腕仍已越过人体可达域。左手脱握时沿柄侧
+    // 留出 30 mm 的独立再握位置；它只在 contactWeight=0 的动作层生效，收招
+    // 随 Pulse 回到逐枪静态接触点，不篡改基础 grip frame。
+    if (dadaoRegrip) this.handLeft.group.position.x += 0.030 * actionPulse;
     if (mode === "slash") {
       // 大刀：只蓄 90 ms，随后约 110 ms 内完成爆发斜劈。旧版 0.62 s 的
       // 前 24% 都在慢慢举、后 50% 又在慢慢回，真正的走刀只有约 160 ms，读起来
@@ -2845,6 +2803,7 @@ export class Viewmodel {
     const amp = Mix(0.65, 1.0, Clamp01(power));
 
     if (offhand) {
+      this.riggedArms?.SetContactWeight("l", 0);
       // 步枪单手垂到右下，视野让出来
       const lower = Clamp01(cock - follow * 0.9);
       this.actionPivot.position.set(0.04 * lower, -0.12 * lower, 0.05 * lower);

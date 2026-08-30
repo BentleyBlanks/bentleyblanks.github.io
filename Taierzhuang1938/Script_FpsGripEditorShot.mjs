@@ -54,15 +54,24 @@ try {
       const T = window.Taierzhuang;
       const editor = T.editor.active;
       if (!editor.SetWeapon(weaponId)) return false;
-      editor.SetPose("hip");
-      editor.SetView("player");
-      T.StepFrames(45);
       return true;
     }, id);
     if (!supported) throw new Error(`第一人称检查装备不存在或不支持：${id}`);
-    const playerPath = path.join(outDir, `FpsGrip_${id}_Player.png`);
-    await page.screenshot({ path: playerPath });
-    console.log(playerPath);
+
+    for (const pose of ["hip", "ads", "sprint"]) {
+      await page.evaluate(({ weaponId, pose }) => {
+        const T = window.Taierzhuang;
+        const editor = T.editor.active;
+        editor.SetWeapon(weaponId);
+        editor.SetPose(pose);
+        editor.SetView("player");
+        for (let frame = 0; frame < 90; frame += 1) editor.Update(1 / 60);
+        T.StepFrames(2);
+      }, { weaponId: id, pose });
+      const playerPath = path.join(outDir, `FpsGrip_${id}_${pose}.png`);
+      await page.screenshot({ path: playerPath });
+      console.log(playerPath);
+    }
 
     await page.evaluate(() => {
       const T = window.Taierzhuang;
@@ -74,6 +83,37 @@ try {
     const inspectPath = path.join(outDir, `FpsGrip_${id}_InspectRightRear.png`);
     await page.screenshot({ path: inspectPath });
     console.log(inspectPath);
+
+    const actions = await page.evaluate((weaponId) => {
+      const T = window.Taierzhuang;
+      const editor = T.editor.active;
+      editor.SetWeapon(weaponId);
+      const list = Object.keys(T.viewmodel.actionSpec || {});
+      if (!["throwable", "melee"].includes(T.viewmodel.armPose?.family)) list.unshift("fire");
+      return [...new Set(list)];
+    }, id);
+    for (const action of actions) {
+      await page.evaluate(({ weaponId, action }) => {
+        const T = window.Taierzhuang;
+        const editor = T.editor.active;
+        editor.SetWeapon(weaponId);
+        editor.SetPose("hip");
+        editor.SetView("player");
+        for (let frame = 0; frame < 45; frame += 1) editor.Update(1 / 60);
+        if (action === "bayonet") T.viewmodel.TriggerFixBayonet(true);
+        else editor.Trigger(action);
+        if (action === "fire") {
+          for (let frame = 0; frame < 4; frame += 1) editor.Update(1 / 60);
+        } else {
+          let guard = 0;
+          while (T.viewmodel.action && T.viewmodel.action.t < 0.5 && guard++ < 180) editor.Update(1 / 60);
+        }
+        T.StepFrames(1);
+      }, { weaponId: id, action });
+      const actionPath = path.join(outDir, `FpsGrip_${id}_Action_${action}.png`);
+      await page.screenshot({ path: actionPath });
+      console.log(actionPath);
+    }
   }
   if (errors.length) throw new Error(errors.join("\n"));
 } finally {

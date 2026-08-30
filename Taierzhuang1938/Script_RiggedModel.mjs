@@ -13,8 +13,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS } from "./Data_FpsArmPoses.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=2" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=3" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -23,50 +24,15 @@ const PROFILE_CLIPS = Object.freeze({
   throwable: "AttackCommand",
 });
 const DEG = Math.PI / 180;
-const CLOSED_FINGER_DEG = Object.freeze([58, 78, 48]);
-const TRIGGER_FINGER_DEG = Object.freeze({
-  rifle: CLOSED_FINGER_DEG,
-  lmg: CLOSED_FINGER_DEG,
-  pistol: [18, 24, 12],
-  melee: CLOSED_FINGER_DEG,
-  throwable: CLOSED_FINGER_DEG,
-});
+const CLOSED_FINGER_DEG = Object.freeze([56, 74, 46]);
 
 // 视图模型把真尺寸枪放在眼前展示，双臂跟着缩到同一套画面比例。肩锚留在视锥下沿
 // 外：玩家只看见袖口和手从画面下沿伸进来，不会看见没有躯干的肩截面。
-const ARM_SCALE = 0.66;
-const HAND_SCALE = 0.84;
-// 第一人称枪的位置不是世界里“从真人肩膀量过去”的位置：为窄 FOV 压缩过的步枪
-// 护木在 z≈-0.85，而手枪/手榴弹的左手目标在 z≈-0.20。用一个固定、缩小后的左肩
-// 覆盖两者必有一边要拉长十几厘米。肩本来就在视锥外，所以按握持族切换不可见的
-// 肩锚；肘、腕和画面里看得见的袖手仍由同一副连续骨架解算。
-const SHOULDER_ANCHORS = Object.freeze({
-  rifle: Object.freeze({
-    r: new THREE.Vector3(0.170, -0.300, -0.100),
-    l: new THREE.Vector3(0.000, -0.340, -0.600),
-  }),
-  lmg: Object.freeze({
-    r: new THREE.Vector3(0.170, -0.300, -0.100),
-    l: new THREE.Vector3(0.000, -0.340, -0.600),
-  }),
-  pistol: Object.freeze({
-    r: new THREE.Vector3(0.170, -0.300, -0.100),
-    l: new THREE.Vector3(-0.120, -0.340, -0.400),
-  }),
-  throwable: Object.freeze({
-    r: new THREE.Vector3(0.170, -0.300, -0.100),
-    l: new THREE.Vector3(-0.120, -0.350, -0.320),
-  }),
-  melee: Object.freeze({
-    r: new THREE.Vector3(0.180, -0.310, -0.160),
-    l: new THREE.Vector3(-0.100, -0.360, -0.520),
-  }),
+const ARM_SCALE = 0.60;
+const PROFILE_BY_FAMILY = Object.freeze({
+  boltRifle: "rifle", lmg: "lmg", pistol: "pistol", melee: "melee", throwable: "throwable",
 });
-const ELBOW_POLE = Object.freeze({
-  r: new THREE.Vector3(0.250, -0.360, 0.230),
-  l: new THREE.Vector3(-0.180, -0.330, 0.210),
-});
-const MAX_STRETCH = 1.22;
+const TWIST_LIMIT = Object.freeze({ clavicle: 12 * DEG, upperArm: 32 * DEG, forearm: 58 * DEG, hand: FPS_ARM_LIMITS.handTwistDeg * DEG });
 
 const LOADER = new GLTFLoader();
 let loadPromise = null;
@@ -145,29 +111,6 @@ export async function LoadRiggedAssets() {
   return loadPromise;
 }
 
-const AIM_A = new THREE.Vector3();
-const AIM_B = new THREE.Vector3();
-const AIM_C = new THREE.Vector3();
-const AIM_Q0 = new THREE.Quaternion();
-const AIM_Q1 = new THREE.Quaternion();
-const AIM_Q2 = new THREE.Quaternion();
-
-/** 把 bone→child 的当前方向转到 worldTarget，不假设 Biped 的局部骨轴。 */
-function AimBone(bone, child, worldTarget) {
-  if (!bone || !child || !bone.parent) return;
-  bone.updateWorldMatrix(true, false);
-  child.updateWorldMatrix(true, false);
-  const origin = bone.getWorldPosition(AIM_A);
-  const current = child.getWorldPosition(AIM_B).sub(origin);
-  const wanted = AIM_C.copy(worldTarget).sub(origin);
-  if (current.lengthSq() < 1e-10 || wanted.lengthSq() < 1e-10) return;
-  const delta = AIM_Q0.setFromUnitVectors(current.normalize(), wanted.normalize());
-  const world = bone.getWorldQuaternion(AIM_Q1);
-  const parent = bone.parent.getWorldQuaternion(AIM_Q2).invert();
-  bone.quaternion.copy(parent.multiply(delta.multiply(world)));
-  bone.updateMatrixWorld(true);
-}
-
 /**
  * 正式国军 01 蒙皮双臂，由 Viewmodel 每把武器的两个完整握持目标驱动。
  */
@@ -181,8 +124,13 @@ export class FpsArmRig {
     this.mixer = new THREE.AnimationMixer(this.root);
     this.anchor = null;
     this.targets = null;
+    this.contactTargets = null;
     this.legacyMeshes = [];
     this.profile = "rifle";
+    this.weaponId = null;
+    this.poseSpec = null;
+    this.poseState = { ads: 0, sprint: 0 };
+    this.contactWeight = { r: 1, l: 1 };
     this.bones = {};
     this.fingerBones = {};
     this.bindPose = [];
@@ -193,9 +141,21 @@ export class FpsArmRig {
     this.armLength = {};
     this.shoulderOffset = { r: new THREE.Vector3(), l: new THREE.Vector3() };
     this.stretch = { r: 1, l: 1 };
+    this.reachRatio = { r: 0, l: 0 };
+    this.reachable = { r: true, l: true };
     this.gripError = { r: Infinity, l: Infinity };
+    this.rotationError = { r: Infinity, l: Infinity };
+    this.handTranslation = { r: 0, l: 0 };
+    this.jointTwist = {
+      r: { clavicle: 0, upperArm: 0, forearm: 0, hand: 0 },
+      l: { clavicle: 0, upperArm: 0, forearm: 0, hand: 0 },
+    };
     this.handGoalPosition = { r: new THREE.Vector3(), l: new THREE.Vector3() };
     this.handGoalQuaternion = { r: new THREE.Quaternion(), l: new THREE.Quaternion() };
+    this.gripGoalPosition = { r: new THREE.Vector3(), l: new THREE.Vector3() };
+    this.gripGoalQuaternion = { r: new THREE.Quaternion(), l: new THREE.Quaternion() };
+    this.gripGoalAnchorPosition = { r: new THREE.Vector3(), l: new THREE.Vector3() };
+    this.gripGoalAnchorQuaternion = { r: new THREE.Quaternion(), l: new THREE.Quaternion() };
     this._v0 = new THREE.Vector3();
     this._v1 = new THREE.Vector3();
     this._v2 = new THREE.Vector3();
@@ -206,7 +166,11 @@ export class FpsArmRig {
     this._q0 = new THREE.Quaternion();
     this._q1 = new THREE.Quaternion();
     this._q2 = new THREE.Quaternion();
+    this._q3 = new THREE.Quaternion();
+    this._q4 = new THREE.Quaternion();
+    this._axis = new THREE.Vector3();
     this._m0 = new THREE.Matrix4();
+    this._m1 = new THREE.Matrix4();
     this._e0 = new THREE.Euler();
 
     this._CollectBones();
@@ -221,7 +185,12 @@ export class FpsArmRig {
       profiles: [...this.fingerPoseByProfile.keys()],
       missing: [],
       stretch: this.stretch,
+      reachRatio: this.reachRatio,
+      reachable: this.reachable,
       gripError: this.gripError,
+      rotationError: this.rotationError,
+      handTranslation: this.handTranslation,
+      jointTwist: this.jointTwist,
     };
     for (const side of ["r", "l"]) {
       if (!this.bones[side]) this.report.missing.push(`${side}:armChain`);
@@ -373,14 +342,15 @@ export class FpsArmRig {
     if (poses) for (const side of ["r", "l"]) this._Restore(poses[side] || []);
     this._ApplyFingerCurl(profile);
     for (const side of ["r", "l"]) {
-      const hand = this.bones[side]?.hand;
-      if (hand) hand.scale.multiplyScalar(HAND_SCALE);
       const clavicle = this.bones[side]?.clavicle;
       if (clavicle) clavicle.position.add(this.shoulderOffset[side]);
-      const frame = this.gripFrames.get(`${profile}:${side}`)
-        || this.gripFrames.get(`rifle:${side}`);
+      // 逐枪手指闭合会改变掌内接触质心与轴，必须在该枪的自然手型应用后重新
+      // 反推 grip frame；不能拿五类通用 clip 的旧 frame 强迫腕骨服从。
+      const frame = this.poseSpec ? this._GripFrame(side)
+        : (this.gripFrames.get(`${profile}:${side}`) || this.gripFrames.get(`rifle:${side}`));
       const marker = this.gripNodes[side];
       if (frame && marker) {
+        if (this.weaponId) this.gripFrames.set(`${this.weaponId}:${side}`, frame);
         marker.position.copy(frame.position);
         marker.quaternion.copy(frame.quaternion);
       }
@@ -392,10 +362,11 @@ export class FpsArmRig {
     // 在过渡帧与拇指围成一个圈。保留每根指根的 X/Y 外展，只统一三节的局部 Z
     // 屈曲；右食指按扳机族留开，其余指节包住握把/护木。
     for (const side of ["r", "l"]) {
+      const contact = this.poseSpec?.contacts?.[side === "r" ? "right" : "left"];
       for (let finger = 1; finger <= 4; finger += 1) {
         const curl = side === "r" && finger === 1
-          ? (TRIGGER_FINGER_DEG[profile] || TRIGGER_FINGER_DEG.rifle)
-          : CLOSED_FINGER_DEG;
+          ? (contact?.trigger || contact?.curl || CLOSED_FINGER_DEG)
+          : (contact?.curl || CLOSED_FINGER_DEG);
         for (let segment = 0; segment < 3; segment += 1) {
           const suffix = segment === 0 ? "" : String(segment);
           const bone = FindBySuffix(this.root, `${side}finger${finger}${suffix}`);
@@ -413,13 +384,53 @@ export class FpsArmRig {
     return this;
   }
 
-  Attach(anchor, handRight, handLeft, legacyHands, profile = "rifle") {
+  SetWeaponPose(weaponId) {
+    const pose = FpsArmPose(weaponId);
+    if (!pose) throw new Error(`缺少逐枪第一人称双臂姿势：${weaponId}`);
+    this.weaponId = weaponId;
+    this.poseSpec = pose;
+    this.SetGripProfile(PROFILE_BY_FAMILY[pose.family] || "rifle");
+    return this;
+  }
+
+  SetPoseState({ ads = 0, sprint = 0 } = {}) {
+    this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
+    this.poseState.sprint = THREE.MathUtils.clamp(sprint, 0, 1);
+    if (this.poseSpec && this.contactTargets) {
+      for (const side of ["r", "l"]) {
+        const key = side === "r" ? "right" : "left";
+        const Hip = this.poseSpec.hip.contacts[key].rotation;
+        const Ads = FpsArmStateRotation(this.weaponId, "ads", key);
+        const Sprint = FpsArmStateRotation(this.weaponId, "sprint", key);
+        this._e0.set(Hip[0], Hip[1], Hip[2], "YXZ");
+        this._q0.setFromEuler(this._e0);
+        this._e0.set(Ads[0], Ads[1], Ads[2], "YXZ");
+        this._q1.setFromEuler(this._e0);
+        this._q0.slerp(this._q1, this.poseState.ads);
+        this._e0.set(Sprint[0], Sprint[1], Sprint[2], "YXZ");
+        this._q1.setFromEuler(this._e0);
+        this.contactTargets[side].quaternion.copy(this._q0.slerp(this._q1, this.poseState.sprint));
+      }
+    }
+    return this;
+  }
+
+  SetContactWeight(side, weight) {
+    const key = side === "right" ? "r" : side === "left" ? "l" : side;
+    if (key === "r" || key === "l") this.contactWeight[key] = THREE.MathUtils.clamp(weight, 0, 1);
+    return this;
+  }
+
+  Attach(anchor, handRight, handLeft, contactRight, contactLeft, legacyHands, weaponId) {
     this.Detach();
     this.anchor = anchor;
     this.targets = { r: handRight, l: handLeft };
+    this.contactTargets = { r: contactRight, l: contactLeft };
     this.legacyMeshes = legacyHands.flatMap((hand) => hand.meshes || []);
     for (const mesh of this.legacyMeshes) mesh.visible = false;
-    this.SetGripProfile(profile);
+    this.SetWeaponPose(weaponId);
+    this.contactWeight.r = 1;
+    this.contactWeight.l = 1;
     anchor.add(this.root);
     this.root.position.set(0, 0, 0);
     this.root.rotation.set(0, 0, 0);
@@ -439,19 +450,48 @@ export class FpsArmRig {
 
   _PlaceShoulders() {
     if (!this.anchor || !this.bones.r) return;
-    const shoulders = SHOULDER_ANCHORS[this.profile] || SHOULDER_ANCHORS.rifle;
+    const body = this._CurrentBody();
+    if (!body) return;
+    const shoulders = body.shoulders;
+    this.shoulderOffset.r.set(0, 0, 0);
+    this.shoulderOffset.l.set(0, 0, 0);
+    this._ApplyBase();
     this.anchor.updateWorldMatrix(true, false);
+    this.root.position.set(0, 0, 0);
     this.root.updateWorldMatrix(true, true);
-    this.root.position.add(this._v0.copy(shoulders.r).sub(this._InAnchor(this.bones.r.upperArm, this._v1)));
+    this.root.position.add(this._v0.fromArray(shoulders.right).sub(this._InAnchor(this.bones.r.upperArm, this._v1)));
     this.root.updateWorldMatrix(true, true);
     const left = this.bones.l;
     if (!left?.clavicle?.parent) return;
     const fromWorld = this.anchor.localToWorld(this._InAnchor(left.upperArm, this._v0));
-    const toWorld = this.anchor.localToWorld(this._v1.copy(shoulders.l));
+    const toWorld = this.anchor.localToWorld(this._v1.fromArray(shoulders.left));
     const parent = left.clavicle.parent;
     this.shoulderOffset.l.copy(parent.worldToLocal(toWorld)).sub(parent.worldToLocal(fromWorld));
     this._ApplyBase();
     this.root.updateWorldMatrix(true, true);
+  }
+
+  _CurrentBody() {
+    if (!this.poseSpec) return null;
+    const hip = this.poseSpec.hip.body;
+    const ads = this.poseSpec.ads.body;
+    const sprint = this.poseSpec.sprint.body;
+    const MixVector = (a, b, t) => [
+      THREE.MathUtils.lerp(a[0], b[0], t),
+      THREE.MathUtils.lerp(a[1], b[1], t),
+      THREE.MathUtils.lerp(a[2], b[2], t),
+    ];
+    const MixBody = (a, b, t) => ({
+      shoulders: {
+        right: MixVector(a.shoulders.right, b.shoulders.right, t),
+        left: MixVector(a.shoulders.left, b.shoulders.left, t),
+      },
+      elbowPoles: {
+        right: MixVector(a.elbowPoles.right, b.elbowPoles.right, t),
+        left: MixVector(a.elbowPoles.left, b.elbowPoles.left, t),
+      },
+    });
+    return MixBody(MixBody(hip, ads, this.poseState.ads), sprint, this.poseState.sprint);
   }
 
   _MeasureArms() {
@@ -468,45 +508,92 @@ export class FpsArmRig {
 
   _ComputeHandGoal(side) {
     const chain = this.bones[side];
-    const target = this.targets?.[side];
-    const frame = this.gripFrames.get(`${this.profile}:${side}`)
+    const poseTarget = this.targets?.[side];
+    const contactTarget = this.contactTargets?.[side] || poseTarget;
+    const frame = this.gripFrames.get(`${this.weaponId}:${side}`)
+      || this.gripFrames.get(`${this.profile}:${side}`)
       || this.gripFrames.get(`rifle:${side}`);
-    if (!chain || !target || !frame || !this.anchor) return false;
-    const targetWorldQuaternion = this._WorldBasisQuaternion(target, this._q0);
-    const desiredHandWorldQuaternion = this._q1.copy(targetWorldQuaternion)
-      .multiply(this._q2.copy(frame.quaternion).invert());
-    const handWorldScale = chain.hand.getWorldScale(this._v0);
-    const offset = this._v1.copy(frame.position).multiply(handWorldScale)
-      .applyQuaternion(desiredHandWorldQuaternion);
-    const desiredHandWorldPosition = target.getWorldPosition(this._v2).sub(offset);
-    this.handGoalPosition[side].copy(this.anchor.worldToLocal(desiredHandWorldPosition));
-    const inverseAnchor = this._WorldBasisQuaternion(this.anchor, this._q2).invert();
-    this.handGoalQuaternion[side].copy(inverseAnchor).multiply(desiredHandWorldQuaternion);
+    if (!chain || !poseTarget || !contactTarget || !frame || !this.anchor) return false;
+    const weight = this.contactWeight[side];
+    // Solve in armAnchor coordinates.  Both target and arm are below the
+    // viewmodel's non-uniform FOV compensation; multiplying complete matrices
+    // by inverse(anchor.matrixWorld) cancels that render-only affine layer.
+    this._InAnchorTransform(poseTarget, this._v2, this._q0, this._v4);
+    this._InAnchorTransform(contactTarget, this._v3, this._q1, this._v5);
+    // Operation targets author the palm path, not a free-form wrist rotation.
+    // The legacy hidden hand Euler values were made for rigid hand meshes and
+    // are not anatomical constraints.  Start a detached hand from its natural
+    // post-pose palm frame, then blend back into the calibrated weapon contact.
+    if (weight < 0.999) this._InAnchorBasisQuaternion(this.gripNodes[side], this._q0);
+    const targetAnchorPosition = this._v2.lerp(this._v3, weight);
+    const targetAnchorQuaternion = this._q2.copy(this._q0).slerp(this._q1, weight);
+    this.gripGoalAnchorQuaternion[side].copy(targetAnchorQuaternion);
+    this.gripGoalAnchorPosition[side].copy(targetAnchorPosition);
+    this.handGoalPosition[side].copy(targetAnchorPosition);
+    poseTarget.getWorldPosition(this._v2);
+    contactTarget.getWorldPosition(this._v3);
+    this.gripGoalPosition[side].copy(this._v2).lerp(this._v3, weight);
+    this.gripGoalQuaternion[side].copy(this._WorldBasisQuaternion(contactTarget, this._q3));
+    const desiredHandAnchorQuaternion = this.handGoalQuaternion[side]
+      .copy(targetAnchorQuaternion).multiply(this._q1.copy(frame.quaternion).invert());
+    this.anchor.updateWorldMatrix(true, false);
+    chain.hand.updateWorldMatrix(true, false);
+    this._m1.copy(this.anchor.matrixWorld).invert().multiply(chain.hand.matrixWorld)
+      .decompose(this._v0, this._q0, this._v4);
+    const offsetAnchor = this._v1.copy(frame.position).multiply(this._v4)
+      .applyQuaternion(desiredHandAnchorQuaternion);
+    this.handGoalPosition[side].sub(offsetAnchor);
     return true;
   }
 
-  _SolveArm(side) {
+  _InAnchorTransform(object, position, quaternion, scale) {
+    this.anchor.updateWorldMatrix(true, false);
+    object.updateWorldMatrix(true, false);
+    this._m1.copy(this.anchor.matrixWorld).invert().multiply(object.matrixWorld)
+      .decompose(position, quaternion, scale);
+  }
+
+  _InAnchorBasisQuaternion(object, out) {
+    this.anchor.updateWorldMatrix(true, false);
+    object.updateWorldMatrix(true, false);
+    const elements = this._m1.copy(this.anchor.matrixWorld).invert()
+      .multiply(object.matrixWorld).elements;
+    const x = this._v4.set(elements[0], elements[1], elements[2]).normalize();
+    const y = this._v5.set(elements[4], elements[5], elements[6]);
+    y.addScaledVector(x, -y.dot(x)).normalize();
+    const z = this._v6.crossVectors(x, y).normalize();
+    y.crossVectors(z, x).normalize();
+    return out.setFromRotationMatrix(this._m0.makeBasis(x, y, z));
+  }
+
+  _AimBoneInAnchor(bone, child, target) {
+    if (!bone || !child || !bone.parent) return;
+    const origin = this._InAnchor(bone, this._v0);
+    const current = this._InAnchor(child, this._v1).sub(origin);
+    const wanted = this._v2.copy(target).sub(origin);
+    if (current.lengthSq() < 1e-10 || wanted.lengthSq() < 1e-10) return;
+    const delta = this._q0.setFromUnitVectors(current.normalize(), wanted.normalize());
+    const basis = this._InAnchorBasisQuaternion(bone, this._q1);
+    const parentInverse = this._InAnchorBasisQuaternion(bone.parent, this._q2).invert();
+    bone.quaternion.copy(parentInverse.multiply(delta.multiply(basis))).normalize();
+    bone.updateMatrixWorld(true);
+  }
+
+  _SolveArm(side, computeGoal = true) {
     const chain = this.bones[side];
     const lengths = this.armLength[side];
-    if (!chain || !lengths || !this._ComputeHandGoal(side)) return;
+    if (!chain || !lengths || (computeGoal && !this._ComputeHandGoal(side))) return;
     const shoulder = this._InAnchor(chain.upperArm, this._v0);
     const target = this.handGoalPosition[side];
     let upper = lengths.upper;
     let lower = lengths.lower;
     const distance = shoulder.distanceTo(target);
     const nominalReach = Math.max(1e-5, upper + lower);
-    let stretch = 1;
-    if (distance > nominalReach * 0.998) {
-      stretch = Math.min(MAX_STRETCH, distance / (nominalReach * 0.998));
-      chain.forearm.position.multiplyScalar(stretch);
-      chain.hand.position.multiplyScalar(stretch);
-      chain.upperArm.updateMatrixWorld(true);
-      upper *= stretch;
-      lower *= stretch;
-    }
-    this.stretch[side] = +stretch.toFixed(3);
+    this.reachRatio[side] = +(distance / nominalReach).toFixed(4);
+    this.reachable[side] = distance <= nominalReach * FPS_ARM_LIMITS.maxReachRatio;
+    this.stretch[side] = 1;
     const low = Math.abs(upper - lower) + 1e-4;
-    const high = (upper + lower) * 0.999;
+    const high = (upper + lower) * FPS_ARM_LIMITS.maxReachRatio;
     const solvedDistance = Math.min(high, Math.max(low, distance));
     const direction = this._v1.copy(target).sub(shoulder).normalize();
     const cosine = THREE.MathUtils.clamp(
@@ -516,41 +603,101 @@ export class FpsArmRig {
       1,
     );
     const angle = Math.acos(cosine);
-    const pole = this._v2.copy(ELBOW_POLE[side]);
+    const body = this._CurrentBody();
+    const poleValues = body?.elbowPoles?.[side === "r" ? "right" : "left"] || [side === "r" ? 0.3 : -0.3, -0.8, 0.15];
+    // pole 是肩空间里的方向，不是世界原点里的某个点。旧实现把固定坐标直接投影，
+    // 武器一换/肩一移肘平面就跟着翻面。
+    const pole = this._v2.fromArray(poleValues);
     pole.addScaledVector(direction, -pole.dot(direction));
     if (pole.lengthSq() < 1e-8) pole.set(0, -1, 0).addScaledVector(direction, -direction.y);
     pole.normalize();
     const elbow = this._v3.copy(shoulder)
       .addScaledVector(direction, upper * Math.cos(angle))
       .addScaledVector(pole, upper * Math.sin(angle));
-    AimBone(chain.upperArm, chain.forearm, this.anchor.localToWorld(elbow));
-    AimBone(chain.forearm, chain.hand, this.anchor.localToWorld(this._v4.copy(target)));
+    this._AimBoneInAnchor(chain.upperArm, chain.forearm, elbow);
+    this._AimBoneInAnchor(chain.forearm, chain.hand, target);
   }
 
   _OrientHand(side) {
     const hand = this.bones[side]?.hand;
     const marker = this.gripNodes[side];
-    const target = this.targets?.[side];
-    if (!hand?.parent || !marker || !target || !this.anchor) return;
-    const desiredWorld = this._WorldBasisQuaternion(this.anchor, this._q0)
-      .multiply(this.handGoalQuaternion[side]);
-    const parentInverse = this._WorldBasisQuaternion(hand.parent, this._q1).invert();
-    hand.quaternion.copy(parentInverse.multiply(desiredWorld));
-    hand.updateMatrixWorld(true);
-    // Biped 导出骨架的祖先节点带细小的非均匀 scale；矩阵分解后的 world quaternion
-    // 不再严格满足 parentQ * localQ，单次反解在右腕会稳定残留 12°—24°。直接量 grip
-    // marker 与目标的世界旋转，以世界 delta 回灌 Hand；最多八轮把矩阵三轴残差压到 6° 内。
-    for (let iteration = 0; iteration < 8; iteration += 1) {
-      this._WorldBasisQuaternion(marker, this._q0);
-      this._WorldBasisQuaternion(target, this._q1);
-      if (1 - Math.abs(this._q0.dot(this._q1)) < 1e-10) break;
-      const delta = this._q2.copy(this._q1).multiply(this._q0.invert());
-      const correctedWorld = delta.multiply(this._WorldBasisQuaternion(hand, this._q0));
-      const correctedLocal = this._WorldBasisQuaternion(hand.parent, this._q1).invert()
-        .multiply(correctedWorld);
-      hand.quaternion.copy(correctedLocal);
-      hand.updateMatrixWorld(true);
+    const chain = this.bones[side];
+    if (!hand?.parent || !marker || !chain || !this.anchor) return;
+    const axis = this._InAnchor(chain.hand, this._v0)
+      .sub(this._InAnchor(chain.forearm, this._v1)).normalize();
+    let current = this._InAnchorBasisQuaternion(marker, this._q0);
+    const desired = this.gripGoalAnchorQuaternion[side];
+    let delta = this._q1.copy(desired).multiply(this._q2.copy(current).invert()).normalize();
+    let remainingTwist = this._TwistAngle(delta, axis);
+
+    const roles = [
+      ["clavicle", chain.clavicle, chain.upperArm],
+      ["upperArm", chain.upperArm, chain.forearm],
+      ["forearm", chain.forearm, chain.hand],
+    ];
+    for (const [role, bone, child] of roles) {
+      const share = FPS_ARM_LIMITS.twistShare[role] || 0;
+      const amount = THREE.MathUtils.clamp(remainingTwist * share, -TWIST_LIMIT[role], TWIST_LIMIT[role]);
+      const boneAxis = this._InAnchor(child, this._v2).sub(this._InAnchor(bone, this._v3)).normalize();
+      this._ApplyAnchorAxisRotation(bone, boneAxis, amount);
+      this.jointTwist[side][role] = +(amount / DEG).toFixed(2);
     }
+
+    // Clavicle/upper-arm roll deliberately changes descendant positions even
+    // though it leaves that segment's own endpoint fixed.  Re-close the
+    // analytic position chain before asking the wrist to absorb any residual.
+    // The analytic re-solve preserves the newly authored roll around each segment axis.
+    this._SolveArm(side, false);
+
+    // Position IK established the arm silhouette.  The wrist now receives only
+    // a bounded swing plus the small twist residue left after shoulder/arm
+    // distribution; it never receives an arbitrary target quaternion.
+    current = this._InAnchorBasisQuaternion(marker, this._q0);
+    delta = this._q1.copy(desired).multiply(this._q2.copy(current).invert()).normalize();
+    const twistAngle = this._TwistAngle(delta, axis);
+    const twist = this._q3.setFromAxisAngle(axis, twistAngle);
+    const swing = this._q4.copy(delta).multiply(this._q2.copy(twist).invert()).normalize();
+    const swingAngle = 2 * Math.acos(THREE.MathUtils.clamp(Math.abs(swing.w), -1, 1));
+    if (swingAngle > 1e-6) {
+      const limited = Math.min(swingAngle, FPS_ARM_LIMITS.handSwingDeg * DEG);
+      const sign = swing.w < 0 ? -1 : 1;
+      const denom = Math.max(1e-8, Math.sin(swingAngle * 0.5));
+      this._axis.set(swing.x, swing.y, swing.z).multiplyScalar(sign / denom).normalize();
+      this._ApplyAnchorAxisRotation(hand, this._axis, limited);
+    }
+    current = this._InAnchorBasisQuaternion(marker, this._q0);
+    delta = this._q1.copy(desired).multiply(this._q2.copy(current).invert()).normalize();
+    const handTwist = THREE.MathUtils.clamp(this._TwistAngle(delta, axis), -TWIST_LIMIT.hand, TWIST_LIMIT.hand);
+    this._ApplyAnchorAxisRotation(hand, axis, handTwist);
+    this.jointTwist[side].hand = +(handTwist / DEG).toFixed(2);
+
+    // A bounded wrist will generally not have the arbitrary orientation that
+    // was used to predict its palm offset before IK.  Recompute the wrist
+    // origin from the *actual* anatomical hand frame and close the analytic
+    // chain again.  This moves the elbow/forearm, not the Hand endpoint.
+    for (let iteration = 0; iteration < 6; iteration += 1) {
+      const handAnchor = this._InAnchor(hand, this._v0);
+      const markerOffset = this._InAnchor(marker, this._v1).sub(handAnchor);
+      this.handGoalPosition[side].copy(this.gripGoalAnchorPosition[side]).sub(markerOffset);
+      this._SolveArm(side, false);
+    }
+  }
+
+  _TwistAngle(delta, axis) {
+    const projected = delta.x * axis.x + delta.y * axis.y + delta.z * axis.z;
+    let angle = 2 * Math.atan2(projected, delta.w);
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
+
+  _ApplyAnchorAxisRotation(bone, axis, radians) {
+    if (!bone?.parent || !Number.isFinite(radians) || Math.abs(radians) < 1e-7) return;
+    const delta = this._q3.setFromAxisAngle(axis, radians);
+    const basis = this._InAnchorBasisQuaternion(bone, this._q0);
+    const parentInverse = this._InAnchorBasisQuaternion(bone.parent, this._q1).invert();
+    bone.quaternion.copy(parentInverse.multiply(delta.multiply(basis))).normalize();
+    bone.updateMatrixWorld(true);
   }
 
   /** 从真实 world matrix 的三根轴取正交基；比 getWorldQuaternion 更能抵抗 Biped 祖先 scale 的剪切。 */
@@ -567,24 +714,31 @@ export class FpsArmRig {
 
   _UpdateGripError(side) {
     const marker = this.gripNodes[side];
-    const target = this.targets?.[side];
-    if (!marker || !target) return;
-    marker.getWorldPosition(this._v0);
-    target.getWorldPosition(this._v1);
+    if (!marker) return;
+    this._InAnchor(marker, this._v0);
+    this.anchor.worldToLocal(this._v1.copy(this.gripGoalPosition[side]));
     this.gripError[side] = +this._v0.distanceTo(this._v1).toFixed(5);
+    const actual = this._InAnchorBasisQuaternion(marker, this._q0);
+    this.rotationError[side] = +(2 * Math.acos(THREE.MathUtils.clamp(Math.abs(actual.dot(this.gripGoalAnchorQuaternion[side])), -1, 1)) / DEG).toFixed(3);
   }
 
   _AlignGripPosition(side) {
     const hand = this.bones[side]?.hand;
     const marker = this.gripNodes[side];
-    const target = this.targets?.[side];
-    if (!hand?.parent || !marker || !target) return;
-    marker.getWorldPosition(this._v0);
-    target.getWorldPosition(this._v1);
+    if (!hand?.parent || !marker) return;
+    this._InAnchor(marker, this._v0);
+    this.anchor.worldToLocal(this._v1.copy(this.gripGoalPosition[side]));
     const correction = this._v1.sub(this._v0);
+    const distance = correction.length();
+    this.handTranslation[side] = +distance.toFixed(6);
     if (correction.lengthSq() < 1e-10) return;
-    hand.getWorldPosition(this._v2).add(correction);
-    hand.position.copy(hand.parent.worldToLocal(this._v2));
+    if (distance > FPS_ARM_LIMITS.handClosureM) {
+      this.reachable[side] = false;
+      return;
+    }
+    const handAnchor = this._InAnchor(hand, this._v2).add(correction);
+    const handWorld = this.anchor.localToWorld(handAnchor);
+    hand.position.copy(hand.parent.worldToLocal(handWorld));
     hand.updateMatrixWorld(true);
   }
 
@@ -593,21 +747,22 @@ export class FpsArmRig {
     for (const mesh of this.legacyMeshes) mesh.visible = true;
     this.legacyMeshes.length = 0;
     this.targets = null;
+    this.contactTargets = null;
     this.anchor = null;
     this.root.visible = true;
   }
 
   Update() {
     if (!this.root.parent || !this.targets || !this.anchor) return;
-    this._ApplyBase();
+    this._PlaceShoulders();
     this.anchor.updateWorldMatrix(true, false);
     this.root.updateWorldMatrix(true, true);
     this._SolveArm("r");
     this._SolveArm("l");
     this._OrientHand("r");
     this._OrientHand("l");
-    // 最后一毫米按真实 grip marker 收口。Biped 祖先的矩阵剪切会让解析 IK 算出的
-    // Hand pivot 与渲染后的掌心有少量偏差；这里移动的是末端 Hand，不改肩肘平面。
+    // 只允许毫米级皮肤闭合。超过阈值说明肩锚/握点/姿势数据错了，保留残差并让
+    // 测试失败；不能再平移 Hand 把断腕藏在 0 mm residual 后面。
     this._AlignGripPosition("r");
     this._AlignGripPosition("l");
     this.root.updateWorldMatrix(true, true);

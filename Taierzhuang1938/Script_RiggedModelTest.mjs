@@ -75,4 +75,32 @@ assert.equal(armatureNode.extras.fpsArmInfluenceMinimum, 0.5,
 const jointCount = new Set((arms.skins || []).flatMap((skin) => skin.joints || [])).size;
 assert.equal(jointCount >= 45, true, `FPS arms keep a full upper-body/finger skeleton (${jointCount} joints)`);
 
-console.log(`ok   NRA01 skeletal FPS arms: ${arms.meshes.length} mesh, ${jointCount} joints, ${animations.size} animations`);
+const rigNode = (arms.nodes || []).find((node) => node.name === "Rig_FpsArmsNraSkeletal01");
+assert.ok(rigNode, "FPS armature adapter node exists");
+const adapterScale = rigNode.scale || [1, 1, 1];
+assert.ok(adapterScale.every((value) => value > 0), "armature adapter has no negative scale");
+assert.ok(Math.max(...adapterScale) - Math.min(...adapterScale) < 1e-5,
+  `armature adapter is uniform (${adapterScale.join(", ")})`);
+const jointIndices = new Set((arms.skins || []).flatMap((skin) => skin.joints || []));
+for (const index of jointIndices) {
+  const node = arms.nodes[index];
+  const scale = node.scale || [1, 1, 1];
+  assert.ok(scale.every((value) => Math.abs(value - 1) < 1e-5),
+    `${node.name || index}: runtime joint node uses unit scale`);
+  if (!node.matrix) continue;
+  const x = [node.matrix[0], node.matrix[1], node.matrix[2]];
+  const y = [node.matrix[4], node.matrix[5], node.matrix[6]];
+  const z = [node.matrix[8], node.matrix[9], node.matrix[10]];
+  const Dot = (a, b) => a.reduce((sum, value, axis) => sum + value * b[axis], 0);
+  const Length = (a) => Math.sqrt(Dot(a, a));
+  assert.ok(Math.abs(Dot(x, y)) < 1e-5 && Math.abs(Dot(x, z)) < 1e-5 && Math.abs(Dot(y, z)) < 1e-5,
+    `${node.name || index}: joint basis has no shear`);
+  assert.ok(Length(x) > 0 && Length(y) > 0 && Length(z) > 0, `${node.name || index}: joint basis is non-degenerate`);
+}
+
+assert.equal(rigNode.extras?.fpsRigContract, "uniform-adapter-unit-joints-arm-only-anatomy-v4",
+  "GLB records the reproducible anatomy transform contract");
+assert.equal(rigNode.extras?.fpsArmOnlyWeights, true,
+  "GLB records that hidden torso/spine influences were removed from the viewmodel skin");
+
+console.log(`ok   NRA01 skeletal FPS arms: ${arms.meshes.length} mesh, ${jointCount} unit joints, ${animations.size} animations, adapter ×${adapterScale[0]}`);

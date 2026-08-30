@@ -2,8 +2,10 @@
 
 The input is ``Model/Character/Model_LugouNra01.glb``: the same audited 53-bone,
 16-clip character used by third-person actors. This baker keeps the original
-armature, animation clips, skin weights, uniform sleeves, hands and all finger
-chains, then removes vertices that are not influenced by either arm.
+armature, animation clips, uniform sleeves, hands and all finger chains, then
+removes vertices that are not meaningfully influenced by either arm. Retained
+vertices are normalized to arm-only weights: a first-person shoulder seam must
+not remain partly pinned to the hidden spine/torso while the clavicle moves.
 
 Do not apply the armature modifier here. The 2026-08-30 static-hand bake did so
 and exported ``skins=0 / animations=0``; runtime could only teleport two rigid
@@ -18,9 +20,11 @@ import argparse
 import json
 from pathlib import Path
 import re
+import struct
 import sys
 
 import bpy
+from mathutils import Matrix
 
 
 EXPECTED_ACTIONS = (
@@ -48,6 +52,8 @@ PROFILE_ACTIONS = {
     "melee": "RifleIdle",
     "throwable": "AttackCommand",
 }
+ARM_WEIGHT_MIN = 0.50
+TRANSFORM_EPSILON = 1e-5
 ARM_ROLE_SUFFIXES = (
     "clavicle",
     "upperarm",
@@ -69,12 +75,6 @@ ARM_ROLE_SUFFIXES = (
     "finger41",
     "finger42",
 )
-# Shoulder vertices blend into the torso in the source character.  Treating a
-# token arm weight as ownership kept long torso wedges in the first-person
-# export; IK then stretched those wedges across the camera and exposed their
-# open back faces.  A vertex belongs to the arms only when the arm chains carry
-# at least half of its normalized skin influence.
-MIN_ARM_INFLUENCE = 0.5
 REQUIRED_BONE_SUFFIXES = tuple(
     f"{side}{role}"
     for side in ("l", "r")
@@ -123,14 +123,15 @@ def DeleteNonArmVertices(mesh: bpy.types.Object) -> tuple[int, int]:
     if not armGroups:
         raise RuntimeError(f"{mesh.name}: no arm vertex groups")
     originalCount = len(mesh.data.vertices)
-    keep = []
-    for vertex in mesh.data.vertices:
-        armWeight = sum(
-            assignment.weight
-            for assignment in vertex.groups
-            if assignment.group in armGroups
-        )
-        keep.append(armWeight >= MIN_ARM_INFLUENCE)
+    # 0.02 kept large torso/cape triangles whose only relationship to the arms
+    # was a tiny clavicle blend.  In first person those triangles hung below the
+    # wrists as torn sheets.  Keep the sleeve seam, but require the arms to own
+    # a meaningful share of every exported vertex.
+    keep = [
+        sum(assignment.weight for assignment in vertex.groups if assignment.group in armGroups)
+        >= ARM_WEIGHT_MIN
+        for vertex in mesh.data.vertices
+    ]
     bpy.context.view_layer.objects.active = mesh
     mesh.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT")
@@ -142,7 +143,45 @@ def DeleteNonArmVertices(mesh: bpy.types.Object) -> tuple[int, int]:
     bpy.ops.mesh.delete(type="VERT")
     bpy.ops.object.mode_set(mode="OBJECT")
     mesh.select_set(False)
+    # The source shoulder/cape seam blends arm groups with Spine1/Spine2.  Once
+    # the torso is removed those non-arm weights become invisible anchors: an
+    # overhead throw moves the arm-owned end of a face while its spine-owned
+    # end stays behind, producing metre-long triangular spikes despite perfect
+    # grip residuals.  A viewmodel arm is an arm-only skin; discard the hidden
+    # torso influences and renormalize every retained vertex deterministically.
+    for group in reversed(list(mesh.vertex_groups)):
+        if not IsArmGroup(group.name):
+            mesh.vertex_groups.remove(group)
+    for vertex in mesh.data.vertices:
+        assignments = [(item.group, item.weight) for item in vertex.groups]
+        total = sum(weight for _, weight in assignments)
+        if total <= 1e-8:
+            raise RuntimeError(f"{mesh.name}: retained vertex {vertex.index} lost all arm weights")
+        for groupIndex, weight in assignments:
+            mesh.vertex_groups[groupIndex].add([vertex.index], weight / total, "REPLACE")
     return originalCount, len(mesh.data.vertices)
+
+
+def AuditArmOnlyWeights(mesh: bpy.types.Object) -> dict[str, float]:
+    nonArmWeight = 0.0
+    normalizationError = 0.0
+    for vertex in mesh.data.vertices:
+        total = 0.0
+        for assignment in vertex.groups:
+            group = mesh.vertex_groups[assignment.group]
+            total += assignment.weight
+            if not IsArmGroup(group.name):
+                nonArmWeight = max(nonArmWeight, assignment.weight)
+        normalizationError = max(normalizationError, abs(total - 1.0))
+    if nonArmWeight > TRANSFORM_EPSILON or normalizationError > TRANSFORM_EPSILON:
+        raise RuntimeError(
+            f"{mesh.name}: arm-only weight contract failed "
+            f"nonArm={nonArmWeight} normalizationError={normalizationError}"
+        )
+    return {
+        "maxNonArmWeight": nonArmWeight,
+        "maxWeightNormalizationError": normalizationError,
+    }
 
 
 def CleanMaterialSlots(mesh: bpy.types.Object) -> None:
@@ -177,6 +216,20 @@ def ActionNames() -> set[str]:
     return {action.name for action in bpy.data.actions}
 
 
+def BasisAudit(matrix: Matrix) -> dict[str, float]:
+    basis = matrix.to_3x3()
+    columns = [basis.col[index].copy() for index in range(3)]
+    scales = [column.length for column in columns]
+    unit = [column.normalized() if column.length > 1e-12 else column for column in columns]
+    shear = max(abs(unit[a].dot(unit[b])) for a, b in ((0, 1), (0, 2), (1, 2)))
+    return {
+        "minScale": min(scales),
+        "maxScale": max(scales),
+        "maxShear": shear,
+        "determinant": basis.determinant(),
+    }
+
+
 def ValidateSource(armature: bpy.types.Object) -> None:
     boneNames = {NormalizeName(bone.name) for bone in armature.data.bones}
     missingBones = [
@@ -192,6 +245,11 @@ def ValidateSource(armature: bpy.types.Object) -> None:
 
 def Prepare(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> dict[str, object]:
     ValidateSource(armature)
+    # Keep the imported glTF armature/mesh transform relationship intact.  The
+    # source uses a positive, uniform 0.01 adapter above the actual Biped bones;
+    # applying that transform to only part of a skinned hierarchy changes the
+    # coordinate space expected by the inverse bind matrices and explodes the
+    # mesh.  The adapter is harmless; actual joint nodes are audited below.
     counts = {}
     keptMeshes = []
     for mesh in meshes:
@@ -200,12 +258,15 @@ def Prepare(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> dict[
             bpy.data.objects.remove(mesh, do_unlink=True)
             continue
         CleanMaterialSlots(mesh)
+        weightAudit = AuditArmOnlyWeights(mesh)
         SubdivideForFirstPerson(mesh)
+        weightAudit = AuditArmOnlyWeights(mesh)
         mesh.name = "Mesh_FpsArmsNraSkeletal01" if not keptMeshes else f"Mesh_FpsArmsNraSkeletal01_{len(keptMeshes) + 1}"
         counts[mesh.name] = {
             "sourceVertices": before,
             "keptVertices": after,
             "firstPersonVertices": len(mesh.data.vertices),
+            **weightAudit,
         }
         keptMeshes.append(mesh)
     if not keptMeshes:
@@ -213,8 +274,11 @@ def Prepare(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> dict[
     armature.name = "Rig_FpsArmsNraSkeletal01"
     armature.data.name = "Rig_FpsArmsNraSkeletal01"
     armature["fpsArmSource"] = "Model_LugouNra01"
-    armature["fpsArmInfluenceMinimum"] = MIN_ARM_INFLUENCE
+    armature["fpsArmInfluenceMinimum"] = ARM_WEIGHT_MIN
     armature["fpsGripProfiles"] = json.dumps(PROFILE_ACTIONS, separators=(",", ":"))
+    armature["fpsRigContract"] = "uniform-adapter-unit-joints-arm-only-anatomy-v4"
+    armature["fpsArmWeightMinimum"] = ARM_WEIGHT_MIN
+    armature["fpsArmOnlyWeights"] = True
     return {"meshes": keptMeshes, "counts": counts}
 
 
@@ -230,6 +294,8 @@ def Export(output: Path, armature: bpy.types.Object, meshes: list[bpy.types.Obje
         export_format="GLB",
         use_selection=True,
         export_yup=True,
+        # Preserve the armature adapter, mesh coordinates and inverse bind
+        # matrices as one coherent coordinate system.
         export_apply=False,
         export_texcoords=True,
         export_normals=True,
@@ -255,13 +321,38 @@ def Export(output: Path, armature: bpy.types.Object, meshes: list[bpy.types.Obje
         export_lights=False,
         export_extras=True,
         export_draco_mesh_compression_enable=False,
-        export_meshopt_compression_enable=False,
     )
     if "FINISHED" not in result or not output.is_file():
         raise RuntimeError(f"glTF export failed: {output}")
 
 
 def ValidateOutput(output: Path) -> dict[str, object]:
+    payload = output.read_bytes()
+    jsonLength, jsonType = struct.unpack_from("<II", payload, 12)
+    if jsonType != 0x4E4F534A:
+        raise RuntimeError(f"first GLB chunk is not JSON: {output}")
+    document = json.loads(payload[20 : 20 + jsonLength].rstrip(b" \0").decode("utf8"))
+    runtimeNodes = [
+        node for node in document.get("nodes", [])
+        if node.get("name") == "Rig_FpsArmsNraSkeletal01"
+    ]
+    if len(runtimeNodes) != 1:
+        raise RuntimeError(f"expected one GLB runtime armature node: {runtimeNodes}")
+    adapterScale = runtimeNodes[0].get("scale", [1.0, 1.0, 1.0])
+    if min(adapterScale) <= 0 or max(adapterScale) - min(adapterScale) > TRANSFORM_EPSILON:
+        raise RuntimeError(f"GLB armature adapter is mirrored/nonuniform: {adapterScale}")
+    jointIndices = sorted({joint for skin in document.get("skins", []) for joint in skin.get("joints", [])})
+    if not jointIndices:
+        raise RuntimeError("GLB has no skin joints")
+    badJointScales = []
+    nodes = document.get("nodes", [])
+    for jointIndex in jointIndices:
+        node = nodes[jointIndex]
+        scale = node.get("scale", [1.0, 1.0, 1.0])
+        if any(abs(component - 1.0) > TRANSFORM_EPSILON for component in scale):
+            badJointScales.append((node.get("name", jointIndex), scale))
+    if badJointScales:
+        raise RuntimeError(f"GLB bone nodes are not unit scale: {badJointScales[:8]}")
     bpy.ops.wm.read_factory_settings(use_empty=True)
     result = bpy.ops.import_scene.gltf(filepath=str(output), import_pack_images=False)
     if "FINISHED" not in result:
@@ -277,12 +368,40 @@ def ValidateOutput(output: Path) -> dict[str, object]:
         )
     armature = armatures[0]
     ValidateSource(armature)
+    transformAudit = {}
+    weightAudit = {}
+    for obj in [armature, *meshes]:
+        audit = BasisAudit(obj.matrix_world)
+        transformAudit[obj.name] = {
+            **audit,
+            "scale": [float(component) for component in obj.scale],
+        }
+        # Blender's glTF importer intentionally recreates the positive uniform
+        # adapter object for armatures.  Actual GLB joint nodes are unit scale;
+        # fresh import still audits sign and shear.
+        if obj is not armature and any(abs(component - 1.0) > TRANSFORM_EPSILON for component in obj.scale):
+            raise RuntimeError(f"fresh GLB has non-unit object scale: {obj.name} {tuple(obj.scale)}")
+        if audit["determinant"] <= 0 or audit["maxShear"] > TRANSFORM_EPSILON:
+            raise RuntimeError(f"fresh GLB has mirrored/sheared object basis: {obj.name} {audit}")
+        if obj.type == "MESH":
+            weightAudit[obj.name] = AuditArmOnlyWeights(obj)
+    boneScaleError = 0.0
+    for poseBone in armature.pose.bones:
+        for component in poseBone.matrix.to_scale():
+            boneScaleError = max(boneScaleError, abs(component - 1.0))
+    if boneScaleError > TRANSFORM_EPSILON:
+        raise RuntimeError(f"fresh GLB pose bones are not unit scale: max error {boneScaleError}")
     return {
         "armatures": len(armatures),
         "skinnedMeshes": len(meshes),
         "bones": len(armature.data.bones),
         "animations": sorted(ActionNames()),
         "vertices": sum(len(mesh.data.vertices) for mesh in meshes),
+        "boneScaleError": boneScaleError,
+        "adapterScale": adapterScale,
+        "unitJointNodes": len(jointIndices),
+        "transformAudit": transformAudit,
+        "weightAudit": weightAudit,
     }
 
 

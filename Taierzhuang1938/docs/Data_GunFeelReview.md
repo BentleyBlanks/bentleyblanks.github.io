@@ -696,3 +696,87 @@ B4 是给枪写的：枪要从斜挎位摆回肩上、要压住后坐，所以�
 拉栓抓柄、压桥夹、弹匣操作、拉火绳和逐枪扳机接触动画，也没有为近镜头制作的手部法线/
 指甲细节。现有骨架、IK 与五类握姿能根治整只手漂移和反关节；要达到 3A 特写质量，后续需
 在同一 Hand/Finger 骨命名上补这些第一人称 action，不能再烘静态手或继续堆位置偏移。
+
+---
+
+## 2026-08-31 · 逐枪解剖管线：姿势先行、动作分层、末端 IK 收口
+
+### 最终病因
+
+这轮证明“掌心 residual 小”不能代表人体正确。旧链路同时有六个独立问题：
+
+1. `PROFILE_CLIPS` 只有 rifle/lmg/pistol/melee/throwable 五个源动作中间帧，最多能当
+   手指基础姿态，不能承担十五件装备的肩、肘、腕和掌心姿势。
+2. `MODEL_FP_TWEAK.handRot` 先写死逐枪欧拉角，再让 IK 追这个错误 frame；错误不会消失，
+   只会被推到腕骨。
+3. 两骨 IK 只解决位置，固定世界坐标 `ELBOW_POLE` 会随武器和肩锚翻面；锁骨、上臂、
+   前臂没有共同承担轴向旋转。
+4. `_OrientHand` 把目标 quaternion 的剩余量全部压给 Hand；`_AlignGripPosition` 又直接
+   平移 Hand。掌心可以“到点”，但掌腕会反折、断开。
+5. 第一人称 GLB 的实际 joint 节点虽然接近单位 scale，但源肩缝仍混有 Spine1/Spine2
+   权重。裁掉躯干后，投掷抬臂会让一端随锁骨、另一端留在隐藏脊柱处，拉出长三角尖刺。
+6. 运行时在非等比 FOV 压缩层里解 IK，会把渲染压缩误当人体空间。多轮纠偏只会掩盖
+   输入空间错误，不能替代资产清理和自然姿势。
+
+### 资产与变换契约
+
+`_import/Script_BakeNraFpsArms.py` 是唯一生成源；成品仍是
+`Model/Model_FpsArmsNraSkeletal01.glb`，禁止手改 GLB：
+
+- 保留源角色合法、正值、等比的 `0.01` armature adapter；53 个实际 joint node 必须
+  unit scale，fresh-import 不得有负 determinant、非等比 scale 或 shear。
+- 保留条件为左右臂骨组总权重 `>= 0.50`，排除仅有微量 clavicle 混合的躯干/披片。
+- 所有保留顶点剥离 Spine/躯干权重并重新归一到 clavicle/upper-arm/forearm/hand/finger；
+  fresh-import 审计要求 `maxNonArmWeight = 0`、权重和误差 `<= 1e-5`。
+- 当前资产契约名为 `uniform-adapter-unit-joints-arm-only-anatomy-v4`。实测 1 个 skinned
+  mesh、53 个 unit joints、16 个源动作，pose-bone scale 最大误差约 `3.22e-6`。
+
+### 逐枪姿势与动作职责
+
+`Data_FpsArmPoses.mjs` 是唯一姿势表。十五件装备各自有 hip / ADS / sprint 武器姿势、
+左右掌接触位置与旋转、肩锚、肘极向量、手指覆盖和 action family；枪族只提供起点，
+没有装备靠运行时 `handRot` 补丁冒充验收：
+
+- 中正式、汉阳造、三八式：共享栓动结构骨架，但三者分别保存枪机时序、桥夹时序、
+  grip、肩肘平面和刺刀接触；三八式使用自己的 bolt/stripper family。
+- Kar98k、未识别栓动步枪：共享 turn-bolt/stripper 机械族，各有独立静态姿势和接触。
+- 捷克式：上置弹匣拔出/插入；十一年式：独立 hopper 路径，不复用捷克式动作。
+- 驳壳枪：桥夹压弹；军用手枪、瓦尔特 P38：盒式弹匣路径，各有 grip/ADS/sprint。
+- 木柄手榴弹、集束手榴弹：各有预备/投出姿势；集束弹有独立近身冲刺轮廓。
+- 大刀、军刀、环首短刀：三套基础姿势与 melee regrip；大刀爆发帧左右掌不再重叠在
+  刀柄同一点，左手保留 30 mm 独立再握位置。
+
+呼吸、步行 sway、程序化后坐继续共享。拉栓、装填、刺刀、投掷和刀械动作先产生自然的
+手部轨迹，再用 `SetContactWeight()` 曲线脱离/重新吸附；动作全过程不再把手永久钉在 grip。
+
+### IK 顺序与硬闸
+
+IK 在共享 `armAnchor` 解剖空间、FOV 非等比压缩之前执行：先应用逐枪/逐状态姿势与动作，
+再由解析两骨 IK 做接触修正。肘极向量是肩空间方向；轴向 twist 按 15% / 32% / 53%
+分给锁骨、上臂、前臂，硬限分别为 12° / 32° / 58°。Hand 只接有限 residual：
+twist `<=18°`、swing `<=32°`，随后重新解两骨位置链，而不是平移 Hand。
+
+硬失败条件：reach ratio `>0.985`、stretch `>1.005`、静态位置 residual `>6 mm`、
+旋转 residual `>8°`、Hand 闭合需求 `>3 mm`。超过可达域必须回改武器姿势、肩锚、
+动作路径或握点；运行时会标记 `reachable=false`，测试不能静默夹断。额外蒙皮闸逐三角
+CPU skinning 后要求最大边 `<=180 mm`，专门捕捉“residual 通过但肩缝/掌腕撕裂”。
+
+### 检查器与本轮验收
+
+第一人称检查器现在同时画目标 grip、真实掌心、腕/前臂轴、肘平面、位置/旋转 residual、
+Hand 末端平移、各关节 twist、stretch/reach/reachable，并可切 hip、ADS、sprint、外部视角
+和动作中间帧。`Script_FpsGripEditorShot.mjs --all` 固定输出 93 张：十五件装备的三种玩家
+姿势与右后外检，加 33 张开火/拉栓/装填/刺刀/投掷/刀械中间帧。
+
+最终自动闸为 `Script_FpsArmTest` 680/680；全部 93 张重新出图后逐张复查。掌腕连续、前臂
+twist 没有集中到 Hand、手指接触可读、ADS 中心不被手臂挡住；投掷动作初次视觉复查发现
+的脊柱混权长三角已用 arm-only 权重契约修掉，最终最大蒙皮三角边为 67.8 mm。
+
+### 真实限制
+
+- 资产是“无躯干双臂”，外部检查视角会看见肩口切面；玩家相机下藏在下沿。这不是完整
+  上身模型，也不应通过把隐藏肩顶点重新绑定到 Spine 来遮盖。
+- 16 段第三人称源动作只提供手指基础形态；机械路径仍是程序化 action curve，不是逐帧
+  第一人称 mocap。结构、接触与人体闸已分开，但近镜头 3A 动画仍需同一骨架上的专用 clip。
+- 手部仍沿用源角色贴图与几何，没有独立指甲/掌纹/高频法线；本轮验收目标是可信轮廓、
+  接触和关节连续，不等于影视级手部特写。

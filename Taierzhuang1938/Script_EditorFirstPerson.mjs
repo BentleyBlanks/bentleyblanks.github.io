@@ -128,6 +128,7 @@ export class FirstPersonEditor {
     this.view = "player";
     this.pose = "hip";
     this.ads = 0;
+    this.sprint = 0;
     this.time = 0;
     this.showMounts = true;
     this.showSkeleton = true;
@@ -219,11 +220,13 @@ export class FirstPersonEditor {
     this.poseChips = Chips(pose, [
       { value: "hip", label: "腰射" },
       { value: "ads", label: "开镜" },
+      { value: "sprint", label: "冲刺" },
     ], this.pose, (value) => this.SetPose(value));
     this.adsSlider = Slider(pose, {
       label: "开镜权重", min: 0, max: 1, step: 0.01, value: 0,
       onInput: (value) => {
         this.ads = value;
+        this.sprint = 0;
         this.pose = value >= 0.5 ? "ads" : "hip";
         this.poseChips?.Set(this.pose);
       },
@@ -434,9 +437,10 @@ export class FirstPersonEditor {
   }
 
   SetPose(value) {
-    if (value !== "hip" && value !== "ads") return false;
+    if (value !== "hip" && value !== "ads" && value !== "sprint") return false;
     this.pose = value;
     this.ads = value === "ads" ? 1 : 0;
+    this.sprint = value === "sprint" ? 1 : 0;
     this.poseChips?.Set(value);
     this.adsSlider?.Set(this.ads);
     this.SetStudioFov(this.PlayerFov());
@@ -599,8 +603,29 @@ export class FirstPersonEditor {
   Snapshot() {
     const viewmodel = this.host.viewmodel;
     const arms = viewmodel.riggedArms;
-    const right = GripResidual(arms?.gripNodes?.r, viewmodel.handRight?.group);
-    const left = GripResidual(arms?.gripNodes?.l, viewmodel.handLeft?.group);
+    const ArmGeometry = (side) => {
+      const chain = arms?.bones?.[side];
+      const marker = arms?.gripNodes?.[side];
+      if (!chain || !marker || !arms.anchor) return null;
+      const Point = (object) => arms._InAnchor(object, new THREE.Vector3());
+      const shoulder = Point(chain.upperArm);
+      const elbow = Point(chain.forearm);
+      const wrist = Point(chain.hand);
+      const palm = Point(marker);
+      const forearmAxis = wrist.clone().sub(elbow).normalize();
+      const wristAxis = palm.clone().sub(wrist).normalize();
+      const elbowPlane = elbow.clone().sub(shoulder).cross(wrist.clone().sub(elbow)).normalize();
+      const Round = (vector) => vector.toArray().map((value) => +value.toFixed(5));
+      return {
+        targetPalm: Round(arms.gripGoalAnchorPosition[side]), actualPalm: Round(palm),
+        wristAxis: Round(wristAxis), forearmAxis: Round(forearmAxis), elbowPlane: Round(elbowPlane),
+        positionResidualM: arms.gripError[side], rotationResidualDeg: arms.rotationError[side],
+        handTranslationM: arms.handTranslation[side], twistDeg: { ...arms.jointTwist[side] },
+        stretch: arms.stretch[side], reachRatio: arms.reachRatio[side], reachable: arms.reachable[side],
+      };
+    };
+    const right = ArmGeometry("r");
+    const left = ArmGeometry("l");
     const sources = {};
     for (const [name, source] of this.mountSources) sources[name] = source.source;
     return {
@@ -613,14 +638,16 @@ export class FirstPersonEditor {
       inspectPreset: this.inspectPreset || null,
       pose: this.pose,
       ads: +this.ads.toFixed(3),
+      sprint: +this.sprint.toFixed(3),
       rigSource: viewmodel.rigSource,
       rootParent: viewmodel.root.parent?.name || viewmodel.root.parent?.type || null,
       mountNames: [...this.mountSources.keys()],
       mountSources: sources,
       gripResidual: {
-        right: right ? { meters: +right.meters.toFixed(5), degrees: +right.degrees.toFixed(3) } : null,
-        left: left ? { meters: +left.meters.toFixed(5), degrees: +left.degrees.toFixed(3) } : null,
+        right: right ? { meters: right.positionResidualM, degrees: right.rotationResidualDeg } : null,
+        left: left ? { meters: left.positionResidualM, degrees: left.rotationResidualDeg } : null,
       },
+      anatomy: { right, left },
       stretch: arms ? { right: arms.stretch.r, left: arms.stretch.l } : null,
       skeleton: arms ? {
         source: arms.report?.source,
@@ -646,6 +673,17 @@ export class FirstPersonEditor {
     this.facts.Set("挂点", snapshot.mountNames.map((name) => `${name}:${snapshot.mountSources[name]}`).join(" · "));
     this.facts.Set("右掌→IK目标", FormatGrip(snapshot.gripResidual.right));
     this.facts.Set("左掌→IK目标", FormatGrip(snapshot.gripResidual.left));
+    if (snapshot.anatomy.right && snapshot.anatomy.left) {
+      this.facts.Set("Hand 末端平移", `右 ${(snapshot.anatomy.right.handTranslationM * 1000).toFixed(2)} mm · 左 ${(snapshot.anatomy.left.handTranslationM * 1000).toFixed(2)} mm`,
+        snapshot.anatomy.right.handTranslationM > 0.003 || snapshot.anatomy.left.handTranslationM > 0.003 ? "bad" : "good");
+      const Twist = (side) => Object.entries(snapshot.anatomy[side].twistDeg)
+        .map(([joint, value]) => `${joint}:${Number(value).toFixed(1)}°`).join("/");
+      this.facts.Set("右侧 joint twist", Twist("right"));
+      this.facts.Set("左侧 joint twist", Twist("left"));
+      this.facts.Set("肩肘腕可达", `右 ${snapshot.anatomy.right.reachRatio.toFixed(3)} · 左 ${snapshot.anatomy.left.reachRatio.toFixed(3)}`,
+        snapshot.anatomy.right.reachable && snapshot.anatomy.left.reachable ? "good" : "bad");
+      this.facts.Set("前臂轴 / 肘平面", `右 ${snapshot.anatomy.right.forearmAxis.join(",")} / ${snapshot.anatomy.right.elbowPlane.join(",")}`);
+    }
     if (snapshot.stretch) {
       this.facts.Set("双臂拉伸", `右 ×${snapshot.stretch.right} · 左 ×${snapshot.stretch.left}`,
         snapshot.stretch.right > 1.08 || snapshot.stretch.left > 1.08 ? "warn" : "");
@@ -694,7 +732,7 @@ export class FirstPersonEditor {
     this.time += dt;
     this.refreshTimer -= dt;
     viewmodel.Update(dt, {
-      dt, moveSpeed: 0, strafe: 0, grounded: true, sprint: 0,
+      dt, moveSpeed: this.sprint ? 4 : 0, strafe: 0, grounded: true, sprint: this.sprint,
       ads: this.ads, lookDeltaYaw: 0, lookDeltaPitch: 0,
       crouch: 0, elapsed: this.time, lowAmmo: false,
     });
