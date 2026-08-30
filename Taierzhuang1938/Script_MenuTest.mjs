@@ -225,7 +225,7 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 3) 选章：战区地图 + 日期时间轴、两组入口与任务简报
+// 3) 选章：可拖拽缩放的动态战区地图 + 带图日期轴，单击直达任务
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
@@ -241,12 +241,17 @@ for (let i = 0; i < 3; i += 1) {
     route: !!document.querySelector("#menu .mnCampaignRoute"),
     mapNodes: document.querySelectorAll("#menu .mnCampaignNode").length,
     selectedMapNodes: document.querySelectorAll("#menu .mnCampaignNode.on").length,
+    thumbnails: [...document.querySelectorAll("#menu .mnTimelineTrack .mnLvThumb")]
+      .map((entry) => entry.getAttribute("src") || ""),
+    art: document.querySelector("#menu .mnMissionArt img")?.getAttribute("src") || "",
+    mapTools: document.querySelectorAll("#menu .mnMapTools button").length,
+    mapHint: document.querySelector("#menu .mnMapHint")?.textContent || "",
     timelineDates: [...document.querySelectorAll("#menu .mnTimelineTrack .mnLvDate")]
       .map((entry) => entry.textContent || ""),
     panelTitle: document.querySelector("#menu .mnPanelTitle")?.textContent || "",
     title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
-    objectives: document.querySelectorAll("#menu .mnObjectives li").length,
-    go: document.querySelector("#menu .mnGo")?.textContent || "",
+    objective: document.querySelector("#menu .mnMissionObjective")?.textContent || "",
+    go: !!document.querySelector("#menu .mnGo"),
   }));
   // 规格：正式章节（七章）与测试场景（玩法靶场 / 白刃 QTE / 策划白盒）分两组。
   // 界河白盒与过场预览保留直达 query，但不出现在玩家可见的选章列表里。
@@ -267,15 +272,45 @@ for (let i = 0; i < 3; i += 1) {
     panel.route && panel.mapNodes === 7 && panel.selectedMapNodes === 1
       && panel.panelTitle === "滕县战区 · 任务选择",
     `route=${panel.route} nodes=${panel.mapNodes} selected=${panel.selectedMapNodes} title=${panel.panelTitle}`);
+  Check("地图提供缩放、复位与直接进入提示",
+    panel.mapTools === 3 && panel.mapHint.includes("拖动地图") && panel.mapHint.includes("单击节点进入"),
+    `tools=${panel.mapTools} hint=${panel.mapHint}`);
   Check("正式章节以三月十四至十七日的横向时间轴呈现",
     panel.timelineDates.length === 7
       && panel.timelineDates[1] === "03.14"
       && panel.timelineDates.includes("03.16")
       && panel.timelineDates.at(-1) === "03.17",
     panel.timelineDates.join(" / "));
-  Check("简报有标题、目标清单与进入按钮",
-    panel.title.length > 0 && panel.objectives >= 3 && panel.go.includes("进入"),
-    `${panel.title} / 目标 ${panel.objectives} / ${panel.go}`);
+  Check("七章各有独立缩略图，右侧只留一图一句目标且没有二次确认按钮",
+    panel.thumbnails.length === 7 && new Set(panel.thumbnails).size === 7
+      && panel.art.includes("Texture_MissionCh0Chuchuan")
+      && panel.title.length > 0 && panel.objective.length > 0 && !panel.go,
+    `thumbs=${panel.thumbnails.length}/${new Set(panel.thumbnails).size} art=${panel.art} objective=${panel.objective} go=${panel.go}`);
+
+  const direct = await page.evaluate(() => {
+    const menu = window.Taierzhuang.menu;
+    const original = menu.Play;
+    const played = [];
+    menu.Play = (index) => played.push(index);
+    document.querySelectorAll("#menu .mnCampaignNode")[3].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    document.querySelectorAll("#menu .mnTimelineTrack .mnLevel")[5].click();
+    menu.Play = original;
+    return played;
+  });
+  Check("地图节点与章节卡都是单击直接进入，不再要求再按一次",
+    direct.join(",") === "3,5", direct.join(","));
+
+  const mapBox = await page.locator("#menu .mnMap").boundingBox();
+  const beforeView = await page.locator("#menu .mnMap").getAttribute("viewBox");
+  await page.mouse.move(mapBox.x + mapBox.width * 0.72, mapBox.y + mapBox.height * 0.38);
+  await page.mouse.wheel(0, -420);
+  const zoomed = await page.locator("#menu .mnMap").getAttribute("viewBox");
+  await page.mouse.down();
+  await page.mouse.move(mapBox.x + mapBox.width * 0.60, mapBox.y + mapBox.height * 0.50, { steps: 5 });
+  await page.mouse.up();
+  const dragged = await page.locator("#menu .mnMap").getAttribute("viewBox");
+  Check("战区地图可缩放并可按住拖动", beforeView !== zoomed && zoomed !== dragged,
+    `before=${beforeView} zoomed=${zoomed} dragged=${dragged}`);
   await page.screenshot({ path: path.join(outDir, "Menu_Levels.png") });
 
   // 换一关看简报是不是跟着换
@@ -284,8 +319,11 @@ for (let i = 0; i < 3; i += 1) {
   const second = await page.evaluate(() => ({
     title: document.querySelector("#menu .mnBriefTitle").textContent,
     slice: document.querySelector("#menu .mnMapSlice").getAttribute("x"),
+    art: document.querySelector("#menu .mnMissionArt img")?.getAttribute("src") || "",
   }));
-  Check("换一章，简报与图上的切片框都跟着换", second.title.includes("手榴弹雨"), second.title);
+  Check("换一章，任务图与地图切片都跟着换",
+    second.title.includes("手榴弹雨") && second.art.includes("Texture_MissionCh2Shouliudan"),
+    `${second.title} / ${second.art}`);
 }
 
 // ===========================================================================
@@ -700,8 +738,8 @@ for (let i = 0; i < 3; i += 1) {
         mark: entry.querySelector(".mnLvMark")?.textContent || "",
       })),
       map: !!document.querySelector("#menu .mnMap"),
-      objectives: document.querySelectorAll("#menu .mnObjectives li").length,
-      go: document.querySelector("#menu .mnGo")?.textContent || "",
+      objective: document.querySelector("#menu .mnMissionObjective")?.textContent || "",
+      go: !!document.querySelector("#menu .mnGo"),
     };
   });
   Check("靶场条目排在七章之后，标「沙盒」",
@@ -715,14 +753,13 @@ for (let i = 0; i < 3; i += 1) {
       && brief.sandboxes[2].name.includes("第一关 · 全新策划白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
-  Check("靶场简报有标题、工位清单与进入按钮，且**不画**那张滕县全图",
-    brief.title === "玩法测试靶场" && brief.objectives >= 3
-      && brief.go.includes("玩法测试靶场") && !brief.map,
-    `${brief.title} / 工位 ${brief.objectives} / ${brief.go} / map=${brief.map}`);
+  Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",
+    brief.title === "玩法测试靶场" && brief.objective.length > 0 && !brief.go && !brief.map,
+    `${brief.title} / ${brief.objective} / go=${brief.go} / map=${brief.map}`);
   await page.screenshot({ path: path.join(outDir, "Menu_Levels_Range.png") });
 
-  // 点「进入」——这一下是整页重载，等新页面把 Debug.Range 挂出来
-  await page.click("#menu .mnGo");
+  // 单击已选中的靶场卡片直接整页重载，等新页面把 Debug.Range 挂出来
+  await page.click("#menu .mnSandboxLevel.on");
   await page.waitForFunction(() => window.Taierzhuang?.Debug?.Range !== undefined,
     null, { timeout: 240000 });
   const entered = await page.evaluate(() => ({
