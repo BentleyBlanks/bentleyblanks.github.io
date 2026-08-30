@@ -56,6 +56,8 @@ const WEAPONS = [
   // 大刀的第二式样。它没有自己的 Data_Weapons 条目（只是外观变体），
   // 所以靠 variant 序号选，出图文件名另起 shotId 免得覆盖上面那张。
   { id: "Dadao", variant: 1, shotId: "DadaoAlt", len: 0.90, upright: true },
+  // 带三脚架的架设重机枪必须进入固定台架出图，避免被手持枪姿态托到半空。
+  { id: "Type92Hmg", len: 1.156, upright: true },
   // 用户提供的卢沟桥合集。识别未定的组件也进入固定台架出图，防止“加进表里但
   // 从来没人看过”再发生；它们不进入第一人称玩法时仍可在这里逐件验收贴图。
   { id: "WaltherP38", len: 0.216, closeAt: -0.02 },

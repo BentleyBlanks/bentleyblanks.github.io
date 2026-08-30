@@ -826,7 +826,7 @@ const weapon = await page.evaluate(async () => {
   const THREE = await import("./vendor/three/build/three.module.js");
   active.SetMode("bench");
   out.deployedPoses = {};
-  for (const id of ["UnidentifiedAntiaircraftGun", "LightMortar", "MediumMortar"]) {
+  for (const id of ["Type92Hmg", "UnidentifiedAntiaircraftGun", "LightMortar", "MediumMortar"]) {
     active.SetWeapon(id);
     window.Taierzhuang.StepFrames(10);
     const box = new THREE.Box3().setFromObject(active.benchGroup);
@@ -876,8 +876,9 @@ Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白�
   weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
 Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
 const deployed = weapon.deployedPoses;
-Check("三件架设武器逐件校姿并按最终包围盒落地",
+Check("四件架设武器逐件校姿并按最终包围盒落地",
   Object.values(deployed).every((entry) => entry.grounded)
+    && Math.abs(deployed.Type92Hmg.pitch) < 0.001
     && Math.abs(deployed.UnidentifiedAntiaircraftGun.pitch) < 0.001
     && deployed.LightMortar.pitch > 0.6 && deployed.LightMortar.pitch < 0.8
     && deployed.MediumMortar.pitch > 1.0 && deployed.MediumMortar.pitch < 1.15

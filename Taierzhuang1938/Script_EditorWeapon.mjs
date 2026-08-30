@@ -62,13 +62,14 @@ function IsVehicle(id) {
 /** 架设武器/弹体在台架上按自身包围盒落地，不沿用手枪的 1.1 m 平举姿态。 */
 function IsGroundedBench(id) {
   const w = WEAPONS[id];
-  return !!w && w.kind === "mortar" && !!MESHES[WEAPON_MESH_BY_ID[id]];
+  return !!w && (w.emplaced === true || w.kind === "mortar")
+    && !!MESHES[WEAPON_MESH_BY_ID[id]];
 }
 
 /**
  * WeaponGeometry 为人物动作把枪管/刀刃统一到局部 -Z；台架必须再还原成检视姿态。
  *
- * 三件架设武器不能共用一个「都抬 58°」的猜值：源模型的炮管与规范长轴夹角各不
+ * 架设武器不能共用一个「都抬 58°」的猜值：源模型的炮管与规范长轴夹角各不
  * 相同，共用角度会让轻迫击器直挺、另一门炮又整架侧倒。这里逐件按识别截图校正，
  * 外层随后统一用最终包围盒落地，所以脚架/底钣不会因转姿态而悬空。
  */
@@ -79,6 +80,11 @@ function BenchPose(id) {
   if (id === "UnidentifiedAntiaircraftGun") {
     // 这一件源几何的三脚架已经是落地姿态；再跟迫击炮一起抬角会让枪尾先着地、
     // 两只脚反而悬空。显式留在表里，防止以后又被并回通用迫击炮角度。
+    return { x: 0, y: 0, z: 0 };
+  }
+  if (id === "Type92Hmg") {
+    // 九二式的三脚架在源几何里已经水平落地；这里只写死零俯仰并由外层包围盒落地，
+    // 不能再沿用手持枪的 1.1 m 展示高度，也不能套迫击炮的抬角。
     return { x: 0, y: 0, z: 0 };
   }
   if (id === "LightMortar") {
