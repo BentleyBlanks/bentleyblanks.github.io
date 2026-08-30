@@ -1218,11 +1218,17 @@ export const SETPIECES = {
       // 队伍成分照策划案 §2 阶段三逐条：2 担架 + 4 担架员 + 2 持枪护卫 +
       // 可行走伤兵 + 撤离百姓。**妇孺老人必须在队里看得见** —— 阶段六
       // 「担架、女人、娃儿都照打」是靠玩家自己看见成立的，不是靠台词。
-      s.mem.column = s.Column({
-        waypoints: [
+      const configuredWaypoints = s.phase?.whitebox?.escortWaypoints;
+      const escortWaypoints = Array.isArray(configuredWaypoints)
+        ? configuredWaypoints.map((point) => (
+          point.zone ? s.Zone(point.zone) : point
+        )).filter(Boolean).map((point) => ({ x: point.x, z: point.z }))
+        : [
           s.Zone("C1_Village"), s.Zone("C1_Culvert"), s.Zone("C1_SouthRoad"),
           s.Zone("C1_Ditch"),
-        ].filter(Boolean).map((z) => ({ x: z.x, z: z.z })),
+        ].filter(Boolean).map((z) => ({ x: z.x, z: z.z }));
+      s.mem.column = s.Column({
+        waypoints: escortWaypoints,
         members: [
           { role: "bearer", label: "担架员", weapon: null },
           { role: "bearer", label: "担架员", weapon: null },

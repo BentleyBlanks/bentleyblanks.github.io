@@ -550,7 +550,7 @@ Check("装配层把「这一章玩家演谁」传给了 Companion",
 Check("装配层把 Companion 接进了 story 的 locate 参数",
   /locate: \(who\) => \(companion \? companion\.Locate\(who\) : null\)/.test(MainSource));
 Check("同伴排在撒兵之前（这样兵力预算是自动扣的，不是额外加人）", (() => {
-  const a = MainSource.indexOf("companion.BeginLevel(phase.id");
+  const a = MainSource.indexOf("companion.BeginLevel(contentId");
   const b = MainSource.indexOf("else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);");
   return a > 0 && b > 0 && a < b;
 })());

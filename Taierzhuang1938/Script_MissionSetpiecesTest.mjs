@@ -779,7 +779,7 @@ BLAST_TARGETS.Clear();
 
 Check("装配层建了摆点导演", /setpieces = new MissionSetpieceDirector\(\{/.test(MainSource));
 Check("换关时摆点（排在具名同伴之后、撒兵之前）",
-  /setpieces\.BeginLevel\(phase\.id, phase\);/.test(MainSource));
+  /setpieces\.BeginLevel\(contentId, phase\);/.test(MainSource));
 Check("每帧推它，且排在 story.Update 之后（onVoice 读的是 story.fired）",
   /if \(story\.ObjectiveText\) state\.storyObjective = story\.ObjectiveText;\s*\n(?:\s*\/\/[^\n]*\n)*\s*setpieces\?\.Update\(dt\);/
     .test(MainSource));

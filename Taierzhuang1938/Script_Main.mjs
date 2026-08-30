@@ -30,7 +30,13 @@ import {
 import {
   MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID, MELEE_QTE_TARGETS, MELEE_QTE_STATIONS,
 } from "./Data_MeleeQte.mjs";
-import { FIRST_LEVEL_WHITEBOX_PHASE } from "./Data_FirstLevelWhitebox.mjs";
+import {
+  FIRST_LEVEL_WHITEBOX_PHASE, FIRST_LEVEL_WHITEBOX_LEVEL_ID,
+} from "./Data_FirstLevelWhitebox.mjs";
+import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
+import {
+  PhaseContentId, EvaluateFirstLevelObjectiveGate,
+} from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -76,9 +82,6 @@ import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EP
 import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
-import {
-  EvaluatePlayableBoundary, ConstrainPlayablePosition,
-} from "./Script_WhiteboxGuide.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
@@ -148,7 +151,7 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
  */
 const RANGE = params.get("range") === "1";
 const MELEE_TEST = params.get("melee") === "1";
-/** 第一关大平原空间白盒（?whitebox=1）：测试章节，不占用正式 CH1_NanLu。 */
+/** 第一关策划白盒（?whitebox=1）：独立纯白方盒场地，复用正式 CH1_NanLu 内容。 */
 const FIRST_LEVEL_WHITEBOX = params.get("whitebox") === "1";
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
@@ -463,6 +466,7 @@ const state = {
   // --- 线性关卡的流程状态 ---
   objectiveIndex: 0,          // 目标链走到第几个（= 已到达的路标数）
   objectiveCount: 0,
+  objectiveBlockedReason: null, // 白盒关卡事实门未满足时的取证，不另加屏幕说明。
   levelSeconds: 0,            // 本关的配置时长（秒）
   advancing: false,           // 正在换关（建城是分帧的，期间不许再触发一次）
   cutscene: null,             // 正在播的过场 id；非 null 时玩家没有控制权
@@ -521,9 +525,6 @@ let battlefield = null;
 let physics = null;
 let navGrid = null;
 let player = null;
-/** 当前章节的数据驱动白盒走廊；null 表示该章仍只使用矩形切片边界。 */
-let playableBoundary = null;
-let boundaryHardUntil = 0;
 let ai = null;
 let meleeQte = null;
 let vfx = null;
@@ -569,34 +570,6 @@ let companion = null;
 // 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
 let checkpoint = null;
 
-/** 把章节白盒配置接到玩家的通用二级边界口；没配置的章节完全不受影响。 */
-function ConfigureWhiteboxGuide(phase) {
-  playableBoundary = phase.whitebox?.boundary || null;
-  boundaryHardUntil = 0;
-  if (!player?.world) return;
-  if (!playableBoundary) {
-    delete player.world.ConstrainPosition;
-    return;
-  }
-  player.world.ConstrainPosition = (x, z) => {
-    const result = ConstrainPlayablePosition(x, z, playableBoundary);
-    if (result.hard) boundaryHardUntil = state.elapsed + 1.7;
-    return result;
-  };
-}
-
-/** HUD 读的边界态：真正撞墙后锁住 1.7 秒，避免一帧裁回后提示马上消失。 */
-function WhiteboxBoundaryView() {
-  if (!playableBoundary || !player) return null;
-  const live = EvaluatePlayableBoundary(player.position.x, player.position.z, playableBoundary);
-  if (state.elapsed >= boundaryHardUntil) return live;
-  return {
-    ...live,
-    warning: true,
-    hard: true,
-    message: playableBoundary.hardText || "已离开可玩区域，正在返回战场。",
-  };
-}
 // 章节摆点（集成批 INT2）。「哪一章在哪一拍做什么」是**数据**，在 Script_MissionSetpieces
 // 的 SETPIECES 里一章一条；装配层只建一次、每帧推一下、换关告诉它换到哪儿去了。
 // 它是七个玩法系统与七章内容之间唯一的接缝 —— 这个文件里因此**没有一行 if (章 id)**。
@@ -2105,14 +2078,22 @@ async function Boot() {
         return out;
       },
       Deaths: () => ({ ...ai.deaths }),
-      Whitebox: () => ({
-        phase: PHASE_TABLE[state.phaseIndex].id,
-        boundary: WhiteboxBoundaryView(),
-        hud: hud.WhiteboxState(),
-        annotations: PHASE_TABLE[state.phaseIndex].whitebox?.annotations?.length || 0,
-        enemyCount: ai.CountSide("ija"),
-        phaseTime: state.phaseTime,
-      }),
+      Whitebox: () => {
+        const phase = PHASE_TABLE[state.phaseIndex];
+        return {
+          phase: phase.id,
+          contentId: PhaseContentId(phase),
+          storyLevel: story?.levelId || null,
+          setpieceLevel: setpieces?.levelId || null,
+          companions: companion?.Present?.length || 0,
+          enemyCount: ai.CountSide("ija"),
+          enemyDeaths: ai.deaths.ija || 0,
+          phaseTime: state.phaseTime,
+          objectiveIndex: state.objectiveIndex,
+          blockedReason: state.objectiveBlockedReason,
+          field: battlefield?.DebugState?.() || null,
+        };
+      },
       OpenDirections: (x, z, count = 72, probeM = 20) =>
         CountOpenDirections(x, z, battlefield.GroundHeight(x, z), probeM, count),
     },
@@ -2498,6 +2479,7 @@ const WORLD_CLASSES = {
   [JIEHE_LEVEL_ID]: JieheField,
   [RANGE_LEVEL_ID]: RangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
+  [FIRST_LEVEL_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
 };
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
 
@@ -2865,11 +2847,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     ai.insideWalls = levelBounds;
   }
 
-  // 物理切片换完后再接白盒边界：非首关没有 whitebox，继续只受矩形 bounds 约束。
-  ConfigureWhiteboxGuide(phase);
-
   state.phaseTime = 0;
   state.objectiveIndex = 0;
+  state.objectiveBlockedReason = null;
   state.objectiveCount = phase.zones.length;
   state.levelSeconds = phase.minutes * 60;
   // 钉关：章节数据声明 mechanics.pinFinalZone 的，走到最后一个路标不自动换关。
@@ -2904,7 +2884,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 音乐按关走。上一版整场只有结局那一下会响 —— 四个 cue 里三个从来没进过游戏。
   audio.Music(phase.music);
 
-  const loaded = story.BeginLevel(phase.id);
+  // 测试白盒拥有独立的场地 id，但剧情、同伴与事件必须跑正式第一章内容。
+  const contentId = PhaseContentId(phase);
+  const loaded = story.BeginLevel(contentId);
   state.storyObjective = phase.objectives[0] || null;
   if (loaded === 0) console.warn("这一章没有剧本：", phase.id);
 
@@ -2915,8 +2897,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!RANGE && !MELEE_TEST && !FIRST_LEVEL_WHITEBOX && !PREVIEW && !cutsceneOnly && companion) {
-    companion.BeginLevel(phase.id, {
+  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
+    companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
       // 一律推不出来，终章更是推出一张空表（两个说话的人都不是战斗员）。
@@ -2928,9 +2910,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   }
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
-  // 靶场／白刃训练场／预览／过场承载章都不摆 —— 那几条路上没有章节内容。
-  if (!RANGE && !MELEE_TEST && !FIRST_LEVEL_WHITEBOX && !PREVIEW && !cutsceneOnly && setpieces) {
-    setpieces.BeginLevel(phase.id, phase);
+  // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
+  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
+    setpieces.BeginLevel(contentId, phase);
   }
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
@@ -5327,6 +5309,23 @@ function UpdateObjectives(dt) {
     if (!s.alive || s.side === "nra") continue;
     if (Math.hypot(s.position.x - target.x, s.position.z - target.z) < 8) return;
   }
+  // 白盒目标不是“走进圈就打勾”：时间、交火、护送信号、空袭转向与归路打开
+  // 都是世界事实。圈只是玩家站位，事实门没满足就留在当前段落。
+  const phase = PHASE_TABLE[state.phaseIndex];
+  const gate = phase.whitebox?.objectiveGates?.[index] || null;
+  if (gate) {
+    const verdict = EvaluateFirstLevelObjectiveGate(gate, {
+      elapsed: state.phaseTime,
+      enemyDeaths: ai.deaths.ija || 0,
+      signals: gate.signal && story.Signalled(gate.signal) ? [gate.signal] : [],
+      voices: gate.voice && story.fired.some((beat) => beat.voice === gate.voice)
+        ? [gate.voice] : [],
+    });
+    state.objectiveBlockedReason = verdict.ok ? null : verdict.reason;
+    if (!verdict.ok) return;
+  } else {
+    state.objectiveBlockedReason = null;
+  }
   ReachObjective(index);
 }
 
@@ -5751,6 +5750,13 @@ function Frame(dt, render = true) {
   // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
   // 这种同拍的事会看得出来差一帧。
   setpieces?.Update(dt);
+  // 事件先改变白盒，再让玩家从改变后的世界里读到结果：护送队喊走后开院门，
+  // 南路被切断后开归路。不存在悬浮解释卡，也不存在隐形空气墙。
+  const openedScenarioGates = battlefield?.SyncScenario?.({
+    objectiveIndex: state.objectiveIndex,
+    signalled: (name) => story.Signalled(name),
+  });
+  if (openedScenarioGates > 0) navGrid?.Refresh(battlefield);
   profiler.E("story");
 
   // --- 结束条件 ---
@@ -5887,19 +5893,6 @@ function Frame(dt, render = true) {
       dist,
     };
   }, state.objectiveIndex);
-  hud.UpdateWorldAnnotations(
-    phase.whitebox?.annotations || [], player, state.objectiveIndex, (note) => {
-      const y = battlefield.GroundHeight(note.x, note.z) + (note.height || 2.5);
-      _proj.set(note.x, y, note.z);
-      _proj.project(camera);
-      return {
-        x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
-        y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
-        visible: _proj.z > -1 && _proj.z < 1
-          && Math.abs(_proj.x) < 0.96 && Math.abs(_proj.y) < 0.92,
-      };
-    });
-  hud.SetBoundaryWarning(WhiteboxBoundaryView());
   // 活手榴弹进入实际爆炸伤害范围才提示；屏内钉住落点，屏外贴边指方向。
   // 单独再投影一次最多只有四颗，避免把目标路标与爆炸警告绑成一套生命周期。
   hud.UpdateGrenadeWarnings(combat.GrenadeThreats(player.position), player, (x, y, z) => {

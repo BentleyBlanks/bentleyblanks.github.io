@@ -34,7 +34,7 @@ const NS = "http://www.w3.org/2000/svg";
 const SANDBOX_NAMES = {
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
-  firstLevelWhitebox: { where: "第一关大平原白盒", exit: "退出第一关白盒" },
+  firstLevelWhitebox: { where: "第一关策划白盒", exit: "退出第一关白盒" },
   jiehe: { where: "界河白盒", exit: "退出界河白盒" },
 };
 
@@ -320,7 +320,7 @@ export class MainMenu {
     this.camera = host.camera;
     this.phases = host.phases || [];
     /**
-     * 选章末尾的**沙盒条目**（玩法靶场、白刃 QTE 与第一关空间白盒）。
+     * 选章末尾的**沙盒条目**（玩法靶场、白刃 QTE 与第一关策划白盒）。
      * 它与七关并排摆在同一张列表上，但**不进 `this.phases`** —— 进度、「继续」、
      * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
      * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
@@ -485,7 +485,7 @@ export class MainMenu {
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
-   *   测试场景 —— 列玩法测试靶场、白刃 QTE 与第一关大平原白盒。
+   *   测试场景 —— 列玩法测试靶场、白刃 QTE 与第一关策划白盒。
    * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」，
    * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
    */

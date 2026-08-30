@@ -86,8 +86,8 @@ const tengxianForce = await page.evaluate(() => {
 });
 Check("正式第一关不挂测试白盒配置",
   tengxianForce.whitebox.phase === "CH1_NanLu"
-    && tengxianForce.whitebox.annotations === 0 && tengxianForce.whitebox.boundary === null,
-  `phase=${tengxianForce.whitebox.phase} annotations=${tengxianForce.whitebox.annotations}`);
+    && tengxianForce.whitebox.contentId === "CH1_NanLu" && tengxianForce.whitebox.field === null,
+  `phase=${tengxianForce.whitebox.phase} field=${tengxianForce.whitebox.field}`);
 Check("滕县日军有固定重机枪组与分队轻机枪", tengxianForce.hmg >= 1 && tengxianForce.lmg >= 1,
   `重机=${tengxianForce.hmg} 轻机=${tengxianForce.lmg}`);
 Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0

@@ -7,8 +7,6 @@
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
-import { SelectWhiteboxAnnotations } from "./Script_WhiteboxGuide.mjs";
-
 const NS = "http://www.w3.org/2000/svg";
 
 /** 章节卡排在简报之后要等多久。0.55 s 让简报那 0.6 s 的淡出先走完。 */
@@ -394,18 +392,6 @@ export class Hud {
     this.el.mqAssist = this.el.meleeQte.querySelector(".mqAssist");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
-    // 白盒说明与具体章节解耦：章节给世界坐标和三行文字，HUD 只投影最多三处。
-    this.el.worldAnnotations = mk("hudWorldAnnotations");
-    for (let i = 0; i < 3; i += 1) {
-      const annotation = mk("hudWorldAnnotation", this.el.worldAnnotations);
-      annotation.innerHTML = `<span class="waPin"></span><span class="waCard">`
-        + `<i class="waEyebrow"></i><b class="waTitle"></b><u class="waDetail"></u>`
-        + `<em class="waDistance"></em></span>`;
-      annotation.style.display = "none";
-    }
-    this.el.boundaryWarning = mk("hudBoundaryWarning");
-    this.el.boundaryWarning.innerHTML = `<b></b><span></span>`;
-    this.el.boundaryWarning.setAttribute("aria-hidden", "true");
     this.el.grenadeWarnings = mk("hudGrenadeWarnings");
     for (let i = 0; i < GRENADE_WARNING_LIMIT; i += 1) {
       const warning = mk("hudGrenadeWarning", this.el.grenadeWarnings);
@@ -1146,7 +1132,7 @@ export class Hud {
     objectives.forEach((o, i) => {
       const el = box.children[i];
       // 线性关卡只显示“下一处去向”。把七个未来路标同时钉在屏上不是帮助，
-      // 而是七个同色三角互相争夺注意力；完整链条仍保留在小地图和白盒说明里。
+      // 而是七个同色三角互相争夺注意力；玩家只读眼前的人、通路与下一处目标。
       if (!showAll && i !== Math.min(currentIndex, objectives.length - 1)) {
         el.style.display = "none";
         return;
@@ -1183,60 +1169,6 @@ export class Hud {
       m.el.style.left = `${m.x}px`;
       m.el.style.top = `${m.y}px`;
     }
-  }
-
-  /** 数据驱动的世界空间白盒说明。最多三张，并且只显示当前/相邻阶段。 */
-  UpdateWorldAnnotations(annotations, player, objectiveIndex, project) {
-    const selected = SelectWhiteboxAnnotations(
-      annotations, { x: player.position.x, z: player.position.z }, objectiveIndex, 3);
-    const children = this.el.worldAnnotations.children;
-    for (let i = 0; i < children.length; i += 1) {
-      const el = children[i];
-      const note = selected[i];
-      if (!note) { el.style.display = "none"; continue; }
-      const p = project(note);
-      if (!p.visible) { el.style.display = "none"; continue; }
-      el.style.display = "";
-      el.className = `hudWorldAnnotation ${note.kind || "route"}`
-        + `${note.objective === objectiveIndex ? " active" : ""}`;
-      el.style.left = `${p.x}px`;
-      el.style.top = `${p.y}px`;
-      el.querySelector(".waEyebrow").textContent = note.eyebrow || "白盒说明";
-      el.querySelector(".waTitle").textContent = note.title || note.id;
-      el.querySelector(".waDetail").textContent = note.detail || "";
-      el.querySelector(".waDistance").textContent = `${Math.round(note.distance)}m`;
-    }
-  }
-
-  /** 空气墙有两级：靠近边缘先给方向提示，真正越界时明确说明已被裁回。 */
-  SetBoundaryWarning(view) {
-    const el = this.el.boundaryWarning;
-    if (!view || !view.warning) {
-      el.className = "hudBoundaryWarning";
-      el.setAttribute("aria-hidden", "true");
-      return;
-    }
-    const hard = !!view.hard;
-    el.className = `hudBoundaryWarning on${hard ? " hard" : ""}`;
-    el.children[0].textContent = hard ? "返回战场" : "偏离任务区域";
-    el.children[1].textContent = view.message || (hard
-      ? "已离开可玩区域，正在返回战场。"
-      : "看路标，回到任务路线。");
-    el.setAttribute("aria-hidden", "false");
-  }
-
-  /** 浏览器冒烟取证口。 */
-  WhiteboxState() {
-    return {
-      annotations: [...this.el.worldAnnotations.children]
-        .filter((el) => el.style.display !== "none")
-        .map((el) => ({ title: el.querySelector(".waTitle").textContent, className: el.className })),
-      boundary: {
-        on: this.el.boundaryWarning.classList.contains("on"),
-        hard: this.el.boundaryWarning.classList.contains("hard"),
-        text: this.el.boundaryWarning.textContent,
-      },
-    };
   }
 
   /**

@@ -104,7 +104,7 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeo
 await page.evaluate(() => {
   const T = window.Taierzhuang;
   // 第一关现在把完整交火推迟到 30 秒；伤害靶场测的是展开后的武器口径，
-  // 首敌节拍由 WhiteboxGuideBrowserTest 另行逐秒锁定。这里只推进阶段钟并触发
+  // 首敌节拍由 FirstLevelWhiteboxBrowserTest 另行逐秒锁定。这里只推进阶段钟并触发
   // 下一次补兵拍，不让双方先空打 31 秒，也不能开无敌（后面正要测玩家受伤）。
   T.state.phaseTime = 31;
   T.state.spawnAccumulator = 3.1;

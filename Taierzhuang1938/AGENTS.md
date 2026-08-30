@@ -234,11 +234,16 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - 专用章与正片共用正式 Soldier/Actor/伤害/死亡链；`Debug.MeleeQte` 只做摆位和取证。
 - 回归口 `Script_MeleeQteTest.mjs`（combat 域）。先读：`docs/Data_MeleeQte.md`。
 
-### 第一关大平原白盒（?whitebox=1，独立测试章节）
-- `Data_FirstLevelWhitebox.mjs` 是唯一 phase 数据；`Script_TengxianOutfield.OUTFIELD_SCENES.FirstLevelWhitebox`
-  是压缩走廊场景。两者不进 `PHASES`，不得把空气墙、说明点或首敌节拍挂回正式 `CH1_NanLu`。
-- 选章「测试场景」组可见，直达参数固定 `?whitebox=1`；回归口
-  `Script_WhiteboxGuideTest.mjs` 与 `Script_WhiteboxGuideBrowserTest.mjs`。
+### 第一关策划白盒（?whitebox=1，独立测试章节）
+- `Data_FirstLevelWhitebox.mjs` 是唯一 phase / 体块布局数据，`Script_FirstLevelWhiteboxField.mjs`
+  是独立场景实现；它们不进 `PHASES`，也不借 `TengxianOutfield`、PCG、贴图或外部模型。
+- 可见环境只能是程序化 `BoxGeometry` + 纯白无贴图 `MeshStandardMaterial`，接受正片太阳与阴影。
+  边界必须用可见实体白墙表达，不得恢复空气墙、世界说明卡或未来剧情标注。
+- 场景 id 是 `FirstLevelWhitebox`，内容 id 通过 `Script_FirstLevelWhiteboxFlow.mjs` 复用正式
+  `CH1_NanLu`；具名同伴、对白、后送队、担架、空袭与事件摆点必须跑正式第一章链路。
+- 护送门与折返门由正式剧情信号改变网格和 Rapier 碰撞，目标由事实门推进，不能退回
+  “走进目标圈就算完成”。回归口：`Script_FirstLevelWhiteboxTest.mjs` 与
+  `Script_FirstLevelWhiteboxBrowserTest.mjs`。
 
 ### 界河白盒（?jiehe=1，退出正片但资产完整的那片城北原野）
 - 切片是 `Data_Menu.JIEHE_SANDBOX_PHASE`。**id 仍是 `L0_Jiehe`** —— `OUTFIELD_SCENES` /

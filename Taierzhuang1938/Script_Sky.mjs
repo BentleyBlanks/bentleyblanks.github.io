@@ -136,6 +136,24 @@ void main() {
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
 export const SKY_PRESETS = {
+  // 关卡策划白盒专用：环境体块全是 0xffffff，不能沿用正片 smokyDay 的 8.6 直射、
+  // 1.05 IBL 与 0.34 bloom —— 三项叠加会把地面和迎光面一起剪成纯白，形体反而消失。
+  // 这里不靠给盒子染灰做层次；材质仍是纯白，只把光照压进可审读的动态范围，
+  // 冷灰天空同时给轮廓留出背景分离。正片没有任何章节引用这一档。
+  whiteboxDay: {
+    sunElevation: 45, sunAzimuth: 222,
+    zenith: [0.42, 0.58, 0.86], horizon: [0.82, 0.88, 1.02], ground: [0.26, 0.28, 0.31],
+    sunColor: [1.0, 0.97, 0.91], sunIntensity: 42, sunSize: 0.000012, glow: 0.45, glowSpread: 10,
+    smoke: 0.16, smokeColor: [0.62, 0.66, 0.73], smokeHeight: 0.10, stars: 0.0,
+    lightColor: 0xfff3df, lightIntensity: 3.8,
+    envIntensity: 0.52,
+    shProbeIntensity: 0.20,
+    ambientIntensity: 0.07,
+    fog: { density: 0.0048, falloff: 30, max: 0.70,
+      sky: [0.40, 0.44, 0.52], ground: [0.34, 0.35, 0.38], sunGain: 0.10,
+      desat: 0.18, flatten: 0.04 },
+    exposure: 0.40, godStrength: 0.05, bloom: 0.06, saturation: 0.92, contrast: 1.12,
+  },
   // 完整场景编辑器专用的长视距白昼。县城总览机位离最远门外约 1.6 km，正片的
   // 历史硝烟档会把四关厢压成同一片灰；这一档把雾留作轻空气透视，但不遮掉地物。
   // 不进七章、不进过场，只由 Data_Menu.FULL_SCENE_PHASE 使用。

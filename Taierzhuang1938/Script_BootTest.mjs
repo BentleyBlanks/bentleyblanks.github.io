@@ -389,7 +389,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
     // 第一关白盒故意在 20—30 秒前保持敌方空场，让玩家先认路；这一帧没有日军 Actor
-    // 可供枚举不是材质缺失。完整火力出现后的接线由 WhiteboxGuideBrowserTest 锁定，
+    // 可供枚举不是材质缺失。完整火力出现后的接线由 FirstLevelWhiteboxBrowserTest 锁定，
     // 其余六章仍照旧在开机帧检查双方材质。
     const scriptedQuiet = !!PHASES[phase].whitebox?.firstContact;
     if (!cutsceneOnly && !scriptedQuiet && health.readableIjaMaterials < 2) {
