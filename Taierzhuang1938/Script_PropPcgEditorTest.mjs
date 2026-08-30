@@ -47,6 +47,10 @@ const opened = await page.evaluate(async () => {
     volumes: active.document.volumes.length,
     placements: active.result.placements.length,
     anchors: active.result.stats.anchors,
+    splineVolumes: active.document.volumes.filter((entry) => entry.shape === "spline").length,
+    firingLine: active.result.stats.byProfile.defenseFiringLine || 0,
+    solidSpline: active.result.placements.filter((entry) => entry.pcgProfile === "defenseFiringLine"
+      || entry.pcgProfile === "defenseWireLine").every((entry) => entry.solid === true),
     errors: active.result.errors,
     previewChildren: active.previewRoot.children.length,
     runtimeHidden: T.scene.children.filter((child) => child.userData?.externalProps)
@@ -59,6 +63,9 @@ Check("PCG 编辑器进入自由飞行并列出源码 volume", opened.id === "pr
   && opened.volumes >= 8, JSON.stringify(opened));
 Check("当前切片按真实碰撞生成了 PCG 组", opened.placements > 0 && opened.anchors > 0
   && opened.errors.length === 0, `placements=${opened.placements} anchors=${opened.anchors}`);
+Check("当前切片生成了会随样条朝向的实体工事线", opened.splineVolumes >= 8
+  && opened.firingLine > 0 && opened.solidSpline,
+  `splines=${opened.splineVolumes} firingLine=${opened.firingLine}`);
 Check("预览隐藏正片实例根并画出规则结果", opened.runtimeHidden && opened.previewChildren > 0,
   `children=${opened.previewChildren}`);
 Check("正片仍有 GPU 实例桶取证", opened.runtime?.batch?.buckets > 0
@@ -107,6 +114,26 @@ Check("退出恢复正片实例根并清除预览", !after.active && !after.fly 
   && !after.preview, JSON.stringify(after));
 Check("退出恢复相机投影", Math.abs(after.fov - before.fov) < 0.01
   && Math.abs(after.far - before.far) < 0.01, `${before.fov}/${before.far} -> ${after.fov}/${after.far}`);
+
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=2&menu=0`,
+  { waitUntil: "load", timeout: 120000 });
+await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
+await page.click("#bootStart");
+await page.evaluate(() => window.Taierzhuang.StepFrames(20));
+const eastBreach = await page.evaluate(async () => {
+  const T = window.Taierzhuang;
+  const active = T.editor.Open("propPcg");
+  await active.RefreshPreview();
+  const ids = ["WireEastBreachNorth", "WireEastBreachSouth"];
+  return {
+    wirePlacements: active.result.placements.filter((entry) => ids.includes(entry.pcgVolume)).length,
+    byVolume: Object.fromEntries(ids.map((id) => [id, active.result.stats.byVolume[id] || null])),
+    errors: active.result.errors,
+  };
+});
+Check("东寨缺口两翼的样条铁丝网在真实街巷碰撞下仍能落点", eastBreach.wirePlacements >= 2
+  && eastBreach.errors.length === 0, JSON.stringify(eastBreach));
+await page.evaluate(() => window.Taierzhuang.editor.Close());
 
 await browser.close();
 server.close();

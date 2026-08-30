@@ -4,11 +4,12 @@
 // “哪一片允许出现”。具体落点由 Script_PropPcg 用固定种子、真实院落格与碰撞表生成。
 // 资产 id 必须来自 Script_ExternalProps.ExternalPropCatalog；这里不复制 URL、材质或模型。
 //
-// 两条内容纪律：
+// 三条内容纪律：
 //   · 生活用具按使用关系成组（水缸+桶、柴墩+斧、桌+凳），不均匀撒单件；
-//   · 工事只补低矮军需/休息/就地取材，不自动生成碉堡、战壕或封路障碍。
+//   · 面状工事 PCG 只补低矮军需/休息/就地取材，不自动生成碉堡或战壕；
+//   · 真正会改通行的沙袋/铁丝网只许走 spline，控制点主动绕开门洞、马道与任务轴。
 
-export const PROP_PCG_SCHEMA_VERSION = 1;
+export const PROP_PCG_SCHEMA_VERSION = 2;
 
 /**
  * PCG 只需知道水平占地与用途；真实模型、材质、碰撞 tag 仍归 ExternalProps。
@@ -52,6 +53,11 @@ export const PROP_PCG_ASSET_RULES = Object.freeze({
   battlefieldCanvasCover01: { radius: 1.10, category: "defense" },
   battlefieldCanvasCover02: { radius: 1.10, category: "defense" },
   battlefieldTimberBeam: { radius: 1.18, category: "defense" },
+  battlefieldSandbag01: { radius: 1.06, category: "defenseLine", solid: true },
+  battlefieldSandbag02: { radius: 1.12, category: "defenseLine", solid: true },
+  battlefieldSandbag03: { radius: 1.04, category: "defenseLine", solid: true },
+  battlefieldBarbedWire01: { radius: 1.62, category: "defenseLine", solid: true },
+  battlefieldBarbedWire02: { radius: 1.62, category: "defenseLine", solid: true },
 });
 
 const LifeTemplate = (id, label, weight, items) => Object.freeze({
@@ -122,6 +128,35 @@ export const PROP_PCG_PROFILES = Object.freeze({
       ]),
     ]),
   }),
+  defenseFiringLine: Object.freeze({
+    id: "defenseFiringLine", label: "沙袋散兵线", category: "defenseLine",
+    maxSlope: 0.12, fixedClearance: 0.30, itemClearance: 0.08,
+    yawJitter: 0.035, scaleRange: [0.96, 1.04],
+    templates: Object.freeze([
+      LifeTemplate("sandbag01", "低矮土袋段", 1.0, [
+        { asset: "battlefieldSandbag01", offset: [0, 0], ry: 0 },
+      ]),
+      LifeTemplate("sandbag02", "宽土袋段", 0.85, [
+        { asset: "battlefieldSandbag02", offset: [0, 0], ry: 0 },
+      ]),
+      LifeTemplate("sandbag03", "加高土袋段", 0.92, [
+        { asset: "battlefieldSandbag03", offset: [0, 0], ry: 0 },
+      ]),
+    ]),
+  }),
+  defenseWireLine: Object.freeze({
+    id: "defenseWireLine", label: "铁丝障碍线", category: "defenseLine",
+    maxSlope: 0.10, fixedClearance: 0.36, itemClearance: 0.06, lineOverlap: 0.52,
+    yawJitter: 0.025, scaleRange: [0.98, 1.02],
+    templates: Object.freeze([
+      LifeTemplate("concertina", "蛇腹铁丝网", 1.25, [
+        { asset: "battlefieldBarbedWire01", offset: [0, 0], ry: 0 },
+      ]),
+      LifeTemplate("stakeWire", "三道桩网", 1.0, [
+        { asset: "battlefieldBarbedWire02", offset: [0, 0], ry: 0 },
+      ]),
+    ]),
+  }),
 });
 
 const QuarterVolume = (id, label, bounds, seedOffset) => Object.freeze({
@@ -134,6 +169,27 @@ const DefenseVolume = (id, label, bounds, seedOffset, axisYaw) => Object.freeze(
   id, label, enabled: true, profile: "defenseSupport", shape: "rect", bounds,
   seedOffset, count: 5, attemptsPerAnchor: 42, minSpacing: 12,
   inset: 0.8, axisYaw,
+});
+
+function PointsBounds(points, padding = 4) {
+  const xs = points.map((point) => point[0]);
+  const zs = points.map((point) => point[1]);
+  return Object.freeze({
+    minX: Math.min(...xs) - padding, maxX: Math.max(...xs) + padding,
+    minZ: Math.min(...zs) - padding, maxZ: Math.max(...zs) + padding,
+  });
+}
+
+const DefenseSpline = (id, label, profile, points, seedOffset, options = {}) => Object.freeze({
+  id, label, enabled: true, profile, shape: "spline",
+  bounds: PointsBounds(points, options.boundsPadding ?? 4),
+  points: Object.freeze(points.map((point) => Object.freeze(point))),
+  seedOffset, spacing: options.spacing ?? (profile === "defenseWireLine" ? 3.18 : 12.5),
+  startInset: options.startInset ?? 1.5, endInset: options.endInset ?? 1.5,
+  sideOffset: options.sideOffset ?? 0, sideJitter: options.sideJitter ?? 0.18,
+  alongJitter: options.alongJitter ?? 0.28,
+  minSpacing: 0,
+  exclusions: Object.freeze(options.exclusions || []),
 });
 
 /**
@@ -154,6 +210,32 @@ export const PROP_PCG_DOCUMENT = Object.freeze({
     DefenseVolume("DefenseEastSouth", "东墙南段补给", { minX: 286, maxX: 293, minZ: 104, maxZ: 258 }, 809, Math.PI / 2),
     DefenseVolume("DefenseWest", "西墙补给", { minX: -293, maxX: -286, minZ: 42, maxZ: 258 }, 907, Math.PI / 2),
     DefenseVolume("DefenseNorthEast", "北墙东段补给", { minX: 0, maxX: 258, minZ: -293, maxZ: -286 }, 1009, 0),
+
+    // 顺城街墙根的散兵位按 spline 稀疏排列。控制点已把四门、四条马道、两处缺口
+    // 与章节主轴切成独立安全段；12.5 m 左右一处，不把整圈做成现代齐整胸墙。
+    DefenseSpline("FiringSouthWest", "南墙西段散兵线", "defenseFiringLine",
+      [[-258, 291], [42, 291]], 1201, { spacing: 13.5 }),
+    DefenseSpline("FiringSouthEast", "南墙东段散兵线", "defenseFiringLine",
+      [[118, 291], [258, 291]], 1301, { spacing: 13.0 }),
+    DefenseSpline("FiringEastNorth", "东墙北段散兵线", "defenseFiringLine",
+      [[291, -258], [291, -108]], 1409, { spacing: 12.5 }),
+    DefenseSpline("FiringEastSouth", "东墙南段散兵线", "defenseFiringLine",
+      [[291, 108], [291, 254]], 1511, { spacing: 12.5 }),
+    DefenseSpline("FiringWestSouth", "西墙南段散兵线", "defenseFiringLine",
+      [[-291, 44], [-291, 254]], 1601, { spacing: 13.5 }),
+    DefenseSpline("FiringNorthEast", "北墙东段散兵线", "defenseFiringLine",
+      [[4, -291], [254, -291]], 1709, { spacing: 13.5 }),
+
+    // 东寨缺口两翼是全场最适合连续障碍线的地方：顺巷铺，不横过 x 向主路。
+    // 主路中心 z=-65 与缺口净宽始终留空；拒马和弹壳仍由手摆件做视觉焦点。
+    DefenseSpline("WireEastBreachNorth", "东寨缺口北翼桩网", "defenseWireLine",
+      [[504, -82], [504, -73]], 1801, {
+        spacing: 3.05, startInset: 0.2, endInset: 0.2, sideJitter: 0.06, alongJitter: 0.08,
+      }),
+    DefenseSpline("WireEastBreachSouth", "东寨缺口南翼蛇腹网", "defenseWireLine",
+      [[504, -60.5], [504, -53]], 1901, {
+        spacing: 3.05, startInset: 0.2, endInset: 0.2, sideJitter: 0.06, alongJitter: 0.08,
+      }),
   ]),
 });
 

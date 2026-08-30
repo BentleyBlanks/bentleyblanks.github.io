@@ -188,7 +188,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Script_TownDressing.mjs` —— 城内「每家每户」布设注册表（世界坐标登记一次、按 bounds 过滤，
   同一只米袋三关不搬家）+ 10 份 `Data_Dressing_*.mjs` 分区工作包。
 - `Data_PropPcg.mjs` + `Script_PropPcg.mjs` —— 生活用具 / 工事支援的确定性规则布设；纯生成器
-  不 import three，按院落 / 防区生成完整语义组合并做 AABB、坡度、间距、已手摆构件裁决。
+  不 import three，按院落 / 防区生成完整语义组合，并用 Catmull-Rom 样条铺沙袋/铁丝障碍线，
+  统一做 AABB、坡度、间距、已手摆构件裁决。
   自动小物默认 `solid:false`，只进视觉实例，禁止随机桶凳改写 AI 导航、射界或玩家移动；
   未来逐资产 opt-in 碰撞时必须补交火 / 导航回归。
   编辑入口 `Script_EditorPropPcg.mjs`；回归口 `Script_PropPcgTest.mjs` / `Script_PropPcgEditorTest.mjs`。

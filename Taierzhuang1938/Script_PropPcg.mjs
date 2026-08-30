@@ -9,6 +9,7 @@
 // 禁止 Math.random。同一个院落 seed 在不同章节切片里会得到同一个世界落点。
 
 import { HashString, Mulberry32 } from "./Script_Noise.mjs";
+import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import {
   PROP_PCG_SCHEMA_VERSION, PROP_PCG_ASSET_RULES, PROP_PCG_PROFILES,
 } from "./Data_PropPcg.mjs";
@@ -154,9 +155,43 @@ function RectCandidates(volume, worldBounds, random) {
   return { count, candidates };
 }
 
+/**
+ * 沿 Catmull-Rom 中心线按弧长生成候选。每个槽位拥有独立随机流，所以另一章节
+ * 只截到半条线时，留下来的模块不会跟着换型号、朝向或尺度。
+ */
+function SplineCandidates(volume, volumeSeed) {
+  let path = null;
+  try { path = MakeRoadPath(volume.points); } catch (error) { return []; }
+  const start = Clamp(Finite(volume.startInset, 0), 0, path.length);
+  const end = Clamp(path.length - Finite(volume.endInset, 0), start, path.length);
+  const span = end - start;
+  const spacing = Math.max(0.75, Finite(volume.spacing, 3));
+  const count = Math.max(0, Math.round(span / spacing));
+  if (!count) return [];
+  const stride = span / count;
+  const sideOffset = Finite(volume.sideOffset, 0);
+  const sideJitter = Math.max(0, Finite(volume.sideJitter, 0));
+  const alongJitter = Math.min(stride * 0.34, Math.max(0, Finite(volume.alongJitter, 0)));
+  const candidates = [];
+  for (let index = 0; index < count; index += 1) {
+    const random = Mulberry32(HashString(`${volumeSeed}:spline:${index}`) >>> 0);
+    const nominal = start + (index + 0.5) * stride;
+    const s = Clamp(nominal + (random() * 2 - 1) * alongJitter, start, end);
+    const point = path.At(s);
+    const side = sideOffset + (random() * 2 - 1) * sideJitter;
+    candidates.push({
+      x: point.x - point.tz * side,
+      z: point.z + point.tx * side,
+      yaw: Math.atan2(-point.tz, point.tx),
+      random,
+    });
+  }
+  return candidates;
+}
+
 function ExpandTemplate({ anchor, profile, template, random, volume }) {
-  const baseYaw = Number.isFinite(Number(volume.axisYaw))
-    ? Number(volume.axisYaw) : random() * TWO_PI;
+  const baseYaw = Number.isFinite(Number(anchor.yaw)) ? Number(anchor.yaw)
+    : (Number.isFinite(Number(volume.axisYaw)) ? Number(volume.axisYaw) : random() * TWO_PI);
   const yaw = baseYaw + (random() * 2 - 1) * Math.max(0, Finite(profile.yawJitter, 0));
   const cos = Math.cos(yaw), sin = Math.sin(yaw);
   const items = [];
@@ -211,7 +246,10 @@ function ValidateCluster({ items, volume, profile, context, accepted, anchors, a
     }
     for (const other of accepted) {
       const dx = item.x - other.x, dz = item.z - other.z;
-      const limit = item.radius + other.radius + Math.max(0, Finite(profile.itemClearance, 0));
+      const sameLineOverlap = other.pcgVolume === volume.id
+        ? Math.max(0, Finite(profile.lineOverlap, 0)) : 0;
+      const limit = Math.max(0, item.radius + other.radius
+        + Math.max(0, Finite(profile.itemClearance, 0)) - sameLineOverlap);
       if (dx * dx + dz * dz < limit * limit) return "generated";
     }
   }
@@ -244,9 +282,19 @@ export function ValidatePropPcgDocument(document, { assetIds = null } = {}) {
     if (!volume.id || ids.has(volume.id)) errors.push(`${prefix}.id 缺失或重复`);
     ids.add(volume.id);
     if (!PROP_PCG_PROFILES[volume.profile]) errors.push(`${prefix}.profile 不存在：${volume.profile}`);
-    if (!new Set(["rect", "cells"]).has(volume.shape)) errors.push(`${prefix}.shape 只认 rect/cells`);
+    if (!new Set(["rect", "cells", "spline"]).has(volume.shape)) {
+      errors.push(`${prefix}.shape 只认 rect/cells/spline`);
+    }
     const bounds = CopyBounds(volume.bounds);
     if (!(bounds.maxX > bounds.minX && bounds.maxZ > bounds.minZ)) errors.push(`${prefix}.bounds 无面积`);
+    if (volume.shape === "spline") {
+      if (!Array.isArray(volume.points) || volume.points.length < 2
+        || volume.points.some((point) => !Array.isArray(point) || point.length < 2
+          || !Number.isFinite(Number(point[0])) || !Number.isFinite(Number(point[1])))) {
+        errors.push(`${prefix}.points 至少要两个有限 XZ 控制点`);
+      }
+      if (!(Finite(volume.spacing) > 0)) errors.push(`${prefix}.spacing 必须大于 0`);
+    }
   }
   const known = assetIds ? new Set(assetIds) : null;
   for (const profile of Object.values(PROP_PCG_PROFILES)) {
@@ -273,7 +321,7 @@ export function NormalizePropPcgDocument(document) {
         label: String(raw.label || raw.id || `撒点区 ${index + 1}`).slice(0, 48),
         enabled: raw.enabled !== false,
         profile: PROP_PCG_PROFILES[raw.profile] ? raw.profile : "householdLife",
-        shape: raw.shape === "rect" ? "rect" : "cells",
+        shape: new Set(["rect", "spline"]).has(raw.shape) ? raw.shape : "cells",
         bounds: {
           minX: Clamp(bounds.minX, -2500, 2500), maxX: Clamp(bounds.maxX, -2500, 2500),
           minZ: Clamp(bounds.minZ, -2500, 2500), maxZ: Clamp(bounds.maxZ, -2500, 2500),
@@ -287,6 +335,15 @@ export function NormalizePropPcgDocument(document) {
         minSpacing: Clamp(Finite(raw.minSpacing, 6), 0, 80),
         axisYaw: raw.axisYaw != null && Number.isFinite(Number(raw.axisYaw))
           ? Number(raw.axisYaw) : null,
+        points: Array.isArray(raw.points) ? raw.points.slice(0, 32).map((point) => [
+          Clamp(Finite(point?.[0]), -2500, 2500), Clamp(Finite(point?.[1]), -2500, 2500),
+        ]) : [],
+        spacing: Clamp(Finite(raw.spacing, 3.2), 0.75, 80),
+        startInset: Clamp(Finite(raw.startInset, 0), 0, 80),
+        endInset: Clamp(Finite(raw.endInset, 0), 0, 80),
+        sideOffset: Clamp(Finite(raw.sideOffset, 0), -20, 20),
+        sideJitter: Clamp(Finite(raw.sideJitter, 0), 0, 8),
+        alongJitter: Clamp(Finite(raw.alongJitter, 0), 0, 8),
         exclusions: Array.isArray(raw.exclusions) ? raw.exclusions.slice(0, 32) : [],
       };
     }),
@@ -367,13 +424,15 @@ export function GeneratePropPcg(document, context = {}) {
           if (tryAnchor(anchor, cellRandom)) break;
         }
       }
-    } else {
+    } else if (volume.shape === "rect") {
       const rect = RectCandidates(volume, worldBounds, random);
       let made = 0;
       for (const anchor of rect.candidates) {
         if (made >= rect.count) break;
         if (tryAnchor(anchor)) made += 1;
       }
+    } else {
+      for (const anchor of SplineCandidates(volume, seed)) tryAnchor(anchor, anchor.random);
     }
   }
   return { placements, stats, errors };

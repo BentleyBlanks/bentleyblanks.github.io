@@ -308,24 +308,30 @@ three 的纯生成器；`Script_ExternalProps.mjs` 在每章加载时把结果�
 与实例桶。编辑器只在玩法暂停期间克隆真实模型做全量预览，退出立即清掉克隆并
 恢复正片 `PropBatcher`，所以编辑器显示的高 draw call 不能拿来代表生产性能。
 
-两类规则组各自解决不同问题：
+四类规则组各自解决不同问题：
 
 - `householdLife` 以院落 cell 为锚点，从「取水洗濯、劈柴修补、院心桌凳、收拾到一半、
   农具靠墙、灶间陶瓮」中选一个完整生活组合；不把单只桶、凳子、碗随机撒满地图。
 - `defenseSupport` 在城墙分段矩形内生成手榴弹补给、墙根歇兵或就地取材组合。城门口和
-  道路没有 volume，拒绝自动造碉堡、壕沟或横路障，主工事仍由关卡设计明确布设。
+  道路没有 volume，拒绝自动造碉堡或壕沟。
+- `defenseFiringLine` 把三种沙袋组沿 Catmull-Rom 控制线按弧长稀疏布置，朝向跟随切线；
+  城墙四门、马道、缺口和任务轴通过把长线切成独立安全段主动留空。
+- `defenseWireLine` 用同一套 spline 规则拼接蛇腹网/三道桩网；允许相邻模块按预设小幅压茬，
+  但仍逐件接受真实 AABB、坡度、手摆件与排除区裁决。
 
 纯生成器逐落点检查 volume / 世界 bounds、排除区、真实 AABB、已手摆构件、坡度、资产
 占地半径和组间距。种子按 `document → volume → cell/anchor` 分层：只改一户不会洗牌整座城，
 同一院落在相邻章节切片里也保持相同模板、坐标、朝向与缩放。面板可新建、复制、删除 volume，
-调规则组、形状、密度、边界退让、最小间距和 seed offset；还能切换真实构件 / volume 框 /
+调规则组、院落/矩形/样条形状、密度、控制点、弧长间隔、起终点退让、侧偏/抖动、最小间距
+和 seed offset；还能切换真实构件 / volume 框 /
 落点标记、把相机对准所选区，并做本地保存、JSON 导入导出。试调键是
-`tengxian1938_propPcg_v1`；正式交付必须把 JSON 结果誊回 `Data_PropPcg.mjs`。
+`tengxian1938_propPcg_v2`；正式交付必须把 JSON 结果誊回 `Data_PropPcg.mjs`。
 
 生产优化口径固定为「生成时避真实碰撞、自动小物默认不造物理体、视觉流送、同资产同材质
 GPU 实例桶」：PCG 输出就是普通 ExternalProps placement，但默认 `solid:false`，避免随机
-桶凳改变 AI 导航、射界或玩家移动；未来确需实体碰撞的资产必须逐项 `solid:true` 并补交火 /
-导航回归。静态件继续进入 `THREE.InstancedMesh` + `StaticDrawUsage`，不新建每件 draw call。
+桶凳改变 AI 导航、射界或玩家移动；沙袋/铁丝网是唯一显式 `solid:true` 的自动工事，且只能
+来自已切开通路的 spline volume，并由纯规则与两张真实关卡浏览器回归共同守门。静态件继续进入
+`THREE.InstancedMesh` + `StaticDrawUsage`，不新建每件 draw call。
 编辑器的取证栏同时显示生成件 / 组合 / volume / 拒绝原因、正片 live 数、
 实例数、live / reserved bucket 与 buffer overflow。纯规则回归口是 `Script_PropPcgTest.mjs`，
 真浏览器开关、预览、JSON 往返和退出还原由 `Script_PropPcgEditorTest.mjs` 守。

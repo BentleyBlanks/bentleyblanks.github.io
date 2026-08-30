@@ -14,6 +14,7 @@ import {
 } from "./Script_EditorUi.mjs";
 import { PickWorld, ScreenRay } from "./Script_EditorStage.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { MakeRoadPath } from "./Script_RoadPath.mjs";
 import {
   PROP_PCG_DOCUMENT, PROP_PCG_PROFILE_OPTIONS, PROP_PCG_PROFILES,
 } from "./Data_PropPcg.mjs";
@@ -25,10 +26,13 @@ import {
 } from "./Script_ExternalProps.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
 
-const STORE_KEY = "tengxian1938_propPcg_v1";
+const STORE_KEY = "tengxian1938_propPcg_v2";
 const DEFAULT_FAR = 2200;
 const DEFAULT_FOV = 55;
-const PROFILE_COLOR = { householdLife: 0x60c8a2, defenseSupport: 0xe0a455 };
+const PROFILE_COLOR = {
+  householdLife: 0x60c8a2, defenseSupport: 0xe0a455,
+  defenseFiringLine: 0xe26f52, defenseWireLine: 0xd6b552,
+};
 
 function Clone(value) { return JSON.parse(JSON.stringify(value)); }
 
@@ -43,6 +47,15 @@ function PhaseFor(game) {
 function VolumeCenter(volume) {
   const bounds = volume.bounds;
   return { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
+}
+
+function SplineBounds(points, padding = 4) {
+  const xs = points.map((point) => Number(point[0]));
+  const zs = points.map((point) => Number(point[1]));
+  return {
+    minX: Math.min(...xs) - padding, maxX: Math.max(...xs) + padding,
+    minZ: Math.min(...zs) - padding, maxZ: Math.max(...zs) + padding,
+  };
 }
 
 function MakeInput(value, onInput) {
@@ -60,7 +73,7 @@ function MakeInput(value, onInput) {
 export class PropPcgEditor {
   static id = "propPcg";
   static label = "PCG 撒点";
-  static hint = "按院落/矩形规则自动布设生活用具与工事，并取证 GPU 实例桶";
+  static hint = "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶";
 
   constructor(host) {
     this.host = host;
@@ -134,6 +147,7 @@ export class PropPcgEditor {
     this.FillVolumeList();
     ButtonRow(volumes, [
       { label: "准心处新建 40m 区", onClick: () => this.AddAtView() },
+      { label: "准心处新建 40m 工事线", onClick: () => this.AddSplineAtView() },
       { label: "复制所选", onClick: () => this.DuplicateSelected() },
       { label: "删除所选", onClick: () => this.DeleteSelected(), cls: "danger" },
     ]);
@@ -153,7 +167,7 @@ export class PropPcgEditor {
       { label: "看所选区", onClick: () => this.FrameSelected() },
     ]);
     CameraProjectionControls(preview, this.host.camera, { farMax: 5000 });
-    Note(preview, "青色=生活组，橙色=城防组。真实构件来自 ExternalProps 同一资产缓存；"
+    Note(preview, "青色=生活组，橙色=补给组，红色=沙袋线，黄色=铁丝网。真实构件来自 ExternalProps 同一资产缓存；"
       + "退出编辑器会恢复正片 InstancedMesh，不留下克隆或碰撞。", true);
 
     const evidence = Section(body, "规则与 GPU 取证");
@@ -168,7 +182,7 @@ export class PropPcgEditor {
       { label: "导入 JSON", onClick: () => this.Import(this.io.value) },
       { label: "恢复源码默认", onClick: () => this.Reset(), cls: "danger" },
     ]);
-    this.io = TextArea(io, { rows: 5, placeholder: "{ \"version\":1, \"seed\":…, \"volumes\":[…] }" });
+    this.io = TextArea(io, { rows: 5, placeholder: "{ \"version\":2, \"seed\":…, \"volumes\":[…] }" });
     this.ioNote = Note(io, `本地试调键：${STORE_KEY}；正式结果需誊回 Data_PropPcg.mjs。`);
   }
 
@@ -176,7 +190,8 @@ export class PropPcgEditor {
     if (!this.volumeList) return;
     this.volumeList.Fill(this.document.volumes.map((entry) => ({
       id: entry.id, name: entry.label,
-      tail: `${entry.enabled === false ? "关 · " : ""}${entry.shape === "cells" ? "院落" : "矩形"}`,
+      tail: `${entry.enabled === false ? "关 · " : ""}`
+        + ({ cells: "院落", rect: "矩形", spline: "样条" }[entry.shape] || entry.shape),
       title: `${entry.profile} · ${entry.id}`,
     })));
     if (!this.selected && this.document.volumes.length) this.selectedId = this.document.volumes[0].id;
@@ -195,7 +210,7 @@ export class PropPcgEditor {
     if (!box) return;
     box.innerHTML = "";
     const volume = this.selected;
-    if (!volume) { Note(box, "还没有撒点区。用“准心处新建”建立一个矩形区。"); return; }
+    if (!volume) { Note(box, "还没有撒点区。用“准心处新建”建立矩形区或工事线。"); return; }
     Row(box, "名称", MakeInput(volume.label, (value) => {
       volume.label = value.slice(0, 48) || volume.id;
       this.FillVolumeList();
@@ -213,34 +228,75 @@ export class PropPcgEditor {
     });
     Chips(stateRow, [
       { value: "cells", label: "院落格" }, { value: "rect", label: "矩形散布" },
+      { value: "spline", label: "样条工事" },
     ], volume.shape, (value) => {
       volume.shape = value;
+      if (value === "spline" && (!Array.isArray(volume.points) || volume.points.length < 2)) {
+        const center = VolumeCenter(volume);
+        volume.points = [[center.x - 20, center.z], [center.x + 20, center.z]];
+        volume.bounds = SplineBounds(volume.points);
+        volume.profile = "defenseFiringLine";
+      }
       this.BuildRuleUi();
       this.FillVolumeList();
       this.RequestRefresh();
     });
-    const center = VolumeCenter(volume);
-    const width = volume.bounds.maxX - volume.bounds.minX;
-    const depth = volume.bounds.maxZ - volume.bounds.minZ;
-    const SetBounds = (cx, cz, w, d) => {
-      volume.bounds = { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 };
-      this.RequestRefresh();
-    };
-    let currentX = center.x, currentZ = center.z, currentW = width, currentD = depth;
-    Slider(box, { label: "中心 X", min: -1800, max: 1800, step: 1, value: center.x,
-      format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentX = v; SetBounds(currentX, currentZ, currentW, currentD); } });
-    Slider(box, { label: "中心 Z", min: -1800, max: 1800, step: 1, value: center.z,
-      format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentZ = v; SetBounds(currentX, currentZ, currentW, currentD); } });
-    Slider(box, { label: "宽", min: 4, max: 900, step: 1, value: width,
-      format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentW = v; SetBounds(currentX, currentZ, currentW, currentD); } });
-    Slider(box, { label: "深", min: 4, max: 900, step: 1, value: depth,
-      format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentD = v; SetBounds(currentX, currentZ, currentW, currentD); } });
+    if (volume.shape === "spline") {
+      const pathInput = TextArea(box, { rows: 3, placeholder: "[[x,z],[x,z],…]" });
+      pathInput.value = JSON.stringify(volume.points || []);
+      pathInput.addEventListener("change", () => {
+        try {
+          const points = JSON.parse(pathInput.value);
+          if (!Array.isArray(points) || points.length < 2 || points.some((point) => (
+            !Array.isArray(point) || point.length < 2
+            || !Number.isFinite(Number(point[0])) || !Number.isFinite(Number(point[1]))
+          ))) throw new Error("至少两个有限 XZ 控制点");
+          volume.points = points.slice(0, 32).map((point) => [Number(point[0]), Number(point[1])]);
+          volume.bounds = SplineBounds(volume.points);
+          pathInput.value = JSON.stringify(volume.points);
+          this.RequestRefresh();
+        } catch (error) {
+          this.host.SetHint(`控制点错误：${String(error).slice(0, 100)}`);
+        }
+      });
+      Slider(box, { label: "模块间隔", min: 0.75, max: 40, step: 0.05, value: volume.spacing ?? 3.2,
+        format: (v) => `${v.toFixed(2)} m`, onInput: (v) => { volume.spacing = v; this.RequestRefresh(); } });
+      Slider(box, { label: "起点退让", min: 0, max: 30, step: 0.1, value: volume.startInset ?? 0,
+        format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.startInset = v; this.RequestRefresh(); } });
+      Slider(box, { label: "终点退让", min: 0, max: 30, step: 0.1, value: volume.endInset ?? 0,
+        format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.endInset = v; this.RequestRefresh(); } });
+      Slider(box, { label: "侧向偏移", min: -12, max: 12, step: 0.1, value: volume.sideOffset ?? 0,
+        format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.sideOffset = v; this.RequestRefresh(); } });
+      Slider(box, { label: "侧向抖动", min: 0, max: 3, step: 0.02, value: volume.sideJitter ?? 0,
+        format: (v) => `${v.toFixed(2)} m`, onInput: (v) => { volume.sideJitter = v; this.RequestRefresh(); } });
+      Slider(box, { label: "沿线抖动", min: 0, max: 3, step: 0.02, value: volume.alongJitter ?? 0,
+        format: (v) => `${v.toFixed(2)} m`, onInput: (v) => { volume.alongJitter = v; this.RequestRefresh(); } });
+      Note(box, "控制点走向决定构件朝向；间隔按弧长均匀分槽，抖动只去复制感。"
+        + "会改通行的工事线务必把门洞、马道与任务轴切成独立安全段。", true);
+    } else {
+      const center = VolumeCenter(volume);
+      const width = volume.bounds.maxX - volume.bounds.minX;
+      const depth = volume.bounds.maxZ - volume.bounds.minZ;
+      const SetBounds = (cx, cz, w, d) => {
+        volume.bounds = { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 };
+        this.RequestRefresh();
+      };
+      let currentX = center.x, currentZ = center.z, currentW = width, currentD = depth;
+      Slider(box, { label: "中心 X", min: -1800, max: 1800, step: 1, value: center.x,
+        format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentX = v; SetBounds(currentX, currentZ, currentW, currentD); } });
+      Slider(box, { label: "中心 Z", min: -1800, max: 1800, step: 1, value: center.z,
+        format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentZ = v; SetBounds(currentX, currentZ, currentW, currentD); } });
+      Slider(box, { label: "宽", min: 4, max: 900, step: 1, value: width,
+        format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentW = v; SetBounds(currentX, currentZ, currentW, currentD); } });
+      Slider(box, { label: "深", min: 4, max: 900, step: 1, value: depth,
+        format: (v) => `${v.toFixed(0)} m`, onInput: (v) => { currentD = v; SetBounds(currentX, currentZ, currentW, currentD); } });
+    }
     if (volume.shape === "cells") {
       Slider(box, { label: "院落命中率", min: 0, max: 1, step: 0.01, value: volume.chance,
         format: (v) => `${(v * 100).toFixed(0)}%`, onInput: (v) => { volume.chance = v; this.RequestRefresh(); } });
       Slider(box, { label: "最多生活组", min: 0, max: 64, step: 1, value: volume.maxAnchors,
         format: (v) => `${v.toFixed(0)} 组`, onInput: (v) => { volume.maxAnchors = Math.round(v); this.RequestRefresh(); } });
-    } else {
+    } else if (volume.shape === "rect") {
       Slider(box, { label: "目标组数", min: 0, max: 64, step: 1, value: volume.count,
         format: (v) => `${v.toFixed(0)} 组`, onInput: (v) => { volume.count = Math.round(v); this.RequestRefresh(); } });
       Slider(box, { label: "固定朝向", min: 0, max: Math.PI * 2, step: 0.02,
@@ -248,10 +304,12 @@ export class PropPcgEditor {
         format: (v) => `${(v * 180 / Math.PI).toFixed(0)}°`,
         onInput: (v) => { volume.axisYaw = v; this.RequestRefresh(); } });
     }
-    Slider(box, { label: "边界退让", min: 0, max: 12, step: 0.1, value: volume.inset,
-      format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.inset = v; this.RequestRefresh(); } });
-    Slider(box, { label: "组间距", min: 0, max: 40, step: 0.5, value: volume.minSpacing,
-      format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.minSpacing = v; this.RequestRefresh(); } });
+    if (volume.shape !== "spline") {
+      Slider(box, { label: "边界退让", min: 0, max: 12, step: 0.1, value: volume.inset,
+        format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.inset = v; this.RequestRefresh(); } });
+      Slider(box, { label: "组间距", min: 0, max: 40, step: 0.5, value: volume.minSpacing,
+        format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { volume.minSpacing = v; this.RequestRefresh(); } });
+    }
     Slider(box, { label: "种子偏移", min: 0, max: 4096, step: 1, value: volume.seedOffset,
       format: (v) => v.toFixed(0), onInput: (v) => { volume.seedOffset = Math.round(v); this.RequestRefresh(); } });
     const profile = PROP_PCG_PROFILES[volume.profile];
@@ -315,9 +373,19 @@ export class PropPcgEditor {
   BuildVolumeLines(groundAt) {
     for (const volume of this.document.volumes) {
       if (volume.enabled === false) continue;
-      const b = volume.bounds;
-      const corners = [[b.minX, b.minZ], [b.maxX, b.minZ], [b.maxX, b.maxZ], [b.minX, b.maxZ]];
-      const geometry = new THREE.BufferGeometry().setFromPoints(corners.map(([x, z]) => (
+      let points = [];
+      let loop = true;
+      if (volume.shape === "spline") {
+        try {
+          const path = MakeRoadPath(volume.points);
+          points = path.Dense(3);
+          loop = false;
+        } catch (error) { continue; }
+      } else {
+        const b = volume.bounds;
+        points = [[b.minX, b.minZ], [b.maxX, b.minZ], [b.maxX, b.maxZ], [b.minX, b.maxZ]];
+      }
+      const geometry = new THREE.BufferGeometry().setFromPoints(points.map(([x, z]) => (
         new THREE.Vector3(x, groundAt(x, z) + 0.22, z)
       )));
       const material = MarkNoPrepass(new THREE.LineBasicMaterial({
@@ -325,7 +393,7 @@ export class PropPcgEditor {
         transparent: true, opacity: volume.id === this.selectedId ? 1 : 0.48,
         depthTest: false,
       }));
-      const line = new THREE.LineLoop(geometry, material);
+      const line = loop ? new THREE.LineLoop(geometry, material) : new THREE.Line(geometry, material);
       line.renderOrder = 920;
       line.userData.skipNormalDepth = true;
       this.previewRoot.add(line);
@@ -407,6 +475,32 @@ export class PropPcgEditor {
     this.RefreshPreview();
   }
 
+  AddSplineAtView() {
+    const hit = this.PickCenter();
+    if (!hit) { this.host.SetHint("准心没有落到地面，先把镜头压低"); return; }
+    let id = "";
+    do { id = `PcgSpline${this.nextVolume++}`; }
+    while (this.document.volumes.some((entry) => entry.id === id));
+    const direction = new THREE.Vector3();
+    this.host.camera.getWorldDirection(direction);
+    direction.y = 0;
+    if (direction.lengthSq() < 1e-4) direction.set(1, 0, 0); else direction.normalize();
+    const points = [
+      [hit.x - direction.x * 20, hit.z - direction.z * 20],
+      [hit.x + direction.x * 20, hit.z + direction.z * 20],
+    ];
+    this.document.volumes.push({
+      id, label: `新工事线 ${this.nextVolume - 1}`, enabled: true,
+      profile: "defenseFiringLine", shape: "spline", bounds: SplineBounds(points), points,
+      seedOffset: this.nextVolume * 101, spacing: 3.2, startInset: 1.5, endInset: 1.5,
+      sideOffset: 0, sideJitter: 0.12, alongJitter: 0.16, minSpacing: 0, exclusions: [],
+    });
+    this.selectedId = id;
+    this.FillVolumeList();
+    this.BuildRuleUi();
+    this.RefreshPreview();
+  }
+
   DuplicateSelected() {
     const source = this.selected;
     if (!source) return;
@@ -417,6 +511,7 @@ export class PropPcgEditor {
     copy.label = `${source.label} 副本`;
     copy.bounds.minX += 8; copy.bounds.maxX += 8;
     copy.bounds.minZ += 8; copy.bounds.maxZ += 8;
+    if (copy.shape === "spline") copy.points = copy.points.map((point) => [point[0] + 8, point[1] + 8]);
     copy.seedOffset += 97;
     this.document.volumes.push(copy);
     this.selectedId = copy.id;

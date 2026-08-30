@@ -25,7 +25,7 @@ const cells = [
 ];
 
 const cellDocument = {
-  version: 1,
+  version: 2,
   seed: 417,
   volumes: [{
     id: "TestCells", label: "测试院落", enabled: true,
@@ -48,7 +48,7 @@ Check("出厂文档与 profile 的资产引用完整", () => {
   assert.deepEqual(ValidatePropPcgDocument(PROP_PCG_DOCUMENT, {
     assetIds: Object.keys(PROP_PCG_ASSET_RULES),
   }), []);
-  assert.ok(Object.keys(PROP_PCG_PROFILES).length >= 2);
+  assert.ok(Object.keys(PROP_PCG_PROFILES).length >= 4);
 });
 
 Check("相同种子与环境逐字段确定", () => {
@@ -103,7 +103,7 @@ Check("陡坡按 profile 上限整组拒绝", () => {
 
 Check("矩形区达到目标组数且守最小间距", () => {
   const document = {
-    version: 1, seed: 918,
+    version: 2, seed: 918,
     volumes: [{
       id: "DefenseTest", label: "测试工事", enabled: true,
       profile: "defenseSupport", shape: "rect",
@@ -117,6 +117,73 @@ Check("矩形区达到目标组数且守最小间距", () => {
     && entry.z > -18 && entry.z < 18));
 });
 
+Check("样条按弧长排布、朝向跟随切线且显式生成实体工事", () => {
+  const document = {
+    version: 2, seed: 1203,
+    volumes: [{
+      id: "WireSpline", label: "测试铁丝网", enabled: true,
+      profile: "defenseWireLine", shape: "spline",
+      bounds: { minX: -4, maxX: 44, minZ: -8, maxZ: 20 },
+      points: [[0, 0], [20, 0], [40, 12]], spacing: 3.1,
+      startInset: 0.2, endInset: 0.2, sideOffset: 0, sideJitter: 0,
+      alongJitter: 0, minSpacing: 0,
+    }],
+  };
+  const result = Generate(document, {
+    bounds: { minX: -10, maxX: 50, minZ: -20, maxZ: 30 }, cells: [],
+  });
+  assert.equal(result.errors.length, 0);
+  assert.ok(result.placements.length >= 12, `placements=${result.placements.length}`);
+  assert.ok(result.placements.every((entry) => entry.solid === true));
+  const turns = result.placements.map((entry) => entry.ry);
+  assert.ok(Math.max(...turns) - Math.min(...turns) > 0.2, "折线后的样条朝向没有随切线转动");
+});
+
+Check("样条槽位跨章节切片保持资产、坐标、朝向与尺度", () => {
+  const document = {
+    version: 2, seed: 772,
+    volumes: [{
+      id: "StableLine", label: "跨片散兵线", enabled: true,
+      profile: "defenseFiringLine", shape: "spline",
+      bounds: { minX: -45, maxX: 45, minZ: -5, maxZ: 5 },
+      points: [[-40, 0], [40, 0]], spacing: 8,
+      startInset: 0, endInset: 0, sideOffset: 0, sideJitter: 0,
+      alongJitter: 0, minSpacing: 0,
+    }],
+  };
+  const all = Generate(document, {
+    bounds: { minX: -50, maxX: 50, minZ: -10, maxZ: 10 }, cells: [],
+  });
+  const slice = Generate(document, {
+    bounds: { minX: 0, maxX: 50, minZ: -10, maxZ: 10 }, cells: [],
+  });
+  const fromAll = all.placements.filter((entry) => entry.x >= 0)
+    .map(({ asset, x, z, ry, scale }) => ({ asset, x, z, ry, scale }));
+  const fromSlice = slice.placements.map(({ asset, x, z, ry, scale }) => ({ asset, x, z, ry, scale }));
+  assert.deepEqual(fromSlice, fromAll);
+});
+
+Check("样条 exclusion 能切出门洞而不移动两侧模块", () => {
+  const document = {
+    version: 2, seed: 992,
+    volumes: [{
+      id: "GateGap", label: "门洞缺口", enabled: true,
+      profile: "defenseFiringLine", shape: "spline",
+      bounds: { minX: -34, maxX: 34, minZ: -5, maxZ: 5 },
+      points: [[-30, 0], [30, 0]], spacing: 6,
+      startInset: 0, endInset: 0, sideOffset: 0, sideJitter: 0,
+      alongJitter: 0, minSpacing: 0,
+      exclusions: [{ shape: "rect", bounds: { minX: -5, maxX: 5, minZ: -3, maxZ: 3 } }],
+    }],
+  };
+  const result = Generate(document, {
+    bounds: { minX: -40, maxX: 40, minZ: -10, maxZ: 10 }, cells: [],
+  });
+  assert.ok(result.placements.length > 0);
+  assert.ok(result.placements.every((entry) => Math.abs(entry.x) > 5));
+  assert.ok(result.stats.rejected.exclusion > 0);
+});
+
 Check("导入规范化会限数量、坐标与数值", () => {
   const normalized = NormalizePropPcgDocument({
     version: 99, seed: "7", volumes: [{
@@ -125,7 +192,7 @@ Check("导入规范化会限数量、坐标与数值", () => {
       chance: 7, count: 9999, minSpacing: -4,
     }],
   });
-  assert.equal(normalized.version, 1);
+  assert.equal(normalized.version, 2);
   assert.equal(normalized.volumes[0].id, "__id_");
   assert.equal(normalized.volumes[0].profile, "householdLife");
   assert.equal(normalized.volumes[0].chance, 1);
