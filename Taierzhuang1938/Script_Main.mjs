@@ -189,7 +189,7 @@ const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
 // player.Update(input) 里的 input.ads=false 覆盖成 0，实测就是这么白跑一轮的。
-// 第一人称默认使用国军模型 01 派生的真实蒙皮双手。`?arms=legacy` 只留作资产读取
+// 第一人称默认使用国军模型 01 派生的制服蒙皮双臂 + 十指骨骼 IK。`?arms=legacy` 只留作资产读取
 // 失败时的诊断入口；正常游戏、截图与冲刺都不再显示程序化手。
 const RIGGED_ARMS = params.get("arms") !== "legacy";
 const SHOT_ADS = !!(SHOT && params.get("ads"));

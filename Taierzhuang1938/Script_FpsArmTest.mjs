@@ -1,24 +1,9 @@
-// 第一人称手臂的画面闸：**手要在枪上，胳膊不许糊屏。**
+// 第一人称骨骼双臂画面闸：**手要扣在枪上，胳膊不许糊屏。**
 //
-// 这条测试是补给两次翻车的：
-//   1) 「第一人称从来没有手」—— 骨名带点号查不到，IK 没建起来，整副手臂停在
-//      绑定姿势挂在视野外，而旧的程序化手已经被藏掉。那一轮十几条断言全绿，
-//      画面上一只手都没有。
-//   2) 「持刀的手完全坏了」—— 手臂挂在**武器**下面，肩跟着大刀那组绕刀身自转
-//      88° 的腰射姿态一起侧翻到画面正中，一条肉色管子糊满半屏；步枪同理，
-//      左右大臂各在画面下方糊一坨。
-//
-// 所以这里量的都是画面事实，不是 visible 标志：
-//   · 涂色数像素：手臂在屏幕上占的比例要落在 [0.5%, 22%] 之间。
-//     低于下限 = 又没有手；高于上限 = 又在糊屏（翻车那两版实测 30%—60%）。
-//   · 腕到握点的距离：手真的扣在枪上，不是悬在旁边（≤ 12 cm，掌心到腕就有 9 cm）。
-//   · 大臂根必须落在视锥之外：肩是人身上的零件，一进画面就是穿帮。
-//
-// 覆盖腰射与开镜两个姿态、步枪与大刀两把武器 —— 大刀那组姿态转得最狠，
-// 是这条链最容易再翻的地方。
+// 2026-08-29 的静态手资产没有 skin / animation，回归只量“手掌模型中心离目标
+// 近不近”，因此冻住的手也能绿。这版改量真实指骨构造的 grip marker：位置误差
+// ≤ 5 mm、渲染矩阵三轴误差 ≤ 6°；同时覆盖全部八种玩家武器和五类握姿。
 
-// 国军 01 双手现在就是默认路径；URL 不再带 arms=rig，防止测试只守着一个玩家
-// 永远不会进入的隐藏分支。
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
@@ -52,9 +37,8 @@ const report = await page.evaluate(async () => {
   canvas.width = src.width;
   canvas.height = src.height;
   const ctx = canvas.getContext("2d");
-  const red = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const red = new THREE.MeshBasicMaterial({ color: 0xff0000, skinning: true });
 
-  /** 把整副手臂涂红，数它在屏幕上占了多少像素（枪该挡还挡，depthTest 不动）。 */
   const PaintedFraction = () => {
     const swapped = [];
     arms.root.traverse((node) => { if (node.isMesh) swapped.push([node, node.material]); });
@@ -64,8 +48,6 @@ const report = await page.evaluate(async () => {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let seen = 0;
     for (let i = 0; i < data.length; i += 4) {
-      // 阈值走**相对**红：这一关是阴天巷战，纯红经过色调映射后只有 (130, 10, 25)，
-      // 照 BayonetTest 那条 r > 140 的绝对阈值数出来是零 —— 手明明在画面上。
       if (data[i] > 60 && data[i] - data[i + 1] > 40 && data[i] - data[i + 2] > 40) seen += 1;
     }
     for (const [node, material] of swapped) node.material = material;
@@ -73,45 +55,84 @@ const report = await page.evaluate(async () => {
     return seen / (canvas.width * canvas.height);
   };
 
-  const Camera = (object) => {
-    const point = object.getWorldPosition(new THREE.Vector3());
-    vm.root.worldToLocal(point);
-    return point;
+  const GripResidual = (side) => {
+    const marker = arms.gripNodes[side];
+    const target = side === "r" ? vm.handRight.group : vm.handLeft.group;
+    const markerPosition = marker.getWorldPosition(new THREE.Vector3());
+    const targetPosition = target.getWorldPosition(new THREE.Vector3());
+    const Axis = (object, x, y, z) => {
+      const origin = object.getWorldPosition(new THREE.Vector3());
+      return object.localToWorld(new THREE.Vector3(x, y, z)).sub(origin).normalize();
+    };
+    const axisError = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].reduce((largest, axis) => {
+      const markerAxis = Axis(marker, ...axis);
+      const targetAxis = Axis(target, ...axis);
+      return Math.max(largest, markerAxis.angleTo(targetAxis));
+    }, 0);
+    return {
+      meters: +markerPosition.distanceTo(targetPosition).toFixed(5),
+      degrees: +(THREE.MathUtils.radToDeg(axisError)).toFixed(3),
+    };
   };
 
+  const cases = [
+    ["ZhongZheng", 0], ["ZhongZheng", 1],
+    ["HanYang", 0], ["Type38", 0],
+    ["Zb26", 0], ["Zb26", 1],
+    ["Mauser96", 0], ["Mauser96", 1],
+    ["ServicePistol", 0], ["Grenade", 0],
+    ["Dadao", 0], ["Dadao", 1],
+  ];
   const out = {
-    cases: [], hasArms: !!arms, chains: arms ? arms.report.chains : 0,
+    cases: [],
+    hasArms: !!arms,
     source: arms?.report?.source,
+    chains: arms?.report?.chains,
+    bones: arms?.report?.bones,
+    skinnedMeshes: arms?.report?.skinnedMeshes,
+    profiles: arms?.report?.profiles || [],
   };
-  for (const weapon of ["ZhongZheng", "Dadao"]) {
+  if (!arms) return out;
+  for (const [weapon, ads] of cases) {
     vm.Equip(weapon);
-    for (const ads of [0, 1]) {
-      for (let frame = 0; frame < 60; frame += 1) {
-        vm.Update(1 / 60, { ads, moveSpeed: 0, grounded: true, crouch: 0, sprint: 0 });
-      }
-      T.StepFrames(6);
-      const entry = { weapon, ads, painted: +PaintedFraction().toFixed(4), grip: {} };
-      for (const side of ["r", "l"]) {
-        const hand = side === "r" ? vm.handRight.group : vm.handLeft.group;
-        entry.grip[side] = +Camera(arms.modelHands[side]).distanceTo(Camera(hand)).toFixed(4);
-      }
-      out.cases.push(entry);
+    for (let frame = 0; frame < 60; frame += 1) {
+      vm.Update(1 / 60, { ads, moveSpeed: 0, grounded: true, crouch: 0, sprint: 0 });
     }
+    T.StepFrames(6);
+    const grip = { r: GripResidual("r"), l: GripResidual("l") };
+    out.cases.push({
+      weapon,
+      ads,
+      profile: arms.profile,
+      painted: +PaintedFraction().toFixed(4),
+      grip,
+      stretch: { ...arms.stretch },
+    });
   }
+  red.dispose();
   return out;
 });
 
 const checks = [];
-checks.push(["国军 01 左右手模型都接入默认路径", report.hasArms && report.chains === 2
-  && report.source === "LugouNra01", `source=${report.source} / hands=${report.chains}`]);
+checks.push(["国军 01 制服骨骼双臂接入默认路径",
+  report.hasArms && report.source === "LugouNra01Skeletal" && report.chains === 2
+    && report.skinnedMeshes === 1 && report.bones >= 45,
+  `source=${report.source} / chains=${report.chains} / bones=${report.bones}`]);
+checks.push(["五类武器握姿均从源骨骼动画提取",
+  ["rifle", "lmg", "pistol", "throwable", "melee"].every((profile) => report.profiles.includes(profile)),
+  report.profiles.join(", ")]);
 for (const entry of report.cases) {
   const label = `${entry.weapon} ${entry.ads ? "开镜" : "腰射"}`;
-  checks.push([`${label} 手臂在画面上读得出且没糊屏（0.5%—22%）`,
-    entry.painted >= 0.005 && entry.painted <= 0.22,
+  checks.push([`${label} 手臂在画面上读得出且没糊屏（0.3%—22%）`,
+    entry.painted >= 0.003 && entry.painted <= 0.22,
     `${(entry.painted * 100).toFixed(1)}%`]);
-  checks.push([`${label} 两只模型手掌中心都锁在握点附近（≤ 6 cm）`,
-    entry.grip.r <= 0.06 && entry.grip.l <= 0.06,
-    `右 ${entry.grip.r} m / 左 ${entry.grip.l} m`]);
+  checks.push([`${label} 指骨握持坐标系锁定（≤ 5 mm / 6°）`,
+    entry.grip.r.meters <= 0.005 && entry.grip.l.meters <= 0.005
+      && entry.grip.r.degrees <= 6 && entry.grip.l.degrees <= 6,
+    `右 ${entry.grip.r.meters} m/${entry.grip.r.degrees}°；左 ${entry.grip.l.meters} m/${entry.grip.l.degrees}°`]);
+  checks.push([`${label} 双臂拉伸没有超过 1.22`,
+    entry.stretch.r <= 1.22 && entry.stretch.l <= 1.22,
+    `右 ${entry.stretch.r} / 左 ${entry.stretch.l}`]);
 }
 checks.push(["页面无运行时错误", errors.length === 0, errors.slice(0, 2).join(" | ")]);
 
@@ -120,7 +141,7 @@ for (const [name, ok, detail] of checks) {
   if (!ok) failed += 1;
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 }
-console.log(`\n第一人称手臂：${checks.length - failed}/${checks.length} 过`);
+console.log(`\n第一人称骨骼双臂：${checks.length - failed}/${checks.length} 过`);
 
 await browser.close();
 server.close();

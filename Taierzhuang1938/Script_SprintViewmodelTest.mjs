@@ -1,5 +1,5 @@
 // First-person sprint visual regression. Drives the same Shift+W input path as a player
-// and captures the Dadao frame that previously filled the screen with the imported arm mesh.
+// and guards the single-skeleton contract: sprint must never flash back to legacy hands.
 
 import os from "node:os";
 import path from "node:path";
@@ -9,8 +9,6 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
-// arms=rig：导入整臂现在是可选路径（默认旧手模，见 Script_Main 的 RIGGED_ARMS），
-// 而这条测试量的正是导入整臂在冲刺姿态下的近裁面回退。
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
@@ -38,7 +36,6 @@ const report = await page.evaluate(() => {
     weapon: T.viewmodel.weaponId,
     riggedVisible: rigged?.root?.visible,
     legacyVisible: rigged?.legacyMeshes?.filter((mesh) => mesh.visible).length || 0,
-    fallback: rigged?.sprintFallback,
   };
   return data;
 });
@@ -52,7 +49,6 @@ const recovery = await page.evaluate(() => {
   T.StepFrames(90);
   const rigged = T.viewmodel.riggedArms;
   return {
-    fallback: rigged?.sprintFallback,
     riggedVisible: rigged?.root?.visible,
     legacyVisible: rigged?.legacyMeshes?.filter((mesh) => mesh.visible).length || 0,
   };
@@ -60,11 +56,10 @@ const recovery = await page.evaluate(() => {
 console.log(JSON.stringify({ ...report, recovery, screenshotPath, errors }, null, 2));
 
 const passed = report.sprint > 0.95 && report.spring > 0.95
-  && report.weapon === "Dadao" && report.riggedVisible === false
-  && report.fallback === true && report.legacyVisible > 0
-  && recovery.fallback === false && recovery.riggedVisible === true
+  && report.weapon === "Dadao" && report.riggedVisible === true
+  && report.legacyVisible === 0 && recovery.riggedVisible === true
   && recovery.legacyVisible === 0 && errors.length === 0;
-console.log(`${passed ? "ok  " : "FAIL"} 大刀 Shift+W 冲刺切到近裁面安全手模`);
+console.log(`${passed ? "ok  " : "FAIL"} 大刀 Shift+W 冲刺全程保持同一副骨骼双臂`);
 
 await browser.close();
 server.close();

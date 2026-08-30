@@ -1,11 +1,7 @@
-// 第一人称手臂 GLB 的二进制契约测试（纯 Node，不需要 WebGL / DOM）。
+// 第一人称国军骨骼双臂的 GLB 二进制契约（纯 Node，不需要 WebGL / DOM）。
 //
-// **这个文件曾经还守着四个人物 GLB**（Ija / Nra / Civilian 男女）的分段名、
-// 关节名、头部尺寸。那条显示路径已经拆了：五个 kind 全部走程序化 tzm 模型
-// （Model/Soldier*.tzm.json、Civilian*.tzm.json，建模脚本在 _blender/），
-// 它们的契约由 _blender/Verify.mjs + Script_ActorPoseTest.mjs 守。
-// 那四个 .glb 文件还在 Model/ 下，但没有任何代码路径会读它们 ——
-// 继续在这里断言它们的内部结构，只会让人以为它们还在用。
+// 这条闸专门防止 2026-08-29 那种“为了修手位，把 skin 和 animation 全应用掉”
+// 的回退：模型看起来还叫 arms，实际上已经只剩两块静态网格，运行时无骨可解 IK。
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -30,28 +26,44 @@ function ReadGlb(name) {
   throw new Error(`${name}: missing JSON chunk`);
 }
 
-function Names(doc) { return new Set((doc.nodes || []).map((node) => node.name).filter(Boolean)); }
+function Normalize(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function Names(doc) { return new Set((doc.nodes || []).map((node) => Normalize(node.name)).filter(Boolean)); }
 function Animations(doc) { return new Set((doc.animations || []).map((clip) => clip.name).filter(Boolean)); }
 
-function AssertTexturedMaterialsHaveNormals(doc, label) {
-  for (const material of doc.materials || []) {
-    if (material.pbrMetallicRoughness?.baseColorTexture == null) continue;
-    assert.ok(material.normalTexture, `${label} material ${material.name} keeps a tangent-space normal texture`);
-    const texture = doc.textures?.[material.normalTexture.index];
-    const image = doc.images?.[texture?.source];
-    assert.ok(image?.bufferView != null, `${label} material ${material.name} embeds its normal image`);
-    assert.match(image.mimeType ?? "", /^image\/(?:jpeg|png)$/, `${label} material ${material.name} normal MIME`);
-    assert.ok(material.normalTexture.scale > 0 && material.normalTexture.scale <= 1,
-      `${label} material ${material.name} uses restrained normal strength`);
+const name = "Model_FpsArmsNraSkeletal01.glb";
+const arms = ReadGlb(name);
+const armNames = Names(arms);
+const animations = Animations(arms);
+const profileClips = ["AdvanceFire", "MachineGunFire", "PistolFire", "RifleIdle", "AttackCommand"];
+
+assert.equal((arms.skins || []).length, 1, "FPS arms preserve one runtime skin");
+assert.equal((arms.meshes || []).length >= 1, true, "FPS arms preserve skinned uniform/hand geometry");
+assert.equal((arms.textures || []).length >= 1, true, "FPS arms keep their authored textures");
+assert.equal((arms.animations || []).length >= profileClips.length, true, "FPS arms preserve source motion clips");
+for (const clip of profileClips) assert.ok(animations.has(clip), `FPS grip profile keeps ${clip}`);
+
+for (const side of ["r", "l"]) {
+  for (const suffix of ["clavicle", "upperarm", "forearm", "hand"]) {
+    const wanted = `${side}${suffix}`;
+    assert.ok([...armNames].some((node) => node.endsWith(wanted)), `FPS arm bone ${wanted}`);
+  }
+  for (let finger = 0; finger <= 4; finger += 1) {
+    for (const segment of ["", "1", "2"]) {
+      const wanted = `${side}finger${finger}${segment}`;
+      assert.ok([...armNames].some((node) => node.endsWith(wanted)), `FPS finger bone ${wanted}`);
+    }
   }
 }
 
-const arms = ReadGlb("Model_FpsArmsNra01.glb");
-const armNames = Names(arms);
-assert.equal((arms.meshes || []).length, 2, "FPS hands export one authored mesh per side");
-assert.equal((arms.skins || []).length, 0, "NRA01 skin is applied offline, not retargeted at runtime");
-assert.ok((arms.textures || []).length >= 1, "FPS arms keep an albedo texture");
-for (const node of ["HandRight", "HandLeft"]) assert.ok(armNames.has(node), `FPS hand node ${node}`);
-assert.equal((arms.animations || []).length, 0, "FPS arms freeze model 01 RifleIdle as bind pose");
+const skinnedPrimitives = (arms.meshes || []).flatMap((mesh) => mesh.primitives || [])
+  .filter((primitive) => primitive.attributes?.JOINTS_0 != null || primitive.attributes?.WEIGHTS_0 != null);
+assert.equal(skinnedPrimitives.length >= 1, true, "FPS geometry exposes joint/weight attributes");
+for (const primitive of skinnedPrimitives) {
+  assert.notEqual(primitive.attributes.JOINTS_0, undefined, "skinned primitive has JOINTS_0");
+  assert.notEqual(primitive.attributes.WEIGHTS_0, undefined, "skinned primitive has WEIGHTS_0");
+}
 
-console.log(`ok   NRA01 FPS hands: ${arms.meshes.length} meshes, ${armNames.size} nodes, ${arms.animations?.length || 0} animation`);
+const jointCount = new Set((arms.skins || []).flatMap((skin) => skin.joints || [])).size;
+assert.equal(jointCount >= 45, true, `FPS arms keep a full upper-body/finger skeleton (${jointCount} joints)`);
+
+console.log(`ok   NRA01 skeletal FPS arms: ${arms.meshes.length} mesh, ${jointCount} joints, ${animations.size} animations`);

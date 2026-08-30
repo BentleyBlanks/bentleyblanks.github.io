@@ -1,63 +1,124 @@
-"""Bake canonical first-person hands and uniform sleeves from Lugou NRA model 01.
+"""Derive the first-person skeletal arms from shipped Lugou NRA model 01.
 
-The shipped third-person GLB is the user-provided NRA model 01. This baker poses
-it on the first frame of its authored RifleIdle clip, keeps the two forearm / hand /
-finger vertex sets, applies the original skin, and converts each side into the
-viewmodel grip frame: +X = held-object axis, -Y = palm, +Z = fingers.
+The input is ``Model/Character/Model_LugouNra01.glb``: the same audited 53-bone,
+16-clip character used by third-person actors. This baker keeps the original
+armature, animation clips, skin weights, uniform sleeves, hands and all finger
+chains, then removes vertices that are not influenced by either arm.
 
-The exported meshes are static on purpose. Script_Viewmodel already owns the
-weapon-specific animated hand targets; parenting these authored, posed meshes to
-those targets is more stable than retargeting a second full arm skeleton at runtime.
+Do not apply the armature modifier here. The 2026-08-30 static-hand bake did so
+and exported ``skins=0 / animations=0``; runtime could only teleport two rigid
+hand meshes to coarse targets. The first-person runtime now solves the authored
+upper-arm -> forearm -> hand chains and uses the source clips as finger-pose
+profiles, so losing the skin or clips is a hard bake failure.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
+import re
 import sys
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+
+
+EXPECTED_ACTIONS = (
+    "LeanWallSitPeek",
+    "RifleIdle",
+    "RifleIdleAlt",
+    "RifleRun",
+    "CrouchFire",
+    "CrouchFireAlt",
+    "CrouchIdle",
+    "MachineGunFire",
+    "EmplacementIdle",
+    "AttackCommand",
+    "ProneFire",
+    "StandFireCrouch",
+    "StandFireCrouchAlt",
+    "AdvanceKneelFire",
+    "AdvanceFire",
+    "PistolFire",
+)
+PROFILE_ACTIONS = {
+    "rifle": "RifleIdle",
+    "lmg": "MachineGunFire",
+    "pistol": "PistolFire",
+    "melee": "RifleIdle",
+    "throwable": "AttackCommand",
+}
+ARM_ROLE_SUFFIXES = (
+    "clavicle",
+    "upperarm",
+    "forearm",
+    "hand",
+    "finger0",
+    "finger01",
+    "finger02",
+    "finger1",
+    "finger11",
+    "finger12",
+    "finger2",
+    "finger21",
+    "finger22",
+    "finger3",
+    "finger31",
+    "finger32",
+    "finger4",
+    "finger41",
+    "finger42",
+)
+REQUIRED_BONE_SUFFIXES = tuple(
+    f"{side}{role}"
+    for side in ("l", "r")
+    for role in ("clavicle", "upperarm", "forearm", "hand", "finger0", "finger1", "finger4")
+)
 
 
 def ParseArgs() -> argparse.Namespace:
     args = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-    parser.add_argument("--output", required=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
     return parser.parse_args(args)
 
 
-def FindSource() -> tuple[bpy.types.Object, bpy.types.Object]:
+def NormalizeName(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+
+def FindSource() -> tuple[bpy.types.Object, list[bpy.types.Object]]:
     armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and len(obj.vertex_groups) > 0]
-    if len(armatures) != 1 or len(meshes) != 1:
-        raise RuntimeError(f"expected one armature and one skinned mesh, got {len(armatures)} / {len(meshes)}")
-    return armatures[0], meshes[0]
+    meshes = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH"
+        and len(obj.vertex_groups) > 0
+        and any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
+    ]
+    if len(armatures) != 1 or not meshes:
+        raise RuntimeError(
+            f"expected one armature and at least one skinned mesh, got {len(armatures)} / {len(meshes)}"
+        )
+    return armatures[0], meshes
 
 
-def PoseRifleIdle(armature: bpy.types.Object) -> None:
-    action = next((item for item in bpy.data.actions if item.name == "RifleIdle"), None)
-    if action is None:
-        raise RuntimeError("RifleIdle action is missing")
-    armature.animation_data_create().action = action
-    bpy.context.scene.frame_set(int(action.frame_range[0]))
-    bpy.context.view_layer.update()
-
-
-def IsSideGroup(name: str, side: str) -> bool:
-    normalized = f" {name.lower().replace('_', ' ')} "
-    return f" {side.lower()} " in normalized and any(
-        marker in normalized for marker in (" hand", "finger")
+def IsArmGroup(name: str) -> bool:
+    normalized = NormalizeName(name)
+    return any(
+        normalized.endswith(f"{side}{suffix}")
+        for side in ("l", "r")
+        for suffix in ARM_ROLE_SUFFIXES
     )
 
 
-def DeleteOtherVertices(mesh: bpy.types.Object, side: str) -> None:
-    groups = {group.index for group in mesh.vertex_groups if IsSideGroup(group.name, side)}
-    if not groups:
-        raise RuntimeError(f"no {side} arm vertex groups")
+def DeleteNonArmVertices(mesh: bpy.types.Object) -> tuple[int, int]:
+    armGroups = {group.index for group in mesh.vertex_groups if IsArmGroup(group.name)}
+    if not armGroups:
+        raise RuntimeError(f"{mesh.name}: no arm vertex groups")
+    originalCount = len(mesh.data.vertices)
     keep = [
-        sum(group.weight for group in vertex.groups if group.group in groups) >= 0.20
+        sum(assignment.weight for assignment in vertex.groups if assignment.group in armGroups) >= 0.02
         for vertex in mesh.data.vertices
     ]
     bpy.context.view_layer.objects.active = mesh
@@ -65,111 +126,170 @@ def DeleteOtherVertices(mesh: bpy.types.Object, side: str) -> None:
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="DESELECT")
     bpy.ops.object.mode_set(mode="OBJECT")
-    for vertex, wanted in zip(mesh.data.vertices, keep):
+    for vertex, wanted in zip(mesh.data.vertices, keep, strict=True):
         vertex.select = not wanted
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.delete(type="VERT")
     bpy.ops.object.mode_set(mode="OBJECT")
-
-
-def SourceSocketMatrix(armature: bpy.types.Object, side: str) -> Matrix:
-    """Rebuild the generated socket from the posed wrist without Blender's Empty bug."""
-    wrist = armature.pose.bones.get(f"Bip002 {side} Hand")
-    if wrist is None:
-        raise RuntimeError(f"Bip002 {side} Hand is missing")
-    local = Matrix.Translation(Vector((0, 9.18953, 0))) @ Quaternion(
-        (0.70710678, 0.70710678, 0, 0)
-    ).to_matrix().to_4x4()
-    return armature.matrix_world @ wrist.matrix @ local
-
-
-def DeleteNonSkinFaces(mesh: bpy.types.Object) -> None:
-    """Discard the tiny hand-weighted uniform shards; the runtime sleeve covers the wrist."""
-    skin_slots = {
-        index for index, material in enumerate(mesh.data.materials)
-        if material and material.name == "John_All Body"
-    }
-    bpy.context.view_layer.objects.active = mesh
-    mesh.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    bpy.ops.object.mode_set(mode="OBJECT")
-    for polygon in mesh.data.polygons:
-        polygon.select = polygon.material_index not in skin_slots
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.delete(type="FACE")
-    bpy.ops.object.mode_set(mode="OBJECT")
-
-
-def BakeSide(source: bpy.types.Object, armature: bpy.types.Object, side: str) -> bpy.types.Object:
-    duplicate = source.copy()
-    duplicate.data = source.data.copy()
-    bpy.context.collection.objects.link(duplicate)
-    DeleteOtherVertices(duplicate, side)
-    DeleteNonSkinFaces(duplicate)
-    bpy.context.view_layer.update()
-
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    evaluated = duplicate.evaluated_get(depsgraph)
-    baked_data = bpy.data.meshes.new_from_object(evaluated, depsgraph=depsgraph)
-    baked = bpy.data.objects.new(f"Hand{'Left' if side == 'L' else 'Right'}", baked_data)
-    bpy.context.collection.objects.link(baked)
-    baked.data.transform(duplicate.matrix_world)
-
-    socket_matrix = SourceSocketMatrix(armature, side)
-    origin = socket_matrix.translation.copy()
-    basis = socket_matrix.to_3x3()
-    grip = (basis @ Vector((1, 0, 0))).normalized()
-    fingers = (basis @ Vector((0, 1, 0))).normalized()
-    back = (basis @ Vector((0, 0, 1))).normalized()
-
-    for vertex in baked.data.vertices:
-        relative = vertex.co - origin
-        vertex.co = Vector((relative.dot(grip), relative.dot(back), relative.dot(fingers)))
-    baked.matrix_world = Matrix.Identity(4)
-
-    bpy.data.objects.remove(duplicate, do_unlink=True)
-    return baked
+    mesh.select_set(False)
+    return originalCount, len(mesh.data.vertices)
 
 
 def CleanMaterialSlots(mesh: bpy.types.Object) -> None:
     used = {polygon.material_index for polygon in mesh.data.polygons}
     for index in reversed(range(len(mesh.data.materials))):
-        if index not in used:
-            mesh.data.materials.pop(index=index)
-            for polygon in mesh.data.polygons:
-                if polygon.material_index > index:
-                    polygon.material_index -= 1
+        if index in used:
+            continue
+        mesh.data.materials.pop(index=index)
+        for polygon in mesh.data.polygons:
+            if polygon.material_index > index:
+                polygon.material_index -= 1
 
 
-def Export(output: Path, hands: list[bpy.types.Object]) -> None:
+def SubdivideForFirstPerson(mesh: bpy.types.Object) -> None:
+    """One restrained Catmull-Clark pass; the third-person source is faceted at 25 cm."""
+    bpy.context.view_layer.objects.active = mesh
+    mesh.select_set(True)
+    modifier = mesh.modifiers.new(name="FirstPersonSurface", type="SUBSURF")
+    modifier.subdivision_type = "CATMULL_CLARK"
+    modifier.levels = 1
+    modifier.render_levels = 1
+    # Interpolate bind vertices/weights before the armature, never bake a posed mesh.
+    while mesh.modifiers.find(modifier.name) > 0:
+        bpy.ops.object.modifier_move_up(modifier=modifier.name)
+    result = bpy.ops.object.modifier_apply(modifier=modifier.name)
+    mesh.select_set(False)
+    if "FINISHED" not in result:
+        raise RuntimeError(f"{mesh.name}: first-person subdivision failed")
+
+
+def ActionNames() -> set[str]:
+    return {action.name for action in bpy.data.actions}
+
+
+def ValidateSource(armature: bpy.types.Object) -> None:
+    boneNames = {NormalizeName(bone.name) for bone in armature.data.bones}
+    missingBones = [
+        suffix for suffix in REQUIRED_BONE_SUFFIXES
+        if not any(name.endswith(suffix) for name in boneNames)
+    ]
+    missingActions = sorted(set(EXPECTED_ACTIONS) - ActionNames())
+    if missingBones or missingActions:
+        raise RuntimeError(
+            f"source contract failed: missing bones={missingBones}, missing actions={missingActions}"
+        )
+
+
+def Prepare(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> dict[str, object]:
+    ValidateSource(armature)
+    counts = {}
+    keptMeshes = []
+    for mesh in meshes:
+        before, after = DeleteNonArmVertices(mesh)
+        if after <= 0:
+            bpy.data.objects.remove(mesh, do_unlink=True)
+            continue
+        CleanMaterialSlots(mesh)
+        SubdivideForFirstPerson(mesh)
+        mesh.name = "Mesh_FpsArmsNraSkeletal01" if not keptMeshes else f"Mesh_FpsArmsNraSkeletal01_{len(keptMeshes) + 1}"
+        counts[mesh.name] = {
+            "sourceVertices": before,
+            "keptVertices": after,
+            "firstPersonVertices": len(mesh.data.vertices),
+        }
+        keptMeshes.append(mesh)
+    if not keptMeshes:
+        raise RuntimeError("arm filtering removed every skinned mesh")
+    armature.name = "Rig_FpsArmsNraSkeletal01"
+    armature.data.name = "Rig_FpsArmsNraSkeletal01"
+    armature["fpsArmSource"] = "Model_LugouNra01"
+    armature["fpsGripProfiles"] = json.dumps(PROFILE_ACTIONS, separators=(",", ":"))
+    return {"meshes": keptMeshes, "counts": counts}
+
+
+def Export(output: Path, armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
-    for hand in hands:
-        CleanMaterialSlots(hand)
-        hand.select_set(True)
-    bpy.context.view_layer.objects.active = hands[0]
-    bpy.ops.export_scene.gltf(
-        filepath=str(output), export_format="GLB", use_selection=True,
-        export_animations=False, export_skins=False,
-        export_image_format="WEBP", export_image_add_webp=True,
+    armature.select_set(True)
+    for mesh in meshes:
+        mesh.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+    result = bpy.ops.export_scene.gltf(
+        filepath=str(output),
+        export_format="GLB",
+        use_selection=True,
+        export_yup=True,
+        export_apply=False,
+        export_texcoords=True,
+        export_normals=True,
+        export_tangents=True,
+        export_materials="EXPORT",
+        export_image_format="WEBP",
+        export_image_quality=82,
+        export_image_add_webp=True,
         export_image_webp_fallback=False,
+        export_animations=True,
+        export_animation_mode="ACTIONS",
+        export_force_sampling=True,
+        export_frame_step=1,
+        export_skins=True,
+        export_all_influences=False,
+        export_influence_nb=4,
+        export_def_bones=True,
+        export_optimize_animation_size=False,
+        export_optimize_animation_keep_anim_armature=True,
+        export_optimize_animation_keep_anim_object=True,
+        export_morph=False,
+        export_cameras=False,
+        export_lights=False,
+        export_extras=True,
+        export_draco_mesh_compression_enable=False,
+        export_meshopt_compression_enable=False,
     )
+    if "FINISHED" not in result or not output.is_file():
+        raise RuntimeError(f"glTF export failed: {output}")
+
+
+def ValidateOutput(output: Path) -> dict[str, object]:
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    result = bpy.ops.import_scene.gltf(filepath=str(output), import_pack_images=False)
+    if "FINISHED" not in result:
+        raise RuntimeError(f"fresh glTF import failed: {output}")
+    armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
+    meshes = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
+    ]
+    if len(armatures) != 1 or not meshes:
+        raise RuntimeError(
+            f"fresh GLB lost its rig: armatures={len(armatures)}, skinned meshes={len(meshes)}"
+        )
+    armature = armatures[0]
+    ValidateSource(armature)
+    return {
+        "armatures": len(armatures),
+        "skinnedMeshes": len(meshes),
+        "bones": len(armature.data.bones),
+        "animations": sorted(ActionNames()),
+        "vertices": sum(len(mesh.data.vertices) for mesh in meshes),
+    }
 
 
 def Main() -> None:
     args = ParseArgs()
-    input_path = Path(args.input).resolve()
-    output_path = Path(args.output).resolve()
+    inputPath = args.input.resolve()
+    outputPath = args.output.resolve()
+    if not inputPath.is_file():
+        raise FileNotFoundError(inputPath)
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=str(input_path), import_shading="NORMALS")
-    armature, source = FindSource()
-    PoseRifleIdle(armature)
-    hands = [BakeSide(source, armature, "R"), BakeSide(source, armature, "L")]
-    Export(output_path, hands)
-    print(f"Baked {output_path.name}: " + ", ".join(
-        f"{hand.name}={len(hand.data.vertices)} vertices" for hand in hands
-    ))
+    result = bpy.ops.import_scene.gltf(filepath=str(inputPath), import_pack_images=False)
+    if "FINISHED" not in result:
+        raise RuntimeError(f"glTF import failed: {inputPath}")
+    armature, meshes = FindSource()
+    prepared = Prepare(armature, meshes)
+    Export(outputPath, armature, prepared["meshes"])
+    validation = ValidateOutput(outputPath)
+    print(json.dumps({"output": str(outputPath), "filter": prepared["counts"], **validation}, indent=2))
 
 
 if __name__ == "__main__":

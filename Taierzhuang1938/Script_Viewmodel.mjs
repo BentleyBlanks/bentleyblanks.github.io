@@ -9,8 +9,9 @@
 //    所以调用方还得 `scene.add(camera)` —— 这是最常见的"我明明加了枪却看不见"。
 // 2) 相机近裁面建议 ≤ 0.05。本模型压缩后最近的部件（袖口/手腕）在 0.08—0.12 m。
 //    枪托本来就在眼睛后面（z > 0），被近裁切掉是**正常且必要**的，别去"修"它。
-// 3) 不许骨骼蒙皮。深度法线预通道用 scene.overrideMaterial 覆盖全场，
-//    SkinnedMesh 在那一 pass 会塌到原点，AO 直接变乱码。手指全是 Object3D 层级。
+// 3) 第一人称双臂是 SkinnedMesh，但必须 `skipNormalDepth`：深度法线预通道用
+//    scene.overrideMaterial 覆盖全场，蒙皮在那一 pass 会塌到原点，AO 直接变乱码。
+//    手臂只进主颜色 pass；枪械与程序化兜底手仍按各自原路径渲染。
 //
 // --- 视图模型 FOV：为什么是非等比缩放 ---------------------------------------
 // 广角下枪会畸变成香蕉，所以视图模型要用更窄的 FOV。但这里没有第二个 pass 可用
@@ -1250,7 +1251,9 @@ const HIP_POSES = {
   rifle: { px: 0.100, py: -0.142, pz: -0.320, rx: 0.045, ry: -0.060, rz: 0.028 },
   lmg: { px: 0.100, py: -0.165, pz: -0.300, rx: 0.070, ry: -0.090, rz: 0.045 },
   pistol: { px: 0.055, py: -0.090, pz: -0.140, rx: 0.030, ry: -0.050, rz: 0.020 },
-  throwable: { px: 0.130, py: -0.150, pz: -0.130, rx: 0.150, ry: -0.250, rz: 0.100 },
+  // 木柄弹原来离眼只有 13 cm、又在视线下 15 cm：握点是 49° 俯角，手必然整只
+  // 掉出 27.5° 的半视场，只剩一根怼脸的木棍。推到 42 cm 后手、柄、弹体能同框。
+  throwable: { px: 0.100, py: -0.140, pz: -0.420, rx: 0.150, ry: -0.250, rz: 0.100 },
   // 大刀。**上一版这一行等于"没拿刀"**：pz = -0.130 把刀柄摆在眼前 13 cm，
   // 而 py = -0.165 —— 也就是握把在视线下方 atan(0.165/0.130) = 52°，而半视场只有
   // 27.5°。整只手连同刀柄全部落在画面下沿之外；刀身又几乎顺着视线方向指出去
@@ -1470,9 +1473,8 @@ export class Viewmodel {
     // 肩肘属于人，武器怎么摆都不该牵着它转。导入整臂启用时这两条让位给它。
     this.sleeveRight = MakeSleeve(this.materials, 1);
     this.sleeveLeft = MakeSleeve(this.materials, -1);
-    // 导入整臂在跑的时候这两条也照样挂着、照样每帧对准 —— 冲刺时 FpsArmRig 会
-    // 整副让位给旧手模（SetSprintFallback），那一刻手不能是光秃秃两只拳头。
-    // 显隐交给 Attach/SetSprintFallback 在**网格**那一层管，这里只管位置。
+    // 骨骼双臂在跑时这两条只作隐藏动画靶；Attach 在网格层永久藏住它们，冲刺也
+    // 不再闪切第二套手。GLB/骨链读取失败时 riggedArms 不构造，才显示这条兜底。
     this.armAnchor.add(this.sleeveRight.group);
     this.armAnchor.add(this.sleeveLeft.group);
     this._sleeveTmp = { a: new THREE.Vector3(), b: new THREE.Vector3(), q: new THREE.Quaternion() };
@@ -1635,12 +1637,14 @@ export class Viewmodel {
     this.handBaseRot.right.copy(this.handRight.group.rotation);
     this.handBaseRot.left.copy(this.handLeft.group.rotation);
 
-    // 新手臂用 IK 追随上面两只旧手的握点。旧手只当隐藏动画靶，既有每把枪的
-    // 拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用，不需要重做动作表。
+    // 骨骼双臂用两骨 IK 追随上面两只旧手的握持坐标系。旧手只当隐藏动画靶，既有
+    // 每把枪的拉栓/压桥夹/换匣/投弹轨迹因此可以原样复用；真实 Hand 骨和十指负责
+    // 最终位置、朝向与轮廓，不再拿一个静态手掌网格中心去“差不多贴上”。
     // 挂点给的是 armAnchor（相机稳定）而不是 rig.group，理由见 armAnchor 那段抬头。
     if (this.riggedArms) {
       this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
-        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]);
+        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft],
+        PoseKindOf(this.weapon));
       this.rigSource = `${this.rigSource}+riggedArms`;
     }
 
@@ -1723,7 +1727,7 @@ export class Viewmodel {
     if (!this.rig || !this.rig.sight) return;
     // 导入整臂启用时，旧手模只是 IK 动画靶，不能再交给 ADS 显隐逻辑。
     // 旧代码把它塞进 adsHideParts 后，_RestoreAdsHideParts 会把 Attach() 刚藏掉的
-    // 旧手重新打开，结果腰射时新旧两套手同时在画。冲刺回退由 FpsArmRig 独占控制。
+    // 旧手重新打开，结果腰射时新旧两套手同时在画。兜底只在骨骼 rig 构造失败时启用。
     if (!this.riggedArms) {
       for (const mesh of this.handRight.meshes) this.adsHideParts.push(mesh);
       // 右手藏了袖子也得藏，否则开镜时机匣旁边还挂着半截空袖管
@@ -1755,6 +1759,7 @@ export class Viewmodel {
       // 刀尖压进画面上沿以内。**不能沿用旧的那组数**（pz -0.055 把刀柄贴在眼球上，
       // 和旧腰射姿态一样整只手都在画外），理由见 HIP_POSES.melee 那段账。
       if (kind === "melee") return { px: 0.175, py: -0.170, pz: -0.470, rx: 0.900, ry: -0.540, rz: -1.500 };
+      if (kind === "throwable") return { px: 0.080, py: -0.100, pz: -0.350, rx: 0.28, ry: -0.10, rz: 0.05 };
       return { px: 0.045, py: -0.055, pz: -0.070, rx: 0.28, ry: -0.10, rz: 0.05 };
     }
     const s = this.rig.sight;
@@ -2188,14 +2193,7 @@ export class Viewmodel {
       * (1 - Math.exp(-step * (meleeing ? 30 : 8)));
     const sprintValue = sprintSpringValue * (1 - this.meleeSprintMute);
 
-    // 按下 Shift 立刻切走完整肩臂；松开后等冲刺弹簧回到安全区再恢复，避免退出
-    // 冲刺的半途姿态仍让上臂穿过相机。旧手模和整臂只会有一套可见。
-    // 这里读的是**静音后**的姿态权重：换手模的理由是冲刺姿态那圈旋转会把上臂扫过近平面，
-    // 姿态被按下去了，理由也就不成立 —— 于是跑动中的那一刀和站着劈是同一套整臂。
-    if (this.riggedArms) {
-      const holdingSprint = sprint > 0.03 && this.meleeSprintMute < 0.5;
-      this.riggedArms.SetSprintFallback(holdingSprint || sprintValue > 0.08);
-    }
+    // 骨骼双臂覆盖整条冲刺姿态；这里绝不再切回第二套手，避免显隐闪帧和腕位跳变。
     const crouchValue = this.crouchSpring.Step(step, crouch);
     const equip = Clamp01(this.equipSpring.Step(step, 1));
 
