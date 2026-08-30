@@ -61,7 +61,16 @@ assert.equal(skinnedPrimitives.length >= 1, true, "FPS geometry exposes joint/we
 for (const primitive of skinnedPrimitives) {
   assert.notEqual(primitive.attributes.JOINTS_0, undefined, "skinned primitive has JOINTS_0");
   assert.notEqual(primitive.attributes.WEIGHTS_0, undefined, "skinned primitive has WEIGHTS_0");
+  const position = arms.accessors?.[primitive.attributes.POSITION];
+  assert.ok(position?.min && position?.max, "skinned primitive exposes authored bounds");
+  assert.ok(position.min[1] >= 1.30 && position.max[1] <= 1.56,
+    `FPS arm crop excludes torso remnants (${position.min[1]}..${position.max[1]} m high)`);
 }
+
+const armatureNode = (arms.nodes || []).find((node) => node.extras?.fpsArmSource === "Model_LugouNra01");
+assert.ok(armatureNode, "FPS armature identifies its audited source");
+assert.equal(armatureNode.extras.fpsArmInfluenceMinimum, 0.5,
+  "FPS crop keeps only vertices owned at least 50% by arm chains");
 
 const jointCount = new Set((arms.skins || []).flatMap((skin) => skin.joints || [])).size;
 assert.equal(jointCount >= 45, true, `FPS arms keep a full upper-body/finger skeleton (${jointCount} joints)`);

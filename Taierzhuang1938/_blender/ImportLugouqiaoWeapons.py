@@ -57,6 +57,11 @@ SOURCES = {
                    "note": "源节点 PJP；轻型迫击/掷弹器，具体型号未明。"},
     "Type11": {"lengthM": 1.100, "kind": "rifle", "side": "ija",
                    "excludeObjects": {"4"},
+                   # This source has no material bucket whose name contains
+                   # "Wood", so the generic stock-direction heuristic treats
+                   # the barrel end as the stock.  The resulting mesh points
+                   # opposite to muzzle/gripL in both actor and viewmodel rigs.
+                   "forceFlip": True,
                    "note": "十一年式轻机枪；源节点 QEDQD，保留 body/body2/fore/ammobox 四张原贴图。源文件中的分解展示件保留在独立 Blend，运行时只取装配态枪体。"},
     "Mauser96": {"lengthM": 0.288, "kind": "pistol", "side": "nra",
                    "note": "毛瑟 C96；源节点 Sphere001，保留 maose_d 与 maose_s。"},

@@ -171,6 +171,19 @@ const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Typ
 Report(type11Buckets.size === 5
   && (type11Buckets.get("lqWeaponPlain") || 0) <= type11SourceTriangles * 0.10,
   "十一年式五个材质桶均命中，默认材质不超过选定源几何的 10%");
+const type11Doc = JSON.parse(fs.readFileSync(
+  path.join(projectDir, "Model", MESHES.Type11.file), "utf8"));
+const type11AmmoBox = type11Doc.meshes.find((mesh) => mesh.material === "lqType11AmmoBox");
+const type11AmmoCenterX = type11AmmoBox
+  ? type11AmmoBox.posMin[0] + type11AmmoBox.posScale[0] * 65535 * 0.5
+  : Infinity;
+const type11Mount = (name) => type11Doc.nodes.find((node) => node.name === name)?.t;
+const type11Muzzle = type11Mount("muzzle");
+const type11GripR = type11Mount("gripR");
+const type11GripL = type11Mount("gripL");
+Report(type11AmmoCenterX < -0.04
+  && type11Muzzle?.[2] < type11GripL?.[2] && type11GripL?.[2] < type11GripR?.[2],
+  "十一年式枪体朝向正确：左侧弹斗、枪口/前手/后手依次沿 -Z 排列");
 const swordBuckets = MaterialTriangles("OfficerSwordSet");
 Report(swordBuckets.has("lqOfficerSword") && swordBuckets.has("lqWeaponPlain")
   && swordBuckets.size === 2, "军刀仅饰带使用源贴图，刀身/刀鞘回钢材质");

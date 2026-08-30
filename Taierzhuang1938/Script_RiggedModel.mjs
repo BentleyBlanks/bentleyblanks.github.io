@@ -14,7 +14,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=2" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",

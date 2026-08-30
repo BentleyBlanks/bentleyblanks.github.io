@@ -69,6 +69,12 @@ ARM_ROLE_SUFFIXES = (
     "finger41",
     "finger42",
 )
+# Shoulder vertices blend into the torso in the source character.  Treating a
+# token arm weight as ownership kept long torso wedges in the first-person
+# export; IK then stretched those wedges across the camera and exposed their
+# open back faces.  A vertex belongs to the arms only when the arm chains carry
+# at least half of its normalized skin influence.
+MIN_ARM_INFLUENCE = 0.5
 REQUIRED_BONE_SUFFIXES = tuple(
     f"{side}{role}"
     for side in ("l", "r")
@@ -117,10 +123,14 @@ def DeleteNonArmVertices(mesh: bpy.types.Object) -> tuple[int, int]:
     if not armGroups:
         raise RuntimeError(f"{mesh.name}: no arm vertex groups")
     originalCount = len(mesh.data.vertices)
-    keep = [
-        sum(assignment.weight for assignment in vertex.groups if assignment.group in armGroups) >= 0.02
-        for vertex in mesh.data.vertices
-    ]
+    keep = []
+    for vertex in mesh.data.vertices:
+        armWeight = sum(
+            assignment.weight
+            for assignment in vertex.groups
+            if assignment.group in armGroups
+        )
+        keep.append(armWeight >= MIN_ARM_INFLUENCE)
     bpy.context.view_layer.objects.active = mesh
     mesh.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT")
@@ -203,6 +213,7 @@ def Prepare(armature: bpy.types.Object, meshes: list[bpy.types.Object]) -> dict[
     armature.name = "Rig_FpsArmsNraSkeletal01"
     armature.data.name = "Rig_FpsArmsNraSkeletal01"
     armature["fpsArmSource"] = "Model_LugouNra01"
+    armature["fpsArmInfluenceMinimum"] = MIN_ARM_INFLUENCE
     armature["fpsGripProfiles"] = json.dumps(PROFILE_ACTIONS, separators=(",", ":"))
     return {"meshes": keptMeshes, "counts": counts}
 
