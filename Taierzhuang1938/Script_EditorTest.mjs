@@ -524,6 +524,10 @@ const actor = await page.evaluate(() => {
   let fingerGripSources = false;
   let legacySocketSeparation = 0;
   let weaponRollDot = -1;
+  let correctedCrouchPlayback = false;
+  let correctedCrouchLeanDeg = Infinity;
+  let correctedCrouchStance = -1;
+  let correctionDisclosed = false;
   if (primary?.weaponGroup && primary?.characterRig) {
     primary.root.updateWorldMatrix(true, true);
     const rightSocket = primary.characterRig.Grip("weaponR");
@@ -606,6 +610,23 @@ const actor = await page.evaluate(() => {
       weaponRollDot = weaponUp.dot(bodyHigh.sub(bodyLow).normalize());
     }
   }
+  // CrouchIdle 的源定格前倾约 59°、双手和枪拖地；正式播放必须改走同骨架
+  // RifleIdle 的自然单膝姿，而不能只把列表中文名换掉。
+  active.SetClip("CrouchIdle");
+  window.Taierzhuang.StepFrames(45);
+  primary.root.updateWorldMatrix(true, true);
+  {
+    const Vector3 = primary.root.position.constructor;
+    const pelvis = primary.characterRig.bones.pelvis.getWorldPosition(new Vector3());
+    const head = primary.characterRig.bones.head.getWorldPosition(new Vector3());
+    const torso = head.sub(pelvis);
+    correctedCrouchLeanDeg = Math.acos(Math.min(1, Math.abs(torso.y) / torso.length())) * 180 / Math.PI;
+  }
+  correctedCrouchPlayback = primary.characterRig.currentId === "CrouchIdle"
+    && primary.characterRig.currentPlaybackId === "RifleIdle";
+  correctedCrouchStance = active.gizmos[0]?.stance ?? -1;
+  correctionDisclosed = active.facts.root.textContent.includes("CrouchIdle → RifleIdle")
+    && active.facts.root.textContent.includes("59°");
   // 走真实下拉 change 事件，不只调内部方法：用户反馈的正是面板里换枪不生效。
   active.weaponSelect.root.value = "Type38";
   active.weaponSelect.root.dispatchEvent(new Event("change"));
@@ -678,6 +699,7 @@ const actor = await page.evaluate(() => {
     ragdoll, civilianUnarmed, rigidShadingSolid, socketDirectionDot,
     rightGripError, leftHandWeaponGap, rightHandWeaponGap,
     fingerGripSources, legacySocketSeparation, weaponRollDot,
+    correctedCrouchPlayback, correctedCrouchLeanDeg, correctedCrouchStance, correctionDisclosed,
     sourceDefault, singleWeaponReplaced, nraLineupSourceDefaults,
     ijaLineupSourceDefaults, lineupWeaponsReplaced,
     studio: editor.studio.Active,
@@ -709,6 +731,12 @@ Check("默认站姿双手可见网格都贴住枪身",
   `右 ${(actor.rightHandWeaponGap * 1000).toFixed(1)} mm / 左 ${(actor.leftHandWeaponGap * 1000).toFixed(1)} mm`);
 Check("卧姿配枪滚转朝向与身体一致，不会倒扣在手掌外", actor.weaponRollDot > 0.10,
   `dot=${actor.weaponRollDot.toFixed(3)}`);
+Check("CrouchIdle 不再播放 59° 前倾坏定格，改为自然单膝待机",
+  actor.correctedCrouchPlayback && actor.correctedCrouchLeanDeg < 30,
+  `playback=RifleIdle 前倾=${actor.correctedCrouchLeanDeg.toFixed(1)}°`);
+Check("CrouchIdle 取证明确写出校正曲线并使用蹲姿胶囊",
+  actor.correctionDisclosed && actor.correctedCrouchStance === 1,
+  `stance=${actor.correctedCrouchStance}`);
 Check("倒地动作走到 ragdoll", actor.ragdoll, `meshSource=${actor.source}`);
 Check("百姓切换后自动空手", actor.civilianUnarmed);
 

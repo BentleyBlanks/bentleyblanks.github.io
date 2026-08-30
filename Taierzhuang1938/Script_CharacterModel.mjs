@@ -25,7 +25,7 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   RifleRun: "持枪跑步",
   CrouchFire: "蹲姿射击",
   CrouchFireAlt: "蹲姿射击（二）",
-  CrouchIdle: "跪蹲俯身",
+  CrouchIdle: "单膝跪姿待机（已校正异常前倾）",
   MachineGunFire: "机枪射击",
   EmplacementIdle: "机炮静姿",
   AttackCommand: "进攻指令（站姿挥臂）",
@@ -36,6 +36,19 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   AdvanceFire: "站姿据枪 / 上前射击",
   PistolFire: "手枪射击",
 });
+
+// 源 `CrouchIdle` 是一条 5.37 s 的静态坏定格：骨盆到头的轴前倾约 59.4°，
+// 双臂垂到地面，枪也随手腕拖在脚边。它不是可用的待机循环。保留原 clip 在 GLB
+// 与清单里供源资产审计，但正式播放改走同阵营、同骨架的 `RifleIdle`：同样是单膝
+// 跪姿，躯干前倾约 17.6°，双手与枪的关系也完整。别直接删二进制里的原轨道；
+// CharacterModelTest 仍要逐条核对 10 套模型 × 16 条源动作。
+export const LUGOU_PLAYBACK_CLIP_ALIASES = Object.freeze({
+  CrouchIdle: "RifleIdle",
+});
+
+export function ResolveLugouPlaybackClipId(id) {
+  return LUGOU_PLAYBACK_CLIP_ALIASES[id] || id;
+}
 
 // 导入动作不能只按 clip 名字认。四类军人都借用同一套短名（例如每边都有
 // `RifleIdle`），但实际曲线是按各自阵营的 canonical rig 烘进 GLB 的；把 NRA
@@ -96,6 +109,8 @@ export function GetLugouAnimationEntries(kind) {
   return profile.clipIds.map((clipId) => Object.freeze({
     id: clipId,
     clipId,
+    playbackClipId: ResolveLugouPlaybackClipId(clipId),
+    corrected: ResolveLugouPlaybackClipId(clipId) !== clipId,
     faction: profile.faction,
     role: profile.role,
     targetLabel: profile.label,
@@ -358,6 +373,7 @@ export class LugouCharacterRig {
     this.actor = null;
     this.forcedClip = null;
     this.currentId = null;
+    this.currentPlaybackId = null;
     this.currentAction = null;
     this.headVisible = true;
     this.disposed = false;
@@ -469,10 +485,11 @@ export class LugouCharacterRig {
   }
 
   Play(id, fadeSeconds = 0.12) {
-    const clip = this.clipById.get(id)
+    const playbackId = ResolveLugouPlaybackClipId(id);
+    const clip = this.clipById.get(playbackId)
       || this.clipById.get(POSE_CLIPS.standIdle)
       || this.clipById.values().next().value;
-    if (!clip || this.currentId === id) return this;
+    if (!clip || (this.currentId === id && this.currentPlaybackId === playbackId)) return this;
     const next = this.mixer.clipAction(clip);
     next.enabled = true;
     next.reset().setLoop(THREE.LoopRepeat, Infinity).play();
@@ -480,6 +497,7 @@ export class LugouCharacterRig {
     else if (this.currentAction) this.currentAction.stop();
     this.currentAction = next;
     this.currentId = id;
+    this.currentPlaybackId = playbackId;
     return this;
   }
 

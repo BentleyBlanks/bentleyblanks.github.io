@@ -192,6 +192,10 @@ assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,
   "first-person protagonist hides only its skinned head bone");
 assert.doesNotMatch(main, /shot\.dist\s*<\s*40[\s\S]{0,100}head/, "head hit is not rolled after impact");
 assert.match(runtime, /LUGOU_ANIMATION_PROFILE_BY_KIND/, "runtime owns the character-action compatibility ledger");
+assert.match(runtime, /LUGOU_PLAYBACK_CLIP_ALIASES[\s\S]*?CrouchIdle:\s*"RifleIdle"/,
+  "the unusable 59-degree CrouchIdle source pose resolves to the natural same-rig kneel");
+assert.match(runtime, /const playbackId = ResolveLugouPlaybackClipId\(id\)[\s\S]*?clipById\.get\(playbackId\)/,
+  "animation playback applies the corrective alias instead of only relabeling the UI");
 assert.match(runtime, /nraOfficer:[\s\S]*?role:\s*"officer"/, "NRA officer profile is explicit");
 assert.match(runtime, /ijaOfficer:[\s\S]*?role:\s*"officer"/, "IJA officer profile is explicit");
 assert.match(runtime, /GetLugouAnimationEntries\(kind\)/, "runtime exposes role-filtered imported clips");
@@ -208,6 +212,10 @@ assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the four-
 assert.match(runtime, /nraOfficer:\s*OFFICER_MODEL_VARIANTS/, "NRA officer selects only the officer source model");
 assert.match(runtime, /ijaOfficer:\s*OFFICER_MODEL_VARIANTS/, "IJA officer selects only the officer source model");
 assert.match(editor, /GetLugouCharacterVariantEntries/, "editor exposes selectable source models");
+assert.match(editor, /function ImportedClipStance\(clipId\)[\s\S]*?"CrouchIdle"[\s\S]*?return 1/,
+  "imported CrouchIdle preview uses the crouched movement capsule");
+assert.match(editor, /姿态校正[\s\S]*?去除 59° 异常前倾/,
+  "editor discloses the corrective playback curve in its evidence panel");
 assert.match(editor, /4兵\+1官对比/, "editor offers a full faction lineup instead of a hidden random variant");
 assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");

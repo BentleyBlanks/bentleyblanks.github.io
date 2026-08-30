@@ -353,6 +353,16 @@ function StanceOf(state) {
   return 0;
 }
 
+/** 导入 clip 没有程序化 crouch/prone 量，姿态档必须按动作语义补上。 */
+function ImportedClipStance(clipId) {
+  if (clipId === "StandFireCrouch") return 2;
+  if ([
+    "RifleIdle", "RifleIdleAlt", "CrouchFire", "CrouchFireAlt", "CrouchIdle",
+    "MachineGunFire", "EmplacementIdle", "AdvanceKneelFire",
+  ].includes(clipId)) return 1;
+  return 0;
+}
+
 export class ActorEditor {
   static id = "actor";
   static label = "人物动作";
@@ -556,7 +566,9 @@ export class ActorEditor {
         id: clip.id,
         name: `${clip.name} · ${clip.id}`,
         tail: clip.targetLabel,
-        title: `仅适用于${clip.targetLabel}；使用${clip.faction === "nra" ? "国军" : "日军"}原始骨架烘焙的曲线`,
+        title: clip.corrected
+          ? `仅适用于${clip.targetLabel}；原 ${clip.id} 姿态异常，校正为同骨架 ${clip.playbackClipId} 曲线`
+          : `仅适用于${clip.targetLabel}；使用${clip.faction === "nra" ? "国军" : "日军"}原始骨架烘焙的曲线`,
       }))
       : CLIPS.map((clip) => ({ id: clip.id, name: clip.name }));
     if (this.animationMode === "imported") {
@@ -733,7 +745,9 @@ export class ActorEditor {
       const gizmo = this.gizmos[i];
       if (gizmo) {
         gizmo.root.position.copy(actor.root.position);
-        gizmo.SetStance(StanceOf(state));
+        gizmo.SetStance(this.animationMode === "imported" && !this.manual
+          ? ImportedClipStance(this.clipId)
+          : StanceOf(state));
         gizmo.UpdateFromActor(actor);
         if (i === 0) this.stance = gizmo.stance;
       }
@@ -785,6 +799,9 @@ export class ActorEditor {
     this.facts.Set("动作", this.manual ? "程序化手动"
       : importedEntry ? `${importedEntry.targetLabel} · ${importedEntry.name}` : `${this.animationMode} · ${this.clipId}`);
     if (importedEntry) this.facts.Set("动作适用对象", `${importedEntry.targetLabel} · ${importedEntry.faction === "nra" ? "国军源骨架" : "日军源骨架"}`, "good");
+    this.facts.Set("姿态校正", importedEntry?.corrected
+      ? `${importedEntry.id} → ${importedEntry.playbackClipId} · 去除 59° 异常前倾`
+      : "无", importedEntry?.corrected ? "good" : "");
     const boneHitboxes = actor.GetBoneHitboxes?.() || [];
     this.facts.Set("骨骼命中体", boneHitboxes.length ? `${boneHitboxes.length} 个 · 实时随骨骼` : "保底固定球",
       boneHitboxes.length ? "good" : "warn");
