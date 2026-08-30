@@ -388,7 +388,13 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     if (health.decalOrigin.join(",") !== "17,3,-9") bad.push(`贴花仍被物理抬离命中面 ${health.decalOrigin}`);
     if (!health.decalPreservesTargetAlpha) bad.push("贴花混合仍会降低 HDR 目标 alpha");
     if (!health.decalUsesSurfaceClip) bad.push("贴花没有按场景深度裁掉悬空部分");
-    if (!cutsceneOnly && health.readableIjaMaterials < 2) bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
+    // 第一关白盒故意在 20—30 秒前保持敌方空场，让玩家先认路；这一帧没有日军 Actor
+    // 可供枚举不是材质缺失。完整火力出现后的接线由 WhiteboxGuideBrowserTest 锁定，
+    // 其余六章仍照旧在开机帧检查双方材质。
+    const scriptedQuiet = !!PHASES[phase].whitebox?.firstContact;
+    if (!cutsceneOnly && !scriptedQuiet && health.readableIjaMaterials < 2) {
+      bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
+    }
     const expectedSprites = {
       legacy: { frames: 16, grid: "4,4", size: 1024 },
       compact: { frames: 25, grid: "5,5", size: 1024 },

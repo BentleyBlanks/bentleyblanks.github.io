@@ -481,8 +481,11 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     const g0 = T.battlefield.GroundHeight(spot.x, spot.z);
     // 一座假坟头。物理与战场网格两边都要塞：胶囊靠物理托着，
     // 而 StepCorpse 的采样走 battlefield.StandHeight（读的是战场网格）。
-    const box = { c: [spot.x, g0 + 0.7, spot.z], h: [1.3, 0.7, 1.3], ry: 0, tag: "testGrave",
-      min: [spot.x - 1.3, g0, spot.z - 1.3], max: [spot.x + 1.3, g0 + 1.4, spot.z + 1.3] };
+    // 0.8 m 半宽仍包住最远 0.75 m 的五点取样（留 5 cm 余量），能稳定走到
+    // “小台面”分支；同时保证滑出约 1.2 m 时，0.3 m 尸体胶囊也真正越过台缘，
+    // 而不是中心已出台、胶囊外沿仍搭着，最后把夹具尺寸误判成滑动失败。
+    const box = { c: [spot.x, g0 + 0.7, spot.z], h: [0.8, 0.7, 0.8], ry: 0, tag: "testGrave",
+      min: [spot.x - 0.8, g0, spot.z - 0.8], max: [spot.x + 0.8, g0 + 1.4, spot.z + 0.8] };
     const handle = T.physics.AddSolid(box);
     const bf = T.battlefield;
     const key = Math.floor(spot.x / bf.gridSize) * 100003 + Math.floor(spot.z / bf.gridSize);

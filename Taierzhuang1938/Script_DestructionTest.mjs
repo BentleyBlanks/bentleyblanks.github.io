@@ -171,8 +171,10 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   });
   Check("墙面有分阶段耐久", !r.missing && r.staged?.damaged && !r.staged?.broken && r.stillThere,
     r.missing ? "没找到细长 wall" : `ratio=${Number(r.staged?.ratio || 0).toFixed(2)}`);
+  // 射线末端恰好贴到相邻墙体时，命中距离会落在 maxDistance 的最后几厘米；
+  // 命中局部本身已经完全穿透，不能把远端邻墙误报成破口仍被堵住。
   Check("墙体只移除命中局部并打开物理通路", !r.missing && r.broken?.broken
-    && r.originalGone && r.through === null,
+    && r.originalGone && (r.through === null || r.through >= r.maxDistance - 0.05),
   r.missing ? "" : `ray=${r.through ?? "clear"} max=${Number(r.maxDistance).toFixed(2)}`);
   Check("不规则破口、真实厚度断面与导航一起提交", !r.missing && r.stats?.breaches === 1
     && r.stats.activeVolumes === 1 && r.stats.breachLinings === 1
@@ -190,16 +192,12 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 {
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
-    await T.JumpToPhase(0);
+    // phase 0 是只播序章的承载章；真正可玩的“一 · 往南的路”是 phase 1。
+    await T.JumpToPhase(1);
     T.StepFrames(40);
-    const nearVillage = T.battlefield.colliders.filter((box) => {
-      const c = box.c || [
-        (box.min[0] + box.max[0]) * 0.5,
-        (box.min[1] + box.max[1]) * 0.5,
-        (box.min[2] + box.max[2]) * 0.5,
-      ];
-      return Math.hypot(c[0] + 160, c[2] + 1350) < 92;
-    });
+    // 第一关白盒会移动村落来压缩动线；破坏契约应跟着语义 tag，而不是绑死旧地图坐标。
+    const nearVillage = T.battlefield.colliders.filter((box) =>
+      String(box.tag || "").startsWith("village"));
     const tags = {};
     for (const box of nearVillage) tags[box.tag] = (tags[box.tag] || 0) + 1;
     const wall = nearVillage.find((box) => box.tag === "villageWall" && box.h?.[1] > 0.8);
@@ -240,7 +238,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
     const beforeBlast = T.Debug.Destruction();
     const blast = T.destruction.Blast(
       { x: strawC[0], y: strawC[1], z: strawC[2] }, 1.8, 420, { kind: "grenade" });
-    T.destruction.Update({ x: -160, y: strawC[1], z: -1350 });
+    T.destruction.Update({ x: strawC[0], y: strawC[1], z: strawC[2] });
     T.StepFrames(3);
     const after = T.Debug.Destruction();
     return {

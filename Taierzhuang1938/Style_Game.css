@@ -444,7 +444,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    叠放次序＝Hud.Build() 的 DOM 建序，于是 markers(第 9 个) < brief(13) < title(14)：
    功能层在最底下、演出层盖在它上面，纯属建序的巧合而不是设计。
    写成显式的三档，以后往 Build() 里插一个元素不会再默默改变谁压谁。 */
-.hudMarkers { z-index: 1; }
+.hudMarkers, .hudWorldAnnotations { z-index: 1; }
+.hudBoundaryWarning { z-index: 2; }
 .hudGrenadeWarnings { z-index: 2; }
 .hudBrief, .hudTitle { z-index: 3; }
 .hudDeathCard { z-index: 5; }
@@ -458,10 +459,63 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    要么完整、要么不在。照抄阵亡卡那条先例（第 173 行），不引入新概念。
    那几秒功能层本来也没有决策价值：玩家站在出生点、目标在正前方、
    剧本正让班长说「跟着走」，此刻唯一要做的事就是跟上。 */
-#hud.staging .hudMarkers, #hud.staging .hudActions,
+#hud.staging .hudMarkers, #hud.staging .hudWorldAnnotations, #hud.staging .hudActions,
 #hud.staging .hudInteractRing, #hud.staging .hudCarry,
 #hud.staging .hudTarget { opacity: 0; }
-.hudMarkers { transition: opacity 0.4s ease; }
+.hudMarkers, .hudWorldAnnotations { transition: opacity 0.4s ease; }
+
+/* 世界空间白盒说明：它解释“那里会发生什么”，不是替代当前任务。卡片只在对应
+   阶段与可辨认距离内出现，最多三张；细线和定位点让文字仍然属于场景中的地点。 */
+.hudWorldAnnotations { position: absolute; inset: 0; pointer-events: none; }
+.hudWorldAnnotation {
+  --waColor: rgba(151,190,225,0.92);
+  position: absolute; width: min(270px, 29vw); color: var(--paper);
+  transform: translate(15px, -50%); filter: drop-shadow(0 3px 6px rgba(0,0,0,0.82));
+}
+.hudWorldAnnotation .waPin {
+  position: absolute; left: -16px; top: 50%; width: 10px; height: 10px;
+  box-sizing: border-box; border: 2px solid var(--waColor); border-radius: 50%;
+  background: rgba(10,12,14,0.76);
+}
+.hudWorldAnnotation .waPin::after {
+  content: ""; position: absolute; left: 8px; top: 3px; width: 16px; height: 1px;
+  background: var(--waColor);
+}
+.hudWorldAnnotation .waCard {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+  padding: 8px 10px 8px 11px; border-left: 2px solid var(--waColor);
+  background: linear-gradient(90deg, rgba(10,12,14,0.88), rgba(10,12,14,0.62));
+}
+.hudWorldAnnotation .waEyebrow {
+  grid-column: 1 / -1; color: var(--waColor); font: 600 9px/1.2 inherit;
+  font-style: normal; letter-spacing: 0.13em;
+}
+.hudWorldAnnotation .waTitle { font-size: 13px; letter-spacing: 0.05em; }
+.hudWorldAnnotation .waDetail {
+  grid-column: 1 / -1; color: rgba(230,223,205,0.72); font: 400 10.5px/1.55 inherit;
+  text-decoration: none;
+}
+.hudWorldAnnotation .waDistance { color: var(--waColor); font: 500 10px/1.4 inherit; }
+.hudWorldAnnotation.active .waCard { background: linear-gradient(90deg, rgba(10,12,14,0.94), rgba(10,12,14,0.72)); }
+.hudWorldAnnotation.combat { --waColor: rgba(224,176,98,0.96); }
+.hudWorldAnnotation.danger { --waColor: rgba(224,118,89,0.96); }
+.hudWorldAnnotation.story { --waColor: rgba(202,187,151,0.96); }
+.hudWorldAnnotation.transition { --waColor: rgba(151,201,177,0.96); }
+
+.hudBoundaryWarning {
+  position: absolute; left: 50%; top: 18%; width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box; transform: translate(-50%, -8px); opacity: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 14px; pointer-events: none; text-align: center;
+  border-top: 2px solid rgba(224,176,98,0.78);
+  background: linear-gradient(180deg, rgba(10,11,12,0.82), rgba(10,11,12,0.38));
+  transition: opacity 0.16s linear, transform 0.16s ease;
+}
+.hudBoundaryWarning.on { opacity: 1; transform: translate(-50%, 0); }
+.hudBoundaryWarning b { color: var(--warn); font-size: 12px; letter-spacing: 0.18em; }
+.hudBoundaryWarning span { color: rgba(230,223,205,0.78); font-size: 11px; }
+.hudBoundaryWarning.hard { border-top-color: var(--theirs); }
+.hudBoundaryWarning.hard b { color: #e18a71; }
 
 /* 近弹警告：屏内钉在活手榴弹上，屏外贴边。没有秒数倒计时——引信只用来驱动
    最后一秒的红色脉冲，给玩家“马上离开”的紧迫度，不把内部精确数值白送出来。 */
@@ -531,6 +585,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); width: 132px; }
   .hudInteractRing { transform: translate(-50%, 38px); }
   .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
+  .hudWorldAnnotation { width: min(230px, 58vw); }
+  .hudWorldAnnotation .waDetail { display: none; }
+  .hudBoundaryWarning { top: 15%; }
   .hudHint { bottom: 50px; }
 }
 

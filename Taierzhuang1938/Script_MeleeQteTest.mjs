@@ -15,7 +15,16 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
-page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const text = message.text();
+  const url = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(url) || /ERR_BLOCKED_BY_CLIENT/.test(text)) return;
+  errors.push(text);
+});
+// 这条测的是白刃链，不让 Google Fonts 的外网波动决定成败；系统字体是等价回退。
+await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
+  (route) => route.abort("blockedbyclient"));
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&melee=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });

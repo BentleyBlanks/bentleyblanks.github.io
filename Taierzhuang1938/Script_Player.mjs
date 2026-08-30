@@ -767,6 +767,26 @@ export class PlayerController {
   }
 
   /**
+   * 章节可选的二级可玩区约束。矩形 bounds 负责防止走出已生成切片；这一层负责把
+   * 大场景收成设计好的路线形状。回调只返回 x/z，不把关卡数据泄漏进玩家控制器。
+   */
+  ApplyWorldConstraint(body = null) {
+    const constrain = this.world && this.world.ConstrainPosition;
+    if (typeof constrain !== "function") return false;
+    const result = constrain(this.position.x, this.position.z);
+    if (!result || !Number.isFinite(result.x) || !Number.isFinite(result.z)) return false;
+    if (Math.abs(result.x - this.position.x) < 1e-5
+      && Math.abs(result.z - this.position.z) < 1e-5) return false;
+    this.position.x = result.x;
+    this.position.z = result.z;
+    // 空气墙只做水平裁回；脚底重新贴当前地形，避免斜坡边缘裁回后悬空或入地。
+    const ground = this.world.GroundHeight(this.position.x, this.position.z);
+    if (this.position.y < ground) this.position.y = ground;
+    if (body) body.Teleport(this.position.x, this.position.y, this.position.z);
+    return true;
+  }
+
+  /**
    * 走一步。位移交给 Rapier 的角色控制器：贴墙滑、上台阶、卡坡都是它的事。
    *
    * 这里只剩三件玩家侧的事：
@@ -783,6 +803,7 @@ export class PlayerController {
       this.position.addScaledVector(this.velocity, dt);
       const g0 = this.world.GroundHeight(this.position.x, this.position.z);
       if (this.position.y <= g0) { this.position.y = g0; this.velocity.y = 0; this.grounded = true; }
+      this.ApplyWorldConstraint();
       return;
     }
     // 有人绕过物理直接改了 position（过场摆位、冒烟脚本摆人）就认外面那份
@@ -806,6 +827,7 @@ export class PlayerController {
         this.position.x = Clamp(this.position.x, bounds.minX + 1, bounds.maxX - 1);
         this.position.z = Clamp(this.position.z, bounds.minZ + 1, bounds.maxZ - 1);
       }
+      this.ApplyWorldConstraint();
       body.Teleport(this.position.x, this.position.y, this.position.z);
       return;
     }
@@ -850,6 +872,7 @@ export class PlayerController {
         body.Teleport(cx, this.position.y, cz);
       }
     }
+    this.ApplyWorldConstraint(body);
   }
 
   SyncCamera(dt) {

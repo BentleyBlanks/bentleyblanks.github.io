@@ -422,92 +422,74 @@ const OUTFIELD_SCENES = {
 
   // =========================================================================
   // 一 · 往南的路（CH1_NanLu）：津浦路路基 + 路西村庄 + 南向大车路
-  // 史实锚：十四日夜孙震在北沙河开会、配置第二线阵地；十五日沿津浦路南撤，
-  // 经西关车站与电灯厂，黄昏前从西门进城。
-  // 目标链：二线阵地 (-1450,-380) → 路口 (-1450,-160) → 车站 (-1450,40)
-  //         → 电灯厂 (-700,30) → 西门 (-330,0)
+  // 白盒口径：这里不是按公里摊开的开放平原，而是把「铁路路基—路西村口—涵洞—
+  // 南向大车路—路沟」压缩进约 380×440 m 的窄走廊。远景仍看得到平原，近景则
+  // 每 40—70 m 必有一道可命名、可利用、能说明下一步去向的地标。
   // =========================================================================
   CH1_NanLu: {
-    id: "Beishahe",
-    region: { minX: -1820, maxX: -358, minZ: -780, maxZ: 620 },
-    foci: [[-1450, -430], [-1450, -380], [-1450, -160], [-1450, 40], [-700, 30], [-352, 0]],
-    fieldRadius: 700,
-    // 北沙河：借位到切片北端。**只铺到 x=-820 为止** —— 再往东就压到城北了，
-    // 那是第六关（北门突围）的地皮，不许动
-    river: {
-      centerZ: -482, bedHalf: 18, waterHalf: 5.0, meander: 7,
-      fromX: -1820, toX: -820,
-      north: { offset: -25, height: 1.5, baseHalf: 2.7, topHalf: 1.0,
-        gaps: [[-1660, -1622], [-1400, -1362], [-1140, -1104], [-940, -902]] },
-      south: { offset: 24, height: 2.05, baseHalf: 3.3, topHalf: 1.25,
-        gaps: [[-1710, -1676], [-1330, -1294], [-1020, -984]] },
-    },
-    banks: [],
+    id: "NanLuWhitebox",
+    region: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
+    foci: [[-480, -205], [-466, -150], [-470, -88], [-458, -30], [-436, 30],
+      [-448, 130], [-500, 96], [-330, 0]],
+    fieldRadius: 235,
+    river: null,
+    banks: [
+      // 出生镜头的第一条战线：中间留出大车路和首名侦察兵的清晰通视口。
+      { id: "RailbedDefence", from: [-568, -152], to: [-382, -152], height: 1.22,
+        baseHalf: 2.25, topHalf: 0.70, gaps: [[-506, -430]], tag: "fieldBank" },
+      // 村口第二道横向节拍，迫使玩家从中央缺口继续向南，而不是横穿空田。
+      { id: "VillageGateBank", from: [-548, -76], to: [-390, -76], height: 1.08,
+        // 中央门洞容得下后送队与三个进攻班并排通过，同时避开既有弹药箱陈设。
+        baseHalf: 2.05, topHalf: 0.62, gaps: [[-510, -420]], tag: "fieldBank" },
+      // 西侧田坎把路收成走廊，也是侧翼绕行与后送队躲避的连续掩体。东侧已经有
+      // DitchHouses 的院墙和生活道具带，不再叠一条纵坎，免得白盒自己穿进陈设。
+      { id: "WestRoadBank", from: [-520, -55], to: [-500, 112], height: 1.05,
+        baseHalf: 1.90, topHalf: 0.58, gaps: [[4, 18], [86, 101]], tag: "fieldBank" },
+      // 日机扫射段的横向路沟轮廓，中央缺口仍与道路重合。
+      { id: "DitchBank", from: [-548, 122], to: [-372, 122], height: 1.16,
+        baseHalf: 2.20, topHalf: 0.66, gaps: [[-470, -426]], tag: "fieldBank" },
+    ],
     parapets: [
-      // 二线阵地：十四日夜孙震在北沙河开完会连夜挖的那一条
-      { z: -412, fromX: -1560, toX: -1330, seed: "L1line0" },
-      { z: -388, fromX: -1580, toX: -1250, seed: "L1line" },
-      { z: -368, fromX: -1560, toX: -1290, seed: "L1line2" },
-      // 路口（Dawn 路标）那一处路障
-      { z: -172, fromX: -1500, toX: -1380, seed: "L1road" },
+      { z: -210, fromX: -552, toX: -405, seed: "L1SpawnLine" },
+      { z: -178, fromX: -555, toX: -400, seed: "L1ForwardLine" },
+      { z: 88, fromX: -528, toX: -474, seed: "L1FallbackWest" },
+      { z: 82, fromX: -420, toX: -365, seed: "L1FallbackEast" },
     ],
     pits: [
-      { z: -424, fromX: -1540, toX: -1360, count: 7, seed: "L1pit0" },
-      { z: -400, fromX: -1570, toX: -1260, count: 10, seed: "L1pitA" },
-      { z: -350, fromX: -1540, toX: -1300, count: 6, seed: "L1pitB" },
+      { z: -210, fromX: -548, toX: -402, count: 6, seed: "L1PitSpawn" },
+      { z: -174, fromX: -548, toX: -400, count: 7, seed: "L1PitContact" },
+      { z: 104, fromX: -526, toX: -376, count: 5, seed: "L1PitDitch" },
     ],
     craters: [
-      { z: -395, fromX: -1560, toX: -1270, spread: 44, count: 10, seed: "L1crA" },
-      { z: -150, fromX: -1500, toX: -1360, spread: 40, count: 6, seed: "L1crB" },
+      { z: -166, fromX: -570, toX: -388, spread: 34, count: 7, seed: "L1CrContact" },
+      { z: 60, fromX: -528, toX: -362, spread: 42, count: 8, seed: "L1CrSouthRoad" },
+      { z: 142, fromX: -520, toX: -386, spread: 30, count: 5, seed: "L1CrDitch" },
     ],
-    // 津浦正线：**这一段是真位置**（城西 0.8—1.5 km 为主流记载推算，
-    // Data_Tengxian.WEST_SUBURB.railway.x = -1500）
-    railway: { x: WEST_SUBURB.railway.x, fromZ: -780, toZ: 620,
-      crossings: [-165, 118], bridgeAtZ: -486, poles: true, platformAtZ: 40 },
+    // 铁路在白盒中借位到玩家左侧 45—70 m：它必须一抬眼就能辨认，同时不切断主路。
+    railway: { x: -538, fromZ: -250, toZ: 210, crossings: [-88, 96], poles: true },
     roads: [{
-      width: 5.6,
-      // 车站 → 电灯厂 → 西门外的那条土路（设计稿：西门外土路自 (-310,0) 向西）
-      points: [[-1500, -168], [-1444, -120], [-1440, 40], [-1330, 44], [-1080, 36],
-        // 大车路在西关外收口：末段交给西关大街（z=0 那条才是城防图上的西门轴线路，
-        // 旧末两点 [-470,12]/[-358,4] 会与它并行重影、还从沿街铺面底下穿过 —— WP-B4 取证）
-        [-700, 26], [-560, 16]],
-    }, {
-      // ── 南向大车路（集成批 INT2 补）─────────────────────────────────────
-      //
-      // Data_MissionCh1 的头注写着「『往南』在这片地上是 +Z 方向：路基阵地在北
-      //（z=-180），大车路一路向南（z→+130）」，而本表里**一条对应的路面折线都没有**
-      //（S3 摆扫射航线时发现的：三条航线沿着一条画面上并不存在的路飞）。
-      // 后送队走的就是这一条：阶段②从交通壕出发，③过涵洞沿路南下，
-      // ④在路上被截击，⑤⑥日机沿路扫射，⑧扑进路沟 —— 整整六个阶段都发生在它上面。
-      //
-      // 折线照 CHAPTER.zones 走：C1_Railbed(-466,-150) → C1_Village(-470,-88)
-      // → C1_Culvert(-458,-30) → C1_SouthRoad(-436,30) → C1_Ditch(-448,130)，
-      // 两头各往外延一段（北接阵地后侧的交通壕口，南端在被截断的路口外收住）。
-      //
-      // 宽度比主路窄一档（4.8 < 5.6）：这是一条乡下的大车路，不是官道。
-      // 它在 z≈16 一带与上面那条东西向的土路交叉 —— 那正是「路口」，
-      // 阶段⑨「日军占据道路出口」就在那儿。
       width: 4.8,
       points: [[-472, -206], [-466, -150], [-470, -88], [-458, -30], [-436, 30],
         [-442, 90], [-448, 130], [-452, 182]],
     }],
     villages: [
-      { id: "BeishaheVillage", x: -1276, z: -604, w: 132, d: 78, count: 9, far: true },
-      { id: "RoadInn", x: -1386, z: -196, w: 58, d: 40, count: 4 },
-      // 五里屯（城西，设计稿给的方位参照）
-      { id: "Wulitun", x: -886, z: -104, w: 152, d: 106, count: 11 },
-      { id: "SouthHamlet", x: -1040, z: 330, w: 118, d: 70, count: 8, far: true },
+      // 建筑群都贴在走廊外侧，近到能读作地标，又不把主路变成院墙迷宫。
+      { id: "RailbedHamlet", x: -568, z: -104, w: 72, d: 64, count: 6 },
+      { id: "VillageGate", x: -535, z: -48, w: 54, d: 58, count: 5, stoneWall: true },
+      { id: "SouthRoadRuins", x: -516, z: 62, w: 58, d: 62, count: 5 },
+      { id: "DitchHouses", x: -386, z: 118, w: 62, d: 54, count: 5, stoneWall: true },
+      { id: "EastFieldSilhouette", x: -286, z: -92, w: 82, d: 62, count: 5, far: true },
     ],
     treeRows: [
-      { from: [-1560, -300], to: [-620, -286], pitch: 18 },
-      { from: [-1560, -216], to: [-900, -206], pitch: 20 },
-      { from: [-1320, -470], to: [-1312, 120], pitch: 17 },
-      { from: [-980, -260], to: [-970, 300], pitch: 19 },
-      { from: [-1540, -60], to: [-760, -50], pitch: 21 },
+      { from: [-588, -226], to: [-370, -222], pitch: 20 },
+      { from: [-580, -126], to: [-382, -122], pitch: 18 },
+      { from: [-560, -58], to: [-552, 174], pitch: 17 },
+      { from: [-370, -52], to: [-362, 158], pitch: 19 },
+      { from: [-548, 156], to: [-348, 150], pitch: 18 },
     ],
-    graves: { clusters: 16, seed: "L1grave" },
-    trees: { count: 88, seed: "L1tree" },
-    wheat: { cellW: 38, cellD: 78, wheatShare: 0.40, seed: "L1wheat" },
+    graves: { clusters: 8, seed: "L1grave" },
+    trees: { count: 54, seed: "L1tree" },
+    wheat: { cellW: 34, cellD: 62, wheatShare: 0.38, seed: "L1wheat" },
   },
 };
 

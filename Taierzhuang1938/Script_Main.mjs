@@ -75,6 +75,9 @@ import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EP
 import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
+import {
+  EvaluatePlayableBoundary, ConstrainPlayablePosition,
+} from "./Script_WhiteboxGuide.mjs";
 
 // 近身班组的人数：不是加出来的兵，是把原本撒在两百米外、被雾墙吃掉的人挪到镜头前。
 // 实测一个 Actor 是 **37 个 draw call**（身体部件没合批），14 个近身兵约 1400 calls，
@@ -514,6 +517,9 @@ let battlefield = null;
 let physics = null;
 let navGrid = null;
 let player = null;
+/** 当前章节的数据驱动白盒走廊；null 表示该章仍只使用矩形切片边界。 */
+let playableBoundary = null;
+let boundaryHardUntil = 0;
 let ai = null;
 let meleeQte = null;
 let vfx = null;
@@ -558,6 +564,35 @@ let companion = null;
 // 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。环形采样在 Script_Checkpoint，
 // 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
 let checkpoint = null;
+
+/** 把章节白盒配置接到玩家的通用二级边界口；没配置的章节完全不受影响。 */
+function ConfigureWhiteboxGuide(phase) {
+  playableBoundary = phase.whitebox?.boundary || null;
+  boundaryHardUntil = 0;
+  if (!player?.world) return;
+  if (!playableBoundary) {
+    delete player.world.ConstrainPosition;
+    return;
+  }
+  player.world.ConstrainPosition = (x, z) => {
+    const result = ConstrainPlayablePosition(x, z, playableBoundary);
+    if (result.hard) boundaryHardUntil = state.elapsed + 1.7;
+    return result;
+  };
+}
+
+/** HUD 读的边界态：真正撞墙后锁住 1.7 秒，避免一帧裁回后提示马上消失。 */
+function WhiteboxBoundaryView() {
+  if (!playableBoundary || !player) return null;
+  const live = EvaluatePlayableBoundary(player.position.x, player.position.z, playableBoundary);
+  if (state.elapsed >= boundaryHardUntil) return live;
+  return {
+    ...live,
+    warning: true,
+    hard: true,
+    message: playableBoundary.hardText || "已离开可玩区域，正在返回战场。",
+  };
+}
 // 章节摆点（集成批 INT2）。「哪一章在哪一拍做什么」是**数据**，在 Script_MissionSetpieces
 // 的 SETPIECES 里一章一条；装配层只建一次、每帧推一下、换关告诉它换到哪儿去了。
 // 它是七个玩法系统与七章内容之间唯一的接缝 —— 这个文件里因此**没有一行 if (章 id)**。
@@ -2066,6 +2101,14 @@ async function Boot() {
         return out;
       },
       Deaths: () => ({ ...ai.deaths }),
+      Whitebox: () => ({
+        phase: PHASE_TABLE[state.phaseIndex].id,
+        boundary: WhiteboxBoundaryView(),
+        hud: hud.WhiteboxState(),
+        annotations: PHASE_TABLE[state.phaseIndex].whitebox?.annotations?.length || 0,
+        enemyCount: ai.CountSide("ija"),
+        phaseTime: state.phaseTime,
+      }),
       OpenDirections: (x, z, count = 72, probeM = 20) =>
         CountOpenDirections(x, z, battlefield.GroundHeight(x, z), probeM, count),
     },
@@ -2815,6 +2858,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     ai.insideWalls = levelBounds;
   }
 
+  // 物理切片换完后再接白盒边界：非首关没有 whitebox，继续只受矩形 bounds 约束。
+  ConfigureWhiteboxGuide(phase);
+
   state.phaseTime = 0;
   state.objectiveIndex = 0;
   state.objectiveCount = phase.zones.length;
@@ -3400,6 +3446,9 @@ function SeedSoldiers(phase) {
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
   const nraTarget = Math.round(SCALE.maxAlive * 0.42);
   const ijaTarget = Math.round(SCALE.maxAlive * 0.5 * phase.ijaPressure / 1.3);
+  const firstContact = phase.whitebox?.firstContact || null;
+  const enemyStage = !firstContact || state.phaseTime >= firstContact.fullWaveAtS
+    ? "wave" : state.phaseTime >= firstContact.atS ? "scout" : "quiet";
 
   const px = player.position.x;
   const pz = player.position.z;
@@ -3420,7 +3469,8 @@ function SeedSoldiers(phase) {
 
   // 重机枪是阵地火力，不该跟突击兵一起随机冲脸。每关按配置摆在纵深，
   // 用九二式真的开火；位置、数量是玩法推定，存在本身来自日方战详报。
-  const hmgTeams = phase.ijaSupport?.includes("hmg") ? (phase.ijaForce?.hmgTeams || 0) : 0;
+  const hmgTeams = enemyStage === "wave" && phase.ijaSupport?.includes("hmg")
+    ? (phase.ijaForce?.hmgTeams || 0) : 0;
   for (let i = 0; i < hmgTeams; i += 1) {
     const d = 105 + i * 26;
     const lateral = (i - (hmgTeams - 1) * 0.5) * 34;
@@ -3463,7 +3513,7 @@ function SeedSoldiers(phase) {
     if (s) { s.holdZone = null; s.goal.set(px + ax * 15, 0, pz + az * 15); }
   }
   // --- 中景的敌人：压在你与下一个路标之间 -----------------------------------
-  for (let i = CountNear("ija", 110); i < NEAR_SQUAD.ija; i += 1) {
+  for (let i = CountNear("ija", 110); enemyStage === "wave" && i < NEAR_SQUAD.ija; i += 1) {
     let open = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const d = 45 + rnd() * 55;
@@ -3496,6 +3546,25 @@ function SeedSoldiers(phase) {
     });
     if (s) { s.holdZone = o; s.goal.set(o.x, 0, o.z); }
   }
+  // 首关开场不是“加载完四面已经在打”：先让玩家认路和认同伴，21.8 秒只亮出
+  // 一名田坎侦察兵，30 秒才展开完整火力。时间来自 Notion 首关硬指标与 beats 同一拍。
+  if (enemyStage === "quiet") return;
+  if (enemyStage === "scout") {
+    if (ai.CountSide("ija") === 0) {
+      const scout = firstContact.scout;
+      const open = FindOpenSpot(scout.x, scout.z, 4.5,
+        19380315 + state.phaseIndex * 17, levelBounds);
+      const soldier = ai.Spawn("ija", open.x, open.z, {
+        weapon: scout.weapon || "Type38", squadId: `FirstContact_${phase.id}`,
+      });
+      if (soldier) {
+        soldier.order = "hold";
+        soldier.holdZone = { id: `FirstContact_${phase.id}`, x: open.x, z: open.z, radius: 5 };
+        soldier.goal.set(open.x, 0, open.z);
+      }
+    }
+    return;
+  }
   // --- 日方：从战线前方 60—140 m 压上来 -------------------------------------
   // 写死一个方位（台儿庄那一版是"北面城门"）在这里行不通：
   // 东关是从东打过来、十字街是从西打过来、城墙那一关是从城外往墙上打。
@@ -3512,9 +3581,14 @@ function SeedSoldiers(phase) {
     // 一波一波压上街的观感正是这一关要的。近端那七成一个没动。
     // 这一档现在也走完整 Actor：人物可见性是内容硬规则，性能按 5000 dc / 600 万面验，
     // 不能再以“画不起”为由让 140 m 外的活人从战场上消失。
-    const deep = rnd() < 0.3;
-    const d = deep ? 140 + rnd() * 220 : 60 + rnd() * 80;
-    const lateral = (rnd() - 0.5) * (deep ? 130 : 90);
+    const wave = firstContact?.wave || null;
+    const deepShare = wave ? Clamp(Number(wave.deepShare ?? 0), 0, 1) : 0.3;
+    const deep = rnd() < deepShare;
+    const nearMin = Number(wave?.minDistanceM ?? 60);
+    const nearMax = Math.max(nearMin, Number(wave?.maxDistanceM ?? 140));
+    const d = deep ? 140 + rnd() * 220 : nearMin + rnd() * (nearMax - nearMin);
+    const lateralSpan = deep ? 130 : Number(wave?.lateralSpanM ?? 90);
+    const lateral = (rnd() - 0.5) * lateralSpan;
     const at = {
       x: px + ax * d - az * lateral,
       z: pz + az * d + ax * lateral,
@@ -5804,7 +5878,20 @@ function Frame(dt, render = true) {
       visible: _proj.z < 1 && Math.abs(_proj.x) < 1 && Math.abs(_proj.y) < 1,
       dist,
     };
-  });
+  }, state.objectiveIndex);
+  hud.UpdateWorldAnnotations(
+    phase.whitebox?.annotations || [], player, state.objectiveIndex, (note) => {
+      const y = battlefield.GroundHeight(note.x, note.z) + (note.height || 2.5);
+      _proj.set(note.x, y, note.z);
+      _proj.project(camera);
+      return {
+        x: (_proj.x * 0.5 + 0.5) * window.innerWidth,
+        y: (-_proj.y * 0.5 + 0.5) * window.innerHeight,
+        visible: _proj.z > -1 && _proj.z < 1
+          && Math.abs(_proj.x) < 0.96 && Math.abs(_proj.y) < 0.92,
+      };
+    });
+  hud.SetBoundaryWarning(WhiteboxBoundaryView());
   // 活手榴弹进入实际爆炸伤害范围才提示；屏内钉住落点，屏外贴边指方向。
   // 单独再投影一次最多只有四颗，避免把目标路标与爆炸警告绑成一套生命周期。
   hud.UpdateGrenadeWarnings(combat.GrenadeThreats(player.position), player, (x, y, z) => {

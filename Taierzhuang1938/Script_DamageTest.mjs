@@ -101,7 +101,15 @@ function Check(name, ok, detail = "") {
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
-await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  // 第一关现在把完整交火推迟到 30 秒；伤害靶场测的是展开后的武器口径，
+  // 首敌节拍由 WhiteboxGuideBrowserTest 另行逐秒锁定。这里只推进阶段钟并触发
+  // 下一次补兵拍，不让双方先空打 31 秒，也不能开无敌（后面正要测玩家受伤）。
+  T.state.phaseTime = 31;
+  T.state.spawnAccumulator = 3.1;
+  T.StepFrames(1, 1 / 60, false);
+});
 
 // 取样章体检：**先点名，再开靶**。先证明这一关真撒了兵、且步枪兵够三个，
 // 再谈 TTK。上一版把这件事默认成立，于是换到过场章之后整份报告静默变成
@@ -464,6 +472,10 @@ const pulse = await page.evaluate(() => {
   T.StepFrames(2);
   const grunted = played.includes("hurt");
   player.health = 22;                                // 濒死
+  // 这一段只测 HUD/心跳。完整首遇已经展开，若不重新给保护窗，场上的真人 AI
+  // 会在 1.5 s 采样期内补枪把玩家打到 0；死亡态理应移除 low class，却会让
+  // “濒死是否搏动”随随机弹道偶发变红。
+  player.spawnGrace = 99;
   T.StepFrames(90);                                  // 1.5 s：至少一跳
   const dmg = document.querySelector(".hudDamage");
   const out = {

@@ -29,7 +29,14 @@ try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
-  await page.evaluate(() => window.Taierzhuang.StepFrames(60, 1 / 60, false));
+  await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    // 第一关先留 30 秒认路；AI 专项只把阶段钟拨到完整首遇，再触发一次补兵拍，
+    // 不先模拟 31 秒战斗，以免把关卡进程混进姿态/队形的稳定性基准。
+    T.state.phaseTime = 31;
+    T.state.spawnAccumulator = 3.1;
+    T.StepFrames(1, 1 / 60, false);
+  });
 
   const sample = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -54,6 +61,20 @@ try {
 
     for (let frame = 0; frame < 720; frame += 1) {
       T.StepFrames(1, 1 / 60, false);
+      const squadCenters = new Map();
+      for (const member of T.ai.soldiers) {
+        if (!member.alive) continue;
+        const center = squadCenters.get(member.squadId)
+          || { x: 0, z: 0, count: 0 };
+        center.x += member.position.x;
+        center.z += member.position.z;
+        center.count += 1;
+        squadCenters.set(member.squadId, center);
+      }
+      for (const center of squadCenters.values()) {
+        center.x /= center.count;
+        center.z /= center.count;
+      }
       for (const soldier of T.ai.soldiers) {
         const prev = tracked.get(soldier.id);
         if (!prev || !soldier.alive) continue;
@@ -103,7 +124,18 @@ try {
             const towardSlotBehind = goalLen > 0.3
               && (gx * dx + gz * dz) / (goalLen * moved) > 0
               && gx * soldier.squadForwardX + gz * soldier.squadForwardZ < 0;
-            if (squadDot > 0 || towardSlotBehind) prev.squadDirectedSamples += 1;
+            // 横向槽位同样是编队纪律：首关田坎把三支进攻组导向中央缺口时，
+            // 侧翼兵会先横走到自己 36 m 内的滚动槽位，再沿队向推进。旧口径只放行
+            // “前进/向后收拢”，把这种合法绕障压到 20% 左右。只认**队伍附近**的槽位，
+            // 旧回归里每人各奔几百米外终点的 goal 仍然享受不到这条豁免。
+            const center = squadCenters.get(soldier.squadId);
+            const localSlot = center
+              && Math.hypot(soldier.goal.x - center.x, soldier.goal.z - center.z) <= 36;
+            const towardLocalSlot = localSlot && goalLen > 0.3
+              && (gx * dx + gz * dz) / (goalLen * moved) > 0;
+            if (squadDot > 0 || towardSlotBehind || towardLocalSlot) {
+              prev.squadDirectedSamples += 1;
+            }
           }
         }
         prev.yaw = soldier.yaw; prev.stance = soldier.stance; prev.target = target;
@@ -123,6 +155,17 @@ try {
     const directed = soldiers.reduce((sum, soldier) => sum + soldier.directedSamples, 0);
     const squadSamples = soldiers.reduce((sum, soldier) => sum + soldier.squadSamples, 0);
     const squadDirected = soldiers.reduce((sum, soldier) => sum + soldier.squadDirectedSamples, 0);
+    const squadBreakdown = [...soldiers.reduce((groups, soldier) => {
+      if (!soldier.squadSamples) return groups;
+      const key = `${soldier.side}/${soldier.squad}`;
+      const item = groups.get(key) || { key, samples: 0, directed: 0 };
+      item.samples += soldier.squadSamples;
+      item.directed += soldier.squadDirectedSamples;
+      groups.set(key, item);
+      return groups;
+    }, new Map()).values()]
+      .map((item) => ({ ...item, ratio: item.directed / item.samples }))
+      .sort((a, b) => a.ratio - b.ratio || b.samples - a.samples);
     const stanceWorst = soldiers.slice().sort((a, b) => b.stanceChanges - a.stanceChanges)[0];
     // 规则层直调也按新契约把枪口摆正、把目标标为可见，确认方向闸门没有误伤过热账。
     const gunner = T.ai.soldiers.find((soldier) => soldier.alive && soldier.side === "ija");
@@ -199,6 +242,7 @@ try {
       supportCharges: soldiers.reduce((sum, soldier) => sum + soldier.supportCharges, 0),
       directionRatio: moving ? directed / moving : 0,
       squadDirectionRatio: squadSamples ? squadDirected / squadSamples : 0,
+      squadBreakdown,
       fallbackCount: fallback.length,
       fallbackFocused,
       fallbackDirected,
@@ -230,7 +274,9 @@ try {
   // 前 ~95%，差值来自 58e78f71 压制钉队是有意为之）；要防的散兵回归读数 ~50%。
   // 旧口径混采 fire/charge 战斗噪声时曾掉到 57.6% 贴闸，不是 AI 退步。
   Check("自动推进服从小队共同方向", sample.squadDirectionRatio >= 0.58,
-    `同向采样 ${(sample.squadDirectionRatio * 100).toFixed(1)}%`);
+    `同向采样 ${(sample.squadDirectionRatio * 100).toFixed(1)}%`
+      + `；${sample.squadBreakdown.map((item) => `${item.key}=${(item.ratio * 100).toFixed(0)}%/${item.samples}`)
+        .join(" ")}`);
   Check("无近敌时整队回退到当前任务路标", sample.fallbackCount >= 2
     && sample.fallbackFocused === sample.fallbackCount
     && sample.fallbackDirected >= sample.fallbackCount * 0.8,

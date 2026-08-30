@@ -24,7 +24,17 @@ const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
-page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+page.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const text = message.text();
+  const url = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(url) || /ERR_BLOCKED_BY_CLIENT/.test(text)) return;
+  errors.push(text);
+});
+// 截图只是动作诊断，不该被 Google Fonts 的外网可用性卡住。主动中止远程字体后
+// 浏览器立即落到系统中文字体，document.fonts.ready 也能收敛。
+await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
+  (route) => route.abort("blockedbyclient"));
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });

@@ -2054,15 +2054,18 @@ Check("GroundHeight 的包已拆", !restored.patched && restored.ground === base
 Check("相机交还（FOV 复原）", restored.camera[3] === baseline.camera[3],
   `fov ${baseline.camera[3]} → ${restored.camera[3]}`);
 
-// 玩法恢复：再推 120 帧，仗要接着打
+// 玩法恢复：当前可能已由编辑器切到 CH1。首关故意有 30 秒认路静默期，所以不再拿
+// “立刻有人开枪”当恢复信号；直接验只有战斗主循环才会推进的 phaseTime。
 const resumed = await page.evaluate(() => {
   const T = window.Taierzhuang;
-  const before = T.Debug.FireCount();
+  const before = { phaseTime: T.state.phaseTime, fire: T.Debug.FireCount() };
   T.StepFrames(180);
-  return { before, after: T.Debug.FireCount() };
+  return { before, after: { phaseTime: T.state.phaseTime, fire: T.Debug.FireCount() } };
 });
-Check("关掉编辑器之后仗接着打", resumed.after > resumed.before,
-  `开火 ${resumed.before} → ${resumed.after}`);
+Check("关掉编辑器之后玩法时钟接着走",
+  resumed.after.phaseTime > resumed.before.phaseTime + 2.5,
+  `关卡 ${resumed.before.phaseTime.toFixed(2)} → ${resumed.after.phaseTime.toFixed(2)} s，`
+    + `开火 ${resumed.before.fire} → ${resumed.after.fire}`);
 
 // ---------------------------------------------------------------------------
 // 8) 出图模式：整棵 DOM 必须藏起来

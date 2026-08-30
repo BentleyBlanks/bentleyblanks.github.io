@@ -46,18 +46,27 @@ function Check(name, ok, detail = "") {
 
 // **默认开机进第一章，不是序章。** 序章（CH0）是过场承载章：不撒兵、不发枪，
 // 在那儿量「开枪消耗弹药」「阵亡换人」「AI 数量稳定」测到的都是空场。
-async function Boot(phase = 1, scale = "small") {
+async function Boot(phase = 1, scale = "small", { waitFirstContact = true } = {}) {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=medium&scale=${scale}`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
+  // 第一关正片有 20—30 秒认路窗口；绝大多数通关断言需要场上已经展开火力，
+  // 所以默认跨过这一拍。首敌节拍本身由 WhiteboxGuideBrowserTest 单独逐秒锁定。
+  if (phase === 1 && waitFirstContact) {
+    await page.evaluate(() => {
+      window.Taierzhuang.player.debug.invincible = true;
+      window.Taierzhuang.StepFrames(31 * 60, 1 / 60, false);
+      window.Taierzhuang.StepFrames(1);
+    });
+  }
 }
 
 // ===========================================================================
 // 1) 调试口齐不齐（后面所有断言都靠它）
 // ===========================================================================
 Stage("1 调试口");
-await Boot(1);
+await Boot(1, "small", { waitFirstContact: false });
 const api = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const d = T.Debug || {};
@@ -74,8 +83,13 @@ Check("调试口齐全", api.hasStory && api.hasCombat && api.fns.length === 8,
 // 都不属于这一阶段。这个断言直接从已经建好的第一关取证，防止以后又把配置写回去。
 const tengxianForce = await page.evaluate(() => {
   const T = window.Taierzhuang;
+  const quietEnemies = T.ai.CountSide("ija");
+  T.player.debug.invincible = true;
+  T.StepFrames(31 * 60, 1 / 60, false);
+  T.StepFrames(1);
   const soldiers = T.ai.soldiers || [];
   return {
+    quietEnemies,
     hmg: soldiers.filter((s) => s.side === "ija" && s.weaponId === "Type92Hmg").length,
     lmg: soldiers.filter((s) => s.side === "ija" && s.weaponId === "Type11").length,
     armor: soldiers.filter((s) => s.side === "ija" && /Tank|Tankette/.test(s.weaponId || "")).length,
@@ -83,6 +97,8 @@ const tengxianForce = await page.evaluate(() => {
     grenades: T.state?.grenades ?? -1,
   };
 });
+Check("第一关取得控制时先给玩家认路窗口", tengxianForce.quietEnemies === 0,
+  `日军=${tengxianForce.quietEnemies}`);
 Check("滕县日军有固定重机枪组与分队轻机枪", tengxianForce.hmg >= 1 && tengxianForce.lmg >= 1,
   `重机=${tengxianForce.hmg} 轻机=${tengxianForce.lmg}`);
 Check("滕县不误配战车或集束反坦克弹", tengxianForce.armor === 0
@@ -133,6 +149,14 @@ await page.evaluate(() => {
   // 找一块 9 m 内没有齐胸障碍的空地，免得把撞墙当成移动 bug
   const spot = await page.evaluate(() => {
     const T = window.Taierzhuang;
+    // 首关现在是“宽视野、窄走廊”。优先拿涵洞前的大车路中心做四向移动靶场：
+    // 旧版向出生点四周盲搜会挑到空气墙边沿，随后把“被边界裁回”误报成 W/A/D 失灵。
+    const culvert = T.battlefield.objectives.find((o) => o.id === "C1_Culvert");
+    if (culvert) {
+      const blockers = T.battlefield.NearbyColliders(culvert.x, culvert.z, 9)
+        .filter((b) => b.max[1] - T.battlefield.GroundHeight(culvert.x, culvert.z) >= 0.6);
+      if (!blockers.length) return { x: culvert.x, z: culvert.z };
+    }
     for (let r = 6; r < 90; r += 3) {
       for (let a = 0; a < 12; a += 1) {
         const th = (a / 12) * Math.PI * 2;

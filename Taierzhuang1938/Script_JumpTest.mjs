@@ -187,6 +187,7 @@ try {
   // 判据一律从 D.Traversal() 取，测试里不抄数 —— 改表就该连着改行为，不是连着改断言。
   const ladder = await page.evaluate(() => {
     const T = window.Taierzhuang, D = T.Debug, bf = T.battlefield;
+    const boundaryConstraint = T.player.world.ConstrainPosition;
     const TR = D.Traversal();
     const Kind = (rise) => (rise < TR.vaultMin ? "step"
       : rise <= TR.vaultMax ? "vault" : rise <= TR.mantleMax ? "mantle" : "blocked");
@@ -250,6 +251,10 @@ try {
     }
 
     // 3) 分档：真的翻/爬起来之后，动作档位必须与高度对得上，而且 rise 不许越过硬顶
+    // 这一节会把玩家摆到全切片几十堵墙前逐堵量高度；首关正片的窄走廊空气墙会把
+    // 测试机位裁回路线中心，量到的就不再是那堵墙。边界已有自己的真浏览器专项，
+    // 只在这一小段暂时断开章节回调，结束后原样接回。
+    delete T.player.world.ConstrainPosition;
     const actions = [];
     for (const c of Walls(0.7, TR.mantleMax, 40)) {
       if (actions.length >= 12) break;
@@ -282,6 +287,7 @@ try {
         movedEarly: +movedEarly.toFixed(2),
       });
     }
+    if (boundaryConstraint) T.player.world.ConstrainPosition = boundaryConstraint;
     return { TR, openRise: +openRise.toFixed(3), wallRows, actions };
   });
 
