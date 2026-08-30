@@ -65,9 +65,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   transition: opacity 0.08s linear;
 }
 
-/* 左上角：帧率小读数。等宽数字，不跟着位数抖。 */
+/* 帧率是调试读数，让开 COD 目标通知占用的左上角。 */
 .hudFps {
-  position: absolute; top: 10px; left: 12px;
+  position: absolute; top: 10px; right: 58px;
   font: 600 10px/1 ui-monospace, "Consolas", monospace;
   letter-spacing: 0.08em; color: rgba(230,223,205,0.42);
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
@@ -75,13 +75,13 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudFps.low { color: rgba(224,176,98,0.72); }
 
-/* COD《战争世界》式目标通知：小号、低亮、无底板，只在左上角安静报告动作句。
-   世界标记承担方向与距离；更新回执独立成第二行，章节信息留给过场标题。 */
+/* COD《战争世界》实机目标通知：两行同级、硬黑描边、无底板。
+   整块只在目标更新时出现，停留数秒后一起淡出；平时由世界标记继续指路。 */
 .hudTop {
-  position: absolute; top: 26px; left: 26px;
-  width: min(440px, calc(100vw - 52px));
+  position: absolute; top: 14px; left: 8px;
+  width: min(460px, calc(100vw - 16px));
   display: flex; flex-direction: column; align-items: flex-start;
-  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-family: Arial, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
 }
 .hudPhase {
   display: none;
@@ -89,17 +89,19 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudObjective {
   min-width: 0; max-width: 100%; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: flex-start;
-  padding: 0; background: none; border: 0; filter: none;
+  padding: 0; background: none; border: 0; filter: none; opacity: 0;
 }
-.hudObjective .o {
-  max-width: 100%; font-size: 14px; line-height: 1.25;
-  color: rgba(218,215,207,0.8); font-weight: 500; letter-spacing: 0;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.88); text-wrap: balance;
-}
+.hudObjective .o,
 .hudObjective .objectiveUpdate {
-  margin-top: 1px; font-size: 11px; line-height: 1.25;
-  color: rgba(205,202,194,0.5); font-weight: 400; letter-spacing: 0; opacity: 0;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.82);
+  max-width: 100%; font-size: 17px; line-height: 1.16;
+  color: rgba(224,223,217,0.96); font-weight: 700; letter-spacing: 0;
+  -webkit-text-stroke: 1px rgba(0,0,0,0.96);
+  paint-order: stroke fill;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
+}
+.hudObjective .o { text-wrap: balance; }
+.hudObjective .objectiveUpdate {
+  margin-top: 0;
 }
 .hudForceStatus {
   position: absolute; top: 32px; right: 28px; max-width: min(300px, 44vw);
@@ -117,11 +119,11 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 @keyframes hudObjectiveChanged {
   0% { opacity: 0; }
-  14% { opacity: 0.5; }
-  76% { opacity: 0.5; }
+  7% { opacity: 1; }
+  82% { opacity: 1; }
   100% { opacity: 0; }
 }
-.hudObjective.changed .objectiveUpdate { animation: hudObjectiveChanged 2.2s ease-out both; }
+.hudObjective.changed { animation: hudObjectiveChanged 6.4s ease-out both; }
 
 /* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
 .hudState {
@@ -530,12 +532,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 @media (max-width: 700px) {
   .hudTop {
-    top: max(24px, calc(env(safe-area-inset-top) + 16px)); left: 12px;
-    width: min(70vw, 340px);
+    top: max(14px, calc(env(safe-area-inset-top) + 8px)); left: 8px;
+    width: min(76vw, 350px);
   }
   .hudObjective { width: 100%; }
-  .hudObjective .o { font-size: 13px; }
-  .hudObjective .objectiveUpdate { font-size: 10px; }
+  .hudObjective .o,
+  .hudObjective .objectiveUpdate {
+    font-size: 15px;
+    -webkit-text-stroke-width: 0.8px;
+  }
   .hudForceStatus { top: max(30px, calc(env(safe-area-inset-top) + 20px)); right: 10px; font-size: 9px; }
   .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
   .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 166px; }

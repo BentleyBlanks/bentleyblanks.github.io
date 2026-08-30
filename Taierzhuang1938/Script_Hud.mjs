@@ -435,22 +435,34 @@ export class Hud {
     this.el.phase.innerHTML = `<span class="d">${phase.date}</span><span class="l">${phase.label}</span>`;
   }
 
+  /** 玩家取得控制权时，把加载阶段已经计时完的目标通知重新完整播放一次。 */
+  ReplayObjective() {
+    const text = String(this.el.objectiveText.textContent || "").trim();
+    for (const animation of this.el.objective.getAnimations()) animation.cancel();
+    this.el.objective.classList.remove("changed");
+    // 已经播完的 CSS animation 只删/加 class 不一定会在同一帧重启；读一次布局把
+    // 两个样式状态隔开，保证开局重播与连续目标更新都从 0 秒开始。
+    void this.el.objective.offsetWidth;
+    if (text) this.el.objective.classList.add("changed");
+  }
+
   SetObjective(text, ours, theirs) {
     // COD《战争世界》的目标通知只有两层：眼下可执行的一句动作 + 独立的更新回执。
-    // 路线、距离继续由世界标记承担；章节与时空在下方低权重显示，不能再把剧情提要
-    // 塞回行动句。目标节点常驻但更新回执只闪一次，玩家迷路时仍能随时看见下一步。
+    // 两行作为同一则通知一起出现、一起淡出；路线与距离由常驻世界标记承担。
     //
     // 兵员池机制一点没动：减到零仍是全作唯一失败条件。这里只把它从目标 DOM 里
     // 拆出去，数值变化时在右上角独立闪现，避免与行动动词共用一条阅读路径。
     //
     // 信息不对称照旧：theirs 为 null 就不写「对面 N」。
     const nextText = String(text || "").trim();
+    const bootHidden = document.getElementById("boot")?.classList.contains("gone") ?? true;
+    const playerJustTookControl = bootHidden && this.objectiveBootHidden === false;
+    this.objectiveBootHidden = bootHidden;
     if (this.el.objective.dataset.objective !== nextText) {
       this.el.objective.dataset.objective = nextText;
       this.el.objectiveText.textContent = nextText;
-      this.el.objective.classList.remove("changed");
-      requestAnimationFrame(() => this.el.objective.classList.add("changed"));
-    }
+      this.ReplayObjective();
+    } else if (playerJustTookControl) this.ReplayObjective();
 
     // 第一次进关只记基线，不把开局数字误报成「发生了变化」。
     const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;

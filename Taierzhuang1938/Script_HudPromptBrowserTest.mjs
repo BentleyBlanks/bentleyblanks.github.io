@@ -130,12 +130,17 @@ try {
       changed: objective.classList.contains("changed"),
       background: style.backgroundImage,
       filter: style.filter,
+      animationName: style.animationName,
+      animationDuration: Number.parseFloat(style.animationDuration),
       fontSize: Number.parseFloat(textStyle.fontSize),
       fontWeight: Number.parseInt(textStyle.fontWeight, 10),
       color: textStyle.color,
+      strokeWidth: Number.parseFloat(textStyle.webkitTextStrokeWidth),
       updateTransform: updateStyle.transform,
       updateFontSize: Number.parseFloat(updateStyle.fontSize),
+      updateFontWeight: Number.parseInt(updateStyle.fontWeight, 10),
       left: box.left,
+      top: box.top,
       force: forceStatus?.textContent,
       forceFlashing: forceStatus?.classList.contains("flash"),
       forceIsIndependent: forceStatus?.parentElement?.id === "hud",
@@ -149,18 +154,67 @@ try {
   assert.equal(codObjective.changed, true);
   assert.equal(codObjective.background, "none");
   assert.equal(codObjective.filter, "none");
-  assert.ok(codObjective.fontSize <= 14, `目标字号必须克制，实际 ${codObjective.fontSize}px`);
-  assert.ok(codObjective.fontWeight <= 500, `目标字重必须克制，实际 ${codObjective.fontWeight}`);
+  assert.equal(codObjective.animationName, "hudObjectiveChanged");
+  assert.ok(codObjective.animationDuration >= 6 && codObjective.animationDuration <= 7,
+    `目标通知停留时长应接近 COD 实机，实际 ${codObjective.animationDuration}s`);
+  assert.equal(codObjective.fontSize, 17);
+  assert.equal(codObjective.fontWeight, 700);
   assert.match(codObjective.color, /^rgba\(/, "目标文字不能回退成不透明纯白");
+  assert.ok(codObjective.strokeWidth >= 0.9, "COD 目标文字必须保留足够清楚的硬黑描边");
   assert.equal(codObjective.updateTransform, "none", "目标更新回执不得滑入抢视线");
-  assert.ok(codObjective.updateFontSize < codObjective.fontSize);
-  assert.ok(codObjective.left < 80, `目标通知应在左上角，实际 left=${codObjective.left}`);
+  assert.equal(codObjective.updateFontSize, codObjective.fontSize, "两行应为 COD 式同级字号");
+  assert.equal(codObjective.updateFontWeight, codObjective.fontWeight, "两行应为 COD 式同级字重");
+  assert.ok(codObjective.left <= 12, `目标通知应贴近左上安全边，实际 left=${codObjective.left}`);
+  assert.ok(codObjective.top >= 10 && codObjective.top <= 18,
+    `目标通知纵向位置应贴近 COD 实机，实际 top=${codObjective.top}`);
   assert.equal(codObjective.force, "城中仍在坚守者：35 人");
   assert.equal(codObjective.forceFlashing, true);
   assert.equal(codObjective.forceIsIndependent, true);
   assert.equal(codObjective.forceBackground, "none");
   assert.equal(codObjective.forceBorderRightWidth, "0px");
   assert.equal(codObjective.oldMarkCount, 0);
+
+  const objectiveLifetime = await page.evaluate(async () => {
+    const objective = document.querySelector(".hudObjective");
+    objective.getAnimations().find((animation) => animation.animationName === "hudObjectiveChanged")?.finish();
+    const fadedOpacity = Number.parseFloat(getComputedStyle(objective).opacity);
+    window.Taierzhuang.hud.ReplayObjective();
+    await new Promise(requestAnimationFrame);
+    const replayAnimation = objective.getAnimations()
+      .find((animation) => animation.animationName === "hudObjectiveChanged");
+    const replayed = objective.classList.contains("changed")
+      && getComputedStyle(objective).animationName === "hudObjectiveChanged"
+      && replayAnimation?.playState === "running"
+      && replayAnimation.currentTime < 250;
+    window.Taierzhuang.hud.SetObjective("", 35, null);
+    await new Promise(requestAnimationFrame);
+    return {
+      fadedOpacity,
+      replayed,
+      blankChanged: objective.classList.contains("changed"),
+      blankText: objective.querySelector(".o")?.textContent,
+    };
+  });
+  assert.ok(objectiveLifetime.fadedOpacity <= 0.01, "COD 目标通知停留后应整块淡出");
+  assert.equal(objectiveLifetime.replayed, true, "玩家取得控制权时应重新完整播放目标通知");
+  assert.equal(objectiveLifetime.blankChanged, false, "空目标不得只闪出一行更新回执");
+  assert.equal(objectiveLifetime.blankText, "");
+
+  const controlHandoffReplay = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    const boot = document.getElementById("boot");
+    const objective = document.querySelector(".hudObjective");
+    boot.classList.remove("gone");
+    T.hud.SetObjective("守住主救护所", 35, null);
+    objective.getAnimations().find((animation) => animation.animationName === "hudObjectiveChanged")?.finish();
+    T.hud.SetObjective("守住主救护所", 35, null);
+    boot.classList.add("gone");
+    T.hud.SetObjective("守住主救护所", 35, null);
+    await new Promise(requestAnimationFrame);
+    return objective.getAnimations().some((animation) =>
+      animation.animationName === "hudObjectiveChanged" && animation.playState === "running");
+  });
+  assert.equal(controlHandoffReplay, true, "加载遮罩退场时应重播首次目标通知");
 
   const weaponPrompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
