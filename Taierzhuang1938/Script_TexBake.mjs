@@ -615,6 +615,13 @@ export const RECIPES = {
   // 仍要有同名 recipe，catch 才能补烘而不是到建场时抛“材质未烘焙”。
   WellStone: (s) => BakeStone(s ?? 512, { seed: 911, courses: 6, perCourse: 5 }),
   Millstone: (s) => BakeStone(s ?? 512, { seed: 919, courses: 1, perCourse: 1 }),
+  // ChineseLife 三件专属外图失败时的同名兜底。井台与磨盘正常路径恢复各自
+  // Sketchfab 源 PBR；门板正常路径走无字的 1938 鲁南 imagegen 木板。
+  ShopDoorPbr: (s) => BakeWood(s ?? 512, {
+    seed: 929, hue: [91, 66, 44], planks: 8, weathered: 0.88,
+  }),
+  StoneWellOriginal: (s) => BakeStone(s ?? 512, { seed: 937, courses: 6, perCourse: 7 }),
+  StoneMillOriginal: (s) => BakeStone(s ?? 512, { seed: 941, courses: 1, perCourse: 1 }),
   WaterVatCeramic: (s) => BakeFlat(s ?? 256, { color: [58, 43, 32], rough: 0.78 }),
   // 庙墙灰浆：ImageGen 的 TemplePlaster PBR 在启动时覆盖此兜底；失败时退回土坯质感。
   TemplePlaster: (s) => BakeAdobe(s ?? 512, { seed: 223 }),

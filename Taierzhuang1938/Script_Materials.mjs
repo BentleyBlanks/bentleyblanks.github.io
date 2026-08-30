@@ -347,9 +347,12 @@ export class MaterialLibrary {
   }
 
   /** 一张下好的图 → 一张按本库约定配好的贴图。外部图三条路共用。 */
-  _WrapTexture(image, srgb) {
+  _WrapTexture(image, srgb, flipY = true) {
     const texture = new THREE.Texture(image);
     texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    // 平铺 PBR 按浏览器图片坐标走默认翻转；恢复 glTF 作者 UV atlas 时必须与
+    // GLTFLoader 一样设 false，否则整张 atlas 上下颠倒、模型采到未使用的色块。
+    texture.flipY = flipY;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.generateMipmaps = true;
@@ -374,7 +377,7 @@ export class MaterialLibrary {
    * 名额，后面建关卡还要用。走 ImageLoader 而不是 TextureLoader 就是为了拿到
    * 这个 img 元素 —— TextureLoader 只在成功回调里才把 image 挂到 texture 上。
    */
-  _LoadExternalImage(url, srgb, timeoutMs) {
+  _LoadExternalImage(url, srgb, timeoutMs, flipY = true) {
     return new Promise((resolve, reject) => {
       let image = null;
       let settled = false;
@@ -390,7 +393,7 @@ export class MaterialLibrary {
       }, timeoutMs);
       image = new THREE.ImageLoader().load(
         url,
-        (loaded) => Settle(resolve, this._WrapTexture(loaded, srgb)),
+        (loaded) => Settle(resolve, this._WrapTexture(loaded, srgb, flipY)),
         undefined,
         () => Settle(reject, new Error(`${url} 读不到`)),
       );
@@ -405,11 +408,11 @@ export class MaterialLibrary {
    * 三张图有一张读不到 / 超时就整套不换，抛给调用方 —— 只换一半（比如有 albedo
    * 没 normal）比全部退回程序化更难看。调用方按套接住，别让一套拖垮其它套。
    */
-  async LoadExternalSet(name, { albedo, normal, orm }, { timeoutMs = 30000 } = {}) {
+  async LoadExternalSet(name, { albedo, normal, orm, flipY = true }, { timeoutMs = 30000 } = {}) {
     const loaded = await Promise.all([
-      this._LoadExternalImage(albedo, true, timeoutMs),
-      this._LoadExternalImage(normal, false, timeoutMs),
-      this._LoadExternalImage(orm, false, timeoutMs),
+      this._LoadExternalImage(albedo, true, timeoutMs, flipY),
+      this._LoadExternalImage(normal, false, timeoutMs, flipY),
+      this._LoadExternalImage(orm, false, timeoutMs, flipY),
     ]);
     this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: loaded[2] });
     // LoadExternalSet runs before actors are built. Clear anyway so editor hot reloads
@@ -424,12 +427,13 @@ export class MaterialLibrary {
    * but do not need another network texture just to repeat the same dry-wood
    * roughness/occlusion response.
    */
-  async LoadExternalBaseNormal(name, fallbackName, { albedo, normal }, { timeoutMs = 30000 } = {}) {
+  async LoadExternalBaseNormal(name, fallbackName,
+    { albedo, normal, flipY = true }, { timeoutMs = 30000 } = {}) {
     const fallback = this.baked.get(fallbackName);
     if (!fallback) throw new Error(`材质未烘焙：${fallbackName}`);
     const loaded = await Promise.all([
-      this._LoadExternalImage(albedo, true, timeoutMs),
-      this._LoadExternalImage(normal, false, timeoutMs),
+      this._LoadExternalImage(albedo, true, timeoutMs, flipY),
+      this._LoadExternalImage(normal, false, timeoutMs, flipY),
     ]);
     this.baked.set(name, { albedo: loaded[0], normal: loaded[1], orm: fallback.orm });
     this.materials.clear();

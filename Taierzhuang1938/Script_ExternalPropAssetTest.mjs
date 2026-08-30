@@ -8,6 +8,7 @@ import {
   AddTree, AddPoplar, AddOrchardTree,
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
+import { ASSETS as CHINESE_LIFE_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
 
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -516,6 +517,35 @@ for (const [name, minTriangles] of [
   assert.ok(spec.triangles >= minTriangles,
     `${name} keeps enough surface geometry to avoid visible decimation holes`);
 }
+for (const name of ["ShopPlaque", "StoneWellCurb", "StoneMillWheel"]) {
+  assert.ok(chineseLife.nodes.get(name)?.hasUv,
+    `${name} keeps the authored UV channel required by its dedicated PBR`);
+}
+assert.deepEqual(
+  {
+    material: CHINESE_LIFE_ASSETS.shopPlaque.material,
+    projectUvs: CHINESE_LIFE_ASSETS.shopPlaque.projectUvs ?? true,
+  },
+  { material: "ShopDoorPbr", projectUvs: true },
+  "the mislabeled source signboard uses a text-free projected shop-door material",
+);
+for (const [id, material] of [
+  ["stoneWellCurb", "StoneWellOriginal"],
+  ["stoneMillWheel", "StoneMillOriginal"],
+]) {
+  assert.equal(CHINESE_LIFE_ASSETS[id].material, material, `${id} restores its source PBR`);
+  assert.equal(CHINESE_LIFE_ASSETS[id].projectUvs, false, `${id} preserves its source UV atlas`);
+}
+for (const stem of ["ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal"]) {
+  for (const channel of ["Base", "Normal", "Orm"]) {
+    const fileName = `Texture_${stem}${channel}.webp`;
+    const bytes = fs.readFileSync(path.join(root, "Texture", fileName));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF", `${fileName}: RIFF header`);
+    assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP", `${fileName}: WebP payload`);
+    assert.ok(bytes.length > 10_000 && bytes.length < 180_000,
+      `${fileName}: browser-sized but materially useful`);
+  }
+}
 
 const runtime = fs.readFileSync(path.join(root, "Script_ExternalProps.mjs"), "utf8");
 for (const id of [
@@ -560,6 +590,23 @@ for (const material of ["HandcartWood", "WoodCrate", "WattleFence"]) {
       `runtime loads ${material} ${channel}`);
   }
 }
+for (const material of ["ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal"]) {
+  for (const channel of ["Base", "Normal", "Orm"]) {
+    assert.match(runtime, new RegExp(`Texture_${material}${channel}\\.webp\\?v=chineselifepbr20260830`),
+      `external-prop runtime lazily loads ChineseLife ${material} ${channel}`);
+  }
+}
+for (const material of ["StoneWellOriginal", "StoneMillOriginal"]) {
+  assert.match(runtime,
+    new RegExp(`${material}: \\{[\\s\\S]{0,420}?flipY: false`),
+    `${material} keeps the glTF atlas vertical orientation`);
+}
+assert.match(runtime, /dedicatedPbrLoads = new WeakMap\(\)/,
+  "dedicated ChineseLife PBR loads once per material library");
+assert.match(runtime, /EnsureDedicatedPbr\(ASSETS\[id\], library\)/,
+  "the editor preview loads dedicated PBR before it clones the prop");
+assert.match(runtime, /Promise\.all\(ids\.map\(\(id\) => EnsureDedicatedPbr/,
+  "level construction loads all required dedicated PBR before instancing");
 for (const material of ["WoodCrate", "WattleFence"]) {
   for (const channel of ["Base", "Normal", "Orm"]) {
     const fileName = `Texture_${material}${channel}.webp`;
@@ -571,9 +618,20 @@ for (const material of ["WoodCrate", "WattleFence"]) {
     `${material} uses the regenerated PBR set`);
 }
 const texBake = fs.readFileSync(path.join(root, "Script_TexBake.mjs"), "utf8");
-for (const recipe of ["BakeCrateWood", "BakeFenceWood", "WoodCrate", "WattleFence"]) {
+for (const recipe of [
+  "BakeCrateWood", "BakeFenceWood", "WoodCrate", "WattleFence",
+  "ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal",
+]) {
   assert.match(texBake, new RegExp(`\\b${recipe}\\b`), `${recipe} retains a procedural fallback`);
 }
+const city = fs.readFileSync(path.join(root, "Script_TengxianCity.mjs"), "utf8");
+for (const material of ["ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal"]) {
+  assert.match(city, new RegExp(`\\b${material}: \\{ recipe: "${material}"`),
+    `${material} resolves through the Tengxian material map`);
+}
+const materials = fs.readFileSync(path.join(root, "Script_Materials.mjs"), "utf8");
+assert.match(materials, /texture\.flipY = flipY/,
+  "external PBR loading can preserve the original glTF UV convention");
 
 console.log(`EXTERNAL_PROP_ASSET_OK courtyard=${courtyard.bytes} battlefield=${battlefield.bytes}`
   + ` ruralHouse=${ruralHouse.bytes.length}`

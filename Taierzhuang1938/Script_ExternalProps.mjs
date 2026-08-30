@@ -63,6 +63,49 @@ const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
 const LEAFLESS_TREE_URL = "./Model/Model_LeaflessTreeSet.glb?v=1";
 
+// ChineseLife 三件专属 PBR 不进开机 PBR_SETS：三套约 0.50 MB，会把全局 14 MB
+// 红线顶破，而它们只在相应外部道具出现时才需要。首次实例化/建关时按材质懒载；
+// library 里同名程序化 recipe 已经预烘，404/超时只回退该件，不阻断建关。
+const CHINESE_LIFE_PBR = Object.freeze({
+  ShopDoorPbr: {
+    albedo: "./Texture/Texture_ShopDoorPbrBase.webp?v=chineselifepbr20260830",
+    normal: "./Texture/Texture_ShopDoorPbrNormal.webp?v=chineselifepbr20260830",
+    orm: "./Texture/Texture_ShopDoorPbrOrm.webp?v=chineselifepbr20260830",
+  },
+  StoneWellOriginal: {
+    albedo: "./Texture/Texture_StoneWellOriginalBase.webp?v=chineselifepbr20260830",
+    normal: "./Texture/Texture_StoneWellOriginalNormal.webp?v=chineselifepbr20260830",
+    orm: "./Texture/Texture_StoneWellOriginalOrm.webp?v=chineselifepbr20260830",
+    flipY: false,
+  },
+  StoneMillOriginal: {
+    albedo: "./Texture/Texture_StoneMillOriginalBase.webp?v=chineselifepbr20260830",
+    normal: "./Texture/Texture_StoneMillOriginalNormal.webp?v=chineselifepbr20260830",
+    orm: "./Texture/Texture_StoneMillOriginalOrm.webp?v=chineselifepbr20260830",
+    flipY: false,
+  },
+});
+const dedicatedPbrLoads = new WeakMap();
+
+async function EnsureDedicatedPbr(spec, library) {
+  const materialName = spec?.material;
+  const set = CHINESE_LIFE_PBR[materialName];
+  if (!set) return false;
+  let loads = dedicatedPbrLoads.get(library);
+  if (!loads) {
+    loads = new Map();
+    dedicatedPbrLoads.set(library, loads);
+  }
+  if (!loads.has(materialName)) {
+    const pending = library.LoadExternalSet(materialName, set).then(() => true).catch((error) => {
+      console.warn(`[ExternalProps] ${materialName} 专属 PBR 读取失败，保留程序化兜底：${String(error).slice(0, 180)}`);
+      return false;
+    });
+    loads.set(materialName, pending);
+  }
+  return loads.get(materialName);
+}
+
 function BattlefieldAsset(label, node, material, tag = "prop", solid = true,
   category = "院落小件") {
   return { label, url: BATTLEFIELD_URL, node, materialMap: true, material, tag, solid, category };
@@ -728,6 +771,7 @@ function PlacementsFor(phaseId) {
 /** Clone one runtime prop for the component-library studio without placing it in a level. */
 export async function InstantiateExternalProp(id, library) {
   if (!ASSETS[id]) return null;
+  await EnsureDedicatedPbr(ASSETS[id], library);
   return CloneLoadedAsset(id, await LoadAsset(id), library);
 }
 
@@ -792,6 +836,7 @@ export async function AddExternalProps({
   }
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
+  await Promise.all(ids.map((id) => EnsureDedicatedPbr(ASSETS[id], library)));
   const loaded = await Promise.all(ids.map(async (id) => [id, await LoadAsset(id)]));
   const models = new Map(loaded);
   const root = new THREE.Group();

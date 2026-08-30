@@ -121,6 +121,14 @@ const MATERIAL_MAP = {
     normalScale: 0.82, side: THREE.DoubleSide },
   Millstone: { recipe: "Millstone", color: 0xeeeeea, roughness: 1.0,
     normalScale: 0.74, side: THREE.DoubleSide },
+  // ChineseLife 外部模型：门板源资产其实是写字匾额，改用无字旧木 imagegen PBR；
+  // 井台与磨盘按源 UV 恢复作者原始三通道，不再共享通用 Stone。
+  ShopDoorPbr: { recipe: "ShopDoorPbr", roughness: 0.98,
+    normalScale: 0.68, side: THREE.DoubleSide },
+  StoneWellOriginal: { recipe: "StoneWellOriginal", roughness: 1.0,
+    normalScale: 0.82, side: THREE.DoubleSide },
+  StoneMillOriginal: { recipe: "StoneMillOriginal", roughness: 1.0,
+    normalScale: 0.78, side: THREE.DoubleSide },
   WaterVatCeramic: { recipe: "WaterVatCeramic", color: 0xf3ece5, roughness: 0.72,
     normalScale: 0.68, envMapIntensity: 0.72, side: THREE.DoubleSide },
   Adobe: { recipe: "Adobe", color: 0xf6e6c4 },

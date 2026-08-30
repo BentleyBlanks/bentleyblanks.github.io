@@ -66,7 +66,12 @@ remain visible from both directions after their source material is replaced. Pro
 that use the project's tileable PBR recipes receive metre-scale box-projected UVs;
 their downloaded atlas UVs are not compatible with those recipes and previously
 produced broad stripes across wheels, wells and tools. The two city-wall packs keep
-their explicitly authored UVs. Small external woodwork uses `HandcartWood` (a
+their explicitly authored UVs. `ChineseLife` now has two additional exceptions:
+`StoneWellCurb` and `StoneMillWheel` preserve the source UV atlas and restore the
+authors' compressed Base/Normal/ORM with glTF-style `flipY=false`. The upstream
+`ShopPlaque` is actually a carved sign reading “首播”, so its texture is not restored
+to the prop labelled “铺面门板”; that prop uses a text-free 1938 southern-Shandong
+shop-door PBR generated with built-in imagegen. Small external woodwork uses `HandcartWood` (a
 grain-only PBR without fake plank seams), while crates retain `WoodCrate`.
 
 `Model_HouseholdWareSet.glb` now keeps separate `WoodBeam` and `Steel` primitives
