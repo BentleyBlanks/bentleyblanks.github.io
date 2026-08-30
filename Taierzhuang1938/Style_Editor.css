@@ -283,6 +283,31 @@
 .edMapLabel.ref { opacity: 0.82; border-style: dashed; }
 .edMapLabel.sel { color: #fff; border-color: var(--warn, #e0b062); background: rgba(58, 42, 18, 0.88); }
 
+/* 第一人称持枪检查：标签跟着真实挂点投到屏幕，外部检查时仍与同一棵 Viewmodel 对位。 */
+.edFpsMountHud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
+.edFpsMountLabel {
+  position: absolute; transform: translate(-50%, -118%); white-space: nowrap;
+  padding: 1px 5px; border-radius: 2px;
+  color: var(--mount-color, #fff); background: rgba(7, 7, 6, 0.76);
+  border: 1px solid var(--mount-color, #fff);
+  font: 600 10px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  text-shadow: 0 1px 2px #000;
+}
+.edFpsMountLabel.actual { transform: translate(-50%, 62%); border-style: dashed; }
+.edFpsLegend {
+  position: absolute; left: 240px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 5px 10px;
+  max-width: calc(100vw - 600px); padding: 5px 8px; border-radius: 2px;
+  pointer-events: none; background: rgba(7, 7, 6, 0.72);
+  border: 1px solid rgba(230, 223, 205, 0.18);
+  font: 10px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.edFpsLegend span { color: var(--c); }
+.edFpsLegend span::before { content: "● "; }
+.edFpsLegend::after { content: attr(data-view); color: rgba(230, 223, 205, 0.68); }
+body.edFpsClean #edRoot .edPanel,
+body.edFpsClean #edRoot .edGear,
+body.edFpsClean #edRoot .edHint { display: none !important; }
+
 /* 编辑器接管时把 HUD 收起来（过场自己的 .csRoot 必须留着 —— Timeline 要看它） */
 body.edHideHud #hud > [class^="hud"] { display: none !important; }
 
@@ -294,5 +319,6 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   .edPanel.assetStandards { left: 174px; width: calc(100% - 188px); }
   .edAssetRuleCards { grid-template-columns: 1fr; }
   .edPanel.debugRendering { left: 174px; width: min(280px, calc(100% - 188px)); }
+  .edFpsLegend { left: 14px; max-width: calc(100vw - 28px); }
   .edControlGrid { grid-template-columns: 1fr; }
 }
