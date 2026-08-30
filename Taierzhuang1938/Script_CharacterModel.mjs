@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
-import { RaycastCapsule, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
+import { RaycastCapsule, RaycastEllipsoid, RaycastSphere } from "./Script_CharacterHitboxMath.mjs";
 
 export const LUGOU_ANIMATION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "RifleRun",
@@ -283,7 +283,8 @@ export async function LoadLugouCharacterAssets() {
 // 颈部与下颌，颅顶约十几厘米完全没有命中体。BuildHeadHitCenter 用同一根骨的
 // 长度当尺，在 Head 的局部“向上 / 向前”轴上重建真正的颅腔中心。
 export const CHARACTER_HITBOX_PROFILE = Object.freeze([
-  { id: "head", type: "sphere", role: "headCenter", radius: 0.15, part: "head", priority: 3 },
+  { id: "head", type: "sphere", role: "headCenter", radius: 0.15, nraWidthScale: 0.8,
+    part: "head", priority: 3 },
   { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
   { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
   { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
@@ -297,6 +298,7 @@ export const CHARACTER_HITBOX_PROFILE = Object.freeze([
 ]);
 
 const WORLD_SCALE = new THREE.Vector3();
+const WORLD_QUATERNION = new THREE.Quaternion();
 
 /**
  * Runtime cranial centre carried by the animated Head bone.
@@ -394,12 +396,27 @@ export class LugouCharacterRig {
     // Socket_HeadGear 是骨尾，不是头盔中心；只拿它的长度作尺，方向由 Head 自己给。
     const headCenter = BuildHeadHitCenter(this.bones.head, this.sockets.headGear);
     this.hitboxNodes = { ...this.bones, headCenter };
-    this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => ({
-      ...definition,
-      center: new THREE.Vector3(),
-      start: new THREE.Vector3(),
-      end: new THREE.Vector3(),
-    }));
+    this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => {
+      const isNraHead = definition.id === "head" && String(kind).startsWith("nra");
+      return {
+        ...definition,
+        type: isNraHead ? "ellipsoid" : definition.type,
+        localRadii: isNraHead ? new THREE.Vector3(
+          definition.radius,
+          definition.radius,
+          definition.radius * definition.nraWidthScale,
+        ) : null,
+        worldRadii: new THREE.Vector3(),
+        worldAxes: {
+          x: new THREE.Vector3(),
+          y: new THREE.Vector3(),
+          z: new THREE.Vector3(),
+        },
+        center: new THREE.Vector3(),
+        start: new THREE.Vector3(),
+        end: new THREE.Vector3(),
+      };
+    });
     const skinnedParts = [];
     this.root.traverse((object) => {
       if (!object.isMesh) return;
@@ -543,10 +560,17 @@ export class LugouCharacterRig {
     const active = [];
     for (const shape of this.hitboxes) {
       shape.worldRadius = shape.radius * scale;
-      if (shape.type === "sphere") {
+      if (shape.type === "sphere" || shape.type === "ellipsoid") {
         const node = this.hitboxNodes[shape.role];
         if (!node) continue;
         node.getWorldPosition(shape.center);
+        if (shape.type === "ellipsoid") {
+          shape.worldRadii.copy(shape.localRadii).multiplyScalar(scale);
+          node.getWorldQuaternion(WORLD_QUATERNION);
+          shape.worldAxes.x.set(1, 0, 0).applyQuaternion(WORLD_QUATERNION);
+          shape.worldAxes.y.set(0, 1, 0).applyQuaternion(WORLD_QUATERNION);
+          shape.worldAxes.z.set(0, 0, 1).applyQuaternion(WORLD_QUATERNION);
+        }
       } else {
         const boneA = this.hitboxNodes[shape.a];
         const boneB = this.hitboxNodes[shape.b];
@@ -563,7 +587,9 @@ export class LugouCharacterRig {
     let best = null;
     for (const shape of this.GetHitboxes()) {
       let distance;
-      if (shape.type === "sphere") {
+      if (shape.type === "ellipsoid") {
+        distance = RaycastEllipsoid(origin, direction, shape.center, shape.worldRadii, shape.worldAxes);
+      } else if (shape.type === "sphere") {
         distance = RaycastSphere(origin, direction, shape.center, shape.worldRadius);
       } else {
         distance = RaycastCapsule(origin, direction, shape.start, shape.end, shape.worldRadius);

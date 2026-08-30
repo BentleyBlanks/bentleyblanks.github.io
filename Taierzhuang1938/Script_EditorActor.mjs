@@ -154,9 +154,13 @@ function LineGeometry(points) {
 }
 
 function PushBoneCircle(out, center, axisU, axisV, radius, toLocal, segments = 20) {
+  PushBoneEllipse(out, center, axisU, axisV, radius, radius, toLocal, segments);
+}
+
+function PushBoneEllipse(out, center, axisU, axisV, radiusU, radiusV, toLocal, segments = 20) {
   const At = (angle) => toLocal(new THREE.Vector3().copy(center)
-    .addScaledVector(axisU, Math.cos(angle) * radius)
-    .addScaledVector(axisV, Math.sin(angle) * radius));
+    .addScaledVector(axisU, Math.cos(angle) * radiusU)
+    .addScaledVector(axisV, Math.sin(angle) * radiusV));
   for (let i = 0; i < segments; i += 1) {
     const a = At((i / segments) * Math.PI * 2);
     const b = At(((i + 1) / segments) * Math.PI * 2);
@@ -168,6 +172,12 @@ function PushBoneSphere(out, center, radius, toLocal) {
   PushBoneCircle(out, center, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), radius, toLocal);
   PushBoneCircle(out, center, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), radius, toLocal);
   PushBoneCircle(out, center, new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), radius, toLocal);
+}
+
+function PushBoneEllipsoid(out, center, axes, radii, toLocal) {
+  PushBoneEllipse(out, center, axes.x, axes.y, radii.x, radii.y, toLocal);
+  PushBoneEllipse(out, center, axes.x, axes.z, radii.x, radii.z, toLocal);
+  PushBoneEllipse(out, center, axes.y, axes.z, radii.y, radii.z, toLocal);
 }
 
 function PushBoneCapsule(out, start, end, radius, toLocal) {
@@ -315,7 +325,9 @@ class HitboxGizmo {
     const points = [];
     const ToLocal = (point) => this.root.worldToLocal(new THREE.Vector3().copy(point));
     for (const shape of shapes) {
-      if (shape.type === "sphere") PushBoneSphere(points, shape.center, shape.worldRadius, ToLocal);
+      if (shape.type === "ellipsoid") {
+        PushBoneEllipsoid(points, shape.center, shape.worldAxes, shape.worldRadii, ToLocal);
+      } else if (shape.type === "sphere") PushBoneSphere(points, shape.center, shape.worldRadius, ToLocal);
       else PushBoneCapsule(points, shape.start, shape.end, shape.worldRadius, ToLocal);
     }
     this.boneGeometry.setAttribute("position",

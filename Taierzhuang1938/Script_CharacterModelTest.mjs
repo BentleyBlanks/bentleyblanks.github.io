@@ -164,8 +164,10 @@ assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
-assert.match(runtime, /id: "head", type: "sphere", role: "headCenter"[\s\S]*?part: "head"/,
-  "head uses a dedicated cranial sphere instead of a neck or face-tail capsule");
+assert.match(runtime, /id: "head", type: "sphere", role: "headCenter"[\s\S]*?nraWidthScale: 0\.8[\s\S]*?part: "head"/,
+  "head profile carries the NRA 20%-narrower cranial width");
+assert.match(runtime, /isNraHead[\s\S]*?type: isNraHead \? "ellipsoid"[\s\S]*?definition\.nraWidthScale/,
+  "NRA head instantiates an ellipsoid while IJA retains the shared sphere");
 assert.match(runtime, /function BuildHeadHitCenter\(head, headGear\)/,
   "runtime builds a head-local cranial centre");
 assert.match(runtime, /headGear\.parent === head[\s\S]*?headGear\.position\.length\(\)/,
@@ -176,6 +178,7 @@ assert.doesNotMatch(runtime, /a: "neck", b: "headGear"/,
   "headgear bone tail is not reused as a head-collision endpoint");
 assert.match(runtime, /getWorldScale\(WORLD_SCALE\)/, "hitbox radius uses actual render-root scale");
 assert.match(runtime, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
+assert.match(runtime, /RaycastEllipsoid\(origin, direction/, "NRA head uses exact ellipsoid ray intersection");
 assert.doesNotMatch(runtime, /distanceSqToSegment\(shape\.start/, "old closest-distance capsule approximation removed");
 assert.match(runtime, /SetHeadVisible\(visible\)/, "first-person head visibility control exists");
 assert.match(actor, /SOLDIER_MESH_BY_KIND\.civilian/, "old soldier models are not preloaded");

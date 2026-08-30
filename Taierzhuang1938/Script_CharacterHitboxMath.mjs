@@ -38,6 +38,37 @@ export function RaycastSphere(origin, direction, center, radius) {
 }
 
 /**
+ * First non-negative ray/oriented-ellipsoid intersection.
+ *
+ * `axes` contains the ellipsoid's three orthonormal world axes and `radii` the matching
+ * half-extents. Projecting the ray into unit-sphere space keeps `t` in world metres because
+ * the transformed direction is used only inside the quadratic; `direction` must be normalized.
+ */
+export function RaycastEllipsoid(origin, direction, center, radii, axes) {
+  const relative = {
+    x: origin.x - center.x,
+    y: origin.y - center.y,
+    z: origin.z - center.z,
+  };
+  let a = 0, b = 0, c = -1;
+  for (const key of ["x", "y", "z"]) {
+    const radius = radii[key];
+    if (!(radius > EPSILON)) return null;
+    const projectedOrigin = Dot(relative, axes[key]) / radius;
+    const projectedDirection = Dot(direction, axes[key]) / radius;
+    a += projectedDirection * projectedDirection;
+    b += projectedOrigin * projectedDirection;
+    c += projectedOrigin * projectedOrigin;
+  }
+  if (c <= 0) return 0;
+  if (a < EPSILON || b > 0) return null;
+  const discriminant = b * b - a * c;
+  if (discriminant < 0) return null;
+  const near = (-b - Math.sqrt(discriminant)) / a;
+  return near >= 0 ? near : null;
+}
+
+/**
  * Exact first intersection between a normalized ray and a finite capsule.
  *
  * The old approximation measured nearest ray/bone distance then subtracted a sphere chord.

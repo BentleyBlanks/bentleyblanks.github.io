@@ -36,15 +36,28 @@ try {
     const checkHeadHitbox = (candidate) => {
       candidate.Update(0.016, { elapsed: 0.5, aim: 1 });
       const headShape = candidate.GetBoneHitboxes().find((shape) => shape.id === "head");
-      check(headShape?.type === "sphere" && headShape.part === "head"
-        && Number.isFinite(headShape.worldRadius) && headShape.worldRadius > 0,
-      `${candidate.meshSource} has no live cranial sphere`);
+      const isNra = String(candidate.characterRig?.kind).startsWith("nra");
+      if (isNra) {
+        check(headShape?.type === "ellipsoid" && headShape.part === "head"
+          && headShape.worldRadii?.x > 0 && headShape.worldRadii?.y > 0
+          && headShape.worldRadii?.z > 0
+          && nearly(headShape.worldRadii.y, headShape.worldRadii.x)
+          && nearly(headShape.worldRadii.z / headShape.worldRadii.x, 0.8),
+        `${candidate.meshSource} NRA cranial ellipsoid is not 20% narrower`);
+      } else {
+        check(headShape?.type === "sphere" && headShape.part === "head"
+          && Number.isFinite(headShape.worldRadius) && headShape.worldRadius > 0,
+        `${candidate.meshSource} has no live cranial sphere`);
+      }
+      const headReach = headShape.type === "ellipsoid"
+        ? Math.max(headShape.worldRadii.x, headShape.worldRadii.y, headShape.worldRadii.z)
+        : headShape.worldRadius;
       const headPivot = candidate.characterRig?.bones?.head?.getWorldPosition(new THREE.Vector3());
-      check(headPivot && headShape.center.distanceTo(headPivot) > headShape.worldRadius * 0.65,
-        `${candidate.meshSource} cranial sphere collapsed back onto the neck/head pivot`);
+      check(headPivot && headShape.center.distanceTo(headPivot) > headReach * 0.65,
+        `${candidate.meshSource} cranial proxy collapsed back onto the neck/head pivot`);
       const outward = new THREE.Vector3().subVectors(headShape.center, headPivot).normalize();
-      const origin = headShape.center.clone().addScaledVector(outward, headShape.worldRadius * 3);
-      const hit = candidate.RaycastHitboxes(origin, outward.clone().negate(), headShape.worldRadius * 6);
+      const origin = headShape.center.clone().addScaledVector(outward, headReach * 3);
+      const hit = candidate.RaycastHitboxes(origin, outward.clone().negate(), headReach * 6);
       check(hit?.part === "head" && hit.shape?.id === "head",
         `${candidate.meshSource} cannot be headshot through its visible cranial proxy`);
     };
