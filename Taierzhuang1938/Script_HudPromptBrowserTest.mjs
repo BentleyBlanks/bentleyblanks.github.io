@@ -116,18 +116,31 @@ try {
     T.hud.SetObjective("向师部报告东关战况", 35, null);
     await new Promise(requestAnimationFrame);
     const objective = document.querySelector(".hudObjective");
+    const objectiveText = objective.querySelector(".o");
+    const updateText = objective.querySelector(".objectiveUpdate");
     const forceStatus = document.querySelector(".hudForceStatus");
     const style = getComputedStyle(objective);
+    const textStyle = getComputedStyle(objectiveText);
+    const updateStyle = getComputedStyle(updateText);
+    const forceStyle = getComputedStyle(forceStatus);
     const box = objective.getBoundingClientRect();
     return {
-      text: objective.querySelector(".o")?.textContent,
-      update: objective.querySelector(".objectiveUpdate")?.textContent,
+      text: objectiveText?.textContent,
+      update: updateText?.textContent,
       changed: objective.classList.contains("changed"),
       background: style.backgroundImage,
+      filter: style.filter,
+      fontSize: Number.parseFloat(textStyle.fontSize),
+      fontWeight: Number.parseInt(textStyle.fontWeight, 10),
+      color: textStyle.color,
+      updateTransform: updateStyle.transform,
+      updateFontSize: Number.parseFloat(updateStyle.fontSize),
       left: box.left,
       force: forceStatus?.textContent,
       forceFlashing: forceStatus?.classList.contains("flash"),
       forceIsIndependent: forceStatus?.parentElement?.id === "hud",
+      forceBackground: forceStyle.backgroundImage,
+      forceBorderRightWidth: forceStyle.borderRightWidth,
       oldMarkCount: objective.querySelectorAll(".objectiveMark, .forces").length,
     };
   });
@@ -135,10 +148,18 @@ try {
   assert.equal(codObjective.update, "目标已更新");
   assert.equal(codObjective.changed, true);
   assert.equal(codObjective.background, "none");
+  assert.equal(codObjective.filter, "none");
+  assert.ok(codObjective.fontSize <= 14, `目标字号必须克制，实际 ${codObjective.fontSize}px`);
+  assert.ok(codObjective.fontWeight <= 500, `目标字重必须克制，实际 ${codObjective.fontWeight}`);
+  assert.match(codObjective.color, /^rgba\(/, "目标文字不能回退成不透明纯白");
+  assert.equal(codObjective.updateTransform, "none", "目标更新回执不得滑入抢视线");
+  assert.ok(codObjective.updateFontSize < codObjective.fontSize);
   assert.ok(codObjective.left < 80, `目标通知应在左上角，实际 left=${codObjective.left}`);
   assert.equal(codObjective.force, "城中仍在坚守者：35 人");
   assert.equal(codObjective.forceFlashing, true);
   assert.equal(codObjective.forceIsIndependent, true);
+  assert.equal(codObjective.forceBackground, "none");
+  assert.equal(codObjective.forceBorderRightWidth, "0px");
   assert.equal(codObjective.oldMarkCount, 0);
 
   const weaponPrompts = await page.evaluate(() => {
