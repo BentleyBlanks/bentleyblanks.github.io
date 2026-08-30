@@ -61,19 +61,20 @@ ER2 的出生菜单同理不抄，理由见 `Data_EasyRed2Parity.md` 那条「�
 进度存 `localStorage` 的 `tengxian_progress_v1`（`{ furthest, cleared }`），
 过一关写一次。有进度时第一项变成「继续 · 某关」。
 
-### 「测试场景」组：只保留两条核心玩法沙盒
+### 「测试场景」组：核心玩法沙盒与在验关卡白盒
 
-正式章节七章之后隔一条分隔线，是「测试场景」组。玩家可见列表固定为两条：
+正式章节七章之后隔一条分隔线，是「测试场景」组。玩家可见列表目前是三条：
 
 | 条目 | 标号 | 切片 | query |
 | --- | --- | --- | --- |
 | 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
 | 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
+| 第一关 · 大平原白盒 | 白 | `Data_FirstLevelWhitebox.FIRST_LEVEL_WHITEBOX_PHASE` | `?whitebox=1` |
 
 界河白盒与过场预览不再列入选章，避免测试入口越积越多。它们的内部直达 query 仍保留：
 `?jiehe=1` 服务地形回归与人工验收，`?preview=CS_Chuchuan` 服务序章预览。
 
-两条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
+三条都**不进 `phases`**：菜单另有一份 `entries = [...phases, ...sandboxes]`
 专给列表与键盘上下用，而进度、「继续」、「下一关」标记与 `DefaultLevel()` 一律只按七章数。
 沙盒简报直接读各自的 phase（工位/路标、机制、携行），但**不画那张全图** ——
 `MAP` 那个框写死在滕县城上，靶场在 (1400, 1400)，画出来是空图。

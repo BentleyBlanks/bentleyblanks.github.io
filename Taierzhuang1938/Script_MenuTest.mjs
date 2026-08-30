@@ -248,16 +248,17 @@ for (let i = 0; i < 3; i += 1) {
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
   }));
-  // 规格：正式章节（七章）与测试场景（玩法靶场 / 白刃 QTE）分两组。
+  // 规格：正式章节（七章）与测试场景（玩法靶场 / 白刃 QTE / 大平原白盒）分两组。
   // 界河白盒与过场预览保留直达 query，但不出现在玩家可见的选章列表里。
   Check("选章分成「正式章节」与「测试场景」两组",
     panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
     panel.groups.join(" / "));
-  Check("测试场景只保留玩法靶场与白刃 QTE",
-    panel.levels === 9 && panel.previews === 0 && !panel.prologue
-      && panel.sandboxes.length === 2
+  Check("测试场景包含玩法靶场、白刃 QTE 与大平原白盒",
+    panel.levels === 10 && panel.previews === 0 && !panel.prologue
+      && panel.sandboxes.length === 3
       && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
       && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场"))
+      && panel.sandboxes.some((entry) => entry.includes("第一关 · 大平原白盒"))
       && panel.sandboxes.every((entry) => !entry.includes("界河")),
     `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
@@ -706,11 +707,12 @@ for (let i = 0; i < 3; i += 1) {
   Check("靶场条目排在七章之后，标「沙盒」",
     brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七章 0..6，沙盒是第 7 条
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章只列出玩法靶场与白刃 QTE 测试场",
-    brief.sandboxes.length === 2
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃"
+  Check("选章列出玩法靶场、白刃 QTE 与第一关大平原白盒",
+    brief.sandboxes.length === 3
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃,白"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[1].name.includes("白刃战 QTE")
+      && brief.sandboxes[2].name.includes("第一关 · 大平原白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
   Check("靶场简报有标题、工位清单与进入按钮，且**不画**那张滕县全图",

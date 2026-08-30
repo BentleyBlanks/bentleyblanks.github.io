@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { CHAPTER as CH1 } from "./Data_MissionCh1.mjs";
+import { FIRST_LEVEL_WHITEBOX_PHASE } from "./Data_FirstLevelWhitebox.mjs";
 import {
   NearestPlayableCorridorPoint,
   EvaluatePlayableBoundary,
@@ -7,8 +8,12 @@ import {
   SelectWhiteboxAnnotations,
 } from "./Script_WhiteboxGuide.mjs";
 
-const whitebox = CH1.tuning.whitebox;
-assert.ok(whitebox, "第一关必须声明白盒引导配置");
+const whitebox = FIRST_LEVEL_WHITEBOX_PHASE.whitebox;
+assert.equal(CH1.tuning.whitebox, undefined, "正式第一关不得挂载实验白盒配置");
+assert.ok(FIRST_LEVEL_WHITEBOX_PHASE.sandbox, "大平原白盒必须是独立测试章节");
+assert.equal(FIRST_LEVEL_WHITEBOX_PHASE.sandboxKey, "firstLevelWhitebox",
+  "测试章节必须有稳定的选章入口 key");
+assert.ok(whitebox, "测试章节必须声明白盒引导配置");
 assert.ok(whitebox.boundary.points.length >= CH1.zones.length,
   "可玩走廊至少覆盖每一个目标阶段");
 assert.equal(whitebox.annotations.length, CH1.zones.length,
@@ -20,7 +25,7 @@ for (const zone of CH1.zones) {
     `${zone.id} 必须落在可玩走廊内`);
 }
 
-const spawn = CH1.tuning.spawn;
+const spawn = FIRST_LEVEL_WHITEBOX_PHASE.spawn;
 const inside = EvaluatePlayableBoundary(spawn.x, spawn.z, whitebox.boundary);
 assert.equal(inside.hard, false, "出生点不能撞空气墙");
 
@@ -43,4 +48,4 @@ assert.ok(firstContact.fullWaveAtS < 60, "第一轮完整交火必须在一分�
 assert.ok(Math.hypot(firstContact.scout.x - spawn.x, firstContact.scout.z - spawn.z) <= 65,
   "首名侦察兵必须在出生点附近可辨认距离内");
 
-console.log("WhiteboxGuideTest PASS：首关动线、空气墙、说明点与首敌节拍均有效");
+console.log("WhiteboxGuideTest PASS：正式第一关已隔离，测试章动线、空气墙、说明点与首敌节拍均有效");

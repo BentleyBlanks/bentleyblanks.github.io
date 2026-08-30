@@ -20,7 +20,9 @@ function Check(name, ok, detail) {
 
 try {
   const port = server.address().port;
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small&menu=0`,
+  // 通行专项继续使用那片经过验收的压缩平原，但它现在是独立测试章，
+  // 不再借正式 CH1_NanLu 的 phase=1 入口。
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&quality=low&scale=small&menu=0`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
@@ -251,7 +253,7 @@ try {
     }
 
     // 3) 分档：真的翻/爬起来之后，动作档位必须与高度对得上，而且 rise 不许越过硬顶
-    // 这一节会把玩家摆到全切片几十堵墙前逐堵量高度；首关正片的窄走廊空气墙会把
+    // 这一节会把玩家摆到全切片几十堵墙前逐堵量高度；测试章的窄走廊空气墙会把
     // 测试机位裁回路线中心，量到的就不再是那堵墙。边界已有自己的真浏览器专项，
     // 只在这一小段暂时断开章节回调，结束后原样接回。
     delete T.player.world.ConstrainPosition;

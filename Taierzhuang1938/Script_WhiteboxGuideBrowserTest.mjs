@@ -1,4 +1,4 @@
-// 首关白盒真浏览器验收：数据正确之外，还要证明 HUD、首敌节拍与空气墙真的接上线。
+// 独立测试章真浏览器验收：证明 ?whitebox=1、HUD、首敌节拍与空气墙真的接上线。
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,7 @@ function Check(condition, message, detail = "") {
 }
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   const initial = await page.evaluate(() => {
@@ -39,6 +39,7 @@ try {
     };
   });
   Check(initial.state.annotations === 7, "七个阶段说明已装载");
+  Check(initial.state.phase === "FirstLevelWhitebox", "直达参数进入独立测试章节", initial.state.phase);
   Check(initial.state.enemyCount === 0, "取得控制时没有日军提前开火");
   Check(initial.state.hud.annotations.length >= 1, "出生镜头能读到场景说明");
   Check(initial.visibleMarkers === 1, "屏幕只显示当前任务路标");

@@ -30,6 +30,7 @@ import {
 import {
   MELEE_QTE_PHASE, MELEE_QTE_LEVEL_ID, MELEE_QTE_TARGETS, MELEE_QTE_STATIONS,
 } from "./Data_MeleeQte.mjs";
+import { FIRST_LEVEL_WHITEBOX_PHASE } from "./Data_FirstLevelWhitebox.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
 import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
@@ -147,6 +148,8 @@ const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
  */
 const RANGE = params.get("range") === "1";
 const MELEE_TEST = params.get("melee") === "1";
+/** 第一关大平原空间白盒（?whitebox=1）：测试章节，不占用正式 CH1_NanLu。 */
+const FIRST_LEVEL_WHITEBOX = params.get("whitebox") === "1";
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
  * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
@@ -175,13 +178,14 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = RANGE || MELEE_TEST || JIEHE;
+const SANDBOX = RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || JIEHE;
 const PHASE_TABLE = RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
-    : JIEHE ? [JIEHE_SANDBOX_PHASE]
-      : OVERVIEW ? [OVERVIEW_PHASE]
-        : FULL_SCENE ? [FULL_SCENE_PHASE]
-          : PHASES;
+    : FIRST_LEVEL_WHITEBOX ? [FIRST_LEVEL_WHITEBOX_PHASE]
+      : JIEHE ? [JIEHE_SANDBOX_PHASE]
+        : OVERVIEW ? [OVERVIEW_PHASE]
+          : FULL_SCENE ? [FULL_SCENE_PHASE]
+            : PHASES;
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
@@ -2409,10 +2413,11 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      // 玩家可见的测试场景只保留两条核心玩法入口。界河与过场仍可通过
+      // 玩家可见的测试场景只保留三条核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE],
-      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee" : JIEHE ? "jiehe" : false,
+      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE],
+      sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee"
+        : FIRST_LEVEL_WHITEBOX ? "firstLevelWhitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
       // 这些独立切片都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
@@ -2508,9 +2513,11 @@ function GoToSandbox(key) {
   const url = new URL(window.location.href);
   url.searchParams.delete("range");
   url.searchParams.delete("melee");
+  url.searchParams.delete("whitebox");
   url.searchParams.delete("jiehe");
   if (key === "range") url.searchParams.set("range", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
+  else if (key === "firstLevelWhitebox") url.searchParams.set("whitebox", "1");
   else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
@@ -2908,7 +2915,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && companion) {
+  if (!RANGE && !MELEE_TEST && !FIRST_LEVEL_WHITEBOX && !PREVIEW && !cutsceneOnly && companion) {
     companion.BeginLevel(phase.id, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -2922,12 +2929,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆 —— 那几条路上没有章节内容。
-  if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
+  if (!RANGE && !MELEE_TEST && !FIRST_LEVEL_WHITEBOX && !PREVIEW && !cutsceneOnly && setpieces) {
     setpieces.BeginLevel(phase.id, phase);
   }
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
+  else if (FIRST_LEVEL_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
   // 进关先打一个检查点：第一拍就被击倒时也有地方可退。

@@ -421,13 +421,74 @@ const OUTFIELD_SCENES = {
   },
 
   // =========================================================================
-  // 一 · 往南的路（CH1_NanLu）：津浦路路基 + 路西村庄 + 南向大车路
-  // 白盒口径：这里不是按公里摊开的开放平原，而是把「铁路路基—路西村口—涵洞—
-  // 南向大车路—路沟」压缩进约 380×440 m 的窄走廊。远景仍看得到平原，近景则
-  // 每 40—70 m 必有一道可命名、可利用、能说明下一步去向的地标。
+  // 一 · 往南的路（CH1_NanLu）：正式章节保留原本按公里展开的北沙河与津浦路场景。
   // =========================================================================
   CH1_NanLu: {
-    id: "NanLuWhitebox",
+    id: "Beishahe",
+    region: { minX: -1820, maxX: -358, minZ: -780, maxZ: 620 },
+    foci: [[-1450, -430], [-1450, -380], [-1450, -160], [-1450, 40], [-700, 30], [-352, 0]],
+    fieldRadius: 700,
+    // 北沙河：借位到切片北端。只铺到 x=-820 为止，避免压到城北切片。
+    river: {
+      centerZ: -482, bedHalf: 18, waterHalf: 5.0, meander: 7,
+      fromX: -1820, toX: -820,
+      north: { offset: -25, height: 1.5, baseHalf: 2.7, topHalf: 1.0,
+        gaps: [[-1660, -1622], [-1400, -1362], [-1140, -1104], [-940, -902]] },
+      south: { offset: 24, height: 2.05, baseHalf: 3.3, topHalf: 1.25,
+        gaps: [[-1710, -1676], [-1330, -1294], [-1020, -984]] },
+    },
+    banks: [],
+    parapets: [
+      { z: -412, fromX: -1560, toX: -1330, seed: "L1line0" },
+      { z: -388, fromX: -1580, toX: -1250, seed: "L1line" },
+      { z: -368, fromX: -1560, toX: -1290, seed: "L1line2" },
+      { z: -172, fromX: -1500, toX: -1380, seed: "L1road" },
+    ],
+    pits: [
+      { z: -424, fromX: -1540, toX: -1360, count: 7, seed: "L1pit0" },
+      { z: -400, fromX: -1570, toX: -1260, count: 10, seed: "L1pitA" },
+      { z: -350, fromX: -1540, toX: -1300, count: 6, seed: "L1pitB" },
+    ],
+    craters: [
+      { z: -395, fromX: -1560, toX: -1270, spread: 44, count: 10, seed: "L1crA" },
+      { z: -150, fromX: -1500, toX: -1360, spread: 40, count: 6, seed: "L1crB" },
+    ],
+    railway: { x: WEST_SUBURB.railway.x, fromZ: -780, toZ: 620,
+      crossings: [-165, 118], bridgeAtZ: -486, poles: true, platformAtZ: 40 },
+    roads: [{
+      width: 5.6,
+      points: [[-1500, -168], [-1444, -120], [-1440, 40], [-1330, 44], [-1080, 36],
+        [-700, 26], [-560, 16]],
+    }, {
+      width: 4.8,
+      points: [[-472, -206], [-466, -150], [-470, -88], [-458, -30], [-436, 30],
+        [-442, 90], [-448, 130], [-452, 182]],
+    }],
+    villages: [
+      { id: "BeishaheVillage", x: -1276, z: -604, w: 132, d: 78, count: 9, far: true },
+      { id: "RoadInn", x: -1386, z: -196, w: 58, d: 40, count: 4 },
+      { id: "Wulitun", x: -886, z: -104, w: 152, d: 106, count: 11 },
+      { id: "SouthHamlet", x: -1040, z: 330, w: 118, d: 70, count: 8, far: true },
+    ],
+    treeRows: [
+      { from: [-1560, -300], to: [-620, -286], pitch: 18 },
+      { from: [-1560, -216], to: [-900, -206], pitch: 20 },
+      { from: [-1320, -470], to: [-1312, 120], pitch: 17 },
+      { from: [-980, -260], to: [-970, 300], pitch: 19 },
+      { from: [-1540, -60], to: [-760, -50], pitch: 21 },
+    ],
+    graves: { clusters: 16, seed: "L1grave" },
+    trees: { count: 88, seed: "L1tree" },
+    wheat: { cellW: 38, cellD: 78, wheatShare: 0.40, seed: "L1wheat" },
+  },
+
+  // =========================================================================
+  // 第一关 · 大平原白盒（FirstLevelWhitebox）：只供选章「测试场景」入口。
+  // 把「铁路路基—路西村口—涵洞—南向大车路—路沟」压缩进约 380×440 m
+  // 的窄走廊；每 40—70 m 必有一道可命名、可利用、能说明下一步去向的地标。
+  // =========================================================================
+  FirstLevelWhitebox: {
+    id: "FirstLevelWhitebox",
     region: { minX: -620, maxX: -230, minZ: -250, maxZ: 210 },
     foci: [[-480, -205], [-466, -150], [-470, -88], [-458, -30], [-436, 30],
       [-448, 130], [-500, 96], [-330, 0]],

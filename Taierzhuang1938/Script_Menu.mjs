@@ -34,6 +34,7 @@ const NS = "http://www.w3.org/2000/svg";
 const SANDBOX_NAMES = {
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
+  firstLevelWhitebox: { where: "第一关大平原白盒", exit: "退出第一关白盒" },
   jiehe: { where: "界河白盒", exit: "退出界河白盒" },
 };
 
@@ -302,8 +303,8 @@ export class MainMenu {
    *   root         DOM 容器（#menu）
    *   camera       THREE.PerspectiveCamera —— 只在 title 态被接管，暂停态不碰
    *   phases       Data_Battle.PHASES
-   *   sandboxes    可选：选章末尾的沙盒条目数组（靶场 / 白刃 QTE 测试章）
-   *   sandboxMode  false | "range" | "melee"
+   *   sandboxes    可选：选章末尾的沙盒条目数组（靶场 / 白刃 QTE / 关卡白盒）
+   *   sandboxMode  false | "range" | "melee" | "firstLevelWhitebox"
    *   Play(i, o)   进某一关（装配层负责建切片、播过场、进游戏）
    *   PlaySandbox() / ExitSandbox()  进／出靶场（都要重载页面，见 Play()）
    *   Resume()     暂停态的「继续」
@@ -319,7 +320,7 @@ export class MainMenu {
     this.camera = host.camera;
     this.phases = host.phases || [];
     /**
-     * 选章末尾那一条**沙盒条目**（玩法测试靶场，`Data_Range.RANGE_PHASE`）。
+     * 选章末尾的**沙盒条目**（玩法靶场、白刃 QTE 与第一关空间白盒）。
      * 它与七关并排摆在同一张列表上，但**不进 `this.phases`** —— 进度、「继续」、
      * 「下一关」标记与 `DefaultLevel()` 一概只按正片七关数，与 Script_Main
      * 那边「靶场不进 PHASES」的口径是同一条（见 docs/Data_TestRange.md）。
@@ -327,7 +328,7 @@ export class MainMenu {
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
     /**
-     * 列表上真正排出来的条目 = 七章 + 两条玩法沙盒。键盘上下也按它走。
+     * 列表上真正排出来的条目 = 七章 + 三条测试沙盒。键盘上下也按它走。
      * **顺序就是分组顺序**：正式章节在前，测试场景在后（docs/Data_MissionRemake.md §9）。
      */
     this.entries = [...this.phases, ...this.sandboxes];
@@ -484,7 +485,7 @@ export class MainMenu {
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
-   *   测试场景 —— 只列玩法测试靶场与白刃 QTE 测试场。
+   *   测试场景 —— 列玩法测试靶场、白刃 QTE 与第一关大平原白盒。
    * 混在一张平铺列表里的后果不是难看：玩家分不清「哪些是正片」，
    * 而旧过场已经从正片流程脱钩了，摆在章节中间等于谎报流程。
    */

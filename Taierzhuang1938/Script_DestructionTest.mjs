@@ -190,11 +190,16 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
 // 4. 第一关石墙村的新村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。
 {
+  // 压缩村屋已经迁入独立测试章；先整页进入它，不能再把 phase=1 当作白盒别名。
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&quality=low&scale=small`,
+    { waitUntil: "load", timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.destruction, null, { timeout: 240000 });
+  await page.evaluate(() => {
+    window.Taierzhuang.destruction.SetPreviewMode(true);
+    window.Taierzhuang.StepFrames(30);
+  });
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
-    // phase 0 是只播序章的承载章；真正可玩的“一 · 往南的路”是 phase 1。
-    await T.JumpToPhase(1);
-    T.StepFrames(40);
     // 第一关白盒会移动村落来压缩动线；破坏契约应跟着语义 tag，而不是绑死旧地图坐标。
     const nearVillage = T.battlefield.colliders.filter((box) =>
       String(box.tag || "").startsWith("village"));
@@ -283,10 +288,16 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
 // 5. 换到北沙河：站台/木桥是楼板语义，向下打一只洞后竖直射线要穿过。
 {
+  // 正式北沙河场景仍是正片 phase=1；白盒测试结束后明确整页切回去。
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
+    { waitUntil: "load", timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.destruction, null, { timeout: 240000 });
+  await page.evaluate(() => {
+    window.Taierzhuang.destruction.SetPreviewMode(true);
+    window.Taierzhuang.StepFrames(30);
+  });
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
-    await T.JumpToPhase(1);
-    T.StepFrames(30);
     const reset = T.Debug.Destruction();
     const box = T.battlefield.colliders.find((candidate) =>
       (candidate.tag === "platform" || candidate.tag === "bridge")
