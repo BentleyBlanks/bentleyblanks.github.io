@@ -82,13 +82,41 @@ export const Progress = {
 // 选章里的那张图
 // ---------------------------------------------------------------------------
 /**
- * 战场全图的投影。**范围写死**：西到津浦路（x=-1500）、北到界河（z=-1420）、
- * 东到荆河（x=680）、南到南关（z=420）—— 七关的切片全部落在这个框里。
- * 城（610 见方）在图上约占八十像素，一眼能认出是座方城。
+ * 滕县战区图投影。**范围写死**到七章真正经过的城与关厢：西含津浦路、东含荆河，
+ * 北含东关寺院地、南含南向大车路。界河北侧没有正片任务，交给全城俯瞰入口展示。
  */
-const MAP = { minX: -1580, maxX: 740, minZ: -1680, maxZ: 500, w: 330, h: 310, pad: 8 };
+// COD WWII 的选关地图不是一张百科全图，而是只保留当前战役会经过的战区。
+// 七章实际都发生在滕县城与四关厢，缩掉界河北侧的大块空白后，任务节点和推进线
+// 才能在第一眼读出来。地理坐标仍然全部来自 Data_Tengxian / phase.zones。
+const MAP = { minX: -760, maxX: 760, minZ: -620, maxZ: 480, w: 840, h: 420, pad: 24 };
 const Px = (x) => MAP.pad + ((x - MAP.minX) / (MAP.maxX - MAP.minX)) * (MAP.w - MAP.pad * 2);
 const Pz = (z) => MAP.pad + ((z - MAP.minZ) / (MAP.maxZ - MAP.minZ)) * (MAP.h - MAP.pad * 2);
+
+// 只决定 UI 上把每章的战区节点钉在哪一个**真实路标**上，不造第二份坐标。
+// 选择相互错开的路标是排版裁决：否则序章/第一关与二/三/四关会叠在同一点。
+const CAMPAIGN_ANCHOR_ZONE = [1, 4, 4, 0, 3, 1, 5];
+
+function CampaignAnchor(phase, index) {
+  const zones = phase?.zones || [];
+  const zone = zones[Clamp(CAMPAIGN_ANCHOR_ZONE[index] ?? 0, 0, Math.max(0, zones.length - 1))];
+  if (zone) return { x: zone.x, z: zone.z };
+  const bounds = phase?.bounds || { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  return { x: (bounds.minX + bounds.maxX) * 0.5, z: (bounds.minZ + bounds.maxZ) * 0.5 };
+}
+
+function MissionName(label = "") {
+  const parts = label.split("·");
+  return (parts.length > 1 ? parts.slice(1).join("·") : label).trim();
+}
+
+function TimelineDate(phase) {
+  if (phase?.sandbox) return "TEST";
+  const days = {
+    十四: "14", 十五: "15", 十六: "16", 十七: "17", 十八: "18",
+  };
+  const match = String(phase?.date || "").match(/三月(十四|十五|十六|十七|十八)日/);
+  return match ? `03.${days[match[1]]}` : "03月";
+}
 
 // 菜单只声明文案与布局；开关值及实际效果由装配层交回的 host 管，避免菜单
 // 偷偷持有玩家、物理世界或弹药账本。
@@ -111,14 +139,24 @@ function SvgEl(tag, attrs, parent) {
  * 画一张战场全图，并把选中那一关的切片框出来。
  * 底图全部从 Data_Tengxian 现算 —— 没有第二份坐标，城改了图跟着改。
  */
-function BuildMap(phase) {
+function BuildMap(phase, phases = [], selected = 0, progress = { cleared: [], furthest: 0 }, onSelect = null) {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("class", "mnMap");
   svg.setAttribute("viewBox", `0 0 ${MAP.w} ${MAP.h}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "滕县战区任务地图；可选择七章任务节点");
 
   const g = SvgEl("g", {}, svg);
   const wall = CITY.wallCenter;
+
+  // 作战图方格只是一层纸面坐标，不代表新的世界坐标。
+  for (let x = 80; x < MAP.w; x += 80) {
+    SvgEl("line", { class: "mnMapGrid", x1: x, y1: 0, x2: x, y2: MAP.h }, g);
+  }
+  for (let y = 60; y < MAP.h; y += 60) {
+    SvgEl("line", { class: "mnMapGrid", x1: 0, y1: y, x2: MAP.w, y2: y }, g);
+  }
 
   // --- 城外：荆河、津浦路、界河与北沙河 -----------------------------------
   const river = OUTSKIRTS.river;
@@ -132,11 +170,6 @@ function BuildMap(phase) {
     x1: Px(WEST_SUBURB.railway.x), y1: Pz(MAP.minZ),
     x2: Px(WEST_SUBURB.railway.x), y2: Pz(MAP.maxZ),
   }, g);
-  // 界河与北沙河：本作只取南岸那一小片，图上画成两条东西向的水线
-  for (const [z, name] of [[-1420, "界河"], [-1000, "北沙河"]]) {
-    SvgEl("line", { class: "mnMapWater", x1: Px(-420), y1: Pz(z), x2: Px(420), y2: Pz(z) }, g);
-    SvgEl("text", { class: "mnMapLabel", x: Px(440), y: Pz(z) + 3 }, g).textContent = name;
-  }
 
   // --- 城 -----------------------------------------------------------------
   SvgEl("rect", {
@@ -221,6 +254,40 @@ function BuildMap(phase) {
       }, g).textContent = last.name;
     }
   }
+
+  // --- 七章战役推进线 + 空间节点 -----------------------------------------
+  // 节点的坐标来自各章真实 zone；横向日期顺序由下面那条时间轴负责，这里只讲空间。
+  const anchors = phases.map(CampaignAnchor);
+  if (anchors.length) {
+    const path = anchors.map((point, i) => `${i ? "L" : "M"} ${Px(point.x)} ${Pz(point.z)}`).join(" ");
+    SvgEl("path", { class: "mnCampaignRouteShadow", d: path }, g);
+    SvgEl("path", { class: "mnCampaignRoute", d: path }, g);
+  }
+  phases.forEach((entry, i) => {
+    const anchor = anchors[i];
+    if (!anchor) return;
+    const done = progress.cleared.includes(entry.id);
+    const next = i === progress.furthest;
+    const node = SvgEl("g", {
+      class: `mnCampaignNode${i === selected ? " on" : ""}${done ? " done" : ""}${next ? " next" : ""}`,
+      transform: `translate(${Px(anchor.x)} ${Pz(anchor.z)})`,
+      role: "button", tabindex: "0", "aria-label": `${entry.label}，${entry.date}`,
+    }, g);
+    SvgEl("line", { class: "mnCampaignBeam", x1: 0, y1: -58, x2: 0, y2: -7 }, node);
+    SvgEl("circle", { class: "mnCampaignNodeRing", cx: 0, cy: 0, r: 9 }, node);
+    SvgEl("circle", { class: "mnCampaignNodeCore", cx: 0, cy: 0, r: 3.4 }, node);
+    SvgEl("text", { class: "mnCampaignNodeNo", x: 0, y: -16, "text-anchor": "middle" }, node)
+      .textContent = String(i).padStart(2, "0");
+    SvgEl("text", { class: "mnCampaignNodeLabel", x: 0, y: 23, "text-anchor": "middle" }, node)
+      .textContent = MissionName(entry.label);
+    node.addEventListener("mouseenter", () => onSelect?.(i));
+    node.addEventListener("click", () => onSelect?.(i));
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      onSelect?.(i);
+      event.preventDefault();
+    });
+  });
 
   SvgEl("text", { class: "mnMapNorth", x: MAP.w - 16, y: 16 }, g).textContent = "北 ↑";
   return svg;
@@ -413,7 +480,7 @@ export class MainMenu {
   }
 
   /**
-   * 选章面板：左边两组条目，右边简报 + 全图。
+   * 选章面板：战区图 + 日期时间轴 + 任务简报。
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— 七章按序，带「已通过 / 下一关」标记，进度只按这七条算；
@@ -424,12 +491,26 @@ export class MainMenu {
   BuildLevels() {
     const wrap = document.createElement("div");
     wrap.className = "mnLevels";
+    this.el.campaignMain = document.createElement("div");
+    this.el.campaignMain.className = "mnCampaignMain";
+    this.el.mapShell = document.createElement("section");
+    this.el.mapShell.className = "mnMapShell";
+    const mapHead = document.createElement("div");
+    mapHead.className = "mnMapHead";
+    mapHead.innerHTML = "<span>第五战区 · 滕县战场</span><b>1938.03.14—03.17</b>";
+    this.el.mapCanvas = document.createElement("div");
+    this.el.mapCanvas.className = "mnMapCanvas";
+    const legend = document.createElement("div");
+    legend.className = "mnMapLegend";
+    legend.innerHTML = "<span><i class=\"selected\"></i>当前任务</span>"
+      + "<span><i class=\"done\"></i>已通过</span><span><i></i>可选择</span>";
+    this.el.mapShell.append(mapHead, this.el.mapCanvas, legend);
     this.el.levelList = document.createElement("div");
     this.el.levelList.className = "mnLevelList";
     this.el.brief = document.createElement("div");
     this.el.brief.className = "mnBrief";
-    wrap.appendChild(this.el.levelList);
-    wrap.appendChild(this.el.brief);
+    this.el.campaignMain.append(this.el.mapShell, this.el.brief);
+    wrap.append(this.el.campaignMain, this.el.levelList);
     this.el.levelsWrap = wrap;
 
     const Group = (text, note) => {
@@ -441,10 +522,14 @@ export class MainMenu {
       sub.textContent = note;
       head.append(title, sub);
       this.el.levelList.appendChild(head);
+      const track = document.createElement("div");
+      track.className = text === "正式章节" ? "mnTimelineTrack" : "mnSandboxTrack";
+      this.el.levelList.appendChild(track);
+      return track;
     };
 
     this.levelEls = [];
-    const Row = (entry, i) => {
+    const Row = (entry, i, track) => {
       const b = document.createElement("button");
       b.className = "mnLevel";
       if (entry.sandbox) b.classList.add("mnSandboxLevel");
@@ -460,23 +545,24 @@ export class MainMenu {
         b.appendChild(s);
         return s;
       };
-      mkSpan("mnLvNo", no.trim());
+      mkSpan("mnLvNo", entry.sandbox ? no.trim() : String(i).padStart(2, "0"));
       mkSpan("mnLvName", (rest.join("·") || entry.label).trim());
-      // 副行给日期；沙盒没有史实日期（date 是「测试靶场」，跟名字重了），给 place
-      mkSpan("mnLvDate", entry.sandbox ? entry.place : entry.date);
+      // COD WWII 的日期轴要先读日期，再读任务名；完整时刻仍在右侧简报。
+      mkSpan("mnLvDate", entry.sandbox ? entry.place : TimelineDate(entry));
       mkSpan("mnLvMark", "");
       b.addEventListener("mouseenter", () => this.SelectLevel(i));
-      b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
-      this.el.levelList.appendChild(b);
+      b.addEventListener("click", () => this.SelectLevel(i));
+      b.addEventListener("dblclick", () => this.Play(i));
+      track.appendChild(b);
       this.levelEls[i] = b;
     };
 
-    Group("正式章节", "序章到终章，按顺序打");
-    this.phases.forEach((phase, i) => Row(phase, i));
+    const officialTrack = Group("正式章节", "战区地图对应空间，日期轴对应推进顺序");
+    this.phases.forEach((phase, i) => Row(phase, i, officialTrack));
     if (this.sandboxes.length) {
-      Group("测试场景", "不计进度，不影响正片");
+      const sandboxTrack = Group("测试场景", "独立入口 · 不计进度，不影响正片");
       const offset = this.phases.length;
-      this.sandboxes.forEach((entry, i) => Row(entry, offset + i));
+      this.sandboxes.forEach((entry, i) => Row(entry, offset + i, sandboxTrack));
     }
   }
 
@@ -531,7 +617,7 @@ export class MainMenu {
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     if (mode === "levels") {
-      this.el.panelTitle.textContent = MENU.chapters;
+      this.el.panelTitle.textContent = "滕县战区 · 任务选择";
       this.el.panelBody.textContent = "";
       this.el.panelBody.appendChild(this.el.levelsWrap);
       this.SelectLevel(this.DefaultLevel());
@@ -633,6 +719,19 @@ export class MainMenu {
     });
 
     const phase = this.entries[this.selected];
+    this.el.mapCanvas.textContent = "";
+    if (!phase.sandbox) {
+      this.el.mapCanvas.appendChild(BuildMap(
+        phase, this.phases, this.selected, progress, (index) => this.SelectLevel(index),
+      ));
+      this.el.mapShell.classList.remove("sandbox");
+    } else {
+      const unavailable = document.createElement("div");
+      unavailable.className = "mnMapUnavailable";
+      unavailable.innerHTML = "<b>训练区不属于滕县战役时间线</b><span>请选择下方测试场景，进入后不会改写战役进度。</span>";
+      this.el.mapCanvas.appendChild(unavailable);
+      this.el.mapShell.classList.add("sandbox");
+    }
     const brief = this.el.brief;
     brief.textContent = "";
     const mk = (cls, tag = "div") => {
@@ -641,6 +740,8 @@ export class MainMenu {
       brief.appendChild(e);
       return e;
     };
+    mk("mnBriefEyebrow").textContent = phase.sandbox
+      ? "TRAINING GROUND" : `MISSION ${String(this.selected).padStart(2, "0")} · TENGXIAN THEATER`;
     mk("mnBriefTitle").textContent = phase.label;
     mk("mnBriefPlace").textContent = phase.place;
     if (!phase.sandbox) mk("mnBriefDate").textContent = phase.date;   // 沙盒没有史实日期
@@ -656,9 +757,6 @@ export class MainMenu {
       s.textContent = text;
       meta.appendChild(s);
     }
-    // 那张全图画的是滕县城（框写死在 MAP 里）；靶场在 (1400, 1400)，落在框外，
-    // 画出来是一张空图外加一个贴边的切片框 —— 沙盒条目干脆不给图。
-    if (!phase.sandbox) brief.appendChild(BuildMap(phase));
     const lines = mk("mnBriefLines");
     for (const line of phase.brief || []) {
       const p = document.createElement("p");

@@ -199,8 +199,13 @@ await page.click(".edPanel.launcher .edX");
     still.alive === 5 && still.pool === poolBefore,
     `alive=${still.alive} deaths=${still.deaths} pool=${still.pool}/${poolBefore}`);
 
-  // 定时切机位：一个机位停 16 秒，推 17 秒必须换一条
-  const first = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shot);
+  // 定时切机位：先把计时归零，再推过一个完整 hold。
+  // 不归零时，前面三秒 + 十秒 + 截图等待可能已接近切点；再推 17 秒会跨过**两个**
+  // 切点、回到原机位，测试把「切了两次」误报成「一次没切」。
+  const first = await page.evaluate(() => {
+    window.Taierzhuang.menu.shotTime = 0;
+    return window.Taierzhuang.Debug.Menu().shot;
+  });
   await page.evaluate(() => window.Taierzhuang.StepFrames(17 * 60));
   const second = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shot);
   Check("十六秒后自动切下一个机位", first !== second, `${first} -> ${second}`);
@@ -220,7 +225,7 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 // ===========================================================================
-// 3) 选章：两组（正式章节 / 测试场景）、简报、那张全图
+// 3) 选章：战区地图 + 日期时间轴、两组入口与任务简报
 // ===========================================================================
 {
   await page.evaluate(() => window.Taierzhuang.Debug.MenuShow("levels"));
@@ -233,6 +238,12 @@ for (let i = 0; i < 3; i += 1) {
     sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => entry.textContent || ""),
     map: !!document.querySelector("#menu .mnMap"),
     zones: document.querySelectorAll("#menu .mnMapZone").length,
+    route: !!document.querySelector("#menu .mnCampaignRoute"),
+    mapNodes: document.querySelectorAll("#menu .mnCampaignNode").length,
+    selectedMapNodes: document.querySelectorAll("#menu .mnCampaignNode.on").length,
+    timelineDates: [...document.querySelectorAll("#menu .mnTimelineTrack .mnLvDate")]
+      .map((entry) => entry.textContent || ""),
+    panelTitle: document.querySelector("#menu .mnPanelTitle")?.textContent || "",
     title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
     objectives: document.querySelectorAll("#menu .mnObjectives li").length,
     go: document.querySelector("#menu .mnGo")?.textContent || "",
@@ -251,6 +262,16 @@ for (let i = 0; i < 3; i += 1) {
     `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
     `map=${panel.map} zones=${panel.zones}`);
+  Check("选章以七节点战区地图呈现空间推进",
+    panel.route && panel.mapNodes === 7 && panel.selectedMapNodes === 1
+      && panel.panelTitle === "滕县战区 · 任务选择",
+    `route=${panel.route} nodes=${panel.mapNodes} selected=${panel.selectedMapNodes} title=${panel.panelTitle}`);
+  Check("正式章节以三月十四至十七日的横向时间轴呈现",
+    panel.timelineDates.length === 7
+      && panel.timelineDates[1] === "03.14"
+      && panel.timelineDates.includes("03.16")
+      && panel.timelineDates.at(-1) === "03.17",
+    panel.timelineDates.join(" / "));
   Check("简报有标题、目标清单与进入按钮",
     panel.title.length > 0 && panel.objectives >= 3 && panel.go.includes("进入"),
     `${panel.title} / 目标 ${panel.objectives} / ${panel.go}`);

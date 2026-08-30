@@ -114,71 +114,134 @@
 .mnBack:hover { background: rgba(230, 223, 205, 0.08); }
 .mnPanelBody { flex: 1 1 auto; min-height: 0; display: flex; }
 
-/* --- 选章 ---------------------------------------------------------------- */
-.mnLevels { display: flex; width: 100%; min-height: 0; }
+/* --- 选章：COD WWII「战区地图 + 日期时间轴」----------------------------- */
+.mnLevels {
+  --mn-red: #bd4d3e;
+  display: flex; flex-direction: column; width: 100%; min-height: 0;
+  background: linear-gradient(120deg, rgba(31, 31, 26, 0.30), rgba(8, 8, 7, 0.72));
+}
+.mnCampaignMain {
+  flex: 1 1 auto; min-height: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) 332px;
+  border-bottom: 1px solid rgba(230, 223, 205, 0.14);
+}
+.mnMapShell {
+  position: relative; min-width: 0; min-height: 0; overflow: hidden;
+  border-right: 1px solid rgba(230, 223, 205, 0.13);
+  background:
+    radial-gradient(circle at 44% 48%, rgba(146, 137, 107, 0.09), transparent 46%),
+    linear-gradient(138deg, rgba(35, 36, 30, 0.97), rgba(12, 13, 11, 0.98));
+}
+.mnMapShell::after {
+  content: ""; pointer-events: none; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 48%, rgba(4, 5, 4, 0.68) 100%);
+}
+.mnMapHead {
+  position: absolute; z-index: 3; left: 22px; top: 17px;
+  display: flex; flex-direction: column; gap: 4px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+}
+.mnMapHead span { font-size: 12px; letter-spacing: 0.24em; color: rgba(230, 223, 205, 0.78); }
+.mnMapHead b { font-size: 10.5px; letter-spacing: 0.18em; font-weight: 500; color: var(--mn-red); }
+.mnMapCanvas { position: absolute; inset: 0; display: grid; place-items: center; }
+.mnMapLegend {
+  position: absolute; z-index: 3; left: 22px; bottom: 14px; display: flex; gap: 18px;
+  font-size: 9px; letter-spacing: 0.10em; color: rgba(230, 223, 205, 0.38);
+}
+.mnMapLegend span { display: inline-flex; align-items: center; gap: 6px; }
+.mnMapLegend i { width: 6px; height: 6px; border: 1px solid rgba(230, 223, 205, 0.42); border-radius: 50%; }
+.mnMapLegend i.selected { border-color: var(--mn-red); background: var(--mn-red); }
+.mnMapLegend i.done { border-color: var(--ours, #9dc0e4); background: var(--ours, #9dc0e4); }
+.mnMapUnavailable {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px;
+  text-align: center; color: rgba(230, 223, 205, 0.48);
+}
+.mnMapUnavailable b { font-size: 16px; letter-spacing: 0.16em; font-weight: 500; color: rgba(230, 223, 205, 0.76); }
+.mnMapUnavailable span { max-width: 360px; font-size: 12px; line-height: 1.8; }
+
+/* 下沿就是日期轴。正式章节占一整条；测试入口另起一条，绝不接进战役线。 */
 .mnLevelList {
-  flex: 0 0 292px; overflow-y: auto; border-right: 1px solid rgba(230, 223, 205, 0.12);
-  padding: 8px 0;
+  flex: 0 0 auto; min-width: 0; padding: 8px 18px 13px;
+  background: rgba(7, 7, 6, 0.94); overflow-x: auto;
 }
+.mnLevelGroup {
+  display: flex; align-items: baseline; gap: 10px; min-width: 780px;
+  padding: 4px 2px 6px;
+}
+.mnLevelGroup:not(:first-child) { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(230, 223, 205, 0.09); }
+.mnLevelGroup b {
+  font-size: 10.5px; letter-spacing: 0.22em; font-weight: 500;
+  color: var(--mn-red); opacity: 0.92;
+}
+.mnLevelGroup small { font-size: 9.5px; letter-spacing: 0.06em; color: rgba(230, 223, 205, 0.32); }
+.mnTimelineTrack {
+  position: relative; min-width: 780px; display: grid; grid-template-columns: repeat(7, minmax(94px, 1fr));
+}
+.mnTimelineTrack::before {
+  content: ""; position: absolute; left: 4.5%; right: 4.5%; top: 27px; height: 1px;
+  background: linear-gradient(to right, rgba(230, 223, 205, 0.14), rgba(230, 223, 205, 0.42), rgba(230, 223, 205, 0.14));
+}
+.mnSandboxTrack { min-width: 780px; display: flex; gap: 8px; }
 .mnLevel {
-  pointer-events: auto; cursor: pointer;
-  display: grid; grid-template-columns: 34px 1fr auto; grid-row-gap: 2px;
-  width: 100%; text-align: left;
-  border: 0; border-left: 2px solid transparent; background: transparent;
-  color: rgba(230, 223, 205, 0.72); font: inherit;
-  padding: 11px 16px 11px 14px;
-  transition: background 0.14s linear, color 0.14s linear;
+  pointer-events: auto; cursor: pointer; position: relative; z-index: 1;
+  display: grid; min-width: 0; text-align: left; font: inherit;
+  border: 0; background: transparent; color: rgba(230, 223, 205, 0.62);
+  transition: background 0.14s linear, color 0.14s linear, transform 0.14s ease;
 }
-.mnLevel:hover { background: rgba(230, 223, 205, 0.05); }
-.mnLevel.on {
-  background: rgba(224, 176, 98, 0.10); border-left-color: var(--warn, #e0b062);
-  color: var(--paper, #e6dfcd);
+.mnTimelineTrack .mnLevel {
+  grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: 18px 28px 17px;
+  padding: 0 8px 4px;
+}
+.mnTimelineTrack .mnLevel::before {
+  content: ""; position: absolute; left: 17px; top: 23px; width: 7px; height: 7px;
+  box-sizing: border-box; border: 1px solid rgba(230, 223, 205, 0.54); border-radius: 50%;
+  background: #0a0a08; transition: transform 0.14s ease, border-color 0.14s linear, background 0.14s linear;
+}
+.mnLevel:hover { color: rgba(230, 223, 205, 0.90); }
+.mnTimelineTrack .mnLevel:hover { background: rgba(230, 223, 205, 0.035); }
+.mnTimelineTrack .mnLevel.on { color: var(--paper, #e6dfcd); background: linear-gradient(to top, rgba(189, 77, 62, 0.12), transparent 72%); }
+.mnTimelineTrack .mnLevel.on::before { transform: scale(1.55); border-color: var(--mn-red); background: var(--mn-red); box-shadow: 0 0 12px rgba(189, 77, 62, 0.58); }
+.mnLvDate {
+  grid-column: 1 / -1; grid-row: 1; font-size: 9.5px; letter-spacing: 0.13em;
+  color: rgba(230, 223, 205, 0.38); font-variant-numeric: tabular-nums;
 }
 .mnLvNo {
-  grid-row: 1 / span 2; align-self: center;
-  font-size: 19px; letter-spacing: 0.06em; color: var(--warn, #e0b062); opacity: 0.85;
+  grid-column: 1; grid-row: 2 / span 2; align-self: center;
+  font-size: 13px; letter-spacing: 0.06em; color: rgba(230, 223, 205, 0.44);
 }
-.mnLvName { font-size: 15.5px; letter-spacing: 0.10em; }
-.mnLvDate {
-  grid-column: 2 / span 2; font-size: 11px; letter-spacing: 0.04em;
-  color: rgba(230, 223, 205, 0.42);
+.mnLvName {
+  grid-column: 2; grid-row: 2; align-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 11.5px; letter-spacing: 0.08em;
 }
 .mnLvMark {
-  grid-column: 3; grid-row: 1; align-self: center;
-  font-size: 10.5px; letter-spacing: 0.12em; color: rgba(230, 223, 205, 0.38);
+  grid-column: 2; grid-row: 3; align-self: start;
+  font-size: 8.5px; letter-spacing: 0.10em; color: rgba(230, 223, 205, 0.32);
 }
 .mnLvMark.done { color: var(--ours, #9dc0e4); }
-/* 分组标题（正式章节 / 测试场景）。规格：docs/Data_MissionRemake.md §9 ——
-   旧过场与靶场已经从正片流程脱钩，摆在章节中间等于谎报流程，必须分组。 */
-.mnLevelGroup {
-  display: flex; align-items: baseline; gap: 10px;
-  padding: 14px 16px 6px 14px;
-  border-top: 1px solid rgba(230, 223, 205, 0.10);
-}
-.mnLevelGroup:first-child { border-top: 0; padding-top: 6px; }
-.mnLevelGroup b {
-  font-size: 12px; letter-spacing: 0.22em; font-weight: 500;
-  color: var(--warn, #e0b062); opacity: 0.9;
-}
-.mnLevelGroup small { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(230, 223, 205, 0.34); }
+.mnTimelineTrack .mnLevel:has(.mnLvMark.done)::before { border-color: var(--ours, #9dc0e4); background: var(--ours, #9dc0e4); }
 
-.mnProloguePreview .mnLvMark { color: var(--warn, #e0b062); }
-/* 测试场景组的条目（靶场、白刃 QTE、过场预览）：章号列压暗，
-   与正式章节那一列金色的「第 N 关」拉开 —— 它们不属于正片。 */
-.mnSandboxLevel .mnLvNo,
-.mnCutscenePreview .mnLvNo { color: rgba(230, 223, 205, 0.42); }
-.mnSandboxLevel .mnLvMark,
-.mnCutscenePreview .mnLvMark { color: var(--warn, #e0b062); }
+.mnSandboxLevel {
+  flex: 0 0 230px; grid-template-columns: 34px minmax(0, 1fr) auto; grid-template-rows: 22px 18px;
+  padding: 7px 10px; border: 1px solid rgba(230, 223, 205, 0.10);
+}
+.mnSandboxLevel:hover { background: rgba(230, 223, 205, 0.04); }
+.mnSandboxLevel.on { border-color: rgba(189, 77, 62, 0.62); background: rgba(189, 77, 62, 0.08); }
+.mnSandboxLevel .mnLvNo { grid-column: 1; grid-row: 1 / span 2; font-size: 16px; color: rgba(230, 223, 205, 0.42); }
+.mnSandboxLevel .mnLvName { grid-column: 2; grid-row: 1; align-self: center; font-size: 11px; }
+.mnSandboxLevel .mnLvDate { grid-column: 2; grid-row: 2; font-size: 9px; }
+.mnSandboxLevel .mnLvMark { grid-column: 3; grid-row: 1 / span 2; align-self: center; color: var(--mn-red); }
 
 .mnBrief {
-  flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 18px 24px 26px;
+  min-width: 0; overflow-y: auto; padding: 22px 24px 26px;
+  background: linear-gradient(160deg, rgba(20, 20, 17, 0.82), rgba(7, 7, 6, 0.94));
 }
-.mnBriefTitle { font-size: 24px; letter-spacing: 0.16em; }
+.mnBriefEyebrow { margin-bottom: 9px; font-size: 9.5px; letter-spacing: 0.18em; color: var(--mn-red); }
+.mnBriefTitle { font-size: 23px; letter-spacing: 0.14em; }
 .mnBriefPlace { margin-top: 8px; font-size: 12.5px; color: rgba(230, 223, 205, 0.62); }
 .mnBriefDate { margin-top: 3px; font-size: 12.5px; color: rgba(230, 223, 205, 0.42); }
 .mnBriefMeta {
   margin-top: 10px; display: flex; gap: 18px;
-  font-size: 11.5px; letter-spacing: 0.08em; color: var(--warn, #e0b062); opacity: 0.9;
+  flex-wrap: wrap; font-size: 10.5px; letter-spacing: 0.08em; color: var(--mn-red); opacity: 0.9;
 }
 .mnBriefHead {
   margin-top: 18px; font-size: 11.5px; letter-spacing: 0.20em;
@@ -214,10 +277,9 @@
 .mnGo:hover { background: rgba(224, 176, 98, 0.20); }
 
 /* --- 选章里的那张全图 ---------------------------------------------------- */
-.mnMap {
-  display: block; width: min(420px, 100%); height: auto; margin: 16px 0 4px;
-  background: rgba(20, 19, 16, 0.55); border: 1px solid rgba(230, 223, 205, 0.12);
-}
+/* --- 选章里的战区图 ------------------------------------------------------ */
+.mnMap { display: block; width: 100%; height: 100%; overflow: visible; }
+.mnMapGrid { stroke: rgba(230, 223, 205, 0.035); stroke-width: 0.7; }
 .mnMapWall { fill: rgba(230, 223, 205, 0.05); stroke: rgba(230, 223, 205, 0.55); stroke-width: 1.1; }
 .mnMapMoat { fill: none; stroke: rgba(157, 192, 228, 0.30); stroke-width: 0.7; }
 .mnMapStreet { stroke: rgba(230, 223, 205, 0.22); stroke-width: 0.6; }
@@ -228,13 +290,31 @@
 .mnMapDot { fill: rgba(230, 223, 205, 0.62); }
 .mnMapLabel { fill: rgba(230, 223, 205, 0.46); font-size: 6.4px; letter-spacing: 0.04em; }
 .mnMapSlice {
-  fill: rgba(224, 176, 98, 0.07); stroke: var(--warn, #e0b062);
+  fill: rgba(189, 77, 62, 0.07); stroke: var(--mn-red);
   stroke-width: 0.9; stroke-dasharray: 4 3;
 }
-.mnMapZone { fill: var(--warn, #e0b062); }
-.mnMapPath { stroke: var(--warn, #e0b062); stroke-width: 0.8; opacity: 0.7; }
-.mnMapZoneLabel { fill: var(--warn, #e0b062); font-size: 7px; letter-spacing: 0.06em; }
+.mnMapZone { fill: var(--mn-red); }
+.mnMapPath { stroke: var(--mn-red); stroke-width: 0.8; opacity: 0.68; }
+.mnMapZoneLabel { fill: #d98b79; font-size: 7px; letter-spacing: 0.06em; }
 .mnMapNorth { fill: rgba(230, 223, 205, 0.40); font-size: 7px; letter-spacing: 0.10em; }
+.mnCampaignRouteShadow { fill: none; stroke: rgba(2, 2, 2, 0.80); stroke-width: 5; }
+.mnCampaignRoute { fill: none; stroke: rgba(230, 223, 205, 0.38); stroke-width: 1.25; stroke-dasharray: 4 4; }
+.mnCampaignNode { cursor: pointer; outline: none; }
+.mnCampaignBeam { stroke: rgba(230, 223, 205, 0.11); stroke-width: 1; }
+.mnCampaignNodeRing { fill: rgba(10, 10, 8, 0.90); stroke: rgba(230, 223, 205, 0.62); stroke-width: 1.2; }
+.mnCampaignNodeCore { fill: rgba(230, 223, 205, 0.75); }
+.mnCampaignNodeNo { fill: rgba(230, 223, 205, 0.60); font-size: 8px; letter-spacing: 0.08em; }
+.mnCampaignNodeLabel {
+  fill: rgba(230, 223, 205, 0.66); font-size: 9px; letter-spacing: 0.07em;
+  paint-order: stroke; stroke: rgba(7, 7, 6, 0.92); stroke-width: 3px; stroke-linejoin: round;
+}
+.mnCampaignNode.done .mnCampaignNodeRing { stroke: var(--ours, #9dc0e4); }
+.mnCampaignNode.done .mnCampaignNodeCore { fill: var(--ours, #9dc0e4); }
+.mnCampaignNode.on .mnCampaignBeam { stroke: var(--mn-red); stroke-width: 1.8; filter: drop-shadow(0 0 5px rgba(189,77,62,0.75)); }
+.mnCampaignNode.on .mnCampaignNodeRing { stroke: var(--mn-red); stroke-width: 2; }
+.mnCampaignNode.on .mnCampaignNodeCore { fill: var(--mn-red); }
+.mnCampaignNode.on .mnCampaignNodeNo, .mnCampaignNode.on .mnCampaignNodeLabel { fill: #f0d9d2; }
+.mnCampaignNode:focus .mnCampaignNodeRing { stroke-width: 3; }
 
 /* --- 史实注记 / 关于 ----------------------------------------------------- */
 .mnText {
@@ -302,14 +382,24 @@
   .mnTitleLines { display: none; }
   .mnList { left: 6%; bottom: 12%; }
   .mnItem { font-size: 18px; }
-  .mnLevels { flex-direction: column; }
-  .mnLevelList {
-    flex: 0 0 auto; max-height: 34%; border-right: 0;
-    border-bottom: 1px solid rgba(230, 223, 205, 0.12);
-  }
+  .mnPanel { width: 96vw; height: 92vh; }
+  .mnCampaignMain { grid-template-columns: minmax(0, 1fr) 280px; }
+  .mnBrief { padding: 18px 20px 24px; }
+  .mnLevelList { flex: 0 0 auto; max-height: 190px; padding-inline: 12px; }
+  .mnMapHead { left: 14px; top: 13px; }
+  .mnMapLegend { left: 14px; bottom: 10px; gap: 10px; }
   .mnCodexRow { grid-template-columns: 1fr; gap: 2px; }
   .mnDebug { padding: 16px 18px 22px; }
   .mnDebugRow { align-items: flex-start; gap: 12px; padding-inline: 10px; }
   .mnDebugCopy b { font-size: 14px; }
   .mnDebugCopy small { font-size: 11px; }
+}
+
+@media (max-width: 640px) {
+  .mnCampaignMain { grid-template-columns: 1fr; overflow-y: auto; }
+  .mnMapShell {
+    min-height: 270px; border-right: 0;
+    border-bottom: 1px solid rgba(230, 223, 205, 0.13);
+  }
+  .mnBrief { overflow: visible; }
 }
