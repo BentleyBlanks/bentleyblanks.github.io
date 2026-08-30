@@ -188,6 +188,20 @@ Check("C6 的最后电报确认走 beat 级 cutscene",
   FindLevel("CH6_Zuihou").beats.some((b) => b.type === "cutscene" && b.id === "CS_Ch6_LastWire"));
 Check("C6 的西关殉国也留了一条 beat 入口（cutsceneFired 保证只播一次）",
   FindLevel("CH6_Zuihou").beats.some((b) => b.type === "cutscene" && b.id === "CS_Ch6_Xiguan"));
+{
+  const ch6 = FindLevel("CH6_Zuihou");
+  const objectives = ch6.beats.filter((b) => b.type === "objective").map((b) => b.text);
+  const required = ["进入临时师部", "向师部报告东关战况", "发出最后一封电报"];
+  Check("C6 开场按 COD 单句动词目标拆成三次更新",
+    required.every((text, i) => objectives.indexOf(text) >= 0
+      && (i === 0 || objectives.indexOf(text) > objectives.indexOf(required[i - 1]))),
+    objectives.join(" → "));
+  Check("C6 不再把进入、报告、发报塞进同一条",
+    objectives.every((text) => !(/进入|进临时师部/.test(text) && /报告/.test(text) && /发出/.test(text))),
+    objectives.join(" / "));
+  Check("C6 发报后的处理与转移也分两次目标更新",
+    objectives.includes("处理密码材料") && objectives.includes("随通信组沿西门大街向西转移"));
+}
 
 // 组装层的三道校验必须在源码里（数据错了要在开机就炸，不是玩到一半才发现）
 Check("组装层校验 beats 里的 cutscene 类型", /beat\.type !== "cutscene"/.test(AssemblySource));

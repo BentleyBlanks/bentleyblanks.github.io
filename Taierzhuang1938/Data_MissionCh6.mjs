@@ -109,8 +109,8 @@ export const CHAPTER = {
     "结算不打歼敌数：只打守住时长、阵地易手次数、随你活着出城的人数。",
   ],
   objectives: [
-    "进临时师部，报告东关，亲手发出最后一封电报",
-    "处理密码材料，随通信组沿西门大街转移",
+    "进入临时师部",
+    "向师部报告东关战况",
     "穿过西门里",
     "出西门瓮城",
     "沿西关大街向电灯厂",
@@ -149,7 +149,7 @@ export const CHAPTER = {
   beats: [
     // ── 开场：进城内临时师部 ────────────────────────────────────────────
     { at: "start", type: "title", text: "最后一封", sub: "一九三八年三月十七日 午后　城内临时师部", tier: "主流" },
-    { at: "delay:3.0", type: "objective", text: "进临时师部，报告东关，亲手发出最后一封电报" },
+    { at: "delay:3.0", type: "objective", text: "进入临时师部" },
     { at: "delay:2.4", type: "env", text: "你是小秦。全城的线断了一整天，还通的只剩师部这一条。", tier: "虚构" },
 
     // ── 阶段 ①：前两封电报 ─────────────────────────────────────────────
@@ -157,6 +157,7 @@ export const CHAPTER = {
     // 纯 zone 的问题不在正片而在回归 —— PlayTest 的剧本长跑把关卡钉住、玩家不动，
     // 六条 zone 各吃一次 MAX_WAIT.zone = 95 s，本章十分钟的预算被 570 s 吃光，
     // 表现成「终章剧本被吞了 11 条」。event 的兜底判据由本章 EVENTS 给。
+    { at: "event:AtDivisionHq", type: "objective", text: "向师部报告东关战况" },
     { at: "event:AtDivisionHq", type: "line", who: "canmou", voice: "ch6_canmou_01", text: "前两封都发出去了。", tier: "虚构" },
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_02", text: "援军还是没得消息。", tier: "虚构" },
     { at: "delay:2.6", type: "system", text: "案上压着前两封的底稿 —— 走近可以看。" },
@@ -195,6 +196,7 @@ export const CHAPTER = {
     //   所以关内不再重复；它是本章的转轴，下一段亲手敲电键才有分量。
     //   挂在 event:WireConfirm 上：真发生（玩家走到电台桌前、四问问完）由摆点层推，
     //   推不出来时吃本章 EVENTS 给的时刻兜底。
+    { at: "event:WireConfirm", type: "objective", text: "发出最后一封电报" },
     { at: "event:WireConfirm", type: "cutscene", id: "CS_Ch6_LastWire" },
     { at: "delay:3.6", type: "narration", text: "长版落款「职王铭章叩铣」。「铣」为电报韵目代日，即十六日。", tier: "主流" },
 
@@ -211,11 +213,12 @@ export const CHAPTER = {
     { at: "delay:2.4", type: "line", who: "wangmingzhang", voice: "ch6_wangmingzhang_06", text: "收起。", tier: "虚构" },
 
     // ── 阶段 ⑤：通信组转移（cipherDisposal）───────────────────────────
-    { at: "delay:3.0", type: "env", text: "一发炮弹落在院墙外。屋顶的灰整片掉下来。", tier: "虚构" },
+    { at: "event:HqShelled", type: "objective", text: "处理密码材料" },
+    { at: "event:HqShelled", type: "env", text: "一发炮弹落在院墙外。屋顶的灰整片掉下来。", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_12", text: "密码本、底稿、呼号表 —— 烧。", tier: "虚构" },
     { at: "delay:2.8", type: "line", who: "canmou", voice: "ch6_canmou_13", text: "带不走的机器，砸了再走。", tier: "虚构" },
     { at: "delay:3.6", type: "line", who: "xiaoqin", voice: "ch6_xiaoqin_09", text: "烧完了。", tier: "虚构" },
-    { at: "event:CipherDone", type: "objective", text: "处理密码材料，随通信组沿西门大街转移" },
+    { at: "event:CipherDone", type: "objective", text: "随通信组沿西门大街向西转移" },
     { at: "delay:2.6", type: "line", who: "canmou", voice: "ch6_canmou_14", text: "跟到走，莫散。", tier: "虚构" },
     { at: "event:AtGateInner", type: "objective", text: "穿过西门里" },
     { at: "delay:2.8", type: "env", text: "西门里街一直通到城门洞。这条街是通视的 —— 城门楼上看得见你。", tier: "主流" },
@@ -348,7 +351,7 @@ export const EVENTS = [
   {
     id: "CipherDone",
     when: "密码本、底稿、呼号表三件都处理完（cipherDisposal）",
-    anchorBeat: "objective「处理密码材料，随通信组沿西门大街转移」（「烧完了。」的下一拍）",
+    anchorBeat: "objective「随通信组沿西门大街向西转移」（「烧完了。」的下一拍）",
     fallback: "(c) => c.zone === \"C6_WestStreet\" || c.levelTime > 330",
     note: "三件全销毁才放行；没做完就走，通信组的纪律就白写了。"
       + "兜底把原来那条 c.objectiveIndex >= 1 撤了 —— 它在玩家刚走进师部时就成立，"

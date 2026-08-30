@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
-import { AmmoReadout, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
+import {
+  AmmoReadout, ContextualActionPrompts, CrosshairGeometry, ShowTelegraphPaper,
+} from "./Script_Hud.mjs";
 import { IdentifySystem, TargetCard, IDENTIFY } from "./Script_Identify.mjs";
 import { InteractSystem } from "./Script_Interact.mjs";
 import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
@@ -14,6 +16,12 @@ assert.match(guideText, /B 有绷带且流血时包扎止血/);
 assert.deepEqual(ContextualActionPrompts(), []);
 assert.deepEqual(ContextualActionPrompts({ bleeding: 1, bandages: 0 }), []);
 assert.deepEqual(ContextualActionPrompts({ bleeding: 0, bandages: 2 }), []);
+
+assert.equal(ShowTelegraphPaper(null), false);
+assert.equal(ShowTelegraphPaper({ atKey: false, sent: 0, sending: false, broken: false }), false,
+  "尚未开始且离电键很远时不提前挂出报码纸");
+assert.equal(ShowTelegraphPaper({ atKey: true, sent: 0 }), true, "走到电键旁才显示报码纸");
+assert.equal(ShowTelegraphPaper({ atKey: false, sent: 1 }), true, "已经发过一组后走开也保留进度");
 
 assert.deepEqual(AmmoReadout({ ammo: 5, clips: 6, magazine: 5 }), {
   current: "05", reserve: "30", low: false, empty: false,

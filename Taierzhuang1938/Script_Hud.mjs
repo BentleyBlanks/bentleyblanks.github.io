@@ -7,7 +7,6 @@
 // 生平打出刚才那个人的名字、籍贯、生卒年。ER2 有这个设计，而在台儿庄它有额外的分量：
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
-import { REINFORCE } from "./Data_Battle.mjs";
 import { SelectWhiteboxAnnotations } from "./Script_WhiteboxGuide.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -78,6 +77,14 @@ export function CrosshairGeometry({
   const bloom = 1 + Math.min(1, Math.max(0, sprint)) * CROSSHAIR.sprintBloom;
   const gap = Math.min(maxGap, Math.max(CROSSHAIR.gapMin, cone / tanHalfFov * halfHeight * bloom));
   return { gap, arm, spreadDeg: Math.max(0, Number(spreadDeg) || 0), armed: true, sprint };
+}
+
+/**
+ * 报码纸是发报机的局部交互 HUD：尚未开始时只在玩家走到电键旁才出现。
+ * 一旦已经发过一组、正在发送或断线，进度可以继续留着，走开也不把状态藏掉。
+ */
+export function ShowTelegraphPaper(view) {
+  return !!(view && (view.atKey !== false || Number(view.sent) > 0 || view.sending || view.broken));
 }
 
 const EQUIPMENT_ICONS = {
@@ -257,6 +264,15 @@ export class Hud {
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
+    this.el.objective.innerHTML = `<span class="o"></span>`
+      + `<span class="objectiveUpdate">目标已更新</span>`;
+    this.el.objectiveText = this.el.objective.querySelector(".o");
+    this.el.objective.setAttribute("role", "status");
+    this.el.objective.setAttribute("aria-live", "polite");
+    // 兵员池属于战场状态，不属于行动句。独立放到右上角，只在数值变化时闪现。
+    this.el.forceStatus = mk("hudForceStatus");
+    this.el.forceStatus.setAttribute("role", "status");
+    this.el.forceStatus.setAttribute("aria-live", "polite");
     this.el.state = mk("hudState");
     this.el.combat = mk("hudCombat");
     this.el.combat.innerHTML = `
@@ -434,39 +450,36 @@ export class Hud {
   }
 
   SetObjective(text, ours, theirs) {
-    // 顶栏这一行归**剧本**：打的是本段的目标文案（没有就退回阶段 label）。
+    // COD《战争世界》的目标通知只有两层：眼下可执行的一句动作 + 独立的更新回执。
+    // 路线、距离继续由世界标记承担；章节与时空在下方低权重显示，不能再把剧情提要
+    // 塞回行动句。目标节点常驻但更新回执只闪一次，玩家迷路时仍能随时看见下一步。
     //
-    // 「城里还站着的人 N」不再常驻。机制一点没动 —— 池子照跑、减到零仍然是全作
-    // 唯一的失败条件 —— 但一个每分钟才动一下的数字挂在准心正上方，读起来像
-    // 占领点时代的计分板，会把玩家的注意力从「现在该干什么」上拽走。改成
-    // **只在它掉数的那一刻飘一下**：数字变了才让 .forces 走一遍淡入淡出，
-    // 平时 display:none，不占位、不留空档。
+    // 兵员池机制一点没动：减到零仍是全作唯一失败条件。这里只把它从目标 DOM 里
+    // 拆出去，数值变化时在右上角独立闪现，避免与行动动词共用一条阅读路径。
     //
     // 信息不对称照旧：theirs 为 null 就不写「对面 N」。
-    const intel = theirs === null ? "" : `<span class="t">对面 ${theirs}</span>`;
-    const signature = `${text}|${ours}|${theirs}`;
-    if (this.el.objective.dataset.signature !== signature) {
-      const objectiveChanged = this.el.objective.dataset.objective !== text;
-      // 第一次进关不算「掉数」（this.poolLast 还没有值），别一开局就飘一行。
-      const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;
-      this.poolLast = ours;
-      this.el.objective.dataset.signature = signature;
-      this.el.objective.dataset.objective = text;
-      this.el.objective.innerHTML = `<span class="objectiveMark">◆</span><span class="o">${text}</span>`
-        + `<span class="forces${poolChanged ? " flash" : ""}">`
-        + `<span class="p">${REINFORCE.poolLabel} ${ours}</span>${intel}</span>`;
-      if (poolChanged) {
-        // 淡完就把 flash 摘掉，让 .forces 退回 display:none。
-        // 不摘的话动画停在 opacity:0 上，元素还占着位 —— 顶栏会留一段空档。
-        // 抓的是**这一次**建出来的节点：中途再重建一遍的话这个引用已经脱离文档，
-        // 摘它不会误伤新那一次的动画。
-        const forces = this.el.objective.querySelector(".forces");
-        setTimeout(() => forces?.classList.remove("flash"), 3500);
-      }
-      if (objectiveChanged) {
-        this.el.objective.classList.remove("changed");
-        requestAnimationFrame(() => this.el.objective.classList.add("changed"));
-      }
+    const nextText = String(text || "").trim();
+    if (this.el.objective.dataset.objective !== nextText) {
+      this.el.objective.dataset.objective = nextText;
+      this.el.objectiveText.textContent = nextText;
+      this.el.objective.classList.remove("changed");
+      requestAnimationFrame(() => this.el.objective.classList.add("changed"));
+    }
+
+    // 第一次进关只记基线，不把开局数字误报成「发生了变化」。
+    const poolChanged = this.poolLast !== undefined && ours !== this.poolLast;
+    this.poolLast = ours;
+    if (poolChanged) {
+      const enemyIntel = theirs === null ? "" : ` · 对面 ${theirs}`;
+      this.el.forceStatus.textContent = `城中仍在坚守者：${ours} 人${enemyIntel}`;
+      this.el.forceStatus.classList.remove("flash");
+      // 同一节点连续变化时强制重启动画；否则第二次变化会停在第一次的末帧。
+      void this.el.forceStatus.offsetWidth;
+      this.el.forceStatus.classList.add("flash");
+      clearTimeout(this.forceStatusTimer);
+      this.forceStatusTimer = setTimeout(() => {
+        this.el.forceStatus.classList.remove("flash");
+      }, 3500);
     }
   }
 
@@ -1006,6 +1019,9 @@ export class Hud {
    * 压暗武器 UI 会给出「你这会儿开不了枪」的错误读数。
    */
   SetTelegraph(view = null) {
+    // 章节 Setup 会预建整封电报，但预建不是玩家已经接到发报任务。离电键还很远时
+    // 不提前剧透“最后一封 0/5”；走到设备旁，或已经开始发送后，报码纸才进入 HUD。
+    view = ShowTelegraphPaper(view) ? view : null;
     const root = this.el.telegraph;
     const paperKey = view ? `${view.id}|${view.groups.map((g) => g.code).join(",")}` : "";
     if (paperKey !== this.telegraphPaperKey) {

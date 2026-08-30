@@ -110,6 +110,37 @@ try {
   assert.equal(combatHud.stanceLabel, "蹲伏");
   assert.equal(combatHud.low, true);
 
+  const codObjective = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    T.hud.SetObjective("进入临时师部", 36, null);
+    T.hud.SetObjective("向师部报告东关战况", 35, null);
+    await new Promise(requestAnimationFrame);
+    const objective = document.querySelector(".hudObjective");
+    const forceStatus = document.querySelector(".hudForceStatus");
+    const style = getComputedStyle(objective);
+    const box = objective.getBoundingClientRect();
+    return {
+      text: objective.querySelector(".o")?.textContent,
+      update: objective.querySelector(".objectiveUpdate")?.textContent,
+      changed: objective.classList.contains("changed"),
+      background: style.backgroundImage,
+      left: box.left,
+      force: forceStatus?.textContent,
+      forceFlashing: forceStatus?.classList.contains("flash"),
+      forceIsIndependent: forceStatus?.parentElement?.id === "hud",
+      oldMarkCount: objective.querySelectorAll(".objectiveMark, .forces").length,
+    };
+  });
+  assert.equal(codObjective.text, "向师部报告东关战况");
+  assert.equal(codObjective.update, "目标已更新");
+  assert.equal(codObjective.changed, true);
+  assert.equal(codObjective.background, "none");
+  assert.ok(codObjective.left < 80, `目标通知应在左上角，实际 left=${codObjective.left}`);
+  assert.equal(codObjective.force, "城中仍在坚守者：35 人");
+  assert.equal(codObjective.forceFlashing, true);
+  assert.equal(codObjective.forceIsIndependent, true);
+  assert.equal(codObjective.oldMarkCount, 0);
+
   const weaponPrompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const victim = T.ai.soldiers.find((soldier) => soldier.alive) || T.ai.soldiers[0];

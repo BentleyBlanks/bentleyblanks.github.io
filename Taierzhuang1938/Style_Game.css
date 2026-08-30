@@ -75,41 +75,55 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudFps.low { color: rgba(224,176,98,0.72); }
 
-/* 顶部：阶段与目标 */
+/* COD《战争世界》式目标通知：左上角直接给动作句，不用横贯屏幕的任务条。
+   世界标记承担方向与距离；更新回执独立成第二行，章节时空再降一级。 */
 .hudTop {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  width: min(620px, calc(100vw - 36px));
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  position: absolute; top: 28px; left: 34px;
+  width: min(520px, calc(100vw - 68px));
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
 }
-.hudPhase { font-size: 10px; color: rgba(230,223,205,0.56); letter-spacing: 0.12em; }
+.hudPhase {
+  order: 2; padding-left: 1px; margin-top: 1px;
+  font-size: 10px; color: rgba(230,223,205,0.48); letter-spacing: 0.1em;
+}
 .hudPhase .d { margin-right: 9px; }
 .hudPhase .l { font-weight: 600; }
 .hudObjective {
-  min-width: min(440px, calc(100vw - 48px)); box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  padding: 5px 12px 6px; font-size: 13px; color: var(--dim);
-  background: linear-gradient(90deg, transparent, rgba(8,10,12,0.58) 18%, rgba(8,10,12,0.58) 82%, transparent);
-  border-top: 1px solid rgba(230,223,205,0.12);
+  order: 1; min-width: 0; max-width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 0; color: var(--paper); background: none; border: 0;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.92)) drop-shadow(0 0 3px rgba(0,0,0,0.8));
 }
-.hudObjective .objectiveMark { color: var(--warn); font-size: 9px; }
-.hudObjective .o { color: var(--paper); font-weight: 600; letter-spacing: 0.05em; }
-/* 兵员池不再常驻顶栏：平时整块不占位，只有数字掉了才飘一下（见 Hud.SetObjective）。 */
-.hudObjective .forces { display: none; gap: 9px; font-size: 11px; white-space: nowrap; }
-.hudObjective .forces.flash { display: flex; animation: hudPoolFlash 3.4s ease-out both; }
+.hudObjective .o {
+  max-width: 100%; font-size: 18px; line-height: 1.25; color: #f3f0e8;
+  font-weight: 700; letter-spacing: 0.015em; text-wrap: balance;
+}
+.hudObjective .objectiveUpdate {
+  margin-top: 1px; font-size: 12px; line-height: 1.25; color: rgba(243,240,232,0.86);
+  font-weight: 600; letter-spacing: 0.025em; opacity: 0;
+}
+.hudForceStatus {
+  position: absolute; top: 32px; right: 28px; max-width: min(300px, 44vw);
+  padding: 4px 7px; opacity: 0;
+  font: 600 11px/1.35 "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0.04em; text-align: right; color: rgba(230,223,205,0.78);
+  background: rgba(8,10,12,0.42); border-right: 2px solid rgba(224,176,98,0.72);
+}
+.hudForceStatus.flash { animation: hudPoolFlash 3.4s ease-out both; }
 @keyframes hudPoolFlash {
   0% { opacity: 0; }
   10% { opacity: 1; }
   72% { opacity: 1; }
   100% { opacity: 0; }
 }
-.hudObjective .t { color: var(--theirs); }
 @keyframes hudObjectiveChanged {
-  0% { filter: brightness(1); }
-  28% { filter: brightness(1.8); border-top-color: rgba(224,176,98,0.72); }
-  100% { filter: brightness(1); }
+  0% { opacity: 0; transform: translateX(-8px); }
+  16% { opacity: 1; transform: translateX(0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
 }
-.hudObjective.changed { animation: hudObjectiveChanged 0.72s ease-out; }
+.hudObjective.changed .objectiveUpdate { animation: hudObjectiveChanged 2.45s ease-out both; }
 
 /* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
 .hudState {
@@ -571,10 +585,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudMinimap.on { display: block; }
 
 @media (max-width: 700px) {
-  .hudTop { top: max(7px, env(safe-area-inset-top)); width: calc(100vw - 20px); }
+  .hudTop {
+    top: max(28px, calc(env(safe-area-inset-top) + 18px)); left: 12px;
+    width: min(72vw, 360px);
+  }
   .hudPhase { font-size: 9px; }
-  .hudObjective { min-width: 0; width: 100%; padding-inline: 7px; font-size: 11px; gap: 6px; }
-  .hudObjective .forces { font-size: 9px; gap: 5px; }
+  .hudObjective { width: 100%; }
+  .hudObjective .o { font-size: 15px; }
+  .hudObjective .objectiveUpdate { font-size: 10px; }
+  .hudForceStatus { top: max(30px, calc(env(safe-area-inset-top) + 20px)); right: 10px; font-size: 9px; }
   .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
   .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 166px; }
   .combatMain { height: 48px; grid-template-columns: 46px 1fr; }
