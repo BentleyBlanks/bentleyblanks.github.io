@@ -33,6 +33,21 @@ try {
     });
     const same = (a, b) => a.every((value, index) => nearly(value, b[index]));
     const check = (condition, message) => { if (!condition) fail(message); };
+    const checkHeadHitbox = (candidate) => {
+      candidate.Update(0.016, { elapsed: 0.5, aim: 1 });
+      const headShape = candidate.GetBoneHitboxes().find((shape) => shape.id === "head");
+      check(headShape?.type === "sphere" && headShape.part === "head"
+        && Number.isFinite(headShape.worldRadius) && headShape.worldRadius > 0,
+      `${candidate.meshSource} has no live cranial sphere`);
+      const headPivot = candidate.characterRig?.bones?.head?.getWorldPosition(new THREE.Vector3());
+      check(headPivot && headShape.center.distanceTo(headPivot) > headShape.worldRadius * 0.65,
+        `${candidate.meshSource} cranial sphere collapsed back onto the neck/head pivot`);
+      const outward = new THREE.Vector3().subVectors(headShape.center, headPivot).normalize();
+      const origin = headShape.center.clone().addScaledVector(outward, headShape.worldRadius * 3);
+      const hit = candidate.RaycastHitboxes(origin, outward.clone().negate(), headShape.worldRadius * 6);
+      check(hit?.part === "head" && hit.shape?.id === "head",
+        `${candidate.meshSource} cannot be headshot through its visible cranial proxy`);
+    };
 
     check(JSON.stringify(LIFE_POSE_NAMES) === JSON.stringify([
       "sit", "repairShoe", "cleanRifle", "sleep", "checkAmmo", "prepare",
@@ -72,6 +87,7 @@ try {
         && hitboxes.some((shape) => shape.part === "torso")
         && hitboxes.some((shape) => shape.part === "limb"),
       `${candidate.meshSource} bone hitboxes are incomplete`);
+      checkHeadHitbox(candidate);
     };
     checkRiggedSoldier(actor, "Nra");
     const ija = factory.Create("ija", { seed: 90215, weapon: null });
@@ -85,12 +101,14 @@ try {
       for (let modelVariant = 0; modelVariant < 4; modelVariant += 1) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
+        checkHeadHitbox(candidate);
         candidate.Dispose();
       }
       check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
         `${kind} four-soldier lineup mismatch: ${variants.join(",")}`);
       const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
       check(officer.modelId === `${prefix}05`, `${kind} officer model mismatch: ${officer.modelId}`);
+      checkHeadHitbox(officer);
       officer.Dispose();
     }
 

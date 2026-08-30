@@ -164,10 +164,16 @@ assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
-assert.match(runtime, /a: "neck", b: "headGear"[\s\S]*?part: "head"/,
-  "head uses the neck-to-headgear span rather than the neck-root pivot");
-assert.match(runtime, /headGear: this\.sockets\.headGear/,
-  "head hitbox binds the exported headgear socket");
+assert.match(runtime, /id: "head", type: "sphere", role: "headCenter"[\s\S]*?part: "head"/,
+  "head uses a dedicated cranial sphere instead of a neck or face-tail capsule");
+assert.match(runtime, /function BuildHeadHitCenter\(head, headGear\)/,
+  "runtime builds a head-local cranial centre");
+assert.match(runtime, /headGear\.parent === head[\s\S]*?headGear\.position\.length\(\)/,
+  "headgear bone-tail distance is used only as the authored scale reference");
+assert.match(runtime, /center\.position\.set\(authoredLength \* 0\.52, authoredLength \* 0\.14, 0\)/,
+  "cranial centre offsets along the Head-local anatomical axes");
+assert.doesNotMatch(runtime, /a: "neck", b: "headGear"/,
+  "headgear bone tail is not reused as a head-collision endpoint");
 assert.match(runtime, /getWorldScale\(WORLD_SCALE\)/, "hitbox radius uses actual render-root scale");
 assert.match(runtime, /RaycastCapsule\(origin, direction/, "capsule uses exact ray intersection");
 assert.doesNotMatch(runtime, /distanceSqToSegment\(shape\.start/, "old closest-distance capsule approximation removed");

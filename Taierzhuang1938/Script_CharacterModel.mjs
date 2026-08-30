@@ -275,13 +275,15 @@ export async function LoadLugouCharacterAssets() {
 }
 
 // 按 3A 人物碰撞的配置方式写成“部位代理表”：所有尺寸是资产的局部米制，端点
-// 只认语义骨骼，运行时再跟随每个模型、每条动画的骨架变换。头不再是一颗挂在
-// Head pivot 上的孤球——Max Biped 的 Head pivot 靠近颈根，孤球会吞到胸胶囊里，
-// 造成画面上打脸、规则却先返回 torso。头部的另一端必须取导出资产的
-// Socket_HeadGear（头盔中心），不能取 Bip001 Head 旋转枢轴；否则 kneel 等动作下
-// 头胶囊会退化成一小圈脖子，编辑器看起来像“头部碰撞没了”。
+// 只认语义骨骼，运行时再跟随每个模型、每条动画的骨架变换。
+//
+// 头部必须用跟随 Head 旋转的独立球，不能拿导出的 Socket_HeadGear 当球心或胶囊
+// 端点。Blender 的 BONE-parent 零位空物体落在**骨尾**；这批 Max Biped 的 Head
+// 骨尾沿脸部前下方伸出，不在头盔中心。旧版 neck→Socket_HeadGear 胶囊因此压在
+// 颈部与下颌，颅顶约十几厘米完全没有命中体。BuildHeadHitCenter 用同一根骨的
+// 长度当尺，在 Head 的局部“向上 / 向前”轴上重建真正的颅腔中心。
 export const CHARACTER_HITBOX_PROFILE = Object.freeze([
-  { id: "head", type: "capsule", a: "neck", b: "headGear", radius: 0.115, part: "head", priority: 3 },
+  { id: "head", type: "sphere", role: "headCenter", radius: 0.15, part: "head", priority: 3 },
   { id: "upperTorso", type: "capsule", a: "chest", b: "neck", radius: 0.135, part: "torso", priority: 1 },
   { id: "lowerTorso", type: "capsule", a: "pelvis", b: "chest", radius: 0.19, part: "torso", priority: 1 },
   { id: "upperArmL", type: "capsule", a: "upperArmL", b: "forearmL", radius: 0.075, part: "limb", priority: 0 },
@@ -295,6 +297,28 @@ export const CHARACTER_HITBOX_PROFILE = Object.freeze([
 ]);
 
 const WORLD_SCALE = new THREE.Vector3();
+
+/**
+ * Runtime cranial centre carried by the animated Head bone.
+ *
+ * `Socket_HeadGear` is still useful as a scale reference: its local distance from Head is
+ * the authored head-bone length on every one of the ten models.  Its *direction* is not a
+ * cranial direction, though—the Biped bone tail points through the face.  In the exported
+ * Head frame +X is anatomical up and +Y is forward.  Ratios were measured against vertices
+ * whose dominant skin weight is Head across all ten shipped GLBs, so the same proxy covers
+ * caps, helmets and bare heads without baking a second per-model collision manifest.
+ */
+function BuildHeadHitCenter(head, headGear) {
+  if (!head) return null;
+  const authoredLength = headGear && headGear !== head && headGear.parent === head
+    ? headGear.position.length() : 0;
+  if (!(authoredLength > 1e-6)) return head;
+  const center = new THREE.Object3D();
+  center.name = "RuntimeHitbox_HeadCenter";
+  center.position.set(authoredLength * 0.52, authoredLength * 0.14, 0);
+  head.add(center);
+  return center;
+}
 
 /**
  * Build the grip point carried by the authored fingers, not by Blender's BONE-parent tail.
@@ -367,9 +391,9 @@ export class LugouCharacterRig {
       weaponR: BuildHandGrip(this.bones.handR, "r", this.sockets.weaponR),
       weaponL: BuildHandGrip(this.bones.handL, "l", this.sockets.weaponL),
     };
-    // 碰撞代理既可引用骨骼，也可引用已烘进 GLB 的稳定挂点。headGear 是头盔中心；
-    // 它与 Head pivot 不同，前者才是可见头部的正确端点。
-    this.hitboxNodes = { ...this.bones, headGear: this.sockets.headGear };
+    // Socket_HeadGear 是骨尾，不是头盔中心；只拿它的长度作尺，方向由 Head 自己给。
+    const headCenter = BuildHeadHitCenter(this.bones.head, this.sockets.headGear);
+    this.hitboxNodes = { ...this.bones, headCenter };
     this.hitboxes = CHARACTER_HITBOX_PROFILE.map((definition) => ({
       ...definition,
       center: new THREE.Vector3(),
@@ -520,9 +544,9 @@ export class LugouCharacterRig {
     for (const shape of this.hitboxes) {
       shape.worldRadius = shape.radius * scale;
       if (shape.type === "sphere") {
-        const bone = this.bones[shape.role];
-        if (!bone) continue;
-        bone.getWorldPosition(shape.center);
+        const node = this.hitboxNodes[shape.role];
+        if (!node) continue;
+        node.getWorldPosition(shape.center);
       } else {
         const boneA = this.hitboxNodes[shape.a];
         const boneB = this.hitboxNodes[shape.b];
