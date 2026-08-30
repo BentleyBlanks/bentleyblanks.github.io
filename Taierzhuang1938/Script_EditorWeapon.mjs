@@ -20,10 +20,24 @@ import { Mulberry32 } from "./Script_Noise.mjs";
 
 const KIND_LABEL = {
   boltRifle: "栓动步枪", lmg: "轻机枪", hmg: "重机枪", pistol: "手枪",
-  throwable: "投掷物", melee: "近战", mortar: "掷弹筒", vehicle: "车辆",
+  throwable: "投掷物", melee: "近战", mortar: "曲射/架设武器", vehicle: "车辆",
 };
-const SIDE_SHORT = { nra: "中", ija: "日", neutral: "未明" };
-const SIDE_LONG = { nra: "中方（第 22 集团军）", ija: "日方（濑谷支队）", neutral: "阵营未明/通用资产" };
+const SIDE_SHORT = { nra: "中", ija: "日", neutral: "待考" };
+const SIDE_LONG = {
+  nra: "中方（第 22 集团军）", ija: "日方（濑谷支队）",
+  neutral: "阵营/来源待考（仅用于资产识别）",
+};
+const KIND_LABEL_BY_ID = {
+  BrowningTripodAssembly: "三脚架组件",
+  UnidentifiedMunition: "弹体",
+  UnidentifiedAntiaircraftGun: "架设武器",
+  LightMortar: "轻型迫击器",
+  MediumMortar: "中型迫击炮",
+};
+
+function KindLabel(id) {
+  return KIND_LABEL_BY_ID[id] || KIND_LABEL[WEAPONS[id]?.kind] || WEAPONS[id]?.kind || "待考";
+}
 
 /**
  * 有没有几何。**判据是模型表，不是 kind。**
@@ -51,12 +65,29 @@ function IsGroundedBench(id) {
   return !!w && w.kind === "mortar" && !!MESHES[WEAPON_MESH_BY_ID[id]];
 }
 
-/** WeaponGeometry 为人物动作把刀刃转成 +Y；台架取消这层动作姿态。
- * 两门迫击炮则从运输时的水平规范轴抬到约 58° 的架设姿态。 */
-function BenchPosePitch(id) {
-  if (id === "OfficerSwordSet" || id === "RingPommelDagger") return -Math.PI / 2;
-  if (id === "LightMortar" || id === "MediumMortar") return Math.PI * 0.32;
-  return 0;
+/**
+ * WeaponGeometry 为人物动作把枪管/刀刃统一到局部 -Z；台架必须再还原成检视姿态。
+ *
+ * 三件架设武器不能共用一个「都抬 58°」的猜值：源模型的炮管与规范长轴夹角各不
+ * 相同，共用角度会让轻迫击器直挺、另一门炮又整架侧倒。这里逐件按识别截图校正，
+ * 外层随后统一用最终包围盒落地，所以脚架/底钣不会因转姿态而悬空。
+ */
+function BenchPose(id) {
+  if (id === "OfficerSwordSet" || id === "RingPommelDagger") {
+    return { x: -Math.PI / 2, y: 0, z: 0 };
+  }
+  if (id === "UnidentifiedAntiaircraftGun") {
+    // 这一件源几何的三脚架已经是落地姿态；再跟迫击炮一起抬角会让枪尾先着地、
+    // 两只脚反而悬空。显式留在表里，防止以后又被并回通用迫击炮角度。
+    return { x: 0, y: 0, z: 0 };
+  }
+  if (id === "LightMortar") {
+    return { x: Math.PI * 0.22, y: 0, z: 0 };
+  }
+  if (id === "MediumMortar") {
+    return { x: Math.PI * 0.34, y: 0, z: 0 };
+  }
+  return { x: 0, y: 0, z: 0 };
 }
 
 /** 人能拿在手里的。车辆不算 —— 它没有第一人称手持视图。 */
@@ -161,7 +192,7 @@ export class WeaponEditor {
     this.list.Fill(Object.keys(WEAPONS).map((id) => {
       const w = WEAPONS[id];
       return {
-        id, name: `${w.name}`, tail: `${SIDE_SHORT[w.side] || "未明"}·${KIND_LABEL[w.kind] || w.kind}`,
+        id, name: `${w.name}`, tail: `${SIDE_SHORT[w.side] || "待考"}·${KindLabel(id)}`,
         title: w.fullName,
       };
     }));
@@ -240,6 +271,7 @@ export class WeaponEditor {
     this.facts = Facts(data);
     this.noteEl = Note(data, "");
     this.sourceNote = Note(data, "", true);
+    Note(data, "“待考”表示原始素材没有提供足够信息来确认具体型号或阵营，不是游戏里的未知/未解锁状态。");
     this.RefreshControls();
   }
 
@@ -504,7 +536,8 @@ export class WeaponEditor {
       mesh.receiveShadow = true;
       pose.add(mesh);
     }
-    pose.rotation.x = BenchPosePitch(this.weaponId);
+    const benchPose = BenchPose(this.weaponId);
+    pose.rotation.set(benchPose.x, benchPose.y, benchPose.z);
     // 枪的规范朝向是枪口指 -Z，而起手机位也在 -Z —— 不转的话开场是「看着枪口」。
     // 转 90° 变成正侧面：全长、护木分段、表尺、刺刀座一次看全。
     group.rotation.y = Math.PI / 2;
@@ -609,8 +642,8 @@ export class WeaponEditor {
     this.facts.Clear();
     const F = (k, v, tone = "") => this.facts.Set(k, v, tone);
     F("全称", w.fullName);
-    F("阵营", SIDE_LONG[w.side] || "阵营未明/通用资产");
-    F("类别", KIND_LABEL[w.kind] || w.kind);
+    F("阵营", SIDE_LONG[w.side] || "阵营/来源待考（仅用于资产识别）");
+    F("类别", KindLabel(this.weaponId));
     if (w.ammo) {
       const a = AMMO[w.ammo];
       F("弹药", a ? `${a.label} ${a.caliber} · ${a.muzzle} m/s` : w.ammo);

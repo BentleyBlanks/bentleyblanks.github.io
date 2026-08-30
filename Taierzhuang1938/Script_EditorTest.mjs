@@ -825,12 +825,26 @@ const weapon = await page.evaluate(async () => {
   out.grenadeMeleeHidden = active.actionButtons.melee.hidden;
   const THREE = await import("./vendor/three/build/three.module.js");
   active.SetMode("bench");
-  active.SetWeapon("MediumMortar");
-  window.Taierzhuang.StepFrames(10);
-  const mortarBox = new THREE.Box3().setFromObject(active.benchGroup);
-  const mortarSpan = mortarBox.getSize(new THREE.Vector3());
-  out.mortarGrounded = Math.abs(mortarBox.min.y) < 0.005;
-  out.mortarErected = mortarSpan.y > mortarSpan.x * 0.9;
+  out.deployedPoses = {};
+  for (const id of ["UnidentifiedAntiaircraftGun", "LightMortar", "MediumMortar"]) {
+    active.SetWeapon(id);
+    window.Taierzhuang.StepFrames(10);
+    const box = new THREE.Box3().setFromObject(active.benchGroup);
+    const span = box.getSize(new THREE.Vector3());
+    out.deployedPoses[id] = {
+      grounded: Math.abs(box.min.y) < 0.005,
+      pitch: active.benchGroup.children[0]?.rotation.x ?? null,
+      span: span.toArray(),
+    };
+  }
+  const rows = Array.from(active.list.root.querySelectorAll(".it"), (row) => ({
+    name: row.querySelector(".n")?.textContent || "",
+    tail: row.querySelector(".t")?.textContent || "",
+  }));
+  out.ambiguousRows = rows.filter((row) => ["高射炮", "轻型迫击器", "中型迫击炮"].includes(row.name));
+  out.unknownCopyGone = out.ambiguousRows.length === 3
+    && out.ambiguousRows.every((row) => !row.name.includes("未明") && !row.tail.includes("未明"))
+    && active.panel.body.textContent.includes("不是游戏里的未知/未解锁状态");
   active.SetWeapon("OfficerSwordSet");
   window.Taierzhuang.StepFrames(10);
   const swordSpan = new THREE.Box3().setFromObject(active.benchGroup).getSize(new THREE.Vector3());
@@ -861,8 +875,17 @@ Check("刺刀预览只给支持的枪，并在台架 / 第一人称都切换真�
 Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白刃",
   weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
 Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
-Check("迫击炮台架按架设姿态落地", weapon.mortarGrounded && weapon.mortarErected,
-  `ground=${weapon.mortarGrounded} erected=${weapon.mortarErected}`);
+const deployed = weapon.deployedPoses;
+Check("三件架设武器逐件校姿并按最终包围盒落地",
+  Object.values(deployed).every((entry) => entry.grounded)
+    && Math.abs(deployed.UnidentifiedAntiaircraftGun.pitch) < 0.001
+    && deployed.LightMortar.pitch > 0.6 && deployed.LightMortar.pitch < 0.8
+    && deployed.MediumMortar.pitch > 1.0 && deployed.MediumMortar.pitch < 1.15
+    && deployed.MediumMortar.span[1] > deployed.MediumMortar.span[0] * 0.9,
+  JSON.stringify(deployed));
+Check("型号待考条目不再显示‘未明·掷弹筒’，并解释待考含义",
+  weapon.unknownCopyGone,
+  JSON.stringify(weapon.ambiguousRows));
 Check("军刀台架取消人物动作轴，改为横向检视", weapon.swordInspectionPose);
 
 // ---------------------------------------------------------------------------
