@@ -22,14 +22,16 @@
 //
 // **这个文件里没有 import map。** 它 import 的那几个模块一律走相对路径，
 // 且那条链上不许出现裸名 "three"（见 Script_BootPropStage 的文件头）。
-// 连带的代价：worker 这一侧（Stage / MeshLoad / Noise / Data_Meshes / three）
-// 取到的是**不带版本戳**的 URL —— import map 管不到 worker。
 // 页面那一侧仍然只有一份带戳的 three（拿 import("three") 与相对路径对比过是同一个
 // 模块实例）；worker 是另一个 realm，本来就要自己再拿一份，这不是重复加载。
-// 版本戳只盖到 worker 文件自己头上（宿主把自己的 ?v= 接在 worker URL 上），
-// 深一层靠 ETag/max-age 自然过期。
+// Stage 是展示台最常改的那层，必须把 worker 自己的 query 继续传给它：只靠
+// ETag/max-age 会让刚发布的修复在旧 worker 缓存里继续跑。Stage 再往下的稳定依赖
+// （MeshLoad / Noise / Data_Meshes / three）仍走原相对 URL。
 
-import { PropStage, PickShowcase } from "./Script_BootPropStage.mjs";
+const here = new URL(import.meta.url);
+const { PropStage, PickShowcase } = await import(
+  new URL(`./Script_BootPropStage.mjs${here.search}`, here)
+);
 
 let stage = null;
 let running = false;

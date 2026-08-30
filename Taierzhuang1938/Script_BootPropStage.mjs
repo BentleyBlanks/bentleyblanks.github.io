@@ -105,8 +105,17 @@ function MaterialBank() {
 async function LoadBitmapTexture(url, { srgb = false } = {}) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`PBR ${url} HTTP ${response.status}`);
-  const bitmap = await createImageBitmap(await response.blob());
+  // ImageBitmap uploads ignore WebGL's UNPACK_FLIP_Y_WEBGL flag.  TZM UVs use
+  // the same bottom-left convention as the main game's TextureLoader path, so
+  // the worker must flip the bitmap during decode.  Without this, the blade
+  // samples the handle's dark atlas region and the normal/ORM maps describe a
+  // different part of the model, which looks like broken faceted lighting.
+  const bitmap = await createImageBitmap(await response.blob(), {
+    imageOrientation: "flipY",
+    premultiplyAlpha: "none",
+  });
   const texture = new THREE.Texture(bitmap);
+  texture.flipY = false; // already applied by createImageBitmap above
   texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   texture.generateMipmaps = true;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
