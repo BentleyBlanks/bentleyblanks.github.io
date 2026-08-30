@@ -124,11 +124,17 @@ export class GraphicsSettings {
     shadowBox.className = "edBtns";
     perf.appendChild(shadowBox);
     Toggle(shadowBox, "阴影", gfx.shadows, (on) => { gfx.shadows = on; this.Apply(); });
+    Toggle(shadowBox, "第一人称自阴影", gfx.firstPersonSelfShadow !== false, (on) => {
+      gfx.firstPersonSelfShadow = on;
+      this.Apply();
+    });
     Chips(perf, [
       { value: 0, label: "出厂" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
-    Note(perf, "阴影是编译期 #define：开关它要重编译全场材质，卡几百毫秒。", true);
+    Note(perf, "阴影是编译期 #define：开关它要重编译全场材质，卡几百毫秒。"
+      + "「第一人称自阴影（First Person Self-Shadow）」另画一张只含手臂与武器的小阴影图，"
+      + "不会把镜头前的枪影投到墙上；它服从阴影总闸。", true);
 
     const giBox = Section(body, "全局光照（实时探针体）");
     const giRow = document.createElement("div");
@@ -215,6 +221,7 @@ export class GraphicsSettings {
   Reset() {
     const gfx = this.gfx;
     gfx.renderScale = 1; gfx.shadows = true; gfx.shadowSize = 0;
+    gfx.firstPersonSelfShadow = true;
     gfx.ssao = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
     gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
@@ -256,6 +263,8 @@ export class GraphicsSettings {
     f.Set("阴影图", this.host.lights
       ? `${this.host.lights.sun.shadow.mapSize.x}${this.host.renderer.shadowMap.enabled ? "" : "（已关）"}`
       : "—");
+    const fpShadow = this.host.game?.firstPersonSelfShadow?.Status?.();
+    f.Set("第一人称自阴影", fpShadow?.enabled ? `开（${fpShadow.size}）` : "关");
   }
 }
 

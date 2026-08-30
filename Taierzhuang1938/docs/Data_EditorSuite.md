@@ -45,6 +45,9 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
   `renderer.shadowMap.enabled` 是编译期的 `#define USE_SHADOWMAP`，只改标志位的话
   着色器还在采一张不再更新的图，画面会留着一层永不变化的假阴影。几百毫秒的卡顿，
   但这是设置动作不是每帧的事。
+- **第一人称自阴影**单独走 `Script_FirstPersonSelfShadow` 的小型 packed-depth 靶与
+  3×3 PCF，只压手臂/武器自己的直射光。Viewmodel 仍保持 `castShadow=false`，因此
+  压缩后的枪模不会把巨大的假影投到战场墙面；此项服从「阴影」总闸并随画质设置落盘。
 - **档位（low/medium/high/ultra）热切不了**：MSAA 采样数、AO 靶比例、泛光级数是
   `PostPipeline` 建靶时定死的。所以那一栏老实带 `?quality=` 刷新，不假装能实时换。
 

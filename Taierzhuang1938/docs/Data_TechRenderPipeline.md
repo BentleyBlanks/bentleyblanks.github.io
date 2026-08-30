@@ -831,6 +831,17 @@ sun.shadow.intensity = 1.0;     // r165+ 新字段，可以做"阴影别死黑"
 ```
 想要更软的 8 抽样自定义 Poisson，就替换上面那段 chunk 里的 5 个 `vogelDiskSample` 为 8 个固定 Poisson 常量 —— 但代价是每盏灯每片元 +3 次 `sampler2DShadow` 采样。VSM（`VSMShadowMap`）能给真正的大范围软阴影（`blurSamples` 可调），但有漏光，室外柱子/树叶场景不建议。
 
+### 第一人称自阴影（独立视模靶）
+
+正式实现位于 `Script_FirstPersonSelfShadow.mjs`。第一人称枪械为了伪造窄 FOV 与守住近裁面，
+在相机下经过非等比深度压缩；若直接设 `castShadow=true`，这棵假几何会进入战场太阳阴影图，
+在墙上投出被放大的黑块。因此视模继续禁止向世界投影，另用只看第一人称层的正交相机画
+RGBA packed depth，并在视模自己的材质克隆里以 3×3 PCF 乘直射漫反射与镜面反射。
+
+这张靶在本帧手臂 IK、枪姿与世界矩阵更新后、主颜色 pass 前生成；透明枪焰与飞行弹壳不写入。
+材质必须先克隆再注入，不能改 `MaterialLibrary` 的共享底材，否则世界里的同名枪材质也会采到
+相机旁边这张阴影。画质面板的「第一人称自阴影」可热切、落盘，并服从「阴影」总闸。
+
 ---
 
 ## 11. 材质：CanvasTexture 程序化烘四张图 + 三平面

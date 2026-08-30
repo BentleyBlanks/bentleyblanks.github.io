@@ -130,6 +130,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 渲染管线 / GI / 灯光天空
 - `Script_Post.mjs` —— 自研后处理：深度法线预通道 → SSAO → Bloom → 体积光 → tonemap →
   抗锯齿，**顺序错一条画面就「塑料」**；帧结构在文件头。
+- `Script_FirstPersonSelfShadow.mjs` —— 第一人称手臂/武器专用 packed-depth + 3×3 PCF
+  自阴影；与战场太阳阴影图隔离，禁止改成 Viewmodel 直接 `castShadow=true`。
 - `Script_Gi.mjs`（半实时辐照度探针体 + `Data_GlobalShProbe.mjs`，回归口 `Script_GiTest.mjs`）、
   `Script_Light.mjs`（太阳 + 跟随式阴影框 + 火光池 + 枪口闪光）、
   `Script_Sky.mjs`（解析式天空 + PMREM）、`Script_Water.mjs`（Gerstner 护城河）。

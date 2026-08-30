@@ -43,6 +43,7 @@ import { AiDirector, MakeSoldierIdentity } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
+import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
@@ -378,6 +379,8 @@ const graphics = {
   renderScale: 1.0,
   shadows: true,
   shadowSize: 0,          // 0 = 用出厂档位
+  // 独立小阴影图，只在第一人称手臂/武器材质内部采样；仍服从上面的阴影总闸。
+  firstPersonSelfShadow: true,
   ssao: 1, bloom: 1, god: 1, motionBlur: 1, grain: 1, vignette: 1,
   // 抗锯齿：TAA 开着时末趟的 FXAA 自动让位（两层叠加只会糊）。出厂值跟画质档走
   // （medium 及以上默认开），但这是**布尔开关不是倍率** —— 它不决定"画多重"，
@@ -529,6 +532,7 @@ let ai = null;
 let meleeQte = null;
 let vfx = null;
 let viewmodel = null;
+let firstPersonSelfShadow = null;
 let actorFactory = null;
 let actorBatch = null;
 let story = null;
@@ -972,6 +976,10 @@ async function Boot() {
   // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，
   // 这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
   if (viewmodel.markNoPrepass) viewmodel.markNoPrepass();
+  firstPersonSelfShadow = new FirstPersonSelfShadow(renderer, scene, camera, viewmodel.root, {
+    size: QUALITY === "low" ? 512 : 1024,
+  });
+  firstPersonSelfShadow.SetEnabled(graphics.shadows && graphics.firstPersonSelfShadow);
 
   player = new PlayerController(camera, {
     colliders: battlefield.colliders,
@@ -1589,7 +1597,8 @@ async function Boot() {
   window.Taierzhuang = {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
-    renderer, scene, camera, post, sky, lights, library, profiler, get gi() { return gi; },
+    renderer, scene, camera, post, sky, lights, library, profiler,
+    get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     get meleeQte() { return meleeQte; },
     story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
@@ -2305,7 +2314,8 @@ async function Boot() {
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, get gi() { return gi; },
+      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics,
+      get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 场景编辑器的「序章 · 出川」是一段独立过场，不能用 JumpToLevel(0)
       // 冒充。跳转到稳定预览入口，同时清掉会把编辑器测试/直跳关带过去的
       // query，避免新序章又落到界河战斗切片。
@@ -5989,6 +5999,15 @@ function RenderScene(dt) {
   profiler.B("matrix");
   scene.updateMatrixWorld();
   profiler.E("matrix");
+  // 视模自阴影是独立 offscreen depth pass：必须等本帧手臂 IK / 枪姿矩阵更新完，
+  // 又必须排在主颜色 pass 前，材质才能采到同一帧的手—枪遮挡。
+  if (firstPersonSelfShadow?.enabled) {
+    profiler.B("firstPersonShadow");
+    profiler.GpuPush("firstPersonShadow");
+    firstPersonSelfShadow.Render(sky.sunDirection);
+    profiler.GpuPop();
+    profiler.E("firstPersonShadow");
+  }
   // 人物合批的实例矩阵读的就是刚算完的那份 matrixWorld，所以必须排在这后面。
   profiler.B("actorBatch");
   if (actorBatch) actorBatch.Update(camera);
@@ -6151,6 +6170,10 @@ function ApplyGraphics() {
   // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
   // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
   post.SetTaaEnabled(graphics.taa !== false);
+
+  // 玩家可单关第一人称自阴影，但「阴影」总闸关闭时它也必须一起停：否则面板说
+  // 阴影已关，枪上却还留着一层独立阴影，会成为两套互相矛盾的设置语义。
+  firstPersonSelfShadow?.SetEnabled(!!graphics.shadows && graphics.firstPersonSelfShadow !== false);
 
   const wantShadow = !!graphics.shadows;
   if (renderer.shadowMap.enabled !== wantShadow) {

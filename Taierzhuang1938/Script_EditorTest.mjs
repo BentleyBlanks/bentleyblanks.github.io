@@ -439,6 +439,44 @@ Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
   taaToggle.found && taaToggle.firstFrameHistory === false
   && taaToggle.on.settled === true && taaToggle.saved === true,
   `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
+
+// 第一人称自阴影：同样点真实按钮，并读回独立深度靶。只验 DOM/布尔位会放过
+// 「开关在、材质也注入了，但深度 pass 一直是清屏白色」这一类静默坏法。
+const firstPersonShadowToggle = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
+    .find((b) => (b.textContent || "").includes("第一人称自阴影"));
+  const button = Btn();
+  if (!button || !T.firstPersonSelfShadow) return { found: false };
+  const boot = T.firstPersonSelfShadow.Status();
+  button.click();
+  T.StepFrames(2);
+  const off = T.firstPersonSelfShadow.Status();
+  Btn().click();
+  T.StepFrames(4);
+  const on = T.firstPersonSelfShadow.Status();
+  const depth = T.firstPersonSelfShadow.AuditDepth();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
+  return { found: true, boot, off, on, depth, saved: saved?.firstPersonSelfShadow };
+});
+Check("画质面板：第一人称自阴影可热切并落盘",
+  firstPersonShadowToggle.found && firstPersonShadowToggle.boot.enabled
+  && !firstPersonShadowToggle.off.enabled && firstPersonShadowToggle.on.enabled
+  && firstPersonShadowToggle.saved === true,
+  firstPersonShadowToggle.found
+    ? `开机=${firstPersonShadowToggle.boot.enabled} → 关=${firstPersonShadowToggle.off.enabled}`
+      + ` → 开=${firstPersonShadowToggle.on.enabled} 落盘=${firstPersonShadowToggle.saved}`
+    : "面板上找不到第一人称自阴影开关");
+Check("第一人称自阴影：独立深度靶真有手枪像素且不向世界投影",
+  firstPersonShadowToggle.found && firstPersonShadowToggle.on.renderedFrames > firstPersonShadowToggle.boot.renderedFrames
+  && firstPersonShadowToggle.on.casters > 0 && firstPersonShadowToggle.on.materials > 0
+  && firstPersonShadowToggle.on.isolated && !firstPersonShadowToggle.on.worldCasterLeak
+  && firstPersonShadowToggle.depth.nonClear > 64,
+  firstPersonShadowToggle.found
+    ? `靶=${firstPersonShadowToggle.depth.size} 非空=${firstPersonShadowToggle.depth.nonClear}`
+      + ` caster=${firstPersonShadowToggle.on.casters} 材质=${firstPersonShadowToggle.on.materials}`
+    : "系统未构造");
 // 画质面板整版留一张图：断言只能证明「DOM 里有这个按钮」，证明不了它在版面上
 // 排到哪儿、黄字有没有把面板撑得读不下去。这一栏就是因为「设置里翻不到」才补的，
 // 留张图下一轮直接看。
