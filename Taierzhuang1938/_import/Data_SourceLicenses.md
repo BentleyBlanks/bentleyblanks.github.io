@@ -57,7 +57,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 | 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
 | 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；保留源件约 4,100 三角。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
-| 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源 82,142 三角，超过战车 80k 阈值后减至 79,999。源文件没有可拆的炮塔/车体/履带语义节点，仍作为单一静态装甲件；资产提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
+| 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源 82,142 三角；减至 80k 只降 2.6%，按“降幅 5% 及以下不减面”规则保留原始拓扑。源文件没有可拆的炮塔/车体/履带语义节点，仍作为单一静态装甲件；资产提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
 | 九七式中战车 `Type97ChiHa` | `Source/Model_Type97ChiHa/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | Type 97 Chi-Ha 博物馆扫描源约 4,000 面；Hull/Turret/Track/Barrel 部件可分别收桶，炮塔保留为 joint 节点。外廓归一为 2.475 × 2.380 × 5.50 m，保留原始 3969 三角、不焊点、不减面。 |
 
 车辆源文件由 `_import/SketchfabFetchTanks.py` 通过 BlenderMCP 下载，构建由
@@ -166,7 +166,7 @@ Unity Labs 三个源包的直接下载地址分别是：
 ## 场景布设物（Script_ExternalProps.mjs 运行时加载）
 
 以下 GLB 由 Sketchfab 经本机 BlenderMCP 下载（账号 BentleyJobs）。旧三件资产在 Blender
-里统一贴图降采样到 1024；新场景包则清除源高分贴图、强力减面、逐构件底部归零，并在
+里统一贴图降采样到 1024；新场景包按资产规范保留或减面、逐构件底部归零，并在
 运行时绑定本作共享材质。关卡摆放与构件库预览都由 `Script_ExternalProps.mjs` 负责。
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
@@ -175,10 +175,10 @@ Unity Labs 三个源包的直接下载地址分别是：
 | 民居双栋 `Model_AsianHousePair.glb` | [Asian House - Two Pack](https://sketchfab.com/3d-models/asian-house-two-pack-2aa7bfde643145a3a6aa3a85b06afcd2) | [PolyDavid](https://sketchfab.com/PolyDavid) | CC-BY-4.0 | 两栋组合。贴图 2048→1024，底部对齐原点。 |
 | 沙袋 `Model_Sandbag.glb` | [Sandbag Low Poly Realist](https://sketchfab.com/3d-models/sandbag-low-poly-realist-7d52600a15c747749d845d9f906045cf) | [Islide](https://sketchfab.com/Islide) | CC-BY-4.0 | 单体沙袋，缩放到 0.6 m 长；贴图 2048→1024，底部对齐原点。 |
 | 中式四合院 `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb) | CC-BY-4.0 | 作为序章单处地标；减至 5,500 三角，使用共享夯土和屋瓦材质。 |
-| 战场构件 `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya) | CC-BY-4.0 | 拆成 24 个独立节点；源文件两件铁丝网确为各 80 三角的无刺螺旋线，仍随包留档，但运行时同名 id 已改接项目自制资产。 |
+| 战场构件 `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya) | CC-BY-4.0 | 拆成 24 个独立节点，选定源几何 27,862 三角全部保留；源文件两件铁丝网确为各 80 三角的无刺螺旋线，仍随包留档，但运行时同名 id 已改接项目自制资产。 |
 | 铁丝网 `Model_BarbedWireSet.glb` | `Script_BuildBarbedWireSet.py` 项目内程序化建模 | 本项目自制 | 仓库项目资产 | 两件均落地并保持原约 3.2 m 摆位占地：带卡扣、尖刺的蛇腹网和三道有刺桩网。 |
 | 手推车和市场储物 `Model_Handcart.glb`、`Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew) | CC-BY-4.0 | 新手推车替换旧模型，减至 4,200 三角；另拆出 2 种米袋、3 种木箱、4 种板条箱，单件不超过 900 三角。 |
-| 无叶乔木三变体 `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc)、[tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a)、[tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib)、[Helindu](https://sketchfab.com/Helindu) | CC-BY-4.0 | 三件均落地、统一高度基准并移除源贴图；运行时共享 `TreeBark` 材质，按既有树位 seed 稳定随机选择并走 GPU 实例化/流送。 |
+| 无叶乔木三变体 `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc)、[tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a)、[tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib)、[Helindu](https://sketchfab.com/Helindu) | CC-BY-4.0 | 三件均落地、统一高度基准并移除源贴图；成品分别 47,998 / 60,000 / 22,700 三角，第三件因源模只有 22,700 面而以原拓扑封顶。运行时共享 `TreeBark` 材质。 |
 
 CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保留。
 新三包的原始 `scene.gltf` / `scene.bin`、Sketchfab 自动生成署名和许可副本保存在
@@ -207,7 +207,7 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 | 运行时文件 | 来源 | 许可 | 处理后预算 |
 |---|---|---|---|
-| `Model_ChineseLifeSet.glb`：16 件中式生活件（水缸/陶瓮/酒坛/石磨盘/石井台/条凳/凉床/簸箕/笸箩/斗笠/布灯笼/铺面门板/柴垛） | Sketchfab 13 个源模型，作者：KOREA HERITAGE SERVICE (KHS_Asset)、Joan Tieu、Khyoocumber、MushyDay、Scritta、Bharath (sneeky)、Lyskilde (longtail)、dukat.andrej；UID 与逐件对应记录在 `Data_ExternalAssets_ChineseLife.mjs` 文件头与 `Source/Model_Sketchfab*/License_SketchfabSource.txt` | CC-BY-4.0 | 9,606 三角，601 KB，GLB 内无贴图；石井台/石磨盘在运行时另载作者原 PBR，铺面门板另载无字 imagegen PBR |
+| `Model_ChineseLifeSet.glb`：16 件中式生活件（水缸/陶瓮/酒坛/石磨盘/石井台/条凳/凉床/簸箕/笸箩/斗笠/布灯笼/铺面门板/柴垛） | Sketchfab 13 个源模型，作者：KOREA HERITAGE SERVICE (KHS_Asset)、Joan Tieu、Khyoocumber、MushyDay、Scritta、Bharath (sneeky)、Lyskilde (longtail)、dukat.andrej；UID 与逐件对应记录在 `Data_ExternalAssets_ChineseLife.mjs` 文件头与 `Source/Model_Sketchfab*/License_SketchfabSource.txt` | CC-BY-4.0 | 选定源几何 18,420 三角全部保留，763 KB，GLB 内无贴图；石井台/石磨盘在运行时另载作者原 PBR，铺面门板另载无字 imagegen PBR |
 | `Model_HouseholdWareSet.glb`：14 件家什容器（木桶/木盆/陶罐/花盆/笸箩/提篮/凳/粗木桌/斧锤锹/柴枝/风灯） | Poly Haven（slug 清单在 `Data_ExternalAssets_HouseholdWare.mjs`；`Source/Model_PolyHaven*/`） | CC0 1.0 | 10,594 三角，537 KB，无贴图 |
 | `Model_RuralYardSet.glb`：15 件村居农具（井圈/柴堆/草垛/劈柴墩/石槽/陶盆/水桶/锄/锹/木料/车轮/条凳/方凳/晾杆） | Kenney（Nature / Survival / Graveyard / Fantasy Town Kit）与 Quaternius（Medieval Village），URL+sha256 在 `_import/Source/*/Source_RuralYard.json` | CC0 1.0 | 3,606 三角，254 KB，无贴图 |
 

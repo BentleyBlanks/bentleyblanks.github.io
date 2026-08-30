@@ -19,7 +19,7 @@
 
 export const PACK = Object.freeze({
   id: "ChineseLife",
-  url: "./Model/Model_ChineseLifeSet.glb?v=2",
+  url: "./Model/Model_ChineseLifeSet.glb?v=3",
 });
 
 /**

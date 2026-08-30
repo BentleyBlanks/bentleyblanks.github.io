@@ -262,7 +262,7 @@ export const MESHES = {
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
   WaltherP38: {
-    file: "WaltherP38.tzm.json", category: "weapon", triangles: 29899, meshBlocks: 2, nodes: 7, joints: 0,
+    file: "WaltherP38.tzm.json", category: "weapon", triangles: 30362, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["lqWeaponPlain", "wood"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
     draws: { high: 2, medium: 2, low: 2 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38；12×12 占位图仅对应握把，不再错误铺满整枪。",
   },
@@ -335,12 +335,12 @@ export const MESHES = {
   },
   Type95HaGo: {
     file: "Type95HaGo.tzm.json", category: "vehicle",
-    triangles: 79999, meshBlocks: 1, nodes: 8, joints: 1,
+    triangles: 82142, meshBlocks: 1, nodes: 8, joints: 1,
     materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.07, 2.27, 4.38],
     draws: { high: 1, medium: 1, low: 1 },
     note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）原始 82,142 三角；"
-      + "按战车 80,000 三角阈值减至 79,999，车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。",
+      + "80,000 阈值只会减少 2.6%，按 5% 免减面规则保留原始拓扑。车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。",
   },
   Type97ChiHa: {
     file: "Type97ChiHa.tzm.json", category: "vehicle",

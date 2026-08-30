@@ -20,6 +20,8 @@ from mathutils import Matrix, Vector
 importDir = Path(__file__).resolve().parent
 sourceDir = importDir / "Source"
 modelDir = importDir.parent / "Model"
+sys.path.insert(0, str(importDir.parent / "_blender"))
+from AssetBudgets import TriangleTargetForDesired
 
 
 def ResetScene() -> None:
@@ -88,15 +90,16 @@ def Triangles(obj: bpy.types.Object) -> int:
 
 def Optimize(
     obj: bpy.types.Object,
-    targetTriangles: int,
+    targetTriangles: int | None,
     targetSpan: float | None = None,
     flatShading: bool = False,
 ) -> tuple[int, int]:
     before = Triangles(obj)
-    if before > targetTriangles:
+    resolvedTarget = TriangleTargetForDesired(before, targetTriangles)
+    if before > resolvedTarget:
         modifier = obj.modifiers.new("RuntimeDecimate", "DECIMATE")
         modifier.decimate_type = "COLLAPSE"
-        modifier.ratio = max(0.01, min(1.0, targetTriangles / before))
+        modifier.ratio = max(0.01, min(1.0, resolvedTarget / before))
         modifier.use_collapse_triangulate = True
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=modifier.name)
@@ -190,30 +193,30 @@ def BakeCourtyard() -> None:
 
 
 battlefieldSpecs = (
-    ("barbed_wiere.001_3", "BattlefieldBarbedWire01", "Steel", 200),
-    ("barbed_wiere_2", "BattlefieldBarbedWire02", "Steel", 200),
-    ("Cube.005_0", "BattlefieldBeamObstacle01", "WoodBeam", 200),
-    ("Cube.007_1", "BattlefieldBeamObstacle02", "WoodBeam", 200),
-    ("Cube.001_5", "BattlefieldSupplyBox", "WoodDoor", 200),
-    ("Plane.002_4", "BattlefieldCanvasCover01", "Sandbag", 800),
-    ("Cube.002_10", "BattlefieldCompartmentCrate", "WoodDoor", 400),
-    ("Cube_6", "BattlefieldShellStack", "Steel", 1200),
-    ("Cube.003_7", "BattlefieldGrenadeStack", "Steel", 900),
-    ("Cube.004_8", "BattlefieldCartridgeScatter", "Steel", 700),
-    ("Plane.003_9", "BattlefieldCanvasCover02", "Sandbag", 700),
-    ("Cube.006_11", "BattlefieldHedgehog", "Steel", 300),
-    ("Cube.008_13", "BattlefieldOpenBin", "WoodDoor", 500),
-    ("Cube.009_12", "BattlefieldGroundSheet", "Sandbag", 200),
-    ("Cube.010_14", "BattlefieldTimberBeam", "WoodBeam", 200),
-    ("Cylinder_15", "BattlefieldMetalPole", "Steel", 100),
-    ("Cylinder.003_16", "BattlefieldPillbox", "Stone", 1600),
-    ("Cylinder.008_17", "BattlefieldLadder", "Steel", 700),
-    ("Landscape_18", "BattlefieldTrenchEarthwork", "Ground", 3500),
-    ("Plane_19", "BattlefieldSandbag01", "Sandbag", 600),
-    ("Plane.005_20", "BattlefieldSandbag02", "Sandbag", 600),
-    ("Plane.006_21", "BattlefieldSandbag03", "Sandbag", 600),
-    ("Plane.007_22", "BattlefieldGroundPlane", "Ground", 200),
-    ("Sphere_23", "BattlefieldRock", "Stone", 200),
+    ("barbed_wiere.001_3", "BattlefieldBarbedWire01", "Steel"),
+    ("barbed_wiere_2", "BattlefieldBarbedWire02", "Steel"),
+    ("Cube.005_0", "BattlefieldBeamObstacle01", "WoodBeam"),
+    ("Cube.007_1", "BattlefieldBeamObstacle02", "WoodBeam"),
+    ("Cube.001_5", "BattlefieldSupplyBox", "WoodDoor"),
+    ("Plane.002_4", "BattlefieldCanvasCover01", "Sandbag"),
+    ("Cube.002_10", "BattlefieldCompartmentCrate", "WoodDoor"),
+    ("Cube_6", "BattlefieldShellStack", "Steel"),
+    ("Cube.003_7", "BattlefieldGrenadeStack", "Steel"),
+    ("Cube.004_8", "BattlefieldCartridgeScatter", "Steel"),
+    ("Plane.003_9", "BattlefieldCanvasCover02", "Sandbag"),
+    ("Cube.006_11", "BattlefieldHedgehog", "Steel"),
+    ("Cube.008_13", "BattlefieldOpenBin", "WoodDoor"),
+    ("Cube.009_12", "BattlefieldGroundSheet", "Sandbag"),
+    ("Cube.010_14", "BattlefieldTimberBeam", "WoodBeam"),
+    ("Cylinder_15", "BattlefieldMetalPole", "Steel"),
+    ("Cylinder.003_16", "BattlefieldPillbox", "Stone"),
+    ("Cylinder.008_17", "BattlefieldLadder", "Steel"),
+    ("Landscape_18", "BattlefieldTrenchEarthwork", "Ground"),
+    ("Plane_19", "BattlefieldSandbag01", "Sandbag"),
+    ("Plane.005_20", "BattlefieldSandbag02", "Sandbag"),
+    ("Plane.006_21", "BattlefieldSandbag03", "Sandbag"),
+    ("Plane.007_22", "BattlefieldGroundPlane", "Ground"),
+    ("Sphere_23", "BattlefieldRock", "Stone"),
 )
 
 # These source groups carry split normals opposite to their triangle winding.
@@ -229,9 +232,9 @@ def BakeBattlefield() -> None:
     ResetScene()
     groups = ByParent(Import("Model_SketchfabBattlefieldPack"))
     output = []
-    for sourceName, runtimeName, material, target in battlefieldSpecs:
+    for sourceName, runtimeName, material in battlefieldSpecs:
         output.append(Process(
-            groups[sourceName], runtimeName, material, target,
+            groups[sourceName], runtimeName, material, None,
             rebuildNormals=runtimeName in battlefieldNormalRepairNames,
         ))
     Export(output, "Model_BattlefieldPack.glb")

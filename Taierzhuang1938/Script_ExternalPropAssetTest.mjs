@@ -9,9 +9,11 @@ import {
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
 import { ASSETS as CHINESE_LIFE_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
+import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
 
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const externalStandards = new Map(EXTERNAL_GLB_STANDARDS.map((record) => [record.id, record]));
 
 function ReadGlb(fileName, maxBytes = 300_000) {
   const bytes = fs.readFileSync(path.join(root, "Model", fileName));
@@ -263,17 +265,13 @@ assert.ok(waterBucket.maxSpan >= 0.33 && waterBucket.maxSpan <= 0.35,
 assert.ok(waterBucket.indices / waterBucket.vertices > 1.5,
   "water bucket shares angle-limited normals across triangulation seams");
 
-const leaflessTrees = InspectNodes("Model_LeaflessTreeSet.glb", 3_600_000);
+const leaflessTrees = InspectNodes("Model_LeaflessTreeSet.glb", 7_000_000);
 assert.deepEqual([...leaflessTrees.nodes.keys()].sort(),
   ["LeaflessTree01", "LeaflessTreeLowPoly", "LeaflessTreeOak"],
   "three leafless tree variants are independently instanceable");
-const treeTriangleBudgets = new Map([
-  ["LeaflessTreeOak", 24_000],
-  ["LeaflessTree01", 30_000],
-  ["LeaflessTreeLowPoly", 13_000],
-]);
 for (const [name, spec] of leaflessTrees.nodes) {
-  assert.ok(spec.triangles <= treeTriangleBudgets.get(name), `${name} triangle budget`);
+  assert.equal(spec.triangles, externalStandards.get(name)?.actualTriangles,
+    `${name} matches its doubled-or-source-capped target`);
   assert.ok(Math.abs(spec.minY) < 0.01, `${name} is ground-ready within one centimetre`);
   assert.ok(spec.maxSpan >= 6.7 && spec.maxSpan <= 7.7,
     `${name} keeps the shared seven-metre reference scale`);
@@ -320,7 +318,9 @@ const battlefieldGlb = ReadGlb("Model_BattlefieldPack.glb", 4_100_000);
 AssertNormalsFollowTriangleWinding(battlefieldGlb, "BattlefieldBeamObstacle01");
 AssertNormalsFollowTriangleWinding(battlefieldGlb, "BattlefieldPillbox");
 for (const [name, spec] of battlefield.nodes) {
-  assert.ok(spec.triangles <= 3500, `${name} triangle budget`);
+  const standard = externalStandards.get(name);
+  assert.ok(standard, `${name} has an external-GLB standards record`);
+  assert.equal(spec.triangles, standard.sourceTriangles, `${name} preserves selected source topology`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);
 }
 
@@ -406,8 +406,10 @@ for (const [label, build, tag] of [
     `${label} keeps its aggregate gameplay collider`);
 }
 
-const ruralHouse = ReadGlb("Model_ChineseRuralHouse.glb", 5_500_000);
+const ruralHouse = InspectNodes("Model_ChineseRuralHouse.glb", 6_200_000);
 AssertAllUsedMaterialsHavePbrMaps(ruralHouse.json, "Chinese rural house", 11, "Model_ChineseRuralHouse.glb");
+assert.equal([...ruralHouse.nodes.values()].reduce((sum, spec) => sum + spec.triangles, 0), 58_812,
+  "Chinese rural house is rebuilt at twice the former 29,406-triangle runtime mesh");
 
 for (const [fileName, label, materialCount, maxBytes] of [
   ["Model_AsianHouseRow.glb", "Asian house row", 6, 4_800_000],
@@ -505,7 +507,13 @@ for (const name of ["WoodAxe", "SmithHammer", "IronSpade"]) {
     `${name} separates its steel head from its wooden handle`);
 }
 
-const chineseLife = InspectNodes("Model_ChineseLifeSet.glb", 750_000);
+const chineseLife = InspectNodes("Model_ChineseLifeSet.glb", 1_000_000);
+assert.equal(chineseLife.nodes.size, 16, "all 16 Chinese Life components remain independently selectable");
+for (const [name, spec] of chineseLife.nodes) {
+  const standard = externalStandards.get(name);
+  assert.ok(standard, `${name} has an external-GLB standards record`);
+  assert.equal(spec.triangles, standard.sourceTriangles, `${name} preserves selected source topology`);
+}
 for (const [name, minTriangles] of [
   ["ClothLantern", 950],
   ["WinnowingBasket", 1600],

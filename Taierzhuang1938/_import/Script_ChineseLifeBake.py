@@ -31,6 +31,7 @@ HouseholdCeramic 给的是 Stone × 0xb99a82）在这一层拿不到，交付报
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import bpy
 from mathutils import Matrix, Vector
@@ -39,6 +40,8 @@ from mathutils import Matrix, Vector
 importDir = Path(__file__).resolve().parent
 sourceDir = importDir / "Source"
 modelDir = importDir.parent / "Model"
+sys.path.insert(0, str(importDir.parent / "_blender"))
+from AssetBudgets import TriangleTargetForDesired
 
 
 # 配方名 → 视口占位色。只为在 Blender 里肉眼分得清，运行时按名字重绑游戏材质。
@@ -135,10 +138,11 @@ def Optimize(obj, targetTriangles, targetSpan=None, targetHeight=None):
     落地在缩放之前：缩放是关于原点做的，底面已经贴在 z=0 上，怎么缩都还贴着。
     """
     before = Triangles(obj)
-    if before > targetTriangles:
+    resolvedTarget = TriangleTargetForDesired(before, targetTriangles)
+    if before > resolvedTarget:
         modifier = obj.modifiers.new("RuntimeDecimate", "DECIMATE")
         modifier.decimate_type = "COLLAPSE"
-        modifier.ratio = max(0.01, min(1.0, targetTriangles / before))
+        modifier.ratio = max(0.01, min(1.0, resolvedTarget / before))
         modifier.use_collapse_triangulate = True
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=modifier.name)
@@ -207,49 +211,49 @@ def Export(objects: list[bpy.types.Object], fileName: str) -> None:
 # 陶坊场景里的坛子是卡通六棱带盖件，只留两只当「有盖陶坛」，不冒充水缸。
 SOURCES = (
     ("Model_SketchfabStorageJarTall", (
-        ((), "ClayWaterVat", "Stone", 700, None, 0.90),
+        ((), "ClayWaterVat", "Stone", None, None, 0.90),
     )),
     ("Model_SketchfabStorageJarRound", (
-        ((), "ClayRoundVat", "Stone", 700, None, 0.74),
+        ((), "ClayRoundVat", "Stone", None, None, 0.74),
     )),
     ("Model_SketchfabStorageJarLugged", (
         # 0.57 m 的小件走 600 档，不是大件的 1200 档
-        ((), "ClayLuggedJar", "Stone", 550, None, 0.52),
+        ((), "ClayLuggedJar", "Stone", None, None, 0.52),
     )),
     ("Model_SketchfabAncientChinesePottery", (
-        (("Color_Pot_Red1",), "ClayLiddedJar", "Stone", 500, None, 0.62),
-        (("Color_Pot_White",), "ClayWideJar", "Stone", 500, None, 0.50),
-        (("Pile_Wood",), "FirewoodPile", "WoodBeam", 1200, None, 0.62),
-        (("Table",), "LongBench", "WoodDoor", 260, None, 0.42),
+        (("Color_Pot_Red1",), "ClayLiddedJar", "Stone", None, None, 0.62),
+        (("Color_Pot_White",), "ClayWideJar", "Stone", None, None, 0.50),
+        (("Pile_Wood",), "FirewoodPile", "WoodBeam", None, None, 0.62),
+        (("Table",), "LongBench", "WoodDoor", None, None, 0.42),
     )),
     ("Model_SketchfabChineseWineJar", (
-        ((), "WineJarCluster", "Stone", 650, None, 0.55),
+        ((), "WineJarCluster", "Stone", None, None, 0.55),
     )),
     ("Model_SketchfabOldChineseLantern", (
-        ((), "ClothLantern", "ClothNra", 1200, None, 0.52),
+        ((), "ClothLantern", "ClothNra", None, None, 0.52),
     )),
     ("Model_SketchfabChineseSignboard", (
-        ((), "ShopPlaque", "WoodDoor", 320, None, 1.15),
+        ((), "ShopPlaque", "WoodDoor", None, None, 1.15),
     )),
     ("Model_SketchfabWinnow", (
-        ((), "WinnowingBasket", "Sandbag", 1800, None, 0.78),
+        ((), "WinnowingBasket", "Sandbag", None, None, 0.78),
     )),
     ("Model_SketchfabBambooBasket", (
-        ((), "WovenBasket", "Sandbag", 1800, 0.54, None),
+        ((), "WovenBasket", "Sandbag", None, 0.54, None),
     )),
     ("Model_SketchfabLowWoodenBench", (
-        ((), "WoodPlatformBench", "WoodBeam", 700, 1.62, None),
+        ((), "WoodPlatformBench", "WoodBeam", None, 1.62, None),
     )),
     # 只要井筒：同一个父节点下还挂着木棚 / 棚顶 / 绳桶，那是欧式带顶水井的部件。
     ("Model_SketchfabStoneWell", (
-        (("Well_WellTube_0",), "StoneWellCurb", "Stone", 700, None, 0.72),
+        (("Well_WellTube_0",), "StoneWellCurb", "Stone", None, None, 0.72),
     )),
     ("Model_SketchfabStoneMillWheel", (
-        ((), "StoneMillWheel", "Stone", 700, 1.04, None),
+        ((), "StoneMillWheel", "Stone", None, 1.04, None),
     )),
     # 只要斗笠本体：Hat.rope 那条系带垂在帽檐之下，留着它整顶帽子会离地悬空。
     ("Model_SketchfabAsianConicalHat", (
-        (("Object_3",), "BambooHat", "Sandbag", 1400, 0.46, None),
+        (("Object_3",), "BambooHat", "Sandbag", None, 0.46, None),
     )),
 )
 

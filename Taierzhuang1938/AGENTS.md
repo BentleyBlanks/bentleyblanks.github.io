@@ -64,7 +64,8 @@
     守着它的：没有测试；本文件带头遵守。
 
 13. **外部枪械仅在选定源几何超过 `WEAPON_TRIANGLE_LIMIT` 时减面；战车同理读 `VEHICLE_TRIANGLE_LIMIT`。**
-    展示件/备用状态/重复壳先排除，超过阈值才尽量贴线；指定特例读 `SPECIAL_TRIANGLE_TARGETS`。
+    展示件/备用状态/重复壳先排除，超过阈值才尽量贴线；若目标降幅 ≤5%，仍保留原始拓扑。
+    指定特例读 `SPECIAL_TRIANGLE_TARGETS`；外部 GLB 的逐件原始/实际/目标登记读 `EXTERNAL_GLB_STANDARDS`。
     单件面数变化引起的全场预算同步进 `SCENE_RENDER_LIMITS`；守着它的：`Script_AssetStandardsTest` + 编辑器「资产规范」。
 
 ## 常用命令

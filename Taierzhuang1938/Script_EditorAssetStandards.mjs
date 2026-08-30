@@ -4,8 +4,9 @@
 import { Panel, Chips, Note, El } from "./Script_EditorUi.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import {
-  ASSET_STANDARD_GROUPS, ComplianceFor, OTHER_ASSET_RULES, ReductionPercent,
-  SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
+  ASSET_STANDARD_GROUPS, ComplianceFor, EXTERNAL_GLB_STANDARDS, OTHER_ASSET_RULES,
+  ReductionPercent, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS,
+  ThresholdTriangleTarget, TRIANGLE_RULES,
 } from "./Data_AssetStandards.mjs";
 
 const Num = (value) => Number.isFinite(value) ? value.toLocaleString("en-US") : "—";
@@ -21,9 +22,12 @@ function LimitLabel(id, record) {
   const special = SPECIAL_TRIANGLE_TARGETS[id];
   if (special != null) return `${Num(special)}（指定）`;
   const rule = record.group === "vehicle" ? TRIANGLE_RULES.vehicle : TRIANGLE_RULES.weapon;
-  return record.sourceTriangles > rule.limit
-    ? `${Num(rule.limit)}（减面）`
-    : `${Num(rule.limit)}（免减面）`;
+  const target = ThresholdTriangleTarget(record.sourceTriangles, rule.limit);
+  if (target === record.sourceTriangles && record.sourceTriangles > rule.limit) {
+    return `${Num(target)}（5% 免减面）`;
+  }
+  return target < record.sourceTriangles
+    ? `${Num(target)}（减面）` : `${Num(rule.limit)}（免减面）`;
 }
 
 function SourceRows(group) {
@@ -39,6 +43,24 @@ function SourceRows(group) {
         compliance: ComplianceFor(id, actual), note: record.note || "",
       };
     });
+}
+
+function ExternalRows() {
+  return EXTERNAL_GLB_STANDARDS.map((record) => {
+    const close = record.actualTriangles <= record.targetTriangles * 1.001
+      && record.actualTriangles >= record.targetTriangles * 0.97;
+    return {
+      id: record.id, name: record.name, source: record.sourceTriangles,
+      actual: record.actualTriangles,
+      limit: record.policy === "source"
+        ? `${Num(record.targetTriangles)}（原始拓扑）`
+        : `${Num(record.targetTriangles)}（指定）`,
+      change: ChangeLabel(record.sourceTriangles, record.actualTriangles),
+      sourceTexture: record.sourceTexture, runtimeTexture: record.runtimeTexture,
+      compliance: { label: close ? (record.policy === "source" ? "原始拓扑保留" : "指定目标达标") : "偏离登记目标", tone: close ? "good" : "bad" },
+      note: `${record.pack}；${record.note}`,
+    };
+  });
 }
 
 function ProceduralRows() {
@@ -139,8 +161,15 @@ export class AssetStandardsEditor {
 
   Render() {
     this.dynamic.innerHTML = "";
-    if (["external", "texture"].includes(this.group)) {
+    if (this.group === "texture") {
       RenderRuleCards(this.dynamic, this.group);
+      return;
+    }
+    if (this.group === "external") {
+      RenderRuleCards(this.dynamic, this.group);
+      const rows = ExternalRows();
+      Note(this.dynamic, `四套外部 GLB 共 ${rows.length} 个可审计资产；原始/实际/目标/降幅与贴图策略均按最近一次真实烘焙登记。`, false);
+      RenderAssetTable(this.dynamic, rows);
       return;
     }
     if (this.group === "procedural") {

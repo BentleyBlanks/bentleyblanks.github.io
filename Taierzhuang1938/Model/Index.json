@@ -539,43 +539,6 @@
    }
   },
   {
-   "name": "Type95HaGo",
-   "category": "vehicle",
-   "file": "Type95HaGo.tzm.json",
-   "triangles": 79999,
-   "meshBlocks": 1,
-   "nodes": 8,
-   "joints": 1,
-   "bytes": 3260527,
-   "materials": [
-    "armor"
-   ],
-   "mounts": [
-    "root",
-    "turret",
-    "gunMuzzle",
-    "rearMgMuzzle",
-    "hatch",
-    "mgMuzzle",
-    "hullFront"
-   ],
-   "bounds": {
-    "min": [
-     -1.035,
-     0.0,
-     -2.19
-    ],
-    "max": [
-     1.035,
-     2.27,
-     2.19
-    ]
-   },
-   "sourceTriangles": 82142,
-   "targetTriangles": 80000,
-   "triangleLimit": 80000
-  },
-  {
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "ZhongZheng.tzm.json",
@@ -827,43 +790,6 @@
    },
    "sourceTriangles": 910,
    "targetTriangles": 910,
-   "triangleLimit": 30000
-  },
-  {
-   "name": "WaltherP38",
-   "category": "weapon",
-   "file": "WaltherP38.tzm.json",
-   "triangles": 29899,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 878853,
-   "materials": [
-    "lqWeaponPlain",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01433,
-     -0.06741,
-     -0.17
-    ],
-    "max": [
-     0.0143,
-     0.04494,
-     0.046
-    ]
-   },
-   "sourceTriangles": 31182,
-   "targetTriangles": 30000,
    "triangleLimit": 30000
   },
   {
@@ -1439,6 +1365,80 @@
    },
    "sourceTriangles": 3969,
    "targetTriangles": 3969,
+   "triangleLimit": 80000
+  },
+  {
+   "name": "WaltherP38",
+   "category": "weapon",
+   "file": "WaltherP38.tzm.json",
+   "triangles": 30362,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 889405,
+   "materials": [
+    "lqWeaponPlain",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01433,
+     -0.06741,
+     -0.17
+    ],
+    "max": [
+     0.0143,
+     0.04494,
+     0.046
+    ]
+   },
+   "sourceTriangles": 31182,
+   "targetTriangles": 31182,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Type95HaGo",
+   "category": "vehicle",
+   "file": "Type95HaGo.tzm.json",
+   "triangles": 82142,
+   "meshBlocks": 1,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 3312355,
+   "materials": [
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "turret",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.035,
+     0.0,
+     -2.19
+    ],
+    "max": [
+     1.035,
+     2.27,
+     2.19
+    ]
+   },
+   "sourceTriangles": 82142,
+   "targetTriangles": 82142,
    "triangleLimit": 80000
   }
  ]

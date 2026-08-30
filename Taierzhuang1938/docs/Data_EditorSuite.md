@@ -261,12 +261,14 @@ Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与�
 ### 资产规范 `Script_EditorAssetStandards.mjs`
 
 这是独立于构件库的只读分类，不摆模型、不接管相机。枪械、架设/炮械、刀剑/刺刀、战车、
-程序化 TZM、外部 GLB 与贴图规范分七栏；有源 TZM 逐件显示选定源几何、游戏实际三角形、
+程序化 TZM、外部 GLB 与贴图规范分七栏；有源 TZM 与四套重点外部 GLB 都逐件显示选定源几何、游戏实际三角形、
 分类限制或指定目标、面数降幅、自带贴图、游戏内贴图策略与合规状态。展示件、备用状态、
 重复壳先从“原始”口径排除；史实补件与强制退化面清理单独标注，不伪装成减面。
 
-规则真相在纯数据 `Data_AssetStandards.mjs`，实际面数仍读 `Data_Meshes.mjs`；Blender 侧阈值
-与三件特例在 `_blender/AssetBudgets.py`。`Script_AssetStandardsTest.mjs` 同时核对两边、
+规则真相在纯数据 `Data_AssetStandards.mjs`，实际面数仍读 `Data_Meshes.mjs`；Blender 侧阈值、
+三件特例及“目标降幅 ≤5% 不减面”在 `_blender/AssetBudgets.py`。外部 GLB 页当前登记乡村房屋、
+Battlefield Pack 24 件、Chinese Life 16 件与无叶乔木三变体，共 44 行。
+`Script_AssetStandardsTest.mjs` 同时核对两边、
 `Model/Index.json` 构建元数据、import map 与编辑器分类，防止面数表悄悄过期。
 
 建筑与地标如果登记了预建模战损，会额外出现「建模状态」三选一：原始状态保留构件自己的

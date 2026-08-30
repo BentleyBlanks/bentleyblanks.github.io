@@ -153,8 +153,8 @@ Check("资产规范有七个分类", assetStandards.chips.length === 7
 Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >= 10
   && ["原始面数", "实际面数", "限制 / 目标", "面数降幅", "自带贴图", "游戏内贴图"]
     .every((label) => assetStandards.headers.includes(label)));
-Check("枪械表显示 P38 原始 31,182 与实际 29,899", assetStandards.text.includes("31,182")
-  && assetStandards.text.includes("29,899"));
+Check("枪械表显示 P38 原始 31,182 与实际 30,362", assetStandards.text.includes("31,182")
+  && assetStandards.text.includes("30,362"));
 Check("资产规范当前没有不合规红项", assetStandards.bad === 0, `红项=${assetStandards.bad}`);
 await page.click('[data-editor="assetStandards"]');
 

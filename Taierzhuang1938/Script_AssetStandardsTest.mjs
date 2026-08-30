@@ -5,8 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MESHES } from "./Data_Meshes.mjs";
 import {
-  ASSET_STANDARD_GROUPS, ComplianceFor, SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS,
-  SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
+  ASSET_STANDARD_GROUPS, ComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
+  SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
 } from "./Data_AssetStandards.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
@@ -27,7 +27,9 @@ const Check = (ok, label, detail = "") => {
 
 Check(TRIANGLE_RULES.weapon.limit === 30000, "枪械仅在选定源几何 > 30,000 时减面");
 Check(TRIANGLE_RULES.vehicle.limit === 80000, "战车仅在选定源几何 > 80,000 时减面");
-Check(SCENE_RENDER_LIMITS.drawCalls === 5000 && SCENE_RENDER_LIMITS.triangles === 6500000
+Check(MIN_DECIMATION_REDUCTION === 0.05 && /MIN_DECIMATION_REDUCTION\s*=\s*0\.05/.test(pythonRules),
+  "降幅 5% 及以下时浏览器规范与 Blender 都保留原始拓扑");
+Check(SCENE_RENDER_LIMITS.drawCalls === 5000 && SCENE_RENDER_LIMITS.triangles === 8100000
   && /SCENE_RENDER_LIMITS/.test(sceneEditorSource) && /SCENE_RENDER_LIMITS/.test(bootTestSource),
 "恢复原模后的全场红线由规范、编辑器与开机门禁共用");
 Check(/WEAPON_TRIANGLE_LIMIT\s*=\s*30000/.test(pythonRules)
@@ -68,10 +70,13 @@ Check(drift.length === 0, "实际面数与 Model/Index.json 一致", drift.join(
 Check(sourceDrift.length === 0, "原始选定面数与 Blender 构建元数据一致", sourceDrift.join("、"));
 Check(complianceBad.length === 0, "全部有源资产符合特例或分类阈值", complianceBad.join("、"));
 
-Check(MESHES.WaltherP38.triangles >= 29100 && MESHES.WaltherP38.triangles <= 30000,
-  "P38 超 30k 后落在接近 30k 的 3% 窗内", String(MESHES.WaltherP38.triangles));
-Check(MESHES.Type95HaGo.triangles >= 77600 && MESHES.Type95HaGo.triangles <= 80000,
-  "九五式超 80k 后落在接近 80k 的 3% 窗内", String(MESHES.Type95HaGo.triangles));
+Check(MESHES.WaltherP38.triangles === 30362,
+  "P38 到 30k 仅降 3.8%，保留源拓扑并只清理退化面", String(MESHES.WaltherP38.triangles));
+Check(MESHES.Type95HaGo.triangles === 82142,
+  "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
+Check(EXTERNAL_GLB_STANDARDS.length === 44
+  && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
+  "外部 GLB 分类登记乡村房屋、Battlefield、Chinese Life 与三种无叶乔木共 44 项");
 
 const groupIds = new Set(ASSET_STANDARD_GROUPS.map((entry) => entry.id));
 Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "texture"]
@@ -79,9 +84,11 @@ Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "tex
 Check(/原始面数/.test(editorSource) && /实际面数/.test(editorSource)
   && /面数降幅/.test(editorSource) && /自带贴图/.test(editorSource),
 "资产规范表展示原始/实际/降幅/贴图列");
+Check(/ExternalRows/.test(editorSource) && /EXTERNAL_GLB_STANDARDS/.test(editorSource),
+  "外部 GLB 分类使用逐资产审计表而非仅显示通用卡片");
 Check(/AssetStandardsEditor/.test(suiteSource)
-  && /Script_EditorAssetStandards\.mjs\?v=1/.test(html)
-  && /Data_AssetStandards\.mjs\?v=1/.test(html),
+  && /Script_EditorAssetStandards\.mjs\?v=2/.test(html)
+  && /Data_AssetStandards\.mjs\?v=2/.test(html),
 "资产规范编辑器已注册到套件与 import map");
 
 if (failed) {

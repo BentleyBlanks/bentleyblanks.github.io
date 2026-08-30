@@ -22,25 +22,25 @@ json.samplers ??= [{ magFilter: 9729, minFilter: 9987 }];
 const materialSets = [
   {
     stem: "RoofTile",
-    materials: [2],
+    materials: ["Material.014", "Material.010", "Material"],
     normalScale: 0.82,
     roughness: 0.88,
   },
   {
     stem: "EarthPlaster",
-    materials: [5, 7],
+    materials: ["Material.015", "Material.017", "Material.019"],
     normalScale: 0.52,
     roughness: 0.94,
   },
   {
     stem: "LimePlaster",
-    materials: [0, 8],
+    materials: ["material_0", "Material.016", "Material.018"],
     normalScale: 0.42,
     roughness: 0.92,
   },
   {
     stem: "Timber",
-    materials: [1],
+    materials: ["Material.013", "Material.022"],
     normalScale: 0.68,
     roughness: 0.86,
   },
@@ -70,9 +70,9 @@ function AddExternalTexture(stem, channel) {
 for (const spec of materialSets) {
   const baseTexture = AddExternalTexture(spec.stem, "Base");
   const normalTexture = AddExternalTexture(spec.stem, "Normal");
-  for (const materialIndex of spec.materials) {
-    const material = json.materials?.[materialIndex];
-    if (!material) throw new Error(`Missing rural house material ${materialIndex}`);
+  for (const materialName of spec.materials) {
+    const material = json.materials?.find((entry) => entry.name === materialName);
+    if (!material) throw new Error(`Missing rural house material ${materialName}`);
     material.pbrMetallicRoughness ??= {};
     material.pbrMetallicRoughness.baseColorFactor = [1, 1, 1, 1];
     material.pbrMetallicRoughness.baseColorTexture = { index: baseTexture };

@@ -12,6 +12,7 @@ normalized to the same reference height so placement code can scale by metres.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import bpy
 from mathutils import Matrix, Vector
@@ -21,14 +22,16 @@ importDir = Path(__file__).resolve().parent
 sourceDir = importDir / "Source"
 modelDir = importDir.parent / "Model"
 referenceHeight = 7.0
+sys.path.insert(0, str(importDir.parent / "_blender"))
+from AssetBudgets import TriangleTargetForDesired
 
 treeSpecs = (
-    ("Model_SketchfabOldOakWithoutLeavesHighPoly", "LeaflessTreeOak", 24000, None),
-    ("Model_SketchfabTreeWithoutLeaves01", "LeaflessTree01", 30000, None),
+    ("Model_SketchfabOldOakWithoutLeavesHighPoly", "LeaflessTreeOak", 47998, None),
+    ("Model_SketchfabTreeWithoutLeaves01", "LeaflessTree01", 60000, None),
     # This download also contains two disconnected decorative-card meshes
     # (``tree_twig`` and ``tree_plamatisate``).  They collapse into floating
     # shards under simplification and are not part of the woody tree silhouette.
-    ("Model_SketchfabTreeWithoutLeavesLowPoly", "LeaflessTreeLowPoly", 12000, {"Tree__0"}),
+    ("Model_SketchfabTreeWithoutLeavesLowPoly", "LeaflessTreeLowPoly", 25928, {"Tree__0"}),
 )
 
 
@@ -87,6 +90,7 @@ def Marker() -> bpy.types.Material:
 
 def Optimize(obj: bpy.types.Object, targetTriangles: int) -> tuple[int, int, tuple[float, float, float]]:
     before = TriangleCount(obj)
+    targetTriangles = TriangleTargetForDesired(before, targetTriangles)
     def Normalize() -> None:
         # Read the current mesh, not ``Object.bound_box``: immediately after a
         # modifier apply Blender can leave that cached box one topology behind.

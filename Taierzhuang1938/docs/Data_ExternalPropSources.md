@@ -8,7 +8,7 @@ or destructibility sources.
 
 | Game asset | Sketchfab model (UID) | Author | Download license reported by Sketchfab | Game-side change |
 |---|---|---|---|---|
-| `Model_ChineseRuralHouse.glb` | Traditional Chinese House (Low Poly / Stylized) (`0f5fbcbf1489432a81e372e6d38699dd`) | Himanshu3dArtis | CC Attribution | Largest extent scaled to 6.4 m; mesh reduced to 12% of its original triangle density; source textures retained. |
+| `Model_ChineseRuralHouse.glb` | Traditional Chinese House (Low Poly / Stylized) (`0f5fbcbf1489432a81e372e6d38699dd`) | Himanshu3dArtis | CC Attribution | Selected source 236,434 triangles; rebuilt to 58,812, exactly twice the former 29,406-triangle runtime mesh. Largest extent stays 6.4 m; source UV/material slots and textures are retained, with selected slots rebound to the project's rural-house PBR. |
 | `Model_Handcart.glb` | Medieval Market Asset Pack (`006ffc4ac5f34a1782f567b07e6605f2`) | vmatthew | CC Attribution | The pack's handcart replaces the previous model; reduced to 4,200 triangles and scaled to 2.45 m. Steel stays on the shared recipe; wood uses the dedicated ImageGen `HandcartWood` BaseColor + Normal with the proven dry-wood ORM. |
 | `Model_WoodFence.glb` | Wood Wooden fence Protector of the farm low poly (`ace00004692b48c6afee9f9d505e6e35`) | ahmagh2e | CC Attribution | Largest extent scaled to 2.1 m; source textures stripped and replaced at runtime by the regenerated ImageGen `WattleFence` PBR set. |
 | `Model_WoodCrate.glb` | Wooden Crate Low-poly PBR (`f8fb4c96211d475b9370d1c403273fc6`) | MaX3Dd | CC Attribution | Largest extent scaled to 0.72 m; runtime material is the regenerated ImageGen `WoodCrate` PBR set, with board seams left to the model geometry. |
@@ -29,14 +29,14 @@ system in `Script_TengxianCity.mjs` and `Script_TengxianOutfield.mjs`.
 | Runtime asset | Sketchfab source | Author / license | Runtime treatment |
 |---|---|---|---|
 | `Model_AncientChineseCourtyardHouse.glb` | [Ancient Chinese Courtyard House](https://sketchfab.com/3d-models/ancient-chinese-courtyard-house-ed4ea9eb5f024d989eec182d48fa72d8) | [BlackBirb](https://sketchfab.com/BlackBirb), CC-BY-4.0 | One 11.85 m landmark, reduced to 5,500 triangles; source textures replaced by shared adobe and roof-tile recipes. |
-| `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya), CC-BY-4.0 | Split into 24 independently selectable nodes. The source's two 80-triangle plain helices remain archived in this pack, but the runtime barbed-wire ids now use the authored set below. |
+| `Model_BattlefieldPack.glb` | [Battlefield Pack](https://sketchfab.com/3d-models/battlefield-pack-dcd0ade8c80e46d982a54fe4619f1c87) | [Blenderust](https://sketchfab.com/narighillya), CC-BY-4.0 | Split into 24 independently selectable nodes and preserves all 27,862 selected source triangles. The source's two 80-triangle plain helices remain archived in this pack, but the runtime barbed-wire ids now use the authored set below. |
 | `Model_BarbedWireSet.glb` | Project-authored by `Script_BuildBarbedWireSet.py` | Repository project asset | Two independently selectable, ground-ready obstacles: a clipped and barbed concertina roll plus a three-strand staked fence. They preserve the former 3.2 m placement footprint. |
 | `Model_Handcart.glb`, `Model_MarketStorageSet.glb` | [Medieval Market Asset Pack](https://sketchfab.com/3d-models/medieval-market-asset-pack-006ffc4ac5f34a1782f567b07e6605f2) | [vmatthew](https://sketchfab.com/vmatthew), CC-BY-4.0 | Replacement handcart plus two rice sacks, three boxes, and four slatted crates. Every storage component is independently selectable and stays below 900 triangles; wooden storage shares the regenerated ImageGen `WoodCrate` PBR set. |
-| `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc), [tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a), [tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib), [Helindu](https://sketchfab.com/Helindu), CC-BY-4.0 | Three grounded, equal-height, runtime-budget variants. Every existing deciduous-tree seed deterministically selects one variant and a yaw; evergreen cypresses keep their distinct authored silhouette. Source textures are replaced by the shared `TreeBark` material. |
+| `Model_LeaflessTreeSet.glb` | [Old Oak without Leaves (high-poly)](https://sketchfab.com/3d-models/old-oak-without-leaves-high-poly-74064e17b0204be3951e177e5ed4abbc), [tree without leaves #1](https://sketchfab.com/3d-models/tree-without-leaves-1-336d3bc197ce4618ab325e7a6dfa0e7a), [tree without leaves, Low Poly](https://sketchfab.com/3d-models/tree-without-leaves-low-poly-71289b9e874949b6ada6acc3c819d152) | [Sereib](https://sketchfab.com/Sereib), [Helindu](https://sketchfab.com/Helindu), CC-BY-4.0 | Grounded equal-height variants are 47,998 / 60,000 / 22,700 triangles. The first two are exactly twice their former runtime counts; the third is capped at its 22,700-triangle selected source instead of adding fake subdivision. Source textures are replaced by shared `TreeBark`. |
 
 The three source packages and their generated Sketchfab credit text are retained
 under `_import/Source/Model_Sketchfab*/`. `_import/Script_SketchfabPackBake.py`
-removes the original high-resolution textures, decimates meshes, grounds every
+removes the original high-resolution textures, preserves Battlefield source topology, grounds every
 component, and binds the runtime's shared material recipes. The courtyard is
 placed once in `L0_Jiehe`; the battlefield pieces are used by the walled-town
 defense dressing (see below).
@@ -75,10 +75,10 @@ shop-door PBR generated with built-in imagegen. Small external woodwork uses `Ha
 grain-only PBR without fake plank seams), while crates retain `WoodCrate`.
 
 `Model_HouseholdWareSet.glb` now keeps separate `WoodBeam` and `Steel` primitives
-for the axe, hammer and spade instead of painting the wooden handles as steel. The
-thin woven props in that pack and the winnow, basket, lantern and conical hat in
-`Model_ChineseLifeSet.glb` retain a higher decimation budget to avoid opening cracks
-along their silhouette.
+for the axe, hammer and spade instead of painting the wooden handles as steel.
+All 16 selected `Model_ChineseLifeSet.glb` components preserve their original
+18,420 source triangles. This avoids decimation cracks in thin woven props while
+keeping the authored selection (for example, the European well canopy remains excluded).
 
 ## Walled-town per-household dressing (2026-08-25)
 

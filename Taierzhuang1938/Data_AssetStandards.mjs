@@ -8,20 +8,22 @@ export const TRIANGLE_RULES = Object.freeze({
   weapon: Object.freeze({
     label: "枪械 / 武器源模型",
     limit: 30000,
-    rule: "选定源几何不超过 30,000 三角时不做通用减面；超过时尽量贴近 30,000。",
+    rule: "选定源几何不超过 30,000 三角时不减面；超过时尽量贴近 30,000，但降幅 ≤5% 仍保留原始拓扑。",
   }),
   vehicle: Object.freeze({
     label: "战车源模型",
     limit: 80000,
-    rule: "选定源几何不超过 80,000 三角时不做通用减面；超过时尽量贴近 80,000。",
+    rule: "选定源几何不超过 80,000 三角时不减面；超过时尽量贴近 80,000，但降幅 ≤5% 仍保留原始拓扑。",
   }),
 });
 
-// 恢复外部源模后，七关 high 档实测峰值约 6.29M。保留最小工程余量，
+export const MIN_DECIMATION_REDUCTION = 0.05;
+
+// 恢复外部 GLB 面数后，七关 high 档实测峰值为 7.842M。保留约 3.3% 工程余量，
 // 仍由 BootTest 逐关量；编辑器与门禁必须共用这一份数值。
 export const SCENE_RENDER_LIMITS = Object.freeze({
   drawCalls: 5000,
-  triangles: 6500000,
+  triangles: 8100000,
 });
 
 export const SPECIAL_TRIANGLE_TARGETS = Object.freeze({
@@ -48,7 +50,8 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
     sourceTexture: "有", runtimeTexture: SharedWeaponPbr,
     note: "只取闭锁状态 A；展示弹匣、子弹与空仓挂机状态 B 不进游戏。" },
   WaltherP38: { name: "Walther P38", group: "firearm", sourceTriangles: 31182,
-    sourceTexture: "局部 12×12 占位图", runtimeTexture: SharedWeaponPbr },
+    sourceTexture: "局部 12×12 占位图", runtimeTexture: SharedWeaponPbr,
+    note: "目标 30k 只会减 3.8%，按 5% 规则不减面；实际数差异来自退化拓扑清理。" },
   UnidentifiedBoltActionRifle: { name: "未识别栓动步枪", group: "firearm", sourceTriangles: 8867,
     sourceTexture: "有（木件）", runtimeTexture: `${SourceUv}；钢件使用共享枪钢`,
     note: "横向拆解展示 BA2/LOK 排除；补连续枪管后计入选定源几何。" },
@@ -98,10 +101,73 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
   Type89Tank: { name: "八九式中战车", group: "vehicle", sourceTriangles: 4089,
     sourceTexture: "有（扫描图）", runtimeTexture: "项目共享 armor / track / steel PBR" },
   Type95HaGo: { name: "九五式轻战车", group: "vehicle", sourceTriangles: 82142,
-    sourceTexture: "有源包引用", runtimeTexture: "项目共享 armor PBR" },
+    sourceTexture: "有源包引用", runtimeTexture: "项目共享 armor PBR",
+    note: "目标 80k 只会减 2.6%，按 5% 规则保留原始拓扑。" },
   Type97ChiHa: { name: "九七式中战车", group: "vehicle", sourceTriangles: 3969,
     sourceTexture: "有（扫描图）", runtimeTexture: "项目共享 armor / track / steel PBR" },
 });
+
+const BattlefieldSourceTriangles = Object.freeze({
+  BattlefieldBarbedWire01: 80, BattlefieldBarbedWire02: 80,
+  BattlefieldBeamObstacle01: 36, BattlefieldBeamObstacle02: 36,
+  BattlefieldSupplyBox: 12, BattlefieldCanvasCover01: 968,
+  BattlefieldCompartmentCrate: 132, BattlefieldShellStack: 2384,
+  BattlefieldGrenadeStack: 1920, BattlefieldCartridgeScatter: 1324,
+  BattlefieldCanvasCover02: 882, BattlefieldHedgehog: 180,
+  BattlefieldOpenBin: 352, BattlefieldGroundSheet: 128,
+  BattlefieldTimberBeam: 112, BattlefieldMetalPole: 36,
+  BattlefieldPillbox: 1519, BattlefieldLadder: 764,
+  BattlefieldTrenchEarthwork: 14928, BattlefieldSandbag01: 572,
+  BattlefieldSandbag02: 572, BattlefieldSandbag03: 572,
+  BattlefieldGroundPlane: 133, BattlefieldRock: 140,
+});
+
+const ChineseLifeSourceTriangles = Object.freeze({
+  ClayWaterVat: 856, ClayRoundVat: 856, ClayLuggedJar: 1088,
+  ClayLiddedJar: 500, ClayWideJar: 500, FirewoodPile: 1426,
+  LongBench: 242, WineJarCluster: 650, ClothLantern: 976,
+  ShopPlaque: 316, WinnowingBasket: 4700, WovenBasket: 1088,
+  WoodPlatformBench: 1252, StoneWellCurb: 816, StoneMillWheel: 976,
+  BambooHat: 2178,
+});
+
+function PreserveSourceRows(pack, records, runtimeTexture) {
+  return Object.entries(records).map(([id, triangles]) => Object.freeze({
+    id, name: `${pack} / ${id}`, pack, sourceTriangles: triangles,
+    actualTriangles: triangles, targetTriangles: triangles,
+    sourceTexture: "有（源包）", runtimeTexture, policy: "source",
+    note: "指定保留选定源模型面数，不做通用减面。",
+  }));
+}
+
+export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({
+    id: "ChineseRuralHouse", name: "乡村房屋", pack: "Model_ChineseRuralHouse.glb",
+    sourceTriangles: 236434, actualTriangles: 58812, targetTriangles: 58812,
+    sourceTexture: "有（2 张源 BaseColor）", runtimeTexture: "源 UV + 项目房屋 BaseColor / Normal",
+    policy: "target", note: "指定以原成品 29,406 三角为基准翻倍，目标 58,812。",
+  }),
+  ...PreserveSourceRows("Battlefield Pack", BattlefieldSourceTriangles, "项目共享战场材质 PBR"),
+  ...PreserveSourceRows("Chinese Life", ChineseLifeSourceTriangles, "项目共享 / 专用生活道具 PBR"),
+  Object.freeze({
+    id: "LeaflessTreeOak", name: "无叶乔木 / 老橡树", pack: "Model_LeaflessTreeSet.glb",
+    sourceTriangles: 190527, actualTriangles: 47998, targetTriangles: 47998,
+    sourceTexture: "有（源树皮）", runtimeTexture: "项目共享 TreeBark",
+    policy: "target", note: "指定以原成品 23,999 三角为基准翻倍。",
+  }),
+  Object.freeze({
+    id: "LeaflessTree01", name: "无叶乔木 / 枝展型", pack: "Model_LeaflessTreeSet.glb",
+    sourceTriangles: 253600, actualTriangles: 60000, targetTriangles: 60000,
+    sourceTexture: "源包无有效成品图", runtimeTexture: "项目共享 TreeBark",
+    policy: "target", note: "指定以原成品 30,000 三角为基准翻倍。",
+  }),
+  Object.freeze({
+    id: "LeaflessTreeLowPoly", name: "无叶乔木 / 疏枝型", pack: "Model_LeaflessTreeSet.glb",
+    sourceTriangles: 22700, actualTriangles: 22700, targetTriangles: 22700,
+    sourceTexture: "源包无有效成品图", runtimeTexture: "项目共享 TreeBark",
+    policy: "source", note: "翻倍目标 25,928 高于源模型 22,700；以原始拓扑封顶，不人为细分。",
+  }),
+]);
 
 export const ASSET_STANDARD_GROUPS = Object.freeze([
   { id: "firearm", label: "枪械" },
@@ -120,6 +186,7 @@ export const OTHER_ASSET_RULES = Object.freeze({
     { name: "程序化武器 TZM", limit: "30,000 三角", texture: "项目共享武器 PBR", note: "同枪械分类上限；当前成品远低于阈值。" },
   ]),
   external: Object.freeze([
+    { name: "通用减面下限", limit: "降幅 >5% 才减面", texture: "不影响贴图判定", note: "目标与原始面数相差 5% 及以下时，直接保留选定源拓扑。" },
     { name: "角色 GLB", limit: "逐角色骨架/动作审计", texture: "源贴图或项目换装", note: "面数不是唯一门禁；姿态、骨盆高度、命中骨与动画完整性同时验收。" },
     { name: "场景构件 GLB", limit: "逐资产登记预算", texture: "源图压缩或项目共享材质", note: "不套用枪械 30k / 战车 80k；构件包按 Data_ExternalAssets_* 的逐件预算验收。" },
     { name: "静态世界构件", limit: `开机全场 ≤ ${SCENE_RENDER_LIMITS.triangles.toLocaleString("en-US")} 三角`, texture: "albedo=sRGB；normal/orm=NoColorSpace", note: `同时受 draw call ≤ ${SCENE_RENDER_LIMITS.drawCalls.toLocaleString("en-US")} 与 BuildSink/实例化规则约束。` },
@@ -134,6 +201,13 @@ export const OTHER_ASSET_RULES = Object.freeze({
 
 export function TriangleRuleFor(record) {
   return record?.group === "vehicle" ? TRIANGLE_RULES.vehicle : TRIANGLE_RULES.weapon;
+}
+
+export function ThresholdTriangleTarget(sourceTriangles, limit) {
+  if (!Number.isFinite(sourceTriangles) || sourceTriangles <= 0) return null;
+  const target = Math.min(sourceTriangles, limit);
+  return (sourceTriangles - target) / sourceTriangles <= MIN_DECIMATION_REDUCTION
+    ? sourceTriangles : target;
 }
 
 export function ReductionPercent(sourceTriangles, actualTriangles) {
@@ -151,13 +225,19 @@ export function ComplianceFor(id, actualTriangles) {
     return { label: close ? "特例达标" : "偏离特例目标", tone: close ? "good" : "bad" };
   }
   const rule = TriangleRuleFor(record);
-  if (record.sourceTriangles > rule.limit) {
-    const close = actualTriangles <= rule.limit && actualTriangles >= rule.limit * 0.97;
-    return { label: close ? "阈值达标" : "偏离分类阈值", tone: close ? "good" : "bad" };
-  }
-  if (actualTriangles > rule.limit) return { label: "超过分类阈值", tone: "bad" };
   if (record.repair && actualTriangles > record.sourceTriangles) {
     return { label: "原模保留 + 补件", tone: "good" };
   }
+  const target = ThresholdTriangleTarget(record.sourceTriangles, rule.limit);
+  if (target === record.sourceTriangles) {
+    const close = actualTriangles <= record.sourceTriangles * 1.001
+      && actualTriangles >= record.sourceTriangles * 0.97;
+    return { label: close ? "原始拓扑保留" : "阈值内却明显减面", tone: close ? "good" : "bad" };
+  }
+  if (record.sourceTriangles > rule.limit) {
+    const close = actualTriangles <= target && actualTriangles >= target * 0.97;
+    return { label: close ? "阈值达标" : "偏离分类阈值", tone: close ? "good" : "bad" };
+  }
+  if (actualTriangles > rule.limit) return { label: "超过分类阈值", tone: "bad" };
   return { label: "原始拓扑保留", tone: "good" };
 }

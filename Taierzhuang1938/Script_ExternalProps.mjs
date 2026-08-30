@@ -56,12 +56,12 @@ import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_Chin
 
 const LOADER = new GLTFLoader();
 
-const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=3";
+const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=4";
 const BARBED_WIRE_URL = "./Model/Model_BarbedWireSet.glb?v=1";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=2";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
 const CITY_WALL_DETAIL_URL = "./Model/Model_CityWallDetailPack.glb?v=1";
-const LEAFLESS_TREE_URL = "./Model/Model_LeaflessTreeSet.glb?v=1";
+const LEAFLESS_TREE_URL = "./Model/Model_LeaflessTreeSet.glb?v=2";
 
 // ChineseLife 三件专属 PBR 不进开机 PBR_SETS：三套约 0.50 MB，会把全局 14 MB
 // 红线顶破，而它们只在相应外部道具出现时才需要。首次实例化/建关时按材质懒载；
@@ -225,7 +225,7 @@ function PackAssets(pack, table) {
 }
 
 const ASSETS = Object.freeze({
-  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=3", material: null, tag: "wall", category: "建筑" },
+  house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=4", material: null, tag: "wall", category: "建筑" },
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall", category: "建筑" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall", category: "建筑" },
   sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade", category: "工事" },

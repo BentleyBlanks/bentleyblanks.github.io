@@ -270,6 +270,7 @@ def BuilderFor(name):
         _Build.sourceTriangles = stats["sourceTriangles"]
         _Build.targetTriangles = stats["targetTriangles"]
         _Build.triangleLimit = stats["triangleLimit"]
+        _Build.budget = stats["targetTriangles"]
         return root
     _Build.__name__ = "BuildImported_%s" % name
     _Build.imported = True
