@@ -11,6 +11,7 @@ shipping the packs' 4K texture payloads to every browser.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import bpy
 from mathutils import Matrix, Vector
@@ -128,11 +129,31 @@ def Optimize(
     return before, Triangles(obj)
 
 
-def Process(objects, name, materialFor, targetTriangles, targetSpan=None, flatShading=False):
+def RebuildSurfaceNormals(obj: bpy.types.Object) -> None:
+    """Discard bad imported split normals and rebuild them from face winding."""
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    if obj.data.has_custom_normals:
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    bpy.ops.object.shade_smooth_by_angle()
+
+
+def Process(
+    objects,
+    name,
+    materialFor,
+    targetTriangles,
+    targetSpan=None,
+    flatShading=False,
+    rebuildNormals=False,
+):
     for obj in objects:
         SetMarker(obj, materialFor(obj) if callable(materialFor) else materialFor)
     result = Join(objects, name)
     before, after = Optimize(result, targetTriangles, targetSpan, flatShading)
+    if rebuildNormals:
+        RebuildSurfaceNormals(result)
     print(f"{name}: {before} -> {after} triangles", flush=True)
     return result
 
@@ -195,13 +216,24 @@ battlefieldSpecs = (
     ("Sphere_23", "BattlefieldRock", "Stone", 200),
 )
 
+# These source groups carry split normals opposite to their triangle winding.
+# The main pass still draws their front faces, but the normal/depth prepass then
+# points the SSAO hemisphere into the solid and turns the whole prop black.
+battlefieldNormalRepairNames = frozenset((
+    "BattlefieldBeamObstacle01",
+    "BattlefieldPillbox",
+))
+
 
 def BakeBattlefield() -> None:
     ResetScene()
     groups = ByParent(Import("Model_SketchfabBattlefieldPack"))
     output = []
     for sourceName, runtimeName, material, target in battlefieldSpecs:
-        output.append(Process(groups[sourceName], runtimeName, material, target))
+        output.append(Process(
+            groups[sourceName], runtimeName, material, target,
+            rebuildNormals=runtimeName in battlefieldNormalRepairNames,
+        ))
     Export(output, "Model_BattlefieldPack.glb")
 
 
@@ -242,6 +274,10 @@ def BakeMarket() -> None:
 
 def Main() -> None:
     modelDir.mkdir(parents=True, exist_ok=True)
+    if "--battlefield-only" in sys.argv:
+        BakeBattlefield()
+        print("SKETCHFAB_BATTLEFIELD_BAKE_OK", flush=True)
+        return
     BakeCourtyard()
     BakeBattlefield()
     BakeMarket()

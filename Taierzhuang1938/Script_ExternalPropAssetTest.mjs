@@ -84,8 +84,51 @@ function AssertFlatTriangleNormals(glb, nodeNames, maxDegrees = 1) {
   }
 }
 
+function AssertNormalsFollowTriangleWinding(glb, nodeName) {
+  const node = glb.json.nodes.find((entry) => entry.name === nodeName);
+  assert.ok(node?.mesh != null, `${nodeName}: mesh node exists`);
+  let worstDot = 1;
+  let dotSum = 0;
+  let negativeCorners = 0;
+  let cornerCount = 0;
+  for (const primitive of glb.json.meshes[node.mesh].primitives) {
+    const positions = AccessorReader(glb, primitive.attributes.POSITION);
+    const normals = AccessorReader(glb, primitive.attributes.NORMAL);
+    const indices = AccessorReader(glb, primitive.indices);
+    for (let offset = 0; offset < indices.count; offset += 3) {
+      const triangle = [indices.get(offset), indices.get(offset + 1), indices.get(offset + 2)];
+      const [a, b, c] = triangle.map((index) => [
+        positions.get(index, 0), positions.get(index, 1), positions.get(index, 2),
+      ]);
+      const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const face = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0],
+      ];
+      const faceLength = Math.hypot(...face);
+      if (faceLength < 1e-8) continue;
+      for (const index of triangle) {
+        const dot = (face[0] * normals.get(index, 0)
+          + face[1] * normals.get(index, 1)
+          + face[2] * normals.get(index, 2)) / faceLength;
+        worstDot = Math.min(worstDot, dot);
+        dotSum += dot;
+        if (dot < -0.01) negativeCorners += 1;
+        cornerCount += 1;
+      }
+    }
+  }
+  assert.ok(cornerCount > 0, `${nodeName}: indexed surface has auditable corners`);
+  const negativeRatio = negativeCorners / cornerCount;
+  const averageDot = dotSum / cornerCount;
+  assert.ok(negativeRatio < 0.005 && averageDot > 0.9,
+    `${nodeName}: vertex normals follow triangle winding (${negativeCorners}/${cornerCount} negative, average dot ${averageDot.toFixed(3)}, worst dot ${worstDot.toFixed(3)})`);
+}
+
 function InspectNodes(fileName, maxBytes) {
-  const { bytes, json } = ReadGlb(fileName, maxBytes);
+  const { bytes, json, binaryOffset } = ReadGlb(fileName, maxBytes);
   const result = new Map();
   for (const node of json.nodes ?? []) {
     if (node.mesh == null) continue;
@@ -272,6 +315,9 @@ assert.ok(courtyardSpec.maxSpan > 11 && courtyardSpec.maxSpan < 12, "courtyard s
 const battlefield = InspectNodes("Model_BattlefieldPack.glb", 4_100_000);
 assert.equal(battlefield.nodes.size, 24, "all 24 battlefield components are independent nodes");
 AssertTexturedMaterialsHaveNormals(battlefield.json, "battlefield pack", "Model_BattlefieldPack.glb");
+const battlefieldGlb = ReadGlb("Model_BattlefieldPack.glb", 4_100_000);
+AssertNormalsFollowTriangleWinding(battlefieldGlb, "BattlefieldBeamObstacle01");
+AssertNormalsFollowTriangleWinding(battlefieldGlb, "BattlefieldPillbox");
 for (const [name, spec] of battlefield.nodes) {
   assert.ok(spec.triangles <= 3500, `${name} triangle budget`);
   assert.equal(spec.minY, 0, `${name} is ground-ready`);

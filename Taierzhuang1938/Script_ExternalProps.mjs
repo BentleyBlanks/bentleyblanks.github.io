@@ -54,7 +54,7 @@ import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_Chin
 
 const LOADER = new GLTFLoader();
 
-const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=2";
+const BATTLEFIELD_URL = "./Model/Model_BattlefieldPack.glb?v=3";
 const BARBED_WIRE_URL = "./Model/Model_BarbedWireSet.glb?v=1";
 const MARKET_STORAGE_URL = "./Model/Model_MarketStorageSet.glb?v=2";
 const CITY_WALL_BREACH_URL = "./Model/Model_CityWallBreachPack.glb?v=2";
