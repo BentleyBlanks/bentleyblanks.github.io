@@ -424,12 +424,15 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       return ExternalPropCount(p.fieldFrom || p.id, p.bounds);
     }, phase);
     const expectedExternalPropsWithGenerated = expectedExternalProps
-      + (health.externalProps?.generatedCount || 0);
+      + (health.externalProps?.generatedCount || 0)
+      + (health.externalProps?.pcgCount || 0);
     if (!health.externalProps || health.externalProps.count !== expectedExternalPropsWithGenerated
-      || health.externalProps.failed?.length) {
+      || health.externalProps.failed?.length || health.externalProps.pcgErrors?.length) {
       bad.push(`外部布设未完整接入 count=${health.externalProps?.count ?? "?"}`
         + ` expected=${expectedExternalPropsWithGenerated}`
         + ` generated=${health.externalProps?.generatedCount || 0}`
+        + ` pcg=${health.externalProps?.pcgCount || 0}`
+        + ` pcgErrors=${health.externalProps?.pcgErrors?.join(",") || "none"}`
         + ` failed=${health.externalProps?.failed?.join(",") || "none"}`);
     }
     // 流送自洽（实例化语义，2026-08-26）：登记数必须等于摆位数，live 不得超过

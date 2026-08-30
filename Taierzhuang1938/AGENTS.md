@@ -182,6 +182,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 ### 布设 / 流送 / 外部资产
 - `Script_TownDressing.mjs` —— 城内「每家每户」布设注册表（世界坐标登记一次、按 bounds 过滤，
   同一只米袋三关不搬家）+ 10 份 `Data_Dressing_*.mjs` 分区工作包。
+- `Data_PropPcg.mjs` + `Script_PropPcg.mjs` —— 生活用具 / 工事支援的确定性规则布设；纯生成器
+  不 import three，按院落 / 防区生成完整语义组合并做 AABB、坡度、间距、已手摆构件裁决。
+  自动小物默认 `solid:false`，只进视觉实例，禁止随机桶凳改写 AI 导航、射界或玩家移动；
+  未来逐资产 opt-in 碰撞时必须补交火 / 导航回归。
+  编辑入口 `Script_EditorPropPcg.mjs`；回归口 `Script_PropPcgTest.mjs` / `Script_PropPcgEditorTest.mjs`。
 - `Script_PropStreaming.mjs` —— 视觉流送；**碰撞不流送**（随玩家位置加卸载会打出两样仗）。
 - `Script_PropBatch.mjs` —— 布设 GPU instancing 桶管理器（取舍与实测数字在文件头）；
   回归口 `Script_PropInstancingTest.mjs`。
@@ -358,10 +363,11 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
   口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
-### 编辑器（17 个模块，不对玩家开放）
+### 编辑器（18 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,FullScene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
+- `Script_Editor{Scene,FullScene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
   （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
+  PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
   DebugRendering 与 Profiler 是「可叠加」组：不接管相机、不暂停玩法。

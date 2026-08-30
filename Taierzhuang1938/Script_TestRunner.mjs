@@ -122,6 +122,8 @@ export const testDefs = {
   RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：三格挡 + 三处决 + 慢动作/HUD/骨骼/辅助输入全链" },
   TownDressingTest: { file: "Script_TownDressingTest.mjs", desc: "城内每户布设的硬规则（纯 Node，秒级）" },
+  PropPcgTest: { file: "Script_PropPcgTest.mjs", desc: "生活用具/工事 PCG：确定性、跨切片、碰撞/坡度/间距裁决（纯 Node）" },
+  PropPcgEditorTest: { file: "Script_PropPcgEditorTest.mjs", desc: "PCG 编辑器：真实模型预览、GPU 桶取证、JSON 往返与退出还原" },
   WestDistrictCoverageTest: { file: "Script_WestDistrictCoverageTest.mjs", desc: "L4 总览完整生成西关 5 地标与 137 件布设" },
   WestSuburbBlocksTest: { file: "Script_WestSuburbBlocksTest.mjs", desc: "西关 20 个示意图矩形整块覆盖、净空与院落几何" },
   WestStationTest: { file: "Script_WestStationTest.mjs", desc: "津浦路滕县站构件、信号与货运作业物冒烟" },
@@ -175,6 +177,7 @@ export const browserTests = new Set([
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
+  "PropPcgEditorTest",
   "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
 ]);
@@ -258,7 +261,7 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/可破坏编辑器/采样点", tests: ["EditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/PCG/可破坏编辑器/采样点", tests: ["EditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -269,7 +272,7 @@ export const domains = {
     label: "渲染与合批自动契约",
     // 照明弹的灯走 LightRig 的火光池、烟走 VfxSystem 的烟源池，两处都加了新口子
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
-    tests: ["PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
+    tests: ["PostTest", "ActorDepthTest", "ActorBatchTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -296,9 +299,9 @@ const changedDomainRules = [
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
-  { domain: "editor", pattern: /(Editor|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
+  { domain: "editor", pattern: /(Editor|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|GlobalShProbe|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|GlobalShProbe|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },
   { domain: "physics", pattern: /vendor\/rapier/i },
   { domain: "infra", pattern: /(Script_TestRunner|Script_DevServer)/i },

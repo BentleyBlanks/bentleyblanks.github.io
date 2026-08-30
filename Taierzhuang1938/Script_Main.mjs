@@ -2517,9 +2517,14 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
   }
+  // PCG 的净空真相必须冻结在“外部布设加入之前”。否则编辑器重跑生成时会拿
+  // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
+  battlefield.propPcgBlockers = battlefield.colliders.slice();
   const external = await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
+    blockers: battlefield.propPcgBlockers,
+    cells: battlefield.city?.cells || [],
     generatedPlacements: battlefield.generatedExternalProps
       || battlefield.city?.generatedExternalProps || [],
   });
@@ -2527,6 +2532,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 里面不能有 three 对象。
   battlefield.externalProps = {
     count: external.count, generatedCount: external.generatedCount,
+    pcgCount: external.pcgCount, pcgStats: external.pcgStats, pcgErrors: external.pcgErrors,
     failed: external.failed, colliders: external.colliders,
   };
   battlefield.externalStreamer = external.streamer;

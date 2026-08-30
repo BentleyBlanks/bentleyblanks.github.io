@@ -26,9 +26,9 @@
 //   3. `AddExternalProps` 顺手吐一份碰撞盒（每件一只**带朝向的**长方体，
 //      与程序化民居登记的粒度一致），由调用方并进 field.colliders。
 //
-// 「别让装饰网格改掉 AI 路线」这条担心仍然成立，只是答案变了：这些摆位是
-// **写死的常量**（下面 PLACEMENTS 一个随机数都没有），照它生成的碰撞盒同样是
-// 常量。确定性没丢，丢的是"看得见摸不着"。
+// 「别让装饰网格改掉 AI 路线」这条担心仍然成立：手摆件是写死且有碰撞的常量；
+// PCG 小物由固定种子 + 真实碰撞表找净空，但默认 solid:false，只进视觉实例，不把
+// 随机桶凳写回 AI 导航、射界或玩家物理。确需实体碰撞的模板必须逐资产显式 opt-in。
 //
 // 还没改的一条（留给美术定夺，不在这一轮里）：houseRow / housePair 两个模型
 // 自带的尺度偏小 —— 排屋整体高 1.70 m、双栋高 2.96 m，比 1.66 m 的士兵高不了
@@ -43,6 +43,8 @@ import {
 import { OVERVIEW_BOUNDS } from "./Data_Battle.mjs";
 import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
 import { TownDressingFor } from "./Script_TownDressing.mjs";
+import { PROP_PCG_DOCUMENT } from "./Data_PropPcg.mjs";
+import { GeneratePropPcg } from "./Script_PropPcg.mjs";
 import { PropStreamer } from "./Script_PropStreaming.mjs";
 import { PropBatcher } from "./Script_PropBatch.mjs";
 import { MergeGeometries, TILE_METERS } from "./Script_Geo.mjs";
@@ -767,17 +769,26 @@ export function ClearExternalProps() {
  */
 export async function AddExternalProps({
   scene, library, phaseId, groundAt, bounds, generatedPlacements = [],
+  blockers = [], cells = [], pcgDocument = PROP_PCG_DOCUMENT,
 }) {
   ClearExternalProps();
-  // 两层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
-  // 城内每户布设（Script_TownDressing）。后者跨关共位 —— 城是同一座城。
+  // 三层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
+  // 城内每户布设（Script_TownDressing）+ 按院落 / 防区规则生成的视觉 PCG。后两层
+  // 都跨关共位 —— 城是同一座城；PCG 还用 cell-local seed 保证同一院落不换摆法。
   // generatedPlacements 是 Script_World 构建器产出的沙袋组合；它只负责画面，
   // 碰撞仍由 AddBarricade/AddSandbagPlug/AddSandbagEmplacement 的整段盒负责。
-  const placements = [
-    ...PlacementsFor(phaseId), ...TownDressingFor(bounds), ...generatedPlacements,
-  ];
+  const handPlacements = [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
+  const pcg = GeneratePropPcg(pcgDocument, {
+    bounds, cells, blockers, groundAt,
+    fixedPlacements: [...handPlacements, ...generatedPlacements],
+    assetIds: Object.keys(ASSETS),
+  });
+  const placements = [...handPlacements, ...generatedPlacements, ...pcg.placements];
   if (!placements.length) {
-    return { count: 0, generatedCount: 0, failed: [], colliders: [], streamer: null };
+    return {
+      count: 0, generatedCount: 0, pcgCount: 0, pcgStats: pcg.stats,
+      pcgErrors: pcg.errors, failed: [], colliders: [], streamer: null,
+    };
   }
 
   const ids = [...new Set(placements.map((entry) => entry.asset))];
@@ -864,6 +875,7 @@ export async function AddExternalProps({
   liveStreamer = streamer;
   return {
     count, generatedCount: generatedPlacements.length,
+    pcgCount: pcg.placements.length, pcgStats: pcg.stats, pcgErrors: pcg.errors,
     failed, colliders: sink.colliders, streamer,
   };
 }

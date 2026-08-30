@@ -113,9 +113,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十二个编辑器（含完整场景与场景样条PCG）
+// 三个设置 + 两个可叠加（渲染调试/性能剖析）+ 十三个编辑器（含完整场景、样条 PCG 与道具 PCG）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 18, `按钮数=${afterGear.entries}`);
+Check("面板列出设置、渲染调试与全部编辑器入口", afterGear.entries === 19, `按钮数=${afterGear.entries}`);
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {

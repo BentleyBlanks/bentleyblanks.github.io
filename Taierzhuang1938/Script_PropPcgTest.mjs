@@ -1,0 +1,143 @@
+// 工事 / 生活用具 PCG 的纯 Node 回归：确定性、跨切片同户稳定、规则裁决与数据完整性。
+
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import {
+  PROP_PCG_ASSET_RULES, PROP_PCG_DOCUMENT, PROP_PCG_PROFILES,
+} from "./Data_PropPcg.mjs";
+import {
+  GeneratePropPcg, NormalizePropPcgDocument, ValidatePropPcgDocument,
+} from "./Script_PropPcg.mjs";
+
+let checks = 0;
+function Check(name, fn) {
+  fn();
+  checks += 1;
+  console.log(`ok  ${name}`);
+}
+
+const flatGround = () => 0;
+const cells = [
+  { x: -20, z: 0, w: 18, d: 16, seed: "HomeA" },
+  { x: 20, z: 0, w: 18, d: 16, seed: "HomeB" },
+  { x: 60, z: 0, w: 18, d: 16, seed: "HomeC" },
+];
+
+const cellDocument = {
+  version: 1,
+  seed: 417,
+  volumes: [{
+    id: "TestCells", label: "测试院落", enabled: true,
+    profile: "householdLife", shape: "cells",
+    bounds: { minX: -40, maxX: 80, minZ: -20, maxZ: 20 },
+    chance: 1, maxAnchors: 8, attemptsPerAnchor: 30, inset: 2, minSpacing: 4,
+  }],
+};
+
+function Generate(document = cellDocument, overrides = {}) {
+  return GeneratePropPcg(document, {
+    bounds: { minX: -100, maxX: 100, minZ: -50, maxZ: 50 },
+    cells, blockers: [], fixedPlacements: [], groundAt: flatGround,
+    assetIds: Object.keys(PROP_PCG_ASSET_RULES),
+    ...overrides,
+  });
+}
+
+Check("出厂文档与 profile 的资产引用完整", () => {
+  assert.deepEqual(ValidatePropPcgDocument(PROP_PCG_DOCUMENT, {
+    assetIds: Object.keys(PROP_PCG_ASSET_RULES),
+  }), []);
+  assert.ok(Object.keys(PROP_PCG_PROFILES).length >= 2);
+});
+
+Check("相同种子与环境逐字段确定", () => {
+  const a = Generate();
+  const b = Generate();
+  assert.deepEqual(a, b);
+  assert.ok(a.placements.length >= 6, `placements=${a.placements.length}`);
+  assert.equal(a.stats.anchors, 3);
+  assert.ok(a.placements.every((entry) => entry.solid === false),
+    "自动小物默认不得写入 AI / 玩家物理世界");
+});
+
+Check("同一户在不同章节切片里保持同一模板、坐标、朝向与尺度", () => {
+  const all = Generate();
+  const slice = Generate(cellDocument, {
+    bounds: { minX: 10, maxX: 32, minZ: -20, maxZ: 20 },
+    cells: [cells[1]],
+  });
+  const fromAll = all.placements.filter((entry) => entry.x > 10 && entry.x < 32)
+    .map(({ asset, x, z, ry, scale }) => ({ asset, x, z, ry, scale }));
+  const fromSlice = slice.placements.map(({ asset, x, z, ry, scale }) => ({ asset, x, z, ry, scale }));
+  assert.deepEqual(fromSlice, fromAll);
+});
+
+Check("院落 volume 的 seedOffset 会改变候选与摆法", () => {
+  const shifted = structuredClone(cellDocument);
+  shifted.volumes[0].seedOffset = 991;
+  assert.notDeepEqual(Generate(shifted).placements, Generate(cellDocument).placements);
+});
+
+Check("真实 AABB 能拒绝整组而不是只挪开单件", () => {
+  const blocked = Generate(cellDocument, {
+    blockers: [{ min: [-100, -10, -100], max: [100, 10, 100] }],
+  });
+  assert.equal(blocked.placements.length, 0);
+  assert.ok(blocked.stats.rejected.collision > 0);
+});
+
+Check("固定手摆件参与净空裁决", () => {
+  const fixed = Generate(cellDocument, {
+    fixedPlacements: cells.map((cell) => ({ asset: "battlefieldCanvasCover01", x: cell.x, z: cell.z, scale: 20 })),
+  });
+  assert.equal(fixed.placements.length, 0);
+  assert.ok(fixed.stats.rejected.fixed > 0);
+});
+
+Check("陡坡按 profile 上限整组拒绝", () => {
+  const steep = Generate(cellDocument, { groundAt: (x) => x * 0.8 });
+  assert.equal(steep.placements.length, 0);
+  assert.ok(steep.stats.rejected.slope > 0);
+});
+
+Check("矩形区达到目标组数且守最小间距", () => {
+  const document = {
+    version: 1, seed: 918,
+    volumes: [{
+      id: "DefenseTest", label: "测试工事", enabled: true,
+      profile: "defenseSupport", shape: "rect",
+      bounds: { minX: -80, maxX: 80, minZ: -18, maxZ: 18 },
+      count: 6, attemptsPerAnchor: 50, inset: 2, minSpacing: 14, axisYaw: 0,
+    }],
+  };
+  const result = Generate(document, { cells: [] });
+  assert.equal(result.stats.anchors, 6);
+  assert.ok(result.placements.every((entry) => entry.x > -80 && entry.x < 80
+    && entry.z > -18 && entry.z < 18));
+});
+
+Check("导入规范化会限数量、坐标与数值", () => {
+  const normalized = NormalizePropPcgDocument({
+    version: 99, seed: "7", volumes: [{
+      id: "坏 id!", label: "测试", profile: "missing", shape: "anything",
+      bounds: { minX: 9999, maxX: -9999, minZ: 5, maxZ: 5 },
+      chance: 7, count: 9999, minSpacing: -4,
+    }],
+  });
+  assert.equal(normalized.version, 1);
+  assert.equal(normalized.volumes[0].id, "__id_");
+  assert.equal(normalized.volumes[0].profile, "householdLife");
+  assert.equal(normalized.volumes[0].chance, 1);
+  assert.equal(normalized.volumes[0].count, 256);
+  assert.equal(normalized.volumes[0].minSpacing, 0);
+  assert.deepEqual(NormalizePropPcgDocument(normalized), normalized);
+});
+
+Check("规则层没有 Math.random 且不 import three", () => {
+  const source = fs.readFileSync(fileURLToPath(new URL("./Script_PropPcg.mjs", import.meta.url)), "utf8");
+  assert.doesNotMatch(source, /Math\.random\s*\(/);
+  assert.doesNotMatch(source, /from\s+["']three["']/);
+});
+
+console.log(`PROP_PCG_TEST_OK checks=${checks}`);
