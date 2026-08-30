@@ -339,7 +339,7 @@
 **性能预算（1600×900 / ≥55 fps）**：
 
 > ⚠️ **已过时（2026-08-26 标注）**：下面这组预算是单关竖切片时期的设计稿，早已被现实取代。
-> 现行红线是 `Script_BootTest.mjs` 守的 **draw call ≤ 5000 / 三角形 ≤ 6,000,000**（七关开机实测
+> 现行红线统一读 `Data_AssetStandards.mjs` 的 `SCENE_RENDER_LIMITS`，由 `Script_BootTest.mjs` 守（七关开机实测
 > 890–3170 calls / 最高 267 万三角），同屏 AI 上限 56。读到这里请以 `docs/Data_TestTiers.md`
 > 与 `docs/Data_TechRenderPipeline.md` 末两节的实测记录为准，别拿下面的数字当现状。
 

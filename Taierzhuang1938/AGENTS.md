@@ -26,7 +26,7 @@
    实测过一次：15 万三角形占掉一帧 1408 个 draw call（全场的 84%）——
    瓶颈是 three 每次提交的 JS 固定开销，不是三角形。守着它的：BootTest 的 draw call 红线。
 
-4. **开机红线：drawCalls ≤ 5000、triangles ≤ 6,000,000，七关逐关量，越线即 FAIL。**
+4. **开机红线统一读 `SCENE_RENDER_LIMITS`，七关逐关量，越线即 FAIL。**
    这是整机预算的唯一口径；docs 里旧设计书写的预算数字一律作废。
    守着它的：`Script_BootTest.mjs:36-37`（`MAX_DRAW_CALLS` / `MAX_TRIANGLES`）。
 
@@ -62,6 +62,10 @@
 12. **数值只在代码里，文档写常量名不抄数。**
     抄进文档的数字第二天就过期，还会被下一个 agent 当真。
     守着它的：没有测试；本文件带头遵守。
+
+13. **外部枪械仅在选定源几何超过 `WEAPON_TRIANGLE_LIMIT` 时减面；战车同理读 `VEHICLE_TRIANGLE_LIMIT`。**
+    展示件/备用状态/重复壳先排除，超过阈值才尽量贴线；指定特例读 `SPECIAL_TRIANGLE_TARGETS`。
+    单件面数变化引起的全场预算同步进 `SCENE_RENDER_LIMITS`；守着它的：`Script_AssetStandardsTest` + 编辑器「资产规范」。
 
 ## 常用命令
 
@@ -365,10 +369,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Debug.SetpieceFacts` / `Debug.SetpieceProps` / `Debug.Firewalls`。
   口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
-### 编辑器（18 个模块，不对玩家开放）
+### 编辑器（19 个模块，不对玩家开放）
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
 - `Script_Editor{Scene,FullScene,Actor,Weapon,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler}.mjs`
-  （Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
+  （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。

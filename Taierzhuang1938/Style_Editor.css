@@ -49,6 +49,9 @@
 .edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 76px); }
 .edPanel.work { right: 14px; width: 320px; }
 .edPanel.wide { width: 396px; }
+.edPanel.assetStandards {
+  left: 238px; right: auto; width: min(1120px, calc(100vw - 252px));
+}
 /* 渲染调试是可叠加浮窗：避开左侧入口与右侧的互斥编辑器，不抢它们的位置。 */
 .edPanel.debugRendering { left: 238px; right: auto; width: 368px; bottom: 18px; }
 
@@ -173,6 +176,30 @@
 .edFacts .f .v.bad { color: var(--theirs, #d6604a); }
 .edFacts .f .v.good { color: var(--ours, #9dc0e4); }
 
+.edAssetTableWrap { overflow: auto; max-height: calc(100vh - 190px); margin-top: 7px; }
+.edAssetTable { width: 100%; min-width: 1030px; border-collapse: collapse; font-size: 11px; }
+.edAssetTable th {
+  position: sticky; top: 0; z-index: 1; padding: 7px 6px; text-align: left;
+  background: rgba(18, 16, 13, 0.98); color: rgba(230, 223, 205, 0.58);
+  border-bottom: 1px solid rgba(230, 223, 205, 0.24); white-space: nowrap;
+}
+.edAssetTable td { padding: 6px; border-bottom: 1px solid rgba(230, 223, 205, 0.09); vertical-align: top; }
+.edAssetTable tbody tr:hover { background: rgba(224, 176, 98, 0.08); }
+.edAssetTable td.asset { min-width: 142px; }
+.edAssetTable td.asset .name { color: #e6dfcd; font-size: 12px; }
+.edAssetTable td.asset .id { color: rgba(230, 223, 205, 0.42); font: 10px ui-monospace, Consolas, monospace; }
+.edAssetTable td.num { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
+.edAssetTable td.status { white-space: nowrap; }
+.edAssetTable td.status.good { color: var(--ours, #9dc0e4); }
+.edAssetTable td.status.warn { color: var(--warn, #e0b062); }
+.edAssetTable td.status.bad { color: var(--theirs, #d6604a); }
+.edAssetRuleCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.edAssetRuleCard { padding: 10px; border: 1px solid rgba(230, 223, 205, 0.16); background: rgba(0, 0, 0, 0.18); }
+.edAssetRuleCard .title { color: #e6dfcd; font-size: 13px; margin-bottom: 4px; }
+.edAssetRuleCard .limit { color: var(--warn, #e0b062); font-family: ui-monospace, Consolas, monospace; }
+.edAssetRuleCard .texture { color: rgba(230, 223, 205, 0.72); margin-top: 4px; }
+.edAssetRuleCard .note { color: rgba(230, 223, 205, 0.5); margin-top: 5px; line-height: 1.5; }
+
 .edNote {
   font-size: 11.5px; color: rgba(230, 223, 205, 0.55); line-height: 1.55;
   border-left: 2px solid rgba(230, 223, 205, 0.18); padding: 2px 0 2px 7px; margin: 5px 0;
@@ -264,6 +291,8 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   .edPanel.launcher { width: 160px; }
   .edPanel.work { width: 250px; }
   .edPanel.wide { width: 280px; }
+  .edPanel.assetStandards { left: 174px; width: calc(100% - 188px); }
+  .edAssetRuleCards { grid-template-columns: 1fr; }
   .edPanel.debugRendering { left: 174px; width: min(280px, calc(100% - 188px)); }
   .edControlGrid { grid-template-columns: 1fr; }
 }

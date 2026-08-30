@@ -4,9 +4,9 @@
  "generator": "Taierzhuang1938/_blender/BuildAll.py",
  "budget": {
   "soldier": 1800,
-  "weapon": 6000,
+  "weapon": 30000,
   "prop": 400,
-  "vehicle": 1600
+  "vehicle": 80000
  },
  "models": [
   {
@@ -175,142 +175,6 @@
    }
   },
   {
-   "name": "HanYang",
-   "category": "weapon",
-   "file": "HanYang.tzm.json",
-   "triangles": 4680,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 266031,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01767,
-     -0.12489,
-     -0.995
-    ],
-    "max": [
-     0.0635,
-     0.06822,
-     0.25477
-    ]
-   }
-  },
-  {
-   "name": "Zb26",
-   "category": "weapon",
-   "file": "Zb26.tzm.json",
-   "triangles": 4677,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 198432,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.03843,
-     -0.12294,
-     -0.91
-    ],
-    "max": [
-     0.04156,
-     0.20366,
-     0.255
-    ]
-   }
-  },
-  {
-   "name": "Type38",
-   "category": "weapon",
-   "file": "Type38.tzm.json",
-   "triangles": 4670,
-   "meshBlocks": 4,
-   "nodes": 8,
-   "joints": 0,
-   "bytes": 167173,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.0216,
-     -0.12997,
-     -1.02067
-    ],
-    "max": [
-     0.07654,
-     0.06676,
-     0.25462
-    ]
-   }
-  },
-  {
-   "name": "ServicePistol",
-   "category": "weapon",
-   "file": "ServicePistol.tzm.json",
-   "triangles": 4678,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 138802,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01627,
-     -0.05138,
-     -0.176
-    ],
-    "max": [
-     0.01553,
-     0.07815,
-     0.046
-    ]
-   }
-  },
-  {
    "name": "Grenade",
    "category": "weapon",
    "file": "Grenade.tzm.json",
@@ -338,161 +202,6 @@
      0.029,
      0.02771,
      0.05
-    ]
-   }
-  },
-  {
-   "name": "Dadao",
-   "category": "weapon",
-   "file": "Dadao.tzm.json",
-   "triangles": 4199,
-   "meshBlocks": 1,
-   "nodes": 5,
-   "joints": 0,
-   "bytes": 81756,
-   "materials": [
-    "dadao"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL"
-   ],
-   "bounds": {
-    "min": [
-     -0.01181,
-     -0.05793,
-     -0.63
-    ],
-    "max": [
-     0.01181,
-     0.05269,
-     0.27
-    ]
-   }
-  },
-  {
-   "name": "DadaoAlt",
-   "category": "weapon",
-   "file": "DadaoAlt.tzm.json",
-   "triangles": 2797,
-   "meshBlocks": 2,
-   "nodes": 5,
-   "joints": 0,
-   "bytes": 117820,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL"
-   ],
-   "bounds": {
-    "min": [
-     -0.02868,
-     -0.1056,
-     -0.62817
-    ],
-    "max": [
-     0.02868,
-     0.05193,
-     0.27
-    ]
-   }
-  },
-  {
-   "name": "BayonetZhongZheng",
-   "category": "weapon",
-   "file": "BayonetZhongZheng.tzm.json",
-   "triangles": 2218,
-   "meshBlocks": 2,
-   "nodes": 4,
-   "joints": 0,
-   "bytes": 92734,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "socket",
-    "tip"
-   ],
-   "bounds": {
-    "min": [
-     -0.01638,
-     -0.02578,
-     -0.428
-    ],
-    "max": [
-     0.01651,
-     0.03419,
-     0.14353
-    ]
-   }
-  },
-  {
-   "name": "BayonetHanYang",
-   "category": "weapon",
-   "file": "BayonetHanYang.tzm.json",
-   "triangles": 2198,
-   "meshBlocks": 2,
-   "nodes": 4,
-   "joints": 0,
-   "bytes": 91607,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "socket",
-    "tip"
-   ],
-   "bounds": {
-    "min": [
-     -0.01396,
-     -0.02541,
-     -0.39505
-    ],
-    "max": [
-     0.0156,
-     0.03419,
-     0.12138
-    ]
-   }
-  },
-  {
-   "name": "BayonetType38",
-   "category": "weapon",
-   "file": "BayonetType38.tzm.json",
-   "triangles": 1338,
-   "meshBlocks": 1,
-   "nodes": 4,
-   "joints": 0,
-   "bytes": 56012,
-   "materials": [
-    "steel"
-   ],
-   "mounts": [
-    "root",
-    "socket",
-    "tip"
-   ],
-   "bounds": {
-    "min": [
-     -0.00549,
-     -0.02863,
-     -0.4
-    ],
-    "max": [
-     0.0048,
-     0.0239,
-     0.114
     ]
    }
   },
@@ -797,144 +506,6 @@
    }
   },
   {
-   "name": "Type89Tank",
-   "category": "vehicle",
-   "file": "Type89Tank.tzm.json",
-   "triangles": 4089,
-   "meshBlocks": 4,
-   "nodes": 8,
-   "joints": 1,
-   "bytes": 139309,
-   "materials": [
-    "armor",
-    "steel",
-    "track"
-   ],
-   "mounts": [
-    "root",
-    "gunMuzzle",
-    "rearMgMuzzle",
-    "hatch",
-    "mgMuzzle",
-    "hullFront"
-   ],
-   "bounds": {
-    "min": [
-     -1.075,
-     0.0,
-     -2.15
-    ],
-    "max": [
-     1.075,
-     2.56,
-     2.15
-    ]
-   }
-  },
-  {
-   "name": "Type95HaGo",
-   "category": "vehicle",
-   "file": "Type95HaGo.tzm.json",
-   "triangles": 82142,
-   "meshBlocks": 1,
-   "nodes": 8,
-   "joints": 1,
-   "bytes": 3311215,
-   "materials": [
-    "armor"
-   ],
-   "mounts": [
-    "root",
-    "turret",
-    "gunMuzzle",
-    "rearMgMuzzle",
-    "hatch",
-    "mgMuzzle",
-    "hullFront"
-   ],
-   "bounds": {
-    "min": [
-     -1.035,
-     0.0,
-     -2.19
-    ],
-    "max": [
-     1.035,
-     2.27,
-     2.19
-    ]
-   }
-  },
-  {
-   "name": "Type97ChiHa",
-   "category": "vehicle",
-   "file": "Type97ChiHa.tzm.json",
-   "triangles": 3969,
-   "meshBlocks": 4,
-   "nodes": 8,
-   "joints": 1,
-   "bytes": 133216,
-   "materials": [
-    "armor",
-    "steel",
-    "track"
-   ],
-   "mounts": [
-    "root",
-    "gunMuzzle",
-    "rearMgMuzzle",
-    "hatch",
-    "mgMuzzle",
-    "hullFront"
-   ],
-   "bounds": {
-    "min": [
-     -1.2375,
-     0.0,
-     -2.75
-    ],
-    "max": [
-     1.2375,
-     2.38,
-     2.75
-    ]
-   }
-  },
-  {
-   "name": "ZhongZheng",
-   "category": "weapon",
-   "file": "ZhongZheng.tzm.json",
-   "triangles": 6703,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 169595,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.01938,
-     -0.10733,
-     -0.855
-    ],
-    "max": [
-     0.03618,
-     0.05737,
-     0.255
-    ]
-   }
-  },
-  {
    "name": "Type92Hmg",
    "category": "weapon",
    "file": "Type92Hmg.tzm.json",
@@ -968,14 +539,305 @@
    }
   },
   {
-   "name": "WaltherP38",
+   "name": "Type95HaGo",
+   "category": "vehicle",
+   "file": "Type95HaGo.tzm.json",
+   "triangles": 79999,
+   "meshBlocks": 1,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 3260527,
+   "materials": [
+    "armor"
+   ],
+   "mounts": [
+    "root",
+    "turret",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.035,
+     0.0,
+     -2.19
+    ],
+    "max": [
+     1.035,
+     2.27,
+     2.19
+    ]
+   },
+   "sourceTriangles": 82142,
+   "targetTriangles": 80000,
+   "triangleLimit": 80000
+  },
+  {
+   "name": "ZhongZheng",
    "category": "weapon",
-   "file": "WaltherP38.tzm.json",
-   "triangles": 4517,
+   "file": "ZhongZheng.tzm.json",
+   "triangles": 6703,
    "meshBlocks": 2,
    "nodes": 7,
    "joints": 0,
-   "bytes": 191416,
+   "bytes": 183823,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01938,
+     -0.10733,
+     -0.855
+    ],
+    "max": [
+     0.03618,
+     0.05737,
+     0.255
+    ]
+   },
+   "sourceTriangles": 6703,
+   "targetTriangles": 6703,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "HanYang",
+   "category": "weapon",
+   "file": "HanYang.tzm.json",
+   "triangles": 2672,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 97346,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01767,
+     -0.12517,
+     -0.995
+    ],
+    "max": [
+     0.06282,
+     0.06824,
+     0.255
+    ]
+   },
+   "sourceTriangles": 2672,
+   "targetTriangles": 2672,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Zb26",
+   "category": "weapon",
+   "file": "Zb26.tzm.json",
+   "triangles": 7781,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 270081,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.03843,
+     -0.12294,
+     -0.91
+    ],
+    "max": [
+     0.04156,
+     0.204,
+     0.255
+    ]
+   },
+   "sourceTriangles": 7811,
+   "targetTriangles": 7811,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Type38",
+   "category": "weapon",
+   "file": "Type38.tzm.json",
+   "triangles": 12467,
+   "meshBlocks": 4,
+   "nodes": 8,
+   "joints": 0,
+   "bytes": 285390,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.02157,
+     -0.13052,
+     -1.021
+    ],
+    "max": [
+     0.07644,
+     0.06678,
+     0.255
+    ]
+   },
+   "sourceTriangles": 12475,
+   "targetTriangles": 12475,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "ServicePistol",
+   "category": "weapon",
+   "file": "ServicePistol.tzm.json",
+   "triangles": 7263,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 202798,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.01627,
+     -0.05138,
+     -0.176
+    ],
+    "max": [
+     0.01551,
+     0.07815,
+     0.046
+    ]
+   },
+   "sourceTriangles": 7265,
+   "targetTriangles": 7265,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Dadao",
+   "category": "weapon",
+   "file": "Dadao.tzm.json",
+   "triangles": 4199,
+   "meshBlocks": 1,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 81492,
+   "materials": [
+    "dadao"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.01181,
+     -0.05793,
+     -0.63
+    ],
+    "max": [
+     0.01181,
+     0.05269,
+     0.27
+    ]
+   },
+   "sourceTriangles": 4199,
+   "targetTriangles": 4199,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "DadaoAlt",
+   "category": "weapon",
+   "file": "DadaoAlt.tzm.json",
+   "triangles": 910,
+   "meshBlocks": 2,
+   "nodes": 5,
+   "joints": 0,
+   "bytes": 38055,
+   "materials": [
+    "steel",
+    "wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL"
+   ],
+   "bounds": {
+    "min": [
+     -0.02868,
+     -0.10602,
+     -0.63
+    ],
+    "max": [
+     0.02868,
+     0.05219,
+     0.27
+    ]
+   },
+   "sourceTriangles": 910,
+   "targetTriangles": 910,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "WaltherP38",
+   "category": "weapon",
+   "file": "WaltherP38.tzm.json",
+   "triangles": 29899,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 878853,
    "materials": [
     "lqWeaponPlain",
     "wood"
@@ -990,26 +852,29 @@
    ],
    "bounds": {
     "min": [
-     -0.01434,
+     -0.01433,
      -0.06741,
-     -0.17009
+     -0.17
     ],
     "max": [
-     0.01434,
-     0.04473,
-     0.04609
+     0.0143,
+     0.04494,
+     0.046
     ]
-   }
+   },
+   "sourceTriangles": 31182,
+   "targetTriangles": 30000,
+   "triangleLimit": 30000
   },
   {
    "name": "BrowningTripodAssembly",
    "category": "weapon",
    "file": "BrowningTripodAssembly.tzm.json",
-   "triangles": 4513,
+   "triangles": 9003,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 261747,
+   "bytes": 505262,
    "materials": [
     "lqBrowningTripod"
    ],
@@ -1023,16 +888,19 @@
    ],
    "bounds": {
     "min": [
-     -0.62539,
+     -0.62156,
      -0.67306,
      -2.227
     ],
     "max": [
-     0.11628,
-     0.75941,
-     0.04706
+     0.11391,
+     0.75871,
+     0.04593
     ]
-   }
+   },
+   "sourceTriangles": 54013,
+   "targetTriangles": 9026,
+   "triangleLimit": 30000
   },
   {
    "name": "UnidentifiedMunition",
@@ -1042,7 +910,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 5177,
+   "bytes": 5173,
    "materials": [
     "lqUnidentifiedMunition"
    ],
@@ -1065,17 +933,57 @@
      0.06953,
      0.046
     ]
-   }
+   },
+   "sourceTriangles": 128,
+   "targetTriangles": 128,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "UnidentifiedBoltActionRifle",
+   "category": "weapon",
+   "file": "UnidentifiedBoltActionRifle.tzm.json",
+   "triangles": 8792,
+   "meshBlocks": 2,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 289628,
+   "materials": [
+    "lqUnidentifiedBoltActionRifle",
+    "lqWeaponPlain"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.07121,
+     -0.10343,
+     -0.865
+    ],
+    "max": [
+     0.01951,
+     0.14544,
+     0.255
+    ]
+   },
+   "sourceTriangles": 8867,
+   "targetTriangles": 8867,
+   "triangleLimit": 30000
   },
   {
    "name": "OfficerSwordSet",
    "category": "weapon",
    "file": "OfficerSwordSet.tzm.json",
-   "triangles": 3906,
+   "triangles": 7801,
    "meshBlocks": 2,
    "nodes": 5,
    "joints": 0,
-   "bytes": 199537,
+   "bytes": 392594,
    "materials": [
     "lqOfficerSword",
     "lqWeaponPlain"
@@ -1088,16 +996,19 @@
    ],
    "bounds": {
     "min": [
-     -0.02985,
-     -0.03959,
-     -0.73039
+     -0.02988,
+     -0.03919,
+     -0.72991
     ],
     "max": [
-     0.0299,
-     0.03233,
-     0.27112
+     0.02983,
+     0.03237,
+     0.26985
     ]
-   }
+   },
+   "sourceTriangles": 298456,
+   "targetTriangles": 7812,
+   "triangleLimit": 30000
   },
   {
    "name": "RingPommelDagger",
@@ -1107,7 +1018,7 @@
    "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 26743,
+   "bytes": 26739,
    "materials": [
     "lqRingPommelDagger"
    ],
@@ -1128,7 +1039,46 @@
      0.02858,
      0.27
     ]
-   }
+   },
+   "sourceTriangles": 515,
+   "targetTriangles": 515,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "UnidentifiedAntiaircraftGun",
+   "category": "weapon",
+   "file": "UnidentifiedAntiaircraftGun.tzm.json",
+   "triangles": 17955,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 654828,
+   "materials": [
+    "lqWeaponPlain"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.16274,
+     -0.2103,
+     -0.845
+    ],
+    "max": [
+     0.16274,
+     0.60183,
+     0.255
+    ]
+   },
+   "sourceTriangles": 18013,
+   "targetTriangles": 18013,
+   "triangleLimit": 30000
   },
   {
    "name": "LightMortar",
@@ -1138,7 +1088,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 139136,
+   "bytes": 139132,
    "materials": [
     "lqLightMortar"
    ],
@@ -1161,17 +1111,20 @@
      0.16253,
      0.046
     ]
-   }
+   },
+   "sourceTriangles": 3124,
+   "targetTriangles": 3124,
+   "triangleLimit": 30000
   },
   {
    "name": "Type11",
    "category": "weapon",
    "file": "Type11.tzm.json",
-   "triangles": 4530,
+   "triangles": 8252,
    "meshBlocks": 5,
    "nodes": 7,
    "joints": 0,
-   "bytes": 186070,
+   "bytes": 300343,
    "materials": [
     "lqType11AmmoBox",
     "lqType11Body",
@@ -1189,16 +1142,19 @@
    ],
    "bounds": {
     "min": [
-     -0.1204,
+     -0.12031,
      0.03931,
-     -0.84514
+     -0.845
     ],
     "max": [
      0.12031,
      0.29508,
-     0.25513
+     0.255
     ]
-   }
+   },
+   "sourceTriangles": 8255,
+   "targetTriangles": 8255,
+   "triangleLimit": 30000
   },
   {
    "name": "Mauser96",
@@ -1208,7 +1164,7 @@
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 44897,
+   "bytes": 44893,
    "materials": [
     "lqMauser96"
    ],
@@ -1231,17 +1187,20 @@
      0.05034,
      0.046
     ]
-   }
+   },
+   "sourceTriangles": 1123,
+   "targetTriangles": 1123,
+   "triangleLimit": 30000
   },
   {
    "name": "MediumMortar",
    "category": "weapon",
    "file": "MediumMortar.tzm.json",
-   "triangles": 4534,
+   "triangles": 9064,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 260615,
+   "bytes": 472175,
    "materials": [
     "lqMediumMortar"
    ],
@@ -1260,21 +1219,24 @@
      -1.39794
     ],
     "max": [
-     0.74874,
+     0.75053,
      0.63855,
      0.046
     ]
-   }
+   },
+   "sourceTriangles": 70460,
+   "targetTriangles": 9068,
+   "triangleLimit": 30000
   },
   {
    "name": "Karabiner98k",
    "category": "weapon",
    "file": "Karabiner98k.tzm.json",
-   "triangles": 4535,
+   "triangles": 8445,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 146900,
+   "bytes": 232737,
    "materials": [
     "lqKarabiner98k"
    ],
@@ -1288,83 +1250,196 @@
    ],
    "bounds": {
     "min": [
-     -0.02598,
+     -0.02542,
      -0.12659,
      -0.855
     ],
     "max": [
-     0.05706,
-     0.06603,
-     0.25461
+     0.05689,
+     0.06599,
+     0.255
     ]
-   }
+   },
+   "sourceTriangles": 8445,
+   "targetTriangles": 8445,
+   "triangleLimit": 30000
   },
   {
-   "name": "UnidentifiedBoltActionRifle",
+   "name": "BayonetZhongZheng",
    "category": "weapon",
-   "file": "UnidentifiedBoltActionRifle.tzm.json",
-   "triangles": 4523,
+   "file": "BayonetZhongZheng.tzm.json",
+   "triangles": 14730,
    "meshBlocks": 2,
-   "nodes": 7,
+   "nodes": 4,
    "joints": 0,
-   "bytes": 177824,
+   "bytes": 338795,
    "materials": [
-    "lqUnidentifiedBoltActionRifle",
-    "lqWeaponPlain"
+    "steel",
+    "wood"
    ],
    "mounts": [
     "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
+    "socket",
+    "tip"
    ],
    "bounds": {
     "min": [
-     -0.0702,
-     -0.10343,
-     -0.865
+     -0.01649,
+     -0.01615,
+     -0.428
     ],
     "max": [
-     0.01952,
-     0.14544,
-     0.255
+     0.0125,
+     0.03419,
+     0.144
     ]
-   }
+   },
+   "sourceTriangles": 14431,
+   "targetTriangles": 14431,
+   "triangleLimit": 30000
   },
   {
-   "name": "UnidentifiedAntiaircraftGun",
+   "name": "BayonetHanYang",
    "category": "weapon",
-   "file": "UnidentifiedAntiaircraftGun.tzm.json",
-   "triangles": 4612,
-   "meshBlocks": 1,
-   "nodes": 7,
+   "file": "BayonetHanYang.tzm.json",
+   "triangles": 14666,
+   "meshBlocks": 2,
+   "nodes": 4,
    "joints": 0,
-   "bytes": 235576,
+   "bytes": 338855,
    "materials": [
-    "lqWeaponPlain"
+    "steel",
+    "wood"
    ],
    "mounts": [
     "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
+    "socket",
+    "tip"
    ],
    "bounds": {
     "min": [
-     -0.16276,
-     -0.21032,
-     -0.8448
+     -0.01397,
+     -0.01368,
+     -0.395
     ],
     "max": [
-     0.16276,
-     0.60183,
-     0.255
+     0.0125,
+     0.03419,
+     0.122
     ]
-   }
+   },
+   "sourceTriangles": 14431,
+   "targetTriangles": 14431,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "BayonetType38",
+   "category": "weapon",
+   "file": "BayonetType38.tzm.json",
+   "triangles": 265,
+   "meshBlocks": 1,
+   "nodes": 4,
+   "joints": 0,
+   "bytes": 10297,
+   "materials": [
+    "steel"
+   ],
+   "mounts": [
+    "root",
+    "socket",
+    "tip"
+   ],
+   "bounds": {
+    "min": [
+     -0.00549,
+     -0.02873,
+     -0.4
+    ],
+    "max": [
+     0.0048,
+     0.0239,
+     0.114
+    ]
+   },
+   "sourceTriangles": 265,
+   "targetTriangles": 265,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Type89Tank",
+   "category": "vehicle",
+   "file": "Type89Tank.tzm.json",
+   "triangles": 4089,
+   "meshBlocks": 4,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 143127,
+   "materials": [
+    "armor",
+    "steel",
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.075,
+     0.0,
+     -2.15
+    ],
+    "max": [
+     1.075,
+     2.56,
+     2.15
+    ]
+   },
+   "sourceTriangles": 4089,
+   "targetTriangles": 4089,
+   "triangleLimit": 80000
+  },
+  {
+   "name": "Type97ChiHa",
+   "category": "vehicle",
+   "file": "Type97ChiHa.tzm.json",
+   "triangles": 3968,
+   "meshBlocks": 4,
+   "nodes": 8,
+   "joints": 1,
+   "bytes": 133204,
+   "materials": [
+    "armor",
+    "steel",
+    "track"
+   ],
+   "mounts": [
+    "root",
+    "gunMuzzle",
+    "rearMgMuzzle",
+    "hatch",
+    "mgMuzzle",
+    "hullFront"
+   ],
+   "bounds": {
+    "min": [
+     -1.2375,
+     0.0,
+     -2.75
+    ],
+    "max": [
+     1.2375,
+     2.38,
+     2.75
+    ]
+   },
+   "sourceTriangles": 3969,
+   "targetTriangles": 3969,
+   "triangleLimit": 80000
   }
  ]
 }

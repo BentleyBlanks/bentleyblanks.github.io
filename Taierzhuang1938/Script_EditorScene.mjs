@@ -42,6 +42,7 @@ import { MakeBox } from "./Script_Geo.mjs";
 import { LoadExternalWorldModels } from "./Script_ExternalProps.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MESHES, MeshUrl, MeshIds } from "./Data_Meshes.mjs";
+import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import {
@@ -1959,9 +1960,10 @@ export class SceneEditor {
     f.Set("机位", `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, `
       + `${camera.position.z.toFixed(1)}`);
     f.Set("脚下地高", field ? `${field.GroundHeight(camera.position.x, camera.position.z).toFixed(2)} m` : "—");
-    f.Set("draw call", this.measure.calls, this.measure.calls > 5000 ? "bad" : "good");
+    f.Set("draw call", this.measure.calls,
+      this.measure.calls > SCENE_RENDER_LIMITS.drawCalls ? "bad" : "good");
     f.Set("三角", `${(this.measure.triangles / 1000).toFixed(0)}k`,
-      this.measure.triangles > 6000000 ? "bad" : "good");
+      this.measure.triangles > SCENE_RENDER_LIMITS.triangles ? "bad" : "good");
     f.Set("城的网格", field ? field.meshes.length : 0);
     f.Set("碰撞盒", field ? (field.city ? field.city.colliders : field.colliders || []).length : 0);
     f.Set("构件 / 标记 / 地形", `${this.items.length} 个 / ${this.markers.length} 个 / `

@@ -31,17 +31,18 @@ import bmesh
 import bpy
 from mathutils import Matrix
 
-from TzmCore import Box, Decimate, Node, TubeZ, Transform, Join
+from TzmCore import Box, Node, TubeZ, Transform, Join
 from ImportWeapons import (
-    _Aabb, _BevelForFirstPerson, _Collect, _ImportFile,
+    _Aabb, _Collect, _ImportFile,
     _Src, _Xform, _AlignLongAxisToZ,
 )
+from AssetBudgets import WEAPON_TRIANGLE_LIMIT, TriangleTarget
 
 T_STEEL = "gunSteel"
 T_WOOD = "gunWood"
 
-# 刀不该吃掉一支枪的预算：2400 三角已经够 14k 面的底模减出干净的棱线
-BUDGET = 2400
+BUDGET = WEAPON_TRIANGLE_LIMIT
+BUILD_STATS = {}
 
 SOURCES = {
     "BayonetZhongZheng": {
@@ -170,23 +171,17 @@ def BuildBayonet(name):
                 v.co.z *= stretch
         bm.normal_update()
 
-    # 倒角必须在减面**之前**（ImportWeapons 同序）。反过来的话，减完面的三角汤
-    # 里几乎每条边都超 28°，逐边倒角直接把 2.2k 炸回 12k —— 这轮实测踩过。
-    _BevelForFirstPerson(bms)
-    # 减面：整桶直接按比例 collapse（budget 余量 0.9 留给后面的环与柄片）
-    def Est(list_):
-        return sum(sum(max(len(f.verts) - 2, 1) for f in bm.faces) for bm in list_)
-    total = Est(bms)
-    if total > BUDGET:
-        ratio = max(0.05, 0.9 * BUDGET / float(total))
-        reduced = []
-        for bm in bms:
-            out = Decimate(bm, ratio)
-            bm.free()
-            reduced.append(out)
-        bms = reduced
-        steel = bms[0]
-        wood = bms[1] if len(bms) > 1 else None
+    # The selected source is below the firearm threshold.  Keep its authored
+    # topology: generic bevel/decimation would move it away from the original
+    # count before the historical muzzle ring and grip repairs are added.
+    source_triangles = sum(sum(max(len(face.verts) - 2, 1) for face in mesh.faces)
+                           for mesh in bms)
+    target_triangles = TriangleTarget(name, "weapon", source_triangles)
+    BUILD_STATS[name] = {
+        "sourceTriangles": source_triangles,
+        "targetTriangles": target_triangles,
+        "triangleLimit": WEAPON_TRIANGLE_LIMIT,
+    }
 
     # --- license-safe 史实修形 -----------------------------------------------
     sx, sy, sz = spec["socket"]
@@ -228,7 +223,13 @@ def BuilderFor(name):
         return None
 
     def _Build():
-        return BuildBayonet(name)
+        root = BuildBayonet(name)
+        stats = BUILD_STATS[name]
+        _Build.sourceTriangles = stats["sourceTriangles"]
+        _Build.targetTriangles = stats["targetTriangles"]
+        _Build.triangleLimit = stats["triangleLimit"]
+        return root
     _Build.__name__ = "BuildBayonet_%s" % name
     _Build.imported = True
+    _Build.budget = WEAPON_TRIANGLE_LIMIT
     return _Build

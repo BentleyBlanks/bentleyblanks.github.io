@@ -18,15 +18,22 @@ from ImportWeapons import (
     _FlipIfGripIsAbove, _FlipIfStockIsForward, _Mounts, _OrientAllSteelFirearm,
     _Place,
 )
+from AssetBudgets import (
+    SPECIAL_TRIANGLE_TARGETS, WEAPON_TRIANGLE_LIMIT, TriangleTarget,
+)
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE_DIR = os.path.abspath(os.path.join(HERE, "..", "_import", "Source", "Model_LugouqiaoWeapons"))
+BUILD_STATS = {}
 
 SOURCES = {
     "WaltherP38": {"lengthM": 0.216, "kind": "pistol", "side": "nra",
+                   "decimateBias": 1.030,
+                   "decimateBudget": 30700,
                    "note": "瓦尔特 P38；源节点 2#，保留 Lug_reb 原贴图。"},
     "BrowningTripodAssembly": {"lengthM": 2.273, "kind": "assembly", "side": "neutral",
+                   "decimateBias": 1.030,
                    "note": "源节点 BROTRIPO009；名称与结构不足以确认具体勃朗宁型号，按识别截图标注。"},
     "UnidentifiedMunition": {"lengthM": 0.253, "kind": "assembly", "side": "neutral",
                    "note": "源节点 Cylinder026；弹体型号未明，保留 WW-100heqdf 原贴图。"},
@@ -36,6 +43,8 @@ SOURCES = {
                    "excludeObjects": {"MK98_BA2", "MK98_LOK"},
                    "note": "源节点 FQDQD / MK98_*；仅能确认栓动步枪，具体型号未明。源文件中的分解展示零件保留在独立 Blend，运行时只取装配态枪体。"},
     "OfficerSwordSet": {"lengthM": 1.000, "kind": "melee", "side": "ija",
+                   "decimateBias": 10.000,
+                   "decimateBudget": 9400,
                    "note": "源节点 Group146；军刀与刀鞘组合，具体制式未明。"},
     "RingPommelDagger": {"lengthM": 0.450, "kind": "melee", "side": "neutral",
                    "note": "源节点 Mesh_0300；带环首短刃，具体制式未明。"},
@@ -253,9 +262,20 @@ def BuildImported(name):
         Transform(barrel, y=0.035, z=-0.145)
         material_names.append("lqWeaponPlain")
         bms.append(barrel)
-    reduced = _DecimateToBudget(bms, budget=5800)
-    if reduced is not None:
-        bms = reduced
+    source_triangles = sum(sum(max(len(face.verts) - 2, 1) for face in mesh.faces)
+                           for mesh in bms)
+    target_triangles = TriangleTarget(name, "weapon", source_triangles)
+    BUILD_STATS[name] = {
+        "sourceTriangles": source_triangles,
+        "targetTriangles": target_triangles,
+        "triangleLimit": WEAPON_TRIANGLE_LIMIT,
+    }
+    if source_triangles > target_triangles:
+        reduced = _DecimateToBudget(
+            bms, budget=spec.get("decimateBudget", target_triangles),
+            ratio_bias=spec.get("decimateBias", 1.005))
+        if reduced is not None:
+            bms = reduced
     _prepare_export_normals(bms)
     lo, hi = _Aabb(bms)
     root = Node("root")
@@ -274,8 +294,13 @@ def BuilderFor(name):
         return None
 
     def _Build():
-        return BuildImported(name)
+        root = BuildImported(name)
+        stats = BUILD_STATS[name]
+        _Build.sourceTriangles = stats["sourceTriangles"]
+        _Build.targetTriangles = stats["targetTriangles"]
+        _Build.triangleLimit = stats["triangleLimit"]
+        return root
     _Build.__name__ = "BuildImportedLugouqiao_%s" % name
     _Build.imported = True
-    _Build.budget = 6000
+    _Build.budget = SPECIAL_TRIANGLE_TARGETS.get(name, WEAPON_TRIANGLE_LIMIT)
     return _Build

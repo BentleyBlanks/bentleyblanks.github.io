@@ -34,9 +34,9 @@ UModeler 拆件按**节点名**（三八式的 `All_Wood` 整组），纯色材�
 | 中正式 `ZhongZheng` | `Source/Model_PolyHavenBoltActionRifle762/bolt_action_rifle_7_62_1k.gltf` | [Poly Haven — Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62) | CC0 | 取其老式毛瑟系栓动步枪主体，删除现代瞄准镜、缠布和独立子弹；保留木/钢分桶，全长按史实 1.110 m 缩放。 |
 | 汉阳造 `HanYang` | `Source/Model_Gewehr88/scene.gltf` | [TastyTony](https://sketchfab.com/TastyTony) | CC-BY-4.0 | 汉阳八八式的母型就是 Gewehr 88：**整长套筒、曼利夏漏夹弹仓与露出式通条**都是模型自带的，不再用 Kar98k 拉长加假套筒。全长按史实 1.250 m。 |
 | 三八式 `Type38` | `Source/Model_Type38Arisaka/scene.gltf` | [Snijboer](https://sketchfab.com/Snijboer) | CC-BY-4.0 | 三八式：防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条。全长按史实 1.276 m。 |
-| 捷克式 `Zb26` | `Source/Model_SketchfabZb26Larkien/scene.gltf` | [Larkien — ZB26](https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34) | CC-BY-4.0 | 上置直弹匣、提把、两脚架、木托和木握把均来自源模；按史实全长 1.165 m 缩放，剔除包在完整主枪管外的 24k 三角重复细分壳，再逐连通岛减面到 4677 三角。 |
+| 捷克式 `Zb26` | `Source/Model_SketchfabZb26Larkien/scene.gltf` | [Larkien — ZB26](https://sketchfab.com/3d-models/zb26-6920684ec16d40ffb857245be0661d34) | CC-BY-4.0 | 上置直弹匣、提把、两脚架、木托和木握把均来自源模；按史实全长 1.165 m 缩放，剔除包在完整主枪管外的 24k 三角重复细分壳。选定几何 7,811 三角，低于 30k，不做通用减面；成品拓扑清理后 7,781 三角。 |
 | 驳壳枪 `Mauser96` | `Source/Model_SketchfabMauserC96Maxence/scene.gltf` | [Maxence Rouillet — Mauser C96](https://sketchfab.com/3d-models/mauser-c96-4c49913126894908906c8512a52facd3) | CC-BY-4.0 | 毛瑟 C96：扫帚柄握把、扳机前固定弹仓、长枪管和系绳环均来自源模；按史实全长 0.288 m 缩放，金属度贴图只用于离线木/钢分桶。 |
-| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，移除展示用弹匣、子弹和 B 状态，修正源坐标方向，并按金属度图拆出木握把，成品 4678 三角。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），焊接阈值按模型对角线取值，见 `ImportWeapons._WeldDistance`。 |
+| 第二把手枪 `ServicePistol` | `Source/Model_PolyHavenServicePistol/service_pistol_1k.gltf` | [Poly Haven — Service Pistol](https://polyhaven.com/a/service_pistol) | CC0 | 页面两把是同一支枪的闭锁/空仓挂机状态；游戏只取可正常射击的 A 状态，移除展示用弹匣、子弹和 B 状态，修正源坐标方向，并按金属度图拆出木握把；选定源几何 7,265 三角，拓扑清理后成品 7,263 三角。**这一支是整批外部枪模里唯一一份按真米作者化的源**（进 Blender 就是 0.222 m 长），焊接阈值按模型对角线取值，见 `ImportWeapons._WeldDistance`。 |
 | 大刀第二式样 `DadaoAlt` | `Source/Model_SketchfabDadao/scene.gltf` | [Trector](https://sketchfab.com/trector) | CC-BY-4.0 | 大刀的**外观变体**，没有独立武器数值。圆盘吞口、束节木柄、刃线较直的一路，与主式样的环首宽刃刀刻意不同型。许可原文在 `Source/Model_SketchfabDadao/license.txt`。 |
 
 许可证副本随源放在 `Source/Model_*/license.txt` / `License_*.txt`（Sketchfab 生成的
@@ -57,7 +57,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 | 游戏内资产 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
 | 八九式中战车 `Type89Tank` | `Source/Model_Type89ChiRo/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | 博物馆实体扫描的 Type 89 I-Go (Chi-Ro)：炮塔偏前、塔后机枪、车体右前机枪球座、前起动轮抬高都是模型自带的。导入管线（`_blender/ImportVehicles.py`）按部件组名收桶（Hull/Turret → armor、Track → track、Barrel → steel），炮塔单独成 joint 节点，尺寸按史实 2.15 × 2.56 × 4.30 m 逐轴归一；保留源件约 4,100 三角。源图为 2K 烘焙扫描图，运行时按共享 PBR 三桶重漆。 |
-| 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源约 8.3 万面。源文件没有可拆的炮塔/车体/履带语义节点，导入时不焊点、不减面，保留 82,142 三角并作为单一静态装甲件；资产仍提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
+| 九五式轻战车 `Type95HaGo` | `Source/Model_Type95HaGo/scene.gltf` | [Jesper Landin](https://sketchfab.com/JesperLandin) | CC-BY-4.0 | Type 95 Ha-Go 高模扫描源 82,142 三角，超过战车 80k 阈值后减至 79,999。源文件没有可拆的炮塔/车体/履带语义节点，仍作为单一静态装甲件；资产提供标准挂点，但炮塔不可独立旋转。尺寸归一为 2.07 × 2.27 × 4.38 m。 |
 | 九七式中战车 `Type97ChiHa` | `Source/Model_Type97ChiHa/scene.gltf` | [snrnsrk5](https://sketchfab.com/snrnsrk5) | CC-BY-4.0 | Type 97 Chi-Ha 博物馆扫描源约 4,000 面；Hull/Turret/Track/Barrel 部件可分别收桶，炮塔保留为 joint 节点。外廓归一为 2.475 × 2.380 × 5.50 m，保留原始 3969 三角、不焊点、不减面。 |
 
 车辆源文件由 `_import/SketchfabFetchTanks.py` 通过 BlenderMCP 下载，构建由
@@ -92,7 +92,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 **这份源模不进公开仓库。** bentleyblanks.github.io 是公开站点；买来的原始文件
 只授权用在成品里，不等于可以把 FBX 本身当素材再分发。仓库里只有它派生出的
-`Model/Dadao.tzm.json`（已按 6000 三角预算重算）和从源包压制的 1K 成品 PBR
+`Model/Dadao.tzm.json`（选定源几何低于 30k，保留 4,199 三角）和从源包压制的 1K 成品 PBR
 `Texture/Texture_Dadao{Base,Normal,Orm}.webp`。原始 4K PNG、FBX 与 .blend 都不分发；
 成品贴图保留原 UV，ORM 遵循 R=AO、G=roughness、B=metalness。做法与本文件末尾
 Vefects 素材那条一致。

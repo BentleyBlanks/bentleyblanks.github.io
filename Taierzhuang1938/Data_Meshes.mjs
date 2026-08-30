@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "23";
+const MESH_REV = "24";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -136,7 +136,7 @@ export const MESHES = {
   },
   HanYang: {
     file: "HanYang.tzm.json", category: "weapon",
-    triangles: 4680, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 2672, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.08117, 0.19311, 1.24977], lengthM: 1.250,
     note: "汉阳造。几何来自 CC-BY Gewehr 88（Sketchfab / TastyTony）—— 汉阳八八式"
@@ -146,7 +146,7 @@ export const MESHES = {
   },
   Zb26: {
     file: "Zb26.tzm.json", category: "weapon",
-    triangles: 4677, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 7781, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.07999, 0.32660, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
@@ -158,7 +158,7 @@ export const MESHES = {
     // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
     // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
     // WP-E1 照 Model/Index.json 补正（数字来自构建期实测，不是猜的）。
-    triangles: 4670, meshBlocks: 4, nodes: 8, joints: 0,
+    triangles: 12467, meshBlocks: 4, nodes: 8, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.09814, 0.19673, 1.27529], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
@@ -176,7 +176,7 @@ export const MESHES = {
   },
   ServicePistol: {
     file: "ServicePistol.tzm.json", category: "weapon",
-    triangles: 4678, meshBlocks: 2, nodes: 7, joints: 0,
+    triangles: 7263, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
     span: [0.03180, 0.12953, 0.22200], lengthM: 0.222,
     draws: { high: 2, medium: 2, low: 2 },
@@ -204,7 +204,7 @@ export const MESHES = {
   },
   DadaoAlt: {
     file: "DadaoAlt.tzm.json", category: "weapon",
-    triangles: 2797, meshBlocks: 2, nodes: 5, joints: 0,
+    triangles: 910, meshBlocks: 2, nodes: 5, joints: 0,
     materials: ["steel", "wood"], mounts: ["muzzle", "gripR", "gripL"],
     span: [0.0574, 0.1575, 0.8982], lengthM: 0.900, bladeM: 0.624,
     draws: { high: 2, medium: 2, low: 2 },
@@ -216,24 +216,24 @@ export const MESHES = {
   // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----
   BayonetZhongZheng: {
     file: "BayonetZhongZheng.tzm.json", category: "weapon",
-    triangles: 2218, meshBlocks: 2, nodes: 4, joints: 0,
+    triangles: 14730, meshBlocks: 2, nodes: 4, joints: 0,
     materials: ["steel", "wood"], mounts: ["socket", "tip"],
-    span: [0.03289, 0.05997, 0.57153], lengthM: 0.572, bladeM: 0.428,
+    span: [0.02899, 0.05034, 0.572], lengthM: 0.572, bladeM: 0.428,
     draws: { high: 2, medium: 2, low: 2 },
     note: "HY1935 刺刀（中正式）。CC-BY Seitengewehr 84/98 底模（Sketchfab / "
       + "PL_historyfan_K），程序化补枪口环与木柄片，刃拉长到史实 428 mm。",
   },
   BayonetHanYang: {
     file: "BayonetHanYang.tzm.json", category: "weapon",
-    triangles: 2198, meshBlocks: 2, nodes: 4, joints: 0,
+    triangles: 14666, meshBlocks: 2, nodes: 4, joints: 0,
     materials: ["steel", "wood"], mounts: ["socket", "tip"],
-    span: [0.02956, 0.0596, 0.51643], lengthM: 0.517, bladeM: 0.395,
+    span: [0.02647, 0.04787, 0.517], lengthM: 0.517, bladeM: 0.395,
     draws: { high: 2, medium: 2, low: 2 },
     note: "汉阳造配刀（八八式系）。与 HY1935 同一 CC-BY 底模，刃 395 mm。",
   },
   BayonetType38: {
     file: "BayonetType38.tzm.json", category: "weapon",
-    triangles: 1338, meshBlocks: 1, nodes: 4, joints: 0,
+    triangles: 265, meshBlocks: 1, nodes: 4, joints: 0,
     materials: ["steel"], mounts: ["socket", "tip"],
     span: [0.01029, 0.05253, 0.514], lengthM: 0.514, bladeM: 0.400,
     draws: { high: 1, medium: 1, low: 1 },
@@ -253,7 +253,7 @@ export const MESHES = {
   },
   Type11: {
     file: "Type11.tzm.json", category: "weapon",
-    triangles: 4530, meshBlocks: 5, nodes: 7, joints: 0,
+    triangles: 8252, meshBlocks: 5, nodes: 7, joints: 0,
     materials: ["lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore", "lqWeaponPlain"],
     mounts: WEAPON_MOUNTS,
     span: [0.24071, 0.25577, 1.10027], lengthM: 1.100,
@@ -262,13 +262,13 @@ export const MESHES = {
       + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
   },
   WaltherP38: {
-    file: "WaltherP38.tzm.json", category: "weapon", triangles: 4517, meshBlocks: 2, nodes: 7, joints: 0,
+    file: "WaltherP38.tzm.json", category: "weapon", triangles: 29899, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["lqWeaponPlain", "wood"], mounts: WEAPON_MOUNTS, span: [0.02868, 0.11214, 0.21618], lengthM: 0.216,
     draws: { high: 2, medium: 2, low: 2 }, note: "源节点 2#，套筒铭文可辨识为 Walther P38；12×12 占位图仅对应握把，不再错误铺满整枪。",
   },
   BrowningTripodAssembly: {
-    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 4513, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.74167, 1.43247, 2.27406], lengthM: 2.273,
+    file: "BrowningTripodAssembly.tzm.json", category: "weapon", triangles: 9003, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["lqBrowningTripod"], mounts: WEAPON_MOUNTS, span: [0.73547, 1.43177, 2.27293], lengthM: 2.273,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 BROTRIPO009；仅能确认勃朗宁式三脚架/机件组合，具体型号未明。",
   },
   UnidentifiedMunition: {
@@ -277,13 +277,13 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Cylinder026；弹体型号未明，识别截图随源归档。",
   },
   UnidentifiedBoltActionRifle: {
-    file: "UnidentifiedBoltActionRifle.tzm.json", category: "weapon", triangles: 4523, meshBlocks: 2, nodes: 7, joints: 0,
+    file: "UnidentifiedBoltActionRifle.tzm.json", category: "weapon", triangles: 8792, meshBlocks: 2, nodes: 7, joints: 0,
     materials: ["lqUnidentifiedBoltActionRifle", "lqWeaponPlain"], mounts: WEAPON_MOUNTS,
     span: [0.08972, 0.24887, 1.120], lengthM: 1.120, draws: { high: 2, medium: 2, low: 2 },
     note: "源节点 FQDQD / MK98_MA1+TRG；排除横向陈列的 BA2/LOK，并补齐机匣至枪口的连续钢管，具体型号未明。",
   },
   OfficerSwordSet: {
-    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 3906, meshBlocks: 2, nodes: 5, joints: 0,
+    file: "OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,
     materials: ["lqOfficerSword", "lqWeaponPlain"], mounts: ["muzzle", "gripR", "gripL"], span: [0.05975, 0.07192, 1.00151], lengthM: 1.000,
     draws: { high: 2, medium: 2, low: 2 }, note: "源节点 Group146；仅刀柄饰带使用 stripe01L，刀身与刀鞘改回枪钢材质，具体制式未明。",
   },
@@ -293,7 +293,7 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 Mesh_0300；带环首短刃，具体制式未明。",
   },
   UnidentifiedAntiaircraftGun: {
-    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 4612, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "UnidentifiedAntiaircraftGun.tzm.json", category: "weapon", triangles: 17955, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqWeaponPlain"], mounts: WEAPON_MOUNTS,
     span: [0.32552, 0.81215, 1.09980], lengthM: 1.100, draws: { high: 1, medium: 1, low: 1 },
     note: "源节点 MK1；删除悬空陈列件，纠正枪口朝向；MKCRMT 原图为随机噪点，改用项目枪钢 PBR，具体型号未明。",
@@ -304,12 +304,12 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 PJP；轻型迫击/掷弹器，具体型号未明。",
   },
   MediumMortar: {
-    file: "MediumMortar.tzm.json", category: "weapon", triangles: 4534, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "MediumMortar.tzm.json", category: "weapon", triangles: 9064, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqMediumMortar"], mounts: WEAPON_MOUNTS, span: [0.79565, 1.20429, 1.44394], lengthM: 1.444,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；中型迫击炮，具体型号未明。",
   },
   Karabiner98k: {
-    file: "Karabiner98k.tzm.json", category: "weapon", triangles: 4535, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "Karabiner98k.tzm.json", category: "weapon", triangles: 8445, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["lqKarabiner98k"], mounts: WEAPON_MOUNTS, span: [0.08304, 0.19262, 1.10961], lengthM: 1.110,
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点直接命名 Karabiner 98 Kurz；保留 diffuse 与 normal 原贴图。",
   },
@@ -335,16 +335,16 @@ export const MESHES = {
   },
   Type95HaGo: {
     file: "Type95HaGo.tzm.json", category: "vehicle",
-    triangles: 82142, meshBlocks: 1, nodes: 8, joints: 1,
+    triangles: 79999, meshBlocks: 1, nodes: 8, joints: 1,
     materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.07, 2.27, 4.38],
     draws: { high: 1, medium: 1, low: 1 },
     note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）原始 82,142 三角；"
-      + "不焊点、不减面，完整车体保留为单一 armor 网格，标准挂点与炮塔关节仍齐备。",
+      + "按战车 80,000 三角阈值减至 79,999，车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。",
   },
   Type97ChiHa: {
     file: "Type97ChiHa.tzm.json", category: "vehicle",
-    triangles: 3969, meshBlocks: 4, nodes: 8, joints: 1,
+    triangles: 3968, meshBlocks: 4, nodes: 8, joints: 1,
     materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
     span: [2.475, 2.38, 5.5],
     draws: { high: 4, medium: 4, low: 4 },

@@ -82,6 +82,7 @@ export const testDefs = {
     desc: "一张贴图挂死不许把开机吊在「加载 PBR 材质」上",
   },
   BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
+  AssetStandardsTest: { file: "Script_AssetStandardsTest.mjs", desc: "源/实际面数、枪械 30k、战车 80k、三件翻倍特例与编辑器清单一致性（纯 Node）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
   RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
@@ -184,6 +185,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "BootPayloadTest",
+  "AssetStandardsTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -223,7 +225,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest",
-      "CharacterModelTest", "CharacterHitboxMathTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -261,7 +263,7 @@ export const domains = {
   audio: { label: "音效/音乐/环境声", tests: ["AudioTest"] },
   voice: { label: "语音", tests: ["VoiceTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["MenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/PCG/可破坏编辑器/采样点", tests: ["EditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/PCG/资产规范/可破坏编辑器/采样点", tests: ["AssetStandardsTest", "EditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -299,7 +301,7 @@ const changedDomainRules = [
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|BootProp|index\.html)/i },
-  { domain: "editor", pattern: /(Editor|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
+  { domain: "editor", pattern: /(Editor|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
   { domain: "render", pattern: /(Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|Vfx|Post|Light|Gi|GlobalShProbe|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   { domain: "perf", pattern: /(Performance|FrameProfile|GodRays|Lod|Visibility|ActorBatch|Smoke)/i },

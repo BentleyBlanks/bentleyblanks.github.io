@@ -28,10 +28,16 @@ import ImportWeapons                 # noqa: E402
 import ImportLugouqiaoWeapons        # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
+from AssetBudgets import WEAPON_TRIANGLE_LIMIT, VEHICLE_TRIANGLE_LIMIT  # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
 # 一旦放行，同屏 24 人的 draw call / triangle 红线当场击穿。
-BUDGET = {"soldier": 1800, "weapon": 6000, "prop": 400, "vehicle": 1600}
+BUDGET = {
+    "soldier": 1800,
+    "weapon": WEAPON_TRIANGLE_LIMIT,
+    "prop": 400,
+    "vehicle": VEHICLE_TRIANGLE_LIMIT,
+}
 
 # 武器全长（米），抄自 Data_Weapons.mjs 的 lengthM，**是史实数据，不许为了好看改**。
 # 断言的是模型在 Z 上的实际跨度 —— 它一次就逮出了汉阳造的套筒建到枪口前头去、
@@ -238,12 +244,18 @@ def main():
             if not node.get("meshes"):
                 mounts.append(node["name"])
         materials = sorted({m["material"] for m in doc["meshes"]})
-        manifest.append({
+        entry = {
             "name": name, "category": category, "file": name + ".tzm.json",
             "triangles": tris, "meshBlocks": blocks, "nodes": len(doc["nodes"]),
             "joints": joints, "bytes": size, "materials": materials,
             "mounts": mounts, "bounds": doc["bounds"],
-        })
+        }
+        source_triangles = getattr(builder, "sourceTriangles", None)
+        if source_triangles is not None:
+            entry["sourceTriangles"] = source_triangles
+            entry["targetTriangles"] = getattr(builder, "targetTriangles", None)
+            entry["triangleLimit"] = getattr(builder, "triangleLimit", limit)
+        manifest.append(entry)
         print("%-4s %-16s %-8s tris=%-5d blocks=%-3d nodes=%-3d joints=%-3d %6.1f KB  mats=%s"
               % ("ok" if ok else "FAIL", name, category, tris, blocks,
                  len(doc["nodes"]), joints, size / 1024.0, ",".join(materials)))

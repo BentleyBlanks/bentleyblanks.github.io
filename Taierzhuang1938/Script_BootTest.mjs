@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -29,12 +30,12 @@ page.on("console", (message) => {
   problems.push(`CONSOLE ${message.text().slice(0, 300)}`);
 });
 
-// 性能硬红线：5000 draw calls / 600 万三角面，越线即 FAIL。
+// 性能硬红线统一读资产规范；越线即 FAIL。
 //
 // 人物与尸体的完整可见性仍是更高一级的内容硬规则：优化只能合批或做等价 LOD，
 // 不得再隐藏第 N 个活人、删除第 N 具尸体来压测试数字。
-const MAX_DRAW_CALLS = 5000;
-const MAX_TRIANGLES = 6000000;
+const MAX_DRAW_CALLS = SCENE_RENDER_LIMITS.drawCalls;
+const MAX_TRIANGLES = SCENE_RENDER_LIMITS.triangles;
 
 let failed = 0;
 // 章节表：按 id 分派逐章专项断言（原来按 phase 序号写死，任务流程重制换了一整套
@@ -305,7 +306,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
       bad.push(`draw call 越线 ${health.drawCalls} > ${MAX_DRAW_CALLS}`);
     }
     if (health.triangles > MAX_TRIANGLES) {
-      bad.push(`三角形越线 ${(health.triangles / 1e6).toFixed(2)}M > 6.00M`);
+      bad.push(`三角形越线 ${(health.triangles / 1e6).toFixed(2)}M > ${(MAX_TRIANGLES / 1e6).toFixed(2)}M`);
     }
     // 预通道的天空判据（见上面取证那一段）。天上看得见天的关，w = 0 的像素
     // 必须有一片；一个都没有就说明又有铺满屏幕的东西把自己写进预通道了。

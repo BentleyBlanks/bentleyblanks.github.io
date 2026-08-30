@@ -20,6 +20,7 @@ from mathutils import Matrix, Vector
 from TzmCore import (
     AUTHORED_NORMAL_LAYER, Box, Decimate, Join, Node, Transform, TransformMatrix,
 )
+from AssetBudgets import WEAPON_TRIANGLE_LIMIT, TriangleTarget
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
@@ -30,7 +31,8 @@ PISTOL_REAR_Z = 0.046
 MELEE_REAR_Z = 0.270
 T_STEEL = "gunSteel"
 T_WOOD = "gunWood"
-BUDGET = 6000
+BUDGET = WEAPON_TRIANGLE_LIMIT
+BUILD_STATS = {}
 
 
 def _ExternalRoot():
@@ -92,13 +94,7 @@ SOURCES = {
         # 这份 CC0 来源已经有完整的毛瑟系机匣、抱箍与通条；再把程序化补件嵌进去
         # 会把减面预算挤到枪身上，导致木托/机匣变成肉眼可见的碎三角。
         "noDetails": True,
-        # 玩家明确要求保留这份母模的全部几何：中正式不参与通用 6k 减面流程。
-        # 同时禁止导入后补倒角，避免把原模型的完整拓扑再加工成另一份网格。
-        "noDecimate": True,
-        "noBevel": True,
-        # 这不是全局武器预算的例外口子；只记录这份第一人称主武器的原模预算。
-        # 实际三角数由 BuildAll 写入 Model/Index.json，并由 Verify 与运行时实测。
-        "budget": 25000,
+        # 选定源几何低于 30k 分类阈值，因此保留完整拓扑；通用倒角默认关闭。
         # 原资产的法线贴图不随共享 PBR 带入；减面后必须重建连续的几何法线，
         # 否则机匣和木托会按三角形一块块断光。
         "smoothAll": True,
@@ -171,11 +167,8 @@ SOURCES = {
         ),
         # 源模型的钢件与木托共用一张烘焙漫反射图，以像素色分桶保留两种材质。
         "colorSplit": True,
-        # 用户要求不减面：不补倒角、不添程序化零件，也不走 6k 通用压缩。
-        "noBevel": True,
+        # 选定源几何低于 30k 分类阈值：不添程序化零件，也不走减面。
         "noDetails": True,
-        "noDecimate": True,
-        "budget": 12000,
         "smoothAll": True,
         "note": "CC-BY Type 11 6.5mm Machine Gun（Sketchfab / buh）→ 十一年式轻机枪。"
                 "保留完整来源枪体、左侧漏斗供弹斗与两脚架；独立摆放的桥夹/散弹不进入手持模型；"
@@ -196,11 +189,8 @@ SOURCES = {
         # Maya 源中两个 2 m 的 Cube 是展示底板/环境占位，并非机枪的一部分。
         # stem 匹配会同时排掉 Cube 与 Cube.001；不删除任何枪体或三脚架几何。
         "skip": ("Cube",),
-        # 用户明确要求不减面：保留母模的全部枪身、散热片、瞄具与三脚架拓扑。
-        "noBevel": True,
+        # 已提交成品低于 30k；源文件存在时保留枪身、散热片、瞄具与三脚架拓扑。
         "noDetails": True,
-        "noDecimate": True,
-        "budget": 120000,
         "smoothAll": True,
         "note": "CadNav 免费 Type 92 Heavy Machine Gun（Maya ASCII）→ 九二式重机枪。"
                 "保留完整枪体、冷却套、瞄具和三脚架；仅排除源文件的两块空白展示 Cube；"
@@ -217,7 +207,6 @@ SOURCES = {
         # 深度 collapse 会把它拉成跨屏长刺。丢掉重复壳，保留下面的完整枪管。
         "skip": ("Cylinder.026_0",),
         "roll": -1.0,
-        "noBevel": True,
         "noDetails": True,
         "autoSmooth": 34.0,
         # ZB-26 的上置弹匣占据正中，照门/准星与瞄准挂点都必须左偏。
@@ -226,7 +215,7 @@ SOURCES = {
         "mounts": {"gripZ": -0.470, "sightX": -0.0234, "sightY": 0.095,
                    "sightZ": -0.205, "magY": 0.155, "magZ": -0.118},
         "note": "CC-BY-4.0 ZB26（Sketchfab / Larkien）→ 捷克式。保留上置弹匣、"
-                "两脚架、木托与机匣的来源轮廓；全长按史实 1.165 m，重预算到 6000 三角内。",
+                "两脚架、木托与机匣的来源轮廓；排除重复枪管壳后低于 30k，不做通用减面。",
     },
     "Mauser96": {
         "file": os.path.join("Model_SketchfabMauserC96Maxence", "scene.gltf"),
@@ -237,7 +226,6 @@ SOURCES = {
         "metalSplit": True,
         "metalMask": os.path.join("Model_SketchfabMauserC96Maxence", "Texture_MetalMask.png"),
         "roll": -1.0,
-        "noBevel": True,
         "noDetails": True,
         "autoSmooth": 34.0,
         "mounts": {"sightY": 0.062},
@@ -259,7 +247,6 @@ SOURCES = {
         "noDetails": True,
         # 原包已经有完整的刃口/刀脊/护手倒角。枪械通用补倒角会再次切拓扑，
         # 不但徒增三角，还会把 FBX 的逐角法线插值坏。
-        "noBevel": True,
         "sourcePbr": True,
         # 保留源模的 smooth 法线：专用法线贴图就是按这套切线基底烘焙的。
         # 这里若再按角度强制打硬边，刀面会被切成大块三角明暗。
@@ -298,11 +285,7 @@ SOURCES = {
         "flipForward": True,
         "noDetails": True,
         "mounts": {"sightY": 0.084, "sightZ": 0.030},
-        # 不倒角。这支源模 7556 三角、预算 6000，本来就要减面；`_BevelForFirstPerson`
-        # 会先把它涨到两万面，逼得减面比例掉到 0.28 —— 倒角出来的那圈高光当场
-        # 被压成碎片，还顺手在枪口前戳出 16 mm 的尖刺。Poly Haven 这一支的
-        # 硬表面转折自带真倒角，不需要再补一遍。
-        "noBevel": True,
+        # 选定闭锁状态低于 30k，不减面；源硬表面转折自带真倒角。
         "note": "CC0 Service Pistol（Poly Haven）。保留闭锁状态 A 的枪身、套筒、"
                 "击锤与扳机，移除展示用弹匣、子弹及空仓挂机状态 B；全长 0.222 m。",
     },
@@ -473,8 +456,8 @@ def _WeldDistance(diagonal):
 
     取对角线的 0.15%（一米长的枪 = 1.5 mm，与历史值一致）。保留 1.5 的绝对上限，
     是为了让单位巨大的那几支一字节不变：它们今天拿到的就是「不焊」。真受影响的
-    只有两支米制的小件 —— 手枪（这次要修的）与三十年式刺刀（收料面数不变，
-    只多留下四个原本被并掉的接缝顶点；倒角跟着改了拓扑，成品 1344 → 1338 三角）。
+    只有两支米制的小件 —— 手枪与三十年式刺刀。后者会多保留四个原本被并掉的
+    接缝顶点；当前不再追加通用倒角，选定源几何与成品都保持 265 三角。
     """
     return min(0.0015, max(1e-6, diagonal) * 0.0015)
 
@@ -761,13 +744,44 @@ def _SplitIslands(bm):
     return out
 
 
-def _DecimateToBudget(bms, budget=BUDGET):
+def _DecimateToBudget(bms, budget=BUDGET, ratio_bias=1.005):
     # OBJ 的面可能是四边，WriteTzm 会三角化；按 max(len(f.verts)-2, 1) 估三角数
     def Est(list_):
         return sum(sum(max(len(f.verts) - 2, 1) for f in bm.faces) for bm in list_)
 
-    if Est(bms) <= budget:
+    source_total = Est(bms)
+    if source_total <= budget:
         return None
+
+    # A source only slightly above its category limit does not need the costly
+    # per-island path.  It is also the wrong path for scanned vehicles: copying
+    # an 82k mesh once per disconnected surface can consume tens of gigabytes.
+    # Triangulating a copy makes the modifier ratio and the exported count use
+    # the same unit; the fallback trims the last few faces if necessary.
+    if budget / float(source_total) >= 0.85:
+        direct = []
+        ratio = min(0.999, budget / float(source_total) * ratio_bias)
+        for source in bms:
+            working = source.copy()
+            bmesh.ops.triangulate(working, faces=working.faces[:])
+            reduced = Decimate(working, ratio)
+            if reduced is not working:
+                working.free()
+            direct.append(reduced)
+        replaced = direct
+        for _ in range(3):
+            estimated = Est(replaced)
+            if estimated <= budget:
+                break
+            trim_ratio = max(0.01, (budget - 1) / float(estimated))
+            next_ = []
+            for mesh in replaced:
+                decimated = Decimate(mesh, trim_ratio)
+                if decimated is not mesh:
+                    mesh.free()
+                next_.append(decimated)
+            replaced = next_
+        return replaced
 
     # 1) 按连通岛逐个减面。多壳体来源（Sketchfab 拆件模型 = 一两百个独立壳体）
     #    的全局 collapse 减到一半就停（捷克式实测卡在 0.70），因为壳与壳之间的
@@ -777,37 +791,39 @@ def _DecimateToBudget(bms, budget=BUDGET):
     for idx, bm in enumerate(bms):
         islands.extend((idx, part) for part in _SplitIslands(bm))
     movable = [(idx, part) for idx, part in islands if Est([part]) > 12]
-    total = sum(Est([part]) for _, part in movable)
-    if total > budget * 0.92:
-        per_ratio = max(0.12, 0.85 * (budget * 0.92) / float(total))
-        done = []
-        for idx, part in islands:
-            if Est([part]) <= 12:
-                done.append((idx, part))
-                continue
-            reduced = Decimate(part, per_ratio)
-            part.free()
-            done.append((idx, reduced))
-        buckets = {}
-        for idx, part in done:
-            buckets.setdefault(idx, []).append(part)
-        merged = []
-        for idx in sorted(buckets):
-            merged.append(Join(*buckets[idx]))
-        if Est(merged) <= budget:
-            return merged
-        # 分岛减面没达标也要**用这份结果**继续跑全局（不能 free 了再回头引用）
-    else:
-        merged = [bm for _, bm in islands]
+    fixed = sum(Est([part]) for _, part in islands if Est([part]) <= 12)
+    movable_total = sum(Est([part]) for _, part in movable)
+    print("[AssetBudget] source=%d target=%d islands=%d fixed=%d movable=%d bias=%.3f"
+          % (source_total, budget, len(islands), fixed, movable_total, ratio_bias))
+    # Decimate.ratio is face-based.  Triangulate only the assets that actually
+    # cross a category limit, then the requested ratio and exported triangles
+    # use the same unit.  Start 0.5% high and trim in the fallback below: this
+    # avoids the old permanent 8–25% undershoot while never exporting over cap.
+    desired_movable = max(1, budget - fixed)
+    per_ratio = min(0.999, max(0.01,
+        desired_movable / float(max(1, movable_total)) * ratio_bias))
+    done = []
+    for idx, part in islands:
+        if Est([part]) <= 12:
+            done.append((idx, part))
+            continue
+        bmesh.ops.triangulate(part, faces=part.faces[:])
+        reduced = Decimate(part, per_ratio)
+        part.free()
+        done.append((idx, reduced))
+    buckets = {}
+    for idx, part in done:
+        buckets.setdefault(idx, []).append(part)
+    merged = [Join(*buckets[idx]) for idx in sorted(buckets)]
+    print("[AssetBudget] island pass=%d" % Est(merged))
 
-    # 2) 兜底：全局 collapse 数轮（DECIMATE 的 ratio 按**面数**实现、预算按三角数，
-    #    四边折算留 0.85 余量；减不动就收下这份结果，不硬压到塌质量）。
+    # 2) 兜底：若细小不可折叠壳体让第一轮略超预算，从已经接近目标的结果再收一轮。
     replaced = list(merged)
-    for _ in range(3):
+    for _ in range(4):
         estimated = Est(replaced)
         if estimated <= budget:
             break
-        ratio = max(0.12, 0.85 * (budget * 0.92) / float(estimated))
+        ratio = max(0.01, (budget - 1) / float(estimated))
         prev_faces = sum(len(bm.faces) for bm in replaced)
         next_ = []
         for bm in replaced:
@@ -818,6 +834,7 @@ def _DecimateToBudget(bms, budget=BUDGET):
         replaced = next_
         if unchanged:
             break
+    print("[AssetBudget] final=%d" % Est(replaced))
     return replaced
 
 
@@ -1070,7 +1087,11 @@ def BuildImported(name):
             # 全钢枪：上面两条定向都拿不到路标，换几何判据。
             _OrientAllSteelFirearm(bms)
     _Place(bms, steel, wood, spec["lengthM"], spec["kind"])
-    if not spec.get("noBevel"):
+    # Restoring source topology means generic edge bevel is opt-in.  Imported
+    # assets already carry their authored hard-surface edge loops; adding a
+    # blanket bevel before counting would make an under-limit source exceed its
+    # own original triangle count.
+    if spec.get("addBevel"):
         _BevelForFirstPerson(bms)
     if spec.get("jacket") and steel is not None:
         steel = _AddJacket(steel, spec["lengthM"])
@@ -1078,8 +1099,15 @@ def BuildImported(name):
     if not spec.get("noDetails"):
         steel, wood = _AddHistoricalDetails(name, steel, wood, spec["lengthM"])
     bms = [bm for bm in (steel, wood) if bm is not None]
-    if not spec.get("noDecimate"):
-        decimated = _DecimateToBudget(bms)
+    source_triangles = sum(sum(max(len(face.verts) - 2, 1) for face in bm.faces) for bm in bms)
+    target_triangles = TriangleTarget(name, "weapon", source_triangles)
+    BUILD_STATS[name] = {
+        "sourceTriangles": source_triangles,
+        "targetTriangles": target_triangles,
+        "triangleLimit": WEAPON_TRIANGLE_LIMIT,
+    }
+    if source_triangles > target_triangles:
+        decimated = _DecimateToBudget(bms, budget=target_triangles)
         if decimated is not None:
             steel = decimated[0]
             wood = decimated[1] if len(decimated) > 1 else None
@@ -1130,9 +1158,13 @@ def BuilderFor(name):
         return None
 
     def _Build():
-        return BuildImported(name)
+        root = BuildImported(name)
+        stats = BUILD_STATS[name]
+        _Build.sourceTriangles = stats["sourceTriangles"]
+        _Build.targetTriangles = stats["targetTriangles"]
+        _Build.triangleLimit = stats["triangleLimit"]
+        return root
     _Build.__name__ = "BuildImported_%s" % name
     _Build.imported = True
-    if spec.get("budget"):
-        _Build.budget = spec["budget"]
+    _Build.budget = WEAPON_TRIANGLE_LIMIT
     return _Build

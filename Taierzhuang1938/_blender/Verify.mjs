@@ -167,8 +167,10 @@ Report(rifleBuckets.size === 2 && (rifleBuckets.get("lqUnidentifiedBoltActionRif
   && (rifleBuckets.get("lqWeaponPlain") || 0) > 2500,
   "未识别栓动步枪 MA1 木件与 TRG/补管钢件齐全（不受 material_index=255 影响）");
 const type11Buckets = MaterialTriangles("Type11");
-Report(type11Buckets.size === 5 && (type11Buckets.get("lqWeaponPlain") || 0) <= 500,
-  "十一年式五个材质桶均命中，默认材质面不超过 500");
+const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Type11.triangles;
+Report(type11Buckets.size === 5
+  && (type11Buckets.get("lqWeaponPlain") || 0) <= type11SourceTriangles * 0.10,
+  "十一年式五个材质桶均命中，默认材质不超过选定源几何的 10%");
 const swordBuckets = MaterialTriangles("OfficerSwordSet");
 Report(swordBuckets.has("lqOfficerSword") && swordBuckets.has("lqWeaponPlain")
   && swordBuckets.size === 2, "军刀仅饰带使用源贴图，刀身/刀鞘回钢材质");

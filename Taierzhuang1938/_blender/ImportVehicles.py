@@ -10,8 +10,8 @@
   Barrel        -> steel（炮管等发蓝钢件，tile=steel）
 
 源图依然不进 Pages（与枪械同一个理由：共享三套 authored PBR，见
-Data_SourceLicenses.md）。九五式与九七式按用户要求保留下载源的完整三角面，
-只做坐标、尺度与节点层级的运行时转换，不焊点、不减面。
+Data_SourceLicenses.md）。选定源几何在战车阈值以内原样保留；只有超过阈值的模型
+才减到尽可能贴近阈值，只做必要的坐标、尺度与节点层级运行时转换。
 
 挂点（gunMuzzle / rearMgMuzzle / hatch / mgMuzzle / hullFront）按部件几何推算：
 炮口取枪管最前端的质心、舱盖取炮塔顶面质心、塔后机枪取炮塔后端质心——
@@ -27,18 +27,18 @@ from mathutils import Matrix, Vector
 
 from TzmCore import Join, Node
 from ImportWeapons import _DecimateToBudget
+from AssetBudgets import VEHICLE_TRIANGLE_LIMIT, TriangleTarget
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.abspath(os.path.join(HERE, "..", "_import", "Source"))
 
-BUDGET = 1600
+BUDGET = VEHICLE_TRIANGLE_LIMIT
+BUILD_STATS = {}
 
 SOURCES = {
     "Type95HaGo": {
         "file": os.path.join("Model_Type95HaGo", "scene.gltf"),
         "span": (2.07, 2.27, 4.38),
-        "budget": 100000,
-        "raw": True,
         # 这件高模被作者按表面切成 13 个 Object_* 网格，源文件没有车体/履带/炮塔
         # 语义层级；完整保留原始网格，运行时用 shared armor 材质重漆。
         "parts": [("Object_", "armor", False)],
@@ -51,8 +51,6 @@ SOURCES = {
         "file": os.path.join("Model_Type97ChiHa", "scene.gltf"),
         # 原始网格外廓宽度 2.475 m；运行时碰撞/巷宽与 Data_Weapons 使用同一值。
         "span": (2.475, 2.38, 5.50),
-        "budget": 5000,
-        "raw": True,
         "parts": [("Hull", "armor", False), ("Track", "track", False),
                   ("Turret", "armor", True), ("Barrel", "steel", True)],
         "note": "CC-BY Type 97 Chi-Ha（Sketchfab / snrnsrk5）→ 九七式中战车。"
@@ -62,7 +60,6 @@ SOURCES = {
     "Type89Tank": {
         "file": os.path.join("Model_Type89ChiRo", "scene.gltf"),
         "span": (2.15, 2.56, 4.30),
-        "budget": 5000,
         # (部件组名, 材质桶, 属于炮塔节点?)
         "parts": [("Hull", "armor", False), ("Track", "track", False),
                   ("Turret", "armor", True), ("Barrel", "steel", True)],
@@ -110,7 +107,6 @@ def _Xform(bms, matrix):
 
 def BuildImported(name):
     spec = SOURCES[name]
-    budget = spec.get("budget", BUDGET)
     path = _Src(spec["file"])
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
@@ -142,9 +138,7 @@ def BuildImported(name):
         if not raw_list:
             raise RuntimeError("%s 导入后缺少 %s 部件" % (name, key))
         joined = Join(*raw_list)
-        # 原始近景车不许焊点：扫描源常有按面拆开的顶点，焊接也属于网格改写。
-        if not spec.get("raw"):
-            bmesh.ops.remove_doubles(joined, verts=joined.verts[:], dist=0.0006)
+        # 低于阈值的载具要保留源拓扑；焊接扫描件顶点同样会改变原始面数。
         joined.normal_update()
         partbm[key] = joined
         if in_turret:
@@ -174,6 +168,23 @@ def BuildImported(name):
     lo, hi = _Aabb(all_bms)
     _Xform(all_bms, Matrix.Translation((-0.5 * (lo.x + hi.x), -lo.y, -0.5 * (lo.z + hi.z))))
 
+    def EstTris(mesh):
+        return sum(max(len(face.verts) - 2, 1) for face in mesh.faces)
+
+    source_triangles = sum(EstTris(mesh) for mesh in all_bms)
+    target_triangles = TriangleTarget(name, "vehicle", source_triangles)
+    BUILD_STATS[name] = {
+        "sourceTriangles": source_triangles,
+        "targetTriangles": target_triangles,
+        "triangleLimit": VEHICLE_TRIANGLE_LIMIT,
+    }
+    if source_triangles > target_triangles:
+        reduced = _DecimateToBudget(all_bms, budget=target_triangles)
+        if reduced is not None:
+            for (key, _bucket, _turret), mesh in zip(parts, reduced):
+                partbm[key] = mesh
+            all_bms = list(partbm.values())
+
     # 高模九五式没有可分离的炮塔/履带节点。把所有原始表面维持在一个车体网格，同时仍
     # 保留标准挂点与空炮塔关节，避免它在编辑器、预加载器或将来的载具系统中变成
     # 一个特例；真正逐帧转炮塔必须使用含语义节点的模型。
@@ -199,21 +210,6 @@ def BuildImported(name):
         bmesh.ops.transform(partbm[key], matrix=Matrix.Translation(-pivot),
                             verts=partbm[key].verts[:])
         partbm[key].normal_update()
-
-    # --- 三角预算：原始近景车跳过；其他车装甲+钢件按连通岛压，履带保形 ----
-    def EstTris(bm):
-        return sum(max(len(f.verts) - 2, 1) for f in bm.faces)
-
-    track_tris = EstTris(partbm["Track"])
-    armor_steel = [partbm[k] for k, _b, _t in parts if _b != "track"]
-    dec = None if spec.get("raw") else _DecimateToBudget(
-        armor_steel, budget=int((budget - track_tris) * 0.92))
-    if dec is not None:
-        idx = 0
-        for key, _b, _t in parts:
-            if _b != "track":
-                partbm[key] = dec[idx]
-                idx += 1
 
     # --- 挂点（部件几何推算）-----------------------------------------------
     hlo, hhi = _Aabb([partbm["Hull"]])            # 车体（根空间）
@@ -269,9 +265,14 @@ def BuilderFor(name):
         return None
 
     def _Build():
-        return BuildImported(name)
+        root = BuildImported(name)
+        stats = BUILD_STATS[name]
+        _Build.sourceTriangles = stats["sourceTriangles"]
+        _Build.targetTriangles = stats["targetTriangles"]
+        _Build.triangleLimit = stats["triangleLimit"]
+        return root
     _Build.__name__ = "BuildImported_%s" % name
     _Build.imported = True
     _Build.staticMesh = bool(spec.get("singleBody"))
-    _Build.budget = spec.get("budget", BUDGET)
+    _Build.budget = VEHICLE_TRIANGLE_LIMIT
     return _Build
