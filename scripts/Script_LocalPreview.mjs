@@ -465,8 +465,8 @@ async function Main() {
 
   if (args.includes("--shortcut")) { CreateShortcut(rootDir); return; }
 
-  // 端口上已经有一份、而且服的**正是这棵树**，就别再起一份：直接把浏览器
-  // 指过去。双击快捷方式两次不该变成两个服抢端口。
+  // 端口上已经有一份、而且服的**正是这棵树**，就别再起一份也不再开浏览器。
+  // 双击快捷方式两次不该变成两个服抢端口或反复抢到前台。
   //
   // 「正是这棵树」这个条件不能省：多个 agent 各在自己 worktree 里起预览时，
   // 8080 很可能被别人的树占着，无脑复用等于把浏览器指到别人的代码上，
@@ -474,7 +474,6 @@ async function Main() {
   const existing = await ProbeExisting(basePort);
   if (existing && path.resolve(existing.root) === rootDir) {
     console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
-    if (!noOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
     return;
   }
   if (existing) {
