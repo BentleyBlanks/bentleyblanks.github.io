@@ -165,10 +165,10 @@ const QuarterVolume = (id, label, bounds, seedOffset) => Object.freeze({
   inset: 2.1, minSpacing: 7.5,
 });
 
-const DefenseVolume = (id, label, bounds, seedOffset, axisYaw) => Object.freeze({
+const DefenseVolume = (id, label, bounds, seedOffset, axisYaw, options = {}) => Object.freeze({
   id, label, enabled: true, profile: "defenseSupport", shape: "rect", bounds,
-  seedOffset, count: 5, attemptsPerAnchor: 42, minSpacing: 12,
-  inset: 0.8, axisYaw,
+  seedOffset, count: options.count ?? 3, attemptsPerAnchor: options.attemptsPerAnchor ?? 52,
+  minSpacing: options.minSpacing ?? 9, inset: options.inset ?? 0.8, axisYaw,
 });
 
 function PointsBounds(points, padding = 4) {
@@ -193,8 +193,10 @@ const DefenseSpline = (id, label, profile, points, seedOffset, options = {}) => 
 });
 
 /**
- * 出厂布设文档。生活组只在 PlanBlocks 生成的真实院落格里落点；城防组只在四面
- * 顺城街墙根带补低矮物资，四门洞、马道和缺口由分段 volume 主动绕开。
+ * 出厂布设文档。生活组只在 PlanBlocks 生成的真实院落格里落点。城防工事不再
+ * 沿四面墙平均铺开：Notion「场景设计」的城防图与东关白盒把主防区明确收束为
+ * 东寨门—东关院落—东门／东墙缺口，南东侧只承担逐渐压来的侧翼威胁，西侧是
+ * 退却方向。PCG 因此只补这些节点之间的短线与补给，不把整圈城墙做成齐整胸墙。
  */
 export const PROP_PCG_DOCUMENT = Object.freeze({
   version: PROP_PCG_SCHEMA_VERSION,
@@ -204,27 +206,53 @@ export const PROP_PCG_DOCUMENT = Object.freeze({
     QuarterVolume("LifeNorthwest", "西北片院落", { minX: -282, maxX: -4, minZ: -282, maxZ: -4 }, 211),
     QuarterVolume("LifeSoutheast", "东南片院落", { minX: 4, maxX: 282, minZ: 4, maxZ: 282 }, 307),
     QuarterVolume("LifeSouthwest", "西南片院落", { minX: -282, maxX: -4, minZ: 4, maxZ: 282 }, 401),
-    DefenseVolume("DefenseSouthWest", "南墙西段补给", { minX: -260, maxX: 42, minZ: 286, maxZ: 293 }, 503, 0),
-    DefenseVolume("DefenseSouthEast", "南墙东段补给", { minX: 116, maxX: 262, minZ: 286, maxZ: 293 }, 601, 0),
-    DefenseVolume("DefenseEastNorth", "东墙北段补给", { minX: 286, maxX: 293, minZ: -264, maxZ: -104 }, 701, Math.PI / 2),
-    DefenseVolume("DefenseEastSouth", "东墙南段补给", { minX: 286, maxX: 293, minZ: 104, maxZ: 258 }, 809, Math.PI / 2),
-    DefenseVolume("DefenseWest", "西墙补给", { minX: -293, maxX: -286, minZ: 42, maxZ: 258 }, 907, Math.PI / 2),
-    DefenseVolume("DefenseNorthEast", "北墙东段补给", { minX: 0, maxX: 258, minZ: -293, maxZ: -286 }, 1009, 0),
+    // 第一层：东墙缺口与东门内侧。固定投弹位／交叉机枪位由 EAST_DEFENSE 建造，
+    // 这里仅在其后方空地补弹药、掩体材料与歇兵物件，避免重复压住射界。
+    DefenseVolume("DefenseEastBreachRear", "东墙缺口后方补给",
+      { minX: 258, maxX: 283, minZ: -40, maxZ: 14 }, 503, Math.PI / 2,
+      { count: 3, minSpacing: 11 }),
+    DefenseVolume("DefenseEastGateRear", "东门内侧补给",
+      { minX: 254, maxX: 282, minZ: -82, maxZ: -48 }, 601, 0,
+      { count: 2, minSpacing: 10 }),
+    DefenseVolume("DefenseEastReserve", "东关预备队院落补给",
+      { minX: 366, maxX: 410, minZ: -143, maxZ: -106 }, 701, 0,
+      { count: 3, minSpacing: 10 }),
 
-    // 顺城街墙根的散兵位按 spline 稀疏排列。控制点已把四门、四条马道、两处缺口
-    // 与章节主轴切成独立安全段；12.5 m 左右一处，不把整圈做成现代齐整胸墙。
-    DefenseSpline("FiringSouthWest", "南墙西段散兵线", "defenseFiringLine",
-      [[-258, 291], [42, 291]], 1201, { spacing: 13.5 }),
-    DefenseSpline("FiringSouthEast", "南墙东段散兵线", "defenseFiringLine",
-      [[118, 291], [258, 291]], 1301, { spacing: 13.0 }),
-    DefenseSpline("FiringEastNorth", "东墙北段散兵线", "defenseFiringLine",
-      [[291, -258], [291, -108]], 1409, { spacing: 12.5 }),
-    DefenseSpline("FiringEastSouth", "东墙南段散兵线", "defenseFiringLine",
-      [[291, 108], [291, 254]], 1511, { spacing: 12.5 }),
-    DefenseSpline("FiringWestSouth", "西墙南段散兵线", "defenseFiringLine",
-      [[-291, 44], [-291, 254]], 1601, { spacing: 13.5 }),
-    DefenseSpline("FiringNorthEast", "北墙东段散兵线", "defenseFiringLine",
-      [[4, -291], [254, -291]], 1709, { spacing: 13.5 }),
+    // 第二层：东寨门两翼投弹／阻滞区。主路 z=-65 与门洞保持净空；补给落在
+    // 两侧院巷，沙袋与铁丝线均沿南北向短铺，不横切任务轴。
+    DefenseVolume("DefenseZhaiNorth", "东寨门北翼手榴弹补给",
+      { minX: 478, maxX: 516, minZ: -101, maxZ: -86 }, 809, 0,
+      { count: 2, minSpacing: 9 }),
+    DefenseVolume("DefenseZhaiSouth", "东寨门南翼手榴弹补给",
+      { minX: 478, maxX: 516, minZ: -46, maxZ: -31 }, 907, 0,
+      { count: 2, minSpacing: 9 }),
+
+    // 第三层：日军南侧突破逐渐威胁后方，只在东南角留下少量侧翼物资；西门是
+    // 退却方向，仅在道路两肩放两处补给，不再沿西墙、北墙筑成长线。
+    DefenseVolume("DefenseSouthEastFlank", "东南城角侧翼补给",
+      { minX: 188, maxX: 258, minZ: 286, maxZ: 293 }, 1009, 0,
+      { count: 2, minSpacing: 18, inset: 0.5 }),
+    DefenseVolume("DefenseWestWithdrawalNorth", "西门退却线北肩补给",
+      { minX: -282, maxX: -254, minZ: -34, maxZ: -18 }, 1103, 0,
+      { count: 1, minSpacing: 8 }),
+    DefenseVolume("DefenseWestWithdrawalSouth", "西门退却线南肩补给",
+      { minX: -282, maxX: -254, minZ: 18, maxZ: 34 }, 1151, 0,
+      { count: 1, minSpacing: 8 }),
+
+    // 东墙缺口外围与东门后方用短 spline 串成可换位的火力层；每条只放 1—3 个
+    // 沙袋模块，门洞、马道、固定投弹位和东西门大街始终留空。
+    DefenseSpline("FiringEastBreachSouth", "东墙缺口南翼散兵位", "defenseFiringLine",
+      [[291, 12], [291, 30]], 1201, { spacing: 8.5, startInset: 0.5, endInset: 0.5 }),
+    DefenseSpline("FiringEastGateNorth", "东门后方北肩散兵位", "defenseFiringLine",
+      [[278, -72], [254, -72]], 1301, { spacing: 8.0, startInset: 0.8, endInset: 0.8 }),
+    DefenseSpline("FiringEastGateSouth", "东门后方南肩散兵位", "defenseFiringLine",
+      [[282, -54], [258, -54]], 1409, { spacing: 8.0, startInset: 0.8, endInset: 0.8 }),
+    DefenseSpline("FiringZhaiNorth", "东寨门北翼投弹位", "defenseFiringLine",
+      [[528, -91], [528, -79]], 1511, { spacing: 7.2, startInset: 0.4, endInset: 0.4 }),
+    DefenseSpline("FiringZhaiSouth", "东寨门南翼投弹位", "defenseFiringLine",
+      [[528, -51], [528, -39]], 1601, { spacing: 7.2, startInset: 0.4, endInset: 0.4 }),
+    DefenseSpline("FiringSouthEastFlank", "东南城角侧翼散兵线", "defenseFiringLine",
+      [[188, 291], [258, 291]], 1709, { spacing: 13.5 }),
 
     // 东寨缺口两翼是全场最适合连续障碍线的地方：顺巷铺，不横过 x 向主路。
     // 主路中心 z=-65 与缺口净宽始终留空；拒马和弹壳仍由手摆件做视觉焦点。

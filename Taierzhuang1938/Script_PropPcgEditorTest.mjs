@@ -124,15 +124,26 @@ const eastBreach = await page.evaluate(async () => {
   const T = window.Taierzhuang;
   const active = T.editor.Open("propPcg");
   await active.RefreshPreview();
-  const ids = ["WireEastBreachNorth", "WireEastBreachSouth"];
+  const wireIds = ["WireEastBreachNorth", "WireEastBreachSouth"];
+  const firingIds = [
+    "FiringEastBreachSouth", "FiringEastGateNorth", "FiringEastGateSouth",
+    "FiringZhaiNorth", "FiringZhaiSouth",
+  ];
+  const statsFor = (ids) => Object.fromEntries(ids.map((id) => [id, active.result.stats.byVolume[id] || null]));
   return {
-    wirePlacements: active.result.placements.filter((entry) => ids.includes(entry.pcgVolume)).length,
-    byVolume: Object.fromEntries(ids.map((id) => [id, active.result.stats.byVolume[id] || null])),
+    wirePlacements: active.result.placements.filter((entry) => wireIds.includes(entry.pcgVolume)).length,
+    firingPlacements: active.result.placements.filter((entry) => firingIds.includes(entry.pcgVolume)).length,
+    wireByVolume: statsFor(wireIds),
+    firingByVolume: statsFor(firingIds),
     errors: active.result.errors,
   };
 });
 Check("东寨缺口两翼的样条铁丝网在真实街巷碰撞下仍能落点", eastBreach.wirePlacements >= 2
   && eastBreach.errors.length === 0, JSON.stringify(eastBreach));
+Check("城防图指定的东墙／东门／东寨门短散兵线均有真实落点",
+  eastBreach.firingPlacements >= 5
+  && Object.values(eastBreach.firingByVolume).every((stats) => stats?.placements >= 1),
+  JSON.stringify(eastBreach));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 
 await browser.close();

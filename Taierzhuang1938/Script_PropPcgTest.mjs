@@ -51,6 +51,37 @@ Check("出厂文档与 profile 的资产引用完整", () => {
   assert.ok(Object.keys(PROP_PCG_PROFILES).length >= 4);
 });
 
+Check("城防图口径收束为东关主防、东南侧翼与西门退却补给", () => {
+  const defense = PROP_PCG_DOCUMENT.volumes.filter((volume) => volume.profile !== "householdLife");
+  const supportIds = defense.filter((volume) => volume.profile === "defenseSupport")
+    .map((volume) => volume.id);
+  const firing = defense.filter((volume) => volume.profile === "defenseFiringLine");
+  assert.deepEqual(supportIds, [
+    "DefenseEastBreachRear", "DefenseEastGateRear", "DefenseEastReserve",
+    "DefenseZhaiNorth", "DefenseZhaiSouth", "DefenseSouthEastFlank",
+    "DefenseWestWithdrawalNorth", "DefenseWestWithdrawalSouth",
+  ]);
+  assert.ok(firing.length === 6);
+  assert.ok(firing.every((volume) => {
+    const xs = volume.points.map((point) => point[0]);
+    const zs = volume.points.map((point) => point[1]);
+    return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) <= 75;
+  }), "不得恢复沿整面城墙铺设的长散兵线");
+  assert.ok(!defense.some((volume) => /NorthEast|SouthWest|WestSouth/.test(volume.id)),
+    "北墙、西南墙不得重新变成平均铺开的固定防线");
+});
+
+Check("东寨门主路在沙袋与铁丝两层之间保持连续净空", () => {
+  const lines = PROP_PCG_DOCUMENT.volumes.filter((volume) =>
+    ["FiringZhaiNorth", "FiringZhaiSouth", "WireEastBreachNorth", "WireEastBreachSouth"]
+      .includes(volume.id));
+  assert.equal(lines.length, 4);
+  assert.ok(lines.every((volume) => {
+    const clearance = volume.profile === "defenseWireLine" ? 4.5 : 8;
+    return volume.points.every((point) => Math.abs(point[1] + 65) >= clearance);
+  }), "东关大街 z=-65 两侧的沙袋至少退 8m，贴近缺口的铁丝端点至少退 4.5m");
+});
+
 Check("相同种子与环境逐字段确定", () => {
   const a = Generate();
   const b = Generate();
