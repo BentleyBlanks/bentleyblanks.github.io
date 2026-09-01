@@ -363,7 +363,7 @@ function BuildHandGrip(hand, side, fallback) {
 
 /** One independently animated, skeleton-cloned soldier. */
 export class LugouCharacterRig {
-  constructor(asset, { kind, targetHeight, seed, variantIndex }) {
+  constructor(asset, { kind, targetHeight, seed, variantIndex, materialLibrary = null }) {
     this.asset = asset;
     this.kind = kind;
     this.variantIndex = variantIndex;
@@ -436,6 +436,17 @@ export class LugouCharacterRig {
     const skinnedParts = [];
     this.root.traverse((object) => {
       if (!object.isMesh) return;
+      // 枪械稍后才会挂进骨骼插槽；保留这个边界标记，让诊断与测试只审计
+      // GLB 人体表面，不能把本来就该有金属度的武器误判为人物材质回归。
+      object.userData.characterPbrSurface = true;
+      // GLB 材质不能绕过主材质库：glTF 缺省 metalness=1 会把军装/皮肤渲成黑金属，
+      // 且没注入的材质在 Debug Rendering 的 BaseColor/粗糙度/金属度/阴影/光照
+      // 视图里仍画最终颜色。十套角色材质由加载器缓存共享，ConfigureExternalPbr
+      // 内部幂等，只会给同一材质挂一次统一 shader 钩子。
+      materialLibrary?.ConfigureExternalPbr?.(object.material, {
+        metalness: 0,
+        minRoughness: 0.58,
+      });
       object.castShadow = true;
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
@@ -630,7 +641,9 @@ export class LugouCharacterRig {
   }
 }
 
-export function CreateLugouCharacterRig(library, kind, options = {}, targetHeight = 1.68) {
+export function CreateLugouCharacterRig(
+  library, kind, options = {}, targetHeight = 1.68, materialLibrary = null,
+) {
   const faction = FactionForKind(kind);
   if (!faction) return null;
   const variants = library?.byFaction?.[faction] || [];
@@ -644,6 +657,6 @@ export function CreateLugouCharacterRig(library, kind, options = {}, targetHeigh
       ? explicit
       : allowed[HashString(`${faction}:${options.seed ?? 0}:model`) % allowed.length];
   return new LugouCharacterRig(variants[index], {
-    kind, targetHeight, seed: options.seed ?? 0, variantIndex: index,
+    kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary,
   });
 }

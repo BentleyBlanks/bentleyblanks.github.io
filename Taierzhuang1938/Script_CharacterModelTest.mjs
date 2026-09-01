@@ -202,6 +202,10 @@ assert.match(runtime, /GetLugouAnimationEntries\(kind\)/, "runtime exposes role-
 assert.match(runtime, /IsLugouAnimationAllowed\(kind, clipId\)/, "runtime exposes an applicability guard");
 assert.doesNotMatch(runtime, /this\.root\.userData\.skipNormalDepth\s*=\s*true/,
   "rigged characters are not removed wholesale from NormalDepth");
+assert.match(runtime, /ConfigureExternalPbr\?\.\(object\.material,[\s\S]*?metalness:\s*0[\s\S]*?minRoughness:\s*0\.58/,
+  "rigged character materials enter the shared PBR/debug chain as non-metals");
+assert.match(actor, /CreateLugouCharacterRig\([\s\S]*?this\.library/,
+  "actor factory passes the shared material library to imported characters");
 assert.match(runtime, /normalDepthMaxDistance\s*=\s*NORMAL_DEPTH_DETAIL_MAX_DISTANCE/,
   "only small distant skinned parts use a NormalDepth distance LOD");
 assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");

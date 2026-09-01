@@ -3250,7 +3250,9 @@ export class ActorFactory {
   }
 
   CreateCharacterRig(kind, options = {}, targetHeight = 1.68) {
-    return CreateLugouCharacterRig(this.characterAssets, kind, options, targetHeight);
+    return CreateLugouCharacterRig(
+      this.characterAssets, kind, options, targetHeight, this.library,
+    );
   }
 
   /** 接上人物合批层。传 null 就是关掉（每个分件退回自己一个 draw call）。 */

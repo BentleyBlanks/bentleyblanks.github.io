@@ -165,6 +165,30 @@ await Step(6);
 const debugRendering = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const panel = T.editor.overlays.get("debugRendering");
+  const characterMaterials = new Set();
+  const characterPbr = {
+    meshes: 0, materials: 0, configured: true, injected: true,
+    nonMetal: true, roughEnough: true, shadowReady: true,
+  };
+  for (const soldier of T.ai.soldiers) {
+    soldier.actor?.characterRig?.root?.traverse((object) => {
+      if (!object.isMesh || object.userData.characterPbrSurface !== true) return;
+      characterPbr.meshes += 1;
+      characterPbr.shadowReady &&= object.userData.actorOriginalCastShadow === true
+        && object.receiveShadow === true;
+      for (const material of (Array.isArray(object.material) ? object.material : [object.material])) {
+        if (!material?.isMeshStandardMaterial && !material?.isMeshPhysicalMaterial) continue;
+        characterMaterials.add(material);
+      }
+    });
+  }
+  for (const material of characterMaterials) {
+    characterPbr.configured &&= material.userData.externalPbrConfigured === true;
+    characterPbr.injected &&= material.userData.indirectLightingInjected === true;
+    characterPbr.nonMetal &&= material.metalness === 0;
+    characterPbr.roughEnough &&= material.roughness >= 0.58;
+  }
+  characterPbr.materials = characterMaterials.size;
   // 屏幕真的被写了没有。**只比 uniform 上的纹理引用是不够的** ——
   // 这一趟的展示 pass 曾经因为一个 GLSL ES 3.00 保留字（变量名叫 sample）整段
   // 编译不过：uniform 全接对了，three 却什么都不画，九个视图在屏幕上一律纯黑。
@@ -222,7 +246,7 @@ const debugRendering = await page.evaluate(() => {
     // 留着的话所有材质还在往 hdr 靶里写调试色，正片就毁了。
     matReset: !T.library.gi || T.library.gi.debugView.value === 0,
     target: !!T.post.targets.normalDepth,
-    visible, lit, chipsOn, matMode,
+    visible, lit, chipsOn, matMode, characterPbr,
   };
 });
 Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
@@ -232,6 +256,12 @@ JSON.stringify({ ...debugRendering, lit: undefined, chipsOn: undefined }));
 Check("Debug Rendering：材质假彩色编号随视图同步、离开即归零",
   Object.values(debugRendering.matMode).every(Boolean) && debugRendering.matReset,
   JSON.stringify({ matMode: debugRendering.matMode, matReset: debugRendering.matReset }));
+Check("Debug Rendering：GLB 角色接入 PBR、材质视图与阴影链",
+  debugRendering.characterPbr.meshes > 0 && debugRendering.characterPbr.materials > 0
+  && debugRendering.characterPbr.configured && debugRendering.characterPbr.injected
+  && debugRendering.characterPbr.nonMetal && debugRendering.characterPbr.roughEnough
+  && debugRendering.characterPbr.shadowReady,
+  JSON.stringify(debugRendering.characterPbr));
 // GI 那两张在探针体关着时画的是"不可用"斜纹（也是有颜色的），所以同一条阈值够用。
 // 金属度除外：这一关的世界金属度几乎处处为 0，取景框里没有天空时全屏合法地黑。
 Check("Debug Rendering：每个视图都真的画到了屏幕上（不是黑屏）",

@@ -384,6 +384,12 @@ NormalDepth 和本帧 Composite uniforms 重算距离雾×高度衰减，`景深
 不另建全分辨率调试靶，避免只为编辑器多占显存；蓝→暖黄的假彩色明确显示 0→最大效果量。
 景深只在阵亡镜头触发，未触发时 CoC 视图保留深蓝底而不是黑屏。
 
+正式军人与编辑器摄影棚里的十套蒙皮人物也必须走同一条材质注入链：GLB 自带的
+`MeshStandardMaterial` 在接入时明确把军装、皮肤、头发的金属度归零，并保留作者的
+粗糙度标量/贴图；BaseColor、粗糙度、金属度、太阳阴影和四路光照分量视图都要覆盖人物，
+不能只覆盖 `MaterialLibrary.Get/Plain` 造出的环境与武器材质。角色网格同时逐件开启
+`castShadow/receiveShadow`。透明头发在假彩色重画时保留原 alpha，不能变成一整块实心壳。
+
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
 与 Debug Rendering 同在「渲染调试（可叠加）」组，不接管相机、不暂停玩法 ——

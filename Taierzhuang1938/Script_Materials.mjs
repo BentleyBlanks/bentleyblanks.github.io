@@ -176,7 +176,7 @@ ${GI_SAMPLE_GLSL}`)
         }
         #endif`)
         .replace("#include <dithering_fragment>", `#include <dithering_fragment>
-        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
+        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, diffuseColor.a);`);
     } else if (gi) {
       // 调试视图基建（无探针采样版）。视图语义按「GI 关闭时材质实际在用什么」走：
       //   1/2 = 天空 IBL×0.05 —— 采样层没编进来，材质实际采用的间接辐照度**就是**
@@ -209,7 +209,7 @@ ${GI_SAMPLE_GLSL}`)
         }
         #endif`)
         .replace("#include <dithering_fragment>", `#include <dithering_fragment>
-        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, 1.0);`);
+        if (uGiDebugView > 0.5) gl_FragColor = vec4(gGiDebugColor, diffuseColor.a);`);
     }
 
     // 光照分量必须在 <aomap_fragment> **之后**截取：这里正是 SSAO 实际压过
@@ -268,6 +268,9 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`)
   // 运行时翻转 gi.sampling 再 needsUpdate，就能拿到另一套程序而不撞缓存。
   material.customProgramCacheKey = () =>
     `indirect:${ssao ? 1 : 0}${gi ? (gi.sampling !== false ? 2 : 1) : 0}${destruction ? 1 : 0}`;
+  // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
+  // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
+  material.userData.indirectLightingInjected = true;
   return material;
 }
 
@@ -323,7 +326,47 @@ export class MaterialLibrary {
     // 演员也会复用 BrickWall / WoodBeam 的底材，不能把破口 shader 直接挂到底材上，
     // 否则人走过洞口时身体也会被裁掉。Static() 只给 BuildSink 的场景网格克隆一份。
     this.staticMaterials = new Map();
+    // 外部 GLB 的材质由加载器缓存并在多个蒙皮实例之间共享。WeakSet 既保证只注入
+    // 一次，也不把这些材质变成 MaterialLibrary 的所有物（Dispose 时不能替资产卸载）。
+    this.externalPbrMaterials = new WeakSet();
     this.staticDepthMaterial = destruction ? MakeDestructionDepthMaterial(destruction) : null;
+  }
+
+  /**
+   * 把 GLB 自带的 MeshStandard/PhysicalMaterial 接进项目统一的 PBR 与调试链。
+   *
+   * glTF 规范的 metallicFactor 缺省值是 1。卢沟桥十套人物多数材质没有显式写该
+   * 字段，于是 GLTFLoader 会把军装、皮肤和头发全部当成金属；白盒里又没有贴图环境
+   * 帮暗面提轮廓，最终就成了黑色剪影。角色资产是混合 atlas，没有可独立保留的裸露
+   * 金属桶，因此运行时明确归零 metalness；roughness 仍保留作者标量与贴图，调试视图
+   * 显示的是 three 真正参与 BRDF 的 roughnessFactor。
+   */
+  ConfigureExternalPbr(material, { metalness = null, minRoughness = null } = {}) {
+    const materials = Array.isArray(material) ? material : [material];
+    for (const item of materials) {
+      if (!item || (!item.isMeshStandardMaterial && !item.isMeshPhysicalMaterial)) continue;
+      let changed = false;
+      if (Number.isFinite(metalness)) {
+        const nextMetalness = Math.max(0, Math.min(1, metalness));
+        changed ||= item.metalness !== nextMetalness;
+        item.metalness = nextMetalness;
+      }
+      if (Number.isFinite(minRoughness)) {
+        const nextRoughness = Math.max(minRoughness, Number(item.roughness) || 0);
+        changed ||= item.roughness !== nextRoughness;
+        item.roughness = nextRoughness;
+      }
+      const firstConfiguration = !this.externalPbrMaterials.has(item);
+      if (firstConfiguration) {
+        if (this.ssao || this.gi) {
+          InjectIndirectLighting(item, { ssao: this.ssao, gi: this.gi });
+        }
+        this.externalPbrMaterials.add(item);
+      }
+      item.userData.externalPbrConfigured = true;
+      if (firstConfiguration || changed) item.needsUpdate = true;
+    }
+    return material;
   }
 
   /** 逐个配方烘焙，每 yield 一次交还主线程。 */

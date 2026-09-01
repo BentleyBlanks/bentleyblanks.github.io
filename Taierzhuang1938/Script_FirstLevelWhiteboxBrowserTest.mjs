@@ -32,8 +32,32 @@ try {
     const T = window.Tengxian;
     T.player.debug.invincible = true;
     T.StepFrames(3);
+    const characterMaterials = new Set();
+    const characterPbr = {
+      meshes: 0, materials: 0, configured: true,
+      nonMetal: true, roughEnough: true, shadowReady: true,
+    };
+    for (const soldier of (T.ai?.soldiers || [])) {
+      soldier.actor?.characterRig?.root?.traverse((object) => {
+        if (!object.isMesh || object.userData.characterPbrSurface !== true) return;
+        characterPbr.meshes += 1;
+        characterPbr.shadowReady &&= object.userData.actorOriginalCastShadow === true
+          && object.receiveShadow === true;
+        for (const material of (Array.isArray(object.material) ? object.material : [object.material])) {
+          if (!material?.isMeshStandardMaterial && !material?.isMeshPhysicalMaterial) continue;
+          characterMaterials.add(material);
+        }
+      });
+    }
+    for (const material of characterMaterials) {
+      characterPbr.configured &&= material.userData.externalPbrConfigured === true;
+      characterPbr.nonMetal &&= material.metalness === 0;
+      characterPbr.roughEnough &&= material.roughness >= 0.58;
+    }
+    characterPbr.materials = characterMaterials.size;
     return {
       state: T.Debug.Whitebox(),
+      characterPbr,
       visibleMarkers: [...document.querySelectorAll(".hudMarker")]
         .filter((el) => el.style.display !== "none").length,
       oldGuideDom: document.querySelectorAll(".hudWorldAnnotation,.hudBoundaryWarning").length,
@@ -45,6 +69,11 @@ try {
     && initial.state.setpieceLevel === "CH1_NanLu", "剧情与摆点复用正式第一章内容");
   Check(initial.state.companions > 0, "具名同伴在白盒中真实到场",
     `companions=${initial.state.companions}`);
+  Check(initial.characterPbr.meshes > 0 && initial.characterPbr.materials > 0
+    && initial.characterPbr.configured && initial.characterPbr.nonMetal
+    && initial.characterPbr.roughEnough && initial.characterPbr.shadowReady,
+  "白盒角色使用非金属 PBR 材质并支持投影/受影",
+  JSON.stringify(initial.characterPbr));
   Check(initial.state.field.material === "MeshStandardMaterial"
     && initial.state.field.color === 0xffffff && !initial.state.field.textured,
   "全部场景体块使用无贴图纯白受光材质");
