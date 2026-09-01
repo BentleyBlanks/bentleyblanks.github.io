@@ -48,7 +48,7 @@ export const FIRST_LEVEL_WHITEBOX_LAYOUT = Object.freeze({
     Object.freeze({ id: "SouthRoad", widthM: 48, verb: "冒险压正面或沿破屋侧绕", change: "侧面火力被拔除，队伍重新移动" }),
     Object.freeze({ id: "Ditch", widthM: 18, verb: "在低墙间疏散并躲避航线", change: "飞机转向人群，安全方向反转" }),
     Object.freeze({ id: "Fallback", widthM: 28, verb: "回身压制并让担架先过", change: "南路断开，折返门解锁" }),
-    Object.freeze({ id: "Return", widthM: 16, verb: "沿新揭示的斜向廊道撤回", change: "重新握住担架后端" }),
+    Object.freeze({ id: "Return", widthM: 15, verb: "沿新揭示的斜向廊道撤回", change: "重新握住担架后端" }),
   ]),
   blocks: Object.freeze([
     // 外围体块只负责收画面与阻止越界；玩家永远看见真实墙，不撞隐形空气墙。
@@ -79,10 +79,13 @@ export const FIRST_LEVEL_WHITEBOX_LAYOUT = Object.freeze({
     Box("EscortYardSouth", -500, -94, 34, 5, 5.6),
 
     // 03｜涵洞：十米净宽、低顶、前后视线不贯通；两侧大体块是真碰撞。
+    // 净宽由两只桥墩的**内侧面**定义：-443 与 -433，恰好 10 m —— 第一版桥墩摆在
+    // -449/-427，内净宽实际 18 m，与本表 sections 里 widthM:10 的口径对不上，
+    // 视角审图（低顶压迫感）也压不出来。zone C1_Culvert 圈心 (-438) 居中于洞口。
     Box("CulvertWestBank", -474, -64, 38, 31, 5.8),
     Box("CulvertEastBank", -404, -61, 27, 34, 6.8),
-    Box("CulvertWestPier", -449, -64, 4, 16, 4.3),
-    Box("CulvertEastPier", -427, -64, 4, 16, 4.3),
+    Box("CulvertWestPier", -445, -64, 4, 16, 4.3),
+    Box("CulvertEastPier", -431, -64, 4, 16, 4.3),
     Box("CulvertRoof", -438, -64, 26, 18, 1.2, { y: 4.3, tag: "whiteboxCeiling" }),
     Box("CulvertNearCover", -456, -43, 7, 3, 1.15, { cover: { faceX: 0, faceZ: 1 } }),
 
@@ -96,22 +99,40 @@ export const FIRST_LEVEL_WHITEBOX_LAYOUT = Object.freeze({
     Box("CenterRoadCoverB", -395, 12, 10, 3, 1.25, { cover: { faceX: 0, faceZ: 1 } }),
     Box("MachineGunPlinth", -402, 35, 13, 5, 1.1, { cover: { faceX: 0, faceZ: -1 } }),
 
-    // 05｜路沟：平行白盒墙把横向开阔收成十八米，缺口让玩家/担架分流。
-    Box("DitchWestNorth", -463, 45, 4, 24, 1.45, { cover: { faceX: 1, faceZ: 0 } }),
-    Box("DitchWestSouth", -463, 82, 4, 30, 1.45, { cover: { faceX: 1, faceZ: 0 } }),
-    Box("DitchEastNorth", -413, 44, 4, 21, 1.45, { cover: { faceX: -1, faceZ: 0 } }),
-    Box("DitchEastSouth", -413, 80, 4, 32, 1.45, { cover: { faceX: -1, faceZ: 0 } }),
-    Box("DitchShelter", -435, 88, 27, 8, 2.2, { cover: { faceX: 0, faceZ: -1 } }),
+    // 05｜路沟：南北向沟壁把横向开阔收成**十八米整**（内侧面 -448 / -430，与
+    // sections 的 widthM:18 逐字对上）。缺口让玩家/担架分流；两条沟壁的**北端
+    // 一律顶死在折返廊道的南墙线上**（T 字接缝），沟的北口就是廊道口，不许在
+    // 廊道里再横一截矮墙 —— 第一版沟壁摆到 z=33 起，恰好把撤回廊道拦腰截断。
+    Box("DitchWestNorth", -450, 57, 4, 12, 1.45, { cover: { faceX: 1, faceZ: 0 } }),
+    Box("DitchWestSouth", -450, 80, 4, 24, 1.45, { cover: { faceX: 1, faceZ: 0 } }),
+    Box("DitchEastNorth", -428, 54, 4, 12, 1.45, { cover: { faceX: -1, faceZ: 0 } }),
+    Box("DitchEastSouth", -428, 77, 4, 24, 1.45, { cover: { faceX: -1, faceZ: 0 } }),
+    Box("DitchShelter", -439, 88, 14, 8, 2.2, { cover: { faceX: 0, faceZ: -1 } }),
     Box("FallbackWestCover", -497, 54, 18, 4, 1.3, { cover: { faceX: 0, faceZ: -1 } }),
 
-    // 06/07｜折返：旧路被高墙切断；两条旋转盒组成新的斜向撤回廊道。
+    // 06/07｜折返：旧路被高墙切断；两道平行斜墙组成新的撤回廊道。
+    //
+    // 廊道轴向是 **1:5 缓斜率**（ry=+0.1974，轴 = (0.981, -0.196)）而不是
+    // 「对准回城门」的 19°直线 —— 那条直线在 x≈-384 处会一头扎进南路东侧长块
+    // （它南伸到 z=27），怎么摆墙都是死胡同。正解：斜廊只负责把人送到长块
+    // **南面的过廊**（z 27—35），最后一段沿长块南墙面向东、再从门前小院折向北
+    // 穿门。ry 的符号语义：局部 +X → 世界 (cos ry, -sin ry)；第一版写成 -0.316，
+    // 四条墙各自朝东南倒 18°、与廊道行进方向差 36°，成了人字纹碎墙。
+    //
+    // 两条纪律（都是几何逼出来的，改坐标前先复核）：
+    //  · 北墙 A/B 之间的错位缺口（x -426.5..-414.7）必须罩住 4→5 的护送直线
+    //    （C1_SouthRoad→C1_Ditch 连线在 x≈-421.8 处穿过北墙线）——后送队不做
+    //    群体避障，压在墙上就是整队卡死；
+    //  · 南墙在沟口（x -448..-430）整段留空，沟壁北端 T 字顶上来封缝。
     Box("SouthCutWall", -438, 103, 47, 5, 5.5),
-    Box("ReturnNorthWallA", -453, 35, 58, 4, 3.4, { ry: -0.316 }),
-    Box("ReturnNorthWallB", -397, 17, 58, 4, 3.4, { ry: -0.316 }),
-    Box("ReturnSouthWallA", -448, 52, 54, 4, 3.4, { ry: -0.316 }),
-    Box("ReturnSouthWallB", -392, 34, 54, 4, 3.4, { ry: -0.316 }),
-    Box("ReturnCoverA", -430, 37, 7, 3, 1.05, { ry: -0.316, cover: { faceX: -0.3, faceZ: -0.95 } }),
-    Box("ReturnCoverB", -389, 23, 7, 3, 1.05, { ry: -0.316, cover: { faceX: -0.3, faceZ: -0.95 } }),
+    Box("ReturnNorthWallA", -438.7, 32.9, 25, 4, 3.4, { ry: 0.1974 }),
+    Box("ReturnNorthWallB", -399, 25, 32, 4, 3.4, { ry: 0.1974 }),
+    Box("ReturnSouthWallA", -458.4, 52.1, 21, 4, 3.4, { ry: 0.1974 }),
+    Box("ReturnSouthWallB", -395.1, 39.5, 62, 4, 3.4, { ry: 0.1974 }),
+    // 过廊南沿：接住南墙 B 的东端，把门前小院从南侧收拢（北沿就是长块南墙面）。
+    Box("ReturnPassageSouth", -356, 33, 16, 4, 3.4),
+    Box("ReturnCoverA", -442, 41, 7, 3, 1.05, { ry: 0.1974, cover: { faceX: -0.98, faceZ: 0.2 } }),
+    Box("ReturnCoverB", -398, 30, 7, 3, 1.05, { ry: 0.1974, cover: { faceX: -0.98, faceZ: 0.2 } }),
     Box("FinalEntryLeft", -378, 7, 18, 6, 5.5),
     Box("FinalEntryRight", -340, 7, 14, 6, 5.5),
     Box("FinalLandmark", -342, -15, 9, 9, 13),
