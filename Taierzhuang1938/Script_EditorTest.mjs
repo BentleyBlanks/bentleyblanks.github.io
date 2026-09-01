@@ -779,7 +779,8 @@ Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${act
 Check("摄影棚把城藏起来了", actor.worldHidden && actor.viewmodelHidden);
 Check("单人 / 本阵营四兵一官模型对比", actor.one === 1 && actor.lineupCount === 5,
   `${actor.one} → ${actor.lineupCount}`);
-Check("人物编辑器列出当前士兵适用的 14 条导入动作", actor.importedActions === 14,
+// 14 条卢沟桥源动作 + 3 条视频转骨骼（CarryStretcherFront/Rear、WoundedLimp）
+Check("人物编辑器列出当前士兵适用的 17 条导入动作", actor.importedActions === 17,
   `${actor.importedActions} 条`);
 Check("人物编辑器单人默认读取正式人物配枪", actor.sourceDefault);
 Check("人物编辑器下拉可替换单人枪械", actor.singleWeaponReplaced);

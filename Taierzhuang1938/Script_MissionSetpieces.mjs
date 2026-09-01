@@ -151,6 +151,8 @@ export class EscortColumn {
     this.waypoints = (spec.waypoints || []).map((p) => ({ x: Num(p.x), z: Num(p.z) }));
     this.roster = spec.members || [];
     this.members = [];
+    /** 抬着走的担架实体（两名担架员一副，见 Start / _UpdateLitters）。 */
+    this.litters = [];
     this.legIndex = 0;
     /** 队头在当前航段上走了多远（米）。 */
     this.legT = 0;
@@ -215,8 +217,14 @@ export class EscortColumn {
     if (!head) return 0;
     const dir = this.HeadDirection();
     const right = { x: -dir.z, z: dir.x };
+    let bearerOrdinal = 0;
     this.roster.forEach((entry, index) => {
-      const slot = this._Slot(index, entry);
+      // 担架员成**对**走纵列：同一副担架前后两人隔一副担架的长度（CARRY_KINDS
+      // 里 stretcher 的 spanM ≈ 1.85），一对一对沿走线排开；其余角色照旧分两列。
+      const slot = entry.role === "bearer"
+        ? { back: Math.floor(bearerOrdinal / 2) * 4.2 + (bearerOrdinal % 2) * 1.9, lateral: 0 }
+        : this._Slot(index, entry);
+      if (entry.role === "bearer") bearerOrdinal += 1;
       const x = head.x - dir.x * slot.back + right.x * slot.lateral;
       const z = head.z - dir.z * slot.back + right.z * slot.lateral;
       let handle = null;
@@ -230,9 +238,33 @@ export class EscortColumn {
         return;
       }
       if (!handle) { this.log.push({ label: entry.label, ok: false, why: "宿主没造出来（人口预算满了）" }); return; }
+      // 「能走的轻伤员」走视频转骨骼的跛行 clip（Script_Ai 把旗透传给 Actor）。
+      if (entry.role === "walking") handle.woundedWalk = 1;
       this.members.push({ ...entry, handle, slot, index });
       this.log.push({ label: entry.label, ok: true, x: +x.toFixed(1), z: +z.toFixed(1) });
     });
+    // 两人一副担架：前位/后位各自的抬担架 clip（视频转骨骼），担架与伤员是
+    // 跟着两人双手实时摆的运行时道具 —— 不再是路边那种静态布景箱。
+    this.litters = [];
+    const bearers = this.members.filter((m) => m.role === "bearer");
+    for (let i = 0; i + 1 < bearers.length; i += 2) {
+      const front = bearers[i];
+      const rear = bearers[i + 1];
+      front.handle.carryRole = "front";
+      rear.handle.carryRole = "rear";
+      const fp = this.host.PositionOf ? this.host.PositionOf(front.handle) : null;
+      const at = fp ? { x: fp.x, z: fp.z } : head;
+      const litter = {
+        front, rear, dropped: false, lastMid: null,
+        propLitter: this.host.Prop ? this.host.Prop({
+          id: `escortLitter${i / 2}`, kind: "stretcher", position: { x: at.x, z: at.z },
+        }) : null,
+        propBody: this.host.Prop ? this.host.Prop({
+          id: `escortCasualty${i / 2}`, kind: "shroudedBody", position: { x: at.x, z: at.z },
+        }) : null,
+      };
+      this.litters.push(litter);
+    }
     return this.members.length;
   }
 
@@ -260,7 +292,15 @@ export class EscortColumn {
 
   /** 收摊。**不 Kill** —— 撤走不是阵亡。 */
   Reset() {
+    for (const litter of this.litters || []) {
+      if (litter.front?.handle) litter.front.handle.carryRole = null;
+      if (litter.rear?.handle) litter.rear.handle.carryRole = null;
+      this.host.SetPropState?.(litter.propLitter, "removed");
+      this.host.SetPropState?.(litter.propBody, "removed");
+    }
+    this.litters = [];
     for (const m of this.members) {
+      if (m.handle) m.handle.woundedWalk = 0;
       if (m.handle && this.host.Despawn) {
         try { this.host.Despawn(m.handle); } catch { /* 宿主的事 */ }
       }
@@ -301,6 +341,7 @@ export class EscortColumn {
         if (this.legIndex >= this.waypoints.length - 1) { this.arrived = true; this.legT = 0; break; }
       }
     }
+    this._UpdateLitters();
     if (now - this.regoalAt < this.tuning.columnRegoalS) return true;
     this.regoalAt = now;
     const dir = this.HeadDirection();
@@ -316,12 +357,50 @@ export class EscortColumn {
     return true;
   }
 
+  /**
+   * 担架实体逐帧跟在前后两个担架员中间（高度 = 垂手握杆的高度）。
+   * 任意一名担架员倒下：担架落地、白布伤员跟着落下、幸存者松手（清 carryRole
+   * 回普通姿态）—— 这正是一关阶段七与五关「担架员跌倒」要的画面基座。
+   */
+  _UpdateLitters() {
+    if (!this.litters) return;
+    for (const litter of this.litters) {
+      if (litter.dropped) continue;
+      const frontAlive = litter.front.handle && this._Alive(litter.front.handle);
+      const rearAlive = litter.rear.handle && this._Alive(litter.rear.handle);
+      if (!frontAlive || !rearAlive) {
+        litter.dropped = true;
+        if (frontAlive) litter.front.handle.carryRole = null;
+        if (rearAlive) litter.rear.handle.carryRole = null;
+        const at = litter.lastMid;
+        if (at && this.host.MoveProp) {
+          this.host.MoveProp(litter.propLitter, { x: at.x, y: at.gy + 0.10, z: at.z, rotationY: at.yaw });
+          this.host.MoveProp(litter.propBody, { x: at.x, y: at.gy + 0.30, z: at.z, rotationY: at.yaw });
+        }
+        continue;
+      }
+      const fp = this.host.PositionOf ? this.host.PositionOf(litter.front.handle) : null;
+      const rp = this.host.PositionOf ? this.host.PositionOf(litter.rear.handle) : null;
+      if (!fp || !rp) continue;
+      const mid = { x: (fp.x + rp.x) / 2, z: (fp.z + rp.z) / 2 };
+      const gy = Math.min(fp.y || 0, rp.y || 0);
+      const yaw = Math.atan2(fp.x - rp.x, fp.z - rp.z);
+      litter.lastMid = { ...mid, gy, yaw };
+      this.host.MoveProp?.(litter.propLitter, { x: mid.x, y: gy + 0.62, z: mid.z, rotationY: yaw });
+      this.host.MoveProp?.(litter.propBody, { x: mid.x, y: gy + 0.84, z: mid.z, rotationY: yaw });
+    }
+  }
+
   State() {
     return {
       started: this.started, moving: this.moving, scattered: this.scattered,
       arrived: this.arrived, leg: this.legIndex, legT: +this.legT.toFixed(1),
       alive: this.Alive.length, total: this.members.length,
       head: this.HeadPosition(), log: this.log.slice(),
+      litters: (this.litters || []).map((l) => ({
+        dropped: l.dropped,
+        carried: !l.dropped && !!l.lastMid,
+      })),
     };
   }
 }

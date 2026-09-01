@@ -75,6 +75,12 @@ const CLIP_BANDS = {
   standReach: { head: [1.00, 1.45], pelvis: [0.45, 0.85], why: "站姿伸手/挥臂" },
   sit: { head: [0.35, 0.75], pelvis: [-0.10, 0.20], why: "坐在地上" },
   run: { head: [0.95, 1.35], pelvis: [0.42, 0.80], why: "持枪跑步" },
+  // 视频转骨骼三条（2026-09-02，_import/Script_MocapRetargetClips.mjs 烘的）：
+  // 站立行走类，骨盆带按十套模型的清单 pelvisHeightMeters（0.84–0.99）
+  // 乘演员缩放留余量。
+  carryFront: { head: [0.95, 1.45], pelvis: [0.55, 0.95], why: "抬担架·前位走" },
+  carryRear: { head: [0.95, 1.45], pelvis: [0.55, 0.95], why: "抬担架·后位走" },
+  woundedWalk: { head: [0.95, 1.45], pelvis: [0.55, 0.95], why: "伤员跛行（驼背在躯干不在头：实测 1.36–1.42）" },
 };
 
 /** 过场实机门槛。head 是「离本人 root 平面」的高度。 */

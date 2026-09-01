@@ -36,6 +36,8 @@ const expectedActions = [
   "CrouchFire", "CrouchFireAlt", "CrouchIdle", "MachineGunFire",
   "EmplacementIdle", "AttackCommand", "ProneFire", "StandFireCrouch",
   "StandFireCrouchAlt", "AdvanceKneelFire", "AdvanceFire", "PistolFire",
+  // 视频转骨骼三条（_import/Script_MocapRetargetClips.mjs 追加，顺序 = 追加顺序）
+  "CarryStretcherFront", "CarryStretcherRear", "WoundedLimp",
 ];
 const expectedRoles = [
   "head", "neck", "chest", "pelvis", "handR", "handL", "footR", "footL",

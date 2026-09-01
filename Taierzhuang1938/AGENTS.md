@@ -216,6 +216,10 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   `Script_CharacterModelTest` 直接解析 GLB 现量（`_import/Script_LugouGlbPose.mjs`），
   不看烘焙自报的清单数。那次的离线修复留在 `_import/Script_RestoreLugouPelvisTracks.mjs`。
 - 先读：`_blender/Verify.mjs` 头注；改模型只重建那一件，别跑全量 BuildAll。
+- **视频转骨骼**（AI 视频 → RTMW3D → Biped clip）：`_import/Script_MocapVideoExtract.py`
+  → `_import/Script_MocapRetargetClips.mjs` → 十套 GLB；联系图 `Script_MocapClipShot.mjs`。
+  素材要求、坐标口径、偏航硬夹与遮挡回退的账全在 `docs/Data_MocapPipeline.md`，
+  改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
 ### 人物 / AI / 合批
 - `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
@@ -422,6 +426,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   （线性剧情关，优先级高于之前的 ER2 占点结构）；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（常设审查项，每轮都跑）、
   `Data_MainMenu.md`、`Data_SamplePoints.md`、`Data_VisualReview.md`。
+- `Data_MocapPipeline.md`（视频转骨骼动画流水线：素材要求 / 提取 / 反解 / 接线点名单）。
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`、`Data_CutsceneRedo.md`、
   `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
   `Data_TestRange.md`（?range=1）、`Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、

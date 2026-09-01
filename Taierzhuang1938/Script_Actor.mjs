@@ -1789,6 +1789,11 @@ export class Actor {
     if (this.characterRig) {
       this.characterRig.Update(dt, s);
       this._UpdateRiggedWeaponMount();
+      // 抬担架/跛行时两只手都不在枪上：枪藏起来（视作背在身后），
+      // 否则握姿常量会把整支步枪钉在担架杆的位置上。旗一清就还原。
+      if (this.weaponGroup) {
+        this.weaponGroup.visible = !(s.carryRole || (s.woundedWalk || 0) > 0.5);
+      }
     }
     const weapon = this.weaponData;
     // fireSequence 是战斗 AI 的逐发边沿；过场仍只给 firing，保留旧的布尔退路。

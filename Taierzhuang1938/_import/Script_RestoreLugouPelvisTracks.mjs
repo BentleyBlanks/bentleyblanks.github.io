@@ -51,6 +51,7 @@ import { fileURLToPath } from "node:url";
 import {
   BuildSkin, LoadGlb, MinSkinnedY, PoseScene, ReadAccessor, SerializeGlb,
 } from "./Script_LugouGlbPose.mjs";
+import { PythonJson } from "./Script_LugouManifestJson.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(here, "..");
@@ -147,51 +148,8 @@ function Median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-// ── 清单要按 Python 的写法写回去 ─────────────────────────────────────────────
-// 清单本来是 Script_BakeLugouCharacters.py 用 json.dumps(indent=2) 写的。直接
-// JSON.stringify 会把每一个没动过的数也重排一遍：`0.0` 变 `0`、
-// `3.528594970703125e-05` 变 `0.00003528594970703125` —— 两千行全是假 diff，
-// 真正改了什么反而看不见了。所以照 Python 的 repr 规则序列化，并且**只有真正
-// 是整数的那几个键**才写成整数。改这里之前先跑脚本自带的往返自检（见 Main）。
-const INTEGER_KEYS = new Set([
-  "schema", "vertices", "triangles", "limitedWeightVertices", "bytes",
-  "sourceFrames", "sourceBones", "armatures", "skinnedMeshes",
-]);
-
-function PythonFloat(value) {
-  if (!Number.isFinite(value)) throw new Error(`cannot serialize ${value}`);
-  // `round(-1e-9, 6)` 在 Python 里是 -0.0，清单里真的有几个。别把负零抹平。
-  if (value === 0) return Object.is(value, -0) ? "-0.0" : "0.0";
-  const magnitude = Math.abs(value);
-  if (magnitude >= 1e-4 && magnitude < 1e16) {
-    let text = String(value);
-    if (text.includes("e")) text = value.toFixed(20).replace(/0+$/, "");
-    return text.includes(".") ? text : `${text}.0`;
-  }
-  const parts = value.toExponential().match(/^(-?)(\d(?:\.\d+)?)e([+-])(\d+)$/);
-  if (!parts) throw new Error(`cannot serialize ${value}`);
-  return `${parts[1]}${parts[2]}e${parts[3]}${parts[4].padStart(2, "0")}`;
-}
-
-function PythonJson(value, key = null, depth = 0) {
-  const pad = "  ".repeat(depth + 1);
-  const close = "  ".repeat(depth);
-  if (typeof value === "number") {
-    return INTEGER_KEYS.has(key) && Number.isInteger(value) ? String(value) : PythonFloat(value);
-  }
-  if (value === null || typeof value === "boolean" || typeof value === "string") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    if (!value.length) return "[]";
-    return `[\n${value.map((item) => pad + PythonJson(item, key, depth + 1)).join(",\n")}\n${close}]`;
-  }
-  const entries = Object.entries(value);
-  if (!entries.length) return "{}";
-  return `{\n${entries
-    .map(([name, item]) => `${pad}${JSON.stringify(name)}: ${PythonJson(item, name, depth + 1)}`)
-    .join(",\n")}\n${close}}`;
-}
+// 清单要按 Python 的写法写回去：序列化规则在 Script_LugouManifestJson.mjs（共享），
+// 写盘前 Main 里有往返自检守着。
 
 function Main() {
   const options = ParseArgs();

@@ -87,8 +87,9 @@ try {
     const checkRiggedSoldier = (candidate, faction) => {
       check(candidate.meshSource.startsWith(`glb:Lugou${faction}`),
         `${faction} should use a Lugou skinned GLB, got ${candidate.meshSource}`);
-      check(candidate.characterRig?.clipById?.size === 16,
-        `${candidate.meshSource} did not expose all 16 imported actions`);
+      // 16 条卢沟桥源动作 + 3 条视频转骨骼（CarryStretcherFront/Rear、WoundedLimp）
+      check(candidate.characterRig?.clipById?.size === 19,
+        `${candidate.meshSource} did not expose all 19 imported actions`);
       let skinnedMeshes = 0;
       candidate.characterRig.root.traverse((item) => {
         if (item.isSkinnedMesh && item.visible) skinnedMeshes += 1;

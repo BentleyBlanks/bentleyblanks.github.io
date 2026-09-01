@@ -1432,6 +1432,8 @@ async function Boot() {
     // 只是「这一章这个院子里多出来的那几件东西」。
     Prop: (spec) => MakeSetpieceProp(spec),
     SetPropState: (id, next) => SetSetpiecePropState(id, next),
+    // 抬着走的担架每帧跟着两名担架员的手（EscortColumn._UpdateLitters）。
+    MoveProp: (id, at) => MoveSetpieceProp(id, at),
 
     // --- 火墙（三关传单入火）------------------------------------------------
     // 「油料带成为一段 8—10 m 的持续火墙（≥90 s），追兵改走另一侧院门。
@@ -2733,6 +2735,17 @@ function MakeSetpieceProp(spec = {}) {
   scene.add(mesh);
   setpieceProps.set(id, { root: mesh, spec });
   return id;
+}
+
+/** 逐帧挪一件运行时道具（抬着走的担架）。传世界坐标的**中心点**与朝向。 */
+function MoveSetpieceProp(id, at = {}) {
+  const entry = setpieceProps.get(String(id));
+  if (!entry || !entry.root) return false;
+  if (Number.isFinite(at.x)) entry.root.position.x = at.x;
+  if (Number.isFinite(at.y)) entry.root.position.y = at.y;
+  if (Number.isFinite(at.z)) entry.root.position.z = at.z;
+  if (Number.isFinite(at.rotationY)) entry.root.rotation.y = at.rotationY;
+  return true;
 }
 
 /** 改一件道具的状态。现在只有一档：`removed`（三关拆下来的那几块门板）。 */

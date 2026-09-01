@@ -13,6 +13,9 @@ export const LUGOU_ANIMATION_IDS = Object.freeze([
   "CrouchFire", "CrouchFireAlt", "CrouchIdle", "MachineGunFire",
   "EmplacementIdle", "AttackCommand", "ProneFire", "StandFireCrouch",
   "StandFireCrouchAlt", "AdvanceKneelFire", "AdvanceFire", "PistolFire",
+  // 视频转骨骼（AI 生成实拍 → RTMW3D → _import/Script_MocapRetargetClips.mjs）：
+  // 这三条不来自卢沟桥源 FBX，名实一致，不需要语义纠偏。
+  "CarryStretcherFront", "CarryStretcherRear", "WoundedLimp",
 ]);
 
 // 标签按**实测**写，不按源文件名写：见下面 POSE_CLIPS 的头注，源 FBX 的名字
@@ -35,6 +38,9 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   AdvanceKneelFire: "上前蹲射",
   AdvanceFire: "站姿据枪 / 上前射击",
   PistolFire: "手枪射击",
+  CarryStretcherFront: "抬担架行走·前位（视频转骨骼）",
+  CarryStretcherRear: "抬担架行走·后位（视频转骨骼）",
+  WoundedLimp: "伤员跛行（视频转骨骼）",
 });
 
 // 源 `CrouchIdle` 是一条 5.37 s 的静态坏定格：骨盆到头的轴前倾约 59.4°，
@@ -63,6 +69,7 @@ const SOLDIER_ACTION_IDS = Object.freeze([
   "CrouchFire", "CrouchFireAlt", "CrouchIdle", "MachineGunFire",
   "EmplacementIdle", "ProneFire", "StandFireCrouch", "StandFireCrouchAlt",
   "AdvanceKneelFire", "AdvanceFire",
+  "CarryStretcherFront", "CarryStretcherRear", "WoundedLimp",
 ]);
 const OFFICER_ACTION_IDS = Object.freeze([
   "LeanWallSitPeek", "RifleIdle", "RifleIdleAlt", "CrouchIdle",
@@ -196,14 +203,20 @@ const POSE_CLIPS = Object.freeze({
   standIdle: "AdvanceFire",
   standReach: "AttackCommand",
   run: "RifleRun",
+  // 视频转骨骼一批（2026-09-02 起），名实一致：担架员按前/后位各一条走循环，
+  // 伤员跛行给后送队里「能走的轻伤员」。
+  carryFront: "CarryStretcherFront",
+  carryRear: "CarryStretcherRear",
+  woundedWalk: "WoundedLimp",
 });
 
 export const LUGOU_POSE_CLIPS = POSE_CLIPS;
 
-// v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB。十套模型的二进制都变了，
-// 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是站着的那批。
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=4";
-const ASSET_VERSION = "4";
+// v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB；v5 = 2026-09-02 视频转骨骼三条
+// 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
+// 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=5";
+const ASSET_VERSION = "5";
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
@@ -534,6 +547,11 @@ export class LugouCharacterRig {
     const lifePose = state.lifePose && typeof state.lifePose === "object" ? state.lifePose : state;
     if ((lifePose.sit || 0) > 0.35 || (lifePose.watch || 0) > 0.35) return POSE_CLIPS.sit;
     if ((lifePose.cleanRifle || 0) > 0.35 || (lifePose.checkAmmo || 0) > 0.35) return POSE_CLIPS.tend;
+    // 抬担架决定整具骨架（双手都钉在杆上），排在开火/姿态之前：担架员不开火、
+    // 不卧倒 —— 中弹走的是 Actor 的死亡链，不经过这里。停着不放手，原地踏步
+    // 比松手立正好看（担架还在两人手里）。
+    if (state.carryRole === "front") return POSE_CLIPS.carryFront;
+    if (state.carryRole === "rear") return POSE_CLIPS.carryRear;
     const prone = (state.prone || 0) > 0.45;
     const low = !prone && ((state.crouch || 0) > 0.35 || (state.kneel || 0) > 0.35);
     if (state.firing) {
@@ -550,6 +568,8 @@ export class LugouCharacterRig {
     if (state.throwing > 0.08 || state.melee > 0.08 || state.binoculars > 0.08 || state.reach > 0.08) {
       return POSE_CLIPS.standReach;
     }
+    // 轻伤员：走动时跛行；站定回普通站姿（跛行是步态素材，原地播像踏步）。
+    if ((state.woundedWalk || 0) > 0.5 && (state.moveSpeed || 0) > 0.10) return POSE_CLIPS.woundedWalk;
     if ((state.moveSpeed || 0) > 0.10) return POSE_CLIPS.run;
     return POSE_CLIPS.standIdle;
   }

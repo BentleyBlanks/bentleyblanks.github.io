@@ -1596,6 +1596,10 @@ export class AiDirector {
         fireSequence: s.fireSequence,
         elapsed: this.time,
         lookYaw: s.lookYaw, lookPitch: 0,
+        // 摆点层（EscortColumn）钉在 soldier 上的两个负重旗：担架员前/后位
+        // 与「能走的轻伤员」。姿态取用在 CharacterModel._ActionForState。
+        carryRole: s.carryRole || null,
+        woundedWalk: s.woundedWalk || 0,
       });
     }
   }
