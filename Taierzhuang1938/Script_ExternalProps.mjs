@@ -53,6 +53,7 @@ import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
 import { PACK as RY_PACK, ASSETS as RY_ASSETS } from "./Data_ExternalAssets_RuralYard.mjs";
 import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
+import { PACK as TK_PACK, ASSETS as TK_ASSETS } from "./Data_ExternalAssets_TengxianConstruction.mjs";
 
 const LOADER = new GLTFLoader();
 
@@ -275,6 +276,7 @@ const ASSETS = Object.freeze({
   ...PackAssets(HW_PACK, HW_ASSETS),
   ...PackAssets(RY_PACK, RY_ASSETS),
   ...PackAssets(CL_PACK, CL_ASSETS),
+  ...PackAssets(TK_PACK, TK_ASSETS),
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random

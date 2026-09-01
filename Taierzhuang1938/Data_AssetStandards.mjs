@@ -150,6 +150,42 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   ...PreserveSourceRows("Battlefield Pack", BattlefieldSourceTriangles, "项目共享战场材质 PBR"),
   ...PreserveSourceRows("Chinese Life", ChineseLifeSourceTriangles, "项目共享 / 专用生活道具 PBR"),
   Object.freeze({
+    id: "TengxianShopFacade", name: "滕县临街铺面", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 372, actualTriangles: 372, targetTriangles: 372,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 HouseBrick / Stone / WoodDoor / RoofTile",
+    policy: "source", note: "Blender MCP 自建低模构件；保留经审查的自制拓扑。",
+  }),
+  Object.freeze({
+    id: "TengxianCourtyardHouse", name: "滕县一进院落", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 432, actualTriangles: 432, targetTriangles: 432,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 HouseBrick / Stone / WoodDoor / RoofTile",
+    policy: "source", note: "Blender MCP 自建低模构件；外墙无窗、东南门为鲁南形制约束。",
+  }),
+  Object.freeze({
+    id: "TengxianCountyOfficeGatehouse", name: "滕县县署门楼", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 284, actualTriangles: 284, targetTriangles: 284,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 HouseBrick / Stone / WoodBeam / RoofTile",
+    policy: "source", note: "Blender MCP 自建低模构件；不附加未考证的门匾文字。",
+  }),
+  Object.freeze({
+    id: "TengxianCityGateTower", name: "滕县城门楼", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 664, actualTriangles: 664, targetTriangles: 664,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 GateBrick / Stone / WoodDoor / GateRoofTile",
+    policy: "source", note: "Blender MCP 自建低模构件；按滕县砖石高城墙与双檐门楼尺度做独立基座。",
+  }),
+  Object.freeze({
+    id: "TengxianRailwayStation", name: "津浦铁路三等站（推定）", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 484, actualTriangles: 484, targetTriangles: 484,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 StationBrick / Stone / WoodBeam / RoofTile",
+    policy: "source", note: "Blender MCP 自建低模构件；滕县原站房无图纸，德式三等站形制为明确推定。",
+  }),
+  Object.freeze({
+    id: "TengxianOutfieldDefenseKit", name: "城外防御工事组合", pack: "Model_TengxianConstructionKit.glb",
+    sourceTriangles: 1852, actualTriangles: 1852, targetTriangles: 1852,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "项目共享 RammedEarth / Sandbag / WoodBeam / GroundRubble",
+    policy: "source", note: "Blender MCP 自建低模构件；壕沟、木衬砌、沙袋、瞭望棚与线杆可拆分审查。",
+  }),
+  Object.freeze({
     id: "LeaflessTreeOak", name: "无叶乔木 / 老橡树", pack: "Model_LeaflessTreeSet.glb",
     sourceTriangles: 190527, actualTriangles: 47998, targetTriangles: 47998,
     sourceTexture: "有（源树皮）", runtimeTexture: "项目共享 TreeBark",

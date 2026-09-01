@@ -9,6 +9,7 @@ import {
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
 import { ASSETS as CHINESE_LIFE_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
+import { ASSETS as TENGXIAN_CONSTRUCTION_ASSETS } from "./Data_ExternalAssets_TengxianConstruction.mjs";
 import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
 
 
@@ -156,6 +157,29 @@ function InspectNodes(fileName, maxBytes) {
     result.set(node.name, { triangles, vertices, indices, minY, maxSpan, hasUv });
   }
   return { bytes: bytes.length, json, nodes: result };
+}
+
+function TriangleCountUnderNode(glb, rootName) {
+  const rootIndex = glb.json.nodes.findIndex((node) => node.name === rootName);
+  assert.ok(rootIndex >= 0, rootName + ": root node exists");
+  const visited = new Set();
+  let triangles = 0;
+  const walk = (index) => {
+    assert.ok(!visited.has(index), rootName + ": node graph remains acyclic");
+    visited.add(index);
+    const node = glb.json.nodes[index];
+    if (node.mesh != null) {
+      for (const primitive of glb.json.meshes[node.mesh].primitives) {
+        const positions = glb.json.accessors[primitive.attributes.POSITION];
+        const count = primitive.indices == null
+          ? positions.count : glb.json.accessors[primitive.indices].count;
+        triangles += count / 3;
+      }
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(rootIndex);
+  return triangles;
 }
 
 function ReadJpegSize(bytes, label) {
@@ -310,6 +334,27 @@ const courtyardSpec = courtyard.nodes.get("AncientChineseCourtyardHouse");
 assert.ok(courtyardSpec.triangles <= 5500, "courtyard triangle budget");
 assert.equal(courtyardSpec.minY, 0, "courtyard is ground-ready");
 assert.ok(courtyardSpec.maxSpan > 11 && courtyardSpec.maxSpan < 12, "courtyard scale is plausible");
+
+const tengxianConstruction = ReadGlb("Model_TengxianConstructionKit.glb", 600_000);
+const constructionRootNames = Object.values(TENGXIAN_CONSTRUCTION_ASSETS)
+  .map((spec) => spec.node).sort();
+assert.deepEqual(
+  constructionRootNames,
+  ["TengxianCityGateTower", "TengxianCountyOfficeGatehouse", "TengxianCourtyardHouse",
+    "TengxianOutfieldDefenseKit", "TengxianRailwayStation", "TengxianShopFacade"],
+  "six self-authored Tengxian construction roots retain stable names",
+);
+for (const spec of Object.values(TENGXIAN_CONSTRUCTION_ASSETS)) {
+  const node = tengxianConstruction.json.nodes.find((entry) => entry.name === spec.node);
+  assert.ok(node?.children?.length, spec.node + ": root carries its authored mesh parts");
+  const standard = externalStandards.get(spec.node);
+  assert.ok(standard, spec.node + ": external-GLB standards row exists");
+  assert.equal(
+    TriangleCountUnderNode(tengxianConstruction, spec.node),
+    standard.actualTriangles,
+    spec.node + ": GLB triangle count matches the asset-standards record",
+  );
+}
 
 const battlefield = InspectNodes("Model_BattlefieldPack.glb", 4_100_000);
 assert.equal(battlefield.nodes.size, 24, "all 24 battlefield components are independent nodes");
@@ -556,6 +601,10 @@ for (const stem of ["ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal"]) {
 }
 
 const runtime = fs.readFileSync(path.join(root, "Script_ExternalProps.mjs"), "utf8");
+assert.match(runtime, /Data_ExternalAssets_TengxianConstruction\.mjs/,
+  "Tengxian construction data is connected to the external-prop catalog");
+assert.match(runtime, /PackAssets\(TK_PACK, TK_ASSETS\)/,
+  "all six self-authored construction roots are visible to the component library without placements");
 for (const id of [
   "militaryCrateClosed", "militaryCrateOpen",
   ...Array.from({ length: 7 }, (_, index) => `stackableStone${String(index + 1).padStart(2, "0")}`),
