@@ -171,6 +171,35 @@ await page.evaluate(() => {
   };
   window.Range = {
     /**
+     * 手工把玩家救活。**后面每一个要推帧取证的段落都必须走这一条，
+     * 不能直接 `player.Spawn()`。**
+     *
+     * 事故（一次稳定红，症状是「濒死暗角进入搏动」在 90 帧末尾翻脸）：
+     * `Run()` 是真的把玩家打死的（`player.Kill()`），而装配层要到**下一帧**
+     * 才发现（Script_Main 的 `if (state.playerAliveLast && !player.Alive)
+     * OnPlayerDown()` —— 死亡判定故意排在所有伤害系统之后）。OnPlayerDown
+     * 会弹死亡卡、扣兵员池，并把 `state.deathTimer` 设成 2.6 s
+     *（`REINFORCE.deathCardSeconds`），到点自动 `RespawnPlayer()` 换人。
+     *
+     * `player.Spawn()` 只改玩家自己 —— 那条倒计时还挂在 state 上继续走。
+     * 于是这颗定时炸弹会在**后面某个取证段落的测量窗口中间**落地：换的人
+     * 是满血的，血量被刷回 100、暗角 opacity 归零、`.hudDamage.low` 被摘掉。
+     * 第 6 节量的正好是 90 帧（1.5 s），而残余倒计时约 1.5 s —— 前 89 帧
+     * `low` 都在，最后一帧被换人擦掉，读到的就是「濒死没进搏动」。
+     *
+     * 这不是 HUD 回归也不是判据过期：`Hud.SetHurt` 的 `health < 40 && > 0`
+     * 与 docs/Data_PlayerDamage.md §三 逐字一致，红的是靶场自己留下的状态。
+     */
+    Revive({ ry, grace } = {}) {
+      const { player } = T;
+      player.Spawn(player.position.x, player.position.z, ry ?? player.yaw);
+      if (grace !== undefined) player.spawnGrace = grace;
+      // 拆引信：把装配层排队的那次换人取消掉。
+      T.state.deathTimer = 0;
+      T.state.pendingRespawn = false;
+    },
+
+    /**
      * @param {object} opt { shooters, distance, stance, seconds, patch }
      * @returns {object} 打了多少枪、中了几枪、总伤害、几秒打死、单发最重多少
      */
@@ -394,8 +423,7 @@ Check("首发仍然把人压住（不是白开一枪）", fresh.suppression > 0,
 const feedback = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const { player } = T;
-  player.Spawn(player.position.x, player.position.z, player.yaw);
-  player.spawnGrace = 0;
+  window.Range.Revive({ grace: 0 });                 // 见 Range.Revive：不能直接 Spawn
   player.yaw = 0;                                   // 朝 -Z
   // 从**正右方**（+X）打来的一枪
   const from = player.position.clone(); from.x += 20;
@@ -433,7 +461,7 @@ const grenadeWarning = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const { player, combat } = T;
   combat.ClearProjectiles();
-  player.Spawn(player.position.x, player.position.z, 0); // 朝 -Z
+  window.Range.Revive({ ry: 0 });                     // 朝 -Z；见 Range.Revive
   const start = player.EyePosition.clone();
   start.x += 5;                                      // 正右方五米
   const still = player.position.clone().set(0, 0, 0);
@@ -466,8 +494,7 @@ const pulse = await page.evaluate(() => {
   const played = [];
   const real = T.audio.Play.bind(T.audio);
   T.audio.Play = (name, opt) => { played.push(name); return real(name, opt); };
-  player.Spawn(player.position.x, player.position.z, player.yaw);
-  player.spawnGrace = 0;
+  window.Range.Revive({ grace: 0 });                  // 见 Range.Revive：不能直接 Spawn
   player.TakeHit(30, "torso", null, { bullet: true, from: player.position.clone() });
   T.StepFrames(2);
   const grunted = played.includes("hurt");
