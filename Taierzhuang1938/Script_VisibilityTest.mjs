@@ -82,6 +82,22 @@ try {
   });
   Check("远景层容得下最大 480 人票池", crowdCapacity === 480, `${crowdCapacity}/480`);
 
+  // 【为什么单独量尺寸】上面那三条只数「有没有被推进远景层」，人被推进去了就算过。
+  // 2026-09-02 实拍到的是另一回事：46 m 外每个人都在实例表里，可身体被烘成 1.7 cm
+  // 的一粒（蒙皮网格按 matrixWorld 变换，把 GLB 里那层 0.01 物体缩放当了真），
+  // 画面上只剩一支飘在半空的步枪。renderLod 计数、实例数、visible 标记全绿。
+  // 所以闸门必须落在**烘出来的人体有多大**上，单位是米。
+  const bake = await page.evaluate(() => window.Taierzhuang.ai.crowd?.BakeReport(["nra", "ija"]) || null);
+  const bakeEntries = Object.entries(bake || {});
+  Check("远景层四套姿势都烘到了蒙皮人体",
+    bakeEntries.length >= 4 && bakeEntries.every(([, entry]) => entry.skinnedParts > 0),
+    bakeEntries.map(([key, entry]) => `${key}:${entry.skinnedParts}件`).join(" "));
+  // 站姿据枪约 1.49—1.53 m（不是立正的 1.66 m），倒地横躺约 1.59—1.62 m；
+  // 1.2 m 离两者都远，也离「塌成一粒」的 0.02 m 远得没有争议。
+  Check("远景人体不是只剩一支枪（最长边 ≥ 1.2 m）",
+    bakeEntries.length > 0 && bakeEntries.every(([, entry]) => entry.bodySpan >= 1.2),
+    bakeEntries.map(([key, entry]) => `${key}:${entry.bodySpan.toFixed(2)}m`).join(" "));
+
   const corpses = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const victims = T.ai.soldiers.filter((soldier) => soldier.alive && soldier.actor).slice(0, 30);

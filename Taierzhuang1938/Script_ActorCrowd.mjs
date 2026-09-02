@@ -10,7 +10,10 @@
 // 它在保持全部人物与尸体可见时使用，不能重新引入人数名额。这里的做法：
 //
 //   1) 每个 kind 烘一份「端着枪站着」和一份「已经倒地」的静态姿势，
-//      按材质桶合并成几块几何；
+//      按材质桶合并成几块几何；军人是蒙皮 GLB，那一份必须走 BakeSkinnedPose ——
+//      **别按 matrixWorld 去变换蒙皮网格**，那条路会把人缩成 1.7 cm 的一粒，
+//      画面上只剩一支飘在半空的步枪（2026-09-02 的那张实拍就是它），
+//      账记在 BakeSkinnedPose 的头注上；
 //   2) 每块几何配一个 InstancedMesh，容量给到全场兵力；
 //   3) 每帧把"在视锥里、投影尺寸已经读不出关节动作"的人写进实例矩阵。
 //
@@ -41,6 +44,50 @@ const BAKE_STEPS = 6;      // 姿势是弹簧驱动的，推几帧让它收敛�
 const DEAD_BAKE_STATE = { dead: true, dying: 1 };
 const DEAD_BAKE_STEPS = 54; // 倒地动画 0.8 s；多推 0.1 s，确保烘的是完全定格帧
 
+/**
+ * 蒙皮网格的静态化：按**当前骨骼姿势**把顶点烘进网格自己的局部空间。
+ *
+ * 【这是"远景日军只剩一支飘着的枪"的病根，改这个文件之前先读完这一段】
+ * SkinnedMesh 的顶点**不走自己的 matrixWorld**：three 在 updateMatrixWorld 里把
+ * bindMatrixInverse 设成 inverse(matrixWorld)，着色器里再乘回 matrixWorld，两下
+ * 正好抵消 —— 画出来的位置完全由骨骼给。军人 GLB 是 Max Biped 出的，网格节点上
+ * 挂着一层 0.01 的物体缩放，运行时被这条抵消规则吃掉，所以看起来一切正常。
+ *
+ * 可远景层原来是 `geometry.clone().applyMatrix4(inverse(root)·mesh.matrixWorld)` ——
+ * 它把那层 0.01 当了真：1.76 m 的人被缩成 1.7 cm 的一粒，四十六米外一个像素都不到。
+ * 而挂在手部插槽上的步枪是普通 Mesh（插槽里已经补偿过缩放，世界缩放是 1），
+ * 照常画出来。于是 46 m 外的每个人都只剩一支悬在半空的三八式。
+ *
+ * applyBoneTransform 的返回值末尾乘过 bindMatrixInverse，已经落在**网格自己的
+ * 局部空间**，所以外面那条 inverse(root)·matrixWorld 原样保留即可，别再补偿一次。
+ * 法线用 w=0 的 Vector4 走同一条链路（平移项被 w 吃掉，只剩线性部分），
+ * 不必另外拼一遍混合矩阵，也不能改用 computeVertexNormals —— 那会把 GLB 里
+ * 烘死的硬边全抹平。
+ */
+function BakeSkinnedPose(mesh) {
+  const geometry = mesh.geometry.clone();
+  const position = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  if (!geometry.attributes.skinIndex || !geometry.attributes.skinWeight) return geometry;
+  const vector = new THREE.Vector4();
+  for (let i = 0; i < position.count; i += 1) {
+    vector.set(position.getX(i), position.getY(i), position.getZ(i), 1);
+    mesh.applyBoneTransform(i, vector);
+    position.setXYZ(i, vector.x, vector.y, vector.z);
+    if (!normal) continue;
+    vector.set(normal.getX(i), normal.getY(i), normal.getZ(i), 0);
+    mesh.applyBoneTransform(i, vector);
+    const length = Math.hypot(vector.x, vector.y, vector.z) || 1;
+    normal.setXYZ(i, vector.x / length, vector.y / length, vector.z / length);
+  }
+  position.needsUpdate = true;
+  if (normal) normal.needsUpdate = true;
+  // 姿势已经烘死，蒙皮属性只是白占显存（远景层是 InstancedMesh，不会再蒙皮）。
+  geometry.deleteAttribute("skinIndex");
+  geometry.deleteAttribute("skinWeight");
+  return geometry;
+}
+
 export class ActorCrowd {
   /**
    * @param {THREE.Scene} scene
@@ -50,7 +97,8 @@ export class ActorCrowd {
     this.scene = scene;
     this.factory = factory;
     this.capacity = Math.max(8, capacity | 0);
-    this.kinds = new Map();          // `${kind}:standing|dead` -> { meshes, count, dead }
+    // `${kind}:standing|dead` -> { meshes, count, dead, skinnedParts, bounds, bodyBounds }
+    this.kinds = new Map();
     this.disposed = false;
     this._matrix = new THREE.Matrix4();
     this._pos = new THREE.Vector3();
@@ -65,6 +113,9 @@ export class ActorCrowd {
    *
    * 几何一律 **clone 之后**再交给 MergeGeometries —— 它会 dispose 掉入参，
    * 而这些几何是 ActorFactory 按 kind 缓存、全场 Actor 共用的一份。
+   *
+   * 军人是蒙皮 GLB，那一份必须先过 BakeSkinnedPose（原因见它的头注：直接按
+   * matrixWorld 变换会把人缩成 1.7 cm）；百姓/兜底的程序化分件是刚体，照旧。
    */
   _Bake(kind, dead = false) {
     const actor = this.factory.Create(kind, { seed: 4213 });
@@ -77,11 +128,20 @@ export class ActorCrowd {
     const inverse = new THREE.Matrix4().copy(actor.root.matrixWorld).invert();
     const local = new THREE.Matrix4();
     const byMaterial = new Map();
+    // 取证用：整具与「人体那一部分」各自的包围盒。远景层退化成一支枪的时候，
+    // 整具包围盒仍有枪撑着（0.6 m 见方）看不出问题，人体那一份会塌成一粒。
+    const bounds = new THREE.Box3();
+    const bodyBounds = new THREE.Box3();
+    let skinnedParts = 0;
     actor.root.traverse((object) => {
       if (!object.isMesh || !object.geometry || !object.material || !object.visible) return;
-      const geometry = object.geometry.clone();
+      const skinned = object.isSkinnedMesh === true;
+      const geometry = skinned ? BakeSkinnedPose(object) : object.geometry.clone();
       local.multiplyMatrices(inverse, object.matrixWorld);
       geometry.applyMatrix4(local);
+      geometry.computeBoundingBox();
+      bounds.union(geometry.boundingBox);
+      if (skinned) { skinnedParts += 1; bodyBounds.union(geometry.boundingBox); }
       let list = byMaterial.get(object.material);
       if (!list) { list = []; byMaterial.set(object.material, list); }
       list.push(geometry);
@@ -103,7 +163,7 @@ export class ActorCrowd {
       this.scene.add(mesh);
       meshes.push(mesh);
     }
-    return { meshes, count: 0, dead };
+    return { meshes, count: 0, dead, skinnedParts, bounds, bodyBounds };
   }
 
   _Kind(kind, dead = false) {
@@ -171,6 +231,34 @@ export class ActorCrowd {
     let n = 0;
     for (const entry of this.kinds.values()) if (entry.dead) n += entry.count;
     return n;
+  }
+
+  /**
+   * 烘焙尺寸取证口。**这是"46 m 外只剩一支枪"那条回归的闸门** ——
+   * 逐人 renderLod 计数、实例数、可见性标记全都拦不住它：人照样被推进实例表，
+   * 只是那具身体被缩成一粒。所以断言必须落在 body 的实际尺寸上（米）。
+   *
+   * @param {string[]} kinds 要现场烘出来量的身份；不传就只报已经烘过的。
+   */
+  BakeReport(kinds = []) {
+    for (const kind of kinds) this._Kind(kind, false);
+    const out = {};
+    for (const [key, entry] of this.kinds) {
+      const size = new THREE.Vector3();
+      const bodySize = new THREE.Vector3();
+      if (!entry.bounds.isEmpty()) entry.bounds.getSize(size);
+      if (!entry.bodyBounds.isEmpty()) entry.bodyBounds.getSize(bodySize);
+      out[key] = {
+        dead: entry.dead,
+        meshes: entry.meshes.length,
+        skinnedParts: entry.skinnedParts,
+        size: [size.x, size.y, size.z],
+        bodySize: [bodySize.x, bodySize.y, bodySize.z],
+        // 站姿看高度、倒地看长度，统一取最长边，一条阈值同时管住两种姿势。
+        bodySpan: Math.max(bodySize.x, bodySize.y, bodySize.z),
+      };
+    }
+    return out;
   }
 
   Dispose() {

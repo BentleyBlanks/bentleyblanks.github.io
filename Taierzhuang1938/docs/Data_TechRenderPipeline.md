@@ -1323,6 +1323,37 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 
 ---
 
+### 第三轮的账：远景层里那具「只剩一支枪」的人
+
+**症状**（2026-09-02 实拍，第一关白盒）：46 m 以外的日军全部只剩一支悬在半空的三八式，
+人不见了；近处的国军完好。换句话说，`renderLod` 计数、实例数、`visible` 标记全绿，
+而画面上没有人 —— **这正是「visible 不等于看得见」那条教训的再一次现形**。
+
+**根因在 `ActorCrowd._Bake` 对蒙皮网格的处理**。军人自 GLB 化以后是 `SkinnedMesh`，
+而 `SkinnedMesh` 的顶点**不经过自己的 `matrixWorld`**：three 在 `updateMatrixWorld` 里把
+`bindMatrixInverse` 设成 `inverse(matrixWorld)`，着色器再乘回 `matrixWorld`，两下正好抵消，
+画出来的位置完全由骨骼给。卢沟桥那批 GLB 是 Max Biped 出的，网格节点上挂着一层 0.01 的
+物体缩放，运行时被这条抵消规则吃掉，所以正常渲染一切正常。
+
+远景层原来是 `geometry.clone().applyMatrix4(inverse(root)·mesh.matrixWorld)` —— 它把那层
+0.01 当了真：1.76 m 的人被烘成 **1.7 cm** 的一粒，46 m 外一个像素都不到。而挂在手部插槽上的
+步枪是普通 `Mesh`（插槽已经补偿过缩放，世界缩放是 1），照常画出来。于是只剩一支枪。
+
+**修法**：`BakeSkinnedPose` 逐顶点走 `SkinnedMesh.applyBoneTransform`，按**当前骨骼姿势**把
+顶点烘进网格自己的局部空间（该方法末尾已乘过 `bindMatrixInverse`，所以外面那条
+`inverse(root)·matrixWorld` 原样保留，别再补偿一次）。法线用 `w=0` 的 `Vector4` 走同一条链路，
+平移项被 w 吃掉、只剩线性部分 —— 不要改用 `computeVertexNormals`，那会把 GLB 里烘死的硬边抹平。
+
+**开销为零**：那些三角形原本就已经合并进 `InstancedMesh` 并逐帧提交，只是被缩成了亚像素。
+修复只改顶点坐标，draw call 与三角面数一个没变。
+
+**回归口**：`node Taierzhuang1938/Script_VisibilityTest.mjs` 新增两条 ——
+`ActorCrowd.BakeReport()` 报出每套姿势里**蒙皮那部分**的包围盒，站姿据枪约 1.49—1.53 m、
+倒地横躺约 1.59—1.62 m，闸门设在最长边 ≥ 1.2 m。阈值必须落在**人体尺寸**上：
+整具包围盒有枪撑着（0.6 m 见方）看不出问题，坏版本量出来是 0.02 m。
+
+---
+
 ## 16. 进过场那十几秒：着色器预热
 
 **症状**：主菜单点「序章」，画面整个冻住十几秒 —— 没有加载画面、没有进度条，
