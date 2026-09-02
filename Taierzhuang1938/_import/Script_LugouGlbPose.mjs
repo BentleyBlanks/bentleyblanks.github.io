@@ -317,3 +317,45 @@ export function MeasurePose(glb, { pelvisName, headName, samples = 9, ground = f
     pelvisSpread: Math.max(...highs) - Math.min(...lows),
   };
 }
+
+/**
+ * 这套模型的**正面朝哪**（弧度，0 = 引擎契约的正面「局部 −Z」，π = 背对）。
+ *
+ * 【为什么要量而不是看导出脚本】朝向是资产与引擎之间唯一一条没人写下来的约定：
+ * glTF 的资产约定是正面 +Z，本项目的 Actor 契约是正面 −Z（ry = atan2(−dx,−dz)，
+ * 见 Script_Ai / Data_Cutscene* / Data_Range）。两条差 180°，而差 180° 的模型在
+ * 静止截图上一眼看不出来 —— 它照样站得笔直、贴着地、比例正常，只是背对着自己
+ * 的朝向。2026-08-25 蒙皮模型接进来时就是这么漏过去的，直到有人问「日军怎么
+ * 背对着我开枪」。这个函数把它变成一个可断言的数。
+ *
+ * 【怎么量】拿解剖轴反推，不看任何节点名里的方位词：
+ *   right = 右大腿 − 左大腿（指向人物右侧）
+ *   up    = 头 − 骨盆（沿脊柱向上）
+ *   forward = up × right（右手系：面朝 −Z、+Y 朝上的人，right 正是 +X）
+ * 再取水平分量的偏角。躺/蹲的 clip 的 up 是斜的，所以默认只量站姿参考 clip。
+ */
+export function MeasureForwardYaw(glb, {
+  clip = "AdvanceFire", time = 0, thighLName, thighRName, pelvisName, headName,
+} = {}) {
+  const scene = new PoseScene(glb);
+  const pick = (name, pattern) => (name ? scene.NodeIndex(name) : scene.FindNode(pattern));
+  const thighL = pick(thighLName, /L Thigh$/i);
+  const thighR = pick(thighRName, /R Thigh$/i);
+  const pelvis = pick(pelvisName, /Pelvis$/i);
+  const head = pick(headName, / Head$/i);
+  if (thighL < 0 || thighR < 0 || pelvis < 0 || head < 0) throw new Error("facing bones not found");
+  const index = scene.AnimationIndex(clip);
+  if (index < 0) throw new Error(`clip not found: ${clip}`);
+  scene.Apply(index, time);
+  const at = (node) => [scene.world[node][12], scene.world[node][13], scene.world[node][14]];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const unit = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const right = unit(sub(at(thighR), at(thighL)));
+  const up = unit(sub(at(head), at(pelvis)));
+  const forward = [
+    up[1] * right[2] - up[2] * right[1],
+    up[2] * right[0] - up[0] * right[2],
+    up[0] * right[1] - up[1] * right[0],
+  ];
+  return Math.atan2(-forward[0], -forward[2]);
+}

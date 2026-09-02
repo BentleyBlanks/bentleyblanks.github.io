@@ -32,7 +32,10 @@
 
 5. **坐标与朝向契约：X 向东、Z 向南、Y 向上，单位米，原点 = 城中心十字街口。**
    人物正面与枪口一律**局部 -Z**；导入的 FBX/GLB 源朝 glTF +Z，由桥接层翻转 ——
-   新导入资产先查朝向再摆。守着它的：`Data_Tengxian.mjs` 与 `Script_RiggedModel.mjs` 头注。
+   新导入资产先查朝向再摆（十套军人 GLB 的那一刀是 `Script_CharacterModel.MODEL_FORWARD_YAW`；
+   漏翻的代价是全场军人背对自己的朝向，2026-08-25 漏到 09-02 才有人问「日军怎么背对我开枪」）。
+   守着它的：`CharacterModelTest` 的朝向闸（逐个 GLB 现量）＋ `ActorPoseTest` 的 `checkFacing`
+   （十套模型逐个从世界矩阵验收整条链）。
 
 6. **出图「一片只建一次城」：按切片分批，片内连着拍完再换。**
    建一次城十几秒，八十多个点位挨个重开页面就是二十分钟纯等待。

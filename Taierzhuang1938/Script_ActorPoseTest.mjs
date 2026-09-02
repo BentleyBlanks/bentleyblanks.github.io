@@ -82,6 +82,40 @@ try {
     check(actor.GetMount("hand") === actor.GetMount("handR"), "hand alias failed");
     check(actor.GetMount("noSuchMount") === null, "unknown mount failed");
 
+    /**
+     * 看得见的人体是不是**真的朝着 root.rotation.y 说的那个方向**。
+     *
+     * 【这条测试买的是什么】全项目按「Actor 正面 = 局部 −Z」写朝向（AI 的
+     * `atan2(-dx,-dz)`、过场的 ry、靶场的「ry=0 朝 −Z」），而十套 GLB 按 glTF 的
+     * 资产约定正面朝 +Z。差 180° 的模型静止看不出来 —— 站得笔直、贴着地、比例
+     * 正常，只是背对着自己的朝向：AI 转身面向玩家、枪口火与曳光按 yaw 从胸口
+     * 射出，玩家看见的是后脑勺；纵队倒着行军；标了「背对镜头」的过场角色正对
+     * 镜头。补偿写在 Script_CharacterModel 的 MODEL_FORWARD_YAW，这里从**世界
+     * 矩阵**验收整条链（root yaw → 补偿 → 骨骼），不看那个常量本身。
+     *
+     * 量法拿解剖轴反推：right = 右大腿 − 左大腿，up = 头 − 骨盆，
+     * forward = up × right（右手系里，面朝 −Z、+Y 朝上的人 right 正是 +X）。
+     */
+    const checkFacing = (candidate, label) => {
+      const rig = candidate.characterRig;
+      check(!!rig, `${label} has no rigged character to measure`);
+      const at = (bone) => bone.getWorldPosition(new THREE.Vector3());
+      for (const yaw of [0, 1.1, -2.4]) {
+        candidate.root.rotation.y = yaw;
+        candidate.Update(0.016, { elapsed: 1, moveSpeed: 0, aim: 0 });
+        candidate.root.updateWorldMatrix(true, true);
+        const right = at(rig.bones.thighR).sub(at(rig.bones.thighL)).normalize();
+        const up = at(rig.bones.head).sub(at(rig.bones.pelvis)).normalize();
+        const forward = new THREE.Vector3().crossVectors(up, right).normalize();
+        const want = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
+        const got = new THREE.Vector2(forward.x, forward.z).normalize();
+        const off = Math.abs(Math.atan2(got.x * want.y - got.y * want.x, got.dot(want))) * 180 / Math.PI;
+        check(off <= 5, `${label} 在 ry=${yaw.toFixed(2)} 时人体正面偏了 ${off.toFixed(1)}°`
+          + `（180° = 整个背对自己的朝向：会背对玩家开枪、倒着行军）`);
+      }
+      candidate.root.rotation.y = 0;
+    };
+
     // 军人可见人体已全部换成卢沟桥资产的蒙皮 GLB；程序化骨架仍只作为动作编辑器
     // 的独立模式和既有挂点 API 兼容层，不得重新成为正式军人外观。
     const checkRiggedSoldier = (candidate, faction) => {
@@ -102,6 +136,7 @@ try {
         && hitboxes.some((shape) => shape.part === "limb"),
       `${candidate.meshSource} bone hitboxes are incomplete`);
       checkHeadHitbox(candidate);
+      checkFacing(candidate, candidate.meshSource);
     };
     checkRiggedSoldier(actor, "Nra");
     const ija = factory.Create("ija", { seed: 90215, weapon: null });
@@ -116,6 +151,7 @@ try {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
         checkHeadHitbox(candidate);
+        checkFacing(candidate, candidate.modelId);
         candidate.Dispose();
       }
       check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
@@ -123,6 +159,7 @@ try {
       const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
       check(officer.modelId === `${prefix}05`, `${kind} officer model mismatch: ${officer.modelId}`);
       checkHeadHitbox(officer);
+      checkFacing(officer, officer.modelId);
       officer.Dispose();
     }
 

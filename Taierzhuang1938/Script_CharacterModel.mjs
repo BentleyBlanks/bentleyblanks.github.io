@@ -212,6 +212,30 @@ const POSE_CLIPS = Object.freeze({
 
 export const LUGOU_POSE_CLIPS = POSE_CLIPS;
 
+/**
+ * 把资产的正面接到引擎的正面上 —— 这两条约定差整整 180°。
+ *
+ * 【两条约定】本项目全线按「**Actor 正面 = 局部 −Z**」写：AI 的
+ * `targetYaw = atan2(-dx, -dz)`（Script_Ai）、过场的 ry 口径（Data_Cutscene* 每
+ * 张表头上都抄了一遍）、靶场的「ry=0 正对靶道（朝 −Z）」（Data_Range）、程序化
+ * 人体的帽檐与帽徽也都摆在 −Z 那一面（Script_Actor.BuildHead）。而这十套 GLB 走
+ * 的是 glTF 自己的资产约定 —— **正面朝 +Z**（实测：脚尖、髋骨左右、锁骨全指着
+ * +Z，十套模型十九条 clip 一致）。两条都不算错，但一份工程里只能有一条。
+ *
+ * 【不补这一刀会看见什么】蒙皮模型 2026-08-25 接进来时没人补，于是每个军人都
+ * **背对着自己的朝向**：AI 已经转身面向玩家（yaw 是对的），枪口火与曳光按 yaw
+ * 从胸口射出，玩家看见的却是后脑勺和背包 —— 「射击朝向和模型朝向错位」说的就是
+ * 这个；纵队行军是倒着走的；中弹倒地按 `body.rotation.x` 绕胯翻，前扑变成后仰；
+ * 过场里注明「背对镜头看地图」的参谋反而正对镜头。
+ *
+ * 【为什么修在运行时而不是重烘十个 GLB】清单与离线审计量的全是 Y（骨盆高度、
+ * 贴地余量、接触深度），与 yaw 无关，改朝向对它们一个数都不动；而这里是运行时
+ * 唯一一处把资产坐标系接到 Actor 契约上的地方，改一行、十套一起对。真到了重烘
+ * 把资产正面改成 −Z 的那天，Script_CharacterModelTest 里那条「实测资产朝向 ==
+ * 这个补偿角」的断言会先红，提醒把这一行一起删掉。
+ */
+const MODEL_FORWARD_YAW = Math.PI;
+
 // v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB；v5 = 2026-09-02 视频转骨骼三条
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
@@ -394,6 +418,10 @@ export class LugouCharacterRig {
     const sourceHeight = Number(asset.record.bounds?.size?.[2]) || Number(targetHeight) || 1.68;
     this.modelScale = (Number(targetHeight) || sourceHeight) / sourceHeight;
     this.root.scale.setScalar(this.modelScale);
+    // 资产正面 +Z → Actor 契约的正面 −Z。写在 root 上（不是 Attach 里）：挂点、
+    // 命中体、远景合批烘焙都读世界矩阵，转了 root 它们自己就跟着对；Attach 只补
+    // 一个 Y 位移，绕 Y 转不影响它。见上面 MODEL_FORWARD_YAW 的头注。
+    this.root.rotation.y = MODEL_FORWARD_YAW;
 
     this.clipById = new Map();
     for (const clip of asset.gltf.animations || []) {

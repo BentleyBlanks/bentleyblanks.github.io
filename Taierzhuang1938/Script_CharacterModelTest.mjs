@@ -27,7 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LoadGlb, MeasurePose } from "./_import/Script_LugouGlbPose.mjs";
+import { LoadGlb, MeasurePose, MeasureForwardYaw } from "./_import/Script_LugouGlbPose.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const characterDir = path.join(here, "Model", "Character");
@@ -52,6 +52,14 @@ const STANDING_REFERENCE_CLIP = "AdvanceFire";
 const MIN_PELVIS_SPREAD = 0.40;
 const MAX_LOW_POSE_PELVIS = 0.35;
 const MIN_HIGH_POSE_PELVIS = 0.70;
+// 资产的正面朝哪（弧度，0 = 引擎契约的「局部 −Z」）。十套模型实测全是 π —— 它们
+// 按 glTF 的资产约定正面朝 +Z，与本项目 Actor 的正面 −Z 差 180°。运行时靠
+// Script_CharacterModel 的 MODEL_FORWARD_YAW 把这一刀补上，两个数必须一样：
+// 差 180° 的模型在静止截图上看不出来（照样站直、贴地、比例对），只是背对着自己
+// 的朝向 —— 2026-08-25 接资产时就是这么漏过去的，一路开枪背对玩家开到 09-02。
+// 重烘把资产正面改成 −Z 的那天，这条先红：把这里和 MODEL_FORWARD_YAW 一起改 0。
+const ASSET_FORWARD_YAW = Math.PI;
+const FORWARD_YAW_TOLERANCE = 0.02;   // ≈1.1°，量的是骨骼几何，不该有误差
 
 function ReadGlbJson(filePath) {
   const fd = fs.openSync(filePath, "r");
@@ -130,6 +138,22 @@ for (const model of manifest.models) {
     `${model.id} GLB has an offline mesh-grounding root`);
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
+
+  // ── 朝向闸：资产正面与引擎契约差多少，量出来钉死 ────────────────────────────
+  const forwardYaw = MeasureForwardYaw(LoadGlb(glbPath), {
+    clip: STANDING_REFERENCE_CLIP,
+    thighLName: model.boneRoles.thighL,
+    thighRName: model.boneRoles.thighR,
+    pelvisName: model.boneRoles.pelvis,
+    headName: model.boneRoles.head,
+  });
+  const forwardOff = Math.abs(Math.atan2(
+    Math.sin(forwardYaw - ASSET_FORWARD_YAW), Math.cos(forwardYaw - ASSET_FORWARD_YAW)));
+  assert.equal(forwardOff <= FORWARD_YAW_TOLERANCE, true,
+    `${model.id} 的正面朝 ${(forwardYaw * 180 / Math.PI).toFixed(1)}°（0° = 引擎契约的局部 −Z），`
+    + `与本仓库记录的资产约定 ${(ASSET_FORWARD_YAW * 180 / Math.PI).toFixed(0)}° 差 `
+    + `${(forwardOff * 180 / Math.PI).toFixed(1)}° —— 资产朝向变了，`
+    + "Script_CharacterModel 的 MODEL_FORWARD_YAW 要跟着改，否则全场军人背对自己的朝向");
 
   // ── 姿态闸：直接解析 GLB 走 FK 现量，不看清单自报的数 ──────────────────────
   const measured = MeasurePose(LoadGlb(glbPath), {
@@ -227,6 +251,14 @@ assert.doesNotMatch(runtime, /floorY[\s\S]{0,300}foot/i,
   "runtime does not align ankle-height foot bones to the floor");
 assert.match(runtime, /this\.root\.position\.set\(0,\s*-actor\.body\.position\.y,\s*0\)/,
   "offline-grounded rig cancels the parent body's hip-height translation");
+// 运行时的补偿角必须**等于**上面十套模型实测出来的那个数。写死成字面量比较：
+// 资产朝向只会整 180°/90° 地跳，一旦有人只改一边，这一条与上面那条必有一条红。
+assert.match(runtime, /^const MODEL_FORWARD_YAW = Math\.PI;$/m,
+  `runtime cancels the ${(ASSET_FORWARD_YAW * 180 / Math.PI).toFixed(0)}° gap between the glTF `
+  + "asset facing (+Z) and the project's Actor contract (local -Z)");
+assert.match(runtime, /this\.root\.rotation\.y = MODEL_FORWARD_YAW;/,
+  "the facing correction is applied to the rig root, so sockets, hitboxes and the "
+  + "distant-crowd bake all inherit it from the world matrix");
 assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
   "Max batch exports faction-canonical NRA and IJA action sources");
 
