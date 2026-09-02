@@ -12,7 +12,7 @@ const VIEWS = [
   { id: "fog", label: "雾量", group: "后处理", note: "指数距离雾 × 高度衰减得到的实际混合系数；深蓝 = 无雾、暖黄 = 雾量高。" },
   { id: "dof", label: "景深 CoC", group: "后处理", note: "正式景深使用的散焦系数；蓝 = 锐利、暖黄 = 最大散焦。景深只在阵亡镜头启用。" },
   { id: "normal", label: "法线", group: "GBuffer", note: "NormalDepth 预通道的视空间法线。" },
-  { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。" },
+  { id: "depth", label: "视深", group: "GBuffer", note: "NormalDepth 预通道 alpha；近处亮、80 m 以外渐黑。第一人称的手与枪写的是常数 1 m 近景标签（它的几何带非等比深度压缩，视深不是世界视深），所以那一块是一片平的。" },
   { id: "motionVector", label: "Motion Vector", group: "GBuffer", note: "由深度反投影得到的相机屏幕速度：R/G = 水平/垂直方向，B = 像素速度。没有逐物体速度缓冲。" },
   { id: "ao", label: "AO 原始", group: "AO", note: "SSAO 尚未双边模糊的半分辨率结果。" },
   { id: "aoBlur", label: "AO 模糊", group: "AO", note: "实际注入材质间接光的 AO 结果。" },
@@ -121,7 +121,9 @@ export class DebugRenderingEditor {
     }
     Note(body,
       "前景叠加，开着别的编辑器也不关。前向管线没有 GBuffer：「材质」「光照」是"
-      + "假彩色重画一帧（low 档不可用）。", true);
+      + "假彩色重画一帧（low 档不可用）。第一人称的手与枪进全部视图；只有 GBuffer 的"
+      + "「视深」是个例外 —— 视图模型带非等比深度压缩，那里写的是常数近景标签 1 m，"
+      + "不是它自己的视深。", true);
     const stat = Section(body, "当前靶");
     this.facts = Facts(stat);
   }
@@ -138,6 +140,33 @@ export class DebugRenderingEditor {
     // 第三参 = 材质注了调试层没有：GI 出厂默认关时探针体（host.gi）是 null，
     // 但材质/光照组的假彩色照样可用 —— 可用性要看 library.gi，不看探针体。
     this.host.post?.SetDebugView?.(id, this.host.gi, !!pack);
+  }
+
+  /**
+   * 数一遍第一人称树（`viewmodel.root`：手、袖、枪、刺刀、手雷、枪口焰）。
+   *
+   * 半透明件（枪口焰）按 MarkForegroundPrepass 的约定**不**进预通道，也不算注入
+   * 分母 —— 它没有可用的法线，混进 GBuffer 只会污染 SSAO，不是漏接。
+   */
+  FirstPersonStatus() {
+    const root = this.host.viewmodel?.root;
+    if (!root) return null;
+    const status = { meshes: 0, prepass: 0, materials: 0, injected: 0, visible: !!root.visible };
+    const seen = new Set();
+    root.traverse((object) => {
+      if (!object.isMesh || !object.material) return;
+      const list = Array.isArray(object.material) ? object.material : [object.material];
+      if (list.some((material) => material?.transparent)) return;
+      status.meshes += 1;
+      if (object.userData.foregroundPrepass) status.prepass += 1;
+      for (const material of list) {
+        if (!material || seen.has(material)) continue;
+        seen.add(material);
+        status.materials += 1;
+        if (material.userData?.indirectLightingInjected) status.injected += 1;
+      }
+    });
+    return status;
   }
 
   Update() {
@@ -158,6 +187,21 @@ export class DebugRenderingEditor {
     this.facts.Set("材质假彩色", injected ? "已注入" : "low 档未注入，材质/光照组不可用", injected ? "good" : "warn");
     const shadowOn = !!this.host.renderer?.shadowMap?.enabled;
     this.facts.Set("太阳阴影", shadowOn ? "启用" : "关闭（阴影视图会是全黑/全白）", shadowOn ? "good" : "warn");
+    // 第一人称是两条独立的链，坏哪条都只坏一半视图，所以分两项报：
+    //   · 前景预通道 —— GBuffer / AO / 雾 / CoC 组看不看得见手和枪；
+    //   · 材质注入   —— 材质 / 光照 / GI 组画不画得到它们（外来 GLB 最容易漏）。
+    const fp = this.FirstPersonStatus();
+    if (!fp) {
+      this.facts.Set("第一人称", "本页面没有视图模型", "warn");
+    } else {
+      const inPrepass = fp.meshes > 0 && fp.prepass === fp.meshes;
+      this.facts.Set("第一人称预通道",
+        fp.meshes ? `${fp.prepass}/${fp.meshes} 件（半透明件按约定不进）` : "无网格",
+        inPrepass || fp.prepass > 0 ? "good" : "warn");
+      this.facts.Set("第一人称材质",
+        fp.materials ? `${fp.injected}/${fp.materials} 份已注入` : "无材质",
+        fp.materials > 0 && fp.injected === fp.materials ? "good" : "warn");
+    }
     const composite = post?.uniformsComposite;
     if (this.view === "fog") {
       const density = composite?.uFogDensity?.value ?? 0;

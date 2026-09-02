@@ -9,9 +9,10 @@
 //    所以调用方还得 `scene.add(camera)` —— 这是最常见的"我明明加了枪却看不见"。
 // 2) 相机近裁面建议 ≤ 0.05。本模型压缩后最近的部件（袖口/手腕）在 0.08—0.12 m。
 //    枪托本来就在眼睛后面（z > 0），被近裁切掉是**正常且必要**的，别去"修"它。
-// 3) 第一人称双臂是 SkinnedMesh，但必须 `skipNormalDepth`：深度法线预通道用
-//    scene.overrideMaterial 覆盖全场，蒙皮在那一 pass 会塌到原点，AO 直接变乱码。
-//    手臂只进主颜色 pass；枪械与程序化兜底手仍按各自原路径渲染。
+// 3) 整棵树（含蒙皮双臂）都要经 `Script_Post.MarkForegroundPrepass` 接进深度法线
+//    预通道：写**真法线** + 一个常数近景深度标签。别再用 MarkNoPrepass —— 那不是
+//    "不进预通道"，只是"不换材质"，物体照样被画进去、写的是自己的光照颜色。
+//    覆盖材质带 skinning chunk，蒙皮不会塌到原点（Script_ActorDepthTest 守着同一条）。
 //
 // --- 视图模型 FOV：为什么是非等比缩放 ---------------------------------------
 // 广角下枪会畸变成香蕉，所以视图模型要用更窄的 FOV。但这里没有第二个 pass 可用
@@ -33,7 +34,7 @@ import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
-import { MarkNoPrepass } from "./Script_Post.mjs";
+import { MarkForegroundPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
@@ -1258,16 +1259,31 @@ export class Viewmodel {
 
     // --- 层级：每一层只负责一件事，调试时能单独关掉任意一层 ------------------
     this.root = new THREE.Group();
-    // 视图模型用自己的 FOV 缩放摆在近裁面内，它的深度不是世界深度。
-    // 让它进深度法线预通道，SSAO 会在枪身边缘挖一圈黑边、运动模糊会把枪一起糊。
-    // 这里在 Equip 之后统一把整棵树的材质标成 allowOverride = false。
-    // 注意：**不能**遍历 this.root —— 构造完成时树里只有抛壳池和弹夹道具，
-    // 手、枪身、枪口焰要到 Equip() 里才建出来并挂进去。主程序又习惯在
-    // Equip 之前就调一次，结果是一个都没标上。所以这里遍历材质表（那才是全集），
-    // 并且 Equip() 末尾会自己再调一次，调用方怎么调都不会漏。
-    this.markNoPrepass = () => {
-      for (const m of Object.values(this.materials)) MarkNoPrepass(m);
-      this.root.traverse((o) => { if (o.material) MarkNoPrepass(o.material); });
+    // 视图模型用自己的 FOV 缩放摆在近裁面内，它的深度不是世界深度：真按它的视深
+    // 写进预通道，开镜近景 DOF 会把正在瞄的枪糊掉、运动模糊按 0.2 m 的视差把枪拖花。
+    //
+    // 但**不能因此把它从预通道里划掉**。以前这里调 MarkNoPrepass，那只是"不换材质"，
+    // 枪照样被画进 rtNormalDepth，写的是自己的光照颜色（当法线用是垃圾）——
+    // Debug Rendering 的法线/视深/AO 于是要么一团噪声要么一片空洞。
+    // 现在交给 Script_Post.MarkForegroundPrepass：真法线 + 常数近景深度标签。
+    //
+    // 只遍历 this.root 就够，但**必须在 Equip 之后调**：构造完成时树里只有抛壳池
+    // 和弹夹道具，手、枪身、枪口焰要到 Equip() 里才建出来。Equip() 末尾自己会再调
+    // 一次，调用方怎么调都不会漏。
+    //（顺带修掉一个隐患：老写法遍历 this.materials，而那张表里的
+    // `library.Get(name, {})` 是**与世界共用的同一个实例** —— 给它标上
+    // allowOverride=false，世界里用同一份材质的物件会一起掉出预通道。）
+    this.markForegroundPrepass = () => {
+      // 同一趟顺手把第一人称树里的**外来 GLB**（手榴弹）接进材质库：它的
+      // MeshStandardMaterial 是 GLTFLoader 造的，metallicFactor 缺省是 1，
+      // 而且没注入 SSAO/GI 就意味着 Debug Rendering 的材质/光照组画不到它。
+      // 双臂在 FpsArmRig 构造时已经接过一次，ConfigureExternalPbr 是幂等的。
+      this.root.traverse((object) => {
+        if (!object.isMesh || !object.userData.firstPersonExternalGlb) return;
+        object.userData.firstPersonPbrSurface = true;
+        library?.ConfigureExternalPbr?.(object.material, { metalness: 0, minRoughness: 0.55 });
+      });
+      return MarkForegroundPrepass(this.root);
     };
     this.root.name = "Viewmodel";
     // 自由瞄准那一段偏移就画在 root 自己身上（原点＝相机原点，绕它转 θ
@@ -1371,7 +1387,10 @@ export class Viewmodel {
     this.riggedArms = null;
     if (riggedAssets && riggedAssets.fpsArms) {
       try {
-        this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, this.materials);
+        // 第二参是**材质库**，不是本地材质表：GLB 自带的 MeshStandardMaterial 要走
+        // ConfigureExternalPbr 才能接进 SSAO/GI 注入链与 Debug Rendering 的假彩色
+        //（以前这里传 this.materials，签名根本不收，等于什么都没接）。
+        this.riggedArms = new FpsArmRig(riggedAssets.fpsArms, library);
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
       }
@@ -1626,12 +1645,13 @@ export class Viewmodel {
 
     // 掏枪动画
     this.equipSpring.Set(0);
-    // 每次换枪都会重建整棵 rig：新建出来的材质必须重新退出深度法线预通道。
-    // 漏了的后果不是“预通道多画一遍”那么轻：枪把自己 0.1—0.9 m 的深度
+    // 每次换枪都会重建整棵 rig：新建出来的网格必须重新接进前景预通道口径。
+    // 漏了的后果不是“预通道多画一遍”那么轻：枪把自己 0.1—0.9 m 的真实深度
     // 写进法线深度图，SSAO 就在枪所在的那块屏幕区域算出几乎全遮蔽，
     // 而枪自己的材质又正好采样那张图（MaterialLibrary 给每份材质都注了 SSAO）——
     // 于是整支枪的间接光被乘成 0，画面下方就是一坨黑。
-    if (this.markNoPrepass) this.markNoPrepass();
+    // 常数近景深度标签正是冲这件事去的（见 Script_Post.FOREGROUND_VIEW_DEPTH）。
+    if (this.markForegroundPrepass) this.markForegroundPrepass();
     return this;
   }
 

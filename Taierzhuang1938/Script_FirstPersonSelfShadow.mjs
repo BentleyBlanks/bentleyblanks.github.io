@@ -127,6 +127,7 @@ export class FirstPersonSelfShadow {
     this._clearColor = new THREE.Color();
     this._hidden = [];
     this._overrideStates = [];
+    this._overrideTouched = new Set();   // 见 Render 里的去重注释
     this.Sync();
   }
 
@@ -185,7 +186,9 @@ ${SHADOW_FRAGMENT_GLSL}`)
       return `${previousKey.call(this)}|firstPersonSelfShadow1`;
     };
     material.userData.firstPersonSelfShadow = true;
-    material.allowOverride = false;
+    // **不要在这里动 allowOverride**。预通道归属由 Script_Post.MarkForegroundPrepass
+    // 决定（不透明件要吃覆盖材质才写得出真法线），clone() 已经把源材质那一位抄过来了。
+    // 以前这里写死 false，等于把视图模型偷偷踢出覆盖材质，法线视图里就是一团噪声。
     material.needsUpdate = true;
     this.patchedMaterials.add(material);
   }
@@ -247,6 +250,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
     renderer.getClearColor(this._clearColor);
     this._hidden.length = 0;
     this._overrideStates.length = 0;
+    this._overrideTouched.clear();
 
     const casterSet = new Set(this.casters);
     for (const mesh of this.meshes) {
@@ -257,6 +261,11 @@ ${SHADOW_FRAGMENT_GLSL}`)
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of materials) {
         if (!material) continue;
+        // 一份材质挂在好几个网格上是常态（枪身与刺刀共用钢）。不去重的话第二次
+        // push 记下的是**已经被自己改成 true 的值**，还原时最后一次写回把它永久
+        // 留在 true 上 —— 视图模型的预通道口径于是被这一趟悄悄改掉了。
+        if (this._overrideTouched.has(material)) continue;
+        this._overrideTouched.add(material);
         this._overrideStates.push([material, material.allowOverride]);
         material.allowOverride = true;
       }

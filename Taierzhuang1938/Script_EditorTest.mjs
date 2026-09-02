@@ -189,6 +189,40 @@ const debugRendering = await page.evaluate(() => {
     characterPbr.roughEnough &&= material.roughness >= 0.58;
   }
   characterPbr.materials = characterMaterials.size;
+  // 第一人称（手 / 袖 / 枪 / 刺刀 / 手雷）与人物同一条规矩，但坏法不一样：
+  //   · 双臂与手雷是外来 GLB，材质从来没走过 ConfigureExternalPbr —— glTF 缺省
+  //     metallicFactor=1 让一双手一直在按纯金属渲，而且假彩色一帧画不到它们；
+  //   · 整棵树以前调的是 MarkNoPrepass，那只是"不换材质"不是"不进预通道"，
+  //     枪把自己的光照颜色当法线写进 rtNormalDepth，GBuffer 组一团噪声。
+  // 两条链各自的证据：foregroundPrepass 标记 + 材质注入位。
+  const firstPerson = {
+    meshes: 0, prepass: 0, glbSurfaces: 0, materials: 0,
+    injected: true, nonMetal: true, translucentOut: true,
+  };
+  const firstPersonMaterials = new Set();
+  T.viewmodel?.root?.traverse((object) => {
+    if (!object.isMesh || !object.material) return;
+    const list = Array.isArray(object.material) ? object.material : [object.material];
+    if (list.some((material) => material?.transparent)) {
+      // 半透明件（枪口焰）按约定整只藏出预通道：它没有可用的法线
+      firstPerson.translucentOut &&= object.userData.skipNormalDepth === true;
+      return;
+    }
+    firstPerson.meshes += 1;
+    if (object.userData.foregroundPrepass === true) firstPerson.prepass += 1;
+    if (object.userData.firstPersonPbrSurface === true) firstPerson.glbSurfaces += 1;
+    for (const material of list) {
+      if (!material?.isMeshStandardMaterial && !material?.isMeshPhysicalMaterial) continue;
+      firstPersonMaterials.add(material);
+    }
+  });
+  for (const material of firstPersonMaterials) {
+    firstPerson.injected &&= material.userData.indirectLightingInjected === true;
+    if (material.userData.externalPbrConfigured === true) {
+      firstPerson.nonMetal &&= material.metalness === 0;
+    }
+  }
+  firstPerson.materials = firstPersonMaterials.size;
   // 屏幕真的被写了没有。**只比 uniform 上的纹理引用是不够的** ——
   // 这一趟的展示 pass 曾经因为一个 GLSL ES 3.00 保留字（变量名叫 sample）整段
   // 编译不过：uniform 全接对了，three 却什么都不画，九个视图在屏幕上一律纯黑。
@@ -197,9 +231,12 @@ const debugRendering = await page.evaluate(() => {
   const probe = document.createElement("canvas");
   probe.width = 48; probe.height = 30;
   const ctx = probe.getContext("2d");
-  const Brightest = () => {
+  const Grab = () => {
     ctx.drawImage(canvas, 0, 0, probe.width, probe.height);
-    const data = ctx.getImageData(0, 0, probe.width, probe.height).data;
+    return ctx.getImageData(0, 0, probe.width, probe.height).data;
+  };
+  const Brightest = () => {
+    const data = Grab();
     let max = 0;
     for (let i = 0; i < data.length; i += 4) {
       max = Math.max(max, (data[i] + data[i + 1] + data[i + 2]) / 3);
@@ -236,6 +273,29 @@ const debugRendering = await page.evaluate(() => {
     // 否则面板上会同时亮着四个视图，读者判断不出送屏的到底是哪一张。
     chipsOn[view] = document.querySelectorAll(".edPanel.debugRendering .edChip.on").length;
   }
+  // 「接线对了」不等于「屏幕上看得见」：第一人称以前在 GBuffer 组里就是一片空洞
+  // （双臂 skipNormalDepth）或一团噪声（枪写自己的光照颜色）。所以这里真的把枪藏了
+  // 再拍一次，只认像素差。TAA 会逐帧抖动，先关掉，量完装回去。
+  const taaWas = T.post.taaEnabled;
+  T.post.SetTaaEnabled(false);
+  const foregroundPixels = {};
+  for (const view of ["normal", "depth", "baseColor", "metalness"]) {
+    panel.SetView(view);
+    T.StepFrames(3);
+    const shown = Grab();
+    T.viewmodel.root.visible = false;
+    T.StepFrames(3);
+    const hidden = Grab();
+    T.viewmodel.root.visible = true;
+    T.StepFrames(3);
+    let changed = 0;
+    for (let i = 0; i < shown.length; i += 4) {
+      if (Math.abs(shown[i] - hidden[i]) + Math.abs(shown[i + 1] - hidden[i + 1])
+        + Math.abs(shown[i + 2] - hidden[i + 2]) > 24) changed += 1;
+    }
+    foregroundPixels[view] = changed;
+  }
+  T.post.SetTaaEnabled(taaWas);
   panel.SetView("normal");
   T.StepFrames(3);
   return {
@@ -246,7 +306,8 @@ const debugRendering = await page.evaluate(() => {
     // 留着的话所有材质还在往 hdr 靶里写调试色，正片就毁了。
     matReset: !T.library.gi || T.library.gi.debugView.value === 0,
     target: !!T.post.targets.normalDepth,
-    visible, lit, chipsOn, matMode, characterPbr,
+    visible, lit, chipsOn, matMode, characterPbr, firstPerson, foregroundPixels,
+    probePixels: probe.width * probe.height,
   };
 });
 Check("Debug Rendering：法线 GBuffer 可视化已接入后处理", debugRendering.editor.debugRendering
@@ -256,6 +317,18 @@ JSON.stringify({ ...debugRendering, lit: undefined, chipsOn: undefined }));
 Check("Debug Rendering：材质假彩色编号随视图同步、离开即归零",
   Object.values(debugRendering.matMode).every(Boolean) && debugRendering.matReset,
   JSON.stringify({ matMode: debugRendering.matMode, matReset: debugRendering.matReset }));
+Check("Debug Rendering：第一人称手/枪进前景预通道且材质已注入",
+  debugRendering.firstPerson.meshes > 0
+  && debugRendering.firstPerson.prepass === debugRendering.firstPerson.meshes
+  && debugRendering.firstPerson.glbSurfaces > 0
+  && debugRendering.firstPerson.materials > 0
+  && debugRendering.firstPerson.injected && debugRendering.firstPerson.nonMetal
+  && debugRendering.firstPerson.translucentOut,
+  JSON.stringify(debugRendering.firstPerson));
+// 48x30 的取样图上，屏幕下方那支枪加两只手怎么也该占到百分之几。
+Check("Debug Rendering：藏掉第一人称，四个视图的画面真的变了",
+  Object.values(debugRendering.foregroundPixels).every((n) => n > debugRendering.probePixels * 0.02),
+  JSON.stringify(debugRendering.foregroundPixels));
 Check("Debug Rendering：GLB 角色接入 PBR、材质视图与阴影链",
   debugRendering.characterPbr.meshes > 0 && debugRendering.characterPbr.materials > 0
   && debugRendering.characterPbr.configured && debugRendering.characterPbr.injected

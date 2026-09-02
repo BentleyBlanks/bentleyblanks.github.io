@@ -973,9 +973,9 @@ async function Boot() {
   });
   camera.add(viewmodel.root);
   scene.add(camera);
-  // 视图模型的材质要退出深度法线预通道。Equip() 末尾会自己调一次，
-  // 这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
-  if (viewmodel.markNoPrepass) viewmodel.markNoPrepass();
+  // 视图模型按“前景”口径进深度法线预通道（真法线 + 常数近景深度标签）。
+  // Equip() 末尾会自己调一次，这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
+  if (viewmodel.markForegroundPrepass) viewmodel.markForegroundPrepass();
   firstPersonSelfShadow = new FirstPersonSelfShadow(renderer, scene, camera, viewmodel.root, {
     size: QUALITY === "low" ? 512 : 1024,
   });

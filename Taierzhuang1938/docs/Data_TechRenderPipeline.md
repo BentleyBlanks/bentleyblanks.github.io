@@ -842,6 +842,27 @@ RGBA packed depth，并在视模自己的材质克隆里以 3×3 PCF 乘直射�
 材质必须先克隆再注入，不能改 `MaterialLibrary` 的共享底材，否则世界里的同名枪材质也会采到
 相机旁边这张阴影。画质面板的「第一人称自阴影」可热切、落盘，并服从「阴影」总闸。
 
+它那趟自阴影 depth pass 会临时把视模材质的 `allowOverride` 打开再还原 —— **还原必须按材质
+去重**：一份钢材同时挂在枪身与刺刀上，第二次记下的是自己刚改成的 `true`，还原时最后一次
+写回就把它永久留在 `true` 上，等于这一趟偷偷改掉了视模的预通道口径。反过来，它也**不许**
+在打补丁时把 `allowOverride` 写死成 `false`：那一位归下面的前景预通道口径管。
+
+### 第一人称在深度法线预通道里的口径（前景标签）
+
+视模的几何带一层非等比深度压缩，它的视深不是世界视深（枪口在眼前 0.2 m、枪托在眼睛后面）。
+`Script_Post.MarkForegroundPrepass` 定的口径是：
+
+- **不透明件照常吃覆盖材质**，写**真法线**；深度写常数 `FOREGROUND_VIEW_DEPTH = 1 m`
+  （覆盖材质的 `uForegroundDepth` uniform 按 draw 开关，与破口裁切同一个手法）。
+  真按它自己的视深写，开镜近景 DOF（focus 1.60 m）会把正在瞄的枪整支糊掉、相机运动模糊
+  按 0.2 m 的视差把枪拖成一片、SSAO 在枪身边缘挖黑边。
+- **半透明/加性件（枪口焰）** 没有可用的法线，整只 `skipNormalDepth` 藏出预通道。
+
+**别用 `MarkNoPrepass` 代替它。** 那个函数只保证"不被换材质"，物体照样被画进
+`rtNormalDepth`，写进去的 xyz 是它自己的光照颜色 —— 当法线用是纯垃圾，SSAO 直接读错，
+Debug Rendering 的 GBuffer 组也就成了一团噪声。蒙皮双臂同理不许再标 `skipNormalDepth`：
+覆盖材质带 skinning chunk，蒙皮不会塌到原点（`Script_ActorDepthTest` 守着同一条）。
+
 ---
 
 ## 11. 材质：CanvasTexture 程序化烘四张图 + 三平面

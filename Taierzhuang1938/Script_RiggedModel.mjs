@@ -115,11 +115,15 @@ export async function LoadRiggedAssets() {
  * 正式国军 01 蒙皮双臂，由 Viewmodel 每把武器的两个完整握持目标驱动。
  */
 export class FpsArmRig {
-  constructor(gltf) {
+  /**
+   * @param {object} gltf            LoadRiggedAssets 拿到的 fpsArms
+   * @param {MaterialLibrary} materialLibrary GLB 材质要经它接进统一 PBR/调试链
+   */
+  constructor(gltf, materialLibrary = null) {
     this.gltf = gltf;
+    this.materialLibrary = materialLibrary;
     this.root = CloneSkeleton(gltf.scene);
     this.root.name = "RiggedFpsArmsNra01";
-    this.root.userData.skipNormalDepth = true;
     this.mesh = FirstSkinnedMesh(this.root);
     this.mixer = new THREE.AnimationMixer(this.root);
     this.anchor = null;
@@ -208,7 +212,17 @@ export class FpsArmRig {
       object.frustumCulled = false;
       object.castShadow = false;
       object.receiveShadow = false;
-      object.userData.skipNormalDepth = true;
+      // 双臂是第一人称表面：Debug Rendering 的审计按这个标记只数手，不数手里的枪。
+      object.userData.firstPersonPbrSurface = true;
+      // GLB 材质不能绕过主材质库 —— 与 Script_CharacterModel 里那段是同一条规矩。
+      // glTF 的 metallicFactor 缺省是 1，这两份材质都没写该字段，于是一双手一直
+      // 是**纯金属**在渲；而且没注入的材质在 Debug Rendering 的 BaseColor/粗糙度/
+      // 金属度/阴影/四路光照视图里照画最终颜色 —— 假彩色一帧里的手是假的。
+      // 粗糙度下限沿用原来手写的 0.78。
+      this.materialLibrary?.ConfigureExternalPbr?.(object.material, {
+        metalness: 0,
+        minRoughness: 0.78,
+      });
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of materials) {
         if (!material) continue;
@@ -216,6 +230,7 @@ export class FpsArmRig {
         material.shadowSide = THREE.FrontSide;
         if (material.isMeshStandardMaterial) {
           material.envMapIntensity = Math.min(material.envMapIntensity ?? 1, 0.55);
+          // 与上面 minRoughness 同一个数：材质库缺席时（离线单测）这一行独自兜底。
           material.roughness = Math.max(material.roughness, 0.78);
         }
         material.needsUpdate = true;

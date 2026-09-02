@@ -59,7 +59,7 @@ float Hash12(vec2 p) {
 // 不然实例化的瓦砾会塌到原点，蒙皮人物会留在绑定姿势，AO / TAA / 运动模糊一起读错。
 // ---------------------------------------------------------------------------
 function MakeNormalDepthMaterial(destruction = null) {
-  const uniforms = { uFar: { value: 500 } };
+  const uniforms = { uFar: { value: 500 }, uForegroundDepth: { value: 0 } };
   const damageEnabled = { value: 0 };
   if (destruction) BindDestructionUniforms(uniforms, destruction, damageEnabled);
   const material = new THREE.ShaderMaterial({
@@ -99,6 +99,7 @@ function MakeNormalDepthMaterial(destruction = null) {
     `,
     fragmentShader: /* glsl */`
       uniform float uFar;
+      uniform float uForegroundDepth;
       varying vec3 vViewNormal;
       varying float vViewDepth;
       ${destruction ? `varying vec3 vDamageWorldPos;
@@ -107,7 +108,10 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
         ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
-        gl_FragColor = vec4(n, vViewDepth);
+        // 前景件（第一人称手/枪）写常数近景深度，不写自己的真实视深：
+        // 见 MarkForegroundPrepass 的抬头。法线仍然是真的。
+        float depth = uForegroundDepth > 0.0 ? uForegroundDepth : vViewDepth;
+        gl_FragColor = vec4(n, depth);
       }
     `,
     side: THREE.FrontSide,
@@ -115,6 +119,8 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
   // BuildSink 的静态网格会在自己的 onBeforeRender/onAfterRender 里只为这一 draw
   // 打开裁切。演员、枪、碎片共用 overrideMaterial，但不会被破口 OBB 切掉。
   if (destruction) material.userData.damageObjectEnabled = damageEnabled;
+  // 同一套「按 draw 开关」的手法给第一人称用（MarkForegroundPrepass 读这个）。
+  material.userData.foregroundDepth = uniforms.uForegroundDepth;
   return material;
 }
 
@@ -633,8 +639,9 @@ void main() {
 
   // --- 景深：阵亡虚化远景；开镜只轻微虚化贴眼近景 -----------------------
   // 不能用 CSS blur：那会把贴在镜头前的地面也一起糊掉，只剩一张均匀毛玻璃。
-  // rtNormalDepth.w 是线性视深；视图模型退出 overrideMaterial 后仍以 alpha=1
-  // 写入这一张靶，等价于稳定的 1 m 近景标签，不会把枪重新塞回 SSAO 预通道。
+  // rtNormalDepth.w 是线性视深；视图模型由 MarkForegroundPrepass 显式写
+  // FOREGROUND_VIEW_DEPTH（1 m）这个稳定的近景标签，而不是它自己被压缩过的视深 ——
+  // 否则开镜近景 CoC 会把正在瞄的那支枪整支糊掉。法线仍是真的，SSAO 读得到。
   if (uDofStrength > 0.001 || uNearDofStrength > 0.001) {
     float farCoc = nd.w <= 0.0 ? 1.0
       : smoothstep(uDofFocus, uDofFocus + max(uDofRange, 0.01), nd.w);
@@ -911,6 +918,67 @@ export function MarkNoPrepass(material) {
   if (Array.isArray(material)) { material.forEach(MarkNoPrepass); return material; }
   material.allowOverride = false;
   return material;
+}
+
+/**
+ * 前景（第一人称手 / 枪）在预通道里的**常数近景深度**。
+ *
+ * 视图模型带一层非等比的深度压缩，它的视深不是世界视深（枪口在眼前 0.2 m，
+ * 枪托在眼睛后面）。真按它自己的视深写进 rtNormalDepth，下游全按"贴脸的实体"
+ * 处理：开镜近景 DOF（focus 1.60 m）把正在瞄的枪整支糊掉、相机运动模糊按 0.2 m
+ * 的视差把枪拖成一片、SSAO 在枪身边缘挖黑边。Composite 那边写死的口径就是
+ * "视图模型等价于稳定的 1 m 近景标签"（见近景 CoC 那一段），这里把它做实。
+ */
+export const FOREGROUND_VIEW_DEPTH = 1.0;
+
+// 覆盖材质是全场共用的一份，uniform 按 draw 上传（three 在 renderObject 里先调
+// onBeforeRender 再 setProgram）—— 与破口裁切那一套是同一个手法。
+function ForegroundPrepassOn(renderer, scene, camera, geometry, material) {
+  const uniform = material?.userData?.foregroundDepth;
+  if (uniform) uniform.value = FOREGROUND_VIEW_DEPTH;
+}
+function ForegroundPrepassOff(renderer, scene, camera, geometry, material) {
+  const uniform = material?.userData?.foregroundDepth;
+  if (uniform) uniform.value = 0;
+}
+
+/**
+ * 把一棵前景子树（`viewmodel.root`）接进深度法线预通道。
+ *
+ * 以前这里调的是 MarkNoPrepass，但那**不是**"不进预通道"：allowOverride = false
+ * 只是不换材质，物体照样被画进 rtNormalDepth，写进去的 xyz 是它自己的**光照颜色**
+ * （当法线用是纯垃圾，SSAO 直接读错）、w 是它的不透明度。于是 Debug Rendering 的
+ * 法线/视深/AO 三组视图里，第一人称要么是一团噪声要么整块缺失。
+ *
+ * 现在的口径：
+ *   · 不透明件 —— 照常吃覆盖材质，写**真法线** + FOREGROUND_VIEW_DEPTH 常数深度；
+ *   · 半透明/加性件（枪口焰）—— 仍旧整只藏出预通道（skipNormalDepth），
+ *     它没有可用的法线，混进去只会污染 SSAO。
+ *
+ * 每次 Equip 之后都要再调一次：枪械树是 Equip 里现建的。
+ */
+export function MarkForegroundPrepass(root) {
+  if (!root) return root;
+  root.traverse((object) => {
+    if (!object.isMesh || !object.material) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const translucent = materials.some((material) => material
+      && (material.transparent || material.alphaTest > 0 || material.depthWrite === false));
+    if (translucent) {
+      MarkNoPrepass(object.material);
+      object.userData.skipNormalDepth = true;
+      object.userData.foregroundPrepass = false;
+      return;
+    }
+    for (const material of materials) if (material) material.allowOverride = true;
+    object.userData.skipNormalDepth = false;
+    object.userData.foregroundPrepass = true;
+    // 视图模型的网格没有别的 onBeforeRender 用户（破口裁切只挂在世界静态件上），
+    // 直接赋值即可，重复调用是幂等的。
+    object.onBeforeRender = ForegroundPrepassOn;
+    object.onAfterRender = ForegroundPrepassOff;
+  });
+  return root;
 }
 
 const QUALITY_PRESETS = {
@@ -1373,6 +1441,9 @@ export class PostPipeline {
     const prevOverride = scene.overrideMaterial;
     scene.background = null;
     scene.overrideMaterial = this.normalDepthMaterial;
+    // 前景标签逐 draw 由 MarkForegroundPrepass 的钩子开关；这一趟开头先归零，
+    // 上一帧要是在某个 draw 中途出错（onAfterRender 没跑），整个世界会被写成 1 m。
+    this.normalDepthMaterial.userData.foregroundDepth.value = 0;
     renderer.setRenderTarget(T.normalDepth);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, false);

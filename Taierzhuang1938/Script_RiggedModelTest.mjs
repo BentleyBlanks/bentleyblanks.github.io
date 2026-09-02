@@ -103,4 +103,19 @@ assert.equal(rigNode.extras?.fpsRigContract, "uniform-adapter-unit-joints-arm-on
 assert.equal(rigNode.extras?.fpsArmOnlyWeights, true,
   "GLB records that hidden torso/spine influences were removed from the viewmodel skin");
 
+// --- 运行时接线契约（与人物那条同源，见 Script_CharacterModelTest 尾部）----------
+// 双臂是外来 GLB：不走材质库就是一双**纯金属**的手（glTF metallicFactor 缺省 1），
+// 而且 Debug Rendering 的材质/光照假彩色画不到它们；被 skipNormalDepth 划掉就是
+// GBuffer/AO 组里的一片空洞。这两条只在真浏览器里才看得出来，所以在这里先卡源码。
+const riggedRuntime = fs.readFileSync(path.join(root, "Script_RiggedModel.mjs"), "utf8");
+assert.doesNotMatch(riggedRuntime, /userData\.skipNormalDepth\s*=\s*true/,
+  "FPS arms are not removed wholesale from NormalDepth");
+assert.match(riggedRuntime, /ConfigureExternalPbr\?\.\(object\.material,[\s\S]*?metalness:\s*0[\s\S]*?minRoughness:\s*0\.78/,
+  "FPS arm materials enter the shared PBR/debug chain as non-metals");
+const viewmodelRuntime = fs.readFileSync(path.join(root, "Script_Viewmodel.mjs"), "utf8");
+assert.match(viewmodelRuntime, /new FpsArmRig\(riggedAssets\.fpsArms,\s*library\)/,
+  "viewmodel passes the shared material library to the FPS arm rig");
+assert.match(viewmodelRuntime, /MarkForegroundPrepass\(this\.root\)/,
+  "the whole first-person tree enters the foreground NormalDepth pass");
+
 console.log(`ok   NRA01 skeletal FPS arms: ${arms.meshes.length} mesh, ${jointCount} unit joints, ${animations.size} animations, adapter ×${adapterScale[0]}`);

@@ -47,7 +47,11 @@ export function CloneGrenadeAsset(asset, { firstPerson = false } = {}) {
     if (!object.isMesh) return;
     object.material = Array.isArray(object.material)
       ? object.material.map(cloneMaterial) : cloneMaterial(object.material);
-    object.userData.skipNormalDepth = true;
+    // 第一人称树里的外来 GLB：由 Script_Viewmodel 在 markForegroundPrepass 那一趟
+    // 统一接进材质库（ConfigureExternalPbr）与前景预通道口径。这里只留标记 ——
+    // 这个函数拿不到 MaterialLibrary，而预通道归属由 MarkForegroundPrepass 决定，
+    // 不再自己写 skipNormalDepth（写了就等于永远缺席 Debug Rendering 的 GBuffer 组）。
+    object.userData.firstPersonExternalGlb = true;
   });
   return clone;
 }

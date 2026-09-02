@@ -390,6 +390,26 @@ NormalDepth 和本帧 Composite uniforms 重算距离雾×高度衰减，`景深
 不能只覆盖 `MaterialLibrary.Get/Plain` 造出的环境与武器材质。角色网格同时逐件开启
 `castShadow/receiveShadow`。透明头发在假彩色重画时保留原 alpha，不能变成一整块实心壳。
 
+**第一人称的手与枪同样是被覆盖对象**，而且它有两条独立的链，坏哪条都只坏一半视图，
+面板底部因此分两项报（`第一人称预通道` / `第一人称材质`）：
+
+- **材质注入**（决定材质 / 光照 / GI 共十一个假彩色视图画不画得到它）。双臂
+  （`Script_RiggedModel.FpsArmRig`）与手榴弹（`Script_GrenadeAsset` 的第一人称克隆）
+  是外来 GLB，必须经 `MaterialLibrary.ConfigureExternalPbr` 接入 —— 与人物同一条规矩，
+  同一个坑：glTF 的 `metallicFactor` 缺省是 1，这两份材质都没写该字段，接之前一双手
+  一直在按**纯金属**渲，而且假彩色一帧里的手画的是最终颜色，是假的。
+- **前景预通道**（决定 GBuffer / AO / 雾 / CoC 共七个视图看不看得见它）。整棵
+  `viewmodel.root` 走 `Script_Post.MarkForegroundPrepass`：不透明件照常吃覆盖材质，
+  写**真法线**，但视深写常数 `FOREGROUND_VIEW_DEPTH = 1 m` 的近景标签 —— 视图模型带
+  一层非等比深度压缩，按它自己的视深写进去，开镜近景 DOF 会把正在瞄的枪整支糊掉、
+  相机运动模糊按 0.2 m 的视差把枪拖成一片。半透明/加性件（枪口焰）没有可用的法线，
+  按约定整只 `skipNormalDepth` 藏出预通道。
+  **不要退回 `MarkNoPrepass`**：那不是"不进预通道"，只是"不换材质"，物体照样被画进
+  `rtNormalDepth`，写进去的 xyz 是它自己的光照颜色（当法线用是纯垃圾，SSAO 直接读错）。
+
+`Script_EditorTest` 的两条断言守着这一节：一条对账两条链的标记与注入位，另一条把
+第一人称藏起来再拍一次，只认像素差 —— "接线对了"不等于"屏幕上看得见"。
+
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
 与 Debug Rendering 同在「渲染调试（可叠加）」组，不接管相机、不暂停玩法 ——
