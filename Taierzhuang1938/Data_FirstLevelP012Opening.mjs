@@ -64,6 +64,8 @@ export const openingStoryBeats=Object.freeze([
   ["Chat", "P012NorthApproachChat", "heyoutian", "刚领的子弹捂好，别一跑全撒路上。", 8],
   ["ChatReply", "P012NorthApproachChat", "yaowa", "这点家当，我攥得比命还紧。", 10],
   ["Impact", "P012NorthNearMissImpact", "luo", "卧倒！进沟！别站在路中央！", 6],
+  ["AmmoDogleg", "P012AmmoDoglegEntered", "luo", "弹药箱走狗腿沟，贴着沟壁跟我转。", 8,3.2],
+  ["AmmoGunline", "P012AmmoGunlineNear", "luo", "前头就是机枪位，送到枪眼后边。", 8,3.2],
 ].map(([id,event,who,text,maxAgeS,seconds,completeSignal])=>Object.freeze({
   at:`event:${event}`,type:"line",who,text,tier:"虚构",voice:`p012_text_${id}`,
   p012SubtitleOnly:true,p012SubtitleSeconds:seconds||(id==="Chat"?2.8:3.4),

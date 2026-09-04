@@ -4,7 +4,7 @@ import { CHAPTER as FIRST_CHAPTER } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as PROLOGUE_VOICE_LINES } from "./Data_MissionCh0.mjs";
 import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
   P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES,
-  P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
+  P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES, P012_BLUEPRINT_AMMO_CARRY } from "./Data_FirstLevelP012Layout.mjs";
 import { P012MapPoints, P012RailPoint, P012StationPoint } from "./Data_FirstLevelP012Space.mjs";
 import { openingActivities, openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
@@ -154,7 +154,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
       orientations: Object.freeze([]),
       shellCoverRoute: Object.freeze([{ x: 0, z: -22 }, { x: 3, z: -30 }, { x: 5, z: -38 }, { x: 5, z: -42 }]),
-      ammoRoute: Object.freeze([{ x: -7, z: -52 }, { x: 0, z: -52 }, { x: 5, z: -46 }, { x: 5, z: -59 }, { x: 5, z: -65 }]),
+      ammoRoute: P012_BLUEPRINT_AMMO_CARRY,
       roadWoundedPosition: { x: 50, z: 47 }, regripPosition: { x: -7, z: -37 },
       airRoadRoute: Object.freeze([{ x: 54, z: 57 }, { x: 50, z: 68 }, { x: 47, z: 74 }]),
       airRoadSprintMinM: 4,

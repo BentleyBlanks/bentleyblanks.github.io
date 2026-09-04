@@ -593,7 +593,7 @@ export class FirstLevelP012Director {
     }
     const routeAllowed = this.beat === 0 || this.beat === 2 ? guideNear
       : this.beat === 4 ? !this.facts.has("northNearMissImpact") || this.facts.has("northCovered") || sample.stance !== "stand"
-      : this.beat === 5 ? sample.carryKind === "ammoCrate" && sample.stance === "crouch"
+      : this.beat === 5 ? sample.carryKind === "ammoCrate"
       : this.beat === 11 ? sample.carryKind === "wounded"
       : this.beat === 14 ? !this.ambushRejoin && !this.AmbushThreat()
       : this.beat === 16 ? Distance(p, sample.columnPosition) < 12
@@ -605,6 +605,8 @@ export class FirstLevelP012Director {
     if (routeAllowed && Distance(p, route[this.routeIndex]) <= this.RouteArrivalRadius()) {
       this.routeIndex += 1;
     }
+    if(this.beat===5&&this.routeIndex>=3)this.Emit("P012AmmoDoglegEntered");
+    if(this.beat===5&&this.routeIndex>=7)this.Emit("P012AmmoGunlineNear");
     if (this.beat === 0 && !this.config.arrival && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
     if(this.beat===4){
       const chat=activity.northApproachChatPosition||route[0];
@@ -975,7 +977,7 @@ export class FirstLevelP012Director {
       : this.lastSample.carryKind === "ammoCrate" ? route[this.routeIndex] || anchors.ammoDrop : anchors.ammoPickup;
     if (this.beat === 5 && !this.facts.has("ammo")) interactionId = this.lastSample.carryKind !== "ammoCrate"
       ? "p012_ammoPickup" : this.routeIndex >= route.length ? "p012_ammoDrop" : null;
-    if (this.beat === 5 && this.lastSample.carryKind === "ammoCrate") { requiredStance = "crouch"; text = "低姿沿交通壕搬运弹药，送到机枪阵位"; }
+    if (this.beat === 5 && this.lastSample.carryKind === "ammoCrate") text = "沿狗腿交通壕搬运弹药，送到机枪阵位";
     if (this.beat === 8) { target = anchors.gunports?.[2]; text = "低姿移到东侧枪眼，压制村墙边的机枪"; }
     if (this.beat === 9) { target = anchors.gunports?.[1]; text = `${this.completionReasons[8] === "threatCleared" ? "机枪威胁已清除" : "友军机枪已恢复射击"}；听掷弹筒预警，低姿离开旧落点，转移到中央枪眼`; }
     if (this.beat === 10) { target = anchors.gunports?.[0]; text = "转向西侧枪眼，封锁铁路涵洞"; }

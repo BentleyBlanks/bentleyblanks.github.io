@@ -150,9 +150,15 @@ const blueprintGates=Object.freeze([
 // coordinates rather than scaling the old lane widths or movement speeds.
 const mappedRoutes = P012MapPoints(P012_BLUEPRINT_ROUTES);
 const northLink = Route([[0,-17],[-12,-32],[-12,-50],[0,-62]]);
+const frontlineApproach = Route([[0,-17],[-12,-32],[-12,-59],[-31,-60],[-39,-70],[-35,-82],[-23,-82],[-8,-82],[0,-78],[5,-82]]);
+// After the near miss the squad stays on a real exposed farm approach before
+// dropping behind the reverse slope.  The ammunition box then follows a
+// separate dogleg communication trench; neither route is a timing gate.
+export const P012_BLUEPRINT_AMMO_CARRY = Route([[-7,-52],[0,-52],[5,-46],[16,-46],[19,-51],[18,-54],[5,-54],[5,-59],[5,-65]]);
+const ammoCarry = Object.freeze(P012MapPoints(P012_BLUEPRINT_AMMO_CARRY));
 const eastLink = Route([[30,10],[44,28],[64,28],[74,6],[84,6]]);
 const worldVillage=Route([[-43,100],[-36,95],[-30,80],[-30,62],[-34,46],[-30,30],[-30,19],[-17,12],[0,0]]);
-const worldNorth = Object.freeze([Point(-55,115),Point(-55,104),...worldVillage,...northLink,...mappedRoutes.north.slice(9)]);
+const worldNorth = Object.freeze([Point(-55,115),Point(-55,104),...worldVillage,...frontlineApproach]);
 const worldSouth = Object.freeze([...mappedRoutes.south.slice(0,6),...northLink.slice().reverse(),
   ...mappedRoutes.south.slice(7,9),...eastLink,...mappedRoutes.south.slice(9)]);
 const worldRetreat = Route([[102,98],[85,83],[68,68],[42,48],[34.6666666667,40],[20,24],
@@ -162,7 +168,7 @@ export const P012_ROUTES = Object.freeze({...mappedRoutes,north:worldNorth,villa
   villageWaiting:Route([[-39,94],[-26,60]]),
   villageEvacuation:Route([[-28.6,80],[-23,91],[-23,110],[-18,132],[-18,155]]),
   villageEvacuationWaiting:Route([[-19,108],[-14,153]]),
-  approach:Object.freeze([...northLink,Point(3,-70),Point(5,-78),Point(5,-82)]),machineGunEnemy});
+  approach:frontlineApproach,ammoCarry,machineGunEnemy});
 export const P012_ENEMY_LANES = Object.freeze({...P012MapPoints(blueprintEnemyLanes),
   machineGun:Object.freeze({spawn:machineGunEnemy[0],reveal:machineGunEnemy[2],goal:machineGunEnemy.at(-1),waypoints:machineGunEnemy})});
 export const P012_ANCHORS = Object.freeze({...P012MapPoints(P012_BLUEPRINT_ANCHORS),hub:Point(0,0),
@@ -211,6 +217,17 @@ for(const [name,route] of Object.entries({North:worldNorth,South:worldSouth,Retr
   const stretcher=name==="South"||name==="Retreat";
   for(let i=1;i<route.length;i++)worldBlocks.push(Strip(`${name}Route${i}`,route[i-1],route[i],name==="Flank"?1.4:2.8,
     stretcher?"stretcherRoute":"missionRoute",stretcher?.045:.025));
+}
+for(const [name,route] of Object.entries({FrontlineApproach:P012_ROUTES.approach,AmmoCarry:P012_ROUTES.ammoCarry})) {
+  for(let index=1;index<route.length;index++)worldBlocks.push(Strip(`${name}Route${index}`,route[index-1],route[index],
+    name==="AmmoCarry"?2.2:2.8,"missionRoute",name==="AmmoCarry"?.03:.025));
+}
+for(let index=4;index<=6;index++){
+  const a=P012_ROUTES.ammoCarry[index-1],b=P012_ROUTES.ammoCarry[index],length=Math.hypot(b.x-a.x,b.z-a.z);
+  const ux=(b.x-a.x)/length,uz=(b.z-a.z)/length,nx=uz,nz=-ux,inset=Math.min(2,length*.22);
+  for(const side of [-1,1])worldBlocks.push({...Strip(`AmmoDoglegBank${index}_${side<0?"West":"East"}`,
+    Point(a.x+ux*inset+nx*side*3,a.z+uz*inset+nz*side*3),Point(b.x-ux*inset+nx*side*3,b.z-uz*inset+nz*side*3),.8,"cover",1.05,true),
+    cover:{faceX:-nx*side,faceZ:-nz*side}});
 }
 // Staggered silhouettes conceal the enclosing test volume; no empty rectangle
 // immediately announces the end of the battlefield from the initial station.

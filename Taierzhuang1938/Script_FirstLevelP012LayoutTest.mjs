@@ -161,6 +161,17 @@ const activityRoutes={weaponIssue:[P012StationPoint(-55,44),P012StationPoint(-55
  ammo:phase.whitebox.activities.ammoRoute,
  finalCarry:[P012MapPoints({x:-7,z:-37}),P012MapPoints({x:-7,z:-45}),P012MapPoints({x:-7,z:-52})]};
 for(const [name,route] of Object.entries(activityRoutes))Audit(`Activity_${name}`,route,layout.blocks);
+const approachLength=Audit("B04ExposedApproach",phase.whitebox.activities.shellCoverRoute,layout.blocks,.42);
+const ammoCarryLength=Audit("B05AmmoDogleg",phase.whitebox.activities.ammoRoute,layout.blocks,.42);
+assert.ok(approachLength>=95,"B04 adds a substantial physical exposed-road approach without slowing actors");
+assert.ok(ammoCarryLength>=58,"B05 carries the one ammunition box through a physical dogleg trench");
+assert.equal(phase.whitebox.activities.guideSpeedByBeat[4],3.05,"B04 retains the established guide movement speed");
+assert.equal(phase.whitebox.activities.guideSpeedByBeat[5],1.1,"B05 retains the established loaded-guide movement speed");
+const RouteLength=route=>route.slice(1).reduce((sum,point,index)=>sum+Math.hypot(point.x-route[index].x,point.z-route[index].z),0);
+const previousB04=[{x:0,z:-17},{x:-12,z:-32},{x:-12,z:-50},{x:0,z:-62},{x:3,z:-70},{x:5,z:-78},{x:5,z:-82}];
+const previousB05=[{x:-7,z:-92},{x:0,z:-92},{x:5,z:-86},{x:5,z:-99},{x:5,z:-105}];
+const actionDeltaS=(approachLength-RouteLength(previousB04))/3.05+(ammoCarryLength-RouteLength(previousB05))/1.1;
+assert.ok(actionDeltaS>=35&&actionDeltaS<=50,`B04-B05 add 35-50s of movement at unchanged configured speeds, got ${actionDeltaS.toFixed(2)}s`);
 Audit("FinalRegripApproach",[P012MapPoints({x:5,z:-46}),P012MapPoints({x:-7,z:-37})],layout.blocks);
 for(const offset of [-2,2])Audit(`TrafficLane${offset}`,routes.north.slice(2,8).map(p=>({x:p.x+offset,z:p.z})),layout.blocks,0.4);
 for(const state of layout.scenario.states){
