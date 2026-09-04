@@ -92,6 +92,8 @@ const guidanceCues = Object.freeze([
   ["DelayMiddle", "P012DelayPosition1", "这边压住了。顺着蓝色沟岸换到中段，别离伤员太远。"],
   ["DelaySouth", "P012DelayPosition2", "最后一组从南端缺口来。到折角后再开火，别站在路面上。"],
   ["BlockadeDecision", "P012BlockadeDecision", "路障封死，南路走不通。点烟，改走西沟。"],
+  ["RoadContact", "P012RoadContactSeen", "墙外有四个。先把担架队叫停在墙后，你从右边矮墙过去；我们占住两边。"],
+  ["RoadContactClear", "P012RoadContactClear", "四个都压住了。回队尾亲自放行，别让担架散开。"],
 ].map(([id,event,text])=>Object.freeze({at:`event:${event}`,type:"line",who:"luo",text,tier:"虚构",
   voice:`p012_text_Guide${id}`,p012SubtitleOnly:true,p012SubtitleSeconds:5.5,
   p012Immediate:Object.freeze({event,maxAgeS:12})})));
@@ -133,7 +135,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   // Luo and the actual squad lead the route. Internal targets remain available
   // to rules/tests, but this scene never paints a floating destination or metres.
   hud: Object.freeze({ objectiveMarkers: false, targetDistance: false }),
-  nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,
+  nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 41, ijaPressure: 0.72,
   ijaSpawn: FIRST_CHAPTER.tuning.ijaSpawn, ijaSupport: [],
   ijaForce: FIRST_CHAPTER.tuning.ijaForce,
   loadoutOverride:Object.freeze({primary:null,secondary:null,melee:null,
@@ -189,6 +191,15 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ]),
       ambushEntryRoute: Object.freeze([{ x: 42.5, z: 24 }, { x: 39, z: 25.5 }]),
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
+      roadContactGuideRoute: Object.freeze([...P012_ROUTES.south.slice(0, P012_ROUTES.south.findIndex(point=>point.x===90&&point.z===10)+1), {x:94,z:14}]),
+      roadContactBreach: {x:94,z:14}, roadContactColumnHold: {x:90,z:10},
+      roadContactSideRoute: Object.freeze([{x:97,z:14},{x:100,z:12},{x:101,z:10}]),
+      roadContactFirePosition: {x:101,z:10}, roadContactTailRelease: {x:86,z:8},
+      roadContactFriendlyCovers: Object.freeze([{x:98,z:6},{x:102,z:5}]),
+      roadContactEnemies: Object.freeze([
+        {role:"observer",position:{x:108,z:10}}, {role:"observer",position:{x:111,z:12}},
+        {role:"rifleman",position:{x:108,z:16}}, {role:"rifleman",position:{x:113,z:18}},
+      ]),
       // Three bounded delaying positions use the existing ditch/bank geometry.
       // Clearing a pair earns the next move; no timer, respawn or health padding.
       closeFightRoute: Object.freeze([{ x: 44, z: 62 }, { x: 43.5, z: 64.5 },

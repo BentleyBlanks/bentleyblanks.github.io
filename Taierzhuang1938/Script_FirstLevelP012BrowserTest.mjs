@@ -650,7 +650,7 @@ async function PlayFrontline() {
           if (flow.beatIndex === 20 && !destination) destination = anchors.strafeSlots[0];
           if (flow.beatIndex === 22 && !destination) destination = spatial.southBlockade;
           const distance = destination ? Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) : Infinity;
-          if (![14, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
+          if (![13, 14, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
             game.Debug.Mouse(2, false);
             const arrive = point ? 1.5 : objective.requiredAction === "follow"
               ? Math.max(0.1, Math.min(2.4, (objective.arrivalRadiusM ?? 2.45) - 0.05))
@@ -725,7 +725,7 @@ async function PlayFrontline() {
           if (game.player.stance !== stance) game.Debug.Key(stance === "prone" || game.player.stance === "prone" ? "KeyZ" : "KeyC");
         } else {
           game.Debug.Key("KeyW", false);
-          const behindCover = (flow.beatIndex <= 10 || [14, 20, 21].includes(flow.beatIndex))
+          const behindCover = (flow.beatIndex <= 10 || [13, 14, 20, 21].includes(flow.beatIndex))
             && (game.viewmodel.IsBusy?.() || (game.state.ammo === 0 && !(flow.beatIndex===21&&game.state.clips===0)));
           const noLiveThreats = !game.ai.soldiers.some(soldier => soldier.alive && soldier.side === "ija");
           const stance = behindCover ? "prone" : noLiveThreats && flow.objective.requiredStance
@@ -955,6 +955,7 @@ async function PlayFrontline() {
   // Save the evidence before assertions: a failed distance/camera gate must not
   // discard pacing and idle-time diagnostics from a completed playthrough.
   if (fullCampaign) {
+    Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),"娴忚鍣ㄥ疄璺戝畬鎴愮湅瑙佸洓鏁屻€佸彨鍋溿€佷晶澧欐竻鍦轰笌闃熷熬鏀捐闂幆",JSON.stringify(result.flow.facts));
     const totals = {};
     for (const span of result.activity) totals[span.kind] = (totals[span.kind] || 0) + span.to - span.from;
     const stationaryOverEightSeconds = result.activity.filter(span => span.kind === "stationary" && span.to - span.from > 8);
@@ -988,6 +989,7 @@ async function PlayFrontline() {
   if (fullCampaign && process.argv.includes("--retry")) Check(result.rewindCount >= 1,
     "故意错过首次扑救后真实回退并继续通关", `${result.rewindCount}次`);
   if (fullCampaign) {
+    Check(["roadContactSeen","roadContactHeld","roadContactClear","roadContactReleased"].every(fact=>result.flow.facts.includes(fact)),"娴忚鍣ㄥ疄璺戝畬鎴愮湅瑙佸洓鏁屻€佸彨鍋溿€佷晶澧欐竻鍦轰笌闃熷熬鏀捐闂幆",JSON.stringify(result.flow.facts));
     const requested = result.escortApproval.find(entry => entry.event === "P012EscortRequested");
     const spoken = result.escortApproval.find(entry => entry.event === "LuoApprovalStarted");
     const approved = result.escortApproval.find(entry => entry.event === "P012EscortApproved");

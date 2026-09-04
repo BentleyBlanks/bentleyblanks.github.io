@@ -94,7 +94,7 @@ export class FirstLevelP012Runtime {
     if(this.host.RestorePlayer?.({...this.retryAtLoad || this.safePoint})===false)return false;
     this.failed=false;return true;
   }
-  SpawnEnemy(spec) { const actor = this.host.SpawnEnemy(spec); if (actor) this.near.push(actor); return actor; }
+  SpawnEnemy(spec) { const actor = this.host.SpawnEnemy(spec); if (actor) { actor.p012RoadContact=spec.p012RoadContact===true; this.near.push(actor); } return actor; }
   RecordDodgeIntent(position, view = null, carryKind = null) {
     this.dodgeIntent = { position: { x: position.x, z: position.z }, at: this.time };
     if (view?.player?.open && carryKind === "stretcher") this.host.ReleaseForDodge?.();
@@ -439,7 +439,7 @@ export class FirstLevelP012Runtime {
       if (this.mgSuppressedAt == null && this.host.EnemyMgSuppressed?.()) this.mgSuppressedAt = this.host.CombatTime?.() ?? this.time;
       if (this.mgSuppressedAt != null && this.host.FriendlyMgFired?.(this.mgSuppressedAt)) this.friendlyMgResponse = true;
     }
-    const escortDefense = this.beat === 14 || (this.beat >= 20 && this.beat <= 22);
+    const escortDefense = this.beat === 13 || this.beat === 14 || (this.beat >= 20 && this.beat <= 22);
     const defensive = (this.beat >= 6 && this.beat <= 10) || escortDefense;
     if (defensive && !this.defenders) {
       const ports = this.config.anchors?.gunports || [];
@@ -450,7 +450,8 @@ export class FirstLevelP012Runtime {
       for (const [index, actor] of this.defenders.entries()) {
         if (escortDefense) {
           const slots=this.config.activities?.southDefenseSlots||[];
-          const point = this.beat>=20&&slots.length ? slots[index] : this.host.Position(actor);
+          const contactCover=this.beat===13&&this.host.Signalled?.("P012RoadContactHold")?this.config.activities?.roadContactFriendlyCovers?.[index]:null;
+          const point = contactCover || (this.beat>=20&&slots.length ? slots[index] : null) || this.host.Position(actor);
           if (point) this.host.Defend?.(actor, point, { ...this.config.activities?.frontlineDoctrine, holdRadiusM: 2 });
           else this.host.ReleaseDefense?.(actor);
           continue;
@@ -462,7 +463,15 @@ export class FirstLevelP012Runtime {
         const port = ports[index % ports.length];
         if (port) this.host.Defend?.(actor, { x: port.x + (index % 2 ? 2 : -2), z: port.z + 2 + Math.floor(index / ports.length) * 2 }, this.config.activities?.frontlineDoctrine);
       }
-    } else if (!defensive && this.defenders) {
+    }
+    if(this.beat===13&&this.defenders&&this.host.Signalled?.("P012RoadContactHold")&&!this.roadContactCoversOrdered){
+      this.roadContactCoversOrdered=true;
+      for(const [index,cover] of (this.config.activities?.roadContactFriendlyCovers||[]).entries()){
+        const actor=this.defenders[index];if(actor)this.host.Defend?.(actor,cover,{...this.config.activities?.frontlineDoctrine,holdRadiusM:2});
+      }
+    }
+    if(this.beat!==13)this.roadContactCoversOrdered=false;
+    if (!defensive && this.defenders) {
       for (const actor of this.defenders) this.host.ReleaseDefense?.(actor);
       this.defenders = null;
     }
@@ -509,7 +518,7 @@ export class FirstLevelP012Runtime {
       const distance=player&&position?Math.hypot(player.x-position.x,player.z-position.z):0;
       const ahead=player&&position?(player.x-position.x)*(target.x-position.x)+(player.z-position.z)*(target.z-position.z)>0:false;
       const activity=this.config.activities || {};
-      const waitForPlayer=opening&&!ahead&&distance>(activity.openingGuideWaitDistanceM??10);
+      const waitForPlayer=(opening||guide.beat===13)&&!ahead&&distance>(activity.openingGuideWaitDistanceM??10);
       const speed=opening?(ahead&&distance>3?(activity.openingGuideCatchupMps??5.246):(activity.openingGuideWalkMps??3.05)):guide.speed;
       this.host.Move(actor, waiting||waitForPlayer ? position : target, waiting||waitForPlayer ? 0 : speed);
       if(waiting && guide.FaceAt && !inspecting) {
@@ -639,6 +648,8 @@ export class FirstLevelP012Runtime {
         actorId:walker.actor.id,child:!!walker.child,familyId:walker.familyId,guardianSlot:walker.guardianSlot,lateralM:walker.lateralM,speedMps:walker.actualSpeedMps??walker.speedMps,familyTarget:walker.familyTarget,
         index: walker.index, arrived:walker.arrived,retired:!!walker.retired,retiredAt:walker.retiredAt,parking:walker.parking,position: this.host.Position(walker.actor) })),
       nearEnemyDeaths: this.near.filter((actor) => !this.host.Alive(actor)).length,
+      roadContactVisibleCount:this.near.filter(actor=>actor.alive!==false&&actor.p012RoadContact&&this.host.Visible?.(actor)).length,
+      roadContactFriendlyCoverCount:(this.defenders||[]).filter((actor,index)=>{const at=this.host.Position(actor),cover=this.config.activities?.roadContactFriendlyCovers?.[index];return at&&cover&&Math.hypot(at.x-cover.x,at.z-cover.z)<2;}).length,
       blockadeVisible: this.far.some((actor) => this.host.Alive(actor) && this.host.Visible?.(actor)),
       blockadePressure: this.far.some((actor) => this.host.Firing(actor)),
       blockadeDestroyed: this.far.length === 4 && this.far.every((actor) => !this.host.Alive(actor)),

@@ -59,7 +59,7 @@ import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 const points = new Map();
 {
  const cues=phase.whitebox.storyBeats.filter(beat=>beat.voice?.startsWith("p012_text_Guide"));
- assert.equal(cues.length,7);
+ assert.equal(cues.length,9);
  for(const cue of cues){
   const shown=[],voices=[];
   const story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
@@ -350,7 +350,7 @@ assert.equal(flow.State().pendingEnemies,2,"failed spawns stay in finite pending
 acceptSpawns=true; Tick();
 assert.equal(spawned.length,2,"first pressure is exactly two scouts");
 assert.ok(flow.elapsed<285,"fast completed preparation is not held idle until the target timestamp");
-assert.equal(flow.State().totalEnemyBudget,37);
+assert.equal(flow.State().totalEnemyBudget,41);
 for (const actor of spawned) actor.alive=false;
 Tick({enemyDeaths:2},0.1); Tick({},0.1);
 assert.equal(spawned.length,7,"cleared scouts immediately release the finite front group without empty waiting");
@@ -410,9 +410,21 @@ signals.add("P012EscortApproved"); Tick();
 assert.equal(flow.State().beat,"B13");
 At("Z06"); assert.equal(flow.State().beat,"B13","outbound history does not satisfy reverse escort");
 for(const id of ["Z04","Z03","Z02","Z06"]) At(id);
-assert.equal(flow.State().beat,"B13","player cannot leave escort before the column arrives");
-Tick({columnAtEscortEnd:true,columnPosition:sample.position});
+Tick({},40);const contactActors=spawned.slice(-4);
+assert.equal(contactActors.length,4);assert.ok(contactActors.every(actor=>actor.p012RoadContact),"the first road contact is one finite four-person set");
+Tick({position:phase.whitebox.activities.roadContactBreach,guidePosition:phase.whitebox.activities.roadContactBreach,roadContactVisibleCount:3});
+assert.equal(flow.facts.has("roadContactSeen"),false,"partial or hidden contact cannot open the stop command");
+Tick({roadContactVisibleCount:4});assert.equal(points.get("p012_roadContactHold").Enabled(),true);
+Use("p012_roadContactHold");assert.ok(signals.has("P012RoadContactHold"));
+Walk(phase.whitebox.activities.roadContactSideRoute);
+assert.equal(flow.State().beat,"B13","reaching the physical side wall cannot replace clearing the contact");
+for(const actor of contactActors)actor.alive=false;Tick({roadContactFriendlyCoverCount:1});
+assert.equal(points.get("p012_roadContactRelease").Enabled(),false,"one occupied cover cannot release the column");
+Tick({roadContactFriendlyCoverCount:2,position:phase.whitebox.activities.roadContactTailRelease});
+assert.equal(points.get("p012_roadContactRelease").Enabled(),true);Use("p012_roadContactRelease");
+Tick({columnAtEscortEnd:true,columnPosition:phase.whitebox.activities.roadContactColumnHold});
 assert.equal(flow.State().beat,"B14");
+assert.equal(spawned.filter(actor=>actor.p012RoadContact).length,4,"dead road-contact actors never replenish");
 Tick({},40);
 const ambushActors=spawned.slice(-6);
 Tick({position:P012Point(42.5,24),zone:"Z07"});
@@ -584,8 +596,8 @@ Tick({position:phase.whitebox.activities.regripPosition,carryKind:null});
 Tick({carryKind:"stretcher"});
 for(let z=-40;z>=-52;z-=3) Tick({position:P012Point(-7,z)});
 assert.equal(flow.State().beat,"B25");
-assert.equal(spawned.length,33,"all waves exhaust at a finite total");
-Tick({},600); assert.equal(spawned.length,33,"waiting never respawns cleared enemies");
+assert.equal(spawned.length,37,"all waves exhaust at a finite total");
+Tick({},600); assert.equal(spawned.length,37,"waiting never respawns cleared enemies");
 const count=spawned.length;
 assert.equal(flow.Restore(beforeSpawn),true);
 Tick({},100);
@@ -889,11 +901,11 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
     SpawnEnemy:spec=>{const actor={position:{x:spec.x,z:spec.z},alive:true};actors.push(actor);return actor;},
     EnemyPosition:actor=>actor.alive?actor.position:null,EnemyGoal:(actor,point)=>{actor.goal={x:point.x,z:point.z};},
     EnemyStaging:(actor,value)=>{actor.staging=value;},Pressure:wave=>pressure.push(wave.kind)},phase.whitebox);
-  director.Restore({...director.Snapshot(),beat:18,spawnedTotal:21,unlockedWaves:[0,1,2,3,4,5]});
+  director.Restore({...director.Snapshot(),beat:18,spawnedTotal:25,unlockedWaves:[0,1,2,3,4,5,6]});
   const before=director.Snapshot(),sample={position:P012Point(47,80),zone:"Z08",carryKind:null};
   director.Update(.1,sample);assert.equal(actors.length,0,"being near the wounded does not pre-spawn before real lifting");
   events.add("P012StretcherLifted");director.Update(.1,sample);
-  assert.equal(actors.length,6);assert.equal(director.spawnedTotal,27);
+  assert.equal(actors.length,6);assert.equal(director.spawnedTotal,31);
   assert.ok(actors.every(actor=>actor.staging));assert.deepEqual(pressure,[],"hidden staging is not recorded as active fire pressure");
   for(let waypoint=0;waypoint<=2;waypoint++){
     for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[waypoint]};

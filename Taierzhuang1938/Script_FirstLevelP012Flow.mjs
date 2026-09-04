@@ -69,6 +69,7 @@ export const P012_WAVES = Object.freeze([
   { beat: 8, atS: 380, count: 2, kind: "machineGun", lane: "machineGunEnemy" },
   { beat: 9, atS: 425, count: 2, kind: "mortar", lane: "eastEnemy" },
   { beat: 10, atS: 465, count: 4, kind: "culvert", lane: "westEnemy" },
+  { beat: 13, atS: 600, count: 4, kind: "roadContact", lane: "roadContact" },
   { beat: 14, atS: 740, count: 6, kind: "ambush", lane: "ambush" },
   { beat: 20, atS: 1185, count: 6, kind: "closeFight", lane: "closeFight" },
   { beat: 21, atS: 1250, count: 6, kind: "southFight", lane: "southFight" },
@@ -151,7 +152,7 @@ export class FirstLevelP012Director {
   ActivityRoute() {
     const a = this.config.activities || {};
     return ({ 0: a.trainRoute, 1: a.weaponGuideRoute, 2: a.villageRoute, 3:[a.villageRoute?.at(-1)], 4: a.shellCoverRoute,
-      5: a.ammoRoute, 11: a.woundedDragRoute, 12: [a.woundedDragTo || this.config.anchors.shelter], 14: this.config.routes?.flank,
+      5: a.ammoRoute, 11: a.woundedDragRoute, 12: [a.woundedDragTo || this.config.anchors.shelter], 13: a.roadContactSideRoute, 14: this.config.routes?.flank,
       16: a.airRoadRoute, 17: a.airCoverRoute,
       18: a.stretcherCarryRoute, 20: a.closeFightRoute, 21: a.southRoomRoute, 22: a.southAssemblyRoute })[this.beat] || [];
   }
@@ -194,6 +195,7 @@ export class FirstLevelP012Director {
           ? !this.Signalled("P012NorthContinue") : Distance(this.lastSample.position,this.lastSample.guidePosition)>8,
         FaceAt: index => index===this.ActivityRoute().length-1?this.lastSample.position:null } : {}),
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
+      ...(this.beat === 13 ? { route: this.config.activities.roadContactGuideRoute, startIndex: 0, WaitAt: index => index === this.config.activities.roadContactGuideRoute.length-1, FaceAt: () => this.facts.has("roadContactClear") ? this.lastSample.position : this.config.activities.roadContactEnemies?.[0]?.position } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
   }
 
@@ -235,6 +237,10 @@ export class FirstLevelP012Director {
       Enabled: () => this.beat === 12 && !this.facts.has("volunteer") && this.lastSample.guideAlive === true
         && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3, once: false,
       OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); } });
+    Register({ id: "p012_roadContactHold", kind: "supply", label: "命令担架队停在院墙后", gesture: "hold", seconds: 1.4, position: this.config.activities?.roadContactColumnHold, once: false,
+      Enabled: () => this.beat === 13 && this.facts.has("roadContactSeen") && !this.facts.has("roadContactHeld"), OnComplete: () => { this.Mark("roadContactHeld"); this.Emit("P012RoadContactHold"); } });
+    Register({ id: "p012_roadContactRelease", kind: "supply", label: "从队尾放行担架队", gesture: "hold", seconds: 1.4, position: this.config.activities?.roadContactTailRelease, once: false,
+      Enabled: () => this.beat === 13 && this.facts.has("roadContactClear") && this.lastSample.roadContactFriendlyCoverCount >= 2 && !this.facts.has("roadContactReleased"), OnComplete: () => { this.Mark("roadContactReleased"); this.Emit("P012RoadContactRelease"); } });
     Register({ id: "p012_roadSupply", kind: "supply", label: "检查担架并补充弹药",
       gesture: "hold", seconds: 2.2, position: this.Point("stretcher", P012Point(45, 26)),
       Enabled: () => this.beat === 15 && !this.supplyReceipts.has("regroup"), once: false,
@@ -620,6 +626,12 @@ export class FirstLevelP012Director {
     }
     if(this.beat===5&&this.routeIndex>=3)this.Emit("P012AmmoDoglegEntered");
     if(this.beat===5&&this.routeIndex>=7)this.Emit("P012AmmoGunlineNear");
+    if(this.beat===13){
+      const atBreach=Distance(p,activity.roadContactBreach)<=4&&Distance(sample.guidePosition,activity.roadContactBreach)<=3;
+      if(!this.facts.has("roadContactSeen")&&atBreach&&sample.roadContactVisibleCount===4){this.Mark("roadContactSeen");this.Emit("P012RoadContactSeen");}
+      const contact=this.enemyRoutes.filter(entry=>entry.encounterBeat===13);
+      if(this.facts.has("roadContactHeld")&&contact.length===4&&!this.pendingEnemies.some(entry=>entry.encounterBeat===13)&&contact.every(entry=>!this.host.EnemyPosition?.(entry.handle))){this.Mark("roadContactClear");this.Emit("P012RoadContactClear");}
+    }
     if (this.beat === 0 && !this.config.arrival && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
     if(this.beat===4){
       const chat=activity.northApproachChatPosition||route[0];
@@ -827,7 +839,7 @@ export class FirstLevelP012Director {
         if (ready) this.Emit("EscortCall");
         break;
       case 13: ready = At("Z06") && Followed(["Z04", "Z03", "Z02", "Z06"])
-        && sample.columnAtEscortEnd && Distance(p, sample.columnPosition) < 18; break;
+        && sample.columnAtEscortEnd && Has("roadContactReleased") && Distance(p, activity.roadContactTailRelease) < 4; break;
       case 14:
         {
           const roadActors = this.enemyRoutes.filter((entry) => entry.ambushGroup === 0);
@@ -835,7 +847,7 @@ export class FirstLevelP012Director {
             && !this.pendingEnemies.some((entry) => entry.ambushGroup === 0)) this.Emit("P012RoadGunSilenced");
         }
         if (!this.ambushRejoin && Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
-        ready = dead >= 21 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
+        ready = dead >= 25 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
           && Distance(p, sample.columnPosition) < 18; break;
       case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12; break;
       case 16:
@@ -850,9 +862,9 @@ export class FirstLevelP012Director {
         && this.routeIndex >= route.length && Distance(p, activity.stretcherCarryTo) < 3;
         if (ready) this.Emit("P012CarryReady"); break;
       case 19: ready = this.Signalled("P012Dived") && sample.stance !== "stand"; break;
-      case 20: ready = dead >= 27 && this.closeReleasedGroup >= 2
+      case 20: ready = dead >= 31 && this.closeReleasedGroup >= 2
         && this.routeIndex >= (activity.closeFightRoute?.length || 0); break;
-      case 21: ready = dead >= 33 && At("Z09") && Has("southRoomEntered")
+      case 21: ready = dead >= 37 && At("Z09") && Has("southRoomEntered")
         && this.routeIndex >= route.length
         && this.SouthEnemiesCleared(); break;
       case 22: {
@@ -934,14 +946,15 @@ export class FirstLevelP012Director {
       const encounterSpawn = encounter?.spawns?.[index % 2] || encounterPosition;
       const ambushGroup = wave.kind === "ambush" && this.config.activities?.ambushGroups?.length ? Math.floor(index / 2) : null;
       const ambushPosition = encounterPosition || (ambushGroup !== null ? this.config.activities.ambushGroups[ambushGroup].positions[index % 2] : null);
+      const roadContact = wave.kind === "roadContact" ? this.config.activities?.roadContactEnemies?.[index] : null;
       const weapon = index === 0 && ["machineGun", "ambush", "southFight"].includes(wave.kind)
         ? "Type11" : "Type38";
       const terminal = wave.kind === "culvert" ? lane?.terminalGoals?.[index] : null;
-      const points = encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
+      const points = roadContact ? [roadContact.position] : encounterPosition ? [...(encounter.approaches?.[index % 2] || encounter.approach || []), encounterPosition]
         : ambushPosition ? [ambushPosition] : late ? [fallback] : terminal ? [...(lane?.waypoints || []).slice(0, -1), terminal]
         : [...(lane?.waypoints || []), lane?.goal || fallback];
-      this.pendingEnemies.push({ spec: { x: scout?.spawn.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: scout?.spawn.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
-        weapon, p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
+      this.pendingEnemies.push({ spec: { x: roadContact?.position.x ?? scout?.spawn.x ?? encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: roadContact?.position.z ?? scout?.spawn.z ?? encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
+        weapon, p012RoadContact: wave.kind === "roadContact", p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
         scout: scout ? { approach: points.slice(1), search: scout.points } : null,
         encounterSlot: index % 2, relocation: encounter?.relocations?.[index % 2] || null,
         staging: wave.kind === "closeFight" && encounterGroup > this.closeReleasedGroup,
@@ -1053,6 +1066,12 @@ export class FirstLevelP012Director {
     if (this.beat === 12) { target = activity.woundedDragTo || anchors.shelter; interactionId = "p012_volunteer"; }
     if (this.beat === 12 && this.facts.has("volunteer")) {
       interactionId = null; text = "已报名护送；听清罗班长的接应地点，准备随担架出发";
+    }
+    if(this.beat===13){
+      target=this.lastSample.guidePosition||activity.roadContactBreach;requiredAction="follow";
+      if(this.facts.has("roadContactSeen")&&!this.facts.has("roadContactHeld")){target=activity.roadContactColumnHold;interactionId="p012_roadContactHold";requiredAction="move";text="敌人已暴露；到院墙后命令担架队停下";}
+      else if(this.facts.has("roadContactHeld")&&!this.facts.has("roadContactClear")){target=route[this.routeIndex]||activity.roadContactFirePosition;lookAt=activity.roadContactEnemies?.[0]?.position;requiredAction="fight";text="沿实体侧墙到射位，清除道路上的四名日军";}
+      else if(this.facts.has("roadContactClear")&&!this.facts.has("roadContactReleased")){target=activity.roadContactTailRelease;interactionId="p012_roadContactRelease";requiredAction="move";text="回到担架队尾，确认两处掩体有人后放行";}
     }
     if (this.beat === 15 && !this.facts.has("regroup")) { target = anchors.stretcher; interactionId = "p012_roadSupply"; }
     if (this.beat === 15 && this.facts.has("regroup") && !this.facts.has("roadWounded")) {

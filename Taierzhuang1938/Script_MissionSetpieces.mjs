@@ -1586,6 +1586,8 @@ export const SETPIECES = {
           }
         } else if (drag) drag.last = null;
       }
+      if(p012&&HasSignal("P012RoadContactHold")&&!HasSignal("P012RoadContactRelease")&&s.mem.column)s.mem.column.scriptPaused=true;
+      if(p012&&HasSignal("P012RoadContactRelease")&&s.mem.column)s.mem.column.scriptPaused=false;
       if (p012 && HasSignal("EscortCall")) s.Once("p012_columnStart", (ss) => {
         const route = ss.phase.whitebox.escortWaypoints;
         const stop = P012WaypointIndex(route,ss.phase.whitebox.activities.evacStagingPosition || P012SouthPoint(30,10));

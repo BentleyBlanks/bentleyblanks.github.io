@@ -673,3 +673,6 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
   assert.ok(Math.abs(column.members[0].slot.lateral) < 0.5);
   console.log(`PASS P012 physical body retreat ${time.toFixed(1)}s without teleport`);
 }
+
+assert.equal(P012Phase.whitebox.activities.guideSpeedMps,3.05,"ordinary guide movement speed remains unchanged");
+assert.equal(P012Phase.whitebox.activities.guideSpeedByBeat[13],undefined,"B13 has no slow-speed override");

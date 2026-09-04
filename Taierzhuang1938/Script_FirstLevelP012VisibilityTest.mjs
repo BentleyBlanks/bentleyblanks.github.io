@@ -212,3 +212,7 @@ for(const speed of [activity.openingGuideWalkMps,activity.openingGuideCatchupMps
  assert.ok(target.z>-1&&target.z<1&&Math.abs(target.x)<.95,"production fixed impact lies inside normal horizontal FOV after real walk/run advance");
 }
 console.log("PASS normal 55FOV village traffic: actual Main callback, sky/feet/wall/behind-camera rejection and fixed-impact projection");
+
+const contactEye={...phase.whitebox.activities.roadContactBreach,y:1.55};assert.equal(phase.whitebox.activities.roadContactEnemies.length,4);
+assert.deepEqual(phase.whitebox.activities.roadContactEnemies.map(enemy=>enemy.role),["observer","observer","rifleman","rifleman"]);
+for(const enemy of phase.whitebox.activities.roadContactEnemies)assert.equal(Occluded(contactEye,{...enemy.position,y:1.3}),false,"road contact has real breach LOS");
