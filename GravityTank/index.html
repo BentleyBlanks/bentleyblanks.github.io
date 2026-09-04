@@ -25,7 +25,7 @@
     #bootHint { color:#a8b8c9; font-size:13px; }
     #bootRetry { min-height:44px; padding:8px 18px; color:#fff; border:1px solid #76899a; background:#23384c; cursor:pointer; }
   </style>
-  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank012">
+  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank013">
 </head>
 <body>
   <div id="bootOverlay" role="status" aria-live="polite">
@@ -78,7 +78,7 @@
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
         <span class="title-gravity-cover" aria-hidden="true"></span>
         <span class="title-gravity-art" aria-hidden="true"></span>
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.12</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.13</span>
       </div>
       <p class="tagline">9 个任务 · 3 幕战役 · 重力弹道与物理转轮</p>
     </header>
@@ -258,11 +258,11 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.12</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.13</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
   <script type="module">
-    import("./Script_Game.mjs?v=gravityTank012").catch((error) => window.GravityTankLoading.Fail(error));
+    import("./Script_Game.mjs?v=gravityTank013").catch((error) => window.GravityTankLoading.Fail(error));
   </script>
 </body>
 </html>

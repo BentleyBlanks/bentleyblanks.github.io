@@ -71,7 +71,10 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 The title screen defaults to **简易模式**: player shells pass through the player without consuming armor, including shells left over from an earlier life. **标准模式** retains armed-shell self-hits; its `noSelfHit` upgrade remains available. Easy mode excludes this redundant upgrade from card offers. Enemy fire and HQ damage are unchanged.
 
 Player hulls use one of six cosmetic paints (gold, pink, blue, green, purple, white)
-via `GetPlayerPaint` / `BlitPlayerTinted`. The title picker previews the actual sprite
+via `GetPlayerPaint` / `BlitPlayerTinted`. The separate player barrel uses the same
+`GetPlayerTintImage` palette/cache through `PickBarrelImage`, in preview and combat.
+Preserve its transparent pixels, dark muzzle and lighting; enemy barrels stay separate.
+The title picker previews the actual sprite
 and stores `gravitytank_player_paint_v1` independently of checkpoints. Missing or
 invalid preferences default to gold. Tint frames are cached by paint/frame. There
 are no hull HP pips, HP-based colors, or separate player HP counter. Desktop and
@@ -114,6 +117,11 @@ Spin UX: right-side **pinball pull-arc** (`RouletteReleasePlunger`) — not whee
 v0.11 uses `Texture_RouletteArcadeRim.webp` (built-in imagegen) for the fixed metal housing. Live wedges, labels, icons and the pointer stay procedural and use the real seven-choice pool. The housing is optional background art; absent art must not prevent play.
 
 ## Startup contract
+
+- Input layout follows the primary pointer (`coarse`, or no hover with touch support).
+  Touch-point count or a small browser window alone must not select mobile UI on PCs.
+  `?touch` / `?mobile` remain explicit overrides. Desktop keeps the battlefield square
+  within both viewport dimensions and scrolls the side panels independently.
 
 - Inline `GravityTankLoading` UI paints before the game module, with actual completed tasks (program + five core images + battlefield = 7), slow-network hint and retry.
 - `LoadAssets` downloads the five core images in parallel. Required asset/module failure keeps the loader visible and NEW CAMPAIGN disabled; image timeout is 12 seconds.

@@ -60,6 +60,43 @@ try {
   assert.equal(progress.at(-1), 100);
   assert(progress.every((value, i) => i === 0 || value >= progress[i - 1]));
   assert.equal(await mobile.locator("[data-paint]").count(), 6);
+  // Verify the actual barrel rendering in every paint/direction, not just hull pixels.
+  const barrels = await mobile.evaluate(() => {
+    const game = window.gravityTankTest;
+    const failures = [];
+    for (const button of document.querySelectorAll("[data-paint]")) {
+      button.click();
+      const expected = getComputedStyle(button.firstElementChild).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+      const sprite = game.PickBarrelImage({}, true);
+      const source = document.createElement("canvas");
+      source.width = 10; source.height = 18;
+      const sourceCtx = source.getContext("2d");
+      sourceCtx.drawImage(game.images.barrelPlayer, 0, 0);
+      const original = sourceCtx.getImageData(0, 0, 10, 18).data;
+      sourceCtx.clearRect(0, 0, 10, 18);
+      sourceCtx.drawImage(sprite, 0, 0);
+      const painted = sourceCtx.getImageData(0, 0, 10, 18).data;
+      for (let i = 0; i < painted.length; i += 4) {
+        if (painted[i + 3] !== original[i + 3]) failures.push("barrel alpha changed");
+        if (original[i] === 20 && original[i + 3] === 255 && painted[i] !== 20) failures.push("muzzle black changed");
+      }
+      for (const dir of ["up", "down", "left", "right", "upRight", "downRight", "upLeft", "downLeft"]) {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 80;
+        const ctx = canvas.getContext("2d");
+        game.DrawTankBarrel(ctx, { x: 16, y: 16, w: 48, h: 48, dir }, true);
+        const pixels = ctx.getImageData(0, 0, 80, 80).data;
+        let matching = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 3] === 255 && expected.every((channel, c) => pixels[i + c] === channel)) matching++;
+        }
+        if (matching < 30) failures.push(`${button.dataset.paint}/${dir} barrel not painted`);
+      }
+      if (game.PickBarrelImage({}, false) !== game.images.barrelEnemy) failures.push("enemy barrel changed");
+    }
+    return failures;
+  });
+  assert.deepEqual(barrels, [], "all six paints must reach the separate barrel at all eight angles");
   await mobile.getByRole("button", { name: "樱花粉", exact: true }).click();
   assert.equal(await mobile.locator("[data-paint=pink]").getAttribute("aria-pressed"), "true");
   await mobile.getByRole("button", { name: "冰川蓝", exact: true }).focus();
@@ -96,8 +133,28 @@ try {
   assert.equal(paints.state, "stageIntro");
   await mobile.close();
 
-  const desktop = await OpenPage({ viewport: { width: 1440, height: 1000 } });
+  const desktop = await OpenPage({ viewport: { width: 1440, height: 1000 } }, async (page) => page.addInitScript(() => {
+    Object.defineProperty(navigator, "maxTouchPoints", { get: () => 10 });
+  }));
   await Ready(desktop);
+  for (const [width, height] of [[1920, 1080], [1440, 1000], [1366, 768], [1280, 720], [1024, 768], [800, 600], [640, 480], [1280, 500]]) {
+    await desktop.setViewportSize({ width, height });
+    await desktop.waitForTimeout(80);
+    const layout = await desktop.evaluate(() => {
+      const canvas = document.getElementById("gameCanvas").getBoundingClientRect();
+      const stage = document.querySelector(".stage-shell").getBoundingClientRect();
+      const side = document.querySelector(".side").getBoundingClientRect();
+      return {
+        touch: document.body.classList.contains("is-touch"),
+        square: Math.abs(canvas.width - canvas.height) < 0.1,
+        fits: stage.top >= 0 && stage.left >= 0 && stage.bottom <= innerHeight && stage.right <= innerWidth,
+        sideFits: side.top >= 0 && side.bottom <= innerHeight,
+        pageFits: document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight,
+      };
+    });
+    assert.deepEqual(layout, { touch: false, square: true, fits: true, sideFits: true, pageFits: true }, `PC layout ${width}x${height}, even with 10 reported touch points`);
+  }
+  await desktop.setViewportSize({ width: 1366, height: 768 });
   await desktop.getByRole("button", { name: "樱花粉", exact: true }).click();
   await Screenshot(desktop, "DesktopPaint.png");
   await desktop.locator("#startButton").click();

@@ -28,7 +28,7 @@ import {
 } from "./Data_Upgrades.mjs?v=gravityTank012";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.12";
+export const GAME_VERSION = "0.13";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 import { playerPaints, GetPlayerPaint, ReadPlayerPaint, SavePlayerPaint } from "./Script_PlayerPaint.mjs?v=gravityTank012";
@@ -1453,10 +1453,9 @@ class Game {
     const forced = params.has("touch") || params.has("mobile");
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     const noHover = window.matchMedia("(hover: none)").matches;
-    const narrow = window.matchMedia("(max-width: 860px)").matches;
-    const shortLandscape = window.matchMedia("(orientation: landscape) and (max-height: 560px)").matches;
     const touchPoints = navigator.maxTouchPoints > 0;
-    this.isTouchDevice = forced || coarse || noHover || touchPoints || narrow || shortLandscape;
+    // Touch-capable PCs still use the desktop layout when their primary pointer is a mouse.
+    this.isTouchDevice = forced || coarse || (noHover && touchPoints);
     document.body.classList.toggle("is-touch", this.isTouchDevice);
     document.body.classList.toggle("force-touch", forced);
     document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
@@ -7040,22 +7039,23 @@ class Game {
    * sprite once so the render loop avoids getImageData/readback on every frame.
    */
   BlitPlayerTinted(ctx, gx, gy, dx, dy, dw, dh) {
-    const sheet = this.images.sheet;
-    if (!sheet) return;
-    const sw = 2 * SHEET_CELL;
-    const sh = 2 * SHEET_CELL;
-    const cacheKey = `${this.playerPaint}:${gx}:${gy}`;
+    const sprite = this.GetPlayerTintImage(this.images.sheet, `${gx}:${gy}`, gx * SHEET_CELL, gy * SHEET_CELL, SPRITE, SPRITE);
+    if (!sprite) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, dx, dy, dw, dh);
+  }
+
+  /** The hull and separate barrel share the same source palette and tint cache. */
+  GetPlayerTintImage(source, spriteKey, sx = 0, sy = 0, sw = source?.width, sh = source?.height) {
+    if (!source) return null;
+    const cacheKey = `${this.playerPaint}:${spriteKey}`;
     const cached = this.playerTintCache.get(cacheKey);
-    if (cached) {
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(cached, dx, dy, dw, dh);
-      return;
-    }
+    if (cached) return cached;
     const tc = document.createElement("canvas");
     tc.width = sw; tc.height = sh;
     const tctx = tc.getContext("2d", { willReadFrequently: true });
     tctx.clearRect(0, 0, sw, sh);
-    tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
+    tctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
     const data = img.data;
     const pal = GetPlayerPaint(this.playerPaint);
@@ -7084,8 +7084,7 @@ class Game {
     }
     tctx.putImageData(img, 0, 0);
     this.playerTintCache.set(cacheKey, tc);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
+    return tc;
   }
 
   DrawTank(ctx, tank, isPlayer) {
@@ -7301,8 +7300,8 @@ class Game {
 
   PickBarrelImage(tank, isPlayer) {
     const imgs = this.images || {};
+    if (isPlayer) return this.GetPlayerTintImage(imgs.barrelPlayer, "barrel");
     if (tank.prismTank || tank.typeId === "prismTank") return imgs.barrelPrism;
-    if (isPlayer) return imgs.barrelPlayer;
     if (tank.typeId === "power" || tank.texture === "enemyPower") return imgs.barrelPower;
     return imgs.barrelEnemy;
   }

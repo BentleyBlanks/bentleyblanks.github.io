@@ -1643,3 +1643,77 @@ body.force-touch #app {
 .difficultyChoices label:focus-within { outline: 2px solid white; outline-offset: 3px; }
 .difficultyChoices input { accent-color: #f0d060; margin: 0; }
 .overlay .diff-hint { font-size: 0.82rem; color: #e0ce80; }
+
+/* Mouse-first desktop layout: a square battlefield bounded by both viewport axes.
+   Keep long RULE/STATUS panels in their own scroll area instead of growing grid rows. */
+body:not(.is-touch) {
+  padding: 8px;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+body:not(.is-touch) #app {
+  --desktop-header: clamp(52px, 9dvh, 90px);
+  width: min(1320px, 100%);
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(200px, 22vw, 280px);
+  grid-template-rows: var(--desktop-header) minmax(0, 1fr);
+  grid-template-areas: "hero side" "stage side";
+  gap: 10px;
+  align-content: start;
+}
+body:not(.is-touch) .hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+body:not(.is-touch) .hero-logo {
+  flex: 0 0 auto;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 24 / 13;
+}
+body:not(.is-touch) .title-gravity-cover,
+body:not(.is-touch) .title-gravity-art { display: none; }
+body:not(.is-touch) .title-banner {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+body:not(.is-touch) .tagline {
+  flex: 0 1 260px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+}
+body:not(.is-touch) .stage-shell {
+  width: min(100%, 780px, calc(100dvh - var(--desktop-header) - 40px));
+  max-width: none;
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 1;
+  align-self: start;
+}
+body:not(.is-touch) #gameCanvas { width: 100%; height: auto; aspect-ratio: 1; }
+body:not(.is-touch) .side {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+body:not(.is-touch) .side > * { flex-shrink: 0; }
+body:not(.is-touch) .panel-stats { display: block; }
+body:not(.is-touch) .mobile-hud,
+body:not(.is-touch) .touch-stick-wrap,
+body:not(.is-touch) .touch-actions-wrap { display: none !important; }
