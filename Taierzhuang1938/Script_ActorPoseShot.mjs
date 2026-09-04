@@ -1,5 +1,5 @@
 // 车厢生活动作联系图：在真实 ActorFactory / Three.js 页面里固定六个动作并截图。
-// 用法：node Taierzhuang1938/Script_ActorPoseShot.mjs [输出 PNG]
+// 用法：node Taierzhuang1938/Script_ActorPoseShot.mjs [输出 PNG] [--combat]
 // 默认输出 Taierzhuang1938/_shots/actor_pose/ActorPoses.png（_shots 已 gitignore）。
 
 import fs from "node:fs";
@@ -10,7 +10,9 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
-const outFile = path.resolve(process.argv[2] || path.join(projectDir, "_shots", "actor_pose", "ActorPoses.png"));
+const combat = process.argv.includes("--combat");
+const outFile = path.resolve(process.argv.slice(2).find((arg) => !arg.startsWith("--"))
+  || path.join(projectDir, "_shots", "actor_pose", combat ? "CombatStances.png" : "ActorPoses.png"));
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
 const server = await ServeRoot(rootDir, 0);
@@ -22,7 +24,7 @@ try {
     waitUntil: "load", timeout: 120000,
   });
   await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
-  await page.evaluate(async () => {
+  await page.evaluate(async (combat) => {
     const T = window.Taierzhuang;
     const THREE = await import("/Taierzhuang1938/vendor/three/build/three.module.js");
     // 用独立小场景隔离战场雾/菜单后处理，让联系图只回答“姿态剪影是否读得出”。
@@ -44,11 +46,18 @@ try {
       }
     };
     // 车厢长凳只属于联系图测试场景；它给坐姿/靠墙睡一个明确的参照物。
-    for (const index of [0, 1, 2, 3, 4, 5]) addBench((index - 2.5) * 0.92, index === 3);
+    if (!combat) for (const index of [0, 1, 2, 3, 4, 5]) addBench((index - 2.5) * 0.92, index === 3);
     const camera = new THREE.PerspectiveCamera(32, 1600 / 900, 0.1, 100);
     camera.position.set(0, 1.0, -7.2); camera.lookAt(0, 0.78, 0);
     T.actorFactory.SetBatcher(null);
-    const states = [
+    const states = combat ? [
+      ["站立", "nra", "ZhongZheng", {}],
+      ["下蹲待机", "nra", "ZhongZheng", { crouch: 1 }],
+      ["下蹲射击", "nra", "ZhongZheng", { crouch: 1, firing: true }],
+      ["趴下射击", "nra", "ZhongZheng", { prone: 1, firing: true }],
+      ["机枪下蹲", "nra", "Zb26", { crouch: 1, firing: true }],
+      ["军官下蹲", "nraOfficer", "Mauser96", { crouch: 1, firing: true }],
+    ] : [
       ["坐姿", "nra", null, { sit: 1 }],
       ["补鞋", "civilian", null, { sit: 0.92, repairShoe: 1 }],
       ["擦枪", "nra", "ZhongZheng", { sit: 0.85, cleanRifle: 1 }],
@@ -59,9 +68,11 @@ try {
     const actors = states.map(([label, kind, weapon, state], index) => {
       const actor = T.actorFactory.Create(kind, { seed: 8100 + index, weapon });
       actor.root.position.set((index - 2.5) * 0.92, 0, 0);
-      actor.Update(0.016, { ...state, elapsed: 1.25 });
+      if (combat) actor.root.rotation.y = 0.6;
+      if (combat) {
+        for (let frame = 0; frame < 90; frame += 1) actor.Update(1 / 60, { ...state, elapsed: frame / 60 });
+      } else actor.Update(0.016, { ...state, elapsed: 1.25 });
       actor.root.visible = true;
-      actor.root.traverse((node) => { if (node.isMesh) node.visible = true; });
       scene.add(actor.root);
       return { actor, label };
     });
@@ -83,7 +94,7 @@ try {
       labels.appendChild(item);
     }
     document.body.appendChild(labels);
-  });
+  }, combat);
   await page.screenshot({ path: outFile });
   console.log(`ActorPoseShot: wrote ${outFile}`);
 } finally {

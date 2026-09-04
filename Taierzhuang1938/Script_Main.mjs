@@ -4294,7 +4294,7 @@ function OnPlayerDown() {
 // ---------------------------------------------------------------------------
 const input = {
   forward: 0, strafe: 0, sprint: false, ads: false, lean: 0,
-  lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false,
+  lookX: 0, lookY: 0, crouchPressed: false, pronePressed: false, stanceRequested: null,
   breathHold: false, fire: false, sensitivity: 1,
 };
 const keys = new Set();
@@ -4751,6 +4751,14 @@ const router = new InputRouter({
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (editor && editor.Capturing) return;
+    if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
+      if (!state.running || state.menu || !player.Alive || meleeQte?.Active || emplacement?.Mounted) return;
+    }
+    if (action.startsWith("stance:")) {
+      input.stanceRequested = action.slice(7);
+      if (input.stanceRequested !== "stand") p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId);
+      return;
+    }
     if (p012Runtime?.binocularOwned && (action.startsWith("slot:") || action.startsWith("cook:")
       || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
     switch (action) {
@@ -4869,6 +4877,8 @@ function ReadKeys() {
   if (SHOT_ADS) input.ads = true;
   if (SHOT_FIRE) input.fire = true;
 }
+
+hud.onStanceSelect = (stance) => router.OnAction(`stance:${stance}`, {});
 
 const _aimDir = new THREE.Vector3();
 const _aimPoint = new THREE.Vector3();
@@ -5023,7 +5033,9 @@ function SyncBayonet() {
  * 顺序不能反——院墙前若先给竖直速度，翻越探测就会因为已经离地而失败。
  */
 function DoTraverse() {
-  if (!player?.Alive || viewmodel.IsBusy?.()) return false;
+  if (!player?.Alive) return false;
+  if (player.stance !== "stand") return player.SetStance("stand");
+  if (viewmodel.IsBusy?.()) return false;
   const traverse = player.TryVault();
   if (traverse) {
     // 攀爬慢、贴着墙磨上去，声音也该更闷更长一点
@@ -5873,13 +5885,13 @@ function Frame(dt, render = true) {
   if (meleeQte?.Active) {
     input.forward = 0; input.strafe = 0; input.sprint = false;
     input.fire = false; input.ads = false;
-    input.crouchPressed = false; input.pronePressed = false;
+    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
   }
   // 架着机枪：人钉在射手位上。移动/冲刺/开镜/换姿势一并封掉，**左键留着**
   // （它这会儿是机枪的扳机）。与白刃 QTE 同一条封法，不另起一套。
   if (emplacement?.Mounted) {
     input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
-    input.crouchPressed = false; input.pronePressed = false;
+    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
   }
   fireEdge = input.fire && !firePrev;
   profiler.E("input");
@@ -5924,7 +5936,7 @@ function Frame(dt, render = true) {
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
   }
   input.lookX = 0; input.lookY = 0;
-  input.crouchPressed = false; input.pronePressed = false;
+  input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
 
   // 落地是一次边沿事件，不能拿 grounded 每帧播。轻跳只给靴底闷响，
   // 高处跌落才叠 bodyFall；声音强度读实际下落速度折出的 impact。

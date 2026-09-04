@@ -302,10 +302,14 @@ export class PlayerController {
     return target.set(-Math.sin(y) * cp, sp, -Math.cos(y) * cp).normalize();
   }
 
-  /**
-   * @param {object} input {forward,-1..1 strafe, sprint, crouchPressed, pronePressed,
-   *   lookX, lookY, ads, lean, breathHold}
-   */
+  /** 键盘与 HUD 共用的姿态入口；换姿态收起两脚架，不能在翻越中途改身体。 */
+  SetStance(stance) {
+    if (!Object.hasOwn(STANCE, stance) || !this.alive || this.vault.active) return false;
+    if (this.stance !== stance) this.bipod = false;
+    this.stance = stance;
+    return true;
+  }
+
   /**
    * 翻越 / 攀爬。朝前探一次：前方 0.6 m 有个顶面落在通行阶梯里的东西
    *（`TRAVERSAL.vaultMin` 到 `mantleMax`），而且顶面往前落得下脚，
@@ -581,8 +585,9 @@ export class PlayerController {
     this.pitch = Clamp(this.pitch, -1.35, 1.35);
 
     // --- 姿态 ---------------------------------------------------------------
-    if (input.pronePressed) this.stance = this.stance === "prone" ? "stand" : "prone";
-    else if (input.crouchPressed) this.stance = this.stance === "crouch" ? "stand" : "crouch";
+    if (input.stanceRequested) this.SetStance(input.stanceRequested);
+    else if (input.pronePressed) this.SetStance(this.stance === "prone" ? "stand" : "prone");
+    else if (input.crouchPressed) this.SetStance(this.stance === "crouch" ? "stand" : "crouch");
     // 压制到一定程度会被逼得趴下 —— 这是 ER2 式压制最有说服力的一笔
     // 压制**不再偷偷改玩家的姿态**。
     // 原来是 suppression > 0.85 就把 stance 直接改成 crouch：玩家没按任何键，

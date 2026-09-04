@@ -107,7 +107,7 @@ try {
   assert.equal(combatHud.current, "01");
   assert.equal(combatHud.reserve, "15");
   assert.equal(combatHud.stance, "crouch");
-  assert.equal(combatHud.stanceLabel, "蹲伏");
+  assert.equal(combatHud.stanceLabel, "下蹲");
   assert.equal(combatHud.low, true);
 
   const codObjective = await page.evaluate(async () => {

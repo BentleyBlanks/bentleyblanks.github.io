@@ -153,7 +153,7 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
   const unit = await page.evaluate(async (bands) => {
     const THREE = await import("/Taierzhuang1938/vendor/three/build/three.module.js");
-    const { LUGOU_POSE_CLIPS } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
+    const { LUGOU_POSE_CLIPS, ResolveLugouPlaybackClipId } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
     const factory = window.Taierzhuang.actorFactory;
     const actor = factory.Create("nra", { seed: 41938, weapon: null });
     const rig = actor.characterRig;
@@ -165,7 +165,7 @@ try {
     for (const [pose, band] of Object.entries(bands)) {
       const clipId = LUGOU_POSE_CLIPS[pose];
       if (!clipId) { problems.push(`POSE_CLIPS 缺 ${pose}`); continue; }
-      const clip = rig.clipById.get(clipId);
+      const clip = rig.clipById.get(ResolveLugouPlaybackClipId(clipId));
       if (!clip) { problems.push(`${pose} → ${clipId}：没有这个 clip`); continue; }
       const seen = { head: [Infinity, -Infinity], pelvis: [Infinity, -Infinity] };
       for (let i = 0; i <= 8; i += 1) {

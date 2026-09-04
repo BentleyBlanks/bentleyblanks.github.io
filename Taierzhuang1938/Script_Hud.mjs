@@ -25,8 +25,8 @@ const GRENADE_WARNING_LIMIT = 4;
 
 const STANCE_LABELS = {
   stand: "站立",
-  crouch: "蹲伏",
-  prone: "卧倒",
+  crouch: "下蹲",
+  prone: "趴下",
 };
 
 /**
@@ -285,6 +285,11 @@ export class Hud {
           <span class="ammoCurrent">00</span><span class="ammoDivider"></span><span class="ammoReserve">00</span>
         </div>
       </div>
+      <div class="combatStanceChoices" role="group" aria-label="切换姿态" title="按住 Alt 后点击，或使用对应键位">
+        <button type="button" data-player-stance="stand" aria-pressed="true">站立<kbd>空格</kbd></button>
+        <button type="button" data-player-stance="crouch" aria-pressed="false">下蹲<kbd>C</kbd></button>
+        <button type="button" data-player-stance="prone" aria-pressed="false">趴下<kbd>Z</kbd></button>
+      </div>
       <div class="combatEquipment">
         <span class="equipment grenade" aria-label="手榴弹">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
         <span class="equipment bundle" aria-label="集束手榴弹">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
@@ -292,6 +297,17 @@ export class Hud {
       </div>`;
     this.el.combatWeapon = this.el.combat.querySelector(".combatWeapon");
     this.el.combatStance = this.el.combat.querySelector(".combatStance");
+    this.el.stanceChoices = [...this.el.combat.querySelectorAll("[data-player-stance]")];
+    for (const button of this.el.stanceChoices) {
+      // 点 HUD 不抢指针锁、不同时打出一枪；触控与鼠标共用 click。
+      button.addEventListener("pointerdown", (event) => event.stopPropagation());
+      button.addEventListener("mousedown", (event) => event.stopPropagation());
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.onStanceSelect?.(button.dataset.playerStance);
+        button.blur();
+      });
+    }
     this.el.ammoCurrent = this.el.combat.querySelector(".ammoCurrent");
     this.el.ammoReserve = this.el.combat.querySelector(".ammoReserve");
     this.el.equipment = {
@@ -648,6 +664,9 @@ export class Hud {
     const stanceKey = STANCE_LABELS[stance] ? stance : "stand";
     this.el.combatStance.dataset.stance = stanceKey;
     this.el.combatStance.setAttribute("aria-label", STANCE_LABELS[stanceKey]);
+    for (const button of this.el.stanceChoices) {
+      button.setAttribute("aria-pressed", String(button.dataset.playerStance === stanceKey));
+    }
 
     const rounds = AmmoReadout({ ammo, clips, magazine, armed });
     this.el.ammoCurrent.textContent = rounds.current;

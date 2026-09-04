@@ -127,7 +127,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 
 /* 右下偏上：只有出现伤情、屏息或命令时才亮，不再常驻姿态文字。 */
 .hudState {
-  position: absolute; right: 18px; bottom: 116px;
+  position: absolute; right: 18px; bottom: 158px;
   display: flex; justify-content: flex-end; gap: 9px; max-width: 360px;
   padding: 3px 7px; font: 600 11px/1.4 "Noto Sans SC", "Microsoft YaHei", sans-serif;
   color: var(--dim); background: rgba(8,10,12,0.48); opacity: 0;
@@ -162,6 +162,15 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .combatStance[data-stance="stand"] .stanceStand,
 .combatStance[data-stance="crouch"] .stanceCrouch,
 .combatStance[data-stance="prone"] .stanceProne { display: block; }
+.combatStanceChoices { display: flex; gap: 3px; padding-top: 4px; pointer-events: auto; }
+.combatStanceChoices button {
+  flex: 1; min-width: 0; min-height: 38px; padding: 4px 2px; cursor: pointer;
+  border: 1px solid rgba(230,223,205,0.2); border-radius: 3px;
+  color: var(--paper); background: rgba(13,16,19,0.78); font: inherit; font-size: 11px;
+}
+.combatStanceChoices button[aria-pressed="true"] { border-color: var(--paper); background: rgba(90,96,73,0.88); }
+.combatStanceChoices button:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; }
+.combatStanceChoices kbd { display: block; font-family: inherit; font-size: 10px; line-height: 1.3; opacity: 0.65; }
 .combatAmmo { display: flex; align-items: center; justify-content: flex-end; padding: 0 10px; }
 .ammoCurrent { font: 600 31px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: -0.06em; }
 .ammoDivider { width: 1px; height: 28px; margin: 0 9px; background: rgba(230,223,205,0.24); transform: skewX(-12deg); }
@@ -261,10 +270,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 
 /* 负重条：抬着什么、抬稳没有。贴在右下武器区上方——「手上是什么」本来就该在同一栏。
-   bottom 排在 .hudState（116px，流血/受伤/压制那一行）之上，两条不许叠 ——
+   bottom 排在 .hudState（流血/受伤/压制那一行）之上，两条不许叠 ——
    抬着担架挨枪子正是它们同时出现的时候。 */
 .hudCarry {
-  position: absolute; right: 18px; bottom: 152px; z-index: 3;
+  position: absolute; right: 18px; bottom: 194px; z-index: 3;
   display: flex; align-items: center; gap: 9px;
   padding: 6px 12px 6px 9px; opacity: 0; transition: opacity 0.16s linear;
   border: 1px solid rgba(230,223,205,0.24); border-left: 2px solid var(--warn);
@@ -342,7 +351,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    不摆到准星附近：那块地方归机枪热条与白刃 QTE，而发报根本不用瞄准。
    **不压暗武器 UI**：发报不占手，玩家随时能还手（§7「不夺控制权」）。 */
 .hudTelegraph {
-  position: absolute; right: 18px; bottom: 152px; z-index: 4;
+  position: absolute; right: 18px; bottom: 194px; z-index: 4;
   width: 152px; box-sizing: border-box;
   padding: 6px 9px 5px; opacity: 0; transition: opacity 0.16s linear;
   border: 1px solid rgba(230,223,205,0.24); border-left: 2px solid var(--ours);
@@ -547,9 +556,9 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   .combatMain { height: 48px; grid-template-columns: 46px 1fr; }
   .combatStance svg { width: 31px; height: 31px; }
   .ammoCurrent { font-size: 27px; }
-  .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 94px); max-width: 230px; }
-  .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); }
-  .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 128px); width: 132px; }
+  .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 136px); max-width: 230px; }
+  .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); }
+  .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); width: 132px; }
   .hudInteractRing { transform: translate(-50%, 38px); }
   .hudSubtitle { bottom: 78px; max-width: calc(100vw - 42px); font-size: 14px; }
   .hudHint { bottom: 50px; }

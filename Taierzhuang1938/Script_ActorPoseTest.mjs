@@ -141,6 +141,30 @@ try {
     checkRiggedSoldier(actor, "Nra");
     const ija = factory.Create("ija", { seed: 90215, weapon: null });
     checkRiggedSoldier(ija, "Ija");
+    const CheckLowStance = (candidate) => {
+      const rig = candidate.characterRig;
+      const head = new THREE.Vector3(), pelvis = new THREE.Vector3();
+      for (const clip of ["CrouchIdle", "CrouchFire", "CrouchFireAlt"]) {
+        rig.ForceClip(clip);
+        for (let frame = 0; frame < 24; frame += 1) candidate.Update(1 / 60, { crouch: 1 });
+        rig.bones.head.getWorldPosition(head); rig.bones.pelvis.getWorldPosition(pelvis);
+        const lean = Math.atan2(Math.hypot(head.x - pelvis.x, head.z - pelvis.z), head.y - pelvis.y) * 180 / Math.PI;
+        check(lean < 38 && head.y < 1.25 && pelvis.y > 0.15,
+          `${candidate.modelId}/${clip} 下蹲异常: 前倾 ${lean.toFixed(1)}°, 头高 ${head.y.toFixed(2)}`);
+      }
+      rig.ForceClip(null);
+      for (let frame = 0; frame < 20; frame += 1) candidate.Update(1 / 60, { crouch: 1 });
+      const action = rig.currentAction, time = action.time;
+      for (let frame = 0; frame < 30; frame += 1) {
+        candidate.Update(1 / 60, { crouch: 1, firing: frame % 2 === 0, fireSequence: frame });
+        check(rig.currentAction === action && action.getEffectiveWeight() > 0.99,
+          `${candidate.modelId} 蹲姿开火/停火不能与同一个动作自交叉淡入`);
+      }
+      check(action.time > time + 0.45, `${candidate.modelId} 每发开火重置了动作时钟`);
+      for (let frame = 0; frame < 30; frame += 1) candidate.Update(1 / 60, { prone: 1, firing: true });
+      rig.bones.head.getWorldPosition(head);
+      check(head.y < 0.8, `${candidate.modelId} 卧姿开火被拉站起来: ${head.y}`);
+    };
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
     check(protagonist.modelId === "LugouNra01",
       `protagonist should use LugouNra01, got ${protagonist.modelId}`);
@@ -152,6 +176,8 @@ try {
         variants.push(candidate.modelId);
         checkHeadHitbox(candidate);
         checkFacing(candidate, candidate.modelId);
+        candidate.SetWeapon("ZhongZheng");
+        CheckLowStance(candidate);
         candidate.Dispose();
       }
       check(variants.join(",") === [1, 2, 3, 4].map((n) => `${prefix}0${n}`).join(","),
@@ -160,6 +186,8 @@ try {
       check(officer.modelId === `${prefix}05`, `${kind} officer model mismatch: ${officer.modelId}`);
       checkHeadHitbox(officer);
       checkFacing(officer, officer.modelId);
+      officer.SetWeapon("ZhongZheng");
+      CheckLowStance(officer);
       officer.Dispose();
     }
 

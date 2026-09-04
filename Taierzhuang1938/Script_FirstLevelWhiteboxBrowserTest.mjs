@@ -16,7 +16,7 @@ page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 
 page.on("console", (message) => {
   if (message.type() !== "error") return;
   if (/fonts\.(googleapis|gstatic)\.com/.test(message.location()?.url || "")) return;
-  errors.push(`CONSOLE ${message.text().slice(0, 260)}`);
+  errors.push(`CONSOLE ${message.text().slice(0, 260)} ${message.location()?.url || ""}`);
 });
 
 function Check(condition, message, detail = "") {
@@ -25,7 +25,8 @@ function Check(condition, message, detail = "") {
 }
 
 try {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&quality=low&scale=small`,
+  // 下面用 StepFrames 量首敌出现和存活窗口；不能让真实 RAF 在两次采样之间额外推进。
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&manual=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   const initial = await page.evaluate(() => {

@@ -289,6 +289,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   回归口 `Script_JieheTerrainTest.mjs`（terrain 域）。
 
 ### 武器 / 战斗 / 刺刀
+- 三姿态统一走 `PlayerController.SetStance`：C/Z 切蹲/卧，低姿态 Space 站起，HUD 可直接选择。
+  `Script_StanceTest` 验输入到相机/胶囊/移速；`ActorPoseTest` 验十套模型的低姿与开火交替。
 - `Script_Player.mjs`（移动/碰撞/姿态/**自由瞄准** —— 枪口在视野里滑动、不钉屏幕中心）、
   `Script_Viewmodel.mjs`（第一人称手与枪，几乎每个数字都是手感数字）、
   `Script_Combat.mjs`（投掷物/白刃/日军间接火力/胜负判定）、

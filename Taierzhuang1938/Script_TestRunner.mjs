@@ -133,6 +133,7 @@ export const testDefs = {
     desc: "碰撞盒对账：摸得着的墙必须看得见（窗洞不许被堵死、砌体不许没盒子）",
   },
   JumpTest: { file: "Script_JumpTest.mjs", desc: "跳跃/落点手感" },
+  StanceTest: { file: "Script_StanceTest.mjs", desc: "站/蹲/卧真实输入、相机/碰撞/移速与姿态按钮" },
   DestructionTest: { file: "Script_DestructionTest.mjs", desc: "墙体破坏状态机" },
   AiBehaviorTest: { file: "Script_AiBehaviorTest.mjs", desc: "AI 行为决策深度探针" },
   VisibilityTest: { file: "Script_VisibilityTest.mjs", desc: "战场内容预算：名额/空洞/尸体上限" },
@@ -201,7 +202,7 @@ export const browserTests = new Set([
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
-  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "MeleeQteTest", "MenuTest",
+  "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
   "PerformanceTest", "PhysicsTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
@@ -251,7 +252,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripEditorTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "MeleeQteTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），

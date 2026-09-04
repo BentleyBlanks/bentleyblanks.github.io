@@ -26,8 +26,8 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
   RifleIdle: "★单膝跪地据枪（源名写作「持枪待机」，实为跪姿）",
   RifleIdleAlt: "★单膝跪地据枪（二）",
   RifleRun: "持枪跑步",
-  CrouchFire: "蹲姿射击",
-  CrouchFireAlt: "蹲姿射击（二）",
+  CrouchFire: "单膝跪姿射击（已校正异常前倾）",
+  CrouchFireAlt: "单膝跪姿射击（二，已校正异常前倾）",
   CrouchIdle: "单膝跪姿待机（已校正异常前倾）",
   MachineGunFire: "机枪射击",
   EmplacementIdle: "机炮静姿",
@@ -50,6 +50,10 @@ export const LUGOU_ANIMATION_LABELS = Object.freeze({
 // CharacterModelTest 仍要逐条核对 10 套模型 × 16 条源动作。
 export const LUGOU_PLAYBACK_CLIP_ALIASES = Object.freeze({
   CrouchIdle: "RifleIdle",
+  // 两条蹲射与待机有相同的异常前倾；只修待机会在每次开火时又弯腰垂枪。
+  // 共用同骨架的低姿据枪，逐发后坐仍由 Actor 的 fireSequence 驱动。
+  CrouchFire: "RifleIdle",
+  CrouchFireAlt: "RifleIdleAlt",
 });
 
 export function ResolveLugouPlaybackClipId(id) {
@@ -541,7 +545,11 @@ export class LugouCharacterRig {
     const clip = this.clipById.get(playbackId)
       || this.clipById.get(POSE_CLIPS.standIdle)
       || this.clipById.values().next().value;
-    if (!clip || (this.currentId === id && this.currentPlaybackId === playbackId)) return this;
+    if (!clip) return this;
+    // 蹲姿待机/开火共用一个有效 clip，不能把同一个 AnimationAction 与自己交叉淡入。
+    if (this.currentAction?.isScheduled() && this.currentPlaybackId === playbackId) {
+      this.currentId = id; return this;
+    }
     const next = this.mixer.clipAction(clip);
     next.enabled = true;
     next.reset().setLoop(THREE.LoopRepeat, Infinity).play();

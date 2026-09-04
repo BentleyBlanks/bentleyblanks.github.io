@@ -26,8 +26,10 @@ export const CONTROL_GUIDE = [
       { keys: "鼠标", label: "观察" },
       { keys: "Shift", label: "冲刺；开镜时屏息" },
       { keys: "Q / E", label: "向左 / 右探身" },
-      { keys: "C / Z", label: "蹲下 / 卧倒" },
-      { keys: "Space", label: "靠近矮墙时翻越" },
+      { keys: "C", label: "下蹲；再按一次站立" },
+      { keys: "Z", label: "趴下；再按一次站立" },
+      { keys: "Space", label: "低姿态时站起；站立时翻越 / 跳跃" },
+      { keys: "按住 Alt + 点击姿态", label: "直接选择站立 / 下蹲 / 趴下" },
     ],
   },
   {
