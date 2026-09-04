@@ -15,6 +15,9 @@ export class TerrainDeformation {
     this.basePages = new Map();
     this.dirty = new Set();
     this.tiles = new Set();
+    // Numeric rows keep the hot GroundHeight path allocation-free. `tiles`
+    // remains the string-keyed render contract consumed by the view adapter.
+    this.tileRows = new Map();
     this.revision = 0;
     this.impacts = 0;
     this.lastImpact = null;
@@ -39,7 +42,11 @@ export class TerrainDeformation {
     // Nodes on a tile seam belong to both meshes; normals need a one-cell halo.
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
       const tile = this.Key(Math.floor((ix + dx) / n), Math.floor((iz + dz) / n));
+      const tileX = Math.floor((ix + dx) / n), tileZ = Math.floor((iz + dz) / n);
       this.dirty.add(tile); this.tiles.add(tile);
+      let row = this.tileRows.get(tileZ);
+      if (!row) { row = new Set(); this.tileRows.set(tileZ, row); }
+      row.add(tileX);
     }
   }
   BaseNodeHeight(ix, iz) {
@@ -57,7 +64,8 @@ export class TerrainDeformation {
   NodeHeight(ix, iz) { return this.BaseNodeHeight(ix, iz) - this.Node(ix, iz); }
   HasTile(x, z) {
     const t = this.config.cellM * this.config.tileCells;
-    return this.tiles.has(this.Key(Math.floor(x / t), Math.floor(z / t)));
+    const tx = Math.floor(x / t), tz = Math.floor(z / t);
+    return this.tileRows.get(tz)?.has(tx) || false;
   }
   GroundHeight(x, z) {
     if (!this.HasTile(x, z)) return this.base(x, z);
@@ -131,5 +139,5 @@ export class TerrainDeformation {
   TakeDirty() { const keys = [...this.dirty]; this.dirty.clear(); return keys; }
   State() { return { revision: this.revision, impacts: this.impacts, tiles: this.tiles.size, pages: this.pages.size,
     bytes: this.pages.size * this.config.tileCells ** 2 * 4, maxDepthM: this.config.maxDepthM, lastImpact: this.lastImpact }; }
-  Clear() { this.pages.clear(); this.basePages.clear(); this.dirty.clear(); this.tiles.clear(); this.revision++; this.impacts = 0; this.lastImpact = null; }
+  Clear() { this.pages.clear(); this.basePages.clear(); this.dirty.clear(); this.tiles.clear(); this.tileRows.clear(); this.revision++; this.impacts = 0; this.lastImpact = null; }
 }
