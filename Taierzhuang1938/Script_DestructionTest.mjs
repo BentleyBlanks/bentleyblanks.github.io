@@ -188,10 +188,11 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   r.missing ? "" : `最低亮度=${Number(r.minimumLuma).toFixed(2)} 旧占位=${r.oldBlackPlaceholder} 到期=${r.fragmentsAfterExpiry}`);
 }
 
-// 4. 第一关石墙村的新村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。
+// 4. 界河石墙村的村屋不是纯装饰：墙、瓦顶、院墙、木门和农具都有分件代理。
 {
-  // 压缩村屋已经迁入独立测试章；先整页进入它，不能再把 phase=1 当作白盒别名。
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=1&shot=1&quality=low&scale=small`,
+  // The planning whitebox is now plain blocks. The real village generator and
+  // its semantic collision parts remain in the independent Jiehe scene.
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?jiehe=1&shot=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang?.destruction, null, { timeout: 240000 });
   await page.evaluate(() => {
@@ -200,7 +201,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   });
   const r = await page.evaluate(async () => {
     const T = window.Taierzhuang;
-    // 第一关白盒会移动村落来压缩动线；破坏契约应跟着语义 tag，而不是绑死旧地图坐标。
+    // 破坏契约跟着村落语义 tag，而不是绑死某一版地图坐标。
     const nearVillage = T.battlefield.colliders.filter((box) =>
       String(box.tag || "").startsWith("village"));
     const tags = {};
@@ -267,7 +268,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
       stats: after,
     };
   });
-  Check("当前第一关确实生成分件村屋碰撞", !r.missing
+  Check("界河场景确实生成分件村屋碰撞", !r.missing
     && r.tags?.villageWall >= 20 && r.tags?.villageRoof >= 10
     && r.tags?.villageFoundation >= 5 && r.tags?.villageStoneWall >= 8,
   r.missing ? `缺少代理 ${JSON.stringify(r.tags)}`
@@ -288,7 +289,7 @@ await page.evaluate(() => window.Taierzhuang.StepFrames(30));
 
 // 5. 换到北沙河：站台/木桥是楼板语义，向下打一只洞后竖直射线要穿过。
 {
-  // 正式北沙河场景仍是正片 phase=1；白盒测试结束后明确整页切回去。
+  // 正式北沙河场景是正片 phase=1；界河测试结束后整页切回去。
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=1&quality=low&scale=small`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang?.destruction, null, { timeout: 240000 });

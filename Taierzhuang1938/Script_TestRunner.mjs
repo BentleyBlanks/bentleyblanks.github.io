@@ -73,6 +73,13 @@ export const testDefs = {
     timeoutMs: 4 * 60 * 1000,
     desc: "七关开机冒烟 + draw call/triangles 红线",
   },
+  PlayLateStagesTest: {
+    file: "Script_PlayTest.mjs",
+    args: ["--from=12.14"],
+    timeoutMs: 20 * 60 * 1000,
+    expectedFailures: playTestExpectedFailures,
+    desc: "通关冒烟后半段：300秒停摆、通行、AI翻越、换模、指针锁与枪感",
+  },
   PlayTest: {
     file: "Script_PlayTest.mjs",
     // 七章过场与剧情全量长跑在 Windows Edge 软件渲染上实测会超过 20 分钟；
@@ -213,7 +220,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GunFeelTest",
   "HudPromptBrowserTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MenuTest",
-  "PerformanceTest", "PhysicsTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PlayLateStagesTest", "PlayTest", "PostTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
@@ -243,6 +250,7 @@ export const tier0Browser = ["BootTest", "BootStallTest", "PlayTest", "GeoTest"]
 export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
+  "PlayLateStagesTest",
   "ShotTest",
   "GiTest",
   "PerformanceTest",
@@ -730,6 +738,7 @@ function PreflightSelection(selection) {
 const estimatedSeconds = {
   BootTest: 100,
   BootStallTest: 15,
+  PlayLateStagesTest: 720,
   PlayTest: 700,
   GeoTest: 20,
   ShotTest: 390,

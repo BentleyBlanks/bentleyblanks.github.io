@@ -8,6 +8,7 @@
 // 所以这里的断言一律**从运行时状态取证**，不许读源码推断。
 //
 // 用法：node Taierzhuang1938/Script_PlayTest.mjs
+//       node Taierzhuang1938/Script_PlayTest.mjs --from=12.14  # 后半段排障分片
 // 退出码即成败。
 
 import path from "node:path";
@@ -22,6 +23,9 @@ const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const fromArg = process.argv.find((arg) => arg.startsWith("--from="));
+const lateStagesOnly = fromArg === "--from=12.14";
+if (fromArg && !lateStagesOnly) throw new Error(`Unsupported PlayTest resume point: ${fromArg}`);
 
 const errors = [];
 page.on("pageerror", (e) => errors.push(`PAGEERROR ${String(e).slice(0, 240)}`));
@@ -56,6 +60,7 @@ async function Boot(phase = 1, scale = "small") {
 // ===========================================================================
 // 1) 调试口齐不齐（后面所有断言都靠它）
 // ===========================================================================
+if (!lateStagesOnly) {
 Stage("1 调试口");
 await Boot(1);
 const api = await page.evaluate(() => {
@@ -1448,6 +1453,8 @@ Check("持枪走路时鼠标第一帧直接转相机，不再卡在自由瞄准�
   `yaw ${walkingLook.yaw.toFixed(5)} / ${walkingLook.expectedYaw.toFixed(5)}，`
   + `pitch ${walkingLook.pitch.toFixed(5)} / ${walkingLook.expectedPitch.toFixed(5)}，`
   + `freeAim=(${walkingLook.aimYaw.toFixed(5)}, ${walkingLook.aimPitch.toFixed(5)})`);
+
+}
 
 // 12.14 停摆检查：三百秒分段看开火，后一半必须还有仗打。
 // 这一条是独立复核逼出来的：上一批的断言只数头六十秒，而实跑里仗打到九十秒就停，

@@ -618,6 +618,7 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
 //   · Script_World 拼出来的沙袋是例外：每只 GLB 只是整段工事的视觉分件，上层
 //     本来就不落地，也不各建一只碎碰撞盒；它们必须由 barricade / sandbagPlug /
 //     sandbagEmplacement 的整段盒认领。
+//   · PCG 明确标为不阻挡移动的小摆件只验落地；不得给这些装饰补隐形障碍。
 {
   const r = await page.evaluate(async () => {
     const THREE = await import("./vendor/three/build/three.module.js?v=1");
@@ -664,8 +665,10 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
         b.tag === "prop" && Math.abs(b.c[0] - x) < 0.05 && Math.abs(b.c[2] - z) < 0.05
         && (b.max[0] - b.min[0]) < 1.5 && (b.max[2] - b.min[2]) < 1.5
       ));
+      // PCG clutter explicitly opts out of collision. Aggregated sandbags and
+      // tree trunks still have to prove their generator-owned collision.
       const claimed = generatedTree ? generatedTreeTrunk
-        : (requiresOwnCollider ? mine : aggregate);
+        : generatedSandbag ? aggregate : requiresOwnCollider ? mine : true;
       if (Math.abs(lift) > 0.15 || !claimed) {
         bad.push(`${name} ${generatedSandbag ? "层位" : "离地"}${lift.toFixed(2)}m`
           + `${claimed ? "" : (generatedSandbag ? " 无整段碰撞" : " 无碰撞体")}`);
