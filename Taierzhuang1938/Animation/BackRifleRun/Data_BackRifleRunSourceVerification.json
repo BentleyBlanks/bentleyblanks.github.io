@@ -1,0 +1,11 @@
+{
+  "scene": "Scene_BackRifleRun",
+  "objects": 19,
+  "bones": 53,
+  "clip": "BackRifleRun",
+  "fps": 60,
+  "frameStart": 1,
+  "frameEnd": 45,
+  "missingExternalFiles": [],
+  "reopenedSuccessfully": true
+}

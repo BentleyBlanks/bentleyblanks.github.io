@@ -1,0 +1,15 @@
+{
+  "clip": "BackRifleRun",
+  "sampleCount": 89,
+  "maxChannelSeam": 0,
+  "maxWorldSeamMeters": 3.6525756197391956e-8,
+  "minSoleHeightMeters": 0.0013205293201191681,
+  "maxSupportClearanceMeters": 0.0035341886778897935,
+  "maxSupportSlideMeters": 0.00024659836576856886,
+  "maxChestMountMatrixError": 5.684341886080802e-14,
+  "durationSeconds": 0.7333333492279053,
+  "triangles": 30596,
+  "drawCalls": 16,
+  "productionHashesUnchanged": true,
+  "boneCount": 53
+}

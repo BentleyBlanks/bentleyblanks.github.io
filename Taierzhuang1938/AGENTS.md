@@ -224,6 +224,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   素材要求、坐标口径、偏航硬夹与遮挡回退的账全在 `docs/Data_MocapPipeline.md`，
   改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
+- 独立背枪跑步审查包：`Animation/BackRifleRun/`（不接入生产动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
+
 ### 人物 / AI / 合批
 - `Script_Actor.mjs` —— 程序化人物（不用 SkinnedMesh：预通道 overrideMaterial 不带 skinning，
   蒙皮会在 SSAO 里塌成原点，见头注）；`Script_ActorBatch.mjs` 收成 InstancedMesh，
