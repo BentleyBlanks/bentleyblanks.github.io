@@ -191,13 +191,14 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       ambushColumnCoverRoute: Object.freeze([{ x: 32, z: 14.4 }, { x: 34, z: 18.8 }]),
       // Three bounded delaying positions use the existing ditch/bank geometry.
       // Clearing a pair earns the next move; no timer, respawn or health padding.
-      closeFightRoute: Object.freeze([{ x: 44, z: 62 }, { x: 45, z: 69 }, { x: 45, z: 78 }]),
+      closeFightRoute: Object.freeze([{ x: 44, z: 62 }, { x: 43.5, z: 64.5 },
+        { x: 38.5, z: 68 }, { x: 47, z: 80 }]),
       closeFightGroups: Object.freeze([
         [{ x: 58, z: 52 }, { x: 62, z: 55 }],
         [{ x: 58, z: 58 }, { x: 62, z: 62 }],
         [{ x: 58, z: 65 }, { x: 61, z: 69 }],
-      ].map((positions, group) => ({ routeIndex: group,
-        cover: [{ x: 44, z: 62 }, { x: 45, z: 69 }, { x: 45, z: 78 }][group],
+      ].map((positions, group) => ({ routeIndex: [0, 2, 3][group],
+        cover: [{ x: 44, z: 62 }, { x: 38.5, z: 68 }, { x: 47, z: 80 }][group],
         label: ["伏在第一段沟岸后，截住从残屋逼近的两人",
           "前一组已退；沿蓝色沟岸转到中段，盯住东侧缺口",
           "再转到南端折角，挡住最后两人接近担架"][group],
@@ -235,14 +236,6 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       southAssemblyRoute: Object.freeze([{ x: 34, z: 105 }, { x: 34, z: 104.4 },
         { x: 41, z: 104.4 }, { x: 41, z: 98 }, { x: 42, z: 94 }]),
       blockadeDecisionPosition: { x: 42, z: 94 }, blockadeDecisionRangeM: 8,
-      // Review budget only, never read as a clock gate. Each range is earned by
-      // finite contact, threatened relocation, or visible reconnaissance.
-      southDelayTempoBudget: Object.freeze({
-        closeDelaySeconds: Object.freeze([60, 75]),
-        houseClearSeconds: Object.freeze([65, 80]),
-        blockadeReconSeconds: Object.freeze([25, 35]),
-        totalSeconds: Object.freeze([150, 190]),
-      }),
       retreatSmokeUse: { x: 28, z: 96 }, retreatSmokeAt: { x: 40, z: 99 },
       finalCarryMinM: 10, retreatCoverIndices: Object.freeze([2, 5, 8]), farEnemyBudget: 4,
       retreatColumnSpeedMps: 2.05,

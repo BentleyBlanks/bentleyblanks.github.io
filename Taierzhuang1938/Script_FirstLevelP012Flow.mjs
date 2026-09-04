@@ -587,8 +587,11 @@ export class FirstLevelP012Director {
     if (this.beat === 14 && !this.ambushRejoin && Distance(p, activity.ambushEntryRoute?.[this.ambushEntryIndex]) <= this.RouteArrivalRadius())
       this.ambushEntryIndex += 1;
     const guideNear = Distance(p, sample.guidePosition) <= (activity.guideRangeM || 12);
-    if (this.beat === 20 && !this.LateThreat() && this.routeIndex < route.length - 1)
-      this.Emit(`P012DelayPosition${this.routeIndex + 1}`);
+    if (this.beat === 20 && !this.LateThreat() && this.closeReleasedGroup >= 0 && this.closeReleasedGroup < 2) {
+      const nextGroup = this.closeReleasedGroup + 1;
+      if (this.routeIndex < (activity.closeFightGroups?.[nextGroup]?.routeIndex ?? route.length))
+        this.Emit(`P012DelayPosition${nextGroup}`);
+    }
     // Follow goals belong to the moving guide, not invisible circles left behind him.
     // The actor advances its target within 2m; a player following 1–2m behind can
     // legitimately never enter a 3m circle. Consume only guide-traversed segments
@@ -910,6 +913,9 @@ export class FirstLevelP012Director {
     return true;
   }
   SpawnWave(wave, waveIndex) {
+    // The wave can be authored early by the dive approach or reach the normal
+    // finite-wave path at B20. Emit once from the shared creation seam so both
+    // routes retain the same staged-pressure fact (Emit is idempotent).
     if (wave.kind === "closeFight") this.Emit("P012CloseEnemiesStaged");
     const name = wave.lane === "machineGunEnemy" ? "machineGun" : wave.lane === "westEnemy" ? "west" : wave.lane === "eastEnemy" ? "east" : "center";
     const lane = this.config.enemyLanes?.[name];
@@ -1130,9 +1136,16 @@ export class FirstLevelP012Director {
       const points = this.config.routes?.retreat || [];
       target = points[this.retreatPoint];
       if (!this.facts.has("retreatSmokeDeployed")) {
-        target = activity.retreatSmokeUse; interactionId = "p012_retreatSmoke";
-        text = "到撤退线点燃烟幕，掩护担架离开南路";
-        if (this.completionReasons[22] === "blockadeCleared") text = "四名远哨已清除，但南路断障无法通行；点燃烟幕，护送伤员改走西沟";
+        const guideAtSmoke = Distance(this.lastSample.guidePosition, activity.retreatSmokeUse) < 2.5;
+        if (guideAtSmoke) {
+          target = activity.retreatSmokeUse; interactionId = "p012_retreatSmoke";
+          text = "到撤退线点燃烟幕，掩护担架离开南路";
+          if (this.completionReasons[22] === "blockadeCleared") text = "四名远哨已清除，但南路断障无法通行；点燃烟幕，护送伤员改走西沟";
+        } else {
+          target = this.lastSample.guidePosition || activity.retreatSmokeUse;
+          requiredAction = "follow";
+          text = "跟班长沿已清路沟到撤退线，再点烟改走西沟";
+        }
       } else if (this.facts.has("retreatRecoveryRequired")) {
         target = Distance(this.lastSample.position, this.lastSample.columnPosition) < 8
           ? this.lastSample.columnPosition : this.RetreatRejoinTarget();
@@ -1161,8 +1174,8 @@ export class FirstLevelP012Director {
       }
     }
     if (this.beat === 20) {
-      const threat = this.LateThreat(); target = threat?.cover || activity.closeFightRoute?.[0];
-      lookAt = threat?.lookAt || null; requiredAction = "fight";
+      const threat = this.LateThreat(); target = threat?.cover || route[this.routeIndex] || route.at(-1);
+      lookAt = threat?.lookAt || null; requiredAction = threat ? "fight" : "move";
       text = threat?.label || "守住沟边伤员，确认接近的敌人已被清除";
     }
     if (this.beat === 22) {

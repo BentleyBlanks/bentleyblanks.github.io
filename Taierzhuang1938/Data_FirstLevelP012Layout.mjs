@@ -124,7 +124,9 @@ Add(Box("SouthHouseNorthPartition",31.75,102,15.5,.5,2.8),
  Box("SouthCourtSightPartition",36,96.85,.5,3.3,2.8),
  Box("SouthCourtFightCover",39.4,100,.4,2,1.05,"cover"));
 Add(Box("SouthRoadSideCover",35.5,95.4,.4,1.2,1.05,"cover"));
-Add(Box("DitchRearguardInnerBank",46,64,0.8,4,1.05,"cover"),Box("RearguardArrivalScreen",66,60,1,20,2.8,"boundary"));
+Add(Box("DitchRearguardInnerBank",46,64,0.8,4,1.05,"cover"),
+ Strip("DitchDelayEastBank",{x:52.8,z:65.5},{x:49.8,z:79.5},0.8,"cover",1.05,true),
+ Box("RearguardArrivalScreen",66,60,1,20,2.8,"boundary"));
 // Return drainage banks sit outside the entire swept route, with chamfered open joints.
 for(let i=1;i<6;i++) {
  const a=retreat[i-1],b=retreat[i],len=Math.hypot(b.x-a.x,b.z-a.z),nx=(b.z-a.z)/len,nz=-(b.x-a.x)/len;

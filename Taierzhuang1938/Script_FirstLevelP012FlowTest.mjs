@@ -552,7 +552,11 @@ Tick({position:phase.whitebox.activities.blockadeDecisionPosition,zone:"Z09",sta
 assert.equal(flow.State().beat,"B23");
 assert.ok(signals.has("P012BlockadeDecision"));
 assert.equal(flow.State().completionReasons[22],"blockadeCleared");
+assert.equal(flow.CurrentObjective().requiredAction,"follow","blocked direct line first follows the physical squad leader");
+assert.equal(flow.CurrentObjective().interactionId,null,"smoke interaction is not advertised through intervening banks");
+Tick({guidePosition:phase.whitebox.activities.retreatSmokeUse,guideAlive:true});
 assert.match(flow.CurrentObjective().text,/四名远哨已清除/);
+assert.equal(flow.CurrentObjective().interactionId,"p012_retreatSmoke");
 Use("p012_retreatSmoke"); assert.equal(smokeDeployments,1);
 At("Z04"); Tick({columnArrived:true},100);
 assert.equal(flow.State().beat,"B23","cannot bypass the retreat route with the old visited flag");
@@ -1003,18 +1007,15 @@ for(const index of [2,3,4]) {
       assert.ok(distance>=2&&distance<2.3,"each existing actor receives only one short physical reposition");
     });
   }
-  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,1,2],
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.routeIndex),[0,2,3],
     "each finite delaying pair belongs to a later physical cover position");
-  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.cover),phase.whitebox.activities.closeFightRoute,
+  assert.deepEqual(phase.whitebox.activities.closeFightGroups.map(group=>group.cover),
+    phase.whitebox.activities.closeFightGroups.map(group=>phase.whitebox.activities.closeFightRoute[group.routeIndex]),
     "the three delaying phases use the authored ditch cover route rather than a repeated point");
   for(let index=1;index<phase.whitebox.activities.closeFightRoute.length;index++)
     assert.ok(P012SegmentClear(phase.whitebox.layout.blocks,phase.whitebox.activities.closeFightRoute[index-1],
       phase.whitebox.activities.closeFightRoute[index],.42),"each delaying relocation is physically clear for the player capsule");
   assert.ok(Number.isFinite(phase.whitebox.activities.blockadeDecisionPosition.x));
-  const budget=phase.whitebox.activities.southDelayTempoBudget;
-  assert.deepEqual([budget.closeDelaySeconds,budget.houseClearSeconds,budget.blockadeReconSeconds]
-    .reduce((sum,range)=>sum.map((value,index)=>value+range[index]),[0,0]),budget.totalSeconds,
-    "the 150-190 second extension is fully attributed to causal play, never an idle timer");
   const actors=[0,1].map(x=>({position:{x,z:0},alive:true,lastFire:0,suppression:0}));
   const director=new FirstLevelP012Director({EnemyPosition:a=>a.alive?a.position:null,
     EnemyCombatState:a=>({lastFire:a.lastFire,suppression:a.suppression}),EnemyGoal:(a,p)=>{a.goal=p;}},phase.whitebox);
