@@ -32,7 +32,7 @@ export class FirstLevelP012Runtime {
     }
     if (Number.isInteger(spec.startIndex)) index = Math.max(0, Math.min(route.length - 1, spec.startIndex));
     this.guide = { ...spec, route, index };
-    if (spec.beat === 2 && !this.traffic.length) {
+    if (!this.config.activities?.traffic && spec.beat === 2 && !this.traffic.length) {
       const routes = [route.map((point) => ({ x: point.x - 2, z: point.z })),
         [...route].reverse().map((point) => ({ x: point.x + 2, z: point.z }))];
       for (const [side, path] of routes.entries()) for (let slot = 0; slot < 3; slot++) {
@@ -119,6 +119,16 @@ export class FirstLevelP012Runtime {
     shell.done = true; this.mortarImpactPosition = { x: point.x, z: point.z }; this.mortarImpactCount++;
   }
   Update(dt) {
+    // One finite pool, present from the opening; never recycle people by teleport.
+    if (!this.trafficInitialized && this.config.activities?.traffic) {
+      this.trafficInitialized=true;
+      for(const entry of this.config.activities.traffic){
+        const actor=this.host.TrafficActor?.(entry.side,entry.slot,entry.route[0],entry);
+        if(!actor)continue;
+        actor.scriptedNoncombatant=true;
+        this.traffic.push({...entry,actor,path:entry.route,index:0,parking:entry.route.at(-1),arrived:false,travelM:0,lastPosition:{...entry.route[0]}});
+      }
+    }
     this.time += dt;
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
     if (this.beat === 8) {
@@ -165,10 +175,22 @@ export class FirstLevelP012Runtime {
     const guide = this.guide, actor = this.host.GuideActor();
     if (guide && actor && guide.route.length) {
       const point = guide.route[guide.index]; const position = this.host.Position(actor);
-      if (position && Math.hypot(position.x - point.x, position.z - point.z) < 2 && guide.index < guide.route.length - 1 && !guide.WaitAt?.(guide.index)) guide.index++;
+      const nearPoint=position && Math.hypot(position.x-point.x,position.z-point.z)<(guide.beat===0||guide.beat===1?1.3:2);
+      const waiting=nearPoint && !!guide.WaitAt?.(guide.index);
+      if (nearPoint && guide.index < guide.route.length - 1 && !waiting) guide.index++;
       if (guide.beat === 5 && guide.index === guide.route.length - 1 && position && Math.hypot(position.x - point.x, position.z - point.z) < 2) guide.clearGunport = true;
       const target = guide.clearGunport ? { x: guide.route.at(-1).x - 5, z: guide.route.at(-1).z + 2 } : guide.route[guide.index];
-      this.host.Move(actor, target, guide.speed);
+      this.host.Move(actor, waiting ? position : target, waiting ? 0 : guide.speed);
+      if(waiting && guide.FaceAt) {
+        const facing=guide.FaceAt(guide.index);
+        if(facing && Math.hypot(facing.x-position.x,facing.z-position.z)>.05){
+          const current=this.host.GuideYaw?.(actor) ?? 0;
+          const wanted=Math.atan2(-(facing.x-position.x),-(facing.z-position.z));
+          const delta=Math.atan2(Math.sin(wanted-current),Math.cos(wanted-current));
+          const turn=Math.max(-3.4*dt,Math.min(3.4*dt,delta));
+          this.host.FaceGuide?.(actor,current+turn);
+        }
+      }
     }
     if (this.host.Signalled("P012SouthVerified") && this.far.length < 4) {
       const index = this.far.length;
@@ -182,13 +204,35 @@ export class FirstLevelP012Runtime {
       if(walker.arrived&&walker.side===0&&this.guide?.beat>2){walker.retired=true;walker.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(walker.actor);continue;}
       const point = walker.path[walker.index], position = this.host.Position(walker.actor);
       if (!position) continue;
+      if(walker.lastPosition){walker.travelM+=Math.hypot(position.x-walker.lastPosition.x,position.z-walker.lastPosition.z);walker.lastPosition={x:position.x,z:position.z};}
+      const gate=walker.proximityRelease;
+      if(gate&&!walker.proximityReleased&&walker.index===gate.index&&Math.hypot(position.x-point.x,position.z-point.z)<2){
+        const observer=this.host.PlayerPosition?.();
+        if((this.beat??0)>=gate.beat&&observer&&Math.hypot(observer.x-point.x,observer.z-point.z)<gate.radius)walker.proximityReleased=true;
+        else {this.host.Move(walker.actor,position,0);continue;}
+      }
+      if((this.beat??0)<(walker.releaseBeat??0)
+        || (walker.pauseIndex===walker.index&&!this.host.Signalled("P012TrainDoor")&&Math.hypot(position.x-point.x,position.z-point.z)<2)){
+        this.host.Move(walker.actor,position,0);continue;
+      }
       const leader=this.traffic.find(other=>other.side===walker.side&&other.slot===walker.slot+1);
       const ahead=leader&&this.host.Position(leader.actor);
       if(ahead&&Math.hypot(position.x-ahead.x,position.z-ahead.z)<2.2){this.host.Move(walker.actor,position,0);continue;}
       if (position && Math.hypot(position.x - point.x, position.z - point.z) < 2 && walker.index < walker.path.length - 1) walker.index++;
       // AI Act stops moving at 1.2 m; arrival needs a small tolerance beyond that radius.
       walker.arrived=walker.index===walker.path.length-1&&Math.hypot(position.x-walker.parking.x,position.z-walker.parking.z)<1.3;
-      this.host.Move(walker.actor, walker.arrived?position:walker.path[walker.index], walker.arrived?0:1.2);
+      const destination=walker.path[walker.index], distance=Math.hypot(destination.x-position.x,destination.z-position.z);
+      // These lanes have swept-clear segments. Keep the AI's immediate goal
+      // local so its coarse long-distance nav grid cannot send a passer-by
+      // around the station shed instead of along the visible lane.
+      const localTarget=distance>10?{x:position.x+(destination.x-position.x)*8/distance,z:position.z+(destination.z-position.z)*8/distance}:destination;
+      this.host.Move(walker.actor, walker.arrived?position:localTarget, walker.arrived?0:1.2);
+    }
+    const observer=this.host.PlayerPosition?.();
+    if(observer)for(const north of this.traffic.filter(w=>w.side===0))for(const south of this.traffic.filter(w=>w.side===1)){
+      const a=this.host.Position(north.actor),b=this.host.Position(south.actor);
+      if(a&&b&&a.z<=b.z&&north.travelM>2&&south.travelM>2&&Math.hypot(a.x-b.x,a.z-b.z)<10
+        &&Math.hypot(observer.x-a.x,observer.z-a.z)<18&&Math.hypot(observer.x-b.x,observer.z-b.z)<18)this.trafficPassedNearPlayer=true;
     }
   }
   Sample() {
@@ -206,8 +250,9 @@ export class FirstLevelP012Runtime {
       guidePosition: this.host.Position(this.host.GuideActor()), guideRouteIndex: this.guide?.index || 0,
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),
       guideHealth: this.host.GuideActor()?.health ?? null, guideOrder: this.host.GuideActor()?.order ?? null,
-      trafficReady: this.traffic.length === 6 && this.traffic.every((walker) => walker.index > 0),
-      traffic: this.traffic.map((walker) => ({ side: walker.side, slot:walker.slot, index: walker.index, arrived:walker.arrived,parking:walker.parking,position: this.host.Position(walker.actor) })),
+      trafficReady: this.config.activities?.traffic ? !!this.trafficPassedNearPlayer : this.traffic.length === 6 && this.traffic.every((walker) => walker.index > 0),
+      traffic: this.traffic.map((walker) => ({ side: walker.side, slot:walker.slot, role:walker.role, travelM:walker.travelM||0,
+        index: walker.index, arrived:walker.arrived,parking:walker.parking,position: this.host.Position(walker.actor) })),
       nearEnemyDeaths: this.near.filter((actor) => !this.host.Alive(actor)).length,
       blockadeVisible: this.far.some((actor) => this.host.Alive(actor) && this.host.Visible?.(actor)),
       blockadePressure: this.far.some((actor) => this.host.Firing(actor)),

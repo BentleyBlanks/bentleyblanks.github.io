@@ -120,7 +120,7 @@ export class FirstLevelP012Director {
   }
   ActivityRoute() {
     const a = this.config.activities || {};
-    return ({ 0: a.trainRoute, 2: a.villageRoute, 4: a.shellCoverRoute,
+    return ({ 0: a.trainRoute, 1: a.weaponGuideRoute, 2: a.villageRoute, 4: a.shellCoverRoute,
       5: a.ammoRoute, 11: a.woundedDragRoute, 12: [a.woundedDragTo || this.config.anchors.shelter], 14: this.config.routes?.flank,
       16: a.airRoadRoute, 17: a.airCoverRoute,
       18: a.stretcherCarryRoute, 20: a.closeFightRoute, 21: a.southRoomRoute, 22: a.southAssemblyRoute })[this.beat] || [];
@@ -128,6 +128,12 @@ export class FirstLevelP012Director {
   StartGuide() {
     this.guideStarted = true;
     this.host.Guide?.({ beat: this.beat, route: this.ActivityRoute(),
+      ...(this.beat === 0 ? { WaitAt: index => index === 2
+        && Distance(this.lastSample.position, this.lastSample.guidePosition || this.config.anchors.trainDoor) > 3,
+        FaceAt: () => this.lastSample.position } : {}),
+      ...(this.beat === 1 ? { startIndex: 0,
+        WaitAt: index => index === 0 ? !this.facts.has("weapon") : index === 1 ? !this.facts.has("issuedAmmo") : true,
+        FaceAt: index => this.config.activities.weaponGuideFacing[index] } : {}),
       ...(this.beat === 11 ? { route: this.config.activities.woundedGuideRoute, startIndex: 0 } : {}),
       ...([14, 16, 17, 20, 21, 22].includes(this.beat) ? { route: [] } : {}),
       ...(this.beat === 4 ? { startIndex: 0, WaitAt: (index) => this.routeIndex <= index } : {}),
@@ -138,11 +144,11 @@ export class FirstLevelP012Director {
   InstallInteractions() {
     const Register = (spec) => this.host.Register?.(spec);
     Register({ id: "p012_weaponCheck", kind: "supply", label: "领取步枪，前往弹药分发点",
-      gesture: "hold", seconds: 2.4, position: this.Point("weaponCheck", { x: -55, z: 44 }),
+      gesture: "hold", seconds: 2.4, position: this.config.activities.weaponReceiveAnchor,
       Enabled: () => this.beat <= 3, once: false,
       OnComplete: () => { this.Mark("weapon"); this.Emit("P012WeaponReceived"); } });
     Register({ id: "p012_ammoIssue", kind: "supply", label: "领取子弹，再到旁边检查步枪",
-      gesture: "hold", seconds: 1.8, position: this.config.activities?.weaponIssuePosition,
+      gesture: "hold", seconds: 1.8, position: this.config.activities?.weaponIssueAnchor,
       Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"), once: false,
       OnComplete: () => { this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.weaponActionStart = this.lastSample.weaponActionCount || 0; this.host.CheckWeapon?.(); } });
     Register({ id: "p012_hubSupply", kind: "supply", label: "补充弹药，观察铁路方向",
@@ -220,7 +226,8 @@ export class FirstLevelP012Director {
 
   RouteArrivalRadius() {
     const activity = this.config.activities || {};
-    return this.beat === 14 ? (activity.ambushRouteRadiusM || 0.6) : (activity.routeRadiusM || 3);
+    return [21, 22].includes(this.beat) ? 0.6
+      : this.beat === 14 ? (activity.ambushRouteRadiusM || 0.6) : (activity.routeRadiusM || 3);
   }
 
   RetreatRouteProjection(position) {
@@ -252,6 +259,65 @@ export class FirstLevelP012Director {
       ? vertex.along > from.along + 0.6 && vertex.along < to.along
       : vertex.along < from.along - 0.6 && vertex.along > to.along);
     return (forward ? candidates[0] : candidates.at(-1))?.point || to.point;
+  }
+
+  FrontlineApproachTarget(target) {
+    // Player-only retries retain combat facts but may return behind the solid
+    // reverse slope. Rejoin through the existing ammunition trench, not through
+    // the wall. This latch is navigation only, never a checkpoint/world reset.
+    const player = this.lastSample.position;
+    if (!player || !target) return null;
+    if (player.z > -55) this.frontlineApproaching = true;
+    if (!this.frontlineApproaching) return null;
+    if (Distance(player, target) <= 0.6) { this.frontlineApproaching = false; return null; }
+    const central = this.config.anchors.gunports[1];
+    const points = [...this.config.activities.ammoRoute.slice(-3),
+      ...(target.x > central.x ? [{ x: central.x + 2, z: central.z - 0.8 }] : []), target];
+    let along = 0, nearest = null;
+    const vertices = points.map((point, index) => {
+      if (index) {
+        const a = points[index - 1], dx = point.x - a.x, dz = point.z - a.z;
+        const length = Math.hypot(dx, dz);
+        const t = Math.max(0, Math.min(1, ((player.x-a.x)*dx+(player.z-a.z)*dz)/(length*length || 1)));
+        const distance = Math.hypot(player.x-a.x-dx*t,player.z-a.z-dz*t);
+        if (!nearest || distance < nearest.distance) nearest = { distance, along: along+length*t };
+        along += length;
+      }
+      return { point, along };
+    });
+    if (player.z > points[0].z + 0.6) return points[0];
+    return vertices.find(vertex => vertex.along > (nearest?.along || 0)+0.001
+      && Distance(player,vertex.point)>0.6)?.point || target;
+  }
+
+  SouthRouteApproachTarget(target) {
+    // A player-only retry keeps the room-clear progress but returns to the
+    // northern ditch. Reuse the complete cleared approach in both directions;
+    // the short B22 exit route alone would still point through the return bank.
+    // This is guidance along that known route, not arbitrary off-road pathfinding.
+    const activity = this.config.activities || {};
+    const points = [activity.closeFightRoute?.[0], ...(activity.southRoomRoute || [])].filter(Boolean);
+    const player = this.lastSample.position;
+    if (!player || !target || points.length < 2) return null;
+    let along = 0, nearest = null;
+    const vertices = points.map((point, index) => {
+      if (index) {
+        const a = points[index - 1], dx = point.x - a.x, dz = point.z - a.z;
+        const length = Math.hypot(dx, dz);
+        const t = Math.max(0, Math.min(1, ((player.x - a.x) * dx + (player.z - a.z) * dz) / (length * length || 1)));
+        const distance = Math.hypot(player.x - a.x - dx * t, player.z - a.z - dz * t);
+        if (!nearest || distance < nearest.distance) nearest = { distance, along: along + length * t };
+        along += length;
+      }
+      return { point, along };
+    });
+    const destination = vertices.find(vertex => Distance(vertex.point, target) < 0.01);
+    if (!destination || !nearest) return null;
+    const forward = destination.along >= nearest.along;
+    const candidates = vertices.filter(vertex => Distance(player, vertex.point) > this.RouteArrivalRadius()
+      && (forward ? vertex.along > nearest.along + 0.001 && vertex.along < destination.along
+        : vertex.along < nearest.along - 0.001 && vertex.along > destination.along));
+    return (forward ? candidates[0] : candidates.at(-1))?.point || null;
   }
 
   RetreatLeadTarget(target) {
@@ -702,7 +768,7 @@ export class FirstLevelP012Director {
     if ([0, 2, 13].includes(this.beat)) requiredAction = "follow";
     if ([0, 2, 4, 14].includes(this.beat)) target = route[this.routeIndex] || route.at(-1);
     if ([0, 2].includes(this.beat) && this.lastSample.guidePosition) target = this.lastSample.guidePosition;
-    if (this.beat === 1) { target = anchors.weaponCheck; interactionId = "p012_weaponCheck"; }
+    if (this.beat === 1) { target = activity.weaponReceivePosition; interactionId = "p012_weaponCheck"; }
     if (this.beat === 1 && this.facts.has("weapon")) {
       target = this.facts.has("issuedAmmo") ? activity.weaponInspectPosition : activity.weaponIssuePosition;
       text = this.facts.has("issuedAmmo") ? "到检查位按 R 检查步枪并完成装填" : "到弹药桌领取子弹";
@@ -839,7 +905,11 @@ export class FirstLevelP012Director {
     if (this.beat === 17) {
       target = route[this.routeIndex] || route.at(-1); requiredAction = "move";
       requiredStance = this.routeIndex >= route.length - 1 ? "crouch" : null;
-      text = "飞机正在转向道路；看清人群位置，低姿进入近旁路沟";
+      // Do not tell an unobservant player the target of the turn in advance,
+      // or keep describing a turn after the actual crowd-fire event.
+      text = this.Signalled("P012CrowdFire")
+        ? "飞机已向道路开火；低姿进入近旁路沟"
+        : "留意飞机来向，照看担架，寻找近旁路沟";
     }
     if (this.beat === 18) target = this.lastSample.columnPosition || anchors.stretcher;
     if (this.beat === 18) interactionId = "ch1_stretcher";
@@ -894,6 +964,13 @@ export class FirstLevelP012Director {
       if (moving) { text += "；敌人正转移到另一射击位，注意移动射手";
         lookAt = this.host.EnemyPosition(moving.handle); }
     }
+    if ([21, 22].includes(this.beat)) {
+      const approach = this.SouthRouteApproachTarget(target);
+      if (approach) {
+        target = approach; lookAt = null; requiredAction = "move";
+        text = "沿已清路沟的转角接近民房入口，绕开沟岸";
+      }
+    }
     if (this.beat >= 24) target = this.lastSample.carryKind === "stretcher" ? anchors.shelter
       : this.lastSample.regripPosition || activity.regripPosition;
     if (this.beat === 24 && this.lastSample.carryKind !== "stretcher") interactionId = "ch1_regrip";
@@ -910,8 +987,17 @@ export class FirstLevelP012Director {
       && Number(this.lastSample.ammo) === 0 && Number(this.lastSample.clips) === 0) {
       text += "；弹药耗尽：到已清掩体旁靠近地上枪械，按 F 缴获（会替换当前枪弹）";
     }
+    let frontlineApproach = null;
+    if (this.beat >= 6 && this.beat <= 10 && interactionId !== "p012_frontlineAmmo") {
+      const port = anchors.gunports?.[this.beat === 8 ? 2 : this.beat === 10 ? 0 : 1];
+      frontlineApproach = this.FrontlineApproachTarget(port);
+      if (frontlineApproach) {
+        target = frontlineApproach; lookAt = null; requiredAction = "move"; requiredStance = "prone";
+        text = "沿反斜面中间交通壕回到枪眼，绕开两侧实体壕墙";
+      }
+    }
     return { text, zone: beat.zone, target, lookAt, interactionId, requiredAction, requiredStance, progress,
-      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: this.beat === 23 && requiredAction === "follow" ? 0.6 : this.RouteArrivalRadius() };
+      routeTarget: route[this.routeIndex] || null, arrivalRadiusM: frontlineApproach || (this.beat === 23 && requiredAction === "follow") ? 0.6 : this.RouteArrivalRadius() };
   }
   Snapshot() { return Clone({ beat: this.beat, elapsed: this.elapsed, enteredAt: this.enteredAt,
     facts: [...this.facts], signals: [...this.signals], visits: this.visits, travelM: this.travelM,

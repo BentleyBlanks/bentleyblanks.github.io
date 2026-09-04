@@ -5,6 +5,53 @@ import vm from "node:vm";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { SETPIECES, EscortColumn, LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
+import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
+import {InteractSystem} from "./Script_Interact.mjs";
+import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Layout.mjs";
+{
+ const config=P012Phase.whitebox,a=config.activities,actor={...config.anchors.trainDoor,yaw:0},orders=[],faces=[],points=new Map();
+ const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:value=>value,Signalled:()=>false,
+  Move:(who,point,speed)=>orders.push({point:{...point},speed}),GuideYaw:who=>who.yaw,
+  FaceGuide:(who,yaw)=>{const delta=Math.atan2(Math.sin(yaw-who.yaw),Math.cos(yaw-who.yaw));assert.ok(Math.abs(delta)<=.34000001,"wait facing turns smoothly at 3.4 radians per second");who.yaw=yaw;faces.push(yaw);}},config);
+ const director=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec),Register:spec=>points.set(spec.id,spec)},config);
+ director.lastSample={position:config.anchors.trainSpawn};director.StartGuide();runtime.guide.index=2;
+ for(let i=0;i<120;i++)runtime.Update(.1);
+ assert.equal(runtime.guide.index,2,"door guide waits for the player, not a timer");
+ assert.equal(orders.at(-1).speed,0);
+ const doorFacing=Math.atan2(-(config.anchors.trainSpawn.x-actor.x),-(config.anchors.trainSpawn.z-actor.z));
+ assert.ok(Math.abs(faces.at(-1)-doorFacing)<1e-9,"door guide eventually faces back towards the player");
+ director.lastSample.position=config.anchors.trainDoor;runtime.Update(.1);
+ assert.equal(runtime.guide.index,3,"approaching the real door releases the guide");
+ director.beat=1;director.StartGuide();
+ for(let index=0;index<3;index++){
+  Object.assign(actor,a.weaponGuideRoute[index]);
+  for(let i=0;i<120;i++)runtime.Update(.1);
+  assert.equal(runtime.guide.index,index,"B01 does not leave an unfinished physical operation");
+  assert.equal(orders.at(-1).speed,0);
+  const facing=a.weaponGuideFacing[index],wanted=Math.atan2(-(facing.x-actor.x),-(facing.z-actor.z));
+  assert.ok(Math.abs(Math.atan2(Math.sin(faces.at(-1)-wanted),Math.cos(faces.at(-1)-wanted)))<1e-9,"waiting guide faces the real table");
+  if(index<2){points.get(index===0?"p012_weaponCheck":"p012_ammoIssue").OnComplete();runtime.Update(.1);assert.equal(runtime.guide.index,index+1);}
+ }
+ const interaction=new InteractSystem({});
+ for(const [id,stand,boxId] of [["p012_weaponCheck",a.weaponReceivePosition,"WeaponCheckTable"],["p012_ammoIssue",a.weaponIssuePosition,"WeaponIssueCrate"]]){
+  interaction.Register(points.get(id));const point=interaction.points.get(id),box=openingLayout.blocks.find(b=>b.id===boxId);
+  assert.equal(point.position.x,box.x);assert.ok(Math.abs(point.position.z-(box.z+box.d/2))<1e-9,"F anchor is on the box front surface");
+  assert.notEqual(interaction.Reach(point,{position:stand,yaw:0}),null,"looking at the actual box from its front gives a reachable F interaction");
+  assert.equal(interaction.Reach(point,{position:{x:stand.x,z:stand.z+4},yaw:0}),null,"no remote interaction extension");
+ }
+ const route=[{x:-55,z:44},...a.weaponGuideRoute],stands=[a.weaponReceivePosition,a.weaponIssuePosition,a.weaponInspectPosition];
+ function Hits(point,box){
+  if(box.solid===false||box.y-box.h/2>1.8||box.y+box.h/2<=.05)return false;
+  const dx=point.x-box.x,dz=point.z-box.z,c=Math.cos(box.ry),s=Math.sin(box.ry);
+  return Math.hypot(Math.max(0,Math.abs(dx*c-dz*s)-box.w/2),Math.max(0,Math.abs(dx*s+dz*c)-box.d/2))<.42;
+ }
+ for(const point of stands)assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"player work position is outside solid furniture");
+ for(let leg=1;leg<route.length;leg++)for(let i=0;i<=100;i++){
+  const point={x:route[leg-1].x+(route[leg].x-route[leg-1].x)*i/100,z:route[leg-1].z+(route[leg].z-route[leg-1].z)*i/100};
+  assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"guide physically walks between tables without entering a collider");
+ }
+ console.log("PASS opening door/operation-driven guide waits, facing requests, real furniture reach and capsule paths");
+}
 {
  const {Vector3}=await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
  const source=readFileSync(new URL("./Script_Player.mjs",import.meta.url),"utf8");
@@ -139,6 +186,38 @@ assert.equal(runtime.traffic.length, 6, "repeated Guide does not duplicate traff
  assert.ok(trafficRun.traffic.filter(w=>w.side===1).every(w=>!w.retired&&w.actor.scriptedNoncombatant),"southbound civilians remain noncombatants");
 }
 const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
+{
+ const walkers=[];let door=false;const player={x:-60,z:61};
+ const run=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,PlayerPosition:()=>player,Signalled:name=>name==="P012TrainDoor"&&door,
+  TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role};walkers.push(actor);return actor;},
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=1.2)return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:()=>{}
+ },P012Phase.whitebox);
+ run.Update(.1);assert.equal(walkers.length,8,"opening finite pool exists before B02");assert.equal(run.Sample().trafficReady,false);
+ for(let i=0;i<600;i++)run.Update(.1);
+ assert.ok(run.traffic.filter(w=>w.pauseIndex!==undefined).every(w=>w.index<=w.pauseIndex),"slow player does not miss the whole station stream");
+ assert.ok(run.traffic.filter(w=>w.role==="walking").every(w=>w.travelM===0));
+ door=true;run.beat=1;
+ for(let i=0;i<1400;i++){
+  run.Update(.1);
+  for(let a=0;a<walkers.length;a++)for(let b=a+1;b<walkers.length;b++)assert.ok(Math.hypot(walkers[a].x-walkers[b].x,walkers[a].z-walkers[b].z)>.84,"finite crossing routes preserve two capsule radii");
+ }
+ assert.equal(run.Sample().trafficReady,true,"real opposite directions pass near player, not merely an index advance");
+ assert.equal(walkers.length,8,"no repeated initialization or replacement spawning");
+ assert.equal(walkers.filter(w=>w.side===0).length,3);assert.equal(walkers.filter(w=>w.side===1).length,5);
+ const reserved=run.traffic.filter(w=>w.proximityRelease);
+ assert.equal(reserved.length,2);
+ assert.ok(reserved.every(w=>w.index===w.proximityRelease.index&&!w.proximityReleased),"B01 longer than 120s retains a real pair at village entry");
+ const beforeRelease=reserved.map(w=>({...w.actor}));
+ run.beat=2;for(let i=0;i<100;i++)run.Update(.1);
+ assert.ok(reserved.every(w=>!w.proximityReleased),"B02 alone cannot consume the pair while player remains at station");
+ player.x=-42;player.z=40;
+ for(let i=0;i<120;i++)run.Update(.1);
+ assert.ok(reserved.every(w=>w.proximityReleased&&Math.hypot(w.actor.x-beforeRelease[reserved.indexOf(w)].x,w.actor.z-beforeRelease[reserved.indexOf(w)].z)>3),"approaching village releases both real actors into opposite movement");
+ for(let i=0;i<900;i++)run.Update(.1);
+ assert.ok(run.traffic.every(w=>w.arrived),"all eight actual paths end at separate parking positions");
+ const parked=run.traffic.map(w=>w.actor);
+ for(let i=0;i<parked.length;i++)for(let j=i+1;j<parked.length;j++)assert.ok(Math.hypot(parked[i].x-parked[j].x,parked[i].z-parked[j].z)>1.2);
+}
 assert.match(ai,/s\.scriptArrivalRadius\) : 1\.2/ ,"ordinary traffic retains production AI stopping radius");
 assert.match(ai, /if \(Number\.isFinite\(s\.scriptMoveSpeedMps\)\) speed = Math\.min/);
 const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");

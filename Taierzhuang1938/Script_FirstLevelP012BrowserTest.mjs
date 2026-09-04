@@ -22,6 +22,7 @@ if (perceptionName && !perceptionProfiles[perceptionName]) throw new Error(`Unkn
 const perceptionProfile = perceptionProfiles[perceptionName] || null;
 const runLabel = process.argv.find(arg => arg.startsWith("--run-label="))?.split("=")[1] || "";
 const orientationReview = process.argv.includes("--orientation");
+const openingGuidanceReview = process.argv.includes("--opening-guidance");
 if (runLabel && !/^[A-Za-z0-9_]+$/.test(runLabel)) throw new Error("Run label must contain only English letters, digits, or underscores");
 const outputDir = process.env.P012_SCREENSHOT_DIR || path.join(os.tmpdir(),
   perceptionProfile ? `P012WhiteboxPerception_${perceptionProfile.name}${runLabel ? `_${runLabel}` : ""}`
@@ -62,6 +63,7 @@ async function PlayPrelude() {
       };
       for (let frame = 0; frame < 600; frame += 1) {
         const flow = game.Debug.P012();
+        if (window.p012PendingTrafficView) break;
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
         // Return an actual gameplay frame while the landmark is being observed.
@@ -88,7 +90,8 @@ async function PlayPrelude() {
         const following = objective.requiredAction === "follow";
         const crouching = flow.beatIndex === 4 ? distance < 3.1 : objective.requiredStance === "crouch";
         if (game.player.stance !== (crouching ? "crouch" : "stand")) game.Debug.Key("KeyC");
-        const arrive = interactionId ? 1.6 : following ? 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
+        const arrive = interactionId ? flow.beatIndex === 1 ? 0.35 : 1.6
+          : following ? 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
         const move = distance > arrive && !bot.held.KeyF;
         Key("KeyW", move);
         Key("ShiftLeft", move && flow.beatIndex === 4 && !crouching);
@@ -117,8 +120,10 @@ async function PlayPrelude() {
         player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
         camera: game.camera.position.toArray() } : null;
       bot.pendingOrientation = null;
+      const trafficView = window.p012PendingTrafficView || null;
+      window.p012PendingTrafficView = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
-        orientation,
+        orientation, trafficView,
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
@@ -126,6 +131,10 @@ async function PlayPrelude() {
     if (result.orientation) {
       orientations.push(result.orientation);
       await page.screenshot({ path: path.join(outputDir, `Scene_P012Orientation${result.orientation.index + 1}.png`) });
+    }
+    if (result.trafficView) {
+      await fs.writeFile(path.join(outputDir, `Data_P012Traffic_${result.trafficView.captureId}.json`), JSON.stringify(result.trafficView, null, 2));
+      await page.screenshot({ path: path.join(outputDir, `Scene_P012Traffic_${result.trafficView.captureId}.png`) });
     }
     console.log("P012 opening", JSON.stringify({ at: result.flow.elapsed, beat: result.flow.beat,
       route: result.flow.routeIndex, action: result.flow.action, position: result.position,
@@ -269,11 +278,11 @@ async function PlayFrontline() {
           continue;
         }
         let destination = null;
-        if (flow.beatIndex === 6 || flow.beatIndex === 7) destination = ports[1];
+        if (flow.beatIndex === 6 || flow.beatIndex === 7) destination = flow.objective.target || ports[1];
         if (flow.beatIndex === 8) destination = flow.objective.target || ports[2];
         if (flow.beatIndex === 9) destination = flow.objective.target || ports[1];
         if (flow.beatIndex === 10) destination = flow.objective.target || ports[0];
-        if (destination && flow.beatIndex <= 10) destination = { x: destination.x, z: destination.z - 0.8 };
+        if (destination && flow.beatIndex <= 10 && flow.objective.requiredAction !== "move") destination = { x: destination.x, z: destination.z - 0.8 };
         if (flow.beatIndex >= 11) {
           const objective = flow.objective;
           const point = objective.interactionId && game.interact.Point(objective.interactionId);
@@ -289,7 +298,7 @@ async function PlayFrontline() {
             game.Debug.Mouse(2, false);
             const arrive = point ? 1.5 : objective.requiredAction === "follow"
               ? Math.max(0.1, Math.min(2.4, (objective.arrivalRadiusM ?? 2.45) - 0.05))
-              : 0.9;
+              : Math.min(0.9, (objective.arrivalRadiusM ?? 0.95) - 0.05);
             Key("KeyW", !!destination && distance > arrive && !bot.held.KeyF);
             Key("ShiftLeft", objective.requiredAction === "sprint" && !!destination && distance > arrive);
             if (destination && distance > 0.1) {
@@ -307,7 +316,7 @@ async function PlayFrontline() {
               game.player.yaw = Math.atan2(-(air.x - eye.x), -(air.z - eye.z));
               game.player.pitch = Math.atan2(air.y - eye.y, Math.hypot(air.x - eye.x, air.z - eye.z));
             }
-            if (flow.beatIndex === 22 && distance < arrive + 0.2) {
+            if (flow.beatIndex === 22 && objective.requiredAction === "observe" && objective.lookAt && distance < arrive + 0.2) {
               const target = objective.lookAt;
               game.player.yaw = target ? Math.atan2(-(target.x - game.player.position.x), -(target.z - game.player.position.z)) : Math.PI;
               game.player.pitch = 0;
@@ -334,7 +343,7 @@ async function PlayFrontline() {
         }
         Key("KeyF", false);
         if (destination && Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z)
-          > (flow.beatIndex <= 10 ? 0.35 : flow.beatIndex === 14
+          > (flow.beatIndex <= 10 ? 0.35 : [14, 21].includes(flow.beatIndex)
             ? Math.max(0.1, (flow.objective.arrivalRadiusM ?? 0.6) - 0.05) : 1)) {
           game.Debug.Mouse(2, false);
           Key("ShiftLeft", flow.objective.requiredAction === "sprint");
@@ -465,7 +474,7 @@ async function PlayFrontline() {
       game.Debug.Key("KeyW", false); game.Debug.Mouse(2, false); game.StepFrames(1);
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene(), health: game.player.health,
         activity: window.p012ActivityTrace || [],
-        airViews: window.p012AirViews || [], airGroundShots: window.p012AirGroundShots || [],
+        airViews: window.p012AirViews || [], crowdFireCues: window.p012CrowdFireCues || [], airGroundShots: window.p012AirGroundShots || [],
         airImpacts: window.p012AirImpacts || [],
         escortApproval: window.p012EscortApproval || [],
         prematureEscortMovement: window.p012PrematureEscortMovement || [],
@@ -537,8 +546,10 @@ async function PlayFrontline() {
   Check(result.flow.beatIndex >= (fullCampaign ? 25 : 11), fullCampaign ? "整关真实输入顺序通关" : "有限前线五波可由真实操作完成",
     `${result.flow.beat} at ${result.flow.elapsed.toFixed(1)}s; health ${result.health}; ${path.join(outputDir, "Data_P012GameplayTrace.json")}`);
   Check(result.firstShotAt !== null, "玩家实际参与射击而非全靠友军清场", String(result.firstShotAt));
-  Check(result.firstShotAt >= 285 && result.firstShotAt <= 330,
-    "实际第一枪落在 P1 窗口", `${result.firstShotAt.toFixed(1)}s`);
+  // P0's explicit acceptance window (4:30–5:30) takes precedence over the
+  // illustrative 4:45 start in P1's table. Do not pad walking to hit that start.
+  Check(result.firstShotAt >= 270 && result.firstShotAt <= 330,
+    "实际第一枪落在 P0 四分半至五分半窗口", `${result.firstShotAt.toFixed(1)}s`);
   Check(result.shots[0]?.distance >= 44 && result.shots[0]?.distance <= 61,
     "中央枪眼首次交火距离约 45–60 米（含角色与枪眼边缘容差）", `${result.shots[0]?.distance?.toFixed(2)}m`);
   Check(result.flow.frontlineAmmo.remainingClips >= 0 && result.flow.spawnedTotal <= 33,
@@ -601,12 +612,23 @@ async function PlayFrontline() {
       && Math.hypot(centers[0].x - centers[1].x, centers[0].z - centers[1].z) >= 3,
     "回撤停车仍保留两副担架及前后抬手间距", JSON.stringify(parked));
     Check(ending.scene.farSpawned === 4 && ending.scene.retreatPursuit.length === 2
-      && ending.scene.retreatPursuit.some(entry => entry.index > 1),
-    "原有两名远敌实际沿有限路线追击，未新增兵力");
+      && ending.scene.retreatPursuit.every(entry => !entry.alive || entry.index > 1),
+    "有限追兵已沿路线追击或被真实击毙，不复活补兵",
+    JSON.stringify(ending.scene.retreatPursuit));
     Check(!!result.windowView?.collisionClear, "实际从破屋窗口看到前副担架移出院墙", JSON.stringify(result.windowView));
     Check(result.airViews.some(view => view.preset === "crowdTurn" && view.phase === "approach"
       && view.airVisible && view.bearersVisible >= 2 && view.civiliansVisible >= 1),
     "自由视角实际同屏看见飞机转向、担架员与平民道路");
+    const turnPrompts = result.airViews.filter(view => view.beat === "B17" && view.preset === "crowdTurn");
+    const beforeCrowdFire = turnPrompts.filter(view => !view.crowdFire);
+    const afterCrowdFire = turnPrompts.filter(view => view.crowdFire);
+    Check(beforeCrowdFire.length > 0 && beforeCrowdFire.every(view => /留意飞机来向/.test(view.objectiveText)
+      && !/转向道路|向道路开火|扫射/.test(view.objectiveText)),
+    "转向期间提示引导观察，不预告飞机将攻击道路", `${beforeCrowdFire.length} actual frames`);
+    Check(result.crowdFireCues.some(cue => cue.beat === "B17" && /已向道路开火/.test(cue.text))
+      && afterCrowdFire.every(view => /已向道路开火/.test(view.objectiveText)
+        && !/正在转向/.test(view.objectiveText) && view.phase !== "approach"),
+    "真实道路扫射事件立即更新提示；已入沟可直接推进B18", JSON.stringify(result.crowdFireCues));
     // A rifle shot during the aviation gun's existing 0.18s burst gap is still
     // overlapping pressure. Require real impacts within 0.25s in the same run;
     // merely seeing an egress aircraft, or a phase label without bullets, fails.
@@ -637,6 +659,252 @@ async function PlayFrontline() {
     }, null, 2));
   }
   await page.screenshot({ path: path.join(outputDir, "Scene_P012FrontlineAftermath.png") });
+}
+
+// Production director objectives + real player collision, isolated from the
+// sequential campaign. Fixture setup may reset position; movement never does.
+async function VerifySouthRouteRecoveryFixtures() {
+  const results = await page.evaluate(async () => {
+    const { FirstLevelP012Director } = await import("./Script_FirstLevelP012Flow.mjs");
+    const { FIRST_LEVEL_P012_WHITEBOX_PHASE: phase } = await import("./Data_FirstLevelP012Whitebox.mjs");
+    const game = window.Tengxian, results = [];
+    for (const beat of [21, 22]) {
+      const indices = beat === 21 ? [5, 6, 7] : [0, 1, 2, 3, 4];
+      for (const routeIndex of indices) {
+        const director = new FirstLevelP012Director({}, phase.whitebox);
+        director.beat = beat; director.routeIndex = routeIndex;
+        const destination = director.ActivityRoute()[routeIndex];
+        const unchanged = JSON.stringify(director.Snapshot()), path = [];
+        game.player.Spawn(44, 62, 0);
+        game.player.stance = "stand"; game.player.pitch = 0;
+        let reached = false;
+        for (let frame = 0; frame < 2400; frame++) {
+          director.lastSample = { position: game.player.position };
+          if (game.player.position.distanceTo(game.player.position.clone().set(destination.x, 0, destination.z)) < .6) {
+            reached = true; break;
+          }
+          const objective = director.CurrentObjective(), target = objective.target;
+          if (!target) break;
+          game.player.yaw = Math.atan2(-(target.x - game.player.position.x), -(target.z - game.player.position.z));
+          game.Debug.Key("KeyW", true);
+          game.StepFrames(1, 1 / 30, false);
+          if (frame % 30 === 0) path.push(game.player.position.toArray());
+        }
+        game.Debug.Key("KeyW", false);
+        results.push({ beat, routeIndex, reached, position: game.player.position.toArray(),
+          destination, path, preserved: unchanged === JSON.stringify(director.Snapshot()) });
+      }
+    }
+    return results;
+  });
+  await fs.writeFile(path.join(outputDir, "Data_P012SouthRetryRoutes.json"), JSON.stringify(results, null, 2));
+  for (const result of results) Check(result.reached && result.preserved,
+    `B${result.beat} 路点${result.routeIndex}：从CP05按公开转角目标真实走回，任务进度不变`,
+    JSON.stringify({ destination: result.destination, position: result.position }));
+  await page.screenshot({ path: path.join(outputDir, "Scene_P012SouthRetryArrival.png") });
+}
+
+async function VerifyFrontlineRecoveryFixtures() {
+  const results = await page.evaluate(async () => {
+    const { FirstLevelP012Director } = await import("./Script_FirstLevelP012Flow.mjs");
+    const { FIRST_LEVEL_P012_WHITEBOX_PHASE: phase } = await import("./Data_FirstLevelP012Whitebox.mjs");
+    const game = window.Tengxian, results = [];
+    for (const beat of [6, 7, 8, 9, 10]) {
+      const director = new FirstLevelP012Director({}, phase.whitebox);
+      director.beat = beat;
+      const destination = phase.whitebox.anchors.gunports[beat === 8 ? 2 : beat === 10 ? 0 : 1];
+      const unchanged = JSON.stringify(director.Snapshot()), path = [];
+      game.player.Spawn(3.32966, -43.11849, 0);
+      game.player.stance = "prone"; game.player.pitch = 0;
+      let reached = false;
+      for (let frame = 0; frame < 3000; frame++) {
+        director.lastSample = { position: game.player.position, clips: 1 };
+        const objective = director.CurrentObjective();
+        if (Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) < .6) {
+          reached = true; break;
+        }
+        const target = objective.target;
+        if (!target) break;
+        game.player.yaw = Math.atan2(-(target.x - game.player.position.x), -(target.z - game.player.position.z));
+        game.Debug.Key("KeyW", true);
+        game.StepFrames(1, 1 / 30, false);
+        if (frame % 30 === 0) path.push(game.player.position.toArray());
+      }
+      game.Debug.Key("KeyW", false);
+      results.push({ beat, reached, position: game.player.position.toArray(), destination, path,
+        preserved: unchanged === JSON.stringify(director.Snapshot()) });
+    }
+    return results;
+  });
+  await fs.writeFile(path.join(outputDir, "Data_P012FrontlineRetryRoutes.json"), JSON.stringify(results, null, 2));
+  for (const result of results) Check(result.reached && result.preserved,
+    `B${result.beat}：从CP01沿交通壕真实卧姿回枪眼，任务进度不变`,
+    JSON.stringify({ destination: result.destination, position: result.position }));
+  await page.screenshot({ path: path.join(outputDir, "Scene_P012FrontlineRetryArrival.png") });
+}
+
+// Inspection fixture, not campaign movement or a natural gameplay camera claim.
+async function VerifyCastClothing() {
+  const cast = await page.evaluate(async () => {
+    const { P012_CAST_CLOTH_COLORS: colors } = await import("./Script_FirstLevelP012CastAppearance.mjs");
+    const game = window.Tengxian;
+    return game.ai.soldiers.filter(soldier => soldier.castId).map(soldier => {
+      const clothes = [], other = [];
+      soldier.actor.characterRig.root.traverse(object => {
+        if (!object.isMesh) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          const entry = { name: material.name, color: material.color?.getHex(), map: !!material.map };
+          (material.name.startsWith("P012Cloth_") ? clothes : other).push(entry);
+        }
+      });
+      return { castId: soldier.castId, expected: colors[soldier.castId],
+        applied: soldier.actor.p012ClothColor, clothes, other };
+    });
+  });
+  Check(cast.length === 5 && new Set(cast.map(entry => entry.applied)).size === 5
+    && cast.every(entry => entry.applied === entry.expected && entry.clothes.length > 0
+      && entry.clothes.every(material => material.color === entry.expected && !material.map)
+      && entry.other.some(material => material.map)),
+  "五名具名NPC使用各自纯色衣服，仍保留原皮肤/装备贴图");
+  for (const entry of cast) {
+    const placement = await page.evaluate(castId => {
+      const game = window.Tengxian, soldier = game.ai.soldiers.find(actor => actor.castId === castId);
+      const before = { position: soldier.position.toArray(), goal: soldier.goal.toArray(), yaw: soldier.yaw,
+        speed: soldier.scriptMoveSpeedMps ?? null, manualGoalUntil: soldier.manualGoalUntil };
+      // Explicit appearance inspection stage: avoid the random initial squad
+      // formation occluding a costume. This is not used by campaign acceptance.
+      soldier.position.set(-50, 0, 60); soldier.body?.Teleport(-50, 0, 60);
+      soldier.goal.set(-50, 0, 60); soldier.manualGoalUntil = game.ai.time + 5;
+      soldier.scriptMoveSpeedMps = 0; soldier.yaw = Math.PI;
+      game.player.Spawn(-50, 63.5, 0);
+      game.player.stance = "stand"; game.player.pitch = -.1;
+      game.StepFrames(2);
+      return before;
+    }, entry.castId);
+    await page.screenshot({ path: path.join(outputDir, `Scene_P012Cast_${entry.castId}.png`) });
+    await page.evaluate(({ castId, before }) => {
+      const soldier = window.Tengxian.ai.soldiers.find(actor => actor.castId === castId);
+      soldier.position.fromArray(before.position); soldier.body?.Teleport(...before.position);
+      soldier.actor.root.position.copy(soldier.position); soldier.goal.fromArray(before.goal);
+      soldier.yaw = before.yaw; soldier.manualGoalUntil = before.manualGoalUntil;
+      if (before.speed === null) delete soldier.scriptMoveSpeedMps;
+      else soldier.scriptMoveSpeedMps = before.speed;
+    }, { castId: entry.castId, before: placement });
+  }
+  await fs.writeFile(path.join(outputDir, "Data_P012CastClothing.json"), JSON.stringify(cast, null, 2));
+}
+
+// Physical scale audit: isolated straight corridor, no plot gating or combat.
+// This measures a spatial traverse, not the length of a complete mission.
+async function VerifyMapScale() {
+  const report = await page.evaluate(async () => {
+    const { FIRST_LEVEL_P012_LAYOUT: layout, P012_ROUTES: routes } = await import("./Data_FirstLevelP012Layout.mjs");
+    const game = window.Tengxian, original = game.Debug.DebugOptions(), runs = [];
+    const length = points => points.slice(1).reduce((sum, point, index) => sum
+      + Math.hypot(point.x - points[index].x, point.z - points[index].z), 0);
+    try {
+      game.Debug.SetDebugOption("noCollision", false);
+      for (const fastMove of [false, true]) {
+        game.Debug.SetDebugOption("fastMove", fastMove);
+        game.player.Spawn(-76, 110, 0); game.player.stance = "stand";
+        game.player.stamina = 1; game.player.pitch = 0;
+        game.Debug.Key("KeyW", true); game.Debug.Key("ShiftLeft", true);
+        let tenSeconds = null, frame = 0;
+        for (; frame < 5400; frame++) {
+          game.StepFrames(1, 1 / 30, false);
+          if (frame === 299) tenSeconds = { distanceM: 110 - game.player.position.z, position: game.player.position.toArray() };
+          if (game.player.position.z <= -110) break;
+        }
+        game.Debug.Key("KeyW", false); game.Debug.Key("ShiftLeft", false);
+        runs.push({ fastMove, tenSeconds, crossingSeconds: (frame + 1) / 30,
+          reached: game.player.position.z <= -110, position: game.player.position.toArray() });
+      }
+    } finally {
+      for (const [id, value] of Object.entries(original)) game.Debug.SetDebugOption(id, value);
+    }
+    return { bounds: layout.bounds, routesM: Object.fromEntries(Object.entries(routes).map(([key, points]) => [key, length(points)])), runs };
+  });
+  await fs.writeFile(path.join(outputDir, "Data_P012MapScale.json"), JSON.stringify(report, null, 2));
+  Check(report.runs.every(run => run.reached && run.tenSeconds && run.crossingSeconds > 10),
+    "沿西侧实际220米空走廊测试普通/三倍奔跑，保留真实碰撞", JSON.stringify(report));
+}
+
+// Discovery fixture: follow the actual leader and look along his body heading.
+// No objective target, route waypoint or interaction-anchor position steers this
+// player. This proves the cues are physically usable, not that every human will
+// understand them; first-person captures still require visual review.
+async function VerifyOpeningDiscovery() {
+  const pause = await page.evaluate(() => {
+    const game = window.Tengxian;
+    game.StepFrames(1200, 1 / 30, false);
+    const guide = game.ai.soldiers.find(actor => actor.castId === "luo");
+    const before = guide.position.clone();
+    game.StepFrames(180, 1 / 30, false);
+    // The idle batch did not stop on a capture; discard its stale candidate.
+    window.p012PendingTrafficView = null;
+    window.p012TrafficCapturedBeats = [];
+    game.StepFrames(1);
+    return { beat: game.Debug.P012().beat, position: guide.position.toArray(),
+      moved: guide.position.distanceTo(before), player: game.player.position.toArray() };
+  });
+  Check(pause.beat === "B00" && pause.moved < .1, "开局停留观察时罗班长等候，不独自走完路线", JSON.stringify(pause));
+  await page.screenshot({ path: path.join(outputDir, "Scene_P012GuideWaitsAtDoor.png") });
+  let result;
+  for (let chunk = 0; chunk < 45; chunk++) {
+    result = await page.evaluate(() => {
+      const game = window.Tengxian;
+      const bot = window.p012DiscoveryBot ||= { used: [], captured: [], held: false, elapsed: 0 };
+      let capture = null, trafficView = null;
+      for (let frame = 0; frame < 120; frame++) {
+        if (window.p012PendingTrafficView) {
+          trafficView = window.p012PendingTrafficView; window.p012PendingTrafficView = null; break;
+        }
+        const guide = game.ai.soldiers.find(actor => actor.castId === "luo");
+        const flow = game.Debug.P012();
+        if (bot.used.includes("p012_ammoIssue") || flow.beatIndex >= 2) break;
+        const completed = ["p012_weaponCheck", "p012_ammoIssue"].filter(id => game.interact.Point(id)?.count > 0);
+        if (completed.length > bot.used.length) { bot.used = completed; game.Debug.Key("KeyF", false); bot.held = false; }
+        const waitingAtTable = flow.beatIndex === 1 && guide.scriptMoveSpeedMps === 0;
+        const sight = waitingAtTable ? { x: guide.position.x - Math.sin(guide.yaw) * 2.4,
+          z: guide.position.z - Math.cos(guide.yaw) * 2.4 } : guide.position;
+        game.player.yaw = Math.atan2(-(sight.x - game.player.position.x), -(sight.z - game.player.position.z));
+        game.player.pitch = waitingAtTable ? -.15 : 0;
+        const query = game.interact.Query(game.player)?.point;
+        const usable = waitingAtTable && query && ["p012_weaponCheck", "p012_ammoIssue"].includes(query.id)
+          && !bot.used.includes(query.id);
+        game.Debug.Key("KeyW", !bot.held && (waitingAtTable
+          ? !usable && Math.hypot(sight.x - game.player.position.x, sight.z - game.player.position.z) > 1.1
+          : guide.position.distanceTo(game.player.position) > 2.6));
+        if (usable && !bot.captured.includes(query.id)) {
+          game.Debug.Key("KeyW", false);
+          bot.captured.push(query.id);
+          game.StepFrames(1);
+          capture = { id: query.id, player: game.player.position.toArray(), guide: guide.position.toArray(),
+            yaw: game.player.yaw, guideYaw: guide.yaw, label: query.label, at: flow.elapsed };
+          break;
+        }
+        if (usable) { game.Debug.Key("KeyF", true); bot.held = true; }
+        game.StepFrames(1, 1 / 30, false); bot.elapsed += 1 / 30;
+      }
+      game.Debug.Key("KeyW", false);
+      if (trafficView) game.StepFrames(1);
+      return { used: bot.used, captured: bot.captured, elapsed: bot.elapsed, capture, trafficView,
+        flow: game.Debug.P012(), scene: game.Debug.P012Scene(), player: game.player.position.toArray() };
+    });
+    if (result.capture) {
+      await fs.writeFile(path.join(outputDir, `Data_P012Discovery_${result.capture.id}.json`), JSON.stringify(result, null, 2));
+      await page.screenshot({ path: path.join(outputDir, `Scene_P012Discovery_${result.capture.id}.png`) });
+    }
+    if (result.trafficView) {
+      await fs.writeFile(path.join(outputDir, `Data_P012Traffic_${result.trafficView.captureId}.json`), JSON.stringify(result.trafficView, null, 2));
+      await page.screenshot({ path: path.join(outputDir, `Scene_P012Traffic_${result.trafficView.captureId}.png`) });
+    }
+    if (result.used.includes("p012_ammoIssue")) break;
+  }
+  await fs.writeFile(path.join(outputDir, "Data_P012OpeningDiscovery.json"), JSON.stringify(result, null, 2));
+  Check(result.used.includes("p012_weaponCheck") && result.used.includes("p012_ammoIssue"),
+    "仅跟随罗班长、看向其停步朝向即可实际完成桌边交互（未读取目标坐标）", JSON.stringify(result.used));
+  await page.evaluate(() => { window.Tengxian.Debug.Key("KeyF", false); window.Tengxian.Debug.Key("KeyW", false); });
 }
 
 // 独立物理夹具可重置出生位置；不计入顺序通关或节奏证据。
@@ -758,6 +1026,10 @@ try {
     window.p012DamageTrace = [];
     window.p012ActivityTrace = [];
     window.p012AirViews = [];
+    window.p012TrafficViews = [];
+    window.p012TrafficCapturedBeats = [];
+    window.p012PopulationMax = { armed: 0, unarmed: 0 };
+    window.p012CrowdFireCues = [];
     window.p012AirGroundShots = [];
     window.p012AirImpacts = [];
     window.p012EscortApproval = [];
@@ -779,6 +1051,10 @@ try {
     const originalSignal = game.story.Signal;
     game.story.Signal = function (name, ...args) {
       const result = originalSignal.call(this, name, ...args);
+      if (name === "P012CrowdFire") {
+        const flow = game.Debug.P012();
+        window.p012CrowdFireCues.push({ at: flow.elapsed, beat: flow.beat, text: flow.objective.text });
+      }
       if (["P012EscortRequested", "P012EscortApproved", "EscortCall"].includes(name)) {
         window.p012EscortApproval.push({ at: game.Debug.P012().elapsed, event: name,
           column: game.Debug.P012Scene().columnPosition });
@@ -824,6 +1100,8 @@ try {
     let lastShotAt = -Infinity;
     let previousShots = game.state.playerShots;
     let lastAirViewAt = -Infinity;
+    let lastTrafficViewAt = -Infinity;
+    const previousTraffic = new Map();
     game.StepFrames = function (count = 1, dt = 1 / 60, render = true) {
       for (let frame = 0; frame < count; frame += 1) {
         const before = game.Debug.P012(), position = game.player.position.clone();
@@ -844,6 +1122,39 @@ try {
           continue;
         }
         if (after.elapsed <= before.elapsed) continue;
+        const friendly = game.ai.soldiers.filter(actor => actor.alive && actor.side === "nra");
+        window.p012PopulationMax.armed = Math.max(window.p012PopulationMax.armed, friendly.filter(actor => !actor.unarmed).length);
+        window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed, friendly.filter(actor => actor.unarmed).length);
+        if (after.beatIndex <= 2 && after.elapsed - lastTrafficViewAt >= .5) {
+          lastTrafficViewAt = after.elapsed;
+          const actors = friendly.filter(actor => actor.p012TrafficSide !== undefined).map(actor => {
+            const at = actor.position.clone(); at.y += 1.2;
+            const screen = at.clone().project(game.camera), delta = at.sub(game.player.EyePosition), distance = delta.length();
+            const hit = game.battlefield.Raycast(game.player.EyePosition, delta.normalize(), distance);
+            const previous = previousTraffic.get(actor.id);
+            previousTraffic.set(actor.id, { at: after.elapsed, x: actor.position.x, z: actor.position.z });
+            return { id: actor.id, side: actor.p012TrafficSide, role: actor.escortRole,
+              position: actor.position.toArray(), distance,
+              speedX: previous ? (actor.position.x - previous.x) / (after.elapsed - previous.at) : 0,
+              speedZ: previous ? (actor.position.z - previous.z) / (after.elapsed - previous.at) : 0,
+              visible: screen.z >= -1 && screen.z <= 1 && Math.abs(screen.x) < .95 && Math.abs(screen.y) < .95
+                && (!hit || hit.t >= distance - .3) };
+          });
+          const view = { at: after.elapsed, beat: after.beat, player: game.player.position.toArray(),
+            yaw: game.player.yaw, pitch: game.player.pitch, actors, population: { ...window.p012PopulationMax } };
+          window.p012TrafficViews.push(view);
+          const movingVisible = actors.filter(actor => actor.visible && actor.distance < 24
+            && Math.hypot(actor.speedX, actor.speedZ) > .2);
+          const opposed = movingVisible.some(north => north.side === 0 && movingVisible.some(south => south.side === 1
+            && north.speedX * south.speedX + north.speedZ * south.speedZ < -.25));
+          const dense = movingVisible.filter(actor => actor.role === "civilian").length >= 2
+            && movingVisible.filter(actor => actor.side === 0).length >= 2;
+          view.captureId = after.beat + (dense ? "Crowd" : "");
+          if (!window.p012TrafficCapturedBeats.includes(view.captureId) && opposed) {
+            window.p012TrafficCapturedBeats.push(view.captureId);
+            window.p012PendingTrafficView = view;
+          }
+        }
         if (after.beatIndex >= 15 && after.beatIndex <= 20 && after.elapsed - lastAirViewAt >= 0.25) {
           lastAirViewAt = after.elapsed;
           const air = game.Debug.Strafe.State().run;
@@ -859,6 +1170,7 @@ try {
             const members = game.Debug.P012Scene().columnActors;
             const visible = members.filter(member => Visible({ x: member.x, y: 1.2, z: member.z }));
             const view = { at: after.elapsed, beat: after.beat, preset: air.presetId, phase: air.phase,
+              objectiveText: after.objective.text, crowdFire: game.story.Signalled("P012CrowdFire"),
               flightTime: air.t, airVisible: Visible(air.aircraft), airPosition: air.aircraft,
               player: game.player.position.toArray(), yaw: game.player.yaw, pitch: game.player.pitch,
               bearersVisible: visible.filter(member => member.role === "bearer").length,
@@ -929,11 +1241,20 @@ try {
   Check(initial.state.field.externalAssets === 0 && initial.externalProps === 0 && initial.trimProps === 0 && initial.colliders > 15,
     "程序体块环境具有实际碰撞且不加载正式环境资产");
   await page.screenshot({ path: path.join(outputDir, "Scene_P012Arrival.png") });
+  if (openingGuidanceReview) await VerifyOpeningDiscovery();
   if (orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
+  if (process.argv.includes("--south-recovery")) await VerifySouthRouteRecoveryFixtures();
+  if (process.argv.includes("--front-recovery")) await VerifyFrontlineRecoveryFixtures();
+  if (process.argv.includes("--cast-colors")) await VerifyCastClothing();
+  if (process.argv.includes("--scale-review")) await VerifyMapScale();
   if (process.argv.includes("--overview")) await CaptureLayoutOverview();
   if (audioSmoke) await VerifyAudioPlayback();
+  const traffic = await page.evaluate(() => ({ views: window.p012TrafficViews, population: window.p012PopulationMax }));
+  await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
+  Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
+    "实际全程友军战斗角色不超12、无枪群众伤员不超15", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
   console.log(process.argv.includes("--campaign") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");

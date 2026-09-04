@@ -98,11 +98,25 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     enemyLanes: P012_ENEMY_LANES, friendlyLimit: 12,
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
     activities: Object.freeze({
+      traffic: Object.freeze([
+        ...[0,1,2].map(slot=>({side:0,slot,role:"soldier",releaseBeat:0,
+          proximityRelease:slot===0?{index:3,beat:2,radius:18}:undefined,
+          route:[{x:-54,z:66-slot*3},{x:-54,z:49-slot*3},{x:-54,z:40},{x:-43,z:38},{x:-34,z:38},{x:-32,z:30},{x:-32,z:18-slot*3}],pauseIndex:1})),
+        ...[0,1,2].map(slot=>({side:1,slot,role:"civilian",variant:slot===1?"female":"male",releaseBeat:0,
+          route:[{x:-59,z:20+slot*3},{x:-59,z:46+slot*3},{x:-59,z:58},{x:-56,z:62},{x:-52,z:62+slot*3}],pauseIndex:1})),
+        ...[0,1].map(slot=>({side:1,slot:3+slot,role:"walking",releaseBeat:1,
+          proximityRelease:slot===0?{index:1,beat:2,radius:18}:undefined,
+          route:[{x:-28,z:19+slot*3},{x:-28,z:30},{x:-34,z:40},{x:-43,z:42},{x:-50,z:42},{x:-50,z:52},{x:-52,z:54},{x:-52,z:56+slot*3}]})),
+      ]),
       guideSpeedMps: 1.3, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
       guideSpeedByBeat: Object.freeze({ 0: 0.6, 2: 0.685, 4: 0.85, 5: 0.85, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
       frontlineAmmo: Object.freeze({ stockClips: 12, carryCapClips: 4, takeSeconds: 2.4 }),
-      weaponIssuePosition: { x: -55, z: 34 }, weaponInspectPosition: { x: -45, z: 34 },
+      weaponReceivePosition: { x: -57.2, z: 45.8 }, weaponReceiveAnchor: { x: -57.2, z: 44.75 },
+      weaponIssuePosition: { x: -57, z: 35.7 }, weaponIssueAnchor: { x: -57, z: 34.6 },
+      weaponInspectPosition: { x: -47, z: 37.5 },
+      weaponGuideRoute: [{x:-55,z:43},{x:-55,z:33},{x:-45,z:35}],
+      weaponGuideFacing: [{x:-57.2,z:44},{x:-57,z:34},{x:-47,z:36}],
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
       trainRoute: P012_ROUTES.trainExit, villageRoute: P012_ROUTES.north.slice(2, 8),
       orientations: Object.freeze([
@@ -204,7 +218,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       scout: Object.freeze({ ...P012_ANCHORS.scout, weapon: "Type38" }),
       wave: Object.freeze({ minDistanceM: 45, maxDistanceM: 60, lateralSpanM: 18, deepShare: 0 }) }),
     timing: Object.freeze({ targetMinutes: [23,26], combatShare: 0.55, escortShare: 0.45,
-      firstShotWindowS: [285,330], pressureIntervalS: [30,50], maxPureWaitS: 8, z10DurationS: [90,120] }),
+      firstShotWindowS: [270,330], pressureIntervalS: [30,50], maxPureWaitS: 8, z10DurationS: [90,120] }),
     escortWaypoints: P012_ROUTES.south.slice(0,-1), returnWaypoints: P012_ROUTES.retreat,
     aircraftRoutes: Object.freeze({
       // Rail fire stays west at x=-72; its exit is two metres beyond z110.

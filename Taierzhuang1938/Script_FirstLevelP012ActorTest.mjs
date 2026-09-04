@@ -2,6 +2,68 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import { CHAPTER } from "./Data_MissionCh1.mjs";
+import { ApplyP012CastAppearance, P012_CAST_CLOTH_COLORS, P012_UNIFORM_MATERIAL_NAME } from "./Script_FirstLevelP012CastAppearance.mjs";
+const threeSource = fs.readFileSync(new URL("./vendor/three/build/three.core.js", import.meta.url), "utf8");
+const THREE = await import(`data:text/javascript;base64,${Buffer.from(threeSource).toString("base64")}`);
+
+// Read the real GLB primitive/material separation, not invented clothing names.
+assert.deepEqual(Object.keys(P012_CAST_CLOTH_COLORS).sort(), [...CHAPTER.roster].sort());
+assert.equal(new Set(Object.values(P012_CAST_CLOTH_COLORS)).size, 5);
+for (let variant = 1; variant <= 5; variant++) {
+  const buffer = fs.readFileSync(new URL(`./Model/Character/Model_LugouNra0${variant}.glb`, import.meta.url));
+  const gltf = JSON.parse(buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString());
+  const uniformIndex = gltf.materials.findIndex((item) => item.name === P012_UNIFORM_MATERIAL_NAME);
+  assert.ok(uniformIndex >= 0);
+  const uniform = gltf.materials[uniformIndex];
+  const texture = gltf.textures[uniform.pbrMetallicRoughness.baseColorTexture.index];
+  const imageIndex = texture.source ?? texture.extensions.EXT_texture_webp.source;
+  assert.match(gltf.images[imageIndex].name, /国名党男/);
+  const shared = gltf.materials.map((item) => {
+    const material = new THREE.MeshStandardMaterial({ color: 0x667788 });
+    material.name = item.name; material.map = new THREE.Texture();
+    // Production lighting uniforms can hold circular references; copying an
+    // individual colour must not JSON-clone live shared lighting state.
+    material.userData.liveUniform = {}; material.userData.liveUniform.self = material.userData.liveUniform;
+    return material;
+  });
+  const MakeActor = () => {
+    const root = new THREE.Group();
+    for (const mesh of gltf.meshes) for (const primitive of mesh.primitives) {
+      const object = new THREE.Mesh(new THREE.BufferGeometry(), shared[primitive.material]);
+      object.userData.characterPbrSurface = true; root.add(object);
+    }
+    // An attached gun deliberately sharing the name must still be excluded.
+    const weapon = new THREE.Mesh(new THREE.BufferGeometry(), shared[uniformIndex]); root.add(weapon);
+    return { characterRig: { root }, disposed: false, Dispose() { this.disposed = true; } };
+  };
+  const ordinary = MakeActor();
+  const originalColors = shared.map((material) => material.color.getHex());
+  assert.equal(ApplyP012CastAppearance({ castId: "ordinary", actor: ordinary }), false);
+  const allClones = new Set();
+  for (const [castId, color] of Object.entries(P012_CAST_CLOTH_COLORS)) {
+    const actor = MakeActor(), originals = actor.characterRig.root.children.map((item) => item.material);
+    const configured = [];
+    assert.equal(ApplyP012CastAppearance({ castId, actor }, { ConfigureExternalPbr(material) { configured.push(material); } }), true);
+    assert.equal(ApplyP012CastAppearance({ castId, actor }), false, "idempotent application");
+    assert.equal(configured.length, 1, "one private clone per source uniform");
+    const clone = configured[0]; assert.ok(!allClones.has(clone)); allClones.add(clone);
+    assert.equal(clone.color.getHex(), color); assert.equal(clone.map, null);
+    actor.characterRig.root.children.forEach((object, index) => {
+      const changed = object.userData.characterPbrSurface && originals[index] === shared[uniformIndex];
+      assert.equal(object.material, changed ? clone : originals[index], "skin/head/badge/gun stay original");
+    });
+    let disposals = 0; clone.addEventListener("dispose", () => disposals++);
+    actor.Dispose(); actor.Dispose(); assert.equal(disposals, 1); assert.equal(actor.disposed, true);
+  }
+  assert.deepEqual(shared.map((material) => material.color.getHex()), originalColors);
+  assert.ok(shared.every((material) => material.map), "shared albedo maps retained");
+  ordinary.characterRig.root.children.forEach((object) => assert.ok(shared.includes(object.material)));
+}
+console.log("PASS P012 five real roster colours, all five GLB uniform partitions, private material/disposal and unchanged skin/guns/defaults");
+const mainAppearanceSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8").replace(/\r/g, "");
+assert.match(mainAppearanceSource, /if \(phase\.whitebox\?\.p012\) \{\n\s+for \(const actor of ai\.soldiers\)[\s\S]*?ApplyP012CastAppearance\(actor, library\);/);
+assert.equal((mainAppearanceSource.match(/ApplyP012CastAppearance\(actor, library\)/g) || []).length, 1, "only the P012 setup opts in");
 const source=fs.readFileSync(new URL("./Script_Ai.mjs",import.meta.url),"utf8").replace(/\r/g,"");
 function Method(name){return source.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s\\S]*?\\n  }\\n`))[0];}
 let serial=0;

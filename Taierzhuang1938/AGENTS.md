@@ -263,6 +263,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
 - `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
   适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
+- `Script_FirstLevelP012CastAppearance.mjs` 只在本白盒给具名同伴的衣服使用私有纯色材质；
+  不修改人物源资产、肤色或武器，不把临时识别色带入正式关卡。ActorTest 验共享材质隔离。
 - 几何、Flow、Runtime、Actor 均有同名 `Test`；`Script_FirstLevelP012BrowserTest.mjs`
   的 `--prelude --geometry` 验证实际开场和通行，`--campaign` 驱动整关真实移动/射击/交互。
   测试夹具的传送不计入通关时长；验收证据与设计来源见 `docs/Data_FirstLevelP012Acceptance.md`。

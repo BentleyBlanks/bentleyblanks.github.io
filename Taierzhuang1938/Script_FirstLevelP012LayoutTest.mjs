@@ -54,6 +54,7 @@ for(const kind of ["step","vault","mantle"]){const b=layout.blocks.find(b=>b.sem
 for(const p of [anchors.weaponCheck,anchors.ammoPickup,anchors.ammoDrop,...anchors.gunports,anchors.scout,anchors.stretcher])assert.ok(!layout.blocks.some(b=>Hits(p,b,0.4)),`anchor ${JSON.stringify(p)} buried`);
 Audit("NorthInitial",routes.north,[...layout.blocks,...layout.gates]);
 Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
+for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.42);
 assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
 Audit("StretcherSouth",routes.south,layout.blocks);
 const returnLength=Audit("StretcherReturn",routes.retreat,layout.blocks);assert.ok(returnLength>150);
@@ -87,6 +88,56 @@ const ruinFights=[{at:{x:58,z:24},enemies:[{x:58,z:39},{x:57,z:41}]},{at:{x:68,z
 const lateFights=[{at:{x:44,z:62},enemies:[{x:58,z:52},{x:62,z:55},{x:58,z:58},{x:62,z:62},{x:58,z:65},{x:61,z:69}]},{at:{x:42,z:94},enemies:[{x:49,z:104},{x:53,z:108}]},{at:{x:41,z:104.4},enemies:[{x:28,z:97},{x:35,z:99}]},{at:{x:34,z:105},enemies:[{x:27,z:109},{x:33,z:109.5}]}];
 Audit("LateFightSupplyLink",[{x:44,z:62},{x:44,z:66},{x:47,z:80},{x:42,z:94}],layout.blocks,1.3);
 Audit("SouthRoomClearRoute",[{x:42,z:94},{x:41,z:98},{x:41,z:104.4},{x:34,z:104.4},{x:34,z:105},{x:30,z:105}],layout.blocks,1.3);
+const southApproach=[phase.whitebox.activities.closeFightRoute[0],...phase.whitebox.activities.southRoomRoute];
+const frontlineRetry={x:3.32966,z:-43.11849};
+assert.ok(Array.from({length:501},(_,i)=>({x:frontlineRetry.x+(-15-frontlineRetry.x)*i/500,z:frontlineRetry.z+(-64-frontlineRetry.z)*i/500}))
+ .some(p=>layout.blocks.some(b=>b.id==="ReverseSlopeWest"&&Hits(p,b,.42))),"old CP01 to west gunport guidance crosses the reverse slope");
+for(const beat of [6,7,8,9,10]) {
+ const director=new FirstLevelP012Director({},phase.whitebox);director.beat=beat;
+ const goal=anchors.gunports[beat===8?2:beat===10?0:1];
+ const before=JSON.stringify(director.Snapshot());let point=frontlineRetry;const path=[point];
+ for(let hop=0;hop<8&&Math.hypot(point.x-goal.x,point.z-goal.z)>.01;hop++) {
+  director.lastSample={position:point,clips:1};
+  const objective=director.CurrentObjective();
+  assert.equal(objective.arrivalRadiusM,.6);assert.equal(objective.requiredAction,"move");
+  point=objective.target;path.push(point);
+ }
+ assert.deepEqual(point,goal,`B${beat} retry rejoins its actual gunport`);
+ Audit(`FrontlineRetry${beat}`,path,layout.blocks,.42+.6);
+ director.lastSample={position:goal,clips:1};director.CurrentObjective();
+ assert.equal(director.frontlineApproaching,false,"normal battle guidance resumes at the gunport");
+ assert.equal(JSON.stringify(director.Snapshot()),before,"frontline guidance does not change progress, resources or enemy receipts");
+ director.lastSample={position:frontlineRetry,clips:0};
+ assert.equal(director.CurrentObjective().interactionId,"p012_frontlineAmmo","actual supply interaction retains priority");
+}
+const retryFlow=new FirstLevelP012Director({},phase.whitebox);retryFlow.beat=21;retryFlow.routeIndex=5;
+const retrySnapshot=JSON.stringify(retryFlow.Snapshot());
+assert.equal(retryFlow.RouteArrivalRadius(),.6);
+Audit("SouthRetryArrivalEnvelope",southApproach,layout.blocks,.42+retryFlow.RouteArrivalRadius());
+const oldRetryTarget={x:34,z:104.4},retrySpawn={x:44,z:62};
+assert.ok(Array.from({length:401},(_,i)=>({x:44-10*i/400,z:62+42.4*i/400}))
+ .some(p=>layout.blocks.some(b=>b.id==="ReturnBank1_West"&&Hits(p,b,.42))),"old public retry target demonstrably cuts through the return bank");
+for(const beat of [21,22]) {
+ retryFlow.beat=beat;
+ const route=retryFlow.ActivityRoute();
+ for(let index=0;index<route.length;index++) {
+  retryFlow.routeIndex=index;retryFlow.lastSample={position:retrySpawn};
+  let point=retrySpawn;const recovered=[point],budget=route.length+southApproach.length+2;
+  for(let hop=0;hop<budget;hop++) {
+   retryFlow.lastSample={position:point};
+   const objective=retryFlow.CurrentObjective();
+   assert.equal(objective.arrivalRadiusM,.6,"player-facing tolerance matches swept geometry");
+   if(Math.hypot(point.x-route[index].x,point.z-route[index].z)<.01)break;
+   point=objective.target;recovered.push(point);
+  }
+  assert.deepEqual(point,route[index],`B${beat} route ${index} recovers from CP05`);
+  assert.equal(retryFlow.routeIndex,index,"navigation never rewinds room progress");
+  Audit(`B${beat}Retry${index}`,recovered,layout.blocks,.42+.6);
+ }
+}
+retryFlow.beat=21;retryFlow.routeIndex=5;retryFlow.lastSample={position:southApproach[2]};
+assert.deepEqual(retryFlow.CurrentObjective().target,southApproach[3],"walking back along the road retains forward corner guidance");
+assert.equal(JSON.stringify(retryFlow.Snapshot()),retrySnapshot,"guidance does not mutate facts, enemies, checkpoint or resources");
 for(const [i,goal] of lateFights[0].enemies.entries())Audit(`RearguardArrival${i}`,[{x:72,z:54+i*2.5},{x:69,z:73},{x:64,z:73},{x:64,z:67},goal],layout.blocks,.42);
 const ruinCovers=layout.blocks.filter(b=>/^Ruin.*FightCover$/.test(b.id));
 assert.equal(ruinCovers.length,3);

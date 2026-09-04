@@ -39,6 +39,7 @@ import {
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { ApplyP012CastAppearance } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import {
   PhaseContentId, ContentZoneId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate,
@@ -3000,7 +3001,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       playerCast: phase.playerCast || phase.level?.playerCast || undefined,
     });
     if (phase.whitebox?.p012) {
-      for (const actor of ai.soldiers) if (actor.alive && actor.castId) actor.scriptEssential = true;
+      for (const actor of ai.soldiers) if (actor.alive && actor.castId) {
+        actor.scriptEssential = true;
+        ApplyP012CastAppearance(actor, library);
+      }
       const guide = companion.Handle("luo");
       if (guide) {
         const x = -66, z = 61, y = battlefield.GroundHeight(x, z);
@@ -3026,6 +3030,11 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       return actor;
     },
     GuideActor: () => companion?.Handle("luo"), Position: (actor) => actor?.position ? { x: actor.position.x, z: actor.position.z } : null,
+    GuideYaw: (actor) => actor.yaw,
+    FaceGuide: (actor, yaw) => {
+      actor.yaw = yaw; actor.lookYaw = 0;
+      if (actor.actor) actor.actor.root.rotation.y = yaw;
+    },
     RestorePlayer: (point) => { player.Spawn(point.x,point.z,point.yaw);player.stance=point.stance;return true; },
     Signal: (name) => story.Signal(name),
     ObservationVisible: (target) => {
@@ -3098,9 +3107,26 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
         && HasLineOfSight(actor.position.x, actor.position.z);
     },
     ReleaseGuide: (actor) => { if (actor) { actor.p012Guided = false; delete actor.scriptMoveSpeedMps; actor.manualGoalUntil = ai.time; } },
-    TrafficActor: (side, slot, point) => {
-      if (side === 0) return ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.castId && !actor.unarmed)[slot] || null;
-      return setpieces.host.SpawnActor({ label: "向南转移的乡亲", x: point.x, z: point.z, weapon: null, civilian: true, variant: slot % 2 ? "female" : "male", role: "civilian", squadId: "P012Traffic" });
+    PlayerPosition: () => player.position,
+    TrafficActor: (side, slot, point, entry = {}) => {
+      let actor;
+      if (side === 0) {
+        actor = ai.soldiers.filter(candidate => candidate.side === "nra" && candidate.alive
+          && !candidate.castId && !candidate.unarmed && !candidate.escortRole)[slot] || null;
+        if (actor) {
+          const y = battlefield.GroundHeight(point.x, point.z);
+          actor.position.set(point.x, y, point.z); actor.body?.Teleport(point.x, y, point.z);
+          actor.goal.set(point.x, 0, point.z);
+          if (actor.actor) actor.actor.root.position.copy(actor.position);
+        }
+      } else {
+        actor = setpieces.host.SpawnActor({ label: entry.role === "walking" ? "向后方转移的伤兵" : "向后方转移的乡亲",
+          x: point.x, z: point.z, weapon: null, civilian: entry.role !== "walking",
+          variant: entry.variant, role: entry.role || "civilian", squadId: "P012Traffic" });
+        if (actor && entry.role === "walking") actor.woundedWalk = 1;
+      }
+      if (actor) actor.p012TrafficSide = side;
+      return actor;
     },
     Signalled: (name) => story.Signalled(name),
     Dodge: (reason) => strafe?.Dodge(reason),
