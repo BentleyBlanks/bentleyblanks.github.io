@@ -25,6 +25,17 @@ import {
   AircraftStrafeDirector, STRAFE_PRESETS, STRAFE_DEFAULTS, STRAFE_SFX, STRAFE_PHASES, STRAFE_BEATS,
 } from "./Script_AircraftStrafe.mjs";
 import { EVENTS } from "./Data_MissionCh1.mjs";
+import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
+import { readFileSync } from "node:fs";
+const { Vector3 } = await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
+
+{
+ const director=new AircraftStrafeDirector({});let hit=false,killed=false;
+ const npc={position:new Vector3(0,0,0),TakeHit(damage,part,dir){assert.ok(dir instanceof Vector3);assert.ok(Number.isFinite(dir.lengthSq()));hit=true;return false;},Kill(dir){assert.ok(dir instanceof Vector3);killed=true;return true;}};
+ director.StrikeNpc(npc,{damage:100,part:"torso",lethal:true});
+ assert.ok(hit&&killed,"native Soldier damage and ragdoll receive native Vector3");
+ assert.deepEqual(npc.position.toArray(),[0,0,0],"damage direction does not mutate NPC position");
+}
 
 let checks = 0;
 function Check(condition, message) {
@@ -630,4 +641,62 @@ console.log("ok  打飞机：命中判定存在、打偏认得出、打一百枪
 
 console.log("ok  参数校验与换关兜底：起不来的四种、必不死优先、Abort/Reset 分账、掉帧有闸");
 
+{
+  const { sys } = MakeRig();
+  const routes = P012Phase.whitebox.aircraftRoutes;
+  sys.StrafeRun({ preset: "railPass", ...routes.railPass });
+  let last;
+  while (sys.Active) { const view = sys.Update(1 / 120); if (view) last = view.aircraft; }
+  sys.StrafeRun({ preset: "crowdTurn", ...routes.crowdTurn });
+  const start = sys.Update(0).aircraft;
+  Check(Math.hypot(last.x - start.x, last.z - start.z) <= 3, "P012 railway exit joins visible turn within 3m");
+  Check(Math.abs(last.y - start.y) <= 1, "P012 turn preserves aircraft altitude at join");
+  const middle = Step(sys, 2.5).aircraft;
+  Check(Math.hypot(middle.x - start.x, middle.z - start.z) > 20, "P012 five second turn actually moves through curve");
+  Check(sys.View().phase === "approach", "P012 turn does not begin firing halfway through");
+}
+{
+  const cfg={preset:"crowdTurn",from:{x:50,z:110},to:{x:50,z:30},leadM:55,fireFromS:5,
+    turnFrom:{x:-72,z:112},turnControl:{x:-72,z:185},turnControl2:{x:50,z:210}};
+  const sys=new AircraftStrafeDirector({});sys.StrafeRun(cfg);
+  sys.run.t=0;sys.PlaceAircraft(0);
+  Check(sys.run.air.dirZ===1,"cubic starts heading south, continuous with railway exit");
+  sys.run.t=5;sys.PlaceAircraft(0);
+  const end={...sys.run.air};
+  Check(Math.hypot(end.x-50,end.z-165)<1e-9&&Math.abs(end.dirZ+1)<1e-9,"cubic ends northward at the real lead-offset aircraft position");
+  sys.run.phase="strafe";sys.PlaceAircraft(0);
+  Check(Math.hypot(end.x-sys.run.air.x,end.z-sys.run.air.z)<1e-9,"cubic-to-fire has no position jump");
+  const old=new AircraftStrafeDirector({});const {turnControl2,...quadratic}=cfg;old.StrafeRun(quadratic);
+  for(const p of [0,.2,.5,.8,1]){
+    old.run.t=p*5;old.PlaceAircraft(0);const q=1-p;
+    Check(Math.abs(old.run.air.x-(q*q*-72+2*q*p*-72+p*p*50))<1e-9
+      &&Math.abs(old.run.air.z-(q*q*112+2*q*p*185+p*p*165))<1e-9,"missing second control preserves quadratic formula exactly");
+  }
+  const straight=new AircraftStrafeDirector({});straight.StrafeRun({preset:"railPass",from:{x:0,z:0},to:{x:0,z:100}});
+  straight.run.t=straight.run.fireFromS*.5;straight.PlaceAircraft(0);
+  Check(Math.abs(straight.run.air.z-(-straight.run.approachM*.5-straight.run.leadM))<1e-9,"default formal straight approach unchanged");
+}
+{
+  const cfg=P012Phase.whitebox.aircraftRoutes.divePress;
+  for(const z of [60,62])for(const dodge of [false,true]){
+    const target={x:44,y:0,z}, {sys,log}=MakeRig({PlayerPos:()=>target});
+    sys.StrafeRun({preset:"divePress",...cfg,TrackTo:()=>target});
+    Check(Math.abs(sys.run.fireToS-sys.run.fireFromS-2.5)<1e-9,"P012 dive has 2.5 seconds of actual strafe, excluding exit");
+    Check(sys.run.player.windowS===2.2,"expanded corridor preserves the 2.2 second reaction window");
+    let closest={distance:Infinity,time:0},activeShots=0;
+    while(sys.Active){
+      sys.Update(1/120);
+      if(dodge&&sys.run?.player.open)sys.Dodge("testActualDitchInput");
+      if(sys.run?.phase==="strafe"){
+        const p=sys.run.impact,distance=Math.hypot(p.x-target.x,p.z-target.z);
+        if(distance<closest.distance)closest={distance,time:sys.run.t};
+        if(sys.View().firing)activeShots++;
+      }
+    }
+    Check(closest.distance<.2&&Math.abs(closest.time-cfg.player.atS)<.08,"explicit player impact time agrees with the real steered line at both ditch positions");
+    Check(log.impacts.length>=30&&log.tracers.length>=10&&activeShots>120,"extended run produces real impacts and tracers during strafe, not just a long exit");
+    Check(log.playerHits.length===(dodge?0:1),"successful dodge prevents all later player damage; missed window hits exactly once");
+  }
+  Check(STRAFE_PRESETS.divePress.speed===88,"formal chapter dive speed is unchanged");
+}
 console.log(`\nAircraftStrafeTest 通过：${checks} 条断言`);

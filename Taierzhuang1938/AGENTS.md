@@ -254,6 +254,19 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
   “走进目标圈就算完成”。回归口：`Script_FirstLevelWhiteboxTest.mjs` 与
   `Script_FirstLevelWhiteboxBrowserTest.mjs`。
 
+### 第一关 P0/P1/P2 场景白盒（?whitebox=p012，额外独立版本）
+
+- `Data_FirstLevelP012Layout.mjs` 管 P2 坐标、体块、颜色语义和通行路线；
+  `Data_FirstLevelP012Whitebox.mjs` 管独立 phase、现有角色/对白适配和节奏参数。
+- 与旧 `?whitebox=1`、正式第一关并存，不覆盖它们。这个版本按用户要求使用
+  灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
+  环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。
+- `Script_FirstLevelP012Flow.mjs` 是纯任务事实编排；`Script_FirstLevelP012Runtime.mjs`
+  适配真实演员、人流、防守、炮击与扑沟输入。不能以目标时刻或虚拟队头替代真实完成。
+- 几何、Flow、Runtime、Actor 均有同名 `Test`；`Script_FirstLevelP012BrowserTest.mjs`
+  的 `--prelude --geometry` 验证实际开场和通行，`--campaign` 驱动整关真实移动/射击/交互。
+  测试夹具的传送不计入通关时长；验收证据与设计来源见 `docs/Data_FirstLevelP012Acceptance.md`。
+
 ### 界河白盒（?jiehe=1，退出正片但资产完整的那片城北原野）
 - 切片是 `Data_Menu.JIEHE_SANDBOX_PHASE`。**id 仍是 `L0_Jiehe`** —— `OUTFIELD_SCENES` /
   `PLACEMENTS` / `TRIM_PLACEMENTS` 三张表都按这个 levelId 分组，换 id 等于把布景摘光；

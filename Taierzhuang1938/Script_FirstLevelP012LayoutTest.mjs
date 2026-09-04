@@ -1,0 +1,305 @@
+// Pure Node geometry audit: OBB/circle sweep, not merely a constants check.
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import {FIRST_LEVEL_P012_LAYOUT as layout,P012_ROUTES as routes,P012_ZONES as zones,P012_ANCHORS as anchors,P012_SEMANTIC_COLORS as colors,P012_ENEMY_LANES as lanes} from "./Data_FirstLevelP012Layout.mjs";
+import {TRAVERSAL,TraversalKind} from "./Data_Traversal.mjs";
+import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
+import {FIRST_LEVEL_P012_WHITEBOX_PHASE as phase} from "./Data_FirstLevelP012Whitebox.mjs";
+function Hits(p,b,r=1.3) {
+ if(b.solid===false||b.y-b.h/2>1.8||b.y+b.h/2<=0.05)return false;
+ const dx=p.x-b.x,dz=p.z-b.z,c=Math.cos(b.ry),s=Math.sin(b.ry);
+ const x=dx*c-dz*s,z=dx*s+dz*c;
+ return Math.hypot(Math.max(0,Math.abs(x)-b.w/2),Math.max(0,Math.abs(z)-b.d/2))<r;
+}
+function Audit(name,route,obstacles,r=1.3){
+ let length=0,samples=0;
+ for(let i=1;i<route.length;i++){
+  const a=route[i-1],b=route[i],distance=Math.hypot(b.x-a.x,b.z-a.z);length+=distance;
+  for(let j=0;j<=Math.ceil(distance/0.2);j++){
+   const k=j/Math.ceil(distance/0.2),p={x:a.x+(b.x-a.x)*k,z:a.z+(b.z-a.z)*k};
+   const hits=obstacles.filter(block=>Hits(p,block,r));
+   assert.equal(hits.length,0,`${name} at ${p.x.toFixed(2)},${p.z.toFixed(2)}: ${hits.map(b=>b.id)}`);samples++;
+  }
+ }
+ console.log(`${name}: ${length.toFixed(1)}m, ${samples} swept samples, radius ${r}m clear`);return length;
+}
+assert.equal(zones.length,11);assert.deepEqual(zones[2].x,0);assert.equal(zones[5].z,-80);
+assert.equal(layout.ground.y+layout.ground.h/2,0);
+// Analytic GroundHeight owns flat-floor contact. A second solid at y=0 makes
+// Rapier spawn overlap rejection eject the player from the carriage.
+for(const block of layout.blocks.filter(b=>b.semantic==="ground"&&b.y+b.h/2===0))assert.equal(block.solid,false,`${block.id} duplicates analytic floor collision`);
+for(const b of layout.blocks)assert.ok(colors[b.semantic]!==undefined,`${b.id} semantic`);
+assert.equal(layout.blocks.find(b=>b.id==="StationWindowSill").semantic,"cover","barred carriage window must not advertise a vault exit");
+const ruinSill=layout.blocks.find(b=>b.id==="RuinWindowSill"),ruinLintel=layout.blocks.find(b=>b.id==="RuinWindowLintel");
+assert.equal(ruinSill.semantic,"cover","low-headroom window must not advertise a guaranteed vault");
+assert.ok(ruinLintel.y-ruinLintel.h/2-(ruinSill.y+ruinSill.h/2)<1.78,"window cannot fit the standing vault capsule above its sill");
+const routePaint=layout.blocks.filter(b=>/^(North|South|Retreat|Flank|TrainExit)Route\d+$/.test(b.id));
+for(const paint of routePaint){
+ assert.equal(paint.solid,false,"route paint never changes collision");
+ assert.equal(paint.y+paint.h/2,paint.semantic==="stretcherRoute"?.045:.025,"route semantic fixes its visual depth layer");
+}
+for(const kind of ["step","vault","mantle"]){const b=layout.blocks.find(b=>b.semantic===kind);assert.equal(TraversalKind(b.h),kind);}
+for(const p of [anchors.weaponCheck,anchors.ammoPickup,anchors.ammoDrop,...anchors.gunports,anchors.scout,anchors.stretcher])assert.ok(!layout.blocks.some(b=>Hits(p,b,0.4)),`anchor ${JSON.stringify(p)} buried`);
+Audit("NorthInitial",routes.north,[...layout.blocks,...layout.gates]);
+Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
+assert.ok(!layout.blocks.some(b=>Hits(anchors.trainSpawn,b,0.4)));
+Audit("StretcherSouth",routes.south,layout.blocks);
+const returnLength=Audit("StretcherReturn",routes.retreat,layout.blocks);assert.ok(returnLength>150);
+const activityRoutes={weaponIssue:[{x:-55,z:44},{x:-55,z:34},{x:-45,z:34},{x:-43,z:40}],
+ orientations:[{x:-3,z:0},{x:7,z:6},{x:2,z:-12},{x:0,z:0},{x:16,z:5}],
+ shellCover:[{x:0,z:-22},{x:3,z:-30},{x:5,z:-38},{x:5,z:-42}],
+ ammo:[{x:-7,z:-52},{x:0,z:-52},{x:5,z:-46},{x:5,z:-59},{x:5,z:-65}],
+ finalCarry:[{x:-7,z:-37},{x:-7,z:-45},{x:-7,z:-52}]};
+for(const [name,route] of Object.entries(activityRoutes))Audit(`Activity_${name}`,route,layout.blocks);
+Audit("FinalRegripApproach",[{x:5,z:-46},{x:-7,z:-37}],layout.blocks);
+for(const offset of [-2,2])Audit(`TrafficLane${offset}`,routes.north.slice(2,8).map(p=>({x:p.x+offset,z:p.z})),layout.blocks,0.4);
+for(const state of layout.scenario.states){
+ const geometry=[...layout.blocks.filter(b=>!layout.scenario.replaceBlockIds.includes(b.id)),...state.blocks];
+ Audit(`${state.id}South`,routes.south,geometry);
+ Audit(`${state.id}Return`,routes.retreat,geometry);
+ for(const [name,route] of Object.entries(activityRoutes))Audit(`${state.id}_Activity_${name}`,route,geometry);
+}
+const flankLength=Audit("HouseFlank",routes.flank,layout.blocks,0.4);assert.ok(flankLength/2>=35&&flankLength/2<=50);
+const cornerFlow=new FirstLevelP012Director({},phase.whitebox);cornerFlow.beat=14;
+const cornerRadius=cornerFlow.RouteArrivalRadius();
+assert.equal(cornerFlow.CurrentObjective().arrivalRadiusM,cornerRadius,"HUD and route consumption share the same arrival tolerance");
+assert.ok(cornerRadius<=.6);
+const oldShortcut=[{x:42.5,z:24},{x:58,z:24}];
+assert.ok(Array.from({length:201},(_,i)=>({x:oldShortcut[0].x+(oldShortcut[1].x-oldShortcut[0].x)*i/200,z:24})).some(p=>layout.blocks.some(b=>b.id==="EvacWindowScreen"&&Hits(p,b,.42))),"regression reproduces the old public 3m early-turn wall collision");
+assert.ok(Math.hypot(42.5-45,24-26)>cornerRadius,"actual early-turn position is not an arrived corner");
+// Sweeping radius(player)+radius(arrival) covers every segment joining points
+// inside the endpoint arrival discs, not just the ideal waypoint centerline.
+Audit("PublicB14ArrivalEnvelope",[{x:42.5,z:24},...routes.flank],layout.blocks,.42+cornerRadius);
+Audit("HouseFightCoverBypassPlayerEnvelope",routes.flank.slice(0,-3),layout.blocks,.42+cornerRadius);
+const ruinFights=[{at:{x:58,z:24},enemies:[{x:58,z:39},{x:57,z:41}]},{at:{x:68,z:24},enemies:[{x:68,z:34},{x:70,z:36}]},{at:{x:72,z:43},enemies:[{x:67,z:49},{x:70,z:49}]}];
+const lateFights=[{at:{x:44,z:62},enemies:[{x:58,z:52},{x:62,z:55},{x:58,z:58},{x:62,z:62},{x:58,z:65},{x:61,z:69}]},{at:{x:42,z:94},enemies:[{x:49,z:104},{x:53,z:108}]},{at:{x:41,z:104.4},enemies:[{x:28,z:97},{x:35,z:99}]},{at:{x:34,z:105},enemies:[{x:27,z:109},{x:33,z:109.5}]}];
+Audit("LateFightSupplyLink",[{x:44,z:62},{x:44,z:66},{x:47,z:80},{x:42,z:94}],layout.blocks,1.3);
+Audit("SouthRoomClearRoute",[{x:42,z:94},{x:41,z:98},{x:41,z:104.4},{x:34,z:104.4},{x:34,z:105},{x:30,z:105}],layout.blocks,1.3);
+for(const [i,goal] of lateFights[0].enemies.entries())Audit(`RearguardArrival${i}`,[{x:72,z:54+i*2.5},{x:69,z:73},{x:64,z:73},{x:64,z:67},goal],layout.blocks,.42);
+const ruinCovers=layout.blocks.filter(b=>/^Ruin.*FightCover$/.test(b.id));
+assert.equal(ruinCovers.length,3);
+for(const b of ruinCovers)assert.ok(b.semantic==="cover"&&b.h>=.9&&b.h<=1.05);
+for(const fight of [...ruinFights,...lateFights]){
+ assert.ok(!layout.blocks.some(b=>Hits(fight.at,b,.42)));
+ for(const enemy of fight.enemies){
+  assert.ok(!layout.blocks.some(b=>Hits(enemy,b,.42)));
+  for(const height of (ruinFights.includes(fight)?[.42,.8,1.62]:[.42,1.62])){
+   let blocked=false;
+   for(let sample=0;sample<=500;sample++){
+    const k=sample/500,p={x:fight.at.x+(enemy.x-fight.at.x)*k,z:fight.at.z+(enemy.z-fight.at.z)*k},eye=height+(1.5-height)*k;
+    if(layout.blocks.some(b=>b.y-b.h/2<eye&&b.y+b.h/2>eye&&Hits(p,b,.01)))blocked=true;
+   }
+   assert.equal(blocked,height<1,`ruin fight ${JSON.stringify(fight.at)} eye/torso ${height} versus ${JSON.stringify(enemy)}`);
+  }
+ }
+}
+Audit("ConnectedGunports",routes.gunports,layout.blocks,0.42);
+const closeGunports=routes.gunports.map(p=>({x:p.x,z:p.z-.8}));
+Audit("GunportTransitClose",closeGunports,layout.blocks,0.42);
+const breastwork=layout.blocks.filter(b=>b.id.startsWith("Gunport")&&b.semantic==="cover");
+assert.equal(breastwork.length,5);
+for(const block of breastwork)assert.ok(block.h<=1.05&&block.solid!==false);
+// Check real sloping enemy-eye rays, not a constant-height plan-view line.
+// A prone head remains screened throughout both exposed lateral gaps; a
+// standing player's sight stays above every breastwork segment.
+for(const route of [routes.gunports,closeGunports])for(let segment=1;segment<route.length;segment++){
+ const a=route[segment-1],b=route[segment];
+ for(let step=0;step<=100;step++){
+  const t=step/100,p={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};
+  for(const enemy of [...lanes.west.terminalGoals,{x:-25,z:-83},lanes.center.goal,lanes.east.goal]){
+   let screened=false;
+   for(let sample=0;sample<=500;sample++){
+    const k=sample/500,q={x:p.x+(enemy.x-p.x)*k,z:p.z+(enemy.z-p.z)*k},eye=.45+(1.5-.45)*k;
+    if(breastwork.some(block=>eye<block.y+block.h/2&&Hits(q,block,.01)))screened=true;
+   }
+   assert.ok(screened,`prone transit exposed at ${JSON.stringify(p)} to ${JSON.stringify(enemy)}`);
+  }
+ }
+}
+const sight=Math.hypot(anchors.scout.x-anchors.gunports[1].x,anchors.scout.z-anchors.gunports[1].z);assert.ok(sight>=45&&sight<=60);
+function SightClear(a,b,height){
+ for(let i=0;i<=500;i++){
+  const k=i/500,p={x:a.x+(b.x-a.x)*k,z:a.z+(b.z-a.z)*k};
+  assert.ok(!layout.blocks.some(block=>block.solid!==false&&block.y-block.h/2<height&&block.y+block.h/2>height&&Hits(p,{...block,y:0.5,h:1},0.01)),`sight blocked at ${JSON.stringify(p)}`);
+ }
+}
+function SegmentBlocked(from,to){
+ return layout.blocks.some(b=>{
+  if(b.solid===false)return false;
+  const c=Math.cos(b.ry),s=Math.sin(b.ry),local=p=>[(p.x-b.x)*c-(p.z-b.z)*s,p.y-b.y,(p.x-b.x)*s+(p.z-b.z)*c];
+  const a=local(from),end=local(to),half=[b.w/2,b.h/2,b.d/2];let low=0,high=1;
+  for(let axis=0;axis<3;axis++){
+   const delta=end[axis]-a[axis];
+   if(Math.abs(delta)<1e-8){if(Math.abs(a[axis])>half[axis])return false;}
+   else{const t=(-half[axis]-a[axis])/delta,u=(half[axis]-a[axis])/delta;low=Math.max(low,Math.min(t,u));high=Math.min(high,Math.max(t,u));if(low>high)return false;}
+  }
+  return true;
+ });
+}
+Audit("InjuredRoadCoverAccess",[{x:42.5,z:24},{x:39,z:25.5},{x:45,z:26}],layout.blocks,1.02);
+for(let i=0;i<360;i++){
+ const point={x:39+.6*Math.cos(i*Math.PI/180),z:25.5+.6*Math.sin(i*Math.PI/180)};
+ assert.ok(!layout.blocks.some(b=>Hits(point,b,.42)));
+ for(const enemy of [{x:58,y:1.5,z:39},{x:57,y:1.5,z:41}]){
+  assert.ok(SegmentBlocked({...point,y:.42},enemy),"existing waiting cover protects an injured prone player before the exposed road transfer");
+  assert.ok(!SegmentBlocked({...point,y:1.62},enemy),"standing at the waiting cover still exposes a real firing angle");
+ }
+}
+let relocationCount=0;
+for(const key of ["closeFightGroups","southFightGroups"]){
+ const groups=phase.whitebox.activities[key];
+ assert.equal(groups.length,3,`${key} keeps three finite pairs`);
+ for(const [groupIndex,group] of groups.entries()){
+  assert.equal(group.positions.length,2);assert.equal(group.relocations.length,2);
+  for(const [index,to] of group.relocations.entries()){
+   const from=group.positions[index],label=`${key}_${groupIndex}_${index}`;
+   Audit(`RelocationEnvelope_${label}`,[from,to],layout.blocks,1.02);
+   for(let sample=0;sample<=100;sample++){
+    const t=sample/100,enemy={x:from.x+(to.x-from.x)*t,y:1.5,z:from.z+(to.z-from.z)*t};
+    assert.ok(!SegmentBlocked(enemy,{...group.cover,y:1.62}),`${label} must remain a genuinely shootable moving enemy`);
+    assert.ok(SegmentBlocked(enemy,{...group.cover,y:.42}),`${label} must retain the player's real prone shelter through its whole move`);
+   }
+   relocationCount++;
+  }
+ }
+}
+assert.equal(relocationCount,12,"B20/B21 geometry audits every configured relocation, not a stale copied coordinate list");
+const ambushEnemies=[{x:58,y:1.5,z:39},{x:57,y:1.5,z:41},{x:68,y:1.5,z:34},{x:70,y:1.5,z:36},{x:67,y:1.5,z:49},{x:70,y:1.5,z:49}];
+const shelteredTransfers=[{name:"RoadPocketEarlyProne",a:{x:56.5,z:24.23077},b:{x:58,z:24},first:0,axis:"z"},
+ {name:"NorthToEastProne",a:{x:68,z:24},b:{x:72,z:24},first:4,axis:"z"},
+ {name:"EastCorridorProne",a:{x:72,z:24},b:{x:72,z:43},first:4,axis:"x"}];
+for(const segment of shelteredTransfers){
+ const exposed={};
+ for(const y of [.42,1.05,1.62]){
+  let count=0;
+  for(let sample=0;sample<=100;sample++)for(const offset of [-.2,0,.2]){
+   const t=sample/100,p={x:segment.a.x+(segment.b.x-segment.a.x)*t,y,z:segment.a.z+(segment.b.z-segment.a.z)*t};p[segment.axis]+=offset;
+   if(ambushEnemies.slice(segment.first).some(enemy=>!SegmentBlocked(p,enemy)))count++;
+  }
+  exposed[y]=count;
+ }
+ assert.equal(exposed[.42],0,`${segment.name} must protect a real prone-width lane`);
+ assert.ok(exposed[1.05]>0&&exposed[1.62]>0,`${segment.name} must not misleadingly promise standing/crouched head protection`);
+ console.log(`${segment.name}: exposed samples per 303, prone/crouch/stand ${exposed[.42]}/${exposed[1.05]}/${exposed[1.62]}`);
+}
+for(const sample of [{x:57.3419,z:24.0851,enemy:{x:58,y:1.5,z:39}},{x:71.971,z:33.671,enemy:{x:70,y:1.5,z:49}}]){
+ assert.ok(SegmentBlocked({...sample,y:.42},sample.enemy),"recorded later B14 wound point must be protected when prone");
+ assert.ok(!SegmentBlocked({...sample,y:1.62},sample.enemy),"standing fire at recorded wound point remains real exposure");
+}
+// Audit every transfer, including arrival-disc edges, under the actual staged
+// living groups. Exposure is reported, not disguised as universally safe cover.
+for(let index=1;index<routes.flank.length;index++){
+ const a=routes.flank[index-1],b=routes.flank[index],remaining=index===1?ambushEnemies:index===2?ambushEnemies.slice(2):index<=5?ambushEnemies.slice(4):[];
+ const counts=[];
+ for(const y of [.42,1.05,1.62]){
+  let exposed=0;
+  for(let step=0;step<=20;step++)for(let angle=0;angle<8;angle++){
+   const t=step/20,theta=angle*Math.PI/4,p={x:a.x+(b.x-a.x)*t+Math.cos(theta)*cornerRadius,y,z:a.z+(b.z-a.z)*t+Math.sin(theta)*cornerRadius};
+   if(remaining.some(enemy=>!SegmentBlocked(p,enemy)))exposed++;
+  }
+  counts.push(exposed);
+ }
+ console.log(`B14 transfer ${index}: live=${remaining.length}, exposed prone/crouch/stand per 168: ${counts.join("/")}`);
+}
+Audit("ConvoyWindowAdvance",[{x:30,z:10},{x:34,z:18.8}],layout.blocks,1.3);
+for(let sample=0;sample<=100;sample++){
+ const t=sample/100;
+ for(const side of [-.6,0,.6])for(const y of [.7,1.5])for(const enemy of [{x:68,y:1.5,z:34},{x:70,y:1.5,z:36}])
+  assert.ok(SegmentBlocked(enemy,{x:30+4*t+side*.910366,y,z:10+8.8*t-side*.413803}),"convoy short advance and litter half-width must not emerge into indoor fire");
+}
+for(const x of [58,68])for(const y of [.7,1.5])assert.ok(!SegmentBlocked({x,y:1.62,z:24},{x:34,y,z:18.8}),"window must reveal actual convoy, including low stretcher");
+for(const x of [58,68])assert.ok(!SegmentBlocked({x,y:1.62,z:24},{x:34-1.1*.413803,y:.7,z:18.8-1.1*.910366}),"first physical litter trails lead bearer 1.1m and must still be visible");
+SightClear(anchors.gunports[1],anchors.scout,1.62);
+SightClear({x:68,z:34},anchors.stretcher,1.62);
+const partition=layout.blocks.find(b=>b.id==="RuinCrossfirePartition");
+assert.deepEqual([partition.x,partition.z,partition.w,partition.d,partition.h],[67,40,7,.5,2.2]);
+assert.equal(partition.semantic,"boundary");
+// Include the public arrival-disc uncertainty, not just the exact blue-pocket
+// centers: the previous narrow partition exposed x62.253,z24.002 mid-transfer.
+for(let step=0;step<=100;step++)for(let angle=0;angle<72;angle++){
+ const theta=angle*Math.PI/36;
+ for(const y of [1.62,1.05])for(const enemy of [{x:67,y:1.5,z:49},{x:70,y:1.5,z:49}])
+  assert.ok(SegmentBlocked({x:58+step*.1+Math.cos(theta)*cornerRadius,y,z:24+Math.sin(theta)*cornerRadius},enemy),"rear pair must not crossfire the entire public B14 transfer envelope");
+}
+for(const y of [1.62,1.05])assert.ok(SegmentBlocked({x:62.253,y,z:24.002},{x:67,y:1.5,z:49}),"actual 644.95s torso-hit position is screened");
+for(const from of [{x:68,z:24},{x:68.23,z:23.93},{x:66.42,z:23.99}]){
+ for(const enemy of [{x:68,z:34},{x:70,z:36}])SightClear(from,enemy,1.62);
+ for(const enemy of [{x:67,z:49},{x:70,z:49}]){
+  let screened=false;
+  for(let i=0;i<=1000;i++){
+   const t=i/1000,p={x:from.x+(enemy.x-from.x)*t,z:from.z+(enemy.z-from.z)*t},eye=1.62+(1.5-1.62)*t;
+   if(eye<partition.y+partition.h/2&&Hits(p,partition,.001))screened=true;
+  }
+  assert.ok(screened,`second firing pocket ${JSON.stringify(from)} must screen southern crossfire`);
+ }
+}
+for(const enemy of [{x:67,z:49},{x:70,z:49}])SightClear({x:72,z:43},enemy,1.62);
+Audit("RuinPartitionBypass",[{x:72,z:30},{x:72,z:43}],layout.blocks,.42+cornerRadius);
+for(const point of anchors.blockadePositions){
+ assert.ok(!layout.blocks.some(b=>Hits(point,b,.42)));
+ assert.ok(Math.hypot(point.x-42,point.z-98)>=28);
+ SightClear({x:42,z:98},point,1.62);
+}
+for(let index=0;index<6;index++){
+ const from={x:44,z:62},to={x:72,z:54+index*2.5};let blocked=false;
+ for(let sample=0;sample<=500;sample++){
+  const k=sample/500,p={x:from.x+(to.x-from.x)*k,z:from.z+(to.z-from.z)*k};
+  if(layout.blocks.some(b=>b.y-b.h/2<1.62&&b.y+b.h/2>1.62&&Hits(p,b,.01)))blocked=true;
+ }
+ assert.ok(blocked,`B20 spawn ${index} must arrive from behind real geometry`);
+}
+for(const [name,lane] of Object.entries(lanes)){
+ Audit(`${name}EnemyApproach`,lane.waypoints,layout.blocks,0.4);
+ for(const gunport of anchors.gunports){
+  let blocked=false;
+  for(let i=0;i<=500;i++){
+   const k=i/500,p={x:gunport.x+(lane.spawn.x-gunport.x)*k,z:gunport.z+(lane.spawn.z-gunport.z)*k};
+   if(layout.blocks.some(b=>b.y-b.h/2<1.62&&b.y+b.h/2>1.62&&Hits(p,b,0.01)))blocked=true;
+  }
+  assert.ok(blocked,`${name} spawn visible from gunport`);
+ }
+}
+for(const [index,goal] of lanes.west.terminalGoals.entries()){
+ const distance=Math.hypot(goal.x-anchors.gunports[0].x,goal.z-anchors.gunports[0].z);
+ assert.ok(distance>=12&&distance<=15,`culvert terminal ${index} must remain a readable 12–15m threat`);
+ Audit(`CulvertTerminal${index}`,[...lanes.west.waypoints.slice(0,-1),goal],layout.blocks,0.4);
+ for(const other of lanes.west.terminalGoals.slice(index+1))assert.ok(Math.hypot(goal.x-other.x,goal.z-other.z)>=1.2,"culvert terminal capsules cannot share a single goal");
+}
+const bridge=layout.blocks.find(b=>b.id==="ReturnRailSpurDeck");
+assert.ok(routes.retreat.some(p=>Math.abs(p.x-bridge.x)<bridge.w/2&&Math.abs(p.z-bridge.z)<bridge.d/2));
+assert.ok(bridge.y-bridge.h/2>=2.6);
+assert.ok(Hits({x:23,z:7.2},layout.gates.find(g=>g.signal==="EscortCall")));
+assert.ok(Hits({x:22,z:92},layout.gates.find(g=>g.signal==="SouthCut")));
+// Standing and takeoff / landing space around each traversal obstacle is physically clear.
+for(const [kind,p] of Object.entries(anchors.traversal)){
+ const box=layout.blocks.find(b=>b.id===`Station${kind[0].toUpperCase()+kind.slice(1)}`);
+ for(const dz of [-2,2])assert.ok(!layout.blocks.some(b=>b!==box&&Hits({x:p.x,z:p.z+dz},b,0.4)),`${kind} blocked landing`);
+ // The real traversal starts 0.9m south and ends at the shared reach distance.
+ // Sweep the whole horizontal capsule footprint against the full apex+standing
+ // envelope, including overhead decks that ground-only tests deliberately skip.
+ const reach=kind==="mantle"?TRAVERSAL.mantleReachM:TRAVERSAL.vaultReachM;
+ const apex=box.h+(kind==="mantle"?TRAVERSAL.mantleApexOverM:TRAVERSAL.vaultApexOverM);
+ for(let i=0;i<=100;i++){
+  const sample={x:p.x,z:p.z+0.9-reach*i/100};
+  for(const obstacle of layout.blocks){
+   if(obstacle===box||obstacle.solid===false||obstacle.y+obstacle.h/2<=0||obstacle.y-obstacle.h/2>=apex+1.78)continue;
+   assert.ok(!Hits(sample,{...obstacle,y:0.5,h:1},0.4),`${kind} full traversal envelope blocked by ${obstacle.id}`);
+  }
+ }
+}
+assert.ok(layout.blocks.some(b=>b.id==="RailEmbankment"&&b.h>=2&&b.h<=3));
+assert.ok(TRAVERSAL.mantleMax<layout.blocks.find(b=>b.id==="WestBoundary").h);
+console.log("PASS P012 layout geometry");
+// Execute the production reconciliation method with a minimal field host; no WebGL needed.
+const fieldSource=fs.readFileSync(new URL("./Script_FirstLevelWhiteboxField.mjs",import.meta.url),"utf8");
+const syncMethod=fieldSource.match(/  SyncScenario\(\{[\s\S]*?\n  }\n/)[0];
+const sync=vm.runInNewContext(`({${syncMethod}})`).SyncScenario;
+const host={layout,gates:new Map([["a",{open:false,spec:{signal:"EscortCall"}}],["b",{open:false,spec:{signal:"SouthCut"}}]]),scenarioState:"Ordered",
+ OpenGate(id){this.gates.get(id).open=true;return true;},CloseGate(id){this.gates.get(id).open=false;return true;},
+ SetScenarioState(state){if(this.scenarioState===state.id)return false;this.scenarioState=state.id;return true;}};
+assert.equal(sync.call(host,{signalled:()=>true}),3,"two gates plus changed hub must refresh navigation");
+assert.equal(sync.call(host,{signalled:()=>false,restore:true}),3,"two restored gates plus changed hub must refresh navigation");
+assert.equal(sync.call(host,{signalled:()=>false,restore:true}),0,"stable restore is idempotent");
+host.layout={};assert.equal(sync.call(host,{signalled:()=>true}),2,"legacy count remains opened gates only");
+console.log("PASS P012 scenario reconciliation change counts");

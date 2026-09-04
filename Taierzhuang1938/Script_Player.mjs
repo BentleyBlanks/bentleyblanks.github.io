@@ -672,6 +672,9 @@ export class PlayerController {
     if (wish.lengthSq() > 1) wish.normalize();
     // 后退与横移比前进慢
     if ((input.forward || 0) < 0) speed *= 0.72;
+    // Explicit scenario dive impulse: still requires directional input and uses normal collision.
+    // Absent in normal play; the host only enables it during a live, intentional ditch dive.
+    if (this.stance !== "stand" && !this.InWater && Number.isFinite(input.diveSpeedMps)) speed = Math.max(speed, Math.min(1.2, input.diveSpeedMps));
 
     const desired = wish.multiplyScalar(speed);
     // 空中不许**加速**到助跑之上（accel 3 只够小幅修正方向），但也不能把蹬地那一下

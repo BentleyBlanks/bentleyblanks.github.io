@@ -91,6 +91,18 @@ export const testDefs = {
     desc: "首关纯白盒体、变截面路线、事实门与正式第一章内容复用（纯 Node）" },
   FirstLevelWhiteboxBrowserTest: { file: "Script_FirstLevelWhiteboxBrowserTest.mjs", timeoutMs: 5 * 60 * 1000,
     desc: "首关纯白受光场地、具名同伴、实体剧情门与简洁 HUD 真浏览器接线" },
+  FirstLevelP012LayoutTest: { file: "Script_FirstLevelP012LayoutTest.mjs",
+    desc: "P012节点、担架扫掠、三态枢纽与敌军遮挡来向（纯 Node）" },
+  FirstLevelP012FlowTest: { file: "Script_FirstLevelP012FlowTest.mjs",
+    desc: "P012真实动作退出、反向护送、有限波次与检查点（纯 Node）" },
+  FirstLevelP012RuntimeTest: { file: "Script_FirstLevelP012RuntimeTest.mjs",
+    desc: "P012导游、有限远敌与炮击警告接线（纯 Node）" },
+  FirstLevelP012ActorTest: { file: "Script_FirstLevelP012ActorTest.mjs",
+    desc: "P012平民身份与无枪战斗隔离（纯 Node）" },
+  FirstLevelP012VisibilityTest: { file: "Script_FirstLevelP012VisibilityTest.mjs",
+    desc: "P012剧情门恢复与飞机有意入场、旧模式兼容（纯 Node）" },
+  FirstLevelP012BrowserTest: { file: "Script_FirstLevelP012BrowserTest.mjs", args: ["--prelude", "--geometry"], timeoutMs: 8 * 60 * 1000,
+    desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
@@ -189,6 +201,7 @@ export const browserTests = new Set([
   "RangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
   "FirstLevelWhiteboxBrowserTest",
+  "FirstLevelP012BrowserTest",
 ]);
 
 export const tier0Fast = [
@@ -223,7 +236,7 @@ export const tier2 = [
 export const domains = {
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -297,7 +310,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|Data_Levels)/i },
+  { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。

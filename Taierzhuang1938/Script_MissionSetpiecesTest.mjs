@@ -781,7 +781,7 @@ Check("装配层建了摆点导演", /setpieces = new MissionSetpieceDirector\(\
 Check("换关时摆点（排在具名同伴之后、撒兵之前）",
   /setpieces\.BeginLevel\(contentId, phase\);/.test(MainSource));
 Check("每帧推它，且排在 story.Update 之后（onVoice 读的是 story.fired）",
-  /if \(story\.ObjectiveText\) state\.storyObjective = story\.ObjectiveText;\s*\n(?:\s*\/\/[^\n]*\n)*\s*setpieces\?\.Update\(dt\);/
+  /if \(story\.ObjectiveText(?: && !p012Flow)?\) state\.storyObjective = story\.ObjectiveText;\s*\n(?:\s*\/\/[^\n]*\n)*\s*setpieces\?\.Update\(dt\);/
     .test(MainSource));
 Check("换关清摆点（交互点、后送队、运行时道具）",
   /setpieces\?\.Reset\("levelChange"\);/.test(MainSource)

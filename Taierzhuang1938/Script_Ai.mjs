@@ -368,6 +368,8 @@ export class Soldier {
     if (!this.alive) return false;
     const mult = part === "head" ? 3.2 : part === "torso" ? 1.0 : 0.6;
     this.health -= damage * mult;
+    // Opt-in narrative cast protection; explicit scripted Kill remains authoritative.
+    if (this.scriptEssential) this.health = Math.max(1, this.health);
     this.suppression = Clamp01(this.suppression + 0.45);
     if (this.health <= 0) return this.Kill(direction);
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
@@ -501,6 +503,9 @@ export class AiDirector {
       y = this.ctx.battlefield.GroundHeight(x, z);
     }
     const soldier = new Soldier(side, { ...options, x, z });
+    soldier.unarmed = options.unarmed === true || options.actorKind === "civilian";
+    soldier.scriptedNoncombatant = options.scriptedNoncombatant === true;
+    soldier.escortRole = options.escortRole || null;
     const serial = this.spawnSerial[side]++;
     const explicitSquadId = typeof options.squadId === "string" && options.squadId
       ? `${side}_${options.squadId}` : null;
@@ -534,11 +539,15 @@ export class AiDirector {
         radius: CAPSULE[0].radius, height: CAPSULE[0].height, position: soldier.position,
       });
     }
-    const kind = side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija";
+    const kind = options.actorKind || (side === "nra" ? (options.towel ? "nraDare" : "nra") : "ija");
     soldier.actor = this.ctx.actorFactory.Create(kind, {
       seed: soldier.id * 131 + 7,
-      weapon: soldier.weaponId,
+      weapon: soldier.unarmed ? null : soldier.weaponId,
+      variant: options.actorVariant,
     });
+    soldier.actorKind = soldier.actor.kind || kind;
+    soldier.actorVariant = soldier.actor.variant || null;
+    if (soldier.unarmed) soldier.tacticalRole = "noncombatant";
     soldier.director = this;
     if (options.towel) { soldier.towel = true; soldier.actor.SetTowel(true); }
     soldier.actor.root.position.copy(soldier.position);
@@ -1071,6 +1080,14 @@ export class AiDirector {
     // 翻墙翻到一半不做决策：状态机会立刻把 VAULT 打回 advance，人卡在墙头上
     if (s.state === STATE.VAULT) return;
 
+    // Opt-in scene actors follow the host's evacuation goals, never a combat cover/target.
+    // Physics, suppression accounting, wounded poses and death remain on the normal path.
+    if (s.scriptedNoncombatant) {
+      s.target = null; s.targetVisible = false; s.cover = null; s.bayonetFixed = false;
+      s.state = STATE.ADVANCE; s.aimBlend = 0;
+      return;
+    }
+
     // 找目标：取最近的**三个**敌人，逐个试通视。
     // 只试最近那一个的后果是实跑出来的：一堵院墙就能让整条战线永远没有目标 ——
     // 70 名 AI 每一次采样都是 {advance: 70}，开火计数恒为 0。
@@ -1157,6 +1174,8 @@ export class AiDirector {
       if (s.targetLostTime > 5) s.target = null;
       else bestDist = s.position.distanceTo(s.target.position);
     }
+
+    if (s.scriptDefensive) { this.ApplyScriptDefense(s); return; }
 
     // cohesion：34 m 内还有几个同侧活人。这是班组密度，不是士气，永不出 UI。
     let mates = 0, close = 0;
@@ -1350,6 +1369,7 @@ export class AiDirector {
       s.position.y + AiDirector.StanceEye(s.stance), s.position.z);
     const to = this.tmpB.set(cand.position.x,
       cand.position.y + AiDirector.StanceEye(cand.stance), cand.position.z);
+    if (this.ctx.BlocksSight?.(from, to)) return false;
     const dir = this.tmpC.subVectors(to, from);
     const dist = dir.length();
     if (dist < 0.001) return true;
@@ -1370,6 +1390,7 @@ export class AiDirector {
     // 这一帧有没有走过物理。没走的（站着不动、在射击）也要补一次 ——
     // 不补的话站在墙头上的人在墙被炸掉之后会浮在半空。
     let stepped = false;
+    if (s.scriptDefensive && s.state !== STATE.VAULT) this.ApplyScriptDefense(s);
 
     // 白刃演出接管整帧：不重新 Think、不走导航、不在格挡中途再开一枪。
     if (s.meleeQte) { this.StepMeleeQte(s, dt, player); return; }
@@ -1398,7 +1419,7 @@ export class AiDirector {
         if (this.time - s.regoalTime > 1.5) {
           s.regoalTime = this.time;
           const a = s.rnd() * Math.PI * 2;
-          const r = s.holdZone.radius * (0.20 + s.rnd() * 0.55);
+          const r = Number.isFinite(s.scriptArrivalRadius) ? 0 : s.holdZone.radius * (0.20 + s.rnd() * 0.55);
           s.goal.set(s.holdZone.x + Math.cos(a) * r, 0, s.holdZone.z + Math.sin(a) * r);
           // 中正门那个点的圆边压过北寨墙，随机撒出来的守位有一部分在墙外面 ——
           // 人走不过去，只会贴着墙抖到死。
@@ -1460,6 +1481,13 @@ export class AiDirector {
     // 否则守点单位（也就是最需要被冲出去的那批人）按下去纹丝不动 ——
     // 独立复核实测带 holdZone 时位移 0.00 m，正是被这一行盖回去的。
     if (strayed && s.order !== "charge") { desired = this.tmpD.copy(s.goal); speed = Math.max(speed, 2.2); }
+    // Scripted defence can fire in place, but never pursue an enemy or remote cover.
+    if (s.scriptDefensive) {
+      const anchor = s.holdZone || s.position;
+      const outside = Math.hypot(s.position.x - anchor.x, s.position.z - anchor.z) > 2;
+      desired = outside ? this.tmpD.set(anchor.x, 0, anchor.z) : null;
+      speed = outside ? 2.2 : 0;
+    }
 
     // 移动：直奔目标 + 撞墙就沿墙滑 + **卡住就拐弯绕**。
     //
@@ -1469,10 +1497,12 @@ export class AiDirector {
     // 两边各自站在自己的院子里 —— 「仗根本没在打」有一半是这么来的。
     // 这不是寻路，是"摸着墙走"：拐九十度走一两秒再回头奔目标。在一座街巷本来
     // 就通的城里够用，而且比 A* 便宜两个数量级。
+    if (Number.isFinite(s.scriptMoveSpeedMps)) speed = Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
     if (desired && speed > 0) {
       const dx = desired.x - s.position.x, dz = desired.z - s.position.z;
       const d = Math.hypot(dx, dz);
-      if (d > 1.2) {
+      const arrivalRadius = Number.isFinite(s.scriptArrivalRadius) ? Math.max(0.05, s.scriptArrivalRadius) : 1.2;
+      if (d > arrivalRadius) {
         let nx = dx / d, nz = dz / d;
         // 远目标走导航场：直奔目标在这座城里等于直奔一堵院墙。
         // 近目标（掩体、眼前的敌人）仍然直奔 —— 那种距离上局部避障就够，
@@ -1935,6 +1965,7 @@ export class AiDirector {
    * 「上刺刀」按下去只是让人跑快一点的话，这个动词就还是假的。
    */
   TryBayonet(s, dt, player) {
+    if (s.unarmed || s.scriptDefensive) return;
     s.meleeTimer -= dt;
     if (!s.bayonetFixed || s.meleeTimer > 0 || !s.target) return;
     const dx = s.target.position.x - s.position.x;
@@ -1958,7 +1989,23 @@ export class AiDirector {
     if (this.ctx.audio) this.ctx.audio.Play("bayonetHit", { position: s.position.clone(), volume: 0.8 });
   }
 
+  ApplyScriptDefense(s) {
+    s.order = "hold"; s.cover = null; s.bayonetFixed = false;
+    if (s.ammo <= 0) {
+      if (s.state !== STATE.RELOAD) s.reloadTimer = s.weapon.reloadTimeS || 3.2;
+      s.state = STATE.RELOAD;
+    } else s.state = s.target ? STATE.FIRE : STATE.IDLE;
+  }
+
+  ScriptFireFactors(s) {
+    return {
+      interval: Number.isFinite(s.scriptFireIntervalScale) ? Math.max(0.1, Math.min(20, s.scriptFireIntervalScale)) : 1,
+      accuracy: Number.isFinite(s.scriptAccuracyScale) ? Math.max(0, Math.min(4, s.scriptAccuracyScale)) : 1,
+    };
+  }
+
   TryFire(s, dt, player) {
+    if (s.unarmed) return;
     s.fireTimer -= dt;
     // 潜行的班不许开枪 —— 这是那道命令的全部代价，也是它区别于"跟我来"的地方
     if (s.order === "covert" && this.time < s.covertUntil) return;
@@ -1985,7 +2032,8 @@ export class AiDirector {
     dir.divideScalar(dist || 1);
 
     s.ammo -= 1;
-    s.fireTimer = s.weapon.fireIntervalS ?? 1.2;
+    const scriptFactors = this.ScriptFireFactors(s);
+    s.fireTimer = (s.weapon.fireIntervalS ?? 1.2) * scriptFactors.interval;
     s.lastFire = this.time;
     s.fireSequence += 1;
     s.aimTime = 0;
@@ -2008,7 +2056,7 @@ export class AiDirector {
 
     // 命中判定：基础命中率按距离、压制、姿态修正。**AI 不许百发百中** ——
     // 那会让玩家觉得自己在被作弊，而不是在被压制。
-    let acc = COMBAT.aiAccuracyBase * (DIFFICULTY.aiAccuracy ?? 1);
+    let acc = COMBAT.aiAccuracyBase * (DIFFICULTY.aiAccuracy ?? 1) * scriptFactors.accuracy;
     // 距离衰减按**绝对米数**，不按枪的标称有效射程 —— 三八式标称 460 m，
     // 于是原来的式子在 27 m 上算出来还是满命中（1.25 − 0.09 → 钳到 1）。
     // 实际上机械瞄具打一个会动的人：25 m 内基本能打中，100 m 打一半，200 m 靠运气。

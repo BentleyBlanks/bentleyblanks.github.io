@@ -33,9 +33,15 @@ import {
 import {
   FIRST_LEVEL_WHITEBOX_PHASE, FIRST_LEVEL_WHITEBOX_LEVEL_ID,
 } from "./Data_FirstLevelWhitebox.mjs";
-import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import {
-  PhaseContentId, EvaluateFirstLevelObjectiveGate,
+  FIRST_LEVEL_P012_WHITEBOX_PHASE, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,
+} from "./Data_FirstLevelP012Whitebox.mjs";
+import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
+import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
+import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { CAST } from "./Data_TengxianScript.mjs";
+import {
+  PhaseContentId, ContentZoneId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate,
 } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
@@ -65,14 +71,14 @@ import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
-import { AddTrimProps } from "./Script_TrimProps.mjs";
+import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
 import { AircraftFlight, MakeAircraftStrafeHost } from "./Script_Aircraft.mjs";
 import { AircraftStrafeDirector } from "./Script_AircraftStrafe.mjs";
 import { FlareDirector, MakeFlareHost } from "./Script_Flare.mjs";
 import { TelegraphSystem, MakeTelegraphHost } from "./Script_Telegraph.mjs";
 import { CompanionDirector } from "./Script_Companion.mjs";
 import { CheckpointRecorder } from "./Script_Checkpoint.mjs";
-import { MissionSetpieceDirector } from "./Script_MissionSetpieces.mjs";
+import { MissionSetpieceDirector, LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE,
@@ -114,12 +120,17 @@ const FLAT_NORMAL = [0, 1, 0];
  */
 let levelBounds = { minX: -300, maxX: 300, minZ: -300, maxZ: 300 };
 
-function MakeLevelBounds(bounds) {
-  const margin = 10;
+function MakeLevelBounds(bounds, margin = 10) {
   return {
     minX: bounds.minX + margin, maxX: bounds.maxX - margin,
     minZ: bounds.minZ + margin, maxZ: bounds.maxZ - margin,
   };
+}
+function AirColumnEnteredRoad(column, position) {
+  const members=(column?.litters || []).flatMap(litter=>[litter.front,litter.rear]);
+  const head=column?.HeadPosition?.();
+  return members.length===4 && !!head && Math.hypot(position.x-head.x,position.z-head.z)<12
+    && members.every(member=>member?.handle?.alive && member.handle.position.z>=60 && Math.abs(member.handle.position.x-50)<8);
 }
 
 // 执行到这一行 = 一百五十多个文件的模块图整张拉齐了。告诉 index.html 的开机守望
@@ -154,6 +165,7 @@ const RANGE = params.get("range") === "1";
 const MELEE_TEST = params.get("melee") === "1";
 /** 第一关策划白盒（?whitebox=1）：独立纯白方盒场地，复用正式 CH1_NanLu 内容。 */
 const FIRST_LEVEL_WHITEBOX = params.get("whitebox") === "1";
+const FIRST_LEVEL_P012_WHITEBOX = params.get("whitebox") === "p012";
 /**
  * 序 · 界河白盒（?jiehe=1）：与靶场同一条整表替换的路子。
  * 界河退出了正片流程，但 Script_JieheField / Script_JieheHeight /
@@ -182,10 +194,11 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || JIEHE;
+const SANDBOX = RANGE || MELEE_TEST || FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX || JIEHE;
 const PHASE_TABLE = RANGE ? [RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_WHITEBOX ? [FIRST_LEVEL_WHITEBOX_PHASE]
+      : FIRST_LEVEL_P012_WHITEBOX ? [FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
         : OVERVIEW ? [OVERVIEW_PHASE]
           : FULL_SCENE ? [FULL_SCENE_PHASE]
@@ -423,6 +436,8 @@ let gi = (GI_ON && graphics.gi)
 if (gi) gi.enabled = true;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
+audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],
+  (signal) => story?.Signalled(signal) || false);
 
 const state = {
   ready: false,
@@ -573,6 +588,8 @@ let companion = null;
 // 脚本检查点（第一关「不躲被击倒 → 从数秒前重来」）。环形采样在 Script_Checkpoint，
 // 这里只给它「采一帧」与「写回去」两个回调。**不扣兵员池、不走死亡换人卡。**
 let checkpoint = null;
+let p012Flow = null;
+let p012Runtime = null;
 
 // 章节摆点（集成批 INT2）。「哪一章在哪一拍做什么」是**数据**，在 Script_MissionSetpieces
 // 的 SETPIECES 里一章一条；装配层只建一次、每帧推一下、换关告诉它换到哪儿去了。
@@ -1002,6 +1019,7 @@ async function Boot() {
   destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction,
+    BlocksSight: (from, to) => p012Runtime?.BlocksSight(from, to) || false,
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。
@@ -1105,7 +1123,7 @@ async function Boot() {
     // 固定战位（重机枪）。这三种情况下跟随一律让开 ——
     // 不让的话「上刺刀冲锋」按下去，班里的人还是在玩家脚边打转，命令白下。
     Busy: (soldier) => !!soldier && (soldier.order === "charge" || soldier.order === "flank"
-      || soldier.order === "covert" || !!soldier.emplacementId),
+      || soldier.order === "covert" || !!soldier.emplacementId || !!soldier.p012Guided || !!soldier.scriptDefensive),
     Alive: (soldier) => !!(soldier && soldier.alive),
     Place: (soldier, x, z) => {
       if (!soldier || !battlefield) return;
@@ -1143,6 +1161,10 @@ async function Boot() {
       health: player.health, bleeding: player.bleeding, bandages: player.bandages,
       ammo: state.ammo, clips: state.clips,
       grenades: state.grenades, bundles: state.bundles,
+      p012: p012Flow?.Snapshot() || null,
+      p012Carry: p012Flow ? carry?.KindId : null,
+      p012Story: p012Flow ? { index: story.index, pushed: [...story.pushed], cued: [...story.cued], fired: [...story.fired],
+        levelTime: story.levelTime, sinceLast: story.sinceLast, beatWait: story.beatWait, immediate: story.P012Snapshot?.() } : null,
     } : null),
     Apply: (sample) => {
       if (!player || !sample) return false;
@@ -1159,6 +1181,16 @@ async function Boot() {
       if (Number.isFinite(sample.bundles)) state.bundles = sample.bundles;
       // 重来的那一下手上不该还抬着担架（担架已经翻了），也不该还架着机枪。
       carry?.Reset("checkpoint");
+      if (sample.p012) p012Flow?.Restore(sample.p012);
+      if (sample.p012Carry) carry?.Begin(sample.p012Carry, { label: "担架（伤员）" });
+      if (sample.p012Story) {
+        story.index = sample.p012Story.index; story.pushed = new Set(sample.p012Story.pushed);
+        story.cued = new Set(sample.p012Story.cued);
+        // P012 world/setpieces stay alive on rewind: keep fired monotonic for firedCursor.
+        story.levelTime = sample.p012Story.levelTime; story.sinceLast = sample.p012Story.sinceLast; story.beatWait = sample.p012Story.beatWait;
+        story.P012Restore?.(sample.p012Story.immediate);
+        battlefield.RestoreScenario?.({ signalled: (name) => story.Signalled(name) });
+      }
       emplacement?.EndClear?.();
       state.playerAliveLast = true;
       return true;
@@ -1352,13 +1384,19 @@ async function Boot() {
     Checkpoint: () => checkpoint,
 
     // --- 演员：与具名同伴同一条造人路径（AiDirector.Spawn），不另造一套 -----
-    SpawnActor: ({ label, x, z, weapon, squadId }) => {
+    SpawnActor: ({ label, x, z, weapon, squadId, role, civilian, variant }) => {
       if (!ai) return null;
       const seed = HashString(`setpiece:${label}:${Math.round(x)}:${Math.round(z)}`);
       const identity = { ...MakeSoldierIdentity(seed), name: label || "后送队" };
-      return ai.Spawn("nra", x, z, {
+      const noncombatant = !!PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 && weapon === null;
+      const actor = ai.Spawn("nra", x, z, {
         identity, weapon: weapon || identity.weapon, squadId: squadId || "Setpiece",
+        unarmed: noncombatant, actorKind: noncombatant && civilian ? "civilian" : undefined,
+        scriptedNoncombatant: noncombatant,
+        actorVariant: variant, escortRole: role,
       });
+      if (actor && PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 && (role === "bearer" || role === "guard")) actor.scriptEssential = true;
+      return actor;
     },
     Despawn: (soldier) => { if (soldier && ai) ai.Remove(soldier); },
     PositionOf: (soldier) => (soldier && soldier.position
@@ -2002,6 +2040,22 @@ async function Boot() {
        *   SetCombatBed  —— 交火声床的整层淡入淡出归音频批（INT3）。
        */
       Setpieces: () => (setpieces ? setpieces.State() : null),
+      P012: () => p012Flow?.State() || null,
+      P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
+        roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
+      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
+        woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
+        carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
+        litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
+        fallenAt: setpieces?.mem?.p012FallenAt ? { ...setpieces.mem.p012FallenAt } : null, recoveryReason: setpieces?.mem?.p012RecoveryReason || null,
+        litters: (setpieces?.mem?.column?.litters || []).map((litter) => ({ id: litter.propLitter, bodyId: litter.propBody, dropped: litter.dropped,
+          originalCarried: litter === setpieces?.mem?.p012CarriedLitter,
+          front: litter.front?.handle?.position ? { ...litter.front.handle.position } : null,
+          rear: litter.rear?.handle?.position ? { ...litter.rear.handle.position } : null,
+          frontAlive: !!litter.front?.handle?.alive, rearAlive: !!litter.rear?.handle?.alive,
+          frontHealth: litter.front?.handle?.health ?? null, rearHealth: litter.rear?.handle?.health ?? null,
+          propPosition: setpieceProps.get(String(litter.propLitter))?.root?.position ? { ...setpieceProps.get(String(litter.propLitter)).root.position } : null })),
+        columnActors: (setpieces?.mem?.column?.Alive || []).map((member) => ({ role: member.role, x: member.handle.position.x, z: member.handle.position.z })) } : null,
       SetpieceFacts: () => ({ ...state.setpieceFacts, items: { ...state.setpieceItems } }),
       SetpieceProps: () => [...setpieceProps.entries()].map(([id, entry]) => ({
         id, kind: entry.spec.kind || "box", visible: !!entry.root?.visible,
@@ -2395,7 +2449,7 @@ async function Boot() {
   // --- 主菜单 --------------------------------------------------------------
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
-  if (MENU_ON && menuRoot) {
+  if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
     menu = new MainMenu({
       root: menuRoot, camera, phases: PHASES,
       SliceIndex: () => state.builtPhase,
@@ -2406,11 +2460,13 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      // 玩家可见的测试场景只保留三条核心玩法入口。界河与过场仍可通过
+      // 玩家可见的测试场景只保留四条核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
-      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE],
+      sandboxes: [RANGE_PHASE, MELEE_QTE_PHASE, FIRST_LEVEL_WHITEBOX_PHASE,
+        FIRST_LEVEL_P012_WHITEBOX_PHASE],
       sandboxMode: RANGE ? "range" : MELEE_TEST ? "melee"
-        : FIRST_LEVEL_WHITEBOX ? "firstLevelWhitebox" : JIEHE ? "jiehe" : false,
+        : FIRST_LEVEL_WHITEBOX ? "firstLevelWhitebox"
+          : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
       // 这些独立切片都不在 PHASES 里，照 SliceIndex 去查 PHASES 会取到别人的机位
@@ -2418,6 +2474,8 @@ async function Boot() {
       // 这条与旧行为逐字相同。
       SlicePhase: () => PHASE_TABLE[state.builtPhase] || PHASES[state.builtPhase] || null,
       ExitSandbox: () => GoToSandbox(null),
+      RestartSandbox: () => location.reload(),
+      RetrySandbox: () => { if(p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint("保留现场进度与剩余补给",4);} },
       Resume: () => ResumeFromPause(),
       // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
@@ -2492,6 +2550,7 @@ const WORLD_CLASSES = {
   [RANGE_LEVEL_ID]: RangeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
+  [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
 };
 function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
 
@@ -2512,6 +2571,7 @@ function GoToSandbox(key) {
   if (key === "range") url.searchParams.set("range", "1");
   else if (key === "melee") url.searchParams.set("melee", "1");
   else if (key === "firstLevelWhitebox") url.searchParams.set("whitebox", "1");
+  else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
   else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
@@ -2536,8 +2596,9 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   aircraft?.SetPhase(phase);
   if (destruction) destruction.Clear();
   ClearExternalProps();
+  if(phase.whitebox?.p012)ClearTrimProps(scene);
   if (battlefield) { battlefield.Dispose(); battlefield = null; }
-  levelBounds = MakeLevelBounds(phase.bounds);
+  levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 ? 1 : 10);
   const World = WorldClassFor(phase);
   battlefield = new World(scene, library, {
     quality: QUALITY,
@@ -2552,6 +2613,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     // 焦点给错的后果不是"难看"，是把 draw call 花在玩家永远不去的城角上。
     foci: phase.zones.map((z) => [z.x, z.z]),
     zones: phase.zones,
+    whiteboxLayout: phase.whitebox?.layout || null,
     // 每关自己的 LOD 分界（Data_Battle.TUNING）；没给就用默认。
     // 这是 draw call 的主要旋钮之一，改它之前先跑 BootTest 看数
     detailRadius: (phase.detailRadius ?? 100) * (QUALITY === "low" ? 0.72 : 1),
@@ -2564,7 +2626,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // PCG 的净空真相必须冻结在“外部布设加入之前”。否则编辑器重跑生成时会拿
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
-  const external = await AddExternalProps({
+  // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
+  const external = phase.whitebox?.p012 ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -2592,7 +2655,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -2700,15 +2763,17 @@ function MakeSetpieceProp(spec = {}) {
   const id = String(spec.id || `sp${setpieceProps.size}`);
   if (setpieceProps.has(id)) return id;
   const kind = spec.kind || "box";
+  const whiteboxColors = PHASE_TABLE[state.phaseIndex]?.whitebox?.p012
+    ? PHASE_TABLE[state.phaseIndex].whitebox.layout.semanticColors : null;
   const at = spec.position;
   const y = Number.isFinite(at.y) ? at.y : (battlefield ? battlefield.GroundHeight(at.x, at.z) : 0);
   let mesh = null;
   if (kind === "panel" || kind === "plane") {
     const size = spec.size || [0.28, 0.20];
-    const geometry = new THREE.PlaneGeometry(size[0], size[1]);
+    const geometry = whiteboxColors ? new THREE.BoxGeometry(size[0], size[1], 0.015) : new THREE.PlaneGeometry(size[0], size[1]);
     const material = new THREE.MeshStandardMaterial({
-      map: spec.texture ? SetpiecePropTexture(spec.texture) : null,
-      color: spec.color ?? 0xece0c4, roughness: 1.0, metalness: 0,
+      map: !whiteboxColors && spec.texture ? SetpiecePropTexture(spec.texture) : null,
+      color: whiteboxColors?.missionRoute ?? spec.color ?? 0xece0c4, roughness: 1.0, metalness: 0,
       side: THREE.DoubleSide, transparent: !!spec.transparent,
     });
     mesh = new THREE.Mesh(geometry, material);
@@ -2722,7 +2787,9 @@ function MakeSetpieceProp(spec = {}) {
           : kind === "debris" ? [0.9, 0.22, 0.7] : [0.72, 0.42, 0.48]);
     const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
     const material = new THREE.MeshStandardMaterial({
-      color: spec.color ?? (kind === "shroudedBody" ? 0xd8d2c4 : 0x6b5a41),
+      color: whiteboxColors && kind !== "shroudedBody" && kind !== "stretcher"
+        ? whiteboxColors[kind === "debris" ? "ground" : "missionRoute"]
+        : spec.color ?? (kind === "shroudedBody" ? 0xd8d2c4 : 0x6b5a41),
       roughness: 1.0, metalness: 0,
     });
     mesh = new THREE.Mesh(geometry, material);
@@ -2745,6 +2812,7 @@ function MoveSetpieceProp(id, at = {}) {
   if (Number.isFinite(at.y)) entry.root.position.y = at.y;
   if (Number.isFinite(at.z)) entry.root.position.z = at.z;
   if (Number.isFinite(at.rotationY)) entry.root.rotation.y = at.rotationY;
+  if (Number.isFinite(at.rotationZ)) entry.root.rotation.z = at.rotationZ;
   return true;
 }
 
@@ -2909,7 +2977,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
 
   // 测试白盒拥有独立的场地 id，但剧情、同伴与事件必须跑正式第一章内容。
   const contentId = PhaseContentId(phase);
-  const loaded = story.BeginLevel(contentId);
+  const loaded = story.BeginLevel(contentId, { beats: phase.whitebox?.storyBeats,
+    actualEventsOnly: phase.whitebox?.actualEventsOnly });
   state.storyObjective = phase.objectives[0] || null;
   if (loaded === 0) console.warn("这一章没有剧本：", phase.id);
 
@@ -2930,6 +2999,14 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       // 这一章玩家演的是谁 —— 他不进名册（终章玩家就是小秦，而小秦在终章话最多）。
       playerCast: phase.playerCast || phase.level?.playerCast || undefined,
     });
+    if (phase.whitebox?.p012) {
+      for (const actor of ai.soldiers) if (actor.alive && actor.castId) actor.scriptEssential = true;
+      const guide = companion.Handle("luo");
+      if (guide) {
+        const x = -66, z = 61, y = battlefield.GroundHeight(x, z);
+        guide.position.set(x, y, z); guide.body?.Teleport(x, y, z); guide.goal.set(x, 0, z);
+      }
+    }
   }
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
@@ -2937,10 +3014,139 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   if (!RANGE && !MELEE_TEST && !PREVIEW && !cutsceneOnly && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
+  interact.Clear("P012");
+  p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
+    SpawnEnemy: (spec) => {
+      const actor = ai.Spawn("ija", spec.x, spec.z, spec);
+      if (actor && spec.p012Far) {
+        actor.scriptDefensive = true;
+        actor.order = "hold"; actor.holdZone = { id: "P012SouthBlockade", x: spec.x, z: spec.z, radius: 2 };
+        actor.goal.set(spec.x, 0, spec.z);
+      }
+      return actor;
+    },
+    GuideActor: () => companion?.Handle("luo"), Position: (actor) => actor?.position ? { x: actor.position.x, z: actor.position.z } : null,
+    RestorePlayer: (point) => { player.Spawn(point.x,point.z,point.yaw);player.stance=point.stance;return true; },
+    Signal: (name) => story.Signal(name),
+    VisibleAircraft: (origin, air) => {
+      const target = new THREE.Vector3(air.x, air.y, air.z), screen = target.clone().project(camera);
+      if (Math.abs(screen.x) > 1 || Math.abs(screen.y) > 1 || screen.z < -1 || screen.z > 1) return false;
+      const ray = target.sub(origin), distance = ray.length();
+      const hit = battlefield.Raycast(origin, ray.normalize(), distance);
+      return !hit || hit.t >= distance - 0.6;
+    },
+    Alive: (actor) => !!actor?.alive, Firing: (actor) => actor?.alive && ai.time - actor.lastFire < 4,
+    CombatTime: () => ai.time,
+    ThreatensEscort: (actor) => {
+      const target=actor.target;
+      if (!target || !actor.targetVisible || (!target.isPlayer && target.ref?.side !== "nra")) return false;
+      const at=target.position;
+      const nearby=[player.position,...(setpieces?.mem?.column?.Bearers || []).filter(member=>member.handle?.alive).map(member=>member.handle.position)];
+      return !!at && nearby.some(point=>Math.hypot(point.x-at.x,point.z-at.z)<=12);
+    },
+    PursuitGoal: (actor, point) => {
+      actor.scriptDefensive = false; actor.scriptArrivalRadius = 0.3;
+      actor.order = "hold"; actor.holdZone = { id: "P012RetreatPursuit", ...point, radius: 0.3 };
+      actor.goal.set(point.x, 0, point.z);
+    },
+    EnemyMgSuppressed: () => ai.soldiers.some((actor) => actor.side === "ija" && actor.weaponId === "Type11" && (actor.suppression > 0.3 || !actor.alive)),
+    FriendlyMgFired: (since) => ai.soldiers.some((actor) => actor.side === "nra" && actor.weaponId === "Zb26" && actor.lastFire > since),
+    DeploySmoke: (point) => vfx.SmokeSource(new THREE.Vector3(point.x, 0.2, point.z), { kind: "screen", rate: 12, radius: 7.5, rise: 0.4, sizeStart: 3, sizeEnd: 6, life: 10 }),
+    ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
+    FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed),
+    RetreatPosition: () => setpieces?.mem?.column?.Bearers?.[0]?.handle?.position || null,
+    FireDiscipline: (actor, doctrine) => {
+      if (doctrine) { actor.scriptAccuracyScale=doctrine.accuracyScale; actor.scriptFireIntervalScale=doctrine.fireIntervalScale; }
+      else { delete actor.scriptAccuracyScale; delete actor.scriptFireIntervalScale; }
+    },
+    Defend: (actor, point, doctrine) => {
+      if (!doctrine) return;
+      actor.scriptDefensive = true; actor.scriptAccuracyScale = doctrine.accuracyScale;
+      actor.scriptFireIntervalScale = doctrine.fireIntervalScale;
+      actor.order = "hold"; actor.holdZone = { id: "P012FrontDefense", ...point, radius: doctrine.holdRadiusM };
+      actor.goal.set(point.x, 0, point.z);
+    },
+    ReleaseDefense: (actor) => {
+      actor.scriptDefensive = false; delete actor.scriptAccuracyScale; delete actor.scriptFireIntervalScale;
+      actor.holdZone = null; actor.order = "advance";
+    },
+    Visible: (actor) => {
+      const point = actor.position.clone(); point.y += 1.3;
+      const screen = point.project(camera);
+      return Math.abs(screen.x) < 0.95 && Math.abs(screen.y) < 0.95 && screen.z > -1 && screen.z < 1
+        && HasLineOfSight(actor.position.x, actor.position.z);
+    },
+    ReleaseGuide: (actor) => { if (actor) { actor.p012Guided = false; delete actor.scriptMoveSpeedMps; actor.manualGoalUntil = ai.time; } },
+    TrafficActor: (side, slot, point) => {
+      if (side === 0) return ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.castId && !actor.unarmed)[slot] || null;
+      return setpieces.host.SpawnActor({ label: "向南转移的乡亲", x: point.x, z: point.z, weapon: null, civilian: true, variant: slot % 2 ? "female" : "male", role: "civilian", squadId: "P012Traffic" });
+    },
+    Signalled: (name) => story.Signalled(name),
+    Dodge: (reason) => strafe?.Dodge(reason),
+    ReleaseForDodge: () => { carry?.ForceRelease("diveAttempt"); if (setpieces) setpieces.mem.p012ReleaseAt = { ...player.position }; },
+    Move: (actor, point, speed) => { actor.p012Guided = true; actor.scriptMoveSpeedMps = speed; actor.order = "advance"; actor.holdZone = null; actor.manualGoalUntil = ai.time + 3; actor.goal.set(point.x, 0, point.z); },
+    WarnShell: (point, damaging, OnImpact) => {
+      const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z);
+      if (damaging) { const impact = combat.CallIncoming("launcher", at, { OnImpact }); return { x: impact.x, z: impact.z }; }
+      vfx.IncomingMarker(at, 1.6); audio.Play("shellIncoming", { position: at }); return point;
+    },
+    ImpactShell: (point) => { const at = new THREE.Vector3(point.x, battlefield.GroundHeight(point.x, point.z), point.z); vfx.Explosion(at, { radius: 4, kind: "shell" }); audio.Play("explosionNear", { position: at }); },
+  }, phase.whitebox) : null;
+  p012Runtime?.SaveSafePoint("Start",player.position,player.stance,player.yaw);
+  p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
+    Register: (spec) => interact.Register({ ...spec, tag: "P012" }),
+    Carry: () => carry,
+    Signal: (name) => story.Signal(name),
+    Signalled: (name) => story.Signalled(name),
+    Objective: (text) => { state.storyObjective = text; },
+    CheckWeapon: () => { state.clips = Math.max(state.clips, 3); if (!p012Runtime.weaponActionCount) state.ammo = 0; },
+    CurrentClips: () => state.clips,
+    GiveBandages: (request) => {
+      const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0;
+      player.bandages += granted;
+      if (granted) hud.Hint(`补充${granted}包绷带；受伤流血时按 B 包扎`, 4);
+      return granted;
+    },
+    GiveGrenades: (request) => { const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0; state.grenades += granted; return granted; },
+    DeployRetreatSmoke: (point) => p012Runtime.DeployRetreatSmoke(point),
+    GiveClips: (request) => {
+      const granted = Number.isFinite(request) ? Math.max(0, Math.floor(request)) : 0;
+      state.clips += granted;
+      return granted;
+    },
+    Checkpoint: (id) => { p012Runtime.SaveSafePoint(id,player.position,player.stance,player.yaw);return checkpoint?.Save(); },
+    RestoreSignals: (signals) => {
+      story.pushed = new Set(signals); story.cued.clear();
+      battlefield.RestoreScenario?.({ signalled: (name) => story.Signalled(name) });
+    },
+    SpawnEnemy: (spec) => p012Runtime.SpawnEnemy(spec),
+    Guide: (spec) => p012Runtime.Guide(spec),
+    EnemyPosition: (soldier) => soldier?.alive ? soldier.position : null,
+    EnemyCombatState: (soldier) => soldier ? {lastFire:soldier.lastFire,suppression:soldier.suppression} : null,
+    EnemyStaging: (soldier, staging) => {
+      if (!soldier?.alive) return;
+      soldier.scriptedNoncombatant = !!staging;
+      if (staging) { soldier.target = null; soldier.targetVisible = false; soldier.cover = null; soldier.state = "advance"; }
+    },
+    EnemyGoal: (soldier, point, arrivalRadius) => {
+      soldier.order = "hold";
+      if (Number.isFinite(arrivalRadius) && arrivalRadius > 0) soldier.scriptArrivalRadius = Math.min(1, arrivalRadius * 0.5);
+      else delete soldier.scriptArrivalRadius;
+      soldier.holdZone = { id: "P012Lane", x: point.x, z: point.z, radius: soldier.scriptArrivalRadius ?? 1 };
+      soldier.goal.set(point.x, 0, point.z);
+    },
+    Pressure: (wave) => {
+      if (wave.kind === "mortar") p012Runtime.Shelling({ x: player.position.x, z: player.position.z }, true);
+    },
+    Shelling: (point) => {
+      p012Runtime.Shelling(point);
+    },
+  }, phase.whitebox) : null;
+  if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   // 靶场撒的是木桩兵，不是战线；同时钉住本关 —— 站遍三个工位不许触发换关结算。
   if (RANGE) { state.pinned = true; SeedRangeTargets(); }
   else if (MELEE_TEST) { state.pinned = true; SeedMeleeTargets(); }
-  else if (FIRST_LEVEL_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
+  else if (FIRST_LEVEL_WHITEBOX || FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
   // 进关先打一个检查点：第一拍就被击倒时也有地方可退。
@@ -3457,10 +3663,11 @@ function HasLineOfSight(toX, toZ) {
  */
 function SeedSoldiers(phase) {
   const rnd = Mulberry32(1000 + state.phaseIndex * 97);
-  const nraTarget = Math.round(SCALE.maxAlive * 0.42);
+  const nraTarget = phase.whitebox?.p012
+    ? Math.max(0, phase.whitebox.friendlyLimit - (ai.deaths.nra || 0)) : Math.round(SCALE.maxAlive * 0.42);
   const ijaTarget = Math.round(SCALE.maxAlive * 0.5 * phase.ijaPressure / 1.3);
   const firstContact = phase.whitebox?.firstContact || null;
-  const enemyStage = !firstContact || state.phaseTime >= firstContact.fullWaveAtS
+  const enemyStage = phase.whitebox?.p012 ? "quiet" : !firstContact || state.phaseTime >= firstContact.fullWaveAtS
     ? "wave" : state.phaseTime >= firstContact.atS ? "scout" : "quiet";
 
   const px = player.position.x;
@@ -3503,7 +3710,8 @@ function SeedSoldiers(phase) {
   }
 
   // --- 近身班组：跟着你的班 -------------------------------------------------
-  for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra; i += 1) {
+  for (let i = CountNear("nra", 40); i < NEAR_SQUAD.nra
+    && (!phase.whitebox?.p012 || ai.CountSide("nra") < nraTarget); i += 1) {
     // 前向弧而不是整圈：整圈撒 5 个人，85° 的水平视场只兜得住 1 个。
     // 直接转前向量，不要去凑"yaw 对应的极角"—— player.yaw 的零向是 -Z，
     // 跟 atan2(z, x) 差一个 -yaw - π/2，凭印象写必错，兵会撒到背后去
@@ -3519,6 +3727,7 @@ function SeedSoldiers(phase) {
       if (HasLineOfSight(spot.x, spot.z)) break;
     }
     const s = ai.Spawn("nra", open.x, open.z, {
+      weapon: phase.whitebox?.p012 && !ai.soldiers.some((actor) => actor.side === "nra" && actor.weaponId === "Zb26") ? "Zb26" : undefined,
       towel: !!phase.nightRaid && rnd() < 0.55,
       squadId: `Near_${phase.id}`,
     });
@@ -3713,7 +3922,7 @@ function RespawnPlayer(initial = false) {
   emplacement?.Reset("respawn");
   carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
-  state.identity = MakeSoldierIdentity(seed);
+  state.identity = phase.whitebox?.p012 ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:"HanYang"} : MakeSoldierIdentity(seed);
   currentWeapon = state.identity.weapon;
 
   // 靶场（sandbox）阵亡后也回出生工位：那套「退到路标后方」的算法是给战线写的，
@@ -3923,6 +4132,12 @@ function PlayHurtCues() {
 }
 
 function OnPlayerDown() {
+  if(p012Runtime){
+    p012Runtime.failed=true;state.pendingRespawn=false;state.deathTimer=0;
+    p012Runtime.retryAtLoad=carry?.Active?{x:player.position.x,z:player.position.z,yaw:player.yaw,stance:player.stance}:null;
+    // An active load stays at the death location; only an empty-handed retry returns to a checkpoint.
+    audio.Play("bodyFall",{volume:.9});ShowPauseMenu();menu.OpenSandboxFailure(!!p012Runtime.retryAtLoad);return;
+  }
   const identity = state.identity;
   state.fallen.push(identity);
   state.nraPool = Math.max(0, state.nraPool - 1);
@@ -4329,6 +4544,8 @@ function PauseGame() {
 /** 暂停里的「继续」。 */
 function ResumeFromPause() {
   if (!menu) return;
+  if (p012Runtime?.completed) return;
+  if (p012Runtime?.failed) return;
   // 设置面板很可能还开着：关掉「画质」那一页只关那一页，**入口面板留着**
   //（Close() 不动 panelOpen）。不收掉它 editor.Capturing 就一直是 true，
   // 于是「继续」之后：Frame 走的还是编辑器那条分支（世界冻着）、Guard 把每一次
@@ -4395,8 +4612,8 @@ const router = new InputRouter({
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (editor && editor.Capturing) return;
     switch (action) {
-      case "crouch": input.crouchPressed = true; return;
-      case "prone": input.pronePressed = true; return;
+      case "crouch": input.crouchPressed = true; p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId); return;
+      case "prone": input.pronePressed = true; p012Runtime?.RecordDodgeIntent(player.position, strafe?.View(), carry?.KindId); return;
       // 架着机枪时 R 是**拉枪机**：没卡壳就当换弹板，小卡是排障起手（按住继续），
       // 脚本触发的必然失效则数着拉了几下 —— 拉够了这挺枪就废了（§6 阶段⑩②）。
       case "reload":
@@ -4421,7 +4638,11 @@ const router = new InputRouter({
         // **离位永远是玩家自己按的这一下** —— 脚本没有替他下枪位的口子。
         if (emplacement?.Mounted) { emplacement.Vacate("player"); return; }
         // 手上占着东西时，F 的语义就只剩「放下」——不再去查地上有没有枪可捡。
-        if (carry?.Active) { carry.Drop("player"); return; }
+        if (carry?.Active) {
+          // This mission's non-droppable ammunition must reach its registered delivery gesture.
+          if (p012Flow && interact?.Query(player)?.point?.id === "p012_ammoDrop") { DoInteract(); return; }
+          carry.Drop("player"); return;
+        }
         DoInteract(); return;
       case "bipod": ToggleBipod(); return;
       case "fireMode": ToggleFireMode(); return;
@@ -4525,11 +4746,16 @@ function AimPoint(maxDist = 120) {
 function Reload() {
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
+  if (p012Runtime && w && state.ammo >= (w.magazine ?? 5)) {
+    viewmodel.TriggerReload(); audio.Play("bolt", { volume: 0.7 });
+    p012Runtime.weaponActionPending = true; return true;
+  }
   const infiniteAmmo = debugOptions.Enabled("infiniteAmmo");
   if (!w || (!infiniteAmmo && state.clips <= 0) || state.ammo >= (w.magazine ?? 5)) return false;
   if (!infiniteAmmo) state.clips -= 1;
   state.ammo = w.magazine ?? 5;
   viewmodel.TriggerReload();
+  if (p012Runtime) p012Runtime.weaponActionPending = true;
   audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
   return true;
 }
@@ -4554,7 +4780,8 @@ function ReleaseCook() {
   const power = Clamp01(state.cook / 1.1);
   const cooked = Math.max(0, state.cook - 0.35);
   const dir = player.AimDirection(_aimDir).clone();
-  combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
+  const projectile = combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
+  if (projectile && kind === "Grenade") p012Runtime?.RecordGrenade(player.position);
   // 夹到 0：BeginCook 已经挡过"没货就别拔弦"，但调试口（Debug.Throw）是直接
   // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
   // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。
@@ -5052,6 +5279,7 @@ function TryFire(dt) {
   if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
   else state.ammo -= 1;
   state.playerShots += 1;
+  p012Runtime?.RecordAircraftShot(player.EyePosition, player.AimDirection(_aimDir), strafe?.View());
   fireCooldown = weapon.fireIntervalS ?? 1.2;
 
   viewmodel.TriggerFire();
@@ -5308,6 +5536,13 @@ function AimEmplacementView(view) {
  * 「争夺中：路西村庄外围」）—— 顶栏那一行归剧本，不归战场状态。
  */
 function UpdateObjectives(dt) {
+  if (p012Flow) {
+    const goal = p012Flow.CurrentObjective();
+    const index = battlefield.objectives.findIndex((item) => item.id === goal.zone);
+    if (index >= 0) state.objectiveIndex = index;
+    state.storyObjective = goal.text;
+    return;
+  }
   const objectives = battlefield.objectives;
   if (!objectives.length) return;
   const index = Math.min(state.objectiveIndex, objectives.length - 1);
@@ -5385,6 +5620,11 @@ const _proj = new THREE.Vector3();
  *   而不是把断言的时长缩水去迁就它。
  */
 function Frame(dt, render = true) {
+  // StepFrames also enters here directly: terminal P012 screens freeze the entire world clock.
+  if (p012Runtime?.completed || p012Runtime?.failed) {
+    if (render) RenderScene(0);
+    return;
+  }
   const realDt = dt;
   // QTE 窗口走真实时间；下面玩家、AI、弹道、特效和叙事统一吃缩放后的玩法时间。
   // 这句必须在 state.elapsed 之前：否则慢的只有 AI，玩家/故事仍按正常速度飞过去。
@@ -5482,6 +5722,7 @@ function Frame(dt, render = true) {
   // 玩家要用的那个乘数，写晚一帧就会出现「刚抬起来还能冲刺一步」。
   carry?.Update(dt, player);
   profiler.B("player");
+  input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.Update(dt, input, WEAPONS[currentWeapon]);
   profiler.E("player");
   // 架设机枪同样排在 player.Update **之后**：射界限位要夹的是这一帧的视线，
@@ -5710,6 +5951,7 @@ function Frame(dt, render = true) {
   }
   if (state.playerAliveLast && !player.Alive) OnPlayerDown();
   state.playerAliveLast = player.Alive;
+  if(p012Runtime?.failed){if(render)RenderScene(dt);return;}
 
   // 火墙（三关传单入火封住的那条追击路线）。**对玩家同样有伤害** ——
   // 它是封路，不是单向道具。烧完就把烟收掉。
@@ -5743,6 +5985,50 @@ function Frame(dt, render = true) {
   checkpoint?.Update();
 
   profiler.B("story");
+  if (p012Flow) {
+    p012Runtime.Update(dt);
+    p012Runtime.TryDitchDodge(player.position, player.stance, strafe?.View());
+    if (p012Runtime.weaponActionPending && !viewmodel.IsBusy?.()) { p012Runtime.weaponActionPending = false; p012Runtime.weaponActionCount++; }
+    const column = setpieces?.mem?.column;
+    const columnActor = column?.Bearers?.[0]?.handle || column?.Alive?.[0]?.handle;
+    const columnPosition = columnActor?.position || column?.HeadPosition() || null;
+    const columnEnd = column?.waypoints?.at(-1);
+    const columnAtEnd = !!column?.arrived && !!columnPosition && !!columnEnd
+      && Math.hypot(columnPosition.x - columnEnd.x, columnPosition.z - columnEnd.z) < 8;
+    const lastLitterArrived = LastLitterArrived(column);
+    const zone = battlefield.objectives.find((item) =>
+      Math.hypot(player.position.x - item.x, player.position.z - item.z) < item.radius);
+    p012Flow.Update(dt, {
+      ...p012Runtime.Sample(),
+      position: player.position, yaw: player.yaw, stance: player.stance, sprint: player.sprint,
+      zone: zone?.id || null, enemyDeaths: ai.deaths.ija || 0,
+      scoutAlarm: ai.soldiers.some((soldier) => soldier.side === "ija" && state.elapsed - soldier.lastFire < 1),
+      ammoDelivered: setpieces?.mem?.ammoDelivered || 0,
+      clips: state.clips, ammo: state.ammo, grenades: state.grenades,
+      woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered,
+      woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
+      stretcherCarryDistance: setpieces?.mem?.p012CarryDistance || 0,
+      carryDistance: setpieces?.mem?.p012CarryDistance || 0,
+      lastLitterArrived,
+      carryKind: carry?.KindId, columnArrived: columnAtEnd,
+      bleeding: player.bleeding, bandages: player.bandages,
+      columnPosition, columnAtEscortEnd: columnAtEnd,
+      columnAtAirRoad: !!columnPosition && columnPosition.z >= 60 && Math.abs(columnPosition.x - 50) < 8,
+      airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position),
+      roadWoundedPosition: setpieces?.mem?.p012RoadWoundedPosition || null,
+      roadWoundedAtInspection: !!setpieces?.mem?.p012RoadWoundedAtInspection,
+      airColumnTailPosition: (column?.litters || []).filter(litter=>litter.front?.handle?.alive&&litter.rear?.handle?.alive).map(litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2})).sort((a,b)=>a.z-b.z)[0] || null,
+      airColumnReady: !!column?.litters?.length && column.litters.every((litter)=>{
+        const a=litter.front?.handle,b=litter.rear?.handle;
+        return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=68 && Math.abs((a.position.x+b.position.x)/2-50)<8;
+      }),
+      columnAtSouthAssembly: !!column?.litters?.length && column.litters.every((litter) => !litter.dropped && [litter.front,litter.rear].every((member) => member?.handle?.alive && Math.hypot(member.handle.position.x-42,member.handle.position.z-94)<6)),
+    });
+    if (story.Signalled("P012Complete")) {
+      p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();
+      profiler.E("story"); return;
+    }
+  }
   UpdateObjectives(dt);
 
   // 「占点耗对方的票」那一套（ER2 2.0.9 的机制）跟着占领点一起删了。
@@ -5762,13 +6048,14 @@ function Frame(dt, render = true) {
   const playerZone = battlefield.objectives.find((o) =>
     Math.hypot(player.position.x - o.x, player.position.z - o.z) < o.radius);
   story.Update(dt, {
-    zone: playerZone ? playerZone.id : null,
+    zone: playerZone ? ContentZoneId(playerZone) : null,
     objectiveIndex: state.objectiveIndex,
     objectiveCount: state.objectiveCount,
     levelSeconds: state.levelSeconds,
     pool: state.nraPool,
+    p012Beat: p012Flow?.beat,
   });
-  if (story.ObjectiveText) state.storyObjective = story.ObjectiveText;
+  if (story.ObjectiveText && !p012Flow) state.storyObjective = story.ObjectiveText;
   // 章节摆点：**排在 story.Update 之后**。它的 onVoice 钩子读的是 story.fired，
   // 排在前面的话每一拍都要慢一帧 —— 「顺子喊完『老子回去压住！』就播转身那一场」
   // 这种同拍的事会看得出来差一帧。
@@ -5905,7 +6192,11 @@ function Frame(dt, render = true) {
     yaw: player.yaw,
   });
   PlayHurtCues();
-  hud.UpdateMarkers(battlefield.objectives, camera, (x, y, z) => {
+  const p012Target = p012Flow?.CurrentObjective().target;
+  const markerObjectives = p012Target ? battlefield.objectives.map((item, index) =>
+    index === state.objectiveIndex ? { ...item, x: p012Target.x, z: p012Target.z } : item)
+    : battlefield.objectives;
+  hud.UpdateMarkers(markerObjectives, camera, (x, y, z) => {
     _proj.set(x, y, z);
     const dist = _proj.distanceTo(camera.position);
     _proj.project(camera);

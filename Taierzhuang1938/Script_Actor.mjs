@@ -1198,7 +1198,7 @@ export class Actor {
     // 所以同一个人重开一局还是同一个人。
     const variantNames = spec.variants ? Object.keys(spec.variants) : null;
     this.variant = variantNames
-      ? variantNames[HashString(`${seedText}|variant`) % variantNames.length]
+      ? (variantNames.includes(options.variant) ? options.variant : variantNames[HashString(`${seedText}|variant`) % variantNames.length])
       : null;
 
     // 身高 ±4% 的个体差走整体缩放，手持武器再乘 1/scale 抵消 —— 枪长是史实数据

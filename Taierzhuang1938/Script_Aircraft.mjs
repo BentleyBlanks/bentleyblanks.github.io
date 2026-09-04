@@ -81,6 +81,7 @@ export class AircraftFlight {
     const settled = await Promise.allSettled(AIRCRAFT_ASSETS.map(async (spec) => {
       const gltf = await LOADER.loadAsync(spec.url);
       const root = PrepareAircraft(gltf, spec);
+      if (this.phase?.whitebox?.p012) root.visible = false;
       this.group.add(root);
       this.forms.push({ spec, root });
     }));
@@ -89,6 +90,7 @@ export class AircraftFlight {
 
   SetPhase(phase) {
     this.phase = phase;
+    if (phase.whitebox?.p012) for (const { root } of this.forms) root.visible = false;
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
       (phase.bounds.minZ + phase.bounds.maxZ) * 0.5,
@@ -114,6 +116,8 @@ export class AircraftFlight {
     for (const form of this.forms) {
       const { spec, root } = form;
       if (form === taken) { ApplyStrafePose(root, strafe.aircraft); root.visible = true; continue; }
+      // P012 has a deliberate first railway pass: background orbiters never pre-empt it.
+      if (this.phase.whitebox?.p012) { root.visible = false; continue; }
       // 航线刚走完的那一架：先藏着，别让它从航线末端瞬移回圆周上。
       if (form === this.strafeForm) { root.visible = false; continue; }
       root.visible = true;

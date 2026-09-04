@@ -136,6 +136,20 @@ void main() {
  * 数值单位是"线性 HDR"，配合 PostPipeline 的 exposure 一起看。
  */
 export const SKY_PRESETS = {
+  // P012 是颜色语义审读场：照亮背光人物与可通行体块，不借正片的烟尘掩盖空间。
+  // 独立预设，不改变旧白盒与正式章节。低对比保留蓝/紫/黑等类别的可辨性。
+  p012WhiteboxDay: {
+    sunElevation: 52, sunAzimuth: 222,
+    zenith: [0.42, 0.58, 0.78], horizon: [0.78, 0.85, 0.96], ground: [0.34, 0.35, 0.36],
+    sunColor: [1.0, 0.98, 0.95], sunIntensity: 42, sunSize: 0.000012, glow: 0.3, glowSpread: 10,
+    smoke: 0.05, smokeColor: [0.67, 0.70, 0.75], smokeHeight: 0.10, stars: 0,
+    lightColor: 0xfffaf0, lightIntensity: 4.2,
+    envIntensity: 0.85, shProbeIntensity: 0.35, ambientIntensity: 0.14,
+    fog: { density: 0.0015, falloff: 30, max: 0.35,
+      sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0.05,
+      desat: 0.03, flatten: 0.02 },
+    exposure: 0.65, godStrength: 0, bloom: 0.03, saturation: 1, contrast: 1,
+  },
   // 关卡策划白盒专用：环境体块全是 0xffffff，不能沿用正片 smokyDay 的 8.6 直射、
   // 1.05 IBL 与 0.34 bloom —— 三项叠加会把地面和迎光面一起剪成纯白，形体反而消失。
   // 这里不靠给盒子染灰做层次；材质仍是纯白，只把光照压进可审读的动态范围，

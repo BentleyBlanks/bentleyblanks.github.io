@@ -35,6 +35,7 @@ const SANDBOX_NAMES = {
   range: { where: "靶场", exit: "退出靶场" },
   melee: { where: "白刃测试场", exit: "退出白刃测试场" },
   firstLevelWhitebox: { where: "第一关策划白盒", exit: "退出第一关白盒" },
+  firstLevelP012Whitebox: { where: "第一关 P0/P1/P2 场景白盒", exit: "退出 P0/P1/P2 白盒" },
   jiehe: { where: "界河白盒", exit: "退出界河白盒" },
 };
 
@@ -689,6 +690,7 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   /** 开机进菜单：接管相机，跑运镜。 */
   Open() {
+    this.ClearSandboxComplete();
     this.open = true;
     this.live = true;
     this.time = 0;
@@ -700,6 +702,7 @@ export class MainMenu {
 
   /** 游戏中按 Esc：只挂一层暂停，**不碰相机**（世界冻在原地就是暂停该有的样子）。 */
   OpenPause() {
+    this.ClearSandboxComplete();
     this.open = true;
     this.live = false;
     this.mode = "pause";
@@ -709,7 +712,43 @@ export class MainMenu {
     this.root.classList.add("pause");
   }
 
+  OpenSandboxComplete() {
+    this.OpenPause();
+    this.el.titleSub.textContent = "第一关 P0/P1/P2 测试关卡完成";
+    this.SetItems([
+      { id: "restartSandbox", label: "重新测试", hint: "从车厢重新开始这一版白盒" },
+      { id: "exitSandbox", label: "返回主菜单", hint: "退出独立测试，不进入第二章" },
+    ]);
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes p012EndingBlack { from { background-color:transparent; } to { background-color:#000; } }
+      @keyframes p012EndingControls { from { visibility:hidden; opacity:0; } to { visibility:visible; opacity:1; } }
+      #menu.p012Complete { animation:p012EndingBlack 2s ease-in-out both; }
+      #menu.p012Complete > :not(style) { animation:p012EndingControls 0.3s 2s both; }
+      #menu.p012Complete .mnFade, #menu.p012Complete .mnVignette { display:none; }
+    `;
+    this.root.appendChild(style);
+    this.sandboxCompleteStyle = style;
+    this.root.classList.add("p012Complete");
+  }
+  OpenSandboxFailure(atLoad = false) {
+    this.OpenPause();
+    this.el.titleSub.textContent="顺子 · 测试失败";
+    this.SetItems([
+      {id:"retrySandbox",label:atLoad?"在载物处继续":"从检查点继续",hint:"保留现场进度与剩余补给；仅恢复顺子本人，不移动载物"},
+      {id:"restartSandbox",label:"重新测试",hint:"从车厢重新开始这一版白盒"},
+      {id:"exitSandbox",label:"返回主菜单",hint:"退出独立测试"},
+    ]);
+  }
+
+  ClearSandboxComplete() {
+    this.sandboxCompleteStyle?.remove();
+    this.sandboxCompleteStyle = null;
+    this.root.classList.remove("p012Complete");
+  }
+
   Close() {
+    this.ClearSandboxComplete();
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
@@ -720,6 +759,7 @@ export class MainMenu {
 
   /** 从暂停回到主菜单：这时候才接管相机并起运镜。 */
   ToTitle() {
+    this.ClearSandboxComplete();
     this.live = true;
     this.SetItems(this.TitleItems());
     this.PickShots(true);
@@ -905,6 +945,8 @@ export class MainMenu {
       case "resume": this.host.Resume?.(); return;
       case "settings": this.host.Settings?.(); return;
       case "exitSandbox": this.host.ExitSandbox?.(); return;
+      case "restartSandbox": this.host.RestartSandbox?.(); return;
+      case "retrySandbox": this.host.RetrySandbox?.(); return;
       case "title": this.ToTitle(); return;
       default: break;
     }

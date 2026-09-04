@@ -1,0 +1,150 @@
+// Execute production render-policy methods without WebGL or a browser.
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
+import {FIRST_LEVEL_P012_LAYOUT as layout} from "./Data_FirstLevelP012Layout.mjs";
+import phase from "./Data_FirstLevelP012Whitebox.mjs";
+import {MissionSetpieceDirector} from "./Script_MissionSetpieces.mjs";
+function Source(file){return fs.readFileSync(new URL(file,import.meta.url),"utf8").replace(/\r/g,"");}
+function Method(source,name){return source.match(new RegExp(`  (?:async )?${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0];}
+const field=Source("./Script_FirstLevelWhiteboxField.mjs");
+const nodes=[];
+const document={createElement:tag=>({tag,style:{},children:[],appendChild(node){this.children.push(node);}}),createTextNode:text=>({text}),body:{appendChild:node=>nodes.push(node)}};
+const legendMethod=vm.runInNewContext(`({${Method(field,"BuildLegend")}})`,{document,window:{innerWidth:390}});
+const legendHost={layout:{scenario:{},semanticColors:{ground:0xb8b8b0,step:1,vault:2,mantle:3,cover:4,boundary:5,danger:6,missionRoute:7,stretcherRoute:8}}};
+legendMethod.BuildLegend.call(legendHost);
+assert.equal(legendHost.legend.open,false,"mobile legend starts compact");
+const objectiveCss=legendHost.legend.children.find(n=>n.tag==="style").textContent;
+assert.match(objectiveCss,/body:has\(#firstLevelP012Legend\) \.hudObjective/);
+assert.match(objectiveCss,/opacity:1 !important; animation:none !important; background:#151a20/);
+assert.match(objectiveCss,/color:#fff/);
+legendMethod.BuildLegend.call({layout:{}});assert.equal(nodes.length,1,"legacy field adds no HUD override");
+assert.match(Method(field,"Dispose"),/this\.legend\?\.remove\(\)/,"P012 styles leave with the disposable legend");
+const gateMethods=vm.runInNewContext(`({${Method(field,"OpenGate")},${Method(field,"CloseGate")}})`,{ColliderRecord:spec=>({id:spec.id})});
+for(const p012 of [false,true]){
+ const spec={id:"Door",y:1.9,h:3.8},collider={_physicsHandle:1};
+ const gate={spec,collider,open:false,mesh:{position:{y:spec.y},visible:true}};
+ const removed=[],added=[];
+ const host={layout:p012?{scenario:{}}:{},gates:new Map([[spec.id,gate]]),colliders:[collider],physics:{RemoveSolid:h=>removed.push(h),AddSolid:b=>added.push(b)},BuildCollisionGrid(){}};
+ assert.equal(gateMethods.OpenGate.call(host,spec.id),true);
+ assert.equal(gate.mesh.visible,!p012);assert.equal(gate.mesh.position.y,p012?spec.y:spec.y+spec.h+1.2);
+ assert.equal(host.colliders.length,0);assert.equal(removed.length,1);
+ assert.equal(gateMethods.CloseGate.call(host,spec.id),true);assert.equal(gate.mesh.visible,true);assert.equal(gate.mesh.position.y,spec.y);
+ assert.equal(host.colliders.length,1);assert.equal(added.length,1);
+}
+function Root(){return {visible:true,position:{set(){}},rotation:{set(){}}};}
+const aircraft=Source("./Script_Aircraft.mjs");
+const specs=[0,1,2].map(id=>({id,orbitRadius:40,speed:1,phaseOffset:0,altitude:30,bank:0}));
+const methods=vm.runInNewContext(`({${["Load","SetPhase","Update","FormFor"].map(n=>Method(aircraft,n)).join(",")}})`,{
+ REJOIN_HIDE_S:2.5,AIRCRAFT_ASSETS:specs,LOADER:{loadAsync:async()=>({})},PrepareAircraft:()=>Root(),ApplyStrafePose:()=>{},
+});
+const host={forms:[],group:{add(){}},phase:null,anchor:{x:0,y:0,set(x,y){this.x=x;this.y=y;}},lastElapsed:0,rejoinT:0,strafeForm:null,FormFor:methods.FormFor};
+const bounds={minX:0,maxX:10,minZ:0,maxZ:10};
+methods.SetPhase.call(host,{bounds,whitebox:{p012:true}});
+await methods.Load.call(host);assert.ok(host.forms.every(f=>!f.root.visible),"late-loaded P012 planes must start hidden");
+methods.Update.call(host,1,null);assert.ok(host.forms.every(f=>!f.root.visible),"no pre-story orbiters");
+methods.Update.call(host,2,{active:true,aircraft:{id:1}});assert.deepEqual(host.forms.map(f=>f.root.visible),[false,true,false]);
+methods.Update.call(host,10,null);assert.ok(host.forms.every(f=>!f.root.visible),"no orbiters after scripted exit");
+methods.SetPhase.call(host,{bounds});for(let time=20;time<26;time++)methods.Update.call(host,time,null);assert.ok(host.forms.every(f=>f.root.visible),"legacy orbit returns after its unchanged rejoin delay");
+methods.SetPhase.call(host,{bounds,whitebox:{p012:true}});assert.ok(host.forms.every(f=>!f.root.visible),"phase entry hides loaded planes immediately");
+console.log("PASS P012 gate visibility/restore and story-only aircraft, legacy visuals unchanged");
+
+// Replay the production curve and impact steering, rather than a separate
+// test-only trajectory. A voluntary south-facing view includes the people and
+// the final turn; this does not lock the camera or promise visibility behind it.
+function Occluded(from,to){
+ return layout.blocks.some(b=>{
+  if(b.solid===false)return false;
+  const c=Math.cos(b.ry),s=Math.sin(b.ry),local=p=>[(p.x-b.x)*c-(p.z-b.z)*s,p.y-b.y,(p.x-b.x)*s+(p.z-b.z)*c];
+  const a=local(from),end=local(to),half=[b.w/2,b.h/2,b.d/2];let low=0,high=1;
+  for(let axis=0;axis<3;axis++){
+   const delta=end[axis]-a[axis];
+   if(Math.abs(delta)<1e-8){if(Math.abs(a[axis])>half[axis])return false;}
+   else{const t=(-half[axis]-a[axis])/delta,u=(half[axis]-a[axis])/delta;low=Math.max(low,Math.min(t,u));high=Math.min(high,Math.max(t,u));if(low>high)return false;}
+  }return true;
+ });
+}
+const airCfg=phase.whitebox.aircraftRoutes.crowdTurn;
+assert.ok(airCfg.turnControl2,"P012 uses a two-tangent continuous turn");
+assert.ok(airCfg.to.z<airCfg.from.z,"attack enters from the south, not same-direction pursuit");
+const curve=new AircraftStrafeDirector({});curve.StrafeRun({preset:"crowdTurn",...airCfg});
+const observers=[{x:47,z:74},{x:46,z:70},{x:44,z:66},{x:44,z:62}];
+const crowd={x:47,y:1.1,z:80};let sightSamples=0;
+for(let i=0;i<=100;i++){
+ curve.run.t=2.5+2.5*i/100;curve.PlaceAircraft(0);const plane=curve.run.air;
+ for(let leg=1;leg<observers.length;leg++)for(let k=0;k<=10;k++){
+  const a=observers[leg-1],b=observers[leg],eye={x:a.x+(b.x-a.x)*k/10,y:1.62,z:a.z+(b.z-a.z)*k/10};
+  for(const target of [plane,crowd]){
+   assert.equal(Occluded(eye,target),false,"air and unarmed road column have actual solid-geometry LOS");
+   // Perspective projection, south-facing, pitched up 8 degrees, base FOV55.
+   const dx=target.x-eye.x,dy=target.y-eye.y,dz=target.z-eye.z,pitch=8*Math.PI/180;
+   const depth=dy*Math.sin(pitch)+dz*Math.cos(pitch),up=dy*Math.cos(pitch)-dz*Math.sin(pitch);
+   assert.ok(depth>0&&Math.abs(dx/depth)<Math.tan(55*Math.PI/360)*16/9&&Math.abs(up/depth)<Math.tan(55*Math.PI/360),"last 2.5s plane and people fit the same freely chosen 16:9 view");
+  }sightSamples++;
+ }
+}
+function ReplayCrowdPass(){
+ const sys=new AircraftStrafeDirector({});sys.StrafeRun({preset:"crowdTurn",...airCfg,TrackTo:()=>crowd});
+ let nearest=Infinity;const trace=[];
+ while(sys.Active){sys.Update(1/60);if(sys.run?.phase==="strafe"){
+  const p=sys.run.impact;nearest=Math.min(nearest,Math.hypot(p.x-crowd.x,p.z-crowd.z));trace.push([p.x,p.z]);
+ }}return {nearest,trace};
+}
+const pass=ReplayCrowdPass();assert.ok(pass.nearest<.5,"real steered impact line crosses the actual road column, not an empty endpoint");
+assert.deepEqual(ReplayCrowdPass(),pass,"air attack geometry is deterministic and replayable");
+console.log(`PASS P012 southern turn: ${sightSamples} LOS/projected-view samples; crowd impact miss ${pass.nearest.toFixed(3)}m`);
+
+// Use actual chapter roster and EscortColumn.Start slot placement, not a single
+// invented crowd point. This checks the new formation, not AI arrival timing.
+const castHost={SpawnActor:spec=>({position:{x:spec.x,y:0,z:spec.z},alive:true}),PositionOf:actor=>actor.position};
+const castDirector=new MissionSetpieceDirector(castHost);
+assert.equal(castDirector.BeginLevel("CH1_NanLu",phase),true);
+const cast=castDirector.mem.column;
+cast.waypoints=[{x:47,z:80},{x:44,z:92}];cast.Start();
+const civilians=cast.members.filter(m=>m.role==="civilian");
+assert.deepEqual(civilians.map(m=>m.variant).sort(),["female","male"]);
+assert.ok(civilians.every(m=>m.weapon===null));
+for(const member of cast.members.filter(m=>m.role==="civilian"||m.role==="bearer")){
+ assert.ok(Math.abs(member.slot.lateral)+.42<=1.3,"mixed formation fits the existing stretcher corridor");
+ for(const other of cast.members.filter(m=>m!==member&&(m.role==="civilian"||m.role==="bearer"))){
+  const a=member.handle.position,b=other.handle.position;
+  assert.ok(Math.hypot(a.x-b.x,a.z-b.z)>=.84,"civilian must not overlap a bearer capsule");
+ }
+}
+const actualEye={x:45.356,y:1.62,z:66.265},actualPitch=.249;
+curve.run.t=4.75;curve.PlaceAircraft(0);
+const actualYaw=Math.atan2(curve.run.air.x-actualEye.x,curve.run.air.z-actualEye.z);
+for(const member of civilians){
+ const target={...member.handle.position,y:1.1};
+ assert.equal(Occluded(actualEye,target),false,`${member.variant} civilian actual slot has LOS from failed-run camera position`);
+ const dx=target.x-actualEye.x,dz=target.z-actualEye.z,dy=target.y-actualEye.y;
+ const right=dx*Math.cos(actualYaw)-dz*Math.sin(actualYaw),forward=dx*Math.sin(actualYaw)+dz*Math.cos(actualYaw);
+ const depth=dy*Math.sin(actualPitch)+forward*Math.cos(actualPitch),up=dy*Math.cos(actualPitch)-forward*Math.sin(actualPitch);
+ assert.ok(depth>0&&Math.abs(right/depth)<Math.tan(55*Math.PI/360)*16/9&&Math.abs(up/depth)<Math.tan(55*Math.PI/360),`${member.variant} civilian fits the same actual-pitch plane-facing view`);
+}
+console.log("PASS production male/female formation slots: separation, corridor width, actual-camera LOS and shared aircraft view");
+// Runtime ten-person movement replay, not ideal slot placement: late members
+// have not yet caught up to their desired slots. Preserve this distinction.
+const reachedCivilians=[{variant:"male",x:48.182,y:1.1,z:71.455},{variant:"female",x:49.085,y:1.1,z:67.353}];
+const reachedVisible=reachedCivilians.filter(target=>{
+ const dx=target.x-actualEye.x,dz=target.z-actualEye.z,dy=target.y-actualEye.y;
+ const right=dx*Math.cos(actualYaw)-dz*Math.sin(actualYaw),forward=dx*Math.sin(actualYaw)+dz*Math.cos(actualYaw);
+ const depth=dy*Math.sin(actualPitch)+forward*Math.cos(actualPitch),up=dy*Math.cos(actualPitch)-forward*Math.sin(actualPitch);
+ return !Occluded(actualEye,target)&&depth>0&&Math.abs(right/depth)<Math.tan(55*Math.PI/360)*16/9&&Math.abs(up/depth)<Math.tan(55*Math.PI/360);
+});
+assert.deepEqual(reachedVisible.map(m=>m.variant),["male"],"actual movement replay shows a civilian with the aircraft; the near-right female is correctly outside this camera");
+console.log("PASS actual ten-person replay positions: male civilian visible, near-right female correctly reported offscreen");
+const dive=new AircraftStrafeDirector({});
+dive.StrafeRun({preset:"divePress",...phase.whitebox.aircraftRoutes.divePress,TrackTo:()=>({x:44,z:62})});
+let diveVisibleSamples=0;
+while(dive.Active){
+ dive.Update(1/120);
+ if(dive.run?.phase!=="strafe")continue;
+ const eye={x:44,y:1.62,z:62},air=dive.run.air;
+ assert.equal(Occluded(eye,air),false,"expanded actual dive pass is not hidden by scene geometry");
+ assert.ok(air.z>eye.z,"actual attack stays in the southern sky rather than switching behind the player");
+ diveVisibleSamples++;
+}
+assert.ok(diveVisibleSamples>=299,"visibility audit covers 2.5 seconds of strafe, not exit");
+console.log(`PASS expanded dive: ${diveVisibleSamples} real strafe sky-LOS samples`);

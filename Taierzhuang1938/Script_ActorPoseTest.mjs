@@ -174,6 +174,13 @@ try {
     }
     check(civilianVariants.size === 2 && civilianVariants.has("male") && civilianVariants.has("female"),
       `civilian variants missing: ${[...civilianVariants.keys()].join(",")}`);
+    for (const variant of ["male", "female"]) {
+      const explicit = factory.Create("civilian", { seed: 7000, variant, weapon: null });
+      check(explicit.variant === variant && explicit.meshSource === "model"
+        && factory.KindGeometry(explicit.kind, explicit.variant).meshId === (variant === "male" ? "CivilianMale" : "CivilianFemale"),
+      `explicit civilian ${variant} must resolve its actual geometry`);
+      explicit.Dispose();
+    }
     for (const [variant, civilian] of civilianVariants) {
       check(civilian.meshSource === "model",
         `civilian ${variant} fell back to ${civilian.meshSource} instead of the tzm model`);

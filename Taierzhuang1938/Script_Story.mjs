@@ -415,20 +415,26 @@ export class StoryDirector {
   }
 
   /** 换关：装载这一关的全部 beats。 */
-  BeginLevel(levelId) {
+  BeginLevel(levelId, options = {}) {
     // 上一关最后一句可能还在响：切黑两秒之后它会盖在新关第一句上面。
     if (this.voiceStop) { try { this.voiceStop(); } catch { /* 宿主的事，别带崩剧本 */ } }
     this.voiceLog = [];
     const level = FindLevel(levelId);
+    const beats = Array.isArray(options.beats) ? options.beats : level?.beats || [];
+    this.actualEventsOnly = options.actualEventsOnly === true;
+    this.p012Immediate = this.actualEventsOnly
+      ? beats.filter((beat) => beat.p012Immediate).map((beat) => ({ ...beat, level: levelId, done: false })) : [];
+    this.p012SignalTimes = new Map();
+    this.p012CueLog = [];
     this.levelId = levelId;
     // sameAsPrev：连着几条写同一个 at 的，作者的意思是「这几句一起来」。
     // 不标出来的话每一条都要各等一遍自己的兜底 —— 实测 L0 那 12 条里有 6 条
     // 是成对的同 at，各等 95 s 的结果是一关跑到头也播不完（冒烟里表现为
     // 「剧本被吞了」，而其实只是排在后面）。标出来之后同组的第二条只等 0.25 s。
     this.queue = level
-      ? level.beats.map((b, i) => ({
+      ? beats.filter((beat) => !this.p012Immediate.length || !beat.p012Immediate).map((b, i, sequence) => ({
         ...b, level: levelId,
-        sameAsPrev: i > 0 && b.at === level.beats[i - 1].at,
+        sameAsPrev: i > 0 && b.at === sequence[i - 1].at,
       }))
       : [];
     this.index = 0;
@@ -459,10 +465,41 @@ export class StoryDirector {
    */
   Signal(name) {
     if (!name) return false;
+    if (this.p012Immediate?.length && !this.p012SignalTimes.has(name)) this.p012SignalTimes.set(name, this.levelTime);
     this.pushed.add(name);
     const id = this.signalCutscenes && this.signalCutscenes[name];
     if (id) return this._RunCutscene(id, `signal:${name}`);
     return false;
+  }
+
+  /** P012 checkpoint extension. Signal ages survive clock rewind; delivered
+   * voice hooks are monotonic because the scene/interactions are not rebuilt. */
+  P012Snapshot() {
+    if (!this.p012Immediate?.length) return null;
+    return {
+      cues: this.p012Immediate.map((beat) => ({ key: beat.voice, done: beat.done })),
+      signalAges: [...this.p012SignalTimes].map(([name, time]) => [name, Math.max(0, this.levelTime - time)]),
+      log: this.p012CueLog.map((entry) => ({ ...entry })),
+    };
+  }
+
+  P012Restore(snapshot) {
+    if (!this.p012Immediate?.length || !snapshot) return false;
+    const delivered = new Set([...this.p012CueLog, ...(snapshot.log || [])]
+      .filter((entry) => !entry.expired).map((entry) => entry.key));
+    const saved = new Map((snapshot.cues || []).map((entry) => [entry.key, entry.done]));
+    for (const beat of this.p012Immediate) beat.done = delivered.has(beat.voice) || saved.get(beat.voice) === true;
+    this.p012SignalTimes = new Map((snapshot.signalAges || []).map(([name, age]) =>
+      [name, this.levelTime - Math.max(0, Number(age) || 0)]));
+    const log = [...(snapshot.log || [])];
+    for (const entry of this.p012CueLog) {
+      if (!entry.expired && !log.some((savedEntry) => savedEntry.key === entry.key && !savedEntry.expired)) log.push({ ...entry });
+    }
+    this.p012CueLog = log;
+    // Retry cancels the old in-flight recording before freeing its channel.
+    if (this.voiceStop) { try { this.voiceStop(); } catch { /* optional audio host */ } }
+    this.sinceLast = MIN_GAP;
+    return true;
   }
 
   /** 这个事件到此刻算不算已经发生过（推过的或时刻表判过的）。装配层的钉关放行读它。 */
@@ -505,6 +542,7 @@ export class StoryDirector {
   _EventReady(name, ctx) {
     if (this.pushed.has(name)) return true;
     if (this.cued.has(name)) return true;
+    if (this.actualEventsOnly) return false;
     const table = LEVEL_CUES[this.levelId];
     const test = table && table[name];
     if (test && test(ctx)) { this.cued.add(name); return true; }
@@ -521,9 +559,31 @@ export class StoryDirector {
     this.beatWait += dt;
     if (this.fightCooldown > 0) this.fightCooldown -= dt;
 
-    if (this.index >= this.queue.length) return;
     // 一帧最多播一条：台词叠在一起谁都读不清
     if (this.sinceLast < MIN_GAP) return;
+    // P012 alone: scene cues share the normal voice occupancy, never interrupt
+    // a recording. A missed semantic window is logged rather than queued late.
+    for (const beat of this.p012Immediate || []) {
+      if (beat.done) continue;
+      const cue = beat.p012Immediate;
+      const started = this.p012SignalTimes.get(cue.event);
+      if (started === undefined) continue;
+      if ((cue.until && this.Signalled(cue.until))
+        || (Number.isFinite(cue.maxAgeS) && this.levelTime - started > cue.maxAgeS)) {
+        beat.done = true;
+        this.p012CueLog.push({ key: beat.voice, time: this.levelTime, expired: true });
+        continue;
+      }
+      beat.done = true;
+      this.Play(beat, false);
+      this.p012CueLog.push({ key: beat.voice, time: this.levelTime, expired: false });
+      return;
+    }
+    // Reserve the short two-pass scene for truthful event cues; gameplay and
+    // aircraft clocks continue. Ordinary dialogue resumes during carrying.
+    if (this.p012Immediate?.length && this.Signalled("P012AircraftApproach")
+      && !this.Signalled("StretcherHandoff")) return;
+    if (this.index >= this.queue.length) return;
 
     const full = {
       zone: ctx.zone ?? null,
@@ -535,6 +595,8 @@ export class StoryDirector {
     };
 
     const beat = this.queue[this.index];
+    if (Number.isFinite(beat.p012Beat) && (ctx.p012Beat ?? -1) < beat.p012Beat) return;
+    if (Number.isFinite(beat.notBeforeS) && this.levelTime < beat.notBeforeS) return;
     const cond = beat._cond
       || (beat._cond = beat.sameAsPrev ? { kind: "after", seconds: 0.25 } : ParseAt(beat.at));
     let ready = false;
@@ -555,7 +617,8 @@ export class StoryDirector {
 
     // 超时兜底：等不到就直接播。没有这一条，链子会卡死并静默吞掉后面全部剧本。
     const limit = MAX_WAIT[cond.kind] ?? 60;
-    const timedOut = limit > 0 && this.beatWait >= limit;
+    const timedOut = !(this.actualEventsOnly && ["event", "zone"].includes(cond.kind))
+      && limit > 0 && this.beatWait >= limit;
     if (!ready && !timedOut) return;
 
     this.Play(beat, timedOut && !ready);

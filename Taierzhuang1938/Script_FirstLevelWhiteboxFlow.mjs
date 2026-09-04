@@ -12,6 +12,16 @@ export function PhaseContentId(phase) {
   return phase?.contentId || phase?.id || null;
 }
 
+/** 白盒可用自己的审图编号，同时把正式章节事件看到的 zone id 保留下来。 */
+export function ContentZoneId(zone) {
+  return zone?.contentZoneId || zone?.id || null;
+}
+
+export function AllowAutonomousBark(phase, signalled = () => false) {
+  const until = phase?.whitebox?.barkPolicy?.suppressAutonomousUntilSignal;
+  return !until || signalled(until);
+}
+
 /**
  * 路标只是“事实发生在哪里”，不再是“走进圈就算完成”。
  * 每一段至少等一个战斗事实、剧情信号或真实台词；返回 reason 给运行时取证。

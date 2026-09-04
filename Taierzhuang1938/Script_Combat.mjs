@@ -226,7 +226,7 @@ export class CombatSystem {
    * 日军间接火力。掷弹筒能越过院墙打进院子 —— 这是"原地不动就是靶子"的物理来源。
    * 落点先给啸声与地面标记（warnLeadS），玩家有一秒半时间挪开。
    */
-  CallIncoming(kind, targetPosition) {
+  CallIncoming(kind, targetPosition, options = {}) {
     const spec = kind === "artillery"
       ? SUPPORT.ija.find((s) => s.id === "artillery")
       : SUPPORT.ija.find((s) => s.id === "launcher");
@@ -236,7 +236,7 @@ export class CombatSystem {
     at.z += (this.rnd() - 0.5) * jitter;
     at.y = this.host.battlefield.GroundHeight(at.x, at.z);
     const flight = kind === "artillery" ? 2.6 : 1.6;
-    this.incoming.push({ at, t: 0, flight, spec, kind });
+    this.incoming.push({ at, t: 0, flight, spec, kind, OnImpact: options.OnImpact });
     if (this.host.vfx) this.host.vfx.IncomingMarker(at, flight);
     if (this.host.audio) {
       this.host.audio.Play("shellIncoming", { position: at.clone(), volume: kind === "artillery" ? 1 : 0.7 });
@@ -334,6 +334,7 @@ export class CombatSystem {
       if (shell.t < shell.flight) continue;
       this.Blast(shell.at, shell.spec.radius, shell.spec.damage,
         shell.kind === "artillery" ? "shell" : "launcher");
+      shell.OnImpact?.(shell.at);
       if (this.host.story) this.host.story.Signal("shelling");
       this.incoming.splice(i, 1);
     }

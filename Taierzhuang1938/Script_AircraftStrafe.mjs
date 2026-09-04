@@ -718,8 +718,10 @@ export class AircraftStrafeDirector {
     if (typeof this.host.HitNpc === "function") {
       died = !!this.host.HitNpc(ref, { ...info, dir });
     } else {
-      if (typeof ref.TakeHit === "function") died = !!ref.TakeHit(info.damage, info.part, dir);
-      if (!died && info.lethal && typeof ref.Kill === "function") died = !!ref.Kill(dir);
+      // Production Soldier/Ragdoll expects its native Vector3, not a rules-layer point.
+      const hitDirection = typeof ref.position?.clone === "function" ? ref.position.clone().set(dir.x, dir.y, dir.z) : dir;
+      if (typeof ref.TakeHit === "function") died = !!ref.TakeHit(info.damage, info.part, hitDirection);
+      if (!died && info.lethal && typeof ref.Kill === "function") died = !!ref.Kill(hitDirection);
     }
     if (died) this.stats.npcKills += 1;
     // 被打中的那一下要听得见；倒地表现走现有那一套（Ragdoll + 旁边人喊），
@@ -786,8 +788,8 @@ export class AircraftStrafeDirector {
   PlaceAircraft(step, dirX = null, dirZ = null) {
     const run = this.run;
     const a = run.air;
-    const dx = dirX === null ? Math.sin(run.heading) : dirX;
-    const dz = dirZ === null ? Math.cos(run.heading) : dirZ;
+    let dx = dirX === null ? Math.sin(run.heading) : dirX;
+    let dz = dirZ === null ? Math.cos(run.heading) : dirZ;
     const prevY = a.y;
     if (run.phase === "approach") {
       // **进入段按比例走，不按速度积分**：这样不论 fireFromS 被章节改成多少，
@@ -797,6 +799,27 @@ export class AircraftStrafeDirector {
       const s = -(run.approachM + run.leadM) + run.approachM * p;
       a.x = run.from.x + dx * s;
       a.z = run.from.z + dz * s;
+      // 可选的可见转弯段：章节仍用同一条扫射状态机，二次Bezier在fireFromS内
+      // 连续把机首转向扫射起点。无相机接管；旧预设未给turnFrom时逐字走原直线。
+      const turnFrom = Flat(run.cfg.turnFrom);
+      const control = Flat(run.cfg.turnControl);
+      if (turnFrom && control) {
+        const end = { x: run.from.x - dx * run.leadM, z: run.from.z - dz * run.leadM };
+        const q = 1 - p;
+        // Optional cubic preserves both arrival and attack headings. Existing
+        // chapters without a second control retain their exact quadratic path.
+        const control2 = Flat(run.cfg.turnControl2);
+        a.x = control2 ? q*q*q*turnFrom.x + 3*q*q*p*control.x + 3*q*p*p*control2.x + p*p*p*end.x
+          : q * q * turnFrom.x + 2 * q * p * control.x + p * p * end.x;
+        a.z = control2 ? q*q*q*turnFrom.z + 3*q*q*p*control.z + 3*q*p*p*control2.z + p*p*p*end.z
+          : q * q * turnFrom.z + 2 * q * p * control.z + p * p * end.z;
+        const tx = control2 ? 3*q*q*(control.x-turnFrom.x) + 6*q*p*(control2.x-control.x) + 3*p*p*(end.x-control2.x)
+          : 2 * q * (control.x - turnFrom.x) + 2 * p * (end.x - control.x);
+        const tz = control2 ? 3*q*q*(control.z-turnFrom.z) + 6*q*p*(control2.z-control.z) + 3*p*p*(end.z-control2.z)
+          : 2 * q * (control.z - turnFrom.z) + 2 * p * (end.z - control.z);
+        const length = Math.hypot(tx, tz) || 1;
+        dx = tx / length; dz = tz / length;
+      }
       a.agl = run.entryAltM + (run.altitudeM - run.entryAltM) * SmoothStep(0, 1, p);
       a.bank = run.entryBankRad * Math.sin(Math.PI * p);
     } else if (run.phase === "strafe") {

@@ -135,6 +135,71 @@ const Num = (value, fallback = 0) => {
 // 一关阶段七「一名担架员中弹 → 顺子，接后头！」要的画面。
 // ---------------------------------------------------------------------------
 
+export function LastLitterArrived(column, radius = 2.5) {
+  const end = column?.waypoints?.at(-1);
+  const litters = column?.litters || [];
+  return !!column?.arrived && !!end && litters.length > 0 && litters.every((litter) => !litter.dropped &&
+    [litter.front, litter.rear].every((member) => {
+      const target=column.scriptTerminalQueue ? TerminalSlot(column.waypoints,member.slot.back) : end;
+      return member.handle?.alive && member.handle.position
+        && Math.hypot(member.handle.position.x - target.x, member.handle.position.z - target.z) < (column.scriptTerminalQueue ? .7 : radius);
+    }));
+}
+export function TerminalSlot(points, back) {
+  for(let i=points.length-1;i>0;i--){const a=points[i],b=points[i-1],length=Math.hypot(b.x-a.x,b.z-a.z);
+    if(back<=length)return {x:a.x+(b.x-a.x)*back/length,z:a.z+(b.z-a.z)*back/length};back-=length;}
+  return {...points[0]};
+}
+
+/** P012 road fire cleared: a bounded relocation inside the evacuation cover.
+ * Bodies keep their existing identities and traverse real goals. The distant
+ * player may watch from the ruin; this exception ends at the short route end. */
+export function StepP012RoadCover(s, HasSignal) {
+  const column = s.mem.column;
+  const route = s.phase?.whitebox?.activities?.ambushColumnCoverRoute;
+  if (!s.phase?.whitebox?.p012 || !column?.started || !route?.length || !HasSignal("P012AmbushStarted")) return false;
+  let state = s.mem.p012RoadCoverMove;
+  if (!state) {
+    state = s.mem.p012RoadCoverMove = { started: false, complete: false, released: false };
+    s.mem.p012RoadCoverPoses = column.Alive.filter((member) => member.role === "bearer" || member.handle.scriptedNoncombatant)
+      .map((member) => ({ actor: member.handle, stance: member.handle.stance || 0 }));
+    for (const entry of s.mem.p012RoadCoverPoses) entry.actor.stance = 1;
+    column.scriptPaused = true;
+  }
+  if (HasSignal("P012AmbushClear")) {
+    if (!state.released) {
+      for (const entry of s.mem.p012RoadCoverPoses) entry.actor.stance = entry.stance;
+      column.scriptPaused = false; column.scriptMoveWithoutEscort = false; column.scriptHoldTailSlots = false; state.released = true;
+    }
+    return false;
+  }
+  if (!HasSignal("P012RoadGunSilenced")) return false;
+  if (!state.started) {
+    const front = column.litters?.[0]?.front?.handle;
+    const start = front && s.d.host.PositionOf?.(front);
+    if (!start) return false;
+    if (!column.Repath(route, start)) return false;
+    state.started = true; state.from = { x: start.x, z: start.z };
+    for (const entry of s.mem.p012RoadCoverPoses) entry.actor.stance = 0;
+    column.scriptPaused = false; column.scriptMoveWithoutEscort = true; column.scriptHoldTailSlots = true;
+  }
+  const end = route.at(-1), previous = route.at(-2) || state.from;
+  const length = Math.hypot(end.x - previous.x, end.z - previous.z) || 1;
+  const rearGoal = { x: end.x - (end.x - previous.x) / length * 1.9,
+    z: end.z - (end.z - previous.z) / length * 1.9 };
+  const first = column.litters?.[0];
+  const frontAt = first?.front && s.d.host.PositionOf?.(first.front.handle);
+  const rearAt = first?.rear && s.d.host.PositionOf?.(first.rear.handle);
+  if (column.arrived && first && !first.dropped && frontAt && rearAt
+    && Math.hypot(frontAt.x - end.x, frontAt.z - end.z) < 1.3
+    && Math.hypot(rearAt.x - rearGoal.x, rearAt.z - rearGoal.z) < 1.3) {
+    state.complete = true;
+    column.scriptPaused = true; column.scriptMoveWithoutEscort = false;
+  }
+  if (state.complete && !HasSignal("P012RoadCoverReached")) s.Signal("P012RoadCoverReached");
+  return state.started && !state.complete;
+}
+
 export class EscortColumn {
   /**
    * @param {object} host 与 CompanionDirector 同一套窄回调（装配层复用同一份）：
@@ -150,6 +215,7 @@ export class EscortColumn {
     this.tuning = { ...SETPIECE_TUNING, ...(spec.tuning || {}) };
     this.waypoints = (spec.waypoints || []).map((p) => ({ x: Num(p.x), z: Num(p.z) }));
     this.roster = spec.members || [];
+    this.followRouteBodies = !!spec.followRouteBodies;
     this.members = [];
     /** 抬着走的担架实体（两名担架员一副，见 Start / _UpdateLitters）。 */
     this.litters = [];
@@ -205,6 +271,30 @@ export class EscortColumn {
     return { x: (b.x - a.x) / len, z: (b.z - a.z) / len };
   }
 
+  /** 从当前队头连续改道，不销毁、不重生、不传送任何成员。 */
+  Repath(points, physicalStart = null) {
+    const head = physicalStart || this.HeadPosition();
+    if (!head || !Array.isArray(points) || points.length < 2) return false;
+    this.waypoints = [head, ...points.map((point) => ({ x: point.x, z: point.z }))];
+    this.legIndex = 0; this.legT = 0; this.arrived = false;
+    this.tailAdvanceM = 0;
+    for (const member of this.members) {
+      member.routeLeg = 0; member.routeFloorDistance = 0;
+      if (physicalStart) {
+        const at=this.host.PositionOf?.(member.handle);let along=0,best=Infinity;
+        if (at) for(let i=0;i<this.waypoints.length-1;i++) {
+          const a=this.waypoints[i],b=this.waypoints[i+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+          const t=Math.max(0,Math.min(1,((at.x-a.x)*dx+(at.z-a.z)*dz)/(length*length||1)));
+          const miss=Math.hypot(at.x-a.x-dx*t,at.z-a.z-dz*t);
+          if(miss<best){best=miss;member.routeFloorDistance=along+t*length;member.routeLeg=i;}
+          along+=length;
+        }
+      }
+    }
+    this.moving = true; this.scattered = false;
+    return true;
+  }
+
   /**
    * 造人并开始走。**不许传送**（策划案原文）：所有人都在第一个路点附近生成，
    * 然后自己走 —— 玩家跟着走的那一段是这一关的内容，不是过渡。
@@ -232,6 +322,7 @@ export class EscortColumn {
         handle = this.host.SpawnActor ? this.host.SpawnActor({
           label: entry.label || "后送队", x, z,
           weapon: entry.weapon || null, squadId: "EscortColumn",
+          role: entry.role, civilian: entry.civilian === true, variant: entry.variant,
         }) : null;
       } catch (err) {
         this.log.push({ label: entry.label, ok: false, why: String((err && err.message) || err) });
@@ -270,6 +361,8 @@ export class EscortColumn {
 
   /** 第 index 个人站在队头后面多远、偏左右多少。 */
   _Slot(index, entry) {
+    if (this.followRouteBodies && entry.routeSlot) return { ...entry.routeSlot };
+    if (this.followRouteBodies) return { back: index * 2.2, lateral: entry.role === "bearer" ? 0 : (index % 2 ? 0.35 : -0.35) };
     const rows = Math.max(1, Math.ceil(this.roster.length / 2));
     const row = Math.floor(index / 2);
     const side = index % 2 === 0 ? -1 : 1;
@@ -325,11 +418,13 @@ export class EscortColumn {
     if (!head) return false;
     const player = this.host.PlayerPos ? this.host.PlayerPos() : null;
     // 玩家落后就等 —— 「不许传送」的另一半是「不许把人甩掉」。
-    if (player && !this.scattered) {
+    if (player && !this.scattered && !this.scriptMoveWithoutEscort) {
       const gap = Math.hypot(player.x - head.x, player.z - head.z);
       if (this.moving && gap > this.tuning.columnWaitM) this.moving = false;
       else if (!this.moving && gap < this.tuning.columnResumeM) this.moving = true;
     }
+    if (this.scriptPaused) this.moving = false;
+    if (this.followRouteBodies && this.arrived && !this.scriptPaused && !this.scriptHoldTailSlots) this.tailAdvanceM = Math.min(this.roster.length * 2.2, (this.tailAdvanceM || 0) + this.tuning.columnSpeedMS * dt);
     if (this.moving && this.legIndex < this.waypoints.length - 1) {
       const a = this.waypoints[this.legIndex];
       const b = this.waypoints[this.legIndex + 1];
@@ -350,6 +445,35 @@ export class EscortColumn {
     for (const m of this.members) {
       if (!m.handle || !this._Alive(m.handle)) continue;
       const lateral = m.slot.lateral + (this.scattered ? -scatterSide : 0);
+      if (this.followRouteBodies && !this.scattered) {
+        let distance = this.legT + (this.tailAdvanceM || 0);
+        for (let i = 0; i < this.legIndex; i++) distance += Math.hypot(this.waypoints[i + 1].x - this.waypoints[i].x, this.waypoints[i + 1].z - this.waypoints[i].z);
+        distance = Math.max(0, distance - m.slot.back);
+        if (distance < (m.routeFloorDistance || 0)) {
+          const waiting=this.host.PositionOf?.(m.handle);
+          if(waiting)this.host.SetGoal?.(m.handle,waiting.x,waiting.z);
+          continue;
+        }
+        let targetLeg = 0;
+        while (targetLeg < this.waypoints.length - 2) {
+          const length = Math.hypot(this.waypoints[targetLeg + 1].x - this.waypoints[targetLeg].x, this.waypoints[targetLeg + 1].z - this.waypoints[targetLeg].z);
+          if (distance <= length) break;
+          distance -= length; targetLeg++;
+        }
+        const position = this.host.PositionOf?.(m.handle);
+        m.routeLeg ??= 0;
+        const next = this.waypoints[m.routeLeg + 1];
+        if (next && position && Math.hypot(position.x - next.x, position.z - next.z) < 1.7 && m.routeLeg < targetLeg) m.routeLeg++;
+        const a = this.waypoints[Math.min(m.routeLeg, targetLeg)];
+        const b = this.waypoints[Math.min(m.routeLeg, targetLeg) + 1] || a;
+        const length = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+        const fraction = m.routeLeg < targetLeg ? 1 : Math.min(1, distance / length);
+        const x = a.x + (b.x - a.x) * fraction - (b.z - a.z) / length * lateral;
+        const z = a.z + (b.z - a.z) * fraction + (b.x - a.x) / length * lateral;
+        m.handle.scriptMoveSpeedMps = this.tuning.columnSpeedMS;
+        this.host.SetGoal?.(m.handle, x, z);
+        continue;
+      }
       const x = head.x - dir.x * m.slot.back + right.x * lateral;
       const z = head.z - dir.z * m.slot.back + right.z * lateral;
       this.host.SetGoal?.(m.handle, x, z);
@@ -444,7 +568,8 @@ class SetpieceContext {
   /** 本章某个路标（{id,x,z,radius}）。写错 id 返回 null，不抛。 */
   Zone(id) {
     const zones = this.d.phase?.zones || [];
-    return zones.find((z) => z && z.id === id) || null;
+    return zones.find((z) => z && (z.id === id || z.contentZoneId === id
+      || z.contentZoneIds?.includes(id))) || null;
   }
 
   /** 路标附近的一个点。dx/dz 是相对路标圆心的偏移（米）。 */
@@ -1240,6 +1365,24 @@ function DressAidYard(s, levelId) {
 // **一章一条，每一条都读得完。** 找「第五关的机枪位摆在哪儿」只有一个地方可看。
 // ---------------------------------------------------------------------------
 
+function BeginCh1RailPass(s) {
+  s.Once("ch1_railPass", (ss) => {
+    ss.strafe?.StrafeRun({
+      preset: "railPass",
+      from: { x: -486, z: -60 }, to: { x: -482, z: 150 },
+      ...(ss.phase?.whitebox?.aircraftRoutes?.railPass || {}),
+      OnPhase: (beat) => {
+        if (ss.phase?.whitebox?.p012) {
+          if (beat === "enter" && !ss.d.host.Story?.()?.Signalled("P012AircraftApproach")) ss.Signal("P012AircraftApproach");
+          if (beat === "fire") ss.Signal("P012AircraftRailFire");
+          if (beat === "exit") ss.Signal("P012AircraftRailExit");
+        }
+        if (beat === "exit") { ss.mem.railPassDone = ss.Time(); ss.Signal("P012RailComplete"); }
+      },
+    });
+  });
+}
+
 export const SETPIECES = {
 
   // =========================================================================
@@ -1273,14 +1416,14 @@ export const SETPIECES = {
       // --- ① 给机枪组补弹（两点：箱子在哪儿、送到哪儿）--------------------
       const crate = s.Near("C1_Railbed", 6, 4);
       const nest = s.Near("C1_Railbed", -9, -6);
-      if (crate) {
+      if (crate && !s.phase?.whitebox?.p012) {
         s.Register(PickUpLoadInteraction({
           id: "ch1_ammoCrate", position: crate, kindId: "ammoCrate",
           label: "抬起弹药箱", carry: s.carry, once: false,
           options: { label: "弹药箱", payload: { to: "mg" } },
         }));
       }
-      if (nest) {
+      if (nest && !s.phase?.whitebox?.p012) {
         s.Register(GiveSupplyInteraction({
           id: "ch1_ammoDrop", position: nest, item: "弹药箱", label: "把箱子送过去",
           Has: () => !!s.carry && s.carry.KindId === "ammoCrate",
@@ -1308,6 +1451,7 @@ export const SETPIECES = {
         ].filter(Boolean).map((z) => ({ x: z.x, z: z.z }));
       s.mem.column = s.Column({
         waypoints: escortWaypoints,
+        followRouteBodies: !!s.phase?.whitebox?.p012,
         members: [
           { role: "bearer", label: "担架员", weapon: null },
           { role: "bearer", label: "担架员", weapon: null },
@@ -1317,18 +1461,38 @@ export const SETPIECES = {
           { role: "guard", label: "护卫", weapon: "HanYang" },
           { role: "walking", label: "可行走伤兵", weapon: null },
           { role: "walking", label: "可行走伤兵", weapon: null },
-          // 百姓走的是同一条队列。**这一层不造平民模型** —— 百姓 tzm 分身归
-          // 布设层（Script_ActorCrowd / 城内布设），这里只占住队列里的位置，
-          // 由宿主决定用哪一具皮。装配层没接平民皮时他们是没枪的国军兵。
-          { role: "civilian", label: "百姓", weapon: null, civilian: true },
-          { role: "civilian", label: "百姓（抱娃的婆娘）", weapon: null, civilian: true },
+          // 队列只传角色身份；P012宿主通过正式ActorFactory复用男女平民模型，
+          // 无枪标记同时约束可见武器和AI攻击，不在这里复制人物渲染或战斗规则。
+          { role: "civilian", label: "百姓", weapon: null, civilian: true, variant: s.phase?.whitebox?.p012 ? "male" : undefined,
+            routeSlot: s.phase?.whitebox?.p012 ? {back:.95,lateral:.8} : undefined },
+          { role: "civilian", label: "百姓（抱娃的婆娘）", weapon: null, civilian: true, variant: s.phase?.whitebox?.p012 ? "female" : undefined,
+            routeSlot: s.phase?.whitebox?.p012 ? {back:5.15,lateral:.8} : undefined },
         ],
       });
+      if (s.phase?.whitebox?.p012) {
+        const shelter = s.phase.whitebox.anchors.shelter;
+        const woundedAt = s.phase.whitebox.activities.woundedDragFrom || shelter;
+        s.mem.prepWounded = s.Column({ waypoints: [shelter, { x: shelter.x + 0.1, z: shelter.z }],
+          members: [{ role: "bearer", label: "阵地救护兵", weapon: null },
+            { role: "bearer", label: "阵地救护兵", weapon: null }] });
+        s.mem.prepWounded.Start();
+        const litter = s.mem.prepWounded.litters[0];
+        if (litter) {
+          litter.dropped = true; s.d.host.SetPropState?.(litter.propLitter, "removed");
+          s.mem.p012WoundedDrag = { prop: litter.propBody, position: { ...woundedAt }, distance: 0, delivered: false };
+          s.d.host.MoveProp?.(litter.propBody, { ...woundedAt, y: 0.15 });
+          s.Register({ ...PickUpLoadInteraction({ id: "p012_woundedDrag", kindId: "wounded", carry: s.carry,
+            Anchor: () => s.mem.p012WoundedDrag.position, label: "拖住伤员，带回交通壕",
+            options: { label: "拖回伤员", canDrop: true, payload: { who: "p012DraggedWounded" } } }),
+            once: false, Enabled: () => !s.mem.p012WoundedDrag.delivered && !s.carry?.Active && s.d.host.Story?.()?.Signalled("P012WoundedChecked") });
+        }
+      }
     },
 
     onZone: {
       // ② 后方喊「缺两个护送伤兵的！」—— 打退这一波、玩家退到村口那一线时。
       C1_Village(s) {
+        if (s.phase?.whitebox?.p012) return;
         s.After(8, (ss) => {
           ss.Signal("EscortCall");
           ss.mem.column?.Start();
@@ -1336,13 +1500,8 @@ export const SETPIECES = {
       },
       // ⑤ 第一次掠过：沿铁路打车辆，一个人都不伤（preset 的 damage.npc = none）。
       C1_Ditch(s) {
-        s.Once("ch1_railPass", (ss) => {
-          ss.strafe?.StrafeRun({
-            preset: "railPass",
-            from: { x: -486, z: -60 }, to: { x: -482, z: 150 },
-            OnPhase: (beat) => { if (beat === "exit") ss.mem.railPassDone = ss.Time(); },
-          });
-        });
+        if (s.phase?.whitebox?.p012) return;
+        BeginCh1RailPass(s);
       },
     },
 
@@ -1365,6 +1524,12 @@ export const SETPIECES = {
           OnComplete: () => {
             s.Signal("StretcherHandoff");
             s.mem.carryStartedAt = s.Time();
+            if (s.phase?.whitebox?.p012) {
+              s.mem.p012CarriedLitter = s.mem.column?.litters?.find((litter) => litter.dropped) || s.mem.column?.litters?.[0];
+              if (s.mem.p012CarriedLitter) s.mem.p012CarriedLitter.dropped = true;
+              s.mem.p012CarryDistance = 0; s.mem.p012CarryLast = { ...s.PlayerPos() };
+              s.Signal("P012StretcherLifted");
+            }
             // 抬起来那一刻打一个检查点：阶段八「不躲则从数秒前重来」退到这儿。
             s.checkpoint?.Save();
           },
@@ -1374,10 +1539,139 @@ export const SETPIECES = {
 
     Update(s, dt) {
       s.mem.column?.Update(dt);
+      const p012 = s.phase?.whitebox?.p012;
+      if (p012 && s.mem.p012RetryDive) {
+        s.mem.p012RetryDive = false; s.strafe?.Abort("p012Retry");
+        s.mem.diveAt = null; s.mem.diveDone = null;
+      }
+      const HasSignal = (name) => s.d.host.Story?.()?.Signalled(name);
+      StepP012RoadCover(s, HasSignal);
+      if (p012 && HasSignal("P012AmbushClear") && !HasSignal("P012AirReady")) {
+        const column=s.mem.column, litter=s.mem.p012InspectionLitter ||= column?.litters?.[0];
+        const front=litter?.front?.handle,rear=litter?.rear?.handle;
+        if(front?.alive && rear?.alive){
+          const a=s.d.host.PositionOf?.(front),b=s.d.host.PositionOf?.(rear);
+          if(a&&b){
+            s.mem.p012RoadWoundedPosition={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
+            s.mem.p012RoadWoundedAtInspection=Math.hypot(s.mem.p012RoadWoundedPosition.x-50,s.mem.p012RoadWoundedPosition.z-47)<3;
+            if(!HasSignal("P012RoadWoundedChecked") && s.mem.p012RoadWoundedAtInspection) column.scriptPaused=true;
+            if(HasSignal("P012RoadWoundedChecked"))column.scriptPaused=false;
+          }
+        }
+      }
+      if (p012 && HasSignal("P012AmbushClear") && !HasSignal("P012AircraftApproach") && s.mem.column?.moving) {
+        const player = s.PlayerPos(), road = s.phase.whitebox.activities.roadWoundedPosition;
+        const bearer = s.mem.column.Bearers?.[0]?.handle;
+        const at = bearer && s.d.host.PositionOf?.(bearer);
+        if (road && player && at && Math.hypot(player.x - road.x, player.z - road.z) < 8
+          && Math.hypot(player.x - at.x, player.z - at.z) < 30) s.Signal("P012AircraftApproach");
+      }
+      if (p012) {
+        const drag = s.mem.p012WoundedDrag, point = s.PlayerPos();
+        if (drag && !drag.delivered && s.carry?.KindId === "wounded") {
+          const step = drag.last ? Math.hypot(point.x - drag.last.x, point.z - drag.last.z) : 0;
+          if (step < 3) drag.distance += step;
+          drag.last = { ...point }; drag.position = { x: point.x, z: point.z + 1 };
+          s.d.host.MoveProp?.(drag.prop, { ...drag.position, y: 0.15 });
+          const goal = s.phase.whitebox.activities.woundedDragTo;
+          if (goal && drag.distance >= 10 && Math.hypot(point.x - goal.x, point.z - goal.z) < 3) {
+            drag.delivered = true; s.carry.ForceRelease("delivered"); s.Signal("P012WoundedDragDelivered");
+          }
+        } else if (drag) drag.last = null;
+      }
+      if (p012 && HasSignal("EscortCall")) s.Once("p012_columnStart", (ss) => {
+        const route = ss.phase.whitebox.escortWaypoints;
+        const stop = route.findIndex((point) => point.x === 30 && point.z === 10);
+        if (stop >= 0) ss.mem.column.waypoints = route.slice(0, stop + 1);
+        ss.mem.prepWounded?.Reset(); ss.mem.column?.Start();
+      });
+      if (p012 && HasSignal("P012AmbushClear")) s.Once("p012_columnContinue", (ss) =>
+        ss.mem.column?.Repath(ss.phase.whitebox.escortWaypoints.slice(10)));
+      if (p012 && HasSignal("P012AirReady")) {
+        BeginCh1RailPass(s);
+      }
+      if (p012 && HasSignal("SouthCut")) s.Once("p012_columnReturn", (ss) => {
+        ss.mem.column.scriptPaused = false;
+        ss.mem.column.tuning.columnSpeedMS = ss.phase.whitebox.activities.retreatColumnSpeedMps;
+        ss.mem.column?.Repath([...ss.phase.whitebox.returnWaypoints.slice(0, -1), ss.phase.whitebox.activities.regripPosition]);
+        ss.mem.column.scriptTerminalQueue = true;
+        ss.mem.column.scriptHoldTailSlots = true;
+        ss.mem.column.litters.forEach((litter,index)=>[litter.front,litter.rear].forEach((member,end)=>{
+          member.slot.back=index*4.2+end*1.9;member.slot.lateral=0;member.handle.scriptArrivalRadius=.3;
+        }));
+      });
+      if (p012 && s.mem.p012ReleaseAt && s.mem.p012CarriedLitter) {
+        const point = s.mem.p012ReleaseAt, litter = s.mem.p012CarriedLitter;
+        s.d.host.MoveProp?.(litter.propLitter, { x: point.x, y: 0.1, z: point.z - 1.5 });
+        s.d.host.MoveProp?.(litter.propBody, { x: point.x, y: 0.3, z: point.z - 1.5 });
+        s.mem.p012ReleaseAt = null;
+      }
+      if (p012 && s.mem.p012CarriedLitter && s.carry?.KindId === "stretcher") {
+        const point = s.PlayerPos(), litter = s.mem.p012CarriedLitter;
+        const last = s.mem.p012CarryLast;
+        const step = last ? Math.hypot(point.x - last.x, point.z - last.z) : 0;
+        if (step < 3) s.mem.p012CarryDistance = (s.mem.p012CarryDistance || 0) + step;
+        s.mem.p012CarryLast = { ...point };
+        s.d.host.MoveProp?.(litter.propLitter, { x: point.x, y: (point.y || 0) + 0.62, z: point.z - 1.5, rotationZ: 0 });
+        s.d.host.MoveProp?.(litter.propBody, { x: point.x, y: (point.y || 0) + 0.84, z: point.z - 1.5, rotationZ: 0 });
+      }
+      if (p012 && s.mem.p012LitterOverturned && !s.mem.p012LitterRecovered) {
+        const litter = s.mem.p012CarriedLitter, column = s.mem.column, point = s.mem.p012FallenAt;
+        if (litter && column && point) {
+          for (const role of ["front", "rear"]) {
+            if (!litter[role]?.handle?.alive) {
+              const replacement = column.Alive.find((member) => member.role !== "bearer" && member.role !== "civilian");
+              if (replacement) {
+                replacement.role = "bearer"; replacement.slot = { ...litter[role].slot }; litter[role] = replacement;
+                replacement.handle.scriptedNoncombatant = true; replacement.handle.unarmed = true;
+                replacement.handle.scriptEssential = true;
+                replacement.handle.scriptDefensive = false; replacement.handle.target = null;
+                replacement.handle.actor?.SetWeapon?.(null);
+              }
+            }
+          }
+          let arrived = true;
+          for (const [role, offset] of [["front", -0.9], ["rear", 0.9]]) {
+            const actor = litter[role]?.handle, target = { x: point.x, z: point.z + offset };
+            if (!actor?.alive) { arrived = false; continue; }
+            s.d.host.SetGoal?.(actor, target.x, target.z);
+            const at = s.d.host.PositionOf?.(actor);
+            if (!at || Math.hypot(at.x - target.x, at.z - target.z) > 1.8) arrived = false;
+          }
+          if (arrived) {
+            litter.dropped = false; s.mem.p012LitterRecovered = true;
+            s.mem.p012RecoveryReason = "livingReplacementReachedFallenLitter";
+            litter.front.handle.carryRole = "front"; litter.rear.handle.carryRole = "rear";
+            s.d.host.MoveProp?.(litter.propLitter, { ...point, y: 0.62, rotationZ: 0 });
+            s.d.host.MoveProp?.(litter.propBody, { ...point, y: 0.84, rotationZ: 0 });
+            s.Signal("P012LitterRecovered");
+          }
+        }
+      }
+
+      // Keep this same recovered patient at the actual ditch, not the stale column head.
+      if (p012 && s.mem.p012LitterRecovered && !HasSignal("P012DitchClear")) {
+        const point = s.mem.p012FallenAt, litter = s.mem.p012CarriedLitter;
+        if (point && litter) for (const [role, offset] of [["front", -0.9], ["rear", 0.9]]) {
+          const actor = litter[role]?.handle;
+          if (actor?.alive) s.d.host.SetGoal?.(actor, point.x, point.z + offset);
+        }
+      }
+
+      if (p012 && HasSignal("P012DitchClear")) s.Once("p012_ditchContinue", (ss) => {
+        const column=ss.mem.column;
+        if (column) {
+          for(const member of column.Alive) if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
+          const actor=ss.mem.p012CarriedLitter?.front?.handle;
+          const start=actor && ss.d.host.PositionOf?.(actor);
+          column.scriptPaused=false; column.Repath([{x:44,z:66},{x:47,z:80},{x:42,z:94}],start);
+        }
+      });
 
       // ⑥ 转向人群。第一轮走完 9 秒后拐回来 —— 「拉起、转弯、降高」那一下
       //    必须在玩家的自由视角里看得见（§2 不设开场过场就是为了这一眼）。
-      if (s.mem.railPassDone && !s.mem.crowdTurnAt && s.Time() - s.mem.railPassDone > 9) {
+      if (s.mem.railPassDone && !s.mem.crowdTurnAt && !s.strafe?.Active
+        && (p012 || s.Time() - s.mem.railPassDone > 9)) {
         s.mem.crowdTurnAt = s.Time();
         const column = s.mem.column;
         // **点名，不掷骰子**：谁倒下由脚本决定（Script_AircraftStrafe 的白名单）。
@@ -1390,60 +1684,109 @@ export const SETPIECES = {
         s.strafe?.StrafeRun({
           preset: "crowdTurn",
           from: { x: -440, z: 55 }, to: { x: -450, z: 165 },
+          ...(s.phase?.whitebox?.aircraftRoutes?.crowdTurn || {}),
           TrackTo: () => column?.HeadPosition() || s.PlayerPos(),
           victims,
           // 后面还有戏的人一律必不死：班里那几个（罗班长、幺娃、何有田…）
           // 与担架上那个伤员。`immune` 压过 `victims`（白名单不许自相矛盾）。
           immune: (s.companion?.Roster || []).map((id) => s.companion.Handle(id)).filter(Boolean),
           OnPhase: (beat) => {
-            if (beat === "fire") column?.Scatter(14);
+            if (beat === "fire") {
+              if (!p012) column?.Scatter(14);
+              if (p012 && column) column.scriptPaused = true;
+              if (p012) { s.Signal("P012CrowdFire"); s.Signal("P012AircraftCrowdFire"); s.Signal("StretcherHandoff"); }
+            }
             if (beat === "exit") s.mem.crowdTurnDone = s.Time();
           },
         });
       }
 
+      if (p012 && HasSignal("P012SeekAirCover") && !HasSignal("P012Dived")) {
+        const slots=s.phase.whitebox.anchors.strafeSlots || [];
+        for(const [index,member] of (s.mem.column?.Alive || []).filter((m)=>m.role!=="bearer").entries()) {
+          if(member.role==="civilian" && !HasSignal("P012CrowdFire")) continue;
+          const point=slots[index%slots.length];
+          if(point){
+            member.handle.scriptedNoncombatant=true;
+            const at=s.d.host.PositionOf?.(member.handle), target=at&&at.z>66.8?{x:44,z:66}:point;
+            s.d.host.SetGoal?.(member.handle,target.x,target.z+(target===point?(index%2?1:-1):0));
+          }
+        }
+      }
+      if(p012 && HasSignal("P012Dived"))s.Once("p012_restoreCoverGuards",ss=>{
+        for(const member of ss.mem.column?.Alive || [])if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
+      });
+
       // ⑧ 第三次进入航线。**要等玩家真的抬上担架**（搬运态满 20 s），
       //    没抬上就用 crowdTurn 结束后 30 s 兜底 —— 不能让这一拍等一个
       //    可能永远不发生的条件。
       if (!s.mem.diveAt && s.mem.crowdTurnDone) {
-        const carried = s.mem.carryStartedAt && s.Time() - s.mem.carryStartedAt > 20;
-        const timedOut = s.Time() - s.mem.crowdTurnDone > 30;
+        const carried = p012 ? HasSignal("P012CarryReady") : s.mem.carryStartedAt && s.Time() - s.mem.carryStartedAt > 20;
+        const timedOut = !p012 && s.Time() - s.mem.crowdTurnDone > 30;
         if (carried || timedOut) {
           s.mem.diveAt = s.Time();
           s.strafe?.StrafeRun({
             preset: "divePress",
             from: { x: -444, z: 100 }, to: { x: -452, z: 195 },
+            ...(s.phase?.whitebox?.aircraftRoutes?.divePress || {}),
             TrackTo: () => s.PlayerPos(),
             // 「你的手是先松开的」—— 剧情要求，不是玩家操作失误。
-            OnDodge: () => { s.carry?.ForceRelease("dive"); },
+            OnDodge: () => {
+              s.carry?.ForceRelease("dive");
+              if (p012) {
+                const point = s.PlayerPos(), litter = s.mem.p012CarriedLitter;
+                if (litter) {
+                  s.d.host.MoveProp?.(litter.propLitter, { x: point.x + 1.2, y: 0.35, z: point.z, rotationZ: Math.PI * 0.6 });
+                  s.d.host.MoveProp?.(litter.propBody, { x: point.x + 1.7, y: 0.18, z: point.z + 0.4, rotationZ: 0.35 });
+                  s.mem.p012LitterOverturned = true;
+                  s.mem.p012FallenAt = { x: point.x + 1.2, z: point.z };
+                }
+                s.Signal("P012Dived");
+              }
+            },
             // 「不躲则被击倒并从数秒前重来」。**倒带必须发生在把伤害交给
             // 死亡链路之前** —— Script_AircraftStrafe 的 OnPlayerHit 就在那之前调。
             OnPlayerHit: () => {
               s.carry?.ForceRelease("dive");
               s.checkpoint?.Rewind(4);
+              if (p012) s.mem.p012RetryDive = true;
               s.Hint("再来一次 —— 它压下来的时候扑进沟里。", 3.2);
             },
-            OnPhase: (beat) => { if (beat === "exit") s.mem.diveDone = s.Time(); },
+            OnPhase: (beat) => {
+              if (p012 && beat === "enter") s.Signal("P012DiveApproach");
+              if (beat === "exit") s.mem.diveDone = s.Time();
+            },
           });
         }
       }
 
       // ⑨ 南路被截断：飞机走后二十秒，路口那头的枪声一直没停。
-      if (s.mem.diveDone && s.Time() - s.mem.diveDone > 20) {
+      if (!p012 && s.mem.diveDone && s.Time() - s.mem.diveDone > 20) {
         s.Once("ch1_southCut", (ss) => ss.Signal("SouthCut"));
       }
 
       // ⑪ 结尾：重新握住担架后端。**只在伤员那一句之后摆** ——
       //    §0 六个验收结果之二，这一下是本关的收束动作。
-      if (s.Spoken("ch1_shangbing_04")) {
+      if (s.Spoken("ch1_shangbing_04") && (!p012 || HasSignal("P012RegripReady"))) {
         s.Once("ch1_regrip", (ss) => {
-          const spot = ss.Near("C1_BackToWall", 4, 6);
+          const originalLitter = ss.mem.p012CarriedLitter;
+          const actualRear = originalLitter?.rear?.handle && ss.d.host.PositionOf?.(originalLitter.rear.handle);
+          const spot = (p012 ? actualRear || originalLitter?.lastMid : null) || ss.phase?.whitebox?.activities?.regripPosition || ss.phase?.whitebox?.anchors?.shelter || ss.Near("C1_BackToWall", 4, 6);
           if (!spot) return;
+          if (p012) {
+            const litter = originalLitter;
+            if (litter) {
+              litter.dropped = true; ss.mem.p012CarriedLitter = litter;
+            }
+          }
           ss.Register(PickUpLoadInteraction({
             id: "ch1_regrip", position: spot, kindId: "stretcher",
             label: "重新握住担架后端", carry: ss.carry,
             options: { label: "担架（伤员）", canDrop: true, payload: { who: "shangbing" } },
-            OnComplete: () => ss.Hint("腿抬高了。", 2.2),
+            OnComplete: () => {
+              ss.Hint("腿抬高了。", 2.2);
+              if (ss.phase?.whitebox?.p012) ss.Signal("P012Regripped");
+            },
           }));
         });
       }
@@ -2431,10 +2774,11 @@ export class MissionSetpieceDirector {
 
     // --- 路标：只触发第一次 --------------------------------------------------
     const zone = this.host.PlayerZone?.();
-    if (zone && !this.zonesSeen.has(zone)) {
-      this.zonesSeen.add(zone);
-      const hook = this.spec.onZone && this.spec.onZone[zone];
-      if (hook) this._Safe(() => hook(s), `onZone:${zone}`);
+    const contentZone = this.phase?.zones?.find((item) => item?.id === zone)?.contentZoneId || zone;
+    if (contentZone && !this.zonesSeen.has(contentZone)) {
+      this.zonesSeen.add(contentZone);
+      const hook = this.spec.onZone && this.spec.onZone[contentZone];
+      if (hook) this._Safe(() => hook(s), `onZone:${contentZone}`);
     }
 
     // --- 定时器 --------------------------------------------------------------

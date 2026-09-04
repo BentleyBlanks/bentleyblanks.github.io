@@ -55,6 +55,191 @@ try {
 
 const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small${query}`;
 
+// Explicit lethal-hit fixture, not campaign or balance evidence.
+if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only")){
+ try{
+  await page.goto(Url("&whitebox=p012&shot=1&manual=1"),{timeout:120000});
+  await page.waitForFunction(()=>window.Tengxian?.Debug?.P012?.(),null,{timeout:240000});
+  if(process.argv.includes("--p012-enemy-bound-only")){
+    const rows=await page.evaluate(async()=>{
+      const g=window.Tengxian,{default:phase}=await import("./Data_FirstLevelP012Whitebox.mjs"),rows=[];
+      const pursuit=phase.whitebox.activities.retreatPursuitRoutes||[];
+      const groups=[...phase.whitebox.activities.closeFightGroups,...phase.whitebox.activities.southFightGroups,
+        ...pursuit.map(route=>({spawns:[route[0],route[0]],positions:[route.at(-1),route.at(-1)],approaches:[route.slice(1),route.slice(1)],relocations:[route.at(-1),route.at(-1)]}))];
+      const {P012_ENEMY_LANES,P012_ANCHORS}=await import("./Data_FirstLevelP012Layout.mjs");
+      const spawnPoints=[...Object.values(P012_ENEMY_LANES).map(lane=>lane.spawn),...P012_ANCHORS.blockadePositions,
+        ...[...groups,...phase.whitebox.activities.ambushGroups].flatMap(group=>group.spawns||group.positions)];
+      const spawns=spawnPoints.map(point=>{const actor=g.ai.Spawn("ija",point.x,point.z,{weapon:"Type38"});
+        const eye=actor.position.clone();eye.y+=1.62;const target=eye.clone().set(point.z>110?42:68,1.62,point.z>110?98:24),dir=target.clone().sub(eye),distance=dir.length();
+        const row={requested:point,actual:actor.position.toArray(),inMain:g.ai.ctx.nav?.InMain(point.x,point.z),free:g.ai.ctx.physics?.FindFreeSpot(actor.position.x,actor.position.z,.42,1.8),los:!g.ai.ctx.battlefield.Raycast(eye,dir.normalize(),distance),error:Math.hypot(actor.position.x-point.x,actor.position.z-point.z)};actor.Kill();return row;});
+      for(const [groupIndex,group] of groups.entries())for(let slot=0;slot<2;slot++){
+        const start=group.spawns?.[slot]||group.positions[slot],s=g.ai.Spawn("ija",start.x,start.z,{weapon:"Type38"});
+        s.scriptArrivalRadius=.3;s.order="hold";s.state="advance";s.target=null;
+        const route=[...(group.approaches?.[slot]||[]),group.positions[slot],group.relocations[slot]];
+        for(const [index,point] of route.entries()){
+          s.holdZone={x:point.x,z:point.z,radius:.3};s.goal.set(point.x,0,point.z);
+          let frames=0;for(;frames<3600&&Math.hypot(s.position.x-point.x,s.position.z-point.z)>.6;frames++){
+            g.ai.time+=1/60;g.ai.Act(s,1/60,g.player);g.ai.ctx.physics?.Step(1/60);
+          }
+          rows.push({groupIndex,slot,index,frames,distance:Math.hypot(s.position.x-point.x,s.position.z-point.z),position:s.position.toArray(),goal:s.goal.toArray(),bounds:g.ai.insideWalls});
+        }
+        s.Kill();
+      }
+      const s=g.ai.Spawn("ija",50,70,{weapon:"Type38"});s.order="hold";s.state="advance";s.target=null;s.holdZone={x:50,z:75,radius:.3};s.goal.set(50,0,75);
+      for(let i=0;i<600;i++){g.ai.time+=1/60;g.ai.Act(s,1/60,g.player);g.ai.ctx.physics?.Step(1/60);}
+      const defaultDistance=Math.hypot(s.position.x-50,s.position.z-75);s.Kill();
+      const {EscortColumn,LastLitterArrived,TerminalSlot}=await import("./Script_MissionSetpieces.mjs");
+      let airTime=0,airColumn;const airActors=[],airRoster=g.setpieces.mem.column.roster;
+      airColumn=new EscortColumn({Time:()=>airTime,PlayerPos:()=>({x:54,z:57}),PositionOf:a=>a.position,Alive:a=>a.alive,
+        SpawnActor:({x,z})=>{const a=g.ai.Spawn("nra",x,z,{weapon:"HanYang"});a.unarmed=true;a.scriptedNoncombatant=true;a.order="advance";a.state="advance";airActors.push(a);return a;},SetGoal:(a,x,z)=>a.goal.set(x,0,z)},
+        {waypoints:[{x:50,z:47},{x:50,z:68},{x:47,z:80}],followRouteBodies:true,tuning:{columnSpeedMS:1.35},members:airRoster});
+      airColumn.Start();g.setpieces.mem.column=airColumn;g.player.Spawn(54,57,0);
+      const enteredBefore=g.Debug.P012Scene().airColumnEnteredRoad;
+      for(let i=0;i<1800&&!g.Debug.P012Scene().airColumnEnteredRoad;i++){airTime+=1/60;airColumn.Update(1/60);for(const a of airActors)g.ai.Act(a,1/60,g.player);g.ai.ctx.physics?.Step(1/60);}
+      const entered=g.Debug.P012Scene().airColumnEnteredRoad;g.story.Signal("P012AirReady");g.setpieces.Update(1/60);
+      const airEntry={enteredBefore,entered,active:g.strafe.Active,positions:airActors.map(a=>a.position.toArray()),remainingRoadM:Math.hypot(54-50,57-68)+Math.hypot(50-47,68-74)};
+      for(let i=0;i<600&&!g.setpieces.mem.crowdTurnAt;i++){g.state.elapsed+=1/60;g.strafe.Update(1/60);g.setpieces.Update(1/60);}
+      airEntry.turnWithoutPlayerGate=!!g.setpieces.mem.crowdTurnAt&&!g.story.Signalled("P012CrowdReady");
+      airEntry.turnGap=g.setpieces.mem.crowdTurnAt-g.setpieces.mem.railPassDone;
+      g.player.Spawn(45.356,66.265,Math.PI);g.story.Signal("P012SeekAirCover");
+      for(let i=0;i<285;i++){airTime+=1/60;g.state.elapsed+=1/60;g.strafe.Update(1/60);g.setpieces.Update(1/60);for(const actor of airActors)g.ai.Act(actor,1/60,g.player);g.ai.ctx.physics?.Step(1/60);}
+      airEntry.formation=airColumn.members.map(member=>({role:member.role,slot:member.slot,position:member.handle.position.toArray()}));
+      const closeMembers=airColumn.members.filter(member=>member.role==="bearer"||member.role==="civilian");
+      airEntry.minimumBodyGap=Math.min(...closeMembers.flatMap((member,i)=>closeMembers.slice(i+1).map(other=>member.handle.position.distanceTo(other.handle.position))));
+      airEntry.civiliansAhead=airColumn.members.filter(member=>member.role==="civilian").every(member=>member.handle.position.z>g.player.position.z);
+      g.strafe.Abort("fixtureEnd");for(const actor of airActors)actor.Kill();
+      let now=0,column;const bodies=[];
+      column=new EscortColumn({Time:()=>now,PlayerPos:()=>column.HeadPosition(),PositionOf:a=>a.position,Alive:a=>a.alive,
+        SpawnActor:({x,z})=>{const a=g.ai.Spawn("nra",x,z,{weapon:"HanYang"});a.unarmed=true;a.scriptedNoncombatant=true;a.scriptArrivalRadius=.3;a.order="advance";a.state="advance";bodies.push(a);return a;},
+        SetGoal:(a,x,z)=>a.goal.set(x,0,z)},
+        {waypoints:[{x:5,z:-46},{x:-7,z:-37}],followRouteBodies:true,tuning:{columnSpeedMS:2.05},members:[...Array.from({length:4},()=>({role:"bearer"})),{role:"guard"}]});
+      column.Start();
+      const fallen=column.litters[0].rear,replacement=column.members[4];fallen.handle.Kill();
+      replacement.role="bearer";replacement.slot={...fallen.slot};column.litters[0].rear=replacement;
+      g.setpieces.mem.column=column;
+      const savedPhase=g.setpieces.phase;
+      g.setpieces.phase={...savedPhase,whitebox:{...savedPhase.whitebox,returnWaypoints:[{x:5,z:-46},{x:-7,z:-37}]}};
+      g.story.Signal("SouthCut");g.setpieces.Update(1/60);g.setpieces.phase=savedPhase;
+      const before=LastLitterArrived(column);
+      for(let i=0;i<1800&&!LastLitterArrived(column);i++){now+=1/60;column.Update(1/60);for(const a of bodies.filter(a=>a.alive)){g.ai.Act(a,1/60,g.player);}g.ai.ctx.physics?.Step(1/60);}
+      const parked={before,arrived:LastLitterArrived(column),positions:column.litters.flatMap(l=>[l.front,l.rear]).map(m=>m.handle.position.toArray()),targets:column.litters.flatMap(l=>[l.front,l.rear]).map(m=>TerminalSlot(column.waypoints,m.slot.back)),spans:column.litters.map(l=>l.front.handle.position.distanceTo(l.rear.handle.position))};
+      const centers=column.litters.map(l=>l.front.handle.position.clone().add(l.rear.handle.position).multiplyScalar(.5));parked.centerGap=centers[0].distanceTo(centers[1]);
+      g.setpieces.mem.column=column;g.setpieces.mem.p012CarriedLitter=column.litters[0];
+      const original=column.litters[0],second=column.litters[1],secondBefore=second.front.handle.position.clone();
+      g.setpieces.spoken.add("ch1_shangbing_04");g.story.Signal("P012RegripReady");g.setpieces.Update(1/60);
+      const rear=original.rear.handle.position;g.player.Spawn(rear.x,rear.z,0);
+      const candidate=g.interact.Query(g.player),picked=candidate?.point?.id==="ch1_regrip"&&!!g.interact.Press(g.player);
+      let travel=0;const startCarry=g.player.position.clone();
+      for(let i=0;i<1800&&Math.hypot(g.player.position.x+7,g.player.position.z+52)>.7;i++){
+        const dx=-7-g.player.position.x,dz=-52-g.player.position.z;g.player.yaw=Math.atan2(-dx,-dz);
+        g.player.Update(1/60,{forward:1,strafe:0,lookX:0,lookY:0,sprint:false,ads:false},g.state.weapon);
+        g.carry.Update(1/60);g.setpieces.Update(1/60);g.ai.ctx.physics?.Step(1/60);
+      }
+      travel=g.player.position.distanceTo(startCarry);
+      parked.regrip={picked,same:original===g.setpieces.mem.p012CarriedLitter,travel,remaining:Math.hypot(g.player.position.x+7,g.player.position.z+52),secondMoved:second.front.handle.position.distanceTo(secondBefore)};
+      g.carry.ForceRelease("fixtureEnd");g.player.Spawn(44,62,Math.PI);g.player.spawnGrace=0;
+      const attackers=phase.whitebox.activities.closeFightGroups.flatMap(group=>group.positions.map((end,i)=>{
+        const start=group.spawns[i],actor=g.ai.Spawn("ija",start.x,start.z,{weapon:"Type38"});
+        actor.scriptedNoncombatant=true;actor.state="advance";actor.order="hold";actor.scriptArrivalRadius=.3;
+        return {actor,points:[...group.approaches[i],end],index:0,stop:group.stagingStopIndices[i]};
+      }));
+      function EnemyStep(staged){for(const entry of attackers){const a=entry.actor;if(!a.alive)continue;
+        const target=staged&&entry.index>entry.stop?(entry.stop<0?a.position:entry.points[entry.stop]):entry.points[entry.index];
+        a.holdZone={x:target.x,z:target.z,radius:.3};a.goal.set(target.x,0,target.z);
+        if(a.position.distanceTo(a.goal)<.6&&entry.index<entry.points.length-1&&(!staged||entry.index<=entry.stop))entry.index++;
+        g.ai.Think(a,.1,g.player);g.ai.Act(a,1/60,g.player);
+      }g.ai.ctx.physics?.Step(1/60);}
+      for(let i=0;i<1800;i++){g.ai.time+=1/60;EnemyStep(true);}
+      const stageShots=attackers.filter(entry=>Number.isFinite(entry.actor.lastFire)&&entry.actor.lastFire>0).length;
+      for(const entry of attackers)entry.actor.scriptedNoncombatant=false;
+      // Observational firing fixture: no world advance or guaranteed player-hit replay.
+      g.strafe.StrafeRun({preset:"divePress",...phase.whitebox.aircraftRoutes.divePress,TrackTo:()=>g.player.position,player:{enabled:false}});
+      const fireSequence=[],impactTimes=[];let aircraftFiringFrames=0;const impactsBefore=g.strafe.stats.impacts;
+      for(let i=0;i<600;i++){g.ai.time+=1/60;g.state.elapsed+=1/60;const previousImpacts=g.strafe.stats.impacts;g.strafe.Update(1/60);
+        if(g.strafe.stats.impacts>previousImpacts)impactTimes.push(i/60);
+        if(g.strafe.View()?.firing)aircraftFiringFrames++;
+        const before=attackers.map(e=>e.actor.lastFire);EnemyStep(false);
+        attackers.forEach((entry,index)=>{if(entry.actor.lastFire!==before[index])fireSequence.push({index,time:i/60,air:g.strafe.View()?.phase,airFiring:g.strafe.View()?.firing});});
+      }
+      for(const shot of fireSequence)shot.nearestImpactS=Math.min(...impactTimes.map(time=>Math.abs(time-shot.time)));
+      return {rows,spawns,parked,airEntry,overlap:{stageShots,fireSequence,count:attackers.length,aircraftFiringFrames,aircraftImpacts:g.strafe.stats.impacts-impactsBefore},scoutRange:Math.hypot(P012_ENEMY_LANES.center.reveal.x-P012_ANCHORS.gunports[1].x,P012_ENEMY_LANES.center.reveal.z-P012_ANCHORS.gunports[1].z),defaultDistance};
+    });
+    Check("真实 AI / 碰撞逐段到达十二名战术演员及两条有限追击路线",rows.rows.every(row=>row.distance<=.6),JSON.stringify(rows));
+    Check("未指定字段保留1.2米停止距离",rows.defaultDistance>.9&&rows.defaultDistance<=1.3,String(rows.defaultDistance));
+    Check("指定出生仅允许安全导航半格吸附且偏移点射界成立",rows.spawns.every(row=>row.error<.01||(row.error<=1&&!row.inMain&&row.free.moved===0&&row.los)),JSON.stringify(rows.spawns));
+    Check("侦察露出点距离主枪眼45至60米",rows.scoutRange>=45&&rows.scoutRange<=60,String(rows.scoutRange));
+    Check("四抬手实际入路即起飞且玩家仍有过路距离",!rows.airEntry.enteredBefore&&rows.airEntry.entered&&rows.airEntry.active&&rows.airEntry.remainingRoadM>15,JSON.stringify(rows.airEntry));
+    Check("铁路离场立即转弯，不等待玩家冲刺门",rows.airEntry.turnWithoutPlayerGate&&rows.airEntry.turnGap<=1/60,JSON.stringify(rows.airEntry));
+    Check("实际十人队列转弯末端百姓仍在观察者前方且不重叠",rows.airEntry.civiliansAhead&&rows.airEntry.minimumBodyGap>.84,JSON.stringify({formation:rows.airEntry.formation,minimumBodyGap:rows.airEntry.minimumBodyGap}));
+    Check("替补护卫后四名真实抬手按担架归属停车",!rows.parked.before&&rows.parked.arrived&&rows.parked.centerGap>=3&&rows.parked.spans.every(span=>span>=1.2&&span<=2.8),JSON.stringify(rows.parked));
+    Check("同副真实重新握持并搬入掩蔽点，另一副仍停车",rows.parked.regrip.picked&&rows.parked.regrip.same&&rows.parked.regrip.travel>=10&&rows.parked.regrip.remaining<.7&&rows.parked.regrip.secondMoved<.01,JSON.stringify(rows.parked.regrip));
+    Check("同六人待机不射击，攻击段地面枪响距真实航空弹着不超过0.25秒",rows.overlap.count===6&&rows.overlap.stageShots===0&&rows.overlap.aircraftFiringFrames>0&&rows.overlap.aircraftImpacts>0&&rows.overlap.fireSequence.some(row=>row.air==="strafe"&&row.nearestImpactS<=.25),JSON.stringify(rows.overlap));
+    Check("无浏览器错误",problems.length===0,problems.join("\n"));
+    await browser.close();await server.close();process.exit(failed?1:0);
+  }
+  if(process.argv.includes("--p012-voice-only")){
+    const voices=await page.evaluate(async()=>{
+      const {VOICE_LINES,VOICE_BASE}=await import("./Data_Voice.mjs");
+      const {default:phase}=await import("./Data_FirstLevelP012Whitebox.mjs");
+      const keys=[...new Set(phase.whitebox.storyBeats.map(b=>b.voice).filter(Boolean))],audio=new AudioContext();
+      const rows=await Promise.all(keys.map(async key=>{const entry=VOICE_LINES.find(v=>v.key===key);try{
+        if(!entry?.file)throw new Error("missing voice entry");const response=await fetch(VOICE_BASE+entry.file);if(!response.ok)throw new Error(String(response.status));
+        const buffer=await audio.decodeAudioData(await response.arrayBuffer());return {key,duration:buffer.duration};
+      }catch(error){return {key,error:String(error)};}}));await audio.close();
+      const {StoryDirector}=await import("./Script_Story.mjs"),longest=rows.filter(row=>!row.error).sort((a,b)=>b.duration-a.duration)[0],played=[];
+      const director=new StoryDirector({hud:{Say(){},Title(){}}});
+      director.AttachVoice(({key})=>{played.push({key,at:director.levelTime});return key===longest.key?longest.duration:1;});
+      director.BeginLevel(phase.contentId,{beats:[{type:"line",at:"delay:0",voice:"nextFixture",text:"fixture"}],actualEventsOnly:true});
+      director._Speech("fixture",{voice:longest.key,text:"fixture"},4.2);
+      for(let i=0;i<Math.ceil((longest.duration+.4)*60);i++)director.Update(1/60,{});
+      return {rows,played,longest};
+    });
+    console.log("P012 decoded audio durations",JSON.stringify(voices.rows));
+    Check("P012引用语音全部可实际解码",voices.rows.every(v=>!v.error));
+    Check("当前P012实际录音不触及八秒占用上限",voices.rows.every(v=>v.duration+.35<=8),JSON.stringify(voices.longest));
+    Check("生产Story队列等待最长实际录音及尾留白",voices.played.length===2&&voices.played[1].at>=voices.longest.duration+.35,JSON.stringify(voices.played));
+    await browser.close();await new Promise(resolve=>server.close(resolve));process.exit(failed?1:0);
+  }
+  const environment=await page.evaluate(()=>window.Tengxian.Debug.P012Environment());
+  Check("P012不生成外部环境布景/PCG/饰件",environment.externalCount===0&&environment.pcgCount===0&&environment.trimCount===0&&environment.roots.length===0,JSON.stringify(environment));
+  const downloads=await page.evaluate(()=>performance.getEntriesByType("resource").map(r=>r.name).filter(name=>/Model_(BattlefieldPack|BarbedWireSet|MarketStorageSet|CityWallBreachPack|CityWallDetailPack|LeaflessTreeSet)\.glb/.test(name)));
+  Check("P012不下载正式环境模型包",downloads.length===0,JSON.stringify(downloads));
+  const result=await page.evaluate(()=>{
+   const g=window.Tengxian;g.StepFrames(2);
+   const before={flow:JSON.stringify(g.Debug.P012()),ammo:g.state.ammo,clips:g.state.clips,pool:g.state.nraPool,actors:g.ai.soldiers.map(a=>a.id)};
+   g.player.spawnGrace=0;g.player.TakeHit(10000,"torso");g.StepFrames(1);
+   const menu=g.Debug.Menu(),failed=!g.player.Alive&&!g.state.running;
+   const frozenBefore=JSON.stringify({elapsed:g.state.elapsed,hp:g.player.health,aiTime:g.ai.time,positions:g.ai.soldiers.map(a=>a.position.toArray()),flow:g.Debug.P012()});
+   g.StepFrames(600,1/60,false);
+   const frozen=frozenBefore===JSON.stringify({elapsed:g.state.elapsed,hp:g.player.health,aiTime:g.ai.time,positions:g.ai.soldiers.map(a=>a.position.toArray()),flow:g.Debug.P012()});
+   g.Debug.MenuAct("retrySandbox");
+   return {before,menu,failed,frozen,alive:g.player.Alive,hp:g.player.health,ammo:g.state.ammo,clips:g.state.clips,pool:g.state.nraPool,actors:g.ai.soldiers.map(a=>a.id),flow:JSON.stringify(g.Debug.P012()),identity:g.state.identity,running:g.state.running};
+  });
+  Check("真实致死进入专属失败菜单",result.failed&&result.menu.items.includes("retrySandbox"));
+  Check("失败菜单600帧不推进时间/伤害/NPC/任务",result.frozen);
+  Check("恢复同一顺子而非随机新兵",result.identity.name==="顺子"&&!("origin" in result.identity)&&result.alive&&result.running&&result.hp===100);
+  Check("任务资源与NPC世界保留",["flow","ammo","clips","pool"].every(k=>result[k]===result.before[k])&&JSON.stringify(result.actors)===JSON.stringify(result.before.actors));
+  const loaded=await page.evaluate(()=>{
+   const g=window.Tengxian,payload={fixture:"existingLoad"};g.carry.Begin("stretcher",{payload});
+   const serial=g.carry.serial,position=g.player.position.clone(),update=g.combat.Update;
+   g.combat.Update=function(...args){update.apply(this,args);this.Update=update;g.player.spawnGrace=0;g.player.TakeHit(10000,"torso");};
+   g.StepFrames(1);const label=g.menu.items.find(i=>i.id==="retrySandbox")?.label;
+   g.Debug.MenuAct("retrySandbox");
+   return {label,sameSerial:g.carry.serial===serial,samePayload:g.carry.load?.payload===payload,active:g.carry.Active,moved:g.player.position.distanceTo(position)};
+  });
+  Check("负重死亡在同一载物处恢复，不搬运/复制",loaded.label==="在载物处继续"&&loaded.sameSerial&&loaded.samePayload&&loaded.active&&loaded.moved<.1,JSON.stringify(loaded));
+  const completed=await page.evaluate(()=>{
+   const g=window.Tengxian;g.story.Signal("P012Complete");g.StepFrames(1);
+   const Snapshot=()=>JSON.stringify({elapsed:g.state.elapsed,hp:g.player.health,aiTime:g.ai.time,positions:g.ai.soldiers.map(a=>a.position.toArray()),flow:g.Debug.P012(),carrySerial:g.carry.serial});
+   const before=Snapshot();g.StepFrames(600,1/60,false);
+   return {frozen:before===Snapshot(),items:g.Debug.Menu().items,running:g.state.running};
+  });
+  Check("完成菜单600帧冻结全部世界，不进入CH2",completed.frozen&&!completed.running&&completed.items.join(",")==="restartSandbox,exitSandbox");
+  Check("无浏览器异常",problems.length===0,problems.join(";"));
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+ process.exit(failed?1:0);
+}
+
 async function Boot(query = "") {
   await page.goto(Url(query), { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
@@ -65,6 +250,26 @@ async function Boot(query = "") {
 // ===========================================================================
 // 1) 开机就落在菜单上，玩法没有在背后跑
 // ===========================================================================
+// Isolated browser DOM executes the production completion method and CSS;
+// --completion-only avoids loading the full battlefield for this visual gate.
+{
+  const source=fs.readFileSync(path.join(projectDir,"Script_Menu.mjs"),"utf8").replace(/\r/g,"");
+  const methods=["OpenSandboxComplete","ClearSandboxComplete"].map(name=>source.match(new RegExp(`  ${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0]).join(",");
+  await page.setContent(`<style>${fs.readFileSync(path.join(projectDir,"Style_Menu.css"),"utf8")}</style><body style="background:#829aaa"><div id="menu"><div class="mnTitle"><div class="mnTitleSub"></div></div><nav class="mnList">重新测试 / 返回主菜单</nav></div></body>`);
+  await page.evaluate(methods=>{
+    const menu={...new Function(`return ({${methods}})`)(),root:document.querySelector("#menu"),el:{titleSub:document.querySelector(".mnTitleSub")},OpenPause(){this.ClearSandboxComplete();this.root.classList.add("pause");},SetItems(items){this.items=items;}};
+    window.completionTest=menu;menu.OpenSandboxComplete();
+  },methods);
+  Check("白盒完成淡黑期间不显示操作",await page.locator(".mnList").evaluate(el=>getComputedStyle(el).visibility==="hidden"));
+  await page.waitForTimeout(2350);
+  const completed=await page.evaluate(()=>({background:getComputedStyle(completionTest.root).backgroundColor,visible:getComputedStyle(document.querySelector(".mnList")).visibility,items:completionTest.items.map(item=>item.id)}));
+  Check("白盒约两秒后纯黑完成界面",completed.background==="rgb(0, 0, 0)"&&completed.visible==="visible",JSON.stringify(completed));
+  Check("白盒完成没有第二章入口",completed.items.join(",")==="restartSandbox,exitSandbox");
+  await page.screenshot({path:path.join(outDir,"Scene_P012CompleteDom.png")});
+  await page.evaluate(()=>completionTest.ClearSandboxComplete());
+  Check("退出白盒完成恢复原菜单样式",await page.locator("#menu").evaluate(el=>getComputedStyle(el).backgroundColor==="rgba(0, 0, 0, 0)"&&!el.classList.contains("p012Complete")));
+}
+if(process.argv.includes("--completion-only")){await browser.close();server.close();process.exit(failed?1:0);}
 await Boot();
 {
   const m = await page.evaluate(() => {
@@ -259,11 +464,12 @@ for (let i = 0; i < 3; i += 1) {
     panel.groups.length === 2 && panel.groups[0] === "正式章节" && panel.groups[1] === "测试场景",
     panel.groups.join(" / "));
   Check("测试场景包含玩法靶场、白刃 QTE 与策划白盒",
-    panel.levels === 10 && panel.previews === 0 && !panel.prologue
-      && panel.sandboxes.length === 3
+    panel.levels === 11 && panel.previews === 0 && !panel.prologue
+      && panel.sandboxes.length === 4
       && panel.sandboxes.some((entry) => entry.includes("玩法测试靶场"))
       && panel.sandboxes.some((entry) => entry.includes("白刃战 QTE 测试场"))
       && panel.sandboxes.some((entry) => entry.includes("第一关 · 全新策划白盒"))
+      && panel.sandboxes.some((entry) => entry.includes("第一关 · P0/P1/P2 场景白盒"))
       && panel.sandboxes.every((entry) => !entry.includes("界河")),
     `levels=${panel.levels} previews=${panel.previews} prologue=${panel.prologue} sandboxes=${panel.sandboxes.join("|")}`);
   Check("简报里有全图，且标出了这一关的路标链", panel.map && panel.zones >= 3,
@@ -746,11 +952,13 @@ for (let i = 0; i < 3; i += 1) {
     brief.selected === 7 && brief.mark === "沙盒" && brief.no === "靶",   // 七章 0..6，沙盒是第 7 条
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
   Check("选章列出玩法靶场、白刃 QTE 与第一关策划白盒",
-    brief.sandboxes.length === 3
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃,白"
+    brief.sandboxes.length === 4
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "靶,刃,白,012"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[1].name.includes("白刃战 QTE")
       && brief.sandboxes[2].name.includes("第一关 · 全新策划白盒")
+      && brief.sandboxes[0].name.includes("玩法测试靶场")
+      && brief.sandboxes[3].name.includes("第一关 · P0/P1/P2 场景白盒")
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));
   Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",
@@ -808,6 +1016,27 @@ for (let i = 0; i < 3; i += 1) {
   Check("「退出靶场」摘掉 range，回到主菜单",
     back.range === null && back.open && back.mode === "title" && back.level !== "Range",
     `range=${back.range} mode=${back.mode} level=${back.level}`);
+
+  await page.evaluate(() => {
+    window.Taierzhuang.Debug.MenuShow("levels");
+    const menu = window.Taierzhuang.menu;
+    menu.SelectLevel(menu.entries.findIndex(entry => entry.sandboxKey === "firstLevelP012Whitebox"));
+  });
+  await page.click("#menu .mnSandboxLevel.on");
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.P012?.()?.beat === "B00",
+    null, { timeout: 240000 });
+  const p012Entered = await page.evaluate(() => ({
+    query: new URL(location.href).searchParams.get("whitebox"),
+    phase: window.Taierzhuang.Debug.Whitebox().phase,
+    open: window.Taierzhuang.Debug.Menu().open,
+  }));
+  Check("新增 P012 菜单卡实际进入独立白盒，旧白盒入口未被替换",
+    p012Entered.query === "p012" && p012Entered.phase === "FirstLevelP012Whitebox" && !p012Entered.open,
+    JSON.stringify(p012Entered));
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.Menu?.()?.mode === "title"
+    && !new URL(location.href).searchParams.has("whitebox"), null, { timeout: 240000 });
+  Check("P012 退出独立测试后回主菜单", await page.evaluate(() => window.Taierzhuang.Debug.Menu().open));
 }
 
 // ===========================================================================

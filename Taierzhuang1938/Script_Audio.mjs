@@ -2803,6 +2803,8 @@ export class AudioEngine {
    */
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
     side = "nra" } = {}) {
+    // 章节可压低自主闲聊；具名脚本对白走 PlayStoryVoice，优先战术提示不受此闸影响。
+    if (!priority && this.allowAutonomousBark?.() === false) return null;
     if (!this.ctx || this.disposed || !this.voicesReady || this.voiceMute) return null;
     // 太远的那一嗓子直接不算数 —— **要在两道节流闸之前判**：
     // 否则四百米外一个兵张个嘴就把 0.55 s 的全局闸占掉了，

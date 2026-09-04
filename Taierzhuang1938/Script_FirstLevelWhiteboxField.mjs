@@ -29,6 +29,13 @@ function MakeWhiteMaterial(name = "FirstLevelWhiteboxWhite") {
   return material;
 }
 
+function MakeSemanticMaterial(name, color) {
+  const material = new THREE.MeshStandardMaterial({ name, color, roughness: 0.82, metalness: 0 });
+  material.userData.firstLevelWhitebox = true;
+  material.userData.whiteboxSemantic = name;
+  return material;
+}
+
 /** 把 frozen 的布局规格翻成可挂物理 handle 的碰撞记录。 */
 function ColliderRecord(spec) {
   const hx = spec.w * 0.5;
@@ -48,10 +55,10 @@ function ColliderRecord(spec) {
 }
 
 export class FirstLevelWhiteboxField {
-  constructor(scene, _library, { bounds = null, zones = [], levelId = null } = {}) {
+  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null } = {}) {
     this.scene = scene;
     this.levelId = levelId;
-    this.layout = FIRST_LEVEL_WHITEBOX_LAYOUT;
+    this.layout = whiteboxLayout || FIRST_LEVEL_WHITEBOX_LAYOUT;
     this.bounds = bounds
       ? { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }
       : { ...this.layout.bounds };
@@ -73,7 +80,15 @@ export class FirstLevelWhiteboxField {
       reached: false,
     }));
     this.whiteMaterial = MakeWhiteMaterial();
+    this.materials = new Map([["Whitebox", this.whiteMaterial]]);
+    for (const [semantic, color] of Object.entries(this.layout.semanticColors || {})) {
+      this.materials.set(semantic, MakeSemanticMaterial(`FirstLevelWhitebox_${semantic}`, color));
+    }
     this.gates = new Map();
+    this.scenarioMeshes = [];
+    this.scenarioColliders = [];
+    this.scenarioState = null;
+    this.legend = null;
     this.stats = {
       groundChunks: 0,
       groundTris: 0,
@@ -89,13 +104,14 @@ export class FirstLevelWhiteboxField {
     const sink = new BuildSink();
     sink.SetSector("FirstLevelWhitebox");
     const ground = this.layout.ground;
-    sink.Add("Whitebox", PlaceGeometry(MakeBox(ground.w, ground.h, ground.d, 1,
+    sink.Add(ground.semantic || "Whitebox", PlaceGeometry(MakeBox(ground.w, ground.h, ground.d, 1,
       "FirstLevelWhiteboxGround"), { x: ground.x, y: ground.y, z: ground.z }));
     this.stats.groundChunks = 1;
     this.stats.groundTris = 12;
 
     for (const block of this.layout.blocks) {
-      sink.Add("Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
+      if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
+      sink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
         x: block.x,
         y: block.y,
         z: block.z,
@@ -112,7 +128,7 @@ export class FirstLevelWhiteboxField {
       this.stats.structures += 1;
     }
 
-    for (const mesh of sink.Flush(this.scene, { Get: () => this.whiteMaterial })) {
+    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
       mesh.name = "FirstLevelWhitebox_StaticWhiteBoxes";
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -124,7 +140,10 @@ export class FirstLevelWhiteboxField {
 
   BuildGates() {
     for (const spec of this.layout.gates) {
-      const material = MakeWhiteMaterial(`FirstLevelWhitebox_${spec.id}`);
+      const material = this.layout.semanticColors?.[spec.semantic]
+        ? MakeSemanticMaterial(`FirstLevelWhitebox_${spec.semantic}_${spec.id}`,
+          this.layout.semanticColors[spec.semantic])
+        : MakeWhiteMaterial(`FirstLevelWhitebox_${spec.id}`);
       const mesh = new THREE.Mesh(MakeBox(spec.w, spec.h, spec.d, 1, spec.id), material);
       mesh.position.set(spec.x, spec.y, spec.z);
       mesh.rotation.y = spec.ry || 0;
@@ -147,6 +166,8 @@ export class FirstLevelWhiteboxField {
     this.BuildWhiteBoxes();
     yield { label: "策划白盒：空间体块", progress: 0.62 };
     this.BuildGates();
+    this.SetScenarioState(this.layout.scenario?.states[0]);
+    this.BuildLegend();
     yield { label: "策划白盒：碰撞与掩体", progress: 0.88 };
     this.BuildCollisionGrid();
     yield { label: "策划白盒就绪", progress: 1 };
@@ -156,24 +177,109 @@ export class FirstLevelWhiteboxField {
    * 正式第一章的事实直接驱动可见空间变化。不存在“走到说明牌，文字说门开了”：
    * 信号真发生 → 白门升起 → 碰撞真移除 → 队伍从院里走出来。
    */
-  SyncScenario({ signalled = null } = {}) {
+  SyncScenario({ signalled = null, restore = false } = {}) {
     if (typeof signalled !== "function") return 0;
     let opened = 0;
     for (const [id, gate] of this.gates) {
       if (!gate.open && signalled(gate.spec.signal) && this.OpenGate(id)) opened += 1;
+      else if (restore && gate.open && !signalled(gate.spec.signal) && this.CloseGate(id)) opened += 1;
     }
+    const states = this.layout.scenario?.states;
+    if (states && this.SetScenarioState([...states].reverse().find(state => !state.signal || signalled(state.signal)))) opened += 1;
     return opened;
+  }
+
+  /** Checkpoint replay is explicit so legacy callers retain one-way gate semantics. */
+  RestoreScenario(options = {}) { return this.SyncScenario({ ...options, signalled: options.signalled || (() => false), restore: true }); }
+
+  SetScenarioState(state) {
+    if (!state || this.scenarioState === state.id) return false;
+    for (const collider of this.scenarioColliders) {
+      if (this.physics && collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
+      const index = this.colliders.indexOf(collider);
+      if (index >= 0) this.colliders.splice(index, 1);
+    }
+    for (const mesh of this.scenarioMeshes) {
+      this.scene.remove(mesh); mesh.geometry.dispose();
+      const index = this.meshes.indexOf(mesh);
+      if (index >= 0) this.meshes.splice(index, 1);
+    }
+    const sink = new BuildSink();
+    sink.SetSector("FirstLevelWhiteboxScenario");
+    for (const block of state.blocks) {
+      sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
+      if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0);
+    }
+    this.scenarioMeshes = sink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
+    for (const mesh of this.scenarioMeshes) { mesh.name = `FirstLevelWhitebox_Hub_${state.id}`; mesh.castShadow = true; mesh.receiveShadow = true; this.meshes.push(mesh); }
+    this.scenarioColliders = sink.colliders;
+    for (const collider of this.scenarioColliders) { this.colliders.push(collider); if (this.physics) this.physics.AddSolid(collider); }
+    this.scenarioState = state.id;
+    this.BuildCollisionGrid();
+    return true;
+  }
+
+  BuildLegend() {
+    if (!this.layout.scenario || typeof document === "undefined" || this.legend) return;
+    const legend = document.createElement("details");
+    legend.id = "firstLevelP012Legend";
+    legend.open = typeof window === "undefined" || window.innerWidth >= 640;
+    // Tutorial objectives must remain readable during long posture/movement
+    // drills. Scope to this disposable P012 node; legacy HUD keeps its fade.
+    const objectiveStyle = document.createElement("style");
+    objectiveStyle.textContent = `body:has(#firstLevelP012Legend) .hudObjective {
+      opacity:1 !important; animation:none !important; background:#151a20;
+      padding:8px 10px; border:1px solid #76808b; border-radius:5px;
+    }
+    body:has(#firstLevelP012Legend) .hudObjective .o {
+      color:#fff; -webkit-text-stroke:0; text-shadow:none; font-size:16px; line-height:1.35;
+    }
+    body:has(#firstLevelP012Legend) .hudObjective .objectiveUpdate { display:none; }
+    @media(max-width:639px) {
+      body:has(#firstLevelP012Legend) .hudTop { width:calc(100vw - 120px); }
+      body:has(#firstLevelP012Legend) .hudObjective .o { font-size:13px; }
+      #firstLevelP012Legend { top:14px !important; max-width:190px !important; }
+    }`;
+    legend.appendChild(objectiveStyle);
+    legend.style.cssText = "position:fixed;right:12px;top:76px;z-index:25;max-width:220px;padding:8px 10px;background:#151a20df;color:#fff;border:1px solid #76808b;border-radius:5px;font:12px/1.55 sans-serif;pointer-events:auto;";
+    const title = document.createElement("summary"); title.textContent = "白盒色标"; title.style.cursor = "pointer"; legend.appendChild(title);
+    const direction = document.createElement("div"); direction.textContent = "北：阵地｜南：兵站｜西：铁路"; direction.style.cssText = "font-size:11px;color:#c6d2df;margin:5px 0"; legend.appendChild(direction);
+    const coordinates = document.createElement("details");
+    const coordinateTitle = document.createElement("summary"); coordinateTitle.textContent = "坐标约定"; coordinates.appendChild(coordinateTitle);
+    coordinates.appendChild(document.createTextNode("世界坐标：北 −Z，南 +Z，东 +X；不随镜头转动。"));
+    coordinates.style.cssText = "font-size:10px;color:#b7c3d0;margin:3px 0"; legend.appendChild(coordinates);
+    const labels = {ground:"通行/奔跑",step:"跨步",vault:"翻越",mantle:"攀爬",cover:"掩体",boundary:"不可通行",danger:"危险区域",missionRoute:"任务路线",stretcherRoute:"担架通道"};
+    for (const [semantic, label] of Object.entries(labels)) {
+      const row = document.createElement("div"); row.style.cssText = "display:inline-flex;align-items:center;gap:5px;width:50%;white-space:nowrap";
+      const chip = document.createElement("span"); chip.style.cssText = `display:inline-block;width:10px;height:10px;border:1px solid #aaa;background:#${this.layout.semanticColors[semantic].toString(16).padStart(6,"0")}`;
+      row.appendChild(chip); row.appendChild(document.createTextNode(label)); legend.appendChild(row);
+    }
+    document.body.appendChild(legend); this.legend = legend;
   }
 
   OpenGate(id) {
     const gate = this.gates.get(id);
     if (!gate || gate.open) return false;
     gate.open = true;
-    gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
+    if (this.layout.scenario) gate.mesh.visible = false;
+    else gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
     const handle = gate.collider._physicsHandle;
     if (this.physics && handle !== null && handle !== undefined) this.physics.RemoveSolid(handle);
     const index = this.colliders.indexOf(gate.collider);
     if (index >= 0) this.colliders.splice(index, 1);
+    this.BuildCollisionGrid();
+    return true;
+  }
+
+  CloseGate(id) {
+    const gate = this.gates.get(id);
+    if (!gate || !gate.open) return false;
+    gate.open = false;
+    gate.mesh.visible = true;
+    gate.mesh.position.y = gate.spec.y;
+    gate.collider = ColliderRecord(gate.spec);
+    this.colliders.push(gate.collider);
+    if (this.physics) this.physics.AddSolid(gate.collider);
     this.BuildCollisionGrid();
     return true;
   }
@@ -293,6 +399,9 @@ export class FirstLevelWhiteboxField {
       material: this.whiteMaterial.type,
       color: this.whiteMaterial.color.getHex(),
       textured: !!this.whiteMaterial.map,
+      coloredSemantics: Object.keys(this.layout.semanticColors || {}),
+      scenarioState: this.scenarioState,
+      scenarioColliders: this.scenarioColliders.length,
       whiteBoxes: this.stats.whiteBoxes,
       blocks: this.layout.blocks.length,
       sections: this.layout.sections.map((section) => ({ ...section })),
@@ -307,6 +416,7 @@ export class FirstLevelWhiteboxField {
   }
 
   Dispose() {
+    this.legend?.remove(); this.legend = null;
     const disposedMaterials = new Set();
     for (const mesh of this.meshes) {
       this.scene.remove(mesh);
@@ -324,6 +434,7 @@ export class FirstLevelWhiteboxField {
     this.covers = [];
     this.grid.clear();
     this.gates.clear();
+    this.scenarioMeshes = []; this.scenarioColliders = []; this.scenarioState = null;
     this.objectives.length = 0;
   }
 }
