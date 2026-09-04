@@ -64,6 +64,17 @@ const points = new Map();
   assert.deepEqual(voices,[],"new guide cues are subtitle-only, never generated or borrowed voice");
  }
 }
+{
+ const shown=[],story=new StoryDirector({hud:{Say:(who,text)=>shown.push(text),Title(){}}});
+ story.AttachVoice(()=>0);
+ story.BeginLevel(phase.contentId,{beats:openingStoryBeats,actualEventsOnly:true});
+ story.Signal("P012NorthSquadRegrouped");
+ let elapsed=0;
+ for(;elapsed<12&&!story.Signalled("P012NorthContinue");elapsed+=.1)story.Update(.1,{p012Beat:4});
+ assert.deepEqual(shown,["靠沟边收拢，报数。","一个不少，都在！","后头齐了。沿沟继续，去接机枪位。"]);
+ assert.ok(elapsed>=9.9&&elapsed<=10.4,`displayed regroup/count/continue chain is ten causal seconds, got ${elapsed.toFixed(1)}`);
+ assert.ok(elapsed+2.4>=12&&elapsed+2.4<=18,"actual squad reaction plus displayed count fits the 12-18s post-impact window");
+}
 // Recorded VillageFrontlineCampaign failure: CP03 retry preserved B14 cursor5
 // but the old public goal aimed straight through the ruin to the third nest.
 {
@@ -290,6 +301,10 @@ assert.equal(flow.facts.has("northCovered"),true);
 assert.ok(signals.has("P012NorthDitchEntered"));
 for(const p of northRoute.slice(1))Tick({position:p,zone:"Z03",stance:"crouch",guidePosition:p});
 At("Z04");assert.equal(shelling,1);assert.equal(northReactions,1);
+assert.equal(flow.State().beat,"B04","reaching the trench end cannot skip the squad regroup and count");
+Tick({},1);assert.equal(flow.State().beat,"B04","elapsed time cannot invent a regrouped squad");
+for(const event of ["P012NorthSquadRegrouped","P012NorthCountCalled","P012NorthCounted"]){signals.add(event);Tick();assert.equal(flow.State().beat,"B04");}
+signals.add("P012NorthContinue");Tick();
 assert.equal(flow.State().beat,"B05");
 Use("p012_ammoPickup"); assert.equal(carry.KindId,"ammoCrate");
 carry.load.canDrop=false;

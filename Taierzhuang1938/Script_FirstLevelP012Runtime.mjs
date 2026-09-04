@@ -311,6 +311,14 @@ export class FirstLevelP012Runtime {
       entry.marchPlan=plan;entry.stage="march";
       this.host.Move(entry.actor,plan.point,plan.speed);
     }
+    if(this.beat===4&&this.host.Signalled?.("P012NorthDitchEntered")&&!this.host.Signalled?.("P012NorthSquadRegrouped")){
+      const squad=(this.openingCast||[]).filter(entry=>entry.ammoIssued&&entry.actor?.alive!==false);
+      const regroup=this.config.activities?.shellCoverRoute?.at(-1),range=this.config.activities?.northRegroupRangeM??10;
+      if(squad.length===6&&regroup&&Math.hypot(guide.x-regroup.x,guide.z-regroup.z)<2.5
+        &&squad.every(entry=>entry.shellReacted&&this.time>=(entry.shellReactionUntil||0)
+          &&Math.hypot(this.host.Position(entry.actor).x-guide.x,this.host.Position(entry.actor).z-guide.z)<=range))
+        this.host.Signal?.("P012NorthSquadRegrouped");
+    }
   }
   DefendMarchEntry(entry){
     entry.actor.scriptArrivalRadius=.3;

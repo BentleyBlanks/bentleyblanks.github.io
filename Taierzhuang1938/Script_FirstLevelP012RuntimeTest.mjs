@@ -74,9 +74,10 @@ assert.ok(openingStoryBeats.length>0);
  const route=[{x:0,z:20},{x:0,z:0},{x:0,z:-20},{x:0,z:-40}];
  const positions=actors.map((_,i)=>({x:4+i*2,z:-39}));
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>guide,Position:a=>a,Signalled:s=>signals.has(s),
+  Signal:s=>signals.add(s),
   SetOpeningShelter:(a,duration)=>stances.push({a,duration}),ReleaseGuide:a=>releases.push(a),Defend:(a,p)=>defenses.push({a,p}),
   Move:(a,p,speed)=>{orders.push({a,speed});const d=Math.hypot(p.x-a.x,p.z-a.z);if(d>.3){const f=Math.min(d-.3,speed*.05)/d;a.x+=(p.x-a.x)*f;a.z+=(p.z-a.z)*f;}},
- },{layout:{blocks:[]},activities:{openingMarch:true,villageRoute:route.slice(0,2),openingMarchRoute:route,openingMarchDefensePositions:positions}});
+ },{layout:{blocks:[]},activities:{openingMarch:true,villageRoute:route.slice(0,2),shellCoverRoute:route,openingMarchRoute:route,openingMarchDefensePositions:positions}});
  runtime.openingCast=actors.map((actor,slot)=>({actor,slot,ammoIssued:true,issueComplete:true,parking:{...actor}}));
  for(const beat of [2,3,4]){runtime.beat=beat;guide.z=beat===4?-20:0;for(let i=0;i<180;i++){runtime.time+=.05;runtime.StepMarch(.05);}}
  assert.equal(releases.length,0,'B03 village arrival does not discard the six companions');assert.equal(stances.length,0,'no low posture before actual impact');
@@ -84,7 +85,11 @@ assert.ok(openingStoryBeats.length>0);
  signals.add('P012NorthNearMissImpact');runtime.guideReactionUntil=runtime.time+2.4;const before=actors.map(a=>({x:a.x,z:a.z}));
  for(let i=0;i<47;i++){runtime.StepMarch(.05);runtime.time+=.05;}
  assert.equal(stances.length,6);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),before,'actual impact stops all six without changing positions');
- runtime.time+=.1;runtime.beat=5;guide.z=-40;
+ signals.add('P012NorthDitchEntered');guide.z=-40;
+ for(let i=0;i<400&&!signals.has('P012NorthSquadRegrouped');i++){runtime.time+=.05;runtime.StepMarch(.05);}
+ assert.ok(signals.has('P012NorthSquadRegrouped'),'all six physically finish reaction and close on Luo before the count begins');
+ assert.ok(runtime.openingCast.every(entry=>entry.shellReacted&&runtime.time>=entry.shellReactionUntil));
+ runtime.time+=.1;runtime.beat=5;
  for(let i=0;i<600;i++){runtime.time+=.05;runtime.StepMarch(.05);}
  assert.equal(releases.length,6);assert.equal(defenses.length,6);assert.ok(runtime.openingCast.every(e=>e.marchComplete&&e.stage==='frontline'));
  for(const [i,a] of actors.entries())assert.ok(Math.hypot(a.x-positions[i].x,a.z-positions[i].z)<.45,'defense handover follows actual individual arrival');

@@ -184,7 +184,10 @@ export class FirstLevelP012Director {
         ReleaseWhen: () => this.facts.has("retreatSmokeDeployed"),
       } : {}),
       ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.HubFacing()} : {}),
-      ...(this.beat === 4 ? { startIndex: 0, WaitAt: () => Distance(this.lastSample.position,this.lastSample.guidePosition)>8 } : {}),
+      ...(this.beat === 4 ? { startIndex: 0,
+        WaitAt: index => index===this.ActivityRoute().length-1
+          ? !this.Signalled("P012NorthContinue") : Distance(this.lastSample.position,this.lastSample.guidePosition)>8,
+        FaceAt: index => index===this.ActivityRoute().length-1?this.lastSample.position:null } : {}),
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
   }
@@ -777,7 +780,8 @@ export class FirstLevelP012Director {
         if(ready)this.Emit("P012VillageNorthDeparture");
         break;
       }
-      case 4: ready = At("Z04") && this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered"); break;
+      case 4: ready = At("Z04") && this.routeIndex >= route.length && Has("northNearMissImpact") && Has("northCovered")
+        && this.Signalled("P012NorthContinue"); break;
       case 5: ready = Has("ammo") && this.gunports.size > 0; break;
       case 6: ready = dead >= 2 || (this.unlockedWaves.includes(0) && sample.scoutAlarm); break;
       case 7: ready = dead >= 7; break;

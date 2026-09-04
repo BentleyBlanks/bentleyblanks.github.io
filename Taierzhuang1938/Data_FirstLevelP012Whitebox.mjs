@@ -143,7 +143,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
     activities: Object.freeze({...P012MapPoints({
       guideSpeedMps: 3.05, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
-      guideSpeedByBeat: Object.freeze({ 0: 3.05, 2: 3.05, 4: 3.05, 5: 1.1, 11: 2 }),
+      guideSpeedByBeat: Object.freeze({ 0: 3.05, 2: 3.05, 4: 3.05, 5: 1.525, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
       frontlineSupply: Object.freeze({
         approach: Object.freeze([{x:5,z:-60},{x:10,z:-61}]),
@@ -155,6 +155,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       orientations: Object.freeze([]),
       shellCoverRoute: Object.freeze([{ x: 0, z: -22 }, { x: 3, z: -30 }, { x: 5, z: -38 }, { x: 5, z: -42 }]),
       ammoRoute: P012_BLUEPRINT_AMMO_CARRY,
+      northRegroupRangeM: 10,
       roadWoundedPosition: { x: 50, z: 47 }, regripPosition: { x: -7, z: -37 },
       airRoadRoute: Object.freeze([{ x: 54, z: 57 }, { x: 50, z: 68 }, { x: 47, z: 74 }]),
       airRoadSprintMinM: 4,
