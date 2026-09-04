@@ -26,6 +26,7 @@ import {
 } from "./Script_AircraftStrafe.mjs";
 import { EVENTS } from "./Data_MissionCh1.mjs";
 import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
+import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { readFileSync } from "node:fs";
 const { Vector3 } = await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
 
@@ -679,7 +680,7 @@ console.log("ok  参数校验与换关兜底：起不来的四种、必不死优
 {
   const cfg=P012Phase.whitebox.aircraftRoutes.divePress;
   for(const z of [60,62])for(const dodge of [false,true]){
-    const target={x:44,y:0,z}, {sys,log}=MakeRig({PlayerPos:()=>target});
+    const target={...P012SouthPoint(44,z),y:0}, {sys,log}=MakeRig({PlayerPos:()=>target});
     sys.StrafeRun({preset:"divePress",...cfg,TrackTo:()=>target});
     Check(Math.abs(sys.run.fireToS-sys.run.fireFromS-2.5)<1e-9,"P012 dive has 2.5 seconds of actual strafe, excluding exit");
     Check(sys.run.player.windowS===2.2,"expanded corridor preserves the 2.2 second reaction window");

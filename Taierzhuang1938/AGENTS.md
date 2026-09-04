@@ -258,6 +258,8 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 
 - `Data_FirstLevelP012Layout.mjs` 管 P2 坐标、体块、颜色语义和通行路线；
   `Data_FirstLevelP012Whitebox.mjs` 管独立 phase、现有角色/对白适配和节奏参数。
+- `Data_FirstLevelP012Space.mjs` 只在配置初始化时把原稿点位编译到扩展战场；
+  北／东南战术区刚性平移，跨区连接另写世界路线，禁止二次变换或缩放角色／掩体／速度。
 - 与旧 `?whitebox=1`、正式第一关并存，不覆盖它们。这个版本按用户要求使用
   灰地面、黄跨步、橙翻越、紫攀爬、蓝掩体、黑边界、红危险、绿任务路、青担架路。
   环境仍是程序化无贴图体块，人物及已烘焙声音复用现有配置。

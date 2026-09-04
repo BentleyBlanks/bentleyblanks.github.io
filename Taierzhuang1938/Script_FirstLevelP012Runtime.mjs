@@ -1,4 +1,5 @@
 // P012 physical actors and pressure adapters. Pure rules; geometry/audio remain host-owned.
+import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 function TrafficPoint(path, distance) {
   for(let i=1;i<path.length;i++){
     const a=path[i-1],b=path[i],length=Math.hypot(b.x-a.x,b.z-a.z);
@@ -48,7 +49,10 @@ export class FirstLevelP012Runtime {
     }
   }
   SaveSafePoint(id, position, stance = "stand", yaw = 0) {
-    const fixed={CP03:{x:30,z:10},CP05:{x:44,z:62,stance:"prone"},CP06:{x:42,z:94,stance:"prone"}}[id];
+    const activity = this.config.activities || {};
+    const fixed={CP03:activity.evacStagingPosition || P012SouthPoint(30,10),
+      CP05:{...(activity.closeFightRoute?.[0] || P012SouthPoint(44,62)),stance:"prone"},
+      CP06:{...(activity.southGrenadeSupply || P012SouthPoint(42,94)),stance:"prone"}}[id];
     this.safePoint={id,x:position.x,z:position.z,stance,yaw,...fixed};
   }
   RetryPlayer() {
@@ -118,6 +122,42 @@ export class FirstLevelP012Runtime {
     if (shell.done) return;
     shell.done = true; this.mortarImpactPosition = { x: point.x, z: point.z }; this.mortarImpactCount++;
   }
+  StepOpeningCast() {
+    const activity=this.config.activities,parking=activity?.openingCastParking;
+    if(!parking?.length)return;
+    if(!this.openingCast){
+      const guide=this.host.GuideActor();
+      this.openingCast=(this.host.FriendlyActors?.()||[]).filter(actor=>actor!==guide&&!this.traffic.some(entry=>entry.actor===actor)).slice(0,parking.length).map((actor,slot)=>{
+        // This is initial scene assembly, not a later movement or a respawn loop.
+        this.host.InitializeOpeningActor?.(actor,parking[slot]);
+        const route=[parking[slot]];
+        actor.scriptedNoncombatant=true;
+        return {actor,parking:parking[slot],route,index:0,slot};
+      });
+    }
+    for(const entry of this.openingCast){
+      if(entry.released)continue;
+      if((this.beat??0)>2){entry.released=true;entry.actor.scriptedNoncombatant=false;this.host.ReleaseGuide?.(entry.actor);continue;}
+      const at=this.host.Position(entry.actor);if(!at)continue;
+      const point=entry.route[entry.index];
+      if(Math.hypot(at.x-point.x,at.z-point.z)<1.3&&entry.index<entry.route.length-1)entry.index++;
+      let target=entry.route[entry.index];
+      if(this.beat===2&&entry.index===entry.route.length-1&&Math.hypot(at.x-target.x,at.z-target.z)<1.3)entry.following=true;
+      if(entry.following){
+        const route=activity.openingCastRoute,player=this.host.PlayerPosition?.();
+        if(player){let best=Infinity,along=0,progress=0;
+          for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz),t=Math.max(0,Math.min(1,((player.x-a.x)*dx+(player.z-a.z)*dz)/(len*len||1))),distance=Math.hypot(player.x-a.x-t*dx,player.z-a.z-t*dz);if(distance<best){best=distance;progress=along+t*len;}along+=len;}
+          const limit=Math.max(0,progress-6-entry.slot*3);
+          entry.followDistance??=0;
+          const followRoute=[entry.parking,...route];
+          const current=TrafficPoint(followRoute,entry.followDistance);
+          if(Math.hypot(at.x-current.x,at.z-current.z)<1.3)entry.followDistance=Math.min(limit,entry.followDistance+1);
+          target=TrafficPoint(followRoute,Math.min(limit,entry.followDistance));
+        }
+      }
+      this.host.Move(entry.actor,target,Math.hypot(at.x-target.x,at.z-target.z)<1.25?0:2.2);
+    }
+  }
   Update(dt) {
     // One finite pool, present from the opening; never recycle people by teleport.
     if (!this.trafficInitialized && this.config.activities?.traffic) {
@@ -129,6 +169,7 @@ export class FirstLevelP012Runtime {
         this.traffic.push({...entry,actor,path:entry.route,index:0,parking:entry.route.at(-1),arrived:false,travelM:0,lastPosition:{...entry.route[0]}});
       }
     }
+    this.StepOpeningCast();
     this.time += dt;
     if (this.smoke && this.time >= this.smoke.until && !this.smoke.cleared) { this.host.ClearSmoke?.(this.smoke.handle); this.smoke.cleared = true; }
     if (this.beat === 8) {
@@ -194,7 +235,7 @@ export class FirstLevelP012Runtime {
     }
     if (this.host.Signalled("P012SouthVerified") && this.far.length < 4) {
       const index = this.far.length;
-      const point = this.config.anchors?.blockadePositions?.[index] || { x: 35 + index * 4, z: 113 };
+      const point = this.config.anchors?.blockadePositions?.[index] || P012SouthPoint(35 + index * 4, 113);
       const actor = this.host.SpawnEnemy({ ...point, weapon: "Type38", p012Far: true, squadId: "P012Blockade" });
       if (actor) this.far.push(actor);
     }
@@ -248,6 +289,7 @@ export class FirstLevelP012Runtime {
       retreatPursuit: (this.pursuit || []).map(entry=>({index:entry.index,alive:!!this.host.Alive(entry.actor),position:this.host.Position(entry.actor),target:entry.route[entry.index]})),
       weaponActionCount: this.weaponActionCount,
       guidePosition: this.host.Position(this.host.GuideActor()), guideRouteIndex: this.guide?.index || 0,
+      openingCast: (this.openingCast || []).map(entry=>({position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released})),
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),
       guideHealth: this.host.GuideActor()?.health ?? null, guideOrder: this.host.GuideActor()?.order ?? null,
       trafficReady: this.config.activities?.traffic ? !!this.trafficPassedNearPlayer : this.traffic.length === 6 && this.traffic.every((walker) => walker.index > 0),

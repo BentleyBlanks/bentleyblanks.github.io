@@ -51,6 +51,12 @@ import { TelegraphKeyInteraction, TelegraphReconnectInteraction } from "./Script
 // 二关阶段③的殉爆倒计时靠它才有一只**真的打得中**的弹药箱 ——
 // 分工与为什么不是一条 host 回调，写在 Script_BlastTargets.mjs 的头注里。
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
+import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
+
+function P012WaypointIndex(route, target) {
+  return route.reduce((best,point,index)=>best<0 || Math.hypot(point.x-target.x,point.z-target.z)
+    < Math.hypot(route[best].x-target.x,route[best].z-target.z) ? index : best,-1);
+}
 
 // ---------------------------------------------------------------------------
 // 数值
@@ -1553,7 +1559,8 @@ export const SETPIECES = {
           const a=s.d.host.PositionOf?.(front),b=s.d.host.PositionOf?.(rear);
           if(a&&b){
             s.mem.p012RoadWoundedPosition={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
-            s.mem.p012RoadWoundedAtInspection=Math.hypot(s.mem.p012RoadWoundedPosition.x-50,s.mem.p012RoadWoundedPosition.z-47)<3;
+            const inspection=s.phase.whitebox.activities.roadWoundedPosition || P012SouthPoint(50,47);
+            s.mem.p012RoadWoundedAtInspection=Math.hypot(s.mem.p012RoadWoundedPosition.x-inspection.x,s.mem.p012RoadWoundedPosition.z-inspection.z)<3;
             if(!HasSignal("P012RoadWoundedChecked") && s.mem.p012RoadWoundedAtInspection) column.scriptPaused=true;
             if(HasSignal("P012RoadWoundedChecked"))column.scriptPaused=false;
           }
@@ -1581,12 +1588,16 @@ export const SETPIECES = {
       }
       if (p012 && HasSignal("EscortCall")) s.Once("p012_columnStart", (ss) => {
         const route = ss.phase.whitebox.escortWaypoints;
-        const stop = route.findIndex((point) => point.x === 30 && point.z === 10);
+        const stop = P012WaypointIndex(route,ss.phase.whitebox.activities.evacStagingPosition || P012SouthPoint(30,10));
         if (stop >= 0) ss.mem.column.waypoints = route.slice(0, stop + 1);
         ss.mem.prepWounded?.Reset(); ss.mem.column?.Start();
       });
-      if (p012 && HasSignal("P012AmbushClear")) s.Once("p012_columnContinue", (ss) =>
-        ss.mem.column?.Repath(ss.phase.whitebox.escortWaypoints.slice(10)));
+      if (p012 && HasSignal("P012AmbushClear")) s.Once("p012_columnContinue", (ss) => {
+        const route=ss.phase.whitebox.escortWaypoints;
+        // New connecting corridors may insert any number of points before staging.
+        const stop=P012WaypointIndex(route,ss.phase.whitebox.activities.evacStagingPosition || P012SouthPoint(30,10));
+        ss.mem.column?.Repath(route.slice(Math.max(0,stop+1)));
+      });
       if (p012 && HasSignal("P012AirReady")) {
         BeginCh1RailPass(s);
       }
@@ -1664,7 +1675,8 @@ export const SETPIECES = {
           for(const member of column.Alive) if(member.role==="guard"&&!member.handle.unarmed)member.handle.scriptedNoncombatant=false;
           const actor=ss.mem.p012CarriedLitter?.front?.handle;
           const start=actor && ss.d.host.PositionOf?.(actor);
-          column.scriptPaused=false; column.Repath([{x:44,z:66},{x:47,z:80},{x:42,z:94}],start);
+          column.scriptPaused=false; column.Repath(ss.phase.whitebox.activities.ditchContinuationRoute
+            || [P012SouthPoint(44,66),P012SouthPoint(47,80),P012SouthPoint(42,94)],start);
         }
       });
 
@@ -1708,7 +1720,8 @@ export const SETPIECES = {
           const point=slots[index%slots.length];
           if(point){
             member.handle.scriptedNoncombatant=true;
-            const at=s.d.host.PositionOf?.(member.handle), target=at&&at.z>66.8?{x:44,z:66}:point;
+            const entry=s.phase.whitebox.activities.airCoverEntryPosition || P012SouthPoint(44,66);
+            const at=s.d.host.PositionOf?.(member.handle), target=at&&at.z>entry.z+.8?entry:point;
             s.d.host.SetGoal?.(member.handle,target.x,target.z+(target===point?(index%2?1:-1):0));
           }
         }

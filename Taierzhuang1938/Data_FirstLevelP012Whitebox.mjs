@@ -3,9 +3,26 @@
 import { CHAPTER as FIRST_CHAPTER } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as PROLOGUE_VOICE_LINES } from "./Data_MissionCh0.mjs";
 import { FIRST_LEVEL_P012_LAYOUT, P012_ZONES, P012_SEMANTIC_COLORS,
-  P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES } from "./Data_FirstLevelP012Layout.mjs";
+  P012_ANCHORS, P012_ROUTES, P012_ENEMY_LANES,
+  P012_BLUEPRINT_ANCHORS, P012_BLUEPRINT_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
+import { P012MapPoints, P012RailPoint } from "./Data_FirstLevelP012Space.mjs";
 export { FIRST_LEVEL_P012_LAYOUT, P012_SEMANTIC_COLORS };
 export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
+
+// Preserve the authored polyline while keeping scripted moves below the AI's
+// long-range navigation threshold. Coarse destination quantisation must not
+// pull a soldier into the room on the other side of a swept, clear corridor.
+function SubdivideRoute(points, maxLegM = 10) {
+  const route = [points[0]];
+  for (let index = 1; index < points.length; index++) {
+    const a = points[index - 1], b = points[index];
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / maxLegM);
+    for (let step = 1; step <= steps; step++) route.push(Object.freeze({
+      x: a.x + (b.x - a.x) * step / steps, z: a.z + (b.z - a.z) * step / steps,
+    }));
+  }
+  return Object.freeze(route);
+}
 
 const aliases = { Z05: "C1_Railbed", Z06: "C1_Village", Z07: "C1_SouthRoad",
   Z08: "C1_Ditch", Z09: "C1_Fallback", Z10: "C1_BackToWall" };
@@ -91,25 +108,29 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   nraPool: FIRST_CHAPTER.pool.start, poolGain: 0, ijaPool: 37, ijaPressure: 0.72,
   ijaSpawn: FIRST_CHAPTER.tuning.ijaSpawn, ijaSupport: [],
   ijaForce: FIRST_CHAPTER.tuning.ijaForce, loadoutOverride: FIRST_CHAPTER.tuning.loadoutOverride,
-  bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 330, zones,
+  bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 500, zones,
   spawn: Object.freeze({ ...P012_ANCHORS.trainSpawn, ry: 0 }),
   whitebox: Object.freeze({
     p012: true, layout: FIRST_LEVEL_P012_LAYOUT, anchors: P012_ANCHORS, routes: P012_ROUTES,
     enemyLanes: P012_ENEMY_LANES, friendlyLimit: 12,
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
-    activities: Object.freeze({
+    activities: Object.freeze({...P012MapPoints({
+      openingCastParking:[{x:-52,z:62},{x:-49,z:62},{x:-46,z:62},{x:-43,z:62},{x:-49,z:65},{x:-46,z:65}],
+      openingCastRoute:[{x:-52,z:62},{x:-52,z:40},{x:-43,z:38},{x:-34,z:38},{x:-32,z:30},{x:-32,z:19},{x:-17,z:12},{x:0,z:0}],
       traffic: Object.freeze([
         ...[0,1,2].map(slot=>({side:0,slot,role:"soldier",releaseBeat:0,
           proximityRelease:slot===0?{index:3,beat:2,radius:18}:undefined,
           route:[{x:-54,z:66-slot*3},{x:-54,z:49-slot*3},{x:-54,z:40},{x:-43,z:38},{x:-34,z:38},{x:-32,z:30},{x:-32,z:18-slot*3}],pauseIndex:1})),
-        ...[0,1,2].map(slot=>({side:1,slot,role:"civilian",variant:slot===1?"female":"male",releaseBeat:0,
-          route:[{x:-59,z:20+slot*3},{x:-59,z:46+slot*3},{x:-59,z:58},{x:-56,z:62},{x:-52,z:62+slot*3}],pauseIndex:1})),
-        ...[0,1].map(slot=>({side:1,slot:3+slot,role:"walking",releaseBeat:1,
+        ...[0,1,2,3,4].map(slot=>({side:1,slot,role:"civilian",variant:slot%2?"female":"male",releaseBeat:0,
+          route:[{x:-59,z:8+slot*3},{x:-59,z:46+slot*3},...(slot<3
+            ? [{x:-59,z:58},{x:-56,z:62},{x:-52,z:62+slot*3}]
+            : [{x:-59,z:64+(slot-3)*3}])],pauseIndex:1})),
+        ...[0,1].map(slot=>({side:1,slot:5+slot,role:"walking",releaseBeat:1,
           proximityRelease:slot===0?{index:1,beat:2,radius:18}:undefined,
           route:[{x:-28,z:19+slot*3},{x:-28,z:30},{x:-34,z:40},{x:-43,z:42},{x:-50,z:42},{x:-50,z:52},{x:-52,z:54},{x:-52,z:56+slot*3}]})),
       ]),
       guideSpeedMps: 1.3, guideRangeM: 12, routeRadiusM: 3, ambushRouteRadiusM: 0.6, observationConeRad: 0.42,
-      guideSpeedByBeat: Object.freeze({ 0: 0.6, 2: 0.685, 4: 0.85, 5: 0.85, 11: 2 }),
+      guideSpeedByBeat: Object.freeze({ 0: 0.6, 2: 0.685, 4: 1.5, 5: 0.85, 11: 2 }),
       frontlineDoctrine: Object.freeze({ accuracyScale: 0.22, fireIntervalScale: 2.5, holdRadiusM: 2 }),
       frontlineAmmo: Object.freeze({ stockClips: 12, carryCapClips: 4, takeSeconds: 2.4 }),
       weaponReceivePosition: { x: -57.2, z: 45.8 }, weaponReceiveAnchor: { x: -57.2, z: 44.75 },
@@ -118,7 +139,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       weaponGuideRoute: [{x:-55,z:43},{x:-55,z:33},{x:-45,z:35}],
       weaponGuideFacing: [{x:-57.2,z:44},{x:-57,z:34},{x:-47,z:36}],
       observationSeconds: 6.5, shellObservationSeconds: 3, shellGuideRangeM: 6,
-      trainRoute: P012_ROUTES.trainExit, villageRoute: P012_ROUTES.north.slice(2, 8),
+      trainRoute: P012_BLUEPRINT_ROUTES.trainExit, villageRoute: P012_BLUEPRINT_ROUTES.north.slice(2, 8),
       orientations: Object.freeze([
         { position: { x: 7, z: 6 }, lookAt: { x: -30, z: 30 }, label: "辨认西南侧兵站后路",
           visibleTarget: { id: "SouthStation", blockId: "StationWindowSill", point: { x: -63.3, y: 0.7, z: 51 } } },
@@ -150,7 +171,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       woundedDragFrom: { x: 5, z: -65 }, woundedDragTo: { x: -7, z: -52 },
       woundedDragRoute: Object.freeze([{ x: 5, z: -65 }, { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
       woundedDragMinM: 10, stretcherCarryTo: { x: 44, z: 60 }, stretcherCarryMinM: 10,
-      woundedGuideRoute: Object.freeze([P012_ANCHORS.gunports[0], P012_ANCHORS.gunports[1],
+      woundedGuideRoute: Object.freeze([P012_BLUEPRINT_ANCHORS.gunports[0], P012_BLUEPRINT_ANCHORS.gunports[1],
         { x: 5, z: -59 }, { x: 5, z: -46 }, { x: 0, z: -52 }, { x: -7, z: -52 }]),
       // All six exist before the flank begins: different wall/door sightlines,
       // never late pop-in beside a player who has already crossed the room.
@@ -177,11 +198,11 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         }),
         relocations: [[{ x: 56, z: 52 }, { x: 60, z: 55 }],
           [{ x: 56, z: 58 }, { x: 60, z: 62 }], [{ x: 56, z: 65 }, { x: 63, z: 69 }]][group],
-        stagingStopIndices: positions.map((_, index) => group * 2 + index < 3 ? 1 : -1),
+        stagingStopIndices: positions.map((_, index) => group * 2 + index < 3 ? 2 : -1),
         approaches: positions.map((_, index) => {
           const slot = group * 2 + index;
-          return slot < 3 ? [{ x: 74, z: 30 }, { x: 74, z: 45 + slot * 1.5 },
-            ...(slot < 2 ? [{ x: 74, z: 48 }] : []), { x: 59, z: 48 },
+          return slot < 3 ? [{ x: 74, z: 30 }, { x: 74, z: 38 }, { x: 74, z: 45 + slot * 1.5 },
+            ...(slot < 2 ? [{ x: 74, z: 48 }] : []), { x: 66.5, z: 48 }, { x: 59, z: 48 },
             ...(slot ? [{ x: 58, z: 54 }] : [])]
             : [{ x: 69, z: 73 }, { x: 64, z: 73 }, { x: 64, z: 67 }];
         }),
@@ -212,6 +233,34 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         [[66,114],[62,108],[57,99],[47,93],[37,89.5],[35,89.5],[35,87]],
         [[70,115],[64,108],[59,99],[49,93],[39,90],[35,90],[33,88],[25,80]],
       ].map(route => Object.freeze(route.map(([x,z]) => ({x,z}))))),
+      evacStagingPosition:{x:30,z:10}, airAttackStartPosition:{x:50,z:60}, airColumnReadyPosition:{x:50,z:68},
+      southAssemblyPosition:{x:42,z:94}, airCoverEntryPosition:{x:44,z:66},
+      ditchContinuationRoute:[{x:44,z:66},{x:47,z:80},{x:42,z:94}],
+    }),
+      shellCoverRoute:P012_ROUTES.approach,
+      shellObservationIndices:Object.freeze([3,4,5,6]),
+      // Hub observations describe the near entrances, not invisible destination
+      // coordinates on the far side of the expanded route. North's tall marker
+      // remains in the direction of the front, behind the first road bend.
+      orientations:Object.freeze([
+        {position:{x:7,z:6},lookAt:{x:-30,z:30},label:"辨认西南侧兵站后路",
+          visibleTarget:{id:"SouthStation",blockId:"StationWindowSill",point:{x:-63.3,y:.7,z:51}}},
+        {position:{x:2,z:-12},lookAt:{x:-12,z:-32},label:"观察通向北面阵地的道路",
+          visibleTarget:{id:"NorthFrontline",blockId:"NorthLinkWestBank",point:{x:-19.5,y:2.8,z:-24}}},
+        {position:{x:-3,z:0},lookAt:{x:-72,z:0},label:"看向西侧铁路路基",
+          visibleTarget:{id:"WestRailway",blockId:"RailEmbankment",point:{x:-68.5,y:1.6,z:0}}},
+        {position:{x:16,z:5},via:{x:0,z:0},lookAt:{x:30,z:10},label:"记住东南侧的伤员后送道路",
+          visibleTarget:{id:"EvacuationEntrance",blockId:"EvacEastCourtyard",point:{x:37.5,y:1.4,z:9},
+            points:[3,6,12,15].map(z=>({x:37.5,y:1.4,z})),requiredPoints:[{x:28,z:9.3},{x:29,z:9.65},{x:30,z:10},{x:31,z:12.2}]
+              .flatMap(point=>[-.6,0,.6].map(offset=>({x:point.x+offset,y:.06,z:point.z})))}}
+      ]),
+      // Pursuers follow the newly connected physical return road; they do not
+      // run to the coordinates of the removed compact-map western ditch.
+      retreatPursuitRoutes:Object.freeze([
+        [{x:126,z:114},{x:117,z:99},{x:108,z:94},{x:102,z:94},{x:102,z:98},{x:85,z:83},{x:68,z:68}],
+        [{x:130,z:115},{x:119,z:99},{x:110,z:92},{x:100,z:92},{x:100,z:96},{x:87,z:85},{x:70,z:68}]
+      ].map(route=>SubdivideRoute(route))),
+      retreatSmokeUse:{x:85,z:83},retreatSmokeAt:{x:100,z:99},retreatCoverIndices:Object.freeze([2,4,6]),
     }),
     storyBeats, actualEventsOnly: true,
     firstContact: Object.freeze({ atS: 285, fullWaveAtS: 330,
@@ -229,7 +278,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
       crowdTurn: Object.freeze({ from: P012_ANCHORS.crowdTurnFrom, to: P012_ANCHORS.crowdTurnTo,
         aircraftId: "MitsubishiKi30",
         approachM: 140, leadM: 55, fireFromS: 5, entryAltM: 42, altitudeM: 28,
-        turnFrom: { x: -72, z: 112 }, turnControl: { x: -72, z: 185 }, turnControl2: { x: 50, z: 210 } }),
+        turnFrom: P012RailPoint(-72,112), turnControl: P012RailPoint(-72,185), turnControl2: { x: 110, z: 210 } }),
       divePress: Object.freeze({ from: P012_ANCHORS.diveFrom, to: P012_ANCHORS.diveTo,
         aircraftId: "MitsubishiKi30",
         speed: 32, approachM: 160, entryAltM: 38, altitudeM: 24,

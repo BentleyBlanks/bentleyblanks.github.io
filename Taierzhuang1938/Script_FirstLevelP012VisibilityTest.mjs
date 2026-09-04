@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import {P012MapPoints} from "./Data_FirstLevelP012Space.mjs";
 import {AircraftStrafeDirector} from "./Script_AircraftStrafe.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as layout} from "./Data_FirstLevelP012Layout.mjs";
 import phase from "./Data_FirstLevelP012Whitebox.mjs";
@@ -70,8 +71,8 @@ const airCfg=phase.whitebox.aircraftRoutes.crowdTurn;
 assert.ok(airCfg.turnControl2,"P012 uses a two-tangent continuous turn");
 assert.ok(airCfg.to.z<airCfg.from.z,"attack enters from the south, not same-direction pursuit");
 const curve=new AircraftStrafeDirector({});curve.StrafeRun({preset:"crowdTurn",...airCfg});
-const observers=[{x:47,z:74},{x:46,z:70},{x:44,z:66},{x:44,z:62}];
-const crowd={x:47,y:1.1,z:80};let sightSamples=0;
+const observers=[P012MapPoints({x:47,z:74}),P012MapPoints({x:46,z:70}),P012MapPoints({x:44,z:66}),P012MapPoints({x:44,z:62})];
+const crowd=P012MapPoints({x:47,y:1.1,z:80});let sightSamples=0;
 for(let i=0;i<=100;i++){
  curve.run.t=2.5+2.5*i/100;curve.PlaceAircraft(0);const plane=curve.run.air;
  for(let leg=1;leg<observers.length;leg++)for(let k=0;k<=10;k++){
@@ -102,7 +103,7 @@ const castHost={SpawnActor:spec=>({position:{x:spec.x,y:0,z:spec.z},alive:true})
 const castDirector=new MissionSetpieceDirector(castHost);
 assert.equal(castDirector.BeginLevel("CH1_NanLu",phase),true);
 const cast=castDirector.mem.column;
-cast.waypoints=[{x:47,z:80},{x:44,z:92}];cast.Start();
+cast.waypoints=[P012MapPoints({x:47,z:80}),P012MapPoints({x:44,z:92})];cast.Start();
 const civilians=cast.members.filter(m=>m.role==="civilian");
 assert.deepEqual(civilians.map(m=>m.variant).sort(),["female","male"]);
 assert.ok(civilians.every(m=>m.weapon===null));
@@ -113,7 +114,7 @@ for(const member of cast.members.filter(m=>m.role==="civilian"||m.role==="bearer
   assert.ok(Math.hypot(a.x-b.x,a.z-b.z)>=.84,"civilian must not overlap a bearer capsule");
  }
 }
-const actualEye={x:45.356,y:1.62,z:66.265},actualPitch=.249;
+const actualEye=P012MapPoints({x:45.356,y:1.62,z:66.265}),actualPitch=.249;
 curve.run.t=4.75;curve.PlaceAircraft(0);
 const actualYaw=Math.atan2(curve.run.air.x-actualEye.x,curve.run.air.z-actualEye.z);
 for(const member of civilians){
@@ -127,7 +128,7 @@ for(const member of civilians){
 console.log("PASS production male/female formation slots: separation, corridor width, actual-camera LOS and shared aircraft view");
 // Runtime ten-person movement replay, not ideal slot placement: late members
 // have not yet caught up to their desired slots. Preserve this distinction.
-const reachedCivilians=[{variant:"male",x:48.182,y:1.1,z:71.455},{variant:"female",x:49.085,y:1.1,z:67.353}];
+const reachedCivilians=[P012MapPoints({variant:"male",x:48.182,y:1.1,z:71.455}),P012MapPoints({variant:"female",x:49.085,y:1.1,z:67.353})];
 const reachedVisible=reachedCivilians.filter(target=>{
  const dx=target.x-actualEye.x,dz=target.z-actualEye.z,dy=target.y-actualEye.y;
  const right=dx*Math.cos(actualYaw)-dz*Math.sin(actualYaw),forward=dx*Math.sin(actualYaw)+dz*Math.cos(actualYaw);
@@ -137,12 +138,12 @@ const reachedVisible=reachedCivilians.filter(target=>{
 assert.deepEqual(reachedVisible.map(m=>m.variant),["male"],"actual movement replay shows a civilian with the aircraft; the near-right female is correctly outside this camera");
 console.log("PASS actual ten-person replay positions: male civilian visible, near-right female correctly reported offscreen");
 const dive=new AircraftStrafeDirector({});
-dive.StrafeRun({preset:"divePress",...phase.whitebox.aircraftRoutes.divePress,TrackTo:()=>({x:44,z:62})});
+dive.StrafeRun({preset:"divePress",...phase.whitebox.aircraftRoutes.divePress,TrackTo:()=>(P012MapPoints({x:44,z:62}))});
 let diveVisibleSamples=0;
 while(dive.Active){
  dive.Update(1/120);
  if(dive.run?.phase!=="strafe")continue;
- const eye={x:44,y:1.62,z:62},air=dive.run.air;
+ const eye=P012MapPoints({x:44,y:1.62,z:62}),air=dive.run.air;
  assert.equal(Occluded(eye,air),false,"expanded actual dive pass is not hidden by scene geometry");
  assert.ok(air.z>eye.z,"actual attack stays in the southern sky rather than switching behind the player");
  diveVisibleSamples++;

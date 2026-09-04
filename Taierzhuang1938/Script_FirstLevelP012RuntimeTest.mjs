@@ -8,6 +8,7 @@ import P012Phase from "./Data_FirstLevelP012Whitebox.mjs";
 import {FirstLevelP012Director} from "./Script_FirstLevelP012Flow.mjs";
 import {InteractSystem} from "./Script_Interact.mjs";
 import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Layout.mjs";
+import {P012SouthPoint} from "./Data_FirstLevelP012Space.mjs";
 {
  const config=P012Phase.whitebox,a=config.activities,actor={...config.anchors.trainDoor,yaw:0},orders=[],faces=[],points=new Map();
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:value=>value,Signalled:()=>false,
@@ -51,6 +52,13 @@ import {FIRST_LEVEL_P012_LAYOUT as openingLayout} from "./Data_FirstLevelP012Lay
   assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"guide physically walks between tables without entering a collider");
  }
  console.log("PASS opening door/operation-driven guide waits, facing requests, real furniture reach and capsule paths");
+ for(const parking of a.openingCastParking){
+  const path=[parking,...a.openingCastRoute];
+  for(let leg=1;leg<path.length;leg++)for(let i=0;i<=100;i++){
+   const point={x:path[leg-1].x+(path[leg].x-path[leg-1].x)*i/100,z:path[leg-1].z+(path[leg].z-path[leg-1].z)*i/100};
+   assert.ok(!openingLayout.blocks.some(box=>Hits(point,box)),"opening formation parking and follow route clear real furniture");
+  }
+ }
 }
 {
  const {Vector3}=await import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL("./vendor/three/build/three.core.js",import.meta.url),"utf8")).toString("base64")}`);
@@ -97,7 +105,7 @@ const guide = { x: 0, z: 0 }, actors = [], moves = [], impacts = [], signals = n
  opening.failed=true;assert.equal(opening.RetryPlayer(),true);assert.equal(restored.id,"Start");assert.deepEqual([restored.x,restored.z],[-66,65]);
  const r=new FirstLevelP012Runtime({RestorePlayer:p=>{restored=p;return true;}},{});
  r.SaveSafePoint("CP03",{x:99,z:99});assert.equal(r.RetryPlayer(),false);
- r.failed=true;assert.equal(r.RetryPlayer(),true);assert.deepEqual([restored.x,restored.z],[30,10]);
+ r.failed=true;assert.equal(r.RetryPlayer(),true);assert.deepEqual([restored.x,restored.z],[90,10]);
  r.SaveSafePoint("CP05",{x:99,z:99});assert.equal(r.safePoint.stance,"prone");
  r.failed=true;r.retryAtLoad={x:load.x,z:load.z,stance:"prone"};const before=JSON.stringify(load);
  r.RetryPlayer();assert.deepEqual([restored.x,restored.z],[44,60]);assert.equal(JSON.stringify(load),before,"retry does not move or duplicate the active payload");
@@ -187,12 +195,25 @@ assert.equal(runtime.traffic.length, 6, "repeated Guide does not duplicate traff
 }
 const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
 {
+ const guide={castId:"luo",x:-55,z:53},cast=[guide,...[0,1,2,3,4,5].map(i=>({castId:i<4?`cast${i}`:null,x:-76+i*2,z:60}))];
+ const traffic=[{x:-54,z:50},{x:-54,z:47},{x:-54,z:44}];cast.push(...traffic);let initialized=0;
+ const player={x:-56,z:55};
+ const r=new FirstLevelP012Runtime({GuideActor:()=>guide,FriendlyActors:()=>cast,Position:a=>a,PlayerPosition:()=>player,
+  InitializeOpeningActor:(a,p)=>{Object.assign(a,p);initialized++;},
+  Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=1.2)return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:a=>{a.released=true;}
+ },P012Phase.whitebox);
+ r.traffic=traffic.map(actor=>({actor}));r.beat=0;for(let i=0;i<300;i++)r.StepOpeningCast();
+ assert.equal(r.openingCast.length,6);assert.equal(initialized,6,"safe initial assembly happens once, never a teleport loop");assert.deepEqual(traffic[0],{x:-54,z:50},"traffic pool is excluded");assert.deepEqual(guide,{castId:"luo",x:-55,z:53},"opening spacing never changes Luo pacing");
+ assert.ok(r.openingCast.every(e=>Math.hypot(e.actor.x-e.parking.x,e.actor.z-e.parking.z)<1.3&&e.actor.z>player.z+5),"cast physically wait behind the exiting player, not in the forward view");
+ r.beat=3;r.StepOpeningCast();assert.ok(r.openingCast.every(e=>e.released&&e.actor.released&&!e.actor.scriptedNoncombatant),"only opening beats own this formation");
+}
+{
  const walkers=[];let door=false;const player={x:-60,z:61};
  const run=new FirstLevelP012Runtime({GuideActor:()=>null,Position:a=>a,PlayerPosition:()=>player,Signalled:name=>name==="P012TrainDoor"&&door,
   TrafficActor:(side,slot,p,entry)=>{const actor={...p,alive:true,side,slot,role:entry.role};walkers.push(actor);return actor;},
   Move:(a,p,speed)=>{const d=Math.hypot(p.x-a.x,p.z-a.z);if(d<=1.2)return;const k=Math.min(1,speed*.1/d);a.x+=(p.x-a.x)*k;a.z+=(p.z-a.z)*k;},ReleaseGuide:()=>{}
  },P012Phase.whitebox);
- run.Update(.1);assert.equal(walkers.length,8,"opening finite pool exists before B02");assert.equal(run.Sample().trafficReady,false);
+ run.Update(.1);assert.equal(walkers.length,10,"opening finite pool exists before B02");assert.equal(run.Sample().trafficReady,false);
  for(let i=0;i<600;i++)run.Update(.1);
  assert.ok(run.traffic.filter(w=>w.pauseIndex!==undefined).every(w=>w.index<=w.pauseIndex),"slow player does not miss the whole station stream");
  assert.ok(run.traffic.filter(w=>w.role==="walking").every(w=>w.travelM===0));
@@ -202,8 +223,9 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
   for(let a=0;a<walkers.length;a++)for(let b=a+1;b<walkers.length;b++)assert.ok(Math.hypot(walkers[a].x-walkers[b].x,walkers[a].z-walkers[b].z)>.84,"finite crossing routes preserve two capsule radii");
  }
  assert.equal(run.Sample().trafficReady,true,"real opposite directions pass near player, not merely an index advance");
- assert.equal(walkers.length,8,"no repeated initialization or replacement spawning");
- assert.equal(walkers.filter(w=>w.side===0).length,3);assert.equal(walkers.filter(w=>w.side===1).length,5);
+ assert.equal(walkers.length,10,"no repeated initialization or replacement spawning");
+ assert.equal(walkers.filter(w=>w.side===0).length,3);assert.equal(walkers.filter(w=>w.side===1).length,7);
+ assert.equal(walkers.filter(w=>w.role==="civilian").length,5);assert.equal(walkers.filter(w=>w.role==="walking").length,2);
  const reserved=run.traffic.filter(w=>w.proximityRelease);
  assert.equal(reserved.length,2);
  assert.ok(reserved.every(w=>w.index===w.proximityRelease.index&&!w.proximityReleased),"B01 longer than 120s retains a real pair at village entry");
@@ -214,9 +236,10 @@ const ai = readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
  for(let i=0;i<120;i++)run.Update(.1);
  assert.ok(reserved.every(w=>w.proximityReleased&&Math.hypot(w.actor.x-beforeRelease[reserved.indexOf(w)].x,w.actor.z-beforeRelease[reserved.indexOf(w)].z)>3),"approaching village releases both real actors into opposite movement");
  for(let i=0;i<900;i++)run.Update(.1);
- assert.ok(run.traffic.every(w=>w.arrived),"all eight actual paths end at separate parking positions");
+ assert.ok(run.traffic.every(w=>w.arrived),"all ten actual paths end at separate parking positions");
  const parked=run.traffic.map(w=>w.actor);
  for(let i=0;i<parked.length;i++)for(let j=i+1;j<parked.length;j++)assert.ok(Math.hypot(parked[i].x-parked[j].x,parked[i].z-parked[j].z)>1.2);
+ console.log("PASS ten finite traffic actors, slow-player reserve, physical separation and independent parking");
 }
 assert.match(ai,/s\.scriptArrivalRadius\) : 1\.2/ ,"ordinary traffic retains production AI stopping radius");
 assert.match(ai, /if \(Number\.isFinite\(s\.scriptMoveSpeedMps\)\) speed = Math\.min/);
@@ -229,12 +252,12 @@ const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8")
  soldier.alive=false;Stage(soldier,true);assert.equal(soldier.alive,false,"staging never resurrects an actor");
 }
 {
- const source=main.match(/function AirColumnEnteredRoad\(column, position\) \{[\s\S]*?\n\}/)[0];
- const Check=vm.runInNewContext(`(${source})`),members=Array.from({length:4},()=>({handle:{alive:true,position:{x:50,z:60}}}));
- const column={litters:[{front:members[0],rear:members[1]},{front:members[2],rear:members[3]}],HeadPosition:()=>({x:50,z:66})};
- assert.equal(Check(column,{x:54,z:57}),true);members[3].handle.position.z=59.99;assert.equal(Check(column,{x:54,z:57}),false);
- members[3].handle.position.z=60;members[3].handle.alive=false;assert.equal(Check(column,{x:54,z:57}),false);
- members[3].handle.alive=true;assert.equal(Check(column,{x:70,z:57}),false);
+ const source=main.match(/function AirColumnEnteredRoad\(column, position, activities = null\) \{[\s\S]*?\n\}/)[0];
+ const Check=vm.runInNewContext(`(${source})`,{P012SouthPoint}),members=Array.from({length:4},()=>({handle:{alive:true,position:P012SouthPoint(50,60)}}));
+ const column={litters:[{front:members[0],rear:members[1]},{front:members[2],rear:members[3]}],HeadPosition:()=>P012SouthPoint(50,66)};
+ assert.equal(Check(column,P012SouthPoint(54,57)),true);members[3].handle.position.z=P012SouthPoint(50,59.99).z;assert.equal(Check(column,P012SouthPoint(54,57)),false);
+ members[3].handle.position.z=P012SouthPoint(50,60).z;members[3].handle.alive=false;assert.equal(Check(column,P012SouthPoint(54,57)),false);
+ members[3].handle.alive=true;assert.equal(Check(column,P012SouthPoint(70,57)),false);
 }
 {
  const body=main.match(/ThreatensEscort: \(actor\) => \{([\s\S]*?)\n    \},/)[1];
@@ -336,13 +359,16 @@ console.log("PASS P012 runtime finite actors, guide speed, shell warning, delive
   column = new EscortColumn(host, { waypoints: P012Phase.whitebox.routes.retreat, followRouteBodies: true,
     tuning: { columnSpeedMS: P012Phase.whitebox.activities.retreatColumnSpeedMps }, members: [{ role: "bearer" }, { role: "bearer" }] });
   column.Start(); const finish = column.waypoints.at(-1);
-  for (; time < 140; time += 0.1) {
+  const routeLength=column.waypoints.slice(1).reduce((sum,point,index)=>sum+Math.hypot(point.x-column.waypoints[index].x,point.z-column.waypoints[index].z),0);
+  const idealSeconds=routeLength/P012Phase.whitebox.activities.retreatColumnSpeedMps;
+  for (; time < Math.max(140,idealSeconds*1.3); time += 0.1) {
     column.Update(0.1);
     for (const actor of actors) { const dx = actor.goal.x - actor.position.x, dz = actor.goal.z - actor.position.z, distance = Math.hypot(dx, dz);
       if (distance > 1.2) { const step = Math.min(distance - 1.2, actor.scriptMoveSpeedMps * 0.1); actor.position.x += dx / distance * step; actor.position.z += dz / distance * step; } }
     if (column.arrived && Math.hypot(actors[0].position.x - finish.x, actors[0].position.z - finish.z) < 8) break;
   }
-  assert.ok(time >= 90 && time <= 120, `physical column retreat ${time.toFixed(1)}s`);
+  assert.ok(column.arrived,"actual column must finish before the watchdog, not merely run out the test clock");
+  assert.ok(time >= 90 && time <= 120, `physical column retreat ${time.toFixed(1)}s; expanded route ideal ${idealSeconds.toFixed(1)}s; original P2 timing remains unmet`);
   assert.ok(Math.abs(column.members[0].slot.lateral) < 0.5);
   console.log(`PASS P012 physical body retreat ${time.toFixed(1)}s without teleport`);
 }

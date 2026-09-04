@@ -39,6 +39,7 @@ import {
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
+import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { ApplyP012CastAppearance } from "./Script_FirstLevelP012CastAppearance.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import {
@@ -127,11 +128,12 @@ function MakeLevelBounds(bounds, margin = 10) {
     minZ: bounds.minZ + margin, maxZ: bounds.maxZ - margin,
   };
 }
-function AirColumnEnteredRoad(column, position) {
+function AirColumnEnteredRoad(column, position, activities = null) {
+  const entrance=activities?.airAttackStartPosition || P012SouthPoint(50,60);
   const members=(column?.litters || []).flatMap(litter=>[litter.front,litter.rear]);
   const head=column?.HeadPosition?.();
   return members.length===4 && !!head && Math.hypot(position.x-head.x,position.z-head.z)<12
-    && members.every(member=>member?.handle?.alive && member.handle.position.z>=60 && Math.abs(member.handle.position.x-50)<8);
+    && members.every(member=>member?.handle?.alive && member.handle.position.z>=entrance.z && Math.abs(member.handle.position.x-entrance.x)<8);
 }
 
 // 执行到这一行 = 一百五十多个文件的模块图整张拉齐了。告诉 index.html 的开机守望
@@ -2044,7 +2046,7 @@ async function Boot() {
       P012: () => p012Flow?.State() || null,
       P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
-      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
+      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
         woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
         carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
         litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
@@ -3022,6 +3024,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
   p012Runtime = phase.whitebox?.p012 ? new FirstLevelP012Runtime({
     SpawnEnemy: (spec) => {
       const actor = ai.Spawn("ija", spec.x, spec.z, spec);
+      if (actor && spec.p012MachineGun) actor.scriptDefensive = true;
       if (actor && spec.p012Far) {
         actor.scriptDefensive = true;
         actor.order = "hold"; actor.holdZone = { id: "P012SouthBlockade", x: spec.x, z: spec.z, radius: 2 };
@@ -3084,6 +3087,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     DeploySmoke: (point) => vfx.SmokeSource(new THREE.Vector3(point.x, 0.2, point.z), { kind: "screen", rate: 12, radius: 7.5, rise: 0.4, sizeStart: 3, sizeEnd: 6, life: 10 }),
     ClearSmoke: (handle) => vfx.RemoveSmokeSource(handle),
     FriendlyActors: () => ai.soldiers.filter((actor) => actor.side === "nra" && actor.alive && !actor.unarmed),
+    InitializeOpeningActor: (actor, point) => {
+      const y = battlefield.GroundHeight(point.x, point.z);
+      actor.position.set(point.x, y, point.z); actor.body?.Teleport(point.x, y, point.z);
+      actor.goal.set(point.x, 0, point.z);
+      if (actor.actor) actor.actor.root.position.copy(actor.position);
+    },
     RetreatPosition: () => setpieces?.mem?.column?.Bearers?.[0]?.handle?.position || null,
     FireDiscipline: (actor, doctrine) => {
       if (doctrine) { actor.scriptAccuracyScale=doctrine.accuracyScale; actor.scriptFireIntervalScale=doctrine.fireIntervalScale; }
@@ -6044,6 +6053,10 @@ function Frame(dt, render = true) {
     const columnAtEnd = !!column?.arrived && !!columnPosition && !!columnEnd
       && Math.hypot(columnPosition.x - columnEnd.x, columnPosition.z - columnEnd.z) < 8;
     const lastLitterArrived = LastLitterArrived(column);
+    const p012Activities=PHASE_TABLE[state.phaseIndex].whitebox.activities;
+    const airEntrance=p012Activities.airAttackStartPosition || P012SouthPoint(50,60);
+    const airReady=p012Activities.airColumnReadyPosition || P012SouthPoint(50,68);
+    const southAssembly=p012Activities.southAssemblyPosition || P012SouthPoint(42,94);
     const zone = battlefield.objectives.find((item) =>
       Math.hypot(player.position.x - item.x, player.position.z - item.z) < item.radius);
     p012Flow.Update(dt, {
@@ -6061,16 +6074,16 @@ function Frame(dt, render = true) {
       carryKind: carry?.KindId, columnArrived: columnAtEnd,
       bleeding: player.bleeding, bandages: player.bandages,
       columnPosition, columnAtEscortEnd: columnAtEnd,
-      columnAtAirRoad: !!columnPosition && columnPosition.z >= 60 && Math.abs(columnPosition.x - 50) < 8,
-      airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position),
+      columnAtAirRoad: !!columnPosition && columnPosition.z >= airEntrance.z && Math.abs(columnPosition.x - airEntrance.x) < 8,
+      airColumnEnteredRoad: AirColumnEnteredRoad(column, player.position, p012Activities),
       roadWoundedPosition: setpieces?.mem?.p012RoadWoundedPosition || null,
       roadWoundedAtInspection: !!setpieces?.mem?.p012RoadWoundedAtInspection,
       airColumnTailPosition: (column?.litters || []).filter(litter=>litter.front?.handle?.alive&&litter.rear?.handle?.alive).map(litter=>({x:(litter.front.handle.position.x+litter.rear.handle.position.x)/2,z:(litter.front.handle.position.z+litter.rear.handle.position.z)/2})).sort((a,b)=>a.z-b.z)[0] || null,
       airColumnReady: !!column?.litters?.length && column.litters.every((litter)=>{
         const a=litter.front?.handle,b=litter.rear?.handle;
-        return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=68 && Math.abs((a.position.x+b.position.x)/2-50)<8;
+        return a?.alive && b?.alive && (a.position.z+b.position.z)/2>=airReady.z && Math.abs((a.position.x+b.position.x)/2-airReady.x)<8;
       }),
-      columnAtSouthAssembly: !!column?.litters?.length && column.litters.every((litter) => !litter.dropped && [litter.front,litter.rear].every((member) => member?.handle?.alive && Math.hypot(member.handle.position.x-42,member.handle.position.z-94)<6)),
+      columnAtSouthAssembly: !!column?.litters?.length && column.litters.every((litter) => !litter.dropped && [litter.front,litter.rear].every((member) => member?.handle?.alive && Math.hypot(member.handle.position.x-southAssembly.x,member.handle.position.z-southAssembly.z)<6)),
     });
     if (story.Signalled("P012Complete")) {
       p012Runtime.completed = true; ShowPauseMenu(); menu.OpenSandboxComplete();

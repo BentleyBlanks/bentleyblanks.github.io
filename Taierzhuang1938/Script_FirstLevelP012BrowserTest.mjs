@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { P012_ANCHORS, P012_ROUTES } from "./Data_FirstLevelP012Layout.mjs";
+import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as prologueVoices } from "./Data_MissionCh0.mjs";
 
@@ -91,7 +92,9 @@ async function PlayPrelude() {
         const crouching = flow.beatIndex === 4 ? distance < 3.1 : objective.requiredStance === "crouch";
         if (game.player.stance !== (crouching ? "crouch" : "stand")) game.Debug.Key("KeyC");
         const arrive = interactionId ? flow.beatIndex === 1 ? 0.35 : 1.6
-          : following ? 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
+          // Respect the public opening follow radius instead of deliberately
+          // walking into the leader's backpack. Later carry/escort stays unchanged.
+          : following ? [0,2].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
         const move = distance > arrive && !bot.held.KeyF;
         Key("KeyW", move);
         Key("ShiftLeft", move && flow.beatIndex === 4 && !crouching);
@@ -121,6 +124,7 @@ async function PlayPrelude() {
         camera: game.camera.position.toArray() } : null;
       bot.pendingOrientation = null;
       const trafficView = window.p012PendingTrafficView || null;
+      if(trafficView)trafficView.openingCast=game.Debug.P012Scene?.().openingCast;
       window.p012PendingTrafficView = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
         orientation, trafficView,
@@ -162,7 +166,7 @@ async function PlayFrontline() {
   let capturedWindow = false;
   let capturedJointAirView = false;
   for (let chunk = 0; chunk < (fullCampaign ? 250 : 45); chunk += 1) {
-    result = await page.evaluate(({ ports, fullCampaign, anchors, routes, retryDive, perception }) => {
+    result = await page.evaluate(({ ports, fullCampaign, anchors, routes, retryDive, perception, spatial }) => {
       const game = window.Tengxian;
       const bot = window.p012CombatReview ||= { frame: 0, firstShotAt: null, trace: [], oldBeat: -1, shots: [], targetId: null, aimFrames: 0, held: {}, cleanupPoint: 0, lastProgress: 0, progressKey: "" };
       const Key = (code, down) => {
@@ -175,6 +179,9 @@ async function PlayFrontline() {
           bot.jointAirViewCaptured = true;
           break;
         }
+        // Observer-only lateral/backward input is scoped to the aircraft turn.
+        // Always release it before another objective, interaction or retry.
+        Key("KeyS", false); Key("KeyA", false); Key("KeyD", false);
         const interactionId = flow.objective.interactionId || null;
         if (bot.interactionId !== interactionId) {
           Key("KeyF", false);
@@ -213,7 +220,7 @@ async function PlayFrontline() {
         // 飞机目标转移只有数秒：每2秒交回真实画面，避免20秒采样跨过整个转弯。
         if (flow.beatIndex >= 16 && flow.beatIndex <= 19 && frame >= 60) break;
         const progressKey = [flow.beat, flow.routeIndex, flow.retreatPoint, flow.spawnedTotal,
-          game.Debug.P012Scene().nearEnemyDeaths, flow.facts.join(",")].join("|");
+          game.Debug.P012Scene().nearEnemyDeaths, game.Debug.P012Scene().columnRouteIndex, flow.facts.join(",")].join("|");
         if (bot.progressKey !== progressKey) { bot.progressKey = progressKey; bot.lastProgress = flow.elapsed; }
         if (flow.elapsed - bot.lastProgress > 180) break;
         if (retryDive && flow.beatIndex === 19 && !bot.forceMissDone) {
@@ -226,7 +233,7 @@ async function PlayFrontline() {
         // An actual window glance after clearing the interior firing pair.
         // Observe the moving litter through real collision/LOS; do not advance its path or facts.
         if (flow.beatIndex === 14 && flow.routeIndex >= 3 && !bot.windowView
-          && Math.hypot(game.player.position.x - 68, game.player.position.z - 24) < 2
+          && Math.hypot(game.player.position.x - spatial.window.x, game.player.position.z - spatial.window.z) < 2
           && (bot.windowWatchFrames || 0) < 240) {
           const litter = game.Debug.P012Scene().litters[0];
           if (litter?.front && litter?.rear) {
@@ -288,11 +295,11 @@ async function PlayFrontline() {
           const point = objective.interactionId && game.interact.Point(objective.interactionId);
           const anchor = point && (point.Anchor ? point.Anchor() : point.position);
           destination = anchor || objective.target;
-          if (flow.beatIndex === 15 && !destination) destination = { x: 50, z: 68 };
+          if (flow.beatIndex === 15 && !destination) destination = spatial.airRoad;
           const diveOpen = flow.beatIndex === 19 && game.Debug.Strafe.State().run?.player?.open;
           if (flow.beatIndex === 19) destination = { x: anchors.strafeSlots[0].x, z: anchors.strafeSlots[0].z + (diveOpen ? 0 : 1.8) };
-          if (flow.beatIndex === 20 && !destination) destination = { x: 44, z: 62 };
-          if (flow.beatIndex === 22 && !destination) destination = { x: 42, z: 98 };
+          if (flow.beatIndex === 20 && !destination) destination = anchors.strafeSlots[0];
+          if (flow.beatIndex === 22 && !destination) destination = spatial.southBlockade;
           const distance = destination ? Math.hypot(destination.x - game.player.position.x, destination.z - game.player.position.z) : Infinity;
           if (![14, 20, 21].includes(flow.beatIndex) || point || objective.requiredAction === "grenade") {
             game.Debug.Mouse(2, false);
@@ -307,14 +314,27 @@ async function PlayFrontline() {
             }
             const strafeState = game.Debug.Strafe.State();
             const air = strafeState.modelAt;
-            // Glance up while travelling, then return to the public route. Do not
-            // keep walking along the aircraft camera heading instead of the road.
+            // A player can choose to track the five-second turn while backing
+            // toward the public ditch objective. Use ordinary movement keys;
+            // do not lock the production camera or move any actor directly.
+            // Global frame-modulo glances previously missed the end of this
+            // event when earlier travel changed by a fraction of a second.
+            const observeTurn = flow.beatIndex === 17 && strafeState.run?.presetId === "crowdTurn"
+              && strafeState.run?.phase === "approach";
             if ([16, 17].includes(flow.beatIndex) && air
-              && (!destination || distance <= arrive || bot.frame % 90 < 30)) {
+              && (observeTurn || !destination || distance <= arrive || bot.frame % 90 < 30)) {
               Key("KeyW", false);
               const eye = game.player.EyePosition;
               game.player.yaw = Math.atan2(-(air.x - eye.x), -(air.z - eye.z));
               game.player.pitch = Math.atan2(air.y - eye.y, Math.hypot(air.x - eye.x, air.z - eye.z));
+              if (observeTurn && destination && distance > arrive && !bot.held.KeyF) {
+                const dx = (destination.x - game.player.position.x) / distance;
+                const dz = (destination.z - game.player.position.z) / distance;
+                const sine = Math.sin(game.player.yaw), cosine = Math.cos(game.player.yaw);
+                const forward = -(dx * sine + dz * cosine), right = dx * cosine - dz * sine;
+                Key("KeyW", forward > 0.25); Key("KeyS", forward < -0.25);
+                Key("KeyD", right > 0.25); Key("KeyA", right < -0.25);
+              }
             }
             if (flow.beatIndex === 22 && objective.requiredAction === "observe" && objective.lookAt && distance < arrive + 0.2) {
               const target = objective.lookAt;
@@ -373,7 +393,12 @@ async function PlayFrontline() {
             const shapes = soldier.actor?.GetBoneHitboxes?.() || [];
             // A head visibly exposed above a parapet remains a perceptible target;
             // refusing it would test an artificial inability to recognize heads.
-            for (const part of ["torso", "head"]) {
+            // The precision fixture used to keep selecting the low torso behind
+            // the distant MG parapet after many visible misses. Prefer the
+            // exposed head for long shots; still require live LOS/hitboxes and
+            // use ordinary trigger, spread and damage (never write enemy health).
+            const parts=!perception && soldier.position.distanceTo(eye)>60 ? ["head","torso"] : ["torso","head"];
+            for (const part of parts) {
               const shape = shapes.find(item => item.part === part);
               if (!shape) continue;
               const aim = ["sphere", "ellipsoid"].includes(shape.type) ? shape.center.clone()
@@ -494,7 +519,8 @@ async function PlayFrontline() {
         enemies: game.ai.soldiers.filter(s => s.alive && s.side === "ija").map(s => ({
           position: s.position.toArray(), health: s.health, state: s.state, goal: s.goal.toArray() })) };
     }, { ports: P012_ANCHORS.gunports, fullCampaign, anchors: P012_ANCHORS, routes: P012_ROUTES,
-      retryDive: process.argv.includes("--retry"), perception: perceptionProfile });
+      retryDive: process.argv.includes("--retry"), perception: perceptionProfile,
+      spatial:{window:P012SouthPoint(68,24),airRoad:P012SouthPoint(50,68),southBlockade:P012SouthPoint(42,98)} });
     console.log("P012 frontline", JSON.stringify({ at: result.flow.elapsed, beat: result.flow.beat,
       health: result.health, ammo: result.ammo, clips: result.clips, position: result.position,
       enemies: result.enemies.length, dead: result.scene.nearEnemyDeaths, firstShotAt: result.firstShotAt,
@@ -675,7 +701,8 @@ async function VerifySouthRouteRecoveryFixtures() {
         director.beat = beat; director.routeIndex = routeIndex;
         const destination = director.ActivityRoute()[routeIndex];
         const unchanged = JSON.stringify(director.Snapshot()), path = [];
-        game.player.Spawn(44, 62, 0);
+        const start=phase.whitebox.anchors.strafeSlots[0];
+        game.player.Spawn(start.x, start.z, 0);
         game.player.stance = "stand"; game.player.pitch = 0;
         let reached = false;
         for (let frame = 0; frame < 2400; frame++) {
@@ -708,13 +735,15 @@ async function VerifyFrontlineRecoveryFixtures() {
   const results = await page.evaluate(async () => {
     const { FirstLevelP012Director } = await import("./Script_FirstLevelP012Flow.mjs");
     const { FIRST_LEVEL_P012_WHITEBOX_PHASE: phase } = await import("./Data_FirstLevelP012Whitebox.mjs");
+    const { P012NorthPoint } = await import("./Data_FirstLevelP012Space.mjs");
     const game = window.Tengxian, results = [];
     for (const beat of [6, 7, 8, 9, 10]) {
       const director = new FirstLevelP012Director({}, phase.whitebox);
       director.beat = beat;
       const destination = phase.whitebox.anchors.gunports[beat === 8 ? 2 : beat === 10 ? 0 : 1];
       const unchanged = JSON.stringify(director.Snapshot()), path = [];
-      game.player.Spawn(3.32966, -43.11849, 0);
+      const start=P012NorthPoint(3.32966,-43.11849);
+      game.player.Spawn(start.x, start.z, 0);
       game.player.stance = "prone"; game.player.pitch = 0;
       let reached = false;
       for (let frame = 0; frame < 3000; frame++) {
@@ -800,33 +829,34 @@ async function VerifyMapScale() {
   const report = await page.evaluate(async () => {
     const { FIRST_LEVEL_P012_LAYOUT: layout, P012_ROUTES: routes } = await import("./Data_FirstLevelP012Layout.mjs");
     const game = window.Tengxian, original = game.Debug.DebugOptions(), runs = [];
+    const corridor={x:layout.bounds.minX+7,fromZ:layout.bounds.maxZ-10,toZ:layout.bounds.minZ+10};
     const length = points => points.slice(1).reduce((sum, point, index) => sum
       + Math.hypot(point.x - points[index].x, point.z - points[index].z), 0);
     try {
       game.Debug.SetDebugOption("noCollision", false);
       for (const fastMove of [false, true]) {
         game.Debug.SetDebugOption("fastMove", fastMove);
-        game.player.Spawn(-76, 110, 0); game.player.stance = "stand";
+        game.player.Spawn(corridor.x, corridor.fromZ, 0); game.player.stance = "stand";
         game.player.stamina = 1; game.player.pitch = 0;
         game.Debug.Key("KeyW", true); game.Debug.Key("ShiftLeft", true);
         let tenSeconds = null, frame = 0;
         for (; frame < 5400; frame++) {
           game.StepFrames(1, 1 / 30, false);
-          if (frame === 299) tenSeconds = { distanceM: 110 - game.player.position.z, position: game.player.position.toArray() };
-          if (game.player.position.z <= -110) break;
+          if (frame === 299) tenSeconds = { distanceM: corridor.fromZ - game.player.position.z, position: game.player.position.toArray() };
+          if (game.player.position.z <= corridor.toZ) break;
         }
         game.Debug.Key("KeyW", false); game.Debug.Key("ShiftLeft", false);
         runs.push({ fastMove, tenSeconds, crossingSeconds: (frame + 1) / 30,
-          reached: game.player.position.z <= -110, position: game.player.position.toArray() });
+          reached: game.player.position.z <= corridor.toZ, position: game.player.position.toArray() });
       }
     } finally {
       for (const [id, value] of Object.entries(original)) game.Debug.SetDebugOption(id, value);
     }
-    return { bounds: layout.bounds, routesM: Object.fromEntries(Object.entries(routes).map(([key, points]) => [key, length(points)])), runs };
+    return { bounds: layout.bounds, corridor, corridorLengthM:corridor.fromZ-corridor.toZ, routesM: Object.fromEntries(Object.entries(routes).map(([key, points]) => [key, length(points)])), runs };
   });
   await fs.writeFile(path.join(outputDir, "Data_P012MapScale.json"), JSON.stringify(report, null, 2));
   Check(report.runs.every(run => run.reached && run.tenSeconds && run.crossingSeconds > 10),
-    "沿西侧实际220米空走廊测试普通/三倍奔跑，保留真实碰撞", JSON.stringify(report));
+    "沿新外框西侧实际走廊测试普通/三倍奔跑，保留真实碰撞与速度", JSON.stringify(report));
 }
 
 // Discovery fixture: follow the actual leader and look along his body heading.
@@ -938,16 +968,18 @@ async function VerifyTraversalFixtures() {
 
 // Dedicated P2 plan-view evidence, after gameplay checks; the menu owns this camera.
 async function CaptureLayoutOverview() {
-  const view = await page.evaluate(() => {
+  const view = await page.evaluate(async () => {
+    const {FIRST_LEVEL_P012_LAYOUT:layout}=await import("./Data_FirstLevelP012Layout.mjs");
     const game = window.Tengxian;
     game.Debug.Pause();
     const menu = game.menu;
     menu.live = true; menu.open = true; game.state.menu = true;
     menu.shotSliceId = menu.host.SlicePhase().id;
-    menu.shots = [{ id: "P012Overview", from: [0, 285, 0], to: [0, 285, 0],
-      look: [0, 0, 0], lookTo: [0, 0, 0], focalMm: 24 }];
+    const b=layout.bounds,x=(b.minX+b.maxX)/2,z=(b.minZ+b.maxZ)/2,height=Math.max(b.maxX-b.minX,b.maxZ-b.minZ)*1.4;
+    menu.shots = [{ id: "P012Overview", from: [x, height, z], to: [x, height, z],
+      look: [x, 0, z], lookTo: [x, 0, z], focalMm: 24 }];
     menu.shotIndex = 0; menu.shotTime = 0;
-    game.camera.up.set(0, 0, -1); game.camera.far = 600; game.camera.updateProjectionMatrix();
+    game.camera.up.set(0, 0, -1); game.camera.far = height+600; game.camera.updateProjectionMatrix();
     document.getElementById("menu").style.display = "none";
     game.viewmodel.root.visible = false;
     menu.ApplyShot(0); game.StepFrames(12);

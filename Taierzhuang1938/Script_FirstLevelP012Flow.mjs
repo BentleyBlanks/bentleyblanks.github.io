@@ -1,6 +1,7 @@
 // P012 白盒行为编排。纯规则，不 import three；复用正式交互、搬运、剧情信号与检查点。
 // 动作驱动阶段；新战术压力常态40秒、快清最短30秒。侦察→同轴步枪增援是明确例外，不代表全部波次达标。
 import { PickUpLoadInteraction, GiveSupplyInteraction } from "./Script_Interact.mjs";
+import { P012Point } from "./Data_FirstLevelP012Space.mjs";
 
 const Distance = (a, b) => a && b ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 const Clone = (value) => JSON.parse(JSON.stringify(value));
@@ -38,7 +39,7 @@ export const P012_BEATS = Object.freeze([
 export const P012_WAVES = Object.freeze([
   { beat: 6, atS: 285, count: 2, kind: "scouts", lane: "centerEnemy" },
   { beat: 7, atS: 330, count: 5, kind: "rifles", lane: "centerEnemy" },
-  { beat: 8, atS: 380, count: 2, kind: "machineGun", lane: "eastEnemy" },
+  { beat: 8, atS: 380, count: 2, kind: "machineGun", lane: "machineGunEnemy" },
   { beat: 9, atS: 425, count: 2, kind: "mortar", lane: "eastEnemy" },
   { beat: 10, atS: 465, count: 4, kind: "culvert", lane: "westEnemy" },
   { beat: 14, atS: 740, count: 6, kind: "ambush", lane: "ambush" },
@@ -152,11 +153,11 @@ export class FirstLevelP012Director {
       Enabled: () => this.beat === 1 && this.facts.has("weapon") && !this.facts.has("issuedAmmo"), once: false,
       OnComplete: () => { this.Mark("issuedAmmo"); this.Emit("P012AmmoIssued"); this.weaponActionStart = this.lastSample.weaponActionCount || 0; this.host.CheckWeapon?.(); } });
     Register({ id: "p012_hubSupply", kind: "supply", label: "补充弹药，观察铁路方向",
-      gesture: "hold", seconds: 1.8, position: this.Point("supplyPoint", { x: 5, z: 5 }),
+      gesture: "hold", seconds: 1.8, position: this.Point("supplyPoint", P012Point(5, 5)),
       Enabled: () => this.beat === 3 && !this.supplyReceipts.has("supply"), once: false,
       OnComplete: () => this.SupplyOnce("supply") });
     Register({ id: "p012_woundedCheck", kind: "bandage", label: "查看伤员，整理弹药并补充1包绷带",
-      gesture: "hold", seconds: 2.2, position: this.config.activities?.woundedDragFrom || this.Point("shelter", { x: -7, z: -52 }),
+      gesture: "hold", seconds: 2.2, position: this.config.activities?.woundedDragFrom || this.Point("shelter", P012Point(-7, -52)),
       Enabled: () => this.beat === 11 && !this.supplyReceipts.has("wounded"), once: false,
       OnComplete: () => { const issued = this.SupplyOnce("wounded"); if (issued) this.host.GiveBandages?.(1);
         this.Emit("P012WoundedChecked"); return issued; } });
@@ -166,7 +167,7 @@ export class FirstLevelP012Director {
         && Distance(this.lastSample.guidePosition, this.config.activities.woundedDragTo) < 3, once: false,
       OnComplete: () => { this.Mark("volunteer"); this.Emit("P012EscortRequested"); } });
     Register({ id: "p012_roadSupply", kind: "supply", label: "检查担架并补充弹药",
-      gesture: "hold", seconds: 2.2, position: this.Point("stretcher", { x: 45, z: 26 }),
+      gesture: "hold", seconds: 2.2, position: this.Point("stretcher", P012Point(45, 26)),
       Enabled: () => this.beat === 15 && !this.supplyReceipts.has("regroup"), once: false,
       OnComplete: () => this.SupplyOnce("regroup") });
     Register({ id: "p012_frontlineAmmo", kind: "supply", label: this.FrontlineAmmoLabel(),
@@ -211,12 +212,12 @@ export class FirstLevelP012Director {
       } });
     const carry = this.host.Carry?.();
     Register({ ...PickUpLoadInteraction({ id: "p012_ammoPickup", kindId: "ammoCrate", carry,
-      position: this.Point("ammoPickup", { x: -7, z: -52 }), label: "抬起机枪弹药箱",
+      position: this.Point("ammoPickup", P012Point(-7, -52)), label: "抬起机枪弹药箱",
       once: false,
       options: { label: "机枪弹药箱", payload: { to: "p012Mg" } } }),
       Enabled: () => this.beat === 5 && !carry?.Active });
     Register(GiveSupplyInteraction({ id: "p012_ammoDrop", item: "弹药箱",
-      position: this.Point("ammoDrop", { x: 5, z: -65 }), label: "把弹药送到机枪阵位",
+      position: this.Point("ammoDrop", P012Point(5, -65)), label: "把弹药送到机枪阵位",
       Has: () => this.beat === 5 && carry?.KindId === "ammoCrate" && this.routeIndex >= this.ActivityRoute().length, once: false,
       OnComplete: () => {
         carry?.ForceRelease("delivered");
@@ -267,7 +268,7 @@ export class FirstLevelP012Director {
     // the wall. This latch is navigation only, never a checkpoint/world reset.
     const player = this.lastSample.position;
     if (!player || !target) return null;
-    if (player.z > -55) this.frontlineApproaching = true;
+    if (player.z > this.Point("ammoPickup", P012Point(-7, -52)).z - 3) this.frontlineApproaching = true;
     if (!this.frontlineApproaching) return null;
     if (Distance(player, target) <= 0.6) { this.frontlineApproaching = false; return null; }
     const central = this.config.anchors.gunports[1];
@@ -482,7 +483,7 @@ export class FirstLevelP012Director {
         || !this.LateThreat() : true;
     if (routeAllowed && Distance(p, route[this.routeIndex]) <= this.RouteArrivalRadius()) {
       const reachedPoint = route[this.routeIndex];
-      if (this.beat === 4) {
+      if (this.beat === 4 && (!activity.shellObservationIndices || activity.shellObservationIndices.includes(this.routeIndex))) {
         if (!this.shellTarget) {
           this.shellTarget = { x: reachedPoint.x - 7, z: reachedPoint.z - 3 };
           this.shellImpactStart = sample.mortarImpactCount || 0;
@@ -531,7 +532,7 @@ export class FirstLevelP012Director {
           this.Emit(`P012RetreatCover${(activity.retreatCoverIndices || []).indexOf(this.retreatPoint)}`);
           if (Number(sample.clips) === 0 && Number(sample.ammo) === 0) this.Emit("P012RetreatAmmoLow");
         }
-        if (Distance(returnRoute[this.retreatPoint], { x: 0, z: 0 }) < 1) this.Emit("P012HubRevisited");
+        if (Distance(returnRoute[this.retreatPoint], this.Point("hub", P012Point(0, 0))) < 1) this.Emit("P012HubRevisited");
         if (this.retreatPoint < returnRoute.length - 1) this.retreatPoint += 1;
       }
     }
@@ -652,7 +653,7 @@ export class FirstLevelP012Director {
           if (roadActors.length === 2 && roadActors.every((entry) => !this.host.EnemyPosition?.(entry.handle))
             && !this.pendingEnemies.some((entry) => entry.ambushGroup === 0)) this.Emit("P012RoadGunSilenced");
         }
-        if (Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || { x: 72, z: 43 }) < 7) this.Mark("flanked");
+        if (Distance(p, this.config.activities?.ambushGroups?.[2]?.cover || P012Point(72, 43)) < 7) this.Mark("flanked");
         ready = dead >= 21 && Has("flanked") && this.ambushEntryIndex >= (activity.ambushEntryRoute?.length || 0) && this.routeIndex >= route.length
           && Distance(p, sample.columnPosition) < 18; break;
       case 15: ready = Has("regroup") && Has("roadWounded") && Distance(p, sample.columnPosition) < 12; break;
@@ -684,7 +685,7 @@ export class FirstLevelP012Director {
         && this.retreatPoint >= (this.config.routes?.retreat?.length || 1) - 1
         && this.retreatCovers.length >= (activity.retreatCoverIndices?.length || 0); break;
       case 24: ready = sample.carryKind === "stretcher" && this.carryTravelM >= (activity.finalCarryMinM || 10)
-        && Distance(p, this.Point("shelter", { x: -7, z: -52 })) < 3; break;
+        && Distance(p, this.Point("shelter", P012Point(-7, -52))) < 3; break;
       default: break;
     }
     if (ready && this.beat < 25) this.Enter(this.beat + 1);
@@ -706,11 +707,11 @@ export class FirstLevelP012Director {
     return true;
   }
   SpawnWave(wave, waveIndex) {
-    const name = wave.lane === "westEnemy" ? "west" : wave.lane === "eastEnemy" ? "east" : "center";
+    const name = wave.lane === "machineGunEnemy" ? "machineGun" : wave.lane === "westEnemy" ? "west" : wave.lane === "eastEnemy" ? "east" : "center";
     const lane = this.config.enemyLanes?.[name];
     const late = wave.beat >= 14;
-    const fallback = late ? (wave.beat >= 21 ? this.Point("southGunpoint", { x: 48, z: 107 })
-      : this.Point("gunpoint", { x: 58, z: 39 })) : this.Point("scout", { x: 5, z: -113 });
+    const fallback = late ? (wave.beat >= 21 ? this.Point("southGunpoint", P012Point(48, 107))
+      : this.Point("gunpoint", P012Point(58, 39))) : this.Point("scout", P012Point(5, -113));
     const source = late ? fallback : lane?.spawn || fallback;
     for (let index = 0; index < wave.count; index += 1) {
       const groups = wave.beat === 20 ? this.config.activities?.closeFightGroups
@@ -728,7 +729,7 @@ export class FirstLevelP012Director {
         : ambushPosition ? [ambushPosition] : late ? [fallback] : terminal ? [...(lane?.waypoints || []).slice(0, -1), terminal]
         : [...(lane?.waypoints || []), lane?.goal || fallback];
       this.pendingEnemies.push({ spec: { x: encounterSpawn?.x ?? ambushPosition?.x ?? source.x, z: encounterSpawn?.z ?? ambushPosition?.z ?? source.z + index * 0.7,
-        weapon, p012Near: true, squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
+        weapon, p012Near: true, p012MachineGun: wave.kind === "machineGun", squadId: `P012_${waveIndex}`, order: wave.kind === "scouts" || wave.kind === "machineGun" || ambushPosition ? "hold" : "attack" }, points, ambushGroup, encounterGroup, encounterBeat: wave.beat,
         encounterSlot: index % 2, relocation: encounter?.relocations?.[index % 2] || null,
         staging: wave.kind === "closeFight" && this.beat < 20 && !this.closePressureReleased,
         stagingStopIndex: encounter?.stagingStopIndices?.[index % 2] ?? -1 });
@@ -788,7 +789,7 @@ export class FirstLevelP012Director {
         target = observation.via; requiredAction = "move"; lookAt = null;
       }
     }
-    if (this.beat === 4) { text = "冲刺到下一个路沟掩体，蹲下避炮"; if (this.routeIndex >= route.length) target = { x: 0, z: -52 }; }
+    if (this.beat === 4) { text = "冲刺到下一个路沟掩体，蹲下避炮"; if (this.routeIndex >= route.length) target = this.Point("ammoPickup", P012Point(-7, -52)); }
     if (this.beat === 4 && this.shellTarget) {
       requiredStance = "crouch"; lookAt = this.shellTarget;
       const observed = Math.min(this.shellObservationTime, activity.shellObservationSeconds);

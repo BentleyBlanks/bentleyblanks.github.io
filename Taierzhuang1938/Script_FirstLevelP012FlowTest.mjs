@@ -1,5 +1,6 @@
 // P012实际状态机的纯Node宿主测试：用注册交互回调/玩家动作/正式信号驱动，不写beat跳关。
 import assert from "node:assert/strict";
+import { P012Point } from "./Data_FirstLevelP012Space.mjs";
 import { FirstLevelP012Director, P012_WAVES } from "./Script_FirstLevelP012Flow.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as phase } from "./Data_FirstLevelP012Whitebox.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
@@ -99,6 +100,7 @@ function Walk(route, extra = {}) {
 }
 
 assert.equal(points.get("p012_ammoPickup").Enabled(), false, "ammo cannot be taken during arrival");
+assert.equal(flow.CurrentObjective().arrivalRadiusM,3,"opening follow publishes comfortable spacing without forcing the camera or attaching to the leader");
 At("Z00", phase.whitebox.anchors.trainDoor);
 assert.equal(flow.State().beat, "B00", "door proximity alone does not replace train traversal");
 Walk(phase.whitebox.activities.trainRoute);
@@ -109,7 +111,7 @@ Use("p012_ammoIssue");
 Tick({weaponActionCount:1,position:phase.whitebox.activities.weaponInspectPosition});
 assert.equal(flow.State().checkpointId, "CP00");
 const villageRoute = phase.whitebox.activities.villageRoute;
-Tick({zone:"Z01",position:{x:70,z:100},guidePosition:villageRoute[2],guideRouteIndex:3,trafficReady:false});
+Tick({zone:"Z01",position:P012Point(70,100),guidePosition:villageRoute[2],guideRouteIndex:3,trafficReady:false});
 assert.equal(flow.State().routeIndex,0,"a remote guide does not grant followed segments");
 for (let i=0;i<villageRoute.length;i++) {
   const point=villageRoute[i];
@@ -141,10 +143,14 @@ for (const observation of phase.whitebox.activities.orientations) {
   Tick({position:p,yaw,orientationVisible:[true,true,true,true]},phase.whitebox.activities.observationSeconds+0.1);
 }
 assert.equal(flow.State().beat, "B04");
-At("Z03"); Tick({position:{x:0,z:-31},sprint:1}); Tick({position:{x:0,z:-34},sprint:1});
-Tick({position:{x:0,z:-37},sprint:1,stance:"crouch"});
-for(const p of phase.whitebox.activities.shellCoverRoute) {
+At("Z03"); Tick({position:P012Point(0,-31),sprint:1}); Tick({position:P012Point(0,-34),sprint:1});
+Tick({position:P012Point(0,-37),sprint:1,stance:"crouch"});
+for(const [leg,p] of phase.whitebox.activities.shellCoverRoute.entries()) {
   Tick({position:p,zone:"Z03",stance:"crouch",guidePosition:p});
+  if(!phase.whitebox.activities.shellObservationIndices.includes(leg)) {
+    assert.equal(flow.routeIndex,leg+1,"a connecting-road corner does not invent another mandatory explosion observation");
+    continue;
+  }
   const index=flow.routeIndex;
   Tick({yaw:Math.atan2(7,3)},3.1);
   assert.equal(flow.routeIndex,index,"looking without the real impact does not complete a cover leg");
@@ -208,10 +214,10 @@ assert.equal(fallbackMg.State().completionReasons[8],"threatCleared");
 assert.ok(fallbackMg.CurrentObjective().text.startsWith("机枪威胁已清除"),"all-clear is not falsely described as friendly fire");
 Tick({friendlyMgFiredAfterSuppression:true});
 assert.equal(flow.State().completionReasons[8],"friendlyMgResumed");
-Tick({position:{x:5,z:-65},mortarWarningActive:true,mortarWarningPosition:{x:5,z:-65}});
+Tick({position:P012Point(5,-65),mortarWarningActive:true,mortarWarningPosition:P012Point(5,-65)});
 assert.equal(flow.CurrentObjective().requiredAction,"sprint","mortar escape starts with sprint, never slow prone crawling");
 assert.equal(flow.CurrentObjective().requiredStance,"stand");
-Tick({position:{x:-3,z:-65}});
+Tick({position:P012Point(-3,-65)});
 assert.equal(flow.CurrentObjective().requiredStance,"prone","after actual six-metre escape the remaining transfer is prone");
 Tick({position:phase.whitebox.anchors.gunports[0]});
 assert.equal(flow.CurrentObjective().requiredStance,null,"arrival at a safe gunport permits standing to fire");
@@ -219,7 +225,7 @@ const mortarFightingSample=flow.lastSample;
 flow.lastSample={...mortarFightingSample,nearEnemyDeaths:11,stance:"stand"};
 assert.equal(flow.CurrentObjective().requiredStance,"prone","cleared mortar fight explicitly requests the low stance needed to finish relocation");
 flow.lastSample=mortarFightingSample;
-Tick({mortarImpactCount:(sample.mortarImpactCount||0)+1,mortarImpactPosition:{x:100,z:100}});
+Tick({mortarImpactCount:(sample.mortarImpactCount||0)+1,mortarImpactPosition:P012Point(100,100)});
 KillWave(); Tick({},40); KillWave();
 assert.equal(flow.State().beat,"B11");
 Use("p012_woundedCheck"); Tick();
@@ -246,17 +252,17 @@ Tick({columnAtEscortEnd:true,columnPosition:sample.position});
 assert.equal(flow.State().beat,"B14");
 Tick({},40);
 const ambushActors=spawned.slice(-6);
-Tick({position:{x:42.5,z:24},zone:"Z07"});
+Tick({position:P012Point(42.5,24),zone:"Z07"});
 assert.equal(flow.routeIndex,0,"three metre turn cutting cannot consume the courtyard corner");
-assert.deepEqual(flow.CurrentObjective().target,{x:39,z:25.5},"safe entry directs the player into the existing blue firing cover, not across the exposed gap");
+assert.deepEqual(flow.CurrentObjective().target,P012Point(39,25.5),"safe entry directs the player into the existing blue firing cover, not across the exposed gap");
 assert.equal(flow.CurrentObjective().arrivalRadiusM,phase.whitebox.activities.ambushRouteRadiusM);
 assert.equal(flow.RouteArrivalRadius(),0.6);
-Tick({position:{x:44.39,z:26},zone:"Z07"});
+Tick({position:P012Point(44.39,26),zone:"Z07"});
 assert.equal(flow.routeIndex,0,"outside the public arrival radius remains at the corner");
 assert.ok(signals.has("P012AmbushStarted"));
 assert.equal(signals.has("P012RoadGunSilenced"),false,"live road shooters cannot release the litters");
 assert.equal(new Set(ambushActors.map(actor=>`${actor.x},${actor.z}`)).size,6,"six ambushers exist at distinct positions before the flank");
-Tick({position:{x:39,z:25.5},bleeding:1,bandages:1});
+Tick({position:P012Point(39,25.5),bleeding:1,bandages:1});
 assert.ok(flow.CurrentObjective().text.includes("按 B"));
 Tick({bandages:0});
 assert.ok(!flow.CurrentObjective().text.includes("按 B"));
@@ -273,9 +279,9 @@ for(const point of phase.whitebox.routes.flank){
   const threat=flow.AmbushThreat();
   if(threat){
     if(threat.index===2){
-      Tick({position:{x:72,z:35}});
+      Tick({position:P012Point(72,35)});
       assert.equal(flow.CurrentObjective().requiredStance,"prone","the verified east gallery stays low before the third firing nest");
-      Tick({position:{x:72,z:40}});
+      Tick({position:P012Point(72,40)});
       assert.equal(flow.CurrentObjective().requiredStance,"prone");
     }
     Tick({position:threat.cover});
@@ -306,8 +312,8 @@ Use("p012_roadSupply"); At("Z08");
 assert.equal(flow.State().beat,"B15","supply alone does not replace checking the wounded");
 assert.equal(points.get("p012_roadWounded").Enabled(),false,"a fixed empty inspection point is not an actual litter");
 assert.equal(points.get("p012_roadWounded").OnComplete(),false,"stale completion cannot check a missing litter");
-const inspectionPoint={x:50,z:46.3};
-Tick({position:{x:50,z:47},columnPosition:{x:50,z:47},zone:"Z07",roadWoundedPosition:inspectionPoint,roadWoundedAtInspection:true});
+const inspectionPoint=P012Point(50,46.3);
+Tick({position:P012Point(50,47),columnPosition:P012Point(50,47),zone:"Z07",roadWoundedPosition:inspectionPoint,roadWoundedAtInspection:true});
 assert.deepEqual(points.get("p012_roadWounded").Anchor(),inspectionPoint);
 Use("p012_roadWounded"); Tick();
 assert.ok(signals.has("P012RoadWoundedChecked"));
@@ -315,18 +321,18 @@ assert.equal(flow.State().beat,"B16","actual inspection releases B16 before the 
 for(const zone of ["Z07",null]) {
   const director=new FirstLevelP012Director({},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:15,facts:["regroup","roadWounded"]});
-  director.Update(.1,{position:{x:50,z:47},columnPosition:{x:50,z:70},zone});
+  director.Update(.1,{position:P012Point(50,47),columnPosition:P012Point(50,70),zone});
   assert.equal(director.State().beat,"B15","actual checked facts still require physical proximity to the column");
-  director.Update(.1,{position:{x:50,z:47},columnPosition:{x:50,z:47},zone});
+  director.Update(.1,{position:P012Point(50,47),columnPosition:P012Point(50,47),zone});
   assert.equal(director.State().beat,"B16","actual inspection and nearby column do not depend on a region-circle label");
 }
 assert.equal(signals.has("P012AirReady"),false,"one inspected litter cannot substitute for four bearers entering the road");
-Tick({position:{x:54,z:57},columnPosition:{x:50,z:56},airColumnEnteredRoad:false,airColumnReady:false,sprint:0});
+Tick({position:P012Point(54,57),columnPosition:P012Point(50,56),airColumnEnteredRoad:false,airColumnReady:false,sprint:0});
 assert.equal(signals.has("P012AirReady"),false);
-Tick({position:{x:54,z:60},columnPosition:{x:50,z:66},airColumnEnteredRoad:true});
+Tick({position:P012Point(54,60),columnPosition:P012Point(50,66),airColumnEnteredRoad:true});
 assert.equal(signals.has("P012AirReady"),false,"four bearers entering does not replace the player's actual acceleration");
 assert.equal(flow.CurrentObjective().requiredAction,"sprint");
-Tick({position:{x:50,z:63},sprint:1});Tick({position:{x:50,z:66},sprint:1});
+Tick({position:P012Point(50,63),sprint:1});Tick({position:P012Point(50,66),sprint:1});
 assert.ok(signals.has("P012AirReady"),"first attack starts while the complete player road route still remains");
 assert.ok(flow.airSprintM>=4);
 assert.ok(flow.routeIndex<phase.whitebox.activities.airRoadRoute.length);
@@ -352,12 +358,12 @@ Walk(phase.whitebox.activities.stretcherCarryRoute,{carryKind:"stretcher",carryD
 signals.add("P012Dived"); Tick({carryKind:null,stance:"crouch"});
 Tick({},40);
 const closeActors=spawned.slice(-6);
-assert.deepEqual(closeActors.map(actor=>[actor.x,actor.z]),[[72,28],[72,30],[72,32],[72,61.5],[72,64],[72,66.5]],"six finite enemies start on screened northeast and southeast approaches");
+assert.deepEqual(closeActors.map(actor=>[actor.x,actor.z]),[[72,28],[72,30],[72,32],[72,61.5],[72,64],[72,66.5]].map(([x,z])=>Object.values(P012Point(x,z))),"six finite enemies start on screened northeast and southeast approaches");
 assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.points[0]),[
-  {x:74,z:30},{x:74,z:30},{x:74,z:30},{x:69,z:73},{x:69,z:73},{x:69,z:73}],"three actors physically follow each distinct approach without changing pair groups");
+  P012Point(74,30),P012Point(74,30),P012Point(74,30),P012Point(69,73),P012Point(69,73),P012Point(69,73)],"three actors physically follow each distinct approach without changing pair groups");
 assert.deepEqual(flow.enemyRoutes.slice(-6).map(entry=>entry.encounterGroup),[0,0,1,1,2,2]);
 assert.equal(flow.CurrentObjective().requiredAction,"fight");
-assert.deepEqual(flow.CurrentObjective().target,{x:44,z:62});
+assert.deepEqual(flow.CurrentObjective().target,P012Point(44,62));
 KillWave(); assert.ok(signals.has("P012DitchClear"),"only cleared ditch combat releases actual litters");
 Tick({},40);
 const southActors=spawned.slice(-6);
@@ -398,7 +404,7 @@ Tick({position:phase.whitebox.anchors.shelter,carryKind:"stretcher"});
 assert.equal(flow.State().beat,"B24","pickup at the destination cannot complete delivery");
 Tick({position:phase.whitebox.activities.regripPosition,carryKind:null});
 Tick({carryKind:"stretcher"});
-for(let z=-40;z>=-52;z-=3) Tick({position:{x:-7,z}});
+for(let z=-40;z>=-52;z-=3) Tick({position:P012Point(-7,z)});
 assert.equal(flow.State().beat,"B25");
 assert.equal(spawned.length,33,"all waves exhaust at a finite total");
 Tick({},600); assert.equal(spawned.length,33,"waiting never respawns cleared enemies");
@@ -585,10 +591,10 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
 // permits only this bounded cover move, not a global follow-distance bypass.
 {
   let time=0;const events=new Set(["P012AmbushStarted"]),actors=[];
-  const host={Time:()=>time,PlayerPos:()=>({x:68,z:24}),Alive:actor=>actor.alive,PositionOf:actor=>actor.position,
+  const host={Time:()=>time,PlayerPos:()=>(P012Point(68,24)),Alive:actor=>actor.alive,PositionOf:actor=>actor.position,
     SpawnActor:({x,z})=>{const actor={alive:true,stance:0,position:{x,z},goal:{x,z}};actors.push(actor);return actor;},
     SetGoal:(actor,x,z)=>{actor.goal={x,z};}};
-  const column=new EscortColumn(host,{waypoints:[{x:30,z:10},{x:31,z:12.2}],followRouteBodies:true,
+  const column=new EscortColumn(host,{waypoints:[P012Point(30,10),P012Point(31,12.2)],followRouteBodies:true,
     members:Array.from({length:4},()=>({role:"bearer"}))});
   column.Start();
   const identities=column.litters.map(litter=>[litter.front.handle,litter.rear.handle]);
@@ -627,16 +633,17 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
     EnemyPosition:actor=>actor.alive?actor.position:null,EnemyGoal:(actor,point)=>{actor.goal={x:point.x,z:point.z};},
     EnemyStaging:(actor,value)=>{actor.staging=value;},Pressure:wave=>pressure.push(wave.kind)},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:18,spawnedTotal:21,unlockedWaves:[0,1,2,3,4,5]});
-  const before=director.Snapshot(),sample={position:{x:47,z:80},zone:"Z08",carryKind:null};
+  const before=director.Snapshot(),sample={position:P012Point(47,80),zone:"Z08",carryKind:null};
   director.Update(.1,sample);assert.equal(actors.length,0,"being near the wounded does not pre-spawn before real lifting");
   events.add("P012StretcherLifted");director.Update(.1,sample);
   assert.equal(actors.length,6);assert.equal(director.spawnedTotal,27);
   assert.ok(actors.every(actor=>actor.staging));assert.deepEqual(pressure,[],"hidden staging is not recorded as active fire pressure");
-  for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[0]};
-  director.Update(.1,sample);
-  for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[1]};
+  for(let waypoint=0;waypoint<=2;waypoint++){
+    for(let index=0;index<3;index++)actors[index].position={...director.enemyRoutes[index].points[waypoint]};
+    director.Update(.1,sample);
+  }
   director.Update(.1,sample);director.Update(30,sample);
-  for(let index=0;index<3;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].points[1]);
+  for(let index=0;index<3;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].points[2]);
   for(let index=3;index<6;index++)assert.deepEqual(actors[index].goal,director.enemyRoutes[index].spawnPoint);
   assert.deepEqual(pressure,[],"elapsed time cannot release staged enemies");
   actors[0].alive=false;events.add("P012DiveApproach");director.Update(.1,sample);
@@ -648,25 +655,28 @@ assert.equal(returnVoices.filter(key=>key==="ch1_shunzi_07").length,1);
 }
 {
   const director=new FirstLevelP012Director({},phase.whitebox);
-  director.Restore({...director.Snapshot(),beat:23,retreatPoint:5,facts:["retreatSmokeDeployed"]});
-  const column={x:-4.8078,z:74.075};
+  const retreat=phase.whitebox.routes.retreat;
+  director.Restore({...director.Snapshot(),beat:23,retreatPoint:8,facts:["retreatSmokeDeployed"]});
+  const column=retreat[5];
+  const behindColumn=distance=>{const next=retreat[6],length=Math.hypot(next.x-column.x,next.z-column.z);
+    return {x:column.x+(next.x-column.x)*distance/length,z:column.z+(next.z-column.z)*distance/length};};
   const update=position=>director.Update(.1,{position,columnPosition:column,stance:"stand",zone:"Z10"});
-  update({x:-21.7998,z:27.8035});
+  update(retreat[7]);
   assert.equal(director.CurrentObjective().requiredAction,"follow","cover stance must not override actual rejoining");
-  assert.deepEqual(director.CurrentObjective().target,{x:-18,z:50},"return via the intervening safe corner, not a diagonal to the litter");
+  assert.deepEqual(director.CurrentObjective().target,retreat[6],"return via the intervening safe corner, not a diagonal to the litter");
   assert.equal(director.CurrentObjective().arrivalRadiusM,.6);
-  assert.equal(director.retreatPoint,5,"rejoining does not consume the pending cover fact");
-  update({x:-18,z:50});assert.deepEqual(director.CurrentObjective().target,{x:-8,z:72});
-  update({x:-14,z:65});assert.equal(director.retreatRejoining,true,"hysteresis keeps rejoining in the 10–20 metre band");
-  update({x:-8,z:72});assert.equal(director.retreatRejoining,false);
+  assert.equal(director.retreatPoint,8,"rejoining does not consume the pending cover fact");
+  update(retreat[6]);assert.deepEqual(director.CurrentObjective().target,column);
+  update(behindColumn(15));assert.equal(director.retreatRejoining,true,"hysteresis keeps rejoining in the 10–20 metre band");
+  update(behindColumn(8));assert.equal(director.retreatRejoining,false);
   const lead=director.CurrentObjective();
   assert.equal(lead.requiredAction,"follow","after reconnecting, lead the column nearby rather than sprinting back to the distant cover");
   assert.ok(director.RetreatRouteProjection(lead.target).along<=director.RetreatRouteProjection(column).along+10.01);
-  assert.equal(director.retreatPoint,5);
-  director.Restore({...director.Snapshot(),retreatPoint:12,retreatRejoining:true});
-  director.Update(.1,{position:{x:4.98,z:-42.25},columnPosition:{x:-7,z:-37},lastLitterArrived:true,stance:"stand",zone:"Z10"});
+  assert.equal(director.retreatPoint,8);
+  director.Restore({...director.Snapshot(),retreatPoint:retreat.length-1,retreatRejoining:true});
+  director.Update(.1,{position:P012Point(4.98,-42.25),columnPosition:phase.whitebox.activities.regripPosition,lastLitterArrived:true,stance:"stand",zone:"Z10"});
   assert.equal(director.retreatRejoining,false,"parked litters cannot keep calling the player back");
-  assert.deepEqual(director.CurrentObjective().target,{x:0,z:-52},"terminal route objective is restored after actual litter parking");
+  assert.deepEqual(director.CurrentObjective().target,retreat.at(-1),"terminal route objective is restored after actual litter parking");
   assert.notEqual(director.CurrentObjective().requiredAction,"follow");
 }
 for(const index of [2,3,4]) {
@@ -676,8 +686,8 @@ for(const index of [2,3,4]) {
     EnemyPosition:actor=>actor.position},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:P012_WAVES[index].beat,elapsed:129,lastWaveAt:100,
     unlockedWaves:Array.from({length:index},(_,i)=>i)});
-  const sample={position:{x:23,z:-68},zone:"Z05",stance:"prone",enemyDeaths:0,mortarImpactCount:7,
-    mortarWarningActive:true,mortarWarningPosition:{x:23,z:-68}};
+  const sample={position:P012Point(23,-68),zone:"Z05",stance:"prone",enemyDeaths:0,mortarImpactCount:7,
+    mortarWarningActive:true,mortarWarningPosition:P012Point(23,-68)};
   director.Update(.9,sample);
   assert.equal(actors.length,0,`${P012_WAVES[index].kind} cannot clear-bypass its 30s minimum`);
   assert.deepEqual(pressures,[],"no pressure callback or mortar blast warning before real wave release");
@@ -693,9 +703,9 @@ for(const index of [2,3,4]) {
   const pressures=[];
   const director=new FirstLevelP012Director({Pressure:wave=>pressures.push(wave.kind),EnemyPosition:actor=>actor.position},phase.whitebox);
   director.Restore({...director.Snapshot(),beat:8,elapsed:139,lastWaveAt:100,unlockedWaves:[0,1]});
-  director.enemyRoutes=[{handle:{position:{x:0,z:0}},points:[],index:0}];
-  director.Update(.9,{position:{x:5,z:-65},zone:"Z05"});assert.equal(pressures.length,0);
-  director.Update(.2,{position:{x:5,z:-65},zone:"Z05"});
+  director.enemyRoutes=[{handle:{position:P012Point(0,0)},points:[],index:0}];
+  director.Update(.9,{position:P012Point(5,-65),zone:"Z05"});assert.equal(pressures.length,0);
+  director.Update(.2,{position:P012Point(5,-65),zone:"Z05"});
   assert.deepEqual(pressures,["machineGun"]);
   assert.equal(director.State().pressureHistory.at(-1).reason,"normal40");
 }
@@ -713,7 +723,7 @@ for(const index of [2,3,4]) {
     EnemyCombatState:a=>({lastFire:a.lastFire,suppression:a.suppression}),EnemyGoal:(a,p)=>{a.goal=p;}},phase.whitebox);
   director.enemyRoutes=actors.map((handle,encounterSlot)=>({handle,encounterSlot,encounterBeat:20,
     encounterGroup:0,index:1,points:[handle.position],relocation:{x:encounterSlot,z:3}}));
-  const [cover,mover]=director.enemyRoutes,player={x:44,z:62};
+  const [cover,mover]=director.enemyRoutes,player=P012Point(44,62);
   director.StepEnemyBound(cover,player);director.StepEnemyBound(mover,player);
   for(let i=0;i<100;i++){director.StepEnemyBound(cover,player);director.StepEnemyBound(mover,player);}
   assert.equal(mover.bound.phase,"cover","time alone cannot release a bound");
@@ -728,7 +738,7 @@ for(const index of [2,3,4]) {
   mover.bound={phase:"cover",player,partnerFire:10};actors[1].suppression=0;actors[0].alive=false;
   director.StepEnemyBound(mover,player);assert.equal(mover.bound.reason,"partnerLost","a dead cover shooter cannot softlock its partner");
   actors[0].alive=true;mover.bound={phase:"cover",player,partnerFire:10};
-  director.StepEnemyBound(mover,{x:47,z:62});assert.equal(mover.bound.reason,"playerRepositioned");
+  director.StepEnemyBound(mover,P012Point(47,62));assert.equal(mover.bound.reason,"playerRepositioned");
   assert.equal(actors.length,2,"bounds never spawn replacement enemies");
 }
 assert.equal(bandagesIssued,1,"only the first B11 receipt supplies one bandage, not B03/B15 or checkpoint restores");
@@ -737,7 +747,7 @@ for(const beat of [14,20,21]) {
   const director=new FirstLevelP012Director({GiveClips:()=>{resourceWrites++;},GiveBandages:()=>{resourceWrites++;},
     CheckWeapon:()=>{resourceWrites++;}},phase.whitebox);
   director.Restore({...director.Snapshot(),beat});
-  director.lastSample={position:{x:44,z:62},ammo:0,clips:1,carryKind:null};
+  director.lastSample={position:P012Point(44,62),ammo:0,clips:1,carryKind:null};
   const normal=director.CurrentObjective();
   assert.ok(!normal.text.includes("弹药耗尽"));
   director.lastSample.clips=0;
