@@ -38,6 +38,9 @@ export class FirstLevelP012Runtime {
     if(config.anchors?.trainSpawn)this.SaveSafePoint("Start",config.anchors.trainSpawn,"stand",0);
   }
   Guide(spec) {
+    if(Number.isFinite(spec.arrivalRadius)) {
+      const actor=this.host.GuideActor();if(actor)actor.scriptArrivalRadius=Math.max(.05,spec.arrivalRadius*.5);
+    }
     if(this.guide?.heldStance!==undefined){const actor=this.host.GuideActor();if(actor)this.ApplyGuideStance(actor,this.guide.heldStance);}
     if (spec.beat === 8 && this.beat !== 8) { this.mgSuppressedAt = null; this.friendlyMgResponse = false; }
     this.beat = spec.beat;
@@ -473,7 +476,7 @@ export class FirstLevelP012Runtime {
         this.StepSafeGuide(guide,actor,dt);
       } else {
       const point = guide.route[guide.index]; const position = this.host.Position(actor);
-      const nearPoint=position && Math.hypot(position.x-point.x,position.z-point.z)<(guide.beat===0||guide.beat===1?1.3:2);
+      const nearPoint=position && Math.hypot(position.x-point.x,position.z-point.z)<(guide.arrivalRadius??(guide.beat===0||guide.beat===1?1.3:2));
       const reacting=this.time<(this.guideReactionUntil??0);
       const inspecting=position&&this.StepGuideInspection(guide,actor,position,this.host.PlayerPosition?.(),dt);
       const waiting=reacting || inspecting || (nearPoint && !!guide.WaitAt?.(guide.index));
@@ -589,7 +592,7 @@ export class FirstLevelP012Runtime {
       briefingStage:this.host.Signalled?.("P012BriefingComplete")?"complete":this.host.Signalled?.("P012BriefingStarted")?"briefing":this.host.Signalled?.("P012AmmoIssued")?"gathering":"issuing",
       briefingReadyCount:(this.openingCast||[]).filter(entry=>entry.ammoIssued&&this.host.Position(entry.actor)&&this.host.Position(this.host.GuideActor())
         &&Math.hypot(this.host.Position(entry.actor).x-this.host.Position(this.host.GuideActor()).x,this.host.Position(entry.actor).z-this.host.Position(this.host.GuideActor()).z)<10).length,
-      openingCast: (this.openingCast || []).map(entry=>({actorId:entry.actor.id,position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released,
+      openingCast: (this.openingCast || []).map(entry=>({actorId:entry.actor.id,age:entry.actor.identity?.age,modelVariant:entry.actor.actor?.modelVariant,position:this.host.Position(entry.actor),parking:entry.parking,index:entry.index,released:!!entry.released,
         stage:entry.stage||"muster",weaponIssued:!!entry.weaponIssued,ammoIssued:!!entry.ammoIssued,marchPlan:entry.marchPlan||null,
         marchComplete:!!entry.marchComplete,marchDefensePoint:entry.marchDefensePoint||null})),
       guideAlive: !!this.host.GuideActor() && !!this.host.Alive(this.host.GuideActor()),

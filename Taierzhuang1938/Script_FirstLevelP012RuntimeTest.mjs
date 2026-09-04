@@ -155,7 +155,7 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
  const runtime=new FirstLevelP012Runtime({GuideActor:()=>actor,Position:value=>value,Signalled:()=>false,
   Move:(who,point,speed)=>orders.push({point:{...point},speed}),GuideYaw:who=>who.yaw,
   FaceGuide:(who,yaw)=>{const delta=Math.atan2(Math.sin(yaw-who.yaw),Math.cos(yaw-who.yaw));assert.ok(Math.abs(delta)<=.34000001,"wait facing turns smoothly at 3.4 radians per second");who.yaw=yaw;faces.push(yaw);}},config);
- const director=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec),Register:spec=>points.set(spec.id,spec)},config);
+ const director=new FirstLevelP012Director({Guide:spec=>runtime.Guide(spec),Register:spec=>points.set(spec.id,spec),Signalled:name=>name==="P012TrainDoor"},config);
  director.lastSample={position:config.anchors.trainSpawn};director.StartGuide();runtime.guide.index=2;
  for(let i=0;i<120;i++)runtime.Update(.1);
  assert.equal(runtime.guide.index,2,"door guide waits for the player, not a timer");

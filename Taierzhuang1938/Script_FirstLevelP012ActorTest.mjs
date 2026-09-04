@@ -201,4 +201,10 @@ for(const [flag,speed] of [[false,1],[true,undefined]]){
 }
 const waiting=FollowMovement(true,0);
 assert.equal(waiting.actor.position.length(),0);assert.equal(waiting.actor.detourTime,0);
+{
+ let steerCalls=0;const actor={p012RouteRejoining:true,position:new THREE.Vector3(),goal:new THREE.Vector3(0,0,-16),scriptArrivalRadius:.1,stance:0,detourTime:0,stuckTime:0,rnd:()=>.5};
+ const moves=[],host={ctx:{nav:{Steer(x,z,gx,gz,out){steerCalls++;out.x=1;out.z=0;return true;}}},tmpD:new THREE.Vector3(),navOut:{x:0,z:0},StepBody(s,dx,dz){moves.push({dx,dz});s.position.x+=dx;s.position.z+=dz;},TryVault:()=>false};
+ ActMovement.call(host,actor,.1);assert.equal(steerCalls,0,"certified reconnect waypoints bypass grid quantization even above fourteen metres");
+ assert.ok(Math.abs(moves[0].dx)<1e-12&&moves[0].dz<0,"reconnect follows its swept segment rather than a grid-sideways goal");
+}
 console.log("PASS actual AI Act: P012 swept follower stops/resumes without stale/random detour or vault; default actors retain both");

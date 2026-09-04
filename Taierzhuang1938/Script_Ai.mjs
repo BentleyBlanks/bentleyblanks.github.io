@@ -504,6 +504,7 @@ export class AiDirector {
       seed: soldier.id * 131 + 7,
       weapon: soldier.unarmed ? null : soldier.weaponId,
       variant: options.actorVariant,
+      modelVariant: options.modelVariant,
     });
     if (kind === "civilian" && ["childBoy", "childGirl"].includes(options.actorVariant)
       && soldier.actor.isChild && Number.isFinite(soldier.actor.height) && soldier.actor.height > 0
@@ -1537,7 +1538,7 @@ export class AiDirector {
         let navigated = false;
         // 门槛取 14 m 而不是 8 m：导航场的目标被量化到 16 m，近距离用它反而会
         // 把人往格心上推。十四米以内本来就是"看得见就直接过去"的距离。
-        if (this.ctx.nav && d > 14) {
+        if (this.ctx.nav && d > 14 && !s.p012RouteRejoining) {
           navigated = this.ctx.nav.Steer(s.position.x, s.position.z, desired.x, desired.z, this.navOut);
           if (navigated) { nx = this.navOut.x; nz = this.navOut.z; s.detourTime = 0; s.stuckTime = 0; }
         }

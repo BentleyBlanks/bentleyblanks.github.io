@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import config from './Data_FirstLevelP012TrainColumn.mjs';
 import {FirstLevelP012TrainColumn} from './Script_FirstLevelP012TrainColumn.mjs';
 import {FIRST_LEVEL_P012_LAYOUT as layout} from './Data_FirstLevelP012Layout.mjs';
+import {FIRST_LEVEL_P012_WHITEBOX_PHASE as phase} from './Data_FirstLevelP012Whitebox.mjs';
 assert.deepEqual(config.cars[0].ammoPoint,{x:-55,z:94},'north car reuses the existing ammunition station');
 assert.deepEqual(config.cars[0].onward,[{x:-51,z:94},{x:-49,z:92}],'north car proceeds onward without doubling back onto the platform');
 function Ground(p){let y=0;for(const b of layout.walkableSurfaces||[]){const dx=p.x-b.x,dz=p.z-b.z,c=Math.cos(b.ry||0),s=Math.sin(b.ry||0);if(Math.abs(dx*c-dz*s)<=b.w/2&&Math.abs(dx*s+dz*c)<=b.d/2)y=Math.max(y,b.y+b.h/2);}return y;}
@@ -26,7 +27,7 @@ run.Update(dt,0);assert.equal(actors.length,40);assert.equal(spawned,34);
 assert.deepEqual([0,1,2].map(car=>run.Entries().filter(e=>e.carIndex===car).length),[8,24,8]);
 for(const a of actors){assert.equal(Ground(a),1.25);Clear(a);}
 for(let i=0;i<actors.length;i++)for(let j=i+1;j<actors.length;j++)assert.ok(Math.hypot(actors[i].x-actors[j].x,actors[i].z-actors[j].z)>=.9);
-for(const a of actors)for(const p of [{x:-66,z:125},{x:-66,z:121}])assert.ok(Math.hypot(a.x-p.x,a.z-p.z)>.84,'player and Luo reserve real body space');
+for(const a of actors)for(const p of [phase.spawn,phase.whitebox.activities.arrivalGuideStart,phase.whitebox.activities.trainRoute[1]])assert.ok(Math.hypot(a.x-p.x,a.z-p.z)>.84,'player and Luo reserve real body space');
 const start=actors.map(a=>({x:a.x,z:a.z}));for(let i=0;i<40;i++)run.Update(dt,0);assert.deepEqual(actors.map(a=>({x:a.x,z:a.z})),start);
 open=true;let frames=0,unchanged=0,lastSignature='';const checked=new Map();
 for(;frames<24000;frames++){

@@ -157,9 +157,9 @@ export class FirstLevelP012Director {
   StartGuide() {
     this.guideStarted = true;
     this.host.Guide?.({ beat: this.beat, route: this.ActivityRoute(),
-      ...(this.beat === 0 ? { WaitAt: index => index === 2
-        && Distance(this.lastSample.position, this.lastSample.guidePosition || this.config.anchors.trainDoor) > 3,
-        FaceAt: () => this.lastSample.position } : {}),
+      ...(this.beat === 0 ? { ...(this.config.arrival ? {startIndex:1,arrivalRadius:.45} : {}), WaitAt: index => (this.config.arrival && index === 1 && !this.Signalled("P012TrainDoor")) || (index === 2
+        && Distance(this.lastSample.position, this.lastSample.guidePosition || this.config.anchors.trainDoor) > 3),
+        FaceAt: () => this.config.arrival&&!this.Signalled("P012TrainDoor")?this.config.activities.arrivalGatePoint:this.lastSample.position } : {}),
       ...(this.beat === 1 ? { startIndex: 0,
         WaitAt: index => index === 0 ? !this.facts.has("weapon") : index === 1 ? !this.facts.has("issuedAmmo") : true,
         FaceAt: index => this.config.activities.weaponGuideFacing[index] } : {}),
@@ -183,10 +183,19 @@ export class FirstLevelP012Director {
         WaitAt: () => true, FaceAt: () => this.lastSample.position,
         ReleaseWhen: () => this.facts.has("retreatSmokeDeployed"),
       } : {}),
-      ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.lastSample.position} : {}),
+      ...(this.beat === 3 ? {startIndex:0,WaitAt:()=>true,FaceAt:()=>this.HubFacing()} : {}),
       ...(this.beat === 4 ? { startIndex: 0, WaitAt: () => Distance(this.lastSample.position,this.lastSample.guidePosition)>8 } : {}),
       ...(this.beat === 12 ? { startIndex: 0, WaitAt: () => this.beat === 12 } : {}),
       speed: this.config.activities?.guideSpeedByBeat?.[this.beat] || this.config.activities?.guideSpeedMps || 1.3 });
+  }
+
+  HubFacing() {
+    const directions=this.config.activities?.hubBriefing;
+    if(!directions||!this.Signalled("P012HubBriefingStarted"))return this.lastSample.position;
+    if(!this.Signalled("P012HubRailExplained"))return directions.rail;
+    if(!this.Signalled("P012HubFrontExplained"))return directions.front;
+    if(!this.Signalled("P012HubVillageExplained"))return directions.village;
+    return directions.south;
   }
 
   InstallInteractions() {
@@ -596,7 +605,7 @@ export class FirstLevelP012Director {
     if (routeAllowed && Distance(p, route[this.routeIndex]) <= this.RouteArrivalRadius()) {
       this.routeIndex += 1;
     }
-    if (this.beat === 0 && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
+    if (this.beat === 0 && !this.config.arrival && this.routeIndex >= 2 && guideNear) this.Emit("P012TrainDoor");
     if(this.beat===4){
       const chat=activity.northApproachChatPosition||route[0];
       if(!this.facts.has("northApproachChat")&&Distance(p,chat)<=3){
@@ -762,6 +771,7 @@ export class FirstLevelP012Director {
         ready=sample.guideAlive!==false && Distance(p,sample.guidePosition)<=4
           &&Distance(sample.guidePosition,hub)<=4 && !!exit
           &&P012SegmentClear(this.config.layout?.blocks||[],sample.guidePosition,exit,.42);
+        if(ready&&activity.hubBriefing){this.Emit("P012HubBriefingStarted");ready=this.Signalled("P012HubBriefed");}
         if(ready)this.Emit("P012VillageNorthDeparture");
         break;
       }
@@ -947,7 +957,7 @@ export class FirstLevelP012Director {
     }
     if (this.beat === 3) {
       target=this.lastSample.guidePosition||activity.villageRoute?.at(-1);
-      interactionId=null;requiredAction="follow";text="跟上班长，穿过北口去接防";
+      interactionId=null;requiredAction="follow";text=this.Signalled("P012HubBriefingStarted")?"听班长交代前沿位置与后送路":"跟班长到村口集合";
     }
     if(this.beat===4){
       if(this.routeIndex>=route.length)target=this.Point("ammoPickup",P012Point(-7,-52));

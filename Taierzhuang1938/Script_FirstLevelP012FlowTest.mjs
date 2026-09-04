@@ -193,6 +193,8 @@ assert.equal(flow.CurrentObjective().arrivalRadiusM,3,"opening follow publishes 
 At("Z00", phase.whitebox.anchors.trainDoor);
 assert.equal(flow.State().beat, "B00", "door proximity alone does not replace train traversal");
 Walk(phase.whitebox.activities.trainRoute);
+assert.equal(flow.State().beat,"B00","traversal cannot manufacture the physical arrival door signal");
+signals.add("P012TrainDoor");Tick(); // Arrival controller is exercised in ArrivalTest.
 assert.equal(flow.State().beat, "B01");
 Use("p012_weaponCheck"); Tick();
 assert.equal(flow.State().beat, "B01", "receiving a rifle still requires the single ammunition issue");
@@ -256,6 +258,10 @@ assert.equal(P012SegmentClear(phase.whitebox.layout.blocks,hub,exit,.42),true,"p
  assert.equal(remote.State().beat,"B03");assert.equal(remote.orientationIndex,0);
 }
 Tick({position:hub,guidePosition:hub,guideAlive:true,zone:"Z02"});
+assert.equal(flow.State().beat,"B03","the actual hub briefing must finish before departure");
+assert.ok(signals.has("P012HubBriefingStarted"));
+assert.equal(flow.CurrentObjective().text,"听班长交代前沿位置与后送路","briefing text must not simultaneously order the player to leave");
+signals.add("P012HubBriefed");Tick();
 assert.ok(signals.has("P012VillageNorthDeparture"));
 assert.equal(signals.has("P012NorthApproachChat"),false,"departure and roadside chat do not fire in the same update");
 assert.equal(flow.State().beat,"B04");assert.equal(shelling,0);
@@ -628,7 +634,7 @@ assert.equal(spoken.length,0,"opening speech requires actual arrival rather than
 for(const event of ["P012Arrival","P012TrainDoor","P012WeaponReceived","P012AmmoIssued"]){
   openingStory.Signal(event);openingStory.Update(10,{p012Beat:1});
 }
-assert.deepEqual(spoken,["ch0_junguan_04","ch0_luo_11","ch0_luo_08"],"arrival and weapon recordings remain available; ammo issue now starts the actual subtitle muster instead of premature frontline dialogue");
+assert.deepEqual(spoken,["ch0_luo_08"],"arrival uses its own quiet subtitles, while gun issue retains its checked-in recording");
 openingStory.Signal("P012AmmoTask");
 for(let i=0;i<4;i++)openingStory.Update(10,{p012Beat:5});
 assert.equal(phase.whitebox.storyBeats.filter(beat=>beat.voice==="ch1_luo_01").length,0,"old one-line ammo departure is replaced by the actual muster briefing");

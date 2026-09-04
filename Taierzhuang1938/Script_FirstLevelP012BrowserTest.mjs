@@ -11,6 +11,7 @@ import { openingActivities } from "./Data_FirstLevelP012Opening.mjs";
 import { P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { VOICE_LINES as chapterVoices } from "./Data_MissionCh1.mjs";
 import { VOICE_LINES as prologueVoices } from "./Data_MissionCh0.mjs";
+import { P012_COMPANION_CAST } from "./Data_FirstLevelP012Cast.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -62,7 +63,7 @@ async function PlayPrelude() {
   let result;
   const orientations = [];
   const spatialCaptures = [];
-  for (let chunk = 0; chunk < 36; chunk += 1) {
+  for (let chunk = 0; chunk < 64; chunk += 1) {
     result = await page.evaluate(({ orientationReview, openingCausalityReview, savedInfiniteAmmo, northShelter, northShelterRadius }) => {
       const game = window.Tengxian;
       const bot = window.p012ReviewBot ||= { held: {}, trace: [], frame: 0, lastProgress: 0, progressKey: "" };
@@ -154,6 +155,7 @@ async function PlayPrelude() {
         if (window.p012PendingTrafficView) break;
         if (window.p012PendingSpatialView) break;
         if (window.p012PendingTrainView) break;
+        if (window.p012PendingStageZeroView) break;
         const objective = flow.objective;
         if (flow.beatIndex >= 6 || !game.player.Alive) break;
         if(openingCausalityReview&&!bot.emptyHandsTested&&!flow.facts.includes("weapon")){
@@ -249,7 +251,7 @@ async function PlayPrelude() {
         const arrive = interactionId ? flow.beatIndex === 1 ? 0.35 : 1.6
           // Respect the public opening follow radius instead of deliberately
           // walking into the leader's backpack. Later carry/escort stays unchanged.
-          : following ? [0,1,2,4].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
+          : following ? [0,1,2,3,4].includes(flow.beatIndex) ? objective.arrivalRadiusM : 1.2 : flow.beatIndex === 4 ? 2 : 0.8;
         const move = distance > arrive && !bot.held.KeyF;
         Key("KeyW", move);
         Key("ShiftLeft", move && objective.requiredAction === "sprint" && !crouching);
@@ -283,17 +285,22 @@ async function PlayPrelude() {
       const stationView=window.p012PendingStationView||null;window.p012PendingStationView=null;
       const spatialView=window.p012PendingSpatialView||null;window.p012PendingSpatialView=null;
       const trainView=window.p012PendingTrainView||null;window.p012PendingTrainView=null;
+      const stageZeroView=window.p012PendingStageZeroView||null;window.p012PendingStageZeroView=null;
       const briefingView=bot.pendingBriefing||null;bot.pendingBriefing=null;
       const trafficView = window.p012PendingTrafficView || null;
       if(trafficView)trafficView.openingCast=game.Debug.P012Scene?.().openingCast;
       window.p012PendingTrafficView = null;
       return { flow: game.Debug.P012(), scene: game.Debug.P012Scene?.(),
-        orientation, trafficView, causality, stationView, spatialView, trainView, briefingView,
+        orientation, trafficView, causality, stationView, spatialView, trainView, briefingView,stageZeroView,
         position: game.player.position.toArray(), health: game.player.health, alive: game.player.Alive,
         trace: bot.trace, stalled: game.Debug.P012().elapsed - bot.lastProgress > 65,
         weapons: game.Debug.Slots(), carry: game.carry.KindId, ammo: game.state.ammo, interact: game.Debug.Interact() };
     }, { orientationReview, openingCausalityReview,savedInfiniteAmmo,northShelter:openingActivities.northShelterPosition,northShelterRadius:openingActivities.northShelterRadiusM });
     if(result.stationView) await CaptureStationView(result.stationView);
+    if(result.stageZeroView){
+      await fs.writeFile(path.join(outputDir,`Data_P012StageZero_${result.stageZeroView.id}.json`),JSON.stringify(result.stageZeroView,null,2));
+      await page.screenshot({path:path.join(outputDir,`Scene_P012StageZero_${result.stageZeroView.id}.png`)});
+    }
     if(result.briefingView){
       await fs.writeFile(path.join(outputDir,`Data_P012_${result.briefingView.id}.json`),JSON.stringify(result.briefingView,null,2));
       await page.screenshot({path:path.join(outputDir,`Scene_P012_${result.briefingView.id}.png`)});
@@ -1764,7 +1771,9 @@ try {
         const temporary=friendly.filter(actor=>actor.unarmed&&temporaryIds.has(actor.id)).length;
         const aiRawUnarmed=friendly.filter(actor=>actor.unarmed).length;
         const resting=openingScene.resting?.count||0;
-        const rawUnarmed=aiRawUnarmed+resting;
+        const stageZeroPeople=openingScene.stageZero?.village?.actors.length||0;
+        const rawUnarmed=aiRawUnarmed+resting+stageZeroPeople;
+        window.p012PopulationMax.stageZeroPeople=Math.max(window.p012PopulationMax.stageZeroPeople||0,stageZeroPeople);
         window.p012PopulationMax.armed = Math.max(window.p012PopulationMax.armed, friendly.filter(actor => !actor.unarmed&&!extraIds.has(actor.id)).length);
         window.p012PopulationMax.unarmed = Math.max(window.p012PopulationMax.unarmed,friendly.filter(actor=>actor.unarmed&&!actor.actor?.isChild&&!temporaryIds.has(actor.id)&&!extraIds.has(actor.id)).length);
         window.p012PopulationMax.rawArmed=Math.max(window.p012PopulationMax.rawArmed,friendly.filter(actor=>!actor.unarmed).length);
@@ -1932,6 +1941,32 @@ try {
       }
     };
   });
+  if(process.argv.includes("--stage-zero-review"))await page.evaluate(()=>{
+    const game=window.Tengxian,original=game.StepFrames,captured=new Set();
+    window.p012StageZeroCaptures=[];
+    game.StepFrames=function(count=1,dt=1/60,render=true){
+      for(let i=0;i<count;i++){
+        original(1,dt,render);
+        if(window.p012PendingStageZeroView)continue;
+        const snapshot=game.Debug.P012Scene()?.stageZero;if(!snapshot)continue;
+        const arrival=snapshot.arrival,village=snapshot.village,speech=game.story.p012PendingCompletion;
+        const ids=[];
+        if(arrival.phase==="door"&&arrival.doorProgress>.3)ids.push("ArrivalDoor");
+        if(arrival.fade>.7)ids.push("ArrivalTitle");
+        for(const item of village.vignettes.filter(item=>item.visible)) {
+          if(item.id==="DoorStretcher"){
+            if(item.state==="lowering")ids.push("DoorLowering");
+            if(item.state==="stretcherReady")ids.push("DoorReady");
+          }else ids.push(item.id);
+        }
+        if(speech?.key.startsWith("p012_text_Hub"))ids.push(speech.key);
+        const id=ids.find(id=>!captured.has(id));if(!id)continue;
+        captured.add(id);window.p012StageZeroCaptures.push(id);
+        window.p012PendingStageZeroView={id,at:game.Debug.P012().elapsed,player:game.player.position.toArray(),yaw:game.player.yaw,
+          snapshot,subtitle:document.querySelector(".hudSubtitle")?.textContent,scope:"ordinary walking camera, no actor/camera placement"};
+      }
+    };
+  });
   if(stationReview) await page.evaluate(({platformLimit,door,heights})=>{
     const game=window.Tengxian,originalStep=game.StepFrames;
     window.p012StationTrace=[];window.p012StationViews=[];
@@ -2006,9 +2041,54 @@ try {
     "程序体块环境具有实际碰撞且不加载正式环境资产");
   await page.screenshot({ path: path.join(outputDir, "Scene_P012Arrival.png") });
   if(stationReview)await page.screenshot({path:path.join(outputDir,"Scene_P012StationCarInterior.png")});
+  if(process.argv.includes("--village-fixture")){
+    await page.evaluate(()=>{
+      const game=window.Tengxian,target={x:-36.9,z:54};
+      game.player.Spawn(-32.5,58.5,Math.atan2(-(target.x+32.5),-(target.z-58.5)));
+      game.player.pitch=-.08;game.StepFrames(60,1/30,true);
+    });
+    const samples=[];
+    for(const [seconds,frames] of [[0,0],[4,120],[7,90],[12,150]]){
+      if(frames)await page.evaluate(count=>window.Tengxian.StepFrames(count,1/30,true),frames);
+      const sample=await page.evaluate(()=>({at:window.Tengxian.Debug.P012().elapsed,stageZero:window.Tengxian.Debug.P012Scene().stageZero,
+        scope:"explicit close village-work visual fixture; moves only the test player/camera, never actors, props, facts or production camera"}));
+      samples.push(sample);await page.screenshot({path:path.join(outputDir,`Scene_P012VillageWork_${seconds}s.png`)});
+    }
+    await fs.writeFile(path.join(outputDir,"Data_P012VillageWork.json"),JSON.stringify(samples,null,2));
+    const lowering=samples.find(sample=>sample.stageZero.village.door.state==="lowering");
+    Check(!!lowering&&samples.at(-1).stageZero.village.door.state==="stretcherReady","真实村路工兵把门板逐段放平并绑成担架");
+    Check(samples.filter(sample=>sample.stageZero.village.door.state!=="stretcherReady").every(sample=>sample.stageZero.village.workerPoses.every(worker=>worker.pose?.hands.length===2&&worker.pose.hands.every(hand=>!hand.unreachable&&hand.residual<.012))),
+      "两名工兵用真实手臂骨骼接触移动门板，未拉长手臂");
+  }
   if (openingGuidanceReview) await VerifyOpeningDiscovery();
   if (stationReview || openingCausalityReview || orientationReview || process.argv.includes("--prelude") || process.argv.includes("--pacing") || process.argv.includes("--frontline") || process.argv.includes("--campaign")) await PlayPrelude();
+  if(process.argv.includes("--stage-zero-review")){
+    const captures=await page.evaluate(()=>window.p012StageZeroCaptures||[]),required=["ArrivalDoor","ArrivalTitle","WaitingWounded","DoorLowering","Telephone","MuleAmmo","FamilyCart","p012_text_HubRail","p012_text_HubFront","p012_text_HubVillage","p012_text_HubSouth"];
+    Check(required.every(id=>captures.includes(id)),"普通跟队实跑依次看见到站、村路生活与四向口头交代",JSON.stringify(captures));
+  }
   if (process.argv.includes("--frontline") || process.argv.includes("--campaign") || process.argv.includes("--pacing")) await PlayFrontline();
+  if(process.argv.includes("--cast-review")) {
+    const squad=await page.evaluate(()=>window.Tengxian.Debug.P012Scene().openingCast);
+    Check(squad.length===6&&squad.every(person=>person.age>=18&&person.age<=23&&[1,3].includes(person.modelVariant)),
+      "原有六名同行者（含无名队友）实际使用年轻身份与面孔",JSON.stringify(squad.map(({actorId,age,modelVariant})=>({actorId,age,modelVariant}))));
+    const cast=await page.evaluate(()=>window.Tengxian.Debug.P012Scene().cast);
+    for(const person of cast){
+      const spec=P012_COMPANION_CAST[person.castId];
+      Check(!!spec&&person.age===spec.age&&person.modelVariant===spec.modelVariant,`${person.castId} 实际身份与可见GLB采用固定选角`,JSON.stringify(person));
+      await page.evaluate(id=>{
+        const game=window.Tengxian,actor=game.ai.soldiers.find(actor=>actor.castId===id);
+        // Explicit portrait fixture, never part of a pacing or campaign claim.
+        const angle=actor.yaw,at=actor.position;
+        game.player.Spawn(at.x-Math.sin(angle)*1.75,at.z-Math.cos(angle)*1.75,angle+Math.PI);
+        game.StepFrames(1);
+        let head=null;actor.actor.root.traverse(node=>{if(node.isBone&&/head$/i.test(node.name))head=node;});
+        const face=head?head.getWorldPosition(at.clone()):at.clone().add({x:0,y:1.55,z:0});
+        game.player.pitch=Math.atan2(face.y-game.player.EyePosition.y,Math.hypot(face.x-game.player.position.x,face.z-game.player.position.z));game.StepFrames(1);
+      },person.castId);
+      await page.screenshot({path:path.join(outputDir,`Scene_P012Cast_${person.castId}.png`)});
+    }
+    await fs.writeFile(path.join(outputDir,"Data_P012CastReview.json"),JSON.stringify({scope:"explicit close-up portrait fixture; actual existing named actors, no model replacement",cast},null,2));
+  }
   if (process.argv.includes("--guide-handoffs")) await VerifyGuideHandoffs();
   if (process.argv.includes("--geometry")) await VerifyTraversalFixtures();
   if (process.argv.includes("--south-recovery")) await VerifySouthRouteRecoveryFixtures();
@@ -2089,7 +2169,7 @@ try {
   }
   await fs.writeFile(path.join(outputDir, "Data_P012TrafficViews.json"), JSON.stringify(traffic, null, 2));
   Check(traffic.population.armed <= 12 && traffic.population.unarmed <= 15,
-    "战斗角色不超12、成人群众伤员不超15；另列34训练队军人/2儿童与原始总人数", JSON.stringify(traffic.population));
+    "原有战斗/群众预算独立统计；另列训练队、儿童、坐姿百姓及新增5名村路作业人员，全部计入原始人数", JSON.stringify(traffic.population));
   Check(errors.length === 0, "浏览器没有脚本或控制台错误", errors.join(" | "));
   console.log(`P012 screenshots: ${outputDir}`);
   console.log(process.argv.includes("--campaign") ? "FirstLevelP012BrowserTest campaign PASS" : "FirstLevelP012BrowserTest partial PASS (not a full campaign playthrough)");

@@ -279,6 +279,22 @@ export class FirstLevelWhiteboxField {
     document.body.appendChild(legend); this.legend = legend;
   }
 
+  // Freight side panels slide along the wagon. The collision record follows
+  // the visible panel every frame, including when only partly open.
+  SetGateProgress(id, progress) {
+    const gate=this.gates.get(id);if(!gate)return;
+    const value=Math.max(0,Math.min(1,progress));
+    if(gate.progress===value)return;
+    gate.progress=value;
+    const handle=gate.collider?._physicsHandle;
+    if(this.physics&&handle!=null)this.physics.RemoveSolid(handle);
+    const index=this.colliders.indexOf(gate.collider);if(index>=0)this.colliders.splice(index,1);
+    gate.mesh.visible=true;gate.mesh.position.set(gate.spec.x,gate.spec.y,gate.spec.z+value*(gate.spec.d+.15));
+    gate.open=value===1;
+    if(!gate.open){gate.collider=ColliderRecord({...gate.spec,z:gate.mesh.position.z});this.colliders.push(gate.collider);if(this.physics)this.physics.AddSolid(gate.collider);}
+    this.BuildCollisionGrid();
+  }
+
   OpenGate(id) {
     const gate = this.gates.get(id);
     if (!gate || gate.open) return false;
@@ -299,6 +315,7 @@ export class FirstLevelWhiteboxField {
     gate.open = false;
     gate.mesh.visible = true;
     gate.mesh.position.y = gate.spec.y;
+    gate.mesh.position.z = gate.spec.z; gate.progress = undefined;
     gate.collider = ColliderRecord(gate.spec);
     this.colliders.push(gate.collider);
     if (this.physics) this.physics.AddSolid(gate.collider);

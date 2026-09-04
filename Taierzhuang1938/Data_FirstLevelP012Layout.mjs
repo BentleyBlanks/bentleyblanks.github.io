@@ -5,6 +5,7 @@ import { P012Point, P012MapPoints, P012SouthPoint, P012RailPoint, P012StationPoi
 import { P012_STATION_BLOCKS, P012_STATION_SURFACES, P012_STATION_GATES, P012_STATION_REMOVE_IDS, P012_STATION_HEIGHTS } from "./Data_FirstLevelP012Station.mjs";
 import { P012_HORIZON_GROUND, P012_HORIZON_BLOCKS, P012_HORIZON_REMOVE_IDS } from "./Data_FirstLevelP012Horizon.mjs";
 import { P012_RESTING_BLOCKS } from "./Data_FirstLevelP012Resting.mjs";
+import { P012_VILLAGE_LIFE_BLOCKS } from "./Data_FirstLevelP012VillageLife.mjs";
 
 export const P012_SEMANTIC_COLORS = Object.freeze({ ground:0xb8b8b0, structure:0xc9c9c3, step:0xf1cf45, vault:0xe58b2f, mantle:0xb75bd6, cover:0x3977c8, boundary:0x24272c, danger:0xc83232, missionRoute:0x35b86b, stretcherRoute:0x2dcbd0 });
 function Point(x,z) { return Object.freeze({x,z}); }
@@ -36,7 +37,7 @@ const blueprintEnemyLanes = Object.freeze({
   east:Object.freeze({spawn:Point(35,-115),reveal:Point(29,-108),goal:Point(23,-80),waypoints:P012_BLUEPRINT_ROUTES.eastEnemy}),
 });
 export const P012_BLUEPRINT_ANCHORS = Object.freeze({
-  trainSpawn:Point(-66,65), trainDoor:Point(-60,61), railObserve:Point(-3,0), supplyPoint:Point(4,4), sideImpact:Point(-6,-33),
+  trainSpawn:Point(-66,63.3), trainDoor:Point(-60,61), railObserve:Point(-3,0), supplyPoint:Point(4,4), sideImpact:Point(-6,-33),
   ammoCrate:Point(-7,-52), railPassFrom:Point(-72,0), railPassTo:Point(-72,110),
   crowdTurnFrom:Point(50,110), crowdTurnTo:Point(50,30), diveFrom:Point(50,110), diveTo:Point(50,30),
   weaponCheck:Point(-55,44), ammoPickup:Point(-7,-52), ammoDrop:Point(5,-65),
@@ -182,6 +183,7 @@ const worldBlocks = blocks.filter(block=>!discarded.test(block.id)).map(block=>{
   return {...block,...P012Point(block.x,block.z)};
 });
 worldBlocks.push({...blocks.find(block=>block.id==="EvacEastCourtyard"),...P012SouthPoint(40,9),id:"EvacDestinationCourtyard"});
+worldBlocks.push(...P012_VILLAGE_LIFE_BLOCKS);
 // Separate buildings and open courts, not a continuous tunnel. The broad centre
 // corridor admits opposing foot traffic without shrinking people or cover.
 worldBlocks.push(Box("StationNorthWestHouse",-81,85,10,12,3.5,"structure"),

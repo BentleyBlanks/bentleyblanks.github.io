@@ -101,6 +101,9 @@ export const testDefs = {
   FirstLevelP012RuntimeTest: { file: "Script_FirstLevelP012RuntimeTest.mjs",
     desc: "P012导游、有限远敌与炮击警告接线（纯 Node）" },
   FirstLevelP012OpeningTest: { file: "Script_FirstLevelP012OpeningTest.mjs", desc: "P012开场持久无限弹药隔离、真实R与检查点库存（纯 Node）" },
+  FirstLevelP012ArrivalTest: { file: "Script_FirstLevelP012ArrivalTest.mjs", desc: "P012到站实际门前条件、短黑场与音频连续（纯 Node）" },
+  FirstLevelP012VillageLifeTest: { file: "Script_FirstLevelP012VillageLifeTest.mjs", desc: "P012村路有限伤兵、担架作业与双向物流（纯 Node）" },
+  FirstLevelP012CastTest: { file: "Script_FirstLevelP012CastTest.mjs", desc: "P012年轻同行者固定年龄与可见模型选择（纯 Node）" },
   FirstLevelP012FamilyTest: { file: "Script_FirstLevelP012FamilyTest.mjs", desc: "P012家庭与儿童的有限人流、实体路线（纯 Node）" },
   FirstLevelP012RestingTest: { file: "Script_FirstLevelP012RestingTest.mjs", desc: "P012路边有限坐姿百姓、座凳净空与真实炮后反应（纯 Node）" },
   FirstLevelP012MarchTest: { file: "Script_FirstLevelP012MarchTest.mjs", desc: "P012松散队伍、可见目标直达与家庭真实移动（纯 Node）" },
@@ -280,7 +283,7 @@ export const domains = {
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     tests: ["AiBehaviorTest", "VisibilityTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
-      "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest"],
+      "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
   hud: {
     label: "HUD/交互提示/目标识别",
@@ -325,7 +328,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: 'animation', pattern: /BackRifleRun/i },
-  { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting)/i },
+  { domain: "ai", pattern: /FirstLevelP012(TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。

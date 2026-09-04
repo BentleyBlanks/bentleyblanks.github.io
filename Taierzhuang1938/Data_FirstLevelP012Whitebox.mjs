@@ -96,8 +96,6 @@ const storyBeats = Object.freeze([
   ...openingStoryBeats,
   ...guidanceCues,
   ...aircraftCues,
-  ExistingPrologueVoice("ch0_junguan_04", "P012Arrival"),
-  ExistingPrologueVoice("ch0_luo_11", "P012TrainDoor"),
   ExistingPrologueVoice("ch0_luo_08", "P012WeaponReceived"),
   ...["ch1_heyoutian_01", "ch1_shunzi_01", "ch1_luo_05"].map((key) => MovedFirstChapterVoice(key, "P012AmmoTask")),
   ...FIRST_CHAPTER.beats.filter((beat) => !movedVoices.has(beat.voice)
@@ -140,7 +138,7 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
   bounds: FIRST_LEVEL_P012_LAYOUT.bounds, cameraFar: 1100, zones,
   spawn: Object.freeze({ ...P012_ANCHORS.trainSpawn, ry: 0 }),
   whitebox: Object.freeze({
-    p012: true, triggerAimBeforeRecoil: true, layout: FIRST_LEVEL_P012_LAYOUT, anchors: P012_ANCHORS, routes: P012_ROUTES,
+    p012: true, arrival: true, triggerAimBeforeRecoil: true, layout: FIRST_LEVEL_P012_LAYOUT, anchors: P012_ANCHORS, routes: P012_ROUTES,
     enemyLanes: P012_ENEMY_LANES, friendlyLimit: 12,
     // Activity lengths are calibration inputs, never mandatory waiting clocks.
     activities: Object.freeze({...P012MapPoints({
@@ -260,7 +258,9 @@ export const FIRST_LEVEL_P012_WHITEBOX_PHASE = Object.freeze({
         musterRoute:Object.freeze([P012StationPoint(-51,34),P012StationPoint(-51,48)]),
         musterPoints:stationActivities.openingCastParking,weaponSeconds:1,ammoSeconds:.8,
       }),
-      trainRoute:P012_ROUTES.trainExit,villageRoute:Object.freeze([{x:-51,z:90},{x:-43,z:94},...P012_ROUTES.village.slice(1)]),
+      arrivalGuideStart:Object.freeze({x:-65.8,z:122.1}),arrivalGatePoint:Object.freeze({x:-63.6,z:121}),
+      trainRoute:Object.freeze(P012_ROUTES.trainExit.map((point,index)=>index===1?Object.freeze({x:-64.4,z:121}):point)),
+      villageRoute:Object.freeze([{x:-51,z:90},{x:-43,z:94},...P012_ROUTES.village.slice(1)]),
       openingCastRoute:Object.freeze([P012StationPoint(-29,48),P012StationPoint(-29,40),
         ...P012_ROUTES.village.slice(1).map(point=>({x:point.x-1.4,z:point.z}))]),
       shellCoverRoute:P012_ROUTES.approach,

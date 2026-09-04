@@ -266,6 +266,9 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐
 - `Data_FirstLevelP012Station.mjs` / `Data_FirstLevelP012Horizon.mjs` 是已编译世界坐标的兵站与远景体块；
   台阶顶面由 `Script_FirstLevelWhiteboxField.mjs` 与可见体块对账，共用地表采样，不能再做坐标变换。
 - `Data_FirstLevelP012Opening.mjs` 管开场两向人流和纯字幕；班长直接带队接防，不再使用借镜／辨路／还镜流程。
+  `Data_FirstLevelP012Arrival` / `Script_FirstLevelP012Arrival` 管到站事实与短黑场，`ArrivalView` 只画字幕底层；
+  `Data_FirstLevelP012VillageLife` / `Script_FirstLevelP012VillageLife` 管有限村路作业和物流，`VillageLifeView` 只画无贴图体块；
+  `Script_FirstLevelP012StageZero` 接现有角色、Rapier、声音和视线，不占玩家镜头；`Data_FirstLevelP012Cast` 只对本白盒固定年轻队友与成熟班长的身份/模型，不改正式人物源资产。
   不恢复四向计时看路、村口重复领弹或炮击发生前的避炮目标；镜子模块仅保留独立测试，不在本关装配。
 - `Data_FirstLevelP012TrainColumn.mjs` / `Script_FirstLevelP012TrainColumn.mjs` 管三车有限下车、发枪发弹与实际集结；额外士兵不进入战斗。
   `Script_FirstLevelP012March.mjs` 管可见目标直达、宽处松散并行与窄口收队；家庭/儿童只沿可走道路连续移动。

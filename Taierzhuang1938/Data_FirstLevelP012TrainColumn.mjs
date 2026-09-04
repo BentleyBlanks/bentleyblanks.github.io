@@ -7,8 +7,13 @@ export const trainColumn=Object.freeze({
   weaponSeconds:1,ammoSeconds:.8,
   cars:Object.freeze(P012_STATION_EXITS.map((exit,carIndex)=>{
     const count=carIndex===1?24:8,center=exit.route[0].z;
-    const seats=Array.from({length:count},(_,i)=>Point(i%2?-64.65:-67.35,center-6+Math.floor(i/2)*(carIndex===1?1.05:2.7)));
-    seats.sort((a,b)=>Math.abs(a.z-exit.route[1].z)-Math.abs(b.z-exit.route[1].z)||b.x-a.x);
+    // Leave the middle wagon's door approach and player pocket genuinely free.
+    // Three abreast farther inside; the centre man exits first, then his sides.
+    const seats=Array.from({length:count},(_,i)=>carIndex===1
+      ?Point([-66,-64.65,-67.35][i%3],center-.55+Math.floor(i/3))
+      :Point(i%2?-64.65:-67.35,center-6+Math.floor(i/2)*2.7));
+    seats.sort((a,b)=>Math.abs(a.z-exit.route[1].z)-Math.abs(b.z-exit.route[1].z)
+      ||Math.abs(a.x+66)-Math.abs(b.x+66)||b.x-a.x);
     const z=exit.route.at(-1).z;
     return Object.freeze({carIndex,seats:Object.freeze(seats),exitRoute:exit.route,
       weaponPoint:Point(-55,z),ammoPoint:carIndex===0?Point(-55,94):Point(-51,z),

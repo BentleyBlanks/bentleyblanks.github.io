@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COMPANION_CAST } from "./Script_Companion.mjs";
-import { P012_COMPANION_CAST, SelectP012CompanionCast } from "./Data_FirstLevelP012Cast.mjs";
+import { P012_COMPANION_CAST, SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 
 const ids = ["luo", "yaowa", "heyoutian", "liuwencai", "zhaodegui", "xiaoqin"];
 const manifest = JSON.parse(readFileSync(new URL("./Model/Character/Data_LugouCharacterManifest.json", import.meta.url), "utf8"));
@@ -34,5 +34,10 @@ for (const unknown of ["shunzi", "paizhang", "toString", "__proto__", "", null])
   assert.equal(SelectP012CompanionCast(unknown), null, "non-P012-squad identities are not recast");
 }
 assert.equal(P012_COMPANION_CAST.luo.modelVariant, 0);
+for(let slot=0;slot<40;slot++){
+  const base={name:"无名队友",age:47},selected=SelectP012RecruitCast(slot,base);
+  assert.ok(selected.identity.age>=18&&selected.identity.age<=23);
+  assert.ok([1,3].includes(selected.modelVariant));assert.equal(base.age,47);
+}
 assert.ok(P012_COMPANION_CAST.yaowa.age < P012_COMPANION_CAST.xiaoqin.age);
 console.log("FirstLevelP012CastTest: PASS (six stable identities, younger companion faces, NRA soldier roles, no random override)");

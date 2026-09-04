@@ -17,7 +17,7 @@ export class FirstLevelP012Arrival {
   }
   Start() {
     if (this.phase !== 'idle') return false;
-    this.phase = 'braking'; this.StartAudio();
+    this.phase = 'braking'; this.StartAudio(); this.host.Subtitle?.(this.config.muster);
     this.host.PlaySfx?.(this.config.audio.brake); this.Render(); return true;
   }
   StartAudio() {
@@ -29,7 +29,6 @@ export class FirstLevelP012Arrival {
   }
   Enter(phase) {
     this.phase = phase; this.elapsed = 0;
-    if (phase === 'guide') this.host.Subtitle?.(this.config.muster);
     if (phase === 'door') {
       this.host.Subtitle?.(this.config.follow); this.host.PlaySfx?.(this.config.audio.door);
     }

@@ -72,7 +72,7 @@ for(const side of [-1.4,1.4])Audit(`VillageOpposingLane${side}`,routes.village.m
 for(const point of routes.villageWaiting)assert.ok(!layout.blocks.some(block=>Hits(point,block,1.3)),"roadside waiting place has actual clear standing room");
 Audit("EastCivilianEvacuation",routes.villageEvacuation,layout.blocks,.42);
 for(const point of routes.villageEvacuationWaiting)assert.ok(!layout.blocks.some(block=>Hits(point,block,1.3)),"east evacuation waiting space stays separate from station equipment");
-for(const [key,blueprint] of Object.entries({trainSpawn:{x:-66,z:65},trainDoor:{x:-60,z:61},weaponCheck:{x:-55,z:44},ammoIssue:{x:-55,z:34},weaponInspect:{x:-45,z:34}}))assert.deepEqual(anchors[key],P012StationPoint(blueprint.x,blueprint.z),`${key} moves exactly once with station`);
+for(const [key,blueprint] of Object.entries({trainSpawn:{x:-66,z:63.3},trainDoor:{x:-60,z:61},weaponCheck:{x:-55,z:44},ammoIssue:{x:-55,z:34},weaponInspect:{x:-45,z:34}}))assert.deepEqual(anchors[key],P012StationPoint(blueprint.x,blueprint.z),`${key} moves exactly once with station`);
 assert.deepEqual(P012Point(-55,55),{x:-55,z:55},"station transform is never automatic");
 Audit("CarriageDoorToEquipment",routes.trainExit,layout.blocks,0.4);
 for(const [index,entry] of phase.whitebox.activities.traffic.entries())Audit(`OpeningTraffic${index}`,entry.route,layout.blocks,0.6);

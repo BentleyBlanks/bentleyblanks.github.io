@@ -44,6 +44,8 @@ import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
 import { ApplyP012CastAppearance, InstallP012OpeningPose } from "./Script_FirstLevelP012CastAppearance.mjs";
+import { SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
+import { FirstLevelP012StageZero } from "./Script_FirstLevelP012StageZero.mjs";
 import { CAST } from "./Data_TengxianScript.mjs";
 import {
   PhaseContentId, ContentZoneId, AllowAutonomousBark, EvaluateFirstLevelObjectiveGate,
@@ -597,6 +599,7 @@ let checkpoint = null;
 let p012Flow = null;
 let p012Runtime = null;
 let p012Resting = null;
+let p012StageZero = null;
 let p012Binoculars = null;
 let p012BinocularRaised = false;
 
@@ -1117,8 +1120,9 @@ async function Boot() {
       // 「罗班长」在场上会显示成一个随机姓名，那就等于没有这个人。
       const seed = HashString(`companion:${castId}`);
       const identity = { ...MakeSoldierIdentity(seed), name: label || castId };
+      const casting = PHASE_TABLE[state.phaseIndex]?.whitebox?.p012 ? SelectP012CompanionCast(castId, identity) : null;
       const soldier = ai.Spawn("nra", x, z, {
-        identity, weapon: weapon || identity.weapon, squadId,
+        identity, weapon: weapon || identity.weapon, squadId, ...casting,
       });
       if (soldier) soldier.castId = castId;
       return soldier;
@@ -1175,6 +1179,7 @@ async function Boot() {
       ammo: state.ammo, clips: state.clips,
       grenades: state.grenades, bundles: state.bundles,
       p012: p012Flow?.Snapshot() || null,
+      p012Arrival: p012StageZero?.arrival.Snapshot() || null,
       p012Opening: p012Flow ? { manualReloadCompleted: p012Runtime?.manualReloadCompleted === true } : null,
       p012Carry: p012Flow ? carry?.KindId : null,
       p012Story: p012Flow ? { index: story.index, pushed: [...story.pushed], cued: [...story.cued], fired: [...story.fired],
@@ -1209,6 +1214,7 @@ async function Boot() {
         story.P012Restore?.(sample.p012Story.immediate);
         battlefield.RestoreScenario?.({ signalled: (name) => story.Signalled(name) });
       }
+      if(sample.p012Arrival)p012StageZero?.RestoreArrival(sample.p012Arrival);
       emplacement?.EndClear?.();
       state.playerAliveLast = true;
       return true;
@@ -2061,7 +2067,7 @@ async function Boot() {
       P012: () => p012Flow?.State() || null,
       P012Environment: () => ({externalCount:battlefield?.externalProps?.count || 0,pcgCount:battlefield?.externalProps?.pcgCount || 0,trimCount:battlefield?.trimProps?.count || 0,
         roots:scene.children.filter(root=>root.userData?.externalProps || /^(ExternalProps_|TrimProps_)/.test(root.name)).map(root=>root.name)}),
-      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
+      P012Scene: () => p012Runtime ? { ...p012Runtime.Sample(), stageZero:p012StageZero?.Snapshot(), cast:ai.soldiers.filter(actor=>actor.castId).map(actor=>({castId:actor.castId,age:actor.identity?.age,modelVariant:actor.actor?.modelVariant,position:{...actor.position}})), resting:{count:p012Resting?.entries.length||0,people:p012Resting?.Snapshot()||[]}, airColumnEnteredRoad:AirColumnEnteredRoad(setpieces?.mem?.column,player.position,PHASE_TABLE[state.phaseIndex]?.whitebox?.activities), columnPosition: setpieces?.mem?.column?.HeadPosition(), columnRouteIndex: setpieces?.mem?.column?.legIndex,
         woundedDragDelivered: !!setpieces?.mem?.p012WoundedDrag?.delivered, woundedDragDistance: setpieces?.mem?.p012WoundedDrag?.distance || 0,
         carryDistance: setpieces?.mem?.p012CarryDistance || 0, litterOverturned: !!setpieces?.mem?.p012LitterOverturned,
         litterRecovered: !!setpieces?.mem?.p012LitterRecovered, lastLitterArrived: LastLitterArrived(setpieces?.mem?.column),
@@ -2857,6 +2863,7 @@ function ClearSetpieceProps() {
 }
 
 function ClearRuntime() {
+  p012StageZero?.Dispose(); p012StageZero = null;
   meleeQte?.Cancel("levelChange");
   // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
   // **缺席宣告不在这里清**（那在 companion 手里，是剧情事实不是关卡状态）。
@@ -3026,7 +3033,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
       }
       const guide = companion.Handle("luo");
       if (guide) {
-        const {x,z} = phase.whitebox.activities.trainRoute[1], y = battlefield.GroundHeight(x, z);
+        const {x,z} = phase.whitebox.activities.arrivalGuideStart, y = battlefield.GroundHeight(x, z);
         guide.position.set(x, y, z); guide.body?.Teleport(x, y, z); guide.goal.set(x, 0, z);
       }
     }
@@ -3038,6 +3045,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
+  p012StageZero?.Dispose(); p012StageZero = null;
   p012Binoculars?.Dispose();
   p012Binoculars = null; // Removed from this scenario: the leader supplies the route.
   p012BinocularRaised = false;
@@ -3227,6 +3235,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT } = {}) {
     },
   }, phase.whitebox) : null;
   p012Runtime?.SaveSafePoint("Start",phase.spawn,"stand",phase.spawn.ry || 0);
+  if (p012Runtime) p012StageZero = new FirstLevelP012StageZero({scene,actorFactory,physics,battlefield,audio,hud,camera,vfx,
+    runtime:p012Runtime, config:phase.whitebox, ambience:phase.ambience||phase.sky,
+    Player:()=>player, Guide:()=>companion.Handle("luo"), Signal:name=>story.Signal(name), Signalled:name=>story.Signalled(name)});
   p012Flow = phase.whitebox?.p012 ? new FirstLevelP012Director({
     Register: (spec) => interact.Register({ ...spec, tag: "P012",
       // Both Query and the held interaction recheck Enabled: starting a charge
@@ -3916,6 +3927,7 @@ function SeedSoldiers(phase) {
     }
     const s = ai.Spawn("nra", open.x, open.z, {
       weapon: phase.whitebox?.p012 && !ai.soldiers.some((actor) => actor.side === "nra" && actor.weaponId === "Zb26") ? "Zb26" : undefined,
+      ...(phase.whitebox?.p012?SelectP012RecruitCast(i,MakeSoldierIdentity(31337+i*907)):{}),
       towel: !!phase.nightRaid && rnd() < 0.55,
       squadId: `Near_${phase.id}`,
     });
@@ -3951,6 +3963,7 @@ function SeedSoldiers(phase) {
     if (!o) break;
     const open = FindOpenSpot(o.x, o.z, o.radius, 5000 + i * 733 + state.phaseIndex * 31, levelBounds);
     const s = ai.Spawn("nra", open.x, open.z, {
+      ...(phase.whitebox?.p012?SelectP012RecruitCast(i,MakeSoldierIdentity(5000+i*733)):{}),
       towel: !!phase.nightRaid && rnd() < 0.55,
       squadId: `Defend_${phase.id}_${o.id}_${Math.floor(i / 6)}`,
     });
@@ -6221,6 +6234,7 @@ function Frame(dt, render = true) {
 
   profiler.B("story");
   if (p012Flow) {
+    p012StageZero?.Update(dt);
     p012Resting?.Update(dt);
     p012Runtime.Update(dt);
     p012Runtime.TryDitchDodge(player.position, player.stance, strafe?.View());

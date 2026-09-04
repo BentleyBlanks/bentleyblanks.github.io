@@ -23,3 +23,9 @@ export function SelectP012CompanionCast(castId, baseIdentity = {}) {
     identity: { ...baseIdentity, castId, name: spec.name, fullName: spec.fullName, age: spec.age },
   };
 }
+
+/** Unnamed recruits in the same marching squad also use the younger cast pool. */
+export function SelectP012RecruitCast(slot, baseIdentity = {}) {
+  const index=Math.abs(Math.trunc(slot)||0);
+  return {actorKind:"nra",modelVariant:index%2?3:1,identity:{...baseIdentity,age:18+index%6}};
+}
