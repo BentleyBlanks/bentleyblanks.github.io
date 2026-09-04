@@ -1630,3 +1630,34 @@ body.force-touch #app {
   .touch-fire { font-size: 0.45rem; }
   .touch-label { display: none; }
 }
+
+/* Keep mode selection and campaign actions reachable on short mobile screens. */
+#startOverlay { overflow-y: auto; justify-content: flex-start; }
+#startOverlay > :first-child { margin-top: auto; }
+#startOverlay > :last-child { margin-bottom: auto; }
+#startOverlay > * { flex-shrink: 0; }
+.difficultyChoices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font-pixel);
+}
+.difficultyChoices legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.difficultyChoices label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 2px solid #666;
+  color: #ccc;
+  cursor: pointer;
+}
+.difficultyChoices label:has(input:checked) { border-color: #f0d060; color: #fff0a0; background: #41320b; }
+.difficultyChoices label:focus-within { outline: 2px solid white; outline-offset: 3px; }
+.difficultyChoices input { accent-color: #f0d060; margin: 0; }
+.overlay .diff-hint { font-size: 0.82rem; color: #e0ce80; }

@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=v09f">
+  <link rel="stylesheet" href="./Style_Game.css?v=gravityTank010">
 </head>
 <body>
   <div id="app">
@@ -27,7 +27,7 @@
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
         <span class="title-gravity-cover" aria-hidden="true"></span>
         <span class="title-gravity-art" aria-hidden="true"></span>
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.9</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.10</span>
       </div>
       <p class="tagline">9 个任务 · 3 幕战役 · 重力弹道与物理转轮</p>
     </header>
@@ -70,7 +70,12 @@
         <p id="startStageBlurb" class="start-blurb">炮弹会下坠，也会绕回来。
 
 读懂落点，护住总部，完成三幕战役。</p>
-        <p class="diff-hint" id="difficultyHint">9 个任务 · 3 幕 · 3 辆座驾 · 车体 3 HP · 总部 3 HP</p>
+        <fieldset class="difficultyChoices" aria-describedby="difficultyHint">
+          <legend>游戏模式</legend>
+          <label><input type="radio" name="difficulty" value="easy" checked> 简易模式</label>
+          <label><input type="radio" name="difficulty" value="standard"> 标准模式</label>
+        </fieldset>
+        <p class="diff-hint" id="difficultyHint">简易：自己的炮弹不会击中自己</p>
         <div class="start-actions">
           <button id="startButton" class="primary" type="button">NEW CAMPAIGN</button>
           <button id="continueButton" class="primary continue-action" type="button" hidden>CONTINUE</button>
@@ -168,9 +173,9 @@
         <h3>RULE</h3>
         <ul class="rule-list">
           <li>
-            炮弹持续受重力影响，会下坠甚至绕回；自己的炮弹也能伤到自己。
+            炮弹持续受重力影响，会下坠甚至绕回。默认简易模式：自己的炮弹不会击中自己；标准模式开启自伤。
           </li>
-          <li>你有 3 辆座驾，每辆 3 HP；普通弹伤 1，重炮 / Boss 弹 / 炸弹伤 2，受击后短暂无敌。</li>
+          <li>开局 3 条命。没有护盾或装甲保护时，中弹即损失 1 条命；复活后短暂无敌。</li>
           <li>总部有 3 HP。失败会回到本任务起点，分数、火力与构筑按关卡存档恢复，也可刷新后继续。</li>
           <li>敌军炮弹始终会误伤友军，但由敌军造成的击破不计入你的得分。</li>
           <li>
@@ -199,9 +204,9 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.9</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.10</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=gravityTank09g"></script>
+  <script type="module" src="./Script_Game.mjs?v=gravityTank010"></script>
 </body>
 </html>

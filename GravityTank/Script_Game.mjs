@@ -28,7 +28,7 @@ import {
 } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.9";
+export const GAME_VERSION = "0.10";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
@@ -44,9 +44,8 @@ const MAX_ENEMIES_ON_FIELD = 4;
 const MAX_ENEMIES_LATE = 5;
 const MAX_ABSORB_HITS = 4;
 const PLAYER_LIVES = 3;
-const PLAYER_MAX_HP = 3;
 const BASE_MAX_HP = 3;
-/** Brief i-frames after a non-lethal hit so one volley cannot shred all HP. */
+/** Brief protection after armor absorbs a hit. */
 const HIT_IFRAME = 1.0;
 /** Death presentation: briefly let the fatal moment hang before normal speed returns. */
 const DEATH_SLOW_DURATION = 0.85;
@@ -97,11 +96,9 @@ const ARMOR_HP_PALETTE = {
   1: { mid: [200, 200, 200], dark: [70, 70, 80], light: [255, 255, 255], flash: [200, 200, 200] }, // white/gray
 };
 
-/** Player body tint by remaining HP — reads clearly at a glance. */
-const PLAYER_HP_PALETTE = {
-  3: { mid: [232, 188, 36], dark: [96, 64, 8], light: [255, 244, 170], flash: [255, 250, 210] }, // full — gold
-  2: { mid: [220, 112, 32], dark: [96, 40, 8], light: [255, 196, 120], flash: [255, 220, 160] }, // hurt — orange
-  1: { mid: [208, 52, 44], dark: [88, 12, 12], light: [255, 160, 140], flash: [255, 210, 200] }, // critical — red
+/** Fixed gold player hull; lives are the only player health counter. */
+const PLAYER_PALETTE = {
+  mid: [232, 188, 36], dark: [96, 64, 8], light: [255, 244, 170],
 };
 
 const TILE_EMPTY = 0;
@@ -958,6 +955,7 @@ class Game {
     this.spawnQueue = [];
     this.score = 0;
     this.lives = PLAYER_LIVES;
+    this.difficulty = "easy";
     this.enemiesRemaining = 20;
     this.spawnTimer = 0;
     this.freezeTimer = 0;
@@ -1066,11 +1064,12 @@ class Game {
       const stagePerk = FindUpgrade(data.stagePerk)?.id || null;
       return {
         schema: 1,
+        difficulty: data.difficulty === "standard" ? "standard" : "easy",
         stage: IsBarricadeTeachStage(data.stage) ? "barricadeTeach" : Number(data.stage),
         score: Math.max(0, Number(data.score) || 0),
         lives: Clamp(Number(data.lives) || PLAYER_LIVES, 1, 9),
         playClock: Math.max(0, Number(data.playClock) || 0),
-        playerStats: { power, maxBullets, absorbHits, hp: PLAYER_MAX_HP },
+        playerStats: { power, maxBullets, absorbHits },
         runPerks,
         stagePerk,
         savedAt: Number(data.savedAt) || Date.now(),
@@ -1087,6 +1086,7 @@ class Game {
     if (!validStage || !this.player) return;
     const checkpoint = {
       schema: 1,
+      difficulty: this.difficulty,
       stage: this.isBarricadeTeach ? "barricadeTeach" : this.stage,
       score: Math.max(0, this.score | 0),
       lives: Math.max(1, this.lives | 0),
@@ -1095,7 +1095,6 @@ class Game {
         power: Clamp(this.player.power | 0, 1, 3),
         maxBullets: Clamp(this.player.maxBullets | 0, 1, 6),
         absorbHits: Clamp(this.absorbHits | 0, 0, MAX_ABSORB_HITS),
-        hp: PLAYER_MAX_HP,
       },
       runPerks: this.runPerks.slice(),
       stagePerk: this.stagePerk || null,
@@ -1132,7 +1131,7 @@ class Game {
     const position = IsBarricadeTeachStage(checkpoint.stage)
       ? "路障教学"
       : `任务 ${GetCampaignStagePosition(checkpoint.stage)}/${CAMPAIGN_STAGE_COUNT}`;
-    this.overlays.checkpointHint.textContent = `存档：${position} · 得分 ${checkpoint.score}`;
+    this.overlays.checkpointHint.textContent = `存档：${position} · ${checkpoint.difficulty === "standard" ? "标准模式" : "简易模式"} · 得分 ${checkpoint.score}`;
     this.overlays.checkpointHint.hidden = false;
   }
 
@@ -1148,6 +1147,7 @@ class Game {
     this.campaignActive = true;
     this.score = checkpoint.score;
     this.lives = checkpoint.lives;
+    this.SetDifficulty(checkpoint.difficulty);
     this.playClock = checkpoint.playClock;
     this.runPerks = checkpoint.runPerks.slice();
     this.absorbHits = checkpoint.playerStats.absorbHits;
@@ -1170,6 +1170,7 @@ class Game {
     this.campaignActive = true;
     this.score = checkpoint.score;
     this.lives = checkpoint.lives;
+    this.SetDifficulty(checkpoint.difficulty);
     this.playClock = checkpoint.playClock;
     this.runPerks = checkpoint.runPerks.slice();
     this.absorbHits = checkpoint.playerStats.absorbHits;
@@ -1314,6 +1315,11 @@ class Game {
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
     this.BindDebugPanel();
+    document.querySelectorAll('input[name="difficulty"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        if (this.state === "ready" && input.checked) this.SetDifficulty(input.value);
+      });
+    });
 
     this.canvas.addEventListener("pointerdown", (ev) => this.OnCanvasPointerDown(ev));
     this.canvas.addEventListener("pointermove", (ev) => this.OnCanvasPointerMove(ev));
@@ -1321,6 +1327,7 @@ class Game {
     this.canvas.addEventListener("pointercancel", (ev) => this.OnCanvasPointerUp(ev));
 
     window.addEventListener("keydown", (e) => {
+      if (e.target?.matches?.('input[name="difficulty"]')) return;
       const k = e.key.toLowerCase();
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "j", "k"].includes(k) || e.code === "Space") {
         e.preventDefault();
@@ -1960,6 +1967,11 @@ class Game {
     }
   }
 
+  SetDifficulty(value) {
+    this.difficulty = value === "standard" ? "standard" : "easy";
+    this.SyncStageLabels();
+  }
+
   GetStartLives() {
     return PLAYER_LIVES;
   }
@@ -2045,6 +2057,15 @@ class Game {
   }
 
   SyncStageLabels() {
+    const easy = this.difficulty === "easy";
+    document.querySelectorAll('input[name="difficulty"]').forEach((input) => {
+      input.checked = input.value === this.difficulty;
+    });
+    const difficultyHint = document.getElementById("difficultyHint");
+    if (difficultyHint) difficultyHint.textContent = easy
+      ? "简易：自己的炮弹不会击中自己"
+      : "标准：小心自己的回旋炮弹";
+    const selfHitHint = easy ? "自己的炮弹不会击中自己。" : "自己也要当心落弹。";
     const label = this.GetStageDisplayLabel();
     if (this.hud.stage) this.hud.stage.textContent = label;
     if (this.hud.mobileStage) this.hud.mobileStage.textContent = label;
@@ -2060,7 +2081,7 @@ class Game {
     if (this.overlays.startBlurb) {
       const lines = [];
       if (this.isTutorial) {
-        lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
+        lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", selfHitHint);
       } else if (this.isBarricadeTeach) {
         lines.push(
           "靠近路障按 K（触屏「扛」）举起。",
@@ -2076,15 +2097,15 @@ class Game {
       } else if (this.state === "ready" || this.state === "boot") {
         lines.push("炮弹会下坠，也会绕回来。", "读懂落点，护住总部，完成三幕战役。");
       } else if (this.isBossStage) {
-        lines.push("BOSS 关。", "炮弹带重力——自己也要当心落弹。");
+        lines.push("BOSS 关。", selfHitHint);
       } else if (this.stageData.prepSeconds) {
         lines.push(
           `开场准备 ${Math.ceil(this.stageData.prepSeconds)} 秒。`,
           "用路障封死敌窝出口。",
-          "炮弹带重力，别炸到自己。",
+          selfHitHint,
         );
       } else {
-        lines.push("炮弹带重力会下坠。", "自己也要当心落弹。");
+        lines.push("炮弹带重力会下坠。", selfHitHint);
       }
       this.overlays.startBlurb.textContent = lines.join("\n");
     }
@@ -2188,7 +2209,8 @@ class Game {
     this.state = "upgrade";
     this.overlays.end.hidden = true;
     const tutorial = this.isTutorial && !special;
-    const pool = tutorial ? TUTORIAL_UPGRADES : (special ? BOSS_UPGRADES : STAGE_UPGRADES);
+    const pool = (tutorial ? TUTORIAL_UPGRADES : (special ? BOSS_UPGRADES : STAGE_UPGRADES))
+      .filter((upgrade) => this.difficulty !== "easy" || upgrade.id !== "noSelfHit");
     const nextStage = tutorial
       ? 1
       : (!this.campaignActive && typeof this.stage === "number"
@@ -2458,7 +2480,7 @@ class Game {
         perk ? `BOSS · 本关强化：${perk.title}` : `BOSS：${bossTitle} — 准备战斗！`
       );
     } else if (this.campaignActive && this.campaignStagePosition === 1) {
-      this.ShowBuffToast("任务 1：炮弹会下坠 · 总部与每辆座驾都有 3 HP");
+      this.ShowBuffToast(`任务 1 · ${this.difficulty === "easy" ? "简易模式：自己的炮弹不会击中自己" : "标准模式：当心自己的落弹"} · 3 条命`);
     } else if (this.campaignActive && this.campaignStagePosition === 2) {
       this.ShowBuffToast("敌军也会误伤友军；借它们的弹道清场，但误伤击破不计分");
     } else {
@@ -2706,7 +2728,6 @@ class Game {
     this.playerDisarmed = !!this.isNoFireStage;
     // Top HQ / tutorial: face the battlefield. Classic bottom HQ: face up toward enemies.
     const faceDown = this.isTutorial || sy < MAP_H / 2 || this.IsBaseAtTop();
-    const hp = keepStats?.hp != null ? Clamp(keepStats.hp | 0, 1, PLAYER_MAX_HP) : PLAYER_MAX_HP;
     this.player = {
       x: sx * TILE + 2,
       y: sy * TILE + 2,
@@ -2716,8 +2737,6 @@ class Game {
       speed: this.GetPlayerBaseSpeed(),
       power,
       maxBullets,
-      hp,
-      maxHp: PLAYER_MAX_HP,
       absorbHits: this.absorbHits || 0,
       disarmed: !!this.isNoFireStage,
       alive: true,
@@ -2882,7 +2901,6 @@ class Game {
             power: 1,
             maxBullets: 1,
             absorbHits: this.absorbHits,
-            hp: PLAYER_MAX_HP,
           };
           this.pendingRespawnStats = null;
           this.SpawnPlayer(true, keep, true);
@@ -4352,7 +4370,7 @@ class Game {
       this.audio.Bounce();
       return;
     }
-    this.DamagePlayer({ heavy: true, source: "bomb" });
+    this.DamagePlayer({ source: "bomb" });
   }
 
   SpawnSniperShellFromDir(e, dirName, angleOffset = 0) {
@@ -4793,7 +4811,9 @@ class Game {
     this.audio.Shoot();
     if (isPlayer && this.firstShotCoachPending) {
       this.firstShotCoachPending = false;
-      this.ShowBuffToast("观察落点：炮弹会持续下坠，也可能绕回来命中自己");
+      this.ShowBuffToast(this.difficulty === "easy"
+        ? "观察落点：炮弹会持续下坠，自己的炮弹不会击中自己"
+        : "观察落点：炮弹会持续下坠，也可能绕回来命中自己");
     }
   }
 
@@ -4944,7 +4964,7 @@ class Game {
       if (this.BulletHitEagleStroll(b)) continue;
       if (this.BulletHitEagleAlly(b)) continue;
 
-      // Armed bullets can hit any tank, including the shooter (gravity self-kill).
+      // Standard mode allows self-hits once a shell has cleared the barrel.
       const canSelfHit = b.arm <= 0 || b.traveled >= 36;
 
       // hit enemies
@@ -4968,9 +4988,9 @@ class Game {
 
       // hit player (enemy fire, or own returning shell)
       if (!(this.isNoFireStage && !b.isPlayer) && this.player?.alive) {
-        const isOwnShell = b.owner === this.player;
-        if (isOwnShell && !canSelfHit) {
-          // still leaving the barrel
+        const isOwnShell = b.isPlayer;
+        if (isOwnShell && (this.difficulty === "easy" || !canSelfHit)) {
+          // Easy mode ignores all player shells, including those fired before respawn.
         } else if (RectsOverlap(b, this.player)) {
           b.alive = false;
           if (isOwnShell && this.HasPerk("noSelfHit")) {
@@ -4978,7 +4998,6 @@ class Game {
             this.audio.Bounce();
           } else {
             this.DamagePlayer({
-              heavy: this.IsHeavyIncoming(b),
               source: isOwnShell ? "self" : "bullet",
               bullet: b,
             });
@@ -5021,8 +5040,9 @@ class Game {
     if (this.carriedBlock?.alive && this.player?.alive) {
       const shield = this.CarryShieldRect(this.player);
       if (shield && RectsOverlap(b, shield)) {
-        // Own outgoing shells ignore the shield briefly.
-        if (b.isPlayer && b.owner === this.player && (b.arm > 0 || b.traveled < 28)) {
+        // Easy mode also protects the carried shield from player shells.
+        if (b.isPlayer && (this.difficulty === "easy"
+          || (b.owner === this.player && (b.arm > 0 || b.traveled < 28)))) {
           return false;
         }
         this.DamageCarryable(this.carriedBlock, b.power || 1);
@@ -5143,7 +5163,7 @@ class Game {
     }
   }
 
-  /** Heavy = boss/sniper/meteor/power-cannon shells (and bombs). Normal shells deal 1 HP. */
+  /** Heavy = boss/sniper/meteor/power-cannon shells (and bombs). Used for HQ damage and incident descriptions. */
   IsHeavyIncoming(b) {
     if (!b) return false;
     if (b.heavy || b.bossShell || b.sniper || b.meteor) return true;
@@ -5184,12 +5204,13 @@ class Game {
 
   /**
    * Apply damage to the player tank.
-   * Normal hits: −1 HP + HIT_IFRAME. Heavy hits: −2 HP.
-   * Armor / giant / time-rift still intercept before HP loss.
+   * Any unprotected hit costs one life.
+   * Armor / giant / time-rift still intercept before death.
    */
-  DamagePlayer({ heavy = false, source = "bullet", bullet = null } = {}) {
+  DamagePlayer({ source = "bullet", bullet = null } = {}) {
     const p = this.player;
     if (!p?.alive) return false;
+    if (this.difficulty === "easy" && (source === "self" || bullet?.isPlayer)) return false;
     if (this.debugGodMode) {
       p.protect = Math.max(p.protect, 2);
       this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.45);
@@ -5226,20 +5247,6 @@ class Game {
       return false;
     }
 
-    if (p.hp == null) p.hp = PLAYER_MAX_HP;
-    if (p.maxHp == null) p.maxHp = PLAYER_MAX_HP;
-
-    p.hp = Math.max(0, (p.hp | 0) - (heavy ? 2 : 1));
-
-    if (p.hp > 0) {
-      p.protect = Math.max(p.protect, HIT_IFRAME);
-      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.65);
-      this.audio.Bounce();
-      this.ShowBuffToast(`受伤！生命 ${p.hp}/${p.maxHp}`);
-      this.UpdateHud();
-      return false;
-    }
-
     this.KillPlayer({ source, bullet });
     return true;
   }
@@ -5250,7 +5257,7 @@ class Game {
     let maxBullets = p?.maxBullets || 1;
     if (power <= 1) maxBullets = Math.min(maxBullets, 1);
     else if (power === 2) maxBullets = Math.min(Math.max(maxBullets, 2), 3);
-    return { power, maxBullets, absorbHits: this.absorbHits || 0, hp: PLAYER_MAX_HP };
+    return { power, maxBullets, absorbHits: this.absorbHits || 0 };
   }
 
   KillPlayer({ source = "unknown", bullet = null } = {}) {
@@ -5277,12 +5284,12 @@ class Game {
       this.lives = 0;
       this.respawnTimer = 0;
       this.pendingRespawnStats = null;
-      this.EndGame(false, "座驾耗尽。将从本任务起点重试，构筑与分数回档。");
+      this.EndGame(false, "生命耗尽。将从本任务起点重试，构筑与分数回档。");
       return;
     }
     this.pendingRespawnStats = keep;
     this.respawnTimer = 0.9;
-    this.ShowBuffToast(`阵亡 · 火力保留 ${keep.power} · 剩余座驾 ×${this.lives}`);
+    this.ShowBuffToast(`阵亡 · 火力保留 ${keep.power} · 剩余生命 ×${this.lives}`);
   }
 
   DamageBase({ heavy = false, bullet = null } = {}) {
@@ -6977,11 +6984,7 @@ class Game {
   }
 
   UpdateHud() {
-    const hp = this.state === "ready" || this.state === "boot"
-      ? PLAYER_MAX_HP
-      : (this.player?.alive ? Math.max(0, this.player.hp ?? PLAYER_MAX_HP) : 0);
-    const stock = Math.max(0, this.lives);
-    const lifeText = `${hp}/${PLAYER_MAX_HP}×${stock}`;
+    const lifeText = String(Math.max(0, this.lives));
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
     const remainingEnemies = this.state === "ready" || this.state === "boot"
@@ -7526,10 +7529,9 @@ class Game {
   }
 
   /**
-   * Remap classic yellow player hull by remaining HP:
-   * 3 gold → 2 orange → 1 red. Power tier still picks sheet row.
+   * Keep the player hull gold. Power tier still picks the sprite sheet row.
    */
-  BlitPlayerHpTinted(ctx, gx, gy, dx, dy, dw, dh, hp) {
+  BlitPlayerTinted(ctx, gx, gy, dx, dy, dw, dh) {
     const sheet = this.images.sheet;
     if (!sheet) return;
     const sw = 2 * SHEET_CELL;
@@ -7539,8 +7541,7 @@ class Game {
     tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
     const data = img.data;
-    const stage = Clamp(hp | 0, 1, PLAYER_MAX_HP);
-    const pal = PLAYER_HP_PALETTE[stage] || PLAYER_HP_PALETTE[PLAYER_MAX_HP];
+    const pal = PLAYER_PALETTE;
     const useMid = pal.mid;
     const useDark = pal.dark;
     const useLight = pal.light;
@@ -7589,7 +7590,7 @@ class Game {
     const { gx, gy, redFlash } = this.TankSheetOrigin(tank, isPlayer);
     const isArmor = !isPlayer && tank.typeId === "armor" && tank.maxHp > 1;
     if (isPlayer) {
-      this.BlitPlayerHpTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h, tank.hp ?? PLAYER_MAX_HP);
+      this.BlitPlayerTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
     } else if (isArmor && !redFlash) {
       this.BlitArmorTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h, tank.hp);
     } else {
@@ -7662,30 +7663,6 @@ class Game {
       ctx.textAlign = "center";
       ctx.fillText(`甲${this.absorbHits}`, tank.x + tank.w / 2, tank.y - 3);
       ctx.textAlign = "left";
-    }
-
-    if (isPlayer && tank.alive) {
-      const hp = Math.max(0, tank.hp ?? PLAYER_MAX_HP);
-      const maxHp = tank.maxHp || PLAYER_MAX_HP;
-      const pipW = 5;
-      const gap = 2;
-      const totalW = maxHp * pipW + (maxHp - 1) * gap;
-      let px = tank.x + tank.w / 2 - totalW / 2;
-      const py = tank.y - 7;
-      const fillByHp = {
-        3: "#e8bc24",
-        2: "#dc7020",
-        1: "#d0342c",
-      };
-      const fill = fillByHp[Math.max(1, Math.min(PLAYER_MAX_HP, hp))] || fillByHp[PLAYER_MAX_HP];
-      for (let i = 0; i < maxHp; i++) {
-        ctx.fillStyle = i < hp ? fill : "#303038";
-        ctx.fillRect(px, py, pipW, 3);
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px + 0.5, py + 0.5, pipW - 1, 2);
-        px += pipW + gap;
-      }
     }
 
     if (tank.isBoss && tank.alive && tank.spawnFlash <= 0) {

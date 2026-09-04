@@ -36,7 +36,7 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 | Path | Owns |
 |------|------|
-| `index.html` | Shell UI, RULE copy, logo/version, fixed standard-mode copy, cache-bust `?v=` |
+| `index.html` | Shell UI, RULE copy, logo/version, easy/standard mode selector, cache-bust `?v=` |
 | `Style_Game.css` | Layout, RULE list, logo badge, touch HUD, overlays |
 | `Script_Game.mjs` | Runtime loop, tanks, bullets, roulette, bosses, FX, HUD |
 | `Data_Stages.mjs` | Stage maps, enemy counts, barricade teach, HQ flip helpers |
@@ -54,30 +54,22 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 | Knob | Value | Symbol |
 |------|--------|--------|
-| Seats (standard only) | **3** | `PLAYER_LIVES` / `GetStartLives()` |
-| HP per seat | **3** | `PLAYER_MAX_HP` |
-| Normal shell | −1 HP | `DamagePlayer` |
-| Heavy / boss shell / bomb | −2 HP | `IsHeavyIncoming` / `DamagePlayer({ heavy: true })` |
-| Hit i-frames | 1.0 s | `HIT_IFRAME` |
+| Lives (both modes) | **3** | `PLAYER_LIVES` / `GetStartLives()` |
+| Unprotected hit (normal / heavy / boss / bomb) | lose **1 life** immediately; no hull HP | `DamagePlayer` / `KillPlayer` |
+| Armor-hit protection | 1.0 s | `HIT_IFRAME` |
 | Revive presentation | 1.25 s ring / beam / particles | `respawnFx`, `StartRespawnFx`, `DrawRespawnFx` |
 | Death presentation | 0.85 s slow motion + 3.2 s incident report | `deathSlowTimer`, `StartIncidentReport`, `DrawIncidentSlowFx` |
 | On death | keep firepower (−1 max) | `SoftenFirepowerOnDeath` / `KillPlayer` |
 | HQ durability | **3 HP** | `BASE_MAX_HP`, `DamageBase` |
 | Mission failure | restore mission-start checkpoint | `RestoreStageCheckpoint` |
 
-### Hull look by HP
+### Mode and life display
 
-Player sheet is classic yellow; draw remaps by remaining HP:
+The title screen defaults to **简易模式**: player shells pass through the player and their carried shield without consuming armor, including shells left over from an earlier life. **标准模式** retains armed-shell self-hits; its `noSelfHit` upgrade remains available. Easy mode excludes this redundant upgrade from card offers. Enemy fire and HQ damage are unchanged.
 
-| HP | Look | Palette |
-|----|------|---------|
-| 3 | gold | `PLAYER_HP_PALETTE[3]` |
-| 2 | orange | `PLAYER_HP_PALETTE[2]` |
-| 1 | red | `PLAYER_HP_PALETTE[1]` |
+Player hulls keep the fixed gold `PLAYER_PALETTE` via `BlitPlayerTinted`. There are no hull HP pips, HP-based colors, or separate player HP counter. Desktop and mobile LIFE show only the remaining life count. Power tier still picks the sprite row via `TankSheetOrigin`; enemy armor HP rendering remains separate.
 
-Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Power tier still picks sheet row via `TankSheetOrigin` (`gy = (power-1)*2`). Enemy armor tanks use `BlitArmorTinted` + `ARMOR_HP_PALETTE` separately.
-
-Difficulty copy: fixed standard mode; campaign starts directly at mission 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「9 个任务 · 3 幕 · 3 辆座驾 · 车体与总部各 3 HP」. There is no free first-death revive.
+`SetDifficulty` / `SyncStageLabels` keep the selector and mode explanation aligned. A checkpoint records `difficulty`; retry/CONTINUE restore it. Older saves without a mode use easy and discard old player HP. The campaign starts at mission 1; the old tutorial remains legacy/debug-only. There is no free first-death revive.
 
 Focused campaign progression: **9 missions in 3 acts**, with data ids `[1, 2, 3, 4, 5, 6, 7, 8, 15]` (`CAMPAIGN_STAGE_IDS`). Stage 6 flows through `barricadeTeach`, then stage 7. All 15 legacy definitions remain selectable through Debug, but ids 9–14 are not on the default route. Main-route Bosses are ids 3, 6, and 15.
 
@@ -87,7 +79,7 @@ Enemy friendly fire is active throughout ordinary play. Enemy-caused kills incre
 
 Armor is explicit only: upgrade cards and roulette powers may add `absorbHits`; there is no XP or automatic level-up armor.
 
-Checkpoint contract: `SaveStageCheckpoint` captures score, seats, base firepower, armor, temporary next-mission card, and permanent Boss perks at mission start. Failure and the title-screen CONTINUE action restore that snapshot from `gravitytank_campaign_v09`; final victory clears it.
+Checkpoint contract: `SaveStageCheckpoint` captures difficulty, score, lives, base firepower, armor, temporary next-mission card, and permanent Boss perks at mission start. Failure and the title-screen CONTINUE action restore that snapshot from `gravitytank_campaign_v09`; final victory clears it.
 
 ---
 
@@ -122,8 +114,8 @@ Grep these first:
 | Area | Symbols |
 |------|---------|
 | Version | `GAME_VERSION` |
-| Balance / difficulty | `GetStartLives`, `GetPowerDropRate`, `SyncStageLabels` |
-| Player HP / death | `DamagePlayer`, `KillPlayer`, `StartIncidentReport`, `BlitPlayerHpTinted`, `SoftenFirepowerOnDeath` |
+| Balance / difficulty | `SetDifficulty`, `GetStartLives`, `GetPowerDropRate`, `SyncStageLabels` |
+| Player HP / death | `DamagePlayer`, `KillPlayer`, `StartIncidentReport`, `BlitPlayerTinted`, `SoftenFirepowerOnDeath` |
 | Draw | `DrawTank`, `DrawTankBarrel`, `DrawBossBarrels`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
 | Fort / HQ | `DamageBase`, `DestroyBase`, `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
@@ -147,9 +139,9 @@ Grep these first:
 ## Quick checklists
 
 ### Changing lives / HP feel
-1. Constants near top of `Script_Game.mjs` (`PLAYER_LIVES*`, `PLAYER_MAX_HP`, iframes)
+1. Constants near top of `Script_Game.mjs` (`PLAYER_LIVES`, armor iframes); player hull HP was removed in v0.10
 2. `DamagePlayer` / `KillPlayer` / mission checkpoint retry path
-3. `BlitPlayerHpTinted` + pips if look changes
+3. `BlitPlayerTinted` and desktop/mobile LIFE count if look changes
 4. `SyncStageLabels` / `#difficultyHint` / RULE `<li>`
 5. Cache-bust `?v=`
 
@@ -164,3 +156,6 @@ Grep these first:
 1. Edit owner file
 2. Bump `?v=`
 3. Merge `master` + smoke `https://bentleyblanks.github.io/GravityTank/`
+
+### Easy mode / lives regression
+Run `node GravityTank/Script_EasyModeTest.mjs` after changes to self-hit collision, lives, damage, or mode checkpoint handling. Also preview the title selector and gameplay at desktop and mobile sizes.
